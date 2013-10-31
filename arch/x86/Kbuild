@@ -10,6 +10,9 @@ obj-$(CONFIG_XEN) += xen/
 # lguest paravirtualization support
 obj-$(CONFIG_LGUEST_GUEST) += lguest/
 
+# LCD support
+obj-$(CONFIG_LCD) += lcd/
+
 obj-y += realmode/
 obj-y += kernel/
 obj-y += mm/

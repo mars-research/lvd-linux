@@ -1,0 +1,11 @@
+#
+# LCD configuration
+#
+
+config LCD
+	tristate "Light-weight Capability Domain"
+	depends on X86_64
+	default y
+	---help---
+	Light-weight Capability Domain, based on
+	Intel VT-x on 64bit X86 CPUs.

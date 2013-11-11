@@ -1,17 +1,50 @@
 /*
- * _lcd_vmx_ops.c - LCD related VMX operations
+ * vmx.c - LCD related VMX operations
  *
  * To be included by LCD source files.
  */
 
-#ifndef LCD__LCD_VMX_OPS_C
-#define LCD__LCD_VMX_OPS_C
+#ifndef LCD_VMX_C
+#define LCD_VMX_C
+
+/*
+ * LCD initializes its memory space as follows:
+ *
+ * Physical memory starts at 1GB (0x4000_0000), ends at
+ * 1GB+2MB-1 (0x41ff_ffff), totally 2MB, 512 pages.
+ *
+ * Virtual memory is mapped to physical memory identically.
+ *
+ * The first several (four) pages are for page table structures.
+ */
+
+// 1GB Physical memory start
+#define LCD_PHY_MEM_START (0x1ULL << 30)
+// L4 table address
+#define LCD_PGD_TBL_ADDR (LCD_PHY_MEM_START)                  
+// first L3 table address
+#define LCD_PUD_TBL_0_ADDR (LCD_PGD_TBL_ADDR + PAGE_SIZE)     
+// second L2 table address (in the first L3 table)
+#define LCD_PMD_TBL_1_ADDR (LCD_PUD_TBL_0_ADDR + PAGE_SIZE)
+// first L1 table address (in the above L2 table)
+#define LCD_PTE_TBL_0_ADDR (LCD_PMD_TBL_1_ADDR + PAGE_SIZE)   
 
 // We disable CR4.PCIDE
-#define LCD_PHY_MEM_START (0x1ULL << 30)
-#define LCD_CR3_VAL (LCD_PHY_MEM_START << PAGE_SHIFT)
-// Fix: LCD_CR3_VAL & with PUD_MASK
-#define LCD_PML4_0_VAL (_KERNPG_TABLE | (LCD_CR3_VAL))
+// LCD domain CR3 value, fixed.
+#define LCD_CR3_VAL (LCD_PGD_TBLE_ADDR & PAGE_MASK)
+#define LCD_PGD_0_VAL __pgd(_KERNPG_TABLE | (LCD_PUD_TBL_0_ADDR & PAGE_MASK))
+#define LCD_PUD_1_VAL __pud(_KERNPG_TABLE | (LCD_PMD_TBL_1_ADDR & PAGE_MASK))
+#define LCD_PMD_0_VAL __pmd(_KERNPG_TABLE | (LCD_PTE_TBL_0_ADDR & PAGE_MASK))
+
+#define MAKE_VADDR (pgd_ofs, pud_ofs, pmd_ofs, pte_ofs, pg_ofs)         \
+  ((unsigned long)((pgd_ofs << PGD_SHITF) | (pud_ofs << PUD_SHIFT) |    \
+                   (pmd_ofs << PMD_SHIFT) | (pte_ofs << PTE_SHIFT) |    \
+                   pg_ofs))
+
+#define LCD_PTE_PGD_TBL __pte(__KERNEL_PAGE | (LCD_PGD_TBL_ADDR & PAGE_MASK))
+#define LCD_PTE_PUD_TBL_0 __pte(__KERNEL_PAGE | (LCD_PUD_TBL_0_ADDR & PAGE_MASK))
+#define LCD_PTE_PMD_TBL_1 __pte(__KERNEL_PAGE | (LCD_PMD_TBL_1_ADDR & PAGE_MASK))
+#define LCD_PTE_PTE_TBL_0 __pte(__KERNEL_PAGE | (LCD_PTE_TBL_0_ADDR & PAGE_MASK))
 
 
 /* The label in the asm code. */
@@ -449,4 +482,4 @@ static void vmx_destroy_vcpu(struct vmx_vcpu *vcpu)
   kfree(vcpu);
 }
 
-#endif  // LCD__LCD_VMX_OPS_C
+#endif  // LCD_VMX_C

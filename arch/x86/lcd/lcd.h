@@ -49,6 +49,11 @@ struct vmx_vcpu {
   unsigned long eptp;
   bool ept_ad_enabled;
 
+  struct page *pgd_table;
+  struct page *pud_table_0;
+  struct page *pmd_table_1;
+  struct page *pte_table_0;
+
   u8  fail;
   u64 exit_reason;
   u64 host_rsp;

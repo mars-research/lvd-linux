@@ -23,28 +23,172 @@
 // L4 table address
 #define LCD_PGD_TBL_ADDR (LCD_PHY_MEM_START)                  
 // first L3 table address
-#define LCD_PUD_TBL_0_ADDR (LCD_PGD_TBL_ADDR + PAGE_SIZE)     
+#define LCD_PUD_TBL_ADDR (LCD_PGD_TBL_ADDR + PAGE_SIZE)     
 // second L2 table address (in the first L3 table)
-#define LCD_PMD_TBL_1_ADDR (LCD_PUD_TBL_0_ADDR + PAGE_SIZE)
+#define LCD_PMD_TBL_ADDR (LCD_PUD_TBL_ADDR + PAGE_SIZE)
 // first L1 table address (in the above L2 table)
-#define LCD_PTE_TBL_0_ADDR (LCD_PMD_TBL_1_ADDR + PAGE_SIZE)   
+#define LCD_PTE_TBL_ADDR (LCD_PMD_TBL_ADDR + PAGE_SIZE)
+
+// A test page for code.
+#define LCD_TEST_CODE_PAGE_ADDR (LCD_PTE_TBL_ADDR + PAGE_SIZE)
+// A test page for data.
+#define LCD_TEST_DATA_PAGE_ADDR (LCD_TEST_CODE_PAGE_ADDR + PAGE_SIZE)
 
 // We disable CR4.PCIDE
 // LCD domain CR3 value, fixed.
 #define LCD_CR3_VAL (LCD_PGD_TBLE_ADDR & PAGE_MASK)
-#define LCD_PGD_0_VAL __pgd(_KERNPG_TABLE | (LCD_PUD_TBL_0_ADDR & PAGE_MASK))
-#define LCD_PUD_1_VAL __pud(_KERNPG_TABLE | (LCD_PMD_TBL_1_ADDR & PAGE_MASK))
-#define LCD_PMD_0_VAL __pmd(_KERNPG_TABLE | (LCD_PTE_TBL_0_ADDR & PAGE_MASK))
+#define LCD_PGD_VAL __pgd(_KERNPG_TABLE | (LCD_PUD_TBL_ADDR & PAGE_MASK))
+#define LCD_PUD_VAL __pud(_KERNPG_TABLE | (LCD_PMD_TBL_ADDR & PAGE_MASK))
+#define LCD_PMD_VAL __pmd(_KERNPG_TABLE | (LCD_PTE_TBL_ADDR & PAGE_MASK))
 
 #define MAKE_VADDR (pgd_ofs, pud_ofs, pmd_ofs, pte_ofs, pg_ofs)         \
   ((unsigned long)((pgd_ofs << PGD_SHITF) | (pud_ofs << PUD_SHIFT) |    \
                    (pmd_ofs << PMD_SHIFT) | (pte_ofs << PTE_SHIFT) |    \
                    pg_ofs))
 
-#define LCD_PTE_PGD_TBL __pte(__KERNEL_PAGE | (LCD_PGD_TBL_ADDR & PAGE_MASK))
-#define LCD_PTE_PUD_TBL_0 __pte(__KERNEL_PAGE | (LCD_PUD_TBL_0_ADDR & PAGE_MASK))
-#define LCD_PTE_PMD_TBL_1 __pte(__KERNEL_PAGE | (LCD_PMD_TBL_1_ADDR & PAGE_MASK))
-#define LCD_PTE_PTE_TBL_0 __pte(__KERNEL_PAGE | (LCD_PTE_TBL_0_ADDR & PAGE_MASK))
+#define LCD_PTE_PGD_TBL __pte(__PAGE_KERNEL_EXEC | (LCD_PGD_TBL_ADDR & PAGE_MASK))
+#define LCD_PTE_PUD_TBL __pte(__PAGE_KERNEL_EXEC | (LCD_PUD_TBL_ADDR & PAGE_MASK))
+#define LCD_PTE_PMD_TBL __pte(__PAGE_KERNEL_EXEC | (LCD_PMD_TBL_ADDR & PAGE_MASK))
+#define LCD_PTE_PTE_TBL __pte(__PAGE_KERNEL_EXEC | (LCD_PTE_TBL_ADDR & PAGE_MASK))
+#define LCD_PTE_TEST_CODE_PAGE __pte(__PAGE_KERNEL_EXEC | (LCD_TEST_CODE_PAGE_ADDR & PAGE_MASK))
+#define LCD_PTE_TEST_DATA_PAGE __pte(__PAGE_KERNEL_EXEC | (LCD_TEST_DATA_PAGE_ADDR & PAGE_MASK))
+
+/*
+ * EPT settings
+ */
+
+#define EPT_LEVELS 4
+
+#define VMX_EPT_FAULT_READ 0x01
+#define VMX_EPT_FAULT_WRITE 0x02
+#define VMX_EPT_FAULT_INS 0x04
+
+typedef unsigned long epte_t;
+
+#define __EPTE_READ 0x01
+#define __EPTE_WRITE 0x02
+#define __EPTE_EXEC 0x04
+#define __EPTE_IPAT 0x40
+#define __EPTE_SZ 0x80
+#define __EPTE_A 0x100
+#define __EPTE_D 0x200
+#define __EPTE_TYPE(n) (((n) & 0x7) << 3)
+
+enum {
+  EPTE_TYPE_UC = 0, /* uncachable */
+  EPTE_TYPE_WC = 1, /* write combining */
+  EPTE_TYPE_WT = 4, /* write through */
+  EPTE_TYPE_WP = 5, /* write protected */
+  EPTE_TYPE_WB = 6, /* write back */
+};
+
+#define __EPTE_NONE 0
+#define __EPTE_FULL (__EPTE_READ | __EPTE_WRITE | __EPTE_EXEC)
+
+#define EPTE_ADDR (~(PAGE_SIZE - 1))
+#define EPTE_FLAGS (PAGE_SIZE - 1)
+
+static inline uintptr_t epte_addr(epte_t epte)
+{
+  return (epte & EPTE_ADDR);
+}
+
+static inline uintptr_t epte_page_vaddr(epte_t epte)
+{
+  return (uintptr_t) __va(epte_addr(epte));
+}
+
+static inline epte_t epte_flags(epte_t epte)
+{
+  return (epte & EPTE_FLAGS);
+}
+
+static inline int epte_present(epte_t epte)
+{
+  return (epte & __EPTE_FULL) > 0;
+}
+
+static void free_ept_page(epte_t epte)
+{
+  struct page *page = pfn_to_page(epte_addr(epte) >> PAGE_SHIFT);
+
+  if (epte & __EPTE_WRITE)
+    set_page_dirty_lock(page);
+  put_page(page);
+}
+
+static int ept_clear_epte(epte_t *epte)
+{
+  if (*epte == __EPTE_NONE)
+    return 0;
+
+  free_ept_page(*epte);
+  *epte = __EPTE_NONE;
+
+  return 1;
+}
+
+static int ept_clear_l1_epte(epte_t *epte)
+{
+  int i;
+  epte_t *pte = (epte_t *) epte_page_vaddr(*epte);
+
+  if (*epte == __EPTE_NONE)
+    return 0;
+
+  for (i = 0; i < PTRS_PER_PTE; i++) {
+    if (!epte_present(pte[i]))
+      continue;
+
+    free_ept_page(pte[i]);
+  }
+
+  free_page((uintptr_t) pte);
+  *epte = __EPTE_NONE;
+
+  return 1;
+}
+
+#define ADDR_TO_IDX(la, n)                                      \
+  ((((unsigned long) (la)) >> (12 + 9 * (n))) & ((1 << 9) - 1))
+
+
+static int ept_lookup_gpa(struct vmx_vcpu *vcpu,
+                          void *gpa,
+                          int create,
+                          epte_t **epte_out)
+{
+  int i;
+  epte_t *dir = (epte_t *) __va(vcpu->ept_root);
+
+  for (i = EPT_LEVELS - 1; i > 0; i--) {
+    int idx = ADDR_TO_IDX(gpa, i);
+
+    if (!epte_present(dir[idx])) {
+      void *page;
+
+      if (!create)
+        return -ENOENT;
+
+      page = (void *) __get_free_page(GFP_ATOMIC);
+      if (!page)
+        return -ENOMEM;
+
+      memset(page, 0, PAGE_SIZE);
+      dir[idx] = epte_addr(virt_to_phys(page)) |
+          __EPTE_FULL;
+    }
+
+    if (epte_big(dir[idx])) {
+      return -EINVAL;
+    }
+
+    dir = (epte_t *) epte_page_vaddr(dir[idx]);
+  }
+
+  *epte_out = &dir[ADDR_TO_IDX(gpa, 0)];
+  return 0;
+}
 
 
 /* The label in the asm code. */
@@ -388,6 +532,52 @@ static void vmx_free_vpid(struct vmx_vcpu *vmx)
   spin_unlock(&vmx_vpid_lock);
 }
 
+static void vmx_free_ept(unsigned long ept_root)
+{
+  epte_t *pgd = (epte_t *) __va(ept_root);
+  int i, j, k, l;
+
+  for (i = 0; i < PTRS_PER_PGD; i++) {
+    epte_t *pud = (epte_t *) epte_page_vaddr(pgd[i]);
+    if (!epte_present(pgd[i]))
+      continue;
+
+    for (j = 0; j < PTRS_PER_PUD; j++) {
+      epte_t *pmd = (epte_t *) epte_page_vaddr(pud[j]);
+      if (!epte_present(pud[j]))
+        continue;
+      if (epte_flags(pud[j]) & __EPTE_SZ)
+        continue;
+
+      for (k = 0; k < PTRS_PER_PMD; k++) {
+        epte_t *pte = (epte_t *) epte_page_vaddr(pmd[k]);
+        if (!epte_present(pmd[k]))
+          continue;
+        if (epte_flags(pmd[k]) & __EPTE_SZ) {
+          free_ept_page(pmd[k]);
+          continue;
+        }
+
+        for (l = 0; l < PTRS_PER_PTE; l++) {
+          if (!epte_present(pte[l]))
+            continue;
+
+          free_ept_page(pte[l]);
+        }
+
+        free_page((unsigned long) pte);
+      }
+
+      free_page((unsigned long) pmd);
+    }
+
+    free_page((unsigned long) pud);
+  }
+
+  free_page((unsigned long) pgd);
+}
+
+
 int vmx_init_ept(struct vmx_vcpu *vcpu)
 {
   void *page = (void *) __get_free_page(GFP_KERNEL);
@@ -405,7 +595,6 @@ static u64 construct_eptp(unsigned long root_hpa)
 {
   u64 eptp;
 
-  /* TODO write the value reading from MSR */
   eptp = VMX_EPT_DEFAULT_MT |
       VMX_EPT_DEFAULT_GAW << VMX_EPT_GAW_EPTP_SHIFT;
   if (cpu_has_vmx_ept_ad_bits())
@@ -413,6 +602,254 @@ static u64 construct_eptp(unsigned long root_hpa)
   eptp |= (root_hpa & PAGE_MASK);
 
   return eptp;
+}
+
+
+static int ept_set_epte(struct vmx_vcpu *vcpu,
+                        unsigned long gpa, unsigned long hpa)
+{
+  int ret;
+  epte_t *epte, flags;
+
+  spin_lock(&vcpu->ept_lock);
+
+  ret = ept_lookup_gpa(vcpu, (void *) gpa, 1, &epte);
+  if (ret) {
+    spin_unlock(&vcpu->ept_lock);
+    printk(KERN_ERR "ept: failed to lookup EPT entry\n");
+    return ret;
+  }
+
+  if (epte_present(*epte)) {
+      ept_clear_epte(epte);
+  }
+
+  flags = __EPTE_READ | __EPTE_EXEC | __EPTE_WRITE |
+      __EPTE_TYPE(EPTE_TYPE_WB) | __EPTE_IPAT;
+
+  if (vcpu->ept_ad_enabled) {
+    /* premark A/D to avoid extra memory references */
+    flags |= __EPTE_A | __EPTE_D;
+  }
+
+  *epte = epte_addr(hpa) | flags;
+
+  spin_unlock(&vcpu->ept_lock);
+
+  return 0;
+}
+
+static int vmx_setup_initial_page_table(struct vmx_vcpu *vcpu) {
+  pgd_t *pgd_dir = (pgd_t*)(page_to_pfn(vcpu->pgd_table) << PAGE_SHIFT);
+  pgd_t *pgd = pgd_dir + pgd_index(LCD_PGD_TBL_ADDR);
+  set_pgd(pgd, LCD_PGD_VAL);
+
+  pud_t *pud_dir = (pud_t*)(page_to_pfn(vcpu->pud_table) << PAGE_SHIFT);
+  pud_t *pud = pud_dir + pud_index(LCD_PGD_TBL_ADDR);
+  set_pud(pud, LCD_PUD_VAL);
+
+  pmd_t *pmd_dir = (pmd_t*)(page_to_pfn(vcpu->pmd_table) << PAGE_SHIFT);
+  pmd_t *pmd = pmd_dir + pmd_index(LCD_PGD_TBL_ADDR);
+  set_pmd(pmd, LCD_PMD_VAL);
+
+  pte_t *pte_dir = (pte_t*)(page_to_pfn(vcpu->pte_table) << PAGE_SHIFT);
+  pte_t *pte = pte_dir + pte_index(LCD_PGD_TBL_ADDR);
+  set_pte(pte, LCD_PTE_PGD_TBL);
+  ++pte;
+  set_pte(pte, LCD_PTE_PUD_TBL);
+  ++pte;
+  set_pte(pte, LCD_PTE_PMD_TBL);
+  ++pte;
+  set_pte(pte, LCD_PTE_PTE_TBL);
+  ++pte;
+  set_pte(pte, LCD_PTE_TEST_CODE_PAGE);
+  ++pte;
+  set_pte(pte, LCD_PTE_TEST_DATA_PAGE);  
+}
+
+static int vmx_create_ept(struct vmx_vcpu *vcpu)
+{
+  int ret;
+  
+  vcpu->pgd_table = alloc_page(GFP_KERNEL);
+  if (!vcpu->pgd_table) {
+    ret = -ENOMEM;
+    goto fail;
+  }
+
+  vcpu->pud_table = alloc_page(GFP_KERNEL);
+  if (!vcpu->pud_table) {
+    ret = -ENOMEM;
+    goto out1;
+  }
+
+  vcpu->pmd_table = alloc_page(GFP_KERNEL);
+  if (!vcpu->pmd_table) {
+    ret = -ENOMEM;
+    goto out2;
+  }
+
+  vcpu->pte_table = alloc_page(GFP_KERNEL);
+  if (!vcpu->pte_table) {
+    ret = -ENOMEM;
+    goto out3;
+  }
+
+  vcpu->code_page = alloc_page(GFP_KERNEL);
+  if (!vcpu->code_page) {
+    ret = -ENOMEM;
+    goto out4;
+  }
+
+  vcpu->data_page = alloc_page(GFP_KERNEL);
+  if (!vcpu->data_page) {
+    ret = -ENOMEM;
+    goto out5;
+  }
+
+  ret = ept_set_epte(vcpu, LCD_PGD_TBL_ADDR,
+                     page_to_pfn(vcpu->pgd_table) << PAGE_SHIFT);
+  if (ret < 0) {
+    goto out6;
+  }
+  ret = ept_set_epte(vcpu, LCD_PUD_TBL_ADDR,
+                     page_to_pfn(vcpu->pud_table) << PAGE_SHIFT);
+  if (ret < 0) {
+    goto out6;
+  }
+  ret = ept_set_epte(vcpu, LCD_PMD_TBL_ADDR,
+                     page_to_pfn(vcpu->pmd_table) << PAGE_SHIFT);
+  if (ret < 0) {
+    goto out6;
+  }
+  ret = ept_set_epte(vcpu, LCD_PTE_TBL_ADDR,
+                     page_to_pfn(vcpu->pte_table) << PAGE_SHIFT);
+  if (ret < 0) {
+    goto out6;
+  }
+  ret = ept_set_epte(vcpu, LCD_TEST_CODE_PAGE_ADDR,
+                     page_to_pfn(vcpu->code_page) << PAGE_SHIFT);
+  if (ret < 0) {
+    goto out6;
+  }
+  ret = ept_set_epte(vcpu, LCD_TEST_DATA_PAGE_ADDR,
+                     page_to_pfn(vcpu->data_page) << PAGE_SHIFT);
+  if (ret < 0) {
+    goto out6;
+  }
+
+  vcpu->page_table_pool = LCD_TEST_DATA_PAGE_ADDR + PAGE_SIZE;
+
+  ret = vmx_setup_initial_page_table(vcpu);
+  if (ret == 0) {
+    return ret;
+  }
+
+out6:
+  __free_page(vcpu->data_page);
+out5:
+  __free_page(vcpu->code_page);  
+out4:
+  __free_page(vcpu->pte_table);
+out3:
+  __free_page(vcpu->pmd_table);
+out2:
+  __free_page(vcpu->pud_table);
+out1:
+  __free_page(vcpu->pgd_table);
+fail:
+  vmx_free_ept(vcpu->ept_root);
+
+  return ret;
+}
+
+static void vmx_setup_initial_guest_state(struct vmx_vcpu *vcpu)
+{
+  unsigned long tmpl;
+  unsigned long cr4 = X86_CR4_PAE | X86_CR4_VMXE | X86_CR4_OSXMMEXCPT |
+      X86_CR4_PGE | X86_CR4_OSFXSR;
+  /* if (boot_cpu_has(X86_FEATURE_PCID)) */
+    /* cr4 |= X86_CR4_PCIDE; */
+  if (boot_cpu_has(X86_FEATURE_OSXSAVE))
+    cr4 |= X86_CR4_OSXSAVE;
+  if (boot_cpu_has(X86_FEATURE_FSGSBASE))
+    cr4 |= X86_CR4_RDWRGSFS;
+
+  /* configure control and data registers */
+  vmcs_writel(GUEST_CR0, X86_CR0_PG | X86_CR0_PE | X86_CR0_WP |
+              X86_CR0_MP | X86_CR0_ET | X86_CR0_NE);
+  vmcs_writel(CR0_READ_SHADOW, X86_CR0_PG | X86_CR0_PE | X86_CR0_WP |
+              X86_CR0_MP | X86_CR0_ET | X86_CR0_NE);
+  vmcs_writel(GUEST_CR3, LCD_CR3_VAL);
+  vmcs_writel(GUEST_CR4, cr4);
+  vmcs_writel(CR4_READ_SHADOW, cr4);
+  vmcs_writel(GUEST_IA32_EFER, EFER_LME | EFER_LMA |
+              EFER_SCE | EFER_FFXSR);
+  vmcs_writel(GUEST_GDTR_BASE, 0);
+  vmcs_writel(GUEST_GDTR_LIMIT, 0);
+  vmcs_writel(GUEST_IDTR_BASE, 0);
+  vmcs_writel(GUEST_IDTR_LIMIT, 0);
+  vmcs_writel(GUEST_RIP, LCD_TEST_CODE_PAGE_ADDR);
+  vmcs_writel(GUEST_RSP, LCD_TEST_DATA_PAGE_ADDR+PAGE_SIZE-sizeof(unsigned long));
+  vmcs_writel(GUEST_RFLAGS, 0x02);
+  vmcs_writel(GUEST_DR7, 0);
+
+  /* guest segment bases */
+  vmcs_writel(GUEST_CS_BASE, 0);
+  vmcs_writel(GUEST_DS_BASE, 0);
+  vmcs_writel(GUEST_ES_BASE, 0);
+  vmcs_writel(GUEST_GS_BASE, 0);
+  vmcs_writel(GUEST_SS_BASE, 0);
+  /* rdmsrl(MSR_FS_BASE, tmpl); */
+  vmcs_writel(GUEST_FS_BASE, 0);
+
+  /* guest segment access rights */
+  vmcs_writel(GUEST_CS_AR_BYTES, 0xA09B);
+  vmcs_writel(GUEST_DS_AR_BYTES, 0xA093);
+  vmcs_writel(GUEST_ES_AR_BYTES, 0xA093);
+  vmcs_writel(GUEST_FS_AR_BYTES, 0xA093);
+  vmcs_writel(GUEST_GS_AR_BYTES, 0xA093);
+  vmcs_writel(GUEST_SS_AR_BYTES, 0xA093);
+
+  /* guest segment limits */
+  vmcs_write32(GUEST_CS_LIMIT, 0xFFFFFFFF);
+  vmcs_write32(GUEST_DS_LIMIT, 0xFFFFFFFF);
+  vmcs_write32(GUEST_ES_LIMIT, 0xFFFFFFFF);
+  vmcs_write32(GUEST_FS_LIMIT, 0xFFFFFFFF);
+  vmcs_write32(GUEST_GS_LIMIT, 0xFFFFFFFF);
+  vmcs_write32(GUEST_SS_LIMIT, 0xFFFFFFFF);
+
+  /* configure segment selectors */
+  vmcs_write16(GUEST_CS_SELECTOR, 0);
+  vmcs_write16(GUEST_DS_SELECTOR, 0);
+  vmcs_write16(GUEST_ES_SELECTOR, 0);
+  vmcs_write16(GUEST_FS_SELECTOR, 0);
+  vmcs_write16(GUEST_GS_SELECTOR, 0);
+  vmcs_write16(GUEST_SS_SELECTOR, 0);
+  vmcs_write16(GUEST_TR_SELECTOR, 0);
+
+  /* guest LDTR */
+  vmcs_write16(GUEST_LDTR_SELECTOR, 0);
+  vmcs_writel(GUEST_LDTR_AR_BYTES, 0x0082);
+  vmcs_writel(GUEST_LDTR_BASE, 0);
+  vmcs_writel(GUEST_LDTR_LIMIT, 0);
+
+  /* guest TSS */
+  vmcs_writel(GUEST_TR_BASE, 0);
+  vmcs_writel(GUEST_TR_AR_BYTES, 0x0080 | AR_TYPE_BUSY_64_TSS);
+  vmcs_writel(GUEST_TR_LIMIT, 0xff);
+
+  /* initialize sysenter */
+  vmcs_write32(GUEST_SYSENTER_CS, 0);
+  vmcs_writel(GUEST_SYSENTER_ESP, 0);
+  vmcs_writel(GUEST_SYSENTER_EIP, 0);
+
+  /* other random initialization */
+  vmcs_write32(GUEST_ACTIVITY_STATE, GUEST_ACTIVITY_ACTIVE);
+  vmcs_write32(GUEST_INTERRUPTIBILITY_INFO, 0);
+  vmcs_write32(GUEST_PENDING_DBG_EXCEPTIONS, 0);
+  vmcs_write64(GUEST_IA32_DEBUGCTL, 0);
+  vmcs_write32(VM_ENTRY_INTR_INFO_FIELD, 0);  /* 22.2.1 */
 }
 
 /**
@@ -451,8 +888,10 @@ static struct vmx_vcpu * vmx_create_vcpu()
     vcpu->ept_ad_enabled = true;
     printk(KERN_INFO "vmx: enabled EPT A/D bits");
   }
-  if (vmx_create_ept(vcpu))
+  if (vmx_create_ept(vcpu)) {
+    printk(KERN_ERRO "vmx: creating EPT failed.");
     goto fail_ept;
+  }
 
   return vcpu;
 

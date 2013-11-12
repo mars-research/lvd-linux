@@ -54,6 +54,8 @@ struct vmx_vcpu {
   struct page *pmd_table_1;
   struct page *pte_table_0;
 
+  unsigned long page_table_pool;
+
   u8  fail;
   u64 exit_reason;
   u64 host_rsp;

@@ -606,7 +606,9 @@ static u64 construct_eptp(unsigned long root_hpa)
 
 
 static int ept_set_epte(struct vmx_vcpu *vcpu,
-                        unsigned long gpa, unsigned long hpa)
+                        unsigned long gpa,
+                        unsigned long hpa,
+                        int overwrite)
 {
   int ret;
   epte_t *epte, flags;
@@ -621,7 +623,13 @@ static int ept_set_epte(struct vmx_vcpu *vcpu,
   }
 
   if (epte_present(*epte)) {
+    if (overwrite)
       ept_clear_epte(epte);
+    else {
+      spin_unlock(&vcpu->ept_lock);
+      printk(KERN_ERR "ept: epte exists %p\n", (void*)(*epte));
+      return -EINVL;
+    }
   }
 
   flags = __EPTE_READ | __EPTE_EXEC | __EPTE_WRITE |

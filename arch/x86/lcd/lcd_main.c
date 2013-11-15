@@ -1,4 +1,5 @@
 #include "lcd.h"
+#include "lcd_defs.h"
 
 #include <linux/kernel.h>
 #include <linux/module.h>

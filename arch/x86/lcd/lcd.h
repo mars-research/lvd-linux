@@ -5,7 +5,7 @@
 
 /* Memory management */
 
-#define NR_PT_PAGES    (1 << 15)       /* #pages for page table */
+#define NR_PT_PAGES    (1 << 12)       /* #pages for page table */
 #define PT_PAGES_START (0x1ULL << 24)  /* above 16MB */
 #define PT_PAGES_END   (PT_PAGES_START + (NR_PT_PAGES << PAGE_SHIFT))
 
@@ -107,7 +107,16 @@ struct vmx_vcpu {
   unsigned long eptp;
   bool ept_ad_enabled;
 
-  DECLARE_BITMAP(bmp_pt_pages, NR_PT_PAGES);
+  pgd_t* pt;
+  unsigned long pt_gpa;
+
+  unsigned long *bmp_pt_pages;
+
+  /* GDT_ENTRIES * desc_struct */
+  struct desc_struct* gdt;
+  /* IDT_ENTRIES * gate_desc */
+  gate_desc* idt;
+  struct desc_ptr gdt, idt;
 
   u8  fail;
   u64 exit_reason;

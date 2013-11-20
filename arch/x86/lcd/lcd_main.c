@@ -1,3 +1,9 @@
+/*
+ * LCD main source file.
+ *
+ * Based on KVM and Dune.
+ *
+ */
 #include "lcd.h"
 #include "lcd_defs.h"
 
@@ -7,7 +13,7 @@
 
 #include <asm/vmx.h>
 
-MODULE_AUTHOR("FluxVirt");
+MODULE_AUTHOR("Weibin Sun");
 MODULE_LICENSE("GPL");
 
 static DECLARE_BITMAP(vmx_vpid_bitmap, VMX_NR_VPIDS);
@@ -338,9 +344,10 @@ static int ept_set_epte(struct vmx_vcpu *vcpu,
 }
 
 static unsigned long alloc_pt_pfn(struct vmx_vcpu *vcpu) {
-  unsigned long which = bitmap_find_next_zero_area(vcpu->bmp_pt_pages,
-                                                   NR_PT_PAGES,
-                                                   0, 1, 0);
+  unsigned long which = bitmap_find_next_zero_area(
+      vcpu->bmp_pt_pages,
+      NR_PT_PAGES,
+      0, 1, 0);
   if (which >= NR_PT_PAGES) {
     return 0;
   } else {
@@ -607,6 +614,57 @@ static int vmx_setup_initial_page_table(struct vmx_vcpu *vcpu) {
     gva += PAGE_SIZE;
     gpa += PAGE_SIZE;
   }
+
+  /* Map stack PT */
+  gpa = gva = LCD_STACK_ADDR;
+  for (i = 0; i < (LCD_STACK_SIZE >> PAGE_SHIFT); ++i) {
+    ret = map_gva_to_gpa(vcpu, gva, gpa, 1, 0);
+    if (ret) {
+      printk(KERN_ERR "ept: populate stack pt failed at %d\n", i);
+      return ret;
+    }
+    gva += PAGE_SIZE;
+    gpa += PAGE_SIZE;
+  }
+
+  /* Map descriptors and tables in EPT */
+  ret = ept_set_epte(vcpu, __pa(vcpu->gdt), LCD_GDT_ADDR, 0);
+  if (ret) {
+    printk(KERN_ERR "ept: GDT phy-addr occupied in EPT\n");
+    return ret;
+  }
+
+  ret = ept_set_epte(vcpu, __pa(vcpu->idt), LCD_IDT_ADDR, 0);
+  if (ret) {
+    printk(KERN_ERR "ept: IDT phy-addr occupied in EPT\n");
+    return ret;
+  }
+
+  ret = ept_set_epte(vcpu, __pa(vcpu->tss), LCD_TSS_ADDR, 0);
+  if (ret) {
+    printk(KERN_ERR "ept: TSS phy-addr occupied in EPT\n");
+    return ret;
+  }
+
+  ret = map_gva_to_gpa(vcpu, LCD_GDT_ADDR, LCD_GDT_ADDR, 1, 0);
+  if (ret) {
+    printk(KERN_ERR "ept: GDT virt-addr occupied in guest PT\n");
+    return ret;
+  }
+
+  ret = map_gva_to_gpa(vcpu, LCD_IDT_ADDR, LCD_IDT_ADDR, 1, 0);
+  if (ret) {
+    printk(KERN_ERR "ept: IDT virt-addr occupied in guest PT\n");
+    return ret;
+  }
+
+  ret = map_gva_to_gpa(vcpu, LCD_TSS_ADDR, LCD_TSS_ADDR, 1, 0);
+  if (ret) {
+    printk(KERN_ERR "ept: TSS virt-addr occupied in guest PT\n");
+    return ret;
+  }
+
+  return 0;
 }
 
 static int vmx_create_ept(struct vmx_vcpu *vcpu)
@@ -1127,7 +1185,7 @@ static void vmx_setup_initial_guest_state(struct vmx_vcpu *vcpu)
   vmcs_writel(GUEST_IDTR_BASE, LCD_IDT_ADDR);
   vmcs_writel(GUEST_IDTR_LIMIT, IDT_ENTRIES*16);
   vmcs_writel(GUEST_RIP, LCD_CODE_START);
-  vmcs_writel(GUEST_RSP, LCD_STACK_START);
+  vmcs_writel(GUEST_RSP, LCD_STACK_ADDR);
   vmcs_writel(GUEST_RFLAGS, 0x02);
   vmcs_writel(GUEST_DR7, 0);
 
@@ -1172,9 +1230,9 @@ static void vmx_setup_initial_guest_state(struct vmx_vcpu *vcpu)
   vmcs_writel(GUEST_LDTR_LIMIT, 0);
 
   /* guest TSS */
-  vmcs_writel(GUEST_TR_BASE, 0);
+  vmcs_writel(GUEST_TR_BASE, LCD_TSS_ADDR);
   vmcs_writel(GUEST_TR_AR_BYTES, 0x0080 | AR_TYPE_BUSY_64_TSS);
-  vmcs_writel(GUEST_TR_LIMIT, 0xff);
+  vmcs_writel(GUEST_TR_LIMIT, LCD_TSS_SIZE);
 
   /* initialize sysenter */
   vmcs_write32(GUEST_SYSENTER_CS, 0);
@@ -1189,17 +1247,12 @@ static void vmx_setup_initial_guest_state(struct vmx_vcpu *vcpu)
   vmcs_write32(VM_ENTRY_INTR_INFO_FIELD, 0);  /* 22.2.1 */
 }
 
-static void set_gdt_entry(struct desc_struct* desc,
-                          u8 type, u8 s) {
-  memset(desc, 0, sizeof (struct desc_struct));
-}
-
 static int setup_gdt(struct vmx_vcpu* vcpu) {
   memset(vcpu->gdt, 0, GDT_SIZE);
   struct desc_struct *desc = vcpu->gdt + LCD_CS;
 
   /* ignored fields according to APM Vol.3 Ch4.8 */
-  /* code seg */
+  /* code seg desc */
   desc->type = SEG_TYPE_CODE | SEG_TYPE_EXEC_READ;
   desc->s = DESC_TYPE_CODE_DATA;
   desc->dpl = 0;
@@ -1207,28 +1260,23 @@ static int setup_gdt(struct vmx_vcpu* vcpu) {
   desc->l = 1;
   desc->d = 0;
 
-  /* data seg */
+  /* data seg desc */
   desc = vcpu->gdt + LCD_DS;
   desc->type = SEG_TYPE_DATA | SEG_TYPE_READ_WRITE;
   desc->s = DESC_TYPE_CODE_DATA;
   desc->p = 1;
 
-  /* task segment value */
+  /* task segment desc value */
   tss_desc* tss = (tss_desc*)(vcpu->gdt + LCD_TSS);
+  set_tssldt_descriptor(tss, LCD_TSS_ADDR, DESC_TSS, LCD_TSS_SIZE);
 
-  desc->limit0 = 0x0000;
-  desc->base0 = 0x0000;
-  desc->base1 = 0x0000;
-  desc->type = SEG_TYPE_TSS;
-  desc->s = 0;
-  desc->dpl = 0;
-  desc->p = 1;
-  desc->limit = 0x0;
-  desc->avl = 0;
-  desc->l = 0;
-  desc->d = 0;
-  desc->g = SEG_GRANULARITY_4KB;
-  desc->base2 = 0x00;
+  /* TSS segment */
+  memset(vcpu->tss, 0, LCD_TSS_SIZE);
+  struct x86_hw_tss* tss = &vcpu->tss->tss;
+  tss->sp0 = LCD_STACK_ADDR;
+  tss->io_bitmap_base = offsetof(struct lcd_tss_struct, io_bitmap);
+  tss->ist[0] = LCD_TSS_ADDR + (PAGE_SIZE>>1);
+  vcpu->tss->io_bitmap[0] = 0xff;
 }
 
 static struct vmx_vcpu * vmx_create_vcpu()
@@ -1247,6 +1295,14 @@ static struct vmx_vcpu * vmx_create_vcpu()
   vcpu->gdt = (struct desc_struct*)__get_free_page(GFP_KERNEL);
   if (!vcpu->gdt)
     goto fail_gdt;
+
+  vcpu->idt = (gate_desc*)__get_free_page(GFP_KERNEL);
+  if (!vcpu->idt)
+    goto fail_idt;
+
+  vcpu->tss = (struct lcd_tss_struct)__get_free_page(GFP_KERNEL);
+  if (!vcpu->tss)
+    goto fail_tss;
 
   vcpu->vmcs = vmx_alloc_vmcs();
   if (!vcpu->vmcs)
@@ -1283,6 +1339,10 @@ fail_ept:
 fail_vpid:
   vmx_free_vmcs(vcpu->vmcs);
 fail_vmcs:
+  kfree(vcpu->tss);
+fail_tss:
+  kfree(vcpu->idt);
+fail_idt:
   kfree(vcpu->gdt);
 fail_gdt:
   kfree(vcpu->bmp_pt_pages);

@@ -116,9 +116,9 @@ struct vmx_vcpu {
   struct desc_struct* gdt;
   /* IDT_ENTRIES * gate_desc */
   gate_desc* idt;
-  struct desc_ptr gdt, idt;
-
   struct lcd_tss_struct* tss;
+
+  unsigned long isr_page;
 
   u8  fail;
   u64 exit_reason;
@@ -143,9 +143,6 @@ struct lcd_tss_struct {
   u8 io_bitmap[1];
 } __attribute__((packed));
 
-#define LCD_CS 8
-#define LCD_DS 10
-#define LCD_TSS 12
 #define LCD_GDT_ADDR (0x1ULL << 30)
 #define LCD_IDT_ADDR (LCD_GDT_ADDR + PAGE_SIZE)
 #define LCD_TSS_ADDR (LCD_IDT_ADDR + PAGE_SIZE)
@@ -153,5 +150,7 @@ struct lcd_tss_struct {
 
 #define LCD_STACK_ADDR (0x1ULL << 31)
 #define LCD_STACK_SIZE (PAGE_SIZE * 4)
+
+#define LCD_ISR_ADDR LCD_STACK_ADDR
 
 #endif

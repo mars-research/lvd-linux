@@ -646,6 +646,12 @@ static int vmx_setup_initial_page_table(struct vmx_vcpu *vcpu) {
     return ret;
   }
 
+  ret = ept_set_epte(vcpu, vcpu->isr_page, LCD_ISR_ADDR, 0);
+  if (ret) {
+    printk(KERN_ERR "ept: ISR phy-addr occupied in EPT\n");
+    return ret;
+  }
+
   ret = map_gva_to_gpa(vcpu, LCD_GDT_ADDR, LCD_GDT_ADDR, 1, 0);
   if (ret) {
     printk(KERN_ERR "ept: GDT virt-addr occupied in guest PT\n");
@@ -661,6 +667,12 @@ static int vmx_setup_initial_page_table(struct vmx_vcpu *vcpu) {
   ret = map_gva_to_gpa(vcpu, LCD_TSS_ADDR, LCD_TSS_ADDR, 1, 0);
   if (ret) {
     printk(KERN_ERR "ept: TSS virt-addr occupied in guest PT\n");
+    return ret;
+  }
+
+  ret = map_gva_to_gpa(vcpu, LCD_ISR_ADDR, LCD_ISR_ADDR, 1, 0);
+  if (ret) {
+    printk(KERN_ERR "ept: ISR virt-addr occupied in guest PT\n");
     return ret;
   }
 
@@ -1215,12 +1227,12 @@ static void vmx_setup_initial_guest_state(struct vmx_vcpu *vcpu)
   vmcs_write32(GUEST_SS_LIMIT, 0xFFFFFFFF);
 
   /* configure segment selectors */
-  vmcs_write16(GUEST_CS_SELECTOR, 2); // code
-  vmcs_write16(GUEST_DS_SELECTOR, 3); // data
+  vmcs_write16(GUEST_CS_SELECTOR, __KERNEL_CS); // code
+  vmcs_write16(GUEST_DS_SELECTOR, __KERNEL_DS); // data
   vmcs_write16(GUEST_ES_SELECTOR, 0);
   vmcs_write16(GUEST_FS_SELECTOR, 0);
   vmcs_write16(GUEST_GS_SELECTOR, 0);
-  vmcs_write16(GUEST_SS_SELECTOR, 3); // data
+  vmcs_write16(GUEST_SS_SELECTOR, 0); // data
   vmcs_write16(GUEST_TR_SELECTOR, 0);
 
   /* guest LDTR */
@@ -1249,7 +1261,7 @@ static void vmx_setup_initial_guest_state(struct vmx_vcpu *vcpu)
 
 static int setup_gdt(struct vmx_vcpu* vcpu) {
   memset(vcpu->gdt, 0, GDT_SIZE);
-  struct desc_struct *desc = vcpu->gdt + LCD_CS;
+  struct desc_struct *desc = vcpu->gdt + GDT_ENTRY_KERNEL_CS;
 
   /* ignored fields according to APM Vol.3 Ch4.8 */
   /* code seg desc */
@@ -1261,13 +1273,13 @@ static int setup_gdt(struct vmx_vcpu* vcpu) {
   desc->d = 0;
 
   /* data seg desc */
-  desc = vcpu->gdt + LCD_DS;
+  desc = vcpu->gdt + GDT_ENTRY_KERNEL_DS;
   desc->type = SEG_TYPE_DATA | SEG_TYPE_READ_WRITE;
   desc->s = DESC_TYPE_CODE_DATA;
   desc->p = 1;
 
   /* task segment desc value */
-  tss_desc* tss = (tss_desc*)(vcpu->gdt + LCD_TSS);
+  tss_desc* tss = (tss_desc*)(vcpu->gdt + GDT_ENTRY_TSS);
   set_tssldt_descriptor(tss, LCD_TSS_ADDR, DESC_TSS, LCD_TSS_SIZE);
 
   /* TSS segment */
@@ -1277,10 +1289,21 @@ static int setup_gdt(struct vmx_vcpu* vcpu) {
   tss->io_bitmap_base = offsetof(struct lcd_tss_struct, io_bitmap);
   tss->ist[0] = LCD_TSS_ADDR + (PAGE_SIZE>>1);
   vcpu->tss->io_bitmap[0] = 0xff;
+
+  return 0;
 }
 
-static struct vmx_vcpu * vmx_create_vcpu()
-{
+static int setup_idt(vmx_vcpu* vcpu) {
+  int i;
+  memset(vcpu->idt, 0, PAGE_SIZE);
+  /* Just fill the IDT  */
+  for (i = 0; i < IDT_ENTRIES; ++i) {
+    gate_desc* gate = vcpu->idt + i;
+    pack_gate(gate, GATE_INTERRUPT, LCD_ISR_ADDR, 0, 1, __KERNEL_CS);
+  }
+}
+
+static struct vmx_vcpu * vmx_create_vcpu() {
   struct vmx_vcpu *vcpu = kmalloc(sizeof(struct vmx_vcpu), GFP_KERNEL);
   if (!vcpu)
     return NULL;
@@ -1304,6 +1327,11 @@ static struct vmx_vcpu * vmx_create_vcpu()
   if (!vcpu->tss)
     goto fail_tss;
 
+  vcpu->isr_page = __get_free_page(GFP_KERNEL);
+  if (!vcpu->isr_page)
+    goto fail_isr;
+  memset((void*)vcpu->isr_page, 0, PAGE_SIZE);
+
   vcpu->vmcs = vmx_alloc_vmcs();
   if (!vcpu->vmcs)
     goto fail_vmcs;
@@ -1321,6 +1349,8 @@ static struct vmx_vcpu * vmx_create_vcpu()
   vmx_get_cpu(vcpu);
   vmx_setup_vmcs(vcpu);
   vmx_setup_initial_guest_state();
+  setup_gdt(vcpu);
+  setup_idt(vcpu);
   vmx_put_cpu(vcpu);
 
   if (cpu_has_vmx_ept_ad_bits()) {
@@ -1339,6 +1369,8 @@ fail_ept:
 fail_vpid:
   vmx_free_vmcs(vcpu->vmcs);
 fail_vmcs:
+  kfree(vcpu->isr_page);
+fail_isr:
   kfree(vcpu->tss);
 fail_tss:
   kfree(vcpu->idt);

@@ -59,6 +59,16 @@ typedef uint32_t un; /* unknown */
 
 typedef enum {ObjType_CNode, ObjType_Null} LCD_Type;
 
+#define CAPRIGHTS_READ          (1 << 0)
+#define CAPRIGHTS_WRITE         (1 << 1)
+#define CAPRIGHTS_EXECUTE       (1 << 2)
+#define CAPRIGHTS_GRANT         (1 << 3)
+#define CAPRIGHTS_IDENTIFY      (1 << 4)
+#define CAPRIGHTS_NUM           5
+
+#define CAPRIGHTS_ALLRIGHTS     ((1 << CAPRIGHTS_NUM) - 1)
+#define CAPRIGHTS_READ_WRITE    (CAPRIGHTS_READ | CAPRIGHTS_WRITE)
+#define CAPRIGHTS_NORIGHTS      0
 
 struct CapRights
 {
@@ -70,7 +80,7 @@ typedef struct cnode
 	int32_t bits;
 	int32_t guard;
 	int32_t guard_size;
-	un cnode;
+	uint32_t* cnode;
 }CNode;
 
 struct capability
@@ -88,7 +98,75 @@ struct cte
 	struct capability cap;
 };
 
-struct cte * caps_locate_slot(un cnode, size_t offset);
+struct cte * caps_locate_slot(uint32_t* cnode, size_t offset);
+
+/**
+ * \brief Create capabilities to kernel objects.
+ *
+ * This function creates kernel objects of 'type' into the memory
+ * area, based at 'addr' and of size 2^'bits', so they completely fill the
+ * area. For each created kernel object, a capability is created to it and
+ * put consecutively into the array of CTEs pointed to by 'caps'. The array
+ * needs to have the appropriate size to hold all created caps. Some kernel
+ * objects can have a variable size. In that case, 'objbits' should be non-zero
+ * and give the a size multiplier as 2^'objbits'.
+ *
+ * \param bits          Size of memory area as 2^bits.
+ * \param dest_caps     Pointer to array of CTEs to hold created caps.
+ *
+ * \return Error code
+
+ GFP_KERNEL
+ seL4_Untyped_Retype(
+ untyped_item,
+ item_type, item_size,
+ seL4_CapInitThreadCNode,
+ allocator->root_cnode, allocator->root_cnode_depth,
+ allocator->cslots.first + allocator->num_slots_used,
+ num_items);
+ */
+
+
+LCD_CPtr create_CNode(uint32_t objAddr, int size_bits, LCD_CPtr root, int node_index, int node_depth, int node_offset, int num_objects);
+
+LCD_CPtr LCD_Untyped_Retype(uint32_t objAddr, LCD_Type objType, int size_bits, LCD_CPtr root, int node_index, int node_depth, int node_offset, int num_objects)
+{
+	LCD_CPtr returnAddr = 0;
+	switch (objType)
+	{
+		case ObjType_CNode:
+			returnAddr = create_CNode(objAddr, size_bits, root, node_index, node_depth, node_offset, num_objects);
+			break;
+		default:
+			break;	
+	}
+	return returnAddr;
+}
+
+LCD_CPtr create_CNode(uint32_t objAddr_, int size_bits, LCD_CPtr root, int node_index, int node_depth, int node_offset, int num_objects)
+{
+	/* Initialize the created capability */
+	static struct capability src_cap;
+	uint32_t *objAddr;
+	memset(&src_cap, 0, sizeof(struct capability));
+
+	src_cap.type = ObjType_CNode;
+	src_cap.rights = CAPRIGHTS_ALLRIGHTS;
+
+	objAddr = kmalloc((1UL << size_bits)*sizeof(struct cte), GFP_KERNEL);
+	memset(objAddr, 0, 1UL << size_bits);
+
+	// Initialize type specific fields
+	src_cap.u.cnode.cnode = objAddr;
+	src_cap.u.cnode.bits = size_bits;
+	src_cap.u.cnode.guard = 0;
+	src_cap.u.cnode.guard_size = 0;
+
+	//TODO: need to find destination CNode using root, node_index, node_depth
+	//TODO: need to find destination slot using node_offset
+	memcpy(&src_cap, &src_cap, sizeof(struct capability));
+	return 0;
+}
 
 /*
  * cnode_cap: CNode
@@ -170,7 +248,7 @@ int caps_lookup_slot(struct capability *cnode_cap, LCD_CPtr cptr,
 	return caps_lookup_slot(&next_slot->cap, cptr, bitsleft, ret, rights);
 }
 
-struct cte * caps_locate_slot(un cnode, size_t offset)
+struct cte * caps_locate_slot(uint32_t *cnode, size_t offset)
 {
 	return NULL;
 }

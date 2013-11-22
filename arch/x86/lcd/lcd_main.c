@@ -7,11 +7,15 @@
 #include "lcd.h"
 #include "lcd_defs.h"
 
+#include <linux/init.h>
 #include <linux/kernel.h>
 #include <linux/module.h>
 #include <linux/mm.h>
+#include <linux/sched.h>
+#include <linux/kthread.h>
 
 #include <asm/vmx.h>
+#include <asm/processor.h>
 
 MODULE_AUTHOR("Weibin Sun");
 MODULE_LICENSE("GPL");
@@ -25,10 +29,6 @@ static DEFINE_PER_CPU(int, vmx_enabled);
 static DEFINE_PER_CPU(struct vmx_vcpu *, local_vcpu);
 
 static struct vmcs_config vmcs_config;
-
-/* The label in the asm code. */
-extern unsigned long vmx_return;
-
 
 /* CPU Features and Ops */
 
@@ -74,6 +74,37 @@ static inline bool cpu_has_vmx_invept_global(void) {
 
 static inline bool cpu_has_vmx_ept_ad_bits(void) {
   return vmx_capability.ept & VMX_EPT_AD_BIT;
+}
+
+static inline void __invept(int ext, u64 eptp, gpa_t gpa) {
+  struct {
+    u64 eptp, gpa;
+  } operand = {eptp, gpa};
+
+  asm volatile (ASM_VMX_INVEPT
+                /* CF==1 or ZF==1 --> rc = -1 */
+                "; ja 1f ; ud2 ; 1:\n"
+                : : "a" (&operand), "c" (ext) : "cc", "memory");
+}
+
+static inline void ept_sync_global(void) {
+  if (cpu_has_vmx_invept_global())
+    __invept(VMX_EPT_EXTENT_GLOBAL, 0, 0);
+}
+
+static inline void ept_sync_context(u64 eptp) {
+  if (cpu_has_vmx_invept_context())
+    __invept(VMX_EPT_EXTENT_CONTEXT, eptp, 0);
+  else
+    ept_sync_global();
+}
+
+static inline void ept_sync_individual_addr(u64 eptp, gpa_t gpa) {
+  if (cpu_has_vmx_invept_individual_addr())
+    __invept(VMX_EPT_EXTENT_INDIVIDUAL_ADDR,
+             eptp, gpa);
+  else
+    ept_sync_context(eptp);
 }
 
 static inline void __invvpid(int ext, u16 vpid, gva_t gva) {
@@ -544,16 +575,16 @@ static void vmx_free_ept(unsigned long ept_root) {
             continue;
 
           free_ept_page(pte[l]);
-        }
+        } // PTE loop
 
         free_page((unsigned long) pte);
-      }
+      } // PMD loop
 
       free_page((unsigned long) pmd);
-    }
+    } // PUD loop
 
     free_page((unsigned long) pud);
-  }
+  } // PGD loop
 
   free_page((unsigned long) pgd);
 }
@@ -863,7 +894,7 @@ static __init int setup_vmcs_config(struct vmcs_config *vmcs_conf) {
      - RDPMC exit
      - L/S CR8 exit
      - Unconditional I/O exit (no I/O bitmap)
-     - No MSR bitmap
+     ### - (No) MSR bitmap
    */  
   min = CPU_BASED_HLT_EXITING |
       CPU_BASED_MWAIT_EXITING |
@@ -871,10 +902,11 @@ static __init int setup_vmcs_config(struct vmcs_config *vmcs_conf) {
       CPU_BASED_CR8_LOAD_EXITING |
       CPU_BASED_CR8_STORE_EXITING |
       CPU_BASED_MOV_DR_EXITING |
-      CPU_BASED_UNCOND_IO_EXITING | 
+      CPU_BASED_UNCOND_IO_EXITING |
       CPU_BASED_MONITOR_EXITING;
 
-  opt = CPU_BASED_ACTIVATE_SECONDARY_CONTROLS;
+  opt = CPU_BASED_ACTIVATE_SECONDARY_CONTROLS |
+      CPU_BASED_USE_MSR_BITMAPS;
   if (adjust_vmx_controls(min, opt, MSR_IA32_VMX_PROCBASED_CTLS,
                           &_cpu_based_exec_control) < 0)
     return -EIO;
@@ -966,9 +998,7 @@ static __init int setup_vmcs_config(struct vmcs_config *vmcs_conf) {
   return 0;
 }
 
-static struct vmcs *vmx_alloc_vmcs(void)
-{
-  int cpu = raw_smp_processor_id();
+static struct vmcs *vmx_alloc_vmcs(int cpu) {
   int node = cpu_to_node(cpu);
   struct page *pages;
   struct vmcs *vmcs;
@@ -982,13 +1012,11 @@ static struct vmcs *vmx_alloc_vmcs(void)
   return vmcs;
 }
 
-static void vmx_free_vmcs(struct vmcs *vmcs)
-{
+static void vmx_free_vmcs(struct vmcs *vmcs) {
   free_pages((unsigned long)vmcs, vmcs_config.order);
 }
 
-static void vmx_setup_constant_host_state(void)
-{
+static void vmx_setup_constant_host_state(void) {
   u32 low32, high32;
   unsigned long tmpl;
   struct desc_ptr dt;
@@ -1006,7 +1034,6 @@ static void vmx_setup_constant_host_state(void)
   native_store_idt(&dt);
   vmcs_writel(HOST_IDTR_BASE, dt.address);   /* 22.2.4 */
 
-  /* TODO: change the label for vmx_return  */
   asm("mov $.Lvmx_return, %0" : "=r"(tmpl));
   vmcs_writel(HOST_RIP, tmpl); /* 22.2.5 */
 
@@ -1033,8 +1060,25 @@ static void vmx_setup_constant_host_state(void)
   vmcs_writel(HOST_GS_BASE, tmpl); /* 22.2.4 */
 }
 
-static void setup_msr(struct vmx_vcpu *vcpu)
-{
+static void vmx_disable_intercept_for_msr(
+    unsigned long *msr_bitmap, u32 msr) {
+  int f = sizeof(unsigned long);
+  /*
+   * See Intel PRM Vol. 3, 20.6.9 (MSR-Bitmap Address). Early manuals
+   * have the write-low and read-high bitmap offsets the wrong way round.
+   * We can control MSRs 0x00000000-0x00001fff and 0xc0000000-0xc0001fff.
+   */
+  if (msr <= 0x1fff) {
+    __clear_bit(msr, msr_bitmap + 0x000 / f); /* read-low */
+    __clear_bit(msr, msr_bitmap + 0x800 / f); /* write-low */
+  } else if ((msr >= 0xc0000000) && (msr <= 0xc0001fff)) {
+    msr &= 0x1fff;
+    __clear_bit(msr, msr_bitmap + 0x400 / f); /* read-high */
+    __clear_bit(msr, msr_bitmap + 0xc00 / f); /* write-high */
+  }
+}
+
+static void setup_msr(struct vmx_vcpu *vcpu) {
   int set[] = { MSR_LSTAR };
   struct vmx_msr_entry *e;
   int sz = sizeof(set) / sizeof(*set);
@@ -1332,7 +1376,7 @@ static struct vmx_vcpu * vmx_create_vcpu() {
     goto fail_isr;
   memset((void*)vcpu->isr_page, 0, PAGE_SIZE);
 
-  vcpu->vmcs = vmx_alloc_vmcs();
+  vcpu->vmcs = vmx_alloc_vmcs(raw_smp_processor_id());
   if (!vcpu->vmcs)
     goto fail_vmcs;
 
@@ -1384,13 +1428,9 @@ fail_gmp:
   return NULL;
 }
 
-/**
- * vmx_destroy_vcpu - destroys and frees an existing virtual cpu
- * @vcpu: the VCPU to destroy
- */
 static void vmx_destroy_vcpu(struct vmx_vcpu *vcpu)
 {
-  vmx_destroy_ept(vcpu);
+  vmx_free_ept(vcpu->ept_root);
   vmx_get_cpu(vcpu);
   ept_sync_context(vcpu->eptp);
   vmcs_clear(vcpu->vmcs);
@@ -1398,12 +1438,9 @@ static void vmx_destroy_vcpu(struct vmx_vcpu *vcpu)
   vmx_put_cpu(vcpu);
   vmx_free_vpid(vcpu);
   vmx_free_vmcs(vcpu->vmcs);
+  kfree(vcpu->bmp_pt_pages);
   kfree(vcpu);
 }
-
-
-#define R "r"
-#define Q "q"
 
 static int __noclone vmx_run_vcpu(struct vmx_vcpu *vcpu) {
   asm(
@@ -1540,7 +1577,11 @@ static int vmx_handle_ept_violation(struct vmx_vcpu *vcpu) {
     return -EINVAL;
   }
 
-  ret = vmx_do_ept_fault(vcpu, gpa, gva, exit_qual);
+  /* TODO: fix this. Now we fail on EPT fault unconditionally.  */
+  /* ret = vmx_do_ept_fault(vcpu, gpa, gva, exit_qual); */
+  printk(KERN_INFO "EPT: get violation GPA 0x%lx, GVA: 0x%lx, fail now!\n",
+         gpa, gva);
+  ret = -EINVAL;
 
   if (ret) {
     printk(KERN_ERR "vmx: page fault failure "
@@ -1553,9 +1594,9 @@ static int vmx_handle_ept_violation(struct vmx_vcpu *vcpu) {
   return ret;
 }
 
-int vmx_launch(struct dune_config *conf, int64_t *ret_code) {
+int vmx_launch(int64_t *ret_code) {
   int ret, done = 0;
-  struct vmx_vcpu *vcpu = vmx_create_vcpu(conf);
+  struct vmx_vcpu *vcpu = vmx_create_vcpu();
   if (!vcpu)
     return -ENOMEM;
 
@@ -1565,6 +1606,7 @@ int vmx_launch(struct dune_config *conf, int64_t *ret_code) {
   while (1) {
     vmx_get_cpu(vcpu);
 
+#if 0
     /* TODO: fix this.
      * We assume that a Dune process will always use
      * the FPU whenever it is entered, and thus we go
@@ -1574,41 +1616,14 @@ int vmx_launch(struct dune_config *conf, int64_t *ret_code) {
      */
     if (!__thread_has_fpu(current))
       math_state_restore();
-
+#endif
+    
     local_irq_disable();
 
     if (need_resched()) {
       local_irq_enable();
       vmx_put_cpu(vcpu);
       cond_resched();
-      continue;
-    }
-
-    if (signal_pending(current)) {
-      int signr;
-      siginfo_t info;
-      uint32_t x;
-
-      local_irq_enable();
-      vmx_put_cpu(vcpu);
-
-      spin_lock_irq(&current->sighand->siglock);
-      signr = dequeue_signal(current, &current->blocked,
-                             &info);
-      spin_unlock_irq(&current->sighand->siglock);
-      if (!signr)
-        continue;
-
-      if (signr == SIGKILL) {
-        printk(KERN_INFO "vmx: got sigkill, dying");
-        vcpu->ret_code = ((ENOSYS) << 8);
-        break;
-      }
-
-      x  = DUNE_SIGNAL_INTR_BASE + signr;
-      x |= INTR_INFO_VALID_MASK;
-
-      vmcs_write32(VM_ENTRY_INTR_INFO_FIELD, x);
       continue;
     }
 
@@ -1645,10 +1660,184 @@ int vmx_launch(struct dune_config *conf, int64_t *ret_code) {
   return 0;
 }
 
+static __init int __vmx_enable(struct vmcs *vmxon_buf) {
+  u64 phys_addr = __pa(vmxon_buf);
+  u64 old, test_bits;
+
+  if (read_cr4() & X86_CR4_VMXE)
+    return -EBUSY;
+
+  rdmsrl(MSR_IA32_FEATURE_CONTROL, old);
+
+  test_bits = FEATURE_CONTROL_LOCKED;
+  test_bits |= FEATURE_CONTROL_VMXON_ENABLED_OUTSIDE_SMX;
+  if (tboot_enabled())
+    test_bits |= FEATURE_CONTROL_VMXON_ENABLED_INSIDE_SMX;
+
+  if ((old & test_bits) != test_bits) {
+    /* enable and lock */
+    wrmsrl(MSR_IA32_FEATURE_CONTROL, old | test_bits);
+  }
+  write_cr4(read_cr4() | X86_CR4_VMXE);
+
+  __vmxon(phys_addr);
+  vpid_sync_vcpu_global();
+  ept_sync_global();
+
+  return 0;
+}
+
+static __init void vmx_enable(void *unused) {
+  int ret;
+  struct vmcs *vmxon_buf = __get_cpu_var(vmxarea);
+
+  if ((ret = __vmx_enable(vmxon_buf)))
+    goto failed;
+
+  __get_cpu_var(vmx_enabled) = 1;
+  store_gdt(&__get_cpu_var(host_gdt));
+
+  printk(KERN_INFO "vmx: VMX enabled on CPU %d\n",
+         raw_smp_processor_id());
+  return;
+
+failed:
+  atomic_inc(&vmx_enable_failed);
+  printk(KERN_ERR "vmx: failed to enable VMX, err = %d\n", ret);
+}
+
+static void vmx_disable(void *unused) {
+  if (__get_cpu_var(vmx_enabled)) {
+    __vmxoff();
+    write_cr4(read_cr4() & ~X86_CR4_VMXE);
+    __get_cpu_var(vmx_enabled) = 0;
+  }
+}
+
+static void vmx_free_vmxon_areas(void) {
+  int cpu;
+
+  for_each_possible_cpu(cpu) {
+    if (per_cpu(vmxarea, cpu)) {
+      vmx_free_vmcs(per_cpu(vmxarea, cpu));
+      per_cpu(vmxarea, cpu) = NULL;
+    }
+  }
+}
+
+int vmx_init(void) {
+  int r, cpu;
+
+  if (!cpu_has_vmx()) {
+    printk(KERN_ERR "vmx: CPU does not support VT-x\n");
+    return -EIO;
+  }
+
+  if (setup_vmcs_config(&vmcs_config) < 0)
+    return -EIO;
+
+  if (!cpu_has_vmx_vpid()) {
+    printk(KERN_ERR "vmx: CPU is missing required feature 'VPID'\n");
+    return -EIO;
+  }
+
+  if (!cpu_has_vmx_ept()) {
+    printk(KERN_ERR "vmx: CPU is missing required feature 'EPT'\n");
+    return -EIO;
+  }
+
+  if (!vmx_capability.has_load_efer) {
+    printk(KERN_ERR "vmx: ability to load EFER register is required\n");
+    return -EIO;
+  }
+
+  msr_bitmap = (unsigned long *)__get_free_page(GFP_KERNEL);
+  if (!msr_bitmap) {
+    return -ENOMEM;
+  }
+
+  memset(msr_bitmap, 0xff, PAGE_SIZE);
+  vmx_disable_intercept_for_msr(msr_bitmap, MSR_FS_BASE);
+  vmx_disable_intercept_for_msr(msr_bitmap, MSR_GS_BASE);
+
+  set_bit(0, vmx_vpid_bitmap); /* 0 is reserved for host */
+
+  for_each_possible_cpu(cpu) {
+    struct vmcs *vmxon_buf;
+
+    vmxon_buf = vmx_alloc_vmcs(cpu);
+    if (!vmxon_buf) {
+      vmx_free_vmxon_areas();
+      return -ENOMEM;
+    }
+
+    per_cpu(vmxarea, cpu) = vmxon_buf;
+  }
+
+  atomic_set(&vmx_enable_failed, 0);
+  if (on_each_cpu(vmx_enable, NULL, 1)) {
+    printk(KERN_ERR "vmx: timeout waiting for VMX mode enable.\n");
+    r = -EIO;
+    goto failed1; /* sadly we can't totally recover */
+  }
+
+  if (atomic_read(&vmx_enable_failed)) {
+    r = -EBUSY;
+    goto failed2;
+  }
+
+  return 0;
+
+failed2:
+  on_each_cpu(vmx_disable, NULL, 1);
+failed1:
+  vmx_free_vmxon_areas();
+  return r;
+}
+
+void vmx_exit(void)
+{
+  on_each_cpu(vmx_disable, NULL, 1);
+  vmx_free_vmxon_areas();
+  free_page((unsigned long)msr_bitmap);
+}
+
+static task_struct *test_thread;
+static int lcd_thread(void) {
+  int ret;
+  int64_t ret_code;
+
+  ret = vmx_launch(&ret_code);
+  if (ret) {
+    printk(KERN_ERR "LCD: launch failure %d\n", ret);
+  } else {
+    printk(KERN_INFO "LCD: launch OK\n");
+  }
+
+  printk(KERN_INFO "LCD: ret code: %ld\n", ret_code);
+  
+  do_exit(ret);
+}
+
 static void __init lcd_init(void) {
+  int r;
+  printk(KERN_INFO "LCD module loaded\n");
+  if ((r = vmx_init())) {
+    printk(KERN_ERR "LCD: failed to init VMX\n");
+  } else {
+    test_thread = kthread_create(&lcd_thread, NULL, "LCD");
+    if (!test_thread) {
+      printk(KERN_ERR "LCD: test thread failed to create\n");
+    }
+  } 
+
+  return r;
 }
 
 static void __exit lcd_exit(void) {
+  printk(KERN_INFO "LCD module unloading...\n");
+  vmx_exit();
+  printk(KERN_INFO "LCD module unloaded\n");
 }
 
 module_init(lcd_init);

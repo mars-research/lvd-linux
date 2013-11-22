@@ -1401,6 +1401,250 @@ static void vmx_destroy_vcpu(struct vmx_vcpu *vcpu)
   kfree(vcpu);
 }
 
+
+#define R "r"
+#define Q "q"
+
+static int __noclone vmx_run_vcpu(struct vmx_vcpu *vcpu) {
+  asm(
+      /* Store host registers */
+      "push %%rdx; push %%rbp;"
+      "push %%rcx \n\t" /* placeholder for guest rcx */
+      "push %%rcx \n\t"
+      "cmp %%rsp, %c[host_rsp](%0) \n\t"
+      "je 1f \n\t"
+      "mov %%rsp, %c[host_rsp](%0) \n\t"
+      ASM_VMX_VMWRITE_RSP_RDX "\n\t"
+      "1: \n\t"
+      /* Reload cr2 if changed */
+      "mov %c[cr2](%0), %%rax \n\t"
+      "mov %%cr2, %%rdx \n\t"
+      "cmp %%rax, %%rdx \n\t"
+      "je 2f \n\t"
+      "mov %%rax, %%cr2 \n\t"
+      "2: \n\t"
+      /* Check if vmlaunch of vmresume is needed */
+      "cmpl $0, %c[launched](%0) \n\t"
+      /* Load guest registers.  Don't clobber flags. */
+      "mov %c[rax](%0), %%rax \n\t"
+      "mov %c[rbx](%0), %%rbx \n\t"
+      "mov %c[rdx](%0), %%rdx \n\t"
+      "mov %c[rsi](%0), %%rsi \n\t"
+      "mov %c[rdi](%0), %%rdi \n\t"
+      "mov %c[rbp](%0), %%rbp \n\t"
+      "mov %c[r8](%0),  %%r8  \n\t"
+      "mov %c[r9](%0),  %%r9  \n\t"
+      "mov %c[r10](%0), %%r10 \n\t"
+      "mov %c[r11](%0), %%r11 \n\t"
+      "mov %c[r12](%0), %%r12 \n\t"
+      "mov %c[r13](%0), %%r13 \n\t"
+      "mov %c[r14](%0), %%r14 \n\t"
+      "mov %c[r15](%0), %%r15 \n\t"
+      "mov %c[rcx](%0), %%rcx \n\t" /* kills %0 (ecx) */
+
+      /* Enter guest mode */
+      "jne .Llaunched \n\t"
+      ASM_VMX_VMLAUNCH "\n\t"
+      "jmp .Lvmx_return \n\t"
+      ".Llaunched: " ASM_VMX_VMRESUME "\n\t"
+      ".Lvmx_return: "
+      /* Save guest registers, load host registers, keep flags */
+      "mov %0, %c[wordsize](%%rsp) \n\t"
+      "pop %0 \n\t"
+      "mov %%rax, %c[rax](%0) \n\t"
+      "mov %%rbx, %c[rbx](%0) \n\t"
+      "popq %c[rcx](%0) \n\t"
+      "mov %%rdx, %c[rdx](%0) \n\t"
+      "mov %%rsi, %c[rsi](%0) \n\t"
+      "mov %%rdi, %c[rdi](%0) \n\t"
+      "mov %%rbp, %c[rbp](%0) \n\t"
+      "mov %%r8,  %c[r8](%0) \n\t"
+      "mov %%r9,  %c[r9](%0) \n\t"
+      "mov %%r10, %c[r10](%0) \n\t"
+      "mov %%r11, %c[r11](%0) \n\t"
+      "mov %%r12, %c[r12](%0) \n\t"
+      "mov %%r13, %c[r13](%0) \n\t"
+      "mov %%r14, %c[r14](%0) \n\t"
+      "mov %%r15, %c[r15](%0) \n\t"
+      "mov %%rax, %%r10 \n\t"
+      "mov %%rdx, %%r11 \n\t"
+
+      "mov %%cr2, %%rax   \n\t"
+      "mov %%rax, %c[cr2](%0) \n\t"
+
+      "pop  %%rbp; pop  %%rdx \n\t"
+      "setbe %c[fail](%0) \n\t"
+
+      "mov $" __stringify(__USER_DS) ", %%rax \n\t"
+      "mov %%rax, %%ds \n\t"
+      "mov %%rax, %%es \n\t"
+      : : "c"(vcpu), "d"((unsigned long)HOST_RSP),
+        [launched]"i"(offsetof(struct vmx_vcpu, launched)),
+        [fail]"i"(offsetof(struct vmx_vcpu, fail)),
+        [host_rsp]"i"(offsetof(struct vmx_vcpu, host_rsp)),
+        [rax]"i"(offsetof(struct vmx_vcpu, regs[VCPU_REGS_RAX])),
+        [rbx]"i"(offsetof(struct vmx_vcpu, regs[VCPU_REGS_RBX])),
+        [rcx]"i"(offsetof(struct vmx_vcpu, regs[VCPU_REGS_RCX])),
+        [rdx]"i"(offsetof(struct vmx_vcpu, regs[VCPU_REGS_RDX])),
+        [rsi]"i"(offsetof(struct vmx_vcpu, regs[VCPU_REGS_RSI])),
+        [rdi]"i"(offsetof(struct vmx_vcpu, regs[VCPU_REGS_RDI])),
+        [rbp]"i"(offsetof(struct vmx_vcpu, regs[VCPU_REGS_RBP])),
+        [r8]"i"(offsetof(struct vmx_vcpu, regs[VCPU_REGS_R8])),
+        [r9]"i"(offsetof(struct vmx_vcpu, regs[VCPU_REGS_R9])),
+        [r10]"i"(offsetof(struct vmx_vcpu, regs[VCPU_REGS_R10])),
+        [r11]"i"(offsetof(struct vmx_vcpu, regs[VCPU_REGS_R11])),
+        [r12]"i"(offsetof(struct vmx_vcpu, regs[VCPU_REGS_R12])),
+        [r13]"i"(offsetof(struct vmx_vcpu, regs[VCPU_REGS_R13])),
+        [r14]"i"(offsetof(struct vmx_vcpu, regs[VCPU_REGS_R14])),
+        [r15]"i"(offsetof(struct vmx_vcpu, regs[VCPU_REGS_R15])),
+        [cr2]"i"(offsetof(struct vmx_vcpu, cr2)),
+        [wordsize]"i"(sizeof(ulong))
+      : "cc", "memory"
+        , "rax", "rbx", "rdi", "rsi"
+        , "r8", "r9", "r10", "r11", "r12", "r13", "r14", "r15"
+      );
+
+  vcpu->launched = 1;
+
+  if (unlikely(vcpu->fail)) {
+    printk(KERN_ERR "vmx: failure detected (err %x)\n",
+           vmcs_read32(VM_INSTRUCTION_ERROR));
+    return VMX_EXIT_REASONS_FAILED_VMENTRY;
+  }
+
+  return vmcs_read32(VM_EXIT_REASON);
+}
+
+static void vmx_step_instruction(void) {
+  vmcs_writel(GUEST_RIP, vmcs_readl(GUEST_RIP) +
+              vmcs_read32(VM_EXIT_INSTRUCTION_LEN));
+}
+
+static int vmx_handle_ept_violation(struct vmx_vcpu *vcpu) {
+  unsigned long gva, gpa;
+  int exit_qual, ret;
+
+  vmx_get_cpu(vcpu);
+  exit_qual = vmcs_read32(EXIT_QUALIFICATION);
+  gva = vmcs_readl(GUEST_LINEAR_ADDRESS);
+  gpa = vmcs_read64(GUEST_PHYSICAL_ADDRESS);
+  vmx_put_cpu(vcpu);
+
+  if (exit_qual & (1 << 6)) {
+    printk(KERN_ERR "EPT: GPA 0x%lx exceeds GAW!\n", gpa);
+    return -EINVAL;
+  }
+
+  if (!(exit_qual & (1 << 7))) {
+    printk(KERN_ERR "EPT: linear address is not valid, GPA: 0x%lx!\n", gpa);
+    return -EINVAL;
+  }
+
+  ret = vmx_do_ept_fault(vcpu, gpa, gva, exit_qual);
+
+  if (ret) {
+    printk(KERN_ERR "vmx: page fault failure "
+           "GPA: 0x%lx, GVA: 0x%lx\n",
+           gpa, gva);
+    vcpu->ret_code = ((EFAULT) << 8);
+    vmx_dump_cpu(vcpu);
+  }
+
+  return ret;
+}
+
+int vmx_launch(struct dune_config *conf, int64_t *ret_code) {
+  int ret, done = 0;
+  struct vmx_vcpu *vcpu = vmx_create_vcpu(conf);
+  if (!vcpu)
+    return -ENOMEM;
+
+  printk(KERN_ERR "vmx: created VCPU (VPID %d)\n",
+         vcpu->vpid);
+
+  while (1) {
+    vmx_get_cpu(vcpu);
+
+    /* TODO: fix this.
+     * We assume that a Dune process will always use
+     * the FPU whenever it is entered, and thus we go
+     * ahead and load FPU state here. The reason is
+     * that we don't monitor or trap FPU usage inside
+     * a Dune process.
+     */
+    if (!__thread_has_fpu(current))
+      math_state_restore();
+
+    local_irq_disable();
+
+    if (need_resched()) {
+      local_irq_enable();
+      vmx_put_cpu(vcpu);
+      cond_resched();
+      continue;
+    }
+
+    if (signal_pending(current)) {
+      int signr;
+      siginfo_t info;
+      uint32_t x;
+
+      local_irq_enable();
+      vmx_put_cpu(vcpu);
+
+      spin_lock_irq(&current->sighand->siglock);
+      signr = dequeue_signal(current, &current->blocked,
+                             &info);
+      spin_unlock_irq(&current->sighand->siglock);
+      if (!signr)
+        continue;
+
+      if (signr == SIGKILL) {
+        printk(KERN_INFO "vmx: got sigkill, dying");
+        vcpu->ret_code = ((ENOSYS) << 8);
+        break;
+      }
+
+      x  = DUNE_SIGNAL_INTR_BASE + signr;
+      x |= INTR_INFO_VALID_MASK;
+
+      vmcs_write32(VM_ENTRY_INTR_INFO_FIELD, x);
+      continue;
+    }
+
+    ret = vmx_run_vcpu(vcpu);
+
+    local_irq_enable();
+
+    if (ret == EXIT_REASON_VMCALL ||
+        ret == EXIT_REASON_CPUID) {
+      vmx_step_instruction();
+    }
+
+    vmx_put_cpu(vcpu);
+
+    if (ret == EXIT_REASON_EPT_VIOLATION)
+      done = vmx_handle_ept_violation(vcpu);
+    } else if (ret != EXIT_REASON_EXTERNAL_INTERRUPT) {
+      printk(KERN_INFO "unhandled exit: reason %d, exit qualification %x\n",
+             ret, vmcs_read32(EXIT_QUALIFICATION));
+      vmx_dump_cpu(vcpu);
+      done = 1;
+    }
+
+    if (done || vcpu->shutdown)
+      break;
+  }
+
+  printk(KERN_ERR "vmx: destroying VCPU (VPID %d)\n",
+         vcpu->vpid);
+
+  *ret_code = vcpu->ret_code;
+  vmx_destroy_vcpu(vcpu);
+
+  return 0;
+}
+
 static void __init lcd_init(void) {
 }
 

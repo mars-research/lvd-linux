@@ -4,21 +4,29 @@
  * Based on KVM and Dune.
  *
  */
-#include "lcd.h"
-#include "lcd_defs.h"
-
 #include <linux/init.h>
 #include <linux/kernel.h>
 #include <linux/module.h>
 #include <linux/mm.h>
 #include <linux/sched.h>
 #include <linux/kthread.h>
+#include <linux/slab.h>
+#include <linux/tboot.h>
 
 #include <asm/vmx.h>
 #include <asm/processor.h>
+#include <asm/desc.h>
+#include <asm/virtext.h>
+
+#include "lcd.h"
+#include "lcd_defs.h"
 
 MODULE_AUTHOR("Weibin Sun");
 MODULE_LICENSE("GPL");
+
+struct vmx_capability vmx_capability;
+
+static atomic_t vmx_enable_failed;
 
 static DECLARE_BITMAP(vmx_vpid_bitmap, VMX_NR_VPIDS);
 static DEFINE_SPINLOCK(vmx_vpid_lock);
@@ -28,7 +36,9 @@ static DEFINE_PER_CPU(struct desc_ptr, host_gdt);
 static DEFINE_PER_CPU(int, vmx_enabled);
 static DEFINE_PER_CPU(struct vmx_vcpu *, local_vcpu);
 
-static struct vmcs_config vmcs_config;
+static unsigned long *msr_bitmap;
+
+struct vmcs_config vmcs_config;
 
 /* CPU Features and Ops */
 
@@ -146,7 +156,7 @@ static inline u16 vmx_read_ldt(void) {
   return ldt;
 }
 
-static __init bool allow_1_setting(u32 msr, u32 ctl) {
+static bool allow_1_setting(u32 msr, u32 ctl) {
   u32 vmx_msr_low, vmx_msr_high;
 
   rdmsr(msr, vmx_msr_low, vmx_msr_high);
@@ -254,6 +264,10 @@ static inline int epte_present(epte_t epte) {
   return (epte & __EPTE_FULL) > 0;
 }
 
+static inline int epte_big(epte_t epte) {
+  return (epte & __EPTE_SZ) > 0;
+}
+
 static void free_ept_page(epte_t epte) {
   struct page *page = pfn_to_page(epte_addr(epte) >> PAGE_SHIFT);
 
@@ -267,26 +281,6 @@ static int clear_epte(epte_t *epte) {
     return 0;
 
   free_ept_page(*epte);
-  *epte = __EPTE_NONE;
-
-  return 1;
-}
-
-static int clear_l1_epte(epte_t *epte) {
-  int i;
-  epte_t *pte = (epte_t *) epte_page_vaddr(*epte);
-
-  if (*epte == __EPTE_NONE)
-    return 0;
-
-  for (i = 0; i < PTRS_PER_PTE; i++) {
-    if (!epte_present(pte[i]))
-      continue;
-
-    free_ept_page(pte[i]);
-  }
-
-  free_page((uintptr_t) pte);
   *epte = __EPTE_NONE;
 
   return 1;
@@ -359,11 +353,11 @@ static int ept_set_epte(struct vmx_vcpu *vcpu,
 
   if (epte_present(*epte)) {
     if (overwrite)
-      ept_clear_epte(epte);
+      clear_epte(epte);
     else {
       spin_unlock(&vcpu->ept_lock);
       printk(KERN_ERR "ept: epte exists %p\n", (void*)(*epte));
-      return -EINVL;
+      return -EINVAL;
     }
   }
 
@@ -387,16 +381,18 @@ static unsigned long alloc_pt_pfn(struct vmx_vcpu *vcpu) {
   }                               
 }
 
+/*
 static int free_pt_pfn(struct vmx_vcpu *vcpu,
                        unsigned long pfn) {
   unsigned long which = pfn - (PT_PAGES_START >> PAGE_SHIFT);
   if (which >= (PT_PAGES_END >> PAGE_SHIFT)) {
-    return -EINVL; 
+    return -EINVAL; 
   } else {
     bitmap_clear(vcpu->bmp_pt_pages, which, 1);
     return 0;
   }
 }
+*/
 
 static int ept_alloc_pt_item(struct vmx_vcpu *vcpu,
                              unsigned long *gpfn,
@@ -407,7 +403,7 @@ static int ept_alloc_pt_item(struct vmx_vcpu *vcpu,
     ret = -ENOMEM;
   } else {
     epte_t *epte;
-    ret = ept_lookup_gpa(vcpu, ((*gpfn) << PAGE_SHIFT), 1, &epte);
+    ret = ept_lookup_gpa(vcpu, (void*)((*gpfn) << PAGE_SHIFT), 1, &epte);
     if (!ret) {
       if (!epte_present(*epte)) {
         *page = __get_free_page(GFP_ATOMIC);
@@ -429,7 +425,7 @@ static int ept_gpa_to_hva(struct vmx_vcpu* vcpu,
                           unsigned long gpa,
                           unsigned long* hva) {
   epte_t *epte;
-  int ret = ept_lookup_gpa(vcpu, gpa, 0, &epte);
+  int ret = ept_lookup_gpa(vcpu, (void*)gpa, 0, &epte);
   if (ret) {
     printk(KERN_ERR "ept: failed to lookup GPA: %p\n",
            (void*)gpa);
@@ -453,7 +449,7 @@ static int map_gva_to_gpa(struct vmx_vcpu *vcpu,
                           int create, int overwrite) {
   int ret = 0;
   unsigned long gpfn, page;
-  epte_t *epte;
+  /* epte_t *epte; */
   
   pud_t *pud_dir, *pud;
   pmd_t *pmd_dir, *pmd;
@@ -538,8 +534,9 @@ static int map_gva_to_gpa(struct vmx_vcpu *vcpu,
   if (!pte_present(*pte) || overwrite) {
     set_pte(pte, __pte((gpa & PTE_PFN_MASK)|__PAGE_KERNEL_EXEC));
   } else {
-    printk(KERN_ERR "mm: pte conflicts %p %p\n", (void*)gpa, (void*)(*pte));
-    ret = -EINVL;
+    printk(KERN_ERR "mm: pte conflicts %p %p\n", (void*)gpa,
+           (void*)pte_val(*pte));
+    ret = -EINVAL;
   }
 
   return ret;  
@@ -621,7 +618,7 @@ static int vmx_setup_initial_page_table(struct vmx_vcpu *vcpu) {
   unsigned long gpa, hpa, gva;
   /* Map guest page table structure's pages in ept  */
   for (i = 0, gpa = PT_PAGES_START;
-       i < NR_PT_PAGES, gpa+=PAGE_SIZE; ++i) {
+       i < NR_PT_PAGES; gpa+=PAGE_SIZE, ++i) {
     hpa = __get_free_page(GFP_KERNEL);
     if (!hpa)
       return -ENOMEM;
@@ -767,8 +764,8 @@ static void __vmx_setup_cpu(void) {
   vmcs_writel(HOST_GDTR_BASE, gdt->address);   /* 22.2.4 */
 
   /* No sysenter should be called */
-  rdmsrl(MSR_IA32_SYSENTER_ESP, 0);
-  vmcs_writel(HOST_IA32_SYSENTER_ESP, 0); /* 22.2.3 */
+  rdmsrl(MSR_IA32_SYSENTER_ESP, sysenter_esp);
+  vmcs_writel(HOST_IA32_SYSENTER_ESP, sysenter_esp); /* 22.2.3 */
 
   rdmsrl(MSR_FS_BASE, tmpl);
   vmcs_writel(HOST_FS_BASE, tmpl); /* 22.2.4 */
@@ -827,7 +824,7 @@ static void vmx_put_cpu(struct vmx_vcpu *vcpu) {
 }
 
 
-static __init int adjust_vmx_controls(u32 ctl_min, u32 ctl_opt,
+static int adjust_vmx_controls(u32 ctl_min, u32 ctl_opt,
                                       u32 msr, u32 *result) {
   u32 vmx_msr_low, vmx_msr_high;
   u32 ctl = ctl_min | ctl_opt;
@@ -877,7 +874,7 @@ static void vmx_dump_cpu(struct vmx_vcpu *vcpu) {
   printk(KERN_INFO "vmx: --- End VCPU Dump ---\n");
 }
 
-static __init int setup_vmcs_config(struct vmcs_config *vmcs_conf) {
+static int setup_vmcs_config(struct vmcs_config *vmcs_conf) {
   u32 vmx_msr_low, vmx_msr_high;
   u32 min, opt, min2, opt2;
   u32 _pin_based_exec_control = 0;
@@ -930,7 +927,7 @@ static __init int setup_vmcs_config(struct vmcs_config *vmcs_conf) {
                             &_cpu_based_2nd_exec_control) < 0)
       return -EIO;
   } else {
-    printk(KERN_ERR "lcd: secondary VME controls not supported\n")
+    printk(KERN_ERR "lcd: secondary VME controls not supported\n");
     return -EIO;
   }
 
@@ -939,7 +936,7 @@ static __init int setup_vmcs_config(struct vmcs_config *vmcs_conf) {
     rdmsr(MSR_IA32_VMX_EPT_VPID_CAP,
           vmx_capability.ept, vmx_capability.vpid);
   } else {
-    printk(KERN_ERR "lcd: EPT not supported\n")
+    printk(KERN_ERR "lcd: EPT not supported\n");
     return -EIO;
   }
 
@@ -1216,7 +1213,7 @@ static void vmx_free_vpid(struct vmx_vcpu *vmx)
 
 static void vmx_setup_initial_guest_state(struct vmx_vcpu *vcpu)
 {
-  unsigned long tmpl;
+  /* unsigned long tmpl; */
   unsigned long cr4 = X86_CR4_PAE | X86_CR4_VMXE | X86_CR4_OSXMMEXCPT |
       X86_CR4_PGE | X86_CR4_OSFXSR;
   /* if (boot_cpu_has(X86_FEATURE_PCID)) */
@@ -1231,7 +1228,7 @@ static void vmx_setup_initial_guest_state(struct vmx_vcpu *vcpu)
               X86_CR0_MP | X86_CR0_ET | X86_CR0_NE);
   vmcs_writel(CR0_READ_SHADOW, X86_CR0_PG | X86_CR0_PE | X86_CR0_WP |
               X86_CR0_MP | X86_CR0_ET | X86_CR0_NE);
-  vmcs_writel(GUEST_CR3, LCD_CR3_VAL);
+  vmcs_writel(GUEST_CR3, vcpu->pt_gpa);
   vmcs_writel(GUEST_CR4, cr4);
   vmcs_writel(CR4_READ_SHADOW, cr4);
   vmcs_writel(GUEST_IA32_EFER, EFER_LME | EFER_LMA |
@@ -1240,7 +1237,7 @@ static void vmx_setup_initial_guest_state(struct vmx_vcpu *vcpu)
   vmcs_writel(GUEST_GDTR_LIMIT, GDT_SIZE);
   vmcs_writel(GUEST_IDTR_BASE, LCD_IDT_ADDR);
   vmcs_writel(GUEST_IDTR_LIMIT, IDT_ENTRIES*16);
-  vmcs_writel(GUEST_RIP, LCD_CODE_START);
+  vmcs_writel(GUEST_RIP, LCD_CODE_ADDR);
   vmcs_writel(GUEST_RSP, LCD_STACK_ADDR);
   vmcs_writel(GUEST_RFLAGS, 0x02);
   vmcs_writel(GUEST_DR7, 0);
@@ -1304,9 +1301,13 @@ static void vmx_setup_initial_guest_state(struct vmx_vcpu *vcpu)
 }
 
 static int setup_gdt(struct vmx_vcpu* vcpu) {
-  memset(vcpu->gdt, 0, GDT_SIZE);
-  struct desc_struct *desc = vcpu->gdt + GDT_ENTRY_KERNEL_CS;
+  struct desc_struct *desc;
+  tss_desc* tssd;
+  struct x86_hw_tss* tss;
 
+  memset(vcpu->gdt, 0, GDT_SIZE);
+
+  desc = vcpu->gdt + GDT_ENTRY_KERNEL_CS;
   /* ignored fields according to APM Vol.3 Ch4.8 */
   /* code seg desc */
   desc->type = SEG_TYPE_CODE | SEG_TYPE_EXEC_READ;
@@ -1323,12 +1324,12 @@ static int setup_gdt(struct vmx_vcpu* vcpu) {
   desc->p = 1;
 
   /* task segment desc value */
-  tss_desc* tss = (tss_desc*)(vcpu->gdt + GDT_ENTRY_TSS);
-  set_tssldt_descriptor(tss, LCD_TSS_ADDR, DESC_TSS, LCD_TSS_SIZE);
+  tssd = (tss_desc*)(vcpu->gdt + GDT_ENTRY_TSS);
+  set_tssldt_descriptor(tssd, LCD_TSS_ADDR, DESC_TSS, LCD_TSS_SIZE);
 
   /* TSS segment */
   memset(vcpu->tss, 0, LCD_TSS_SIZE);
-  struct x86_hw_tss* tss = &vcpu->tss->tss;
+  tss = &vcpu->tss->tss;
   tss->sp0 = LCD_STACK_ADDR;
   tss->io_bitmap_base = offsetof(struct lcd_tss_struct, io_bitmap);
   tss->ist[0] = LCD_TSS_ADDR + (PAGE_SIZE>>1);
@@ -1337,7 +1338,7 @@ static int setup_gdt(struct vmx_vcpu* vcpu) {
   return 0;
 }
 
-static int setup_idt(vmx_vcpu* vcpu) {
+static void setup_idt(struct vmx_vcpu* vcpu) {
   int i;
   memset(vcpu->idt, 0, PAGE_SIZE);
   /* Just fill the IDT  */
@@ -1347,15 +1348,17 @@ static int setup_idt(vmx_vcpu* vcpu) {
   }
 }
 
-static struct vmx_vcpu * vmx_create_vcpu() {
+static struct vmx_vcpu * vmx_create_vcpu(void) {
   struct vmx_vcpu *vcpu = kmalloc(sizeof(struct vmx_vcpu), GFP_KERNEL);
   if (!vcpu)
     return NULL;
 
   memset(vcpu, 0, sizeof(*vcpu));
 
-  vcpu->bmp_pt_pages = kmalloc(sizeof(long) * BITS_TO_LONGS(NR_PT_PAGES));
-  if (!vcpu->bmp_at_page)
+  vcpu->bmp_pt_pages = kmalloc(
+      sizeof(long) * BITS_TO_LONGS(NR_PT_PAGES),
+      GFP_KERNEL);
+  if (!vcpu->bmp_pt_pages)
     goto fail_bmp;
   bitmap_zero(vcpu->bmp_pt_pages, NR_PT_PAGES);
 
@@ -1367,7 +1370,7 @@ static struct vmx_vcpu * vmx_create_vcpu() {
   if (!vcpu->idt)
     goto fail_idt;
 
-  vcpu->tss = (struct lcd_tss_struct)__get_free_page(GFP_KERNEL);
+  vcpu->tss = (struct lcd_tss_struct*)__get_free_page(GFP_KERNEL);
   if (!vcpu->tss)
     goto fail_tss;
 
@@ -1390,21 +1393,21 @@ static struct vmx_vcpu * vmx_create_vcpu() {
     goto fail_ept;
   vcpu->eptp = construct_eptp(vcpu->ept_root);
 
-  vmx_get_cpu(vcpu);
-  vmx_setup_vmcs(vcpu);
-  vmx_setup_initial_guest_state();
-  setup_gdt(vcpu);
-  setup_idt(vcpu);
-  vmx_put_cpu(vcpu);
-
   if (cpu_has_vmx_ept_ad_bits()) {
     vcpu->ept_ad_enabled = true;
     printk(KERN_INFO "vmx: enabled EPT A/D bits");
   }
   if (vmx_create_ept(vcpu)) {
-    printk(KERN_ERRO "vmx: creating EPT failed.");
+    printk(KERN_ERR "vmx: creating EPT failed.");
     goto fail_ept;
   }
+
+  vmx_get_cpu(vcpu);
+  vmx_setup_vmcs(vcpu);
+  vmx_setup_initial_guest_state(vcpu);
+  setup_gdt(vcpu);
+  setup_idt(vcpu);
+  vmx_put_cpu(vcpu);
 
   return vcpu;
 
@@ -1413,7 +1416,7 @@ fail_ept:
 fail_vpid:
   vmx_free_vmcs(vcpu->vmcs);
 fail_vmcs:
-  kfree(vcpu->isr_page);
+  kfree((void*)vcpu->isr_page);
 fail_isr:
   kfree(vcpu->tss);
 fail_tss:
@@ -1422,7 +1425,7 @@ fail_idt:
   kfree(vcpu->gdt);
 fail_gdt:
   kfree(vcpu->bmp_pt_pages);
-fail_gmp:
+fail_bmp:
   kfree(vcpu);
 
   return NULL;
@@ -1638,14 +1641,14 @@ int vmx_launch(int64_t *ret_code) {
 
     vmx_put_cpu(vcpu);
 
-    if (ret == EXIT_REASON_EPT_VIOLATION)
+    if (ret == EXIT_REASON_EPT_VIOLATION) {
       done = vmx_handle_ept_violation(vcpu);
-    } else if (ret != EXIT_REASON_EXTERNAL_INTERRUPT) {
+    } else {// if (ret != EXIT_REASON_EXTERNAL_INTERRUPT) {
       printk(KERN_INFO "unhandled exit: reason %d, exit qualification %x\n",
              ret, vmcs_read32(EXIT_QUALIFICATION));
       vmx_dump_cpu(vcpu);
       done = 1;
-    }
+    } 
 
     if (done || vcpu->shutdown)
       break;
@@ -1660,7 +1663,7 @@ int vmx_launch(int64_t *ret_code) {
   return 0;
 }
 
-static __init int __vmx_enable(struct vmcs *vmxon_buf) {
+static int __vmx_enable(struct vmcs *vmxon_buf) {
   u64 phys_addr = __pa(vmxon_buf);
   u64 old, test_bits;
 
@@ -1687,7 +1690,7 @@ static __init int __vmx_enable(struct vmcs *vmxon_buf) {
   return 0;
 }
 
-static __init void vmx_enable(void *unused) {
+static void vmx_enable(void *unused) {
   int ret;
   struct vmcs *vmxon_buf = __get_cpu_var(vmxarea);
 
@@ -1802,11 +1805,13 @@ void vmx_exit(void)
   free_page((unsigned long)msr_bitmap);
 }
 
-static task_struct *test_thread;
-static int lcd_thread(void) {
+static struct task_struct *test_thread;
+
+static int lcd_test(void) {
   int ret;
   int64_t ret_code;
 
+  printk("LCD: start launching vmx\n");
   ret = vmx_launch(&ret_code);
   if (ret) {
     printk(KERN_ERR "LCD: launch failure %d\n", ret);
@@ -1814,21 +1819,29 @@ static int lcd_thread(void) {
     printk(KERN_INFO "LCD: launch OK\n");
   }
 
-  printk(KERN_INFO "LCD: ret code: %ld\n", ret_code);
-  
-  do_exit(ret);
+  printk(KERN_INFO "LCD: ret code: %llu\n", ret_code);
+  return ret;
 }
 
-static void __init lcd_init(void) {
+static int lcd_thread(void* d) {
+  int ret = lcd_test();
+  do_exit(ret);
+  return 0; // avoid compiler warning
+}
+
+static int __init lcd_init(void) {
   int r;
   printk(KERN_INFO "LCD module loaded\n");
   if ((r = vmx_init())) {
     printk(KERN_ERR "LCD: failed to init VMX\n");
   } else {
+    r = lcd_test();
+    /*
     test_thread = kthread_create(&lcd_thread, NULL, "LCD");
     if (!test_thread) {
       printk(KERN_ERR "LCD: test thread failed to create\n");
     }
+    */
   } 
 
   return r;

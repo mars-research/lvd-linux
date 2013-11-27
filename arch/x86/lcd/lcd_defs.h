@@ -1,7 +1,56 @@
-#ifndef LCD_LCD_H
-#define LCD_LCD_H
+#ifndef LCD_LCD_DEFS_H
+#define LCD_LCD_DEFS_H
 
 #include <linux/bitmap.h>
+
+#if !defined(VMX_EPT_AD_BIT)
+#define VMX_EPT_AD_BIT          (1ull << 21)
+#define VMX_EPT_AD_ENABLE_BIT   (1ull << 6)
+#endif
+
+#ifndef VMX_EPT_EXTENT_INDIVIDUAL_BIT
+#define VMX_EPT_EXTENT_INDIVIDUAL_BIT           (1ull << 24)
+#endif
+
+#ifndef X86_CR4_PCIDE
+#define X86_CR4_PCIDE0x00020000 /* enable PCID support */
+#endif
+
+#ifndef SECONDARY_EXEC_ENABLE_INVPCID
+#define SECONDARY_EXEC_ENABLE_INVPCID0x00001000
+#endif
+
+#ifndef SEG_TYPE_DATA
+#define SEG_TYPE_DATA		(0 << 3)
+#endif
+
+#ifndef SEG_TYPE_READ_WRITE
+#define SEG_TYPE_READ_WRITE	(1 << 1)
+#endif
+
+#ifndef SEG_TYPE_CODE
+#define SEG_TYPE_CODE		(1 << 3)
+#endif
+
+#ifndef SEG_TYPE_EXEC_READ
+#define SEG_TYPE_EXEC_READ	(1 << 1)
+#endif
+
+#ifndef SEG_TYPE_TSS
+#define SEG_TYPE_TSS		((1 << 3) | (1 << 0))
+#endif
+
+#ifndef SEG_OP_SIZE_32BIT
+#define SEG_OP_SIZE_32BIT	(1 << 0)
+#endif
+
+#ifndef SEG_GRANULARITY_4KB
+#define SEG_GRANULARITY_4KB	(1 << 0)
+#endif
+
+#ifndef DESC_TYPE_CODE_DATA
+#define DESC_TYPE_CODE_DATA	(1 << 0)
+#endif
 
 /* Memory management */
 
@@ -18,6 +67,8 @@
 #define VMX_EPT_FAULT_INS   0x04
 
 typedef unsigned long epte_t;
+typedef unsigned long gpa_t;
+typedef unsigned long gva_t;
 
 #define __EPTE_READ    0x01
 #define __EPTE_WRITE   0x02
@@ -150,6 +201,8 @@ struct lcd_tss_struct {
 
 #define LCD_STACK_ADDR (0x1ULL << 31)
 #define LCD_STACK_SIZE (PAGE_SIZE * 4)
+
+#define LCD_CODE_ADDR (0x1ULL << 32)
 
 #define LCD_ISR_ADDR LCD_STACK_ADDR
 

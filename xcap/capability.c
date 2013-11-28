@@ -51,7 +51,7 @@ static int __init hello_init(void)
 
 /// Sets the specified number of low-order bits to 1
 #define MASK(bits)      ((1UL << bits) - 1)
-
+#define OBJBITS_CTE 7
 
 typedef uint32_t LCD_CPtr;
 typedef uint32_t CapRights;
@@ -75,6 +75,13 @@ struct CapRights
 
 };
 
+
+typedef struct endpoint
+{
+	int a;
+	int b;
+} EndPoint;
+
 typedef struct cnode
 {
 	int32_t bits;
@@ -83,14 +90,16 @@ typedef struct cnode
 	uint32_t* cnode;
 }CNode;
 
+union capability_u{
+	CNode cnode;
+	EndPoint endpoint;
+	};
+
 struct capability
 {
 	LCD_Type type;
 	CapRights rights;
-	union myU{
-		CNode cnode;
-		CNode cnode2;
-	}u;
+	union capability_u u;
 };
 
 struct cte
@@ -129,6 +138,9 @@ struct cte * caps_locate_slot(uint32_t* cnode, size_t offset);
 
 LCD_CPtr create_CNode(uint32_t objAddr, int size_bits, LCD_CPtr root, int node_index, int node_depth, int node_offset, int num_objects);
 
+int caps_lookup_slot(struct capability *cnode_cap, LCD_CPtr cptr,
+		uint8_t vbits, struct cte **ret, CapRights rights);
+
 LCD_CPtr LCD_Untyped_Retype(uint32_t objAddr, LCD_Type objType, int size_bits, LCD_CPtr root, int node_index, int node_depth, int node_offset, int num_objects)
 {
 	LCD_CPtr returnAddr = 0;
@@ -147,6 +159,8 @@ LCD_CPtr create_CNode(uint32_t objAddr_, int size_bits, LCD_CPtr root, int node_
 {
 	/* Initialize the created capability */
 	static struct capability src_cap;
+	static struct capability *dest_cap;
+	struct cte *tempCte = NULL;
 	uint32_t *objAddr;
 	memset(&src_cap, 0, sizeof(struct capability));
 
@@ -162,9 +176,10 @@ LCD_CPtr create_CNode(uint32_t objAddr_, int size_bits, LCD_CPtr root, int node_
 	src_cap.u.cnode.guard = 0;
 	src_cap.u.cnode.guard_size = 0;
 
-	//TODO: need to find destination CNode using root, node_index, node_depth
-	//TODO: need to find destination slot using node_offset
-	memcpy(&src_cap, &src_cap, sizeof(struct capability));
+	caps_lookup_slot ((struct capability*)root, node_index, node_depth, &tempCte,CAPRIGHTS_ALLRIGHTS); 
+	tempCte = caps_locate_slot((uint32_t *)tempCte, node_offset);
+	dest_cap = &(tempCte->cap);
+	memcpy(&src_cap, dest_cap, sizeof(struct capability));
 	return 0;
 }
 
@@ -223,7 +238,7 @@ int caps_lookup_slot(struct capability *cnode_cap, LCD_CPtr cptr,
 	offset = (cptr >> (vbits - bits_resolved)) &
 		MASK(cnode_cap->u.cnode.bits);
 	// The capability at the offset
-	next_slot = caps_locate_slot(cnode_cap->u.cnode.cnode, offset);
+	next_slot = caps_locate_slot((uint32_t*)cnode_cap->u.cnode.cnode, offset);
 	// Do not return NULL type capability
 	if (next_slot->cap.type == ObjType_Null) {
 		return -1;
@@ -250,7 +265,7 @@ int caps_lookup_slot(struct capability *cnode_cap, LCD_CPtr cptr,
 
 struct cte * caps_locate_slot(uint32_t *cnode, size_t offset)
 {
-	return NULL;
+	return (struct cte*)(cnode + sizeof(struct cte) * offset);
 }
 module_init(hello_init);
 module_exit(hello_cleanup);

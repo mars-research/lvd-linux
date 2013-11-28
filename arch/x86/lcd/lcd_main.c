@@ -13,6 +13,8 @@
 #include <linux/slab.h>
 #include <linux/tboot.h>
 
+#include <uapi/asm/kvm.h>
+
 #include <asm/vmx.h>
 #include <asm/processor.h>
 #include <asm/desc.h>
@@ -247,6 +249,12 @@ static void vmcs_write64(unsigned long field, u64 value) {
 
 
 /* Memory Management */
+
+static inline bool is_page_fault(u32 intr_info) {
+  return (intr_info & (INTR_INFO_INTR_TYPE_MASK | INTR_INFO_VECTOR_MASK |
+                       INTR_INFO_VALID_MASK)) ==
+      (INTR_TYPE_HARD_EXCEPTION | PF_VECTOR | INTR_INFO_VALID_MASK);
+}
 
 static inline uintptr_t epte_addr(epte_t epte) {
   return (epte & EPTE_ADDR);
@@ -635,7 +643,7 @@ static int vmx_setup_initial_page_table(struct vmx_vcpu *vcpu) {
 
   gpa = gva = PT_PAGES_START;
   /* Populate at least a page table path, 4 pages. */
-  for (i = 0; i < 4; ++i) {
+  for (i = 0; i < NR_PT_PAGES; ++i) {
     ret = map_gva_to_gpa(vcpu, gva, gpa, 1, 0);
     if (ret) {
       printk(KERN_ERR "ept: populate pt failed at %d\n", i);
@@ -643,6 +651,32 @@ static int vmx_setup_initial_page_table(struct vmx_vcpu *vcpu) {
     }
     gva += PAGE_SIZE;
     gpa += PAGE_SIZE;
+  }
+
+  /* Test code page */
+  gpa = gva = LCD_CODE_ADDR;
+  ret = map_gva_to_gpa(vcpu, gva, gpa, 1, 0);
+  if (ret) {
+    printk(KERN_ERR "ept: populate code page failed\n");
+    return ret;
+  }
+  hpa = __get_free_page(GFP_KERNEL);
+  if (!hpa)
+    return -ENOMEM;
+  memset((void*)hpa, 0, PAGE_SIZE);
+  /* 0: b8 e0 0f 00 01       mov    $0x1000fe0,%eax*/
+  /* 5: c7 00 ef be ad de    movl   $0xdeadbeef,(%rax) */
+  ((u8*)hpa)[0] = 0xb8; ((u8*)hpa)[1] = 0xe0; ((u8*)hpa)[2] = 0xf; ((u8*)hpa)[4] = 0x1;
+  ((u8*)hpa)[5] = 0xc7; ((u8*)hpa)[7] = 0xef; ((u8*)hpa)[8] = 0xbe; ((u8*)hpa)[9] = 0xad;
+  ((u8*)hpa)[10] = 0xde;
+  ((u8*)hpa)[11] = 0xf4; ((u8*)hpa)[12] = 0xf4;
+  
+  hpa = __pa(hpa);
+  
+  ret = ept_set_epte(vcpu, gpa, hpa, 0);
+  if (ret) {
+    printk(KERN_ERR "ept: map code page failed\n");
+    return ret;
   }
 
   /* Map stack PT */
@@ -653,30 +687,65 @@ static int vmx_setup_initial_page_table(struct vmx_vcpu *vcpu) {
       printk(KERN_ERR "ept: populate stack pt failed at %d\n", i);
       return ret;
     }
+    hpa = __get_free_page(GFP_KERNEL);
+    if (!hpa)
+      return -ENOMEM;
+    memset((void*)hpa, 0, PAGE_SIZE);
+    hpa = __pa(hpa);
+
+    ret = ept_set_epte(vcpu, gpa, hpa, 0);
+    if (ret) {
+      printk(KERN_ERR "ept: map stack pages failed at %d\n", i);
+      return ret;
+    }
+
+    gva += PAGE_SIZE;
+    gpa += PAGE_SIZE;
+  }
+  
+  gpa = gva = LCD_STACK_ADDR - LCD_STACK_SIZE;
+  for (i = 0; i < (LCD_STACK_SIZE >> PAGE_SHIFT); ++i) {
+    ret = map_gva_to_gpa(vcpu, gva, gpa, 1, 0);
+    if (ret) {
+      printk(KERN_ERR "ept: populate stack pt failed at %d\n", i);
+      return ret;
+    }
+    hpa = __get_free_page(GFP_KERNEL);
+    if (!hpa)
+      return -ENOMEM;
+    memset((void*)hpa, 0, PAGE_SIZE);
+    hpa = __pa(hpa);
+
+    ret = ept_set_epte(vcpu, gpa, hpa, 0);
+    if (ret) {
+      printk(KERN_ERR "ept: map stack pages failed at %d\n", i);
+      return ret;
+    }
+
     gva += PAGE_SIZE;
     gpa += PAGE_SIZE;
   }
 
   /* Map descriptors and tables in EPT */
-  ret = ept_set_epte(vcpu, __pa(vcpu->gdt), LCD_GDT_ADDR, 0);
+  ret = ept_set_epte(vcpu, LCD_GDT_ADDR, __pa(vcpu->gdt), 0);
   if (ret) {
     printk(KERN_ERR "ept: GDT phy-addr occupied in EPT\n");
     return ret;
   }
 
-  ret = ept_set_epte(vcpu, __pa(vcpu->idt), LCD_IDT_ADDR, 0);
+  ret = ept_set_epte(vcpu, LCD_IDT_ADDR, __pa(vcpu->idt), 0);
   if (ret) {
     printk(KERN_ERR "ept: IDT phy-addr occupied in EPT\n");
     return ret;
   }
 
-  ret = ept_set_epte(vcpu, __pa(vcpu->tss), LCD_TSS_ADDR, 0);
+  ret = ept_set_epte(vcpu, LCD_TSS_ADDR, __pa(vcpu->tss), 0);
   if (ret) {
     printk(KERN_ERR "ept: TSS phy-addr occupied in EPT\n");
     return ret;
   }
 
-  ret = ept_set_epte(vcpu, __pa(vcpu->isr_page), LCD_ISR_ADDR, 0);
+  ret = ept_set_epte(vcpu, LCD_ISR_ADDR, __pa(vcpu->isr_page), 0);
   if (ret) {
     printk(KERN_ERR "ept: ISR phy-addr occupied in EPT\n");
     return ret;
@@ -709,8 +778,7 @@ static int vmx_setup_initial_page_table(struct vmx_vcpu *vcpu) {
   return 0;
 }
 
-static int vmx_create_ept(struct vmx_vcpu *vcpu)
-{
+static int vmx_create_ept(struct vmx_vcpu *vcpu) {
   int ret;
   ret = vmx_setup_initial_page_table(vcpu);
   return ret;
@@ -846,17 +914,19 @@ static int adjust_vmx_controls(u32 ctl_min, u32 ctl_opt,
 
 static void vmx_dump_cpu(struct vmx_vcpu *vcpu) {
   unsigned long flags;
+  u32 inst_len;
 
   vmx_get_cpu(vcpu);
   vcpu->regs[VCPU_REGS_RIP] = vmcs_readl(GUEST_RIP);
   vcpu->regs[VCPU_REGS_RSP] = vmcs_readl(GUEST_RSP);
   flags = vmcs_readl(GUEST_RFLAGS);
+  inst_len = vmcs_read32(VM_EXIT_INSTRUCTION_LEN);
   vmx_put_cpu(vcpu);
 
   printk(KERN_INFO "vmx: --- Begin VCPU Dump ---\n");
   printk(KERN_INFO "vmx: CPU %d VPID %d\n", vcpu->cpu, vcpu->vpid);
-  printk(KERN_INFO "vmx: RIP 0x%016llx RFLAGS 0x%08lx\n",
-         vcpu->regs[VCPU_REGS_RIP], flags);
+  printk(KERN_INFO "vmx: RIP 0x%016llx Instruction length %u\n",
+         vcpu->regs[VCPU_REGS_RIP], inst_len);
   printk(KERN_INFO "vmx: RAX 0x%016llx RCX 0x%016llx\n",
          vcpu->regs[VCPU_REGS_RAX], vcpu->regs[VCPU_REGS_RCX]);
   printk(KERN_INFO "vmx: RDX 0x%016llx RBX 0x%016llx\n",
@@ -873,6 +943,8 @@ static void vmx_dump_cpu(struct vmx_vcpu *vcpu) {
          vcpu->regs[VCPU_REGS_R12], vcpu->regs[VCPU_REGS_R13]);
   printk(KERN_INFO "vmx: R14 0x%016llx R15 0x%016llx\n",
          vcpu->regs[VCPU_REGS_R14], vcpu->regs[VCPU_REGS_R15]);
+  printk(KERN_INFO "vmx: RFLAGS 0x%08lx CR2 0x%016llx\n",
+         flags, vcpu->cr2);
   printk(KERN_INFO "vmx: --- End VCPU Dump ---\n");
 }
 
@@ -1132,6 +1204,7 @@ static void vmx_setup_vmcs(struct vmx_vcpu *vcpu)
 
   vmcs_write64(EPT_POINTER, vcpu->eptp);
 
+  vmcs_write32(EXCEPTION_BITMAP, 0xffffffff);
   vmcs_write32(PAGE_FAULT_ERROR_CODE_MASK, 0);
   vmcs_write32(PAGE_FAULT_ERROR_CODE_MATCH, 0);
   vmcs_write32(CR3_TARGET_COUNT, 0);           /* 22.2.1 */
@@ -1380,6 +1453,7 @@ static struct vmx_vcpu * vmx_create_vcpu(void) {
   if (!vcpu->isr_page)
     goto fail_isr;
   memset((void*)vcpu->isr_page, 0, PAGE_SIZE);
+  *((u8*)vcpu->isr_page) = 0xf4; //HLT
 
   vcpu->vmcs = vmx_alloc_vmcs(raw_smp_processor_id());
   if (!vcpu->vmcs)
@@ -1589,7 +1663,7 @@ static int vmx_handle_ept_violation(struct vmx_vcpu *vcpu) {
   ret = -EINVAL;
 
   if (ret) {
-    printk(KERN_ERR "vmx: page fault failure "
+    printk(KERN_ERR "vmx: EPT violation failure "
            "GPA: 0x%lx, GVA: 0x%lx\n",
            gpa, gva);
     vcpu->ret_code = ((EFAULT) << 8);
@@ -1636,21 +1710,37 @@ int vmx_launch(int64_t *ret_code) {
 
     local_irq_enable();
 
-    if (ret == EXIT_REASON_VMCALL ||
+    /*if (ret == EXIT_REASON_VMCALL ||
         ret == EXIT_REASON_CPUID) {
       vmx_step_instruction();
-    }
+      } */
 
     vmx_put_cpu(vcpu);
 
     if (ret == EXIT_REASON_EPT_VIOLATION) {
       done = vmx_handle_ept_violation(vcpu);
-    } else {// if (ret != EXIT_REASON_EXTERNAL_INTERRUPT) {
-      printk(KERN_INFO "unhandled exit: reason %d, exit qualification %x\n",
-             ret, vmcs_read32(EXIT_QUALIFICATION));
+    } else {
+      if (ret == EXIT_REASON_EXTERNAL_INTERRUPT ||
+          ret == EXIT_REASON_EXCEPTION_NMI) {
+        u32 intr_info = vmcs_read32(VM_EXIT_INTR_INFO);
+        printk(KERN_INFO "exception: exit reason %d, intr info %x,"
+               " vector %u, vetoring info %x, error code %x\n",
+               ret, intr_info, intr_info&INTR_INFO_VECTOR_MASK,
+               vmcs_read32(IDT_VECTORING_INFO_FIELD),
+               vmcs_read32(IDT_VECTORING_ERROR_CODE));
+        if (is_page_fault(intr_info)) {
+          printk(KERN_INFO "got page fault gva: %p\n",
+                 (void*)vcpu->cr2);
+        }
+      } else {
+        printk(KERN_INFO "unhandled exit: reason %d, "
+               "exit qualification %x\n",
+               ret, vmcs_read32(EXIT_QUALIFICATION));
+      }
+
       vmx_dump_cpu(vcpu);
       done = 1;
-    } 
+    }
 
     if (done || vcpu->shutdown)
       break;
@@ -1658,6 +1748,11 @@ int vmx_launch(int64_t *ret_code) {
 
   printk(KERN_ERR "vmx: destroying VCPU (VPID %d)\n",
          vcpu->vpid);
+
+  {
+    u32* ptr = (u32*)((u8*)vcpu->pt + 0xfe0);
+    printk(KERN_INFO "LCD: verify data 0x%x\n", *ptr);
+  }
 
   *ret_code = vcpu->ret_code;
   vmx_destroy_vcpu(vcpu);

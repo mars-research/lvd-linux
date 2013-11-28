@@ -204,6 +204,6 @@ struct lcd_tss_struct {
 
 #define LCD_CODE_ADDR (0x1ULL << 32)
 
-#define LCD_ISR_ADDR (LCD_STACK_ADDR + LCD_STACK_SIZE)
+#define LCD_ISR_ADDR (LCD_TSS_ADDR + 4*PAGE_SIZE)
 
 #endif

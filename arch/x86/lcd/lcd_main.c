@@ -411,7 +411,7 @@ static int ept_alloc_pt_item(struct vmx_vcpu *vcpu,
           ret = -ENOMEM;
         } else {
           memset((void*)(*page), 0, PAGE_SIZE);
-          __set_epte(vcpu, epte, *page);
+          __set_epte(vcpu, epte, __pa(*page));
         }
       } else {
         *page = (unsigned long)epte_page_vaddr(*epte);
@@ -622,6 +622,8 @@ static int vmx_setup_initial_page_table(struct vmx_vcpu *vcpu) {
     hpa = __get_free_page(GFP_KERNEL);
     if (!hpa)
       return -ENOMEM;
+    memset((void*)hpa, 0, PAGE_SIZE);
+    hpa = __pa(hpa);
 
     /* No overwriting, should not exist at all. */
     ret = ept_set_epte(vcpu, gpa, hpa, 0);
@@ -674,7 +676,7 @@ static int vmx_setup_initial_page_table(struct vmx_vcpu *vcpu) {
     return ret;
   }
 
-  ret = ept_set_epte(vcpu, vcpu->isr_page, LCD_ISR_ADDR, 0);
+  ret = ept_set_epte(vcpu, __pa(vcpu->isr_page), LCD_ISR_ADDR, 0);
   if (ret) {
     printk(KERN_ERR "ept: ISR phy-addr occupied in EPT\n");
     return ret;
@@ -1328,7 +1330,7 @@ static int setup_gdt(struct vmx_vcpu* vcpu) {
   set_tssldt_descriptor(tssd, LCD_TSS_ADDR, DESC_TSS, LCD_TSS_SIZE);
 
   /* TSS segment */
-  memset(vcpu->tss, 0, LCD_TSS_SIZE);
+  memset(vcpu->tss, 0, PAGE_SIZE);
   tss = &vcpu->tss->tss;
   tss->sp0 = LCD_STACK_ADDR;
   tss->io_bitmap_base = offsetof(struct lcd_tss_struct, io_bitmap);

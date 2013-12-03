@@ -42,6 +42,29 @@ static unsigned long *msr_bitmap;
 
 struct vmcs_config vmcs_config;
 
+struct exit_reason_item {
+  int code;
+  const char *reason;
+};
+
+static struct exit_reason_item vmx_exit_reason_table[] = {
+  VMX_EXIT_REASONS };
+
+static const char *get_exit_reason(int exit_code) {
+  int i = ARRAY_SIZE(vmx_exit_reason_table);
+  struct exit_reason_item *tbl = vmx_exit_reason_table;
+
+  while (i--) {
+    if (tbl->code == exit_code)
+      return tbl->reason;
+    tbl++;
+  }
+  
+  printk(KERN_ERR "unknown VMX exit code:%d\n",
+         exit_code);
+  return "UNKNOWN";
+}
+
 /* CPU Features and Ops */
 
 static inline bool cpu_has_secondary_exec_ctrls(void) {
@@ -968,6 +991,7 @@ static int setup_vmcs_config(struct vmcs_config *vmcs_conf) {
      ### - (No) MSR bitmap
    */  
   min = CPU_BASED_HLT_EXITING |
+      CPU_BASED_INVLPG_EXITING |
       CPU_BASED_MWAIT_EXITING |
       CPU_BASED_RDPMC_EXITING |
       CPU_BASED_CR8_LOAD_EXITING |
@@ -1023,7 +1047,8 @@ static int setup_vmcs_config(struct vmcs_config *vmcs_conf) {
 
 
   // Exit control:
-  min = VM_EXIT_HOST_ADDR_SPACE_SIZE;
+  min = VM_EXIT_HOST_ADDR_SPACE_SIZE |
+      VM_EXIT_ACK_INTR_ON_EXIT;
   opt = 0;
   if (adjust_vmx_controls(min, opt, MSR_IA32_VMX_EXIT_CTLS,
                           &_vmexit_control) < 0)
@@ -1720,22 +1745,24 @@ int vmx_launch(int64_t *ret_code) {
     if (ret == EXIT_REASON_EPT_VIOLATION) {
       done = vmx_handle_ept_violation(vcpu);
     } else {
+      u64 eq = vmcs_readl(EXIT_QUALIFICATION);
       if (ret == EXIT_REASON_EXTERNAL_INTERRUPT ||
           ret == EXIT_REASON_EXCEPTION_NMI) {
         u32 intr_info = vmcs_read32(VM_EXIT_INTR_INFO);
-        printk(KERN_INFO "exception: exit reason %d, intr info %x,"
+        printk(KERN_INFO "exception: exit reason %d: %s, intr info %x,"
                " vector %u, vetoring info %x, error code %x\n",
-               ret, intr_info, intr_info&INTR_INFO_VECTOR_MASK,
+               ret, get_exit_reason(ret),
+               intr_info, intr_info&INTR_INFO_VECTOR_MASK,
                vmcs_read32(IDT_VECTORING_INFO_FIELD),
                vmcs_read32(IDT_VECTORING_ERROR_CODE));
         if (is_page_fault(intr_info)) {
-          printk(KERN_INFO "got page fault gva: %p\n",
-                 (void*)vcpu->cr2);
+          printk(KERN_INFO "got page fault gva: %p %p\n",
+                 (void*)vcpu->cr2, (void*)eq);
         }
       } else {
-        printk(KERN_INFO "unhandled exit: reason %d, "
-               "exit qualification %x\n",
-               ret, vmcs_read32(EXIT_QUALIFICATION));
+        printk(KERN_INFO "unhandled exit: reason %d: %s, "
+               "exit qualification %lx\n",
+               ret, get_exit_reason(ret), eq);
       }
 
       vmx_dump_cpu(vcpu);

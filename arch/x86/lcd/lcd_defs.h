@@ -13,11 +13,11 @@
 #endif
 
 #ifndef X86_CR4_PCIDE
-#define X86_CR4_PCIDE0x00020000 /* enable PCID support */
+#define X86_CR4_PCIDE 0x00020000 /* enable PCID support */
 #endif
 
 #ifndef SECONDARY_EXEC_ENABLE_INVPCID
-#define SECONDARY_EXEC_ENABLE_INVPCID0x00001000
+#define SECONDARY_EXEC_ENABLE_INVPCID 0x00001000
 #endif
 
 #ifndef SEG_TYPE_DATA

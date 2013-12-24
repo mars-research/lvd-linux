@@ -24,8 +24,6 @@ static void __exit hello_cleanup(void)
 
 static int LCD_Create_CSpace(void)
 {
-	char *cspace;
-	cspace = (char*) kmalloc(100, GFP_KERNEL);
 	printk(KERN_INFO "CSpace is created\n");
 	return 0;
 }
@@ -37,8 +35,11 @@ static int LCD_Create_Object(objType_t type)
 
 int thread_fn(void* abc)
 {
+	/* We assume that the CSpace is already created for this thread */
 	LCD_Create_CSpace();
-	LCD_Create_Object(TYPE_ENDPOINT);
+	/* make the first CNode */
+LCD_CPtr LCD_Untyped_Retype(0, ObjType_CNode, 4, LCD_CPtr root, int node_index, int node_depth, int node_offset, 1);
+
 	return 0;
 }
 

@@ -22,94 +22,60 @@ static void __exit hello_cleanup(void)
 	printk(KERN_INFO "Cleaning up module.\n");
 }
 
+struct cte initCte; /* TODO: Copy this cte to TCB */
 static int LCD_Create_CSpace(void)
 {
-	printk(KERN_INFO "CSpace is created\n");
-	return 0;
-}
+	/* Create CNode and put the capability to a slot in a TCB */
+	static struct capability *src_cap;
+	struct cte *objAddr;
+	uint32_t size_bits = 4;
 
-static int LCD_Create_Object(objType_t type)
-{
+	printk(KERN_INFO "LCD_Create_CSpace\n");
+
+	src_cap = &(initCte.cap);
+	objAddr = (struct cte*)kmalloc((1UL << size_bits)*sizeof(struct cte), GFP_KERNEL);
+	memset(src_cap, 0, sizeof(struct capability));
+	src_cap->type = ObjType_CNode;
+	src_cap->rights = CAPRIGHTS_ALLRIGHTS;
+
+	if (objAddr == 0)
+	{
+		printk(KERN_INFO "Fail to Alloc mem for initial CNode\n");
+		return 1;
+	}
+	memset(objAddr, 0, (1UL << size_bits)*sizeof(struct cte));
+
+	src_cap->u.cnode.cnode = objAddr;
+	src_cap->u.cnode.bits = size_bits;
+	src_cap->u.cnode.guard = 0;
+	src_cap->u.cnode.guard_size = 0;
+
+	/* Make a CNode for Task */
+	printk(KERN_INFO "size of cte is: %ld\n", sizeof(struct cte));
+	printk(KERN_INFO "CSpace is created, InitCte is pointing: %p\n", objAddr);
+	LCD_Untyped_Retype(0, ObjType_CNode, 4, 0, 0, 0, LCD_CapInitThreadCNode, 1);
+	print_cnode(&initCte, 0);
+
 	return 0;
 }
 
 int thread_fn(void* abc)
 {
-	/* We assume that the CSpace is already created for this thread */
+	/* TODO: CSpace for the first thread should be created before it runs */
 	LCD_Create_CSpace();
-	/* make the first CNode */
-LCD_CPtr LCD_Untyped_Retype(0, ObjType_CNode, 4, LCD_CPtr root, int node_index, int node_depth, int node_offset, 1);
 
+	//LCD_Untyped_Retype(LCD_Untyped _service, LCD_Type objType, int size_bits, LCD_CNode root, int node_index, int node_depth, int node_offset, int num_objects)
+	//Rights?
+//	LCD_Untyped_Retype(0, ObjType_CNode, 4, LCD_CapInitThreadCNode, 0x0, 4, 0, 0);
 	return 0;
 }
 
 static int __init hello_init(void)
 {
 	printk(KERN_INFO "Hello world!\n");
-	capTask = kthread_create(thread_fn, NULL, "CapTest");
+	capTask = kthread_run(thread_fn, NULL, "CapTest");
 	return 0;    // Non-zero return means that the module couldn't be loaded.
 }
-
-/// Sets the specified number of low-order bits to 1
-#define MASK(bits)      ((1UL << bits) - 1)
-#define OBJBITS_CTE 7
-
-typedef uint32_t LCD_CPtr;
-typedef uint32_t CapRights;
-typedef uint32_t un; /* unknown */
-
-typedef enum {ObjType_CNode, ObjType_Null} LCD_Type;
-
-#define CAPRIGHTS_READ          (1 << 0)
-#define CAPRIGHTS_WRITE         (1 << 1)
-#define CAPRIGHTS_EXECUTE       (1 << 2)
-#define CAPRIGHTS_GRANT         (1 << 3)
-#define CAPRIGHTS_IDENTIFY      (1 << 4)
-#define CAPRIGHTS_NUM           5
-
-#define CAPRIGHTS_ALLRIGHTS     ((1 << CAPRIGHTS_NUM) - 1)
-#define CAPRIGHTS_READ_WRITE    (CAPRIGHTS_READ | CAPRIGHTS_WRITE)
-#define CAPRIGHTS_NORIGHTS      0
-
-struct CapRights
-{
-
-};
-
-
-typedef struct endpoint
-{
-	int a;
-	int b;
-} EndPoint;
-
-typedef struct cnode
-{
-	int32_t bits;
-	int32_t guard;
-	int32_t guard_size;
-	uint32_t* cnode;
-}CNode;
-
-union capability_u{
-	CNode cnode;
-	EndPoint endpoint;
-	};
-
-struct capability
-{
-	LCD_Type type;
-	CapRights rights;
-	union capability_u u;
-};
-
-struct cte
-{
-	struct capability cap;
-};
-
-struct cte * caps_locate_slot(uint32_t* cnode, size_t offset);
-
 /**
  * \brief Create capabilities to kernel objects.
  *
@@ -139,37 +105,42 @@ struct cte * caps_locate_slot(uint32_t* cnode, size_t offset);
 
 LCD_CPtr create_CNode(uint32_t objAddr, int size_bits, LCD_CPtr root, int node_index, int node_depth, int node_offset, int num_objects);
 
-int caps_lookup_slot(struct capability *cnode_cap, LCD_CPtr cptr,
+int caps_lookup_slot(struct capability * cap, LCD_CPtr cptr,
 		uint8_t vbits, struct cte **ret, CapRights rights);
 
-LCD_CPtr LCD_Untyped_Retype(uint32_t objAddr, LCD_Type objType, int size_bits, LCD_CPtr root, int node_index, int node_depth, int node_offset, int num_objects)
+/*
+ TODO: Implement CDT
+ return value: 0 if successful.
+*/
+
+int LCD_Untyped_Retype(LCD_Untyped _service, LCD_Type objType, int size_bits, LCD_CNode root, int node_index, int node_depth, int node_offset, int num_objects)
 {
-	LCD_CPtr returnAddr = 0;
+	int returnVal = 0;
 	switch (objType)
 	{
 		case ObjType_CNode:
-			returnAddr = create_CNode(objAddr, size_bits, root, node_index, node_depth, node_offset, num_objects);
+			create_CNode(_service, size_bits, root, node_index, node_depth, node_offset, num_objects);
 			break;
 		default:
 			break;	
 	}
-	return returnAddr;
+	return returnVal;
 }
 
-LCD_CPtr create_CNode(uint32_t objAddr_, int size_bits, LCD_CPtr root, int node_index, int node_depth, int node_offset, int num_objects)
+LCD_CPtr create_CNode(LCD_Untyped _service, int size_bits, LCD_CNode root, int node_index, int node_depth, int node_offset, int num_objects)
 {
 	/* Initialize the created capability */
 	static struct capability src_cap;
-	static struct capability *dest_cap;
 	struct cte *tempCte = NULL;
-	uint32_t *objAddr;
+	struct cte *rootCte= NULL;
+	struct cte *objAddr;
 	memset(&src_cap, 0, sizeof(struct capability));
 
 	src_cap.type = ObjType_CNode;
 	src_cap.rights = CAPRIGHTS_ALLRIGHTS;
 
-	objAddr = kmalloc((1UL << size_bits)*sizeof(struct cte), GFP_KERNEL);
-	memset(objAddr, 0, 1UL << size_bits);
+	objAddr = (struct cte*)kmalloc((1UL << size_bits)*sizeof(struct cte), GFP_KERNEL);
+	memset(objAddr, 0, 1UL << size_bits*sizeof(struct cte));
 
 	// Initialize type specific fields
 	src_cap.u.cnode.cnode = objAddr;
@@ -177,10 +148,10 @@ LCD_CPtr create_CNode(uint32_t objAddr_, int size_bits, LCD_CPtr root, int node_
 	src_cap.u.cnode.guard = 0;
 	src_cap.u.cnode.guard_size = 0;
 
-	caps_lookup_slot ((struct capability*)root, node_index, node_depth, &tempCte,CAPRIGHTS_ALLRIGHTS); 
-	tempCte = caps_locate_slot((uint32_t *)tempCte, node_offset);
-	dest_cap = &(tempCte->cap);
-	memcpy(&src_cap, dest_cap, sizeof(struct capability));
+	rootCte = caps_locate_slot(initCte.cap.u.cnode.cnode, root);
+	caps_lookup_slot (&rootCte->cap, node_index, node_depth, &tempCte, CAPRIGHTS_ALLRIGHTS); 
+	tempCte = caps_locate_slot(tempCte, node_offset);
+	memcpy(&tempCte->cap, &src_cap, sizeof(struct capability));
 	return 0;
 }
 
@@ -197,6 +168,13 @@ int caps_lookup_slot(struct capability *cnode_cap, LCD_CPtr cptr,
 	size_t offset;
 	struct cte *next_slot;
 	int bitsleft;
+
+	// If vbit == 0, it's initialization
+	if(vbits == 0) {
+		*ret = initCte.cap.u.cnode.cnode;
+		return 0;
+	}
+
 	/* Can only resolve CNode type */    
 	if (cnode_cap->type != ObjType_CNode) {
 		printk("caps_lookup_slot: Cap to lookup not of type CNode\n"
@@ -239,7 +217,7 @@ int caps_lookup_slot(struct capability *cnode_cap, LCD_CPtr cptr,
 	offset = (cptr >> (vbits - bits_resolved)) &
 		MASK(cnode_cap->u.cnode.bits);
 	// The capability at the offset
-	next_slot = caps_locate_slot((uint32_t*)cnode_cap->u.cnode.cnode, offset);
+	next_slot = caps_locate_slot(cnode_cap->u.cnode.cnode, offset);
 	// Do not return NULL type capability
 	if (next_slot->cap.type == ObjType_Null) {
 		return -1;
@@ -264,10 +242,50 @@ int caps_lookup_slot(struct capability *cnode_cap, LCD_CPtr cptr,
 	return caps_lookup_slot(&next_slot->cap, cptr, bitsleft, ret, rights);
 }
 
-struct cte * caps_locate_slot(uint32_t *cnode, size_t offset)
+struct cte * caps_locate_slot(struct cte * topCte, size_t offset)
 {
-	return (struct cte*)(cnode + sizeof(struct cte) * offset);
+	return (struct cte*)(topCte+ offset);
 }
+
+void print_cnode(struct cte * myCte, int depth)
+{
+	struct capability * myCap;
+	struct capability * iterCap;
+	struct cte * iterCte;
+	int i = 0;
+	int size = 0;
+
+	myCap = &myCte->cap;
+	if (depth == 0)
+	{
+		printk(KERN_INFO "=========print_code start=========\n");
+	}
+	printk(KERN_INFO "Depth: %d::: Type: %d\n", depth, myCap->type);
+
+	if (myCap->type == ObjType_CNode)
+	{
+		size = myCap->u.cnode.bits;
+		size = (1UL<<size);
+		printk(KERN_INFO "CNode size: %d\n", size);
+		for (i = 0 ; i < size; i++)
+		{
+			iterCte = caps_locate_slot(myCap->u.cnode.cnode, i);
+			iterCap = &iterCte->cap;
+			printk(KERN_INFO "Depth: %d::: Type: %d\n", depth+1, iterCap->type);
+		}
+		/*
+		printk(KERN_INFO "One more depth start\n");
+		print_cnode(myCap->u.cnode.cnode, depth+1);
+		printk(KERN_INFO "One more depth end\n");
+		*/
+	}
+
+	if (depth == 0)
+	{
+		printk(KERN_INFO "==========print_code end==========\n");
+	}
+}
+
 module_init(hello_init);
 module_exit(hello_cleanup);
 

@@ -54,21 +54,11 @@
 
 /* Memory management */
 
-#define NR_PT_PAGES    (1 << 12)       /* #pages for page table */
-#define PT_PAGES_START (0x1ULL << 24)  /* above 16MB */
-#define PT_PAGES_END   (PT_PAGES_START + (NR_PT_PAGES << PAGE_SHIFT))
-
-// #define NORMAL_MEM_START (0x1ULL << 30)
-
 #define EPT_LEVELS 4
 
 #define VMX_EPT_FAULT_READ  0x01
-#define VMX_EPT_FAULT_WRITE 0x02
-#define VMX_EPT_FAULT_INS   0x04
 
 typedef unsigned long epte_t;
-typedef unsigned long gpa_t;
-typedef unsigned long gva_t;
 
 #define __EPTE_READ    0x01
 #define __EPTE_WRITE   0x02
@@ -148,7 +138,12 @@ enum vmx_reg {
   NR_VCPU_REGS
 };
 
-struct vmx_vcpu {
+struct lcd_tss_struct {
+  struct x86_hw_tss tss;
+  u8 io_bitmap[1];
+} __attribute__((packed));
+
+typedef struct {
   int cpu;
   int vpid;
   int launched;
@@ -187,23 +182,67 @@ struct vmx_vcpu {
   } msr_autoload;
 
   struct vmcs *vmcs;
-};
+  
+  struct module *mod;
+} lcd_struct;
 
-struct lcd_tss_struct {
-  struct x86_hw_tss tss;
-  u8 io_bitmap[1];
-} __attribute__((packed));
 
-#define LCD_GDT_ADDR (0x1ULL << 30)
+/* Memory layout */
+// Range format: [begin, end)
+// 0x0000 0000 0000 0000 ~ 0x0000 0000 0100 0000 : 16MB : hole (Avoid possible MMIO)
+// 0x0000 0000 0100 0000 ~ 0x0000 0000 0500 0000 : 64MB : Page table structures
+// 4K page gap as memory guard
+// 0x0000 0000 0500 1000 ~ 0x0000 0000 0500 2000 : 4KB  : GDT
+// 0x0000 0000 0500 2000 ~ 0x0000 0000 0500 3000 : 4KB  : IDT
+// 0x0000 0000 0500 3000 ~ 0x0000 0000 0500 4000 : 4KB  : TSS page (sizeof(lcd_tss_struct))
+// 4K page gap as memory guard
+// 0x0000 0000 0500 5000 ~ 0x0000 0000 0500 6000 : 4KB  : Common ISR code page
+// 4K memory guard
+// 0x0000 0000 0500 7000 ~ 0x0000 0000 0500 F000 : 32KB : stack
+// 4K memory guard
+// 0x0000 0000 0501 0000 ~ 0x0000 0000 0511 0000 : 1MB  : 256 ISRs, 4KB code page per ISR
+// 4K memory guard
+// 0x0000 0000 0511 1000 ~ Memory limit          : Code/data (start from 81MB+68KB)
+//
+// Todo:
+//   Heap start; Heap end.
+
+#define LCD_NR_PT_PAGES    (1 << 14)       /* #pages for page table */
+#define LCD_PT_PAGES_START (0x1ULL << 24)  /* above 16MB */
+#define LCD_PT_PAGES_END   (LCD_PT_PAGES_START + (LCD_NR_PT_PAGES << PAGE_SHIFT))
+
+#define LCD_GDT_ADDR (LCD_PT_PAGES_END + PAGE_SIZE)  /* start from 80MB + 4KB */
 #define LCD_IDT_ADDR (LCD_GDT_ADDR + PAGE_SIZE)
 #define LCD_TSS_ADDR (LCD_IDT_ADDR + PAGE_SIZE)
 #define LCD_TSS_SIZE (sizeof(struct lcd_tss_struct))
 
-#define LCD_STACK_ADDR (0x1ULL << 31)
-#define LCD_STACK_SIZE (PAGE_SIZE * 4)
+#define LCD_COMM_ISR_ADDR (LCD_TSS_ADDR + 2*PAGE_SIZE)
+#define LCD_COMM_ISR_END  (LCD_COMM_ISR_ADDR + PAGE_SIZE)
 
-#define LCD_CODE_ADDR (0x1ULL << 32)
+#define LCD_STACK_BOTTOM (LCD_COMM_ISR_END + PAGE_SIZE)
+#define LCD_STACK_SIZE   (PAGE_SIZE * 8)
+#define LCD_STACK_TOP    (LCD_STACK_BOTTOM + LCD_STACK_SIZE)
+#define LCD_STACK_ADDR   LCD_STACK_TOP
 
-#define LCD_ISR_ADDR (LCD_TSS_ADDR + 4*PAGE_SIZE)
+#define LCD_NR_ISRS      256
+#define LCD_ISR_START    (LCD_STACK_TOP + PAGE_SIZE)
+#define LCD_ISR_END      (LCD_ISR_START + LCD_NR_ISRS*PAGE_SIZE)
+#define LCD_ISR_ADDR(n)  (LCD_ISR_START + (n)*PAGE_SIZE)
+
+#define LCD_FREE_MEM_START (LCD_ISR_END + PAGE_SIZE)
+#define LCD_TEST_CODE_ADDR LCD_FREE_MEM_START
+
+/* Exported functions */
+lcd_struct* lcd_create(void);
+int lcd_destroy(lcd_struct *lcd);
+
+int lcd_move_module(lcd_struct *lcd, struct module *mod);
+
+int lcd_map_gpa_to_hpa(lcd_struct *lcd, u64 gpa, u64 hpa, int overwrite);
+int lcd_map_gva_to_gpa(lcd_struct *lcd, u64 gva, u64 gpa, int create, int overwrite);
+int lcd_find_hva_by_gpa(lcd_struct *lcd, u64 gpa, u64 *hva);
+
+int lcd_run(lcd_struct *lcd);
+const char* lcd_exit_reason(int exit_code);
 
 #endif

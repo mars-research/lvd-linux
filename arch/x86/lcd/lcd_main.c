@@ -1931,6 +1931,76 @@ static int lcd_thread(void* d) {
   return 0; // avoid compiler warning
 }
 
+lcd_struct* lcd_create(void) {
+  lcd_struct* lcd = vmx_create_vcpu();
+  return lcd;
+}
+EXPORT_SYMBOL(lcd_create);
+
+int lcd_destroy(lcd_struct* lcd) {
+  vmx_destroy_vcpu(&lcd);
+  return 0;
+}
+EXPORT_SYMBOL(lcd_destroy);
+
+static int __move_host_mapping(lcd_struct *lcd, void* hva,
+                               unsigned int size) {
+  unsigned int mapped = 0;
+  void *pa, *va = hva;
+  int ret = 0;
+  while (mapped < size) {
+    ret = lcd_va_to_pa(va, pa);
+    if (ret != 0) {
+      return ret;
+    }
+
+    ret = lcd_map_gpa_to_hpa(lcd, pa, pa, 0);
+    if (ret != 0) {
+      printk(KERN_ERR "lcd: move PA mapping conflicts\n");
+      return ret;
+    }
+    ret = lcd_map_gva_to_gpa(lcd, va, pa, 1, 0);
+    if (ret != 0) {
+      printk(KERN_ERR "lcd: move PT mapping conflicts\n");
+      return ret;
+    }
+    mapped += PAGE_SIZE;
+    va += PAGE_SIZE;
+  }
+  return 0;
+}
+
+int lcd_move_module(lcd_struct *lcd, struct module *mod) {
+  lcd->mod = mod;
+  // lcd_va_to_pa(va, pa) // 4KB page assumption
+
+  int ret = __move_host_mapping(lcd, mod->module_init, mod->init_size);
+  if (!ret) {
+    ret = __move_host_mapping(lcd, mod->module_core, mod->core_size);
+  }
+
+  return ret;
+}
+EXPORT_SYMBOL(lcd_move_module);
+
+int lcd_map_gpa_to_hpa(lcd_struct *lcd, u64 gpa, u64 hpa, int overwrite) {
+  return ept_set_epte(lcd, gpa, hpa, overwrite);
+}
+EXPORT_SYMBOL(lcd_map_gpa_to_hpa);
+
+int lcd_map_gva_to_gpa(lcd_struct *lcd, u64 gva, u64 gpa,
+                       int create, int overwrite) {
+  return map_gva_to_gpa(lcd, gva, gpa, create, overwrite);
+}
+EXPORT_SYMBOL(lcd_map_gva_to_gpa);
+
+int lcd_find_hva_by_gpa(lcd_struct *lcd, u64 gpa, u64 *hva) {
+  return ept_gpa_to_hva(lcd, gpa, hva);
+}
+EXPORT_SYMBOL(lcd_find_hva_by_gpa);
+
+
+
 static int __init lcd_init(void) {
   int r;
   printk(KERN_INFO "LCD module loaded\n");

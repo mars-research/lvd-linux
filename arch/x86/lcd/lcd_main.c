@@ -1740,7 +1740,7 @@ int vmx_launch(int64_t *ret_code) {
       } else {
         printk(KERN_INFO "unhandled exit: reason %d: %s, "
                "exit qualification %lx\n",
-               ret, lcd_exit_reason(ret), eq);
+               ret, lcd_exit_reason(ret), (unsigned long)eq);
       }
 
       vmx_dump_cpu(vcpu);
@@ -1938,28 +1938,34 @@ lcd_struct* lcd_create(void) {
 EXPORT_SYMBOL(lcd_create);
 
 int lcd_destroy(lcd_struct* lcd) {
-  vmx_destroy_vcpu(&lcd);
+  vmx_destroy_vcpu(lcd);
   return 0;
 }
 EXPORT_SYMBOL(lcd_destroy);
 
+static int lcd_va_to_pa(void* va, void** pa) {
+  *(unsigned long*)pa = vmalloc_to_pfn(va)<<PAGE_SHIFT;
+  return 0;
+}
+
 static int __move_host_mapping(lcd_struct *lcd, void* hva,
                                unsigned int size) {
   unsigned int mapped = 0;
-  void *pa, *va = hva;
+  void *pa;
+  void *va = (void*)round_down(((unsigned long)hva), PAGE_SIZE);
   int ret = 0;
   while (mapped < size) {
-    ret = lcd_va_to_pa(va, pa);
+    ret = lcd_va_to_pa(va, &pa);
     if (ret != 0) {
       return ret;
     }
 
-    ret = lcd_map_gpa_to_hpa(lcd, pa, pa, 0);
+    ret = lcd_map_gpa_to_hpa(lcd, (u64)pa, (u64)pa, 0);
     if (ret != 0) {
       printk(KERN_ERR "lcd: move PA mapping conflicts\n");
       return ret;
     }
-    ret = lcd_map_gva_to_gpa(lcd, va, pa, 1, 0);
+    ret = lcd_map_gva_to_gpa(lcd, (u64)va, (u64)pa, 1, 0);
     if (ret != 0) {
       printk(KERN_ERR "lcd: move PT mapping conflicts\n");
       return ret;
@@ -1971,13 +1977,19 @@ static int __move_host_mapping(lcd_struct *lcd, void* hva,
 }
 
 int lcd_move_module(lcd_struct *lcd, struct module *mod) {
+  int ret;
   lcd->mod = mod;
   // lcd_va_to_pa(va, pa) // 4KB page assumption
 
-  int ret = __move_host_mapping(lcd, mod->module_init, mod->init_size);
+  ret = __move_host_mapping(lcd, mod->module_init, mod->init_size);
   if (!ret) {
     ret = __move_host_mapping(lcd, mod->module_core, mod->core_size);
+    if (!ret) {
+      vmcs_writel(GUEST_RIP, (unsigned long)mod->module_init);
+    }
   }
+
+  printk(KERN_ERR "lcd: failed to move module %d\n", ret);
 
   return ret;
 }

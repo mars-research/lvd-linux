@@ -12,6 +12,7 @@
 #include <linux/kthread.h>
 #include <linux/slab.h>
 #include <linux/tboot.h>
+#include <linux/types.h>
 
 #include <uapi/asm/kvm.h>
 
@@ -19,6 +20,65 @@
 #include <asm/processor.h>
 #include <asm/desc.h>
 #include <asm/virtext.h>
+
+#include <linux/fs.h>
+#include <linux/file.h>
+#include <linux/stat.h>
+#include <asm/segment.h>
+#include <asm/uaccess.h>
+
+#include <uapi/linux/limits.h>
+#include <linux/string.h>
+static char target_mod_filepath[PATH_MAX];
+module_param_string(mod_file, target_mod_filepath,
+                    sizeof(target_mod_filepath), 0644);
+MODULE_PARM_DESC(mod_file, "Filepath of the target module to"
+                 " run inside LCD");
+
+static int lcd_read_mod_file(const char* filepath,
+                             void** filecontent, long* size) {
+  struct file* filp = NULL;
+  mm_segment_t oldfs;
+  int err = 0;
+  loff_t pos = 0;
+
+  oldfs = get_fs();
+  set_fs(get_ds());
+
+  filp = filp_open(filepath, O_RDONLY, 0);
+  if (IS_ERR(filp)) {
+    err = PTR_ERR(filp);
+    printk(KERN_ERR "Error when opening file %d\n", err);
+    goto error_out;
+  }
+
+  *size = i_size_read(file_inode(filp));
+  if (*size < 0) {
+    err = (int)*size;
+    printk(KERN_ERR "File size error\n");
+    goto after_open_error_out;
+  }
+  *filecontent = vmalloc(*size);
+  if (!*filecontent) {
+    printk(KERN_ERR "Failed to allocate %lu mem for file\n", *size);
+    goto after_open_error_out;
+  }
+
+  err = vfs_read(filp, *filecontent, *size, &pos);
+  if (err != (int)*size) {
+    printk(KERN_ERR "Failed to read %s content\n", filepath);
+    vfree(*filecontent);
+    *filecontent = NULL;
+    goto after_open_error_out;
+  } else
+    err = 0;
+  
+after_open_error_out:
+  filp_close(filp, NULL);
+error_out:
+  set_fs(oldfs);
+  return err; 
+}
 
 /* #include "lcd.h" */
 #include "lcd_defs.h"

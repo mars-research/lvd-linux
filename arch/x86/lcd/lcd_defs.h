@@ -166,8 +166,15 @@ typedef struct {
 
   unsigned long isr_page;
 
+  unsigned long host_idt_base;
+
   u8  fail;
   u64 exit_reason;
+  u64 exit_qualification;
+  u32 idt_vectoring_info;
+  u32 exit_intr_info;
+  u32 error_code;
+  u32 vec_no;
   u64 host_rsp;
   u64 regs[NR_VCPU_REGS];
   u64 cr2;
@@ -244,5 +251,8 @@ int lcd_find_hva_by_gpa(lcd_struct *lcd, u64 gpa, u64 *hva);
 
 int lcd_run(lcd_struct *lcd);
 const char* lcd_exit_reason(int exit_code);
+
+// Inside LCD:
+int lcd_read_mod_file(const char* filepath, void** content, long* size);
 
 #endif

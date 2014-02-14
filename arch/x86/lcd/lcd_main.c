@@ -25,6 +25,7 @@
 #include <linux/file.h>
 #include <linux/stat.h>
 #include <asm/segment.h>
+#include <asm/tsc.h>
 #include <asm/uaccess.h>
 
 #include <uapi/linux/limits.h>
@@ -56,6 +57,8 @@ static unsigned long *msr_bitmap;
 
 struct vmcs_config vmcs_config;
 
+
+static cycles_t g_prepare_start, g_prepare_time;
 
 /* CPU Features and Ops */
 
@@ -1034,8 +1037,8 @@ static int setup_vmcs_config(struct vmcs_config *vmcs_conf) {
 
 
   // Exit control:
-  min = VM_EXIT_HOST_ADDR_SPACE_SIZE;
-      /* | VM_EXIT_ACK_INTR_ON_EXIT; */
+  min = VM_EXIT_HOST_ADDR_SPACE_SIZE//;
+      | VM_EXIT_ACK_INTR_ON_EXIT;
   opt = 0;
   if (adjust_vmx_controls(min, opt, MSR_IA32_VMX_EXIT_CTLS,
                           &_vmexit_control) < 0)
@@ -1932,10 +1935,11 @@ static int lcd_test(void) {
 
   printk("LCD: start launching vmx\n");
   /* ret = vmx_launch(&ret_code); */
+  g_prepare_start = get_cycles();
   lcd = lcd_create();
   if (!lcd)
     return -ENOMEM;
-  printk("LCD: create lcd VPID %d\n", lcd->vpid);
+  /* printk("LCD: create lcd VPID %d\n", lcd->vpid); */
   ret = lcd_run(lcd);
   if (ret) {
     printk(KERN_ERR "LCD: launch failure %d\n", ret);
@@ -1943,7 +1947,8 @@ static int lcd_test(void) {
     printk(KERN_INFO "LCD: launch OK\n");
   }
 
-  printk(KERN_INFO "LCD: ret code: %d\n", lcd->ret_code);
+  printk(KERN_INFO "LCD: prepare time %llu, ret code: %d\n",
+         g_prepare_time, lcd->ret_code);
   lcd_destroy(lcd);
   return ret;
 }
@@ -2035,7 +2040,8 @@ int lcd_find_hva_by_gpa(lcd_struct *lcd, u64 gpa, u64 *hva) {
 EXPORT_SYMBOL(lcd_find_hva_by_gpa);
 
 static void vmx_handle_external_interrupt(lcd_struct *lcd) {  
-  if ((lcd->exit_intr_info & (INTR_INFO_VALID_MASK | INTR_INFO_INTR_TYPE_MASK))
+  if ((lcd->exit_intr_info &
+       (INTR_INFO_VALID_MASK | INTR_INFO_INTR_TYPE_MASK))
       == (INTR_INFO_VALID_MASK | INTR_TYPE_EXT_INTR)) {
     unsigned int vector;
     unsigned long entry;
@@ -2062,6 +2068,8 @@ static void vmx_handle_external_interrupt(lcd_struct *lcd) {
         [cs]"i"(__KERNEL_CS)
                  );
     /* printk("lcd: handling external %u\n", vector); */
+    if (irqs_disabled())
+      local_irq_enable();
   } else {
     local_irq_enable();
     /* printk("lcd: not handling external %u\n", lcd->exit_intr_info); */
@@ -2069,24 +2077,27 @@ static void vmx_handle_external_interrupt(lcd_struct *lcd) {
 }
 
 static void vmx_handle_vmcall(lcd_struct *lcd) {
-  printk(KERN_INFO "lcd: got vmcall %llu\n", lcd->regs[VCPU_REGS_RAX]);
+  /* printk(KERN_INFO "lcd: got vmcall %llu\n", lcd->regs[VCPU_REGS_RAX]); */
 }
 
 static void vmx_handle_page_fault(lcd_struct *lcd) {
-  printk(KERN_INFO "lcd: page fault VA %p\n", (void*)lcd->exit_qualification);
+  printk(KERN_INFO "lcd: page fault VA %p\n",
+         (void*)lcd->exit_qualification);
 }
 
 static int vmx_handle_nmi_exception(lcd_struct *vcpu)
 {
   printk(KERN_INFO "lcd: got an exception\n");
-  if ((vcpu->exit_intr_info & INTR_INFO_INTR_TYPE_MASK) == INTR_TYPE_NMI_INTR)
+  if ((vcpu->exit_intr_info & INTR_INFO_INTR_TYPE_MASK)
+      == INTR_TYPE_NMI_INTR)
     return 0;
   else if (is_page_fault(vcpu->exit_intr_info)) {
     vmx_handle_page_fault(vcpu);
     return 1;
   }
 
-  printk(KERN_ERR "lcd: unhandled nmi, intr_info %x\n", vcpu->exit_intr_info);
+  printk(KERN_ERR "lcd: unhandled nmi, intr_info %x\n",
+         vcpu->exit_intr_info);
   vcpu->ret_code = ((EFAULT) << 8);
   return -EIO;
 }
@@ -2094,17 +2105,22 @@ static int vmx_handle_nmi_exception(lcd_struct *vcpu)
 int lcd_run(lcd_struct *lcd) {
   int done = 0;
   int ret = 0;
+  int countdown = 1000;
+
+  cycles_t begin, end;
+  begin = get_cycles();
+  g_prepare_time = begin - g_prepare_start;
   while (1) {
     vmx_get_cpu(lcd);
 
     local_irq_disable();
 
-    if (need_resched()) {
+    /*if (need_resched()) {
       local_irq_enable();
       vmx_put_cpu(lcd);
       cond_resched();
       continue;
-    }
+    }*/
 
     // In case we run from insmod.
     if (signal_pending(current)) {
@@ -2140,11 +2156,12 @@ int lcd_run(lcd_struct *lcd) {
     ret = vmx_run_vcpu(lcd);
     if (ret == EXIT_REASON_VMCALL ||
         ret == EXIT_REASON_CPUID) {
-      vmx_step_instruction();
+      /* vmx_step_instruction(); */
     }
 
     if (ret == EXIT_REASON_EXTERNAL_INTERRUPT) {
       vmx_handle_external_interrupt(lcd);
+      /* --countdown; */
     }
     
     vmx_put_cpu(lcd);
@@ -2162,17 +2179,24 @@ int lcd_run(lcd_struct *lcd) {
              ret, lcd_exit_reason(ret), lcd->exit_qualification);
       vmx_dump_cpu(lcd);
       done = 1;
-    } 
+    }
 
-    if (done || lcd->shutdown) {
+    --countdown;
+
+    if (countdown <=0 || done || lcd->shutdown) {
+      end = get_cycles();
+      printk("Cycles: %llu, counter %d\n", end-begin, countdown);
       printk(KERN_INFO "unhandled exit: reason %d: %s, "
              "exit qualification %llx, intr_info %x\n",
              ret, lcd_exit_reason(ret), lcd->exit_qualification,
              lcd->exit_intr_info);
-      vmx_dump_cpu(lcd);
+      /* vmx_dump_cpu(lcd); */
       break;
     }
   }
+
+  if (irqs_disabled())
+    local_irq_enable();
 
   return 0;
 }

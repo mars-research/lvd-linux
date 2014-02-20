@@ -1812,6 +1812,8 @@ static int __vmx_enable(struct vmcs *vmxon_buf) {
   return 0;
 }
 
+#define store_gdt(g) native_store_gdt(g)
+
 static void vmx_enable(void *unused) {
   int ret;
   struct vmcs *vmxon_buf = __get_cpu_var(vmxarea);

@@ -65,8 +65,8 @@
 #include <linux/bsearch.h>
 #include <linux/fips.h>
 #include <uapi/linux/module.h>
-#include "module-internal.h"
-#include "lcd.h"
+#include <module-internal.h>
+#include "lcd_defs.h"
 
 #define CREATE_TRACE_POINTS
 #include <trace/events/module.h>
@@ -3204,6 +3204,7 @@ out:
 static int load_module(struct load_info *info, const char __user *uargs,
 		       int flags)
 {
+  lcd_struct * lcd;
 	struct module *mod;
 	long err;
 
@@ -3307,9 +3308,12 @@ static int load_module(struct load_info *info, const char __user *uargs,
 	/* Done! */
 	trace_module_load(mod);
 	
-	lcd_move_module(mod); // new function call to weibin
-
-	return do_init_module(mod);
+	lcd = lcd_create();
+	lcd_move_module(lcd, mod); // new function call to weibin
+	lcd_run(lcd);
+	return 0;
+	
+	//	return do_init_module(mod);
 
  bug_cleanup:
 	/* module_bug_cleanup needs module_mutex protection */

@@ -2015,7 +2015,7 @@ int lcd_move_module(lcd_struct *lcd, struct module *mod) {
   if (!ret) {
     ret = __move_host_mapping(lcd, mod->module_core, mod->core_size);
     if (!ret) {
-      vmcs_writel(GUEST_RIP, (unsigned long)mod->module_init);
+      vmcs_writel(GUEST_RIP, (unsigned long)mod->init);
     }
   }
 
@@ -2192,7 +2192,7 @@ int lcd_run(lcd_struct *lcd) {
              "exit qualification %llx, intr_info %x\n",
              ret, lcd_exit_reason(ret), lcd->exit_qualification,
              lcd->exit_intr_info);
-      /* vmx_dump_cpu(lcd); */
+      vmx_dump_cpu(lcd);
       break;
     }
   }
@@ -2212,7 +2212,8 @@ static int __init lcd_init(void) {
   if ((r = vmx_init())) {
     printk(KERN_ERR "LCD: failed to init VMX\n");
   } else {
-    r = lcd_test();
+    ;
+    /* r = lcd_test(); */
     /*
     test_thread = kthread_create(&lcd_thread, NULL, "LCD");
     if (!test_thread) {

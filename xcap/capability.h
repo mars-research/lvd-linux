@@ -1,3 +1,14 @@
+#ifndef __LCD_CAPABILITY_H__
+#define __LCD_CAPABILITY_H__
+
+#include <linux/module.h>
+#include <linux/kernel.h>
+#include <linux/init.h>
+#include <linux/slab.h>
+#include <linux/fs.h>
+#include <linux/kthread.h>
+#include <linux/sched.h>
+#include <linux/semaphore.h>
 
 typedef enum _lcd_cap_type
 {
@@ -136,3 +147,4 @@ uint32_t lcd_untyped_retype();
 // will be used to get the rights available with a capability.
 uint32_t lcd_get_cap_rights(lcd_tcb ptcb, cap_id cid, lcd_cap_rights &rights);
 
+#endif // __LCD_CAPABILITY_H__

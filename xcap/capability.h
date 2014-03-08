@@ -4,7 +4,7 @@
 #include <linux/types.h>
 #include <linux/module.h>
 #include <linux/kernel.h>
-#include <linux/slab.h>
+#include <linux/slab_def.h>
 #include <linux/fs.h>
 #include <linux/kthread.h>
 #include <linux/sched.h>
@@ -14,8 +14,17 @@
 MODULE_LICENSE("GPL");
 MODULE_AUTHOR ("FLUX-LAB University of Utah");
 
+#define LCD_CAPABILITY
+
+#define SAFE_EXIT_IF_ALLOC_FAILED(ptr, label)    \
+if (ptr == NULL)                            \
+{                                           \
+  goto label;                               \
+}                                           \
+
 typedef enum _lcd_cap_type
 {
+  lcd_type_free,
   lcd_type_untyped,
   lcd_type_cnode,
   lcd_type_endpoint
@@ -28,8 +37,8 @@ enum {
 	LCD_CapInitThreadCNode     =  2, /* initial thread's root CNode cap */
 	LCD_CapInitThreadPD        =  3, /* initial thread' page directory */
 	LCD_CapIRQControl          =  4, /* global IRQ controller */
-	LCD_CapBootInfoFrame       =  9, /* bootinfo frame cap */
-	LCD_CapInitThreadIPCBuffer = 10  /* initial thread's IPC buffer frame cap */
+	LCD_CapInitThreadIPCBuffer =  5,  /* initial thread's IPC buffer frame cap */
+	LCD_CapFirstFreeSlot       =  6
 }; 
 
 typedef uint32_t lcd_cnode; 		// a pointer to the cnode
@@ -51,9 +60,9 @@ typedef uint16_t   lcd_cap_rights;	// holds the rights associated with a capabil
 
 typedef struct _cap_derivation_list
 {
-  lcd_tcb          remote_TCB;    // reference to the thread which was granted this capability
+  void             *remote_TCB;  // reference to the thread which was granted this capability
   cap_id           remote_cid;   // address in the remote threads capability space where this 
-			          // capability is stored.
+                                 // capability is stored.
   struct _cap_derivation_list *next;
 }cap_derivation_list;
 
@@ -65,7 +74,7 @@ typedef struct _capability
 typedef struct _capability_internal 
 {
 	void          *hobject;      // a pointer to a kernel object
-	struct cap_derivation_list   *cgrant_list; // list of domain ids to whom this capability is granted
+	struct cap_derivation_list   *cdt_list; // list of domain ids to whom this capability is granted
 	lcd_cap_rights crights;      // specifies the rights the domain has over this capability
 }capability_internal;
 
@@ -77,7 +86,8 @@ typedef struct _cte // capability table entry
     union{
           struct _cap_node *cnode;
           capability_internal *cap;
-    }u;
+          int next_free_slot;
+    };
 }cte;
 
 typedef struct _cap_node
@@ -87,23 +97,23 @@ typedef struct _cap_node
 	  int32_t  guard_bits:27; // actual guard bits
 	  int32_t  guard_size:5;  // number of valid bits in guard_bits
 	}guard;
-	uint32_t nfree_slots; /* number of free slots left in this cnode. when this reaches
-				  2 power bits - 1 we must allocate another cnode before insert*/
+    int max_slots;
 	cte *cap_entry; /* may point to another cnode or to a capability */
-	uint16_t bits; /* total slots in this cnode is 2 power bits. 
-			Minimum value must be 5 i.e. 32 slots*/
 }cap_node;
 
 
 
 typedef struct _cap_space
 {
-	struct cap_node *cnode;
-    struct semaphore g_cspace;
+	struct cte *root_cnode;
+    struct semaphore sem_cspace;
 }cap_space;
 
 
 /* Helper Functions */
+
+// initializes the free slots available in the cnode structure.
+void initialize_freelist(cap_node *cnode, int size, bool bFirstCNode=false);
 
 // will be used to search for the cnode which has a free slot available.
 // if no such cnode exists will make a call to create lcd_create_cnode to create an
@@ -126,7 +136,7 @@ uint32_t lcd_delete_cnode(cap_id cid);
 // one for its cspace
 // one for the endpoint.
 // the returned value goes into the TCB of the caller.
-cap_space * lcd_create_cspace(void * ptcb);
+cap_space * lcd_create_cspace();
 
 // creates a new capability, inserts it into cspace of caller and 
 // returns the capability identifier.

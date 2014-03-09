@@ -8,18 +8,27 @@
 #include <linux/mm.h>
 #include <linux/slab.h>
 #include <linux/fs.h>
-#include <linux/kthread.h>
 #include <linux/semaphore.h>
 #include <linux/log2.h>
 #include <linux/delay.h>
 #include <asm/page.h>
+#include "../../../SeL4/seL4-release-1.2/code/apps/wombat-vmlinux/linux-2.6.38.1/arch/arm/nwfpe/ARM-gcc.h"
 
 MODULE_LICENSE("GPL");
 MODULE_AUTHOR ("FLUX-LAB University of Utah");
 
-#define LCD_CAPABILITY
-#define MAX_SLOTS          (PAGE_SIZE/sizeof(struct cte))
-#define CNODE_INDEX_BITS   (ilog2(MAX_SLOTS))
+typedef uint32_t lcd_cnode;         // a pointer to the cnode
+typedef uint64_t cap_id ;           // a locally unique identifier (address within cspace)
+typedef uint32_t lcd_cnode_entry;   // a pointer to an entry within a cnode
+typedef uint64_t   lcd_tcb;     // a pointer/handle to the thread contrl block
+typedef uint16_t   lcd_cap_rights;  // holds the rights associated with a capability.
+
+#define MAX_SLOTS               (PAGE_SIZE/sizeof(struct cte))
+#define CNODE_SLOTS_PER_CNODE   5
+#define CNODE_SLOTS_START       (MAX_SLOTS - CNODE_SLOTS_PER_CNODE)
+#define CNODE_INDEX_BITS        (ilog2(MAX_SLOTS))
+#define CAP_ID_SIZE             (sizeof(cap_id) * 8)
+#define MAX_DEPTH               ((CAP_ID_SIZE - 1)/CNODE_INDEX_BITS)
 
 #define SAFE_EXIT_IF_ALLOC_FAILED(ptr, label)    \
 if (ptr == NULL)                            \
@@ -52,11 +61,7 @@ enum {
 	LCD_CapFirstFreeSlot       =  6
 }; 
 
-typedef uint32_t lcd_cnode; 		// a pointer to the cnode
-typedef uint64_t cap_id	;    		// a locally unique identifier (address within cspace)
-typedef uint32_t lcd_cnode_entry;	// a pointer to an entry within a cnode
-typedef uint64_t   lcd_tcb;		// a pointer/handle to the thread contrl block
-typedef uint16_t   lcd_cap_rights;	// holds the rights associated with a capability.
+
 
 #define CAPRIGHTS_READ          (1 << 0)
 #define CAPRIGHTS_WRITE         (1 << 1)
@@ -114,6 +119,28 @@ struct cap_space
 
 
 /* Helper Functions */
+
+static inline int get_bits_at_level(cap_id id, int level)
+{
+  int bits = 0;
+  id = id << ((MAX_DEPTH - level - 1) * CNODE_INDEX_BITS);
+  id = id >> ((MAX_DEPTH - 1)         * CNODE_INDEX_BITS);
+  bits = (int) id;
+  return bits;
+}
+
+static inline void clear_bits_at_level(cap_id *id, int level)
+{
+  cap_id mask = (~0);
+  // clear all higher order bits.
+  mask = mask << ((MAX_DEPTH - level - 1) * CNODE_INDEX_BITS);
+  // clear lower order bits
+  mask = mask >> ((MAX_DEPTH - 1)         * CNODE_INDEX_BITS);
+  // get the mask to appropriate position
+  mask = mask << (level * CNODE_INDEX_BITS);
+  mask = ~mask;
+  *id = (*id) & mask;
+}
 
 // initializes the free slots available in the cnode structure.
 void lcd_initialize_freelist(struct cte *cnode, int size, bool bFirstCNode);

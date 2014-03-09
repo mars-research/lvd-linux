@@ -70,7 +70,37 @@ cap_id lcd_lookup_free_slot(struct cap_space *cspace, struct cte **cap)
 
 struct cte * lcd_lookup_capability(struct cap_space *cspace, cap_id cid)
 {
-  struct cte *cap;
+  struct cte *cap = NULL, *cnode = NULL;
+  cap_id id = cid;
+  int index = 0;
+  int mask = (~0);
+  mask = mask << (CNODE_INDEX_BITS);
+  mask = ~mask;
+  
+  // check if input is valid
+  if (cspace == NULL || cid == 0)
+    return NULL;
+  cnode = cspace->root_cnode;
+  
+  while (id > 0)
+  {
+    index = (int)(id) & mask;
+    id = id >> (CNODE_INDEX_BITS);
+    if (cnode[index].ctetype == lcd_type_capability && id == 0)
+    {
+      cap = &cnode[index];
+      break;
+    }
+    else if (cnode[index].ctetype == lcd_type_cnode && id != 0)
+    {
+      cnode = cnode[index].cnode.cap_entry;
+    }
+    else
+    {
+      break;
+    }
+  }
+  
   return cap;
 }
 
@@ -111,7 +141,7 @@ success:
 
 cap_id lcd_create_cap(void * ptcb, void * hobject, lcd_cap_rights crights)
 {
-  struct task_struct *tcb = (struct task_struct *)ptcb;
+  struct task_struct *tcb = ptcb;
   struct cap_space *cspace;
   struct cte *cap;
   cap_id cid;

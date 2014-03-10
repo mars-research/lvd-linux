@@ -3,11 +3,17 @@
 //  
 //
 //  Created by jithu joseph on 2/28/14.
-//  some standalone utility routines to be used by guest
+//  some utility routines to be used by guest
 //  compile using -static -fno-builtin
 //
 
 //#include <stdio.h>
+#include <linux/module.h>	/* Needed by all modules */
+#include <linux/kernel.h>	/* Needed for KERN_INFO */
+#include <linux/init.h>		/* Needed for the macros */
+#include <asm/vmx.h>
+#include "../lcd_defs.h"
+
 typedef unsigned int   uint;
 
 
@@ -53,6 +59,13 @@ static int putc(int fd, const char c)
 	return ret;
 }
 
+static inline void
+lcd_putc(char c)
+{
+    asm volatile("movzx %0,%%rax" : : "r" (c));
+    asm volatile("vmcall");
+}
+
 static void
 printint(int fd, int xx, int base, int sgn)
 {
@@ -77,10 +90,9 @@ printint(int fd, int xx, int base, int sgn)
     buf[i++] = '-';
     
     while(--i >= 0)
-    putc(fd, buf[i]);
+    lcd_putc(buf[i]);
 }
 
-// Print to the given fd. Only understands %d, %x, %p, %s.
 void
 printf(int fd, char *fmt, ...)
 {
@@ -96,10 +108,12 @@ printf(int fd, char *fmt, ...)
             if(c == '%'){
                 state = '%';
             } else {
-                putc(fd, c);
+              //  lcd_putc(fd, c);
+                lcd_putc(c);
             }
         } else if(state == '%'){
             if(c == 'd'){
+                printk(KERN_ERR "printk The int is %d\n", *ap);
                 printint(fd, *ap, 10, 1);
                 ap++;
             } else if(c == 'x' || c == 'p'){
@@ -111,24 +125,62 @@ printf(int fd, char *fmt, ...)
                 if(s == 0)
                 s = "(null)";
                 while(*s != 0){
-                    putc(fd, *s);
+                    lcd_putc(*s);
                     s++;
                 }
             } else if(c == 'c'){
-                putc(fd, *ap);
+                lcd_putc( *ap);
                 ap++;
             } else if(c == '%'){
-                putc(fd, c);
+                lcd_putc(c);
             } else {
                 // Unknown % sequence.  Print it to draw attention.
-                putc(fd, '%');
-                putc(fd, c);
+                lcd_putc('%');
+                lcd_putc(c);
             }
             state = 0;
         }
     }
 }
 
+void temp_fn() {
+  int check = 107;
+    printk(KERN_ERR "printk2 %d\n", check);
+  printf(1, "temp func \n");
+    
+}
 
+static volatile int shared_var = 0;
+
+static int  hello_2_init(void)
+{
+    int check = 107;
+//printk(KERN_INFO "Hello, world 2\n");
+    if (shared_var == 0) {
+        shared_var = 1;
+        lcd_struct *lcd = lcd_create();
+        lcd_move_module(lcd, &__this_module);
+        lcd_run(lcd);
+        printk("%d\n", shared_var);
+      //  lcd_destroy(lcd);
+        return 0;
+    }
+    // guest
+    shared_var = 2;
+    //printk(KERN_ERR "printk2 %d\n", check);
+    printf(1, "Hellow  World\n");
+    temp_fn();
+    
+	return 0;
+}
+
+static void __exit hello_2_exit(void)
+{
+   printk(KERN_INFO "Goodbye, world 2\n");
+   //  printf(1, "goodbye World\n");
+}
+
+module_init(hello_2_init);
+module_exit(hello_2_exit);
 
 

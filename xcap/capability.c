@@ -52,12 +52,13 @@ void lcd_initialize_freelist(struct cte *cnode, bool bFirstCNode)
   cnode[i].slot.next_free_cnode_slot = 0;
 }
 
-struct cte * lcd_insert_capability(struct cte *node, cap_id *cid, int free_slot, int level)
+struct cte * lcd_insert_capability(struct cte *cnode, cap_id *cid, int free_slot)
 {
+  struct cte *node = cnode->cnode.cap_entry;
   ASSERT(node[free_slot].ctetype == lcd_type_free, "Free List is corrupted\n");
   // a valid empty slot
   node[0].slot.next_free_cap_slot = node[free_slot].slot.next_free_cap_slot;
-  set_level_bits(cid, node->cnode.cnode_id, free_slot, level);
+  lcd_set_level_bits(&cid, cnode->cnode.cnode_id, free_slot, cnode->cnode.level);
   return &node[free_slot];
 }
 
@@ -71,27 +72,38 @@ cap_id lcd_lookup_free_slot(struct cap_space *cspace, struct cte **cap)
   int level = 0, i = 0;
   struct kfifo cnode_q;
   
-  if (cspace == NULL || cap == NULL)
+  if (cspace == NULL || cspace->root_cnode.cnode.cap_entry == NULL || cap == NULL)
     return 0;
   
   if (kfifo_alloc(&cnode_q, sizeof(struct cte) * 512, GFP_KERNEL) != 0)
-    return 0;
-  kfifo_in(&cnode_q, cspace->root_cnode.cnode.cap_entry, 1);
+  {
+    cid = 0;
+    goto free_kfifo;
+  }
+
+  kfifo_in(&cnode_q, &(cspace->root_cnode), 1);
   
   while (!found && !kfifo_is_empty(&cnode_q))
   {
     int free_cap_slot = 0, free_cnode_slot = 0;
-    struct cte *node = NULL;
-    kfifo_out(&cnode_q, node, 1);
-    if (node == NULL)
-      return 0;
-
-    free_cap_slot = node[0].next_free_cap_slot;
-    free_cnode_slot = node[0].next_free_cnode_slot;
+    struct cte *node = NULL, *cnode = NULL;
+    kfifo_out(&cnode_q, cnode, 1);
+  
+    if (cnode == NULL)
+    {
+      cid = 0;
+      goto free_kfifo;
+    }
+    node = cnode->cnode.cap_entry;
+    
+    free_cap_slot = node[0].slot.next_free_cap_slot;
+    free_cnode_slot = node[0].slot.next_free_cnode_slot;
+    level = cnode->cnode.level;
+    
     if (free_cap_slot != 0 && free_cap_slot < CNODE_SLOTS_START)
     {
-      *cap = lcd_insert_capability(node, &cid, free_cap_slot, level);
-      return cid;
+      *cap = lcd_insert_capability(cnode, &cid, free_cap_slot);
+      goto free_kfifo;
     }
     else if (free_cnode_slot != 0 && free_cnode_slot >= CNODE_SLOTS_START && free_cnode_slot < MAX_SLOTS)
     {
@@ -101,12 +113,13 @@ cap_id lcd_lookup_free_slot(struct cap_space *cspace, struct cte **cap)
       {
         if (node[i].ctetype == lcd_type_cnode)
         {
+          struct cte * next_cnode = &node[i];
           struct cte *next_node = node[i].cnode.cap_entry;
           free_cap_slot = next_node[0].next_free_cap_slot;
           if (free_cap_slot != 0 && free_cap_slot < CNODE_SLOTS_START)
           {
-            *cap = lcd_insert_capability(next_node, &cid, free_cap_slot, level + 1);
-            return cid;
+            *cap = lcd_insert_capability(next_cnode, &cid, free_cap_slot);
+            goto free_kfifo;
           }
         }
       }
@@ -114,16 +127,27 @@ cap_id lcd_lookup_free_slot(struct cap_space *cspace, struct cte **cap)
       node[0].slot.next_free_cnode_slot = node[free_cnode_slot].slot.next_free_cnode_slot;
       node[free_cnode_slot].ctetype = lcd_type_cnode;
       node[free_cnode_slot].cnode.cap_entry = kmalloc(PAGE_SIZE, GFP_KERNEL);
+      
       if (node[free_cnode_slot].cnode.cap_entry == NULL)
-        return 0;
+      {
+        cid = 0;
+        goto free_kfifo;
+      }
       lcd_initialize_freelist(node[free_cnode_slot].cnode.cap_entry, false);
+      
+      lcd_set_level_bits(&cid, code->cnode.cnode_id, free_cnode_slot, cnode->cnode.level + 1);
+      node[free_cnode_slot].cnode.cnode_id = cid;
+      node[free_cnode_slot].cnode.level = cnode->cnode.level + 1;
       node = node[free_cnode_slot].cnode.cap_entry;
-      free_cap_slot = node[0].next_free_cap_slot;
+      
+      free_cap_slot = node[0].slot.next_free_cap_slot;
       if (free_cap_slot != 0 && free_cap_slot < CNODE_SLOTS_START)
       {
-        *cap = lcd_insert_capability(node, &cid, free_slot, level + 1);
-        return cid;
+        *cap = lcd_insert_capability(node, &cid, free_slot);
+        goto free_kfifo;
       }
+      cid = 0;
+      goto free_kfifo;
     }
     else 
     {
@@ -133,9 +157,9 @@ cap_id lcd_lookup_free_slot(struct cap_space *cspace, struct cte **cap)
       {
         kfifo_in(&cnode_q, &node[i], 1);
       }
-      level++;
     }
   }
+free_kfifo:
   kfifo_free(&cnode_q);
   return cid;
 }

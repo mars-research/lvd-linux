@@ -151,7 +151,12 @@ static inline void clear_bits_at_level(cap_id *id, int level)
   *id = (*id) & mask;
 }
 
-struct cte * lcd_insert_capability(struct cte *node, cap_id *cid, int free_slot, int level);
+void lcd_set_level_bits(cap_id *cid, node->cnode.cnode_id, free_slot, level)
+{
+  
+}
+
+struct cte * lcd_insert_capability(struct cte *node, cap_id *cid, int free_slot);
 
 // initializes the free slots available in the cnode structure.
 void lcd_initialize_freelist(struct cte *cnode, bool bFirstCNode);

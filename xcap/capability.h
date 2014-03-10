@@ -11,6 +11,7 @@
 #include <linux/semaphore.h>
 #include <linux/log2.h>
 #include <linux/delay.h>
+#include <linux/kfifo.h>
 #include <asm/page.h>
 #include "../../../SeL4/seL4-release-1.2/code/apps/wombat-vmlinux/linux-2.6.38.1/arch/arm/nwfpe/ARM-gcc.h"
 
@@ -24,7 +25,7 @@ typedef uint64_t   lcd_tcb;     // a pointer/handle to the thread contrl block
 typedef uint16_t   lcd_cap_rights;  // holds the rights associated with a capability.
 
 #define MAX_SLOTS               (PAGE_SIZE/sizeof(struct cte))
-#define CNODE_SLOTS_PER_CNODE   5
+#define CNODE_SLOTS_PER_CNODE   64
 #define CNODE_SLOTS_START       (MAX_SLOTS - CNODE_SLOTS_PER_CNODE)
 #define CNODE_INDEX_BITS        (ilog2(MAX_SLOTS))
 #define CAP_ID_SIZE             (sizeof(cap_id) * 8)
@@ -98,7 +99,15 @@ struct cte;
 
 struct cap_node
 {
+    cap_id cnode_id;
+    int level;
     struct cte *cap_entry; /* may point to another cnode or to a capability */
+};
+
+struct free_slot_t
+{
+  int next_free_cap_slot;
+  int next_free_cnode_slot;
 };
 
 struct cte // capability table entry
@@ -107,13 +116,13 @@ struct cte // capability table entry
     union{
           struct cap_node cnode;
           struct capability_internal cap;
-          int next_free_slot;
+          struct free_slot_t slot;
     };
 };
 
 struct cap_space
 {
-	struct cte *root_cnode;
+	struct cte root_cnode;
     struct semaphore sem_cspace;
 };
 
@@ -142,8 +151,10 @@ static inline void clear_bits_at_level(cap_id *id, int level)
   *id = (*id) & mask;
 }
 
+struct cte * lcd_insert_capability(struct cte *node, cap_id *cid, int free_slot, int level);
+
 // initializes the free slots available in the cnode structure.
-void lcd_initialize_freelist(struct cte *cnode, int size, bool bFirstCNode);
+void lcd_initialize_freelist(struct cte *cnode, bool bFirstCNode);
 
 // will be used to search for the cnode which has a free slot available.
 // if no such cnode exists will make a call to create lcd_create_cnode to create an

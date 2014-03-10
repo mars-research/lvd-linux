@@ -17,10 +17,10 @@ void cleanup_module(void)
 	printk(KERN_INFO "Cleaning up LCD Module\n");
 }
 
-void lcd_initialize_freelist(struct cte *cnode, int size, bool bFirstCNode)
+void lcd_initialize_freelist(struct cte *cnode, bool bFirstCNode)
 {
   int startid = 1;
-  int i = startid;
+  int i;
   
   if (cnode == NULL)
     return;
@@ -31,15 +31,34 @@ void lcd_initialize_freelist(struct cte *cnode, int size, bool bFirstCNode)
   }
   
   cnode[0].ctetype = lcd_type_free;
-  cnode[0].next_free_slot = startid;
+  cnode[0].slot.next_free_cap_slot = startid;
   cnode[startid].ctetype = lcd_type_free;
-  i = startid;
-  for (; i < MAX_SLOTS - 1; i++)
+  
+  for (i = startid; i < CNODE_SLOTS_START; i++)
   {
-    cnode[i].next_free_slot = i + 1;
+    cnode[i].slot.next_free_cap_slot = i + 1;
     cnode[i+1].ctetype = lcd_type_free;
   }
-  cnode[i].next_free_slot = 0;
+  cnode[i].slot.next_free_cap_slot = 0;
+  
+  startid = CNODE_SLOTS_START;
+  cnode[0].slot.next_free_cnode_slot = startid;
+  cnode[startid].ctetype = lcd_type_free;
+  for (i = CNODE_SLOTS_START; i < MAX_SLOTS - 1; i++)
+  {
+    cnode[i].slot.next_free_cnode_slot = i + 1;
+    cnode[i+1].ctetype = lcd_type_free;
+  }
+  cnode[i].slot.next_free_cnode_slot = 0;
+}
+
+struct cte * lcd_insert_capability(struct cte *node, cap_id *cid, int free_slot, int level)
+{
+  ASSERT(node[free_slot].ctetype == lcd_type_free, "Free List is corrupted\n");
+  // a valid empty slot
+  node[0].slot.next_free_cap_slot = node[free_slot].slot.next_free_cap_slot;
+  set_level_bits(cid, node->cnode.cnode_id, free_slot, level);
+  return &node[free_slot];
 }
 
 // caller responsible for locking cspace.
@@ -48,23 +67,76 @@ void lcd_initialize_freelist(struct cte *cnode, int size, bool bFirstCNode)
 cap_id lcd_lookup_free_slot(struct cap_space *cspace, struct cte **cap)
 {
   cap_id cid = 0;
-  struct cte *cnode;
   bool found = false;
+  int level = 0, i = 0;
+  struct kfifo cnode_q;
   
-  if (cspace == NULL)
+  if (cspace == NULL || cap == NULL)
     return 0;
-  cnode = cspace->root_cnode;
   
-    while (!found)
+  if (kfifo_alloc(&cnode_q, sizeof(struct cte) * 512, GFP_KERNEL) != 0)
+    return 0;
+  kfifo_in(&cnode_q, cspace->root_cnode.cnode.cap_entry, 1);
+  
+  while (!found && !kfifo_is_empty(&cnode_q))
   {
-      int nxt = cnode[0].next_free_slot;
-      // check if only one free slot is available
-      if (cnode[nxt].next_free_slot == 0)
+    int free_cap_slot = 0, free_cnode_slot = 0;
+    struct cte *node = NULL;
+    kfifo_out(&cnode_q, node, 1);
+    if (node == NULL)
+      return 0;
+
+    free_cap_slot = node[0].next_free_cap_slot;
+    free_cnode_slot = node[0].next_free_cnode_slot;
+    if (free_cap_slot != 0 && free_cap_slot < CNODE_SLOTS_START)
+    {
+      *cap = lcd_insert_capability(node, &cid, free_cap_slot, level);
+      return cid;
+    }
+    else if (free_cnode_slot != 0 && free_cnode_slot >= CNODE_SLOTS_START && free_cnode_slot < MAX_SLOTS)
+    {
+      // there is no slot free for capability
+      // 1. Check if free slots are available at next level
+      for (i = CNODE_SLOTS_START; i < free_cap_slot; i++)
       {
-        // only one free slot is available, allocate a new cnode and set free_cnode
-         
+        if (node[i].ctetype == lcd_type_cnode)
+        {
+          struct cte *next_node = node[i].cnode.cap_entry;
+          free_cap_slot = next_node[0].next_free_cap_slot;
+          if (free_cap_slot != 0 && free_cap_slot < CNODE_SLOTS_START)
+          {
+            *cap = lcd_insert_capability(next_node, &cid, free_cap_slot, level + 1);
+            return cid;
+          }
+        }
       }
+      // we will have to allocate a new cnode
+      node[0].slot.next_free_cnode_slot = node[free_cnode_slot].slot.next_free_cnode_slot;
+      node[free_cnode_slot].ctetype = lcd_type_cnode;
+      node[free_cnode_slot].cnode.cap_entry = kmalloc(PAGE_SIZE, GFP_KERNEL);
+      if (node[free_cnode_slot].cnode.cap_entry == NULL)
+        return 0;
+      lcd_initialize_freelist(node[free_cnode_slot].cnode.cap_entry, false);
+      node = node[free_cnode_slot].cnode.cap_entry;
+      free_cap_slot = node[0].next_free_cap_slot;
+      if (free_cap_slot != 0 && free_cap_slot < CNODE_SLOTS_START)
+      {
+        *cap = lcd_insert_capability(node, &cid, free_slot, level + 1);
+        return cid;
+      }
+    }
+    else 
+    {
+      // nothing is free in this cnode 
+      // kep lookin at all its children
+      for (i = CNODE_SLOTS_START; i < MAX_SLOTS; i++)
+      {
+        kfifo_in(&cnode_q, &node[i], 1);
+      }
+      level++;
+    }
   }
+  kfifo_free(&cnode_q);
   return cid;
 }
 
@@ -78,9 +150,9 @@ struct cte * lcd_lookup_capability(struct cap_space *cspace, cap_id cid)
   mask = ~mask;
   
   // check if input is valid
-  if (cspace == NULL || cid == 0)
+  if (cspace == NULL || cid == 0 || cspace->root_cnode.cnode.cap_entry == NULL)
     return NULL;
-  cnode = cspace->root_cnode;
+  cnode = cspace->root_cnode.cnode.cap_entry;
   
   while (id > 0)
   {
@@ -114,21 +186,23 @@ struct cap_space * lcd_create_cspace()
   sema_init(&(cspace->sem_cspace), 1);
   
   // allocate memory for the first cnode.
-  cspace->root_cnode = kmalloc(PAGE_SIZE, GFP_KERNEL);
-  SAFE_EXIT_IF_ALLOC_FAILED(cspace->root_cnode, alloc_failure);
-  
+  cspace->root_cnode.ctetype = lcd_type_cnode;
+  cspace->root_cnode.cnode.cnode_id = 0;
+  cspace->root_cnode.cnode.level = 0;
+  cspace->root_cnode.cnode.cap_entry = kmalloc(PAGE_SIZE, GFP_KERNEL);
+  SAFE_EXIT_IF_ALLOC_FAILED(cspace->root_cnode.cnode.cap_entry, alloc_failure);
   // initialize the free list
-  lcd_initialize_freelist(cspace->root_cnode, PAGE_SIZE, true);
+  lcd_initialize_freelist(cspace->root_cnode.cnode.cap_entry, true);
 
   goto success;
   
 alloc_failure:
   if (cspace)
   {
-    if (cspace->root_cnode)
+    if (cspace->root_cnode.cnode.cap_entry)
     {
-      kfree(cspace->root_cnode);
-      cspace->root_cnode = NULL;
+      kfree(cspace->root_cnode.cnode.cap_entry);
+      cspace->root_cnode.cnode.cap_entry = NULL;
     }
     vfree(cspace);
     cspace = NULL;
@@ -150,11 +224,16 @@ cap_id lcd_create_cap(void * ptcb, void * hobject, lcd_cap_rights crights)
     return 0;
   cspace = tcb->cspace;
   
-  if (cspace == NULL || cspace->root_cnode == NULL)
+  if (cspace == NULL || cspace->root_cnode.cnode.cap_entry == NULL)
     return 0;
   
   down_interruptible(&cspace->sem_cspace);
   cid = lcd_lookup_free_slot(cspace, &cap);
+  if (cid == 0)
+  {
+    up(&cspace->sem_cspace);
+    return 0;
+  }
   cap->ctetype = lcd_type_capability;  
   cap->cap.crights = crights;
   cap->cap.hobject = hobject;
@@ -178,7 +257,7 @@ cap_id lcd_cap_grant(void *src_tcb, cap_id src_cid, void * dst_tcb, lcd_cap_righ
   
   while (!done)
   {
-    // if (down_trylock() == 0) Lock source cspace. 
+    // Lock source cspace. 
     if (down_trylock(stcb->cspace->sem_cspace) == 0)
     {
         //  if (down_trylock() == 0)  lock dst cspace 
@@ -188,7 +267,8 @@ cap_id lcd_cap_grant(void *src_tcb, cap_id src_cid, void * dst_tcb, lcd_cap_righ
             src_cte = lcd_lookup_capability(stcb->cspace, src_cid);
             // get a free slot in destination.
             cid = lcd_lookup_free_slot(dtcb->cspace, &dst_cte);
-            if (cid != 0){
+            if (cid != 0 && src_cte != NULL && dst_cte != NULL)
+            {
               struct cap_derivation_list *cdt_node;
               // add the capability to destination.
               dst_cte->ctetype = lcd_type_capability;
@@ -198,16 +278,22 @@ cap_id lcd_cap_grant(void *src_tcb, cap_id src_cid, void * dst_tcb, lcd_cap_righ
               
               // update the CDT of source
               cdt_node = kmalloc(sizeof(struct cap_derivation_list), GFP_KERNEL);
-              if (cdt_node != NULL){
+              if (cdt_node != NULL)
+              {
                 cdt_node->next = src_cte->cap.cdt_list;
                 src_cte->cap.cdt_list = cdt_node;
-                cdt_node->remote_cid = src_cid;
-                cdt_node->remote_TCB = src_tcb;
+                cdt_node->remote_cid = cid;
+                cdt_node->remote_TCB = dst_tcb;
               }
-              else{
+              else
+              {
                 ASSERT(false, "cdt_node allocation failed");
               }
               done = true;
+            }
+            else
+            {
+              ASSERT(false, "Source capability not found or no free slot in destination");
             }
             // release lock on dst cspace.
             up(dtcb->cspace->sem_cspace);
@@ -219,4 +305,22 @@ cap_id lcd_cap_grant(void *src_tcb, cap_id src_cid, void * dst_tcb, lcd_cap_righ
       msleep_interruptible(1);
   }
   return cid;
+}
+
+uint32_t lcd_get_cap_rights(void * ptcb, cap_id cid, lcd_cap_rights *rights)
+{
+  struct task_struct *tcb = ptcb;
+  struct cte *cap;
+  if (tcb == NULL || tcb->cspace == NULL || cid == 0 || rights == NULL)
+    return -1;
+  down_interruptible(tcb->cspace->sem_cspace);
+  cap = lcd_lookup_capability(tcb->cspace, cid);
+  if (cap == NULL || cap->ctetype != lcd_type_capability)
+  {
+    up(tcb->cspace->sem_cspace);
+    return -1;
+  }
+  rights = cap->cap.crights;
+  up(tcb->cspace->sem_cspace);
+  return 0;
 }

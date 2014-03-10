@@ -29,7 +29,7 @@ typedef uint16_t   lcd_cap_rights;  // holds the rights associated with a capabi
 #define CNODE_SLOTS_START       (MAX_SLOTS - CNODE_SLOTS_PER_CNODE)
 #define CNODE_INDEX_BITS        (ilog2(MAX_SLOTS))
 #define CAP_ID_SIZE             (sizeof(cap_id) * 8)
-#define MAX_DEPTH               ((CAP_ID_SIZE - 1)/CNODE_INDEX_BITS)
+#define MAX_DEPTH               ((CAP_ID_SIZE + 1)/CNODE_INDEX_BITS)
 
 #define SAFE_EXIT_IF_ALLOC_FAILED(ptr, label)    \
 if (ptr == NULL)                            \
@@ -100,8 +100,8 @@ struct cte;
 struct cap_node
 {
     cap_id cnode_id;
-    int level;
-    struct cte *cap_entry; /* may point to another cnode or to a capability */
+    int table_level;
+    struct cte *table; /* points to another cnode table */
 };
 
 struct free_slot_t
@@ -142,21 +142,27 @@ static inline void clear_bits_at_level(cap_id *id, int level)
 {
   cap_id mask = (~0);
   // clear all higher order bits.
-  mask = mask << ((MAX_DEPTH - level - 1) * CNODE_INDEX_BITS);
+  mask = mask << ((MAX_DEPTH - 1) * CNODE_INDEX_BITS);
   // clear lower order bits
-  mask = mask >> ((MAX_DEPTH - 1)         * CNODE_INDEX_BITS);
+  mask = mask >> ((MAX_DEPTH - 1) * CNODE_INDEX_BITS);
   // get the mask to appropriate position
   mask = mask << (level * CNODE_INDEX_BITS);
   mask = ~mask;
   *id = (*id) & mask;
 }
 
-void lcd_set_level_bits(cap_id *cid, node->cnode.cnode_id, free_slot, level)
+static inline void lcd_set_level_bits(struct cte *cnode, cap_id *cid, int free_slot)
 {
+  int level = cnode->cnode.table_level;
+  cap_id id = free_slot;
   
+  *cid = cnode->cnode.cnode_id;
+  clear_bits_at_level(cid, level);
+  id = id << (level * CNODE_INDEX_BITS);
+  *cid = *cid | id;
 }
 
-struct cte * lcd_insert_capability(struct cte *node, cap_id *cid, int free_slot);
+struct cte * lcd_reserve_cap_slot(struct cte *cnode, cap_id *cid, int free_slot);
 
 // initializes the free slots available in the cnode structure.
 void lcd_initialize_freelist(struct cte *cnode, bool bFirstCNode);

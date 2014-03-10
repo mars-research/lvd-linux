@@ -52,27 +52,30 @@ void lcd_initialize_freelist(struct cte *cnode, bool bFirstCNode)
   cnode[i].slot.next_free_cnode_slot = 0;
 }
 
-struct cte * lcd_insert_capability(struct cte *cnode, cap_id *cid, int free_slot)
+struct cte * lcd_reserve_cap_slot(struct cte *cnode, cap_id *cid, int free_slot)
 {
-  struct cte *node = cnode->cnode.cap_entry;
+  struct cte *node = cnode->cnode.table;
   ASSERT(node[free_slot].ctetype == lcd_type_free, "Free List is corrupted\n");
   // a valid empty slot
   node[0].slot.next_free_cap_slot = node[free_slot].slot.next_free_cap_slot;
-  lcd_set_level_bits(&cid, cnode->cnode.cnode_id, free_slot, cnode->cnode.level);
+  lcd_set_level_bits(cnode, cid, free_slot);
   return &node[free_slot];
 }
 
 // caller responsible for locking cspace.
 // free slot will be booked for the caller.
 // ie. it will not longer be free once this function returns it.
+// naming convention:
+// cnode = struct cte entry in the table, which points to another table.
+// node = pointer the the array of struct cte entries/capability table i.e. cnode->cnode.table
 cap_id lcd_lookup_free_slot(struct cap_space *cspace, struct cte **cap)
 {
   cap_id cid = 0;
   bool found = false;
-  int level = 0, i = 0;
+  int i = 0;
   struct kfifo cnode_q;
   
-  if (cspace == NULL || cspace->root_cnode.cnode.cap_entry == NULL || cap == NULL)
+  if (cspace == NULL || cspace->root_cnode.cnode.table == NULL || cap == NULL)
     return 0;
   
   if (kfifo_alloc(&cnode_q, sizeof(struct cte) * 512, GFP_KERNEL) != 0)
@@ -94,15 +97,14 @@ cap_id lcd_lookup_free_slot(struct cap_space *cspace, struct cte **cap)
       cid = 0;
       goto free_kfifo;
     }
-    node = cnode->cnode.cap_entry;
+    node = cnode->cnode.table;
     
     free_cap_slot = node[0].slot.next_free_cap_slot;
     free_cnode_slot = node[0].slot.next_free_cnode_slot;
-    level = cnode->cnode.level;
     
     if (free_cap_slot != 0 && free_cap_slot < CNODE_SLOTS_START)
     {
-      *cap = lcd_insert_capability(cnode, &cid, free_cap_slot);
+      *cap = lcd_reserve_cap_slot(cnode, &cid, free_cap_slot);
       goto free_kfifo;
     }
     else if (free_cnode_slot != 0 && free_cnode_slot >= CNODE_SLOTS_START && free_cnode_slot < MAX_SLOTS)
@@ -114,36 +116,35 @@ cap_id lcd_lookup_free_slot(struct cap_space *cspace, struct cte **cap)
         if (node[i].ctetype == lcd_type_cnode)
         {
           struct cte * next_cnode = &node[i];
-          struct cte *next_node = node[i].cnode.cap_entry;
-          free_cap_slot = next_node[0].next_free_cap_slot;
+          struct cte *next_node = node[i].cnode.table;
+          free_cap_slot = next_node[0].slot.next_free_cap_slot;
           if (free_cap_slot != 0 && free_cap_slot < CNODE_SLOTS_START)
           {
-            *cap = lcd_insert_capability(next_cnode, &cid, free_cap_slot);
+            *cap = lcd_reserve_cap_slot(next_cnode, &cid, free_cap_slot);
             goto free_kfifo;
           }
         }
       }
       // we will have to allocate a new cnode
-      node[0].slot.next_free_cnode_slot = node[free_cnode_slot].slot.next_free_cnode_slot;
-      node[free_cnode_slot].ctetype = lcd_type_cnode;
-      node[free_cnode_slot].cnode.cap_entry = kmalloc(PAGE_SIZE, GFP_KERNEL);
-      
-      if (node[free_cnode_slot].cnode.cap_entry == NULL)
+      node[free_cnode_slot].cnode.table = kmalloc(PAGE_SIZE, GFP_KERNEL);
+      if (node[free_cnode_slot].cnode.table == NULL)
       {
         cid = 0;
         goto free_kfifo;
       }
-      lcd_initialize_freelist(node[free_cnode_slot].cnode.cap_entry, false);
-      
-      lcd_set_level_bits(&cid, code->cnode.cnode_id, free_cnode_slot, cnode->cnode.level + 1);
+      node[0].slot.next_free_cnode_slot = node[free_cnode_slot].slot.next_free_cnode_slot;
+      node[free_cnode_slot].ctetype = lcd_type_cnode;
+      lcd_initialize_freelist(node[free_cnode_slot].cnode.table, false);
+      node[free_cnode_slot].cnode.table_level = cnode->cnode.table_level + 1;
+      lcd_set_level_bits(cnode, &cid, free_cnode_slot);
       node[free_cnode_slot].cnode.cnode_id = cid;
-      node[free_cnode_slot].cnode.level = cnode->cnode.level + 1;
-      node = node[free_cnode_slot].cnode.cap_entry;
       
+      cnode = &node[free_cnode_slot];
+      node = node[free_cnode_slot].cnode.table;
       free_cap_slot = node[0].slot.next_free_cap_slot;
       if (free_cap_slot != 0 && free_cap_slot < CNODE_SLOTS_START)
       {
-        *cap = lcd_insert_capability(node, &cid, free_slot);
+        *cap = lcd_reserve_cap_slot(cnode, &cid, free_cap_slot);
         goto free_kfifo;
       }
       cid = 0;
@@ -174,9 +175,9 @@ struct cte * lcd_lookup_capability(struct cap_space *cspace, cap_id cid)
   mask = ~mask;
   
   // check if input is valid
-  if (cspace == NULL || cid == 0 || cspace->root_cnode.cnode.cap_entry == NULL)
+  if (cspace == NULL || cid == 0 || cspace->root_cnode.cnode.table == NULL)
     return NULL;
-  cnode = cspace->root_cnode.cnode.cap_entry;
+  cnode = cspace->root_cnode.cnode.table;
   
   while (id > 0)
   {
@@ -189,7 +190,7 @@ struct cte * lcd_lookup_capability(struct cap_space *cspace, cap_id cid)
     }
     else if (cnode[index].ctetype == lcd_type_cnode && id != 0)
     {
-      cnode = cnode[index].cnode.cap_entry;
+      cnode = cnode[index].cnode.table;
     }
     else
     {
@@ -212,21 +213,21 @@ struct cap_space * lcd_create_cspace()
   // allocate memory for the first cnode.
   cspace->root_cnode.ctetype = lcd_type_cnode;
   cspace->root_cnode.cnode.cnode_id = 0;
-  cspace->root_cnode.cnode.level = 0;
-  cspace->root_cnode.cnode.cap_entry = kmalloc(PAGE_SIZE, GFP_KERNEL);
-  SAFE_EXIT_IF_ALLOC_FAILED(cspace->root_cnode.cnode.cap_entry, alloc_failure);
+  cspace->root_cnode.cnode.table_level = 0;
+  cspace->root_cnode.cnode.table = kmalloc(PAGE_SIZE, GFP_KERNEL);
+  SAFE_EXIT_IF_ALLOC_FAILED(cspace->root_cnode.cnode.table, alloc_failure);
   // initialize the free list
-  lcd_initialize_freelist(cspace->root_cnode.cnode.cap_entry, true);
+  lcd_initialize_freelist(cspace->root_cnode.cnode.table, true);
 
   goto success;
   
 alloc_failure:
   if (cspace)
   {
-    if (cspace->root_cnode.cnode.cap_entry)
+    if (cspace->root_cnode.cnode.table)
     {
-      kfree(cspace->root_cnode.cnode.cap_entry);
-      cspace->root_cnode.cnode.cap_entry = NULL;
+      kfree(cspace->root_cnode.cnode.table);
+      cspace->root_cnode.cnode.table = NULL;
     }
     vfree(cspace);
     cspace = NULL;
@@ -248,7 +249,7 @@ cap_id lcd_create_cap(void * ptcb, void * hobject, lcd_cap_rights crights)
     return 0;
   cspace = tcb->cspace;
   
-  if (cspace == NULL || cspace->root_cnode.cnode.cap_entry == NULL)
+  if (cspace == NULL || cspace->root_cnode.cnode.table == NULL)
     return 0;
   
   down_interruptible(&cspace->sem_cspace);
@@ -344,7 +345,7 @@ uint32_t lcd_get_cap_rights(void * ptcb, cap_id cid, lcd_cap_rights *rights)
     up(tcb->cspace->sem_cspace);
     return -1;
   }
-  rights = cap->cap.crights;
+  *rights = cap->cap.crights;
   up(tcb->cspace->sem_cspace);
   return 0;
 }

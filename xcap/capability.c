@@ -263,6 +263,8 @@ cap_id lcd_create_cap(void * ptcb, void * hobject, lcd_cap_rights crights)
   cap->cap.crights = crights;
   cap->cap.hobject = hobject;
   cap->cap.cdt_list = NULL;
+  cap->cap.parent_cid = 0;
+  cap->cap.parent_tcb = NULL;
   up(&(cspace->sem_cspace));
   return cid;
 }
@@ -300,15 +302,16 @@ cap_id lcd_cap_grant(void *src_tcb, cap_id src_cid, void * dst_tcb, lcd_cap_righ
               dst_cte->cap.crights = crights;
               dst_cte->cap.hobject = src_cte->cap.hobject;
               dst_cte->cap.cdt_list = NULL;
-              
+              dst_cte->cap.parent_cid = src_cid;
+              dst_cte->cap.parent_tcb = src_tcb;
               // update the CDT of source
               cdt_node = kmalloc(sizeof(struct cap_derivation_list), GFP_KERNEL);
               if (cdt_node != NULL)
               {
                 cdt_node->next = src_cte->cap.cdt_list;
                 src_cte->cap.cdt_list = cdt_node;
-                cdt_node->remote_cid = cid;
-                cdt_node->remote_TCB = dst_tcb;
+                cdt_node->child_cid = cid;
+                cdt_node->child_TCB = dst_tcb;
               }
               else
               {

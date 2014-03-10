@@ -77,8 +77,8 @@ enum {
 
 struct cap_derivation_list
 {
-  void             *remote_TCB;  // reference to the thread which was granted this capability
-  cap_id           remote_cid;   // address in the remote threads capability space where this 
+  void             *child_TCB;  // reference to the thread which was granted this capability
+  cap_id           child_cid;   // address in the remote threads capability space where this 
                                  // capability is stored.
   struct cap_derivation_list *next;
 };
@@ -93,6 +93,8 @@ struct capability_internal
 	void          *hobject;      // a pointer to a kernel object
 	struct cap_derivation_list   *cdt_list; // list of domain ids to whom this capability is granted
 	lcd_cap_rights crights;      // specifies the rights the domain has over this capability
+	void *parent_tcb;
+    cap_id parent_cid;
 };
 
 struct cte;
@@ -212,6 +214,11 @@ uint32_t lcd_cap_delete(void * ptcb, cap_id cid);
 // as such the thread owning the parent capability has a right to delete 
 // a capability which is its child or was derieved from it.
 uint32_t lcd_cap_revoke(void * ptcb, cap_id cid);
+
+// should be called when the thread exits.
+// this is extremely heavy function which updates the CDT for all capabilities present
+// in the cspace of the exiting thread.
+void lcd_update_cdt(void *ptcb);
 
 // will be used to get the rights available with a capability.
 uint32_t lcd_get_cap_rights(void * ptcb, cap_id cid, lcd_cap_rights *rights);

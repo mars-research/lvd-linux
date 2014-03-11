@@ -75,12 +75,13 @@ enum {
 #define CAPRIGHTS_RWX           (CAPRIGHTS_RW | CAPRIGHTS_EXECUTE)
 #define CAPRIGHTS_NORIGHTS      0
 
-struct cap_derivation_list
+struct cap_derivation_tree
 {
-  void             *child_TCB;  // reference to the thread which was granted this capability
-  cap_id           child_cid;   // address in the remote threads capability space where this 
-                                 // capability is stored.
+  struct cte *cap;
   struct cap_derivation_list *next;
+  struct cap_derivation_list *prev;
+  struct cap_derivation_list *parent_ptr;
+  struct cap_derivation_list *child_ptr;  
 };
 
 struct capability
@@ -91,10 +92,8 @@ struct capability
 struct capability_internal 
 {
 	void          *hobject;      // a pointer to a kernel object
-	struct cap_derivation_list   *cdt_list; // list of domain ids to whom this capability is granted
+	struct cap_derivation_tree   *cdt_node; // list of domain ids to whom this capability is granted
 	lcd_cap_rights crights;      // specifies the rights the domain has over this capability
-	void *parent_tcb;
-    cap_id parent_cid;
 };
 
 struct cte;

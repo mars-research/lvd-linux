@@ -243,26 +243,44 @@ cap_id lcd_create_cap(void * ptcb, void * hobject, lcd_cap_rights crights)
   struct task_struct *tcb = ptcb;
   struct cap_space *cspace;
   struct cte *cap;
+  struct cap_derivation_tree *cdtnode = kmalloc(sizeof(struct cap_derivation_tree), GFP_KERNEL);
+  if (cap_derivation_tree == NULL)
+  {
+    ASSERT(false, "CDT Node allocation failed\n");
+    return 0;
+  }
   cap_id cid;
   
   if (ptcb == NULL)
+  {
+    kfree(cdtnode);
     return 0;
+  }
   cspace = tcb->cspace;
   
   if (cspace == NULL || cspace->root_cnode.cnode.table == NULL)
+  {
+    kfree(cdtnode);
     return 0;
+  }
   
   down_interruptible(&cspace->sem_cspace);
   cid = lcd_lookup_free_slot(cspace, &cap);
   if (cid == 0)
   {
     up(&cspace->sem_cspace);
+    kfree(cdtnode);
     return 0;
   }
   cap->ctetype = lcd_type_capability;  
   cap->cap.crights = crights;
   cap->cap.hobject = hobject;
-  cap->cap.cdt_list = NULL;
+  cap->cap.cdt_node = cdtnode;
+  cap->cap.cdt_node->cap = cap;
+  cap->cap.cdt_node->child_ptr  = NULL;
+  cap->cap.cdt_node->parent_ptr = NULL;
+  cap->cap.cdt_node->prev = NULL;
+  cap->cap.cdt_node->next = NULL;
   cap->cap.parent_cid = 0;
   cap->cap.parent_tcb = NULL;
   up(&(cspace->sem_cspace));
@@ -275,9 +293,18 @@ cap_id lcd_cap_grant(void *src_tcb, cap_id src_cid, void * dst_tcb, lcd_cap_righ
   struct task_struct *stcb, *dtcb;
   struct cte *src_cte = NULL, *dst_cte = NULL;
   bool done = false;
-  
-  if (src_tcb == NULL || dst_tcb == NULL || src_cid <= 0)
+  struct cap_derivation_tree *dst_cdt_node = kmalloc(sizeof(struct cap_derivation_tree), GFP_KERNEL);
+  if (dst_cdt_node == NULL)
+  {
+    ASSERT(false, "lcd_cap_grant: Failed to allocate cdt node");
     return 0;
+  }
+    
+  if (src_tcb == NULL || dst_tcb == NULL || src_cid <= 0)
+  {
+    kfree(dst_cdt_node);
+    return 0;
+  }
   
   stcb = (struct task_struct *)src_tcb;
   dtcb = (struct task_struct *)dst_tcb;
@@ -296,26 +323,22 @@ cap_id lcd_cap_grant(void *src_tcb, cap_id src_cid, void * dst_tcb, lcd_cap_righ
             cid = lcd_lookup_free_slot(dtcb->cspace, &dst_cte);
             if (cid != 0 && src_cte != NULL && dst_cte != NULL)
             {
-              struct cap_derivation_list *cdt_node;
+              struct cap_derivation_tree *src_cdt_node = src_cte->cap.cdt_node;
+              struct cap_derivation_tree *cdtnode = src_cdt_node->child_ptr;
+              
               // add the capability to destination.
               dst_cte->ctetype = lcd_type_capability;
               dst_cte->cap.crights = crights;
               dst_cte->cap.hobject = src_cte->cap.hobject;
-              dst_cte->cap.cdt_list = NULL;
-              dst_cte->cap.parent_cid = src_cid;
-              dst_cte->cap.parent_tcb = src_tcb;
-              // update the CDT of source
-              cdt_node = kmalloc(sizeof(struct cap_derivation_list), GFP_KERNEL);
-              if (cdt_node != NULL)
+              dst_cte->cap.cdt_node = dst_cdt_node;
+              
+              src_cdt_node->child_ptr = dst_cdt_node;
+              dst_cdt_node->parent_ptr = src_cdt_node;
+              dst_cdt_node->next = cdtnode;
+              dst_cdt_node->prev = NULL;
+              if (cdtnode)
               {
-                cdt_node->next = src_cte->cap.cdt_list;
-                src_cte->cap.cdt_list = cdt_node;
-                cdt_node->child_cid = cid;
-                cdt_node->child_TCB = dst_tcb;
-              }
-              else
-              {
-                ASSERT(false, "cdt_node allocation failed");
+                cdtnode->prev = dst_cdt_node;
               }
               done = true;
             }

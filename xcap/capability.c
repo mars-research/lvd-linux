@@ -244,12 +244,13 @@ cap_id lcd_create_cap(void * ptcb, void * hobject, lcd_cap_rights crights)
   struct cap_space *cspace;
   struct cte *cap;
   struct cap_derivation_tree *cdtnode = kmalloc(sizeof(struct cap_derivation_tree), GFP_KERNEL);
-  if (cap_derivation_tree == NULL)
+  cap_id cid;
+  
+  if (cdtnode == NULL)
   {
     ASSERT(false, "CDT Node allocation failed\n");
     return 0;
   }
-  cap_id cid;
   
   if (ptcb == NULL)
   {
@@ -264,7 +265,11 @@ cap_id lcd_create_cap(void * ptcb, void * hobject, lcd_cap_rights crights)
     return 0;
   }
   
-  down_interruptible(&cspace->sem_cspace);
+  if (down_interruptible(&cspace->sem_cspace) == -EINTR)
+    
+    kfree(cdtnode);
+    retrun 0;
+  }
   cid = lcd_lookup_free_slot(cspace, &cap);
   if (cid == 0)
   {
@@ -277,12 +282,11 @@ cap_id lcd_create_cap(void * ptcb, void * hobject, lcd_cap_rights crights)
   cap->cap.hobject = hobject;
   cap->cap.cdt_node = cdtnode;
   cap->cap.cdt_node->cap = cap;
+  cap->cap.cdt_node->cspace = cspace;
   cap->cap.cdt_node->child_ptr  = NULL;
   cap->cap.cdt_node->parent_ptr = NULL;
   cap->cap.cdt_node->prev = NULL;
   cap->cap.cdt_node->next = NULL;
-  cap->cap.parent_cid = 0;
-  cap->cap.parent_tcb = NULL;
   up(&(cspace->sem_cspace));
   return cid;
 }
@@ -333,9 +337,12 @@ cap_id lcd_cap_grant(void *src_tcb, cap_id src_cid, void * dst_tcb, lcd_cap_righ
               dst_cte->cap.cdt_node = dst_cdt_node;
               
               src_cdt_node->child_ptr = dst_cdt_node;
+              dst_cdt_node->cspace = dtcb->cspace;
               dst_cdt_node->parent_ptr = src_cdt_node;
+              dst_cdt_node->child_ptr  = NULL;
               dst_cdt_node->next = cdtnode;
               dst_cdt_node->prev = NULL;
+              
               if (cdtnode)
               {
                 cdtnode->prev = dst_cdt_node;
@@ -358,13 +365,99 @@ cap_id lcd_cap_grant(void *src_tcb, cap_id src_cid, void * dst_tcb, lcd_cap_righ
   return cid;
 }
 
+void lcd_update_cdt(void *ptcb)
+{
+  struct task_struct *tcb = ptcb;
+  struct cte *cnode, *node;
+  struct kfifo cnode_q;
+  bool cspace_locked;
+  int i = 0;
+  if (tcb == NULL)
+    return;
+  
+  // lock the cspace.
+  if (down_interruptible(tcb->cspace->sem_cspace))
+    return;
+  
+  cspace_locked = true;
+  
+  cnode = tcb->cspace->root_cnode;
+  if (cnode == NULL)
+    return;
+  
+  if (kfifo_alloc(&cnode_q, sizeof(struct cte) * 512, GFP_KERNEL) != 0)
+  {
+    goto free_kfifo;
+  }
+  
+  // add root cnode to kfifo
+  kfifo_in(cnode_q, cnode, 1);
+  while (!kfifo_is_empty(cnode_q))
+  {
+    // pop a cnode.
+    kfifo_out(cnode_q, cnode, 1);
+loop:
+    if (!cspace_locked)
+    {
+      if (down_interruptible(tcb->cspace->sem_cspace))
+        return;
+    }
+    
+    if (cnode == NULL || cnode->ctetype == lcd_type_free)
+      continue;
+       
+    node = cnode->cnode.table;
+    for (i = 1; i < CNODE_SLOTS_START; i++)
+    {
+      struct cap_derivation_tree *p_cdt, *cdt, *c_cdt;
+      if (node[i].ctetype == lcd_type_free)
+        continue;
+      cdt = node[i].cap.cdt_node;
+      p_cdt = cdt->parent_ptr;
+      c_cdt = cdt->child_ptr;
+    
+      while (c_cdt != NULL)
+      {
+        if (p_cdt == NULL || down_trylock(p_cdt->cspace->sem_cspace) == 0)
+        {
+            // lock acquired
+            if (down_trylock(c_cdt->cspace->sem_cspace) == 0)
+            {
+              // all locks are acquired
+              
+              
+              up(c_cdt->cspace->sem_cspace);
+              if (p_cdt != NULL)
+                up(p_cdt->cspace->sem_cspace);
+              up(tcb->cspace->sem_cspace);
+              break;
+            }
+        
+        }
+        if (p_cdt != NULL)
+          up(p_cdt->cspace->sem_cspace);
+        up(tcb->cspace->sem_cspace);
+        cspace_locked = false;
+        goto loop;
+      }
+      
+      
+    }
+  }
+  
+  up(tcb->cspace->sem_cspace);
+free_kfifo:
+  kfifo_free(cnode_q);
+  return;
+}
+
 uint32_t lcd_get_cap_rights(void * ptcb, cap_id cid, lcd_cap_rights *rights)
 {
   struct task_struct *tcb = ptcb;
   struct cte *cap;
   if (tcb == NULL || tcb->cspace == NULL || cid == 0 || rights == NULL)
     return -1;
-  down_interruptible(tcb->cspace->sem_cspace);
+  while (down_interruptible(tcb->cspace->sem_cspace) != 0);
   cap = lcd_lookup_capability(tcb->cspace, cid);
   if (cap == NULL || cap->ctetype != lcd_type_capability)
   {

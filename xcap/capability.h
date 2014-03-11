@@ -77,11 +77,12 @@ enum {
 
 struct cap_derivation_tree
 {
-  struct cte *cap;
-  struct cap_derivation_list *next;
-  struct cap_derivation_list *prev;
-  struct cap_derivation_list *parent_ptr;
-  struct cap_derivation_list *child_ptr;  
+  struct cte *cap;      
+  struct cap_space *cspace;
+  struct cap_derivation_tree *next;
+  struct cap_derivation_tree *prev;
+  struct cap_derivation_tree *parent_ptr;
+  struct cap_derivation_tree *child_ptr;  
 };
 
 struct capability

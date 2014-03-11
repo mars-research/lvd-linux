@@ -266,9 +266,9 @@ cap_id lcd_create_cap(void * ptcb, void * hobject, lcd_cap_rights crights)
   }
   
   if (down_interruptible(&cspace->sem_cspace) == -EINTR)
-    
+  {
     kfree(cdtnode);
-    retrun 0;
+    return 0;
   }
   cid = lcd_lookup_free_slot(cspace, &cap);
   if (cid == 0)
@@ -377,38 +377,46 @@ void lcd_update_cdt(void *ptcb)
   
   // lock the cspace.
   if (down_interruptible(tcb->cspace->sem_cspace))
+  {
+    ASSERT(false, "lcd_update_cdt: Signal interrupted lock, CDT will be corrupted\n");
     return;
-  
+  }
   cspace_locked = true;
   
-  cnode = tcb->cspace->root_cnode;
+  cnode = &(tcb->cspace->root_cnode);
   if (cnode == NULL)
-    return;
+    goto safe_return;
   
   if (kfifo_alloc(&cnode_q, sizeof(struct cte) * 512, GFP_KERNEL) != 0)
   {
-    goto free_kfifo;
+    ASSERT(false, "lcd_update_cdt: Failed to allcoate kfifo, CDT will be corrupted\n");
+    goto safe_return;
   }
   
   // add root cnode to kfifo
-  kfifo_in(cnode_q, cnode, 1);
-  while (!kfifo_is_empty(cnode_q))
+  kfifo_in(&cnode_q, cnode, 1);
+  while (!kfifo_is_empty(&cnode_q))
   {
     // pop a cnode.
-    kfifo_out(cnode_q, cnode, 1);
+    kfifo_out(&cnode_q, cnode, 1);
 loop:
     if (!cspace_locked)
     {
       if (down_interruptible(tcb->cspace->sem_cspace))
+      {
+        ASSERT(false, "lcd_update_cdt: Signal interrupted lock, CDT will be corrupted\n");
         return;
+      }
+      cspace_locked = true;
     }
     
-    if (cnode == NULL || cnode->ctetype == lcd_type_free)
-      continue;
-       
     node = cnode->cnode.table;
+    if (node == NULL || cnode->ctetype == lcd_type_free)
+      continue;
+    
     for (i = 1; i < CNODE_SLOTS_START; i++)
     {
+      bool parent_lock_acquired = false;
       struct cap_derivation_tree *p_cdt, *cdt, *c_cdt;
       if (node[i].ctetype == lcd_type_free)
         continue;
@@ -418,36 +426,61 @@ loop:
     
       while (c_cdt != NULL)
       {
-        if (p_cdt == NULL || down_trylock(p_cdt->cspace->sem_cspace) == 0)
+        if (parent_lock_acquired || p_cdt == NULL || down_trylock(&(p_cdt->cspace->sem_cspace)) == 0)
         {
-            // lock acquired
-            if (down_trylock(c_cdt->cspace->sem_cspace) == 0)
+          // multiple children have the same parent so no need to reacquire lock.
+          parent_lock_acquired = true;
+          // lock acquired
+          if (down_trylock(&(c_cdt->cspace->sem_cspace)) == 0)
+          {
+            // all locks are acquired
+            // update parent pointer of child to point to parent of cdt.
+            c_cdt->parent_ptr = p_cdt;
+            if (p_cdt && p_cdt->child_ptr == cdt)
             {
-              // all locks are acquired
-              
-              
-              up(c_cdt->cspace->sem_cspace);
-              if (p_cdt != NULL)
-                up(p_cdt->cspace->sem_cspace);
-              up(tcb->cspace->sem_cspace);
-              break;
+              p_cdt->child_ptr = c_cdt;
             }
-        
+            cdt->child_ptr = c_cdt->next;
+            up(&(c_cdt->cspace->sem_cspace));
+            c_cdt = c_cdt->next;
+            continue;
+          }
+          else
+          {
+            // failed to acquire child lock
+            if (p_cdt != NULL)
+              up(&(p_cdt->cspace->sem_cspace));
+            parent_lock_acquired = false;
+            up(&(tcb->cspace->sem_cspace));
+            cspace_locked = false;  
+            goto loop;
+          }
+        } // if (parent_lock_acquired || p_cdt == NULL ...
+        else
+        {
+          // failure to acquire parent lock
+          up(&(tcb->cspace->sem_cspace));
+          cspace_locked = false;  
+          goto loop;
         }
-        if (p_cdt != NULL)
-          up(p_cdt->cspace->sem_cspace);
-        up(tcb->cspace->sem_cspace);
-        cspace_locked = false;
-        goto loop;
+      } // while c_cdt != NULL
+      if (p_cdt != NULL)
+          up(&(p_cdt->cspace->sem_cspace));
+      parent_lock_acquired = false;
+    } // for loop for cap slot
+    
+    for (i = CNODE_SLOTS_START; i < MAX_SLOTS; i++)
+    {
+      if (node[i].ctetype != lcd_type_free)
+      {
+        kfifo_in(&cnode_q, &node[i], 1);
       }
-      
-      
     }
-  }
+  } // while !kfifo_is_empty()
   
-  up(tcb->cspace->sem_cspace);
-free_kfifo:
-  kfifo_free(cnode_q);
+safe_return:
+  up(&(tcb->cspace->sem_cspace));
+  kfifo_free(&cnode_q);
   return;
 }
 

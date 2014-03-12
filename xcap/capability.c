@@ -165,7 +165,7 @@ free_kfifo:
   return cid;
 }
 
-struct cte * lcd_lookup_capability(struct cap_space *cspace, cap_id cid)
+struct cte * lcd_lookup_capability(struct cap_space *cspace, cap_id cid, int *slot)
 {
   struct cte *cap = NULL, *cnode = NULL;
   cap_id id = cid;
@@ -186,6 +186,8 @@ struct cte * lcd_lookup_capability(struct cap_space *cspace, cap_id cid)
     if (cnode[index].ctetype == lcd_type_capability && id == 0)
     {
       cap = &cnode[index];
+      if (slot != NULL)
+        *slot = index;
       break;
     }
     else if (cnode[index].ctetype == lcd_type_cnode && id != 0)
@@ -443,7 +445,7 @@ cap_id lcd_cap_grant(void *src_tcb, cap_id src_cid, void * dst_tcb, lcd_cap_righ
         if (down_trylock(&(dtcb->cspace->sem_cspace)) == 0)
         {
             // Lookup the source TCB and get a pointer to capability.
-            src_cte = lcd_lookup_capability(stcb->cspace, src_cid);
+            src_cte = lcd_lookup_capability(stcb->cspace, src_cid, NULL);
             // get a free slot in destination.
             cid = lcd_lookup_free_slot(dtcb->cspace, &dst_cte);
             if (cid != 0 && src_cte != NULL && dst_cte != NULL)
@@ -489,7 +491,11 @@ cap_id lcd_cap_grant(void *src_tcb, cap_id src_cid, void * dst_tcb, lcd_cap_righ
 uint32_t lcd_cap_delete(void * ptcb, cap_id cid)
 {
   struct task_struct *tcb = ptcb;
-  struct cte *cap_cte;
+  struct cte *cap_cte, *table;
+  struct cap_derivation_tree *cdt;
+  struct cap_derivation_tree *ptr, *parent, *prev_ptr = NULL;
+  int slot;
+  
   if (tcb == NULL)
     return -1;
   if (down_interruptible(&(tcb->cspace->sem_cspace)))
@@ -498,12 +504,64 @@ uint32_t lcd_cap_delete(void * ptcb, cap_id cid)
     return -1;
   }
   
-  cap_cte = lcd_lookup_capability(stcb->cspace, src_cid);
-  if (cap_cte == NULL)
+  cap_cte = lcd_lookup_capability(tcb->cspace, cid, &slot);
+  if (cap_cte == NULL || cdt == NULL)
     goto safe_exit;
-  // case1: the root is getting deleted.
-  // case2: An intermediate node in a sibling list is getting deleted.
-  // case3: The start of the sibling list is being deleted.
+  cdt = cap_cte->cap.cdt_node;
+  if (cdt == NULL)
+    goto safe_exit;
+  // patch the cdt. 
+  ptr = cdt->child_ptr;  
+  parent = cdt->parent_ptr;
+  
+  // update parent pointers
+  while (ptr)
+  {
+    prev_ptr = ptr;
+    ptr->parent_ptr = parent;
+    ptr = ptr->next;
+  }
+  
+  // update sibling pointers
+  if (cdt->child_ptr != NULL)
+  {
+    if (cdt->next != NULL)
+    {
+      prev_ptr->next = cdt->next;
+      cdt->next->prev = prev_ptr;
+    }
+    if (cdt->prev != NULL)
+    {
+      cdt->prev->next = cdt->child_ptr;
+      cdt->child_ptr->prev = cdt->prev;
+    }
+  }
+  else
+  {
+    if (cdt->next != NULL)
+    {
+      cdt->next->prev = cdt->prev;
+    }
+    if (cdt->prev != NULL)
+    {
+      cdt->prev->next = cdt->next;
+    }
+  }
+    
+  // update child pointer
+  if (parent != NULL && parent->child_ptr == cdt)
+  {
+    parent->child_ptr = cdt->child_ptr;
+  }
+  
+  kfree(cdt);
+  // free the slot
+  table = cap_cte - slot;
+  ASSERT(table->ctetype == lcd_type_free, "lcd_cap_delete: Could not find cnode table\n");
+  cap_cte->ctetype = lcd_type_free;
+  cap_cte->slot.next_free_cap_slot = table[0].slot.next_free_cap_slot;
+  table[0].slot.next_free_cap_slot = slot;
+
 safe_exit:
   up(&(tcb->cspace->sem_cspace));
   return 0;
@@ -579,7 +637,7 @@ uint32_t lcd_get_cap_rights(void * ptcb, cap_id cid, lcd_cap_rights *rights)
   if (down_interruptible(&(tcb->cspace->sem_cspace)))
     return -1;
     
-  cap = lcd_lookup_capability(tcb->cspace, cid);
+  cap = lcd_lookup_capability(tcb->cspace, cid, NULL);
   if (cap == NULL || cap->ctetype != lcd_type_capability)
   {
     up(&(tcb->cspace->sem_cspace));

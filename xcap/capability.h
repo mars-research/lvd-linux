@@ -175,7 +175,7 @@ static void lcd_initialize_freelist(struct cte *cnode, bool bFirstCNode);
 // empty cnode.
 static cap_id lcd_lookup_free_slot(struct cap_space *cspace, struct cte **cap);
 
-static struct cte * lcd_lookup_capability(struct cap_space *cspace, cap_id cid);
+static struct cte * lcd_lookup_capability(struct cap_space *cspace, cap_id cid, int *slot);
 
 static void lcd_update_cdt(void *ptcb);
 

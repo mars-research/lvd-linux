@@ -201,6 +201,127 @@ struct cte * lcd_lookup_capability(struct cap_space *cspace, cap_id cid)
   return cap;
 }
 
+void lcd_update_cdt(void *ptcb)
+{
+  struct task_struct *tcb = ptcb;
+  struct cte *cnode, *node;
+  struct kfifo cnode_q;
+  bool cspace_locked;
+  int i = 0;
+  if (tcb == NULL)
+    return;
+  
+  // lock the cspace.
+  if (down_interruptible(tcb->cspace->sem_cspace))
+  {
+    ASSERT(false, "lcd_update_cdt: Signal interrupted lock, CDT will be corrupted\n");
+    return;
+  }
+  cspace_locked = true;
+  
+  cnode = &(tcb->cspace->root_cnode);
+  if (cnode == NULL)
+    goto safe_return;
+  
+  if (kfifo_alloc(&cnode_q, sizeof(struct cte) * 512, GFP_KERNEL) != 0)
+  {
+    ASSERT(false, "lcd_update_cdt: Failed to allcoate kfifo, CDT will be corrupted\n");
+    goto safe_return;
+  }
+  
+  // add root cnode to kfifo
+  kfifo_in(&cnode_q, cnode, 1);
+  while (!kfifo_is_empty(&cnode_q))
+  {
+    // pop a cnode.
+    kfifo_out(&cnode_q, cnode, 1);
+loop:
+    if (!cspace_locked)
+    {
+      if (down_interruptible(tcb->cspace->sem_cspace))
+      {
+        ASSERT(false, "lcd_update_cdt: Signal interrupted lock, CDT will be corrupted\n");
+        return;
+      }
+      cspace_locked = true;
+    }
+    
+    node = cnode->cnode.table;
+    if (node == NULL || cnode->ctetype == lcd_type_free)
+      continue;
+    
+    for (i = 1; i < CNODE_SLOTS_START; i++)
+    {
+      bool parent_lock_acquired = false;
+      struct cap_derivation_tree *p_cdt, *cdt, *c_cdt, *next_cdt;
+      if (node[i].ctetype == lcd_type_free)
+        continue;
+      cdt = node[i].cap.cdt_node;
+      p_cdt = cdt->parent_ptr;
+      c_cdt = cdt->child_ptr;
+    
+      while (c_cdt != NULL)
+      {
+        if (parent_lock_acquired || p_cdt == NULL || down_trylock(&(p_cdt->cspace->sem_cspace)) == 0)
+        {
+          // multiple children have the same parent so no need to reacquire lock.
+          parent_lock_acquired = true;
+          // lock acquired
+          if (down_trylock(&(c_cdt->cspace->sem_cspace)) == 0)
+          {
+            // all locks are acquired
+            // update parent pointer of child to point to parent of cdt.
+            c_cdt->parent_ptr = p_cdt;
+            if (p_cdt && p_cdt->child_ptr == cdt)
+            {
+              p_cdt->child_ptr = c_cdt;
+            }
+            cdt->child_ptr = c_cdt->next;
+            up(&(c_cdt->cspace->sem_cspace));
+            next_cdt = c_cdt->next;
+            c_cdt->cap->cap.cdt_node = NULL;
+            kfree(c_cdt);
+            c_cdt = next_cdt;
+            continue;
+          }
+          else
+          {
+            // failed to acquire child lock
+            if (p_cdt != NULL)
+              up(&(p_cdt->cspace->sem_cspace));
+            parent_lock_acquired = false;
+            up(&(tcb->cspace->sem_cspace));
+            cspace_locked = false;  
+            goto loop;
+          }
+        } // if (parent_lock_acquired || p_cdt == NULL ...
+        else
+        {
+          // failure to acquire parent lock
+          up(&(tcb->cspace->sem_cspace));
+          cspace_locked = false;  
+          goto loop;
+        }
+      } // while c_cdt != NULL
+      if (p_cdt != NULL)
+          up(&(p_cdt->cspace->sem_cspace));
+      parent_lock_acquired = false;
+    } // for loop for cap slot
+    
+    for (i = CNODE_SLOTS_START; i < MAX_SLOTS; i++)
+    {
+      if (node[i].ctetype != lcd_type_free)
+      {
+        kfifo_in(&cnode_q, &node[i], 1);
+      }
+    }
+  } // while !kfifo_is_empty()
+  
+safe_return:
+  up(&(tcb->cspace->sem_cspace));
+  kfifo_free(&cnode_q);
+  return;
+}
 
 struct cap_space * lcd_create_cspace()
 {
@@ -365,123 +486,55 @@ cap_id lcd_cap_grant(void *src_tcb, cap_id src_cid, void * dst_tcb, lcd_cap_righ
   return cid;
 }
 
-void lcd_update_cdt(void *ptcb)
+void lcd_destroy_cspace(void *ptcb)
 {
   struct task_struct *tcb = ptcb;
-  struct cte *cnode, *node;
-  struct kfifo cnode_q;
-  bool cspace_locked;
-  int i = 0;
+  struct cte *node, level_separator;
+  struct kfifo node_q;
+  int depth_count = 0;
   if (tcb == NULL)
     return;
+  // patch the cdt
+  lcd_update_cdt(tcb);
   
-  // lock the cspace.
-  if (down_interruptible(tcb->cspace->sem_cspace))
-  {
-    ASSERT(false, "lcd_update_cdt: Signal interrupted lock, CDT will be corrupted\n");
-    return;
-  }
-  cspace_locked = true;
-  
-  cnode = &(tcb->cspace->root_cnode);
-  if (cnode == NULL)
-    goto safe_return;
-  
-  if (kfifo_alloc(&cnode_q, sizeof(struct cte) * 512, GFP_KERNEL) != 0)
+  // free all the cnodes.
+  if (kfifo_alloc(&node_q, sizeof(struct cte) * 512, GFP_KERNEL) != 0)
   {
     ASSERT(false, "lcd_update_cdt: Failed to allcoate kfifo, CDT will be corrupted\n");
-    goto safe_return;
+    return;
   }
-  
-  // add root cnode to kfifo
-  kfifo_in(&cnode_q, cnode, 1);
-  while (!kfifo_is_empty(&cnode_q))
+  level_separator.ctetype = lcd_type_separator;
+  node = tcb->cspace->root_cnode.cnode.table;
+  if (node != NULL)
+    kfifo_in(&node_q, node, 1);
+  kfifo_in(&node_q, &level_separator, 1);
+  while (!kfifo_is_empty(&node_q) && depth_count < MAX_DEPTH)
   {
-    // pop a cnode.
-    kfifo_out(&cnode_q, cnode, 1);
-loop:
-    if (!cspace_locked)
+    int i;
+    kfifo_out(&node_q, node, 1);
+    if (node->ctetype == lcd_type_separator)
     {
-      if (down_interruptible(tcb->cspace->sem_cspace))
+      depth_count++;
+      if (!kfifo_is_empty(&node_q))
       {
-        ASSERT(false, "lcd_update_cdt: Signal interrupted lock, CDT will be corrupted\n");
-        return;
-      }
-      cspace_locked = true;
-    }
-    
-    node = cnode->cnode.table;
-    if (node == NULL || cnode->ctetype == lcd_type_free)
-      continue;
-    
-    for (i = 1; i < CNODE_SLOTS_START; i++)
-    {
-      bool parent_lock_acquired = false;
-      struct cap_derivation_tree *p_cdt, *cdt, *c_cdt;
-      if (node[i].ctetype == lcd_type_free)
+        kfifo_in(&node_q, &level_separator, 1);
         continue;
-      cdt = node[i].cap.cdt_node;
-      p_cdt = cdt->parent_ptr;
-      c_cdt = cdt->child_ptr;
-    
-      while (c_cdt != NULL)
+      }
+      else
       {
-        if (parent_lock_acquired || p_cdt == NULL || down_trylock(&(p_cdt->cspace->sem_cspace)) == 0)
-        {
-          // multiple children have the same parent so no need to reacquire lock.
-          parent_lock_acquired = true;
-          // lock acquired
-          if (down_trylock(&(c_cdt->cspace->sem_cspace)) == 0)
-          {
-            // all locks are acquired
-            // update parent pointer of child to point to parent of cdt.
-            c_cdt->parent_ptr = p_cdt;
-            if (p_cdt && p_cdt->child_ptr == cdt)
-            {
-              p_cdt->child_ptr = c_cdt;
-            }
-            cdt->child_ptr = c_cdt->next;
-            up(&(c_cdt->cspace->sem_cspace));
-            c_cdt = c_cdt->next;
-            continue;
-          }
-          else
-          {
-            // failed to acquire child lock
-            if (p_cdt != NULL)
-              up(&(p_cdt->cspace->sem_cspace));
-            parent_lock_acquired = false;
-            up(&(tcb->cspace->sem_cspace));
-            cspace_locked = false;  
-            goto loop;
-          }
-        } // if (parent_lock_acquired || p_cdt == NULL ...
-        else
-        {
-          // failure to acquire parent lock
-          up(&(tcb->cspace->sem_cspace));
-          cspace_locked = false;  
-          goto loop;
-        }
-      } // while c_cdt != NULL
-      if (p_cdt != NULL)
-          up(&(p_cdt->cspace->sem_cspace));
-      parent_lock_acquired = false;
-    } // for loop for cap slot
-    
+        break;
+      }
+    }
+
     for (i = CNODE_SLOTS_START; i < MAX_SLOTS; i++)
     {
-      if (node[i].ctetype != lcd_type_free)
+      if (node[i].ctetype != lcd_type_free && node[i].cnode.table != NULL)
       {
-        kfifo_in(&cnode_q, &node[i], 1);
+        kfifo_in(&node_q, node[i].cnode.table, 1);
       }
     }
-  } // while !kfifo_is_empty()
-  
-safe_return:
-  up(&(tcb->cspace->sem_cspace));
-  kfifo_free(&cnode_q);
-  return;
+    kfree(node);
+  }
 }
 
 uint32_t lcd_get_cap_rights(void * ptcb, cap_id cid, lcd_cap_rights *rights)

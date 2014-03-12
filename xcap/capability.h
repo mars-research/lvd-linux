@@ -48,7 +48,8 @@ typedef enum _lcd_cap_type
   lcd_type_free,
   lcd_type_capability,
   lcd_type_cnode,
-  lcd_type_endpoint
+  lcd_type_endpoint,
+  lcd_type_separator
 }lcd_cap_type;
 
 /* caps with fixed slot potitions in the root CNode */
@@ -164,25 +165,19 @@ static inline void lcd_set_level_bits(struct cte *cnode, cap_id *cid, int free_s
   *cid = *cid | id;
 }
 
-struct cte * lcd_reserve_cap_slot(struct cte *cnode, cap_id *cid, int free_slot);
+static struct cte * lcd_reserve_cap_slot(struct cte *cnode, cap_id *cid, int free_slot);
 
 // initializes the free slots available in the cnode structure.
-void lcd_initialize_freelist(struct cte *cnode, bool bFirstCNode);
+static void lcd_initialize_freelist(struct cte *cnode, bool bFirstCNode);
 
 // will be used to search for the cnode which has a free slot available.
 // if no such cnode exists will make a call to create lcd_create_cnode to create an
 // empty cnode.
-cap_id lcd_lookup_free_slot(struct cap_space *cspace, struct cte **cap);
+static cap_id lcd_lookup_free_slot(struct cap_space *cspace, struct cte **cap);
 
-struct cte * lcd_lookup_capability(struct cap_space *cspace, cap_id cid);
+static struct cte * lcd_lookup_capability(struct cap_space *cspace, cap_id cid);
 
-// will be used to allocate memory for a cnode.
-struct cap_node * lcd_create_cnode(uint16_t size);
-
-// will be used to de-allocate memory of a cnode.
-uint32_t lcd_delete_cnode(cap_id cid);
-
-
+static void lcd_update_cdt(void *ptcb);
 
 /* External Interface */
 
@@ -218,7 +213,7 @@ uint32_t lcd_cap_revoke(void * ptcb, cap_id cid);
 // should be called when the thread exits.
 // this is extremely heavy function which updates the CDT for all capabilities present
 // in the cspace of the exiting thread.
-void lcd_update_cdt(void *ptcb);
+void lcd_destroy_cspace(void *ptcb);
 
 // will be used to get the rights available with a capability.
 uint32_t lcd_get_cap_rights(void * ptcb, cap_id cid, lcd_cap_rights *rights);

@@ -17,6 +17,7 @@ void cleanup_module(void)
 	printk(KERN_INFO "Cleaning up LCD Module\n");
 }
 
+// does not lock the cspace.
 void lcd_initialize_freelist(struct cte *cnode, bool bFirstCNode)
 {
   int startid = 1;
@@ -33,13 +34,16 @@ void lcd_initialize_freelist(struct cte *cnode, bool bFirstCNode)
   cnode[0].ctetype = lcd_type_free;
   cnode[0].slot.next_free_cap_slot = startid;
   cnode[startid].ctetype = lcd_type_free;
+  cnode[0].index = 0;
   
-  for (i = startid; i < CNODE_SLOTS_START; i++)
+  for (i = startid; i < CNODE_SLOTS_START - 1; i++)
   {
     cnode[i].slot.next_free_cap_slot = i + 1;
     cnode[i+1].ctetype = lcd_type_free;
+    cnode[i].index = i;
   }
   cnode[i].slot.next_free_cap_slot = 0;
+  cnode[i].index = i;
   
   startid = CNODE_SLOTS_START;
   cnode[0].slot.next_free_cnode_slot = startid;
@@ -47,9 +51,11 @@ void lcd_initialize_freelist(struct cte *cnode, bool bFirstCNode)
   for (i = CNODE_SLOTS_START; i < MAX_SLOTS - 1; i++)
   {
     cnode[i].slot.next_free_cnode_slot = i + 1;
+    cnode[i].index = i;
     cnode[i+1].ctetype = lcd_type_free;
   }
   cnode[i].slot.next_free_cnode_slot = 0;
+  cnode[i].index = i;
 }
 
 struct cte * lcd_reserve_cap_slot(struct cte *cnode, cap_id *cid, int free_slot)
@@ -165,7 +171,8 @@ free_kfifo:
   return cid;
 }
 
-struct cte * lcd_lookup_capability(struct cap_space *cspace, cap_id cid, int *slot)
+// does not lock the cspace caller responsbile for the same.
+struct cte * lcd_lookup_capability(struct cap_space *cspace, cap_id cid)
 {
   struct cte *cap = NULL, *cnode = NULL;
   cap_id id = cid;
@@ -186,8 +193,6 @@ struct cte * lcd_lookup_capability(struct cap_space *cspace, cap_id cid, int *sl
     if (cnode[index].ctetype == lcd_type_capability && id == 0)
     {
       cap = &cnode[index];
-      if (slot != NULL)
-        *slot = index;
       break;
     }
     else if (cnode[index].ctetype == lcd_type_cnode && id != 0)
@@ -203,6 +208,7 @@ struct cte * lcd_lookup_capability(struct cap_space *cspace, cap_id cid, int *sl
   return cap;
 }
 
+// caller should not lock the cspace.
 void lcd_update_cdt(void *ptcb)
 {
   struct task_struct *tcb = ptcb;
@@ -243,6 +249,7 @@ loop:
       if (down_interruptible(&(tcb->cspace->sem_cspace)))
       {
         ASSERT(false, "lcd_update_cdt: Signal interrupted lock, CDT will be corrupted\n");
+        kfifo_free(&cnode_q);
         return;
       }
       cspace_locked = true;
@@ -323,6 +330,72 @@ safe_return:
   up(&(tcb->cspace->sem_cspace));
   kfifo_free(&cnode_q);
   return;
+}
+
+// Does not lock cspace caller responsible for locking cspace.
+// does not perform input validation, caller responsible for the same.
+uint32_t lcd_cap_delete_internal(struct cte *cap_cte)
+{
+  struct cte *table;
+  struct cap_derivation_tree *cdt;
+  struct cap_derivation_tree *ptr, *parent, *prev_ptr = NULL;
+    
+  cdt = cap_cte->cap.cdt_node;
+  if (cdt == NULL)
+    return 0;
+  // patch the cdt. 
+  ptr = cdt->child_ptr;  
+  parent = cdt->parent_ptr;
+  
+  // update parent pointers
+  while (ptr)
+  {
+    prev_ptr = ptr;
+    ptr->parent_ptr = parent;
+    ptr = ptr->next;
+  }
+  
+  // update sibling pointers
+  if (cdt->child_ptr != NULL)
+  {
+    if (cdt->next != NULL)
+    {
+      prev_ptr->next = cdt->next;
+      cdt->next->prev = prev_ptr;
+    }
+    if (cdt->prev != NULL)
+    {
+      cdt->prev->next = cdt->child_ptr;
+      cdt->child_ptr->prev = cdt->prev;
+    }
+  }
+  else
+  {
+    if (cdt->next != NULL)
+    {
+      cdt->next->prev = cdt->prev;
+    }
+    if (cdt->prev != NULL)
+    {
+      cdt->prev->next = cdt->next;
+    }
+  }
+    
+  // update child pointer
+  if (parent != NULL && parent->child_ptr == cdt)
+  {
+    parent->child_ptr = cdt->child_ptr;
+  }
+  
+  kfree(cdt);
+  // free the slot
+  table = cap_cte - cap_cte->index;
+  ASSERT(table->ctetype == lcd_type_free, "lcd_cap_delete: Could not find cnode table\n");
+  cap_cte->ctetype = lcd_type_free;
+  cap_cte->slot.next_free_cap_slot = table[0].slot.next_free_cap_slot;
+  table[0].slot.next_free_cap_slot = cap_cte->index;
+
+  return 0;
 }
 
 struct cap_space * lcd_create_cspace()
@@ -445,7 +518,7 @@ cap_id lcd_cap_grant(void *src_tcb, cap_id src_cid, void * dst_tcb, lcd_cap_righ
         if (down_trylock(&(dtcb->cspace->sem_cspace)) == 0)
         {
             // Lookup the source TCB and get a pointer to capability.
-            src_cte = lcd_lookup_capability(stcb->cspace, src_cid, NULL);
+            src_cte = lcd_lookup_capability(stcb->cspace, src_cid);
             // get a free slot in destination.
             cid = lcd_lookup_free_slot(dtcb->cspace, &dst_cte);
             if (cid != 0 && src_cte != NULL && dst_cte != NULL)
@@ -490,13 +563,10 @@ cap_id lcd_cap_grant(void *src_tcb, cap_id src_cid, void * dst_tcb, lcd_cap_righ
 
 uint32_t lcd_cap_delete(void * ptcb, cap_id cid)
 {
+  int ret;
+  struct cte *cap_cte;
   struct task_struct *tcb = ptcb;
-  struct cte *cap_cte, *table;
-  struct cap_derivation_tree *cdt;
-  struct cap_derivation_tree *ptr, *parent, *prev_ptr = NULL;
-  int slot;
-  
-  if (tcb == NULL)
+  if (ptcb == NULL || cid == 0)
     return -1;
   if (down_interruptible(&(tcb->cspace->sem_cspace)))
   {
@@ -504,66 +574,78 @@ uint32_t lcd_cap_delete(void * ptcb, cap_id cid)
     return -1;
   }
   
-  cap_cte = lcd_lookup_capability(tcb->cspace, cid, &slot);
-  if (cap_cte == NULL || cdt == NULL)
-    goto safe_exit;
-  cdt = cap_cte->cap.cdt_node;
-  if (cdt == NULL)
-    goto safe_exit;
-  // patch the cdt. 
-  ptr = cdt->child_ptr;  
-  parent = cdt->parent_ptr;
-  
-  // update parent pointers
-  while (ptr)
+  cap_cte = lcd_lookup_capability(tcb->cspace, cid);
+  if (cap_cte == NULL || cap_cte->cap.cdt_node == NULL)
   {
-    prev_ptr = ptr;
-    ptr->parent_ptr = parent;
-    ptr = ptr->next;
+    up(&(tcb->cspace->sem_cspace));
+    return 0;
   }
-  
-  // update sibling pointers
-  if (cdt->child_ptr != NULL)
-  {
-    if (cdt->next != NULL)
-    {
-      prev_ptr->next = cdt->next;
-      cdt->next->prev = prev_ptr;
-    }
-    if (cdt->prev != NULL)
-    {
-      cdt->prev->next = cdt->child_ptr;
-      cdt->child_ptr->prev = cdt->prev;
-    }
-  }
-  else
-  {
-    if (cdt->next != NULL)
-    {
-      cdt->next->prev = cdt->prev;
-    }
-    if (cdt->prev != NULL)
-    {
-      cdt->prev->next = cdt->next;
-    }
-  }
-    
-  // update child pointer
-  if (parent != NULL && parent->child_ptr == cdt)
-  {
-    parent->child_ptr = cdt->child_ptr;
-  }
-  
-  kfree(cdt);
-  // free the slot
-  table = cap_cte - slot;
-  ASSERT(table->ctetype == lcd_type_free, "lcd_cap_delete: Could not find cnode table\n");
-  cap_cte->ctetype = lcd_type_free;
-  cap_cte->slot.next_free_cap_slot = table[0].slot.next_free_cap_slot;
-  table[0].slot.next_free_cap_slot = slot;
-
-safe_exit:
+  ret = lcd_cap_delete_internal(cap_cte);
   up(&(tcb->cspace->sem_cspace));
+  return ret;
+}
+
+uint32_t lcd_cap_revoke(void * ptcb, cap_id cid)
+{
+  struct task_struct *tcb = ptcb;
+  struct cap_derivation_tree *cdt;
+  struct kfifo cdt_q;
+  struct cte *cap;
+  
+  if (ptcb == NULL || cid == 0)
+    return -1;
+  
+  if (kfifo_alloc(&cdt_q, sizeof(struct cap_derivation_tree) * 512, GFP_KERNEL) != 0)
+  {
+    ASSERT(false, "lcd_cap_revoke: Failed to allocate kfifo\n");
+    return -1;
+  }
+  if (down_interruptible(&(tcb->cspace->sem_cspace)))
+  {
+    ASSERT(false, "lcd_cap_revoke: Signal interrupted cspace lock, CDT will be corrupted\n");
+    kfifo_free(&cdt_q);
+    return -1;
+  }
+  cap = lcd_lookup_capability(tcb->cspace, cid);
+  up(&(tcb->cspace->sem_cspace));
+  
+  if (cap == NULL)
+  {
+    ASSERT(false, "lcd_cap_revoke: Capability not found\n");  
+    kfifo_free(&cdt_q);
+    return -1;
+  }
+  kfifo_in(&cdt_q, cap->cap.cdt_node, 1);
+  while (!kfifo_is_empty(&cdt_q))
+  {
+    kfifo_out(&cdt_q, cdt, 1);
+    if (cdt == NULL)
+    {
+      ASSERT(false, "lcd_cap_revoke: Corrupted CDT\n");
+      kfifo_free(&cdt_q);
+      return -1;
+    }
+    if (cdt->cap && cdt->cap->ctetype == lcd_type_capability)
+    {
+      struct cap_derivation_tree *ptr;
+      struct cap_space *cspace = cdt->cspace;
+      if (down_interruptible(&(cspace->sem_cspace)))
+      {
+        ASSERT(false, "lcd_cap_revoke: Signal interrupted cspace lock, CDT will be corrupted\n");
+        kfifo_free(&cdt_q);
+        return -1;
+      }
+      ptr = cdt->child_ptr;
+      while (ptr)
+      {
+        kfifo_in(&cdt_q, ptr, 1);
+        ptr = ptr->next;
+      }
+      lcd_cap_delete_internal(cdt->cap);
+      up(&(cspace->sem_cspace));
+    }
+  }
+  kfifo_free(&cdt_q);
   return 0;
 }
 
@@ -588,6 +670,7 @@ void lcd_destroy_cspace(void *ptcb)
   if (down_interruptible(&(tcb->cspace->sem_cspace)))
   {
     ASSERT(false, "lcd_update_cdt: Signal interrupted lock, CDT will be corrupted\n");
+    kfifo_free(&node_q);
     return;
   }
   node = tcb->cspace->root_cnode.cnode.table;
@@ -620,12 +703,13 @@ void lcd_destroy_cspace(void *ptcb)
       }
     }
     kfree(node);
-  }
+  }  
   tcb->cspace->root_cnode.cnode.table = NULL;
   tcb->cspace->root_cnode.ctetype = lcd_type_free;
   up(&(tcb->cspace->sem_cspace));
   kfree(tcb->cspace);
   tcb->cspace = NULL;
+  kfifo_free(&node_q);
 }
 
 uint32_t lcd_get_cap_rights(void * ptcb, cap_id cid, lcd_cap_rights *rights)
@@ -637,7 +721,7 @@ uint32_t lcd_get_cap_rights(void * ptcb, cap_id cid, lcd_cap_rights *rights)
   if (down_interruptible(&(tcb->cspace->sem_cspace)))
     return -1;
     
-  cap = lcd_lookup_capability(tcb->cspace, cid, NULL);
+  cap = lcd_lookup_capability(tcb->cspace, cid);
   if (cap == NULL || cap->ctetype != lcd_type_capability)
   {
     up(&(tcb->cspace->sem_cspace));

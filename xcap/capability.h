@@ -23,6 +23,7 @@ typedef uint64_t cap_id ;           // a locally unique identifier (address with
 typedef uint32_t lcd_cnode_entry;   // a pointer to an entry within a cnode
 typedef uint64_t   lcd_tcb;     // a pointer/handle to the thread contrl block
 typedef uint16_t   lcd_cap_rights;  // holds the rights associated with a capability.
+typedef uint16_t   lcd_cap_type;
 
 #define MAX_SLOTS               (PAGE_SIZE/sizeof(struct cte))
 #define CNODE_SLOTS_PER_CNODE   64
@@ -43,14 +44,14 @@ if (ptr == NULL)                            \
                 panic(#expr); \
         }
 
-typedef enum _lcd_cap_type
+enum __lcd_cap_type
 {
   lcd_type_free,
   lcd_type_capability,
   lcd_type_cnode,
   lcd_type_endpoint,
   lcd_type_separator
-}lcd_cap_type;
+};
 
 /* caps with fixed slot potitions in the root CNode */
 enum {
@@ -103,8 +104,8 @@ struct cte;
 struct cap_node
 {
     cap_id cnode_id;
-    int table_level;
     struct cte *table; /* points to another cnode table */
+    uint16_t table_level;
 };
 
 struct free_slot_t
@@ -115,12 +116,13 @@ struct free_slot_t
 
 struct cte // capability table entry
 {
-    lcd_cap_type ctetype;
     union{
           struct cap_node cnode;
           struct capability_internal cap;
           struct free_slot_t slot;
     };
+    lcd_cap_type ctetype;
+    uint16_t index;
 };
 
 struct cap_space
@@ -175,9 +177,11 @@ static void lcd_initialize_freelist(struct cte *cnode, bool bFirstCNode);
 // empty cnode.
 static cap_id lcd_lookup_free_slot(struct cap_space *cspace, struct cte **cap);
 
-static struct cte * lcd_lookup_capability(struct cap_space *cspace, cap_id cid, int *slot);
+static struct cte * lcd_lookup_capability(struct cap_space *cspace, cap_id cid);
 
 static void lcd_update_cdt(void *ptcb);
+
+static uint32_t lcd_cap_delete_internal(struct cte *cap_cte);
 
 /* External Interface */
 

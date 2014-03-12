@@ -28,12 +28,18 @@
 #include <asm/tsc.h>
 #include <asm/uaccess.h>
 
+#include <uapi/asm/bootparam.h>
+#include <uapi/linux/elf.h>
+
 #include <uapi/linux/limits.h>
-static char target_mod_filepath[PATH_MAX];
-module_param_string(mod_file, target_mod_filepath,
-                    sizeof(target_mod_filepath), 0644);
-MODULE_PARM_DESC(mod_file, "Filepath of the target module to"
-                 " run inside LCD");
+
+static char vmlinux_file[PATH_MAX];
+module_param_string(vmlinux_file, vmlinux_file,
+                    sizeof(vmlinux_file), 0644);
+MODULE_PARM_DESC(vmlinux_file, "vmlinux or vmlinuz path");
+
+int lcd_load_vmlinux(const char* kfile, 
+
 
 /* #include "lcd.h" */
 #include "lcd_defs.h"
@@ -1009,6 +1015,7 @@ static int setup_vmcs_config(struct vmcs_config *vmcs_conf) {
         SECONDARY_EXEC_RDTSCP |
         SECONDARY_EXEC_ENABLE_VPID |
         SECONDARY_EXEC_WBINVD_EXITING |
+        SECONDARY_EXEC_UNRESTRICTED_GUEST | // SECONDARY_EXEC_VIRTUAL_INTR_DELIVERY |
         SECONDARY_EXEC_ENABLE_INVPCID;
     if (adjust_vmx_controls(min2, opt2,
                             MSR_IA32_VMX_PROCBASED_CTLS2,
@@ -1695,96 +1702,6 @@ static int vmx_handle_ept_violation(lcd_struct *vcpu) {
   return ret;
 }
 
-// Obsoleted, use lcd_run instead.
-int vmx_launch(int64_t *ret_code) {
-  int ret, done = 0;
-  lcd_struct *vcpu = vmx_create_vcpu();
-  if (!vcpu)
-    return -ENOMEM;
-
-  printk(KERN_ERR "vmx: created VCPU (VPID %d)\n",
-         vcpu->vpid);
-
-  while (1) {
-    vmx_get_cpu(vcpu);
-
-#if 0
-    /* TODO: fix this.
-     * We assume that a Dune process will always use
-     * the FPU whenever it is entered, and thus we go
-     * ahead and load FPU state here. The reason is
-     * that we don't monitor or trap FPU usage inside
-     * a Dune process.
-     */
-    if (!__thread_has_fpu(current))
-      math_state_restore();
-#endif
-    
-    local_irq_disable();
-
-    if (need_resched()) {
-      local_irq_enable();
-      vmx_put_cpu(vcpu);
-      cond_resched();
-      continue;
-    }
-
-    ret = vmx_run_vcpu(vcpu);
-
-    local_irq_enable();
-
-    if (ret == EXIT_REASON_VMCALL ||
-        ret == EXIT_REASON_CPUID) {
-      vmx_step_instruction();
-    }
-
-    vmx_put_cpu(vcpu);
-
-    if (ret == EXIT_REASON_EPT_VIOLATION) {
-      done = vmx_handle_ept_violation(vcpu);
-    } else {
-      u64 eq = vmcs_readl(EXIT_QUALIFICATION);
-      if (ret == EXIT_REASON_EXTERNAL_INTERRUPT ||
-          ret == EXIT_REASON_EXCEPTION_NMI) {
-        u32 intr_info = vmcs_read32(VM_EXIT_INTR_INFO);
-        printk(KERN_INFO "exception: exit reason %d: %s, intr info %x,"
-               " vector %u, vetoring info %x, error code %x\n",
-               ret, lcd_exit_reason(ret),
-               intr_info, intr_info&INTR_INFO_VECTOR_MASK,
-               vmcs_read32(IDT_VECTORING_INFO_FIELD),
-               vmcs_read32(IDT_VECTORING_ERROR_CODE));
-        if (is_page_fault(intr_info)) {
-          printk(KERN_INFO "got page fault gva: %p %p\n",
-                 (void*)vcpu->cr2, (void*)eq);
-        }
-      } else {
-        printk(KERN_INFO "unhandled exit: reason %d: %s, "
-               "exit qualification %lx\n",
-               ret, lcd_exit_reason(ret), (unsigned long)eq);
-      }
-
-      vmx_dump_cpu(vcpu);
-      done = 1;
-    }
-
-    if (done || vcpu->shutdown)
-      break;
-  }
-
-  printk(KERN_ERR "vmx: destroying VCPU (VPID %d)\n",
-         vcpu->vpid);
-
-  {
-    u32* ptr = (u32*)((u8*)vcpu->pt + 0xfe0);
-    printk(KERN_INFO "LCD: verify data 0x%x\n", *ptr);
-  }
-
-  *ret_code = vcpu->ret_code;
-  vmx_destroy_vcpu(vcpu);
-
-  return 0;
-}
-
 static int __vmx_enable(struct vmcs *vmxon_buf) {
   u64 phys_addr = __pa(vmxon_buf);
   u64 old, test_bits;
@@ -2015,7 +1932,7 @@ int lcd_move_module(lcd_struct *lcd, struct module *mod) {
   if (!ret) {
     ret = __move_host_mapping(lcd, mod->module_core, mod->core_size);
     if (!ret) {
-      vmcs_writel(GUEST_RIP, (unsigned long)mod->init);
+      vmcs_writel(GUEST_RIP, (unsigned long)mod->module_init);
     }
   }
 
@@ -2192,7 +2109,7 @@ int lcd_run(lcd_struct *lcd) {
              "exit qualification %llx, intr_info %x\n",
              ret, lcd_exit_reason(ret), lcd->exit_qualification,
              lcd->exit_intr_info);
-      vmx_dump_cpu(lcd);
+      /* vmx_dump_cpu(lcd); */
       break;
     }
   }
@@ -2212,8 +2129,7 @@ static int __init lcd_init(void) {
   if ((r = vmx_init())) {
     printk(KERN_ERR "LCD: failed to init VMX\n");
   } else {
-    ;
-    /* r = lcd_test(); */
+    r = lcd_test();
     /*
     test_thread = kthread_create(&lcd_thread, NULL, "LCD");
     if (!test_thread) {

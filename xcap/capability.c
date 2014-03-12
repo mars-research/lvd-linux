@@ -212,7 +212,7 @@ void lcd_update_cdt(void *ptcb)
     return;
   
   // lock the cspace.
-  if (down_interruptible(tcb->cspace->sem_cspace))
+  if (down_interruptible(&(tcb->cspace->sem_cspace)))
   {
     ASSERT(false, "lcd_update_cdt: Signal interrupted lock, CDT will be corrupted\n");
     return;
@@ -238,7 +238,7 @@ void lcd_update_cdt(void *ptcb)
 loop:
     if (!cspace_locked)
     {
-      if (down_interruptible(tcb->cspace->sem_cspace))
+      if (down_interruptible(&(tcb->cspace->sem_cspace)))
       {
         ASSERT(false, "lcd_update_cdt: Signal interrupted lock, CDT will be corrupted\n");
         return;
@@ -386,7 +386,7 @@ cap_id lcd_create_cap(void * ptcb, void * hobject, lcd_cap_rights crights)
     return 0;
   }
   
-  if (down_interruptible(&cspace->sem_cspace) == -EINTR)
+  if (down_interruptible(&(cspace->sem_cspace)) == -EINTR)
   {
     kfree(cdtnode);
     return 0;
@@ -394,7 +394,7 @@ cap_id lcd_create_cap(void * ptcb, void * hobject, lcd_cap_rights crights)
   cid = lcd_lookup_free_slot(cspace, &cap);
   if (cid == 0)
   {
-    up(&cspace->sem_cspace);
+    up(&(cspace->sem_cspace));
     kfree(cdtnode);
     return 0;
   }
@@ -437,10 +437,10 @@ cap_id lcd_cap_grant(void *src_tcb, cap_id src_cid, void * dst_tcb, lcd_cap_righ
   while (!done)
   {
     // Lock source cspace. 
-    if (down_trylock(stcb->cspace->sem_cspace) == 0)
+    if (down_trylock(&(stcb->cspace->sem_cspace)) == 0)
     {
         //  if (down_trylock() == 0)  lock dst cspace 
-        if (down_trylock(dtcb->cspace->sem_cspace) == 0)
+        if (down_trylock(&(dtcb->cspace->sem_cspace)) == 0)
         {
             // Lookup the source TCB and get a pointer to capability.
             src_cte = lcd_lookup_capability(stcb->cspace, src_cid);
@@ -475,15 +475,38 @@ cap_id lcd_cap_grant(void *src_tcb, cap_id src_cid, void * dst_tcb, lcd_cap_righ
               ASSERT(false, "Source capability not found or no free slot in destination");
             }
             // release lock on dst cspace.
-            up(dtcb->cspace->sem_cspace);
+            up(&(dtcb->cspace->sem_cspace));
         }
         // release lock on source cspace.
-        up(stcb->cspace->sem_cspace);
+        up(&(stcb->cspace->sem_cspace));
     }
     if (!done)
       msleep_interruptible(1);
   }
   return cid;
+}
+
+uint32_t lcd_cap_delete(void * ptcb, cap_id cid)
+{
+  struct task_struct *tcb = ptcb;
+  struct cte *cap_cte;
+  if (tcb == NULL)
+    return -1;
+  if (down_interruptible(&(tcb->cspace->sem_cspace)))
+  {
+    ASSERT(false, "lcd_cap_delete: Failed to acquire lock, cannot delete capability\n");
+    return -1;
+  }
+  
+  cap_cte = lcd_lookup_capability(stcb->cspace, src_cid);
+  if (cap_cte == NULL)
+    goto safe_exit;
+  // case1: the root is getting deleted.
+  // case2: An intermediate node in a sibling list is getting deleted.
+  // case3: The start of the sibling list is being deleted.
+safe_exit:
+  up(&(tcb->cspace->sem_cspace));
+  return 0;
 }
 
 void lcd_destroy_cspace(void *ptcb)
@@ -504,6 +527,11 @@ void lcd_destroy_cspace(void *ptcb)
     return;
   }
   level_separator.ctetype = lcd_type_separator;
+  if (down_interruptible(&(tcb->cspace->sem_cspace)))
+  {
+    ASSERT(false, "lcd_update_cdt: Signal interrupted lock, CDT will be corrupted\n");
+    return;
+  }
   node = tcb->cspace->root_cnode.cnode.table;
   if (node != NULL)
     kfifo_in(&node_q, node, 1);
@@ -535,6 +563,11 @@ void lcd_destroy_cspace(void *ptcb)
     }
     kfree(node);
   }
+  tcb->cspace->root_cnode.cnode.table = NULL;
+  tcb->cspace->root_cnode.ctetype = lcd_type_free;
+  up(&(tcb->cspace->sem_cspace));
+  kfree(tcb->cspace);
+  tcb->cspace = NULL;
 }
 
 uint32_t lcd_get_cap_rights(void * ptcb, cap_id cid, lcd_cap_rights *rights)
@@ -543,14 +576,16 @@ uint32_t lcd_get_cap_rights(void * ptcb, cap_id cid, lcd_cap_rights *rights)
   struct cte *cap;
   if (tcb == NULL || tcb->cspace == NULL || cid == 0 || rights == NULL)
     return -1;
-  while (down_interruptible(tcb->cspace->sem_cspace) != 0);
+  if (down_interruptible(&(tcb->cspace->sem_cspace)))
+    return -1;
+    
   cap = lcd_lookup_capability(tcb->cspace, cid);
   if (cap == NULL || cap->ctetype != lcd_type_capability)
   {
-    up(tcb->cspace->sem_cspace);
+    up(&(tcb->cspace->sem_cspace));
     return -1;
   }
   *rights = cap->cap.crights;
-  up(tcb->cspace->sem_cspace);
+  up(&(tcb->cspace->sem_cspace));
   return 0;
 }

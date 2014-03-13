@@ -16,6 +16,17 @@
 
 typedef unsigned int   uint;
 
+// The idea is to get the shared page which is
+// to be used for IPC . It is the lowest page
+// the bottom of the 4 Page Stack block.
+// The address of which can be obtained by
+// clearing 14 bits from stack pointer
+static inline char* get_shared(void)
+{
+    char *shared;
+    __asm__("and %%rsp,%0; ":"=r" (shared) : "0" (0xFFFFFFFFFFFFC000));
+    return shared;
+}
 
 unsigned long
 strlen(const char *s)
@@ -144,9 +155,13 @@ printf(int fd, char *fmt, ...)
 }
 
 void temp_fn() {
-  int check = 107;
-    printk(KERN_ERR "printk2 %d\n", check);
+    char *ptr;
+ // int check = 107;
+ //   printk(KERN_ERR "printk2 %d\n", check);
   printf(1, "temp func \n");
+    
+    ptr = get_shared();
+    *ptr = 'J';
     
 }
 

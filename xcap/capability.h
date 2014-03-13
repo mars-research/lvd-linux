@@ -13,7 +13,6 @@
 #include <linux/delay.h>
 #include <linux/kfifo.h>
 #include <asm/page.h>
-#include "../../../SeL4/seL4-release-1.2/code/apps/wombat-vmlinux/linux-2.6.38.1/arch/arm/nwfpe/ARM-gcc.h"
 
 MODULE_LICENSE("GPL");
 MODULE_AUTHOR ("FLUX-LAB University of Utah");
@@ -57,11 +56,10 @@ enum __lcd_cap_type
 enum {
 	LCD_CapNull                =  0, /* null cap */
 	LCD_CapInitThreadTCB       =  1, /* initial thread's TCB cap */
-	LCD_CapInitThreadCNode     =  2, /* initial thread's root CNode cap */
-	LCD_CapInitThreadPD        =  3, /* initial thread' page directory */
-	LCD_CapIRQControl          =  4, /* global IRQ controller */
-	LCD_CapInitThreadIPCBuffer =  5,  /* initial thread's IPC buffer frame cap */
-	LCD_CapFirstFreeSlot       =  6
+	LCD_CapInitThreadPD        =  2, /* initial thread' page directory */
+	LCD_CapIRQControl          =  3, /* global IRQ controller */
+	LCD_CapInitThreadIPCBuffer =  4,  /* initial thread's IPC buffer frame cap */
+	LCD_CapFirstFreeSlot       =  5
 }; 
 
 
@@ -134,7 +132,7 @@ struct cap_space
 
 /* Helper Functions */
 
-static inline int get_bits_at_level(cap_id id, int level)
+static inline int lcd_get_bits_at_level(cap_id id, int level)
 {
   int bits = 0;
   id = id << ((MAX_DEPTH - level - 1) * CNODE_INDEX_BITS);
@@ -143,7 +141,7 @@ static inline int get_bits_at_level(cap_id id, int level)
   return bits;
 }
 
-static inline void clear_bits_at_level(cap_id *id, int level)
+static inline void lcd_clear_bits_at_level(cap_id *id, int level)
 {
   cap_id mask = (~0);
   // clear all higher order bits.
@@ -156,42 +154,50 @@ static inline void clear_bits_at_level(cap_id *id, int level)
   *id = (*id) & mask;
 }
 
-static inline void lcd_set_level_bits(struct cte *cnode, cap_id *cid, int free_slot)
+static inline void lcd_set_bits_at_level(struct cte *cnode, cap_id *cid, int free_slot)
 {
   int level = cnode->cnode.table_level;
   cap_id id = free_slot;
   
   *cid = cnode->cnode.cnode_id;
-  clear_bits_at_level(cid, level);
+  lcd_clear_bits_at_level(cid, level);
   id = id << (level * CNODE_INDEX_BITS);
   *cid = *cid | id;
 }
 
-static struct cte * lcd_reserve_cap_slot(struct cte *cnode, cap_id *cid, int free_slot);
+struct cte * lcd_reserve_cap_slot(struct cte *cnode, cap_id *cid, int free_slot);
 
 // initializes the free slots available in the cnode structure.
-static void lcd_initialize_freelist(struct cte *cnode, bool bFirstCNode);
+void lcd_initialize_freelist(struct cte *cnode, bool bFirstCNode);
 
 // will be used to search for the cnode which has a free slot available.
 // if no such cnode exists will make a call to create lcd_create_cnode to create an
 // empty cnode.
-static cap_id lcd_lookup_free_slot(struct cap_space *cspace, struct cte **cap);
+cap_id lcd_lookup_free_slot(struct cap_space *cspace, struct cte **cap);
 
-static struct cte * lcd_lookup_capability(struct cap_space *cspace, cap_id cid);
+struct cte * lcd_lookup_capability(struct cap_space *cspace, cap_id cid);
 
-static void lcd_update_cdt(void *ptcb);
+void lcd_update_cdt(void *ptcb);
 
-static uint32_t lcd_cap_delete_internal(struct cte *cap_cte);
+uint32_t lcd_cap_delete_internal(struct cte *cap_cte);
 
 /* External Interface */
 
 // creates a cspace for a thread. should be called during lcd creation.
-// initially the cspace contains just three capabilities:
-// one for its TCB
-// one for its cspace
-// one for the endpoint.
+// expects the following objects as input with the rights for those objects:
+// ****(LCD_CapInitThreadTCB is compulsory)
+//     Objects               Index within input array   Comments
+//     LCD_CapNull                0                     Should be a NULL entry in objects array                
+// ****LCD_CapInitThreadTCB       1                     Pointer to task_struct of thread.
+//     LCD_CapInitThreadPD        2                     Pointer to the page directory of process.
+//     LCD_CapIRQControl          3                     ?? will be used later.
+//     LCD_CapInitThreadIPCBuffer 4                     Pointer to the IPC buffer which will be used.
+//  total number of object pointers expected is equal to LCD_CapFirstFreeSlot.
+//  Put a NULL pointer for entries which the thread is not expected to have.
+//  e.g. if the thread does not need an IPC buffer then objects[4] should be NULL.
 // the returned value goes into the TCB of the caller.
-struct cap_space * lcd_create_cspace(void);
+
+struct cap_space * lcd_create_cspace(void *objects[], lcd_cap_rights rights[]);
 
 // creates a new capability, inserts it into cspace of caller and 
 // returns the capability identifier.

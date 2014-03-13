@@ -1,4 +1,4 @@
-obj-m += capability.o
+obj-m += lcd_cap.o
 
 all: 
 	make -C /lib/modules/$(shell uname -r)/build M=$(PWD) modules

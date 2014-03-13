@@ -14,7 +14,7 @@
 #include "lcd_defs.h"
 
 int lcd_read_mod_file(const char* filepath,
-                             void** filecontent, long* size) {
+                      void** filecontent, long* size) {
   struct file* filp = NULL;
   mm_segment_t oldfs;
   int err = 0;
@@ -57,6 +57,73 @@ error_out:
   set_fs(oldfs);
   return err; 
 }
+
+int lcd_load_vmlinux(const char* kfile, lcd_struct *lcd) {
+  Elf64_Ehdr hdr;
+  Elf64_Phdr *phdrs;
+  mm_segment_t oldfs;
+  struct file* filp;
+  loff_t pos = 0;
+  int err = 0;
+  int i = 0;
+
+  oldfs = get_fs();
+  set_fs(get_ds());
+
+  filp = filp_open(kfile, O_RDONLY, 0);
+  if (IS_ERR(filp)) {
+    err = PTR_ERR(filp);
+    printk(KERN_ERR "Error when opening vmlinux file %d\n", err);
+    goto error_out;
+  }
+
+  err = vfs_read(filp, &hdr, sizeof(hdr), &pos);
+  if (err != sizeof(hdr)) {
+    printk(KERN_ERR "Error when reading vmlinux %d\n", err);
+    goto after_open_error_out;
+  }
+  err = 0;
+
+  if (memcmp(hdr.e_ident, ELFMAG, SELFMAG) != 0) {
+    err = -EINVAL;
+    printk(KERN_ERR "Invalide vmlinux file\n");
+    goto after_open_error_out;
+  }
+
+  phdrs = kmalloc(sizeof(Elf64_Phdr)*hdr.e_phnum, GPF_KERNEL);
+  if (!phdrs) {
+    err = -ENOMEM;
+    printk(KERN_ERR "Out of mem\n");
+    goto after_open_error_out;
+  }
+
+  pos = hdr->e_phoff;
+  err = vfs_read(filp, phdrs, sizeof(Elf64_Phdr)*hdr.e_phnum, &pos);
+  if (err != sizeof(Elf64_Phdr)*hdr.e_phnum) {
+    printk(KERN_ERR "Error when reading p hdrs %d\n", err);
+    goto after_mem_error_out;
+  }
+  err = 0;
+
+  for (i = 0; i < hdr.e_phnum; ++i) {
+    if (phdrs[i].p_type != PT_LOAD) {
+      if (phdrs[i].p_type != PT_NOTE)
+        continue;
+      else {
+        // todo READ NOTE.
+      }
+    }
+  }
+
+after_mem_error_out:
+  kfree(phdrs);
+after_open_error_out:
+  filp_close(filp, NULL);
+error_out:
+  set_fs(oldfs);
+  return err;  
+}
+
 
 struct exit_reason_item {
   int code;

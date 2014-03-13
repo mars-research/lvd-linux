@@ -38,8 +38,6 @@ module_param_string(vmlinux_file, vmlinux_file,
                     sizeof(vmlinux_file), 0644);
 MODULE_PARM_DESC(vmlinux_file, "vmlinux or vmlinuz path");
 
-int lcd_load_vmlinux(const char* kfile, 
-
 
 /* #include "lcd.h" */
 #include "lcd_defs.h"

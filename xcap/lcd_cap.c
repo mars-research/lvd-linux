@@ -173,17 +173,21 @@ free_kfifo:
 }
 
 // does not lock the cspace caller responsbile for the same.
-struct cte * lcd_lookup_capability(struct cap_space *cspace, cap_id cid)
+struct cte * lcd_lookup_capability(struct task_struct *tcb, cap_id cid)
 {
   struct cte *cap = NULL, *cnode = NULL;
+  struct cap_space *cspace;
   cap_id id = cid;
   int index = 0;
   int mask = (~0);
   mask = mask << (CNODE_INDEX_BITS);
   mask = ~mask;
   
+  if (tcb == NULL || cid == 0)
+    return NULL;
+  cspace = tcb->cspace;
   // check if input is valid
-  if (cspace == NULL || cid == 0 || cspace->root_cnode.cnode.table == NULL)
+  if (cspace == NULL || cspace->root_cnode.cnode.table == NULL)
     return NULL;
   cnode = cspace->root_cnode.cnode.table;
   
@@ -562,7 +566,7 @@ cap_id lcd_cap_grant(void *src_tcb, cap_id src_cid, void * dst_tcb, lcd_cap_righ
         if (down_trylock(&(dtcb_cspace->sem_cspace)) == 0)
         {
             // Lookup the source TCB and get a pointer to capability.
-            src_cte = lcd_lookup_capability(stcb_cspace, src_cid);
+            src_cte = lcd_lookup_capability(stcb, src_cid);
             // get a free slot in destination.
             cid = lcd_lookup_free_slot(dtcb_cspace, &dst_cte);
             if (cid != 0 && src_cte != NULL && dst_cte != NULL)
@@ -620,7 +624,7 @@ uint32_t lcd_cap_delete(void * ptcb, cap_id cid)
     return -1;
   }
   
-  cap_cte = lcd_lookup_capability(tcb_cspace, cid);
+  cap_cte = lcd_lookup_capability(tcb, cid);
   if (cap_cte == NULL || cap_cte->cap.cdt_node == NULL)
   {
     up(&(tcb_cspace->sem_cspace));
@@ -654,7 +658,7 @@ uint32_t lcd_cap_revoke(void * ptcb, cap_id cid)
     kfifo_free(&cdt_q);
     return -1;
   }
-  cap = lcd_lookup_capability(tcb_cspace, cid);
+  cap = lcd_lookup_capability(tcb, cid);
   up(&(tcb_cspace->sem_cspace));
   
   if (cap == NULL)
@@ -773,7 +777,7 @@ uint32_t lcd_get_cap_rights(void * ptcb, cap_id cid, lcd_cap_rights *rights)
   if (down_interruptible(&(tcb_cspace->sem_cspace)))
     return -1;
     
-  cap = lcd_lookup_capability(tcb_cspace, cid);
+  cap = lcd_lookup_capability(tcb, cid);
   if (cap == NULL || cap->ctetype != lcd_type_capability)
   {
     up(&(tcb_cspace->sem_cspace));

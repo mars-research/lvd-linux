@@ -175,8 +175,6 @@ void lcd_initialize_freelist(struct cte *cnode, bool bFirstCNode);
 // empty cnode.
 cap_id lcd_lookup_free_slot(struct cap_space *cspace, struct cte **cap);
 
-struct cte * lcd_lookup_capability(struct cap_space *cspace, cap_id cid);
-
 void lcd_update_cdt(void *ptcb);
 
 uint32_t lcd_cap_delete_internal(struct cte *cap_cte);
@@ -198,6 +196,8 @@ uint32_t lcd_cap_delete_internal(struct cte *cap_cte);
 // the returned value goes into the TCB of the caller.
 
 struct cap_space * lcd_create_cspace(void *objects[], lcd_cap_rights rights[]);
+
+struct cte * lcd_lookup_capability(struct task_struct *tcb, cap_id cid);
 
 // creates a new capability, inserts it into cspace of caller and 
 // returns the capability identifier.

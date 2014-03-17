@@ -1,6 +1,7 @@
 #include <linux/kernel.h>
 #include <linux/module.h>
 #include <linux/mm.h>
+#include <linux/slab.h>
 #include <linux/string.h>
 #include <uapi/asm/kvm.h>
 #include <linux/fs.h>
@@ -10,6 +11,7 @@
 #include <asm/uaccess.h>
 #include <asm/vmx.h>
 
+#include <uapi/linux/elf.h>
 
 #include "lcd_defs.h"
 
@@ -58,7 +60,115 @@ error_out:
   return err; 
 }
 
-int lcd_load_vmlinux(const char* kfile, lcd_struct *lcd) {
+
+void process_vmlinux_note(lcd_struct *lcd, Elf64_Phdr *hdr,
+                          struct file *filp) {
+  char *name, *desc;
+  u64 ofs;
+  Elf64_Nhdr nhdr;
+  int ret;
+  u64 pos;
+
+  /* REQ: Name and Desc size less than half page  */
+  name = (char*)__get_free_page(GFP_KERNEL);
+  if (!name) {
+    printk(KERN_ERR "Out of mem for note\n");
+    return;
+  }
+  desc = name + (PAGE_SIZE > 1);
+
+  ofs = hdr->p_offset;
+  pos = ofs;
+  while (ofs < hdr->p_offset + hdr->p_filesz) {
+    ret = vfs_read(filp, (char*)&nhdr, sizeof(nhdr), &pos);
+    if (ret != sizeof(nhdr)) {
+      printk(KERN_ERR "Error reading vmlinux note\n");
+      goto after_mem_out;
+    }
+
+    if (nhdr.n_namesz > 0) {
+      ret = vfs_read(filp, name,
+                     round_up(nhdr.n_namesz, hdr->p_align),
+                     &pos);
+      if (ret != round_up(nhdr.n_namesz, hdr->p_align)) {
+        printk(KERN_ERR "Error reading vmlinux note name\n");
+        goto after_mem_out;
+      }
+    }
+
+    if (nhdr.n_descsz > 0) {
+      ret = vfs_read(filp, desc,
+                     round_up(nhdr.n_descsz, hdr->p_align),
+                     &pos);
+      if (ret != round_up(nhdr.n_descsz, hdr->p_align)) {
+        printk(KERN_ERR "Error reading vmlinux note desc\n");
+        goto after_mem_out;
+      }
+    }
+
+    /* TODO: use Xen notes */
+    
+  }
+
+after_mem_out:
+  free_page((u64)name);      
+}
+
+void load_vmlinux_segment(lcd_struct *lcd, Elf64_Phdr *hdr,
+                          struct file *filp) {
+  u64 sz, left;
+  int ret;
+  u64 hva, gpa;
+  u64 pos;
+
+  pos = hdr->p_offset;
+  left = hdr->p_filesz;
+
+  gpa = round_down(hdr->p_paddr, PAGE_SIZE);
+
+  sz = PAGE_SIZE - (hdr->p_paddr - gpa);
+  if (sz > hdr->p_filesz)
+    sz = hdr->p_filesz;
+
+  while (left > 0) {
+    ret = lcd_find_hva_by_gpa(lcd, gpa, &hva);
+    if (ret == -ENOENT) {
+      hva = __get_free_page(GFP_KERNEL);
+      if (!hva) {
+        printk(KERN_ERR "Out of memory for vmlinux\n");
+        return;
+      }
+      if (lcd_map_gpa_to_hpa(lcd, gpa, __pa(hva), 0)) {
+        printk(KERN_ERR "Map ept page failed\n");
+        free_page(hva);
+        return;
+      }
+      if (lcd_map_gva_to_gpa(lcd, gpa, gpa, 1, 0)) {
+        printk(KERN_ERR "Map gva to gpa failed\n");
+        return;
+      }
+    } else if (ret) {
+      printk(KERN_ERR "Find hva error %p\n", (void*)gpa);
+      return;
+    }
+
+    if (left == hdr->p_filesz)
+      hva += hdr->p_paddr - gpa;
+    
+    ret = vfs_read(filp, (void*)hva, sz, &pos);
+    if (ret != sz) {
+      printk(KERN_ERR "Error reading vmlinux %d\n", ret);
+      return;
+    }
+    
+    left -= sz;
+    sz = (left > PAGE_SIZE)? PAGE_SIZE:left;
+    gpa += PAGE_SIZE;
+  }  
+}
+
+int lcd_load_vmlinux(const char* kfile, lcd_struct *lcd,
+                     u64 *elf_entry) {
   Elf64_Ehdr hdr;
   Elf64_Phdr *phdrs;
   mm_segment_t oldfs;
@@ -77,7 +187,7 @@ int lcd_load_vmlinux(const char* kfile, lcd_struct *lcd) {
     goto error_out;
   }
 
-  err = vfs_read(filp, &hdr, sizeof(hdr), &pos);
+  err = vfs_read(filp, (char*)&hdr, sizeof(hdr), &pos);
   if (err != sizeof(hdr)) {
     printk(KERN_ERR "Error when reading vmlinux %d\n", err);
     goto after_open_error_out;
@@ -90,15 +200,15 @@ int lcd_load_vmlinux(const char* kfile, lcd_struct *lcd) {
     goto after_open_error_out;
   }
 
-  phdrs = kmalloc(sizeof(Elf64_Phdr)*hdr.e_phnum, GPF_KERNEL);
+  phdrs = kmalloc(sizeof(Elf64_Phdr)*hdr.e_phnum, GFP_KERNEL);
   if (!phdrs) {
     err = -ENOMEM;
     printk(KERN_ERR "Out of mem\n");
     goto after_open_error_out;
   }
 
-  pos = hdr->e_phoff;
-  err = vfs_read(filp, phdrs, sizeof(Elf64_Phdr)*hdr.e_phnum, &pos);
+  pos = hdr.e_phoff;
+  err = vfs_read(filp, (char*)phdrs, sizeof(Elf64_Phdr)*hdr.e_phnum, &pos);
   if (err != sizeof(Elf64_Phdr)*hdr.e_phnum) {
     printk(KERN_ERR "Error when reading p hdrs %d\n", err);
     goto after_mem_error_out;
@@ -110,10 +220,14 @@ int lcd_load_vmlinux(const char* kfile, lcd_struct *lcd) {
       if (phdrs[i].p_type != PT_NOTE)
         continue;
       else {
-        // todo READ NOTE.
+        process_vmlinux_note(lcd, &phdrs[i], filp);
       }
+    } else {
+      load_vmlinux_segment(lcd, &phdrs[i], filp);
     }
   }
+
+  *elf_entry = hdr.e_entry;
 
 after_mem_error_out:
   kfree(phdrs);

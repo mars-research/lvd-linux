@@ -440,7 +440,7 @@ static int ept_alloc_pt_item(lcd_struct *vcpu,
     ret = ept_lookup_gpa(vcpu, (void*)((*gpfn) << PAGE_SHIFT), 1, &epte);
     if (!ret) {
       if (!epte_present(*epte)) {
-        *page = __get_free_page(GFP_ATOMIC);
+        *page = __get_free_page(GFP_KERNEL);
         if (!(*page)) {
           ret = -ENOMEM;
         } else {
@@ -679,44 +679,6 @@ static int vmx_setup_initial_page_table(lcd_struct *vcpu) {
     gpa += PAGE_SIZE;
   }
 
-  /* Test code page */
-  gpa = gva = LCD_TEST_CODE_ADDR;
-  ret = map_gva_to_gpa(vcpu, gva, gpa, 1, 0);
-  if (ret) {
-    printk(KERN_ERR "ept: populate code page failed\n");
-    return ret;
-  }
-  hpa = __get_free_page(GFP_KERNEL);
-  if (!hpa)
-    return -ENOMEM;
-  memset((void*)hpa, 0, PAGE_SIZE);
-  {
-    u8* bincode = (u8*)hpa;
-    /* 0: b8 e0 0f 00 01       mov    $0x1000fe0,%eax*/
-    /* 5: c7 00 ef be ad de    movl   $0xdeadbeef,(%rax) */
-    /* ((u8*)hpa)[0] = 0xb8; ((u8*)hpa)[1] = 0xe0; ((u8*)hpa)[2] = 0xf; ((u8*)hpa)[3] = 0x10; */
-    /* ((u8*)hpa)[5] = 0xc7; ((u8*)hpa)[7] = 0xef; ((u8*)hpa)[8] = 0xbe; ((u8*)hpa)[9] = 0xad; */
-    /* ((u8*)hpa)[10] = 0xde; */
-    /* ((u8*)hpa)[11] = 0xf4; ((u8*)hpa)[12] = 0xf4; */
-    
-    bincode[0] = 0xf;  bincode[1] = 0x1; bincode[2] = 0xc1;
-    bincode[3] = 0xb8; bincode[4] = 0x34; bincode[5] = 0x12;
-    bincode[8] = 0x48; bincode[9] = 0x89; bincode[10] = 0xc1;
-    bincode[11] = 0xeb; bincode[12] = 0xf6;
-    bincode[13] = 0x90;
-    bincode[14] = 0xf4;
-  }
-  
-  hpa = __pa(hpa);
-  
-  ret = ept_set_epte(vcpu, gpa, hpa, 0);
-  if (ret) {
-    printk(KERN_ERR "ept: map code page failed\n");
-    return ret;
-  }
-
-    // commented to check the dynamically allocated stack
-#if 0
   /* Map stack PT */
   gpa = gva = LCD_STACK_BOTTOM;
   for (i = 0; i < (LCD_STACK_SIZE >> PAGE_SHIFT); ++i) {
@@ -740,7 +702,7 @@ static int vmx_setup_initial_page_table(lcd_struct *vcpu) {
     gva += PAGE_SIZE;
     gpa += PAGE_SIZE;
   }
-#endif
+
   /* Map descriptors and tables in EPT */
   ret = ept_set_epte(vcpu, LCD_GDT_ADDR, __pa(vcpu->gdt), 0);
   if (ret) {
@@ -1686,11 +1648,26 @@ static int vmx_handle_ept_violation(lcd_struct *vcpu) {
     return -EINVAL;
   }
 
-  /* TODO: fix this. Now we fail on EPT fault unconditionally.  */
-  /* ret = vmx_do_ept_fault(vcpu, gpa, gva, exit_qual); */
-  printk(KERN_INFO "EPT: get violation GPA 0x%lx, GVA: 0x%lx, fail now!\n",
-         gpa, gva);
-  ret = -EINVAL;
+  /*
+   * EPT Fault.
+   * TODO: lock page table?
+   */
+  if (gpa < LCD_PHY_MEM_SIZE) {
+    u64 gpa_pg;
+    u64 pg = __get_free_page(GFP_KERNEL);
+    if (!pg)
+      ret = -ENOMEM;
+    else {
+      gpa_pg = round_down(gpa, PAGE_SIZE);
+      ret = lcd_map_gpa_to_hpa(vcpu, gpa_pg, __pa(pg), 0);
+      if (ret) {
+        printk(KERN_ERR "EPT: map page %p for %p failed\n",
+               (void*)pg, (void*)gpa_pg);
+        free_page(pg);
+      }
+    }
+  } else
+    ret = -EINVAL;
 
   if (ret) {
     printk(KERN_ERR "vmx: EPT violation failure "

@@ -196,29 +196,29 @@ typedef struct {
 
 /* Memory layout */
 // Range format: [begin, end)
-// 0x0000 0000 0000 0000 ~ 0x0000 0000 0100 0000 : 16MB : hole (Avoid possible MMIO)
-// 0x0000 0000 0100 0000 ~ 0x0000 0000 0500 0000 : 64MB : Page table structures
+// 0x0000 0000 0000 0000 ~ 0x0000 0000 4000 0000 : 1GB  : Physical Mem
+// 4K gap
+// 0x0000 0000 4000 1000 ~ 0x0000 0000 4040 1000 : 4MB : Page table structures
+// 0x0000 0000 4040 1000 ~ 0x0000 0000 4040 2000 : 4KB  : GDT
+// 0x0000 0000 4040 2000 ~ 0x0000 0000 4040 3000 : 4KB  : IDT
+// 0x0000 0000 4040 3000 ~ 0x0000 0000 4040 4000 : 4KB  : TSS page (sizeof(lcd_tss_struct))
 // 4K page gap as memory guard
-// 0x0000 0000 0500 1000 ~ 0x0000 0000 0500 2000 : 4KB  : GDT
-// 0x0000 0000 0500 2000 ~ 0x0000 0000 0500 3000 : 4KB  : IDT
-// 0x0000 0000 0500 3000 ~ 0x0000 0000 0500 4000 : 4KB  : TSS page (sizeof(lcd_tss_struct))
-// 4K page gap as memory guard
-// 0x0000 0000 0500 5000 ~ 0x0000 0000 0500 6000 : 4KB  : Common ISR code page
+// 0x0000 0000 4040 5000 ~ 0x0000 0000 4040 6000 : 4KB  : Common ISR code page
 // 4K memory guard
-// 0x0000 0000 0500 7000 ~ 0x0000 0000 0500 F000 : 32KB : stack
+// 0x0000 0000 4040 7000 ~ 0x0000 0000 4040 F000 : 32KB : stack
 // 4K memory guard
-// 0x0000 0000 0501 0000 ~ 0x0000 0000 0511 0000 : 1MB  : 256 ISRs, 4KB code page per ISR
-// 4K memory guard
-// 0x0000 0000 0511 1000 ~ Memory limit          : Code/data (start from 81MB+68KB)
-//
-// Todo:
-//   Heap start; Heap end.
+// 0x0000 0000 4041 0000 ~ 0x0000 0000 4051 0000 : 1MB  : 256 ISRs, 4KB code page per ISR
 
-#define LCD_NR_PT_PAGES    (1 << 14)       /* #pages for page table */
-#define LCD_PT_PAGES_START (0x1ULL << 24)  /* above 16MB */
+
+
+// Bootup structure:
+#define LCD_PHY_MEM_SIZE (1 << 30)  /* 1GB physical mem */
+
+#define LCD_NR_PT_PAGES    (1 << 10)       /* #pages for page table */
+#define LCD_PT_PAGES_START (LCD_PHY_MEM_SIZE + PAGE_SIZE) /* 1GB + 4KB */
 #define LCD_PT_PAGES_END   (LCD_PT_PAGES_START + (LCD_NR_PT_PAGES << PAGE_SHIFT))
 
-#define LCD_GDT_ADDR (LCD_PT_PAGES_END + PAGE_SIZE)  /* start from 80MB + 4KB */
+#define LCD_GDT_ADDR (LCD_PT_PAGES_END)  /* start from 1G + 4M + 4K */
 #define LCD_IDT_ADDR (LCD_GDT_ADDR + PAGE_SIZE)
 #define LCD_TSS_ADDR (LCD_IDT_ADDR + PAGE_SIZE)
 #define LCD_TSS_SIZE (sizeof(struct lcd_tss_struct))
@@ -235,6 +235,8 @@ typedef struct {
 #define LCD_ISR_START    (LCD_STACK_TOP + PAGE_SIZE)
 #define LCD_ISR_END      (LCD_ISR_START + LCD_NR_ISRS*PAGE_SIZE)
 #define LCD_ISR_ADDR(n)  (LCD_ISR_START + (n)*PAGE_SIZE)
+
+#define LCD_PHY_MEM_LIMIT LCD_ISR_END
 
 #define LCD_FREE_MEM_START (LCD_ISR_END + PAGE_SIZE)
 #define LCD_TEST_CODE_ADDR LCD_FREE_MEM_START
@@ -254,5 +256,9 @@ const char* lcd_exit_reason(int exit_code);
 
 // Inside LCD:
 int lcd_read_mod_file(const char* filepath, void** content, long* size);
+
+int lcd_load_vmlinux(const char* kfile, lcd_struct *lcd, u64 *elf_entry);
+
+
 
 #endif

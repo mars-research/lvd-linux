@@ -5,8 +5,6 @@
 #define MODULE
 
 #include "lcd_cap.h"
-#include <net/irda/parameters.h>
-#include <../kvm/paging_tmpl.h>
 
 int init_module(void)
 {
@@ -19,73 +17,12 @@ void cleanup_module(void)
 	printk(KERN_INFO "Cleaning up LCD-Capability Module\n");
 }
 
-
-
-
-bool lcd_cap_delete_internal(struct cte *cap, bool *last_reference)
-{
-  struct cap_space *cspace;
-  struct cte *node;
-  bool done = false;
-  if (cap == NULL || last_reference == NULL)
-    return false;
-  *last_reference = false;
-  node = cap - cap->index;
-  if (node[0].ctetype != lcd_type_free)
-    return false;
-  cspace = node[0].slot.cspace;
-  if (cspace == NULL)
-    return false;
-  
-  while (!done)
-  {
-    // lock the cspace
-    if (down_trylock(cspace->sem_cspace) == 0)
-    {
-      lcd_cap_delete_internal_lockless(cap, last_reference);
-      done = true;
-    }
-    else
-    {
-      msleep_interruptible(1);
-    }
-  }
-  return true;
-}
-
-uint32_t lcd_cap_delete_capability(struct task_struct *tcb, cap_id cid)
-{
-  struct cte *cap;
-  bool last_reference = false;
-  if (tcb == NULL)
-  {
-    LCD_PANIC("lcd_cap_delete_capability: Invalid Input\n");
-    return -1;
-  }
-  
-  cap = lcd_cap_lookup_capability(tcb, cid, true);
-  if (cap == NULL)
-  {
-    return -1;
-  }
-  lcd_cap_delete_internal(cap, &last_reference);
-  up(cap->cap.cdt_node->sem_cdt);
-  if (last_reference == true)
-  {
-    // TBD: this is the place where we free the object associated with teh capability.
-    // for now we just release the sem_cdt semaphore.
-    kfree(cap->cap.cdt_node->sem_cdt);
-  }
-  return 0;
-}
-
 // this function will not lock any semaphore.
 // assumption is that cdt and cspace are already locked.
 bool lcd_cap_delete_internal_lockless(struct cte *cap, bool *last_reference)
 {
   struct cte *table;
   struct cap_derivation_tree *p_cdt, *cdt, *c_cdt, *prev_cdt = NULL;
-  int i = 1;
   *last_reference = false;
   
  
@@ -160,13 +97,133 @@ bool lcd_cap_delete_internal_lockless(struct cte *cap, bool *last_reference)
   return true;
 }
 
+bool lcd_cap_delete_internal(struct cte *cap, bool *last_reference)
+{
+  struct cap_space *cspace;
+  struct cte *node;
+  bool done = false;
+  if (cap == NULL || last_reference == NULL)
+    return false;
+  *last_reference = false;
+  node = cap - cap->index;
+  if (node[0].ctetype != lcd_type_free)
+    return false;
+  cspace = node[0].slot.cspace;
+  if (cspace == NULL)
+    return false;
+  
+  while (!done)
+  {
+    // lock the cspace
+    if (down_trylock(&(cspace->sem_cspace)) == 0)
+    {
+      lcd_cap_delete_internal_lockless(cap, last_reference);
+      done = true;
+    }
+    else
+    {
+      msleep_interruptible(1);
+    }
+  }
+  return true;
+}
+
+uint32_t lcd_cap_delete_capability(struct task_struct *tcb, cap_id cid)
+{
+  struct cte *cap;
+  bool last_reference = false;
+  struct semaphore *sem_cdt_backup;
+  if (tcb == NULL || cid <= 0)
+  {
+    LCD_PANIC("lcd_cap_delete_capability: Invalid Input\n");
+    return -1;
+  }
+  
+  cap = lcd_cap_lookup_capability(tcb, cid, true);
+  if (cap == NULL)
+  {
+    LCD_PANIC("lcd_cap_delete_capability: Capability not found\n");
+    return -1;
+  }
+  sem_cdt_backup = cap->cap.cdt_node->sem_cdt;
+  lcd_cap_delete_internal(cap, &last_reference);
+  up(sem_cdt_backup);
+  if (last_reference == true)
+  {
+    // TBD: this is the place where we free the object associated with teh capability.
+    // for now we just release the sem_cdt semaphore.
+    kfree(sem_cdt_backup);
+  }
+  return 0;
+}
+
+uint32_t lcd_cap_revoke_capability(struct task_struct *tcb, cap_id cid)
+{
+  struct cte *cap;
+  struct cap_derivation_tree *cdt, *c_cdt;
+  struct kfifo cap_q;
+  struct semaphore *sem_cdt_backup;
+  int size = sizeof(struct cte);
+  bool dummy = false, last_reference = false;
+  
+  if (tcb == NULL || cid <= 0)
+  {
+    LCD_PANIC("lcd_cap_delete_capability: Invalid Input\n");
+    return -1;
+  }
+  
+  if (kfifo_alloc(&cap_q, sizeof(struct cte) * 512, GFP_KERNEL) != 0)
+  {
+    LCD_PANIC("lcd_cap_revoke_capability: Fifo allocation failed, aborting\n");
+    return -1;
+  }
+  
+  cap = lcd_cap_lookup_capability(tcb, cid, true);
+  if (cap == NULL)
+  {
+    LCD_PANIC("lcd_cap_delete_capability: Capability not found\n");
+    return -1;
+  }
+  cdt = cap->cap.cdt_node;
+  sem_cdt_backup = cap->cap.cdt_node->sem_cdt;
+  if (cdt->parent_ptr == NULL && cdt->next == NULL && cdt->prev == NULL)
+    last_reference = true;
+    
+  kfifo_in(&cap_q, cap, size);
+  
+  while (!kfifo_is_empty(&cap_q))
+  {
+    kfifo_out(&cap_q, cap, size);
+    if (cap == NULL || cap->ctetype != lcd_type_capability)
+      continue;
+    cdt = cap->cap.cdt_node;
+    c_cdt = cdt->child_ptr;
+    while (c_cdt != NULL)
+    {
+      kfifo_in(&cap_q, c_cdt->cap, size);
+      c_cdt = c_cdt->next;
+    }
+    lcd_cap_delete_internal(cap, &dummy);
+  }
+  up(sem_cdt_backup);
+  // with revoke the entire tree is deleted. Now if the root of the tree had not parent,
+  // or no siblings then this was the true last_reference so we now remove the cdt semaphore.
+  if (last_reference)
+  { 
+    kfree(sem_cdt_backup);
+  }
+  return 0;
+}
+
+
 void lcd_cap_destroy_cspace(struct task_struct *tcb)
 {
   struct cte *cnode, *node, level_separator;
   struct kfifo cnode_q;
   int size = sizeof(struct cte);
   struct cap_space *cspace;
-  int depth_count = 0;
+  int depth_count = 0, i;
+  struct semaphore *sem_cdt_backup;
   bool cspace_locked = false, table_visited = false, last_reference = false;
   
   if (tcb == NULL)
@@ -182,7 +239,7 @@ void lcd_cap_destroy_cspace(struct task_struct *tcb)
     return;
   }
   if (cspace->root_cnode.cnode.table != NULL)
-    kfifo_in(&cnode_q, cspace->root_cnode, size);
+    kfifo_in(&cnode_q, &(cspace->root_cnode), size);
   level_separator.ctetype = lcd_type_separator;
   kfifo_in(&cnode_q, &level_separator, size);
   
@@ -206,7 +263,7 @@ void lcd_cap_destroy_cspace(struct task_struct *tcb)
             }
             else
             {
-              kfifo_in(&cnode_q, level_separator, size);
+              kfifo_in(&cnode_q, &level_separator, size);
               continue;
             }
         }
@@ -224,7 +281,7 @@ void lcd_cap_destroy_cspace(struct task_struct *tcb)
           if (node[i].ctetype == lcd_type_cnode)
           {
             if (node[i].cnode.table != NULL)
-              kfifo_in(&cnode_q, &node[i], size);
+              kfifo_in(&cnode_q, &(node[i]), size);
           }
         }
         table_visited = true;
@@ -240,9 +297,10 @@ void lcd_cap_destroy_cspace(struct task_struct *tcb)
         // this function or the lock access patterns in this and the related functions.
         if (down_trylock(node[i].cap.cdt_node->sem_cdt) == 0)
         {
+          sem_cdt_backup = node[i].cap.cdt_node->sem_cdt;
           last_reference = false;
           lcd_cap_delete_internal_lockless(&(node[i]), &last_reference);
-          up(node[i].cap.cdt_node->sem_cdt);
+          up(sem_cdt_backup);
           if (last_reference == true)
           {
             // TBD: this is the place where we can free the object associated with the cap.
@@ -266,9 +324,9 @@ void lcd_cap_destroy_cspace(struct task_struct *tcb)
       {
         msleep_interruptible(1);
       }
-      if (kfifo_is_empty(*cnode_q) || depth_count >= MAX_DEPTH)
+      if (kfifo_is_empty(&cnode_q) || depth_count >= MAX_DEPTH)
       {
-        up(cspace->sem_cspace);
+        up(&(cspace->sem_cspace));
         cspace_locked = false;
       }
     } // if down_trylock(cspace->sem_cspace)
@@ -318,12 +376,12 @@ cap_id lcd_cap_grant_capability(struct task_struct *stcb, cap_id src_cid, struct
     src_cdt_node = src_cte->cap.cdt_node;
     cdtnode = src_cdt_node->child_ptr;
     // lock the destination cspace
-    if (down_trylock(dst_cspace->sem_cspace) == 0)
+    if (down_trylock(&(dst_cspace->sem_cspace)) == 0)
     {
       if (dst_cspace->root_cnode.ctetype == lcd_type_invalid)
       {
         LCD_PANIC("lcd_cap_grant_capability: Destroy may be in progress, aborting operation\n");
-        up(dst_cspace->sem_cspace);
+        up(&(dst_cspace->sem_cspace));
         up(src_cte->cap.cdt_node->sem_cdt);
         kfree(dst_cdt_node);
         return 0;
@@ -337,7 +395,7 @@ cap_id lcd_cap_grant_capability(struct task_struct *stcb, cap_id src_cid, struct
       if (dst_cte == NULL || dst_cte->ctetype != lcd_type_free)
       {
         LCD_PANIC("lcd_cap_grant_capability: No free slot\n");
-        up(dst_cspace->sem_cspace);
+        up(&(dst_cspace->sem_cspace));
         up(src_cte->cap.cdt_node->sem_cdt);
         kfree(dst_cdt_node);
         return 0;
@@ -361,7 +419,7 @@ cap_id lcd_cap_grant_capability(struct task_struct *stcb, cap_id src_cid, struct
       }
       dst_cte->ctetype = lcd_type_capability;
       done = true;
-      up(dst_cspace->sem_cspace);
+      up(&(dst_cspace->sem_cspace));
       up(src_cte->cap.cdt_node->sem_cdt);
       break;
     }
@@ -381,7 +439,7 @@ uint32_t lcd_cap_get_rights(struct task_struct *tcb, cap_id cid, lcd_cap_rights 
     ASSERT(false, "lcd_get_cap_rights: Invalid Inputs\n");
     return -1;
   }
-  cap = lcd_lookup_capability(tcb, cid);
+  cap = lcd_cap_lookup_capability(tcb, cid, false);
   if (cap == NULL || cap->ctetype != lcd_type_capability)
   {
     ASSERT(false, "lcd_get_cap_rights: Invalid capability identifier\n");
@@ -508,7 +566,7 @@ cap_id lcd_cap_create_capability(struct task_struct *tcb, void * hobject, lcd_ca
       LCD_PANIC("lcd_cap_create_capability: No Free Slot found\n");
       kfree(cdtnode->sem_cdt);
       kfree(cdtnode);
-      up(&(cspace->sem_cspace);
+      up(&(cspace->sem_cspace));
       return 0;
     }
     
@@ -522,7 +580,7 @@ cap_id lcd_cap_create_capability(struct task_struct *tcb, void * hobject, lcd_ca
     cap->cap.cdt_node->parent_ptr = NULL;
     cap->cap.cdt_node->prev = NULL;
     cap->cap.cdt_node->next = NULL;
-    up(&(cspace->sem_cspace);
+    up(&(cspace->sem_cspace));
   }
   else
   {
@@ -557,7 +615,7 @@ struct cap_space * lcd_cap_create_cspace(void *objects[], lcd_cap_rights rights[
   
   // initialize semaphore
   sema_init(&(cspace->sem_cspace), 1);
-  if (down_interruptible(&(cspace->root_cnode.sem_cspace)))
+  if (down_interruptible(&(cspace->sem_cspace)))
   {
     // allocate memory for the first cnode.
     cspace->root_cnode.ctetype = lcd_type_cnode;
@@ -596,7 +654,7 @@ struct cap_space * lcd_cap_create_cspace(void *objects[], lcd_cap_rights rights[
         LCD_PANIC("lcd_cap_create_cspace: Failed to allocate cdt semaphore\n");
         goto create_cspace_safe_exit;
       }
-      sema_init(cdt->sem_cdt, 1);
+      sema_init(cdtnode->sem_cdt, 1);
       cdtnode->parent_ptr = NULL;
       cdtnode->child_ptr = NULL;
       cdtnode->next = NULL;
@@ -656,7 +714,7 @@ bool lcd_cap_initialize_freelist(struct cap_space *cspace, struct cte *cnode, bo
   int i;
   
   if (cnode == NULL || cspace == NULL)
-    return;
+    return false;
   
   if (bFirstCNode)
   {
@@ -689,6 +747,7 @@ bool lcd_cap_initialize_freelist(struct cap_space *cspace, struct cte *cnode, bo
   }
   cnode[i].slot.next_free_cnode_slot = 0;
   cnode[i].index = i;
+  return true;
 }
 
 // Removes the free_slot from free list.
@@ -710,7 +769,7 @@ struct cte * lcd_cap_reserve_slot(struct cte *cnode, cap_id *cid, int free_slot)
 // node = pointer the the array of struct cte entries/capability table i.e. cnode->cnode.table
 cap_id lcd_cap_lookup_freeslot(struct cap_space *cspace, struct cte **cap)
 {
-  cap_id cid = 0;
+  cap_id cid = 0, cnode_id;
   bool found = false;
   int i = 0;
   int size = sizeof(struct cte);
@@ -732,7 +791,7 @@ cap_id lcd_cap_lookup_freeslot(struct cap_space *cspace, struct cte **cap)
   
   while (!found && !kfifo_is_empty(&cnode_q))
   {
-    int free_cap_slot = 0, free_cnode_slot = 0, cnode_id;
+    int free_cap_slot = 0, free_cnode_slot = 0;
     struct cte *node = NULL, *cnode = NULL;
     
     kfifo_out(&cnode_q, cnode, size);
@@ -804,7 +863,6 @@ cap_id lcd_cap_lookup_freeslot(struct cap_space *cspace, struct cte **cap)
       }
     }
   } // while (!kfifo_is_empty())
-lookup_freeslot_safe_exit:
   kfifo_free(&cnode_q);
   return cid;
 }

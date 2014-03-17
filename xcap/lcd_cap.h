@@ -180,7 +180,9 @@ cap_id       lcd_cap_lookup_freeslot(struct cap_space *cspace, struct cte **cap)
 
 void         lcd_cap_update_cdt(struct task_struct *tcb);
 
-uint32_t     lcd_cap_delete_internal(struct cte *cap_cte);
+bool         lcd_cap_delete_internal(struct cte *cap, bool *last_reference);
+
+bool         lcd_cap_delete_internal_lockless(struct cte *cap, bool *last_reference);
 
 
 ////////////////////////////////////////////////////////////////////////////////////////////

@@ -114,7 +114,7 @@ struct free_slot_t
 {
   int next_free_cap_slot;
   int next_free_cnode_slot;
-  struct semaphore *sem_slot;
+  struct cap_space *cspace;
 };
 
 struct cte // capability table entry
@@ -174,7 +174,7 @@ static inline void lcd_set_bits_at_level(struct cte *cnode, cap_id *cid, int fre
 
 struct cte * lcd_cap_reserve_slot(struct cte *cnode, cap_id *cid, int free_slot);
 
-bool         lcd_cap_initialize_freelist(struct cte *cnode, bool bFirstCNode);
+bool         lcd_cap_initialize_freelist(struct cap_space *cspace, struct cte *cnode, bool bFirstCNode);
 
 cap_id       lcd_cap_lookup_freeslot(struct cap_space *cspace, struct cte **cap);
 
@@ -213,7 +213,7 @@ struct cap_space * lcd_cap_create_cspace(void *objects[], lcd_cap_rights rights[
 // cid: capability identifier of the object on which the method is to be invoked.
 // Output:
 // pointer to the capability table entry if the cid is valid else NULL is returned.
-struct cte * lcd_cap_lookup_capability(struct task_struct *tcb, cap_id cid);
+struct cte * lcd_cap_lookup_capability(struct task_struct *tcb, cap_id cid, bool keep_locked);
 
 // creates a new capability, inserts it into cspace of caller and 
 // returns the capability identifier.

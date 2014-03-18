@@ -1908,6 +1908,33 @@ static int __move_host_mapping(lcd_struct *lcd, void* hva,
   return 0;
 }
 
+static int map_host_page_at_guest_va(lcd_struct *lcd, void* hva,
+                                     void *gva, int vmallocd ) {
+    void *pa;
+    void *va = (void*)round_down(((unsigned long)hva), PAGE_SIZE);
+    int ret = 0;
+    
+    ret = lcd_va_to_pa(va, &pa, vmallocd);
+    if (ret != 0) {
+        return ret;
+    }
+    
+    ret = lcd_map_gpa_to_hpa(lcd, (u64)pa, (u64)pa, 0);
+    if (ret != 0) {
+        printk(KERN_ERR "lcd: move PA mapping conflicts canary\n");
+        return ret;
+    }
+    
+    ret = lcd_map_gva_to_gpa(lcd, (u64)gva, (u64)pa, 1, 0);
+    if (ret != 0) {
+        printk(KERN_ERR "lcd: move PT mapping conflicts canary\n");
+        return ret;
+    }
+    
+    return 0;
+
+}
+
 static char *my_shared;
 static int lcd_setup_stack(lcd_struct *lcd) {
     char *sp = NULL;
@@ -1935,6 +1962,29 @@ static int lcd_setup_stack(lcd_struct *lcd) {
     
     //setup the stack
     vmcs_writel(GUEST_RSP, stack_top);
+    
+    //setup the stack canary page referenced by %gs:28
+    sp = __get_free_pages(GFP_KERNEL | __GFP_ZERO, 0);
+    if (!sp) {
+        return -ENOMEM;
+    }
+    
+    // Map a valid page into first guest virtual page
+    // The aim is to not fault due to stack canary added
+    // against buffer overflow  stack protection.
+    // The gcc generated code expects %fs:0x28 to be
+    // valid. Since we have zero base for all segment
+    // registers - mapping the some page into virtual
+    // address 0 should suffice.
+    // refer to linux/arch/x86/include/asm/stackprotector.h for
+    // details.[http://stackoverflow.com/a/22476070/2950979]
+    map_host_page_at_guest_va(lcd, (void *)sp , 0, 0);
+    if (ret != 0) {
+        printk(KERN_ERR "lcd: Unable to map the canary\n");
+        return ret;
+    }
+
+    
     return 0;
 }
 

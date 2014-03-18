@@ -76,27 +76,24 @@ static int abc_putc(int fd, const char c)
 	return ret;
 }
 
+// %rax not getting saved automatically
 static void
 lcd_putc(char c)
 {
+    asm volatile("push %rax");
     asm volatile("movzx %0,%%rax" : : "r" (c));
     asm volatile("vmcall");
- //   printk(KERN_ERR "%c", c);
+    asm volatile("pop %rax");
+//    printk(KERN_ERR "%c", c);
 
 }
 
-#if 0
-// Need to see if there is any issue with
-// loading ... This code is faulting
-// lcd: page fault VA 0000000000000028
-// RIP 0xffffffffa02e2017 ... The culprit
-// has to be access to digits[] = "0123456789ABCDEF"
-// A slightly different logic below the ifdef .works
-// The same works in a regular kernel module
+#if 1
+
 static void
 printint(int xx, int base, int sgn)
 {
-    char digits[] = "0123456789ABCDEF";
+    static char digits[] = "0123456789ABCDEF";
     char buf[16];
     int i, neg;
     uint x;
@@ -112,6 +109,7 @@ printint(int xx, int base, int sgn)
     i = 0;
     do{
         buf[i++] = digits[x % base];
+       // lcd_putc('*');
     }while((x /= base) != 0);
     if(neg)
         buf[i++] = '-';
@@ -121,7 +119,7 @@ printint(int xx, int base, int sgn)
 }
 #endif
 
-#if 1
+#if 0
 static void
 printint(int xx, int base, int sgn)
 {
@@ -234,7 +232,7 @@ my_printf(char *fmt, ...)
     }
 }
 
-
+#if 1
 void temp_fn(int var) {
      int check = 107;
     int hex = 0xdeadbeef;
@@ -260,7 +258,6 @@ static int  hello_2_init(void)
     }
     // guest
     shared_var = 2;
-    my_printf("ozzie\n");
  
     temp_fn(69);
     
@@ -276,4 +273,27 @@ static void __exit hello_2_exit(void)
 
 module_init(hello_2_init);
 module_exit(hello_2_exit);
+#endif
+#if 0
+static int  __init hello_print_init(void)
+{
+    int check = 107;
+    u64 pp = 45;
+    printk(KERN_ERR "Hello, world 2\n");
+    
+    my_printf("Hellow %d World %d done\n", check, pp);
+    //  temp_fn();
+    
+	return 0;
+}
 
+static void __exit hello_print_exit(void)
+{
+    printk(KERN_INFO "Goodbye, world 2\n");
+    
+}
+
+module_init(hello_print_init);
+module_exit(hello_print_exit);
+
+#endif

@@ -2,6 +2,7 @@
 #define LCD_LCD_DEFS_H
 
 #include <linux/bitmap.h>
+#include <uapi/asm/bootparam.h>
 
 #if !defined(VMX_EPT_AD_BIT)
 #define VMX_EPT_AD_BIT          (1ull << 21)
@@ -189,6 +190,8 @@ typedef struct {
   } msr_autoload;
 
   struct vmcs *vmcs;
+
+  struct boot_params *bp;
   
   struct module *mod;
 } lcd_struct;
@@ -213,6 +216,8 @@ typedef struct {
 
 // Bootup structure:
 #define LCD_PHY_MEM_SIZE (1 << 30)  /* 1GB physical mem */
+
+#define LCD_BOOT_PARAMS_ADDR (1 << 20)
 
 #define LCD_NR_PT_PAGES    (1 << 10)       /* #pages for page table */
 #define LCD_PT_PAGES_START (LCD_PHY_MEM_SIZE + PAGE_SIZE) /* 1GB + 4KB */

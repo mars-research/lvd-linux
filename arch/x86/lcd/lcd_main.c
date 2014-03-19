@@ -28,6 +28,7 @@
 #include <asm/tsc.h>
 #include <asm/uaccess.h>
 
+#include <uapi/asm/e820.h>
 #include <uapi/asm/bootparam.h>
 #include <uapi/linux/elf.h>
 
@@ -703,6 +704,17 @@ static int vmx_setup_initial_page_table(lcd_struct *vcpu) {
     gpa += PAGE_SIZE;
   }
 
+  ret = ept_set_epte(vcpu, LCD_BOOT_PARAMS_ADDR, __pa(vcpu->bp), 0);
+  if (ret) {
+    printk(KERN_ERR "ept: BP phy-addr occupied in EPT\n");
+    return ret;
+  }
+  ret = map_gva_to_gpa(vcpu, LCD_BOOT_PARAMS_ADDR, LCD_BOOT_PARAMS_ADDR, 1, 0);
+  if (ret) {
+    printk(KERN_ERR "ept: BP virt-addr occupied in guest PT\n");
+    return ret;
+  }
+  
   /* Map descriptors and tables in EPT */
   ret = ept_set_epte(vcpu, LCD_GDT_ADDR, __pa(vcpu->gdt), 0);
   if (ret) {
@@ -1457,12 +1469,19 @@ static lcd_struct * vmx_create_vcpu(void) {
 
   if (cpu_has_vmx_ept_ad_bits()) {
     vcpu->ept_ad_enabled = true;
-    printk(KERN_INFO "vmx: enabled EPT A/D bits");
+    printk(KERN_INFO "vmx: enabled EPT A/D bits\n");
   }
   if (vmx_create_ept(vcpu)) {
-    printk(KERN_ERR "vmx: creating EPT failed.");
+    printk(KERN_ERR "vmx: creating EPT failed.\n");
     goto fail_ept;
   }
+
+  vcpu->bp = (struct boot_params*)__get_free_page(GFP_KERNEL)
+  if (!vcpu->bp) {
+    printk(KERN_ERR "vmx: out of mem for boot params\n");
+    goto fail_ept;
+  }
+  memset(vcpu->bp, 0, sizeof(struct boot_params));
 
   vmx_get_cpu(vcpu);
   vmx_setup_vmcs(vcpu);
@@ -1478,13 +1497,13 @@ fail_ept:
 fail_vpid:
   vmx_free_vmcs(vcpu->vmcs);
 fail_vmcs:
-  kfree((void*)vcpu->isr_page);
+  free_page((void*)vcpu->isr_page);
 fail_isr:
-  kfree(vcpu->tss);
+  free_page(vcpu->tss);
 fail_tss:
-  kfree(vcpu->idt);
+  free_page(vcpu->idt);
 fail_idt:
-  kfree(vcpu->gdt);
+  free_page(vcpu->gdt);
 fail_gdt:
   kfree(vcpu->bmp_pt_pages);
 fail_bmp:
@@ -1504,6 +1523,7 @@ static void vmx_destroy_vcpu(lcd_struct *vcpu)
   vmx_free_vpid(vcpu);
   vmx_free_vmcs(vcpu->vmcs);
   kfree(vcpu->bmp_pt_pages);
+  free_page(vcpu->bp);
   kfree(vcpu);
 }
 
@@ -1824,37 +1844,6 @@ void vmx_exit(void)
   free_page((unsigned long)msr_bitmap);
 }
 
-static struct task_struct *test_thread;
-
-static int lcd_test(void) {
-  int ret;
-  lcd_struct *lcd;
-
-  printk("LCD: start launching vmx\n");
-  /* ret = vmx_launch(&ret_code); */
-  g_prepare_start = get_cycles();
-  lcd = lcd_create();
-  if (!lcd)
-    return -ENOMEM;
-  /* printk("LCD: create lcd VPID %d\n", lcd->vpid); */
-  ret = lcd_run(lcd);
-  if (ret) {
-    printk(KERN_ERR "LCD: launch failure %d\n", ret);
-  } else {
-    printk(KERN_INFO "LCD: launch OK\n");
-  }
-
-  printk(KERN_INFO "LCD: prepare time %llu, ret code: %d\n",
-         g_prepare_time, lcd->ret_code);
-  lcd_destroy(lcd);
-  return ret;
-}
-
-static int lcd_thread(void* d) {
-  int ret = lcd_test();
-  do_exit(ret);
-  return 0; // avoid compiler warning
-}
 
 lcd_struct* lcd_create(void) {
   lcd_struct* lcd = vmx_create_vcpu();
@@ -2191,6 +2180,46 @@ int lcd_run(lcd_struct *lcd) {
 EXPORT_SYMBOL(lcd_run);
 
 
+int setup_vmlinux(lcd_struct *lcd) {
+  int ret;
+  u64 elf_entry;
+
+  struct boot_params *bp = lcd->bp;
+
+  ret = lcd_load_vmlinux(vmlinux_file, lcd, &elf_entry);
+  if (!ret) {
+    printk(KERN_ERR "Error when loading vmlinux %d\n", ret);
+    goto err_out;
+  }
+
+  bp->e820_entries = 2;
+  
+  bp->e820_map[0].addr = 0;
+  bp->e820_map[0].size = 0x9fc00;
+  bp->e820_map[0].type = E820_RAM;
+
+  bp->e820_map[0].addr = 0x9fc00;
+  bp->e820_map[0].size = 0x400;
+  bp->e820_map[0].type = E820_RESERVED;
+
+  bp->e820_map[0].addr = 0xe8000;
+  bp->e820_map[0].size = 0x18000;
+  bp->e820_map[0].type = E820_RESERVED;
+
+  bp->e820_map[0].addr = 0x100000;
+  bp->e820_map[0].size = (LCD_PHY_MEM_SIZE - 0x100000);
+  bp->e820_map[0].type = E820_RAM;
+
+  bp->e820_map[1].addr = LCD_PHY_MEM_SIZE;
+  bp->e820_map[1].size = LCD_PHY_MEM_LIMIT - LCD_PHY_MEM_SIZE;
+  bp->e820_map[1].type = E820_RESERVED_KERN;
+
+  // TODO: setup correct boot_params
+  lcd->regs[VCPU_REGS_RSI] = elf_entry; 
+
+err_out:
+  return ret;
+}
 
 static int __init lcd_init(void) {
   int r;
@@ -2198,13 +2227,7 @@ static int __init lcd_init(void) {
   if ((r = vmx_init())) {
     printk(KERN_ERR "LCD: failed to init VMX\n");
   } else {
-    r = lcd_test();
-    /*
-    test_thread = kthread_create(&lcd_thread, NULL, "LCD");
-    if (!test_thread) {
-      printk(KERN_ERR "LCD: test thread failed to create\n");
-    }
-    */
+    ;//    r = lcd_test();
   } 
 
   return r;

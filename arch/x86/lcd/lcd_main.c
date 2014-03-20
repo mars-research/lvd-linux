@@ -16,7 +16,7 @@
 
 #include <uapi/asm/kvm.h>
 
-#include <asm/vmx.h>
+//#include <asm/vmx.h>
 #include <asm/processor.h>
 #include <asm/desc.h>
 #include <asm/virtext.h>

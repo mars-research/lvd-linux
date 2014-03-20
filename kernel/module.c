@@ -63,6 +63,7 @@
 #include <linux/dynamic_debug.h>
 #include <uapi/linux/module.h>
 #include "module-internal.h"
+#include <../lcd/lcd_defs.h>
 
 #define CREATE_TRACE_POINTS
 #include <trace/events/module.h>
@@ -3749,6 +3750,166 @@ static int load_module(struct load_info *info, const char __user *uargs,
  free_copy:
 	free_copy(info);
 	return err;
+}
+
+static int load_lcd(struct load_info *info, const char __user *uargs,
+		       int flags)
+{
+  lcd_struct * lcd;
+	struct module *mod;
+	long err;
+
+	err = module_sig_check(info);
+	if (err)
+		goto free_copy;
+
+	err = elf_header_check(info);
+	if (err)
+		goto free_copy;
+
+	/* Figure out module layout, and allocate all the memory. */
+	mod = layout_and_allocate(info, flags);
+	if (IS_ERR(mod)) {
+		err = PTR_ERR(mod);
+		goto free_copy;
+	}
+
+	/* Reserve our place in the list. */
+	err = add_unformed_module(mod);
+	if (err)
+		goto free_module;
+
+#ifdef CONFIG_MODULE_SIG
+	mod->sig_ok = info->sig_ok;
+	if (!mod->sig_ok) {
+		printk_once(KERN_NOTICE
+			    "%s: module verification failed: signature and/or"
+			    " required key missing - tainting kernel\n",
+			    mod->name);
+		add_taint_module(mod, TAINT_FORCED_MODULE, LOCKDEP_STILL_OK);
+	}
+#endif
+
+	/* To avoid stressing percpu allocator, do this once we're unique. */
+	err = alloc_module_percpu(mod, info);
+	if (err)
+		goto unlink_mod;
+
+	/* Now module is in final location, initialize linked lists, etc. */
+	err = module_unload_init(mod);
+	if (err)
+		goto unlink_mod;
+
+	/* Now we've got everything in the final locations, we can
+	 * find optional sections. */
+	find_module_sections(mod, info);
+
+	err = check_module_license_and_versions(mod);
+	if (err)
+		goto free_unload;
+
+	/* Set up MODINFO_ATTR fields */
+	setup_modinfo(mod, info);
+
+	/* Fix up syms, so that st_value is a pointer to location. */
+	err = simplify_symbols(mod, info);
+	if (err < 0)
+		goto free_modinfo;
+
+	err = apply_relocations(mod, info);
+	if (err < 0)
+		goto free_modinfo;
+
+	err = post_relocation(mod, info);
+	if (err < 0)
+		goto free_modinfo;
+
+	flush_module_icache(mod);
+
+	/* Now copy in args */
+	mod->args = strndup_user(uargs, ~0UL >> 1);
+	if (IS_ERR(mod->args)) {
+		err = PTR_ERR(mod->args);
+		goto free_arch_cleanup;
+	}
+
+	dynamic_debug_setup(info->debug, info->num_debug);
+
+	/* Finally it's fully formed, ready to start executing. */
+	err = complete_formation(mod, info);
+	if (err)
+		goto ddebug_cleanup;
+
+	/* Module is ready to execute: parsing args may do that. */
+	err = parse_args(mod->name, mod->args, mod->kp, mod->num_kp,
+			 -32768, 32767, &ddebug_dyndbg_module_param_cb);
+	if (err < 0)
+		goto bug_cleanup;
+
+	/* Link in to syfs. */
+	err = mod_sysfs_setup(mod, info, mod->kp, mod->num_kp);
+	if (err < 0)
+		goto bug_cleanup;
+
+	/* Get rid of temporary copy. */
+	free_copy(info);
+
+	/* Done! */
+	trace_module_load(mod);
+
+	lcd = lcd_create();
+	lcd_move_module(lcd, mod);
+	lcd_run(lcd);
+	return 0;
+	//	return do_init_module(mod);
+
+ bug_cleanup:
+	/* module_bug_cleanup needs module_mutex protection */
+	mutex_lock(&module_mutex);
+	module_bug_cleanup(mod);
+	mutex_unlock(&module_mutex);
+ ddebug_cleanup:
+	dynamic_debug_remove(info->debug);
+	synchronize_sched();
+	kfree(mod->args);
+ free_arch_cleanup:
+	module_arch_cleanup(mod);
+ free_modinfo:
+	free_modinfo(mod);
+ free_unload:
+	module_unload_free(mod);
+ unlink_mod:
+	mutex_lock(&module_mutex);
+	/* Unlink carefully: kallsyms could be walking list. */
+	list_del_rcu(&mod->list);
+	wake_up_all(&module_wq);
+	mutex_unlock(&module_mutex);
+ free_module:
+	module_deallocate(mod, info);
+ free_copy:
+	free_copy(info);
+	return err;
+}
+
+
+SYSCALL_DEFINE3(init_lcd, void __user *, umod,
+		unsigned long, len, const char __user *, uargs)
+{
+	int err;
+	struct load_info info = { };
+
+	err = may_init_module();
+	if (err)
+		return err;
+
+	pr_debug("init_module: umod=%p, len=%lu, uargs=%p\n",
+	       umod, len, uargs);
+
+	err = copy_module_from_user(umod, len, &info);
+	if (err)
+		return err;
+
+	return load_lcd(&info, uargs, 0);
 }
 
 SYSCALL_DEFINE3(init_module, void __user *, umod,

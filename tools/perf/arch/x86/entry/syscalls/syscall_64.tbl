@@ -335,7 +335,7 @@
 326	common	copy_file_range		sys_copy_file_range
 327	64	preadv2			sys_preadv2
 328	64	pwritev2		sys_pwritev2
-
+329	common	init_lcd		sys_init_lcd
 #
 # x32-specific system call numbers start at 512 to avoid cache impact
 # for native 64-bit operation.

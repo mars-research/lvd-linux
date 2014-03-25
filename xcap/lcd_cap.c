@@ -368,7 +368,8 @@ cap_id lcd_cap_grant_capability(struct task_struct *stcb, cap_id src_cid, struct
     if (src_cte == NULL || src_cte->ctetype != lcd_type_capability)
     {
       LCD_PANIC("lcd_cap_grant_capability: Invalid Capability\n");
-      up(src_cte->cap.cdt_node->sem_cdt);
+      if (src_cte != NULL)
+        up(src_cte->cap.cdt_node->sem_cdt);
       kfree(dst_cdt_node);
       return 0;
     }
@@ -599,7 +600,12 @@ struct cap_space * lcd_cap_create_cspace(void *objects[], lcd_cap_rights rights[
   struct cap_derivation_tree *cdtnode;
   struct task_struct *tcb = objects[LCD_CapInitThreadTCB];
   struct cap_space *cspace = kmalloc(sizeof(struct cap_space), GFP_KERNEL);
-  SAFE_EXIT_IF_ALLOC_FAILED(cspace, create_cspace_safe_exit);
+  
+  if (cspace == NULL)
+  {
+    LCD_PANIC("lcd_cap_create_cspace: Failed to allocate memory for cspace\n");
+    return NULL;
+  }
   cspace->root_cnode.cnode.table = NULL;
   if (tcb == NULL)
   {
@@ -867,3 +873,89 @@ cap_id lcd_cap_lookup_freeslot(struct cap_space *cspace, struct cte **cap)
   return cid;
 }
 
+cap_id lcd_cap_mint_capability(struct task_struct *tcb, cap_id cid, lcd_cap_rights rights)
+{
+  cap_id id = 0;
+  struct cap_space *cspace;
+  struct cte *src_cte = NULL, *dst_cte = NULL;
+  struct cap_derivation_tree *cdt;
+  struct cap_derivation_tree *dst_cdt;
+  bool done = false;
+  
+  if (tcb == NULL || cid == 0)
+  {
+    LCD_PANIC("lcd_cap_mint_capability: Invalid Inputs\n");
+    return 0;
+  }
+  cspace = tcb->cspace;
+  
+  
+  dst_cdt = kmalloc(sizeof(struct cap_derivation_tree), GFP_KERNEL);
+  if (dst_cdt == NULL)
+  {
+    LCD_PANIC("lcd_cap_mint_capability: Failed to allocate memory for cdt node\n");
+    return 0;
+  }
+  while (!done)
+  {
+    // keep the source cdt locked.
+    src_cte = lcd_cap_lookup_capability(tcb, cid, true);
+    if (src_cte == NULL || src_cte->ctetype != lcd_type_capability)
+    {
+      LCD_PANIC("lcd_cap_mint_capability: Invalid Capability\n");
+      if (src_cte != NULL)
+        up(src_cte->cap.cdt_node->sem_cdt);
+      kfree(dst_cdt);
+      return 0;
+    }
+    cdt = src_cte->cap.cdt_node;
+    if (down_trylock(&(cspace->sem_cspace)) == 0)
+    {
+      if (cspace->root_cnode.ctetype == lcd_type_invalid)
+      {
+        LCD_PANIC("lcd_cap_mint_capability: Destroy may be in progress, aborting operation\n");
+        up(&(cspace->sem_cspace));
+        up(cdt->sem_cdt);
+        kfree(dst_cdt);
+        return 0;
+      }
+      
+      // get a free slot in destination.
+      if (id == 0)
+      {
+        cid = lcd_cap_lookup_freeslot(cspace, &dst_cte);
+      }
+      if (dst_cte == NULL || dst_cte->ctetype != lcd_type_free)
+      {
+        LCD_PANIC("lcd_cap_mint_capability: No free slot\n");
+        up(&(cspace->sem_cspace));
+        up(cdt->sem_cdt);
+        kfree(dst_cdt);
+        return 0;
+      }
+      
+      // add the capability in cspace and cdt node as a sibling.
+      dst_cte->cap.crights = (rights & src_cte->cap.crights);
+      dst_cte->cap.hobject = src_cte->cap.hobject;
+      dst_cdt->sem_cdt = cdt->sem_cdt;
+      dst_cte->cap.cdt_node = dst_cdt;
+    
+      dst_cdt->next = cdt->next;
+      if (cdt->next != NULL)
+         cdt->next->prev = dst_cdt;
+      cdt->next = dst_cdt;
+      dst_cdt->prev = cdt;
+      dst_cdt->child_ptr  = NULL;
+      dst_cdt->parent_ptr = cdt->parent_ptr;
+      
+      dst_cte->ctetype = lcd_type_capability;
+      done = true;
+      up(&(cspace->sem_cspace));
+    }
+    up(cdt->sem_cdt);
+    if (!done)
+      msleep_interruptible(1);
+  }  
+  
+  return id;
+}

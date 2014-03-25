@@ -213,6 +213,7 @@ struct cap_space * lcd_cap_create_cspace(void *objects[], lcd_cap_rights rights[
 // Input:
 // tcb: pointer to the thread control block of the thread which invokes method.
 // cid: capability identifier of the object on which the method is to be invoked.
+// keep_locked: whether or not to keep the semaphore protecting cdt locked.
 // Output:
 // pointer to the capability table entry if the cid is valid else NULL is returned.
 struct cte * lcd_cap_lookup_capability(struct task_struct *tcb, cap_id cid, bool keep_locked);
@@ -278,5 +279,17 @@ void lcd_cap_destroy_cspace(struct task_struct *tcb);
 // Return Value: 0 = Success, Any other value indicates failure.
 // The rights associated with the capability will be saved in the rights ouput paramter.
 uint32_t lcd_cap_get_rights(struct task_struct *tcb, cap_id cid, lcd_cap_rights *rights);
+
+// will be used to craete a copy of the capability identified by cid within the same cspace
+// the rights of the copied capability could be modified using the rights parameter.
+// Input:
+// tcb: pointer to the thread control block whose cspace has the capability to be copied.
+// cid: the capability identifier of the capability to be copied.
+// rights: the new rights for the copied capability, the final rights the capability will 
+//          be the Logical AND of the original rights and the parameter rights.
+// Output:
+// the capability identifier for the copied capability is returned.
+// 0 indicates failure.
+cap_id lcd_cap_mint_capability(struct task_struct *tcb, cap_id cid, lcd_cap_rights rights);
 
 #endif // __LCD_CAP_H__

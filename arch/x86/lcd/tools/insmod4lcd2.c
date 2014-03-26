@@ -163,8 +163,8 @@ int main(int argc, char *argv[])
 			filename, strerror(errno));
 		exit(1);
 	}
-	printf("gets to call");
-	ret = syscall(351, file, len, options);
+	//	printf("gets to call");
+	ret = syscall(314, file, len, options);
 	if (ret != 0) {
 		fprintf(stderr, "insmod: error inserting '%s': %li %s\n",
 			filename, ret, moderror(errno));

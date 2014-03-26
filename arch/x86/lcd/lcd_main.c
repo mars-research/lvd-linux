@@ -1986,10 +1986,11 @@ int lcd_move_module(lcd_struct *lcd, struct module *mod) {
   if (!ret) {
     ret = __move_host_mapping(lcd, mod->module_core, mod->core_size, 1);
     if (!ret) {
-      vmcs_writel(GUEST_RIP, (unsigned long)mod->module_init);
+      vmcs_writel(GUEST_RIP, (unsigned long)mod->init);
+      lcd_setup_stack(lcd);
+      return ret;
     }
   }
-  lcd_setup_stack(lcd);
 
   printk(KERN_ERR "lcd: failed to move module %d\n", ret);
 

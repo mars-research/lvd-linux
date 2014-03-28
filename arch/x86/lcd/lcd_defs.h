@@ -4,6 +4,7 @@
 #include <linux/bitmap.h>
 #include <uapi/asm/bootparam.h>
 #include <asm/vmx.h>
+#include <xen/interface/xen.h>
 
 #if !defined(VMX_EPT_AD_BIT)
 #define VMX_EPT_AD_BIT          (1ull << 21)
@@ -193,6 +194,7 @@ typedef struct {
   struct vmcs *vmcs;
 
   struct boot_params *bp;
+  struct start_info *si;
   
   struct module *mod;
 } lcd_struct;

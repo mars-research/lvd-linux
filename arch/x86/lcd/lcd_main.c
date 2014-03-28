@@ -1483,6 +1483,14 @@ static lcd_struct * vmx_create_vcpu(void) {
   }
   memset(vcpu->bp, 0, sizeof(struct boot_params));
 
+  vcpu->si = (struct start_info*)__get_free_page(GFP_KERNEL)
+  if (!vcpu->si) {
+    printk(KERN_ERR "vmx: out of mem for start info\n");
+    goto fail_si;
+  }
+  memset(vcpu->si, 0, sizeof(struct start_info));
+  
+
   vmx_get_cpu(vcpu);
   vmx_setup_vmcs(vcpu);
   vmx_setup_initial_guest_state(vcpu);
@@ -1492,6 +1500,8 @@ static lcd_struct * vmx_create_vcpu(void) {
 
   return vcpu;
 
+fail_si:
+  free_page(vcpu->bp);
 fail_ept:
   vmx_free_vpid(vcpu);
 fail_vpid:
@@ -1524,6 +1534,7 @@ static void vmx_destroy_vcpu(lcd_struct *vcpu)
   vmx_free_vmcs(vcpu->vmcs);
   kfree(vcpu->bmp_pt_pages);
   free_page(vcpu->bp);
+  free_page(vcpu->si);
   kfree(vcpu);
 }
 
@@ -2216,7 +2227,7 @@ int setup_vmlinux(lcd_struct *lcd) {
   bp->e820_map[1].type = E820_RESERVED_KERN;
 
   // TODO: setup correct boot_params
-  lcd->regs[VCPU_REGS_RSI] = elf_entry; 
+
 
 err_out:
   return ret;

@@ -374,6 +374,14 @@ cap_id lcd_cap_grant_capability(struct task_struct *stcb, cap_id src_cid, struct
       return 0;
     }
     
+    if  (src_cte->cap.crights & CAPRIGHTS_GRANT == 0)
+    {
+      LCD_PANIC("lcd_cap_grant_capability: Source does not have grant permissions\n");
+      up(src_cte->cap.cdt_node->sem_cdt);
+      kfree(dst_cdt_node);
+      return 0;
+    }
+    
     src_cdt_node = src_cte->cap.cdt_node;
     cdtnode = src_cdt_node->child_ptr;
     // lock the destination cspace
@@ -923,7 +931,7 @@ cap_id lcd_cap_mint_capability(struct task_struct *tcb, cap_id cid, lcd_cap_righ
       // get a free slot in destination.
       if (id == 0)
       {
-        cid = lcd_cap_lookup_freeslot(cspace, &dst_cte);
+        id = lcd_cap_lookup_freeslot(cspace, &dst_cte);
       }
       if (dst_cte == NULL || dst_cte->ctetype != lcd_type_free)
       {

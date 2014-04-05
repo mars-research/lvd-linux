@@ -13,6 +13,7 @@
 #include <linux/init.h>		/* Needed for the macros */
 #include <asm/vmx.h>
 #include "../lcd_defs.h"
+#include "../ipc_common_defs.h"
 
 
 
@@ -22,6 +23,8 @@
 
 
 typedef unsigned int   uint;
+
+
 // The idea is to get the shared page which is
 // to be used for IPC . It is the lowest page
 // the bottom of the 4 Page Stack block.
@@ -88,15 +91,27 @@ lcd_putc(char c)
 
 }
 
-#if 1
+static void
+lcd_ipc()
+{
+    asm volatile("push %rax");
+    //asm volatile("mov $0xdeadbeef, %rax");
+    // DIR : 2  (RCV) and peer capid 2
+    asm volatile("mov $0x0000000200000002, %rax");
+    asm volatile("vmcall");
+    asm volatile("pop %rax");
+    //    printk(KERN_ERR "%c", c);
+    
+}
+
 
 static void
-printint(int xx, int base, int sgn)
+printint(long xx, int base, int sgn)
 {
     static char digits[] = "0123456789ABCDEF";
     char buf[16];
     int i, neg;
-    uint x;
+    u64 x;
     
     neg = 0;
     if(sgn && xx < 0){
@@ -117,75 +132,7 @@ printint(int xx, int base, int sgn)
     while(--i >= 0)
         lcd_putc(buf[i]);
 }
-#endif
 
-#if 0
-static void
-printint(int xx, int base, int sgn)
-{
-    char buf[16];
-    int i, neg;
-    int  int_digs[16];
-    uint x;
-    
-    neg = 0;
-    if(sgn && xx < 0){
-        neg = 1;
-        x = -xx;
-    } else {
-        x = xx;
-    }
-    
-    i = 0;
-    do{
-        int_digs[i++] = x % base;
-    }while((x /= base) != 0);
-    if(neg)
-        buf[i++] = '-';
-    
-    while(--i >= 0) {
-        switch(int_digs[i]) {
-            case 0: lcd_putc('0');
-                    break;
-            case 1: lcd_putc('1');
-                    break;
-            case 2: lcd_putc('2');
-                    break;
-            case 3: lcd_putc('3');
-                    break;
-            case 4: lcd_putc('4');
-                    break;
-            case 5: lcd_putc('5');
-                    break;
-            case 6: lcd_putc('6');
-                    break;
-            case 7: lcd_putc('7');
-                    break;
-            case 8: lcd_putc('8');
-                    break;
-            case 9: lcd_putc('9');
-                    break;
-            case 10: lcd_putc('a');
-                break;
-            case 11: lcd_putc('b');
-                break;
-            case 12: lcd_putc('c');
-                break;
-            case 13: lcd_putc('d');
-                break;
-            case 14: lcd_putc('e');
-                break;
-            case 15: lcd_putc('f');
-                break;
-                
-            default:
-                lcd_putc('-');
-                break;
-        
-        }
-    }
-}
-#endif
 
 // Print to the given fd. Only understands %d, %x, %p, %s.
 void
@@ -207,9 +154,9 @@ my_printf(char *fmt, ...)
             }
         } else if(state == '%'){
             if(c == 'd'){
-                printint(va_arg(ap, int), 10, 1);
+                printint(va_arg(ap, long), 10, 1);
             } else if(c == 'x' || c == 'p'){
-                printint(va_arg(ap, int), 16, 0);
+                printint(va_arg(ap, long), 16, 0);
             } else if(c == 's'){
                 s = va_arg(ap, char*);
                 if(s == 0)
@@ -232,11 +179,24 @@ my_printf(char *fmt, ...)
     }
 }
 
-#if 1
+
 void temp_fn(int var) {
-     int check = 107;
+    utcb_t *p_utcb = (utcb_t *) get_shared();
     int hex = 0xdeadbeef;
-    my_printf("Temp  %d here %d and %x\n", check, var, hex);
+    char my_str[] = "lcdstr";
+    
+    p_utcb->mr[0] = 20;
+    p_utcb->mr[1] = 21;
+    p_utcb->mr[2] = 22;
+    p_utcb->mr[3] = 23;
+    p_utcb->mr[4] = 24;
+    p_utcb->mr[5] = 25;
+
+  //  my_printf("Temp %d and %s n %x\n", var, my_str, hex);
+    //my_printf("shared pg 0x%x\n", p_utcb);
+    
+    lcd_ipc();
+    
     
     
 }
@@ -273,27 +233,4 @@ static void __exit hello_2_exit(void)
 
 module_init(hello_2_init);
 module_exit(hello_2_exit);
-#endif
-#if 0
-static int  __init hello_print_init(void)
-{
-    int check = 107;
-    u64 pp = 45;
-    printk(KERN_ERR "Hello, world 2\n");
-    
-    my_printf("Hellow %d World %d done\n", check, pp);
-    //  temp_fn();
-    
-	return 0;
-}
 
-static void __exit hello_print_exit(void)
-{
-    printk(KERN_INFO "Goodbye, world 2\n");
-    
-}
-
-module_init(hello_print_init);
-module_exit(hello_print_exit);
-
-#endif

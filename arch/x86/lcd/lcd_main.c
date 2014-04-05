@@ -42,6 +42,7 @@ MODULE_PARM_DESC(vmlinux_file, "vmlinux or vmlinuz path");
 
 /* #include "lcd.h" */
 #include "lcd_defs.h"
+#include "ipc_common_defs.h"
 
 MODULE_AUTHOR("Weibin Sun");
 MODULE_LICENSE("GPL");
@@ -1421,6 +1422,20 @@ static void setup_idt(lcd_struct* vcpu) {
   }
 }
 
+// Some temporary capability functions for IPC testing
+// To be replaced while interfacing with capability module
+static u32 curr_cap = 1;
+void * cap_arr[10]= {0};
+
+void * get_cap_obj(u32 cap_id){
+  return cap_arr[cap_id];
+}
+
+u32 set_cap(void *obj){
+  cap_arr[curr_cap] = obj;
+  return curr_cap++;
+}
+
 static lcd_struct * vmx_create_vcpu(void) {
   lcd_struct *vcpu = kmalloc(sizeof(lcd_struct), GFP_KERNEL);
   if (!vcpu)
@@ -1497,6 +1512,15 @@ static lcd_struct * vmx_create_vcpu(void) {
   setup_gdt(vcpu);
   setup_idt(vcpu);
   vmx_put_cpu(vcpu);
+
+  //IPC queues 
+  INIT_LIST_HEAD(&vcpu->sync_ipc.snd_q);
+  vcpu->sync_ipc.task = current;
+  vcpu->sync_ipc.state = IPC_DONT_CARE;
+  vcpu->sync_ipc.expected_sender = 0;
+  vcpu->sync_ipc.my_capid =  set_cap(vcpu);
+ // printk(KERN_ERR "=========%d======\n", vcpu->sync_ipc.my_capid);
+
 
   return vcpu;
 
@@ -1935,7 +1959,6 @@ static int map_host_page_at_guest_va(lcd_struct *lcd, void* hva,
 
 }
 
-static char *my_shared;
 static int lcd_setup_stack(lcd_struct *lcd) {
     char *sp = NULL;
     char *stack_top = NULL;
@@ -1949,9 +1972,10 @@ static int lcd_setup_stack(lcd_struct *lcd) {
         return -ENOMEM;
     }
     
-    my_shared = sp;
+    //We use low addr page of this block for passing message registers
+    lcd->shared = sp;
     stack_top = (sp + (PAGE_SIZE * 4) - 1);
-    printk (KERN_ERR "lcd : stack bootm %p , stack top %p and myshare %p", sp, stack_top, my_shared);
+    printk (KERN_ERR "lcd : stack bootm %p , stack top %p and myshare %p", sp, stack_top, sp);
     
     // map the stack in the LCD address space
     ret = __move_host_mapping(lcd, (void *)sp , (PAGE_SIZE * 4), 0);
@@ -2062,9 +2086,146 @@ static void vmx_handle_external_interrupt(lcd_struct *lcd) {
   }
 }
 
+
+int ipc_send(u32 myself, u32 recv_capid)
+{
+  lcd_struct *recv_lcd, *snd_lcd;
+  ipc_wait_list_elem stack_elem;
+
+  printk(KERN_ERR "ipc_send : myself %d reciever %d\n", myself, recv_capid);
+  //chk if the reciever is ready
+  // fetch the reciever task struct from if
+  recv_lcd = (lcd_struct *) get_cap_obj(recv_capid);
+  if (recv_lcd == NULL) {
+    printk(KERN_ERR "ipc_send : Cant get object for reciever %d\n", recv_capid);
+    return -1;   
+  }
+
+  snd_lcd = (lcd_struct *) get_cap_obj(myself);
+  if (snd_lcd == NULL) {
+    printk(KERN_ERR "ipc_send : Cant get object for myself %d\n", myself);
+    return -1;   
+  }
+
+  if (recv_lcd->sync_ipc.state == IPC_RCV_WAIT && \
+      recv_lcd->sync_ipc.expected_sender == myself) {
+
+    printk(KERN_ERR "ipc_send : partner %d expecting me\n", current);
+    //copy the message registers
+    memcpy(recv_lcd->shared, snd_lcd->shared, sizeof(utcb_t));
+    //awaken the thread
+    wake_up_process(recv_lcd->sync_ipc.task);
+    
+    //looks like there is no need for a reciever queue
+    //as if a process invokes a recv and finds no
+    //corresponding senders , then it puts itself to sleep
+    recv_lcd->sync_ipc.state = IPC_DONT_CARE;
+    recv_lcd->sync_ipc.expected_sender = 0;
+    //No case of 
+
+  } else {
+    // put him in the Q
+    recv_lcd->sync_ipc.snd_sleepers++;
+    set_current_state(TASK_INTERRUPTIBLE);
+    stack_elem.peer = myself;
+    stack_elem.task = current;
+   // recv_lcd->sync_ipc.status = IPC_SND_WAIT;
+    list_add_tail(&stack_elem.list, &recv_lcd->sync_ipc.snd_q);
+    printk(KERN_ERR "ipc_send : putting myself to sleep %p\n", current);
+
+    schedule();
+
+  }
+
+  printk(KERN_ERR "ipc_send : Finished\n");
+  return 0;
+
+}
+
+int ipc_recv(u32 myself, u32 send_capid) 
+{
+  lcd_struct *recv_lcd, *snd_lcd;
+  struct list_head *ptr;
+  ipc_wait_list_elem *entry;
+
+  printk(KERN_ERR "ipc_recv : myself %d sender %d\n", myself, send_capid);
+
+  recv_lcd = (lcd_struct *) get_cap_obj(myself);
+  if (recv_lcd == NULL) {
+    printk(KERN_ERR "ipc_recv : Cant get object for my id %d\n", myself);
+    return -1;   
+  }
+
+  snd_lcd = (lcd_struct *) get_cap_obj(send_capid);
+  if (snd_lcd == NULL) {
+    printk(KERN_ERR "ipc_recv : Cant get object for peer id %d\n", send_capid);
+    //return -1;   
+  }
+
+  //check if one of the senders in the snd q is our intended
+  // recipient
+  if (recv_lcd->sync_ipc.snd_sleepers > 0) {
+
+    printk(KERN_ERR "ipc_recv : Num of senders in Q %d \n", \
+                      recv_lcd->sync_ipc.snd_sleepers);
+
+    list_for_each(ptr, &recv_lcd->sync_ipc.snd_q) {
+      entry = list_entry(ptr, ipc_wait_list_elem, list);
+      if (entry->peer == send_capid) {
+          printk(KERN_ERR "ipc_recv : Found expected sender %d\n", send_capid);
+
+          recv_lcd->sync_ipc.snd_sleepers--;
+          //copy the message registers
+          memcpy(recv_lcd->shared, snd_lcd->shared, sizeof(utcb_t));
+          //remove the entry
+          list_del(ptr);
+          //wakeup
+          wake_up_process(entry->task);
+           // we dont care for state in snd_wait
+           //recv_lcd->sync_ipc.status = IPC_RUNNING; 
+          printk(KERN_ERR "ipc_recv : Returning after waking up sender\n");
+          return 0; 
+        }
+    }
+  }
+  printk(KERN_ERR "ipc_recv : Scheduling out myself\n");
+  // we cant proceed further
+  recv_lcd->sync_ipc.state = IPC_RCV_WAIT ;
+  recv_lcd->sync_ipc.expected_sender = send_capid;
+  set_current_state(TASK_INTERRUPTIBLE);
+  schedule();
+
+  printk(KERN_ERR "ipc_recv : Somebody woke me\n");
+  return 0;
+
+}
+
 static void vmx_handle_vmcall(lcd_struct *lcd) {
+    u32 ipc_dir, ipc_peer;
+    
+    //printk(KERN_ERR "%c", lcd->regs[VCPU_REGS_RAX]);
+    printk(KERN_ERR "%016llx", lcd->regs[VCPU_REGS_RAX]);
+    ipc_dir = LCD_IPC_DIR(lcd->regs[VCPU_REGS_RAX]);
+    ipc_peer = LCD_IPC_PEER(lcd->regs[VCPU_REGS_RAX]);
+
+    printk(KERN_ERR "vmx_handle_vmcall  - dir %d peer %d\n", ipc_dir, ipc_peer);
+
+    switch(ipc_dir) {
+      case IPC_SEND:
+        ipc_send(lcd->sync_ipc.my_capid, ipc_peer);
+        break;
+      case IPC_RECV:
+        ipc_recv(lcd->sync_ipc.my_capid, ipc_peer);
+        break;
+    }
+#if 0
    //printk(KERN_ERR "lcd_run: got vmcall %llu and %c\n", lcd->regs[VCPU_REGS_RAX], lcd->regs[VCPU_REGS_RAX]);
-   printk(KERN_ERR "%c", lcd->regs[VCPU_REGS_RAX]);
+    if (lcd->regs[VCPU_REGS_RAX] == 0xdeadbeef) {
+        display_mr((utcb_t *)lcd->shared);
+        return;
+    }
+#endif    
+   
 }
 
 static void vmx_handle_page_fault(lcd_struct *lcd) {

@@ -1,5 +1,5 @@
-#ifndef LCD_GUEST_DEFS_H
-#define LCD_GUEST_DEFS_H
+#ifndef LCD_IPC_GUEST_DEFS_H
+#define LCD_IPC_GUEST_DEFS_H
 
 
 typedef struct  {
@@ -41,8 +41,6 @@ union utcb_union {
 	char kstack[PAGE_SIZE];
 };
 
-void display_mr(utcb_t *p_utcb) {
-    printk(KERN_ERR "Message Regs at utcb %p - %d ,%d , %d\n", p_utcb, p_utcb->mr[0], p_utcb->mr[1], p_utcb->mr[3]);
-}
+
 
 #endif

@@ -12,8 +12,10 @@
 #include <linux/kernel.h>	/* Needed for KERN_INFO */
 #include <linux/init.h>		/* Needed for the macros */
 #include <asm/vmx.h>
+#include "../ipc.h"
 #include "../lcd_defs.h"
-#include "../ipc_common_defs.h"
+//#include "../ipc_common_defs.h"
+
 
 
 

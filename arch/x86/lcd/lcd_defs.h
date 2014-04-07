@@ -151,21 +151,6 @@ struct ipc_waitq {
   struct list_head list;
 };
 
-typedef struct {
-  u32 peer;
-  struct list_head list;
-  struct task_struct *task;
-} ipc_wait_list_elem;
-
-
-/* Task states */
-enum ipc_state {
-  IPC_DONT_CARE = 0,
-  IPC_RCV_WAIT = 1,
-  IPC_SND_WAIT = 2,
-  IPC_RUNNING = 3,
-};
-
 
 typedef struct {
   int cpu;
@@ -212,26 +197,7 @@ typedef struct {
     struct vmx_msr_entry host[NR_AUTOLOAD_MSRS];
   } msr_autoload;
 
-  struct sync_ipc {
-    // either we put an explicit capid here
-    // so that given the capid we can  fetch
-    // the peers sync_ipc or lcd_struct
-    u32 state;
-    u32 my_capid;
-    //u32 dir;
-    u32 expected_sender;
-   // void *waiting_on; -> this might not be reqd as we are modelling spl states
-    //struct lcd_struct *lcd_mine;
-    //struct lcd_struct *lcd_partner;
-    // some waitq
-    spinlock_t snd_lock;
-    u32 snd_sleepers;
-    struct list_head snd_q;
-    struct task_struct *task;
-    //spinlock_t rcv_lock;
-   // struct list_head rcv_q;
-  } sync_ipc;
-
+  sync_ipc_t sync_ipc;
   struct vmcs *vmcs;
   void *shared;
   
@@ -305,6 +271,7 @@ const char* lcd_exit_reason(int exit_code);
 
 // Inside LCD:
 int lcd_read_mod_file(const char* filepath, void** content, long* size);
+void * get_cap_obj(u32 cap_id);
 
 int lcd_load_vmlinux(const char* kfile, lcd_struct *lcd, u64 *elf_entry);
 

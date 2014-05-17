@@ -99,6 +99,10 @@ ID
 *.orig
 *~
 \#*#
+*.vpw
+*.vpj
+*.vtg
+*.vpwhistu
 
 #
 # Leavings from module signing

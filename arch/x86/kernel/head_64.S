@@ -490,6 +490,8 @@ ENTRY(phys_base)
 	.quad   0x0000000000000000
 
 #include "../../x86/xen/xen-head.S"
+
+#include "../../x86/lcd/lcd-head.S"
 	
 	__PAGE_ALIGNED_BSS
 NEXT_PAGE(empty_zero_page)

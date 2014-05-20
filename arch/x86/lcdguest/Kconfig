@@ -1,5 +1,6 @@
 config LCD_GUEST
 	bool "LCD guest (paravirtual Linux on LCD) support"
-	depends on X86_64
+	default n
+    depends on X86_64
 	help
 	  Selecting this will allow your kernel to boot under lcd. 

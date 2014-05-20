@@ -63,7 +63,10 @@
 #include <linux/dynamic_debug.h>
 #include <uapi/linux/module.h>
 #include "module-internal.h"
-#include <../lcd/lcd_defs.h>
+
+#ifdef CONFIG_LCD
+#include <lcd/lcd.h>
+#endif
 
 #define CREATE_TRACE_POINTS
 #include <trace/events/module.h>
@@ -3752,10 +3755,11 @@ static int load_module(struct load_info *info, const char __user *uargs,
 	return err;
 }
 
+#ifdef CONFIG_LCD
 static int load_lcd(struct load_info *info, const char __user *uargs,
 		       int flags)
 {
-  lcd_struct * lcd;
+  struct lcd * lcd;
 	struct module *mod;
 	long err;
 
@@ -3890,8 +3894,9 @@ static int load_lcd(struct load_info *info, const char __user *uargs,
 	free_copy(info);
 	return err;
 }
+#endif
 
-
+#ifdef CONFIG_LCD
 SYSCALL_DEFINE3(init_lcd, void __user *, umod,
 		unsigned long, len, const char __user *, uargs)
 {
@@ -3911,6 +3916,7 @@ SYSCALL_DEFINE3(init_lcd, void __user *, umod,
 
 	return load_lcd(&info, uargs, 0);
 }
+#endif
 
 SYSCALL_DEFINE3(init_module, void __user *, umod,
 		unsigned long, len, const char __user *, uargs)

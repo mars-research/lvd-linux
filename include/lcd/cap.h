@@ -17,6 +17,9 @@
 MODULE_LICENSE("GPL");
 MODULE_AUTHOR ("FLUX-LAB University of Utah");
 
+/* XXX: some temporary crap from Jithu to test IPC */
+void * get_cap_obj(u32 cap_id);
+
 typedef uint32_t   lcd_cnode;         // a pointer to the cnode
 typedef uint64_t   cap_id ;           // a locally unique identifier (address within cspace)
 typedef uint32_t   lcd_cnode_entry;   // a pointer to an entry within a cnode

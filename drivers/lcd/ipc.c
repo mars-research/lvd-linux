@@ -4,8 +4,10 @@
 #include <linux/spinlock.h>
 #include <linux/sched.h>
 
-#include "ipc.h"
-#include "lcd_defs.h"
+#include <lcd/cap.h>
+#include <lcd/lcd.h>
+
+//#include "lcd_defs.h"
 
 void display_mr(utcb_t *p_utcb) {
     printk(KERN_ERR "Message Regs at utcb %p - %d ,%d , %d\n", p_utcb, p_utcb->mr[0], p_utcb->mr[1], p_utcb->mr[3]);
@@ -14,19 +16,19 @@ void display_mr(utcb_t *p_utcb) {
 
 int ipc_send(u32 myself, u32 recv_capid)
 {
-  lcd_struct *recv_lcd, *snd_lcd;
+  struct lcd *recv_lcd, *snd_lcd;
   ipc_wait_list_elem stack_elem;
 
   printk(KERN_ERR "ipc_send : myself %d reciever %d\n", myself, recv_capid);
   //chk if the reciever is ready
   // fetch the reciever task struct from if
-  recv_lcd = (lcd_struct *) get_cap_obj(recv_capid);
+  recv_lcd = (struct lcd *) get_cap_obj(recv_capid);
   if (recv_lcd == NULL) {
     printk(KERN_ERR "ipc_send : Cant get object for reciever %d\n", recv_capid);
     return -1;   
   }
 
-  snd_lcd = (lcd_struct *) get_cap_obj(myself);
+  snd_lcd = (struct lcd *) get_cap_obj(myself);
   if (snd_lcd == NULL) {
     printk(KERN_ERR "ipc_send : Cant get object for myself %d\n", myself);
     return -1;   
@@ -69,19 +71,19 @@ int ipc_send(u32 myself, u32 recv_capid)
 
 int ipc_recv(u32 myself, u32 send_capid) 
 {
-  lcd_struct *recv_lcd, *snd_lcd;
+  struct lcd *recv_lcd, *snd_lcd;
   struct list_head *ptr;
   ipc_wait_list_elem *entry;
 
   printk(KERN_ERR "ipc_recv : myself %d sender %d\n", myself, send_capid);
 
-  recv_lcd = (lcd_struct *) get_cap_obj(myself);
+  recv_lcd = (struct lcd *) get_cap_obj(myself);
   if (recv_lcd == NULL) {
     printk(KERN_ERR "ipc_recv : Cant get object for my id %d\n", myself);
     return -1;   
   }
 
-  snd_lcd = (lcd_struct *) get_cap_obj(send_capid);
+  snd_lcd = (struct lcd *) get_cap_obj(send_capid);
   if (snd_lcd == NULL) {
     printk(KERN_ERR "ipc_recv : Cant get object for peer id %d\n", send_capid);
     //return -1;   

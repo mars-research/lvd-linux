@@ -4,7 +4,7 @@
 #undef MODULE
 #define MODULE
 
-#include "lcd_cap.h"
+#include <lcd/cap.h>
 
 int init_module(void)
 {
@@ -374,7 +374,7 @@ cap_id lcd_cap_grant_capability(struct task_struct *stcb, cap_id src_cid, struct
       return 0;
     }
     
-    if  (src_cte->cap.crights & CAPRIGHTS_GRANT == 0)
+    if  ((src_cte->cap.crights & CAPRIGHTS_GRANT) == 0)
     {
       LCD_PANIC("lcd_cap_grant_capability: Source does not have grant permissions\n");
       up(src_cte->cap.cdt_node->sem_cdt);

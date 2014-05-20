@@ -10,7 +10,7 @@
 #include <asm/asm.h>
 #include <asm/page_types.h>
 
-#include <xen/interface/elfnote.h>
+#include <lcd/elfnote.h>
 #include <asm/xen/interface.h>
 
 	__INIT

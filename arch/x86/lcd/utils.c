@@ -11,8 +11,8 @@
 #include <asm/uaccess.h>
 #include <asm/vmx.h>
 
+#include <lcd/ipc.h>
 #include <uapi/linux/elf.h>
-#include "ipc.h"
 #include "lcd_defs.h"
 
 int lcd_read_mod_file(const char* filepath,
@@ -61,7 +61,7 @@ error_out:
 }
 
 
-void process_vmlinux_note(lcd_struct *lcd, Elf64_Phdr *hdr,
+void process_vmlinux_note(struct lcd *lcd, Elf64_Phdr *hdr,
                           struct file *filp) {
   char *name, *desc;
   u64 ofs;
@@ -114,7 +114,7 @@ after_mem_out:
   free_page((u64)name);      
 }
 
-void load_vmlinux_segment(lcd_struct *lcd, Elf64_Phdr *hdr,
+void load_vmlinux_segment(struct lcd *lcd, Elf64_Phdr *hdr,
                           struct file *filp) {
   u64 sz, left;
   int ret;
@@ -167,7 +167,7 @@ void load_vmlinux_segment(lcd_struct *lcd, Elf64_Phdr *hdr,
   }  
 }
 
-int lcd_load_vmlinux(const char* kfile, lcd_struct *lcd,
+int lcd_load_vmlinux(const char* kfile, struct lcd *lcd,
                      u64 *elf_entry) {
   Elf64_Ehdr hdr;
   Elf64_Phdr *phdrs;

@@ -340,6 +340,10 @@ asmlinkage long sys_init_module(void __user *umod, unsigned long len,
 				const char __user *uargs);
 asmlinkage long sys_delete_module(const char __user *name_user,
 				unsigned int flags);
+#ifdef CONFIG_LCD
+asmlinkage long sys_init_lcd(void __user *umod, unsigned long len,
+				const char __user *uargs);
+#endif
 
 #ifdef CONFIG_OLD_SIGSUSPEND
 asmlinkage long sys_sigsuspend(old_sigset_t mask);

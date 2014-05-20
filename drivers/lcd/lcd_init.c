@@ -65,8 +65,9 @@
 #include <linux/bsearch.h>
 #include <linux/fips.h>
 #include <uapi/linux/module.h>
-#include <module-internal.h>
-#include "lcd_defs.h"
+//#include <module-internal.h>
+//#include "lcd_defs.h"
+#include <lcd/lcd.h>
 
 #define CREATE_TRACE_POINTS
 #include <trace/events/module.h>
@@ -3204,7 +3205,7 @@ out:
 static int load_module(struct load_info *info, const char __user *uargs,
 		       int flags)
 {
-  lcd_struct * lcd;
+    struct lcd * lcd;
 	struct module *mod;
 	long err;
 

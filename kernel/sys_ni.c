@@ -250,3 +250,7 @@ cond_syscall(sys_execveat);
 
 /* membarrier */
 cond_syscall(sys_membarrier);
+
+/* LCD */
+cond_syscall(sys_init_lcd);
+

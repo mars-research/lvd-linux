@@ -34,15 +34,16 @@
 
 #include <uapi/linux/limits.h>
 
+/* #include "lcd.h" */
+#include <lcd/ipc.h>
+#include "lcd_defs.h"
+
+
 static char vmlinux_file[PATH_MAX];
 module_param_string(vmlinux_file, vmlinux_file,
                     sizeof(vmlinux_file), 0644);
 MODULE_PARM_DESC(vmlinux_file, "vmlinux or vmlinuz path");
 
-
-/* #include "lcd.h" */
-#include "ipc.h"
-#include "lcd_defs.h"
 
 MODULE_AUTHOR("Weibin Sun");
 MODULE_LICENSE("GPL");
@@ -57,7 +58,7 @@ static DEFINE_SPINLOCK(vmx_vpid_lock);
 static DEFINE_PER_CPU(struct vmcs *, vmxarea);
 static DEFINE_PER_CPU(struct desc_ptr, host_gdt);
 static DEFINE_PER_CPU(int, vmx_enabled);
-static DEFINE_PER_CPU(lcd_struct *, local_vcpu);
+static DEFINE_PER_CPU(struct lcd *, local_vcpu);
 
 static unsigned long *msr_bitmap;
 
@@ -322,7 +323,7 @@ static int clear_epte(epte_t *epte) {
   return 1;
 }
 
-static int ept_lookup_gpa(lcd_struct *vcpu,
+static int ept_lookup_gpa(struct lcd *vcpu,
                           void *gpa,
                           int create,
                           epte_t **epte_out) {
@@ -358,7 +359,7 @@ static int ept_lookup_gpa(lcd_struct *vcpu,
   return 0;
 }
 
-static void __set_epte(lcd_struct *vcpu,
+static void __set_epte(struct lcd *vcpu,
                        epte_t* epte, u64 hpa) {
   epte_t flags = __EPTE_READ | __EPTE_EXEC | __EPTE_WRITE |
       __EPTE_TYPE(EPTE_TYPE_WB) | __EPTE_IPAT;
@@ -371,7 +372,7 @@ static void __set_epte(lcd_struct *vcpu,
   *epte = epte_addr(hpa) | flags;
 }
 
-static int ept_set_epte(lcd_struct *vcpu,
+static int ept_set_epte(struct lcd *vcpu,
                         u64 gpa,
                         u64 hpa,
                         int overwrite) {
@@ -404,7 +405,7 @@ static int ept_set_epte(lcd_struct *vcpu,
   return 0;
 }
 
-static unsigned long alloc_pt_pfn(lcd_struct *vcpu) {
+static unsigned long alloc_pt_pfn(struct lcd *vcpu) {
   unsigned long which = bitmap_find_next_zero_area(
       vcpu->bmp_pt_pages,
       LCD_NR_PT_PAGES,
@@ -418,7 +419,7 @@ static unsigned long alloc_pt_pfn(lcd_struct *vcpu) {
 }
 
 /*
-static int free_pt_pfn(lcd_struct *vcpu,
+static int free_pt_pfn(struct lcd *vcpu,
                        unsigned long pfn) {
   unsigned long which = pfn - (PT_PAGES_START >> PAGE_SHIFT);
   if (which >= (PT_PAGES_END >> PAGE_SHIFT)) {
@@ -430,7 +431,7 @@ static int free_pt_pfn(lcd_struct *vcpu,
 }
 */
 
-static int ept_alloc_pt_item(lcd_struct *vcpu,
+static int ept_alloc_pt_item(struct lcd *vcpu,
                              unsigned long *gpfn,
                              unsigned long *page) {
   int ret = 0;
@@ -457,7 +458,7 @@ static int ept_alloc_pt_item(lcd_struct *vcpu,
   return ret;
 }
 
-static int ept_gpa_to_hva(lcd_struct* vcpu,
+static int ept_gpa_to_hva(struct lcd* vcpu,
                           u64 gpa,
                           u64* hva) {
   epte_t *epte;
@@ -479,7 +480,7 @@ static int ept_gpa_to_hva(lcd_struct* vcpu,
 // Set gva => gpa. No page allocated for gva/gpa, just
 // pte value setting. But page table structures along the
 // path can be created by setting 'create' to 1.
-static int map_gva_to_gpa(lcd_struct *vcpu,
+static int map_gva_to_gpa(struct lcd *vcpu,
                           u64 gva,
                           u64 gpa,
                           int create, int overwrite) {
@@ -623,7 +624,7 @@ static void vmx_free_ept(u64 ept_root) {
 }
 
 
-int vmx_init_ept(lcd_struct *vcpu) {
+int vmx_init_ept(struct lcd *vcpu) {
   void *page = (void *) __get_free_page(GFP_KERNEL);
 
   if (!page)
@@ -647,7 +648,7 @@ static u64 construct_eptp(u64 root_hpa) {
   return eptp;
 }
 
-static int vmx_setup_initial_page_table(lcd_struct *vcpu) {
+static int vmx_setup_initial_page_table(struct lcd *vcpu) {
   int ret = 0;
   int i;
 
@@ -768,7 +769,7 @@ static int vmx_setup_initial_page_table(lcd_struct *vcpu) {
   return 0;
 }
 
-static int vmx_create_ept(lcd_struct *vcpu) {
+static int vmx_create_ept(struct lcd *vcpu) {
   int ret;
   ret = vmx_setup_initial_page_table(vcpu);
   return ret;
@@ -834,7 +835,7 @@ static void __vmx_setup_cpu(void) {
 }
 
 static void __vmx_get_cpu_helper(void *ptr) {
-  lcd_struct *vcpu = ptr;
+  struct lcd *vcpu = ptr;
 
   BUG_ON(raw_smp_processor_id() != vcpu->cpu);
   vmcs_clear(vcpu->vmcs);
@@ -848,7 +849,7 @@ static void __vmx_get_cpu_helper(void *ptr) {
  *
  * Disables preemption. Call vmx_put_cpu() when finished.
  */
-static void vmx_get_cpu(lcd_struct *vcpu) {
+static void vmx_get_cpu(struct lcd *vcpu) {
   int cur_cpu = get_cpu();
 
   if (__get_cpu_var(local_vcpu) != vcpu) {
@@ -879,7 +880,7 @@ static void vmx_get_cpu(lcd_struct *vcpu) {
  * vmx_put_cpu - called after using a cpu
  * @vcpu: VCPU that was loaded.
  */
-static void vmx_put_cpu(lcd_struct *vcpu) {
+static void vmx_put_cpu(struct lcd *vcpu) {
   put_cpu();
 }
 
@@ -902,7 +903,7 @@ static int adjust_vmx_controls(u32 ctl_min, u32 ctl_opt,
   return 0;
 }
 
-static void vmx_dump_cpu(lcd_struct *vcpu) {
+static void vmx_dump_cpu(struct lcd *vcpu) {
   unsigned long flags;
   u32 inst_len;
 
@@ -1084,7 +1085,7 @@ static void vmx_free_vmcs(struct vmcs *vmcs) {
   free_pages((unsigned long)vmcs, vmcs_config.order);
 }
 
-static void vmx_setup_constant_host_state(lcd_struct *lcd) {
+static void vmx_setup_constant_host_state(struct lcd *lcd) {
   u32 low32, high32;
   unsigned long tmpl;
   struct desc_ptr dt;
@@ -1103,7 +1104,7 @@ static void vmx_setup_constant_host_state(lcd_struct *lcd) {
   vmcs_writel(HOST_IDTR_BASE, dt.address);   /* 22.2.4 */
   lcd->host_idt_base = dt.address;
 
-  asm("mov $.Lvmx_return, %0" : "=r"(tmpl));
+  asm("mov $.Llcd_vmx_return, %0" : "=r"(tmpl));
   vmcs_writel(HOST_RIP, tmpl); /* 22.2.5 */
 
   rdmsr(MSR_IA32_SYSENTER_CS, low32, high32);
@@ -1147,7 +1148,7 @@ static void vmx_disable_intercept_for_msr(
   }
 }
 
-static void setup_msr(lcd_struct *vcpu) {
+static void setup_msr(struct lcd *vcpu) {
   int set[] = { MSR_LSTAR };
   struct vmx_msr_entry *e;
   int sz = sizeof(set) / sizeof(*set);
@@ -1183,7 +1184,7 @@ static void setup_msr(lcd_struct *vcpu) {
   }
 }
 
-static void vmx_setup_vmcs(lcd_struct *vcpu)
+static void vmx_setup_vmcs(struct lcd *vcpu)
 {
   vmcs_write16(VIRTUAL_PROCESSOR_ID, vcpu->vpid);
   vmcs_write64(VMCS_LINK_POINTER, -1ull); /* 22.3.1.5 */
@@ -1255,7 +1256,7 @@ static void vmx_setup_vmcs(lcd_struct *vcpu)
  * vmx_allocate_vpid - reserves a vpid and sets it in the VCPU
  * @vmx: the VCPU
  */
-static int vmx_allocate_vpid(lcd_struct *vmx)
+static int vmx_allocate_vpid(struct lcd *vmx)
 {
   int vpid;
 
@@ -1276,7 +1277,7 @@ static int vmx_allocate_vpid(lcd_struct *vmx)
  * vmx_free_vpid - frees a vpid
  * @vmx: the VCPU
  */
-static void vmx_free_vpid(lcd_struct *vmx)
+static void vmx_free_vpid(struct lcd *vmx)
 {
   spin_lock(&vmx_vpid_lock);
   if (vmx->vpid != 0)
@@ -1284,7 +1285,7 @@ static void vmx_free_vpid(lcd_struct *vmx)
   spin_unlock(&vmx_vpid_lock);
 }
 
-static void vmx_setup_initial_guest_state(lcd_struct *vcpu)
+static void vmx_setup_initial_guest_state(struct lcd *vcpu)
 {
   /* unsigned long tmpl; */
   unsigned long cr4 = X86_CR4_PAE | X86_CR4_VMXE | X86_CR4_OSXMMEXCPT |
@@ -1374,7 +1375,7 @@ static void vmx_setup_initial_guest_state(lcd_struct *vcpu)
   vmcs_write32(VM_ENTRY_INTR_INFO_FIELD, 0);  /* 22.2.1 */
 }
 
-static int setup_gdt(lcd_struct* vcpu) {
+static int setup_gdt(struct lcd* vcpu) {
   struct desc_struct *desc;
   tss_desc* tssd;
   struct x86_hw_tss* tss;
@@ -1412,7 +1413,7 @@ static int setup_gdt(lcd_struct* vcpu) {
   return 0;
 }
 
-static void setup_idt(lcd_struct* vcpu) {
+static void setup_idt(struct lcd* vcpu) {
   int i;
   memset(vcpu->idt, 0, PAGE_SIZE);
   /* Just fill the IDT  */
@@ -1436,8 +1437,8 @@ u32 set_cap(void *obj){
   return curr_cap++;
 }
 
-static lcd_struct * vmx_create_vcpu(void) {
-  lcd_struct *vcpu = kmalloc(sizeof(lcd_struct), GFP_KERNEL);
+static struct lcd * vmx_create_vcpu(void) {
+  struct lcd *vcpu = kmalloc(sizeof(struct lcd), GFP_KERNEL);
   if (!vcpu)
     return NULL;
 
@@ -1491,14 +1492,14 @@ static lcd_struct * vmx_create_vcpu(void) {
     goto fail_ept;
   }
 
-  vcpu->bp = (struct boot_params*)__get_free_page(GFP_KERNEL)
+  vcpu->bp = (struct boot_params*)__get_free_page(GFP_KERNEL);
   if (!vcpu->bp) {
     printk(KERN_ERR "vmx: out of mem for boot params\n");
     goto fail_ept;
   }
   memset(vcpu->bp, 0, sizeof(struct boot_params));
 
-  vcpu->si = (struct start_info*)__get_free_page(GFP_KERNEL)
+  vcpu->si = (struct start_info*)__get_free_page(GFP_KERNEL);
   if (!vcpu->si) {
     printk(KERN_ERR "vmx: out of mem for start info\n");
     goto fail_si;
@@ -1546,7 +1547,7 @@ fail_bmp:
   return NULL;
 }
 
-static void vmx_destroy_vcpu(lcd_struct *vcpu)
+static void vmx_destroy_vcpu(struct lcd *vcpu)
 {
   vmx_free_ept(vcpu->ept_root);
   vmx_get_cpu(vcpu);
@@ -1562,7 +1563,7 @@ static void vmx_destroy_vcpu(lcd_struct *vcpu)
   kfree(vcpu);
 }
 
-static int __noclone vmx_run_vcpu(lcd_struct *vcpu) {
+static int __noclone vmx_run_vcpu(struct lcd *vcpu) {
   asm(
       /* Store host registers */
       "push %%rdx; push %%rbp;"
@@ -1602,9 +1603,9 @@ static int __noclone vmx_run_vcpu(lcd_struct *vcpu) {
       /* Enter guest mode */
       "jne .Llaunched \n\t"
       ASM_VMX_VMLAUNCH "\n\t"
-      "jmp .Lvmx_return \n\t"
+      "jmp .Llcd_vmx_return \n\t"
       ".Llaunched: " ASM_VMX_VMRESUME "\n\t"
-      ".Lvmx_return: "
+      ".Llcd_vmx_return: "
       /* Save guest registers, load host registers, keep flags */
       "mov %0, %c[wordsize](%%rsp) \n\t"
       "pop %0 \n\t"
@@ -1636,25 +1637,25 @@ static int __noclone vmx_run_vcpu(lcd_struct *vcpu) {
       "mov %%rax, %%ds \n\t"
       "mov %%rax, %%es \n\t"
       : : "c"(vcpu), "d"((unsigned long)HOST_RSP),
-        [launched]"i"(offsetof(lcd_struct, launched)),
-        [fail]"i"(offsetof(lcd_struct, fail)),
-        [host_rsp]"i"(offsetof(lcd_struct, host_rsp)),
-        [rax]"i"(offsetof(lcd_struct, regs[VCPU_REGS_RAX])),
-        [rbx]"i"(offsetof(lcd_struct, regs[VCPU_REGS_RBX])),
-        [rcx]"i"(offsetof(lcd_struct, regs[VCPU_REGS_RCX])),
-        [rdx]"i"(offsetof(lcd_struct, regs[VCPU_REGS_RDX])),
-        [rsi]"i"(offsetof(lcd_struct, regs[VCPU_REGS_RSI])),
-        [rdi]"i"(offsetof(lcd_struct, regs[VCPU_REGS_RDI])),
-        [rbp]"i"(offsetof(lcd_struct, regs[VCPU_REGS_RBP])),
-        [r8]"i"(offsetof(lcd_struct, regs[VCPU_REGS_R8])),
-        [r9]"i"(offsetof(lcd_struct, regs[VCPU_REGS_R9])),
-        [r10]"i"(offsetof(lcd_struct, regs[VCPU_REGS_R10])),
-        [r11]"i"(offsetof(lcd_struct, regs[VCPU_REGS_R11])),
-        [r12]"i"(offsetof(lcd_struct, regs[VCPU_REGS_R12])),
-        [r13]"i"(offsetof(lcd_struct, regs[VCPU_REGS_R13])),
-        [r14]"i"(offsetof(lcd_struct, regs[VCPU_REGS_R14])),
-        [r15]"i"(offsetof(lcd_struct, regs[VCPU_REGS_R15])),
-        [cr2]"i"(offsetof(lcd_struct, cr2)),
+        [launched]"i"(offsetof(struct lcd, launched)),
+        [fail]"i"(offsetof(struct lcd, fail)),
+        [host_rsp]"i"(offsetof(struct lcd, host_rsp)),
+        [rax]"i"(offsetof(struct lcd, regs[VCPU_REGS_RAX])),
+        [rbx]"i"(offsetof(struct lcd, regs[VCPU_REGS_RBX])),
+        [rcx]"i"(offsetof(struct lcd, regs[VCPU_REGS_RCX])),
+        [rdx]"i"(offsetof(struct lcd, regs[VCPU_REGS_RDX])),
+        [rsi]"i"(offsetof(struct lcd, regs[VCPU_REGS_RSI])),
+        [rdi]"i"(offsetof(struct lcd, regs[VCPU_REGS_RDI])),
+        [rbp]"i"(offsetof(struct lcd, regs[VCPU_REGS_RBP])),
+        [r8]"i"(offsetof(struct lcd, regs[VCPU_REGS_R8])),
+        [r9]"i"(offsetof(struct lcd, regs[VCPU_REGS_R9])),
+        [r10]"i"(offsetof(struct lcd, regs[VCPU_REGS_R10])),
+        [r11]"i"(offsetof(struct lcd, regs[VCPU_REGS_R11])),
+        [r12]"i"(offsetof(struct lcd, regs[VCPU_REGS_R12])),
+        [r13]"i"(offsetof(struct lcd, regs[VCPU_REGS_R13])),
+        [r14]"i"(offsetof(struct lcd, regs[VCPU_REGS_R14])),
+        [r15]"i"(offsetof(struct lcd, regs[VCPU_REGS_R15])),
+        [cr2]"i"(offsetof(struct lcd, cr2)),
         [wordsize]"i"(sizeof(ulong))
       : "cc", "memory"
         , "rax", "rbx", "rdi", "rsi"
@@ -1684,7 +1685,7 @@ static void vmx_step_instruction(void) {
               vmcs_read32(VM_EXIT_INSTRUCTION_LEN));
 }
 
-static int vmx_handle_ept_violation(lcd_struct *vcpu) {
+static int vmx_handle_ept_violation(struct lcd *vcpu) {
   unsigned long gva, gpa;
   int ret;
 
@@ -1880,13 +1881,13 @@ void vmx_exit(void)
 }
 
 
-lcd_struct* lcd_create(void) {
-  lcd_struct* lcd = vmx_create_vcpu();
+struct lcd* lcd_create(void) {
+  struct lcd* lcd = vmx_create_vcpu();
   return lcd;
 }
 EXPORT_SYMBOL(lcd_create);
 
-int lcd_destroy(lcd_struct* lcd) {
+int lcd_destroy(struct lcd* lcd) {
   vmx_destroy_vcpu(lcd);
   return 0;
 }
@@ -1901,7 +1902,7 @@ static int lcd_va_to_pa(void* va, void** pa, int vmallocd) {
   return 0;
 }
 
-static int __move_host_mapping(lcd_struct *lcd, void* hva,
+static int __move_host_mapping(struct lcd *lcd, void* hva,
                                unsigned int size, int vmallocd) {
   unsigned int mapped = 0;
   void *pa;
@@ -1932,7 +1933,7 @@ static int __move_host_mapping(lcd_struct *lcd, void* hva,
   return 0;
 }
 
-static int map_host_page_at_guest_va(lcd_struct *lcd, void* hva,
+static int map_host_page_at_guest_va(struct lcd *lcd, void* hva,
                                      void *gva, int vmallocd ) {
     void *pa;
     void *va = (void*)round_down(((unsigned long)hva), PAGE_SIZE);
@@ -1959,7 +1960,7 @@ static int map_host_page_at_guest_va(lcd_struct *lcd, void* hva,
 
 }
 
-static int lcd_setup_stack(lcd_struct *lcd) {
+static int lcd_setup_stack(struct lcd *lcd) {
     char *sp = NULL;
     char *stack_top = NULL;
     int ret = 0;
@@ -2012,7 +2013,7 @@ static int lcd_setup_stack(lcd_struct *lcd) {
     return 0;
 }
 
-int lcd_move_module(lcd_struct *lcd, struct module *mod) {
+int lcd_move_module(struct lcd *lcd, struct module *mod) {
   int ret;
   lcd->mod = mod;
   // lcd_va_to_pa(va, pa) // 4KB page assumption
@@ -2033,23 +2034,23 @@ int lcd_move_module(lcd_struct *lcd, struct module *mod) {
 }
 EXPORT_SYMBOL(lcd_move_module);
 
-int lcd_map_gpa_to_hpa(lcd_struct *lcd, u64 gpa, u64 hpa, int overwrite) {
+int lcd_map_gpa_to_hpa(struct lcd *lcd, u64 gpa, u64 hpa, int overwrite) {
   return ept_set_epte(lcd, gpa, hpa, overwrite);
 }
 EXPORT_SYMBOL(lcd_map_gpa_to_hpa);
 
-int lcd_map_gva_to_gpa(lcd_struct *lcd, u64 gva, u64 gpa,
+int lcd_map_gva_to_gpa(struct lcd *lcd, u64 gva, u64 gpa,
                        int create, int overwrite) {
   return map_gva_to_gpa(lcd, gva, gpa, create, overwrite);
 }
 EXPORT_SYMBOL(lcd_map_gva_to_gpa);
 
-int lcd_find_hva_by_gpa(lcd_struct *lcd, u64 gpa, u64 *hva) {
+int lcd_find_hva_by_gpa(struct lcd *lcd, u64 gpa, u64 *hva) {
   return ept_gpa_to_hva(lcd, gpa, hva);
 }
 EXPORT_SYMBOL(lcd_find_hva_by_gpa);
 
-static void vmx_handle_external_interrupt(lcd_struct *lcd) {  
+static void vmx_handle_external_interrupt(struct lcd *lcd) {  
   if ((lcd->exit_intr_info &
        (INTR_INFO_VALID_MASK | INTR_INFO_INTR_TYPE_MASK))
       == (INTR_INFO_VALID_MASK | INTR_TYPE_EXT_INTR)) {
@@ -2087,7 +2088,7 @@ static void vmx_handle_external_interrupt(lcd_struct *lcd) {
 }
 
 
-static void vmx_handle_vmcall(lcd_struct *lcd) {
+static void vmx_handle_vmcall(struct lcd *lcd) {
     u32 ipc_dir, ipc_peer;
     
     //printk(KERN_ERR "%c", lcd->regs[VCPU_REGS_RAX]);
@@ -2115,12 +2116,12 @@ static void vmx_handle_vmcall(lcd_struct *lcd) {
    
 }
 
-static void vmx_handle_page_fault(lcd_struct *lcd) {
+static void vmx_handle_page_fault(struct lcd *lcd) {
   printk(KERN_INFO "lcd: page fault VA %p\n",
          (void*)lcd->exit_qualification);
 }
 
-static int vmx_handle_nmi_exception(lcd_struct *vcpu)
+static int vmx_handle_nmi_exception(struct lcd *vcpu)
 {
   printk(KERN_INFO "lcd: got an exception\n");
   if ((vcpu->exit_intr_info & INTR_INFO_INTR_TYPE_MASK)
@@ -2137,7 +2138,7 @@ static int vmx_handle_nmi_exception(lcd_struct *vcpu)
   return -EIO;
 }
 
-int lcd_run(lcd_struct *lcd) {
+int lcd_run(struct lcd *lcd) {
   int done = 0;
   int ret = 0;
   int countdown = 1000;
@@ -2240,7 +2241,7 @@ int lcd_run(lcd_struct *lcd) {
 EXPORT_SYMBOL(lcd_run);
 
 
-int setup_vmlinux(lcd_struct *lcd) {
+int setup_vmlinux(struct lcd *lcd) {
   int ret;
   u64 elf_entry;
 

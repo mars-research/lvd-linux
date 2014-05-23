@@ -71,15 +71,12 @@
 #include <xen/interface/platform.h>
 #endif
 
-//#include "xen-ops.h"
-//#include "mmu.h"
-//#include "smp.h"
-//#include "multicalls.h"
-
+#include <lcd/console.h>
 
 /* First C function to be called on Xen boot */
 asmlinkage void __init lcd_start_kernel(void)
 {
+	lcd_printf("Inside PV kernel\n");
 	return;
 }
 

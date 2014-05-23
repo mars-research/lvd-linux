@@ -99,10 +99,13 @@ ID
 *.orig
 *~
 \#*#
+
+# LCD     
 *.vpw
 *.vpj
 *.vtg
 *.vpwhistu
+tools/lcd/insmod4lcd
 
 #
 # Leavings from module signing

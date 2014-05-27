@@ -1,3 +1,4 @@
-obj-$(CONFIG_LCD) += cap.o ipc.o core.o
+obj-$(CONFIG_LCD) += lcd.o
+lcd-y := cap.o ipc.o core.o
 
-lcd-y := lcd.o
+

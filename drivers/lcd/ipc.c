@@ -68,6 +68,7 @@ int ipc_send(u32 myself, u32 recv_capid)
 	return 0;
 
 }
+EXPORT_SYMBOL(ipc_send);
 
 int ipc_recv(u32 myself, u32 send_capid) 
 {
@@ -126,3 +127,4 @@ int ipc_recv(u32 myself, u32 send_capid)
 	return 0;
 
 }
+EXPORT_SYMBOL(ipc_recv);

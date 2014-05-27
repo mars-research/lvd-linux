@@ -1,21 +1,4 @@
-#undef __KERNEL__
-#define __KERNEL__
-
-#undef MODULE
-#define MODULE
-
 #include <lcd/cap.h>
-
-int init_module(void)
-{
-	printk(KERN_INFO "Initializing LCD-Capability Module\n");
-	return 0;    // Non-zero return means that the module couldn't be loaded.
-}
-
-void cleanup_module(void)
-{
-	printk(KERN_INFO "Cleaning up LCD-Capability Module\n");
-}
 
 // this function will not lock any semaphore.
 // assumption is that cdt and cspace are already locked.

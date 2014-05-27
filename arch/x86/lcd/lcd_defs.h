@@ -76,11 +76,11 @@ typedef unsigned long epte_t;
 #define __EPTE_TYPE(n) (((n) & 0x7) << 3)
 
 enum {
-  EPTE_TYPE_UC = 0, /* uncachable */
-  EPTE_TYPE_WC = 1, /* write combining */
-  EPTE_TYPE_WT = 4, /* write through */
-  EPTE_TYPE_WP = 5, /* write protected */
-  EPTE_TYPE_WB = 6, /* write back */
+	EPTE_TYPE_UC = 0, /* uncachable */
+	EPTE_TYPE_WC = 1, /* write combining */
+	EPTE_TYPE_WT = 4, /* write through */
+	EPTE_TYPE_WP = 5, /* write protected */
+	EPTE_TYPE_WB = 6, /* write back */
 };
 
 #define __EPTE_NONE 0
@@ -89,33 +89,33 @@ enum {
 #define EPTE_ADDR  (~(PAGE_SIZE - 1))
 #define EPTE_FLAGS (PAGE_SIZE - 1)
 
-#define ADDR_TO_IDX(la, n)                                      \
-  ((((unsigned long) (la)) >> (12 + 9 * (n))) & ((1 << 9) - 1))
+#define ADDR_TO_IDX(la, n)						\
+	((((unsigned long) (la)) >> (12 + 9 * (n))) & ((1 << 9) - 1))
 
 
 /* VMCS related */
 
 struct vmcs_config {
-  int size;
-  int order;
-  u32 revision_id;
-  u32 pin_based_exec_ctrl;
-  u32 cpu_based_exec_ctrl;
-  u32 cpu_based_2nd_exec_ctrl;
-  u32 vmexit_ctrl;
-  u32 vmentry_ctrl;
+	int size;
+	int order;
+	u32 revision_id;
+	u32 pin_based_exec_ctrl;
+	u32 cpu_based_exec_ctrl;
+	u32 cpu_based_2nd_exec_ctrl;
+	u32 vmexit_ctrl;
+	u32 vmentry_ctrl;
 };
 
 struct vmcs {
-  u32 revision_id;
-  u32 abort;
-  char data[0];
+	u32 revision_id;
+	u32 abort;
+	char data[0];
 };
 
 struct vmx_capability {
-  u32 ept;
-  u32 vpid;
-  int has_load_efer:1;
+	u32 ept;
+	u32 vpid;
+	int has_load_efer:1;
 };
 
 extern struct vmx_capability vmx_capability;
@@ -123,13 +123,13 @@ extern struct vmcs_config vmcs_config;
 
 
 struct lcd_tss_struct {
-  struct x86_hw_tss tss;
-  u8 io_bitmap[1];
+	struct x86_hw_tss tss;
+	u8 io_bitmap[1];
 } __attribute__((packed));
 
 struct ipc_waitq {
-  u32 partner_id;
-  struct list_head list;
+	u32 partner_id;
+	struct list_head list;
 };
 
 

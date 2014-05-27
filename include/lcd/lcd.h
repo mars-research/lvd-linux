@@ -10,80 +10,80 @@
 
 /* XXX: arch dependent, move to ./arch/x86/lcd */ 
 enum vmx_reg {
-  VCPU_REGS_RAX = 0,
-  VCPU_REGS_RCX = 1,
-  VCPU_REGS_RDX = 2,
-  VCPU_REGS_RBX = 3,
-  VCPU_REGS_RSP = 4,
-  VCPU_REGS_RBP = 5,
-  VCPU_REGS_RSI = 6,
-  VCPU_REGS_RDI = 7,
-  VCPU_REGS_R8 = 8,
-  VCPU_REGS_R9 = 9,
-  VCPU_REGS_R10 = 10,
-  VCPU_REGS_R11 = 11,
-  VCPU_REGS_R12 = 12,
-  VCPU_REGS_R13 = 13,
-  VCPU_REGS_R14 = 14,
-  VCPU_REGS_R15 = 15,
-  VCPU_REGS_RIP,
-  NR_VCPU_REGS
+	VCPU_REGS_RAX = 0,
+	VCPU_REGS_RCX = 1,
+	VCPU_REGS_RDX = 2,
+	VCPU_REGS_RBX = 3,
+	VCPU_REGS_RSP = 4,
+	VCPU_REGS_RBP = 5,
+	VCPU_REGS_RSI = 6,
+	VCPU_REGS_RDI = 7,
+	VCPU_REGS_R8 = 8,
+	VCPU_REGS_R9 = 9,
+	VCPU_REGS_R10 = 10,
+	VCPU_REGS_R11 = 11,
+	VCPU_REGS_R12 = 12,
+	VCPU_REGS_R13 = 13,
+	VCPU_REGS_R14 = 14,
+	VCPU_REGS_R15 = 15,
+	VCPU_REGS_RIP,
+	NR_VCPU_REGS
 };
 
 /* XXX: split and move arch dependent parts to ./arch/x86/lcd */ 
 typedef struct lcd {
-  int cpu;
-  int vpid;
-  int launched;
+	int cpu;
+	int vpid;
+	int launched;
 
-  spinlock_t ept_lock;
-  unsigned long ept_root;
-  unsigned long eptp;
-  bool ept_ad_enabled;
+	spinlock_t ept_lock;
+	unsigned long ept_root;
+	unsigned long eptp;
+	bool ept_ad_enabled;
 
-  pgd_t* pt;
-  unsigned long pt_gpa;
+	pgd_t* pt;
+	unsigned long pt_gpa;
 
-  unsigned long *bmp_pt_pages;
+	unsigned long *bmp_pt_pages;
 
-  /* GDT_ENTRIES * desc_struct */
-  struct desc_struct* gdt;
-  /* IDT_ENTRIES * gate_desc */
-  gate_desc* idt;
-  struct lcd_tss_struct* tss;
+	/* GDT_ENTRIES * desc_struct */
+	struct desc_struct* gdt;
+	/* IDT_ENTRIES * gate_desc */
+	gate_desc* idt;
+	struct lcd_tss_struct* tss;
 
-  unsigned long isr_page;
+	unsigned long isr_page;
 
-  unsigned long host_idt_base;
+	unsigned long host_idt_base;
 
-  u8  fail;
-  u64 exit_reason;
-  u64 exit_qualification;
-  u32 idt_vectoring_info;
-  u32 exit_intr_info;
-  u32 error_code;
-  u32 vec_no;
-  u64 host_rsp;
-  u64 regs[NR_VCPU_REGS];
-  u64 cr2;
+	u8  fail;
+	u64 exit_reason;
+	u64 exit_qualification;
+	u32 idt_vectoring_info;
+	u32 exit_intr_info;
+	u32 error_code;
+	u32 vec_no;
+	u64 host_rsp;
+	u64 regs[NR_VCPU_REGS];
+	u64 cr2;
 
-  int shutdown;
-  int ret_code;
+	int shutdown;
+	int ret_code;
 
-  struct msr_autoload {
-    unsigned nr;
-    struct vmx_msr_entry guest[NR_AUTOLOAD_MSRS];
-    struct vmx_msr_entry host[NR_AUTOLOAD_MSRS];
-  } msr_autoload;
+	struct msr_autoload {
+		unsigned nr;
+		struct vmx_msr_entry guest[NR_AUTOLOAD_MSRS];
+		struct vmx_msr_entry host[NR_AUTOLOAD_MSRS];
+	} msr_autoload;
 
-  sync_ipc_t sync_ipc;
-  struct vmcs *vmcs;
-  void *shared;
+	sync_ipc_t sync_ipc;
+	struct vmcs *vmcs;
+	void *shared;
 
-  struct boot_params *bp;
-  struct start_info *si;
+	struct boot_params *bp;
+	struct start_info *si;
   
-  struct module *mod;
+	struct module *mod;
 } lcd_t;
 
 int lcd_vmx_init(void); 

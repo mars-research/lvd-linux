@@ -54,12 +54,12 @@ if(!(condition))                                        \
 
 enum __lcd_cap_type
 {
-  lcd_type_invalid,
-  lcd_type_free,
-  lcd_type_capability,
-  lcd_type_cnode,
-  lcd_type_endpoint,
-  lcd_type_separator
+	lcd_type_invalid,
+	lcd_type_free,
+	lcd_type_capability,
+	lcd_type_cnode,
+	lcd_type_endpoint,
+	lcd_type_separator
 };
 
 /* caps with fixed slot potitions in the root CNode */
@@ -88,12 +88,12 @@ enum
 
 struct cap_derivation_tree
 {
-  struct cte                 *cap;      
-  struct semaphore           *sem_cdt;
-  struct cap_derivation_tree *next;
-  struct cap_derivation_tree *prev;
-  struct cap_derivation_tree *parent_ptr;
-  struct cap_derivation_tree *child_ptr;  
+	struct cte                 *cap;      
+	struct semaphore           *sem_cdt;
+	struct cap_derivation_tree *next;
+	struct cap_derivation_tree *prev;
+	struct cap_derivation_tree *parent_ptr;
+	struct cap_derivation_tree *child_ptr;  
 };
 
 struct capability_internal 
@@ -108,34 +108,34 @@ struct cte;
 
 struct cap_node
 {
-    cap_id     cnode_id;
-    struct cte *table; /* points to another cnode table */
-    uint16_t   table_level;
+	cap_id     cnode_id;
+	struct cte *table; /* points to another cnode table */
+	uint16_t   table_level;
 };
 
 struct free_slot_t
 {
-  int next_free_cap_slot;
-  int next_free_cnode_slot;
-  struct cap_space *cspace;
+	int next_free_cap_slot;
+	int next_free_cnode_slot;
+	struct cap_space *cspace;
 };
 
 struct cte // capability table entry
 {
-    union
-    {
-          struct cap_node cnode;
-          struct capability_internal cap;
-          struct free_slot_t slot;
-    };
-    lcd_cap_type ctetype;
-    uint16_t     index;
+	union
+	{
+		struct cap_node cnode;
+		struct capability_internal cap;
+		struct free_slot_t slot;
+	};
+	lcd_cap_type ctetype;
+	uint16_t     index;
 };
 
 struct cap_space
 {
 	struct cte       root_cnode;
-    struct semaphore sem_cspace;
+	struct semaphore sem_cspace;
 };
 
 
@@ -144,35 +144,35 @@ struct cap_space
 ////////////////////////////////////////////////////////////////////////////////////////////
 static inline int lcd_get_bits_at_level(cap_id id, int level)
 {
-  int bits = 0;
-  id = id << ((MAX_DEPTH - level - 1) * CNODE_INDEX_BITS);
-  id = id >> ((MAX_DEPTH - 1)         * CNODE_INDEX_BITS);
-  bits = (int) id;
-  return bits;
+	int bits = 0;
+	id = id << ((MAX_DEPTH - level - 1) * CNODE_INDEX_BITS);
+	id = id >> ((MAX_DEPTH - 1)         * CNODE_INDEX_BITS);
+	bits = (int) id;
+	return bits;
 }
 
 static inline void lcd_clear_bits_at_level(cap_id *id, int level)
 {
-  cap_id mask = (~0);
-  // clear all higher order bits.
-  mask = mask << ((MAX_DEPTH - 1) * CNODE_INDEX_BITS);
-  // clear lower order bits
-  mask = mask >> ((MAX_DEPTH - 1) * CNODE_INDEX_BITS);
-  // get the mask to appropriate position
-  mask = mask << (level * CNODE_INDEX_BITS);
-  mask = ~mask;
-  *id = (*id) & mask;
+	cap_id mask = (~0);
+	// clear all higher order bits.
+	mask = mask << ((MAX_DEPTH - 1) * CNODE_INDEX_BITS);
+	// clear lower order bits
+	mask = mask >> ((MAX_DEPTH - 1) * CNODE_INDEX_BITS);
+	// get the mask to appropriate position
+	mask = mask << (level * CNODE_INDEX_BITS);
+	mask = ~mask;
+	*id = (*id) & mask;
 }
 
 static inline void lcd_set_bits_at_level(struct cte *cnode, cap_id *cid, int free_slot)
 {
-  int level = cnode->cnode.table_level;
-  cap_id id = free_slot;
+	int level = cnode->cnode.table_level;
+	cap_id id = free_slot;
   
-  *cid = cnode->cnode.cnode_id;
-  lcd_clear_bits_at_level(cid, level);
-  id = id << (level * CNODE_INDEX_BITS);
-  *cid = *cid | id;
+	*cid = cnode->cnode.cnode_id;
+	lcd_clear_bits_at_level(cid, level);
+	id = id << (level * CNODE_INDEX_BITS);
+	*cid = *cid | id;
 }
 
 struct cte * lcd_cap_reserve_slot(struct cte *cnode, cap_id *cid, int free_slot);

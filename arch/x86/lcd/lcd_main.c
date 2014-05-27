@@ -1,9 +1,14 @@
 /*
- * LCD main source file.
+ * LCD core VTX functions 
  *
  * Based on KVM and Dune.
  *
+ * Authors:
+ *
+ *   Weibin Sun <wbsun@flux.utah.edu>
+ *
  */
+
 #include <linux/init.h>
 #include <linux/kernel.h>
 #include <linux/module.h>
@@ -39,14 +44,6 @@
 #include "lcd_defs.h"
 
 
-static char vmlinux_file[PATH_MAX];
-module_param_string(vmlinux_file, vmlinux_file,
-                    sizeof(vmlinux_file), 0644);
-MODULE_PARM_DESC(vmlinux_file, "vmlinux or vmlinuz path");
-
-
-MODULE_AUTHOR("Weibin Sun");
-MODULE_LICENSE("GPL");
 
 struct vmx_capability vmx_capability;
 
@@ -1526,19 +1523,19 @@ static struct lcd * vmx_create_vcpu(void) {
   return vcpu;
 
 fail_si:
-  free_page(vcpu->bp);
+  free_page((unsigned long) vcpu->bp);
 fail_ept:
   vmx_free_vpid(vcpu);
 fail_vpid:
   vmx_free_vmcs(vcpu->vmcs);
 fail_vmcs:
-  free_page((void*)vcpu->isr_page);
+  free_page((unsigned long)vcpu->isr_page);
 fail_isr:
-  free_page(vcpu->tss);
+  free_page((unsigned long)vcpu->tss);
 fail_tss:
-  free_page(vcpu->idt);
+  free_page((unsigned long)vcpu->idt);
 fail_idt:
-  free_page(vcpu->gdt);
+  free_page((unsigned long)vcpu->gdt);
 fail_gdt:
   kfree(vcpu->bmp_pt_pages);
 fail_bmp:
@@ -1558,8 +1555,8 @@ static void vmx_destroy_vcpu(struct lcd *vcpu)
   vmx_free_vpid(vcpu);
   vmx_free_vmcs(vcpu->vmcs);
   kfree(vcpu->bmp_pt_pages);
-  free_page(vcpu->bp);
-  free_page(vcpu->si);
+  free_page((unsigned long) vcpu->bp);
+  free_page((unsigned long) vcpu->si);
   kfree(vcpu);
 }
 
@@ -1803,7 +1800,7 @@ static void vmx_free_vmxon_areas(void) {
   }
 }
 
-int vmx_init(void) {
+int lcd_vmx_init(void) {
   int r, cpu;
 
   if (!cpu_has_vmx()) {
@@ -1872,13 +1869,15 @@ failed1:
   vmx_free_vmxon_areas();
   return r;
 }
+EXPORT_SYMBOL(lcd_vmx_init);
 
-void vmx_exit(void)
+void lcd_vmx_exit(void)
 {
   on_each_cpu(vmx_disable, NULL, 1);
   vmx_free_vmxon_areas();
   free_page((unsigned long)msr_bitmap);
 }
+EXPORT_SYMBOL(lcd_vmx_exit);
 
 
 struct lcd* lcd_create(void) {
@@ -1909,7 +1908,8 @@ static int __move_host_mapping(struct lcd *lcd, void* hva,
   void *va = (void*)round_down(((unsigned long)hva), PAGE_SIZE);
   int ret = 0;
   
-  printk(KERN_ERR "mapping base - 0x%p (phys 0x%p)(phys2 %p) size %d\n", hva, (vmalloc_to_pfn(va)<<PAGE_SHIFT),virt_to_phys(va),size);
+  printk(KERN_ERR "mapping base - 0x%p (phys 0x%lx)(phys2 0x%lx) size %d\n", 
+		  hva, (vmalloc_to_pfn(va)<<PAGE_SHIFT), (unsigned long)virt_to_phys(va),size);
     
   while (mapped < size) {
     ret = lcd_va_to_pa(va, &pa, vmallocd);
@@ -1968,7 +1968,7 @@ static int lcd_setup_stack(struct lcd *lcd) {
     printk (KERN_ERR "lcd : Entered lcd_setup_stack\n");
     // allocate a few pages for LCD stack from
     // Linux kernel memory allocator
-    sp = __get_free_pages(GFP_KERNEL | __GFP_ZERO, 2);
+    sp = (char*)__get_free_pages(GFP_KERNEL | __GFP_ZERO, 2);
     if (!sp) {
         return -ENOMEM;
     }
@@ -1986,10 +1986,10 @@ static int lcd_setup_stack(struct lcd *lcd) {
     }
     
     //setup the stack
-    vmcs_writel(GUEST_RSP, stack_top);
+    vmcs_writel(GUEST_RSP, (unsigned long) stack_top);
     
     //setup the stack canary page referenced by %gs:28
-    sp = __get_free_pages(GFP_KERNEL | __GFP_ZERO, 0);
+    sp = (char*)__get_free_pages(GFP_KERNEL | __GFP_ZERO, 0);
     if (!sp) {
         return -ENOMEM;
     }
@@ -2241,13 +2241,13 @@ int lcd_run(struct lcd *lcd) {
 EXPORT_SYMBOL(lcd_run);
 
 
-int setup_vmlinux(struct lcd *lcd) {
+int setup_vmlinux(struct lcd *lcd, char *file) {
   int ret;
   u64 elf_entry;
 
   struct boot_params *bp = lcd->bp;
 
-  ret = lcd_load_vmlinux(vmlinux_file, lcd, &elf_entry);
+  ret = lcd_load_vmlinux(file, lcd, &elf_entry);
   if (!ret) {
     printk(KERN_ERR "Error when loading vmlinux %d\n", ret);
     goto err_out;
@@ -2282,23 +2282,4 @@ err_out:
   return ret;
 }
 
-static int __init lcd_init(void) {
-  int r;
-  printk(KERN_INFO "LCD module loaded\n");
-  if ((r = vmx_init())) {
-    printk(KERN_ERR "LCD: failed to init VMX\n");
-  } else {
-    ;//    r = lcd_test();
-  } 
 
-  return r;
-}
-
-static void __exit lcd_exit(void) {
-  printk(KERN_INFO "LCD module unloading...\n");
-  vmx_exit();
-  printk(KERN_INFO "LCD module unloaded\n");
-}
-
-module_init(lcd_init);
-module_exit(lcd_exit);

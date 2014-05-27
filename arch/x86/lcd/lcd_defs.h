@@ -244,7 +244,6 @@ typedef struct {
 // Inside LCD:
 int lcd_read_mod_file(const char* filepath, void** content, long* size);
 
-int lcd_load_vmlinux(const char* kfile, struct lcd *lcd, u64 *elf_entry);
 
 
 

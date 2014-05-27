@@ -1,3 +1,0 @@
-#!/bin/bash
-
-find $1 -name *.ko -exec sh -c "printf \"%d \\t {}\\n\" \`nm {} | egrep '^\\s*U' | wc -l\`" \; | sort -nr

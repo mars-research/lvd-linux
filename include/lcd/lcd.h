@@ -92,6 +92,7 @@ void lcd_vmx_exit(void);
 
 int lcd_init_module(void __user * umod, unsigned long len, const char __user * uargs);
 //int lcd_load_module(struct load_info *info, const char __user *uargs, int flags);
+int lcd_setup_vmlinux(struct lcd *lcd, char *file); 
 
 int lcd_load_vmlinux(const char* kfile, struct lcd *lcd, u64 *elf_entry);
 

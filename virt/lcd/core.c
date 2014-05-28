@@ -24,20 +24,41 @@ static long lcd_dev_ioctl(struct file *filp,
 			  unsigned int ioctl, unsigned long arg)
 {
 	long r = -EINVAL;
-	struct lcd_pv_kernel_config conf;
 
 	switch (ioctl) {
-	case LCD_LOAD_PV_KERNEL:
-		//r = copy_from_user(&conf, (int __user *) arg,
-		//		   sizeof(struct lcd_pv_kernel_config));
-		//if (r) {
-		//	r = -EIO;
-		//	goto out;
-		//}
+	case LCD_LOAD_PV_KERNEL: 
+	{
+		int error;
+		struct lcd *lcd;
+		struct filename *filename;
+		struct lcd_pv_kernel_config conf;
+
+		r = copy_from_user(&conf, (int __user *) arg,
+				   sizeof(conf));
+		if (r) {
+			r = -EIO;
+			goto out;
+		}
 
 		/* create LCD with a PV Linux kernel */
-		break;
+		lcd = lcd_create();
+		if (!lcd) {
+			r = -ENOMEM;
+			goto out;		
+		}
 
+		filename = getname((const char __user *) conf.file);
+		error = PTR_ERR(filename);
+		if (IS_ERR(filename))
+			goto out;
+ 
+		lcd_setup_vmlinux(lcd, filename->name);
+
+		putname(filename);
+
+		lcd_run(lcd);
+		break;
+        } 
 	default:
 		return -ENOTTY;
 	}

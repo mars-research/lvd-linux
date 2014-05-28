@@ -2240,7 +2240,7 @@ int lcd_run(struct lcd *lcd) {
 EXPORT_SYMBOL(lcd_run);
 
 
-int setup_vmlinux(struct lcd *lcd, char *file) {
+int lcd_setup_vmlinux(struct lcd *lcd, char *file) {
 	int ret;
 	u64 elf_entry;
 

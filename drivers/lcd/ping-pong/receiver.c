@@ -13,7 +13,7 @@
 #include <linux/init.h>		/* Needed for the macros */
 #include <asm/vmx.h>
 #include <lcd/ipc.h>
-#include <lcd/lcd_defs.h>
+//#include <lcd/lcd_defs.h>
 #include <lcd/console.h>
 
 
@@ -98,7 +98,7 @@ void temp_fn(int var) {
 	//my_printf("shared pg 0x%x\n", p_utcb);
     
 	lcd_ipc();
-    
+ 
     
     
 }

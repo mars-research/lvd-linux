@@ -1,9 +1,9 @@
 
 ccflags-y += -Ivirt/kvm -Iarch/x86/kvm
 
-obj-$(CONFIG_LCD)	+= lcd.o
+obj-$(CONFIG_LCD)	+= lcd-domains.o
 #
 #obj-m 			+= lcd.o
-lcd-y			+= $(addprefix ../../../virt/lcd/, core.o cap.o \
+lcd-domains-y		+= $(addprefix ../../../virt/lcd/, core.o cap.o \
 				ipc.o)
-lcd-y			+= lcd-vtx.o utils.o 
+lcd-domains-y		+= lcd-vtx.o utils.o 

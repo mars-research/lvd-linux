@@ -14,7 +14,6 @@
 #include <linux/compat.h>
 #include <linux/fs.h>
 #include <asm/uaccess.h>
-#include <linux/lcd-domains.h>
 #include <lcd/lcd.h>
 
 MODULE_LICENSE("GPL");

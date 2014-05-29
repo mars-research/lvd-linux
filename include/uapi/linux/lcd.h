@@ -1,9 +1,11 @@
 /*
- * lcd.h - public header for LCD support
+ * lcd.h - interface to LCD domains
+ *
+ * Author: Anton Burtsev 
  */
 
-#include <linux/types.h>
-
+#ifndef __LINUX_PUBLIC_LCD_H__
+#define __LINUX_PUBLIC_LCD_H__
 /*
  * IOCTL interface
  */
@@ -17,3 +19,4 @@ struct lcd_pv_kernel_config {
 	char  *file;
 } __attribute__((packed));
 
+#endif /* __LINUX_PUBLIC_LCD_H__ */

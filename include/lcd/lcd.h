@@ -2,8 +2,8 @@
 #define LCD_LCD_H
 
 #include <asm/vmx.h>
-
 #include <lcd/ipc.h>
+#include <uapi/linux/lcd.h>
 
 /* XXX: arch dependent, move to ./arch/x86/lcd */ 
 #define NR_AUTOLOAD_MSRS 8

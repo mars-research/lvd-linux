@@ -320,9 +320,7 @@ static int clear_epte(epte_t *epte) {
 	return 1;
 }
 
-static int ept_lookup_gpa(struct lcd *vcpu,
-			void *gpa,
-			int create,
+static int lcd_ept_walk(struct lcd *vcpu, u64 gpa, int create,
 			epte_t **epte_out) {
 	int i;
 	epte_t *dir = (epte_t *) __va(vcpu->ept_root);
@@ -356,9 +354,13 @@ static int ept_lookup_gpa(struct lcd *vcpu,
 	return 0;
 }
 
-static void __set_epte(struct lcd *vcpu,
-		epte_t* epte, u64 hpa) {
-	epte_t flags = __EPTE_READ | __EPTE_EXEC | __EPTE_WRITE |
+static int lcd_ept_set_epte(struct lcd *vcpu, epte_t *epte_entry, u64 hpa) {
+	int ret;
+	epte_t flags;
+
+	spin_lock(&vcpu->ept_lock);
+
+	flags = __EPTE_READ | __EPTE_EXEC | __EPTE_WRITE |
 		__EPTE_TYPE(EPTE_TYPE_WB) | __EPTE_IPAT;
 
 	if (vcpu->ept_ad_enabled) {
@@ -367,35 +369,6 @@ static void __set_epte(struct lcd *vcpu,
 	}
 
 	*epte = epte_addr(hpa) | flags;
-}
-
-static int ept_set_epte(struct lcd *vcpu,
-                        u64 gpa,
-                        u64 hpa,
-                        int overwrite) {
-	int ret;
-	epte_t *epte;
-
-	spin_lock(&vcpu->ept_lock);
-
-	ret = ept_lookup_gpa(vcpu, (void *) gpa, 1, &epte);
-	if (ret) {
-		spin_unlock(&vcpu->ept_lock);
-		printk(KERN_ERR "ept: failed to lookup EPT entry\n");
-		return ret;
-	}
-
-	if (epte_present(*epte)) {
-		if (overwrite)
-			clear_epte(epte);
-		else {
-			spin_unlock(&vcpu->ept_lock);
-			printk(KERN_ERR "ept: epte exists %p\n", (void*)(*epte));
-			return -EINVAL;
-		}
-	}
-
-	__set_epte(vcpu, epte, hpa);
   
 	spin_unlock(&vcpu->ept_lock);
 
@@ -405,13 +378,13 @@ static int ept_set_epte(struct lcd *vcpu,
 static unsigned long alloc_pt_pfn(struct lcd *vcpu) {
 	unsigned long which = bitmap_find_next_zero_area(
 		vcpu->bmp_pt_pages,
-		LCD_NR_PT_PAGES,
+		LCD_PAGING_MEM_NUM_PAGES,
 		0, 1, 0);
-	if (which >= LCD_NR_PT_PAGES) {
+	if (which >= LCD_PAGING_MEM_NUM_PAGES) {
 		return 0;
 	} else {
 		bitmap_set(vcpu->bmp_pt_pages, which, 1);
-		return (LCD_PT_PAGES_START >> PAGE_SHIFT) + which;
+		return (LCD_PAGING_MEM_START >> PAGE_SHIFT) + which;
 	}                               
 }
 
@@ -645,124 +618,86 @@ static u64 construct_eptp(u64 root_hpa) {
 	return eptp;
 }
 
-static int vmx_setup_initial_page_table(struct lcd *vcpu) {
-	int ret = 0;
+static int lcd_setup_initial_ept(struct lcd *vcpu) {
+	int ret;
 	int i;
+	u64 hva;
+	u64 gpa;
+	epte_t *ept_entry;
 
-	u64 gpa, hpa, gva;
-	/* Map guest page table structure's pages in ept  */
-	for (i = 0, gpa = LCD_PT_PAGES_START;
-	     i < LCD_NR_PT_PAGES; gpa+=PAGE_SIZE, ++i) {
-		hpa = __get_free_page(GFP_KERNEL);
-		if (!hpa)
+	/*
+	 * Map guest physical from LCD_BOTTOM to LCD_PAGING_MEM_START
+	 */
+	for (gpa = LCD_BOTTOM; gpa < LCD_PAGING_MEM_START; gpa += PAGE_SIZE) {
+
+		hva = __get_free_page(GFP_KERNEL);
+		if (!hva) {
+			/*
+			 * FIXME: Need to free any prev alloc'd mem.
+			 */
 			return -ENOMEM;
-		memset((void*)hpa, 0, PAGE_SIZE);
-		hpa = __pa(hpa);
+		}
+		memset((void*)hva, 0, PAGE_SIZE);
 
-		/* No overwriting, should not exist at all. */
-		ret = ept_set_epte(vcpu, gpa, hpa, 0);
+		/*
+		 * Walk ept, allocating along the way.
+		 */
+		ret = lcd_ept_walk(vcpu, gpa, 1, &ept_entry);
 		if (ret) {
-			printk(KERN_ERR "ept: map pt pages failed at %d\n", i);
+			printk(KERN_ERR "lcd_ept_walk failed at %x\n", gpa);
 			return ret;
 		}
-	}
 
-	gpa = gva = LCD_PT_PAGES_START;
-	/* Populate at least a page table path, 4 pages. */
-	for (i = 0; i < LCD_NR_PT_PAGES; ++i) {
+		/*
+		 * Map the guest physical addr to the host physical addr.
+		 */
+		lcd_ept_set_epte(vcpu, ept_entry, gpa, __pa(hva));
+	}
+}
+
+/**
+ * Builds ept and guest virtual page tables.
+ */
+static int lcd_setup_addr_space(struct lcd *vcpu) {
+	int ret;
+	int i;
+	u64 hva;
+	u64 gva;
+	u64 gpa;
+	epte_t ept_entry;
+	unsigned long *paging_mem_bitmap;
+
+	/*
+	 * Use a bitmap to track allocation of memory for
+	 * guest virtual paging.
+	 */
+	paging_mem_bitmap = kmalloc(sizeof(long) * 
+				BITS_TO_LONGS(LCD_PAGING_MEM_NUM_PAGES),
+				GFP_KERNEL);
+	if (!paging_mem_bitmap)
+		goto fail_bmp;
+	bitmap_zero(paging_mem_bitmap, LCD_PAGING_MEM_NUM_PAGES);
+
+
+		
+
+	for (gpa = gva = 0; gpa < LCD_FREE_START; gpa += PAGE_SIZE,
+		     gva += PAGE_SIZE) {
+		/*
+		 * Create page table structures along the way, but do
+		 * not overwrite.
+		 */
 		ret = map_gva_to_gpa(vcpu, gva, gpa, 1, 0);
 		if (ret) {
-			printk(KERN_ERR "ept: populate pt failed at %d\n", i);
+			printk(KERN_ERR "setup_pt: map failed at %x\n",
+				gpa);
 			return ret;
 		}
-		gva += PAGE_SIZE;
-		gpa += PAGE_SIZE;
 	}
-
-	gpa = gva = LCD_STACK_BOTTOM;
-	for (i = 0; i < (LCD_STACK_SIZE >> PAGE_SHIFT); ++i) {
-		ret = map_gva_to_gpa(vcpu, gva, gpa, 1, 0);
-		if (ret) {
-			printk(KERN_ERR "ept: populate stack pt failed at %d\n", i);
-			return ret;
-		}
-		hpa = __get_free_page(GFP_KERNEL);
-		if (!hpa)
-			return -ENOMEM;
-		memset((void*)hpa, 0, PAGE_SIZE);
-		hpa = __pa(hpa);
-
-		ret = ept_set_epte(vcpu, gpa, hpa, 0);
-		if (ret) {
-			printk(KERN_ERR "ept: map stack pages failed at %d\n", i);
-			return ret;
-		}
-
-		gva += PAGE_SIZE;
-		gpa += PAGE_SIZE;
-	}
-
-	ret = ept_set_epte(vcpu, LCD_BOOT_PARAMS_ADDR, __pa(vcpu->bp), 0);
-	if (ret) {
-		printk(KERN_ERR "ept: BP phy-addr occupied in EPT\n");
-		return ret;
-	}
-	ret = map_gva_to_gpa(vcpu, LCD_BOOT_PARAMS_ADDR, LCD_BOOT_PARAMS_ADDR, 1, 0);
-	if (ret) {
-		printk(KERN_ERR "ept: BP virt-addr occupied in guest PT\n");
-		return ret;
-	}
-  
-	/* Map descriptors and tables in EPT */
-	ret = ept_set_epte(vcpu, LCD_GDT_ADDR, __pa(vcpu->gdt), 0);
-	if (ret) {
-		printk(KERN_ERR "ept: GDT phy-addr occupied in EPT\n");
-		return ret;
-	}
-
-	ret = ept_set_epte(vcpu, LCD_IDT_ADDR, __pa(vcpu->idt), 0);
-	if (ret) {
-		printk(KERN_ERR "ept: IDT phy-addr occupied in EPT\n");
-		return ret;
-	}
-
-	ret = ept_set_epte(vcpu, LCD_TSS_ADDR, __pa(vcpu->tss), 0);
-	if (ret) {
-		printk(KERN_ERR "ept: TSS phy-addr occupied in EPT\n");
-		return ret;
-	}
-
-	ret = ept_set_epte(vcpu, LCD_COMM_ISR_ADDR, __pa(vcpu->isr_page), 0);
-	if (ret) {
-		printk(KERN_ERR "ept: common ISR phy-addr occupied in EPT\n");
-		return ret;
-	}
-
-	ret = map_gva_to_gpa(vcpu, LCD_GDT_ADDR, LCD_GDT_ADDR, 1, 0);
-	if (ret) {
-		printk(KERN_ERR "ept: GDT virt-addr occupied in guest PT\n");
-		return ret;
-	}
-
-	ret = map_gva_to_gpa(vcpu, LCD_IDT_ADDR, LCD_IDT_ADDR, 1, 0);
-	if (ret) {
-		printk(KERN_ERR "ept: IDT virt-addr occupied in guest PT\n");
-		return ret;
-	}
-
-	ret = map_gva_to_gpa(vcpu, LCD_TSS_ADDR, LCD_TSS_ADDR, 1, 0);
-	if (ret) {
-		printk(KERN_ERR "ept: TSS virt-addr occupied in guest PT\n");
-		return ret;
-	}
-
-	ret = map_gva_to_gpa(vcpu, LCD_COMM_ISR_ADDR, LCD_COMM_ISR_ADDR, 1, 0);
-	if (ret) {
-		printk(KERN_ERR "ept: common ISR virt-addr occupied in guest PT\n");
-		return ret;
-	}
-
 	return 0;
+
+fail_bmp:
+	kfree(paging_mem_bitmap);
 }
 
 static int vmx_create_ept(struct lcd *vcpu) {

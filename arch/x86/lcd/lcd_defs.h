@@ -132,119 +132,58 @@ struct ipc_waitq {
 	struct list_head list;
 };
 
+/*
+ * Guest Physical and Virtual Memory Layout
+ * ========================================
+ *
+ * IA-32e paging is used, with a 4-level page table hierarchy (see
+ * Intel Manual 4.5). IA-32e paging maps 48-bit guest virtual addresses
+ * to 52-bit guest physical addresses. The upper 16 bits are ignored.
+ *
+ *
+ *                         +---------------------------+ 0xFFFF FFFF FFFF FFFF
+ *                         |                           |
+ *                         :                           :
+ *                         :       Kernel Module       :
+ *                         :       Mapping Area        :
+ *                         :                           :
+ *                         |                           |
+ * LCD_HEAP_END----------> +---------------------------+ TASK_SIZE (arch-dep)
+ * LCD_MODULE_START        |                           |
+ *                         |                           |
+ *                         :                           :
+ *                         :          HEAP             :
+ *                         :       (grows up)          :
+ *                         :                           :
+ *                         :                           :
+ *                         |                           |
+ * LCD_HEAP_START--------> +---------------------------+ 0x0000 0000 0040 3000
+ *                         |  Initial Guest Virtual    |
+ *                         |      Paging Memory        | (4 MBs)
+ * LCD_PAGING_MEM_START--> +---------------------------+ 0x0000 0000 0000 3000
+ *                         |           GDT             | (4 KBs)
+ * LCD_GDT---------------> +---------------------------+ 0x0000 0000 0000 2000
+ *                         |                           |
+ *                         |          Stack            |
+ *                         :       (grows down)        : (4 KBs)
+ *                         :                           :
+ *                         |                           |
+ *                         |   IPC Message Registers   |
+ * LCD_ROOT_TCB----------> +---------------------------+ 0x0000 0000 0000 1000
+ *                         |    Stack Canary Page      | (4 KBs)
+ * LCD_STACK_CANARY,-----> +---------------------------+ 0x0000 0000 0000 0000
+ * LCD_BOTTOM
+ */
+#define LCD_BOTTOM           0x0000000000000000UL
+#define LCD_STACK_CANARY     LCD_BOTTOM
+#define LCD_ROOT_TCB         0x0000000000001000UL
+#define LCD_GDT              0x0000000000002000UL
+#define LCD_PAGING_MEM_START 0x0000000000003000UL
+#define LCD_HEAP_START       0x0000000000403000UL
+#define LCD_HEAP_END         TASK_SIZE
+#define LCD_MODULE_START     TASK_SIZE
 
-<<<<<<< HEAD
-typedef struct {
-  int cpu;
-  int vpid;
-  int launched;
-
-  spinlock_t ept_lock;
-  unsigned long ept_root;
-  unsigned long eptp;
-  bool ept_ad_enabled;
-
-  pgd_t* pt;
-  unsigned long pt_gpa;
-
-  unsigned long *bmp_pt_pages;
-
-  /* GDT_ENTRIES * desc_struct */
-  struct desc_struct* gdt;
-  /* IDT_ENTRIES * gate_desc */
-  gate_desc* idt;
-  struct lcd_tss_struct* tss;
-
-  unsigned long isr_page;
-
-  unsigned long host_idt_base;
-
-  u8  fail;
-  u64 exit_reason;
-  u64 exit_qualification;
-  u32 idt_vectoring_info;
-  u32 exit_intr_info;
-  u32 error_code;
-  u32 vec_no;
-  u64 host_rsp;
-  u64 regs[NR_VCPU_REGS];
-  u64 cr2;
-
-  int shutdown;
-  int ret_code;
-
-  struct msr_autoload {
-    unsigned nr;
-    struct vmx_msr_entry guest[NR_AUTOLOAD_MSRS];
-    struct vmx_msr_entry host[NR_AUTOLOAD_MSRS];
-  } msr_autoload;
-
-  sync_ipc_t sync_ipc;
-  struct vmcs *vmcs;
-  void *shared;
-  
-  struct module *mod;
-} lcd_struct;
-
-=======
->>>>>>> Move things around
-
-/* Memory layout */
-// Range format: [begin, end)
-// 0x0000 0000 0000 0000 ~ 0x0000 0000 4000 0000 : 1GB  : Physical Mem
-// 4K gap
-// 0x0000 0000 4000 1000 ~ 0x0000 0000 4040 1000 : 4MB : Page table structures
-// 0x0000 0000 4040 1000 ~ 0x0000 0000 4040 2000 : 4KB  : GDT
-// 0x0000 0000 4040 2000 ~ 0x0000 0000 4040 3000 : 4KB  : IDT
-// 0x0000 0000 4040 3000 ~ 0x0000 0000 4040 4000 : 4KB  : TSS page (sizeof(lcd_tss_struct))
-// 4K page gap as memory guard
-// 0x0000 0000 4040 5000 ~ 0x0000 0000 4040 6000 : 4KB  : Common ISR code page
-// 4K memory guard
-// 0x0000 0000 4040 7000 ~ 0x0000 0000 4040 F000 : 32KB : stack
-// 4K memory guard
-// 0x0000 0000 4041 0000 ~ 0x0000 0000 4051 0000 : 1MB  : 256 ISRs, 4KB code page per ISR
-
-
-
-// Bootup structure:
-#define LCD_PHY_MEM_SIZE (1 << 30)  /* 1GB physical mem */
-
-#define LCD_BOOT_PARAMS_ADDR (1 << 20)
-
-#define LCD_NR_PT_PAGES    (1 << 10)       /* #pages for page table */
-#define LCD_PT_PAGES_START (LCD_PHY_MEM_SIZE + PAGE_SIZE) /* 1GB + 4KB */
-#define LCD_PT_PAGES_END   (LCD_PT_PAGES_START + (LCD_NR_PT_PAGES << PAGE_SHIFT))
-
-#define LCD_GDT_ADDR (LCD_PT_PAGES_END)  /* start from 1G + 4M + 4K */
-#define LCD_IDT_ADDR (LCD_GDT_ADDR + PAGE_SIZE)
-#define LCD_TSS_ADDR (LCD_IDT_ADDR + PAGE_SIZE)
-#define LCD_TSS_SIZE (sizeof(struct lcd_tss_struct))
-
-#define LCD_COMM_ISR_ADDR (LCD_TSS_ADDR + 2*PAGE_SIZE)
-#define LCD_COMM_ISR_END  (LCD_COMM_ISR_ADDR + PAGE_SIZE)
-
-#define LCD_STACK_BOTTOM (LCD_COMM_ISR_END + PAGE_SIZE)
-#define LCD_STACK_SIZE   (PAGE_SIZE * 8)
-#define LCD_STACK_TOP    (LCD_STACK_BOTTOM + LCD_STACK_SIZE)
-#define LCD_STACK_ADDR   LCD_STACK_TOP
-
-#define LCD_NR_ISRS      256
-#define LCD_ISR_START    (LCD_STACK_TOP + PAGE_SIZE)
-#define LCD_ISR_END      (LCD_ISR_START + LCD_NR_ISRS*PAGE_SIZE)
-#define LCD_ISR_ADDR(n)  (LCD_ISR_START + (n)*PAGE_SIZE)
-
-#define LCD_PHY_MEM_LIMIT LCD_ISR_END
-
-#define LCD_FREE_MEM_START (LCD_ISR_END + PAGE_SIZE)
-#define LCD_TEST_CODE_ADDR LCD_FREE_MEM_START
-
-//static int load_lcd(struct load_info * info, const char __user *uargs, int flags);
-
-
-// Inside LCD:
-int lcd_read_mod_file(const char* filepath, void** content, long* size);
-
-
-
+#define LCD_PAGING_MEM_NUM_PAGES  ((LCD_HEAP_START - LCD_PAGING_MEM_START) \
+					/ PAGE_SIZE)
 
 #endif

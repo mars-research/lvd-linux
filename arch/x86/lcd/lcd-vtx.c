@@ -375,178 +375,52 @@ static int lcd_ept_set_epte(struct lcd *vcpu, epte_t *epte_entry, u64 hpa) {
 	return 0;
 }
 
-static unsigned long alloc_pt_pfn(struct lcd *vcpu) {
-	unsigned long which = bitmap_find_next_zero_area(
-		vcpu->bmp_pt_pages,
-		LCD_PAGING_MEM_NUM_PAGES,
-		0, 1, 0);
-	if (which >= LCD_PAGING_MEM_NUM_PAGES) {
-		return 0;
-	} else {
-		bitmap_set(vcpu->bmp_pt_pages, which, 1);
-		return (LCD_PAGING_MEM_START >> PAGE_SHIFT) + which;
-	}                               
+static int lcd_ept_map_gpa_to_hpa(struct lcd *vcpu, u64 gpa, u64 hpa,
+				int create, int overwrite) {
+	int ret;
+	epte_t *ept_entry;
+
+	/*
+	 * Walk ept
+	 */
+	ret = lcd_ept_walk(vcpu, gpa, create, &ept_entry);
+	if (ret)
+		return ret;
+
+	/*
+	 * Check if guest physical address already mapped
+	 */
+	if (!overwrite && epte_present(ept_entry))
+		return -E;
+
+	/*
+	 * Map the guest physical addr to the host physical addr.
+	 */
+	lcd_ept_set_epte(vcpu, ept_entry, gpa, hpa);
+
+	return 0;
 }
 
-/*
-  static int free_pt_pfn(struct lcd *vcpu,
-  unsigned long pfn) {
-  unsigned long which = pfn - (PT_PAGES_START >> PAGE_SHIFT);
-  if (which >= (PT_PAGES_END >> PAGE_SHIFT)) {
-  return -EINVAL; 
-  } else {
-  bitmap_clear(vcpu->bmp_pt_pages, which, 1);
-  return 0;
-  }
-  }
-*/
-
-static int ept_alloc_pt_item(struct lcd *vcpu,
-			unsigned long *gpfn,
-			unsigned long *page) {
-	int ret = 0;
-	*gpfn = alloc_pt_pfn(vcpu);
-	if (*gpfn == 0) {
-		ret = -ENOMEM;
-	} else {
-		epte_t *epte;
-		ret = ept_lookup_gpa(vcpu, (void*)((*gpfn) << PAGE_SHIFT), 1, &epte);
-		if (!ret) {
-			if (!epte_present(*epte)) {
-				*page = __get_free_page(GFP_KERNEL);
-				if (!(*page)) {
-					ret = -ENOMEM;
-				} else {
-					memset((void*)(*page), 0, PAGE_SIZE);
-					__set_epte(vcpu, epte, __pa(*page));
-				}
-			} else {
-				*page = (unsigned long)epte_page_vaddr(*epte);
-			}
-		}
-	}
-	return ret;
-}
-
-static int ept_gpa_to_hva(struct lcd* vcpu,
-			u64 gpa,
-			u64* hva) {
+static int lcd_ept_gpa_to_hva(struct lcd* vcpu, u64 gpa, u64 *hva) {
 	epte_t *epte;
-	int ret = ept_lookup_gpa(vcpu, (void*)gpa, 0, &epte);
+	int ret;
+
+	ret = lcd_ept_walk(vcpu, gpa, 0, &epte);
 	if (ret) {
-		printk(KERN_ERR "ept: failed to lookup GPA: %p\n",
-			(void*)gpa);
-	} else {
-		if (!epte_present(*epte)) {
-			printk(KERN_ERR "ept: epte not present when translating\n");
-			ret = -ENOENT;
-		} else {
-			*hva = (u64)epte_page_vaddr(*epte);
-		}
-	}
-	return ret;
-}
-
-// Set gva => gpa. No page allocated for gva/gpa, just
-// pte value setting. But page table structures along the
-// path can be created by setting 'create' to 1.
-static int map_gva_to_gpa(struct lcd *vcpu,
-			u64 gva,
-			u64 gpa,
-			int create, int overwrite) {
-	int ret = 0;
-	unsigned long gpfn, page;
-	/* epte_t *epte; */
-  
-	pud_t *pud_dir, *pud;
-	pmd_t *pmd_dir, *pmd;
-	pte_t *pte_dir, *pte;
-  
-	pgd_t *pgd;
-	if (!vcpu->pt) {
-		if (!create)
-			return -ENOENT;
-		else {
-			ret = ept_alloc_pt_item(vcpu, &gpfn, &page);
-			if (ret)
-				return ret;
-			else {
-				vcpu->pt = (pgd_t*)page;
-				vcpu->pt_gpa = (gpfn << PAGE_SHIFT);
-			}
-		}
-	}
-  
-	pgd = vcpu->pt + pgd_index(gva);
-	if (!pgd_present(*pgd)) {
-		if (!create) {
-			return -ENOENT;
-		} else {
-			ret = ept_alloc_pt_item(vcpu, &gpfn, &page);
-			if (ret) {
-				return ret;
-			} else {
-				set_pgd(pgd, mk_kernel_pgd((gpfn << PAGE_SHIFT)));
-				pud_dir = (pud_t*)page;
-			}  // ept_alloc_pt_item
-		}  // !create
-	} else {
-		ret = ept_gpa_to_hva(vcpu, pgd_val(*pgd)&PTE_PFN_MASK,
-				(u64*)(&pud_dir));
-		if (ret)
-			return ret;
-	}  // !pgd_present
-
-	pud = pud_dir + pud_index(gva);
-	if (!pud_present(*pud)) {
-		if (!create) {
-			return -ENOENT;
-		} else {
-			ret = ept_alloc_pt_item(vcpu, &gpfn, &page);
-			if (ret) {
-				return ret;
-			} else {
-				set_pud(pud, __pud((gpfn << PAGE_SHIFT)|_KERNPG_TABLE));
-				pmd_dir = (pmd_t*)page;
-			}  // ept_alloc_pt_item
-		}  // !create
-	} else {
-		ret = ept_gpa_to_hva(vcpu, pud_val(*pud)&PTE_PFN_MASK,
-				(u64*)(&pmd_dir));
-		if (ret)
-			return ret;
-	}  // !pud_present
-
-	pmd = pmd_dir + pmd_index(gva);
-	if (!pmd_present(*pmd)) {
-		if (!create) {
-			return -ENOENT;
-		} else {
-			ret = ept_alloc_pt_item(vcpu, &gpfn, &page);
-			if (ret) {
-				return ret;
-			} else {
-				set_pmd(pmd, __pmd((gpfn << PAGE_SHIFT)|_KERNPG_TABLE));
-				pte_dir = (pte_t*)page;
-			}  // ept_alloc_pt_item
-		}  // !create
-	} else {
-		ret = ept_gpa_to_hva(vcpu, pmd_val(*pmd)&PTE_PFN_MASK,
-				(u64*)(&pte_dir));
-		if (ret)
-			return ret;
-	}  // !pmd_present
-
-	pte = pte_dir + pte_index(gva);
-	if (!pte_present(*pte) || overwrite) {
-		set_pte(pte, __pte((gpa & PTE_PFN_MASK)|__PAGE_KERNEL_EXEC));
-	} else {
-		printk(KERN_ERR "mm: pte conflicts %p %p\n", (void*)gpa,
-			(void*)pte_val(*pte));
-		ret = -EINVAL;
+		printk(KERN_ERR "ept gpa to hva: failed to lookup gpa: %x\n",
+			gpa);
+		return ret;
 	}
 
-	return ret;  
+	if (!epte_present(*epte)) {
+		printk(KERN_ERR "ept gpa to hva: no mapping for gpa: %x\n",
+			gpa);
+		return -ENOENT;
+	}
+
+	*hva = (u64)epte_page_vaddr(*epte);
+
+	return 0;
 }
 
 static void vmx_free_ept(u64 ept_root) {
@@ -618,6 +492,270 @@ static u64 construct_eptp(u64 root_hpa) {
 	return eptp;
 }
 
+/* END EPT ======================================== */
+
+static int lcd_gv_alloc_paging_mem_page(unsigned long *paging_mem_bitmap,
+				u64 *gpa, u64 *hva) {
+	unsigned long which;
+	u64 page;
+	
+	/*
+	 * Allocate a host physical page for the paging memory
+	 */
+	page = __get_free_page(GFP_KERNEL);
+	if (!page)
+		return -ENOMEM;
+	memset((void *)page, 0, PAGE_SIZE);
+	*hva = page;
+
+	/*
+	 * Allocate guest physical address space for paging mem page.
+	 */
+	which = bitmap_find_next_zero_area(
+		paging_mem_bitmap,
+		LCD_PAGING_MEM_NUM_PAGES,
+		0, 1, 0);
+
+	if (which >= LCD_PAGING_MEM_NUM_PAGES) {
+		return -ENOMEM;
+	} else {
+		bitmap_set(paging_mem_bitmap, which, 1);
+		*gpa = LCD_PAGING_MEM_START + (which << PAGE_SHIFT);
+		return 0;
+	}
+}
+
+static int lcd_gv_lookup_ptb(struct lcd *vcpu, pmd_t *pmd_hva, u64 gva,
+			unsigned long *paging_mem_bitmap, 
+			pte_t **ptb_out) {
+	int ret;
+	pmd_t *pmd_entry;
+	u64 ptb_gpa;
+	u64 ptb_hva;
+
+	pmd_entry = pmd_hva + pmd_index(gva);
+	if (!pmd_present(*pmd_entry)) {
+
+		/*
+		 * Alloc and map a page table
+		 */
+		ret = lcd_gv_alloc_paging_mem_page(paging_mem_bitmap,
+						&ptb_gpa, &ptb_hva);
+		if (ret)
+			return ret;
+
+		/*
+		 * Map *guest physical* address into pmd entry
+		 */
+		set_pmd(pmd_entry, __pmd(ptb_gpa | _KERNPG_TABLE));
+
+	} else {
+
+		ret = lcd_ept_gpa_to_hva(vcpu, pmd_val(*pmd_entry),
+					&ptb_hva);
+		if (ret)
+			return ret;
+	}
+
+	*ptb_out = ptb_hva;
+
+	return 0;
+}
+
+static int lcd_gv_lookup_pmd(struct lcd *vcpu, pud_t *pud_hva, u64 gva,
+			unsigned long *paging_mem_bitmap, 
+			pmd_t **pmd_out) {
+	int ret;
+	pud_t *pud_entry;
+	u64 pmd_gpa;
+	u64 pmd_hva;
+
+	pud_entry = pud_hva + pud_index(gva);
+	if (!pud_present(*pud_entry)) {
+
+		/*
+		 * Alloc and map a pmd
+		 */
+		ret = lcd_gv_alloc_paging_mem_page(paging_mem_bitmap,
+						&pmd_gpa, &pmd_hva);
+		if (ret)
+			return ret;
+
+		/*
+		 * Map *guest physical* address into pud entry
+		 */
+		set_pud(pud_entry, __pud(pmd_gpa | _KERNPG_TABLE));
+
+	} else {
+
+		ret = lcd_ept_gpa_to_hva(vcpu, pud_val(*pud_entry),
+					&pmd_hva);
+		if (ret)
+			return ret;
+	}
+
+	*pmd_out = pmd_hva;
+
+	return 0;
+}
+
+static int lcd_gv_lookup_pud(struct lcd *vcpu, pgd_t *root_hva, u64 gva,
+			unsigned long *paging_mem_bitmap, 
+			pud_t **pud_out) {
+	int ret;
+	pgd_t *pgd_entry;
+	u64 pud_gpa;
+	u64 pud_hva;
+
+	pgd_entry = root_hva + pgd_index(gva);
+	if (!pgd_present(*pgd_entry)) {
+
+		/*
+		 * Alloc and map a pud
+		 */
+		ret = lcd_gv_alloc_paging_mem_page(paging_mem_bitmap,
+						&pud_gpa, &pud_hva);
+		if (ret)
+			return ret;
+
+		/*
+		 * Map *guest physical* address into pgd entry
+		 */
+		set_pgd(pgd_entry, mk_kernel_pgd(pud_gpa));
+
+	} else {
+
+		ret = lcd_ept_gpa_to_hva(vcpu, pgd_val(*pgd_entry),
+					&pud_hva);
+		if (ret)
+			return ret;
+	}
+
+	*pud_out = pud_hva;
+
+	return 0;
+}
+
+static int lcd_gv_walk(struct lcd *vcpu, pgd_t *root_hva, u64 gva,
+			unsigned long *paging_mem_bitmap, 
+			pte_t *pte_out) {
+	int ret;
+	pud_t *pud;
+	pmd_t *pmd;
+	pte_t *ptb;
+
+	/*
+	 * 1st level --> 2nd level
+	 */
+	ret = lcd_gv_lookup_pud(vcpu, root_hva, gva, paging_mem_bitmap,
+				&pud);
+	if (ret)
+		return ret;
+
+	/*
+	 * 2nd level --> 3rd level
+	 */
+	ret = lcd_gv_lookup_pmd(vcpu, pud, gva, paging_mem_bitmap, &pmd);
+	if (ret)
+		return ret;
+
+	/*
+	 * 3rd level --> 4th level
+	 */
+	ret = lcd_gv_lookup_ptb(vcpu, pmd, gva, paging_mem_bitmap, &ptb);
+	if (ret)
+		return ret;
+
+	/*
+	 * Lookup pte
+	 */
+	*pte_out = ptb + pte_index(gva);
+
+	return 0;
+}
+
+static int lcd_gv_map_gva_to_gpa(struct lcd *vcpu, pgd_t *root_hva, u64 gva,
+				u64 gpa, unsigned long *paging_mem_bitmap) {
+	int ret;
+	pte_t *pte_entry;
+
+	ret = lcd_gv_walk(vcpu, root_hva, gva, gpa, paging_mem_bitmap,
+			&pte_entry);
+	if (ret)
+		return ret;
+
+	/*
+	 * Set pte, making memory executable
+	 */
+	set_pte(pte_entry, __pte(gpa | __PAGE_KERNEL_EXEC));
+
+	return 0;
+}
+
+static int lcd_setup_guest_virtual(struct lcd *vcpu, u64 *root_hva_out) {
+	unsigned long *paging_mem_bitmap;
+	pte_t *pte;
+	u64 root_gpa;
+	u64 root_hva;
+
+	/*
+	 * Use a bitmap to track allocation of memory for
+	 * guest virtual paging.
+	 */
+	paging_mem_bitmap = kmalloc(sizeof(long) * 
+				BITS_TO_LONGS(LCD_PAGING_MEM_NUM_PAGES),
+				GFP_KERNEL);
+	if (!paging_mem_bitmap) {
+		ret = -ENOMEM;
+		goto fail_bmp;
+	}
+	bitmap_zero(paging_mem_bitmap, LCD_PAGING_MEM_NUM_PAGES);
+
+	/*
+	 * Allocate and map root page directory
+	 */
+	ret = alloc_paging_mem_page(paging_mem_bitmap, &root_gpa, &root_hva);
+	if (ret) {
+		printk(KERN_ERR "guest virt setup: root pgd fail\n");
+		goto fail_root_pgd_alloc;
+	}
+	ret = lcd_ept_map_gpa_to_hpa(vcpu, root_gpa, __pa(root_hva), 1, 0);
+	if (ret) {
+		printk(KERN_ERR "guest virt setup: root pgd fail\n");
+		goto fail_root_pgd_map;
+	}
+
+	/*
+	 * Map all of the virtual address space, up to LCD_HEAP_START.
+	 * Guest physical and guest virtual addresses are mapped one-to-one.
+	 */
+	for (gpa = gva = LCD_BOTTOM; gva < LCD_HEAP_START; 
+	     gpa += PAGE_SIZE, gva += PAGE_SIZE) {
+
+		ret = lcd_gv_map_gva_to_gpa(vcpu, pgd_t *root_hva, gva, gpa,
+					paging_mem_bitmap);
+		if (ret) {
+			printk(KERN_ERR "map gva to gpa: map failed at %x\n",
+				gva);
+			/*
+			 * FIXME: Need to dealloc memory allocated
+			 */
+			return ret;
+		}
+	}
+
+	*root_hva_out = root_hva;
+	
+	return 0;
+
+fail_root_pgd_map:
+	kfree(pgd_hva);
+fail_root_pgd_alloc:
+	kfree(paging_mem_bmp);
+fail_bmp:
+	return ret;
+}
+
 static int lcd_setup_initial_ept(struct lcd *vcpu) {
 	int ret;
 	int i;
@@ -640,18 +778,16 @@ static int lcd_setup_initial_ept(struct lcd *vcpu) {
 		memset((void*)hva, 0, PAGE_SIZE);
 
 		/*
-		 * Walk ept, allocating along the way.
+		 * Map guest physical to host physical, allocating
+		 * ept paging structures along the way, but do not
+		 * overwrite.
 		 */
-		ret = lcd_ept_walk(vcpu, gpa, 1, &ept_entry);
+		ret = lcd_ept_map_gpa_to_hpa(vcpu, gpa, __pa(hva), 1, 0);
 		if (ret) {
-			printk(KERN_ERR "lcd_ept_walk failed at %x\n", gpa);
+			printk(KERN_ERR "setup initial ept: failed at %x\n",
+				gpa);
 			return ret;
 		}
-
-		/*
-		 * Map the guest physical addr to the host physical addr.
-		 */
-		lcd_ept_set_epte(vcpu, ept_entry, gpa, __pa(hva));
 	}
 }
 
@@ -665,35 +801,7 @@ static int lcd_setup_addr_space(struct lcd *vcpu) {
 	u64 gva;
 	u64 gpa;
 	epte_t ept_entry;
-	unsigned long *paging_mem_bitmap;
 
-	/*
-	 * Use a bitmap to track allocation of memory for
-	 * guest virtual paging.
-	 */
-	paging_mem_bitmap = kmalloc(sizeof(long) * 
-				BITS_TO_LONGS(LCD_PAGING_MEM_NUM_PAGES),
-				GFP_KERNEL);
-	if (!paging_mem_bitmap)
-		goto fail_bmp;
-	bitmap_zero(paging_mem_bitmap, LCD_PAGING_MEM_NUM_PAGES);
-
-
-		
-
-	for (gpa = gva = 0; gpa < LCD_FREE_START; gpa += PAGE_SIZE,
-		     gva += PAGE_SIZE) {
-		/*
-		 * Create page table structures along the way, but do
-		 * not overwrite.
-		 */
-		ret = map_gva_to_gpa(vcpu, gva, gpa, 1, 0);
-		if (ret) {
-			printk(KERN_ERR "setup_pt: map failed at %x\n",
-				gpa);
-			return ret;
-		}
-	}
 	return 0;
 
 fail_bmp:

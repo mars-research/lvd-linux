@@ -120,6 +120,16 @@
  * POSIX.1 2.4: an empty pathname is invalid (ENOENT).
  * PATH_MAX includes the nul terminator --RR.
  */
+void final_putname(struct filename *name)
+{
+	if (name->separate) {
+		__putname(name->name);
+		kfree(name);
+	} else {
+		__putname(name);
+	}
+}
+EXPORT_SYMBOL(final_putname);
 
 #define EMBEDDED_NAME_MAX	(PATH_MAX - offsetof(struct filename, iname))
 
@@ -242,7 +252,7 @@ getname_kernel(const char * filename)
 
 	return result;
 }
-
+#ifdef CONFIG_AUDITSYSCALL
 void putname(struct filename *name)
 {
 	BUG_ON(name->refcnt <= 0);
@@ -256,6 +266,8 @@ void putname(struct filename *name)
 	} else
 		__putname(name);
 }
+EXPORT_SYMBOL(putname);
+#endif
 
 static int check_acl(struct inode *inode, int mask)
 {

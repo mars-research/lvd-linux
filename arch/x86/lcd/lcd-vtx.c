@@ -320,6 +320,15 @@ static int clear_epte(epte_t *epte) {
 	return 1;
 }
 
+/**
+ * Look up the ept entry for guest physical
+ * address gpa. If create is 1, ept paging structures
+ * will be allocated on the fly.
+ *
+ * The page frame where gpa resides is not allocated.
+ *
+ * FIXME: Do we need to lock inside here?
+ */
 static int lcd_ept_walk(struct lcd *vcpu, u64 gpa, int create,
 			epte_t **epte_out) {
 	int i;
@@ -354,6 +363,12 @@ static int lcd_ept_walk(struct lcd *vcpu, u64 gpa, int create,
 	return 0;
 }
 
+/**
+ * Store host physical address hpa, along with
+ * default flags, to the epte.
+ *
+ * FIXME: Do we want to lock inside here?
+ */
 static int lcd_ept_set_epte(struct lcd *vcpu, epte_t *epte_entry, u64 hpa) {
 	int ret;
 	epte_t flags;
@@ -375,6 +390,10 @@ static int lcd_ept_set_epte(struct lcd *vcpu, epte_t *epte_entry, u64 hpa) {
 	return 0;
 }
 
+/**
+ * Maps gpa to hpa in the lcd's ept. Simple wrapper
+ * around lookup and set.
+ */
 static int lcd_ept_map_gpa_to_hpa(struct lcd *vcpu, u64 gpa, u64 hpa,
 				int create, int overwrite) {
 	int ret;
@@ -401,6 +420,14 @@ static int lcd_ept_map_gpa_to_hpa(struct lcd *vcpu, u64 gpa, u64 hpa,
 	return 0;
 }
 
+/**
+ * Returns host virtual address associated with
+ * guest physical address, using lcd's ept.
+ *
+ * Needed for manipulating guest (inner lcd) data structures
+ * that store guest physical addresses, like guest virtual
+ * paging structures.
+ */
 static int lcd_ept_gpa_to_hva(struct lcd* vcpu, u64 gpa, u64 *hva) {
 	epte_t *epte;
 	int ret;
@@ -423,9 +450,11 @@ static int lcd_ept_gpa_to_hva(struct lcd* vcpu, u64 gpa, u64 *hva) {
 	return 0;
 }
 
-static void vmx_free_ept(u64 ept_root) {
-	epte_t *pgd = (epte_t *) __va(ept_root);
+static void lcd_free_ept(u64 ept_root) {
+	epte_t *pgd;
 	int i, j, k, l;
+
+	pgd = (epte_t *) __va(ept_root);
 
 	for (i = 0; i < PTRS_PER_PGD; i++) {
 		epte_t *pud = (epte_t *) epte_page_vaddr(pgd[i]);
@@ -494,6 +523,10 @@ static u64 construct_eptp(u64 root_hpa) {
 
 /* END EPT ======================================== */
 
+/**
+ * Allocates a host physical page and guest physical
+ * page (using the bitmap) for storing a page table.
+ */
 static int lcd_gv_alloc_paging_mem_page(unsigned long *paging_mem_bitmap,
 				u64 *gpa, u64 *hva) {
 	unsigned long which;
@@ -525,6 +558,11 @@ static int lcd_gv_alloc_paging_mem_page(unsigned long *paging_mem_bitmap,
 	}
 }
 
+/**
+ * Look up the page table (level 3) for guest virtual
+ * address gva, using the middle page directory (level 2)
+ * pmd_hva (host virtual address of the pmd).
+ */
 static int lcd_gv_lookup_ptb(struct lcd *vcpu, pmd_t *pmd_hva, u64 gva,
 			unsigned long *paging_mem_bitmap, 
 			pte_t **ptb_out) {
@@ -562,6 +600,12 @@ static int lcd_gv_lookup_ptb(struct lcd *vcpu, pmd_t *pmd_hva, u64 gva,
 	return 0;
 }
 
+/**
+ * Look up the middle page directory (level 2)
+ * for guest virtual address gva, using the upper
+ * page directory (level 1) pud_hva (host virtual
+ * address of upper directory).
+ */
 static int lcd_gv_lookup_pmd(struct lcd *vcpu, pud_t *pud_hva, u64 gva,
 			unsigned long *paging_mem_bitmap, 
 			pmd_t **pmd_out) {
@@ -599,6 +643,13 @@ static int lcd_gv_lookup_pmd(struct lcd *vcpu, pud_t *pud_hva, u64 gva,
 	return 0;
 }
 
+/**
+ * Look up the upper page directory (level 1)
+ * for guest virtual address gva, using the
+ * global page directory (level 0?) root_hva
+ * (host virtual address of the root / global
+ * page directory).
+ */
 static int lcd_gv_lookup_pud(struct lcd *vcpu, pgd_t *root_hva, u64 gva,
 			unsigned long *paging_mem_bitmap, 
 			pud_t **pud_out) {
@@ -636,6 +687,15 @@ static int lcd_gv_lookup_pud(struct lcd *vcpu, pgd_t *root_hva, u64 gva,
 	return 0;
 }
 
+/**
+ * Look up the page table entry for guest virtual
+ * address gva, using the root / global page
+ * directory root_hva (host virtual address of the
+ * global page directory).
+ *
+ * Paging data structures are allocated along the
+ * way.
+ */
 static int lcd_gv_walk(struct lcd *vcpu, pgd_t *root_hva, u64 gva,
 			unsigned long *paging_mem_bitmap, 
 			pte_t *pte_out) {
@@ -645,7 +705,7 @@ static int lcd_gv_walk(struct lcd *vcpu, pgd_t *root_hva, u64 gva,
 	pte_t *ptb;
 
 	/*
-	 * 1st level --> 2nd level
+	 * 0th level --> 1st level
 	 */
 	ret = lcd_gv_lookup_pud(vcpu, root_hva, gva, paging_mem_bitmap,
 				&pud);
@@ -653,14 +713,14 @@ static int lcd_gv_walk(struct lcd *vcpu, pgd_t *root_hva, u64 gva,
 		return ret;
 
 	/*
-	 * 2nd level --> 3rd level
+	 * 1st level --> 2nd level
 	 */
 	ret = lcd_gv_lookup_pmd(vcpu, pud, gva, paging_mem_bitmap, &pmd);
 	if (ret)
 		return ret;
 
 	/*
-	 * 3rd level --> 4th level
+	 * 2nd level --> 3rd level
 	 */
 	ret = lcd_gv_lookup_ptb(vcpu, pmd, gva, paging_mem_bitmap, &ptb);
 	if (ret)
@@ -674,6 +734,13 @@ static int lcd_gv_walk(struct lcd *vcpu, pgd_t *root_hva, u64 gva,
 	return 0;
 }
 
+/**
+ * Maps gva to gpa in the paging hierarchy
+ * rooted at root_hva (the host virtual
+ * address of the global page directory).
+ *
+ * Simple wrapper for lookup and set.
+ */
 static int lcd_gv_map_gva_to_gpa(struct lcd *vcpu, pgd_t *root_hva, u64 gva,
 				u64 gpa, unsigned long *paging_mem_bitmap) {
 	int ret;
@@ -692,7 +759,18 @@ static int lcd_gv_map_gva_to_gpa(struct lcd *vcpu, pgd_t *root_hva, u64 gva,
 	return 0;
 }
 
-static int lcd_setup_guest_virtual(struct lcd *vcpu, u64 *root_hva_out) {
+/**
+ * Maps all critical parts of the guest virtual
+ * address space so that code can run upon entry.
+ *
+ * The guest physical address of the root / global 
+ * page directory is stored in root_gpa_out.
+ *
+ * If mapping fails, caller is responsible for
+ * freeing memory allocated for guest virtual
+ * paging (using the mappings in the ept).
+ */
+static int lcd_setup_initial_gva(struct lcd *vcpu, u64 *root_gpa_out) {
 	unsigned long *paging_mem_bitmap;
 	pte_t *pte;
 	u64 root_gpa;
@@ -707,7 +785,7 @@ static int lcd_setup_guest_virtual(struct lcd *vcpu, u64 *root_hva_out) {
 				GFP_KERNEL);
 	if (!paging_mem_bitmap) {
 		ret = -ENOMEM;
-		goto fail_bmp;
+		goto fail1;
 	}
 	bitmap_zero(paging_mem_bitmap, LCD_PAGING_MEM_NUM_PAGES);
 
@@ -717,12 +795,12 @@ static int lcd_setup_guest_virtual(struct lcd *vcpu, u64 *root_hva_out) {
 	ret = alloc_paging_mem_page(paging_mem_bitmap, &root_gpa, &root_hva);
 	if (ret) {
 		printk(KERN_ERR "guest virt setup: root pgd fail\n");
-		goto fail_root_pgd_alloc;
+		goto fail2;
 	}
 	ret = lcd_ept_map_gpa_to_hpa(vcpu, root_gpa, __pa(root_hva), 1, 0);
 	if (ret) {
 		printk(KERN_ERR "guest virt setup: root pgd fail\n");
-		goto fail_root_pgd_map;
+		goto fail2;
 	}
 
 	/*
@@ -737,25 +815,29 @@ static int lcd_setup_guest_virtual(struct lcd *vcpu, u64 *root_hva_out) {
 		if (ret) {
 			printk(KERN_ERR "map gva to gpa: map failed at %x\n",
 				gva);
-			/*
-			 * FIXME: Need to dealloc memory allocated
-			 */
-			return ret;
+			goto fail2;
 		}
 	}
 
-	*root_hva_out = root_hva;
+	*root_gpa_out = root_gpa;
 	
 	return 0;
 
-fail_root_pgd_map:
-	kfree(pgd_hva);
-fail_root_pgd_alloc:
+fail2:
 	kfree(paging_mem_bmp);
-fail_bmp:
+fail1:
 	return ret;
 }
 
+/**
+ * Maps all critical parts of the guest physical
+ * address space that are needed by the lcd upon
+ * entry.
+ *
+ * If mapping fails, caller is responsible for
+ * freeing host physical memory allocated
+ * (using the entries in the ept).
+ */
 static int lcd_setup_initial_ept(struct lcd *vcpu) {
 	int ret;
 	int i;
@@ -770,9 +852,6 @@ static int lcd_setup_initial_ept(struct lcd *vcpu) {
 
 		hva = __get_free_page(GFP_KERNEL);
 		if (!hva) {
-			/*
-			 * FIXME: Need to free any prev alloc'd mem.
-			 */
 			return -ENOMEM;
 		}
 		memset((void*)hva, 0, PAGE_SIZE);
@@ -792,28 +871,33 @@ static int lcd_setup_initial_ept(struct lcd *vcpu) {
 }
 
 /**
- * Builds ept and guest virtual page tables.
+ * Allocates memory and maps all parts of the
+ * guest physical and guest virtual address
+ * space that are needed upon initial entry
+ * to the lcd.
+ *
+ * On error, deallocates ept.
  */
 static int lcd_setup_addr_space(struct lcd *vcpu) {
 	int ret;
-	int i;
-	u64 hva;
-	u64 gva;
-	u64 gpa;
 	epte_t ept_entry;
+	u64 guest_paging_pgd_gpa;
+
+	ret = lcd_setup_initial_ept(vcpu);
+	if (ret)
+		goto fail;
+
+	ret = lcd_setup_initial_gva(vcpu, &guest_paging_pgd_gpa);
+	if (ret)
+		goto fail;
+
 
 	return 0;
 
-fail_bmp:
-	kfree(paging_mem_bitmap);
-}
-
-static int vmx_create_ept(struct lcd *vcpu) {
-	int ret;
-	ret = vmx_setup_initial_page_table(vcpu);
+fail:
+	lcd_free_ept(vcpu);
 	return ret;
 }
-
 
 /* VMCS Related */
 
@@ -1324,7 +1408,8 @@ static void vmx_free_vpid(struct lcd *vmx)
 	spin_unlock(&vmx_vpid_lock);
 }
 
-static void vmx_setup_initial_guest_state(struct lcd *vcpu)
+static void vmx_setup_initial_guest_state(struct lcd *vcpu, 
+					u64 guest_paging_cr3)
 {
 	/* unsigned long tmpl; */
 	unsigned long cr4 = X86_CR4_PAE | X86_CR4_VMXE | X86_CR4_OSXMMEXCPT |
@@ -1341,7 +1426,7 @@ static void vmx_setup_initial_guest_state(struct lcd *vcpu)
 		X86_CR0_MP | X86_CR0_ET | X86_CR0_NE);
 	vmcs_writel(CR0_READ_SHADOW, X86_CR0_PG | X86_CR0_PE | X86_CR0_WP |
 		X86_CR0_MP | X86_CR0_ET | X86_CR0_NE);
-	vmcs_writel(GUEST_CR3, vcpu->pt_gpa);
+	vmcs_writel(GUEST_CR3, guest_paging_cr3);
 	vmcs_writel(GUEST_CR4, cr4);
 	vmcs_writel(CR4_READ_SHADOW, cr4);
 	vmcs_writel(GUEST_IA32_EFER, EFER_LME | EFER_LMA |
@@ -1478,6 +1563,8 @@ u32 set_cap(void *obj){
 
 static struct lcd * vmx_create_vcpu(void) {
 	struct lcd *vcpu = kmalloc(sizeof(struct lcd), GFP_KERNEL);
+	u64 guest_paging_cr3;
+
 	if (!vcpu)
 		return NULL;
 
@@ -1526,8 +1613,8 @@ static struct lcd * vmx_create_vcpu(void) {
 		vcpu->ept_ad_enabled = true;
 		printk(KERN_INFO "vmx: enabled EPT A/D bits\n");
 	}
-	if (vmx_create_ept(vcpu)) {
-		printk(KERN_ERR "vmx: creating EPT failed.\n");
+	if (lcd_setup_addr_space(vcpu, &guest_paging_cr3)) {
+		printk(KERN_ERR "vmx: creating addr space failed.\n");
 		goto fail_ept;
 	}
 
@@ -1548,7 +1635,7 @@ static struct lcd * vmx_create_vcpu(void) {
 
 	vmx_get_cpu(vcpu);
 	vmx_setup_vmcs(vcpu);
-	vmx_setup_initial_guest_state(vcpu);
+	vmx_setup_initial_guest_state(vcpu, guest_paging_cr3);
 	setup_gdt(vcpu);
 	setup_idt(vcpu);
 	vmx_put_cpu(vcpu);

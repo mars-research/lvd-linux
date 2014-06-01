@@ -11,8 +11,8 @@
  */
 
 #include <asm/virtext.h>
-#include <linux/bitmap.h>
 #include <asm/lcd-vmx.h>
+#include <linux/bitmap.h>
 
 static struct lcd_vmx_vmcs_config vmcs_config;
 static struct lcd_vmx_capability vmx_capability;
@@ -515,8 +515,10 @@ int lcd_vmx_init(void) {
 	 */
 
 	msr_bitmap = (unsigned long *)__get_free_page(GFP_KERNEL);
-	if (!msr_bitmap)
-		return -ENOMEM;
+	if (!msr_bitmap) {
+		ret = -ENOMEM;
+		goto fail1;
+	}	
 
 	memset(msr_bitmap, 0xff, PAGE_SIZE);
 	vmx_disable_intercept_for_msr(msr_bitmap, MSR_FS_BASE);
@@ -569,5 +571,6 @@ failed2:
 	on_each_cpu(vmx_disable, NULL, 1);
 failed1:
 	vmx_free_vmxon_areas();
+	free_page((unsigned long)msr_bitmap);
 	return ret;
 }

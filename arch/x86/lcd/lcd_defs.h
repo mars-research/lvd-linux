@@ -95,31 +95,32 @@ enum {
 
 /* VMCS related */
 
-struct vmcs_config {
-	int size;
-	int order;
-	u32 revision_id;
-	u32 pin_based_exec_ctrl;
-	u32 cpu_based_exec_ctrl;
-	u32 cpu_based_2nd_exec_ctrl;
-	u32 vmexit_ctrl;
-	u32 vmentry_ctrl;
-};
+/* moved to lcd-vmx.h */
+/* struct vmcs_config { */
+/* 	int size; */
+/* 	int order; */
+/* 	u32 revision_id; */
+/* 	u32 pin_based_exec_ctrl; */
+/* 	u32 cpu_based_exec_ctrl; */
+/* 	u32 cpu_based_2nd_exec_ctrl; */
+/* 	u32 vmexit_ctrl; */
+/* 	u32 vmentry_ctrl; */
+/* }; */
 
-struct vmcs {
-	u32 revision_id;
-	u32 abort;
-	char data[0];
-};
+/* struct vmcs { */
+/* 	u32 revision_id; */
+/* 	u32 abort; */
+/* 	char data[0]; */
+/* }; */
 
-struct vmx_capability {
-	u32 ept;
-	u32 vpid;
-	int has_load_efer:1;
-};
+/* struct vmx_capability { */
+/* 	u32 ept; */
+/* 	u32 vpid; */
+/* 	int has_load_efer:1; */
+/* }; */
 
-extern struct vmx_capability vmx_capability;
-extern struct vmcs_config vmcs_config;
+/* extern struct vmx_capability vmx_capability; */
+/* extern struct vmcs_config vmcs_config; */
 
 
 struct lcd_tss_struct {

@@ -1,6 +1,28 @@
 #ifndef LCD_VMX_H
 #define LCD_VMX_H
 
+struct lcd_vmx_config {
+	int size;
+	int order;
+	u32 revision_id;
+	u32 pin_based_exec_ctrl;
+	u32 cpu_based_exec_ctrl;
+	u32 cpu_based_2nd_exec_ctrl;
+	u32 vmexit_ctrl;
+	u32 vmentry_ctrl;
+};
+
+struct lcd_vmx_vmcs {
+	u32 revision_id;
+	u32 abort;
+	char data[0];
+};
+
+struct lcd_vmx_capability {
+	u32 ept;
+	u32 vpid;
+};
+
 #define LCD_VMX_NUM_AUTOLOAD_MSRS 8
 
 enum lcd_vmx_reg {

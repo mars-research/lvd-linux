@@ -45,134 +45,134 @@
 
 
 
-struct vmx_capability vmx_capability;
+/* struct vmx_capability vmx_capability; */
 
-static atomic_t vmx_enable_failed;
+/* static atomic_t vmx_enable_failed; */
 
-static DECLARE_BITMAP(vmx_vpid_bitmap, VMX_NR_VPIDS);
-static DEFINE_SPINLOCK(vmx_vpid_lock);
+/* static DECLARE_BITMAP(vmx_vpid_bitmap, VMX_NR_VPIDS); */
+/* static DEFINE_SPINLOCK(vmx_vpid_lock); */
 
-static DEFINE_PER_CPU(struct vmcs *, vmxarea);
-static DEFINE_PER_CPU(struct desc_ptr, host_gdt);
-static DEFINE_PER_CPU(int, vmx_enabled);
-static DEFINE_PER_CPU(struct lcd *, local_vcpu);
+/* static DEFINE_PER_CPU(struct vmcs *, vmxarea); */
+/* static DEFINE_PER_CPU(struct desc_ptr, host_gdt); */
+/* static DEFINE_PER_CPU(int, vmx_enabled); */
+/* static DEFINE_PER_CPU(struct lcd *, local_vcpu); */
 
-static unsigned long *msr_bitmap;
+/* static unsigned long *msr_bitmap; */
 
-struct vmcs_config vmcs_config;
+/* struct vmcs_config vmcs_config; */
 
 
-static cycles_t g_prepare_start, g_prepare_time;
+/* static cycles_t g_prepare_start, g_prepare_time; */
 
 /* CPU Features and Ops */
 
-static inline bool cpu_has_secondary_exec_ctrls(void) {
-	return vmcs_config.cpu_based_exec_ctrl &
-		CPU_BASED_ACTIVATE_SECONDARY_CONTROLS;
-}
+/* static inline bool cpu_has_secondary_exec_ctrls(void) { */
+/* 	return vmcs_config.cpu_based_exec_ctrl & */
+/* 		CPU_BASED_ACTIVATE_SECONDARY_CONTROLS; */
+/* } */
 
-static inline bool cpu_has_vmx_vpid(void) {
-	return vmcs_config.cpu_based_2nd_exec_ctrl &
-		SECONDARY_EXEC_ENABLE_VPID;
-}
+/* static inline bool cpu_has_vmx_vpid(void) { */
+/* 	return vmcs_config.cpu_based_2nd_exec_ctrl & */
+/* 		SECONDARY_EXEC_ENABLE_VPID; */
+/* } */
 
-static inline bool cpu_has_vmx_invpcid(void) {
-	return vmcs_config.cpu_based_2nd_exec_ctrl &
-		SECONDARY_EXEC_ENABLE_INVPCID;
-}
+/* static inline bool cpu_has_vmx_invpcid(void) { */
+/* 	return vmcs_config.cpu_based_2nd_exec_ctrl & */
+/* 		SECONDARY_EXEC_ENABLE_INVPCID; */
+/* } */
 
-static inline bool cpu_has_vmx_invvpid_single(void) {
-	return vmx_capability.vpid & VMX_VPID_EXTENT_SINGLE_CONTEXT_BIT;
-}
+/* static inline bool cpu_has_vmx_invvpid_single(void) { */
+/* 	return vmx_capability.vpid & VMX_VPID_EXTENT_SINGLE_CONTEXT_BIT; */
+/* } */
 
-static inline bool cpu_has_vmx_invvpid_global(void) {
-	return vmx_capability.vpid & VMX_VPID_EXTENT_GLOBAL_CONTEXT_BIT;
-}
+/* static inline bool cpu_has_vmx_invvpid_global(void) { */
+/* 	return vmx_capability.vpid & VMX_VPID_EXTENT_GLOBAL_CONTEXT_BIT; */
+/* } */
 
-static inline bool cpu_has_vmx_ept(void) {
-	return vmcs_config.cpu_based_2nd_exec_ctrl &
-		SECONDARY_EXEC_ENABLE_EPT;
-}
+/* static inline bool cpu_has_vmx_ept(void) { */
+/* 	return vmcs_config.cpu_based_2nd_exec_ctrl & */
+/* 		SECONDARY_EXEC_ENABLE_EPT; */
+/* } */
 
-static inline bool cpu_has_vmx_invept_individual_addr(void) {
-	return vmx_capability.ept & VMX_EPT_EXTENT_INDIVIDUAL_BIT;
-}
+/* static inline bool cpu_has_vmx_invept_individual_addr(void) { */
+/* 	return vmx_capability.ept & VMX_EPT_EXTENT_INDIVIDUAL_BIT; */
+/* } */
 
-static inline bool cpu_has_vmx_invept_context(void) {
-	return vmx_capability.ept & VMX_EPT_EXTENT_CONTEXT_BIT;
-}
+/* static inline bool cpu_has_vmx_invept_context(void) { */
+/* 	return vmx_capability.ept & VMX_EPT_EXTENT_CONTEXT_BIT; */
+/* } */
 
-static inline bool cpu_has_vmx_invept_global(void) {
-	return vmx_capability.ept & VMX_EPT_EXTENT_GLOBAL_BIT;
-}
+/* static inline bool cpu_has_vmx_invept_global(void) { */
+/* 	return vmx_capability.ept & VMX_EPT_EXTENT_GLOBAL_BIT; */
+/* } */
 
-static inline bool cpu_has_vmx_ept_ad_bits(void) {
-	return vmx_capability.ept & VMX_EPT_AD_BIT;
-}
+/* static inline bool cpu_has_vmx_ept_ad_bits(void) { */
+/* 	return vmx_capability.ept & VMX_EPT_AD_BIT; */
+/* } */
 
-static inline void __invept(int ext, u64 eptp, u64 gpa) {
-	struct {
-		u64 eptp, gpa;
-	} operand = {eptp, gpa};
+/* static inline void __invept(int ext, u64 eptp, u64 gpa) { */
+/* 	struct { */
+/* 		u64 eptp, gpa; */
+/* 	} operand = {eptp, gpa}; */
 
-	asm volatile (ASM_VMX_INVEPT
-                /* CF==1 or ZF==1 --> rc = -1 */
-                "; ja 1f ; ud2 ; 1:\n"
-                : : "a" (&operand), "c" (ext) : "cc", "memory");
-}
+/* 	asm volatile (ASM_VMX_INVEPT */
+/*                 /\* CF==1 or ZF==1 --> rc = -1 *\/ */
+/*                 "; ja 1f ; ud2 ; 1:\n" */
+/*                 : : "a" (&operand), "c" (ext) : "cc", "memory"); */
+/* } */
 
-static inline void ept_sync_global(void) {
-	if (cpu_has_vmx_invept_global())
-		__invept(VMX_EPT_EXTENT_GLOBAL, 0, 0);
-}
+/* static inline void ept_sync_global(void) { */
+/* 	if (cpu_has_vmx_invept_global()) */
+/* 		__invept(VMX_EPT_EXTENT_GLOBAL, 0, 0); */
+/* } */
 
-static inline void ept_sync_context(u64 eptp) {
-	if (cpu_has_vmx_invept_context())
-		__invept(VMX_EPT_EXTENT_CONTEXT, eptp, 0);
-	else
-		ept_sync_global();
-}
+/* static inline void ept_sync_context(u64 eptp) { */
+/* 	if (cpu_has_vmx_invept_context()) */
+/* 		__invept(VMX_EPT_EXTENT_CONTEXT, eptp, 0); */
+/* 	else */
+/* 		ept_sync_global(); */
+/* } */
 
-static inline void ept_sync_individual_addr(u64 eptp, u64 gpa) {
-	if (cpu_has_vmx_invept_individual_addr())
-		__invept(VMX_EPT_EXTENT_INDIVIDUAL_ADDR,
-			eptp, gpa);
-	else
-		ept_sync_context(eptp);
-}
+/* static inline void ept_sync_individual_addr(u64 eptp, u64 gpa) { */
+/* 	if (cpu_has_vmx_invept_individual_addr()) */
+/* 		__invept(VMX_EPT_EXTENT_INDIVIDUAL_ADDR, */
+/* 			eptp, gpa); */
+/* 	else */
+/* 		ept_sync_context(eptp); */
+/* } */
 
-static inline void __invvpid(int ext, u16 vpid, u64 gva) {
-	struct {
-		u64 vpid : 16;
-		u64 rsvd : 48;
-		u64 gva;
-	} operand = { vpid, 0, gva };
+/* static inline void __invvpid(int ext, u16 vpid, u64 gva) { */
+/* 	struct { */
+/* 		u64 vpid : 16; */
+/* 		u64 rsvd : 48; */
+/* 		u64 gva; */
+/* 	} operand = { vpid, 0, gva }; */
 
-	asm volatile (ASM_VMX_INVVPID
-                /* CF==1 or ZF==1 --> rc = -1 */
-		"; ja 1f ; ud2 ; 1:"
-                : : "a"(&operand), "c"(ext) : "cc", "memory");
-}
+/* 	asm volatile (ASM_VMX_INVVPID */
+/*                 /\* CF==1 or ZF==1 --> rc = -1 *\/ */
+/* 		"; ja 1f ; ud2 ; 1:" */
+/*                 : : "a"(&operand), "c"(ext) : "cc", "memory"); */
+/* } */
 
-static inline void vpid_sync_vcpu_single(u16 vpid) {
-	if (vpid == 0)
-		return;
+/* static inline void vpid_sync_vcpu_single(u16 vpid) { */
+/* 	if (vpid == 0) */
+/* 		return; */
 
-	if (cpu_has_vmx_invvpid_single())
-		__invvpid(VMX_VPID_EXTENT_SINGLE_CONTEXT, vpid, 0);
-}
+/* 	if (cpu_has_vmx_invvpid_single()) */
+/* 		__invvpid(VMX_VPID_EXTENT_SINGLE_CONTEXT, vpid, 0); */
+/* } */
 
-static inline void vpid_sync_vcpu_global(void) {
-	if (cpu_has_vmx_invvpid_global())
-		__invvpid(VMX_VPID_EXTENT_ALL_CONTEXT, 0, 0);
-}
+/* static inline void vpid_sync_vcpu_global(void) { */
+/* 	if (cpu_has_vmx_invvpid_global()) */
+/* 		__invvpid(VMX_VPID_EXTENT_ALL_CONTEXT, 0, 0); */
+/* } */
 
-static inline void vpid_sync_context(u16 vpid) {
-	if (cpu_has_vmx_invvpid_single())
-		vpid_sync_vcpu_single(vpid);
-	else
-		vpid_sync_vcpu_global();
-}
+/* static inline void vpid_sync_context(u16 vpid) { */
+/* 	if (cpu_has_vmx_invvpid_single()) */
+/* 		vpid_sync_vcpu_single(vpid); */
+/* 	else */
+/* 		vpid_sync_vcpu_global(); */
+/* } */
 
 static inline u16 vmx_read_ldt(void) {
 	u16 ldt;
@@ -180,22 +180,22 @@ static inline u16 vmx_read_ldt(void) {
 	return ldt;
 }
 
-static bool allow_1_setting(u32 msr, u32 ctl) {
-	u32 vmx_msr_low, vmx_msr_high;
+/* static bool allow_1_setting(u32 msr, u32 ctl) { */
+/* 	u32 vmx_msr_low, vmx_msr_high; */
 
-	rdmsr(msr, vmx_msr_low, vmx_msr_high);
-	return vmx_msr_high & ctl;
-}
+/* 	rdmsr(msr, vmx_msr_low, vmx_msr_high); */
+/* 	return vmx_msr_high & ctl; */
+/* } */
 
-static inline void __vmxon(u64 addr) {
-	asm volatile (ASM_VMX_VMXON_RAX
-                : : "a"(&addr), "m"(addr)
-                : "memory", "cc");
-}
+/* static inline void __vmxon(u64 addr) { */
+/* 	asm volatile (ASM_VMX_VMXON_RAX */
+/*                 : : "a"(&addr), "m"(addr) */
+/*                 : "memory", "cc"); */
+/* } */
 
-static inline void __vmxoff(void) {
-	asm volatile (ASM_VMX_VMXOFF : : : "cc");
-}
+/* static inline void __vmxoff(void) { */
+/* 	asm volatile (ASM_VMX_VMXOFF : : : "cc"); */
+/* } */
 
 static void vmcs_clear(struct vmcs *vmcs) {
 	u64 phys_addr = __pa(vmcs);
@@ -1008,23 +1008,23 @@ static void vmx_put_cpu(struct lcd *vcpu) {
 }
 
 
-static int adjust_vmx_controls(u32 ctl_min, u32 ctl_opt,
-			u32 msr, u32 *result) {
-	u32 vmx_msr_low, vmx_msr_high;
-	u32 ctl = ctl_min | ctl_opt;
+/* static int adjust_vmx_controls(u32 ctl_min, u32 ctl_opt, */
+/* 			u32 msr, u32 *result) { */
+/* 	u32 vmx_msr_low, vmx_msr_high; */
+/* 	u32 ctl = ctl_min | ctl_opt; */
 
-	rdmsr(msr, vmx_msr_low, vmx_msr_high);
+/* 	rdmsr(msr, vmx_msr_low, vmx_msr_high); */
 
-	ctl &= vmx_msr_high; /* bit == 0 in high word ==> must be zero */
-	ctl |= vmx_msr_low;  /* bit == 1 in low word  ==> must be one  */
+/* 	ctl &= vmx_msr_high; /\* bit == 0 in high word ==> must be zero *\/ */
+/* 	ctl |= vmx_msr_low;  /\* bit == 1 in low word  ==> must be one  *\/ */
 
-	/* Ensure minimum (required) set of control bits are supported. */
-	if (ctl_min & ~ctl)
-		return -EIO;
+/* 	/\* Ensure minimum (required) set of control bits are supported. *\/ */
+/* 	if (ctl_min & ~ctl) */
+/* 		return -EIO; */
 
-	*result = ctl;
-	return 0;
-}
+/* 	*result = ctl; */
+/* 	return 0; */
+/* } */
 
 static void vmx_dump_cpu(struct lcd *vcpu) {
 	unsigned long flags;
@@ -1066,147 +1066,147 @@ static void vmx_dump_cpu(struct lcd *vcpu) {
 	printk(KERN_INFO "vmx: --- End VCPU Dump ---\n");
 }
 
-static int setup_vmcs_config(struct vmcs_config *vmcs_conf) {
-	u32 vmx_msr_low, vmx_msr_high;
-	u32 min, opt, min2, opt2;
-	u32 _pin_based_exec_control = 0;
-	u32 _cpu_based_exec_control = 0;
-	u32 _cpu_based_2nd_exec_control = 0;
-	u32 _vmexit_control = 0;
-	u32 _vmentry_control = 0;
+/* static int setup_vmcs_config(struct vmcs_config *vmcs_conf) { */
+/* 	u32 vmx_msr_low, vmx_msr_high; */
+/* 	u32 min, opt, min2, opt2; */
+/* 	u32 _pin_based_exec_control = 0; */
+/* 	u32 _cpu_based_exec_control = 0; */
+/* 	u32 _cpu_based_2nd_exec_control = 0; */
+/* 	u32 _vmexit_control = 0; */
+/* 	u32 _vmentry_control = 0; */
 
-	/* Primrary Processor-based VME controls:
-	   - No TSC offsetting (not set)
-	   - HLT exit
-	   - Invalidate PG exit
-	   - MWAIT exit
-	   - RDPMC exit
-	   - L/S CR8 exit
-	   - Unconditional I/O exit (no I/O bitmap)
-	   ### - (No) MSR bitmap
-	*/  
-	min = CPU_BASED_HLT_EXITING |
-		CPU_BASED_INVLPG_EXITING |
-		CPU_BASED_MWAIT_EXITING |
-		CPU_BASED_RDPMC_EXITING |
-		CPU_BASED_CR8_LOAD_EXITING |
-		CPU_BASED_CR8_STORE_EXITING |
-		CPU_BASED_MOV_DR_EXITING |
-		CPU_BASED_UNCOND_IO_EXITING |
-		CPU_BASED_MONITOR_EXITING;
+/* 	/\* Primrary Processor-based VME controls: */
+/* 	   - No TSC offsetting (not set) */
+/* 	   - HLT exit */
+/* 	   - Invalidate PG exit */
+/* 	   - MWAIT exit */
+/* 	   - RDPMC exit */
+/* 	   - L/S CR8 exit */
+/* 	   - Unconditional I/O exit (no I/O bitmap) */
+/* 	   ### - (No) MSR bitmap */
+/* 	*\/   */
+/* 	min = CPU_BASED_HLT_EXITING | */
+/* 		CPU_BASED_INVLPG_EXITING | */
+/* 		CPU_BASED_MWAIT_EXITING | */
+/* 		CPU_BASED_RDPMC_EXITING | */
+/* 		CPU_BASED_CR8_LOAD_EXITING | */
+/* 		CPU_BASED_CR8_STORE_EXITING | */
+/* 		CPU_BASED_MOV_DR_EXITING | */
+/* 		CPU_BASED_UNCOND_IO_EXITING | */
+/* 		CPU_BASED_MONITOR_EXITING; */
 
-	opt = CPU_BASED_ACTIVATE_SECONDARY_CONTROLS |
-		CPU_BASED_USE_MSR_BITMAPS;
-	if (adjust_vmx_controls(min, opt, MSR_IA32_VMX_PROCBASED_CTLS,
-					&_cpu_based_exec_control) < 0)
-		return -EIO;
-	if ((_cpu_based_exec_control & CPU_BASED_TPR_SHADOW))
-		_cpu_based_exec_control &= ~CPU_BASED_CR8_LOAD_EXITING &
-			~CPU_BASED_CR8_STORE_EXITING;
+/* 	opt = CPU_BASED_ACTIVATE_SECONDARY_CONTROLS | */
+/* 		CPU_BASED_USE_MSR_BITMAPS; */
+/* 	if (adjust_vmx_controls(min, opt, MSR_IA32_VMX_PROCBASED_CTLS, */
+/* 					&_cpu_based_exec_control) < 0) */
+/* 		return -EIO; */
+/* 	if ((_cpu_based_exec_control & CPU_BASED_TPR_SHADOW)) */
+/* 		_cpu_based_exec_control &= ~CPU_BASED_CR8_LOAD_EXITING & */
+/* 			~CPU_BASED_CR8_STORE_EXITING; */
 
-	// We need the secondary VME controls.
-	if (_cpu_based_exec_control & CPU_BASED_ACTIVATE_SECONDARY_CONTROLS) {
-		min2 = 0;
-		/* Secondary VME control:
-		   - No virtual APIC access
-		*/
-		opt2 = SECONDARY_EXEC_ENABLE_EPT |
-			SECONDARY_EXEC_RDTSCP |
-			SECONDARY_EXEC_ENABLE_VPID |
-			SECONDARY_EXEC_WBINVD_EXITING |
-			SECONDARY_EXEC_UNRESTRICTED_GUEST | // SECONDARY_EXEC_VIRTUAL_INTR_DELIVERY |
-			SECONDARY_EXEC_ENABLE_INVPCID;
-		if (adjust_vmx_controls(min2, opt2,
-						MSR_IA32_VMX_PROCBASED_CTLS2,
-						&_cpu_based_2nd_exec_control) < 0)
-			return -EIO;
-	} else {
-		printk(KERN_ERR "lcd: secondary VME controls not supported\n");
-		return -EIO;
-	}
+/* 	// We need the secondary VME controls. */
+/* 	if (_cpu_based_exec_control & CPU_BASED_ACTIVATE_SECONDARY_CONTROLS) { */
+/* 		min2 = 0; */
+/* 		/\* Secondary VME control: */
+/* 		   - No virtual APIC access */
+/* 		*\/ */
+/* 		opt2 = SECONDARY_EXEC_ENABLE_EPT | */
+/* 			SECONDARY_EXEC_RDTSCP | */
+/* 			SECONDARY_EXEC_ENABLE_VPID | */
+/* 			SECONDARY_EXEC_WBINVD_EXITING | */
+/* 			SECONDARY_EXEC_UNRESTRICTED_GUEST | // SECONDARY_EXEC_VIRTUAL_INTR_DELIVERY | */
+/* 			SECONDARY_EXEC_ENABLE_INVPCID; */
+/* 		if (adjust_vmx_controls(min2, opt2, */
+/* 						MSR_IA32_VMX_PROCBASED_CTLS2, */
+/* 						&_cpu_based_2nd_exec_control) < 0) */
+/* 			return -EIO; */
+/* 	} else { */
+/* 		printk(KERN_ERR "lcd: secondary VME controls not supported\n"); */
+/* 		return -EIO; */
+/* 	} */
 
-	// We need EPT.
-	if (_cpu_based_2nd_exec_control & SECONDARY_EXEC_ENABLE_EPT) {
-		rdmsr(MSR_IA32_VMX_EPT_VPID_CAP,
-			vmx_capability.ept, vmx_capability.vpid);
-	} else {
-		printk(KERN_ERR "lcd: EPT not supported\n");
-		return -EIO;
-	}
+/* 	// We need EPT. */
+/* 	if (_cpu_based_2nd_exec_control & SECONDARY_EXEC_ENABLE_EPT) { */
+/* 		rdmsr(MSR_IA32_VMX_EPT_VPID_CAP, */
+/* 			vmx_capability.ept, vmx_capability.vpid); */
+/* 	} else { */
+/* 		printk(KERN_ERR "lcd: EPT not supported\n"); */
+/* 		return -EIO; */
+/* 	} */
 
-	// Pin-based control:
-	min = PIN_BASED_EXT_INTR_MASK | PIN_BASED_NMI_EXITING;
-	opt = 0;
-	if (adjust_vmx_controls(min, opt, MSR_IA32_VMX_PINBASED_CTLS,
-					&_pin_based_exec_control) < 0)
-		return -EIO;
+/* 	// Pin-based control: */
+/* 	min = PIN_BASED_EXT_INTR_MASK | PIN_BASED_NMI_EXITING; */
+/* 	opt = 0; */
+/* 	if (adjust_vmx_controls(min, opt, MSR_IA32_VMX_PINBASED_CTLS, */
+/* 					&_pin_based_exec_control) < 0) */
+/* 		return -EIO; */
 
 
-	// Exit control:
-	min = VM_EXIT_HOST_ADDR_SPACE_SIZE//;
-		| VM_EXIT_ACK_INTR_ON_EXIT;
-	opt = 0;
-	if (adjust_vmx_controls(min, opt, MSR_IA32_VMX_EXIT_CTLS,
-					&_vmexit_control) < 0)
-		return -EIO;
+/* 	// Exit control: */
+/* 	min = VM_EXIT_HOST_ADDR_SPACE_SIZE//; */
+/* 		| VM_EXIT_ACK_INTR_ON_EXIT; */
+/* 	opt = 0; */
+/* 	if (adjust_vmx_controls(min, opt, MSR_IA32_VMX_EXIT_CTLS, */
+/* 					&_vmexit_control) < 0) */
+/* 		return -EIO; */
 
-	// Entry control:
-	min = VM_ENTRY_IA32E_MODE;
-	opt = 0;
-	if (adjust_vmx_controls(min, opt, MSR_IA32_VMX_ENTRY_CTLS,
-					&_vmentry_control) < 0)
-		return -EIO;
+/* 	// Entry control: */
+/* 	min = VM_ENTRY_IA32E_MODE; */
+/* 	opt = 0; */
+/* 	if (adjust_vmx_controls(min, opt, MSR_IA32_VMX_ENTRY_CTLS, */
+/* 					&_vmentry_control) < 0) */
+/* 		return -EIO; */
 
-	rdmsr(MSR_IA32_VMX_BASIC, vmx_msr_low, vmx_msr_high);
+/* 	rdmsr(MSR_IA32_VMX_BASIC, vmx_msr_low, vmx_msr_high); */
 
-	/* IA-32 SDM Vol 3B: VMCS size is never greater than 4kB. */
-	if ((vmx_msr_high & 0x1fff) > PAGE_SIZE)
-		return -EIO;
+/* 	/\* IA-32 SDM Vol 3B: VMCS size is never greater than 4kB. *\/ */
+/* 	if ((vmx_msr_high & 0x1fff) > PAGE_SIZE) */
+/* 		return -EIO; */
 
-	/* IA-32 SDM Vol 3B: 64-bit CPUs always have VMX_BASIC_MSR[48]==0. */
-	if (vmx_msr_high & (1u<<16))
-		return -EIO;
+/* 	/\* IA-32 SDM Vol 3B: 64-bit CPUs always have VMX_BASIC_MSR[48]==0. *\/ */
+/* 	if (vmx_msr_high & (1u<<16)) */
+/* 		return -EIO; */
 
-	/* Require Write-Back (WB) memory type for VMCS accesses. */
-	if (((vmx_msr_high >> 18) & 15) != 6)
-		return -EIO;
+/* 	/\* Require Write-Back (WB) memory type for VMCS accesses. *\/ */
+/* 	if (((vmx_msr_high >> 18) & 15) != 6) */
+/* 		return -EIO; */
 
-	vmcs_conf->size = vmx_msr_high & 0x1fff;
-	vmcs_conf->order = get_order(vmcs_config.size);
-	vmcs_conf->revision_id = vmx_msr_low;
+/* 	vmcs_conf->size = vmx_msr_high & 0x1fff; */
+/* 	vmcs_conf->order = get_order(vmcs_config.size); */
+/* 	vmcs_conf->revision_id = vmx_msr_low; */
 
-	vmcs_conf->pin_based_exec_ctrl = _pin_based_exec_control;
-	vmcs_conf->cpu_based_exec_ctrl = _cpu_based_exec_control;
-	vmcs_conf->cpu_based_2nd_exec_ctrl = _cpu_based_2nd_exec_control;
-	vmcs_conf->vmexit_ctrl         = _vmexit_control;
-	vmcs_conf->vmentry_ctrl        = _vmentry_control;
+/* 	vmcs_conf->pin_based_exec_ctrl = _pin_based_exec_control; */
+/* 	vmcs_conf->cpu_based_exec_ctrl = _cpu_based_exec_control; */
+/* 	vmcs_conf->cpu_based_2nd_exec_ctrl = _cpu_based_2nd_exec_control; */
+/* 	vmcs_conf->vmexit_ctrl         = _vmexit_control; */
+/* 	vmcs_conf->vmentry_ctrl        = _vmentry_control; */
 
-	vmx_capability.has_load_efer =
-		allow_1_setting(MSR_IA32_VMX_ENTRY_CTLS,
-				VM_ENTRY_LOAD_IA32_EFER)
-		&& allow_1_setting(MSR_IA32_VMX_EXIT_CTLS,
-				VM_EXIT_LOAD_IA32_EFER);
+/* 	vmx_capability.has_load_efer = */
+/* 		allow_1_setting(MSR_IA32_VMX_ENTRY_CTLS, */
+/* 				VM_ENTRY_LOAD_IA32_EFER) */
+/* 		&& allow_1_setting(MSR_IA32_VMX_EXIT_CTLS, */
+/* 				VM_EXIT_LOAD_IA32_EFER); */
 
-	return 0;
-}
+/* 	return 0; */
+/* } */
 
-static struct vmcs *vmx_alloc_vmcs(int cpu) {
-	int node = cpu_to_node(cpu);
-	struct page *pages;
-	struct vmcs *vmcs;
+/* static struct vmcs *vmx_alloc_vmcs(int cpu) { */
+/* 	int node = cpu_to_node(cpu); */
+/* 	struct page *pages; */
+/* 	struct vmcs *vmcs; */
 
-	pages = alloc_pages_exact_node(node, GFP_KERNEL, vmcs_config.order);
-	if (!pages)
-		return NULL;
-	vmcs = page_address(pages);
-	memset(vmcs, 0, vmcs_config.size);
-	vmcs->revision_id = vmcs_config.revision_id; /* vmcs revision id */
-	return vmcs;
-}
+/* 	pages = alloc_pages_exact_node(node, GFP_KERNEL, vmcs_config.order); */
+/* 	if (!pages) */
+/* 		return NULL; */
+/* 	vmcs = page_address(pages); */
+/* 	memset(vmcs, 0, vmcs_config.size); */
+/* 	vmcs->revision_id = vmcs_config.revision_id; /\* vmcs revision id *\/ */
+/* 	return vmcs; */
+/* } */
 
-static void vmx_free_vmcs(struct vmcs *vmcs) {
-	free_pages((unsigned long)vmcs, vmcs_config.order);
-}
+/* static void vmx_free_vmcs(struct vmcs *vmcs) { */
+/* 	free_pages((unsigned long)vmcs, vmcs_config.order); */
+/* } */
 
 static void vmx_setup_constant_host_state(struct lcd *lcd) {
 	u32 low32, high32;
@@ -1253,23 +1253,23 @@ static void vmx_setup_constant_host_state(struct lcd *lcd) {
 	vmcs_writel(HOST_GS_BASE, tmpl); /* 22.2.4 */
 }
 
-static void vmx_disable_intercept_for_msr(
-	unsigned long *msr_bitmap, u32 msr) {
-	int f = sizeof(unsigned long);
-	/*
-	 * See Intel PRM Vol. 3, 20.6.9 (MSR-Bitmap Address). Early manuals
-	 * have the write-low and read-high bitmap offsets the wrong way round.
-	 * We can control MSRs 0x00000000-0x00001fff and 0xc0000000-0xc0001fff.
-	 */
-	if (msr <= 0x1fff) {
-		__clear_bit(msr, msr_bitmap + 0x000 / f); /* read-low */
-		__clear_bit(msr, msr_bitmap + 0x800 / f); /* write-low */
-	} else if ((msr >= 0xc0000000) && (msr <= 0xc0001fff)) {
-		msr &= 0x1fff;
-		__clear_bit(msr, msr_bitmap + 0x400 / f); /* read-high */
-		__clear_bit(msr, msr_bitmap + 0xc00 / f); /* write-high */
-	}
-}
+/* static void vmx_disable_intercept_for_msr( */
+/* 	unsigned long *msr_bitmap, u32 msr) { */
+/* 	int f = sizeof(unsigned long); */
+/* 	/\* */
+/* 	 * See Intel PRM Vol. 3, 20.6.9 (MSR-Bitmap Address). Early manuals */
+/* 	 * have the write-low and read-high bitmap offsets the wrong way round. */
+/* 	 * We can control MSRs 0x00000000-0x00001fff and 0xc0000000-0xc0001fff. */
+/* 	 *\/ */
+/* 	if (msr <= 0x1fff) { */
+/* 		__clear_bit(msr, msr_bitmap + 0x000 / f); /\* read-low *\/ */
+/* 		__clear_bit(msr, msr_bitmap + 0x800 / f); /\* write-low *\/ */
+/* 	} else if ((msr >= 0xc0000000) && (msr <= 0xc0001fff)) { */
+/* 		msr &= 0x1fff; */
+/* 		__clear_bit(msr, msr_bitmap + 0x400 / f); /\* read-high *\/ */
+/* 		__clear_bit(msr, msr_bitmap + 0xc00 / f); /\* write-high *\/ */
+/* 	} */
+/* } */
 
 static void setup_msr(struct lcd *vcpu) {
 	int set[] = { MSR_LSTAR };
@@ -1375,38 +1375,37 @@ static void vmx_setup_vmcs(struct lcd *vcpu)
 	vmx_setup_constant_host_state(vcpu);
 }
 
-/**
- * vmx_allocate_vpid - reserves a vpid and sets it in the VCPU
- * @vmx: the VCPU
- */
-static int vmx_allocate_vpid(struct lcd *vmx)
-{
-	int vpid;
+/* /\** */
+/*  * vmx_allocate_vpid - reserves a vpid and sets it in the vcpu */
+/*  *\/ */
+/* static int vmx_allocate_vpid(struct lcd *vmx) */
+/* { */
+/* 	int vpid; */
 
-	vmx->vpid = 0;
+/* 	vmx->vpid = 0; */
 
-	spin_lock(&vmx_vpid_lock);
-	vpid = find_first_zero_bit(vmx_vpid_bitmap, VMX_NR_VPIDS);
-	if (vpid < VMX_NR_VPIDS) {
-		vmx->vpid = vpid;
-		__set_bit(vpid, vmx_vpid_bitmap);
-	}
-	spin_unlock(&vmx_vpid_lock);
+/* 	spin_lock(&vpids.lock); */
+/* 	vpid = find_first_zero_bit(vpids.bitmap, VMX_NR_VPIDS); */
+/* 	if (vpid < VMX_NR_VPIDS) { */
+/* 		vmx->vpid = vpid; */
+/* 		__set_bit(vpid, vpids.bitmap); */
+/* 	} */
+/* 	spin_unlock(&vpids.lock); */
 
-	return vpid >= VMX_NR_VPIDS;
-}
+/* 	return vpid >= VMX_NR_VPIDS; */
+/* } */
 
-/**
- * vmx_free_vpid - frees a vpid
- * @vmx: the VCPU
- */
-static void vmx_free_vpid(struct lcd *vmx)
-{
-	spin_lock(&vmx_vpid_lock);
-	if (vmx->vpid != 0)
-		__clear_bit(vmx->vpid, vmx_vpid_bitmap);
-	spin_unlock(&vmx_vpid_lock);
-}
+/* /\** */
+/*  * vmx_free_vpid - frees a vpid */
+/*  * @vmx: the VCPU */
+/*  *\/ */
+/* static void vmx_free_vpid(struct lcd *vmx) */
+/* { */
+/* 	spin_lock(&vmx_vpid_lock); */
+/* 	if (vmx->vpid != 0) */
+/* 		__clear_bit(vmx->vpid, vmx_vpid_bitmap); */
+/* 	spin_unlock(&vmx_vpid_lock); */
+/* } */
 
 static void vmx_setup_initial_guest_state(struct lcd *vcpu, 
 					u64 guest_paging_cr3)
@@ -1862,151 +1861,151 @@ static int vmx_handle_ept_violation(struct lcd *vcpu) {
 	return ret;
 }
 
-static int __vmx_enable(struct vmcs *vmxon_buf) {
-	u64 phys_addr = __pa(vmxon_buf);
-	u64 old, test_bits;
+/* static int __vmx_enable(struct vmcs *vmxon_buf) { */
+/* 	u64 phys_addr = __pa(vmxon_buf); */
+/* 	u64 old, test_bits; */
 
-	if (read_cr4() & X86_CR4_VMXE)
-		return -EBUSY;
+/* 	if (read_cr4() & X86_CR4_VMXE) */
+/* 		return -EBUSY; */
 
-	rdmsrl(MSR_IA32_FEATURE_CONTROL, old);
+/* 	rdmsrl(MSR_IA32_FEATURE_CONTROL, old); */
 
-	test_bits = FEATURE_CONTROL_LOCKED;
-	test_bits |= FEATURE_CONTROL_VMXON_ENABLED_OUTSIDE_SMX;
-	if (tboot_enabled())
-		test_bits |= FEATURE_CONTROL_VMXON_ENABLED_INSIDE_SMX;
+/* 	test_bits = FEATURE_CONTROL_LOCKED; */
+/* 	test_bits |= FEATURE_CONTROL_VMXON_ENABLED_OUTSIDE_SMX; */
+/* 	if (tboot_enabled()) */
+/* 		test_bits |= FEATURE_CONTROL_VMXON_ENABLED_INSIDE_SMX; */
 
-	if ((old & test_bits) != test_bits) {
-		/* enable and lock */
-		wrmsrl(MSR_IA32_FEATURE_CONTROL, old | test_bits);
-	}
-	write_cr4(read_cr4() | X86_CR4_VMXE);
+/* 	if ((old & test_bits) != test_bits) { */
+/* 		/\* enable and lock *\/ */
+/* 		wrmsrl(MSR_IA32_FEATURE_CONTROL, old | test_bits); */
+/* 	} */
+/* 	write_cr4(read_cr4() | X86_CR4_VMXE); */
 
-	__vmxon(phys_addr);
-	vpid_sync_vcpu_global();
-	ept_sync_global();
+/* 	__vmxon(phys_addr); */
+/* 	vpid_sync_vcpu_global(); */
+/* 	ept_sync_global(); */
 
-	return 0;
-}
+/* 	return 0; */
+/* } */
 
-#define store_gdt(g) native_store_gdt(g)
+/* #define store_gdt(g) native_store_gdt(g) */
 
-static void vmx_enable(void *unused) {
-	int ret;
-	struct vmcs *vmxon_buf = __get_cpu_var(vmxarea);
+/* static void vmx_enable(void *unused) { */
+/* 	int ret; */
+/* 	struct vmcs *vmxon_buf = __get_cpu_var(vmxarea); */
 
-	if ((ret = __vmx_enable(vmxon_buf)))
-		goto failed;
+/* 	if ((ret = __vmx_enable(vmxon_buf))) */
+/* 		goto failed; */
 
-	__get_cpu_var(vmx_enabled) = 1;
-	store_gdt(&__get_cpu_var(host_gdt));
+/* 	__get_cpu_var(vmx_enabled) = 1; */
+/* 	store_gdt(&__get_cpu_var(host_gdt)); */
 
-	printk(KERN_INFO "vmx: VMX enabled on CPU %d\n",
-		raw_smp_processor_id());
-	return;
+/* 	printk(KERN_INFO "vmx: VMX enabled on CPU %d\n", */
+/* 		raw_smp_processor_id()); */
+/* 	return; */
 
-failed:
-	atomic_inc(&vmx_enable_failed);
-	printk(KERN_ERR "vmx: failed to enable VMX, err = %d\n", ret);
-}
+/* failed: */
+/* 	atomic_inc(&vmx_enable_failed); */
+/* 	printk(KERN_ERR "vmx: failed to enable VMX, err = %d\n", ret); */
+/* } */
 
-static void vmx_disable(void *unused) {
-	if (__get_cpu_var(vmx_enabled)) {
-		__vmxoff();
-		write_cr4(read_cr4() & ~X86_CR4_VMXE);
-		__get_cpu_var(vmx_enabled) = 0;
-	}
-}
+/* static void vmx_disable(void *unused) { */
+/* 	if (__get_cpu_var(vmx_enabled)) { */
+/* 		__vmxoff(); */
+/* 		write_cr4(read_cr4() & ~X86_CR4_VMXE); */
+/* 		__get_cpu_var(vmx_enabled) = 0; */
+/* 	} */
+/* } */
 
-static void vmx_free_vmxon_areas(void) {
-	int cpu;
+/* static void vmx_free_vmxon_areas(void) { */
+/* 	int cpu; */
 
-	for_each_possible_cpu(cpu) {
-		if (per_cpu(vmxarea, cpu)) {
-			vmx_free_vmcs(per_cpu(vmxarea, cpu));
-			per_cpu(vmxarea, cpu) = NULL;
-		}
-	}
-}
+/* 	for_each_possible_cpu(cpu) { */
+/* 		if (per_cpu(vmxarea, cpu)) { */
+/* 			vmx_free_vmcs(per_cpu(vmxarea, cpu)); */
+/* 			per_cpu(vmxarea, cpu) = NULL; */
+/* 		} */
+/* 	} */
+/* } */
 
-int lcd_vmx_init(void) {
-	int r, cpu;
+/* int lcd_vmx_init(void) { */
+/* 	int r, cpu; */
 
-	if (!cpu_has_vmx()) {
-		printk(KERN_ERR "vmx: CPU does not support VT-x\n");
-		return -EIO;
-	}
+/* 	if (!cpu_has_vmx()) { */
+/* 		printk(KERN_ERR "vmx: CPU does not support VT-x\n"); */
+/* 		return -EIO; */
+/* 	} */
 
-	if (setup_vmcs_config(&vmcs_config) < 0)
-		return -EIO;
+/* 	if (setup_vmcs_config(&vmcs_config) < 0) */
+/* 		return -EIO; */
 
-	if (!cpu_has_vmx_vpid()) {
-		printk(KERN_ERR "vmx: CPU is missing required feature 'VPID'\n");
-		return -EIO;
-	}
+/* 	if (!cpu_has_vmx_vpid()) { */
+/* 		printk(KERN_ERR "vmx: CPU is missing required feature 'VPID'\n"); */
+/* 		return -EIO; */
+/* 	} */
 
-	if (!cpu_has_vmx_ept()) {
-		printk(KERN_ERR "vmx: CPU is missing required feature 'EPT'\n");
-		return -EIO;
-	}
+/* 	if (!cpu_has_vmx_ept()) { */
+/* 		printk(KERN_ERR "vmx: CPU is missing required feature 'EPT'\n"); */
+/* 		return -EIO; */
+/* 	} */
 
-	if (!vmx_capability.has_load_efer) {
-		printk(KERN_ERR "vmx: ability to load EFER register is required\n");
-		return -EIO;
-	}
+/* 	if (!vmx_capability.has_load_efer) { */
+/* 		printk(KERN_ERR "vmx: ability to load EFER register is required\n"); */
+/* 		return -EIO; */
+/* 	} */
 
-	msr_bitmap = (unsigned long *)__get_free_page(GFP_KERNEL);
-	if (!msr_bitmap) {
-		return -ENOMEM;
-	}
+/* 	msr_bitmap = (unsigned long *)__get_free_page(GFP_KERNEL); */
+/* 	if (!msr_bitmap) { */
+/* 		return -ENOMEM; */
+/* 	} */
 
-	memset(msr_bitmap, 0xff, PAGE_SIZE);
-	vmx_disable_intercept_for_msr(msr_bitmap, MSR_FS_BASE);
-	vmx_disable_intercept_for_msr(msr_bitmap, MSR_GS_BASE);
+/* 	memset(msr_bitmap, 0xff, PAGE_SIZE); */
+/* 	vmx_disable_intercept_for_msr(msr_bitmap, MSR_FS_BASE); */
+/* 	vmx_disable_intercept_for_msr(msr_bitmap, MSR_GS_BASE); */
 
-	set_bit(0, vmx_vpid_bitmap); /* 0 is reserved for host */
+/* 	set_bit(0, vmx_vpid_bitmap); /\* 0 is reserved for host *\/ */
 
-	for_each_possible_cpu(cpu) {
-		struct vmcs *vmxon_buf;
+/* 	for_each_possible_cpu(cpu) { */
+/* 		struct vmcs *vmxon_buf; */
 
-		vmxon_buf = vmx_alloc_vmcs(cpu);
-		if (!vmxon_buf) {
-			vmx_free_vmxon_areas();
-			return -ENOMEM;
-		}
+/* 		vmxon_buf = vmx_alloc_vmcs(cpu); */
+/* 		if (!vmxon_buf) { */
+/* 			vmx_free_vmxon_areas(); */
+/* 			return -ENOMEM; */
+/* 		} */
 
-		per_cpu(vmxarea, cpu) = vmxon_buf;
-	}
+/* 		per_cpu(vmxarea, cpu) = vmxon_buf; */
+/* 	} */
 
-	atomic_set(&vmx_enable_failed, 0);
-	if (on_each_cpu(vmx_enable, NULL, 1)) {
-		printk(KERN_ERR "vmx: timeout waiting for VMX mode enable.\n");
-		r = -EIO;
-		goto failed1; /* sadly we can't totally recover */
-	}
+/* 	atomic_set(&vmx_enable_failed, 0); */
+/* 	if (on_each_cpu(vmx_enable, NULL, 1)) { */
+/* 		printk(KERN_ERR "vmx: timeout waiting for VMX mode enable.\n"); */
+/* 		r = -EIO; */
+/* 		goto failed1; /\* sadly we can't totally recover *\/ */
+/* 	} */
 
-	if (atomic_read(&vmx_enable_failed)) {
-		r = -EBUSY;
-		goto failed2;
-	}
+/* 	if (atomic_read(&vmx_enable_failed)) { */
+/* 		r = -EBUSY; */
+/* 		goto failed2; */
+/* 	} */
 
-	return 0;
+/* 	return 0; */
 
-failed2:
-	on_each_cpu(vmx_disable, NULL, 1);
-failed1:
-	vmx_free_vmxon_areas();
-	return r;
-}
-EXPORT_SYMBOL(lcd_vmx_init);
+/* failed2: */
+/* 	on_each_cpu(vmx_disable, NULL, 1); */
+/* failed1: */
+/* 	vmx_free_vmxon_areas(); */
+/* 	return r; */
+/* } */
+/* EXPORT_SYMBOL(lcd_vmx_init); */
 
-void lcd_vmx_exit(void)
-{
-	on_each_cpu(vmx_disable, NULL, 1);
-	vmx_free_vmxon_areas();
-	free_page((unsigned long)msr_bitmap);
-}
-EXPORT_SYMBOL(lcd_vmx_exit);
+/* void lcd_vmx_exit(void) */
+/* { */
+/* 	on_each_cpu(vmx_disable, NULL, 1); */
+/* 	vmx_free_vmxon_areas(); */
+/* 	free_page((unsigned long)msr_bitmap); */
+/* } */
+/* EXPORT_SYMBOL(lcd_vmx_exit); */
 
 
 struct lcd* lcd_create(void) {

@@ -12,6 +12,7 @@
 
 #include <asm/virtext.h>
 #include <asm/vmx.h>
+#include <asm/desc.h>
 #include <asm/lcd-vmx.h>
 
 #include <linux/bitmap.h>
@@ -33,7 +34,7 @@ static struct {
 } vpids;
 
 //static DEFINE_PER_CPU(struct desc_ptr, host_gdt);
-//static DEFINE_PER_CPU(struct lcd *, local_vcpu);
+static DEFINE_PER_CPU(struct lcd_vmx *, local_vcpu);
 
 static unsigned long *msr_bitmap;
 
@@ -70,12 +71,12 @@ static inline void __invept(int ext, u64 eptp, u64 gpa) {
                 : : "a" (&operand), "c" (ext) : "cc", "memory");
 }
 
-static inline void invept_global(void) {
+static inline void invept_global_context(void) {
 	if (cpu_has_vmx_invept_global())
 		__invept(VMX_EPT_EXTENT_GLOBAL, 0, 0);
 }
 
-static inline void invept_context(u64 eptp) {
+static inline void invept_single_context(u64 eptp) {
 	if (cpu_has_vmx_invept_context())
 		__invept(VMX_EPT_EXTENT_CONTEXT, eptp, 0);
 	else
@@ -95,13 +96,12 @@ static inline void __invvpid(int ext, u16 vpid, u64 gva) {
                 : : "a"(&operand), "c"(ext) : "cc", "memory");
 }
 
-static inline void invvpid_global(void) {
+static inline void invvpid_global_context(void) {
 	if (cpu_has_vmx_invvpid_global())
 		__invvpid(VMX_VPID_EXTENT_ALL_CONTEXT, 0, 0);
 }
 
 static inline void invvpid_single_context(u16 vpid) {
-
 	/*
 	 * Don't invalidate host mappings
 	 */
@@ -220,8 +220,8 @@ static void vmx_enable(void *unused) {
 	 * Flush TLB and caches of any old VPID and EPT
 	 * mappings.
 	 */
-	invvpid_global();
-	invept_global();
+	invvpid_global_context();
+	invept_global_context();
 
 	__get_cpu_var(vmx_enabled) = 1;
 
@@ -525,6 +525,8 @@ static int setup_vmcs_config(struct lcd_vmx_vmcs_config *vmcs_conf) {
 	return 0;
 }
 
+/* VMX INIT / EXIT -------------------------------------------------- */
+
 int lcd_vmx_init(void) {
 	int ret;
 	int cpu;
@@ -560,7 +562,7 @@ int lcd_vmx_init(void) {
 	/*
 	 * Initialize VPID bitmap spinlock
 	 */
-	vpids.lock = __SPIN_LOCK_UNLOCKED(vpids.lock);
+	spin_lock_init(&vpids.lock);
 
 	/*
 	 * VPID 0 is reserved for host. See INVVPID instruction.
@@ -621,3 +623,294 @@ void lcd_vmx_exit(void)
 	free_page((unsigned long)msr_bitmap);
 }
 EXPORT_SYMBOL(lcd_vmx_exit);
+
+/* VMX EPT -------------------------------------------------- */
+
+/**
+ * Initializes the EPT's root global page directory page, the
+ * VMCS pointer, and the spinlock.
+ */
+int vmx_init_ept(struct lcd_vmx *vcpu) {
+	void *page;
+	u64 eptp;
+
+	/*
+	 * Alloc the root global page directory page
+	 */
+
+	page = (void *)__get_free_page(GFP_KERNEL);
+	if (!page)
+		return -ENOMEM;
+	memset(page, 0, PAGE_SIZE);
+
+	vcpu->ept.root_hpa =  __pa(page);
+
+	/*
+	 * Init the VMCS EPT pointer
+	 *
+	 * -- default memory type (write-back)
+	 * -- default ept page walk length (4, pointer stores
+	 *    length - 1)
+	 * -- use access/dirty bits, if available
+	 *
+	 * See Intel SDM V3 24.6.11 and Figure 28-1.
+	 */
+
+	eptp = VMX_EPT_DEFAULT_MT |
+		VMX_EPT_DEFAULT_GAW << VMX_EPT_GAW_EPTP_SHIFT;
+	if (cpu_has_vmx_ept_ad_bits()) {
+		vcpu->ept.access_dirty_enabled = true;
+		eptp |= VMX_EPT_AD_ENABLE_BIT;
+	}
+	eptp |= (ept.root_hpa & PAGE_MASK);
+	vcpu->ept.vmcs_ptr = eptp;
+
+	/*
+	 * Init the spinlock
+	 */
+	spin_lock_init(&vcpu->ept.lock);
+
+	return 0;
+}
+
+/* HOST INFO -------------------------------------------------- */
+
+static struct desc_struct * vmx_per_cpu_gdt(void) {
+	return get_cpu_gdt_table(smp_processor_id());
+}
+
+static struct desc_struct * vmx_per_cpu_tss_desc(void) {
+	struct desc_struct *gdt;
+	u16 tr;
+	gdt = vmx_per_cpu_gdt();
+	store_tr(tr);
+	return &gdt[tr];
+}	
+
+/* VMCS LOADING -------------------------------------------------- */
+
+static void __vmx_setup_cpu(struct lcd_vmx *vcpu, int cur_cpu) {
+	struct desc_struct *gdt;
+	struct desc_struct *tss_desc;
+	unsigned long tmpl;
+
+	/*
+	 * Linux uses per-cpu TSS and GDT, so we need to set these
+	 * in the host part of the vmcs when switching cpu's.
+	 */
+	gdt = vmx_per_cpu_gdt();
+	tss_desc = vmx_per_cpu_tss_desc();
+	vmcs_writel(HOST_TR_BASE, get_desc_base(tss_desc));
+	vmcs_writel(HOST_GDTR_BASE, gdt);
+
+	/*
+	 * %fs and %gs are also per-cpu
+	 *
+	 * (MSRs are used to load / store %fs and %gs in 64-bit mode.
+	 * See Intel SDM V3 3.2.4 and 3.4.4.)
+	 */
+	rdmsrl(MSR_FS_BASE, tmpl);
+	vmcs_writel(HOST_FS_BASE, tmpl);
+	rdmsrl(MSR_GS_BASE, tmpl);
+	vmcs_writel(HOST_GS_BASE, tmpl);
+}
+
+/**
+ * Clears vcpu (active -> inactive) on a cpu.
+ */
+static void __vmx_get_cpu_helper(void *ptr) {
+	struct lcd_vmx *vcpu;
+	vcpu = ptr;
+	BUG_ON(raw_smp_processor_id() != vcpu->cpu);
+	vmcs_clear(vcpu->vmcs);
+	if (__get_cpu_var(local_vcpu) == vcpu)
+		__get_cpu_var(local_vcpu) = NULL;
+}
+
+/**
+ * Loads VCPU on the calling cpu.
+ *
+ * Disables preemption. Call vmx_put_cpu() when finished.
+ */
+static void vmx_get_cpu(struct lcd_vmx *vcpu) {
+	int cur_cpu;
+
+	/*
+	 * Preemption disabled
+	 */
+	cur_cpu = get_cpu();
+
+	/*
+	 * See Intel SDM V3 24.1 and Figure 31.1
+	 *
+	 * If vcpu is the cpu's local vcpu, vcpu is
+	 * active and current on the current cpu, and
+	 * there's nothing to be done.
+	 */
+
+	/*
+	 * Otherwise, we need to make the vcpu active
+	 * and current on this cpu.
+	 */
+	if (__get_cpu_var(local_vcpu) != vcpu) {
+
+		__get_cpu_var(local_vcpu) = vcpu;
+
+		if (vcpu->cpu != cur_cpu) {
+
+			/*
+			 * vcpu not active on this cpu
+			 */
+			if (vcpu->cpu >= 0)
+				/*
+				 * vcpu active on a different cpu;
+				 * clear it there (active -> inactive)
+				 */
+				smp_call_function_single(vcpu->cpu,
+							__vmx_get_cpu_helper, 
+							(void *) vcpu, 1);
+			else
+				/*
+				 * vcpu inactive; clear it to get to
+				 * initial vmcs state
+				 */
+				vmcs_clear(vcpu->vmcs);
+
+			/*
+			 * Invalidate any vpid or ept cache lines
+			 */
+			invvpid_single_context(vcpu->vpid);
+			invept_single_context(vcpu->ept.vmcs_ptr);
+
+			/*
+			 * vcpu is not in launched state
+			 */
+			vcpu->launched = 0;
+
+			/*
+			 * Load vmcs pointer on this cpu
+			 */
+			vmcs_load(vcpu->vmcs);
+
+			/*
+			 * Update cpu-specific data in vmcs
+			 */
+			__vmx_setup_cpu();
+
+			/*
+			 * Remember which cpu we are active on
+			 */
+			vcpu->cpu = cur_cpu;
+		} else {
+			vmcs_load(vcpu->vmcs);
+		}
+	}
+}
+
+/**
+ * vmx_put_cpu - called after using a cpu
+ * @vcpu: VCPU that was loaded.
+ */
+static void vmx_put_cpu(struct lcd *vcpu) {
+	put_cpu();
+}
+
+
+/* VMX INIT -------------------------------------------------- */
+
+/**
+ * Reserves a vpid and sets it in the vcpu.
+ */
+static int vmx_allocate_vpid(struct lcd_vmx *vmx)
+{
+	int vpid;
+
+	vmx->vpid = 0;
+
+	spin_lock(&vpids.lock);
+	vpid = find_first_zero_bit(vpids.bitmap, VMX_NR_VPIDS);
+	if (vpid < VMX_NR_VPIDS) {
+		vmx->vpid = vpid;
+		__set_bit(vpid, vpids.bitmap);
+	}
+	spin_unlock(&vpids.lock);
+
+	return vpid >= VMX_NR_VPIDS;
+}
+
+/**
+ * Frees a vpid.
+ */
+static void vmx_free_vpid(struct lcd_vmx *vmx)
+{
+	spin_lock(&vpids.lock);
+	if (vmx->vpid != 0)
+		__clear_bit(vmx->vpid, vpids.bitmap);
+	spin_unlock(&vpids.lock);
+}
+
+struct lcd_vmx* lcd_vmx_create(void) {
+	struct lcd_vmx* vcpu;
+
+	/*
+	 * Alloc lcd_vmx
+	 */
+	vcpu = kmalloc(sizeof(*vcpu), GFP_KERNEL);
+	if (!vcpu)
+		goto fail_vcpu;
+	memset(vcpu, 0, sizeof(*vcpu));
+
+	/*
+	 * Alloc vmcs
+	 */
+	vcpu->vmcs = vmx_alloc_vmcs(raw_smp_processor_id());
+	if (!vcpu->vmcs)
+		goto fail_vmcs;
+
+	if (vmx_allocate_vpid(vcpu))
+		goto fail_vpid;
+
+	/*
+	 * Not loaded on a cpu right now
+	 */
+	vcpu->cpu = -1;
+
+	/*
+	 * Initialize EPT
+	 */
+	if (vmx_init_ept(vcpu))
+		goto fail_ept;
+
+	vmx_get_cpu(vcpu);
+	vmx_setup_vmcs(vcpu);
+	vmx_setup_initial_guest_state(vcpu, guest_paging_cr3);
+	vmx_put_cpu(vcpu);
+
+	return vcpu;
+
+fail_ept:
+	vmx_free_vpid(vcpu);
+fail_vpid:
+	vmx_free_vmcs(vcpu->vmcs);
+fail_vmcs:
+	free_page((unsigned long)vcpu->isr_page);
+fail_isr:
+	free_page((unsigned long)vcpu->tss);
+fail_tss:
+	free_page((unsigned long)vcpu->idt);
+fail_idt:
+	free_page((unsigned long)vcpu->gdt);
+fail_gdt:
+	kfree(vcpu->bmp_pt_pages);
+fail_bmp:
+	kfree(vcpu);
+
+fail_ept:
+	vmx_free_vpid(vcpu);
+fail_vpid:
+	vmx_free_vmcs(vcpu->vmcs);
+fail_vmcs:
+	kfree(vcpu);
+fail_vcpu:
+	return NULL;
+}

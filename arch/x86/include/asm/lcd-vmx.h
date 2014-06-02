@@ -50,10 +50,10 @@ enum lcd_vmx_reg {
 };
 
 struct lcd_vmx_ept {
-	spinlock_t ept_lock;
-	unsigned long ept_root;
-	unsigned long ept_ptr;
-	bool ept_ad_enabled;
+	spinlock_t lock;
+	unsigned long root_hpa;
+	unsigned long vmcs_ptr;
+	bool access_dirty_enabled;
 };
 
 struct lcd_vmx {

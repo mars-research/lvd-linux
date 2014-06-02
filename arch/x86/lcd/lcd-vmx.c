@@ -612,6 +612,7 @@ failed1:
 	free_page((unsigned long)msr_bitmap);
 	return ret;
 }
+EXPORT_SYMBOL(lcd_vmx_init);
 
 void lcd_vmx_exit(void)
 {
@@ -619,3 +620,4 @@ void lcd_vmx_exit(void)
 	vmx_free_vmxon_areas();
 	free_page((unsigned long)msr_bitmap);
 }
+EXPORT_SYMBOL(lcd_vmx_exit);

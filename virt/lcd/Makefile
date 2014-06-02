@@ -2,8 +2,6 @@
 # One (and only) build file for LCD system.
 #
 
-ccflags-y               += -Werror
+ccflags-y               	+= -Werror
 
-obj-$(CONFIG_LCD)	+= core.o
-
-lcd-y                   += arch/$(ARCH)/lcd/lcd-vmx.o
+obj-$(CONFIG_LCD_DOMAINS)	+= lcd-domains.o

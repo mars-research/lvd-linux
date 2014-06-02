@@ -2,9 +2,17 @@
 # LCD configuration
 #
 
-config LCD
-	tristate "Light-weight Capability Domains"
-	depends on X86_64
-	default y
-	---help---
-	Light-weight Capability Domains for Linux.
+config LCD_DOMAINS
+       tristate "Light-weight Capability Domains"
+       depends on X86_64
+       depends on LCD_VMX_INTEL
+       default y
+       ---help---
+       Light-weight Capability Domains for Linux.
+
+config LCD_VMX_INTEL
+       tristate "Intel support for LCDs"
+       depends on X86_64
+       default y
+       ---help---
+       Intel-specific code for using LCDs.

@@ -86,9 +86,6 @@ typedef struct lcd {
 	struct module *mod;
 } lcd_t;
 
-int lcd_vmx_init(void); 
-void lcd_vmx_exit(void);
-
 
 int lcd_init_module(void __user * umod, unsigned long len, const char __user * uargs);
 //int lcd_load_module(struct load_info *info, const char __user *uargs, int flags);

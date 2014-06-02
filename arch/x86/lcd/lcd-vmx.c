@@ -612,3 +612,10 @@ failed1:
 	free_page((unsigned long)msr_bitmap);
 	return ret;
 }
+
+void lcd_vmx_exit(void)
+{
+	on_each_cpu(vmx_disable, NULL, 1);
+	vmx_free_vmxon_areas();
+	free_page((unsigned long)msr_bitmap);
+}

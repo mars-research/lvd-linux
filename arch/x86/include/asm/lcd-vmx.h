@@ -1,6 +1,7 @@
 #ifndef LCD_VMX_H
 #define LCD_VMX_H
 
+#include <asm/vmx.h>
 #include <linux/spinlock.h>
 
 struct lcd_vmx_vmcs_config {
@@ -81,5 +82,8 @@ struct lcd_vmx {
 		struct vmx_msr_entry host[LCD_VMX_NUM_AUTOLOAD_MSRS];
 	} msr_autoload;
 };
+
+int lcd_vmx_init(void);
+void lcd_vmx_exit(void);
 
 #endif  /* LCD_VMX_H */

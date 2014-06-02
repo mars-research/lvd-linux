@@ -14,9 +14,11 @@
 #define VMX_EPT_AD_ENABLE_BIT   (1ull << 6)
 #endif
 
+/* Where did this come from ? it's not documented in ia32 manual
 #ifndef VMX_EPT_EXTENT_INDIVIDUAL_BIT
 #define VMX_EPT_EXTENT_INDIVIDUAL_BIT           (1ull << 24)
 #endif
+*/
 
 #ifndef X86_CR4_PCIDE
 #define X86_CR4_PCIDE 0x00020000 /* enable PCID support */

@@ -11,23 +11,29 @@
  */
 
 #include <asm/virtext.h>
+#include <asm/vmx.h>
 #include <asm/lcd-vmx.h>
+
 #include <linux/bitmap.h>
+#include <linux/spinlock.h>
+#include <linux/gfp.h>
+#include <linux/mm.h>
+#include <linux/tboot.h>
 
 static struct lcd_vmx_vmcs_config vmcs_config;
 static struct lcd_vmx_capability vmx_capability;
 
-static atomic_t lcd_vmx_enable_failed;
+static atomic_t vmx_enable_failed;
 static DEFINE_PER_CPU(int, vmx_enabled);
-static DEFINE_PER_CPU(struct vmcs *, vmxon_area);
+static DEFINE_PER_CPU(struct lcd_vmx_vmcs *, vmxon_area);
 
 static struct {
-	DECLARE_BITMAP(bitmap, LCD_VMX_NUM_VPIDS);
-	DEFINE_SPINLOCK(lock);
+	DECLARE_BITMAP(bitmap, VMX_NR_VPIDS);
+	spinlock_t lock;
 } vpids;
 
-static DEFINE_PER_CPU(struct desc_ptr, host_gdt);
-static DEFINE_PER_CPU(struct lcd *, local_vcpu);
+//static DEFINE_PER_CPU(struct desc_ptr, host_gdt);
+//static DEFINE_PER_CPU(struct lcd *, local_vcpu);
 
 static unsigned long *msr_bitmap;
 
@@ -39,10 +45,6 @@ static inline bool cpu_has_vmx_invvpid_single(void) {
 
 static inline bool cpu_has_vmx_invvpid_global(void) {
 	return vmx_capability.vpid & VMX_VPID_EXTENT_GLOBAL_CONTEXT_BIT;
-}
-
-static inline bool cpu_has_vmx_invept_individual_addr(void) {
-	return vmx_capability.ept & VMX_EPT_EXTENT_INDIVIDUAL_BIT;
 }
 
 static inline bool cpu_has_vmx_invept_context(void) {
@@ -80,14 +82,6 @@ static inline void invept_context(u64 eptp) {
 		invept_global();
 }
 
-static inline void invept_individual_addr(u64 eptp, u64 gpa) {
-	if (cpu_has_vmx_invept_individual_addr())
-		__invept(VMX_EPT_EXTENT_INDIVIDUAL_ADDR,
-			eptp, gpa);
-	else
-		invept_context(eptp);
-}
-
 static inline void __invvpid(int ext, u16 vpid, u64 gva) {
 	struct {
 		u64 vpid : 16;
@@ -122,7 +116,7 @@ static inline void invvpid_single_context(u16 vpid) {
 
 /* VMCS SETUP --------------------------------------------------*/
 
-static void vmx_free_vmcs(struct vmcs *vmcs) {
+static void vmx_free_vmcs(struct lcd_vmx_vmcs *vmcs) {
 	free_pages((unsigned long)vmcs, vmcs_config.order);
 }
 
@@ -130,10 +124,10 @@ static void vmx_free_vmcs(struct vmcs *vmcs) {
  * Allocates memory for a vmcs on cpu, and sets the
  * revision id.
  */
-static struct vmcs *vmx_alloc_vmcs(int cpu) {
+static struct lcd_vmx_vmcs *vmx_alloc_vmcs(int cpu) {
 	int node;
 	struct page *pages;
-	struct vmcs *vmcs;
+	struct lcd_vmx_vmcs *vmcs;
 
 	node = cpu_to_node(cpu);
 	pages = alloc_pages_exact_node(node, GFP_KERNEL, vmcs_config.order);
@@ -159,7 +153,7 @@ static inline void __vmxoff(void) {
 	asm volatile (ASM_VMX_VMXOFF : : : "cc");
 }
 
-static int __vmx_enable(struct vmcs *vmxon_buf) {
+static int __vmx_enable(struct lcd_vmx_vmcs *vmxon_buf) {
 	u64 phys_addr;
 	u64 old;
 	u64 test_bits;
@@ -211,7 +205,7 @@ static int __vmx_enable(struct vmcs *vmxon_buf) {
  */
 static void vmx_enable(void *unused) {
 	int ret;
-	struct vmcs *vmxon_buf;
+	struct lcd_vmx_vmcs *vmxon_buf;
 
 	vmxon_buf = __get_cpu_var(vmxon_area);
 	
@@ -273,9 +267,46 @@ static void vmx_free_vmxon_areas(void) {
 /* VMX SETTINGS --------------------------------------------------*/
 
 /**
+ * Clears the correct bit in the msr bitmap to allow vm access
+ * to an msr.
+ */
+static void vmx_disable_intercept_for_msr(unsigned long *msr_bitmap, u32 msr) {
+	int sz;
+	sz = sizeof(unsigned long);
+
+	/*
+	 * Intel SDM V3 24.6.9 (MSR-Bitmap Addresses).
+	 *
+	 * The bitmap is 4KBs:
+	 *
+	 *  -- bitmap + 0KB (0x000) = read bitmap for low MSRs
+	 *  -- bitmap + 1KB (0x400) = read bitmap for high MSRs
+	 *  -- bitmap + 2KB (0x800) = write bitmap for low MSRs
+	 *  -- bitmap + 3KB (0xc00) = write bitmap for high MSRs
+	 *
+	 * We have to divide by the size of an unsigned long to get
+	 * the correct pointer offset.
+	 */
+	if (msr <= 0x1fff) {
+		/*
+		 * Low MSR
+		 */
+		__clear_bit(msr, msr_bitmap + 0x000 / sz); /* read  */
+		__clear_bit(msr, msr_bitmap + 0x800 / sz); /* write */
+	} else if ((msr >= 0xc0000000) && (msr <= 0xc0001fff)) {
+		/*
+		 * High MSR
+		 */
+		msr &= 0x1fff;
+		__clear_bit(msr, msr_bitmap + 0x400 / sz); /* read  */
+		__clear_bit(msr, msr_bitmap + 0xc00 / sz); /* write */
+	}
+}
+	
+/**
  * Checks and sets basic vmcs settings (vmxon region size, etc.)
  */
-static int vmcs_config_basic_settings(struct vmcs_config *vmcs_conf) {
+static int vmcs_config_basic_settings(struct lcd_vmx_vmcs_config *vmcs_conf) {
 	u32 msr_low;
 	u32 msr_high;
 
@@ -319,7 +350,9 @@ static int vmcs_config_basic_settings(struct vmcs_config *vmcs_conf) {
  * reserved bits during the `checking' process.
  */
 static int adjust_vmx_controls(u32 *controls, u32 reserved_mask, u32 msr) {
-	u32 msr_low, msr_high;
+	u32 msr_low;
+	u32 msr_high;
+	u32 controls_copy;
 	
 	/*
 	 * Make sure the desired controls are possible. In the pin-based
@@ -342,15 +375,17 @@ static int adjust_vmx_controls(u32 *controls, u32 reserved_mask, u32 msr) {
 
 	rdmsr(msr, msr_low, msr_high);
 
-	if (((msr_high & (~reserved_mask)) & *controls == *controls) &&
-		((msr_low & (~reserved_mask)) | *controls == *controls)) {
-		*controls &= msr_high;
-		*controls |= msr_low;
-		return 0;
-	} else {
-		return -1;
-	}
+	controls_copy = *controls;
 
+	if (((msr_high & (~reserved_mask)) & controls_copy) != controls_copy)
+		return -1;
+
+	if (((msr_low & (~reserved_mask)) | controls_copy) != controls_copy)
+		return -1;
+
+	*controls &= msr_high;
+	*controls |= msr_low;
+	return 0;
 }
 
 
@@ -359,9 +394,7 @@ static int adjust_vmx_controls(u32 *controls, u32 reserved_mask, u32 msr) {
  * vm entries, vm exits, vm execution (e.g., interrupt handling),
  * etc.
  */
-static int setup_vmcs_config(struct vmcs_config *vmcs_conf) {
-	u32 basic_vmx_msr_low;
-	u32 basic_vmx_msr_high;
+static int setup_vmcs_config(struct lcd_vmx_vmcs_config *vmcs_conf) {
 	u32 pin_based_exec_controls;
 	u32 primary_proc_based_exec_controls;
 	u32 secondary_proc_based_exec_controls;
@@ -439,7 +472,7 @@ static int setup_vmcs_config(struct vmcs_config *vmcs_conf) {
 		SECONDARY_EXEC_WBINVD_EXITING |
 		SECONDARY_EXEC_UNRESTRICTED_GUEST |
 		SECONDARY_EXEC_ENABLE_INVPCID;
-	if (adjust_vmx_controls(secondary_proc_based_exec_controls,
+	if (adjust_vmx_controls(&secondary_proc_based_exec_controls,
 					SECONDARY_EXEC_RESERVED_MASK,
 					MSR_IA32_VMX_PROCBASED_CTLS2) < 0)
 		return -EIO;
@@ -481,7 +514,7 @@ static int setup_vmcs_config(struct vmcs_config *vmcs_conf) {
 		return -EIO;
 
 
-	vmcs_conf->pin_based_exec_ctrl = pin_based_exec_controls;
+	vmcs_conf->pin_based_exec_controls = pin_based_exec_controls;
 	vmcs_conf->primary_proc_based_exec_controls =
 		primary_proc_based_exec_controls;
 	vmcs_conf->secondary_proc_based_exec_controls = 
@@ -517,12 +550,17 @@ int lcd_vmx_init(void) {
 	msr_bitmap = (unsigned long *)__get_free_page(GFP_KERNEL);
 	if (!msr_bitmap) {
 		ret = -ENOMEM;
-		goto fail1;
+		goto failed1;
 	}	
 
 	memset(msr_bitmap, 0xff, PAGE_SIZE);
 	vmx_disable_intercept_for_msr(msr_bitmap, MSR_FS_BASE);
 	vmx_disable_intercept_for_msr(msr_bitmap, MSR_GS_BASE);
+
+	/*
+	 * Initialize VPID bitmap spinlock
+	 */
+	vpids.lock = __SPIN_LOCK_UNLOCKED(vpids.lock);
 
 	/*
 	 * VPID 0 is reserved for host. See INVVPID instruction.
@@ -536,7 +574,7 @@ int lcd_vmx_init(void) {
 	 */
 
 	for_each_possible_cpu(cpu) {
-		struct vmcs *vmxon_buf;
+		struct lcd_vmx_vmcs *vmxon_buf;
 
 		vmxon_buf = vmx_alloc_vmcs(cpu);
 		if (!vmxon_buf) {

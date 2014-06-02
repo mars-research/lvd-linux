@@ -2776,6 +2776,6 @@ source "arch/x86/kvm/Kconfig"
 
 source "lib/Kconfig"
 
-source "virt/lcd/Kconfig"
+source "virt/Kconfig"
 
 source "arch/x86/lcdguest/Kconfig"

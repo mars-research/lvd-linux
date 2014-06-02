@@ -10,12 +10,11 @@ obj-$(CONFIG_XEN) += xen/
 # lguest paravirtualization support
 obj-$(CONFIG_LGUEST_GUEST) += lguest/
 
-# LCD support
+# Lightweight Capability Domains (LCD)
 obj-$(CONFIG_LCD) += lcd/
 
 # LCD paravirtualization support
 obj-$(CONFIG_LCD_GUEST) += lcdguest/
-
 
 obj-y += realmode/
 obj-y += kernel/

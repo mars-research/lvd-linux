@@ -15,7 +15,6 @@
 #include <linux/fs.h>
 #include <asm/uaccess.h>
 #include <lcd/lcd.h>
-#include <lcd/config.h>
 
 MODULE_LICENSE("GPL");
 MODULE_DESCRIPTION("LCD driver");
@@ -24,47 +23,27 @@ static long lcd_dev_ioctl(struct file *filp,
 			  unsigned int ioctl, unsigned long arg)
 {
 	long r = -EINVAL;
+	//struct lcd_pv_kernel_config conf;
 
 	switch (ioctl) {
 	case LCD_LOAD_PV_KERNEL: 
-	{
-		int error;
-		struct lcd *lcd;
-		struct filename *filename;
-		struct lcd_pv_kernel_config conf;
-
-		r = copy_from_user(&conf, (int __user *) arg,
-				   sizeof(conf));
-		if (r) {
-			r = -EIO;
-			goto out;
-		}
+		//r = copy_from_user(&conf, (int __user *) arg,
+		//		   sizeof(conf));
+		//if (r) {
+		//	r = -EIO;
+		//	goto out;
+		//}
 
 		/* create LCD with a PV Linux kernel */
-		lcd = lcd_create();
-		if (!lcd) {
-			r = -ENOMEM;
-			goto out;		
-		}
-
-		filename = getname((const char __user *) conf.file);
-		error = PTR_ERR(filename);
-		if (IS_ERR(filename))
-			goto out;
- 
-		lcd_setup_vmlinux(lcd, filename->name);
-
-		putname(filename);
-
-		lcd_run(lcd);
+		return r;
 		break;
-        } 
+
 	default:
 		return -ENOTTY;
 	}
 
-out:
-	return r;
+//out:
+//	return r;
 }
 
 static const struct file_operations lcd_chardev_ops = {

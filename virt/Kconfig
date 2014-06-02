@@ -1,0 +1,5 @@
+menu "Virtualization (2)"
+
+source "virt/lcd/Kconfig"
+
+endmenu

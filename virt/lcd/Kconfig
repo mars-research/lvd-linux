@@ -2,9 +2,9 @@
 # LCD configuration
 #
 
-menuconfig LCD
+config LCD
 	tristate "Light-weight Capability Domains"
 	depends on X86_64
 	default y
 	---help---
-	Light-weight Capability Domains.
+	Light-weight Capability Domains for Linux.

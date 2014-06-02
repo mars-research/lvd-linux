@@ -64,10 +64,6 @@
 #include <uapi/linux/module.h>
 #include "module-internal.h"
 
-#ifdef CONFIG_LCD
-#include <lcd/lcd.h>
-#endif
-
 #define CREATE_TRACE_POINTS
 #include <trace/events/module.h>
 

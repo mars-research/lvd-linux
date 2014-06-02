@@ -1,15 +1,17 @@
 #ifndef LCD_VMX_H
 #define LCD_VMX_H
 
-struct lcd_vmx_config {
+#include <linux/spinlock.h>
+
+struct lcd_vmx_vmcs_config {
 	int size;
 	int order;
 	u32 revision_id;
-	u32 pin_based_exec_ctrl;
-	u32 cpu_based_exec_ctrl;
-	u32 cpu_based_2nd_exec_ctrl;
-	u32 vmexit_ctrl;
-	u32 vmentry_ctrl;
+	u32 pin_based_exec_controls;
+	u32 primary_proc_based_exec_controls;
+	u32 secondary_proc_based_exec_controls;
+	u32 vmexit_controls;
+	u32 vmentry_controls;
 };
 
 struct lcd_vmx_vmcs {

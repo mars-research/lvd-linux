@@ -20,6 +20,7 @@
 #include <linux/gfp.h>
 #include <linux/mm.h>
 #include <linux/tboot.h>
+#include <linux/slab.h>
 
 static struct lcd_vmx_vmcs_config vmcs_config;
 static struct lcd_vmx_capability vmx_capability;
@@ -88,7 +89,7 @@ static inline void invept_single_context(u64 eptp)
 	if (cpu_has_vmx_invept_context())
 		__invept(VMX_EPT_EXTENT_CONTEXT, eptp, 0);
 	else
-		invept_global();
+		invept_global_context();
 }
 
 static inline void __invvpid(int ext, u16 vpid, u64 gva)
@@ -122,12 +123,12 @@ static inline void invvpid_single_context(u16 vpid)
 	if (cpu_has_vmx_invvpid_single())
 		__invvpid(VMX_VPID_EXTENT_SINGLE_CONTEXT, vpid, 0);
 	else
-		invvpid_global();		
+		invvpid_global_context();		
 }
 
 /* VMCS READ / WRITE --------------------------------------------------*/
 
-static void vmcs_clear(struct vmcs *vmcs)
+static void vmcs_clear(struct lcd_vmx_vmcs *vmcs)
 {
 	u64 phys_addr = __pa(vmcs);
 	u8 error;
@@ -140,7 +141,7 @@ static void vmcs_clear(struct vmcs *vmcs)
 			vmcs, phys_addr);
 }
 
-static void vmcs_load(struct vmcs *vmcs)
+static void vmcs_load(struct lcd_vmx_vmcs *vmcs)
 {
 	u64 phys_addr = __pa(vmcs);
 	u8 error;
@@ -769,7 +770,7 @@ int vmx_init_ept(struct lcd_vmx *vcpu)
 		vcpu->ept.access_dirty_enabled = true;
 		eptp |= VMX_EPT_AD_ENABLE_BIT;
 	}
-	eptp |= (ept.root_hpa & PAGE_MASK);
+	eptp |= (vcpu->ept.root_hpa & PAGE_MASK);
 	vcpu->ept.vmcs_ptr = eptp;
 
 	/*
@@ -803,10 +804,7 @@ static struct desc_struct * vmx_per_cpu_tss_desc(void)
  */
 static void vmx_setup_vmcs_host(struct lcd_vmx *vcpu)
 {
-	u32 low32;
-	u32 high32;
 	unsigned long tmpl;
-	struct desc_ptr dt;
 
 	/*
 	 * Host %cr0, %cr4, %cr3
@@ -852,7 +850,7 @@ static void vmx_setup_vmcs_host(struct lcd_vmx *vcpu)
 	 * (will be loaded on vm exit)
 	 */
 	rdmsrl(MSR_EFER, tmpl);
-	vmcs_writel(HOST_IA32_EFER, tmp);
+	vmcs_writel(HOST_IA32_EFER, tmpl);
 
 	/* asm("mov $.Llcd_vmx_return, %0" : "=r"(tmpl)); */
 	/* vmcs_writel(HOST_RIP, tmpl); /\* 22.2.5 *\/ */
@@ -913,6 +911,7 @@ static void vmx_setup_vmcs_guest_regs(struct lcd_vmx *vcpu)
 {
 	unsigned long cr0;
 	unsigned long cr4;
+	unsigned long tmpl;
 
 	/*
 	 * %cr0 (and its shadow)
@@ -1171,7 +1170,7 @@ static void __vmx_setup_cpu(struct lcd_vmx *vcpu, int cur_cpu)
 	gdt = vmx_per_cpu_gdt();
 	tss_desc = vmx_per_cpu_tss_desc();
 	vmcs_writel(HOST_TR_BASE, get_desc_base(tss_desc));
-	vmcs_writel(HOST_GDTR_BASE, gdt);
+	vmcs_writel(HOST_GDTR_BASE, (unsigned long)gdt);
 
 	/*
 	 * %fs and %gs are also per-cpu
@@ -1269,7 +1268,7 @@ static void vmx_get_cpu(struct lcd_vmx *vcpu)
 			/*
 			 * Update cpu-specific data in vmcs
 			 */
-			__vmx_setup_cpu();
+			__vmx_setup_cpu(vcpu, cur_cpu);
 
 			/*
 			 * Remember which cpu we are active on

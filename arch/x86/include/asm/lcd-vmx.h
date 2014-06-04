@@ -26,10 +26,10 @@ struct lcd_vmx_capability {
 	u32 vpid;
 };
 
-int lcd_vmx_autoload_msrs {
+int lcd_vmx_autoload_msrs[] = {
 	/* NONE */
-}
-#define LCD_VMX_NUM_AUTOLOAD_MSRS 
+};
+#define LCD_VMX_NUM_AUTOLOAD_MSRS 0
 
 enum lcd_vmx_reg {
 	LCD_VMX_REGS_RAX = 0,
@@ -66,7 +66,8 @@ struct lcd_vmx_ept {
 struct lcd_vmx {
 	int cpu;
 	int launched;
-	struct vmcs *vmcs;
+	int vpid;
+	struct lcd_vmx_vmcs *vmcs;
 	struct lcd_vmx_ept ept;
 	struct desc_struct *gdt;
 
@@ -84,12 +85,18 @@ struct lcd_vmx {
 	int ret_code;
 
 	struct msr_autoload {
+#if LCD_VMX_NUM_AUTOLOAD_MSRS > 0
 		struct vmx_msr_entry guest[LCD_VMX_NUM_AUTOLOAD_MSRS];
 		struct vmx_msr_entry host[LCD_VMX_NUM_AUTOLOAD_MSRS];
+#else
+		struct vmx_msr_entry *guest;
+		struct vmx_msr_entry *host;
+#endif
 	} msr_autoload;
 };
 
 int lcd_vmx_init(void);
 void lcd_vmx_exit(void);
+struct lcd_vmx *lcd_vmx_create(void);
 
 #endif  /* LCD_VMX_H */

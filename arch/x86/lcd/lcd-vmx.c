@@ -40,27 +40,33 @@ static unsigned long *msr_bitmap;
 
 /* INVEPT / INVVPID --------------------------------------------------*/
 
-static inline bool cpu_has_vmx_invvpid_single(void) {
+static inline bool cpu_has_vmx_invvpid_single(void)
+{
 	return vmx_capability.vpid & VMX_VPID_EXTENT_SINGLE_CONTEXT_BIT;
 }
 
-static inline bool cpu_has_vmx_invvpid_global(void) {
+static inline bool cpu_has_vmx_invvpid_global(void)
+{
 	return vmx_capability.vpid & VMX_VPID_EXTENT_GLOBAL_CONTEXT_BIT;
 }
 
-static inline bool cpu_has_vmx_invept_context(void) {
+static inline bool cpu_has_vmx_invept_context(void)
+{
 	return vmx_capability.ept & VMX_EPT_EXTENT_CONTEXT_BIT;
 }
 
-static inline bool cpu_has_vmx_invept_global(void) {
+static inline bool cpu_has_vmx_invept_global(void)
+{
 	return vmx_capability.ept & VMX_EPT_EXTENT_GLOBAL_BIT;
 }
 
-static inline bool cpu_has_vmx_ept_ad_bits(void) {
+static inline bool cpu_has_vmx_ept_ad_bits(void)
+{
 	return vmx_capability.ept & VMX_EPT_AD_BIT;
 }
 
-static inline void __invept(int ext, u64 eptp, u64 gpa) {
+static inline void __invept(int ext, u64 eptp, u64 gpa)
+{
 	struct {
 		u64 eptp, gpa;
 	} operand = {eptp, gpa};
@@ -71,19 +77,22 @@ static inline void __invept(int ext, u64 eptp, u64 gpa) {
                 : : "a" (&operand), "c" (ext) : "cc", "memory");
 }
 
-static inline void invept_global_context(void) {
+static inline void invept_global_context(void)
+{
 	if (cpu_has_vmx_invept_global())
 		__invept(VMX_EPT_EXTENT_GLOBAL, 0, 0);
 }
 
-static inline void invept_single_context(u64 eptp) {
+static inline void invept_single_context(u64 eptp)
+{
 	if (cpu_has_vmx_invept_context())
 		__invept(VMX_EPT_EXTENT_CONTEXT, eptp, 0);
 	else
 		invept_global();
 }
 
-static inline void __invvpid(int ext, u16 vpid, u64 gva) {
+static inline void __invvpid(int ext, u16 vpid, u64 gva)
+{
 	struct {
 		u64 vpid : 16;
 		u64 rsvd : 48;
@@ -96,12 +105,14 @@ static inline void __invvpid(int ext, u16 vpid, u64 gva) {
                 : : "a"(&operand), "c"(ext) : "cc", "memory");
 }
 
-static inline void invvpid_global_context(void) {
+static inline void invvpid_global_context(void)
+{
 	if (cpu_has_vmx_invvpid_global())
 		__invvpid(VMX_VPID_EXTENT_ALL_CONTEXT, 0, 0);
 }
 
-static inline void invvpid_single_context(u16 vpid) {
+static inline void invvpid_single_context(u16 vpid)
+{
 	/*
 	 * Don't invalidate host mappings
 	 */
@@ -116,7 +127,8 @@ static inline void invvpid_single_context(u16 vpid) {
 
 /* VMCS SETUP --------------------------------------------------*/
 
-static void vmx_free_vmcs(struct lcd_vmx_vmcs *vmcs) {
+static void vmx_free_vmcs(struct lcd_vmx_vmcs *vmcs)
+{
 	free_pages((unsigned long)vmcs, vmcs_config.order);
 }
 
@@ -124,7 +136,8 @@ static void vmx_free_vmcs(struct lcd_vmx_vmcs *vmcs) {
  * Allocates memory for a vmcs on cpu, and sets the
  * revision id.
  */
-static struct lcd_vmx_vmcs *vmx_alloc_vmcs(int cpu) {
+static struct lcd_vmx_vmcs *vmx_alloc_vmcs(int cpu)
+{
 	int node;
 	struct page *pages;
 	struct lcd_vmx_vmcs *vmcs;
@@ -143,17 +156,20 @@ static struct lcd_vmx_vmcs *vmx_alloc_vmcs(int cpu) {
 
 /* VMX ON/OFF --------------------------------------------------*/
 
-static inline void __vmxon(u64 addr) {
+static inline void __vmxon(u64 addr)
+{
 	asm volatile (ASM_VMX_VMXON_RAX
                 : : "a"(&addr), "m"(addr)
                 : "memory", "cc");
 }
 
-static inline void __vmxoff(void) {
+static inline void __vmxoff(void)
+{
 	asm volatile (ASM_VMX_VMXOFF : : : "cc");
 }
 
-static int __vmx_enable(struct lcd_vmx_vmcs *vmxon_buf) {
+static int __vmx_enable(struct lcd_vmx_vmcs *vmxon_buf)
+{
 	u64 phys_addr;
 	u64 old;
 	u64 test_bits;
@@ -203,7 +219,8 @@ static int __vmx_enable(struct lcd_vmx_vmcs *vmxon_buf) {
  * Important: Assumes preemption is disabled (it will be
  * if called via on_each_cpu).
  */
-static void vmx_enable(void *unused) {
+static void vmx_enable(void *unused)
+{
 	int ret;
 	struct lcd_vmx_vmcs *vmxon_buf;
 
@@ -243,7 +260,8 @@ failed:
  * Important: Assumes preemption is disabled. (It will
  * be if called from on_each_cpu.)
  */
-static void vmx_disable(void *unused) {
+static void vmx_disable(void *unused)
+{
 	if (__get_cpu_var(vmx_enabled)) {
 		__vmxoff();
 		write_cr4(read_cr4() & ~X86_CR4_VMXE);
@@ -254,7 +272,8 @@ static void vmx_disable(void *unused) {
 /**
  * Frees any vmxon areas allocated for cpu's.
  */
-static void vmx_free_vmxon_areas(void) {
+static void vmx_free_vmxon_areas(void)
+{
 	int cpu;
 	for_each_possible_cpu(cpu) {
 		if (per_cpu(vmxon_area, cpu)) {
@@ -270,7 +289,8 @@ static void vmx_free_vmxon_areas(void) {
  * Clears the correct bit in the msr bitmap to allow vm access
  * to an msr.
  */
-static void vmx_disable_intercept_for_msr(unsigned long *msr_bitmap, u32 msr) {
+static void vmx_disable_intercept_for_msr(unsigned long *msr_bitmap, u32 msr)
+{
 	int sz;
 	sz = sizeof(unsigned long);
 
@@ -306,7 +326,8 @@ static void vmx_disable_intercept_for_msr(unsigned long *msr_bitmap, u32 msr) {
 /**
  * Checks and sets basic vmcs settings (vmxon region size, etc.)
  */
-static int vmcs_config_basic_settings(struct lcd_vmx_vmcs_config *vmcs_conf) {
+static int vmcs_config_basic_settings(struct lcd_vmx_vmcs_config *vmcs_conf)
+{
 	u32 msr_low;
 	u32 msr_high;
 
@@ -349,7 +370,8 @@ static int vmcs_config_basic_settings(struct lcd_vmx_vmcs_config *vmcs_conf) {
  * set. The negation of the reserved mask is used to ignore
  * reserved bits during the `checking' process.
  */
-static int adjust_vmx_controls(u32 *controls, u32 reserved_mask, u32 msr) {
+static int adjust_vmx_controls(u32 *controls, u32 reserved_mask, u32 msr)
+{
 	u32 msr_low;
 	u32 msr_high;
 	u32 controls_copy;
@@ -394,7 +416,8 @@ static int adjust_vmx_controls(u32 *controls, u32 reserved_mask, u32 msr) {
  * vm entries, vm exits, vm execution (e.g., interrupt handling),
  * etc. for all lcd types.
  */
-static int setup_vmcs_config(struct lcd_vmx_vmcs_config *vmcs_conf) {
+static int setup_vmcs_config(struct lcd_vmx_vmcs_config *vmcs_conf)
+{
 	u32 pin_based_exec_controls;
 	u32 primary_proc_based_exec_controls;
 	u32 secondary_proc_based_exec_controls;
@@ -527,7 +550,8 @@ static int setup_vmcs_config(struct lcd_vmx_vmcs_config *vmcs_conf) {
 
 /* VMX INIT / EXIT -------------------------------------------------- */
 
-int lcd_vmx_init(void) {
+int lcd_vmx_init(void)
+{
 	int ret;
 	int cpu;
 
@@ -628,7 +652,8 @@ void lcd_vmx_exit(void)
  * Initializes the EPT's root global page directory page, the
  * VMCS pointer, and the spinlock.
  */
-int vmx_init_ept(struct lcd_vmx *vcpu) {
+int vmx_init_ept(struct lcd_vmx *vcpu)
+{
 	void *page;
 	u64 eptp;
 
@@ -673,11 +698,13 @@ int vmx_init_ept(struct lcd_vmx *vcpu) {
 
 /* HOST INFO -------------------------------------------------- */
 
-static struct desc_struct * vmx_per_cpu_gdt(void) {
+static struct desc_struct * vmx_per_cpu_gdt(void)
+{
 	return get_cpu_gdt_table(smp_processor_id());
 }
 
-static struct desc_struct * vmx_per_cpu_tss_desc(void) {
+static struct desc_struct * vmx_per_cpu_tss_desc(void)
+{
 	struct desc_struct *gdt;
 	u16 tr;
 	gdt = vmx_per_cpu_gdt();
@@ -687,6 +714,9 @@ static struct desc_struct * vmx_per_cpu_tss_desc(void) {
 
 /* VMCS INITIALIZATION -------------------------------------------------- */
 
+/**
+ * Stores expected host state in VMCS.
+ */
 static void vmx_setup_vmcs_host(struct lcd_vmx *vcpu)
 {
 	u32 low32;
@@ -744,6 +774,9 @@ static void vmx_setup_vmcs_host(struct lcd_vmx *vcpu)
 	/* vmcs_writel(HOST_RIP, tmpl); /\* 22.2.5 *\/ */
 }
 
+/**
+ * Sets up MSR autloading for MSRs listed in lcd_vmx_autoload_msrs.
+ */
 static void vmx_setup_vmcs_msr(struct lcd_vmx *vcpu)
 {
 	int i;
@@ -780,15 +813,18 @@ static void vmx_setup_vmcs_msr(struct lcd_vmx *vcpu)
 	for (i = 0; i < LCD_VMX_NUM_AUTOLOAD_MSRS; i++) {
 	
 		e = &vcpu->msr_autoload.host[i];
-		e->index = set[i];
+		e->index = lcd_vmx_autoload_msrs[i];
 		rdmsrl(e->index, val);
 		e->value = val;
 
 		e = &vcpu->msr_autoload.guest[i];
-		e->index = set[i];
+		e->index = lcd_vmx_autoload_msrs[i];
 	}
 }
 
+/**
+ * Sets up initial guest register values in VMCS.
+ */
 static void vmx_setup_vmcs_guest_regs(struct lcd_vmx *vcpu)
 {
 	unsigned long cr0;
@@ -954,6 +990,10 @@ static void vmx_setup_vmcs_guest_regs(struct lcd_vmx *vcpu)
 	
 }
 
+/**
+ * Sets up VMCS settings--execution control, control register
+ * access, exception handling.
+ */
 static void vmx_setup_vmcs_guest_settings(struct lcd_vmx *vcpu)
 {
 	/*
@@ -1005,6 +1045,10 @@ static void vmx_setup_vmcs_guest_settings(struct lcd_vmx *vcpu)
 	vmcs_writel(CR4_GUEST_HOST_MASK, ~0ul);
 }
 
+/**
+ * Front-end for setting up VMCS. Calls helper routines
+ * to set up guest and host states of VMCS.
+ */
 static void vmx_setup_vmcs(struct lcd_vmx *vcpu)
 {
 	/*
@@ -1025,7 +1069,13 @@ static void vmx_setup_vmcs(struct lcd_vmx *vcpu)
 
 /* VMCS LOADING -------------------------------------------------- */
 
-static void __vmx_setup_cpu(struct lcd_vmx *vcpu, int cur_cpu) {
+/**
+ * Updates an lcd's VMCS when the lcd is moved to a different
+ * cpu. (Linux uses per-cpu data that needs to be updated in
+ * the lcd's VMCS.)
+ */
+static void __vmx_setup_cpu(struct lcd_vmx *vcpu, int cur_cpu)
+{
 	struct desc_struct *gdt;
 	struct desc_struct *tss_desc;
 	unsigned long tmpl;
@@ -1054,7 +1104,8 @@ static void __vmx_setup_cpu(struct lcd_vmx *vcpu, int cur_cpu) {
 /**
  * Clears vcpu (active -> inactive) on a cpu.
  */
-static void __vmx_get_cpu_helper(void *ptr) {
+static void __vmx_get_cpu_helper(void *ptr)
+{
 	struct lcd_vmx *vcpu;
 	vcpu = ptr;
 	BUG_ON(raw_smp_processor_id() != vcpu->cpu);
@@ -1068,7 +1119,8 @@ static void __vmx_get_cpu_helper(void *ptr) {
  *
  * Disables preemption. Call vmx_put_cpu() when finished.
  */
-static void vmx_get_cpu(struct lcd_vmx *vcpu) {
+static void vmx_get_cpu(struct lcd_vmx *vcpu)
+{
 	int cur_cpu;
 
 	/*
@@ -1150,7 +1202,8 @@ static void vmx_get_cpu(struct lcd_vmx *vcpu) {
  *
  * Enables preemption.
  */
-static void vmx_put_cpu(struct lcd_vmx *vcpu) {
+static void vmx_put_cpu(struct lcd_vmx *vcpu)
+{
 	put_cpu();
 }
 
@@ -1188,7 +1241,8 @@ static void vmx_free_vpid(struct lcd_vmx *vmx)
 	spin_unlock(&vpids.lock);
 }
 
-struct lcd_vmx* lcd_vmx_create(void) {
+struct lcd_vmx* lcd_vmx_create(void)
+{
 	struct lcd_vmx* vcpu;
 
 	/*

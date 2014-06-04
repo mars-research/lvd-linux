@@ -39,6 +39,26 @@ static DEFINE_PER_CPU(struct lcd_vmx *, local_vcpu);
 
 static unsigned long *msr_bitmap;
 
+/* DEBUG --------------------------------------------------*/
+
+static void print_vmx_controls(u32 controls, u32 mask, u32 msr)
+{
+	u32 msr_low;
+	u32 msr_high;
+
+	/*
+	 * See doc in adjust_vmx_controls
+	 */
+
+	rdmsr(msr, msr_low, msr_high);
+
+	printk(KERN_ERR "  MSR LOW:             0x%08x\n", msr_low);
+	printk(KERN_ERR "  ATTEMPTED CONTROLS:  0x%08x\n", controls);
+	printk(KERN_ERR "  MSR HIGH:            0x%08x\n", msr_high);
+	printk(KERN_ERR "  RESERVED BIT MASK:   0x%08x\n", mask);
+	printk(KERN_ERR "See Intel SDM V3 Appendix A\n");	
+}
+
 /* INVEPT / INVVPID --------------------------------------------------*/
 
 static inline bool cpu_has_vmx_invvpid_single(void)
@@ -490,8 +510,10 @@ static int adjust_vmx_controls(u32 *controls, u32 reserved_mask, u32 msr)
 	if (((msr_low & (~reserved_mask)) | controls_copy) != controls_copy)
 		return -1;
 
-	*controls &= msr_high;
-	*controls |= msr_low;
+	controls_copy &= msr_high;
+	controls_copy |= msr_low;
+
+	*controls = controls_copy;
 	return 0;
 }
 
@@ -528,8 +550,13 @@ static int setup_vmcs_config(struct lcd_vmx_vmcs_config *vmcs_conf)
 		PIN_BASED_NMI_EXITING;
 	if (adjust_vmx_controls(&pin_based_exec_controls,
 					PIN_BASED_RESERVED_MASK,
-					MSR_IA32_VMX_PINBASED_CTLS) < 0)
+					MSR_IA32_VMX_PINBASED_CTLS) < 0) {
+		printk(KERN_ERR "lcd vmx: pin based exec controls not allowed\n");
+		print_vmx_controls(pin_based_exec_controls,
+				PIN_BASED_RESERVED_MASK,
+				MSR_IA32_VMX_PINBASED_CTLS);
 		return -EIO;
+	}
 
 	/*
 	 * Primary Processor Execution Controls
@@ -561,8 +588,13 @@ static int setup_vmcs_config(struct lcd_vmx_vmcs_config *vmcs_conf)
 		CPU_BASED_ACTIVATE_SECONDARY_CONTROLS;
 	if (adjust_vmx_controls(&primary_proc_based_exec_controls,
 					CPU_BASED_RESERVED_MASK,
-					MSR_IA32_VMX_PROCBASED_CTLS))
+					MSR_IA32_VMX_PROCBASED_CTLS)) {
+		printk(KERN_ERR "lcd vmx: primary proc based exec ctrls not allowed\n");
+		print_vmx_controls(primary_proc_based_exec_controls,
+				CPU_BASED_RESERVED_MASK,
+				MSR_IA32_VMX_PROCBASED_CTLS);
 		return -EIO;
+	}
 
 	/*
 	 * Secondary Processor Execution Controls
@@ -582,8 +614,13 @@ static int setup_vmcs_config(struct lcd_vmx_vmcs_config *vmcs_conf)
 		SECONDARY_EXEC_ENABLE_INVPCID;
 	if (adjust_vmx_controls(&secondary_proc_based_exec_controls,
 					SECONDARY_EXEC_RESERVED_MASK,
-					MSR_IA32_VMX_PROCBASED_CTLS2) < 0)
+					MSR_IA32_VMX_PROCBASED_CTLS2) < 0) {
+		printk(KERN_ERR "lcd vmx: secondary proc based exec ctls not allowed\n");
+		print_vmx_controls(secondary_proc_based_exec_controls,
+				SECONDARY_EXEC_RESERVED_MASK,
+				MSR_IA32_VMX_PROCBASED_CTLS2);
 		return -EIO;
+	}
 
 	/*
 	 * Remember the EPT and VPID capabilities
@@ -605,8 +642,14 @@ static int setup_vmcs_config(struct lcd_vmx_vmcs_config *vmcs_conf)
 		VM_EXIT_LOAD_IA32_EFER;
 	if (adjust_vmx_controls(&vmexit_controls, 
 					VM_EXIT_RESERVED_MASK,
-					MSR_IA32_VMX_EXIT_CTLS) < 0)
+					MSR_IA32_VMX_EXIT_CTLS) < 0) {
+		printk(KERN_ERR "lcd vmx: vmexit controls not allowed\n");
+		
+		print_vmx_controls(vmexit_controls,
+				VM_EXIT_RESERVED_MASK,
+				MSR_IA32_VMX_EXIT_CTLS);
 		return -EIO;
+	}
 
 	/*
 	 * VM Entry Controls (Intel SDM V3 24.8)
@@ -618,8 +661,15 @@ static int setup_vmcs_config(struct lcd_vmx_vmcs_config *vmcs_conf)
 		VM_ENTRY_LOAD_IA32_EFER;
 	if (adjust_vmx_controls(&vmentry_controls,
 					VM_ENTRY_RESERVED_MASK,
-					MSR_IA32_VMX_ENTRY_CTLS) < 0)
+					MSR_IA32_VMX_ENTRY_CTLS) < 0) {
+		printk(KERN_ERR "lcd vmx: vm entry controls not allowed\n");
+		
+		print_vmx_controls(vmentry_controls,
+				VM_ENTRY_RESERVED_MASK,
+				MSR_IA32_VMX_ENTRY_CTLS);
+		
 		return -EIO;
+	}
 
 
 	vmcs_conf->pin_based_exec_controls = pin_based_exec_controls;
@@ -649,10 +699,8 @@ int lcd_vmx_init(void)
 		return -EIO;
 	}
 
-	if (setup_vmcs_config(&vmcs_config) < 0) {
-		printk(KERN_ERR "lcd vmx: CPU does not support a required VMX setting\n");
+	if (setup_vmcs_config(&vmcs_config) < 0)
 		return -EIO;
-	}
 
 	/*
 	 * Set up default MSR bitmap
@@ -785,7 +833,18 @@ int vmx_init_ept(struct lcd_vmx *vcpu)
 
 static struct desc_struct * vmx_per_cpu_gdt(void)
 {
-	return get_cpu_gdt_table(smp_processor_id());
+	struct desc_ptr gdt_ptr;
+	/*
+	 * I had trouble using get_cpu_gdt_table: Unknown symbol gdt_page
+	 * when inserting module. Couldn't figure out why it couldn't find
+	 * the gdt_page symbol (gdt_page was listed in /proc/kallsyms).
+	 *
+	 * Also, it looks like CONFIG_PARAVIRT is always set by default,
+	 * due to KVM being default? This means store_gdt in desc.h is
+	 * not visible, so need to use native_store_gdt.
+	 */
+	native_store_gdt(&gdt_ptr);
+	return (struct desc_struct *)gdt_ptr.address;
 }
 
 static struct desc_struct * vmx_per_cpu_tss_desc(void)
@@ -1375,6 +1434,8 @@ fail_vmcs:
 fail_vcpu:
 	return NULL;
 }
+
+/* EXPORTS -------------------------------------------------- */
 
 EXPORT_SYMBOL(lcd_vmx_init);
 EXPORT_SYMBOL(lcd_vmx_exit);

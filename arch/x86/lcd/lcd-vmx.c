@@ -125,6 +125,90 @@ static inline void invvpid_single_context(u16 vpid)
 		invvpid_global();		
 }
 
+/* VMCS READ / WRITE --------------------------------------------------*/
+
+static void vmcs_clear(struct vmcs *vmcs)
+{
+	u64 phys_addr = __pa(vmcs);
+	u8 error;
+
+	asm volatile (ASM_VMX_VMCLEAR_RAX "; setna %0"
+                : "=qm"(error) : "a"(&phys_addr), "m"(phys_addr)
+                : "cc", "memory");
+	if (error)
+		printk(KERN_ERR "lcd vmx: vmclear fail: %p/%llx\n",
+			vmcs, phys_addr);
+}
+
+static void vmcs_load(struct vmcs *vmcs)
+{
+	u64 phys_addr = __pa(vmcs);
+	u8 error;
+
+	asm volatile (ASM_VMX_VMPTRLD_RAX "; setna %0"
+                : "=qm"(error) : "a"(&phys_addr), "m"(phys_addr)
+                : "cc", "memory");
+	if (error)
+		printk(KERN_ERR "lcd vmx: vmptrld %p/%llx failed\n",
+			vmcs, phys_addr);
+}
+
+static __always_inline unsigned long vmcs_readl(unsigned long field)
+{
+	unsigned long value;
+
+	asm volatile (ASM_VMX_VMREAD_RDX_RAX
+                : "=a"(value) : "d"(field) : "cc");
+	return value;
+}
+
+static __always_inline u16 vmcs_read16(unsigned long field)
+{
+	return vmcs_readl(field);
+}
+
+static __always_inline u32 vmcs_read32(unsigned long field)
+{
+	return vmcs_readl(field);
+}
+
+static __always_inline u64 vmcs_read64(unsigned long field)
+{
+	return vmcs_readl(field);
+}
+
+static noinline void vmwrite_error(unsigned long field, unsigned long value)
+{
+	printk(KERN_ERR "lcd vmx: vmwrite error: reg %lx value %lx (err %d)\n",
+		field, value, vmcs_read32(VM_INSTRUCTION_ERROR));
+	dump_stack();
+}
+
+static void vmcs_writel(unsigned long field, unsigned long value)
+{
+	u8 error;
+
+	asm volatile (ASM_VMX_VMWRITE_RAX_RDX "; setna %0"
+                : "=q"(error) : "a"(value), "d"(field) : "cc");
+	if (unlikely(error))
+		vmwrite_error(field, value);
+}
+
+static void vmcs_write16(unsigned long field, u16 value)
+{
+	vmcs_writel(field, value);
+}
+
+static void vmcs_write32(unsigned long field, u32 value)
+{
+	vmcs_writel(field, value);
+}
+
+static void vmcs_write64(unsigned long field, u64 value)
+{
+	vmcs_writel(field, value);
+}
+
 /* VMCS SETUP --------------------------------------------------*/
 
 static void vmx_free_vmcs(struct lcd_vmx_vmcs *vmcs)

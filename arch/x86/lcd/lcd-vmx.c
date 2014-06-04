@@ -45,6 +45,9 @@ static void print_vmx_controls(u32 controls, u32 mask, u32 msr)
 {
 	u32 msr_low;
 	u32 msr_high;
+	u32 bad_high;
+	u32 bad_low;
+	int i;
 
 	/*
 	 * See doc in adjust_vmx_controls
@@ -56,7 +59,32 @@ static void print_vmx_controls(u32 controls, u32 mask, u32 msr)
 	printk(KERN_ERR "  ATTEMPTED CONTROLS:  0x%08x\n", controls);
 	printk(KERN_ERR "  MSR HIGH:            0x%08x\n", msr_high);
 	printk(KERN_ERR "  RESERVED BIT MASK:   0x%08x\n", mask);
-	printk(KERN_ERR "See Intel SDM V3 Appendix A\n");	
+
+	/*
+	 * For each bit, if the reserved mask is not set *and* the msr high
+	 * bit is not set, then the control bit should not be set.
+	 */
+	bad_high = ~msr_high & ~mask & controls;
+	for (i = 0; i < 32; i++) {
+		if (bad_high & 1)
+			printk(KERN_ERR "  Control bit %d should be 0.\n",
+				i);
+		bad_high >>= 1;
+	}
+
+	/*
+	 * For each bit, if the reserved mask is not set *and* the msr low
+	 * bit is set, then the control bit should be set.
+	 */
+	bad_low = msr_low & ~mask & ~controls;
+	for (i = 0; i < 32; i++) {
+		if (bad_low & 1)
+			printk(KERN_ERR "  Control bit %d should be 1.\n",
+				i);
+		bad_low >>= 1;
+	}
+
+	printk(KERN_ERR "See Intel SDM V3 24.{6,7,8,9} and Appendix A\n");
 }
 
 /* INVEPT / INVVPID --------------------------------------------------*/
@@ -504,10 +532,16 @@ static int adjust_vmx_controls(u32 *controls, u32 reserved_mask, u32 msr)
 
 	controls_copy = *controls;
 
-	if (((msr_high & (~reserved_mask)) & controls_copy) != controls_copy)
+	/*
+	 * (msr high bit not set, and not a reserved bit) ==> ctrl bit not set
+	 */
+	if (~msr_high & ~reserved_mask & controls_copy)
 		return -1;
 
-	if (((msr_low & (~reserved_mask)) | controls_copy) != controls_copy)
+	/*
+	 * (msr low bit set, and not a reserved bit) ==> ctrl bit set
+	 */
+	if (msr_low & ~reserved_mask & ~controls_copy)
 		return -1;
 
 	controls_copy &= msr_high;
@@ -566,6 +600,7 @@ static int setup_vmcs_config(struct lcd_vmx_vmcs_config *vmcs_conf)
 	 * -- MWAIT Exit
 	 * -- RDPMC Exit
 	 * -- L/S CR8 Exit
+	 * -- L/S CR3 Exit   / required by emulab machines :(
 	 * -- MOV DR Exit
 	 * -- Unconditional I/O Exit (no I/O bitmap)
 	 * -- Use MSR Bitmaps
@@ -581,6 +616,8 @@ static int setup_vmcs_config(struct lcd_vmx_vmcs_config *vmcs_conf)
 		CPU_BASED_RDPMC_EXITING |
 		CPU_BASED_CR8_LOAD_EXITING |
 		CPU_BASED_CR8_STORE_EXITING |
+		CPU_BASED_CR3_LOAD_EXITING |
+		CPU_BASED_CR3_STORE_EXITING |
 		CPU_BASED_MOV_DR_EXITING |
 		CPU_BASED_UNCOND_IO_EXITING |
 		CPU_BASED_USE_MSR_BITMAPS |
@@ -603,15 +640,14 @@ static int setup_vmcs_config(struct lcd_vmx_vmcs_config *vmcs_conf)
 	 * -- Enable RDTSCP
 	 * -- Enable VPID
 	 * -- WBINVD Exit
-	 * -- Enable Unrestricted Guest
-	 * -- Enable INVPCID
+	 *
+	 * Note: Unrestricted guest and INVPCID not available on
+	 * emulab machines.
 	 */
 	secondary_proc_based_exec_controls = SECONDARY_EXEC_ENABLE_EPT |
 		SECONDARY_EXEC_RDTSCP |
 		SECONDARY_EXEC_ENABLE_VPID |
-		SECONDARY_EXEC_WBINVD_EXITING |
-		SECONDARY_EXEC_UNRESTRICTED_GUEST |
-		SECONDARY_EXEC_ENABLE_INVPCID;
+		SECONDARY_EXEC_WBINVD_EXITING;
 	if (adjust_vmx_controls(&secondary_proc_based_exec_controls,
 					SECONDARY_EXEC_RESERVED_MASK,
 					MSR_IA32_VMX_PROCBASED_CTLS2) < 0) {
@@ -635,11 +671,13 @@ static int setup_vmcs_config(struct lcd_vmx_vmcs_config *vmcs_conf)
 	 * -- Host Address Space (host in 64-bit mode on vm exit)
 	 * -- Acknowledge interrupts on vm exit
 	 * -- Save / load IA-32 EFER MSR on exit
+	 * -- Save debug controls    / needed for emulab machines
 	 */
 	vmexit_controls = VM_EXIT_HOST_ADDR_SPACE_SIZE |
 		VM_EXIT_ACK_INTR_ON_EXIT |
 		VM_EXIT_SAVE_IA32_EFER |
-		VM_EXIT_LOAD_IA32_EFER;
+		VM_EXIT_LOAD_IA32_EFER |
+		VM_EXIT_SAVE_DEBUG_CONTROLS;
 	if (adjust_vmx_controls(&vmexit_controls, 
 					VM_EXIT_RESERVED_MASK,
 					MSR_IA32_VMX_EXIT_CTLS) < 0) {
@@ -656,9 +694,11 @@ static int setup_vmcs_config(struct lcd_vmx_vmcs_config *vmcs_conf)
 	 *
 	 * -- IA-32E Mode inside guest
 	 * -- Load IA-32 EFER MSR on entry
+	 * -- Load debug controls  / needed on emulab
 	 */
 	vmentry_controls = VM_ENTRY_IA32E_MODE |
-		VM_ENTRY_LOAD_IA32_EFER;
+		VM_ENTRY_LOAD_IA32_EFER |
+		VM_ENTRY_LOAD_DEBUG_CONTROLS;
 	if (adjust_vmx_controls(&vmentry_controls,
 					VM_ENTRY_RESERVED_MASK,
 					MSR_IA32_VMX_ENTRY_CTLS) < 0) {

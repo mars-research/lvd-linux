@@ -109,7 +109,7 @@
 #define VM_ENTRY_LOAD_IA32_PAT			0x00004000
 #define VM_ENTRY_LOAD_IA32_EFER                 0x00008000
 #define VM_ENTRY_LOAD_BNDCFGS                   0x00010000
-#define VM_ENTRY_RESERVED_MASK                  0xFFFF11FD
+#define VM_ENTRY_RESERVED_MASK                  0xFFFF11FB
 
 #define VM_ENTRY_ALWAYSON_WITHOUT_TRUE_MSR	0x000011ff
 

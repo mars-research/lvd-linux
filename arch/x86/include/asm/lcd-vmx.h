@@ -26,7 +26,10 @@ struct lcd_vmx_capability {
 	u32 vpid;
 };
 
-#define LCD_VMX_NUM_AUTOLOAD_MSRS 8
+int lcd_vmx_autoload_msrs {
+	/* NONE */
+}
+#define LCD_VMX_NUM_AUTOLOAD_MSRS 
 
 enum lcd_vmx_reg {
 	LCD_VMX_REGS_RAX = 0,
@@ -48,6 +51,10 @@ enum lcd_vmx_reg {
 	LCD_VMX_REGS_RIP,
 	LCD_VMX_NUM_REGS
 };
+
+#define LCD_VMX_CS_SELECTOR 1
+#define LCD_VMX_FS_SELECTOR 2
+#define LCD_VMX_GS_SELECTOR 3
 
 struct lcd_vmx_ept {
 	spinlock_t lock;
@@ -77,7 +84,6 @@ struct lcd_vmx {
 	int ret_code;
 
 	struct msr_autoload {
-		unsigned nr;
 		struct vmx_msr_entry guest[LCD_VMX_NUM_AUTOLOAD_MSRS];
 		struct vmx_msr_entry host[LCD_VMX_NUM_AUTOLOAD_MSRS];
 	} msr_autoload;

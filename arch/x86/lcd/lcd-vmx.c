@@ -1390,7 +1390,7 @@ static void vmx_put_cpu(struct lcd_vmx *vcpu)
 }
 
 
-/* VMX INIT -------------------------------------------------- */
+/* VMX CREATE / DESTROY -------------------------------------------------- */
 
 /**
  * Reserves a vpid and sets it in the vcpu.
@@ -1475,8 +1475,45 @@ fail_vcpu:
 	return NULL;
 }
 
+static void lcd_vmx_destroy(struct lcd_vmx *vcpu)
+{
+	/*
+	 * Premption Disabled
+	 *
+	 * The call to vmx_get_cpu is done because if vcpu is
+	 * active on a different cpu, it needs to be
+	 * vmclear'd there (and vmx_get_cpu will do
+	 * that, as a side effect).
+	 *
+	 * There might be alternative ways, but this works ...
+	 */
+	vmx_get_cpu(vcpu);
+	/*
+	 * Invalidate any cached ept and vpid mappings.
+	 */
+	invept_single_context(vcpu->eptp);
+	invvpid_single_context(vcpu->vpid)
+	/*
+	 * VM clear on this cpu
+	 */
+	vmcs_clear(vcpu->vmcs);
+	__get_cpu_var(local_vcpu) = NULL;
+	/*
+	 * Preemption enabled
+	 */
+	vmx_put_cpu();
+	/*
+	 * Free remaining junk
+	 */
+	vmx_free_vpid(vcpu);
+	vmx_free_vmcs(vcpu->vmcs);
+	kfree(vcpu);
+}
+
+
 /* EXPORTS -------------------------------------------------- */
 
 EXPORT_SYMBOL(lcd_vmx_init);
 EXPORT_SYMBOL(lcd_vmx_exit);
 EXPORT_SYMBOL(lcd_vmx_create);
+EXPORT_SYMBOL(lcd_vmx_destroy);

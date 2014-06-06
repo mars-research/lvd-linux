@@ -95,8 +95,27 @@ struct lcd_vmx {
 	} msr_autoload;
 };
 
+/**
+ * Initializes the arch-dependent code for LCD (detects required
+ * features, turns on VMX on *all* cpu's).
+ */
 int lcd_vmx_init(void);
+/**
+ * Turns off VMX on *all* cpu's and tears down arch-dependent code.
+ * 
+ * Important: All LCDs should be destroyed before calling this
+ * routine (otherwise, memory will leak).
+ */
 void lcd_vmx_exit(void);
+/**
+ * Creates the arch-dependent part of an LCD, and initializes 
+ * the settings and most register values.
+ */
 struct lcd_vmx *lcd_vmx_create(void);
+/**
+ * Tears down arch-dep part of LCD. (If LCD is launched on
+ * some cpu, it will become inactive.)
+ */
+void lcd_vmx_destroy(struct lcd_vmx *vcpu);
 
 #endif  /* LCD_VMX_H */

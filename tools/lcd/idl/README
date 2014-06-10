@@ -1,0 +1,5 @@
+Note: run make, then add #include <string> to the top of "flounder_parser.h",
+then run make again.
+
+
+Currently idl_compiler does not do anything

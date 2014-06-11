@@ -20,4 +20,5 @@ flounder_parser.h:
 		vembyr-1.1/peg.py --h flounder > flounder_parser.h
 
 clean:
-		rm flounder_parser.* *.o compiler
+		rm flounder_parser.* *.o compiler vembyr-1.1/peg_peg.py
+		vembyr-1.1/peg_peg.pyc

@@ -41,6 +41,10 @@ static unsigned long *msr_bitmap;
 
 /* DEBUG --------------------------------------------------*/
 
+/**
+ * Prints the vmx controls, lower and upper bounds on the controls,
+ * and tries to find the bits that were rejected.
+ */
 static void print_vmx_controls(u32 controls, u32 mask, u32 msr)
 {
 	u32 msr_low;
@@ -126,12 +130,19 @@ static inline void __invept(int ext, u64 eptp, u64 gpa)
                 : : "a" (&operand), "c" (ext) : "cc", "memory");
 }
 
+/**
+ * Invalidates all mappings associated with eptp's.
+ */
 static inline void invept_global_context(void)
 {
 	if (cpu_has_vmx_invept_global())
 		__invept(VMX_EPT_EXTENT_GLOBAL, 0, 0);
 }
 
+/**
+ * Invalidates all mappings associated with eptp, and possibly
+ * others.
+ */
 static inline void invept_single_context(u64 eptp)
 {
 	if (cpu_has_vmx_invept_context())
@@ -154,12 +165,19 @@ static inline void __invvpid(int ext, u16 vpid, u64 gva)
                 : : "a"(&operand), "c"(ext) : "cc", "memory");
 }
 
+/**
+ * Invalidates all mappings associated with vpid's other than
+ * vpid = 0 (the host).
+ */
 static inline void invvpid_global_context(void)
 {
 	if (cpu_has_vmx_invvpid_global())
 		__invvpid(VMX_VPID_EXTENT_ALL_CONTEXT, 0, 0);
 }
 
+/**
+ * Invalidates all mappings associated with vpid.
+ */
 static inline void invvpid_single_context(u16 vpid)
 {
 	/*
@@ -176,6 +194,9 @@ static inline void invvpid_single_context(u16 vpid)
 
 /* VMCS READ / WRITE --------------------------------------------------*/
 
+/**
+ * Takes vmcs from any state to {inactive, clear, not current}
+ */
 static void vmcs_clear(struct lcd_vmx_vmcs *vmcs)
 {
 	u64 phys_addr = __pa(vmcs);
@@ -189,6 +210,10 @@ static void vmcs_clear(struct lcd_vmx_vmcs *vmcs)
 			vmcs, phys_addr);
 }
 
+/**
+ * Takes vmcs to {active, current} on cpu. Any vmcs reads and writes
+ * will affect this vmcs.
+ */
 static void vmcs_load(struct lcd_vmx_vmcs *vmcs)
 {
 	u64 phys_addr = __pa(vmcs);
@@ -260,6 +285,9 @@ static void vmcs_write64(unsigned long field, u64 value)
 
 /* VMCS SETUP --------------------------------------------------*/
 
+/**
+ * Frees vmcs memory.
+ */
 static void vmx_free_vmcs(struct lcd_vmx_vmcs *vmcs)
 {
 	free_pages((unsigned long)vmcs, vmcs_config.order);
@@ -301,6 +329,10 @@ static inline void __vmxoff(void)
 	asm volatile (ASM_VMX_VMXOFF : : : "cc");
 }
 
+/**
+ * Helper for vmx_enable. A few more low-level checks and
+ * settings, and then turns on vmx.
+ */
 static int __vmx_enable(struct lcd_vmx_vmcs *vmxon_buf)
 {
 	u64 phys_addr;
@@ -871,6 +903,10 @@ int vmx_init_ept(struct lcd_vmx *vcpu)
 
 /* HOST INFO -------------------------------------------------- */
 
+/**
+ * Returns pointer to current gdt (array of segment descriptors) on 
+ * calling cpu.
+ */
 static struct desc_struct * vmx_per_cpu_gdt(void)
 {
 	struct desc_ptr gdt_ptr;
@@ -887,6 +923,9 @@ static struct desc_struct * vmx_per_cpu_gdt(void)
 	return (struct desc_struct *)gdt_ptr.address;
 }
 
+/**
+ * Returns pointer to tss segment descriptor in cpu's gdt.
+ */
 static struct desc_struct * vmx_per_cpu_tss_desc(void)
 {
 	struct desc_struct *gdt;
@@ -1510,6 +1549,167 @@ static void lcd_vmx_destroy(struct lcd_vmx *vcpu)
 	kfree(vcpu);
 }
 
+/* VMX RUN LOOP -------------------------------------------------- */
+
+/**
+ * Low-level vmx launch / resume to enter non-root mode on cpu with
+ * the current vmcs.
+ */
+static int __noclone vmx_enter(struct lcd_vmx *vcpu)
+{
+	asm(
+		/* 
+		 * Store host registers on stack (all other regs are
+		 * clobbered)
+		 */
+		"push %%rdx \n\t"
+		"push %%rbp \n\t"
+		"push %%rcx \n\t" /* placeholder for guest %rcx (see below) */
+		"push %%rcx \n\t" 
+		/*
+		 * Remember the current %rsp
+		 * (je 1f jumps forward to numeric label 1)
+		 */
+		"cmp %%rsp, %c[host_rsp](%0) \n\t"
+		"je 1f \n\t"
+		"mov %%rsp, %c[host_rsp](%0) \n\t"
+		ASM_VMX_VMWRITE_RSP_RDX "\n\t"
+		"1: \n\t"
+		/*
+		 * Re-load %cr2 if changed
+		 */
+		"mov %c[cr2](%0), %%rax \n\t"
+		"mov %%cr2, %%rdx \n\t"
+		"cmp %%rax, %%rdx \n\t"
+		"je 2f \n\t"
+		"mov %%rax, %%cr2 \n\t"
+		"2: \n\t"
+		/*
+		 * Check if vmlaunch or vmresume is needed
+		 */
+		"cmpl $0, %c[launched](%0) \n\t"
+		/*
+		 * Load guest registers.  Don't clobber flags.
+		 */
+		"mov %c[rax](%0), %%rax \n\t"
+		"mov %c[rbx](%0), %%rbx \n\t"
+		"mov %c[rdx](%0), %%rdx \n\t"
+		"mov %c[rsi](%0), %%rsi \n\t"
+		"mov %c[rdi](%0), %%rdi \n\t"
+		"mov %c[rbp](%0), %%rbp \n\t"
+		"mov %c[r8](%0),  %%r8  \n\t"
+		"mov %c[r9](%0),  %%r9  \n\t"
+		"mov %c[r10](%0), %%r10 \n\t"
+		"mov %c[r11](%0), %%r11 \n\t"
+		"mov %c[r12](%0), %%r12 \n\t"
+		"mov %c[r13](%0), %%r13 \n\t"
+		"mov %c[r14](%0), %%r14 \n\t"
+		"mov %c[r15](%0), %%r15 \n\t"
+		"mov %c[rcx](%0), %%rcx \n\t" /* kills %0 (host %rcx) */
+		/*
+		 * Enter guest mode
+		 */
+		"jne .Llaunched \n\t"
+		ASM_VMX_VMLAUNCH "\n\t"
+		"jmp .Llcd_vmx_return \n\t"
+		".Llaunched: " ASM_VMX_VMRESUME "\n\t"
+		".Llcd_vmx_return: "
+
+		/*
+		 * Save guest registers, load host registers, keep flags
+		 */
+
+		/*
+		 * Store guest %rcx at rsp + wordsize (placeholder)
+		 */
+		"mov %0, %c[wordsize](%%rsp) \n\t"
+		/*
+		 * Pop %0 (host %rcx is at bottom of stack)
+		 */
+		"pop %0 \n\t"
+		"mov %%rax, %c[rax](%0) \n\t"
+		"mov %%rbx, %c[rbx](%0) \n\t"
+		
+		/*
+		 * Pop guest %rcx that was stored above
+		 */
+		"popq %c[rcx](%0) \n\t"
+
+		/*
+		 * Store remaining regs
+		 */
+		"mov %%rdx, %c[rdx](%0) \n\t"
+		"mov %%rsi, %c[rsi](%0) \n\t"
+		"mov %%rdi, %c[rdi](%0) \n\t"
+		"mov %%rbp, %c[rbp](%0) \n\t"
+		"mov %%r8,  %c[r8](%0) \n\t"
+		"mov %%r9,  %c[r9](%0) \n\t"
+		"mov %%r10, %c[r10](%0) \n\t"
+		"mov %%r11, %c[r11](%0) \n\t"
+		"mov %%r12, %c[r12](%0) \n\t"
+		"mov %%r13, %c[r13](%0) \n\t"
+		"mov %%r14, %c[r14](%0) \n\t"
+		"mov %%r15, %c[r15](%0) \n\t"
+		"mov %%rax, %%r10 \n\t"
+		"mov %%rdx, %%r11 \n\t"
+
+		"mov %%cr2, %%rax   \n\t"
+		"mov %%rax, %c[cr2](%0) \n\t"
+
+		"pop  %%rbp \n\t"
+		"pop  %%rdx \n\t"
+		
+		/*
+		 * Read flags
+		 */
+		"setbe %c[fail](%0) \n\t"
+
+		: : "c"(vcpu),
+		  [launched]"i"(offsetof(struct lcd, launched)),
+		  [fail]"i"(offsetof(struct lcd, fail)),
+		  [host_rsp]"i"(offsetof(struct lcd, host_rsp)),
+		  [rax]"i"(offsetof(struct lcd, regs[VCPU_REGS_RAX])),
+		  [rbx]"i"(offsetof(struct lcd, regs[VCPU_REGS_RBX])),
+		  [rcx]"i"(offsetof(struct lcd, regs[VCPU_REGS_RCX])),
+		  [rdx]"i"(offsetof(struct lcd, regs[VCPU_REGS_RDX])),
+		  [rsi]"i"(offsetof(struct lcd, regs[VCPU_REGS_RSI])),
+		  [rdi]"i"(offsetof(struct lcd, regs[VCPU_REGS_RDI])),
+		  [rbp]"i"(offsetof(struct lcd, regs[VCPU_REGS_RBP])),
+		  [r8]"i"(offsetof(struct lcd, regs[VCPU_REGS_R8])),
+		  [r9]"i"(offsetof(struct lcd, regs[VCPU_REGS_R9])),
+		  [r10]"i"(offsetof(struct lcd, regs[VCPU_REGS_R10])),
+		  [r11]"i"(offsetof(struct lcd, regs[VCPU_REGS_R11])),
+		  [r12]"i"(offsetof(struct lcd, regs[VCPU_REGS_R12])),
+		  [r13]"i"(offsetof(struct lcd, regs[VCPU_REGS_R13])),
+		  [r14]"i"(offsetof(struct lcd, regs[VCPU_REGS_R14])),
+		  [r15]"i"(offsetof(struct lcd, regs[VCPU_REGS_R15])),
+		  [cr2]"i"(offsetof(struct lcd, cr2)),
+		  [wordsize]"i"(sizeof(ulong))
+		: "cc", "memory"
+		  , "rax", "rbx", "rdi", "rsi"
+		  , "r8", "r9", "r10", "r11", "r12", "r13", "r14", "r15"
+		);
+
+	vcpu->launched = 1;
+
+	if (unlikely(vcpu->fail)) {
+		/*
+		 * See Intel SDM V3 30.4 for error codes
+		 */
+		printk(KERN_ERR "lcd vmx: failure detected (err %x)\n",
+			vmcs_read32(VM_INSTRUCTION_ERROR));
+		return VMX_EXIT_REASONS_FAILED_VMENTRY;
+	}
+
+	vcpu->exit_reason = vmcs_read32(VM_EXIT_REASON);
+	vcpu->exit_qualification = vmcs_readl(EXIT_QUALIFICATION);
+	vcpu->idt_vectoring_info = vmcs_read32(IDT_VECTORING_INFO_FIELD);
+	vcpu->error_code = vmcs_read32(IDT_VECTORING_ERROR_CODE);
+	vcpu->exit_intr_info = vmcs_read32(VM_EXIT_INTR_INFO);
+	vcpu->vec_no = vcpu->exit_intr_info & INTR_INFO_VECTOR_MASK;
+
+	return vcpu->exit_reason;
+}
 
 /* EXPORTS -------------------------------------------------- */
 
@@ -1517,3 +1717,4 @@ EXPORT_SYMBOL(lcd_vmx_init);
 EXPORT_SYMBOL(lcd_vmx_exit);
 EXPORT_SYMBOL(lcd_vmx_create);
 EXPORT_SYMBOL(lcd_vmx_destroy);
+EXPORT_SYMBOL(lcd_vmx_run);

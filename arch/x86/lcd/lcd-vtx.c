@@ -174,11 +174,11 @@
 /* 		vpid_sync_vcpu_global(); */
 /* } */
 
-static inline u16 vmx_read_ldt(void) {
-	u16 ldt;
-	asm("sldt %0" : "=g"(ldt));
-	return ldt;
-}
+/* static inline u16 vmx_read_ldt(void) { */
+/* 	u16 ldt; */
+/* 	asm("sldt %0" : "=g"(ldt)); */
+/* 	return ldt; */
+/* } */
 
 /* static bool allow_1_setting(u32 msr, u32 ctl) { */
 /* 	u32 vmx_msr_low, vmx_msr_high; */
@@ -1548,17 +1548,17 @@ static void setup_idt(struct lcd* vcpu) {
 
 // Some temporary capability functions for IPC testing
 // To be replaced while interfacing with capability module
-static u32 curr_cap = 1;
-void * cap_arr[10]= {0};
+/* static u32 curr_cap = 1; */
+/* void * cap_arr[10]= {0}; */
 
-void * get_cap_obj(u32 cap_id){
-	return cap_arr[cap_id];
-}
+/* void * get_cap_obj(u32 cap_id){ */
+/* 	return cap_arr[cap_id]; */
+/* } */
 
-u32 set_cap(void *obj){
-	cap_arr[curr_cap] = obj;
-	return curr_cap++;
-}
+/* u32 set_cap(void *obj){ */
+/* 	cap_arr[curr_cap] = obj; */
+/* 	return curr_cap++; */
+/* } */
 
 /* static struct lcd * vmx_create_vcpu(void) { */
 /* 	struct lcd *vcpu = kmalloc(sizeof(struct lcd), GFP_KERNEL); */
@@ -1688,122 +1688,122 @@ u32 set_cap(void *obj){
 /* 	kfree(vcpu); */
 /* } */
 
-static int __noclone vmx_run_vcpu(struct lcd *vcpu) {
-	asm(
-		/* Store host registers */
-		"push %%rdx; push %%rbp;"
-		"push %%rcx \n\t" /* placeholder for guest rcx */
-		"push %%rcx \n\t"
-		"cmp %%rsp, %c[host_rsp](%0) \n\t"
-		"je 1f \n\t"
-		"mov %%rsp, %c[host_rsp](%0) \n\t"
-		ASM_VMX_VMWRITE_RSP_RDX "\n\t"
-		"1: \n\t"
-		/* Reload cr2 if changed */
-		"mov %c[cr2](%0), %%rax \n\t"
-		"mov %%cr2, %%rdx \n\t"
-		"cmp %%rax, %%rdx \n\t"
-		"je 2f \n\t"
-		"mov %%rax, %%cr2 \n\t"
-		"2: \n\t"
-		/* Check if vmlaunch of vmresume is needed */
-		"cmpl $0, %c[launched](%0) \n\t"
-		/* Load guest registers.  Don't clobber flags. */
-		"mov %c[rax](%0), %%rax \n\t"
-		"mov %c[rbx](%0), %%rbx \n\t"
-		"mov %c[rdx](%0), %%rdx \n\t"
-		"mov %c[rsi](%0), %%rsi \n\t"
-		"mov %c[rdi](%0), %%rdi \n\t"
-		"mov %c[rbp](%0), %%rbp \n\t"
-		"mov %c[r8](%0),  %%r8  \n\t"
-		"mov %c[r9](%0),  %%r9  \n\t"
-		"mov %c[r10](%0), %%r10 \n\t"
-		"mov %c[r11](%0), %%r11 \n\t"
-		"mov %c[r12](%0), %%r12 \n\t"
-		"mov %c[r13](%0), %%r13 \n\t"
-		"mov %c[r14](%0), %%r14 \n\t"
-		"mov %c[r15](%0), %%r15 \n\t"
-		"mov %c[rcx](%0), %%rcx \n\t" /* kills %0 (ecx) */
+/* static int __noclone vmx_run_vcpu(struct lcd *vcpu) { */
+/* 	asm( */
+/* 		/\* Store host registers *\/ */
+/* 		"push %%rdx; push %%rbp;" */
+/* 		"push %%rcx \n\t" /\* placeholder for guest rcx *\/ */
+/* 		"push %%rcx \n\t" */
+/* 		"cmp %%rsp, %c[host_rsp](%0) \n\t" */
+/* 		"je 1f \n\t" */
+/* 		"mov %%rsp, %c[host_rsp](%0) \n\t" */
+/* 		ASM_VMX_VMWRITE_RSP_RDX "\n\t" */
+/* 		"1: \n\t" */
+/* 		/\* Reload cr2 if changed *\/ */
+/* 		"mov %c[cr2](%0), %%rax \n\t" */
+/* 		"mov %%cr2, %%rdx \n\t" */
+/* 		"cmp %%rax, %%rdx \n\t" */
+/* 		"je 2f \n\t" */
+/* 		"mov %%rax, %%cr2 \n\t" */
+/* 		"2: \n\t" */
+/* 		/\* Check if vmlaunch of vmresume is needed *\/ */
+/* 		"cmpl $0, %c[launched](%0) \n\t" */
+/* 		/\* Load guest registers.  Don't clobber flags. *\/ */
+/* 		"mov %c[rax](%0), %%rax \n\t" */
+/* 		"mov %c[rbx](%0), %%rbx \n\t" */
+/* 		"mov %c[rdx](%0), %%rdx \n\t" */
+/* 		"mov %c[rsi](%0), %%rsi \n\t" */
+/* 		"mov %c[rdi](%0), %%rdi \n\t" */
+/* 		"mov %c[rbp](%0), %%rbp \n\t" */
+/* 		"mov %c[r8](%0),  %%r8  \n\t" */
+/* 		"mov %c[r9](%0),  %%r9  \n\t" */
+/* 		"mov %c[r10](%0), %%r10 \n\t" */
+/* 		"mov %c[r11](%0), %%r11 \n\t" */
+/* 		"mov %c[r12](%0), %%r12 \n\t" */
+/* 		"mov %c[r13](%0), %%r13 \n\t" */
+/* 		"mov %c[r14](%0), %%r14 \n\t" */
+/* 		"mov %c[r15](%0), %%r15 \n\t" */
+/* 		"mov %c[rcx](%0), %%rcx \n\t" /\* kills %0 (ecx) *\/ */
 
-		/* Enter guest mode */
-		"jne .Llaunched \n\t"
-		ASM_VMX_VMLAUNCH "\n\t"
-		"jmp .Llcd_vmx_return \n\t"
-		".Llaunched: " ASM_VMX_VMRESUME "\n\t"
-		".Llcd_vmx_return: "
-		/* Save guest registers, load host registers, keep flags */
-		"mov %0, %c[wordsize](%%rsp) \n\t"
-		"pop %0 \n\t"
-		"mov %%rax, %c[rax](%0) \n\t"
-		"mov %%rbx, %c[rbx](%0) \n\t"
-		"popq %c[rcx](%0) \n\t"
-		"mov %%rdx, %c[rdx](%0) \n\t"
-		"mov %%rsi, %c[rsi](%0) \n\t"
-		"mov %%rdi, %c[rdi](%0) \n\t"
-		"mov %%rbp, %c[rbp](%0) \n\t"
-		"mov %%r8,  %c[r8](%0) \n\t"
-		"mov %%r9,  %c[r9](%0) \n\t"
-		"mov %%r10, %c[r10](%0) \n\t"
-		"mov %%r11, %c[r11](%0) \n\t"
-		"mov %%r12, %c[r12](%0) \n\t"
-		"mov %%r13, %c[r13](%0) \n\t"
-		"mov %%r14, %c[r14](%0) \n\t"
-		"mov %%r15, %c[r15](%0) \n\t"
-		"mov %%rax, %%r10 \n\t"
-		"mov %%rdx, %%r11 \n\t"
+/* 		/\* Enter guest mode *\/ */
+/* 		"jne .Llaunched \n\t" */
+/* 		ASM_VMX_VMLAUNCH "\n\t" */
+/* 		"jmp .Llcd_vmx_return \n\t" */
+/* 		".Llaunched: " ASM_VMX_VMRESUME "\n\t" */
+/* 		".Llcd_vmx_return: " */
+/* 		/\* Save guest registers, load host registers, keep flags *\/ */
+/* 		"mov %0, %c[wordsize](%%rsp) \n\t" */
+/* 		"pop %0 \n\t" */
+/* 		"mov %%rax, %c[rax](%0) \n\t" */
+/* 		"mov %%rbx, %c[rbx](%0) \n\t" */
+/* 		"popq %c[rcx](%0) \n\t" */
+/* 		"mov %%rdx, %c[rdx](%0) \n\t" */
+/* 		"mov %%rsi, %c[rsi](%0) \n\t" */
+/* 		"mov %%rdi, %c[rdi](%0) \n\t" */
+/* 		"mov %%rbp, %c[rbp](%0) \n\t" */
+/* 		"mov %%r8,  %c[r8](%0) \n\t" */
+/* 		"mov %%r9,  %c[r9](%0) \n\t" */
+/* 		"mov %%r10, %c[r10](%0) \n\t" */
+/* 		"mov %%r11, %c[r11](%0) \n\t" */
+/* 		"mov %%r12, %c[r12](%0) \n\t" */
+/* 		"mov %%r13, %c[r13](%0) \n\t" */
+/* 		"mov %%r14, %c[r14](%0) \n\t" */
+/* 		"mov %%r15, %c[r15](%0) \n\t" */
+/* 		"mov %%rax, %%r10 \n\t" */
+/* 		"mov %%rdx, %%r11 \n\t" */
 
-		"mov %%cr2, %%rax   \n\t"
-		"mov %%rax, %c[cr2](%0) \n\t"
+/* 		"mov %%cr2, %%rax   \n\t" */
+/* 		"mov %%rax, %c[cr2](%0) \n\t" */
 
-		"pop  %%rbp; pop  %%rdx \n\t"
-		"setbe %c[fail](%0) \n\t"
+/* 		"pop  %%rbp; pop  %%rdx \n\t" */
+/* 		"setbe %c[fail](%0) \n\t" */
 
-		"mov $" __stringify(__USER_DS) ", %%rax \n\t"
-		"mov %%rax, %%ds \n\t"
-		"mov %%rax, %%es \n\t"
-		: : "c"(vcpu), "d"((unsigned long)HOST_RSP),
-		  [launched]"i"(offsetof(struct lcd, launched)),
-		  [fail]"i"(offsetof(struct lcd, fail)),
-		  [host_rsp]"i"(offsetof(struct lcd, host_rsp)),
-		  [rax]"i"(offsetof(struct lcd, regs[VCPU_REGS_RAX])),
-		  [rbx]"i"(offsetof(struct lcd, regs[VCPU_REGS_RBX])),
-		  [rcx]"i"(offsetof(struct lcd, regs[VCPU_REGS_RCX])),
-		  [rdx]"i"(offsetof(struct lcd, regs[VCPU_REGS_RDX])),
-		  [rsi]"i"(offsetof(struct lcd, regs[VCPU_REGS_RSI])),
-		  [rdi]"i"(offsetof(struct lcd, regs[VCPU_REGS_RDI])),
-		  [rbp]"i"(offsetof(struct lcd, regs[VCPU_REGS_RBP])),
-		  [r8]"i"(offsetof(struct lcd, regs[VCPU_REGS_R8])),
-		  [r9]"i"(offsetof(struct lcd, regs[VCPU_REGS_R9])),
-		  [r10]"i"(offsetof(struct lcd, regs[VCPU_REGS_R10])),
-		  [r11]"i"(offsetof(struct lcd, regs[VCPU_REGS_R11])),
-		  [r12]"i"(offsetof(struct lcd, regs[VCPU_REGS_R12])),
-		  [r13]"i"(offsetof(struct lcd, regs[VCPU_REGS_R13])),
-		  [r14]"i"(offsetof(struct lcd, regs[VCPU_REGS_R14])),
-		  [r15]"i"(offsetof(struct lcd, regs[VCPU_REGS_R15])),
-		  [cr2]"i"(offsetof(struct lcd, cr2)),
-		  [wordsize]"i"(sizeof(ulong))
-		: "cc", "memory"
-		  , "rax", "rbx", "rdi", "rsi"
-		  , "r8", "r9", "r10", "r11", "r12", "r13", "r14", "r15"
-		);
+/* 		"mov $" __stringify(__USER_DS) ", %%rax \n\t" */
+/* 		"mov %%rax, %%ds \n\t" */
+/* 		"mov %%rax, %%es \n\t" */
+/* 		: : "c"(vcpu), "d"((unsigned long)HOST_RSP), */
+/* 		  [launched]"i"(offsetof(struct lcd, launched)), */
+/* 		  [fail]"i"(offsetof(struct lcd, fail)), */
+/* 		  [host_rsp]"i"(offsetof(struct lcd, host_rsp)), */
+/* 		  [rax]"i"(offsetof(struct lcd, regs[VCPU_REGS_RAX])), */
+/* 		  [rbx]"i"(offsetof(struct lcd, regs[VCPU_REGS_RBX])), */
+/* 		  [rcx]"i"(offsetof(struct lcd, regs[VCPU_REGS_RCX])), */
+/* 		  [rdx]"i"(offsetof(struct lcd, regs[VCPU_REGS_RDX])), */
+/* 		  [rsi]"i"(offsetof(struct lcd, regs[VCPU_REGS_RSI])), */
+/* 		  [rdi]"i"(offsetof(struct lcd, regs[VCPU_REGS_RDI])), */
+/* 		  [rbp]"i"(offsetof(struct lcd, regs[VCPU_REGS_RBP])), */
+/* 		  [r8]"i"(offsetof(struct lcd, regs[VCPU_REGS_R8])), */
+/* 		  [r9]"i"(offsetof(struct lcd, regs[VCPU_REGS_R9])), */
+/* 		  [r10]"i"(offsetof(struct lcd, regs[VCPU_REGS_R10])), */
+/* 		  [r11]"i"(offsetof(struct lcd, regs[VCPU_REGS_R11])), */
+/* 		  [r12]"i"(offsetof(struct lcd, regs[VCPU_REGS_R12])), */
+/* 		  [r13]"i"(offsetof(struct lcd, regs[VCPU_REGS_R13])), */
+/* 		  [r14]"i"(offsetof(struct lcd, regs[VCPU_REGS_R14])), */
+/* 		  [r15]"i"(offsetof(struct lcd, regs[VCPU_REGS_R15])), */
+/* 		  [cr2]"i"(offsetof(struct lcd, cr2)), */
+/* 		  [wordsize]"i"(sizeof(ulong)) */
+/* 		: "cc", "memory" */
+/* 		  , "rax", "rbx", "rdi", "rsi" */
+/* 		  , "r8", "r9", "r10", "r11", "r12", "r13", "r14", "r15" */
+/* 		); */
 
-	vcpu->launched = 1;
+/* 	vcpu->launched = 1; */
 
-	if (unlikely(vcpu->fail)) {
-		printk(KERN_ERR "vmx: failure detected (err %x)\n",
-			vmcs_read32(VM_INSTRUCTION_ERROR));
-		return VMX_EXIT_REASONS_FAILED_VMENTRY;
-	}
+/* 	if (unlikely(vcpu->fail)) { */
+/* 		printk(KERN_ERR "vmx: failure detected (err %x)\n", */
+/* 			vmcs_read32(VM_INSTRUCTION_ERROR)); */
+/* 		return VMX_EXIT_REASONS_FAILED_VMENTRY; */
+/* 	} */
 
-	vcpu->exit_reason = vmcs_read32(VM_EXIT_REASON);
-	vcpu->exit_qualification = vmcs_readl(EXIT_QUALIFICATION);
-	vcpu->idt_vectoring_info = vmcs_read32(IDT_VECTORING_INFO_FIELD);
-	vcpu->error_code = vmcs_read32(IDT_VECTORING_ERROR_CODE);
-	vcpu->exit_intr_info = vmcs_read32(VM_EXIT_INTR_INFO);
-	vcpu->vec_no = vcpu->exit_intr_info & INTR_INFO_VECTOR_MASK;
+/* 	vcpu->exit_reason = vmcs_read32(VM_EXIT_REASON); */
+/* 	vcpu->exit_qualification = vmcs_readl(EXIT_QUALIFICATION); */
+/* 	vcpu->idt_vectoring_info = vmcs_read32(IDT_VECTORING_INFO_FIELD); */
+/* 	vcpu->error_code = vmcs_read32(IDT_VECTORING_ERROR_CODE); */
+/* 	vcpu->exit_intr_info = vmcs_read32(VM_EXIT_INTR_INFO); */
+/* 	vcpu->vec_no = vcpu->exit_intr_info & INTR_INFO_VECTOR_MASK; */
 
-	return vcpu->exit_reason;
-}
+/* 	return vcpu->exit_reason; */
+/* } */
 
 static void vmx_step_instruction(void) {
 	vmcs_writel(GUEST_RIP, vmcs_readl(GUEST_RIP) +
@@ -2369,45 +2369,45 @@ int lcd_run(struct lcd *lcd) {
 EXPORT_SYMBOL(lcd_run);
 
 
-int lcd_setup_vmlinux(struct lcd *lcd, char *file) {
-	int ret;
-	u64 elf_entry;
+/* int setup_vmlinux(struct lcd *lcd, char *file) { */
+/* 	int ret; */
+/* 	u64 elf_entry; */
 
-	struct boot_params *bp = lcd->bp;
+/* 	struct boot_params *bp = lcd->bp; */
 
-	ret = lcd_load_vmlinux(file, lcd, &elf_entry);
-	if (!ret) {
-		printk(KERN_ERR "Error when loading vmlinux %d\n", ret);
-		goto err_out;
-	}
+/* 	ret = lcd_load_vmlinux(file, lcd, &elf_entry); */
+/* 	if (!ret) { */
+/* 		printk(KERN_ERR "Error when loading vmlinux %d\n", ret); */
+/* 		goto err_out; */
+/* 	} */
 
-	bp->e820_entries = 2;
+/* 	bp->e820_entries = 2; */
   
-	bp->e820_map[0].addr = 0;
-	bp->e820_map[0].size = 0x9fc00;
-	bp->e820_map[0].type = E820_RAM;
+/* 	bp->e820_map[0].addr = 0; */
+/* 	bp->e820_map[0].size = 0x9fc00; */
+/* 	bp->e820_map[0].type = E820_RAM; */
 
-	bp->e820_map[0].addr = 0x9fc00;
-	bp->e820_map[0].size = 0x400;
-	bp->e820_map[0].type = E820_RESERVED;
+/* 	bp->e820_map[0].addr = 0x9fc00; */
+/* 	bp->e820_map[0].size = 0x400; */
+/* 	bp->e820_map[0].type = E820_RESERVED; */
 
-	bp->e820_map[0].addr = 0xe8000;
-	bp->e820_map[0].size = 0x18000;
-	bp->e820_map[0].type = E820_RESERVED;
+/* 	bp->e820_map[0].addr = 0xe8000; */
+/* 	bp->e820_map[0].size = 0x18000; */
+/* 	bp->e820_map[0].type = E820_RESERVED; */
 
-	bp->e820_map[0].addr = 0x100000;
-	bp->e820_map[0].size = (LCD_PHY_MEM_SIZE - 0x100000);
-	bp->e820_map[0].type = E820_RAM;
+/* 	bp->e820_map[0].addr = 0x100000; */
+/* 	bp->e820_map[0].size = (LCD_PHY_MEM_SIZE - 0x100000); */
+/* 	bp->e820_map[0].type = E820_RAM; */
 
-	bp->e820_map[1].addr = LCD_PHY_MEM_SIZE;
-	bp->e820_map[1].size = LCD_PHY_MEM_LIMIT - LCD_PHY_MEM_SIZE;
-	bp->e820_map[1].type = E820_RESERVED_KERN;
+/* 	bp->e820_map[1].addr = LCD_PHY_MEM_SIZE; */
+/* 	bp->e820_map[1].size = LCD_PHY_MEM_LIMIT - LCD_PHY_MEM_SIZE; */
+/* 	bp->e820_map[1].type = E820_RESERVED_KERN; */
 
-	// TODO: setup correct boot_params
+/* 	// TODO: setup correct boot_params */
 
 
-err_out:
-	return ret;
-}
+/* err_out: */
+/* 	return ret; */
+/* } */
 
 

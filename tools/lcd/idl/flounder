@@ -1,4 +1,6 @@
 start-symbol: File
+options: debug9
+
 include: {{ #include "ast.h"
 	    #include <vector>
 	    #include <stdlib.h> }}
@@ -25,7 +27,7 @@ void cast_a(std::vector<Argument* > * v, Value & val)
 rules:
 File	= Interface Spacing <eof> {{ value = $1; }}
 
-Interface = INTERFACE n:Identifier OPENC m:Message+ CLOSEC SEMI {{ std::vector<Message*> * functions = new std::vector<Message*>;
+Interface = INTERFACE n:Identifier OPENC Spacing m:Message+ CLOSEC SEMI {{ std::vector<Message*> * functions = new std::vector<Message*>;
 		     cast_m(functions, m);
 		     value = new Interface((char *)n.getValue(), functions); }}
 
@@ -54,38 +56,23 @@ ArgStart     =	   s:SimpleArg COMMA {{ value = s; }}
 ArgLast	     =	   s:SimpleArg {{ value = s; }}
 		   | d:DynamicArg {{ value = d; }}
 
-SimpleArg    =	   t:Type i:Identifier {{ value = new Argument((Type*) t.getValue(), (char *) i.getValue()); }}
+SimpleArg    =	   t:Identifier i:Identifier {{ value = new Argument((Type*) t.getValue(), (char *) i.getValue()); }}
 
-DynamicArg   =	   t:Type i:Identifier OPENS i2:Identifier CLOSES {{ value = new Argument((Type*) t.getValue(), (char *) i.getValue(), (char *) i2.getValue()); }}
+DynamicArg   =	   t:Identifier i:Identifier OPENS i2:Identifier CLOSES {{ value = new Argument((Type*) t.getValue(), (char *) i.getValue(), (char *) i2.getValue()); }}
 
-#Types	     =	   #incomplete
-Type	     =	   "bool" | "int32" | "char"
+Type	     =	   "bool" | "int32" | "char" 
 	     	   
 
 Description  =	   """ d:.* """ Spacing
 	     	   
 
-Identifier   =	   i1:IdentStart i2:IdentCont* Spacing {{ char * f = (char *) malloc(2*sizeof(char));
-	     	   		 f[0] = (char) (intptr_t) i1.getValue();
-				 f[1] = '\0';
-		      char * str = (char *) malloc(sizeof(char)+1+(sizeof(char)*i2.getValues().size()));
-		      strcpy(str, f);
-		      for(Value::iterator it = i2.getValues().begin(); it != i2.getValues().end(); it ++)
-		      {
-			const Value & v = *it;
-			char * temp = (char *) malloc(2*sizeof(char));
-			char ms = (char) (intptr_t) v.getValue();
-			temp[0] = ms;
-			temp[1] = '\0';
-			strcat(str, temp);
-		     }
-		     value = str; }}
+Identifier   =	   i1:IdentStart i2:IdentCont* Spacing
 		      
-IdentStart   =	   i:[a-zA-Z_] {{
+IdentStart   =	   i:[abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ_] {{
 		      value = i; }}
 IdentCont    =	   i:IdentStart {{
 		      value = i; }}
-		   | i:[0-9] {{ 
+		   | i:[0123456789] {{ 
 		      value = i; }}
 
 
@@ -106,7 +93,8 @@ COMMA	     =	   ","
 
 Spacing	     =	   Space*
 Space	     =	   " " | "\t" | EndOfLine
-Comment	     =	   "/*" .* "*/" 
-	     	   | "//" (!EndOfLine .)* EndOfLine
+##Comment	     =	   "/*" .* "*/" 
+##	     	   | "//" (!EndOfLine .)* EndOfLine
 
-EndOfLine    =	   "\r\n" | "\n" | "\r"
+EndOfLine    =	  "\n" 
+	     	  | "\r"

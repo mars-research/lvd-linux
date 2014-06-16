@@ -1582,6 +1582,12 @@ void lcd_arch_destroy(struct lcd_arch *vcpu)
 
 /* VMX EXIT HANDLING -------------------------------------------------- */
 
+static void vmx_step_instruction(void)
+{
+	vmcs_writel(GUEST_RIP, vmcs_readl(GUEST_RIP) +
+		vmcs_read32(VM_EXIT_INSTRUCTION_LEN));
+}
+
 static void vmx_handle_vmcall(struct lcd_arch *vcpu)
 {
 
@@ -1725,6 +1731,10 @@ static int vmx_handle_exception_nmi(struct lcd_arch *vcpu)
 	}
 }
 
+/**
+ * Simple processing of ept violation (e.g., violation due to
+ * an access to unmapped memory).
+ */
 static int vmx_handle_ept(struct lcd_arch *vcpu)
 {
 	/*
@@ -1735,9 +1745,55 @@ static int vmx_handle_ept(struct lcd_arch *vcpu)
 	return LCD_ARCH_STATUS_EPT_FAULT;
 }
 
-static void vmx_handle_control_reg(struct lcd_arch *vcpu)
+/**
+ * Checking and emulation of control register accessing.
+ * All accesses to %cr0, %cr4, and %cr8 lead to vm exits, and are
+ * not currently allowed. Loads / stores to %cr3 lead to
+ * vm exits (required for emulab machines) and are emulated.
+ */
+static int vmx_handle_control_reg(struct lcd_arch *vcpu)
 {
+	int control_reg;
+	int access_type;
+	int general_reg;
+	/*
+	 * Intel SDM V3 27.2.1
+	 */
+	
+	/*
+	 * Determine the control and general purpose registers involved, 
+	 * and the access type.
+	 */
+	control_reg = vcpu->exit_qualification & CONTROL_REG_ACCESS_NUM;
+	access_type = vcpu->exit_qualification & CONTROL_REG_ACCESS_TYPE;
+	general_reg = vcpu->exit_qualification & CONTROL_REG_ACCESS_REG;
 
+	switch (control_reg) {
+	case 3:
+		/*
+		 * %cr3
+		 */
+		if (access_type == 0) {
+			/*
+			 * Move to
+			 */
+			vmcs_writel(GUEST_CR3, vcpu->regs[general_reg]);
+		} else {
+			/*
+			 * Move from
+			 */
+			vcpu->regs[general_reg] = vmcs_readl(GUEST_CR3);
+		}
+		/*
+		 * Step past instruction that caused exit
+		 */
+		vmx_step_instruction()		
+		return LCD_ARCH_STATUS_CR3_ACCESS;
+	default:
+		printk(KERN_ERR "lcd vmx: attempted access to protected cr\n");
+		return -EIO;
+	}
+	
 
 }
 
@@ -1939,7 +1995,7 @@ int lcd_arch_run(struct lcd_arch *vcpu)
 		ret = vmx_handle_ept(vcpu);
 		break;
 	case EXIT_REASON_CR_ACCESS:
-		vmx_handle_control_reg(vcpu);
+		ret = vmx_handle_control_reg(vcpu);
 		break;			
 	}
 

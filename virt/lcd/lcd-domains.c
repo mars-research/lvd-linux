@@ -15,7 +15,7 @@
 #include <linux/fs.h>
 #include <asm/uaccess.h>
 #include <linux/lcd-domains.h>
-#include <asm/lcd-vmx.h>
+#include <asm/lcd-domains-arch.h>
 
 MODULE_LICENSE("GPL");
 MODULE_DESCRIPTION("LCD driver");
@@ -68,7 +68,7 @@ static int __init lcd_init(void)
 
 	printk(KERN_ERR "LCD module loaded\n");
 
-	if ((r = lcd_vmx_init())) {
+	if ((r = lcd_arch_init())) {
 		printk(KERN_ERR "lcd: failed to initialize vmx\n");
 		return r;
 	}
@@ -85,7 +85,7 @@ static int __init lcd_init(void)
 static void __exit lcd_exit(void)
 {
 	misc_deregister(&lcd_dev);
-	lcd_vmx_exit();
+	lcd_arch_exit();
 }
 
 module_init(lcd_init);

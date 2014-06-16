@@ -22,19 +22,38 @@
 #include <linux/tboot.h>
 #include <linux/slab.h>
 
-static struct lcd_vmx_vmcs_config vmcs_config;
-static struct lcd_vmx_capability vmx_capability;
+/* VMX DATA STRUCTURES -------------------------------------------------- */
+
+struct vmx_vmcs_config {
+	int size;
+	int order;
+	u32 revision_id;
+	u32 pin_based_exec_controls;
+	u32 primary_proc_based_exec_controls;
+	u32 secondary_proc_based_exec_controls;
+	u32 vmexit_controls;
+	u32 vmentry_controls;
+};
+
+struct vmx_capability {
+	u32 ept;
+	u32 vpid;
+};
+
+/* SHARED / PERCPU VARS -------------------------------------------------- */
+
+static struct vmx_vmcs_config vmcs_config;
+static struct vmx_capability vmx_capability;
 
 static atomic_t vmx_enable_failed;
 static DEFINE_PER_CPU(int, vmx_enabled);
-static DEFINE_PER_CPU(struct lcd_vmx_vmcs *, vmxon_area);
+static DEFINE_PER_CPU(struct vmx_vmcs *, vmxon_area);
 
 static struct {
 	DECLARE_BITMAP(bitmap, VMX_NR_VPIDS);
 	spinlock_t lock;
 } vpids;
 
-//static DEFINE_PER_CPU(struct desc_ptr, host_gdt);
 static DEFINE_PER_CPU(struct lcd_vmx *, local_vcpu);
 
 static unsigned long *msr_bitmap;
@@ -197,7 +216,7 @@ static inline void invvpid_single_context(u16 vpid)
 /**
  * Takes vmcs from any state to {inactive, clear, not current}
  */
-static void vmcs_clear(struct lcd_vmx_vmcs *vmcs)
+static void vmcs_clear(struct vmx_vmcs *vmcs)
 {
 	u64 phys_addr = __pa(vmcs);
 	u8 error;
@@ -214,7 +233,7 @@ static void vmcs_clear(struct lcd_vmx_vmcs *vmcs)
  * Takes vmcs to {active, current} on cpu. Any vmcs reads and writes
  * will affect this vmcs.
  */
-static void vmcs_load(struct lcd_vmx_vmcs *vmcs)
+static void vmcs_load(struct vmx_vmcs *vmcs)
 {
 	u64 phys_addr = __pa(vmcs);
 	u8 error;
@@ -288,7 +307,7 @@ static void vmcs_write64(unsigned long field, u64 value)
 /**
  * Frees vmcs memory.
  */
-static void vmx_free_vmcs(struct lcd_vmx_vmcs *vmcs)
+static void vmx_free_vmcs(struct vmx_vmcs *vmcs)
 {
 	free_pages((unsigned long)vmcs, vmcs_config.order);
 }
@@ -297,11 +316,11 @@ static void vmx_free_vmcs(struct lcd_vmx_vmcs *vmcs)
  * Allocates memory for a vmcs on cpu, and sets the
  * revision id.
  */
-static struct lcd_vmx_vmcs *vmx_alloc_vmcs(int cpu)
+static struct vmx_vmcs *vmx_alloc_vmcs(int cpu)
 {
 	int node;
 	struct page *pages;
-	struct lcd_vmx_vmcs *vmcs;
+	struct vmx_vmcs *vmcs;
 
 	node = cpu_to_node(cpu);
 	pages = alloc_pages_exact_node(node, GFP_KERNEL, vmcs_config.order);
@@ -333,7 +352,7 @@ static inline void __vmxoff(void)
  * Helper for vmx_enable. A few more low-level checks and
  * settings, and then turns on vmx.
  */
-static int __vmx_enable(struct lcd_vmx_vmcs *vmxon_buf)
+static int __vmx_enable(struct vmx_vmcs *vmxon_buf)
 {
 	u64 phys_addr;
 	u64 old;
@@ -387,7 +406,7 @@ static int __vmx_enable(struct lcd_vmx_vmcs *vmxon_buf)
 static void vmx_enable(void *unused)
 {
 	int ret;
-	struct lcd_vmx_vmcs *vmxon_buf;
+	struct vmx_vmcs *vmxon_buf;
 
 	vmxon_buf = __get_cpu_var(vmxon_area);
 	
@@ -491,7 +510,7 @@ static void vmx_disable_intercept_for_msr(unsigned long *msr_bitmap, u32 msr)
 /**
  * Checks and sets basic vmcs settings (vmxon region size, etc.)
  */
-static int vmcs_config_basic_settings(struct lcd_vmx_vmcs_config *vmcs_conf)
+static int vmcs_config_basic_settings(struct vmx_vmcs_config *vmcs_conf)
 {
 	u32 msr_low;
 	u32 msr_high;
@@ -589,7 +608,7 @@ static int adjust_vmx_controls(u32 *controls, u32 reserved_mask, u32 msr)
  * vm entries, vm exits, vm execution (e.g., interrupt handling),
  * etc. for all lcd types.
  */
-static int setup_vmcs_config(struct lcd_vmx_vmcs_config *vmcs_conf)
+static int setup_vmcs_config(struct vmx_vmcs_config *vmcs_conf)
 {
 	u32 pin_based_exec_controls;
 	u32 primary_proc_based_exec_controls;
@@ -805,7 +824,7 @@ int lcd_vmx_init(void)
 	 */
 
 	for_each_possible_cpu(cpu) {
-		struct lcd_vmx_vmcs *vmxon_buf;
+		struct vmx_vmcs *vmxon_buf;
 
 		vmxon_buf = vmx_alloc_vmcs(cpu);
 		if (!vmxon_buf) {

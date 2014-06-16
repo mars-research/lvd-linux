@@ -12,6 +12,7 @@
 
 #include <asm/virtext.h>
 #include <asm/vmx.h>
+#include <uapi/asm/vmx.h>
 #include <asm/desc.h>
 #include <asm/lcd-domains-arch.h>
 
@@ -1533,7 +1534,7 @@ fail_vcpu:
 	return NULL;
 }
 
-static void lcd_arch_destroy(struct lcd_arch *vcpu)
+void lcd_arch_destroy(struct lcd_arch *vcpu)
 {
 	/*
 	 * Premption Disabled
@@ -1568,7 +1569,82 @@ static void lcd_arch_destroy(struct lcd_arch *vcpu)
 	kfree(vcpu);
 }
 
-/* VMX RUN LOOP -------------------------------------------------- */
+/* VMX EXIT HANDLING -------------------------------------------------- */
+
+static void vmx_handle_vmcall(struct lcd_arch *vcpu)
+{
+
+
+}
+
+static void vmx_handle_external_int(struct lcd_arch *vcpu)
+{
+
+
+}
+
+static int vmx_handle_hard_exception(struct lcd_arch *vcpu)
+{
+	int vector;
+	/*
+	 * Intel SDM V3 24.9.2, 27.2.2
+	 */
+	vector = vcpu->exit_intr_info & INTR_INFO_VECTOR_MASK;
+	switch (vector) {
+	case 14:
+		/*
+		 * Guest virtual page fault
+		 *
+		 * Set page fault address, and return status code.
+		 */
+		vcpu->page_fault_addr = vcpu->exit_qualification;
+		return LCD_ARCH_STATUS_PF;
+	default:
+		printk(KERN_ERR "lcd vmx: unhandled hw exception:\n");
+		printk(KERN_ERR "         vector: %x, info: %x\n",
+			vector, vcpu->exit_intr_info);
+		return -EIO;
+	}
+}
+
+/**
+ * Processes software / hardware exceptions and nmi's generated
+ * while lcd was running.
+ */
+static int vmx_handle_exception_nmi(struct lcd_arch *vcpu)
+{
+	int type;
+	type = vcpu->exit_intr_info & INTR_INFO_INTR_TYPE_MASK;
+	switch (type) {
+	case INTR_TYPE_HARD_EXCEPTION:
+		/*
+		 * Page fault, trap, machine check, ...
+		 */
+		return vmx_handle_hard_exception(vcpu);
+	default:
+		/*
+		 * NMI, div by zero, overflow, ...
+		 */
+		printk(KERN_ERR "lcd vmx: unhandled exception or nmi:\n");
+		printk(KERN_ERR "         interrupt info: %x\n",
+			vcpu->exit_intr_info);
+		return -EIO;
+	}
+}
+
+static void vmx_handle_ept(struct lcd_arch *vcpu)
+{
+
+
+}
+
+static void vmx_handle_control_reg(struct lcd_arch *vcpu)
+{
+
+
+}
+
+/* VMX RUN -------------------------------------------------- */
 
 /**
  * Low-level vmx launch / resume to enter non-root mode on cpu with
@@ -1729,6 +1805,52 @@ static int __noclone vmx_enter(struct lcd_arch *vcpu)
 
 	return vcpu->exit_reason;
 }
+
+int lcd_arch_run(struct lcd_arch *vcpu)
+{
+	int ret;
+
+	/*
+	 * Load the lcd and invalidate any cached mappings.
+	 *
+	 * *preemption disabled*
+	 */
+	vmx_get_cpu(vcpu);
+
+	/*
+	 * Enter lcd
+	 */
+	ret = vmx_enter(vcpu);
+
+	/*
+	 * Handle exit reason
+	 *
+	 * Intel SDM V3 Appendix C
+	 */
+	switch (ret) {
+	case EXIT_REASON_EXCEPTION_NMI:
+		vmx_handle_exception_nmi(vcpu);
+		break;
+	case EXIT_REASON_EXTERNAL_INTERRUPT:
+		vmx_handle_external_int(vcpu);
+		break;
+	case EXIT_REASON_VMCALL:
+		vmx_handle_vmcall(vcpu);
+		break;
+	case EXIT_REASON_EPT_VIOLATION:
+		vmx_handle_ept(vcpu);
+		break;
+	case EXIT_REASON_CR_ACCESS:
+		vmx_handle_control_reg(vcpu);
+		break;			
+	}
+
+	/*
+	 * Preemption enabled
+	 */
+	vmx_put_cpu(vcpu);
+}
+
 
 /* EXPORTS -------------------------------------------------- */
 

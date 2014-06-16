@@ -2266,107 +2266,107 @@ static int vmx_handle_nmi_exception(struct lcd *vcpu)
 	return -EIO;
 }
 
-int lcd_run(struct lcd *lcd) {
-	int done = 0;
-	int ret = 0;
-	int countdown = 1000;
+/* int lcd_run(struct lcd *lcd) { */
+/* 	int done = 0; */
+/* 	int ret = 0; */
+/* 	int countdown = 1000; */
 
-	cycles_t begin, end;
-	begin = get_cycles();
-	g_prepare_time = begin - g_prepare_start;
-	while (1) {
-		vmx_get_cpu(lcd);
+/* 	cycles_t begin, end; */
+/* 	begin = get_cycles(); */
+/* 	g_prepare_time = begin - g_prepare_start; */
+/* 	while (1) { */
+/* 		vmx_get_cpu(lcd); */
 
-		local_irq_disable();
+/* 		local_irq_disable(); */
 
-		/*if (need_resched()) {
-		  local_irq_enable();
-		  vmx_put_cpu(lcd);
-		  cond_resched();
-		  continue;
-		  }*/
+/* 		/\*if (need_resched()) { */
+/* 		  local_irq_enable(); */
+/* 		  vmx_put_cpu(lcd); */
+/* 		  cond_resched(); */
+/* 		  continue; */
+/* 		  }*\/ */
 
-		// In case we run from insmod.
-		if (signal_pending(current)) {
-			int signr;
-			siginfo_t info;
-			uint32_t x;
+/* 		// In case we run from insmod. */
+/* 		if (signal_pending(current)) { */
+/* 			int signr; */
+/* 			siginfo_t info; */
+/* 			uint32_t x; */
 
-			local_irq_enable();
-			vmx_put_cpu(lcd);
+/* 			local_irq_enable(); */
+/* 			vmx_put_cpu(lcd); */
 
-			spin_lock_irq(&current->sighand->siglock);
-			signr = dequeue_signal(current, &current->blocked,
-					&info);
-			spin_unlock_irq(&current->sighand->siglock);
-			if (!signr)
-				continue;
+/* 			spin_lock_irq(&current->sighand->siglock); */
+/* 			signr = dequeue_signal(current, &current->blocked, */
+/* 					&info); */
+/* 			spin_unlock_irq(&current->sighand->siglock); */
+/* 			if (!signr) */
+/* 				continue; */
 
-			if (signr == SIGKILL) {
-				printk(KERN_INFO "vmx: got sigkill, dying");
-				lcd->ret_code = ((ENOSYS) << 8);
-				break;
-			}
+/* 			if (signr == SIGKILL) { */
+/* 				printk(KERN_INFO "vmx: got sigkill, dying"); */
+/* 				lcd->ret_code = ((ENOSYS) << 8); */
+/* 				break; */
+/* 			} */
 
-			x  = signr; // + base?
-			x |= INTR_INFO_VALID_MASK;
+/* 			x  = signr; // + base? */
+/* 			x |= INTR_INFO_VALID_MASK; */
 
-			vmcs_write32(VM_ENTRY_INTR_INFO_FIELD, x);
-			continue;
-		}
+/* 			vmcs_write32(VM_ENTRY_INTR_INFO_FIELD, x); */
+/* 			continue; */
+/* 		} */
 
-		/* local_irq_enable(); */
+/* 		/\* local_irq_enable(); *\/ */
 
-		ret = vmx_run_vcpu(lcd);
-		if (ret == EXIT_REASON_VMCALL ||
-			ret == EXIT_REASON_CPUID) {
-			vmx_step_instruction();
-		}
+/* 		ret = vmx_run_vcpu(lcd); */
+/* 		if (ret == EXIT_REASON_VMCALL || */
+/* 			ret == EXIT_REASON_CPUID) { */
+/* 			vmx_step_instruction(); */
+/* 		} */
 
-		if (ret == EXIT_REASON_EXTERNAL_INTERRUPT) {
-			vmx_handle_external_interrupt(lcd);
-			/* --countdown; */
-		}
+/* 		if (ret == EXIT_REASON_EXTERNAL_INTERRUPT) { */
+/* 			vmx_handle_external_interrupt(lcd); */
+/* 			/\* --countdown; *\/ */
+/* 		} */
     
-		vmx_put_cpu(lcd);
+/* 		vmx_put_cpu(lcd); */
 
-		if (ret == EXIT_REASON_VMCALL) {
-			vmx_handle_vmcall(lcd);
-		}
-		else if (ret == EXIT_REASON_EPT_VIOLATION) {
-			done = vmx_handle_ept_violation(lcd);
-		}
-		else if (ret == EXIT_REASON_EXCEPTION_NMI) {
-			if (vmx_handle_nmi_exception(lcd))
-				done = 1;
-		} else if (ret != EXIT_REASON_EXTERNAL_INTERRUPT) {
-			printk(KERN_INFO "unhandled exit: reason %d: %s, "
-				"exit qualification %llx\n",
-				ret, lcd_exit_reason(ret), lcd->exit_qualification);
-			vmx_dump_cpu(lcd);
-			done = 1;
-		}
+/* 		if (ret == EXIT_REASON_VMCALL) { */
+/* 			vmx_handle_vmcall(lcd); */
+/* 		} */
+/* 		else if (ret == EXIT_REASON_EPT_VIOLATION) { */
+/* 			done = vmx_handle_ept_violation(lcd); */
+/* 		} */
+/* 		else if (ret == EXIT_REASON_EXCEPTION_NMI) { */
+/* 			if (vmx_handle_nmi_exception(lcd)) */
+/* 				done = 1; */
+/* 		} else if (ret != EXIT_REASON_EXTERNAL_INTERRUPT) { */
+/* 			printk(KERN_INFO "unhandled exit: reason %d: %s, " */
+/* 				"exit qualification %llx\n", */
+/* 				ret, lcd_exit_reason(ret), lcd->exit_qualification); */
+/* 			vmx_dump_cpu(lcd); */
+/* 			done = 1; */
+/* 		} */
 
-		--countdown;
+/* 		--countdown; */
 
-		if (countdown <=0 || done || lcd->shutdown) {
-			end = get_cycles();
-			printk("Cycles: %llu, counter %d\n", end-begin, countdown);
-			printk(KERN_INFO "unhandled exit: reason %d: %s, "
-				"exit qualification %llx, intr_info %x\n",
-				ret, lcd_exit_reason(ret), lcd->exit_qualification,
-				lcd->exit_intr_info);
-			/* vmx_dump_cpu(lcd); */
-			break;
-		}
-	}
+/* 		if (countdown <=0 || done || lcd->shutdown) { */
+/* 			end = get_cycles(); */
+/* 			printk("Cycles: %llu, counter %d\n", end-begin, countdown); */
+/* 			printk(KERN_INFO "unhandled exit: reason %d: %s, " */
+/* 				"exit qualification %llx, intr_info %x\n", */
+/* 				ret, lcd_exit_reason(ret), lcd->exit_qualification, */
+/* 				lcd->exit_intr_info); */
+/* 			/\* vmx_dump_cpu(lcd); *\/ */
+/* 			break; */
+/* 		} */
+/* 	} */
 
-	if (irqs_disabled())
-		local_irq_enable();
+/* 	if (irqs_disabled()) */
+/* 		local_irq_enable(); */
 
-	return 0;
-}
-EXPORT_SYMBOL(lcd_run);
+/* 	return 0; */
+/* } */
+/* EXPORT_SYMBOL(lcd_run); */
 
 
 /* int setup_vmlinux(struct lcd *lcd, char *file) { */

@@ -48,6 +48,15 @@ struct lcd_arch_ept {
 };
 
 struct lcd_arch {
+	/*
+	 * Public Data
+	 */
+	u64 page_fault_addr;
+
+
+	/*
+	 * Private Data
+	 */
 	int cpu;
 	int launched;
 	int vpid;
@@ -101,5 +110,19 @@ struct lcd_arch *lcd_arch_create(void);
  * some cpu, it will become inactive.)
  */
 void lcd_arch_destroy(struct lcd_arch *vcpu);
+/**
+ * Runs the LCD on the calling cpu. (If the LCD is active on
+ * a different cpu, it will become inactive there.) Kernel
+ * preemption is disabled while the LCD is launched, but
+ * external interrupts are not disabled and will be handled.
+ */
+int lcd_arch_run(struct lcd_arch *vcpu);
+
+/**
+ * Status codes for running LCDs.
+ */
+enum lcd_arch_status {
+	LCD_ARCH_STATUS_PF = 0
+};
 
 #endif  /* LCD_DOMAINS_ARCH_H */

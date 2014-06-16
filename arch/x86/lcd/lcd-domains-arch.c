@@ -1582,6 +1582,11 @@ void lcd_arch_destroy(struct lcd_arch *vcpu)
 
 /* VMX EXIT HANDLING -------------------------------------------------- */
 
+/**
+ * Skips to next instruction in lcd. This should only be
+ * called when a vm exit occurs that sets the exit
+ * instruction length. See Intel SDM V3 27.2.4.
+ */
 static void vmx_step_instruction(void)
 {
 	vmcs_writel(GUEST_RIP, vmcs_readl(GUEST_RIP) +
@@ -1590,8 +1595,8 @@ static void vmx_step_instruction(void)
 
 static void vmx_handle_vmcall(struct lcd_arch *vcpu)
 {
-
-
+	/* not implemented yet until we get to ipc */
+	return -EIO;
 }
 
 /**
@@ -1989,7 +1994,7 @@ int lcd_arch_run(struct lcd_arch *vcpu)
 		ret = vmx_handle_external_int(vcpu);
 		break;
 	case EXIT_REASON_VMCALL:
-		vmx_handle_vmcall(vcpu);
+		ret = vmx_handle_vmcall(vcpu);
 		break;
 	case EXIT_REASON_EPT_VIOLATION:
 		ret = vmx_handle_ept(vcpu);

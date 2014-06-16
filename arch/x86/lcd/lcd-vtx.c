@@ -1805,61 +1805,61 @@ static void setup_idt(struct lcd* vcpu) {
 /* 	return vcpu->exit_reason; */
 /* } */
 
-static void vmx_step_instruction(void) {
-	vmcs_writel(GUEST_RIP, vmcs_readl(GUEST_RIP) +
-		vmcs_read32(VM_EXIT_INSTRUCTION_LEN));
-}
+/* static void vmx_step_instruction(void) { */
+/* 	vmcs_writel(GUEST_RIP, vmcs_readl(GUEST_RIP) + */
+/* 		vmcs_read32(VM_EXIT_INSTRUCTION_LEN)); */
+/* } */
 
-static int vmx_handle_ept_violation(struct lcd *vcpu) {
-	unsigned long gva, gpa;
-	int ret;
+/* static int vmx_handle_ept_violation(struct lcd *vcpu) { */
+/* 	unsigned long gva, gpa; */
+/* 	int ret; */
 
-	vmx_get_cpu(vcpu);
-	gva = vmcs_readl(GUEST_LINEAR_ADDRESS);
-	gpa = vmcs_read64(GUEST_PHYSICAL_ADDRESS);
-	vmx_put_cpu(vcpu);
+/* 	vmx_get_cpu(vcpu); */
+/* 	gva = vmcs_readl(GUEST_LINEAR_ADDRESS); */
+/* 	gpa = vmcs_read64(GUEST_PHYSICAL_ADDRESS); */
+/* 	vmx_put_cpu(vcpu); */
 
-	if (vcpu->exit_qualification & (1 << 6)) {
-		printk(KERN_ERR "EPT: GPA 0x%lx exceeds GAW!\n", gpa);
-		return -EINVAL;
-	}
+/* 	if (vcpu->exit_qualification & (1 << 6)) { */
+/* 		printk(KERN_ERR "EPT: GPA 0x%lx exceeds GAW!\n", gpa); */
+/* 		return -EINVAL; */
+/* 	} */
 
-	if (!(vcpu->exit_qualification & (1 << 7))) {
-		printk(KERN_ERR "EPT: linear address is not valid, GPA: 0x%lx!\n", gpa);
-		return -EINVAL;
-	}
+/* 	if (!(vcpu->exit_qualification & (1 << 7))) { */
+/* 		printk(KERN_ERR "EPT: linear address is not valid, GPA: 0x%lx!\n", gpa); */
+/* 		return -EINVAL; */
+/* 	} */
 
-	/*
-	 * EPT Fault.
-	 * TODO: lock page table?
-	 */
-	if (gpa < LCD_PHY_MEM_SIZE) {
-		u64 gpa_pg;
-		u64 pg = __get_free_page(GFP_KERNEL);
-		if (!pg)
-			ret = -ENOMEM;
-		else {
-			gpa_pg = round_down(gpa, PAGE_SIZE);
-			ret = lcd_map_gpa_to_hpa(vcpu, gpa_pg, __pa(pg), 0);
-			if (ret) {
-				printk(KERN_ERR "EPT: map page %p for %p failed\n",
-					(void*)pg, (void*)gpa_pg);
-				free_page(pg);
-			}
-		}
-	} else
-		ret = -EINVAL;
+/* 	/\* */
+/* 	 * EPT Fault. */
+/* 	 * TODO: lock page table? */
+/* 	 *\/ */
+/* 	if (gpa < LCD_PHY_MEM_SIZE) { */
+/* 		u64 gpa_pg; */
+/* 		u64 pg = __get_free_page(GFP_KERNEL); */
+/* 		if (!pg) */
+/* 			ret = -ENOMEM; */
+/* 		else { */
+/* 			gpa_pg = round_down(gpa, PAGE_SIZE); */
+/* 			ret = lcd_map_gpa_to_hpa(vcpu, gpa_pg, __pa(pg), 0); */
+/* 			if (ret) { */
+/* 				printk(KERN_ERR "EPT: map page %p for %p failed\n", */
+/* 					(void*)pg, (void*)gpa_pg); */
+/* 				free_page(pg); */
+/* 			} */
+/* 		} */
+/* 	} else */
+/* 		ret = -EINVAL; */
 
-	if (ret) {
-		printk(KERN_ERR "vmx: EPT violation failure "
-			"GPA: 0x%lx, GVA: 0x%lx\n",
-			gpa, gva);
-		vcpu->ret_code = ((EFAULT) << 8);
-		vmx_dump_cpu(vcpu);
-	}
+/* 	if (ret) { */
+/* 		printk(KERN_ERR "vmx: EPT violation failure " */
+/* 			"GPA: 0x%lx, GVA: 0x%lx\n", */
+/* 			gpa, gva); */
+/* 		vcpu->ret_code = ((EFAULT) << 8); */
+/* 		vmx_dump_cpu(vcpu); */
+/* 	} */
 
-	return ret;
-}
+/* 	return ret; */
+/* } */
 
 /* static int __vmx_enable(struct vmcs *vmxon_buf) { */
 /* 	u64 phys_addr = __pa(vmxon_buf); */

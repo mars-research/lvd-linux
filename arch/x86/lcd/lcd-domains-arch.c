@@ -1596,7 +1596,7 @@ static void vmx_handle_vmcall(struct lcd_arch *vcpu)
  * to be *enabled*, but will be disabled when the interrupt
  * handler is called, per the ia32 spec (Intel SDM V3 6.8.1).
  */
-static void vmx_handle_external_intr(struct lcd_arch *vcpu)
+static int vmx_handle_external_intr(struct lcd_arch *vcpu)
 {
 	unsigned int vector;
 	unsigned long entry;
@@ -1669,6 +1669,7 @@ static void vmx_handle_external_intr(struct lcd_arch *vcpu)
 		[ss]"i"(__KERNEL_DS),
 		[cs]"i"(__KERNEL_CS)
 		);
+	return LCD_ARCH_STATUS_EXT_INTR;
 }
 
 /**
@@ -1689,7 +1690,7 @@ static int vmx_handle_hard_exception(struct lcd_arch *vcpu)
 		 *
 		 * Set page fault address, and return status code.
 		 */
-		vcpu->page_fault_addr = vcpu->exit_qualification;
+		vcpu->run_info.gva = vcpu->exit_qualification;
 		return LCD_ARCH_STATUS_PAGE_FAULT;
 	default:
 		printk(KERN_ERR "lcd vmx: unhandled hw exception:\n");
@@ -1724,10 +1725,14 @@ static int vmx_handle_exception_nmi(struct lcd_arch *vcpu)
 	}
 }
 
-static void vmx_handle_ept(struct lcd_arch *vcpu)
+static int vmx_handle_ept(struct lcd_arch *vcpu)
 {
-
-
+	/*
+	 * Intel SDM V3 27.2.1
+	 */
+	vcpu->run_info.gva = vmcs_readl(GUEST_LINEAR_ADDRESS);
+	vcpu->run_info.gpa = vmcs_readl(GUEST_PHYSICAL_ADDRESS);
+	return LCD_ARCH_STATUS_EPT_FAULT;
 }
 
 static void vmx_handle_control_reg(struct lcd_arch *vcpu)
@@ -1925,14 +1930,13 @@ int lcd_arch_run(struct lcd_arch *vcpu)
 		ret = vmx_handle_exception_nmi(vcpu);
 		break;
 	case EXIT_REASON_EXTERNAL_INTERRUPT:
-		vmx_handle_external_int(vcpu);
-		ret = LCD_ARCH_STATUS_EXT_INTR;
+		ret = vmx_handle_external_int(vcpu);
 		break;
 	case EXIT_REASON_VMCALL:
 		vmx_handle_vmcall(vcpu);
 		break;
 	case EXIT_REASON_EPT_VIOLATION:
-		vmx_handle_ept(vcpu);
+		ret = vmx_handle_ept(vcpu);
 		break;
 	case EXIT_REASON_CR_ACCESS:
 		vmx_handle_control_reg(vcpu);

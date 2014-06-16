@@ -51,8 +51,10 @@ struct lcd_arch {
 	/*
 	 * Public Data
 	 */
-	u64 page_fault_addr;
-
+	struct {
+		u64 gva;
+		u64 gpa;
+	} run_info;
 
 	/*
 	 * Private Data
@@ -127,6 +129,7 @@ int lcd_arch_run(struct lcd_arch *vcpu);
 enum lcd_arch_status {
 	LCD_ARCH_STATUS_PAGE_FAULT = 0,
 	LCD_ARCH_STATUS_EXT_INTR = 1,
+	LCD_ARCH_STATUS_EPT_FAULT = 2,
 };
 
 #endif  /* LCD_DOMAINS_ARCH_H */

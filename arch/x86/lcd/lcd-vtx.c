@@ -2178,71 +2178,71 @@ int lcd_find_hva_by_gpa(struct lcd *lcd, u64 gpa, u64 *hva) {
 }
 EXPORT_SYMBOL(lcd_find_hva_by_gpa);
 
-static void vmx_handle_external_interrupt(struct lcd *lcd) {  
-	if ((lcd->exit_intr_info &
-			(INTR_INFO_VALID_MASK | INTR_INFO_INTR_TYPE_MASK))
-		== (INTR_INFO_VALID_MASK | INTR_TYPE_EXT_INTR)) {
-		unsigned int vector;
-		unsigned long entry;
-		gate_desc *desc;
-		unsigned long tmp;
+/* static void vmx_handle_external_interrupt(struct lcd *lcd) {   */
+/* 	if ((lcd->exit_intr_info & */
+/* 			(INTR_INFO_VALID_MASK | INTR_INFO_INTR_TYPE_MASK)) */
+/* 		== (INTR_INFO_VALID_MASK | INTR_TYPE_EXT_INTR)) { */
+/* 		unsigned int vector; */
+/* 		unsigned long entry; */
+/* 		gate_desc *desc; */
+/* 		unsigned long tmp; */
               
-		vector = lcd->vec_no;
-		desc = (gate_desc *)lcd->host_idt_base + vector;
-		entry = gate_offset(*desc);
-		asm volatile(
-			"mov %%" _ASM_SP ", %[sp]\n\t"
-			"and $0xfffffffffffffff0, %%" _ASM_SP "\n\t"
-			"push $%c[ss]\n\t"
-			"push %[sp]\n\t"
-			"pushf\n\t"
-			"orl $0x200, (%%" _ASM_SP ")\n\t"
-			__ASM_SIZE(push) " $%c[cs]\n\t"
-			"call *%[entry]\n\t"
-			:
-			[sp]"=&r"(tmp)
-			:
-			[entry]"r"(entry),
-			[ss]"i"(__KERNEL_DS),
-			[cs]"i"(__KERNEL_CS)
-			);
-		/* printk("lcd: handling external %u\n", vector); */
-		if (irqs_disabled())
-			local_irq_enable();
-	} else {
-		local_irq_enable();
-		/* printk("lcd: not handling external %u\n", lcd->exit_intr_info); */
-	}
-}
+/* 		vector = lcd->vec_no; */
+/* 		desc = (gate_desc *)lcd->host_idt_base + vector; */
+/* 		entry = gate_offset(*desc); */
+/* 		asm volatile( */
+/* 			"mov %%" _ASM_SP ", %[sp]\n\t" */
+/* 			"and $0xfffffffffffffff0, %%" _ASM_SP "\n\t" */
+/* 			"push $%c[ss]\n\t" */
+/* 			"push %[sp]\n\t" */
+/* 			"pushf\n\t" */
+/* 			"orl $0x200, (%%" _ASM_SP ")\n\t" */
+/* 			__ASM_SIZE(push) " $%c[cs]\n\t" */
+/* 			"call *%[entry]\n\t" */
+/* 			: */
+/* 			[sp]"=&r"(tmp) */
+/* 			: */
+/* 			[entry]"r"(entry), */
+/* 			[ss]"i"(__KERNEL_DS), */
+/* 			[cs]"i"(__KERNEL_CS) */
+/* 			); */
+/* 		/\* printk("lcd: handling external %u\n", vector); *\/ */
+/* 		if (irqs_disabled()) */
+/* 			local_irq_enable(); */
+/* 	} else { */
+/* 		local_irq_enable(); */
+/* 		/\* printk("lcd: not handling external %u\n", lcd->exit_intr_info); *\/ */
+/* 	} */
+/* } */
 
 
-static void vmx_handle_vmcall(struct lcd *lcd) {
-	u32 ipc_dir, ipc_peer;
+/* static void vmx_handle_vmcall(struct lcd *lcd) { */
+/* 	u32 ipc_dir, ipc_peer; */
     
-	//printk(KERN_ERR "%c", lcd->regs[VCPU_REGS_RAX]);
-	printk(KERN_ERR "%016llx", lcd->regs[VCPU_REGS_RAX]);
-	ipc_dir = LCD_IPC_DIR(lcd->regs[VCPU_REGS_RAX]);
-	ipc_peer = LCD_IPC_PEER(lcd->regs[VCPU_REGS_RAX]);
+/* 	//printk(KERN_ERR "%c", lcd->regs[VCPU_REGS_RAX]); */
+/* 	printk(KERN_ERR "%016llx", lcd->regs[VCPU_REGS_RAX]); */
+/* 	ipc_dir = LCD_IPC_DIR(lcd->regs[VCPU_REGS_RAX]); */
+/* 	ipc_peer = LCD_IPC_PEER(lcd->regs[VCPU_REGS_RAX]); */
 
-	printk(KERN_ERR "vmx_handle_vmcall  - dir %d peer %d\n", ipc_dir, ipc_peer);
+/* 	printk(KERN_ERR "vmx_handle_vmcall  - dir %d peer %d\n", ipc_dir, ipc_peer); */
 
-	switch(ipc_dir) {
-	case IPC_SEND:
-		ipc_send(lcd->sync_ipc.my_capid, ipc_peer);
-		break;
-	case IPC_RECV:
-		ipc_recv(lcd->sync_ipc.my_capid, ipc_peer);
-		break;
-	}
-#if 0
-	//printk(KERN_ERR "lcd_run: got vmcall %llu and %c\n", lcd->regs[VCPU_REGS_RAX], lcd->regs[VCPU_REGS_RAX]);
-	if (lcd->regs[VCPU_REGS_RAX] == 0xdeadbeef) {
-		display_mr((utcb_t *)lcd->shared);
-		return;
-	}
-#endif    
+/* 	switch(ipc_dir) { */
+/* 	case IPC_SEND: */
+/* 		ipc_send(lcd->sync_ipc.my_capid, ipc_peer); */
+/* 		break; */
+/* 	case IPC_RECV: */
+/* 		ipc_recv(lcd->sync_ipc.my_capid, ipc_peer); */
+/* 		break; */
+/* 	} */
+/* #if 0 */
+/* 	//printk(KERN_ERR "lcd_run: got vmcall %llu and %c\n", lcd->regs[VCPU_REGS_RAX], lcd->regs[VCPU_REGS_RAX]); */
+/* 	if (lcd->regs[VCPU_REGS_RAX] == 0xdeadbeef) { */
+/* 		display_mr((utcb_t *)lcd->shared); */
+/* 		return; */
+/* 	} */
+/* #endif     */
    
-}
+/* } */
 
 /* static void vmx_handle_page_fault(struct lcd *lcd) { */
 /* 	printk(KERN_INFO "lcd: page fault VA %p\n", */

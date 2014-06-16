@@ -13,7 +13,7 @@
 #include <asm/virtext.h>
 #include <asm/vmx.h>
 #include <asm/desc.h>
-#include <asm/lcd-vmx.h>
+#include <asm/lcd-domains.h>
 
 #include <linux/bitmap.h>
 #include <linux/spinlock.h>

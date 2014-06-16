@@ -14,11 +14,11 @@ flounder_parser.o: flounder_parser.cpp flounder_parser.h
 		g++ -c -g flounder_parser.cpp flounder_parser.h
 
 flounder_parser.cpp:
-		vembyr/peg.py --cpp flounder > flounder_parser.cpp
+		vembyr-1.1/peg.py --cpp flounder > flounder_parser.cpp
 
 flounder_parser.h:
-		vembyr/peg.py --h flounder > flounder_parser.h
+		vembyr-1.1/peg.py --h flounder > flounder_parser.h
 
 clean:
 		rm flounder_parser.* *.o compiler peg_peg.py
-		vembyr/peg_peg.pyc
+		vembyr-1.1/peg_peg.pyc

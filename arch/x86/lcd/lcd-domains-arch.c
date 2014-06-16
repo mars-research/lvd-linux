@@ -944,6 +944,17 @@ static struct desc_struct * vmx_per_cpu_gdt(void)
 }
 
 /**
+ * Returns pointer to current idt (array of gate descriptors) on 
+ * calling cpu.
+ */
+static struct gate_desc * vmx_per_cpu_idt(void)
+{
+	struct desc_ptr idt_ptr;
+	native_store_idt(&idt_ptr);
+	return (struct gate_desc *)idt_ptr.address;
+}
+
+/**
  * Returns pointer to tss segment descriptor in cpu's gdt.
  */
 static struct desc_struct * vmx_per_cpu_tss_desc(void)
@@ -1577,15 +1588,96 @@ static void vmx_handle_vmcall(struct lcd_arch *vcpu)
 
 }
 
-static void vmx_handle_external_int(struct lcd_arch *vcpu)
+/**
+ * Processes an external interrupt (e.g. timer interrupt) by
+ * emulating 64-bit interrupt handling. Kernel preemption should
+ * be disabled, otherwise the interrupt handler could switch to
+ * another conflicting task. Unlike kvm, interrupts are assumed
+ * to be *enabled*, but will be disabled when the interrupt
+ * handler is called, per the ia32 spec (Intel SDM V3 6.8.1).
+ */
+static void vmx_handle_external_intr(struct lcd_arch *vcpu)
 {
+	unsigned int vector;
+	unsigned long entry;
+	unsigned long sp_tmp;
+	struct gate_desc *idt;
+	struct gate_desc *gate;
+	/*
+	 * Load interrupt entry address
+	 *
+	 * Intel SDM V3 24.9.2, 27.2.2 (for vmx intr info)
+	 * Intel SDM V3 6.14.1 (for idt layout)
+	 */
+	vector =  exit_intr_info & INTR_INFO_VECTOR_MASK;
+	idt = vmx_per_cpu_idt();
+	gate = idt + vector;
+	entry = gate_offset(&gate);
 
+	/*
+	 * Disable interrupts, per what the interrupt handler expects.
+	 *
+	 * Intel SDM V3 6.8.1
+	 */
+	local_irq_disable();
 
+	/*
+	 * Emulate 64-bit interrupt handling
+	 *
+	 * Intel SDM V3 6.14
+	 */
+	asm volatile(
+		/*
+		 * Save current stack pointer (notice & in asm flags)
+		 */
+		"mov %%" _ASM_SP ", %[sp]\n\t"
+		/*
+		 * Align sp to 16 bits (this should be OK under normal
+		 * conditions since stack frames are 16-bit aligned and
+		 * any junk in this stack frame is no longer needed -- we
+		 * just needed to calc handler_addr, which is now in a
+		 * register due to the r constraint).
+		 */
+		"and $0xfffffffffffffff0, %%" _ASM_SP "\n\t"
+		/*
+		 * %ss and sp are always pushed
+		 */
+		"push $%c[ss]\n\t"
+		"push %[sp]\n\t"
+		/*
+		 * Push %rflags. Ensure `interrupts enabled' bit is
+		 * set so that interrupts will be enabled on return
+		 * (and maybe for some other reason?).
+		 */
+		"pushf\n\t"
+		"orl $0x200, (%%" _ASM_SP ")\n\t"
+		/*
+		 * Push %cs
+		 */
+		__ASM_SIZE(push) " $%c[cs]\n\t"
+		/*
+		 * Call will push %rip, and jump to handler. Error code
+		 * not needed for external interrupts.
+		 *
+		 * Interrupt service routine will return here.
+		 */
+		"call *%[entry]\n\t"
+		:
+		[sp]"=&r"(sp_tmp)
+		:
+		[entry]"r"(entry),
+		[ss]"i"(__KERNEL_DS),
+		[cs]"i"(__KERNEL_CS)
+		);
 }
 
+/**
+ * Processes hardware exceptions -- page faults, general protection
+ * exceptions, etc.
+ */
 static int vmx_handle_hard_exception(struct lcd_arch *vcpu)
 {
-	int vector;
+	unsigned int vector;
 	/*
 	 * Intel SDM V3 24.9.2, 27.2.2
 	 */
@@ -1598,7 +1690,7 @@ static int vmx_handle_hard_exception(struct lcd_arch *vcpu)
 		 * Set page fault address, and return status code.
 		 */
 		vcpu->page_fault_addr = vcpu->exit_qualification;
-		return LCD_ARCH_STATUS_PF;
+		return LCD_ARCH_STATUS_PAGE_FAULT;
 	default:
 		printk(KERN_ERR "lcd vmx: unhandled hw exception:\n");
 		printk(KERN_ERR "         vector: %x, info: %x\n",
@@ -1618,7 +1710,7 @@ static int vmx_handle_exception_nmi(struct lcd_arch *vcpu)
 	switch (type) {
 	case INTR_TYPE_HARD_EXCEPTION:
 		/*
-		 * Page fault, trap, machine check, ...
+		 * Page fault, trap, machine check, gp ...
 		 */
 		return vmx_handle_hard_exception(vcpu);
 	default:
@@ -1808,6 +1900,7 @@ static int __noclone vmx_enter(struct lcd_arch *vcpu)
 
 int lcd_arch_run(struct lcd_arch *vcpu)
 {
+	int exit_reason;
 	int ret;
 
 	/*
@@ -1820,19 +1913,20 @@ int lcd_arch_run(struct lcd_arch *vcpu)
 	/*
 	 * Enter lcd
 	 */
-	ret = vmx_enter(vcpu);
+	exit_reason = vmx_enter(vcpu);
 
 	/*
 	 * Handle exit reason
 	 *
 	 * Intel SDM V3 Appendix C
 	 */
-	switch (ret) {
+	switch (exit_reason) {
 	case EXIT_REASON_EXCEPTION_NMI:
-		vmx_handle_exception_nmi(vcpu);
+		ret = vmx_handle_exception_nmi(vcpu);
 		break;
 	case EXIT_REASON_EXTERNAL_INTERRUPT:
 		vmx_handle_external_int(vcpu);
+		ret = LCD_ARCH_STATUS_EXT_INTR;
 		break;
 	case EXIT_REASON_VMCALL:
 		vmx_handle_vmcall(vcpu);
@@ -1849,6 +1943,8 @@ int lcd_arch_run(struct lcd_arch *vcpu)
 	 * Preemption enabled
 	 */
 	vmx_put_cpu(vcpu);
+
+	return ret;
 }
 
 

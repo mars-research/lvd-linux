@@ -2244,27 +2244,27 @@ static void vmx_handle_vmcall(struct lcd *lcd) {
    
 }
 
-static void vmx_handle_page_fault(struct lcd *lcd) {
-	printk(KERN_INFO "lcd: page fault VA %p\n",
-		(void*)lcd->exit_qualification);
-}
+/* static void vmx_handle_page_fault(struct lcd *lcd) { */
+/* 	printk(KERN_INFO "lcd: page fault VA %p\n", */
+/* 		(void*)lcd->exit_qualification); */
+/* } */
 
-static int vmx_handle_nmi_exception(struct lcd *vcpu)
-{
-	printk(KERN_INFO "lcd: got an exception\n");
-	if ((vcpu->exit_intr_info & INTR_INFO_INTR_TYPE_MASK)
-		== INTR_TYPE_NMI_INTR)
-		return 0;
-	else if (is_page_fault(vcpu->exit_intr_info)) {
-		vmx_handle_page_fault(vcpu);
-		return 1;
-	}
+/* static int vmx_handle_nmi_exception(struct lcd *vcpu) */
+/* { */
+/* 	printk(KERN_INFO "lcd: got an exception\n"); */
+/* 	if ((vcpu->exit_intr_info & INTR_INFO_INTR_TYPE_MASK) */
+/* 		== INTR_TYPE_NMI_INTR) */
+/* 		return 0; */
+/* 	else if (is_page_fault(vcpu->exit_intr_info)) { */
+/* 		vmx_handle_page_fault(vcpu); */
+/* 		return 1; */
+/* 	} */
 
-	printk(KERN_ERR "lcd: unhandled nmi, intr_info %x\n",
-		vcpu->exit_intr_info);
-	vcpu->ret_code = ((EFAULT) << 8);
-	return -EIO;
-}
+/* 	printk(KERN_ERR "lcd: unhandled nmi, intr_info %x\n", */
+/* 		vcpu->exit_intr_info); */
+/* 	vcpu->ret_code = ((EFAULT) << 8); */
+/* 	return -EIO; */
+/* } */
 
 /* int lcd_run(struct lcd *lcd) { */
 /* 	int done = 0; */

@@ -115,6 +115,9 @@ void lcd_arch_destroy(struct lcd_arch *vcpu);
  * a different cpu, it will become inactive there.) Kernel
  * preemption is disabled while the LCD is launched, but
  * external interrupts are not disabled and will be handled.
+ *
+ * Unless the caller does otherwise, kernel preemption is
+ * enabled before returning.
  */
 int lcd_arch_run(struct lcd_arch *vcpu);
 
@@ -122,7 +125,8 @@ int lcd_arch_run(struct lcd_arch *vcpu);
  * Status codes for running LCDs.
  */
 enum lcd_arch_status {
-	LCD_ARCH_STATUS_PF = 0
+	LCD_ARCH_STATUS_PAGE_FAULT = 0,
+	LCD_ARCH_STATUS_EXT_INTR = 1,
 };
 
 #endif  /* LCD_DOMAINS_ARCH_H */

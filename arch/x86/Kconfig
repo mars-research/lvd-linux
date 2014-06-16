@@ -2776,6 +2776,13 @@ source "arch/x86/kvm/Kconfig"
 
 source "lib/Kconfig"
 
+config LCD_INTEL
+       tristate "Intel support for LCDs"
+       depends on X86_64
+       default y
+       ---help---
+       Intel-specific code for using LCDs.
+
 source "virt/Kconfig"
 
 source "arch/x86/lcdguest/Kconfig"

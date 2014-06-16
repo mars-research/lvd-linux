@@ -40,21 +40,17 @@ Message      =	   MESSAGE i:Identifier OPEN a:Arguments CLOSE SEMI Spacing {{ st
 	     	   cast_a(args, a);
 	     	   value = new Message((char*)i.getValue(), args); }}
 
-Arguments    =	   a:ArgStart* {{ std::vector<Argument*> * args = new std::vector<Argument*>;
-		      cast_a(args, a);
-		      value = args; }}
-		      
-	     	   | a:ArgStart* a2:ArgLast {{ std::vector<Argument*> * args = new std::vector<Argument*>;
+Arguments    =	    a:ArgStart* a2:ArgLast {{ std::vector<Argument*> * args = new std::vector<Argument*>;
 		      cast_a(args, a);
 		      Argument * as = (Argument *) a2.getValue();
 		      args->push_back(as);
 		      value = args; }}
 
-ArgStart     =	   s:SimpleArg COMMA {{ value = s; }}	        
-		   | d:DynamicArg COMMA {{ value = d; }}
+ArgStart     =	   s:SimpleArg COMMA Spacing {{ value = s; }}	        
+		   | d:DynamicArg COMMA Spacing {{ value = d; }}
 
-ArgLast	     =	   s:SimpleArg {{ value = s; }}
-		   | d:DynamicArg {{ value = d; }}
+ArgLast	     =	   s:SimpleArg Spacing {{ value = s; }}
+		   | d:DynamicArg Spacing {{ value = d; }}
 
 SimpleArg    =	   t:Identifier i:Identifier {{ value = new Argument((Type*) t.getValue(), (char *) i.getValue()); }}
 

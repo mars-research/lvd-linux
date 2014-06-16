@@ -13,7 +13,7 @@
 #include <asm/virtext.h>
 #include <asm/vmx.h>
 #include <asm/desc.h>
-#include <asm/lcd-domains.h>
+#include <asm/lcd-domains-arch.h>
 
 #include <linux/bitmap.h>
 #include <linux/spinlock.h>
@@ -54,7 +54,7 @@ static struct {
 	spinlock_t lock;
 } vpids;
 
-static DEFINE_PER_CPU(struct lcd_vmx *, local_vcpu);
+static DEFINE_PER_CPU(struct lcd_arch *, local_vcpu);
 
 static unsigned long *msr_bitmap;
 
@@ -398,7 +398,7 @@ static int __vmx_enable(struct vmx_vmcs *vmxon_buf)
 /**
  * Turn on vmx on calling cpu, using per cpu vmxon_area.
  *
- * unused is ignored (NULL is passed in lcd_vmx_init).
+ * unused is ignored (NULL is passed in lcd_arch_init).
  *
  * Important: Assumes preemption is disabled (it will be
  * if called via on_each_cpu).
@@ -439,7 +439,7 @@ failed:
 /**
  * Turns off vmx on calling cpu.
  *
- * unused is ignored (NULL is passed in lcd_vmx_init).
+ * unused is ignored (NULL is passed in lcd_arch_init).
  *
  * Important: Assumes preemption is disabled. (It will
  * be if called from on_each_cpu.)
@@ -776,7 +776,7 @@ static int setup_vmcs_config(struct vmx_vmcs_config *vmcs_conf)
 
 /* VMX INIT / EXIT -------------------------------------------------- */
 
-int lcd_vmx_init(void)
+int lcd_arch_init(void)
 {
 	int ret;
 	int cpu;
@@ -863,7 +863,7 @@ failed1:
 	return ret;
 }
 
-void lcd_vmx_exit(void)
+void lcd_arch_exit(void)
 {
 	on_each_cpu(vmx_disable, NULL, 1);
 	vmx_free_vmxon_areas();
@@ -876,7 +876,7 @@ void lcd_vmx_exit(void)
  * Initializes the EPT's root global page directory page, the
  * VMCS pointer, and the spinlock.
  */
-int vmx_init_ept(struct lcd_vmx *vcpu)
+int vmx_init_ept(struct lcd_arch *vcpu)
 {
 	void *page;
 	u64 eptp;
@@ -959,7 +959,7 @@ static struct desc_struct * vmx_per_cpu_tss_desc(void)
 /**
  * Stores expected host state in VMCS.
  */
-static void vmx_setup_vmcs_host(struct lcd_vmx *vcpu)
+static void vmx_setup_vmcs_host(struct lcd_arch *vcpu)
 {
 	unsigned long tmpl;
 
@@ -1009,14 +1009,14 @@ static void vmx_setup_vmcs_host(struct lcd_vmx *vcpu)
 	rdmsrl(MSR_EFER, tmpl);
 	vmcs_writel(HOST_IA32_EFER, tmpl);
 
-	/* asm("mov $.Llcd_vmx_return, %0" : "=r"(tmpl)); */
+	/* asm("mov $.Llcd_arch_return, %0" : "=r"(tmpl)); */
 	/* vmcs_writel(HOST_RIP, tmpl); /\* 22.2.5 *\/ */
 }
 
 /**
- * Sets up MSR autloading for MSRs listed in lcd_vmx_autoload_msrs.
+ * Sets up MSR autloading for MSRs listed in lcd_arch_autoload_msrs.
  */
-static void vmx_setup_vmcs_msr(struct lcd_vmx *vcpu)
+static void vmx_setup_vmcs_msr(struct lcd_arch *vcpu)
 {
 	int i;
 	u64 val;
@@ -1041,30 +1041,30 @@ static void vmx_setup_vmcs_msr(struct lcd_vmx *vcpu)
 	 *
 	 * Intel SDM V3 24.7.2, 24.8.2, 31.10.2, 31.10.3
 	 */
-	vmcs_write32(VM_EXIT_MSR_STORE_COUNT, LCD_VMX_NUM_AUTOLOAD_MSRS);
-	vmcs_write32(VM_EXIT_MSR_LOAD_COUNT, LCD_VMX_NUM_AUTOLOAD_MSRS);
-	vmcs_write32(VM_ENTRY_MSR_LOAD_COUNT, LCD_VMX_NUM_AUTOLOAD_MSRS);
+	vmcs_write32(VM_EXIT_MSR_STORE_COUNT, LCD_ARCH_NUM_AUTOLOAD_MSRS);
+	vmcs_write32(VM_EXIT_MSR_LOAD_COUNT, LCD_ARCH_NUM_AUTOLOAD_MSRS);
+	vmcs_write32(VM_ENTRY_MSR_LOAD_COUNT, LCD_ARCH_NUM_AUTOLOAD_MSRS);
 
 	vmcs_write64(VM_EXIT_MSR_LOAD_ADDR, __pa(vcpu->msr_autoload.host));
 	vmcs_write64(VM_EXIT_MSR_STORE_ADDR, __pa(vcpu->msr_autoload.guest));
 	vmcs_write64(VM_ENTRY_MSR_LOAD_ADDR, __pa(vcpu->msr_autoload.guest));
 
-	for (i = 0; i < LCD_VMX_NUM_AUTOLOAD_MSRS; i++) {
+	for (i = 0; i < LCD_ARCH_NUM_AUTOLOAD_MSRS; i++) {
 	
 		e = &vcpu->msr_autoload.host[i];
-		e->index = lcd_vmx_autoload_msrs[i];
+		e->index = lcd_arch_autoload_msrs[i];
 		rdmsrl(e->index, val);
 		e->value = val;
 
 		e = &vcpu->msr_autoload.guest[i];
-		e->index = lcd_vmx_autoload_msrs[i];
+		e->index = lcd_arch_autoload_msrs[i];
 	}
 }
 
 /**
  * Sets up initial guest register values in VMCS.
  */
-static void vmx_setup_vmcs_guest_regs(struct lcd_vmx *vcpu)
+static void vmx_setup_vmcs_guest_regs(struct lcd_arch *vcpu)
 {
 	unsigned long cr0;
 	unsigned long cr4;
@@ -1186,11 +1186,11 @@ static void vmx_setup_vmcs_guest_regs(struct lcd_vmx *vcpu)
 	 *
 	 * Intel SDM V3 3.4.4
 	 */
-	vmcs_write16(GUEST_CS_SELECTOR, LCD_VMX_CS_SELECTOR); /* code */
+	vmcs_write16(GUEST_CS_SELECTOR, LCD_ARCH_CS_SELECTOR); /* code */
 	vmcs_write16(GUEST_DS_SELECTOR, 0); /* ignored */
 	vmcs_write16(GUEST_ES_SELECTOR, 0); /* ignored */
-	vmcs_write16(GUEST_FS_SELECTOR, LCD_VMX_FS_SELECTOR); /* data */ 
-	vmcs_write16(GUEST_GS_SELECTOR, LCD_VMX_GS_SELECTOR); /* data */
+	vmcs_write16(GUEST_FS_SELECTOR, LCD_ARCH_FS_SELECTOR); /* data */ 
+	vmcs_write16(GUEST_GS_SELECTOR, LCD_ARCH_GS_SELECTOR); /* data */
 	vmcs_write16(GUEST_SS_SELECTOR, 0); /* ignored */
 
 	/*
@@ -1234,7 +1234,7 @@ static void vmx_setup_vmcs_guest_regs(struct lcd_vmx *vcpu)
  * Sets up VMCS settings--execution control, control register
  * access, exception handling.
  */
-static void vmx_setup_vmcs_guest_settings(struct lcd_vmx *vcpu)
+static void vmx_setup_vmcs_guest_settings(struct lcd_arch *vcpu)
 {
 	/*
 	 * VPID
@@ -1289,7 +1289,7 @@ static void vmx_setup_vmcs_guest_settings(struct lcd_vmx *vcpu)
  * Front-end for setting up VMCS. Calls helper routines
  * to set up guest and host states of VMCS.
  */
-static void vmx_setup_vmcs(struct lcd_vmx *vcpu)
+static void vmx_setup_vmcs(struct lcd_arch *vcpu)
 {
 	/*
 	 * Set up guest part of vmcs, and guest exec
@@ -1314,7 +1314,7 @@ static void vmx_setup_vmcs(struct lcd_vmx *vcpu)
  * cpu. (Linux uses per-cpu data that needs to be updated in
  * the lcd's VMCS.)
  */
-static void __vmx_setup_cpu(struct lcd_vmx *vcpu, int cur_cpu)
+static void __vmx_setup_cpu(struct lcd_arch *vcpu, int cur_cpu)
 {
 	struct desc_struct *gdt;
 	struct desc_struct *tss_desc;
@@ -1346,7 +1346,7 @@ static void __vmx_setup_cpu(struct lcd_vmx *vcpu, int cur_cpu)
  */
 static void __vmx_get_cpu_helper(void *ptr)
 {
-	struct lcd_vmx *vcpu;
+	struct lcd_arch *vcpu;
 	vcpu = ptr;
 	BUG_ON(raw_smp_processor_id() != vcpu->cpu);
 	vmcs_clear(vcpu->vmcs);
@@ -1359,7 +1359,7 @@ static void __vmx_get_cpu_helper(void *ptr)
  *
  * Disables preemption. Call vmx_put_cpu() when finished.
  */
-static void vmx_get_cpu(struct lcd_vmx *vcpu)
+static void vmx_get_cpu(struct lcd_arch *vcpu)
 {
 	int cur_cpu;
 
@@ -1442,7 +1442,7 @@ static void vmx_get_cpu(struct lcd_vmx *vcpu)
  *
  * Enables preemption.
  */
-static void vmx_put_cpu(struct lcd_vmx *vcpu)
+static void vmx_put_cpu(struct lcd_arch *vcpu)
 {
 	put_cpu();
 }
@@ -1453,7 +1453,7 @@ static void vmx_put_cpu(struct lcd_vmx *vcpu)
 /**
  * Reserves a vpid and sets it in the vcpu.
  */
-static int vmx_allocate_vpid(struct lcd_vmx *vmx)
+static int vmx_allocate_vpid(struct lcd_arch *vmx)
 {
 	int vpid;
 
@@ -1473,7 +1473,7 @@ static int vmx_allocate_vpid(struct lcd_vmx *vmx)
 /**
  * Frees a vpid.
  */
-static void vmx_free_vpid(struct lcd_vmx *vmx)
+static void vmx_free_vpid(struct lcd_arch *vmx)
 {
 	spin_lock(&vpids.lock);
 	if (vmx->vpid != 0)
@@ -1481,12 +1481,12 @@ static void vmx_free_vpid(struct lcd_vmx *vmx)
 	spin_unlock(&vpids.lock);
 }
 
-struct lcd_vmx* lcd_vmx_create(void)
+struct lcd_arch* lcd_arch_create(void)
 {
-	struct lcd_vmx* vcpu;
+	struct lcd_arch* vcpu;
 
 	/*
-	 * Alloc lcd_vmx
+	 * Alloc lcd_arch
 	 */
 	vcpu = kmalloc(sizeof(*vcpu), GFP_KERNEL);
 	if (!vcpu)
@@ -1533,7 +1533,7 @@ fail_vcpu:
 	return NULL;
 }
 
-static void lcd_vmx_destroy(struct lcd_vmx *vcpu)
+static void lcd_arch_destroy(struct lcd_arch *vcpu)
 {
 	/*
 	 * Premption Disabled
@@ -1574,7 +1574,7 @@ static void lcd_vmx_destroy(struct lcd_vmx *vcpu)
  * Low-level vmx launch / resume to enter non-root mode on cpu with
  * the current vmcs.
  */
-static int __noclone vmx_enter(struct lcd_vmx *vcpu)
+static int __noclone vmx_enter(struct lcd_arch *vcpu)
 {
 	asm(
 		/* 
@@ -1630,9 +1630,9 @@ static int __noclone vmx_enter(struct lcd_vmx *vcpu)
 		 */
 		"jne .Llaunched \n\t"
 		ASM_VMX_VMLAUNCH "\n\t"
-		"jmp .Llcd_vmx_return \n\t"
+		"jmp .Llcd_arch_return \n\t"
 		".Llaunched: " ASM_VMX_VMRESUME "\n\t"
-		".Llcd_vmx_return: "
+		".Llcd_arch_return: "
 
 		/*
 		 * Save guest registers, load host registers, keep flags
@@ -1732,8 +1732,8 @@ static int __noclone vmx_enter(struct lcd_vmx *vcpu)
 
 /* EXPORTS -------------------------------------------------- */
 
-EXPORT_SYMBOL(lcd_vmx_init);
-EXPORT_SYMBOL(lcd_vmx_exit);
-EXPORT_SYMBOL(lcd_vmx_create);
-EXPORT_SYMBOL(lcd_vmx_destroy);
-EXPORT_SYMBOL(lcd_vmx_run);
+EXPORT_SYMBOL(lcd_arch_init);
+EXPORT_SYMBOL(lcd_arch_exit);
+EXPORT_SYMBOL(lcd_arch_create);
+EXPORT_SYMBOL(lcd_arch_destroy);
+EXPORT_SYMBOL(lcd_arch_run);

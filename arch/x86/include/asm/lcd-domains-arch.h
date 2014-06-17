@@ -42,6 +42,7 @@ enum lcd_arch_reg {
 
 #define LCD_ARCH_EPT_WALK_LENGTH 4
 #define LCD_ARCH_EPTP_WALK_SHIFT 3
+#define LCD_ARCH_PTRS_PER_EPTE   (1 << 9)
 
 struct lcd_arch_ept {
 	spinlock_t lock;

@@ -878,6 +878,7 @@ void lcd_arch_exit(void)
  */
 #define VMX_EPTE_ADDR_MASK PAGE_MASK
 #define VMX_EPTE_ADDR(epte) (((u64)epte) & PAGE_MASK)
+#define VMX_EPTE_VADDR(epte) (__va(VMX_EPTE_ADDR(epte)))
 #define VMX_EPT_ALL_MASK (VMX_EPT_READABLE_MASK | \
                           VMX_EPT_WRITABLE_MASK | \
 			  VMX_EPT_EXECUTABLE_MASK)
@@ -896,7 +897,14 @@ enum vmx_epte_mts {
  * we are using a page walk length of 4, epte's at all levels have
  * the `size' bit (bit 7) set to 0. Page table entries (entries at the final
  * level) have the IPAT (ignore page attribute table) and EPT MT (memory
- * type) bits set. See Intel SDM V3 Figure 28-1 and 28.2.2.
+ * type) bits set. Paging levels are zero-indexed:
+ *
+ *  0 = PML4 entry
+ *  1 = PDPTE entry
+ *  2 = Page Directory entry
+ *  3 = Page Table entry
+ *
+ *  See Intel SDM V3 Figure 28-1 and 28.2.2.
  */
 static void vmx_epte_set(lcd_arch_epte_t *epte, u64 hpa, int level)
 {
@@ -974,6 +982,61 @@ void lcd_arch_ept_set(lcd_arch_epte_t *epte, u64 hpa)
 u64 lcd_arch_ept_hpa(lcd_arch_epte_t *epte)
 {
 	return VMX_EPTE_ADDR(*epte);
+}
+
+/**
+ * Recursively frees all present entries in dir at level, and
+ * the page containing the dir.
+ *
+ * 0 = pml4
+ * 1 = pdpt
+ * 2 = page dir
+ * 3 = page table
+ */
+static void vmx_free_ept_dir_level(lcd_arch_epte_t *dir, int level)
+{
+	int idx;
+	lcd_arch_epte_t *dir;
+	
+	if (level == 3) {
+		/*
+		 * Base case of recursion
+		 *
+		 * Free present pages in page table
+		 */
+		for (idx = 0; idx < LCD_ARCH_PTRS_PER_EPTE; idx++) {
+			if (VMX_EPTE_PRESENT(dir[idx]))
+				free_page(VMX_EPTE_VADDR(dir[idx]));
+		}
+	} else {
+		/*
+		 * pml4, pdpt, or page directory
+		 *
+		 * Recur on present entries
+		 */
+		for (idx = 0; idx < LCD_ARCH_PTRS_PER_EPTE; idx++) {
+			if (VMX_EPTE_PRESENT(dir[idx]))
+				vmx_free_ept_dir_level(dir[idx], level + 1);
+		}
+	}
+	/*
+	 * Free page containing dir
+	 */
+	free_page((u64)dir);
+}
+
+/**
+ * Frees all memory associated with ept (ept paging
+ * structures and mapped physical mem).
+ */
+static void vmx_free_ept(struct lcd_arch *vcpu)
+{
+	lcd_arch_epte_t *dir;
+	/*
+	 * Get pml4 table
+	 */
+	dir = (lcd_arch_epte_t *) __va(vcpu->ept.root_hpa);
+	vmx_free_ept_dir_level(dir, 0);
 }
 
 /**

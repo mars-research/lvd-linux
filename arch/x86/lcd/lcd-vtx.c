@@ -302,23 +302,23 @@
 /* 	return (epte & __EPTE_SZ) > 0; */
 /* } */
 
-static void free_ept_page(epte_t epte) {
-	struct page *page = pfn_to_page(epte_addr(epte) >> PAGE_SHIFT);
+/* static void free_ept_page(epte_t epte) { */
+/* 	struct page *page = pfn_to_page(epte_addr(epte) >> PAGE_SHIFT); */
 
-	if (epte & __EPTE_WRITE)
-		set_page_dirty_lock(page);
-	put_page(page);
-}
+/* 	if (epte & __EPTE_WRITE) */
+/* 		set_page_dirty_lock(page); */
+/* 	put_page(page); */
+/* } */
 
-static int clear_epte(epte_t *epte) {
-	if (*epte == __EPTE_NONE)
-		return 0;
+/* static int clear_epte(epte_t *epte) { */
+/* 	if (*epte == __EPTE_NONE) */
+/* 		return 0; */
 
-	free_ept_page(*epte);
-	*epte = __EPTE_NONE;
+/* 	free_ept_page(*epte); */
+/* 	*epte = __EPTE_NONE; */
 
-	return 1;
-}
+/* 	return 1; */
+/* } */
 
 /* /\** */
 /*  * Look up the ept entry for guest physical */
@@ -450,51 +450,51 @@ static int lcd_ept_gpa_to_hva(struct lcd* vcpu, u64 gpa, u64 *hva) {
 	return 0;
 }
 
-static void lcd_free_ept(u64 ept_root) {
-	epte_t *pgd;
-	int i, j, k, l;
+/* static void lcd_free_ept(u64 ept_root) { */
+/* 	epte_t *pgd; */
+/* 	int i, j, k, l; */
 
-	pgd = (epte_t *) __va(ept_root);
+/* 	pgd = (epte_t *) __va(ept_root); */
 
-	for (i = 0; i < PTRS_PER_PGD; i++) {
-		epte_t *pud = (epte_t *) epte_page_vaddr(pgd[i]);
-		if (!epte_present(pgd[i]))
-			continue;
+/* 	for (i = 0; i < PTRS_PER_PGD; i++) { */
+/* 		epte_t *pud = (epte_t *) epte_page_vaddr(pgd[i]); */
+/* 		if (!epte_present(pgd[i])) */
+/* 			continue; */
 
-		for (j = 0; j < PTRS_PER_PUD; j++) {
-			epte_t *pmd = (epte_t *) epte_page_vaddr(pud[j]);
-			if (!epte_present(pud[j]))
-				continue;
-			if (epte_flags(pud[j]) & __EPTE_SZ)
-				continue;
+/* 		for (j = 0; j < PTRS_PER_PUD; j++) { */
+/* 			epte_t *pmd = (epte_t *) epte_page_vaddr(pud[j]); */
+/* 			if (!epte_present(pud[j])) */
+/* 				continue; */
+/* 			if (epte_flags(pud[j]) & __EPTE_SZ) */
+/* 				continue; */
 
-			for (k = 0; k < PTRS_PER_PMD; k++) {
-				epte_t *pte = (epte_t *) epte_page_vaddr(pmd[k]);
-				if (!epte_present(pmd[k]))
-					continue;
-				if (epte_flags(pmd[k]) & __EPTE_SZ) {
-					free_ept_page(pmd[k]);
-					continue;
-				}
+/* 			for (k = 0; k < PTRS_PER_PMD; k++) { */
+/* 				epte_t *pte = (epte_t *) epte_page_vaddr(pmd[k]); */
+/* 				if (!epte_present(pmd[k])) */
+/* 					continue; */
+/* 				if (epte_flags(pmd[k]) & __EPTE_SZ) { */
+/* 					free_ept_page(pmd[k]); */
+/* 					continue; */
+/* 				} */
 
-				for (l = 0; l < PTRS_PER_PTE; l++) {
-					if (!epte_present(pte[l]))
-						continue;
+/* 				for (l = 0; l < PTRS_PER_PTE; l++) { */
+/* 					if (!epte_present(pte[l])) */
+/* 						continue; */
 
-					free_ept_page(pte[l]);
-				} // PTE loop
+/* 					free_ept_page(pte[l]); */
+/* 				} // PTE loop */
 
-				free_page((unsigned long) pte);
-			} // PMD loop
+/* 				free_page((unsigned long) pte); */
+/* 			} // PMD loop */
 
-			free_page((unsigned long) pmd);
-		} // PUD loop
+/* 			free_page((unsigned long) pmd); */
+/* 		} // PUD loop */
 
-		free_page((unsigned long) pud);
-	} // PGD loop
+/* 		free_page((unsigned long) pud); */
+/* 	} // PGD loop */
 
-	free_page((unsigned long) pgd);
-}
+/* 	free_page((unsigned long) pgd); */
+/* } */
 
 
 /* int vmx_init_ept(struct lcd *vcpu) { */

@@ -1294,8 +1294,6 @@ static void vmx_setup_vmcs_guest_regs(struct lcd_arch *vcpu)
 	vmcs_writel(GUEST_IA32_EFER, EFER_LME | EFER_LMA);
 
 	/*
-	 * gdtr -- to be set when guest address space set up
-	 *
 	 * %rip, %rsp -- to be set when guest address space set up
 	 */
 
@@ -1306,56 +1304,76 @@ static void vmx_setup_vmcs_guest_regs(struct lcd_arch *vcpu)
 	 */
 	vmcs_writel(GUEST_RFLAGS, 0x02);
 
-	/* 
-	 * Guest segment bases
+	/*
+	 *===--- Segment and descriptor table registers ---===
 	 *
-	 * -- Use same %fs and %gs as host
+	 * See Intel SDM V3 26.3.1.2, 26.3.1.3 for register requirements
+	 */
+
+	/* 
+	 * Bases
 	 */
 	vmcs_writel(GUEST_CS_BASE, 0);
 	vmcs_writel(GUEST_DS_BASE, 0);
 	vmcs_writel(GUEST_ES_BASE, 0);
 	vmcs_writel(GUEST_SS_BASE, 0);
-	rdmsrl(MSR_GS_BASE, tmpl);
-	vmcs_writel(GUEST_GS_BASE, tmpl);
-	rdmsrl(MSR_FS_BASE, tmpl);
-	vmcs_writel(GUEST_FS_BASE, tmpl);
+	vmcs_writel(GUEST_FS_BASE, LCD_ARCH_FS_BASE);
+	vmcs_writel(GUEST_GS_BASE, LCD_ARCH_GS_BASE);
+ 	vmcs_writel(GUEST_GDTR_BASE, LCD_ARCH_GDTR_BASE);
+ 	vmcs_writel(GUEST_IDTR_BASE, LCD_ARCH_IDTR_BASE);
+ 	vmcs_writel(GUEST_TR_BASE, LCD_ARCH_TSS_BASE);
 
 	/*
-	 * Guest segment access rights
+	 * Access rights
 	 *
 	 * -- %cs:
 	 *    -- code segment type, execute/read/accessed
 	 *    -- code or data segment desc type
+	 *    -- dpl = 0
 	 *    -- present
 	 *    -- 64-bit mode
-	 *    -- 4KB granularity
+	 *    -- granularity = 1
 	 * -- %ds, %es, %fs, %gs, %ss
 	 *    -- data segment type, read/write/accessed
 	 *    -- code or data segment desc type
+	 *    -- dpl = 0
 	 *    -- present
-	 *    -- 4KB granularity
+	 *    -- granularity = 1
+	 * -- ldtr
+	 *    -- unusable (bit 16 = 1)
+	 * -- tr
+	 *    -- 64-bit busy tss
+	 *    -- present
+	 *    -- granularity = 0
 	 *
-	 * Intel SDM V3 24.4.1, 3.4.5
+	 * Intel SDM V3 24.4.1, 3.4.5, 26.3.1.2
 	 */
-	vmcs_writel(GUEST_CS_AR_BYTES, 0xA09B);
-	vmcs_writel(GUEST_DS_AR_BYTES, 0x8093);
-	vmcs_writel(GUEST_ES_AR_BYTES, 0x8093);
-	vmcs_writel(GUEST_FS_AR_BYTES, 0x8093);
-	vmcs_writel(GUEST_GS_AR_BYTES, 0x8093);
-	vmcs_writel(GUEST_SS_AR_BYTES, 0x8093);
+	vmcs_writel(GUEST_CS_AR_BYTES,   0xA09B);
+	vmcs_writel(GUEST_DS_AR_BYTES,   0x8093);
+	vmcs_writel(GUEST_ES_AR_BYTES,   0x8093);
+	vmcs_writel(GUEST_FS_AR_BYTES,   0x8093);
+	vmcs_writel(GUEST_GS_AR_BYTES,   0x8093);
+	vmcs_writel(GUEST_SS_AR_BYTES,   0x8093);
+ 	vmcs_writel(GUEST_LDTR_AR_BYTES, (1 << 16));
+ 	vmcs_writel(GUEST_TR_AR_BYTES,   0x0083);
 
 	/*
-	 * Guest segment limits 
+	 * Limits 
 	 *
-	 * Granularity = 1, so units are in 4KBs (not bytes) and
-	 * hence each is a 4GB limit.
+	 * -- Limits are always in bytes
+	 * -- Granularity (see above) seems to have different
+	 *    semantics? See Intel SDM V3 26.3.1.2.
+	 * -- For gdtr and idtr, upper 16 bits are set to 0 on vm enter.
 	 */
-	vmcs_write32(GUEST_CS_LIMIT, 0xFFFFF);
-	vmcs_write32(GUEST_DS_LIMIT, 0xFFFFF);
-	vmcs_write32(GUEST_ES_LIMIT, 0xFFFFF);
-	vmcs_write32(GUEST_FS_LIMIT, 0xFFFFF);
-	vmcs_write32(GUEST_GS_LIMIT, 0xFFFFF);
-	vmcs_write32(GUEST_SS_LIMIT, 0xFFFFF);
+	vmcs_write32(GUEST_CS_LIMIT, 0xFFFFFFFF);
+	vmcs_write32(GUEST_DS_LIMIT, 0xFFFFFFFF);
+	vmcs_write32(GUEST_ES_LIMIT, 0xFFFFFFFF);
+	vmcs_write32(GUEST_FS_LIMIT, 0xFFFFFFFF);
+	vmcs_write32(GUEST_GS_LIMIT, 0xFFFFFFFF);
+	vmcs_write32(GUEST_SS_LIMIT, 0xFFFFFFFF);
+	vmcs_write32(GUEST_TR_LIMIT,   LCD_ARCH_TSS_LIMIT);
+	vmcs_write32(GUEST_GDTR_LIMIT, LCD_ARCH_GDTR_LIMIT);
+	vmcs_write32(GUEST_IDTR_LIMIT, LCD_ARCH_IDTR_LIMIT);
 
 	/* 
 	 * Guest segment selectors
@@ -1370,6 +1388,7 @@ static void vmx_setup_vmcs_guest_regs(struct lcd_arch *vcpu)
 	vmcs_write16(GUEST_FS_SELECTOR, LCD_ARCH_FS_SELECTOR); /* data */ 
 	vmcs_write16(GUEST_GS_SELECTOR, LCD_ARCH_GS_SELECTOR); /* data */
 	vmcs_write16(GUEST_SS_SELECTOR, 0); /* ignored */
+	vmcs_write16(GUEST_TR_SELECTOR, LCD_ARCH_TR_SELECTOR);
 
 	/*
 	 * Guest activity state = active

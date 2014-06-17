@@ -36,10 +36,6 @@ enum lcd_arch_reg {
 	LCD_ARCH_NUM_REGS
 };
 
-#define LCD_ARCH_CS_SELECTOR 1
-#define LCD_ARCH_FS_SELECTOR 2
-#define LCD_ARCH_GS_SELECTOR 3
-
 #define LCD_ARCH_EPT_WALK_LENGTH 4
 #define LCD_ARCH_EPTP_WALK_SHIFT 3
 #define LCD_ARCH_PTRS_PER_EPTE   (1 << 9)
@@ -52,6 +48,22 @@ struct lcd_arch_ept {
 };
 
 typedef epte_t lcd_arch_epte_t;
+
+struct lcd_arch_tss {
+	/*
+	 * Intel SDM V3 7.7
+	 *
+	 * Base TSS before I/O bitmap, etc.
+	 */
+	struct x86_hw_tss base_tss;
+	/*
+	 * I/O bitmap must be at least 8 bits to contain
+	 * required 8 bits that are set.
+	 *
+	 * Intel SDM V1 16.5.2
+	 */
+	u8 io_bitmap[1];
+} __attribute__((packed));
 
 
 struct lcd_arch {
@@ -70,8 +82,10 @@ struct lcd_arch {
 	int launched;
 	int vpid;
 	struct lcd_arch_vmcs *vmcs;
+
 	struct lcd_arch_ept ept;
-	struct desc_struct *gdt;
+	struct desc_struct  *gdt;
+	struct lcd_arch_tss *tss;
 
 	u8  fail;
 	u64 exit_reason;
@@ -157,5 +171,67 @@ int lcd_arch_ept_set(lcd_arch_epte_t *epte, u64 hpa);
  */
 u64 lcd_arch_ept_hpa(lcd_arch_epte_t *epte);
 
+/*
+ * GDT Layout
+ * ==========
+ * 0 = NULL
+ * 1 = Code segment
+ * 2 = Data segment
+ * 3 = Data segment
+ * 4 = Task segment
+ *
+ * See Intel SDM V3 26.3.1.2, 26.3.1.3 for register requirements.
+ * See Intel SDM V3 3.4.2, 3.4.3 for segment register layout
+ * See Intel SDM V3 2.4.1 - 2.4.4 for gdtr, ldtr, idtr, tr
+ */
+#define LCD_ARCH_FS_BASE     0x0UL
+#define LCD_ARCH_FS_LIMIT    0xFFFFFFFF
+#define LCD_ARCH_GS_BASE     0x0UL
+#define LCD_ARCH_GS_LIMIT    0xFFFFFFFF
+#define LCD_ARCH_GDTR_BASE   0x0000000000002000UL
+#define LCD_ARCH_GDTR_LIMIT  ~(PAGE_SIZE - 1)
+#define LCD_ARCH_TSS_BASE    0x0000000000003000UL
+/* tss base + limit = address of last byte in tss, hence -1 */
+#define LCD_ARCH_TSS_LIMIT   (sizeof(struct lcd_arch_tss) - 1)
+#define LCD_ARCH_IDTR_BASE   0x0UL
+#define LCD_ARCH_IDTR_LIMIT  0x0 /* no idt right now */
+
+#define LCD_ARCH_CS_SELECTOR   (1 << 3)
+#define LCD_ARCH_FS_SELECTOR   (2 << 3)
+#define LCD_ARCH_GS_SELECTOR   (3 << 3)
+#define LCD_ARCH_TR_SELECTOR   (4 << 3) /* TI must be 0 */
+#define LCD_ARCH_LDTR_SELECTOR (0 << 3) /* unusable */
+
+/*
+ * Guest Physical Memory Layout
+ * ============================
+ *
+ *                         +---------------------------+ 0xFFFF FFFF FFFF FFFF
+ *                         |                           |
+ *                         :                           :
+ *                         :      Free / Unmapped      :
+ *                         :                           :
+ *                         |                           |
+ * LCD_ARCH_STACK_TOP,---> +---------------------------+ 0x0000 0000 0000 4000
+ * LCD_ARCH_FREE           |                           |
+ *                         |          Stack            |
+ *                         :       (grows down)        : (4 KBs)
+ *                         :                           :
+ *                         |                           |
+ *                         |   IPC Message Registers   |
+ * LCD_ARCH_IPC_REGS-----> +---------------------------+ 0x0000 0000 0000 3000
+ *                         |           TSS             |
+ *                         |    only sizeof(tss) is    | (4 KBs)
+ *                         |           used            |
+ * LCD_ARCH_TSS_BASE-----> +---------------------------+ 0x0000 0000 0000 2000
+ *                         |           GDT             | (4 KBs)
+ * LCD_ARCH_GDT_BASE-----> +---------------------------+ 0x0000 0000 0000 1000
+ *                         |         Reserved          |
+ *                         |       (not mapped)        | (4 KBs)
+ *                         +---------------------------+ 0x0000 0000 0000 0000
+ */
+#define LCD_ARCH_IPC_REGS    0x0000000000003000UL
+#define LCD_ARCH_STACK_TOP   0x0000000000004000UL
+#define LCD_ARCH_FREE        LCD_ARCH_STACK_TOP
 
 #endif  /* LCD_DOMAINS_ARCH_H */

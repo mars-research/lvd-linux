@@ -874,6 +874,109 @@ void lcd_arch_exit(void)
 /* VMX EPT -------------------------------------------------- */
 
 /**
+ * PAGE_SHIFT is assumed to be 12.
+ */
+#define VMX_EPTE_ADDR_MASK PAGE_MASK
+#define VMX_EPTE_ADDR(epte) (((u64)epte) & PAGE_MASK)
+#define VMX_EPT_ALL_MASK (VMX_EPT_READABLE_MASK | \
+                          VMX_EPT_WRITABLE_MASK | \
+			  VMX_EPT_EXECUTABLE_MASK)
+#define VMX_EPTE_PRESENT(epte) (epte & VMX_EPT_ALL_MASK)
+
+enum vmx_epte_mts {
+	VMX_EPTE_MT_UC = 0, /* uncachable */
+	VMX_EPTE_MT_WC = 1, /* write combining */
+	VMX_EPTE_MT_WT = 4, /* write through */
+	VMX_EPTE_MT_WP = 5, /* write protected */
+	VMX_EPTE_MT_WB = 6, /* write back */
+};
+
+/**
+ * Sets address in epte along with default access settings. Since
+ * we are using a page walk length of 4, epte's at all levels have
+ * the `size' bit (bit 7) set to 0. Page table entries (entries at the final
+ * level) have the IPAT (ignore page attribute table) and EPT MT (memory
+ * type) bits set. See Intel SDM V3 Figure 28-1 and 28.2.2.
+ */
+static void vmx_epte_set(lcd_arch_epte_t *epte, u64 hpa, int level)
+{
+	/*
+	 * zero out epte, and set
+	 */
+	*epte = 0;
+	*epte = (hpa & VMX_EPTE_ADDR_MASK) | VMX_EPT_ALL_MASK;
+	if (level == 3) {
+		/*
+		 * Page table entry. Set EPT memory type to write back
+		 * and ignore page attribute table.
+		 */
+		*epte |= (VMX_EPT_IPAT_BIT |
+			(VMX_EPTE_MT_WB << VMX_EPT_MT_EPTE_SHIFT));
+	}
+}
+
+int lcd_arch_ept_walk(struct lcd_arch *vcpu, u64 gpa, int create,
+		lcd_arch_epte_t **epte_out)
+{
+	int i;
+	epte_t *dir;
+	u64 mask;
+	u64 idx;
+	u64 page;
+
+	dir = (lcd_arch_epte_t *) __va(vcpu->ept.root_hpa);
+
+	/*
+	 * The first level uses bits 47:39 (9 bits) of the gpa
+	 */
+	mask = 0x1ff << 39;
+
+	/*
+	 * Walk plm4 -> pdpt -> pd. Each step uses 9 bits
+	 * of the gpa.
+	 */
+	for (i = 0; i < LCD_ARCH_EPT_WALK_LENGTH - 1; i++) {
+
+		idx = gpa & mask;
+
+		if (!epte_present(dir[idx])) {
+			
+			if (!create)
+				return -ENOENT;
+			/*
+			 * Get host virtual addr of fresh page, and
+			 * set the epte's addr to the host physical addr
+			 */
+			page = __get_free_page(GFP_KERNEL);
+			if (!page)
+				return -ENOMEM;
+			memset((void *)page, 0, PAGE_SIZE);
+			vmx_epte_set(dir[idx], __pa(page), i);
+		}
+
+		dir = (epte_t *) __va(VMX_EPTE_ADDR(dir[idx]));
+		mask >>= 9;
+	}
+	
+	/*
+	 * mask is now 0x1ff000, and dir points to the correct page
+	 * table.
+	 */
+	*epte_out = &dir[gpa & mask];
+	return 0;
+}
+
+void lcd_arch_ept_set(lcd_arch_epte_t *epte, u64 hpa)
+{
+	vmx_epte_set(epte, hpa, 3);
+}
+
+u64 lcd_arch_ept_hpa(lcd_arch_epte_t *epte)
+{
+	return VMX_EPTE_ADDR(*epte);
+}
+
+/**
  * Initializes the EPT's root global page directory page, the
  * VMCS pointer, and the spinlock.
  */
@@ -905,7 +1008,7 @@ int vmx_init_ept(struct lcd_arch *vcpu)
 	 */
 
 	eptp = VMX_EPT_DEFAULT_MT |
-		VMX_EPT_DEFAULT_GAW << VMX_EPT_GAW_EPTP_SHIFT;
+		(LCD_ARCH_EPT_WALK_LENGTH - 1) << LCD_ARCH_EPTP_WALK_SHIFT;
 	if (cpu_has_vmx_ept_ad_bits()) {
 		vcpu->ept.access_dirty_enabled = true;
 		eptp |= VMX_EPT_AD_ENABLE_BIT;
@@ -2012,7 +2115,6 @@ int lcd_arch_run(struct lcd_arch *vcpu)
 	return ret;
 }
 
-
 /* EXPORTS -------------------------------------------------- */
 
 EXPORT_SYMBOL(lcd_arch_init);
@@ -2020,3 +2122,7 @@ EXPORT_SYMBOL(lcd_arch_exit);
 EXPORT_SYMBOL(lcd_arch_create);
 EXPORT_SYMBOL(lcd_arch_destroy);
 EXPORT_SYMBOL(lcd_arch_run);
+EXPORT_SYMBOL(lcd_arch_ept_walk);
+EXPORT_SYMBOL(lcd_arch_ept_set);
+EXPORT_SYMBOL(lcd_arch_ept_hpa);
+

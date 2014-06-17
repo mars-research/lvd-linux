@@ -40,12 +40,18 @@ enum lcd_arch_reg {
 #define LCD_ARCH_FS_SELECTOR 2
 #define LCD_ARCH_GS_SELECTOR 3
 
+#define LCD_ARCH_EPT_WALK_LENGTH 4
+#define LCD_ARCH_EPTP_WALK_SHIFT 3
+
 struct lcd_arch_ept {
 	spinlock_t lock;
 	unsigned long root_hpa;
 	unsigned long vmcs_ptr;
 	bool access_dirty_enabled;
 };
+
+typedef epte_t lcd_arch_epte_t;
+
 
 struct lcd_arch {
 	/*
@@ -132,5 +138,23 @@ enum lcd_arch_status {
 	LCD_ARCH_STATUS_EPT_FAULT  = 2,
 	LCD_ARCH_STATUS_CR3_ACCESS = 3,
 };
+
+/**
+ * Lookup ept entry for guest physical address gpa.
+ *
+ * Set create = 1 to allocate ept page table data structures
+ * along the path as needed.
+ */
+int lcd_arch_ept_walk(struct lcd_arch *vcpu, u64 gpa, int create,
+		lcd_arch_epte_t **epte_out);
+/**
+ * Set the guest physical => host physical mapping in the ept entry.
+ */
+int lcd_arch_ept_set(lcd_arch_epte_t *epte, u64 hpa);
+/**
+ * Read the host physical address stored in epte.
+ */
+u64 lcd_arch_ept_hpa(lcd_arch_epte_t *epte);
+
 
 #endif  /* LCD_DOMAINS_ARCH_H */

@@ -269,38 +269,38 @@
 /* 	vmcs_writel(field, value); */
 /* } */
 
-static inline bool is_external_interrupt(u32 intr_info) {
-	return (intr_info & (INTR_INFO_INTR_TYPE_MASK | INTR_INFO_VALID_MASK))
-		== (INTR_TYPE_EXT_INTR | INTR_INFO_VALID_MASK);
-}
+/* static inline bool is_external_interrupt(u32 intr_info) { */
+/* 	return (intr_info & (INTR_INFO_INTR_TYPE_MASK | INTR_INFO_VALID_MASK)) */
+/* 		== (INTR_TYPE_EXT_INTR | INTR_INFO_VALID_MASK); */
+/* } */
 
 /* Memory Management */
 
-static inline bool is_page_fault(u32 intr_info) {
-	return (intr_info & (INTR_INFO_INTR_TYPE_MASK | INTR_INFO_VECTOR_MASK |
-				INTR_INFO_VALID_MASK)) ==
-		(INTR_TYPE_HARD_EXCEPTION | PF_VECTOR | INTR_INFO_VALID_MASK);
-}
+/* static inline bool is_page_fault(u32 intr_info) { */
+/* 	return (intr_info & (INTR_INFO_INTR_TYPE_MASK | INTR_INFO_VECTOR_MASK | */
+/* 				INTR_INFO_VALID_MASK)) == */
+/* 		(INTR_TYPE_HARD_EXCEPTION | PF_VECTOR | INTR_INFO_VALID_MASK); */
+/* } */
 
-static inline uintptr_t epte_addr(epte_t epte) {
-	return (epte & EPTE_ADDR);
-}
+/* static inline uintptr_t epte_addr(epte_t epte) { */
+/* 	return (epte & EPTE_ADDR); */
+/* } */
 
-static inline uintptr_t epte_page_vaddr(epte_t epte) {
-	return (uintptr_t) __va(epte_addr(epte));
-}
+/* static inline uintptr_t epte_page_vaddr(epte_t epte) { */
+/* 	return (uintptr_t) __va(epte_addr(epte)); */
+/* } */
 
-static inline epte_t epte_flags(epte_t epte) {
-	return (epte & EPTE_FLAGS);
-}
+/* static inline epte_t epte_flags(epte_t epte) { */
+/* 	return (epte & EPTE_FLAGS); */
+/* } */
 
-static inline int epte_present(epte_t epte) {
-	return (epte & __EPTE_FULL) > 0;
-}
+/* static inline int epte_present(epte_t epte) { */
+/* 	return (epte & __EPTE_FULL) > 0; */
+/* } */
 
-static inline int epte_big(epte_t epte) {
-	return (epte & __EPTE_SZ) > 0;
-}
+/* static inline int epte_big(epte_t epte) { */
+/* 	return (epte & __EPTE_SZ) > 0; */
+/* } */
 
 static void free_ept_page(epte_t epte) {
 	struct page *page = pfn_to_page(epte_addr(epte) >> PAGE_SHIFT);
@@ -320,75 +320,75 @@ static int clear_epte(epte_t *epte) {
 	return 1;
 }
 
-/**
- * Look up the ept entry for guest physical
- * address gpa. If create is 1, ept paging structures
- * will be allocated on the fly.
- *
- * The page frame where gpa resides is not allocated.
- *
- * FIXME: Do we need to lock inside here?
- */
-static int lcd_ept_walk(struct lcd *vcpu, u64 gpa, int create,
-			epte_t **epte_out) {
-	int i;
-	epte_t *dir = (epte_t *) __va(vcpu->ept_root);
+/* /\** */
+/*  * Look up the ept entry for guest physical */
+/*  * address gpa. If create is 1, ept paging structures */
+/*  * will be allocated on the fly. */
+/*  * */
+/*  * The page frame where gpa resides is not allocated. */
+/*  * */
+/*  * FIXME: Do we need to lock inside here? */
+/*  *\/ */
+/* static int lcd_ept_walk(struct lcd *vcpu, u64 gpa, int create, */
+/* 			epte_t **epte_out) { */
+/* 	int i; */
+/* 	epte_t *dir = (epte_t *) __va(vcpu->ept_root); */
 
-	for (i = EPT_LEVELS - 1; i > 0; i--) {
-		int idx = ADDR_TO_IDX(gpa, i);
+/* 	for (i = EPT_LEVELS - 1; i > 0; i--) { */
+/* 		int idx = ADDR_TO_IDX(gpa, i); */
 
-		if (!epte_present(dir[idx])) {
-			void *page;
+/* 		if (!epte_present(dir[idx])) { */
+/* 			void *page; */
 
-			if (!create)
-				return -ENOENT;
+/* 			if (!create) */
+/* 				return -ENOENT; */
 
-			page = (void *) __get_free_page(GFP_ATOMIC);
-			if (!page)
-				return -ENOMEM;
+/* 			page = (void *) __get_free_page(GFP_ATOMIC); */
+/* 			if (!page) */
+/* 				return -ENOMEM; */
 
-			memset(page, 0, PAGE_SIZE);
-			dir[idx] = epte_addr(virt_to_phys(page)) |
-				__EPTE_FULL;
-		}
+/* 			memset(page, 0, PAGE_SIZE); */
+/* 			dir[idx] = epte_addr(virt_to_phys(page)) | */
+/* 				__EPTE_FULL; */
+/* 		} */
 
-		if (epte_big(dir[idx])) {
-			return -EINVAL;
-		}
+/* 		if (epte_big(dir[idx])) { */
+/* 			return -EINVAL; */
+/* 		} */
 
-		dir = (epte_t *) epte_page_vaddr(dir[idx]);
-	}
+/* 		dir = (epte_t *) epte_page_vaddr(dir[idx]); */
+/* 	} */
 
-	*epte_out = &dir[ADDR_TO_IDX(gpa, 0)];
-	return 0;
-}
+/* 	*epte_out = &dir[ADDR_TO_IDX(gpa, 0)]; */
+/* 	return 0; */
+/* } */
 
-/**
- * Store host physical address hpa, along with
- * default flags, to the epte.
- *
- * FIXME: Do we want to lock inside here?
- */
-static int lcd_ept_set_epte(struct lcd *vcpu, epte_t *epte_entry, u64 hpa) {
-	int ret;
-	epte_t flags;
+/* /\** */
+/*  * Store host physical address hpa, along with */
+/*  * default flags, to the epte. */
+/*  * */
+/*  * FIXME: Do we want to lock inside here? */
+/*  *\/ */
+/* static int lcd_ept_set_epte(struct lcd *vcpu, epte_t *epte_entry, u64 hpa) { */
+/* 	int ret; */
+/* 	epte_t flags; */
 
-	spin_lock(&vcpu->ept_lock);
+/* 	spin_lock(&vcpu->ept_lock); */
 
-	flags = __EPTE_READ | __EPTE_EXEC | __EPTE_WRITE |
-		__EPTE_TYPE(EPTE_TYPE_WB) | __EPTE_IPAT;
+/* 	flags = __EPTE_READ | __EPTE_EXEC | __EPTE_WRITE | */
+/* 		__EPTE_TYPE(EPTE_TYPE_WB) | __EPTE_IPAT; */
 
-	if (vcpu->ept_ad_enabled) {
-		/* premark A/D to avoid extra memory references */
-		flags |= __EPTE_A | __EPTE_D;
-	}
+/* 	if (vcpu->ept_ad_enabled) { */
+/* 		/\* premark A/D to avoid extra memory references *\/ */
+/* 		flags |= __EPTE_A | __EPTE_D; */
+/* 	} */
 
-	*epte = epte_addr(hpa) | flags;
+/* 	*epte = epte_addr(hpa) | flags; */
   
-	spin_unlock(&vcpu->ept_lock);
+/* 	spin_unlock(&vcpu->ept_lock); */
 
-	return 0;
-}
+/* 	return 0; */
+/* } */
 
 /**
  * Maps gpa to hpa in the lcd's ept. Simple wrapper
@@ -497,29 +497,29 @@ static void lcd_free_ept(u64 ept_root) {
 }
 
 
-int vmx_init_ept(struct lcd *vcpu) {
-	void *page = (void *) __get_free_page(GFP_KERNEL);
+/* int vmx_init_ept(struct lcd *vcpu) { */
+/* 	void *page = (void *) __get_free_page(GFP_KERNEL); */
 
-	if (!page)
-		return -ENOMEM;
+/* 	if (!page) */
+/* 		return -ENOMEM; */
 
-	memset(page, 0, PAGE_SIZE);
-	vcpu->ept_root =  __pa(page);
+/* 	memset(page, 0, PAGE_SIZE); */
+/* 	vcpu->ept_root =  __pa(page); */
 
-	return 0;
-}
+/* 	return 0; */
+/* } */
 
-static u64 construct_eptp(u64 root_hpa) {
-	u64 eptp;
+/* static u64 construct_eptp(u64 root_hpa) { */
+/* 	u64 eptp; */
 
-	eptp = VMX_EPT_DEFAULT_MT |
-		VMX_EPT_DEFAULT_GAW << VMX_EPT_GAW_EPTP_SHIFT;
-	if (cpu_has_vmx_ept_ad_bits())
-		eptp |= VMX_EPT_AD_ENABLE_BIT;
-	eptp |= (root_hpa & PAGE_MASK);
+/* 	eptp = VMX_EPT_DEFAULT_MT | */
+/* 		VMX_EPT_DEFAULT_GAW << VMX_EPT_GAW_EPTP_SHIFT; */
+/* 	if (cpu_has_vmx_ept_ad_bits()) */
+/* 		eptp |= VMX_EPT_AD_ENABLE_BIT; */
+/* 	eptp |= (root_hpa & PAGE_MASK); */
 
-	return eptp;
-}
+/* 	return eptp; */
+/* } */
 
 /* END EPT ======================================== */
 

@@ -1647,6 +1647,106 @@ static void vmx_put_cpu(struct lcd_arch *vcpu)
 
 /* VMX CREATE / DESTROY -------------------------------------------------- */
 
+static void vmx_pack_desc(struct desc_struct *desc, u64 base, u64 limit,
+			unsigned char type, unsigned char s,
+			unsigned char dpl, unsigned char p,
+			unsigned char avl, unsigned char l,
+			unsigned char d, unsigned char g)
+{
+	set_desc_base(desc, base);
+	set_desc_limit(desc, limit);
+	desc->type = type;
+	desc->s    = s;
+	desc->dpl  = dpl;
+	desc->p    = p;
+	desc->avl  = avl;
+	desc->l    = l;
+	desc->d    = d;
+	desc->g    = g;
+}
+
+static int vmx_init_gdt(struct lcd_arch *vcpu)
+{
+	struct desc_struct *desc;
+	struct tss_desc *tssd;
+
+	/*
+	 * Alloc zero'd page for gdt
+	 */
+	vcpu->gdt = (struct desc_struct *)get_zeroed_page(GFP_KERNEL);
+	if (!vcpu->gdt)
+		return -ENOMEM;
+
+	/*
+	 *===--- Populate gdt; see layout in lcd-domains-arch.h. ---===
+	 */
+
+	/*
+	 * Code Segment
+	 */
+	desc = vcpu->gdt + (LCD_ARCH_CS_SELECTOR >> 3); /* div by 8 */
+	vmx_pack_desc(desc,
+		0,        /* base */
+		0xFFFFF,  /* limit (granularity = 1) */
+		0xB,      /* code seg type, exec/read/accessed */
+		0x1,      /* code/data segment desc type */
+		0x0,      /* dpl = 0 */
+		0x1,      /* present */
+		0x0,      /* avl (not used) */
+		0x1,      /* 64-bit code */
+		0x0,      /* d must be cleared for 64-bit code */
+		0x1);     /* 4KB granularity */
+
+	/*
+	 * Data Segment (for %fs)
+	 */
+	desc = vcpu->gdt + (LCD_ARCH_FS_SELECTOR >> 3); /* div by 8 */
+	vmx_pack_desc(desc,
+		0,        /* base */
+		0xFFFFF,  /* limit (granularity = 1) */
+		0x3,      /* data seg type, exec/read/accessed */
+		0x1,      /* code/data segment desc type */
+		0x0,      /* dpl = 0 */
+		0x1,      /* present */
+		0x0,      /* avl (not used) */
+		0x0,      /* l (not 64-bit code) */
+		0x1,      /* d (linux uses 1 for d ...) */
+		0x1);     /* 4KB granularity */
+
+	/*
+	 * Data Segment (for %gs)
+	 */
+	desc = vcpu->gdt + (LCD_ARCH_GS_SELECTOR >> 3); /* div by 8 */
+	vmx_pack_desc(desc,
+		0,        /* base */
+		0xFFFFF,  /* limit (granularity = 1) */
+		0x3,      /* data seg type, exec/read/accessed */
+		0x1,      /* code/data segment desc type */
+		0x0,      /* dpl = 0 */
+		0x1,      /* present */
+		0x0,      /* avl (not used) */
+		0x0,      /* l (not 64-bit code) */
+		0x1,      /* d (linux uses 1 for d ...) */
+		0x1);     /* 4KB granularity */
+
+	/*
+	 * Task Segment (descriptor)
+	 */
+	tssd = (tss_desc *)(vcpu->gdt + (LCD_ARCH_TR_SELECTOR >> 3));
+	set_tssldt_descriptor(tssd, 
+			LCD_ARCH_TSS_BASE,   /* base */
+			0xB,                 /* type = 64-bit busy tss */
+			LCD_ARCH_TSS_LIMIT); /* limit */
+
+	return 0;
+}
+
+static int vmx_init_tss(struct lcd_arch *vcpu)
+{
+
+
+}
+
 /**
  * Reserves a vpid and sets it in the vcpu.
  */
@@ -1706,13 +1806,19 @@ struct lcd_arch* lcd_arch_create(void)
 	vcpu->cpu = -1;
 
 	/*
-	 * Initialize EPT
+	 * Initialize EPT, GDT, and TSS
 	 */
 	if (vmx_init_ept(vcpu))
 		goto fail_ept;
+	if (vmx_init_gdt(vcpu))
+		goto fail_gdt;
+	if (vmx_init_tss(vcpu))
+		goto fail_tss;	
 
 	/*
 	 * Initialize VMCS register values and settings
+	 * 
+	 * Preemption disabled while doing so ...
 	 */
 	vmx_get_cpu(vcpu);
 	vmx_setup_vmcs(vcpu);
@@ -1720,6 +1826,10 @@ struct lcd_arch* lcd_arch_create(void)
 
 	return vcpu;
 
+fail_tss:
+	free_page((u64)vcpu->gdt);
+fail_gdt:
+	vmx_free_ept(vcpu);
 fail_ept:
 	vmx_free_vpid(vcpu);
 fail_vpid:

@@ -176,8 +176,8 @@ u64 lcd_arch_ept_hpa(lcd_arch_epte_t *epte);
  * ==========
  * 0 = NULL
  * 1 = Code segment
- * 2 = Data segment
- * 3 = Data segment
+ * 2 = Data segment  (%fs, default not present)
+ * 3 = Data segment  (%gs, default not present)
  * 4 = Task segment
  *
  * See Intel SDM V3 26.3.1.2, 26.3.1.3 for register requirements.

@@ -1498,53 +1498,53 @@ static void vmx_dump_cpu(struct lcd *vcpu) {
 /* 	vmcs_write32(VM_ENTRY_INTR_INFO_FIELD, 0);  /\* 22.2.1 *\/ */
 /* } */
 
-static int setup_gdt(struct lcd* vcpu) {
-	struct desc_struct *desc;
-	tss_desc* tssd;
-	struct x86_hw_tss* tss;
+/* static int setup_gdt(struct lcd* vcpu) { */
+/* 	struct desc_struct *desc; */
+/* 	tss_desc* tssd; */
+/* 	struct x86_hw_tss* tss; */
 
-	memset(vcpu->gdt, 0, GDT_SIZE);
+/* 	memset(vcpu->gdt, 0, GDT_SIZE); */
 
-	desc = vcpu->gdt + GDT_ENTRY_KERNEL_CS;
-	/* ignored fields according to APM Vol.3 Ch4.8 */
-	/* code seg desc */
-	desc->type = SEG_TYPE_CODE | SEG_TYPE_EXEC_READ;
-	desc->s = DESC_TYPE_CODE_DATA;
-	desc->dpl = 0;
-	desc->p = 1;
-	desc->l = 1;
-	desc->d = 0;
+/* 	desc = vcpu->gdt + GDT_ENTRY_KERNEL_CS; */
+/* 	/\* ignored fields according to APM Vol.3 Ch4.8 *\/ */
+/* 	/\* code seg desc *\/ */
+/* 	desc->type = SEG_TYPE_CODE | SEG_TYPE_EXEC_READ; */
+/* 	desc->s = DESC_TYPE_CODE_DATA; */
+/* 	desc->dpl = 0; */
+/* 	desc->p = 1; */
+/* 	desc->l = 1; */
+/* 	desc->d = 0; */
 
-	/* data seg desc */
-	desc = vcpu->gdt + GDT_ENTRY_KERNEL_DS;
-	desc->type = SEG_TYPE_DATA | SEG_TYPE_READ_WRITE;
-	desc->s = DESC_TYPE_CODE_DATA;
-	desc->p = 1;
+/* 	/\* data seg desc *\/ */
+/* 	desc = vcpu->gdt + GDT_ENTRY_KERNEL_DS; */
+/* 	desc->type = SEG_TYPE_DATA | SEG_TYPE_READ_WRITE; */
+/* 	desc->s = DESC_TYPE_CODE_DATA; */
+/* 	desc->p = 1; */
 
-	/* task segment desc value */
-	tssd = (tss_desc*)(vcpu->gdt + GDT_ENTRY_TSS);
-	set_tssldt_descriptor(tssd, LCD_TSS_ADDR, DESC_TSS, LCD_TSS_SIZE);
+/* 	/\* task segment desc value *\/ */
+/* 	tssd = (tss_desc*)(vcpu->gdt + GDT_ENTRY_TSS); */
+/* 	set_tssldt_descriptor(tssd, LCD_TSS_ADDR, DESC_TSS, LCD_TSS_SIZE); */
 
-	/* TSS segment */
-	memset(vcpu->tss, 0, PAGE_SIZE);
-	tss = &vcpu->tss->tss;
-	tss->sp0 = LCD_STACK_ADDR;
-	tss->io_bitmap_base = offsetof(struct lcd_tss_struct, io_bitmap);
-	tss->ist[0] = LCD_TSS_ADDR + (PAGE_SIZE>>1);
-	vcpu->tss->io_bitmap[0] = 0xff;
+/* 	/\* TSS segment *\/ */
+/* 	memset(vcpu->tss, 0, PAGE_SIZE); */
+/* 	tss = &vcpu->tss->tss; */
+/* 	tss->sp0 = LCD_STACK_ADDR; */
+/* 	tss->io_bitmap_base = offsetof(struct lcd_tss_struct, io_bitmap); */
+/* 	tss->ist[0] = LCD_TSS_ADDR + (PAGE_SIZE>>1); */
+/* 	vcpu->tss->io_bitmap[0] = 0xff; */
 
-	return 0;
-}
+/* 	return 0; */
+/* } */
 
-static void setup_idt(struct lcd* vcpu) {
-	int i;
-	memset(vcpu->idt, 0, PAGE_SIZE);
-	/* Just fill the IDT  */
-	for (i = 0; i < IDT_ENTRIES; ++i) {
-		gate_desc* gate = vcpu->idt + i;
-		pack_gate(gate, GATE_INTERRUPT, LCD_COMM_ISR_ADDR, 0, 1, __KERNEL_CS);
-	}
-}
+/* static void setup_idt(struct lcd* vcpu) { */
+/* 	int i; */
+/* 	memset(vcpu->idt, 0, PAGE_SIZE); */
+/* 	/\* Just fill the IDT  *\/ */
+/* 	for (i = 0; i < IDT_ENTRIES; ++i) { */
+/* 		gate_desc* gate = vcpu->idt + i; */
+/* 		pack_gate(gate, GATE_INTERRUPT, LCD_COMM_ISR_ADDR, 0, 1, __KERNEL_CS); */
+/* 	} */
+/* } */
 
 // Some temporary capability functions for IPC testing
 // To be replaced while interfacing with capability module

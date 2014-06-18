@@ -170,6 +170,14 @@ int lcd_arch_ept_set(lcd_arch_epte_t *epte, u64 hpa);
  * Read the host physical address stored in epte.
  */
 u64 lcd_arch_ept_hpa(lcd_arch_epte_t *epte);
+/**
+ * Simple routine combining ept walk and set.
+ *
+ * overwrite = 0  => do not overwrite if ept entry is already present
+ * overwrite = 1  => overwrite any existing ept entry
+ */
+int lcd_arch_ept_map_gpa_to_hpa(struct lcd_arch *vcpu, u64 gpa, u64 hpa,
+				int create, int overwrite);
 
 /*
  * GDT Layout

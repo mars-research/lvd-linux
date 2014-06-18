@@ -984,6 +984,33 @@ u64 lcd_arch_ept_hpa(lcd_arch_epte_t *epte)
 	return VMX_EPTE_ADDR(*epte);
 }
 
+int lcd_arch_ept_map_gpa_to_hpa(struct lcd_arch *vcpu, u64 gpa, u64 hpa,
+				int create, int overwrite)
+{
+	int ret;
+	lcd_arch_epte_t *ept_entry;
+
+	/*
+	 * Walk ept
+	 */
+	ret = lcd_arch_ept_walk(vcpu, gpa, create, &ept_entry);
+	if (ret)
+		return ret;
+
+	/*
+	 * Check if guest physical address already mapped
+	 */
+	if (!overwrite && VMX_EPTE_PRESENT(*ept_entry))
+		return -EINVALID;
+
+	/*
+	 * Map the guest physical addr to the host physical addr.
+	 */
+	lcd_arch_ept_set(ept_entry, hpa);
+
+	return 0;
+}
+
 /**
  * Recursively frees all present entries in dir at level, and
  * the page containing the dir.
@@ -1647,6 +1674,11 @@ static void vmx_put_cpu(struct lcd_arch *vcpu)
 
 /* VMX CREATE / DESTROY -------------------------------------------------- */
 
+/**
+ * Pack base, limit, and flags into a segment descriptor.
+ *
+ * See Intel SDM V3 3.4.5
+ */
 static void vmx_pack_desc(struct desc_struct *desc, u64 base, u64 limit,
 			unsigned char type, unsigned char s,
 			unsigned char dpl, unsigned char p,
@@ -1665,17 +1697,29 @@ static void vmx_pack_desc(struct desc_struct *desc, u64 base, u64 limit,
 	desc->g    = g;
 }
 
+/**
+ * Allocates gdt and populates descriptor entries using layout
+ * in lcd-domains-arch.h.
+ *
+ * Maps GDT in guest physical address space.
+ *
+ * FIXME: Is a gdt necessary if an lcd never touches it? The base,
+ * limit, etc. are loaded in the hidden fields of the segment registers.
+ */
 static int vmx_init_gdt(struct lcd_arch *vcpu)
 {
 	struct desc_struct *desc;
 	struct tss_desc *tssd;
+	int ret;
 
 	/*
 	 * Alloc zero'd page for gdt
 	 */
 	vcpu->gdt = (struct desc_struct *)get_zeroed_page(GFP_KERNEL);
-	if (!vcpu->gdt)
-		return -ENOMEM;
+	if (!vcpu->gdt) {
+		ret = -ENOMEM;
+		goto fail;
+	}
 
 	/*
 	 *===--- Populate gdt; see layout in lcd-domains-arch.h. ---===
@@ -1738,13 +1782,93 @@ static int vmx_init_gdt(struct lcd_arch *vcpu)
 			0xB,                 /* type = 64-bit busy tss */
 			LCD_ARCH_TSS_LIMIT); /* limit */
 
+	/*
+	 *===--- Map GDT in guest physical address space ---===
+	 */
+	ret = lcd_arch_ept_map_gpa_to_hpa(vcpu, 
+					/* gpa */
+					LCD_ARCH_GDT_BASE, 
+					/* hpa */
+					__pa(vcpu->gdt),
+					/* create paging structs as needed */
+					1,
+					/* no overwrite */
+					0);
+	if (ret)
+		goto fail_map;
+
 	return 0;
+
+fail_map:
+	free_page((u64)vcpu->gdt);
+fail:
+	return ret
 }
 
+/**
+ * Allocates tss and sets minimal number of fields needed.
+ *
+ * Maps TSS in guest physical address space.
+ *
+ * FIXME: Is a TSS necessary if stack switching / interrupts are
+ * not handled in the lcd?
+ */
 static int vmx_init_tss(struct lcd_arch *vcpu)
 {
+	struct x86_hw_tss *base_tss;
+	int ret;
 
+	/*
+	 * Alloc zero'd page for tss.
+	 *
+	 * Only the first part of the page will be filled by the tss. This is
+	 * done for now to make the address space layout simpler, but
+	 * could perhaps be improved later.
+	 */
+	vcpu->tss = (struct lcd_arch_tss *)get_zeroed_page(GFP_KERNEL);
+	if (!vcpu->tss) {
+		ret = -ENOMEM;
+		goto fail;
+	}
+	base_tss = &(vcpu->tss.base_tss);
+	/*
+	 * Set up 64-bit TSS (See Intel SDM V3 7.7)
+	 *
+	 * No interrupt stack tables are used (since the lcd won't be
+	 * handling interrupts anyway).
+	 *
+	 * Privilege Level 0 Stack
+	 */
+	base_tss->sp0 = LCD_ARCH_STACK_TOP;
+	/*
+	 * The TSS must have a minimal I/O bitmap with one byte of 1's
+	 *
+	 * Intel SDM V1 16.5.2
+	 */
+	base_tss->io_bitmap_base = offsetof(struct lcd_arch_tss, io_bitmap);
+	vcpu->tss->io_bitmap[0] = 0xff;
 
+	/*
+	 *===--- Map TSS in guest physical address space ---===
+	 */
+	ret = lcd_arch_ept_map_gpa_to_hpa(vcpu, 
+					/* gpa */
+					LCD_ARCH_TSS_BASE, 
+					/* hpa */
+					__pa(vcpu->tss),
+					/* create paging structs as needed */
+					1,
+					/* no overwrite */
+					0);
+	if (ret)
+		goto fail_map;
+
+	return 0;
+
+fail_map:
+	free_page((u64)vcpu->tss);
+fail:
+	return ret
 }
 
 /**
@@ -1806,14 +1930,23 @@ struct lcd_arch* lcd_arch_create(void)
 	vcpu->cpu = -1;
 
 	/*
-	 * Initialize EPT, GDT, and TSS
+	 * Initialize EPT, GDT, and TSS.
+	 *
+	 * The EPT must be initialized before GDT, TSS, and stack,
+	 * so that they can be mapped in guest physical.
 	 */
 	if (vmx_init_ept(vcpu))
 		goto fail_ept;
 	if (vmx_init_gdt(vcpu))
 		goto fail_gdt;
 	if (vmx_init_tss(vcpu))
-		goto fail_tss;	
+		goto fail_tss;
+
+	/*
+	 * Initialize stack / ipc registers
+	 */
+	if (vmx_init_stack(vcpu))
+		goto fail_stack;
 
 	/*
 	 * Initialize VMCS register values and settings
@@ -1826,6 +1959,8 @@ struct lcd_arch* lcd_arch_create(void)
 
 	return vcpu;
 
+fail_stack:
+	free_page((u64)vcpu->tss);
 fail_tss:
 	free_page((u64)vcpu->gdt);
 fail_gdt:

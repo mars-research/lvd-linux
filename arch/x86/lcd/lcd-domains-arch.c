@@ -2066,10 +2066,13 @@ static void vmx_step_instruction(void)
 		vmcs_read32(VM_EXIT_INSTRUCTION_LEN));
 }
 
-static void vmx_handle_vmcall(struct lcd_arch *vcpu)
+/**
+ * Processes a vmcall. For now, the only reason the lcd
+ * would execute a vmcall is for ipc.
+ */
+static int vmx_handle_vmcall(struct lcd_arch *vcpu)
 {
-	/* not implemented yet until we get to ipc */
-	return -EIO;
+	return LCD_ARCH_STATUS_IPC;
 }
 
 /**

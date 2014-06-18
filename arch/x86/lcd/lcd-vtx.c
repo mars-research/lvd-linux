@@ -390,35 +390,35 @@
 /* 	return 0; */
 /* } */
 
-/**
- * Maps gpa to hpa in the lcd's ept. Simple wrapper
- * around lookup and set.
- */
-static int lcd_ept_map_gpa_to_hpa(struct lcd *vcpu, u64 gpa, u64 hpa,
-				int create, int overwrite) {
-	int ret;
-	epte_t *ept_entry;
+/* /\** */
+/*  * Maps gpa to hpa in the lcd's ept. Simple wrapper */
+/*  * around lookup and set. */
+/*  *\/ */
+/* static int lcd_ept_map_gpa_to_hpa(struct lcd *vcpu, u64 gpa, u64 hpa, */
+/* 				int create, int overwrite) { */
+/* 	int ret; */
+/* 	epte_t *ept_entry; */
 
-	/*
-	 * Walk ept
-	 */
-	ret = lcd_ept_walk(vcpu, gpa, create, &ept_entry);
-	if (ret)
-		return ret;
+/* 	/\* */
+/* 	 * Walk ept */
+/* 	 *\/ */
+/* 	ret = lcd_ept_walk(vcpu, gpa, create, &ept_entry); */
+/* 	if (ret) */
+/* 		return ret; */
 
-	/*
-	 * Check if guest physical address already mapped
-	 */
-	if (!overwrite && epte_present(ept_entry))
-		return -E;
+/* 	/\* */
+/* 	 * Check if guest physical address already mapped */
+/* 	 *\/ */
+/* 	if (!overwrite && epte_present(ept_entry)) */
+/* 		return -E; */
 
-	/*
-	 * Map the guest physical addr to the host physical addr.
-	 */
-	lcd_ept_set_epte(vcpu, ept_entry, gpa, hpa);
+/* 	/\* */
+/* 	 * Map the guest physical addr to the host physical addr. */
+/* 	 *\/ */
+/* 	lcd_ept_set_epte(vcpu, ept_entry, gpa, hpa); */
 
-	return 0;
-}
+/* 	return 0; */
+/* } */
 
 /**
  * Returns host virtual address associated with

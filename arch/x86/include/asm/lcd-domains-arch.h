@@ -142,6 +142,9 @@ void lcd_arch_destroy(struct lcd_arch *vcpu);
  *
  * Unless the caller does otherwise, kernel preemption is
  * enabled before returning.
+ *
+ * Returns status code (e.g., LCD_ARCH_STATUS_PAGE_FAULT)
+ * so that caller knows why lcd exited and can respond.
  */
 int lcd_arch_run(struct lcd_arch *vcpu);
 
@@ -153,6 +156,7 @@ enum lcd_arch_status {
 	LCD_ARCH_STATUS_EXT_INTR   = 1,
 	LCD_ARCH_STATUS_EPT_FAULT  = 2,
 	LCD_ARCH_STATUS_CR3_ACCESS = 3,
+	LCD_ARCH_STATUS_IPC        = 4,
 };
 
 /**
@@ -242,5 +246,69 @@ int lcd_arch_ept_map_gpa_to_hpa(struct lcd_arch *vcpu, u64 gpa, u64 hpa,
 #define LCD_ARCH_IPC_REGS    0x0000000000003000UL
 #define LCD_ARCH_STACK_TOP   0x0000000000004000UL
 #define LCD_ARCH_FREE        LCD_ARCH_STACK_TOP
+
+
+/*
+ * Accessor Macros for IPC
+ * =======================
+ *
+ * Based on x86 seL4 message register design.
+ *
+ * See seL4 manual, 4.1.
+ */
+#define LCD_ARCH_GET_CAP_REG(vcpu) (vcpu->regs[LCD_ARCH_REGS_RAX])
+#define LCD_ARCH_GET_BDG_REG(vcpu) (vcpu->regs[LCD_ARCH_REGS_RBX])
+#define LCD_ARCH_GET_TAG_REG(vcpu) (vcpu->regs[LCD_ARCH_REGS_RSI])
+#define LCD_ARCH_GET_MSG_REG(vcpu, idx) (__lcd_arch_get_msg_reg(vcpu, idx))
+static inline u64 __lcd_arch_get_msg_reg(lcd_arch *vcpu, unsigned int idx)
+{
+	/*
+	 * Message regs 0 and 1 are fast (use machine registers)
+	 *
+	 * Message regs 2, ... always use the mr's in struct lcd_ipc_regs.
+	 *
+	 * (The first two mr's in struct lcd_ipc_regs are reserved for
+	 * mr's 0 and 1. If the caller wishes to explicitly use those mr's,
+	 * they should do so by manually accessing struct lcd_ipc_regs.)
+	 */
+	if (idx == 0)
+		return vcpu->regs[LCD_ARCH_REGS_EDI];
+	else if (idx == 1)
+		return vcpu->regs[LCD_ARCH_REGS_EBP];
+	else
+		return vcpu->ipc_regs->mr[idx];
+}
+
+#define LCD_ARCH_SET_CAP_REG(vcpu, val) ({                    \
+			vcpu->regs[LCD_ARCH_REGS_RAX] = val;  \
+		})
+#define LCD_ARCH_SET_BDG_REG(vcpu, val) ({                    \
+			vcpu->regs[LCD_ARCH_REGS_RBX] = val;  \
+		})
+#define LCD_ARCH_SET_TAG_REG(vcpu, val) ({                    \
+			vcpu->regs[LCD_ARCH_REGS_RSI] = val;  \
+		})
+#define LCD_ARCH_SET_MSG_REG(vcpu, idx, val) ({                 \
+			__lcd_arch_set_msg_reg(vcpu, val, idx);	\
+		})
+static inline void __lcd_arch_set_msg_reg(lcd_arch *vcpu, unsigned int idx,
+					u64 val)
+{
+	/*
+	 * Message regs 0 and 1 are fast (use machine registers)
+	 *
+	 * Message regs 2, ... always use the mr's in struct lcd_ipc_regs.
+	 *
+	 * (The first two mr's in struct lcd_ipc_regs are reserved for
+	 * mr's 0 and 1. If the caller wishes to explicitly use those mr's,
+	 * they should do so by manually accessing struct lcd_ipc_regs.)
+	 */
+	if (idx == 0)
+		vcpu->regs[LCD_ARCH_REGS_EDI] = val;
+	else if (idx == 1)
+		vcpu->regs[LCD_ARCH_REGS_EBP] = val;
+	else
+		vcpu->ipc_regs->mr[idx] = val;
+}
 
 #endif  /* LCD_DOMAINS_ARCH_H */

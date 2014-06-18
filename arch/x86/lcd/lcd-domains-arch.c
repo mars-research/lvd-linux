@@ -1872,7 +1872,7 @@ fail:
 }
 
 /**
- * Allocates and maps stack / ipc registers memory.
+ * Allocates and maps stack / utcb.
  *
  * %rsp not set until guest virtual address space initialized.
  */
@@ -1883,10 +1883,10 @@ static int vmx_init_stack(struct lcd_arch *vcpu)
 	/*
 	 * Alloc zero'd page for stack.
 	 *
-	 * Bottom of stack will contain ipc buffer.
+	 * Bottom of stack will contain utcb.
 	 */
-	vcpu->ipc_regs = (struct lcd_ipc_regs *)get_zeroed_page(GFP_KERNEL);
-	if (!vcpu->ipc_regs) {
+	vcpu->utcb = (struct lcd_utcb *)get_zeroed_page(GFP_KERNEL);
+	if (!vcpu->utcb) {
 		ret = -ENOMEM;
 		goto fail;
 	}
@@ -1909,7 +1909,7 @@ static int vmx_init_stack(struct lcd_arch *vcpu)
 	return 0;
 
 fail_map:
-	free_page((u64)vcpu->ipc_regs);
+	free_page((u64)vcpu->utcb);
 fail:
 	return ret
 }
@@ -1986,7 +1986,7 @@ struct lcd_arch* lcd_arch_create(void)
 		goto fail_tss;
 
 	/*
-	 * Initialize stack / ipc registers
+	 * Initialize stack / utcb
 	 */
 	if (vmx_init_stack(vcpu))
 		goto fail_stack;

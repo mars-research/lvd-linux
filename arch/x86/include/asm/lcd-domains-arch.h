@@ -3,7 +3,7 @@
 
 #include <asm/vmx.h>
 #include <linux/spinlock.h>
-#include <lcd-domains/ipc.h>
+#include <lcd-domains/utcb.h>
 
 struct lcd_arch_vmcs {
 	u32 revision_id;
@@ -86,7 +86,7 @@ struct lcd_arch {
 	struct lcd_arch_ept ept;
 	struct desc_struct  *gdt;
 	struct lcd_arch_tss *tss;
-	struct lcd_ipc_regs *ipc_regs;
+	struct lcd_utcb *utcb;
 
 	u8  fail;
 	u64 exit_reason;
@@ -231,8 +231,8 @@ int lcd_arch_ept_map_gpa_to_hpa(struct lcd_arch *vcpu, u64 gpa, u64 hpa,
  *                         :       (grows down)        : (4 KBs)
  *                         :                           :
  *                         |                           |
- *                         |   IPC Message Registers   |
- * LCD_ARCH_IPC_REGS-----> +---------------------------+ 0x0000 0000 0000 3000
+ *                         |   User Thread Ctrl Block  |
+ * LCD_ARCH_UTCB---------> +---------------------------+ 0x0000 0000 0000 3000
  *                         |           TSS             |
  *                         |    only sizeof(tss) is    | (4 KBs)
  *                         |           used            |
@@ -243,7 +243,7 @@ int lcd_arch_ept_map_gpa_to_hpa(struct lcd_arch *vcpu, u64 gpa, u64 hpa,
  *                         |       (not mapped)        | (4 KBs)
  *                         +---------------------------+ 0x0000 0000 0000 0000
  */
-#define LCD_ARCH_IPC_REGS    0x0000000000003000UL
+#define LCD_ARCH_UTCB        0x0000000000003000UL
 #define LCD_ARCH_STACK_TOP   0x0000000000004000UL
 #define LCD_ARCH_FREE        LCD_ARCH_STACK_TOP
 
@@ -267,16 +267,16 @@ static inline u64 __lcd_arch_get_msg_reg(lcd_arch *vcpu, unsigned int idx)
 	 *
 	 * Message regs 2, ... always use the mr's in struct lcd_ipc_regs.
 	 *
-	 * (The first two mr's in struct lcd_ipc_regs are reserved for
+	 * (The first two mr's in utcb are reserved for
 	 * mr's 0 and 1. If the caller wishes to explicitly use those mr's,
-	 * they should do so by manually accessing struct lcd_ipc_regs.)
+	 * they should do so by manually accessing the mr's in utcb.)
 	 */
 	if (idx == 0)
 		return vcpu->regs[LCD_ARCH_REGS_EDI];
 	else if (idx == 1)
 		return vcpu->regs[LCD_ARCH_REGS_EBP];
 	else
-		return vcpu->ipc_regs->mr[idx];
+		return vcpu->utcb->ipc.mr[idx];
 }
 
 #define LCD_ARCH_SET_CAP_REG(vcpu, val) ({                    \
@@ -299,16 +299,16 @@ static inline void __lcd_arch_set_msg_reg(lcd_arch *vcpu, unsigned int idx,
 	 *
 	 * Message regs 2, ... always use the mr's in struct lcd_ipc_regs.
 	 *
-	 * (The first two mr's in struct lcd_ipc_regs are reserved for
+	 * (The first two mr's in utcb are reserved for
 	 * mr's 0 and 1. If the caller wishes to explicitly use those mr's,
-	 * they should do so by manually accessing struct lcd_ipc_regs.)
+	 * they should do so by manually accessing the mr's in utcb.)
 	 */
 	if (idx == 0)
 		vcpu->regs[LCD_ARCH_REGS_EDI] = val;
 	else if (idx == 1)
 		vcpu->regs[LCD_ARCH_REGS_EBP] = val;
 	else
-		vcpu->ipc_regs->mr[idx] = val;
+		vcpu->utcb->ipc.mr[idx] = val;
 }
 
 #endif  /* LCD_DOMAINS_ARCH_H */

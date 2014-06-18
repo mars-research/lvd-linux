@@ -1885,7 +1885,7 @@ static int vmx_init_stack(struct lcd_arch *vcpu)
 	 *
 	 * Bottom of stack will contain ipc buffer.
 	 */
-	vcpu->ipc_regs = (u8 *)get_zeroed_page(GFP_KERNEL);
+	vcpu->ipc_regs = (struct lcd_ipc_regs *)get_zeroed_page(GFP_KERNEL);
 	if (!vcpu->ipc_regs) {
 		ret = -ENOMEM;
 		goto fail;

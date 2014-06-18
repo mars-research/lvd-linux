@@ -3,6 +3,7 @@
 
 #include <asm/vmx.h>
 #include <linux/spinlock.h>
+#include <lcd-domains/ipc.h>
 
 struct lcd_arch_vmcs {
 	u32 revision_id;
@@ -85,7 +86,7 @@ struct lcd_arch {
 	struct lcd_arch_ept ept;
 	struct desc_struct  *gdt;
 	struct lcd_arch_tss *tss;
-	u8 *ipc_regs;
+	struct lcd_ipc_regs *ipc_regs;
 
 	u8  fail;
 	u64 exit_reason;

@@ -247,6 +247,11 @@ int lcd_arch_ept_map_gpa_to_hpa(struct lcd_arch *vcpu, u64 gpa, u64 hpa,
 #define LCD_ARCH_STACK_TOP   0x0000000000004000UL
 #define LCD_ARCH_FREE        LCD_ARCH_STACK_TOP
 
+/*
+ * Accessor Macro for syscalls
+ * ===========================
+ */
+#define LCD_ARCH_GET_SYSCALL_NUM(vcpu) (vcpu->regs[LCD_ARCH_REGS_RAX])
 
 /*
  * Accessor Macros for IPC
@@ -256,7 +261,7 @@ int lcd_arch_ept_map_gpa_to_hpa(struct lcd_arch *vcpu, u64 gpa, u64 hpa,
  *
  * See seL4 manual, 4.1.
  */
-#define LCD_ARCH_GET_CAP_REG(vcpu) (vcpu->regs[LCD_ARCH_REGS_RAX])
+#define LCD_ARCH_GET_CAP_REG(vcpu) (vcpu->regs[LCD_ARCH_REGS_RBX])
 #define LCD_ARCH_GET_BDG_REG(vcpu) (vcpu->regs[LCD_ARCH_REGS_RBX])
 #define LCD_ARCH_GET_TAG_REG(vcpu) (vcpu->regs[LCD_ARCH_REGS_RSI])
 #define LCD_ARCH_GET_MSG_REG(vcpu, idx) (__lcd_arch_get_msg_reg(vcpu, idx))
@@ -280,7 +285,7 @@ static inline u64 __lcd_arch_get_msg_reg(lcd_arch *vcpu, unsigned int idx)
 }
 
 #define LCD_ARCH_SET_CAP_REG(vcpu, val) ({                    \
-			vcpu->regs[LCD_ARCH_REGS_RAX] = val;  \
+			vcpu->regs[LCD_ARCH_REGS_RBX] = val;  \
 		})
 #define LCD_ARCH_SET_BDG_REG(vcpu, val) ({                    \
 			vcpu->regs[LCD_ARCH_REGS_RBX] = val;  \

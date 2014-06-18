@@ -1,0 +1,14 @@
+#ifndef LCD_DOMAINS_SYSCALL_H
+#define LCD_DOMAINS_SYSCALL_H
+
+enum lcd_syscall {
+	LCD_SYSCALL_SEND       = 0,
+	LCD_SYSCALL_NBSEND     = 1,
+	LCD_SYSCALL_CALL       = 2,
+	LCD_SYSCALL_WAIT       = 3,
+	LCD_SYSCALL_REPLY      = 4,
+	LCD_SYSCALL_REPLYWAIT  = 5,
+	LCD_SYSCALL_YIELD      = 6,
+};
+
+#endif /* LCD_DOMAINS_SYSCALL_H */

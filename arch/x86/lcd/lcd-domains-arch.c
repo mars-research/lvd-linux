@@ -2068,11 +2068,12 @@ static void vmx_step_instruction(void)
 
 /**
  * Processes a vmcall. For now, the only reason the lcd
- * would execute a vmcall is for ipc.
+ * would execute a vmcall is for a syscall to the
+ * hypervisor.
  */
 static int vmx_handle_vmcall(struct lcd_arch *vcpu)
 {
-	return LCD_ARCH_STATUS_IPC;
+	return LCD_ARCH_STATUS_SYSCALL;
 }
 
 /**

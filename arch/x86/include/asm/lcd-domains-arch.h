@@ -65,7 +65,6 @@ struct lcd_arch_tss {
 	u8 io_bitmap[1];
 } __attribute__((packed));
 
-
 struct lcd_arch {
 	/*
 	 * Public Data
@@ -86,6 +85,7 @@ struct lcd_arch {
 	struct lcd_arch_ept ept;
 	struct desc_struct  *gdt;
 	struct lcd_arch_tss *tss;
+	u8 *ipc_regs;
 
 	u8  fail;
 	u64 exit_reason;

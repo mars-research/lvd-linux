@@ -1872,6 +1872,49 @@ fail:
 }
 
 /**
+ * Allocates and maps stack / ipc registers memory.
+ *
+ * %rsp not set until guest virtual address space initialized.
+ */
+static int vmx_init_stack(struct lcd_arch *vcpu)
+{
+	int ret;
+
+	/*
+	 * Alloc zero'd page for stack.
+	 *
+	 * Bottom of stack will contain ipc buffer.
+	 */
+	vcpu->ipc_regs = (u8 *)get_zeroed_page(GFP_KERNEL);
+	if (!vcpu->ipc_regs) {
+		ret = -ENOMEM;
+		goto fail;
+	}
+
+	/*
+	 *===--- Map stack in guest physical address space ---===
+	 */
+	ret = lcd_arch_ept_map_gpa_to_hpa(vcpu, 
+					/* gpa */
+					LCD_ARCH_IPC_REGS, 
+					/* hpa */
+					__pa(vcpu->ipc_regs),
+					/* create paging structs as needed */
+					1,
+					/* no overwrite */
+					0);
+	if (ret)
+		goto fail_map;
+
+	return 0;
+
+fail_map:
+	free_page((u64)vcpu->ipc_regs);
+fail:
+	return ret
+}
+
+/**
  * Reserves a vpid and sets it in the vcpu.
  */
 static int vmx_allocate_vpid(struct lcd_arch *vmx)

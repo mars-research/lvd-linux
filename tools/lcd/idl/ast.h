@@ -6,8 +6,10 @@
 
 class Type
 {
+  char * t;
  public:
-  Type();
+  Type(char * t);
+  char * getStr();
 };
 
 class Argument
@@ -19,6 +21,12 @@ class Argument
  public:
   Argument(Type * t, char * n, char * s);
   Argument(Type * t, char *n);
+  bool isDynamic();
+  Type * getType();
+  char * getName();
+  char * getSize();
+  
+  
 };
 
 class Message
@@ -27,6 +35,8 @@ class Message
   std::vector<Argument*> * args;
  public:
   Message(char * n, std::vector<Argument* > * a);
+  char * getName();
+  std::vector<Argument*> * getArguments();
 
 };
 
@@ -38,6 +48,7 @@ class Interface
  public:
   Interface(char * n, char * desc, std::vector<Message*> * m);
   Interface(char * n, std::vector<Message*> * m);
+  std::vector<Message*> * getMessages();
 
 };
 

@@ -14,19 +14,30 @@ Interface::Interface(char * n, std::vector<Message*> * m)
     description = 0;
     function_decs = m;
   }
+
+std::vector<Message*> *Interface::getMessages()
+{
+  return this->function_decs;
+}
   
 
 
 
 Message::Message(char * n, std::vector<Argument*> * a)
 {
-  name = n;
-  args = a;
+  this->name = n;
+  this->args = a;
 }
 
-  
+char * Message::getName()
+{
+  return this->name;
+}
 
-
+std::vector<Argument*> *Message::getArguments()
+{
+  return this->args;
+}
 
 Argument::Argument(Type * t_, char * n, char * s)
 {
@@ -44,7 +55,33 @@ Argument::Argument(Type * t_, char * n)
   size =  0;
 }
 
-Type::Type()
+bool Argument::isDynamic()
 {
+  return this->array;
+}
+
+Type * Argument::getType()
+{
+  return this->t;
+}
+
+char * Argument::getName()
+{
+  return this->name;
+}
+
+char * Argument::getSize()
+{
+  return this->size;
+}
+
+Type::Type(char * t)
+{
+  this->t = t;
+}
+
+char * Type::getStr()
+{
+  return this->t;
 }
 

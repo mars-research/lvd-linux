@@ -1,11 +1,12 @@
+#ifndef LCD_DOMAINS_H
+#define LCD_DOMAINS_H
+
 /*
  * lcd.h - interface to LCD domains
  *
  * Author: Anton Burtsev 
  */
 
-#ifndef __LINUX_PUBLIC_LCD_H__
-#define __LINUX_PUBLIC_LCD_H__
 /*
  * IOCTL interface
  */
@@ -19,4 +20,4 @@ struct lcd_pv_kernel_config {
 	char  *file;
 } __attribute__((packed));
 
-#endif /* __LINUX_PUBLIC_LCD_H__ */
+#endif /* LCD_DOMAINS_H */

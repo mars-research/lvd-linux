@@ -1,5 +1,5 @@
-#ifndef LCD_DOMAINS_ARCH_H
-#define LCD_DOMAINS_ARCH_H
+#ifndef _ASM_X86_LCD_DOMAINS_ARCH_H
+#define _ASM_X86_LCD_DOMAINS_ARCH_H
 
 #include <asm/vmx.h>
 #include <linux/spinlock.h>
@@ -11,9 +11,6 @@ struct lcd_arch_vmcs {
 	char data[0];
 };
 
-int lcd_arch_autoload_msrs[] = {
-	/* NONE */
-};
 #define LCD_ARCH_NUM_AUTOLOAD_MSRS 0
 
 enum lcd_arch_reg {
@@ -48,7 +45,7 @@ struct lcd_arch_ept {
 	bool access_dirty_enabled;
 };
 
-typedef epte_t lcd_arch_epte_t;
+typedef unsigned long lcd_arch_epte_t;
 
 struct lcd_arch_tss {
 	/*
@@ -156,7 +153,7 @@ enum lcd_arch_status {
 	LCD_ARCH_STATUS_EXT_INTR   = 1,
 	LCD_ARCH_STATUS_EPT_FAULT  = 2,
 	LCD_ARCH_STATUS_CR3_ACCESS = 3,
-	LCD_ARCH_STATUS_IPC        = 4,
+	LCD_ARCH_STATUS_SYSCALL    = 4,
 };
 
 /**
@@ -170,7 +167,7 @@ int lcd_arch_ept_walk(struct lcd_arch *vcpu, u64 gpa, int create,
 /**
  * Set the guest physical => host physical mapping in the ept entry.
  */
-int lcd_arch_ept_set(lcd_arch_epte_t *epte, u64 hpa);
+void lcd_arch_ept_set(lcd_arch_epte_t *epte, u64 hpa);
 /**
  * Read the host physical address stored in epte.
  */
@@ -202,7 +199,7 @@ int lcd_arch_ept_map_gpa_to_hpa(struct lcd_arch *vcpu, u64 gpa, u64 hpa,
 #define LCD_ARCH_GS_BASE     0x0UL
 #define LCD_ARCH_GS_LIMIT    0xFFFFFFFF
 #define LCD_ARCH_GDTR_BASE   0x0000000000002000UL
-#define LCD_ARCH_GDTR_LIMIT  ~(PAGE_SIZE - 1)
+#define LCD_ARCH_GDTR_LIMIT  ((u32)~(PAGE_SIZE - 1))
 #define LCD_ARCH_TSS_BASE    0x0000000000003000UL
 /* tss base + limit = address of last byte in tss, hence -1 */
 #define LCD_ARCH_TSS_LIMIT   (sizeof(struct lcd_arch_tss) - 1)
@@ -238,7 +235,7 @@ int lcd_arch_ept_map_gpa_to_hpa(struct lcd_arch *vcpu, u64 gpa, u64 hpa,
  *                         |           used            |
  * LCD_ARCH_TSS_BASE-----> +---------------------------+ 0x0000 0000 0000 2000
  *                         |           GDT             | (4 KBs)
- * LCD_ARCH_GDT_BASE-----> +---------------------------+ 0x0000 0000 0000 1000
+ * LCD_ARCH_GDTR_BASE----> +---------------------------+ 0x0000 0000 0000 1000
  *                         |         Reserved          |
  *                         |       (not mapped)        | (4 KBs)
  *                         +---------------------------+ 0x0000 0000 0000 0000
@@ -265,7 +262,8 @@ int lcd_arch_ept_map_gpa_to_hpa(struct lcd_arch *vcpu, u64 gpa, u64 hpa,
 #define LCD_ARCH_GET_BDG_REG(vcpu) (vcpu->regs[LCD_ARCH_REGS_RBX])
 #define LCD_ARCH_GET_TAG_REG(vcpu) (vcpu->regs[LCD_ARCH_REGS_RSI])
 #define LCD_ARCH_GET_MSG_REG(vcpu, idx) (__lcd_arch_get_msg_reg(vcpu, idx))
-static inline u64 __lcd_arch_get_msg_reg(lcd_arch *vcpu, unsigned int idx)
+static inline u64 __lcd_arch_get_msg_reg(struct lcd_arch *vcpu, 
+					unsigned int idx)
 {
 	/*
 	 * Message regs 0 and 1 are fast (use machine registers)
@@ -277,9 +275,9 @@ static inline u64 __lcd_arch_get_msg_reg(lcd_arch *vcpu, unsigned int idx)
 	 * they should do so by manually accessing the mr's in utcb.)
 	 */
 	if (idx == 0)
-		return vcpu->regs[LCD_ARCH_REGS_EDI];
+		return vcpu->regs[LCD_ARCH_REGS_RDI];
 	else if (idx == 1)
-		return vcpu->regs[LCD_ARCH_REGS_EBP];
+		return vcpu->regs[LCD_ARCH_REGS_RBP];
 	else
 		return vcpu->utcb->ipc.mr[idx];
 }
@@ -296,8 +294,8 @@ static inline u64 __lcd_arch_get_msg_reg(lcd_arch *vcpu, unsigned int idx)
 #define LCD_ARCH_SET_MSG_REG(vcpu, idx, val) ({                 \
 			__lcd_arch_set_msg_reg(vcpu, val, idx);	\
 		})
-static inline void __lcd_arch_set_msg_reg(lcd_arch *vcpu, unsigned int idx,
-					u64 val)
+static inline void __lcd_arch_set_msg_reg(struct lcd_arch *vcpu, 
+					unsigned int idx, u64 val)
 {
 	/*
 	 * Message regs 0 and 1 are fast (use machine registers)
@@ -309,11 +307,11 @@ static inline void __lcd_arch_set_msg_reg(lcd_arch *vcpu, unsigned int idx,
 	 * they should do so by manually accessing the mr's in utcb.)
 	 */
 	if (idx == 0)
-		vcpu->regs[LCD_ARCH_REGS_EDI] = val;
+		vcpu->regs[LCD_ARCH_REGS_RDI] = val;
 	else if (idx == 1)
-		vcpu->regs[LCD_ARCH_REGS_EBP] = val;
+		vcpu->regs[LCD_ARCH_REGS_RBP] = val;
 	else
 		vcpu->utcb->ipc.mr[idx] = val;
 }
 
-#endif  /* LCD_DOMAINS_ARCH_H */
+#endif  /* _ASM_X86_LCD_DOMAINS_ARCH_H */

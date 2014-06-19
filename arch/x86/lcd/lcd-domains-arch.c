@@ -48,7 +48,7 @@ static struct vmx_capability vmx_capability;
 
 static atomic_t vmx_enable_failed;
 static DEFINE_PER_CPU(int, vmx_enabled);
-static DEFINE_PER_CPU(struct vmx_vmcs *, vmxon_area);
+static DEFINE_PER_CPU(struct lcd_arch_vmcs *, vmxon_area);
 
 static struct {
 	DECLARE_BITMAP(bitmap, VMX_NR_VPIDS);
@@ -217,7 +217,7 @@ static inline void invvpid_single_context(u16 vpid)
 /**
  * Takes vmcs from any state to {inactive, clear, not current}
  */
-static void vmcs_clear(struct vmx_vmcs *vmcs)
+static void vmcs_clear(struct lcd_arch_vmcs *vmcs)
 {
 	u64 phys_addr = __pa(vmcs);
 	u8 error;
@@ -234,7 +234,7 @@ static void vmcs_clear(struct vmx_vmcs *vmcs)
  * Takes vmcs to {active, current} on cpu. Any vmcs reads and writes
  * will affect this vmcs.
  */
-static void vmcs_load(struct vmx_vmcs *vmcs)
+static void vmcs_load(struct lcd_arch_vmcs *vmcs)
 {
 	u64 phys_addr = __pa(vmcs);
 	u8 error;
@@ -308,7 +308,7 @@ static void vmcs_write64(unsigned long field, u64 value)
 /**
  * Frees vmcs memory.
  */
-static void vmx_free_vmcs(struct vmx_vmcs *vmcs)
+static void vmx_free_vmcs(struct lcd_arch_vmcs *vmcs)
 {
 	free_pages((unsigned long)vmcs, vmcs_config.order);
 }
@@ -317,11 +317,11 @@ static void vmx_free_vmcs(struct vmx_vmcs *vmcs)
  * Allocates memory for a vmcs on cpu, and sets the
  * revision id.
  */
-static struct vmx_vmcs *vmx_alloc_vmcs(int cpu)
+static struct lcd_arch_vmcs *vmx_alloc_vmcs(int cpu)
 {
 	int node;
 	struct page *pages;
-	struct vmx_vmcs *vmcs;
+	struct lcd_arch_vmcs *vmcs;
 
 	node = cpu_to_node(cpu);
 	pages = alloc_pages_exact_node(node, GFP_KERNEL, vmcs_config.order);
@@ -353,7 +353,7 @@ static inline void __vmxoff(void)
  * Helper for vmx_enable. A few more low-level checks and
  * settings, and then turns on vmx.
  */
-static int __vmx_enable(struct vmx_vmcs *vmxon_buf)
+static int __vmx_enable(struct lcd_arch_vmcs *vmxon_buf)
 {
 	u64 phys_addr;
 	u64 old;
@@ -407,7 +407,7 @@ static int __vmx_enable(struct vmx_vmcs *vmxon_buf)
 static void vmx_enable(void *unused)
 {
 	int ret;
-	struct vmx_vmcs *vmxon_buf;
+	struct lcd_arch_vmcs *vmxon_buf;
 
 	vmxon_buf = __get_cpu_var(vmxon_area);
 	
@@ -825,7 +825,7 @@ int lcd_arch_init(void)
 	 */
 
 	for_each_possible_cpu(cpu) {
-		struct vmx_vmcs *vmxon_buf;
+		struct lcd_arch_vmcs *vmxon_buf;
 
 		vmxon_buf = vmx_alloc_vmcs(cpu);
 		if (!vmxon_buf) {
@@ -878,7 +878,7 @@ void lcd_arch_exit(void)
  */
 #define VMX_EPTE_ADDR_MASK PAGE_MASK
 #define VMX_EPTE_ADDR(epte) (((u64)epte) & PAGE_MASK)
-#define VMX_EPTE_VADDR(epte) (__va(VMX_EPTE_ADDR(epte)))
+#define VMX_EPTE_VADDR(epte) ((u64)__va(VMX_EPTE_ADDR(epte)))
 #define VMX_EPT_ALL_MASK (VMX_EPT_READABLE_MASK | \
                           VMX_EPT_WRITABLE_MASK | \
 			  VMX_EPT_EXECUTABLE_MASK)
@@ -927,7 +927,7 @@ int lcd_arch_ept_walk(struct lcd_arch *vcpu, u64 gpa, int create,
 		lcd_arch_epte_t **epte_out)
 {
 	int i;
-	epte_t *dir;
+	lcd_arch_epte_t *dir;
 	u64 mask;
 	u64 idx;
 	u64 page;
@@ -937,7 +937,7 @@ int lcd_arch_ept_walk(struct lcd_arch *vcpu, u64 gpa, int create,
 	/*
 	 * The first level uses bits 47:39 (9 bits) of the gpa
 	 */
-	mask = 0x1ff << 39;
+	mask = 0x1ffUL << 39;
 
 	/*
 	 * Walk plm4 -> pdpt -> pd. Each step uses 9 bits
@@ -947,7 +947,7 @@ int lcd_arch_ept_walk(struct lcd_arch *vcpu, u64 gpa, int create,
 
 		idx = gpa & mask;
 
-		if (!epte_present(dir[idx])) {
+		if (!VMX_EPTE_PRESENT(dir[idx])) {
 			
 			if (!create)
 				return -ENOENT;
@@ -959,10 +959,10 @@ int lcd_arch_ept_walk(struct lcd_arch *vcpu, u64 gpa, int create,
 			if (!page)
 				return -ENOMEM;
 			memset((void *)page, 0, PAGE_SIZE);
-			vmx_epte_set(dir[idx], __pa(page), i);
+			vmx_epte_set(&dir[idx], __pa(page), i);
 		}
 
-		dir = (epte_t *) __va(VMX_EPTE_ADDR(dir[idx]));
+		dir = (lcd_arch_epte_t *) VMX_EPTE_VADDR(dir[idx]);
 		mask >>= 9;
 	}
 	
@@ -1001,7 +1001,7 @@ int lcd_arch_ept_map_gpa_to_hpa(struct lcd_arch *vcpu, u64 gpa, u64 hpa,
 	 * Check if guest physical address already mapped
 	 */
 	if (!overwrite && VMX_EPTE_PRESENT(*ept_entry))
-		return -EINVALID;
+		return -EINVAL;
 
 	/*
 	 * Map the guest physical addr to the host physical addr.
@@ -1023,7 +1023,6 @@ int lcd_arch_ept_map_gpa_to_hpa(struct lcd_arch *vcpu, u64 gpa, u64 hpa,
 static void vmx_free_ept_dir_level(lcd_arch_epte_t *dir, int level)
 {
 	int idx;
-	lcd_arch_epte_t *dir;
 	
 	if (level == 3) {
 		/*
@@ -1043,7 +1042,7 @@ static void vmx_free_ept_dir_level(lcd_arch_epte_t *dir, int level)
 		 */
 		for (idx = 0; idx < LCD_ARCH_PTRS_PER_EPTE; idx++) {
 			if (VMX_EPTE_PRESENT(dir[idx]))
-				vmx_free_ept_dir_level(dir[idx], level + 1);
+				vmx_free_ept_dir_level(&dir[idx], level + 1);
 		}
 	}
 	/*
@@ -1140,11 +1139,11 @@ static struct desc_struct * vmx_per_cpu_gdt(void)
  * Returns pointer to current idt (array of gate descriptors) on 
  * calling cpu.
  */
-static struct gate_desc * vmx_per_cpu_idt(void)
+static gate_desc * vmx_per_cpu_idt(void)
 {
 	struct desc_ptr idt_ptr;
 	native_store_idt(&idt_ptr);
-	return (struct gate_desc *)idt_ptr.address;
+	return (gate_desc *)idt_ptr.address;
 }
 
 /**
@@ -1226,6 +1225,9 @@ static void vmx_setup_vmcs_msr(struct lcd_arch *vcpu)
 	int i;
 	u64 val;
 	struct vmx_msr_entry *e;
+	int autoload_msrs[] = {
+		/* None for now */
+	};
 	
 	/*
 	 * MSR Bitmap (bit = 0 ==> access allowed in non-root mode)
@@ -1257,12 +1259,12 @@ static void vmx_setup_vmcs_msr(struct lcd_arch *vcpu)
 	for (i = 0; i < LCD_ARCH_NUM_AUTOLOAD_MSRS; i++) {
 	
 		e = &vcpu->msr_autoload.host[i];
-		e->index = lcd_arch_autoload_msrs[i];
+		e->index = autoload_msrs[i];
 		rdmsrl(e->index, val);
 		e->value = val;
 
 		e = &vcpu->msr_autoload.guest[i];
-		e->index = lcd_arch_autoload_msrs[i];
+		e->index = autoload_msrs[i];
 	}
 }
 
@@ -1273,7 +1275,6 @@ static void vmx_setup_vmcs_guest_regs(struct lcd_arch *vcpu)
 {
 	unsigned long cr0;
 	unsigned long cr4;
-	unsigned long tmpl;
 
 	/*
 	 * %cr0 (and its shadow)
@@ -1776,7 +1777,7 @@ static int vmx_init_gdt(struct lcd_arch *vcpu)
 	/*
 	 * Task Segment (descriptor)
 	 */
-	tssd = (tss_desc *)(vcpu->gdt + (LCD_ARCH_TR_SELECTOR >> 3));
+	tssd = (struct tss_desc *)(vcpu->gdt + (LCD_ARCH_TR_SELECTOR >> 3));
 	set_tssldt_descriptor(tssd, 
 			LCD_ARCH_TSS_BASE,   /* base */
 			0xB,                 /* type = 64-bit busy tss */
@@ -1787,7 +1788,7 @@ static int vmx_init_gdt(struct lcd_arch *vcpu)
 	 */
 	ret = lcd_arch_ept_map_gpa_to_hpa(vcpu, 
 					/* gpa */
-					LCD_ARCH_GDT_BASE, 
+					LCD_ARCH_GDTR_BASE, 
 					/* hpa */
 					__pa(vcpu->gdt),
 					/* create paging structs as needed */
@@ -1802,7 +1803,7 @@ static int vmx_init_gdt(struct lcd_arch *vcpu)
 fail_map:
 	free_page((u64)vcpu->gdt);
 fail:
-	return ret
+	return ret;
 }
 
 /**
@@ -1830,7 +1831,7 @@ static int vmx_init_tss(struct lcd_arch *vcpu)
 		ret = -ENOMEM;
 		goto fail;
 	}
-	base_tss = &(vcpu->tss.base_tss);
+	base_tss = &(vcpu->tss->base_tss);
 	/*
 	 * Set up 64-bit TSS (See Intel SDM V3 7.7)
 	 *
@@ -1868,7 +1869,7 @@ static int vmx_init_tss(struct lcd_arch *vcpu)
 fail_map:
 	free_page((u64)vcpu->tss);
 fail:
-	return ret
+	return ret;
 }
 
 /**
@@ -1896,9 +1897,9 @@ static int vmx_init_stack(struct lcd_arch *vcpu)
 	 */
 	ret = lcd_arch_ept_map_gpa_to_hpa(vcpu, 
 					/* gpa */
-					LCD_ARCH_IPC_REGS, 
+					LCD_ARCH_UTCB,
 					/* hpa */
-					__pa(vcpu->ipc_regs),
+					__pa(vcpu->utcb),
 					/* create paging structs as needed */
 					1,
 					/* no overwrite */
@@ -1911,7 +1912,7 @@ static int vmx_init_stack(struct lcd_arch *vcpu)
 fail_map:
 	free_page((u64)vcpu->utcb);
 fail:
-	return ret
+	return ret;
 }
 
 /**
@@ -2034,8 +2035,8 @@ void lcd_arch_destroy(struct lcd_arch *vcpu)
 	/*
 	 * Invalidate any cached ept and vpid mappings.
 	 */
-	invept_single_context(vcpu->eptp);
-	invvpid_single_context(vcpu->vpid)
+	invept_single_context(vcpu->ept.vmcs_ptr);
+	invvpid_single_context(vcpu->vpid);
 	/*
 	 * VM clear on this cpu
 	 */
@@ -2044,12 +2045,15 @@ void lcd_arch_destroy(struct lcd_arch *vcpu)
 	/*
 	 * Preemption enabled
 	 */
-	vmx_put_cpu();
+	vmx_put_cpu(vcpu);
 	/*
 	 * Free remaining junk
 	 */
 	vmx_free_vpid(vcpu);
 	vmx_free_vmcs(vcpu->vmcs);
+	free_page((u64)vcpu->gdt);
+	free_page((u64)vcpu->tss);
+	free_page((u64)vcpu->utcb);
 	kfree(vcpu);
 }
 
@@ -2089,18 +2093,18 @@ static int vmx_handle_external_intr(struct lcd_arch *vcpu)
 	unsigned int vector;
 	unsigned long entry;
 	unsigned long sp_tmp;
-	struct gate_desc *idt;
-	struct gate_desc *gate;
+	gate_desc *idt;
+	gate_desc *gate;
 	/*
 	 * Load interrupt entry address
 	 *
 	 * Intel SDM V3 24.9.2, 27.2.2 (for vmx intr info)
 	 * Intel SDM V3 6.14.1 (for idt layout)
 	 */
-	vector =  exit_intr_info & INTR_INFO_VECTOR_MASK;
+	vector =  vcpu->exit_intr_info & INTR_INFO_VECTOR_MASK;
 	idt = vmx_per_cpu_idt();
 	gate = idt + vector;
-	entry = gate_offset(&gate);
+	entry = gate_offset(*gate);
 
 	/*
 	 * Disable interrupts, per what the interrupt handler expects.
@@ -2269,7 +2273,7 @@ static int vmx_handle_control_reg(struct lcd_arch *vcpu)
 		/*
 		 * Step past instruction that caused exit
 		 */
-		vmx_step_instruction()		
+		vmx_step_instruction();
 		return LCD_ARCH_STATUS_CR3_ACCESS;
 	default:
 		printk(KERN_ERR "lcd vmx: attempted access to protected cr\n");
@@ -2395,25 +2399,25 @@ static int __noclone vmx_enter(struct lcd_arch *vcpu)
 		"setbe %c[fail](%0) \n\t"
 
 		: : "c"(vcpu),
-		  [launched]"i"(offsetof(struct lcd, launched)),
-		  [fail]"i"(offsetof(struct lcd, fail)),
-		  [host_rsp]"i"(offsetof(struct lcd, host_rsp)),
-		  [rax]"i"(offsetof(struct lcd, regs[VCPU_REGS_RAX])),
-		  [rbx]"i"(offsetof(struct lcd, regs[VCPU_REGS_RBX])),
-		  [rcx]"i"(offsetof(struct lcd, regs[VCPU_REGS_RCX])),
-		  [rdx]"i"(offsetof(struct lcd, regs[VCPU_REGS_RDX])),
-		  [rsi]"i"(offsetof(struct lcd, regs[VCPU_REGS_RSI])),
-		  [rdi]"i"(offsetof(struct lcd, regs[VCPU_REGS_RDI])),
-		  [rbp]"i"(offsetof(struct lcd, regs[VCPU_REGS_RBP])),
-		  [r8]"i"(offsetof(struct lcd, regs[VCPU_REGS_R8])),
-		  [r9]"i"(offsetof(struct lcd, regs[VCPU_REGS_R9])),
-		  [r10]"i"(offsetof(struct lcd, regs[VCPU_REGS_R10])),
-		  [r11]"i"(offsetof(struct lcd, regs[VCPU_REGS_R11])),
-		  [r12]"i"(offsetof(struct lcd, regs[VCPU_REGS_R12])),
-		  [r13]"i"(offsetof(struct lcd, regs[VCPU_REGS_R13])),
-		  [r14]"i"(offsetof(struct lcd, regs[VCPU_REGS_R14])),
-		  [r15]"i"(offsetof(struct lcd, regs[VCPU_REGS_R15])),
-		  [cr2]"i"(offsetof(struct lcd, cr2)),
+		  [launched]"i"(offsetof(struct lcd_arch, launched)),
+		  [fail]"i"(offsetof(struct lcd_arch, fail)),
+		  [host_rsp]"i"(offsetof(struct lcd_arch, host_rsp)),
+		  [rax]"i"(offsetof(struct lcd_arch, regs[LCD_ARCH_REGS_RAX])),
+		  [rbx]"i"(offsetof(struct lcd_arch, regs[LCD_ARCH_REGS_RBX])),
+		  [rcx]"i"(offsetof(struct lcd_arch, regs[LCD_ARCH_REGS_RCX])),
+		  [rdx]"i"(offsetof(struct lcd_arch, regs[LCD_ARCH_REGS_RDX])),
+		  [rsi]"i"(offsetof(struct lcd_arch, regs[LCD_ARCH_REGS_RSI])),
+		  [rdi]"i"(offsetof(struct lcd_arch, regs[LCD_ARCH_REGS_RDI])),
+		  [rbp]"i"(offsetof(struct lcd_arch, regs[LCD_ARCH_REGS_RBP])),
+		  [r8]"i"(offsetof(struct lcd_arch, regs[LCD_ARCH_REGS_R8])),
+		  [r9]"i"(offsetof(struct lcd_arch, regs[LCD_ARCH_REGS_R9])),
+		  [r10]"i"(offsetof(struct lcd_arch, regs[LCD_ARCH_REGS_R10])),
+		  [r11]"i"(offsetof(struct lcd_arch, regs[LCD_ARCH_REGS_R11])),
+		  [r12]"i"(offsetof(struct lcd_arch, regs[LCD_ARCH_REGS_R12])),
+		  [r13]"i"(offsetof(struct lcd_arch, regs[LCD_ARCH_REGS_R13])),
+		  [r14]"i"(offsetof(struct lcd_arch, regs[LCD_ARCH_REGS_R14])),
+		  [r15]"i"(offsetof(struct lcd_arch, regs[LCD_ARCH_REGS_R15])),
+		  [cr2]"i"(offsetof(struct lcd_arch, cr2)),
 		  [wordsize]"i"(sizeof(ulong))
 		: "cc", "memory"
 		  , "rax", "rbx", "rdi", "rsi"
@@ -2468,7 +2472,7 @@ int lcd_arch_run(struct lcd_arch *vcpu)
 		ret = vmx_handle_exception_nmi(vcpu);
 		break;
 	case EXIT_REASON_EXTERNAL_INTERRUPT:
-		ret = vmx_handle_external_int(vcpu);
+		ret = vmx_handle_external_intr(vcpu);
 		break;
 	case EXIT_REASON_VMCALL:
 		ret = vmx_handle_vmcall(vcpu);
@@ -2478,7 +2482,12 @@ int lcd_arch_run(struct lcd_arch *vcpu)
 		break;
 	case EXIT_REASON_CR_ACCESS:
 		ret = vmx_handle_control_reg(vcpu);
-		break;			
+		break;
+	default:
+		printk(KERN_ERR "lcd vmx: unhandled exit reason: %x\n",
+			exit_reason);
+		ret = -EIO;
+		break;
 	}
 
 	/*

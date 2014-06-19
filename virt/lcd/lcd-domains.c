@@ -17,8 +17,6 @@
 
 #include <linux/lcd-domains.h>
 #include <asm/lcd-domains-arch.h>
-#include <lcd-domains/lcd-domains.h>
-#include <lcd-domains/ipc.h>
 
 MODULE_LICENSE("GPL");
 MODULE_DESCRIPTION("LCD driver");

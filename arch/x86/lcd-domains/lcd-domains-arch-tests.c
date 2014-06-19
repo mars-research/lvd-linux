@@ -34,6 +34,7 @@ static int test02(void)
 			lcd->vpid);
 		goto fail_free;
 	}
+	vmx_free_vpid(lcd);
 	if (vmx_allocate_vpid(lcd)) {
 		printk(KERN_ERR "lcd arch : test02 2nd vpid alloc failed\n");
 		goto fail;
@@ -109,7 +110,7 @@ static int test04(void)
 		printk(KERN_ERR "lcd arch : test04 gdt init failed\n");
 		goto fail_gdt;
 	}	
-	if (lcd_arch_ept_gpa_to_hpa(lcd, LCD_ARCH_GDT_BASE, &hpa)) {
+	if (lcd_arch_ept_gpa_to_hpa(lcd, LCD_ARCH_GDTR_BASE, &hpa)) {
 		printk(KERN_ERR "lcd arch : test04 lookup failed\n");
 		goto fail_lookup;
 	}

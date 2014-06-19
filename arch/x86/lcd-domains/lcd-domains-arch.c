@@ -777,8 +777,7 @@ static int setup_vmcs_config(struct vmx_vmcs_config *vmcs_conf)
 
 /* VMX INIT / EXIT -------------------------------------------------- */
 
-/* for debugging */
-#include "lcd-domains-arch-tests.c"
+static void lcd_arch_tests(void);
 
 int lcd_arch_init(void)
 {
@@ -957,15 +956,20 @@ int lcd_arch_ept_walk(struct lcd_arch *vcpu, u64 gpa, int create,
 
 		if (!VMX_EPTE_PRESENT(dir[idx])) {
 			
-			if (!create)
+			if (!create) {
+				printk(KERN_ERR "lcd_arch_ept_walk: attempted lookup for unmapped gpa %x, create was not allowed\n",
+					gpa);
 				return -ENOENT;
+			}
 			/*
 			 * Get host virtual addr of fresh page, and
 			 * set the epte's addr to the host physical addr
 			 */
 			page = __get_free_page(GFP_KERNEL);
-			if (!page)
+			if (!page) {
+				printk(KERN_ERR "lcd_arch_ept_walk: alloc failed\n");
 				return -ENOMEM;
+			}
 			memset((void *)page, 0, PAGE_SIZE);
 			vmx_epte_set(&dir[idx], __pa(page), i);
 		}
@@ -1008,8 +1012,11 @@ int lcd_arch_ept_map_gpa_to_hpa(struct lcd_arch *vcpu, u64 gpa, u64 hpa,
 	/*
 	 * Check if guest physical address already mapped
 	 */
-	if (!overwrite && VMX_EPTE_PRESENT(*ept_entry))
+	if (!overwrite && VMX_EPTE_PRESENT(*ept_entry)) {
+		printk(KERN_ERR "lcd_arch_map_gpa_to_hpa: would overwrite hpa %x with hpa %x\n",
+			lcd_arch_ept_hpa(*ept_entry), hpa);
 		return -EINVAL;
+	}
 
 	/*
 	 * Map the guest physical addr to the host physical addr.
@@ -1027,14 +1034,14 @@ int lcd_arch_ept_gpa_to_hpa(struct lcd_arch *vcpu, u64 gpa, u64 *hpa_out)
 	/*
 	 * Walk ept
 	 */
-	ret = lcd_arch_ept_walk(vcpu, gpa, create, &ept_entry);
+	ret = lcd_arch_ept_walk(vcpu, gpa, 0, &ept_entry);
 	if (ret)
 		return ret;
 
 	/*
 	 * Map the guest physical addr to the host physical addr.
 	 */
-	*hpa = lcd_arch_ept_hpa(ept_entry);
+	*hpa_out = lcd_arch_ept_hpa(ept_entry);
 
 	return 0;
 }
@@ -1107,8 +1114,10 @@ int vmx_init_ept(struct lcd_arch *vcpu)
 	 */
 
 	page = (void *)__get_free_page(GFP_KERNEL);
-	if (!page)
+	if (!page) {
+		printk(KERN_ERR "vmx init ept: failed to alloc page\n");
 		return -ENOMEM;
+	}
 	memset(page, 0, PAGE_SIZE);
 
 	vcpu->ept.root_hpa =  __pa(page);
@@ -1746,6 +1755,7 @@ static int vmx_init_gdt(struct lcd_arch *vcpu)
 	 */
 	vcpu->gdt = (struct desc_struct *)get_zeroed_page(GFP_KERNEL);
 	if (!vcpu->gdt) {
+		printk(KERN_ERR "vmx init gdt: failed to alloc gdt\n");
 		ret = -ENOMEM;
 		goto fail;
 	}
@@ -1856,6 +1866,7 @@ static int vmx_init_tss(struct lcd_arch *vcpu)
 	 */
 	vcpu->tss = (struct lcd_arch_tss *)get_zeroed_page(GFP_KERNEL);
 	if (!vcpu->tss) {
+		printk(KERN_ERR "vmx_init_tss: failed to alloc tss\n");
 		ret = -ENOMEM;
 		goto fail;
 	}
@@ -1916,6 +1927,7 @@ static int vmx_init_stack(struct lcd_arch *vcpu)
 	 */
 	vcpu->utcb = (struct lcd_utcb *)get_zeroed_page(GFP_KERNEL);
 	if (!vcpu->utcb) {
+		printk(KERN_ERR "vmx_init_stack: failed to alloc stack\n");
 		ret = -ENOMEM;
 		goto fail;
 	}
@@ -1982,19 +1994,25 @@ struct lcd_arch* lcd_arch_create(void)
 	 * Alloc lcd_arch
 	 */
 	vcpu = kmalloc(sizeof(*vcpu), GFP_KERNEL);
-	if (!vcpu)
+	if (!vcpu) {
+		printk(KERN_ERR "lcd arch create: failed to alloc lcd\n");
 		goto fail_vcpu;
+	}
 	memset(vcpu, 0, sizeof(*vcpu));
 
 	/*
 	 * Alloc vmcs
 	 */
 	vcpu->vmcs = vmx_alloc_vmcs(raw_smp_processor_id());
-	if (!vcpu->vmcs)
+	if (!vcpu->vmcs) {
+		printk(KERN_ERR "lcd arch create: failed to alloc vmcs\n");
 		goto fail_vmcs;
+	}
 
-	if (vmx_allocate_vpid(vcpu))
+	if (vmx_allocate_vpid(vcpu)) {
+		printk(KERN_ERR "lcd arch create: failed to alloc vpid\n");
 		goto fail_vpid;
+	}
 
 	/*
 	 * Not loaded on a cpu right now
@@ -2536,3 +2554,7 @@ EXPORT_SYMBOL(lcd_arch_ept_set);
 EXPORT_SYMBOL(lcd_arch_ept_hpa);
 EXPORT_SYMBOL(lcd_arch_ept_map_gpa_to_hpa);
 EXPORT_SYMBOL(lcd_arch_ept_gpa_to_hpa);
+
+/* DEBUGGING -------------------------------------------------- */
+
+#include "lcd-domains-arch-tests.c"

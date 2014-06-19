@@ -180,6 +180,10 @@ u64 lcd_arch_ept_hpa(lcd_arch_epte_t *epte);
  */
 int lcd_arch_ept_map_gpa_to_hpa(struct lcd_arch *vcpu, u64 gpa, u64 hpa,
 				int create, int overwrite);
+/**
+ * Simple routine combinding ept walk and get.
+ */
+int lcd_arch_ept_gpa_to_hpa(struct lcd_arch *vcpu, u64 gpa, u64 *hpa_out);
 
 /*
  * GDT Layout

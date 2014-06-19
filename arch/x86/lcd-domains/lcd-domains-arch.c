@@ -777,6 +777,9 @@ static int setup_vmcs_config(struct vmx_vmcs_config *vmcs_conf)
 
 /* VMX INIT / EXIT -------------------------------------------------- */
 
+/* for debugging */
+#include "lcd-domains-arch-tests.c"
+
 int lcd_arch_init(void)
 {
 	int ret;
@@ -853,6 +856,11 @@ int lcd_arch_init(void)
 		ret = -EBUSY;
 		goto failed2;
 	}
+
+	/*
+	 * Run tests
+	 */
+	lcd_arch_tests();
 
 	return 0;
 
@@ -1007,6 +1015,26 @@ int lcd_arch_ept_map_gpa_to_hpa(struct lcd_arch *vcpu, u64 gpa, u64 hpa,
 	 * Map the guest physical addr to the host physical addr.
 	 */
 	lcd_arch_ept_set(ept_entry, hpa);
+
+	return 0;
+}
+
+int lcd_arch_ept_gpa_to_hpa(struct lcd_arch *vcpu, u64 gpa, u64 *hpa_out)
+{
+	int ret;
+	lcd_arch_epte_t *ept_entry;
+
+	/*
+	 * Walk ept
+	 */
+	ret = lcd_arch_ept_walk(vcpu, gpa, create, &ept_entry);
+	if (ret)
+		return ret;
+
+	/*
+	 * Map the guest physical addr to the host physical addr.
+	 */
+	*hpa = lcd_arch_ept_hpa(ept_entry);
 
 	return 0;
 }
@@ -2051,9 +2079,7 @@ void lcd_arch_destroy(struct lcd_arch *vcpu)
 	 */
 	vmx_free_vpid(vcpu);
 	vmx_free_vmcs(vcpu->vmcs);
-	free_page((u64)vcpu->gdt);
-	free_page((u64)vcpu->tss);
-	free_page((u64)vcpu->utcb);
+	vmx_free_ept(vcpu); /* auto frees gdt, tss, utcb */
 	kfree(vcpu);
 }
 
@@ -2509,3 +2535,4 @@ EXPORT_SYMBOL(lcd_arch_ept_walk);
 EXPORT_SYMBOL(lcd_arch_ept_set);
 EXPORT_SYMBOL(lcd_arch_ept_hpa);
 EXPORT_SYMBOL(lcd_arch_ept_map_gpa_to_hpa);
+EXPORT_SYMBOL(lcd_arch_ept_gpa_to_hpa);

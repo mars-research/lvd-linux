@@ -45,6 +45,7 @@ static int test02(void)
 		goto fail_free;
 	}
 
+	vmx_free_vpid(lcd);
 	kfree(lcd);
 	return 0;
 
@@ -132,6 +133,100 @@ fail_alloc:
 	return -1;
 }
 
+static int test05(void)
+{
+	struct lcd_arch *lcd;
+	u64 hpa;
+
+	lcd = (struct lcd_arch *)kmalloc(sizeof(*lcd), GFP_KERNEL);
+	if (!lcd) {
+		printk(KERN_ERR "lcd arch : test05 failed to alloc lcd\n");
+		goto fail_alloc;
+	}
+	if (vmx_init_ept(lcd)) {
+		printk(KERN_ERR "lcd arch : test05 ept init failed\n");
+		goto fail_ept;
+	}
+	if (vmx_init_tss(lcd)) {
+		printk(KERN_ERR "lcd arch : test05 tss init failed\n");
+		goto fail_tss;
+	}	
+	if (lcd_arch_ept_gpa_to_hpa(lcd, LCD_ARCH_TSS_BASE, &hpa)) {
+		printk(KERN_ERR "lcd arch : test05 lookup failed\n");
+		goto fail_lookup;
+	}
+	if (hpa != __pa(lcd->tss)) {
+		printk(KERN_ERR "lcd arch : test05 unexpected tss addr\n");
+		goto fail_lookup;
+	}
+
+	vmx_free_ept(lcd); /* frees tss */
+	kfree(lcd);
+	return 0;
+
+fail_lookup:
+fail_tss:
+	vmx_free_ept(lcd);
+fail_ept:
+	kfree(lcd);
+fail_alloc:
+	return -1;
+}
+
+static int test06(void)
+{
+	struct lcd_arch *lcd;
+	u64 hpa;
+
+	lcd = (struct lcd_arch *)kmalloc(sizeof(*lcd), GFP_KERNEL);
+	if (!lcd) {
+		printk(KERN_ERR "lcd arch : test06 failed to alloc lcd\n");
+		goto fail_alloc;
+	}
+	if (vmx_init_ept(lcd)) {
+		printk(KERN_ERR "lcd arch : test06 ept init failed\n");
+		goto fail_ept;
+	}
+	if (vmx_init_stack(lcd)) {
+		printk(KERN_ERR "lcd arch : test06 stack init failed\n");
+		goto fail_stack;
+	}	
+	if (lcd_arch_ept_gpa_to_hpa(lcd, LCD_ARCH_UTCB, &hpa)) {
+		printk(KERN_ERR "lcd arch : test06 lookup failed\n");
+		goto fail_lookup;
+	}
+	if (hpa != __pa(lcd->utcb)) {
+		printk(KERN_ERR "lcd arch : test06 unexpected utcb addr\n");
+		goto fail_lookup;
+	}
+
+	vmx_free_ept(lcd); /* frees stack */
+	kfree(lcd);
+	return 0;
+
+fail_lookup:
+fail_stack:
+	vmx_free_ept(lcd);
+fail_ept:
+	kfree(lcd);
+fail_alloc:
+	return -1;
+}
+
+static int test07(void)
+{
+	struct lcd_arch *lcd;
+
+	lcd = lcd_arch_create();
+	if (!lcd) {
+		printk(KERN_ERR "lcd arch : test07 failed to create lcd\n");
+		return -1;
+	}
+
+	lcd_arch_destroy(lcd);
+	return 0;
+}
+
 static void lcd_arch_tests(void)
 {
 	if (test01())
@@ -141,6 +236,12 @@ static void lcd_arch_tests(void)
 	if (test03())
 		return;
 	if (test04())
+		return;
+	if (test05())
+		return;
+	if (test06())
+		return;
+	if (test07())
 		return;
 
 	return;

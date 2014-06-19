@@ -7,7 +7,7 @@ menuconfig VIRTUALIZATION2
 
 if VIRTUALIZATION2
 
-source "virt/lcd/Kconfig"
+source "virt/lcd-domains/Kconfig"
 
 endif
 

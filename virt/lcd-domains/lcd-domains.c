@@ -21,6 +21,8 @@
 MODULE_LICENSE("GPL");
 MODULE_DESCRIPTION("LCD driver");
 
+/* ioctl -------------------------------------------------- */
+
 static long lcd_dev_ioctl(struct file *filp,
 			  unsigned int ioctl, unsigned long arg)
 {

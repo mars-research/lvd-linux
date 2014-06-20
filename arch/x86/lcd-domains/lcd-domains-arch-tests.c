@@ -96,9 +96,9 @@ fail_alloc:
 static int test04(void)
 {
 	struct lcd_arch *lcd;
-	int i;
 	u64 base;
 	u64 actual;
+	u64 off;
 
 	lcd = (struct lcd_arch *)kmalloc(sizeof(*lcd), GFP_KERNEL);
 	if (!lcd) {
@@ -162,11 +162,15 @@ static int test04(void)
 
 	base = 0;
 	for (off = 0; off < 0x40000; off += PAGE_SIZE) {
-		actual = lcd_arch_ept_gpa_to_hpa(lcd, base + off);
+		if (lcd_arch_ept_gpa_to_hpa(lcd, base + off, &actual)) {
+			printk(KERN_ERR "lcd arch : test04 failed lookup at %lx\n",
+				(unsigned long)(base + off));
+			goto fail_map;
+		}
 		if (actual != (base + off)) {
 			printk(KERN_ERR "lcd arch : test04 expected hpa %lx got %lx\n",
 				(unsigned long)(base + off),
-				(unsigned long)actual)
+				(unsigned long)actual);
 
 			goto fail_map;
 		}
@@ -174,11 +178,15 @@ static int test04(void)
 
 	base = 0x40000000;
 	for (off = 0; off < 0x40000; off += PAGE_SIZE) {
-		actual = lcd_arch_ept_gpa_to_hpa(lcd, base + off);
+		if (lcd_arch_ept_gpa_to_hpa(lcd, base + off, &actual)) {
+			printk(KERN_ERR "lcd arch : test04 failed lookup at %lx\n",
+				(unsigned long)(base + off));
+			goto fail_map;
+		}
 		if (actual != (base + off)) {
 			printk(KERN_ERR "lcd arch : test04 expected hpa %lx got %lx\n",
 				(unsigned long)(base + off),
-				(unsigned long)actual)
+				(unsigned long)actual);
 
 			goto fail_map;
 		}
@@ -186,23 +194,27 @@ static int test04(void)
 
 	base = 0x8000000000;
 	for (off = 0; off < 0x40000; off += PAGE_SIZE) {
-		actual = lcd_arch_ept_gpa_to_hpa(lcd, base + off);
+		if (lcd_arch_ept_gpa_to_hpa(lcd, base + off, &actual)) {
+			printk(KERN_ERR "lcd arch : test04 failed lookup at %lx\n",
+				(unsigned long)(base + off));
+			goto fail_map;
+		}
 		if (actual != (base + off)) {
 			printk(KERN_ERR "lcd arch : test04 expected hpa %lx got %lx\n",
 				(unsigned long)(base + off),
-				(unsigned long)actual)
+				(unsigned long)actual);
 
 			goto fail_map;
 		}
 	}
 
-	vmx_free_ept(lcd);
+//	vmx_free_ept(lcd);
 	kfree(lcd);
 
 	return 0;
 
 fail_map:
-	vmx_free_ept(lcd);
+//	vmx_free_ept(lcd);
 fail:
 	kfree(lcd);
 fail_alloc:

@@ -1014,7 +1014,7 @@ int lcd_arch_ept_map_gpa_to_hpa(struct lcd_arch *vcpu, u64 gpa, u64 hpa,
 	 */
 	if (!overwrite && VMX_EPTE_PRESENT(*ept_entry)) {
 		printk(KERN_ERR "lcd_arch_map_gpa_to_hpa: would overwrite hpa %lx with hpa %lx\n",
-			(unsigned long)lcd_arch_ept_hpa(*ept_entry), 
+			(unsigned long)lcd_arch_ept_hpa(ept_entry), 
 			(unsigned long)hpa);
 		return -EINVAL;
 	}

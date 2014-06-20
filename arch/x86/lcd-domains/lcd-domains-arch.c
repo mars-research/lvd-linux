@@ -884,12 +884,20 @@ void lcd_arch_exit(void)
  * PAGE_SHIFT is assumed to be 12.
  */
 #define VMX_EPTE_ADDR_MASK PAGE_MASK
-#define VMX_EPTE_ADDR(epte) (((u64)epte) & PAGE_MASK)
+#define VMX_EPTE_ADDR(epte) (((u64)epte) & VMX_EPTE_ADDR_MASK)
 #define VMX_EPTE_VADDR(epte) ((u64)__va(VMX_EPTE_ADDR(epte)))
 #define VMX_EPT_ALL_MASK (VMX_EPT_READABLE_MASK | \
                           VMX_EPT_WRITABLE_MASK | \
 			  VMX_EPT_EXECUTABLE_MASK)
 #define VMX_EPTE_PRESENT(epte) (epte & VMX_EPT_ALL_MASK)
+/*
+ * level 0 (PML4) = bits 47:39 (9 bits)
+ * level 1 (PDPT) = bits 38:30 (9 bits)
+ * level 2 (PD)   = bits 29:21 (9 bits)
+ * level 3 (PT)   = bits 20:12 (9 bits)
+ */
+#define VMX_EPT_IDX(gpa, lvl) \
+	(((gpa) >> (12 + 9 * (3 - lvl))) & ((1 << 9) - 1))
 
 enum vmx_epte_mts {
 	VMX_EPTE_MT_UC = 0, /* uncachable */
@@ -935,16 +943,10 @@ int lcd_arch_ept_walk(struct lcd_arch *vcpu, u64 gpa, int create,
 {
 	int i;
 	lcd_arch_epte_t *dir;
-	u64 mask;
 	u64 idx;
 	u64 page;
 
 	dir = (lcd_arch_epte_t *) __va(vcpu->ept.root_hpa);
-
-	/*
-	 * The first level uses bits 47:39 (9 bits) of the gpa
-	 */
-	mask = 0x1ffUL << 39;
 
 	/*
 	 * Walk plm4 -> pdpt -> pd. Each step uses 9 bits
@@ -952,7 +954,7 @@ int lcd_arch_ept_walk(struct lcd_arch *vcpu, u64 gpa, int create,
 	 */
 	for (i = 0; i < LCD_ARCH_EPT_WALK_LENGTH - 1; i++) {
 
-		idx = gpa & mask;
+		idx = VMX_EPT_IDX(gpa, i);
 
 		if (!VMX_EPTE_PRESENT(dir[idx])) {
 			
@@ -975,14 +977,12 @@ int lcd_arch_ept_walk(struct lcd_arch *vcpu, u64 gpa, int create,
 		}
 
 		dir = (lcd_arch_epte_t *) VMX_EPTE_VADDR(dir[idx]);
-		mask >>= 9;
 	}
-	
+
 	/*
-	 * mask is now 0x1ff000, and dir points to the correct page
-	 * table.
+	 * dir points to page table (level 3)
 	 */
-	*epte_out = &dir[gpa & mask];
+	*epte_out = &dir[VMX_EPT_IDX(gpa, 3)];
 	return 0;
 }
 

@@ -208,13 +208,13 @@ static int test04(void)
 		}
 	}
 
-//	vmx_free_ept(lcd);
+	vmx_free_ept(lcd);
 	kfree(lcd);
 
 	return 0;
 
 fail_map:
-//	vmx_free_ept(lcd);
+	vmx_free_ept(lcd);
 fail:
 	kfree(lcd);
 fail_alloc:

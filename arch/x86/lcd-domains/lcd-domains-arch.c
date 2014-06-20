@@ -884,20 +884,39 @@ void lcd_arch_exit(void)
  * PAGE_SHIFT is assumed to be 12.
  */
 #define VMX_EPTE_ADDR_MASK PAGE_MASK
-#define VMX_EPTE_ADDR(epte) (((u64)epte) & VMX_EPTE_ADDR_MASK)
-#define VMX_EPTE_VADDR(epte) ((u64)__va(VMX_EPTE_ADDR(epte)))
 #define VMX_EPT_ALL_MASK (VMX_EPT_READABLE_MASK | \
                           VMX_EPT_WRITABLE_MASK | \
 			  VMX_EPT_EXECUTABLE_MASK)
-#define VMX_EPTE_PRESENT(epte) (epte & VMX_EPT_ALL_MASK)
+static inline u64 vmx_epte_hpa(lcd_arch_epte_t epte)
+{
+	return ((u64)epte) & VMX_EPTE_ADDR_MASK;
+}
+static inline u64 vmx_epte_hva(lcd_arch_epte_t epte)
+{
+	return (u64)__va(vmx_epte_hpa(epte));
+}
+static inline lcd_arch_epte_t * vmx_epte_dir_hva(lcd_arch_epte_t epte)
+{
+	return (lcd_arch_epte_t *)vmx_epte_hva(epte);
+}
+static inline int vmx_epte_present(lcd_arch_epte_t epte)
+{
+	return (int)(((u64)epte) & VMX_EPT_ALL_MASK);
+}
 /*
  * level 0 (PML4) = bits 47:39 (9 bits)
  * level 1 (PDPT) = bits 38:30 (9 bits)
  * level 2 (PD)   = bits 29:21 (9 bits)
  * level 3 (PT)   = bits 20:12 (9 bits)
  */
-#define VMX_EPT_IDX(gpa, lvl) \
-	(((gpa) >> (12 + 9 * (3 - lvl))) & ((1 << 9) - 1))
+static inline int vmx_ept_idx(u64 gpa, int lvl)
+{
+	return (int)(((gpa) >> (12 + 9 * (3 - lvl))) & ((1 << 9) - 1));
+}
+static inline u64 vmx_ept_offset(u64 gpa)
+{
+	return gpa & ~(PAGE_MASK);
+}
 
 enum vmx_epte_mts {
 	VMX_EPTE_MT_UC = 0, /* uncachable */
@@ -954,9 +973,9 @@ int lcd_arch_ept_walk(struct lcd_arch *vcpu, u64 gpa, int create,
 	 */
 	for (i = 0; i < LCD_ARCH_EPT_WALK_LENGTH - 1; i++) {
 
-		idx = VMX_EPT_IDX(gpa, i);
+		idx = vmx_ept_idx(gpa, i);
 
-		if (!VMX_EPTE_PRESENT(dir[idx])) {
+		if (!vmx_epte_present(dir[idx])) {
 			
 			if (!create) {
 				printk(KERN_ERR "lcd_arch_ept_walk: attempted lookup for unmapped gpa %lx, create was not allowed\n",
@@ -976,13 +995,13 @@ int lcd_arch_ept_walk(struct lcd_arch *vcpu, u64 gpa, int create,
 			vmx_epte_set(&dir[idx], __pa(page), i);
 		}
 
-		dir = (lcd_arch_epte_t *) VMX_EPTE_VADDR(dir[idx]);
+		dir = (lcd_arch_epte_t *) vmx_epte_hva(dir[idx]);
 	}
 
 	/*
 	 * dir points to page table (level 3)
 	 */
-	*epte_out = &dir[VMX_EPT_IDX(gpa, 3)];
+	*epte_out = &dir[vmx_ept_idx(gpa, 3)];
 	return 0;
 }
 
@@ -993,7 +1012,7 @@ void lcd_arch_ept_set(lcd_arch_epte_t *epte, u64 hpa)
 
 u64 lcd_arch_ept_hpa(lcd_arch_epte_t *epte)
 {
-	return VMX_EPTE_ADDR(*epte);
+	return vmx_epte_hpa(*epte);
 }
 
 int lcd_arch_ept_map_gpa_to_hpa(struct lcd_arch *vcpu, u64 gpa, u64 hpa,
@@ -1012,7 +1031,7 @@ int lcd_arch_ept_map_gpa_to_hpa(struct lcd_arch *vcpu, u64 gpa, u64 hpa,
 	/*
 	 * Check if guest physical address already mapped
 	 */
-	if (!overwrite && VMX_EPTE_PRESENT(*ept_entry)) {
+	if (!overwrite && vmx_epte_present(*ept_entry)) {
 		printk(KERN_ERR "lcd_arch_map_gpa_to_hpa: would overwrite hpa %lx with hpa %lx\n",
 			(unsigned long)lcd_arch_ept_hpa(ept_entry), 
 			(unsigned long)hpa);
@@ -1040,9 +1059,19 @@ int lcd_arch_ept_gpa_to_hpa(struct lcd_arch *vcpu, u64 gpa, u64 *hpa_out)
 		return ret;
 
 	/*
-	 * Map the guest physical addr to the host physical addr.
+	 * Confirm the entry is present
+	 */
+	if (!vmx_epte_present(*ept_entry)) {
+		printk(KERN_ERR "lcd_arch_ept_gpa_to_hpa: gpa %lx is not mapped\n",
+			(unsigned long)gpa);
+		return -EINVAL;
+	}	
+
+	/*
+	 * Get the base host physical address, and add the offset.
 	 */
 	*hpa_out = lcd_arch_ept_hpa(ept_entry);
+	*hpa_out += vmx_ept_offset(gpa);
 
 	return 0;
 }
@@ -1067,8 +1096,8 @@ static void vmx_free_ept_dir_level(lcd_arch_epte_t *dir, int level)
 		 * Free present pages in page table
 		 */
 		for (idx = 0; idx < LCD_ARCH_PTRS_PER_EPTE; idx++) {
-			if (VMX_EPTE_PRESENT(dir[idx]))
-				free_page(VMX_EPTE_VADDR(dir[idx]));
+			if (vmx_epte_present(dir[idx]))
+				free_page(vmx_epte_hva(dir[idx]));
 		}
 	} else {
 		/*
@@ -1077,8 +1106,10 @@ static void vmx_free_ept_dir_level(lcd_arch_epte_t *dir, int level)
 		 * Recur on present entries
 		 */
 		for (idx = 0; idx < LCD_ARCH_PTRS_PER_EPTE; idx++) {
-			if (VMX_EPTE_PRESENT(dir[idx]))
-				vmx_free_ept_dir_level(&dir[idx], level + 1);
+			if (vmx_epte_present(dir[idx]))
+				vmx_free_ept_dir_level(
+					vmx_epte_dir_hva(dir[idx]),
+					level + 1);
 		}
 	}
 	/*

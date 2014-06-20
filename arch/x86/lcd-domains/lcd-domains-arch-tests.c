@@ -104,8 +104,8 @@ static void test04_help_rec(lcd_arch_epte_t *dir, int level)
 		 * Free present pages in page dir
 		 */
 		for (idx = 0; idx < LCD_ARCH_PTRS_PER_EPTE; idx++) {
-			if (VMX_EPTE_PRESENT(dir[idx]))
-				free_page(VMX_EPTE_VADDR(dir[idx]));
+			if (vmx_epte_present(dir[idx]))
+				free_page(vmx_epte_hva(dir[idx]));
 		}
 	} else {
 		/*
@@ -114,8 +114,10 @@ static void test04_help_rec(lcd_arch_epte_t *dir, int level)
 		 * Recur on present entries
 		 */
 		for (idx = 0; idx < LCD_ARCH_PTRS_PER_EPTE; idx++) {
-			if (VMX_EPTE_PRESENT(dir[idx]))
-				vmx_free_ept_dir_level(&dir[idx], level + 1);
+			if (vmx_epte_present(dir[idx]))
+				test04_help_rec(
+					vmx_epte_dir_hva(dir[idx]),
+					level + 1);
 		}
 	}
 	/*
@@ -133,7 +135,6 @@ static void test04_help(struct lcd_arch *vcpu)
 	dir = (lcd_arch_epte_t *) __va(vcpu->ept.root_hpa);
 	test04_help_rec(dir, 0);
 }
-
 
 static int test04(void)
 {
@@ -415,7 +416,6 @@ static void lcd_arch_tests(void)
 		return;
 	if (test04())
 		return;
-
 #if 0
 	if (test05())
 		return;

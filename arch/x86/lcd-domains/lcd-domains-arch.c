@@ -957,8 +957,8 @@ int lcd_arch_ept_walk(struct lcd_arch *vcpu, u64 gpa, int create,
 		if (!VMX_EPTE_PRESENT(dir[idx])) {
 			
 			if (!create) {
-				printk(KERN_ERR "lcd_arch_ept_walk: attempted lookup for unmapped gpa %x, create was not allowed\n",
-					gpa);
+				printk(KERN_ERR "lcd_arch_ept_walk: attempted lookup for unmapped gpa %lx, create was not allowed\n",
+					(unsigned long)gpa);
 				return -ENOENT;
 			}
 			/*
@@ -1013,8 +1013,9 @@ int lcd_arch_ept_map_gpa_to_hpa(struct lcd_arch *vcpu, u64 gpa, u64 hpa,
 	 * Check if guest physical address already mapped
 	 */
 	if (!overwrite && VMX_EPTE_PRESENT(*ept_entry)) {
-		printk(KERN_ERR "lcd_arch_map_gpa_to_hpa: would overwrite hpa %x with hpa %x\n",
-			lcd_arch_ept_hpa(*ept_entry), hpa);
+		printk(KERN_ERR "lcd_arch_map_gpa_to_hpa: would overwrite hpa %lx with hpa %lx\n",
+			(unsigned long)lcd_arch_ept_hpa(*ept_entry), 
+			(unsigned long)hpa);
 		return -EINVAL;
 	}
 

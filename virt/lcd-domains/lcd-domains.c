@@ -13,10 +13,13 @@
 #include <linux/miscdevice.h>
 #include <linux/compat.h>
 #include <linux/fs.h>
+#include <linux/slab.h>
 #include <asm/uaccess.h>
 
 #include <linux/lcd-domains.h>
 #include <asm/lcd-domains-arch.h>
+#include <lcd-domains/lcd-domains.h>
+#include <lcd-domains/syscall.h>
 
 MODULE_LICENSE("GPL");
 MODULE_DESCRIPTION("LCD driver");
@@ -26,6 +29,7 @@ MODULE_DESCRIPTION("LCD driver");
 static int lcd_do_run_blob_once(struct lcd *lcd)
 {
 	int r;
+	int syscall_id;
 
 	r = lcd_arch_run(lcd->lcd_arch);
 	if (r < 0) {
@@ -123,7 +127,7 @@ static int lcd_load_blob(struct lcd *lcd, unsigned char *blob,
 							/* no overwrite */
 							0)) {
 			printk(KERN_ERR "lcd_load_blob: error mapping blob at offset %lx\n",
-				off);
+				(unsigned long)off);
 			return -EIO;
 		}
 	}
@@ -135,6 +139,8 @@ static int lcd_load_blob(struct lcd *lcd, unsigned char *blob,
 		printk(KERN_ERR "lcd_load_blob: error setting prgm ctr.\n");
 		return -EIO;
 	}
+
+	return 0;
 }
 
 static int lcd_run_blob(struct lcd_blob_info *bi)
@@ -142,7 +148,6 @@ static int lcd_run_blob(struct lcd_blob_info *bi)
 	struct lcd *lcd;
 	int r;
 	unsigned char *blob;
-	int syscall_id;
 
 	/*
 	 * Sanity check blob order
@@ -166,7 +171,8 @@ static int lcd_run_blob(struct lcd_blob_info *bi)
 	/*
 	 * Copy blob
 	 */
-	r = copy_from_user(blob, (void __user *)bi->blob, (1 << bi->order));
+	r = copy_from_user(blob, (void __user *)bi->blob, 
+			(1 << bi->blob_order));
 	if (r) {
 		printk(KERN_ERR "lcd_run_blob: error copying blob\n");
 		goto fail3;
@@ -191,7 +197,7 @@ static int lcd_run_blob(struct lcd_blob_info *bi)
 	/*
 	 * Load blob in lcd
 	 */
-	r = lcd_load_blob(lcd, blob);
+	r = lcd_load_blob(lcd, blob, bi->blob_order);
 	if (r) {
 		printk(KERN_ERR "lcd_run_blob: error loading blob in lcd\n");
 		r = -EIO;
@@ -205,14 +211,13 @@ static int lcd_run_blob(struct lcd_blob_info *bi)
 	goto done;
 
 done:
-fail7:
 fail6:
 	lcd_arch_destroy(lcd->lcd_arch);
 fail5:
 	kfree(lcd);
 fail4:
 fail3:
-	free_pages((u64)blob, bi->order);
+	free_pages((u64)blob, bi->blob_order);
 fail2:
 fail1:
 	return r;
@@ -229,8 +234,8 @@ static long lcd_dev_ioctl(struct file *filp,
 
 	switch (ioctl) {
 	case LCD_LOAD_PV_KERNEL:
-		/* r = copy_from_user(&conf, (int __user *) arg, */
-		/* 		   sizeof(struct lcd_pv_kernel_config)); */
+		r = copy_from_user(&conf, (int __user *) arg,
+				sizeof(struct lcd_pv_kernel_config));
 		if (r) {
 			r = -EIO;
 			goto out;
@@ -239,7 +244,7 @@ static long lcd_dev_ioctl(struct file *filp,
 		goto out;
 		break;
 	case LCD_RUN_BLOB:
-		r = copy_from_user(&bi, (void __user *)arg, sizeof(*bi));
+		r = copy_from_user(&bi, (void __user *)arg, sizeof(bi));
 		if (r) {
 			printk(KERN_ERR "lcd: error loading blob info\n");
 			r = -EIO;

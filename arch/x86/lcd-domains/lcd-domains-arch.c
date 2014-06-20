@@ -2595,6 +2595,7 @@ int lcd_arch_run(struct lcd_arch *vcpu)
 int lcd_arch_set_pc(struct lcd_arch *vcpu, u64 gpa)
 {
 	vcpu->regs[LCD_ARCH_REGS_RIP] = gpa;
+	return 0;
 }
 
 /* EXPORTS -------------------------------------------------- */

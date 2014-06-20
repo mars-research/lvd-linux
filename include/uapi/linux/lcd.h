@@ -15,7 +15,9 @@
 #define LCD_MINOR       234
 
 struct lcd_pv_kernel_config {
-	char  *file;
+	char  *file_name;
+	unsigned int file_name_length;
+	__u64 length;
 } __attribute__((packed));
 
 struct lcd_blob_info {

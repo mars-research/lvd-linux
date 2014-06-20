@@ -1865,8 +1865,10 @@ static int vmx_init_gdt(struct lcd_arch *vcpu)
 					1,
 					/* no overwrite */
 					0);
-	if (ret)
+	if (ret) {
+		printk(KERN_ERR "vmx_gdt_init: failed to map gdt\n");
 		goto fail_map;
+	}
 
 	return 0;
 
@@ -1932,8 +1934,10 @@ static int vmx_init_tss(struct lcd_arch *vcpu)
 					1,
 					/* no overwrite */
 					0);
-	if (ret)
+	if (ret) {
+		printk(KERN_ERR "vmx_init_tss: failed to map tss\n");
 		goto fail_map;
+	}
 
 	return 0;
 
@@ -1976,8 +1980,10 @@ static int vmx_init_stack(struct lcd_arch *vcpu)
 					1,
 					/* no overwrite */
 					0);
-	if (ret)
+	if (ret) {
+		printk(KERN_ERR "vmx_init_stack: failed to map stack\n");
 		goto fail_map;
+	}
 
 	return 0;
 
@@ -2057,18 +2063,26 @@ struct lcd_arch* lcd_arch_create(void)
 	 * The EPT must be initialized before GDT, TSS, and stack,
 	 * so that they can be mapped in guest physical.
 	 */
-	if (vmx_init_ept(vcpu))
+	if (vmx_init_ept(vcpu)) {
+		printk(KERN_ERR "lcd_arch_create: failed to init ept\n");
 		goto fail_ept;
-	if (vmx_init_gdt(vcpu))
+	}
+	if (vmx_init_gdt(vcpu)) {
+		printk(KERN_ERR "lcd_arch_create: failed to init gdt\n");
 		goto fail_gdt;
-	if (vmx_init_tss(vcpu))
+	}
+	if (vmx_init_tss(vcpu)) {
+		printk(KERN_ERR "lcd_arch_create: failed to init tss\n");
 		goto fail_tss;
+	}
 
 	/*
 	 * Initialize stack / utcb
 	 */
-	if (vmx_init_stack(vcpu))
+	if (vmx_init_stack(vcpu)) {
+		printk(KERN_ERR "lcd_arch_create: failed to init stack\n");
 		goto fail_stack;
+	}
 
 	/*
 	 * Initialize VMCS register values and settings
@@ -2082,10 +2096,12 @@ struct lcd_arch* lcd_arch_create(void)
 	return vcpu;
 
 fail_stack:
-	free_page((u64)vcpu->tss);
 fail_tss:
-	free_page((u64)vcpu->gdt);
 fail_gdt:
+	/*
+	 * free ept will free gdt, tss, and stack, since they
+	 * are mapped in ept
+	 */
 	vmx_free_ept(vcpu);
 fail_ept:
 	vmx_free_vpid(vcpu);

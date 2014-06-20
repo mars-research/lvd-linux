@@ -202,9 +202,9 @@ int lcd_arch_ept_gpa_to_hpa(struct lcd_arch *vcpu, u64 gpa, u64 *hpa_out);
 #define LCD_ARCH_FS_LIMIT    0xFFFFFFFF
 #define LCD_ARCH_GS_BASE     0x0UL
 #define LCD_ARCH_GS_LIMIT    0xFFFFFFFF
-#define LCD_ARCH_GDTR_BASE   0x0000000000002000UL
+#define LCD_ARCH_GDTR_BASE   0x0000000000001000UL
 #define LCD_ARCH_GDTR_LIMIT  ((u32)~(PAGE_SIZE - 1))
-#define LCD_ARCH_TSS_BASE    0x0000000000003000UL
+#define LCD_ARCH_TSS_BASE    0x0000000000002000UL
 /* tss base + limit = address of last byte in tss, hence -1 */
 #define LCD_ARCH_TSS_LIMIT   (sizeof(struct lcd_arch_tss) - 1)
 #define LCD_ARCH_IDTR_BASE   0x0UL

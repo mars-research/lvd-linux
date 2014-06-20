@@ -2590,6 +2590,13 @@ int lcd_arch_run(struct lcd_arch *vcpu)
 	return ret;
 }
 
+/* LCD RUNTIME ENV -------------------------------------------------- */
+
+int lcd_arch_set_pc(struct lcd_arch *vcpu, u64 gpa)
+{
+	vcpu->regs[LCD_ARCH_REGS_RIP] = gpa;
+}
+
 /* EXPORTS -------------------------------------------------- */
 
 EXPORT_SYMBOL(lcd_arch_init);
@@ -2602,6 +2609,7 @@ EXPORT_SYMBOL(lcd_arch_ept_set);
 EXPORT_SYMBOL(lcd_arch_ept_hpa);
 EXPORT_SYMBOL(lcd_arch_ept_map_gpa_to_hpa);
 EXPORT_SYMBOL(lcd_arch_ept_gpa_to_hpa);
+EXPORT_SYMBOL(lcd_arch_set_pc);
 
 /* DEBUGGING -------------------------------------------------- */
 

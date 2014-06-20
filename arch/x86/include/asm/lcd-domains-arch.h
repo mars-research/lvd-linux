@@ -184,6 +184,11 @@ int lcd_arch_ept_map_gpa_to_hpa(struct lcd_arch *vcpu, u64 gpa, u64 hpa,
  * Simple routine combinding ept walk and get.
  */
 int lcd_arch_ept_gpa_to_hpa(struct lcd_arch *vcpu, u64 gpa, u64 *hpa_out);
+/**
+ * Set the lcd's program counter to the guest physical address
+ * gpa.
+ */
+int lcd_arch_set_pc(struct lcd_arch *vcpu, u64 gpa);
 
 /*
  * GDT Layout

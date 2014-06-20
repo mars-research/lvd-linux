@@ -93,6 +93,48 @@ fail_alloc:
 	return -1;
 }
 
+static void test04_help_rec(lcd_arch_epte_t *dir, int level)
+{
+	int idx;
+	
+	if (level == 2) {
+		/*
+		 * Base case of recursion
+		 *
+		 * Free present pages in page dir
+		 */
+		for (idx = 0; idx < LCD_ARCH_PTRS_PER_EPTE; idx++) {
+			if (VMX_EPTE_PRESENT(dir[idx]))
+				free_page(VMX_EPTE_VADDR(dir[idx]));
+		}
+	} else {
+		/*
+		 * pml4, pdpt
+		 *
+		 * Recur on present entries
+		 */
+		for (idx = 0; idx < LCD_ARCH_PTRS_PER_EPTE; idx++) {
+			if (VMX_EPTE_PRESENT(dir[idx]))
+				vmx_free_ept_dir_level(&dir[idx], level + 1);
+		}
+	}
+	/*
+	 * Free page containing dir
+	 */
+	free_page((u64)dir);
+}
+
+static void test04_help(struct lcd_arch *vcpu)
+{
+	lcd_arch_epte_t *dir;
+	/*
+	 * Get pml4 table
+	 */
+	dir = (lcd_arch_epte_t *) __va(vcpu->ept.root_hpa);
+	test04_help_rec(dir, 0);
+}
+
+
 static int test04(void)
 {
 	struct lcd_arch *lcd;
@@ -208,13 +250,20 @@ static int test04(void)
 		}
 	}
 
-	vmx_free_ept(lcd);
+	/*
+	 * can't use regular free ept since the hpa's were bogus
+	 */
+	test04_help(lcd);
 	kfree(lcd);
 
 	return 0;
 
 fail_map:
-	vmx_free_ept(lcd);
+	/*
+	 * can't use regular free ept since the hpa's were bogus
+	 */
+	test04_help(lcd);
+>>>>>>> Fixing test04 free ept.
 fail:
 	kfree(lcd);
 fail_alloc:

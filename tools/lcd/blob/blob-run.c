@@ -21,7 +21,7 @@
 #define PAGE_SIZE 4096
 #define DEVICE_NAME "/dev/lcd"
 
-int do_mmap(FILE *f, size_t order, unsigned char **blob_addr_out)
+int do_mmap(int blob_fd, size_t order, unsigned char **blob_addr_out)
 {
 	void *ret;
 	size_t len;
@@ -30,12 +30,13 @@ int do_mmap(FILE *f, size_t order, unsigned char **blob_addr_out)
 
 	ret = mmap(NULL, len, 
 		PROT_EXEC | PROT_READ | PROT_WRITE, 
-		MAP_ANONYMOUS | MAP_PRIVATE, fileno(f), 0);
+		MAP_PRIVATE, blob_fd, 0);
 	if (ret == MAP_FAILED) {
 		return -1;
 	}
 
 	*blob_addr_out = (unsigned char *)ret;
+
 	return 0;
 }
 
@@ -52,7 +53,7 @@ int main(int argc, char *argv[])
 	struct lcd_blob_info bi;
 	char *fname;
 	int order;
-	FILE *f;
+	int blob_fd;
 	int lcd_fd;
 	
 	/*
@@ -67,21 +68,18 @@ int main(int argc, char *argv[])
 	/*
 	 * Open and map blob
 	 */
-	f = fopen(fname, "r");
-	if (!f) {
+	blob_fd = open(fname, O_RDONLY);
+	if (blob_fd < 0) {
 		fprintf(stderr, "blob-run: error opening file %s\n",
 			fname);
 		goto fail;
 	}
-	if (do_mmap(f, order, &(bi.blob))) {
+	if (do_mmap(blob_fd, order, &(bi.blob))) {
 		fprintf(stderr, "blob-run: error mapping file %s\n",
 			fname);
 		goto fail_map;
 	}
 	bi.blob_order = order;
-
-	printf("blob-run: addr = %lx, order = %d\n",
-		(unsigned long)bi.blob, bi.blob_order);
 
 	/*
 	 * Run in lcd
@@ -99,7 +97,7 @@ int main(int argc, char *argv[])
 	}
 
 	close(lcd_fd);
-	fclose(f);
+	close(blob_fd);
 
 	return 0;
 
@@ -107,7 +105,7 @@ fail_ioctl:
 	close(lcd_fd);
 fail_open:
 fail_map:
-	fclose(f);
+	close(blob_fd);
 fail:
 	return -1;
 }

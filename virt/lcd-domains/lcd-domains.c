@@ -148,8 +148,7 @@ static int lcd_run_blob(struct lcd_blob_info *bi)
 	struct lcd *lcd;
 	int r;
 	unsigned char *blob;
-
-	return 0;
+	int i;
 	/*
 	 * Sanity check blob order
 	 */
@@ -173,11 +172,19 @@ static int lcd_run_blob(struct lcd_blob_info *bi)
 	 * Copy blob
 	 */
 	r = copy_from_user(blob, (void __user *)bi->blob, 
-			(1 << bi->blob_order));
+			(1 << bi->blob_order) * PAGE_SIZE);
 	if (r) {
 		printk(KERN_ERR "lcd_run_blob: error copying blob\n");
 		goto fail3;
 	}
+
+
+	for (i = 0; i < 64; i++) {
+		printk(KERN_ERR "lcd: blob[%d] = %x\n",
+			i, blob[i]);
+	}
+	
+	return 0;
 
 	/*
 	 * Alloc and init lcd

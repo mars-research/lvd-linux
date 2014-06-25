@@ -173,6 +173,15 @@ void lcd_arch_ept_set(lcd_arch_epte_t *epte, u64 hpa);
  */
 u64 lcd_arch_ept_hpa(lcd_arch_epte_t *epte);
 /**
+ * Clears guest physical => host physical mapping in the ept.
+ *
+ * (This is not going to free up potentially empty paging structures
+ * higher up in the ept hierarchy; but, for now, unset is used when
+ * we're tearing down the lcd -- due to an error -- so the paging
+ * structures will be freed up when the ept is torn down.)
+ */
+int lcd_arch_ept_unset(lcd_arch_epte_t *epte)
+/**
  * Simple routine combining ept walk and set.
  *
  * overwrite = 0  => do not overwrite if ept entry is already present

@@ -1010,6 +1010,11 @@ void lcd_arch_ept_set(lcd_arch_epte_t *epte, u64 hpa)
 	vmx_epte_set(epte, hpa, 3);
 }
 
+int lcd_arch_ept_unset(lcd_arch_epte_t *epte)
+{
+	*epte = 0;
+}
+
 u64 lcd_arch_ept_hpa(lcd_arch_epte_t *epte)
 {
 	return vmx_epte_hpa(*epte);
@@ -2618,10 +2623,12 @@ EXPORT_SYMBOL(lcd_arch_destroy);
 EXPORT_SYMBOL(lcd_arch_run);
 EXPORT_SYMBOL(lcd_arch_ept_walk);
 EXPORT_SYMBOL(lcd_arch_ept_set);
+EXPORT_SYMBOL(lcd_arch_ept_unset);
 EXPORT_SYMBOL(lcd_arch_ept_hpa);
 EXPORT_SYMBOL(lcd_arch_ept_map_gpa_to_hpa);
 EXPORT_SYMBOL(lcd_arch_ept_gpa_to_hpa);
 EXPORT_SYMBOL(lcd_arch_set_pc);
+EXPORT_SYMBOL(lcd_arch_set_gva_root);
 
 /* DEBUGGING -------------------------------------------------- */
 

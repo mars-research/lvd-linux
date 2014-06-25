@@ -123,7 +123,7 @@ static int lcd_mm_gpa_map_range(struct lcd *lcd, u64 gpa_start, u64 hpa_start,
  *
  * Must be called before mapping any gva's.
  */
-int lcd_mm_gva_init(struct lcd *lcd, u64 gv_paging_mem_gpa_start,
+static int lcd_mm_gva_init(struct lcd *lcd, u64 gv_paging_mem_gpa_start,
 		u64 gv_paging_mem_end)
 {
 	u64 root;
@@ -179,7 +179,7 @@ int lcd_mm_gva_init(struct lcd *lcd, u64 gv_paging_mem_gpa_start,
  *
  * Note! Call lcd_mm_gva_init before mapping any gva's.
  */
-int lcd_mm_gva_map_range(struct lcd *lcd, u64 gva_start, u64 gpa_start, 
+static int lcd_mm_gva_map_range(struct lcd *lcd, u64 gva_start, u64 gpa_start, 
 			u64 npages)
 {
 	/* unimplemented */

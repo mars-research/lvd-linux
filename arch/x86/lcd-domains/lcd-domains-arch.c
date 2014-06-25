@@ -1051,6 +1051,27 @@ int lcd_arch_ept_map_gpa_to_hpa(struct lcd_arch *vcpu, u64 gpa, u64 hpa,
 	return 0;
 }
 
+int lcd_arch_ept_unmap_gpa(struct lcd_arch *vcpu, u64 gpa)
+{
+	int ret;
+	lcd_arch_epte_t *ept_entry;
+
+	/*
+	 * Walk ept
+	 */
+	ret = lcd_arch_ept_walk(vcpu, gpa, create, &ept_entry);
+	if (ret)
+		return ret;
+
+	/*
+	 * Unset
+	 */
+	lcd_arch_ept_unset(ept_entry);
+
+	return 0;
+}
+
+
 int lcd_arch_ept_gpa_to_hpa(struct lcd_arch *vcpu, u64 gpa, u64 *hpa_out)
 {
 	int ret;
@@ -1884,6 +1905,18 @@ fail:
 }
 
 /**
+ * Unmaps gdt in ept, and frees memory.
+ */
+static void vmx_destroy_gdt(struct lcd_arch *vcpu)
+{
+	free_page((u64)vcpu->gdt);
+	if (lcd_arch_ept_unmap_gpa(vcpu, LCD_ARCH_GDTR_BASE)) {
+		printk(KERN_ERR "vmx_destroy_gdt: error unmapping gdt\n");
+	}
+	vcpu->gdt = NULL;
+}
+
+/**
  * Allocates tss and sets minimal number of fields needed.
  *
  * Maps TSS in guest physical address space.
@@ -1953,6 +1986,18 @@ fail:
 }
 
 /**
+ * Unmaps tss and frees memory.
+ */
+static void vmx_destroy_tss(struct lcd_arch *vcpu)
+{
+	free_page((u64)vcpu->tss);
+	if (lcd_arch_ept_unmap_gpa(vcpu, LCD_ARCH_TSS_BASE)) {
+		printk(KERN_ERR "vmx_destroy_tss: error unmapping tss\n");
+	}
+	vcpu->tss = NULL;
+}
+
+/**
  * Allocates and maps stack / utcb. Initializes
  * stack pointer.
  */
@@ -2000,6 +2045,18 @@ fail_map:
 	free_page((u64)vcpu->utcb);
 fail:
 	return ret;
+}
+
+/**
+ * Unmaps stack and frees memory.
+ */
+static void vmx_destroy_stack(struct lcd_arch *vcpu)
+{
+	free_page((u64)vcpu->utcb);
+	if (lcd_arch_ept_unmap_gpa(vcpu, LCD_ARCH_UTCB)) {
+		printk(KERN_ERR "vmx_destroy_stack: error unmapping tss\n");
+	}
+	vcpu->utcb = NULL;
 }
 
 /**
@@ -2105,12 +2162,10 @@ struct lcd_arch* lcd_arch_create(void)
 	return vcpu;
 
 fail_stack:
+	vmx_destroy_tss(vcpu);
 fail_tss:
+	vmx_destroy_gdt(vcpu);
 fail_gdt:
-	/*
-	 * free ept will free gdt, tss, and stack, since they
-	 * are mapped in ept
-	 */
 	vmx_free_ept(vcpu);
 fail_ept:
 	vmx_free_vpid(vcpu);
@@ -2154,7 +2209,10 @@ void lcd_arch_destroy(struct lcd_arch *vcpu)
 	 */
 	vmx_free_vpid(vcpu);
 	vmx_free_vmcs(vcpu->vmcs);
-	vmx_free_ept(vcpu); /* auto frees gdt, tss, utcb */
+	vmx_destroy_gdt(vcpu);
+	vmx_destroy_tss(vcpu);
+	vmx_destroy_stack(vcpu);
+	vmx_free_ept(vcpu);
 	kfree(vcpu);
 }
 

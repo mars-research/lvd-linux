@@ -190,6 +190,10 @@ int lcd_arch_ept_unset(lcd_arch_epte_t *epte)
 int lcd_arch_ept_map_gpa_to_hpa(struct lcd_arch *vcpu, u64 gpa, u64 hpa,
 				int create, int overwrite);
 /**
+ * Simple routine combining ept walk and unset.
+ */
+int lcd_arch_ept_unmap_gpa(struct lcd_arch *vcpu, u64 gpa);
+/**
  * Simple routine combinding ept walk and get.
  */
 int lcd_arch_ept_gpa_to_hpa(struct lcd_arch *vcpu, u64 gpa, u64 *hpa_out);

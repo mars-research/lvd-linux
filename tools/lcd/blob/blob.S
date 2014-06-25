@@ -1,2 +1,10 @@
+#
+# IMPORTANT: A yield hypercall needs to terminate the code.
+#            Otherwise, the hypervisor will happily
+#            continue executing into neighboring
+#            memory.
+#
 .text
-	movq $1, %rax
+	# yield
+	movq $6, %rax
+	vmcall

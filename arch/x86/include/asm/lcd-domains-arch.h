@@ -278,6 +278,12 @@ int lcd_arch_set_gva_root(struct lcd_arch *vcpu, u64 gpa);
 #define LCD_ARCH_GET_SYSCALL_NUM(vcpu) (vcpu->regs[LCD_ARCH_REGS_RAX])
 
 /*
+ * Accessor Macro for utcb
+ * =======================
+ */
+#define LCD_ARCH_GET_UTCB(vcpu) (vcpu->utcb);
+
+/*
  * Accessor Macros for IPC
  * =======================
  *

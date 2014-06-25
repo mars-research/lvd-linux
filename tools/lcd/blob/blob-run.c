@@ -1,18 +1,32 @@
+/*
+ * Code for mapping and running blob in lcd.
+ *
+ * Depending on where linux headers are installed,
+ * may need to change header includes. For example,
+ *
+ *   sudo headers_install INSTALL_HDR_DIR=/usr/include/temp
+ *
+ * will install all include/uapi headers in /usr/include/temp/include/...
+ */
+
 #include <stdio.h>
 #include <stdlib.h>
 #include <sys/ioctl.h>
-#include <linux/lcd-domains.h>
+#include <temp/linux/lcd-domains.h>
+
+#define PAGE_SIZE 4096
+#define DEVICE_NAME "/dev/lcd"
 
 int do_mmap(FILE *f, size_t order, unsigned char **blob_addr_out)
 {
 	void *ret;
 	size_t len;
 
-	len = (1 << size) * PAGE_SIZE;
+	len = (1 << order) * PAGE_SIZE;
 
 	ret = mmap(NULL, len, 
 		PROT_EXEC | PROT_READ | PROT_WRITE, 
-		MAP_ANONYMOUS, fileno(f), 0);
+		MAP_ANONYMOUS | MAP_PRIVATE, fileno(f), 0);
 	if (ret == MAP_FAILED) {
 		return -1;
 	}
@@ -23,7 +37,7 @@ int do_mmap(FILE *f, size_t order, unsigned char **blob_addr_out)
 
 void usage(void)
 {
-	fprintf(stderr, "blob: usage: ./blob <blob fname> <blob order>\n");
+	fprintf(stderr, "blob-run: usage: ./blob <blob fname> <blob order>\n");
 	fprintf(stderr, "  blob should be 2^(blob order) pages\n");
 	exit(1);
 }
@@ -35,6 +49,7 @@ int main(int argc, char *argv[])
 	char *fname;
 	int order;
 	FILE *f;
+	int lcd_fd;
 	
 	/*
 	 * Get blob file name
@@ -50,26 +65,41 @@ int main(int argc, char *argv[])
 	 */
 	f = fopen(fname, "r");
 	if (!f) {
-		fprintf(stderr, "blob: error opening file %s\n",
+		fprintf(stderr, "blob-run: error opening file %s\n",
 			fname);
-		exit(-1);
+		goto fail;
 	}
-	if (do_mmap(f, size, &(bi.blob))) {
-		fprintf(stderr, "blob: error mapping file %s\n",
+	if (do_mmap(f, order, &(bi.blob))) {
+		fprintf(stderr, "blob-run: error mapping file %s\n",
 			fname);
-		fclose(f);
-		exit(-1);
+		goto fail_map;
 	}
 	bi.blob_order = order;
 
 	/*
 	 * Run in lcd
 	 */
-	ret = ioctl(LCD_MINOR, LCD_RUN_BLOB, &bi);
+	lcd_fd = open(DEVICE_NAME, O_RDONLY);
+	if (lcd_fd < 0) {
+		printf("blob-run: error opening lcd device\n");
+		goto fail_open;
+	}
+	ret = ioctl(lcd_fd, LCD_RUN_BLOB, &bi);
 	if (ret) {
-		printf("blob: ioctl returned error %d\n", ret);
-		return -1;
+		printf("blob-run: ioctl returned error %d\n", ret);
+		goto fail_ioctl;
 	}
 
+	close(lcd_fd);
+	fclose(f);
+
 	return 0;
+
+fail_ioctl:
+	close(lcd_fd);
+fail_open:
+fail_map:
+	fclose(f);
+fail:
+	return -1;
 }

@@ -17,9 +17,9 @@ if 2 ** order != npages:
     order += 1
 
 if sys.argv[2] == "-s":
-    print str(int((2 ** order) * 4096))
-else if sys.argv[2] == "-o":
-    print str(int(order))
+    sys.stdout.write(str((2 ** order) * 4096))
+elif sys.argv[2] == "-o":
+    sys.stdout.write(str(order))
 else:
     sys.stderr.write("blob-size.py: unexpected second option " + sys.argv[2] + "\n")
     exit(-1)

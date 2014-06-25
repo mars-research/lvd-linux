@@ -1,3 +1,2 @@
 .text
-	;; code goes here
-	;; no mem accesses allowed for now
+	movq $1, %rax

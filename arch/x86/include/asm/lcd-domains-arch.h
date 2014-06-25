@@ -189,6 +189,11 @@ int lcd_arch_ept_gpa_to_hpa(struct lcd_arch *vcpu, u64 gpa, u64 *hpa_out);
  * gpa.
  */
 int lcd_arch_set_pc(struct lcd_arch *vcpu, u64 gpa);
+/**
+ * Set the lcd's gva root pointer (for x86, %cr3) to the
+ * guest physical address gpa.
+ */
+int lcd_arch_set_gva_root(struct lcd_arch *vcpu, u64 gpa);
 
 /*
  * GDT Layout

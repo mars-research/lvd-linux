@@ -24,7 +24,169 @@
 MODULE_LICENSE("GPL");
 MODULE_DESCRIPTION("LCD driver");
 
-/* run blob -------------------------------------------------- */
+/* lcd create / destroy ---------------------------------------- */
+
+static int lcd_create(struct lcd **lcd_out)
+{
+	struct lcd *lcd;
+	int r;
+
+	/*
+	 * Alloc and init lcd
+	 */
+	lcd = (struct lcd *)kmalloc(sizeof(*lcd), GFP_KERNEL);
+	if (!lcd) {
+		printk(KERN_ERR "lcd_create: error alloc'ing lcd\n");
+		r = -ENOMEM;
+		goto fail1;
+	}
+	lcd->lcd_arch = lcd_arch_create();
+	if(!lcd->lcd_arch) {
+		printk(KERN_ERR "lcd_create: error creating lcd_arch\n");
+		r = -ENOMEM;
+		goto fail2;
+	}
+
+	/*
+	 * Point utcb to arch-dependent utcb.
+	 */
+	lcd->utcb = lcd_arch->utcb;
+
+	*lcd_out = lcd;
+
+fail3:
+	lcd_arch_destroy(lcd->lcd_arch);
+fail2:
+	kfree(lcd);
+fail1:
+	return r;
+
+}
+
+static void lcd_destroy(struct lcd *lcd)
+{
+	/*
+	 * All memory mapped in lcd's ept will be automatically
+	 * freed when the ept is teared down. This currently
+	 * includes:
+	 *
+	 *   -- utcb
+	 *   -- guest virtual paging memory
+	 */
+	lcd_arch_destroy(lcd->lcd_arch);
+	kfree(lcd);
+}
+
+/* Memory Management ---------------------------------------- */
+
+/**
+ * Maps 
+ *
+ *    gpa_start --> gpa_start + npages * PAGE_SIZE
+ *
+ * to
+ *
+ *    hpa_start --> hpa_start + npages * PAGE_SIZE
+ *
+ * in lcd's ept.
+ */
+static int lcd_mm_gpa_map_range(struct lcd *lcd, u64 gpa_start, u64 hpa_start, 
+			u64 npages)
+{
+	u64 off;
+	u64 len;
+
+	len = npages * PAGE_SIZE;
+	for (off = 0; off < len; off += PAGE_SIZE) {
+		if (lcd_arch_ept_map_gpa_to_hpa(lcd->lcd_arch,
+							/* gpa */
+							gpa_start + off,
+							/* hpa */
+							hpa_start + off,
+							/* create */
+							1,
+							/* no overwrite */
+							0)) {
+			printk(KERN_ERR "lcd_mm_gpa_map_range: error mapping gpa %lx to hpa %lx\n",
+				(unsigned long)(gpa_start + off),
+				(unsigned long)(hpa_start + off));
+			return -EIO;
+		}
+	}
+
+	return 0;
+}
+
+/**
+ * Initializes guest virtual address space info in lcd, and
+ * sets gva root pointer (e.g., x86 %cr3).
+ *
+ * Must be called before mapping any gva's.
+ */
+int lcd_mm_gva_init(struct lcd *lcd, u64 gv_paging_mem_gpa_start,
+		u64 gv_paging_mem_end)
+{
+	u64 root;
+	int ret;
+
+	/*
+	 * Set start / end (we will use one page for the
+	 * global page dir)
+	 */
+	lcd->gv.paging_mem_bot = gv_paging_mem_start_gpa;
+	lcd->gv.paging_mem_brk = gv_paging_mem_start_gpa + PAGE_SIZE;
+	lcd->gv.paging_mem_top = gv_paging_mem_end_gpa;
+	
+	if (lcd->gv.paging_mem_brk > lcd->gv.paging_mem_top) {
+		printk(KERN_ERR "lcd_mm_gva_init: not enough room in gpa for paging\n");
+		return -EINVAL;			
+	}
+
+	/*
+	 * Allocate a page for the global page dir.
+	 */
+	root = __get_free_page(GFP_KERNEL);
+	if (!root) {
+		printk(KERN_ERR "lcd_mm_gva_init: error allocating global page dir\n");
+		return -ENOMEM;
+	}
+	memset((void *)root, 0, PAGE_SIZE);
+	lcd->gv.root_hva = root;
+	
+	/*
+	 * Map global page dir's page in lcd's ept
+	 */
+	ret = lcd_mm_gpa_map_range(lcd, gv_paging_mem_start_gpa, root, 1);
+	if (ret) {
+		printk("lcd_mm_gva_init: error mapping global page dir\n");
+		free_page(root);
+		return ret;
+	}
+
+	return 0;
+}
+
+/**
+ * Maps 
+ *
+ *    gva_start --> gva_start + npages * PAGE_SIZE
+ *
+ * to
+ *
+ *    gpa_start --> gpa_start + npages * PAGE_SIZE
+ *
+ * in lcd's guest virtual paging tables.
+ *
+ * Note! Call lcd_mm_gva_init before mapping any gva's.
+ */
+int lcd_mm_gva_map_range(struct lcd *lcd, u64 gva_start, u64 gpa_start, 
+			u64 npages)
+{
+	/* unimplemented */
+	return -1;
+}
+
+/* BLOBs -------------------------------------------------- */
 
 static int lcd_do_run_blob_once(struct lcd *lcd)
 {
@@ -103,44 +265,110 @@ static int lcd_do_run_blob(struct lcd *lcd)
 	}
 }
 
-static int lcd_load_blob(struct lcd *lcd, unsigned char *blob,
-	unsigned int blob_order)
+static int lcd_init_blob(struct lcd *lcd, unsigned char *blob,
+			unsigned int blob_order)
 {
-	u64 blob_hpa_base;
-	u64 blob_gpa_base;
-	u64 off;
 	unsigned int blob_size;
+	int r;
+	u64 paging_mem_size;
+	u64 npages;
+
 	/*
-	 * Map blob in lcd, starting at LCD_ARCH_FREE
+	 * (initial)
+	 * Blob Memory Layout
+	 * ==================
+	 *
+	 * The layout below reflects the guest physical *and* virtual memory
+	 * layout with the exception that not all paging memory is mapped in
+	 * in the guest physical address space (for efficiency). 
+	 *
+	 * Guest physical addresses are mapped one-to-one to the same guest 
+	 * virtual addresses.
+	 *
+	 * All allocated guest physical memory--including the arch-dependent 
+	 * region, guest virtual page tables, and the lcd's code--is mapped
+	 * in the guest virtual address space.
+	 *
+	 *                   +---------------------------+
+	 *                   |                           |
+	 *                   :                           :
+	 *                   :      Free / Unmapped      :
+	 *                   |                           |
+	 *                   +---------------------------+
+	 *                   |           Blob            | (max 16 pgs)	 
+	 * blob entry------> +---------------------------+ 
+	 *                   |       Guest Virtual       | (4 MBs)
+	 *                   |       Paging Memory       |
+	 * LCD_ARCH_FREE---> +---------------------------+
+	 *                   |                           |
+	 *                   :   Reserved Arch Memory    :
+	 *                   |                           |
+	 *                   +---------------------------+ 0x0000 0000 0000 0000
 	 */
-	blob_size = 1 << blob_order;
-	blob_hpa_base = __pa((u64)blob);
-	blob_gpa_base = LCD_ARCH_FREE;
-	for (off = 0; off < blob_size; off += PAGE_SIZE) {
-		if (lcd_arch_ept_map_gpa_to_hpa(lcd->lcd_arch,
-							/* gpa */
-							blob_gpa_base + off,
-							/* hpa */
-							blob_hpa_base + off,
-							/* create */
-							1,
-							/* no overwrite */
-							0)) {
-			printk(KERN_ERR "lcd_load_blob: error mapping blob at offset %lx\n",
-				(unsigned long)off);
-			return -EIO;
-		}
+	
+	paging_mem_size = 4 * (1 << 20); /* 4 MBs */
+
+	/*
+	 * Initialize guest virtual paging
+	 */
+	r = lcd_mm_gva_init(lcd, LCD_ARCH_FREE, 
+			LCD_ARCH_FREE + paging_mem_size);
+	if (r) {
+		printk(KERN_ERR "lcd_init_blob: error setting up gva\n");
+		goto fail1;
 	}
 
 	/*
-	 * Set program counter to start of free mem
+	 * Map blob in guest physical, after paging mem
 	 */
-	if (lcd_arch_set_pc(lcd->lcd_arch, LCD_ARCH_FREE)) {
-		printk(KERN_ERR "lcd_load_blob: error setting prgm ctr.\n");
-		return -EIO;
+	r = lcd_mm_gpa_range(lcd, LCD_ARCH_FREE + paging_mem_size, 
+			__pa((u64)blob), (1 << blob_order));
+	if (r) {
+		printk(KERN_ERR "lcd_init_blob: error mapping blob in gpa\n");
+		goto fail2;
+	}
+
+	/*
+	 * Map gpa from 0 to top of blob in lcd's gva
+	 */
+	npages = (LCD_ARCH_FREE + paging_mem_size) >> PAGE_SHIFT;
+	npages += (1 << blob_order);
+	r = lcd_mm_gva_range(lcd, 
+			/* gva start */
+			0, 
+			/* gpa start */
+			0, 
+			/* num pages */
+			npages);
+	if (r) {
+		printk(KERN_ERR "lcd_init_blob: error setting up initial gva\n");
+		goto fail3;
+	}
+
+	/*
+	 * Initialize program counter to blob entry point (just after
+	 * guest virtual paging mem).
+	 */
+	r = lcd_arch_set_pc(lcd, LCD_ARCH_FREE + paging_mem_size);
+	if (r) {
+		printk(KERN_ERR "lcd_init_blob: error setting prgm counter\n");
+		goto fail4;
 	}
 
 	return 0;
+
+fail4:
+fail3:
+fail2:
+fail1:
+	/* 
+	 * For now, relying on the fact that all paging memory allocated
+	 * for lcd is mapped in ept, so it will be freed eventually
+	 * when the lcd_arch is destroyed.
+	 *
+	 * Probably better to unmap and free instead, in the future ...
+	 */
+	return r;
 }
 
 static int lcd_run_blob(struct lcd_blob_info *bi)
@@ -149,6 +377,7 @@ static int lcd_run_blob(struct lcd_blob_info *bi)
 	int r;
 	unsigned char *blob;
 	int i;
+
 	/*
 	 * Sanity check blob order
 	 */
@@ -178,38 +407,23 @@ static int lcd_run_blob(struct lcd_blob_info *bi)
 		goto fail3;
 	}
 
-
-	for (i = 0; i < 64; i++) {
-		printk(KERN_ERR "lcd: blob[%d] = %x\n",
-			i, blob[i]);
-	}
-	
-	return 0;
-
 	/*
 	 * Alloc and init lcd
 	 */
-	lcd = (struct lcd *)kmalloc(sizeof(*lcd), GFP_KERNEL);
-	if (!lcd) {
-		printk(KERN_ERR "lcd_run_blob: error alloc'ing lcd\n");
-		r = -ENOMEM;
+	r = lcd_create(&lcd);
+	if (r) {
+		printk(KERN_ERR "lcd_run_blob: error creating lcd\n");
 		goto fail4;
-	}
-	lcd->lcd_arch = lcd_arch_create();
-	if(!lcd->lcd_arch) {
-		printk(KERN_ERR "lcd_run_blob: error alloc'ing lcd_arch\n");
-		r = -ENOMEM;
-		goto fail5;
 	}
 
 	/*
-	 * Load blob in lcd
+	 * Initialize lcd for blob
 	 */
-	r = lcd_load_blob(lcd, blob, bi->blob_order);
+	r = lcd_init_blob(lcd, blob, bi->blob_order);
 	if (r) {
 		printk(KERN_ERR "lcd_run_blob: error loading blob in lcd\n");
 		r = -EIO;
-		goto fail6;
+		goto fail5;
 	}
 
 	/*
@@ -219,10 +433,10 @@ static int lcd_run_blob(struct lcd_blob_info *bi)
 	goto done;
 
 done:
-fail6:
-	lcd_arch_destroy(lcd->lcd_arch);
 fail5:
-	kfree(lcd);
+	lcd_destroy(lcd);
+	/* blob is freed via ept tear down ... kind of ugly for now ... */
+	return r;
 fail4:
 fail3:
 	free_pages((u64)blob, bi->blob_order);
@@ -230,6 +444,7 @@ fail2:
 fail1:
 	return r;
 }
+
 
 /* ioctl -------------------------------------------------- */
 

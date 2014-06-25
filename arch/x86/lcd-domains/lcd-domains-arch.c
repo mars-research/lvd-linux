@@ -1948,9 +1948,8 @@ fail:
 }
 
 /**
- * Allocates and maps stack / utcb.
- *
- * %rsp not set until guest virtual address space initialized.
+ * Allocates and maps stack / utcb. Initializes
+ * stack pointer.
  */
 static int vmx_init_stack(struct lcd_arch *vcpu)
 {
@@ -1984,6 +1983,11 @@ static int vmx_init_stack(struct lcd_arch *vcpu)
 		printk(KERN_ERR "vmx_init_stack: failed to map stack\n");
 		goto fail_map;
 	}
+
+	/*
+	 * Initialize stack pointer (%rsp)
+	 */
+	vmcs_writel(GUEST_RSP, LCD_ARCH_STACK_TOP);
 
 	return 0;
 
@@ -2595,6 +2599,13 @@ int lcd_arch_run(struct lcd_arch *vcpu)
 int lcd_arch_set_pc(struct lcd_arch *vcpu, u64 gpa)
 {
 	vcpu->regs[LCD_ARCH_REGS_RIP] = gpa;
+	vmcs_writel(GUEST_RIP, gpa);
+	return 0;
+}
+
+int lcd_arch_set_gva_root(struct lcd_arch *vcpu, u64 gpa)
+{
+	vmcs_writel(GUEST_CR3, gpa);
 	return 0;
 }
 

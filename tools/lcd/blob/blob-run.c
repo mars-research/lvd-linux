@@ -4,7 +4,7 @@
  * Depending on where linux headers are installed,
  * may need to change header includes. For example,
  *
- *   sudo headers_install INSTALL_HDR_DIR=/usr/include/temp
+ *   sudo headers_install INSTALL_HDR_PATH=/usr/include/temp
  *
  * will install all include/uapi headers in /usr/include/temp/include/...
  */
@@ -12,7 +12,11 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <sys/ioctl.h>
-#include <temp/linux/lcd-domains.h>
+#include <sys/mman.h>
+#include <sys/types.h>
+#include <sys/stat.h>
+#include <fcntl.h>
+#include <temp/include/linux/lcd-domains.h>
 
 #define PAGE_SIZE 4096
 #define DEVICE_NAME "/dev/lcd"
@@ -75,6 +79,9 @@ int main(int argc, char *argv[])
 		goto fail_map;
 	}
 	bi.blob_order = order;
+
+	printf("blob-run: addr = %lx, order = %d\n",
+		(unsigned long)bi.blob, bi.blob_order);
 
 	/*
 	 * Run in lcd

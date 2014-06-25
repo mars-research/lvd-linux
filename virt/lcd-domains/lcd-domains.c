@@ -149,6 +149,7 @@ static int lcd_run_blob(struct lcd_blob_info *bi)
 	int r;
 	unsigned char *blob;
 
+	return 0;
 	/*
 	 * Sanity check blob order
 	 */
@@ -251,6 +252,8 @@ static long lcd_dev_ioctl(struct file *filp,
 			goto out;
 		}
 		r = lcd_run_blob(&bi);
+		printk(KERN_ERR "lcd: addr=%lx, order=%d\n",
+			(unsigned long)bi.blob, bi.blob_order);
 		if (r) {
 			printk(KERN_ERR "lcd: error running blob\n");
 			goto out;

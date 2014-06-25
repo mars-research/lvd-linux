@@ -88,6 +88,7 @@ int main(int argc, char *argv[])
 	 */
 	lcd_fd = open(DEVICE_NAME, O_RDONLY);
 	if (lcd_fd < 0) {
+		perror("blob-run");
 		printf("blob-run: error opening lcd device\n");
 		goto fail_open;
 	}

@@ -1,6 +1,6 @@
 
 run: blob-run blob
-	./blob-run blob `python blob-size.py blob.bin -o`
+	sudo ./blob-run blob `python blob-size.py blob.bin -o`
 
 blob-run: blob-run.c
 	gcc $^ -o $@

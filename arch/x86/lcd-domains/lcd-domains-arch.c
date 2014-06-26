@@ -1418,7 +1418,12 @@ static void vmx_setup_vmcs_guest_regs(struct lcd_arch *vcpu)
 	vmcs_writel(GUEST_IA32_EFER, EFER_LME | EFER_LMA);
 
 	/*
-	 * %rip, %rsp -- to be set when guest address space set up
+	 * $rsp
+	 */
+	vmcs_writel(GUEST_RSP, LCD_ARCH_STACK_TOP);
+	
+	/*
+	 * %rip -- to be set when guest address space set up
 	 */
 
 	/*
@@ -2034,11 +2039,6 @@ static int vmx_init_stack(struct lcd_arch *vcpu)
 		printk(KERN_ERR "vmx_init_stack: failed to map stack\n");
 		goto fail_map;
 	}
-
-	/*
-	 * Initialize stack pointer (%rsp)
-	 */
-	vmcs_writel(GUEST_RSP, LCD_ARCH_STACK_TOP);
 
 	return 0;
 

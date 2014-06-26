@@ -425,6 +425,18 @@ static int lcd_mm_gva_walk_pgd(struct lcd *lcd, u64 gva, pgd_t **pgd_out)
  *
  * Hierarchy: pgd -> pud -> pmd -> page table -> page frame
  *
+ * For concreteness, on Intel 64-bit, IA-32e paging
+ * is used, and
+ *
+ *    pgd = pml4
+ *    pud = pdpt
+ *    pmd = page directory
+ *
+ * with the `standard' 512 entries per paging structure.
+ * (No huge pages are used for the initial guest
+ * virtual address space. But the intra-lcd code can
+ * change that if it wishes.)
+ *
  * Since guest physical addresses (rather than 
  * host physical addresses) are stored in the paging
  * structures, we can't use some of the most benefical

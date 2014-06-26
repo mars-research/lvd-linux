@@ -3,7 +3,8 @@
  *
  *
  * Authors:
- *   Anton Burtsev   <aburtsev@flux.utah.edu>
+ *   Anton Burtsev     <aburtsev@flux.utah.edu>
+ *   Charlie Jacobsen  <charlesj@cs.utah.edu>
  */
 
 #include <linux/errno.h>
@@ -146,6 +147,107 @@ fail1:
 	return ret;
 }
 
+static void lcd_mm_pt_destroy(struct lcd *lcd, pmd_t *pmd_entry)
+{
+	u64 hpa;
+
+	/*
+	 * Get hpa of page table, using gpa stored in pmd_entry.
+	 */
+	ret = lcd_arch_ept_gpa_to_hpa(lcd->lcd_arch, pmd_val(*pmd_entry), &hpa);
+	if (ret) {
+		printk(KERN_ERR "lcd_mm_pt_destroy: error looking up gpa %lx\n",
+			(unsigned long)pmd_val(*pmd_entry));
+		return ret;
+	}
+
+	/*
+	 * Unmap page table
+	 */
+	ret = lcd_mm_gpa_unmap_range(lcd, pmd_val(*pmd_entry), 1);
+
+
+	/*
+	 * Free page table
+	 */
+	free_page((u64)__va(hpa));
+}
+
+static void lcd_mm_pmd_destroy(struct lcd *lcd, pud_t *pud_entry)
+{
+	pmd_t *pmd;
+	u64 hpa;
+	int i;
+
+	/*
+	 * Get hpa of pmd, using gpa stored in pud_entry.
+	 */
+	ret = lcd_arch_ept_gpa_to_hpa(lcd->lcd_arch, pud_val(*pud_entry), &hpa);
+	if (ret) {
+		printk(KERN_ERR "lcd_mm_pmd_destroy: error looking up gpa %lx\n",
+			(unsigned long)pud_val(*pud_entry));
+		return ret;
+	}
+
+	pmd = (pmd_t *)__va(hpa);
+
+	/*
+	 * Free all present page tables
+	 */
+	for (i = 0; i < PTRS_PER_PMD; i++) {
+		if (pmd_present(pmd[i]))
+			lcd_mm_pt_destroy(lcd, pmd[i]);
+	}
+
+	/*
+	 * Unmap pmd
+	 */
+	ret = lcd_mm_gpa_unmap_range(lcd, pud_val(*pud_entry), 1);
+
+
+	/*
+	 * Free pmd
+	 */
+	free_page((u64)pmd);
+}
+
+static void lcd_mm_pud_destroy(pgd_t *pgd_entry)
+{
+	pud_t *pud;
+	u64 hpa;
+	int i;
+
+	/*
+	 * Get hpa of pud, using gpa stored in pgd_entry.
+	 */
+	ret = lcd_arch_ept_gpa_to_hpa(lcd->lcd_arch, pgd_val(*pgd_entry), &hpa);
+	if (ret) {
+		printk(KERN_ERR "lcd_mm_pud_destroy: error looking up gpa %lx\n",
+			(unsigned long)pgd_val(*pgd_entry));
+		return ret;
+	}
+
+	pud = (pud_t *)__va(hpa);
+
+	/*
+	 * Destroy all present pmd's
+	 */
+	for (i = 0; i < PTRS_PER_PUD; i++) {
+		if (pud_present(pud[i]))
+			lcd_mm_pmd_destroy(lcd, pud[i]);
+	}
+
+	/*
+	 * Unmap pud
+	 */
+	ret = lcd_mm_gpa_unmap_range(lcd, pgd_val(*pgd_entry), 1);
+
+	/*
+	 * Free pud
+	 */
+	free_page((u64)pud);
+}
+
 /**
  * Unmaps guest virtual paging structures in lcd's ept, and
  * frees host physical memory associated with paging structures.
@@ -155,8 +257,38 @@ fail1:
  */
 static void lcd_mm_gva_destroy(struct lcd *lcd)
 {
-	/* free root */
-	return 0;
+	pgd_t *pgd;
+	int i;
+	int ret;
+
+	pgd = (pgd_t *)lcd->gv.root_hva;
+
+	/*
+	 * Free all present pud's
+	 */
+	for (i = 0; i < PTRS_PER_PGD; i++) {
+		if (pgd_present(pgd[i])) {
+			ret = lcd_mm_pud_destroy(lcd, pgd[i]);
+			if (ret) {
+				printk(KERN_ERR "lcd_mm_gva_destroy: error freeing pud at idx %d\n",
+					i);
+				return;
+			}
+	}
+
+	/*
+	 * Unmap in ept
+	 */
+	ret = lcd_mm_gpa_unmap_range(lcd, lcd->gv.paging_mem_start, 1);
+	if (ret) {
+		printk(KERN_ERR "lcd_mm_gva_destroy: error unmapping pgd\n");
+		return;
+	}
+
+	/*
+	 * Free pgd
+	 */
+	free_page((u64)pgd);
 }
 
 /**
@@ -201,14 +333,13 @@ static int lcd_mm_gva_lookup_pte(struct lcd *lcd, u64 gva, pmd_t *pmd_entry,
 {
 	int ret;
 	u64 hpa;
-	u64 gpa;
 	pte_t *entry;
 
 	/*
 	 * Get hpa of page table, using gpa stored in pmd_entry.
 	 */
 	ret = lcd_arch_ept_gpa_to_hpa(lcd->lcd_arch, pmd_val(*pmd_entry), &hpa);
-	if (ret) {
+	if (ret)
 		printk(KERN_ERR "lcd_mm_gva_lookup_pte: error looking up gpa %lx\n",
 			(unsigned long)pmd_val(*pmd_entry));
 		return ret;
@@ -490,6 +621,7 @@ static void lcd_mm_gva_set(pte_t *pte, u64 gpa)
 {
 	set_pte(pte, __pte(gpa | _KERNPG_TABLE));	
 }
+
 
 /**
  * Simple routine combining walk and set. Never

@@ -2686,6 +2686,7 @@ EXPORT_SYMBOL(lcd_arch_run);
 EXPORT_SYMBOL(lcd_arch_ept_walk);
 EXPORT_SYMBOL(lcd_arch_ept_set);
 EXPORT_SYMBOL(lcd_arch_ept_unset);
+EXPORT_SYMBOL(lcd_arch_ept_unmap_gpa);
 EXPORT_SYMBOL(lcd_arch_ept_hpa);
 EXPORT_SYMBOL(lcd_arch_ept_map_gpa_to_hpa);
 EXPORT_SYMBOL(lcd_arch_ept_gpa_to_hpa);

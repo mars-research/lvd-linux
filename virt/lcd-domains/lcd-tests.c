@@ -16,7 +16,7 @@ static int test01(void)
 		return ret;
 	}
 
-	lcd_destory(lcd);
+	lcd_destroy(lcd);
 
 	return 0;
 }

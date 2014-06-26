@@ -731,6 +731,8 @@ static int lcd_create(struct lcd **lcd_out)
 
 	*lcd_out = lcd;
 
+	return 0;
+
 fail2:
 	kfree(lcd);
 fail1:

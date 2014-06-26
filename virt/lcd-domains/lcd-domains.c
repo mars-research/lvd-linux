@@ -24,59 +24,6 @@
 MODULE_LICENSE("GPL");
 MODULE_DESCRIPTION("LCD driver");
 
-/* lcd create / destroy ---------------------------------------- */
-
-static int lcd_create(struct lcd **lcd_out)
-{
-	struct lcd *lcd;
-	int r;
-
-	/*
-	 * Alloc and init lcd
-	 */
-	lcd = (struct lcd *)kmalloc(sizeof(*lcd), GFP_KERNEL);
-	if (!lcd) {
-		printk(KERN_ERR "lcd_create: error alloc'ing lcd\n");
-		r = -ENOMEM;
-		goto fail1;
-	}
-	lcd->lcd_arch = lcd_arch_create();
-	if(!lcd->lcd_arch) {
-		printk(KERN_ERR "lcd_create: error creating lcd_arch\n");
-		r = -ENOMEM;
-		goto fail2;
-	}
-
-	/*
-	 * Point utcb to arch-dependent utcb.
-	 */
-	lcd->utcb = lcd_arch->utcb;
-
-	*lcd_out = lcd;
-
-fail3:
-	lcd_arch_destroy(lcd->lcd_arch);
-fail2:
-	kfree(lcd);
-fail1:
-	return r;
-
-}
-
-static void lcd_destroy(struct lcd *lcd)
-{
-	/*
-	 * All memory mapped in lcd's ept will be automatically
-	 * freed when the ept is teared down. This currently
-	 * includes:
-	 *
-	 *   -- utcb
-	 *   -- guest virtual paging memory
-	 */
-	lcd_arch_destroy(lcd->lcd_arch);
-	kfree(lcd);
-}
-
 /* Memory Management ---------------------------------------- */
 
 /**
@@ -118,6 +65,30 @@ static int lcd_mm_gpa_map_range(struct lcd *lcd, u64 gpa_start, u64 hpa_start,
 }
 
 /**
+ * Unmaps 
+ *
+ *    gpa_start --> gpa_start + npages * PAGE_SIZE
+ *
+ * in lcd's ept.
+ */
+static int lcd_mm_gpa_unmap_range(struct lcd *lcd, u64 gpa_start, u64 npages)
+{
+	u64 off;
+	u64 len;
+
+	len = npages * PAGE_SIZE;
+	for (off = 0; off < len; off += PAGE_SIZE) {
+		if (lcd_arch_ept_unmap_gpa(lcd->lcd_arch, gpa_start + off)) {n
+			printk(KERN_ERR "lcd_mm_gpa_unmap_range: error unmapping gpa %lx\n",
+				(unsigned long)(gpa_start + off));
+			return -EIO;
+		}
+	}
+
+	return 0;
+}
+
+/**
  * Initializes guest virtual address space info in lcd, and
  * sets gva root pointer (e.g., x86 %cr3).
  *
@@ -139,7 +110,8 @@ static int lcd_mm_gva_init(struct lcd *lcd, u64 gv_paging_mem_gpa_start,
 	
 	if (lcd->gv.paging_mem_brk > lcd->gv.paging_mem_top) {
 		printk(KERN_ERR "lcd_mm_gva_init: not enough room in gpa for paging\n");
-		return -EINVAL;			
+		ret = -EINVAL;
+		goto fail1;
 	}
 
 	/*
@@ -148,7 +120,8 @@ static int lcd_mm_gva_init(struct lcd *lcd, u64 gv_paging_mem_gpa_start,
 	root = __get_free_page(GFP_KERNEL);
 	if (!root) {
 		printk(KERN_ERR "lcd_mm_gva_init: error allocating global page dir\n");
-		return -ENOMEM;
+		ret = -ENOMEM;
+		goto fail2;
 	}
 	memset((void *)root, 0, PAGE_SIZE);
 	lcd->gv.root_hva = root;
@@ -159,10 +132,28 @@ static int lcd_mm_gva_init(struct lcd *lcd, u64 gv_paging_mem_gpa_start,
 	ret = lcd_mm_gpa_map_range(lcd, gv_paging_mem_start_gpa, root, 1);
 	if (ret) {
 		printk("lcd_mm_gva_init: error mapping global page dir\n");
-		free_page(root);
-		return ret;
+		goto fail3;
 	}
 
+	return 0;
+
+fail3:
+	free_page(root);
+fail2:
+fail1:
+	return ret;
+}
+
+/**
+ * Unmaps guest virtual paging structures in lcd's ept, and
+ * frees host physical memory associated with paging structures.
+ *
+ * Note! Does not free host physical memory mapped (via guest
+ * physical addresses) by gva; just the paging structures themselves.
+ */
+static void lcd_mm_gva_destroy(struct lcd *lcd)
+{
+	/* free root */
 	return 0;
 }
 
@@ -185,6 +176,52 @@ static int lcd_mm_gva_map_range(struct lcd *lcd, u64 gva_start, u64 gpa_start,
 	/* unimplemented */
 	return -1;
 }
+
+/* lcd create / destroy ---------------------------------------- */
+
+static int lcd_create(struct lcd **lcd_out)
+{
+	struct lcd *lcd;
+	int r;
+
+	/*
+	 * Alloc and init lcd
+	 */
+	lcd = (struct lcd *)kmalloc(sizeof(*lcd), GFP_KERNEL);
+	if (!lcd) {
+		printk(KERN_ERR "lcd_create: error alloc'ing lcd\n");
+		r = -ENOMEM;
+		goto fail1;
+	}
+	lcd->lcd_arch = lcd_arch_create();
+	if(!lcd->lcd_arch) {
+		printk(KERN_ERR "lcd_create: error creating lcd_arch\n");
+		r = -ENOMEM;
+		goto fail2;
+	}
+
+	/*
+	 * Point utcb to arch-dependent utcb.
+	 */
+	lcd->utcb = lcd_arch->utcb;
+
+	*lcd_out = lcd;
+
+fail3:
+	lcd_arch_destroy(lcd->lcd_arch);
+fail2:
+	kfree(lcd);
+fail1:
+	return r;
+
+}
+
+static void lcd_destroy(struct lcd *lcd)
+{
+	lcd_mm_gva_destroy(lcd);
+	kfree(lcd);
+}
+
 
 /* BLOBs -------------------------------------------------- */
 
@@ -358,16 +395,13 @@ static int lcd_init_blob(struct lcd *lcd, unsigned char *blob,
 	return 0;
 
 fail4:
+	/* gva destroy will handle clean up after this failure */
 fail3:
+	lcd_mm_unmap_gpa_range(lcd, LCD_ARCH_FREE + paging_mem_size, 
+			(1 << blob_order));
 fail2:
+	lcd_mm_gva_destroy(lcd);
 fail1:
-	/* 
-	 * For now, relying on the fact that all paging memory allocated
-	 * for lcd is mapped in ept, so it will be freed eventually
-	 * when the lcd_arch is destroyed.
-	 *
-	 * Probably better to unmap and free instead, in the future ...
-	 */
 	return r;
 }
 
@@ -435,8 +469,6 @@ static int lcd_run_blob(struct lcd_blob_info *bi)
 done:
 fail5:
 	lcd_destroy(lcd);
-	/* blob is freed via ept tear down ... kind of ugly for now ... */
-	return r;
 fail4:
 fail3:
 	free_pages((u64)blob, bi->blob_order);

@@ -311,6 +311,11 @@ static void lcd_mm_gva_destroy(struct lcd *lcd)
 	 * Free pgd
 	 */
 	free_page((u64)pgd);
+
+	/*
+	 * Mark as invalid
+	 */
+	lcd->gv.present = 0;
 }
 
 /**
@@ -664,6 +669,26 @@ static int lcd_mm_gva_map(struct lcd *lcd, u64 gva, u64 gpa)
 	}
 
 	lcd_mm_gva_set(pte, gpa);
+
+	return 0;
+}
+
+/**
+ * Simple routine combining walk and get. Never
+ * overwrites.
+ */
+static int lcd_mm_gva_to_gpa(struct lcd *lcd, u64 gva, u64 *gpa)
+{
+	int ret;
+	pte_t *pte;
+
+	ret = lcd_mm_gva_walk(lcd, gva, &pte);
+	if (ret) {
+		printk(KERN_ERR "lcd_mm_gva_to_gpa: error getting pte\n");
+		return ret;
+	}
+
+	*gpa = (u64)pte_val(*pte);
 
 	return 0;
 }

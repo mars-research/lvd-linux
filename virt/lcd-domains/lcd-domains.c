@@ -24,7 +24,7 @@
 MODULE_LICENSE("GPL");
 MODULE_DESCRIPTION("LCD driver");
 
-/* Memory Management ---------------------------------------- */
+/* Guest Physical ---------------------------------------- */
 
 /**
  * Maps 
@@ -87,6 +87,8 @@ static int lcd_mm_gpa_unmap_range(struct lcd *lcd, u64 gpa_start, u64 npages)
 
 	return 0;
 }
+
+/* Guest Virtual -------------------------------------------------- */
 
 /**
  * Initializes guest virtual address space info in lcd, and
@@ -158,6 +160,352 @@ static void lcd_mm_gva_destroy(struct lcd *lcd)
 }
 
 /**
+ * Allocates a host physical page and guest physical
+ * page (in the lcd's guest phys address space) for
+ * storing a paging structure.
+ */
+static int lcd_mm_gva_alloc(struct lcd *lcd, u64 *gpa, u64 *hpa)
+{
+	u64 hva;
+
+	/*
+	 * Check watermark, and bump it.
+	 */
+	if (lcd->gv.paging_mem_brk >= lcd->gv.paging_mem_top) {
+		printk(KERN_ERR "lcd_mm_gva_alloc: exhausted paging mem\n");
+		return -ENOMEM;
+	}
+	*gpa = lcd->gv.paging_mem_brk;
+	lcd->gv.paging_mem_brk += PAGE_SIZE;
+
+	/*
+	 * Allocate a host physical page
+	 */
+	hva = __get_free_page(GFP_KERNEL);
+	if (!hva) {
+		printk(KERN_ERR "lcd_mm_gva_alloc: no host phys mem\n");
+		return -ENOMEM;
+	}
+	memset((void *)hva, 0, PAGE_SIZE);
+	*hpa = __pa(hva);
+
+	return 0;
+}
+
+/**
+ * Get host virtual address of pte
+ * for gva and pmd_entry.
+ */
+static int lcd_mm_gva_lookup_pte(struct lcd *lcd, u64 gva, pmd_t *pmd_entry,
+				pte_t **pte_out)
+{
+	int ret;
+	u64 hpa;
+	u64 gpa;
+	pte_t *entry;
+
+	/*
+	 * Get hpa of page table, using gpa stored in pmd_entry.
+	 */
+	ret = lcd_arch_ept_gpa_to_hpa(lcd->lcd_arch, pmd_val(*pmd_entry), &hpa);
+	if (ret) {
+		printk(KERN_ERR "lcd_mm_gva_lookup_pte: error looking up gpa %lx\n",
+			(unsigned long)pmd_val(*pmd_entry));
+		return ret;
+	}
+	/*
+	 * Look up entry in page table
+	 */
+	entry = ((pte_t *)__va(hpa)) + pte_index(gva);
+	
+	*pte_out = entry;
+	return 0;
+}
+
+/**
+ * Look up pte for the page frame containing gva,
+ * using the page table referenced by pmd_entry.
+ */
+static int lcd_mm_gva_walk_pt(struct lcd *lcd, u64 gva, pmd_t *pmd_entry,
+			pte_t **pte_out)
+{
+	int ret;
+	pte_t *entry;
+	u64 gpa;
+	u64 hpa;
+
+	ret = lcd_mm_gva_lookup_pte(lcd, gva, pmd_entry, &entry);
+	if (ret) {
+		printk(KERN_ERR "lcd_mm_gva_walk_pt: error looking up pte\n");
+		return ret;
+	}
+
+	*pte_out = entry;
+
+	return 0;
+}
+
+/**
+ * Get host virtual address of pmd entry
+ * for gva and pud_entry.
+ */
+static int lcd_mm_gva_lookup_pmd(struct lcd *lcd, u64 gva, pud_t *pud_entry,
+				pmd_t **pmd_out)
+{
+	int ret;
+	u64 hpa;
+	u64 gpa;
+	pmd_t *entry;
+
+	/*
+	 * Get hpa of pmd, using gpa stored in pud_entry.
+	 */
+	ret = lcd_arch_ept_gpa_to_hpa(lcd->lcd_arch, pud_val(*pud_entry), &hpa);
+	if (ret) {
+		printk(KERN_ERR "lcd_mm_gva_lookup_pmd: error looking up gpa %lx\n",
+			(unsigned long)pud_val(*pud_entry));
+		return ret;
+	}
+	/*
+	 * Look up entry in pmd
+	 */
+	entry = ((pmd_t *)__va(hpa)) + pmd_index(gva);
+	
+	*pmd_out = entry;
+	return 0;
+}
+
+/**
+ * Look up pmd entry for the page table for gva,
+ * using the pmd referenced by pud_entry.
+ */
+static int lcd_mm_gva_walk_pmd(struct lcd *lcd, u64 gva, pud_t *pud_entry,
+				pmd_t **pmd_out)
+{
+	int ret;
+	pmd_t *entry;
+	u64 gpa;
+	u64 hpa;
+
+	ret = lcd_mm_gva_lookup_pmd(lcd, gva, pud_entry, &entry);
+	if (ret) {
+		printk(KERN_ERR "lcd_mm_gva_walk_pmd: error looking up pmd\n");
+		return ret;
+	}
+
+	if (!pmd_present(*entry)) {
+		/*
+		 * Alloc and map a page table
+		 */
+		ret = lcd_mm_gva_alloc(lcd, &gpa, &hpa);
+		if (ret) {
+			printk(KERN_ERR "lcd_mm_gva_walk_pmd: error alloc'ing\n");
+			return ret;
+		}
+
+		/*
+		 * Map *guest physical* address into pud entry
+		 */
+		set_pmd(entry, __pmd(gpa | _KERNPG_TABLE));
+
+	}
+
+	*pmd_out = entry;
+
+	return 0;
+}
+
+/**
+ * Get host virtual address of pud entry
+ * for gva and pgd_entry.
+ */
+static int lcd_mm_gva_lookup_pud(struct lcd *lcd, u64 gva, pgd_t *pgd_entry,
+				pud_t **pud_out)
+{
+	int ret;
+	u64 hpa;
+	u64 gpa;
+	pud_t *entry;
+
+	/*
+	 * Get hpa of pud, using gpa stored in pgd_entry.
+	 */
+	ret = lcd_arch_ept_gpa_to_hpa(lcd->lcd_arch, pgd_val(*pgd_entry), &hpa);
+	if (ret) {
+		printk(KERN_ERR "lcd_mm_gva_lookup_pud: error looking up gpa %lx\n",
+			(unsigned long)pgd_val(*pgd_entry));
+		return ret;
+	}
+	/*
+	 * Look up entry in pud
+	 */
+	entry = ((pud_t *)__va(hpa)) + pud_index(gva);
+	
+	*pud_out = entry;
+	return 0;
+}
+
+/**
+ * Look up pud entry for the pmd for gva, using
+ * the pud referenced by pgd_entry.
+ */
+static int lcd_mm_gva_walk_pud(struct lcd *lcd, u64 gva, pgd_t *pgd_entry,
+				pud_t **pud_out)
+{
+	int ret;
+	pud_t *entry;
+	u64 gpa;
+	u64 hpa;
+
+	ret = lcd_mm_gva_lookup_pud(lcd, gva, pgd_entry, &entry);
+	if (ret) {
+		printk(KERN_ERR "lcd_mm_gva_walk_pud: error looking up pud\n");
+		return ret;
+	}
+
+	if (!pud_present(*entry)) {
+		/*
+		 * Alloc and map a pmd
+		 */
+		ret = lcd_mm_gva_alloc(lcd, &gpa, &hpa);
+		if (ret) {
+			printk(KERN_ERR "lcd_mm_gva_walk_pud: error alloc'ing\n");
+			return ret;
+		}
+
+		/*
+		 * Map *guest physical* address into pud entry
+		 */
+		set_pud(entry, __pud(gpa | _KERNPG_TABLE));
+
+	}
+
+	*pud_out = entry;
+
+	return 0;
+}
+
+/**
+ * Look up pgd entry for the pud for gva.
+ */
+static int lcd_mm_gva_walk_pgd(struct lcd *lcd, u64 gva, pgd_t **pgd_out)
+{
+	int ret;
+	pgd_t *entry;
+	u64 gpa;
+	u64 hpa;
+
+	entry = lcd->gv.root_hva + pgd_index(gva);
+	if (!pgd_present(*entry)) {
+		/*
+		 * Alloc and map a pud
+		 */
+		ret = lcd_mm_gva_alloc(lcd, &gpa, &hpa);
+		if (ret) {
+			printk(KERN_ERR "lcd_mm_gva_lookup_pgd: error alloc'ing\n");
+			return ret;
+		}
+		/*
+		 * Map *guest physical* address into pgd entry
+		 */
+		set_pgd(entry, __pgd(gpa | _KERNPG_TABLE));
+	}
+
+	*pgd_out = entry;
+
+	return 0;
+}
+
+/**
+ * Look up the page table entry for guest virtual
+ * address gva, using the pgd pointed to by root_hva.
+ *
+ * Paging data structures are allocated along the
+ * way.
+ *
+ * Hierarchy: pgd -> pud -> pmd -> page table -> page frame
+ *
+ * Since guest physical addresses (rather than 
+ * host physical addresses) are stored in the paging
+ * structures, we can't use some of the most benefical
+ * macros that allow for pud- and pmd-folding
+ * (e.g., pud_offset). C'est la vie ... We could define
+ * some macros that do the same thing, later ...
+ *
+ * Punchline: Arch must have 4 paging levels.
+ */
+static int lcd_mm_gva_walk(struct lcd *lcd, u64 gva, pte_t **pte_out)
+{
+	int ret;
+	pgd_t *pgd;
+	pud_t *pud;
+	pmd_t *pmd;
+
+	/*
+	 * Get pgd entry for pud
+	 */
+	ret = lcd_mm_gva_walk_pgd(lcd, gva, &pgd);
+	if (ret) {
+		printk(KERN_ERR "lcd_mm_gva_walk: err walking pgd\n");
+		return ret;
+	}
+
+	/*
+	 * Get pud entry for pmd
+	 */
+	ret = lcd_mm_gva_walk_pud(lcd, gva, pgd, &pud);
+	if (ret) {
+		printk(KERN_ERR "lcd_mm_gva_walk: err walking pud\n");
+		return ret;
+	}
+
+	/*
+	 * Get pmd entry for page table
+	 */
+	ret = lcd_mm_gva_walk_pmd(lcd, gva, pud, &pmd);
+	if (ret) {
+		printk(KERN_ERR "lcd_mm_gva_walk: err walking pmd\n");
+		return ret;
+	}
+
+	/*
+	 * Finally, get page table entry
+	 */
+	return lcd_mm_gva_walk_pt(lcd, gva, pmd, pte_out);
+}
+
+static void lcd_mm_gva_set(pte_t *pte, u64 gpa)
+{
+	set_pte(pte, __pte(gpa | _KERNPG_TABLE));	
+}
+
+/**
+ * Simple routine combining walk and set. Never
+ * overwrites.
+ */
+static int lcd_mm_gva_map(struct lcd *lcd, u64 gva, u64 gpa)
+{
+	int ret;
+	pte_t *pte;
+
+	ret = lcd_mm_gva_walk(lcd, gva, &pte);
+	if (ret) {
+		printk(KERN_ERR "lcd_mm_gva_map: error getting pte\n");
+		return ret;
+	}
+
+	if (pte_present(*pte)) {
+		printk(KERN_ERR "lcd_mm_gva_map: remap gva %lx to gpa %lx\n",
+			(unsigned long)gva, (unsigned long)gpa);
+		return -EINVAL;
+	}
+
+	lcd_mm_gva_set(pte, gpa);
+
+	return 0;
+}
+
+/**
  * Maps 
  *
  *    gva_start --> gva_start + npages * PAGE_SIZE
@@ -171,10 +519,26 @@ static void lcd_mm_gva_destroy(struct lcd *lcd)
  * Note! Call lcd_mm_gva_init before mapping any gva's.
  */
 static int lcd_mm_gva_map_range(struct lcd *lcd, u64 gva_start, u64 gpa_start, 
-			u64 npages)
+				u64 npages)
 {
-	/* unimplemented */
-	return -1;
+	u64 off;
+	u64 len;
+
+	len = npages * PAGE_SIZE;
+	for (off = 0; off < len; off += PAGE_SIZE) {
+		if (lcd_mm_gva_map(lcd->lcd_arch,
+					/* gva */
+					gva_start + off,
+					/* gpa */
+					gpa_start + off)) {
+			printk(KERN_ERR "lcd_mm_gva_map_range: error mapping gva %lx to gpa %lx\n",
+				(unsigned long)(gva_start + off),
+				(unsigned long)(gpa_start + off));
+			return -EIO;
+		}
+	}
+
+	return 0;
 }
 
 /* lcd create / destroy ---------------------------------------- */

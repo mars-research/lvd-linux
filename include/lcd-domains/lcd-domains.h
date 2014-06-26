@@ -13,10 +13,10 @@ struct lcd {
 	 */
 	struct {
 		/*
-		 * Host physical address of the root of the lcd's
+		 * Host virtual address of the root of the lcd's
 		 * (initial) guest virtual paging hierarchy.
 		 */
-		u64 root_hpa;
+		u64 root_hva;
 		/*
 		 * Pointer to start of guest physical address space 
 		 * used for paging.

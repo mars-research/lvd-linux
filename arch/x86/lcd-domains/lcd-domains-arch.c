@@ -2668,7 +2668,10 @@ int lcd_arch_set_pc(struct lcd_arch *vcpu, u64 gpa)
 
 int lcd_arch_set_gva_root(struct lcd_arch *vcpu, u64 gpa)
 {
-	vmcs_writel(GUEST_CR3, gpa);
+	u64 cr3_ptr;
+
+	cr3_ptr = gpa; /* no page write through, etc. ... */
+	vmcs_writel(GUEST_CR3, cr3_ptr);
 	return 0;
 }
 

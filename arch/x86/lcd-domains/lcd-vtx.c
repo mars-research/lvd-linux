@@ -420,35 +420,35 @@
 /* 	return 0; */
 /* } */
 
-/**
- * Returns host virtual address associated with
- * guest physical address, using lcd's ept.
- *
- * Needed for manipulating guest (inner lcd) data structures
- * that store guest physical addresses, like guest virtual
- * paging structures.
- */
-static int lcd_ept_gpa_to_hva(struct lcd* vcpu, u64 gpa, u64 *hva) {
-	epte_t *epte;
-	int ret;
+/* /\** */
+/*  * Returns host virtual address associated with */
+/*  * guest physical address, using lcd's ept. */
+/*  * */
+/*  * Needed for manipulating guest (inner lcd) data structures */
+/*  * that store guest physical addresses, like guest virtual */
+/*  * paging structures. */
+/*  *\/ */
+/* static int lcd_ept_gpa_to_hva(struct lcd* vcpu, u64 gpa, u64 *hva) { */
+/* 	epte_t *epte; */
+/* 	int ret; */
 
-	ret = lcd_ept_walk(vcpu, gpa, 0, &epte);
-	if (ret) {
-		printk(KERN_ERR "ept gpa to hva: failed to lookup gpa: %x\n",
-			gpa);
-		return ret;
-	}
+/* 	ret = lcd_ept_walk(vcpu, gpa, 0, &epte); */
+/* 	if (ret) { */
+/* 		printk(KERN_ERR "ept gpa to hva: failed to lookup gpa: %x\n", */
+/* 			gpa); */
+/* 		return ret; */
+/* 	} */
 
-	if (!epte_present(*epte)) {
-		printk(KERN_ERR "ept gpa to hva: no mapping for gpa: %x\n",
-			gpa);
-		return -ENOENT;
-	}
+/* 	if (!epte_present(*epte)) { */
+/* 		printk(KERN_ERR "ept gpa to hva: no mapping for gpa: %x\n", */
+/* 			gpa); */
+/* 		return -ENOENT; */
+/* 	} */
 
-	*hva = (u64)epte_page_vaddr(*epte);
+/* 	*hva = (u64)epte_page_vaddr(*epte); */
 
-	return 0;
-}
+/* 	return 0; */
+/* } */
 
 /* static void lcd_free_ept(u64 ept_root) { */
 /* 	epte_t *pgd; */
@@ -829,75 +829,75 @@ fail1:
 	return ret;
 }
 
-/**
- * Maps all critical parts of the guest physical
- * address space that are needed by the lcd upon
- * entry.
- *
- * If mapping fails, caller is responsible for
- * freeing host physical memory allocated
- * (using the entries in the ept).
- */
-static int lcd_setup_initial_ept(struct lcd *vcpu) {
-	int ret;
-	int i;
-	u64 hva;
-	u64 gpa;
-	epte_t *ept_entry;
+/* /\** */
+/*  * Maps all critical parts of the guest physical */
+/*  * address space that are needed by the lcd upon */
+/*  * entry. */
+/*  * */
+/*  * If mapping fails, caller is responsible for */
+/*  * freeing host physical memory allocated */
+/*  * (using the entries in the ept). */
+/*  *\/ */
+/* static int lcd_setup_initial_ept(struct lcd *vcpu) { */
+/* 	int ret; */
+/* 	int i; */
+/* 	u64 hva; */
+/* 	u64 gpa; */
+/* 	epte_t *ept_entry; */
 
-	/*
-	 * Map guest physical from LCD_BOTTOM to LCD_PAGING_MEM_START
-	 */
-	for (gpa = LCD_BOTTOM; gpa < LCD_PAGING_MEM_START; gpa += PAGE_SIZE) {
+/* 	/\* */
+/* 	 * Map guest physical from LCD_BOTTOM to LCD_PAGING_MEM_START */
+/* 	 *\/ */
+/* 	for (gpa = LCD_BOTTOM; gpa < LCD_PAGING_MEM_START; gpa += PAGE_SIZE) { */
 
-		hva = __get_free_page(GFP_KERNEL);
-		if (!hva) {
-			return -ENOMEM;
-		}
-		memset((void*)hva, 0, PAGE_SIZE);
+/* 		hva = __get_free_page(GFP_KERNEL); */
+/* 		if (!hva) { */
+/* 			return -ENOMEM; */
+/* 		} */
+/* 		memset((void*)hva, 0, PAGE_SIZE); */
 
-		/*
-		 * Map guest physical to host physical, allocating
-		 * ept paging structures along the way, but do not
-		 * overwrite.
-		 */
-		ret = lcd_ept_map_gpa_to_hpa(vcpu, gpa, __pa(hva), 1, 0);
-		if (ret) {
-			printk(KERN_ERR "setup initial ept: failed at %x\n",
-				gpa);
-			return ret;
-		}
-	}
-}
+/* 		/\* */
+/* 		 * Map guest physical to host physical, allocating */
+/* 		 * ept paging structures along the way, but do not */
+/* 		 * overwrite. */
+/* 		 *\/ */
+/* 		ret = lcd_ept_map_gpa_to_hpa(vcpu, gpa, __pa(hva), 1, 0); */
+/* 		if (ret) { */
+/* 			printk(KERN_ERR "setup initial ept: failed at %x\n", */
+/* 				gpa); */
+/* 			return ret; */
+/* 		} */
+/* 	} */
+/* } */
 
-/**
- * Allocates memory and maps all parts of the
- * guest physical and guest virtual address
- * space that are needed upon initial entry
- * to the lcd.
- *
- * On error, deallocates ept.
- */
-static int lcd_setup_addr_space(struct lcd *vcpu) {
-	int ret;
-	epte_t ept_entry;
-	u64 guest_paging_pgd_gpa;
+/* /\** */
+/*  * Allocates memory and maps all parts of the */
+/*  * guest physical and guest virtual address */
+/*  * space that are needed upon initial entry */
+/*  * to the lcd. */
+/*  * */
+/*  * On error, deallocates ept. */
+/*  *\/ */
+/* static int lcd_setup_addr_space(struct lcd *vcpu) { */
+/* 	int ret; */
+/* 	epte_t ept_entry; */
+/* 	u64 guest_paging_pgd_gpa; */
 
-	ret = lcd_setup_initial_ept(vcpu);
-	if (ret)
-		goto fail;
+/* 	ret = lcd_setup_initial_ept(vcpu); */
+/* 	if (ret) */
+/* 		goto fail; */
 
-	ret = lcd_setup_initial_gva(vcpu, &guest_paging_pgd_gpa);
-	if (ret)
-		goto fail;
+/* 	ret = lcd_setup_initial_gva(vcpu, &guest_paging_pgd_gpa); */
+/* 	if (ret) */
+/* 		goto fail; */
 
 
-	return 0;
+/* 	return 0; */
 
-fail:
-	lcd_free_ept(vcpu);
-	return ret;
-}
+/* fail: */
+/* 	lcd_free_ept(vcpu); */
+/* 	return ret; */
+/* } */
 
 /* /\* VMCS Related *\/ */
 

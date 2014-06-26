@@ -13,6 +13,11 @@ struct lcd {
 	 */
 	struct {
 		/*
+		 * = 0 if root_hva invalid
+		 * = 1 if root_hva valid
+		 */
+		int present;
+		/*
 		 * Host virtual address of the root of the lcd's
 		 * (initial) guest virtual paging hierarchy.
 		 */

@@ -139,6 +139,11 @@ static int lcd_mm_gva_init(struct lcd *lcd, u64 gv_paging_mem_start_gpa,
 		goto fail3;
 	}
 
+	/*
+	 * Mark root_hva as valid
+	 */
+	lcd->gv.present = 1;
+
 	return 0;
 
 fail3:
@@ -278,7 +283,7 @@ static void lcd_mm_gva_destroy(struct lcd *lcd)
 	int ret;
 
 	pgd = (pgd_t *)lcd->gv.root_hva;
-
+	
 	/*
 	 * Free all present pud's
 	 */
@@ -715,6 +720,8 @@ static int lcd_create(struct lcd **lcd_out)
 		r = -ENOMEM;
 		goto fail1;
 	}
+	memset(lcd, 0, sizeof(*lcd));
+
 	lcd->lcd_arch = lcd_arch_create();
 	if(!lcd->lcd_arch) {
 		printk(KERN_ERR "lcd_create: error creating lcd_arch\n");
@@ -733,7 +740,12 @@ fail1:
 
 static void lcd_destroy(struct lcd *lcd)
 {
-	lcd_mm_gva_destroy(lcd);
+	/*
+	 * Order is important ...
+	 */
+	if (lcd->gv.present)
+		lcd_mm_gva_destroy(lcd);
+	lcd_arch_destroy(lcd->lcd_arch);
 	kfree(lcd);
 }
 
@@ -1050,6 +1062,10 @@ static struct miscdevice lcd_dev = {
 	&lcd_chardev_ops,
 };
 
+/* Init / Exit ---------------------------------------- */
+
+static void lcd_tests(void);
+
 static int __init lcd_init(void)
 {
 	int r;
@@ -1067,6 +1083,11 @@ static int __init lcd_init(void)
 		
 	}
 
+	/*
+	 * Run tests
+	 */
+	lcd_tests();
+
 	return r;
 }
 
@@ -1076,5 +1097,11 @@ static void __exit lcd_exit(void)
 	lcd_arch_exit();
 }
 
+/* EXPORTS ---------------------------------------- */
+
 module_init(lcd_init);
 module_exit(lcd_exit);
+
+/* DEBUGGING ---------------------------------------- */
+
+#include "lcd-tests.c"

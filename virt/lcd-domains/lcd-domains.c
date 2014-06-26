@@ -326,13 +326,15 @@ static void lcd_mm_gva_destroy(struct lcd *lcd)
 static int lcd_mm_gva_alloc(struct lcd *lcd, u64 *gpa, u64 *hpa)
 {
 	u64 hva;
+	int ret;
 
 	/*
 	 * Check watermark, and bump it.
 	 */
 	if (lcd->gv.paging_mem_brk >= lcd->gv.paging_mem_top) {
 		printk(KERN_ERR "lcd_mm_gva_alloc: exhausted paging mem\n");
-		return -ENOMEM;
+		ret = -ENOMEM;
+		goto fail1;
 	}
 	*gpa = lcd->gv.paging_mem_brk;
 	lcd->gv.paging_mem_brk += PAGE_SIZE;
@@ -343,12 +345,31 @@ static int lcd_mm_gva_alloc(struct lcd *lcd, u64 *gpa, u64 *hpa)
 	hva = __get_free_page(GFP_KERNEL);
 	if (!hva) {
 		printk(KERN_ERR "lcd_mm_gva_alloc: no host phys mem\n");
-		return -ENOMEM;
+		ret = -ENOMEM;
+		goto fail2;
 	}
 	memset((void *)hva, 0, PAGE_SIZE);
 	*hpa = __pa(hva);
 
+	/*
+	 * Map in ept
+	 */
+	ret = lcd_mm_gpa_map_range(lcd, *gpa, *hpa, 1);
+	if (ret) {
+		printk(KERN_ERR "lcd_mm_gva_alloc: couldn't map gpa %lx to hpa %lx\n",
+			(unsigned long)*gpa,
+			(unsigned long)*hpa);
+		goto fail3;
+	}
+
 	return 0;
+
+fail3:
+	free_page((u64)hva);
+fail2:
+	lcd->gv.paging_mem_brk -= PAGE_SIZE;
+fail1:
+	return ret;
 }
 
 /**
@@ -1058,8 +1079,6 @@ static long lcd_dev_ioctl(struct file *filp,
 			goto out;
 		}
 		r = lcd_run_blob(&bi);
-		printk(KERN_ERR "lcd: addr=%lx, order=%d\n",
-			(unsigned long)bi.blob, bi.blob_order);
 		if (r) {
 			printk(KERN_ERR "lcd: error running blob\n");
 			goto out;

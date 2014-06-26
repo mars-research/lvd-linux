@@ -1013,6 +1013,7 @@ void lcd_arch_ept_set(lcd_arch_epte_t *epte, u64 hpa)
 int lcd_arch_ept_unset(lcd_arch_epte_t *epte)
 {
 	*epte = 0;
+	return 0;
 }
 
 u64 lcd_arch_ept_hpa(lcd_arch_epte_t *epte)
@@ -1059,7 +1060,7 @@ int lcd_arch_ept_unmap_gpa(struct lcd_arch *vcpu, u64 gpa)
 	/*
 	 * Walk ept
 	 */
-	ret = lcd_arch_ept_walk(vcpu, gpa, create, &ept_entry);
+	ret = lcd_arch_ept_walk(vcpu, gpa, 0, &ept_entry);
 	if (ret)
 		return ret;
 

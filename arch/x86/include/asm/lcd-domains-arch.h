@@ -180,7 +180,7 @@ u64 lcd_arch_ept_hpa(lcd_arch_epte_t *epte);
  * we're tearing down the lcd -- due to an error -- so the paging
  * structures will be freed up when the ept is torn down.)
  */
-int lcd_arch_ept_unset(lcd_arch_epte_t *epte)
+int lcd_arch_ept_unset(lcd_arch_epte_t *epte);
 /**
  * Simple routine combining ept walk and set.
  *

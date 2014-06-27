@@ -2663,7 +2663,12 @@ int lcd_arch_run(struct lcd_arch *vcpu)
 int lcd_arch_set_pc(struct lcd_arch *vcpu, u64 gpa)
 {
 	vcpu->regs[LCD_ARCH_REGS_RIP] = gpa;
+	/*
+	 * Must load vmcs to modify it
+	 */
+	vmx_get_cpu(vcpu);
 	vmcs_writel(GUEST_RIP, gpa);
+	vmx_put_cpu(vcpu);
 	return 0;
 }
 

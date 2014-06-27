@@ -56,6 +56,52 @@ static int test03(void)
 {
 	struct lcd *lcd;
 	int ret;
+	u64 gpa;
+	u64 hpa;
+
+	ret = lcd_create(&lcd);
+	if (ret) {
+		printk(KERN_ERR "lcd test: test03 failed to create lcd\n");
+		goto fail1;
+	}
+	
+	ret = lcd_mm_gva_init(lcd, LCD_ARCH_FREE,
+			LCD_ARCH_FREE + 4 * (1 << 20));
+	if (ret) {
+		printk(KERN_ERR "lcd test: test03 failed to init gva\n");
+		goto fail2;
+	}
+
+	ret = lcd_mm_gva_alloc(lcd, &gpa, &hpa);
+	if (ret) {
+		printk(KERN_ERR "lcd test: test03 failed to alloc pg mem\n");
+		goto fail3;
+	}
+	if (gpa != LCD_ARCH_FREE) {
+		printk(KERN_ERR "lcd test: test03 gpa at wrond addr %lx\n",
+			gpa);
+		goto fail4;
+	}		
+
+	free_page((u64)__va(hpa));
+	lcd_destroy(lcd);
+
+	return 0;
+
+fail4:
+	free_page((u64)__va(hpa));
+fail3:
+fail2:
+	lcd_destroy(lcd);
+fail1:
+	return ret;
+}
+
+#if 0
+static int test03(void)
+{
+	struct lcd *lcd;
+	int ret;
 	u64 base;
 	u64 off;
 	u64 actual;
@@ -163,6 +209,7 @@ fail2:
 fail1:
 	return ret;
 }
+#endif
 
 static void lcd_tests(void)
 {

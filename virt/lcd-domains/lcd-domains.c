@@ -684,8 +684,9 @@ static int lcd_mm_gva_map(struct lcd *lcd, u64 gva, u64 gpa)
 	}
 
 	if (pte_present(*pte)) {
-		printk(KERN_ERR "lcd_mm_gva_map: remap gva %lx to gpa %lx\n",
-			(unsigned long)gva, (unsigned long)gpa);
+		printk(KERN_ERR "lcd_mm_gva_map: remap gva %lx to gpa %lx (was %lx)\n",
+			(unsigned long)gva, (unsigned long)gpa,
+			(unsigned long)pte_val(*pte));
 		return -EINVAL;
 	}
 
@@ -698,6 +699,7 @@ static int lcd_mm_gva_map(struct lcd *lcd, u64 gva, u64 gpa)
  * Simple routine combining walk and get. Never
  * overwrites.
  */
+#if 0
 static int lcd_mm_gva_to_gpa(struct lcd *lcd, u64 gva, u64 *gpa)
 {
 	int ret;
@@ -713,7 +715,7 @@ static int lcd_mm_gva_to_gpa(struct lcd *lcd, u64 gva, u64 *gpa)
 
 	return 0;
 }
-
+#endif
 /**
  * Maps 
  *

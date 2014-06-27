@@ -77,19 +77,27 @@ static int test03(void)
 		printk(KERN_ERR "lcd test: test03 failed to alloc pg mem\n");
 		goto fail3;
 	}
-	if (gpa != LCD_ARCH_FREE) {
+	
+	/*
+	 * The root pgd takes up the first page, so this gpa should be
+	 * one page above
+	 */
+	if (gpa != LCD_ARCH_FREE + PAGE_SIZE) {
 		printk(KERN_ERR "lcd test: test03 gpa at wrond addr %lx\n",
-			gpa);
+			(unsigned long)gpa);
 		goto fail4;
 	}		
 
 	free_page((u64)__va(hpa));
+	lcd_mm_gpa_unmap_range(lcd, gpa, 1);
+
 	lcd_destroy(lcd);
 
 	return 0;
 
 fail4:
 	free_page((u64)__va(hpa));
+	lcd_mm_gpa_unmap_range(lcd, gpa, 1);
 fail3:
 fail2:
 	lcd_destroy(lcd);

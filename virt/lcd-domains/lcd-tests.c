@@ -185,6 +185,88 @@ fail1:
 	return ret;
 }
 
+static int test05(void)
+{
+	struct lcd *lcd;
+	int ret;
+	u64 gpa;
+	u64 hpa;
+	pud_t *pud_entry;
+	pmd_t *pmd;
+	pmd_t *pmd_entry;
+
+	ret = lcd_create(&lcd);
+	if (ret) {
+		printk(KERN_ERR "lcd test: test05 failed to create lcd\n");
+		goto fail1;
+	}
+	
+	ret = lcd_mm_gva_init(lcd, LCD_ARCH_FREE,
+			LCD_ARCH_FREE + 4 * (1 << 20));
+	if (ret) {
+		printk(KERN_ERR "lcd test: test05 failed to init gva\n");
+		goto fail2;
+	}
+
+	ret = lcd_mm_gva_alloc(lcd, &gpa, &hpa);
+	if (ret) {
+		printk(KERN_ERR "lcd test: test05 failed to alloc pg mem\n");
+		goto fail3;
+	}
+
+	/*
+	 * Populate 5th entry in pmd to point to a (bogus) page table at
+	 * gpa 0x1234000UL.
+	 */
+	pmd = (pmd_t *)__va(hpa);
+	set_pmd(pmd + 4, 0x1234000UL);
+
+	/*
+	 * Set up pud entry for look up, and find pmd
+	 */
+	pud_entry = (pud_t *)kmalloc(sizeof(*pud_entry), GFP_KERNEL);
+	if (!pud_entry) {
+		goto fail4;
+	}
+
+	set_pud(pud_entry, __pud(gpa | _KERNPG_TABLE));
+	ret = lcd_mm_gva_lookup_pmd(lcd, 0x4UL << PMD_SHIFT, 
+				pud_entry, &pmd_entry);
+	if (ret) {
+		printk(KERN_ERR "lcd test: test05 failed to lookup pmd\n");
+		goto fail5;
+	}
+
+	/*
+	 * Check
+	 */
+	if (pmd_pfn(*pmd_entry) << PAGE_SHIFT != 0x1234000UL) {
+		printk(KERN_ERR "lcd test: test05 pte gpa is %lx\n",
+			(unsigned long)pmd_pfn(*pmd_entry) << PAGE_SHIFT);
+		goto fail6;
+	}
+
+	free_page((u64)__va(hpa));
+	lcd_mm_gpa_unmap_range(lcd, gpa, 1);
+	kfree(pud_entry);
+
+	lcd_destroy(lcd);
+
+	return 0;
+
+fail6:
+fail5:
+	kfree(pud_entry);
+fail4:
+	free_page((u64)__va(hpa));
+	lcd_mm_gpa_unmap_range(lcd, gpa, 1);
+fail3:
+fail2:
+	lcd_destroy(lcd);
+fail1:
+	return ret;
+}
+
 #if 0
 static int test03(void)
 {
@@ -308,6 +390,8 @@ static void lcd_tests(void)
 	if (test03())
 		return;
 	if (test04())
+		return;
+	if (test05())
 		return;
 	return;
 }

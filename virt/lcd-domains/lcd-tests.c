@@ -113,6 +113,7 @@ static int test04(void)
 	u64 hpa;
 	pmd_t *pmd_entry;
 	pte_t *pt;
+	pte_t *pte_entry;
 
 	ret = lcd_create(&lcd);
 	if (ret) {
@@ -142,11 +143,16 @@ static int test04(void)
 	/*
 	 * Set up pmd entry for look up, and find pte
 	 */
+	pmd_entry = (pmd_t *)kmalloc(sizeof(*pmd_entry), GFP_KERNEL);
+	if (!pmd_entry) {
+		goto fail4;
+	}
+
 	set_pmd(pmd_entry, __pmd(gpa | _KERNPG_TABLE));
 	ret = lcd_mm_gva_lookup_pte(lcd, 0x4000UL, pmd_entry, &pte_entry);
 	if (ret) {
 		printk(KERN_ERR "lcd test: test04 failed to lookup pte\n");
-		goto fail4;
+		goto fail5;
 	}
 
 	/*
@@ -155,17 +161,20 @@ static int test04(void)
 	if (pte_val(*pte_entry) != 0x1234UL) {
 		printk(KERN_ERR "lcd test: test04 pte gpa is %lx\n",
 			(unsigned long)pte_val(*pte_entry));
-		goto fail5;
+		goto fail6;
 	}
 
 	free_page((u64)__va(hpa));
 	lcd_mm_gpa_unmap_range(lcd, gpa, 1);
+	kfree(pmd_entry);
 
 	lcd_destroy(lcd);
 
 	return 0;
 
+fail6:
 fail5:
+	kfree(pmd_entry);
 fail4:
 	free_page((u64)__va(hpa));
 	lcd_mm_gpa_unmap_range(lcd, gpa, 1);

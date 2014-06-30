@@ -135,10 +135,10 @@ static int test04(void)
 	}
 
 	/*
-	 * Map gva = 0x4000 (start of 5th page frame) to gpa = 0x1234
+	 * Map gva = 0x4000 (start of 5th page frame) to gpa = 0x1234000UL
 	 */
 	pt = (pte_t *)__va(hpa);
-	lcd_mm_gva_set(pt + pte_index(0x4000UL), 0x1234UL);
+	lcd_mm_gva_set(pt + pte_index(0x4000UL), 0x1234000UL);
 
 	/*
 	 * Set up pmd entry for look up, and find pte
@@ -158,9 +158,9 @@ static int test04(void)
 	/*
 	 * Check
 	 */
-	if (pte_val(*pte_entry) != 0x1234UL) {
+	if (lcd_mm_gva_get(pte_entry) != 0x1234000UL) {
 		printk(KERN_ERR "lcd test: test04 pte gpa is %lx\n",
-			(unsigned long)pte_val(*pte_entry));
+			(unsigned long)lcd_mm_gva_get(pte_entry));
 		goto fail6;
 	}
 

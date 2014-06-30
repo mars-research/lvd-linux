@@ -386,7 +386,8 @@ static int lcd_mm_gva_lookup_pte(struct lcd *lcd, u64 gva, pmd_t *pmd_entry,
 	/*
 	 * Get hpa of page table, using gpa stored in pmd_entry.
 	 */
-	ret = lcd_arch_ept_gpa_to_hpa(lcd->lcd_arch, pmd_val(*pmd_entry), 
+	ret = lcd_arch_ept_gpa_to_hpa(lcd->lcd_arch, 
+				pmd_pfn(*pmd_entry) << PAGE_SHIFT, 
 				&hpa);
 	if (ret) {
 		printk(KERN_ERR "lcd_mm_gva_lookup_pte: error looking up gpa %lx\n",
@@ -437,7 +438,9 @@ static int lcd_mm_gva_lookup_pmd(struct lcd *lcd, u64 gva, pud_t *pud_entry,
 	/*
 	 * Get hpa of pmd, using gpa stored in pud_entry.
 	 */
-	ret = lcd_arch_ept_gpa_to_hpa(lcd->lcd_arch, pud_val(*pud_entry), &hpa);
+	ret = lcd_arch_ept_gpa_to_hpa(lcd->lcd_arch, 
+				pud_pfn(*pud_entry) << PAGE_SHIFT, 
+				&hpa);
 	if (ret) {
 		printk(KERN_ERR "lcd_mm_gva_lookup_pmd: error looking up gpa %lx\n",
 			(unsigned long)pud_val(*pud_entry));
@@ -506,7 +509,9 @@ static int lcd_mm_gva_lookup_pud(struct lcd *lcd, u64 gva, pgd_t *pgd_entry,
 	/*
 	 * Get hpa of pud, using gpa stored in pgd_entry.
 	 */
-	ret = lcd_arch_ept_gpa_to_hpa(lcd->lcd_arch, pgd_val(*pgd_entry), &hpa);
+	ret = lcd_arch_ept_gpa_to_hpa(lcd->lcd_arch, 
+				pgd_pfn(*pgd_entry) << PAGE_SHIFT, 
+				&hpa);
 	if (ret) {
 		printk(KERN_ERR "lcd_mm_gva_lookup_pud: error looking up gpa %lx\n",
 			(unsigned long)pgd_val(*pgd_entry));
@@ -664,9 +669,13 @@ static int lcd_mm_gva_walk(struct lcd *lcd, u64 gva, pte_t **pte_out)
 
 static void lcd_mm_gva_set(pte_t *pte, u64 gpa)
 {
-	set_pte(pte, __pte(gpa | _KERNPG_TABLE));	
+	set_pte(pte, __pte(gpa | _KERNPG_TABLE));
 }
 
+static u64 lcd_mm_gva_get(pte_t *pte)
+{
+	return (u64)(pte_pfn(*pte) << PAGE_SHIFT);
+}
 
 /**
  * Simple routine combining walk and set. Never

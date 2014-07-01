@@ -13,6 +13,10 @@ void display_mr(utcb_t *p_utcb) {
 	printk(KERN_ERR "Message Regs at utcb %p - %d ,%d , %d\n", p_utcb, p_utcb->mr[0], p_utcb->mr[1], p_utcb->mr[3]);
 }
 
+//int ipc_send(capability_t recv, struct lcd_message *msg) {
+//
+//};
+
 
 int ipc_send(u32 myself, u32 recv_capid)
 {

@@ -111,7 +111,7 @@ bool lcd_cap_delete_internal(struct cte *cap, bool *last_reference)
 	return true;
 }
 
-uint32_t lcd_cap_delete_capability(struct task_struct *tcb, cap_id cid)
+uint32_t lcd_cap_delete_capability(struct task_struct *tcb, capability_t cid)
 {
 	struct cte *cap;
 	bool last_reference = false;
@@ -140,7 +140,7 @@ uint32_t lcd_cap_delete_capability(struct task_struct *tcb, cap_id cid)
 	return 0;
 }
 
-uint32_t lcd_cap_revoke_capability(struct task_struct *tcb, cap_id cid)
+uint32_t lcd_cap_revoke_capability(struct task_struct *tcb, capability_t cid)
 {
 	struct cte *cap;
 	struct cap_derivation_tree *cdt, *c_cdt;
@@ -320,9 +320,9 @@ void lcd_cap_destroy_cspace(struct task_struct *tcb)
 	return;
 }
 
-cap_id lcd_cap_grant_capability(struct task_struct *stcb, cap_id src_cid, struct task_struct *dtcb, lcd_cap_rights crights)
+capability_t lcd_cap_grant_capability(struct task_struct *stcb, capability_t src_cid, struct task_struct *dtcb, lcd_cap_rights crights)
 {
-	cap_id cid = 0;
+	capability_t cid = 0;
 	struct cap_space *src_cspace, *dst_cspace;
 	struct cte *src_cte = NULL, *dst_cte = NULL;
 	bool done = false;
@@ -422,7 +422,7 @@ cap_id lcd_cap_grant_capability(struct task_struct *stcb, cap_id src_cid, struct
 	return cid;
 }
 
-uint32_t lcd_cap_get_rights(struct task_struct *tcb, cap_id cid, lcd_cap_rights *rights)
+uint32_t lcd_cap_get_rights(struct task_struct *tcb, capability_t cid, lcd_cap_rights *rights)
 {
 	struct cte       *cap;
   
@@ -444,11 +444,11 @@ uint32_t lcd_cap_get_rights(struct task_struct *tcb, cap_id cid, lcd_cap_rights 
 // does not lock the cspace caller responsbile for the same.
 // Given a task_struct and a capability identifier, will return the pointer to the 
 // capability table entry associated with that identifier within the cspace of the thread.
-struct cte * lcd_cap_lookup_capability(struct task_struct *tcb, cap_id cid, bool keep_locked)
+struct cte * lcd_cap_lookup_capability(struct task_struct *tcb, capability_t cid, bool keep_locked)
 {
 	struct cte *cap = NULL, *node = NULL;
 	struct cap_space *cspace;
-	cap_id id = cid;
+	capability_t id = cid;
 	int index = 0;
 	int mask = (~0);
     
@@ -507,11 +507,11 @@ struct cte * lcd_cap_lookup_capability(struct task_struct *tcb, cap_id cid, bool
 	return cap;
 }
 
-cap_id lcd_cap_create_capability(struct task_struct *tcb, void * hobject, lcd_cap_rights crights)
+capability_t lcd_cap_create_capability(struct task_struct *tcb, void * hobject, lcd_cap_rights crights)
 {
 	struct cap_space *cspace;
 	struct cte       *cap;
-	cap_id           cid;
+	capability_t           cid;
 	struct cap_derivation_tree *cdtnode;
   
 	if (tcb == NULL)
@@ -748,7 +748,7 @@ bool lcd_cap_initialize_freelist(struct cap_space *cspace, struct cte *cnode, bo
 }
 
 // Removes the free_slot from free list.
-struct cte * lcd_cap_reserve_slot(struct cte *cnode, cap_id *cid, int free_slot)
+struct cte * lcd_cap_reserve_slot(struct cte *cnode, capability_t *cid, int free_slot)
 {
 	struct cte *node = cnode->cnode.table;
 	ASSERT(node[free_slot].ctetype == lcd_type_free, "Free List is corrupted\n");
@@ -764,9 +764,9 @@ struct cte * lcd_cap_reserve_slot(struct cte *cnode, cap_id *cid, int free_slot)
 // naming convention:
 // cnode = struct cte entry in the table, which points to another table.
 // node = pointer the the array of struct cte entries/capability table i.e. cnode->cnode.table
-cap_id lcd_cap_lookup_freeslot(struct cap_space *cspace, struct cte **cap)
+capability_t lcd_cap_lookup_freeslot(struct cap_space *cspace, struct cte **cap)
 {
-	cap_id cid = 0, cnode_id;
+	capability_t cid = 0, cnode_id;
 	bool found = false;
 	int i = 0;
 	int size = sizeof(struct cte);
@@ -864,9 +864,9 @@ cap_id lcd_cap_lookup_freeslot(struct cap_space *cspace, struct cte **cap)
 	return cid;
 }
 
-cap_id lcd_cap_mint_capability(struct task_struct *tcb, cap_id cid, lcd_cap_rights rights)
+capability_t lcd_cap_mint_capability(struct task_struct *tcb, capability_t cid, lcd_cap_rights rights)
 {
-	cap_id id = 0;
+	capability_t id = 0;
 	struct cap_space *cspace;
 	struct cte *src_cte = NULL, *dst_cte = NULL;
 	struct cap_derivation_tree *cdt;

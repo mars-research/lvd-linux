@@ -21,7 +21,7 @@ MODULE_AUTHOR ("FLUX-LAB University of Utah");
 void * get_cap_obj(u32 cap_id);
 
 typedef uint32_t   lcd_cnode;         // a pointer to the cnode
-typedef uint64_t   cap_id ;           // a locally unique identifier (address within cspace)
+typedef uint64_t   capability_t ;           // a locally unique identifier (address within cspace)
 typedef uint32_t   lcd_cnode_entry;   // a pointer to an entry within a cnode
 typedef uint64_t   lcd_tcb;           // a pointer/handle to the thread contrl block
 typedef uint16_t   lcd_cap_rights;    // holds the rights associated with a capability.
@@ -31,7 +31,7 @@ typedef uint16_t   lcd_cap_type;
 #define CNODE_SLOTS_PER_CNODE   64
 #define CNODE_SLOTS_START       (MAX_SLOTS - CNODE_SLOTS_PER_CNODE)
 #define CNODE_INDEX_BITS        (ilog2(MAX_SLOTS))
-#define CAP_ID_SIZE             (sizeof(cap_id) * 8)
+#define CAP_ID_SIZE             (sizeof(capability_t) * 8)
 #define MAX_DEPTH               ((CAP_ID_SIZE + 1)/CNODE_INDEX_BITS)
 
 #define SAFE_EXIT_IF_ALLOC_FAILED(ptr, label) \
@@ -108,7 +108,7 @@ struct cte;
 
 struct cap_node
 {
-	cap_id     cnode_id;
+	capability_t     cnode_id;
 	struct cte *table; /* points to another cnode table */
 	uint16_t   table_level;
 };
@@ -142,7 +142,7 @@ struct cap_space
 ////////////////////////////////////////////////////////////////////////////////////////////
 /*                         Helper Functions                                               */
 ////////////////////////////////////////////////////////////////////////////////////////////
-static inline int lcd_get_bits_at_level(cap_id id, int level)
+static inline int lcd_get_bits_at_level(capability_t id, int level)
 {
 	int bits = 0;
 	id = id << ((MAX_DEPTH - level - 1) * CNODE_INDEX_BITS);
@@ -151,9 +151,9 @@ static inline int lcd_get_bits_at_level(cap_id id, int level)
 	return bits;
 }
 
-static inline void lcd_clear_bits_at_level(cap_id *id, int level)
+static inline void lcd_clear_bits_at_level(capability_t *id, int level)
 {
-	cap_id mask = (~0);
+	capability_t mask = (~0);
 	// clear all higher order bits.
 	mask = mask << ((MAX_DEPTH - 1) * CNODE_INDEX_BITS);
 	// clear lower order bits
@@ -164,10 +164,10 @@ static inline void lcd_clear_bits_at_level(cap_id *id, int level)
 	*id = (*id) & mask;
 }
 
-static inline void lcd_set_bits_at_level(struct cte *cnode, cap_id *cid, int free_slot)
+static inline void lcd_set_bits_at_level(struct cte *cnode, capability_t *cid, int free_slot)
 {
 	int level = cnode->cnode.table_level;
-	cap_id id = free_slot;
+	capability_t id = free_slot;
   
 	*cid = cnode->cnode.cnode_id;
 	lcd_clear_bits_at_level(cid, level);
@@ -175,11 +175,11 @@ static inline void lcd_set_bits_at_level(struct cte *cnode, cap_id *cid, int fre
 	*cid = *cid | id;
 }
 
-struct cte * lcd_cap_reserve_slot(struct cte *cnode, cap_id *cid, int free_slot);
+struct cte * lcd_cap_reserve_slot(struct cte *cnode, capability_t *cid, int free_slot);
 
 bool         lcd_cap_initialize_freelist(struct cap_space *cspace, struct cte *cnode, bool bFirstCNode);
 
-cap_id       lcd_cap_lookup_freeslot(struct cap_space *cspace, struct cte **cap);
+capability_t       lcd_cap_lookup_freeslot(struct cap_space *cspace, struct cte **cap);
 
 void         lcd_cap_update_cdt(struct task_struct *tcb);
 
@@ -219,7 +219,7 @@ struct cap_space * lcd_cap_create_cspace(void *objects[], lcd_cap_rights rights[
 // keep_locked: whether or not to keep the semaphore protecting cdt locked.
 // Output:
 // pointer to the capability table entry if the cid is valid else NULL is returned.
-struct cte * lcd_cap_lookup_capability(struct task_struct *tcb, cap_id cid, bool keep_locked);
+struct cte * lcd_cap_lookup_capability(struct task_struct *tcb, capability_t cid, bool keep_locked);
 
 // creates a new capability, inserts it into cspace of caller and 
 // returns the capability identifier.
@@ -231,7 +231,7 @@ struct cte * lcd_cap_lookup_capability(struct task_struct *tcb, cap_id cid, bool
 // Output:
 // capability identifier within the cspace of the thread which intended to create this capability.
 // 0 = Failure
-cap_id lcd_cap_create_capability(struct task_struct *tcb, void * hobject, lcd_cap_rights crights);
+capability_t lcd_cap_create_capability(struct task_struct *tcb, void * hobject, lcd_cap_rights crights);
 
 // will be used to grant a capability to another thread
 // returns the address of the capability within the cspace of the receiver thread.
@@ -242,7 +242,7 @@ cap_id lcd_cap_create_capability(struct task_struct *tcb, void * hobject, lcd_ca
 // src_cid: capability identifier of the capability being granted.
 // dst_tcb: pointer to the task_struct of the receiver thread.
 // crights: the rights on the capability to be granted to the receiver.
-cap_id lcd_cap_grant_capability(struct task_struct *stcb, cap_id src_cid, struct task_struct *dtcb, lcd_cap_rights crights);
+capability_t lcd_cap_grant_capability(struct task_struct *stcb, capability_t src_cid, struct task_struct *dtcb, lcd_cap_rights crights);
 
 // will be called to delete a particular capability in the calling threads 
 // cspace. threads have right to delete capabilities in their own cspace.
@@ -252,7 +252,7 @@ cap_id lcd_cap_grant_capability(struct task_struct *stcb, cap_id src_cid, struct
 // Output:
 // 0 = Success
 // Any other value indicates failure.
-uint32_t lcd_cap_delete_capability(struct task_struct *tcb, cap_id cid);
+uint32_t lcd_cap_delete_capability(struct task_struct *tcb, capability_t cid);
 
 // will be called to delete the capability and all its children.
 // the children can be present in cspace belonging to different threads.
@@ -264,7 +264,7 @@ uint32_t lcd_cap_delete_capability(struct task_struct *tcb, cap_id cid);
 // Ouptput:
 // 0 = Success
 // Any other value indicates failure.
-uint32_t lcd_cap_revoke_capability(struct task_struct *tcb, cap_id cid);
+uint32_t lcd_cap_revoke_capability(struct task_struct *tcb, capability_t cid);
 
 // should be called when the thread exits.
 // this is extremely heavy function which updates the CDT for all capabilities present
@@ -281,7 +281,7 @@ void lcd_cap_destroy_cspace(struct task_struct *tcb);
 // Output:
 // Return Value: 0 = Success, Any other value indicates failure.
 // The rights associated with the capability will be saved in the rights ouput paramter.
-uint32_t lcd_cap_get_rights(struct task_struct *tcb, cap_id cid, lcd_cap_rights *rights);
+uint32_t lcd_cap_get_rights(struct task_struct *tcb, capability_t cid, lcd_cap_rights *rights);
 
 // will be used to craete a copy of the capability identified by cid within the same cspace
 // the rights of the copied capability could be modified using the rights parameter.
@@ -293,6 +293,6 @@ uint32_t lcd_cap_get_rights(struct task_struct *tcb, cap_id cid, lcd_cap_rights 
 // Output:
 // the capability identifier for the copied capability is returned.
 // 0 indicates failure.
-cap_id lcd_cap_mint_capability(struct task_struct *tcb, cap_id cid, lcd_cap_rights rights);
+capability_t lcd_cap_mint_capability(struct task_struct *tcb, capability_t cid, lcd_cap_rights rights);
 
 #endif // __LCD_CAP_H__

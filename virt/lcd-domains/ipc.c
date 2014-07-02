@@ -18,15 +18,17 @@ void display_mr(utcb_t *p_utcb) {
 //};
 
 
-int ipc_send(u32 myself, u32 recv_capid)
+
+int ipc_send(capability_t cap, struct lcd_message_info *msg)
 {
 	struct lcd *recv_lcd, *snd_lcd;
-	ipc_wait_list_elem stack_elem;
-
-	printk(KERN_ERR "ipc_send : myself %d reciever %d\n", myself, recv_capid);
+	struct ipc_wait_list_elem stack_elem;
+#if 0
+	printk(KERN_ERR "ipc_send : myself %p re %d\n", current->utcb, cap);
 	//chk if the reciever is ready
 	// fetch the reciever task struct from if
-	recv_lcd = (struct lcd *) get_cap_obj(recv_capid);
+	
+	recv_lcd = (struct lcd *) get_cap_obj(recv);
 	if (recv_lcd == NULL) {
 		printk(KERN_ERR "ipc_send : Cant get object for reciever %d\n", recv_capid);
 		return -1;   
@@ -67,7 +69,7 @@ int ipc_send(u32 myself, u32 recv_capid)
 		schedule();
 
 	}
-
+#endif
 	printk(KERN_ERR "ipc_send : Finished\n");
 	return 0;
 
@@ -78,7 +80,7 @@ int ipc_recv(u32 myself, u32 send_capid)
 {
 	struct lcd *recv_lcd, *snd_lcd;
 	struct list_head *ptr;
-	ipc_wait_list_elem *entry;
+	struct ipc_wait_list_elem *entry;
 
 	printk(KERN_ERR "ipc_recv : myself %d sender %d\n", myself, send_capid);
 
@@ -102,7 +104,7 @@ int ipc_recv(u32 myself, u32 send_capid)
 			recv_lcd->sync_ipc.snd_sleepers);
 
 		list_for_each(ptr, &recv_lcd->sync_ipc.snd_q) {
-			entry = list_entry(ptr, ipc_wait_list_elem, list);
+			entry = list_entry(ptr, struct ipc_wait_list_elem, list);
 			if (entry->peer == send_capid) {
 				printk(KERN_ERR "ipc_recv : Found expected sender %d\n", send_capid);
 

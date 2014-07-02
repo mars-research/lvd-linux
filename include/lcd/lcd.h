@@ -31,7 +31,7 @@ enum vmx_reg {
 };
 
 /* XXX: split and move arch dependent parts to ./arch/x86/lcd */ 
-typedef struct lcd {
+struct lcd {
 	int cpu;
 	int vpid;
 	int launched;
@@ -76,7 +76,7 @@ typedef struct lcd {
 		struct vmx_msr_entry host[NR_AUTOLOAD_MSRS];
 	} msr_autoload;
 
-	sync_ipc_t sync_ipc;
+	struct sync_ipc sync_ipc;
 	struct vmcs *vmcs;
 	void *shared;
 
@@ -84,7 +84,7 @@ typedef struct lcd {
 	struct start_info *si;
   
 	struct module *mod;
-} lcd_t;
+};
 
 
 int lcd_init_module(void __user * umod, unsigned long len, const char __user * uargs);
@@ -105,5 +105,6 @@ int lcd_find_hva_by_gpa(struct lcd *lcd, u64 gpa, u64 *hva);
 
 int lcd_run(struct lcd *lcd);
 const char* lcd_exit_reason(int exit_code);
+
 
 #endif /* LCD_LCD_H */

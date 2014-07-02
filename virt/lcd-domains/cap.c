@@ -9,12 +9,8 @@ bool lcd_cap_delete_internal_lockless(struct cte *cap, bool *last_reference)
 	*last_reference = false;
   
  
-	if (cap == NULL)
-	{
-		LCD_PANIC("lcd_cap_delete_internal: Invalid Input\n");
-		return false;
-	}
-
+	BUG_ON(cap != NULL); 
+	
 	cdt = cap->cap.cdt_node;
 	p_cdt = cdt->parent_ptr;
 	c_cdt = cdt->child_ptr;
@@ -85,7 +81,10 @@ bool lcd_cap_delete_internal(struct cte *cap, bool *last_reference)
 	struct cap_space *cspace;
 	struct cte *node;
 	bool done = false;
-	if (cap == NULL || last_reference == NULL)
+	
+	BUG_ON(cap != NULL); 
+	  
+	if(last_reference == NULL)
 		return false;
 	*last_reference = false;
 	node = cap - cap->index;
@@ -111,18 +110,15 @@ bool lcd_cap_delete_internal(struct cte *cap, bool *last_reference)
 	return true;
 }
 
-uint32_t lcd_cap_delete_capability(struct task_struct *tcb, capability_t cid)
+uint32_t lcd_cap_delete_capability(struct cap_space *cspace, capability_t cid)
 {
 	struct cte *cap;
 	bool last_reference = false;
 	struct semaphore *sem_cdt_backup;
-	if (tcb == NULL || cid <= 0)
-	{
-		LCD_PANIC("lcd_cap_delete_capability: Invalid Input\n");
-		return -1;
-	}
+
+	BUG_ON(cid);
   
-	cap = lcd_cap_lookup_capability(tcb, cid, true);
+	cap = lcd_cap_lookup_capability(cspace, cid, true);
 	if (cap == NULL)
 	{
 		LCD_PANIC("lcd_cap_delete_capability: Capability not found\n");
@@ -140,7 +136,7 @@ uint32_t lcd_cap_delete_capability(struct task_struct *tcb, capability_t cid)
 	return 0;
 }
 
-uint32_t lcd_cap_revoke_capability(struct task_struct *tcb, capability_t cid)
+uint32_t lcd_cap_revoke_capability(struct cap_space *cspace, capability_t cid)
 {
 	struct cte *cap;
 	struct cap_derivation_tree *cdt, *c_cdt;
@@ -149,19 +145,15 @@ uint32_t lcd_cap_revoke_capability(struct task_struct *tcb, capability_t cid)
 	int size = sizeof(struct cte);
 	bool dummy = false, last_reference = false;
   
-	if (tcb == NULL || cid <= 0)
-	{
-		LCD_PANIC("lcd_cap_delete_capability: Invalid Input\n");
-		return -1;
-	}
-  
+	BUG_ON(cid);
+
 	if (kfifo_alloc(&cap_q, sizeof(struct cte) * 512, GFP_KERNEL) != 0)
 	{
 		LCD_PANIC("lcd_cap_revoke_capability: Fifo allocation failed, aborting\n");
 		return -1;
 	}
   
-	cap = lcd_cap_lookup_capability(tcb, cid, true);
+	cap = lcd_cap_lookup_capability(cspace, cid, true);
 	if (cap == NULL)
 	{
 		LCD_PANIC("lcd_cap_delete_capability: Capability not found\n");
@@ -199,26 +191,20 @@ uint32_t lcd_cap_revoke_capability(struct task_struct *tcb, capability_t cid)
 }
 
 
-void lcd_cap_destroy_cspace(struct task_struct *tcb)
+void lcd_cap_destroy_cspace(struct cap_space *cspace)
 {
 	struct cte *cnode, *node, level_separator;
 	struct kfifo cnode_q;
 	int size = sizeof(struct cte);
-	struct cap_space *cspace;
 	int depth_count = 0, i;
 	struct semaphore *sem_cdt_backup;
 	bool cspace_locked = false, table_visited = false, last_reference = false;
-  
-	if (tcb == NULL)
-	{
-		ASSERT(false, "lcd_cap_destroy_cspace: Invalid Input\n");
-		return;
-	}
-	cspace = tcb->cspace;
+ 
+        BUG_ON(cspace);
 
 	if (kfifo_alloc(&cnode_q, sizeof(struct cte) * 512, GFP_KERNEL) != 0)
 	{
-		ASSERT(false, "lcd_cap_destroy_cspace: Failed to allcoate kfifo, cspace cannot be destroyed\n");
+		printk(KERN_ALERT "lcd_cap_destroy_cspace: Failed to allcoate kfifo, cspace cannot be destroyed\n");
 		return;
 	}
 	if (cspace->root_cnode.cnode.table != NULL)
@@ -238,6 +224,7 @@ void lcd_cap_destroy_cspace(struct task_struct *tcb)
 				if (cnode->ctetype == lcd_type_separator)
 				{
 					depth_count++;
+					
 					if (kfifo_is_empty(&cnode_q))
 					{
 						up(&(cspace->sem_cspace));
@@ -315,39 +302,31 @@ void lcd_cap_destroy_cspace(struct task_struct *tcb)
 		} // if down_trylock(cspace->sem_cspace)
 	} // while (!kfifo_is_empty(&cnode_q) && depth_count < MAX_DEPTH)
 	kfifo_free(&cnode_q);
-	kfree(cspace);
-	tcb->cspace = NULL;
 	return;
 }
 
-capability_t lcd_cap_grant_capability(struct task_struct *stcb, capability_t src_cid, struct task_struct *dtcb, lcd_cap_rights crights)
+capability_t lcd_cap_grant_capability(struct cap_space *src_space, capability_t src_cid, struct cap_space *dst_space, lcd_cap_rights crights)
 {
 	capability_t cid = 0;
-	struct cap_space *src_cspace, *dst_cspace;
 	struct cte *src_cte = NULL, *dst_cte = NULL;
 	bool done = false;
-	struct cap_derivation_tree *dst_cdt_node = kmalloc(sizeof(struct cap_derivation_tree), GFP_KERNEL);
-	if (dst_cdt_node == NULL)
-	{
-		ASSERT(false, "lcd_cap_grant: Failed to allocate cdt node");
+	struct cap_derivation_tree *dst_cdt_node;
+	
+	BUG_ON(src_space != NULL && dst_space != NULL && src_cid != 0);
+	
+	dst_cdt_node = kmalloc(sizeof(struct cap_derivation_tree), GFP_KERNEL);
+	if(!dst_cdt_node) {
+		LCD_PANIC("Allocation failed\n");
 		return 0;
-	}
+	};
 
-	if (stcb == NULL || dtcb == NULL || src_cid <= 0)
-	{
-		ASSERT(false, "lcd_cap_grant: Invalid Inputs\n");
-		kfree(dst_cdt_node);
-		return 0;
-	}
-	src_cspace = stcb->cspace;
-	dst_cspace = dtcb->cspace;
 	while (!done)
 	{
 		struct cap_derivation_tree *src_cdt_node;
 		struct cap_derivation_tree *cdtnode;
     
 		// Lookup the source TCB to get a pointer to capability and keep the cdt locked.
-		src_cte = lcd_cap_lookup_capability(stcb, src_cid, true);
+		src_cte = lcd_cap_lookup_capability(src_space, src_cid, true);
 		if (src_cte == NULL || src_cte->ctetype != lcd_type_capability)
 		{
 			LCD_PANIC("lcd_cap_grant_capability: Invalid Capability\n");
@@ -368,12 +347,12 @@ capability_t lcd_cap_grant_capability(struct task_struct *stcb, capability_t src
 		src_cdt_node = src_cte->cap.cdt_node;
 		cdtnode = src_cdt_node->child_ptr;
 		// lock the destination cspace
-		if (down_trylock(&(dst_cspace->sem_cspace)) == 0)
+		if (down_trylock(&(dst_space->sem_cspace)) == 0)
 		{
-			if (dst_cspace->root_cnode.ctetype == lcd_type_invalid)
+			if (dst_space->root_cnode.ctetype == lcd_type_invalid)
 			{
 				LCD_PANIC("lcd_cap_grant_capability: Destroy may be in progress, aborting operation\n");
-				up(&(dst_cspace->sem_cspace));
+				up(&(dst_space->sem_cspace));
 				up(src_cte->cap.cdt_node->sem_cdt);
 				kfree(dst_cdt_node);
 				return 0;
@@ -382,12 +361,12 @@ capability_t lcd_cap_grant_capability(struct task_struct *stcb, capability_t src
 			// get a free slot in destination.
 			if (cid == 0)
 			{
-				cid = lcd_cap_lookup_freeslot(dst_cspace, &dst_cte);
+				cid = lcd_cap_lookup_freeslot(dst_space, &dst_cte);
 			}
 			if (dst_cte == NULL || dst_cte->ctetype != lcd_type_free)
 			{
 				LCD_PANIC("lcd_cap_grant_capability: No free slot\n");
-				up(&(dst_cspace->sem_cspace));
+				up(&(dst_space->sem_cspace));
 				up(src_cte->cap.cdt_node->sem_cdt);
 				kfree(dst_cdt_node);
 				return 0;
@@ -411,7 +390,7 @@ capability_t lcd_cap_grant_capability(struct task_struct *stcb, capability_t src
 			}
 			dst_cte->ctetype = lcd_type_capability;
 			done = true;
-			up(&(dst_cspace->sem_cspace));
+			up(&(dst_space->sem_cspace));
 			up(src_cte->cap.cdt_node->sem_cdt);
 			break;
 		}
@@ -422,19 +401,16 @@ capability_t lcd_cap_grant_capability(struct task_struct *stcb, capability_t src
 	return cid;
 }
 
-uint32_t lcd_cap_get_rights(struct task_struct *tcb, capability_t cid, lcd_cap_rights *rights)
+uint32_t lcd_cap_get_rights(struct cap_space *cspace, capability_t cid, lcd_cap_rights *rights)
 {
 	struct cte       *cap;
   
-	if (tcb == NULL || tcb->cspace == NULL || cid == 0 || rights == NULL)
-	{
-		ASSERT(false, "lcd_get_cap_rights: Invalid Inputs\n");
-		return -1;
-	}
-	cap = lcd_cap_lookup_capability(tcb, cid, false);
+	BUG_ON(cspace && cid != 0 && rights); 
+
+	cap = lcd_cap_lookup_capability(cspace, cid, false);
 	if (cap == NULL || cap->ctetype != lcd_type_capability)
 	{
-		ASSERT(false, "lcd_get_cap_rights: Invalid capability identifier\n");
+		printk(KERN_ALERT "lcd_get_cap_rights: Invalid capability identifier\n");
 		return -1;
 	}
 	*rights = cap->cap.crights;
@@ -444,30 +420,20 @@ uint32_t lcd_cap_get_rights(struct task_struct *tcb, capability_t cid, lcd_cap_r
 // does not lock the cspace caller responsbile for the same.
 // Given a task_struct and a capability identifier, will return the pointer to the 
 // capability table entry associated with that identifier within the cspace of the thread.
-struct cte * lcd_cap_lookup_capability(struct task_struct *tcb, capability_t cid, bool keep_locked)
+struct cte * lcd_cap_lookup_capability(struct cap_space *cspace, capability_t cid, bool keep_locked)
 {
 	struct cte *cap = NULL, *node = NULL;
-	struct cap_space *cspace;
 	capability_t id = cid;
 	int index = 0;
 	int mask = (~0);
     
-	// check if input is valid
-	if (tcb == NULL || cid == 0)
-	{
-		ASSERT(false, "lcd_lookup_capability: Invalid Inputs\n");
-		return NULL;
-	}
-	cspace = tcb->cspace;
-  
+	BUG_ON(cspace && cid != 0);
+
 	mask = mask << (CNODE_INDEX_BITS);
 	mask = ~mask;
   
-	if (cspace == NULL || cspace->root_cnode.cnode.table == NULL)
-	{
-		ASSERT(false, "lcd_lookup_capability: Invalid/Corrupted cspace\n");
-		return NULL;
-	}
+	BUG_ON(cspace->root_cnode.cnode.table);
+
 	node = cspace->root_cnode.cnode.table;
   
 	while (id > 0)
@@ -499,7 +465,7 @@ struct cte * lcd_cap_lookup_capability(struct task_struct *tcb, capability_t cid
 		}
 		else
 		{
-			ASSERT(false, "lcd_lookup_capability: Invalid Capability Identifier\n");
+			printk(KERN_ALERT "lcd_lookup_capability: Invalid Capability Identifier\n");
 			break;
 		}
 	}
@@ -507,25 +473,13 @@ struct cte * lcd_cap_lookup_capability(struct task_struct *tcb, capability_t cid
 	return cap;
 }
 
-capability_t lcd_cap_create_capability(struct task_struct *tcb, void * hobject, lcd_cap_rights crights)
+capability_t lcd_cap_create_capability(struct cap_space *cspace, void * hobject, lcd_cap_rights crights)
 {
-	struct cap_space *cspace;
 	struct cte       *cap;
 	capability_t           cid;
 	struct cap_derivation_tree *cdtnode;
   
-	if (tcb == NULL)
-	{
-		LCD_PANIC("lcd_cap_create_capability: Invalid Input\n");
-		return 0;
-	}
-	cspace = tcb->cspace;
-  
-	if (cspace == NULL || cspace->root_cnode.cnode.table == NULL)
-	{
-		LCD_PANIC("lcd_cap_create_capability: Invalid TCB\n");
-		return 0;
-	}
+	BUG_ON(cspace && cspace->root_cnode.cnode.table);
   
 	cdtnode = kmalloc(sizeof(struct cap_derivation_tree), GFP_KERNEL);
 	if (cdtnode == NULL)
@@ -583,33 +537,13 @@ capability_t lcd_cap_create_capability(struct task_struct *tcb, void * hobject, 
 	return cid;
 }
 
-struct cap_space * lcd_cap_create_cspace(void *objects[], lcd_cap_rights rights[])
+int lcd_cap_init_cspace(struct cap_space *cspace)
 {
-	int i;
 	bool success = false;
 	struct cte *table;
-	struct cap_derivation_tree *cdtnode;
-	struct task_struct *tcb = objects[LCD_CapInitThreadTCB];
-	struct cap_space *cspace = kmalloc(sizeof(struct cap_space), GFP_KERNEL);
-  
-	if (cspace == NULL)
-	{
-		LCD_PANIC("lcd_cap_create_cspace: Failed to allocate memory for cspace\n");
-		return NULL;
-	}
+	
 	cspace->root_cnode.cnode.table = NULL;
-	if (tcb == NULL)
-	{
-		LCD_PANIC("lcd_create_cspace: LCD_CapInitThreadTCB cannot be NULL\n");
-		goto create_cspace_safe_exit;
-	}
-	if ((sizeof(objects)/sizeof(objects[0]) != LCD_CapFirstFreeSlot) ||
-		(sizeof(rights)/sizeof(rights[0]) != LCD_CapFirstFreeSlot))
-	{
-		LCD_PANIC("lcd_create_cspace: Invalid inputs, size of arrays should be equal to LCD_CapFirstFreeSlot\n");
-		goto create_cspace_safe_exit;
-	}
-  
+	
 	// initialize semaphore
 	sema_init(&(cspace->sem_cspace), 1);
 	if (down_interruptible(&(cspace->sem_cspace)))
@@ -627,6 +561,7 @@ struct cap_space * lcd_cap_create_cspace(void *objects[], lcd_cap_rights rights[
 
 		table = cspace->root_cnode.cnode.table;
 		table[0].ctetype = lcd_type_free;
+#if 0
 		// Get the intitial capabilities into the cspace.
 		for (i = 1; i < LCD_CapFirstFreeSlot; i++)
 		{
@@ -658,7 +593,7 @@ struct cap_space * lcd_cap_create_cspace(void *objects[], lcd_cap_rights rights[
 			cdtnode->prev = NULL;
 			table[i].cap.cdt_node = cdtnode;
 		}
-
+#endif
 		// initialize the free list
 		success = lcd_cap_initialize_freelist(cspace, cspace->root_cnode.cnode.table, true);
 		up(&(cspace->sem_cspace));
@@ -674,32 +609,28 @@ struct cap_space * lcd_cap_create_cspace(void *objects[], lcd_cap_rights rights[
 		goto create_cspace_safe_exit;
 	}
   
-	tcb->cspace = cspace;
-	return cspace;
+	return 0;
   
 create_cspace_safe_exit:
-	if (cspace)
+	if (cspace->root_cnode.cnode.table)
 	{
-		if (cspace->root_cnode.cnode.table)
+#if 0
+		for (i = 1; i < LCD_CapFirstFreeSlot; i++)
 		{
-			for (i = 1; i < LCD_CapFirstFreeSlot; i++)
+			if (cspace->root_cnode.cnode.table[i].cap.cdt_node != NULL)
 			{
-				if (cspace->root_cnode.cnode.table[i].cap.cdt_node != NULL)
+				if (cspace->root_cnode.cnode.table[i].cap.cdt_node->sem_cdt != NULL)
 				{
-					if (cspace->root_cnode.cnode.table[i].cap.cdt_node->sem_cdt != NULL)
-					{
-						kfree(cspace->root_cnode.cnode.table[i].cap.cdt_node->sem_cdt);
-					}
-					kfree(cspace->root_cnode.cnode.table[i].cap.cdt_node);
+					kfree(cspace->root_cnode.cnode.table[i].cap.cdt_node->sem_cdt);
 				}
+				kfree(cspace->root_cnode.cnode.table[i].cap.cdt_node);
 			}
-			kfree(cspace->root_cnode.cnode.table);
-			cspace->root_cnode.cnode.table = NULL;
 		}
-		kfree(cspace);
-		tcb->cspace = NULL;
+#endif
+		kfree(cspace->root_cnode.cnode.table);
+		cspace->root_cnode.cnode.table = NULL;
 	}
-	return NULL;
+	return -1;
 }
 
 // does not lock the cspace.
@@ -709,10 +640,9 @@ bool lcd_cap_initialize_freelist(struct cap_space *cspace, struct cte *cnode, bo
 {
 	int startid = 1;
 	int i;
-  
-	if (cnode == NULL || cspace == NULL)
-		return false;
-  
+ 
+	BUG_ON(cnode && cspace);
+
 	if (bFirstCNode)
 	{
 		startid = LCD_CapFirstFreeSlot;
@@ -751,7 +681,7 @@ bool lcd_cap_initialize_freelist(struct cap_space *cspace, struct cte *cnode, bo
 struct cte * lcd_cap_reserve_slot(struct cte *cnode, capability_t *cid, int free_slot)
 {
 	struct cte *node = cnode->cnode.table;
-	ASSERT(node[free_slot].ctetype == lcd_type_free, "Free List is corrupted\n");
+	BUG_ON(node[free_slot].ctetype == lcd_type_free);
 	// a valid empty slot
 	node[0].slot.next_free_cap_slot = node[free_slot].slot.next_free_cap_slot;
 	lcd_set_bits_at_level(cnode, cid, free_slot);
@@ -772,12 +702,8 @@ capability_t lcd_cap_lookup_freeslot(struct cap_space *cspace, struct cte **cap)
 	int size = sizeof(struct cte);
 	struct kfifo cnode_q;
   
-	if (cspace == NULL || cspace->root_cnode.cnode.table == NULL || cap == NULL)
-	{
-		LCD_PANIC("lcd_cap_lookup_freeslot: Invalid Inputs\n");
-		return 0;
-	}
-  
+	BUG_ON(cspace && cspace->root_cnode.cnode.table && cap);
+
 	if (kfifo_alloc(&cnode_q, sizeof(struct cte) * 512, GFP_KERNEL) != 0)
 	{
 		LCD_PANIC("lcd_cap_lookup_freeslot: Failed to allocate FIFO buffer\n");
@@ -864,23 +790,16 @@ capability_t lcd_cap_lookup_freeslot(struct cap_space *cspace, struct cte **cap)
 	return cid;
 }
 
-capability_t lcd_cap_mint_capability(struct task_struct *tcb, capability_t cid, lcd_cap_rights rights)
+capability_t lcd_cap_mint_capability(struct cap_space *cspace, capability_t cid, lcd_cap_rights rights)
 {
 	capability_t id = 0;
-	struct cap_space *cspace;
 	struct cte *src_cte = NULL, *dst_cte = NULL;
 	struct cap_derivation_tree *cdt;
 	struct cap_derivation_tree *dst_cdt;
 	bool done = false;
   
-	if (tcb == NULL || cid == 0)
-	{
-		LCD_PANIC("lcd_cap_mint_capability: Invalid Inputs\n");
-		return 0;
-	}
-	cspace = tcb->cspace;
-  
-  
+	BUG_ON(cid);
+
 	dst_cdt = kmalloc(sizeof(struct cap_derivation_tree), GFP_KERNEL);
 	if (dst_cdt == NULL)
 	{
@@ -890,7 +809,7 @@ capability_t lcd_cap_mint_capability(struct task_struct *tcb, capability_t cid, 
 	while (!done)
 	{
 		// keep the source cdt locked.
-		src_cte = lcd_cap_lookup_capability(tcb, cid, true);
+		src_cte = lcd_cap_lookup_capability(cspace, cid, true);
 		if (src_cte == NULL || src_cte->ctetype != lcd_type_capability)
 		{
 			LCD_PANIC("lcd_cap_mint_capability: Invalid Capability\n");

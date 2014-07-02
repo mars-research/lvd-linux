@@ -1,8 +1,9 @@
 #ifndef HOST_IPC_H
 #define HOST_IPC_H
 
-#include "ipc_common_defs.h"
+#include <lcd/cap.h>
 
+#include "ipc_common_defs.h"
 enum ipc_state {
 	IPC_DONT_CARE = 0,
 	IPC_RCV_WAIT = 1,
@@ -10,13 +11,13 @@ enum ipc_state {
 	IPC_RUNNING = 3,
 };
 
-typedef struct {
+struct ipc_wait_list_elem {
 	u32 peer;
 	struct list_head list;
 	struct task_struct *task;
-} ipc_wait_list_elem;
+};
 
-typedef struct  {
+struct sync_ipc {
 	// either we put an explicit capid here
 	// so that given the capid we can  fetch
 	// the peers sync_ipc or lcd_struct
@@ -34,10 +35,17 @@ typedef struct  {
 	struct task_struct *task;
 	//spinlock_t rcv_lock;
 	// struct list_head rcv_q;
-} sync_ipc_t;
+};
+
+struct lcd_message_info {
+	unsigned char regs;
+	unsigned char cap_regs;
+};
 
 //headers used by host for ipc
-int ipc_send(u32 myself, u32 recv_capid);
+//int ipc_send(u32 myself, u32 recv_capid);
+int ipc_send(capability_t cap, struct lcd_message_info *msg);
+
 int ipc_recv(u32 myself, u32 send_capid);
 void display_mr(utcb_t *p_utcb);
 

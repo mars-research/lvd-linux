@@ -4,7 +4,7 @@
 #include <linux/types.h>
 #include <linux/module.h>
 #include <linux/kernel.h>
-#include <linux/sched.h>
+//#include <linux/sched.h>
 #include <linux/mm.h>
 #include <linux/slab.h>
 #include <linux/fs.h>
@@ -208,7 +208,7 @@ bool         lcd_cap_delete_internal_lockless(struct cte *cap, bool *last_refere
 // pointer to the cspace is also added to the TCB of the caller.
 // Output:
 // pointer to the newly created cspace.
-struct cap_space * lcd_cap_create_cspace(void *objects[], lcd_cap_rights rights[]);
+int lcd_cap_init_cspace(struct cap_space *cspace);
 
 // will be used to access the object on which a method is to be invoked.
 // the returned value is a pointer to the entry in the table where the capability
@@ -219,7 +219,7 @@ struct cap_space * lcd_cap_create_cspace(void *objects[], lcd_cap_rights rights[
 // keep_locked: whether or not to keep the semaphore protecting cdt locked.
 // Output:
 // pointer to the capability table entry if the cid is valid else NULL is returned.
-struct cte * lcd_cap_lookup_capability(struct task_struct *tcb, capability_t cid, bool keep_locked);
+struct cte * lcd_cap_lookup_capability(struct cap_space *cspace, capability_t cid, bool keep_locked);
 
 // creates a new capability, inserts it into cspace of caller and 
 // returns the capability identifier.
@@ -231,7 +231,7 @@ struct cte * lcd_cap_lookup_capability(struct task_struct *tcb, capability_t cid
 // Output:
 // capability identifier within the cspace of the thread which intended to create this capability.
 // 0 = Failure
-capability_t lcd_cap_create_capability(struct task_struct *tcb, void * hobject, lcd_cap_rights crights);
+capability_t lcd_cap_create_capability(struct cap_space *cspace, void * hobject, lcd_cap_rights crights);
 
 // will be used to grant a capability to another thread
 // returns the address of the capability within the cspace of the receiver thread.
@@ -242,7 +242,7 @@ capability_t lcd_cap_create_capability(struct task_struct *tcb, void * hobject, 
 // src_cid: capability identifier of the capability being granted.
 // dst_tcb: pointer to the task_struct of the receiver thread.
 // crights: the rights on the capability to be granted to the receiver.
-capability_t lcd_cap_grant_capability(struct task_struct *stcb, capability_t src_cid, struct task_struct *dtcb, lcd_cap_rights crights);
+capability_t lcd_cap_grant_capability(struct cap_space *src_space, capability_t src_cid, struct cap_space *dst_space, lcd_cap_rights crights);
 
 // will be called to delete a particular capability in the calling threads 
 // cspace. threads have right to delete capabilities in their own cspace.
@@ -252,7 +252,7 @@ capability_t lcd_cap_grant_capability(struct task_struct *stcb, capability_t src
 // Output:
 // 0 = Success
 // Any other value indicates failure.
-uint32_t lcd_cap_delete_capability(struct task_struct *tcb, capability_t cid);
+uint32_t lcd_cap_delete_capability(struct cap_space *cspace, capability_t cid);
 
 // will be called to delete the capability and all its children.
 // the children can be present in cspace belonging to different threads.
@@ -264,14 +264,14 @@ uint32_t lcd_cap_delete_capability(struct task_struct *tcb, capability_t cid);
 // Ouptput:
 // 0 = Success
 // Any other value indicates failure.
-uint32_t lcd_cap_revoke_capability(struct task_struct *tcb, capability_t cid);
+uint32_t lcd_cap_revoke_capability(struct cap_space *cspace, capability_t cid);
 
 // should be called when the thread exits.
 // this is extremely heavy function which updates the CDT for all capabilities present
 // in the cspace of the exiting thread.
 // Input:
 // ptcb: pointer to the task_struct of the thread which is getting terminated.
-void lcd_cap_destroy_cspace(struct task_struct *tcb);
+void lcd_cap_destroy_cspace(struct cap_space *cspace);
 
 // will be used to get the rights available with a capability.
 // Input:
@@ -281,7 +281,7 @@ void lcd_cap_destroy_cspace(struct task_struct *tcb);
 // Output:
 // Return Value: 0 = Success, Any other value indicates failure.
 // The rights associated with the capability will be saved in the rights ouput paramter.
-uint32_t lcd_cap_get_rights(struct task_struct *tcb, capability_t cid, lcd_cap_rights *rights);
+uint32_t lcd_cap_get_rights(struct cap_space *cspace, capability_t cid, lcd_cap_rights *rights);
 
 // will be used to craete a copy of the capability identified by cid within the same cspace
 // the rights of the copied capability could be modified using the rights parameter.
@@ -293,6 +293,6 @@ uint32_t lcd_cap_get_rights(struct task_struct *tcb, capability_t cid, lcd_cap_r
 // Output:
 // the capability identifier for the copied capability is returned.
 // 0 indicates failure.
-capability_t lcd_cap_mint_capability(struct task_struct *tcb, capability_t cid, lcd_cap_rights rights);
+capability_t lcd_cap_mint_capability(struct cap_space *cspace, capability_t cid, lcd_cap_rights rights);
 
 #endif // __LCD_CAP_H__

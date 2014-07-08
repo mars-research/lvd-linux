@@ -138,11 +138,11 @@ static inline bool cpu_has_vmx_ept_ad_bits(void)
 	return vmx_capability.ept & VMX_EPT_AD_BIT;
 }
 
-static inline void __invept(int ext, u64 eptp, gpa_t a)
+static inline void __invept(int ext, u64 eptp)
 {
 	struct {
 		u64 eptp, gpa;
-	} operand = {eptp, gpa_val(a)};
+	} operand = {eptp, 0};
 
 	asm volatile (ASM_VMX_INVEPT
                 /* CF==1 or ZF==1 --> rc = -1 */
@@ -156,7 +156,7 @@ static inline void __invept(int ext, u64 eptp, gpa_t a)
 static inline void invept_global_context(void)
 {
 	if (cpu_has_vmx_invept_global())
-		__invept(VMX_EPT_EXTENT_GLOBAL, 0, 0);
+		__invept(VMX_EPT_EXTENT_GLOBAL, 0);
 }
 
 /**
@@ -166,7 +166,7 @@ static inline void invept_global_context(void)
 static inline void invept_single_context(u64 eptp)
 {
 	if (cpu_has_vmx_invept_context())
-		__invept(VMX_EPT_EXTENT_CONTEXT, eptp, 0);
+		__invept(VMX_EPT_EXTENT_CONTEXT, eptp);
 	else
 		invept_global_context();
 }
@@ -226,7 +226,7 @@ static void vmcs_clear(struct lcd_arch_vmcs *vmcs)
                 : "=qm"(error) : "a"(hpa_ptr(&a)), "m"(hpa_val(a))
                 : "cc", "memory");
 	if (error)
-		printk(KERN_ERR "lcd vmx: vmclear fail: %p/%llx\n",
+		printk(KERN_ERR "lcd vmx: vmclear fail: %p/%lx\n",
 			vmcs, hpa_val(a));
 }
 
@@ -243,7 +243,7 @@ static void vmcs_load(struct lcd_arch_vmcs *vmcs)
                 : "=qm"(error) : "a"(hpa_ptr(&a)), "m"(hpa_val(a))
                 : "cc", "memory");
 	if (error)
-		printk(KERN_ERR "lcd vmx: vmptrld %p/%llx failed\n",
+		printk(KERN_ERR "lcd vmx: vmptrld %p/%lx failed\n",
 			vmcs, hpa_val(a));
 }
 
@@ -965,7 +965,7 @@ int lcd_arch_ept_walk(struct lcd_arch *vcpu, gpa_t a, int create,
 	u64 idx;
 	hva_t page;
 
-	dir = (lcd_arch_epte_t *) hpa2va(vcpu->ept.root);
+	dir = vcpu->ept.root;
 
 	/*
 	 * Walk plm4 -> pdpt -> pd. Each step uses 9 bits
@@ -987,7 +987,7 @@ int lcd_arch_ept_walk(struct lcd_arch *vcpu, gpa_t a, int create,
 			 * set the epte's addr to the host physical addr
 			 */
 			page = __hva(__get_free_page(GFP_KERNEL));
-			if (!page) {
+			if (!hva_val(page)) {
 				printk(KERN_ERR "lcd_arch_ept_walk: alloc failed\n");
 				return -ENOMEM;
 			}
@@ -1007,7 +1007,7 @@ int lcd_arch_ept_walk(struct lcd_arch *vcpu, gpa_t a, int create,
 
 void lcd_arch_ept_set(lcd_arch_epte_t *epte, hpa_t a)
 {
-	vmx_epte_set(epte, hpa, 3);
+	vmx_epte_set(epte, a, 3);
 }
 
 int lcd_arch_ept_unset(lcd_arch_epte_t *epte)
@@ -1060,18 +1060,18 @@ int lcd_arch_ept_map_range(struct lcd_arch *lcd, gpa_t ga_start, hpa_t ha_start,
 
 	len = npages * PAGE_SIZE;
 	for (off = 0; off < len; off += PAGE_SIZE) {
-		if (lcd_arch_ept_map_gpa_to_hpa(lcd,
-							/* gpa */
-							gpa_val(ga_start) + off,
-							/* hpa */
-							hpa_val(ha_start) + off,
-							/* create */
-							1,
-							/* no overwrite */
-							0)) {
+		if (lcd_arch_ept_map(lcd,
+					/* gpa */
+					gpa_add(ga_start, off),
+					/* hpa */
+					hpa_add(ha_start, off),
+					/* create */
+					1,
+					/* no overwrite */
+					0)) {
 			printk(KERN_ERR "lcd_arch_ept_map_range: error mapping gpa %lx to hpa %lx\n",
-				gpa_val(gpa_start) + off,
-				hpa_val(hpa_start) + off));
+				gpa_val(gpa_add(ga_start, off)),
+				hpa_val(hpa_add(ha_start, off));
 			return -EIO;
 		}
 	}
@@ -1144,7 +1144,7 @@ int lcd_arch_ept_gpa_to_hpa(struct lcd_arch *vcpu, gpa_t ga, hpa_t *ha_out)
 	 */
 	hpa = lcd_arch_ept_hpa(ept_entry);
 	hpa = hpa_add(hpa, vmx_ept_offset(ga));
-	*hpa_out = hpa;
+	*ha_out = hpa;
 
 	return 0;
 }
@@ -1216,7 +1216,7 @@ static void vmx_free_ept(struct lcd_arch *vcpu)
  */
 int vmx_init_ept(struct lcd_arch *vcpu)
 {
-	void *page;
+	hva_t page;
 	u64 eptp;
 
 	/*
@@ -1230,7 +1230,7 @@ int vmx_init_ept(struct lcd_arch *vcpu)
 	}
 	memset(hva2va(page), 0, PAGE_SIZE);
 
-	vcpu->ept.root = hva2hpa(page);
+	vcpu->ept.root = (lcd_arch_epte_t *)hva2va(page);
 
 	/*
 	 * Init the VMCS EPT pointer
@@ -1249,7 +1249,7 @@ int vmx_init_ept(struct lcd_arch *vcpu)
 		vcpu->ept.access_dirty_enabled = true;
 		eptp |= VMX_EPT_AD_ENABLE_BIT;
 	}
-	eptp |= (hpa_val(vcpu->ept.root) & PAGE_MASK);
+	eptp |= (((unsigned long)vcpu->ept.root) & PAGE_MASK);
 	vcpu->ept.vmcs_ptr = eptp;
 
 	/*
@@ -1932,9 +1932,9 @@ static int vmx_init_gdt(struct lcd_arch *vcpu)
 	 */
 	tssd = (struct tss_desc *)(vcpu->gdt + (LCD_ARCH_TR_SELECTOR >> 3));
 	set_tssldt_descriptor(tssd, 
-			LCD_ARCH_TSS_BASE,   /* base */
-			0xB,                 /* type = 64-bit busy tss */
-			LCD_ARCH_TSS_LIMIT); /* limit */
+			gpa_val(LCD_ARCH_TSS_BASE),/* base */
+			0xB,                       /* type = 64-bit busy tss */
+			LCD_ARCH_TSS_LIMIT);       /* limit */
 
 	/*
 	 *===--- Map GDT in guest physical address space ---===
@@ -2393,7 +2393,7 @@ static int vmx_handle_hard_exception(struct lcd_arch *vcpu)
 		 *
 		 * Set page fault address, and return status code.
 		 */
-		vcpu->run_info.gva = __gva(vcpu->exit_qualification);
+		vcpu->run_info.fault_gva = __gva(vcpu->exit_qualification);
 		return LCD_ARCH_STATUS_PAGE_FAULT;
 	default:
 		printk(KERN_ERR "lcd vmx: unhandled hw exception:\n");
@@ -2437,8 +2437,8 @@ static int vmx_handle_ept(struct lcd_arch *vcpu)
 	/*
 	 * Intel SDM V3 27.2.1
 	 */
-	vcpu->run_info.gva = __gva(vmcs_readl(GUEST_LINEAR_ADDRESS));
-	vcpu->run_info.gpa = __gpa(vmcs_readl(GUEST_PHYSICAL_ADDRESS));
+	vcpu->run_info.fault_gva = __gva(vmcs_readl(GUEST_LINEAR_ADDRESS));
+	vcpu->run_info.fault_gpa = __gpa(vmcs_readl(GUEST_PHYSICAL_ADDRESS));
 	return LCD_ARCH_STATUS_EPT_FAULT;
 }
 
@@ -2745,7 +2745,7 @@ EXPORT_SYMBOL(lcd_arch_ept_unset);
 EXPORT_SYMBOL(lcd_arch_ept_unmap_gpa);
 EXPORT_SYMBOL(lcd_arch_ept_unmap_range);
 EXPORT_SYMBOL(lcd_arch_ept_hpa);
-EXPORT_SYMBOL(lcd_arch_ept_map_gpa_to_hpa);
+EXPORT_SYMBOL(lcd_arch_ept_map);
 EXPORT_SYMBOL(lcd_arch_ept_map_range);
 EXPORT_SYMBOL(lcd_arch_ept_gpa_to_hpa);
 EXPORT_SYMBOL(lcd_arch_set_pc);

@@ -7,10 +7,10 @@
 
 /* ADDRESS SPACE TYPES ---------------------------------------- */
 
-typedef struct { unsigned long gva } gva_t;
-typedef struct { unsigned long hva } hva_t;
-typedef struct { unsigned long gpa } gpa_t;
-typedef struct { unsigned long hpa } hpa_t;
+typedef struct { unsigned long gva; } gva_t;
+typedef struct { unsigned long hva; } hva_t;
+typedef struct { unsigned long gpa; } gpa_t;
+typedef struct { unsigned long hpa; } hpa_t;
 
 static inline gva_t __gva(unsigned long gva)
 {
@@ -92,15 +92,14 @@ static inline hva_t hpa2hva(hpa_t hpa)
 {
 	return (hva_t){ (unsigned long)__va(hpa.hpa) };
 }
-static inline hpa_t hva2hpa(hva_t hva)
-{
-	return (hpa_t){ (unsigned long)__pa(hva2va(hva)) };
-}
 static inline void * hva2va(hva_t hva)
 {
 	return (void *)hva_val(hva);
 }
-
+static inline hpa_t hva2hpa(hva_t hva)
+{
+	return (hpa_t){ (unsigned long)__pa(hva2va(hva)) };
+}
 
 /* LCD ARCH DATA STRUCTURES ---------------------------------------- */
 
@@ -137,14 +136,14 @@ enum lcd_arch_reg {
 #define LCD_ARCH_EPTP_WALK_SHIFT 3
 #define LCD_ARCH_PTRS_PER_EPTE   (1 << 9)
 
+typedef unsigned long lcd_arch_epte_t;
+
 struct lcd_arch_ept {
 	spinlock_t lock;
-	hpa_t root;
+	lcd_arch_epte_t *root;
 	unsigned long vmcs_ptr;
 	bool access_dirty_enabled;
 };
-
-typedef unsigned long lcd_arch_epte_t;
 
 struct lcd_arch_tss {
 	/*
@@ -342,16 +341,16 @@ int lcd_arch_set_gva_root(struct lcd_arch *vcpu, gpa_t a);
  * See Intel SDM V3 3.4.2, 3.4.3 for segment register layout
  * See Intel SDM V3 2.4.1 - 2.4.4 for gdtr, ldtr, idtr, tr
  */
-#define LCD_ARCH_FS_BASE     __gpa(0UL);
+#define LCD_ARCH_FS_BASE     __gpa(0UL)
 #define LCD_ARCH_FS_LIMIT    0xFFFFFFFF
-#define LCD_ARCH_GS_BASE     __gpa(0UL);
+#define LCD_ARCH_GS_BASE     __gpa(0UL)
 #define LCD_ARCH_GS_LIMIT    0xFFFFFFFF
-#define LCD_ARCH_GDTR_BASE   __gpa(1UL << PAGE_SHIFT);
+#define LCD_ARCH_GDTR_BASE   __gpa(1UL << PAGE_SHIFT)
 #define LCD_ARCH_GDTR_LIMIT  ((u32)~(PAGE_SIZE - 1))
-#define LCD_ARCH_TSS_BASE    __gpa(2UL << PAGE_SHIFT);
+#define LCD_ARCH_TSS_BASE    __gpa(2UL << PAGE_SHIFT)
 /* tss base + limit = address of last byte in tss, hence -1 */
 #define LCD_ARCH_TSS_LIMIT   (sizeof(struct lcd_arch_tss) - 1)
-#define LCD_ARCH_IDTR_BASE   __gpa(0UL);
+#define LCD_ARCH_IDTR_BASE   __gpa(0UL)
 #define LCD_ARCH_IDTR_LIMIT  0x0 /* no idt right now */
 
 #define LCD_ARCH_CS_SELECTOR   (1 << 3)
@@ -388,8 +387,8 @@ int lcd_arch_set_gva_root(struct lcd_arch *vcpu, gpa_t a);
  *                         |       (not mapped)        | (4 KBs)
  *                         +---------------------------+ 0x0000 0000 0000 0000
  */
-#define LCD_ARCH_UTCB        __gpa(3UL << PAGE_SHIFT);
-#define LCD_ARCH_STACK_TOP   __gpa(4UL << PAGE_SHIFT);
+#define LCD_ARCH_UTCB        __gpa(3UL << PAGE_SHIFT)
+#define LCD_ARCH_STACK_TOP   __gpa(4UL << PAGE_SHIFT)
 #define LCD_ARCH_FREE        LCD_ARCH_STACK_TOP
 
 /*

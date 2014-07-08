@@ -155,23 +155,25 @@ fail1:
 
 static int lcd_mm_pt_destroy(struct lcd *lcd, pmd_t *pmd_entry)
 {
+	u64 gpa;
 	u64 hpa;
 	int ret;
-
+	
 	/*
 	 * Get hpa of page table, using gpa stored in pmd_entry.
 	 */
-	ret = lcd_arch_ept_gpa_to_hpa(lcd->lcd_arch, pmd_val(*pmd_entry), &hpa);
+	gpa = pmd_pfn(*pmd_entry) << PAGE_SHIFT;
+	ret = lcd_arch_ept_gpa_to_hpa(lcd->lcd_arch, gpa, &hpa);
 	if (ret) {
 		printk(KERN_ERR "lcd_mm_pt_destroy: error looking up gpa %lx\n",
-			(unsigned long)pmd_val(*pmd_entry));
+			(unsigned long)gpa);
 		return ret;
 	}
 
 	/*
 	 * Unmap page table
 	 */
-	ret = lcd_mm_gpa_unmap_range(lcd, pmd_val(*pmd_entry), 1);
+	ret = lcd_mm_gpa_unmap_range(lcd, gpa, 1);
 	if (ret) {
 		printk(KERN_ERR "lcd_mm_pt_destroy: error unmapping pt\n");
 		return ret;
@@ -188,6 +190,7 @@ static int lcd_mm_pt_destroy(struct lcd *lcd, pmd_t *pmd_entry)
 static int lcd_mm_pmd_destroy(struct lcd *lcd, pud_t *pud_entry)
 {
 	pmd_t *pmd;
+	u64 gpa;
 	u64 hpa;
 	int i;
 	int ret;
@@ -195,10 +198,11 @@ static int lcd_mm_pmd_destroy(struct lcd *lcd, pud_t *pud_entry)
 	/*
 	 * Get hpa of pmd, using gpa stored in pud_entry.
 	 */
-	ret = lcd_arch_ept_gpa_to_hpa(lcd->lcd_arch, pud_val(*pud_entry), &hpa);
+	gpa = pud_pfn(*pud_entry) << PAGE_SHIFT;
+	ret = lcd_arch_ept_gpa_to_hpa(lcd->lcd_arch, gpa, &hpa);
 	if (ret) {
 		printk(KERN_ERR "lcd_mm_pmd_destroy: error looking up gpa %lx\n",
-			(unsigned long)pud_val(*pud_entry));
+			gpa);
 		return ret;
 	}
 
@@ -208,14 +212,18 @@ static int lcd_mm_pmd_destroy(struct lcd *lcd, pud_t *pud_entry)
 	 * Free all present page tables
 	 */
 	for (i = 0; i < PTRS_PER_PMD; i++) {
-		if (pmd_present(pmd[i]))
-			lcd_mm_pt_destroy(lcd, &pmd[i]);
+		if (pmd_present(pmd[i])) {
+			ret = lcd_mm_pt_destroy(lcd, &pmd[i]);
+			if (ret) {
+				printk(KERN_ERR "lcd_mm_pmd_destroy: error destroying child pt\n");
+				return ret;
+			}
 	}
 
 	/*
 	 * Unmap pmd
 	 */
-	ret = lcd_mm_gpa_unmap_range(lcd, pud_val(*pud_entry), 1);
+	ret = lcd_mm_gpa_unmap_range(lcd, gpa, 1);
 	if (ret) {
 		printk(KERN_ERR "lcd_mm_pmd_destroy: error unmapping pmd\n");
 		return ret;
@@ -232,6 +240,7 @@ static int lcd_mm_pmd_destroy(struct lcd *lcd, pud_t *pud_entry)
 static int lcd_mm_pud_destroy(struct lcd *lcd, pgd_t *pgd_entry)
 {
 	pud_t *pud;
+	u64 gpa;
 	u64 hpa;
 	int i;
 	int ret;
@@ -239,10 +248,11 @@ static int lcd_mm_pud_destroy(struct lcd *lcd, pgd_t *pgd_entry)
 	/*
 	 * Get hpa of pud, using gpa stored in pgd_entry.
 	 */
-	ret = lcd_arch_ept_gpa_to_hpa(lcd->lcd_arch, pgd_val(*pgd_entry), &hpa);
+	gpa = pgd_pfn(*pgd_entry) << PAGE_SHIFT;
+	ret = lcd_arch_ept_gpa_to_hpa(lcd->lcd_arch, gpa, &hpa);
 	if (ret) {
 		printk(KERN_ERR "lcd_mm_pud_destroy: error looking up gpa %lx\n",
-			(unsigned long)pgd_val(*pgd_entry));
+			gpa);
 		return ret;
 	}
 
@@ -252,14 +262,18 @@ static int lcd_mm_pud_destroy(struct lcd *lcd, pgd_t *pgd_entry)
 	 * Destroy all present pmd's
 	 */
 	for (i = 0; i < PTRS_PER_PUD; i++) {
-		if (pud_present(pud[i]))
-			lcd_mm_pmd_destroy(lcd, &pud[i]);
+		if (pud_present(pud[i])) {
+			ret = lcd_mm_pmd_destroy(lcd, &pud[i]);
+			if (ret) {
+				printk(KERN_ERR "lcd_mm_pud_destroy: error destroying child pmd\n");
+				return ret;
+			}
 	}
 
 	/*
 	 * Unmap pud
 	 */
-	ret = lcd_mm_gpa_unmap_range(lcd, pgd_val(*pgd_entry), 1);
+	ret = lcd_mm_gpa_unmap_range(lcd, gpa, 1);
 
 	/*
 	 * Free pud

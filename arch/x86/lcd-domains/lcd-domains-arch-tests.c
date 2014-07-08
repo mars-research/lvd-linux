@@ -130,7 +130,7 @@ static int test04(void)
 	 * Map 0x8000000000 - 0x8000400000 (512GB -- 512GB + 4MBs, 
 	 * takes two page dirs)
 	 */
-	if (lcd_arch_ept_map_range(lcd, 1 << 39, 1 << 39, 1024)) {
+	if (lcd_arch_ept_map_range(lcd, 1UL << 39, 1UL << 39, 1024)) {
 		printk(KERN_ERR "lcd arch: test04 failed to map 3rd 4 MBs\n");
 		goto fail5;
 	}
@@ -187,20 +187,20 @@ static int test04(void)
 		}
 	}
 
-	lcd_arch_ept_unmap_range(lcd, 1 << 39, 1 << 39, 1024);
-	lcd_arch_ept_unmap_range(lcd, 1 << 30, 1 << 30, 1024);
-	lcd_arch_ept_unmap_range(lcd, 0, 0, 1024);
+	lcd_arch_ept_unmap_range(lcd, 1UL << 39, 1024);
+	lcd_arch_ept_unmap_range(lcd, 1 << 30, 1024);
+	lcd_arch_ept_unmap_range(lcd, 0, 1024);
 	vmx_free_ept(lcd);
 	kfree(lcd);
 
 	return 0;
 
 fail6:
-	lcd_arch_ept_unmap_range(lcd, 1 << 39, 1 << 39, 1024);
+	lcd_arch_ept_unmap_range(lcd, 1UL << 39, 1024);
 fail5:
-	lcd_arch_ept_unmap_range(lcd, 1 << 30, 1 << 30, 1024);
+	lcd_arch_ept_unmap_range(lcd, 1 << 30, 1024);
 fail4:
-	lcd_arch_ept_unmap_range(lcd, 0, 0, 1024);
+	lcd_arch_ept_unmap_range(lcd, 0, 1024);
 fail3:
 	vmx_free_ept(lcd);
 fail2:

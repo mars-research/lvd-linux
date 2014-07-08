@@ -90,7 +90,7 @@ static int test03(void)
 	}		
 
 	free_page((u64)__va(hpa));
-	lcd_arch_ept_unmap_range(lcd, gpa, 1);
+	lcd_arch_ept_unmap_range(lcd->lcd_arch, gpa, 1);
 
 	lcd_destroy(lcd);
 
@@ -98,7 +98,7 @@ static int test03(void)
 
 fail4:
 	free_page((u64)__va(hpa));
-	lcd_arch_ept_unmap_range(lcd, gpa, 1);
+	lcd_arch_ept_unmap_range(lcd->lcd_arch, gpa, 1);
 fail3:
 fail2:
 	lcd_destroy(lcd);
@@ -167,7 +167,7 @@ static int test04(void)
 	}
 
 	free_page((u64)__va(hpa));
-	lcd_arch_ept_unmap_range(lcd, gpa, 1);
+	lcd_arch_ept_unmap_range(lcd->lcd_arch, gpa, 1);
 	kfree(pmd_entry);
 
 	lcd_destroy(lcd);
@@ -179,7 +179,7 @@ fail5:
 	kfree(pmd_entry);
 fail4:
 	free_page((u64)__va(hpa));
-	lcd_arch_ept_unmap_range(lcd, gpa, 1);
+	lcd_arch_ept_unmap_range(lcd->lcd_arch, gpa, 1);
 fail3:
 fail2:
 	lcd_destroy(lcd);
@@ -250,7 +250,7 @@ static int test05(void)
 	}
 
 	free_page((u64)__va(hpa));
-	lcd_arch_ept_unmap_range(lcd, gpa, 1);
+	lcd_arch_ept_unmap_range(lcd->lcd_arch, gpa, 1);
 	kfree(pud_entry);
 
 	lcd_destroy(lcd);
@@ -262,7 +262,7 @@ fail5:
 	kfree(pud_entry);
 fail4:
 	free_page((u64)__va(hpa));
-	lcd_arch_ept_unmap_range(lcd, gpa, 1);
+	lcd_arch_ept_unmap_range(lcd->lcd_arch, gpa, 1);
 fail3:
 fail2:
 	lcd_destroy(lcd);
@@ -333,7 +333,7 @@ static int test06(void)
 	}
 
 	free_page((u64)__va(hpa));
-	lcd_arch_ept_unmap_range(lcd, gpa, 1);
+	lcd_arch_ept_unmap_range(lcd->lcd_arch, gpa, 1);
 	kfree(pgd_entry);
 
 	lcd_destroy(lcd);
@@ -345,7 +345,7 @@ fail5:
 	kfree(pgd_entry);
 fail4:
 	free_page((u64)__va(hpa));
-	lcd_arch_ept_unmap_range(lcd, gpa, 1);
+	lcd_arch_ept_unmap_range(lcd->lcd_arch, gpa, 1);
 fail3:
 fail2:
 	lcd_destroy(lcd);
@@ -413,7 +413,6 @@ static int test08(void)
 {
 	struct lcd *lcd;
 	int ret;
-	u64 gpa;
 	pgd_t *pgd_entry1;
 	pgd_t *pgd_entry2;
 

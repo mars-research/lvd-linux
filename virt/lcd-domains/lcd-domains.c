@@ -69,7 +69,8 @@ static int lcd_mm_gva_init(struct lcd *lcd, u64 gv_paging_mem_start_gpa,
 	/*
 	 * Map global page dir's page in lcd's ept
 	 */
-	ret = lcd_arch_ept_map_range(lcd, gv_paging_mem_start_gpa, root, 1);
+	ret = lcd_arch_ept_map_range(lcd->lcd_arch, 
+				gv_paging_mem_start_gpa, root, 1);
 	if (ret) {
 		printk("lcd_mm_gva_init: error mapping global page dir\n");
 		goto fail3;
@@ -109,7 +110,7 @@ static int lcd_mm_pt_destroy(struct lcd *lcd, pmd_t *pmd_entry)
 	/*
 	 * Unmap page table
 	 */
-	ret = lcd_arch_ept_unmap_range(lcd, gpa, 1);
+	ret = lcd_arch_ept_unmap_range(lcd->lcd_arch, gpa, 1);
 	if (ret) {
 		printk(KERN_ERR "lcd_mm_pt_destroy: error unmapping pt\n");
 		return ret;
@@ -160,7 +161,7 @@ static int lcd_mm_pmd_destroy(struct lcd *lcd, pud_t *pud_entry)
 	/*
 	 * Unmap pmd
 	 */
-	ret = lcd_arch_ept_unmap_range(lcd, gpa, 1);
+	ret = lcd_arch_ept_unmap_range(lcd->lcd_arch, gpa, 1);
 	if (ret) {
 		printk(KERN_ERR "lcd_mm_pmd_destroy: error unmapping pmd\n");
 		return ret;
@@ -211,7 +212,7 @@ static int lcd_mm_pud_destroy(struct lcd *lcd, pgd_t *pgd_entry)
 	/*
 	 * Unmap pud
 	 */
-	ret = lcd_arch_ept_unmap_range(lcd, gpa, 1);
+	ret = lcd_arch_ept_unmap_range(lcd->lcd_arch, gpa, 1);
 
 	/*
 	 * Free pud
@@ -253,7 +254,8 @@ static void lcd_mm_gva_destroy(struct lcd *lcd)
 	/*
 	 * Unmap in ept
 	 */
-	ret = lcd_arch_ept_unmap_range(lcd, lcd->gv.paging_mem_bot, 1);
+	ret = lcd_arch_ept_unmap_range(lcd->lcd_arch, 
+				lcd->gv.paging_mem_bot, 1);
 	if (ret) {
 		printk(KERN_ERR "lcd_mm_gva_destroy: error unmapping pgd\n");
 		return;
@@ -306,7 +308,7 @@ static int lcd_mm_gva_alloc(struct lcd *lcd, u64 *gpa, u64 *hpa)
 	/*
 	 * Map in ept
 	 */
-	ret = lcd_arch_ept_map_range(lcd, *gpa, *hpa, 1);
+	ret = lcd_arch_ept_map_range(lcd->lcd_arch, *gpa, *hpa, 1);
 	if (ret) {
 		printk(KERN_ERR "lcd_mm_gva_alloc: couldn't map gpa %lx to hpa %lx\n",
 			(unsigned long)*gpa,
@@ -894,7 +896,7 @@ static int lcd_init_blob(struct lcd *lcd, unsigned char *blob,
 	/*
 	 * Map blob in guest physical, after paging mem
 	 */
-	r = lcd_arch_ept_map_range(lcd, LCD_ARCH_FREE + paging_mem_size, 
+	r = lcd_arch_ept_map_range(lcd->lcd_arch, LCD_ARCH_FREE + paging_mem_size, 
 			__pa((u64)blob), (1 << blob_order));
 	if (r) {
 		printk(KERN_ERR "lcd_init_blob: error mapping blob in gpa\n");
@@ -933,8 +935,9 @@ static int lcd_init_blob(struct lcd *lcd, unsigned char *blob,
 fail4:
 	/* gva destroy will handle clean up after this failure */
 fail3:
-	lcd_arch_ept_unmap_range(lcd, LCD_ARCH_FREE + paging_mem_size, 
-			(1 << blob_order));
+	lcd_arch_ept_unmap_range(lcd->lcd_arch, 
+				LCD_ARCH_FREE + paging_mem_size, 
+				(1 << blob_order));
 fail2:
 	lcd_mm_gva_destroy(lcd);
 fail1:

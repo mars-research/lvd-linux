@@ -583,7 +583,7 @@ static int lcd_mm_gva_walk_pgd(struct lcd *lcd, u64 gva, pgd_t **pgd_out)
 		 */
 		ret = lcd_mm_gva_alloc(lcd, &gpa, &hpa);
 		if (ret) {
-			printk(KERN_ERR "lcd_mm_gva_lookup_pgd: error alloc'ing\n");
+			printk(KERN_ERR "lcd_mm_gva_walk_pgd: error alloc'ing\n");
 			return ret;
 		}
 		/*

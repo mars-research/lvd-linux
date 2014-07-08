@@ -169,14 +169,10 @@ static int test04(void)
 	if (test04_help(lcd, base))
 		goto fail6;
 
-	lcd_arch_ept_unmap_range(lcd, __gpa(1UL << 39), 1024);
-	lcd_arch_ept_unmap_range(lcd, __gpa(1 << 30), 1024);
-	lcd_arch_ept_unmap_range(lcd, __gpa(0), 1024);
-	vmx_free_ept(lcd);
-	kfree(lcd);
+	ret = 0;
+	goto done;
 
-	return 0;
-
+done:
 fail6:
 	lcd_arch_ept_unmap_range(lcd, __gpa(1UL << 39), 1024);
 fail5:

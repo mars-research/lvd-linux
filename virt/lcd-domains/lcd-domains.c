@@ -44,6 +44,22 @@ static inline gpa_t pgd_gpa(pgd_t *pgd_entry)
 {
 	return __gpa(pgd_pfn(*pgd_entry) << PAGE_SHIFT);
 }
+static inline void set_pte_gpa(pte_t *pte, gpa_t gpa)
+{
+	set_pte(pte, __pte(gpa_val(gpa) | _KERNPG_TABLE));
+}
+static inline void set_pmd_gpa(pmd_t *entry, gpa_t gpa)
+{
+	set_pmd(entry, __pmd(gpa_val(gpa) | _KERNPG_TABLE));
+}
+static inline void set_pud_gpa(pud_t *entry, gpa_t gpa)
+{
+	set_pud(entry, __pud(gpa_val(gpa) | _KERNPG_TABLE));
+}
+static inline void set_pgd_gpa(pgd_t *entry, gpa_t gpa)
+{
+	set_pgd(entry, __pgd(gpa_val(gpa) | _KERNPG_TABLE));
+}
 
 /**
  * Allocates a host physical page and guest physical
@@ -469,7 +485,8 @@ static int lcd_mm_gva_walk_pmd(struct lcd *lcd, gva_t gva, pud_t *pud_entry,
 		/*
 		 * Map *guest physical* address into pud entry
 		 */
-		set_pmd(entry, __pmd(gpa_val(gpa) | _KERNPG_TABLE));
+		set_pmd_gpa(entry, gpa);
+
 
 	}
 
@@ -540,8 +557,7 @@ static int lcd_mm_gva_walk_pud(struct lcd *lcd, gva_t gva, pgd_t *pgd_entry,
 		/*
 		 * Map *guest physical* address into pud entry
 		 */
-		set_pud(entry, __pud(gpa_val(gpa) | _KERNPG_TABLE));
-
+		set_pud_gpa(entry, gpa);
 	}
 
 	*pud_out = entry;
@@ -573,7 +589,7 @@ static int lcd_mm_gva_walk_pgd(struct lcd *lcd, gva_t gva, pgd_t **pgd_out)
 		/*
 		 * Map *guest physical* address into pgd entry
 		 */
-		set_pgd(entry, __pgd(gpa_val(gpa) | _KERNPG_TABLE));
+		set_pgd_gpa(entry, gpa);
 	}
 
 	*pgd_out = entry;
@@ -653,7 +669,8 @@ static int lcd_mm_gva_walk(struct lcd *lcd, gva_t gva, pte_t **pte_out)
 
 static void lcd_mm_gva_set(pte_t *pte, gpa_t gpa)
 {
-	set_pte(pte, __pte(gpa_val(gpa) | _KERNPG_TABLE));
+	set_pte_gpa(pte, gpa);
+
 }
 
 static gpa_t lcd_mm_gva_get(pte_t *pte)

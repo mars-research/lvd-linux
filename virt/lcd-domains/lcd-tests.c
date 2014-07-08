@@ -85,6 +85,7 @@ static int test03(void)
 	if (gpa != LCD_ARCH_FREE + PAGE_SIZE) {
 		printk(KERN_ERR "lcd test: test03 gpa at wrond addr %lx\n",
 			(unsigned long)gpa);
+		ret = -1;
 		goto fail4;
 	}		
 
@@ -161,6 +162,7 @@ static int test04(void)
 	if (lcd_mm_gva_get(pte_entry) != 0x1234000UL) {
 		printk(KERN_ERR "lcd test: test04 pte gpa is %lx\n",
 			(unsigned long)lcd_mm_gva_get(pte_entry));
+		ret = -1;
 		goto fail6;
 	}
 
@@ -243,6 +245,7 @@ static int test05(void)
 	if (pmd_pfn(*pmd_entry) << PAGE_SHIFT != 0x1234000UL) {
 		printk(KERN_ERR "lcd test: test05 pte gpa is %lx\n",
 			(unsigned long)pmd_pfn(*pmd_entry) << PAGE_SHIFT);
+		ret = -1;
 		goto fail6;
 	}
 
@@ -312,7 +315,7 @@ static int test06(void)
 	}
 
 	set_pgd(pgd_entry, __pgd(gpa | _KERNPG_TABLE));
-	ret = lcd_mm_gva_lookup_pud(lcd, 0x4UL << PMD_SHIFT, 
+	ret = lcd_mm_gva_lookup_pud(lcd, 0x4UL << PUD_SHIFT, 
 				pgd_entry, &pud_entry);
 	if (ret) {
 		printk(KERN_ERR "lcd test: test06 failed to lookup pud\n");
@@ -323,8 +326,9 @@ static int test06(void)
 	 * Check
 	 */
 	if (pud_pfn(*pud_entry) << PAGE_SHIFT != 0x1234000UL) {
-		printk(KERN_ERR "lcd test: test06 pte gpa is %lx\n",
+		printk(KERN_ERR "lcd test: test06 pmd gpa is %lx\n",
 			(unsigned long)pud_pfn(*pud_entry) << PAGE_SHIFT);
+		ret = -1;
 		goto fail6;
 	}
 
@@ -368,19 +372,13 @@ static int test07(void)
 		goto fail2;
 	}
 
-	ret = lcd_mm_gva_alloc(lcd, &gpa, &hpa);
-	if (ret) {
-		printk(KERN_ERR "lcd test: test07 failed to alloc pg mem\n");
-		goto fail3;
-	}
-
 	/*
 	 * Map gva 0x1234000UL to gpa 0x5678000UL
 	 */
 	ret = lcd_mm_gva_map(lcd, 0x1234000UL, 0x5678000UL);
 	if (ret) {
 		printk(KERN_ERR "lcd test: test07 failed to map\n");
-		goto fail4;
+		goto fail3;
 	}
 
 	/*
@@ -389,20 +387,19 @@ static int test07(void)
 	ret = lcd_mm_gva_to_gpa(lcd, 0x1234000UL, &gpa);
 	if (ret) {
 		printk(KERN_ERR "lcd test: test07 failed to lookup\n");
-		goto fail5;
+		goto fail4;
 	}
 
 	if (gpa != 0x5678000UL) {
 		printk(KERN_ERR "lcd test: test07 got phys addr %lx\n",
 			(unsigned long)gpa);
-		goto fail6;
+		goto fail5;
 	}
 
 	lcd_destroy(lcd);
 
 	return 0;
 
-fail6:
 fail5:
 fail4:
 fail3:

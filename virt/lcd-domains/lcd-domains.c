@@ -708,7 +708,6 @@ static int lcd_mm_gva_map(struct lcd *lcd, u64 gva, u64 gpa)
  * Simple routine combining walk and get. Never
  * overwrites.
  */
-#if 0
 static int lcd_mm_gva_to_gpa(struct lcd *lcd, u64 gva, u64 *gpa)
 {
 	int ret;
@@ -720,11 +719,11 @@ static int lcd_mm_gva_to_gpa(struct lcd *lcd, u64 gva, u64 *gpa)
 		return ret;
 	}
 
-	*gpa = (u64)pte_val(*pte);
+	*gpa = lcd_mm_gva_get(pte);
 
 	return 0;
 }
-#endif
+
 /**
  * Maps 
  *

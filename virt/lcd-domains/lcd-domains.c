@@ -28,6 +28,8 @@ MODULE_DESCRIPTION("LCD driver");
 
 /* Guest Virtual -------------------------------------------------- */
 
+static int lcd_mm_gva_alloc(struct lcd *lcd, u64 *gpa, u64 *hpa);
+
 /**
  * Initializes guest virtual address space info in lcd, and
  * sets gva root pointer (e.g., x86 %cr3).
@@ -37,45 +39,24 @@ MODULE_DESCRIPTION("LCD driver");
 static int lcd_mm_gva_init(struct lcd *lcd, u64 gv_paging_mem_start_gpa,
 		u64 gv_paging_mem_end_gpa)
 {
-	u64 root;
+	u64 gpa;
+	u64 hpa;
 	int ret;
 
 	/*
-	 * Set start / end (we will use one page for the
-	 * global page dir)
+	 * Set start / end
 	 */
 	lcd->gv.paging_mem_bot = gv_paging_mem_start_gpa;
-	lcd->gv.paging_mem_brk = gv_paging_mem_start_gpa + PAGE_SIZE;
+	lcd->gv.paging_mem_brk = gv_paging_mem_start_gpa;
 	lcd->gv.paging_mem_top = gv_paging_mem_end_gpa;
 	
-	if (lcd->gv.paging_mem_brk > lcd->gv.paging_mem_top) {
-		printk(KERN_ERR "lcd_mm_gva_init: not enough room in gpa for paging\n");
-		ret = -EINVAL;
+	ret = lcd_mm_gva_alloc(lcd, &gpa, &hpa);
+	if (ret) {
+		printk(KERN_ERR "lcd_mm_gva_init: error alloc'ing\n");
 		goto fail1;
 	}
-
-	/*
-	 * Allocate a page for the global page dir.
-	 */
-	root = __get_free_page(GFP_KERNEL);
-	if (!root) {
-		printk(KERN_ERR "lcd_mm_gva_init: error allocating global page dir\n");
-		ret = -ENOMEM;
-		goto fail2;
-	}
-	memset((void *)root, 0, PAGE_SIZE);
-	lcd->gv.root_hva = root;
+	lcd->gv.root_hva = (u64)__va(hpa);
 	
-	/*
-	 * Map global page dir's page in lcd's ept
-	 */
-	ret = lcd_arch_ept_map_range(lcd->lcd_arch, 
-				gv_paging_mem_start_gpa, root, 1);
-	if (ret) {
-		printk("lcd_mm_gva_init: error mapping global page dir\n");
-		goto fail3;
-	}
-
 	/*
 	 * Mark root_hva as valid
 	 */
@@ -83,9 +64,6 @@ static int lcd_mm_gva_init(struct lcd *lcd, u64 gv_paging_mem_start_gpa,
 
 	return 0;
 
-fail3:
-	free_page(root);
-fail2:
 fail1:
 	return ret;
 }
@@ -277,9 +255,11 @@ static void lcd_mm_gva_destroy(struct lcd *lcd)
  * page (in the lcd's guest phys address space) for
  * storing a paging structure.
  */
-static int lcd_mm_gva_alloc(struct lcd *lcd, u64 *gpa, u64 *hpa)
+static int lcd_mm_gva_alloc(struct lcd *lcd, u64 *gpa_out, u64 *hpa_out)
 {
 	u64 hva;
+	u64 gpa;
+	u64 hpa;
 	int ret;
 
 	/*
@@ -290,7 +270,7 @@ static int lcd_mm_gva_alloc(struct lcd *lcd, u64 *gpa, u64 *hpa)
 		ret = -ENOMEM;
 		goto fail1;
 	}
-	*gpa = lcd->gv.paging_mem_brk;
+	gpa = lcd->gv.paging_mem_brk;
 	lcd->gv.paging_mem_brk += PAGE_SIZE;
 
 	/*
@@ -303,18 +283,21 @@ static int lcd_mm_gva_alloc(struct lcd *lcd, u64 *gpa, u64 *hpa)
 		goto fail2;
 	}
 	memset((void *)hva, 0, PAGE_SIZE);
-	*hpa = __pa(hva);
+	hpa = __pa(hva);
 
 	/*
 	 * Map in ept
 	 */
-	ret = lcd_arch_ept_map_range(lcd->lcd_arch, *gpa, *hpa, 1);
+	ret = lcd_arch_ept_map_range(lcd->lcd_arch, gpa, hpa, 1);
 	if (ret) {
 		printk(KERN_ERR "lcd_mm_gva_alloc: couldn't map gpa %lx to hpa %lx\n",
-			(unsigned long)*gpa,
-			(unsigned long)*hpa);
+			(unsigned long)gpa,
+			(unsigned long)hpa);
 		goto fail3;
 	}
+
+	*gpa_out = gpa;
+	*hpa_out = hpa;
 
 	return 0;
 

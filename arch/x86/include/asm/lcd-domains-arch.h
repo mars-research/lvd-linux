@@ -5,6 +5,101 @@
 #include <linux/spinlock.h>
 #include <lcd-domains/utcb.h>
 
+/* ADDRESS SPACE TYPES ---------------------------------------- */
+
+typedef struct { unsigned long gva } gva_t;
+typedef struct { unsigned long hva } hva_t;
+typedef struct { unsigned long gpa } gpa_t;
+typedef struct { unsigned long hpa } hpa_t;
+
+static inline gva_t __gva(unsigned long gva)
+{
+	return (gva_t){ gva };
+}
+static inline unsigned long gva_val(gva_t gva)
+{
+	return gva.gva;
+}
+static inline unsigned long * gva_ptr(gva_t * gva)
+{
+	return &(gva->gva);
+}
+static inline gva_t gva_add(gva_t gva, unsigned long off)
+{
+	return __gva(gva_val(gva) + off);
+}
+static inline hva_t __hva(unsigned long hva)
+{
+	return (hva_t){ hva };
+}
+static inline unsigned long hva_val(hva_t hva)
+{
+	return hva.hva;
+}
+static inline unsigned long * hva_ptr(hva_t * hva)
+{
+	return &(hva->hva);
+}
+static inline hva_t hva_add(hva_t hva, unsigned long off)
+{
+	return __hva(hva_val(hva) + off);
+}
+static inline gpa_t __gpa(unsigned long gpa)
+{
+	return (gpa_t){ gpa };
+}
+static inline unsigned long gpa_val(gpa_t gpa)
+{
+	return gpa.gpa;
+}
+static inline unsigned long * gpa_ptr(gpa_t * gpa)
+{
+	return &(gpa->gpa);
+}
+static inline gpa_t gpa_add(gpa_t gpa, unsigned long off)
+{
+	return __gpa(gpa_val(gpa) + off);
+}
+static inline hpa_t __hpa(unsigned long hpa)
+{
+	return (hpa_t){ hpa };
+}
+static inline unsigned long hpa_val(hpa_t hpa)
+{
+	return hpa.hpa;
+}
+static inline unsigned long * hpa_ptr(hpa_t * hpa)
+{
+	return &(hpa->hpa);
+}
+static inline hpa_t hpa_add(hpa_t hpa, unsigned long off)
+{
+	return __hpa(hpa_val(hpa) + off);
+}
+static inline hpa_t va2hpa(void *va)
+{
+	return (hpa_t){ __pa(va) };
+}
+static inline void * hpa2va(hpa_t hpa)
+{
+	return __va(hpa_val(hpa));
+}
+static inline hva_t hpa2hva(hpa_t hpa)
+{
+	return (hva_t){ (unsigned long)__va(hpa.hpa) };
+}
+static inline hpa_t hva2hpa(hva_t hva)
+{
+	return (hpa_t){ (unsigned long)__pa(hva2va(hva)) };
+}
+static inline void * hva2va(hva_t hva)
+{
+	return (void *)hva_val(hva);
+}
+
+
+/* LCD ARCH DATA STRUCTURES ---------------------------------------- */
+
 struct lcd_arch_vmcs {
 	u32 revision_id;
 	u32 abort;
@@ -40,7 +135,7 @@ enum lcd_arch_reg {
 
 struct lcd_arch_ept {
 	spinlock_t lock;
-	unsigned long root_hpa;
+	hpa_t root;
 	unsigned long vmcs_ptr;
 	bool access_dirty_enabled;
 };
@@ -68,8 +163,8 @@ struct lcd_arch {
 	 * Public Data
 	 */
 	struct {
-		u64 gva;
-		u64 gpa;
+		gva_t gv_fault_addr;
+		gpa_t gp_fault_addr;
 	} run_info;
 
 	/*
@@ -157,21 +252,21 @@ enum lcd_arch_status {
 };
 
 /**
- * Lookup ept entry for guest physical address gpa.
+ * Lookup ept entry for guest physical address a.
  *
  * Set create = 1 to allocate ept page table data structures
  * along the path as needed.
  */
-int lcd_arch_ept_walk(struct lcd_arch *vcpu, u64 gpa, int create,
+int lcd_arch_ept_walk(struct lcd_arch *vcpu, gpa_t a, int create,
 		lcd_arch_epte_t **epte_out);
 /**
  * Set the guest physical => host physical mapping in the ept entry.
  */
-void lcd_arch_ept_set(lcd_arch_epte_t *epte, u64 hpa);
+void lcd_arch_ept_set(lcd_arch_epte_t *epte, hpa_t a);
 /**
  * Read the host physical address stored in epte.
  */
-u64 lcd_arch_ept_hpa(lcd_arch_epte_t *epte);
+hpa_t lcd_arch_ept_hpa(lcd_arch_epte_t *epte);
 /**
  * Clears guest physical => host physical mapping in the ept.
  *
@@ -187,47 +282,48 @@ int lcd_arch_ept_unset(lcd_arch_epte_t *epte);
  * overwrite = 0  => do not overwrite if ept entry is already present
  * overwrite = 1  => overwrite any existing ept entry
  */
-int lcd_arch_ept_map_gpa_to_hpa(struct lcd_arch *vcpu, u64 gpa, u64 hpa,
-				int create, int overwrite);
+int lcd_arch_ept_map(struct lcd_arch *vcpu, gpa_t ga, hpa_t ha,
+		int create, int overwrite);
 /**
  * Maps 
  *
- *    gpa_start --> gpa_start + npages * PAGE_SIZE
+ *    ga_start --> ga_start + npages * PAGE_SIZE
  *
  * to
  *
- *    hpa_start --> hpa_start + npages * PAGE_SIZE
+ *    ha_start --> ha_start + npages * PAGE_SIZE
  *
  * in lcd's ept.
  */
-int lcd_arch_ept_map_range(struct lcd_arch *lcd, u64 gpa_start, u64 hpa_start, 
-			u64 npages);
+int lcd_arch_ept_map_range(struct lcd_arch *lcd, gpa_t ga_start, 
+			hpa_t ha_start, unsigned long npages);
 /**
  * Simple routine combining ept walk and unset.
  */
-int lcd_arch_ept_unmap_gpa(struct lcd_arch *vcpu, u64 gpa);
+int lcd_arch_ept_unmap(struct lcd_arch *vcpu, gpa_t a);
 /**
  * Unmaps 
  *
- *    gpa_start --> gpa_start + npages * PAGE_SIZE
+ *    ga_start --> ga_start + npages * PAGE_SIZE
  *
  * in lcd's ept.
  */
-int lcd_arch_ept_unmap_range(struct lcd_arch *lcd, u64 gpa_start, u64 npages);
+int lcd_arch_ept_unmap_range(struct lcd_arch *lcd, gpa_t ga_start, 
+			unsigned long npages);
 /**
  * Simple routine combinding ept walk and get.
  */
-int lcd_arch_ept_gpa_to_hpa(struct lcd_arch *vcpu, u64 gpa, u64 *hpa_out);
+int lcd_arch_ept_gpa_to_hpa(struct lcd_arch *vcpu, gpa_t ga, hpa_t *ha_out);
 /**
  * Set the lcd's program counter to the guest physical address
- * gpa.
+ * a.
  */
-int lcd_arch_set_pc(struct lcd_arch *vcpu, u64 gpa);
+int lcd_arch_set_pc(struct lcd_arch *vcpu, gpa_t a);
 /**
  * Set the lcd's gva root pointer (for x86, %cr3) to the
- * guest physical address gpa.
+ * guest physical address a.
  */
-int lcd_arch_set_gva_root(struct lcd_arch *vcpu, u64 gpa);
+int lcd_arch_set_gva_root(struct lcd_arch *vcpu, gpa_t a);
 
 /*
  * GDT Layout
@@ -242,16 +338,16 @@ int lcd_arch_set_gva_root(struct lcd_arch *vcpu, u64 gpa);
  * See Intel SDM V3 3.4.2, 3.4.3 for segment register layout
  * See Intel SDM V3 2.4.1 - 2.4.4 for gdtr, ldtr, idtr, tr
  */
-#define LCD_ARCH_FS_BASE     0x0UL
+#define LCD_ARCH_FS_BASE     __gpa(0UL);
 #define LCD_ARCH_FS_LIMIT    0xFFFFFFFF
-#define LCD_ARCH_GS_BASE     0x0UL
+#define LCD_ARCH_GS_BASE     __gpa(0UL);
 #define LCD_ARCH_GS_LIMIT    0xFFFFFFFF
-#define LCD_ARCH_GDTR_BASE   0x0000000000001000UL
+#define LCD_ARCH_GDTR_BASE   __gpa(1UL << PAGE_SHIFT);
 #define LCD_ARCH_GDTR_LIMIT  ((u32)~(PAGE_SIZE - 1))
-#define LCD_ARCH_TSS_BASE    0x0000000000002000UL
+#define LCD_ARCH_TSS_BASE    __gpa(2UL << PAGE_SHIFT);
 /* tss base + limit = address of last byte in tss, hence -1 */
 #define LCD_ARCH_TSS_LIMIT   (sizeof(struct lcd_arch_tss) - 1)
-#define LCD_ARCH_IDTR_BASE   0x0UL
+#define LCD_ARCH_IDTR_BASE   __gpa(0UL);
 #define LCD_ARCH_IDTR_LIMIT  0x0 /* no idt right now */
 
 #define LCD_ARCH_CS_SELECTOR   (1 << 3)
@@ -288,8 +384,8 @@ int lcd_arch_set_gva_root(struct lcd_arch *vcpu, u64 gpa);
  *                         |       (not mapped)        | (4 KBs)
  *                         +---------------------------+ 0x0000 0000 0000 0000
  */
-#define LCD_ARCH_UTCB        0x0000000000003000UL
-#define LCD_ARCH_STACK_TOP   0x0000000000004000UL
+#define LCD_ARCH_UTCB        __gpa(3UL << PAGE_SHIFT);
+#define LCD_ARCH_STACK_TOP   __gpa(4UL << PAGE_SHIFT);
 #define LCD_ARCH_FREE        LCD_ARCH_STACK_TOP
 
 /*

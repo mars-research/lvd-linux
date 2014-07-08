@@ -219,7 +219,7 @@ static int test05(void)
 	 * gpa 0x1234000UL.
 	 */
 	pmd = (pmd_t *)__va(hpa);
-	set_pmd(pmd + 4, 0x1234000UL);
+	set_pmd(pmd + 4, __pmd(0x1234000UL));
 
 	/*
 	 * Set up pud entry for look up, and find pmd

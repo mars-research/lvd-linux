@@ -1120,11 +1120,14 @@ static void vmx_free_ept_dir_level(lcd_arch_epte_t *dir, int level)
 		/*
 		 * Base case of recursion
 		 *
-		 * Free present pages in page table
+		 * Just make sure none of the pte's are present, to
+		 * ensure there are no memory leaks.
 		 */
 		for (idx = 0; idx < LCD_ARCH_PTRS_PER_EPTE; idx++) {
 			if (vmx_epte_present(dir[idx]))
-				free_page(vmx_epte_hva(dir[idx]));
+				printk(KERN_ERR "vmx_free_ept_dir_level: potential memory leak at hva %lx (hpa %lx)\n",
+					vmx_epte_hva(dir[idx]),
+					__pa(vmx_epte_hva(dir[idx])));
 		}
 	} else {
 		/*
@@ -1146,8 +1149,10 @@ static void vmx_free_ept_dir_level(lcd_arch_epte_t *dir, int level)
 }
 
 /**
- * Frees all memory associated with ept (ept paging
- * structures and mapped physical mem).
+ * Frees all memory associated with ept structures
+ * (but not the mapped memory itself! -- this can
+ * lead to memory leaks, but is better than potential
+ * double frees).
  */
 static void vmx_free_ept(struct lcd_arch *vcpu)
 {

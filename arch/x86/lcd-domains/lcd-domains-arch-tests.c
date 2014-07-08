@@ -237,7 +237,8 @@ static int test05(void)
 		goto fail_lookup;
 	}
 
-	vmx_free_ept(lcd); /* frees gdt */
+	vmx_destroy_gdt(lcd);
+	vmx_free_ept(lcd);
 	kfree(lcd);
 	return 0;
 
@@ -277,7 +278,8 @@ static int test06(void)
 		goto fail_lookup;
 	}
 
-	vmx_free_ept(lcd); /* frees tss */
+	vmx_destroy_tss(lcd);
+	vmx_free_ept(lcd);
 	kfree(lcd);
 	return 0;
 
@@ -317,7 +319,8 @@ static int test07(void)
 		goto fail_lookup;
 	}
 
-	vmx_free_ept(lcd); /* frees stack */
+	vmx_destroy_stack(lcd);
+	vmx_free_ept(lcd);
 	kfree(lcd);
 	return 0;
 

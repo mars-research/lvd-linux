@@ -1174,10 +1174,13 @@ static void vmx_free_ept_dir_level(lcd_arch_epte_t *dir, int level)
 		 * ensure there are no memory leaks.
 		 */
 		for (idx = 0; idx < LCD_ARCH_PTRS_PER_EPTE; idx++) {
-			if (vmx_epte_present(dir[idx]))
-				printk(KERN_ERR "vmx_free_ept_dir_level: potential memory leak at hva %lx (hpa %lx)\n",
+			if (vmx_epte_present(dir[idx])) {
+				printk(KERN_ERR "vmx_free_ept_dir_level: potential memory leak at hva %lx (hpa %lx, idx %d)\n",
 					(unsigned long)vmx_epte_hva(dir[idx]),
-					__pa(vmx_epte_hva(dir[idx])));
+					__pa(vmx_epte_hva(dir[idx])),
+					idx);
+				dump_stack();
+			}
 		}
 	} else {
 		/*

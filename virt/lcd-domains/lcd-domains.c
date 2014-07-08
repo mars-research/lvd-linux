@@ -437,8 +437,6 @@ static int lcd_mm_gva_walk_pmd(struct lcd *lcd, u64 gva, pud_t *pud_entry,
 			return ret;
 		}
 
-		entry = __va(hpa);
-
 		/*
 		 * Map *guest physical* address into pud entry
 		 */
@@ -510,8 +508,6 @@ static int lcd_mm_gva_walk_pud(struct lcd *lcd, u64 gva, pgd_t *pgd_entry,
 			return ret;
 		}
 
-		entry = __va(hpa);
-
 		/*
 		 * Map *guest physical* address into pud entry
 		 */
@@ -544,8 +540,6 @@ static int lcd_mm_gva_walk_pgd(struct lcd *lcd, u64 gva, pgd_t **pgd_out)
 			printk(KERN_ERR "lcd_mm_gva_walk_pgd: error alloc'ing\n");
 			return ret;
 		}
-
-		entry = __va(hpa);
 
 		/*
 		 * Map *guest physical* address into pgd entry

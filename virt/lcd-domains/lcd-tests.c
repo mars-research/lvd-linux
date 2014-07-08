@@ -415,6 +415,8 @@ static int test08(void)
 	int ret;
 	pgd_t *pgd_entry1;
 	pgd_t *pgd_entry2;
+	u64 gpa1;
+	u64 gpa2;
 
 	ret = lcd_create(&lcd);
 	if (ret) {
@@ -453,6 +455,22 @@ static int test08(void)
 		goto fail5;
 	}
 
+	gpa1 = pgd_pfn(*pgd_entry1) << PAGE_SHIFT;
+	gpa2 = pgd_pfn(*pgd_entry2) << PAGE_SHIFT;
+	if (gpa1 < LCD_ARCH_FREE || gpa1 > LCD_ARCH_FREE + 2 * PAGE_SIZE) {
+		printk(KERN_ERR "lcd test: test08 bad gpa %lx\n",
+			(unsigned long)gpa1);
+		ret = -1;
+		goto fail5;
+	}
+	
+	if (gpa1 != gpa2) {
+		printk(KERN_ERR "lcd test: test08 two diff gpa's: first = %lx, second %lx\n",
+			(unsigned long)gpa1, (unsigned long)gpa2);
+		ret = -1;
+		goto fail5;
+	}
+
 	lcd_destroy(lcd);
 
 	return 0;
@@ -466,7 +484,6 @@ fail1:
 	return ret;
 }
 
-#if 0
 static int test09(void)
 {
 	struct lcd *lcd;
@@ -578,7 +595,7 @@ fail2:
 fail1:
 	return ret;
 }
-#endif
+
 static void lcd_tests(void)
 {
 	if (test01())
@@ -597,7 +614,7 @@ static void lcd_tests(void)
 		return;
 	if (test08())
 		return;
-//	if (test09())
-//		return;
+	if (test09())
+		return;
 	return;
 }

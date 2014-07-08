@@ -513,7 +513,7 @@ static int lcd_mm_gva_walk_pgd(struct lcd *lcd, u64 gva, pgd_t **pgd_out)
 	u64 gpa;
 	u64 hpa;
 
-	entry = (pgd_t *)(lcd->gv.root_hva + pgd_index(gva));
+	entry = ((pgd_t *)lcd->gv.root_hva) + pgd_index(gva);
 	if (!pgd_present(*entry)) {
 		/*
 		 * Alloc and map a pud

@@ -409,8 +409,7 @@ fail1:
 	return ret;
 }
 
-#if 0
-static int test03(void)
+static int test08(void)
 {
 	struct lcd *lcd;
 	int ret;
@@ -521,7 +520,6 @@ fail2:
 fail1:
 	return ret;
 }
-#endif
 
 static void lcd_tests(void)
 {
@@ -538,6 +536,8 @@ static void lcd_tests(void)
 	if (test06())
 		return;
 	if (test07())
+		return;
+	if (test08())
 		return;
 	return;
 }

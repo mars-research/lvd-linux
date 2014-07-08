@@ -15,6 +15,14 @@
 #include <net/net_namespace.h>
 #include <linux/sched/rt.h>
 
+#ifdef CONFIG_LCD
+#define INIT_LCD(tsk)					\
+	.sync_rendezvous = LIST_HEAD_INIT(tsk.sync_rendezvous), \
+        .utcb = NULL,
+#else
+#define INIT_LCD(tsk)
+#endif
+
 #ifdef CONFIG_SMP
 # define INIT_PUSHABLE_TASKS(tsk)					\
 	.pushable_tasks = PLIST_NODE_INIT(tsk.pushable_tasks, MAX_PRIO),

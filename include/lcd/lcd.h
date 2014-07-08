@@ -76,7 +76,6 @@ struct lcd {
 		struct vmx_msr_entry host[NR_AUTOLOAD_MSRS];
 	} msr_autoload;
 
-	struct sync_ipc sync_ipc;
 	struct vmcs *vmcs;
 	void *shared;
 

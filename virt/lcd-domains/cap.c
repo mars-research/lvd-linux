@@ -82,7 +82,7 @@ bool lcd_cap_delete_internal(struct cte *cap, bool *last_reference)
 	struct cte *node;
 	bool done = false;
 	
-	BUG_ON(cap != NULL); 
+	BUG_ON(cap == NULL); 
 	  
 	if(last_reference == NULL)
 		return false;
@@ -116,7 +116,7 @@ uint32_t lcd_cap_delete_capability(struct cap_space *cspace, capability_t cid)
 	bool last_reference = false;
 	struct semaphore *sem_cdt_backup;
 
-	BUG_ON(cid);
+	BUG_ON(cid == 0);
   
 	cap = lcd_cap_lookup_capability(cspace, cid, true);
 	if (cap == NULL)
@@ -145,7 +145,7 @@ uint32_t lcd_cap_revoke_capability(struct cap_space *cspace, capability_t cid)
 	int size = sizeof(struct cte);
 	bool dummy = false, last_reference = false;
   
-	BUG_ON(cid);
+	BUG_ON(cid == 0);
 
 	if (kfifo_alloc(&cap_q, sizeof(struct cte) * 512, GFP_KERNEL) != 0)
 	{
@@ -156,7 +156,7 @@ uint32_t lcd_cap_revoke_capability(struct cap_space *cspace, capability_t cid)
 	cap = lcd_cap_lookup_capability(cspace, cid, true);
 	if (cap == NULL)
 	{
-		LCD_PANIC("lcd_cap_delete_capability: Capability not found\n");
+		LCD_PANIC("lcd_cap_revoke_capability: Capability not found\n");
 		return -1;
 	}
 	cdt = cap->cap.cdt_node;
@@ -200,7 +200,7 @@ void lcd_cap_destroy_cspace(struct cap_space *cspace)
 	struct semaphore *sem_cdt_backup;
 	bool cspace_locked = false, table_visited = false, last_reference = false;
  
-        BUG_ON(cspace);
+        BUG_ON(cspace == NULL);
 
 	if (kfifo_alloc(&cnode_q, sizeof(struct cte) * 512, GFP_KERNEL) != 0)
 	{
@@ -312,7 +312,7 @@ capability_t lcd_cap_grant_capability(struct cap_space *src_space, capability_t 
 	bool done = false;
 	struct cap_derivation_tree *dst_cdt_node;
 	
-	BUG_ON(src_space != NULL && dst_space != NULL && src_cid != 0);
+	BUG_ON(src_space == NULL || dst_space == NULL || src_cid == 0);
 	
 	dst_cdt_node = kmalloc(sizeof(struct cap_derivation_tree), GFP_KERNEL);
 	if(!dst_cdt_node) {
@@ -405,7 +405,7 @@ uint32_t lcd_cap_get_rights(struct cap_space *cspace, capability_t cid, lcd_cap_
 {
 	struct cte       *cap;
   
-	BUG_ON(cspace && cid != 0 && rights); 
+	BUG_ON(cspace == NULL || cid == 0 || rights == NULL); 
 
 	cap = lcd_cap_lookup_capability(cspace, cid, false);
 	if (cap == NULL || cap->ctetype != lcd_type_capability)
@@ -427,12 +427,12 @@ struct cte * lcd_cap_lookup_capability(struct cap_space *cspace, capability_t ci
 	int index = 0;
 	int mask = (~0);
     
-	BUG_ON(cspace && cid != 0);
+	BUG_ON(cspace == NULL || cid == 0);
 
 	mask = mask << (CNODE_INDEX_BITS);
 	mask = ~mask;
   
-	BUG_ON(cspace->root_cnode.cnode.table);
+	BUG_ON(cspace->root_cnode.cnode.table == NULL);
 
 	node = cspace->root_cnode.cnode.table;
   
@@ -479,7 +479,7 @@ capability_t lcd_cap_create_capability(struct cap_space *cspace, void * hobject,
 	capability_t           cid;
 	struct cap_derivation_tree *cdtnode;
   
-	BUG_ON(cspace && cspace->root_cnode.cnode.table);
+	BUG_ON(cspace == NULL || cspace->root_cnode.cnode.table == NULL);
   
 	cdtnode = kmalloc(sizeof(struct cap_derivation_tree), GFP_KERNEL);
 	if (cdtnode == NULL)
@@ -641,7 +641,7 @@ bool lcd_cap_initialize_freelist(struct cap_space *cspace, struct cte *cnode, bo
 	int startid = 1;
 	int i;
  
-	BUG_ON(cnode && cspace);
+	BUG_ON(cnode == NULL || cspace == NULL);
 
 	if (bFirstCNode)
 	{
@@ -681,7 +681,7 @@ bool lcd_cap_initialize_freelist(struct cap_space *cspace, struct cte *cnode, bo
 struct cte * lcd_cap_reserve_slot(struct cte *cnode, capability_t *cid, int free_slot)
 {
 	struct cte *node = cnode->cnode.table;
-	BUG_ON(node[free_slot].ctetype == lcd_type_free);
+	BUG_ON(node[free_slot].ctetype != lcd_type_free);
 	// a valid empty slot
 	node[0].slot.next_free_cap_slot = node[free_slot].slot.next_free_cap_slot;
 	lcd_set_bits_at_level(cnode, cid, free_slot);
@@ -702,7 +702,7 @@ capability_t lcd_cap_lookup_freeslot(struct cap_space *cspace, struct cte **cap)
 	int size = sizeof(struct cte);
 	struct kfifo cnode_q;
   
-	BUG_ON(cspace && cspace->root_cnode.cnode.table && cap);
+	BUG_ON(cspace == NULL || cspace->root_cnode.cnode.table == NULL || cap == NULL);
 
 	if (kfifo_alloc(&cnode_q, sizeof(struct cte) * 512, GFP_KERNEL) != 0)
 	{
@@ -798,7 +798,7 @@ capability_t lcd_cap_mint_capability(struct cap_space *cspace, capability_t cid,
 	struct cap_derivation_tree *dst_cdt;
 	bool done = false;
   
-	BUG_ON(cid);
+	BUG_ON(cid == 0);
 
 	dst_cdt = kmalloc(sizeof(struct cap_derivation_tree), GFP_KERNEL);
 	if (dst_cdt == NULL)

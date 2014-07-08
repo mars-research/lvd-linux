@@ -7,130 +7,127 @@
 #include <lcd/cap.h>
 #include <lcd/lcd.h>
 
-//#include "lcd_defs.h"
-
-void display_mr(utcb_t *p_utcb) {
-	printk(KERN_ERR "Message Regs at utcb %p - %d ,%d , %d\n", p_utcb, p_utcb->mr[0], p_utcb->mr[1], p_utcb->mr[3]);
-}
-
-//int ipc_send(capability_t recv, struct lcd_message *msg) {
-//
-//};
-
-
-
-int ipc_send(capability_t cap, struct lcd_message_info *msg)
+int ipc_send(capability_t rvp_cap, struct message_info *msg)
 {
-	struct lcd *recv_lcd, *snd_lcd;
-	struct ipc_wait_list_elem stack_elem;
-#if 0
-	printk(KERN_ERR "ipc_send : myself %p re %d\n", current->utcb, cap);
-	//chk if the reciever is ready
-	// fetch the reciever task struct from if
+	struct task_struct *recv_task;
+	struct sync_ipc *sync_ipc;
+	struct cte *rvp_cte;
+	unsigned long flags;
+
+	printk(KERN_ERR "ipc_send:%s: sending on cap %lld\n", current->comm, rvp_cap);
 	
-	recv_lcd = (struct lcd *) get_cap_obj(recv);
-	if (recv_lcd == NULL) {
-		printk(KERN_ERR "ipc_send : Cant get object for reciever %d\n", recv_capid);
-		return -1;   
+        rvp_cte = lcd_cap_lookup_capability(&current->cspace, rvp_cap, true);
+	if (rvp_cte == NULL) {
+		printk(KERN_ERR "ipc_send: can't resolve rendezvous capabilty: %lld\n", rvp_cap);
+		return -EINVAL;   
 	}
 
-	snd_lcd = (struct lcd *) get_cap_obj(myself);
-	if (snd_lcd == NULL) {
-		printk(KERN_ERR "ipc_send : Cant get object for myself %d\n", myself);
-		return -1;   
-	}
+	sync_ipc = (struct sync_ipc *) rvp_cte->cap.hobject;
+	
+	BUG_ON(!sync_ipc); 
 
-	if (recv_lcd->sync_ipc.state == IPC_RCV_WAIT && \
-		recv_lcd->sync_ipc.expected_sender == myself) {
+	// XXX: BU: Maybe I need to do some reference counting for IPC 
+	// objects here (before releasing the lock)
+	up(rvp_cte->cap.cdt_node->sem_cdt);
 
-		printk(KERN_ERR "ipc_send : partner %d expecting me\n", recv_capid);
-		//copy the message registers
-		memcpy(recv_lcd->shared, snd_lcd->shared, sizeof(utcb_t));
-		//awaken the thread
-		wake_up_process(recv_lcd->sync_ipc.task);
-    
-		//looks like there is no need for a reciever queue
-		//as if a process invokes a recv and finds no
-		//corresponding senders , then it puts itself to sleep
-		recv_lcd->sync_ipc.state = IPC_DONT_CARE;
-		recv_lcd->sync_ipc.expected_sender = 0;
-		//No case of 
+	spin_lock_irqsave(&sync_ipc->lock, flags); 	
+	if (list_empty(&sync_ipc->receivers)) {
 
-	} else {
-		// put him in the Q
-		recv_lcd->sync_ipc.snd_sleepers++;
 		set_current_state(TASK_INTERRUPTIBLE);
-		stack_elem.peer = myself;
-		stack_elem.task = current;
-		// recv_lcd->sync_ipc.status = IPC_SND_WAIT;
-		list_add_tail(&stack_elem.list, &recv_lcd->sync_ipc.snd_q);
-		printk(KERN_ERR "ipc_send : putting myself to sleep %p\n", current);
-
+		list_add_tail(&current->sync_rendezvous, &sync_ipc->senders);
+		
+		printk(KERN_ERR "ipc_send:%s: putting myself to sleep\n", current->comm);
+		
+		spin_unlock_irqrestore(&sync_ipc->lock, flags);
 		schedule();
+		printk(KERN_ERR "ipc_send: somone woke me up\n");
+		return 0; 
 
 	}
-#endif
-	printk(KERN_ERR "ipc_send : Finished\n");
+
+	recv_task = list_first_entry(&sync_ipc->receivers, 
+					struct task_struct, 
+					sync_rendezvous);
+
+        list_del(&recv_task->sync_rendezvous); 
+	spin_unlock_irqrestore(&sync_ipc->lock, flags);
+	 
+	printk(KERN_ERR "ipc_send: found other end %s\n", recv_task->comm);
+	
+	// copy the message registers
+	// XXX: BU: maybe MIN(of valid_regs)?
+	memcpy(recv_task->utcb->msg_info.regs, 
+		current->utcb->msg_info.regs, 
+		sizeof(uint64_t)*recv_task->utcb->msg_info.valid_regs);
+
+	// BU: TODO: transfer capabilities
+
+	wake_up_process(recv_task); 
+	printk(KERN_ERR "ipc_send: finished\n");
 	return 0;
 
 }
 EXPORT_SYMBOL(ipc_send);
 
-int ipc_recv(u32 myself, u32 send_capid) 
+int ipc_recv(capability_t rvp_cap, struct message_info *msg)
 {
-	struct lcd *recv_lcd, *snd_lcd;
-	struct list_head *ptr;
-	struct ipc_wait_list_elem *entry;
+	struct task_struct *send_task;
+	struct sync_ipc *sync_ipc;
+	struct cte *rvp_cte;
+	unsigned long flags;
 
-	printk(KERN_ERR "ipc_recv : myself %d sender %d\n", myself, send_capid);
-
-	recv_lcd = (struct lcd *) get_cap_obj(myself);
-	if (recv_lcd == NULL) {
-		printk(KERN_ERR "ipc_recv : Cant get object for my id %d\n", myself);
-		return -1;   
+	printk(KERN_ERR "ipc_recv:%s: receiving on cap %lld\n", current->comm, rvp_cap);
+	
+        rvp_cte = lcd_cap_lookup_capability(&current->cspace, rvp_cap, true);
+	if (rvp_cte == NULL) {
+		printk(KERN_ERR "ipc_recv: can't resolve capability: %lld\n", rvp_cap);
+		return -EINVAL;   
 	}
 
-	snd_lcd = (struct lcd *) get_cap_obj(send_capid);
-	if (snd_lcd == NULL) {
-		printk(KERN_ERR "ipc_recv : Cant get object for peer id %d\n", send_capid);
-		//return -1;   
+	sync_ipc = (struct sync_ipc *) rvp_cte->cap.hobject;
+	
+	BUG_ON(!sync_ipc); 
+
+	// XXX: BU: Maybe I need to do some reference counting for IPC 
+	// objects here (before releasing the lock)
+	up(rvp_cte->cap.cdt_node->sem_cdt);
+
+	spin_lock_irqsave(&sync_ipc->lock, flags); 	
+	if (list_empty(&sync_ipc->senders)) {
+
+		set_current_state(TASK_INTERRUPTIBLE);
+		list_add_tail(&current->sync_rendezvous, &sync_ipc->receivers);
+		
+		printk(KERN_ERR "ipc_recv:%s: putting myself to sleep\n", current->comm);
+		
+		spin_unlock_irqrestore(&sync_ipc->lock, flags);
+		schedule();		
+		printk(KERN_ERR "ipc_recv: somone woke me up\n");
+		return 0; 
 	}
 
-	//check if one of the senders in the snd q is our intended
-	// recipient
-	if (recv_lcd->sync_ipc.snd_sleepers > 0) {
+	send_task = list_first_entry(&sync_ipc->senders,
+					struct task_struct, 
+					sync_rendezvous);
 
-		printk(KERN_ERR "ipc_recv : Num of senders in Q %d \n", \
-			recv_lcd->sync_ipc.snd_sleepers);
+        list_del(&send_task->sync_rendezvous); 
+	spin_unlock_irqrestore(&sync_ipc->lock, flags);
+	 
+	printk(KERN_ERR "ipc_send: other end %s\n", send_task->comm);
+	
+	// copy the message registers
+	// XXX: BU: maybe MIN(of valid_regs)?
+	memcpy(current->utcb->msg_info.regs, 
+		send_task->utcb->msg_info.regs, 
+		sizeof(uint64_t)*send_task->utcb->msg_info.valid_regs);
 
-		list_for_each(ptr, &recv_lcd->sync_ipc.snd_q) {
-			entry = list_entry(ptr, struct ipc_wait_list_elem, list);
-			if (entry->peer == send_capid) {
-				printk(KERN_ERR "ipc_recv : Found expected sender %d\n", send_capid);
+	// BU: TODO: transfer capabilities
 
-				recv_lcd->sync_ipc.snd_sleepers--;
-				//copy the message registers
-				memcpy(recv_lcd->shared, snd_lcd->shared, sizeof(utcb_t));
-				//remove the entry
-				list_del(ptr);
-				//wakeup
-				wake_up_process(entry->task);
-				// we dont care for state in snd_wait
-				//recv_lcd->sync_ipc.status = IPC_RUNNING; 
-				printk(KERN_ERR "ipc_recv : Returning after waking up sender\n");
-				return 0; 
-			}
-		}
-	}
-	printk(KERN_ERR "ipc_recv : Scheduling out myself\n");
-	// we cant proceed further
-	recv_lcd->sync_ipc.state = IPC_RCV_WAIT ;
-	recv_lcd->sync_ipc.expected_sender = send_capid;
-	set_current_state(TASK_INTERRUPTIBLE);
-	schedule();
-
-	printk(KERN_ERR "ipc_recv : Somebody woke me\n");
+	wake_up_process(send_task); 
+	printk(KERN_ERR "ipc_recv: finished\n");
 	return 0;
 
 }
 EXPORT_SYMBOL(ipc_recv);
+
+

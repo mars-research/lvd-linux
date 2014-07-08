@@ -13,15 +13,15 @@
 #include <linux/delay.h>
 #include <linux/kfifo.h>
 #include <asm/page.h>
+#include <uapi/linux/lcd-cap.h>
 
 MODULE_LICENSE("GPL");
-MODULE_AUTHOR ("FLUX-LAB University of Utah");
+MODULE_AUTHOR ("Flux Research Group, University of Utah");
 
 /* XXX: some temporary crap from Jithu to test IPC */
 void * get_cap_obj(u32 cap_id);
 
 typedef uint32_t   lcd_cnode;         // a pointer to the cnode
-typedef uint64_t   capability_t ;           // a locally unique identifier (address within cspace)
 typedef uint32_t   lcd_cnode_entry;   // a pointer to an entry within a cnode
 typedef uint64_t   lcd_tcb;           // a pointer/handle to the thread contrl block
 typedef uint16_t   lcd_cap_rights;    // holds the rights associated with a capability.

@@ -21,22 +21,22 @@ struct lcd {
 		 * Host virtual address of the root of the lcd's
 		 * (initial) guest virtual paging hierarchy.
 		 */
-		u64 root_hva;
+		pgd_t *root;
 		/*
 		 * Pointer to start of guest physical address space 
 		 * used for paging.
 		 */
-		u64 paging_mem_bot;
+		gpa_t paging_mem_bot;
 		/*
 		 * Pointer to next free page in guest physical
 		 * address space that can be used for a page table.
 		 */
-		u64 paging_mem_brk;
+		gpa_t paging_mem_brk;
 		/*
 		 * Top of region in guest physical address space
 		 * for page tables.
 		 */
-		u64 paging_mem_top;
+		gpa_t paging_mem_top;
 	} gv;
 };
 

@@ -72,7 +72,7 @@ static int test03(void)
 		goto fail;
 	}
 
-	buf = (char *)__va(lcd->ept.root_hpa);
+	buf = (char *)hpa2va(lcd->ept.root);
 	for (i = 0; i < PAGE_SIZE; i++) {
 		if (buf[i]) {
 			printk(KERN_ERR "lcd arch : test03 nonzero in ept\n");
@@ -93,12 +93,32 @@ fail_alloc:
 	return -1;
 }
 
+static int test04_help(struct lcd_arch *lcd, gpa_t base)
+{
+	hpa_t actual;
+	unsigned long off;
+
+	for (off = 0; off < 0x40000; off += PAGE_SIZE) {
+		if (lcd_arch_ept_gpa_to_hpa(lcd, gpa_add(base, off), &actual)) {
+			printk(KERN_ERR "lcd arch : test04 failed lookup at %lx\n",
+				gpa_val(gpa_add(base, off)));
+			return -1;
+		}
+		if (hpa_val(actual) != gpa_val(gpa_add(base, off))) {
+			printk(KERN_ERR "lcd arch : test04 expected hpa %lx got %lx\n",
+				gpa_val(gpa_add(base, off)),
+				hpa_val(actual));
+			return -1;
+		}
+	}
+}
+
 static int test04(void)
 {
 	struct lcd_arch *lcd;
-	u64 base;
-	u64 actual;
-	u64 off;
+	gpa_t base;
+	hpa_t actual;
+	unsigned long off;
 
 	lcd = (struct lcd_arch *)kmalloc(sizeof(*lcd), GFP_KERNEL);
 	if (!lcd) {
@@ -111,26 +131,26 @@ static int test04(void)
 	}
 
 	/*
-	 * Map 0x0 - 0x400000 (first 4 MBs, takes two page dirs)
+	 * Map 0x0 - 0x400000 (first 4 MBs, takes two page tables)
 	 */
-	if (lcd_arch_ept_map_range(lcd, 0, 0, 1024)) {
+	if (lcd_arch_ept_map_range(lcd, __gpa(0), __hpa(0), 1024)) {
 		printk(KERN_ERR "lcd arch: test04 failed to map first 4 MBs\n");
 		goto fail3;
 	}
 
 	/*
-	 * Map 0x40000000 - 0x40400000 (1GB -- 1GB + 4MBs, takes two page dirs)
+	 * Map 0x40000000 - 0x40400000 (1GB -- 1GB + 4MBs)
 	 */
-	if (lcd_arch_ept_map_range(lcd, 1 << 30, 1 << 30, 1024)) {
+	if (lcd_arch_ept_map_range(lcd, __gpa(1 << 30), __hpa(1 << 30), 1024)) {
 		printk(KERN_ERR "lcd arch: test04 failed to map 2nd 4 MBs\n");
 		goto fail4;
 	}
 
 	/*
-	 * Map 0x8000000000 - 0x8000400000 (512GB -- 512GB + 4MBs, 
-	 * takes two page dirs)
+	 * Map 0x8000000000 - 0x8000400000 (512GB -- 512GB + 4MBs)
 	 */
-	if (lcd_arch_ept_map_range(lcd, 1UL << 39, 1UL << 39, 1024)) {
+	if (lcd_arch_ept_map_range(lcd, __gpa(1UL << 39), 
+					__hpa(1UL << 39), 1024)) {
 		printk(KERN_ERR "lcd arch: test04 failed to map 3rd 4 MBs\n");
 		goto fail5;
 	}
@@ -139,68 +159,30 @@ static int test04(void)
 	 * CHECK
 	 */
 
-	base = 0;
-	for (off = 0; off < 0x40000; off += PAGE_SIZE) {
-		if (lcd_arch_ept_gpa_to_hpa(lcd, base + off, &actual)) {
-			printk(KERN_ERR "lcd arch : test04 failed lookup at %lx\n",
-				(unsigned long)(base + off));
-			goto fail6;
-		}
-		if (actual != (base + off)) {
-			printk(KERN_ERR "lcd arch : test04 expected hpa %lx got %lx\n",
-				(unsigned long)(base + off),
-				(unsigned long)actual);
+	base = __gpa(0);
+	if (test04_help(lcd, base))
+		goto fail6;
+	base = __gpa(1 << 30);
+	if (test04_help(lcd, base))
+		goto fail6;
+	base = __gpa(1 << 39);
+	if (test04_help(lcd, base))
+		goto fail6;
 
-			goto fail6;
-		}
-	}
-
-	base = 0x40000000;
-	for (off = 0; off < 0x40000; off += PAGE_SIZE) {
-		if (lcd_arch_ept_gpa_to_hpa(lcd, base + off, &actual)) {
-			printk(KERN_ERR "lcd arch : test04 failed lookup at %lx\n",
-				(unsigned long)(base + off));
-			goto fail6;
-		}
-		if (actual != (base + off)) {
-			printk(KERN_ERR "lcd arch : test04 expected hpa %lx got %lx\n",
-				(unsigned long)(base + off),
-				(unsigned long)actual);
-
-			goto fail6;
-		}
-	}
-
-	base = 0x8000000000;
-	for (off = 0; off < 0x40000; off += PAGE_SIZE) {
-		if (lcd_arch_ept_gpa_to_hpa(lcd, base + off, &actual)) {
-			printk(KERN_ERR "lcd arch : test04 failed lookup at %lx\n",
-				(unsigned long)(base + off));
-			goto fail6;
-		}
-		if (actual != (base + off)) {
-			printk(KERN_ERR "lcd arch : test04 expected hpa %lx got %lx\n",
-				(unsigned long)(base + off),
-				(unsigned long)actual);
-
-			goto fail6;
-		}
-	}
-
-	lcd_arch_ept_unmap_range(lcd, 1UL << 39, 1024);
-	lcd_arch_ept_unmap_range(lcd, 1 << 30, 1024);
-	lcd_arch_ept_unmap_range(lcd, 0, 1024);
+	lcd_arch_ept_unmap_range(lcd, __gpa(1UL << 39), 1024);
+	lcd_arch_ept_unmap_range(lcd, __gpa(1 << 30), 1024);
+	lcd_arch_ept_unmap_range(lcd, __gpa(0), 1024);
 	vmx_free_ept(lcd);
 	kfree(lcd);
 
 	return 0;
 
 fail6:
-	lcd_arch_ept_unmap_range(lcd, 1UL << 39, 1024);
+	lcd_arch_ept_unmap_range(lcd, __gpa(1UL << 39), 1024);
 fail5:
-	lcd_arch_ept_unmap_range(lcd, 1 << 30, 1024);
+	lcd_arch_ept_unmap_range(lcd, __gpa(1 << 30), 1024);
 fail4:
-	lcd_arch_ept_unmap_range(lcd, 0, 1024);
+	lcd_arch_ept_unmap_range(lcd, __gpa(0), 1024);
 fail3:
 	vmx_free_ept(lcd);
 fail2:
@@ -213,7 +195,7 @@ fail1:
 static int test05(void)
 {
 	struct lcd_arch *lcd;
-	u64 hpa;
+	hpa_t hpa;
 
 	lcd = (struct lcd_arch *)kmalloc(sizeof(*lcd), GFP_KERNEL);
 	if (!lcd) {
@@ -232,7 +214,7 @@ static int test05(void)
 		printk(KERN_ERR "lcd arch : test05 lookup failed\n");
 		goto fail_lookup;
 	}
-	if (hpa != __pa(lcd->gdt)) {
+	if (hpa_val(hpa) != hpa_val(pa2hpa(lcd->gdt))) {
 		printk(KERN_ERR "lcd arch : test05 unexpected gdt addr\n");
 		goto fail_lookup;
 	}
@@ -254,7 +236,7 @@ fail_alloc:
 static int test06(void)
 {
 	struct lcd_arch *lcd;
-	u64 hpa;
+	hpa_t hpa;
 
 	lcd = (struct lcd_arch *)kmalloc(sizeof(*lcd), GFP_KERNEL);
 	if (!lcd) {
@@ -273,7 +255,7 @@ static int test06(void)
 		printk(KERN_ERR "lcd arch : test06 lookup failed\n");
 		goto fail_lookup;
 	}
-	if (hpa != __pa(lcd->tss)) {
+	if (hpa_val(hpa) != hpa_val(pa2hpa(lcd->tss))) {
 		printk(KERN_ERR "lcd arch : test06 unexpected tss addr\n");
 		goto fail_lookup;
 	}
@@ -295,7 +277,7 @@ fail_alloc:
 static int test07(void)
 {
 	struct lcd_arch *lcd;
-	u64 hpa;
+	hpa_t hpa;
 
 	lcd = (struct lcd_arch *)kmalloc(sizeof(*lcd), GFP_KERNEL);
 	if (!lcd) {
@@ -314,7 +296,7 @@ static int test07(void)
 		printk(KERN_ERR "lcd arch : test07 lookup failed\n");
 		goto fail_lookup;
 	}
-	if (hpa != __pa(lcd->utcb)) {
+	if (hpa_val(hpa) != hpa_val(pa2hpa(lcd->utcb))) {
 		printk(KERN_ERR "lcd arch : test07 unexpected utcb addr\n");
 		goto fail_lookup;
 	}

@@ -28,7 +28,87 @@ MODULE_DESCRIPTION("LCD driver");
 
 /* Guest Virtual -------------------------------------------------- */
 
-static int lcd_mm_gva_alloc(struct lcd *lcd, u64 *gpa, u64 *hpa);
+static inline gpa_t pte_gpa(pte_t *pte)
+{
+	return __gpa(pte_pfn(*pte) << PAGE_SHIFT);
+}
+static inline gpa_t pmd_gpa(pmd_t *pmd_entry)
+{
+	return __gpa(pmd_pfn(*pmd_entry) << PAGE_SHIFT);
+}
+static inline gpa_t pud_gpa(pud_t *pud_entry)
+{
+	return __gpa(pud_pfn(*pud_entry) << PAGE_SHIFT);
+}
+static inline gpa_t pgd_gpa(pgd_t *pgd_entry)
+{
+	return __gpa(pgd_pfn(*pgd_entry) << PAGE_SHIFT);
+}
+
+/**
+ * Allocates a host physical page and guest physical
+ * page (in the lcd's guest phys address space) for
+ * storing a paging structure.
+ */
+static int lcd_mm_gva_alloc(struct lcd *lcd, gpa_t *ga_out, hpa_t *ha_out)
+{
+	hva_t hva;
+	gpa_t gpa;
+	hpa_t hpa;
+	int ret;
+
+	if (!lcd->gv.present) {
+		printk(KERN_ERR "lcd_mm_gva_alloc: gv paging not present\n");
+		ret = -EINVAL;
+		goto fail1;
+	}
+
+	/*
+	 * Check watermark, and bump it.
+	 */
+	if (gpa_val(lcd->gv.paging_mem_brk) >= 
+		gpa_val(lcd->gv.paging_mem_top)) {
+		printk(KERN_ERR "lcd_mm_gva_alloc: exhausted paging mem\n");
+		ret = -ENOMEM;
+		goto fail1;
+	}
+	gpa = lcd->gv.paging_mem_brk;
+	lcd->gv.paging_mem_brk = gpa_add(lcd->gv.paging_mem_brk, PAGE_SIZE);
+
+	/*
+	 * Allocate a host physical page
+	 */
+	hva = __hva(__get_free_page(GFP_KERNEL));
+	if (!hva_val(hva)) {
+		printk(KERN_ERR "lcd_mm_gva_alloc: no host phys mem\n");
+		ret = -ENOMEM;
+		goto fail2;
+	}
+	memset(hva2va(hva), 0, PAGE_SIZE);
+	hpa = hva2hpa(hva);
+
+	/*
+	 * Map in ept
+	 */
+	ret = lcd_arch_ept_map_range(lcd->lcd_arch, gpa, hpa, 1);
+	if (ret) {
+		printk(KERN_ERR "lcd_mm_gva_alloc: couldn't map gpa %lx to hpa %lx\n",
+			gpa_val(gpa),
+			hpa_val(hpa));
+		goto fail3;
+	}
+
+	*ga_out = gpa;
+	*ha_out = hpa;
+
+	return 0;
+
+fail3:
+	free_page(hva_val(hva));
+fail2:
+fail1:
+	return ret;
+}
 
 /**
  * Initializes guest virtual address space info in lcd, and
@@ -36,11 +116,11 @@ static int lcd_mm_gva_alloc(struct lcd *lcd, u64 *gpa, u64 *hpa);
  *
  * Must be called before mapping any gva's.
  */
-static int lcd_mm_gva_init(struct lcd *lcd, u64 gv_paging_mem_start_gpa,
-		u64 gv_paging_mem_end_gpa)
+static int lcd_mm_gva_init(struct lcd *lcd, gpa_t gv_paging_mem_start,
+			gpa_t gv_paging_mem_end)
 {
-	u64 gpa;
-	u64 hpa;
+	gpa_t gpa;
+	hpa_t hpa;
 	int ret;
 
 	/*
@@ -50,15 +130,23 @@ static int lcd_mm_gva_init(struct lcd *lcd, u64 gv_paging_mem_start_gpa,
 	lcd->gv.paging_mem_brk = gv_paging_mem_start_gpa;
 	lcd->gv.paging_mem_top = gv_paging_mem_end_gpa;
 	
+	/*
+	 * Alloc a page for the pgd
+	 */
 	ret = lcd_mm_gva_alloc(lcd, &gpa, &hpa);
 	if (ret) {
 		printk(KERN_ERR "lcd_mm_gva_init: error alloc'ing\n");
 		goto fail1;
 	}
-	lcd->gv.root_hva = (u64)__va(hpa);
 	
 	/*
-	 * Mark root_hva as valid
+	 * Store the root pointer
+	 */
+	lcd->gv.root = (pgd_t *)hpa2va(hpa);
+	lcd_arch_set_gva_root(lcd, gpa);
+	
+	/*
+	 * Mark paging as present
 	 */
 	lcd->gv.present = 1;
 
@@ -70,19 +158,34 @@ fail1:
 
 static int lcd_mm_pt_destroy(struct lcd *lcd, pmd_t *pmd_entry)
 {
-	u64 gpa;
-	u64 hpa;
+	gpa_t gpa;
+	hpa_t hpa;
 	int ret;
+	pte_t pt;
 	
 	/*
 	 * Get hpa of page table, using gpa stored in pmd_entry.
 	 */
-	gpa = pmd_pfn(*pmd_entry) << PAGE_SHIFT;
+	gpa = pmd_gpa(pmd_entry);
 	ret = lcd_arch_ept_gpa_to_hpa(lcd->lcd_arch, gpa, &hpa);
 	if (ret) {
 		printk(KERN_ERR "lcd_mm_pt_destroy: error looking up gpa %lx\n",
-			(unsigned long)gpa);
+			gpa_val(gpa));
 		return ret;
+	}
+
+	pt = (pte_t *)hpa2va(hpa);
+
+	/*
+	 * Check for any potential memory leaks
+	 */
+	for (i = 0; i < PTRS_PER_PTE; i++) {
+		if (pte_present(pt[i])) {
+			printk(KERN_ERR "lcd_mm_pt_destroy: possible memory leak
+for gpa %lx (pt idx %d)\n",
+				gpa_val(pte_gpa(&pt[i])), i);
+			dump_stack();
+		}
 	}
 
 	/*
@@ -97,7 +200,7 @@ static int lcd_mm_pt_destroy(struct lcd *lcd, pmd_t *pmd_entry)
 	/*
 	 * Free page table
 	 */
-	free_page((u64)__va(hpa));
+	free_page((unsigned long)pt);
 
 	return 0;
 }
@@ -105,23 +208,23 @@ static int lcd_mm_pt_destroy(struct lcd *lcd, pmd_t *pmd_entry)
 static int lcd_mm_pmd_destroy(struct lcd *lcd, pud_t *pud_entry)
 {
 	pmd_t *pmd;
-	u64 gpa;
-	u64 hpa;
+	gpa_t gpa;
+	hpa_t hpa;
 	int i;
 	int ret;
 
 	/*
 	 * Get hpa of pmd, using gpa stored in pud_entry.
 	 */
-	gpa = pud_pfn(*pud_entry) << PAGE_SHIFT;
+	gpa = pud_gpa(pud_entry);
 	ret = lcd_arch_ept_gpa_to_hpa(lcd->lcd_arch, gpa, &hpa);
 	if (ret) {
 		printk(KERN_ERR "lcd_mm_pmd_destroy: error looking up gpa %lx\n",
-			(unsigned long)gpa);
+			gpa_val(gpa));
 		return ret;
 	}
 
-	pmd = (pmd_t *)__va(hpa);
+	pmd = (pmd_t *)hpa2va(hpa);
 
 	/*
 	 * Free all present page tables
@@ -148,7 +251,7 @@ static int lcd_mm_pmd_destroy(struct lcd *lcd, pud_t *pud_entry)
 	/*
 	 * Free pmd
 	 */
-	free_page((u64)pmd);
+	free_page((unsigned long)pmd);
 
 	return 0;
 }
@@ -156,23 +259,23 @@ static int lcd_mm_pmd_destroy(struct lcd *lcd, pud_t *pud_entry)
 static int lcd_mm_pud_destroy(struct lcd *lcd, pgd_t *pgd_entry)
 {
 	pud_t *pud;
-	u64 gpa;
-	u64 hpa;
+	gpa_t gpa;
+	hpa_t hpa;
 	int i;
 	int ret;
 
 	/*
 	 * Get hpa of pud, using gpa stored in pgd_entry.
 	 */
-	gpa = pgd_pfn(*pgd_entry) << PAGE_SHIFT;
+	gpa = pgd_gpa(pgd_entry);
 	ret = lcd_arch_ept_gpa_to_hpa(lcd->lcd_arch, gpa, &hpa);
 	if (ret) {
 		printk(KERN_ERR "lcd_mm_pud_destroy: error looking up gpa %lx\n",
-			(unsigned long)gpa);
+			gpa_val(gpa));
 		return ret;
 	}
 
-	pud = (pud_t *)__va(hpa);
+	pud = (pud_t *)hpa2va(hpa);
 
 	/*
 	 * Destroy all present pmd's
@@ -195,7 +298,7 @@ static int lcd_mm_pud_destroy(struct lcd *lcd, pgd_t *pgd_entry)
 	/*
 	 * Free pud
 	 */
-	free_page((u64)pud);
+	free_page((unsigned long)pud);
 
 	return 0;
 }
@@ -213,7 +316,7 @@ static void lcd_mm_gva_destroy(struct lcd *lcd)
 	int i;
 	int ret;
 
-	pgd = (pgd_t *)lcd->gv.root_hva;
+	pgd = lcd->gv.root;
 	
 	/*
 	 * Free all present pud's
@@ -242,7 +345,8 @@ static void lcd_mm_gva_destroy(struct lcd *lcd)
 	/*
 	 * Free pgd
 	 */
-	free_page((u64)pgd);
+	free_page((unsigned long)pgd);
+	lcd->gv.root = NULL;
 
 	/*
 	 * Mark as invalid
@@ -250,91 +354,33 @@ static void lcd_mm_gva_destroy(struct lcd *lcd)
 	lcd->gv.present = 0;
 }
 
-/**
- * Allocates a host physical page and guest physical
- * page (in the lcd's guest phys address space) for
- * storing a paging structure.
- */
-static int lcd_mm_gva_alloc(struct lcd *lcd, u64 *gpa_out, u64 *hpa_out)
-{
-	u64 hva;
-	u64 gpa;
-	u64 hpa;
-	int ret;
-
-	/*
-	 * Check watermark, and bump it.
-	 */
-	if (lcd->gv.paging_mem_brk >= lcd->gv.paging_mem_top) {
-		printk(KERN_ERR "lcd_mm_gva_alloc: exhausted paging mem\n");
-		ret = -ENOMEM;
-		goto fail1;
-	}
-	gpa = lcd->gv.paging_mem_brk;
-	lcd->gv.paging_mem_brk += PAGE_SIZE;
-
-	/*
-	 * Allocate a host physical page
-	 */
-	hva = __get_free_page(GFP_KERNEL);
-	if (!hva) {
-		printk(KERN_ERR "lcd_mm_gva_alloc: no host phys mem\n");
-		ret = -ENOMEM;
-		goto fail2;
-	}
-	memset((void *)hva, 0, PAGE_SIZE);
-	hpa = __pa(hva);
-
-	/*
-	 * Map in ept
-	 */
-	ret = lcd_arch_ept_map_range(lcd->lcd_arch, gpa, hpa, 1);
-	if (ret) {
-		printk(KERN_ERR "lcd_mm_gva_alloc: couldn't map gpa %lx to hpa %lx\n",
-			(unsigned long)gpa,
-			(unsigned long)hpa);
-		goto fail3;
-	}
-
-	*gpa_out = gpa;
-	*hpa_out = hpa;
-
-	return 0;
-
-fail3:
-	free_page((u64)hva);
-fail2:
-	lcd->gv.paging_mem_brk -= PAGE_SIZE;
-fail1:
-	return ret;
-}
 
 /**
  * Get host virtual address of pte
  * for gva and pmd_entry.
  */
-static int lcd_mm_gva_lookup_pte(struct lcd *lcd, u64 gva, pmd_t *pmd_entry,
+static int lcd_mm_gva_lookup_pte(struct lcd *lcd, gva_t gva, pmd_t *pmd_entry,
 				pte_t **pte_out)
 {
 	int ret;
-	u64 gpa;
-	u64 hpa;
+	gpa_t gpa;
+	hpa_t hpa;
 	pte_t *entry;
 
 	/*
 	 * Get hpa of page table, using gpa stored in pmd_entry.
 	 */
-	gpa = pmd_pfn(*pmd_entry) << PAGE_SHIFT;
+	gpa = pmd_gpa(pmd_entry);
 	ret = lcd_arch_ept_gpa_to_hpa(lcd->lcd_arch, gpa, &hpa);
 	if (ret) {
 		printk(KERN_ERR "lcd_mm_gva_lookup_pte: error looking up gpa %lx\n",
-			(unsigned long)gpa);
+			gpa_val(gpa));
 		return ret;
 	}
 	/*
 	 * Look up entry in page table
 	 */
-	entry = ((pte_t *)__va(hpa)) + pte_index(gva);
+	entry = ((pte_t *)hpa2va(hpa)) + pte_index(gva_val(gva));
 	
 	*pte_out = entry;
 	return 0;
@@ -344,7 +390,7 @@ static int lcd_mm_gva_lookup_pte(struct lcd *lcd, u64 gva, pmd_t *pmd_entry,
  * Look up pte for the page frame containing gva,
  * using the page table referenced by pmd_entry.
  */
-static int lcd_mm_gva_walk_pt(struct lcd *lcd, u64 gva, pmd_t *pmd_entry,
+static int lcd_mm_gva_walk_pt(struct lcd *lcd, gva_t gva, pmd_t *pmd_entry,
 			pte_t **pte_out)
 {
 	int ret;
@@ -365,28 +411,28 @@ static int lcd_mm_gva_walk_pt(struct lcd *lcd, u64 gva, pmd_t *pmd_entry,
  * Get host virtual address of pmd entry
  * for gva and pud_entry.
  */
-static int lcd_mm_gva_lookup_pmd(struct lcd *lcd, u64 gva, pud_t *pud_entry,
+static int lcd_mm_gva_lookup_pmd(struct lcd *lcd, gva_t gva, pud_t *pud_entry,
 				pmd_t **pmd_out)
 {
 	int ret;
-	u64 gpa;
-	u64 hpa;
+	gpa_t gpa;
+	hpa_t hpa;
 	pmd_t *entry;
 
 	/*
 	 * Get hpa of pmd, using gpa stored in pud_entry.
 	 */
-	gpa = pud_pfn(*pud_entry) << PAGE_SHIFT;
+	gpa = pud_gpa(pud_entry);
 	ret = lcd_arch_ept_gpa_to_hpa(lcd->lcd_arch, gpa, &hpa);
 	if (ret) {
 		printk(KERN_ERR "lcd_mm_gva_lookup_pmd: error looking up gpa %lx\n",
-			(unsigned long)gpa);
+			gpa_val(gpa));
 		return ret;
 	}
 	/*
 	 * Look up entry in pmd
 	 */
-	entry = ((pmd_t *)__va(hpa)) + pmd_index(gva);
+	entry = ((pmd_t *)hpa2va(hpa)) + pmd_index(gva_val(gva));
 	
 	*pmd_out = entry;
 	return 0;
@@ -396,13 +442,13 @@ static int lcd_mm_gva_lookup_pmd(struct lcd *lcd, u64 gva, pud_t *pud_entry,
  * Look up pmd entry for the page table for gva,
  * using the pmd referenced by pud_entry.
  */
-static int lcd_mm_gva_walk_pmd(struct lcd *lcd, u64 gva, pud_t *pud_entry,
+static int lcd_mm_gva_walk_pmd(struct lcd *lcd, gva_t gva, pud_t *pud_entry,
 				pmd_t **pmd_out)
 {
 	int ret;
 	pmd_t *entry;
-	u64 gpa;
-	u64 hpa;
+	gpa_t gpa;
+	hpa_t hpa;
 
 	ret = lcd_mm_gva_lookup_pmd(lcd, gva, pud_entry, &entry);
 	if (ret) {
@@ -423,7 +469,7 @@ static int lcd_mm_gva_walk_pmd(struct lcd *lcd, u64 gva, pud_t *pud_entry,
 		/*
 		 * Map *guest physical* address into pud entry
 		 */
-		set_pmd(entry, __pmd(gpa | _KERNPG_TABLE));
+		set_pmd(entry, __pmd(gpa_val(gpa) | _KERNPG_TABLE));
 
 	}
 
@@ -436,28 +482,28 @@ static int lcd_mm_gva_walk_pmd(struct lcd *lcd, u64 gva, pud_t *pud_entry,
  * Get host virtual address of pud entry
  * for gva and pgd_entry.
  */
-static int lcd_mm_gva_lookup_pud(struct lcd *lcd, u64 gva, pgd_t *pgd_entry,
+static int lcd_mm_gva_lookup_pud(struct lcd *lcd, gva_t gva, pgd_t *pgd_entry,
 				pud_t **pud_out)
 {
 	int ret;
-	u64 gpa;
-	u64 hpa;
+	gpa_t gpa;
+	hpa_t hpa;
 	pud_t *entry;
 
 	/*
 	 * Get hpa of pud, using gpa stored in pgd_entry.
 	 */
-	gpa = pgd_pfn(*pgd_entry) << PAGE_SHIFT;
+	gpa = pgd_gpa(pgd_entry);
 	ret = lcd_arch_ept_gpa_to_hpa(lcd->lcd_arch, gpa, &hpa);
 	if (ret) {
 		printk(KERN_ERR "lcd_mm_gva_lookup_pud: error looking up gpa %lx\n",
-			(unsigned long)gpa);
+			gpa_val(gpa));
 		return ret;
 	}
 	/*
 	 * Look up entry in pud
 	 */
-	entry = ((pud_t *)__va(hpa)) + pud_index(gva);
+	entry = ((pud_t *)hpa2va(hpa)) + pud_index(gva_val(gva));
 	
 	*pud_out = entry;
 	return 0;
@@ -467,13 +513,13 @@ static int lcd_mm_gva_lookup_pud(struct lcd *lcd, u64 gva, pgd_t *pgd_entry,
  * Look up pud entry for the pmd for gva, using
  * the pud referenced by pgd_entry.
  */
-static int lcd_mm_gva_walk_pud(struct lcd *lcd, u64 gva, pgd_t *pgd_entry,
+static int lcd_mm_gva_walk_pud(struct lcd *lcd, gva_t gva, pgd_t *pgd_entry,
 				pud_t **pud_out)
 {
 	int ret;
 	pud_t *entry;
-	u64 gpa;
-	u64 hpa;
+	gpa_t gpa;
+	hpa_t hpa;
 
 	ret = lcd_mm_gva_lookup_pud(lcd, gva, pgd_entry, &entry);
 	if (ret) {
@@ -494,7 +540,7 @@ static int lcd_mm_gva_walk_pud(struct lcd *lcd, u64 gva, pgd_t *pgd_entry,
 		/*
 		 * Map *guest physical* address into pud entry
 		 */
-		set_pud(entry, __pud(gpa | _KERNPG_TABLE));
+		set_pud(entry, __pud(gpa_val(gpa) | _KERNPG_TABLE));
 
 	}
 
@@ -506,14 +552,14 @@ static int lcd_mm_gva_walk_pud(struct lcd *lcd, u64 gva, pgd_t *pgd_entry,
 /**
  * Look up pgd entry for the pud for gva.
  */
-static int lcd_mm_gva_walk_pgd(struct lcd *lcd, u64 gva, pgd_t **pgd_out)
+static int lcd_mm_gva_walk_pgd(struct lcd *lcd, gva_t gva, pgd_t **pgd_out)
 {
 	int ret;
 	pgd_t *entry;
-	u64 gpa;
-	u64 hpa;
+	gpa_t gpa;
+	hpa_t hpa;
 
-	entry = ((pgd_t *)lcd->gv.root_hva) + pgd_index(gva);
+	entry = lcd->gv.root + pgd_index(gva_val(gva));
 	if (!pgd_present(*entry)) {
 		/*
 		 * Alloc and map a pud
@@ -527,7 +573,7 @@ static int lcd_mm_gva_walk_pgd(struct lcd *lcd, u64 gva, pgd_t **pgd_out)
 		/*
 		 * Map *guest physical* address into pgd entry
 		 */
-		set_pgd(entry, __pgd(gpa | _KERNPG_TABLE));
+		set_pgd(entry, __pgd(gpa_val(gpa) | _KERNPG_TABLE));
 	}
 
 	*pgd_out = entry;
@@ -565,7 +611,7 @@ static int lcd_mm_gva_walk_pgd(struct lcd *lcd, u64 gva, pgd_t **pgd_out)
  *
  * Punchline: Arch must have 4 paging levels.
  */
-static int lcd_mm_gva_walk(struct lcd *lcd, u64 gva, pte_t **pte_out)
+static int lcd_mm_gva_walk(struct lcd *lcd, gva_t gva, pte_t **pte_out)
 {
 	int ret;
 	pgd_t *pgd;
@@ -605,21 +651,21 @@ static int lcd_mm_gva_walk(struct lcd *lcd, u64 gva, pte_t **pte_out)
 	return lcd_mm_gva_walk_pt(lcd, gva, pmd, pte_out);
 }
 
-static void lcd_mm_gva_set(pte_t *pte, u64 gpa)
+static void lcd_mm_gva_set(pte_t *pte, gpa_t gpa)
 {
-	set_pte(pte, __pte(gpa | _KERNPG_TABLE));
+	set_pte(pte, __pte(gpa_val(gpa) | _KERNPG_TABLE));
 }
 
-static u64 lcd_mm_gva_get(pte_t *pte)
+static gpa_t lcd_mm_gva_get(pte_t *pte)
 {
-	return (u64)(pte_pfn(*pte) << PAGE_SHIFT);
+	return pte_gpa(pte);
 }
 
 /**
  * Simple routine combining walk and set. Never
  * overwrites.
  */
-static int lcd_mm_gva_map(struct lcd *lcd, u64 gva, u64 gpa)
+static int lcd_mm_gva_map(struct lcd *lcd, gva_t gva, gpa_t gpa)
 {
 	int ret;
 	pte_t *pte;
@@ -632,8 +678,8 @@ static int lcd_mm_gva_map(struct lcd *lcd, u64 gva, u64 gpa)
 
 	if (pte_present(*pte)) {
 		printk(KERN_ERR "lcd_mm_gva_map: remap gva %lx to gpa %lx (was %lx)\n",
-			(unsigned long)gva, (unsigned long)gpa,
-			(unsigned long)pte_val(*pte));
+			gva_val(gva), gpa_val(gpa),
+			gpa_val(lcd_mm_gva_get(pte)));
 		return -EINVAL;
 	}
 
@@ -646,7 +692,7 @@ static int lcd_mm_gva_map(struct lcd *lcd, u64 gva, u64 gpa)
  * Simple routine combining walk and get. Never
  * overwrites.
  */
-static int lcd_mm_gva_to_gpa(struct lcd *lcd, u64 gva, u64 *gpa)
+static int lcd_mm_gva_to_gpa(struct lcd *lcd, gva_t gva, gpa_t *gpa)
 {
 	int ret;
 	pte_t *pte;
@@ -675,8 +721,8 @@ static int lcd_mm_gva_to_gpa(struct lcd *lcd, u64 gva, u64 *gpa)
  *
  * Note! Call lcd_mm_gva_init before mapping any gva's.
  */
-static int lcd_mm_gva_map_range(struct lcd *lcd, u64 gva_start, u64 gpa_start, 
-				u64 npages)
+static int lcd_mm_gva_map_range(struct lcd *lcd, gva_t gva_start, 
+				gpa_t gpa_start, unsigned long npages)
 {
 	u64 off;
 	u64 len;
@@ -685,12 +731,12 @@ static int lcd_mm_gva_map_range(struct lcd *lcd, u64 gva_start, u64 gpa_start,
 	for (off = 0; off < len; off += PAGE_SIZE) {
 		if (lcd_mm_gva_map(lcd,
 					/* gva */
-					gva_start + off,
+					gva_add(gva_start, off),
 					/* gpa */
-					gpa_start + off)) {
+					gpa_add(gpa_start, off))) {
 			printk(KERN_ERR "lcd_mm_gva_map_range: error mapping gva %lx to gpa %lx\n",
-				(unsigned long)(gva_start + off),
-				(unsigned long)(gpa_start + off));
+				gva_val(gva_add(gva_start,off)),
+				gpa_val(gpa_add(gpa_start,off)));
 			return -EIO;
 		}
 	}
@@ -829,8 +875,8 @@ static int lcd_init_blob(struct lcd *lcd, unsigned char *blob,
 			unsigned int blob_order)
 {
 	int r;
-	u64 paging_mem_size;
-	u64 npages;
+	unsigned long paging_mem_size;
+	unsigned long npages;
 
 	/*
 	 * (initial)
@@ -880,8 +926,10 @@ static int lcd_init_blob(struct lcd *lcd, unsigned char *blob,
 	/*
 	 * Map blob in guest physical, after paging mem
 	 */
-	r = lcd_arch_ept_map_range(lcd->lcd_arch, LCD_ARCH_FREE + paging_mem_size, 
-			__pa((u64)blob), (1 << blob_order));
+	r = lcd_arch_ept_map_range(lcd->lcd_arch, 
+				__gpa(LCD_ARCH_FREE + paging_mem_size), 
+				va2hpa(blob),
+				(1 << blob_order));
 	if (r) {
 		printk(KERN_ERR "lcd_init_blob: error mapping blob in gpa\n");
 		goto fail2;
@@ -893,12 +941,12 @@ static int lcd_init_blob(struct lcd *lcd, unsigned char *blob,
 	npages = (LCD_ARCH_FREE + paging_mem_size) >> PAGE_SHIFT;
 	npages += (1 << blob_order);
 	r = lcd_mm_gva_map_range(lcd, 
-			/* gva start */
-			0, 
-			/* gpa start */
-			0, 
-			/* num pages */
-			npages);
+				/* gva start */
+				__gva(0), 
+				/* gpa start */
+				__gpa(0), 
+				/* num pages */
+				npages);
 	if (r) {
 		printk(KERN_ERR "lcd_init_blob: error setting up initial gva\n");
 		goto fail3;
@@ -908,7 +956,8 @@ static int lcd_init_blob(struct lcd *lcd, unsigned char *blob,
 	 * Initialize program counter to blob entry point (just after
 	 * guest virtual paging mem).
 	 */
-	r = lcd_arch_set_pc(lcd->lcd_arch, LCD_ARCH_FREE + paging_mem_size);
+	r = lcd_arch_set_pc(lcd->lcd_arch, 
+			__gpa(LCD_ARCH_FREE + paging_mem_size));
 	if (r) {
 		printk(KERN_ERR "lcd_init_blob: error setting prgm counter\n");
 		goto fail4;
@@ -917,10 +966,10 @@ static int lcd_init_blob(struct lcd *lcd, unsigned char *blob,
 	return 0;
 
 fail4:
-	/* gva destroy will handle clean up after this failure */
+	lcd_mm_gva_unmap_range(lcd, __gva(0), __gpa(0), npages);
 fail3:
 	lcd_arch_ept_unmap_range(lcd->lcd_arch, 
-				LCD_ARCH_FREE + paging_mem_size, 
+				__gpa(LCD_ARCH_FREE + paging_mem_size), 
 				(1 << blob_order));
 fail2:
 	lcd_mm_gva_destroy(lcd);
@@ -993,7 +1042,7 @@ fail5:
 	lcd_destroy(lcd);
 fail4:
 fail3:
-	free_pages((u64)blob, bi->blob_order);
+	free_pages((unsigned long)blob, bi->blob_order);
 fail2:
 fail1:
 	return r;

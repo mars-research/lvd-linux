@@ -76,6 +76,10 @@ static inline hpa_t hpa_add(hpa_t hpa, unsigned long off)
 {
 	return __hpa(hpa_val(hpa) + off);
 }
+static inline hpa_t pa2hpa(unsigned long pa)
+{
+	return (hpa_t){ pa };
+}
 static inline hpa_t va2hpa(void *va)
 {
 	return (hpa_t){ __pa(va) };

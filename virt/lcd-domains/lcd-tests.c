@@ -90,7 +90,7 @@ static int test03(void)
 	}		
 
 	free_page((u64)__va(hpa));
-	lcd_mm_gpa_unmap_range(lcd, gpa, 1);
+	lcd_arch_ept_unmap_range(lcd, gpa, 1);
 
 	lcd_destroy(lcd);
 
@@ -98,7 +98,7 @@ static int test03(void)
 
 fail4:
 	free_page((u64)__va(hpa));
-	lcd_mm_gpa_unmap_range(lcd, gpa, 1);
+	lcd_arch_ept_unmap_range(lcd, gpa, 1);
 fail3:
 fail2:
 	lcd_destroy(lcd);
@@ -167,7 +167,7 @@ static int test04(void)
 	}
 
 	free_page((u64)__va(hpa));
-	lcd_mm_gpa_unmap_range(lcd, gpa, 1);
+	lcd_arch_ept_unmap_range(lcd, gpa, 1);
 	kfree(pmd_entry);
 
 	lcd_destroy(lcd);
@@ -179,7 +179,7 @@ fail5:
 	kfree(pmd_entry);
 fail4:
 	free_page((u64)__va(hpa));
-	lcd_mm_gpa_unmap_range(lcd, gpa, 1);
+	lcd_arch_ept_unmap_range(lcd, gpa, 1);
 fail3:
 fail2:
 	lcd_destroy(lcd);
@@ -250,7 +250,7 @@ static int test05(void)
 	}
 
 	free_page((u64)__va(hpa));
-	lcd_mm_gpa_unmap_range(lcd, gpa, 1);
+	lcd_arch_ept_unmap_range(lcd, gpa, 1);
 	kfree(pud_entry);
 
 	lcd_destroy(lcd);
@@ -262,7 +262,7 @@ fail5:
 	kfree(pud_entry);
 fail4:
 	free_page((u64)__va(hpa));
-	lcd_mm_gpa_unmap_range(lcd, gpa, 1);
+	lcd_arch_ept_unmap_range(lcd, gpa, 1);
 fail3:
 fail2:
 	lcd_destroy(lcd);
@@ -333,7 +333,7 @@ static int test06(void)
 	}
 
 	free_page((u64)__va(hpa));
-	lcd_mm_gpa_unmap_range(lcd, gpa, 1);
+	lcd_arch_ept_unmap_range(lcd, gpa, 1);
 	kfree(pgd_entry);
 
 	lcd_destroy(lcd);
@@ -345,7 +345,7 @@ fail5:
 	kfree(pgd_entry);
 fail4:
 	free_page((u64)__va(hpa));
-	lcd_mm_gpa_unmap_range(lcd, gpa, 1);
+	lcd_arch_ept_unmap_range(lcd, gpa, 1);
 fail3:
 fail2:
 	lcd_destroy(lcd);
@@ -409,6 +409,59 @@ fail1:
 	return ret;
 }
 
+static int test08(void)
+{
+	struct lcd *lcd;
+	int ret;
+	u64 gpa;
+	pgd_t *pgd_entry1;
+	pgd_t *pgd_entry2;
+
+	ret = lcd_create(&lcd);
+	if (ret) {
+		printk(KERN_ERR "lcd test: test08 failed to create lcd\n");
+		goto fail1;
+	}
+	
+	ret = lcd_mm_gva_init(lcd, LCD_ARCH_FREE,
+			LCD_ARCH_FREE + 4 * (1 << 20));
+	if (ret) {
+		printk(KERN_ERR "lcd test: test08 failed to init gva\n");
+		goto fail2;
+	}
+
+	ret = lcd_mm_gva_walk_pgd(lcd, 0x1234000UL, &pgd_entry1);
+	if (ret) {
+		printk(KERN_ERR "lcd test: test08 failed to walk pgd\n");
+		goto fail3;
+	}
+
+	ret = lcd_mm_gva_walk_pgd(lcd, 0x1234000UL, &pgd_entry2);
+	if (ret) {
+		printk(KERN_ERR "lcd test: test08 failed to walk pgd2\n");
+		goto fail4;
+	}
+
+	if (pgd_entry1 != pgd_entry2) {
+		printk(KERN_ERR "lcd test: test08 entries differ\n");
+		ret = -1;
+		goto fail5;
+	}
+
+	lcd_destroy(lcd);
+
+	return 0;
+
+fail5:
+fail4:
+fail3:
+fail2:
+	lcd_destroy(lcd);
+fail1:
+	return ret;
+}
+
+#if 0
 static int test08(void)
 {
 	struct lcd *lcd;
@@ -520,6 +573,7 @@ fail2:
 fail1:
 	return ret;
 }
+#endif
 
 static void lcd_tests(void)
 {

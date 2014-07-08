@@ -190,9 +190,30 @@ int lcd_arch_ept_unset(lcd_arch_epte_t *epte);
 int lcd_arch_ept_map_gpa_to_hpa(struct lcd_arch *vcpu, u64 gpa, u64 hpa,
 				int create, int overwrite);
 /**
+ * Maps 
+ *
+ *    gpa_start --> gpa_start + npages * PAGE_SIZE
+ *
+ * to
+ *
+ *    hpa_start --> hpa_start + npages * PAGE_SIZE
+ *
+ * in lcd's ept.
+ */
+int lcd_arch_ept_map_range(struct lcd_arch *lcd, u64 gpa_start, u64 hpa_start, 
+			u64 npages);
+/**
  * Simple routine combining ept walk and unset.
  */
 int lcd_arch_ept_unmap_gpa(struct lcd_arch *vcpu, u64 gpa);
+/**
+ * Unmaps 
+ *
+ *    gpa_start --> gpa_start + npages * PAGE_SIZE
+ *
+ * in lcd's ept.
+ */
+int lcd_arch_ept_unmap_range(struct lcd_arch *lcd, u64 gpa_start, u64 npages);
 /**
  * Simple routine combinding ept walk and get.
  */

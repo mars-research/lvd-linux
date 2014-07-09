@@ -35,8 +35,8 @@ static int test02(void)
 		goto fail1;
 	}
 	
-	ret = lcd_mm_gva_init(lcd, __gpa(LCD_ARCH_FREE),
-			__gpa(LCD_ARCH_FREE + 4 * (1 << 20)));
+	ret = lcd_mm_gva_init(lcd, LCD_ARCH_FREE,
+			gpa_add(LCD_ARCH_FREE, 4 * (1 << 20)));
 	if (ret) {
 		printk(KERN_ERR "lcd test: test02 failed to init gva\n");
 		goto fail2;
@@ -65,8 +65,8 @@ static int test03(void)
 		goto fail1;
 	}
 	
-	ret = lcd_mm_gva_init(lcd, __gpa(LCD_ARCH_FREE),
-			__gpa(LCD_ARCH_FREE + 4 * (1 << 20)));
+	ret = lcd_mm_gva_init(lcd, LCD_ARCH_FREE,
+			gpa_add(LCD_ARCH_FREE, 4 * (1 << 20)));
 	if (ret) {
 		printk(KERN_ERR "lcd test: test03 failed to init gva\n");
 		goto fail2;
@@ -82,7 +82,6 @@ static int test03(void)
 	goto done;
 
 done:
-fail4:
 	free_page(hva_val(hpa2hva(hpa)));
 	lcd_arch_ept_unmap_range(lcd->lcd_arch, gpa, 1);
 fail3:
@@ -108,8 +107,8 @@ static int test04(void)
 		goto fail1;
 	}
 	
-	ret = lcd_mm_gva_init(lcd, __gpa(LCD_ARCH_FREE),
-			__gpa(LCD_ARCH_FREE + 4 * (1 << 20)));
+	ret = lcd_mm_gva_init(lcd, LCD_ARCH_FREE,
+			gpa_add(LCD_ARCH_FREE, 4 * (1 << 20)));
 	if (ret) {
 		printk(KERN_ERR "lcd test: test04 failed to init gva\n");
 		goto fail2;
@@ -186,8 +185,8 @@ static int test05(void)
 		goto fail1;
 	}
 	
-	ret = lcd_mm_gva_init(lcd, __gpa(LCD_ARCH_FREE),
-			__gpa(LCD_ARCH_FREE + 4 * (1 << 20)));
+	ret = lcd_mm_gva_init(lcd, LCD_ARCH_FREE,
+			gpa_add(LCD_ARCH_FREE, 4 * (1 << 20)));
 	if (ret) {
 		printk(KERN_ERR "lcd test: test05 failed to init gva\n");
 		goto fail2;
@@ -265,8 +264,8 @@ static int test06(void)
 		goto fail1;
 	}
 	
-	ret = lcd_mm_gva_init(lcd, __gpa(LCD_ARCH_FREE),
-			__gpa(LCD_ARCH_FREE + 4 * (1 << 20)));
+	ret = lcd_mm_gva_init(lcd, LCD_ARCH_FREE,
+			gpa_add(LCD_ARCH_FREE, 4 * (1 << 20)));
 	if (ret) {
 		printk(KERN_ERR "lcd test: test06 failed to init gva\n");
 		goto fail2;
@@ -314,6 +313,7 @@ static int test06(void)
 	ret = 0;
 	goto done;
 
+done:
 fail6:
 fail5:
 	kfree(pgd_entry);
@@ -339,8 +339,8 @@ static int test07(void)
 		goto fail1;
 	}
 	
-	ret = lcd_mm_gva_init(lcd, __gpa(LCD_ARCH_FREE),
-			__gpa(LCD_ARCH_FREE + 4 * (1 << 20)));
+	ret = lcd_mm_gva_init(lcd, LCD_ARCH_FREE,
+			gpa_add(LCD_ARCH_FREE, 4 * (1 << 20)));
 	if (ret) {
 		printk(KERN_ERR "lcd test: test07 failed to init gva\n");
 		goto fail2;
@@ -373,6 +373,7 @@ static int test07(void)
 	ret = 0;
 	goto done;
 
+done:
 fail5:
 fail4:
 fail3:
@@ -397,8 +398,8 @@ static int test08(void)
 		goto fail1;
 	}
 	
-	ret = lcd_mm_gva_init(lcd, __gpa(LCD_ARCH_FREE), 
-			__gpa(LCD_ARCH_FREE + 2 * PAGE_SIZE));
+	ret = lcd_mm_gva_init(lcd, LCD_ARCH_FREE, 
+			gpa_add(LCD_ARCH_FREE, 2 * PAGE_SIZE));
 	if (ret) {
 		printk(KERN_ERR "lcd test: test08 failed to init gva\n");
 		goto fail2;
@@ -430,8 +431,8 @@ static int test08(void)
 
 	gpa1 = pgd_gpa(pgd_entry1);
 	gpa2 = pgd_gpa(pgd_entry2);
-	if (gpa_val(gpa1) < LCD_ARCH_FREE || 
-		gpa_val(gpa1) > LCD_ARCH_FREE + 2 * PAGE_SIZE) {
+	if (gpa_val(gpa1) < gpa_val(LCD_ARCH_FREE) || 
+		gpa_val(gpa1) > gpa_val(gpa_add(LCD_ARCH_FREE,2 * PAGE_SIZE))){
 		printk(KERN_ERR "lcd test: test08 bad gpa %lx\n",
 			gpa_val(gpa1));
 		ret = -1;
@@ -448,6 +449,7 @@ static int test08(void)
 	ret = 0;
 	goto done;
 
+done:
 fail5:
 fail4:
 fail3:
@@ -475,7 +477,7 @@ static int test09_help(struct lcd *lcd, unsigned long base)
 			return -1;
 		}
 	}
-
+	return 0;
 }
 
 static int test09(void)
@@ -490,8 +492,8 @@ static int test09(void)
 		goto fail1;
 	}
 	
-	ret = lcd_mm_gva_init(lcd, __gpa(LCD_ARCH_FREE),
-			__gpa(LCD_ARCH_FREE + 4 * (1 << 20)));
+	ret = lcd_mm_gva_init(lcd, LCD_ARCH_FREE,
+			gpa_add(LCD_ARCH_FREE, 4 * (1 << 20)));
 	if (ret) {
 		printk(KERN_ERR "lcd test: test09 failed to init gva\n");
 		goto fail2;
@@ -518,7 +520,8 @@ static int test09(void)
 	/*
 	 * Map 0x8000000000 - 0x8000400000 (512GB -- 512GB + 4MBs)
 	 */
-	ret = lcd_mm_gva_map_range(lcd, __gva(1 << 39), __gpa(1 << 39), 1024);
+	ret = lcd_mm_gva_map_range(lcd, __gva(1UL << 39), 
+				__gpa(1UL << 39), 1024);
 	if (ret) {
 		printk(KERN_ERR "lcd test: test09 failed to map 3rd 4 MBs\n");
 		goto fail5;
@@ -534,7 +537,7 @@ static int test09(void)
 	base = 1 << 30;
 	if (test09_help(lcd, base))
 		goto fail6;
-	base = 1 << 39;
+	base = 1UL << 39;
 	if (test09_help(lcd, base))
 		goto fail6;
 
@@ -543,7 +546,7 @@ static int test09(void)
 
 done:
 fail6:
-	lcd_mm_gva_unmap_range(lcd, __gva(1 << 39), 1024);
+	lcd_mm_gva_unmap_range(lcd, __gva(1UL << 39), 1024);
 fail5:
 	lcd_mm_gva_unmap_range(lcd, __gva(1 << 30), 1024);
 fail4:

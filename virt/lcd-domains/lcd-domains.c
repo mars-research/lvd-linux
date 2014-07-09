@@ -142,9 +142,9 @@ static int lcd_mm_gva_init(struct lcd *lcd, gpa_t gv_paging_mem_start,
 	/*
 	 * Set start / end
 	 */
-	lcd->gv.paging_mem_bot = gv_paging_mem_start_gpa;
-	lcd->gv.paging_mem_brk = gv_paging_mem_start_gpa;
-	lcd->gv.paging_mem_top = gv_paging_mem_end_gpa;
+	lcd->gv.paging_mem_bot = gv_paging_mem_start;
+	lcd->gv.paging_mem_brk = gv_paging_mem_start;
+	lcd->gv.paging_mem_top = gv_paging_mem_end;
 	
 	/*
 	 * Alloc a page for the pgd
@@ -159,7 +159,7 @@ static int lcd_mm_gva_init(struct lcd *lcd, gpa_t gv_paging_mem_start,
 	 * Store the root pointer
 	 */
 	lcd->gv.root = (pgd_t *)hpa2va(hpa);
-	lcd_arch_set_gva_root(lcd, gpa);
+	lcd_arch_set_gva_root(lcd->lcd_arch, gpa);
 	
 	/*
 	 * Mark paging as present
@@ -177,7 +177,8 @@ static int lcd_mm_pt_destroy(struct lcd *lcd, pmd_t *pmd_entry)
 	gpa_t gpa;
 	hpa_t hpa;
 	int ret;
-	pte_t pt;
+	pte_t* pt;
+	int i;
 	
 	/*
 	 * Get hpa of page table, using gpa stored in pmd_entry.
@@ -197,8 +198,7 @@ static int lcd_mm_pt_destroy(struct lcd *lcd, pmd_t *pmd_entry)
 	 */
 	for (i = 0; i < PTRS_PER_PTE; i++) {
 		if (pte_present(pt[i])) {
-			printk(KERN_ERR "lcd_mm_pt_destroy: possible memory leak
-for gpa %lx (pt idx %d)\n",
+			printk(KERN_ERR "lcd_mm_pt_destroy: possible memory leak for gpa %lx (pt idx %d)\n",
 				gpa_val(pte_gpa(&pt[i])), i);
 			dump_stack();
 		}
@@ -934,7 +934,7 @@ static int lcd_init_blob(struct lcd *lcd, unsigned char *blob,
 	 * Initialize guest virtual paging
 	 */
 	r = lcd_mm_gva_init(lcd, LCD_ARCH_FREE, 
-			LCD_ARCH_FREE + paging_mem_size);
+			gpa_add(LCD_ARCH_FREE, paging_mem_size));
 	if (r) {
 		printk(KERN_ERR "lcd_init_blob: error setting up gva\n");
 		goto fail1;
@@ -944,7 +944,7 @@ static int lcd_init_blob(struct lcd *lcd, unsigned char *blob,
 	 * Map blob in guest physical, after paging mem
 	 */
 	r = lcd_arch_ept_map_range(lcd->lcd_arch, 
-				__gpa(LCD_ARCH_FREE + paging_mem_size), 
+				gpa_add(LCD_ARCH_FREE, paging_mem_size), 
 				va2hpa(blob),
 				(1 << blob_order));
 	if (r) {
@@ -955,7 +955,7 @@ static int lcd_init_blob(struct lcd *lcd, unsigned char *blob,
 	/*
 	 * Map gpa from 0 to top of blob in lcd's gva
 	 */
-	npages = (LCD_ARCH_FREE + paging_mem_size) >> PAGE_SHIFT;
+	npages = (gpa_val(LCD_ARCH_FREE) + paging_mem_size) >> PAGE_SHIFT;
 	npages += (1 << blob_order);
 	r = lcd_mm_gva_map_range(lcd, 
 				/* gva start */
@@ -974,7 +974,7 @@ static int lcd_init_blob(struct lcd *lcd, unsigned char *blob,
 	 * guest virtual paging mem).
 	 */
 	r = lcd_arch_set_pc(lcd->lcd_arch, 
-			__gpa(LCD_ARCH_FREE + paging_mem_size));
+			gpa_add(LCD_ARCH_FREE, paging_mem_size));
 	if (r) {
 		printk(KERN_ERR "lcd_init_blob: error setting prgm counter\n");
 		goto fail4;
@@ -986,7 +986,7 @@ fail4:
 	lcd_mm_gva_unmap_range(lcd, __gva(0), __gpa(0), npages);
 fail3:
 	lcd_arch_ept_unmap_range(lcd->lcd_arch, 
-				__gpa(LCD_ARCH_FREE + paging_mem_size), 
+				gpa_add(LCD_ARCH_FREE, paging_mem_size), 
 				(1 << blob_order));
 fail2:
 	lcd_mm_gva_destroy(lcd);

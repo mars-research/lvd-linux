@@ -220,14 +220,16 @@ static inline void invvpid_single_context(u16 vpid)
 static void vmcs_clear(struct lcd_arch_vmcs *vmcs)
 {
 	hpa_t a = va2hpa(vmcs);
+	unsigned long hpa;
 	u8 error;
 
+	hpa = hpa_val(a);
 	asm volatile (ASM_VMX_VMCLEAR_RAX "; setna %0"
-                : "=qm"(error) : "a"(hpa_ptr(&a)), "m"(hpa_val(a))
+                : "=qm"(error) : "a"(&hpa), "m"(hpa)
                 : "cc", "memory");
 	if (error)
 		printk(KERN_ERR "lcd vmx: vmclear fail: %p/%lx\n",
-			vmcs, hpa_val(a));
+			vmcs, hpa);
 }
 
 /**
@@ -238,13 +240,16 @@ static void vmcs_load(struct lcd_arch_vmcs *vmcs)
 {
 	hpa_t a = va2hpa(vmcs);
 	u8 error;
+	unsigned long hpa;
+
+	hpa = hpa_val(a);
 
 	asm volatile (ASM_VMX_VMPTRLD_RAX "; setna %0"
-                : "=qm"(error) : "a"(hpa_ptr(&a)), "m"(hpa_val(a))
+                : "=qm"(error) : "a"(&hpa), "m"(hpa)
                 : "cc", "memory");
 	if (error)
 		printk(KERN_ERR "lcd vmx: vmptrld %p/%lx failed\n",
-			vmcs, hpa_val(a));
+			vmcs, hpa);
 }
 
 static __always_inline unsigned long vmcs_readl(unsigned long field)
@@ -1052,8 +1057,8 @@ int lcd_arch_ept_map(struct lcd_arch *vcpu, gpa_t ga, hpa_t ha,
 	return 0;
 }
 
-int lcd_arch_ept_map_range(struct lcd_arch *lcd, gpa_t ga_start, hpa_t ha_start,
-			unsigned long npages)
+int lcd_arch_ept_map_range(struct lcd_arch *lcd, gpa_t ga_start, 
+			hpa_t ha_start, unsigned long npages)
 {
 	unsigned long off;
 	unsigned long len;
@@ -1071,7 +1076,7 @@ int lcd_arch_ept_map_range(struct lcd_arch *lcd, gpa_t ga_start, hpa_t ha_start,
 					0)) {
 			printk(KERN_ERR "lcd_arch_ept_map_range: error mapping gpa %lx to hpa %lx\n",
 				gpa_val(gpa_add(ga_start, off)),
-				hpa_val(hpa_add(ha_start, off));
+				hpa_val(hpa_add(ha_start, off)));
 			return -EIO;
 		}
 	}
@@ -1206,7 +1211,7 @@ static void vmx_free_ept(struct lcd_arch *vcpu)
 	/*
 	 * Get pml4 table
 	 */
-	dir = (lcd_arch_epte_t *) hpa2va(vcpu->ept.root);
+	dir = vcpu->ept.root;
 	vmx_free_ept_dir_level(dir, 0);
 }
 
@@ -1224,7 +1229,7 @@ int vmx_init_ept(struct lcd_arch *vcpu)
 	 */
 
 	page = __hva(__get_free_page(GFP_KERNEL));
-	if (!page) {
+	if (!hva_val(page)) {
 		printk(KERN_ERR "vmx init ept: failed to alloc page\n");
 		return -ENOMEM;
 	}
@@ -1469,7 +1474,11 @@ static void vmx_setup_vmcs_guest_regs(struct lcd_arch *vcpu)
 	vmcs_writel(GUEST_IA32_EFER, EFER_LME | EFER_LMA);
 
 	/*
-	 * $rsp
+	 * %rsp
+	 *
+	 * XXX: this should be placed in separate interface
+	 * and set by arch-indep code. This relies on the
+	 * arch-indep code to set gva = gpa for all addresses!
 	 */
 	vmcs_writel(GUEST_RSP, gpa_val(LCD_ARCH_STACK_TOP));
 	
@@ -1939,15 +1948,15 @@ static int vmx_init_gdt(struct lcd_arch *vcpu)
 	/*
 	 *===--- Map GDT in guest physical address space ---===
 	 */
-	ret = lcd_arch_ept_map_gpa_to_hpa(vcpu, 
-					/* gpa */
-					LCD_ARCH_GDTR_BASE, 
-					/* hpa */
-					va2hpa(vcpu->gdt),
-					/* create paging structs as needed */
-					1,
-					/* no overwrite */
-					0);
+	ret = lcd_arch_ept_map(vcpu, 
+			/* gpa */
+			LCD_ARCH_GDTR_BASE, 
+			/* hpa */
+			va2hpa(vcpu->gdt),
+			/* create paging structs as needed */
+			1,
+			/* no overwrite */
+			0);
 	if (ret) {
 		printk(KERN_ERR "vmx_gdt_init: failed to map gdt\n");
 		goto fail_map;
@@ -2007,8 +2016,12 @@ static int vmx_init_tss(struct lcd_arch *vcpu)
 	 * handling interrupts anyway).
 	 *
 	 * Privilege Level 0 Stack
+	 *
+	 * XXX: This should be moved to arch-dep interface code, so
+	 * that arch-indep code can set it. Relies on arch-indep
+	 * code to use gva = gpa!
 	 */
-	base_tss->sp0 = LCD_ARCH_STACK_TOP;
+	base_tss->sp0 = gpa_val(LCD_ARCH_STACK_TOP);
 	/*
 	 * The TSS must have a minimal I/O bitmap with one byte of 1's
 	 *
@@ -2020,15 +2033,15 @@ static int vmx_init_tss(struct lcd_arch *vcpu)
 	/*
 	 *===--- Map TSS in guest physical address space ---===
 	 */
-	ret = lcd_arch_ept_map_gpa_to_hpa(vcpu, 
-					/* gpa */
-					LCD_ARCH_TSS_BASE, 
-					/* hpa */
-					va2hpa(vcpu->tss),
-					/* create paging structs as needed */
-					1,
-					/* no overwrite */
-					0);
+	ret = lcd_arch_ept_map(vcpu, 
+			/* gpa */
+			LCD_ARCH_TSS_BASE, 
+			/* hpa */
+			va2hpa(vcpu->tss),
+			/* create paging structs as needed */
+			1,
+			/* no overwrite */
+			0);
 	if (ret) {
 		printk(KERN_ERR "vmx_init_tss: failed to map tss\n");
 		goto fail_map;
@@ -2077,15 +2090,15 @@ static int vmx_init_stack(struct lcd_arch *vcpu)
 	/*
 	 *===--- Map stack in guest physical address space ---===
 	 */
-	ret = lcd_arch_ept_map_gpa_to_hpa(vcpu, 
-					/* gpa */
-					LCD_ARCH_UTCB,
-					/* hpa */
-					va2hpa(vcpu->utcb),
-					/* create paging structs as needed */
-					1,
-					/* no overwrite */
-					0);
+	ret = lcd_arch_ept_map(vcpu, 
+			/* gpa */
+			LCD_ARCH_UTCB,
+			/* hpa */
+			va2hpa(vcpu->utcb),
+			/* create paging structs as needed */
+			1,
+			/* no overwrite */
+			0);
 	if (ret) {
 		printk(KERN_ERR "vmx_init_stack: failed to map stack\n");
 		goto fail_map;
@@ -2393,7 +2406,7 @@ static int vmx_handle_hard_exception(struct lcd_arch *vcpu)
 		 *
 		 * Set page fault address, and return status code.
 		 */
-		vcpu->run_info.fault_gva = __gva(vcpu->exit_qualification);
+		vcpu->run_info.gv_fault_addr = __gva(vcpu->exit_qualification);
 		return LCD_ARCH_STATUS_PAGE_FAULT;
 	default:
 		printk(KERN_ERR "lcd vmx: unhandled hw exception:\n");
@@ -2437,8 +2450,9 @@ static int vmx_handle_ept(struct lcd_arch *vcpu)
 	/*
 	 * Intel SDM V3 27.2.1
 	 */
-	vcpu->run_info.fault_gva = __gva(vmcs_readl(GUEST_LINEAR_ADDRESS));
-	vcpu->run_info.fault_gpa = __gpa(vmcs_readl(GUEST_PHYSICAL_ADDRESS));
+	vcpu->run_info.gv_fault_addr = __gva(vmcs_readl(GUEST_LINEAR_ADDRESS));
+	vcpu->run_info.gp_fault_addr = 
+		__gpa(vmcs_readl(GUEST_PHYSICAL_ADDRESS));
 	return LCD_ARCH_STATUS_EPT_FAULT;
 }
 

@@ -72,7 +72,7 @@ static int test03(void)
 		goto fail;
 	}
 
-	buf = (char *)hpa2va(lcd->ept.root);
+	buf = (char *)lcd->ept.root;
 	for (i = 0; i < PAGE_SIZE; i++) {
 		if (buf[i]) {
 			printk(KERN_ERR "lcd arch : test03 nonzero in ept\n");
@@ -111,14 +111,16 @@ static int test04_help(struct lcd_arch *lcd, gpa_t base)
 			return -1;
 		}
 	}
+	return 0;
 }
 
 static int test04(void)
 {
 	struct lcd_arch *lcd;
 	gpa_t base;
-	hpa_t actual;
-	unsigned long off;
+	int ret;
+
+	ret = -1;
 
 	lcd = (struct lcd_arch *)kmalloc(sizeof(*lcd), GFP_KERNEL);
 	if (!lcd) {
@@ -165,7 +167,7 @@ static int test04(void)
 	base = __gpa(1 << 30);
 	if (test04_help(lcd, base))
 		goto fail6;
-	base = __gpa(1 << 39);
+	base = __gpa(1UL << 39);
 	if (test04_help(lcd, base))
 		goto fail6;
 
@@ -210,7 +212,7 @@ static int test05(void)
 		printk(KERN_ERR "lcd arch : test05 lookup failed\n");
 		goto fail_lookup;
 	}
-	if (hpa_val(hpa) != hpa_val(pa2hpa(lcd->gdt))) {
+	if (hpa_val(hpa) != hpa_val(va2hpa(lcd->gdt))) {
 		printk(KERN_ERR "lcd arch : test05 unexpected gdt addr\n");
 		goto fail_lookup;
 	}
@@ -251,7 +253,7 @@ static int test06(void)
 		printk(KERN_ERR "lcd arch : test06 lookup failed\n");
 		goto fail_lookup;
 	}
-	if (hpa_val(hpa) != hpa_val(pa2hpa(lcd->tss))) {
+	if (hpa_val(hpa) != hpa_val(va2hpa(lcd->tss))) {
 		printk(KERN_ERR "lcd arch : test06 unexpected tss addr\n");
 		goto fail_lookup;
 	}
@@ -292,7 +294,7 @@ static int test07(void)
 		printk(KERN_ERR "lcd arch : test07 lookup failed\n");
 		goto fail_lookup;
 	}
-	if (hpa_val(hpa) != hpa_val(pa2hpa(lcd->utcb))) {
+	if (hpa_val(hpa) != hpa_val(va2hpa(lcd->utcb))) {
 		printk(KERN_ERR "lcd arch : test07 unexpected utcb addr\n");
 		goto fail_lookup;
 	}

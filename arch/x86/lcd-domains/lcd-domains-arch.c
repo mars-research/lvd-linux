@@ -1084,7 +1084,7 @@ int lcd_arch_ept_map_range(struct lcd_arch *lcd, gpa_t ga_start,
 	return 0;
 }
 
-int lcd_arch_ept_unmap_gpa(struct lcd_arch *vcpu, gpa_t a)
+int lcd_arch_ept_unmap(struct lcd_arch *vcpu, gpa_t a)
 {
 	int ret;
 	lcd_arch_epte_t *ept_entry;
@@ -1976,7 +1976,7 @@ fail:
 static void vmx_destroy_gdt(struct lcd_arch *vcpu)
 {
 	free_page((unsigned long)vcpu->gdt);
-	if (lcd_arch_ept_unmap_gpa(vcpu, LCD_ARCH_GDTR_BASE)) {
+	if (lcd_arch_ept_unmap(vcpu, LCD_ARCH_GDTR_BASE)) {
 		printk(KERN_ERR "vmx_destroy_gdt: error unmapping gdt\n");
 	}
 	vcpu->gdt = NULL;
@@ -2061,7 +2061,7 @@ fail:
 static void vmx_destroy_tss(struct lcd_arch *vcpu)
 {
 	free_page((unsigned long)vcpu->tss);
-	if (lcd_arch_ept_unmap_gpa(vcpu, LCD_ARCH_TSS_BASE)) {
+	if (lcd_arch_ept_unmap(vcpu, LCD_ARCH_TSS_BASE)) {
 		printk(KERN_ERR "vmx_destroy_tss: error unmapping tss\n");
 	}
 	vcpu->tss = NULL;
@@ -2118,7 +2118,7 @@ fail:
 static void vmx_destroy_stack(struct lcd_arch *vcpu)
 {
 	free_page((unsigned long)vcpu->utcb);
-	if (lcd_arch_ept_unmap_gpa(vcpu, LCD_ARCH_UTCB)) {
+	if (lcd_arch_ept_unmap(vcpu, LCD_ARCH_UTCB)) {
 		printk(KERN_ERR "vmx_destroy_stack: error unmapping tss\n");
 	}
 	vcpu->utcb = NULL;
@@ -2756,7 +2756,7 @@ EXPORT_SYMBOL(lcd_arch_run);
 EXPORT_SYMBOL(lcd_arch_ept_walk);
 EXPORT_SYMBOL(lcd_arch_ept_set);
 EXPORT_SYMBOL(lcd_arch_ept_unset);
-EXPORT_SYMBOL(lcd_arch_ept_unmap_gpa);
+EXPORT_SYMBOL(lcd_arch_ept_unmap);
 EXPORT_SYMBOL(lcd_arch_ept_unmap_range);
 EXPORT_SYMBOL(lcd_arch_ept_hpa);
 EXPORT_SYMBOL(lcd_arch_ept_map);

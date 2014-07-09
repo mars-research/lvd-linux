@@ -1038,7 +1038,7 @@ static int lcd_init_blob(struct lcd *lcd, unsigned char *blob,
 	return 0;
 
 fail4:
-	lcd_mm_gva_unmap_range(lcd, __gva(0), __gpa(0), npages);
+	lcd_mm_gva_unmap_range(lcd, __gva(0), npages);
 fail3:
 	lcd_arch_ept_unmap_range(lcd->lcd_arch, 
 				gpa_add(LCD_ARCH_FREE, paging_mem_size), 

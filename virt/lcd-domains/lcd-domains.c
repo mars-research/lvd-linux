@@ -670,7 +670,11 @@ static int lcd_mm_gva_walk(struct lcd *lcd, gva_t gva, pte_t **pte_out)
 static void lcd_mm_gva_set(pte_t *pte, gpa_t gpa)
 {
 	set_pte_gpa(pte, gpa);
+}
 
+static void lcd_mm_gva_unset(pte_t *pte)
+{
+	*pte = __pte(0);
 }
 
 static gpa_t lcd_mm_gva_get(pte_t *pte)
@@ -701,6 +705,32 @@ static int lcd_mm_gva_map(struct lcd *lcd, gva_t gva, gpa_t gpa)
 	}
 
 	lcd_mm_gva_set(pte, gpa);
+
+	return 0;
+}
+
+/**
+ * Simple routine combining walk and set. Never
+ * overwrites.
+ */
+static int lcd_mm_gva_unmap(struct lcd *lcd, gva_t gva)
+{
+	int ret;
+	pte_t *pte;
+
+	ret = lcd_mm_gva_walk(lcd, gva, &pte);
+	if (ret) {
+		printk(KERN_ERR "lcd_mm_gva_unmap: error getting pte\n");
+		return ret;
+	}
+
+	if (!pte_present(*pte)) {
+		printk(KERN_ERR "lcd_mm_gva_unmap: no mapping for gva %lx\n",
+			gva_val(gva));
+		return -EINVAL;
+	}
+
+	lcd_mm_gva_unset(pte);
 
 	return 0;
 }
@@ -741,8 +771,8 @@ static int lcd_mm_gva_to_gpa(struct lcd *lcd, gva_t gva, gpa_t *gpa)
 static int lcd_mm_gva_map_range(struct lcd *lcd, gva_t gva_start, 
 				gpa_t gpa_start, unsigned long npages)
 {
-	u64 off;
-	u64 len;
+	unsigned long off;
+	unsigned long len;
 
 	len = npages * PAGE_SIZE;
 	for (off = 0; off < len; off += PAGE_SIZE) {
@@ -754,6 +784,31 @@ static int lcd_mm_gva_map_range(struct lcd *lcd, gva_t gva_start,
 			printk(KERN_ERR "lcd_mm_gva_map_range: error mapping gva %lx to gpa %lx\n",
 				gva_val(gva_add(gva_start,off)),
 				gpa_val(gpa_add(gpa_start,off)));
+			return -EIO;
+		}
+	}
+
+	return 0;
+}
+
+/**
+ * Unmaps 
+ *
+ *    gva_start --> gva_start + npages * PAGE_SIZE
+ *
+ * in lcd's guest virtual paging tables.
+ */
+static int lcd_mm_gva_unmap_range(struct lcd *lcd, gva_t gva_start, 
+				unsigned long npages)
+{
+	unsigned long off;
+	unsigned long len;
+
+	len = npages * PAGE_SIZE;
+	for (off = 0; off < len; off += PAGE_SIZE) {
+		if (lcd_mm_gva_unmap(lcd, gva_add(gva_start, off))) {
+			printk(KERN_ERR "lcd_mm_gva_unmap_range: error unmapping gva %lx\n",
+				gva_val(gva_add(gva_start,off)));
 			return -EIO;
 		}
 	}

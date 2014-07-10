@@ -18,6 +18,8 @@ union utcb_union {
 };
 
 
+struct sync_ipc * alloc_sync_ipc(void);
+
 int ipc_send(capability_t cap, struct message_info *msg);
 int ipc_recv(capability_t rvp_cap, struct message_info *msg);
 

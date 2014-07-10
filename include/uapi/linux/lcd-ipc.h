@@ -17,8 +17,13 @@ struct message_info {
 	u8		valid_cap_regs;
 };
 
+struct boot_info {
+	capability_t 	boot_rvp; 
+};
+
 struct utcb {
 	struct message_info msg_info;
+	struct boot_info    boot_info;
 };
 
 #endif

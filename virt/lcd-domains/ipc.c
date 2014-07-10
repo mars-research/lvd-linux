@@ -7,6 +7,20 @@
 #include <lcd/cap.h>
 #include <lcd/lcd.h>
 
+struct sync_ipc * alloc_sync_ipc() {
+	struct sync_ipc *rvp; 
+
+	rvp = (struct sync_ipc*) kmalloc(sizeof(struct sync_ipc), GFP_KERNEL);
+	if(!rvp) {
+		printk(KERN_ERR "Failed to allocate memory\n");
+		return NULL;
+	};
+
+	spin_lock_init(&rvp->lock);
+	return rvp;
+};
+EXPORT_SYMBOL(alloc_sync_ipc);
+
 int ipc_send(capability_t rvp_cap, struct message_info *msg)
 {
 	struct task_struct *recv_task;

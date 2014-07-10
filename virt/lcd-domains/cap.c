@@ -536,6 +536,7 @@ capability_t lcd_cap_create_capability(struct cap_space *cspace, void * hobject,
 	}
 	return cid;
 }
+EXPORT_SYMBOL(lcd_cap_create_capability);
 
 int lcd_cap_init_cspace(struct cap_space *cspace)
 {
@@ -632,6 +633,7 @@ create_cspace_safe_exit:
 	}
 	return -1;
 }
+EXPORT_SYMBOL(lcd_cap_init_cspace);
 
 // does not lock the cspace.
 // First entry of every cnode table will be the head of the free slots available

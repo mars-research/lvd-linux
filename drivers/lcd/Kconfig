@@ -5,12 +5,14 @@
 config LCD_PING_PONG_RECEIVER
        tristate "LCD ping-pong IPC test (receiver)"
        depends on LCD_PING_PONG_SENDER
+       depends on LCD
        default m
        ---help---
        Receiver for the ping-pong LCD IPC test
 
 config LCD_PING_PONG_SENDER
        tristate "LCD ping-pong IPC test (sender)"
+       depends on LCD
        default m
        ---help---
        Sender for the ping-pong LCD IPC test

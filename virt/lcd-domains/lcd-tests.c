@@ -370,10 +370,17 @@ static int test07(void)
 		goto fail5;
 	}
 
+	ret = lcd_mm_gva_unmap(lcd, __gva(0x1234000UL));
+	if (ret) {
+		printk(KERN_ERR "lcd test: test07 failed to unmap\n");
+		goto fail6;
+	}
+
 	ret = 0;
 	goto done;
 
 done:
+fail6:
 fail5:
 fail4:
 fail3:

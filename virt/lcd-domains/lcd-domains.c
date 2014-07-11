@@ -145,7 +145,12 @@ static int lcd_mm_gva_init(struct lcd *lcd, gpa_t gv_paging_mem_start,
 	lcd->gv.paging_mem_bot = gv_paging_mem_start;
 	lcd->gv.paging_mem_brk = gv_paging_mem_start;
 	lcd->gv.paging_mem_top = gv_paging_mem_end;
-	
+
+	/*
+	 * Mark paging as present
+	 */
+	lcd->gv.present = 1;
+
 	/*
 	 * Alloc a page for the pgd
 	 */
@@ -160,11 +165,6 @@ static int lcd_mm_gva_init(struct lcd *lcd, gpa_t gv_paging_mem_start,
 	 */
 	lcd->gv.root = (pgd_t *)hpa2va(hpa);
 	lcd_arch_set_gva_root(lcd->lcd_arch, gpa);
-	
-	/*
-	 * Mark paging as present
-	 */
-	lcd->gv.present = 1;
 
 	return 0;
 

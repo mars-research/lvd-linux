@@ -7,6 +7,8 @@
 
 /* ADDRESS SPACE TYPES ---------------------------------------- */
 
+/* XXX: Assuming host and guest run in 64-bit mode */
+
 typedef struct { unsigned long gva; } gva_t;
 typedef struct { unsigned long hva; } hva_t;
 typedef struct { unsigned long gpa; } gpa_t;
@@ -141,7 +143,7 @@ typedef unsigned long lcd_arch_epte_t;
 struct lcd_arch_ept {
 	spinlock_t lock;
 	lcd_arch_epte_t *root;
-	unsigned long vmcs_ptr;
+	u64 vmcs_ptr;
 	bool access_dirty_enabled;
 };
 

@@ -138,16 +138,25 @@ static inline bool cpu_has_vmx_ept_ad_bits(void)
 	return vmx_capability.ept & VMX_EPT_AD_BIT;
 }
 
+/**
+ * On error, generates an invalid opcode exception
+ * (ud2 instruction).
+ */
 static inline void __invept(int ext, u64 eptp)
 {
+	u8 error;
+
 	struct {
 		u64 eptp, gpa;
-	} operand = {eptp, 0};
+	} operand = {eptp, U64_C(0)};
 
-	asm volatile (ASM_VMX_INVEPT
+	asm volatile (ASM_VMX_INVEPT "; setna %0"
                 /* CF==1 or ZF==1 --> rc = -1 */
-                "; ja 1f ; ud2 ; 1:\n"
-                : : "a" (&operand), "c" (ext) : "cc", "memory");
+                : "=qm"(error) : "a" (&operand), "c" (ext) : "cc", "memory");
+	if (error)
+		printk(KERN_ERR "lcd vmx: invept error: ext=%d, eptp=0x%llx\n",
+			ext, eptp);
+			
 }
 
 /**
@@ -171,18 +180,26 @@ static inline void invept_single_context(u64 eptp)
 		invept_global_context();
 }
 
+/**
+ * On error, generates an invalid opcode exception
+ * (ud2 instruction).
+ */
 static inline void __invvpid(int ext, u16 vpid)
 {
+	u8 error;
+
 	struct {
 		u64 vpid : 16;
 		u64 rsvd : 48;
 		u64 addr;
-	} operand = { vpid, 0, 0 };
+	} operand = { vpid, 0, U64_C(0) };
 
-	asm volatile (ASM_VMX_INVVPID
+	asm volatile (ASM_VMX_INVVPID "; setna %0"
                 /* CF==1 or ZF==1 --> rc = -1 */
-		"; ja 1f ; ud2 ; 1:"
-                : : "a"(&operand), "c"(ext) : "cc", "memory");
+		: "=qm"(error) : "a"(&operand), "c"(ext) : "cc", "memory");
+	if (error)
+		printk(KERN_ERR "lcd vmx: invvpid fail: ext=%d, vpid=0x%hx\n",
+			ext, vpid);
 }
 
 /**
@@ -219,16 +236,14 @@ static inline void invvpid_single_context(u16 vpid)
  */
 static void vmcs_clear(struct lcd_arch_vmcs *vmcs)
 {
-	hpa_t a = va2hpa(vmcs);
-	unsigned long hpa;
+	u64 hpa = __pa(vmcs);
 	u8 error;
 
-	hpa = hpa_val(a);
 	asm volatile (ASM_VMX_VMCLEAR_RAX "; setna %0"
                 : "=qm"(error) : "a"(&hpa), "m"(hpa)
                 : "cc", "memory");
 	if (error)
-		printk(KERN_ERR "lcd vmx: vmclear fail: %p/%lx\n",
+		printk(KERN_ERR "lcd vmx: vmclear fail: %p/%llx\n",
 			vmcs, hpa);
 }
 
@@ -238,17 +253,14 @@ static void vmcs_clear(struct lcd_arch_vmcs *vmcs)
  */
 static void vmcs_load(struct lcd_arch_vmcs *vmcs)
 {
-	hpa_t a = va2hpa(vmcs);
+	u64 hpa = __pa(vmcs);
 	u8 error;
-	unsigned long hpa;
-
-	hpa = hpa_val(a);
 
 	asm volatile (ASM_VMX_VMPTRLD_RAX "; setna %0"
                 : "=qm"(error) : "a"(&hpa), "m"(hpa)
                 : "cc", "memory");
 	if (error)
-		printk(KERN_ERR "lcd vmx: vmptrld %p/%lx failed\n",
+		printk(KERN_ERR "lcd vmx: vmptrld %p/%llx failed\n",
 			vmcs, hpa);
 }
 
@@ -344,8 +356,11 @@ static struct lcd_arch_vmcs *vmx_alloc_vmcs(int cpu)
 
 static inline void __vmxon(hpa_t addr)
 {
+	u64 paddr;
+	
+	paddr = hpa_val(addr);
 	asm volatile (ASM_VMX_VMXON_RAX
-                : : "a"(hpa_ptr(&addr)), "m"(addr)
+                : : "a"(&paddr), "m"(paddr)
                 : "memory", "cc");
 }
 
@@ -1254,7 +1269,7 @@ int vmx_init_ept(struct lcd_arch *vcpu)
 		vcpu->ept.access_dirty_enabled = true;
 		eptp |= VMX_EPT_AD_ENABLE_BIT;
 	}
-	eptp |= (((unsigned long)vcpu->ept.root) & PAGE_MASK);
+	eptp |= hpa_val(va2hpa(vcpu->ept.root)) & PAGE_MASK;
 	vcpu->ept.vmcs_ptr = eptp;
 
 	/*

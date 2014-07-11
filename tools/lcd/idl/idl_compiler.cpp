@@ -1,6 +1,7 @@
 #include "ast.h"
 #include "flounder_parser.h"
-#include "visitor.h"
+#include "stub-generator.h"
+#include "header-generator.h"
 #include <stdio.h>
 #include <stdlib.h>
 #include <iostream>

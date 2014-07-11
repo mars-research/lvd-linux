@@ -20,7 +20,26 @@ std::vector<Message*> *Interface::getMessages()
   return this->function_decs;
 }
   
+void Interface::init_types()
+{
+  // best way to do builtin types ?
+  this->types = new std::map<char *,char *>();
+  /*
+    bool cap char give_away_cap int int8
+    int16 int32 int64 intptr iref size
+    string uint8 uint16 uint32 uint64 uintptr
+   */
+  // insert pairs
+  this->types->insert( std::pair<char *, char *>("bool", "int"));
+  // this for all in above....
+						 
 
+}
+
+void Interface::add_type_alias(char * a, char * b)
+{
+ 
+}
 
 
 Message::Message(char * n, std::vector<Argument*> * a)

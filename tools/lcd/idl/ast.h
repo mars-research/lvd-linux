@@ -42,9 +42,11 @@ class Message
 
 class Interface
 {
+  std::map<char *, char *> types;
   char * name;
   char * description;
   std::vector<Message*> * function_decs;
+  void init_types();
  public:
   Interface(char * n, char * desc, std::vector<Message*> * m);
   Interface(char * n, std::vector<Message*> * m);

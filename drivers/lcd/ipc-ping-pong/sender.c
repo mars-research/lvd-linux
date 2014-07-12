@@ -17,6 +17,7 @@
 #include <linux/kthread.h>
 
 #include <lcd/lcd.h>
+#include <lcd/cap-internal.h>
 
 MODULE_LICENSE("GPL");
 MODULE_DESCRIPTION("LCD ping-pong IPC test (sender)");

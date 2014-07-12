@@ -3,14 +3,32 @@
 #include <linux/types.h>
 #include <linux/spinlock.h>
 #include <linux/sched.h>
+#include <linux/slab.h>
 
-#include <lcd/cap.h>
+#include <lcd/cap-internal.h>
 #include <lcd/lcd.h>
+
+struct kmem_cache *sync_ipc_cache;
+
+int lcd_ipc_init(void){
+	sync_ipc_cache = KMEM_CACHE(sync_ipc, 0);
+	if(!sync_ipc_cache){
+		printk(KERN_ERR "Failed to allocate cte slab\n");
+		return -ENOMEM;
+	};
+	return 0;
+};
+
+int lcd_ipc_exit(void) {
+	if (sync_ipc_cache)
+		kmem_cache_destroy(sync_ipc_cache);
+	return 0;
+}
 
 struct sync_ipc * alloc_sync_ipc() {
 	struct sync_ipc *rvp; 
 
-	rvp = (struct sync_ipc*) kmalloc(sizeof(struct sync_ipc), GFP_KERNEL);
+	rvp = (struct sync_ipc*) kmem_cache_alloc(sync_ipc_cache, GFP_KERNEL);
 	if(!rvp) {
 		printk(KERN_ERR "Failed to allocate memory\n");
 		return NULL;
@@ -20,6 +38,12 @@ struct sync_ipc * alloc_sync_ipc() {
 	return rvp;
 };
 EXPORT_SYMBOL(alloc_sync_ipc);
+
+void free_sync_ipc(struct sync_ipc *rvp) {
+	kmem_cache_free(sync_ipc_cache, rvp);
+	return;
+};
+EXPORT_SYMBOL(free_sync_ipc);
 
 int ipc_send(capability_t rvp_cap, struct message_info *msg)
 {

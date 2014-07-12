@@ -1,4 +1,33 @@
-#include <lcd/cap.h>
+#include <linux/slab.h>
+#include <lcd/cap-internal.h>
+
+struct kmem_cache *cte_cache;
+struct kmem_cache *cdt_cache;
+
+int lcd_cap_init(void){
+	cte_cache = KMEM_CACHE(cte, 0);
+	if(!cte_cache){
+		printk(KERN_ERR "Failed to allocate cte slab\n");
+		return -ENOMEM;
+	};
+
+	cdt_cache = KMEM_CACHE(cap_derivation_tree, 0);
+	if(!cdt_cache){
+		printk(KERN_ERR "Failed to allocate cte slab\n");
+		return -ENOMEM;
+	};
+
+	return 0;
+};
+
+int lcd_cap_exit(void) {
+	if (cte_cache)
+		kmem_cache_destroy(cte_cache);
+	if (cdt_cache)
+		kmem_cache_destroy(cdt_cache);
+	return 0;
+}
+
 
 // this function will not lock any semaphore.
 // assumption is that cdt and cspace are already locked.
@@ -68,7 +97,7 @@ bool lcd_cap_delete_internal_lockless(struct cte *cap, bool *last_reference)
 	}
   
 	// delete the capability
-	kfree(cdt);
+	kmem_cache_free(cdt_cache, cdt);
 	cap->ctetype = lcd_type_free;
 	table = cap - cap->index;
 	cap->slot.next_free_cap_slot = table[0].slot.next_free_cap_slot;
@@ -287,7 +316,7 @@ void lcd_cap_destroy_cspace(struct cap_space *cspace)
 			}
 			if (i == CNODE_SLOTS_START)
 			{
-				kfree(node);
+				kmem_cache_free(cte_cache, node);
 				table_visited = false;
 			}
 			else
@@ -314,7 +343,7 @@ capability_t lcd_cap_grant_capability(struct cap_space *src_space, capability_t 
 	
 	BUG_ON(src_space == NULL || dst_space == NULL || src_cid == 0);
 	
-	dst_cdt_node = kmalloc(sizeof(struct cap_derivation_tree), GFP_KERNEL);
+	dst_cdt_node = kmem_cache_alloc(cdt_cache, GFP_KERNEL);
 	if(!dst_cdt_node) {
 		LCD_PANIC("Allocation failed\n");
 		return 0;
@@ -332,7 +361,7 @@ capability_t lcd_cap_grant_capability(struct cap_space *src_space, capability_t 
 			LCD_PANIC("lcd_cap_grant_capability: Invalid Capability\n");
 			if (src_cte != NULL)
 				up(src_cte->cap.cdt_node->sem_cdt);
-			kfree(dst_cdt_node);
+			kmem_cache_free(cdt_cache, dst_cdt_node);
 			return 0;
 		}
     
@@ -340,7 +369,7 @@ capability_t lcd_cap_grant_capability(struct cap_space *src_space, capability_t 
 		{
 			LCD_PANIC("lcd_cap_grant_capability: Source does not have grant permissions\n");
 			up(src_cte->cap.cdt_node->sem_cdt);
-			kfree(dst_cdt_node);
+			kmem_cache_free(cdt_cache, dst_cdt_node);
 			return 0;
 		}
     
@@ -354,7 +383,7 @@ capability_t lcd_cap_grant_capability(struct cap_space *src_space, capability_t 
 				LCD_PANIC("lcd_cap_grant_capability: Destroy may be in progress, aborting operation\n");
 				up(&(dst_space->sem_cspace));
 				up(src_cte->cap.cdt_node->sem_cdt);
-				kfree(dst_cdt_node);
+				kmem_cache_free(cdt_cache, dst_cdt_node);
 				return 0;
 			}
       
@@ -368,7 +397,7 @@ capability_t lcd_cap_grant_capability(struct cap_space *src_space, capability_t 
 				LCD_PANIC("lcd_cap_grant_capability: No free slot\n");
 				up(&(dst_space->sem_cspace));
 				up(src_cte->cap.cdt_node->sem_cdt);
-				kfree(dst_cdt_node);
+				kmem_cache_free(cdt_cache, dst_cdt_node);
 				return 0;
 			}
       
@@ -481,7 +510,7 @@ capability_t lcd_cap_create_capability(struct cap_space *cspace, void * hobject,
   
 	BUG_ON(cspace == NULL || cspace->root_cnode.cnode.table == NULL);
   
-	cdtnode = kmalloc(sizeof(struct cap_derivation_tree), GFP_KERNEL);
+	cdtnode = kmem_cache_alloc(cdt_cache, GFP_KERNEL);
 	if (cdtnode == NULL)
 	{
 		LCD_PANIC("lcd_cap_create_capability: CDT Node allocation failed\n");
@@ -492,18 +521,18 @@ capability_t lcd_cap_create_capability(struct cap_space *cspace, void * hobject,
 	if (cdtnode == NULL)
 	{
 		LCD_PANIC("lcd_cap_create_capability: CDT Semaphore allocation failed\n");
-		kfree(cdtnode);
+		kmem_cache_free(cdt_cache, cdtnode);
 		return 0;
 	}
   
-	if (down_interruptible(&(cspace->sem_cspace)))
+	if (down_interruptible(&(cspace->sem_cspace)) == 0)
 	{
 		if (cspace->root_cnode.ctetype == lcd_type_invalid)
 		{
 			LCD_PANIC("lcd_cap_create_capability: Destroy may be in progress, operation aborted\n");
 			up(&(cspace->sem_cspace));
 			kfree(cdtnode->sem_cdt);
-			kfree(cdtnode);
+			kmem_cache_free(cdt_cache, cdtnode);
 			return 0;
 		}
 		cid = lcd_cap_lookup_freeslot(cspace, &cap);
@@ -511,7 +540,7 @@ capability_t lcd_cap_create_capability(struct cap_space *cspace, void * hobject,
 		{
 			LCD_PANIC("lcd_cap_create_capability: No Free Slot found\n");
 			kfree(cdtnode->sem_cdt);
-			kfree(cdtnode);
+			kmem_cache_free(cdt_cache, cdtnode);
 			up(&(cspace->sem_cspace));
 			return 0;
 		}
@@ -532,7 +561,7 @@ capability_t lcd_cap_create_capability(struct cap_space *cspace, void * hobject,
 	{
 		LCD_PANIC("lcd_cap_create_capability: Signal interrupted cspace lock acquire\n");
 		kfree(cdtnode->sem_cdt);
-		kfree(cdtnode);
+		kmem_cache_free(cdt_cache, cdtnode);
 	}
 	return cid;
 }
@@ -540,98 +569,42 @@ EXPORT_SYMBOL(lcd_cap_create_capability);
 
 int lcd_cap_init_cspace(struct cap_space *cspace)
 {
-	bool success = false;
+	int ret;
 	struct cte *table;
 	
 	cspace->root_cnode.cnode.table = NULL;
 	
 	// initialize semaphore
-	sema_init(&(cspace->sem_cspace), 1);
-	if (down_interruptible(&(cspace->sem_cspace)))
-	{
-		// allocate memory for the first cnode.
-		cspace->root_cnode.ctetype = lcd_type_cnode;
-		cspace->root_cnode.cnode.cnode_id = 0;
-		cspace->root_cnode.cnode.table_level = 0;
-		cspace->root_cnode.cnode.table = kmalloc(PAGE_SIZE, GFP_KERNEL);
-		if (cspace->root_cnode.cnode.table == NULL)
-		{
-			LCD_PANIC("lcd_cap_create_cspace: Failed to allocate cnode table\n");
-			goto create_cspace_safe_exit;
-		}
-
-		table = cspace->root_cnode.cnode.table;
-		table[0].ctetype = lcd_type_free;
-#if 0
-		// Get the intitial capabilities into the cspace.
-		for (i = 1; i < LCD_CapFirstFreeSlot; i++)
-		{
-			table[i].cap.hobject = objects[i];
-			table[i].cap.crights = rights[i];
-			if (objects[i] == NULL)
-			{
-				table[i].ctetype = lcd_type_invalid;
-				continue;
-			}
-			table[i].ctetype = lcd_type_capability;
-			cdtnode = kmalloc(sizeof(struct cap_derivation_tree), GFP_KERNEL);
-			if (cdtnode == NULL)
-			{
-				LCD_PANIC("lcd_cap_create_cspace: Failed to allocate cdt node\n");
-				goto create_cspace_safe_exit;
-			}
-			cdtnode->cap = &(cspace->root_cnode.cnode.table[i]);
-			cdtnode->sem_cdt = kmalloc(sizeof(struct semaphore), GFP_KERNEL);
-			if (cdtnode->sem_cdt == NULL)
-			{
-				LCD_PANIC("lcd_cap_create_cspace: Failed to allocate cdt semaphore\n");
-				goto create_cspace_safe_exit;
-			}
-			sema_init(cdtnode->sem_cdt, 1);
-			cdtnode->parent_ptr = NULL;
-			cdtnode->child_ptr = NULL;
-			cdtnode->next = NULL;
-			cdtnode->prev = NULL;
-			table[i].cap.cdt_node = cdtnode;
-		}
-#endif
-		// initialize the free list
-		success = lcd_cap_initialize_freelist(cspace, cspace->root_cnode.cnode.table, true);
-		up(&(cspace->sem_cspace));
-		if (!success)
-		{
-			LCD_PANIC("lcd_cap_create_cspace: Failed to initialize free list\n");
-			goto create_cspace_safe_exit;
-		}
+	sema_init(&cspace->sem_cspace, 1);
+		
+	// allocate memory for the first cnode.
+	cspace->root_cnode.ctetype = lcd_type_cnode;
+	cspace->root_cnode.cnode.cnode_id = 0;
+	cspace->root_cnode.cnode.table_level = 0;
+	cspace->root_cnode.cnode.table = kmalloc(PAGE_SIZE, GFP_KERNEL);
+	if (cspace->root_cnode.cnode.table == NULL) {
+		LCD_PANIC("lcd_cap_create_cspace: Failed to allocate cnode table\n");
+		return -ENOMEM;
 	}
-	else
-	{
-		LCD_PANIC("lcd_cap_create_cspace: Failed to acquire cspace lock\n");
-		goto create_cspace_safe_exit;
+
+	table = cspace->root_cnode.cnode.table;
+	table[0].ctetype = lcd_type_free;
+
+	// initialize the free list
+	ret = lcd_cap_initialize_freelist(cspace, cspace->root_cnode.cnode.table, true);
+	if (!ret) {
+		LCD_PANIC("lcd_cap_create_cspace: Failed to initialize free list\n");
+		goto out;	
 	}
   
 	return 0;
   
-create_cspace_safe_exit:
-	if (cspace->root_cnode.cnode.table)
-	{
-#if 0
-		for (i = 1; i < LCD_CapFirstFreeSlot; i++)
-		{
-			if (cspace->root_cnode.cnode.table[i].cap.cdt_node != NULL)
-			{
-				if (cspace->root_cnode.cnode.table[i].cap.cdt_node->sem_cdt != NULL)
-				{
-					kfree(cspace->root_cnode.cnode.table[i].cap.cdt_node->sem_cdt);
-				}
-				kfree(cspace->root_cnode.cnode.table[i].cap.cdt_node);
-			}
-		}
-#endif
+out:
+	if (cspace->root_cnode.cnode.table) {
 		kfree(cspace->root_cnode.cnode.table);
 		cspace->root_cnode.cnode.table = NULL;
 	}
-	return -1;
+	return ret;
 }
 EXPORT_SYMBOL(lcd_cap_init_cspace);
 
@@ -701,35 +674,39 @@ capability_t lcd_cap_lookup_freeslot(struct cap_space *cspace, struct cte **cap)
 	capability_t cid = 0, cnode_id;
 	bool found = false;
 	int i = 0;
-	int size = sizeof(struct cte);
 	struct kfifo cnode_q;
   
 	BUG_ON(cspace == NULL || cspace->root_cnode.cnode.table == NULL || cap == NULL);
 
-	if (kfifo_alloc(&cnode_q, sizeof(struct cte) * 512, GFP_KERNEL) != 0)
+	if (kfifo_alloc(&cnode_q, sizeof(struct cte *) * 512, GFP_KERNEL) != 0)
 	{
 		LCD_PANIC("lcd_cap_lookup_freeslot: Failed to allocate FIFO buffer\n");
 		return 0;
 	}
 
-	kfifo_in(&cnode_q, &(cspace->root_cnode), size);
+	kfifo_in(&cnode_q, &cspace->root_cnode, sizeof(struct cte *));
   
 	while (!found && !kfifo_is_empty(&cnode_q))
 	{
 		int free_cap_slot = 0, free_cnode_slot = 0;
-		struct cte *node = NULL, *cnode = NULL;
-    
-		kfifo_out(&cnode_q, cnode, size);
+		struct cte *node = NULL, *cnode;
+   
+		printk(KERN_INFO "Looking up free slot\n");
+
+		kfifo_out(&cnode_q, &cnode, sizeof(struct cte *));
 		if (cnode == NULL)
 		{
 			break;
 		}
     
 		node = cnode->cnode.table;
-    
+
+	    
 		free_cap_slot   = node[0].slot.next_free_cap_slot;
 		free_cnode_slot = node[0].slot.next_free_cnode_slot;
-    
+    	
+		printk(KERN_INFO "Next free cap slot:%d, cnode slot:%d\n", free_cap_slot, free_cnode_slot);
+
 		if (free_cap_slot != 0 && free_cap_slot < CNODE_SLOTS_START)
 		{
 			*cap = lcd_cap_reserve_slot(cnode, &cid, free_cap_slot);
@@ -781,10 +758,10 @@ capability_t lcd_cap_lookup_freeslot(struct cap_space *cspace, struct cte **cap)
 		else 
 		{
 			// nothing is free in this cnode 
-			// kep lookin at all its children
+			// keep lookin at all its children
 			for (i = CNODE_SLOTS_START; i < MAX_SLOTS; i++)
 			{
-				kfifo_in(&cnode_q, &node[i], size);
+				kfifo_in(&cnode_q, &node[i], sizeof(struct cte *));
 			}
 		}
 	} // while (!kfifo_is_empty())
@@ -802,7 +779,7 @@ capability_t lcd_cap_mint_capability(struct cap_space *cspace, capability_t cid,
   
 	BUG_ON(cid == 0);
 
-	dst_cdt = kmalloc(sizeof(struct cap_derivation_tree), GFP_KERNEL);
+	dst_cdt = kmem_cache_alloc(cdt_cache, GFP_KERNEL);
 	if (dst_cdt == NULL)
 	{
 		LCD_PANIC("lcd_cap_mint_capability: Failed to allocate memory for cdt node\n");
@@ -817,7 +794,7 @@ capability_t lcd_cap_mint_capability(struct cap_space *cspace, capability_t cid,
 			LCD_PANIC("lcd_cap_mint_capability: Invalid Capability\n");
 			if (src_cte != NULL)
 				up(src_cte->cap.cdt_node->sem_cdt);
-			kfree(dst_cdt);
+			kmem_cache_free(cdt_cache, dst_cdt);
 			return 0;
 		}
 		cdt = src_cte->cap.cdt_node;
@@ -828,7 +805,7 @@ capability_t lcd_cap_mint_capability(struct cap_space *cspace, capability_t cid,
 				LCD_PANIC("lcd_cap_mint_capability: Destroy may be in progress, aborting operation\n");
 				up(&(cspace->sem_cspace));
 				up(cdt->sem_cdt);
-				kfree(dst_cdt);
+				kmem_cache_free(cdt_cache, dst_cdt);
 				return 0;
 			}
       
@@ -842,7 +819,7 @@ capability_t lcd_cap_mint_capability(struct cap_space *cspace, capability_t cid,
 				LCD_PANIC("lcd_cap_mint_capability: No free slot\n");
 				up(&(cspace->sem_cspace));
 				up(cdt->sem_cdt);
-				kfree(dst_cdt);
+				kmem_cache_free(cdt_cache, dst_cdt);
 				return 0;
 			}
       

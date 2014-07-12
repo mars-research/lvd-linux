@@ -20,6 +20,9 @@ union utcb_union {
 
 struct sync_ipc * alloc_sync_ipc(void);
 
+int lcd_ipc_init(void);
+int lcd_ipc_exit(void);
+
 int ipc_send(capability_t cap, struct message_info *msg);
 int ipc_recv(capability_t rvp_cap, struct message_info *msg);
 

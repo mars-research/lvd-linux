@@ -111,7 +111,7 @@ struct lcd_arch_vmcs {
 	char data[0];
 };
 
-#define LCD_ARCH_NUM_AUTOLOAD_MSRS 0
+#define LCD_ARCH_NUM_AUTOLOAD_MSRS 1
 
 enum lcd_arch_reg {
 	LCD_ARCH_REGS_RAX = 0,
@@ -226,6 +226,11 @@ void lcd_arch_exit(void);
  * the settings and most register values.
  */
 struct lcd_arch *lcd_arch_create(void);
+/**
+ * Does logical consistency checks (e.g., runs through checks
+ * listed in Intel SDM V3 26.1, 26.2, and 26.3).
+ */
+int lcd_arch_check(struct lcd_arch *vcpu);
 /**
  * Tears down arch-dep part of LCD. (If LCD is launched on
  * some cpu, it will become inactive.)
@@ -348,7 +353,7 @@ int lcd_arch_set_gva_root(struct lcd_arch *vcpu, gpa_t a);
 #define LCD_ARCH_GS_BASE     __gpa(0UL)
 #define LCD_ARCH_GS_LIMIT    0xFFFFFFFF
 #define LCD_ARCH_GDTR_BASE   __gpa(1UL << PAGE_SHIFT)
-#define LCD_ARCH_GDTR_LIMIT  ((u32)~(PAGE_SIZE - 1))
+#define LCD_ARCH_GDTR_LIMIT  0xFFFUL
 #define LCD_ARCH_TSS_BASE    __gpa(2UL << PAGE_SHIFT)
 /* tss base + limit = address of last byte in tss, hence -1 */
 #define LCD_ARCH_TSS_LIMIT   (sizeof(struct lcd_arch_tss) - 1)

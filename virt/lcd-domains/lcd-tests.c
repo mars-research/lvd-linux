@@ -585,5 +585,6 @@ static void lcd_tests(void)
 		return;
 	if (test09())
 		return;
+	printk(KERN_ERR "lcd-domains: all tests passed!\n");
 	return;
 }

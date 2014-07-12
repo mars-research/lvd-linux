@@ -186,7 +186,7 @@ fail3:
 fail2:
 	kfree(lcd);
 fail1:
-	return -1;
+	return ret;
 }
 
 
@@ -316,14 +316,116 @@ fail_alloc:
 static int test08(void)
 {
 	struct lcd_arch *lcd;
+	hva_t pgd;
+	int ret;
 
 	lcd = lcd_arch_create();
 	if (!lcd) {
 		printk(KERN_ERR "lcd arch : test08 failed to create lcd\n");
+		ret = 1;
+		goto fail1;
+	}
+	
+	pgd = __hva(__get_free_page(GFP_KERNEL));
+	if (!hva_val(pgd)) {
+		printk(KERN_ERR "lcd arch: test08 failed to alloc page\n");
+		ret = 1;
+		goto fail2;
+	}
+	ret = lcd_arch_ept_map(lcd, __gpa(0), hva2hpa(pgd), 1, 0);
+	if (ret) {
+		printk(KERN_ERR "lcd arch: test08 error mapping pgd\n");
+		goto fail3;
+	}
+	ret = lcd_arch_set_gva_root(lcd, __gpa(0));
+	if (ret) {
+		printk(KERN_ERR "lcd arch: test08 error setting gva root\n");
+		goto fail4;
+	}
+	ret = lcd_arch_set_pc(lcd, __gpa(0));
+	if (ret) {
+		printk(KERN_ERR "lcd arch: test08 error setting pc\n");
+		goto fail5;
+	}
+
+	if (lcd_arch_check(lcd)) {
+		printk(KERN_ERR "lcd arch: test08 failed a check\n");
+		ret = -1;
+		goto fail6;
+	}
+
+	ret = 0;
+	goto done;
+done:
+fail6:
+fail5:
+fail4:
+	lcd_arch_ept_unmap(lcd, __gpa(0));
+fail3:
+	free_page(hva_val(pgd));
+fail2:
+	lcd_arch_destroy(lcd);
+fail1:
+	return ret;
+}
+
+static int test09(void)
+{
+	if (!vmx_addr_is_canonical(0UL)) {
+		printk(KERN_ERR "lcd arch: test09.1 failed\n");
+		return -1;
+	}
+	if (vmx_addr_is_canonical(1UL << 63)) {
+		printk(KERN_ERR "lcd arch: test09.2 failed\n");
+		return -1;
+	}
+	if (vmx_addr_is_canonical(0xFFFFUL << 48)) {
+		printk(KERN_ERR "lcd arch: test09.3 failed\n");
+		return -1;
+	}
+	if (!vmx_addr_is_canonical(0xFFFF8UL << 44)) {
+		printk(KERN_ERR "lcd arch: test09.4 failed\n");
+		return -1;
+	}
+	if (!vmx_addr_is_canonical(0x00007UL << 44)) {
+		printk(KERN_ERR "lcd arch: test09.5 failed\n");
+		return -1;
+	}
+	
+	return 0;
+}
+
+static int test10(void)
+{
+	u32 width;
+
+	width = cpuid_eax(0x80000008) & 0xff;
+
+	if (vmx_bad_phys_addr(0xff)) {
+		printk(KERN_ERR "lcd vmx: test10.0 failed\n");
+		return -1;
+	}
+	
+	if (vmx_bad_phys_addr(1UL << (width - 1))) {
+		printk(KERN_ERR "lcd vmx: test10.1 failed\n");
+		return -1;
+	}
+	
+	if (!vmx_bad_phys_addr(1UL << width)) {
+		printk(KERN_ERR "lcd vmx: test10.2 failed\n");
 		return -1;
 	}
 
-	lcd_arch_destroy(lcd);
+	if (!vmx_bad_phys_addr(-1ULL)) {
+		printk(KERN_ERR "lcd vmx: test10.3 failed\n");
+		return -1;
+	}
+
+	if (width >= 40 && vmx_bad_phys_addr(0x30682f000)) {
+		printk(KERN_ERR "lcd vmx: test10.4 failed\n");
+		return -1;
+	}
+
 	return 0;
 }
 
@@ -345,5 +447,10 @@ static void lcd_arch_tests(void)
 		return;
 	if (test08())
 		return;
+	if (test09())
+		return;
+	if (test10())
+		return;
+	printk(KERN_ERR "lcd vmx: all tests passed!\n");
 	return;
 }

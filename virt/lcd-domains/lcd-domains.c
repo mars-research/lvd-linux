@@ -892,7 +892,7 @@ static int lcd_do_run_blob_once(struct lcd *lcd)
 		 * Continue
 		 */
 		printk(KERN_ERR "lcd_run_blob: got external intr\n");
-		r = 0;
+		r = -EIO;
 		goto out;
 	case LCD_ARCH_STATUS_EPT_FAULT:
 		/*
@@ -924,7 +924,7 @@ static int lcd_do_run_blob_once(struct lcd *lcd)
 			goto out;
 		} else {
 			printk(KERN_ERR "lcd_run_blob: lcd yielded, exiting lcd...\n");
-			r = 0;
+			r = -EIO;
 			goto out;
 		}
 	}
@@ -936,6 +936,7 @@ out:
 static int lcd_do_run_blob(struct lcd *lcd)
 {
 	int r;
+
 	while (1) {
 		r = lcd_do_run_blob_once(lcd);
 		if (r)
@@ -1035,8 +1036,16 @@ static int lcd_init_blob(struct lcd *lcd, unsigned char *blob,
 		goto fail4;
 	}
 
-	return 0;
+	r = lcd_do_run_blob(lcd);
+	if (r) {
+		printk(KERN_ERR "lcd_init_blob: error running blob: err %d\n",
+			r);
+		goto fail4;
+	}
 
+	r = 0;
+	goto done;
+done:
 fail4:
 	lcd_mm_gva_unmap_range(lcd, __gva(0), npages);
 fail3:
@@ -1103,12 +1112,9 @@ static int lcd_run_blob(struct lcd_blob_info *bi)
 		goto fail5;
 	}
 
-	/*
-	 * Run blob until it yields or fails
-	 */
-	r = lcd_do_run_blob(lcd);
-	goto done;
 
+	r = 0;
+	goto done;
 done:
 fail5:
 	lcd_destroy(lcd);

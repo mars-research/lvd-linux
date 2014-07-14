@@ -1469,7 +1469,7 @@ struct task_struct {
 	unsigned int flags;	/* per process flags, defined below */
 	unsigned int ptrace;
 #ifdef CONFIG_HAVE_LCD
-	struct cap_space cspace;
+	struct cspace cspace;
 	struct list_head sync_rendezvous;
 	struct utcb *utcb;
 #endif

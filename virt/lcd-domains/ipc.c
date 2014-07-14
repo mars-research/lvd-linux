@@ -5,7 +5,7 @@
 #include <linux/sched.h>
 #include <linux/slab.h>
 
-#include <lcd/cap-internal.h>
+#include <lcd/cap.h>
 #include <lcd/lcd.h>
 
 struct kmem_cache *sync_ipc_cache;
@@ -49,24 +49,24 @@ int ipc_send(capability_t rvp_cap, struct message_info *msg)
 {
 	struct task_struct *recv_task;
 	struct sync_ipc *sync_ipc;
-	struct cte *rvp_cte;
+	struct cnode *cnode;
 	unsigned long flags;
 
 	printk(KERN_ERR "ipc_send:%s: sending on cap %lld\n", current->comm, rvp_cap);
 	
-        rvp_cte = lcd_cap_lookup_capability(&current->cspace, rvp_cap, true);
-	if (rvp_cte == NULL) {
+        cnode = lcd_cnode_lookup(&current->cspace, rvp_cap);
+	if (cnode == NULL || cnode->type != LCD_TYPE_SYNC_EP) {
 		printk(KERN_ERR "ipc_send: can't resolve rendezvous capabilty: %lld\n", rvp_cap);
 		return -EINVAL;   
 	}
 
-	sync_ipc = (struct sync_ipc *) rvp_cte->cap.hobject;
+	sync_ipc = (struct sync_ipc *) cnode->object;
 	
 	BUG_ON(!sync_ipc); 
 
 	// XXX: BU: Maybe I need to do some reference counting for IPC 
 	// objects here (before releasing the lock)
-	up(rvp_cte->cap.cdt_node->sem_cdt);
+	lcd_cnode_release(&cnode);
 
 	spin_lock_irqsave(&sync_ipc->lock, flags); 	
 	if (list_empty(&sync_ipc->receivers)) {
@@ -111,24 +111,24 @@ int ipc_recv(capability_t rvp_cap, struct message_info *msg)
 {
 	struct task_struct *send_task;
 	struct sync_ipc *sync_ipc;
-	struct cte *rvp_cte;
+	struct cnode *cnode;
 	unsigned long flags;
 
 	printk(KERN_ERR "ipc_recv:%s: receiving on cap %lld\n", current->comm, rvp_cap);
 	
-        rvp_cte = lcd_cap_lookup_capability(&current->cspace, rvp_cap, true);
-	if (rvp_cte == NULL) {
+        cnode = lcd_cnode_lookup(&current->cspace, rvp_cap);
+	if (cnode == NULL || cnode->type != LCD_TYPE_SYNC_EP) {
 		printk(KERN_ERR "ipc_recv: can't resolve capability: %lld\n", rvp_cap);
 		return -EINVAL;   
 	}
 
-	sync_ipc = (struct sync_ipc *) rvp_cte->cap.hobject;
+	sync_ipc = (struct sync_ipc *) cnode->object;
 	
 	BUG_ON(!sync_ipc); 
 
 	// XXX: BU: Maybe I need to do some reference counting for IPC 
 	// objects here (before releasing the lock)
-	up(rvp_cte->cap.cdt_node->sem_cdt);
+	lcd_cnode_release(cnode);
 
 	spin_lock_irqsave(&sync_ipc->lock, flags); 	
 	if (list_empty(&sync_ipc->senders)) {

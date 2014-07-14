@@ -15,9 +15,10 @@
 #include <linux/fs.h>
 #include <asm/uaccess.h>
 #include <linux/kthread.h>
+#include <linux/slab.h>
 
 #include <lcd/lcd.h>
-#include <lcd/cap-internal.h>
+#include <lcd/cap.h>
 
 MODULE_LICENSE("GPL");
 MODULE_DESCRIPTION("LCD ping-pong IPC test (sender)");
@@ -26,7 +27,8 @@ struct sync_ipc *rvp;
 
 int lcd_ping_pong_init_sender(void) {
 	int ret; 
-	capability_t rvp_cap;
+	capability_t rvp_cap = 0;
+	struct cnode *cnode;
 	
 	ret = lcd_enter();
 	if (ret) {
@@ -40,12 +42,17 @@ int lcd_ping_pong_init_sender(void) {
 		return -ENOMEM;
 	};
 
-        rvp_cap = lcd_cap_create_capability(&current->cspace, (void*)rvp, 0);
-	if(rvp_cap == 0) {
+        cnode = lcd_cnode_lookup(&current->cspace, rvp_cap);
+	if(cnode == 0) {
 		printk(KERN_ERR "Failed to create capability\n");
 		kfree(rvp);
 		return -ENOMEM;
 	};
+
+	cnode->type = LCD_TYPE_SYNC_EP;
+	cnode->object = rvp; 
+
+	lcd_cnode_release(cnode);
 
 	current->utcb->boot_info.boot_rvp = rvp_cap;
 	return 0;
@@ -54,8 +61,8 @@ int lcd_ping_pong_init_sender(void) {
 int lcd_ping_pong_init_receiver(void) 
 {
 	int ret; 
-	struct sync_ipc *rvp; 
-	capability_t rvp_cap;
+	capability_t rvp_cap = 0;
+	struct cnode *cnode;
 	
 	ret = lcd_enter();
 	if (ret) {
@@ -65,12 +72,17 @@ int lcd_ping_pong_init_receiver(void)
 
 	BUG_ON(rvp == NULL); 
 
-        rvp_cap = lcd_cap_create_capability(&current->cspace, (void*)rvp, 0);
-	if(rvp_cap == 0) {
+        cnode = lcd_cnode_lookup(&current->cspace, rvp_cap);
+	if(cnode == 0) {
 		printk(KERN_ERR "Failed to create capability\n");
 		kfree(rvp);
 		return -ENOMEM;
 	};
+
+	cnode->type = LCD_TYPE_SYNC_EP;
+	cnode->object = rvp;
+
+	lcd_cnode_release(cnode);
 
 	current->utcb->boot_info.boot_rvp = rvp_cap;
 	return 0;

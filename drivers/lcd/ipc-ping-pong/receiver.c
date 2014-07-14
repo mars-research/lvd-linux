@@ -38,11 +38,25 @@ int module_execution_loop(void) {
 		return ret;
 	};
 
-//	printk(KERN_INFO "Receiver: %c%c%c%c%c%c", (char) msg->regs[0], (char) msg->regs[1],
-//			(char) msg->regs[2], (char) msg->regs[3], (char) msg->regs[4], (char) msg->regs[5]);
-	printk(KERN_INFO "Receiver: %d%d%d%d%d%d", msg->regs[0], msg->regs[1],
+	printk(KERN_INFO "Receiver got: %lld,%lld,%lld,%lld,%lld,%lld", msg->regs[0], msg->regs[1],
 			 msg->regs[2], msg->regs[3], msg->regs[4], msg->regs[5]);
 
+	msg->regs[0] = 7;
+	msg->regs[1] = 8;
+	msg->regs[2] = 9;
+	msg->regs[3] = 10;
+	msg->regs[4] = 11;
+	msg->regs[5] = 12;
+	msg->regs[6] = 13;
+	msg->regs[7] = 14;
+
+	msg->valid_regs = 8;
+
+	ret = ipc_send(rvp_cap, msg);
+	if (ret) {
+		printk(KERN_ERR "receiver failed to send:%d\n", ret);
+		return ret;
+	};
 
 	return 0;
 };

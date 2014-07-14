@@ -102,14 +102,6 @@ int module_execution_loop(void) {
 	msg->regs[4] = 5;
 	msg->regs[5] = 6;
 
-#if 0
-	msg->regs[0] = (uint64_t)"H";
-	msg->regs[1] = (uint64_t)"e";
-	msg->regs[2] = (uint64_t)"l";
-	msg->regs[3] = (uint64_t)"l";
-	msg->regs[4] = (uint64_t)"o";
-	msg->regs[5] = (uint64_t)"\n";
-#endif
 	msg->valid_regs = 6;
 
 	ret = ipc_send(rvp_cap, msg);
@@ -117,6 +109,20 @@ int module_execution_loop(void) {
 		printk(KERN_ERR "sender failed:%d\n", ret);
 		return ret;
 	};
+
+	msg->valid_regs = 8;
+
+	ret = ipc_recv(rvp_cap, msg);
+	if (ret) {
+		printk(KERN_ERR "sender failed to recv:%d\n", ret);
+		return ret;
+	};
+
+	printk(KERN_INFO "Sender got: %lld,%lld,%lld,%lld,%lld,%lld,%lld,%lld\n", 
+			 msg->regs[0], msg->regs[1], msg->regs[2], msg->regs[3], 
+			 msg->regs[4], msg->regs[5], msg->regs[6], msg->regs[7]);
+
+
 
 	return 0;
 };

@@ -34,6 +34,9 @@ struct sync_ipc * alloc_sync_ipc() {
 		return NULL;
 	};
 
+	INIT_LIST_HEAD(&rvp->senders);
+	INIT_LIST_HEAD(&rvp->receivers);
+
 	spin_lock_init(&rvp->lock);
 	return rvp;
 };
@@ -44,6 +47,20 @@ void free_sync_ipc(struct sync_ipc *rvp) {
 	return;
 };
 EXPORT_SYMBOL(free_sync_ipc);
+
+inline void transfer_msg(struct task_struct *to, struct task_struct *from) {
+
+	printk(KERN_INFO "Sending %d registers (recv ready to take %d)\n", 
+			from->utcb->msg_info.valid_regs, to->utcb->msg_info.valid_regs);
+	// copy the message registers
+	// XXX: BU: maybe MIN(of valid_regs)?
+	memcpy(&to->utcb->msg_info.regs, 
+		&from->utcb->msg_info.regs, 
+		sizeof(uint64_t)*to->utcb->msg_info.valid_regs);
+
+	// BU: TODO: transfer capabilities
+	return; 
+}
 
 int ipc_send(capability_t rvp_cap, struct message_info *msg)
 {
@@ -78,7 +95,7 @@ int ipc_send(capability_t rvp_cap, struct message_info *msg)
 		
 		spin_unlock_irqrestore(&sync_ipc->lock, flags);
 		schedule();
-		printk(KERN_ERR "ipc_send: somone woke me up\n");
+		printk(KERN_ERR "ipc_send: someone woke me up\n");
 		return 0; 
 
 	}
@@ -92,13 +109,7 @@ int ipc_send(capability_t rvp_cap, struct message_info *msg)
 	 
 	printk(KERN_ERR "ipc_send: found other end %s\n", recv_task->comm);
 	
-	// copy the message registers
-	// XXX: BU: maybe MIN(of valid_regs)?
-	memcpy(recv_task->utcb->msg_info.regs, 
-		current->utcb->msg_info.regs, 
-		sizeof(uint64_t)*recv_task->utcb->msg_info.valid_regs);
-
-	// BU: TODO: transfer capabilities
+	transfer_msg(recv_task, current); 
 
 	wake_up_process(recv_task); 
 	printk(KERN_ERR "ipc_send: finished\n");
@@ -140,7 +151,7 @@ int ipc_recv(capability_t rvp_cap, struct message_info *msg)
 		
 		spin_unlock_irqrestore(&sync_ipc->lock, flags);
 		schedule();		
-		printk(KERN_ERR "ipc_recv: somone woke me up\n");
+		printk(KERN_ERR "ipc_recv: someone woke me up\n");
 		return 0; 
 	}
 
@@ -152,15 +163,9 @@ int ipc_recv(capability_t rvp_cap, struct message_info *msg)
 	spin_unlock_irqrestore(&sync_ipc->lock, flags);
 	 
 	printk(KERN_ERR "ipc_send: other end %s\n", send_task->comm);
+
+	transfer_msg(current, send_task);
 	
-	// copy the message registers
-	// XXX: BU: maybe MIN(of valid_regs)?
-	memcpy(current->utcb->msg_info.regs, 
-		send_task->utcb->msg_info.regs, 
-		sizeof(uint64_t)*send_task->utcb->msg_info.valid_regs);
-
-	// BU: TODO: transfer capabilities
-
 	wake_up_process(send_task); 
 	printk(KERN_ERR "ipc_recv: finished\n");
 	return 0;

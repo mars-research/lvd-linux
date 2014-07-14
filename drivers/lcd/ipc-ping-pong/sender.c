@@ -91,6 +91,33 @@ EXPORT_SYMBOL(lcd_ping_pong_init_receiver);
 
 int module_execution_loop(void) {
 
+	int ret;
+        capability_t rvp_cap = current->utcb->boot_info.boot_rvp;
+	struct message_info *msg = &current->utcb->msg_info;
+
+	msg->regs[0] = 1;
+	msg->regs[1] = 2;
+	msg->regs[2] = 3;
+	msg->regs[3] = 4;
+	msg->regs[4] = 5;
+	msg->regs[5] = 6;
+
+#if 0
+	msg->regs[0] = (uint64_t)"H";
+	msg->regs[1] = (uint64_t)"e";
+	msg->regs[2] = (uint64_t)"l";
+	msg->regs[3] = (uint64_t)"l";
+	msg->regs[4] = (uint64_t)"o";
+	msg->regs[5] = (uint64_t)"\n";
+#endif
+	msg->valid_regs = 6;
+
+	ret = ipc_send(rvp_cap, msg);
+	if (ret) {
+		printk(KERN_ERR "sender failed:%d\n", ret);
+		return ret;
+	};
+
 	return 0;
 };
 

@@ -26,6 +26,24 @@ extern int lcd_ping_pong_init_receiver(void);
 
 int module_execution_loop(void) {
 
+	int ret; 
+	capability_t rvp_cap = current->utcb->boot_info.boot_rvp;
+	struct message_info *msg = &current->utcb->msg_info;
+
+	msg->valid_regs = 6;
+
+	ret = ipc_recv(rvp_cap, msg);
+	if (ret) {
+		printk(KERN_ERR "receiver failed:%d\n", ret);
+		return ret;
+	};
+
+//	printk(KERN_INFO "Receiver: %c%c%c%c%c%c", (char) msg->regs[0], (char) msg->regs[1],
+//			(char) msg->regs[2], (char) msg->regs[3], (char) msg->regs[4], (char) msg->regs[5]);
+	printk(KERN_INFO "Receiver: %d%d%d%d%d%d", msg->regs[0], msg->regs[1],
+			 msg->regs[2], msg->regs[3], msg->regs[4], msg->regs[5]);
+
+
 	return 0;
 };
 

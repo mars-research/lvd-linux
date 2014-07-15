@@ -1,0 +1,338 @@
+start-symbol: File
+options: debug9
+
+include: {{ #include "lcd_ast.h"
+	    #include <vector>
+	    #include <stdlib.h>
+	    #include <string>
+	    #include <stdint.h> }}
+
+rules:
+
+Spacing		=	Space*
+
+Space		=	" " | "\t" | EndOfLine
+EndOfLine	=	"\n" | "\r"
+
+OPEN		=	"("
+CLOSE		=	")"
+SEMI		=	";"	
+OPENC		=	"{"
+CLOSEC		=	"}"
+OPENA		=	"<"
+CLOSEA		=	">"
+OPENS		=	"["
+CLOSES		=	"]"
+COMMA		=	","
+
+Identifier	=	i1:IdentStart i2:IdentCont* Spacing {{ char * str = (char *) malloc(sizeof(char)*(2+ i2.getValues().size()));
+		   	char * temp1 = (char *) malloc(sizeof(char)*2);
+			if(!temp1)
+			{
+				printf("Error null pointer\n");
+				exit(0);
+			}
+		   	temp1[0] = (char) (intptr_t) i1.getValue();
+		   	temp1[1] = '\0';
+		   	strcpy(str, temp1);
+		   	for(Value::iterator it = i2.getValues().begin(); it != i2.getValues().end(); it ++)
+		   	{
+				const Value & v = *it;
+				char letter = (char) (intptr_t) v.getValue();
+				char * temp2 = (char *) malloc(sizeof(char)*2);
+				if(!temp2)
+				{
+					printf("Error null pointer\n");
+					exit(0);
+				}
+				temp2[0] = letter;
+				temp2[1] = '\0';
+				strcat(str, temp2);
+		   	}
+		   		value = str; }}
+
+IdentStart	=	[abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ_]
+
+IdentCont	=	IdentStart | [0123456789]
+
+
+
+File		=	i:Include* Spacing t:Things* <eof> {{ std::vector<Definition *>* defs = new std::vector<Definition *>;
+			std::vector<Rpc *>* rpcs = new std::vector<Rpc *>;
+			std::vector<Message *>* messages = new std::vector<Message *>;
+			std::map<char *, Projection *> *env = new std::map<char *, Projection *>;
+			std::map<char *, Module *> *modules = new std::map<char *, Module *>;
+			for(Value::iterator it = t.getValues().begin(); it != t.getValues().end(); it ++)
+			{
+				const Value & v = *it;
+				Definition * ds = (Definition *) v.getValue();
+				if(!ds)
+				{
+					printf("error null pointer\n");
+					exit(0);
+				}
+				switch (ds->get_definition_type())
+				{
+				case rpc:
+				{
+				Rpc * rp = reinterpret_cast<Rpc *>(ds);
+				rpcs->push_back(rp);
+				}				
+				break;
+				case module:
+				{
+				Module * mod = reinterpret_cast<Module *>(ds);
+				modules->insert(std::pair<char *, Module *>(mod->get_name(), mod));
+				}
+				break;
+				case message:
+				{
+				Message * mess = reinterpret_cast<Message *>(ds);
+				messages->push_back(mess);
+				}
+				break;
+				case projection:
+				{
+				Projection * proj = reinterpret_cast<Projection *>(ds);
+				env->insert(std::pair<char *, Projection *>(proj->get_name(), proj));
+				}
+				break;
+				default:
+				{
+				printf("fatal error\n");
+				}
+				}
+
+			}
+			std::vector<char *>* includes = new std::vector<char *>;
+			for(Value::iterator it2 = i.getValues().begin(); it2 != i.getValues().end(); it2 ++)
+			{
+				const Value & v = *it2;
+				char * c = (char *) v.getValue();
+				includes->push_back(c);
+			}
+			value = new Module(includes, rpcs, messages, env, modules); }}	
+
+Module		=	"module" Space+ id:Identifier OPENC Spacing t:Things* CLOSEC Spacing {{	
+				 std::vector<Definition *>* defs = new std::vector<Definition *>;
+
+				 std::vector<Rpc *>* rpcs = new std::vector<Rpc *>;
+				 std::vector<Message *>* messages = new std::vector<Message *>;
+				 std::map<char *, Projection *> *env = new std::map<char *, Projection *>;
+				 std::map<char *, Module *> *modules = new std::map<char *, Module *>;
+			 
+				 for(Value::iterator it = t.getValues().begin(); it != t.getValues().end(); it ++)
+			{
+				const Value & v = *it;
+				Definition * ds = (Definition *) v.getValue();
+				if(!ds)
+				{
+					printf("error null pointer\n");
+					exit(0);
+				}
+				switch (ds->get_definition_type())
+				{
+				case rpc:
+				{
+				Rpc * rp = reinterpret_cast<Rpc *>(ds);
+				rpcs->push_back(rp);
+				}
+				break;
+				case module:
+				{
+				Module * mod = reinterpret_cast<Module *>(ds);
+				modules->insert(std::pair<char *, Module *>(mod->get_name(), mod));
+				}
+				break;
+				case message:
+				{
+				Message * mess = reinterpret_cast<Message *>(ds);
+				messages->push_back(mess);
+				}
+				break;
+				case projection:
+				{
+				Projection * proj = reinterpret_cast<Projection *>(ds);
+				env->insert(std::pair<char *, Projection *>(proj->get_name(), proj));
+				}
+				break;
+				default:
+				{
+				printf("fatal error\n");
+				}
+				}
+
+			}
+			value = new Module((char *) id.getValue(), rpcs, messages, env, modules); }}
+
+Things		=	Module | Rpc | Message | Projection
+
+FileName	=	 n:.*  {{ char * name = (char *) malloc(sizeof(char)*(n.getValues().size()+1));
+			 if(!name)
+			 {
+				printf("Error null pointer\n");
+				exit(0);
+			 }
+			 int i = 0;
+			 for(Value::iterator it = n.getValues().begin(); it != n.getValues().end(); it ++)
+			 {
+				const Value & v = *it;
+				char c = (char) (intptr_t) v.getValue();
+				name[i] = c;
+				i += 1;
+			 }	
+			 name[i] = '\0';
+			 value = name; }}
+
+Anything	=	 ^Space
+
+Include		=	"#include" Space+ "<" Spacing f:Identifier Spacing ">" Spacing {{ char * include = (char *) malloc(sizeof(char)*(12+strlen((char *) f.getValue())));
+			if(!include)
+			{
+				printf("Error null pointer\n");
+				exit(0);
+			}
+			strcpy(include, "#include <");
+			strcat(include, (char *) f.getValue());
+			strcat(include, ">");
+			value = include; }}
+			| "#include" Space+ a:Anything* {{ char * include = (char *) malloc(sizeof(char)*(12+strlen((char *) f.getValue())));
+			if(!include)
+			{
+				printf("Error null pointer\n");
+				exit(0);
+			}
+			strcpy(include, "#include ");
+			strcat(include, (char *) f.getValue());
+			strcat(include, "");
+			value = include; }}
+
+FirstParam	=	t:Type_form id:Identifier Spacing COMMA Spacing {{
+			value = new Parameter((Type *) t.getValue(), (char *) id.getValue()); }} 
+			  
+
+LastParam	=	t:Type_form id:Identifier Spacing {{
+			value = new Parameter((Type *) t.getValue(), (char *) id.getValue()); }}
+
+Parameters	=	f:FirstParam* l:LastParam {{
+			std::vector<Parameter *>* params = new std::vector<Parameter *>;
+			for(Value::iterator it = f.getValues().begin(); it != f.getValues().end(); it ++)
+			{
+				const Value & v = *it;
+				Parameter * p = (Parameter *) v.getValue();
+				params->push_back(p);
+			}
+			params->push_back((Parameter *) l.getValue());
+			value = params; }}
+
+Rpc		=	"rpc" Space+ t:Type_form id:Identifier Spacing OPEN p:Parameters CLOSE SEMI Spacing {{
+			value = new Rpc((Type *) t.getValue(), (char *) id.getValue(), (std::vector<Parameter *> *) p.getValue()); }}  
+
+Message		=	"message" Space+ id:Identifier Spacing OPENC Spacing c:Cap* CLOSEC Spacing {{ std::vector<Capability *>* caps = new std::vector<Capability *>;
+			for(Value::iterator it = c.getValues().begin(); it != c.getValues().end(); it ++)
+			{		   
+				const Value & v = *it;
+				Capability* cap = (Capability *) v.getValue();
+				caps->push_back(cap);
+			}
+			value = new Message((char *) id.getValue(), caps); }}
+
+Cap		=	"capability" Space+ id:Identifier Spacing SEMI Spacing {{ value = new Capability((char *) id.getValue()); }}
+
+Projection	=	"projection" Space+ id:Identifier "<" Spacing t:Proj_type CLOSEA Spacing OPENC Spacing p:ProjField+ CLOSEC Spacing {{ std::vector<ProjField *>* p_fields = new std::vector<ProjField *>;
+			for(Value::iterator it = p.getValues().begin(); it != p.getValues().end(); it ++)
+			{
+				const Value & v = *it;
+				ProjField * p = (ProjField *) v.getValue();
+				p_fields->push_back(p);
+			} 
+			value = new Projection((char *) id.getValue(), (Type *) t.getValue(), p_fields); }}
+		## what is the point of having a projection without at least one line
+
+Proj_type	=  	"struct" Space+ id:Identifier Spacing
+
+Keyword		=     	"out" {{ int * x = (int *) malloc(sizeof(int));
+			      *x = OUT;
+			      value = x; }}
+			| "in" {{ int * x = (int *) malloc(sizeof(int));
+			       *x = IN; 
+			       value = x; }}
+			| "bind" {{ int * x = (int *) malloc(sizeof(int));
+			  	 *x = BIND; 
+			  	 value = x; }}
+			| "alloc" {{ int * x = (int *) malloc(sizeof(int));
+			  	  *x = ALLOC;
+				  value = x; }}
+			
+Start		=	k:Keyword Spacing COMMA Spacing {{ value = k; }}
+
+Specification	=	s:Start* l:Last {{ std::vector<int *>* specs = new std::vector<int*>;
+			int res = 0;
+			for(Value::iterator it = s.getValues().begin(); it != s.getValues().end(); it ++)
+			{
+				const Value & v = *it;
+				int *x = (int*) v.getValue();
+				if(!x)
+				{
+					printf("error x is null\n");
+					exit(0);       
+				}
+				res = res & *x; 
+			}
+			int * y = (int *) l.getValue();
+			int * ret = (int *) malloc(sizeof(int));
+			*ret = res & *y; 
+			value = ret; }}
+
+ProjField	=	OPENS Spacing s:Specification CLOSES Spacing t:Type_form id:Identifier SEMI Spacing {{ int * spec = (int *)s.getValue();
+			value = new ProjField(*spec, (Type *) t.getValue(), (char *) id.getValue()); }}
+
+
+Last		=	k:Keyword Spacing {{ value = k; }}
+
+Declaration	=	Type Space+ Identifier Spacing SEMI Spacing ## not called from anywhere
+
+
+
+
+
+Option		=	"projection"
+
+Comment		=	Comment_start Comment_rest
+
+Comment_rest	=	Comment_end
+			| . Comment_rest
+
+Comment_start	=	"/*"
+Comment_end	=	"*/"
+
+
+Line_comm_rest	=	Line_comm_end
+			| . Line_comm_rest
+
+Line_comm_start	=	"//"
+
+Line_comment	=	Line_comm_start Line_comm_rest
+
+
+Line_comm_end	=	"\n"
+
+Pointer		=	p:"*"* {{ char * str = (char *) malloc(sizeof(char)*(p.getValues().size()+1));
+			int i = 0;
+			for(Value::iterator it = p.getValues().begin(); it != p.getValues().end(); it ++)
+			{
+				const Value & v = *it;
+				char c = (char) (intptr_t) v.getValue();
+				str[i] = c;
+				i += 1; 	
+			}
+			str[i] = '\0';
+			value = str; }}	
+
+Type		=	"int" | "char" | "capability"
+
+Type_form	=	"projection" Space+ m:Identifier "::" name:Identifier Spacing "*" Spacing
+			| "projection" Space+ m:Identifier "::" name:Identifier Space+
+			| "projection" Space+ name:Identifier Spacing "*" Spacing
+			| "projection" Space+ name:Identifier Space+
+			| t:Type Space+ 	

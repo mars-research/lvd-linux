@@ -27,7 +27,7 @@ class Type
 
  public:
   Type(char * o, char * t, char * m, char * p);
-
+  ~Type();
 };
 
 class Parameter
@@ -37,6 +37,7 @@ class Parameter
 
  public:
   Parameter(Type* t,char * n);
+  ~Parameter();
   bool isProjection();
 };
 
@@ -48,6 +49,7 @@ class Rpc : public Definition
 
  public:
   Rpc(Type* r, char * n, std::vector<Parameter *>* param);
+  ~Rpc();
   definition_type get_definition_type(){return rpc;}
 
 };
@@ -58,6 +60,7 @@ class Capability // capability? for message
   
  public:
   Capability(char * n);
+  ~Capability();
   char * get_name();
 
 };
@@ -70,7 +73,7 @@ class ProjField
   
  public:
   ProjField(int s, Type* t, char * name);
-  
+  ~ProjField();
 };
 
 class Projection : public Definition
@@ -81,6 +84,7 @@ class Projection : public Definition
 
  public:
   Projection(char * name, Type* real, std::vector<ProjField *>* f);
+  ~Projection();
   definition_type get_definition_type(){return projection;}
   char * get_name();
 
@@ -93,11 +97,12 @@ class Message : public Definition
 
  public:
   Message(char * n, std::vector<Capability *>* e);
+  ~Message();
   std::vector<Capability *>* get_capabilities();
   definition_type get_definition_type() {return message; }
 };
 
-class Module
+class Module : public Definition
 {
   char * name; // just leave "" if top level
   std::vector<char *> * includes; // only top level can have includes
@@ -112,7 +117,9 @@ class Module
   // for top level
   Module(std::vector<char *>* in, std::vector<Rpc *>* rs, std::vector<Message *>* ms,
       std::map<char *, Projection *>* e, std::map<char *, Module *>* mods);
+  ~Module();
   char * get_name();
+  definition_type get_definition_type() {return module; }
   
 };
 

@@ -20,7 +20,7 @@ int main(int argc, char ** argv)
   catch (const Parser::ParseException e)
     {
       printf("caught an exception\n");
-      std::cout << e.getReason();
+      //      std::cout << e.getReason();
       exit(0);
     }
 }

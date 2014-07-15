@@ -5,6 +5,7 @@
 #define __LCD_CAP_H__
 
 #include <linux/types.h>
+#include <linux/spinlock.h>
 
 #include <uapi/linux/lcd-cap.h>
 

@@ -3,7 +3,10 @@
  * Copyright: University of Utah
  */
 
-static inline int lcd_create_sync_endpoint(capability_t cap, capability_t rvp) {
+#include <lcd/api.h>
+#include <lcd/cap-cache.h>
+
+static inline int lcd_create_sync_endpoint(capability_t cap, capability_t ep_cap) {
 
 	struct message_info *msg = &current->utcb.message_info;
 
@@ -13,13 +16,13 @@ static inline int lcd_create_sync_endpoint(capability_t cap, capability_t rvp) {
 	msg->cap_regs[0] = rvp; 
 	msg->valid_cap_regs = 1; 
 
-	return ipc_send_and_receive(cap, msg); 
+	return ipc_call(cap, msg); 
 
 };
 
 
 
-int lcd_create_sync_endpoint(capability_t otherend) {
+int lcd_create_sync_endpoint(struct sync_ipc *otherend) {
 	int ret; 
 	struct sync_ipc *rvp; 
 	capability_t free_cap; 

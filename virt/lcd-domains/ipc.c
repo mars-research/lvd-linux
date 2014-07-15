@@ -25,6 +25,14 @@ int lcd_ipc_exit(void) {
 	return 0;
 }
 
+static inline void init_sync_ipc(struct sync_ipc *rvp) {
+	INIT_LIST_HEAD(&rvp->senders);
+	INIT_LIST_HEAD(&rvp->receivers);
+
+	spin_lock_init(&rvp->lock);
+	return;
+};
+
 struct sync_ipc * alloc_sync_ipc() {
 	struct sync_ipc *rvp; 
 
@@ -34,10 +42,7 @@ struct sync_ipc * alloc_sync_ipc() {
 		return NULL;
 	};
 
-	INIT_LIST_HEAD(&rvp->senders);
-	INIT_LIST_HEAD(&rvp->receivers);
-
-	spin_lock_init(&rvp->lock);
+	init_sync_ipc(rvp);
 	return rvp;
 };
 EXPORT_SYMBOL(alloc_sync_ipc);
@@ -59,8 +64,39 @@ inline void transfer_msg(struct task_struct *to, struct task_struct *from) {
 		sizeof(uint64_t)*to->utcb->msg_info.valid_regs);
 
 	// BU: TODO: transfer capabilities
+	//
+	
+	// Transfer call capability
+	//
 	return; 
 }
+
+int ipc_reply(capability_t cap, struct message_info *msg)
+{
+	return ipc_send(cap, msg);
+}
+EXPORT_SYMBOL(ipc_reply);
+
+int ipc_call(capability_t cap, struct message_info *msg)
+{
+	int ret; 
+
+	// The last capability register is expected to 
+	// have the reply capability
+	if (msg->valid_cap_regs == 0) 
+		return -EINVAL; 
+
+	ret = ipc_send(cap, msg);
+	if (ret)
+		return ret;
+	
+	// The last capability register is expected to 
+	// have the reply capability
+	ret = ipc_recv(msg->cap_regs[msg->valid_cap_regs - 1], msg); 
+	return ret; 
+}
+EXPORT_SYMBOL(ipc_call);
+
 
 int ipc_send(capability_t rvp_cap, struct message_info *msg)
 {
@@ -125,6 +161,7 @@ int ipc_recv(capability_t rvp_cap, struct message_info *msg)
 	struct cnode *cnode;
 	unsigned long flags;
 
+	
 	printk(KERN_ERR "ipc_recv:%s: receiving on cap %lld\n", current->comm, rvp_cap);
 	
         cnode = lcd_cnode_lookup(&current->cspace, rvp_cap);
@@ -134,13 +171,12 @@ int ipc_recv(capability_t rvp_cap, struct message_info *msg)
 	}
 
 	sync_ipc = (struct sync_ipc *) cnode->object;
-	
 	BUG_ON(!sync_ipc); 
 
 	// XXX: BU: Maybe I need to do some reference counting for IPC 
 	// objects here (before releasing the lock)
 	lcd_cnode_release(cnode);
-
+	
 	spin_lock_irqsave(&sync_ipc->lock, flags); 	
 	if (list_empty(&sync_ipc->senders)) {
 
@@ -164,7 +200,7 @@ int ipc_recv(capability_t rvp_cap, struct message_info *msg)
 	 
 	printk(KERN_ERR "ipc_send: other end %s\n", send_task->comm);
 
-	transfer_msg(current, send_task);
+	transfer_msg(current, send_task); 
 	
 	wake_up_process(send_task); 
 	printk(KERN_ERR "ipc_recv: finished\n");

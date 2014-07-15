@@ -5,7 +5,6 @@
 #include <linux/slab.h>
 #include <lcd/cap.h>
 
-#define LCD_MAX_CAPS 32
 
 struct kmem_cache *cnode_cache;
 struct kmem_cache *cdtnode_cache;
@@ -77,4 +76,16 @@ struct cnode *lcd_cnode_lookup(struct cspace *cspace, capability_t cap) {
 	return &cspace->cnode[cap];
 };
 EXPORT_SYMBOL(lcd_cnode_lookup);
+
+void lcd_cap_drop(struct cspace *cspace, capability_t cap) {
+	struct cnode *cnode; 
+
+	cnode = lcd_cnode_lookup(cspace, cap); 
+	if(!cnode)
+		return; 
+	cnode->type = LCD_TYPE_FREE; 
+	cnode->object = NULL; 
+	lcd_cnode_release(cnode); 
+	return; 
+};
 

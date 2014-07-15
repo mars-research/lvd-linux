@@ -34,5 +34,8 @@ void lcd_cnode_release(struct cnode *cnode);
 int lcd_init_cspace(struct cspace *cspace);
 int lcd_cnode_insert(struct cspace *cspace, capability_t cap, struct cnode *cnode);
 struct cnode *lcd_cnode_lookup(struct cspace *cspace, capability_t cap);
+void lcd_cap_drop(struct cspace *cspace, capability_t cap);
+
+#define LCD_MAX_CAPS 32
 
 #endif

@@ -3,29 +3,21 @@
  * Copyright: University of Utah
  */
 
+#include <linux/slab.h>
 #include <lcd/api.h>
 #include <lcd/cap-cache.h>
+#include <lcd/cap.h>
+#include <linux/sched.h>
+#include <linux/kthread.h>
 
-static inline int lcd_create_sync_endpoint(capability_t cap, capability_t ep_cap) {
+struct cap_cache cap_cache;  
 
-	struct message_info *msg = &current->utcb.message_info;
-
-	msg->regs[0] = LCD_CREATE_SYNC_ENDPOINT; 
-	msg->valid_regs = 1; 
-
-	msg->cap_regs[0] = rvp; 
-	msg->valid_cap_regs = 1; 
-
-	return ipc_call(cap, msg); 
-
-};
-
-
-
-int lcd_create_sync_endpoint(struct sync_ipc *otherend) {
+int lcd_api_create_sync_endpoint(capability_t reply_cap) {
 	int ret; 
 	struct sync_ipc *rvp; 
 	capability_t free_cap; 
+	struct cnode *cnode;
+	struct message_info *msg = &current->utcb->msg_info; 
 
 	rvp = alloc_sync_ipc();
 	if(!rvp) {
@@ -34,7 +26,7 @@ int lcd_create_sync_endpoint(struct sync_ipc *otherend) {
 		goto err;
 	};
 
-	ret = lcd_alloc_free_cap(cap_cache, &free_cap); 
+	ret = lcd_alloc_cap(&cap_cache, &free_cap); 
 	if(ret) {
 		printk(KERN_ERR "Failed to allocate free capability\n");
 		ret = -ENOSPC;
@@ -57,17 +49,50 @@ int lcd_create_sync_endpoint(struct sync_ipc *otherend) {
 
 	msg->cap_regs[0] = free_cap;
 	msg->valid_cap_regs = 1;
-	ipc_reply(otherend, msg);
+	ipc_reply(reply_cap, msg);
 
-	lcd_cap_drop(free_cap);
+	lcd_cap_drop(&current->cspace, free_cap);
 
-	lcd_release_free_cap(cap_cache); 
+	lcd_free_cap(&cap_cache, free_cap); 
 	return 0;
 err:
 	msg->err = ret; 
-	ipc_reply(otherend, msg);
+	ipc_reply(reply_cap, msg);
 	return ret;
 };
+
+int lcd_api_execution_loop(void) {
+
+
+	return 0;
+};
+
+int lcd_api_thread(void *p) {
+	int ret;
+
+	return lcd_api_execution_loop();
+};
+
+int lcd_api_init(void) {
+	int ret;
+	struct task_struct *t;
+
+	ret = lcd_init_list_cache(&cap_cache, LCD_MAX_CAPS);
+	if (ret) {
+		printk(KERN_ERR "Failed to initialize cap cache:%d\n", ret);
+		return ret;
+
+	}
+
+	t = kthread_create(lcd_api_thread, NULL, "lcd-api");
+	if (!t) {
+		printk(KERN_ERR "Failed to create LCD API thread\n");
+		return -EINVAL;
+	};
+
+	wake_up_process(t);
+	return 0;
+}
 
 
 

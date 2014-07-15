@@ -1,5 +1,6 @@
-Note: run make, then add #include <string> to the top of "flounder_parser.h",
+Note: run make, then add #include <string> to the top of "lcd_idl.h",
 then run make again.
 
+To run compiler:
 
-Currently idl_compiler does not do anything
+./compiler input_file

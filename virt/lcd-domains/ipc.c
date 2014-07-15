@@ -66,8 +66,8 @@ inline void transfer_msg(struct task_struct *to, struct task_struct *from) {
 	// BU: TODO: transfer capabilities
 	//
 	
-	// Transfer call capability
-	//
+	// Transfer err code
+	to->utcb->msg_info.err =  from->utcb->msg_info.err; 
 	return; 
 }
 
@@ -119,7 +119,7 @@ int ipc_send(capability_t rvp_cap, struct message_info *msg)
 
 	// XXX: BU: Maybe I need to do some reference counting for IPC 
 	// objects here (before releasing the lock)
-	lcd_cnode_release(&cnode);
+	lcd_cnode_release(cnode);
 
 	spin_lock_irqsave(&sync_ipc->lock, flags); 	
 	if (list_empty(&sync_ipc->receivers)) {

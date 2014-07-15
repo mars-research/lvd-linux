@@ -18,9 +18,12 @@
 
 #include <lcd/lcd.h>
 #include <lcd/cap.h>
+#include <lcd/api.h>
 
 MODULE_LICENSE("GPL");
 MODULE_DESCRIPTION("LCD driver");
+
+struct lcd_api lcd_api; 
 
 int lcd_enter(void) {
 	
@@ -107,6 +110,12 @@ static int __init lcd_init(void)
 	if(r)
 		return r;
 
+	r = lcd_api_init(&lcd_api); 
+	if(r)
+		return r;
+
+
+
 #if 0
 
 	printk(KERN_ERR "LCD module loaded\n");
@@ -128,6 +137,9 @@ static int __init lcd_init(void)
 static void __exit lcd_exit(void)
 {
 	lcd_cap_exit();
+	lcd_api_exit(&lcd_api);
+
+
 #if 0
 	misc_deregister(&lcd_dev);
 	lcd_vmx_exit();

@@ -1,0 +1,27 @@
+#include <test>
+
+rpc int foo(capability cap, char v1, int v2);
+
+message foo_interface{
+  capability foo;
+  capability bar;
+}
+
+projection super_block <struct super_block> {
+  [out,in] int field1;
+  [out] char field2;
+}
+
+rpc int bar(projection super_block *sb);
+
+module name {
+  projection super_block2<struct super_block> {
+    [in] int field1;
+  }
+}
+
+rpc int foo2(projection name::super_block * sb);
+
+
+
+

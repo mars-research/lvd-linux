@@ -1,0 +1,4 @@
+message foo_interface{
+  capability foo;
+  capability bar;
+}

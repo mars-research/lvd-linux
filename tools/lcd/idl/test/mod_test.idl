@@ -1,0 +1,5 @@
+module name {
+  projection super_block<struct super_block> {
+    [in] int field1;
+  }
+}    

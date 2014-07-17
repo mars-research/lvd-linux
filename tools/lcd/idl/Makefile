@@ -20,5 +20,4 @@ lcd_idl.h:
 		vembyr-1.1/peg.py --h lcd_idl.peg > lcd_idl.h
 
 clean:
-		rm flounder_parser.* *.o compiler peg_peg.py
-		vembyr-1.1/peg_peg.pyc
+		rm lcd_idl.cpp lcd_idl.h compiler

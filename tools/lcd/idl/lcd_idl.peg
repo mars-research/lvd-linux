@@ -9,55 +9,26 @@ include: {{ #include "lcd_ast.h"
 
 rules:
 
-Spacing		=	Space*
 
-Space		=	" " | "\t" | EndOfLine
-EndOfLine	=	"\n" | "\r"
 
-OPEN		=	"("
-CLOSE		=	")"
-SEMI		=	";"	
-OPENC		=	"{"
-CLOSEC		=	"}"
-OPENA		=	"<"
-CLOSEA		=	">"
-OPENS		=	"["
-CLOSES		=	"]"
-COMMA		=	","
+Identifier	=	i1:IdentStart i2:IdentCont* Spacing {{ 
+			std::ostringstream total;
+			total << (char) (intptr_t) i1.getValue();
 
-Identifier	=	i1:IdentStart i2:IdentCont* Spacing {{ char * str = (char *) malloc(sizeof(char)*(2+ i2.getValues().size()));
-		   	char * temp1 = (char *) malloc(sizeof(char)*2);
-			if(!temp1)
-			{
-				printf("Error null pointer\n");
-				exit(0);
-			}
-		   	temp1[0] = (char) (intptr_t) i1.getValue();
-		   	temp1[1] = '\0';
-		   	strcpy(str, temp1);
 		   	for(Value::iterator it = i2.getValues().begin(); it != i2.getValues().end(); it ++)
 		   	{
 				const Value & v = *it;
 				char letter = (char) (intptr_t) v.getValue();
-				char * temp2 = (char *) malloc(sizeof(char)*2);
-				if(!temp2)
-				{
-					printf("Error null pointer\n");
-					exit(0);
-				}
-				temp2[0] = letter;
-				temp2[1] = '\0';
-				strcat(str, temp2);
+				total << letter;
 		   	}
-		   		value = str; }}
+				std::string str = total.str();
+		   		value = &str[0]; }}
 
 IdentStart	=	[abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ_]
 
 IdentCont	=	IdentStart | [0123456789]
 
-
-
-File		=	i:Include* Spacing t:Things* <eof> {{ std::vector<Definition *>* defs = new std::vector<Definition *>;
+File		=	i:Include* t:Things* <eof> {{ std::vector<Definition *>* defs = new std::vector<Definition *>;
 			std::vector<Rpc *>* rpcs = new std::vector<Rpc *>;
 			std::vector<Message *>* messages = new std::vector<Message *>;
 			std::map<char *, Projection *> *env = new std::map<char *, Projection *>;
@@ -113,6 +84,42 @@ File		=	i:Include* Spacing t:Things* <eof> {{ std::vector<Definition *>* defs = 
 			}
 			value = new Module(includes, rpcs, messages, env, modules); }}	
 
+String		=	<ascii 34> l:any_letter+ <ascii 34> {{
+			std::ostringstream total;
+			for(Value::iterator it = l.getValues().begin(); it != l.getValues().end(); it ++)
+			{
+				const Value & v = *it;
+				char letter = (char) (intptr_t) v.getValue();
+				
+				if(letter == '\\')
+				{
+					if((it++) == l.getValues().end())
+					{
+						total << letter;
+						break;
+					}	
+					
+					letter = (char) (intptr_t) (*it).getValue();
+					switch (letter)
+					{
+					case 'n':
+					     total <<'\n';
+					     break;
+					case 't':
+					     total << '\t';
+					     break;
+					default:
+						total << letter;
+					}
+					continue;
+				}
+				total << letter;
+			}
+			std::string str = total.str();
+			value = &str[0]; }}
+
+any_letter	=	[_.,/?<>'; =:%`!@#$^&*()-+{}|\\ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789]
+
 Module		=	"module" Space+ id:Identifier OPENC Spacing t:Things* CLOSEC Spacing {{	
 				 std::vector<Definition *>* defs = new std::vector<Definition *>;
 
@@ -167,45 +174,17 @@ Module		=	"module" Space+ id:Identifier OPENC Spacing t:Things* CLOSEC Spacing {
 
 Things		=	Module | Rpc | Message | Projection
 
-FileName	=	 n:.*  {{ char * name = (char *) malloc(sizeof(char)*(n.getValues().size()+1));
-			 if(!name)
-			 {
-				printf("Error null pointer\n");
-				exit(0);
-			 }
-			 int i = 0;
-			 for(Value::iterator it = n.getValues().begin(); it != n.getValues().end(); it ++)
-			 {
-				const Value & v = *it;
-				char c = (char) (intptr_t) v.getValue();
-				name[i] = c;
-				i += 1;
-			 }	
-			 name[i] = '\0';
-			 value = name; }}
-
-Anything	=	 ^Space
-
-Include		=	"#include" Space+ "<" Spacing f:Identifier Spacing ">" Spacing {{ char * include = (char *) malloc(sizeof(char)*(12+strlen((char *) f.getValue())));
-			if(!include)
-			{
-				printf("Error null pointer\n");
-				exit(0);
-			}
-			strcpy(include, "#include <");
-			strcat(include, (char *) f.getValue());
-			strcat(include, ">");
-			value = include; }}
-			| "#include" Space+ a:Anything* {{ char * include = (char *) malloc(sizeof(char)*(12+strlen((char *) f.getValue())));
-			if(!include)
-			{
-				printf("Error null pointer\n");
-				exit(0);
-			}
-			strcpy(include, "#include ");
-			strcat(include, (char *) f.getValue());
-			strcat(include, "");
-			value = include; }}
+Include		=	"#include" Space+ "<" Spacing f:Identifier Spacing ">" Spacing {{
+			std::ostringstream total;
+			total << "#include <" << (char *) f.getValue() << ">";
+			std::string str = total.str();
+			value = &str[0]; }}
+			
+			| "#include" Space+ s:String Spacing {{
+			std::ostringstream total;
+			total << "#include " << (char *) s.getValue();
+			std::string str = total.str();
+			value = &str[0]; }}
 
 FirstParam	=	t:Type_form id:Identifier Spacing COMMA Spacing {{
 			value = new Parameter((Type *) t.getValue(), (char *) id.getValue()); }} 
@@ -227,6 +206,7 @@ Parameters	=	f:FirstParam* l:LastParam {{
 
 Rpc		=	"rpc" Space+ t:Type_form id:Identifier Spacing OPEN p:Parameters CLOSE SEMI Spacing {{
 			value = new Rpc((Type *) t.getValue(), (char *) id.getValue(), (std::vector<Parameter *> *) p.getValue()); }}  
+
 
 Message		=	"message" Space+ id:Identifier Spacing OPENC Spacing c:Cap* CLOSEC Spacing {{ std::vector<Capability *>* caps = new std::vector<Capability *>;
 			for(Value::iterator it = c.getValues().begin(); it != c.getValues().end(); it ++)
@@ -292,10 +272,6 @@ Last		=	k:Keyword Spacing {{ value = k; }}
 
 Declaration	=	Type Space+ Identifier Spacing SEMI Spacing ## not called from anywhere
 
-
-
-
-
 Option		=	"projection"
 
 Comment		=	Comment_start Comment_rest
@@ -317,18 +293,6 @@ Line_comment	=	Line_comm_start Line_comm_rest
 
 Line_comm_end	=	"\n"
 
-Pointer		=	p:"*"* {{ char * str = (char *) malloc(sizeof(char)*(p.getValues().size()+1));
-			int i = 0;
-			for(Value::iterator it = p.getValues().begin(); it != p.getValues().end(); it ++)
-			{
-				const Value & v = *it;
-				char c = (char) (intptr_t) v.getValue();
-				str[i] = c;
-				i += 1; 	
-			}
-			str[i] = '\0';
-			value = str; }}	
-
 Type		=	"int" | "char" | "capability"
 
 Type_form	=	"projection" Space+ m:Identifier "::" name:Identifier Spacing "*" Spacing
@@ -336,3 +300,19 @@ Type_form	=	"projection" Space+ m:Identifier "::" name:Identifier Spacing "*" Sp
 			| "projection" Space+ name:Identifier Spacing "*" Spacing
 			| "projection" Space+ name:Identifier Space+
 			| t:Type Space+ 	
+
+Spacing		=	Space*
+
+Space		=	" " | "\t" | EndOfLine
+EndOfLine	=	"\n" | "\r"
+
+OPEN		=	"("
+CLOSE		=	")"
+SEMI		=	";"	
+OPENC		=	"{"
+CLOSEC		=	"}"
+OPENA		=	"<"
+CLOSEA		=	">"
+OPENS		=	"["
+CLOSES		=	"]"
+COMMA		=	","

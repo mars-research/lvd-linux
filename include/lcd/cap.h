@@ -29,6 +29,12 @@ struct cspace {
 int lcd_cap_init(void);
 int lcd_cap_exit(void);
 
+int lcd_cap_insert_object(struct cspace *cspace, capability_t cap, 
+		void *object, enum ... type);
+
+struct sync_ipc *lcd_cap_make_sync_endpoint(struct cspace *cspace, 
+		struct cap_cache *cache, capability_t *cap);
+
 void lcd_cnode_release(struct cnode *cnode);
 
 int lcd_init_cspace(struct cspace *cspace);

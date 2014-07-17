@@ -11,9 +11,9 @@
 #include <lcd/cap-cache.h>
 
 struct lcd_api {
-	struct cap_cache cap_cache;  
-	int 	     	 api_thread_exit;
-	capability_t 	 rvp;
+	bool 	     	 exit_flag;
+	capability_t 	 ep_cap;
+	struct sync_ipc  *ep; 
 };
 
 

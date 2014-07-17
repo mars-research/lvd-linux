@@ -19,7 +19,7 @@ struct message_info {
 };
 
 struct boot_info {
-	capability_t 	boot_rvp; 
+	capability_t 	boot_caps[8];
 };
 
 struct utcb {

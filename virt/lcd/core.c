@@ -19,21 +19,77 @@
 #include <lcd/lcd.h>
 #include <lcd/cap.h>
 #include <lcd/api.h>
+#include <lcd/boot.h>
 
 MODULE_LICENSE("GPL");
 MODULE_DESCRIPTION("LCD driver");
 
 struct lcd_api lcd_api; 
 
+struct lcd_api *lcd_get_api(void) {
+	return &lcd_api;
+};
+EXPORT_SYMBOL(lcd_get_api);
+
 int lcd_enter(void) {
-	
+	int ret; 
+
 	current->utcb = kmalloc(sizeof(struct utcb), GFP_KERNEL); 
 	if (!current->utcb) 
 		return -ENOMEM;
 
-	return lcd_init_cspace(&current->cspace);
+	ret = lcd_init_list_cache(&current->cap_cache, LCD_MAX_CAPS);
+	if (ret) {
+		printk(KERN_ERR "Failed to initialize cap cache:%d\n", ret);
+		return ret;
+
+	}
+
+	ret = lcd_init_cspace(&current->cspace);
+	if(ret) {
+		printk(KERN_ERR "Failed to init cspace:%d\n", ret); 
+		return ret;
+	};
+
+	return 0;
+
 };
 EXPORT_SYMBOL(lcd_enter);
+
+int lcd_api_connect(struct lcd_api *api) {
+	capability_t reply_cap;
+	capability_t api_cap;
+
+	/* Frist: we take an existing endpoint for the API and insert it into 
+	 * the connecting cspace */
+	ret = lcd_alloc_cap(&current->cap_cache, &api_cap); 
+	if(ret) {
+		printk(KERN_ERR "Failed to allocate free capability\n");
+		kfree(rvp);
+		return -ENOSPC;
+	};
+
+        ret = lcd_cap_insert_object(&current->cspace, api_cap, api->ep, LCD_TYPE_SYNC_EP); 
+	if(ret) {
+		printk(KERN_ERR "Failed to insert endpoint into the cspace:%d\n", ret);
+		kfree(rvp);
+		return -ENOSPC;
+	};
+
+	/* Second: make a new endpoint so the connecting cspace can use call/reply
+	 * primitives */
+	ret = lcd_make_sync_endpoint(&current->cspace, &current->cap_cache, &reply_cap);
+	if(ret) {
+		printk(KERN_ERR "Failed to create API endpoint:%d\n", ret);
+		return ret;
+	};
+
+	current->utcb->boot_info.boot_caps[LCD_BOOT_API_CAP] = api_cap;
+	current->utcb->boot_info.boot_caps[LCD_BOOT_REPLY_CAP] = reply_cap;
+
+	return 0;
+};
+EXPORT_SYMBOL(lcd_api_connect);
 
 static long lcd_dev_ioctl(struct file *filp ,
 			  unsigned int ioctl, unsigned long arg)

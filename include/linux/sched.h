@@ -63,6 +63,7 @@ struct sched_param {
 #ifdef CONFIG_HAVE_LCD
 #include <lcd/cap.h>
 #include <lcd/ipc.h>
+#include <lcd/cap-cache.h>
 #endif
 
 #include <asm/processor.h>
@@ -1470,6 +1471,7 @@ struct task_struct {
 	unsigned int ptrace;
 #ifdef CONFIG_HAVE_LCD
 	struct cspace cspace;
+	struct cap_cache cap_cache;
 	struct list_head sync_rendezvous;
 	struct utcb *utcb;
 #endif

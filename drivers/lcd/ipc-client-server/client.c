@@ -26,7 +26,7 @@ struct sync_ipc *rvp;
 
 int lcd_client_server_init_client(void) {
 	int ret; 
-	capability_t rvp_cap = 0;
+	capability_t server;
 	struct cnode *cnode;
 	
 	ret = lcd_enter();
@@ -35,55 +35,68 @@ int lcd_client_server_init_client(void) {
 		return ret;
 	};
 
-	rvp = alloc_sync_ipc();
-	if(!rvp) {
-		printk(KERN_ERR "Failed to allocate memory\n");
-		return -ENOMEM;
+	ret = lcd_api_connect(lcd_get_api());
+	if (ret) {
+		printk(KERN_ERR "Failed to connect to LCD API\n");
+		return ret;
 	};
 
-        cnode = lcd_cnode_lookup(&current->cspace, rvp_cap);
-	if(cnode == 0) {
+	api_cap = current->utcb->boot_info.boot_caps[LCD_BOOT_API_CAP];
+	reply_cap = current->utcb->boot_info.boot_caps[LCD_BOOT_REPLY_CAP];
+
+
+        ret = lcd_alloc_cap(&current->cap_cache, &server); 
+	if(ret) {
+		printk(KERN_ERR "Failed to allocate free capability\n");
+		return -ENOSPC;
+	};
+
+	ret = lcd_api_create_sync_endpoint(api_cap, reply_cap, server); 
+	if(ret) {
+		printk(KERN_ERR "Failed to allocate free capability\n");
+		return -ENOSPC;
+	};
+
+	current->utcb->boot_info.boot_caps[LCD_BOOT_FREE_CAP0] = server;
+
+	cnode = lcd_cnode_lookup(&current->cspace, server);
+	if(cnode == NULL || cnode->type != LCD_TYPE_SYNC_EP) {
 		printk(KERN_ERR "Failed to create capability\n");
-		kfree(rvp);
 		return -ENOMEM;
 	};
 
-	cnode->type = LCD_TYPE_SYNC_EP;
-	cnode->object = rvp; 
-
+	rvp = cnode->object; 
 	lcd_cnode_release(cnode);
 
-	current->utcb->boot_info.boot_rvp = rvp_cap;
 	return 0;
 };
 
 int lcd_client_server_init_server(void) 
 {
 	int ret; 
-	capability_t rvp_cap = 0;
-	struct cnode *cnode;
-	
+	capability_t client;
+
 	ret = lcd_enter();
 	if (ret) {
 		printk(KERN_ERR "Failed to enter LCD environment\n");
 		return ret;
 	};
 
-	BUG_ON(rvp == NULL); 
-
-        cnode = lcd_cnode_lookup(&current->cspace, rvp_cap);
-	if(cnode == 0) {
-		printk(KERN_ERR "Failed to create capability\n");
-		kfree(rvp);
-		return -ENOMEM;
+	ret = lcd_api_connect(lcd_get_api());
+	if (ret) {
+		printk(KERN_ERR "Failed to connect to LCD API\n");
+		return ret;
 	};
 
-	cnode->type = LCD_TYPE_SYNC_EP;
-	cnode->object = rvp;
+        ret = lcd_alloc_cap(&current->cap_cache, &client); 
+	if(ret) {
+		printk(KERN_ERR "Failed to allocate free capability\n");
+		return -ENOSPC;
+	};
 
-	lcd_cnode_release(cnode);
+	lcd_cap_insert_object(&current->cspace, client, rvp, LCD_TYPE_SYNC_EP);
 
-	current->utcb->boot_info.boot_rvp = rvp_cap;
+	current->utcb->boot_caps[LCD_BOOT_FREE_CAP0] = client; 
 	return 0;
 };
 EXPORT_SYMBOL(lcd_client_server_init_server); 
@@ -91,29 +104,45 @@ EXPORT_SYMBOL(lcd_client_server_init_server);
 int module_execution_loop(void) {
 
 	int ret; 
-	capability_t boot_cap = current->utcb->boot_info.boot_rvp;
-	capability_t server_cap; 
+	capability_t api_cap = current->utcb->boot_info.boot_caps[LCD_BOOT_API_CAP];
+	capability_t reply_cap = current->utcb->boot_info.boot_caps[LCD_BOOT_REPLY_CAP];
+	capability_t server = current->utcb->boot_info.boot_caps[LCD_BOOT_FREE_CAP0];
+	capability_t server_interface;
+	capability_t server_reply; 
 	struct message_info *msg = &current->utcb->msg_info;
 
-	server_cap = boot_cap + 1;
 
-	msg->cap_regs[0] = server_cap;
+        ret = lcd_alloc_cap(&current->cap_cache, &server_interface); 
+	if(ret) {
+		printk(KERN_ERR "Failed to allocate free capability\n");
+		return -ENOSPC;
+	};
+
+	msg->cap_regs[0] = server_interface;
 	msg->valid_cap_regs = 1;
 
-	ret = ipc_recv(boot_cap, msg);
+	ret = ipc_recv(server, msg);
 	if (ret) {
 		printk(KERN_ERR "client failed to receive from the server:%d\n", ret);
 		return ret;
+	};
+
+	ret = lcd_api_alloc_reply_cap(api_cap, reply_cap, &server_reply); 
+	if(ret) {
+		printk(KERN_ERR "Failed to allocate free capability\n");
+		return -ENOSPC;
 	};
 
 	msg->regs[0] = 0 /* FUNC_TYPE_1*/;
 	msg->regs[1] = 1;
 	msg->regs[2] = 2;
 	msg->regs[3] = 3;
-
 	msg->valid_regs = 4;
 
-	ret = ipc_send(server_cap, msg);
+	msg->cap_regs[0] = server_reply;
+	msg->valid_cap_regs = 1;
+
+	ret = ipc_call(server_interface, msg);
 	if (ret) {
 		printk(KERN_ERR "client failed to ivoke server:%d\n", ret);
 		return ret;

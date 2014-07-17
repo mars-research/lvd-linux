@@ -14,7 +14,7 @@ enum lcd_api_calls {
 
 struct utcb *utcb(void);
 
-static inline int lcd_create_sync_endpoint(capability_t cap, capability_t reply_cap, capability_t ep_cap) {
+static inline int lcd_api_create_sync_endpoint(capability_t cap, capability_t reply_cap, capability_t ep_cap) {
 
 	struct message_info *msg = &utcb()->msg_info;
 
@@ -28,6 +28,5 @@ static inline int lcd_create_sync_endpoint(capability_t cap, capability_t reply_
 	return ipc_call(cap, msg); 
 
 };
-
 
 #endif

@@ -31,6 +31,7 @@ struct lcd_api *lcd_get_api(void) {
 };
 EXPORT_SYMBOL(lcd_get_api);
 
+
 int lcd_enter(void) {
 	int ret; 
 
@@ -90,6 +91,26 @@ int lcd_api_connect(struct lcd_api *api) {
 	return 0;
 };
 EXPORT_SYMBOL(lcd_api_connect);
+
+int lcd_init_current(void) {
+	int ret; 
+	struct cnode *cnode;
+	
+	ret = lcd_enter();
+	if (ret) {
+		printk(KERN_ERR "Failed to enter LCD environment\n");
+		return ret;
+	};
+
+	ret = lcd_api_connect(lcd_get_api());
+	if (ret) {
+		printk(KERN_ERR "Failed to connect to LCD API\n");
+		return ret;
+	};
+
+	return 0;
+};
+EXPORT_SYMBOL(lcd_init_current); 
 
 static long lcd_dev_ioctl(struct file *filp ,
 			  unsigned int ioctl, unsigned long arg)

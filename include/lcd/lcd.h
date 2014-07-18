@@ -105,8 +105,11 @@ int lcd_find_hva_by_gpa(struct lcd *lcd, u64 gpa, u64 *hva);
 int lcd_run(struct lcd *lcd);
 const char* lcd_exit_reason(int exit_code);
 
+
+
 int lcd_enter(void);
 int lcd_api_connect(struct lcd_api *api);
 struct lcd_api *lcd_get_api(void);
+int lcd_init_current(void); 
 
 #endif /* LCD_LCD_H */

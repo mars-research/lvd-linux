@@ -5,6 +5,7 @@ enum client_interface {
 	client_interface_register_server,
 };
 
-int register_server(capability_t client, capability _t server);
+int register_server(capability_t client, struct server_interface *server);
+int register_server_callee(capability_t server, );
 
 #endif

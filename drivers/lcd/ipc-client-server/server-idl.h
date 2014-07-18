@@ -7,11 +7,14 @@ enum server_interface {
 }
 
 /* Caller stubs */
-int test_func1(unsigned long a, long b, char c);
-int test_func2(unsigned long a);
+int test_func1_caller(capability_t server, unsigned long a, long b, char c);
+int test_func2_caller(capability_t server, unsigned long a);
 
 /* Callee stubs */
-int test_func1_srv(unsigned long a, long b, char c);
-int test_func2_srv(unsigned long a);
+int test_func1_callee(struct message_info *msg, capability_t reply_cap);
+int test_func2_callee(struct message_info *msg, capability_t reply_cap);
+
+/* Introduction code */
+extern int accept_client_introduction(void);
 
 #endif

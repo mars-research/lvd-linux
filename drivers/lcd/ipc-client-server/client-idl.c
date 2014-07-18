@@ -1,10 +1,6 @@
 
 #include "server-idl.h"
 
-struct server_interface {
-	int (*test_func1) (unsigned long a, long b, char c);
-	int (*test_func2) (unsigned long a);
-};
 
 
 /* Caller stubs */
@@ -22,16 +18,12 @@ int register_server_callee(struct server_interface *server) {
 /* Main execution loop */
 int execution_loop(void) {
 
-	int ret; 
-	capability_t api_cap = current->utcb->boot_info.boot_caps[LCD_BOOT_API_CAP];
-	capability_t reply_cap = current->utcb->boot_info.boot_caps[LCD_BOOT_REPLY_CAP];
+	int ret;
+	enum client_interface call; 
 	capability_t server = current->utcb->boot_info.boot_caps[LCD_BOOT_FREE_CAP0];
-
 	capability_t server_interface;
-	capability_t server_reply; 
 	
 	struct message_info *msg = &current->utcb->msg_info;
-
 
         ret = lcd_alloc_cap(&current->cap_cache, &server_interface); 
 	if(ret) {
@@ -52,8 +44,8 @@ int execution_loop(void) {
 	call = msg->regs[0];
 
 	switch (call) {
-		case LCD_CREATE_SYNC_ENDPOINT: 
-			ret = lcd_api_create_sync_endpoint(lcd_api, reply_cap); 
+		case client_interface_register_server: 
+			ret = register(lcd_api, reply_cap); 
 			break; 
 		default: 
 			printk(KERN_ERR "lcd_api: invalid call number:%d\n", call);
@@ -84,17 +76,11 @@ int execution_loop_thread(void *p) {
 		return -EINVAL;
 	}
 
+	/* Introduction code */
 	ret = lcd_prepare_introduction(lcd_api_cap(), 
 			lcd_api_reply_cap(), 
 			&client_server_rvp, 
 			&current->utcb->boot_info.boot_caps[LCD_BOOT_FREE_CAP0]);
-	if (ret) {
-		printk(KERN_ERR "client failed to initialize client-server environtment\n");
-		return -EINVAL;
-	}
-
-	/* Introduction code */
-	ret = lcd_prepare_introduction(&client_server_rvp);
 	if (ret) {
 		printk(KERN_ERR "client failed to initialize client-server environtment\n");
 		return -EINVAL;

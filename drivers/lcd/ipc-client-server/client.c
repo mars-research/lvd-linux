@@ -27,6 +27,7 @@ struct server_interface *server;
 
 int register_server(struct server_interface *s) {
 	server = s;
+	client_main(); 
 };
 EXPORT_SYMBOL(register_server);
 

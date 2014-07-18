@@ -20,4 +20,4 @@ lcd_idl.h:
 		vembyr-1.1/peg.py --h lcd_idl.peg > lcd_idl.h
 
 clean:
-		rm lcd_idl.cpp lcd_idl.h compiler
+		rm lcd_idl.cpp lcd_idl.h compiler *.o

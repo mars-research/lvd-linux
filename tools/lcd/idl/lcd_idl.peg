@@ -28,7 +28,7 @@ IdentStart	=	[abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ_]
 
 IdentCont	=	IdentStart | [0123456789]
 
-File		=	i:Include* t:Things* <eof> {{ std::vector<Definition *>* defs = new std::vector<Definition *>;
+File		=	Spacing i:Include* t:Things* <eof> {{ std::vector<Definition *>* defs = new std::vector<Definition *>;
 			std::vector<Rpc *>* rpcs = new std::vector<Rpc *>;
 			std::vector<Message *>* messages = new std::vector<Message *>;
 			std::map<char *, Projection *> *env = new std::map<char *, Projection *>;
@@ -219,7 +219,7 @@ Message		=	"message" Space+ id:Identifier Spacing OPENC Spacing c:Cap* CLOSEC Sp
 
 Cap		=	"capability" Space+ id:Identifier Spacing SEMI Spacing {{ value = new Capability((char *) id.getValue()); }}
 
-Projection	=	"projection" Space+ id:Identifier "<" Spacing t:Proj_type CLOSEA Spacing OPENC Spacing p:ProjField+ CLOSEC Spacing {{ std::vector<ProjField *>* p_fields = new std::vector<ProjField *>;
+Projection	=	"projection" Space+ id:Identifier "<" Spacing t:Proj_type ">" Spacing OPENC Spacing p:ProjField+ CLOSEC Spacing {{ std::vector<ProjField *>* p_fields = new std::vector<ProjField *>;
 			for(Value::iterator it = p.getValues().begin(); it != p.getValues().end(); it ++)
 			{
 				const Value & v = *it;
@@ -293,7 +293,10 @@ Line_comment	=	Line_comm_start Line_comm_rest
 
 Line_comm_end	=	"\n"
 
-Type		=	"int" | "char" | "capability"
+Type		=	"int" | "char" | "capability" | "short" | "long" Space+ "long" | "long"
+			| "unsigned" Space+  "short" | "unsigned" Space+ "int" 
+			| "unsigned" Space+  "long" Space+ "long" 
+			| "unsigned" Space+ "long"
 
 Type_form	=	"projection" Space+ m:Identifier "::" name:Identifier Spacing "*" Spacing
 			| "projection" Space+ m:Identifier "::" name:Identifier Space+

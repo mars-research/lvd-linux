@@ -32,7 +32,6 @@ File		=	Spacing i:Include* t:Things* <eof> {{ std::vector<Definition *>* defs = 
 			std::vector<Rpc *>* rpcs = new std::vector<Rpc *>;
 			std::vector<Message *>* messages = new std::vector<Message *>;
 			std::map<char *, Projection *> *env = new std::map<char *, Projection *>;
-			std::map<char *, Module *> *modules = new std::map<char *, Module *>;
 			for(Value::iterator it = t.getValues().begin(); it != t.getValues().end(); it ++)
 			{
 				const Value & v = *it;
@@ -44,28 +43,22 @@ File		=	Spacing i:Include* t:Things* <eof> {{ std::vector<Definition *>* defs = 
 				}
 				switch (ds->get_definition_type())
 				{
-				case rpc:
+				case kRpc:
 				{
 				Rpc * rp = reinterpret_cast<Rpc *>(ds);
 				rpcs->push_back(rp);
 				}				
 				break;
-				case module:
-				{
-				Module * mod = reinterpret_cast<Module *>(ds);
-				modules->insert(std::pair<char *, Module *>(mod->get_name(), mod));
-				}
-				break;
-				case message:
+				case kMessage:
 				{
 				Message * mess = reinterpret_cast<Message *>(ds);
 				messages->push_back(mess);
 				}
 				break;
-				case projection:
+				case kProjection:
 				{
-				Projection * proj = reinterpret_cast<Projection *>(ds);
-				env->insert(std::pair<char *, Projection *>(proj->get_name(), proj));
+				Projection* proj = reinterpret_cast<Projection *>(ds);
+				env->insert(std::pair<char *, Projection *>(proj->name(), proj));
 				}
 				break;
 				default:
@@ -82,7 +75,7 @@ File		=	Spacing i:Include* t:Things* <eof> {{ std::vector<Definition *>* defs = 
 				char * c = (char *) v.getValue();
 				includes->push_back(c);
 			}
-			value = new Module(includes, rpcs, messages, env, modules); }}	
+			value = new Scope(includes, rpcs, messages, env); }}	
 
 String		=	<ascii 34> l:any_letter+ <ascii 34> {{
 			std::ostringstream total;
@@ -120,59 +113,7 @@ String		=	<ascii 34> l:any_letter+ <ascii 34> {{
 
 any_letter	=	[_.,/?<>'; =:%`!@#$^&*()-+{}|\\ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789]
 
-Module		=	"module" Space+ id:Identifier OPENC Spacing t:Things* CLOSEC Spacing {{	
-				 std::vector<Definition *>* defs = new std::vector<Definition *>;
-
-				 std::vector<Rpc *>* rpcs = new std::vector<Rpc *>;
-				 std::vector<Message *>* messages = new std::vector<Message *>;
-				 std::map<char *, Projection *> *env = new std::map<char *, Projection *>;
-				 std::map<char *, Module *> *modules = new std::map<char *, Module *>;
-			 
-				 for(Value::iterator it = t.getValues().begin(); it != t.getValues().end(); it ++)
-			{
-				const Value & v = *it;
-				Definition * ds = (Definition *) v.getValue();
-				if(!ds)
-				{
-					printf("error null pointer\n");
-					exit(0);
-				}
-				switch (ds->get_definition_type())
-				{
-				case rpc:
-				{
-				Rpc * rp = reinterpret_cast<Rpc *>(ds);
-				rpcs->push_back(rp);
-				}
-				break;
-				case module:
-				{
-				Module * mod = reinterpret_cast<Module *>(ds);
-				modules->insert(std::pair<char *, Module *>(mod->get_name(), mod));
-				}
-				break;
-				case message:
-				{
-				Message * mess = reinterpret_cast<Message *>(ds);
-				messages->push_back(mess);
-				}
-				break;
-				case projection:
-				{
-				Projection * proj = reinterpret_cast<Projection *>(ds);
-				env->insert(std::pair<char *, Projection *>(proj->get_name(), proj));
-				}
-				break;
-				default:
-				{
-				printf("fatal error\n");
-				}
-				}
-
-			}
-			value = new Module((char *) id.getValue(), rpcs, messages, env, modules); }}
-
-Things		=	Module | Rpc | Message | Projection
+Things		=	Rpc | Message | Projection
 
 Include		=	"#include" Space+ "<" Spacing f:Identifier Spacing ">" Spacing {{
 			std::ostringstream total;
@@ -194,78 +135,101 @@ LastParam	=	t:Type_form id:Identifier Spacing {{
 			value = new Parameter((Type *) t.getValue(), (char *) id.getValue()); }}
 
 Parameters	=	f:FirstParam* l:LastParam {{
-			std::vector<Parameter *>* params = new std::vector<Parameter *>;
+			std::vector<Parameter* >* params = new std::vector<Parameter* >;
 			for(Value::iterator it = f.getValues().begin(); it != f.getValues().end(); it ++)
-			{
+			{ 
 				const Value & v = *it;
-				Parameter * p = (Parameter *) v.getValue();
+				Parameter* p = (Parameter* ) v.getValue();
 				params->push_back(p);
 			}
-			params->push_back((Parameter *) l.getValue());
+			params->push_back((Parameter* ) l.getValue());
 			value = params; }}
 
 Rpc		=	"rpc" Space+ t:Type_form id:Identifier Spacing OPEN p:Parameters CLOSE SEMI Spacing {{
 			value = new Rpc((Type *) t.getValue(), (char *) id.getValue(), (std::vector<Parameter *> *) p.getValue()); }}  
 
 
-Message		=	"message" Space+ id:Identifier Spacing OPENC Spacing c:Cap* CLOSEC Spacing {{ std::vector<Capability *>* caps = new std::vector<Capability *>;
-			for(Value::iterator it = c.getValues().begin(); it != c.getValues().end(); it ++)
+Message		=	"message" Space+ id:Identifier Spacing OPENC Spacing m:Message_field* CLOSEC Spacing {{ std::vector<MessageField* >* fields = new std::vector<MessageField* >;
+			for(Value::iterator it = m.getValues().begin(); it != m.getValues().end(); it ++)
 			{		   
 				const Value & v = *it;
-				Capability* cap = (Capability *) v.getValue();
-				caps->push_back(cap);
+				MessageField* mess_field = (MessageField *) v.getValue();
+				fields->push_back(mess_field);
 			}
-			value = new Message((char *) id.getValue(), caps); }}
+			value = new Message((char *) id.getValue(), fields); }}
 
-Cap		=	"capability" Space+ id:Identifier Spacing SEMI Spacing {{ value = new Capability((char *) id.getValue()); }}
+Message_field	=	t:Type_form Space+ id:Identifier Spacing SEMI Spacing {{
+			value = new MessageField((Type* ) t.getValue(), (char* ) id.getValue()); }}
 
-Projection	=	"projection" Space+ id:Identifier "<" Spacing t:Proj_type ">" Spacing OPENC Spacing p:ProjField+ CLOSEC Spacing {{ std::vector<ProjField *>* p_fields = new std::vector<ProjField *>;
+Projection	=	"projection" Space+ id:Identifier "<" Spacing t:Proj_type ">" Spacing OPENC Spacing p:ProjField+ CLOSEC Spacing {{ std::vector<ProjectionField *>* p_fields = new std::vector<ProjectionField *>;
 			for(Value::iterator it = p.getValues().begin(); it != p.getValues().end(); it ++)
 			{
 				const Value & v = *it;
-				ProjField * p = (ProjField *) v.getValue();
+				ProjectionField * p = (ProjectionField *) v.getValue();
 				p_fields->push_back(p);
 			} 
-			value = new Projection((char *) id.getValue(), (Type *) t.getValue(), p_fields); }}
+			value = new Projection((char* ) id.getValue(), (char* ) t.getValue(), p_fields); }}
 		## what is the point of having a projection without at least one line
 
-Proj_type	=  	"struct" Space+ id:Identifier Spacing
+Proj_type	=  	"struct" Space+ id:Identifier Spacing {{
+			std::ostringstream total;
+			total << "struct " << (char *) id.getValue();
+			std::string str = total.str();
+			value = &str[0]; }}
 
 Keyword		=     	"out" {{ int * x = (int *) malloc(sizeof(int));
-			      *x = OUT;
+			      *x = 1;
 			      value = x; }}
 			| "in" {{ int * x = (int *) malloc(sizeof(int));
-			       *x = IN; 
+			       *x = 2; 
 			       value = x; }}
 			| "bind" {{ int * x = (int *) malloc(sizeof(int));
-			  	 *x = BIND; 
+			  	 *x = 3; 
 			  	 value = x; }}
 			| "alloc" {{ int * x = (int *) malloc(sizeof(int));
-			  	  *x = ALLOC;
+			  	  *x = 4;
 				  value = x; }}
 			
 Start		=	k:Keyword Spacing COMMA Spacing {{ value = k; }}
 
-Specification	=	s:Start* l:Last {{ std::vector<int *>* specs = new std::vector<int*>;
-			int res = 0;
+Specification	=	s:Start* l:Last {{
+			std::vector<bool> specs (4, false);
 			for(Value::iterator it = s.getValues().begin(); it != s.getValues().end(); it ++)
 			{
 				const Value & v = *it;
-				int *x = (int*) v.getValue();
+				int* x = (int*) v.getValue();
 				if(!x)
 				{
 					printf("error x is null\n");
 					exit(0);       
 				}
-				res = res & *x; 
+				specs[*x -1] = true;
+				 
 			}
 			int * y = (int *) l.getValue();
-			int * ret = (int *) malloc(sizeof(int));
-			*ret = res & *y; 
-			value = ret; }}
+			if(!y) { printf("error y is null\n"); exit(0); }
+			specs[*y-1] = true;
+			value = &specs; }}
 
 ProjField	=	OPENS Spacing s:Specification CLOSES Spacing t:Type_form id:Identifier SEMI Spacing {{ int * spec = (int *)s.getValue();
-			value = new ProjField(*spec, (Type *) t.getValue(), (char *) id.getValue()); }}
+			bool in = false; bool out = false; bool bind = false; bool alloc = false;
+			std::vector<bool>* specs = (std::vector<bool>*) s.getValue();
+			int i = 0;
+			for(std::vector<bool>::iterator it = specs->begin(); it != specs->end(); it ++)
+			{
+				if(*it)
+				{
+				if(i == 0)
+				     out = true;
+				else if(i == 1)
+				     in = true;
+				else if(i == 2)
+				     bind = true;
+				else
+					alloc = true;
+				}			
+			}
+			value = new ProjectionField(in, out, alloc, bind, (Type *) t.getValue(), (char *) id.getValue()); }}
 
 
 Last		=	k:Keyword Spacing {{ value = k; }}
@@ -293,16 +257,39 @@ Line_comment	=	Line_comm_start Line_comm_rest
 
 Line_comm_end	=	"\n"
 
-Type		=	"int" | "char" | "capability" | "short" | "long" Space+ "long" | "long"
-			| "unsigned" Space+  "short" | "unsigned" Space+ "int" 
-			| "unsigned" Space+  "long" Space+ "long" 
-			| "unsigned" Space+ "long"
+Simple_Type	=	"int" {{ int* ret = (int*) malloc(sizeof(int)); *ret = kInt; value = ret; }}
+			| "char" {{ int* ret = (int*) malloc(sizeof(int)); *ret = kChar; value = ret; }}   
+			| "capability" {{ int* ret = (int*) malloc(sizeof(int)); *ret = kCapability; value = ret; }}
+			| "short" {{ int* ret = (int*) malloc(sizeof(int)); *ret = kShort; value = ret; }}
+			| "long" Space+ "long" {{ int* ret = (int*) malloc(sizeof(int)); *ret = kLongLong; value = ret; }}
+			| "long" {{ int* ret = (int*) malloc(sizeof(int)); *ret = kLong; value = ret; }}
+
+Modifier	=	"unsigned" {{
+			int* ret = (int*) malloc(sizeof(int));
+			*ret = kUnsigned;
+			 value = ret; }}
+
+Type_w_modifier	=	m:Modifier Space+ s:Simple_Type {{ 
+			int* val = (int*) m.getValue();
+			int* sval = (int*) s.getValue();
+			value = new PrimitiveType((TypeModifier) *val,
+			(PrimType) *sval); }} 
+
+Type 		=	Type_w_modifier
+			| s:Simple_Type {{ 
+			int* sval = (int*) s.getValue();
+			value = new PrimitiveType(kNone, (PrimType) *sval); }} 
+
+## just ignore the modules ones, not supporting right now
 
 Type_form	=	"projection" Space+ m:Identifier "::" name:Identifier Spacing "*" Spacing
 			| "projection" Space+ m:Identifier "::" name:Identifier Space+
-			| "projection" Space+ name:Identifier Spacing "*" Spacing
-			| "projection" Space+ name:Identifier Space+
-			| t:Type Space+ 	
+			| "projection" Space+ name:Identifier Spacing "*" Spacing {{
+			value = new ProjectionType((char *)name.getValue(), 1); }}
+			| "projection" Space+ name:Identifier Space+ {{
+			value = new ProjectionType((char *)name.getValue(), 0); }}
+			| t:Type Space+ {{
+			value = (PrimitiveType *) t.getValue(); }}	
 
 Spacing		=	Space*
 

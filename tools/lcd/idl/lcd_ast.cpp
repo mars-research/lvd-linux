@@ -1,95 +1,66 @@
 #include "lcd_ast.h"
 
-Module::Module(char * n, std::vector<Rpc *>* rs, std::vector<Message *>* ms,
-      std::map<char *, Projection *>* e, std::map<char *, Module *>* mods)
+PrimitiveType::PrimitiveType(TypeModifier type_mod, PrimType primitive)
 {
-  this->name = n;
-  this->rpcs = rs;
-  this->messages = ms;
-  this->env = e;
-  this->modules = mods;
+  this->type_modifier_ = type_mod;
+  this->primitive_ = primitive;
 }
 
-Module::Module(std::vector<char *>* in, std::vector<Rpc *>* rs, std::vector<Message *>* ms,
-      std::map<char *, Projection *>* e, std::map<char *, Module *>* mods)
+ProjectionType::ProjectionType(char * type_name, bool pointer)
 {
-  this->includes = in;
-  this->rpcs = rs;
-  this->messages = ms;
-  this->env = e;
-  this->modules = mods;
+  this->type_name_ = type_name;
+  this->pointer_ = pointer;
 }
 
-char * Module::get_name()
+Scope::Scope(std::vector<char* >* includes, std::vector<Rpc* >* rpc_definitions, std::vector<Message* >* message_definitions,
+	     std::map<char* , Projection* >* projection_definitions)
 {
-  return this->name;
+  this->includes_ = includes;
+  this->rpc_definitions_ = rpc_definitions;
+  this->message_definitions_ = message_definitions;
+  this->projection_definitions_ = projection_definitions;
 }
 
-Rpc::Rpc(Type* r, char * n, std::vector<Parameter *>* param)
+Rpc::Rpc(Type* return_type, char * name, std::vector<Parameter* >* parameters)
 {
-  this->ret = r;
-  this->name = n;
-  this->parameters = param;
+  this->return_type_ = return_type;
+  this->name_ = name;
+  this->parameters_ = parameters;
 }
 
-Projection::Projection(char * name, Type* real, std::vector<ProjField *>* f)
+Projection::Projection(char * name, char* true_type, std::vector<ProjectionField* >* fields)
 {
-  this->name = name;
-  this->underlying = real;
-  this->fields = f;
+  this->name_ = name;
+  this->true_type_ = true_type;
+  this->fields_ = fields;
 }
 
-char * Projection::get_name()
+ProjectionField::ProjectionField(bool in, bool out, bool alloc, bool bind, Type* field_type, char* field_name)
 {
-  return this->name;
+  this->in_ = in;
+  this->out_ = out;
+  this->alloc_ = alloc;
+  this->bind_ = bind;
+  this->field_type_ = field_type;
+  this->field_name_ = field_name;
 }
 
-ProjField::ProjField(int s, Type* t, char * name)
+Parameter::Parameter(Type* type, char* name)
 {
-  this->specifications = s;
-  this->t = t;
-  this->name = name;
+  this->type_ = type;
+  this->name_ = name;
 }
 
-/* o is option such as "struct" or "projection
-   t is type such as "int"
-   m is module, "" if it belongs to top level
-   p is * etc */
-Type::Type(char * o, char * t, char * m, char * p)
+MessageField::MessageField(Type* field_type, char * field_name)
 {
-  this->option = o;
-  this->type_ = t;
-  this->module = m;
-  this->pointer = p;
+  this->field_type_ = field_type;
+  this->field_name_ = field_name;
 }
 
-Parameter::Parameter(Type* t, char * n)
+Message::Message(char * name, std::vector<MessageField* >* fields)
 {
-  this->type = t;
-  this->name = n;
-}
-
-bool Parameter::isProjection()
-{
-  
-}
-
-Message::Message(char * n, std::vector<Capability *>* cap)
-{
-  this->name = n;
-  this->caps = cap;
-}
-
-/* Capability constructor */
-Capability::Capability(char * n)
-{
-  this->name = n;
-}
-
-/* get name of capability */
-char * Capability::get_name()
-{
-  return this->name;
+  this->name_ = name;
+  this->fields_ = fields;
 }
 
 

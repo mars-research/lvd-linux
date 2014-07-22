@@ -4,122 +4,134 @@
 #include <vector>
 #include <map>
 
-#define IN 0x1
-#define OUT 0x2
-#define BIND 0x4
-#define ALLOC 0x8
-
-enum definition_type {rpc, module, message, projection};
+enum DefinitionType {kRpc = 1, kModule, kMessage, kProjection};
+enum PrimType { kChar = 1, kShort, kInt, kLong, kLongLong, kCapability};
+enum TypeModifier {kUnsigned = 1, kNone};
 
 class Definition
 {
  public:
-  virtual definition_type get_definition_type() = 0;
+  virtual DefinitionType get_definition_type(void) = 0;
+  // virtual ~Definition() {};
 
 };
 
 class Type
 {
-  char * option;
-  char * type_;
-  char * module;
-  char * pointer;
+ public:
+  virtual ~Type() {}
+};
+
+class PrimitiveType : public Type
+{
+  TypeModifier type_modifier_;
+  PrimType primitive_;
+  
+ public:
+  PrimitiveType(TypeModifier type_mod, PrimType primitive);
+  TypeModifier type_modifier() {return type_modifier_; }
+  PrimType primitive() {return primitive_; }
+  char * GetFullName();
+  // maybe for consistency this shouldnt have getfullname
+};
+
+class ProjectionType : public Type // complex type
+{
+  char* type_name_; 
+  bool pointer_;
 
  public:
-  Type(char * o, char * t, char * m, char * p);
-  ~Type();
+  ProjectionType(char * type_name, bool pointer);
+  char * type_name() {return type_name_; }
+  bool pointer() { return pointer_; }
+  // get full name function? class isn't aware of parent need to pass env
 };
 
 class Parameter
 {
-  Type* type;
-  char* name;
+  Type* type_;
+  char* name_;
 
  public:
-  Parameter(Type* t,char * n);
+  Parameter(Type* type, char* name);
   ~Parameter();
-  bool isProjection();
 };
 
 class Rpc : public Definition
 {
-  Type* ret;
-  char * name;
-  std::vector<Parameter *>* parameters;
+  Type* return_type_;
+  char* name_;
+  std::vector<Parameter* >* parameters_;
 
  public:
-  Rpc(Type* r, char * n, std::vector<Parameter *>* param);
-  ~Rpc();
-  definition_type get_definition_type(){return rpc;}
+  Rpc(Type* return_type, char* name, std::vector<Parameter* >* parameters);
+  DefinitionType get_definition_type(){ return kRpc; }
 
 };
 
-class Capability // capability? for message
+class ProjectionField
 {
-  char * name;
+  bool in_;
+  bool out_;
+  bool alloc_;
+  bool bind_;
+  Type* field_type_;
+  char* field_name_;
   
  public:
-  Capability(char * n);
-  ~Capability();
-  char * get_name();
-
-};
-
-class ProjField
-{
-  int specifications; // set bits for in out bind alloc
-  Type* t;
-  char * name;
-  
- public:
-  ProjField(int s, Type* t, char * name);
-  ~ProjField();
+  ProjectionField(bool in, bool out, bool alloc, bool bind, Type* field_type, char* field_name);
+  ~ProjectionField();
+  bool in() { return in_; }
+  bool out() { return out_; }
+  bool alloc() { return alloc_; }
+  bool bind() { return bind_; }
 };
 
 class Projection : public Definition
 {
-  char * name;
-  Type* underlying;
-  std::vector<ProjField *>* fields;
+  char* name_;
+  char* true_type_; // struct isn't allowed anywhere but here so just use char *
+  std::vector<ProjectionField* >* fields_;
 
  public:
-  Projection(char * name, Type* real, std::vector<ProjField *>* f);
-  ~Projection();
-  definition_type get_definition_type(){return projection;}
-  char * get_name();
+  Projection(char* name, char* true_type, std::vector<ProjectionField* >* fields);
+  char* name() const { return name_; }
+  DefinitionType get_definition_type(){return kProjection;}
+  
+};
 
+class MessageField
+{
+  Type* field_type_;
+  char* field_name_;
+
+ public:
+  MessageField(Type* field_type, char* field_name);
 };
 
 class Message : public Definition
 {
-  char * name;
-  std::vector<Capability *>* caps;
+  char * name_;
+  std::vector<MessageField* >* fields_;
 
  public:
-  Message(char * n, std::vector<Capability *>* e);
-  ~Message();
-  std::vector<Capability *>* get_capabilities();
-  definition_type get_definition_type() {return message; }
+  Message(char * name, std::vector<MessageField* >* fields);
+  DefinitionType get_definition_type() { return kMessage; }
 };
 
-class Module : public Definition
+
+
+class Scope 
 {
-  char * name; // just leave "" if top level
-  std::vector<char *> * includes; // only top level can have includes
-  std::vector<Rpc *> * rpcs;
-  std::vector<Message *> * messages;
-  std::map<char *, Projection *> *env;
-  std::map<char *, Module *> *modules;
+  std::vector<char* >* includes_;
+  std::vector<Rpc *>* rpc_definitions_;
+  std::vector<Message *>* message_definitions_;
+  std::map<char *, Projection *>* projection_definitions_;
+  // believe it is only necessary to store projections in "env" since functions can't be referenced in other functions
   
  public:
-  Module(char * n, std::vector<Rpc *>* rs, std::vector<Message *>* ms,
-      std::map<char *, Projection *>* e, std::map<char *, Module *>* mods);
-  // for top level
-  Module(std::vector<char *>* in, std::vector<Rpc *>* rs, std::vector<Message *>* ms,
-      std::map<char *, Projection *>* e, std::map<char *, Module *>* mods);
-  ~Module();
-  char * get_name();
-  definition_type get_definition_type() {return module; }
+  Scope(std::vector<char* >* includes, std::vector<Rpc* >* rpc_definitions, std::vector<Message* >* message_definitions,
+	std::map<char* , Projection* >* projection_definitions);
   
 };
 

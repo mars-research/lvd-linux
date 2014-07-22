@@ -14,7 +14,7 @@ int main(int argc, char ** argv)
   try
     {
       char * file = argv[1];
-      Module * tree = (Module *) Parser::parse(std::string(file));
+      Scope * tree = (Scope *) Parser::parse(std::string(file));
       printf("we have a tree\n");
     }
   catch (const Parser::ParseException e)

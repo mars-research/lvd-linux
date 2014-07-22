@@ -1,5 +1,5 @@
 /**
- * sender.c - sender for the IPC ping-pong test
+ * server.c - server for the LCD client server example
  *
  *
  * Authors: Anton Burtsev   <aburtsev@flux.utah.edu>
@@ -23,6 +23,9 @@
 MODULE_LICENSE("GPL");
 MODULE_DESCRIPTION("LCD client-server test server");
 
+
+
+
 int test_func1(unsigned long a, long b, char c) {
 	printk(KERN_INFO "test_func1: a:%llu, b:%li, c:%c\n", a, b, c);
 	return a + b; 
@@ -33,11 +36,15 @@ int test_func2(unsigned long a) {
 	return a * 10; 
 };
 
+struct server_interface server = { 
+	.test_func1 = test_func1,
+	.test_func2 = test_func2,
+};
 
 static int __init server_init(void)
 {
 	execution_loop_thread_init();
-	register_server();
+	register_server(&server);
 }
 
 static void __exit server_exit(void)

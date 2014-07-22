@@ -2,15 +2,62 @@
 #include "server-idl.h"
 
 
-
 /* Caller stubs */
-int register_server(struct server_interface *server) {
+/* Generate a global capability variable */
+client_t client; 
+int __register_server_caller(capability_t client, struct server_interface *server) {
+	int ret; 
 
+	msg->regs[0] = client_interface_register_server;
+	msg->valid_regs = 1;
 
+	msg->cap_regs[0] = server;
+	msg->valid_cap_regs = 1;
+
+	ret = ipc_call(server, msg);
+	if (ret) {
+		printk(KERN_ERR "client failed to ivoke server:%d\n", ret);
+		/* XXX: BU: make up some result, which? */
+		return ret;
+	};
+
+	return (int) msg->regs[0];
+}
+
+int register_server_caller(struct server_interface *server) {
+	return __register_server_caller(client, server);
 }
 
 /* Callee stubs */
-int register_server_callee(struct server_interface *server) {
+int register_server_callee(struct message_info *msg, capability_t reply_cap) {
+	int ret; 
+	struct server_interface *server; 
+
+	server = (struct server_interface *) malloc(sizeof(struct server_interface));
+	if (!server) {
+		printk(KERN_ERR "memory allocation failed\n");
+		msg->valid_regs = 0; 
+		msg->valid_cap_regs = 0; 
+		msg->err = -ENOMEM;
+		ipc_reply(reply_cap, msg);
+		return 0;
+	};
+
+
+
+	ret = register_server(server); 
+	
+	msg->regs[0] = ret;
+	msg->valid_regs = 1;
+	msg->valid_cap_regs = 0;
+	
+	ret = ipc_reply(reply_cap, msg);
+	if(ret) {
+		printk(KERN_ERR "IPC reply failed: %d\n", ret);
+		return ret;
+	};
+
+	return ret;
 
 
 }
@@ -61,8 +108,8 @@ int execution_loop(void) {
 
 struct sync_ipc *client_server_rvp;
 int accept_client_introduction(void) {
-	return lcd_accept_introduction(&client_server_rvp, 
-			&current->utcb->boot_info.boot_caps[LCD_BOOT_FREE_CAP0]);
+	return	lcd_accept_introduction(&client_server_rvp, 
+			&client);
 
 };
 EXPORT_SYMBOL(accept_client_introduction);

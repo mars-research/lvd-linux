@@ -5,6 +5,9 @@
 /* Caller stubs */
 /* Generate a global capability variable */
 client_t client; 
+
+struct cap_space module_cspace; 
+
 int __register_server_caller(capability_t client, struct server_interface *server) {
 	int ret; 
 
@@ -44,6 +47,8 @@ int register_server_callee(struct message_info *msg, capability_t reply_cap) {
 	};
 
 
+	
+
 
 	ret = register_server(server); 
 	
@@ -72,7 +77,7 @@ int execution_loop(void) {
 	
 	struct message_info *msg = &current->utcb->msg_info;
 
-        ret = lcd_alloc_cap(&current->cap_cache, &server_interface); 
+	ret = lcd_alloc_cap(&current->cap_cache, &server_interface); 
 	if(ret) {
 		printk(KERN_ERR "Failed to allocate free capability\n");
 		return -ENOSPC;
@@ -108,7 +113,7 @@ int execution_loop(void) {
 
 struct sync_ipc *client_server_rvp;
 int accept_client_introduction(void) {
-	return	lcd_accept_introduction(&client_server_rvp, 
+	return lcd_accept_introduction(&client_server_rvp, 
 			&client);
 
 };
@@ -123,6 +128,12 @@ int execution_loop_thread(void *p) {
 		return -EINVAL;
 	}
 
+	ret = lcd_init_cspace(&module_cspace); 
+	if (ret) {
+		printk(KERN_ERR "Failed to init global cspace for this module:%d\n", ret);
+		return ret;
+	};
+
 	/* Introduction code */
 	ret = lcd_prepare_introduction(lcd_api_cap(), 
 			lcd_api_reply_cap(), 
@@ -132,6 +143,9 @@ int execution_loop_thread(void *p) {
 		printk(KERN_ERR "client failed to initialize client-server environtment\n");
 		return -EINVAL;
 	}
+
+	/* Record the clients session */
+	lcd_cap_make_cspace(&module_cspace, &module_cap_cache, * 
 
 	return execution_loop();
 };

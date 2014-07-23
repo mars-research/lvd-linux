@@ -16,20 +16,12 @@ int lcd_cap_init(void){
 		return -ENOMEM;
 	};
 
-	//cdtnode_cache = KMEM_CACHE(cap_derivation_tree, 0);
-	//if(!cdt_cache){
-	//	printk(KERN_ERR "Failed to allocate cte slab\n");
-	//	return -ENOMEM;
-	//};
-
 	return 0;
 };
 
 int lcd_cap_exit(void) {
 	if (cnode_cache)
 		kmem_cache_destroy(cnode_cache);
-	//if (cdt_cache)
-	//	kmem_cache_destroy(cdt_cache);
 	return 0;
 }
 
@@ -51,7 +43,8 @@ int lcd_cap_insert_object(struct cspace *cspace, capability_t cap,
 	return 0; 
 }
 
-struct sync_ipc * lcd_cap_make_sync_endpoint(struct cspace *cspace, struct cap_cache *cache, capability_t *cap) {
+struct sync_ipc * lcd_cap_make_sync_endpoint(struct cspace *cspace, 
+		struct cap_cache *cache, capability_t *cap) {
 	struct sync_ipc *rvp;
 
 	rvp = alloc_sync_ipc();

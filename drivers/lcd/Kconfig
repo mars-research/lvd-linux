@@ -16,3 +16,26 @@ config LCD_PING_PONG_SENDER
        default m
        ---help---
        Sender for the ping-pong LCD IPC test
+
+config LCD_CS_INIT
+       tristate "LCD client-server test (init module)"
+       depends on LCD_CS_CLIENT
+       depends on LCD_CS_SERVER
+       depends on LCD
+       default m
+       ---help---
+       Init code to start the LCD client-server test
+
+config LCD_CS_CLIENT
+       tristate "LCD client-server test (client)"
+       depends on LCD
+       default m
+       ---help---
+       Client module for the LCD client-server test
+
+config LCD_CS_SERVER
+       tristate "LCD client-server test (server)"
+       depends on LCD
+       default m
+       ---help---
+       Server module for the LCD client-server test

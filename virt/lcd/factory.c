@@ -22,7 +22,7 @@ int lcd_prepare_introduction(capability_t api_cap, capabiity_t reply_cap, sync_i
 	};
 
 
-	cnode = lcd_cnode_lookup(&current->cspace, server);
+	cnode = lcd_cnode_lookup(&current->cspace, *rvp_cap);
 	if(cnode == NULL || cnode->type != LCD_TYPE_SYNC_EP) {
 		printk(KERN_ERR "Failed to create capability\n");
 		return -ENOMEM;

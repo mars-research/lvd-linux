@@ -10,9 +10,12 @@
 
 #include <linux/lcd-cap.h>
 
+#define LCD_MAX_REGS 		64
+#define LCD_MAX_CAP_REGS 	8
+
 struct message_info {
-	u64 		regs[8];
-	capability_t 	cap_regs[8];
+	u64 		regs[LCD_MAX_REGS];
+	capability_t 	cap_regs[LCD_MAX_CAP_REGS];
 	u8		valid_regs;
 	u8		valid_cap_regs;
 	u8		err; 

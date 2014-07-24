@@ -24,12 +24,13 @@ static inline int __lcd_api_create_sync_endpoint(capability_t cap, capability_t 
 	msg->regs[0] = LCD_CREATE_SYNC_ENDPOINT; 
 	msg->valid_regs = 1; 
 
-	msg->cap_regs[0] = ep_cap; 
-	msg->cap_regs[1] = reply_cap; 
-	msg->valid_cap_regs = 2; 
+	msg->cap_regs[0] = reply_cap; 
+	msg->valid_cap_regs = 1; 
+
+	msg->cap_regs[1] = ep_cap; 
+	msg->valid_cap_reply_regs = 1;
 
 	return ipc_call(cap, msg); 
-
 };
 
 static inline int lcd_api_create_sync_endpoint(capability_t ep_cap) {
@@ -51,11 +52,15 @@ static inline int __lcd_api_create_lcd(capability_t cap,
 	str_regs = lcd_cap_marshal_string(&msg->regs[1], module_name, LCD_MAX_REGS - 1);
 	msg->valid_regs = 1 + str_regs; 
 
-	cap_regs = lcd_cap_marshal_cap_array(&msg->cap_regs[0], boot_caps, boot_caps_size, LCD_MAX_CAP_REGS - 2);
-	msg->cap_regs[cap_regs] = lcd_cap; 
-	msg->cap_regs[cap_regs + 1] = reply_cap; 
-	
-	msg->valid_cap_regs = cap_regs + 2; 
+	cap_regs = lcd_cap_marshal_cap_array(&msg->cap_regs[0], 
+			boot_caps, boot_caps_size, 
+			LCD_MAX_CAP_REGS - 2);
+
+	msg->cap_regs[cap_regs] = reply_cap; 
+	msg->valid_cap_regs = cap_regs + 1; 
+
+	msg->cap_regs[cap_regs + 1] = lcd_cap;
+	msg->valid_cap_reply_regs = 1;
 
 	return ipc_call(cap, msg); 
 

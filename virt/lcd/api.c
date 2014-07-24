@@ -10,11 +10,10 @@
 #include <linux/sched.h>
 #include <linux/kthread.h>
 
-
 int lcd_api_create_sync_endpoint(struct lcd_api *api, capability_t reply_cap) {
 	int ret; 
 	struct sync_ipc *rvp; 
-	capability_t free_cap; 
+	capability_t rvp_cap; 
 	struct cnode *cnode;
 	struct message_info *msg = &current->utcb->msg_info; 
 
@@ -25,7 +24,7 @@ int lcd_api_create_sync_endpoint(struct lcd_api *api, capability_t reply_cap) {
 		goto err;
 	};
 
-	ret = lcd_alloc_cap(&current->cap_cache, &free_cap); 
+	ret = lcd_alloc_cap(&current->cap_cache, &rvp_cap); 
 	if(ret) {
 		printk(KERN_ERR "Failed to allocate free capability\n");
 		ret = -ENOSPC;
@@ -33,7 +32,7 @@ int lcd_api_create_sync_endpoint(struct lcd_api *api, capability_t reply_cap) {
 		goto err;
 	};
 
-        ret = lcd_cap_insert_object(&current->cspace, free_cap, rvp, LCD_TYPE_SYNC_EP);
+        ret = lcd_cap_insert_object(&current->cspace, rvp_cap, rvp, LCD_TYPE_SYNC_EP);
 	if(cnode == 0) {
 		kfree(rvp);
 		goto err;
@@ -74,8 +73,8 @@ int lcd_api_execution_loop(struct lcd_api *lcd_api) {
 			continue; 
 		}
 
-		// We know we're serving a call invocation, reply cap must 
-		// be there
+		// We know we're serving a call invocation, reply cap is 
+		// verified by the ipc_call()
 
 		if(msg->valid_regs == 0) {
 			printk(KERN_ERR "lcd_api: invalid invocation\n");
@@ -92,6 +91,10 @@ int lcd_api_execution_loop(struct lcd_api *lcd_api) {
 		case LCD_CREATE_SYNC_ENDPOINT: 
 			ret = lcd_api_create_sync_endpoint(lcd_api, reply_cap); 
 			break; 
+		case LCD_CREATE_LCD: 
+			ret = lcd_api_create_sync_endpoint(lcd_api, reply_cap); 
+			break; 
+
 		default: 
 			printk(KERN_ERR "lcd_api: invalid call number:%d\n", call);
 			msg->valid_regs = 0; 

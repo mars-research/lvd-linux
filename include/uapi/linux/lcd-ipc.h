@@ -18,6 +18,7 @@ struct message_info {
 	capability_t 	cap_regs[LCD_MAX_CAP_REGS];
 	u8		valid_regs;
 	u8		valid_cap_regs;
+	u8		valid_cap_reply_regs;
 	u8		err; 
 };
 

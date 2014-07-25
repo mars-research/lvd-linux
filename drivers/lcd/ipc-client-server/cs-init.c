@@ -25,9 +25,15 @@ MODULE_DESCRIPTION("LCD client-server test launcher");
 
 static int __init cslaunch_init(void)
 {
+ 	capability_t boot_caps[3];
 	capability_t shared_rvp = 2; 
 	capability_t client_lcd_cap = 3; 
 	capability_t server_lcd_cap = 4; 
+
+	boot_caps[0] = lcd_api_cap(); 
+	boot_caps[1] = lcd_api_reply_cap(); 
+	boot_caps[2] = shared_rvp; 
+
 
 	ret = lcd_init_current();
 	if (ret) {
@@ -41,18 +47,17 @@ static int __init cslaunch_init(void)
 		return -ENOSPC;
 	};
 
-	ret = lcd_api_create_lcd("cs-client", &shared_rvp, 1, client_lcd_cap); 
+	ret = lcd_api_create_lcd("cs-client", &boot_caps, 3, client_lcd_cap); 
 	if(ret) {
 		printk(KERN_ERR "Failed to create client LCD\n");
 		return -ENOSPC;
 	};
 
-	ret = lcd_api_create_lcd("cs-server", &shared_rvp, 1, server_lcd_cap); 
+	ret = lcd_api_create_lcd("cs-server", &boot_caps, 3, server_lcd_cap); 
 	if(ret) {
 		printk(KERN_ERR "Failed to create server LCD\n");
 		return -ENOSPC;
 	};
-
 
 	return;
 }

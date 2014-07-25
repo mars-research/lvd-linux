@@ -111,5 +111,6 @@ int lcd_enter(void);
 int lcd_api_connect(struct lcd_api *api);
 struct lcd_api *lcd_get_api(void);
 int lcd_init_current(void); 
+struct task_struct *lcd_create_as_module(char *name);
 
 #endif /* LCD_LCD_H */

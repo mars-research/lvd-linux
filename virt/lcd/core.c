@@ -110,7 +110,12 @@ int lcd_init_current(void) {
 
 	return 0;
 };
-EXPORT_SYMBOL(lcd_init_current); 
+EXPORT_SYMBOL(lcd_init_current);
+
+struct task_struct *lcd_create_as_module(char *name) {
+	return NULL;
+
+};
 
 static long lcd_dev_ioctl(struct file *filp ,
 			  unsigned int ioctl, unsigned long arg)

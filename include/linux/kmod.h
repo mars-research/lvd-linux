@@ -30,12 +30,16 @@
 
 #ifdef CONFIG_MODULES
 extern char modprobe_path[]; /* for sysctl */
+extern char lcd_modprobe_path[]; /* for sysctl */
 /* modprobe exit status on success, -ve on error.  Return value
  * usually useless though. */
-extern __printf(2, 3)
-int __request_module(bool wait, const char *name, ...);
+extern __printf(3, 4)
+int __do_request_module(bool wait, int for_lcd, const char *name, ...);
+#define __request_module(wait, mod...) __do_request_module(wait,0,mod)
 #define request_module(mod...) __request_module(true, mod)
 #define request_module_nowait(mod...) __request_module(false, mod)
+#define request_lcd_module(mod...) __do_request_module(true,1,mod)
+
 #define try_then_request_module(x, mod...) \
 	((x) ?: (__request_module(true, mod), (x)))
 #else

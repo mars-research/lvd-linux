@@ -56,9 +56,10 @@ static DECLARE_RWSEM(umhelper_sem);
 #ifdef CONFIG_MODULES
 
 /*
-	modprobe_path is set via /proc/sys.
+	modprobe_path and lcd_modprobe_path is set via /proc/sys.
 */
 char modprobe_path[KMOD_PATH_LEN] = "/sbin/modprobe";
+char lcd_modprobe_path[KMOD_PATH_LEN] = "/sbin/lcd-modprobe";
 
 static void free_modprobe_argv(struct subprocess_info *info)
 {
@@ -66,7 +67,7 @@ static void free_modprobe_argv(struct subprocess_info *info)
 	kfree(info->argv);
 }
 
-static int call_modprobe(char *module_name, int wait)
+static int call_modprobe(char *module_name, int wait, int for_lcd)
 {
 	struct subprocess_info *info;
 	static char *envp[] = {
@@ -77,6 +78,7 @@ static int call_modprobe(char *module_name, int wait)
 	};
 
 	char **argv = kmalloc(sizeof(char *[5]), GFP_KERNEL);
+	char *__modprobe_path = for_lcd ? lcd_modprobe_path : modprobe_path;
 	if (!argv)
 		goto out;
 
@@ -84,14 +86,15 @@ static int call_modprobe(char *module_name, int wait)
 	if (!module_name)
 		goto free_argv;
 
-	argv[0] = modprobe_path;
+	argv[0] = __modprobe_path;
 	argv[1] = "-q";
 	argv[2] = "--";
 	argv[3] = module_name;	/* check free_modprobe_argv() */
 	argv[4] = NULL;
 
-	info = call_usermodehelper_setup(modprobe_path, argv, envp, GFP_KERNEL,
-					 NULL, free_modprobe_argv, NULL);
+	info = call_usermodehelper_setup(__modprobe_path, argv, envp, 
+					GFP_KERNEL, NULL, free_modprobe_argv, 
+					NULL);
 	if (!info)
 		goto free_module_name;
 
@@ -106,8 +109,9 @@ out:
 }
 
 /**
- * __request_module - try to load a kernel module
+ * __do_request_module - try to load a kernel module
  * @wait: wait (or not) for the operation to complete
+ * @for_lcd: non-zero if module will be exec'd in lcd
  * @fmt: printf style format string for the name of the module
  * @...: arguments as specified in the format string
  *
@@ -121,7 +125,7 @@ out:
  * If module auto-loading support is disabled then this function
  * becomes a no-operation.
  */
-int __request_module(bool wait, const char *fmt, ...)
+int __do_request_module(bool wait, int for_lcd, const char *fmt, ...)
 {
 	va_list args;
 	char module_name[MODULE_NAME_LEN];
@@ -180,12 +184,13 @@ int __request_module(bool wait, const char *fmt, ...)
 
 	trace_module_request(module_name, wait, _RET_IP_);
 
-	ret = call_modprobe(module_name, wait ? UMH_WAIT_PROC : UMH_WAIT_EXEC);
+	ret = call_modprobe(module_name, wait ? UMH_WAIT_PROC : UMH_WAIT_EXEC,
+		for_lcd);
 
 	atomic_dec(&kmod_concurrent);
 	return ret;
 }
-EXPORT_SYMBOL(__request_module);
+EXPORT_SYMBOL(__do_request_module);
 #endif /* CONFIG_MODULES */
 
 static void call_usermodehelper_freeinfo(struct subprocess_info *info)

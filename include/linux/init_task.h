@@ -15,12 +15,11 @@
 #include <net/net_namespace.h>
 #include <linux/sched/rt.h>
 
-#ifdef CONFIG_LCD
-#define INIT_LCD(tsk)					\
-	.sync_rendezvous = LIST_HEAD_INIT(tsk.sync_rendezvous), \
-        .utcb = NULL,
+#ifdef CONFIG_HAVE_LCD
+#include <lcd-domains/lcd-domains.h>
+#define INIT_LCD .lcd = NULL,
 #else
-#define INIT_LCD(tsk)
+#define INIT_LCD
 #endif
 
 #ifdef CONFIG_SMP
@@ -254,7 +253,7 @@ extern struct task_group root_task_group;
 	},								\
 	.thread_group	= LIST_HEAD_INIT(tsk.thread_group),		\
 	.thread_node	= LIST_HEAD_INIT(init_signals.thread_head),	\
-	.cspace = NULL,                     				\
+	INIT_LCD                                                        \
 	INIT_IDS							\
 	INIT_PERF_EVENTS(tsk)						\
 	INIT_TRACE_IRQFLAGS						\

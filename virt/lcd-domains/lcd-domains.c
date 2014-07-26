@@ -17,6 +17,9 @@
 #include <linux/slab.h>
 #include <asm/uaccess.h>
 #include <asm/pgtable.h>
+#include <linux/kthread.h>
+#include <linux/kmod.h>
+#include <linux/mm.h>
 
 #include <linux/lcd-domains.h>
 #include <asm/lcd-domains-arch.h>
@@ -25,6 +28,36 @@
 
 MODULE_LICENSE("GPL");
 MODULE_DESCRIPTION("LCD driver");
+
+#define LCD_PAGING_MEM_SIZE (4 * (1 << 20)) /* 4 MBs */
+
+#define LCD_ERR(msg...) __lcd_err(__FILE__, __LINE__, msg)
+static inline void __lcd_err(char *file, int lineno, char *fmt, ...)
+{
+	va_list args;
+	printk(KERN_ERR "lcd-domains: %s:%d: error: ", file, lineno);
+	va_start(args, fmt);
+	vprintk(fmt, args);
+	va_end(args);
+}
+#define LCD_MSG(msg...) __lcd_msg(__FILE__, __LINE__, msg)
+static inline void __lcd_msg(char *file, int lineno, char *fmt, ...)
+{
+	va_list args;
+	printk(KERN_ERR "lcd-domains: %s:%d: note: ", file, lineno);
+	va_start(args, fmt);
+	vprintk(fmt, args);
+	va_end(args);
+}
+#define LCD_WARN(msg...) __lcd_warn(__FILE__, __LINE__, msg)
+static inline void __lcd_warn(char *file, int lineno, char *fmt, ...)
+{
+	va_list args;
+	printk(KERN_ERR "lcd-domains: %s:%d: warning: ", file, lineno);
+	va_start(args, fmt);
+	vprintk(fmt, args);
+	va_end(args);
+}
 
 /* Guest Virtual -------------------------------------------------- */
 
@@ -832,7 +865,7 @@ static int lcd_create(struct lcd **lcd_out)
 		r = -ENOMEM;
 		goto fail1;
 	}
-	memset(lcd, 0, sizeof(*lcd));
+	memset(lcd, 0, sizeof(*lcd)); /* sets status to unformed */
 
 	lcd->lcd_arch = lcd_arch_create();
 	if(!lcd->lcd_arch) {
@@ -1030,7 +1063,8 @@ static int lcd_init_blob(struct lcd *lcd, unsigned char *blob,
 	 * guest virtual paging mem).
 	 */
 	r = lcd_arch_set_pc(lcd->lcd_arch, 
-			gpa_add(LCD_ARCH_FREE, paging_mem_size));
+			__gva(gpa_val(gpa_add(LCD_ARCH_FREE, 
+							paging_mem_size))));
 	if (r) {
 		printk(KERN_ERR "lcd_init_blob: error setting prgm counter\n");
 		goto fail4;
@@ -1126,6 +1160,604 @@ fail1:
 	return r;
 }
 
+/* module loading ---------------------------------------- */
+
+struct lcd_module_load {
+	struct module *module;
+	struct completion done;
+};
+
+/**
+ * Walks physical pages in module chunk (init or core), and fires callback
+ * with the values that should be used to either map or unmap the pages.
+ * Because module memory is allocated with vmalloc, there's 
+ * no guarantee the physical pages are contiguous, hence why we need to
+ * do this.
+ *
+ * Code assumes chunk is page aligned, and the entire chunk is a group of
+ * pages.
+ *
+ * (Jithu, I owe you one for implementing this in the original code.)
+ */
+static int lcd_module_mem_walk(struct lcd *lcd, hva_t chunk, unsigned long size,
+			int (*cb)(struct lcd *, hpa_t, gpa_t, gva_t))
+{
+	int r;
+	hpa_t hpa;
+	gpa_t gpa;
+	gva_t gva;
+	unsigned long mapped;
+
+	mapped = 0;
+	while (mapped < size) {
+		/*
+		 * Convert hva to correct hpa
+		 */
+		hpa = __hpa(vmalloc_to_pfn(hva2va(chunk)) << PAGE_SHIFT);
+		/*
+		 * Map gpa = hpa ---> hpa, and gva = hva ---> gpa
+		 *
+		 * (So, overall, we will have hva ---> hpa, inside the lcd.)
+		 *
+		 * XXX: Guest physical address = host physical address, for
+		 * simplicity. This shouldn't overlap with arch-dependent guest
+		 * physical mem, but be aware...
+		 */
+		gpa = __gpa(hpa_val(hpa));
+		gva = __gva(hva_val(chunk));
+		r = cb(lcd, hpa, gpa, gva);
+		if (r)
+			return r;
+
+		mapped += PAGE_SIZE;
+		chunk = hva_add(chunk, PAGE_SIZE);
+	}
+	return 0;
+}
+
+/**
+ * Check module code alignment before we do anything.
+ *
+ * If the base or top is not page aligned, the lcd could peek into
+ * the host kernel.
+ */
+static int lcd_module_check_chunk(hva_t base, unsigned long size)
+{
+	if (hva_val(base) & ~(PAGE_MASK))
+		return -EINVAL;
+	if ((hva_val(base) + size) & ~(PAGE_MASK))
+		return -EINVAL;
+	return 0;
+}	
+
+static int lcd_module_map_page(struct lcd *lcd, hpa_t hpa, gpa_t gpa,
+			gva_t gva)
+{
+	int r;
+
+	r = lcd_arch_ept_map(lcd->lcd_arch, gpa, hpa, 1, 0);
+	if (r) {
+		LCD_ERR("error mapping into ept");
+		return r;
+	}
+	r = lcd_mm_gva_map(lcd, gva, gpa);
+	if (r) {
+		LCD_ERR("error mapping into gv");
+		return r;
+	}
+	return 0;
+}
+
+static int lcd_module_unmap_page(struct lcd *lcd, hpa_t hpa, gpa_t gpa,
+				gva_t gva)
+{
+	int r;
+
+	r = lcd_arch_ept_unmap(lcd->lcd_arch, gpa);
+	if (r) {
+		LCD_ERR("error unmapping gpa in ept");
+		return r;
+	}
+	r = lcd_mm_gva_unmap(lcd, gva);
+	if (r) {
+		LCD_ERR("error unmapping gva in gv");
+		return r;
+	}
+	return 0;
+}
+
+static void lcd_module_addr_free(struct lcd *lcd, struct module *m)
+{
+	int r;
+	unsigned long npages;
+
+	r = lcd_module_mem_walk(lcd, va2hva(m->module_init), 
+				m->init_size, lcd_module_unmap_page);
+	if (r) {
+		LCD_ERR("unmap module init");
+		goto fail;
+	}
+	r = lcd_module_mem_walk(lcd, va2hva(m->module_core), 
+				m->core_size, lcd_module_unmap_page);
+	if (r) {
+		LCD_ERR("unmap module core");
+		goto fail;
+	}
+	npages = (gpa_val(LCD_ARCH_FREE) + LCD_PAGING_MEM_SIZE) >> PAGE_SHIFT; 
+	r = lcd_mm_gva_unmap_range(lcd, __gva(0), npages);
+	if (r) {
+		LCD_ERR("unmap arch-dep and paging mem\n");
+		goto fail;
+	}		
+	lcd_mm_gva_destroy(lcd);
+
+	return;	
+fail:
+	return;
+}
+
+/**
+ * Initializes the lcd's guest virtual address space, and maps
+ * the kernel module m into the lcd's guest physical / virtual
+ * address space.
+ */
+static int lcd_module_load(struct lcd *lcd, struct module *m)
+{
+	int r = -EINVAL;
+	unsigned long npages;
+	/*
+	 * Module Memory Layout
+	 * ====================
+	 *
+	 * The layout below reflects the guest physical *and* virtual memory
+	 * layout with the exception that not all paging memory is mapped in
+	 * in the guest physical address space (for efficiency). 
+	 *
+	 * Guest physical addresses are mapped one-to-one to the same guest 
+	 * virtual addresses.
+	 *
+	 * All allocated guest physical memory--including the arch-dependent 
+	 * region, guest virtual page tables, and the lcd's code--is mapped
+	 * in the guest virtual address space.
+	 *
+	 * The module is mapped to the same guest physical / guest virtual
+	 * address space as the host, to avoid relocating symbols.
+	 *
+	 *                  +---------------------------+
+	 *   module mapped  |                           |
+	 *   somewhere in   :                           :
+	 *    here ------>  :                           :
+	 *                  |                           |
+	 *                  +---------------------------+ 
+	 *                  |       Guest Virtual       | (4 MBs)
+	 *                  |       Paging Memory       |
+	 * LCD_ARCH_FREE--> +---------------------------+
+	 *                  |                           |
+	 *                  :   Reserved Arch Memory    :
+	 *                  |                           |
+	 *                  +---------------------------+ 0x0000 0000 0000 0000
+	 */
+
+	/*
+	 * Check module memory alignment
+	 */
+	r = lcd_module_check_chunk(va2hva(m->module_init), m->init_size);
+	if (r)
+		LCD_WARN("mod init code not page aligned; parts of host kernel will be visible inside lcd");
+
+	r = lcd_module_check_chunk(va2hva(m->module_core), m->core_size);
+	if (r)
+		LCD_WARN("mod core code not page aligned; parts of host kernel will be visible inside lcd");
+
+	/*
+	 * Initialize guest virtual paging
+	 */
+	r = lcd_mm_gva_init(lcd, LCD_ARCH_FREE, 
+			gpa_add(LCD_ARCH_FREE, LCD_PAGING_MEM_SIZE));
+	if (r) {
+		LCD_ERR("setting up gva");
+		goto fail;
+	}
+
+	/*
+	 * Map arch-dependent mem and paging mem in guest virtual
+	 */
+	npages = (gpa_val(LCD_ARCH_FREE) + LCD_PAGING_MEM_SIZE) >> PAGE_SHIFT;
+	r = lcd_mm_gva_map_range(lcd, __gva(0), __gpa(0), npages);
+	if (r) {
+		LCD_ERR("mapping arch-dep code and paging mem");
+		goto fail;
+	}
+
+	/*
+	 * Map module init and core
+	 */
+	r = lcd_module_mem_walk(lcd, va2hva(m->module_init), m->init_size,
+				lcd_module_map_page);
+	if (r) {
+		LCD_ERR("error mapping init code");
+		goto fail;
+	}
+	r = lcd_module_mem_walk(lcd, va2hva(m->module_core), m->core_size,
+				lcd_module_map_page);
+	if (r) {
+		LCD_ERR("error mapping core code");
+		goto fail;
+	}
+	
+	/*
+	 * Initialize program counter to module init
+	 */
+	r = lcd_arch_set_pc(lcd->lcd_arch, 
+			__gva(hva_val(va2hva(m->module_init))));
+	if (r) {
+		LCD_ERR("setting pgm counter");
+		goto fail;
+	}
+
+	return 0;
+
+fail:
+	return r;
+}
+
+/**
+ * Returns when the hypervisor says the kthread should stop.
+ */
+static void lcd_module_kthread_stop(void)
+{
+	set_current_state(TASK_INTERRUPTIBLE);
+	while(!kthread_should_stop()) {
+		schedule();
+		set_current_state(TASK_INTERRUPTIBLE);
+	}
+	set_current_state(TASK_RUNNING);
+}
+
+/**
+ * Tears down lcd, and waits until hypervisor tells it to stop (if
+ * run_ret_val is non-zero). The entire lcd is not destroyed until
+ * the hypervisor tells it to stop, so that it can check the lcd's
+ * status.
+ */
+static int lcd_module_kthread_die(struct lcd *lcd, 
+				struct lcd_module_load *info, int run_ret_val)
+{
+	/*
+	 * XXX: For now, we're not calling the module's exit routine ...
+	 */
+
+	/*
+	 * Unmap module (hypervisor / user is responsible for 
+	 * deleting it)
+	 */
+	lcd_module_addr_free(lcd, info->module);
+	/*
+	 * Set status = LCD_STATUS_DEAD
+	 */
+	lcd->status = LCD_STATUS_DEAD;
+	/*
+	 * If run_ret_val is non-zero, wait until we should stop
+	 */
+	if (run_ret_val)
+		lcd_module_kthread_stop();
+	/*
+	 * Destroy lcd
+	 */
+	lcd_destroy(lcd);
+	kfree(info);
+	/*
+	 * Pass back the return value (to hypervisor)
+	 */
+	return run_ret_val;
+}
+
+static int lcd_module_run_once(struct lcd *lcd)
+{
+	int r;
+	int syscall_id;
+
+	r = lcd_arch_run(lcd->lcd_arch);
+	if (r < 0) {
+		LCD_ERR("running lcd");
+		goto out;
+	}
+
+	switch(r) {
+	case LCD_ARCH_STATUS_PAGE_FAULT:
+		LCD_ERR("page fault");
+		r = -EIO;
+		goto out;
+		break;
+	case LCD_ARCH_STATUS_EXT_INTR:
+		/*
+		 * Continue
+		 */
+		LCD_MSG("got external intr");
+		r = 0;
+		goto out;
+	case LCD_ARCH_STATUS_EPT_FAULT:
+		LCD_ERR("ept fault");
+		r = -EIO;
+		goto out;
+	case LCD_ARCH_STATUS_CR3_ACCESS:
+		LCD_ERR("cr3 access");
+		r = -EIO;
+		goto out;
+	case LCD_ARCH_STATUS_SYSCALL:
+		/*
+		 * Only allow yield syscalls for now
+		 */
+		syscall_id = LCD_ARCH_GET_SYSCALL_NUM(lcd->lcd_arch);
+		LCD_MSG("handling syscall %d", syscall_id);
+		if (syscall_id != LCD_SYSCALL_YIELD) {
+			LCD_ERR("unexpected syscall id %d", syscall_id);
+			r = -EIO;
+			goto out;
+		} else {
+			LCD_MSG("lcd yielded, exiting lcd...");
+			r = 1;
+			goto out;
+		}
+	}
+out:
+	return r;
+}
+
+/**
+ * Suspends kthread until lcd is marked as running.
+ */
+static void lcd_module_kthread_wait(struct lcd *lcd)
+{
+	lcd->status = LCD_STATUS_SUSPENDED;
+
+	set_current_state(TASK_INTERRUPTIBLE);
+	while(lcd->status == LCD_STATUS_SUSPENDED) {
+		schedule();
+		set_current_state(TASK_INTERRUPTIBLE);
+	}
+	set_current_state(TASK_RUNNING);
+}
+
+/**
+ * The `main' function for the kthread that loads and runs a kernel
+ * module in an lcd.
+ */
+static int lcd_module_kthread(void *_info)
+{
+	struct lcd_module_load *info;
+	struct lcd *lcd;
+	int r;
+
+	info = (struct lcd_module_load *)_info;
+
+	/*
+	 * Alloc and init lcd
+	 */
+	r = lcd_create(&lcd);
+	if (r) {
+		LCD_ERR("creating lcd");
+		goto fail1;
+	}
+
+	/*
+	 * Load module in lcd
+	 */
+	r = lcd_module_load(lcd, info->module);
+	if (r) {
+		LCD_ERR("module load");
+		goto fail2;
+	}
+
+	/*
+	 * === past this line, all code should use lcd_module_kthread_die ===
+	 */
+
+	/*
+	 * Copy name and pointer to lcd
+	 */
+	strncpy(lcd->name, info->module->name, MODULE_NAME_LEN);
+	current->lcd = lcd;
+
+	/*
+	 * Complete, and wait until we aren't suspended
+	 */
+	complete(&info->done);
+	lcd_module_kthread_wait(lcd);
+	if (lcd->status != LCD_STATUS_RUNNABLE)
+		return lcd_module_kthread_die(lcd, info, -1);
+
+	/*
+	 * Make sure lcd has valid state
+	 */
+	r = lcd_arch_check(lcd->lcd_arch);
+	if (r)
+		return lcd_module_kthread_die(lcd, info, -1);
+
+	/*
+	 * Run loop, check after each iter if we should stop
+	 */
+	for(;;) {
+		r = lcd_module_run_once(lcd);
+		if (r || kthread_should_stop()) {
+			return lcd_module_kthread_die(lcd, info, r);
+		}
+	}
+	
+	/* unreachabe ... */
+
+fail2:
+	lcd_destroy(lcd);
+fail1:
+	/*
+	 * Complete and wait until we should stop, then pass back ret val
+	 */
+	complete(&info->done);
+	lcd_module_kthread_stop();
+	kfree(info);
+	return r;
+}
+
+struct task_struct * lcd_create_as_module(char *module_name)
+{
+	struct task_struct *t;
+	struct lcd_module_load *info;
+	int ret;
+
+	info = kmalloc(sizeof(*info), GFP_KERNEL);
+	if (!info) {
+		LCD_ERR("alloc info");
+		goto fail;
+	}
+
+	/*
+	 * Load module via usermode helper. This call blocks
+	 * and returns the exit status of lcd-modprobe.
+	 */
+	ret = request_lcd_module(module_name);
+	if (ret < 0) {
+		LCD_ERR("load module");
+		kfree(info);
+		goto fail;
+	}
+
+	/*
+	 * Find loaded module, and inc its ref counter; must hold module mutex
+	 * while finding module.
+	 */
+	mutex_lock(&module_mutex);
+	info->module = find_module(module_name);
+	mutex_unlock(&module_mutex);	
+	if (!info->module) {
+		LCD_ERR("couldn't find module");
+		kfree(info);
+		goto fail;
+	}
+	if(!try_module_get(info->module)) {
+		LCD_ERR("incrementing module ref count");
+		kfree(info);
+		goto fail_module;
+	}
+
+	/*
+	 * Spawn hosting kernel thread, and give it the info.
+	 */
+	init_completion(&info->done);
+	t = kthread_create(lcd_module_kthread, info, module_name);
+	if (!t) {
+		LCD_ERR("spawning kthread");
+		kfree(info);
+		goto fail_module_put;
+	}
+	
+	/*
+	 * kthread owns info after this point ...
+	 */
+
+	/*
+	 * Wake kthread up, and wait until it is ready
+	 */
+	wake_up_process(t);
+	ret = wait_for_completion_interruptible(&info->done);
+	if (ret) {
+		LCD_ERR("errno %d waiting for kthread", ret);
+		goto fail_stop;
+	}
+
+	/*
+	 * Confirm the kernel thread has an lcd and is waiting
+	 *
+	 * XXX: Is this vulnerable to memory barrier problems? The
+	 * documentation for the complete routine states there is
+	 * an implied write memory barrier of some kind.
+	 */
+	if (t->lcd && t->lcd->status == LCD_STATUS_SUSPENDED) {
+		return t;
+	} else {
+		LCD_ERR("lcd failed to init");
+		goto fail_stop;
+	}
+
+fail_stop:
+	ret = kthread_stop(t);
+	LCD_MSG("kthread retval = %d", ret);
+fail_module_put:
+	module_put(info->module);
+fail_module:
+	ret = do_sys_delete_module(module_name, 0, 1);
+	if (ret)
+		LCD_ERR("deleting module");
+fail:
+	return NULL;	
+}
+
+int lcd_run_as_module(struct task_struct *t)
+{
+	/*
+	 * Set lcd's status to runnable, and wake up the kthread
+	 */
+	t->lcd->status = LCD_STATUS_RUNNABLE;
+	wake_up_process(t);
+
+	return 0;
+}
+
+void lcd_destroy_as_module(struct task_struct *t, char *module_name)
+{
+	int ret;
+	struct module *m;
+	
+	/*
+	 * If lcd is suspended, kill it. This happens if we want to
+	 * kill the lcd before it starts running for the first time.
+	 */
+	if (t->lcd->status == LCD_STATUS_SUSPENDED) {
+		t->lcd->status = LCD_STATUS_KILL;
+		wake_up_process(t);
+	}
+
+	/*
+	 * Tell kthread to stop, and delete the module when it's done.
+	 */
+	ret = kthread_stop(t);
+	LCD_ERR("kthread retval = %d", ret);
+
+	mutex_lock(&module_mutex);
+	m = find_module(module_name);
+	mutex_unlock(&module_mutex);
+	if (!m) {
+		LCD_ERR("finding module");
+		return;
+	}
+	module_put(m);
+	ret = do_sys_delete_module(module_name, 0, 1);
+	if (ret)
+		LCD_ERR("deleting module");
+}
+
+/**
+ * Does insmod syscall on behalf of user code call to ioctl.
+ */
+static int lcd_init_module(void __user *_mi)
+{
+	int r;
+	struct lcd_init_module_args mi;
+	
+	/*
+	 * Grab info
+	 */
+	r = copy_from_user(&mi, _mi, sizeof(mi));
+	if (r) {
+		LCD_ERR("copy_from_user");
+		return r;
+	}
+
+	/*
+	 * Init module (for_lcd = 1)
+	 */
+	return do_sys_init_module(mi.module_image, mi.len, 
+				mi.param_values, 1);
+}
 
 /* ioctl -------------------------------------------------- */
 
@@ -1160,6 +1792,9 @@ static long lcd_dev_ioctl(struct file *filp,
 			goto out;
 		}
 		r = 0;
+		goto out;
+	case LCD_INIT_MODULE:
+		r = lcd_init_module((void __user *)arg);
 		goto out;
 	default:
 		return -ENOTTY;
@@ -1223,6 +1858,10 @@ static void __exit lcd_exit(void)
 
 module_init(lcd_init);
 module_exit(lcd_exit);
+
+EXPORT_SYMBOL(lcd_create_as_module);
+EXPORT_SYMBOL(lcd_run_as_module);
+EXPORT_SYMBOL(lcd_destroy_as_module);
 
 /* DEBUGGING ---------------------------------------- */
 

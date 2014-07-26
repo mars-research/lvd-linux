@@ -1470,10 +1470,7 @@ struct task_struct {
 	unsigned int flags;	/* per process flags, defined below */
 	unsigned int ptrace;
 #ifdef CONFIG_HAVE_LCD
-	struct cspace cspace;
-	struct cap_cache cap_cache;
-	struct list_head sync_rendezvous;
-	struct utcb *utcb;
+	struct lcd *lcd;
 #endif
 #ifdef CONFIG_SMP
 	struct llist_node wake_entry;

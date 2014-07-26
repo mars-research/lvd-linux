@@ -6,6 +6,7 @@ config LCD_DOMAINS
        tristate "Light-weight Capability Domains"
        depends on X86_64
        depends on LCD_INTEL
+       select HAVE_LCD
        default y
        ---help---
        Light-weight Capability Domains for Linux.
@@ -16,3 +17,12 @@ config LCD_INTEL
        default y
        ---help---
        Intel-specific code for usings LCDs.
+
+config HAVE_LCD
+       bool
+
+config LCD_MODULE_LOAD_TEST
+       tristate
+       depends on LCD_DOMAINS
+       default m
+

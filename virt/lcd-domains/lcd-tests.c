@@ -565,6 +565,45 @@ fail1:
 	return ret;
 }
 
+static int test10(void)
+{
+	struct task_struct *t;
+	int r;
+
+	/*
+	 * lcd-module-load-test.c is in virt/lcd-domains/
+	 */
+
+	/*
+	 * Create it
+	 */
+	t = lcd_create_as_module("lcd_module_load_test");
+	if (!t) {
+		LCD_ERR("create");
+		goto fail1;
+	}
+	
+	/*
+	 * Run it (once)
+	 */
+	r = lcd_run_as_module(t);
+	if (r) {
+		LCD_ERR("run");
+		goto fail2;
+	}
+
+	/*
+	 * Tear it down
+	 */
+	lcd_destroy_as_module(t, "lcd_module_load_test");
+	return 0;
+
+fail2:
+	lcd_destroy_as_module(t, "lcd_module_load_test");
+fail1:
+	return -1;
+}
+
 static void lcd_tests(void)
 {
 	if (test01())
@@ -584,6 +623,8 @@ static void lcd_tests(void)
 	if (test08())
 		return;
 	if (test09())
+		return;
+	if (test10())
 		return;
 	printk(KERN_ERR "lcd-domains: all tests passed!\n");
 	return;

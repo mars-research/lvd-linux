@@ -98,6 +98,10 @@ static inline void * hva2va(hva_t hva)
 {
 	return (void *)hva_val(hva);
 }
+static inline hva_t va2hva(void *va)
+{
+	return __hva((unsigned long)va);
+}
 static inline hpa_t hva2hpa(hva_t hva)
 {
 	return (hpa_t){ (unsigned long)__pa(hva2va(hva)) };
@@ -325,10 +329,10 @@ int lcd_arch_ept_unmap_range(struct lcd_arch *lcd, gpa_t ga_start,
  */
 int lcd_arch_ept_gpa_to_hpa(struct lcd_arch *vcpu, gpa_t ga, hpa_t *ha_out);
 /**
- * Set the lcd's program counter to the guest physical address
+ * Set the lcd's program counter to the guest virtual address
  * a.
  */
-int lcd_arch_set_pc(struct lcd_arch *vcpu, gpa_t a);
+int lcd_arch_set_pc(struct lcd_arch *vcpu, gva_t a);
 /**
  * Set the lcd's gva root pointer (for x86, %cr3) to the
  * guest physical address a.

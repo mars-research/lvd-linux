@@ -342,7 +342,7 @@ static int test08(void)
 		printk(KERN_ERR "lcd arch: test08 error setting gva root\n");
 		goto fail4;
 	}
-	ret = lcd_arch_set_pc(lcd, __gpa(0));
+	ret = lcd_arch_set_pc(lcd, __gva(0));
 	if (ret) {
 		printk(KERN_ERR "lcd arch: test08 error setting pc\n");
 		goto fail5;

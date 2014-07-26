@@ -1736,7 +1736,7 @@ static void vmx_setup_vmcs_guest_regs(struct lcd_arch *vcpu)
 	 *
 	 * Intel SDM V3 24.4.1, 3.4.5, 26.3.1.2
 	 */
-	vmcs_writel(GUEST_CS_AR_BYTES,   0xD09B);
+	vmcs_writel(GUEST_CS_AR_BYTES,   0xA09B);
 	vmcs_writel(GUEST_DS_AR_BYTES,   0x8093);
 	vmcs_writel(GUEST_ES_AR_BYTES,   0x8093);
 	vmcs_writel(GUEST_FS_AR_BYTES,   0x8093);
@@ -2944,14 +2944,14 @@ int lcd_arch_run(struct lcd_arch *vcpu)
 
 /* LCD RUNTIME ENV -------------------------------------------------- */
 
-int lcd_arch_set_pc(struct lcd_arch *vcpu, gpa_t a)
+int lcd_arch_set_pc(struct lcd_arch *vcpu, gva_t a)
 {
-	vcpu->regs[LCD_ARCH_REGS_RIP] = gpa_val(a);
+	vcpu->regs[LCD_ARCH_REGS_RIP] = gva_val(a);
 	/*
 	 * Must load vmcs to modify it
 	 */
 	vmx_get_cpu(vcpu);
-	vmcs_writel(GUEST_RIP, gpa_val(a));
+	vmcs_writel(GUEST_RIP, gva_val(a));
 	vmx_put_cpu(vcpu);
 	return 0;
 }
@@ -2961,7 +2961,12 @@ int lcd_arch_set_gva_root(struct lcd_arch *vcpu, gpa_t a)
 	u64 cr3_ptr;
 
 	cr3_ptr = gpa_val(a); /* no page write through, etc. ... */
+	/*
+	 * Must load vmcs to modify it
+	 */
+	vmx_get_cpu(vcpu);
 	vmcs_writel(GUEST_CR3, cr3_ptr);
+	vmx_put_cpu(vcpu);
 	return 0;
 }
 
@@ -4137,7 +4142,7 @@ static int vmx_check_guest_seg(struct lcd_arch *vcpu)
 	 */
 	act64 = vmx_getl(vcpu, GUEST_CS_AR_BYTES);
 	if (vmx_entry_has(vcpu, VM_ENTRY_IA32E_MODE) &&
-		vmx_seg_l_mode(act64) && !vmx_seg_db(act64)) {
+		vmx_seg_l_mode(act64) && vmx_seg_db(act64)) {
 		printk(KERN_ERR "lcd vmx: guest cs improper db/l-mode bits\n");
 		return -1;
 	}
@@ -4308,11 +4313,11 @@ static int vmx_check_guest_rip_rflags(struct lcd_arch *vcpu)
 			return -1;
 		}
 	} else {
-		lin_addr_width = (cpuid_eax(0x80000008) >> 7) & 0xff;
+		lin_addr_width = (cpuid_eax(0x80000008) >> 8) & 0xff;
 		sact64 = (signed long)act64;
-		if ((sact64 >> lin_addr_width) != 0 || 
-			(sact64 >> lin_addr_width != -1)) {
-			printk(KERN_ERR "lcd vmx: guest rip exceeds max linear addr\n");
+		if ((sact64 >> lin_addr_width) != 0 &&
+			(sact64 >> lin_addr_width) != -1) {
+			printk(KERN_ERR "lcd vmx: guest rip 0x%llx exceeds max linear addr\n", act64);
 			return -1;
 		}
 	}

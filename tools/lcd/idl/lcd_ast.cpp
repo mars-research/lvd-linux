@@ -12,10 +12,10 @@ ProjectionType::ProjectionType(char * type_name, bool pointer)
   this->pointer_ = pointer;
 }
 
-Scope::Scope(std::vector<char* >* includes, std::vector<Rpc* >* rpc_definitions, std::vector<Message* >* message_definitions,
+Scope::Scope(char* verbatim, std::vector<Rpc* >* rpc_definitions, std::vector<Message* >* message_definitions,
 	     std::map<char* , Projection* >* projection_definitions)
 {
-  this->includes_ = includes;
+  this->verbatim_ = verbatim;
   this->rpc_definitions_ = rpc_definitions;
   this->message_definitions_ = message_definitions;
   this->projection_definitions_ = projection_definitions;

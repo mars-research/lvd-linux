@@ -123,14 +123,14 @@ class Message : public Definition
 
 class Scope 
 {
-  std::vector<char* >* includes_;
+  char* verbatim_;
   std::vector<Rpc *>* rpc_definitions_;
   std::vector<Message *>* message_definitions_;
   std::map<char *, Projection *>* projection_definitions_;
   // believe it is only necessary to store projections in "env" since functions can't be referenced in other functions
   
  public:
-  Scope(std::vector<char* >* includes, std::vector<Rpc* >* rpc_definitions, std::vector<Message* >* message_definitions,
+  Scope(char* verbatim, std::vector<Rpc* >* rpc_definitions, std::vector<Message* >* message_definitions,
 	std::map<char* , Projection* >* projection_definitions);
   
 };

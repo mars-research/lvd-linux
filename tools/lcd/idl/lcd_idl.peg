@@ -9,8 +9,6 @@ include: {{ #include "lcd_ast.h"
 
 rules:
 
-
-
 Identifier	=	i1:IdentStart i2:IdentCont* Spacing {{ 
 			std::ostringstream total;
 			total << (char) (intptr_t) i1.getValue();
@@ -28,7 +26,7 @@ IdentStart	=	[abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ_]
 
 IdentCont	=	IdentStart | [0123456789]
 
-File		=	Spacing i:Include* t:Things* <eof> {{ std::vector<Definition *>* defs = new std::vector<Definition *>;
+File		=	Spacing v:Verbatim t:Things* <eof> {{ std::vector<Definition *>* defs = new std::vector<Definition *>;
 			std::vector<Rpc *>* rpcs = new std::vector<Rpc *>;
 			std::vector<Message *>* messages = new std::vector<Message *>;
 			std::map<char *, Projection *> *env = new std::map<char *, Projection *>;
@@ -68,14 +66,19 @@ File		=	Spacing i:Include* t:Things* <eof> {{ std::vector<Definition *>* defs = 
 				}
 
 			}
-			std::vector<char *>* includes = new std::vector<char *>;
-			for(Value::iterator it2 = i.getValues().begin(); it2 != i.getValues().end(); it2 ++)
+			  value = new Scope((char*) v.getValue(), rpcs, messages, env); }}
+
+Verbatim	=	"verbatim" Spacing "[" contents:VerbatimContent "]" {{ std::ostringstream total;
+			for(Value::iterator it = contents.getValues().begin(); it != contents.getValues().end(); it ++)
 			{
-				const Value & v = *it2;
-				char * c = (char *) v.getValue();
-				includes->push_back(c);
+			const Value &v = *it;
+			char letter = (char) (intptr_t) v.getValue();
+			total << letter;     
 			}
-			value = new Scope(includes, rpcs, messages, env); }}	
+			std::string str = total.str();
+			value = &str[0]; }}
+
+VerbatimContent =	!"]" .		
 
 String		=	<ascii 34> l:any_letter+ <ascii 34> {{
 			std::ostringstream total;
@@ -278,7 +281,7 @@ Type_w_modifier	=	m:Modifier Space+ s:Simple_Type {{
 Type 		=	Type_w_modifier
 			| s:Simple_Type {{ 
 			int* sval = (int*) s.getValue();
-			value = new PrimitiveType(kNone, (PrimType) *sval); }} 
+			value = new PrimitiveType(kNone, (PrimType) *sval); }}
 
 ## just ignore the modules ones, not supporting right now
 

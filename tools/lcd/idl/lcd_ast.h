@@ -4,7 +4,7 @@
 #include <vector>
 #include <map>
 
-enum DefinitionType {kRpc = 1, kModule, kMessage, kProjection};
+enum DefinitionType {kRpc = 1, kModule, kMessage, kProjection, kTypedef};
 enum PrimType { kChar = 1, kShort, kInt, kLong, kLongLong, kCapability};
 enum TypeModifier {kUnsigned = 1, kNone};
 
@@ -45,6 +45,18 @@ class ProjectionType : public Type // complex type
   char * type_name() {return type_name_; }
   bool pointer() { return pointer_; }
   // get full name function? class isn't aware of parent need to pass env
+};
+
+class Typedef : public Definition
+{
+  char* real_type_; // how should this be represented?
+  Type* marshal_type_; // should this be a supported type?
+  char* name_;
+
+ public:
+  Typedef(char* real_type, Type* marshal_type, char* typedef_name);
+  char* name() { return name_; }
+  DefinitionType get_definition_type(){ return kTypedef; }
 };
 
 class Parameter
@@ -126,12 +138,12 @@ class Scope
   char* verbatim_;
   std::vector<Rpc *>* rpc_definitions_;
   std::vector<Message *>* message_definitions_;
-  std::map<char *, Projection *>* projection_definitions_;
+  std::map<char *, Definition *>* symbol_table__;
   // believe it is only necessary to store projections in "env" since functions can't be referenced in other functions
   
  public:
   Scope(char* verbatim, std::vector<Rpc* >* rpc_definitions, std::vector<Message* >* message_definitions,
-	std::map<char* , Projection* >* projection_definitions);
+	std::map<char* , Definition* >* symbol_table);
   
 };
 

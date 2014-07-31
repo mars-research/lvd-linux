@@ -26,10 +26,10 @@ IdentStart	=	[abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ_]
 
 IdentCont	=	IdentStart | [0123456789]
 
-File		=	Spacing v:Verbatim t:Things* <eof> {{ std::vector<Definition *>* defs = new std::vector<Definition *>;
+File		=	Spacing v:Verbatim? t:Things* <eof> {{ std::vector<Definition *>* defs = new std::vector<Definition *>;
 			std::vector<Rpc *>* rpcs = new std::vector<Rpc *>;
 			std::vector<Message *>* messages = new std::vector<Message *>;
-			std::map<char *, Projection *> *env = new std::map<char *, Projection *>;
+			std::map<char *, Definition*> *env = new std::map<char *, Definition *>;
 			for(Value::iterator it = t.getValues().begin(); it != t.getValues().end(); it ++)
 			{
 				const Value & v = *it;
@@ -56,7 +56,12 @@ File		=	Spacing v:Verbatim t:Things* <eof> {{ std::vector<Definition *>* defs = 
 				case kProjection:
 				{
 				Projection* proj = reinterpret_cast<Projection *>(ds);
-				env->insert(std::pair<char *, Projection *>(proj->name(), proj));
+				env->insert(std::pair<char *, Definition *>(proj->name(), ds));
+				}
+				case kTypedef:
+				{
+				Typedef* td = reinterpret_cast<Typedef*>(ds);
+				env->insert(std::pair<char*, Definition*>(td->name(), ds));
 				}
 				break;
 				default:
@@ -68,7 +73,10 @@ File		=	Spacing v:Verbatim t:Things* <eof> {{ std::vector<Definition *>* defs = 
 			}
 			  value = new Scope((char*) v.getValue(), rpcs, messages, env); }}
 
-Verbatim	=	"verbatim" Spacing "[" contents:VerbatimContent "]" {{ std::ostringstream total;
+Typedef		=	 "typedef" Spacing "<" Spacing rt:RealType Spacing "," Spacing mt:Type Spacing ">" Spacing id:Identifier Spacing {{ 
+			 value = new Typedef((char*) rt.getValue(), (Type*) mt.getValue(), (char*) id.getValue());}}
+
+Verbatim	=	 "verbatim" Spacing "[" contents:VerbatimContent "]" {{ std::ostringstream total;
 			for(Value::iterator it = contents.getValues().begin(); it != contents.getValues().end(); it ++)
 			{
 			const Value &v = *it;
@@ -78,7 +86,14 @@ Verbatim	=	"verbatim" Spacing "[" contents:VerbatimContent "]" {{ std::ostringst
 			std::string str = total.str();
 			value = &str[0]; }}
 
-VerbatimContent =	!"]" .		
+VerbatimContent =	!"]" .
+
+RealType	=	fp:Identifier? Spacing sp:Identifier {{ //temporary solution
+			std::ostringstream total;
+			total << fp.getValue() << ' ' << sp.getValue();
+			std::string str = total.str();
+			value = &str[0];
+			}}		
 
 String		=	<ascii 34> l:any_letter+ <ascii 34> {{
 			std::ostringstream total;
@@ -116,7 +131,7 @@ String		=	<ascii 34> l:any_letter+ <ascii 34> {{
 
 any_letter	=	[_.,/?<>'; =:%`!@#$^&*()-+{}|\\ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789]
 
-Things		=	Rpc | Message | Projection
+Things		=	Typedef | Rpc | Message | Projection
 
 Include		=	"#include" Space+ "<" Spacing f:Identifier Spacing ">" Spacing {{
 			std::ostringstream total;

@@ -1,0 +1,192 @@
+#! /bin/bash
+# Shell script to run test suite.
+
+set -e
+
+usage()
+{
+    echo "Usage: tests/runtests [-v] [-v] [--valgrind] [test]"
+    echo " -v (or --verbose) prints each test as it is run"
+    echo " -vv (very verbose) traces test execution"
+    echo " --valgrind runs the test programs using the valgrind memory checker"
+    echo "The TEST_ENDIAN and TEST_BITS variables can be used to limit which"
+    echo "endianess (le, be) and bitness (32, 64) will be tested"
+    exit
+}
+
+while [ $# != 0 ]; do
+    case "$1" in
+    -v)
+        if [ -z "$VERBOSE" ]; then
+          VERBOSE=1
+        else
+          EXTRA_ARGS=-x
+        fi
+        ;;
+    -vv)
+        VERBOSE=1
+        EXTRA_ARGS=-x
+        ;;
+    --valgrind)
+        VALGRIND=1
+        ;;
+    -h|--help|-*)
+        usage
+        ;;
+    *)
+        [ -n "$TEST" ] && usage
+        TEST="$1"
+        ;;
+    esac
+    shift
+done
+
+# Creates a temporary file and exports the name of the file to
+# the provided argument.  Exits on error.
+# 
+# Usage: create_tempfile TEMPFILE
+#
+create_tempfile()
+{
+    if test $# = 0
+    then
+       echo "No argument passed to create_tempfile()"
+       exit 1
+    fi
+
+    if [ -x /bin/tempfile ]
+    then
+        # Debian 
+        export $1="`tempfile`"
+    elif [ -x  /bin/mktemp ]
+    then
+        # RedHat et. al.
+        export $1="`mktemp /tmp/modtest.XXXXXX`"
+    else
+        echo "Don't know how to make a temporary file on this "
+        echo "system, sorry."
+        exit 1
+    fi
+
+    if [ $? -ne 0 ]
+    then
+        echo "Can't create temporary file."
+        exit 1
+    fi
+}
+export -f create_tempfile
+
+if [ ! -e "tests/build" ]; then
+    echo Making build directory for tests
+    mkdir tests/build
+fi
+if [ ! -e "tests/tmp" ]; then
+    echo Making temporary directory for tests
+    mkdir tests/tmp
+fi
+
+: ${TEST_ENDIAN:=-be -le}
+_tmp=
+for e in $TEST_ENDIAN; do
+	case $e in
+	-be | -le)
+		_tmp="$_tmp $e"
+		;;
+	be | le)
+		_tmp="$_tmp -$e"
+		;;
+	*)
+		echo "Unknown endian: $e, valid values are \"be\" and \"le\"" >&2
+		exit 1
+	esac
+done
+TEST_ENDIAN="$_tmp"
+export TEST_ENDIAN
+
+: ${TEST_BITS:=32 64}
+for b in $TEST_BITS; do
+	case $b in
+	32 | 64)
+		;;
+	*)
+		echo "Unknown word size: $b, valid values are 32 and 64" >&2
+		exit 1
+	esac
+done
+export TEST_BITS
+
+for config in --enable-zlib --disable-zlib; do
+    echo Building with $config...
+
+    cd tests/build
+    ../../configure $config CFLAGS="-DJUST_TESTING -g -Wall" >/dev/null
+    make clean >/dev/null
+    # ismod.static doesn't build with -DJUST_TESTING and --enable-zlib
+    make insmod.static >/dev/null 2>&1 || touch insmod.static
+    make all >/dev/null
+    cd ../..
+
+    echo Testing with $config...
+    if grep -q CONFIG_USE_ZLIB=1 tests/build/Makefile; then
+	CONFIG_HAVE_ZLIB=1
+	export CONFIG_HAVE_ZLIB
+    else
+	unset CONFIG_HAVE_ZLIB
+    fi
+
+    # Create endianness links
+    case `file tests/build/modprobe` in
+	*MSB*) ENDIAN=be;;
+	*LSB*) ENDIAN=le;;
+	*) echo Unknown endian! >&2; exit 1;;
+    esac
+    ln -sfn 64-$ENDIAN tests/data/64
+    ln -sfn 32-$ENDIAN tests/data/32
+
+    # Make them run the valgrind wrappers if requested.
+    if [ -n "$VALGRIND" ]; then
+	PATH=`pwd`/tests/valgrind:$PATH
+    else
+	PATH=`pwd`/tests/build:$PATH
+    fi
+
+    # By default, we want to look like a new kernel.
+    MODTEST_UNAME=2.6.27
+    export MODTEST_UNAME
+
+    MODTEST_OVERRIDE_ROOT=tests/tmp
+    export MODTEST_OVERRIDE_ROOT
+
+    if [ -n "$TEST" ]; then DOING=0; else DOING=1; fi
+
+    for dir in `find tests/test-* -type d | sort`
+      do
+
+      if [ -z "$VERBOSE" ]; then
+	  echo -n Running tests for $dir.
+      else
+	  echo Running tests for $dir.
+      fi
+      shopt -s nullglob
+      for f in $dir/[0-9]*.sh; do
+	  if [ $DOING -eq 0 ]; then
+	      case "$f" in *$TEST*) DOING=1;; *) continue;; esac
+	  fi
+
+	  rm -rf tests/tmp/*
+	  if sh -e $EXTRA_ARGS $f; then
+	      if [ -z "$VERBOSE" ]; then
+		  echo -n .
+	      else
+		  echo Tests $f succeeded.
+	      fi
+	  else
+	      echo Test for $f failed.
+	      exit 1
+	  fi
+      done
+      if [ -z "$VERBOSE" ]; then echo; fi
+    done
+done
+
+exit 0

@@ -1,0 +1,108 @@
+module-init-tools - Linux userspace module loading utilities
+------------------------------------------------------------
+
+============================================================
+
+LCD Project Specifics:
+
+Modprobe (modprobe.c) and insmod (insmod.c) have been patched to use the
+LCD module loading interface. Unless you change the path where the user mode
+helper expects to find the patched modprobe (the expected path is defined
+in kernel/kmod.c), you should use the following configuration:
+
+./configure --prefix=/ --program-prefix=lcd-
+
+If you do this on the emulab machines, the installation of the manpages will
+most likely fail because /share is mounted read only, but overall things will
+still work.
+
+============================================================
+
+
+NOTE: module-init-tools is due to be replaced with a new utility, which will
+      be based upon the "libkmod" (kmod) codebase, unified with this one. To
+      join in the fun, see #kmod on Freenode, and the mailing list. Consider
+      progress of this new project before embarking on new development here.
+      Once the replacement is ready, the existing codebase will be obsolete.
+
+Handy Resources:
+	- Bugs: Please send email to list
+	- Git:  git://git.kernel.org/pub/scm/utils/kernel/module-init-tools/module-init-tools.git
+	- IRC:  irc.freenode.org/#module-init-tools
+	- Mail: linux-modules@vger.kernel.org
+	- Web:  http://modules.wiki.kernel.org/
+
+The module-init-tools are used by modern 2.6 series Linux systems to provide
+userspace-side assistance in loading kernel modules and their dependencies.
+Originally written to replace the older "modutils", the utilities include
+the "modprobe" (load modules and their dependencies), "insmod" (load just
+a single module), "modinfo" (retrieve module information), and other related
+module management commands. These are intended to be relatively lightweight
+in their design, since 2.6 series kernels do much of the work internally.
+
+You will find documentation within the man pages and in this README file,
+as well as some hints on development within the HACKING file. You are
+encouraged to get involved by signing up to the linux-modules@vger.kernel.org
+project mailing list, and posting patches (git pull requests are welcome).
+You can also find further information, including the address of the mailing
+list, this git repository, and so forth on the module-init-tools wiki.
+
+Development takes place against the latest upstream Linux kernels (2.6.33
+as of this writing, though kernel development moves quickly). Backward
+compatibility is generally attempted, but forward compatibility (i.e. the
+ability for a specific release of module-init-tools to work against data
+files created by a later version as yet unreleased version) is not. In
+particular, the generated data files within /lib/modules/<kernel version>
+must not be assumed to have any particular format, nor should they be
+parsed be any other tools. There is a specific "modinfo" utility intended
+for the purposes of providing the information stored within those files.
+
+Recent Changes:
+	- There is no backwards compatibility for pre-2.6 series kernels. If
+	  you intend to use an older kernel (wherein the module utilities
+	  must perform various linking stages in userspace), use an older
+	  tool such as provided in the "modutils" legacy kernel package.
+
+	- Explicit locking of kernel modules is no longer being performed at
+	  load time (the existing implementation required a writeable mount
+	  in /lib/modules that is by no means assured - an alternative of
+	  using SYSV locks was experimented with but deemed unnecessary).
+	  The kernel will handle one modprobe instance racing with another
+	  by denying the load and returning an error message.
+
+Work in progress:
+	- We are working on soft-dependency support that will allow modules
+	  to provide hints as to dependencies that may not be explicit.
+
+Requirements:
+	- A 2.6 series Linux kernel with sysfs, procfs, and loadable module
+	  support enabled in the kernel configuration. It is also required
+	  that sysfs and procfs be mounted in their usual /proc and /sys
+	  locations in order for certain functionality to be provided.
+
+	- Module remove support must be enabled if removing is required. Yo
+	  can also enable other options such as forced removal, but this is
+	  really a bad idea for anything other than development.
+
+	- Module versioning (MODVERSIONS) must be enabled if you would
+	  like to try to use modules from one kernel with another, similar
+	  one without the kernel complaining loudly at the difference.
+
+Quickstart:
+	- Make sure you have appropriate development tools (gcc, GNU autotools,
+	  docbook2man, etc. Some distributions may require optional packages
+	  for a static version of glibc, as an example).
+
+	- To begin hacking on module-init-tools, you can do the following:
+
+	1). aclocal -I m4 && automake --add-missing --copy && autoconf
+	    (or run "autoreconf" from an existing setup)
+	2). ./configure
+	    (optionally specify "--prefix" or "--mandir" for non /usr/local)
+	3). make
+	4). make install
+	5). depmod
+	    (to update /lib/modules/<kernel version> for the latest release)
+
+Please direct any comment/question to the linux-modules mailing list at:
+	linux-modules@vger.kernel.org

@@ -1,0 +1,32 @@
+Notes for Hackers
+-----------------
+
+Here are some quick notes, that may or may not evolve into something more
+substantial over time. Development is preferably done via git merges.
+
+* git trees don't contain pre-built config/Makefiles/etc. You'll need to
+  run the following (in order):
+
+      aclocal -I m4
+      automake --add-missing --copy
+      autoconf
+
+  You can also run "autoreconf -i" to perform these three stages.
+
+* Regression tests can be run as follows (try --help for more details):
+
+      tests/runtests
+
+* Documentation is in SGML source in doc/ so don't edit *.8, *.5 directly.
+
+Prior to a new release:
+
+	Update configure.ac with new version
+	commit git tree to appropriate branch (dev/master/topic)
+	perform a final tests/runtests on the tree
+	push tree up to git.kernel.org
+	prep tree for tarball (git archive)
+	sign tree with GPG and save signature
+	push archive up to kernel.org
+
+Jon Masters <jcm@jonmasters.org>

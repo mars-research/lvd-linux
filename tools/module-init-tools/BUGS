@@ -1,0 +1,18 @@
+Some BUGs, grouped by the individual utilty
+-------------------------------------------
+
+NOTE: There is an official Bugzilla on bugzilla.kernel.org. Please do not
+      add to this file - file a bug on that website instead (one line URL):
+      https://bugzilla.kernel.org/enter_bug.cgi?component=module-init-tools
+						&product=Other
+      (Or on buzilla.kernel.org click "New", "Other", "module-init-tools")
+
+modprobe
+--------
+	* BZ: https://bugzilla.kernel.org/show_bug.cgi?id=16044
+	* BUG: We don't output deps correctly when calling --show-depends (-D)
+	* REASON: show-depends sets a variety of individual flags but there's
+	  no easy way for handle_module->insmod to know the difference between
+	  these options or an actual "-D", so we skip out too early if we hit
+	  command entries when processing a module. RHEL has a temp fix that
+	  it will re-read the environment (which does have -D set) in insmod.

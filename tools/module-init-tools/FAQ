@@ -1,0 +1,13 @@
+Frequently Asked Module User Questions
+--------------------------------------
+
+Q) Where should I report bugs?
+A) Please post to the linux-modules@vger.kernel.org mailing list, along with
+   a description of how to reproduce. Copy Jon Masters <jcm@jonmasters.org>.
+
+Q) I get "/usr/bin/ld: cannot find -lc"
+A) You need to install a development package which contains libc.a.
+   For example, on Fedora systems, you would type "yum install glibc-static".
+
+Q) I'm having trouble inserting out-of-tree modules
+A) See kernel source tree documentation: Documentation/kbuild/modules.txt

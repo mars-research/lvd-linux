@@ -1,0 +1,35 @@
+Some TODOs, grouped by the individual utilty
+--------------------------------------------
+
+build
+-----
+	* Fix "make dist" to build documentation.
+	* Fix "make distcheck" at the same time.
+
+global
+------
+	* Unify implementations of grab_module into one (depmod/modinfo).
+
+depmod
+------
+	* Fix use of special list handling (e.g. add_search) to use lists.
+	* Fix command line path and kernel version handling to detect files
+	  (fix warning on absolute paths, use file access to verify file).
+	* Convert functions do_module et al to use list functions as possible.
+	* Rework symbol version checks on load_symbols into generic function.
+	* Kill off the "map" files. They aren't really needed any more.
+
+modprobe
+--------
+	* Default to only removing requested module
+	  (make removal of unused dependencies configurable to avoid races)
+	* Clean up module removal in main to use do_modprobe properly (maybe)
+	* Fix use of special list handling (e.g. aliases) to use lists.
+	* Use modprobe_flags_t for use_binary_indexes
+	* Unify read_depends_file and read_depends (binary indexes support)
+	* Fix naming of alias handling functions and parameter order
+	  (make it the same as the other config option param ordering)
+	* Functions like read_attribute should be read_sysfs_attribute
+	* Kill off some of the legacy options.
+	* Fix grab_elf_file_fd error handling for test-module/10alias.sh.
+	* Enforce use of *.conf files in /etc/modprobe.d as filename extension.

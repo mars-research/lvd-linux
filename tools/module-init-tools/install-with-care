@@ -1,0 +1,30 @@
+#! /bin/sh
+
+echo install-with-care "$@"
+
+# Final arg is dest.
+eval DEST=\$$#
+
+case $(echo $DEST | tr -s / /) in
+    /sbin/insmod.static) ;;# This didn't exist before, OK.
+    /sbin/insmod|/sbin/lsmod|/sbin/modprobe|/sbin/rmmod|/sbin/depmod)
+	if [ -f $DEST ] && [ -f $DEST.old ]; then
+	    echo Refusing to install $DEST, remove $DEST.old first. >&2
+	    echo Note: $DEST requires kernel version 2.5.48 or above.
+	    if [ $DEST = /sbin/modprobe ]; then
+cat << EOF >&2
+
+Note: generate-modprobe.conf requires /sbin/modprobe.old.
+(i.e. if you need to run it, do so before removing modprobe.old).
+
+EOF
+	    fi
+	    exit 1
+	fi
+	;;
+    /bin/lsmod) # If we're installing into /bin, make /sbin/lsmod link.
+	ln -sf ../bin/lsmod /sbin/lsmod
+	;;
+esac
+
+exec install "$@"

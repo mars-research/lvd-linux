@@ -23,7 +23,8 @@ struct manufacturer_interface {
 	void (*free_automobile)(struct automobile *a);
 };
 
-int dealer_register_manufacturer(struct server_interface *s);
+int dealer_register_manufacturer(struct manufacturer_interface *s);
 struct automobile * dealer_buy_car(void);
+void dealer_return_car(struct automobile *a);
 
 #endif

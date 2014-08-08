@@ -39,3 +39,9 @@ config LCD_CS_SERVER
        default m
        ---help---
        Server module for the LCD client-server test
+
+config RUN_IN_LCD
+       bool "Run client-server in LCD"
+       default false
+       ---help---
+       Set to true to run client and server in lcd.

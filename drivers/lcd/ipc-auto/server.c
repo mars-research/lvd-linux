@@ -19,6 +19,7 @@
 
 #include <lcd/lcd.h>
 #include <lcd/cap.h>
+#include "common.h"
 
 MODULE_LICENSE("GPL");
 MODULE_DESCRIPTION("LCD client-server test server");

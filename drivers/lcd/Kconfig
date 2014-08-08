@@ -17,31 +17,56 @@ config LCD_PING_PONG_SENDER
        ---help---
        Sender for the ping-pong LCD IPC test
 
-config LCD_CS_INIT
-       tristate "LCD client-server test (init module)"
-       depends on LCD_CS_CLIENT
-       depends on LCD_CS_SERVER
-       depends on LCD
-       default m
-       ---help---
-       Init code to start the LCD client-server test
+# config LCD_CS_INIT
+#        tristate "LCD client-server test (init module)"
+#        depends on LCD_CS_CLIENT
+#        depends on LCD_CS_SERVER
+#        depends on LCD
+#        default m
+#        ---help---
+#        Init code to start the LCD client-server test
 
-config LCD_CS_CLIENT
-       tristate "LCD client-server test (client)"
-       depends on LCD
-       default m
-       ---help---
-       Client module for the LCD client-server test
+# config LCD_CS_CLIENT
+#        tristate "LCD client-server test (client)"
+#        depends on LCD
+#        default m
+#        ---help---
+#        Client module for the LCD client-server test
 
-config LCD_CS_SERVER
-       tristate "LCD client-server test (server)"
-       depends on LCD
+# config LCD_CS_SERVER
+#        tristate "LCD client-server test (server)"
+#        depends on LCD
+#        default m
+#        ---help---
+#        Server module for the LCD client-server test
+
+config LCD_IPC_AUTO
+       bool "Build automobile ipc test"
+       
+config LCD_AUTO_CUSTOMER
+       tristate "LCD automobile ipc test (customer)"
+       depends on LCD_IPC_AUTO
        default m
        ---help---
-       Server module for the LCD client-server test
+       Auto customer module for ipc test
+
+config LCD_AUTO_DEALER
+       tristate "LCD automobile ipc test (dealer)"
+       depends on LCD_IPC_AUTO
+       default m
+       ---help---
+       Auto dealer module for ipc test
+
+config LCD_AUTO_MANUFACTURER
+       tristate "LCD automobile ipc test (manufacturer)"
+       depends on LCD_IPC_AUTO
+       default m
+       ---help---
+       Auto manufacturer module for ipc test
 
 config RUN_IN_LCD
-       bool "Run client-server in LCD"
+       bool "Run automobile ipc test modules in LCDs"
+       depends on LCD_IPC_AUTO
        default false
        ---help---
-       Set to true to run client and server in lcd.
+       Set to true to run ipc auto modules in lcds.

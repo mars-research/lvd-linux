@@ -1,2 +1,2 @@
-obj-y                     += ipc-client-server/
-obj-y                     += ipc-ping-pong/
+obj-$(LCD_IPC_AUTO)       += ipc-auto/
+#obj-y                     += ipc-ping-pong/

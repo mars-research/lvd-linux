@@ -8,7 +8,7 @@
 static inline void __au_err(char *file, int lineno, char *fmt, ...)
 {
 	va_list args;
-	pr_err("cs: %s:%d: error: ", file, lineno);
+	pr_err("lcd-ipc-auto: %s:%d: error: ", file, lineno);
 	va_start(args, fmt);
 	vprintk(fmt, args);
 	va_end(args);
@@ -17,7 +17,7 @@ static inline void __au_err(char *file, int lineno, char *fmt, ...)
 static inline void __au_msg(char *file, int lineno, char *fmt, ...)
 {
 	va_list args;
-	pr_info("cs: %s:%d: note: ", file, lineno);
+	pr_info("lcd-ipc-auto: %s:%d: note: ", file, lineno);
 	va_start(args, fmt);
 	vprintk(fmt, args);
 	va_end(args);
@@ -26,7 +26,7 @@ static inline void __au_msg(char *file, int lineno, char *fmt, ...)
 static inline void __au_warn(char *file, int lineno, char *fmt, ...)
 {
 	va_list args;
-	pr_warn("cs: %s:%d: warning: ", file, lineno);
+	pr_warn("lcd-ipc-auto: %s:%d: warning: ", file, lineno);
 	va_start(args, fmt);
 	vprintk(fmt, args);
 	va_end(args);

@@ -39,7 +39,7 @@ static int __init customer_init(void)
 #ifdef CONFIG_RUN_IN_LCD
 void customer_exit(void)
 #else
-static void __init customer_exit(void)
+static void __exit customer_exit(void)
 #endif
 {
 	AU_MSG("customer exited");

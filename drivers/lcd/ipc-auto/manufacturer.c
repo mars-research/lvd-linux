@@ -25,6 +25,7 @@ static struct engine * mk_engine(int cylinders)
 	e = kmalloc(sizeof(*e), GFP_KERNEL);
 	if (!e)
 		AU_ERR("no memory for engine");
+	e->cylinders = 8;
 	return e;
 }
 
@@ -96,7 +97,7 @@ static int __init manufacturer_init(void)
 #ifdef CONFIG_RUN_IN_LCD
 void manufacturer_exit(void)
 #else
-static void __init manufacturer_exit(void)
+static void __exit manufacturer_exit(void)
 #endif
 {
 	AU_MSG("manufacturer exited");

@@ -74,7 +74,7 @@ static int __init dealer_init(void)
 #ifdef CONFIG_RUN_IN_LCD
 void dealer_exit(void)
 #else
-static void __init dealer_exit(void)
+static void __exit dealer_exit(void)
 #endif
 {
 	AU_MSG("dealer exited");

@@ -3,6 +3,8 @@
  * Copyright: University of Utah
  *
  */
+#ifndef LCD_IPC_AUTO_COMMON_H
+#define LCD_IPC_AUTO_COMMON_H
 
 #define AU_ERR(msg...) __au_err(__FILE__, __LINE__, msg)
 static inline void __au_err(char *file, int lineno, char *fmt, ...)
@@ -31,3 +33,5 @@ static inline void __au_warn(char *file, int lineno, char *fmt, ...)
 	vprintk(fmt, args);
 	va_end(args);
 }
+
+#endif /* LCD_IPC_AUTO_COMMON_H */

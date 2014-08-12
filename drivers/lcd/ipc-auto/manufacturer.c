@@ -79,7 +79,7 @@ static struct manufacturer_interface mi = {
 };
 
 #ifdef CONFIG_RUN_IN_LCD
-int manufacturer_init(void)
+int __manufacturer_init(void)
 #else
 static int __init manufacturer_init(void)
 #endif
@@ -95,7 +95,7 @@ static int __init manufacturer_init(void)
 }
 
 #ifdef CONFIG_RUN_IN_LCD
-void manufacturer_exit(void)
+void __manufacturer_exit(void)
 #else
 static void __exit manufacturer_exit(void)
 #endif

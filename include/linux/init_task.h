@@ -15,9 +15,9 @@
 #include <net/net_namespace.h>
 #include <linux/sched/rt.h>
 
-#ifdef CONFIG_HAVE_LCD
-#include <lcd-domains/lcd-domains.h>
-#define INIT_LCD .lcd = NULL,
+#ifdef CONFIG_LCD_PROTOTYPE
+#define INIT_LCD(tsk) \
+	.lcd = NULL,  
 #else
 #define INIT_LCD
 #endif
@@ -201,6 +201,7 @@ extern struct task_group root_task_group;
 	.usage		= ATOMIC_INIT(2),				\
 	.flags		= PF_KTHREAD,					\
 	.prio		= MAX_PRIO-20,					\
+	INIT_LCD(tsk)                                                   \
 	.static_prio	= MAX_PRIO-20,					\
 	.normal_prio	= MAX_PRIO-20,					\
 	.policy		= SCHED_NORMAL,					\

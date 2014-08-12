@@ -1,0 +1,4 @@
+obj-$(CONFIG_LCD_PROTOTYPE_TEST_CUSTOMER)     += customer.o
+obj-$(CONFIG_LCD_PROTOTYPE_TEST_DEALER)       += dealer.o
+obj-$(CONFIG_LCD_PROTOTYPE_TEST_MANUFACTURER) += manufacturer.o
+

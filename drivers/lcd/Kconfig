@@ -2,17 +2,23 @@
 # LCD modules configuration
 #
 
+config LCD_DRIVERS
+       bool "Misc drivers for testing LCDs"
+       default y
+       ---help---
+       Misc drivers for testing Lightweight cap domains.
+       
 config LCD_PING_PONG_RECEIVER
        tristate "LCD ping-pong IPC test (receiver)"
        depends on LCD_PING_PONG_SENDER
-       depends on LCD
+       depends on LCD_DRIVERS
        default m
        ---help---
        Receiver for the ping-pong LCD IPC test
 
 config LCD_PING_PONG_SENDER
        tristate "LCD ping-pong IPC test (sender)"
-       depends on LCD
+       depends on LCD_DRIVERS
        default m
        ---help---
        Sender for the ping-pong LCD IPC test
@@ -42,7 +48,8 @@ config LCD_PING_PONG_SENDER
 
 config LCD_IPC_AUTO
        bool "Build automobile ipc test"
-       
+       depends on LCD_DRIVERS
+
 config LCD_AUTO_CUSTOMER
        tristate "LCD automobile ipc test (customer)"
        depends on LCD_IPC_AUTO

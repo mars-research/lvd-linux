@@ -17,7 +17,7 @@
 MODULE_LICENSE("GPL");
 MODULE_DESCRIPTION("Auto buyer (LCD test)");
 
-#if CONFIG_RUN_IN_LCD
+#ifdef CONFIG_RUN_IN_LCD
 int customer_init(void)
 #else
 static int __init customer_init(void)
@@ -36,7 +36,7 @@ static int __init customer_init(void)
 	return 0;
 }
 
-#if CONFIG_RUN_IN_LCD
+#ifdef CONFIG_RUN_IN_LCD
 void customer_exit(void)
 #else
 static void __init customer_exit(void)
@@ -45,7 +45,7 @@ static void __init customer_exit(void)
 	AU_MSG("customer exited");
 }
 
-#if !CONFIG_RUN_IN_LCD
+#ifndef CONFIG_RUN_IN_LCD
 module_init(customer_init);
 module_exit(customer_exit);
 #endif

@@ -71,13 +71,13 @@ static void free_automobile(struct automobile *a)
 }
 
 static struct manufacturer_interface mi = {
-	.mk_engine = mk_engine;
-	.mk_automobile = mk_automobile;
-	.free_engine = free_engine;
-	.free_automobile = free_automobile;
+	.mk_engine = mk_engine,
+	.mk_automobile = mk_automobile,
+	.free_engine = free_engine,
+	.free_automobile = free_automobile,
 };
 
-#if CONFIG_RUN_IN_LCD
+#ifdef CONFIG_RUN_IN_LCD
 int manufacturer_init(void)
 #else
 static int __init manufacturer_init(void)
@@ -93,7 +93,7 @@ static int __init manufacturer_init(void)
 	return 0;
 }
 
-#if CONFIG_RUN_IN_LCD
+#ifdef CONFIG_RUN_IN_LCD
 void manufacturer_exit(void)
 #else
 static void __init manufacturer_exit(void)
@@ -102,7 +102,7 @@ static void __init manufacturer_exit(void)
 	AU_MSG("manufacturer exited");
 }
 
-#if !CONFIG_RUN_IN_LCD
+#ifndef CONFIG_RUN_IN_LCD
 module_init(manufacturer_init);
 module_exit(manufacturer_exit);
 #endif

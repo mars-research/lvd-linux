@@ -5,9 +5,6 @@
 config LCD_PROTOTYPE
        bool "LCD Prototype"
        default y
-       select LCD_PROTOTYPE_API
-       select LCD_PROTOTYPE_LIBLCD
-       select LCD_PROTOTYPE_TEST
        ---help---
        Prototype for Lightweight Capability Domains system.
 
@@ -19,15 +16,15 @@ config LCD_PROTOTYPE_API
        The kernel prototype for the LCD system.
 
 config LCD_PROTOTYPE_LIBLCD
-       bool "LCD Prototype LibLCD"
-       default y
+       tristate "LCD Prototype LibLCD"
+       default m
        depends on LCD_PROTOTYPE
        ---help---
        Routines used by test modules.
 
 config LCD_PROTOTYPE_TEST
-       bool "LCD Prototype Test"
-       default y
+       tristate "LCD Prototype Test"
+       default m
        depends on LCD_PROTOTYPE_API
        depends on LCD_PROTOTYPE_LIBLCD
        select LCD_PROTOTYPE_TEST_CUSTOMER

@@ -16,4 +16,5 @@ static int api_tests(void)
 	if (test01())
 		return -1;
 	LCD_MSG("all api tests passed!");
+	return 0;
 }

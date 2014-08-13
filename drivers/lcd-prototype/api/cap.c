@@ -9,7 +9,6 @@
 int lcd_mk_cspace(struct cspace **cspace_ptr)
 {
 	struct cspace *cspace;
-	int i;
 	/*
 	 * Allocate cspace
 	 */

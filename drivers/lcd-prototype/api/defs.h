@@ -15,6 +15,7 @@
 #define LCD_PROTOTYPE_API_DEFS_H
 
 #include <linux/mutex.h>
+#include <linux/sched.h>
 #include <lcd-prototype/lcd.h>
 
 /* CAPABILITIES -------------------------------------------------- */
@@ -54,11 +55,11 @@ int lcd_mk_cspace(struct cspace **cspace_ptr);
  */
 static inline int lcd_lock_cspace(struct cspace *cspace)
 {
-	return mutex_lock_interruptible(cspace->lock);
+	return mutex_lock_interruptible(&cspace->lock);
 }
 static inline void lcd_unlock_cspace(struct cspace *cspace)
 {
-	mutex_unlock(cspace->lock);
+	mutex_unlock(&cspace->lock);
 }
 /**
  * (SAFE) Allocates an empty cnode slot, and returns a cptr to it. Returns
@@ -79,8 +80,8 @@ static inline int lcd_cap_alloc(struct cspace *cspace, cptr_t *cptr)
 /**
  * (SAFE) Insert object into cspace.
  */
-static inline int lcd_cap_insert(struct cspace *cspace, cptr_t cptr, 
-				void *object, enum lcd_cap_type type);
+int lcd_cap_insert(struct cspace *cspace, cptr_t cptr, 
+		void *object, enum lcd_cap_type type);
 /**
  * (UNSAFE) Look up cnode in cspace at cptr.
  */
@@ -89,7 +90,7 @@ static inline struct cnode *__lcd_cnode_lookup(struct cspace *cspace,
 {
 	BUG_ON(cspace->free_slot > LCD_NUM_CAPS);
 	if (cptr < cspace->free_slot)
-		return cspace->cnodes[cptr];
+		return &cspace->cnodes[cptr];
 	else
 		return NULL;
 }
@@ -119,14 +120,18 @@ int lcd_cap_grant(struct cspace *src_cspace, struct cspace *dest_cspace,
 /**
  * (SAFE) Get capability type.
  */
-static inline enum lcd_cap_type lcd_cap_type(struct cspace *cspace, cptr_t cptr)
+static inline int lcd_cap_type(struct cspace *cspace, cptr_t cptr, int *out)
 {
 	struct cnode *cnode;
-	enum lcd_cap_type type;
-	if (lcd_cnode_lookup(cspace, cptr, &cnode) || !cnode)
-		return LCD_CAP_TYPE_INVALID;
-	else
-		return cnode->type;
+	int ret = lcd_cnode_lookup(cspace, cptr, &cnode);
+	if (ret)
+		return ret;
+	if (!cnode)
+		return -EINVAL;
+	else {
+		*out = cnode->type;
+		return 0;
+	}
 }
 static inline int __lcd_cap_can_read(struct cnode *cnode)
 {

@@ -4,75 +4,78 @@
 #include <vector>
 #include <map>
 
-enum DefinitionType {kRpc = 1, kModule, kMessage, kProjection, kTypedef};
-enum Types {kProjectionType, kPrimType, kUnresolvedType }
 enum PrimType { kChar = 1, kShort, kInt, kLong, kLongLong, kCapability};
-enum TypeModifier {kUnsigned = 1, kNone};
 
-class Definition
+class Base
 {
- public:
-  virtual DefinitionType get_definition_type(void) = 0;
-  virtual void accept(ASTVisitor *worker) = 0;
-  // virtual ~Definition() {};
-
+  
 };
 
-class Type
+class Scope : public Base
+{
+
+};
+ 
+class Type : public Base
 {
  public:
-  virtual ~Type() {}
-  virtual DerivedType DerivedClassType(void) = 0;
   virtual void accept(ASTVisitor *worker) = 0;
-  char* GetType();
+  virtual void marshal() = 0;
 };
 
-class UnresolvedType : public Type
+class Typedef : public Type
 {
-  char* name_;
+  Type* type_;
+  char* alias_;
+  char* marshal_info_;
 
  public:
-  UnresolvedType(char* name) { this->name_ = name; }
-  DerivedType DerivedClassType() { return kUnresolvedType; }
-  char * name() { return name_; }
-  void accept(ASTVisitor *worker) { worker->visit(this); }
+
+  virtual void accept(ASTVisitor *worker);
+  virtual void marshal();
 }
 
-class PrimitiveType : public Type
+class IntegerType : public Type
 {
-  TypeModifier type_modifier_;
-  PrimType primitive_;
+  bool unsigned_;
+  PrimType type_;
+  int size_:
   
  public:
-  PrimitiveType(TypeModifier type_mod, PrimType primitive) {
-    this->type_modifier_ = type_mod;
-    this->primitive_ = primitive; }
-  TypeModifier type_modifier() {return type_modifier_; }
-  PrimType primitive() {return primitive_; }
-  char * GetType();
-  DerivedType DerivedClassType() { return kPrimType; }
-  void accept(ASTVisitor *worker) { worker->visit(this); }
-  
-  // maybe for consistency this shouldnt have getfullname
+  PrimitiveType(TypeModifier type_mod, PrimType primitive) 
+  { this->type_modifier_ = type_mod; this->primitive_ = primitive; }
+  virtual void accept(ASTVisitor *worker) { worker->visit(this); }
+  virtual void marshal();
+};
+
+class CapabilityType : public IntegerType
+{
+  // is this needed?
+};
+
+class PointerType : public Type
+{
+  Type* type_;
+ public:
+  PointerType(Type* type);
+  virtual void accept(ASTVisitor *worker) { worker->visit(this); }
+  virtual void marshal();
 };
 
 class ProjectionType : public Type // complex type
 {
-  char* type_name_; 
-  bool pointer_;
+  char* id_; 
+  char* real_type_;
+  std::vector<ProjectionField*>* fields_;
 
  public:
-  ProjectionType(char * type_name, bool pointer) {
-    this->type_name_ = type_name;
-    this->pointer_ = pointer; }
-  char* type_name() {return type_name_; }
-  bool pointer() { return pointer_; }
-  DerivedType DerivedClassType() { return kProjectionType; }
+  ProjectionType(char * id, char* real_type, std::vector<ProjectionField*>* fields) 
+    { this->id_ = id; this->real_type_ = real_type; this->fields_ = fields; }
   void accept(ASTVisitor *worker) { worker->visit(this); }
-  // get full name function? class isn't aware of parent need to pass env
+  virtual void marshal();
 };
 
-class Typedef : public Definition
+class Typedef : public Declaration
 {
   char* real_type_; // how should this be represented?
   Type* marshal_type_; // should this be a supported type?
@@ -88,20 +91,19 @@ class Typedef : public Definition
   void accept(ASTVisitor *worker) { worker->visit(this); }
 };
 
-class Parameter
+class Parameter : public Base
 {
   Type* type_;
   char* name_;
 
  public:
-  Parameter(Type* type, char* name) {
-    this->type_ = type;
-    this->name_ = name; }
+  Parameter(Type* type, char* name) 
+    { this->type_ = type; this->name_ = name; }
   ~Parameter();
   void accept(ASTVisitor *worker) { worker->visit(this); }
 };
 
-class Rpc : public Definition
+class Rpc : public Base
 {
   Type* return_type_;
   char* name_;
@@ -119,7 +121,7 @@ class Rpc : public Definition
   void accept(ASTVisitor *worker) { worker->visit(this); }
 };
 
-class ProjectionField
+class ProjectionField : public Base
 {
   bool in_;
   bool out_;
@@ -129,32 +131,19 @@ class ProjectionField
   char* field_name_;
   
  public:
-  ProjectionField(bool in, bool out, bool alloc, bool bind, Type* field_type, char* field_name);
+  ProjectionField(bool in, bool out, bool alloc, bool bind, Type* field_type, char* field_name)
+    { this->in_ = in; this->out_ = out; this->alloc_ = alloc; this->bind_ = bind; this->field_type_ = field_type;
+      this->field_name_ = field_name; }
   ~ProjectionField();
   bool in() { return in_; }
   bool out() { return out_; }
   bool alloc() { return alloc_; }
   bool bind() { return bind_; }
   void accept(ASTVisitor *worker) { worker->visit(this); }
+  virtual void marshal();   // should this be connected to type needs to be marshalled too?
 };
 
-class Projection : public Definition
-{
-  char* name_;
-  char* true_type_; // struct isn't allowed anywhere but here so just use char *
-  std::vector<ProjectionField* >* fields_;
-
- public:
-  Projection(char* name, char* true_type, std::vector<ProjectionField* >* fields) {
-    this->name_ = name;
-    this->true_type_ = true_type;
-    this->fields_ = fields; }
-  char* name() const { return name_; }
-  DefinitionType get_definition_type(){return kProjection;}
-  void accept(ASTVisitor *worker) { worker->visit(this); }
-  
-};
-
+/*
 class MessageField
 {
   Type* field_type_;
@@ -167,7 +156,7 @@ class MessageField
   void accept(ASTVisitor *worker) { worker->visit(this); }
 };
 
-class Message : public Definition
+class Message : public  Definition
 {
   char * name_;
   std::vector<MessageField* >* fields_;
@@ -179,10 +168,10 @@ class Message : public Definition
   DefinitionType get_definition_type() { return kMessage; }
   void accept(ASTVisitor *worker) { worker->visit(this); }
 };
+*/
 
 
-
-class Scope 
+class File : public Scope
 {
   char* verbatim_;
   std::vector<Rpc *>* rpc_definitions_;
@@ -191,7 +180,7 @@ class Scope
   // believe it is only necessary to store projections in "env" since functions can't be referenced in other functions
   
  public:
-  Scope(char* verbatim, std::vector<Rpc* >* rpc_definitions, std::vector<Message* >* message_definitions,
+  File(char* verbatim, std::vector<Rpc* >* rpc_definitions, std::vector<Message* >* message_definitions,
 	std::map<char* , Definition* >* symbol_table) {
     this->verbatim_ = verbatim;
     this->rpc_definitions_ = rpc_definitions;

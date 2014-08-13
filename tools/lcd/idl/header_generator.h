@@ -12,7 +12,7 @@ class HeaderGeneratorVisitor : public ASTVisitor
  public:
   HeaderGeneratorVisitor(FILE *out_file) { 
     this->out_file_ = out_file; }
-  virtual void visit(Scope *scope);
+  virtual void visit(File *file);
   virtual void visit(Message *message);
   virtual void visit(MessageField *message_field);
   virtual void visit(Projection *projection);

@@ -4,7 +4,7 @@
 class ASTVisitor
 {
  public:
-  virtual void visit(Scope *scope) = 0;
+  virtual void visit(File *file) = 0;
   virtual void visit(Message *message) = 0;
   virtual void visit(MessageField *message_field) = 0;
   virtual void visit(Projection *projection) = 0;

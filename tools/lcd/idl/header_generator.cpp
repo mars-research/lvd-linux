@@ -1,6 +1,6 @@
 #include "header_generator.h"
 
-void HeaderGeneratorVisitor::visit(Scope *scope)
+void HeaderGeneratorVisitor::visit(File *file)
 {
   // maybe i should change name again
   // print out verbatim section
@@ -66,7 +66,7 @@ void HeaderGeneratorVisitor::visit(PrimitiveType *prim_type)
 
 void HeaderGeneratorVisitor::visit(UnresolvedType *unresolved_type)
 {
-  
+  // need to lookup type in symbol table 
 }
 
 

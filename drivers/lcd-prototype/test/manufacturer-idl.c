@@ -9,7 +9,6 @@
 /* INTERNAL DEFS -------------------------------------------------- */
 
 #include "dealer.h"
-#include "common.h"
 
 extern int __manufacturer_init(void);
 extern void __manufacturer_exit(void);
@@ -17,6 +16,11 @@ extern void __manufacturer_exit(void);
 /* IDL/LCD DEFS -------------------------------------------------- */
 
 #include "manufacturer-idl.h"
+#include "../include/common.h"
+#include "../include/ipc.h"
+#include "../include/api.h"
+#include "../include/dstore.h"
+#include "../include/utcb.h"
 
 /* INTERFACE WRAPPERS -------------------------------------------------- */
 
@@ -76,7 +80,7 @@ static int mk_engine_callee(void)
 
 	return ret;
 fail3:
-	__lcd_ds_drop(lcd_reply_badge(), engine_dsptr);
+	lcd_ds_drop(lcd_reply_badge(), engine_dsptr);
 fail2:
 	mi->free_engine(e);
 fail1:
@@ -145,7 +149,7 @@ static int mk_automobile_callee(void)
 	return ret;
 
 fail3:
-	__lcd_ds_drop(lcd_reply_badge(), auto_dsptr);
+	lcd_ds_drop(lcd_reply_badge(), auto_dsptr);
 fail2:
 	mi->free_automobile(a);
 fail1:
@@ -305,10 +309,10 @@ int dealer_register_manufacturer(struct manufacturer_interface *__mi)
 	/*
 	 * Store in the cap regs for the caller, and send
 	 */
-	lcd_store_cap0(manufacturer_interface_cptrs.mk_engine);
-	lcd_store_cap1(manufacturer_interface_cptrs.mk_automobile);
-	lcd_store_cap2(manufacturer_interface_cptrs.free_engine);
-	lcd_store_cap3(manufacturer_interface_cptrs.free_automobile);
+	lcd_store_out_cap0(manufacturer_interface_cptrs.mk_engine);
+	lcd_store_out_cap1(manufacturer_interface_cptrs.mk_automobile);
+	lcd_store_out_cap2(manufacturer_interface_cptrs.free_engine);
+	lcd_store_out_cap3(manufacturer_interface_cptrs.free_automobile);
 	ret = lcd_call(lcd_boot_cptr(DEALER_REGISTER_MANUFACTURER));
 	if (ret) {
 		AU_ERR("call to dealer");
@@ -318,13 +322,13 @@ int dealer_register_manufacturer(struct manufacturer_interface *__mi)
 	return (int)lcd_r0();
 
 fail5:
-	lcd_destroy_sync_endpoint(manufacturer_interface_cptrs.free_automobile);
+	lcd_rm_sync_endpoint(manufacturer_interface_cptrs.free_automobile);
 fail4:
-	lcd_destroy_sync_endpoint(manufacturer_interface_cptrs.free_engine);
+	lcd_rm_sync_endpoint(manufacturer_interface_cptrs.free_engine);
 fail3:
-	lcd_destroy_sync_endpoint(manufacturer_interface_cptrs.mk_automobile);
+	lcd_rm_sync_endpoint(manufacturer_interface_cptrs.mk_automobile);
 fail2:
-	lcd_destroy_sync_endpoint(manufacturer_interface_cptrs.mk_engine);
+	lcd_rm_sync_endpoint(manufacturer_interface_cptrs.mk_engine);
 fail1:
 	return -1;
 }

@@ -6,6 +6,11 @@
  * Copyright: University of Utah
  */
 
+#include <linux/kernel.h>
+#include <linux/module.h>
+#include "../include/common.h"
+#include "defs.h"
+
 #define LCD_FAIL(msg...) do{ LCD_ERR(msg); return -1; } while(0)
 #define LCD_PASS() do{ return 0; } while(0)
 
@@ -37,7 +42,6 @@ static int test02(void)
 static int test03(void)
 {
 	struct cspace *cspace;
-	int ret;
 	cptr_t cptr;
 	int i;
 	if (lcd_mk_cspace(&cspace))
@@ -63,7 +67,6 @@ static int test03(void)
 static int test04(void)
 {
 	struct cspace *cspace;
-	int ret;
 	cptr_t cptr;
 	int i;
 	int x;
@@ -83,7 +86,7 @@ static int test04(void)
 		LCD_FAIL("insert");
 	}
 	if (lcd_cnode_lookup(cspace, cptr, &cnode)) {
-		lcd_rm_cpsace(cspace);
+		lcd_rm_cspace(cspace);
 		LCD_FAIL("lookup");
 	}
 	if (cnode->type != LCD_CAP_TYPE_SYNC_EP ||
@@ -100,7 +103,6 @@ static int test05(void)
 {
 	struct cspace *src_cspace;
 	struct cspace *dest_cspace;
-	int ret;
 	cptr_t src_cptr, dest_cptr;
 	int i;
 	int x;
@@ -153,7 +155,7 @@ static int test05(void)
 	LCD_PASS();
 }
 
-static int api_tests(void)
+int api_tests(void)
 {
 	if (test01())
 		return -1;

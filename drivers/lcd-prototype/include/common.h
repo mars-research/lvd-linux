@@ -6,7 +6,7 @@
 #ifndef LCD_PROTOTYPE_COMMON_H
 #define LCD_PROTOTYPE_COMMON_H
 
-#define LCD_ERR(msg...) __lcd_err(__FILE__, __LINE__, msg)
+#define LCD_ERR(fmt, args...) __lcd_err(__FILE__, __LINE__, fmt "\n" , ##args)
 static inline void __lcd_err(char *file, int lineno, char *fmt, ...)
 {
 	va_list args;
@@ -15,7 +15,7 @@ static inline void __lcd_err(char *file, int lineno, char *fmt, ...)
 	vprintk(fmt, args);
 	va_end(args);
 }
-#define LCD_MSG(msg...) __lcd_msg(__FILE__, __LINE__, msg)
+#define LCD_MSG(fmt, args...) __lcd_msg(__FILE__, __LINE__, fmt "\n" , ##args)
 static inline void __lcd_msg(char *file, int lineno, char *fmt, ...)
 {
 	va_list args;
@@ -24,7 +24,7 @@ static inline void __lcd_msg(char *file, int lineno, char *fmt, ...)
 	vprintk(fmt, args);
 	va_end(args);
 }
-#define LCD_WARN(msg...) __lcd_warn(__FILE__, __LINE__, msg)
+#define LCD_WARN(fmt, args...) __lcd_warn(__FILE__, __LINE__, fmt "\n" , ##args)
 static inline void __lcd_warn(char *file, int lineno, char *fmt, ...)
 {
 	va_list args;

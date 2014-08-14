@@ -70,7 +70,7 @@ static inline int lcd_cap_alloc(struct cspace *cspace, cptr_t *cptr)
 	int ret = lcd_lock_cspace(cspace);
 	if (!ret) {
 		if (cspace->free_slot < LCD_NUM_CAPS)
-			*cptr = ++cspace->free_slot;
+			*cptr = cspace->free_slot++;
 		else
 			ret = -ENOMEM;
 		lcd_unlock_cspace(cspace);

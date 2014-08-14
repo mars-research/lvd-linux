@@ -6,17 +6,15 @@
  * Copyright: University of Utah
  */
 
-#include <linux/kernel.h>
+#include <linux/init.h>
 #include <linux/module.h>
 #include "../include/common.h"
 #include "defs.h"
 
-static int api_tests(void);
+int api_tests(void);
 
-static int __init api_init(void)
+int __init api_init(void)
 {
-	LCD_MSG("api starting");
-
 	/*
 	 * Run regression tests
 	 */
@@ -27,7 +25,7 @@ static int __init api_init(void)
 	return 0;
 }
 
-static void __exit api_exit(void)
+void __exit api_exit(void)
 {
 	return;
 }
@@ -35,6 +33,3 @@ static void __exit api_exit(void)
 module_init(api_init);
 module_exit(api_exit);
 
-/* DEBUG -------------------------------------------------- */
-
-#include "api-tests.c"

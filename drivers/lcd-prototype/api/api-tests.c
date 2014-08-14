@@ -27,7 +27,7 @@ static int test02(void)
 	ret = lcd_lock_cspace(cspace);
 	if (ret)
 		LCD_FAIL("lock cspace returned %d", ret);
-	lcd_unlock_cspace(cspacse);
+	lcd_unlock_cspace(cspace);
 	lcd_rm_cspace(cspace);
 	LCD_PASS();
 }

@@ -2,13 +2,6 @@
  * Authors: Anton Burtsev <aburtsev@flux.utah.edu>
  *          Charles Jacobsen <charlesj@cs.utah.edu>
  * Copyright: University of Utah
- *
- * This simple prototype uses a global lock on an lcd's cspace. No
- * rights checking. The lcd need only have a valid cnode mapped by
- * the cptr. Capability grants just copy cnode data from one cspace
- * to another. Capabilities cannot be revoked, so if a cnode is valid,
- * it can be used freely. Cnodes are allocated in a linear order, so
- * no need to do fancy free lists, etc.
  */
 
 #ifndef LCD_PROTOTYPE_API_DEFS_H
@@ -17,8 +10,18 @@
 #include <linux/mutex.h>
 #include <linux/sched.h>
 #include <lcd-prototype/lcd.h>
+#include "../include/api-internal.h"
 
 /* CAPABILITIES -------------------------------------------------- */
+
+/*
+ * This simple prototype uses a global lock on an lcd's cspace. No
+ * rights checking. The lcd need only have a valid cnode mapped by
+ * the cptr. Capability grants just copy cnode data from one cspace
+ * to another. Capabilities cannot be revoked, so if a cnode is valid,
+ * it can be used freely. Cnodes are allocated in a linear order, so
+ * no need to do fancy free lists, etc.
+ */
 
 enum lcd_cap_type {
 	LCD_CAP_TYPE_UNFORMED = 0,
@@ -162,5 +165,31 @@ static inline int lcd_cap_can_grant(struct cspace *cspace, cptr_t cptr)
  * use the cspace (e.g., is waiting on the lock).
  */
 void lcd_rm_cspace(struct cspace *cspace);
+
+/* IPC -------------------------------------------------- */
+
+/* 
+ * There is no low-level interface to the api code, so we need
+ * to make the ipc routines directly callable for now, in
+ * include/api-internal.h. All other api code is directly or
+ * indirectly accessed via ipc.
+ */
+
+struct sync_endpoint {
+	struct list_head senders;
+        struct list_head receivers;
+        struct mutex lock;
+};
+
+/**
+ * Create a synchronous end point, and install it in t's cspace
+ * at location c.
+ */
+int lcd_mk_sync_endpoint(struct task_struct *t, cptr_t c);
+/**
+ * Remove synchronous end point identified by c in t's cspace.
+ */
+int lcd_rm_sync_endpoint(struct task_struct *t, cptr_t c);
+
 
 #endif /* LCD_PROTOTYPE_API_DEFS_H */

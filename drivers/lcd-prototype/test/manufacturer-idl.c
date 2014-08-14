@@ -338,7 +338,7 @@ fail1:
 int execution_loop(void)
 {
 	int ret;
-	struct lcd_handler *handlers[] = { 
+	struct lcd_handler handlers[] = { 
 		{ manufacturer_interface_cptrs.mk_engine,
 		  mk_engine_callee },
 		{ manufacturer_interface_cptrs.mk_automobile,

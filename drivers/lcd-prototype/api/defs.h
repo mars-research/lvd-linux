@@ -98,7 +98,6 @@ struct cspace;
 struct cnode {
 	enum lcd_cap_type type;
 	int rights;
-	struct mutex lock;
 	/* Pointer to containing cspace */
 	struct cspace *cspace;
 	/* Linked list of free cnodes */
@@ -248,6 +247,10 @@ static inline void __lcd_cnode_set_type(struct cnode *cnode,
 				enum lcd_cap_type t)
 {
 	cnode->type = t;
+}
+static inline void * __lcd_cnode_object(struct cnode *cnode)
+{
+	return cnode->object;
 }
 
 /* IPC -------------------------------------------------- */

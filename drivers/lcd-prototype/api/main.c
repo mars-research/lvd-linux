@@ -15,6 +15,8 @@ int api_tests(void);
 
 int __init api_init(void)
 {
+	LCD_MSG("lcd prototype api starting");
+
 	/*
 	 * Run regression tests
 	 */

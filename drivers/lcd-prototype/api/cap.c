@@ -6,6 +6,8 @@
 #include "defs.h"
 #include "../include/common.h"
 
+struct mutex __lcd_cap_lock;
+
 int lcd_cap_init(void)
 {
 	mutex_init(&__lcd_cap_lock);
@@ -58,14 +60,14 @@ int lcd_mk_cspace(struct cspace **cspace_ptr)
 
 static int __lcd_cnode_alloc(struct cspace *cspace, cptr_t *cptr)
 {
-	int ret;
+	struct cnode *cnode;
 	if (list_empty(&cspace->free_list)) {
 		return -ENOMEM;
 	} else {
 		/*
 		 * Get first available cnode, and remove it from the list.
 		 */
-		cnode = list_first_entry(&cspace->free_list, struct cspace,
+		cnode = list_first_entry(&cspace->free_list, struct cnode,
 					free_list);
 		/*
 		 * Remove from free list
@@ -74,7 +76,7 @@ static int __lcd_cnode_alloc(struct cspace *cspace, cptr_t *cptr)
 		/*
 		 * Mark it as unformed
 		 */
-		lcd_cnode_set_type(cnode, LCD_CAP_TYPE_UNFORMED);
+		__lcd_cnode_set_type(cnode, LCD_CAP_TYPE_UNFORMED);
 		/*
 		 * Calc index
 		 */
@@ -85,7 +87,6 @@ static int __lcd_cnode_alloc(struct cspace *cspace, cptr_t *cptr)
 
 int lcd_cnode_alloc(struct cspace *cspace, cptr_t *cptr)
 {
-	struct cnode *cnode;
 	int ret;
 	/*
 	 * LOCK cap
@@ -104,7 +105,6 @@ int lcd_cnode_alloc(struct cspace *cspace, cptr_t *cptr)
 int __lcd_cnode_lookup(struct cspace *cspace, cptr_t cptr, struct cnode **out)
 {
 	struct cnode *c;
-	int ret;
 	if (cptr >= LCD_NUM_CAPS)
 		return -EINVAL;
 	c = &cspace->cnodes[cptr];
@@ -115,7 +115,7 @@ int __lcd_cnode_lookup(struct cspace *cspace, cptr_t cptr, struct cnode **out)
 static int __lcd_cnode_insert(struct cnode *cnode, void *object, 
 			enum lcd_cap_type type, int rights)
 {
-	if (!lcd_cnode_is_unformed(cnode))
+	if (!__lcd_cnode_is_unformed(cnode))
 		return -EINVAL;
 	else {
 		cnode->object = object;
@@ -190,9 +190,9 @@ static int __lcd_cnode_grant(struct cspace *src_cspace,
 		!__lcd_cnode_is_unformed(dest_cnode))
 		return -EINVAL;
 
-	dest_rights = lcd_cnode_rights(src_cnode) & rights;
+	dest_rights = __lcd_cnode_rights(src_cnode) & rights;
 
-	ret = __lcd_insert_for_grant(src_cnode, dest_cnode, dest_rights);
+	ret = __lcd_cnode_insert_for_grant(src_cnode, dest_cnode, dest_rights);
 
 	return ret;
 }
@@ -204,7 +204,7 @@ int lcd_cnode_grant(struct cspace *src_cspace, struct cspace *dest_cspace,
 	/*
 	 * LOCK cap
 	 */
-	ret = lcd_lock_cap();
+	ret = lcd_cap_lock();
 	if (ret)
 		return ret;
 	ret = __lcd_cnode_grant(src_cspace, dest_cspace, src_cptr, dest_cptr,
@@ -212,13 +212,12 @@ int lcd_cnode_grant(struct cspace *src_cspace, struct cspace *dest_cspace,
 	/*
 	 * UNLOCK cap
 	 */
-	lcd_unlock_cap();
+	lcd_cap_unlock();
 	return ret;
 }
 
 static void __lcd_cnode_do_revoke(struct cnode *parent, int rights)
 {
-	int ret;
 	struct cnode *child;
 	struct list_head *ptr;
 
@@ -256,14 +255,14 @@ int lcd_cnode_revoke(struct cspace *cspace, cptr_t cptr, int rights)
 	/*
 	 * LOCK cap
 	 */
-	ret = lcd_lock_cap();
+	ret = lcd_cap_lock();
 	if (ret)
 		return ret;
 	ret = __lcd_cnode_revoke(cspace, cptr, rights);
 	/*
 	 * UNLOCK cap
 	 */
-	lcd_unlock_cap();
+	lcd_cap_unlock();
 	return ret;
 }
 
@@ -280,7 +279,7 @@ static void __lcd_cnode_do_free(struct cnode *parent)
 		 *
 		 * XXX: Be aware of stack overflow
 		 */
-		__lcd_cnode_do_free(cspace, child);
+		__lcd_cnode_do_free(child);
 		/*
 		 * Remove from parent
 		 */
@@ -305,7 +304,7 @@ void __lcd_cnode_free(struct cnode *cnode)
 
 void __lcd_rm_cnode(struct cnode *cnode)
 {
-	if (lcd_cnode_is_occupied(cnode))
+	if (__lcd_cnode_is_occupied(cnode))
 		__lcd_cnode_do_free(cnode);
 	return;
 }

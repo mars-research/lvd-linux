@@ -16,6 +16,11 @@ int api_tests(void);
 int __init api_init(void)
 {
 	LCD_MSG("lcd prototype api starting");
+	
+	/*
+	 * Initialize capability module
+	 */
+	lcd_cap_init();
 
 	/*
 	 * Run regression tests

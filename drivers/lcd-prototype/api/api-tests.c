@@ -19,7 +19,11 @@ static int test01(void)
 	struct cspace *cspace;
 	if (lcd_mk_cspace(&cspace))
 		LCD_FAIL("mk cspace");
-	lcd_rm_cspace(&cspace);
+
+	lcd_cap_lock();
+	__lcd_rm_cspace(&cspace);
+	lcd_cap_unlock();
+
 	LCD_PASS();
 }
 

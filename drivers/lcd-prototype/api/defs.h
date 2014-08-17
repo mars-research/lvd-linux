@@ -191,17 +191,18 @@ int lcd_cnode_grant(struct cspace *src_cspace, struct cspace *dest_cspace,
 int lcd_cnode_revoke(struct cspace *cspace, cptr_t cptr, int rights);
 /**
  * [UNSAFE]
- * Frees the slot containing cnode in cspace, and recursively frees derived
- * children in other cspaces (so this also acts as a total revoke).
+ * Frees the slot containing cnode in its containing cspace, and recursively 
+ * frees derived children in other cspaces (so this also acts as a total 
+ * revoke).
  */
-int __lcd_cnode_free(struct cspace *cspace, struct cnode *cnode);
+void __lcd_cnode_free(struct cnode *cnode);
 /**
  * [UNSAFE]
  * Deallocates cspace. Caller should ensure no one is trying to
  * use the cspace (e.g., via grant, insert, etc.). This will revoke all
  * cnodes derived from this cspace.
  */
-void __lcd_rm_cspace(struct cspace *cspace);
+void __lcd_rm_cspace(struct cspace **cspace_ptr);
 /**
  * [UNSAFE]
  * Quick inlines for determining rights and type. These should be wrapped

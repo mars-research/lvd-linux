@@ -92,6 +92,7 @@ enum lcd_cap_right {
 	LCD_CAP_RIGHT_OWNER   = (1 << 3),
 };
 #define LCD_CAP_RIGHT_ALL ((1 << 4) - 1)
+#define LCD_CAP_RIGHT_NONE 0
 
 struct cspace;
 
@@ -211,6 +212,23 @@ static inline int __lcd_cnode_rights(struct cnode *cnode)
 {
 	return cnode->rights;
 }
+static inline void __lcd_cnode_set_rights(struct cnode *cnode, int rights)
+{
+	cnode->rights = rights;
+}
+static inline int __lcd_cnode_type(struct cnode *cnode)
+{
+	return cnode->type;
+}
+static inline void __lcd_cnode_set_type(struct cnode *cnode, 
+				enum lcd_cap_type t)
+{
+	cnode->type = t;
+}
+static inline void * __lcd_cnode_object(struct cnode *cnode)
+{
+	return cnode->object;
+}
 static inline int __lcd_cnode_can_read(struct cnode *cnode)
 {
 	return cnode->rights & LCD_CAP_RIGHT_READ;
@@ -242,15 +260,6 @@ static inline int __lcd_cnode_is_occupied(struct cnode *cnode)
 static inline int __lcd_cnode_is_sync_ep(struct cnode *cnode)
 {
 	return cnode->type == LCD_CAP_TYPE_SYNC_EP;
-}
-static inline void __lcd_cnode_set_type(struct cnode *cnode, 
-				enum lcd_cap_type t)
-{
-	cnode->type = t;
-}
-static inline void * __lcd_cnode_object(struct cnode *cnode)
-{
-	return cnode->object;
 }
 
 /* IPC -------------------------------------------------- */

@@ -33,7 +33,7 @@ static inline void test_check_cnode(struct cspace *cspace, cptr_t cptr,
 {
 	struct cnode *cnode;
 	lcd_cap_lock();
-	if (lcd_cnode_lookup(cspace, cptr, &cnode)) {
+	if (__lcd_cnode_lookup(cspace, cptr, &cnode)) {
 		LCD_ERR("looking up object at %p in cspace at %p at cptr %d",
 			object, cspace, cptr);
 		goto unlock;
@@ -202,7 +202,7 @@ fail:
 	return test_rm_cspace(cspace, -1);
 }
 
-static int test03(void)
+static int test04(void)
 {
 	struct cspace *cspace;
 	struct cnode *cnode;
@@ -263,7 +263,7 @@ fail:
 	return test_rm_cspace(cspace, -1);
 }
 
-static int test04(void)
+static int test05(void)
 {
 	struct cspace *cspace1;
 	struct cspace *cspace2;
@@ -291,15 +291,15 @@ static int test04(void)
 	/*
 	 * ALLOC SLOTS IN EACH FOR CAP
 	 */
-	if (lcd_cap_alloc(cspace1, &cptr1)) {
+	if (lcd_cnode_alloc(cspace1, &cptr1)) {
 		LCD_ERR("alloc cptr1");
 		goto fail3;
 	}
-	if (lcd_cap_alloc(cspace2, &cptr2)) {
+	if (lcd_cnode_alloc(cspace2, &cptr2)) {
 		LCD_ERR("alloc cptr2");
 		goto fail3;
 	}
-	if (lcd_cap_alloc(cspace3, &cptr3)) {
+	if (lcd_cnode_alloc(cspace3, &cptr3)) {
 		LCD_ERR("alloc cptr3");
 		goto fail3;
 	}
@@ -319,9 +319,10 @@ static int test04(void)
 	 */
 
 	/*
-	 * Grant write and read to cspace 2
+	 * Grant grant, write and read to cspace 2
 	 */
 	if (lcd_cnode_grant(cspace1, cspace2, cptr1, cptr2,
+				LCD_CAP_RIGHT_GRANT | 
 				LCD_CAP_RIGHT_WRITE | LCD_CAP_RIGHT_READ)) {
 		LCD_ERR("grant 1 to 2");
 		goto fail3;
@@ -341,6 +342,7 @@ static int test04(void)
 	test_check_cnode(cspace1, cptr1, &x, LCD_CAP_TYPE_SYNC_EP,
 			LCD_CAP_RIGHT_ALL);
 	test_check_cnode(cspace2, cptr2, &x, LCD_CAP_TYPE_SYNC_EP,
+			LCD_CAP_RIGHT_GRANT | 
 			LCD_CAP_RIGHT_WRITE | LCD_CAP_RIGHT_READ);
 	test_check_cnode(cspace3, cptr3, &x, LCD_CAP_TYPE_SYNC_EP,
 			LCD_CAP_RIGHT_READ);
@@ -357,14 +359,14 @@ static int test04(void)
 	test_check_cnode(cspace1, cptr1, &x, LCD_CAP_TYPE_SYNC_EP,
 			LCD_CAP_RIGHT_ALL);
 	test_check_cnode(cspace2, cptr2, &x, LCD_CAP_TYPE_SYNC_EP,
-			LCD_CAP_RIGHT_WRITE);
+			LCD_CAP_RIGHT_GRANT | LCD_CAP_RIGHT_WRITE);
 	test_check_cnode(cspace3, cptr3, &x, LCD_CAP_TYPE_SYNC_EP, 0);
 
 	/*
 	 * Free cap
 	 */
 	lcd_cap_lock();
-	if (lcd_cnode_lookup(cspace1, cptr1, &cnode)) {
+	if (__lcd_cnode_lookup(cspace1, cptr1, &cnode)) {
 		LCD_ERR("cspace1 cnode lookup");
 		goto fail3_unlock;
 	}
@@ -408,6 +410,8 @@ int api_tests(void)
 	if (test03())
 		return -1;
 	if (test04())
+		return -1;
+	if (test05())
 		return -1;
 	LCD_MSG("all api tests passed!");
 	return 0;

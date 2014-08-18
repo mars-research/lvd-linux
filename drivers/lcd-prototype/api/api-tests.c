@@ -22,7 +22,7 @@ static inline int test_rm_cspace(struct cspace *cspace, int ret_val)
 		LCD_ERR("lock failed with %d", ret);
 		return ret;
 	}
-	__lcd_rm_cspace(cspace);
+	__lcd_rm_cspace(&cspace);
 	lcd_cap_unlock();
 	return ret_val;	
 }
@@ -51,7 +51,6 @@ static int test02(void)
 	struct cspace *cspace;
 	struct cnode *cnode;
 	cptr_t cptr;
-	int ret;
 
 	if (lcd_mk_cspace(&cspace))
 		LCD_FAIL("mk cspace");
@@ -60,7 +59,7 @@ static int test02(void)
 		goto fail;
 	}
 	if (cptr >= LCD_NUM_CAPS) {
-		LCD_ERR("cptr = %d >= %d = LCD_NUM_CAPS",
+		LCD_ERR("cptr = %d >= %d = LCD_NUM_CAPS", 
 			cptr, LCD_NUM_CAPS);
 		goto fail;
 	}
@@ -73,7 +72,7 @@ static int test02(void)
 		goto fail_unlock;
 	}
 	if (!__lcd_cnode_is_unformed(cnode)) {
-		LCD_ERR("cnode not unformed");
+		LCD_ERR("cnode not unformed, type is %d", cnode->type);
 		goto fail_unlock;
 	}
 	if (__lcd_cnode_rights(cnode) != 0) {
@@ -109,14 +108,14 @@ fail_unlock:
 	 */
 	lcd_cap_unlock();			
 fail:
-	return test_rm_cspace(&cspace, -1);
+	return test_rm_cspace(cspace, -1);
 }
 
 static int test03(void)
 {
 	struct cspace *cspace;
+	struct cnode *cnode;
 	cptr_t cptr;
-	int ret;
 	int x;
 
 	if (lcd_mk_cspace(&cspace))
@@ -143,7 +142,7 @@ static int test03(void)
 		LCD_ERR("lookup");
 		goto fail_unlock;
 	}
-	if (__lcd_cnode_is_sync_ep(cnode)) {
+	if (!__lcd_cnode_is_sync_ep(cnode)) {
 		LCD_ERR("cnode not sync ep");
 		goto fail_unlock;
 	}
@@ -170,7 +169,7 @@ fail_unlock:
 	 */
 	lcd_cap_unlock();			
 fail:
-	return test_rm_cspace(&cspace, -1);
+	return test_rm_cspace(cspace, -1);
 }
 
 #if 0

@@ -80,7 +80,7 @@ static int __lcd_cnode_alloc(struct cspace *cspace, cptr_t *cptr)
 		/*
 		 * Calc index
 		 */
-		*cptr = (cnode - (cspace->cnodes)) / sizeof(struct cnode);
+		*cptr = cnode - (cspace->cnodes);
 		return 0;
 	}
 }

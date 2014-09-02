@@ -16,6 +16,7 @@ int lcd_init_list_cache(struct cap_cache *list_cache, uint64_t size) {
 	}
 
 	list_cache->cap[size - 2] = size - 2;
+    spin_lock_init(&list_cache->lock);
 	return 0; 
 }
 

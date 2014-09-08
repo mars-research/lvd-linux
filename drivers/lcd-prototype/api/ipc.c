@@ -13,8 +13,9 @@
 #include "../include/common.h"
 #include "defs.h"
 
-int __lcd_send(struct task_struct *from, cptr_t c)
+int __lcd_send(struct lcd *lcd, cptr_t c)
 {
+	
 	return -ENOSYS;
 }
 
@@ -54,62 +55,80 @@ int lcd_mk_sync_endpoint(struct lcd *lcd, cptr_t c)
 	INIT_LIST_HEAD(&e->receivers);
 	mutex_init(&e->lock);
 	/*
-	 * Get the destination node in the cspace
+	 * Insert endpoint into cspace at c
 	 */
-	ret = lcd_cnode_lookup(lcd->cspace, c, &cnode);
+	ret = lcd_cnode_insert(lcd->cspace, c, e, LCD_CAP_TYPE_SYNC_EP,
+			LCD_CAP_RIGHT_ALL);
 	if (ret) {
-		LCD_ERR("cnode lookup at %lld", c);
+		LCD_ERR("insert endpoint");
 		goto fail2;
 	}
-	if (!CNODE_UNFORMED(cnode)) {
-		LCD_ERR("cnode occupied at %lld", c);
-		ret = -EINVAL;
-		goto fail3;
-	}
-	/*
-	 * Install endpoint
-	 */
-	cnode->object = e;
-	cnode->type = CAP_TYPE_SYNC_EP;
-	lcd_cnode_release(cnode);
 	return 0;
-fail3:
-	lcd_cnode_release(cnode);
 fail2:
 	kfree(e);
 fail1:
 	return ret;
 }
 
-int lcd_rm_sync_endpoint(struct lcd *lcd, cptr_t c)
+static int __cleanup_sync_endpoint(struct cnode *cnode)
 {
 	struct sync_endpoint *e;
-	struct cnode *cnode;
-	int ret = -EINVAL;
+	/*
+	 * Check that cnode contains sync ep, and lcd is owner
+	 */
+	if (!__lcd_cnode_is_sync_ep(cnode))
+		return -EINVAL;
+	if (!__lcd_cnode_is_owner(cnode))
+		return -EINVAL;
+
+	e = __lcd_cnode_object(cnode);
+
+	/*
+	 * Remove from cspaces first, so no one can refer to sync ep
+	 */
+	__lcd_cnode_free(cnode);
+
+	/*
+	 * Free end point
+	 */
+	kfree(e);
+
+	return 0;
+}
+
+static int __lcd_rm_sync_endpoint(struct lcd *lcd, cptr_t cptr)
+{
+	int ret;
 	/*
 	 * Look up cnode
 	 */
-	ret = lcd_cnode_lookup(lcd->cspace, c, &cnode);
+	ret = __lcd_cnode_lookup(lcd->cspace, c, &cnode);
 	if (ret) {
 		LCD_ERR("cnode lookup at %lld", c);
-		goto fail1;
-	}
-	if (!CNODE_SYNC_EP(cnode)) {
-		LCD_ERR("cnode does not contain sync ep at %lld", c);
-		ret = -EINVAL;
-		goto fail2;
+		return ret;
 	}
 	/*
-	 * Free end point
-	 *
-	 * XXX: For now, we assume no one is in line, and no one has
-	 * the lock.
+	 * Remove it from lcd's cspace, and recursively remove from
+	 * any cspaces with derivations
 	 */
-	kfree(cnode->object);
-	return 0;
-fail2:
-	lcd_cnode_release(cnode);
-fail1:
+	return __cleanup_sync_endpoint(cnode);
+}
+
+int lcd_rm_sync_endpoint(struct lcd *lcd, cptr_t cptr)
+{
+	struct cnode *cnode;
+	int ret;
+	/*
+	 * LOCK cap
+	 */
+	ret = lcd_cap_lock();
+	if (ret)
+		return ret;
+	ret = __lcd_rm_sync_endpoint(lcd, cptr);
+	/*
+	 * UNLOCK cap
+	 */
+	lcd_cap_unlock();
 	return ret;
 }
 

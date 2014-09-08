@@ -27,46 +27,55 @@ static inline int test_rm_cspace(struct cspace *cspace, int ret_val)
 	return ret_val;	
 }
 
-static inline void test_check_cnode(struct cspace *cspace, cptr_t cptr,
+static inline int test_check_cnode(struct cspace *cspace, cptr_t cptr,
 				void *object, enum lcd_cap_type t,
 				int rights)
 {
 	struct cnode *cnode;
-	lcd_cap_lock();
+	int ret;
+	if (lcd_cap_lock())
+		return -1;
 	if (__lcd_cnode_lookup(cspace, cptr, &cnode)) {
 		LCD_ERR("looking up object at %p in cspace at %p at cptr %d",
 			object, cspace, cptr);
-		goto unlock;
+		goto fail;
 	}
 	if (__lcd_cnode_type(cnode) != t) {
 		LCD_ERR("cnode has type %d, expected %d",
 			__lcd_cnode_type(cnode), t);
-		goto unlock;
+		goto fail;
 	}
 	if (__lcd_cnode_rights(cnode) != rights) {
 		LCD_ERR("cnode has rights %d, expected %d",
 			__lcd_cnode_rights(cnode), rights);
-		goto unlock;
+		goto fail;
 	}
 	if (__lcd_cnode_object(cnode) != object) {
 		LCD_ERR("cnode has object %p, expected %p",
 			__lcd_cnode_object(cnode), object);
-		goto unlock;
+		goto fail;
 	}
-unlock:
+
 	lcd_cap_unlock();
+	return 0;
+
+fail:
+	lcd_cap_unlock();
+	return -1;
 }
 
 static int test01(void)
 {
 	struct cspace *cspace;
+	int ret;
 
 	if (lcd_mk_cspace(&cspace))
 		LCD_FAIL("mk cspace");
 	if (!cspace)
 		LCD_FAIL("cspace null");
 
-	lcd_cap_lock();
+	if (lcd_cap_lock())
+		return -1;
 	__lcd_rm_cspace(&cspace);
 	lcd_cap_unlock();
 
@@ -96,7 +105,8 @@ static int test02(void)
 	/*
 	 * LOCK cap
 	 */
-	lcd_cap_lock();
+	if (lcd_cap_lock())
+		goto fail;
 	if (__lcd_cnode_lookup(cspace, cptr, &cnode)) {
 		LCD_ERR("lookup");
 		goto fail_unlock;
@@ -167,7 +177,8 @@ static int test03(void)
 	/*
 	 * LOCK cap
 	 */
-	lcd_cap_lock();
+	if (lcd_cap_lock())
+		goto fail;
 	if (__lcd_cnode_lookup(cspace, cptr, &cnode)) {
 		LCD_ERR("lookup");
 		goto fail_unlock;
@@ -228,7 +239,8 @@ static int test04(void)
 	/*
 	 * LOCK cap
 	 */
-	lcd_cap_lock();
+	if (lcd_cap_lock())
+		goto fail;
 	if (__lcd_cnode_lookup(cspace, cptr, &cnode)) {
 		LCD_ERR("lookup");
 		goto fail_unlock;
@@ -339,13 +351,16 @@ static int test05(void)
 	/*
 	 * Check
 	 */
-	test_check_cnode(cspace1, cptr1, &x, LCD_CAP_TYPE_SYNC_EP,
-			LCD_CAP_RIGHT_ALL);
-	test_check_cnode(cspace2, cptr2, &x, LCD_CAP_TYPE_SYNC_EP,
-			LCD_CAP_RIGHT_GRANT | 
-			LCD_CAP_RIGHT_WRITE | LCD_CAP_RIGHT_READ);
-	test_check_cnode(cspace3, cptr3, &x, LCD_CAP_TYPE_SYNC_EP,
-			LCD_CAP_RIGHT_READ);
+	if (test_check_cnode(cspace1, cptr1, &x, LCD_CAP_TYPE_SYNC_EP,
+				LCD_CAP_RIGHT_ALL))
+		goto fail3;
+	if (test_check_cnode(cspace2, cptr2, &x, LCD_CAP_TYPE_SYNC_EP,
+				LCD_CAP_RIGHT_GRANT | 
+				LCD_CAP_RIGHT_WRITE | LCD_CAP_RIGHT_READ))
+		goto fail3;
+	if (test_check_cnode(cspace3, cptr3, &x, LCD_CAP_TYPE_SYNC_EP,
+				LCD_CAP_RIGHT_READ))
+		goto fail3;
 	/*
 	 * Revoke read
 	 */
@@ -356,16 +371,20 @@ static int test05(void)
 	/*
 	 * Check
 	 */
-	test_check_cnode(cspace1, cptr1, &x, LCD_CAP_TYPE_SYNC_EP,
-			LCD_CAP_RIGHT_ALL);
-	test_check_cnode(cspace2, cptr2, &x, LCD_CAP_TYPE_SYNC_EP,
-			LCD_CAP_RIGHT_GRANT | LCD_CAP_RIGHT_WRITE);
-	test_check_cnode(cspace3, cptr3, &x, LCD_CAP_TYPE_SYNC_EP, 0);
+	if (test_check_cnode(cspace1, cptr1, &x, LCD_CAP_TYPE_SYNC_EP,
+				LCD_CAP_RIGHT_ALL))
+		goto fail3;
+	if (test_check_cnode(cspace2, cptr2, &x, LCD_CAP_TYPE_SYNC_EP,
+				LCD_CAP_RIGHT_GRANT | LCD_CAP_RIGHT_WRITE))
+		goto fail3;
+	if (test_check_cnode(cspace3, cptr3, &x, LCD_CAP_TYPE_SYNC_EP, 0))
+		goto fail3;
 
 	/*
 	 * Free cap
 	 */
-	lcd_cap_lock();
+	if (lcd_cap_lock())
+		goto fail3;
 	if (__lcd_cnode_lookup(cspace1, cptr1, &cnode)) {
 		LCD_ERR("cspace1 cnode lookup");
 		goto fail3_unlock;
@@ -376,9 +395,12 @@ static int test05(void)
 	/*
 	 * Check
 	 */
-	test_check_cnode(cspace1, cptr1, &x, LCD_CAP_TYPE_FREE, 0);
-	test_check_cnode(cspace2, cptr2, &x, LCD_CAP_TYPE_FREE, 0);
-	test_check_cnode(cspace3, cptr3, &x, LCD_CAP_TYPE_FREE, 0);
+	if (test_check_cnode(cspace1, cptr1, &x, LCD_CAP_TYPE_FREE, 0))
+		goto fail3;
+	if (test_check_cnode(cspace2, cptr2, &x, LCD_CAP_TYPE_FREE, 0))
+		goto fail3;
+	if (test_check_cnode(cspace3, cptr3, &x, LCD_CAP_TYPE_FREE, 0))
+		goto fail3;
 
 	/*
 	 * rm cspaces

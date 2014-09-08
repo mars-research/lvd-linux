@@ -279,13 +279,13 @@ struct sync_endpoint {
 
 /**
  * Create a synchronous end point, and install it in t's cspace
- * at location c.
+ * at location cptr.
  */
-int lcd_mk_sync_endpoint(struct task_struct *t, cptr_t c);
+int lcd_mk_sync_endpoint(struct task_struct *t, cptr_t cptr);
 /**
- * Remove synchronous end point identified by c in t's cspace.
+ * Remove synchronous end point identified by cptr in t's cspace.
  */
-int lcd_rm_sync_endpoint(struct task_struct *t, cptr_t c);
+int lcd_rm_sync_endpoint(struct task_struct *t, cptr_t cptr);
 
 
 #endif /* LCD_PROTOTYPE_API_DEFS_H */

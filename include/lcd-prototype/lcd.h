@@ -12,9 +12,7 @@
 #define LCD_NUM_BOOT_CPTRS 	8
 
 struct cspace;
-struct cap_cache;
 struct dstore;
-struct capability;
 typedef u64 cptr_t;
 
 struct lcd {
@@ -23,7 +21,7 @@ struct lcd {
 	 */
 	u64 badge;
 	struct cspace *cspace;
-	struct cap_cache *cap_cache;
+	struct list_head 
 	/*
 	 * Accessible in lcd
 	 */

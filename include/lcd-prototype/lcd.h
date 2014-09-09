@@ -12,16 +12,19 @@
 #define LCD_NUM_BOOT_CPTRS 	8
 
 struct cspace;
-struct dstore;
 typedef u64 cptr_t;
+struct sync_endpoint;
 
 struct lcd {
 	/*
 	 * Not accessible in lcd
 	 */
+	struct task_struct *parent;
 	u64 badge;
 	struct cspace *cspace;
-	struct list_head 
+	struct list_head sending_eps;
+	struct list_head recving_eps;
+	int making_call;
 	/*
 	 * Accessible in lcd
 	 */
@@ -33,10 +36,9 @@ struct lcd {
 		u8 max_valid_reg_idx;
 		u8 max_valid_out_cap_reg_idx;
 		u8 max_valid_in_cap_reg_idx;
-		cptr_t reply_cap;
-		u64 reply_badge;
+		cptr_t call_endpoint_cap;
+		cptr_t reply_endpoint_cap;
 	} utcb;
-	struct dstore *dstore;
 };
 
 #endif /* LCD_LCD_H */

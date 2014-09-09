@@ -274,18 +274,29 @@ static inline int __lcd_cnode_is_sync_ep(struct cnode *cnode)
 struct sync_endpoint {
 	struct list_head senders;
         struct list_head receivers;
+	struct list_head proxies;
         struct mutex lock;
 };
 
+struct sync_endpoint_proxy {
+	struct lcd *parent;
+	struct sync_endpoint *endpoint;
+
+	struct list_head lcd_active_list;
+	struct list_head endpoint_active_list;
+	
+	struct list_head proxies;
+};
+
 /**
- * Create a synchronous end point, and install it in t's cspace
+ * Create a synchronous end point, and install it in lcd's cspace
  * at location cptr.
  */
-int lcd_mk_sync_endpoint(struct task_struct *t, cptr_t cptr);
+int lcd_mk_sync_endpoint(struct lcd *lcd, cptr_t cptr);
 /**
- * Remove synchronous end point identified by cptr in t's cspace.
+ * Remove synchronous end point identified by cptr in lcd's cspace.
  */
-int lcd_rm_sync_endpoint(struct task_struct *t, cptr_t cptr);
+int lcd_rm_sync_endpoint(struct lcd *lcd, cptr_t cptr);
 
 
 #endif /* LCD_PROTOTYPE_API_DEFS_H */

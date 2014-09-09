@@ -49,15 +49,8 @@ static void copy_call_endpoint(struct lcd *from, struct lcd *to)
 	return;	
 }
 
-static void transfer_msg(struct sync_endpoint_proxy *from_proxy,
-			struct sync_endpoint_proxy *to_proxy, 
-			int making_call)
+static void transfer_msg(struct lcd *from, struct lcd *to, int making_call)
 {
-	struct lcd *from;
-	struct lcd *to;
-	
-	from = from_proxy->parent;
-	to = to_proxy->parent;
 	/*
 	 * Copy valid regs
 	 */
@@ -72,18 +65,16 @@ static void transfer_msg(struct sync_endpoint_proxy *from_proxy,
 	return; 
 }
 
-static int lcd_do_send(struct lcd *lcd, cptr_t c, int making_call)
+static int lcd_do_send(struct lcd *from, cptr_t c, int making_call)
 {
 	int ret;
-	struct sync_endpoint_proxy *from_proxy;
-	struct sync_endpoing_proxy *to_proxy;
-	struct sync_endpoint *e;
+	struct lcd *to;
 	struct cnode *cnode;
 	
 	/*
 	 * Lookup cnode
 	 */
-	ret = __lcd_lookup_cnode(lcd->cspace, c, &cnode);
+	ret = __lcd_lookup_cnode(from->cspace, c, &cnode);
 	if (ret)
 		goto fail1;
 	/*
@@ -94,10 +85,9 @@ static int lcd_do_send(struct lcd *lcd, cptr_t c, int making_call)
 		goto fail1;
 	}
 	/*
-	 * Get synch end point proxy and end point
+	 * Get synch end point
 	 */
-	from_proxy = __lcd_cnode_object(cnode);
-	e = from_proxy->endpoint;
+	e = __lcd_cnode_object(cnode);
 	/*
 	 * Check if any recvr waiting, and do immediate send, wake up
 	 * recvr
@@ -108,20 +98,17 @@ static int lcd_do_send(struct lcd *lcd, cptr_t c, int making_call)
 	mutex_lock(&e->lock);
 	if (list_empty(&e->receivers)) {
 		/*
-		 * No one receiving; put myself in e's sender list and lcd's
-		 * sending eps list.
-		 *
-		 * XXX: maybe we want per-lcd lock?
+		 * No one receiving; put myself in e's sender list
 		 */
-		list_add_tail(&from_proxy->lcd_proxy_list, &lcd->sending_eps);
-		list_add_tail(&from_proxy->endpoint_proxy_list, &e->senders);
+		list_add_tail(&from->senders, &e->senders);
 		/*
 		 * Mark myself as making a call, if necessary, so that recvr
 		 * knows it needs to copy reply rendezvous point cap.
 		 */
-		lcd->making_call = making_call;
+		from->making_call = making_call;
 		/*
-		 * IMPORTANT: Must unlock cap before going to sleep.
+		 * IMPORTANT: Must unlock cap and e's lock before going to 
+		 * sleep.
 		 */
 		mutex_unlock(&e->unlock());
 		lcd_cap_unlock();
@@ -135,7 +122,7 @@ static int lcd_do_send(struct lcd *lcd, cptr_t c, int making_call)
 		 *
 		 * Reset making_call var.
 		 */
-		lcd->making_call = 0;
+		from->making_call = 0;
 		lcd_cap_lock();
 
 		return 0;
@@ -145,10 +132,8 @@ static int lcd_do_send(struct lcd *lcd, cptr_t c, int making_call)
 	 * Otherwise, someone waiting to receive. Remove from
 	 * receiving queue.
 	 */
-	to_proxy = list_first_entry(&e->receivers, struct sync_endpoint_proxy,
-				endpoint_proxy_list);
-        list_del_init(&to_proxy->endpoint_proxy_list);
-        list_del_init(&to_proxy->lcd_proxy_list);
+	to = list_first_entry(&e->receivers, struct lcd, receivers);
+        list_del_init(&to->receivers);
 	mutex_unlock(&e->lock);
 
 	/*
@@ -160,11 +145,11 @@ static int lcd_do_send(struct lcd *lcd, cptr_t c, int making_call)
 	/*
 	 * Send message, and wake up lcd
 	 */
-	transfer_msg(from_proxy, to_proxy, making_call);
+	transfer_msg(from, to, making_call);
 
 	lcd_cap_lock();
 
-	wake_up_process(to_proxy->parent->parent);
+	wake_up_process(to->parent);
 
 	return 0;
 fail1:
@@ -191,18 +176,17 @@ int __lcd_send(struct lcd *lcd, cptr_t c)
 	return ret;
 }
 
-static int lcd_do_recv(struct lcd *lcd, cptr_t c)
+static int lcd_do_recv(struct lcd *to, cptr_t c)
 {
 	int ret;
-	struct sync_endpoint_proxy *from_proxy;
-	struct sync_endpoing_proxy *to_proxy;
+	struct lcd *from;
 	struct sync_endpoint *e;
 	struct cnode *cnode;
 	
 	/*
 	 * Lookup cnode
 	 */
-	ret = __lcd_lookup_cnode(lcd->cspace, c, &cnode);
+	ret = __lcd_lookup_cnode(to->cspace, c, &cnode);
 	if (ret)
 		goto fail1;
 	/*
@@ -215,8 +199,7 @@ static int lcd_do_recv(struct lcd *lcd, cptr_t c)
 	/*
 	 * Get synch end point proxy and end point
 	 */
-	to_proxy = __lcd_cnode_object(cnode);
-	e = to_proxy->endpoint;
+	e = __lcd_cnode_object(cnode);
 	/*
 	 * Check if any sender waiting, and do immediate recv, wake up
 	 * sender
@@ -232,8 +215,7 @@ static int lcd_do_recv(struct lcd *lcd, cptr_t c)
 		 *
 		 * XXX: maybe we want per-lcd lock?
 		 */
-		list_add_tail(&to_proxy->lcd_proxy_list, &lcd->recving_eps);
-		list_add_tail(&to_proxy->endpoint_proxy_list, &e->receivers);
+		list_add_tail(&to->receivers, &e->receivers);
 		/*
 		 *
 		 * IMPORTANT: Must unlock cap before going to sleep.
@@ -256,10 +238,8 @@ static int lcd_do_recv(struct lcd *lcd, cptr_t c)
 	 * Otherwise, someone waiting to receive. Remove from
 	 * sending queue.
 	 */
-	from_proxy = list_first_entry(&e->senders, struct sync_endpoint_proxy,
-				endpoint_proxy_list);
-        list_del_init(&from_proxy->endpoint_proxy_list);
-        list_del_init(&from_proxy->lcd_proxy_list);
+	from = list_first_entry(&e->senders, struct lcd, senders);
+        list_del_init(&from->senders);
 	mutex_unlock(&e->lock);
 
 	/*
@@ -271,11 +251,11 @@ static int lcd_do_recv(struct lcd *lcd, cptr_t c)
 	/*
 	 * Send message, and wake up lcd
 	 */
-	transfer_msg(from_proxy, to_proxy, from_proxy->parent->making_call);
+	transfer_msg(from, to, from->making_call);
 
 	lcd_cap_lock();
 
-	wake_up_process(to_proxy->parent->parent);
+	wake_up_process(from->parent);
 
 	return 0;
 fail1:
@@ -340,12 +320,6 @@ int __lcd_reply(struct lcd *lcd)
 	lcd_cap_unlock();
 
 	return ret;
-}
-
-int __lcd_select(struct task_struct *from, cptr_t *cs, int cs_count,
-		cptr_t *c_out)
-{
-	return -ENOSYS;
 }
 
 int lcd_mk_sync_endpoint(struct lcd *lcd, cptr_t c)
@@ -505,29 +479,3 @@ int lcd_rm_sync_endpoint(struct lcd *lcd, cptr_t cptr)
 	lcd_cap_unlock();
 	return ret;
 }
-
-int ipc_reply(capability_t cap, struct message_info *msg)
-{
-	return ipc_send(cap, msg);
-}
-EXPORT_SYMBOL(ipc_reply);
-
-int ipc_call(capability_t cap, struct message_info *msg)
-{
-	int ret; 
-
-	// The last capability register is expected to 
-	// have the reply capability
-	if (msg->valid_cap_regs == 0) 
-		return -EINVAL; 
-
-	ret = ipc_send(cap, msg);
-	if (ret)
-		return ret;
-	
-	// The last capability register is expected to 
-	// have the reply capability
-	ret = ipc_recv(msg->cap_regs[msg->valid_cap_regs - 1], msg); 
-	return ret; 
-}
-EXPORT_SYMBOL(ipc_call);

@@ -274,18 +274,7 @@ static inline int __lcd_cnode_is_sync_ep(struct cnode *cnode)
 struct sync_endpoint {
 	struct list_head senders;
         struct list_head receivers;
-	struct list_head proxies;
         struct mutex lock;
-};
-
-struct sync_endpoint_proxy {
-	struct lcd *parent;
-	struct sync_endpoint *endpoint;
-
-	struct list_head lcd_active_list;
-	struct list_head endpoint_active_list;
-	
-	struct list_head proxies;
 };
 
 /**

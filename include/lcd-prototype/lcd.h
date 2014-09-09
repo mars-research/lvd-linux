@@ -13,7 +13,6 @@
 
 struct cspace;
 typedef u64 cptr_t;
-struct sync_endpoint;
 
 struct lcd {
 	/*
@@ -22,8 +21,9 @@ struct lcd {
 	struct task_struct *parent;
 	u64 badge;
 	struct cspace *cspace;
-	struct list_head sending_eps;
-	struct list_head recving_eps;
+
+	struct list_head senders;
+	struct list_head receivers;
 	int making_call;
 	/*
 	 * Accessible in lcd

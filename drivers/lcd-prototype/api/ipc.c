@@ -95,7 +95,10 @@ static int lcd_do_send(struct lcd *from, cptr_t c, int making_call)
 	 * (Locking endpoint is probably pointless for now since
 	 * it's used primarily when cap is locked.)
 	 */
-	mutex_lock(&e->lock);
+	ret = mutex_lock_interruptible(&e->lock);
+	if (ret)
+		goto fail1;
+
 	if (list_empty(&e->receivers)) {
 		/*
 		 * No one receiving; put myself in e's sender list
@@ -123,9 +126,8 @@ static int lcd_do_send(struct lcd *from, cptr_t c, int making_call)
 		 * Reset making_call var.
 		 */
 		from->making_call = 0;
-		lcd_cap_lock();
-
-		return 0;
+		
+		return lcd_cap_lock();
 	}
 
 	/*
@@ -147,11 +149,9 @@ static int lcd_do_send(struct lcd *from, cptr_t c, int making_call)
 	 */
 	transfer_msg(from, to, making_call);
 
-	lcd_cap_lock();
-
 	wake_up_process(to->parent);
 
-	return 0;
+	return lcd_cap_lock();
 fail1:
 	return ret;
 }
@@ -207,7 +207,10 @@ static int lcd_do_recv(struct lcd *to, cptr_t c)
 	 * (Locking endpoint is probably pointless for now since
 	 * it's used primarily when cap is locked.)
 	 */
-	mutex_lock(&e->lock);
+	ret = mutex_lock_interruptible(&e->lock);
+	if (ret)
+		return ret;
+
 	if (list_empty(&e->receivers)) {
 		/*
 		 * No one sending; put myself in e's recvr list and lcd's
@@ -230,8 +233,7 @@ static int lcd_do_recv(struct lcd *to, cptr_t c)
 		 * Someone woke me up; re-lock cap. Receiver should transfer
 		 * message, so we just return.
 		 */
-		lcd_cap_lock();
-		return 0;
+		return lcd_cap_lock();
 	}
 
 	/*
@@ -253,11 +255,9 @@ static int lcd_do_recv(struct lcd *to, cptr_t c)
 	 */
 	transfer_msg(from, to, from->making_call);
 
-	lcd_cap_lock();
-
 	wake_up_process(from->parent);
 
-	return 0;
+	return lcd_cap_lock();
 fail1:
 	return ret;
 }

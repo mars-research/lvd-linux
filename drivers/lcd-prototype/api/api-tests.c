@@ -8,6 +8,9 @@
 
 #include <linux/kernel.h>
 #include <linux/module.h>
+#include <linux/slab.h>
+#include <linux/completion.h>
+#include <linux/kthread.h>
 #include "../include/common.h"
 #include "defs.h"
 
@@ -32,7 +35,7 @@ static inline int test_check_cnode(struct cspace *cspace, cptr_t cptr,
 				int rights)
 {
 	struct cnode *cnode;
-	int ret;
+
 	if (lcd_cap_lock())
 		return -1;
 	if (__lcd_cnode_lookup(cspace, cptr, &cnode)) {
@@ -91,7 +94,6 @@ static inline void test_rm_lcd(struct lcd *lcd)
 static int test01(void)
 {
 	struct cspace *cspace;
-	int ret;
 
 	if (lcd_mk_cspace(&cspace))
 		LCD_FAIL("mk cspace");
@@ -478,7 +480,7 @@ static int test06_thread1(void *__info)
 
 out:
 	info->ret_val = ret;
-	complete(info->done);
+	complete(&info->done);
 	return 0;
 }
 
@@ -505,7 +507,7 @@ static int test06_thread2(void *__info)
 
 out:
 	info->ret_val = ret;
-	complete(info->done);
+	complete(&info->done);
 	return 0;
 }
 
@@ -606,8 +608,8 @@ static int test06(void)
 		ret = -1;
 		goto clean4;
 	}
-	if (lcd1->regs[0] != 12345) {
-		LCD_ERR("lcd1 reg 0 is %u", lcd1->regs[0]);
+	if (lcd1->utcb.regs[0] != 12345) {
+		LCD_ERR("lcd1 reg 0 is %u", lcd1->utcb.regs[0]);
 		ret = -1;
 		goto clean4;
 	}

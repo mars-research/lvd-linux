@@ -16,8 +16,8 @@
 static void copy_msg_regs(struct lcd *from, struct lcd *to)
 {
 	int i;
-	for (i = 0; i < from->max_valid_reg_idx; i++)
-		to->regs[i] = from->regs[i];
+	for (i = 0; i < from->utcb.max_valid_reg_idx; i++)
+		to->utcb.regs[i] = from->utcb.regs[i];
 }
 
 static void copy_msg_cap(struct lcd *from, struct lcd *to,
@@ -26,7 +26,7 @@ static void copy_msg_cap(struct lcd *from, struct lcd *to,
 	int ret;
 
 	ret = lcd_cnode_grant(from->cspace, to->cspace, from_ptr, to_ptr,
-			LCD_CAP_ALL_RIGHTS);
+			LCD_CAP_RIGHT_ALL);
 	if (ret) {
 		LCD_ERR("failed to transfer cap @ %d in lcd %p to slot @ %d in lcd %p",
 			from_ptr, from, to_ptr, to);
@@ -36,10 +36,10 @@ static void copy_msg_cap(struct lcd *from, struct lcd *to,
 static void copy_msg_caps(struct lcd *from, struct lcd *to)
 {
 	int i;
-	for (i = 0; i < from->max_valid_out_cap_reg_idx &&
-		     i < to->max_valid_in_cap_reg_idx; i++)
-		copy_msg_cap(from, to, from->out_cap_regs[i],
-			to->in_cap_regs[i]);
+	for (i = 0; i < from->utcb.max_valid_out_cap_reg_idx &&
+		     i < to->utcb.max_valid_in_cap_reg_idx; i++)
+		copy_msg_cap(from, to, from->utcb.out_cap_regs[i],
+			to->utcb.in_cap_regs[i]);
 }
 
 static void copy_call_endpoint(struct lcd *from, struct lcd *to)
@@ -70,11 +70,12 @@ static int lcd_do_send(struct lcd *from, cptr_t c, int making_call)
 	int ret;
 	struct lcd *to;
 	struct cnode *cnode;
+	struct sync_endpoint *e;
 	
 	/*
 	 * Lookup cnode
 	 */
-	ret = __lcd_lookup_cnode(from->cspace, c, &cnode);
+	ret = __lcd_cnode_lookup(from->cspace, c, &cnode);
 	if (ret)
 		goto fail1;
 	/*
@@ -113,7 +114,7 @@ static int lcd_do_send(struct lcd *from, cptr_t c, int making_call)
 		 * IMPORTANT: Must unlock cap and e's lock before going to 
 		 * sleep.
 		 */
-		mutex_unlock(&e->unlock());
+		mutex_unlock(&e->lock);
 		lcd_cap_unlock();
 
 		set_current_state(TASK_INTERRUPTIBLE);
@@ -166,7 +167,7 @@ int __lcd_send(struct lcd *lcd, cptr_t c)
 	if (ret)
 		return ret;
 
-	ret = lcd_do_send(lcd, c);
+	ret = lcd_do_send(lcd, c, 0);
 
 	/*
 	 * UNLOCK cap
@@ -186,7 +187,7 @@ static int lcd_do_recv(struct lcd *to, cptr_t c)
 	/*
 	 * Lookup cnode
 	 */
-	ret = __lcd_lookup_cnode(to->cspace, c, &cnode);
+	ret = __lcd_cnode_lookup(to->cspace, c, &cnode);
 	if (ret)
 		goto fail1;
 	/*
@@ -223,7 +224,7 @@ static int lcd_do_recv(struct lcd *to, cptr_t c)
 		 *
 		 * IMPORTANT: Must unlock cap before going to sleep.
 		 */
-		mutex_unlock(&e->unlock());
+		mutex_unlock(&e->lock);
 		lcd_cap_unlock();
 
 		set_current_state(TASK_INTERRUPTIBLE);
@@ -299,7 +300,13 @@ int __lcd_call(struct lcd *lcd, cptr_t c)
 	 */
 	lcd_cap_unlock();
 
-	return ret;
+	if (ret)
+		return ret;
+
+	/*
+	 * Receive on my special end point
+	 */
+	return __lcd_recv(lcd, lcd->utcb.call_endpoint_cap);
 }
 
 int __lcd_reply(struct lcd *lcd)
@@ -312,7 +319,7 @@ int __lcd_reply(struct lcd *lcd)
 	if (ret)
 		return ret;
 
-	ret = lcd_do_send(lcd, lcd->reply_endpoint_cap, 0);
+	ret = lcd_do_send(lcd, lcd->utcb.reply_endpoint_cap, 0);
 
 	/*
 	 * UNLOCK cap
@@ -325,8 +332,6 @@ int __lcd_reply(struct lcd *lcd)
 int lcd_mk_sync_endpoint(struct lcd *lcd, cptr_t c)
 {
 	struct sync_endpoint *e;
-	struct sync_endpoint_proxy *proxy;
-	struct cnode *cnode;
 	int ret = -EINVAL;
 	/*
 	 * Allocate end point
@@ -341,100 +346,41 @@ int lcd_mk_sync_endpoint(struct lcd *lcd, cptr_t c)
 	 */
 	INIT_LIST_HEAD(&e->senders);
 	INIT_LIST_HEAD(&e->receivers);
-	INIT_LIST_HEAD(&e->proxies);
 	mutex_init(&e->lock);
 	/*
-	 * Allocate end point proxy
+	 * Insert endpoint into cspace at c
 	 */
-	proxy = kmalloc(sizeof(*proxy), GFP_KERNEL);
-	if (!proxy) {
-		ret = -ENOMEM;
-		goto fail2;
-	}
-	/*
-	 * Initialize proxy
-	 */
-	INIT_LIST_HEAD(&proxy->lcd_proxy_list);
-	INIT_LIST_HEAD(&proxy->endpoint_proxy_list);
-	INIT_LIST_HEAD(&proxy->proxies);
-	proxy->parent = lcd;
-	proxy->ep = e;
-	/*
-	 * Add proxy to end point
-	 */
-	list_add(&proxy->proxies, &e->proxies);
-	/*
-	 * Insert endpoint proxy into cspace at c
-	 */
-	ret = lcd_cnode_insert(lcd->cspace, c, proxy, LCD_CAP_TYPE_SYNC_EP,
+	ret = lcd_cnode_insert(lcd->cspace, c, e, LCD_CAP_TYPE_SYNC_EP,
 			LCD_CAP_RIGHT_ALL);
 	if (ret) {
 		LCD_ERR("insert endpoint");
-		goto fail3;
+		goto fail2;
 	}
 	return 0;
 
-fail3:
-	kfree(proxy);
 fail2:
 	kfree(e);
 fail1:
 	return ret;
 }
 
-static void __cleanup_sync_endpoint_proxies(struct sync_endpoint *e)
-{
-	struct list_head *ptr;
-	struct list_head *n;
-	struct sync_endpoint_proxy *proxy;
-
-	list_for_each_safe(ptr, n, &e->proxies) {
-		proxy = list_entry(ptr, struct sync_endpoint_proxy, proxies);
-		/*
-		 * Remove proxy from parent lcd's list (send or recv)
-		 */
-		list_del(&proxy->lcd_active_list);
-		/*
-		 * Remove proxy from end point's list (send or recv)
-		 */
-		list_del(&proxy->endpoint_active_list);
-		/*
-		 * Remove proxy from all of end point's proxies 
-		 * (active/inactive)
-		 */
-		list_del(&proxy->proxies);
-		/*
-		 * Free mem
-		 */
-		kfree(proxy);
-	}
-}
-
 static int __cleanup_sync_endpoint(struct cnode *cnode)
 {
-	struct sync_endpoint_proxy *proxy;
 	struct sync_endpoint *e;
 	/*
-	 * Check that cnode contains sync ep (proxy), and lcd is owner
+	 * Check that cnode contains sync ep, and lcd is owner
 	 */
 	if (!__lcd_cnode_is_sync_ep(cnode))
 		return -EINVAL;
 	if (!__lcd_cnode_is_owner(cnode))
 		return -EINVAL;
 
-	proxy = __lcd_cnode_object(cnode);
-	e = proxy->endpoint;
+	e = __lcd_cnode_object(cnode);
 
 	/*
-	 * Remove from cspaces first, so no one can refer to sync ep (via
-	 * a proxy)
+	 * Remove from cspaces first, so no one can refer to sync ep
 	 */
 	__lcd_cnode_free(cnode);
-
-	/*
-	 * Remove all proxies (proxy var invalid after this point!)
-	 */
-	__cleanup_sync_endpoint_proxies(e);
 
 	/*
 	 * Free end point
@@ -447,12 +393,13 @@ static int __cleanup_sync_endpoint(struct cnode *cnode)
 static int __lcd_rm_sync_endpoint(struct lcd *lcd, cptr_t cptr)
 {
 	int ret;
+	struct cnode *cnode;
 	/*
 	 * Look up cnode
 	 */
-	ret = __lcd_cnode_lookup(lcd->cspace, c, &cnode);
+	ret = __lcd_cnode_lookup(lcd->cspace, cptr, &cnode);
 	if (ret) {
-		LCD_ERR("cnode lookup at %lld", c);
+		LCD_ERR("cnode lookup at %lld", cptr);
 		return ret;
 	}
 	/*
@@ -464,7 +411,6 @@ static int __lcd_rm_sync_endpoint(struct lcd *lcd, cptr_t cptr)
 
 int lcd_rm_sync_endpoint(struct lcd *lcd, cptr_t cptr)
 {
-	struct cnode *cnode;
 	int ret;
 	/*
 	 * LOCK cap

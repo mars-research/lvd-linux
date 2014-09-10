@@ -101,6 +101,8 @@ static int lcd_do_send(struct lcd *from, cptr_t c, int making_call)
 		goto fail1;
 
 	if (list_empty(&e->receivers)) {
+		
+		LCD_MSG("no one waiting to recv, putting myself to sleep");
 		/*
 		 * No one receiving; put myself in e's sender list
 		 */
@@ -163,6 +165,7 @@ int __lcd_send(struct lcd *lcd, cptr_t c)
 	/*
 	 * LOCK cap
 	 */
+	LCD_MSG("sending ...");
 	ret = lcd_cap_lock();
 	if (ret)
 		return ret;
@@ -213,6 +216,8 @@ static int lcd_do_recv(struct lcd *to, cptr_t c)
 		return ret;
 
 	if (list_empty(&e->receivers)) {
+
+		LCD_MSG("no one waiting to send, putting myself to sleep");
 		/*
 		 * No one sending; put myself in e's recvr list and lcd's
 		 * receiving eps list.
@@ -269,6 +274,7 @@ int __lcd_recv(struct lcd *lcd, cptr_t c)
 	/*
 	 * LOCK cap
 	 */
+	LCD_MSG("recving ...");
 	ret = lcd_cap_lock();
 	if (ret)
 		return ret;

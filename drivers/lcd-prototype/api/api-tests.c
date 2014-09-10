@@ -452,63 +452,24 @@ fail1:
 struct test06_info {
 	struct lcd *lcd;
 	cptr_t ep_cptr;
-	struct completion c;
-	struct completion done;
-	int ret_val;
 };
 
 static int test06_thread1(void *__info)
 {
 	struct test06_info *info;
-	int ret;
 
 	info = (struct test06_info *)__info;
 
-	ret = wait_for_completion_interruptible(&info->c);
-	if (ret)
-		goto out;
-
-	/* check if we should die */
-	if (kthread_should_stop()) {
-		ret = 1;
-		goto out;
-	}
-
-	/* ok, coast clear */	
-	ret = __lcd_recv(info->lcd, info->ep_cptr);
-	goto out;
-
-out:
-	info->ret_val = ret;
-	complete(&info->done);
-	return 0;
+	return __lcd_recv(info->lcd, info->ep_cptr);
 }
 
 static int test06_thread2(void *__info)
 {
 	struct test06_info *info;
-	int ret;
 
 	info = (struct test06_info *)__info;
 
-	ret = wait_for_completion_interruptible(&info->c);
-	if (ret)
-		goto out;
-
-	/* check if we should die */
-	if (kthread_should_stop()) {
-		ret = 1;
-		goto out;
-	}
-
-	/* ok, coast clear */	
-	ret = __lcd_send(info->lcd, info->ep_cptr);
-	goto out;
-
-out:
-	info->ret_val = ret;
-	complete(&info->done);
-	return 0;
+	return __lcd_send(info->lcd, info->ep_cptr);
 }
 
 static int test06(void)
@@ -524,12 +485,17 @@ static int test06(void)
 	int ret;
 
 	lcd1 = test_mk_lcd();
-	if (!lcd1)
+	if (!lcd1) {
+		ret = -1;
 		goto clean1;
+	}
 	lcd2 = test_mk_lcd();
-	if (!lcd2)
+	if (!lcd2) {
+		ret = -1;
 		goto clean2;
+	}
 
+	LCD_MSG("done mking lcds");
 	/*
 	 * Allocate a cnode and endpoint
 	 */
@@ -541,6 +507,7 @@ static int test06(void)
 		LCD_ERR("mk sync endpoint");
 		goto clean3;
 	}
+	LCD_MSG("done setting up ep");
 	/*
 	 * Grant send rights to lcd2
 	 */
@@ -561,8 +528,8 @@ static int test06(void)
 
 	info1.lcd = lcd1;
 	info1.ep_cptr = cptr1;
-	init_completion(&info1.c);
-	init_completion(&info1.done);
+
+	LCD_MSG("ready to spawn task1");
 
 	lcd1_task = kthread_create(test06_thread1, &info1, "test06_thread1");
 	if (!lcd1_task) {
@@ -572,39 +539,39 @@ static int test06(void)
 
 	info2.lcd = lcd2;
 	info2.ep_cptr = cptr2;
-	init_completion(&info2.c);
-	init_completion(&info2.done);
 
 	lcd2_task = kthread_create(test06_thread2, &info2, "test06_thread2");
 	if (!lcd2_task) {
 		LCD_ERR("spawning lcd2 task");
 
-		/* tell thread1 to stop, and fire completion */
+		/* cancel thread1 (before it even starts) */
 		kthread_stop(lcd1_task);
-		complete(&info1.c);
 		goto clean4;
 	}
 
-	/* coast clear, fire both completions */
-	complete(&info1.c);
-	complete(&info2.c);
+	/* coast clear, wake up both tasks */
+	wake_up_process(lcd1_task);
+	wake_up_process(lcd2_task);
 
-	/* wait for kthreads to complete */
-	ret = wait_for_completion_interruptible(&info1.done);
-	if (ret)
-		goto clean5;
-	ret = wait_for_completion_interruptible(&info2.done);
-	if (ret)
-		goto clean5;
+	LCD_MSG("done init'ing tasks");
+
+
+	/* wait for kthreads to complete, and get ret vals */
 
 	/* send / recv should be done; check result. */
-	if (info1.ret_val != 0) {
-		LCD_ERR("lcd1 non-zero ret_val = %d", info1.ret_val);
+	ret = kthread_stop(lcd1_task);
+	if (ret) {
+		LCD_ERR("lcd1 non-zero ret_val = %d", ret);
+
+		/* make sure we clean up task 2 */
+		kthread_stop(lcd2_task);
+
 		ret = -1;
 		goto clean4;
 	}
-	if (info2.ret_val != 0) {
-		LCD_ERR("lcd2 non-zero ret_val = %d", info2.ret_val);
+	ret = kthread_stop(lcd2_task);
+	if (ret) {
+		LCD_ERR("lcd2 non-zero ret_val = %d", ret);
 		ret = -1;
 		goto clean4;
 	}
@@ -617,10 +584,6 @@ static int test06(void)
 	ret = 0;
 	goto clean4;
 
-clean5:
-	/* tell both threads to stop */
-	kthread_stop(lcd1_task);
-	kthread_stop(lcd2_task);
 clean4:
 	lcd_rm_sync_endpoint(lcd1, cptr1);
 clean3:

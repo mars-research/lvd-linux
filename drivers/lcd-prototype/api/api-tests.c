@@ -511,7 +511,7 @@ static int test06(void)
 	ret = lcd_cnode_alloc(lcd1->cspace, &cptr1);
 	if (ret)
 		goto clean3;
-	ret = lcd_mk_sync_endpoint(lcd1, cptr1);
+	ret = __lcd_mk_sync_endpoint(lcd1, cptr1);
 	if (ret) {
 		LCD_ERR("mk sync endpoint");
 		goto clean3;
@@ -591,7 +591,7 @@ static int test06(void)
 	goto clean4;
 
 clean4:
-	lcd_rm_sync_endpoint(lcd1, cptr1);
+	__lcd_rm_sync_endpoint(lcd1, cptr1);
 clean3:
 	test_rm_lcd(lcd2);
 clean2:
@@ -680,7 +680,7 @@ static int test07(void)
 	ret = lcd_cnode_alloc(lcd1->cspace, &cptr1a);
 	if (ret)
 		goto clean3;
-	ret = lcd_mk_sync_endpoint(lcd1, cptr1a);
+	ret = __lcd_mk_sync_endpoint(lcd1, cptr1a);
 	if (ret) {
 		LCD_ERR("mk sync endpoint");
 		goto clean3;
@@ -709,7 +709,7 @@ static int test07(void)
 	ret = lcd_cnode_alloc(lcd2->cspace, &cptr2b);
 	if (ret)
 		goto clean4;
-	ret = lcd_mk_sync_endpoint(lcd2, cptr2b);
+	ret = __lcd_mk_sync_endpoint(lcd2, cptr2b);
 	if (ret) {
 		LCD_ERR("mk lcd2 reply sync endpoint");
 		goto clean5;
@@ -791,9 +791,9 @@ static int test07(void)
 	goto clean5;
 
 clean5:
-	lcd_rm_sync_endpoint(lcd2, cptr2b);
+	__lcd_rm_sync_endpoint(lcd2, cptr2b);
 clean4:
-	lcd_rm_sync_endpoint(lcd1, cptr1a);
+	__lcd_rm_sync_endpoint(lcd1, cptr1a);
 clean3:
 	test_rm_lcd(lcd2);
 clean2:

@@ -15,37 +15,49 @@
 #include <lcd-prototype/lcd.h>
 #include "utcb.h"
 #include "api-internal.h"
+#include "../api/defs.h"
 
 struct lcd_handler {
 	cptr_t c;
 	int (*handler)(void);
 };
 
+static inline struct lcd * current_lcd(void)
+{
+	return current->lcd;
+}
+
 static inline int lcd_send(cptr_t c)
 {
-	return __lcd_send(current, c);
+	return __lcd_send(current_lcd(), c);
 }
 static inline int lcd_reply(void)
 {
-	return lcd_send(current, lcd_reply_cap());
+	return lcd_send(current_lcd(), lcd_reply_cap());
 }
 static inline int lcd_call(cptr_t c)
 {
-	return __lcd_call(current, c);
+	return __lcd_call(current_lcd(), c);
 }
-static inline int lcd_select(struct lcd_handlers *hs, int hs_count)
+static inline int lcd_mk_sync_endpoint(cptr_t *c)
 {
-	cptr_t cs[hs_count];
-	int recv_idx;
-	int i;
 	int ret;
-	for (i = 0; i < hs_count; i++)
-		cs[i] = hs[i].c;
-	ret = __lcd_select(current, cs, hs_count, &idx);
+
+	ret = lcd_cnode_alloc(current_lcd()->cspace, c);
 	if (ret)
 		return ret;
-	else
-		return hs[idx].handler();
+
+	return __lcd_mk_sync_endpoint(current_lcd(), *c);
+}
+
+static inline int lcd_rm_sync_endpoint(cptr_t c)
+{
+	return __lcd_rm_sync_endpoint(current_lcd(), c);
+}
+
+static inline int lcd_select(struct lcd_handlers *hs, int hs_count)
+{
+	return -ENOSYS;
 }
 
 #endif /* LCD_PROTOTYPE_IPC_H */

@@ -83,6 +83,7 @@ enum lcd_cap_type {
 	LCD_CAP_TYPE_FREE     = 0,
 	LCD_CAP_TYPE_UNFORMED = 1,
 	LCD_CAP_TYPE_SYNC_EP  = 2,
+	LCD_CAP_TYPE_DSTORE   = 3,
 };
 
 enum lcd_cap_right {
@@ -276,16 +277,5 @@ struct sync_endpoint {
         struct list_head receivers;
         struct mutex lock;
 };
-
-/**
- * Create a synchronous end point, and install it in lcd's cspace
- * at location cptr.
- */
-int lcd_mk_sync_endpoint(struct lcd *lcd, cptr_t cptr);
-/**
- * Remove synchronous end point identified by cptr in lcd's cspace.
- */
-int lcd_rm_sync_endpoint(struct lcd *lcd, cptr_t cptr);
-
 
 #endif /* LCD_PROTOTYPE_API_DEFS_H */

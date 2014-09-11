@@ -50,6 +50,17 @@ int __lcd_call(struct lcd *lcd, cptr_t c);
  */
 int __lcd_reply(struct lcd *lcd);
 /**
+ * Create a synchronous end point, and install it in lcd's cspace
+ * at location cptr.
+ */
+int __lcd_mk_sync_endpoint(struct lcd *lcd, cptr_t cptr);
+/**
+ * Remove synchronous end point identified by cptr in lcd's cspace.
+ */
+int __lcd_rm_sync_endpoint(struct lcd *lcd, cptr_t cptr);
+
+
+/**
  * Places from on receive queue for all end points identified by the 
  * cptr's cs. When a matching send is received, idx points to the
  * cptr in cs on which the receive happened.

@@ -10,6 +10,11 @@
 
 #include <lcd-prototype/lcd.h>
 
+static inline struct lcd * current_lcd(void)
+{
+	return current->lcd;
+}
+
 /* BOOT CPTRS -------------------------------------------------- */
 
 static inline cptr_t lcd_boot_cptr(u8 idx)
@@ -114,23 +119,12 @@ LCD_MK_IN_CAP_REG_ACCESS(5);
 LCD_MK_IN_CAP_REG_ACCESS(6);
 LCD_MK_IN_CAP_REG_ACCESS(7);
 
-/* REPLY INFO -------------------------------------------------- */
+/* REPLY INFO ---------------------------------------- */
 
 static inline u64 lcd_reply_badge(void)
 {
-	return current->lcd->utcb.reply_badge;
-}
-static inline void lcd_store_reply_badge(u64 val)
-{
-	current->lcd->utcb.reply_badge = val;
-}
-static inline cptr_t lcd_reply_cap(void)
-{
-	return current->lcd->utcb.reply_cap;
-}
-static inline void lcd_store_reply_cap(cptr_t val)
-{
-	current->lcd->utcb.reply_cap = val;
+	/* not implemented */
+	return 0;
 }
 
 #endif /* LCD_PROTOTYPE_UTCB_H */

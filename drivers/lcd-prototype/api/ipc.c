@@ -330,7 +330,7 @@ int __lcd_reply(struct lcd *lcd)
 	return ret;
 }
 
-int lcd_mk_sync_endpoint(struct lcd *lcd, cptr_t c)
+int __lcd_mk_sync_endpoint(struct lcd *lcd, cptr_t c)
 {
 	struct sync_endpoint *e;
 	int ret = -EINVAL;
@@ -391,7 +391,7 @@ static int __cleanup_sync_endpoint(struct cnode *cnode)
 	return 0;
 }
 
-static int __lcd_rm_sync_endpoint(struct lcd *lcd, cptr_t cptr)
+static int lcd_do_rm_sync_endpoint(struct lcd *lcd, cptr_t cptr)
 {
 	int ret;
 	struct cnode *cnode;
@@ -410,7 +410,7 @@ static int __lcd_rm_sync_endpoint(struct lcd *lcd, cptr_t cptr)
 	return __cleanup_sync_endpoint(cnode);
 }
 
-int lcd_rm_sync_endpoint(struct lcd *lcd, cptr_t cptr)
+int __lcd_rm_sync_endpoint(struct lcd *lcd, cptr_t cptr)
 {
 	int ret;
 	/*
@@ -419,7 +419,7 @@ int lcd_rm_sync_endpoint(struct lcd *lcd, cptr_t cptr)
 	ret = lcd_cap_lock();
 	if (ret)
 		return ret;
-	ret = __lcd_rm_sync_endpoint(lcd, cptr);
+	ret = lcd_do_rm_sync_endpoint(lcd, cptr);
 	/*
 	 * UNLOCK cap
 	 */

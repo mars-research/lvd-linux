@@ -19,26 +19,18 @@ extern void __manufacturer_exit(void);
 #include "../include/common.h"
 #include "../include/ipc.h"
 #include "../include/api.h"
-#include "../include/dstore.h"
 #include "../include/utcb.h"
 
 /* INTERFACE WRAPPERS -------------------------------------------------- */
 
 struct manufacturer_interface *mi;
-struct {
-	cptr_t mk_engine;
-	cptr_t mk_automobile;
-	cptr_t free_engine;
-	cptr_t free_automobile;
-} manufacturer_interface_cptrs;
+cptr_t manufacturer_interface_cap;
 
 /**
  * mk_engine_callee
  * ----------------
  * IN:
- * lcd_r0 = number of cylinders
- * lcd_reply_cap = cptr to reply rendezvous point
- * lcd_reply_badge = badge identifying sender
+ * lcd_r1 = number of cylinders
  * OUT:
  * lcd_r0 = 0
  * lcd_r1 = dsptr to allocated engine
@@ -52,19 +44,19 @@ static int mk_engine_callee(void)
 	/*
 	 * Build engine
 	 */
-	cylinders = (int)lcd_r0();
+	cylinders = (int)lcd_r1();
 	e = mi->mk_engine(cylinders);
 	if (!e) {
-		AU_ERR("bad engine");
+		LCD_ERR("bad engine");
 		ret = -1;
 		goto fail1;
 	}
 	/*
-	 * Put in data store
+	 * Alloc capability
 	 */
 	ret = lcd_ds_store(e, &engine_dsptr, lcd_reply_badge());
 	if(ret) {
-		AU_ERR("store engine");
+		LCD_ERR("store engine");
 		goto fail2;
 	}
 	/*
@@ -74,7 +66,7 @@ static int mk_engine_callee(void)
 	lcd_store_r1(engine_dsptr);
 	ret = lcd_reply();
 	if (ret) {
-		AU_ERR("couldn't reply");
+		LCD_ERR("couldn't reply");
 		goto fail3;
 	}
 
@@ -91,10 +83,8 @@ fail1:
  * mk_automobile_callee
  * --------------------
  * IN:
- * lcd_r0 = number of doors
- * lcd_r1 = dsptr to allocated engine
- * lcd_reply_cap = cptr to reply rendezvous point
- * lcd_reply_badge = badge identifying sender
+ * lcd_r1 = number of doors
+ * lcd_r2 = dsptr to allocated engine
  * OUT:
  * lcd_r0 = 0
  * lcd_r1 = dsptr to allocated auto
@@ -110,20 +100,20 @@ static int mk_automobile_callee(void)
 	/*
 	 * Get the engine from the data store
 	 */
-	engine_dsptr = (dsptr_t)lcd_r1();
+	engine_dsptr = (dsptr_t)lcd_r2();
 	e = lcd_ds_read(lcd_reply_badge(), engine_dsptr);
 	if (!e) {
-		AU_ERR("bad engine dsptr %lld", engine_dsptr);
+		LCD_ERR("bad engine dsptr %lld", engine_dsptr);
 		ret = -EINVAL;
 		goto fail1;
 	}
 	/*
 	 * Build car
 	 */
-	doors = (int)lcd_r0();
+	doors = (int)lcd_r1();
 	a = mi->mk_automobile(e, doors);
 	if (!a) {
-		AU_ERR("bad auto");
+		LCD_ERR("bad auto");
 		ret = -ENOMEM;
 		goto fail1;
 	}
@@ -132,7 +122,7 @@ static int mk_automobile_callee(void)
 	 */
 	ret = lcd_ds_store(a, &auto_dsptr, lcd_reply_badge());
 	if(ret) {
-		AU_ERR("store auto");
+		LCD_ERR("store auto");
 		goto fail2;
 	}
 	/*
@@ -142,7 +132,7 @@ static int mk_automobile_callee(void)
 	lcd_store_r1(auto_dsptr);
 	ret = lcd_reply();
 	if (ret) {
-		AU_ERR("couldn't reply");
+		LCD_ERR("couldn't reply");
 		goto fail3;
 	}
 
@@ -160,9 +150,7 @@ fail1:
  * free_engine_callee
  * ------------------
  * IN:
- * lcd_r0 = dsptr to allocated engine
- * lcd_reply_cap = cptr to reply rendezvous point
- * lcd_reply_badge = badge identifying sender
+ * lcd_r1 = dsptr to allocated engine
  * OUT:
  * lcd_r0 = 0
  */
@@ -174,10 +162,10 @@ static int free_engine_callee(void)
 	/*
 	 * Get and remove engine from data store
 	 */
-	engine_dsptr = (dsptr_t)lcd_r0();
+	engine_dsptr = (dsptr_t)lcd_r1();
 	e = lcd_ds_drop(lcd_reply_badge(), engine_dsptr);
 	if (!e) {
-		AU_ERR("bad engine dsptr %lld", engine_dsptr);
+		LCD_ERR("bad engine dsptr %lld", engine_dsptr);
 		ret = -EINVAL;
 		goto fail1;
 	}
@@ -191,7 +179,7 @@ static int free_engine_callee(void)
 	lcd_store_r0(0);
 	ret = lcd_reply();
 	if (ret)
-		AU_ERR("couldn't reply");
+		LCD_ERR("couldn't reply");
 
 	return ret;
 
@@ -203,9 +191,7 @@ fail1:
  * free_automobile_callee
  * ----------------------
  * IN:
- * lcd_r0 = dsptr to allocated auto
- * lcd_reply_cap = cptr to reply rendezvous point
- * lcd_reply_badge = badge identifying sender
+ * lcd_r1 = dsptr to allocated auto
  * OUT:
  * lcd_r0 = 0
  */
@@ -217,10 +203,10 @@ static int free_automobile_callee(void)
 	/*
 	 * Get and remove auto from data store
 	 */
-	auto_dsptr = (dsptr_t)lcd_r0();
+	auto_dsptr = (dsptr_t)lcd_r1();
 	e = lcd_ds_drop(lcd_reply_badge(), auto_dsptr);
 	if (!e) {
-		AU_ERR("bad auto dsptr %lld", auto_dsptr);
+		LCD_ERR("bad auto dsptr %lld", auto_dsptr);
 		ret = -EINVAL;
 		goto fail1;
 	}
@@ -234,7 +220,7 @@ static int free_automobile_callee(void)
 	lcd_store_r0(0);
 	ret = lcd_reply();
 	if (ret)
-		AU_ERR("couldn't reply");
+		LCD_ERR("couldn't reply");
 
 	return ret;
 
@@ -246,8 +232,7 @@ fail1:
  * manufacturer_die_callee
  * -----------------------
  * IN:
- * lcd_reply_cap = cptr to reply rendezvous point
- * lcd_reply_badge = badge identifying sender
+ * (reply info)
  * OUT:
  * (nothing)
  */
@@ -263,7 +248,7 @@ int manufacturer_die_callee(void)
 	 */
 	ret = lcd_reply();
 	if (ret)
-		AU_ERR("couldn't reply");
+		LCD_ERR("couldn't reply");
 	return ret;
 }
 
@@ -283,52 +268,28 @@ int dealer_register_manufacturer(struct manufacturer_interface *__mi)
 	 */
 	mi = __mi;
 	/*
-	 * Create endpoints for functions in interface
+	 * Create endpoint for interface
 	 */
-	ret = lcd_mk_sync_endpoint(manufacturer_interface_cptrs.mk_engine); 
+	ret = lcd_mk_sync_endpoint(&manufacturer_interface_cap);
 	if(ret) {
-		AU_ERR("mk engine endpoint");
+		LCD_ERR("mk manufacturer iface endpoint");
 		goto fail1;
-	}
-	ret = lcd_mk_sync_endpoint(manufacturer_interface_cptrs.mk_automobile); 
-	if(ret) {
-		AU_ERR("mk auto endpoint");
-		goto fail2;
-	}
-	ret = lcd_mk_sync_endpoint(manufacturer_interface_cptrs.free_engine); 
-	if(ret) {
-		AU_ERR("free engine endpoint");
-		goto fail3;
-	}
-	ret = lcd_mk_sync_endpoint(manufacturer_interface_cptrs.free_automobile); 
-	if(ret) {
-		AU_ERR("free auto endpoint");
-		goto fail4;
 	}
 
 	/*
 	 * Store in the cap regs for the caller, and send
 	 */
-	lcd_store_out_cap0(manufacturer_interface_cptrs.mk_engine);
-	lcd_store_out_cap1(manufacturer_interface_cptrs.mk_automobile);
-	lcd_store_out_cap2(manufacturer_interface_cptrs.free_engine);
-	lcd_store_out_cap3(manufacturer_interface_cptrs.free_automobile);
-	ret = lcd_call(lcd_boot_cptr(DEALER_REGISTER_MANUFACTURER));
+	lcd_store_out_cap0(manufacturer_interface_cap);
+	ret = lcd_call(lcd_boot_cptr(MANUFACTURER_DEALER_INTERFACE_CAP));
 	if (ret) {
-		AU_ERR("call to dealer");
-		goto fail5;
+		LCD_ERR("call to dealer");
+		goto fail2;
 	}
 
 	return (int)lcd_r0();
 
-fail5:
-	lcd_rm_sync_endpoint(manufacturer_interface_cptrs.free_automobile);
-fail4:
-	lcd_rm_sync_endpoint(manufacturer_interface_cptrs.free_engine);
-fail3:
-	lcd_rm_sync_endpoint(manufacturer_interface_cptrs.mk_automobile);
 fail2:
-	lcd_rm_sync_endpoint(manufacturer_interface_cptrs.mk_engine);
+	lcd_rm_sync_endpoint(manufacturer_interface_cap);
 fail1:
 	return -1;
 }
@@ -338,17 +299,6 @@ fail1:
 int execution_loop(void)
 {
 	int ret;
-	struct lcd_handler handlers[] = { 
-		{ manufacturer_interface_cptrs.mk_engine,
-		  mk_engine_callee },
-		{ manufacturer_interface_cptrs.mk_automobile,
-		  mk_automobile_callee },
-		{ manufacturer_interface_cptrs.free_engine,
-		  free_engine_callee },
-		{ manufacturer_interface_cptrs.free_automobile,
-		  free_automobile_callee },
-		{ lcd_boot_cptr(MANUFACTURER_DIE),
-		  manufacturer_die_callee } };
 	/* 
 	 * Loop unless there's an internal error, or we get killed
 	 */
@@ -356,15 +306,31 @@ int execution_loop(void)
 		/*
 		 * Listen for incoming message
 		 */
-		ret = lcd_select(handlers, 5);
-		if (ret < 0) {
-			AU_ERR("receive via select");
+		ret = lcd_recv(manufacturer_interface_cap);
+		if (ret)
 			goto out;
+		switch (lcd_r0()) {
+
+			case MANUFACTURER_MK_ENGINE:
+				ret = mk_engine_callee();
+				break;
+			case MANUFACTURER_MK_AUTOMOBILE:
+				ret = mk_automobile_callee();
+				break;
+			case MANUFACTURER_FREE_ENGINE:
+				ret = free_engine_callee();
+				break;
+			case MANUFACTURER_FREE_AUTOMOBILE:
+				ret = free_automobile_callee();
+				break;
+			case MANUFACTURER_DIE:
+				manufacturer_die();
+				goto out;
 		}
-		if (ret > 0) {
-			AU_MSG("dying");
+
+		/* internal error ? */
+		if (ret)
 			goto out;
-		}
 	}
 
 out:
@@ -379,14 +345,14 @@ int __init manufacturer_init(void)
 	 */
 	ret = __manufacturer_init();
 	if (ret) {
-		AU_ERR("manufacturer init");
+		LCD_ERR("manufacturer init");
 		return -1;
 	}
 	/*
 	 * Ensure interface is set
 	 */
 	if (!mi) {
-		AU_ERR("interface not set");
+		LCD_ERR("interface not set");
 		return -1;
 	}
 	/*

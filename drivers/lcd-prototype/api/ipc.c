@@ -101,8 +101,6 @@ static int lcd_do_send(struct lcd *from, cptr_t c, int making_call)
 		goto fail1;
 
 	if (list_empty(&e->receivers)) {
-		
-		LCD_MSG("no one waiting to recv, putting myself to sleep");
 		/*
 		 * No one receiving; put myself in e's sender list
 		 */
@@ -137,6 +135,7 @@ static int lcd_do_send(struct lcd *from, cptr_t c, int making_call)
 	 * Otherwise, someone waiting to receive. Remove from
 	 * receiving queue.
 	 */
+
 	to = list_first_entry(&e->receivers, struct lcd, receivers);
         list_del_init(&to->receivers);
 	mutex_unlock(&e->lock);
@@ -165,7 +164,6 @@ int __lcd_send(struct lcd *lcd, cptr_t c)
 	/*
 	 * LOCK cap
 	 */
-	LCD_MSG("sending ...");
 	ret = lcd_cap_lock();
 	if (ret)
 		return ret;
@@ -215,9 +213,7 @@ static int lcd_do_recv(struct lcd *to, cptr_t c)
 	if (ret)
 		return ret;
 
-	if (list_empty(&e->receivers)) {
-
-		LCD_MSG("no one waiting to send, putting myself to sleep");
+	if (list_empty(&e->senders)) {
 		/*
 		 * No one sending; put myself in e's recvr list and lcd's
 		 * receiving eps list.
@@ -243,7 +239,7 @@ static int lcd_do_recv(struct lcd *to, cptr_t c)
 	}
 
 	/*
-	 * Otherwise, someone waiting to receive. Remove from
+	 * Otherwise, someone waiting to send. Remove from
 	 * sending queue.
 	 */
 	from = list_first_entry(&e->senders, struct lcd, senders);
@@ -274,7 +270,6 @@ int __lcd_recv(struct lcd *lcd, cptr_t c)
 	/*
 	 * LOCK cap
 	 */
-	LCD_MSG("recving ...");
 	ret = lcd_cap_lock();
 	if (ret)
 		return ret;

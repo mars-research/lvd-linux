@@ -13,4 +13,6 @@ enum dealer_interface {
 	DEALER_REGISTER_MANUFACTURER,
 };
 
+#define DEALER_MANUFACTURER_INTERFACE_CAP 1
+
 #endif

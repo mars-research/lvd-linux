@@ -280,6 +280,14 @@ int dealer_register_manufacturer(struct manufacturer_interface *__mi)
 	 * Store in the cap regs for the caller, and send
 	 */
 	lcd_store_out_cap0(manufacturer_interface_cap);
+	
+	/*
+	 * Set up call.
+	 *
+	 * r0 = enum for calling reg manufacturer in dealer interface
+	 * boot cptr = points to end point for dealer interface
+	 */
+	lcd_store_r0(DEALER_REGISTER_MANUFACTURER);
 	ret = lcd_call(lcd_boot_cptr(MANUFACTURER_DEALER_INTERFACE_CAP));
 	if (ret) {
 		LCD_ERR("call to dealer");
@@ -337,7 +345,7 @@ out:
 	return ret;
 }
 
-int __init manufacturer_init(void)
+int manufacturer_start(void)
 {
 	int ret;
 	/*
@@ -359,6 +367,12 @@ int __init manufacturer_init(void)
 	 * Now enter loop and listen for calls
 	 */
 	return execution_loop();
+}
+EXPORT_SYMBOL(manufacturer_start);
+
+int __init manufacturer_init(void)
+{
+	return 0;
 }
 
 /* manufacturer_die does the actual tear down */

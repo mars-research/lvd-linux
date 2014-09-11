@@ -621,7 +621,7 @@ static int test07_thread1(void *__info)
 		return 0;
 	}
 
-	info->lcd->utcb.regs[0] = 121212;
+	info->lcd->utcb.regs[0] += 100;
 	info->lcd->utcb.max_valid_reg_idx = 1;
 	info->lcd->utcb.max_valid_out_cap_reg_idx = 0;
 	info->lcd->utcb.max_valid_in_cap_reg_idx = 0;
@@ -776,12 +776,12 @@ static int test07(void)
 		ret = -1;
 		goto clean5;
 	}
-	if (lcd1->utcb.regs[0] != 5678) {
+	if (lcd1->utcb.regs[0] != 5778) {
 		LCD_ERR("lcd1 reg 0 is %u", lcd1->utcb.regs[0]);
 		ret = -1;
 		goto clean5;
 	}
-	if (lcd2->utcb.regs[0] != 121212) {
+	if (lcd2->utcb.regs[0] != 5778) {
 		LCD_ERR("lcd2 reg 0 is %u", lcd2->utcb.regs[0]);
 		ret = -1;
 		goto clean5;

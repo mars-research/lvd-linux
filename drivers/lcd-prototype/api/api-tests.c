@@ -600,6 +600,208 @@ clean1:
 	return ret;
 }
 
+struct test07_info {
+	struct lcd *lcd;
+	cptr_t ep_cptr;
+	struct completion c;
+	int ret_val;
+};
+
+static int test07_thread1(void *__info)
+{
+	struct test07_info *info;
+	int ret;
+
+	info = (struct test07_info *)__info;
+	
+	ret = __lcd_recv(info->lcd, info->ep_cptr);
+	if (ret) {
+		info->ret_val = ret;		
+		complete(&info->c);
+		return 0;
+	}
+
+	info->lcd->utcb.regs[0] = 121212;
+	info->lcd->utcb.max_valid_reg_idx = 1;
+	info->lcd->utcb.max_valid_out_cap_reg_idx = 0;
+	info->lcd->utcb.max_valid_in_cap_reg_idx = 0;
+
+	info->ret_val = __lcd_reply(info->lcd);
+
+	complete(&info->c);
+	
+	return 0;
+}
+
+static int test07_thread2(void *__info)
+{
+	struct test07_info *info;
+
+	info = (struct test07_info *)__info;
+
+	/*
+	 * do call
+	 */
+	info->ret_val = __lcd_call(info->lcd, info->ep_cptr);
+
+	complete(&info->c);
+
+	return 0;
+}
+
+static int test07(void)
+{
+	struct lcd *lcd1;
+	struct lcd *lcd2;
+	struct task_struct *lcd1_task;
+	struct task_struct *lcd2_task;
+	struct test07_info info1;
+	struct test07_info info2;
+	cptr_t cptr1a;
+	cptr_t cptr1b;
+	cptr_t cptr2a;
+	cptr_t cptr2b;
+	int ret;
+
+	lcd1 = test_mk_lcd();
+	if (!lcd1) {
+		ret = -1;
+		goto clean1;
+	}
+	lcd2 = test_mk_lcd();
+	if (!lcd2) {
+		ret = -1;
+		goto clean2;
+	}
+
+	/*
+	 * Allocate a cnode and endpoint
+	 */
+	ret = lcd_cnode_alloc(lcd1->cspace, &cptr1a);
+	if (ret)
+		goto clean3;
+	ret = lcd_mk_sync_endpoint(lcd1, cptr1a);
+	if (ret) {
+		LCD_ERR("mk sync endpoint");
+		goto clean3;
+	}
+	/*
+	 * Grant send rights to lcd2
+	 */
+	ret = lcd_cnode_alloc(lcd2->cspace, &cptr2a);
+	if (ret)
+		goto clean4;
+	ret = lcd_cnode_grant(lcd1->cspace, lcd2->cspace, cptr1a, cptr2a,
+			LCD_CAP_RIGHT_WRITE);
+	if (ret)
+		goto clean4;
+	/*
+	 * Set up message for lcd2 --> lcd1
+	 */
+	lcd2->utcb.regs[0] = 5678;
+	lcd2->utcb.max_valid_reg_idx = 1;
+	lcd2->utcb.max_valid_out_cap_reg_idx = 0;
+	lcd2->utcb.max_valid_in_cap_reg_idx = 0;
+
+	/*
+	 * Set up reply end point
+	 */
+	ret = lcd_cnode_alloc(lcd2->cspace, &cptr2b);
+	if (ret)
+		goto clean4;
+	ret = lcd_mk_sync_endpoint(lcd2, cptr2b);
+	if (ret) {
+		LCD_ERR("mk lcd2 reply sync endpoint");
+		goto clean5;
+	}
+	lcd2->utcb.call_endpoint_cap = cptr2b;
+	
+	/*
+	 * Allocate slot for lcd1 for reply endpoint
+	 */
+	ret = lcd_cnode_alloc(lcd1->cspace, &cptr1b);
+	if (ret)
+		goto clean5;
+	lcd1->utcb.reply_endpoint_cap = cptr1b;
+
+
+	/*
+	 * Spawn threads ...
+	 */
+
+	info1.lcd = lcd1;
+	info1.ep_cptr = cptr1a;
+	init_completion(&info1.c);
+
+	lcd1_task = kthread_create(test07_thread1, &info1, "test07_thread1");
+	if (!lcd1_task) {
+		LCD_ERR("spawning lcd1 task");
+		goto clean5;
+	}
+
+	info2.lcd = lcd2;
+	info2.ep_cptr = cptr2a;
+	init_completion(&info2.c);
+
+	lcd2_task = kthread_create(test07_thread2, &info2, "test07_thread2");
+	if (!lcd2_task) {
+		LCD_ERR("spawning lcd2 task");
+
+		/* cancel thread1 (before it even starts) */
+		kthread_stop(lcd1_task);
+		goto clean5;
+	}
+
+	/* set tasks' lcds */
+	lcd1->parent = lcd1_task;
+	lcd2->parent = lcd2_task;
+
+	/* coast clear, wake up both tasks */
+	wake_up_process(lcd1_task);
+	wake_up_process(lcd2_task);
+
+	/* wait for kthreads to complete, and get ret vals */
+	/* (using completions rather than kthread_stop to avoid hangs) */
+	wait_for_completion_interruptible(&info1.c);
+	wait_for_completion_interruptible(&info2.c);
+
+	/* send / recv should be done; check result. */
+	if (info1.ret_val != 0) {
+		LCD_ERR("lcd1 non-zero ret_val = %d", info1.ret_val);
+		ret = -1;
+		goto clean5;
+	}
+	if (info2.ret_val != 0) {
+		LCD_ERR("lcd2 non-zero ret_val = %d", info2.ret_val);
+		ret = -1;
+		goto clean5;
+	}
+	if (lcd1->utcb.regs[0] != 5678) {
+		LCD_ERR("lcd1 reg 0 is %u", lcd1->utcb.regs[0]);
+		ret = -1;
+		goto clean5;
+	}
+	if (lcd2->utcb.regs[0] != 121212) {
+		LCD_ERR("lcd2 reg 0 is %u", lcd2->utcb.regs[0]);
+		ret = -1;
+		goto clean5;
+	}
+
+	ret = 0;
+	goto clean5;
+
+clean5:
+	lcd_rm_sync_endpoint(lcd2, cptr2b);
+clean4:
+	lcd_rm_sync_endpoint(lcd1, cptr1a);
+clean3:
+	test_rm_lcd(lcd2);
+clean2:
+	test_rm_lcd(lcd1);
+clean1:
+	return ret;
+}
+
 int api_tests(void)
 {
 	if (test01())
@@ -613,6 +815,8 @@ int api_tests(void)
 	if (test05())
 		return -1;
 	if (test06())
+		return -1;
+	if (test07())
 		return -1;
 	LCD_MSG("all api tests passed!");
 	return 0;

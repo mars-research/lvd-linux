@@ -802,6 +802,167 @@ clean1:
 	return ret;
 }
 
+struct test08_info {
+	struct completion c;
+	int ret_val;
+};
+
+int manufacturer_start(void);
+int dealer_start(void);
+int customer_start(void);
+
+static int test08_manufacturer(void *unused)
+{
+	struct test08_info i;
+	int ret;
+
+	i = (struct test08_info *)unused;
+	i->ret_val =  manufacturer_start();
+	complete(&i->c);
+	return 0;
+}
+
+static int test08_dealer(void *unused)
+{
+	struct test08_info i;
+	int ret;
+
+	i = (struct test08_info *)unused;
+	i->ret_val =  dealer_start();
+	complete(&i->c);
+	return 0;
+}
+
+static int test08_customer(void *unused)
+{
+
+	struct test08_info i;
+	int ret;
+
+	i = (struct test08_info *)unused;
+	i->ret_val = customer_start();
+	complete(&i->c);
+	return 0;;
+}
+
+static int test08(void)
+{
+	struct lcd *manufacturer_lcd;
+	struct lcd *dealer_lcd;
+	struct lcd *customer_lcd;
+	struct task_struct *manufacturer_task;
+	struct task_struct *dealer_task;
+	struct task_struct *customer_task;
+	struct test08_info mi;
+	struct test08_info di;
+	struct test08_info ci;
+
+	/*
+	 * Build lcd's
+	 */
+	manufacturer_lcd = test_mk_lcd();
+	if (!manufacturer_lcd) {
+		ret = -1;
+		goto clean1;
+	}
+	dealer_lcd = test_mk_lcd();
+	if (!dealer_lcd) {
+		ret = -1;
+		goto clean2;
+	}
+	customer_lcd = test_mk_lcd();
+	if (!customer_lcd) {
+		ret = -1;
+		goto clean3;
+	}
+	/*
+	 * Init completions
+	 */
+	init_completion(&mi.c);
+	init_completion(&di.c);
+	init_completion(&ci.c);
+	/*
+	 * Spawn kthreads
+	 */
+	manufacturer_task = kthread_create(test08_manufacturer, &mi, 
+					"test08_manufacturer");
+	if (!manufacturer_task) {
+		LCD_ERR("spawning manufacturer task");
+		goto clean4;
+	}
+	dealer_task = kthread_create(test08_dealer, &di, 
+					"test08_dealer");
+	if (!dealer_task) {
+		LCD_ERR("spawning dealer task");
+		goto clean5;
+	}
+	customer_task = kthread_create(test08_customer, &ci, 
+					"test08_customer");
+	if (!customer_task) {
+		LCD_ERR("spawning customer task");
+		goto clean6;
+	}
+
+	/*
+	 * Install lcd's
+	 */
+	manufacturer_task->lcd = manufacturer_lcd;
+	manufacturer_lcd->parent = manufacturer_task;
+	dealer_task->lcd = dealer_lcd;
+	dealer_lcd->parent = dealer_task;
+	customer_task->lcd = customer_lcd;
+	customer_lcd->parent = customer_task;
+
+	/*
+	 * Wake up threads
+	 */
+	wake_up_process(manufacturer_task);
+	wake_up_process(dealer_task);
+	wake_up_process(customer_task);
+	/*
+	 * Wait for them to finish (using completions to avoid hang)
+	 */
+	wait_for_completion_interruptible(&mi.c);
+	wait_for_completion_interruptible(&di.c);
+	wait_for_completion_interruptible(&ci.c);
+
+	if (mi.ret_val) {
+		LCD_ERR("manufacturer non zero ret val %d",
+			mi.ret_val);
+		ret = -1;
+		goto clean4;
+	}
+	if (di.ret_val) {
+		LCD_ERR("dealer non zero ret val %d",
+			di.ret_val);
+		ret = -1;
+		goto clean4;
+	}
+	if (ci.ret_val) {
+		LCD_ERR("customer non zero ret val %d",
+			ci.ret_val);
+		ret = -1;
+		goto clean4;
+	}
+
+	ret = 0;
+	goto clean4;
+	
+clean6:
+	kthread_stop(dealer_task);
+clean5:
+	kthread_stop(manufacturer_task);
+clean4:
+	test_rm_lcd(customer_lcd);
+clean3:
+	test_rm_lcd(dealer_lcd);
+clean2:
+	test_rm_lcd(manufacturer_lcd);
+clean1:
+	return ret;
+}
+
+
 int api_tests(void)
 {
 	if (test01())
@@ -817,6 +978,8 @@ int api_tests(void)
 	if (test06())
 		return -1;
 	if (test07())
+		return -1;
+	if (test08())
 		return -1;
 	LCD_MSG("all api tests passed!");
 	return 0;

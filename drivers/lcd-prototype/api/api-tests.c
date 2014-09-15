@@ -854,6 +854,9 @@ static int test08(void)
 	struct test08_info mi;
 	struct test08_info di;
 	struct test08_info ci;
+	cptr_t mcptr;
+	cptr_t dcptr;
+	cptr_t ccptr;
 
 	/*
 	 * Build lcd's
@@ -873,6 +876,48 @@ static int test08(void)
 		ret = -1;
 		goto clean3;
 	}
+
+	/*
+	 * Create and install boot endpoint
+	 */
+	ret = lcd_cnode_alloc(dealer_lcd->cspace, &dcptr);
+	if (ret)
+		goto clean4;
+	if (dcptr != 1) {
+		ret = -1;
+		LCD_ERR("dealer cptr not 1, so need to change macro first");
+		goto clean4;
+	}
+	ret = __lcd_mk_sync_endpoint(dealer_lcd, dcptr);
+	if (ret)
+		goto clean4;
+
+	ret = lcd_cnode_alloc(manufacturer_lcd->cspace, &mcptr);
+	if (ret)
+		goto clean5;
+	if (mcptr != 1) {
+		ret = -1;
+		LCD_ERR("mfter cptr not 1, so need to change macro first");
+		goto clean5;
+	}
+	ret = lcd_cnode_grant(dealer_lcd->cspace, manufacturer_lcd->cspace,
+			dcptr, mcptr, LCD_CAP_RIGHT_WRITE);
+	if (ret)
+		goto clean5;
+
+	ret = lcd_cnode_alloc(customer_lcd->cspace, &ccptr);
+	if (ret)
+		goto clean5;
+	if (ccptr != 1) {
+		ret = -1;
+		LCD_ERR("customer cptr not 1, so need to change macro first");
+		goto clean5;
+	}
+	ret = lcd_cnode_grant(dealer_lcd->cspace, customer_lcd->cspace,
+			dcptr, ccptr, LCD_CAP_RIGHT_WRITE);
+	if (ret)
+		goto clean5;
+
 	/*
 	 * Init completions
 	 */
@@ -886,19 +931,19 @@ static int test08(void)
 					"test08_manufacturer");
 	if (!manufacturer_task) {
 		LCD_ERR("spawning manufacturer task");
-		goto clean4;
+		goto clean5;
 	}
 	dealer_task = kthread_create(test08_dealer, &di, 
 					"test08_dealer");
 	if (!dealer_task) {
 		LCD_ERR("spawning dealer task");
-		goto clean5;
+		goto clean6;
 	}
 	customer_task = kthread_create(test08_customer, &ci, 
 					"test08_customer");
 	if (!customer_task) {
 		LCD_ERR("spawning customer task");
-		goto clean6;
+		goto clean7;
 	}
 
 	/*
@@ -928,28 +973,30 @@ static int test08(void)
 		LCD_ERR("manufacturer non zero ret val %d",
 			mi.ret_val);
 		ret = -1;
-		goto clean4;
+		goto clean5;
 	}
 	if (di.ret_val) {
 		LCD_ERR("dealer non zero ret val %d",
 			di.ret_val);
 		ret = -1;
-		goto clean4;
+		goto clean5;
 	}
 	if (ci.ret_val) {
 		LCD_ERR("customer non zero ret val %d",
 			ci.ret_val);
 		ret = -1;
-		goto clean4;
+		goto clean5;
 	}
 
 	ret = 0;
-	goto clean4;
+	goto clean5;
 	
-clean6:
+clean7:
 	kthread_stop(dealer_task);
-clean5:
+clean6:
 	kthread_stop(manufacturer_task);
+clean5:
+	__lcd_rm_sync_endpoint(dealer_lcd, dcptr);
 clean4:
 	test_rm_lcd(customer_lcd);
 clean3:

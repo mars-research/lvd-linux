@@ -4,7 +4,7 @@
  *
  */
 
-#ifdef CONFIG_RUN_IN_LCD
+#ifdef CONFIG_LCD_PROTOTYPE_TEST_IN_LCD
 
 /* INTERNAL DEFS -------------------------------------------------- */
 
@@ -15,10 +15,12 @@ extern void __customer_exit(void);
 
 /* IDL/LCD DEFS -------------------------------------------------- */
 
+#include <linux/slab.h>
 #include "dealer-idl.h"
+#include "customer-idl.h"
 #include "../include/common.h"
 #include "../include/ipc.h"
-#include "../include/api.h"
+#include "../include/api-internal.h"
 #include "../include/utcb.h"
 
 /* INTERFACE WRAPPERS -------------------------------------------------- */
@@ -86,6 +88,7 @@ fail1:
  */
 void dealer_return_car(struct automobile *a)
 {
+	int ret;
 	/*
 	 * Free on callee side
 	 */
@@ -105,7 +108,7 @@ void dealer_return_car(struct automobile *a)
 
 	return;
 
-fail1:
+fail:
 	return;
 }
 
@@ -149,4 +152,4 @@ void __exit customer_exit(void)
 module_init(customer_init);
 module_exit(customer_exit);
 
-#endif /* CONFIG_RUN_IN_LCD */
+#endif

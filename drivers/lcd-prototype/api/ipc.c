@@ -177,6 +177,7 @@ int __lcd_send(struct lcd *lcd, cptr_t c)
 
 	return ret;
 }
+EXPORT_SYMBOL(__lcd_send);
 
 static int lcd_do_recv(struct lcd *to, cptr_t c)
 {
@@ -283,6 +284,7 @@ int __lcd_recv(struct lcd *lcd, cptr_t c)
 
 	return ret;
 }
+EXPORT_SYMBOL(__lcd_recv);
 
 int __lcd_call(struct lcd *lcd, cptr_t c)
 {
@@ -309,6 +311,7 @@ int __lcd_call(struct lcd *lcd, cptr_t c)
 	 */
 	return __lcd_recv(lcd, lcd->utcb.call_endpoint_cap);
 }
+EXPORT_SYMBOL(__lcd_call);
 
 int __lcd_reply(struct lcd *lcd)
 {
@@ -329,6 +332,7 @@ int __lcd_reply(struct lcd *lcd)
 
 	return ret;
 }
+EXPORT_SYMBOL(__lcd_reply);
 
 int __lcd_mk_sync_endpoint(struct lcd *lcd, cptr_t c)
 {
@@ -364,6 +368,7 @@ fail2:
 fail1:
 	return ret;
 }
+EXPORT_SYMBOL(__lcd_mk_sync_endpoint);
 
 static int __cleanup_sync_endpoint(struct cnode *cnode)
 {
@@ -426,3 +431,4 @@ int __lcd_rm_sync_endpoint(struct lcd *lcd, cptr_t cptr)
 	lcd_cap_unlock();
 	return ret;
 }
+EXPORT_SYMBOL(__lcd_rm_sync_endpoint);

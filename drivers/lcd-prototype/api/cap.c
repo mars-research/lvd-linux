@@ -7,12 +7,14 @@
 #include "../include/common.h"
 
 struct mutex __lcd_cap_lock;
+EXPORT_SYMBOL(__lcd_cap_lock);
 
 int lcd_cap_init(void)
 {
 	mutex_init(&__lcd_cap_lock);
 	return 0;
 }
+EXPORT_SYMBOL(lcd_cap_init);
 
 static void init_cspace_cnodes(struct cspace *cspace)
 {
@@ -57,6 +59,7 @@ int lcd_mk_cspace(struct cspace **cspace_ptr)
 	*cspace_ptr = cspace;
 	return 0;
 }
+EXPORT_SYMBOL(lcd_mk_cspace);
 
 static int __lcd_cnode_alloc(struct cspace *cspace, cptr_t *cptr)
 {
@@ -101,6 +104,7 @@ int lcd_cnode_alloc(struct cspace *cspace, cptr_t *cptr)
 	lcd_cap_unlock();
 	return ret;
 }
+EXPORT_SYMBOL(lcd_cnode_alloc);
 
 int __lcd_cnode_lookup(struct cspace *cspace, cptr_t cptr, struct cnode **out)
 {
@@ -111,6 +115,7 @@ int __lcd_cnode_lookup(struct cspace *cspace, cptr_t cptr, struct cnode **out)
 	*out = c;
 	return 0;
 }
+EXPORT_SYMBOL(__lcd_cnode_lookup);
 
 static int __lcd_cnode_insert(struct cnode *cnode, void *object, 
 			enum lcd_cap_type type, int rights)
@@ -147,6 +152,7 @@ out:
 	lcd_cap_unlock();
 	return ret;
 }
+EXPORT_SYMBOL(lcd_cnode_insert);
 
 static int __lcd_cnode_insert_for_grant(struct cnode *src_cnode, 
 					struct cnode *dest_cnode, int rights)
@@ -215,6 +221,7 @@ int lcd_cnode_grant(struct cspace *src_cspace, struct cspace *dest_cspace,
 	lcd_cap_unlock();
 	return ret;
 }
+EXPORT_SYMBOL(lcd_cnode_grant);
 
 static void __lcd_cnode_do_revoke(struct cnode *parent, int rights)
 {
@@ -265,6 +272,7 @@ int lcd_cnode_revoke(struct cspace *cspace, cptr_t cptr, int rights)
 	lcd_cap_unlock();
 	return ret;
 }
+EXPORT_SYMBOL(lcd_cnode_revoke);
 
 static void __lcd_cnode_do_free(struct cnode *parent)
 {
@@ -302,6 +310,7 @@ void __lcd_cnode_free(struct cnode *cnode)
 	__lcd_cnode_do_free(cnode);
 	return;
 }
+EXPORT_SYMBOL(__lcd_cnode_free);
 
 void __lcd_rm_cnode(struct cnode *cnode)
 {
@@ -309,6 +318,8 @@ void __lcd_rm_cnode(struct cnode *cnode)
 		__lcd_cnode_do_free(cnode);
 	return;
 }
+EXPORT_SYMBOL(__lcd_rm_cnode);
+
 void __lcd_rm_cspace(struct cspace **cspace_ptr)
 {
 	int i;
@@ -320,3 +331,4 @@ void __lcd_rm_cspace(struct cspace **cspace_ptr)
 	*cspace_ptr = NULL;
 	return;
 }
+EXPORT_SYMBOL(__lcd_rm_cspace);

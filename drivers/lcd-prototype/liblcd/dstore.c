@@ -30,6 +30,7 @@ fail2:
 fail1:
 	return ret;
 }
+EXPORT_SYMBOL(lcd_ds_store);
 
 static void * __lcd_ds_drop(u64 badge, dsptr_t ptr)
 {
@@ -69,6 +70,7 @@ void * lcd_ds_drop(u64 badge, dsptr_t ptr)
 
 	return obj;
 }
+EXPORT_SYMBOL(lcd_ds_drop);
 
 static void * __lcd_ds_read(u64 badge, dsptr_t ptr)
 {
@@ -103,4 +105,4 @@ void * lcd_ds_read(u64 badge, dsptr_t ptr)
 
 	return obj;
 }
-
+EXPORT_SYMBOL(lcd_ds_read);

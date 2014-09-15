@@ -1,3 +1,6 @@
+obj-$(CONFIG_LCD_PROTOTYPE_TEST_BOOT)         += lcd-prototype-test-boot.o
+lcd-prototype-test-boot-y                     += boot.o
+
 obj-$(CONFIG_LCD_PROTOTYPE_TEST_CUSTOMER)     += lcd-prototype-test-customer.o
 lcd-prototype-test-customer-y                 += customer.o customer-idl.o
 

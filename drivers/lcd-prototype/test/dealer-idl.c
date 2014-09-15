@@ -10,8 +10,8 @@
 
 #include "dealer.h"
 
-extern int __manufacturer_init(void);
-extern void __manufacturer_exit(void);
+extern int __dealer_init(void);
+extern void __dealer_exit(void);
 
 /* IDL/LCD DEFS -------------------------------------------------- */
 
@@ -24,11 +24,7 @@ extern void __manufacturer_exit(void);
 
 /* INTERFACE WRAPPERS -------------------------------------------------- */
 
-struct manufacturer_interface __mi = {
-
-
-
-};
+cptr_t manufacturer_interface_cap;
 
 /**
  * dealer_register_manufacturer_callee
@@ -36,17 +32,27 @@ struct manufacturer_interface __mi = {
  *
  * IN:
  * lcd_in_cap0 = cptr to capability for endpoint to manuf. interface
+ *   (automatically transferred)
  * OUT:
  * lcd_r0 = 0
  */
 static int dealer_register_manufacturer_callee(void)
 {
-	
-	
+	int ret;
+	struct manufacturer_interface __mi = {
+		.mk_engine = mk_engine_caller,
+		.mk_automobile = mk_automobile_caller,
+		.free_engine = free_engine_caller,
+		.free_automobile = free_automobile_caller,
+	};
+	/*
+	 * Register ...
+	 */
+	ret = dealer_register_manufacturer(&__mi);
 	/*
 	 * Reply
 	 */
-	lcd_store_r0(0);
+	lcd_store_r0(ret);
 	ret = lcd_reply();
 	if (ret) {
 		LCD_ERR("couldn't reply");
@@ -170,7 +176,7 @@ int dealer_die_callee(void)
 	 * Kill manufacturer
 	 */
 	lcd_store_r0(MANUFACTURER_DIE);
-	ret = lcd_call(lcd_boot_cap(DEALER_MANUFACTURER_INTERFACE_CAP));
+	ret = lcd_call(manfacturer_interface_cap);
 	if (ret)
 		return ret;
 	/*
@@ -185,44 +191,140 @@ int dealer_die_callee(void)
 
 /* DEPENDENCIES -------------------------------------------------- */
 
+/* See callee (manufacturer) for interface */
+
 /**
- * dealer_register_manufacturer
- * ----------------------------
- *
- * See callee for interface.
+ * mk_engine
+ * ---------
  */
-int dealer_register_manufacturer(struct manufacturer_interface *__mi)
+struct engine * mk_engine_caller(int cylinders)
 {
+	struct engine *e;
 	int ret;
 	/*
-	 * Store pointer to original interface
+	 * Alloc caller copy
 	 */
-	mi = __mi;
-	/*
-	 * Create endpoint for interface
-	 */
-	ret = lcd_mk_sync_endpoint(&manufacturer_interface_cap);
-	if(ret) {
-		LCD_ERR("mk manufacturer iface endpoint");
+	e = kmalloc(sizeof(e), GFP_KERNEL);
+	if (!e)
 		goto fail1;
-	}
-
+	e->cylinders = cylinders;
 	/*
-	 * Store in the cap regs for the caller, and send
+	 * Alloc on callee side, and get pointer to callee copy
 	 */
-	lcd_store_out_cap0(manufacturer_interface_cap);
-	ret = lcd_call(lcd_boot_cptr(MANUFACTURER_DEALER_INTERFACE_CAP));
+	lcd_store_r0(MANUFACTURER_MK_ENGINE);
+	lcd_store_r1(cylinders);
+	ret = lcd_call(manufacturer_interface_cap);
 	if (ret) {
-		LCD_ERR("call to dealer");
+		LCD_ERR("call failed");
 		goto fail2;
 	}
+	if (lcd_r0()) {
+		LCD_ERR("non zero ret val");
+		goto fail2;
+	}
+	e->self = lcd_r1();
 
-	return (int)lcd_r0();
-
+	return e;	
 fail2:
-	lcd_rm_sync_endpoint(manufacturer_interface_cap);
+	kfree(e);
 fail1:
-	return -1;
+	return NULL;
+}
+
+/**
+ * mk_automobile
+ * -------------
+ */
+struct automobile * mk_automobile_caller(struct engine *e, int doors)
+{
+	struct automobile *a;
+	int ret;
+	/*
+	 * Alloc caller copy
+	 */
+	a = kmalloc(sizeof(a), GFP_KERNEL);
+	if (!a)
+		goto fail1;
+	a->engine = e;
+	a->doors = doors;
+	/*
+	 * Alloc on callee side, and get pointer to callee copy
+	 */
+	lcd_store_r0(MANUFACTURER_MK_AUTOMOBILE);
+	lcd_store_r1(doors);
+	lcd_store_r2(e->self);
+	ret = lcd_call(manufacturer_interface_cap);
+	if (ret) {
+		LCD_ERR("call failed");
+		goto fail2;
+	}
+	if (lcd_r0()) {
+		LCD_ERR("non zero ret val");
+		goto fail2;
+	}
+	a->self = lcd_r1();
+
+	return a;	
+fail2:
+	kfree(a);
+fail1:
+	return NULL;
+}
+
+/**
+ * free_engine
+ * -----------
+ */
+void free_engine_caller(struct engine *e)
+{
+	/*
+	 * Free on callee side
+	 */
+	lcd_store_r0(MANUFACTURER_FREE_ENGINE);
+	lcd_store_r1(e->self);
+	ret = lcd_call(manufacturer_interface_cap);
+	if (ret) {
+		LCD_ERR("call failed");
+		goto fail;
+	}
+	if (lcd_r0()) {
+		LCD_ERR("non zero ret val");
+		goto fail;
+	}
+
+	kfree(e);
+
+	return;
+fail:
+	return;
+}
+
+/**
+ * free_automobile
+ * ---------------
+ */
+void free_automobile_caller(struct automobile *a)
+{
+	/*
+	 * Free on callee side
+	 */
+	lcd_store_r0(MANUFACTURER_FREE_AUTOMOBILE);
+	lcd_store_r1(a->self);
+	ret = lcd_call(manufacturer_interface_cap);
+	if (ret) {
+		LCD_ERR("call failed");
+		goto fail;
+	}
+	if (lcd_r0()) {
+		LCD_ERR("non zero ret val");
+		goto fail;
+	}
+
+	kfree(a);
+
+	return;
+fail:
+	return;
 }
 
 /* MAIN EXEC LOOP -------------------------------------------------- */
@@ -237,25 +339,21 @@ int execution_loop(void)
 		/*
 		 * Listen for incoming message
 		 */
-		ret = lcd_recv(manufacturer_interface_cap);
+		ret = lcd_recv(DEALER_DEALER_INTERFACE_CAP);
 		if (ret)
 			goto out;
 		switch (lcd_r0()) {
-
-			case MANUFACTURER_MK_ENGINE:
-				ret = mk_engine_callee();
+			case DEALER_REGISTER_MANUFACTURER:
+				ret = dealer_register_manufacturer_callee();
 				break;
-			case MANUFACTURER_MK_AUTOMOBILE:
-				ret = mk_automobile_callee();
+			case DEALER_BUY_CAR:
+				ret = dealer_buy_car_callee();
 				break;
-			case MANUFACTURER_FREE_ENGINE:
-				ret = free_engine_callee();
+			case DEALER_RETURN_CAR:
+				ret = dealer_return_car_callee();
 				break;
-			case MANUFACTURER_FREE_AUTOMOBILE:
-				ret = free_automobile_callee();
-				break;
-			case MANUFACTURER_DIE:
-				manufacturer_die();
+			case DEALER_DIE:
+				ret = dealer_die();
 				goto out;
 		}
 
@@ -268,22 +366,15 @@ out:
 	return ret;
 }
 
-int manufacturer_start(void)
+int dealer_start(void)
 {
 	int ret;
 	/*
-	 * Call manufacturer init, should register interface.
+	 * Call dealer init
 	 */
-	ret = __manufacturer_init();
+	ret = __dealer_init();
 	if (ret) {
-		LCD_ERR("manufacturer init");
-		return -1;
-	}
-	/*
-	 * Ensure interface is set
-	 */
-	if (!mi) {
-		LCD_ERR("interface not set");
+		LCD_ERR("dealer init");
 		return -1;
 	}
 	/*
@@ -293,18 +384,18 @@ int manufacturer_start(void)
 }
 EXPORT_SYMBOL(manufacturer_start);
 
-int __init manufacturer_init(void)
+int __init dealer_init(void)
 {
 	return 0;
 }
 
 /* manufacturer_die does the actual tear down */
-void __exit manufacturer_exit(void)
+void __exit dealer_exit(void)
 {
 	return;
 }
 
-module_init(manufacturer_init);
-module_exit(manufacturer_exit);
+module_init(dealer_init);
+module_exit(dealer_exit);
 
 #endif /* CONFIG_RUN_IN_LCD */

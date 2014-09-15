@@ -7,13 +7,17 @@
 #ifndef LCD_IPC_AUTO_DEALER_H
 #define LCD_IPC_AUTO_DEALER_H
 
+#include "../include/dstore.h"
+
 struct engine {
 	int cylinders;
+	dsptr_t self;	
 };
 
 struct automobile {
 	struct engine *engine;
 	int doors;
+	dsptr_t self;	
 };
 
 struct manufacturer_interface {

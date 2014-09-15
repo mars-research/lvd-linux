@@ -36,7 +36,7 @@ struct automobile * dealer_buy_car(void)
 	 */
 	e = manufacturer->mk_engine(8);
 	if (!e || e->cylinders != 8) {
-		AU_ERR("client: bad engine");
+		LCD_ERR("client: bad engine");
 		return NULL;
 	}
 	/*
@@ -44,7 +44,7 @@ struct automobile * dealer_buy_car(void)
 	 */
 	a = manufacturer->mk_automobile(e, 4);
 	if (!a || a->engine != e || a->doors != 4) {
-		AU_ERR("client: bad auto");
+		LCD_ERR("client: bad auto");
 		return NULL;
 	}
 	return a;
@@ -62,22 +62,22 @@ void dealer_return_car(struct automobile *a)
 EXPORT_SYMBOL(dealer_return_car);
 
 #ifdef CONFIG_RUN_IN_LCD
-int dealer_init(void)
+int __dealer_init(void)
 #else
 static int __init dealer_init(void)
 #endif
 {
-	AU_MSG("dealer initialized");
+	LCD_MSG("dealer initialized");
 	return 0;
 }
 
 #ifdef CONFIG_RUN_IN_LCD
-void dealer_exit(void)
+void __dealer_exit(void)
 #else
 static void __exit dealer_exit(void)
 #endif
 {
-	AU_MSG("dealer exited");
+	LCD_MSG("dealer exited");
 }
 
 #ifndef CONFIG_RUN_IN_LCD

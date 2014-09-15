@@ -295,15 +295,39 @@ int __lcd_recv(struct lcd *lcd, cptr_t c)
 }
 EXPORT_SYMBOL(__lcd_recv);
 
+static int lcd_call_alloc(struct lcd *lcd)
+{
+	int ret;
+	cptr_t call_cptr;
+
+	ret = lcd_cnode_alloc(lcd->cspace, &call_cptr);
+	if (ret)
+		return ret;
+
+	ret = __lcd_mk_sync_endpoint(lcd, call_cptr);
+	if (ret)
+		return ret;
+
+	lcd->utcb.call_endpoint_cap = call_cptr;
+
+	return 0;
+}
+
 int __lcd_call(struct lcd *lcd, cptr_t c)
 {
 	int ret;
+	/*
+	 * Alloc special call endpoint
+	 */
+	ret = lcd_call_alloc(lcd);
+	if (ret)
+		return ret;
 	/*
 	 * LOCK cap
 	 */
 	ret = lcd_cap_lock();
 	if (ret)
-		return ret;
+		goto out;
 
 	ret = lcd_do_send(lcd, c, 1);
 
@@ -312,19 +336,52 @@ int __lcd_call(struct lcd *lcd, cptr_t c)
 	 */
 	lcd_cap_unlock();
 
-	if (ret)
-		return ret;
+	if (ret) {
+		LCD_ERR("send of call failed");
+		goto out;
+	}
 
 	/*
 	 * Receive on my special end point
 	 */
-	return __lcd_recv(lcd, lcd->utcb.call_endpoint_cap);
+	ret = __lcd_recv(lcd, lcd->utcb.call_endpoint_cap);
+	if (ret) {
+		LCD_ERR("recv of call failed");
+		goto out;
+	}
+
+	ret = 0;
+	goto out;
+
+out:
+	__lcd_rm_sync_endpoint(lcd, lcd->utcb.call_endpoint_cap);
+	return ret;
 }
 EXPORT_SYMBOL(__lcd_call);
+
+static int lcd_reply_alloc(struct lcd *lcd)
+{
+	cptr_t reply_cap;
+	int ret;
+
+	ret = lcd_cnode_alloc(lcd->cspace, &reply_cap);
+	if (ret)
+		return ret;
+
+	lcd->utcb.reply_endpoint_cap = reply_cap;
+
+	return 0;
+}
 
 int __lcd_reply(struct lcd *lcd)
 {
 	int ret;
+	/*
+	 * Alloc slot for reply endpoint
+	 */
+	ret = lcd_reply_alloc(lcd);
+	if (ret)
+		return ret;	
 	/*
 	 * LOCK cap
 	 */

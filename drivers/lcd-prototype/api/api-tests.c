@@ -658,9 +658,7 @@ static int test07(void)
 	struct test07_info info1;
 	struct test07_info info2;
 	cptr_t cptr1a;
-	cptr_t cptr1b;
 	cptr_t cptr2a;
-	cptr_t cptr2b;
 	int ret;
 
 	lcd1 = test_mk_lcd();
@@ -704,28 +702,6 @@ static int test07(void)
 	lcd2->utcb.max_valid_in_cap_reg_idx = 0;
 
 	/*
-	 * Set up reply end point
-	 */
-	ret = lcd_cnode_alloc(lcd2->cspace, &cptr2b);
-	if (ret)
-		goto clean4;
-	ret = __lcd_mk_sync_endpoint(lcd2, cptr2b);
-	if (ret) {
-		LCD_ERR("mk lcd2 reply sync endpoint");
-		goto clean5;
-	}
-	lcd2->utcb.call_endpoint_cap = cptr2b;
-	
-	/*
-	 * Allocate slot for lcd1 for reply endpoint
-	 */
-	ret = lcd_cnode_alloc(lcd1->cspace, &cptr1b);
-	if (ret)
-		goto clean5;
-	lcd1->utcb.reply_endpoint_cap = cptr1b;
-
-
-	/*
 	 * Spawn threads ...
 	 */
 
@@ -736,7 +712,7 @@ static int test07(void)
 	lcd1_task = kthread_create(test07_thread1, &info1, "test07_thread1");
 	if (!lcd1_task) {
 		LCD_ERR("spawning lcd1 task");
-		goto clean5;
+		goto clean4;
 	}
 
 	info2.lcd = lcd2;
@@ -749,7 +725,7 @@ static int test07(void)
 
 		/* cancel thread1 (before it even starts) */
 		kthread_stop(lcd1_task);
-		goto clean5;
+		goto clean4;
 	}
 
 	/* set tasks' lcds */
@@ -769,29 +745,27 @@ static int test07(void)
 	if (info1.ret_val != 0) {
 		LCD_ERR("lcd1 non-zero ret_val = %d", info1.ret_val);
 		ret = -1;
-		goto clean5;
+		goto clean4;
 	}
 	if (info2.ret_val != 0) {
 		LCD_ERR("lcd2 non-zero ret_val = %d", info2.ret_val);
 		ret = -1;
-		goto clean5;
+		goto clean4;
 	}
 	if (lcd1->utcb.regs[0] != 5778) {
 		LCD_ERR("lcd1 reg 0 is %u", lcd1->utcb.regs[0]);
 		ret = -1;
-		goto clean5;
+		goto clean4;
 	}
 	if (lcd2->utcb.regs[0] != 5778) {
 		LCD_ERR("lcd2 reg 0 is %u", lcd2->utcb.regs[0]);
 		ret = -1;
-		goto clean5;
+		goto clean4;
 	}
 
 	ret = 0;
-	goto clean5;
+	goto clean4;
 
-clean5:
-	__lcd_rm_sync_endpoint(lcd2, cptr2b);
 clean4:
 	__lcd_rm_sync_endpoint(lcd1, cptr1a);
 clean3:

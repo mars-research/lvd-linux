@@ -4,8 +4,8 @@
  *
  */
 
-#ifndef LCD_IPC_AUTO_DEALER_IDL_H
-#define LCD_IPC_AUTO_DEALER_IDL_H
+#ifndef LCD_PROTOTYPE_DEALER_IDL_H
+#define LCD_PROTOTYPE_DEALER_IDL_H
 
 enum dealer_interface {
 	DEALER_BUY_CAR,

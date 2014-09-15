@@ -4,8 +4,8 @@
  *
  */
 
-#ifndef LCD_IPC_AUTO_DEALER_H
-#define LCD_IPC_AUTO_DEALER_H
+#ifndef LCD_PROTOTYPE_DEALER_H
+#define LCD_PROTOTYPE_DEALER_H
 
 #include "../include/dstore.h"
 

@@ -73,12 +73,14 @@ fail1:
  * OUT:
  * lcd_r0 = ret val
  * lcd_r1 = (cptr) to auto; used to refer to car in dealer space
+ * lcd_r2 = (cptr) to engine inside auto
  */
 static int * dealer_buy_car_callee(void)
 {
 	int ret;
 	struct automobile *a;
 	dsptr_t auto_dsptr;
+	dsptr_t engine_dsptr;
 	/*
 	 * Call into internal code
 	 */
@@ -89,25 +91,34 @@ static int * dealer_buy_car_callee(void)
 		goto fail1;
 	}
 	/*
-	 * Alloc capability
+	 * Alloc capabilities
 	 */
 	ret = lcd_ds_store(a, &auto_dsptr, lcd_reply_badge());
 	if(ret) {
 		LCD_ERR("store auto");
 		goto fail2;
 	}
+	ret = lcd_ds_store(a->engine, &engine_dsptr, lcd_reply_badge());
+	if(ret) {
+		LCD_ERR("store engine");
+		goto fail3;
+	}
 	/*
 	 * Reply
 	 */
 	lcd_store_r0(0);
 	lcd_store_r1(auto_dsptr);
+	lcd_store_r2(engine_dsptr);
 	ret = lcd_reply();
 	if (ret) {
 		LCD_ERR("couldn't reply");
-		goto fail3;
+		goto fail4;
 	}
 
 	return ret;
+
+fail4:
+	lcd_ds_drop(lcd_reply_badge(), engine_dsptr);
 fail3:
 	lcd_ds_drop(lcd_reply_badge(), auto_dsptr);
 fail2:
@@ -382,7 +393,7 @@ int dealer_start(void)
 	 */
 	return execution_loop();
 }
-EXPORT_SYMBOL(manufacturer_start);
+EXPORT_SYMBOL(dealer_start);
 
 int __init dealer_init(void)
 {

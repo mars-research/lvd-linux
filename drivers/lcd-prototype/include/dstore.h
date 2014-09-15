@@ -8,6 +8,7 @@
 #ifndef LCD_PROTOTYPE_DSTORE_H
 #define LCD_PROTOTYPE_DSTORE_H
 
+#include <linux/kernel.h>
 #include <lcd-prototype/lcd.h>
 #include "utcb.h"
 #include "api-internal.h"

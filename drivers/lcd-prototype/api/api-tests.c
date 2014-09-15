@@ -813,8 +813,7 @@ int customer_start(void);
 
 static int test08_manufacturer(void *unused)
 {
-	struct test08_info i;
-	int ret;
+	struct test08_info *i;
 
 	i = (struct test08_info *)unused;
 	i->ret_val =  manufacturer_start();
@@ -824,8 +823,7 @@ static int test08_manufacturer(void *unused)
 
 static int test08_dealer(void *unused)
 {
-	struct test08_info i;
-	int ret;
+	struct test08_info *i;
 
 	i = (struct test08_info *)unused;
 	i->ret_val =  dealer_start();
@@ -836,8 +834,7 @@ static int test08_dealer(void *unused)
 static int test08_customer(void *unused)
 {
 
-	struct test08_info i;
-	int ret;
+	struct test08_info *i;
 
 	i = (struct test08_info *)unused;
 	i->ret_val = customer_start();
@@ -847,6 +844,7 @@ static int test08_customer(void *unused)
 
 static int test08(void)
 {
+	int ret = -1;
 	struct lcd *manufacturer_lcd;
 	struct lcd *dealer_lcd;
 	struct lcd *customer_lcd;

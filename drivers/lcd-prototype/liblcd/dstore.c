@@ -9,7 +9,6 @@
 
 int lcd_ds_store(void *object, u64 badge, dsptr_t *out)
 {
-	struct cnode *cnode;
 	struct cspace *cspace;
 	int ret;
 
@@ -27,11 +26,7 @@ int lcd_ds_store(void *object, u64 badge, dsptr_t *out)
 		goto fail2;
 
 fail2:
-	ret = lcd_cap_lock();
-	if (ret)
-		return ret;
-	__lcd_cnode_free(cspace, *out);
-	lcd_cap_unlock();
+	/* XXX: no way to de-alloc cnodes */
 fail1:
 	return ret;
 }
@@ -93,7 +88,7 @@ static void * __lcd_ds_read(u64 badge, dsptr_t ptr)
 	return cnode->object;
 }
 
-void * lcd_ds_read(u64 badge, dsptr_t out)
+void * lcd_ds_read(u64 badge, dsptr_t ptr)
 {
 	int ret;
 	void *obj;
@@ -109,4 +104,3 @@ void * lcd_ds_read(u64 badge, dsptr_t out)
 	return obj;
 }
 
-#endif /* LCD_PROTOTYPE_DSTORE_H */

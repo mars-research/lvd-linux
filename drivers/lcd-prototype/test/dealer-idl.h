@@ -15,5 +15,6 @@ enum dealer_interface {
 };
 
 #define DEALER_DEALER_INTERFACE_CAP 31
+#define DEALER_MANUFACTURER_OBJ_CAP 30
 
 #endif

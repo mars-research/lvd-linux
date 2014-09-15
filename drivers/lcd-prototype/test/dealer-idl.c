@@ -30,11 +30,17 @@ EXPORT_SYMBOL(dealer_ready);
 
 /* INTERFACE WRAPPERS -------------------------------------------------- */
 
-cptr_t manufacturer_interface_cap;
 struct engine * mk_engine_caller(int cylinders);
 struct automobile * mk_automobile_caller(struct engine *e, int doors);
 void free_engine_caller(struct engine *e);
 void free_automobile_caller(struct automobile *a);
+
+struct manufacturer_interface __mi = {
+	.mk_engine = mk_engine_caller,
+	.mk_automobile = mk_automobile_caller,
+	.free_engine = free_engine_caller,
+	.free_automobile = free_automobile_caller,
+};
 
 /**
  * dealer_register_manufacturer_callee
@@ -49,12 +55,6 @@ void free_automobile_caller(struct automobile *a);
 static int dealer_register_manufacturer_callee(void)
 {
 	int ret;
-	struct manufacturer_interface __mi = {
-		.mk_engine = mk_engine_caller,
-		.mk_automobile = mk_automobile_caller,
-		.free_engine = free_engine_caller,
-		.free_automobile = free_automobile_caller,
-	};
 	/*
 	 * Register ...
 	 */
@@ -69,7 +69,8 @@ static int dealer_register_manufacturer_callee(void)
 		goto fail1;
 	}
 
-	complete(dealer_ready);
+	LCD_MSG("dealer registered");
+	complete(&dealer_ready);
 
 	return ret;
 
@@ -93,6 +94,13 @@ static int dealer_buy_car_callee(void)
 	struct automobile *a;
 	dsptr_t auto_dsptr;
 	dsptr_t engine_dsptr;
+	cptr_t reply_cptr;
+	/*
+	 * Remember reply cptr
+	 *
+	 * XXX: hack?
+	 */
+	reply_cptr = current_lcd()->utcb.reply_endpoint_cap;
 	/*
 	 * Call into internal code
 	 */
@@ -116,11 +124,12 @@ static int dealer_buy_car_callee(void)
 		goto fail3;
 	}
 	/*
-	 * Reply
+	 * Reply, putting reply cptr back in
 	 */
 	lcd_store_r0(0);
 	lcd_store_r1(auto_dsptr);
 	lcd_store_r2(engine_dsptr);
+	current->lcd->utcb.reply_endpoint_cap = reply_cptr;
 	ret = lcd_reply();
 	if (ret) {
 		LCD_ERR("couldn't reply");
@@ -199,7 +208,7 @@ int dealer_die_callee(void)
 	 * Kill manufacturer
 	 */
 	lcd_store_r0(MANUFACTURER_DIE);
-	ret = lcd_call(manufacturer_interface_cap);
+	ret = lcd_call(DEALER_MANUFACTURER_OBJ_CAP);
 	if (ret)
 		return ret;
 	/*
@@ -236,7 +245,7 @@ struct engine * mk_engine_caller(int cylinders)
 	 */
 	lcd_store_r0(MANUFACTURER_MK_ENGINE);
 	lcd_store_r1(cylinders);
-	ret = lcd_call(manufacturer_interface_cap);
+	ret = lcd_call(DEALER_MANUFACTURER_OBJ_CAP);
 	if (ret) {
 		LCD_ERR("call failed");
 		goto fail2;
@@ -276,7 +285,7 @@ struct automobile * mk_automobile_caller(struct engine *e, int doors)
 	lcd_store_r0(MANUFACTURER_MK_AUTOMOBILE);
 	lcd_store_r1(doors);
 	lcd_store_r2(e->self);
-	ret = lcd_call(manufacturer_interface_cap);
+	ret = lcd_call(DEALER_MANUFACTURER_OBJ_CAP);
 	if (ret) {
 		LCD_ERR("call failed");
 		goto fail2;
@@ -306,7 +315,7 @@ void free_engine_caller(struct engine *e)
 	 */
 	lcd_store_r0(MANUFACTURER_FREE_ENGINE);
 	lcd_store_r1(e->self);
-	ret = lcd_call(manufacturer_interface_cap);
+	ret = lcd_call(DEALER_MANUFACTURER_OBJ_CAP);
 	if (ret) {
 		LCD_ERR("call failed");
 		goto fail;
@@ -335,7 +344,7 @@ void free_automobile_caller(struct automobile *a)
 	 */
 	lcd_store_r0(MANUFACTURER_FREE_AUTOMOBILE);
 	lcd_store_r1(a->self);
-	ret = lcd_call(manufacturer_interface_cap);
+	ret = lcd_call(DEALER_MANUFACTURER_OBJ_CAP);
 	if (ret) {
 		LCD_ERR("call failed");
 		goto fail;
@@ -364,20 +373,29 @@ int execution_loop(void)
 		/*
 		 * Listen for incoming message
 		 */
+		/*
+		 * XXX: this only needs to be done once, but for simplicity,
+		 * the dealer always allows receipt of one capability
+		 */
+		lcd_store_in_cap0(DEALER_MANUFACTURER_OBJ_CAP);
 		ret = lcd_recv(DEALER_DEALER_INTERFACE_CAP);
 		if (ret)
 			goto out;
 		switch (lcd_r0()) {
 			case DEALER_REGISTER_MANUFACTURER:
+				LCD_MSG("dealer handling reg manufacturer");
 				ret = dealer_register_manufacturer_callee();
 				break;
 			case DEALER_BUY_CAR:
+				LCD_MSG("dealer handling buy car");
 				ret = dealer_buy_car_callee();
 				break;
 			case DEALER_RETURN_CAR:
+				LCD_MSG("dealer handling return car");
 				ret = dealer_return_car_callee();
 				break;
 			case DEALER_DIE:
+				LCD_MSG("dealer handling die");
 				ret = dealer_die_callee();
 				goto out;
 		}
@@ -411,6 +429,7 @@ EXPORT_SYMBOL(dealer_start);
 
 int __init dealer_init(void)
 {
+	init_completion(&dealer_ready);
 	return 0;
 }
 

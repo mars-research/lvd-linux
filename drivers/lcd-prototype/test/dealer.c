@@ -31,6 +31,10 @@ struct automobile * dealer_buy_car(void)
 	struct engine *e;
 	struct automobile *a;
 
+	if (!manufacturer) {
+		LCD_ERR("manufacturer interface not set!");
+		return NULL;
+	}
 	/*
 	 * Make an 8 cylinder engine
 	 */

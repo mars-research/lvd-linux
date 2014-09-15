@@ -319,20 +319,24 @@ int execution_loop(void)
 		if (ret)
 			goto out;
 		switch (lcd_r0()) {
-
 			case MANUFACTURER_MK_ENGINE:
+				LCD_MSG("manufacturer handling mk engine");
 				ret = mk_engine_callee();
 				break;
 			case MANUFACTURER_MK_AUTOMOBILE:
+				LCD_MSG("manufacturer handling mk auto");
 				ret = mk_automobile_callee();
 				break;
 			case MANUFACTURER_FREE_ENGINE:
+				LCD_MSG("manufacturer handling free engine");
 				ret = free_engine_callee();
 				break;
 			case MANUFACTURER_FREE_AUTOMOBILE:
+				LCD_MSG("manufacturer handling free auto");
 				ret = free_automobile_callee();
 				break;
 			case MANUFACTURER_DIE:
+				LCD_MSG("manufacturer dying");
 				manufacturer_die_callee();
 				goto out;
 		}
@@ -367,6 +371,7 @@ int manufacturer_start(void)
 	/*
 	 * Now enter loop and listen for calls
 	 */
+	LCD_MSG("manufacturer entering loop");
 	return execution_loop();
 }
 EXPORT_SYMBOL(manufacturer_start);

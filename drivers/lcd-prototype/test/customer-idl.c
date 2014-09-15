@@ -40,6 +40,8 @@ struct automobile * dealer_buy_car(void)
 	struct automobile *a;
 	struct engine *e;
 	int ret;
+
+	LCD_MSG("customer buying car");
 	/*
 	 * Alloc caller copy of hierarchy
 	 */
@@ -114,6 +116,8 @@ fail:
 
 /* MAIN EXEC LOOP -------------------------------------------------- */
 
+extern struct completion dealer_ready;
+
 int customer_start(void)
 {
 	int ret;
@@ -123,6 +127,7 @@ int customer_start(void)
 	ret = wait_for_completion_interruptible(&dealer_ready);
 	if (ret)
 		return ret;
+	LCD_MSG("customer ok to proceed");
 	/*
 	 * Call customer init (will buy car)
 	 */

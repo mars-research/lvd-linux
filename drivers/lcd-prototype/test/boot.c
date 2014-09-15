@@ -21,7 +21,7 @@ static inline struct lcd * test_mk_lcd(void)
 	lcd = kmalloc(sizeof(*lcd), GFP_KERNEL);
 	if (!lcd)
 		return NULL;
-
+	memset(lcd, 0, sizeof(*lcd));
 	ret = lcd_mk_cspace(&lcd->cspace);
 	if (ret) {
 		kfree(lcd);
@@ -91,6 +91,7 @@ static int lcd_boot(void)
 	struct lcd_boot_info ci;
 	cptr_t mcptr;
 	cptr_t dcptr;
+	cptr_t dcptr2;
 	cptr_t ccptr;
 
 	/*
@@ -147,7 +148,7 @@ static int lcd_boot(void)
 		goto clean5;
 	if (ccptr != 31) {
 		ret = -1;
-		LCD_ERR("customer cptr not = %d, so need to change macro first",
+		LCD_ERR("customer cptr = %d, so need to change macro first",
 			ccptr);
 		goto clean5;
 	}
@@ -155,6 +156,19 @@ static int lcd_boot(void)
 			dcptr, ccptr, LCD_CAP_RIGHT_WRITE);
 	if (ret)
 		goto clean5;
+
+	/*
+	 * Alloc cnode slot for dealer
+	 */
+	ret = lcd_cnode_alloc(dealer_lcd->cspace, &dcptr2);
+	if (ret)
+		goto clean5;
+	if (dcptr2 != 30) {
+		ret = -1;
+		LCD_ERR("dealer cptr = %d, so need to change macro first",
+			dcptr2);
+		goto clean5;
+	}
 
 	/*
 	 * Init completions

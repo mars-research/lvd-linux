@@ -24,8 +24,8 @@ static inline u8 lcd_max_valid_reg_idx(void)
 }
 static inline void lcd_update_max_valid_reg_idx(u8 idx)
 {
-	if (idx > current->lcd->utcb.max_valid_reg_idx)
-		current->lcd->utcb.max_valid_reg_idx = idx;
+	if (idx >= current->lcd->utcb.max_valid_reg_idx)
+		current->lcd->utcb.max_valid_reg_idx = idx + 1;
 }
 #define LCD_MK_REG_ACCESS(idx)               \
 static inline u64 lcd_r##idx(void)           \
@@ -56,8 +56,8 @@ static inline u8 lcd_max_valid_out_cap_reg_idx(void)
 }
 static inline void lcd_update_max_valid_out_cap_reg_idx(u8 idx)
 {
-	if (idx > current->lcd->utcb.max_valid_out_cap_reg_idx)
-		current->lcd->utcb.max_valid_out_cap_reg_idx = idx;
+	if (idx >= current->lcd->utcb.max_valid_out_cap_reg_idx)
+		current->lcd->utcb.max_valid_out_cap_reg_idx = idx + 1;
 }
 #define LCD_MK_OUT_CAP_REG_ACCESS(idx)                \
 static inline u64 lcd_out_cap##idx(void)              \
@@ -88,8 +88,8 @@ static inline u8 lcd_max_valid_in_cap_reg_idx(void)
 }
 static inline void lcd_update_max_valid_in_cap_reg_idx(u8 idx)
 {
-	if (idx > current->lcd->utcb.max_valid_in_cap_reg_idx)
-		current->lcd->utcb.max_valid_in_cap_reg_idx = idx;
+	if (idx >= current->lcd->utcb.max_valid_in_cap_reg_idx)
+		current->lcd->utcb.max_valid_in_cap_reg_idx = idx + 1;
 }
 #define LCD_MK_IN_CAP_REG_ACCESS(idx)                 \
 static inline u64 lcd_in_cap##idx(void)               \

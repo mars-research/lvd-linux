@@ -41,9 +41,11 @@ static void copy_msg_caps(struct lcd *from, struct lcd *to)
 {
 	int i;
 	for (i = 0; i < from->utcb.max_valid_out_cap_reg_idx &&
-		     i < to->utcb.max_valid_in_cap_reg_idx; i++)
+		     i < to->utcb.max_valid_in_cap_reg_idx; i++) {
+		LCD_MSG("copying cap at %d", i);
 		copy_msg_cap(from, to, from->utcb.out_cap_regs[i],
 			to->utcb.in_cap_regs[i]);
+	}
 	/*
 	 * reset
 	 */
@@ -111,12 +113,15 @@ static int lcd_do_send(struct lcd *from, cptr_t c, int making_call)
 	 * Lookup cnode
 	 */
 	ret = __lcd_cnode_lookup(from->cspace, c, &cnode);
-	if (ret)
+	if (ret) {
+		LCD_ERR("looking up cnode");
 		goto fail1;
+	}
 	/*
 	 * Confirm type and permissions
 	 */
 	if (!__lcd_cnode_is_sync_ep(cnode) || !__lcd_cnode_can_write(cnode)) {
+		LCD_ERR("cnode not an endpoint, or bad perms");
 		ret = -EACCES;
 		goto fail1;
 	}
@@ -132,8 +137,10 @@ static int lcd_do_send(struct lcd *from, cptr_t c, int making_call)
 	 * it's used primarily when cap is locked.)
 	 */
 	ret = mutex_lock_interruptible(&e->lock);
-	if (ret)
+	if (ret) {
+		LCD_ERR("interrupted");
 		goto fail1;
+	}
 
 	if (list_empty(&e->receivers)) {
 		/*
@@ -225,12 +232,15 @@ static int lcd_do_recv(struct lcd *to, cptr_t c)
 	 * Lookup cnode
 	 */
 	ret = __lcd_cnode_lookup(to->cspace, c, &cnode);
-	if (ret)
+	if (ret) {
+		LCD_ERR("recvr looking up cnode");
 		goto fail1;
+	}
 	/*
 	 * Confirm type and permissions
 	 */
 	if (!__lcd_cnode_is_sync_ep(cnode) || !__lcd_cnode_can_read(cnode)) {
+		LCD_ERR("not an endpoint, or bad perms");
 		ret = -EACCES;
 		goto fail1;
 	}
@@ -246,8 +256,10 @@ static int lcd_do_recv(struct lcd *to, cptr_t c)
 	 * it's used primarily when cap is locked.)
 	 */
 	ret = mutex_lock_interruptible(&e->lock);
-	if (ret)
+	if (ret) {
+		LCD_ERR("interrupted");
 		return ret;
+	}
 
 	if (list_empty(&e->senders)) {
 		/*
@@ -306,8 +318,10 @@ static int lcd_reply_alloc(struct lcd *lcd)
 	int ret;
 
 	ret = lcd_cnode_alloc(lcd->cspace, &reply_cap);
-	if (ret)
+	if (ret) {
+		LCD_ERR("alloc failed");
 		return ret;
+	}
 
 	lcd->utcb.reply_endpoint_cap = reply_cap;
 
@@ -347,12 +361,16 @@ static int lcd_call_alloc(struct lcd *lcd)
 	cptr_t call_cptr;
 
 	ret = lcd_cnode_alloc(lcd->cspace, &call_cptr);
-	if (ret)
+	if (ret) {
+		LCD_ERR("alloc failed");
 		return ret;
+	}
 
 	ret = __lcd_mk_sync_endpoint(lcd, call_cptr);
-	if (ret)
+	if (ret) {
+		LCD_ERR("couldn't make endpoint");
 		return ret;
+	}
 
 	lcd->utcb.call_endpoint_cap = call_cptr;
 

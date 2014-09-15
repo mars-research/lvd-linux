@@ -22,18 +22,17 @@ struct lcd_handler {
 	int (*handler)(void);
 };
 
-static inline struct lcd * current_lcd(void)
-{
-	return current->lcd;
-}
-
 static inline int lcd_send(cptr_t c)
 {
 	return __lcd_send(current_lcd(), c);
 }
+static inline int lcd_recv(cptr_t c)
+{
+	return __lcd_recv(current_lcd(), c);
+}
 static inline int lcd_reply(void)
 {
-	return lcd_send(current_lcd(), lcd_reply_cap());
+	return lcd_send(lcd_reply_cap());
 }
 static inline int lcd_call(cptr_t c)
 {
@@ -55,9 +54,11 @@ static inline int lcd_rm_sync_endpoint(cptr_t c)
 	return __lcd_rm_sync_endpoint(current_lcd(), c);
 }
 
+#if 0
 static inline int lcd_select(struct lcd_handlers *hs, int hs_count)
 {
 	return -ENOSYS;
 }
+#endif
 
 #endif /* LCD_PROTOTYPE_IPC_H */

@@ -16,9 +16,10 @@ extern void __manufacturer_exit(void);
 /* IDL/LCD DEFS -------------------------------------------------- */
 
 #include "manufacturer-idl.h"
+#include "dealer-idl.h"
 #include "../include/common.h"
 #include "../include/ipc.h"
-#include "../include/api.h"
+#include "../include/api-internal.h"
 #include "../include/utcb.h"
 
 /* INTERFACE WRAPPERS -------------------------------------------------- */
@@ -54,7 +55,7 @@ static int mk_engine_callee(void)
 	/*
 	 * Alloc capability
 	 */
-	ret = lcd_ds_store(e, &engine_dsptr, lcd_reply_badge());
+	ret = lcd_ds_store(e, lcd_reply_badge(), &engine_dsptr);
 	if(ret) {
 		LCD_ERR("store engine");
 		goto fail2;
@@ -120,7 +121,7 @@ static int mk_automobile_callee(void)
 	/*
 	 * Put in data store
 	 */
-	ret = lcd_ds_store(a, &auto_dsptr, lcd_reply_badge());
+	ret = lcd_ds_store(a, lcd_reply_badge(), &auto_dsptr);
 	if(ret) {
 		LCD_ERR("store auto");
 		goto fail2;
@@ -204,8 +205,8 @@ static int free_automobile_callee(void)
 	 * Get and remove auto from data store
 	 */
 	auto_dsptr = (dsptr_t)lcd_r1();
-	e = lcd_ds_drop(lcd_reply_badge(), auto_dsptr);
-	if (!e) {
+	a = lcd_ds_drop(lcd_reply_badge(), auto_dsptr);
+	if (!a) {
 		LCD_ERR("bad auto dsptr %lld", auto_dsptr);
 		ret = -EINVAL;
 		goto fail1;
@@ -332,7 +333,7 @@ int execution_loop(void)
 				ret = free_automobile_callee();
 				break;
 			case MANUFACTURER_DIE:
-				manufacturer_die();
+				manufacturer_die_callee();
 				goto out;
 		}
 

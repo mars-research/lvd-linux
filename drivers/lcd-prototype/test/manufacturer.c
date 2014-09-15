@@ -12,7 +12,7 @@
 #include <linux/module.h>
 #include <linux/slab.h>
 
-#include "common.h"
+#include "../include/common.h"
 #include "dealer.h"
 
 static struct engine * mk_engine(int cylinders)

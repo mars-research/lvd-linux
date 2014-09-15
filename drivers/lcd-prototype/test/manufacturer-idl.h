@@ -7,7 +7,7 @@
 #ifndef LCD_PROTOTYPE_MANUFACTURER_IDL_H
 #define LCD_PROTOTYPE_MANUFACTURER_IDL_H
 
-enum manufacturer_interface {
+enum manufacturer_interface_enum {
 	MANUFACTURER_MK_ENGINE,
 	MANUFACTURER_MK_AUTOMOBILE,
 	MANUFACTURER_FREE_ENGINE,

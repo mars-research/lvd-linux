@@ -122,6 +122,11 @@ LCD_MK_IN_CAP_REG_ACCESS(7);
 
 /* REPLY INFO ---------------------------------------- */
 
+static inline cptr_t lcd_reply_cap(void)
+{
+	return current_lcd()->utcb.reply_endpoint_cap;
+}
+
 static inline u64 lcd_reply_badge(void)
 {
 	/* not implemented */

@@ -11,7 +11,7 @@
 #include <linux/kernel.h>
 #include <linux/module.h>
 
-#include "common.h"
+#include "../include/common.h"
 #include "dealer.h"
 
 MODULE_LICENSE("GPL");

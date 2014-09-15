@@ -15,16 +15,21 @@ extern void __dealer_exit(void);
 
 /* IDL/LCD DEFS -------------------------------------------------- */
 
+#include <linux/slab.h>
 #include "dealer-idl.h"
 #include "manufacturer-idl.h"
 #include "../include/common.h"
 #include "../include/ipc.h"
-#include "../include/api.h"
+#include "../include/api-internal.h"
 #include "../include/utcb.h"
 
 /* INTERFACE WRAPPERS -------------------------------------------------- */
 
 cptr_t manufacturer_interface_cap;
+struct engine * mk_engine_caller(int cylinders);
+struct automobile * mk_automobile_caller(struct engine *e, int doors);
+void free_engine_caller(struct engine *e);
+void free_automobile_caller(struct automobile *a);
 
 /**
  * dealer_register_manufacturer_callee
@@ -75,7 +80,7 @@ fail1:
  * lcd_r1 = (cptr) to auto; used to refer to car in dealer space
  * lcd_r2 = (cptr) to engine inside auto
  */
-static int * dealer_buy_car_callee(void)
+static int dealer_buy_car_callee(void)
 {
 	int ret;
 	struct automobile *a;
@@ -93,12 +98,12 @@ static int * dealer_buy_car_callee(void)
 	/*
 	 * Alloc capabilities
 	 */
-	ret = lcd_ds_store(a, &auto_dsptr, lcd_reply_badge());
+	ret = lcd_ds_store(a, lcd_reply_badge(), &auto_dsptr);
 	if(ret) {
 		LCD_ERR("store auto");
 		goto fail2;
 	}
-	ret = lcd_ds_store(a->engine, &engine_dsptr, lcd_reply_badge());
+	ret = lcd_ds_store(a->engine, lcd_reply_badge(), &engine_dsptr);
 	if(ret) {
 		LCD_ERR("store engine");
 		goto fail3;
@@ -144,9 +149,9 @@ static int dealer_return_car_callee(void)
 	 * Get and remove engine from data store
 	 */
 	auto_dsptr = (dsptr_t)lcd_r1();
-	a = lcd_ds_drop(lcd_reply_badge(), engine_dsptr);
+	a = lcd_ds_drop(lcd_reply_badge(), auto_dsptr);
 	if (!a) {
-		LCD_ERR("bad auto dsptr %lld", engine_dsptr);
+		LCD_ERR("bad auto dsptr %lld", auto_dsptr);
 		ret = -EINVAL;
 		goto fail1;
 	}
@@ -187,7 +192,7 @@ int dealer_die_callee(void)
 	 * Kill manufacturer
 	 */
 	lcd_store_r0(MANUFACTURER_DIE);
-	ret = lcd_call(manfacturer_interface_cap);
+	ret = lcd_call(manufacturer_interface_cap);
 	if (ret)
 		return ret;
 	/*
@@ -288,6 +293,7 @@ fail1:
  */
 void free_engine_caller(struct engine *e)
 {
+	int ret;
 	/*
 	 * Free on callee side
 	 */
@@ -316,6 +322,7 @@ fail:
  */
 void free_automobile_caller(struct automobile *a)
 {
+	int ret;
 	/*
 	 * Free on callee side
 	 */
@@ -364,7 +371,7 @@ int execution_loop(void)
 				ret = dealer_return_car_callee();
 				break;
 			case DEALER_DIE:
-				ret = dealer_die();
+				ret = dealer_die_callee();
 				goto out;
 		}
 

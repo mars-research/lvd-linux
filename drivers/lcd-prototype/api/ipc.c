@@ -60,6 +60,8 @@ static void copy_call_endpoint(struct lcd *from, struct lcd *to)
 
 static void transfer_msg(struct lcd *from, struct lcd *to, int making_call)
 {
+	int ret;
+	struct cnode *reply_cnode;
 	/*
 	 * Copy valid regs
 	 */
@@ -70,7 +72,31 @@ static void transfer_msg(struct lcd *from, struct lcd *to, int making_call)
 	copy_msg_caps(from, to);
 	if (making_call)
 		copy_call_endpoint(from, to);
-	
+	/*
+	 * Free up receiver cnode slot if sender wasn't making call
+	 *
+	 * XXX: this is obviously a hack
+	 */
+	if (!making_call) {
+		ret = lcd_cap_lock();
+		if (ret) {
+			LCD_ERR("couldn't lock cap system");
+			return;
+		}
+		ret = __lcd_cnode_lookup(to->cspace, 
+					to->utcb.reply_endpoint_cap,
+					&reply_cnode);
+
+		if (ret) {
+			LCD_ERR("couldn't find reply cnode");
+			lcd_cap_unlock();
+			return;
+		}
+		
+		__lcd_cnode_free(reply_cnode);
+		lcd_cap_unlock();
+	}
+
 	return; 
 }
 
@@ -274,9 +300,29 @@ fail1:
 	return ret;
 }
 
+static int lcd_reply_alloc(struct lcd *lcd)
+{
+	cptr_t reply_cap;
+	int ret;
+
+	ret = lcd_cnode_alloc(lcd->cspace, &reply_cap);
+	if (ret)
+		return ret;
+
+	lcd->utcb.reply_endpoint_cap = reply_cap;
+
+	return 0;
+}
+
 int __lcd_recv(struct lcd *lcd, cptr_t c)
 {
 	int ret;
+	/*
+	 * Alloc slot for reply endpoint, in case sender does call
+	 */
+	ret = lcd_reply_alloc(lcd);
+	if (ret)
+		return ret;	
 	/*
 	 * LOCK cap
 	 */
@@ -359,29 +405,9 @@ out:
 }
 EXPORT_SYMBOL(__lcd_call);
 
-static int lcd_reply_alloc(struct lcd *lcd)
-{
-	cptr_t reply_cap;
-	int ret;
-
-	ret = lcd_cnode_alloc(lcd->cspace, &reply_cap);
-	if (ret)
-		return ret;
-
-	lcd->utcb.reply_endpoint_cap = reply_cap;
-
-	return 0;
-}
-
 int __lcd_reply(struct lcd *lcd)
 {
 	int ret;
-	/*
-	 * Alloc slot for reply endpoint
-	 */
-	ret = lcd_reply_alloc(lcd);
-	if (ret)
-		return ret;	
 	/*
 	 * LOCK cap
 	 */

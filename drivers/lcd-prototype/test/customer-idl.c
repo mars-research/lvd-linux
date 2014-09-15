@@ -118,6 +118,12 @@ int customer_start(void)
 {
 	int ret;
 	/*
+	 * Wait until dealer is ready
+	 */
+	ret = wait_for_completion_interruptible(&dealer_ready);
+	if (ret)
+		return ret;
+	/*
 	 * Call customer init (will buy car)
 	 */
 	ret = __customer_init();

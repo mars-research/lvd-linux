@@ -23,6 +23,11 @@ extern void __dealer_exit(void);
 #include "../include/api-internal.h"
 #include "../include/utcb.h"
 
+/* SYNCHRONIZATION HACK ---------------------------------------- */
+
+struct completion dealer_ready;
+EXPORT_SYMBOL(dealer_ready);
+
 /* INTERFACE WRAPPERS -------------------------------------------------- */
 
 cptr_t manufacturer_interface_cap;
@@ -63,6 +68,8 @@ static int dealer_register_manufacturer_callee(void)
 		LCD_ERR("couldn't reply");
 		goto fail1;
 	}
+
+	complete(dealer_ready);
 
 	return ret;
 

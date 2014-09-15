@@ -14,6 +14,6 @@ enum dealer_interface {
 	DEALER_DIE,
 };
 
-#define DEALER_DEALER_INTERFACE_CAP 1
+#define DEALER_DEALER_INTERFACE_CAP 31
 
 #endif

@@ -16,6 +16,6 @@ enum manufacturer_interface_enum {
 };
 
 /* Locations of manufacturer's boot cptrs */
-#define MANUFACTURER_DEALER_INTERFACE_CAP 1
+#define MANUFACTURER_DEALER_INTERFACE_CAP 31
 
 #endif

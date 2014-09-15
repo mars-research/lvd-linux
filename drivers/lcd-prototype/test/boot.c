@@ -11,7 +11,7 @@
 #include <linux/completion.h>
 #include <linux/kthread.h>
 #include "../include/common.h"
-#include "defs.h"
+#include "../api/defs.h"
 
 static inline struct lcd * test_mk_lcd(void)
 {
@@ -118,9 +118,10 @@ static int lcd_boot(void)
 	ret = lcd_cnode_alloc(dealer_lcd->cspace, &dcptr);
 	if (ret)
 		goto clean4;
-	if (dcptr != 1) {
+	if (dcptr != 31) {
 		ret = -1;
-		LCD_ERR("dealer cptr not 1, so need to change macro first");
+		LCD_ERR("dealer cptr = %d, so need to change macro first",
+			dcptr);
 		goto clean4;
 	}
 	ret = __lcd_mk_sync_endpoint(dealer_lcd, dcptr);
@@ -130,9 +131,10 @@ static int lcd_boot(void)
 	ret = lcd_cnode_alloc(manufacturer_lcd->cspace, &mcptr);
 	if (ret)
 		goto clean5;
-	if (mcptr != 1) {
+	if (mcptr != 31) {
 		ret = -1;
-		LCD_ERR("mfter cptr not 1, so need to change macro first");
+		LCD_ERR("mfter cptr = %d, so need to change macro first",
+			mcptr);
 		goto clean5;
 	}
 	ret = lcd_cnode_grant(dealer_lcd->cspace, manufacturer_lcd->cspace,
@@ -143,9 +145,10 @@ static int lcd_boot(void)
 	ret = lcd_cnode_alloc(customer_lcd->cspace, &ccptr);
 	if (ret)
 		goto clean5;
-	if (ccptr != 1) {
+	if (ccptr != 31) {
 		ret = -1;
-		LCD_ERR("customer cptr not 1, so need to change macro first");
+		LCD_ERR("customer cptr not = %d, so need to change macro first",
+			ccptr);
 		goto clean5;
 	}
 	ret = lcd_cnode_grant(dealer_lcd->cspace, customer_lcd->cspace,
@@ -248,9 +251,9 @@ static int __init lcd_boot_init(void)
 	return lcd_boot();
 }
 
-static int __exit lcd_boot_exit(void)
+static void __exit lcd_boot_exit(void)
 {
-	return 0;
+	return;
 }
 
 module_init(lcd_boot_init);

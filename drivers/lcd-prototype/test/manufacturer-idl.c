@@ -289,7 +289,7 @@ int dealer_register_manufacturer(struct manufacturer_interface *__mi)
 	 * boot cptr = points to end point for dealer interface
 	 */
 	lcd_store_r0(DEALER_REGISTER_MANUFACTURER);
-	ret = lcd_call(lcd_boot_cptr(MANUFACTURER_DEALER_INTERFACE_CAP));
+	ret = lcd_call(MANUFACTURER_DEALER_INTERFACE_CAP);
 	if (ret) {
 		LCD_ERR("call to dealer");
 		goto fail2;

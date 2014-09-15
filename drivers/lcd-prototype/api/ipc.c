@@ -18,6 +18,10 @@ static void copy_msg_regs(struct lcd *from, struct lcd *to)
 	int i;
 	for (i = 0; i < from->utcb.max_valid_reg_idx; i++)
 		to->utcb.regs[i] = from->utcb.regs[i];
+	/*
+	 * reset
+	 */
+	from->utcb.max_valid_reg_idx = 0;
 }
 
 static void copy_msg_cap(struct lcd *from, struct lcd *to,
@@ -40,6 +44,11 @@ static void copy_msg_caps(struct lcd *from, struct lcd *to)
 		     i < to->utcb.max_valid_in_cap_reg_idx; i++)
 		copy_msg_cap(from, to, from->utcb.out_cap_regs[i],
 			to->utcb.in_cap_regs[i]);
+	/*
+	 * reset
+	 */
+	from->utcb.max_valid_out_cap_reg_idx = 0;
+	to->utcb.max_valid_in_cap_reg_idx = 0;
 }
 
 static void copy_call_endpoint(struct lcd *from, struct lcd *to)

@@ -16,14 +16,6 @@ static inline struct lcd * current_lcd(void)
 	return current->lcd;
 }
 
-/* BOOT CPTRS -------------------------------------------------- */
-
-static inline cptr_t lcd_boot_cptr(u8 idx)
-{
-	BUG_ON(idx >= LCD_NUM_BOOT_CPTRS);
-	return current->lcd->utcb.boot_cptrs[idx];
-}
-
 /* GENERAL REGISTERS ---------------------------------------- */
 
 static inline u8 lcd_max_valid_reg_idx(void)

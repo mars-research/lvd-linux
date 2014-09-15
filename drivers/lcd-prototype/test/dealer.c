@@ -61,7 +61,7 @@ void dealer_return_car(struct automobile *a)
 }
 EXPORT_SYMBOL(dealer_return_car);
 
-#ifdef CONFIG_RUN_IN_LCD
+#ifdef CONFIG_LCD_PROTOTYPE_TEST_IN_LCD
 int __dealer_init(void)
 #else
 static int __init dealer_init(void)
@@ -71,7 +71,7 @@ static int __init dealer_init(void)
 	return 0;
 }
 
-#ifdef CONFIG_RUN_IN_LCD
+#ifdef CONFIG_LCD_PROTOTYPE_TEST_IN_LCD
 void __dealer_exit(void)
 #else
 static void __exit dealer_exit(void)
@@ -80,7 +80,7 @@ static void __exit dealer_exit(void)
 	LCD_MSG("dealer exited");
 }
 
-#ifndef CONFIG_RUN_IN_LCD
+#ifndef CONFIG_LCD_PROTOTYPE_TEST_IN_LCD
 module_init(dealer_init);
 module_exit(dealer_exit);
 #endif

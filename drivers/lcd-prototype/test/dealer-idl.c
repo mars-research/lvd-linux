@@ -4,7 +4,7 @@
  *
  */
 
-#ifdef CONFIG_RUN_IN_LCD
+#ifdef CONFIG_LCD_PROTOTYPE_TEST_IN_LCD
 
 /* INTERNAL DEFS -------------------------------------------------- */
 
@@ -409,4 +409,4 @@ void __exit dealer_exit(void)
 module_init(dealer_init);
 module_exit(dealer_exit);
 
-#endif /* CONFIG_RUN_IN_LCD */
+#endif /* CONFIG_LCD_PROTOTYPE_TEST_IN_LCD */

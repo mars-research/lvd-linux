@@ -14,7 +14,7 @@
 #include "common.h"
 #include "dealer.h"
 
-#ifdef CONFIG_RUN_IN_LCD
+#ifdef CONFIG_LCD_PROTOTYPE_TEST_IN_LCD
 int __customer_init(void)
 #else
 static int __init customer_init(void)
@@ -33,7 +33,7 @@ static int __init customer_init(void)
 	return 0;
 }
 
-#ifdef CONFIG_RUN_IN_LCD
+#ifdef CONFIG_LCD_PROTOTYPE_TEST_IN_LCD
 void __customer_exit(void)
 #else
 static void __exit customer_exit(void)
@@ -42,7 +42,7 @@ static void __exit customer_exit(void)
 	LCD_MSG("customer exited");
 }
 
-#ifndef CONFIG_RUN_IN_LCD
+#ifndef CONFIG_LCD_PROTOTYPE_TEST_IN_LCD
 module_init(customer_init);
 module_exit(customer_exit);
 #endif

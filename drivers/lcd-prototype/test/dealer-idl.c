@@ -110,6 +110,7 @@ static int dealer_buy_car_callee(void)
 		ret = -1;
 		goto fail1;
 	}
+	LCD_MSG("dealer addr for a = %p", a);
 	/*
 	 * Alloc capabilities
 	 */
@@ -161,6 +162,11 @@ static int dealer_return_car_callee(void)
 	int ret;
 	struct automobile *a;
 	dsptr_t auto_dsptr;
+	cptr_t reply_cptr;
+	/*
+	 * Remember reply cptr
+	 */
+	reply_cptr = current_lcd()->utcb.reply_endpoint_cap;
 	/*
 	 * Get and remove engine from data store
 	 */
@@ -171,6 +177,7 @@ static int dealer_return_car_callee(void)
 		ret = -EINVAL;
 		goto fail1;
 	}
+	LCD_MSG("dealer addr for a (return) = %p", a);
 	/*
 	 * Return car
 	 */
@@ -179,6 +186,7 @@ static int dealer_return_car_callee(void)
 	 * Reply
 	 */
 	lcd_store_r0(0);
+	current->lcd->utcb.reply_endpoint_cap = reply_cptr;
 	ret = lcd_reply();
 	if (ret)
 		LCD_ERR("couldn't reply");
@@ -200,6 +208,11 @@ fail1:
 int dealer_die_callee(void)
 {
 	int ret;
+	cptr_t reply_cptr;
+	/*
+	 * Remember reply cap
+	 */
+	reply_cptr = current_lcd()->utcb.reply_endpoint_cap;
 	/*
 	 * Call internal exit
 	 */
@@ -215,6 +228,7 @@ int dealer_die_callee(void)
 	 * Reply
 	 */
 	lcd_store_r0(0);
+	current->lcd->utcb.reply_endpoint_cap = reply_cptr;
 	ret = lcd_reply();
 	if (ret)
 		LCD_ERR("couldn't reply");

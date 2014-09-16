@@ -95,6 +95,7 @@ void dealer_return_car(struct automobile *a)
 	 * Free on callee side
 	 */
 	lcd_store_r0(DEALER_RETURN_CAR);
+	lcd_store_r1(a->self);
 	ret = lcd_call(CUSTOMER_DEALER_INTERFACE_CAP);
 	if (ret) {
 		LCD_ERR("call failed");

@@ -250,7 +250,7 @@ struct engine * mk_engine_caller(int cylinders)
 	/*
 	 * Alloc caller copy
 	 */
-	e = kmalloc(sizeof(e), GFP_KERNEL);
+	e = kmalloc(sizeof(*e), GFP_KERNEL);
 	if (!e)
 		goto fail1;
 	e->cylinders = cylinders;
@@ -288,7 +288,7 @@ struct automobile * mk_automobile_caller(struct engine *e, int doors)
 	/*
 	 * Alloc caller copy
 	 */
-	a = kmalloc(sizeof(a), GFP_KERNEL);
+	a = kmalloc(sizeof(*a), GFP_KERNEL);
 	if (!a)
 		goto fail1;
 	a->engine = e;

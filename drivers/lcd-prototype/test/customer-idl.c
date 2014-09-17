@@ -45,10 +45,10 @@ struct automobile * dealer_buy_car(void)
 	/*
 	 * Alloc caller copy of hierarchy
 	 */
-	a = kmalloc(sizeof(a), GFP_KERNEL);
+	a = kmalloc(sizeof(*a), GFP_KERNEL);
 	if (!a)
 		goto fail1;
-	e = kmalloc(sizeof(e), GFP_KERNEL);
+	e = kmalloc(sizeof(*e), GFP_KERNEL);
 	if (!e)
 		goto fail2;
 	a->engine = e;

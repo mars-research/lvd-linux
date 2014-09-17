@@ -288,16 +288,16 @@ static void __lcd_cnode_do_free(struct cnode *parent)
 		 * XXX: Be aware of stack overflow
 		 */
 		__lcd_cnode_do_free(child);
-		/*
-		 * Remove from parent
-		 */
-		list_del_init(&child->child_list);
 	}
 	/*
 	 * Mark parent as free, and remove all rights
 	 */
 	__lcd_cnode_set_type(parent, LCD_CAP_TYPE_FREE);
 	__lcd_cnode_set_rights(parent, LCD_CAP_RIGHT_NONE);
+	/*
+	 * Remove from parent
+	 */
+	list_del_init(&parent->child_list);
 	/*
 	 * Add to containing cspace free list
 	 */

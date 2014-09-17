@@ -138,6 +138,10 @@ int customer_start(void)
 		return -1;
 	}
 	/*
+	 * Call customer exit
+	 */
+	__customer_exit();
+	/*
 	 * Now tear down
 	 */
 	lcd_store_r0(DEALER_DIE);
@@ -146,6 +150,8 @@ int customer_start(void)
 		LCD_ERR("call failed");
 		return ret;
 	}
+
+	LCD_MSG("customer idl done");
 
 	return 0;
 }

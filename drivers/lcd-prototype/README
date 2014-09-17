@@ -1,0 +1,21 @@
+
+Introduction
+------------
+
+This is a simple prototype (with a small test) for the LCD architecture. It
+consists of:
+
+  [ 1 ] an API module (in api dir) that implements a simplified capability
+        subsystem and ipc subsystem
+
+  [ 2 ] a `library' module (in liblcd dir) that is intended to contain
+        high-level routines that lcd's can call directly into that carry
+        out low-level tasks (for now, it just contains a simple implementation
+        of a data store, more below).
+
+  [ 3 ] a group of 4 test modules (in test dir)
+
+Building and Running
+--------------------
+
+In the kernel menuconfig, under the drivers submenu, select 

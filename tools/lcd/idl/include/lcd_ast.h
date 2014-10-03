@@ -8,12 +8,18 @@ enum PrimType { kChar = 1, kShort, kInt, kLong, kLongLong, kCapability};
 
 class Base
 {
-  
+  M_info info;
 };
 
 class Scope : public Base
 {
-
+  // add built in types here, so size can be evaluated before parse
+ private:
+  map<int,Type> types_;
+  void init_types();
+ public:
+  Scope();
+  lookup_symbol(char* sym);
 };
  
 class Type : public Base
@@ -21,6 +27,7 @@ class Type : public Base
  public:
   virtual void accept(ASTVisitor *worker) = 0;
   virtual void marshal() = 0;
+  virtual int size() = 0;
 };
 
 class Typedef : public Type
@@ -42,8 +49,8 @@ class IntegerType : public Type
   int size_:
   
  public:
-  PrimitiveType(TypeModifier type_mod, PrimType primitive) 
-  { this->type_modifier_ = type_mod; this->primitive_ = primitive; }
+    IntegerType(PrimType type, bool unsigned, int size) 
+  { this->unsigned_ = unsigned; this->type_ = type; this->size_ = size;}
   virtual void accept(ASTVisitor *worker) { worker->visit(this); }
   virtual void marshal();
 };
@@ -95,10 +102,10 @@ class Parameter : public Base
 {
   Type* type_;
   char* name_;
-
+  M_info m;
  public:
   Parameter(Type* type, char* name) 
-    { this->type_ = type; this->name_ = name; }
+    { this->type_ = type; this->name_ = name; m = new M_info(); }
   ~Parameter();
   void accept(ASTVisitor *worker) { worker->visit(this); }
 };

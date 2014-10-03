@@ -2,10 +2,34 @@ start-symbol: File
 options: debug9
 
 include: {{ #include "lcd_ast.h"
+	    #include "scope.h"
 	    #include <vector>
 	    #include <stdlib.h>
 	    #include <string>
 	    #include <stdint.h> }}
+
+code: {{
+      Type * getType(char * type)
+      {	   
+      	   int * err;
+      	   Root_scope* rs = Root_scope::instance();
+	   Type* val = rs->lookup_symbol(type, err):
+	   if(!*err)
+	   { // error do something
+}
+	    return val;
+      }				
+
+      void insertType(char * sym, Type * val) // should this be void?
+      {
+	Root_scope *rs = Root_scope::instance();
+	int ret = rs->insert_symbol(sym, val);
+	if(!ret)
+	{ // error do something 
+}
+	
+      }	
+}}
 
 rules:
 
@@ -186,7 +210,11 @@ Projection	=	"projection" Space+ id:Identifier "<" Spacing t:Proj_type ">" Spaci
 				ProjectionField * p = (ProjectionField *) v.getValue();
 				p_fields->push_back(p);
 			} 
-			value = new Projection((char* ) id.getValue(), (char* ) t.getValue(), p_fields); }}
+			// insert projection into rootscope for now
+			Project * val = new Projection((char* ) id.getValue(), (char* ) t.getValue(), p_fields);
+			insertType((char*)id.getValue(), val);
+			value = val;
+			 }}
 		## what is the point of having a projection without at least one line
 
 Proj_type	=  	"struct" Space+ id:Identifier Spacing {{
@@ -275,39 +303,31 @@ Line_comment	=	Line_comm_start Line_comm_rest
 
 Line_comm_end	=	"\n"
 
-Simple_Type	=	"int" {{ int* ret = (int*) malloc(sizeof(int)); *ret = kInt; value = ret; }}
-			| "char" {{ int* ret = (int*) malloc(sizeof(int)); *ret = kChar; value = ret; }}   
-			| "capability" {{ int* ret = (int*) malloc(sizeof(int)); *ret = kCapability; value = ret; }}
-			| "short" {{ int* ret = (int*) malloc(sizeof(int)); *ret = kShort; value = ret; }}
-			| "long" Space+ "long" {{ int* ret = (int*) malloc(sizeof(int)); *ret = kLongLong; value = ret; }}
-			| "long" {{ int* ret = (int*) malloc(sizeof(int)); *ret = kLong; value = ret; }}
+signed_type	=	"int" {{ value = getType("int");}}
+			| "char" {{ value = getType("char"); }}   
+			| "capability" {{ value = getType("capability"); }}
+			| "short" {{ value = getType("short");}}
+			| "long" Space+ "long" {{ value = getType("long long");}}
+			| "long" {{ value = getType("long"); }}
 
-Modifier	=	"unsigned" {{
-			int* ret = (int*) malloc(sizeof(int));
-			*ret = kUnsigned;
-			 value = ret; }}
+unsigned_type	=	"unsigned" Space+ "int" {{ value = getType("unsigned int"); }} 
+			| "unsigned" Space+ "char" {{ value = getType("unsigned char"); }} 
+			| "unsigned" Space+ "short" {{ value = getType("unsigned long"); }} 
+			| "unsigned" Space+ "long" Space+ "long" {{ value = getType("unsigned long long"); }}
+			| "unsigned" Space+ "long" {{ value = getType("unsigned long"); }}  
 
-Type_w_modifier	=	m:Modifier Space+ s:Simple_Type {{ 
-			int* val = (int*) m.getValue();
-			int* sval = (int*) s.getValue();
-			value = new PrimitiveType((TypeModifier) *val,
-			(PrimType) *sval); }} 
-
-Type 		=	Type_w_modifier
-			| s:Simple_Type {{ 
-			int* sval = (int*) s.getValue();
-			value = new PrimitiveType(kNone, (PrimType) *sval); }}
+type 		=	unsigned_type
+			| signed_type
 
 ## just ignore the modules ones, not supporting right now
 
 Type_form	=	"projection" Space+ m:Identifier "::" name:Identifier Spacing "*" Spacing
 			| "projection" Space+ m:Identifier "::" name:Identifier Space+
 			| "projection" Space+ name:Identifier Spacing "*" Spacing {{
-			value = new ProjectionType((char *)name.getValue(), 1); }}
-			| "projection" Space+ name:Identifier Space+ {{
-			value = new ProjectionType((char *)name.getValue(), 0); }}
-			| t:Type Space+ {{
-			value = (PrimitiveType *) t.getValue(); }}	
+			value = new PointerType(getType((char*)name.getValue())); }}
+			| "projection" Space+ name:Identifier Space+ {{ 
+			  value = getType((char*)name.getValue()); }}
+			| type	
 
 Spacing		=	Space*
 

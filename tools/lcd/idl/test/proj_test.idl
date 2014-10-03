@@ -1,0 +1,4 @@
+projection super_block <struct super_block> {
+  [out,in] int field1;
+  [out] char field2;
+}

@@ -1,0 +1,9 @@
+projection test<struct device> {
+  [in] projection other *sb;
+  [in,out,bind,alloc] int t;
+  [out] char t2;
+  [bind] capability t3;
+  [alloc] long long t4;
+  [in] unsigned long long t5;
+  [in] unsigned long t6;
+}

@@ -72,13 +72,22 @@ struct sync_ipc * lcd_cap_make_sync_endpoint(struct cspace *cspace,
 
 int lcd_init_cspace(struct cspace *cspace) {
 
-	cspace->cnode = kmalloc(sizeof(struct cnode) * LCD_MAX_CAPS, GFP_KERNEL);
-	if(!cspace->cnode){
-		printk(KERN_ERR "Failed to allocate memory for cnodes\n");
+	spin_lock_init(&cspace->lock);
+	cnode_table_cache = KMEM_CACHE(cnode_table, 0);
+	if(!cnode_table_cache){
+		printk(KERN_ERR "Failed to allocate cnode_table slab\n");
 		return -ENOMEM;
 	};
 
-	spin_lock_init(&cspace->lock);
+	cdt_root_cache = KMEM_CACHE(cdt_root_node, 0);
+	if(!cdt_root_cache){
+		printk(KERN_ERR "Failed to allocate cdt_root slab\n");
+		return -ENOMEM;
+	};
+
+	cspace->cnode_table = kmem_cache_alloc(cnode_table_cache, 0);
+	cspace->state = ALLOCATION_VALID;
+	
 	return 0;
 };
 EXPORT_SYMBOL(lcd_init_cspace);

@@ -72,13 +72,13 @@ struct cspace {
 };
 
 bool _get_level_bits(int table_level, capability_t cap, capability_t *levelId);
-void _lcd_delete_node (struct cspace *cspace, struct cnode *cnode);
+bool _lcd_delete_node (struct cspace *cspace, struct cnode *cnode);
 
 int lcd_cap_init_cspace(struct cspace *cspace);
 struct cnode *lcd_cnode_lookup(struct cspace *cspace, capability_t cap, bool alloc);
 int lcd_cap_insert(struct cspace *cspace, capability_t cap, 
 		void *object, enum lcd_cap_type type);
 void lcd_cap_delete(struct cspace *cspace, capability_t cap);
-//int lcd_cap_grant(struct cspace *cspacesrc, capability_t capsrc, struct cspace *cspacedst, capability_t capdst);
+int lcd_cap_grant(struct cspace *cspacesrc, capability_t capsrc, struct cspace *cspacedst, capability_t capdst);
 
 #endif

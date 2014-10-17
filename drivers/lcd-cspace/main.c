@@ -14,14 +14,12 @@ int __init api_init(void)
 {
 	bool res = true;
 	printk(KERN_ERR "lcd cspace entering module");
-	res = test_insert();
+	res = begintests();
 	if (res == false) {
-		printk(KERN_ERR "lcd_cap_insert failed");
+		printk(KERN_ERR "tests failed");
 	} else {
-		printk(KERN_ERR "lcd_cap_insert succeeded");
-		test_delete();
+		printk(KERN_ERR "tests succeeded");
 	}
-
 	return 0;
 }
 

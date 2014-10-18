@@ -84,6 +84,7 @@ struct cnode *lcd_cnode_lookup(struct cspace *cspace, capability_t cap, bool all
 				cnode = &(table->cnode[levelId]);
 				if (alloc) {
 					spin_lock_init(&cnode->lock);
+					cnode->cap = cap;
 					cnode->cspace = cspace;
 				}
 			} else {
@@ -127,6 +128,7 @@ int lcd_cap_insert(struct cspace *cspace, capability_t cap,
 	cdt_node = kmem_cache_alloc(cspace->cdt_root_cache, 0);
 	spin_unlock_irqrestore(&cspace->lock, flags);		
 	
+	cnode->cap    = cap;
 	cnode->cspace = cspace;
 	cnode->parent = NULL;
 	cnode->next   = NULL;
@@ -180,7 +182,7 @@ void lcd_cap_delete(struct cspace *cspace, capability_t cap) {
 		
 		if (spin_trylock(&cnode->cdt_root->lock)) {
 			cdt_node = cnode->cdt_root;
-			last_node = _lcd_delete_node(cspace, cnode);
+			last_node = _lcd_delete_node(cnode);
 			if (last_node) {	
 				cdt_node->state = ALLOCATION_MARKED_FOR_DELETE;
 			}
@@ -207,7 +209,7 @@ void lcd_cap_delete(struct cspace *cspace, capability_t cap) {
 		} else {
 			// someone is using CDT root
 			// wait for him to finish
-			msleep(5);
+			msleep(1);
 		}
 	} while (!done);
 };
@@ -281,6 +283,7 @@ int lcd_cap_grant(struct cspace *cspacesrc, capability_t capsrc, struct cspace *
 			cnodedst->parent = cnodesrc;
 			cnodedst->type = cnodesrc->type;
 			cnodedst->object = cnodesrc->object;
+			cnodedst->cap   = capdst;
 			cnodedst->cspace = cspacedst;
 			cnodedst->cdt_root = cnodesrc->cdt_root;
 			if (cnodesrc->child) {
@@ -305,13 +308,135 @@ int lcd_cap_grant(struct cspace *cspacesrc, capability_t capsrc, struct cspace *
 		if (!done) {
 			// someone is using CDT root
 			// wait for him to finish
-			msleep(5);
+			msleep(1);
 		}
 	} while (!done);
 	return 0;
 };
 EXPORT_SYMBOL(lcd_cap_grant);
 
+int lcd_cap_revoke(struct cspace *cspace, capability_t cap) {
+	struct cnode *cnode, *childnode; 
+	unsigned long flags, flags_cnode_lock;
+	bool done = false, last_node;
+	struct cdt_root_node *cdt_node = NULL;
+
+	do {
+		spin_lock_irqsave(&cspace->lock, flags);
+		if (cspace->state != ALLOCATION_VALID) {
+			// TBD: not clear what needs to be done here - return with error or continue revoke operation down the hierarchy?
+			// AI: Anton, Muktesh
+			// current state: simply return if the root cspace is not valid.
+			printk(KERN_INFO "lcd_cap_revoke cspace allocation is not valid\n");
+			spin_unlock_irqrestore(&cspace->lock, flags);		
+			return -EINVAL;
+		}
+
+		cnode = lcd_cnode_lookup(cspace, cap, false); 
+		if(cnode == NULL)
+		{
+			printk(KERN_INFO "lcd_cap_delete cnode not found\n");
+			spin_unlock_irqrestore(&cspace->lock, flags);		
+			return -EINVAL; 
+		}
+
+		spin_lock_irqsave(&cnode->lock, flags_cnode_lock);
+		spin_unlock_irqrestore(&cspace->lock, flags);
+		if (cnode->type == LCD_CAP_TYPE_FREE) {
+			printk(KERN_INFO "lcd_cap_delete cnode is already free\n");
+			spin_unlock_irqrestore(&cnode->lock, flags_cnode_lock);
+			return -EINVAL;
+		}
+		
+		if (spin_trylock(&cnode->cdt_root->lock)) {
+			cdt_node = cnode->cdt_root;
+			// get the subtree rooted at cnode out of CDT
+			if (cdt_node->cnode == cnode) {
+				if (cnode->next) {
+					// this is not possible untill we implement capability mint/duplicate feature
+					cdt_node->cnode = cnode->next;
+					cnode->next->prev = NULL;
+					cnode->next = NULL;
+				} else {
+					cdt_node->cnode = NULL;
+				}
+			} else {
+				if (cnode->parent) {
+					if (cnode->parent->child == cnode) {
+						if (cnode->next) {
+							cnode->parent->child = cnode->next;
+							cnode->next->prev = NULL;
+							cnode->next = NULL;
+						} else {
+							cnode->parent->child = NULL;
+						}
+					} else {
+						if (cnode->prev) {
+							cnode->prev->next = cnode->next;
+						}
+						if (cnode->next) {
+							cnode->next->prev = cnode->prev;
+						}
+						cnode->next = NULL;
+						cnode->prev = NULL;
+					}
+					cnode->parent = NULL;
+				}
+			} 
+			// cnode is now isolated from CDT, before unlocking mark it invalid
+			cnode->type = LCD_CAP_TYPE_INVALID;
+			spin_unlock_irqrestore(&cnode->lock, flags_cnode_lock);
+
+			// no one else can modify the CDT relationships as long as we hold CDT lock
+			while (cnode->child) {
+				childnode = cnode->child;
+				spin_lock_irqsave(&childnode->lock, flags_cnode_lock);
+				cspace = childnode->cspace;
+				cap = childnode->cap;
+				_lcd_delete_node(childnode);
+				childnode->cdt_root = NULL;
+				spin_unlock_irqrestore(&childnode->lock, flags_cnode_lock);
+				lcd_free_cap(&(cspace->cap_cache), cap);
+			}
+			
+			spin_lock_irqsave(&cnode->lock, flags_cnode_lock);
+			cspace = cnode->cspace;
+			cap = cnode->cap;
+			last_node = _lcd_delete_node(cnode);
+			if (last_node) {	
+				cdt_node->state = ALLOCATION_MARKED_FOR_DELETE;
+			}
+			cnode->cdt_root = NULL;
+			spin_unlock(&(cdt_node->lock));
+			done = true;
+		} 
+		spin_unlock_irqrestore(&cnode->lock, flags_cnode_lock);
+		
+		
+		if (done) {
+			lcd_free_cap(&(cspace->cap_cache), cap);
+			if (last_node) {	
+				// at this point we are not holding any locks
+				// so its ok to request for cspace lock
+				spin_lock_irqsave(&cspace->lock, flags);
+				if (cspace->state != ALLOCATION_VALID) {
+					spin_unlock_irqrestore(&cspace->lock, flags);		
+					return 0;
+				}
+				cdt_node->state = ALLOCATION_REMOVED;
+				kmem_cache_free(cspace->cdt_root_cache, cdt_node);
+				spin_unlock_irqrestore(&(cspace->lock), flags);	
+			}
+		} else {
+			// someone is using CDT root
+			// wait for him to finish
+			msleep(1);
+		}
+	} while (!done);
+
+	return 0;
+};
+EXPORT_SYMBOL(lcd_cap_revoke);
 
 int lcd_cnode_insert(struct cspace *cspace, capability_t cap, struct cnode *cnode) {
 	/* XXX: not clear */
@@ -356,7 +481,7 @@ bool _get_level_bits(int table_level, capability_t cap, capability_t *levelId)
 }
 
 // assumes cnode and cdt root is locked (in that order) 
-bool _lcd_delete_node (struct cspace *cspace, struct cnode *cnode){
+bool _lcd_delete_node (struct cnode *cnode){
 
 	bool last_node;
 	cnode->object = NULL; 

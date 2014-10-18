@@ -2,16 +2,18 @@
 #define TEST_PASSED true
 #define TEST_FAILED false
 
-int test_cap_count = 0, test_cap_grant_count = 0;
-struct cspace test_cspace, test_cspace_grant;
+int test_cap_count = 0, test_cap_grant_count = 0, test_cap_grant_count2=0;
+struct cspace test_cspace, test_cspace_grant, test_cspace_grant2;
 int test_max_cap = 4 * MAX_CAP_SLOTS;
 capability_t arr[4 * MAX_CAP_SLOTS] = {0};
 capability_t arr_grant[4 * MAX_CAP_SLOTS] = {0};
+capability_t arr_grant2[4 * MAX_CAP_SLOTS] = {0};
 
 bool begintests(void) {
 	bool res;
 	lcd_init_cspace(&test_cspace);
 	lcd_init_cspace(&test_cspace_grant);
+	lcd_init_cspace(&test_cspace_grant2);
 	res = test_insert();
 	if (res == TEST_FAILED) {
 		printk(KERN_ERR "lcd_cap_test test_insert() failed\n");
@@ -26,7 +28,14 @@ bool begintests(void) {
 	} else {
 		printk(KERN_INFO "lcd_cap_test test_grant() Succeeded\n"); 
 	}
-	test_delete();
+	// test_delete();
+	res = test_revoke();
+	if (res == TEST_FAILED) {
+		printk(KERN_ERR "lcd_cap_test test_revoke() failed\n"); 
+		return false;
+	} else {
+		printk(KERN_INFO "lcd_cap_test test_revoke() Succeeded\n"); 
+	}
 	return true;
 }
 
@@ -73,6 +82,23 @@ bool test_grant(void) {
 			return false;
 		}		
 	}
+
+	for (i = 0; i < test_cap_count; i++) {
+		if (lcd_alloc_cap(&(test_cspace_grant2.cap_cache), &capdst) == 0) {
+			capsrc = arr[i];
+			res = lcd_cap_grant(&test_cspace, capsrc, &(test_cspace_grant2), capdst);
+			if (res == 0) {
+				arr_grant2[test_cap_grant_count2++] = capdst;
+				printk(KERN_INFO "lcd_cap_test grant2 capability # %llu to %llu succeeded\n", capsrc, capdst);  
+			} else {
+				printk(KERN_ERR "lcd_cap_test grant2 capability # %llu to %llu failed\n", capsrc, capdst);  
+				return false;
+			}
+		} else {
+			printk(KERN_ERR "lcd_cap_test grant2 failed to allcoate capability\n");
+			return false;
+		}		
+	}
 	return true;
 }
 
@@ -89,4 +115,30 @@ void test_delete(void) {
 		printk(KERN_INFO "lcd_cap_test deleted granted capability # %llu\n", arr_grant[i]);  
 	}
 	test_cap_grant_count = 0;
+
+	for (i = 0; i < test_cap_grant_count2; i++) {
+		lcd_cap_delete(&test_cspace_grant2, arr_grant2[i]);
+		printk(KERN_INFO "lcd_cap_test deleted granted2 capability # %llu\n", arr_grant2[i]);  
+	}
+	test_cap_grant_count2 = 0;
+}
+
+bool test_revoke() {
+	// this inherently tests delete functionality
+	int i = 0;
+	int res;
+	bool ret = true;
+	for (; i < test_cap_count; i++) {
+		res = lcd_cap_revoke(&test_cspace, arr[i]);
+		ret = ret & (res == 0);
+		if (res == 0) {
+			printk(KERN_INFO "lcd_cap_test revoked capability # %llu\n", arr[i]);  
+		} else {
+			printk(KERN_ERR "lcd_cap_test FAILED to revoke capability # %llu\n", arr[i]);  
+		}
+	}
+	test_cap_count = 0;
+	test_cap_grant_count = 0;
+	test_cap_grant_count2 = 0;
+	return ret;
 }

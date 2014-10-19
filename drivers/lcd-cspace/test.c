@@ -36,6 +36,15 @@ bool begintests(void) {
 	} else {
 		printk(KERN_INFO "lcd_cap_test test_revoke() Succeeded\n"); 
 	}
+
+	res = test_cspace_destroy();
+	if (res == TEST_FAILED) {
+		printk(KERN_ERR "lcd_cap_test test_cspace_destroy() failed\n"); 
+		return false;
+	} else {
+		printk(KERN_INFO "lcd_cap_test test_cspace_destroy() Succeeded\n"); 
+	}
+
 	return true;
 }
 
@@ -123,7 +132,7 @@ void test_delete(void) {
 	test_cap_grant_count2 = 0;
 }
 
-bool test_revoke() {
+bool test_revoke(void) {
 	// this inherently tests delete functionality
 	int i = 0;
 	int res;
@@ -141,4 +150,18 @@ bool test_revoke() {
 	test_cap_grant_count = 0;
 	test_cap_grant_count2 = 0;
 	return ret;
+}
+
+bool test_cspace_destroy(void) {
+	bool res = false;
+	int ret = -1;
+	res = test_insert();
+	if (res) {
+		printk(KERN_INFO "lcd_cap_test insert succeeded");
+		ret = lcd_cap_destroy_cspace(&test_cspace);
+	} else {
+		printk(KERN_ERR "lcd_cap_test insert failed");
+	}
+
+	return ret == 0;
 }

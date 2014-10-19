@@ -22,8 +22,12 @@
 // should always be 2^CAP_IDENTIFIER_BITS + 2^TABLE_IDENTIFIER_BITS
 #define MAX_SLOTS_PER_TABLE 6
 
+struct cdt_root_node;
 struct cnode;
 struct cspace;
+
+extern struct cdt_root_node * get_cdt_root(void);
+extern void free_cdt_root(struct cdt_root_node *cdt_node);
 
 enum lcd_cap_type
 {
@@ -59,7 +63,6 @@ struct cnode {
 
 struct cnode_table {
 	struct cnode cnode[MAX_SLOTS_PER_TABLE];
-	uint8_t table_Id;
 	uint8_t table_level;
 };
 
@@ -67,13 +70,13 @@ struct cspace {
 	spinlock_t lock; 
 	enum allocation_state state;
 	struct cnode_table *cnode_table;
-	struct kmem_cache *cdt_root_cache;
 	struct kmem_cache *cnode_table_cache;
 	struct cap_cache cap_cache;
 };
 
 bool _get_level_bits(int table_level, capability_t cap, capability_t *levelId);
 bool _lcd_delete_node (struct cnode *cnode);
+int _lcd_delete_table(struct cspace *cspace, struct cnode_table *table);
 
 int lcd_cap_init_cspace(struct cspace *cspace);
 struct cnode *lcd_cnode_lookup(struct cspace *cspace, capability_t cap, bool alloc);
@@ -82,4 +85,5 @@ int lcd_cap_insert(struct cspace *cspace, capability_t cap,
 void lcd_cap_delete(struct cspace *cspace, capability_t cap);
 int lcd_cap_grant(struct cspace *cspacesrc, capability_t capsrc, struct cspace *cspacedst, capability_t capdst);
 int lcd_cap_revoke(struct cspace *cspace, capability_t cap);
+int lcd_cap_destroy_cspace(struct cspace *cspace);
 #endif

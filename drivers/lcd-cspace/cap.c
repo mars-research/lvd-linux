@@ -23,15 +23,10 @@ int lcd_init_cspace(struct cspace *cspace) {
 		return -ENOMEM;
 	};
 
-	cspace->cdt_root_cache = KMEM_CACHE(cdt_root_node, 0);
-	if(!cspace->cdt_root_cache){
-		printk(KERN_ERR "lcd_cap Failed to allocate cdt_root slab\n");
-		return -ENOMEM;
-	};
-
 	cspace->cnode_table = kmem_cache_alloc(cspace->cnode_table_cache, 0);
 	for (i = 0; i < MAX_SLOTS_PER_TABLE; i++)
 	{
+		spin_lock_init(&(cspace->cnode_table->cnode[i].lock));
 		cspace->cnode_table->cnode[i].type = LCD_CAP_TYPE_FREE;
 		cspace->cnode_table->table_level = 0;
 	}
@@ -108,7 +103,6 @@ int lcd_cap_insert(struct cspace *cspace, capability_t cap,
 {
 	unsigned long flags, flags_cnode_lock;
 	struct cnode *cnode;
-	struct cdt_root_node *cdt_node;
 
 	spin_lock_irqsave(&cspace->lock, flags);
 	if (cspace->state != ALLOCATION_VALID)
@@ -125,7 +119,6 @@ int lcd_cap_insert(struct cspace *cspace, capability_t cap,
 
 	cnode->object = object; 
 	spin_lock_irqsave(&cnode->lock, flags_cnode_lock);
-	cdt_node = kmem_cache_alloc(cspace->cdt_root_cache, 0);
 	spin_unlock_irqrestore(&cspace->lock, flags);		
 	
 	cnode->cap    = cap;
@@ -135,13 +128,9 @@ int lcd_cap_insert(struct cspace *cspace, capability_t cap,
 	cnode->prev   = NULL;
 	cnode->child  = NULL;
 	cnode->type   = type;
-	cnode->cdt_root = cdt_node;
-	cnode->cdt_root->state = ALLOCATION_VALID;
-	cnode->cdt_root->node_count = 0;
-	spin_lock_init(&(cnode->cdt_root->lock));
+	cnode->cdt_root = get_cdt_root();
 	cnode->cdt_root->cnode      = cnode;
 	cnode->cdt_root->node_count = 1;
-	cnode->cdt_root->state      = ALLOCATION_VALID;
 
 	//lcd_cnode_release(cnode);
 	spin_unlock_irqrestore(&cnode->lock, flags_cnode_lock);	
@@ -193,19 +182,10 @@ void lcd_cap_delete(struct cspace *cspace, capability_t cap) {
 		spin_unlock_irqrestore(&cnode->lock, flags_cnode_lock);
 		
 		if (done) {
-			lcd_free_cap(&(cspace->cap_cache), cap);
 			if (last_node) {	
-				// at this point we are not holding any locks
-				// so its ok to request for cspace lock
-				spin_lock_irqsave(&cspace->lock, flags);
-				if (cspace->state != ALLOCATION_VALID) {
-					spin_unlock_irqrestore(&cspace->lock, flags);		
-					return;
-				}
-				cdt_node->state = ALLOCATION_REMOVED;
-				kmem_cache_free(cspace->cdt_root_cache, cdt_node);
-				spin_unlock_irqrestore(&(cspace->lock), flags);	
+				free_cdt_root(cdt_node);	
 			}
+			lcd_free_cap(&(cspace->cap_cache), cap);
 		} else {
 			// someone is using CDT root
 			// wait for him to finish
@@ -414,19 +394,10 @@ int lcd_cap_revoke(struct cspace *cspace, capability_t cap) {
 		
 		
 		if (done) {
-			lcd_free_cap(&(cspace->cap_cache), cap);
 			if (last_node) {	
-				// at this point we are not holding any locks
-				// so its ok to request for cspace lock
-				spin_lock_irqsave(&cspace->lock, flags);
-				if (cspace->state != ALLOCATION_VALID) {
-					spin_unlock_irqrestore(&cspace->lock, flags);		
-					return 0;
-				}
-				cdt_node->state = ALLOCATION_REMOVED;
-				kmem_cache_free(cspace->cdt_root_cache, cdt_node);
-				spin_unlock_irqrestore(&(cspace->lock), flags);	
+				free_cdt_root(cdt_node);
 			}
+			lcd_free_cap(&(cspace->cap_cache), cap);
 		} else {
 			// someone is using CDT root
 			// wait for him to finish
@@ -437,6 +408,23 @@ int lcd_cap_revoke(struct cspace *cspace, capability_t cap) {
 	return 0;
 };
 EXPORT_SYMBOL(lcd_cap_revoke);
+
+int lcd_cap_destroy_cspace(struct cspace *cspace) {
+	
+	int res;
+	unsigned long flags;
+	spin_lock_irqsave(&cspace->lock, flags);
+	if (cspace->state != ALLOCATION_VALID)
+	{
+		spin_unlock_irqrestore(&cspace->lock, flags);		
+		return -EIDRM;
+	}
+	cspace->state = ALLOCATION_MARKED_FOR_DELETE;
+	spin_unlock_irqrestore(&cspace->lock, flags);
+	res = _lcd_delete_table(cspace, cspace->cnode_table);
+	return res;
+};
+EXPORT_SYMBOL(lcd_cap_destroy_cspace);
 
 int lcd_cnode_insert(struct cspace *cspace, capability_t cap, struct cnode *cnode) {
 	/* XXX: not clear */
@@ -548,3 +536,59 @@ bool _lcd_delete_node (struct cnode *cnode){
 	} 	
 	return last_node;
 }  
+
+int _lcd_delete_table(struct cspace *cspace, struct cnode_table *table) {
+
+	unsigned long flags;
+	capability_t index = MAX_CAP_SLOTS;
+	struct cnode *cnode;
+	struct cdt_root_node *cdt_node;
+	bool last_node = false;
+
+	if (table == NULL || table->cnode[index].type == LCD_CAP_TYPE_FREE) {
+		return -EINVAL;
+	}
+	while (index < MAX_SLOTS_PER_TABLE) {
+		_lcd_delete_table(cspace, table->cnode[index].object);
+		// traversal through cnode_table happens only after locking cspace and checking if cspace is valid.
+		// we have already marked cspace as invalid so insert, revoke and delete cannot reach here.
+		table->cnode[index].type = LCD_CAP_TYPE_FREE;
+		index++;
+	}
+
+	index = 0;
+	while (index < MAX_CAP_SLOTS) {
+		spin_lock_irqsave(&(table->cnode[index].lock), flags); 
+		if (table->cnode[index].type == LCD_CAP_TYPE_FREE) {
+			index++;
+			spin_unlock_irqrestore(&(table->cnode[index].lock), flags);
+			continue;
+		}
+		cnode = &(table->cnode[index]);
+		if (spin_trylock(&(cnode->cdt_root->lock))) {
+			cdt_node = cnode->cdt_root;
+			last_node = _lcd_delete_node(cnode);
+			if (last_node) {	
+				cdt_node->state = ALLOCATION_MARKED_FOR_DELETE;
+			}
+			cnode->cdt_root = NULL;
+			spin_unlock(&(cdt_node->lock));
+			spin_unlock_irqrestore(&(cnode->lock), flags);
+			lcd_free_cap(&(cspace->cap_cache), cnode->cap);
+			index++;
+		} else {
+			spin_unlock_irqrestore(&(table->cnode[index].lock), flags);	
+			msleep(1);
+		}
+		if (last_node) {	
+			free_cdt_root(cdt_node);	
+			last_node = false;
+		} 
+	}
+
+	// no locks are being held till here
+	spin_lock_irqsave(&cspace->lock, flags);
+	kmem_cache_free(cspace->cnode_table_cache, table);
+	spin_unlock_irqrestore(&cspace->lock, flags);
+	return 0;
+}

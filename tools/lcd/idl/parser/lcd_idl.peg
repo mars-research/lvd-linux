@@ -95,10 +95,12 @@ File		=	Spacing v:Verbatim? t:Things* <eof> {{ std::vector<Definition *>* defs =
 				}
 
 			}
-			  value = new Scope((char*) v.getValue(), rpcs, messages, env); }}
+			  value = new File((char*) v.getValue(), Root_scope::instance(), rpcs, messages); }}
 
 Typedef		=	 "typedef" Spacing "<" Spacing rt:RealType Spacing "," Spacing mt:Type Spacing ">" Spacing id:Identifier Spacing {{ 
-			 value = new Typedef((char*) rt.getValue(), (Type*) mt.getValue(), (char*) id.getValue());}}
+			 Typedef * val = new Typedef((char*) rt.getValue(), (Type*) mt.getValue(), (char*) id.getValue());
+			 insertType((char*)id.getValue(),val);
+			 }}
 
 Verbatim	=	 "verbatim" Spacing "[" contents:VerbatimContent "]" {{ std::ostringstream total;
 			for(Value::iterator it = contents.getValues().begin(); it != contents.getValues().end(); it ++)
@@ -303,7 +305,7 @@ Line_comment	=	Line_comm_start Line_comm_rest
 
 Line_comm_end	=	"\n"
 
-signed_type	=	"int" {{ value = getType("int");}}
+git stsigned_type	=	"int" {{ value = getType("int");}}
 			| "char" {{ value = getType("char"); }}   
 			| "capability" {{ value = getType("capability"); }}
 			| "short" {{ value = getType("short");}}

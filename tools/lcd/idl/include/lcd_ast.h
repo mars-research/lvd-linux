@@ -82,22 +82,6 @@ class ProjectionType : public Type // complex type
   virtual void marshal();
 };
 
-class Typedef : public Declaration
-{
-  char* real_type_; // how should this be represented?
-  Type* marshal_type_; // should this be a supported type?
-  char* name_;
-
- public:
-  Typedef(char* real_type, Type* marshal_type, char* typedef_name) {
-    this->real_type_ = real_type;
-    this->marshal_type_ = marshal_type;
-    this->name_ = typedef_name; }
-  char* name() { return name_; }
-  DefinitionType get_definition_type(){ return kTypedef; }
-  void accept(ASTVisitor *worker) { worker->visit(this); }
-};
-
 class Parameter : public Base
 {
   Type* type_;
@@ -112,9 +96,9 @@ class Parameter : public Base
 
 class Rpc : public Base
 {
-  Type* return_type_;
+  Type* ret_type_;
   char* name_;
-  std::vector<Parameter* >* parameters_;
+  std::vector<Parameter* >* params_;
 
  public:
   Rpc(Type* return_type, char* name, std::vector<Parameter* >* parameters) {
@@ -181,18 +165,17 @@ class Message : public  Definition
 class File : public Scope
 {
   char* verbatim_;
-  std::vector<Rpc *>* rpc_definitions_;
-  std::vector<Message *>* message_definitions_;
-  std::map<char *, Definition *>* symbol_table_;
-  // believe it is only necessary to store projections in "env" since functions can't be referenced in other functions
+  Root_scope * root_scope_;
+  std::vector<Rpc *>* rpc_defs_;
+  std::vector<Message *>* message_defs_;
   
  public:
-  File(char* verbatim, std::vector<Rpc* >* rpc_definitions, std::vector<Message* >* message_definitions,
-	std::map<char* , Definition* >* symbol_table) {
+  File(char* verbatim, Root_scope* rs, std::vector<Rpc* >* rpc_definitions, std::vector<Message* >* message_definitions) {
     this->verbatim_ = verbatim;
+    this->root_scope_ = rs;
     this->rpc_definitions_ = rpc_definitions;
     this->message_definitions_ = message_definitions;
-    this->symbol_table_ = symbol_table; }
+  }
   void accept(ASTVisitor *worker) { worker->visit(this); }
   
 };

@@ -305,7 +305,7 @@ Line_comment	=	Line_comm_start Line_comm_rest
 
 Line_comm_end	=	"\n"
 
-git stsigned_type	=	"int" {{ value = getType("int");}}
+signed_type	=	"int" {{ value = getType("int");}}
 			| "char" {{ value = getType("char"); }}   
 			| "capability" {{ value = getType("capability"); }}
 			| "short" {{ value = getType("short");}}

@@ -1,5 +1,5 @@
-#include "lcd_ast.h"
-#include "lcd_idl.h"
+#include "include/lcd_ast.h"
+#include "parser/lcd_idl.h"
 #include <stdio.h>
 #include <stdlib.h>
 #include <iostream>

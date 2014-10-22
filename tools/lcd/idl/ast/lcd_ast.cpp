@@ -18,3 +18,42 @@ Scope::Scope()
   builtin->insert( std::pair<int,Type>(1, new IntegerType(kCapability, false, sizeof("int"))));
 }
 
+void Typedef::accept(ASTVisitor* worker)
+{
+  worker->visit(this);
+}
+
+void IntegerType::accept(ASTVisitor* worker)
+{
+  worker->visit(this);
+}
+
+void PointerType::accept(ASTVisitor* worker)
+{
+  worker->visit(this);
+}
+
+void ProjectionType::accept(ASTVisitor* worker)
+{
+  worker->visit(this);
+}
+
+void Parameter::accept(ASTVisitor* worker)
+{
+  worker->visit(this);
+}
+
+void Rpc::accept(ASTVisitor* worker)
+{
+  worker->visit(this);
+}
+
+void ProjectionField::accept(ASTVisitor* worker)
+{
+  worker->visit(this);
+}
+
+void File::accept(ASTVisitor* worker)
+{
+  worker->visit(this);
+}

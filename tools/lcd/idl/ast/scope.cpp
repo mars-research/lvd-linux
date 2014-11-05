@@ -1,5 +1,7 @@
 #include "../include/lcd_ast.h"
 
+RootScope* RootScope::instance_ = 0;
+
 RootScope::RootScope()
 {
    // init builtin int types

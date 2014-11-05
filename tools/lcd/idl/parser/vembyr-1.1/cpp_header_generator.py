@@ -11,6 +11,7 @@ def generate(peg):
     guard = generate_guard(peg)
     
     code = """
+
     /* filename should be a path to a file */
     extern const void * parse(const std::string & filename, bool stats = false);
 
@@ -36,6 +37,8 @@ def generate(peg):
     return """
 #ifndef _%s_
 #define _%s_
+
+#include <string>
 
 %s
 

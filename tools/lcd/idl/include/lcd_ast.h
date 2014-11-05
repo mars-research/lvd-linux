@@ -17,50 +17,63 @@ class Type : public Base
 {
  public:
   virtual void accept(ASTVisitor *worker) = 0;
-  virtual void marshal() = 0;
-  virtual int size() = 0;
+  //  virtual void marshal() = 0;
+  // virtual int size() = 0;
 };
 
 class Scope : public Base
 {
-  // add built in types here, so size can be evaluated before parse
- private:
-  std::map<int,Type> types_;
-  void init_types();
  public:
-  Scope();
-  Type* lookup_symbol(char* sym);
+  virtual Type* lookup_symbol(const char* sym, int* err) =0;
+  virtual int insert_symbol(const char* sym, Type* type) =0;
 };
  
 class RootScope : public Scope
 {
+  static RootScope* instance_;
+  std::map<const char*,Type*>* types_;
+  void init_types();
+  RootScope(void);
+
  public:
-  RootScope();
-  
+  static int test();
+  static RootScope* instance();
+  virtual Type* lookup_symbol(const char* sym, int* err);
+  virtual int insert_symbol(const char* sym, Type* type);
 };
+
+class FileScope : public Scope
+{
+  RootScope* root_;
+  std::map<const char*, Type*> *types_;
+ public:
+  FileScope(RootScope* root);
+  virtual Type* lookup_symbol(const char* sym, int* err);
+  virtual int insert_symbol(const char* type, Type* t);
+};
+
 class Typedef : public Type
 {
   Type* type_;
-  char* alias_;
+  const char* alias_;
   char* marshal_info_;
 
  public:
-
+  Typedef(const char* alias, Type* type);
   virtual void accept(ASTVisitor *worker);
-  virtual void marshal();
+  // virtual void marshal();
 };
 
 class IntegerType : public Type
 {
   bool unsigned_;
-  PrimType type_;
+  const char* type_;
   int size_;
   
  public:
-  IntegerType(PrimType type, bool un, int size) 
-    { this->unsigned_ = un; this->type_ = type; this->size_ = size;}
+  IntegerType(const char* type, bool un, int size);
   virtual void accept(ASTVisitor *worker);
-  virtual void marshal();
+  // virtual void marshal();
 };
 
 class CapabilityType : public IntegerType
@@ -74,7 +87,7 @@ class PointerType : public Type
  public:
   PointerType(Type* type);
   virtual void accept(ASTVisitor *worker);
-  virtual void marshal();
+  // virtual void marshal();
 };
 
 class ProjectionField : public Base
@@ -84,41 +97,37 @@ class ProjectionField : public Base
   bool alloc_;
   bool bind_;
   Type* field_type_;
-  char* field_name_;
+  const char* field_name_;
   
  public:
-  ProjectionField(bool in, bool out, bool alloc, bool bind, Type* field_type, char* field_name)
-    { this->in_ = in; this->out_ = out; this->alloc_ = alloc; this->bind_ = bind; this->field_type_ = field_type;
-      this->field_name_ = field_name; }
+  ProjectionField(bool in, bool out, bool alloc, bool bind, Type* field_type, const char* field_name);
   ~ProjectionField();
-  bool in() { return in_; }
-  bool out() { return out_; }
-  bool alloc() { return alloc_; }
-  bool bind() { return bind_; }
+  bool in();
+  bool out();
+  bool alloc();
+  bool bind();
   void accept(ASTVisitor *worker);
 };
 
 class ProjectionType : public Type // complex type
 {
-  char* id_; 
-  char* real_type_;
+  const char* id_; 
+  const char* real_type_;
   std::vector<ProjectionField*>* fields_;
 
  public:
-  ProjectionType(char * id, char* real_type, std::vector<ProjectionField*>* fields) 
-    { this->id_ = id; this->real_type_ = real_type; this->fields_ = fields; }
+  ProjectionType(const char* id, const char* real_type, std::vector<ProjectionField*>* fields);
   void accept(ASTVisitor *worker);
-  virtual void marshal();
+  // virtual void marshal();
 };
 
 class Parameter : public Base
 {
   Type* type_;
-  char* name_;
+  const char* name_;
   //M_info m;
  public:
-  Parameter(Type* type, char* name) 
-    { this->type_ = type; this->name_ = name; }//m = new M_info(); }
+  Parameter(Type* type, const char* name);
   ~Parameter();
   void accept(ASTVisitor *worker);
 };
@@ -126,17 +135,14 @@ class Parameter : public Base
 class Rpc : public Base
 {
   Type* ret_type_;
-  char* name_;
+  const char* name_;
   std::vector<Parameter* >* params_;
 
  public:
-  Rpc(Type* return_type, char* name, std::vector<Parameter* >* parameters) {
-    this->ret_type_ = return_type;
-    this->name_ = name;
-    this->params_ = parameters; }
-  char* name() { return name_; }
-  Type* return_type() { return ret_type_; }
-  std::vector<Parameter*>* parameters() { return params_; }
+  Rpc(Type* return_type, const char* name, std::vector<Parameter* >* parameters);
+  const char* name();
+  Type* return_type();
+  std::vector<Parameter*>* parameters();
   void accept(ASTVisitor *worker);
 };
 
@@ -170,19 +176,15 @@ class Message : public  Definition
 */
 
 
-class File : public Scope
+class File : public Base
 {
-  char* verbatim_;
-  RootScope * root_scope_;
+  const char* verbatim_;
+  FileScope * scope_; // has pointer to root scope
   std::vector<Rpc *>* rpc_defs_;
   // std::vector<Message *>* message_defs_;
   
  public:
-  File(char* verbatim, RootScope* rs, std::vector<Rpc* >* rpc_definitions) {
-    this->verbatim_ = verbatim;
-    this->root_scope_ = rs;
-    this->rpc_defs_ = rpc_definitions;
-  }
+  File(const char* verbatim, FileScope* fs, std::vector<Rpc* >* rpc_definitions);
   void accept(ASTVisitor *worker);
   
 };

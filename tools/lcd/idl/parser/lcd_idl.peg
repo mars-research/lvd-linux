@@ -1,19 +1,27 @@
 start-symbol: File
 options: debug9
 
-include: {{ #include "lcd_ast.h"
-	    #include "scope.h"
+include: {{ #include "../include/lcd_ast.h"
 	    #include <vector>
 	    #include <stdlib.h>
 	    #include <string>
 	    #include <stdint.h> }}
 
 code: {{
-      Type * getType(char * type)
+      static FileScope* fs_instance;
+      FileScope* current_file_scope()
+      {
+	if(!fs_instance)
+	{
+		fs_instance = new FileScope(RootScope::instance());
+	}
+	return fs_instance;
+      }
+      Type * getType(const char* type)
       {	   
       	   int * err;
-      	   Root_scope* rs = Root_scope::instance();
-	   Type* val = rs->lookup_symbol(type, err):
+      	   RootScope* rs = RootScope::instance();
+	   Type* val = rs->lookup_symbol(type, err);
 	   if(!*err)
 	   { // error do something
 }
@@ -22,11 +30,11 @@ code: {{
 
       void insertType(char * sym, Type * val) // should this be void?
       {
-	Root_scope *rs = Root_scope::instance();
-	int ret = rs->insert_symbol(sym, val);
+	FileScope *fs = current_file_scope();
+	int ret = fs->insert_symbol(sym, val);
 	if(!ret)
 	{ // error do something 
-}
+	}
 	
       }	
 }}
@@ -50,55 +58,19 @@ IdentStart	=	[abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ_]
 
 IdentCont	=	IdentStart | [0123456789]
 
-File		=	Spacing v:Verbatim? t:Things* <eof> {{ std::vector<Definition *>* defs = new std::vector<Definition *>;
+File		=	Spacing v:Verbatim? t:Things* <eof> {{
 			std::vector<Rpc *>* rpcs = new std::vector<Rpc *>;
-			std::vector<Message *>* messages = new std::vector<Message *>;
-			std::map<char *, Definition*> *env = new std::map<char *, Definition *>;
 			for(Value::iterator it = t.getValues().begin(); it != t.getValues().end(); it ++)
 			{
 				const Value & v = *it;
-				Definition * ds = (Definition *) v.getValue();
-				if(!ds)
-				{
-					printf("error null pointer\n");
-					exit(0);
-				}
-				switch (ds->get_definition_type())
-				{
-				case kRpc:
-				{
-				Rpc * rp = reinterpret_cast<Rpc *>(ds);
+				Rpc * rp = (Rpc *) v.getValue();
 				rpcs->push_back(rp);
-				}				
-				break;
-				case kMessage:
-				{
-				Message * mess = reinterpret_cast<Message *>(ds);
-				messages->push_back(mess);
-				}
-				break;
-				case kProjection:
-				{
-				Projection* proj = reinterpret_cast<Projection *>(ds);
-				env->insert(std::pair<char *, Definition *>(proj->name(), ds));
-				}
-				case kTypedef:
-				{
-				Typedef* td = reinterpret_cast<Typedef*>(ds);
-				env->insert(std::pair<char*, Definition*>(td->name(), ds));
-				}
-				break;
-				default:
-				{
-				printf("fatal error\n");
-				}
-				}
 
 			}
-			  value = new File((char*) v.getValue(), Root_scope::instance(), rpcs, messages); }}
+			  value = new File((char*) v.getValue(), current_file_scope(), rpcs); }}
 
-Typedef		=	 "typedef" Spacing "<" Spacing rt:RealType Spacing "," Spacing mt:Type Spacing ">" Spacing id:Identifier Spacing {{ 
-			 Typedef * val = new Typedef((char*) rt.getValue(), (Type*) mt.getValue(), (char*) id.getValue());
+Typedef		=	 "typedef" Spacing "<" Spacing rt:RealType Spacing "," Spacing mt:Type_form Spacing ">" Spacing id:Identifier Spacing {{ 
+			 Typedef * val = new Typedef((char*) rt.getValue(), (Type*) mt.getValue());
 			 insertType((char*)id.getValue(),val);
 			 }}
 
@@ -157,7 +129,7 @@ String		=	<ascii 34> l:any_letter+ <ascii 34> {{
 
 any_letter	=	[_.,/?<>'; =:%`!@#$^&*()-+{}|\\ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789]
 
-Things		=	Typedef | Rpc | Message | Projection
+Things		=	Typedef | Rpc | Projection
 
 Include		=	"#include" Space+ "<" Spacing f:Identifier Spacing ">" Spacing {{
 			std::ostringstream total;
@@ -193,17 +165,7 @@ Rpc		=	"rpc" Space+ t:Type_form id:Identifier Spacing OPEN p:Parameters CLOSE SE
 			value = new Rpc((Type *) t.getValue(), (char *) id.getValue(), (std::vector<Parameter *> *) p.getValue()); }}  
 
 
-Message		=	"message" Space+ id:Identifier Spacing OPENC Spacing m:Message_field* CLOSEC Spacing {{ std::vector<MessageField* >* fields = new std::vector<MessageField* >;
-			for(Value::iterator it = m.getValues().begin(); it != m.getValues().end(); it ++)
-			{		   
-				const Value & v = *it;
-				MessageField* mess_field = (MessageField *) v.getValue();
-				fields->push_back(mess_field);
-			}
-			value = new Message((char *) id.getValue(), fields); }}
 
-Message_field	=	t:Type_form Space+ id:Identifier Spacing SEMI Spacing {{
-			value = new MessageField((Type* ) t.getValue(), (char* ) id.getValue()); }}
 
 Projection	=	"projection" Space+ id:Identifier "<" Spacing t:Proj_type ">" Spacing OPENC Spacing p:ProjField+ CLOSEC Spacing {{ std::vector<ProjectionField *>* p_fields = new std::vector<ProjectionField *>;
 			for(Value::iterator it = p.getValues().begin(); it != p.getValues().end(); it ++)
@@ -213,9 +175,8 @@ Projection	=	"projection" Space+ id:Identifier "<" Spacing t:Proj_type ">" Spaci
 				p_fields->push_back(p);
 			} 
 			// insert projection into rootscope for now
-			Project * val = new Projection((char* ) id.getValue(), (char* ) t.getValue(), p_fields);
+			ProjectionType * val = new ProjectionType((char* ) id.getValue(), (char* ) t.getValue(), p_fields);
 			insertType((char*)id.getValue(), val);
-			value = val;
 			 }}
 		## what is the point of having a projection without at least one line
 
@@ -281,8 +242,6 @@ ProjField	=	OPENS Spacing s:Specification CLOSES Spacing t:Type_form id:Identifi
 
 
 Last		=	k:Keyword Spacing {{ value = k; }}
-
-Declaration	=	Type Space+ Identifier Spacing SEMI Spacing ## not called from anywhere
 
 Option		=	"projection"
 

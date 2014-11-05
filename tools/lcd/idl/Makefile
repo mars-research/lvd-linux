@@ -1,9 +1,9 @@
 
-lcd_compiler: lcd_ast.o lcd_compiler.o lcd_idl.o scope.o
-		g++ lcd_idl.o lcd_ast.o scope.o lcd_compiler.o -o compiler
+compiler: lcd_ast.o main.o lcd_idl.o scope.o
+		g++ lcd_idl.o lcd_ast.o scope.o main.o -o compiler
 
-lcd_compiler.o: lcd_compiler.cpp include/lcd_ast.h lcd_idl.h
-		g++ -c -g lcd_compiler.cpp
+main.o: main/main.cpp include/lcd_ast.h lcd_idl.h
+		g++ -c -g main/main.cpp
 
 lcd_idl.o: lcd_idl.h include/lcd_ast.h lcd_idl.cpp
 		g++ -c parser/lcd_idl.cpp
@@ -23,5 +23,5 @@ lcd_idl.cpp:
 clean:
 		rm parser/lcd_idl.cpp parser/lcd_idl.h lcd_ast.h.gch compiler *.o
 
-test:	lcd_compiler
+test:	compiler
 	./test/test.py

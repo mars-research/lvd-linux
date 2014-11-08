@@ -97,10 +97,16 @@ struct lcd_thread {
 
 	int is_calling;             /* non-zero if thread is sending and send */
                                     /* was part of a call                     */
+
+	int should_stop;            /* set to 1 when lcd_thread should stop */
+	struct completion exited;   /* signal when I'm done exiting */
 };
 
 struct lcd {
+	struct module *m;           /* module code running in lcd */
 	struct cspace *cspace;      /* lcd's cspace, shared by all threads */
+
+	struct mutex lock;          /* protects threads list */
 	struct list_head threads;   /* list of all contained threads */
 	struct list_head all_list;  /* list of all lcds */
 };
@@ -307,14 +313,24 @@ LCD_MK_IN_CAP_REG_ACCESS(7);
 
 /* SYSTEM CALLS ---------------------------------------- */
 
-#define LCD_SYSCALL_SEND  0
-#define LCD_SYSCALL_RECV  1
-#define LCD_SYSCALL_CALL  2
-#define LCD_SYSCALL_REPLY 3
+enum {
+	LCD_SYSCALL_SEND = 0,
+	LCD_SYSCALL_RECV = 1,
+	LCD_SYSCALL_CALL = 2,
+	LCD_SYSCALL_REPLY = 3
+};
 
-/* API CPTR ---------------------------------------- */
+/* API STUFF ---------------------------------------- */
 
 #define LCD_API_CPTR 1
+
+enum {
+	LCD_API_CAP_ALLOC = 0,
+	LCD_API_CREATE_LCD1 = 1,
+	LCD_API_CREATE_LCD2 = 2,
+	LCD_API_EXIT = 3,
+	LCD_API_KILL = 4
+};
 
 /* ERROR CODES ---------------------------------------- */
 
@@ -327,5 +343,11 @@ LCD_MK_IN_CAP_REG_ACCESS(7);
 #define set_gmain(fn)				       \
 	static int __##fn##(int argc, cptr_t *cptrs[]) \
 	__attribute__((__section__(".gmain"))) = fn
+
+/* IOCTL INFO -------------------------------------------------- */
+
+/* see include/uapi/linux/lcd-prototype.h */
+#include <uapi/linux/lcd-prototype.h>
+
 
 #endif /* LCD_LCD_H */

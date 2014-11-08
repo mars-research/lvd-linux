@@ -15,3 +15,14 @@ int lcd_cnode_lookup(struct cspace *cspace, cptr_t c, struct cnode **out);
 int lcd_cnode_grant(struct cspace *src, struct cspace *dest,
 		cptr_t src_cptr, cptr_t dest_cptr, unsigned int rights);
 
+/*
+ * Looks up cnode slot at cptr, and inserts object, type, and rights
+ * info.
+ */
+int lcd_cap_insert(struct cspace *cspace, cptr_t cptr, 
+		void *object, enum lcd_cap_type type, unsigned int rights);
+
+/*
+ * Revokes specified rights on all derived capabilities.
+ */
+int lcd_cap_revoke(struct cspace *cspace, cptr_t cptr, unsigned int rights);

@@ -24,6 +24,9 @@
 #include <linux/percpu.h>
 #include <asm/module.h>
 
+/* Pour lcd's */
+#include <lcd-prototype/lcd.h>
+
 /* In stripped ARM and x86-64 modules, ~ is surprisingly rare. */
 #define MODULE_SIG_STRING "~Module signature appended~\n"
 
@@ -395,6 +398,9 @@ struct module {
 	/* Core layout: rbtree is accessed frequently, so keep together. */
 	struct module_layout core_layout __module_layout_align;
 	struct module_layout init_layout;
+
+	/* Startup for lcd's */
+	int (*gmain)(int, cptr_t *);
 
 	/* Arch-specific module values */
 	struct mod_arch_specific arch;

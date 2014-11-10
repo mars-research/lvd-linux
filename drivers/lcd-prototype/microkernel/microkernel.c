@@ -219,10 +219,6 @@ static int lcd_kthread_main(void *__info)
 
 	info->m->gmain(info->cptr_len, info->cptrs);
 
-	/*
-	 * How to listen for kthread stop?
-	 */
-
 	return 0;
 }
 
@@ -380,9 +376,10 @@ void tear_down_lcd_thread(struct lcd_thread *lcd_thread)
 	int ret;
 	struct lcd_rvp *rvp;
 	/*
-	 * Free tcb
+	 * Free tcb and gmain args
 	 */
 	kfree(lcd_thread->tcb);
+	kfree(lcd_thread->gmain_args);
 	/*
 	 * Look up rvp using calling cptr. 
 	 *
@@ -507,6 +504,11 @@ int boot_lcd(struct lcd *lcd, cptr_t *cptrs, unsigned int cptr_len)
 	if (ret)
 		goto fail3;
 	/*
+	 * Store pointer to gmain args so we can free them when the
+	 * lcd_thread is torn down.
+	 */
+	t->lcd_thread->gmain_args = cptrs;
+	/*
 	 * Wake up kthread
 	 */
 	wake_up_process(t);
@@ -563,7 +565,7 @@ static int __handle_api_create_lcd(struct lcd_thread *t, struct lcd **out)
 	/*
 	 * Install capabilities (including microkernel cap) in lcd's cspace
 	 */
-	out_cptrs = kmalloc(sizeof(unsigned int) * cptr_len);
+	out_cptrs = kmalloc(sizeof(*out_cptrs) * cptr_len);
 	if (!out_cptrs)
 		goto fail2;
 	ret = install_caps(lcd, cptrs, rights, cptr_len, &out_cptrs);
@@ -577,15 +579,17 @@ static int __handle_api_create_lcd(struct lcd_thread *t, struct lcd **out)
 		goto fail4;
 
 	*out = lcd;
+
+	/* out_cptrs freed when lcd_thread torn down */
+
 	return;
 
 fail4:
 	/* any cap tear down necessary? */
 fail3:
-	/* tear down lcd */
-	/* dealloc out_cptrs */
+	kfree(out_cptrs);
 fail2:
-	/* unload module? */
+	tear_down_lcd(lcd);
 fail1:
 	return -EIO;
 }

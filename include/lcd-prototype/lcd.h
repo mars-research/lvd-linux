@@ -100,6 +100,8 @@ struct lcd_thread {
 
 	atomic_t should_stop;       /* set to 1 when lcd_thread should stop */
 	struct completion exited;   /* signal when I'm done exiting */
+
+	cptr_t *gmain_args;         /* so we can free them later ... */
 };
 
 enum lcd_type {

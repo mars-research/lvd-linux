@@ -69,7 +69,7 @@ File		=	Spacing v:Verbatim? t:Things* <eof> {{
 			}
 			  value = new File((char*) v.getValue(), current_file_scope(), rpcs); }}
 
-Typedef		=	 "typedef" Spacing "<" Spacing rt:RealType Spacing "," Spacing mt:Type_form Spacing ">" Spacing id:Identifier Spacing {{ 
+Typedef		=	 "typedef" Spacing "<" Spacing rt:RealType Spacing "," Spacing mt:Type_form ">" Spacing id:Identifier Spacing {{ 
 			 Typedef * val = new Typedef((char*) rt.getValue(), (Type*) mt.getValue());
 			 insertType((char*)id.getValue(),val);
 			 }}
@@ -264,18 +264,18 @@ Line_comment	=	Line_comm_start Line_comm_rest
 
 Line_comm_end	=	"\n"
 
-signed_type	=	"int" {{ value = getType("int");}}
-			| "char" {{ value = getType("char"); }}   
-			| "capability" {{ value = getType("capability"); }}
-			| "short" {{ value = getType("short");}}
-			| "long" Space+ "long" {{ value = getType("long long");}}
-			| "long" {{ value = getType("long"); }}
+signed_type	=	"int" Space+{{ value = getType("int");}}
+			| "char" Space+ {{ value = getType("char"); }}   
+			| "capability" Space+ {{ value = getType("capability"); }}
+			| "short" Space+ {{ value = getType("short");}}
+			| "long" Space+ "long" Space+ {{ value = getType("long long");}}
+			| "long" Space+ {{ value = getType("long"); }}
 
-unsigned_type	=	"unsigned" Space+ "int" {{ value = getType("unsigned int"); }} 
-			| "unsigned" Space+ "char" {{ value = getType("unsigned char"); }} 
-			| "unsigned" Space+ "short" {{ value = getType("unsigned long"); }} 
-			| "unsigned" Space+ "long" Space+ "long" {{ value = getType("unsigned long long"); }}
-			| "unsigned" Space+ "long" {{ value = getType("unsigned long"); }}  
+unsigned_type	=	"unsigned" Space+ "int" Space+ {{ value = getType("unsigned int"); }} 
+			| "unsigned" Space+ "char" Space+ {{ value = getType("unsigned char"); }} 
+			| "unsigned" Space+ "short" Space+ {{ value = getType("unsigned long"); }} 
+			| "unsigned" Space+ "long" Space+ "long" Space+ {{ value = getType("unsigned long long"); }}
+			| "unsigned" Space+ "long" Space+ {{ value = getType("unsigned long"); }}  
 
 type 		=	unsigned_type
 			| signed_type

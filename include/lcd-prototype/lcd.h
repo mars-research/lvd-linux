@@ -98,17 +98,31 @@ struct lcd_thread {
 	int is_calling;             /* non-zero if thread is sending and send */
                                     /* was part of a call                     */
 
-	int should_stop;            /* set to 1 when lcd_thread should stop */
+	atomic_t should_stop;       /* set to 1 when lcd_thread should stop */
 	struct completion exited;   /* signal when I'm done exiting */
 };
 
-struct lcd {
-	struct module *m;           /* module code running in lcd */
-	struct cspace *cspace;      /* lcd's cspace, shared by all threads */
+enum lcd_type {
+	LCD_TYPE_1 = 1,
+	LCD_TYPE_2 = 2,
+	LCD_TYPE_3 = 3
+};
 
-	struct mutex lock;          /* protects threads list */
-	struct list_head threads;   /* list of all contained threads */
-	struct list_head all_list;  /* list of all lcds */
+struct lcd {
+
+	enum lcd_type type;          /* type 1, type 2, or type 3 */
+
+	struct module *m;            /* module code running in lcd */
+	struct cspace *cspace;       /* lcd's cspace, shared by all threads */
+
+	struct mutex lock;           /* protects threads list */
+	struct list_head threads;    /* list of all contained threads */
+	struct list_head all_list;   /* list of all lcds */
+
+	/* for type 3 lcd's */
+	int (*entry)(cptr_t mk_cap); /* all non-isol threads will enter here */
+	int (*exit)(cptr_t mk_cap);  /* non-isol thread that calls lcd_exit
+				      * enters here */
 };
 
 /* MACHINE REGISTERS ---------------------------------------- */

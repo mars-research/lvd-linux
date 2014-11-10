@@ -57,15 +57,41 @@ static void handle_api_cap_alloc(struct lcd_thread *t)
 	return;
 }
 
-static int create_lcd(char *mname, struct lcd **out)
+static int __create_lcd(struct lcd **out)
 {
 	struct lcd *lcd;
 	/*
 	 * Allocate lcd struct
 	 */
-	lcd = kmalloc(sizeof(*lcd));
+	lcd = kzalloc(sizeof(*lcd), GFP_KERNEL);
 	if (!lcd)
 		return -ENOMEM;
+	/* 
+	 * TODO: init cspace 
+	 */
+	
+	/* 
+	 * Init lists and lock
+	 */
+	mutex_init(&lcd->lock);
+	list_init(&lcd->threads);
+	list_init(&lcd->all_lists);
+
+	*out = lcd;
+
+	return 0;
+}
+
+static int create_lcd(char *mname, struct lcd **out)
+{
+	struct lcd *lcd;
+	int ret;
+	/*
+	 * Init lcd data structure
+	 */
+	ret = __create_lcd(&lcd);
+	if (ret)
+		return ret;
 	/*
 	 * Load module via usermode helper. This call blocks
 	 * and returns the exit status of lcd-modprobe.
@@ -91,15 +117,7 @@ static int create_lcd(char *mname, struct lcd **out)
 		goto fail2;
 	}
 
-	/* 
-	 * TODO: init cspace 
-	 */
-
-	/* 
-	 * Init lists
-	 */
-	list_init(&lcd->threads);
-	list_init(&lcd->all_lists);
+	*out = lcd;
 
 	return 0;
 
@@ -123,11 +141,12 @@ void tear_down_lcd(struct lcd **lcd_ptr)
 	/*
 	 * Put the module (rm it?)
 	 */
-	module_put(lcd->m);
+	if (lcd->type != LCD_TYPE_3)
+		module_put(lcd->m);
 	/*
 	 * Tear down cspace
 	 *
-	 * XXX: What do if non-zero ret?
+	 * XXX: What to do if non-zero ret?
 	 */
 	ret = lcd_cap_destroy_cspace(lcd->cspace);
 	if (ret) {
@@ -267,27 +286,15 @@ int setup_lcd_rvp(struct lcd_thread *lcd_thread)
  * Assumptions: No receivers in rvp's receiver queue (this thread is the
  * only thread that can receive).
  */
-void tear_down_lcd_rvp(struct lcd_thread *lcd_thread)
+void tear_down_lcd_rvp(struct lcd_thread *lcd_thread, struct lcd_rvp *rvp)
 {
-	struct lcd_rvp *rvp;
 	struct cnode *cnode;
 	int ret;
 	struct list_head *cursor;
 	struct list_head *next;
 	struct lcd_thread *sender;
 	/*
-	 * Look up rvp using calling cptr. 
-	 *
-	 * XXX: We shouldn't care about rights when tearing down, right?
-	 */
-	rvp = lookup_rvp(lcd_thread, lcd_thread->calling_cptr, 0);
-	if (!rvp) {
-		/* XXX: just fail? */
-		LCD_ERR("failed to get calling rvp");
-		return;
-	}
-	/*
-	 * Revoke all rights except kill on the rvp (so no except the parent
+	 * Revoke all rights except kill on the rvp (so no one except the parent
 	 * can use it anymore)
 	 */
 	ret = lcd_cap_revoke(lcd_thread->lcd->cspace, lcd_thread->calling_cptr,
@@ -318,8 +325,48 @@ void tear_down_lcd_rvp(struct lcd_thread *lcd_thread)
 	mutex_unlock(&rvp->lock);
 
 	/*
-	 * Don't delete the rvp yet. The parent will need it to reap.
+	 * Don't delete the rvp yet. The parent will need it to reap for type
+	 * 1 and 2.
 	 */
+
+	return;
+}
+
+static void finish_lcd_thread_tear_down(struct lcd_thread *thread,
+					struct lcd_rvp *rvp)
+{
+	/*
+	 * Delete rvp from all cspaces
+	 *
+	 * XXX: Does this delete the rvp? I'm assuming no.
+	 */
+	lcd_cap_delete(thread->lcd->cspace, thread->calling_cptr);
+	/*
+	 * Free the rvp
+	 *
+	 * XXX: Possible race if someone has already looked up the rvp
+	 * and is about to try sending. The real solution would use
+	 * reference counting on the rvp or some sort of cnode lock.
+	 */
+	kfree(rvp);
+	/*
+	 * Remove thread from containing lcd's threads
+	 */
+	ret = mutex_lock_interruptible(&thread->lcd->lock);
+	if (ret) {
+		/* XXX: just return? */
+		LCD_ERR("failed to lock lcd to remove myself from list");
+		return;
+	}
+	list_del(&thread->threads);
+	mutex_unlock(&thread->lcd->lock);
+	/*
+	 * Free lcd_thread struct
+	 *
+	 * XXX: Any race condition possible? Possible for another thread to
+	 * try to kill this lcd_thread we are destroying?
+	 */
+	kfree(thread);
 
 	return;
 }
@@ -331,15 +378,24 @@ void tear_down_lcd_rvp(struct lcd_thread *lcd_thread)
 void tear_down_lcd_thread(struct lcd_thread *lcd_thread)
 {
 	int ret;
+	struct lcd_rvp *rvp;
 	/*
 	 * Free tcb
 	 */
 	kfree(lcd_thread->tcb);
 	/*
-	 * Partially tear down my rvp (we need it to hang around until
-	 * the parent has had a chance to reap)
+	 * Look up rvp using calling cptr. 
+	 *
+	 * XXX: We shouldn't care about rights when tearing down, right?
 	 */
-	tear_down_lcd_rvp(lcd_thread);
+	rvp = lookup_rvp(lcd_thread, lcd_thread->calling_cptr, 0);
+	if (!rvp)
+		goto fail1;
+	/*
+	 * Partially tear down my rvp (we need it to hang around until
+	 * the parent has had a chance to reap, for type 1 and type 2 lcds).
+	 */
+	tear_down_lcd_rvp(lcd_thread, rvp);
 
 	/*
 	 * XXX: Any other cspace crap to clean up? Cspace itself not
@@ -347,13 +403,21 @@ void tear_down_lcd_thread(struct lcd_thread *lcd_thread)
 	 */
 
 	/*
-	 * Signal that I've exited; someone should eventually
-	 * notice, and free the lcd_thread struct and remove from
-	 * lcd's list of threads.
+	 * For Type 1 and Type 2:
+	 *
+	 *    Signal that I've exited; someone should eventually notice, and 
+	 *    call finish_lcd_thread_tear_down.
+	 *
+	 * For Type 3:
+	 *
+	 *    We finish now.
 	 *
 	 * XXX: No return value for now.
 	 */
-	complete(&lcd_thread->exited);
+	if (lcd_thread->lcd->type != LCD_TYPE_3)
+		complete(&lcd_thread->exited);
+	else
+		finish_lcd_thread_tear_down(lcd_thread, rvp);
 
 	return;
 }
@@ -390,6 +454,9 @@ int setup_lcd_thread(struct lcd *lcd, struct task_struct *t)
 	list_init(&lcd_thread->rvp_queue);
 
 	lcd_thread->is_calling = 0;
+
+	lcd_thread->should_stop = 0;
+	init_completion(&lcd_thread->completion);
 
 	/*
 	 * Add to lcd's list of threads
@@ -454,7 +521,7 @@ fail1:
 	return ret;
 }
 
-static void handle_api_create_lcd1(struct lcd_thread *t)
+static int __handle_api_create_lcd(struct lcd_thread *t, struct lcd **out)
 {
 	char *mname;
 	u64 mname_len;
@@ -470,10 +537,9 @@ static void handle_api_create_lcd1(struct lcd_thread *t)
 	 * XXX: More care required when type 1 lcd's moved to separate
 	 * address space.
 	 */
-	if (lcd_max_m(t) < 6) {
-		__lcd_set_m0(t, LCD_EINVAL);
-		return;
-	}
+	if (lcd_max_m(t) < 6)
+		return -EINVAL;
+
 	mname = __lcd_m1(t);
 	mname_len = __lcd_m2(t);
 	cptrs = __lcd_m3(t);
@@ -510,7 +576,7 @@ static void handle_api_create_lcd1(struct lcd_thread *t)
 	if (ret) 
 		goto fail4;
 
-	__lcd_set_m0(0);
+	*out = lcd;
 	return;
 
 fail4:
@@ -521,55 +587,75 @@ fail3:
 fail2:
 	/* unload module? */
 fail1:
-	__lcd_set_m0(LCD_EIO);
-	return;
+	return -EIO;
+}
+
+static void handle_api_create_lcd1(struct lcd_thread *t)
+{
+	int ret;
+	struct lcd *lcd;
+	ret = __handle_api_create_lcd(t, &lcd);
+	if (ret) {
+		/* error */
+		__lcd_set_m0(t, LCD_EIO);
+		return;
+	} else {
+		lcd->type = LCD_TYPE_1;
+		__lcd_set_m0(0);
+		return;
+	}
 }
 
 static void handle_api_create_lcd2(struct lcd_thread *t)
 {
 	/*
-	 * XXX: Equivalent to type 1 for now, since same address space.
+	 * XXX: Equivalent to type 1 for now, since we are using the same
+	 * address space for type 1 lcd's for now.
 	 */
-	handle_api_create_lcd1(t);
+	int ret;
+	struct lcd *lcd;
+	ret = __handle_api_create_lcd(t, &lcd);
+	if (ret) {
+		/* error */
+		__lcd_set_m0(t, LCD_EIO);
+		return;
+	} else {
+		lcd->type = LCD_TYPE_2;
+		__lcd_set_m0(0);
+		return;
+	}
 }
 
 static void handle_api_exit(struct lcd_thread *t)
 {
 	/*
-	 * The creator of the lcd is responsible for `reaping' the lcd's
-	 * lcd_threads by removing them from the lcd's list and freeing
-	 * the lcd_thread struct.
+	 * Behavior differs depending on lcd type.
 	 *
-	 * This is done in api_kill.
+	 * Type 1 and Type 2 lcd's:
 	 *
-	 * The containing kthread will be reaped by kthreadd.
+	 *    The creator of the lcd is responsible for `reaping' the lcd's
+	 *    lcd_threads by removing them from the lcd's list and freeing
+	 *    the lcd_thread struct.
+	 *
+	 *    This is done in api_kill.
+	 *
+	 *    The containing kthread will be reaped by kthreadd.
+	 *
+	 * Type 3 lcd's:
+	 *
+	 *    All lcd_thread-specific data is freed up, and the thread is
+	 *    removed from the lcd.
 	 */
 	tear_down_lcd_thread(t);
-	do_exit(0);
+	if (t->lcd->type != LCD_TYPE_3) {
+		do_exit(0);
+	}
+	else {
+		/* null out lcd_thread field */
+		current->lcd_thread = NULL;
+	}		
 }
 
-static void finish_lcd_thread_tear_down(struct lcd_thread *thread,
-					struct lcd_rvp *rvp)
-{
-	/*
-	 * Delete rvp from all cspaces
-	 *
-	 * XXX: Does this delete the rvp? I'm assuming no.
-	 */
-	lcd_cap_delete(thread->lcd->cspace, thread->calling_cptr);
-	/*
-	 * Free the rvp
-	 *
-	 * XXX: Possible race if someone has already looked up the rvp
-	 * and is about to try sending. The real solution would use
-	 * reference counting on the rvp or some sort of cnode lock.
-	 */
-	kfree(rvp);
-	
-	
-
-
-}
 
 /*
  * Assumptions: Only one thread will call this for a specific targeted lcd
@@ -588,7 +674,7 @@ static void handle_api_kill(struct lcd_thread *caller)
 	 *
 	 * Also note: If the targeted lcd_thread has already torn itself
 	 * down partially, the rvp will still be in the caller's cspace
-	 * so that it can look it up.
+	 * so that we can look it up.
 	 */
 	c = __lcd_m1(caller);
 	rvp = lookup_rvp(caller, c, LCD_CAP_RIGHT_KILL);
@@ -615,23 +701,17 @@ static void handle_api_kill(struct lcd_thread *caller)
 	 * inside it.
 	 */
 	finish_lcd_thread_tear_down(target, rvp);
-	
 
+	__lcd_set_m0(caller, 0);
+	return;
 
-	/*
-	 * Remove myself from lcd's threads
-	 */
-	ret = mutex_lock_interruptible(&lcd_thread->lcd->lock);
-	if (ret) {
-		/* XXX: just return? */
-		LCD_ERR("failed to lock lcd to remove myself from list");
-		return;
-	}
-	list_del(&lcd_thread->threads);
-	mutex_unlock(&lcd_thread->lcd->lock);
+fail1:
+	__lcd_set_m0(caller, LCD_EIO);
+	return;
 }
 
-static void api_call(struct lcd_thread *t)
+/* Returns 1 if thread in type 3 lcd just exited. */
+static int api_call(struct lcd_thread *t)
 {
 	/*
 	 * Confirm there is at least one valid message register (containing
@@ -654,7 +734,9 @@ static void api_call(struct lcd_thread *t)
 		break;
 	case LCD_API_EXIT:
 		handle_api_exit(t);
-		break;
+		/* Type 1 and Type 2's never return, but Type 3 will,
+		 * so we need to do a return here instead of a break. */
+		return 1;
 	case LCD_API_KILL:
 		handle_api_kill(t);
 		break;
@@ -664,7 +746,7 @@ static void api_call(struct lcd_thread *t)
 	}
 
 	__lcd_set_r0(t, 0);
-	return;
+	return 0;
 }
 
 /* IPC -------------------------------------------------- */
@@ -773,19 +855,17 @@ static void lcd_do_send(struct lcd_thread *sender, struct lcd_rvp *rvp,
 	return;
 }
 
-static void lcd_send(struct lcd_thread *sender)
+static int lcd_send(struct lcd_thread *sender)
 {
 	cptr_t c;
 	struct lcd_rvp *rvp;
 
 	c = __lcd_r1(sender);
 	/*
-	 * Check for api call.
+	 * Check for api call. Returns 1 if thread in type 3 lcd exited.
 	 */
-	if (c == LCD_API_CPTR) {
-		api_call(sender);
-		return;
-	}	
+	if (c == LCD_API_CPTR)
+		return api_call(sender);
 	/*
 	 * Look up rvp and confirm send rights
 	 *
@@ -802,7 +882,7 @@ static void lcd_send(struct lcd_thread *sender)
 	return;
 }
 
-static void lcd_do_recv(struct lcd_thread *receiver, struct lcd_rvp *rvp,
+static void lcd_do_recv(struct lcd_thread *receiver, struct lcd_rvp *rvp)
 {
 	int ret;
 	struct lcd_thread *sender;
@@ -929,6 +1009,96 @@ static void lcd_reply(struct lcd_thread *sender)
 	return;
 }
 
+/* NON-ISOLATED CODE INTERFACE ---------------------------------------- */
+
+int lcd_create_self(int (*init)(cptr_t), int (*entry)(cptr_t),
+		int (*exit)(cptr_t), struct lcd **out)
+{
+	struct lcd *lcd;
+	int ret;
+	/*
+	 * Init lcd data structure
+	 */
+	ret = __create_lcd(&lcd);
+	if (ret)
+		goto fail1;
+	/*
+	 * Install entry / exit routines
+	 */
+	lcd->entry = entry;
+	lcd->exit = exit;
+	/*
+	 * Set up lcd_thread using current calling thread
+	 */
+	ret = setup_lcd_thread(lcd, current);
+	if (ret)
+		goto fail2;
+	/*
+	 * Call init, with microkernel API cap
+	 */
+	ret = init(LCD_API_CPTR);
+	if (ret)
+		goto fail3;
+
+	*out = lcd;
+
+	return 0;
+fail3:
+	/* XXX: correct to do this here? */
+	tear_down_lcd_thread(current->lcd_thread);
+fail2:
+	/* XXX: correct to do this here? */
+	tear_down_lcd(lcd);
+fail1:
+	return ret;
+}
+
+int lcd_enter(struct lcd *lcd)
+{
+	/*
+	 * Set up lcd_thread using current calling thread
+	 */
+	ret = setup_lcd_thread(lcd, current);
+	if (ret)
+		goto fail1;
+	/*
+	 * Call lcd's entry, with microkernel API cap
+	 */
+	ret = lcd->entry(LCD_API_CPTR);
+	if (ret)
+		goto fail2;
+
+	return 0;
+fail2:
+	/* XXX: correct to do this here? */
+	tear_down_lcd_thread(current->lcd_thread);
+fail1:
+	return ret;
+}
+
+int lcd_exit(struct lcd *lcd)
+{
+	/*
+	 * Set up lcd_thread using current calling thread
+	 */
+	ret = setup_lcd_thread(lcd, current);
+	if (ret)
+		goto fail1;
+	/*
+	 * Call lcd's exit, with microkernel API cap
+	 */
+	ret = lcd->exit(LCD_API_CPTR);
+	if (ret)
+		goto fail2;
+
+	return 0;
+fail2:
+	/* XXX: correct to do this here? */
+	tear_down_lcd_thread(current->lcd_thread);
+fail1:
+	return ret;
+}
+
 /* INTERRUPT -------------------------------------------------- */
 
 /*
@@ -937,12 +1107,19 @@ static void lcd_reply(struct lcd_thread *sender)
 void lcd_int(void)
 {
 	struct lcd_thread *lcd_thread = current->lcd_thread;
+	int ret;
 	
 	/*
 	 * Check that calling thread is an lcd thread
 	 */
 	if (!lcd_thread)
 		return;
+	/*
+	 * Check if someone told us to stop. Call to api exit
+	 * never returns.
+	 */
+	if (lcd_thread->should_stop)
+		handle_api_exit(lcd_thread);
 	/*
 	 * Confirm there is at least one valid machine register (containing
 	 * the system call index)
@@ -954,8 +1131,13 @@ void lcd_int(void)
 
 	switch (__lcd_r0(lcd_thread)) {
 	case LCD_SYSCALL_SEND:
-		lcd_send(lcd_thread);
-		break;
+		/* Need to return immediately if thread in type 3 lcd just
+		 * exited. */
+		ret = lcd_send(lcd_thread);
+		if (ret == 1)
+			return;
+		else
+			break;
 	case LCD_SYSCALL_RECV:
 		lcd_recv(lcd_thread);
 		break;
@@ -982,9 +1164,17 @@ void lcd_int(void)
 	 */
 	lcd_thread->is_calling = 0;
 
+	/*
+	 * Check if someone told us to stop (after we possibly woke up
+	 * from sleeping in an rvp queue). Call to api exit
+	 * never returns.
+	 */
+	if (lcd_thread->should_stop)
+		handle_api_exit(lcd_thread);
+
 	return;
 }
-EXPORT_SYMBOL(lcd_int);
+
 
 /* IOCTL FOR MODPROBE -------------------------------------------------- */
 
@@ -1071,3 +1261,9 @@ void __exit microkernel_exit(void)
 module_init(microkernel_init);
 module_exit(microkernel_exit);
 
+/* EXPORTS -------------------------------------------------- */
+
+EXPORT_SYMBOL(lcd_int);
+EXPORT_SYMBOL(lcd_create_self);
+EXPORT_SYMBOL(lcd_enter);
+EXPORT_SYMBOL(lcd_exit);

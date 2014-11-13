@@ -19,12 +19,22 @@ code: {{
       }
       Type * getType(const char* type)
       {	   
-      	   int * err;
+      	   printf("in getType type is: %s\n", type);
+      	   int err;
       	   RootScope* rs = RootScope::instance();
-	   Type* val = rs->lookup_symbol(type, err);
-	   if(!*err)
+	   Type* val = rs->lookup_symbol(type, &err);
+	   if(!val)
+	   {	
+	   	printf("val is null\n");
+	   }
+	   
+	   if(!err)
 	   { // error do something
+	   printf("ERROR\n\n\n\n\n\n\n\n\n\n\n\n");
 }
+	printf("herheherhehehehehr\n");
+	printf("num is: %d\n", val->num());
+	printf("herheherhehehehehr\n");
 	    return val;
       }				
 
@@ -41,7 +51,7 @@ code: {{
 
 rules:
 
-Identifier	=	i1:IdentStart i2:IdentCont* Spacing {{ 
+Identifier	=	i1:IdentStart i2:IdentCont* {{ 
 			std::ostringstream total;
 			total << (char) (intptr_t) i1.getValue();
 
@@ -86,8 +96,8 @@ Verbatim	=	 "verbatim" Spacing "[" contents:VerbatimContent "]" {{ std::ostrings
 
 VerbatimContent =	!"]" .
 
-RealType	=	fp:Identifier? Spacing sp:Identifier {{ //temporary solution
-			std::ostringstream total;
+RealType	=	fp:Identifier? Spacing sp:Identifier Spacing {{ //temporary solution
+			std::ostringstream total;	     
 			total << fp.getValue() << ' ' << sp.getValue();
 			std::string str = total.str();
 			value = &str[0];
@@ -167,7 +177,7 @@ Rpc		=	"rpc" Space+ t:Type_form id:Identifier Spacing OPEN p:Parameters CLOSE SE
 
 
 
-Projection	=	"projection" Space+ id:Identifier "<" Spacing t:Proj_type ">" Spacing OPENC Spacing p:ProjField+ CLOSEC Spacing {{ std::vector<ProjectionField *>* p_fields = new std::vector<ProjectionField *>;
+Projection	=	"projection" Space+ id:Identifier Spacing "<" Spacing t:Proj_type ">" Spacing OPENC Spacing p:ProjField+ CLOSEC Spacing {{ std::vector<ProjectionField *>* p_fields = new std::vector<ProjectionField *>;
 			for(Value::iterator it = p.getValues().begin(); it != p.getValues().end(); it ++)
 			{
 				const Value & v = *it;
@@ -220,7 +230,7 @@ Specification	=	s:Start* l:Last {{
 			specs[*y-1] = true;
 			value = &specs; }}
 
-ProjField	=	OPENS Spacing s:Specification CLOSES Spacing t:Type_form id:Identifier SEMI Spacing {{ int * spec = (int *)s.getValue();
+ProjField	=	OPENS Spacing s:Specification CLOSES Spacing t:Type_form id:Identifier Spacing SEMI Spacing {{ int * spec = (int *)s.getValue();
 			bool in = false; bool out = false; bool bind = false; bool alloc = false;
 			std::vector<bool>* specs = (std::vector<bool>*) s.getValue();
 			int i = 0;
@@ -282,15 +292,18 @@ type 		=	unsigned_type
 
 ## just ignore the modules ones, not supporting right now
 
-Type_form	=	"projection" Space+ m:Identifier "::" name:Identifier Spacing "*" Spacing
-			| "projection" Space+ m:Identifier "::" name:Identifier Space+
-			| "projection" Space+ name:Identifier Spacing "*" Spacing {{
-			value = new PointerType(getType((char*)name.getValue())); }}
+Spacing		=	Space*
+
+Type_form	=	"projection" Space+ n:Identifier Space* "*" Spacing {{
+			printf("name is: %s\n", (char*)n.getValue());
+			 printf("calling getType 2\n");
+			value = new PointerType(getType((char*)n.getValue())); }}
 			| "projection" Space+ name:Identifier Space+ {{ 
+			  printf("calling getType 1\n");
 			  value = getType((char*)name.getValue()); }}
 			| type	
 
-Spacing		=	Space*
+
 
 Space		=	" " | "\t" | EndOfLine
 EndOfLine	=	"\n" | "\r"

@@ -1,11 +1,12 @@
 #ifndef GEN_VISITOR
 #define GEN_VISITOR
 
-#include "visitor.h"
+#include "lcd_ast.h"
+#include <stdio.h>
 
 class GenVisitor : public ASTVisitor
 {
-  FILE* out_f_;
+  //FILE* out_f_;
  public:
   virtual void visit(File *f) =0;
   virtual void visit(Rpc *rpc) =0;
@@ -19,7 +20,7 @@ class GenVisitor : public ASTVisitor
 
 class HeaderVisitor : public GenVisitor
 {
-  //FILE* out_f_;
+  FILE* out_f_;
  public:
   HeaderVisitor(FILE* f);
   virtual void visit(File *f);

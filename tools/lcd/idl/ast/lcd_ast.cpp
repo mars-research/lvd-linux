@@ -1,4 +1,5 @@
-#include "../include/lcd_ast.h"
+#include "lcd_ast.h"
+#include <stdio.h>
 
 Typedef::Typedef(const char* alias, Type* type)
 {
@@ -8,7 +9,13 @@ Typedef::Typedef(const char* alias, Type* type)
 
 void Typedef::accept(ASTVisitor* worker)
 {
+  printf("in typedef accept\n");
   worker->visit(this);
+}
+
+const char* Typedef::alias()
+{
+  return this->alias_;
 }
 
 IntegerType::IntegerType(const char* type, bool un, int size)
@@ -20,7 +27,18 @@ IntegerType::IntegerType(const char* type, bool un, int size)
 
 void IntegerType::accept(ASTVisitor* worker)
 {
+  printf("in integertype accept\n");
   worker->visit(this);
+}
+
+const char* IntegerType::type()
+{
+  return this->type_;
+}
+
+bool IntegerType::unsigned_huh()
+{
+  return unsigned_;
 }
 
 PointerType::PointerType(Type* type)
@@ -30,7 +48,13 @@ PointerType::PointerType(Type* type)
 
 void PointerType::accept(ASTVisitor* worker)
 {
+  printf("pointer type accept\n");
   worker->visit(this);
+}
+
+Type* PointerType::type()
+{
+  return this->type_;
 }
 
 ProjectionField::ProjectionField(bool in, bool out, bool alloc, bool bind, Type* field_type, const char* field_name)
@@ -70,7 +94,18 @@ ProjectionType::ProjectionType(const char* id, const char* real_type, std::vecto
 
 void ProjectionType::accept(ASTVisitor* worker)
 {
+  printf("in projectype accept\n");
   worker->visit(this);
+}
+
+const char* ProjectionType::id()
+{
+  return this->id_;
+}
+
+const char* ProjectionType::real_type()
+{
+  return this->real_type_;
 }
 
 Parameter::Parameter(Type* type, const char* name)
@@ -82,6 +117,16 @@ Parameter::Parameter(Type* type, const char* name)
 void Parameter::accept(ASTVisitor* worker)
 {
   worker->visit(this);
+}
+
+Type* Parameter::type()
+{
+  return this->type_;
+}
+
+const char* Parameter::name()
+{
+  return this->name_;
 }
 
 Rpc::Rpc(Type* return_type, const char* name, std::vector<Parameter* >* parameters)
@@ -103,6 +148,7 @@ Type* Rpc::return_type()
 
 void Rpc::accept(ASTVisitor* worker)
 {
+  printf("in rpc accpet\n");
   worker->visit(this);
 }
 
@@ -120,5 +166,12 @@ File::File(const char* verbatim, FileScope* fs, std::vector<Rpc* >* rpc_definiti
 
 void File::accept(ASTVisitor* worker)
 {
+  printf("in accept and trying to print size %lu\n", this->rpc_defs_->size());
+  printf("in accept\n");
   worker->visit(this);
+}
+
+std::vector<Rpc*>* File::rpc_defs()
+{
+  return this->rpc_defs_;
 }

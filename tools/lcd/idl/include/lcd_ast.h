@@ -3,6 +3,7 @@
 
 #include <vector>
 #include <map>
+#include <string>
 
 enum PrimType { kChar = 1, kShort, kInt, kLong, kLongLong, kCapability};
 
@@ -17,6 +18,7 @@ class Type : public Base
 {
  public:
   virtual void accept(ASTVisitor *worker) = 0;
+  virtual int num() = 0;
   //  virtual void marshal() = 0;
   // virtual int size() = 0;
 };
@@ -31,7 +33,7 @@ class Scope : public Base
 class RootScope : public Scope
 {
   static RootScope* instance_;
-  std::map<const char*,Type*>* types_;
+  std::map<std::string,Type*>* types_;
   void init_types();
   RootScope(void);
 
@@ -45,7 +47,7 @@ class RootScope : public Scope
 class FileScope : public Scope
 {
   RootScope* root_;
-  std::map<const char*, Type*> *types_;
+  std::map<std::string, Type*> *types_;
  public:
   FileScope(RootScope* root);
   virtual Type* lookup_symbol(const char* sym, int* err);
@@ -61,6 +63,8 @@ class Typedef : public Type
  public:
   Typedef(const char* alias, Type* type);
   virtual void accept(ASTVisitor *worker);
+  const char* alias();
+  virtual int num() {return 1;}
   // virtual void marshal();
 };
 
@@ -73,6 +77,9 @@ class IntegerType : public Type
  public:
   IntegerType(const char* type, bool un, int size);
   virtual void accept(ASTVisitor *worker);
+  const char* type();
+  bool unsigned_huh();
+  virtual int num() {return 2;}
   // virtual void marshal();
 };
 
@@ -87,6 +94,8 @@ class PointerType : public Type
  public:
   PointerType(Type* type);
   virtual void accept(ASTVisitor *worker);
+  Type* type();
+  virtual int num() {return 3;}
   // virtual void marshal();
 };
 
@@ -106,7 +115,7 @@ class ProjectionField : public Base
   bool out();
   bool alloc();
   bool bind();
-  void accept(ASTVisitor *worker);
+  virtual void accept(ASTVisitor *worker);
 };
 
 class ProjectionType : public Type // complex type
@@ -117,7 +126,10 @@ class ProjectionType : public Type // complex type
 
  public:
   ProjectionType(const char* id, const char* real_type, std::vector<ProjectionField*>* fields);
-  void accept(ASTVisitor *worker);
+  virtual void accept(ASTVisitor *worker);
+  const char* id();
+  const char* real_type();
+  virtual int num() {return 4;}
   // virtual void marshal();
 };
 
@@ -129,7 +141,9 @@ class Parameter : public Base
  public:
   Parameter(Type* type, const char* name);
   ~Parameter();
-  void accept(ASTVisitor *worker);
+  virtual void accept(ASTVisitor *worker);
+  Type* type();
+  const char* name();
 };
 
 class Rpc : public Base
@@ -143,7 +157,7 @@ class Rpc : public Base
   const char* name();
   Type* return_type();
   std::vector<Parameter*>* parameters();
-  void accept(ASTVisitor *worker);
+  virtual void accept(ASTVisitor *worker);
 };
 
 
@@ -185,7 +199,8 @@ class File : public Base
   
  public:
   File(const char* verbatim, FileScope* fs, std::vector<Rpc* >* rpc_definitions);
-  void accept(ASTVisitor *worker);
+  virtual void accept(ASTVisitor *worker);
+  std::vector<Rpc*>* rpc_defs();
   
 };
 

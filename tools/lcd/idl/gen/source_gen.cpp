@@ -1,4 +1,4 @@
-#include "../include/gen_visitor.h"
+#include "gen_visitor.h"
 
 void SourceVisitor::visit(File* f)
 {

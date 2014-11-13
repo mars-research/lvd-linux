@@ -1,35 +1,36 @@
-#include "../include/lcd_ast.h"
+#include "lcd_ast.h"
+#include <stdio.h>
 
 RootScope* RootScope::instance_ = 0;
 
 RootScope::RootScope()
 {
    // init builtin int types
-  this->types_ = new std::map<const char*, Type*>();
+  this->types_ = new std::map<std::string, Type*>();
 
   // instert for each builtin in type, add size to type if not done alreayd
-  this->types_->insert( std::pair<const char*,Type*>("char"
-					       , new IntegerType("char", false, sizeof("char"))));
-  this->types_->insert( std::pair<const char*,Type*>("unsigned char"
-					       , new IntegerType("unsigned char", true, sizeof("char"))));
-  this->types_->insert( std::pair<const char*,Type*>("short"
-					      , new IntegerType("short", false, sizeof("short"))));
-  this->types_->insert( std::pair<const char*,Type*>("unsigned short"
-					      , new IntegerType("unsigned short", true, sizeof("short"))));
-  this->types_->insert( std::pair<const char*,Type*>("int"
-					      , new IntegerType("int", false, sizeof("int"))));
-  this->types_->insert( std::pair<const char*,Type*>("unsigned int"
-					      , new IntegerType("unsigned int", true, sizeof("int"))));
-  this->types_->insert( std::pair<const char*,Type*>("long"
-					      , new IntegerType("long", false, sizeof("long"))));
-  this->types_->insert( std::pair<const char*,Type*>("unsigned long"
-					      , new IntegerType("unsigned long", true, sizeof("long"))));
-  this->types_->insert( std::pair<const char*,Type*>("long long"
-					      , new IntegerType("long long", false, sizeof("long long"))));
-  this->types_->insert( std::pair<const char*,Type*>("unsigned long long"
-					      , new IntegerType("unsigned long long", true, sizeof("long long"))));
-  this->types_->insert( std::pair<const char*,Type*>("capability"
-					       , new IntegerType("capability_t", false, sizeof("int"))));
+  this->types_->insert( std::pair<std::string,Type*>("char"
+					       , new IntegerType("char", false, sizeof(char))));
+  this->types_->insert( std::pair<std::string,Type*>("unsigned char"
+					       , new IntegerType("unsigned char", true, sizeof(char))));
+  this->types_->insert( std::pair<std::string,Type*>("short"
+					      , new IntegerType("short", false, sizeof(short))));
+  this->types_->insert( std::pair<std::string,Type*>("unsigned short"
+					      , new IntegerType("unsigned short", true, sizeof(short))));
+  this->types_->insert( std::pair<std::string,Type*>("int"
+					      , new IntegerType("int", false, sizeof(int))));
+  this->types_->insert( std::pair<std::string,Type*>("unsigned int"
+					      , new IntegerType("unsigned int", true, sizeof(int))));
+  this->types_->insert( std::pair<std::string,Type*>("long"
+					      , new IntegerType("long", false, sizeof(long))));
+  this->types_->insert( std::pair<std::string,Type*>("unsigned long"
+					      , new IntegerType("unsigned long", true, sizeof(long))));
+  this->types_->insert( std::pair<std::string,Type*>("long long"
+					      , new IntegerType("long long", false, sizeof(long long))));
+  this->types_->insert( std::pair<std::string,Type*>("unsigned long long"
+					      , new IntegerType("unsigned long long", true, sizeof(long long))));
+  this->types_->insert( std::pair<std::string,Type*>("capability"
+					       , new IntegerType("capability_t", false, sizeof(int))));
 }
 
 RootScope* RootScope::instance()
@@ -41,18 +42,23 @@ RootScope* RootScope::instance()
 
 Type * RootScope::lookup_symbol(const char * sym, int* err)
 {
-  if(types_->find(sym) == types_->end())
+  std::string temp = sym;
+  if(this->types_->find(temp) == this->types_->end())
     {
-      // error
+      // printf("looking up %s\n", sym);
+      // printf("is empty? %d\n", this->types_->size());
+      *err = 0;
+      return 0;
     }
   else
-    return (*types_)[sym];
+    return (*(this->types_))[temp];
 }
 
 int RootScope::insert_symbol(const char* sym, Type * value)
 {
-  std::pair<std::map<const char*,Type*>::iterator,bool> ret;
-  ret = types_->insert(std::pair<const char*, Type*>(sym, value));
+  std::string temp = sym;
+  std::pair<std::map<std::string,Type*>::iterator,bool> ret;
+  ret = types_->insert(std::pair<std::string, Type*>(temp, value));
   
   return ret.second;
 }
@@ -60,21 +66,23 @@ int RootScope::insert_symbol(const char* sym, Type * value)
 // file scope
 Type* FileScope::lookup_symbol(const char* sym, int* err)
 {
+  std::string temp = sym;
   // lookup here or root first?
-  if(types_->find(sym) == types_->end())
+  if(types_->find(temp) == types_->end())
     {
       // error
     }
   else
-    return (*types_)[sym];
+    return (*types_)[temp];
   
 }
 
 int FileScope::insert_symbol(const char* sym, Type* value)
 {
+  std::string temp = sym;
   // redefinition of something at root scope?
-  std::pair<std::map<const char*,Type*>::iterator, bool> ret;
-  ret = types_->insert(std::pair<const char*,Type*>(sym, value));
+  std::pair<std::map<std::string,Type*>::iterator, bool> ret;
+  ret = types_->insert(std::pair<std::string,Type*>(temp, value));
   
   return ret.second;
 		      
@@ -83,6 +91,6 @@ int FileScope::insert_symbol(const char* sym, Type* value)
 FileScope::FileScope(RootScope* root)
 {
   this->root_ = root;
-  this->types_ = new std::map<const char*, Type*>();
+  this->types_ = new std::map<std::string, Type*>();
 }
 

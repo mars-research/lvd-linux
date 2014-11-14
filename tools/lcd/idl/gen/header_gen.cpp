@@ -30,7 +30,7 @@ void HeaderVisitor::visit(Rpc* r)
   printf("%d\n", rt->num());
   rt->accept(this); // this seems unnecessary in this case
   const char* name = r->name();
-  fprintf(this->out_f_, " %s ", name); 
+  fprintf(this->out_f_, " %s(", name); 
   
   for(std::vector<Parameter*>::iterator it = r->parameters()->begin(); it != r->parameters()->end(); it++)
     {
@@ -46,7 +46,7 @@ void HeaderVisitor::visit(Parameter* p)
 {
   p->type()->accept(this);
   // print p->name_
-  fprintf(this->out_f_, "%s", p->name());
+  fprintf(this->out_f_, " %s", p->name());
 }
 
 void HeaderVisitor::visit(ProjectionType* p)

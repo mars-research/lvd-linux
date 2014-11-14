@@ -1,7 +1,7 @@
 start-symbol: File
-options: debug9
 
-include: {{ #include "../include/lcd_ast.h"
+
+include: {{ #include "lcd_ast.h"
 	    #include <vector>
 	    #include <stdlib.h>
 	    #include <string>
@@ -38,7 +38,7 @@ code: {{
 	    return val;
       }				
 
-      void insertType(char * sym, Type * val) // should this be void?
+      void insertType(const char * sym, Type * val) // should this be void?
       {
 	FileScope *fs = current_file_scope();
 	int ret = fs->insert_symbol(sym, val);
@@ -62,7 +62,9 @@ Identifier	=	i1:IdentStart i2:IdentCont* {{
 				total << letter;
 		   	}
 				std::string str = total.str();
-		   		value = &str[0]; }}
+				printf("identifier is: %s\n", str.c_str());
+		   		value.value = malloc(str.length()+1);
+				strncpy((char*)value.value, str.c_str(), str.length()+1); }}
 
 IdentStart	=	[abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ_]
 
@@ -135,7 +137,7 @@ String		=	<ascii 34> l:any_letter+ <ascii 34> {{
 				total << letter;
 			}
 			std::string str = total.str();
-			value = &str[0]; }}
+			value = str.c_str(); }}
 
 any_letter	=	[_.,/?<>'; =:%`!@#$^&*()-+{}|\\ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789]
 
@@ -145,19 +147,21 @@ Include		=	"#include" Space+ "<" Spacing f:Identifier Spacing ">" Spacing {{
 			std::ostringstream total;
 			total << "#include <" << (char *) f.getValue() << ">";
 			std::string str = total.str();
-			value = &str[0]; }}
+			value = str.c_str(); }}
 			
 			| "#include" Space+ s:String Spacing {{
 			std::ostringstream total;
 			total << "#include " << (char *) s.getValue();
 			std::string str = total.str();
-			value = &str[0]; }}
+			value = str.c_str(); }}
 
 FirstParam	=	t:Type_form id:Identifier Spacing COMMA Spacing {{
+			printf("first param: id is %s\n", (char*) id.getValue());
 			value = new Parameter((Type *) t.getValue(), (char *) id.getValue()); }} 
 			  
 
 LastParam	=	t:Type_form id:Identifier Spacing {{
+			printf("last param: id is %s\n", (char*) id.getValue());
 			value = new Parameter((Type *) t.getValue(), (char *) id.getValue()); }}
 
 Parameters	=	f:FirstParam* l:LastParam {{
@@ -171,8 +175,9 @@ Parameters	=	f:FirstParam* l:LastParam {{
 			params->push_back((Parameter* ) l.getValue());
 			value = params; }}
 
-Rpc		=	"rpc" Space+ t:Type_form id:Identifier Spacing OPEN p:Parameters CLOSE SEMI Spacing {{
-			value = new Rpc((Type *) t.getValue(), (char *) id.getValue(), (std::vector<Parameter *> *) p.getValue()); }}  
+Rpc		=	"rpc" Space+ t:Type_form id1:Identifier Spacing OPEN p:Parameters CLOSE SEMI Spacing {{
+			printf("rpc value of id is: %s\n", (char *) id1.getValue());
+			value = new Rpc((Type *) t.getValue(), (char *) id1.getValue(), (std::vector<Parameter *> *) p.getValue()); }}  
 
 
 

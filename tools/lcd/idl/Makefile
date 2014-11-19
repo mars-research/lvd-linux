@@ -6,12 +6,15 @@ idl = parser/lcd_idl.cpp include/lcd_idl.h
 CXXFLAGS = -g -Iinclude/
 CXX = g++
 
-objects = lcd_ast.o main.o lcd_idl.o scope.o header_gen.o
+objects = lcd_ast.o main.o lcd_idl.o scope.o header_gen.o error.o
 
 $(bin): $(objects) 
 	$(CXX) $(LDFLAGS) -o $@ $^ $(LDLIBS)
 
-main.o: main/main.cpp include/lcd_ast.h include/lcd_idl.h include/gen_visitor.h
+main.o: main/main.cpp include/lcd_ast.h include/lcd_idl.h include/gen_visitor.h include/error.h
+	$(CXX) $(CXXFLAGS) -c -o $@ $(filter-out %.h,$^)
+
+error.o: error/error.cpp include/error.h
 	$(CXX) $(CXXFLAGS) -c -o $@ $(filter-out %.h,$^)
 
 header_gen.o: gen/header_gen.cpp include/gen_visitor.h

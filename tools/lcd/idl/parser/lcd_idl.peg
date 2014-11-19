@@ -2,6 +2,7 @@ start-symbol: File
 
 
 include: {{ #include "lcd_ast.h"
+	    #include "error.h"
 	    #include <vector>
 	    #include <stdlib.h>
 	    #include <string>
@@ -29,12 +30,12 @@ code: {{
 	   }
 	   
 	   if(!err)
-	   { // error do something
-	   printf("ERROR\n\n\n\n\n\n\n\n\n\n\n\n");
-}
-	printf("herheherhehehehehr\n");
-	printf("num is: %d\n", val->num());
-	printf("herheherhehehehehr\n");
+	   { 
+	     ErrorReport* er = ErrorReport::instance();
+	     er->set_error();
+	     printf("Error looking up type: %s\n", type);
+	     return 0; // continue execution
+	   }
 	    return val;
       }				
 
@@ -43,7 +44,9 @@ code: {{
 	FileScope *fs = current_file_scope();
 	int ret = fs->insert_symbol(sym, val);
 	if(!ret)
-	{ // error do something 
+	{
+		ErrorReport* er = ErrorReport::instance();
+	     er->set_error();
 	}
 	
       }	

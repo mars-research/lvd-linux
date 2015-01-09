@@ -45,13 +45,14 @@ Type * RootScope::lookup_symbol(const char * sym, int* err)
   std::string temp = sym;
   if(this->types_->find(temp) == this->types_->end())
     {
-      // printf("looking up %s\n", sym);
-      // printf("is empty? %d\n", this->types_->size());
       *err = 0;
       return 0;
     }
   else
-    return (*(this->types_))[temp];
+    {
+      *err = 1;
+      return (*(this->types_))[temp];
+    }
 }
 
 int RootScope::insert_symbol(const char* sym, Type * value)
@@ -67,13 +68,16 @@ int RootScope::insert_symbol(const char* sym, Type * value)
 Type* FileScope::lookup_symbol(const char* sym, int* err)
 {
   std::string temp = sym;
-  // lookup here or root first?
-  if(types_->find(temp) == types_->end())
+  
+  if(this->types_->find(temp) == this->types_->end())
     {
-      // error
+      return this->root_->lookup_symbol(sym, err); 
     }
   else
-    return (*types_)[temp];
+    {
+      *err = 1;
+      return (*types_)[temp];
+    }
   
 }
 
@@ -82,10 +86,9 @@ int FileScope::insert_symbol(const char* sym, Type* value)
   std::string temp = sym;
   // redefinition of something at root scope?
   std::pair<std::map<std::string,Type*>::iterator, bool> ret;
-  ret = types_->insert(std::pair<std::string,Type*>(temp, value));
-  
-  return ret.second;
-		      
+  // filescope map not rootscope
+  ret = this->types_->insert(std::pair<std::string,Type*>(temp, value));
+  return ret.second; 
 }
 
 FileScope::FileScope(RootScope* root)

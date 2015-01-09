@@ -35,9 +35,10 @@ class HeaderVisitor : public GenVisitor
 
 class SourceVisitor : public GenVisitor
 {
-  // FILE* out_f_;
- public:
-  SourceVisitor(FILE* f);
+  FILE* out_f_;
+  int stub_or_proxy_; // 1 equals stub, 2 equals proxy
+ public: 
+  SourceVisitor(FILE* out, int stub_proxy);
   virtual void visit(File *f);
   virtual void visit(Rpc *rpc);
   virtual void visit(Parameter * p);

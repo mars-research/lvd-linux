@@ -2,24 +2,26 @@
 
 from os import getcwd, listdir
 from os.path import join
-from subprocess import call, check_output
+from subprocess import check_call, check_output, CalledProcessError
 
 def main():
-    print("in main")
-    test_dir = getcwd()
-    comp_dir = "../compiler"
+    current_dir = getcwd()
+    test_dir = join(current_dir, "test")
+    comp_dir = join(current_dir, "compiler")
     out_dir = join(test_dir, "out")
     for file in listdir(test_dir):
-        print("in loop: " + file)
         if file.endswith(".idl"):
             try:
-                result = check_output([comp_dir, '-header', file], timeout=2)
-                print("in try")
-            except:
-                print("in except")
-                pass
-
-
+                print("in loop: " + file)
+                idl_file = join("test", file)
+                out_file = join("test", file+".h")
+                print(out_file)
+                print(idl_file)
+            
+                check_call([comp_dir, '-header', idl_file, '-out', out_file])
+            except Exception as e:
+                print("f")
+    
 if __name__ == '__main__':
     main()
             

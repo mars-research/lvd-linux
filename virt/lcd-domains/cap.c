@@ -1,8 +1,7 @@
-/* 
- * Author: Anton Burtsev <aburtsev@flux.utah.edu>
- * Copyright: University of Utah
- */
-#include <linux/slab.h>
+
+/* NOT CURRENTLY USED */
+
+
 #include <lcd/cap.h>
 
 

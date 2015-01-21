@@ -1,3 +1,7 @@
+
+/* NOT CURRENTLY USED */
+
+
 // Sync IPC specific routines
 
 #include <linux/types.h>

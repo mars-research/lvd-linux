@@ -1,3 +1,6 @@
+
+/* NOT CURRENTLY USED */
+
 #include <linux/elf.h>
 #include <stdio.h>
 #include <unistd.h>

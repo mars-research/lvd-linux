@@ -1,3 +1,6 @@
+
+/* NOT CURRENTLY USED */
+
 #ifndef LCD_DOMAINS_IPC_H
 #define LCD_DOMAINS_IPC_H
 

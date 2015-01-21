@@ -3,12 +3,94 @@
 OVERVIEW
 ==============================
 
+This code is in arch/x86/lcd-domains/ and 
+arch/x86/include/asm/lcd-domains-arch.h.
 
+The two main objects are struct lcd_arch and struct lcd_arch_thread, defined in
+arch/x86/include/asm/lcd-domains-arch.h.
+
+struct lcd_arch contains the extended page table (EPT) guest physical address
+space information, and a list of the contained lcd_arch_thread's.
+
+struct lcd_arch_thread corresponds with an Intel VT-x virtual machine, and
+contains all state needed to manage it. Each lcd_arch_thread uses the EPT of
+its parent lcd_arch.
+
+See the comments in the header lcd-domains-arch.h (above), and the test
+cases in arch/x86/lcd-domains/lcd-domains-arch-tests.c.
+
+========================================
+EXAMPLE
+========================================
+
+Here is an example how to set up one lcd_arch with one lcd_arch_thread, and
+run it (without the error checking).
+
+
+struct lcd_arch *lcd_arch;
+struct lcd_arch_thread *lcd_arch_thread;
+
+/*
+ * Create the lcd_arch
+ */
+lcd_arch = lcd_arch_create();
+
+/* (...Allocate and map pages in the LCD...) */
+
+/*
+ * Create and add a thread
+ */
+lcd_arch_thread = lcd_arch_add_thread(lcd_arch);
+
+/* (...Set up the thread's program counter, etc...) */
+
+/*
+ * Tear down the thread
+ */
+lcd_arch_destroy_thread(lcd_arch_thread);
+
+/*
+ * Tear down the LCD
+ */
+lcd_arch_destroy(lcd_arch);
+
+
+========================================
+ADDRESS SPACES
+========================================
+
+One of the hardest, error-prone, confusing parts of this is we need to keep
+track of four different kinds of addresses:
+
+   (1) host physical
+   (2) host virtual
+   (3) guest physical
+   (4) guest virtual
+
+We have created four different data types (much like those used for
+page tables -- pte_t, pmd_t, ...):
+
+   (1) host physical    hpa_t
+   (2) host virtual     hva_t
+   (3) guest physical   gpa_t
+   (4) guest virtual    gva_t
+
+and routines for converting between them. Some conversions are not supported
+directly, and must be done with more work -- e.g., guest physical to host
+virtual requires an EPT. But some, like host physical to host virtual, can
+be done using host macros. See the arch header.
+
+Host physical addresses need to be stored in the EPT.
+
+Guest physical addresses need to be stored in the guest virtual page tables.
+>>>>>>> Support for multiple threads in lcd (limited). Major clean up of code.
 
 
 ==============================
 LOCKING
 ==============================
+
+TODO: Some of the arch code is not thread safe.
 
 Locks are used on an lcd_arch's ept and its list of lcd_arch_threads.
 
@@ -21,16 +103,22 @@ This makes debugging easier since we can interrupt locks (no deadlocks).
 GDT/TSS/IDT
 ==============================
 
-We probably don't need a gdt/tss/idt right now. I'm removing that.
+We will need GDT/TSS/IDT in the future when we provide full support for running
+multiple threads inside an LCD, and if those threads are handling some
+exceptions/interrupts (like guest virtual page faults).
 
-In the future, we could provide a secure interface for an lcd thread to
-change its gdt/tss/idt info in its vmcs. The lcd thread could allocate a gdt,
-etc. inside, and use the interface to update the gdtr, tr, idtr as needed.
-The lcd thread could also tell the microkernel not to vmexit for certain
-external interrupts.
+When an LCD thread is spawned, the creator should provide 4 pages of memory:
 
-If we do tss, each thread will probably need its own - since the tss contains
-a stack pointer that varies with the threads.
+     -- 1 for thread's stack/utcb
+     -- 1 for its gdt
+     -- 1 for its tss
+     -- 1 for its idt
+
+The IDT/GDT could be shared by threads, but it might be complicated, and the
+microkernel would have to make certain assumptions or enforce certain polices
+to protect itself (e.g., if it needed to modify the IDT/GDT when setting up
+a new thread). Having a TSS per thread makes some sense - a thread here is more
+like a logical core - and this is what Linux does.
 
 I'm putting the gdt / tss init code here for reference since it was quite
 complicated to do (some of the macros won't be relevant anymore):

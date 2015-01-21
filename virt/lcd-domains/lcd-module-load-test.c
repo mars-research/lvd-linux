@@ -2,23 +2,30 @@
 #include <linux/kernel.h>
 
 /*
- * Force no inline, so we get a non-trivial jump. Use
- * a hack to turn on no inline.
+ * IMPORTANT: This module should be compiled without
+ * optimizations (see Makefile in this directory).
+ * Otherwise, some things will be optimized away and
+ * we won't fully test the code.
+ *
+ * You may want to inspect the .ko before running with
+ * objdump -d.
+ *
+ * NOTE: If you disassemble the .ko, you will notice
+ * callq's that are not patched to jump to the correct
+ * place (e.g., they just jump to the next instruction). 
+ * This is not an error. The module loading code
+ * patches these calls so that they work when the module
+ * is loaded. You can look at the relocation info in the
+ * .ko elf file with readelf -a.
  */
-#ifdef noinline
-#define lcd_noinline_set
-#define lcd_old_noinline noinline
-#endif
-#undef noinline
 
-static __attribute__ ((noinline)) int foo(int x)
+static int foo(int x)
 {
+	while (1)
+		x = 2;
+
 	return x + 5;
 }
-
-#ifdef lcd_noinline_set
-#define noinline lcd_old_noinline
-#endif
 
 static void lcd_yield(void)
 {

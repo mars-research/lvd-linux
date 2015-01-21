@@ -49,6 +49,8 @@ extern const unsigned long vmx_return;
 
 /* SHARED / PERCPU VARS -------------------------------------------------- */
 
+static struct kmem_cache *vcpu_cache;
+
 static struct vmx_vmcs_config vmcs_config;
 static struct vmx_capability vmx_capability;
 
@@ -883,12 +885,26 @@ int lcd_arch_init(void)
 	}
 
 	/*
+	 * Init vcpu cache
+	 */
+	vcpu_cache = kmem_cache_create("lcd_arch_vcpu", 
+				sizeof(struct lcd_arch),
+				__alignof__(struct lcd_arch),
+				0, NULL);
+	if (!vcpu_cache) {
+		printk(KERN_ERR "lcd_vmx: failed to set up kmem cache\n");
+		ret = -ENOMEM;
+		goto failed3;
+	}
+
+	/*
 	 * Run tests
 	 */
 	lcd_arch_tests();
 
 	return 0;
 
+failed3:
 failed2:
 	on_each_cpu(vmx_disable, NULL, 1);
 failed1:
@@ -902,6 +918,7 @@ void lcd_arch_exit(void)
 	on_each_cpu(vmx_disable, NULL, 1);
 	vmx_free_vmxon_areas();
 	free_page((unsigned long)msr_bitmap);
+	kmem_cache_destroy(vcpu_cache);
 }
 
 /* VMX EPT -------------------------------------------------- */
@@ -2367,7 +2384,7 @@ struct lcd_arch* lcd_arch_create(void)
 	/*
 	 * Alloc lcd_arch
 	 */
-	vcpu = kmalloc(sizeof(*vcpu), GFP_KERNEL);
+	vcpu = kmem_cache_alloc(vcpu_cache, GFP_KERNEL);
 	if (!vcpu) {
 		printk(KERN_ERR "lcd arch create: failed to alloc lcd\n");
 		goto fail_vcpu;
@@ -2442,7 +2459,7 @@ fail_ept:
 fail_vpid:
 	vmx_free_vmcs(vcpu->vmcs);
 fail_vmcs:
-	kfree(vcpu);
+	kmem_cache_free(vcpu_cache, vcpu);
 fail_vcpu:
 	return NULL;
 }
@@ -2483,7 +2500,7 @@ void lcd_arch_destroy(struct lcd_arch *vcpu)
 	vmx_destroy_tss(vcpu);
 	vmx_destroy_stack(vcpu);
 	vmx_free_ept(vcpu);
-	kfree(vcpu);
+	kmem_cache_free(vcpu_cache, vcpu);
 }
 
 /* VMX EXIT HANDLING -------------------------------------------------- */

@@ -1720,7 +1720,8 @@ void lcd_destroy_as_module(struct task_struct *t, char *module_name)
 	 * Tell kthread to stop, and delete the module when it's done.
 	 */
 	ret = kthread_stop(t);
-	LCD_ERR("kthread retval = %d", ret);
+	if (ret)
+		LCD_ERR("kthread retval = %d", ret);
 
 	mutex_lock(&module_mutex);
 	m = find_module(module_name);

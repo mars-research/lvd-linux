@@ -74,3 +74,20 @@ void SourceVisitor::visit(Typedef* td)
 {
    fprintf(this->out_f_, "%s", td->alias());
 }
+
+void SourceVisitor::exec_loop(void)
+{
+  // while truee
+  // switch statement
+  // switch on what? 
+  // cases are: callee functions in file.
+  // 
+}
+
+void SourceVisitor::gen_case_switch(void)
+{
+  // switch
+  // case just callee functions, how are these identified from others?
+  
+}
+

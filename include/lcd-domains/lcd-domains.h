@@ -3,33 +3,110 @@
 
 #include <linux/module.h>
 #include <asm/lcd-domains-arch.h>
+#include <linux/sched.h>
 
 /*
- * lcd_status = status of kthread / lcd
- * ====================================
+ * lcd_thread_status
+ * =================
  *
- * LCD_STATUS_UNFORMED   = still setting up, or status not set yet
- * LCD_STATUS_SUSPENDED  = lcd is paused, and kthread is going to sleep / is 
- *                         asleep
- * LCD_STATUS_RUNNABLE   = lcd is paused, and kthread is awake, or should 
- *                         awaken
- *                         (the status should be set to this if the lcd / 
- *                         kthread are suspended, and you want it to wake up)
- * LCD_STATUS_RUNNING    = lcd is running, or is about to run
- * LCD_STATUS_KILL       = lcd and kthread should die
- * LCD_STATUS_DEAD       = lcd is not running, most parts have been destroyed
- *                         (lcd_struct is only hanging around to provide 
- *                         status info); the kthread is ready to die and be 
- *                         reaped
+ * Similar to status used for task_struct's.
+ *
+ * LCD_THREAD_UNFORMED   = still setting up, or status not set yet
+ * LCD_THREAD_SUSPENDED  = lcd_thread is going to sleep / is asleep
+ * LCD_THREAD_RUNNABLE   = set status to this to wake up lcd_thread
+ * LCD_THREAD_RUNNING    = lcd_thread is running, or is about to run
+ * LCD_THREAD_KILL       = set status to this to kill lcd_thread (as soon as
+ *                         possible)
+ * LCD_THREAD_DEAD       = lcd_thread is not running, most parts have been 
+ *                         destroyed (only hanging around to provide 
+ *                         status info)
  */
-enum lcd_status {
-	LCD_STATUS_UNFORMED  = 0,
-	LCD_STATUS_SUSPENDED = 1,
-	LCD_STATUS_RUNNABLE  = 2,
-	LCD_STATUS_RUNNING   = 3,
-	LCD_STATUS_KILL      = 4,
-	LCD_STATUS_DEAD      = 5,
+enum lcd_thread_status {
+	LCD_THREAD_UNFORMED  = 0,
+	LCD_THREAD_SUSPENDED = 1,
+	LCD_THREAD_RUNNABLE  = 2,
+	LCD_THREAD_RUNNING   = 3,
+	LCD_THREAD_KILL      = 4,
+	LCD_THREAD_DEAD      = 5,
 };
+
+struct lcd;
+
+struct lcd_thread {
+	/*
+	 * The containing lcd
+	 */
+	struct lcd *lcd;
+	/*
+	 * List of threads in containing lcd
+	 */
+	struct list_head lcd_threads;
+	/*
+	 * Thread control block, accessible by lcd_thread while running inside
+	 * lcd. Contains message registers, etc.
+	 */
+	struct lcd_utcb *utcb;
+	/*
+	 * Status (see above)
+	 */
+	int status;
+	/*
+	 * Arch-dependent state of lcd_thread
+	 */
+	struct lcd_arch_thread *lcd_arch_thread;
+};
+
+/*
+ * LCD Memory Layout
+ * =================
+ *
+ * The layout below reflects the guest physical *and* virtual memory
+ * layout. Guest virtual paging memory is filled on on demand
+ * during lcd initialization (so parts may not be backed by host physical
+ * memory), and stacks/utcb's are also filled in on demand as threads are
+ * created and added to the lcd. The lcd starts with one lcd_thread, so
+ * Stack 0 / utcb 0 will be mapped after the lcd is initialized.
+ *
+ * Guest physical addresses are mapped one-to-one to the same guest 
+ * virtual addresses.
+ *
+ * The module is mapped to the same guest physical / guest virtual
+ * address space as the host, to avoid relocating symbols.
+ *
+ *                   +---------------------------+
+ *   module mapped   |                           |
+ *   somewhere in    :                           :
+ *    here ------->  :                           :
+ *   at a higher     |                           |
+ *   address         |                           |
+ *                   |                           |
+ *                   +---------------------------+
+ *                   |       Stack 1023          |
+ *                   :                           : (4 KBs)
+ *                   |        utcb 1023          |
+ *                   +---------------------------+
+ *                   |           ...             |
+ *                   :                           :
+ *                   |           ...             |
+ *                   +---------------------------+
+ *                   |         Stack 1           |
+ *                   :                           : (4 KBs)
+ *                   |          utcb 1           |
+ *                   +---------------------------+
+ *                   |         Stack 0           |
+ *                   :                           : (4 KBs)
+ *                   |          utcb 0           |
+ *                   +---------------------------+
+ *                   |       Guest Virtual       | (4 MBs)
+ *                   |       Paging Memory       |
+ * LCD_ARCH_FREE---> +---------------------------+
+ *                   |                           |
+ *                   :   Reserved Arch Memory    :
+ *                   |                           |
+ *                   +---------------------------+ 0x0000 0000 0000 0000
+ */
+
+#define LCD_PAGING_MEM_SIZE (4 << 20)
 
 struct lcd {
 	/*
@@ -37,43 +114,18 @@ struct lcd {
 	 */
 	char name[MODULE_NAME_LEN];
 	/*
-	 * Status (enum lcd_status)
+	 * Guest virtual paging:
+	 *
+	 * root is the host virtual address that points to the root of
+	 * the lcd's guest virtual paging hierarchy.
+	 *
+	 * We use a simple bitmap for allocating memory used for page tables
+	 * for the lcd's guest virtual address space. This is only needed when
+	 * the lcd is being set up - mapping the arch bits, module code, the
+	 * first lcd_thread's tcb, etc.
 	 */
-	int status;
-	/*
-	 * Arch-dependent state of lcd
-	 */
-	struct lcd_arch *lcd_arch;
-	/*
-	 * Guest virtual paging.
-	 */
-	struct {
-		/*
-		 * = 0 if root_hva invalid
-		 * = 1 if root_hva valid
-		 */
-		int present;
-		/*
-		 * Host virtual address of the root of the lcd's
-		 * (initial) guest virtual paging hierarchy.
-		 */
-		pgd_t *root;
-		/*
-		 * Pointer to start of guest physical address space 
-		 * used for paging.
-		 */
-		gpa_t paging_mem_bot;
-		/*
-		 * Pointer to next free page in guest physical
-		 * address space that can be used for a page table.
-		 */
-		gpa_t paging_mem_brk;
-		/*
-		 * Top of region in guest physical address space
-		 * for page tables.
-		 */
-		gpa_t paging_mem_top;
-	} gv;
+	pgd_t *root;
+	DECLARE_BITMAP(gv_paging_bmap, (LCD_PAGING_MEM_SIZE >> PAGE_SIZE));
 };
 
 /**
@@ -83,7 +135,7 @@ struct lcd {
  * -- Spawns a kernel thread that will host the lcd.
  * -- The kernel thread will create the lcd and map the module into
  *    the lcd. The kernel thread will then wait with the lcd's status
- *    set to LCD_STATUS_SUSPENDED.
+ *    set to LCD_THREAD_SUSPENDED.
  * -- Call lcd_run_as_module to start running the lcd.
  * -- Returns NULL if we fail to create the kernel thread, or if the
  *    kernel thread failed to initialize the lcd, etc.

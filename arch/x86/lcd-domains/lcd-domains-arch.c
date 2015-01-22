@@ -24,6 +24,36 @@
 #include <linux/slab.h>
 #include <linux/kmsg_dump.h>
 
+/* DEBUGGING -------------------------------------------------- */
+
+#define LCD_ARCH_ERR(msg...) __lcd_arch_err(__FILE__, __LINE__, msg)
+static inline void __lcd_arch_err(char *file, int lineno, char *fmt, ...)
+{
+	va_list args;
+	printk(KERN_ERR "lcd-vmx: %s:%d: error: ", file, lineno);
+	va_start(args, fmt);
+	vprintk(fmt, args);
+	va_end(args);
+}
+#define LCD_ARCH_MSG(msg...) __lcd_arch_msg(__FILE__, __LINE__, msg)
+static inline void __lcd_arch_msg(char *file, int lineno, char *fmt, ...)
+{
+	va_list args;
+	printk(KERN_ERR "lcd-vmx: %s:%d: note: ", file, lineno);
+	va_start(args, fmt);
+	vprintk(fmt, args);
+	va_end(args);
+}
+#define LCD_ARCH_WARN(msg...) __lcd_arch_warn(__FILE__, __LINE__, msg)
+static inline void __lcd_arch_warn(char *file, int lineno, char *fmt, ...)
+{
+	va_list args;
+	printk(KERN_ERR "lcd-vmx: %s:%d: warning: ", file, lineno);
+	va_start(args, fmt);
+	vprintk(fmt, args);
+	va_end(args);
+}
+
 /* VMX DATA STRUCTURES -------------------------------------------------- */
 
 struct vmx_vmcs_config {
@@ -49,7 +79,7 @@ extern const unsigned long vmx_return;
 
 /* SHARED / PERCPU VARS -------------------------------------------------- */
 
-static struct kmem_cache *vcpu_cache;
+static struct kmem_cache *lcd_arch_thread_cache;
 
 static struct vmx_vmcs_config vmcs_config;
 static struct vmx_capability vmx_capability;
@@ -63,15 +93,17 @@ static struct {
 	spinlock_t lock;
 } vpids;
 
-static DEFINE_PER_CPU(struct lcd_arch *, local_vcpu);
+static DEFINE_PER_CPU(struct lcd_arch_thread *, local_lcd_arch_thread);
 
 static unsigned long *msr_bitmap;
 
-/* DEBUG --------------------------------------------------*/
+/* DEBUGGING --------------------------------------------------*/
 
 /**
  * Prints the vmx controls, lower and upper bounds on the controls,
  * and tries to find the bits that were rejected.
+ *
+ * Useful for debugging set up of the vmcs.
  */
 static void print_vmx_controls(u32 controls, u32 mask, u32 msr)
 {
@@ -87,10 +119,10 @@ static void print_vmx_controls(u32 controls, u32 mask, u32 msr)
 
 	rdmsr(msr, msr_low, msr_high);
 
-	printk(KERN_ERR "  MSR LOW:             0x%08x\n", msr_low);
-	printk(KERN_ERR "  ATTEMPTED CONTROLS:  0x%08x\n", controls);
-	printk(KERN_ERR "  MSR HIGH:            0x%08x\n", msr_high);
-	printk(KERN_ERR "  RESERVED BIT MASK:   0x%08x\n", mask);
+	LCD_ARCH_MSG("  MSR LOW:             0x%08x\n", msr_low);
+	LCD_ARCH_MSG("  ATTEMPTED CONTROLS:  0x%08x\n", controls);
+	LCD_ARCH_MSG("  MSR HIGH:            0x%08x\n", msr_high);
+	LCD_ARCH_MSG("  RESERVED BIT MASK:   0x%08x\n", mask);
 
 	/*
 	 * For each bit, if the reserved mask is not set *and* the msr high
@@ -99,8 +131,7 @@ static void print_vmx_controls(u32 controls, u32 mask, u32 msr)
 	bad_high = ~msr_high & ~mask & controls;
 	for (i = 0; i < 32; i++) {
 		if (bad_high & 1)
-			printk(KERN_ERR "  Control bit %d should be 0.\n",
-				i);
+			LCD_ARCH_MSG("  Control bit %d should be 0.\n", i);
 		bad_high >>= 1;
 	}
 
@@ -111,12 +142,11 @@ static void print_vmx_controls(u32 controls, u32 mask, u32 msr)
 	bad_low = msr_low & ~mask & ~controls;
 	for (i = 0; i < 32; i++) {
 		if (bad_low & 1)
-			printk(KERN_ERR "  Control bit %d should be 1.\n",
-				i);
+			LCD_ARCH_MSG("  Control bit %d should be 1.\n", i);
 		bad_low >>= 1;
 	}
 
-	printk(KERN_ERR "See Intel SDM V3 24.{6,7,8,9} and Appendix A\n");
+	LCD_ARCH_MSG("See Intel SDM V3 24.{6,7,8,9} and Appendix A\n");
 }
 
 /* INVEPT / INVVPID --------------------------------------------------*/
@@ -146,10 +176,6 @@ static inline bool cpu_has_vmx_ept_ad_bits(void)
 	return vmx_capability.ept & VMX_EPT_AD_BIT;
 }
 
-/**
- * On error, generates an invalid opcode exception
- * (ud2 instruction).
- */
 static inline void __invept(int ext, u64 eptp)
 {
 	u8 error;
@@ -162,8 +188,7 @@ static inline void __invept(int ext, u64 eptp)
                 /* CF==1 or ZF==1 --> rc = -1 */
                 : "=qm"(error) : "a" (&operand), "c" (ext) : "cc", "memory");
 	if (error)
-		printk(KERN_ERR "lcd vmx: invept error: ext=%d, eptp=0x%llx\n",
-			ext, eptp);
+		LCD_ARCH_ERR("ext=%d, eptp=0x%llx\n", ext, eptp);
 			
 }
 
@@ -188,10 +213,6 @@ static inline void invept_single_context(u64 eptp)
 		invept_global_context();
 }
 
-/**
- * On error, generates an invalid opcode exception
- * (ud2 instruction).
- */
 static inline void __invvpid(int ext, u16 vpid)
 {
 	u8 error;
@@ -206,8 +227,7 @@ static inline void __invvpid(int ext, u16 vpid)
                 /* CF==1 or ZF==1 --> rc = -1 */
 		: "=qm"(error) : "a"(&operand), "c"(ext) : "cc", "memory");
 	if (error)
-		printk(KERN_ERR "lcd vmx: invvpid fail: ext=%d, vpid=0x%hx\n",
-			ext, vpid);
+		LCD_ARCH_ERR("ext=%d, vpid=0x%hx\n", ext, vpid);
 }
 
 /**
@@ -251,8 +271,7 @@ static void vmcs_clear(struct lcd_arch_vmcs *vmcs)
                 : "=qm"(error) : "a"(&hpa), "m"(hpa)
                 : "cc", "memory");
 	if (error)
-		printk(KERN_ERR "lcd vmx: vmclear fail: %p/%llx\n",
-			vmcs, hpa);
+		LCD_ARCH_ERR("vmclear fail: %p/%llx\n",	vmcs, hpa);
 }
 
 /**
@@ -268,8 +287,7 @@ static void vmcs_load(struct lcd_arch_vmcs *vmcs)
                 : "=qm"(error) : "a"(&hpa), "m"(hpa)
                 : "cc", "memory");
 	if (error)
-		printk(KERN_ERR "lcd vmx: vmptrld %p/%llx failed\n",
-			vmcs, hpa);
+		LCD_ARCH_ERR("vmptrld %p/%llx failed\n", vmcs, hpa);
 }
 
 static __always_inline unsigned long vmcs_readl(unsigned long field)
@@ -298,7 +316,7 @@ static __always_inline u64 vmcs_read64(unsigned long field)
 
 static noinline void vmwrite_error(unsigned long field, unsigned long value)
 {
-	printk(KERN_ERR "lcd vmx: vmwrite error: reg %lx value %lx (err %d)\n",
+	LCD_ARCH_ERR("reg %lx value %lx (err %d)\n",
 		field, value, vmcs_read32(VM_INSTRUCTION_ERROR));
 	dump_stack();
 }
@@ -455,13 +473,12 @@ static void vmx_enable(void *unused)
 
 	__get_cpu_var(vmx_enabled) = 1;
 
-	printk(KERN_INFO "lcd vmx: VMX enabled on CPU %d\n",
-		raw_smp_processor_id());
+	LCD_ARCH_MSG("VMX enabled on CPU %d\n",	raw_smp_processor_id());
 	return;
 
 failed:
 	atomic_inc(&vmx_enable_failed);
-	printk(KERN_ERR "lcd vmx: failed to enable VMX, err = %d\n", ret);
+	LCD_ARCH_ERR("failed to enable VMX, err = %d\n", ret);
 	return;
 }
 
@@ -665,7 +682,7 @@ static int setup_vmcs_config(struct vmx_vmcs_config *vmcs_conf)
 	if (adjust_vmx_controls(&pin_based_exec_controls,
 					PIN_BASED_RESERVED_MASK,
 					MSR_IA32_VMX_PINBASED_CTLS) < 0) {
-		printk(KERN_ERR "lcd vmx: pin based exec controls not allowed\n");
+		LCD_ARCH_ERR("pin based exec controls not allowed\n");
 		print_vmx_controls(pin_based_exec_controls,
 				PIN_BASED_RESERVED_MASK,
 				MSR_IA32_VMX_PINBASED_CTLS);
@@ -706,7 +723,7 @@ static int setup_vmcs_config(struct vmx_vmcs_config *vmcs_conf)
 	if (adjust_vmx_controls(&primary_proc_based_exec_controls,
 					CPU_BASED_RESERVED_MASK,
 					MSR_IA32_VMX_PROCBASED_CTLS)) {
-		printk(KERN_ERR "lcd vmx: primary proc based exec ctrls not allowed\n");
+		LCD_ARCH_ERR("primary proc based exec ctrls not allowed\n");
 		print_vmx_controls(primary_proc_based_exec_controls,
 				CPU_BASED_RESERVED_MASK,
 				MSR_IA32_VMX_PROCBASED_CTLS);
@@ -731,7 +748,7 @@ static int setup_vmcs_config(struct vmx_vmcs_config *vmcs_conf)
 	if (adjust_vmx_controls(&secondary_proc_based_exec_controls,
 					SECONDARY_EXEC_RESERVED_MASK,
 					MSR_IA32_VMX_PROCBASED_CTLS2) < 0) {
-		printk(KERN_ERR "lcd vmx: secondary proc based exec ctls not allowed\n");
+		LCD_ARCH_ERR("secondary proc based exec ctls not allowed\n");
 		print_vmx_controls(secondary_proc_based_exec_controls,
 				SECONDARY_EXEC_RESERVED_MASK,
 				MSR_IA32_VMX_PROCBASED_CTLS2);
@@ -761,7 +778,7 @@ static int setup_vmcs_config(struct vmx_vmcs_config *vmcs_conf)
 	if (adjust_vmx_controls(&vmexit_controls, 
 					VM_EXIT_RESERVED_MASK,
 					MSR_IA32_VMX_EXIT_CTLS) < 0) {
-		printk(KERN_ERR "lcd vmx: vmexit controls not allowed\n");
+		LCD_ARCH_ERR("vmexit controls not allowed\n");
 		
 		print_vmx_controls(vmexit_controls,
 				VM_EXIT_RESERVED_MASK,
@@ -782,7 +799,7 @@ static int setup_vmcs_config(struct vmx_vmcs_config *vmcs_conf)
 	if (adjust_vmx_controls(&vmentry_controls,
 					VM_ENTRY_RESERVED_MASK,
 					MSR_IA32_VMX_ENTRY_CTLS) < 0) {
-		printk(KERN_ERR "lcd vmx: vm entry controls not allowed\n");
+		LCD_ARCH_ERR("vm entry controls not allowed\n");
 		
 		print_vmx_controls(vmentry_controls,
 				VM_ENTRY_RESERVED_MASK,
@@ -817,7 +834,7 @@ int lcd_arch_init(void)
 	 */
 
 	if (!cpu_has_vmx()) {
-		printk(KERN_ERR "lcd vmx: CPU does not support VMX\n");
+		LCD_ARCH_ERR("CPU does not support VMX\n");
 		return -EIO;
 	}
 
@@ -874,7 +891,7 @@ int lcd_arch_init(void)
 
 	atomic_set(&vmx_enable_failed, 0);
 	if (on_each_cpu(vmx_enable, NULL, 1)) {
-		printk(KERN_ERR "lcd vmx: timeout waiting for VMX mode enable.\n");
+		LCD_ARCH_ERR("timeout waiting for VMX mode enable.\n");
 		ret = -EIO;
 		goto failed1; /* sadly we can't totally recover */
 	}
@@ -885,14 +902,15 @@ int lcd_arch_init(void)
 	}
 
 	/*
-	 * Init vcpu cache
+	 * Init lcd_arch_thread cache (using instead of kmalloc since
+	 * these structs need to be aligned properly)
 	 */
-	vcpu_cache = kmem_cache_create("lcd_arch_vcpu", 
-				sizeof(struct lcd_arch),
-				__alignof__(struct lcd_arch),
-				0, NULL);
-	if (!vcpu_cache) {
-		printk(KERN_ERR "lcd_vmx: failed to set up kmem cache\n");
+	lcd_arch_thread_cache = kmem_cache_create("lcd_arch_thread", 
+						sizeof(struct lcd_arch_thread),
+						__alignof__(struct lcd_arch_thread),
+						0, NULL);
+	if (!lcd_arch_thread_cache) {
+		LCD_ARCH_ERR("failed to set up kmem cache\n");
 		ret = -ENOMEM;
 		goto failed3;
 	}
@@ -918,7 +936,7 @@ void lcd_arch_exit(void)
 	on_each_cpu(vmx_disable, NULL, 1);
 	vmx_free_vmxon_areas();
 	free_page((unsigned long)msr_bitmap);
-	kmem_cache_destroy(vcpu_cache);
+	kmem_cache_destroy(lcd_arch_thread_cache);
 }
 
 /* VMX EPT -------------------------------------------------- */
@@ -954,6 +972,7 @@ static inline int vmx_epte_present(lcd_arch_epte_t epte)
  */
 static inline int vmx_ept_idx(gpa_t a, int lvl)
 {
+	/* we right shift by the correct amount, then mask off 9 bits */
 	return (int)(((gpa_val(a)) >> (12 + 9 * (3 - lvl))) & ((1 << 9) - 1));
 }
 static inline u64 vmx_ept_offset(gpa_t a)
@@ -1000,7 +1019,7 @@ static void vmx_epte_set(lcd_arch_epte_t *epte, hpa_t a, int level)
 	}
 }
 
-int lcd_arch_ept_walk(struct lcd_arch *vcpu, gpa_t a, int create,
+int lcd_arch_ept_walk(struct lcd_arch *lcd, gpa_t a, int create,
 		lcd_arch_epte_t **epte_out)
 {
 	int i;
@@ -1008,7 +1027,7 @@ int lcd_arch_ept_walk(struct lcd_arch *vcpu, gpa_t a, int create,
 	u64 idx;
 	hva_t page;
 
-	dir = vcpu->ept.root;
+	dir = lcd->ept.root;
 
 	/*
 	 * Walk plm4 -> pdpt -> pd. Each step uses 9 bits
@@ -1021,7 +1040,7 @@ int lcd_arch_ept_walk(struct lcd_arch *vcpu, gpa_t a, int create,
 		if (!vmx_epte_present(dir[idx])) {
 			
 			if (!create) {
-				printk(KERN_ERR "lcd_arch_ept_walk: attempted lookup for unmapped gpa %lx, create was not allowed\n",
+				LCD_ARCH_ERR("attempted lookup for unmapped gpa %lx, create was not allowed\n",
 					gpa_val(a));
 				return -ENOENT;
 			}
@@ -1031,7 +1050,7 @@ int lcd_arch_ept_walk(struct lcd_arch *vcpu, gpa_t a, int create,
 			 */
 			page = __hva(__get_free_page(GFP_KERNEL));
 			if (!hva_val(page)) {
-				printk(KERN_ERR "lcd_arch_ept_walk: alloc failed\n");
+				LCD_ARCH_ERR("alloc failed\n");
 				return -ENOMEM;
 			}
 			memset(hva2va(page), 0, PAGE_SIZE);
@@ -1064,7 +1083,7 @@ hpa_t lcd_arch_ept_hpa(lcd_arch_epte_t *epte)
 	return vmx_epte_hpa(*epte);
 }
 
-int lcd_arch_ept_map(struct lcd_arch *vcpu, gpa_t ga, hpa_t ha,
+int lcd_arch_ept_map(struct lcd_arch *lcd, gpa_t ga, hpa_t ha,
 				int create, int overwrite)
 {
 	int ret;
@@ -1073,7 +1092,7 @@ int lcd_arch_ept_map(struct lcd_arch *vcpu, gpa_t ga, hpa_t ha,
 	/*
 	 * Walk ept
 	 */
-	ret = lcd_arch_ept_walk(vcpu, ga, create, &ept_entry);
+	ret = lcd_arch_ept_walk(lcd, ga, create, &ept_entry);
 	if (ret)
 		return ret;
 
@@ -1081,7 +1100,7 @@ int lcd_arch_ept_map(struct lcd_arch *vcpu, gpa_t ga, hpa_t ha,
 	 * Check if guest physical address already mapped
 	 */
 	if (!overwrite && vmx_epte_present(*ept_entry)) {
-		printk(KERN_ERR "lcd_arch_ept_map: would overwrite hpa %lx with hpa %lx\n",
+		LCD_ARCH_ERR("would overwrite hpa %lx with hpa %lx\n",
 			hpa_val(lcd_arch_ept_hpa(ept_entry)), 
 			hpa_val(ha));
 		return -EINVAL;
@@ -1112,7 +1131,7 @@ int lcd_arch_ept_map_range(struct lcd_arch *lcd, gpa_t ga_start,
 					1,
 					/* no overwrite */
 					0)) {
-			printk(KERN_ERR "lcd_arch_ept_map_range: error mapping gpa %lx to hpa %lx\n",
+			LCD_ARCH_ERR("error mapping gpa %lx to hpa %lx\n",
 				gpa_val(gpa_add(ga_start, off)),
 				hpa_val(hpa_add(ha_start, off)));
 			return -EIO;
@@ -1122,7 +1141,7 @@ int lcd_arch_ept_map_range(struct lcd_arch *lcd, gpa_t ga_start,
 	return 0;
 }
 
-int lcd_arch_ept_unmap(struct lcd_arch *vcpu, gpa_t a)
+int lcd_arch_ept_unmap(struct lcd_arch *lcd, gpa_t a)
 {
 	int ret;
 	lcd_arch_epte_t *ept_entry;
@@ -1130,7 +1149,7 @@ int lcd_arch_ept_unmap(struct lcd_arch *vcpu, gpa_t a)
 	/*
 	 * Walk ept
 	 */
-	ret = lcd_arch_ept_walk(vcpu, a, 0, &ept_entry);
+	ret = lcd_arch_ept_walk(lcd, a, 0, &ept_entry);
 	if (ret)
 		return ret;
 
@@ -1151,7 +1170,7 @@ int lcd_arch_ept_unmap_range(struct lcd_arch *lcd, gpa_t ga_start,
 	len = npages * PAGE_SIZE;
 	for (off = 0; off < len; off += PAGE_SIZE) {
 		if (lcd_arch_ept_unmap(lcd, gpa_add(ga_start, off))) {
-			printk(KERN_ERR "lcd_arch_ept_unmap_range: error unmapping gpa %lx\n",
+			LCD_ARCH_ERR("error unmapping gpa %lx\n",
 				gpa_val(gpa_add(ga_start, off)));
 			return -EIO;
 		}
@@ -1160,7 +1179,7 @@ int lcd_arch_ept_unmap_range(struct lcd_arch *lcd, gpa_t ga_start,
 	return 0;
 }
 
-int lcd_arch_ept_gpa_to_hpa(struct lcd_arch *vcpu, gpa_t ga, hpa_t *ha_out)
+int lcd_arch_ept_gpa_to_hpa(struct lcd_arch *lcd, gpa_t ga, hpa_t *ha_out)
 {
 	int ret;
 	lcd_arch_epte_t *ept_entry;
@@ -1169,7 +1188,7 @@ int lcd_arch_ept_gpa_to_hpa(struct lcd_arch *vcpu, gpa_t ga, hpa_t *ha_out)
 	/*
 	 * Walk ept
 	 */
-	ret = lcd_arch_ept_walk(vcpu, ga, 0, &ept_entry);
+	ret = lcd_arch_ept_walk(lcd, ga, 0, &ept_entry);
 	if (ret)
 		return ret;
 
@@ -1177,7 +1196,7 @@ int lcd_arch_ept_gpa_to_hpa(struct lcd_arch *vcpu, gpa_t ga, hpa_t *ha_out)
 	 * Confirm the entry is present
 	 */
 	if (!vmx_epte_present(*ept_entry)) {
-		printk(KERN_ERR "lcd_arch_ept_gpa_to_hpa: gpa %lx is not mapped\n",
+		LCD_ARCH_ERR("gpa %lx is not mapped\n",
 			gpa_val(ga));
 		return -EINVAL;
 	}	
@@ -1213,8 +1232,8 @@ static void vmx_free_ept_dir_level(lcd_arch_epte_t *dir, int level)
 		 * ensure there are no memory leaks.
 		 */
 		for (idx = 0; idx < LCD_ARCH_PTRS_PER_EPTE; idx++) {
-			if (vmx_epte_present(dir[idx]))
-				printk(KERN_ERR "vmx_free_ept_dir_level: potential memory leak at hva %lx (hpa %lx)\n",
+			if (vmx_epte_present(dir[idx])) {
+				LCD_ARCH_ERR("potential memory leak at hva %lx (hpa %lx, pt idx %d)\n",
 					hva_val(vmx_epte_hva(dir[idx])),
 					hpa_val(vmx_epte_hpa(dir[idx])));
 		}
@@ -1241,15 +1260,15 @@ static void vmx_free_ept_dir_level(lcd_arch_epte_t *dir, int level)
  * Frees all memory associated with ept structures
  * (but not the mapped memory itself! -- this can
  * lead to memory leaks, but is better than potential
- * double frees).
+ * double frees that crash the machine or scrog the disk!).
  */
-static void vmx_free_ept(struct lcd_arch *vcpu)
+static void vmx_free_ept(struct lcd_arch *lcd)
 {
 	lcd_arch_epte_t *dir;
 	/*
 	 * Get pml4 table
 	 */
-	dir = vcpu->ept.root;
+	dir = lcd->ept.root;
 	vmx_free_ept_dir_level(dir, 0);
 }
 
@@ -1257,7 +1276,7 @@ static void vmx_free_ept(struct lcd_arch *vcpu)
  * Initializes the EPT's root global page directory page, the
  * VMCS pointer, and the spinlock.
  */
-int vmx_init_ept(struct lcd_arch *vcpu)
+int vmx_init_ept(struct lcd_arch *lcd)
 {
 	hva_t page;
 	u64 eptp;
@@ -1266,14 +1285,13 @@ int vmx_init_ept(struct lcd_arch *vcpu)
 	 * Alloc the root global page directory page
 	 */
 
-	page = __hva(__get_free_page(GFP_KERNEL));
+	page = __hva(get_zeroed_page(GFP_KERNEL));
 	if (!hva_val(page)) {
-		printk(KERN_ERR "vmx init ept: failed to alloc page\n");
+		LCD_ARCH_ERR("failed to alloc page\n");
 		return -ENOMEM;
 	}
-	memset(hva2va(page), 0, PAGE_SIZE);
 
-	vcpu->ept.root = (lcd_arch_epte_t *)hva2va(page);
+	lcd_arch->ept.root = (lcd_arch_epte_t *)hva2va(page);
 
 	/*
 	 * Init the VMCS EPT pointer
@@ -1289,16 +1307,16 @@ int vmx_init_ept(struct lcd_arch *vcpu)
 	eptp = VMX_EPT_DEFAULT_MT |
 		(LCD_ARCH_EPT_WALK_LENGTH - 1) << LCD_ARCH_EPTP_WALK_SHIFT;
 	if (cpu_has_vmx_ept_ad_bits()) {
-		vcpu->ept.access_dirty_enabled = true;
+		lcd_arch->ept.access_dirty_enabled = true;
 		eptp |= VMX_EPT_AD_ENABLE_BIT;
 	}
-	eptp |= hpa_val(va2hpa(vcpu->ept.root)) & PAGE_MASK;
-	vcpu->ept.vmcs_ptr = eptp;
+	eptp |= hpa_val(va2hpa(lcd_arch->ept.root)) & PAGE_MASK;
+	lcd->ept.vmcs_ptr = eptp;
 
 	/*
-	 * Init the spinlock
+	 * Init the mutex
 	 */
-	spin_lock_init(&vcpu->ept.lock);
+	mutex_init(&lcd_arch->ept.lock);
 
 	return 0;
 }
@@ -1357,7 +1375,7 @@ static int vmx_host_seg_base(u16 selector, hva_t *hva_out)
 	if ((selector & SEGMENT_TI_MASK) == SEGMENT_LDT) {
 		store_ldt(ldt_sel);
 		if (vmx_host_seg_base(ldt_sel, &ldt_hva)) {
-			printk(KERN_ERR "lcd vmx: host seg sel points to ldt, which is not present\n");
+			LCD_ARCH_ERR("host seg sel points to ldt, which is not present\n");
 			return -EIO;
 		}
 		table = hva2va(ldt_hva);		
@@ -1407,7 +1425,7 @@ static int vmx_host_tss(hva_t *hva_out)
 	store_tr(tr);
 	ret = vmx_host_seg_base(tr, hva_out);
 	if (ret)
-		printk(KERN_ERR "lcd vmx: error looking up host tss\n");
+		LCD_ARCH_ERR("error looking up host tss\n");
 	return ret;
 }	
 
@@ -1433,7 +1451,7 @@ static int vmx_host_tss(hva_t *hva_out)
  * vmx_enter
  *   - host %rsp: not known until we're about to enter
  */
-static void vmx_setup_vmcs_host(struct lcd_arch *vcpu)
+static void vmx_setup_vmcs_host(struct lcd_arch_thread *t)
 {
 	unsigned long tmpl;
 	gate_desc *idt;
@@ -1499,7 +1517,7 @@ static void vmx_setup_vmcs_host(struct lcd_arch *vcpu)
 	 * vmx_entry.
 	 *
 	 * Also note: vmx_return will not get a value until
-	 * the module is linked and loaded.
+	 * this module is linked and loaded.
 	 */
 	vmcs_writel(HOST_RIP, vmx_return);
 
@@ -1531,7 +1549,7 @@ static void vmx_setup_vmcs_host(struct lcd_arch *vcpu)
 /**
  * Sets up MSR autloading for MSRs listed in autload_msrs (local var).
  */
-static void vmx_setup_vmcs_msr(struct lcd_arch *vcpu)
+static void vmx_setup_vmcs_msr(struct lcd_arch_thread *t)
 {
 	int i;
 	u64 val;
@@ -1563,18 +1581,18 @@ static void vmx_setup_vmcs_msr(struct lcd_arch *vcpu)
 	vmcs_write32(VM_EXIT_MSR_LOAD_COUNT, LCD_ARCH_NUM_AUTOLOAD_MSRS);
 	vmcs_write32(VM_ENTRY_MSR_LOAD_COUNT, LCD_ARCH_NUM_AUTOLOAD_MSRS);
 
-	vmcs_write64(VM_EXIT_MSR_LOAD_ADDR, __pa(vcpu->msr_autoload.host));
-	vmcs_write64(VM_EXIT_MSR_STORE_ADDR, __pa(vcpu->msr_autoload.guest));
-	vmcs_write64(VM_ENTRY_MSR_LOAD_ADDR, __pa(vcpu->msr_autoload.guest));
+	vmcs_write64(VM_EXIT_MSR_LOAD_ADDR, __pa(t->msr_autoload.host));
+	vmcs_write64(VM_EXIT_MSR_STORE_ADDR, __pa(t->msr_autoload.guest));
+	vmcs_write64(VM_ENTRY_MSR_LOAD_ADDR, __pa(t->msr_autoload.guest));
 
 	for (i = 0; i < LCD_ARCH_NUM_AUTOLOAD_MSRS; i++) {
 	
-		e = &vcpu->msr_autoload.host[i];
+		e = &t->msr_autoload.host[i];
 		e->index = autoload_msrs[i];
 		rdmsrl(e->index, val);
 		e->value = val;
 
-		e = &vcpu->msr_autoload.guest[i];
+		e = &t->msr_autoload.guest[i];
 		e->index = autoload_msrs[i];
 	}
 }
@@ -1612,7 +1630,7 @@ static void vmx_setup_vmcs_msr(struct lcd_arch *vcpu)
  * lcd_arch_set_gva_root
  *   - %cr3 (to be set by arch-indep code)
  */
-static void vmx_setup_vmcs_guest_regs(struct lcd_arch *vcpu)
+static void vmx_setup_vmcs_guest_regs(struct lcd_arch_thread *t)
 {
 	unsigned long cr0;
 	unsigned long cr4;
@@ -1686,16 +1704,8 @@ static void vmx_setup_vmcs_guest_regs(struct lcd_arch *vcpu)
 	vmcs_writel(GUEST_SYSENTER_EIP, 0);
 
 	/*
-	 * %rsp
-	 *
-	 * XXX: this should be placed in separate interface
-	 * and set by arch-indep code. This relies on the
-	 * arch-indep code to set gva = gpa for all addresses!
-	 */
-	vmcs_writel(GUEST_RSP, gpa_val(LCD_ARCH_STACK_TOP));
-	
-	/*
-	 * %rip -- to be set when guest address space set up
+	 * %rsp, %rip -- to be set by arch-independent code when guest address 
+	 * space set up (see lcd_arch_set_sp and lcd_arch_set_pc).
 	 */
 
 	/*
@@ -1783,17 +1793,19 @@ static void vmx_setup_vmcs_guest_regs(struct lcd_arch *vcpu)
 	/* 
 	 * Guest segment selectors
 	 *
-	 * -- In IA-32e mode, %ds, %es, and %ss are ignored
+	 * Since we aren't using a gdt, these are all set to 0.
+	 * This is ok since we set all of the hidden fields in the
+	 * segment registers.
 	 *
 	 * Intel SDM V3 3.4.4
 	 */
-	vmcs_write16(GUEST_CS_SELECTOR, LCD_ARCH_CS_SELECTOR); /* code */
-	vmcs_write16(GUEST_DS_SELECTOR, 0); /* ignored */
-	vmcs_write16(GUEST_ES_SELECTOR, 0); /* ignored */
-	vmcs_write16(GUEST_FS_SELECTOR, LCD_ARCH_FS_SELECTOR); /* data */ 
-	vmcs_write16(GUEST_GS_SELECTOR, LCD_ARCH_GS_SELECTOR); /* data */
-	vmcs_write16(GUEST_SS_SELECTOR, 0); /* ignored */
-	vmcs_write16(GUEST_TR_SELECTOR, LCD_ARCH_TR_SELECTOR);
+	vmcs_write16(GUEST_CS_SELECTOR, 0);
+	vmcs_write16(GUEST_DS_SELECTOR, 0);
+	vmcs_write16(GUEST_ES_SELECTOR, 0);
+	vmcs_write16(GUEST_FS_SELECTOR, 0);
+	vmcs_write16(GUEST_GS_SELECTOR, 0);
+	vmcs_write16(GUEST_SS_SELECTOR, 0);
+	vmcs_write16(GUEST_TR_SELECTOR, 0);
 
 	/*
 	 * Guest activity state = active
@@ -1834,8 +1846,11 @@ static void vmx_setup_vmcs_guest_regs(struct lcd_arch *vcpu)
 /**
  * Sets up VMCS settings--execution control, control register
  * access, exception handling.
+ *
+ * We need the lcd_arch so we can set up t's ept.
  */
-static void vmx_setup_vmcs_guest_settings(struct lcd_arch *vcpu)
+static void vmx_setup_vmcs_guest_settings(struct lcd_arch_thread *t,
+					struct lcd_arch *lcd_arch)
 {
 	/*
 	 * VPID
@@ -1861,8 +1876,10 @@ static void vmx_setup_vmcs_guest_settings(struct lcd_arch *vcpu)
 	vmcs_write32(VM_EXIT_CONTROLS, vmcs_config.vmexit_controls);
 	/*
 	 * EPT
+	 *
+	 * XXX: We aren't locking here ...
 	 */
-	vmcs_write64(EPT_POINTER, vcpu->ept.vmcs_ptr);
+	vmcs_write64(EPT_POINTER, t->lcd_arch->ept.vmcs_ptr);
 	/*
 	 * Exception handling (vm exit on any exception)
 	 *
@@ -1890,32 +1907,32 @@ static void vmx_setup_vmcs_guest_settings(struct lcd_arch *vcpu)
  * Front-end for setting up VMCS. Calls helper routines
  * to set up guest and host states of VMCS.
  */
-static void vmx_setup_vmcs(struct lcd_arch *vcpu)
+static void vmx_setup_vmcs(struct lcd_arch_thread *t, struct lcd_arch *lcd_arch)
 {
 	/*
 	 * Set up guest part of vmcs, and guest exec
 	 */
-	vmx_setup_vmcs_guest_settings(vcpu);
-	vmx_setup_vmcs_guest_regs(vcpu);
+	vmx_setup_vmcs_guest_settings(t, lcd_arch);
+	vmx_setup_vmcs_guest_regs(t);
 	/*
 	 * Set up MSR bitmap and autoloading
 	 */
-	vmx_setup_vmcs_msr(vcpu);
+	vmx_setup_vmcs_msr(t);
 	/*
 	 * Set up host part of vmcs
 	 */
-	vmx_setup_vmcs_host(vcpu);
+	vmx_setup_vmcs_host(t);
 }
 
 
 /* VMCS LOADING -------------------------------------------------- */
 
 /**
- * Updates an lcd's VMCS when the lcd is moved to a different
+ * Updates an lcd_arch_thread's VMCS when it is moved to a different
  * cpu. (Linux uses per-cpu data that needs to be updated in
  * the lcd's VMCS.)
  */
-static void __vmx_setup_cpu(struct lcd_arch *vcpu, int cur_cpu)
+static void __vmx_setup_cpu(struct lcd_arch_thread *t, int cur_cpu)
 {
 	struct desc_struct *gdt;
 	hva_t host_tss;
@@ -1954,20 +1971,20 @@ static void __vmx_setup_cpu(struct lcd_arch *vcpu, int cur_cpu)
  */
 static void __vmx_get_cpu_helper(void *ptr)
 {
-	struct lcd_arch *vcpu;
-	vcpu = ptr;
-	BUG_ON(raw_smp_processor_id() != vcpu->cpu);
-	vmcs_clear(vcpu->vmcs);
-	if (__get_cpu_var(local_vcpu) == vcpu)
-		__get_cpu_var(local_vcpu) = NULL;
+	struct lcd_arch_thread *t;
+	t = ptr;
+	BUG_ON(raw_smp_processor_id() != t->cpu);
+	vmcs_clear(t->vmcs);
+	if (__get_cpu_var(local_lcd_arch_thread) == t)
+		__get_cpu_var(local_lcd_arch_thread) = NULL;
 }
 
 /**
- * Loads VCPU on the calling cpu.
+ * Loads t on the calling cpu.
  *
  * Disables preemption. Call vmx_put_cpu() when finished.
  */
-static void vmx_get_cpu(struct lcd_arch *vcpu)
+static void vmx_get_cpu(struct lcd_arch_thread *t)
 {
 	int cur_cpu;
 
@@ -1985,62 +2002,62 @@ static void vmx_get_cpu(struct lcd_arch *vcpu)
 	 */
 
 	/*
-	 * Otherwise, we need to make the vcpu active
+	 * Otherwise, we need to make t active
 	 * and current on this cpu.
 	 */
-	if (__get_cpu_var(local_vcpu) != vcpu) {
+	if (__get_cpu_var(local_lcd_arch_thread) != t) {
 
-		__get_cpu_var(local_vcpu) = vcpu;
+		__get_cpu_var(local_lcd_arch_thread) = t;
 
-		if (vcpu->cpu != cur_cpu) {
+		if (t->cpu != cur_cpu) {
 
 			/*
-			 * vcpu not active on this cpu
+			 * t not active on this cpu
 			 */
-			if (vcpu->cpu >= 0)
+			if (t->cpu >= 0)
 				/*
-				 * vcpu active on a different cpu;
+				 * t active on a different cpu;
 				 * clear it there (active -> inactive)
 				 */
-				smp_call_function_single(vcpu->cpu,
+				smp_call_function_single(t->cpu,
 							__vmx_get_cpu_helper, 
-							(void *) vcpu, 1);
+							(void *) t, 1);
 			else
 				/*
-				 * vcpu inactive; clear it to get to
+				 * t inactive; clear it to get to
 				 * initial vmcs state
 				 *
 				 * Intel SDM V3 24.11.3
 				 */
-				vmcs_clear(vcpu->vmcs);
+				vmcs_clear(t->vmcs);
 
 			/*
 			 * Invalidate any vpid or ept cache lines
 			 */
-			invvpid_single_context(vcpu->vpid);
-			invept_single_context(vcpu->ept.vmcs_ptr);
+			invvpid_single_context(t->vpid);
+			invept_single_context(t->lcd_arch->ept.vmcs_ptr);
 
 			/*
-			 * vcpu is not in launched state
+			 * t is not in launched state
 			 */
-			vcpu->launched = 0;
+			t->launched = 0;
 
 			/*
 			 * Load vmcs pointer on this cpu
 			 */
-			vmcs_load(vcpu->vmcs);
+			vmcs_load(t->vmcs);
 
 			/*
 			 * Update cpu-specific data in vmcs
 			 */
-			__vmx_setup_cpu(vcpu, cur_cpu);
+			__vmx_setup_cpu(t, cur_cpu);
 
 			/*
 			 * Remember which cpu we are active on
 			 */
-			vcpu->cpu = cur_cpu;
+			t->cpu = cur_cpu;
 		} else {
-			vmcs_load(vcpu->vmcs);
+			vmcs_load(t->vmcs);
 		}
 	}
 }
@@ -2050,16 +2067,80 @@ static void vmx_get_cpu(struct lcd_arch *vcpu)
  *
  * Enables preemption.
  */
-static void vmx_put_cpu(struct lcd_arch *vcpu)
+static void vmx_put_cpu(struct lcd_arch_thread *t)
 {
 	put_cpu();
 }
 
+/* LCD_ARCH CREATE / DESTROY ---------------------------------------- */
 
-/* VMX CREATE / DESTROY -------------------------------------------------- */
+struct lcd_arch* lcd_arch_create(void)
+{
+	struct lcd_arch *lcd_arch;
+
+	/*
+	 * Alloc lcd_arch
+	 */
+	lcd_arch = kzalloc(sizeof(*lcd_arch), GFP_KERNEL);
+	if (!lcd_arch) {
+		LCD_ARCH_ERR("failed to alloc lcd_arch");
+		goto fail_alloc;
+	}
+	
+	/*
+	 * Set up ept
+	 */
+	if (vmx_init_ept(lcd_arch)) {
+		LCD_ARCH_ERR("setting up etp");
+		goto fail_ept;
+	}
+
+	/*
+	 * Set up list
+	 */
+	mutex_init(&lcd_arch->lcd_arch_threads.lock);
+	list_init(&lcd_arch->lcd_arch_threads.list);
+
+	return lcd_arch;
+
+fail_ept:
+	kfree(lcd_arch);
+fail_alloc:
+	return NULL;
+}
+
+void lcd_arch_destroy(struct lcd_arch *lcd_arch)
+{
+	/*
+	 * Assumes all lcd_arch_thread's are destroyed ...
+	 */
+	if (mutex_lock_interruptible(lcd_arch->lcd_arch_threads.lock)) {
+		LCD_ARCH_ERR("interrupted, skipping checks and freeing");
+		goto free_junk;
+	}
+	/*
+	 * Warn
+	 */
+	if (!list_empty(&lcd_arch->lcd_arch_threads.list))
+		LCD_ARCH_ERR("lcd_arch still contains some threads...");
+	mutex_unlock(lcd_arch->lcd_arch_threads.lock);
+
+free_junk:
+
+	invept_single_context(lcd_arch->ept.vmcs_ptr);
+	vmx_free_ept(lcd_arch);
+	kfree(lcd_arch);
+}
+
+
+/* LCD_ARCH_THREAD CREATE / DESTROY ---------------------------------------- */
 
 /**
  * Pack base, limit, and flags into a segment descriptor.
+ *
+ * This is not used since we removed the gdt init code. But we're keeping
+ * it in case we have gdt's in lcd's in the future. See
+ * Documentation/lcd-domains/vmx.txt.
  *
  * See Intel SDM V3 3.4.5
  */
@@ -2082,283 +2163,18 @@ static void vmx_pack_desc(struct desc_struct *desc, u64 base, u64 limit,
 }
 
 /**
- * Allocates gdt and populates descriptor entries using layout
- * in lcd-domains-arch.h.
- *
- * Maps GDT in guest physical address space.
- *
- * FIXME: Is a gdt necessary if an lcd never touches it? The base,
- * limit, etc. are loaded in the hidden fields of the segment registers.
- */
-static int vmx_init_gdt(struct lcd_arch *vcpu)
-{
-	struct desc_struct *desc;
-	struct tss_desc *tssd;
-	int ret;
-
-	/*
-	 * Alloc zero'd page for gdt
-	 */
-	vcpu->gdt = (struct desc_struct *)get_zeroed_page(GFP_KERNEL);
-	if (!vcpu->gdt) {
-		printk(KERN_ERR "vmx init gdt: failed to alloc gdt\n");
-		ret = -ENOMEM;
-		goto fail;
-	}
-
-	/*
-	 *===--- Populate gdt; see layout in lcd-domains-arch.h. ---===
-	 */
-
-	/*
-	 * Code Segment
-	 */
-	desc = vcpu->gdt + (LCD_ARCH_CS_SELECTOR >> 3); /* div by 8 */
-	vmx_pack_desc(desc,
-		0,        /* base */
-		0xFFFFF,  /* limit (granularity = 1) */
-		0xB,      /* code seg type, exec/read/accessed */
-		0x1,      /* code/data segment desc type */
-		0x0,      /* dpl = 0 */
-		0x1,      /* present */
-		0x0,      /* avl (not used) */
-		0x1,      /* 64-bit code */
-		0x0,      /* d must be cleared for 64-bit code */
-		0x1);     /* 4KB granularity */
-
-	/*
-	 * Data Segment (for %fs)
-	 */
-	desc = vcpu->gdt + (LCD_ARCH_FS_SELECTOR >> 3); /* div by 8 */
-	vmx_pack_desc(desc,
-		0,        /* base */
-		0xFFFFF,  /* limit (granularity = 1) */
-		0x3,      /* data seg type, exec/read/accessed */
-		0x1,      /* code/data segment desc type */
-		0x0,      /* dpl = 0 */
-		0x1,      /* present */
-		0x0,      /* avl (not used) */
-		0x0,      /* l (not 64-bit code) */
-		0x1,      /* d (linux uses 1 for d ...) */
-		0x1);     /* 4KB granularity */
-
-	/*
-	 * Data Segment (for %gs)
-	 */
-	desc = vcpu->gdt + (LCD_ARCH_GS_SELECTOR >> 3); /* div by 8 */
-	vmx_pack_desc(desc,
-		0,        /* base */
-		0xFFFFF,  /* limit (granularity = 1) */
-		0x3,      /* data seg type, exec/read/accessed */
-		0x1,      /* code/data segment desc type */
-		0x0,      /* dpl = 0 */
-		0x1,      /* present */
-		0x0,      /* avl (not used) */
-		0x0,      /* l (not 64-bit code) */
-		0x1,      /* d (linux uses 1 for d ...) */
-		0x1);     /* 4KB granularity */
-
-	/*
-	 * Task Segment (descriptor)
-	 */
-	tssd = (struct tss_desc *)(vcpu->gdt + (LCD_ARCH_TR_SELECTOR >> 3));
-	set_tssldt_descriptor(tssd, 
-			gpa_val(LCD_ARCH_TSS_BASE),/* base */
-			0xB,                       /* type = 64-bit busy tss */
-			LCD_ARCH_TSS_LIMIT);       /* limit */
-
-	/*
-	 *===--- Map GDT in guest physical address space ---===
-	 */
-	ret = lcd_arch_ept_map(vcpu, 
-			/* gpa */
-			LCD_ARCH_GDTR_BASE, 
-			/* hpa */
-			va2hpa(vcpu->gdt),
-			/* create paging structs as needed */
-			1,
-			/* no overwrite */
-			0);
-	if (ret) {
-		printk(KERN_ERR "vmx_gdt_init: failed to map gdt\n");
-		goto fail_map;
-	}
-
-	return 0;
-
-fail_map:
-	free_page((unsigned long)vcpu->gdt);
-fail:
-	return ret;
-}
-
-/**
- * Unmaps gdt in ept, and frees memory.
- */
-static void vmx_destroy_gdt(struct lcd_arch *vcpu)
-{
-	free_page((unsigned long)vcpu->gdt);
-	if (lcd_arch_ept_unmap(vcpu, LCD_ARCH_GDTR_BASE)) {
-		printk(KERN_ERR "vmx_destroy_gdt: error unmapping gdt\n");
-	}
-	vcpu->gdt = NULL;
-}
-
-/**
- * Allocates tss and sets minimal number of fields needed.
- *
- * Maps TSS in guest physical address space.
- *
- * FIXME: Is a TSS necessary if stack switching / interrupts are
- * not handled in the lcd?
- */
-static int vmx_init_tss(struct lcd_arch *vcpu)
-{
-	struct x86_hw_tss *base_tss;
-	int ret;
-
-	/*
-	 * Alloc zero'd page for tss.
-	 *
-	 * Only the first part of the page will be filled by the tss. This is
-	 * done for now to make the address space layout simpler, but
-	 * could perhaps be improved later.
-	 */
-	vcpu->tss = (struct lcd_arch_tss *)get_zeroed_page(GFP_KERNEL);
-	if (!vcpu->tss) {
-		printk(KERN_ERR "vmx_init_tss: failed to alloc tss\n");
-		ret = -ENOMEM;
-		goto fail;
-	}
-	base_tss = &(vcpu->tss->base_tss);
-	/*
-	 * Set up 64-bit TSS (See Intel SDM V3 7.7)
-	 *
-	 * No interrupt stack tables are used (since the lcd won't be
-	 * handling interrupts anyway).
-	 *
-	 * Privilege Level 0 Stack
-	 *
-	 * XXX: This should be moved to arch-dep interface code, so
-	 * that arch-indep code can set it. Relies on arch-indep
-	 * code to use gva = gpa!
-	 */
-	base_tss->sp0 = gpa_val(LCD_ARCH_STACK_TOP);
-	/*
-	 * The TSS must have a minimal I/O bitmap with one byte of 1's
-	 *
-	 * Intel SDM V1 16.5.2
-	 */
-	base_tss->io_bitmap_base = offsetof(struct lcd_arch_tss, io_bitmap);
-	vcpu->tss->io_bitmap[0] = 0xff;
-
-	/*
-	 *===--- Map TSS in guest physical address space ---===
-	 */
-	ret = lcd_arch_ept_map(vcpu, 
-			/* gpa */
-			LCD_ARCH_TSS_BASE, 
-			/* hpa */
-			va2hpa(vcpu->tss),
-			/* create paging structs as needed */
-			1,
-			/* no overwrite */
-			0);
-	if (ret) {
-		printk(KERN_ERR "vmx_init_tss: failed to map tss\n");
-		goto fail_map;
-	}
-
-	return 0;
-
-fail_map:
-	free_page((unsigned long)vcpu->tss);
-fail:
-	return ret;
-}
-
-/**
- * Unmaps tss and frees memory.
- */
-static void vmx_destroy_tss(struct lcd_arch *vcpu)
-{
-	free_page((unsigned long)vcpu->tss);
-	if (lcd_arch_ept_unmap(vcpu, LCD_ARCH_TSS_BASE)) {
-		printk(KERN_ERR "vmx_destroy_tss: error unmapping tss\n");
-	}
-	vcpu->tss = NULL;
-}
-
-/**
- * Allocates and maps stack / utcb. Initializes
- * stack pointer.
- */
-static int vmx_init_stack(struct lcd_arch *vcpu)
-{
-	int ret;
-
-	/*
-	 * Alloc zero'd page for stack.
-	 *
-	 * Bottom of stack will contain utcb.
-	 */
-	vcpu->utcb = (struct lcd_utcb *)get_zeroed_page(GFP_KERNEL);
-	if (!vcpu->utcb) {
-		printk(KERN_ERR "vmx_init_stack: failed to alloc stack\n");
-		ret = -ENOMEM;
-		goto fail;
-	}
-
-	/*
-	 *===--- Map stack in guest physical address space ---===
-	 */
-	ret = lcd_arch_ept_map(vcpu, 
-			/* gpa */
-			LCD_ARCH_UTCB,
-			/* hpa */
-			va2hpa(vcpu->utcb),
-			/* create paging structs as needed */
-			1,
-			/* no overwrite */
-			0);
-	if (ret) {
-		printk(KERN_ERR "vmx_init_stack: failed to map stack\n");
-		goto fail_map;
-	}
-
-	return 0;
-
-fail_map:
-	free_page((unsigned long)vcpu->utcb);
-fail:
-	return ret;
-}
-
-/**
- * Unmaps stack and frees memory.
- */
-static void vmx_destroy_stack(struct lcd_arch *vcpu)
-{
-	free_page((unsigned long)vcpu->utcb);
-	if (lcd_arch_ept_unmap(vcpu, LCD_ARCH_UTCB)) {
-		printk(KERN_ERR "vmx_destroy_stack: error unmapping tss\n");
-	}
-	vcpu->utcb = NULL;
-}
-
-/**
  * Reserves a vpid and sets it in the vcpu.
  */
-static int vmx_allocate_vpid(struct lcd_arch *vmx)
+static int vmx_allocate_vpid(struct lcd_arch_thread *t)
 {
 	int vpid;
 
-	vmx->vpid = 0;
+	t->vpid = 0;
 
 	spin_lock(&vpids.lock);
 	vpid = find_first_zero_bit(vpids.bitmap, VMX_NR_VPIDS);
 	if (vpid < VMX_NR_VPIDS) {
-		vmx->vpid = vpid;
+		t->vpid = vpid;
 		__set_bit(vpid, vpids.bitmap);
 	}
 	spin_unlock(&vpids.lock);
@@ -2369,138 +2185,124 @@ static int vmx_allocate_vpid(struct lcd_arch *vmx)
 /**
  * Frees a vpid.
  */
-static void vmx_free_vpid(struct lcd_arch *vmx)
+static void vmx_free_vpid(struct lcd_arch_thread *t)
 {
 	spin_lock(&vpids.lock);
-	if (vmx->vpid != 0)
+	if (t->vpid != 0)
 		__clear_bit(vmx->vpid, vpids.bitmap);
 	spin_unlock(&vpids.lock);
 }
 
-struct lcd_arch* lcd_arch_create(void)
+struct lcd_arch_thread* lcd_arch_add_thread(struct lcd_arch *lcd_arch)
 {
-	struct lcd_arch* vcpu;
+	struct lcd_arch_thread* t;
 
 	/*
-	 * Alloc lcd_arch
+	 * Alloc lcd_arch_thread
 	 */
-	vcpu = kmem_cache_alloc(vcpu_cache, GFP_KERNEL);
-	if (!vcpu) {
-		printk(KERN_ERR "lcd arch create: failed to alloc lcd\n");
+	t = kmem_cache_zalloc(lcd_arch_thread_cache, GFP_KERNEL);
+	if (!t) {
+		LCD_ARCH_ERR("failed to alloc lcd_arch_thread\n");
 		goto fail_vcpu;
 	}
-	memset(vcpu, 0, sizeof(*vcpu));
 
 	/*
 	 * Alloc vmcs
 	 */
-	vcpu->vmcs = vmx_alloc_vmcs(raw_smp_processor_id());
-	if (!vcpu->vmcs) {
-		printk(KERN_ERR "lcd arch create: failed to alloc vmcs\n");
+	t->vmcs = vmx_alloc_vmcs(raw_smp_processor_id());
+	if (!t->vmcs) {
+		LCD_ARCH_ERR("failed to alloc vmcs\n");
 		goto fail_vmcs;
 	}
 
-	if (vmx_allocate_vpid(vcpu)) {
-		printk(KERN_ERR "lcd arch create: failed to alloc vpid\n");
+	if (vmx_allocate_vpid(t)) {
+		LCD_ARCH_ERR("failed to alloc vpid\n");
 		goto fail_vpid;
 	}
 
 	/*
 	 * Not loaded on a cpu right now
 	 */
-	vcpu->cpu = -1;
-
-	/*
-	 * Initialize EPT, GDT, and TSS.
-	 *
-	 * The EPT must be initialized before GDT, TSS, and stack,
-	 * so that they can be mapped in guest physical.
-	 */
-	if (vmx_init_ept(vcpu)) {
-		printk(KERN_ERR "lcd_arch_create: failed to init ept\n");
-		goto fail_ept;
-	}
-	if (vmx_init_gdt(vcpu)) {
-		printk(KERN_ERR "lcd_arch_create: failed to init gdt\n");
-		goto fail_gdt;
-	}
-	if (vmx_init_tss(vcpu)) {
-		printk(KERN_ERR "lcd_arch_create: failed to init tss\n");
-		goto fail_tss;
-	}
-
-	/*
-	 * Initialize stack / utcb
-	 */
-	if (vmx_init_stack(vcpu)) {
-		printk(KERN_ERR "lcd_arch_create: failed to init stack\n");
-		goto fail_stack;
-	}
+	t->cpu = -1;
 
 	/*
 	 * Initialize VMCS register values and settings
 	 * 
 	 * Preemption disabled while doing so ...
 	 */
-	vmx_get_cpu(vcpu);
-	vmx_setup_vmcs(vcpu);
-	vmx_put_cpu(vcpu);
+	vmx_get_cpu(t);
+	vmx_setup_vmcs(t, lcd_arch);
+	vmx_put_cpu(t);
+	
+	/*
+	 * Add t to lcd_arch's list
+	 */
+	t->lcd_arch = lcd_arch;
+	list_init(&t.lcd_arch_threads);
+	if (mutex_lock_interruptible(lcd_arch->lcd_arch_threads.lock))
+		goto fail_list;
 
-	return vcpu;
+	list_add(&t->lcd_arch_threads, &lcd_arch->lcd_arch_threads.list);
 
-fail_stack:
-	vmx_destroy_tss(vcpu);
-fail_tss:
-	vmx_destroy_gdt(vcpu);
-fail_gdt:
-	vmx_free_ept(vcpu);
-fail_ept:
-	vmx_free_vpid(vcpu);
+	mutex_unlock(lcd_arch->lcd_arch_threads.lock);
+
+	return t;
+
+fail_list:
+	vmx_free_vpid(t);
 fail_vpid:
-	vmx_free_vmcs(vcpu->vmcs);
+	vmx_free_vmcs(t->vmcs);
 fail_vmcs:
-	kmem_cache_free(vcpu_cache, vcpu);
+	kmem_cache_free(lcd_arch_thread_cache, t);
 fail_vcpu:
 	return NULL;
 }
 
-void lcd_arch_destroy(struct lcd_arch *vcpu)
+void lcd_arch_destroy_thread(struct lcd_arch_thread *t)
 {
 	/*
 	 * Premption Disabled
 	 *
-	 * The call to vmx_get_cpu is done because if vcpu is
+	 * The call to vmx_get_cpu is done because if t is
 	 * active on a different cpu, it needs to be
 	 * vmclear'd there (and vmx_get_cpu will do
 	 * that, as a side effect).
 	 *
 	 * There might be alternative ways, but this works ...
 	 */
-	vmx_get_cpu(vcpu);
+	vmx_get_cpu(t);
 	/*
-	 * Invalidate any cached ept and vpid mappings.
+	 * Invalidate any cached vpid mappings in tlb.
 	 */
-	invept_single_context(vcpu->ept.vmcs_ptr);
-	invvpid_single_context(vcpu->vpid);
+	invvpid_single_context(t->vpid);
 	/*
 	 * VM clear on this cpu
 	 */
-	vmcs_clear(vcpu->vmcs);
-	__get_cpu_var(local_vcpu) = NULL;
+	vmcs_clear(t->vmcs);
+	__get_cpu_var(local_lcd_arch_thread) = NULL;
 	/*
 	 * Preemption enabled
 	 */
-	vmx_put_cpu(vcpu);
+	vmx_put_cpu(t);
 	/*
-	 * Free remaining junk
+	 * Remove t from containing lcd_arch
 	 */
-	vmx_free_vpid(vcpu);
-	vmx_free_vmcs(vcpu->vmcs);
-	vmx_destroy_gdt(vcpu);
-	vmx_destroy_tss(vcpu);
-	vmx_destroy_stack(vcpu);
-	vmx_free_ept(vcpu);
-	kmem_cache_free(vcpu_cache, vcpu);
+	if (mutex_lock_interruptible(t->lcd_arch->lcd_arch_threads.lock)) {
+		LCD_ARCH_ERR("interrupted, still try to free ...");
+		goto free_rest;
+	}
+
+	list_del(&t->lcd_arch_threads);	
+
+	mutex_unlock(t->lcd_arch->lcd_arch_threads.lock);
+
+free_rest:
+	/*
+	 * Free remaining junk and t
+	 */
+	vmx_free_vpid(t);
+	vmx_free_vmcs(t->vmcs);
+	kmem_cache_free(lcd_arch_thread_cache, t);
 }
 
 /* VMX EXIT HANDLING -------------------------------------------------- */
@@ -2974,6 +2776,18 @@ int lcd_arch_set_pc(struct lcd_arch *vcpu, gva_t a)
 	 */
 	vmx_get_cpu(vcpu);
 	vmcs_writel(GUEST_RIP, gva_val(a));
+	vmx_put_cpu(vcpu);
+	return 0;
+}
+
+int lcd_arch_set_sp(struct lcd_arch_thread *t, gva_t a)
+{
+	vcpu->regs[LCD_ARCH_REGS_RSP] = gva_val(a);
+	/*
+	 * Must load vmcs to modify it
+	 */
+	vmx_get_cpu(vcpu);
+	vmcs_writel(GUEST_RSP, gva_val(a));
 	vmx_put_cpu(vcpu);
 	return 0;
 }

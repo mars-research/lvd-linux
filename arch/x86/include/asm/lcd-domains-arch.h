@@ -3,7 +3,7 @@
 
 #include <asm/vmx.h>
 #include <linux/spinlock.h>
-#include <lcd-domains/utcb.h>
+#include <linux/bitmap.h>
 
 /* ADDRESS SPACE TYPES ---------------------------------------- */
 
@@ -140,19 +140,15 @@ enum lcd_arch_reg {
 
 #define LCD_ARCH_EPT_WALK_LENGTH 4
 #define LCD_ARCH_EPTP_WALK_SHIFT 3
-#define LCD_ARCH_PTRS_PER_EPTE   (1 << 9)
+#define LCD_ARCH_PTRS_PER_EPTE   (1 << 9) /* 512 table entries */
 
-typedef unsigned long lcd_arch_epte_t;
-
-struct lcd_arch_ept {
-	spinlock_t lock;
-	lcd_arch_epte_t *root;
-	u64 vmcs_ptr;
-	bool access_dirty_enabled;
-};
+typedef unsigned long lcd_arch_epte_t; /* table entry */
 
 struct lcd_arch_tss {
 	/*
+	 * ** Currently not used. Keeping it here in case we add tss's back
+	 * in later. See Documentation/lcd-domains/vmx.txt. **
+	 *
 	 * Intel SDM V3 7.7
 	 *
 	 * Base TSS before I/O bitmap, etc.
@@ -167,28 +163,37 @@ struct lcd_arch_tss {
 	u8 io_bitmap[1];
 } __attribute__((packed));
 
-struct lcd_arch {
+struct lcd_arch_thread {
 	/*
-	 * Public Data
+	 * Containing lcd_arch
 	 */
-	struct {
-		gva_t gv_fault_addr;
-		gpa_t gp_fault_addr;
-	} run_info;
-
+	struct lcd_arch *lcd_arch;
 	/*
-	 * Private Data
+	 * List of lcd_arch_thread's inside the containing lcd_arch.
+	 * Protected by lock inside lcd_arch.
+	 */
+	struct list_head lcd_arch_threads;
+	/*
+	 * CPU we're running on / vmloaded on
 	 */
 	int cpu;
+	/*
+	 * = 1 if we've launched (need to use vm resume instead of launch
+	 * if we have already launched; intel makes us track this)
+	 */
 	int launched;
+	/*
+	 * VPID of the vm, used by the tlb for vpid-specific invalidations
+	 */
 	int vpid;
+	/*
+	 * vmcs data structure; *must* be accessed using vmread / vmwrite
+	 */
 	struct lcd_arch_vmcs *vmcs;
 
-	struct lcd_arch_ept ept;
-	struct desc_struct  *gdt;
-	struct lcd_arch_tss *tss;
-	struct lcd_utcb *utcb;
-
+	/*
+	 * Exit info
+	 */
 	u8  fail;
 	u64 exit_reason;
 	u64 exit_qualification;
@@ -196,12 +201,21 @@ struct lcd_arch {
 	u32 exit_intr_info;
 	u32 error_code;
 	u32 vec_no;
+
+	/*
+	 * Stuff we need to save explicitly
+	 */
 	u64 host_rsp;
 	u64 regs[LCD_ARCH_NUM_REGS];
 	u64 cr2;
+
 	int shutdown;
 	int ret_code;
 
+	/*
+	 * MSR autload area (used during vm enters and exits). Fields must
+	 * be word aligned!
+	 */
 	struct msr_autoload {
 #if LCD_ARCH_NUM_AUTOLOAD_MSRS > 0
 		struct vmx_msr_entry guest[LCD_ARCH_NUM_AUTOLOAD_MSRS];
@@ -211,6 +225,62 @@ struct lcd_arch {
 		struct vmx_msr_entry *host;
 #endif
 	} msr_autoload;
+};
+
+/*
+ * Guest Physical Memory Layout & Segment Registers
+ * ================================================
+ *
+ * No gdt/tss/idt for now (easier), but perhaps in the future (see
+ * Documentation/lcd-domains/vmx.txt). We can get away with this since
+ * we set all of the hidden fields in the segment registers - like %fs, %gs,
+ * etc.
+ *
+ * See Intel SDM V3 26.3.1.2, 26.3.1.3 for register requirements
+ * See Intel SDM V3 3.4.2, 3.4.3 for segment register layout
+ * See Intel SDM V3 2.4.1 - 2.4.4 for gdtr, ldtr, idtr, tr
+ *
+ *                         +---------------------------+ 0xFFFF FFFF FFFF FFFF
+ *                         |                           |
+ *                         :                           :
+ *                         :      Free / Unmapped      :
+ *                         :                           :
+ *                         |                           |
+ * LCD_ARCH_TOP----------> +---------------------------+ 0x0000 0000 0000 1000
+ *                         |         Reserved          |
+ *                         | (not mapped, catch NULLs) | (4 KBs)
+ *                         +---------------------------+ 0x0000 0000 0000 0000
+ */
+#define LCD_ARCH_TOP (1 << 12)
+
+#define LCD_ARCH_FS_BASE     __gpa(0UL)
+#define LCD_ARCH_FS_LIMIT    0xFFFFFFFF
+#define LCD_ARCH_GS_BASE     __gpa(0UL)
+#define LCD_ARCH_GS_LIMIT    0xFFFFFFFF
+#define LCD_ARCH_GDTR_BASE   __gpa(0UL)
+#define LCD_ARCH_GDTR_LIMIT  0x0 /* no gdt */
+#define LCD_ARCH_TSS_BASE    __gpa(0UL)
+#define LCD_ARCH_TSS_LIMIT   0x0 /* no tss */
+#define LCD_ARCH_IDTR_BASE   __gpa(0UL)
+#define LCD_ARCH_IDTR_LIMIT  0x0 /* no idt right now */
+
+struct lcd_arch {
+	/*
+	 * The guest physical address space is shared by all lcd_arch_thread's.
+	 */
+	struct {
+		spinlock_t lock;
+		lcd_arch_epte_t *root;
+		u64 vmcs_ptr; /* to be loaded in vmcs EPT_POINTER field */
+		bool access_dirty_enabled;
+	} ept;
+	/*
+	 * List of lcd_arch_thread's inside this lcd_arch.
+	 */
+	struct {
+		struct list_head list;
+		struct mutex lock;
+	} lcd_arch_threads;
 };
 
 /**
@@ -339,68 +409,6 @@ int lcd_arch_set_pc(struct lcd_arch *vcpu, gva_t a);
  */
 int lcd_arch_set_gva_root(struct lcd_arch *vcpu, gpa_t a);
 
-/*
- * GDT Layout
- * ==========
- * 0 = NULL
- * 1 = Code segment
- * 2 = Data segment  (%fs, default not present)
- * 3 = Data segment  (%gs, default not present)
- * 4 = Task segment
- *
- * See Intel SDM V3 26.3.1.2, 26.3.1.3 for register requirements.
- * See Intel SDM V3 3.4.2, 3.4.3 for segment register layout
- * See Intel SDM V3 2.4.1 - 2.4.4 for gdtr, ldtr, idtr, tr
- */
-#define LCD_ARCH_FS_BASE     __gpa(0UL)
-#define LCD_ARCH_FS_LIMIT    0xFFFFFFFF
-#define LCD_ARCH_GS_BASE     __gpa(0UL)
-#define LCD_ARCH_GS_LIMIT    0xFFFFFFFF
-#define LCD_ARCH_GDTR_BASE   __gpa(1UL << PAGE_SHIFT)
-#define LCD_ARCH_GDTR_LIMIT  0xFFFUL
-#define LCD_ARCH_TSS_BASE    __gpa(2UL << PAGE_SHIFT)
-/* tss base + limit = address of last byte in tss, hence -1 */
-#define LCD_ARCH_TSS_LIMIT   (sizeof(struct lcd_arch_tss) - 1)
-#define LCD_ARCH_IDTR_BASE   __gpa(0UL)
-#define LCD_ARCH_IDTR_LIMIT  0x0 /* no idt right now */
-
-#define LCD_ARCH_CS_SELECTOR   (1 << 3)
-#define LCD_ARCH_FS_SELECTOR   (2 << 3)
-#define LCD_ARCH_GS_SELECTOR   (3 << 3)
-#define LCD_ARCH_TR_SELECTOR   (4 << 3) /* TI must be 0 */
-#define LCD_ARCH_LDTR_SELECTOR (0 << 3) /* unusable */
-
-/*
- * Guest Physical Memory Layout
- * ============================
- *
- *                         +---------------------------+ 0xFFFF FFFF FFFF FFFF
- *                         |                           |
- *                         :                           :
- *                         :      Free / Unmapped      :
- *                         :                           :
- *                         |                           |
- * LCD_ARCH_STACK_TOP,---> +---------------------------+ 0x0000 0000 0000 4000
- * LCD_ARCH_FREE           |                           |
- *                         |          Stack            |
- *                         :       (grows down)        : (4 KBs)
- *                         :                           :
- *                         |                           |
- *                         |   User Thread Ctrl Block  |
- * LCD_ARCH_UTCB---------> +---------------------------+ 0x0000 0000 0000 3000
- *                         |           TSS             |
- *                         |    only sizeof(tss) is    | (4 KBs)
- *                         |           used            |
- * LCD_ARCH_TSS_BASE-----> +---------------------------+ 0x0000 0000 0000 2000
- *                         |           GDT             | (4 KBs)
- * LCD_ARCH_GDTR_BASE----> +---------------------------+ 0x0000 0000 0000 1000
- *                         |         Reserved          |
- *                         |       (not mapped)        | (4 KBs)
- *                         +---------------------------+ 0x0000 0000 0000 0000
- */
-#define LCD_ARCH_UTCB        __gpa(3UL << PAGE_SHIFT)
-#define LCD_ARCH_STACK_TOP   __gpa(4UL << PAGE_SHIFT)
-#define LCD_ARCH_FREE        LCD_ARCH_STACK_TOP
 
 /*
  * Accessor Macro for syscalls

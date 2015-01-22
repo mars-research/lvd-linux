@@ -1,0 +1,171 @@
+
+==============================
+OVERVIEW
+==============================
+
+
+
+
+==============================
+LOCKING
+==============================
+
+Locks are used on an lcd_arch's ept and its list of lcd_arch_threads.
+
+We use mutexes for now, so some functions are not safe to call from
+interrupt context (we can sleep when we lock a mutex).
+
+This makes debugging easier since we can interrupt locks (no deadlocks).
+
+==============================
+GDT/TSS/IDT
+==============================
+
+We probably don't need a gdt/tss/idt right now. I'm removing that.
+
+In the future, we could provide a secure interface for an lcd thread to
+change its gdt/tss/idt info in its vmcs. The lcd thread could allocate a gdt,
+etc. inside, and use the interface to update the gdtr, tr, idtr as needed.
+The lcd thread could also tell the microkernel not to vmexit for certain
+external interrupts.
+
+If we do tss, each thread will probably need its own - since the tss contains
+a stack pointer that varies with the threads.
+
+I'm putting the gdt / tss init code here for reference since it was quite
+complicated to do (some of the macros won't be relevant anymore):
+
+	/*
+	 * Alloc zero'd page for gdt
+	 */
+	lcd->gdt = (struct desc_struct *)get_zeroed_page(GFP_KERNEL);
+	if (!lcd->gdt) {
+		printk(KERN_ERR "vmx init gdt: failed to alloc gdt\n");
+		ret = -ENOMEM;
+		goto fail;
+	}
+
+	/*
+	 *===--- Populate gdt; see layout in lcd-domains-arch.h. ---===
+	 */
+
+	/*
+	 * Code Segment
+	 */
+	desc = lcd->gdt + (LCD_ARCH_CS_SELECTOR >> 3); /* div by 8 */
+	vmx_pack_desc(desc,
+		0,        /* base */
+		0xFFFFF,  /* limit (granularity = 1) */
+		0xB,      /* code seg type, exec/read/accessed */
+		0x1,      /* code/data segment desc type */
+		0x0,      /* dpl = 0 */
+		0x1,      /* present */
+		0x0,      /* avl (not used) */
+		0x1,      /* 64-bit code */
+		0x0,      /* d must be cleared for 64-bit code */
+		0x1);     /* 4KB granularity */
+
+	/*
+	 * Data Segment (for %fs)
+	 */
+	desc = lcd->gdt + (LCD_ARCH_FS_SELECTOR >> 3); /* div by 8 */
+	vmx_pack_desc(desc,
+		0,        /* base */
+		0xFFFFF,  /* limit (granularity = 1) */
+		0x3,      /* data seg type, exec/read/accessed */
+		0x1,      /* code/data segment desc type */
+		0x0,      /* dpl = 0 */
+		0x1,      /* present */
+		0x0,      /* avl (not used) */
+		0x0,      /* l (not 64-bit code) */
+		0x1,      /* d (linux uses 1 for d ...) */
+		0x1);     /* 4KB granularity */
+
+	/*
+	 * Data Segment (for %gs)
+	 */
+	desc = lcd->gdt + (LCD_ARCH_GS_SELECTOR >> 3); /* div by 8 */
+	vmx_pack_desc(desc,
+		0,        /* base */
+		0xFFFFF,  /* limit (granularity = 1) */
+		0x3,      /* data seg type, exec/read/accessed */
+		0x1,      /* code/data segment desc type */
+		0x0,      /* dpl = 0 */
+		0x1,      /* present */
+		0x0,      /* avl (not used) */
+		0x0,      /* l (not 64-bit code) */
+		0x1,      /* d (linux uses 1 for d ...) */
+		0x1);     /* 4KB granularity */
+
+	/*
+	 * Task Segment (descriptor)
+	 */
+	tssd = (struct tss_desc *)(lcd->gdt + (LCD_ARCH_TR_SELECTOR >> 3));
+	set_tssldt_descriptor(tssd, 
+			gpa_val(LCD_ARCH_TSS_BASE),/* base */
+			0xB,                       /* type = 64-bit busy tss */
+			LCD_ARCH_TSS_LIMIT);       /* limit */
+
+	/*
+	 *===--- Map GDT in guest physical address space ---===
+	 */
+	ret = lcd_arch_ept_map(lcd, 
+			/* gpa */
+			LCD_ARCH_GDTR_BASE, 
+			/* hpa */
+			va2hpa(lcd->gdt),
+			/* create paging structs as needed */
+			1,
+			/* no overwrite */
+			0);
+
+       ======================================= END GDT CODE
+
+	/*
+	 * Alloc zero'd page for tss.
+	 *
+	 * Only the first part of the page will be filled by the tss. This is
+	 * done for now to make the address space layout simpler, but
+	 * could perhaps be improved later.
+	 */
+	lcd->tss = (struct lcd_arch_tss *)get_zeroed_page(GFP_KERNEL);
+	if (!lcd->tss) {
+		printk(KERN_ERR "vmx_init_tss: failed to alloc tss\n");
+		ret = -ENOMEM;
+		goto fail;
+	}
+	base_tss = &(lcd->tss->base_tss);
+	/*
+	 * Set up 64-bit TSS (See Intel SDM V3 7.7)
+	 *
+	 * XXX: No interrupt stack tables are used (since the lcd won't be
+	 * handling interrupts for now).
+	 *
+	 * Privilege Level 0 Stack
+	 *
+	 * XXX: This should be moved to arch-dep interface code, so
+	 * that arch-indep code can set it. Relies on arch-indep
+	 * code to use gva = gpa!
+	 */
+	base_tss->sp0 = gpa_val(LCD_ARCH_STACK_TOP);
+	/*
+	 * The TSS must have a minimal I/O bitmap with one byte of 1's
+	 *
+	 * Intel SDM V1 16.5.2
+	 */
+	base_tss->io_bitmap_base = offsetof(struct lcd_arch_tss, io_bitmap);
+	vcpu->tss->io_bitmap[0] = 0xff;
+
+	/*
+	 *===--- Map TSS in guest physical address space ---===
+	 */
+	ret = lcd_arch_ept_map(vcpu, 
+			/* gpa */
+			LCD_ARCH_TSS_BASE, 
+			/* hpa */
+			va2hpa(vcpu->tss),
+			/* create paging structs as needed */
+			1,
+			/* no overwrite */
+			0);
+

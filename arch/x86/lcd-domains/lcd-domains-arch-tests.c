@@ -10,7 +10,7 @@ static int test01(void)
 	struct lcd_arch_vmcs *vmcs;
 	vmcs = vmx_alloc_vmcs(raw_smp_processor_id());
 	if (!vmcs) {
-		printk(KERN_ERR "lcd arch: test01 failed\n");
+		LCD_ARCH_ERR("failed");
 		return -1;
 	}
 	vmx_free_vmcs(vmcs);
@@ -20,92 +20,45 @@ static int test01(void)
 static int test02(void)
 {
 	struct lcd_arch *lcd;
-	lcd = (struct lcd_arch *)kmalloc(sizeof(*lcd), GFP_KERNEL);
-	if (!lcd) {
-		printk(KERN_ERR "lcd arch : test02 failed to alloc lcd\n");
-		goto fail_alloc;
-	}
-	if (vmx_allocate_vpid(lcd)) {
-		printk(KERN_ERR "lcd arch : test02 vpid alloc failed\n");
-		goto fail;
-	}
-	if (lcd->vpid != 1) {
-		printk(KERN_ERR "lcd arch : test02 actual vpid = %d\n",
-			lcd->vpid);
-		goto fail_free;
-	}
-	vmx_free_vpid(lcd);
-	if (vmx_allocate_vpid(lcd)) {
-		printk(KERN_ERR "lcd arch : test02 2nd vpid alloc failed\n");
-		goto fail;
-	}
-	if (lcd->vpid != 1) {
-		printk(KERN_ERR "lcd arch : test02 2nd actual vpid = %d\n",
-			lcd->vpid);
-		goto fail_free;
-	}
-
-	vmx_free_vpid(lcd);
-	kfree(lcd);
-	return 0;
-
-fail_free:
-	vmx_free_vpid(lcd);
-fail:
-	kfree(lcd);
-fail_alloc:
-	return -1;
-}
-
-static int test03(void)
-{
-	struct lcd_arch *lcd;
 	int i;
 	char *buf;
-	lcd = (struct lcd_arch *)kmalloc(sizeof(*lcd), GFP_KERNEL);
+	int ret = -1;
+
+	lcd = lcd_arch_create();
 	if (!lcd) {
-		printk(KERN_ERR "lcd arch : test03 failed to alloc lcd\n");
+		LCD_ARCH_ERR("failed to alloc lcd");
 		goto fail_alloc;
-	}
-	if (vmx_init_ept(lcd)) {
-		printk(KERN_ERR "lcd arch : test03 ept init failed\n");
-		goto fail;
 	}
 
 	buf = (char *)lcd->ept.root;
 	for (i = 0; i < PAGE_SIZE; i++) {
 		if (buf[i]) {
-			printk(KERN_ERR "lcd arch : test03 nonzero in ept\n");
-			goto fail_mem;
+			LCD_ARCH_ERR("nonzero in ept");
+			goto out;
 		}
 	}		
 
-	vmx_free_ept(lcd);
-	kfree(lcd);
+	ret = 0;
 
-	return 0;
-
-fail_mem:
-	vmx_free_ept(lcd);
-fail:
-	kfree(lcd);
+out:
+	lcd_arch_destroy(lcd);
 fail_alloc:
-	return -1;
+	return ret;
 }
 
-static int test04_help(struct lcd_arch *lcd, gpa_t base)
+static int test03_help(struct lcd_arch *lcd, gpa_t base)
 {
 	hpa_t actual;
 	unsigned long off;
 
 	for (off = 0; off < 0x40000; off += PAGE_SIZE) {
 		if (lcd_arch_ept_gpa_to_hpa(lcd, gpa_add(base, off), &actual)) {
-			printk(KERN_ERR "lcd arch : test04 failed lookup at %lx\n",
+			LCD_ARCH_ERR("failed lookup at %lx",
 				gpa_val(gpa_add(base, off)));
 			return -1;
 		}
 		if (hpa_val(actual) != gpa_val(gpa_add(base, off))) {
-			printk(KERN_ERR "lcd arch : test04 expected hpa %lx got %lx\n",
+			LCD_ARCH_ERR("expected hpa %lx got %lx\n",
 				gpa_val(gpa_add(base, off)),
 				hpa_val(actual));
 			return -1;
@@ -114,29 +67,23 @@ static int test04_help(struct lcd_arch *lcd, gpa_t base)
 	return 0;
 }
 
-static int test04(void)
+static int test03(void)
 {
 	struct lcd_arch *lcd;
 	gpa_t base;
-	int ret;
+	int ret = -1;
 
-	ret = -1;
-
-	lcd = (struct lcd_arch *)kmalloc(sizeof(*lcd), GFP_KERNEL);
+	lcd = lcd_arch_create();
 	if (!lcd) {
-		printk(KERN_ERR "lcd arch : test04 failed to alloc lcd\n");
+		LCD_ARCH_ERR("failed to alloc lcd");
 		goto fail1;
-	}
-	if (vmx_init_ept(lcd)) {
-		printk(KERN_ERR "lcd arch : test04 ept init failed\n");
-		goto fail2;
 	}
 
 	/*
 	 * Map 0x0 - 0x400000 (first 4 MBs, takes two page tables)
 	 */
 	if (lcd_arch_ept_map_range(lcd, __gpa(0), __hpa(0), 1024)) {
-		printk(KERN_ERR "lcd arch: test04 failed to map first 4 MBs\n");
+		LCD_ARCH_ERR("failed to map first 4 MBs");
 		goto fail3;
 	}
 
@@ -144,7 +91,7 @@ static int test04(void)
 	 * Map 0x40000000 - 0x40400000 (1GB -- 1GB + 4MBs)
 	 */
 	if (lcd_arch_ept_map_range(lcd, __gpa(1 << 30), __hpa(1 << 30), 1024)) {
-		printk(KERN_ERR "lcd arch: test04 failed to map 2nd 4 MBs\n");
+		LCD_ARCH_ERR("failed to map 2nd 4 MBs");
 		goto fail4;
 	}
 
@@ -153,7 +100,7 @@ static int test04(void)
 	 */
 	if (lcd_arch_ept_map_range(lcd, __gpa(1UL << 39), 
 					__hpa(1UL << 39), 1024)) {
-		printk(KERN_ERR "lcd arch: test04 failed to map 3rd 4 MBs\n");
+		LCD_ARCH_ERR("failed to map 3rd 4 MBs");
 		goto fail5;
 	}
 
@@ -162,13 +109,13 @@ static int test04(void)
 	 */
 
 	base = __gpa(0);
-	if (test04_help(lcd, base))
+	if (test03_help(lcd, base))
 		goto fail6;
 	base = __gpa(1 << 30);
-	if (test04_help(lcd, base))
+	if (test03_help(lcd, base))
 		goto fail6;
 	base = __gpa(1UL << 39);
-	if (test04_help(lcd, base))
+	if (test03_help(lcd, base))
 		goto fail6;
 
 	ret = 0;
@@ -182,183 +129,97 @@ fail5:
 fail4:
 	lcd_arch_ept_unmap_range(lcd, __gpa(0), 1024);
 fail3:
-	vmx_free_ept(lcd);
-fail2:
-	kfree(lcd);
+	lcd_arch_destory(lcd);
 fail1:
 	return ret;
 }
 
-
-static int test05(void)
+static int test04(void)
 {
 	struct lcd_arch *lcd;
-	hpa_t hpa;
-
-	lcd = (struct lcd_arch *)kmalloc(sizeof(*lcd), GFP_KERNEL);
-	if (!lcd) {
-		printk(KERN_ERR "lcd arch : test05 failed to alloc lcd\n");
-		goto fail_alloc;
-	}
-	if (vmx_init_ept(lcd)) {
-		printk(KERN_ERR "lcd arch : test05 ept init failed\n");
-		goto fail_ept;
-	}
-	if (vmx_init_gdt(lcd)) {
-		printk(KERN_ERR "lcd arch : test05 gdt init failed\n");
-		goto fail_gdt;
-	}	
-	if (lcd_arch_ept_gpa_to_hpa(lcd, LCD_ARCH_GDTR_BASE, &hpa)) {
-		printk(KERN_ERR "lcd arch : test05 lookup failed\n");
-		goto fail_lookup;
-	}
-	if (hpa_val(hpa) != hpa_val(va2hpa(lcd->gdt))) {
-		printk(KERN_ERR "lcd arch : test05 unexpected gdt addr\n");
-		goto fail_lookup;
-	}
-
-	vmx_destroy_gdt(lcd);
-	vmx_free_ept(lcd);
-	kfree(lcd);
-	return 0;
-
-fail_lookup:
-fail_gdt:
-	vmx_free_ept(lcd);
-fail_ept:
-	kfree(lcd);
-fail_alloc:
-	return -1;
-}
-
-static int test06(void)
-{
-	struct lcd_arch *lcd;
-	hpa_t hpa;
-
-	lcd = (struct lcd_arch *)kmalloc(sizeof(*lcd), GFP_KERNEL);
-	if (!lcd) {
-		printk(KERN_ERR "lcd arch : test06 failed to alloc lcd\n");
-		goto fail_alloc;
-	}
-	if (vmx_init_ept(lcd)) {
-		printk(KERN_ERR "lcd arch : test06 ept init failed\n");
-		goto fail_ept;
-	}
-	if (vmx_init_tss(lcd)) {
-		printk(KERN_ERR "lcd arch : test06 tss init failed\n");
-		goto fail_tss;
-	}	
-	if (lcd_arch_ept_gpa_to_hpa(lcd, LCD_ARCH_TSS_BASE, &hpa)) {
-		printk(KERN_ERR "lcd arch : test06 lookup failed\n");
-		goto fail_lookup;
-	}
-	if (hpa_val(hpa) != hpa_val(va2hpa(lcd->tss))) {
-		printk(KERN_ERR "lcd arch : test06 unexpected tss addr\n");
-		goto fail_lookup;
-	}
-
-	vmx_destroy_tss(lcd);
-	vmx_free_ept(lcd);
-	kfree(lcd);
-	return 0;
-
-fail_lookup:
-fail_tss:
-	vmx_free_ept(lcd);
-fail_ept:
-	kfree(lcd);
-fail_alloc:
-	return -1;
-}
-
-static int test07(void)
-{
-	struct lcd_arch *lcd;
-	hpa_t hpa;
-
-	lcd = (struct lcd_arch *)kmalloc(sizeof(*lcd), GFP_KERNEL);
-	if (!lcd) {
-		printk(KERN_ERR "lcd arch : test07 failed to alloc lcd\n");
-		goto fail_alloc;
-	}
-	if (vmx_init_ept(lcd)) {
-		printk(KERN_ERR "lcd arch : test07 ept init failed\n");
-		goto fail_ept;
-	}
-	if (vmx_init_stack(lcd)) {
-		printk(KERN_ERR "lcd arch : test07 stack init failed\n");
-		goto fail_stack;
-	}	
-	if (lcd_arch_ept_gpa_to_hpa(lcd, LCD_ARCH_UTCB, &hpa)) {
-		printk(KERN_ERR "lcd arch : test07 lookup failed\n");
-		goto fail_lookup;
-	}
-	if (hpa_val(hpa) != hpa_val(va2hpa(lcd->utcb))) {
-		printk(KERN_ERR "lcd arch : test07 unexpected utcb addr\n");
-		goto fail_lookup;
-	}
-
-	vmx_destroy_stack(lcd);
-	vmx_free_ept(lcd);
-	kfree(lcd);
-	return 0;
-
-fail_lookup:
-fail_stack:
-	vmx_free_ept(lcd);
-fail_ept:
-	kfree(lcd);
-fail_alloc:
-	return -1;
-}
-
-static int test08(void)
-{
-	struct lcd_arch *lcd;
+	struct lcd_arch_thread *t;
 	hva_t pgd;
-	int ret;
-
+	int ret = -1;
+	
+	/*
+	 * Init lcd
+	 */
 	lcd = lcd_arch_create();
 	if (!lcd) {
-		printk(KERN_ERR "lcd arch : test08 failed to create lcd\n");
-		ret = 1;
+		LCD_ARCH_ERR("failed to create lcd");
 		goto fail1;
 	}
-	
+	/*
+	 * Map a dummy page in the lcd's guest physical address space
+	 */
 	pgd = __hva(__get_free_page(GFP_KERNEL));
 	if (!hva_val(pgd)) {
-		printk(KERN_ERR "lcd arch: test08 failed to alloc page\n");
-		ret = 1;
+		LCD_ARCH_ERR("failed to alloc page");
 		goto fail2;
 	}
 	ret = lcd_arch_ept_map(lcd, __gpa(0), hva2hpa(pgd), 1, 0);
 	if (ret) {
-		printk(KERN_ERR "lcd arch: test08 error mapping pgd\n");
+		LCD_ARCH_ERR("error mapping pgd");
 		goto fail3;
 	}
-	ret = lcd_arch_set_gva_root(lcd, __gpa(0));
-	if (ret) {
-		printk(KERN_ERR "lcd arch: test08 error setting gva root\n");
+	/*
+	 * Set up an lcd_thread, added to lcd
+	 */
+	lcd_thread = lcd_arch_add_thread(lcd);
+	if (!lcd_thread) {
+		LCD_ARCH_ERR("error setting up lcd_thread");
 		goto fail4;
 	}
-	ret = lcd_arch_set_pc(lcd, __gva(0));
-	if (ret) {
-		printk(KERN_ERR "lcd arch: test08 error setting pc\n");
+	/*
+	 * Check fields
+	 */
+	if (t->vpid == 0) {
+		LCD_ARCH_ERR("bad vpid");
 		goto fail5;
 	}
-
-	if (lcd_arch_check(lcd)) {
-		printk(KERN_ERR "lcd arch: test08 failed a check\n");
-		ret = -1;
+	if (t->lcd_arch != lcd) {
+		LCD_ARCH_ERR("wrong lcd");
 		goto fail6;
+	}
+	if (list_empty(&t->lcd_arch_threads)) {
+		LCD_ARCH_ERR("not in lcd arch thread list?");
+		goto fail7;
+	}
+	/*
+	 * Set up its runtime environment
+	 */
+	ret = lcd_arch_set_gva_root(t, __gpa(0));
+	if (ret) {
+		LCD_ARCH_ERR("error setting gva root");
+		goto fail8;
+	}
+	ret = lcd_arch_set_pc(t, __gva(0));
+	if (ret) {
+		LCD_ARCH_ERR("error setting pc");
+		goto fail9;
+	}
+	ret = lcd_arch_set_sp(t, __gva(0));
+	if (ret) {
+		LCD_ARCH_ERR("error setting sp");
+		goto fail10;
+	}
+
+	if (lcd_arch_check(t)) {
+		LCD_ARCH_ERR("failed a check\n");
+		goto fail11;
 	}
 
 	ret = 0;
 	goto done;
+
 done:
+fail11:
+fail10:
+fail9:
+fail8:
 fail6:
 fail5:
+	lcd_arch_destroy_thread(t);
 fail4:
 	lcd_arch_ept_unmap(lcd, __gpa(0));
 fail3:
@@ -369,60 +230,60 @@ fail1:
 	return ret;
 }
 
-static int test09(void)
+static int test05(void)
 {
 	if (!vmx_addr_is_canonical(0UL)) {
-		printk(KERN_ERR "lcd arch: test09.1 failed\n");
+		LCD_ARCH_ERR("failed");
 		return -1;
 	}
 	if (vmx_addr_is_canonical(1UL << 63)) {
-		printk(KERN_ERR "lcd arch: test09.2 failed\n");
+		LCD_ARCH_ERR("failed");
 		return -1;
 	}
 	if (vmx_addr_is_canonical(0xFFFFUL << 48)) {
-		printk(KERN_ERR "lcd arch: test09.3 failed\n");
+		LCD_ARCH_ERR("failed");
 		return -1;
 	}
 	if (!vmx_addr_is_canonical(0xFFFF8UL << 44)) {
-		printk(KERN_ERR "lcd arch: test09.4 failed\n");
+		LCD_ARCH_ERR("failed");
 		return -1;
 	}
 	if (!vmx_addr_is_canonical(0x00007UL << 44)) {
-		printk(KERN_ERR "lcd arch: test09.5 failed\n");
+		LCD_ARCH_ERR("failed");
 		return -1;
 	}
 	
 	return 0;
 }
 
-static int test10(void)
+static int test06(void)
 {
 	u32 width;
 
 	width = cpuid_eax(0x80000008) & 0xff;
 
 	if (vmx_bad_phys_addr(0xff)) {
-		printk(KERN_ERR "lcd vmx: test10.0 failed\n");
+		LCD_ARCH_ERR("failed");
 		return -1;
 	}
 	
 	if (vmx_bad_phys_addr(1UL << (width - 1))) {
-		printk(KERN_ERR "lcd vmx: test10.1 failed\n");
+		LCD_ARCH_ERR("failed");
 		return -1;
 	}
 	
 	if (!vmx_bad_phys_addr(1UL << width)) {
-		printk(KERN_ERR "lcd vmx: test10.2 failed\n");
+		LCD_ARCH_ERR("failed");
 		return -1;
 	}
 
 	if (!vmx_bad_phys_addr(-1ULL)) {
-		printk(KERN_ERR "lcd vmx: test10.3 failed\n");
+		LCD_ARCH_ERR("failed");
 		return -1;
 	}
 
 	if (width >= 40 && vmx_bad_phys_addr(0x30682f000)) {
-		printk(KERN_ERR "lcd vmx: test10.4 failed\n");
+		LCD_ARCH_ERR("failed");
 		return -1;
 	}
 
@@ -443,14 +304,6 @@ static void lcd_arch_tests(void)
 		return;
 	if (test06())
 		return;
-	if (test07())
-		return;
-	if (test08())
-		return;
-	if (test09())
-		return;
-	if (test10())
-		return;
-	printk(KERN_ERR "lcd vmx: all tests passed!\n");
+	LCD_ARCH_MSG("all tests passed!");
 	return;
 }

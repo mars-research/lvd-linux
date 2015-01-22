@@ -25,6 +25,7 @@
 #include <asm/lcd-domains-arch.h>
 #include <lcd-domains/lcd-domains.h>
 #include <lcd-domains/syscall.h>
+#include <lcd-domains/ipc.h>
 
 MODULE_LICENSE("GPL");
 MODULE_DESCRIPTION("LCD driver");
@@ -1452,10 +1453,52 @@ static int lcd_module_kthread_die(struct lcd *lcd,
 	return run_ret_val;
 }
 
+
+static void copy_msg_regs(struct lcd *from, struct lcd *to)
+{
+	int i;
+	for (i = 0; i < from->utcb.max_valid_reg_idx; i++)
+		to->utcb.regs[i] = from->utcb.regs[i];
+	/*
+	 * reset
+	 */
+	from->utcb.max_valid_reg_idx = 0;
+}
+
+static void copy_msg_cap(struct lcd *from, struct lcd *to,
+			cptr_t from_ptr, cptr_t to_ptr)
+{
+	int ret;
+
+	ret = lcd_cnode_grant(from->cspace, to->cspace, from_ptr, to_ptr,
+			LCD_CAP_RIGHT_ALL);
+	if (ret) {
+		LCD_ERR("failed to transfer cap @ %d in lcd %p to slot @ %d in lcd %p",
+			from_ptr, from, to_ptr, to);
+	}
+}
+
+static int lcd_handle_syscall(struct lcd *lcd)
+{
+	int syscall_id;
+	
+	syscall_id = LCD_ARCH_GET_SYSCALL_NUM(lcd->lcd_arch);
+	LCD_MSG("got syscall %d", syscall_id);
+
+	switch (syscall_id) {
+	case LCD_SYSCALL_YIELD:
+		return 1;
+		break;
+	default:
+		LCD_ERR("unimplemented syscall %d", syscall_id);
+		return -ENOSYS;
+	}
+
+}
+
 static int lcd_module_run_once(struct lcd *lcd)
 {
 	int r;
-	int syscall_id;
 
 	r = lcd_arch_run(lcd->lcd_arch);
 	if (r < 0) {
@@ -1485,22 +1528,9 @@ static int lcd_module_run_once(struct lcd *lcd)
 		r = -EIO;
 		goto out;
 	case LCD_ARCH_STATUS_SYSCALL:
-		/*
-		 * Only allow yield syscalls for now
-		 */
-		syscall_id = LCD_ARCH_GET_SYSCALL_NUM(lcd->lcd_arch);
-		LCD_MSG("handling syscall %d", syscall_id);
+		LCD_MSG("syscall");
 		r = lcd_handle_syscall(lcd);
-
-		if (syscall_id != LCD_SYSCALL_YIELD) {
-			LCD_ERR("unexpected syscall id %d", syscall_id);
-			r = -EIO;
-			goto out;
-		} else {
-			LCD_MSG("lcd yielded, exiting lcd...");
-			r = 1;
-			goto out;
-		}
+		goto out;
 	}
 out:
 	return r;

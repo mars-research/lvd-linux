@@ -1490,6 +1490,8 @@ static int lcd_module_run_once(struct lcd *lcd)
 		 */
 		syscall_id = LCD_ARCH_GET_SYSCALL_NUM(lcd->lcd_arch);
 		LCD_MSG("handling syscall %d", syscall_id);
+		r = lcd_handle_syscall(lcd);
+
 		if (syscall_id != LCD_SYSCALL_YIELD) {
 			LCD_ERR("unexpected syscall id %d", syscall_id);
 			r = -EIO;

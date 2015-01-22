@@ -9,16 +9,18 @@
  * ====================================
  *
  * LCD_STATUS_UNFORMED   = still setting up, or status not set yet
- * LCD_STATUS_SUSPENDED  = lcd is paused, and kthread is going to asleep / is 
+ * LCD_STATUS_SUSPENDED  = lcd is paused, and kthread is going to sleep / is 
  *                         asleep
- * LCD_STATUS_RUNNABLE   = lcd is paused, and kthread is awake, or should awaken
+ * LCD_STATUS_RUNNABLE   = lcd is paused, and kthread is awake, or should 
+ *                         awaken
  *                         (the status should be set to this if the lcd / 
  *                         kthread are suspended, and you want it to wake up)
  * LCD_STATUS_RUNNING    = lcd is running, or is about to run
  * LCD_STATUS_KILL       = lcd and kthread should die
  * LCD_STATUS_DEAD       = lcd is not running, most parts have been destroyed
- *                         (lcd_struct is only hanging around to provide status 
- *                         info); the kthread is ready to die and be reaped
+ *                         (lcd_struct is only hanging around to provide 
+ *                         status info); the kthread is ready to die and be 
+ *                         reaped
  */
 enum lcd_status {
 	LCD_STATUS_UNFORMED  = 0,

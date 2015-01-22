@@ -296,20 +296,28 @@ int lcd_arch_init(void);
  */
 void lcd_arch_exit(void);
 /**
- * Creates the arch-dependent part of an LCD, and initializes 
- * the settings and most register values.
+ * Creates the arch-dependent part of an LCD (e.g., the ept).
  */
 struct lcd_arch *lcd_arch_create(void);
+/**
+ * Tears down arch-dep part of LCD. All lcd_arch_threads should be
+ * removed and torn down before calling this.
+ */
+void lcd_arch_destroy(struct lcd_arch *lcd_arch);
+/**
+ * Create an lcd_arch_thread (basically a hardware vm) that will run
+ * inside the lcd_arch's guest physical address space (use the lcd_arch's ept).
+ */
+struct lcd_arch_thread* lcd_arch_add_thread(struct lcd_arch *lcd_arch);
 /**
  * Does logical consistency checks (e.g., runs through checks
  * listed in Intel SDM V3 26.1, 26.2, and 26.3).
  */
-int lcd_arch_check(struct lcd_arch *vcpu);
+int lcd_arch_check(struct lcd_arch *lcd_arch);
 /**
- * Tears down arch-dep part of LCD. (If LCD is launched on
- * some cpu, it will become inactive.)
+ * Tear down a lcd_arch_thread and remove it from its containing lcd_arch.
  */
-void lcd_arch_destroy(struct lcd_arch *vcpu);
+void lcd_arch_destroy_thread(struct lcd_arch_thread *t);
 /**
  * Runs the LCD on the calling cpu. (If the LCD is active on
  * a different cpu, it will become inactive there.) Kernel
@@ -410,6 +418,7 @@ int lcd_arch_set_pc(struct lcd_arch *vcpu, gva_t a);
 int lcd_arch_set_gva_root(struct lcd_arch *vcpu, gpa_t a);
 
 
+#if 0
 /*
  * Accessor Macro for syscalls
  * ===========================
@@ -485,5 +494,6 @@ static inline void __lcd_arch_set_msg_reg(struct lcd_arch *vcpu,
 	else
 		vcpu->utcb->ipc.mr[idx] = val;
 }
+#endif
 
 #endif  /* _ASM_X86_LCD_DOMAINS_ARCH_H */

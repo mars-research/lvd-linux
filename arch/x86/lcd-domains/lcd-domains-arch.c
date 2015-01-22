@@ -2612,7 +2612,8 @@ static int vmx_handle_external_intr(struct lcd_arch *vcpu)
 
 /**
  * Processes hardware exceptions -- page faults, general protection
- * exceptions, etc.
+ * exceptions, etc. For now, we have the host handle all except page
+ * faults.
  */
 static int vmx_handle_hard_exception(struct lcd_arch *vcpu)
 {
@@ -2631,16 +2632,18 @@ static int vmx_handle_hard_exception(struct lcd_arch *vcpu)
 		vcpu->run_info.gv_fault_addr = __gva(vcpu->exit_qualification);
 		return LCD_ARCH_STATUS_PAGE_FAULT;
 	default:
-		printk(KERN_ERR "lcd vmx: unhandled hw exception:\n");
+		printk(KERN_ERR "lcd vmx: hw exception:\n");
 		printk(KERN_ERR "         vector: %x, info: %x\n",
 			vector, vcpu->exit_intr_info);
+		printk(KERN_ERR "         letting host handle it\n");
+		vmx_handle_external_intr(vcpu);
 		return -EIO;
 	}
 }
 
 /**
  * Processes software / hardware exceptions and nmi's generated
- * while lcd was running.
+ * while lcd was running. For now, the host handles all exceptions/nmi's.
  */
 static int vmx_handle_exception_nmi(struct lcd_arch *vcpu)
 {
@@ -2656,10 +2659,12 @@ static int vmx_handle_exception_nmi(struct lcd_arch *vcpu)
 		/*
 		 * NMI, div by zero, overflow, ...
 		 */
-		printk(KERN_ERR "lcd vmx: unhandled exception or nmi:\n");
+		printk(KERN_ERR "lcd vmx: exception or nmi:\n");
 		printk(KERN_ERR "         interrupt info: %x\n",
 			vcpu->exit_intr_info);
-		return -EIO;
+		printk(KERN_ERR "         letting host handle it\n");
+		return vmx_handle_external_intr(vcpu);
+		//return -EIO;
 	}
 }
 

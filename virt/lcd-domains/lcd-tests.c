@@ -5,6 +5,8 @@
  * ran last in lcd_init.
  */
 
+#include <linux/delay.h>
+
 static int test01(void)
 {
 	struct lcd *lcd;
@@ -591,6 +593,9 @@ static int test10(void)
 		LCD_ERR("run");
 		goto fail2;
 	}
+
+	LCD_MSG("test module sleeping for 100 ms.");
+	msleep(100);
 
 	/*
 	 * Tear it down

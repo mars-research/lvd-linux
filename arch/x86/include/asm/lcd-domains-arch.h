@@ -319,18 +319,18 @@ int lcd_arch_check(struct lcd_arch *lcd_arch);
  */
 void lcd_arch_destroy_thread(struct lcd_arch_thread *t);
 /**
- * Runs the LCD on the calling cpu. (If the LCD is active on
+ * Runs t on the calling cpu. (If the LCD is active on
  * a different cpu, it will become inactive there.) Kernel
- * preemption is disabled while the LCD is launched, but
+ * preemption is disabled while t is launched, but
  * external interrupts are not disabled and will be handled.
  *
  * Unless the caller does otherwise, kernel preemption is
  * enabled before returning.
  *
  * Returns status code (e.g., LCD_ARCH_STATUS_PAGE_FAULT)
- * so that caller knows why lcd exited and can respond.
+ * so that caller knows why t exited and can respond.
  */
-int lcd_arch_run(struct lcd_arch *vcpu);
+int lcd_arch_run(struct lcd_arch_thread *t);
 
 /**
  * Status codes for running LCDs.
@@ -349,7 +349,7 @@ enum lcd_arch_status {
  * Set create = 1 to allocate ept page table data structures
  * along the path as needed.
  */
-int lcd_arch_ept_walk(struct lcd_arch *vcpu, gpa_t a, int create,
+int lcd_arch_ept_walk(struct lcd_arch *lcd, gpa_t a, int create,
 		lcd_arch_epte_t **epte_out);
 /**
  * Set the guest physical => host physical mapping in the ept entry.
@@ -374,7 +374,7 @@ int lcd_arch_ept_unset(lcd_arch_epte_t *epte);
  * overwrite = 0  => do not overwrite if ept entry is already present
  * overwrite = 1  => overwrite any existing ept entry
  */
-int lcd_arch_ept_map(struct lcd_arch *vcpu, gpa_t ga, hpa_t ha,
+int lcd_arch_ept_map(struct lcd_arch *lcd, gpa_t ga, hpa_t ha,
 		int create, int overwrite);
 /**
  * Maps 
@@ -392,7 +392,7 @@ int lcd_arch_ept_map_range(struct lcd_arch *lcd, gpa_t ga_start,
 /**
  * Simple routine combining ept walk and unset.
  */
-int lcd_arch_ept_unmap(struct lcd_arch *vcpu, gpa_t a);
+int lcd_arch_ept_unmap(struct lcd_arch *lcd, gpa_t a);
 /**
  * Unmaps 
  *
@@ -405,17 +405,22 @@ int lcd_arch_ept_unmap_range(struct lcd_arch *lcd, gpa_t ga_start,
 /**
  * Simple routine combinding ept walk and get.
  */
-int lcd_arch_ept_gpa_to_hpa(struct lcd_arch *vcpu, gpa_t ga, hpa_t *ha_out);
+int lcd_arch_ept_gpa_to_hpa(struct lcd_arch *lcd, gpa_t ga, hpa_t *ha_out);
 /**
  * Set the lcd's program counter to the guest virtual address
  * a.
  */
-int lcd_arch_set_pc(struct lcd_arch *vcpu, gva_t a);
+int lcd_arch_set_pc(struct lcd_arch_thread *t, gva_t a);
+/**
+ * Set the lcd's stack pointer to the guest virtual address
+ * a.
+ */
+int lcd_arch_set_sp(struct lcd_arch_thread *t, gva_t a)
 /**
  * Set the lcd's gva root pointer (for x86, %cr3) to the
  * guest physical address a.
  */
-int lcd_arch_set_gva_root(struct lcd_arch *vcpu, gpa_t a);
+int lcd_arch_set_gva_root(struct lcd_arch_thread *t, gpa_t a);
 
 
 #if 0

@@ -23,6 +23,9 @@
 #include <linux/tboot.h>
 #include <linux/slab.h>
 #include <linux/kmsg_dump.h>
+#include <linux/list.h>
+#include <linux/module.h>
+#include <linux/kernel.h>
 
 /* DEBUGGING -------------------------------------------------- */
 
@@ -939,6 +942,9 @@ void lcd_arch_exit(void)
 	kmem_cache_destroy(lcd_arch_thread_cache);
 }
 
+module_init(lcd_arch_init);
+module_exit(lcd_arch_exit);
+
 /* VMX EPT -------------------------------------------------- */
 
 /**
@@ -1276,7 +1282,7 @@ static void vmx_free_ept(struct lcd_arch *lcd)
  * Initializes the EPT's root global page directory page, the
  * VMCS pointer, and the spinlock.
  */
-int vmx_init_ept(struct lcd_arch *lcd)
+int vmx_init_ept(struct lcd_arch *lcd_arch)
 {
 	hva_t page;
 	u64 eptp;
@@ -1311,7 +1317,7 @@ int vmx_init_ept(struct lcd_arch *lcd)
 		eptp |= VMX_EPT_AD_ENABLE_BIT;
 	}
 	eptp |= hpa_val(va2hpa(lcd_arch->ept.root)) & PAGE_MASK;
-	lcd->ept.vmcs_ptr = eptp;
+	lcd_arch->ept.vmcs_ptr = eptp;
 
 	/*
 	 * Init the mutex
@@ -1855,7 +1861,7 @@ static void vmx_setup_vmcs_guest_settings(struct lcd_arch_thread *t,
 	/*
 	 * VPID
 	 */
-	vmcs_write16(VIRTUAL_PROCESSOR_ID, vcpu->vpid);
+	vmcs_write16(VIRTUAL_PROCESSOR_ID, t->vpid);
 	/*
 	 * No VMCS Shadow (Intel SDM V3 24.4.2)
 	 */
@@ -2099,7 +2105,7 @@ struct lcd_arch* lcd_arch_create(void)
 	 * Set up list
 	 */
 	mutex_init(&lcd_arch->lcd_arch_threads.lock);
-	list_init(&lcd_arch->lcd_arch_threads.list);
+	INIT_LIST_HEAD(&lcd_arch->lcd_arch_threads.list);
 
 	return lcd_arch;
 
@@ -2114,7 +2120,7 @@ void lcd_arch_destroy(struct lcd_arch *lcd_arch)
 	/*
 	 * Assumes all lcd_arch_thread's are destroyed ...
 	 */
-	if (mutex_lock_interruptible(lcd_arch->lcd_arch_threads.lock)) {
+	if (mutex_lock_interruptible(&lcd_arch->lcd_arch_threads.lock)) {
 		LCD_ARCH_ERR("interrupted, skipping checks and freeing");
 		goto free_junk;
 	}
@@ -2123,7 +2129,7 @@ void lcd_arch_destroy(struct lcd_arch *lcd_arch)
 	 */
 	if (!list_empty(&lcd_arch->lcd_arch_threads.list))
 		LCD_ARCH_ERR("lcd_arch still contains some threads...");
-	mutex_unlock(lcd_arch->lcd_arch_threads.lock);
+	mutex_unlock(&lcd_arch->lcd_arch_threads.lock);
 
 free_junk:
 
@@ -2135,6 +2141,7 @@ free_junk:
 
 /* LCD_ARCH_THREAD CREATE / DESTROY ---------------------------------------- */
 
+#if 0
 /**
  * Pack base, limit, and flags into a segment descriptor.
  *
@@ -2161,6 +2168,7 @@ static void vmx_pack_desc(struct desc_struct *desc, u64 base, u64 limit,
 	desc->d    = d;
 	desc->g    = g;
 }
+#endif
 
 /**
  * Reserves a vpid and sets it in the vcpu.
@@ -2189,7 +2197,7 @@ static void vmx_free_vpid(struct lcd_arch_thread *t)
 {
 	spin_lock(&vpids.lock);
 	if (t->vpid != 0)
-		__clear_bit(vmx->vpid, vpids.bitmap);
+		__clear_bit(t->vpid, vpids.bitmap);
 	spin_unlock(&vpids.lock);
 }
 
@@ -2224,6 +2232,11 @@ struct lcd_arch_thread* lcd_arch_add_thread(struct lcd_arch *lcd_arch)
 	 * Not loaded on a cpu right now
 	 */
 	t->cpu = -1;
+	
+	/*
+	 * Add to lcd_arch (must happen before we set up the vmcs!)
+	 */
+	t->lcd_arch = lcd_arch;
 
 	/*
 	 * Initialize VMCS register values and settings
@@ -2237,14 +2250,13 @@ struct lcd_arch_thread* lcd_arch_add_thread(struct lcd_arch *lcd_arch)
 	/*
 	 * Add t to lcd_arch's list
 	 */
-	t->lcd_arch = lcd_arch;
-	list_init(&t.lcd_arch_threads);
-	if (mutex_lock_interruptible(lcd_arch->lcd_arch_threads.lock))
+	INIT_LIST_HEAD(&t->lcd_arch_threads);
+	if (mutex_lock_interruptible(&lcd_arch->lcd_arch_threads.lock))
 		goto fail_list;
 
 	list_add(&t->lcd_arch_threads, &lcd_arch->lcd_arch_threads.list);
 
-	mutex_unlock(lcd_arch->lcd_arch_threads.lock);
+	mutex_unlock(&lcd_arch->lcd_arch_threads.lock);
 
 	return t;
 
@@ -2287,14 +2299,14 @@ void lcd_arch_destroy_thread(struct lcd_arch_thread *t)
 	/*
 	 * Remove t from containing lcd_arch
 	 */
-	if (mutex_lock_interruptible(t->lcd_arch->lcd_arch_threads.lock)) {
+	if (mutex_lock_interruptible(&t->lcd_arch->lcd_arch_threads.lock)) {
 		LCD_ARCH_ERR("interrupted, still try to free ...");
 		goto free_rest;
 	}
 
 	list_del(&t->lcd_arch_threads);	
 
-	mutex_unlock(t->lcd_arch->lcd_arch_threads.lock);
+	mutex_unlock(&t->lcd_arch->lcd_arch_threads.lock);
 
 free_rest:
 	/*
@@ -2433,7 +2445,7 @@ static int vmx_handle_hard_exception(struct lcd_arch_thread *t)
 		return LCD_ARCH_STATUS_PAGE_FAULT;
 	default:
 		LCD_ARCH_ERR("hw exception: vector = %x, info = %x",
-			vector, vcpu->exit_intr_info);
+			vector, t->exit_intr_info);
 		vmx_handle_external_intr(t);
 		return -EIO;
 	}
@@ -2459,7 +2471,7 @@ static int vmx_handle_exception_nmi(struct lcd_arch_thread *t)
 		 * NMI, div by zero, overflow, ...
 		 */
 		LCD_ARCH_ERR("exception or nmi: info = %x\n",
-			vcpu->exit_intr_info);
+			t->exit_intr_info);
 		return vmx_handle_external_intr(t);
 		//return -EIO;
 	}
@@ -2659,25 +2671,40 @@ static int __noclone vmx_enter(struct lcd_arch_thread *t)
 		".popsection"
 		: : "c"(t),
 		  [host_rsp_field]"i"(HOST_RSP),
-		  [launched]"i"(offsetof(struct lcd_arch, launched)),
-		  [fail]"i"(offsetof(struct lcd_arch, fail)),
-		  [host_rsp]"i"(offsetof(struct lcd_arch, host_rsp)),
-		  [rax]"i"(offsetof(struct lcd_arch, regs[LCD_ARCH_REGS_RAX])),
-		  [rbx]"i"(offsetof(struct lcd_arch, regs[LCD_ARCH_REGS_RBX])),
-		  [rcx]"i"(offsetof(struct lcd_arch, regs[LCD_ARCH_REGS_RCX])),
-		  [rdx]"i"(offsetof(struct lcd_arch, regs[LCD_ARCH_REGS_RDX])),
-		  [rsi]"i"(offsetof(struct lcd_arch, regs[LCD_ARCH_REGS_RSI])),
-		  [rdi]"i"(offsetof(struct lcd_arch, regs[LCD_ARCH_REGS_RDI])),
-		  [rbp]"i"(offsetof(struct lcd_arch, regs[LCD_ARCH_REGS_RBP])),
-		  [r8]"i"(offsetof(struct lcd_arch, regs[LCD_ARCH_REGS_R8])),
-		  [r9]"i"(offsetof(struct lcd_arch, regs[LCD_ARCH_REGS_R9])),
-		  [r10]"i"(offsetof(struct lcd_arch, regs[LCD_ARCH_REGS_R10])),
-		  [r11]"i"(offsetof(struct lcd_arch, regs[LCD_ARCH_REGS_R11])),
-		  [r12]"i"(offsetof(struct lcd_arch, regs[LCD_ARCH_REGS_R12])),
-		  [r13]"i"(offsetof(struct lcd_arch, regs[LCD_ARCH_REGS_R13])),
-		  [r14]"i"(offsetof(struct lcd_arch, regs[LCD_ARCH_REGS_R14])),
-		  [r15]"i"(offsetof(struct lcd_arch, regs[LCD_ARCH_REGS_R15])),
-		  [cr2]"i"(offsetof(struct lcd_arch, cr2)),
+		  [launched]"i"(offsetof(struct lcd_arch_thread, launched)),
+		  [fail]"i"(offsetof(struct lcd_arch_thread, fail)),
+		  [host_rsp]"i"(offsetof(struct lcd_arch_thread, host_rsp)),
+		  [rax]"i"(offsetof(struct lcd_arch_thread, 
+					  regs[LCD_ARCH_REGS_RAX])),
+		  [rbx]"i"(offsetof(struct lcd_arch_thread, 
+					  regs[LCD_ARCH_REGS_RBX])),
+		  [rcx]"i"(offsetof(struct lcd_arch_thread, 
+					  regs[LCD_ARCH_REGS_RCX])),
+		  [rdx]"i"(offsetof(struct lcd_arch_thread, 
+					  regs[LCD_ARCH_REGS_RDX])),
+		  [rsi]"i"(offsetof(struct lcd_arch_thread, 
+					  regs[LCD_ARCH_REGS_RSI])),
+		  [rdi]"i"(offsetof(struct lcd_arch_thread, 
+					  regs[LCD_ARCH_REGS_RDI])),
+		  [rbp]"i"(offsetof(struct lcd_arch_thread, 
+					  regs[LCD_ARCH_REGS_RBP])),
+		  [r8]"i"(offsetof(struct lcd_arch_thread, 
+					  regs[LCD_ARCH_REGS_R8])),
+		  [r9]"i"(offsetof(struct lcd_arch_thread, 
+					  regs[LCD_ARCH_REGS_R9])),
+		  [r10]"i"(offsetof(struct lcd_arch_thread, 
+					  regs[LCD_ARCH_REGS_R10])),
+		  [r11]"i"(offsetof(struct lcd_arch_thread, 
+					  regs[LCD_ARCH_REGS_R11])),
+		  [r12]"i"(offsetof(struct lcd_arch_thread, 
+					  regs[LCD_ARCH_REGS_R12])),
+		  [r13]"i"(offsetof(struct lcd_arch_thread, 
+					  regs[LCD_ARCH_REGS_R13])),
+		  [r14]"i"(offsetof(struct lcd_arch_thread, 
+					  regs[LCD_ARCH_REGS_R14])),
+		  [r15]"i"(offsetof(struct lcd_arch_thread, 
+					  regs[LCD_ARCH_REGS_R15])),
+		  [cr2]"i"(offsetof(struct lcd_arch_thread, cr2)),
 		  [wordsize]"i"(sizeof(ulong))
 		: "cc", "memory"
 		  , "rax", "rdx", "rbx", "rdi", "rsi"

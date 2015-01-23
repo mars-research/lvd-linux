@@ -269,7 +269,7 @@ struct lcd_arch {
 	 * The guest physical address space is shared by all lcd_arch_thread's.
 	 */
 	struct {
-		spinlock_t lock;
+		struct mutex lock;
 		lcd_arch_epte_t *root;
 		u64 vmcs_ptr; /* to be loaded in vmcs EPT_POINTER field */
 		bool access_dirty_enabled;
@@ -313,7 +313,7 @@ struct lcd_arch_thread* lcd_arch_add_thread(struct lcd_arch *lcd_arch);
  * Does logical consistency checks (e.g., runs through checks
  * listed in Intel SDM V3 26.1, 26.2, and 26.3).
  */
-int lcd_arch_check(struct lcd_arch *lcd_arch);
+int lcd_arch_check(struct lcd_arch_thread *t);
 /**
  * Tear down a lcd_arch_thread and remove it from its containing lcd_arch.
  */
@@ -415,7 +415,7 @@ int lcd_arch_set_pc(struct lcd_arch_thread *t, gva_t a);
  * Set the lcd's stack pointer to the guest virtual address
  * a.
  */
-int lcd_arch_set_sp(struct lcd_arch_thread *t, gva_t a)
+int lcd_arch_set_sp(struct lcd_arch_thread *t, gva_t a);
 /**
  * Set the lcd's gva root pointer (for x86, %cr3) to the
  * guest physical address a.

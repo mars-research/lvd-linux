@@ -129,7 +129,7 @@ fail5:
 fail4:
 	lcd_arch_ept_unmap_range(lcd, __gpa(0), 1024);
 fail3:
-	lcd_arch_destory(lcd);
+	lcd_arch_destroy(lcd);
 fail1:
 	return ret;
 }
@@ -165,8 +165,8 @@ static int test04(void)
 	/*
 	 * Set up an lcd_thread, added to lcd
 	 */
-	lcd_thread = lcd_arch_add_thread(lcd);
-	if (!lcd_thread) {
+	t = lcd_arch_add_thread(lcd);
+	if (!t) {
 		LCD_ARCH_ERR("error setting up lcd_thread");
 		goto fail4;
 	}
@@ -217,6 +217,7 @@ fail11:
 fail10:
 fail9:
 fail8:
+fail7:
 fail6:
 fail5:
 	lcd_arch_destroy_thread(t);

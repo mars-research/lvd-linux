@@ -476,7 +476,8 @@ static void vmx_enable(void *unused)
 
 	__get_cpu_var(vmx_enabled) = 1;
 
-	LCD_ARCH_MSG("VMX enabled on CPU %d\n",	raw_smp_processor_id());
+	printk(KERN_INFO "VMX enabled on CPU %d\n",	
+		raw_smp_processor_id());
 	return;
 
 failed:

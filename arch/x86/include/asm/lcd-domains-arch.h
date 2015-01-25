@@ -246,12 +246,13 @@ struct lcd_arch_thread {
  *                         :      Free / Unmapped      :
  *                         :                           :
  *                         |                           |
- * LCD_ARCH_TOP----------> +---------------------------+ 0x0000 0000 0000 1000
- *                         |         Reserved          |
+ * LCD_ARCH_TOP,---------> +---------------------------+ 0x0000 0000 0000 1000
+ * LCD_ARCH_BOTTOM         |         Reserved          |
  *                         | (not mapped, catch NULLs) | (4 KBs)
  *                         +---------------------------+ 0x0000 0000 0000 0000
  */
-#define LCD_ARCH_TOP (1 << 12)
+#define LCD_ARCH_BOTTOM (1 << 12)
+#define LCD_ARCH_TOP LCD_ARCH_BOTTOM
 
 #define LCD_ARCH_FS_BASE     __gpa(0UL)
 #define LCD_ARCH_FS_LIMIT    0xFFFFFFFF
@@ -302,6 +303,9 @@ struct lcd_arch *lcd_arch_create(void);
 /**
  * Tears down arch-dep part of LCD. All lcd_arch_threads should be
  * removed and torn down before calling this.
+ *
+ * IMPORTANT: When the ept is torn down, any host memory that is still mapped
+ * will be freed. This is for convenience. But beware.
  */
 void lcd_arch_destroy(struct lcd_arch *lcd_arch);
 /**
@@ -393,6 +397,10 @@ int lcd_arch_ept_map_range(struct lcd_arch *lcd, gpa_t ga_start,
  * Simple routine combining ept walk and unset.
  */
 int lcd_arch_ept_unmap(struct lcd_arch *lcd, gpa_t a);
+/**
+ * Like unmpa, but returns old hpa in hpa_out.
+ */
+int lcd_arch_ept_unmap2(struct lcd_arch *lcd, gpa_t a, hpa_t *hpa_out);
 /**
  * Unmaps 
  *

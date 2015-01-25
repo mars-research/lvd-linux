@@ -29,6 +29,8 @@
 
 /* DEBUGGING -------------------------------------------------- */
 
+#define LCD_ARCH_DEBUG 0
+
 #define LCD_ARCH_ERR(msg...) __lcd_arch_err(__FILE__, __LINE__, msg)
 static inline void __lcd_arch_err(char *file, int lineno, char *fmt, ...)
 {
@@ -1168,6 +1170,29 @@ int lcd_arch_ept_unmap(struct lcd_arch *lcd, gpa_t a)
 	return 0;
 }
 
+int lcd_arch_ept_unmap2(struct lcd_arch *lcd, gpa_t a, hpa_t *hpa_out)
+{
+	int ret;
+	lcd_arch_epte_t *ept_entry;
+
+	/*
+	 * Walk ept
+	 */
+	ret = lcd_arch_ept_walk(lcd, a, 0, &ept_entry);
+	if (ret)
+		return ret;
+	/*
+	 * Extract hpa
+	 */
+	*hpa_out = lcd_arch_ept_hpa(ept_entry);
+	/*
+	 * Unset
+	 */
+	lcd_arch_ept_unset(ept_entry);
+
+	return 0;
+}
+
 int lcd_arch_ept_unmap_range(struct lcd_arch *lcd, gpa_t ga_start, 
 			unsigned long npages)
 {
@@ -1226,6 +1251,9 @@ int lcd_arch_ept_gpa_to_hpa(struct lcd_arch *lcd, gpa_t ga, hpa_t *ha_out)
  * 1 = pdpt
  * 2 = page dir
  * 3 = page table
+ *
+ * IMPORTANT: Any host page frames that are still mapped are freed! Beware -
+ * this can lead to awful bugs.
  */
 static void vmx_free_ept_dir_level(lcd_arch_epte_t *dir, int level)
 {
@@ -1235,14 +1263,11 @@ static void vmx_free_ept_dir_level(lcd_arch_epte_t *dir, int level)
 		/*
 		 * Base case of recursion
 		 *
-		 * Just make sure none of the pte's are present, to
-		 * ensure there are no memory leaks.
+		 * Free the host page frame
 		 */
 		for (idx = 0; idx < LCD_ARCH_PTRS_PER_EPTE; idx++) {
-			if (vmx_epte_present(dir[idx])) {
-				LCD_ARCH_ERR("potential memory leak at hva %lx (hpa %lx, pt idx %d)\n",
-					hva_val(vmx_epte_hva(dir[idx])),
-					hpa_val(vmx_epte_hpa(dir[idx])));
+			if (vmx_epte_present(dir[idx]))
+				free_page(hva_val(vmx_epte_hva(dir[idx])));
 		}
 	} else {
 		/*

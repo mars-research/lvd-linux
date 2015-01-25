@@ -34,16 +34,22 @@ struct lcd;
 
 struct lcd_thread {
 	/*
+	 * My corresponding kthread
+	 */
+	struct task_struct *kthread;
+	/*
 	 * The containing lcd
 	 */
 	struct lcd *lcd;
 	/*
-	 * List of threads in containing lcd
+	 * List of threads in containing lcd. Protected by lock in containing
+	 * lcd.
 	 */
 	struct list_head lcd_threads;
 	/*
 	 * Thread control block, accessible by lcd_thread while running inside
-	 * lcd. Contains message registers, etc.
+	 * lcd (mapped in the bottom of its stack). Contains message 
+	 * registers, etc.
 	 */
 	struct lcd_utcb *utcb;
 	/*
@@ -61,37 +67,34 @@ struct lcd_thread {
  * =================
  *
  * The layout below reflects the guest physical *and* virtual memory
- * layout. Guest virtual paging memory is filled on on demand
- * during lcd initialization (so parts may not be backed by host physical
- * memory), and stacks/utcb's are also filled in on demand as threads are
- * created and added to the lcd. The lcd starts with one lcd_thread, so
- * Stack 0 / utcb 0 will be mapped after the lcd is initialized.
+ * layout. This means guest physical and virtual addresses have identical
+ * values. (See the arch-dependent code header for the arch-dependent
+ * part of the address space.)
  *
- * Guest physical addresses are mapped one-to-one to the same guest 
- * virtual addresses.
+ * Stack/utcb pages: Except for the first thread, these are set up on demand.
+ * The microkernel will set up and map the first thread's stack/utcb in the
+ * stack 0 / utcb 0 page. For subsequent threads, the LCD requests that a
+ * thread be created and provides the guest physical and virtual addresses for 
+ * its stack/utcb page; the microkernel will allocate a host physical page
+ * and map it in the guest physical/virtual address space of the LCD. This 
+ * makes the microkernel logic simpler and puts the tricky/vulnerable
+ * guest address space allocation logic inside the LCD.
  *
  * The module is mapped to the same guest physical / guest virtual
  * address space as the host, to avoid relocating symbols.
+ * 
+ * The LCD is free to modify its guest virtual -> guest physical mappings after
+ * it starts. The guest virtual paging memory is for the microkernel's
+ * initial set up of the guest virtual address space (mapping the arch
+ * dependent chunks, the module, and the stack for the first thread).
  *
  *                   +---------------------------+
  *   module mapped   |                           |
  *   somewhere in    :                           :
  *    here ------->  :                           :
- *   at a higher     |                           |
+ *   at a higher     |        FREE SPACE         |
  *   address         |                           |
  *                   |                           |
- *                   +---------------------------+
- *                   |       Stack 1023          |
- *                   :                           : (4 KBs)
- *                   |        utcb 1023          |
- *                   +---------------------------+
- *                   |           ...             |
- *                   :                           :
- *                   |           ...             |
- *                   +---------------------------+
- *                   |         Stack 1           |
- *                   :                           : (4 KBs)
- *                   |          utcb 1           |
  *                   +---------------------------+
  *                   |         Stack 0           |
  *                   :                           : (4 KBs)
@@ -99,7 +102,7 @@ struct lcd_thread {
  *                   +---------------------------+
  *                   |       Guest Virtual       | (4 MBs)
  *                   |       Paging Memory       |
- * LCD_ARCH_FREE---> +---------------------------+
+ * LCD_ARCH_TOP----> +---------------------------+
  *                   |                           |
  *                   :   Reserved Arch Memory    :
  *                   |                           |
@@ -114,50 +117,63 @@ struct lcd {
 	 */
 	char name[MODULE_NAME_LEN];
 	/*
-	 * Guest virtual paging:
+	 * The module mapped in the lcd
+	 */
+	struct module *module;
+	/*
+	 * List of contained lcd_threads
+	 */
+	struct {
+		struct list_head list;
+		struct mutex lock;
+	} lcd_threads;
+	/*
+	 * Guest virtual paging
+	 *
+	 * This is only needed while we're setting up the LCD. The LCD will
+	 * be responsible for managing its guest virtual address space after
+	 * it starts up (hence no lock, for now ...).
+	 *
+	 * We use a simple counter for allocating guest virtual memory used for 
+	 * page tables for the lcd's guest virtual address space, to ensure
+	 * we don't go past 4 MBs. (See the address space diagram above.)
 	 *
 	 * root is the host virtual address that points to the root of
 	 * the lcd's guest virtual paging hierarchy.
-	 *
-	 * We use a simple bitmap for allocating memory used for page tables
-	 * for the lcd's guest virtual address space. This is only needed when
-	 * the lcd is being set up - mapping the arch bits, module code, the
-	 * first lcd_thread's tcb, etc.
 	 */
-	pgd_t *root;
-	DECLARE_BITMAP(gv_paging_bmap, (LCD_PAGING_MEM_SIZE >> PAGE_SIZE));
+	struct {
+		pgd_t *root;
+		gpa_t root_gpa;
+		int counter;
+	} gv_paging;
+	/*
+	 * The first thread to enter the lcd and run the module's init. Pass
+	 * this to lcd_thread_start to start running it in the lcd.
+	 */
+	struct lcd_thread *init_thread;
 };
 
 /**
  * -- Loads module_name into host kernel. (Note: The module loading code
  *    expects underscores, _, rather than hyphens. If the module's name
  *    in the file system is some-module.ko, use the name some_module.)
- * -- Spawns a kernel thread that will host the lcd.
- * -- The kernel thread will create the lcd and map the module into
- *    the lcd. The kernel thread will then wait with the lcd's status
- *    set to LCD_THREAD_SUSPENDED.
- * -- Call lcd_run_as_module to start running the lcd.
- * -- Returns NULL if we fail to create the kernel thread, or if the
- *    kernel thread failed to initialize the lcd, etc.
+ * -- Sets up the address space with the module mapped inside it in the lcd
+ * -- Sets up an initial thread for running inside the lcd (stored in
+ *    the struct lcd's init_thread)
  *
- * Call lcd_destroy_as_module after a successful return from 
- * lcd_create_as_module to stop the kthread and remove the module
- * from the host kernel.
- */
-struct task_struct * lcd_create_as_module(char *module_name);
-/**
- * Wakes up kthread to start running lcd. Call this after a successful
- * return from lcd_create_as_module. Call lcd_destroy_as_module when
- * the kthread/lcd are no longer needed.
- */
-int lcd_run_as_module(struct task_struct *t);
-/**
- * Stops the kernel thread (which in turn, destroys the lcd) and removes
- * the module from the host kernel. 
+ * Call lcd_thread_start on the lcd's init thread to start executing the
+ * module's init inside the lcd.
  *
- * Note: The kthread checks if it should stop each time the lcd exits in
- * the main run loop.
+ * Call lcd_destroy after killing the lcd's init thread to tear down the
+ * lcd and remove the module from the host.
+ *
+ * lcd_thread_kill will block until the underlying kernel thread exits (the
+ * kthread checks whether it should stop each time the lcd thread exits from
+ * the lcd -- due to an interrupt, etc.).
  */
-void lcd_destroy_as_module(struct task_struct *t, char *module_name);
+int lcd_create(char *module_name, struct lcd **out);
+void lcd_destroy(struct lcd *lcd);
+int lcd_thread_start(struct lcd_thread *t);
+int lcd_thread_kill(struct lcd_thread *t);
 
 #endif /* LCD_DOMAINS_LCD_DOMAINS_H */

@@ -1467,8 +1467,8 @@ struct task_struct {
 	atomic_t usage;
 	unsigned int flags;	/* per process flags, defined below */
 	unsigned int ptrace;
-#ifdef CONFIG_LCD_CSPACE
-	struct lcd *lcd;
+#ifdef CONFIG_HAVE_LCD
+	struct lcd_thread *lcd_thread;
 #endif
 #ifdef CONFIG_SMP
 	struct llist_node wake_entry;

@@ -10,7 +10,7 @@
 static int test01(void)
 {
 	struct lcd *lcd;
-	int ret;
+	int ret = 0;
 
 	lcd = __lcd_create();
 	if (!lcd) {
@@ -30,7 +30,7 @@ fail:
 static int test02(void)
 {
 	struct lcd *lcd;
-	int ret;
+	int ret = 0;
 	gpa_t gpa;
 	hva_t hva;
 	pmd_t *pmd_entry;
@@ -106,7 +106,7 @@ fail1:
 static int test03(void)
 {
 	struct lcd *lcd;
-	int ret;
+	int ret = 0;
 	gpa_t gpa;
 	hva_t hva;
 	pud_t *pud_entry;
@@ -135,7 +135,7 @@ static int test03(void)
 	 * Populate 5th entry in pmd to point to a (bogus) page table at
 	 * gpa 0x1234000UL.
 	 */
-	pmd = (pmd_t *)hva2va(hpa);
+	pmd = (pmd_t *)hva2va(hva);
 	set_pmd_gpa(pmd + 4, __gpa(0x1234000UL));
 
 	/*
@@ -183,7 +183,7 @@ fail1:
 static int test04(void)
 {
 	struct lcd *lcd;
-	int ret;
+	int ret = 0;
 	gpa_t gpa;
 	hva_t hva;
 	pgd_t *pgd_entry;
@@ -260,11 +260,11 @@ fail1:
 static int test05(void)
 {
 	struct lcd *lcd;
-	int ret;
+	int ret = 0;
 	gpa_t gpa;
 
 	lcd = __lcd_create();
-	if (ret) {
+	if (!lcd) {
 		LCD_ERR("failed to create lcd");
 		goto fail1;
 	}
@@ -295,12 +295,14 @@ static int test05(void)
 
 	if (gpa_val(gpa) != 0x5678000UL) {
 		LCD_ERR("got phys addr %lx\n", gpa_val(gpa));
+		ret = -1;
 		goto fail5;
 	}
 
 	ret = lcd_mm_gva_unmap(lcd, __gva(0x1234000UL));
 	if (ret) {
 		LCD_ERR("failed to unmap");
+		ret = -1;
 		goto fail6;
 	}
 
@@ -321,11 +323,9 @@ fail1:
 static int test06(void)
 {
 	struct lcd *lcd;
-	int ret;
+	int ret = 0;
 	pgd_t *pgd_entry1;
 	pgd_t *pgd_entry2;
-	gpa_t gpa1;
-	gpa_t gpa2;
 
 	lcd = __lcd_create();
 	if (!lcd) {
@@ -361,13 +361,6 @@ static int test06(void)
 
 	if (!pgd_present(*pgd_entry1) || !pgd_present(*pgd_entry2)) {
 		LCD_ERR("entries not present\n");
-		ret = -1;
-		goto fail5;
-	}
-
-	if (gpa_val(gpa1) != gpa_val(gpa2)) {
-		LCD_ERR("two diff gpa's: first = %lx, second %lx\n",
-			gpa_val(gpa1), gpa_val(gpa2));
 		ret = -1;
 		goto fail5;
 	}
@@ -408,7 +401,7 @@ static int test07_help(struct lcd *lcd, unsigned long base)
 static int test07(void)
 {
 	struct lcd *lcd;
-	int ret;
+	int ret = 0;
 	unsigned long base;
 
 	lcd = __lcd_create();
@@ -456,13 +449,13 @@ static int test07(void)
 	 */
 
 	base = 0;
-	if (test09_help(lcd, base))
+	if (test07_help(lcd, base))
 		goto fail6;
 	base = 1 << 30;
-	if (test09_help(lcd, base))
+	if (test07_help(lcd, base))
 		goto fail6;
 	base = 1UL << 39;
-	if (test09_help(lcd, base))
+	if (test07_help(lcd, base))
 		goto fail6;
 
 	ret = 0;
@@ -485,13 +478,13 @@ fail1:
 static int test08(void)
 {
 	struct lcd *lcd;
-	int r;
+	int ret;
 
 	/*
 	 * lcd-module-load-test.c is in virt/lcd-domains/
 	 */
 
-	ret = lcd_create(&lcd);
+	ret = lcd_create("lcd_module_load_test", &lcd);
 	if (ret) {
 		LCD_ERR("creating lcd");
 		goto fail1;

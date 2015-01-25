@@ -431,19 +431,13 @@ int lcd_arch_set_sp(struct lcd_arch_thread *t, gva_t a);
 int lcd_arch_set_gva_root(struct lcd_arch_thread *t, gpa_t a);
 
 
-#if 0
 /*
  * Accessor Macro for syscalls
  * ===========================
  */
-#define LCD_ARCH_GET_SYSCALL_NUM(vcpu) (vcpu->regs[LCD_ARCH_REGS_RAX])
+#define LCD_ARCH_GET_SYSCALL_NUM(t) (t->regs[LCD_ARCH_REGS_RAX])
 
-/*
- * Accessor Macro for utcb
- * =======================
- */
-#define LCD_ARCH_GET_UTCB(vcpu) (vcpu->utcb);
-
+#if 0
 /*
  * Accessor Macros for IPC
  * =======================

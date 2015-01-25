@@ -110,7 +110,7 @@ static int lcd_mm_gfp(struct lcd *lcd, gpa_t gpa, hva_t *hva_out)
 	/*
 	 * Allocate a host physical page
 	 */
-	hva = __hva(__get_zeroed_page(GFP_KERNEL));
+	hva = __hva(get_zeroed_page(GFP_KERNEL));
 	if (!hva_val(hva)) {
 		LCD_ERR("no host mem");
 		ret = -ENOMEM;
@@ -166,20 +166,21 @@ static void lcd_mm_free_page(struct lcd *lcd, gpa_t gpa)
  */
 static int lcd_mm_alloc_gv_page(struct lcd *lcd, gpa_t *gpa_out, hva_t *hva_out)
 {
+	int ret;
 	gpa_t gpa;
 	hva_t hva;
 	/*
 	 * Check counter
 	 */
-	if (lcd->counter >= LCD_PAGING_MEM_SIZE) {
+	if (lcd->gv_paging.counter >= LCD_PAGING_MEM_SIZE) {
 		LCD_ERR("exhausted guest virtual paging mem");
-		ret -ENOMEM;
+		ret = -ENOMEM;
 		goto fail1;
 	}
 	/*
 	 * Allocate a host page
 	 */
-	gpa = __gpa(lcd->counter * PAGE_SIZE);
+	gpa = __gpa(lcd->gv_paging.counter * PAGE_SIZE);
 	ret = lcd_mm_gfp(lcd, gpa, &hva);
 	if (ret) {
 		LCD_ERR("getting free page");
@@ -188,7 +189,7 @@ static int lcd_mm_alloc_gv_page(struct lcd *lcd, gpa_t *gpa_out, hva_t *hva_out)
 	/*
 	 * Bump counter etc.
 	 */
-	lcd->counter += PAGE_SIZE;
+	lcd->gv_paging.counter += PAGE_SIZE;
 	*gpa_out = gpa;
 	*hva_out = hva;
 
@@ -237,7 +238,9 @@ static int lcd_mm_pt_destroy(struct lcd *lcd, pmd_t *pmd_entry)
 	hpa_t hpa;
 	int ret;
 	pte_t* pt;
+#if LCD_DEBUG
 	int i;
+#endif
 	
 	/*
 	 * Get hpa of page table, using gpa stored in pmd_entry.
@@ -846,11 +849,8 @@ static int lcd_mm_gva_unmap_range(struct lcd *lcd, gva_t gva_start,
 static int lcd_vmalloc_walk(struct lcd *lcd, hva_t hva, unsigned long size,
 			int (*cb)(struct lcd *, hpa_t, hva_t))
 {
-	int r;
+	int ret;
 	hpa_t hpa;
-	hva_t hva;
-	gpa_t gpa;
-	gva_t gva;
 	unsigned long mapped;
 
 	mapped = 0;
@@ -871,6 +871,7 @@ static int lcd_vmalloc_walk(struct lcd *lcd, hva_t hva, unsigned long size,
 		mapped += PAGE_SIZE;
 		hva = hva_add(hva, PAGE_SIZE);
 	}
+	return 0;
 }
 
 /**
@@ -900,34 +901,6 @@ static int lcd_module_map_page(struct lcd *lcd, hpa_t hpa, hva_t hva)
 	ret = lcd_mm_gva_map(lcd, gva, gpa);
 	if (ret) {
 		LCD_ERR("error mapping into gv");
-		return ret;
-	}
-	return 0;
-}
-
-/**
- * Callback used with vmalloc walk to unmap module pages. Assumes mapping
- * used in lcd_module_map_page!
- */
-static int lcd_module_unmap_page(struct lcd *lcd, hpa_t hpa, hva_t hva)
-{
-	int ret;
-	gpa_t gpa;
-	gva_t gva;
-
-	gva = __gva(hva_val(hva));
-	gpa = __gpa(gva_val(gva));
-	/*
-	 * Unmap in ept
-	 */
-	ret = lcd_arch_ept_unmap(lcd->lcd_arch, gpa);
-	if (ret) {
-		LCD_ERR("error unmapping gpa in ept");
-		return ret;
-	}
-	ret = lcd_mm_gva_unmap(lcd, gva);
-	if (ret) {
-		LCD_ERR("error unmapping gva in gv");
 		return ret;
 	}
 	return 0;
@@ -1042,10 +1015,9 @@ fail1:
 	return ret;
 }
 
-static struct lcd* __lcd_create(void)
+static struct lcd * __lcd_create(void)
 {
 	struct lcd *lcd;
-	int r;
 	/*
 	 * Alloc lcd data structure
 	 *
@@ -1129,6 +1101,7 @@ fail1:
 
 void lcd_destroy(struct lcd *lcd)
 {
+	int ret;
 	/*
 	 * Assume we have no running lcd_thread's ...
 	 *
@@ -1164,6 +1137,7 @@ static int lcd_setup_initial_thread(struct lcd *lcd);
 
 int lcd_create(char *module_name, struct lcd **out)
 {
+	int ret;
 	struct lcd *lcd;
 
 	/*
@@ -1172,6 +1146,7 @@ int lcd_create(char *module_name, struct lcd **out)
 	lcd = __lcd_create();
 	if (!lcd) {
 		LCD_ERR("failed to init lcd");
+		ret = -EIO;
 		goto fail1;
 	}
 	/*
@@ -1203,6 +1178,8 @@ int lcd_create(char *module_name, struct lcd **out)
 	*out = lcd;
 
 	return 0;
+
+fail4:
 fail3:
 fail2:
 	lcd_destroy(lcd);
@@ -1212,11 +1189,11 @@ fail1:
 
 /* LCD THREAD EXECUTION -------------------------------------------------- */
 
-static int lcd_handle_syscall(struct lcd *lcd)
+static int lcd_handle_syscall(struct lcd_thread *t)
 {
 	int syscall_id;
 	
-	syscall_id = LCD_ARCH_GET_SYSCALL_NUM(lcd->lcd_arch);
+	syscall_id = LCD_ARCH_GET_SYSCALL_NUM(t->lcd_arch_thread);
 	LCD_MSG("got syscall %d", syscall_id);
 
 	switch (syscall_id) {
@@ -1270,21 +1247,16 @@ out:
 	return ret;
 }
 
-static int lcd_kthread_should_stop(struct lcd_thread *t)
-{
-	return kthread_should_stop(t->kthread);
-}
-
-static lcd_kthread_main(void *data) /* data is NULL */
+static int lcd_kthread_main(void *data) /* data is NULL */
 {
 	int ret;
 	struct lcd_thread *current_lcd_thread;
 
-	current_lcd_thread = current()->lcd_thread;
+	current_lcd_thread = current->lcd_thread;
 	/*
 	 * Set my status as running
 	 */
-	current_lcd_thread->status = LCD_STATUS_RUNNING;
+	current_lcd_thread->status = LCD_THREAD_RUNNING;
 	/*
 	 * Enter run loop, check after each iteration if we should stop
 	 *
@@ -1294,7 +1266,7 @@ static lcd_kthread_main(void *data) /* data is NULL */
 	 */
 	for (;;) {
 		ret = lcd_kthread_run_once(current_lcd_thread);
-		if (ret || lcd_kthread_should_stop(current_lcd_thread))
+		if (ret || kthread_should_stop())
 			return ret; /* to microkernel via kthread_stop */
 	}
 	
@@ -1307,8 +1279,8 @@ int lcd_thread_start(struct lcd_thread *t)
 	 * Set lcd's status to runnable, and wake up the kthread (will
 	 * start running lcd_kthread_main).
 	 */
-	t->status = LCD_STATUS_RUNNABLE;
-	wake_up_process(t);
+	t->status = LCD_THREAD_RUNNABLE;
+	wake_up_process(t->kthread);
 
 	return 0;
 }
@@ -1334,7 +1306,7 @@ int lcd_thread_kill(struct lcd_thread *t)
 		LCD_ERR("interrupted, skipping list removal ...");
 		goto finally;
 	}
-	list_del(&t->lcd_threads, &t->lcd->lcd_threads.list);
+	list_del(&t->lcd_threads);
 	mutex_unlock(&t->lcd->lcd_threads.lock);
 
 finally:
@@ -1368,7 +1340,7 @@ finally:
 static int lcd_add_thread(struct lcd *lcd, gva_t pc, gva_t stack_gva,
 			gpa_t stack_gpa, struct lcd_thread **out)
 {
-	struct lcd_arch_thread* t;
+	struct lcd_thread* t;
 	hpa_t stack_hpa;
 	hva_t stack_hva;
 	int ret;
@@ -1407,7 +1379,7 @@ static int lcd_add_thread(struct lcd *lcd, gva_t pc, gva_t stack_gva,
 	 * Set up utcb (at bottom of stack -- masking off lower bits)
 	 */
 	t->utcb = hva2va(stack_hva);
-	t->utcb &= PAGE_MASK;
+	t->utcb = (void *)(((u64)t->utcb) & PAGE_MASK);
 	/*
 	 * Alloc corresponding lcd_arch_thread
 	 */
@@ -1447,7 +1419,8 @@ static int lcd_add_thread(struct lcd *lcd, gva_t pc, gva_t stack_gva,
 	 * Create a kernel thread (won't run till we wake it up)
 	 */
 	t->kthread = kthread_create(lcd_kthread_main, NULL,
-				"lcd:%s/%d", lcd->name, lcd->tcount);
+				"lcd:%s/%d", lcd->name, 
+				lcd->lcd_threads.count++);
 	if (!t->kthread) {
 		LCD_ERR("failed to create kthread");
 		goto fail8;
@@ -1473,7 +1446,7 @@ fail3:
 		goto fail2;
 	}
 
-	list_del(&t->lcd_threads, &lcd->lcd_threads.list);
+	list_del(&t->lcd_threads);
 
 	mutex_unlock(&lcd->lcd_threads.lock);
 fail2:	
@@ -1485,16 +1458,17 @@ fail0:
 
 static int lcd_setup_initial_thread(struct lcd *lcd)
 {
-	struct lcd_thread *t;
+	struct lcd_thread *t = NULL;
 	hva_t stack_page;
 	gpa_t stack_page_gpa;
 	gpa_t stack_ptr_gpa;
+	int ret;
 	/*
 	 * Allocate a page for the initial thread's stack/utcb
 	 *
 	 * Zero it out to prevent leakage of host data
 	 */
-	stack_page = __hva(__get_zeroed_page(GFP_KERNEL));
+	stack_page = __hva(get_zeroed_page(GFP_KERNEL));
 	if (!hva_val(stack_page)) {
 		LCD_ERR("alloc initial thread stack page");
 		ret = -ENOMEM;
@@ -1514,8 +1488,8 @@ static int lcd_setup_initial_thread(struct lcd *lcd)
 	ret = lcd_arch_ept_map(lcd->lcd_arch, 
 			stack_page_gpa,
 			hva2hpa(stack_page),
-			0,
-			1);
+			1,
+			0);
 	if (ret) {
 		LCD_ERR("failed to map stack in guest physical");
 		goto fail2;
@@ -1535,7 +1509,7 @@ static int lcd_setup_initial_thread(struct lcd *lcd)
 	 * code is a bit redundant, but it asserts this fact.
 	 */
 	ret = lcd_add_thread(lcd,
-			__gva(hva_val(__hva(lcd->module->module_init))),
+			__gva(hva_val(va2hva(lcd->module->module_init))),
 			__gva(gpa_val(stack_ptr_gpa)),
 			stack_ptr_gpa,
 			&t);
@@ -1657,9 +1631,10 @@ static void __exit lcd_exit(void)
 module_init(lcd_init);
 module_exit(lcd_exit);
 
-EXPORT_SYMBOL(lcd_create_as_module);
-EXPORT_SYMBOL(lcd_run_as_module);
-EXPORT_SYMBOL(lcd_destroy_as_module);
+EXPORT_SYMBOL(lcd_create);
+EXPORT_SYMBOL(lcd_destroy);
+EXPORT_SYMBOL(lcd_thread_start);
+EXPORT_SYMBOL(lcd_thread_kill);
 
 /* DEBUGGING ---------------------------------------- */
 

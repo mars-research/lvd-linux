@@ -945,9 +945,6 @@ void lcd_arch_exit(void)
 	kmem_cache_destroy(lcd_arch_thread_cache);
 }
 
-module_init(lcd_arch_init);
-module_exit(lcd_arch_exit);
-
 /* VMX EPT -------------------------------------------------- */
 
 /**
@@ -4349,6 +4346,7 @@ EXPORT_SYMBOL(lcd_arch_ept_walk);
 EXPORT_SYMBOL(lcd_arch_ept_set);
 EXPORT_SYMBOL(lcd_arch_ept_unset);
 EXPORT_SYMBOL(lcd_arch_ept_unmap);
+EXPORT_SYMBOL(lcd_arch_ept_unmap2);
 EXPORT_SYMBOL(lcd_arch_ept_unmap_range);
 EXPORT_SYMBOL(lcd_arch_ept_hpa);
 EXPORT_SYMBOL(lcd_arch_ept_map);

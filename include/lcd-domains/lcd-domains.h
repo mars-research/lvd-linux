@@ -121,11 +121,16 @@ struct lcd {
 	 */
 	struct module *module;
 	/*
+	 * The arch-dependent parts of the lcd (e.g., the ept)
+	 */
+	struct lcd_arch *lcd_arch;
+	/*
 	 * List of contained lcd_threads
 	 */
 	struct {
 		struct list_head list;
 		struct mutex lock;
+		unsigned int count;
 	} lcd_threads;
 	/*
 	 * Guest virtual paging

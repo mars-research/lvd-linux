@@ -28,6 +28,7 @@
 #include <errno.h>
 #include <asm/unistd.h>
 #include <temp/include/linux/lcd-domains.h>
+#include <sys/ioctl.h>
 
 #include "util.h"
 #include "testing.h"

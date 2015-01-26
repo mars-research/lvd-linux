@@ -1144,20 +1144,18 @@ void lcd_destroy(struct lcd *lcd)
 	/*
 	 * Delete the module
 	 *
-	 * ORDER IS IMPORTANT: This should be done before tearing down
-	 * the lcd arch; otherwise, the module will be freed before we
-	 * do the module put/delete.
-	 */
-	if (lcd->module) {
-		module_put(lcd->module);
-		ret = do_sys_delete_module(lcd->module->name, 0, 1);
-		if (ret)
-			LCD_ERR("deleting module");
-	}
-	/*
-	 * IMPORTANT: We must unmap the module from the lcd *before*
-	 * we tear down the lcd_arch (the lcd arch code will automatically
-	 * free any pages that are still mapped in the ept).
+	 * ORDER IS IMPORTANT:
+	 *
+	 * First: unmap the module
+	 *
+	 * Second: delete the module from the host
+	 *
+	 * Third: tear down the lcd arch
+	 *
+	 * Why? The lcd arch tear down will free any pages that are still
+	 * mapped in the ept.
+	 *
+	 * Unmap module:
 	 */
 	ret = lcd_vmalloc_walk(lcd, va2hva(lcd->module->module_init),
 			lcd->module->init_size, lcd_module_unmap_page);
@@ -1167,7 +1165,15 @@ void lcd_destroy(struct lcd *lcd)
 			lcd->module->core_size, lcd_module_unmap_page);
 	if (ret)
 		LCD_ERR("unmapping module's core, continuing ...");
-		
+	/*
+	 * Delete module
+	 */
+	if (lcd->module) {
+		module_put(lcd->module);
+		ret = do_sys_delete_module(lcd->module->name, 0, 1);
+		if (ret)	
+			LCD_ERR("deleting module");
+	}
 	/*
 	 * Tear down lcd_arch (ept, ...)
 	 */

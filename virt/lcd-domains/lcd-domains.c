@@ -906,6 +906,37 @@ static int lcd_module_map_page(struct lcd *lcd, hpa_t hpa, hva_t hva)
 	return 0;
 }
 
+/**
+ * Callback used with vmalloc walk to unmap module pages.
+ */
+static int lcd_module_unmap_page(struct lcd *lcd, hpa_t hpa, hva_t hva)
+{
+	int ret;
+	gpa_t gpa;
+	gva_t gva;
+
+	gva = __gva(hva_val(hva));
+	gpa = __gpa(gva_val(gva));
+	/*
+	 * Unmap module page in lcd's ept
+	 */
+	ret = lcd_arch_ept_unmap(lcd->lcd_arch, gpa);
+	if (ret) {
+		LCD_ERR("error unmapping gpa in ept");
+		return ret;
+	}
+	/*
+	 * Unmap module page in lcd's guest virtual
+	 */
+	ret = lcd_mm_gva_unmap(lcd, gva);
+	if (ret) {
+		LCD_ERR("error unmapping gva in gv");
+		return ret;
+	}
+	return 0;
+}
+
+
 /* LCD CREATE / DESTROY -------------------------------------------------- */
 
 /**
@@ -1123,6 +1154,20 @@ void lcd_destroy(struct lcd *lcd)
 		if (ret)
 			LCD_ERR("deleting module");
 	}
+	/*
+	 * IMPORTANT: We must unmap the module from the lcd *before*
+	 * we tear down the lcd_arch (the lcd arch code will automatically
+	 * free any pages that are still mapped in the ept).
+	 */
+	ret = lcd_vmalloc_walk(lcd, va2hva(lcd->module->module_init),
+			lcd->module->init_size, lcd_module_unmap_page);
+	if (ret)
+		LCD_ERR("unmapping module's init, continuing ...");
+	ret = lcd_vmalloc_walk(lcd, va2hva(lcd->module->module_core),
+			lcd->module->core_size, lcd_module_unmap_page);
+	if (ret)
+		LCD_ERR("unmapping module's core, continuing ...");
+		
 	/*
 	 * Tear down lcd_arch (ept, ...)
 	 */

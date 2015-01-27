@@ -1341,10 +1341,14 @@ int lcd_thread_kill(struct lcd_thread *t)
 {
 	int ret;
 	/*
-	 * Stop the kernel thread and get return value, host kernel takes
-	 * care of the rest of the details for the kernel thread.
+	 * Stop the kernel thread and get return value.
 	 */
 	ret = kthread_stop(t->kthread);
+	/*
+	 * Decrement the kthread's reference count. Host kernel will clean
+	 * up the rest.
+	 */
+	put_task_struct(t->kthread);
 	/*
 	 * The LCD still owns the lcd thread's stack, so we won't free it.
 	 *
@@ -1477,7 +1481,14 @@ static int lcd_add_thread(struct lcd *lcd, gva_t pc, gva_t stack_gva,
 		LCD_ERR("failed to create kthread");
 		goto fail8;
 	}
-	t->kthread->lcd_thread = t; /* store back reference */
+	/*
+	 * Bumpg reference count on kthread
+	 */
+	get_task_struct(t->kthread);
+	/*
+	 * Store back reference
+	 */
+	t->kthread->lcd_thread = t;
 
 	/*
 	 * DONE!

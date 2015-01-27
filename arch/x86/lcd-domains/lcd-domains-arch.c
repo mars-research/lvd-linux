@@ -2465,6 +2465,8 @@ static int vmx_handle_hard_exception(struct lcd_arch_thread *t)
 		 *
 		 * TODO: We will have microkernel handle it.
 		 */
+		LCD_ARCH_ERR("page fault: faulting gv address = %lx",
+			t->exit_qualification);
 		return LCD_ARCH_STATUS_PAGE_FAULT;
 	default:
 		LCD_ARCH_ERR("hw exception: vector = %x, info = %x",

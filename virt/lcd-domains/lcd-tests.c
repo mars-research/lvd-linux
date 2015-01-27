@@ -475,7 +475,6 @@ fail1:
 	return ret;
 }
 
-#if 0
 
 static int test08(void)
 {
@@ -520,7 +519,7 @@ fail1:
 	return -1;
 }
 
-#endif
+
 
 static void lcd_tests(void)
 {
@@ -538,8 +537,8 @@ static void lcd_tests(void)
 		return;
 	if (test07())
 		return;
-//	if (test08())
-//		return;
+	if (test08())
+		return;
 	LCD_MSG("all tests passed!");
 	return;
 }

@@ -959,6 +959,9 @@ static int lcd_module_unmap_page(struct lcd *lcd, hpa_t hpa, hva_t hva)
 static int lcd_setup_module_address_space(struct lcd *lcd)
 {
 	int ret;
+	pte_t *pte;
+	unsigned char bytes[8];
+	int i;
 	/*
 	 * Map the module's init code
 	 */
@@ -968,6 +971,28 @@ static int lcd_setup_module_address_space(struct lcd *lcd)
 		LCD_ERR("mapping module's init");
 		return ret;
 	}
+	LCD_MSG("module init at: %p", lcd->module->module_init);
+	ret = lcd_mm_gva_walk(lcd, __gva(hva_val(va2hva(lcd->module->module_init))), &pte);
+	if (ret) {
+		LCD_ERR("failed lookup");
+		return ret;
+	}
+	if (!pte_present(*pte)) {
+		LCD_ERR("mod init not present");
+		return -1;
+	}
+	memcpy(bytes, pte, 8);
+
+	for (i = 7; i >= 0; i--) {
+		printk("%2x", bytes[i]);
+	}
+
+/*	if (gpa_val(lcd_mm_gva_get(pte)) !=
+		((u64)lcd->module->module_init)) {
+		LCD_ERR("bad gpa for mod init: %lx",
+			gpa_val(lcd_mm_gva_get(pte)));
+		return -1;
+		}*/
 	/*
 	 * Map the module's core code
 	 */
@@ -977,6 +1002,7 @@ static int lcd_setup_module_address_space(struct lcd *lcd)
 		LCD_ERR("mapping module's core");
 		return ret;
 	}
+	LCD_MSG("module core at: %p", lcd->module->module_core);
 	return 0;
 }
 
@@ -1136,24 +1162,23 @@ void lcd_destroy(struct lcd *lcd)
 	/*
 	 * Assume we have no running lcd_thread's ...
 	 *
-	 * Tear down guest virtual address space (the checks allow
-	 * lcd_create to call us at various points)
-	 */
-	if (lcd->gv_paging.root)
-		lcd_mm_gva_destroy(lcd);
-	/*
-	 * Delete the module
-	 *
 	 * ORDER IS IMPORTANT:
 	 *
 	 * First: unmap the module
 	 *
 	 * Second: delete the module from the host
 	 *
-	 * Third: tear down the lcd arch
+	 * Third: tear down guest virtual paging
 	 *
-	 * Why? The lcd arch tear down will free any pages that are still
-	 * mapped in the ept.
+	 * Fourth: tear down the lcd arch
+	 *
+	 * Why? The guest physical/virtual paging needs to be in place so
+	 * we can unmap the module. If we don't unmap the module, the lcd 
+	 * arch tear down will try to free it (it frees any pages that are 
+	 * still mapped in the ept).
+	 *
+	 * If you do it in the wrong order, you can get NULLs or double
+	 * frees (very fun!).
 	 */
 	if (lcd->module) {
 		/*
@@ -1175,6 +1200,12 @@ void lcd_destroy(struct lcd *lcd)
 		if (ret)	
 			LCD_ERR("deleting module");
 	}
+	/*
+	 * Tear down guest virtual address space (the checks allow
+	 * lcd_create to call us at various points)
+	 */
+	if (lcd->gv_paging.root)
+		lcd_mm_gva_destroy(lcd);
 	/*
 	 * Tear down lcd_arch (ept, ...)
 	 */

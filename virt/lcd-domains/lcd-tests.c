@@ -49,7 +49,7 @@ static int test02(void)
 		goto fail2;
 	}
 
-	ret = lcd_mm_alloc_gv_page(lcd, &gpa, &hva);
+	ret = lcd_mm_gv_gfp(lcd, &gpa, &hva);
 	if (ret) {
 		LCD_ERR("failed to alloc pg mem");
 		goto fail3;
@@ -94,8 +94,7 @@ fail6:
 fail5:
 	kfree(pmd_entry);
 fail4:
-	free_page(hva_val(hva));
-	lcd_arch_ept_unmap_range(lcd->lcd_arch, gpa, 1);
+	lcd_mm_gp_free_page(lcd, gpa);
 fail3:
 fail2:
 	lcd_destroy(lcd);
@@ -125,7 +124,7 @@ static int test03(void)
 		goto fail2;
 	}
 
-	ret = lcd_mm_alloc_gv_page(lcd, &gpa, &hva);
+	ret = lcd_mm_gv_gfp(lcd, &gpa, &hva);
 	if (ret) {
 		LCD_ERR("failed to alloc pg mem");
 		goto fail3;
@@ -202,7 +201,7 @@ static int test04(void)
 		goto fail2;
 	}
 
-	ret = lcd_mm_alloc_gv_page(lcd, &gpa, &hva);
+	ret = lcd_mm_gv_gfp(lcd, &gpa, &hva);
 	if (ret) {
 		LCD_ERR("failed to alloc pg mem");
 		goto fail3;

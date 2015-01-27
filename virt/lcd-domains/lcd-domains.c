@@ -70,7 +70,7 @@ static inline void __lcd_warn(char *file, int lineno, char *fmt, ...)
  */
 static inline gpa_t lcd_mm_gp_pfn_to_gpa(unsigned long gp_pfn)
 {
-	return __gpa(gp_pfn << PAGE_SHIFT + LCD_GP_MEM_START);
+	return __gpa((gp_pfn << PAGE_SHIFT) + LCD_GP_MEM_START);
 }
 
 /**
@@ -139,6 +139,8 @@ fail1:
 static int lcd_mm_gp_gfp(struct lcd *lcd, hva_t *hva_out, gpa_t *gpa_out)
 {
 	hva_t hva;
+	hpa_t hpa;
+	int ret;
 	/*
 	 * Allocate a host physical page
 	 */
@@ -177,7 +179,6 @@ fail1:
 static void lcd_mm_gp_dealloc_unmap(struct lcd *lcd, gpa_t gpa, hpa_t *hpa_out)
 {
 	int ret;
-	hpa_t hpa;
 	unsigned long gp_pfn;
 	/*
 	 * Convert the gpa to a "page frame"
@@ -229,7 +230,6 @@ static void lcd_mm_gp_free_all(struct lcd *lcd)
 {
 	unsigned long gp_pfn;
 	gpa_t gpa;
-	int ret;
 
 	gp_pfn = 0;
 
@@ -263,12 +263,10 @@ static void lcd_mm_gp_free_all(struct lcd *lcd)
 static int lcd_mm_gv_gfp(struct lcd *lcd, gpa_t *gpa_out, hva_t *hva_out)
 {
 	int ret;
-	gpa_t gpa;
-	hva_t hva;
 	/*
 	 * Check counter
 	 */
-	if (lcd->gv_paging.counter >= LCD_PAGING_MEM_SIZE) {
+	if (lcd->gv_paging.counter >= LCD_GV_MEM_SIZE) {
 		LCD_ERR("exhausted guest virtual paging mem");
 		ret = -ENOMEM;
 		goto fail1;
@@ -276,7 +274,7 @@ static int lcd_mm_gv_gfp(struct lcd *lcd, gpa_t *gpa_out, hva_t *hva_out)
 	/*
 	 * Allocate a host page
 	 */
-	ret = lcd_mm_gp_gfp(lcd, &hva_out, &gpa_out);
+	ret = lcd_mm_gp_gfp(lcd, hva_out, gpa_out);
 	if (ret) {
 		LCD_ERR("getting free page");
 		goto fail2;
@@ -518,7 +516,7 @@ static void lcd_mm_gva_destroy(struct lcd *lcd)
 	/*
 	 * Unmap and free root page dir
 	 */
-	lcd_mm_gp_page(lcd, lcd->gv_paging.root_gpa);
+	lcd_mm_gp_free_page(lcd, lcd->gv_paging.root_gpa);
 	lcd->gv_paging.root = NULL;
 }
 
@@ -1045,7 +1043,7 @@ static int lcd_module_map_page(struct lcd *lcd, hpa_t hpa, hva_t hva)
 	/*
 	 * Map module page in lcd's ept
 	 */
-	ret = lcd_mm_gp_alloc_map(lcd->lcd_arch, hpa, &gpa);
+	ret = lcd_mm_gp_alloc_map(lcd, hpa, &gpa);
 	if (ret) {
 		LCD_ERR("error mapping into ept");
 		return ret;
@@ -1083,11 +1081,7 @@ static int lcd_module_unmap_page(struct lcd *lcd, hpa_t hpa, hva_t hva)
 	/*
 	 * Unmap module page in lcd's ept
 	 */
-	ret = lcd_mm_gp_dealloc_unmap(lcd->lcd_arch, gpa);
-	if (ret) {
-		LCD_ERR("error unmapping gpa in ept");
-		return ret;
-	}
+	lcd_mm_gp_dealloc_unmap(lcd, gpa, NULL);
 	return 0;
 }
 
@@ -1114,9 +1108,6 @@ static int lcd_module_unmap_page(struct lcd *lcd, hpa_t hpa, hva_t hva)
 static int lcd_setup_module_address_space(struct lcd *lcd)
 {
 	int ret;
-	pte_t *pte;
-	unsigned char bytes[8];
-	int i;
 	/*
 	 * Map the module's init code
 	 */
@@ -1700,7 +1691,7 @@ static int lcd_setup_initial_thread(struct lcd *lcd)
 	struct lcd_thread *t = NULL;
 	hva_t stack_page;
 	gpa_t stack_page_gpa;
-	gpa_t stack_page_gva;
+	gva_t stack_page_gva;
 	gpa_t stack_ptr_gpa;
 	gva_t stack_ptr_gva;
 	int ret;
@@ -1749,7 +1740,7 @@ static int lcd_setup_initial_thread(struct lcd *lcd)
 	lcd->init_thread = t;
 	return 0;
 
-fail4:
+fail3:
 	lcd_mm_gva_unmap(lcd, stack_page_gva);
 fail2:
 	lcd_mm_gp_free_page(lcd, stack_page_gpa);

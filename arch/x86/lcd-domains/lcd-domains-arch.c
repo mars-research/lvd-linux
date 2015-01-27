@@ -1260,11 +1260,17 @@ static void vmx_free_ept_dir_level(lcd_arch_epte_t *dir, int level)
 		/*
 		 * Base case of recursion
 		 *
-		 * Free the host page frame
+		 * Free any mapped host page frames, notify
+		 *
+		 * XXX: This can lead to nasty double frees if we made a
+		 * mistake and just forgot to unmap in the ept.
 		 */
 		for (idx = 0; idx < LCD_ARCH_PTRS_PER_EPTE; idx++) {
-			if (vmx_epte_present(dir[idx]))
+			if (vmx_epte_present(dir[idx])) {
+				LCD_ARCH_ERR("memory leak at hva %lx",
+					hva_val(vmx_epte_hva(dir[idx])));
 				free_page(hva_val(vmx_epte_hva(dir[idx])));
+			}
 		}
 	} else {
 		/*

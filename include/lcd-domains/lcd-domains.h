@@ -66,10 +66,58 @@ struct lcd_thread {
  * LCD Memory Layout
  * =================
  *
- * The layout below reflects the guest physical *and* virtual memory
- * layout. This means guest physical and virtual addresses have identical
- * values. (See the arch-dependent code header for the arch-dependent
- * part of the address space.)
+ * Guest Physical
+ * --------------
+ *
+ * The low addresses are occupied by the arch-dependent chunk of memory.
+ * We use a 16 MB part of the guest physical address space for dynamically
+ * mapping pages as they are allocated for the LCD, and a simple bitmap
+ * for tracking which pages in the address space are allocated.
+ *
+ * The rest of guest physical is unused, and the top part is unusable (see
+ * Intel SDM V3 28.2.2). Some of the guest virtual address space code uses
+ * host code for paging - and this depends on the host's physical address
+ * configuration (e.g., extracting a guest physical address from a page
+ * table entry will use the physical address width of the host). Beware!
+ *
+ *                   +---------------------------+ 0xFFFF FFFF FFFF FFFF
+ *                   |                           |
+ *                   |        Unusable           |
+ *                   |                           |
+ *                   +---------------------------+ 0x0000 FFFF FFFF FFFF
+ *                   |                           |
+ *                   |                           |
+ *                   :    Free Guest Physical    :
+ *                   :         Space             :
+ *                   |                           |
+ *                   |                           |
+ *                   +---------------------------+
+ *                   |                           |
+ *                   |      Guest Physical       | (16 MBs)
+ *                   |       "Page Heap"         |
+ *                   |                           |
+ * LCD_ARCH_TOP----> +---------------------------+
+ *                   |                           |
+ *                   :   Reserved Arch Memory    :
+ *                   |                           |
+ * LCD_ARCH_BOTTOM-> +---------------------------+
+ *                   :        Not mapped         :
+ *                   +---------------------------+ 0x0000 0000 0000 0000
+ *
+ * Guest Virtual
+ * -------------
+ *
+ * Since we will be running modules (for now), and these are mapped in the
+ * host at high addresses, we have set up the address space to accomodate
+ * that. 
+ *
+ *   -- Arch-dependent memory is mapped "one-to-one" to guest physical
+ *      addresses. 
+ *   -- A 4 MB part is used for a temporary boot guest virtual address
+ *      space.
+ *   -- A 4 KB page is for the initial thread's stack/utcb.
+ *   -- The module is mapped in the guest virtual at the same place that it is
+ *      in the host virtual - so we can avoid relocating symbols, etc.
  *
  * Stack/utcb pages: Except for the first thread, these are set up on demand.
  * The microkernel will set up and map the first thread's stack/utcb in the
@@ -80,20 +128,15 @@ struct lcd_thread {
  * makes the microkernel logic simpler and puts the tricky/vulnerable
  * guest address space allocation logic inside the LCD.
  *
- * The module is mapped to the same guest physical / guest virtual
- * address space as the host, to avoid relocating symbols.
- * 
  * The LCD is free to modify its guest virtual -> guest physical mappings after
- * it starts. The guest virtual paging memory is for the microkernel's
- * initial set up of the guest virtual address space (mapping the arch
- * dependent chunks, the module, and the stack for the first thread).
+ * it starts.
  *
- *                   +---------------------------+
- *   module mapped   |                           |
- *   somewhere in    :                           :
- *    here ------->  :                           :
- *   at a higher     |        FREE SPACE         |
- *   address         |                           |
+ *                   +---------------------------+ 0xFFFF FFFF FFFF FFFF
+ *                   |                           |
+ *                   |                           |
+ *                   :    Free Guest Virtual     :
+ *                   :         Space             :
+ *                   |                           |
  *                   |                           |
  *                   +---------------------------+
  *                   |         Stack 0           |
@@ -106,10 +149,16 @@ struct lcd_thread {
  *                   |                           |
  *                   :   Reserved Arch Memory    :
  *                   |                           |
+ * LCD_ARCH_BOTTOM-> +---------------------------+
+ *                   :        Not mapped         :
  *                   +---------------------------+ 0x0000 0000 0000 0000
  */
 
-#define LCD_PAGING_MEM_SIZE (4 << 20)
+#define LCD_GP_MEM_SIZE (16 << 20)
+#define LCD_GP_BMAP_NBITS (LCD_GP_MEM_SIZE >> PAGE_SHIFT)
+#define LCD_GP_MEM_START LCD_ARCH_TOP
+#define LCD_GV_MEM_SIZE (4 << 20)
+#define LCD_GV_MEM_START LCD_ARCH_TOP
 
 struct lcd {
 	/*
@@ -132,6 +181,15 @@ struct lcd {
 		struct mutex lock;
 		unsigned int count;
 	} lcd_threads;
+	/*
+	 * Guest physical address space
+	 *
+	 * We use a simple bitmap to track allocation of pages in the
+	 * guest physical address space.
+	 */
+	struct {
+		DECLARE_BITMAP(bmap, LCD_GP_BMAP_NBITS);
+	} gp_paging;
 	/*
 	 * Guest virtual paging
 	 *

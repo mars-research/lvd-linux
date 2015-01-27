@@ -1154,21 +1154,22 @@ void lcd_destroy(struct lcd *lcd)
 	 *
 	 * Why? The lcd arch tear down will free any pages that are still
 	 * mapped in the ept.
-	 *
-	 * Unmap module:
-	 */
-	ret = lcd_vmalloc_walk(lcd, va2hva(lcd->module->module_init),
-			lcd->module->init_size, lcd_module_unmap_page);
-	if (ret)
-		LCD_ERR("unmapping module's init, continuing ...");
-	ret = lcd_vmalloc_walk(lcd, va2hva(lcd->module->module_core),
-			lcd->module->core_size, lcd_module_unmap_page);
-	if (ret)
-		LCD_ERR("unmapping module's core, continuing ...");
-	/*
-	 * Delete module
 	 */
 	if (lcd->module) {
+		/*
+		 * Unmap module
+		 */
+		ret = lcd_vmalloc_walk(lcd, va2hva(lcd->module->module_init),
+				lcd->module->init_size, lcd_module_unmap_page);
+		if (ret)
+			LCD_ERR("unmapping module's init, continuing ...");
+		ret = lcd_vmalloc_walk(lcd, va2hva(lcd->module->module_core),
+				lcd->module->core_size, lcd_module_unmap_page);
+		if (ret)
+			LCD_ERR("unmapping module's core, continuing ...");
+		/*
+		 * Delete module
+		 */
 		module_put(lcd->module);
 		ret = do_sys_delete_module(lcd->module->name, 0, 1);
 		if (ret)	

@@ -10,7 +10,7 @@
 
 int main(int argc, char ** argv)
 {
-  if(argc != 5)
+  if(argc != 4)
     {
       printf("error in number of args\n");
       exit(0);
@@ -26,8 +26,8 @@ int main(int argc, char ** argv)
 	  // cleanup?
 	  exit(0);
 	}
-      char* out_option = argv[3];
-      char* out_file = argv[4];
+      //   char* out_option = argv[3];
+      char* out_file = argv[3];
       FILE* of = fopen(out_file, "w");
       if(!of)
 	{
@@ -45,7 +45,10 @@ int main(int argc, char ** argv)
 	}
       else if(!strcmp(argv[1],"-source"))
 	{
-	  // TODO
+	  printf("in source\n");
+	  SourceVisitor* sv = new SourceVisitor(of);
+	  tree->accept(sv);
+	  printf("have finished sv\n");
 	}
       else
 	{

@@ -1,3 +1,4 @@
 rpc int foo(int cpa, char v1, int v2);
 
-rpc int bar(projection super_block* rp);
+rpc int bar(int r, int a, int c, char b);
+

@@ -1,9 +1,8 @@
 #include "gen_visitor.h"
 
-SourceVisitor::SourceVisitor(FILE* out, int stub_proxy)
+SourceVisitor::SourceVisitor(FILE* out)
 {
   this->out_f_ = out;
-  this->stub_or_proxy_ = stub_proxy;
 }
 
 void SourceVisitor::visit(File* f)
@@ -70,28 +69,12 @@ void SourceVisitor::visit(IntegerType *it)
 
 void SourceVisitor::visit(PointerType *pt)
 {
-  pt->type()->accept(this);
+  pt->p_type()->accept(this);
   fprintf(this->out_f_, "* ");
 }
 
 void SourceVisitor::visit(Typedef* td)
 {
    fprintf(this->out_f_, "%s", td->alias());
-}
-
-void SourceVisitor::exec_loop(void)
-{
-  // while truee
-  // switch statement
-  // switch on what? 
-  // cases are: callee functions in file.
-  // 
-}
-
-void SourceVisitor::gen_case_switch(void)
-{
-  // switch
-  // case just callee functions, how are these identified from others?
-  
 }
 

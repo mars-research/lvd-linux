@@ -398,7 +398,7 @@ int lcd_arch_ept_map_range(struct lcd_arch *lcd, gpa_t ga_start,
  */
 int lcd_arch_ept_unmap(struct lcd_arch *lcd, gpa_t a);
 /**
- * Like unmpa, but returns old hpa in hpa_out.
+ * Like unmpa, but returns old hpa in hpa_out if it is non-NULL.
  */
 int lcd_arch_ept_unmap2(struct lcd_arch *lcd, gpa_t a, hpa_t *hpa_out);
 /**

@@ -117,6 +117,10 @@ static int lcd_mm_gp_alloc_map(struct lcd *lcd, hpa_t hpa, gpa_t *gpa_out)
 			hpa_val(hpa));
 		goto fail2;
 	}
+	/*
+	 * Set bit to mark page as alloc'd
+	 */
+	set_bit(gp_pfn, lcd->gp_paging.bmap);
 
 	if (gpa_out)
 		*gpa_out = gpa;

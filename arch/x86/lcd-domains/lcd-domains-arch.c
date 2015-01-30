@@ -1181,7 +1181,8 @@ int lcd_arch_ept_unmap2(struct lcd_arch *lcd, gpa_t a, hpa_t *hpa_out)
 	/*
 	 * Extract hpa
 	 */
-	*hpa_out = lcd_arch_ept_hpa(ept_entry);
+	if (hpa_out)
+		*hpa_out = lcd_arch_ept_hpa(ept_entry);
 	/*
 	 * Unset
 	 */
@@ -2372,7 +2373,9 @@ static int vmx_handle_vmcall(struct lcd_arch_thread *t)
  * Processes an external interrupt (e.g. timer interrupt) by
  * emulating 64-bit interrupt handling. Kernel preemption should
  * be disabled, otherwise the interrupt handler could switch to
- * another conflicting task. Unlike kvm, interrupts are assumed
+ * another conflicting task. Interrupts are 
+
+Unlike kvm, interrupts are assumed
  * to be *enabled*, but will be disabled when the interrupt
  * handler is called, per the ia32 spec (Intel SDM V3 6.8.1).
  */
@@ -2381,6 +2384,7 @@ static int vmx_handle_external_intr(struct lcd_arch_thread *t)
 	unsigned int vector;
 	unsigned long entry;
 	unsigned long sp_tmp;
+	unsigned long flags;
 	gate_desc *idt;
 	gate_desc *gate;
 	/*
@@ -2394,12 +2398,14 @@ static int vmx_handle_external_intr(struct lcd_arch_thread *t)
 	gate = idt + vector;
 	entry = gate_offset(*gate);
 
+	LCD_ARCH_MSG("external interrupt vector = %u", vector);
+
 	/*
 	 * Disable interrupts, per what the interrupt handler expects.
 	 *
 	 * Intel SDM V3 6.8.1
 	 */
-	local_irq_disable();
+	local_irq_save(flags);
 
 	/*
 	 * Emulate 64-bit interrupt handling
@@ -2430,7 +2436,7 @@ static int vmx_handle_external_intr(struct lcd_arch_thread *t)
 		 * (and maybe for some other reason?).
 		 */
 		"pushf\n\t"
-		"orl $0x200, (%%" _ASM_SP ")\n\t"
+/*		"orl $0x200, (%%" _ASM_SP ")\n\t" */
 		/*
 		 * Push %cs
 		 */
@@ -2449,6 +2455,9 @@ static int vmx_handle_external_intr(struct lcd_arch_thread *t)
 		[ss]"i"(__KERNEL_DS),
 		[cs]"i"(__KERNEL_CS)
 		);
+
+	local_irq_restore(flags);
+
 	return LCD_ARCH_STATUS_EXT_INTR;
 }
 
@@ -2790,8 +2799,6 @@ int lcd_arch_run(struct lcd_arch_thread *t)
 		ret = vmx_handle_exception_nmi(t);
 		break;
 	case EXIT_REASON_EXTERNAL_INTERRUPT:
-		ret = LCD_ARCH_STATUS_EXT_INTR;
-		break;
 		ret = vmx_handle_external_intr(t);
 		break;
 	case EXIT_REASON_VMCALL:

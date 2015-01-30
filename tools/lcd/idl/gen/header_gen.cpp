@@ -93,7 +93,7 @@ void HeaderVisitor::visit(IntegerType* it)
 
 void HeaderVisitor::visit(PointerType* pt)
 {
-  pt->type()->accept(this);
+  pt->p_type()->accept(this);
   fprintf(this->out_f_, "* ");
 }
 

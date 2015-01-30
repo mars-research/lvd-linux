@@ -4,6 +4,10 @@
 #include <vector>
 #include <map>
 #include <string>
+#include <sstream>
+#include <stdio.h>
+#include "marshal_op.h"
+
 
 enum PrimType { kChar = 1, kShort, kInt, kLong, kLongLong, kCapability};
 
@@ -11,7 +15,6 @@ class ASTVisitor;
 
 class Base
 {
-  //M_info info;
 };
 
 class Type : public Base
@@ -20,8 +23,8 @@ class Type : public Base
  public:
   virtual void accept(ASTVisitor *worker) = 0;
   virtual int num() = 0;
-  //  virtual void marshal() = 0;
-  // virtual int size() = 0;
+  virtual const char* type() = 0;
+  virtual ~Type(){printf("type destructor\n");}
 };
 
 class Scope : public Base
@@ -64,6 +67,7 @@ class Typedef : public Type
  public:
   Typedef(const char* alias, Type* type);
   virtual void accept(ASTVisitor *worker);
+  virtual const char* type();
   const char* alias();
   virtual int num() {return 1;}
   // virtual void marshal();
@@ -78,26 +82,27 @@ class IntegerType : public Type
  public:
   IntegerType(const char* type, bool un, int size);
   virtual void accept(ASTVisitor *worker);
-  const char* type();
+  virtual const char* type();
   bool unsigned_huh();
   virtual int num() {return 2;}
-  // virtual void marshal();
+  ~IntegerType(){printf("inttype destructor\n");}
 };
-
+/*
 class CapabilityType : public IntegerType
 {
   // is this needed?
 };
-
+*/
 class PointerType : public Type
 {
   Type* type_;
  public:
   PointerType(Type* type);
   virtual void accept(ASTVisitor *worker);
-  Type* type();
+  virtual const char* type();
+  Type* p_type();
   virtual int num() {return 3;}
-  // virtual void marshal();
+  ~PointerType(){printf("pointer type destructor\n");}
 };
 
 class ProjectionField : public Base
@@ -128,10 +133,12 @@ class ProjectionType : public Type // complex type
  public:
   ProjectionType(const char* id, const char* real_type, std::vector<ProjectionField*>* fields);
   virtual void accept(ASTVisitor *worker);
+  virtual const char* type();
   const char* id();
   const char* real_type();
+  
   virtual int num() {return 4;}
-  // virtual void marshal();
+  ~ProjectionType(){printf("projection type destructor\n");}
 };
 
 class Parameter : public Base
@@ -144,8 +151,8 @@ class Parameter : public Base
   virtual void accept(ASTVisitor *worker);
   Type* type();
   const char* name();
-  char* marshal();
-  char* unmarshal();
+  const char* marshal();
+  const char* unmarshal();
 };
 
 class Rpc : public Base

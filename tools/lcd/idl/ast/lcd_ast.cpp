@@ -17,6 +17,11 @@ const char* Typedef::alias()
   return this->alias_;
 }
 
+const char* Typedef::type()
+{
+  return alias_;
+}
+
 IntegerType::IntegerType(const char* type, bool un, int size)
 {
   this->type_ = type;
@@ -49,9 +54,15 @@ void PointerType::accept(ASTVisitor* worker)
   worker->visit(this);
 }
 
-Type* PointerType::type()
+Type* PointerType::p_type()
 {
   return this->type_;
+}
+
+const char* PointerType::type()
+{
+  // may need *
+  return this->type_->type();
 }
 
 ProjectionField::ProjectionField(bool in, bool out, bool alloc, bool bind, Type* field_type, const char* field_name)
@@ -99,7 +110,14 @@ const char* ProjectionType::id()
   return this->id_;
 }
 
+// may never be used
 const char* ProjectionType::real_type()
+{
+  return this->real_type_;
+}
+
+// may never be used
+const char* ProjectionType::type()
 {
   return this->real_type_;
 }
@@ -125,15 +143,20 @@ const char* Parameter::name()
   return this->name_;
 }
 
-char* Parameter::marshal()
+const char* Parameter::marshal()
 {
+  //allocate?
   std::ostringstream ret;
-  ret << 
+  ret << "lcd_store_r?( " << this->name_ << " );";
+  return ret.str().c_str();
 }
 
-char* Parameter::unmarshal()
+const char* Parameter::unmarshal()
 {
-
+  // allocate?
+  std::ostringstream ret;
+  ret << this->name_ << " = " << "( " << this->type_->type() << " ) " << "lcd_r?()";
+  return ret.str().c_str();
 }
 
 Rpc::Rpc(Type* return_type, const char* name, std::vector<Parameter* >* parameters)

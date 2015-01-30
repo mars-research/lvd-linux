@@ -35,8 +35,12 @@ void SourceVisitor::visit(Rpc* r)
 	fprintf(this->out_f_, ", ");
     }
   fprintf(this->out_f_, ") {\n");
-  // print body 
-  // TODO
+  
+  for(std::vector<Parameter*>::iterator it = r->parameters()->begin(); it != r->parameters()->end(); it++)
+    {
+      Parameter* p = (Parameter*) *it;
+      fprintf(this->out_f_, "%s\n", p->marshal());
+    }
   fprintf(this->out_f_, "}\n");
 }
 

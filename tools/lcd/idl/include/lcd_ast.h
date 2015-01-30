@@ -16,6 +16,7 @@ class Base
 
 class Type : public Base
 {
+  M_type* marshal_info_;
  public:
   virtual void accept(ASTVisitor *worker) = 0;
   virtual int num() = 0;
@@ -137,17 +138,20 @@ class Parameter : public Base
 {
   Type* type_;
   const char* name_;
-  //M_info m;
  public:
   Parameter(Type* type, const char* name);
   ~Parameter();
   virtual void accept(ASTVisitor *worker);
   Type* type();
   const char* name();
+  char* marshal();
+  char* unmarshal();
 };
 
 class Rpc : public Base
 {
+  M_rpc* marshal_caller;
+  M_rpc* marshal_callee;
   Type* ret_type_;
   const char* name_;
   std::vector<Parameter* >* params_;

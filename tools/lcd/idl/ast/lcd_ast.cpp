@@ -9,7 +9,6 @@ Typedef::Typedef(const char* alias, Type* type)
 
 void Typedef::accept(ASTVisitor* worker)
 {
-  printf("in typedef accept\n");
   worker->visit(this);
 }
 
@@ -27,7 +26,6 @@ IntegerType::IntegerType(const char* type, bool un, int size)
 
 void IntegerType::accept(ASTVisitor* worker)
 {
-  printf("in integertype accept\n");
   worker->visit(this);
 }
 
@@ -48,7 +46,6 @@ PointerType::PointerType(Type* type)
 
 void PointerType::accept(ASTVisitor* worker)
 {
-  printf("pointer type accept\n");
   worker->visit(this);
 }
 
@@ -94,7 +91,6 @@ ProjectionType::ProjectionType(const char* id, const char* real_type, std::vecto
 
 void ProjectionType::accept(ASTVisitor* worker)
 {
-  printf("in projectype accept\n");
   worker->visit(this);
 }
 
@@ -129,11 +125,24 @@ const char* Parameter::name()
   return this->name_;
 }
 
+char* Parameter::marshal()
+{
+  std::ostringstream ret;
+  ret << 
+}
+
+char* Parameter::unmarshal()
+{
+
+}
+
 Rpc::Rpc(Type* return_type, const char* name, std::vector<Parameter* >* parameters)
 {
   this->ret_type_ = return_type;
   this->name_ = name;
   this->params_ = parameters;
+  this->marshal_caller = new M_rpc();
+  this->marshal_callee = new M_rpc();
 }
 
 const char* Rpc::name()
@@ -148,7 +157,6 @@ Type* Rpc::return_type()
 
 void Rpc::accept(ASTVisitor* worker)
 {
-  printf("in rpc accpet\n");
   worker->visit(this);
 }
 
@@ -166,8 +174,6 @@ File::File(const char* verbatim, FileScope* fs, std::vector<Rpc* >* rpc_definiti
 
 void File::accept(ASTVisitor* worker)
 {
-  printf("in accept and trying to print size %lu\n", this->rpc_defs_->size());
-  printf("in accept\n");
   worker->visit(this);
 }
 

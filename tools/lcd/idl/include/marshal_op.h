@@ -8,44 +8,21 @@ class M_info
 
 class M_rpc : public M_info
 {
-  /*
   bool regs[LCD_MAX_REGS];
-  bool cap_regs[LCD_MAX_CAP_REGS]; */
+  bool cap_regs[LCD_MAX_CAP_REGS];
+  
  public:
   M_rpc();
-};
-
-class M_proj : public M_info
-{
- public:
-  M_proj(size_t size) { size_ = size; } 
-
-};
-
-class M_param : public M_info
-{
-  int reg;
-  int size;
- public:
-  M_param();
-  init(int size, int reg);
-};
-
-class M_projType : public M_info
-{
- public:
-  M_projType(size_t size) { size_ = size; }
-};
-
-class M_intType : public M_info
-{
- public:
-  M_intType(size_t size) {size_ = size; }
+  int allocate_register(int reg);
+  int next_free_register();
   
 };
 
-class M_pointerType : public M_info
-{
+class M_type : public M_info
+{ 
+  int register_;
+  // can add more necessary info later
  public:
-  M_pointerType(size_t size) { size_ = size; }
+  M_type();
+  void set_size(size_t s);
 };

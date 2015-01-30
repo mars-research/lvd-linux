@@ -33,7 +33,23 @@ class HeaderVisitor : public GenVisitor
   virtual void visit(Typedef* td);
 };
 
-class SourceVisitor : public GenVisitor
+class Caller_SourceVisitor : public GenVisitor
+{
+  FILE* out_f_;
+  //  int stub_or_proxy_; // 1 equals stub, 2 equals proxy
+ public: 
+  SourceVisitor(FILE* out);
+  virtual void visit(File *f);
+  virtual void visit(Rpc *rpc);
+  virtual void visit(Parameter * p);
+  virtual void visit(ProjectionType * p);
+  virtual void visit(ProjectionField * pf);
+  virtual void visit(IntegerType * it);
+  virtual void visit(PointerType * it);
+  virtual void visit(Typedef* td);
+};
+
+class Callee_SourceVisitor : public GenVisitor
 {
   FILE* out_f_;
   //  int stub_or_proxy_; // 1 equals stub, 2 equals proxy

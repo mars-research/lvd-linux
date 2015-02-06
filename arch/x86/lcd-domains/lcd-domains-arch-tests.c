@@ -24,8 +24,8 @@ static int test02(void)
 	char *buf;
 	int ret = -1;
 
-	lcd = lcd_arch_create();
-	if (!lcd) {
+	ret = lcd_arch_create(&lcd);
+	if (ret) {
 		LCD_ARCH_ERR("failed to alloc lcd");
 		goto fail_alloc;
 	}
@@ -73,8 +73,8 @@ static int test03(void)
 	gpa_t base;
 	int ret = -1;
 
-	lcd = lcd_arch_create();
-	if (!lcd) {
+	ret = lcd_arch_create(&lcd);
+	if (ret) {
 		LCD_ARCH_ERR("failed to alloc lcd");
 		goto fail1;
 	}
@@ -137,17 +137,20 @@ fail1:
 static int test04(void)
 {
 	struct lcd_arch *lcd;
-	struct lcd_arch_thread *t;
 	hva_t pgd;
 	int ret = -1;
 	
 	/*
 	 * Init lcd
 	 */
-	lcd = lcd_arch_create();
-	if (!lcd) {
+	ret = lcd_arch_create(&lcd);
+	if (ret) {
 		LCD_ARCH_ERR("failed to create lcd");
 		goto fail1;
+	}
+	if (lcd->vpid == 0) {
+		LCD_ARCH_ERR("bad vpid");
+		goto fail2;
 	}
 	/*
 	 * Map a dummy page in the lcd's guest physical address space
@@ -155,78 +158,51 @@ static int test04(void)
 	pgd = __hva(__get_free_page(GFP_KERNEL));
 	if (!hva_val(pgd)) {
 		LCD_ARCH_ERR("failed to alloc page");
-		goto fail2;
+		goto fail3;
 	}
 	ret = lcd_arch_ept_map(lcd, __gpa(0), hva2hpa(pgd), 1, 0);
 	if (ret) {
 		LCD_ARCH_ERR("error mapping pgd");
-		goto fail3;
-	}
-	/*
-	 * Set up an lcd_thread, added to lcd
-	 */
-	t = lcd_arch_add_thread(lcd);
-	if (!t) {
-		LCD_ARCH_ERR("error setting up lcd_thread");
 		goto fail4;
-	}
-	/*
-	 * Check fields
-	 */
-	if (t->vpid == 0) {
-		LCD_ARCH_ERR("bad vpid");
-		goto fail5;
-	}
-	if (t->lcd_arch != lcd) {
-		LCD_ARCH_ERR("wrong lcd");
-		goto fail6;
-	}
-	if (list_empty(&t->lcd_arch_threads)) {
-		LCD_ARCH_ERR("not in lcd arch thread list?");
-		goto fail7;
 	}
 	/*
 	 * Set up its runtime environment
 	 */
-	ret = lcd_arch_set_gva_root(t, __gpa(0));
+	ret = lcd_arch_set_gva_root(lcd, __gpa(0));
 	if (ret) {
 		LCD_ARCH_ERR("error setting gva root");
-		goto fail8;
+		goto fail5;
 	}
-	ret = lcd_arch_set_pc(t, __gva(0));
+	ret = lcd_arch_set_pc(lcd, __gva(0));
 	if (ret) {
 		LCD_ARCH_ERR("error setting pc");
-		goto fail9;
+		goto fail6;
 	}
-	ret = lcd_arch_set_sp(t, __gva(0));
+	ret = lcd_arch_set_sp(lcd, __gva(0));
 	if (ret) {
 		LCD_ARCH_ERR("error setting sp");
-		goto fail10;
+		goto fail7;
 	}
 
-	if (lcd_arch_check(t)) {
+	if (lcd_arch_check(lcd)) {
 		LCD_ARCH_ERR("failed a check\n");
-		goto fail11;
+		goto fail8;
 	}
 
 	ret = 0;
 	goto done;
 
 done:
-fail11:
-fail10:
-fail9:
 fail8:
 fail7:
 fail6:
 fail5:
-	lcd_arch_destroy_thread(t);
-fail4:
 	lcd_arch_ept_unmap(lcd, __gpa(0));
-fail3:
+fail4:
 	free_page(hva_val(pgd));
-fail2:
+fail3:
 	lcd_arch_destroy(lcd);
+fail2:
 fail1:
 	return ret;
 }

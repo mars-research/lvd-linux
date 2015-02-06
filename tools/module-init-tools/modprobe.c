@@ -43,7 +43,7 @@
 #include <syslog.h>
 
 /* for lcd init module */
-#include <temp/include/linux/lcd-prototype.h>
+#include <temp/include/linux/lcd-domains.h>
 #include <sys/ioctl.h>
 
 #include "util.h"
@@ -1701,7 +1701,7 @@ static int lcd_init_module(void *module_image, unsigned long len,
 			char *param_values)
 {
 	int ret;
-	struct lcd_prototype_module_args ma;
+	struct lcd_init_module_args ma;
 	int fd;
 
 	ma.module_image = module_image;
@@ -1714,7 +1714,7 @@ static int lcd_init_module(void *module_image, unsigned long len,
 		perror("lcd-modprobe");
 		goto fail;
 	}
-	ret = ioctl(fd, LCD_PROTOTYPE_INIT_MODULE, &ma);
+	ret = ioctl(fd, LCD_INIT_MODULE, &ma);
 	if (ret) {
 		perror("lcd-modprobe");
 		goto fail_fd;

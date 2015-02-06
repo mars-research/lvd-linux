@@ -84,7 +84,7 @@ extern const unsigned long vmx_return;
 
 /* SHARED / PERCPU VARS -------------------------------------------------- */
 
-static struct kmem_cache *lcd_arch_thread_cache;
+static struct kmem_cache *lcd_arch_cache;
 
 static struct vmx_vmcs_config vmcs_config;
 static struct vmx_capability vmx_capability;
@@ -98,7 +98,7 @@ static struct {
 	spinlock_t lock;
 } vpids;
 
-static DEFINE_PER_CPU(struct lcd_arch_thread *, local_lcd_arch_thread);
+static DEFINE_PER_CPU(struct lcd_arch *, local_lcd_arch);
 
 static unsigned long *msr_bitmap;
 
@@ -911,11 +911,8 @@ int lcd_arch_init(void)
 	 * Init lcd_arch_thread cache (using instead of kmalloc since
 	 * these structs need to be aligned properly)
 	 */
-	lcd_arch_thread_cache = kmem_cache_create("lcd_arch_thread", 
-						sizeof(struct lcd_arch_thread),
-						__alignof__(struct lcd_arch_thread),
-						0, NULL);
-	if (!lcd_arch_thread_cache) {
+	lcd_arch_cache = KMEM_CACHE(lcd_arch, 0);
+	if (!lcd_arch_cache) {
 		LCD_ARCH_ERR("failed to set up kmem cache\n");
 		ret = -ENOMEM;
 		goto failed3;
@@ -942,7 +939,7 @@ void lcd_arch_exit(void)
 	on_each_cpu(vmx_disable, NULL, 1);
 	vmx_free_vmxon_areas();
 	free_page((unsigned long)msr_bitmap);
-	kmem_cache_destroy(lcd_arch_thread_cache);
+	kmem_cache_destroy(lcd_arch_cache);
 }
 
 /* VMX EPT -------------------------------------------------- */
@@ -1487,7 +1484,7 @@ static int vmx_host_tss(hva_t *hva_out)
  * vmx_enter
  *   - host %rsp: not known until we're about to enter
  */
-static void vmx_setup_vmcs_host(struct lcd_arch_thread *t)
+static void vmx_setup_vmcs_host(struct lcd_arch *lcd_arch)
 {
 	unsigned long tmpl;
 	gate_desc *idt;
@@ -1585,7 +1582,7 @@ static void vmx_setup_vmcs_host(struct lcd_arch_thread *t)
 /**
  * Sets up MSR autloading for MSRs listed in autload_msrs (local var).
  */
-static void vmx_setup_vmcs_msr(struct lcd_arch_thread *t)
+static void vmx_setup_vmcs_msr(struct lcd_arch *lcd_arch)
 {
 	int i;
 	u64 val;
@@ -1617,18 +1614,20 @@ static void vmx_setup_vmcs_msr(struct lcd_arch_thread *t)
 	vmcs_write32(VM_EXIT_MSR_LOAD_COUNT, LCD_ARCH_NUM_AUTOLOAD_MSRS);
 	vmcs_write32(VM_ENTRY_MSR_LOAD_COUNT, LCD_ARCH_NUM_AUTOLOAD_MSRS);
 
-	vmcs_write64(VM_EXIT_MSR_LOAD_ADDR, __pa(t->msr_autoload.host));
-	vmcs_write64(VM_EXIT_MSR_STORE_ADDR, __pa(t->msr_autoload.guest));
-	vmcs_write64(VM_ENTRY_MSR_LOAD_ADDR, __pa(t->msr_autoload.guest));
+	vmcs_write64(VM_EXIT_MSR_LOAD_ADDR, __pa(lcd_arch->msr_autoload.host));
+	vmcs_write64(VM_EXIT_MSR_STORE_ADDR, __pa(
+			lcd_arch->msr_autoload.guest));
+	vmcs_write64(VM_ENTRY_MSR_LOAD_ADDR, __pa(
+			lcd_arch->msr_autoload.guest));
 
 	for (i = 0; i < LCD_ARCH_NUM_AUTOLOAD_MSRS; i++) {
 	
-		e = &t->msr_autoload.host[i];
+		e = &lcd_arch->msr_autoload.host[i];
 		e->index = autoload_msrs[i];
 		rdmsrl(e->index, val);
 		e->value = val;
 
-		e = &t->msr_autoload.guest[i];
+		e = &lcd_arch->msr_autoload.guest[i];
 		e->index = autoload_msrs[i];
 	}
 }
@@ -1666,7 +1665,7 @@ static void vmx_setup_vmcs_msr(struct lcd_arch_thread *t)
  * lcd_arch_set_gva_root
  *   - %cr3 (to be set by arch-indep code)
  */
-static void vmx_setup_vmcs_guest_regs(struct lcd_arch_thread *t)
+static void vmx_setup_vmcs_guest_regs(struct lcd_arch *lcd_arch)
 {
 	unsigned long cr0;
 	unsigned long cr4;
@@ -1885,13 +1884,12 @@ static void vmx_setup_vmcs_guest_regs(struct lcd_arch_thread *t)
  *
  * We need the lcd_arch so we can set up t's ept.
  */
-static void vmx_setup_vmcs_guest_settings(struct lcd_arch_thread *t,
-					struct lcd_arch *lcd_arch)
+static void vmx_setup_vmcs_guest_settings(struct lcd_arch *lcd_arch)
 {
 	/*
 	 * VPID
 	 */
-	vmcs_write16(VIRTUAL_PROCESSOR_ID, t->vpid);
+	vmcs_write16(VIRTUAL_PROCESSOR_ID, lcd_arch->vpid);
 	/*
 	 * No VMCS Shadow (Intel SDM V3 24.4.2)
 	 */
@@ -1913,9 +1911,10 @@ static void vmx_setup_vmcs_guest_settings(struct lcd_arch_thread *t,
 	/*
 	 * EPT
 	 *
-	 * XXX: We aren't locking here ...
+	 * XXX: We aren't locking here, probably don't need to since we're
+	 * setting up the lcd.
 	 */
-	vmcs_write64(EPT_POINTER, t->lcd_arch->ept.vmcs_ptr);
+	vmcs_write64(EPT_POINTER, lcd_arch->ept.vmcs_ptr);
 	/*
 	 * Exception handling (vm exit on any exception)
 	 *
@@ -1943,32 +1942,32 @@ static void vmx_setup_vmcs_guest_settings(struct lcd_arch_thread *t,
  * Front-end for setting up VMCS. Calls helper routines
  * to set up guest and host states of VMCS.
  */
-static void vmx_setup_vmcs(struct lcd_arch_thread *t, struct lcd_arch *lcd_arch)
+static void vmx_setup_vmcs(struct lcd_arch *lcd_arch)
 {
 	/*
 	 * Set up guest part of vmcs, and guest exec
 	 */
-	vmx_setup_vmcs_guest_settings(t, lcd_arch);
-	vmx_setup_vmcs_guest_regs(t);
+	vmx_setup_vmcs_guest_settings(lcd_arch);
+	vmx_setup_vmcs_guest_regs(lcd_arch);
 	/*
 	 * Set up MSR bitmap and autoloading
 	 */
-	vmx_setup_vmcs_msr(t);
+	vmx_setup_vmcs_msr(lcd_arch);
 	/*
 	 * Set up host part of vmcs
 	 */
-	vmx_setup_vmcs_host(t);
+	vmx_setup_vmcs_host(lcd_arch);
 }
 
 
 /* VMCS LOADING -------------------------------------------------- */
 
 /**
- * Updates an lcd_arch_thread's VMCS when it is moved to a different
+ * Updates an lcd_arch's VMCS when it is moved to a different
  * cpu. (Linux uses per-cpu data that needs to be updated in
  * the lcd's VMCS.)
  */
-static void __vmx_setup_cpu(struct lcd_arch_thread *t, int cur_cpu)
+static void __vmx_setup_cpu(struct lcd_arch *lcd_arch, int cur_cpu)
 {
 	struct desc_struct *gdt;
 	hva_t host_tss;
@@ -2007,12 +2006,12 @@ static void __vmx_setup_cpu(struct lcd_arch_thread *t, int cur_cpu)
  */
 static void __vmx_get_cpu_helper(void *ptr)
 {
-	struct lcd_arch_thread *t;
-	t = ptr;
-	BUG_ON(raw_smp_processor_id() != t->cpu);
-	vmcs_clear(t->vmcs);
-	if (__get_cpu_var(local_lcd_arch_thread) == t)
-		__get_cpu_var(local_lcd_arch_thread) = NULL;
+	struct lcd_arch *lcd_arch;
+	lcd_arch = ptr;
+	BUG_ON(raw_smp_processor_id() != lcd_arch->cpu);
+	vmcs_clear(lcd_arch->vmcs);
+	if (__get_cpu_var(local_lcd_arch) == lcd_arch)
+		__get_cpu_var(local_lcd_arch) = NULL;
 }
 
 /**
@@ -2020,7 +2019,7 @@ static void __vmx_get_cpu_helper(void *ptr)
  *
  * Disables preemption. Call vmx_put_cpu() when finished.
  */
-static void vmx_get_cpu(struct lcd_arch_thread *t)
+static void vmx_get_cpu(struct lcd_arch *lcd_arch)
 {
 	int cur_cpu;
 
@@ -2041,59 +2040,59 @@ static void vmx_get_cpu(struct lcd_arch_thread *t)
 	 * Otherwise, we need to make t active
 	 * and current on this cpu.
 	 */
-	if (__get_cpu_var(local_lcd_arch_thread) != t) {
+	if (__get_cpu_var(local_lcd_arch) != lcd_arch) {
 
-		__get_cpu_var(local_lcd_arch_thread) = t;
+		__get_cpu_var(local_lcd_arch) = lcd_arch;
 
-		if (t->cpu != cur_cpu) {
+		if (lcd_arch->cpu != cur_cpu) {
 
 			/*
-			 * t not active on this cpu
+			 * lcd_arch not active on this cpu
 			 */
-			if (t->cpu >= 0)
+			if (lcd_arch->cpu >= 0)
 				/*
-				 * t active on a different cpu;
+				 * lcd_arch active on a different cpu;
 				 * clear it there (active -> inactive)
 				 */
-				smp_call_function_single(t->cpu,
+				smp_call_function_single(lcd_arch->cpu,
 							__vmx_get_cpu_helper, 
-							(void *) t, 1);
+							(void *) lcd_arch, 1);
 			else
 				/*
-				 * t inactive; clear it to get to
+				 * lcd_arch inactive; clear it to get to
 				 * initial vmcs state
 				 *
 				 * Intel SDM V3 24.11.3
 				 */
-				vmcs_clear(t->vmcs);
+				vmcs_clear(lcd_arch->vmcs);
 
 			/*
 			 * Invalidate any vpid or ept cache lines
 			 */
-			invvpid_single_context(t->vpid);
-			invept_single_context(t->lcd_arch->ept.vmcs_ptr);
+			invvpid_single_context(lcd_arch->vpid);
+			invept_single_context(lcd_arch->ept.vmcs_ptr);
 
 			/*
-			 * t is not in launched state
+			 * lcd_arch is not in launched state
 			 */
-			t->launched = 0;
+			lcd_arch->launched = 0;
 
 			/*
 			 * Load vmcs pointer on this cpu
 			 */
-			vmcs_load(t->vmcs);
+			vmcs_load(lcd_arch->vmcs);
 
 			/*
 			 * Update cpu-specific data in vmcs
 			 */
-			__vmx_setup_cpu(t, cur_cpu);
+			__vmx_setup_cpu(lcd_arch, cur_cpu);
 
 			/*
 			 * Remember which cpu we are active on
 			 */
-			t->cpu = cur_cpu;
+			lcd_arch->cpu = cur_cpu;
 		} else {
-			vmcs_load(t->vmcs);
+			vmcs_load(lcd_arch->vmcs);
 		}
 	}
 }
@@ -2103,73 +2102,145 @@ static void vmx_get_cpu(struct lcd_arch_thread *t)
  *
  * Enables preemption.
  */
-static void vmx_put_cpu(struct lcd_arch_thread *t)
+static void vmx_put_cpu(struct lcd_arch *lcd_arch)
 {
 	put_cpu();
 }
 
 /* LCD_ARCH CREATE / DESTROY ---------------------------------------- */
 
-struct lcd_arch* lcd_arch_create(void)
+/**
+ * Reserves a vpid and sets it in the vcpu.
+ */
+static int vmx_allocate_vpid(struct lcd_arch *lcd_arch)
+{
+	int vpid;
+
+	lcd_arch->vpid = 0;
+	
+	spin_lock(&vpids.lock);
+	vpid = find_first_zero_bit(vpids.bitmap, VMX_NR_VPIDS);
+	if (vpid < VMX_NR_VPIDS) {
+		lcd_arch->vpid = vpid;
+		__set_bit(vpid, vpids.bitmap);
+	}
+	spin_unlock(&vpids.lock);
+
+	return vpid >= VMX_NR_VPIDS;
+}
+
+/**
+ * Frees a vpid.
+ */
+static void vmx_free_vpid(struct lcd_arch *lcd_arch)
+{
+	spin_lock(&vpids.lock);
+	if (lcd_arch->vpid != 0)
+		__clear_bit(lcd_arch->vpid, vpids.bitmap);
+	spin_unlock(&vpids.lock);
+}
+
+int lcd_arch_create(struct lcd_arch **out)
 {
 	struct lcd_arch *lcd_arch;
-
+	int ret;
 	/*
 	 * Alloc lcd_arch
 	 */
-	lcd_arch = kzalloc(sizeof(*lcd_arch), GFP_KERNEL);
+	lcd_arch = kmem_cache_zalloc(lcd_arch_cache, GFP_KERNEL);
 	if (!lcd_arch) {
 		LCD_ARCH_ERR("failed to alloc lcd_arch");
+		ret = -ENOMEM;
 		goto fail_alloc;
 	}
-	
 	/*
 	 * Set up ept
 	 */
-	if (vmx_init_ept(lcd_arch)) {
+	ret = vmx_init_ept(lcd_arch);
+	if (ret) {
 		LCD_ARCH_ERR("setting up etp");
 		goto fail_ept;
 	}
+	/*
+	 * Alloc vmcs
+	 */
+	lcd_arch->vmcs = vmx_alloc_vmcs(raw_smp_processor_id());
+	if (!lcd_arch->vmcs) {
+		LCD_ARCH_ERR("failed to alloc vmcs\n");
+		ret = -ENOMEM;
+		goto fail_vmcs;
+	}
+
+	ret = vmx_allocate_vpid(lcd_arch);
+	if (ret) {
+		LCD_ARCH_ERR("failed to alloc vpid\n");
+		goto fail_vpid;
+	}
 
 	/*
-	 * Set up list
+	 * Not loaded on a cpu right now
 	 */
-	mutex_init(&lcd_arch->lcd_arch_threads.lock);
-	INIT_LIST_HEAD(&lcd_arch->lcd_arch_threads.list);
+	lcd_arch->cpu = -1;
+	/*
+	 * Initialize VMCS register values and settings
+	 * 
+	 * Preemption disabled while doing so ...
+	 */
+	vmx_get_cpu(lcd_arch);
+	vmx_setup_vmcs(lcd_arch);
+	vmx_put_cpu(lcd_arch);
 
-	return lcd_arch;
+	*out = lcd_arch;
+	
+	return 0;
 
+fail_vpid:
+	vmx_free_vmcs(lcd_arch->vmcs);
+fail_vmcs:
+	vmx_free_ept(lcd_arch);
 fail_ept:
-	kfree(lcd_arch);
+	kmem_cache_free(lcd_arch_cache, lcd_arch);
 fail_alloc:
-	return NULL;
+	return ret;
 }
 
 void lcd_arch_destroy(struct lcd_arch *lcd_arch)
 {
 	/*
-	 * Assumes all lcd_arch_thread's are destroyed ...
+	 * Premption Disabled
+	 *
+	 * The call to vmx_get_cpu is done because if lcd_arch is
+	 * active on a different cpu, it needs to be
+	 * vmclear'd there (and vmx_get_cpu will do
+	 * that, as a side effect).
+	 *
+	 * There might be alternative ways, but this works ...
 	 */
-	if (mutex_lock_interruptible(&lcd_arch->lcd_arch_threads.lock)) {
-		LCD_ARCH_ERR("interrupted, skipping checks and freeing");
-		goto free_junk;
-	}
+	vmx_get_cpu(lcd_arch);
 	/*
-	 * Warn
+	 * Invalidate any cached mappings in tlb.
+	 *
+	 * XXX: No lock on ept
 	 */
-	if (!list_empty(&lcd_arch->lcd_arch_threads.list))
-		LCD_ARCH_ERR("lcd_arch still contains some threads...");
-	mutex_unlock(&lcd_arch->lcd_arch_threads.lock);
-
-free_junk:
-
+	invvpid_single_context(lcd_arch->vpid);
 	invept_single_context(lcd_arch->ept.vmcs_ptr);
+	/*
+	 * VM clear on this cpu
+	 */
+	vmcs_clear(lcd_arch->vmcs);
+	__get_cpu_var(local_lcd_arch) = NULL;
+	/*
+	 * Preemption enabled
+	 */
+	vmx_put_cpu(lcd_arch);
+	/*
+	 * Free remaining junk
+	 */
+	vmx_free_vpid(lcd_arch);
+	vmx_free_vmcs(lcd_arch->vmcs);
 	vmx_free_ept(lcd_arch);
-	kfree(lcd_arch);
+	kmem_cache_free(lcd_arch_cache, lcd_arch);
 }
-
-
-/* LCD_ARCH_THREAD CREATE / DESTROY ---------------------------------------- */
 
 #if 0
 /**
@@ -2200,153 +2271,6 @@ static void vmx_pack_desc(struct desc_struct *desc, u64 base, u64 limit,
 }
 #endif
 
-/**
- * Reserves a vpid and sets it in the vcpu.
- */
-static int vmx_allocate_vpid(struct lcd_arch_thread *t)
-{
-	int vpid;
-
-	t->vpid = 0;
-
-	spin_lock(&vpids.lock);
-	vpid = find_first_zero_bit(vpids.bitmap, VMX_NR_VPIDS);
-	if (vpid < VMX_NR_VPIDS) {
-		t->vpid = vpid;
-		__set_bit(vpid, vpids.bitmap);
-	}
-	spin_unlock(&vpids.lock);
-
-	return vpid >= VMX_NR_VPIDS;
-}
-
-/**
- * Frees a vpid.
- */
-static void vmx_free_vpid(struct lcd_arch_thread *t)
-{
-	spin_lock(&vpids.lock);
-	if (t->vpid != 0)
-		__clear_bit(t->vpid, vpids.bitmap);
-	spin_unlock(&vpids.lock);
-}
-
-struct lcd_arch_thread* lcd_arch_add_thread(struct lcd_arch *lcd_arch)
-{
-	struct lcd_arch_thread* t;
-
-	/*
-	 * Alloc lcd_arch_thread
-	 */
-	t = kmem_cache_zalloc(lcd_arch_thread_cache, GFP_KERNEL);
-	if (!t) {
-		LCD_ARCH_ERR("failed to alloc lcd_arch_thread\n");
-		goto fail_vcpu;
-	}
-
-	/*
-	 * Alloc vmcs
-	 */
-	t->vmcs = vmx_alloc_vmcs(raw_smp_processor_id());
-	if (!t->vmcs) {
-		LCD_ARCH_ERR("failed to alloc vmcs\n");
-		goto fail_vmcs;
-	}
-
-	if (vmx_allocate_vpid(t)) {
-		LCD_ARCH_ERR("failed to alloc vpid\n");
-		goto fail_vpid;
-	}
-
-	/*
-	 * Not loaded on a cpu right now
-	 */
-	t->cpu = -1;
-	
-	/*
-	 * Add to lcd_arch (must happen before we set up the vmcs!)
-	 */
-	t->lcd_arch = lcd_arch;
-
-	/*
-	 * Initialize VMCS register values and settings
-	 * 
-	 * Preemption disabled while doing so ...
-	 */
-	vmx_get_cpu(t);
-	vmx_setup_vmcs(t, lcd_arch);
-	vmx_put_cpu(t);
-	
-	/*
-	 * Add t to lcd_arch's list
-	 */
-	INIT_LIST_HEAD(&t->lcd_arch_threads);
-	if (mutex_lock_interruptible(&lcd_arch->lcd_arch_threads.lock))
-		goto fail_list;
-
-	list_add(&t->lcd_arch_threads, &lcd_arch->lcd_arch_threads.list);
-
-	mutex_unlock(&lcd_arch->lcd_arch_threads.lock);
-
-	return t;
-
-fail_list:
-	vmx_free_vpid(t);
-fail_vpid:
-	vmx_free_vmcs(t->vmcs);
-fail_vmcs:
-	kmem_cache_free(lcd_arch_thread_cache, t);
-fail_vcpu:
-	return NULL;
-}
-
-void lcd_arch_destroy_thread(struct lcd_arch_thread *t)
-{
-	/*
-	 * Premption Disabled
-	 *
-	 * The call to vmx_get_cpu is done because if t is
-	 * active on a different cpu, it needs to be
-	 * vmclear'd there (and vmx_get_cpu will do
-	 * that, as a side effect).
-	 *
-	 * There might be alternative ways, but this works ...
-	 */
-	vmx_get_cpu(t);
-	/*
-	 * Invalidate any cached vpid mappings in tlb.
-	 */
-	invvpid_single_context(t->vpid);
-	/*
-	 * VM clear on this cpu
-	 */
-	vmcs_clear(t->vmcs);
-	__get_cpu_var(local_lcd_arch_thread) = NULL;
-	/*
-	 * Preemption enabled
-	 */
-	vmx_put_cpu(t);
-	/*
-	 * Remove t from containing lcd_arch
-	 */
-	if (mutex_lock_interruptible(&t->lcd_arch->lcd_arch_threads.lock)) {
-		LCD_ARCH_ERR("interrupted, still try to free ...");
-		goto free_rest;
-	}
-
-	list_del(&t->lcd_arch_threads);	
-
-	mutex_unlock(&t->lcd_arch->lcd_arch_threads.lock);
-
-free_rest:
-	/*
-	 * Free remaining junk and t
-	 */
-	vmx_free_vpid(t);
-	vmx_free_vmcs(t->vmcs);
-	kmem_cache_free(lcd_arch_thread_cache, t);
-}
-
 /* VMX EXIT HANDLING -------------------------------------------------- */
 
 /**
@@ -2361,10 +2285,10 @@ static void vmx_step_instruction(void)
 }
 
 /**
- * Processes a vmcall. For now, the only reason the lcd_arch_thread
+ * Processes a vmcall. For now, the only reason the lcd_arch
  * would execute a vmcall is for a syscall to the hypervisor.
  */
-static int vmx_handle_vmcall(struct lcd_arch_thread *t)
+static int vmx_handle_vmcall(struct lcd_arch *lcd_arch)
 {
 	return LCD_ARCH_STATUS_SYSCALL;
 }
@@ -2373,18 +2297,15 @@ static int vmx_handle_vmcall(struct lcd_arch_thread *t)
  * Processes an external interrupt (e.g. timer interrupt) by
  * emulating 64-bit interrupt handling. Kernel preemption should
  * be disabled, otherwise the interrupt handler could switch to
- * another conflicting task. Interrupts are 
-
-Unlike kvm, interrupts are assumed
+ * another conflicting task. Unlike kvm, interrupts are assumed
  * to be *enabled*, but will be disabled when the interrupt
  * handler is called, per the ia32 spec (Intel SDM V3 6.8.1).
  */
-static int vmx_handle_external_intr(struct lcd_arch_thread *t)
+static int vmx_handle_external_intr(struct lcd_arch *lcd_arch)
 {
 	unsigned int vector;
 	unsigned long entry;
 	unsigned long sp_tmp;
-	unsigned long flags;
 	gate_desc *idt;
 	gate_desc *gate;
 	/*
@@ -2393,7 +2314,7 @@ static int vmx_handle_external_intr(struct lcd_arch_thread *t)
 	 * Intel SDM V3 24.9.2, 27.2.2 (for vmx intr info)
 	 * Intel SDM V3 6.14.1 (for idt layout)
 	 */
-	vector =  t->exit_intr_info & INTR_INFO_VECTOR_MASK;
+	vector =  lcd_arch->exit_intr_info & INTR_INFO_VECTOR_MASK;
 	idt = vmx_host_idt();
 	gate = idt + vector;
 	entry = gate_offset(*gate);
@@ -2405,7 +2326,7 @@ static int vmx_handle_external_intr(struct lcd_arch_thread *t)
 	 *
 	 * Intel SDM V3 6.8.1
 	 */
-	local_irq_save(flags);
+	local_irq_disable();
 
 	/*
 	 * Emulate 64-bit interrupt handling
@@ -2456,8 +2377,6 @@ static int vmx_handle_external_intr(struct lcd_arch_thread *t)
 		[cs]"i"(__KERNEL_CS)
 		);
 
-	local_irq_restore(flags);
-
 	return LCD_ARCH_STATUS_EXT_INTR;
 }
 
@@ -2466,13 +2385,13 @@ static int vmx_handle_external_intr(struct lcd_arch_thread *t)
  * exceptions, etc. For now, we have the host handle all except page
  * faults.
  */
-static int vmx_handle_hard_exception(struct lcd_arch_thread *t)
+static int vmx_handle_hard_exception(struct lcd_arch *lcd_arch)
 {
 	unsigned int vector;
 	/*
 	 * Intel SDM V3 24.9.2, 27.2.2
 	 */
-	vector = t->exit_intr_info & INTR_INFO_VECTOR_MASK;
+	vector = lcd_arch->exit_intr_info & INTR_INFO_VECTOR_MASK;
 	switch (vector) {
 	case 14:
 		/*
@@ -2481,12 +2400,12 @@ static int vmx_handle_hard_exception(struct lcd_arch_thread *t)
 		 * TODO: We will have microkernel handle it.
 		 */
 		LCD_ARCH_ERR("page fault: faulting gv address = %lx",
-			t->exit_qualification);
+			lcd_arch->exit_qualification);
 		return LCD_ARCH_STATUS_PAGE_FAULT;
 	default:
 		LCD_ARCH_ERR("hw exception: vector = %x, info = %x",
-			vector, t->exit_intr_info);
-		vmx_handle_external_intr(t);
+			vector, lcd_arch->exit_intr_info);
+		vmx_handle_external_intr(lcd_arch);
 		return -EIO;
 	}
 }
@@ -2496,23 +2415,23 @@ static int vmx_handle_hard_exception(struct lcd_arch_thread *t)
  * while lcd_arch_thread was running. For now, the host handles all 
  * exceptions/nmi's.
  */
-static int vmx_handle_exception_nmi(struct lcd_arch_thread *t)
+static int vmx_handle_exception_nmi(struct lcd_arch *lcd_arch)
 {
 	int type;
-	type = t->exit_intr_info & INTR_INFO_INTR_TYPE_MASK;
+	type = lcd_arch->exit_intr_info & INTR_INFO_INTR_TYPE_MASK;
 	switch (type) {
 	case INTR_TYPE_HARD_EXCEPTION:
 		/*
 		 * Page fault, trap, machine check, gp ...
 		 */
-		return vmx_handle_hard_exception(t);
+		return vmx_handle_hard_exception(lcd_arch);
 	default:
 		/*
 		 * NMI, div by zero, overflow, ...
 		 */
 		LCD_ARCH_ERR("exception or nmi: info = %x\n",
-			t->exit_intr_info);
-		return vmx_handle_external_intr(t);
+			lcd_arch->exit_intr_info);
+		return vmx_handle_external_intr(lcd_arch);
 		//return -EIO;
 	}
 }
@@ -2521,7 +2440,7 @@ static int vmx_handle_exception_nmi(struct lcd_arch_thread *t)
  * Simple processing of ept violation (e.g., violation due to
  * an access to unmapped memory).
  */
-static int vmx_handle_ept(struct lcd_arch_thread *t)
+static int vmx_handle_ept(struct lcd_arch *lcd_arch)
 {
 	/*
 	 * Intel SDM V3 27.2.1
@@ -2537,7 +2456,7 @@ static int vmx_handle_ept(struct lcd_arch_thread *t)
  * not currently allowed. Loads / stores to %cr3 lead to
  * vm exits (required for emulab machines) and are emulated.
  */
-static int vmx_handle_control_reg(struct lcd_arch_thread *t)
+static int vmx_handle_control_reg(struct lcd_arch *lcd_arch)
 {
 	int control_reg;
 	int access_type;
@@ -2550,9 +2469,9 @@ static int vmx_handle_control_reg(struct lcd_arch_thread *t)
 	 * Determine the control and general purpose registers involved, 
 	 * and the access type.
 	 */
-	control_reg = t->exit_qualification & CONTROL_REG_ACCESS_NUM;
-	access_type = t->exit_qualification & CONTROL_REG_ACCESS_TYPE;
-	general_reg = t->exit_qualification & CONTROL_REG_ACCESS_REG;
+	control_reg = lcd_arch->exit_qualification & CONTROL_REG_ACCESS_NUM;
+	access_type = lcd_arch->exit_qualification & CONTROL_REG_ACCESS_TYPE;
+	general_reg = lcd_arch->exit_qualification & CONTROL_REG_ACCESS_REG;
 
 	switch (control_reg) {
 	case 3:
@@ -2563,12 +2482,12 @@ static int vmx_handle_control_reg(struct lcd_arch_thread *t)
 			/*
 			 * Move to
 			 */
-			vmcs_writel(GUEST_CR3, t->regs[general_reg]);
+			vmcs_writel(GUEST_CR3, lcd_arch->regs[general_reg]);
 		} else {
 			/*
 			 * Move from
 			 */
-			t->regs[general_reg] = vmcs_readl(GUEST_CR3);
+			lcd_arch->regs[general_reg] = vmcs_readl(GUEST_CR3);
 		}
 		/*
 		 * Step past instruction that caused exit
@@ -2589,7 +2508,7 @@ static int vmx_handle_control_reg(struct lcd_arch_thread *t)
  * Low-level vmx launch / resume to enter non-root mode on cpu with
  * the current vmcs.
  */
-static int __noclone vmx_enter(struct lcd_arch_thread *t)
+static int __noclone vmx_enter(struct lcd_arch *lcd_arch)
 {
 	asm(
 		/* 
@@ -2709,51 +2628,51 @@ static int __noclone vmx_enter(struct lcd_arch_thread *t)
 		".global vmx_return \n\t"
 		"vmx_return: " _ASM_PTR " vmx_return_lbl \n\t"
 		".popsection"
-		: : "c"(t),
+		: : "c"(lcd_arch),
 		  [host_rsp_field]"i"(HOST_RSP),
-		  [launched]"i"(offsetof(struct lcd_arch_thread, launched)),
-		  [fail]"i"(offsetof(struct lcd_arch_thread, fail)),
-		  [host_rsp]"i"(offsetof(struct lcd_arch_thread, host_rsp)),
-		  [rax]"i"(offsetof(struct lcd_arch_thread, 
+		  [launched]"i"(offsetof(struct lcd_arch, launched)),
+		  [fail]"i"(offsetof(struct lcd_arch, fail)),
+		  [host_rsp]"i"(offsetof(struct lcd_arch, host_rsp)),
+		  [rax]"i"(offsetof(struct lcd_arch, 
 					  regs[LCD_ARCH_REGS_RAX])),
-		  [rbx]"i"(offsetof(struct lcd_arch_thread, 
+		  [rbx]"i"(offsetof(struct lcd_arch, 
 					  regs[LCD_ARCH_REGS_RBX])),
-		  [rcx]"i"(offsetof(struct lcd_arch_thread, 
+		  [rcx]"i"(offsetof(struct lcd_arch, 
 					  regs[LCD_ARCH_REGS_RCX])),
-		  [rdx]"i"(offsetof(struct lcd_arch_thread, 
+		  [rdx]"i"(offsetof(struct lcd_arch, 
 					  regs[LCD_ARCH_REGS_RDX])),
-		  [rsi]"i"(offsetof(struct lcd_arch_thread, 
+		  [rsi]"i"(offsetof(struct lcd_arch, 
 					  regs[LCD_ARCH_REGS_RSI])),
-		  [rdi]"i"(offsetof(struct lcd_arch_thread, 
+		  [rdi]"i"(offsetof(struct lcd_arch, 
 					  regs[LCD_ARCH_REGS_RDI])),
-		  [rbp]"i"(offsetof(struct lcd_arch_thread, 
+		  [rbp]"i"(offsetof(struct lcd_arch, 
 					  regs[LCD_ARCH_REGS_RBP])),
-		  [r8]"i"(offsetof(struct lcd_arch_thread, 
+		  [r8]"i"(offsetof(struct lcd_arch, 
 					  regs[LCD_ARCH_REGS_R8])),
-		  [r9]"i"(offsetof(struct lcd_arch_thread, 
+		  [r9]"i"(offsetof(struct lcd_arch, 
 					  regs[LCD_ARCH_REGS_R9])),
-		  [r10]"i"(offsetof(struct lcd_arch_thread, 
+		  [r10]"i"(offsetof(struct lcd_arch, 
 					  regs[LCD_ARCH_REGS_R10])),
-		  [r11]"i"(offsetof(struct lcd_arch_thread, 
+		  [r11]"i"(offsetof(struct lcd_arch, 
 					  regs[LCD_ARCH_REGS_R11])),
-		  [r12]"i"(offsetof(struct lcd_arch_thread, 
+		  [r12]"i"(offsetof(struct lcd_arch, 
 					  regs[LCD_ARCH_REGS_R12])),
-		  [r13]"i"(offsetof(struct lcd_arch_thread, 
+		  [r13]"i"(offsetof(struct lcd_arch, 
 					  regs[LCD_ARCH_REGS_R13])),
-		  [r14]"i"(offsetof(struct lcd_arch_thread, 
+		  [r14]"i"(offsetof(struct lcd_arch, 
 					  regs[LCD_ARCH_REGS_R14])),
-		  [r15]"i"(offsetof(struct lcd_arch_thread, 
+		  [r15]"i"(offsetof(struct lcd_arch, 
 					  regs[LCD_ARCH_REGS_R15])),
-		  [cr2]"i"(offsetof(struct lcd_arch_thread, cr2)),
+		  [cr2]"i"(offsetof(struct lcd_arch, cr2)),
 		  [wordsize]"i"(sizeof(ulong))
 		: "cc", "memory"
 		  , "rax", "rdx", "rbx", "rdi", "rsi"
 		  , "r8", "r9", "r10", "r11", "r12", "r13", "r14", "r15"
 		);
 
-	t->launched = 1;
+	lcd_arch->launched = 1;
 
-	if (unlikely(t->fail)) {
+	if (unlikely(lcd_arch->fail)) {
 		/*
 		 * See Intel SDM V3 30.4 for error codes
 		 */
@@ -2762,17 +2681,17 @@ static int __noclone vmx_enter(struct lcd_arch_thread *t)
 		return VMX_EXIT_REASONS_FAILED_VMENTRY;
 	}
 
-	t->exit_reason = vmcs_read32(VM_EXIT_REASON);
-	t->exit_qualification = vmcs_readl(EXIT_QUALIFICATION);
-	t->idt_vectoring_info = vmcs_read32(IDT_VECTORING_INFO_FIELD);
-	t->error_code = vmcs_read32(IDT_VECTORING_ERROR_CODE);
-	t->exit_intr_info = vmcs_read32(VM_EXIT_INTR_INFO);
-	t->vec_no = t->exit_intr_info & INTR_INFO_VECTOR_MASK;
+	lcd_arch->exit_reason = vmcs_read32(VM_EXIT_REASON);
+	lcd_arch->exit_qualification = vmcs_readl(EXIT_QUALIFICATION);
+	lcd_arch->idt_vectoring_info = vmcs_read32(IDT_VECTORING_INFO_FIELD);
+	lcd_arch->error_code = vmcs_read32(IDT_VECTORING_ERROR_CODE);
+	lcd_arch->exit_intr_info = vmcs_read32(VM_EXIT_INTR_INFO);
+	lcd_arch->vec_no = lcd_arch->exit_intr_info & INTR_INFO_VECTOR_MASK;
 
-	return t->exit_reason;
+	return lcd_arch->exit_reason;
 }
 
-int lcd_arch_run(struct lcd_arch_thread *t)
+int lcd_arch_run(struct lcd_arch *lcd_arch)
 {
 	int exit_reason;
 	int ret;
@@ -2782,12 +2701,12 @@ int lcd_arch_run(struct lcd_arch_thread *t)
 	 *
 	 * *preemption disabled*
 	 */
-	vmx_get_cpu(t);
+	vmx_get_cpu(lcd_arch);
 
 	/*
 	 * Enter lcd
 	 */
-	exit_reason = vmx_enter(t);
+	exit_reason = vmx_enter(lcd_arch);
 
 	/*
 	 * Handle exit reason
@@ -2796,19 +2715,19 @@ int lcd_arch_run(struct lcd_arch_thread *t)
 	 */
 	switch (exit_reason) {
 	case EXIT_REASON_EXCEPTION_NMI:
-		ret = vmx_handle_exception_nmi(t);
+		ret = vmx_handle_exception_nmi(lcd_arch);
 		break;
 	case EXIT_REASON_EXTERNAL_INTERRUPT:
-		ret = vmx_handle_external_intr(t);
+		ret = vmx_handle_external_intr(lcd_arch);
 		break;
 	case EXIT_REASON_VMCALL:
-		ret = vmx_handle_vmcall(t);
+		ret = vmx_handle_vmcall(lcd_arch);
 		break;
 	case EXIT_REASON_EPT_VIOLATION:
-		ret = vmx_handle_ept(t);
+		ret = vmx_handle_ept(lcd_arch);
 		break;
 	case EXIT_REASON_CR_ACCESS:
-		ret = vmx_handle_control_reg(t);
+		ret = vmx_handle_control_reg(lcd_arch);
 		break;
 	default:
 		LCD_ARCH_ERR("unhandled exit reason: %x\n",
@@ -2820,38 +2739,38 @@ int lcd_arch_run(struct lcd_arch_thread *t)
 	/*
 	 * Preemption enabled
 	 */
-	vmx_put_cpu(t);	
+	vmx_put_cpu(lcd_arch);	
 
 	return ret;
 }
 
 /* LCD RUNTIME ENV -------------------------------------------------- */
 
-int lcd_arch_set_pc(struct lcd_arch_thread *t, gva_t a)
+int lcd_arch_set_pc(struct lcd_arch *lcd_arch, gva_t a)
 {
-	t->regs[LCD_ARCH_REGS_RIP] = gva_val(a);
+	lcd_arch->regs[LCD_ARCH_REGS_RIP] = gva_val(a);
 	/*
 	 * Must load vmcs to modify it
 	 */
-	vmx_get_cpu(t);
+	vmx_get_cpu(lcd_arch);
 	vmcs_writel(GUEST_RIP, gva_val(a));
-	vmx_put_cpu(t);
+	vmx_put_cpu(lcd_arch);
 	return 0;
 }
 
-int lcd_arch_set_sp(struct lcd_arch_thread *t, gva_t a)
+int lcd_arch_set_sp(struct lcd_arch *lcd_arch, gva_t a)
 {
-	t->regs[LCD_ARCH_REGS_RSP] = gva_val(a);
+	lcd_arch->regs[LCD_ARCH_REGS_RSP] = gva_val(a);
 	/*
 	 * Must load vmcs to modify it
 	 */
-	vmx_get_cpu(t);
+	vmx_get_cpu(lcd_arch);
 	vmcs_writel(GUEST_RSP, gva_val(a));
-	vmx_put_cpu(t);
+	vmx_put_cpu(lcd_arch);
 	return 0;
 }
 
-int lcd_arch_set_gva_root(struct lcd_arch_thread *t, gpa_t a)
+int lcd_arch_set_gva_root(struct lcd_arch *lcd_arch, gpa_t a)
 {
 	u64 cr3_ptr;
 
@@ -2859,15 +2778,15 @@ int lcd_arch_set_gva_root(struct lcd_arch_thread *t, gpa_t a)
 	/*
 	 * Must load vmcs to modify it
 	 */
-	vmx_get_cpu(t);
+	vmx_get_cpu(lcd_arch);
 	vmcs_writel(GUEST_CR3, cr3_ptr);
-	vmx_put_cpu(t);
+	vmx_put_cpu(lcd_arch);
 	return 0;
 }
 
 /* CHECKING ---------------------------------------- */
 
-static inline u16 vmx_get16(struct lcd_arch_thread *t, u64 field)
+static inline u16 vmx_get16(struct lcd_arch *t, u64 field)
 {
 	u16 out;
 	vmx_get_cpu(t);
@@ -2876,7 +2795,7 @@ static inline u16 vmx_get16(struct lcd_arch_thread *t, u64 field)
 	return out;
 }
 
-static inline u32 vmx_get32(struct lcd_arch_thread *t, u64 field)
+static inline u32 vmx_get32(struct lcd_arch *t, u64 field)
 {
 	u32 out;
 	vmx_get_cpu(t);
@@ -2885,7 +2804,7 @@ static inline u32 vmx_get32(struct lcd_arch_thread *t, u64 field)
 	return out;
 }
 
-static inline u64 vmx_getl(struct lcd_arch_thread *t, u64 field)
+static inline u64 vmx_getl(struct lcd_arch *t, u64 field)
 {
 	u64 out;
 	vmx_get_cpu(t);
@@ -2909,33 +2828,33 @@ static inline int vmx_bad_phys_addr(u64 phys_addr)
 	return (phys_addr & mask) != 0;
 }
 
-static inline u32 vmx_get_pin(struct lcd_arch_thread *t)
+static inline u32 vmx_get_pin(struct lcd_arch *t)
 {
 	return vmx_get32(t, PIN_BASED_VM_EXEC_CONTROL);
 }
 
-static inline int vmx_pin_has(struct lcd_arch_thread *t, u32 field)
+static inline int vmx_pin_has(struct lcd_arch *t, u32 field)
 {
 	return (vmx_get_pin(t) & field) != 0;
 } 
 
-static inline u32 vmx_get_prim_exec(struct lcd_arch_thread *t)
+static inline u32 vmx_get_prim_exec(struct lcd_arch *t)
 {
 	return vmx_get32(t, CPU_BASED_VM_EXEC_CONTROL);
 }
 
-static inline int vmx_prim_exec_has(struct lcd_arch_thread *t, u32 field)
+static inline int vmx_prim_exec_has(struct lcd_arch *t, u32 field)
 {
 	return (vmx_get_prim_exec(t) & field) != 0;
 } 
 
-static inline int vmx_has_sec_exec(struct lcd_arch_thread *t)
+static inline int vmx_has_sec_exec(struct lcd_arch *t)
 {
 	return (vmx_get_prim_exec(t) & 
 		CPU_BASED_ACTIVATE_SECONDARY_CONTROLS) != 0;
 }
 
-static inline u32 vmx_get_sec_exec(struct lcd_arch_thread *t)
+static inline u32 vmx_get_sec_exec(struct lcd_arch *t)
 {
 	if (!vmx_has_sec_exec(t)) {
 		printk(KERN_ERR "lcd vmx get sec exec: bad check, something wrong; t doesn't have secondary exec ctrls enabled");
@@ -2944,7 +2863,7 @@ static inline u32 vmx_get_sec_exec(struct lcd_arch_thread *t)
 	return vmx_get32(t, SECONDARY_VM_EXEC_CONTROL);
 }
 
-static inline int vmx_sec_exec_has(struct lcd_arch_thread *t, u32 field)
+static inline int vmx_sec_exec_has(struct lcd_arch *t, u32 field)
 {
 	if (!vmx_has_sec_exec(t)) {
 		printk(KERN_ERR "lcd vmx get sec exec: bad check, something wrong; t doesn't have secondary exec ctrls enabled");
@@ -2953,22 +2872,22 @@ static inline int vmx_sec_exec_has(struct lcd_arch_thread *t, u32 field)
 	return (vmx_get_sec_exec(t) & field) != 0;
 } 
 
-static inline u32 vmx_get_exit(struct lcd_arch_thread *t)
+static inline u32 vmx_get_exit(struct lcd_arch *t)
 {
 	return vmx_get32(t, VM_EXIT_CONTROLS);
 }
 
-static inline int vmx_exit_has(struct lcd_arch_thread *t, u32 field)
+static inline int vmx_exit_has(struct lcd_arch *t, u32 field)
 {
 	return (vmx_get_exit(t) & field) != 0;
 } 
 
-static inline u32 vmx_get_entry(struct lcd_arch_thread *t)
+static inline u32 vmx_get_entry(struct lcd_arch *t)
 {
 	return vmx_get32(t, VM_ENTRY_CONTROLS);
 }
 
-static inline int vmx_entry_has(struct lcd_arch_thread *t, u32 field)
+static inline int vmx_entry_has(struct lcd_arch *t, u32 field)
 {
 	return (vmx_get_entry(t) & field) != 0;
 }
@@ -2992,7 +2911,7 @@ static inline int vmx_bool_eq(int b1, int b2)
 	return (b1 == 0 && b2 == 0) || (b1 != 0 && b2 != 0);
 }
 
-static int vmx_check_exec_ctrls(struct lcd_arch_thread *t)
+static int vmx_check_exec_ctrls(struct lcd_arch *t)
 {
 	u32 low32;
 	u32 high32;
@@ -3247,7 +3166,7 @@ static inline int vmx_bad_msr_addr(u64 msr_addr, u32 msr_count)
 	}
 }
 
-static int vmx_check_exit_ctrls(struct lcd_arch_thread *t)
+static int vmx_check_exit_ctrls(struct lcd_arch *t)
 {
 	u32 low32;
 	u32 high32;
@@ -3293,7 +3212,7 @@ static int vmx_check_exit_ctrls(struct lcd_arch_thread *t)
 	return 0;
 }
 
-static int vmx_check_entry_ctrls(struct lcd_arch_thread *t)
+static int vmx_check_entry_ctrls(struct lcd_arch *t)
 {
 	u32 low32;
 	u32 high32;
@@ -3347,7 +3266,7 @@ static inline int vmx_bad_host_sel(u16 sel)
 	return (sel & SEGMENT_RPL_MASK) != 0 || (sel & SEGMENT_TI_MASK) != 0;
 }
 
-static int vmx_check_host_seg(struct lcd_arch_thread *t)
+static int vmx_check_host_seg(struct lcd_arch *t)
 {
 	u16 act16;
 	u64 act64;
@@ -3429,7 +3348,7 @@ static int vmx_check_host_seg(struct lcd_arch_thread *t)
 	return 0;
 }
 
-static int vmx_check_host_ctrl_regs(struct lcd_arch_thread *t)
+static int vmx_check_host_ctrl_regs(struct lcd_arch *t)
 {
 	u64 act64;
 	u64 min;
@@ -3517,7 +3436,7 @@ static int vmx_check_host_ctrl_regs(struct lcd_arch_thread *t)
 	return 0;
 }
 
-static int vmx_check_addr_size(struct lcd_arch_thread *t)
+static int vmx_check_addr_size(struct lcd_arch *t)
 {
 	u64 templ;
 
@@ -3545,7 +3464,7 @@ static int vmx_check_addr_size(struct lcd_arch_thread *t)
 	return 0;
 }
 
-static int vmx_check_guest_ctrl_regs(struct lcd_arch_thread *t)
+static int vmx_check_guest_ctrl_regs(struct lcd_arch *t)
 {
 	u64 act64;
 	u64 min;
@@ -3753,7 +3672,7 @@ static inline int vmx_seg_resrv(u64 ar_bytes)
 	return ar_bytes & AR_RESERVD_MASK;
 }
 
-static int vmx_check_guest_seg(struct lcd_arch_thread *t)
+static int vmx_check_guest_seg(struct lcd_arch *t)
 {
 	u64 act64;
 	u64 act64b;
@@ -4190,7 +4109,7 @@ static int vmx_check_guest_seg(struct lcd_arch_thread *t)
 	return 0;
 }
 
-static int vmx_check_guest_rip_rflags(struct lcd_arch_thread *t)
+static int vmx_check_guest_rip_rflags(struct lcd_arch *t)
 {
 	u64 act64;
 	u32 act32;
@@ -4249,7 +4168,7 @@ static int vmx_check_guest_rip_rflags(struct lcd_arch_thread *t)
 	return 0;
 }
 
-static int vmx_check_guest_non_reg(struct lcd_arch_thread *t)
+static int vmx_check_guest_non_reg(struct lcd_arch *t)
 {
 	if (vmx_get32(t, GUEST_ACTIVITY_STATE) !=
 		GUEST_ACTIVITY_ACTIVE) {
@@ -4280,7 +4199,7 @@ static int vmx_check_guest_non_reg(struct lcd_arch_thread *t)
 	return 0;
 }
 
-static int vmx_check_guest_pdpte(struct lcd_arch_thread *t)
+static int vmx_check_guest_pdpte(struct lcd_arch *t)
 {
 	
 	if (vmx_getl(t, GUEST_CR0) & X86_CR0_PG &&
@@ -4293,7 +4212,7 @@ static int vmx_check_guest_pdpte(struct lcd_arch_thread *t)
 	return 0;
 }
 
-static int vmx_check_guest(struct lcd_arch_thread *t)
+static int vmx_check_guest(struct lcd_arch *t)
 {
 	if (vmx_check_guest_ctrl_regs(t))
 		return -1;
@@ -4308,7 +4227,7 @@ static int vmx_check_guest(struct lcd_arch_thread *t)
 	return 0;
 }
 
-static int vmx_check_host(struct lcd_arch_thread *t)
+static int vmx_check_host(struct lcd_arch *t)
 {
 	if (vmx_check_host_ctrl_regs(t))
 		return -1;
@@ -4317,7 +4236,7 @@ static int vmx_check_host(struct lcd_arch_thread *t)
 	return 0;
 }
 
-static int vmx_check_ctrls(struct lcd_arch_thread *t)
+static int vmx_check_ctrls(struct lcd_arch *t)
 {
 	if (vmx_check_exec_ctrls(t))
 		return -1;
@@ -4328,7 +4247,7 @@ static int vmx_check_ctrls(struct lcd_arch_thread *t)
 	return 0;
 }
 
-static int vmx_check_ctrls_and_host(struct lcd_arch_thread *t)
+static int vmx_check_ctrls_and_host(struct lcd_arch *t)
 {
 	if (vmx_check_ctrls(t))
 		return -1;
@@ -4339,7 +4258,7 @@ static int vmx_check_ctrls_and_host(struct lcd_arch_thread *t)
 	return 0;
 }
 
-int lcd_arch_check(struct lcd_arch_thread *t)
+int lcd_arch_check(struct lcd_arch *t)
 {
 	if (vmx_check_ctrls_and_host(t))
 		return -1;
@@ -4350,12 +4269,13 @@ int lcd_arch_check(struct lcd_arch_thread *t)
 
 /* EXPORTS -------------------------------------------------- */
 
+module_init(lcd_arch_init);
+module_exit(lcd_arch_exit);
+
 EXPORT_SYMBOL(lcd_arch_init);
 EXPORT_SYMBOL(lcd_arch_exit);
 EXPORT_SYMBOL(lcd_arch_create);
 EXPORT_SYMBOL(lcd_arch_destroy);
-EXPORT_SYMBOL(lcd_arch_add_thread);
-EXPORT_SYMBOL(lcd_arch_destroy_thread);
 EXPORT_SYMBOL(lcd_arch_run);
 EXPORT_SYMBOL(lcd_arch_ept_walk);
 EXPORT_SYMBOL(lcd_arch_ept_set);

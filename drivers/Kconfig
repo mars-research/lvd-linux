@@ -202,8 +202,4 @@ source "drivers/hwtracing/intel_th/Kconfig"
 
 source "drivers/fpga/Kconfig"
 
-source "drivers/lcd-prototype/Kconfig"
-
-source "drivers/lcd-cspace/Kconfig"
-
 endmenu

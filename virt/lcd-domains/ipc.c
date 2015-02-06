@@ -9,455 +9,108 @@
 #include <linux/types.h>
 #include <linux/sched.h>
 #include <linux/slab.h>
-#include <lcd-domains/utcb.h>
-#include <lcd-domains/common.h>
+#include <lcd-domains/types.h>
+#include "internal.h"
 
 
-static void copy_msg_cap(struct lcd *from, struct lcd *to,
-			cptr_t from_ptr, cptr_t to_ptr)
+/* QUICK LOOKUP / LOCK -------------------------------------------------- */
+
+static int lookup_ep(struct cspace *cspace, cptr_t slot, struct cnode **cnode)
 {
 	int ret;
-
-	ret = lcd_cnode_grant(from->cspace, to->cspace, from_ptr, to_ptr,
-			LCD_CAP_RIGHT_ALL);
-	if (ret) {
-		LCD_ERR("failed to transfer cap @ %d in lcd %p to slot @ %d in lcd %p",
-			from_ptr, from, to_ptr, to);
-	}
-}
-
-static void copy_msg_caps(struct lcd *from, struct lcd *to)
-{
-	int i;
-	for (i = 0; i < from->utcb.max_valid_out_cap_reg_idx &&
-		     i < to->utcb.max_valid_in_cap_reg_idx; i++) {
-		LCD_MSG("copying cap at %d", i);
-		copy_msg_cap(from, to, from->utcb.out_cap_regs[i],
-			to->utcb.in_cap_regs[i]);
-	}
 	/*
-	 * reset
+	 * Look up
 	 */
-	from->utcb.max_valid_out_cap_reg_idx = 0;
-	to->utcb.max_valid_in_cap_reg_idx = 0;
-}
-
-static void copy_call_endpoint(struct lcd *from, struct lcd *to)
-{
-	copy_msg_cap(from, to, from->utcb.call_endpoint_cap,
-		to->utcb.reply_endpoint_cap);
-	return;	
-}
-
-static void transfer_msg(struct lcd *from, struct lcd *to, int making_call)
-{
-	int ret;
-	struct cnode *reply_cnode;
-	/*
-	 * Copy valid regs
-	 */
-	copy_msg_regs(from, to);
-	/*
-	 * Transfer capabilities
-	 */
-	copy_msg_caps(from, to);
-	if (making_call)
-		copy_call_endpoint(from, to);
-	/*
-	 * Free up receiver cnode slot if sender wasn't making call
-	 *
-	 * XXX: this is obviously a hack
-	 */
-	if (!making_call) {
-		ret = lcd_cap_lock();
-		if (ret) {
-			LCD_ERR("couldn't lock cap system");
-			return;
-		}
-		ret = __lcd_cnode_lookup(to->cspace, 
-					to->utcb.reply_endpoint_cap,
-					&reply_cnode);
-
-		if (ret) {
-			LCD_ERR("couldn't find reply cnode");
-			lcd_cap_unlock();
-			return;
-		}
-		
-		__lcd_cnode_free(reply_cnode);
-		lcd_cap_unlock();
-	}
-
-	return; 
-}
-
-static int lcd_do_send(struct lcd *from, cptr_t c, int making_call)
-{
-	int ret;
-	struct lcd *to;
-	struct cnode *cnode;
-	struct sync_endpoint *e;
-	
-	/*
-	 * Lookup cnode
-	 */
-	ret = __lcd_cnode_lookup(from->cspace, c, &cnode);
-	if (ret) {
-		LCD_ERR("looking up cnode");
+	ret = __lcd_cnode_get(cspace, slot, cnode);
+	if (ret)
 		goto fail1;
-	}
 	/*
-	 * Confirm type and permissions
+	 * Confirm it's an lcd
 	 */
-	if (!__lcd_cnode_is_sync_ep(cnode) || !__lcd_cnode_can_write(cnode)) {
-		LCD_ERR("cnode not an endpoint, or bad perms");
-		ret = -EACCES;
-		goto fail1;
-	}
-	/*
-	 * Get synch end point
-	 */
-	e = __lcd_cnode_object(cnode);
-	/*
-	 * Check if any recvr waiting, and do immediate send, wake up
-	 * recvr
-	 *
-	 * (Locking endpoint is probably pointless for now since
-	 * it's used primarily when cap is locked.)
-	 */
-	ret = mutex_lock_interruptible(&e->lock);
-	if (ret) {
-		LCD_ERR("interrupted");
-		goto fail1;
+	if ((*cnode)->type != LCD_CAP_TYPE_SYNC_EP) {
+		LCD_ERR("not a sync ep");
+		goto fail2;
 	}
 
-	if (list_empty(&e->receivers)) {
-		/*
-		 * No one receiving; put myself in e's sender list
-		 */
-		list_add_tail(&from->senders, &e->senders);
-		/*
-		 * Mark myself as making a call, if necessary, so that recvr
-		 * knows it needs to copy reply rendezvous point cap.
-		 */
-		from->making_call = making_call;
-		/*
-		 * IMPORTANT: Must unlock cap and e's lock before going to 
-		 * sleep.
-		 */
-		mutex_unlock(&e->lock);
-		lcd_cap_unlock();
+	return 0;
 
-		set_current_state(TASK_INTERRUPTIBLE);
-		schedule();		
-
-		/*
-		 * Someone woke me up; re-lock cap. Receiver should transfer
-		 * message, so we just return.
-		 *
-		 * Reset making_call var.
-		 */
-		from->making_call = 0;
-		
-		return lcd_cap_lock();
-	}
-
-	/*
-	 * Otherwise, someone waiting to receive. Remove from
-	 * receiving queue.
-	 */
-
-	to = list_first_entry(&e->receivers, struct lcd, receivers);
-        list_del_init(&to->receivers);
-	mutex_unlock(&e->lock);
-
-	/*
-	 * XXX: for now, unlock cap (transfer_msg needs cap unlocked, since
-	 * it eventually calls grant)
-	 */
-	lcd_cap_unlock();
-
-	/*
-	 * Send message, and wake up lcd
-	 */
-	transfer_msg(from, to, making_call);
-
-	wake_up_process(to->parent);
-
-	return lcd_cap_lock();
+fail2:
+	__lcd_cnode_put(*cnode);
 fail1:
 	return ret;
 }
 
-int __lcd_send(struct lcd *lcd, cptr_t c)
+static int get_ep(struct cspace *cspace, cptr_t endpoint, struct cnode **cnode,
+		struct lcd_sync_endpoint **e)
 {
 	int ret;
 	/*
-	 * LOCK cap
+	 * Look up and lock cnode containing endpoint
 	 */
-	ret = lcd_cap_lock();
+	ret = lookup_ep(cspace, endpoint, cnode);
 	if (ret)
-		return ret;
-
-	ret = lcd_do_send(lcd, c, 0);
-
-	/*
-	 * UNLOCK cap
-	 */
-	lcd_cap_unlock();
-
-	return ret;
-}
-EXPORT_SYMBOL(__lcd_send);
-
-static int lcd_do_recv(struct lcd *to, cptr_t c)
-{
-	int ret;
-	struct lcd *from;
-	struct sync_endpoint *e;
-	struct cnode *cnode;
-	
-	/*
-	 * Lookup cnode
-	 */
-	ret = __lcd_cnode_lookup(to->cspace, c, &cnode);
-	if (ret) {
-		LCD_ERR("recvr looking up cnode");
 		goto fail1;
-	}
+	*e = (*cnode)->object;
 	/*
-	 * Confirm type and permissions
+	 * Lock endpoint struct
 	 */
-	if (!__lcd_cnode_is_sync_ep(cnode) || !__lcd_cnode_can_read(cnode)) {
-		LCD_ERR("not an endpoint, or bad perms");
-		ret = -EACCES;
-		goto fail1;
-	}
-	/*
-	 * Get synch end point proxy and end point
-	 */
-	e = __lcd_cnode_object(cnode);
-	/*
-	 * Check if any sender waiting, and do immediate recv, wake up
-	 * sender
-	 *
-	 * (Locking endpoint is probably pointless for now since
-	 * it's used primarily when cap is locked.)
-	 */
-	ret = mutex_lock_interruptible(&e->lock);
+	ret = mutex_lock_interruptible(&(*e)->lock);
 	if (ret) {
 		LCD_ERR("interrupted");
-		return ret;
+		goto fail2;
 	}
+	
+	return 0; /* caller should match with put_ep */
 
-	if (list_empty(&e->senders)) {
-		/*
-		 * No one sending; put myself in e's recvr list and lcd's
-		 * receiving eps list.
-		 *
-		 * XXX: maybe we want per-lcd lock?
-		 */
-		list_add_tail(&to->receivers, &e->receivers);
-		/*
-		 *
-		 * IMPORTANT: Must unlock cap before going to sleep.
-		 */
-		mutex_unlock(&e->lock);
-		lcd_cap_unlock();
-
-		set_current_state(TASK_INTERRUPTIBLE);
-		schedule();		
-
-		/*
-		 * Someone woke me up; re-lock cap. Receiver should transfer
-		 * message, so we just return.
-		 */
-		return lcd_cap_lock();
-	}
-
-	/*
-	 * Otherwise, someone waiting to send. Remove from
-	 * sending queue.
-	 */
-	from = list_first_entry(&e->senders, struct lcd, senders);
-        list_del_init(&from->senders);
-	mutex_unlock(&e->lock);
-
-	/*
-	 * XXX: for now, unlock cap (transfer_msg needs cap unlocked, since
-	 * it eventually calls grant)
-	 */
-	lcd_cap_unlock();
-
-	/*
-	 * Send message, and wake up lcd
-	 */
-	transfer_msg(from, to, from->making_call);
-
-	wake_up_process(from->parent);
-
-	return lcd_cap_lock();
+fail2:
+	__lcd_cnode_put(*cnode);
 fail1:
 	return ret;
 }
 
-static int lcd_reply_alloc(struct lcd *lcd)
+static void put_ep(struct cnode *cnode, struct lcd_sync_endpoint *ep)
 {
-	cptr_t reply_cap;
-	int ret;
-
-	ret = lcd_cnode_alloc(lcd->cspace, &reply_cap);
-	if (ret) {
-		LCD_ERR("alloc failed");
-		return ret;
-	}
-
-	lcd->utcb.reply_endpoint_cap = reply_cap;
-
-	return 0;
+	/*
+	 * Unlock lcd
+	 */
+	mutex_unlock(&ep->lock);
+	/*
+	 * Release cnode
+	 */
+	__lcd_cnode_put(cnode);
 }
 
-int __lcd_recv(struct lcd *lcd, cptr_t c)
+/* MAIN INTERFACE -------------------------------------------------- */
+
+int __lcd_create_sync_endpoint(struct lcd *caller, cptr_t slot)
 {
+	struct lcd_sync_endpoint *e;
 	int ret;
 	/*
-	 * Alloc slot for reply endpoint, in case sender does call
-	 */
-	ret = lcd_reply_alloc(lcd);
-	if (ret)
-		return ret;	
-	/*
-	 * LOCK cap
-	 */
-	ret = lcd_cap_lock();
-	if (ret)
-		return ret;
-
-	ret = lcd_do_recv(lcd, c);
-
-	/*
-	 * UNLOCK cap
-	 */
-	lcd_cap_unlock();
-
-	return ret;
-}
-EXPORT_SYMBOL(__lcd_recv);
-
-static int lcd_call_alloc(struct lcd *lcd)
-{
-	int ret;
-	cptr_t call_cptr;
-
-	ret = lcd_cnode_alloc(lcd->cspace, &call_cptr);
-	if (ret) {
-		LCD_ERR("alloc failed");
-		return ret;
-	}
-
-	ret = __lcd_mk_sync_endpoint(lcd, call_cptr);
-	if (ret) {
-		LCD_ERR("couldn't make endpoint");
-		return ret;
-	}
-
-	lcd->utcb.call_endpoint_cap = call_cptr;
-
-	return 0;
-}
-
-int __lcd_call(struct lcd *lcd, cptr_t c)
-{
-	int ret;
-	/*
-	 * Alloc special call endpoint
-	 */
-	ret = lcd_call_alloc(lcd);
-	if (ret)
-		return ret;
-	/*
-	 * LOCK cap
-	 */
-	ret = lcd_cap_lock();
-	if (ret)
-		goto out;
-
-	ret = lcd_do_send(lcd, c, 1);
-
-	/*
-	 * UNLOCK cap
-	 */
-	lcd_cap_unlock();
-
-	if (ret) {
-		LCD_ERR("send of call failed");
-		goto out;
-	}
-
-	/*
-	 * Receive on my special end point
-	 */
-	ret = __lcd_recv(lcd, lcd->utcb.call_endpoint_cap);
-	if (ret) {
-		LCD_ERR("recv of call failed");
-		goto out;
-	}
-
-	ret = 0;
-	goto out;
-
-out:
-	__lcd_rm_sync_endpoint(lcd, lcd->utcb.call_endpoint_cap);
-	return ret;
-}
-EXPORT_SYMBOL(__lcd_call);
-
-int __lcd_reply(struct lcd *lcd)
-{
-	int ret;
-	/*
-	 * LOCK cap
-	 */
-	ret = lcd_cap_lock();
-	if (ret)
-		return ret;
-
-	ret = lcd_do_send(lcd, lcd->utcb.reply_endpoint_cap, 0);
-
-	/*
-	 * UNLOCK cap
-	 */
-	lcd_cap_unlock();
-
-	return ret;
-}
-EXPORT_SYMBOL(__lcd_reply);
-
-int __lcd_mk_sync_endpoint(struct lcd *lcd, cptr_t c)
-{
-	struct sync_endpoint *e;
-	int ret = -EINVAL;
-	/*
-	 * Allocate end point
+	 * Alloc
 	 */
 	e = kmalloc(sizeof(*e), GFP_KERNEL);
 	if (!e) {
+		LCD_ERR("no mem");
 		ret = -ENOMEM;
 		goto fail1;
 	}
 	/*
-	 * Initialize end point
+	 * Set up send/recv queues
 	 */
 	INIT_LIST_HEAD(&e->senders);
 	INIT_LIST_HEAD(&e->receivers);
+	/*
+	 * Set up lock
+	 */
 	mutex_init(&e->lock);
 	/*
-	 * Insert endpoint into cspace at c
+	 * Insert into caller's cspace
 	 */
-	ret = lcd_cnode_insert(lcd->cspace, c, e, LCD_CAP_TYPE_SYNC_EP,
-			LCD_CAP_RIGHT_ALL);
+	ret = __lcd_cap_insert(&caller->cspace, slot, e, 
+			LCD_CAP_TYPE_SYNC_EP);
 	if (ret) {
-		LCD_ERR("insert endpoint");
+		LCD_ERR("insert");
 		goto fail2;
 	}
 	return 0;
@@ -467,188 +120,103 @@ fail2:
 fail1:
 	return ret;
 }
-EXPORT_SYMBOL(__lcd_mk_sync_endpoint);
 
-static int __cleanup_sync_endpoint(struct cnode *cnode)
-{
-	struct sync_endpoint *e;
-	/*
-	 * Check that cnode contains sync ep, and lcd is owner
-	 */
-	if (!__lcd_cnode_is_sync_ep(cnode))
-		return -EINVAL;
-	if (!__lcd_cnode_is_owner(cnode))
-		return -EINVAL;
 
-	e = __lcd_cnode_object(cnode);
-
-	/*
-	 * Remove from cspaces first, so no one can refer to sync ep
-	 */
-	__lcd_cnode_free(cnode);
-
-	/*
-	 * Free end point
-	 */
-	kfree(e);
-
-	return 0;
-}
-
-static int lcd_do_rm_sync_endpoint(struct lcd *lcd, cptr_t cptr)
-{
-	int ret;
-	struct cnode *cnode;
-	/*
-	 * Look up cnode
-	 */
-	ret = __lcd_cnode_lookup(lcd->cspace, cptr, &cnode);
-	if (ret) {
-		LCD_ERR("cnode lookup at %lld", cptr);
-		return ret;
-	}
-	/*
-	 * Remove it from lcd's cspace, and recursively remove from
-	 * any cspaces with derivations
-	 */
-	return __cleanup_sync_endpoint(cnode);
-}
-
-int __lcd_rm_sync_endpoint(struct lcd *lcd, cptr_t cptr)
-{
-	int ret;
-	/*
-	 * LOCK cap
-	 */
-	ret = lcd_cap_lock();
-	if (ret)
-		return ret;
-	ret = lcd_do_rm_sync_endpoint(lcd, cptr);
-	/*
-	 * UNLOCK cap
-	 */
-	lcd_cap_unlock();
-	return ret;
-}
-EXPORT_SYMBOL(__lcd_rm_sync_endpoint);
-
-int lcd_new_sync_endpoint(struct lcd_sync_endpoint **e)
-{
-	struct lcd_sync_endpoint *e;
-	/*
-	 * Alloc
-	 */
-	e = kmalloc(sizeof(e), GFP_KERNEL);
-	if (!e) {
-		LCD_ERR("no mem");
-		ret = -ENOMEM;
-		goto fail1;
-	}
-	/*
-	 * Set up send/recv queues
-	 */
-	INIT_LIST_HEAD(e->senders);
-	INIT_LIST_HEAD(e->receivers);
-	/*
-	 * Set up lock
-	 */
-	mutex_init(&e->lock);
-
-	return 0;
-
-fail1:
-	return ret;
-}
-
-void lcd_destroy_sync_endpoint(struct lcd_sync_endpoint *e)
-{
-#if LCD_DEBUG
-	/*
-	 * Check if queues are empty
-	 */
-	if (mutex_lock_interruptible(&e->lock))
-		goto done; /* skip check */
-
-	if (!list_empty(
-
-	mutex_unlock(&e->lock);	
-
-#endif
-	int ret;
-	struct cnode *cnode;
-	/*
-	 * Look up cnode
-	 */
-	ret = __lcd_cnode_lookup(lcd->cspace, cptr, &cnode);
-	if (ret) {
-		LCD_ERR("cnode lookup at %lld", cptr);
-		return ret;
-	}
-	/*
-	 * Remove it from lcd's cspace, and recursively remove from
-	 * any cspaces with derivations
-	 */
-	return __cleanup_sync_endpoint(cnode);
-}
-
-int __lcd_rm_sync_endpoint(struct lcd *lcd, cptr_t cptr)
-{
-	int ret;
-	/*
-	 * LOCK cap
-	 */
-	ret = lcd_cap_lock();
-	if (ret)
-		return ret;
-	ret = lcd_do_rm_sync_endpoint(lcd, cptr);
-	/*
-	 * UNLOCK cap
-	 */
-	lcd_cap_unlock();
-	return ret;
-}
-EXPORT_SYMBOL(__lcd_rm_sync_endpoint);
-
-static void copy_msg_regs(struct lcd_thread *sender, 
-			struct lcd_thread *receiver)
+static void copy_msg_regs(struct lcd *sender, struct lcd *receiver)
 {
 	int i;
 	for (i = 0; i < LCD_NUM_REGS; i++)
-		receiver->utcb.mr[i] = sender->utcb.mr[i];
+		receiver->utcb->mr[i] = sender->utcb->mr[i];
 }
 
-static void transmit_msg(struct lcd_thread *sender, 
-			struct lcd_thread *receiver)
+static void copy_msg_cap(struct lcd *sender, struct lcd *receiver,
+			cptr_t from_ptr, cptr_t to_ptr)
 {
 	int ret;
+
+	ret = __lcd_cap_grant(&sender->cspace, from_ptr,
+			&receiver->cspace, to_ptr);
+	if (ret) {
+		LCD_ERR("failed to transfer cap @ %llu in lcd %p to slot @ %llu in lcd %p",
+			cptr_val(from_ptr), sender, cptr_val(to_ptr), 
+			receiver);
+	}
+}
+
+static void copy_msg_caps(struct lcd *sender, struct lcd *receiver)
+{
+	int i = 0;
+	cptr_t from, to;
+
+	from = sender->utcb->cr[i];
+	to = receiver->utcb->cr[i];
+
+	while (i < LCD_NUM_REGS && cptr_val(from) && cptr_val(to)) {
+		copy_msg_cap(sender, receiver, from, to);
+		i++;
+		from = sender->utcb->cr[i];
+		to = receiver->utcb->cr[i];
+	}
+}
+
+static void delete_reply_endpoint(struct lcd *sender)
+{
+	__lcd_cap_delete(&sender->cspace, LCD_CPTR_REPLY_ENDPOINT);
+}
+
+static void copy_call_endpoint(struct lcd *sender, struct lcd *receiver)
+{
+	int ret;
+	ret = __lcd_cap_grant(&sender->cspace, LCD_CPTR_CALL_ENDPOINT,
+			&receiver->cspace, LCD_CPTR_REPLY_ENDPOINT);
+	if (ret)
+		LCD_ERR("error granting call endpoint cap");
+}
+
+static int transmit_msg(struct lcd *sender, struct lcd *receiver,
+			int making_call, int doing_reply)
+{
+	int ret = 0;
+	/*
+	 * See if either is dead
+	 */
+	if (lcd_status_dead(sender) || lcd_status_dead(receiver)) {
+		LCD_ERR("dead lcd");
+		return -EINVAL;
+	}
 	/*
 	 * Copy general registers
 	 */
 	copy_msg_regs(sender, receiver);
 	/*
-	 * TODO: Transfer capabilities
+	 * Transfer capabilities
 	 */
-	return; 
+	copy_msg_caps(sender, receiver);
+	/*
+	 * If sender is making call, grant capability to sender's call
+	 * endpoint to receiver
+	 */
+	if (making_call)
+		copy_call_endpoint(sender, receiver);
+	/*
+	 * If sender is doing reply, delete capability to reply endpoint
+	 */
+	if (doing_reply)
+		delete_reply_endpoint(sender);
+	return ret;
 }
 
-/**
- * Sleeps t until its message is sent (if t is a sender) or it receives a
- * message (if t is a receiver). The logic is tricky.
- *
- * NOTE: e is unlocked on return!
- */
-static inline int wait_for_transmit(struct lcd_thread *t, 
-				struct lcd_sync_endpoint *e)
+static int wait_for_transmit(struct lcd *lcd, struct lcd_sync_endpoint *ep)
 {
 	int ret;
 	/*
 	 * Unset our flag
 	 */
-	atomic_set(&t->xmit_flag, 0);
+	atomic_set(&lcd->xmit_flag, 0);
 	/*
 	 * UNLOCK: endpoint e
 	 */
-	mutex_unlock(&e->lock);
+	mutex_unlock(&ep->lock);
 	/*
 	 * Loop until the condition is true, or we get a signal (interrupted)
 	 *
@@ -661,10 +229,17 @@ static inline int wait_for_transmit(struct lcd_thread *t,
 		 */
 		set_current_state(TASK_INTERRUPTIBLE);
 		/*
-		 * Check if message sent/recv'd
+		 * Check if transmit activity
 		 */
-		if (atomic_read(&t->xmit_flag)) {
+		switch (atomic_read(&lcd->xmit_flag)) {
+		case LCD_XMIT_SUCCESS:
 			ret = 0;
+			goto out;
+		case LCD_XMIT_FAILED:
+			ret = -EIO;
+			goto out;
+		default:
+			/* fall through */
 			break;
 		}
 		/*
@@ -680,65 +255,121 @@ static inline int wait_for_transmit(struct lcd_thread *t,
 		ret = -EINTR;
 		break;
 	}
+out:
 	set_current_state(TASK_RUNNING);
 	/*
 	 * Unset our flag
 	 */
-	atomic_set(&t->xmit_flag, 0);
+	atomic_set(&lcd->xmit_flag, 0);
 	return ret;
 }
 
-static int lcd_do_send(struct lcd_thread *sender, struct lcd_sync_endpoint *e)
+static int do_send(struct lcd *sender, struct cnode *cnode, 
+		struct lcd_sync_endpoint *ep, int making_call,
+		int doing_reply)
 {
 	int ret;
-	struct lcd_thread *receiver;
-	/*
-	 * LOCK: endpoint
-	 */
-	ret = mutex_lock_interruptible(&e->lock);
-	if (ret) {
-		LCD_ERR("interrupted");
-		goto fail1;
-	}
-	/*
-	 * Check if any recvr waiting, and do immediate send, wake up
-	 * recvr
-	 */
-	if (list_empty(&e->receivers)) {
+	struct lcd *receiver;
+	if (list_empty(&ep->receivers)) {
 		/*
-		 * No one receiving; put myself in e's sender list
+		 * No one receiving; put myself in ep's sender list
 		 */
-		list_add_tail(&sender->senders, &e->senders);
+		list_add_tail(&sender->endpoint_queue, &ep->senders);
+		/*
+		 * Release the cnode
+		 *
+		 * It's now safe to release cnode since we are in the
+		 * queue
+		 */
+		__lcd_cnode_put(cnode);
+		/*
+		 * Mark myself as making a call, if necessary, so that recvr
+		 * knows it needs to copy reply endpoint cap.
+		 */
+		sender->making_call = making_call;
+		sender->doing_reply = doing_reply;
 		/*
 		 * Wait for a receiver to receive sender's message.
 		 *
-		 * wait_for_transmit will unlock e
+		 * wait_for_transmit will unlock ep
 		 */
-		ret = wait_for_transmit(sender, e);
+		ret = wait_for_transmit(sender, ep);
 		if (ret) { 
-			LCD_ERR("interrupted");
-			goto fail2;
+			LCD_ERR("transmit failed");
+			goto fail1;
 		}
 
 		return 0;
 	}
-
 	/*
 	 * Otherwise, someone waiting to receive. Remove from
 	 * receiving queue.
 	 */
-
-	receiver = list_first_entry(&e->receivers, struct lcd_thread, 
-				receivers);
-        list_del_init(&receiver->receivers);
-	mutex_unlock(&e->lock);
-
+	receiver = list_first_entry(&ep->receivers, struct lcd, endpoint_queue);
+        list_del_init(&receiver->endpoint_queue);
 	/*
-	 * Send message, and wake up lcd
+	 * Lock sender and receiver, for access to their utcb's
 	 */
-	transmit_msg(sender, receiver);
-
+	ret = mutex_lock_interruptible(&sender->lock);
+	if (ret) {
+		LCD_ERR("interrupted");
+		goto fail2;
+	}
+	ret = mutex_lock_interruptible(&receiver->lock);
+	if (ret) {
+		LCD_ERR("interrupted");
+		goto fail3;
+	}
+	/*
+	 * Put endpoint
+	 */
+	put_ep(cnode, ep);
+	/*
+	 * Send message, and wake up receiver
+	 */
+	ret = transmit_msg(sender, receiver, making_call, doing_reply);
+	if (ret) {
+		LCD_ERR("transmit");
+		mutex_unlock(&sender->lock);
+		mutex_unlock(&receiver->lock);
+		return ret;
+	}
 	wake_up_process(receiver->kthread);
+	/*
+	 * Unlock lcd's
+	 */
+	mutex_unlock(&sender->lock);
+	mutex_unlock(&receiver->lock);
+
+	return 0;
+
+fail3:
+	mutex_unlock(&sender->lock);
+fail2:
+	put_ep(cnode, ep);
+fail1:
+	return ret;
+}
+
+int __lcd_send(struct lcd *caller, cptr_t endpoint)
+{
+	struct lcd_sync_endpoint *ep;
+	struct cnode *cnode;
+	int ret;
+	/*
+	 * Look up and lock endpoint
+	 */
+	ret = get_ep(&caller->cspace, endpoint, &cnode, &ep);
+	if (ret) {
+		LCD_ERR("ep lookup");
+		goto fail1;
+	}
+	/* do_send does put on ep; we're not doing a call or reply */
+	ret = do_send(caller, cnode, ep, 0, 0);
+	if (ret) {
+		LCD_ERR("failed send");
+		goto fail2;
+	}
 
 	return 0;
 
@@ -747,55 +378,243 @@ fail1:
 	return ret;
 }
 
-static int lcd_handle_send(struct lcd_thread *t)
+static int do_recv(struct lcd *receiver, struct cnode *cnode, 
+		struct lcd_sync_endpoint *ep)
 {
-	
+	int ret;
+	struct lcd *sender;
+	if (list_empty(&ep->senders)) {
+		/*
+		 * No one sending; put myself in ep's receiver list
+		 */
+		list_add_tail(&receiver->endpoint_queue, &ep->receivers);
+		/*
+		 * Release the cnode
+		 *
+		 * It's now safe to release cnode since we are in the
+		 * queue
+		 */
+		__lcd_cnode_put(cnode);
+		/*
+		 * Wait for a sender to receive message
+		 *
+		 * wait_for_transmit will unlock ep
+		 */
+		ret = wait_for_transmit(receiver, ep);
+		if (ret) { 
+			LCD_ERR("transmit failed");
+			goto fail1;
+		}
+
+		return 0;
+	}
+	/*
+	 * Otherwise, someone waiting to send. Remove from
+	 * sending queue.
+	 */
+	sender = list_first_entry(&ep->senders, struct lcd, endpoint_queue);
+        list_del_init(&sender->endpoint_queue);
+	/*
+	 * Lock sender and receiver, for access to their utcb's
+	 */
+	ret = mutex_lock_interruptible(&sender->lock);
+	if (ret) {
+		LCD_ERR("interrupted");
+		goto fail2;
+	}
+	ret = mutex_lock_interruptible(&receiver->lock);
+	if (ret) {
+		LCD_ERR("interrupted");
+		goto fail3;
+	}
+	/*
+	 * Put endpoint
+	 */
+	put_ep(cnode, ep);
+	/*
+	 * Send message, and wake up sender
+	 *
+	 * XXX: we aren't returning any info to receiver to signal whether
+	 * sender did call (so it knows to do reply). For now, we'll assume
+	 * they have an agreement in their protocol.
+	 */
+	ret = transmit_msg(sender, receiver, sender->making_call,
+			sender->doing_reply);
+	if (ret) {
+		LCD_ERR("transmit");
+		mutex_unlock(&sender->lock);
+		mutex_unlock(&receiver->lock);
+		return ret;
+	}
+	wake_up_process(sender->kthread);
+	/*
+	 * Unlock lcd's
+	 */
+	mutex_unlock(&sender->lock);
+	mutex_unlock(&receiver->lock);
+
+	return 0;
+
+fail3:
+	mutex_unlock(&sender->lock);
+fail2:
+	put_ep(cnode, ep);
+fail1:
+	return ret;
+}
+
+int __lcd_recv(struct lcd *caller, cptr_t endpoint)
+{
+	struct lcd_sync_endpoint *ep;
+	struct cnode *cnode;
 	int ret;
 	/*
-	 * LOCK cap
+	 * Look up and lock endpoint
 	 */
-	ret = lcd_cap_lock();
-	if (ret)
-		return ret;
+	ret = get_ep(&caller->cspace, endpoint, &cnode, &ep);
+	if (ret) {
+		LCD_ERR("ep lookup");
+		goto fail1;
+	}
+	/* do_recv does put on ep */
+	ret = do_recv(caller, cnode, ep);
+	if (ret) {
+		LCD_ERR("failed receive");
+		goto fail2;
+	}
 
-	ret = lcd_do_send(lcd, c, 0);
+	return 0;
 
-	/*
-	 * UNLOCK cap
-	 */
-	lcd_cap_unlock();
-
+fail2:
+fail1:
 	return ret;
-
-	/*
-	 * Extract rendezvous point cptr
-	 */
-
-	/*
-	 * Extract args
-	 */
-
-	/*
-	 * Look up rvp
-	 */
-
-	/*
-	 * Enqueue / do immediate send
-	 */
 }
 
-static int lcd_handle_recv(struct lcd_thread *t)
+int __lcd_call(struct lcd *caller, cptr_t endpoint)
+{
+	struct lcd_sync_endpoint *ep;
+	struct cnode *cnode;
+	int ret;
+	/*
+	 * Look up and lock endpoint
+	 */
+	ret = get_ep(&caller->cspace, endpoint, &cnode, &ep);
+	if (ret) {
+		LCD_ERR("ep lookup");
+		goto fail1;
+	}
+	/* do_send does put on ep; we're doing a call */
+	ret = do_send(caller, cnode, ep, 1, 0);
+	if (ret) {
+		LCD_ERR("failed send");
+		goto fail2;
+	}
+	/*
+	 * Do a receive on the lcd's call endpoint
+	 */
+	return __lcd_recv(caller, LCD_CPTR_CALL_ENDPOINT);
+
+fail2:
+fail1:
+	return ret;
+}
+
+int __lcd_reply(struct lcd *caller)
+{
+	struct lcd_sync_endpoint *ep;
+	struct cnode *cnode;
+	int ret;
+	/*
+	 * Look up and lock reply endpoint
+	 */
+	ret = get_ep(&caller->cspace, LCD_CPTR_REPLY_ENDPOINT, &cnode, &ep);
+	if (ret) {
+		LCD_ERR("ep lookup");
+		goto fail1;
+	}
+	/* do_send does put on ep; we're doing a reply */
+	ret = do_send(caller, cnode, ep, 0, 1);
+	if (ret) {
+		LCD_ERR("failed send");
+		goto fail2;
+	}
+
+	return 0;
+
+fail2:
+fail1:
+	return ret;
+}
+
+/* CHECK / DESTROY -------------------------------------------------- */
+
+void __lcd_sync_endpoint_check(struct lcd *lcd, struct lcd_sync_endpoint *e)
+{
+	int ret;
+	struct list_head *cursor, *next;
+	
+	/*
+	 * Lock the endpoint, and see if lcd is in its queues
+	 */
+	ret = mutex_lock_interruptible(&e->lock);
+	if (ret) {
+		LCD_ERR("interrupted");
+		goto out1;
+	}
+	
+	list_for_each_safe(cursor, next, &e->senders) {
+		if (cursor == &lcd->endpoint_queue) {
+			/*
+			 * Set xmit flag to fail so lcd knows
+			 */
+			atomic_set(&lcd->xmit_flag, LCD_XMIT_FAILED);
+			list_del_init(cursor);
+			goto out2;
+		}
+	}
+
+	list_for_each_safe(cursor, next, &e->receivers) {
+		if (cursor == &lcd->endpoint_queue) {
+			/*
+			 * Set xmit flag to fail so lcd knows
+			 */
+			atomic_set(&lcd->xmit_flag, LCD_XMIT_FAILED);
+			list_del_init(cursor);
+			goto out2;
+		}
+	}
+
+out2:
+	mutex_unlock(&e->lock);
+out1:
+	return;
+}
+
+void __lcd_sync_endpoint_destroy(struct lcd_sync_endpoint *e)
 {
 	/*
-	 * Extract args
+	 * No one has a capability to the endpoint, so no one should
+	 * be in the queues; free e
 	 */
-
-	/*
-	 * Look up rvp
-	 */
-
-	/*
-	 * Enqueue / do immediate recv
-	 */
+	kfree(e);
 }
 
+
+/* INIT/EXIT -------------------------------------------------- */
+
+static int ipc_tests(void);
+
+int __lcd_ipc_init(void)
+{
+	/* nothing else to do during init, for now */
+	return ipc_tests();
+}
+
+void __lcd_ipc_exit(void)
+{
+	return;
+}
+
+/* DEBUGGING -------------------------------------------------- */
+
+#include "tests/ipc-tests.c"

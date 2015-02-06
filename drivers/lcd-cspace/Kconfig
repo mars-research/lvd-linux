@@ -1,9 +1,0 @@
-#
-# LCD cspace
-#
-
-config LCD_CSPACE
-       bool "LCD CSPACE"
-       default y
-       ---help---
-       LCD Cspace implementation

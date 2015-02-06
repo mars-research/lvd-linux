@@ -16,8 +16,8 @@
 #include <linux/sched/rt.h>
 
 #ifdef CONFIG_HAVE_LCD
-#include <lcd-domains/lcd-domains.h>
-#define INIT_LCD_THREAD .lcd_thread = NULL,
+#define INIT_LCD(tsk) \
+	.lcd = NULL, .cptr_cache = NULL,	
 #else
 #define INIT_LCD_THREAD
 #endif
@@ -201,7 +201,6 @@ extern struct task_group root_task_group;
 	.usage		= ATOMIC_INIT(2),				\
 	.flags		= PF_KTHREAD,					\
 	.prio		= MAX_PRIO-20,					\
-	INIT_LCD(tsk)                                                   \
 	.static_prio	= MAX_PRIO-20,					\
 	.normal_prio	= MAX_PRIO-20,					\
 	.policy		= SCHED_NORMAL,					\
@@ -254,7 +253,7 @@ extern struct task_group root_task_group;
 	},								\
 	.thread_group	= LIST_HEAD_INIT(tsk.thread_group),		\
 	.thread_node	= LIST_HEAD_INIT(init_signals.thread_head),	\
-	INIT_LCD_THREAD                                                 \
+	INIT_LCD(tsk)							\
 	INIT_IDS							\
 	INIT_PERF_EVENTS(tsk)						\
 	INIT_TRACE_IRQFLAGS						\

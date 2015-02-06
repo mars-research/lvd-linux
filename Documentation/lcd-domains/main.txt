@@ -97,7 +97,7 @@ and do the following:
 
        [ 1 ] aclocal -I m4 && automake --add-missing --copy && autoconf
 
-       [ 2 ] ./configure --prefix=/ --program-prefx=lcd-
+       [ 2 ] ./configure --prefix=/ --program-prefix=lcd-
 
        [ 3 ] make
 

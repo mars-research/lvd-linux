@@ -26,41 +26,10 @@
 #include <lcd-domains/lcd-domains.h>
 #include <lcd-domains/syscall.h>
 #include <lcd-domains/ipc.h>
+#include <lcd-domains/common.h>
 
 MODULE_LICENSE("GPL");
 MODULE_DESCRIPTION("LCD driver");
-
-/* DEBUG -------------------------------------------------- */
-
-#define LCD_DEBUG 0
-
-#define LCD_ERR(msg...) __lcd_err(__FILE__, __LINE__, msg)
-static inline void __lcd_err(char *file, int lineno, char *fmt, ...)
-{
-	va_list args;
-	printk(KERN_ERR "lcd-domains: %s:%d: error: ", file, lineno);
-	va_start(args, fmt);
-	vprintk(fmt, args);
-	va_end(args);
-}
-#define LCD_MSG(msg...) __lcd_msg(__FILE__, __LINE__, msg)
-static inline void __lcd_msg(char *file, int lineno, char *fmt, ...)
-{
-	va_list args;
-	printk(KERN_ERR "lcd-domains: %s:%d: note: ", file, lineno);
-	va_start(args, fmt);
-	vprintk(fmt, args);
-	va_end(args);
-}
-#define LCD_WARN(msg...) __lcd_warn(__FILE__, __LINE__, msg)
-static inline void __lcd_warn(char *file, int lineno, char *fmt, ...)
-{
-	va_list args;
-	printk(KERN_ERR "lcd-domains: %s:%d: warning: ", file, lineno);
-	va_start(args, fmt);
-	vprintk(fmt, args);
-	va_end(args);
-}
 
 /* MEMORY ALLOCATION -------------------------------------------------- */
 
@@ -1284,19 +1253,58 @@ fail1:
 	return ret;
 }
 
-void lcd_destroy(struct lcd *lcd)
+static void __lcd_destroy(struct lcd *lcd)
 {
 	int ret;
 	/*
-	 * Assume we have no running lcd_thread's ...
+	 * Finish
+	 */
+	kfree(lcd);
+}
+
+void __put_lcd(struct lcd *lcd)
+{
+	__lcd_destroy(lcd);
+}
+
+static int lcd_destroy_ok(struct lcd *lcd)
+{
+	int ret = 0;
+	/**
+	 * If there are still threads in the lcd, fail. They need to die
+	 * first. (And we aren't going to do it for the caller, to make our
+	 * life simpler.)
+	 */
+	ret = mutex_lock_interruptible(&lcd->lcd_threads.lock);
+	if (ret) {
+		LCD_ERR("interrupted, failing ...");
+		goto out;
+	}
+	if (!list_empty(&lcd->lcd_threads.list)) {
+		ret = -EINVAL;
+		LCD_ERR("threads inside lcd, cannot destroy lcd");
+	}
+	mutex_unlock(&lcd->lcd_threads.lock);
+out:
+	return ret;
+}
+
+static void lcd_destroy(struct lcd *lcd)
+{
+	/*
+	 * We assume caller has done lcd_destroy_ok, and proceed assuming
+	 * there are no threads in the lcd.
 	 *
 	 * ORDER IS IMPORTANT:
 	 *
 	 * (1) unmap the module
 	 *
+	 *     This must happen before (4), otherwise the lcd arch tear down
+	 *     will free the module pages from under us before we do (2).
+	 *
 	 * (2) delete the module from the host
 	 *
-	 * (3) tear down guest virtual paging
+	 * (3) 
 	 *
 	 * (4) free up any pages still in the guest physical addr space
 	 *     XXX: This will attempt to free the underlying host page.
@@ -1350,15 +1358,18 @@ void lcd_destroy(struct lcd *lcd)
 	 * Tear down lcd_arch (ept, ...)
 	 */
 	lcd_arch_destroy(lcd->lcd_arch);
-	/*
-	 * Finish
+
+	/* 
+	 * XXX: just call destroy for now. In the future, we could possibly
+	 * loop over any lcd_threads and kill them before destroying the
+	 * LCD. For now, we assume all threads are dead and gone.
 	 */
-	kfree(lcd);
+	__lcd_destroy(lcd);
 }
 
 static int lcd_setup_initial_thread(struct lcd *lcd);
 
-int lcd_create(char *module_name, struct lcd **out)
+static int lcd_create(char *module_name, struct lcd **out)
 {
 	int ret;
 	struct lcd *lcd;
@@ -1400,6 +1411,10 @@ int lcd_create(char *module_name, struct lcd **out)
 
 	*out = lcd;
 
+	/*
+	 * TODO: Put lcd and initial thread in caller's cspace
+	 */
+
 	return 0;
 
 fail4:
@@ -1412,6 +1427,11 @@ fail1:
 
 /* LCD THREAD EXECUTION -------------------------------------------------- */
 
+static inline void set_lcd_thread_status(struct lcd_thread *t, int status)
+{
+	set_mb(t->status, status);
+}
+
 static int lcd_handle_syscall(struct lcd_thread *t)
 {
 	int syscall_id;
@@ -1420,9 +1440,12 @@ static int lcd_handle_syscall(struct lcd_thread *t)
 	LCD_MSG("got syscall %d", syscall_id);
 
 	switch (syscall_id) {
+	case LCD_SYSCALL_SEND:
+		return lcd_handle_send(t);
+	case LCD_SYSCALL_RECV:
+		return lcd_handle_recv(t);
 	case LCD_SYSCALL_YIELD:
 		return 1;
-		break;
 	default:
 		LCD_ERR("unimplemented syscall %d", syscall_id);
 		return -ENOSYS;
@@ -1508,41 +1531,74 @@ int lcd_thread_start(struct lcd_thread *t)
 	return 0;
 }
 
-int lcd_thread_kill(struct lcd_thread *t)
+void __put_lcd_thread(struct lcd_thread *t)
 {
-	int ret;
+	/*
+	 * Free t
+	 */
+	kfree(t);
+}
+
+static void __lcd_thread_kill(struct lcd_thread *t)
+{
 	/*
 	 * Stop the kernel thread and get return value.
 	 */
 	ret = kthread_stop(t->kthread);
 	/*
 	 * Decrement the kthread's reference count. Host kernel will clean
-	 * up the rest.
+	 * up the rest (and eventually decrement t's ref count).
 	 */
 	put_task_struct(t->kthread);
 	/*
-	 * The LCD still owns the lcd thread's stack, so we won't free it.
+	 * Mark t as dead. If an endpoint sees this, it will remove t from
+	 * its queue rather than attempt a send/recv.
+	 */
+	set_lcd_thread_status(t, LCD_THREAD_DEAD);
+	/*
+	 * *Now* we will attempt to remove t from any queue it may be in.
+	 */
+	if (t->proxy.endpoint)
+		lcd_endpoint_dequeue(t->proxy, t->proxy.endpoint);
+	/*
+	 * Now we can safely assume t is not in any endpoint queue, so its
+	 * utcb will not be used. We set it to NULL. BUT the LCD still owns 
+	 * the page that contains the utcb (and stack), so we won't free
+	 * the host physical memory.
 	 *
+	 * XXX: We need to update permissions for the utcb/stack page for those
+	 * LCDs that have access to it. Now that it isn't associated with a 
+	 * thread, we should allow the page to be freed.
+	 */
+	t->utcb = NULL;
+	/*
 	 * Tear down the lcd arch thread
 	 */
 	lcd_arch_destroy_thread(t->lcd_arch_thread);
+}
+
+void lcd_thread_kill(struct lcd_thread *t)
+{
 	/*
 	 * Remove from LCD's list of threads
 	 */
 	if (mutex_lock_interruptible(&t->lcd->lcd_threads.lock)) {
-		LCD_ERR("interrupted, skipping list removal ...");
-		goto finally;
+		LCD_ERR("interrupted, caller should kill lcd ...");
+		goto out;
 	}
 	list_del(&t->lcd_threads);
 	mutex_unlock(&t->lcd->lcd_threads.lock);
+	/*
+	 * Decrement lcd's ref count
+	 */
+	put_lcd(&t->lcd);
+
 
 finally:
 	/*
-	 * Free t
+	 * Decrement the ref the lcd had on t
 	 */
-	kfree(t);
-
-	return ret;
+	put_lcd_thread(&t);
 }
 
 /* LCD THREAD CREATE / DESTROY -------------------------------------------- */
@@ -1583,16 +1639,15 @@ static int lcd_add_thread(struct lcd *lcd, gva_t pc, gva_t stack_gva,
 	/*
 	 * Alloc lcd_thread
 	 */
-	t = kzalloc(sizeof(*t), GFP_KERNEL); /* status unformed */
+	t = kzalloc(sizeof(*t), GFP_KERNEL); /* sets status and flags to 0 */
 	if (!t) {
 		LCD_ERR("failed to alloc lcd_thread");
 		ret = -ENOMEM;
 		goto fail1;
 	}
 	/*
-	 * Add t to lcd's list
+	 * Add t to lcd's list, and bump ref counts
 	 */
-	t->lcd = lcd;
 	INIT_LIST_HEAD(&t->lcd_threads);
 	if (mutex_lock_interruptible(&lcd->lcd_threads.lock)) {
 		LCD_ERR("interrupted, cleaning up...");
@@ -1602,11 +1657,24 @@ static int lcd_add_thread(struct lcd *lcd, gva_t pc, gva_t stack_gva,
 	list_add(&t->lcd_threads, &lcd->lcd_threads.list);
 
 	mutex_unlock(&lcd->lcd_threads.lock);
+
+	get_lcd(&t->lcd, lcd); /* matched with put in lcd_thread_kill / fail3 */
+	get_lcd_thread(&t); /* matched with put in lcd_thread_kill / fail2  */
+
 	/*
 	 * Set up utcb (at bottom of stack -- masking off lower bits)
+	 *
+	 * XXX: We need to restrict any LCD that has a capability to the
+	 * utcb/stack page from freeing it underneath us.
 	 */
 	t->utcb = hva2va(stack_hva);
 	t->utcb = (void *)(((u64)t->utcb) & PAGE_MASK);
+	/*
+	 * Set up thread proxy
+	 */
+	t->proxy.lcd_thread = t;
+	t->proxy.endpoint = NULL;
+	INIT_LIST_HEAD(t->proxy.proxies);
 	/*
 	 * Alloc corresponding lcd_arch_thread
 	 */
@@ -1653,13 +1721,20 @@ static int lcd_add_thread(struct lcd *lcd, gva_t pc, gva_t stack_gva,
 		goto fail8;
 	}
 	/*
-	 * Bumpg reference count on kthread
+	 * Bump reference count on kthread
 	 */
 	get_task_struct(t->kthread);
 	/*
-	 * Store back reference
+	 * Store back reference, and bump reference count on lcd_thread. This
+	 * ref count won't decrement until the kernel thread is free'd (in
+	 * kernel/fork.c).
 	 */
-	t->kthread->lcd_thread = t;
+	get_lcd_thread(&t->kthread->lcd_thread, t); /* put in kernel/fork.c */
+
+	/*
+	 * Mark as alive
+	 */
+	set_lcd_thread_status(t, LCD_THREAD_ALIVE);
 
 	/*
 	 * DONE!
@@ -1683,8 +1758,10 @@ fail3:
 	list_del(&t->lcd_threads);
 
 	mutex_unlock(&lcd->lcd_threads.lock);
+
+	put_lcd(&t->lcd);
 fail2:	
-	kfree(t);
+	put_lcd_thread(&t);
 fail1:
 fail0:
 	return ret;
@@ -1852,8 +1929,10 @@ module_exit(lcd_exit);
 
 EXPORT_SYMBOL(lcd_create);
 EXPORT_SYMBOL(lcd_destroy);
+EXPORT_SYMBOL(__put_lcd);
 EXPORT_SYMBOL(lcd_thread_start);
 EXPORT_SYMBOL(lcd_thread_kill);
+EXPORT_SYMBOL(__put_lcd_thread);
 
 /* DEBUGGING ---------------------------------------- */
 

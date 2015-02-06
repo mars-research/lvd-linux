@@ -4,35 +4,31 @@
 #include <linux/module.h>
 #include <asm/lcd-domains-arch.h>
 #include <linux/sched.h>
+#include <linux/waitqueue.h>
 
-/*
- * lcd_thread_status
- * =================
- *
- * Similar to status used for task_struct's.
- *
- * LCD_THREAD_UNFORMED   = still setting up, or status not set yet
- * LCD_THREAD_SUSPENDED  = lcd_thread is going to sleep / is asleep
- * LCD_THREAD_RUNNABLE   = set status to this to wake up lcd_thread
- * LCD_THREAD_RUNNING    = lcd_thread is running, or is about to run
- * LCD_THREAD_KILL       = set status to this to kill lcd_thread (as soon as
- *                         possible)
- * LCD_THREAD_DEAD       = lcd_thread is not running, most parts have been 
- *                         destroyed (only hanging around to provide 
- *                         status info)
- */
-enum lcd_thread_status {
-	LCD_THREAD_UNFORMED  = 0,
-	LCD_THREAD_SUSPENDED = 1,
-	LCD_THREAD_RUNNABLE  = 2,
-	LCD_THREAD_RUNNING   = 3,
-	LCD_THREAD_KILL      = 4,
-	LCD_THREAD_DEAD      = 5,
+emum lcd_thread_status {
+	LCD_THREAD_DEAD,
+	LCD_THREAD_ALIVE,
+};
+
+emum lcd_xmit_status {
+	LCD_XMIT_INVALID = 0,
+	LCD_XMIT_SUCCESS = 1,
+	LCD_XMIT_FAILED  = 2,
 };
 
 struct lcd;
+struct lcd_thread_proxy;
 
 struct lcd_thread {
+	/*
+	 * Reference counting
+	 */
+	atomic_t usage;
+	/*
+	 * Status
+	 */
+	int status;
 	/*
 	 * My corresponding kthread
 	 */
@@ -47,17 +43,30 @@ struct lcd_thread {
 	 */
 	struct list_head lcd_threads;
 	/*
+	 * Message Passing
+	 * ===============
+	 *
 	 * Thread control block, accessible by lcd_thread while running inside
 	 * lcd (mapped in the bottom of its stack). Contains message 
 	 * registers, etc.
 	 */
 	struct lcd_utcb *utcb;
 	/*
-	 * Status (see above)
+	 * Transmission status. When a send/recv is completed, set to
+	 * success/fail.
 	 */
-	int status;
+	atomic_t xmit_status;
 	/*
+	 * We use a `proxy' object for rendezvous point recv/send queues.
+	 *
+	 * For now, a thread is only allowed to do one blocking send or
+	 * one blocking receive (hence only one proxy).
+	 */
+	struct lcd_thread_proxy proxy;
+	/*
+	 *
 	 * Arch-dependent state of lcd_thread
+	 * ==================================
 	 */
 	struct lcd_arch_thread *lcd_arch_thread;
 };
@@ -162,6 +171,10 @@ struct lcd_thread {
 
 struct lcd {
 	/*
+	 * Reference counting
+	 */
+	atomic_t usage;
+	/*
 	 * Display name
 	 */
 	char name[MODULE_NAME_LEN];
@@ -217,26 +230,95 @@ struct lcd {
 };
 
 /**
- * -- Loads module_name into host kernel. (Note: The module loading code
- *    expects underscores, _, rather than hyphens. If the module's name
- *    in the file system is some-module.ko, use the name some_module.)
- * -- Sets up the address space with the module mapped inside it in the lcd
- * -- Sets up an initial thread for running inside the lcd (stored in
- *    the struct lcd's init_thread)
+ * Message Passing
+ * ===============
  *
- * Call lcd_thread_start on the lcd's init thread to start executing the
- * module's init inside the lcd.
- *
- * Call lcd_destroy after killing the lcd's init thread to tear down the
- * lcd and remove the module from the host.
- *
- * lcd_thread_kill will block until the underlying kernel thread exits (the
- * kthread checks whether it should stop each time the lcd thread exits from
- * the lcd -- due to an interrupt, etc.).
+ * Synchronous endpoints contain a send/receive queue for lcd_thread's 
+ * (similar to an seL4 endpoint). Also known as `rendezvous point'.
  */
-int lcd_create(char *module_name, struct lcd **out);
-void lcd_destroy(struct lcd *lcd);
-int lcd_thread_start(struct lcd_thread *t);
-int lcd_thread_kill(struct lcd_thread *t);
+struct lcd_sync_endpoint {
+	atomic_t usage;
+	struct list_head senders;
+	struct list_head receivers;
+        struct mutex lock;
+};
+/**
+ * An lcd_thread_proxy represents an lcd_thread in an endpoint's queue.
+ *
+ * This is similar to a wait_queue_t that represents a task in a wait queue.
+ *
+ * We do this so that an lcd_thread can receive on multiple endpoints. It
+ * also conveniently wraps a back pointer to the endpoint so we can safely
+ * remove the lcd_thread_proxy (using the endpoint's lock) from the queue.
+ */
+struct lcd_thread_proxy {
+	struct lcd_thread *lcd_thread;
+	struct lcd_sync_endpoint *endpoint;
+	struct list_head proxies;
+};
+
+/* REFERENCE COUNTING -------------------------------------------------- */
+
+/**
+ * TODO: This will be shifted into cspaces soon.
+ *
+ * The put inlines are built so that the ptr is automatically set to NULL.
+ * This prevents use after free.
+ */
+
+extern void __put_lcd_thread(struct lcd_thread *t);
+static inline void __get_lcd_thread(struct lcd_thread *t)
+{
+	atomic_inc(&t->usage);
+}
+static inline void get_lcd_thread(struct lcd_thread **ptr, struct lcd_thread *t)
+{
+	__get_lcd_thread(t);
+	*ptr = t;
+}
+static inline void put_lcd_thread(struct lcd_thread **ptr)
+{
+	BUG_ON(!atomic_read(&(*ptr)->usage));
+	if (atomic_dec_and_test(&(*ptr)->usage))
+		__put_lcd_thread(*ptr);
+	*ptr = NULL;
+}
+
+extern void __put_lcd(struct lcd *lcd);
+static inline void __get_lcd(struct lcd *lcd)
+{
+	atomic_inc(&lcd->usage);
+}
+static inline void get_lcd(struct lcd **ptr, struct lcd *lcd)
+{
+	__get_lcd(lcd);
+	*ptr = lcd;
+}
+static inline void put_lcd(struct lcd **ptr)
+{
+	BUG_ON(!atomic_read(&(*ptr)->usage));
+	if (atomic_dec_and_test(&(*ptr)->usage))
+		__put_lcd(*ptr);
+	*ptr = NULL;
+}
+
+extern void __put_lcd_sync_endpoint(struct lcd_sync_endpoint *e);
+static inline void __get_lcd_sync_endpoint(struct lcd_sync_endpoint *e)
+{
+	atomic_inc(&e->usage);
+}
+static inline void get_lcd_sync_endpoint(struct lcd_sync_endpoint **ptr,
+					struct lcd_sync_endpoint *e)
+{
+	__get_lcd_sync_endpoint(e);
+	*ptr = e;
+}
+static inline void put_lcd_sync_endpoint(struct lcd_sync_endpoint **ptr);
+{
+	BUG_ON(!atomic_read(&(*ptr)->usage));
+	if (atomic_dec_and_test(&(*ptr)->usage))
+		__put_lcd_sync_endpoint(*ptr);
+	*ptr = NULL;
+}
 
 #endif /* LCD_DOMAINS_LCD_DOMAINS_H */

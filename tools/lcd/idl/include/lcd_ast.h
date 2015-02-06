@@ -169,6 +169,8 @@ class Rpc : public Base
   Type* return_type();
   std::vector<Parameter*>* parameters();
   virtual void accept(ASTVisitor *worker);
+  const char* enum_val() {return "TODO";}
+  const char* callee_name() {return "TOdo";}
 };
 
 

@@ -1,6 +1,6 @@
 #include "gen_visitor.h"
 
-Caller_SourceVisitor::SourceVisitor(FILE* out)
+Caller_SourceVisitor::Caller_SourceVisitor(FILE* out)
 {
   this->out_f_ = out;
 }
@@ -18,7 +18,7 @@ void Caller_SourceVisitor::visit(File* f)
 
 void Caller_SourceVisitor::visit(Rpc* r)
 {
-
+  const char* indent = "  ";
   Type* rt = r->return_type();
   printf("here in hv hisit rpc\n");
   printf("%d\n", rt->num());
@@ -38,7 +38,7 @@ void Caller_SourceVisitor::visit(Rpc* r)
   for(std::vector<Parameter*>::iterator it = r->parameters()->begin(); it != r->parameters()->end(); it++)
     {
       Parameter* p = (Parameter*) *it;
-      fprintf(this->out_f_, "%s\n", p->marshal());
+      fprintf(this->out_f_, "%s%s\n", indent, p->marshal());
     }
   fprintf(this->out_f_, "}\n");
 }
@@ -78,7 +78,9 @@ void Caller_SourceVisitor::visit(Typedef* td)
    fprintf(this->out_f_, "%s", td->alias());
 }
 
-Callee_SourceVisitor::SourceVisitor(FILE* out)
+/* CALLEE code*/
+
+Callee_SourceVisitor::Callee_SourceVisitor(FILE* out)
 {
   this->out_f_ = out;
 }
@@ -91,6 +93,7 @@ void Callee_SourceVisitor::visit(File* f)
       r->accept(this);
       fprintf(this->out_f_, "\n\n");
     }
+  exec_loop(f);
   
 }
 
@@ -98,8 +101,9 @@ void Callee_SourceVisitor::visit(Rpc* r)
 {
 
   Type* rt = r->return_type();
+  /*
   printf("here in hv hisit rpc\n");
-  printf("%d\n", rt->num());
+  printf("%d\n", rt->num()); */
   rt->accept(this); // this seems unnecessary in this case
   const char* name = r->name();
   fprintf(this->out_f_, " %s(", name); 
@@ -112,12 +116,9 @@ void Callee_SourceVisitor::visit(Rpc* r)
 	fprintf(this->out_f_, ", ");
     }
   fprintf(this->out_f_, ") {\n");
-  
-  for(std::vector<Parameter*>::iterator it = r->parameters()->begin(); it != r->parameters()->end(); it++)
-    {
-      Parameter* p = (Parameter*) *it;
-      fprintf(this->out_f_, "%s\n", p->marshal());
-    }
+
+  // TODO unmarshaling
+
   fprintf(this->out_f_, "}\n");
 }
 
@@ -156,3 +157,40 @@ void Callee_SourceVisitor::visit(Typedef* td)
    fprintf(this->out_f_, "%s", td->alias());
 }
 
+void Callee_SourceVisitor::exec_loop(File* f)
+{
+  const char* indent = "  ";
+  fprintf(this->out_f_, "int execution_loop(void) {\n");
+  fprintf(this->out_f_, "%sfor (;;) {\n", indent);
+  fprintf(this->out_f_, "%s%sret = lcd_recv(%s);\n",
+	  indent, indent, "todo_cap_name");
+  fprintf(this->out_f_, "%s%sif (ret) {\n", indent, indent);
+  fprintf(this->out_f_, "%s%s%sgoto out; }\n", indent, indent, indent);
+  
+  // switch
+  // don't like this hard coding
+  fprintf(this->out_f_, "%s%sswitch (lcd_r0()) {\n", indent, indent);
+  
+  for(std::vector<Rpc*>::iterator it = f->rpc_defs()->begin(); it != f->rpc_defs()->end(); it++)
+    {
+      Rpc* r = (Rpc*) *it;
+      const char* enum_char = r->enum_val();
+      fprintf(this->out_f_, "%s%scase %s:\n", indent, indent, enum_char);
+      fprintf(this->out_f_, "%s%s%sLCD_MSG(\"todo\");\n", indent, indent, indent);
+      fprintf(this->out_f_, "%s%s%sret = %s();\n", indent, indent, indent, r->callee_name());
+      fprintf(this->out_f_, "%s%s%sbreak;\n", indent, indent, indent);
+    }
+  // fprintf(this->out_f_, "TODO DIE\n");
+  fprintf(this->out_f_, "%s%scase TODO_DIE:\n", indent, indent);
+  fprintf(this->out_f_, "%s%s%sLCD_MSG(\"todo\");\n", indent, indent, indent);
+  fprintf(this->out_f_, "%s%s%s die_callee();\n", indent, indent, indent);
+  fprintf(this->out_f_, "%s%s%sgoto out;\n", indent, indent, indent);
+  fprintf(this->out_f_, "%s%s}\n", indent, indent); // close switch
+  fprintf(this->out_f_, "%s}\n", indent); // close for loop
+  
+  // out
+  fprintf(this->out_f_, "out: \n");
+  fprintf(this->out_f_, "%sreturn ret;\n", indent);
+  fprintf(this->out_f_, "}\n");
+  return;
+}

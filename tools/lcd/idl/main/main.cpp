@@ -46,7 +46,7 @@ int main(int argc, char ** argv)
       else if(!strcmp(argv[1],"-source"))
 	{
 	  printf("in source\n");
-	  SourceVisitor* sv = new SourceVisitor(of);
+	  Callee_SourceVisitor* sv = new Callee_SourceVisitor(of);
 	  tree->accept(sv);
 	  printf("have finished sv\n");
 	}

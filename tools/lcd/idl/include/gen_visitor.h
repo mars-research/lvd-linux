@@ -36,9 +36,9 @@ class HeaderVisitor : public GenVisitor
 class Caller_SourceVisitor : public GenVisitor
 {
   FILE* out_f_;
-  //  int stub_or_proxy_; // 1 equals stub, 2 equals proxy
+  
  public: 
-  SourceVisitor(FILE* out);
+  Caller_SourceVisitor(FILE* out);
   virtual void visit(File *f);
   virtual void visit(Rpc *rpc);
   virtual void visit(Parameter * p);
@@ -52,9 +52,9 @@ class Caller_SourceVisitor : public GenVisitor
 class Callee_SourceVisitor : public GenVisitor
 {
   FILE* out_f_;
-  //  int stub_or_proxy_; // 1 equals stub, 2 equals proxy
+  void exec_loop(File* f);
  public: 
-  SourceVisitor(FILE* out);
+  Callee_SourceVisitor(FILE* out);
   virtual void visit(File *f);
   virtual void visit(Rpc *rpc);
   virtual void visit(Parameter * p);

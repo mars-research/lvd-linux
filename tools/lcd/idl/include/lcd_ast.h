@@ -157,6 +157,7 @@ class Parameter : public Base
 
 class Rpc : public Base
 {
+  const char* enum_name;
   M_rpc* marshal_caller;
   M_rpc* marshal_callee;
   Type* ret_type_;
@@ -169,7 +170,7 @@ class Rpc : public Base
   Type* return_type();
   std::vector<Parameter*>* parameters();
   virtual void accept(ASTVisitor *worker);
-  const char* enum_val() {return "TODO";}
+  const char* enum_name() {return "TODO";}
   const char* callee_name() {return "TOdo";}
 };
 

@@ -488,7 +488,7 @@ class CCSTExpression : public CCSTBase
   virtual void write();
 };
 
-class CCSTAssignExpr
+class CCSTAssignExpr :: public CCSTExpression
 {
   /*
     <assignment-expression> ::= <conditional-expression>
@@ -841,7 +841,7 @@ class CCSTDoLoop : CCSTIterationStmnt
 };
 
 class CCSTForLoop : CCSTIterationStmnt
-{
+{ 
   CCSTExpression *init_;
   CCSTExpression *cond_;
   CCSTExpression *up_;

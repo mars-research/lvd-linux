@@ -196,10 +196,10 @@ class CCSTPointer : public CCSTAbstDeclarator
   /*
     <pointer> ::= * {<type-qualifier>}* {<pointer>}?
    */
-  vector<CCSTTypeQualifier> type_q_;
+  vector<type_qualifier> type_q_;
   CCSTPointer *p_;
  public:
-  CCSTPointer(vector<CCSTTypeQualifier> type_q, CCSTPointer *p){this->type_q_ = type_q; this->p_ = p;}
+  CCSTPointer(vector<type_qualifier> type_q, CCSTPointer *p){this->type_q_ = type_q; this->p_ = p;}
   CCSTPointer(){this->type_q_ = null; this->p_ = null;}
   CCSTPointer(vector<CCSTTypeQualifier> type_q){this->type_q_ = type_q; this->p_ = null;}
   CCSTPointer(CCSTPointer *p){this->type_q_ = null; this->p_ = p;}
@@ -207,16 +207,9 @@ class CCSTPointer : public CCSTAbstDeclarator
 };
 
 // probably does not need to be a class.
-class CCSTTypeQualifier : CCSTSpecifierQual 
-{
-  /*
-    <type-qualifier> ::= const
-                   | volatile
-   */
-  // TODO this is silly
-};
+enum type_qualifer(none_t, const_t, volatile_t);
 
-class CCSTDirectDec
+class CCSTDirectDec : public CCSTBase
 {
   /*
     <direct-declarator> ::= <identifier>
@@ -225,9 +218,92 @@ class CCSTDirectDec
                       | <direct-declarator> ( <parameter-type-list> )
                       | <direct-declarator> ( {<identifier>}* )
    */
-  // TODO, should these be split up
+ public:
+  virtual void write() = 0;
+  
+};
+
+class CCSTDirectDecId
+{
+  /*
+    <direct-declarator> ::= <identifier>
+                      | ( <declarator> )
+                      | <direct-declarator> [ {<constant-expression>}? ]
+                      | <direct-declarator> ( <parameter-type-list> )
+                      | <direct-declarator> ( {<identifier>}* )
+   */
+  const char* id_;
+ public:
+  CCSTDirectDecId(const char* id){this->id_ = id;}
+  virtual void write();
 
 };
+
+class CCSTDirectDecDec : public CCSTDirectDec
+{
+  /*
+    <direct-declarator> ::= <identifier>
+                      | ( <declarator> )
+                      | <direct-declarator> [ {<constant-expression>}? ]
+                      | <direct-declarator> ( <parameter-type-list> )
+                      | <direct-declarator> ( {<identifier>}* )
+   */
+  CCSTDeclarator *dec_;
+ public:
+  CCSTDirectDecDec(CCSTDeclarator *dec){this->dec_ = dec;}
+  virtual void write();
+  
+};
+class CCSTDirectDecConstExpr : public CCSTDirectDec
+{
+  /*
+    <direct-declarator> ::= <identifier>
+                      | ( <declarator> )
+                      | <direct-declarator> [ {<constant-expression>}? ]
+                      | <direct-declarator> ( <parameter-type-list> )
+                      | <direct-declarator> ( {<identifier>}* )
+   */
+  CCSTDirectDec *direct_dec_;
+  CCSTConstExpr *const_expr_; // if null
+ public:
+  CCSTDirectDecConstExpr(CCSTDirectDec *direct_dec, CCSTConstExpr *const_expr){this->direct_dec_ = direct_dec; this->const_expr_ = const_expr;}
+  CCSTDirectDecConstExpr(CCSTDirectDec *direct_dec){this->direct_dec_ = direct_dec; this->const_expr_ = null;}
+  virtual void write();
+
+};
+class CCSTDirectDecParamTypeList : public CCSTDirectDeclarator
+{
+  /*
+    <direct-declarator> ::= <identifier>
+                      | ( <declarator> )
+                      | <direct-declarator> [ {<constant-expression>}? ]
+                      | <direct-declarator> ( <parameter-type-list> )
+                      | <direct-declarator> ( {<identifier>}* )
+   */
+  CCSTDirectDec * direct_dec_;
+  CCSTParamTypeList *p_t_list_;
+ public:
+  CCSTDirectDecParamTypeList(CCSTDirectDec *direct_dec, CCSTParamTypeList *p_t_list){this->direct_dec_ = direct_dec; this->p_t_list_ = p_t_list;}
+  virtual void write();
+
+};
+class CCSTDirectDecIdList : public CCSTDirectDeclarator
+{
+  /*
+    <direct-declarator> ::= <identifier>
+                      | ( <declarator> )
+                      | <direct-declarator> [ {<constant-expression>}? ]
+                      | <direct-declarator> ( <parameter-type-list> )
+                      | <direct-declarator> ( {<identifier>}* )
+   */
+  CCSTDirectDec *direct_dec_;
+  vector<char *> ids_;
+ public:
+  CCSTDirectDecIdList(CCSTDirectDec *direct_dec, vector<char*> ids){this->direct_dec_ = direct_dec; this->ids_ = ids;}
+  virtual void write();
+  
+};
+
 
 // is this right?
 class CCSTConstExpr : public CCSTBase
@@ -235,8 +311,10 @@ class CCSTConstExpr : public CCSTBase
   /*
     <constant-expression> ::= <conditional-expression>
    */
+  CCSTCondExpr *cond_expr_;
  public:
-  virtual void write() = 0;
+  CCSTConstExpr(CCSTCondExpr *cond_expr){this->cond_expr_ = cond_expr;}
+  virtual void write();
 };
 
 class CCSTCondExpr : public CCSTAssignExpr
@@ -428,8 +506,60 @@ class CCSTUnaryExpr : public CCSTCastExpr
                      | sizeof <unary-expression>
                      | sizeof <type-name>
    */
-  // TODO
-  //break this up into smaller
+ public:
+  virtual void write() = 0;
+};
+
+class CCSTUnaryExprCastExpr : public CCSTUnaryExpr
+{
+  /*
+    <unary-expression> ::= <postfix-expression>
+                     | ++ <unary-expression>
+                     | -- <unary-expression>
+                     | <unary-operator> <cast-expression>
+                     | sizeof <unary-expression>
+                     | sizeof <type-name>
+   */
+  CCSTUnaryOp *unary_op_;
+  CCSTCastExpr *cast_expr_;
+ public:
+  CCSTUnaryExprCastExpr(CCSTUnaryOp *unary_op, CCSTCastExpr *cast_expr){this->unary_op_ = unary_op; this->cast_expr_ = cast_expr;}
+  virtual void write();
+};
+
+class CCSTUnaryExprOpOp : public CCSTUnaryExpr
+{
+  /*
+    <unary-expression> ::= <postfix-expression>
+                     | ++ <unary-expression>
+                     | -- <unary-expression>
+                     | <unary-operator> <cast-expression>
+                     | sizeof <unary-expression>
+                     | sizeof <type-name>
+   */
+  bool plusplus_; // false is minus minus
+  CCSTUnaryExpr *unary_expr_;
+ public:
+  CCSTUnaryExprOpOp(bool plusplus, CCSTUnaryExpr *unary_expr){this->unary_expr_ = unary_expr; this->plusplus_ = plusplus;}
+  virtual void write();
+};
+
+class CCSTUnaryExprSizeOf : public CCSTCastExpr
+{
+  /*
+    <unary-expression> ::= <postfix-expression>
+                     | ++ <unary-expression>
+                     | -- <unary-expression>
+                     | <unary-operator> <cast-expression>
+                     | sizeof <unary-expression>
+                     | sizeof <type-name>
+   */
+  CCSTUnaryExpr *unary_expr_;
+  CCSTTypeName *type_name_;
+ public:
+  CCSTUnaryExprSizeOf(CCSTUnaryExpr *unary_expr){this->unary_expr_ = unary_expr; this->type_name_ = null;}
+  CCSTUnaryExprSizeOf(CCSTTypeName *type_name){this->type_name_  = type_name; this->unary_expr_ = null;}
+  virtual void write();
 };
 
 class CCSTPostFixExpr : public CCSTUnaryExpr
@@ -443,7 +573,80 @@ class CCSTPostFixExpr : public CCSTUnaryExpr
                        | <postfix-expression> ++
                        | <postfix-expression> --
    */
-  // TODO
+ public:
+  virtual void write() = 0;
+};
+
+class CCSTPostFixExprOpOp : public CCSTPostFixExpr
+{
+  /*
+    <postfix-expression> ::= <primary-expression>
+                       | <postfix-expression> [ <expression> ]
+                       | <postfix-expression> ( {<assignment-expression>}* )
+                       | <postfix-expression> . <identifier>
+                       | <postfix-expression> -> <identifier>
+                       | <postfix-expression> ++
+                       | <postfix-expression> --
+   */
+  CCSTPostFixExpr *post_fix_expr_;
+  bool plusplus_;
+ public:
+  CCSTPostFixExprOpOp(CCSTPostFixExpr *post_fix_expr, bool plusplus){this->post_fix_expr_ = post_fix_expr; this->plusplus_ = plusplus;}
+  virtual void write();
+};
+
+class CCSTPostFixExprAccess : public CCSTPostFixExpr
+{
+  /*
+    <postfix-expression> ::= <primary-expression>
+                       | <postfix-expression> [ <expression> ]
+                       | <postfix-expression> ( {<assignment-expression>}* )
+                       | <postfix-expression> . <identifier>
+                       | <postfix-expression> -> <identifier>
+                       | <postfix-expression> ++
+                       | <postfix-expression> --
+   */
+  bool pointer_; // -> true . false
+  CCSTPostFixExpr *post_fix_expr_;
+ public:
+  CCSTPostFixExprAccess(CCSTPostFixExpr *post_fix_expr, bool pointer){this->post_fix_expr_ = post_fix_expr; this->pointer_ = pointer;}
+  virtual void write();
+};
+
+class CCSTPostFixExprExpr : public CCSTPostFixExpr
+{
+  /*
+    <postfix-expression> ::= <primary-expression>
+                       | <postfix-expression> [ <expression> ]
+                       | <postfix-expression> ( {<assignment-expression>}* )
+                       | <postfix-expression> . <identifier>
+                       | <postfix-expression> -> <identifier>
+                       | <postfix-expression> ++
+                       | <postfix-expression> --
+   */
+  CCSTPostFixExpr *post_fix_expr_;
+  CCSTExpression *expr_;
+ public:
+  CCSTPostFixExprExpr(CCSTPostFixExpr *post_fix_expr, CCSTExpression *expr){this->post_fix_expr_ = post_fix_expr; this->expr_ = expr;}
+  virtual void write();
+};
+
+class CCSTPostFixExprAssnExpr : public CCSTPostFixExpr
+{
+  /*
+    <postfix-expression> ::= <primary-expression>
+                       | <postfix-expression> [ <expression> ]
+                       | <postfix-expression> ( {<assignment-expression>}* )
+                       | <postfix-expression> . <identifier>
+                       | <postfix-expression> -> <identifier>
+                       | <postfix-expression> ++
+                       | <postfix-expression> --
+   */
+  CCSTPostFixExpr *post_fix_expr_;
+  CCSTAssignExpr *assn_expr_;
+ public:
+  CCSTPostFixExprAssnExpr(CCSTPostFixExpr *post_fix_expr, CCSTAssignExpr *assn_expr){this->post_fix_expr_ = post_fix_expr; this->assn_expr_ = assn_expr;}
+  virtual void write();
 };
 
 class CCSTPrimaryExpr : public CCSTPostFixExpr
@@ -454,7 +657,26 @@ class CCSTPrimaryExpr : public CCSTPostFixExpr
                        | <string>
                        | ( <expression> )
    */
-  // TODO
+  CCSTExpression *expr_;
+ public:
+  CCSTPrimaryExpr(CCSTExpression *expr){this->expr_ = expr;}
+  virtual void write();
+};
+
+class CCSTString : public CCSTPrimaryExpr
+{
+  const char* string_;
+ public:
+  CCSTString(const char* string){this->string_ = string;}
+  virtual void write();
+};
+
+class CCSTPrimaryExprId : public CCSTPrimaryExpr
+{
+  const char* id_;
+ public:
+  CCSTPrimaryExprId(const char* id){this->id_ = id;}
+  virtual void write();
 };
 
 class CCSTConst : public CCSTPrimaryExpr
@@ -472,21 +694,37 @@ class CCSTConst : public CCSTPrimaryExpr
 class CCSTInteger : public CCSTConst
 {
   // TODO
+
 };
 
 class CCSTChar : public CCSTConst
 {
-  // TODO
+  
+  char c_;
+ public:
+  CCSTChar(char c){this->c_ = c;}
+  virtual void write();
 };
 
 class CCSTFloat : public CCSTConst
 {
-  // TODO
+  
+  float f_;
+  double d_;
+  bool float_;
+ public:
+  CCSTFloat(float f){this->f_ = f; this->float_ = true;}
+  CCSTFloat(double d)this->d_ = d; this->float_ = false;}
 };
 
 class CCSTEnumConst : public CCSTConts
 {
-  //TODO
+  
+  // values in enum?
+  const char* enum_val_;
+ public:
+  CCSTEnumConst(const char* enum_val){this->enum_val_ = enum_val;}
+  virtual void write();
 };
 
 class CCSTExpression : public CCSTBase
@@ -507,7 +745,12 @@ class CCSTAssignExpr :: public CCSTExpression
     <assignment-expression> ::= <conditional-expression>
                           | <unary-expression> <assignment-operator> <assignment-expression>
    */
-  // TODO
+  CCSTUnaryExpr *unary_expr_;
+  CCSTAssignOp *assn_op_;
+  CCSTAssignExpr *assn_expr_;
+ public:
+  CCSTAssignExpr(CCSTUnaryExpr *unary_expr, CCSTAssignOp *assn_op, CCSTAssignExpr *assn_expr){this->unary_expr_ = unary_expr; this->assn_op_ = assn_op; this->assn_expr_ = assn_expr; }
+  virtual void write();
 };
 
 enum assign_op {equal_t, mult_eq_t, div_eq_t, mod_eq_t, plus_eq_t, minus_eq_t, lshift_eq_t,
@@ -630,7 +873,7 @@ class CCSTDirectAbstDeclarator : public CCSTAbstDeclarator
                                | {<direct-abstract-declarator>}? [ {<constant-expression>}? ]
                                | {<direct-abstract-declarator>}? ( {<parameter-type-list>|? )
    */
-  // TODO
+  
   CCSTAbstDeclarator *abs_dec_;
   CCSTDirectAbstDeclarator *d_abs_dec_;
   CCSTConstExpr *const_expr_;
@@ -699,7 +942,7 @@ class CCSTDeclaration : public CCSTExDeclaration
   /*
     <declaration> ::=  {<declaration-specifier>}+ {<init-declarator>}*
    */
-  // TODO
+ 
   vector<CCSTDecSpecifier> dec_spec_;
   CCSTInitDeclarator *init_dec_;
  public:

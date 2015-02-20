@@ -2,7 +2,7 @@ class CCSTBase
 {
 };
 
-class CCSTFile : CCSTBase
+class CCSTFile : public CCSTBase
 {
   // Other stuff like File
   vector<CCSTExDeclaration> defs_;
@@ -11,7 +11,7 @@ class CCSTFile : CCSTBase
   virtual void write();
 };
 
-class CCSTExDeclaration : CCSTBase
+class CCSTExDeclaration : public CCSTBase
 {
   /*
   <external-declaration> ::= <function-definition>
@@ -47,7 +47,7 @@ class CCSTDeclaration : public CCSTExDeclaration
   virtual void write();
 };
 
-class CCSTDecSpecifier : CCSTBase
+class CCSTDecSpecifier : public CCSTBase
 {
   /*
     <declaration-specifier> ::= <storage-class-specifier>
@@ -163,7 +163,7 @@ class CCSTStructDecList : CCSTBase
   virtual void write();
 };
 
-class CCSTStructDeclarator : CCSTBase
+class CCSTStructDeclarator : public CCSTStructDecList
 {
   /*
   <struct-declarator> ::= <declarator>
@@ -179,7 +179,7 @@ class CCSTStructDeclarator : CCSTBase
   virtual void write();
 };
 
-class CCSTDeclarator : CCSTBase
+class CCSTDeclarator : public CCSTStructDeclarator
 {
   /*
     <declarator> ::= {<pointer>}? <direct-declarator>
@@ -191,7 +191,7 @@ class CCSTDeclarator : CCSTBase
   virtual void write();
 };
 
-class CCSTPointer : CCSTBase
+class CCSTPointer : public CCSTAbstDeclarator
 {
   /*
     <pointer> ::= * {<type-qualifier>}* {<pointer>}?
@@ -239,7 +239,20 @@ class CCSTConstExpr : public CCSTBase
   virtual void write() = 0;
 };
 
-class CCSTLogicalOrExpr
+class CCSTCondExpr : public CCSTAssignExpr
+{
+  /*
+    <conditional-expression> ::= <logical-or-expression>
+                           | <logical-or-expression> ? <expression> : <conditional-expression>
+   */
+  CCSTLogicalOrExpr *log_or_expr_;
+  CCSTExpr *expr_;
+  CCSTCondExpr *cond_expr_;
+ public:
+  CCSTCondExpr(CCSTLogicalOrExpr *log_or_expr, CCSTExpr *expr, CCSTCondExpr *cond_expr){this->log_or_expr_ = log_or_expr; this->expr_ = expr; this->cond_expr_ = cond_expr;}
+};
+
+class CCSTLogicalOrExpr : public CCSTCondExpr
 {
   /*
     <logical-or-expression> ::= <logical-and-expression>
@@ -586,8 +599,14 @@ class CCSTParamDeclaration : public CCSTParamList
                           | {<declaration-specifier>}+ <abstract-declarator>
                           | {<declaration-specifier>}+
    */
-  // TODO
-  
+  vector<CCSTDecSpecifier> dec_specs_;
+  CCSTDeclarator *dec_;
+  CCSTAbstDeclarator *abs_dec_;
+ public:
+  CCSTParamDeclaration(vector<CCSTDecSpecifier> dec_specs){this->dec_specs_ = dec_specs;}
+  CCSTParamDeclaration(vector<CCSTDecSpecifier> dec_specs, CCSTDeclarator *dec){this->dec_specs_ = dec_specs; this->dec_ = dec; this->abs_dec_ = abs_dec;}
+  CCSTParamDeclaration(vector<CCSTDecSpecifier> dec_specs, CCSTAbstDeclarator *abs_dec){this->dec_specs_ = dec_specs; this->abs_dec_ = abs_dec; this->dec_ = dec;}
+  virtual void write();
 };
 
 class CCSTAbstDeclarator : public CCSTBase
@@ -597,10 +616,14 @@ class CCSTAbstDeclarator : public CCSTBase
                         | <pointer> <direct-abstract-declarator>
                         | <direct-abstract-declarator>
    */
-  // TODO
+  CCSTPointer *p_;
+  CCSTDirectAbstDeclarator *d_abs_dec_;
+ public:
+  CCSTAbstDeclarator(CCSTPointer *p, CCSTDirectAbstDeclarator *d_abs_dec){this->p_ = p; this->d_abs_dec_ = d_abs_dec;}
+  virtual void write();
 };
 
-class CCSTDirectAbstDeclarator : public CCSTBase
+class CCSTDirectAbstDeclarator : public CCSTAbstDeclarator
 {
   /*
     <direct-abstract-declarator> ::=  ( <abstract-declarator> )
@@ -608,6 +631,15 @@ class CCSTDirectAbstDeclarator : public CCSTBase
                                | {<direct-abstract-declarator>}? ( {<parameter-type-list>|? )
    */
   // TODO
+  CCSTAbstDeclarator *abs_dec_;
+  CCSTDirectAbstDeclarator *d_abs_dec_;
+  CCSTConstExpr *const_expr_;
+  CCSTParamTypeList *param_type_list_;
+ public:
+  CCSTDirectAbstDeclarator(CCSTAbstDeclarator *abs_dec){this->abs_dec_ = abs_dec;}
+  CCSTDirectAbstDeclarator(CCSTDirectAbstDeclarator *d_abs_dec, CCSTConstExpr *const_expr){this->d_abs_dec_ = d_abs_dec; this->const_expr_ = const_expr;}
+  CCSTDirectAbstDeclarator(CCSTDirectAbstDeclarator *d_abs_dec, CCSTParamTypeList *param_type_list){this->d_abs_dec_ = d_abs_dec; this->param_type_list_ = param_type_list;}
+  virtual void write();
 };
 
 class CCSTEnumSpecifier : public CCSTTypeSpecifier
@@ -698,16 +730,25 @@ class CCSTInitializer : public CCSTInitializerList
                 | { <initializer-list> }
                 | { <initializer-list> , }
    */
-
-  // TODO
+  CCSTAssignExpr *assn_expr_;
+ public:
+  CCSTInitializer(CCSTAssignExpr *assn_expr){this->assn_expr_ = assn_expr;}
+  virtual void write();
 };
 
-class CCSTInitializerList
+class CCSTInitializerList : public CCSTBase
 {
-  // TODO
+  /*
+    <initializer-list> ::= <initializer>
+                     | <initializer-list> , <initializer>
+   */
+  vector<CCSTInitializer> init_list_;
+ public:
+  CCSTInitializerList(vector<CCSTInitializer> init_list){this->init_list_ = init_list;}
+  virtual void write();
 };
 
-class CCSTCompoundStatement : CCSTStatement
+class CCSTCompoundStatement : public CCSTStatement
 {
   /*
     <compound-statement> ::= { {<declaration>}* {<statement>}* }
@@ -720,7 +761,7 @@ class CCSTCompoundStatement : CCSTStatement
   virtual void write();
 };
 
-class CCSTStatement
+class CCSTStatement : public CCSTBase
 {
   /*
     <statement> ::= <labeled-statement>
@@ -734,7 +775,7 @@ class CCSTStatement
   virtual void write() = 0;
 };
 
-class CCSTLabeledStatement : CCSTStatement
+class CCSTLabeledStatement : public CCSTStatement
 {
   /*
     <labeled-statement> ::= <identifier> : <statement>
@@ -745,7 +786,7 @@ class CCSTLabeledStatement : CCSTStatement
   virtual void write() = 0;
 };
 
-class CCSTPlainLabelStatement : CCSTLabeledStatement
+class CCSTPlainLabelStatement : public CCSTLabeledStatement
 {
   const char* id_;
   CCSTStatement *stmnt_;
@@ -754,7 +795,7 @@ class CCSTPlainLabelStatement : CCSTLabeledStatement
   virtual void write();
 };
 
-class CCSTCaseStatement : CCSTLabeledStatement
+class CCSTCaseStatement : public CCSTLabeledStatement
 {
   CCSTConstExpr *case_label_;
   CCSTStatement *body_;
@@ -763,7 +804,7 @@ class CCSTCaseStatement : CCSTLabeledStatement
   virtual void write();
 };
 
-class CCSTExprStatement : CCSTStatement
+class CCSTExprStatement : public CCSTStatement
 {
   /*
     <expression-statement> ::= {<expression>}? ;
@@ -773,7 +814,7 @@ class CCSTExprStatement : CCSTStatement
   CCSTExprStatement(CCSTExpression *expr){this->expr_ = expr;}
 };
 
-class CCSTSelectionStatement : CCSTStatement
+class CCSTSelectionStatement : public CCSTStatement
 {
   /*
     <selection-statement> ::= if ( <expression> ) <statement>
@@ -783,7 +824,7 @@ class CCSTSelectionStatement : CCSTStatement
   virtual void write() = 0;
 };
 
-class CCSTIfStatement : CCSTSelectionStatement
+class CCSTIfStatement : public CCSTSelectionStatement
 {
   CCSTExpression *cond_;
   CCSTStatement *body_;
@@ -792,7 +833,7 @@ class CCSTIfStatement : CCSTSelectionStatement
   virtual void write();
 };
 
-class CCSTIfElseStatement : CCSTSelectionStatement
+class CCSTIfElseStatement : public CCSTSelectionStatement
 {
   CCSTExpression *cond_;
   CCSTStatement *if_body_;
@@ -802,7 +843,7 @@ class CCSTIfElseStatement : CCSTSelectionStatement
   virtual void write();
 };
 
-class CCSTSwitchStatement : CCSTSelectionStatement
+class CCSTSwitchStatement : public CCSTSelectionStatement
 {
   CCSTExpression *expr_;
   CCSTStatement *body_;
@@ -811,7 +852,7 @@ class CCSTSwitchStatement : CCSTSelectionStatement
   virtual void write();
 };
 
-class CCSTIterationStmnt : CCSTStatement
+class CCSTIterationStmnt : public CCSTStatement
 {
   /*
     <iteration-statement> ::= while ( <expression> ) <statement>
@@ -822,7 +863,7 @@ class CCSTIterationStmnt : CCSTStatement
   virtual void write() = 0;
 };
 
-class CCSTWhileLoop : CCSTIterationStmnt
+class CCSTWhileLoop : public CCSTIterationStmnt
 {
   CCSTExpression *cond_;
   CCSTStatement *body_;
@@ -831,7 +872,7 @@ class CCSTWhileLoop : CCSTIterationStmnt
   virtual void write();
 };
 
-class CCSTDoLoop : CCSTIterationStmnt
+class CCSTDoLoop : public CCSTIterationStmnt
 {
   CCSTExpression *cond_;
   CCSTStatement * body_;
@@ -840,7 +881,7 @@ class CCSTDoLoop : CCSTIterationStmnt
   virtual void write();
 };
 
-class CCSTForLoop : CCSTIterationStmnt
+class CCSTForLoop : public CCSTIterationStmnt
 { 
   CCSTExpression *init_;
   CCSTExpression *cond_;
@@ -851,7 +892,7 @@ class CCSTForLoop : CCSTIterationStmnt
   virtual void write();
 };
 
-class CCSTJumpStmnt : CCSTStatement
+class CCSTJumpStmnt : public CCSTStatement
 {
   /*
     <jump-statement> ::= goto <identifier> ;
@@ -865,7 +906,7 @@ class CCSTJumpStmnt : CCSTStatement
   
 };
 
-class CCSTGoto : CCSTJumpStmnt
+class CCSTGoto : public CCSTJumpStmnt
 {
   const char* identifier_;
  public:
@@ -874,21 +915,21 @@ class CCSTGoto : CCSTJumpStmnt
   
 };
 
-class CCSTContinue : CCSTJumpStmnt
+class CCSTContinue : public CCSTJumpStmnt
 {
  public:
   CCSTContinue();
   virtual void write();
 };
 
-class CCSTBreak : CCSTJumpStmnt
+class CCSTBreak : public CCSTJumpStmnt
 {
  public:
   CCSTBreak();
   virtual void write();
 };
 
-class CCSTReturn : CCSTJumpStmnt
+class CCSTReturn : public CCSTJumpStmnt
 {
   CCSTExpression *expr_;
  public:

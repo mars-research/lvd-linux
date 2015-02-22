@@ -22,17 +22,18 @@ static int test02(void)
 	struct cspace c;
 	int ret;
 	struct cnode *cnode1, *cnode2;
+	cptr_t cp = __cptr((1 << LCD_CPTR_SLOT_BITS) - 1);
 	ret = __lcd_cap_init_cspace(&c);
 	if (ret) {
 		LCD_ERR("init cspace");
 		goto fail1;
 	}
-	ret = __lcd_cnode_lookup(&c, __cptr(15), true, &cnode1);
+	ret = __lcd_cnode_lookup(&c, cp, true, &cnode1);
 	if (ret) {
 		LCD_ERR("lookup");
 		goto fail2;
 	}
-	ret = __lcd_cnode_lookup(&c, __cptr(15), true, &cnode2);
+	ret = __lcd_cnode_lookup(&c, cp, true, &cnode2);
 	if (ret) {
 		LCD_ERR("lookup");
 		goto fail3;
@@ -173,6 +174,7 @@ static int test05(void)
 	int ret;
 	struct cnode *cnode;
 	struct page *p;
+	cptr_t cp = __cptr((1 << LCD_CPTR_SLOT_BITS) - 1);
 
 	p = alloc_page(GFP_KERNEL);
 	if (!p) {
@@ -186,13 +188,13 @@ static int test05(void)
 		goto fail1;
 	}
 	ret = __lcd_cap_insert(&current->lcd->cspace, 
-			__cptr(15), p, LCD_CAP_TYPE_PAGE);
+			cp, p, LCD_CAP_TYPE_PAGE);
 	if (ret) {
 		LCD_ERR("insert");
 		goto fail2;
 	}
 	ret = __lcd_cnode_lookup(&current->lcd->cspace, 
-				__cptr(15), false, &cnode);
+				cp, false, &cnode);
 	if (ret) {
 		LCD_ERR("lookup");
 		goto fail3;
@@ -304,6 +306,16 @@ static int test07(void)
 	int ret;
 	struct page *p;
 	struct cnode *cnode;
+	/*
+	 * Assume certain cptr layout for simplicity
+	 */
+	cptr_t cp0 = __cptr(1);
+	cptr_t cp1 = __cptr(4 | (1 << LCD_CPTR_LEVEL_SHIFT));
+	cptr_t cp2 = __cptr(0xb | (1 << LCD_CPTR_LEVEL_SHIFT));
+	cptr_t cp3 = __cptr(0x30 | 0x3 | (2 << LCD_CPTR_LEVEL_SHIFT));
+	cptr_t cp4 = __cptr(0x30 | 0x1 | (2 << LCD_CPTR_LEVEL_SHIFT));
+	cptr_t cp5 = __cptr(0xFF | (3 << LCD_CPTR_LEVEL_SHIFT));
+	cptr_t cp6 = __cptr(3);
 
 	p = alloc_page(GFP_KERNEL);
 	if (!p) {
@@ -322,7 +334,7 @@ static int test07(void)
 	/*
 	 * Insert into 0's cspace
 	 */
-	ret = __lcd_cap_insert(&lcds[0]->cspace, __cptr(23), p,
+	ret = __lcd_cap_insert(&lcds[0]->cspace, cp0, p,
 			LCD_CAP_TYPE_PAGE);
 	if (ret) {
 		LCD_ERR("insert");
@@ -331,14 +343,14 @@ static int test07(void)
 	/*
 	 * Grant to 1 and 2 (so they are children of 0)
 	 */
-	ret = __lcd_cap_grant(&lcds[0]->cspace, __cptr(23),
-			&lcds[1]->cspace, __cptr(13));
+	ret = __lcd_cap_grant(&lcds[0]->cspace, cp0,
+			&lcds[1]->cspace, cp1);
 	if (ret) {
 		LCD_ERR("grant 0 to 1");
 		goto fail2;
 	}
-	ret = __lcd_cap_grant(&lcds[0]->cspace, __cptr(23),
-			&lcds[2]->cspace, __cptr(15));
+	ret = __lcd_cap_grant(&lcds[0]->cspace, cp0,
+			&lcds[2]->cspace, cp2);
 	if (ret) {
 		LCD_ERR("grant 0 to 2");
 		goto fail2;
@@ -346,26 +358,26 @@ static int test07(void)
 	/*
 	 * Grant 1 -> 3 & 4, 2 -> 5 & 6
 	 */
-	ret = __lcd_cap_grant(&lcds[1]->cspace, __cptr(13),
-			&lcds[3]->cspace, __cptr(4));
+	ret = __lcd_cap_grant(&lcds[1]->cspace, cp1,
+			&lcds[3]->cspace, cp3);
 	if (ret) {
 		LCD_ERR("grant 1 to 3");
 		goto fail2;
 	}
-	ret = __lcd_cap_grant(&lcds[1]->cspace, __cptr(13),
-			&lcds[4]->cspace, __cptr(6));
+	ret = __lcd_cap_grant(&lcds[1]->cspace, cp1,
+			&lcds[4]->cspace, cp4);
 	if (ret) {
 		LCD_ERR("grant 1 to 4");
 		goto fail2;
 	}
-	ret = __lcd_cap_grant(&lcds[2]->cspace, __cptr(15),
-			&lcds[5]->cspace, __cptr(9));
+	ret = __lcd_cap_grant(&lcds[2]->cspace, cp2,
+			&lcds[5]->cspace, cp5);
 	if (ret) {
 		LCD_ERR("grant 2 to 5");
 		goto fail2;
 	}
-	ret = __lcd_cap_grant(&lcds[2]->cspace, __cptr(15),
-			&lcds[6]->cspace, __cptr(10));
+	ret = __lcd_cap_grant(&lcds[2]->cspace, cp2,
+			&lcds[6]->cspace, cp6);
 	if (ret) {
 		LCD_ERR("grant 2 to 6");
 		goto fail2;
@@ -373,7 +385,7 @@ static int test07(void)
 	/*
 	 * 0 does a revoke
 	 */
-	ret = __lcd_cap_revoke(&lcds[0]->cspace, __cptr(23));
+	ret = __lcd_cap_revoke(&lcds[0]->cspace, cp0);
 	if (ret) {
 		LCD_ERR("revoke");
 		goto fail2;
@@ -381,7 +393,7 @@ static int test07(void)
 	/*
 	 * Make sure 0 still has access
 	 */
-	ret = __lcd_cnode_lookup(&lcds[0]->cspace, __cptr(23), false, &cnode);
+	ret = __lcd_cnode_lookup(&lcds[0]->cspace, cp0, false, &cnode);
 	if (ret) {
 		LCD_ERR("cnode lookup");
 		goto fail2;
@@ -398,37 +410,37 @@ static int test07(void)
 	 * XXX: this relies on us not cleaning up unused cnode tables, 
 	 * may change in the future ...
 	 */
-	ret = __lcd_cnode_lookup(&lcds[1]->cspace, __cptr(13), false, &cnode);
+	ret = __lcd_cnode_lookup(&lcds[1]->cspace, cp1, false, &cnode);
 	if (!ret) {
 		LCD_ERR("cnode lookup unexpectedly found something");
 		ret = -1;
 		goto fail2;
 	}
-	ret = __lcd_cnode_lookup(&lcds[2]->cspace, __cptr(15), false, &cnode);
+	ret = __lcd_cnode_lookup(&lcds[2]->cspace, cp2, false, &cnode);
 	if (!ret) {
 		LCD_ERR("cnode lookup unexpectedly found something");
 		ret = -1;
 		goto fail2;
 	}
-	ret = __lcd_cnode_lookup(&lcds[3]->cspace, __cptr(4), false, &cnode);
+	ret = __lcd_cnode_lookup(&lcds[3]->cspace, cp3, false, &cnode);
 	if (!ret) {
 		LCD_ERR("cnode lookup unexpectedly found something");
 		ret = -1;
 		goto fail2;
 	}
-	ret = __lcd_cnode_lookup(&lcds[4]->cspace, __cptr(6), false, &cnode);
+	ret = __lcd_cnode_lookup(&lcds[4]->cspace, cp4, false, &cnode);
 	if (!ret) {
 		LCD_ERR("cnode lookup unexpectedly found something");
 		ret = -1;
 		goto fail2;
 	}
-	ret = __lcd_cnode_lookup(&lcds[5]->cspace, __cptr(9), false, &cnode);
+	ret = __lcd_cnode_lookup(&lcds[5]->cspace, cp5, false, &cnode);
 	if (!ret) {
 		LCD_ERR("cnode lookup unexpectedly found something");
 		ret = -1;
 		goto fail2;
 	}
-	ret = __lcd_cnode_lookup(&lcds[6]->cspace, __cptr(10), false, &cnode);
+	ret = __lcd_cnode_lookup(&lcds[6]->cspace, cp6, false, &cnode);
 	if (!ret) {
 		LCD_ERR("cnode lookup unexpectedly found something");
 		ret = -1;

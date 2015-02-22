@@ -52,8 +52,59 @@ static inline void __lcd_warn(char *file, int lineno, char *fmt, ...)
  * See Documentation/lcd-domains/cap.txt.
  */
 
-#define LCD_MAX_CAPS 32
-#define LCD_CNODE_TABLE_NUM_SLOTS 8 /* should be a power of 2 */
+#define LCD_CPTR_DEPTH_BITS  2    /* max depth of 3, zero indexed         */
+#define LCD_CPTR_FANOUT_BITS 2    /* each level fans out by a factor of 4 */
+#define LCD_CPTR_SLOT_BITS   2    /* each node contains 4 cap slots       */
+#define LCD_CNODE_TABLE_NUM_SLOTS ((1 << LCD_CPTR_SLOT_BITS) + \
+					(1 << LCD_CPTR_FANOUT_BITS))
+#define LCD_CPTR_LEVEL_SHIFT (((1 << LCD_CPTR_DEPTH_BITS) - 1) * \
+				LCD_CPTR_FANOUT_BITS + LCD_CPTR_SLOT_BITS)
+
+static inline unsigned long lcd_cptr_slot(cptr_t c)
+{
+	/*
+	 * Mask off low bits
+	 */ 
+	return cptr_val(c) & ((1 << LCD_CPTR_SLOT_BITS) - 1);
+}
+
+/* 
+ * Gives fanout index for going *from* lvl to lvl + 1, where 
+ * 0 <= lvl < 2^LCD_CPTR_DEPTH_BITS - 1 (i.e., we can't go anywhere
+ * if lvl = 2^LCD_CPTR_DEPTH_BITS - 1, because we are at the deepest
+ * level).
+ */
+static inline unsigned long lcd_cptr_fanout(cptr_t c, int lvl)
+{
+	unsigned long i;
+
+	BUG_ON(lvl >= (1 << LCD_CPTR_DEPTH_BITS) - 1);
+
+	i = cptr_val(c);
+	/*
+	 * Shift and mask off bits at correct section
+	 */
+	i >>= (lvl * LCD_CPTR_FANOUT_BITS + LCD_CPTR_SLOT_BITS);
+	i &= ((1 << LCD_CPTR_FANOUT_BITS) - 1);
+
+	return i;
+}
+/*
+ * Gives depth/level of cptr, zero indexed (0 means the root cnode table)
+ */
+static inline unsigned long lcd_cptr_level(cptr_t c)
+{
+	unsigned long i;
+
+	i = cptr_val(c);
+	/*
+	 * Shift and mask
+	 */
+	i >>= LCD_CPTR_LEVEL_SHIFT;
+	i &= ((1 << LCD_CPTR_DEPTH_BITS) - 1);
+
+	return i;
+}
 
 /* 
  * --------------------------------------------------
@@ -222,13 +273,15 @@ struct lcd_utcb {
  *
  * LCDs - lightweight capability domain
  *
+ * See Documentation/lcd-domains/lcd.txt
  */
 
 
 #define	LCD_STATUS_EMBRYO     0
-#define	LCD_STATUS_SUSPENDED  1
-#define	LCD_STATUS_RUNNING    2
-#define	LCD_STATUS_DEAD       3 /* an lcd can never come back to life */
+#define	LCD_STATUS_CONFIGED   1
+#define	LCD_STATUS_SUSPENDED  2
+#define	LCD_STATUS_RUNNING    3
+#define	LCD_STATUS_DEAD       4
 
 
 enum lcd_xmit_status {
@@ -312,14 +365,17 @@ struct lcd {
 	atomic_set(&(lcd)->status, (status_value));	\
 	smp_mb();					\
 	} while(0);					
+#define get_lcd_status(lcd) (atomic_read(&(lcd)->status))
 #define lcd_status_embryo(lcd) \
-	(atomic_read(&(lcd)->status) == LCD_STATUS_EMBRYO)
+	(get_lcd_status(lcd) == LCD_STATUS_EMBRYO)
+#define lcd_status_configed(lcd) \
+	(get_lcd_status(lcd) == LCD_STATUS_CONFIGED)
 #define lcd_status_suspended(lcd) \
-	(atomic_read(&(lcd)->status) == LCD_STATUS_SUSPENDED)
+	(get_lcd_status(lcd) == LCD_STATUS_SUSPENDED)
 #define lcd_status_running(lcd) \
-	(atomic_read(&(lcd)->status) == LCD_STATUS_RUNNING)
+	(get_lcd_status(lcd) == LCD_STATUS_RUNNING)
 #define lcd_status_dead(lcd) \
-	(atomic_read(&(lcd)->status) == LCD_STATUS_DEAD)
+	(get_lcd_status(lcd) == LCD_STATUS_DEAD)
 
 /*
  * --------------------------------------------------
@@ -333,22 +389,6 @@ struct lcd_sync_endpoint {
 	struct list_head senders;
 	struct list_head receivers;
         struct mutex lock;
-};
-
-/* --------------------------------------------------
- *
- * SYSTEM CALLS
- *
- */
-
-enum lcd_syscall {
-	LCD_SYSCALL_SEND       = 0,
-	LCD_SYSCALL_NBSEND     = 1,
-	LCD_SYSCALL_CALL       = 2,
-	LCD_SYSCALL_WAIT       = 3,
-	LCD_SYSCALL_REPLY      = 4,
-	LCD_SYSCALL_REPLYWAIT  = 5,
-	LCD_SYSCALL_YIELD      = 6,
 };
 
 /* KLCD STUFF -------------------------------------------------- */

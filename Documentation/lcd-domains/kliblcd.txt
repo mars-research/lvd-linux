@@ -1,0 +1,81 @@
+
+========================================
+OVERVIEW
+========================================
+
+The code is inside virt/lcd-domains/kliblcd.c. The header (for non-isolated
+kernel code to use) is in include/lcd-domains/kliblcd.h.
+
+A kernel thread can "enter/exit into lcd mode" (similar to cap_enter in
+Capsicum) by invoking klcd_enter/klcd_exit. A kernel thread that has entered
+lcd mode is called a *kernel lcd* or *klcd*. The functions you see with
+klcd_ instead of lcd_ are only part of the kliblcd interface and only
+available to non-isolated lcd's.
+
+Upon entering lcd mode, a kernel thread can invoke the functions in the
+kliblcd interface for creating lcd's, allocating pages, loading modules, etc.
+
+A klcd has a cspace and utcb for message passing, but does not have an
+underlying hardware vm (the thread runs unisolated).
+
+See the kliblcd header for a detailed description of the interface. See the
+test cases for examples.
+
+========================================
+LCD STATUS
+========================================
+
+To do: I will probably remove the suspend state. This seemed like it would be
+       simple, but the proper handling of it when combined with ipc may be
+       too difficult to justify right now.
+
+An lcd can be in one of five states:
+
+   E = Embryo       -  just after it is created, not configured with a starting
+                       stack pointer, etc.
+   C = Configured   -  stack pointer, starting program counter configured
+   R = Running      -  kthread is runnable or running, and may be running 
+                       inside vm
+   S = Suspended    -  kthread is asleep or will soon sleep
+   D = Dead         -  kthread has stopped or will soon stop; lcd may be in
+                       the process of being torn down
+
+                                  _____________________________________
+                                 /          lcd_destroy                \
+          lcd_run               |                                       |
+          lcd_suspend           |            lcd_run, lcd_config        |
+           .__.                 ^                .__.                   |
+          |   |    .----------->|               |   |                   |
+          \   |   / lcd_destroy |               \   |                   |
+           \  |  /              ^                \  |                   |
+            \ V /               |                 \ V                   V
+   create  +---+  lcd_config  +---+   lcd_run    +---+  lcd_destroy   +---+
+  -------->| E |------------->| C |------------->| R |--------------->| D |
+           +---+           .->+---+              +---+                +---+
+                          /   /                   / ^                  ^ \
+                         /   /                   /   \                 |  \
+                        /   /                   /    |                 |   \
+                       '---'        lcd_suspend |    | lcd_run         '---'
+                   lcd_config,                  \    /              lcd_run
+                   lcd_suspend                   V  /               lcd_suspend
+                                                 +---+              lcd_destroy
+                                                 | S |              lcd_config
+                                                 +---+
+                                                  ^ \
+                                                  |  \
+                                                  |   \
+                                                  '---'
+                                             lcd_config, lcd_suspend
+
+
+The following transitions are an error (return non-zero), and have no effect:
+
+    E: lcd_run, lcd_suspend    -  you must configure the lcd first
+    C: lcd_config, lcd_suspend -  lcd already configured; cannot suspend either
+    R: lcd_run, lcd_config     -  lcd already running and config'd
+    S: lcd_suspend, lcd_config -  lcd already suspended and config'd
+    D: all                     -  lcd is dead
+
+Some of these may be too restrictive, and could change in the future (e.g.,
+allow re-config, allow multiple suspend calls - only first one has effect,
+rest are no-ops).

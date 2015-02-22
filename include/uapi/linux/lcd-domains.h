@@ -12,7 +12,7 @@
  */
 
 /* FIXME: this must be reserved in miscdevice.h */
-#define LCD_MINOR       234
+#define LCD_MINOR       239
 
 struct lcd_init_module_args {
 	/* syscall arguments to init_module */

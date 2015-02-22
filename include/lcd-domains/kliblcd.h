@@ -159,7 +159,8 @@ int lcd_run(cptr_t lcd);
  * This will not tear it down - this happens when the last capability to the
  * lcd goes away. Use lcd_delete or lcd_revoke as necessary.
  *
- * Blocks until lcd halts.
+ * Blocks until lcd halts. Warning: This could be a while if the lcd is
+ * sitting in an endpoint queue.
  */
 int lcd_suspend(cptr_t lcd);
 
@@ -218,8 +219,6 @@ int lcd_cap_revoke(cptr_t slot);
 /* CPTR CACHE -------------------------------------------------- */
 
 
-#define LCD_MAX_CPTRS 32
-
 /**
  * Find an unused cptr (a cptr that refers to an unused cnode).
  */
@@ -270,10 +269,6 @@ struct lcd_module_info {
 	 * Where to point the program counter to run init
 	 */
 	gva_t init;
-	/*
-	 * Counter to track which cptrs are used
-	 */
-	unsigned long cptr_counter;
 	/*
 	 * List of lcd_module_pages
 	 */

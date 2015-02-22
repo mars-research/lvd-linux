@@ -91,7 +91,7 @@ static int call_modprobe(char *module_name, int wait, int for_lcd)
 	argv[2] = "--";
 	argv[3] = module_name;	/* check free_modprobe_argv() */
 	argv[4] = NULL;
-
+	
 	info = call_usermodehelper_setup(__modprobe_path, argv, envp, 
 					GFP_KERNEL, NULL, free_modprobe_argv, 
 					NULL);

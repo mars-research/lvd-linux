@@ -187,7 +187,6 @@ static int update_cnode_table(struct cspace *cspace,
 		 * cnode free, invalid, etc.
 		 */
 		return -EINVAL; /* signal error in look up */
-
 	}
 }
 
@@ -218,28 +217,34 @@ static int find_cnode(struct cspace *cspace, struct cnode_table *old,
 		
 		return 1; /* signal we found the slot and are done */
 	} else {
+		/*
+		 * invalid indexing, etc.
+		 */
 		return -EINVAL; /* signal an error in look up */
 	}
 }
 
-static int get_level_index(int table_level, unsigned long index, 
+static int get_level_index(int table_level, cptr_t c, 
 			unsigned long *level_id)
 {
-	int more_levels;
 	/*
-	 * Right shift to set of bits for the level
+	 * Calculate the depth of the index
 	 */
-	index >>= (LCD_CNODE_TABLE_NUM_SLOTS * table_level);
-	/*
-	 * Determine if we need to follow a table pointer
-	 */
-	more_levels = index & (LCD_CNODE_TABLE_NUM_SLOTS >> 1);
-	/*
-	 * Calculate index in this level
-	 */
-	*level_id = index & ((LCD_CNODE_TABLE_NUM_SLOTS >> 1) - 1);
-
-	return more_levels;
+	if (lcd_cptr_level(c) == table_level) {
+		/*
+		 * We're at the final level - we're done, and need to look in 
+		 * the cap slots in the cnode table
+		 */
+		*level_id = lcd_cptr_slot(c);
+		return 0; /* signal no more levels to traverse */
+	} else {
+		/*
+		 * More levels to go; determine index of next table to
+		 * look at
+		 */
+		*level_id = lcd_cptr_fanout(c, table_level);
+		return 1; /* signal more levels to traverse */
+	}
 }
 
 static int walk_one_level(struct cspace *cspace, cptr_t c, bool alloc, 
@@ -249,7 +254,7 @@ static int walk_one_level(struct cspace *cspace, cptr_t c, bool alloc,
 	int more_levels;
 	unsigned long level_id;
 
-	more_levels = get_level_index(old->table_level, cptr_val(c), &level_id);
+	more_levels = get_level_index(old->table_level, c, &level_id);
 	if (more_levels)
 		return update_cnode_table(cspace, old, level_id, alloc, new);
 	else
@@ -269,9 +274,6 @@ static int __lcd_cnode_lookup(struct cspace *cspace, cptr_t c, bool alloc,
 	int ret;
 	struct cnode_table *old;
 	struct cnode_table *new;
-
-	if(cptr_val(c) >= LCD_MAX_CAPS) 
-		return -EINVAL;
 
 	/*
 	 * Initialize to root cnode table

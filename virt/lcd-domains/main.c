@@ -23,6 +23,7 @@
 
 #include <asm/lcd-domains-arch.h>
 #include <lcd-domains/types.h>
+#include <lcd-domains/syscall.h>
 #include "internal.h"
 #include <uapi/linux/lcd-domains.h>
 
@@ -163,17 +164,16 @@ int __klcd_page_zalloc(struct lcd *klcd, cptr_t c, hpa_t *hpa_out,
 {
 	int ret;
 	struct page *p;
-	unsigned long addr;
 	/*
 	 * Allocate a page
 	 */
-	addr = get_zeroed_page(GFP_KERNEL);
-	if (!addr) {
+	p = alloc_page(GFP_KERNEL);
+	if (!p) {
 		LCD_ERR("alloc failed");
 		ret = -ENOMEM;
 		goto fail1;
 	}
-	p = virt_to_page(addr);
+	memset(page_address(p), 0, PAGE_SIZE);
 	/*
 	 * Insert into klcd's cspace
 	 */
@@ -185,13 +185,13 @@ int __klcd_page_zalloc(struct lcd *klcd, cptr_t c, hpa_t *hpa_out,
 	/*
 	 * Store addresses
 	 */
-	*hva_out = __hva(addr);
+	*hva_out = va2hva(page_address(p));
 	*hpa_out = hva2hpa(*hva_out);
 
 	return 0;
 
 fail2:
-	free_page(addr);
+	__free_pages(p, 0);
 fail1:
 	return ret;
 }
@@ -262,6 +262,8 @@ fail1:
 	return ret;
 }
 
+static int lcd_kthread_main(void *data);
+
 int __lcd_create(struct lcd *caller, cptr_t slot, gpa_t stack)
 {
 	struct lcd *lcd;
@@ -304,18 +306,37 @@ int __lcd_create(struct lcd *caller, cptr_t slot, gpa_t stack)
 	 */
 	lcd->utcb = hva2va(addr);
 	/*
+	 * Create a kernel thread (won't run till we wake it up)
+	 */
+	lcd->kthread = kthread_create(lcd_kthread_main, NULL, "lcd");
+	if (!lcd->kthread) {
+		LCD_ERR("failed to create kthread");
+		goto fail5;
+	}
+	/*
+	 * Bump reference count on kthread
+	 */
+	get_task_struct(lcd->kthread);
+	/*
+	 * Store back reference to lcd
+	 */
+	lcd->kthread->lcd = lcd;
+	/*
 	 * Put in caller's cspace
 	 */
 	ret = __lcd_cap_insert(&caller->cspace, slot, lcd, LCD_CAP_TYPE_LCD);
 	if (ret) {
 		LCD_ERR("insert");
-		goto fail5;
+		goto fail6;
 	}
 	/*
 	 * Done
 	 */
 	return 0;
 
+fail6:
+	kthread_stop(lcd->kthread); /* never ran, so should die */
+	put_task_struct(lcd->kthread);
 fail5:
 	gp_unmap(lcd, stack);
 fail4:
@@ -327,8 +348,6 @@ fail2:
 fail1:
 	return ret;
 }
-
-static int lcd_kthread_main(void *data);
 
 int __lcd_config(struct lcd *caller, cptr_t lcd, gva_t pc, gva_t sp, 
 		gpa_t gva_root)
@@ -343,6 +362,14 @@ int __lcd_config(struct lcd *caller, cptr_t lcd, gva_t pc, gva_t sp,
 	if (ret)
 		goto fail1;
 	/*
+	 * If lcd is not an embryo, fail
+	 */
+	if (!lcd_status_embryo(lcd_struct)) {
+		LCD_ERR("cannot config: lcd not an embryo");
+		ret = -EINVAL;
+		goto fail2;
+	}
+	/*
 	 * Set pc, sp, gva_root
 	 */
 	lcd_arch_set_pc(lcd_struct->lcd_arch, pc);
@@ -354,25 +381,12 @@ int __lcd_config(struct lcd *caller, cptr_t lcd, gva_t pc, gva_t sp,
 	ret = lcd_arch_check(lcd_struct->lcd_arch);
 	if (ret) {
 		LCD_ERR("bad lcd_arch state");
-		goto fail2;
-	}
-	/*
-	 * Create a kernel thread (won't run till we wake it up)
-	 */
-	lcd_struct->kthread = kthread_create(lcd_kthread_main, NULL, "lcd");
-	if (!lcd_struct->kthread) {
-		LCD_ERR("failed to create kthread");
 		goto fail3;
 	}
 	/*
-	 * Bump reference count on kthread
+	 * Set status to configed
 	 */
-	get_task_struct(lcd_struct->kthread);
-	/*
-	 * Store back reference to lcd
-	 */
-	lcd_struct->kthread->lcd = lcd_struct;
-
+	set_lcd_status(lcd_struct, LCD_STATUS_CONFIGED);
 	/*
 	 * Unlock
 	 */
@@ -399,15 +413,17 @@ int __lcd_run(struct lcd *caller, cptr_t lcd)
 	if (ret)
 		goto fail1;
 	/*
-	 * If lcd is dead, fail
+	 * If lcd is not in config or suspend state, fail
 	 */
-	if (lcd_status_dead(lcd_struct)) {
-		LCD_ERR("lcd is dead");
+	if (!(lcd_status_configed(lcd_struct) ||
+			lcd_status_suspended(lcd_struct))) {
+		LCD_ERR("cannot run: lcd is in state %d",
+			get_lcd_status(lcd_struct));
 		ret = -EINVAL;
 		goto fail2;
 	}
 	/*
-	 * If lcd is an embryo, this will run the kthread for the first
+	 * If lcd is in config state, this will run the kthread for the first
 	 * time
 	 */
 	set_lcd_status(lcd_struct, LCD_STATUS_RUNNING);
@@ -437,27 +453,18 @@ int __lcd_suspend(struct lcd *caller, cptr_t lcd)
 	if (ret)
 		goto fail1;
 	/*
-	 * If lcd is dead, fail
+	 * If lcd is not in running state, fail
 	 */
-	if (lcd_status_dead(lcd_struct)) {
-		LCD_ERR("lcd is dead");
+	if (!lcd_status_running(lcd_struct)) {
+		LCD_ERR("cannot suspend: lcd not running");
 		ret = -EINVAL;
 		goto fail2;
 	}
 	/*
-	 * If lcd is running, suspend it; otherwise (embryo or already
-	 * suspended), just skip
+	 * Suspend it and wait for it to ack
 	 */
-	if (lcd_status_running(lcd_struct)) {
-
-		set_lcd_status(lcd_struct, LCD_STATUS_SUSPENDED);
-		/*
-		 * Wait till it acknowledges
-		 */
-		wait_for_completion(&lcd_struct->suspended);
-
-	}
-
+	set_lcd_status(lcd_struct, LCD_STATUS_SUSPENDED);
+	wait_for_completion(&lcd_struct->suspended);
 	/*
 	 * Unlock
 	 */
@@ -522,6 +529,9 @@ void __klcd_exit(void)
 	struct lcd *lcd;
 	
 	lcd = current->lcd;
+
+	BUG_ON(lcd_status_dead(lcd)); /* lcd shouldn't be dead already */
+
 	/*
 	 * Like lcd destroy, but simpler.
 	 *
@@ -529,7 +539,8 @@ void __klcd_exit(void)
 	 * not in an endpoint queue.
 	 *
 	 * We still use some care and mark the lcd as dead (even though
-	 * the thread itself isn't going away).
+	 * the thread itself isn't going away), so that endpoints handle
+	 * the lcd properly, etc.
 	 */
 	if (mutex_lock_interruptible(&lcd->lock)) {
 		/*
@@ -557,6 +568,10 @@ lock_skip:
 	 * Finish
 	 */
 	kfree(lcd);
+	/*
+	 * Null it out
+	 */
+	current->lcd = NULL;
 }
 
 /* CAPABILITIES -------------------------------------------------- */
@@ -719,6 +734,9 @@ void __lcd_kpage_destroy(struct page *p)
 	return;
 }
 
+/*
+ * For lcd's with no underlying vm
+ */
 void __lcd_destroy__(struct lcd *lcd)
 {
 	/*
@@ -731,6 +749,23 @@ void __lcd_destroy__(struct lcd *lcd)
 void __lcd_destroy(struct lcd *lcd)
 {
 	int ret;
+	int need_wakeup;
+
+	BUG_ON(lcd_status_dead(lcd)); /* lcd shouldn't be dead already */
+
+	/*
+	 * If the lcd is suspended, we need to wake it up so it can
+	 * acknowledge it should die, and exit. (Since we are destroying
+	 * the lcd, no one has a reference to it and can make it runnable.)
+	 *
+	 * Since we don't allow the transition configed --> suspended, waking
+	 * up the lcd will not run the kthread for the first time. (We could
+	 * change the code and allow configed --> suspended, if necessary in
+	 * the future. This would require an extra check at the beginning
+	 * of kthread main to see if we are dead.)
+	 */
+	need_wakeup = lcd_status_suspended(lcd);
+
 	/*
 	 * ORDER IS IMPORTANT:
 	 *
@@ -746,7 +781,9 @@ void __lcd_destroy(struct lcd *lcd)
 	 *     will automatically be unmapped as their caps are deleted (via
 	 *     __lcd_page_check).
 	 *
-	 * (2) Tear down the lcd arch
+	 * (2) Tear down the lcd arch. (This *must* come after (1), because
+	 *     the cspace tear down may lead to unmapping pages in the lcd's
+	 *     ept, which requires the lcd arch.)
 	 *
 	 * Mark the lcd as dead
 	 */
@@ -764,6 +801,8 @@ void __lcd_destroy(struct lcd *lcd)
 	mutex_unlock(&lcd->lock);
 
 lock_skip:
+	if (need_wakeup)
+		wake_up_process(lcd->kthread);
 	/*
 	 * Now any endpoints that still have the lcd in the queue will
 	 * check and see that it is dead before trying to wake up the
@@ -785,19 +824,29 @@ lock_skip:
 	 */
 	free_page((unsigned long)lcd->utcb);
 	/*
+	 * Tear down cspace.
+	 *
+	 * We null out some stuff afterward so that if anyone tries to
+	 * use these fields, they'll get a NULL deref (easier to debug than
+	 * use after free).
+	 */
+	__lcd_cap_destroy_cspace(&lcd->cspace);
+	lcd->kthread = NULL;
+	lcd->utcb = NULL;
+	/*
 	 * Tear down lcd_arch (ept, ...)
 	 */
 	lcd_arch_destroy(lcd->lcd_arch);
+	lcd->lcd_arch = NULL;
 	/*
-	 * Finish - cspace, etc.
+	 * Free lcd data structure
 	 */
-	__lcd_destroy__(lcd);
+	kfree(lcd);
 }
 
 
 /* LCD EXECUTION -------------------------------------------------- */
 
-#if 0
 static int lcd_handle_syscall(struct lcd *lcd)
 {
 	int syscall_id;
@@ -806,10 +855,8 @@ static int lcd_handle_syscall(struct lcd *lcd)
 	LCD_MSG("got syscall %d", syscall_id);
 
 	switch (syscall_id) {
-	case LCD_SYSCALL_YIELD:
+	case LCD_SYSCALL_EXIT:
 		return 1;
-	case LCD_SYSCALL_SEND:
-	case LCD_SYSCALL_RECV:
 	default:
 		LCD_ERR("unimplemented syscall %d", syscall_id);
 		return -ENOSYS;
@@ -849,18 +896,84 @@ static int lcd_kthread_run_once(struct lcd *lcd)
 		goto out;
 	case LCD_ARCH_STATUS_SYSCALL:
 		LCD_MSG("syscall");
-		ret = lcd_handle_syscall(t);
+		ret = lcd_handle_syscall(lcd);
 		goto out;
 	}
 
 out:
 	return ret;
 }
-#endif
 
-static int lcd_kthread_main(void *data) { return 0; }
+static int lcd_should_stop(struct lcd *lcd)
+{
+	int ret;
+	for(;;) {
+		/*
+		 * Get ready to sleep
+		 */
+		set_current_state(TASK_INTERRUPTIBLE);
+		/*
+		 * Check our status
+		 */
+		switch(get_lcd_status(lcd)) {
 
-#if 0
+		case LCD_STATUS_DEAD:
+			/*
+			 * We're dead; return 1 to signal to caller.
+			 * (kthread_should_stop would also become true at some
+			 * later point)
+			 */
+			ret = 1;
+			goto out;
+		case LCD_STATUS_SUSPENDED:
+			/*
+			 * We're suspended; acknowledge in case someone is
+			 * waiting
+			 *
+			 * XXX: This could be redundant if we have already
+			 * been suspended and got a spurious wakeup. Should
+			 * be ok for now.
+			 */
+			complete(&lcd->suspended);
+			/*
+			 * Check if we were interrupted
+			 */
+			if (!signal_pending(current)) {
+				/*
+				 * Go to schleep ...
+				 */
+				schedule();
+				/*
+				 * ... waking up (task state running)
+				 */
+				continue;
+			} else {
+				/*
+				 * We were interrupted (by e.g. sigkill); we
+				 * will die now
+				 */
+				ret = 1;
+				goto out;
+			}
+		case LCD_STATUS_RUNNING:
+			/*
+			 * The lcd should start or continue running; return 0
+			 * to signal that
+			 */
+			ret = 0;
+			goto out;
+		default:
+			BUG(); /* shouldn't be in config'd or embryo states */
+			ret = 1;
+			goto out;
+		}
+	}
+
+out:
+	set_current_state(TASK_RUNNING);
+	return ret;
+}
+
 static int lcd_kthread_main(void *data) /* data is NULL */
 {
 	int ret;
@@ -876,26 +989,18 @@ static int lcd_kthread_main(void *data) /* data is NULL */
 	 */
 	for (;;) {
 		ret = lcd_kthread_run_once(current_lcd);
-		if (ret || kthread_should_stop())
-			return ret; /* to microkernel via kthread_stop */
+		if (ret || lcd_should_stop(current_lcd)) 
+			return ret; /* to microkernel via kthread_stop in
+				     * __lcd_destory
+				     */
 	}
 	
 	/* unreachable */
 }
 
-int lcd_start(struct lcd *lcd)
-{
-	/*
-	 * Wake up the kthread (will start running lcd_kthread_main).
-	 */
-	wake_up_process(lcd->kthread);
-
-	return 0;
-}
-
-#endif
 
 /* IOCTL -------------------------------------------------- */
+
 
 /**
  * Does insmod syscall on behalf of user code call to ioctl.
@@ -934,6 +1039,8 @@ static long lcd_dev_ioctl(struct file *filp,
 		return -ENOTTY;
 	}
 
+
+
 out:
 	return r;
 }
@@ -952,6 +1059,7 @@ static struct miscdevice lcd_dev = {
 	"lcd",
 	&lcd_chardev_ops,
 };
+
 
 /* Init / Exit ---------------------------------------- */
 
@@ -973,17 +1081,16 @@ static int __init lcd_init(void)
 		LCD_ERR("failed to init ipc subsystem");
 		goto fail2;
 	}
+	ret = misc_register(&lcd_dev);
+	if (ret) {
+		LCD_ERR("misc device register failed, ret = %d", ret);
+		goto fail3;
+	}
 	ret = __kliblcd_init();
 	if (ret) {
 		LCD_ERR("failed to init kliblcd");
-		goto fail3;
+		goto fail4;
 	}
-	ret = misc_register(&lcd_dev);
-	if (ret) {
-		LCD_ERR("misc device register failed");
-		goto fail4;		
-	}
-
 	/*
 	 * Run main's tests
 	 */
@@ -994,9 +1101,9 @@ static int __init lcd_init(void)
 	return 0;
 
 fail5:
-	misc_deregister(&lcd_dev);
-fail4:
 	__kliblcd_exit();
+fail4:
+	misc_deregister(&lcd_dev);
 fail3:
 	__lcd_ipc_exit();
 fail2:
@@ -1010,6 +1117,7 @@ static void __exit lcd_exit(void)
 	misc_deregister(&lcd_dev);
 	__lcd_cap_exit();
 	__lcd_ipc_exit();
+	__kliblcd_exit();
 }
 
 /* EXPORTS ---------------------------------------- */

@@ -243,9 +243,26 @@ static int wait_for_transmit(struct lcd *lcd, struct lcd_sync_endpoint *ep)
 			break;
 		}
 		/*
+		 * Check if we're dead
+		 *
+		 * The current code (in do send/recv) doesn't take the
+		 * lcd out of the queue.
+		 *
+		 * XXX: This needs a lot more attention actually when I start
+		 * testing it ...
+		 */
+		if (lcd_status_dead(lcd)) {
+			ret = -EIO;
+			goto out;
+		}
+		/*
 		 * Check if we're signaled
 		 */
 		if (!signal_pending(current)) {
+			/*
+			 * We weren't signaled, and message still not sent;
+			 * go back to schleep
+			 */
 			schedule();
 			continue;
 		}

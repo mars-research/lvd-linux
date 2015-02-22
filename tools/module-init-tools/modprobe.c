@@ -1696,7 +1696,7 @@ static void do_softdep(const struct module_softdep *softdep,
 	}
 }
 
-#define DEVICE_NAME "/dev/lcd-prototype"
+#define DEVICE_NAME "/dev/lcd"
 static int lcd_init_module(void *module_image, unsigned long len,
 			char *param_values)
 {

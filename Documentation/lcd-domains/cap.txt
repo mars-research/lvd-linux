@@ -49,8 +49,13 @@ microkernel will initialize a cdt with the cnode at the root.
 grant
 -----
 
-During ipc (and only during ipc), LCD A can grant rights to LCD B. This is how
-it works:
+Grant can occur at two times: when an lcd is being created, and during ipc.
+
+If LCD A is creating LCD B, A can grant capabilities to B using lcd_cap_grant.
+LCD A is responsible for notifying B where the capabilities are in B's
+cspace, by some agreed upon protocol.
+
+During ipc, LCD A can grant rights to LCD B. This is how it works:
 
    -- Suppose LCD A has a capability to an object already. The capability
       is stored in a cnode and referenced by cptr1.
@@ -116,29 +121,6 @@ The cspace/cdt data structures can also accomodate this weird case too.
 (Note: It's not possible for an object to be inserted mutliple times - and
 lead to multiple cdts - because the microkernel does the insertion.)
 
-[ 2 ]
-
-Two different cptr's can refer to the same cap slot. For example, with
-a cnode table size of 8, 0b000011 and 0b001011 refer to the same slot.
-
-The cptr cache allocator will ensure it generates cptr's for unique slots. If
-an LCD manipulates a cptr, it does so at its own peril - cptr's are meant to
-be opaque.
-
-Cptr `aliasing' still allows for plenty of cptr's - for a cnode table of
-size 8, and 64 bit cptr's, you can get roughly:
-
-    4 + 4^2 + 4^3 + 4^4 + ...
-
-cptr's (i.e., plenty).
-
-Note that the cptr cache allocator needs to ensure it also doesn't hand out
-a cptr like 0xFFFFFFFFFF .... since this cannot resolve to a cap slot (it will
-always follow a table pointer).
-
-See the section "Capability Space Radix Tree" for more details about cspace
-traversal.
-
 ========================================
 COMPARISON TO seL4
 ========================================
@@ -171,13 +153,22 @@ does, we do the copying on behalf of the LCDs when rights are granted. (As
 mentioned in "Warnings", it is still possible for an LCD to have multiple
 capabilities to the same object.)
 
+[ 3 ]
+
+In our microkernel, an LCD can grant capabilities to an LCD it is creating,
+using lcd_cap_grant.
+
 ========================================
 CPTR CACHE
 ========================================
 
-For now, so that the LCD doesn't need to track which cnodes are used, we
-give it a cptr cache for getting a fresh cptr to an unused cnode. This should 
-be moved at some point to liblcd.
+kliblcd (and soon, liblcd) contain cptr cache implementations, so that the 
+other code inside an LCD doesn't need to track which cnodes are used. Not every
+integer is a valid cptr, so the allocation is a bit complicated. See the
+"Capability Space Radix Tree" below for an overview of cptr indexing.
+
+The cache contains a bitmap for each level of the cspace tree. This makes it
+easy to generate valid cptr's and track allocation/free's.
 
 ========================================
 CAPABILITY SPACE RADIX TREE
@@ -205,68 +196,98 @@ The cspace is built dynamically by the microkernel as slots are referenced by
 an LCD. (This is different from seL4 - threads in seL4 are responsible for
 building the cspace using the interface provided by the microkernel.)
 
-An index, or cptr, is resolved using a radix-tree-style look up, but from the
-least significant bit rather than the most significant bit. If the bits
-resolve to a cap slot, the search is done; otherwise, the table pointer is
-followed to the next level, and the next set of bits are considered. Some
-examples follow. 0b1101 means binary 1101.
+[See notes at the end if you're wondering why this is so complicated.]
 
-  Suppose the number of slots per table is 8 - so there are 4 cap slots and
-  4 table slots. 
+The shape of the cspace is controlled by three parameters (in internal.h):
 
-  Index = 3 = 0b000011:
+      LCD_CPTR_DEPTH_BITS   -   controls number of levels in cspace 
 
-    Since there are 8 entries in the root table, we look at the first three
-    bits - 011. This indexes into the 3rd cap slot (zero indexed) in the
-    root cnode table:
-                          |
-                          |
-                          V |
-            +---+---+---+---+---+---+---+---+
-            |   |   |   |011|   |   |   |   |           level 0 (root table)
-            +---+---+---+---+---+---+---+---+
-                            |
-               cap slots       table slots
+                             0 bits :   only root table (2^0 levels)
+                             1 bit  :   root and one more level (2^1 levels)
+                             2 bits :   root and three more levels (2^2 levels)
 
+      LCD_CPTR_FANOUT_BITS  -   controls how many table slots are in the
+                                cnode tables - in other words, the fanout
 
-  Index = 6 = 0b000110
+                             0 bits :   one table slot (2^0)
+                             1 bit  :   two table slots (2^1)
+                             2 bits :   four table slots (2^2)
 
-    First three bits are 110 - this is a table slot, so we follow the pointer
-    to the next level.
+      LCD_CPTR_SLOT_BITS    -   controls how many cap slots are in the
+                                cnode tables; similar to table slots above
 
-    Next three bits are 000 - this is a cap slot - we're done.
+An index, or cptr, encodes the location of a cnode in the cspace. The encoding
+includes the level of the table that contains the slot; the fanout "path" to
+get to that table; and the slot index inside the table.
 
-                            |
-            +---+---+---+---+---+---+---+---+
-            |   |   |   |   |   |   |110|   |                    level 0
-            +---+---+---+---+---+---+-|-+---+
-                            |         |
-                                      |
-                                      V
-                                      
-                                             |
-                             +---+---+---+---+---+---+---+---+
-                             |000|   |   |   |   |   |   |   |  level 1
-                             +---+---+---+---+---+---+---+---+
-                               ^             |
-                               |
-                               |
-                          final slot
+The lookup is just like a radix tree lookup (starting from LSB instead of MSB), 
+but the level bits tell us how far to go / how many fanout bits are meaningful.
 
-  Index = 11 = 0b001011
+If all of the parameters are 2 (2 bits each), the cptr bit layout is the 
+following:
+                                        ____ cap slot index bits
+                                       /
+                                      /
+                         00 00 00 00 00
+                         /   |  |  |
+                        /    |  |  |
+            level -----'     fanout path (like a radix tree path)
 
-    First three bits are 011 - this is the 3rd cap slot again.
+So, in LSB order, the slot index bits come first, then the fanout path, then
+the level. The level and slot index bits are always in the same position. The
+interpretation of the fanout path bits depends on the level.
 
-    This demonstrates that two different indexes can refer to the same slot!
+For example, if the cptr is
 
-                          |
-                          |
-                          V |
-            +---+---+---+---+---+---+---+---+
-            |   |   |   |011|   |   |   |   |
-            +---+---+---+---+---+---+---+---+
-                            |
+                         11 11 00 10 01
 
+the slot index is 01 = 1, and the level of the table is 11 = 3. All three
+pairs of fanout bits are used to traverse from the root cnode table to the
+final cnode table:
+
+         [1] From the root cnode table, we look at the first pair of fanout
+             bits (in LSB order) = 10 = 2; so we follow the 2nd table slot
+             (zero indexed) in the root cnode table to level 1
+
+         [2] From the level 1 cnode table, we look at the next pair of fanout
+             bits = 00 = 0; so we follow the 0th table slot in this cnode
+             table to level 2
+
+         [3] Finally, from level 2, we look at the next pair of fanout
+             bits = 11 = 3; so we follow the 3rd table slot to arrive
+             at the cnode table in level 3
+
+We now use the cap lot index bits = 01 = 1 to look up the capability.
+
+Another example: if the cptr is
+
+                         01 00 00 01 11
+
+the level is 1, and only the first pair (01) of fanout bits are meaningful.
+Starting in the root cnode table,
+
+    [1] we see that the level = 01 = 1 > 0, so we look at the first pair of
+        fanout bits = 01 = 1; we follow the pointer in the 1st table slot
+        to level
+
+    [2] we now see that the level of the cptr = the level we are at, 1, so
+        we now use the slot bits to look up the slot in the table (11 = 3).
+
+Notes
+-----
+
+It looks more complicated than it is. It's just radix tree traversal with
+a depth check.
+
+We tried a similar technique, but without using the level bits. This lead to
+problems: since a cptr may refer to different levels, it became hard to
+know when to stop the radix tree-like traversal.
+
+As an alternative, we tried taking triples of bits from LSB to MSB: If the
+high bit was set in a triple, this indicated to keep traversing and look at the
+next triple; otherwise, stop. But it's hard to convert a number like 15 to an 
+index of this type. And this makes alloc/free of cptrs hard (talk to Charlie 
+for more details).
 
 ========================================
 CAPABILITY DERIVATION TREE
@@ -360,8 +381,11 @@ containing cdt and cspace from going away while it is in use (they can't go
 away until the cnode is locked and removed from the cspace and/or cdt).
 
 ========================================
-CALL/REPLY CAPABILITIES
+SPECIAL CPTRS / CAPABILITIES
 ========================================
 
-slot 1 = capability to lcd's endpoint for receiving replies
-slot 2 = (dynamic) capability to caller's reply endpoint, during call/reply
+To be implemented soon:
+
+cptr 0 = null, always invalid
+cptr 1 = capability to lcd's endpoint for receiving replies
+cptr 2 = (dynamic) capability to caller's reply endpoint, during call/reply

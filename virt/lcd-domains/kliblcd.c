@@ -16,55 +16,142 @@
 /* CPTR CACHE -------------------------------------------------- */
 
 struct cptr_cache {
-	DECLARE_BITMAP(bmap, LCD_MAX_CPTRS);
+	unsigned long *bmaps[1 << LCD_CPTR_DEPTH_BITS];
 	struct mutex lock;
 };
 
 static int cptr_cache_init(struct cptr_cache **out)
 {
-	*out = kzalloc(sizeof(**out), GFP_KERNEL);
-	if (!(*out))
-		return -ENOMEM;
-	mutex_init(&(*out)->lock);
+	struct cptr_cache *cache;
+	int ret;
+	int i, j;
+	int nbits;
+	/*
+	 * Allocate the container
+	 */
+	cache = kzalloc(sizeof(*cache), GFP_KERNEL);
+	if (!cache) {
+		ret = -ENOMEM;
+		goto fail1;
+	}
+	/*
+	 * Allocate the bitmaps
+	 */
+	for (i = 0; i < (1 << LCD_CPTR_DEPTH_BITS); i++) {
+		/*
+		 * For level i, we use the slot bits plus i * fanout bits
+		 *
+		 * So e.g. for level 0, we use only slot bits, so there
+		 * are only 2^(num slot bits) cap slots at level 0.
+		 */
+		nbits = 1 << (LCD_CPTR_SLOT_BITS + i * LCD_CPTR_FANOUT_BITS);
+		/*
+		 * Alloc bitmap
+		 */
+		cache->bmaps[i] = kzalloc(sizeof(unsigned long) *
+					BITS_TO_LONGS(nbits),
+					GFP_KERNEL);
+		if (!cache->bmaps[i]) {
+			ret = -ENOMEM;
+			goto fail2; /* i = level we failed at */
+		}
+	}
+	/*
+	 * Init cache lock
+	 */
+	mutex_init(&cache->lock);
+
+	*out = cache;
+
 	return 0;
+
+fail2:
+	for (j = 0; j < i; j++)
+		kfree(cache->bmaps[j]);
+	kfree(cache);
+fail1:
+	return ret;
 }
 
 static void cptr_cache_destroy(struct cptr_cache *cache)
 {
+	int i;
+	/*
+	 * Free bitmaps
+	 */
+	for (i = 0; i < (1 << LCD_CPTR_DEPTH_BITS); i++)
+		kfree(cache->bmaps[i]);
+	/*
+	 * Free container
+	 */
 	kfree(cache);
+}
+
+static int __lcd_alloc_cptr_from_bmap(unsigned long *bmap, int size,
+				unsigned long *out)
+{
+	unsigned long idx;
+	/*
+	 * Find next zero bit
+	 */
+	idx = find_first_zero_bit(bmap, size);
+	if (idx >= size)
+		return 0; /* signal we are full */
+	/*
+	 * Set bit to mark cptr as in use
+	 */
+	set_bit(idx, bmap);
+
+	*out = idx;
+
+	return 1; /* signal we are done */
 }
 
 static int __lcd_alloc_cptr(struct cptr_cache *cptr_cache, cptr_t *free_cptr)
 {
 	int ret;
+	int depth;
+	int done;
+	unsigned long *bmap;
+	unsigned long idx;
+	int size;
 
 	ret = mutex_lock_interruptible(&cptr_cache->lock); 
 	if (ret) {
 		LCD_ERR("interrupted");
 		goto fail1;
 	}
-	/*
-	 * Find next zero bit
-	 */
-	*free_cptr = __cptr(
-		find_first_zero_bit(cptr_cache->bmap, 
-				LCD_MAX_CPTRS));
-	if (cptr_val(*free_cptr) >= LCD_MAX_CPTRS) {
+
+	depth = 0;
+	do {
+		bmap = cptr_cache->bmaps[depth];
+		size = 1 << (LCD_CPTR_SLOT_BITS + 
+			depth * LCD_CPTR_FANOUT_BITS);
+		done = __lcd_alloc_cptr_from_bmap(bmap, size, &idx);
+		depth++;
+	} while (!done && depth < (1 << LCD_CPTR_DEPTH_BITS));
+
+	mutex_unlock(&cptr_cache->lock);
+
+	if (!done) {
+		/*
+		 * Didn't find one
+		 */
 		LCD_ERR("out of cptrs");
 		ret = -ENOMEM;
 		goto fail2;
 	}
 	/*
-	 * Set bit to mark cptr as in use
+	 * Found one; dec depth back to what it was, and encode
+	 * depth in cptr
 	 */
-	set_bit(cptr_val(*free_cptr), cptr_cache->bmap);
-	
-	mutex_unlock(&cptr_cache->lock);
+	depth--;
+	idx |= (depth << LCD_CPTR_LEVEL_SHIFT);
+	*free_cptr = __cptr(idx);
 
 	return 0; 
 
 fail2:
-	mutex_unlock(&cptr_cache->lock);
 fail1:
 	return ret;
 }
@@ -72,14 +159,9 @@ fail1:
 void __lcd_free_cptr(struct cptr_cache *cptr_cache, cptr_t c)
 {
 	int ret;
-	/*
-	 * Ensure cptr isn't too big
-	 */ 
-	if (cptr_val(c) >= LCD_MAX_CPTRS) {
-		LCD_ERR("cptr %llu bigger than max cptrs %llu",
-			cptr_val(c), LCD_MAX_CPTRS);
-		return;
-	}
+	unsigned long *bmap;
+	unsigned long bmap_idx;
+	unsigned long level;
 
 	ret = mutex_lock_interruptible(&cptr_cache->lock);
 	if (ret) {
@@ -87,9 +169,19 @@ void __lcd_free_cptr(struct cptr_cache *cptr_cache, cptr_t c)
 		return;
 	}
 	/*
+	 * Get the correct level bitmap
+	 */
+	level = lcd_cptr_level(c);
+	bmap = cptr_cache->bmaps[level];
+	/*
+	 * The bitmap index includes all fanout bits and the slot bits
+	 */
+	bmap_idx = ((1 << (LCD_CPTR_FANOUT_BITS * level + LCD_CPTR_SLOT_BITS))
+		- 1) & cptr_val(c);
+	/*
 	 * Clear the bit in the bitmap
 	 */
-	clear_bit(cptr_val(c), cptr_cache->bmap);
+	clear_bit(bmap_idx, bmap);
 
 	mutex_unlock(&cptr_cache->lock);
 
@@ -371,6 +463,7 @@ int lcd_cap_revoke(cptr_t slot)
 static int get_module(char *module_name, struct module **m)
 {
 	int ret;
+	struct module *m1;
 	/*
 	 * Load the requested module
 	 */
@@ -384,16 +477,18 @@ static int get_module(char *module_name, struct module **m)
 	 * while finding module.
 	 */
 	mutex_lock(&module_mutex);
-	*m = find_module(module_name);
+	m1 = find_module(module_name);
 	mutex_unlock(&module_mutex);	
-	if (!(*m)) {
+	if (!m1) {
 		LCD_ERR("couldn't find module");
 		goto fail2;
 	}
-	if(!try_module_get(*m)) {
+	if(!try_module_get(m1)) {
 		LCD_ERR("incrementing module ref count");
 		goto fail3;
 	}
+
+	*m = m1;
 
 	return ret;
 
@@ -401,9 +496,9 @@ fail3:
 	ret = do_sys_delete_module(module_name, 0, 1);
 	if (ret)
 		LCD_ERR("deleting module");
-	(*m) = NULL;
 fail2:
 fail1:
+	*m = NULL;
 	return ret;
 }
 
@@ -483,11 +578,12 @@ int lcd_load_module(char *mname, cptr_t mloader_endpoint,
 	 */
 	struct module *m;
 	
-	*mi = kmalloc(sizeof(mi), GFP_KERNEL);
+	*mi = kmalloc(sizeof(**mi), GFP_KERNEL);
 	if (!*mi) {
 		ret = -ENOMEM;
 		goto fail0;
 	}
+	INIT_LIST_HEAD(&(*mi)->mpages_list);
 	/*
 	 * Load module in host
 	 */
@@ -512,10 +608,6 @@ int lcd_load_module(char *mname, cptr_t mloader_endpoint,
 	 */
 	(*mi)->init = __gva(hva_val(va2hva(m->module_init)));
 	strncpy((*mi)->mname, mname, LCD_MODULE_NAME_MAX);
-	/*
-	 * Init cptr counter to 1, to skip over null cptr
-	 */
-	(*mi)->cptr_counter = 1;
 
 	return 0;
 
@@ -602,29 +694,46 @@ struct hpa_cptr_tuple {
 	cptr_t cptr;
 };
 
-struct gv_cxt {
-	struct hpa_cptr_tuple gpa2hpacptr[LCD_GV_PAGING_MEM_SIZE >> PAGE_SHIFT];
+struct create_module_cxt {
+	struct hpa_cptr_tuple gpa2hpacptr[LCD_GV_PAGING_MEM_SIZE >> 
+					PAGE_SHIFT];
 	unsigned int counter;
 	pgd_t *root;
+	struct cptr_cache *cache;
 };
 
-static int gv_init(struct gv_cxt **cxt_out)
+static int cxt_init(struct create_module_cxt **cxt_out)
 {
+	int ret;
 	/*
 	 * Allocate context
 	 *
 	 * XXX: This is a big chunk of memory. But it will do for now ...
 	 */
-	*cxt_out = kzalloc(sizeof(struct gv_cxt), GFP_KERNEL);
+	*cxt_out = kzalloc(sizeof(struct create_module_cxt), GFP_KERNEL);
 	if (!*cxt_out) {
 		LCD_ERR("no mem");
-		return -ENOMEM;
+		ret = -ENOMEM;
+		goto fail1;
+	}
+	/*
+	 * Set up cptr cache
+	 */
+	ret = cptr_cache_init(&(*cxt_out)->cache);
+	if (ret) {
+		LCD_ERR("cache init");
+		goto fail2;
 	}
 
 	return 0;
+
+fail2:
+	kfree(*cxt_out);
+fail1:
+	return ret;
 }
 
-static void gv_destroy(struct gv_cxt *cxt)
+static void cxt_destroy(struct create_module_cxt *cxt)
 {
 	int i;
 	cptr_t c;
@@ -638,20 +747,23 @@ static void gv_destroy(struct gv_cxt *cxt)
 		lcd_cap_delete(c);
 	}
 	/*
+	 * Tear down cptr cache
+	 */
+	cptr_cache_destroy(cxt->cache);
+	/*
 	 * Free cxt
 	 */
 	kfree(cxt);
 }
 
-static int gv_gfp(cptr_t lcd, struct gv_cxt *cxt, struct lcd_module_info *mi,
-		gpa_t *gpa_out)
+static int gv_gfp(cptr_t lcd, struct create_module_cxt *cxt, gpa_t *gpa_out)
 {
 	cptr_t slot;
 	int ret;
 	gpa_t gpa;
 	gva_t gva;
 	hpa_t hpa;
-	hva_t hva;
+	cptr_t dest_slot;
 	/*
 	 * Ensure we still have room
 	 */
@@ -670,11 +782,16 @@ static int gv_gfp(cptr_t lcd, struct gv_cxt *cxt, struct lcd_module_info *mi,
 	 * Guest addresses = host for klcd's
 	 */
 	hpa = __hpa(gpa_val(gpa));
-	hva = __hva(gva_val(gva));
+	/*
+	 * Alloc a dest slot
+	 */
+	ret = __lcd_alloc_cptr(cxt->cache, &dest_slot);
+	if (ret) {
+		LCD_ERR("failed to alloc dest slot");
+		goto fail3;
+	}
 	/*
 	 * Grant and map in lcd
-	 *
-	 * The capability will go in slot cptr_counter in the lcd.
 	 *
 	 * The page will be mapped at the gpa given below (use the counter
 	 * as an offset into the chunk of the guest physical address space
@@ -682,11 +799,10 @@ static int gv_gfp(cptr_t lcd, struct gv_cxt *cxt, struct lcd_module_info *mi,
 	 */
 	*gpa_out = gpa_add(LCD_GV_PAGING_MEM_GPA,
 			cxt->counter * PAGE_SIZE);
-	ret = lcd_cap_page_grant_map(lcd, slot, __cptr(mi->cptr_counter),
-				*gpa_out);
+	ret = lcd_cap_page_grant_map(lcd, slot, dest_slot, *gpa_out);
 	if (ret) {
 		LCD_ERR("mapping page");
-		goto fail3;
+		goto fail4;
 	}
 	/*
 	 * Store correspondence from lcd gpa to the caller's address space
@@ -694,13 +810,14 @@ static int gv_gfp(cptr_t lcd, struct gv_cxt *cxt, struct lcd_module_info *mi,
 	cxt->gpa2hpacptr[cxt->counter].hpa = hpa;
 	cxt->gpa2hpacptr[cxt->counter].cptr = slot;
 	/*
-	 * Bump counters
+	 * Bump page counter
 	 */
 	cxt->counter++;
-	mi->cptr_counter++;
 
 	return 0;
 
+fail4:
+	__lcd_free_cptr(cxt->cache, dest_slot);
 fail3:
 	lcd_cap_delete(slot); /* will free page */
 fail2:
@@ -708,9 +825,10 @@ fail1:
 	return ret;	
 }
 
-static int gv_gpa2hpa(struct gv_cxt *cxt, gpa_t gpa, hpa_t *hpa_out)
+static int gv_gpa2hpa(struct create_module_cxt *cxt, gpa_t gpa, hpa_t *hpa_out)
 {
 	int ret;
+	unsigned long offset;
 	unsigned long pfn;
 	/*
 	 * Error check
@@ -723,9 +841,18 @@ static int gv_gpa2hpa(struct gv_cxt *cxt, gpa_t gpa, hpa_t *hpa_out)
 		goto fail1;
 	}
 	/*
+	 * Compute address offset into paging memory
+	 */
+	offset = gpa_val(gpa) - gpa_val(LCD_GV_PAGING_MEM_GPA);
+	if (offset & ~PAGE_MASK) {
+		LCD_ERR("offset 0x%llx not page aligned", offset);
+		ret = -EINVAL;
+		goto fail1;
+	}
+	/*
 	 * Determine guest physical page frame
 	 */
-	pfn = gpa_val(gpa) >> PAGE_SHIFT;
+	pfn = offset >> PAGE_SHIFT;
 	/*
 	 * Do look up
 	 */
@@ -743,13 +870,12 @@ fail1:
  * Must be called before mapping any gva's, or else you'll get a kernel
  * oops on the NULL %cr3 when we try to do a page walk.
  */
-static int gv_setup_pgd(cptr_t lcd, struct gv_cxt *cxt, 
-			struct lcd_module_info *mi)
+static int gv_setup_pgd(cptr_t lcd, struct create_module_cxt *cxt)
 {
 	gpa_t gpa;
 	hpa_t hpa;
 	int ret;
-	ret = gv_gfp(lcd, cxt, mi, &gpa);
+	ret = gv_gfp(lcd, cxt, &gpa);
 	if (ret)
 		return ret;
 	ret = gv_gpa2hpa(cxt, gpa, &hpa);
@@ -762,8 +888,8 @@ static int gv_setup_pgd(cptr_t lcd, struct gv_cxt *cxt,
 /**
  * Get host virtual address of pte for gva and pmd_entry.
  */
-static int gv_lookup_pte(struct gv_cxt *cxt, gva_t gva, pmd_t *pmd_entry, 
-			pte_t **pte_out)
+static int gv_lookup_pte(struct create_module_cxt *cxt, gva_t gva, 
+			pmd_t *pmd_entry, pte_t **pte_out)
 {
 	int ret;
 	gpa_t gpa;
@@ -790,8 +916,8 @@ static int gv_lookup_pte(struct gv_cxt *cxt, gva_t gva, pmd_t *pmd_entry,
  * Look up pte for the page frame containing gva,
  * using the page table referenced by pmd_entry.
  */
-static int gv_walk_pt(struct gv_cxt *cxt, gva_t gva, pmd_t *pmd_entry,
-		pte_t **pte_out)
+static int gv_walk_pt(struct create_module_cxt *cxt, gva_t gva, 
+		pmd_t *pmd_entry, pte_t **pte_out)
 {
 	int ret;
 	pte_t *entry;
@@ -810,8 +936,8 @@ static int gv_walk_pt(struct gv_cxt *cxt, gva_t gva, pmd_t *pmd_entry,
 /**
  * Get host virtual address of pmd entry for gva and pud_entry.
  */
-static int gv_lookup_pmd(struct gv_cxt *cxt, gva_t gva, pud_t *pud_entry,
-			pmd_t **pmd_out)
+static int gv_lookup_pmd(struct create_module_cxt *cxt, gva_t gva, 
+			pud_t *pud_entry, pmd_t **pmd_out)
 {
 	int ret;
 	gpa_t gpa;
@@ -838,9 +964,8 @@ static int gv_lookup_pmd(struct gv_cxt *cxt, gva_t gva, pud_t *pud_entry,
  * Look up pmd entry for the page table for gva,
  * using the pmd referenced by pud_entry.
  */
-static int gv_walk_pmd(cptr_t lcd, struct gv_cxt *cxt, 
-		struct lcd_module_info *mi, gva_t gva, 
-		pud_t *pud_entry, pmd_t **pmd_out)
+static int gv_walk_pmd(cptr_t lcd, struct create_module_cxt *cxt, 
+		gva_t gva, pud_t *pud_entry, pmd_t **pmd_out)
 {
 	int ret;
 	pmd_t *entry;
@@ -856,7 +981,7 @@ static int gv_walk_pmd(cptr_t lcd, struct gv_cxt *cxt,
 		/*
 		 * Alloc and map a page table
 		 */
-		ret = gv_gfp(lcd, cxt, mi, &gpa);
+		ret = gv_gfp(lcd, cxt, &gpa);
 		if (ret) {
 			LCD_ERR("alloc page table");
 			return ret;
@@ -876,8 +1001,8 @@ static int gv_walk_pmd(cptr_t lcd, struct gv_cxt *cxt,
 /**
  * Get host virtual address of pud entry for gva and pgd_entry.
  */
-static int gv_lookup_pud(struct gv_cxt *cxt, gva_t gva, pgd_t *pgd_entry,
-				pud_t **pud_out)
+static int gv_lookup_pud(struct create_module_cxt *cxt, gva_t gva, 
+			pgd_t *pgd_entry, pud_t **pud_out)
 {
 	int ret;
 	gpa_t gpa;
@@ -904,9 +1029,8 @@ static int gv_lookup_pud(struct gv_cxt *cxt, gva_t gva, pgd_t *pgd_entry,
  * Look up pud entry for the pmd for gva, using
  * the pud referenced by pgd_entry.
  */
-static int gv_walk_pud(cptr_t lcd, struct gv_cxt *cxt, 
-		struct lcd_module_info *mi, gva_t gva, 
-		pgd_t *pgd_entry, pud_t **pud_out)
+static int gv_walk_pud(cptr_t lcd, struct create_module_cxt *cxt, 
+		gva_t gva, pgd_t *pgd_entry, pud_t **pud_out)
 {
 	int ret;
 	pud_t *entry;
@@ -922,7 +1046,7 @@ static int gv_walk_pud(cptr_t lcd, struct gv_cxt *cxt,
 		/*
 		 * Alloc and map a pmd
 		 */
-		ret = gv_gfp(lcd, cxt, mi, &gpa);
+		ret = gv_gfp(lcd, cxt, &gpa);
 		if (ret) {
 			LCD_ERR("alloc pmd");
 			return ret;
@@ -942,8 +1066,7 @@ static int gv_walk_pud(cptr_t lcd, struct gv_cxt *cxt,
 /**
  * Look up pgd entry for the pud for gva.
  */
-static int gv_walk_pgd(cptr_t lcd, struct lcd_module_info *mi, 
-			struct gv_cxt *cxt, gva_t gva, 
+static int gv_walk_pgd(cptr_t lcd, struct create_module_cxt *cxt, gva_t gva, 
 			pgd_t **pgd_out)
 {
 	int ret;
@@ -955,7 +1078,7 @@ static int gv_walk_pgd(cptr_t lcd, struct lcd_module_info *mi,
 		/*
 		 * Alloc and map a pud
 		 */
-		ret = gv_gfp(lcd, cxt, mi, &gpa);
+		ret = gv_gfp(lcd, cxt, &gpa);
 		if (ret) {
 			LCD_ERR("alloc pud");
 			return ret;
@@ -1003,7 +1126,7 @@ static int gv_walk_pgd(cptr_t lcd, struct lcd_module_info *mi,
  *
  * Punchline: Arch must have 4 paging levels.
  */
-static int gv_walk(cptr_t lcd, struct gv_cxt *cxt, struct lcd_module_info *mi,
+static int gv_walk(cptr_t lcd, struct create_module_cxt *cxt,
 		gva_t gva, pte_t **pte_out)
 {
 	int ret;
@@ -1014,7 +1137,7 @@ static int gv_walk(cptr_t lcd, struct gv_cxt *cxt, struct lcd_module_info *mi,
 	/*
 	 * Get pgd entry for pud
 	 */
-	ret = gv_walk_pgd(lcd, mi, cxt, gva, &pgd);
+	ret = gv_walk_pgd(lcd, cxt, gva, &pgd);
 	if (ret) {
 		LCD_ERR("walking pgd for gva %lx", gva_val(gva));
 		return ret;
@@ -1023,7 +1146,7 @@ static int gv_walk(cptr_t lcd, struct gv_cxt *cxt, struct lcd_module_info *mi,
 	/*
 	 * Get pud entry for pmd
 	 */
-	ret = gv_walk_pud(lcd, cxt, mi, gva, pgd, &pud);
+	ret = gv_walk_pud(lcd, cxt, gva, pgd, &pud);
 	if (ret) {
 		LCD_ERR("walking pud for gva %lx", gva_val(gva));
 		return ret;
@@ -1032,7 +1155,7 @@ static int gv_walk(cptr_t lcd, struct gv_cxt *cxt, struct lcd_module_info *mi,
 	/*
 	 * Get pmd entry for page table
 	 */
-	ret = gv_walk_pmd(lcd, cxt, mi, gva, pud, &pmd);
+	ret = gv_walk_pmd(lcd, cxt, gva, pud, &pmd);
 	if (ret) {
 		LCD_ERR("walking pmd for gva %lx", gva_val(gva));
 		return ret;
@@ -1058,13 +1181,13 @@ static gpa_t gv_get(pte_t *pte)
  * Simple routine combining walk and set. Never
  * overwrites.
  */
-static int gv_map(cptr_t lcd, struct gv_cxt *cxt, struct lcd_module_info *mi,
+static int gv_map(cptr_t lcd, struct create_module_cxt *cxt,
 		gva_t gva, gpa_t gpa)
 {
 	int ret;
 	pte_t *pte;
 
-	ret = gv_walk(lcd, cxt, mi, gva, &pte);
+	ret = gv_walk(lcd, cxt, gva, &pte);
 	if (ret) {
 		LCD_ERR("getting pte for gva %lx", gva_val(gva));
 		return ret;
@@ -1095,16 +1218,15 @@ static int gv_map(cptr_t lcd, struct gv_cxt *cxt, struct lcd_module_info *mi,
  *
  * Note! Call lcd_mm_gva_init before mapping any gva's.
  */
-static int gv_map_range(cptr_t lcd, struct gv_cxt *cxt, 
-			struct lcd_module_info *mi, gva_t gva_start, 
-			gpa_t gpa_start, unsigned long npages)
+static int gv_map_range(cptr_t lcd, struct create_module_cxt *cxt, 
+			gva_t gva_start, gpa_t gpa_start, unsigned long npages)
 {
 	unsigned long off;
 	unsigned long len;
 
 	len = npages * PAGE_SIZE;
 	for (off = 0; off < len; off += PAGE_SIZE) {
-		if (gv_map(lcd, cxt, mi,
+		if (gv_map(lcd, cxt,
 				/* gva */
 				gva_add(gva_start, off),
 				/* gpa */
@@ -1119,7 +1241,7 @@ static int gv_map_range(cptr_t lcd, struct gv_cxt *cxt,
 	return 0;
 }
 
-static int map_module(cptr_t lcd, struct gv_cxt *cxt,
+static int map_module(cptr_t lcd, struct create_module_cxt *cxt,
 		struct lcd_module_info *mi)
 {
 	struct list_head *cursor;
@@ -1127,6 +1249,7 @@ static int map_module(cptr_t lcd, struct gv_cxt *cxt,
 	unsigned long offset;
 	gpa_t gpa;
 	int ret = 0;
+	cptr_t dest_slot;
 
 	offset = 0;
 
@@ -1143,44 +1266,51 @@ static int map_module(cptr_t lcd, struct gv_cxt *cxt,
 		mp = list_entry(cursor, struct lcd_module_page, list);
 
 		gpa = gpa_add(LCD_MODULE_GPA, offset);
-
+		/*
+		 * Alloc slot in dest
+		 */
+		ret = __lcd_alloc_cptr(cxt->cache, &dest_slot);
+		if (ret) {
+			LCD_ERR("alloc failed");
+			goto fail1;
+		}
 		/*
 		 * Grant and map in lcd's guest physical
 		 */
-		ret = lcd_cap_page_grant_map(lcd, mp->cptr, 
-					__cptr(mi->cptr_counter),
+		ret = lcd_cap_page_grant_map(lcd, mp->cptr,
+					dest_slot,
 					gpa);
 		if (ret) {
 			LCD_ERR("couldn't map module page in lcd's gp");
-			goto fail1;
+			goto fail2;
 		}
 		/*
 		 * Map in lcd's guest virtual
 		 */
-		ret = gv_map(lcd, cxt, mi, mp->gva, gpa);
+		ret = gv_map(lcd, cxt, mp->gva, gpa);
 		if (ret) {
 			LCD_ERR("couldn't map in lcd's gv");
-			goto fail2;
+			goto fail3;
 		}
 		/*
-		 * Bump counter / offset
+		 * Bump offset
 		 */
-		mi->cptr_counter++;
 		offset += PAGE_SIZE;
 	}
 
+fail3:
 fail2:
 fail1:
-	return ret;	
+	return ret;	/* we failed; pages will be unmapped when lcd is
+			 * destroyed */
 }
 
-static int map_gv_memory_and_stack(cptr_t lcd, struct gv_cxt *cxt, 
-				struct lcd_module_info *mi)
+static int map_gv_memory_and_stack(cptr_t lcd, struct create_module_cxt *cxt)
 {
 	/*
 	 * Map paging mem and stack/utcb
 	 */
-	return gv_map_range(lcd, cxt, mi,
+	return gv_map_range(lcd, cxt,
 			LCD_GV_PAGING_MEM_GVA,
 			LCD_GV_PAGING_MEM_GPA,
 			(gpa_val(LCD_MODULE_GPA) - 
@@ -1189,18 +1319,18 @@ static int map_gv_memory_and_stack(cptr_t lcd, struct gv_cxt *cxt,
 
 static int setup_addr_space(cptr_t lcd, struct lcd_module_info *mi)
 {
-	struct gv_cxt *cxt;
+	struct create_module_cxt *cxt;
 	int ret;
 	/*
 	 * Set up guest virtual cxt
 	 */
-	ret = gv_init(&cxt);
+	ret = cxt_init(&cxt);
 	if (ret)
 		goto fail1;
 	/*
 	 * Set up root page directory
 	 */
-	ret = gv_setup_pgd(lcd, cxt, mi);
+	ret = gv_setup_pgd(lcd, cxt);
 	if (ret)
 		goto fail2;
 	/*
@@ -1214,7 +1344,7 @@ static int setup_addr_space(cptr_t lcd, struct lcd_module_info *mi)
 	/*
 	 * Map guest virtual paging memory and stack/utcb
 	 */
-	ret = map_gv_memory_and_stack(lcd, cxt, mi);
+	ret = map_gv_memory_and_stack(lcd, cxt);
 	if (ret) {
 		LCD_ERR("mapping paging mem");
 		goto fail4;
@@ -1223,7 +1353,9 @@ static int setup_addr_space(cptr_t lcd, struct lcd_module_info *mi)
 	 * Remove our references to the guest virtual paging memory, so
 	 * the pages will be freed when the lcd is torn down.
 	 */
-	gv_destroy(cxt);
+	cxt_destroy(cxt);
+
+	return 0;
 
 fail4:
 fail3:
@@ -1233,7 +1365,7 @@ fail2:
 	 *
 	 * module pages will be freed when lcd_unload_module is called
 	 */
-	gv_destroy(cxt);
+	cxt_destroy(cxt);
 fail1:
 	return ret;		
 }

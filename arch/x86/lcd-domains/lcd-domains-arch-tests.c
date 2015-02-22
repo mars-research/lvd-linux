@@ -45,7 +45,7 @@ out:
 fail_alloc:
 	return ret;
 }
-
+#if 0
 static int test03_help(struct lcd_arch *lcd, gpa_t base)
 {
 	hpa_t actual;
@@ -133,7 +133,7 @@ fail3:
 fail1:
 	return ret;
 }
-
+#endif
 static int test04(void)
 {
 	struct lcd_arch *lcd;
@@ -273,8 +273,8 @@ static void lcd_arch_tests(void)
 		return;
 	if (test02())
 		return;
-	if (test03())
-		return;
+//	if (test03())
+//		return;
 	if (test04())
 		return;
 	if (test05())

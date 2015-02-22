@@ -1148,7 +1148,7 @@ int lcd_arch_ept_unmap(struct lcd_arch *lcd, gpa_t a)
 {
 	int ret;
 	lcd_arch_epte_t *ept_entry;
-
+	
 	/*
 	 * Walk ept
 	 */
@@ -1240,7 +1240,8 @@ int lcd_arch_ept_gpa_to_hpa(struct lcd_arch *lcd, gpa_t ga, hpa_t *ha_out)
 
 /**
  * Recursively frees all present entries in dir at level, and
- * the page containing the dir.
+ * the page containing the dir. The recursion depth is limited to 3 - 4 stack
+ * frames, so it's reasonable to use.
  *
  * 0 = pml4
  * 1 = pdpt
@@ -1254,23 +1255,16 @@ static void vmx_free_ept_dir_level(lcd_arch_epte_t *dir, int level)
 {
 	int idx;
 	
-	if (level == 3) {
-		/*
-		 * Base case of recursion
-		 *
-		 * Free any mapped host page frames, notify
-		 *
-		 * XXX: This can lead to nasty double frees if we made a
-		 * mistake and just forgot to unmap in the ept.
-		 */
-		for (idx = 0; idx < LCD_ARCH_PTRS_PER_EPTE; idx++) {
-			if (vmx_epte_present(dir[idx])) {
-				LCD_ARCH_ERR("memory leak at hva %lx",
-					hva_val(vmx_epte_hva(dir[idx])));
-				free_page(hva_val(vmx_epte_hva(dir[idx])));
-			}
-		}
-	} else {
+	/*
+	 * Base case of recursion is when level = 3.
+	 *
+	 * In that case - don't do anything - don't try to free any 
+	 * pages that are still mapped. The higher level layers 
+	 * should've done that already (but may not have bothered 
+	 * unmapping). If we try to free pages that are still mapped,
+	 * we may get bad double free's.
+	 */
+	if (level != 3) {
 		/*
 		 * pml4, pdpt, or page directory
 		 *

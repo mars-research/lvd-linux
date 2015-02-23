@@ -5,9 +5,10 @@ class CCSTBase
 class CCSTFile : public CCSTBase
 {
   // Other stuff like File
-  vector<CCSTExDeclaration> defs_;
+  vector<CCSTExDeclaration*> defs_;
+  FILE *out_file_;
  public:
-  CCSTFile(vector<CCSTExDeclaration> defs){this->defs_ = defs;}
+  CCSTFile(vector<CCSTExDeclaration*> defs){this->defs_ = defs;}
   virtual void write();
 };
 
@@ -26,12 +27,12 @@ class CCSTFuncDef : public CCSTExDeclaration
   /* <function-definition> ::= 
      {<declaration-specifier>}* <declarator> {<declaration>}* <compound-statement>
   */
-  vector<CCSTDecSpecifier> specifiers_;
+  vector<CCSTDecSpecifier*> specifiers_;
   CCSTDeclarator *ret_;
-  vector<CCSTDeclaration> decs_;
+  vector<CCSTDeclaration*> decs_;
   CCSTCompoundStatement *body_;
  public:
-  CCSTFuncDef(vector<CCSTDecSpecifier> specifiers, CCSTDeclarator *ret, vector<CCSTDeclaration> decs_, CCSTCompoundStatement *body){this->specifiers_ = specifiers; this->ret_ = ret; this->decs_ = decs; this->body_ = body;}
+  CCSTFuncDef(vector<CCSTDecSpecifier*> specifiers, CCSTDeclarator *ret, vector<CCSTDeclaration*> decs_, CCSTCompoundStatement *body){this->specifiers_ = specifiers; this->ret_ = ret; this->decs_ = decs; this->body_ = body;}
   virtual void write();
 };
 
@@ -40,8 +41,8 @@ class CCSTDeclaration : public CCSTExDeclaration
   /*
     <declaration> ::=  {<declaration-specifier>}+ {<init-declarator>}*
    */
-  vector<CCSTDecSpecifier> specifier_;
-  vector<CCSTInitDeclarator> decs_;
+  vector<CCSTDecSpecifier*> specifier_;
+  vector<CCSTInitDeclarator*> decs_;
  public:
   CCSTDeclaration(vector<CCSTDecSpecifier> specifier, vector<CCSTInitDeclarator> decs){this->specifier_ = specifier; this->decs_ = decs;}
   virtual void write();
@@ -114,13 +115,13 @@ enum struct_union_t {struct_t, union_t}; // probably unecessary
 class CCSTStructUnionSpecifier : CCSTTypeSpecifier
 {
   /*
-  <struct-or-union-specifier> ::= <struct-or-union> <identifier> { {<struct-declaration>}+ }
+    <struct-or-union-specifier> ::= <struct-or-union> <identifier> { {<struct-declaration>}+ }
                               | <struct-or-union> { {<struct-declaration>}+ }
                               | <struct-or-union> <identifier>
   */
   struct_union_t s_or_u_;
   const char* id_;
-  vector<CCSTStructDeclaration> struct_dec_;
+  vector<CCSTStructDeclaration*> struct_dec_;
  public:
   CCSTStructUnionSpecifier(struct_union_t s_or_u, const char* id){this->s_or_u_ = s_or_u; this->id_ = id; this->struct_dec_ = null;}
   CCSTStructUnionSpecifier(struct_union_t s_or_u, const char* id, vector<CCSTStructDeclaration> struct_dec){this->s_or_u_ = s_or_u; this->id_ = id; this->struct_dec_ = struct_dec;}
@@ -133,7 +134,7 @@ class CCSTStructDeclaration : CCSTBase
   /*
     <struct-declaration> ::= {<specifier-qualifier>}* <struct-declarator-list>
    */
-  vector<CCSTSpecifierQual> spec_qual_;
+  vector<CCSTSpecifierQual*> spec_qual_;
   CCSTStructDecList *dec_list_;
  public:
   CCSTSTructDeclaration(vector<CCSTSpecifierQual spec_qual, CCSTStructDecList *dec_list){this->spec_qual_ = spec_qual; this->dec_list_ = dec_list;}
@@ -157,7 +158,7 @@ class CCSTStructDecList : CCSTBase
     <struct-declarator-list> ::= <struct-declarator>
                            | <struct-declarator-list> , <struct-declarator>
    */
-  vector<CCSTStructDeclarator> struct_decs_;
+  vector<CCSTStructDeclarator*> struct_decs_;
  public:
   CCSTStructDecList(vector<CCSTStructDeclarator> struct_decs){this->struct_decs_ = struct_decs;}
   virtual void write();
@@ -179,7 +180,7 @@ class CCSTStructDeclarator : public CCSTStructDecList
   virtual void write();
 };
 
-class CCSTDeclarator : public CCSTStructDeclarator
+class CCSTDeclarator : public CCSTBase // this seems incorrect
 {
   /*
     <declarator> ::= {<pointer>}? <direct-declarator>
@@ -223,7 +224,7 @@ class CCSTDirectDec : public CCSTBase
   
 };
 
-class CCSTDirectDecId
+class CCSTDirectDecId : public CCSTDirectDec
 {
   /*
     <direct-declarator> ::= <identifier>
@@ -527,6 +528,7 @@ class CCSTUnaryExprCastExpr : public CCSTUnaryExpr
   virtual void write();
 };
 
+enum incr_decr_ops {increment_t, decrement_t};
 class CCSTUnaryExprOpOp : public CCSTUnaryExpr
 {
   /*
@@ -537,10 +539,10 @@ class CCSTUnaryExprOpOp : public CCSTUnaryExpr
                      | sizeof <unary-expression>
                      | sizeof <type-name>
    */
-  bool plusplus_; // false is minus minus
+  incr_decr_ops op_;
   CCSTUnaryExpr *unary_expr_;
  public:
-  CCSTUnaryExprOpOp(bool plusplus, CCSTUnaryExpr *unary_expr){this->unary_expr_ = unary_expr; this->plusplus_ = plusplus;}
+  CCSTUnaryExprOpOp(incr_decr_ops op, CCSTUnaryExpr *unary_expr){this->unary_expr_ = unary_expr; this->op_ = op;}
   virtual void write();
 };
 
@@ -589,11 +591,13 @@ class CCSTPostFixExprOpOp : public CCSTPostFixExpr
                        | <postfix-expression> --
    */
   CCSTPostFixExpr *post_fix_expr_;
-  bool plusplus_;
+ incr_decr_ops op_;
  public:
-  CCSTPostFixExprOpOp(CCSTPostFixExpr *post_fix_expr, bool plusplus){this->post_fix_expr_ = post_fix_expr; this->plusplus_ = plusplus;}
+  CCSTPostFixExprOpOp(CCSTPostFixExpr *post_fix_expr, incr_decr_ops op){this->post_fix_expr_ = post_fix_expr; this->op_ = op;}
   virtual void write();
 };
+
+enum accessor {pointer_access_t, object_access_t};
 
 class CCSTPostFixExprAccess : public CCSTPostFixExpr
 {
@@ -606,10 +610,11 @@ class CCSTPostFixExprAccess : public CCSTPostFixExpr
                        | <postfix-expression> ++
                        | <postfix-expression> --
    */
-  bool pointer_; // -> true . false
+  accessor op_; 
   CCSTPostFixExpr *post_fix_expr_;
+  const char * id_;
  public:
-  CCSTPostFixExprAccess(CCSTPostFixExpr *post_fix_expr, bool pointer){this->post_fix_expr_ = post_fix_expr; this->pointer_ = pointer;}
+  CCSTPostFixExprAccess(CCSTPostFixExpr *post_fix_expr, accessor op, const char * id){this->post_fix_expr_ = post_fix_expr; this->op_ = op;}
   virtual void write();
 };
 

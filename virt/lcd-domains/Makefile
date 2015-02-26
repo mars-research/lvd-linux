@@ -1,13 +1,19 @@
 #
-# One (and only) build file for LCD system.
+# LCD arch-independent code
 #
 
 ccflags-y               	   += -Werror
 
+# The module
 obj-$(CONFIG_LCD_DOMAINS)	   += lcd-domains.o
 
-lcd-domains-y                      := main.o ipc.o kliblcd.o cap.o
+lcd-domains-y                      += main.o ipc.o kliblcd.o cap.o
 
-obj-$(CONFIG_LCD_MODULE_LOAD_TEST) += lcd-module-load-test.o
+lcd-domains-y                      += ../../arch/$(ARCH)/lcd-domains/main.o
 
-CFLAGS_lcd-module-load-test.o      = -O0
+# Test modules
+
+obj-$(CONFIG_LCD_TEST_MOD)         += test-mods/
+
+# LCD Debug
+obj-$(CONFIG_LCD_DEBUG)            += debug/

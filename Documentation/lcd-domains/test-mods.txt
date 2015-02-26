@@ -1,0 +1,71 @@
+
+========================================
+OVERVIEW
+========================================
+
+In virt/lcd-domains/test-mods, you can put a new group of test modules
+for running with the lcd system. You will find a few in there already.
+One of them - load - is built automatically and ran during a test when the
+lcd module is inserted.
+
+Beware! The load test module contains an infinite loop, so you probably don't
+want to run it on your host machine (i.e., you should run it inside an
+lcd where it will be preempted periodically and then stopped by the test
+case).
+
+========================================
+HOW TO DO A TEST MODULE
+========================================
+
+Follow the examples in the test-mods dir when in doubt.
+
+Step 1
+------
+
+Create a new sub dir in test-mods with source files. At least one of the
+modules should probably run non-isolated - it will set up the lcd's.
+
+Important: Modules that will run inside lcd's should textually include
+the liblcd file.
+
+Step 2
+------
+
+Set up a makefile.
+
+Step 3
+------
+
+Modify the makefile inside virt/lcd-domains/test-mods to include your new sub 
+dir.
+
+Step 4
+------
+
+Modify the Kconfig file inside virt/lcd-domains to include your new
+modules.
+
+Step 5
+------
+
+Run make menuconfig to turn on building for your modules. It will be under
+Virtualization (2) at the bottom.
+
+Step 6
+------
+
+Run
+
+   make
+
+and then
+
+   sudo make modules_install install
+
+do install.
+
+Step 7
+------
+
+Ensure the lcd-domains.ko module is insmod'd. Insert your boot module, which
+should boot all lcd's, etc.

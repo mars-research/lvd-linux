@@ -1,10 +1,46 @@
-#ifndef _ASM_X86_LCD_DOMAINS_ARCH_H
-#define _ASM_X86_LCD_DOMAINS_ARCH_H
+#ifndef _ASM_X86_LCD_DOMAINS_LCD_DOMAINS_H
+#define _ASM_X86_LCD_DOMAINS_LCD_DOMAINS_H
 
 #include <asm/vmx.h>
 #include <linux/spinlock.h>
 #include <linux/bitmap.h>
 #include <lcd-domains/types.h>
+
+extern int lcd_on_cpu;
+extern int lcd_in_non_root;
+
+/* DEBUGGING -------------------------------------------------- */
+
+#define LCD_ARCH_DEBUG 0
+
+#define LCD_ARCH_ERR(msg...) __lcd_arch_err(__FILE__, __LINE__, msg)
+static inline void __lcd_arch_err(char *file, int lineno, char *fmt, ...)
+{
+	va_list args;
+	printk(KERN_ERR "lcd-vmx: %s:%d: error: ", file, lineno);
+	va_start(args, fmt);
+	vprintk(fmt, args);
+	va_end(args);
+}
+#define LCD_ARCH_MSG(msg...) __lcd_arch_msg(__FILE__, __LINE__, msg)
+static inline void __lcd_arch_msg(char *file, int lineno, char *fmt, ...)
+{
+	va_list args;
+	printk(KERN_ERR "lcd-vmx: %s:%d: note: ", file, lineno);
+	va_start(args, fmt);
+	vprintk(fmt, args);
+	va_end(args);
+}
+#define LCD_ARCH_WARN(msg...) __lcd_arch_warn(__FILE__, __LINE__, msg)
+static inline void __lcd_arch_warn(char *file, int lineno, char *fmt, ...)
+{
+	va_list args;
+	printk(KERN_ERR "lcd-vmx: %s:%d: warning: ", file, lineno);
+	va_start(args, fmt);
+	vprintk(fmt, args);
+	va_end(args);
+}
+
 
 /* LCD ARCH DATA STRUCTURES ---------------------------------------- */
 
@@ -304,6 +340,13 @@ int lcd_arch_set_gva_root(struct lcd_arch *lcd_arch, gpa_t a);
  * Accessor Macro for syscalls
  * ===========================
  */
-#define LCD_ARCH_GET_SYSCALL_NUM(lcd) (lcd->regs[LCD_ARCH_REGS_RAX])
+static inline u64 lcd_arch_get_syscall_num(struct lcd_arch *lcd)
+{
+	return lcd->regs[LCD_ARCH_REGS_RAX];
+}
+static inline void lcd_arch_set_syscall_ret(struct lcd_arch *lcd, u64 val)
+{
+	lcd->regs[LCD_ARCH_REGS_RAX] = val;
+}
 
 #endif  /* _ASM_X86_LCD_DOMAINS_ARCH_H */

@@ -5,24 +5,88 @@
 config LCD_DOMAINS
        tristate "Light-weight Capability Domains"
        depends on X86_64
-       depends on LCD_INTEL
        select HAVE_LCD
-       default y
+       select TEST_MOD
+       default m
        ---help---
        Light-weight Capability Domains for Linux.
-
-config LCD_INTEL
-       tristate "Intel support for LCDs"
-       depends on X86_64
-       default y
-       ---help---
-       Intel-specific code for usings LCDs.
 
 config HAVE_LCD
        bool
 
-config LCD_MODULE_LOAD_TEST
-       tristate
+config LCD_DEBUG
+       tristate "LCD Debug"
        depends on LCD_DOMAINS
        default m
+       ---help---
+       Simple debug module that just dumps stack on all cpu's.
+
+
+
+menuconfig LCD_TEST_MOD
+	   bool "Test Modules"
+	   default y
+	   ---help---
+	   Test modules for LCDs.
+
+if LCD_TEST_MOD
+
+# --------------------------------------------------
+
+config LCD_TEST_MOD_LOAD
+       tristate "Basic load test"
+       depends on LCD_DOMAINS
+       default m
+       ---help---
+       Simple infinite loop - don't run outside lcd, it never quits!
+
+# --------------------------------------------------
+
+config LCD_TEST_MOD_IPC1
+       bool "IPC test with 1 LCD"
+       depends on LCD_DOMAINS
+       default y
+       select LCD_TEST_MOD_IPC1_BOOT
+       select LCD_TEST_MOD_IPC1_LCD
+       ---help---
+       Simple send/recv test with one lcd and one non-isolated module.
+
+config LCD_TEST_MOD_IPC1_BOOT
+       tristate
+       depends on LCD_TEST_MOD_IPC1
+       default m
+
+config LCD_TEST_MOD_IPC1_LCD
+       tristate
+       depends on LCD_TEST_MOD_IPC1
+       default m
+
+# --------------------------------------------------
+
+config LCD_TEST_MOD_IPC2
+       bool "IPC test with 2 LCDs"
+       depends on LCD_DOMAINS
+       default y
+       select LCD_TEST_MOD_IPC2_BOOT
+       select LCD_TEST_MOD_IPC2_LCD1
+       select LCD_TEST_MOD_IPC2_LCD2
+       ---help---
+       Simple send/recv test with two lcd's and one non-isolated module.
+     
+config LCD_TEST_MOD_IPC2_BOOT
+       tristate
+       depends on LCD_TEST_MOD_IPC2
+       default m
+
+config LCD_TEST_MOD_IPC2_LCD1
+       tristate
+       depends on LCD_TEST_MOD_IPC2
+       default m
+
+config LCD_TEST_MOD_IPC2_LCD2
+       tristate
+       depends on LCD_TEST_MOD_IPC2
+       default m
+
+endif
 

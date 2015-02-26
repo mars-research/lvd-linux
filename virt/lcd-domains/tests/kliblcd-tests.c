@@ -8,12 +8,12 @@ static int test01(void)
 {
 	int ret;
 
-	ret = klcd_enter();
+	ret = lcd_enter();
 	if (ret) {
 		LCD_ERR("enter");
 		goto fail1;
 	}
-	klcd_exit();
+	lcd_exit(0);
 	
 	return 0;
 
@@ -26,7 +26,7 @@ static int test02(void)
 	int ret;
 	cptr_t c;
 
-	ret = klcd_enter();
+	ret = lcd_enter();
 	if (ret) {
 		LCD_ERR("enter");
 		goto fail1;
@@ -39,12 +39,12 @@ static int test02(void)
 	}
 	lcd_free_cptr(c);
 
-	klcd_exit();
+	lcd_exit(0);
 	
 	return 0;
 
 fail2:
-	klcd_exit();
+	lcd_exit(0);
 fail1:
 	return ret;
 }
@@ -62,7 +62,7 @@ static int test03(void)
 		goto fail0;
 	}
 
-	ret = klcd_enter();
+	ret = lcd_enter();
 	if (ret) {
 		LCD_ERR("enter");
 		goto fail1;
@@ -76,12 +76,12 @@ static int test03(void)
 
 	klcd_rm_page(c);
 
-	klcd_exit();
+	lcd_exit(0);
 	
 	return 0;
 
 fail2:
-	klcd_exit();
+	lcd_exit(0);
 fail1:
 	__free_pages(p, 0);
 fail0:
@@ -95,7 +95,7 @@ static int test04(void)
 	gpa_t gpa;
 	gva_t gva;
 
-	ret = klcd_enter();
+	ret = lcd_enter();
 	if (ret) {
 		LCD_ERR("enter");
 		goto fail1;
@@ -108,12 +108,12 @@ static int test04(void)
 	}
 	lcd_cap_delete(c);
 
-	klcd_exit();
+	lcd_exit(0);
 	
 	return 0;
 
 fail2:
-	klcd_exit();
+	lcd_exit(0);
 fail1:
 	return ret;
 }
@@ -123,12 +123,12 @@ static int test05(void)
 	int ret;
 	struct lcd_module_info *mi;
 
-	ret = klcd_enter();
+	ret = lcd_enter();
 	if (ret) {
 		LCD_ERR("enter");
 		goto fail1;
 	}
-	ret = lcd_load_module("lcd_module_load_test", LCD_CPTR_NULL, &mi);
+	ret = lcd_load_module("lcd_test_mod_load", LCD_CPTR_NULL, &mi);
 	if (ret) {
 		LCD_ERR("lcd load module");
 		goto fail2;
@@ -136,12 +136,12 @@ static int test05(void)
 
 	lcd_unload_module(mi, LCD_CPTR_NULL);
 
-	klcd_exit();
-	
+	lcd_exit(0);
+
 	return 0;
 
 fail2:
-	klcd_exit();
+	lcd_exit(0);
 fail1:
 	return ret;
 }
@@ -162,7 +162,7 @@ static int test06(void)
 		LCD_ERR("cptr alloc");
 		goto fail2;
 	}
-	if (cptr_val(c) != 0) {
+	if (cptr_val(c) != 1) {
 		LCD_ERR("unexpected cptr %llu", cptr_val(c));
 		goto fail3;
 	}
@@ -249,7 +249,7 @@ static int test08(void)
 	 * Alloc enough to fill root
 	 */
 	top = 1 << LCD_CPTR_SLOT_BITS;
-	for (i = 0; i < top; i++) {
+	for (i = 1; i < top; i++) {
 		ret = __lcd_alloc_cptr(cache, &c);
 		if (ret) {
 			LCD_ERR("cache alloc at %d", i);
@@ -284,13 +284,13 @@ static int test08(void)
 	 * Free root
 	 */
 	top = 1 << LCD_CPTR_SLOT_BITS;
-	for (i = 0; i < top; i++)
+	for (i = 1; i < top; i++)
 		__lcd_free_cptr(cache, __cptr(i));
 	/*
 	 * Re-alloc enough to fill root
 	 */
 	top = 1 << LCD_CPTR_SLOT_BITS;
-	for (i = 0; i < top; i++) {
+	for (i = 1; i < top; i++) {
 		ret = __lcd_alloc_cptr(cache, &c);
 		if (ret) {
 			LCD_ERR("cache alloc at %d", i);
@@ -318,10 +318,12 @@ static int test09(void)
 	int ret;
 	struct lcd_module_info *mi;
 	cptr_t lcd;
+
+	LCD_MSG("\n\nin test09------------------------\n\n");
 	/*
 	 * Enter lcd mode
 	 */
-	ret = klcd_enter();
+	ret = lcd_enter();
 	if (ret) {
 		LCD_ERR("enter");
 		goto fail1;
@@ -329,7 +331,7 @@ static int test09(void)
 	/*
 	 * Create a new lcd
 	 */
-	ret = lcd_create_module_lcd(&lcd, "lcd_module_load_test",
+	ret = lcd_create_module_lcd(&lcd, "lcd_test_mod_load",
 				LCD_CPTR_NULL, &mi);
 	if (ret) {
 		LCD_ERR("create module lcd");
@@ -344,33 +346,20 @@ static int test09(void)
 		goto fail3;
 	}
 	/*
-	 * Wait for 2 seconds
+	 * Wait for 4 seconds
 	 */
-	msleep(2000);
-	/*
-	 * Suspend it
-	 */
-	ret = lcd_suspend(lcd);
-	if (ret) {
-		LCD_ERR("suspend lcd");
-		goto fail4;
-	}
+	msleep(4000);
 	/*
 	 * Tear everything down
 	 */
-	lcd_destroy_module_lcd(lcd, mi, LCD_CPTR_NULL);
-	/*
-	 * Exit lcd mode
-	 */
-	klcd_exit();
-	
-	return 0;
+	ret = 0;
+	goto out;
 
-fail4:
+out:
 fail3:
 	lcd_destroy_module_lcd(lcd, mi, LCD_CPTR_NULL);
 fail2:
-	klcd_exit();
+	lcd_exit(0);
 fail1:
 	return ret;
 }

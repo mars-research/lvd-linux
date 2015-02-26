@@ -1,8 +1,5 @@
 /**
  * Regression tests for lcd arch code.
- *
- * Included in lcd-domains-arch.c and
- * ran last in lcd_arch_init.
  */
 
 static int test01(void)
@@ -45,7 +42,7 @@ out:
 fail_alloc:
 	return ret;
 }
-#if 0
+
 static int test03_help(struct lcd_arch *lcd, gpa_t base)
 {
 	hpa_t actual;
@@ -133,7 +130,7 @@ fail3:
 fail1:
 	return ret;
 }
-#endif
+
 static int test04(void)
 {
 	struct lcd_arch *lcd;
@@ -267,20 +264,20 @@ static int test06(void)
 	return 0;
 }
 
-static void lcd_arch_tests(void)
+static int main_tests(void)
 {
 	if (test01())
-		return;
+		return -1;
 	if (test02())
-		return;
-//	if (test03())
-//		return;
+		return -1;
+	if (test03())
+		return -1;
 	if (test04())
-		return;
+		return -1;
 	if (test05())
-		return;
+		return -1;
 	if (test06())
-		return;
-	LCD_ARCH_MSG("all tests passed!");
-	return;
+		return -1;
+	LCD_ARCH_MSG("all lcd arch main tests passed!");
+	return 0;
 }

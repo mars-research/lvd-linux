@@ -1,118 +1,114 @@
 /* 
- * kliblcd.h - header for kliblcd.ko
+ * liblcd.h - header for liblcd.ko
  *
  * Author: Charles Jacobsen <charlesj@cs.utah.edu>
  * Copyright: University of Utah
  *
- * This is the non-isolated code interface to the microkernel. The
- * implementation is in virt/lcd-domains/kliblcd.c.
+ * This is the *isolated* code interface to the microkernel. The
+ * implementation is in arch/x86/lcd-domains/liblcd.c.
  *
- * An LCD that runs in non-isolated code is called a klcd.
+ * This code runs in a very bare environment.
+ *
+ * We don't use arch headers for asm because some macros aren't 
+ * available (for e.g., bitwise and), and this has to run in 64 bit anyway.
  */
-#ifndef LCD_DOMAINS_KLIBLCD_H
-#define LCD_DOMAINS_KLIBLCD_H
+#ifndef _ASM_X86_LCD_DOMAINS_LIBLCD_H
+#define _ASM_X86_LCD_DOMAINS_LIBLCD_H
 
 #include <lcd-domains/types.h>
+#include <lcd-domains/syscall.h>
 #include <lcd-domains/utcb.h>
-#include <linux/sched.h>
+#include <linux/errno.h>
 
-/* DEBUG ------------------------------------------------------------ */
+/* LCD REG ACCESS -------------------------------------------------- */
 
-#define LIBLCD_ERR(msg...) __kliblcd_err(__FILE__, __LINE__, msg)
-static inline void __kliblcd_err(char *file, int lineno, char *fmt, ...)
+static inline struct lcd_utcb * lcd_get_utcb(void)
 {
-	va_list args;
-	printk(KERN_ERR "error in klcd (kthread 0x%p): %s:%d: error: ", 
-		current, file, lineno);
-	va_start(args, fmt);
-	vprintk(fmt, args);
-	va_end(args);
-}
-#define LIBLCD_MSG(msg...) __kliblcd_msg(__FILE__, __LINE__, msg)
-static inline void __kliblcd_msg(char *file, int lineno, char *fmt, ...)
-{
-	va_list args;
-	printk(KERN_ERR "msg in klcd (kthread 0x%p): %s:%d: note: ", 
-		current, file, lineno);
-	va_start(args, fmt);
-	vprintk(fmt, args);
-	va_end(args);
-}
-#define LIBLCD_WARN(msg...) __kliblcd_warn(__FILE__, __LINE__, msg)
-static inline void __kliblcd_warn(char *file, int lineno, char *fmt, ...)
-{
-	va_list args;
-	printk(KERN_ERR "warn in klcd (kthread 0x%p): %s:%d: warning: ", 
-		current, file, lineno);
-	va_start(args, fmt);
-	vprintk(fmt, args);
-	va_end(args);
+	struct lcd_utcb *out;
+	/*
+	 * The utcb is in the bottom of the stack page. All we have to
+	 * do is mask off the low 12 bits to get the address.
+	 */
+	asm volatile(
+		"movq %%rsp, %0 \n\t"
+		"andq $0xFFFFFFFFFFFFF000, %0 \n\t"
+		: "=g" (out)
+		::);
+	return out;
 }
 
-/* KLCD-SPECIFIC STUFF -------------------------------------------------- */
-
-struct lcd;
-
-#define KLCD_MK_REG_ACCESS(idx)						\
-extern u64 __klcd_r##idx(struct lcd *lcd);			        \
-extern void __klcd_set_r##idx(struct lcd *lcd, u64 val);		\
-extern cptr_t __klcd_cr##idx(struct lcd *lcd);				\
-extern void __klcd_set_cr##idx(struct lcd *lcd, cptr_t val);		\
+#define LCD_MK_REG_ACCESS(idx)						\
 static inline u64 lcd_r##idx(void)					\
 {									\
-        return __klcd_r##idx(current->lcd);				\
+	return __lcd_r##idx(lcd_get_utcb());				\
 }									\
 static inline void lcd_set_r##idx(u64 val)				\
 {									\
-	__klcd_set_r##idx(current->lcd, val);				\
+	__lcd_set_r##idx(lcd_get_utcb(), val);				\
 }									\
 static inline cptr_t lcd_cr##idx(void)					\
 {									\
-        return __klcd_cr##idx(current->lcd);				\
+        return __lcd_cr##idx(lcd_get_utcb());				\
 }								        \
 static inline void lcd_set_cr##idx(cptr_t val)				\
 {									\
-	__klcd_set_cr##idx(current->lcd, val);				\
+	__lcd_set_cr##idx(lcd_get_utcb(), val);				\
 }									
-KLCD_MK_REG_ACCESS(0)
-KLCD_MK_REG_ACCESS(1)
-KLCD_MK_REG_ACCESS(2)
-KLCD_MK_REG_ACCESS(3)
-KLCD_MK_REG_ACCESS(4)
-KLCD_MK_REG_ACCESS(5)
-KLCD_MK_REG_ACCESS(6)
-KLCD_MK_REG_ACCESS(7)
+LCD_MK_REG_ACCESS(0)
+LCD_MK_REG_ACCESS(1)
+LCD_MK_REG_ACCESS(2)
+LCD_MK_REG_ACCESS(3)
+LCD_MK_REG_ACCESS(4)
+LCD_MK_REG_ACCESS(5)
+LCD_MK_REG_ACCESS(6)
+LCD_MK_REG_ACCESS(7)
 
-/* KLCD SPECIFICS -------------------------------------------------- */
+
+/* LOW LEVEL SYSCALLS -------------------------------------------------- */
 
 /**
- * Put a kernel page in the caller's cspace at slot_out. The microkernel will 
- * not free such pages when the last capability to them goes away - the caller
- * is responsible for freeing them.
- *
- * (This is used for adding module pages.)
+ * Low level syscall routines.
  */
-int klcd_add_page(struct page *p, cptr_t *slot_out);
+
+#define __LCD_MK_SYSCALL(num)						\
+static inline int lcd_syscall_##num(void)	                        \
+{									\
+        long ret;							\
+	asm volatile(							\
+		"movq $" #num ", %%rax \n\t" /* move syscall into rax */\
+		"vmcall \n\t"                /* do vmcall (exit vm)   */\
+		"movq %%rax, %0 \n\t"        /* get return value      */\
+		: "=g" (ret)						\
+		:							\
+		: "rax");						\
+	return (int)ret;						\
+}									
+
+#define LCD_MK_SYSCALL(name) __LCD_MK_SYSCALL(name)
+
+LCD_MK_SYSCALL(LCD_SYSCALL_EXIT)
+LCD_MK_SYSCALL(LCD_SYSCALL_SEND)
+LCD_MK_SYSCALL(LCD_SYSCALL_RECV)
+LCD_MK_SYSCALL(LCD_SYSCALL_CALL)
+LCD_MK_SYSCALL(LCD_SYSCALL_REPLY)
+
+
+#define __LCD_DO_SYSCALL(num) lcd_syscall_##num()
+#define LCD_DO_SYSCALL(name) __LCD_DO_SYSCALL(name)
+
+
+/* ENTER / EXIT FROM LCD -------------------------------------------------- */
+
 /**
- * Remove a kernel page from the caller's cspace at slot. This will
- * automatically revoke any capabilities that were derived. Doesn't free page.
- */
-void klcd_rm_page(cptr_t slot);
-
-
-/* LCD ENTER / EXIT -------------------------------------------------- */
-
-
-/**
- * Thread enter lcd mode. This is required before invoking anything.
+ * This should be called right when a thread starts executing inside an lcd.
+ * Sets up cptr cache and other odds and ends.
  */
 int lcd_enter(void);
+
 /**
- * Thread exit lcd mode. This will tear down the thread's cspace, etc.
- *
- * For klcd's, the kernel thread won't die, and retval is ignored (for now).
+ * Exit from lcd with return value. Doesn't return.
  */
-void lcd_exit(int retval);
+void __noreturn lcd_exit(int retval);
 
 
 /* LOW LEVEL PAGE ALLOC -------------------------------------------------- */
@@ -120,7 +116,7 @@ void lcd_exit(int retval);
 
 /**
  * Allocate a zero'd out page, and put the capability in slot_out. Map it
- * at gpa in the guest physical address space.
+ * at gpa.
  */
 int lcd_page_alloc(cptr_t *slot_out, gpa_t gpa);
 /**
@@ -131,6 +127,7 @@ int lcd_gfp(cptr_t *slot_out, gpa_t *gpa_out, gva_t *gva_out);
 
 
 /* IPC -------------------------------------------------- */
+
 
 /**
  * Create a synchronous endpoint, capability stored in slot_out.
@@ -189,6 +186,16 @@ int lcd_config(cptr_t lcd, gva_t pc, gva_t sp, gpa_t gva_root);
  * Runs / resumes an lcd.
  */
 int lcd_run(cptr_t lcd);
+/**
+ * Suspend an lcd.
+ *
+ * This will not tear it down - this happens when the last capability to the
+ * lcd goes away. Use lcd_delete or lcd_revoke as necessary.
+ *
+ * Blocks until lcd halts. Warning: This could be a while if the lcd is
+ * sitting in an endpoint queue.
+ */
+int lcd_suspend(cptr_t lcd);
 
 
 /* CAPABILITIES -------------------------------------------------- */
@@ -228,7 +235,7 @@ int lcd_cap_page_grant_map(cptr_t lcd, cptr_t page, cptr_t dest, gpa_t gpa);
  * from the caller's address space.)
  *
  * If this is the last capability to the object, the object will be destroyed,
- * unless it is a kernel page. See klcd_add_page and klcd_rm_page.
+ * unless it is a kernel page.
  */
 void lcd_cap_delete(cptr_t slot);
 /**
@@ -258,18 +265,17 @@ void lcd_free_cptr(cptr_t c);
 /* EXTRAS -------------------------------------------------- */
 
 
+/* TODO : not implemented for regular lcd's yet */
+
+
 /**
  * When provided with an endpoint connected to a module loader, this routine
  * will communicate with the module loader and load the module with name and
  * get capabilities to the pages that contain the module. It returns a
- * list of lcd_module_pages inside the doubly-linked list head. (The pages
- * are in this order: init pages followed by core pages.)
+ * list of lcd_module_pages inside the doubly-linked list head.
  *
  * The caller is responsible for freeing the list of lcd_module_page structs
  * (e.g., via lcd_unload_module).
- *
- * (For klcd's, for now anyway, the endpoint is ignored, so the null cptr
- * can be passed. The non-isolated module loading code is used.)
  */
 struct lcd_module_page {
 	/*
@@ -423,4 +429,4 @@ void lcd_destroy_module_lcd(cptr_t lcd, struct lcd_module_info *mi,
 			cptr_t mloader_endpoint);
 
 
-#endif  /* LCD_DOMAINS_KLIBLCD_H */
+#endif  /* _ASM_X86_LCD_DOMAINS_LIBLCD_H */

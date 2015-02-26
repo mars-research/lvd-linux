@@ -1,0 +1,9 @@
+#
+# Modules for testing
+#
+
+obj-$(CONFIG_LCD_TEST_MOD_LOAD)   += load/
+
+obj-$(CONFIG_LCD_TEST_MOD_IPC1)   += ipc1/
+
+obj-$(CONFIG_LCD_TEST_MOD_IPC2)   += ipc2/

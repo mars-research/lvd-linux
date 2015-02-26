@@ -2,7 +2,6 @@
  * Regression tests for cap.c.
  */
 
-
 static int test01(void)
 {
 	struct cspace c;
@@ -185,39 +184,38 @@ static int test05(void)
 	ret = __klcd_enter();
 	if (ret) {
 		LCD_ERR("enter klcd");
-		goto fail1;
+		__free_pages(p, 0);
+		goto fail0;
 	}
 	ret = __lcd_cap_insert(&current->lcd->cspace, 
 			cp, p, LCD_CAP_TYPE_PAGE);
 	if (ret) {
 		LCD_ERR("insert");
-		goto fail2;
+		__free_pages(p, 0);
+		goto fail1;
 	}
 	ret = __lcd_cnode_lookup(&current->lcd->cspace, 
 				cp, false, &cnode);
 	if (ret) {
 		LCD_ERR("lookup");
-		goto fail3;
+		goto fail1; /* page should be tracked and will be freed when
+			     * klcd exits */
 	}
 	if (cnode->type != LCD_CAP_TYPE_PAGE) {
 		LCD_ERR("not free");
-		goto fail4;
+		goto fail1;
 	}
 	if (cnode->object != p) {
 		LCD_ERR("wrong object");
-		goto fail5;
+		goto fail1;
 	}
 	
 	__klcd_exit();
 
 	return 0;
-fail5:
-fail4:
-fail3:
-fail2:
-	__klcd_exit();
+
 fail1:
-	__free_pages(p, 0);
+	__klcd_exit();
 fail0:
 	return ret;
 }
@@ -328,6 +326,7 @@ static int test07(void)
 		ret = __lcd_create__(&lcds[i]);
 		if (ret) {
 			LCD_ERR("lcd create");
+			__free_pages(p, 0);
 			goto fail1;
 		}
 	}
@@ -338,6 +337,7 @@ static int test07(void)
 			LCD_CAP_TYPE_PAGE);
 	if (ret) {
 		LCD_ERR("insert");
+		__free_pages(p, 0);
 		goto fail2;
 	}
 	/*
@@ -347,7 +347,8 @@ static int test07(void)
 			&lcds[1]->cspace, cp1);
 	if (ret) {
 		LCD_ERR("grant 0 to 1");
-		goto fail2;
+		goto fail2; /* page is tracked since we inserted it, so will
+			     * be freed when we destroy all lcds */
 	}
 	ret = __lcd_cap_grant(&lcds[0]->cspace, cp0,
 			&lcds[2]->cspace, cp2);
@@ -458,6 +459,44 @@ fail0:
 	return ret;
 }
 
+static int test08(void)
+{
+	int ret;
+	struct page *p;
+	cptr_t cp = LCD_CPTR_NULL;
+
+	p = alloc_page(GFP_KERNEL);
+	if (!p) {
+		LCD_ERR("alloc page");
+		ret = -ENOMEM;
+		goto fail0;
+	}
+	ret = __klcd_enter();
+	if (ret) {
+		LCD_ERR("enter klcd");
+		__free_pages(p, 0);
+		goto fail0;
+	}
+	ret = __lcd_cap_insert(&current->lcd->cspace, 
+			cp, p, LCD_CAP_TYPE_PAGE);
+	if (!ret) {
+		LCD_ERR("insert didn't fail");
+		goto fail1;
+	}
+	
+	__klcd_exit();
+
+	__free_pages(p, 0); /* page shouldn't have been inserted, so won't
+			     * be freed when we exit */
+
+	return 0;
+
+fail1:
+	__klcd_exit(); /* page should be freed since it was (incorrectly)
+			* inserted */
+fail0:
+	return ret;
+}
 
 int cap_tests(void)
 {
@@ -474,6 +513,8 @@ int cap_tests(void)
 	if (test06())
 		return -1;
 	if (test07())
+		return -1;
+	if (test08())
 		return -1;
 	LCD_MSG("all cap.c tests passed!");
 	return 0;

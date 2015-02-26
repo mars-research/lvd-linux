@@ -1,10 +1,13 @@
 #include <linux/module.h>
 #include <linux/kernel.h>
+#include <asm/lcd-domains/liblcd.h>
+
+#include "../../../../arch/x86/lcd-domains/liblcd.c"
 
 /*
  * IMPORTANT: This module should be compiled without
  * optimizations (see Makefile in this directory).
- * Otherwise, some things will be optimized away and
+ * Otherwise, the loop in foo will be optimized away and
  * we won't fully test the code.
  *
  * You may want to inspect the .ko before running with
@@ -27,25 +30,18 @@ static int foo(int x)
 	return x + 5;
 }
 
-static void lcd_yield(void)
-{
-	asm volatile("mov $6, %rax \n\t"
-		"vmcall");
-	/* shouldn't return */
-}
-
-static int __init test_init(void)
+static int __noreturn __init test_init(void) 
 {
 	int r;
-	r = foo(10);
+	r = lcd_enter();
+	if (r)
+		goto fail1;
 
-	lcd_yield();
+	r = foo(10); /* never returns */
 
-	/* make compiler happy */
-	/* (if we actually return, will probably cause ept fault, as we will
-	 * jump to a potentially random place)
-	 */
-	return 0;
+
+fail1:
+	lcd_exit(r);
 }
 
 /* 

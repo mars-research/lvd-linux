@@ -1,3 +1,26 @@
+/**
+ * main.c - for debugging, dumping stack on all cpu's
+ *
+ */
+
+#include <linux/module.h>
+#include <linux/kernel.h>
+#include <linux/nmi.h>
+#include <asm/lcd-domains/lcd-domains.h>
+#include <linux/delay.h>
+#include <asm/desc.h>
+#include <asm/lcd-domains/lcd-domains.h>
+
+#include <linux/bitmap.h>
+#include <linux/spinlock.h>
+#include <linux/gfp.h>
+#include <linux/mm.h>
+#include <linux/tboot.h>
+#include <linux/slab.h>
+#include <linux/kmsg_dump.h>
+#include <linux/list.h>
+
+
 /*
  * LCD core VMX functions 
  *
@@ -14,7 +37,7 @@
 #include <asm/vmx.h>
 #include <uapi/asm/vmx.h>
 #include <asm/desc.h>
-#include <asm/lcd-domains-arch.h>
+#include <asm/lcd-domains/lcd-domains.h>
 
 #include <linux/bitmap.h>
 #include <linux/spinlock.h>
@@ -27,37 +50,6 @@
 #include <linux/module.h>
 #include <linux/kernel.h>
 
-/* DEBUGGING -------------------------------------------------- */
-
-#define LCD_ARCH_DEBUG 0
-
-#define LCD_ARCH_ERR(msg...) __lcd_arch_err(__FILE__, __LINE__, msg)
-static inline void __lcd_arch_err(char *file, int lineno, char *fmt, ...)
-{
-	va_list args;
-	printk(KERN_ERR "lcd-vmx: %s:%d: error: ", file, lineno);
-	va_start(args, fmt);
-	vprintk(fmt, args);
-	va_end(args);
-}
-#define LCD_ARCH_MSG(msg...) __lcd_arch_msg(__FILE__, __LINE__, msg)
-static inline void __lcd_arch_msg(char *file, int lineno, char *fmt, ...)
-{
-	va_list args;
-	printk(KERN_ERR "lcd-vmx: %s:%d: note: ", file, lineno);
-	va_start(args, fmt);
-	vprintk(fmt, args);
-	va_end(args);
-}
-#define LCD_ARCH_WARN(msg...) __lcd_arch_warn(__FILE__, __LINE__, msg)
-static inline void __lcd_arch_warn(char *file, int lineno, char *fmt, ...)
-{
-	va_list args;
-	printk(KERN_ERR "lcd-vmx: %s:%d: warning: ", file, lineno);
-	va_start(args, fmt);
-	vprintk(fmt, args);
-	va_end(args);
-}
 
 /* VMX DATA STRUCTURES -------------------------------------------------- */
 
@@ -525,7 +517,7 @@ static void vmx_free_vmxon_areas(void)
  * Clears the correct bit in the msr bitmap to allow vm access
  * to an msr.
  */
-static void vmx_disable_intercept_for_msr(unsigned long *msr_bitmap, u32 msr)
+void vmx_disable_intercept_for_msr(unsigned long *msr_bitmap, u32 msr)
 {
 	int sz;
 	sz = sizeof(unsigned long);
@@ -660,7 +652,7 @@ static int adjust_vmx_controls(u32 *controls, u32 reserved_mask, u32 msr)
  * vm entries, vm exits, vm execution (e.g., interrupt handling),
  * etc. for all lcd types.
  */
-static int setup_vmcs_config(struct vmx_vmcs_config *vmcs_conf)
+int setup_vmcs_config(struct vmx_vmcs_config *vmcs_conf)
 {
 	u32 pin_based_exec_controls;
 	u32 primary_proc_based_exec_controls;
@@ -772,12 +764,10 @@ static int setup_vmcs_config(struct vmx_vmcs_config *vmcs_conf)
 	 * VM Exit Controls (Intel SDM V3 24.7)
 	 *
 	 * -- Host Address Space (host in 64-bit mode on vm exit)
-	 * -- Acknowledge interrupts on vm exit
 	 * -- Save / load IA-32 EFER MSR on exit
 	 * -- Save debug controls    / needed for emulab machines
 	 */
 	vmexit_controls = VM_EXIT_HOST_ADDR_SPACE_SIZE |
-		VM_EXIT_ACK_INTR_ON_EXIT |
 		VM_EXIT_SAVE_IA32_EFER |
 		VM_EXIT_LOAD_IA32_EFER |
 		VM_EXIT_SAVE_DEBUG_CONTROLS;
@@ -828,7 +818,7 @@ static int setup_vmcs_config(struct vmx_vmcs_config *vmcs_conf)
 
 /* VMX INIT / EXIT -------------------------------------------------- */
 
-static void lcd_arch_tests(void);
+//static int main_tests(void);
 
 int lcd_arch_init(void)
 {
@@ -838,38 +828,6 @@ int lcd_arch_init(void)
 	/*
 	 * Check For VMX Features
 	 */
-
-	if (!cpu_has_vmx()) {
-		LCD_ARCH_ERR("CPU does not support VMX\n");
-		return -EIO;
-	}
-
-	if (setup_vmcs_config(&vmcs_config) < 0)
-		return -EIO;
-
-	/*
-	 * Set up default MSR bitmap
-	 */
-
-	msr_bitmap = (unsigned long *)__get_free_page(GFP_KERNEL);
-	if (!msr_bitmap) {
-		ret = -ENOMEM;
-		goto failed1;
-	}	
-
-	memset(msr_bitmap, 0xff, PAGE_SIZE);
-	vmx_disable_intercept_for_msr(msr_bitmap, MSR_FS_BASE);
-	vmx_disable_intercept_for_msr(msr_bitmap, MSR_GS_BASE);
-
-	/*
-	 * Initialize VPID bitmap spinlock
-	 */
-	spin_lock_init(&vpids.lock);
-
-	/*
-	 * VPID 0 is reserved for host. See INVVPID instruction.
-	 */
-	set_bit(0, vpids.bitmap); 
 
 	/*
 	 * Allocate vmxon buffers for each cpu. A vmxon buffer is
@@ -907,30 +865,12 @@ int lcd_arch_init(void)
 		goto failed2;
 	}
 
-	/*
-	 * Init lcd_arch_thread cache (using instead of kmalloc since
-	 * these structs need to be aligned properly)
-	 */
-	lcd_arch_cache = KMEM_CACHE(lcd_arch, 0);
-	if (!lcd_arch_cache) {
-		LCD_ARCH_ERR("failed to set up kmem cache\n");
-		ret = -ENOMEM;
-		goto failed3;
-	}
-
-	/*
-	 * Run tests
-	 */
-	lcd_arch_tests();
-
 	return 0;
 
-failed3:
 failed2:
 	on_each_cpu(vmx_disable, NULL, 1);
 failed1:
 	vmx_free_vmxon_areas();
-	free_page((unsigned long)msr_bitmap);
 	return ret;
 }
 
@@ -938,8 +878,6 @@ void lcd_arch_exit(void)
 {
 	on_each_cpu(vmx_disable, NULL, 1);
 	vmx_free_vmxon_areas();
-	free_page((unsigned long)msr_bitmap);
-	kmem_cache_destroy(lcd_arch_cache);
 }
 
 /* VMX EPT -------------------------------------------------- */
@@ -1346,6 +1284,49 @@ int vmx_init_ept(struct lcd_arch *lcd_arch)
 	mutex_init(&lcd_arch->ept.lock);
 
 	return 0;
+}
+
+static void debug_ept_lvl(lcd_arch_epte_t *dir, int lvl, int idx)
+{
+	int i;
+	struct page *p;
+	lcd_arch_epte_t *entry;
+	/*
+	 * Print ept dir info
+	 */
+	printk(KERN_INFO "ept dir lvl %d idx %d\n-----------------------\n",
+		lvl, idx);
+	/*
+	 * Print level entries
+	 *
+	 * XXX: assumes 512 entires per dir
+	 */
+	for (i = 0; i < 512; i++) {
+		entry = &dir[i];
+		if (vmx_epte_present(*entry)) {
+			p = virt_to_page(hva2va(vmx_epte_hva(*entry)));
+			printk(KERN_INFO "%03d: page = %p\n", i, p);
+		}
+	}
+	/*
+	 * Print next level, if lvl < 3
+	 */
+	if (lvl >= 3)
+		return;
+
+	for (i = 0; i < 512; i++) {
+		entry = &dir[i];
+		if (vmx_epte_present(*entry))
+			debug_ept_lvl(hva2va(vmx_epte_hva(*entry)), 
+				lvl + 1, i);
+	}
+
+	return;
+}
+
+void debug_ept(struct lcd_arch *t)
+{
+	debug_ept_lvl(t->ept.root, 0, 0);
 }
 
 /* HOST INFO -------------------------------------------------- */
@@ -2267,12 +2248,82 @@ static void vmx_pack_desc(struct desc_struct *desc, u64 base, u64 limit,
 
 /* VMX EXIT HANDLING -------------------------------------------------- */
 
+static inline int vmx_exit_intr(struct lcd_arch *lcd_arch)
+{
+	return (lcd_arch->exit_reason == EXIT_REASON_EXTERNAL_INTERRUPT) ||
+		(lcd_arch->exit_reason == EXIT_REASON_EXCEPTION_NMI);
+}
+
+static inline int vmx_exit_intr_info_valid(struct lcd_arch *lcd_arch)
+{
+	return lcd_arch->exit_intr_info & INTR_INFO_VALID_MASK;
+}
+
+static inline unsigned int vmx_exit_intr_type(struct lcd_arch *lcd_arch)
+{
+	return lcd_arch->exit_intr_info & INTR_INFO_INTR_TYPE_MASK;
+}
+
+static inline unsigned int vmx_exit_intr_vector(struct lcd_arch *lcd_arch)
+{
+	return lcd_arch->exit_intr_info & INTR_INFO_VECTOR_MASK;
+}
+#if 0
+static int find_highest(unsigned *vals)
+{
+	int i;
+	int j;
+
+	for (i = APIC_ISR_NR - 1; i >= 0; i--) {
+		for (j = 31; j >= 0; j--) {
+			if (vals[i] & (1 << j)) {
+				return i * 32 + j;
+			}
+		}
+	}
+	return 0;
+}
+#endif
+/**
+ * For debugging external interrupts. This will print the bits set in
+ * the ISR in the local apic for the calling cpu, and determine the
+ * highest priority bit set.
+ */
+void print_ext_intr_info(unsigned vector)
+{
+#if 0
+	int i;
+	unsigned values[APIC_ISR_NR];
+	unsigned long flags;
+	int max;
+	
+	local_irq_save(flags);
+
+	for (i = APIC_ISR_NR - 1; i >= 0; i--) {
+		values[i] = apic_read(APIC_ISR + i*0x10);
+	}
+
+	max = find_highest(values);
+
+	local_irq_restore(flags);
+
+	for (i = APIC_ISR_NR - 1; i >= 0; i--) {
+		printk("apic isr is 0x%08x\n", values[i]);
+	}
+	printk("and I am %d\n", vector);
+
+	if (max != vector) {
+		printk("unexpected max vec %d, I am %d\n", max, vector);
+	}
+#endif
+}
+
 /**
  * Skips to next instruction in lcd. This should only be
  * called when a vm exit occurs that sets the exit
  * instruction length. See Intel SDM V3 27.2.4.
  */
-static void vmx_step_instruction(void)
+static void vmx_step_instruction(struct lcd_arch *lcd_arch)
 {
 	vmcs_writel(GUEST_RIP, vmcs_readl(GUEST_RIP) +
 		vmcs_read32(VM_EXIT_INSTRUCTION_LEN));
@@ -2284,150 +2335,11 @@ static void vmx_step_instruction(void)
  */
 static int vmx_handle_vmcall(struct lcd_arch *lcd_arch)
 {
+	/*
+	 * Advance the pc
+	 */
+	vmx_step_instruction(lcd_arch);
 	return LCD_ARCH_STATUS_SYSCALL;
-}
-
-/**
- * Processes an external interrupt (e.g. timer interrupt) by
- * emulating 64-bit interrupt handling. Kernel preemption should
- * be disabled, otherwise the interrupt handler could switch to
- * another conflicting task. Unlike kvm, interrupts are assumed
- * to be *enabled*, but will be disabled when the interrupt
- * handler is called, per the ia32 spec (Intel SDM V3 6.8.1).
- */
-static int vmx_handle_external_intr(struct lcd_arch *lcd_arch)
-{
-	unsigned int vector;
-	unsigned long entry;
-	unsigned long sp_tmp;
-	gate_desc *idt;
-	gate_desc *gate;
-	/*
-	 * Load interrupt entry address
-	 *
-	 * Intel SDM V3 24.9.2, 27.2.2 (for vmx intr info)
-	 * Intel SDM V3 6.14.1 (for idt layout)
-	 */
-	vector =  lcd_arch->exit_intr_info & INTR_INFO_VECTOR_MASK;
-	idt = vmx_host_idt();
-	gate = idt + vector;
-	entry = gate_offset(*gate);
-
-	LCD_ARCH_MSG("external interrupt vector = %u", vector);
-
-	/*
-	 * Disable interrupts, per what the interrupt handler expects.
-	 *
-	 * Intel SDM V3 6.8.1
-	 */
-	local_irq_disable();
-
-	/*
-	 * Emulate 64-bit interrupt handling
-	 *
-	 * Intel SDM V3 6.14
-	 */
-	asm volatile(
-		/*
-		 * Save current stack pointer (notice & in asm flags)
-		 */
-		"mov %%" _ASM_SP ", %[sp]\n\t"
-		/*
-		 * Align sp to 16 bits (this should be OK under normal
-		 * conditions since stack frames are 16-bit aligned and
-		 * any junk in this stack frame is no longer needed -- we
-		 * just needed to calc handler_addr, which is now in a
-		 * register due to the r constraint).
-		 */
-		"and $0xfffffffffffffff0, %%" _ASM_SP "\n\t"
-		/*
-		 * %ss and sp are always pushed
-		 */
-		"push $%c[ss]\n\t"
-		"push %[sp]\n\t"
-		/*
-		 * Push %rflags. Ensure `interrupts enabled' bit is
-		 * set so that interrupts will be enabled on return
-		 * (and maybe for some other reason?).
-		 */
-		"pushf\n\t"
-/*		"orl $0x200, (%%" _ASM_SP ")\n\t" */
-		/*
-		 * Push %cs
-		 */
-		__ASM_SIZE(push) " $%c[cs]\n\t"
-		/*
-		 * Call will push %rip, and jump to handler. Error code
-		 * not needed for external interrupts.
-		 *
-		 * Interrupt service routine will return here.
-		 */
-		"call *%[entry]\n\t"
-		:
-		[sp]"=&r"(sp_tmp)
-		:
-		[entry]"r"(entry),
-		[ss]"i"(__KERNEL_DS),
-		[cs]"i"(__KERNEL_CS)
-		);
-
-	return LCD_ARCH_STATUS_EXT_INTR;
-}
-
-/**
- * Processes hardware exceptions -- page faults, general protection
- * exceptions, etc. For now, we have the host handle all except page
- * faults.
- */
-static int vmx_handle_hard_exception(struct lcd_arch *lcd_arch)
-{
-	unsigned int vector;
-	/*
-	 * Intel SDM V3 24.9.2, 27.2.2
-	 */
-	vector = lcd_arch->exit_intr_info & INTR_INFO_VECTOR_MASK;
-	switch (vector) {
-	case 14:
-		/*
-		 * Guest virtual page fault
-		 *
-		 * TODO: We will have microkernel handle it.
-		 */
-		LCD_ARCH_ERR("page fault: faulting gv address = %lx",
-			lcd_arch->exit_qualification);
-		return LCD_ARCH_STATUS_PAGE_FAULT;
-	default:
-		LCD_ARCH_ERR("hw exception: vector = %x, info = %x",
-			vector, lcd_arch->exit_intr_info);
-		vmx_handle_external_intr(lcd_arch);
-		return -EIO;
-	}
-}
-
-/**
- * Processes software / hardware exceptions and nmi's generated
- * while lcd_arch_thread was running. For now, the host handles all 
- * exceptions/nmi's.
- */
-static int vmx_handle_exception_nmi(struct lcd_arch *lcd_arch)
-{
-	int type;
-	type = lcd_arch->exit_intr_info & INTR_INFO_INTR_TYPE_MASK;
-	switch (type) {
-	case INTR_TYPE_HARD_EXCEPTION:
-		/*
-		 * Page fault, trap, machine check, gp ...
-		 */
-		return vmx_handle_hard_exception(lcd_arch);
-	default:
-		/*
-		 * NMI, div by zero, overflow, ...
-		 */
-		LCD_ARCH_ERR("exception or nmi: info = %x\n",
-			lcd_arch->exit_intr_info);
-		return vmx_handle_external_intr(lcd_arch);
-		//return -EIO;
-	}
 }
 
 /**
@@ -2486,24 +2398,189 @@ static int vmx_handle_control_reg(struct lcd_arch *lcd_arch)
 		/*
 		 * Step past instruction that caused exit
 		 */
-		vmx_step_instruction();
+		vmx_step_instruction(lcd_arch);
 		return LCD_ARCH_STATUS_CR3_ACCESS;
 	default:
 		LCD_ARCH_ERR("attempted access to protected cr");
 		return -EIO;
 	}
-	
+}
 
+static int vmx_handle_ext_intr(struct lcd_arch *lcd_arch)
+{
+	/*
+	 * We don't try to emulate hardware interrupt handling anymore. I
+	 * don't think the code in KVM is actually used anymore, because they
+	 * don't set the VM_EXIT_ACK_INTR_ON_EXIT vm exit control for
+	 * non-nested vm's. (So the interrupt emulation code is always skipped
+	 * and just re-enables interrupts.)
+	 *
+	 * This is what Dune does too - they don't try to emulate.
+	 *
+	 * I made this choice when I realized our emulation code (and KVM's
+	 * code) is probably not switching to the per-cpu interrupt stack;
+	 * it's calling the interrupt handler with the same stack = bad idea
+	 * on x86_64! Could lead to stack overflows, or using the wrong
+	 * stack for certain exceptions/interrupts.
+	 * 
+	 * See:
+	 *
+	 * https://www.kernel.org/doc/Documentation/x86/x86_64/kernel-stacks
+	 *
+	 * In order to correctly emulate, we would need to look up the correct
+	 * IST entry in the cpu's tss, and switch to the correct stack. But
+	 * I have a feeling that wouldn't be reliable ...
+	 *
+	 * So ... this code will probably never be called for now - because I
+	 * turned off ack interrupts on vm exit, and hence
+	 * the interrupt info will be invalid in the case of an external
+	 * interrupt, and we check that before calling into here.
+	 */
+	return LCD_ARCH_STATUS_EXT_INTR;
+}
+
+static int vmx_handle_hard_exception(struct lcd_arch *lcd_arch)
+{
+	unsigned int vector;
+	/*
+	 * Page fault, invalid opcode, gp exception, ...
+	 *
+	 * We error out on all except page faults.
+	 */
+	vector = vmx_exit_intr_vector(lcd_arch);
+	switch (vector) {
+	case 14: // Page fault
+		/*
+		 * Guest virtual page fault
+		 *
+		 * TODO: We will have microkernel handle it.
+		 */
+		LCD_ARCH_ERR("page fault: faulting gv address = 0x%lx, faulting instruction address = 0x%lx",
+			lcd_arch->exit_qualification,
+			vmcs_readl(GUEST_RIP));
+		return LCD_ARCH_STATUS_PAGE_FAULT;
+	case 18: // Machine Check
+		/*
+		 * This could be a serious problem, so we single it out from
+		 * the others.
+		 */
+		LCD_ARCH_ERR("got a machine check inside vm!");
+		return -EIO;
+	default:
+		LCD_ARCH_ERR("unhandled exception: vector = %x, info = %x",
+			vector, lcd_arch->exit_intr_info);
+		return -EIO;
+	}
+}
+
+static int vmx_handle_soft_exception(struct lcd_arch *lcd_arch)
+{
+	/*
+	 * Software exception
+	 *
+	 * div by zero, overflow, ...
+	 *
+	 * For now, we error out.
+	 */
+	LCD_ARCH_ERR("unhandled exception, vector: %d\n",
+		vmx_exit_intr_vector(lcd_arch));
+	return -EIO;
+}
+
+static int vmx_handle_nmi(struct lcd_arch *lcd_arch)
+{
+	/*
+	 * This is how KVM does it. We just fire another nmi manually. This
+	 * is allowed by the architecture, but it won't trigger some of the
+	 * nmi hardware (see Intel SDM V3 6.3.3).
+	 *
+	 * Note that getting nmi's is not necessarily bad. They are set up
+	 * by the nmi watchdog, and will inevitably fire sometimes while we are
+	 * inside the vm. Improper handling of them can lead to nasty
+	 * lockups, however ...
+	 */
+	asm("int $2;");
+	return LCD_ARCH_STATUS_EXT_INTR;
+}
+
+static int vmx_handle_exception_interrupt(struct lcd_arch *lcd_arch)
+{
+	int ret;
+	int type;
+	/*
+	 * Check if we exited due to an exception/interrupt, and if the
+	 * interrupt info is valid. The info will be invalid if we turned
+	 * off the VM_EXIT_ACK_INTR_ON_EXIT vm exit control, for example.
+	 */
+	if (!vmx_exit_intr(lcd_arch))
+		return 0;
+	if (!vmx_exit_intr_info_valid(lcd_arch))
+		return LCD_ARCH_STATUS_EXT_INTR;
+
+	type = vmx_exit_intr_type(lcd_arch);
+	switch (type) {
+	case INTR_TYPE_NMI_INTR:
+		ret = vmx_handle_nmi(lcd_arch);
+		break;
+	case INTR_TYPE_SOFT_EXCEPTION:
+		ret = vmx_handle_soft_exception(lcd_arch);
+		break;
+	case INTR_TYPE_HARD_EXCEPTION:
+		ret = vmx_handle_hard_exception(lcd_arch);
+		break;
+	case INTR_TYPE_EXT_INTR:
+		ret = vmx_handle_ext_intr(lcd_arch);
+		break;
+	default:
+		LCD_ARCH_ERR("unexcepted interrupt type %d", type);
+		ret = -EIO;
+		break;
+	}
+	return ret;
+}
+
+static int vmx_handle_other_exits(struct lcd_arch *lcd_arch)
+{
+	int exit_reason;
+	int ret;
+
+	exit_reason = lcd_arch->exit_reason;
+
+	switch (exit_reason) {
+	case EXIT_REASON_VMCALL:
+		ret = vmx_handle_vmcall(lcd_arch);
+		break;
+	case EXIT_REASON_EPT_VIOLATION:
+		ret = vmx_handle_ept(lcd_arch);
+		break;
+	case EXIT_REASON_CR_ACCESS:
+		ret = vmx_handle_control_reg(lcd_arch);
+		break;
+	default:
+		LCD_ARCH_ERR("unhandled exit reason: %x\n",
+			exit_reason);
+		ret = -EIO;
+		break;
+	}
+	return ret;
 }
 
 /* VMX RUN -------------------------------------------------- */
+
+//static void trace_in_non_root(void);
+//static void clear_non_root(void);
+
 
 /**
  * Low-level vmx launch / resume to enter non-root mode on cpu with
  * the current vmcs.
  */
-static int __noclone vmx_enter(struct lcd_arch *lcd_arch)
+static void __noclone vmx_enter(struct lcd_arch *lcd_arch)
 {
+	/*
+	 * before we enter
+	 */
+	//trace_in_non_root();
 	asm(
 		/* 
 		 * Store host registers on stack (all other regs are
@@ -2666,13 +2743,16 @@ static int __noclone vmx_enter(struct lcd_arch *lcd_arch)
 
 	lcd_arch->launched = 1;
 
+//	clear_non_root();
+
 	if (unlikely(lcd_arch->fail)) {
 		/*
 		 * See Intel SDM V3 30.4 for error codes
 		 */
 		LCD_ARCH_ERR("failure detected (err %x)\n",
 			vmcs_read32(VM_INSTRUCTION_ERROR));
-		return VMX_EXIT_REASONS_FAILED_VMENTRY;
+		lcd_arch->exit_reason = VMX_EXIT_REASONS_FAILED_VMENTRY;
+		return;
 	}
 
 	lcd_arch->exit_reason = vmcs_read32(VM_EXIT_REASON);
@@ -2682,12 +2762,11 @@ static int __noclone vmx_enter(struct lcd_arch *lcd_arch)
 	lcd_arch->exit_intr_info = vmcs_read32(VM_EXIT_INTR_INFO);
 	lcd_arch->vec_no = lcd_arch->exit_intr_info & INTR_INFO_VECTOR_MASK;
 
-	return lcd_arch->exit_reason;
+	return;
 }
 
 int lcd_arch_run(struct lcd_arch *lcd_arch)
 {
-	int exit_reason;
 	int ret;
 
 	/*
@@ -2698,38 +2777,44 @@ int lcd_arch_run(struct lcd_arch *lcd_arch)
 	vmx_get_cpu(lcd_arch);
 
 	/*
-	 * Enter lcd
+	 * Interrupts off
+	 *
+	 * This is important - see Documentation/lcd-domains/vmx.txt.
 	 */
-	exit_reason = vmx_enter(lcd_arch);
+	local_irq_disable();
 
 	/*
-	 * Handle exit reason
+	 * Enter lcd
+	 */
+	vmx_enter(lcd_arch);
+
+	/*
+	 * Check/handle nmi's, exceptions, and external interrupts *before*
+	 * we re-enable interrupts.
+	 */
+	ret = vmx_handle_exception_interrupt(lcd_arch);
+	
+	/*
+	 * Now turn interrupts back on.
+	 */
+	local_irq_enable();
+
+	if (ret) {
+		/*
+		 * We exited due to an exception, nmi, or external interrupt.
+		 * All done.
+		 */
+		goto out;
+	}
+
+	/*
+	 * Handle all other exit reasons
 	 *
 	 * Intel SDM V3 Appendix C
 	 */
-	switch (exit_reason) {
-	case EXIT_REASON_EXCEPTION_NMI:
-		ret = vmx_handle_exception_nmi(lcd_arch);
-		break;
-	case EXIT_REASON_EXTERNAL_INTERRUPT:
-		ret = vmx_handle_external_intr(lcd_arch);
-		break;
-	case EXIT_REASON_VMCALL:
-		ret = vmx_handle_vmcall(lcd_arch);
-		break;
-	case EXIT_REASON_EPT_VIOLATION:
-		ret = vmx_handle_ept(lcd_arch);
-		break;
-	case EXIT_REASON_CR_ACCESS:
-		ret = vmx_handle_control_reg(lcd_arch);
-		break;
-	default:
-		LCD_ARCH_ERR("unhandled exit reason: %x\n",
-			exit_reason);
-		ret = -EIO;
-		break;
-	}
+	ret = vmx_handle_other_exits(lcd_arch);
 
+out:
 	/*
 	 * Preemption enabled
 	 */
@@ -4258,34 +4343,32 @@ int lcd_arch_check(struct lcd_arch *t)
 		return -1;
 	if (vmx_check_guest(t))
 		return -1;
+
 	return 0;
 }
 
-/* EXPORTS -------------------------------------------------- */
+static int debug_main(void)
+{
+	int i;
+	int ret;
+	for (i = 0; i < 100000; i++) {
+		ret = lcd_arch_init();
+		if (ret) {
+			printk("err init\n");
+			return ret;
+		}
+		printk("no op\n");
+		msleep(1000);
+		lcd_arch_exit();
+	}
 
-module_init(lcd_arch_init);
-module_exit(lcd_arch_exit);
+	return 0;
+}
 
-EXPORT_SYMBOL(lcd_arch_init);
-EXPORT_SYMBOL(lcd_arch_exit);
-EXPORT_SYMBOL(lcd_arch_create);
-EXPORT_SYMBOL(lcd_arch_destroy);
-EXPORT_SYMBOL(lcd_arch_run);
-EXPORT_SYMBOL(lcd_arch_ept_walk);
-EXPORT_SYMBOL(lcd_arch_ept_set);
-EXPORT_SYMBOL(lcd_arch_ept_unset);
-EXPORT_SYMBOL(lcd_arch_ept_unmap);
-EXPORT_SYMBOL(lcd_arch_ept_unmap2);
-EXPORT_SYMBOL(lcd_arch_ept_unmap_range);
-EXPORT_SYMBOL(lcd_arch_ept_hpa);
-EXPORT_SYMBOL(lcd_arch_ept_map);
-EXPORT_SYMBOL(lcd_arch_ept_map_range);
-EXPORT_SYMBOL(lcd_arch_ept_gpa_to_hpa);
-EXPORT_SYMBOL(lcd_arch_set_pc);
-EXPORT_SYMBOL(lcd_arch_set_sp);
-EXPORT_SYMBOL(lcd_arch_set_gva_root);
-EXPORT_SYMBOL(lcd_arch_check);
+static void debug_exit(void)
+{
+	/* nothing to do */
+}
 
-/* DEBUGGING -------------------------------------------------- */
-
-#include "lcd-domains-arch-tests.c"
+module_init(debug_main);
+module_exit(debug_exit);

@@ -1,7 +1,7 @@
 #
-# Makefile for VMX code for LCDs
+# Arch-dependent code for LCDs
 #
 
-ccflags-y  += -Werror -O0
+extra-y += main.o
 
-obj-$(CONFIG_LCD_INTEL)   += lcd-domains-arch.o
+extra-y += liblcd.o

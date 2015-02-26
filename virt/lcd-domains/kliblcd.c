@@ -9,9 +9,45 @@
 #include <linux/mm.h>
 #include <asm/page.h>
 #include <lcd-domains/kliblcd.h>
+#include <lcd-domains/utcb.h>
 #include <lcd-domains/types.h>
 #include <linux/mutex.h>
 #include "internal.h"
+
+/* KLCD REGISTER ACCESS -------------------------------------------------- */
+
+
+#define __KLCD_MK_REG_ACCESS(idx)					\
+u64 __klcd_r##idx(struct lcd *lcd)				        \
+{									\
+        return __lcd_r##idx(lcd->utcb);					\
+}									\
+void __klcd_set_r##idx(struct lcd *lcd, u64 val)			\
+{									\
+	__lcd_set_r##idx(lcd->utcb, val);				\
+}									\
+cptr_t __klcd_cr##idx(struct lcd *lcd)					\
+{									\
+        return __lcd_cr##idx(lcd->utcb);				\
+}								        \
+void __klcd_set_cr##idx(struct lcd *lcd, cptr_t val)			\
+{									\
+	__lcd_set_cr##idx(lcd->utcb, val);				\
+}									\
+EXPORT_SYMBOL(__klcd_r##idx);						\
+EXPORT_SYMBOL(__klcd_set_r##idx);					\
+EXPORT_SYMBOL(__klcd_cr##idx);						\
+EXPORT_SYMBOL(__klcd_set_cr##idx);
+
+__KLCD_MK_REG_ACCESS(0)
+__KLCD_MK_REG_ACCESS(1)
+__KLCD_MK_REG_ACCESS(2)
+__KLCD_MK_REG_ACCESS(3)
+__KLCD_MK_REG_ACCESS(4)
+__KLCD_MK_REG_ACCESS(5)
+__KLCD_MK_REG_ACCESS(6)
+__KLCD_MK_REG_ACCESS(7)
+
 
 /* CPTR CACHE -------------------------------------------------- */
 
@@ -60,6 +96,11 @@ static int cptr_cache_init(struct cptr_cache **out)
 	 * Init cache lock
 	 */
 	mutex_init(&cache->lock);
+	/*
+	 * Mark null cptr as allocated
+	 */
+	set_bit(0, cache->bmaps[0]);
+
 
 	*out = cache;
 
@@ -156,7 +197,7 @@ fail1:
 	return ret;
 }
 
-void __lcd_free_cptr(struct cptr_cache *cptr_cache, cptr_t c)
+static void __lcd_free_cptr(struct cptr_cache *cptr_cache, cptr_t c)
 {
 	int ret;
 	unsigned long *bmap;
@@ -201,41 +242,6 @@ void lcd_free_cptr(cptr_t c)
 
 /* KLCD SPECIAL HANDLING -------------------------------------------------- */
 
-int klcd_enter(void)
-{
-	int ret;
-	/*
-	 * Set up cptr cache
-	 */
-	ret = cptr_cache_init(&current->cptr_cache);
-	if (ret) {
-		LCD_ERR("cptr cache init");
-		goto fail1;
-	}
-	ret = __klcd_enter();
-	if (ret) {
-		LCD_ERR("enter");
-		goto fail2;
-	}
-
-	return 0;
-fail2:
-	cptr_cache_destroy(current->cptr_cache);
-fail1:
-	return ret;
-}
-
-void klcd_exit(void)
-{
-	/*
-	 * Exit from lcd mode
-	 */
-	__klcd_exit();
-	/*
-	 * Destroy cptr cache
-	 */
-	cptr_cache_destroy(current->cptr_cache);
-}
 
 int klcd_add_page(struct page *p, cptr_t *slot_out)
 {
@@ -274,6 +280,48 @@ void klcd_rm_page(cptr_t slot)
 	lcd_free_cptr(slot);
 }
 
+/* LCD ENTER / EXIT -------------------------------------------------- */
+
+int lcd_enter(void)
+{
+	int ret;
+	/*
+	 * Set up cptr cache
+	 */
+	ret = cptr_cache_init(&current->cptr_cache);
+	if (ret) {
+		LCD_ERR("cptr cache init");
+		goto fail1;
+	}
+	ret = __klcd_enter();
+	if (ret) {
+		LCD_ERR("enter");
+		goto fail2;
+	}
+
+	return 0;
+fail2:
+	cptr_cache_destroy(current->cptr_cache);
+fail1:
+	return ret;
+}
+
+void lcd_exit(int retval)
+{
+	/*
+	 * Return value is ignored for now
+	 */
+
+	/*
+	 * Exit from lcd mode
+	 */
+	__klcd_exit();
+	/*
+	 * Destroy cptr cache
+	 */
+	cptr_cache_destroy(current->cptr_cache);
+}
+
 /* LOW LEVEL PAGE ALLOCATION ---------------------------------------- */
 
 static int __lcd_page_alloc(cptr_t *slot_out, hpa_t *hpa_out, hva_t *hva_out)
@@ -300,19 +348,15 @@ fail1:
 	return ret;
 }
 
-int lcd_page_alloc(cptr_t *slot_out)
+int lcd_page_alloc(cptr_t *slot_out, gpa_t gpa)
 {
 	hpa_t hpa;
 	hva_t hva;
-	return __lcd_page_alloc(slot_out, &hpa, &hva);
-}
-
-int lcd_page_map(cptr_t page, gpa_t gpa)
-{
 	/*
-	 * Not allowed in a klcd for now
+	 * Ignore gpa, since klcd's don't have control over where
+	 * page is mapped.
 	 */
-	return -ENOSYS;
+	return __lcd_page_alloc(slot_out, &hpa, &hva);
 }
 
 int lcd_gfp(cptr_t *slot_out, gpa_t *gpa_out, gva_t *gva_out)
@@ -341,8 +385,10 @@ int lcd_create_sync_endpoint(cptr_t *slot_out)
 	 * Alloc cptr
 	 */
 	ret = lcd_alloc_cptr(slot_out);
-	if (ret)
+	if (ret) {
+		LCD_ERR("cptr alloc");
 		goto fail1;
+	}
 	/*
 	 * Get new endpoint
 	 */
@@ -413,10 +459,6 @@ int lcd_run(cptr_t lcd)
 	return __lcd_run(current->lcd, lcd);
 }
 
-int lcd_suspend(cptr_t lcd)
-{
-	return __lcd_suspend(current->lcd, lcd);
-}
 
 /* CAPABILITIES -------------------------------------------------- */
 
@@ -481,10 +523,12 @@ static int get_module(char *module_name, struct module **m)
 	mutex_unlock(&module_mutex);	
 	if (!m1) {
 		LCD_ERR("couldn't find module");
+		ret = -EIO;
 		goto fail2;
 	}
 	if(!try_module_get(m1)) {
 		LCD_ERR("incrementing module ref count");
+		ret = -EIO;
 		goto fail3;
 	}
 
@@ -535,7 +579,7 @@ static int get_module_pages(hva_t hva, unsigned long size,
 		mp->cptr = pg_cptr;
 		mp->gva = __gva(hva_val(hva)); /* use same address */
 		INIT_LIST_HEAD(&mp->list);
-		list_add(&mp->list, mpage_list);
+		list_add_tail(&mp->list, mpage_list);
 		/*
 		 * Increment ...
 		 */
@@ -743,7 +787,7 @@ static void cxt_destroy(struct create_module_cxt *cxt)
 	for (i = 0; i < (LCD_GV_PAGING_MEM_SIZE >> PAGE_SHIFT); i++) {
 		c = cxt->gpa2hpacptr[i].cptr;
 		if (!cptr_val(c))
-			break; /* reached end of used paging mem */
+			continue; /* skip over, no page here */
 		lcd_cap_delete(c);
 	}
 	/*
@@ -1241,6 +1285,122 @@ static int gv_map_range(cptr_t lcd, struct create_module_cxt *cxt,
 	return 0;
 }
 
+/* DEBUG -------------------------------------------------- */
+
+static void gv_debug_pt(struct create_module_cxt *cxt,
+			pmd_t *pmd_entry, unsigned my_idx)
+{
+	unsigned idx;
+	int ret;
+	pte_t *entry;
+	gpa_t pt_gpa;
+	hpa_t pt_hpa;
+
+	printk(KERN_ERR "\n\npt %03u entries:\n------------------\n\n",
+		my_idx);	
+
+	pt_gpa = pmd_gpa(pmd_entry);
+	ret = gv_gpa2hpa(cxt, pt_gpa, &pt_hpa);
+	if (ret) 
+		printk(KERN_ERR "bad pt gpa address 0x%lx from pmd entry 0x%lx\n", gpa_val(pt_gpa), pmd_val(*pmd_entry));
+
+	for (idx = 0; idx < 512; idx++) {
+		entry = ((pte_t *)hpa2va(pt_hpa)) + idx;
+		printk(KERN_ERR "%03u %lx\n", idx, pte_val(*entry));
+	}
+}
+
+static void gv_debug_pmd(struct create_module_cxt *cxt,
+			pud_t *pud_entry, unsigned my_idx)
+{
+	unsigned idx;
+	pmd_t *entry;
+	gpa_t pmd_gpa;
+	hpa_t pmd_hpa;
+	int ret;
+
+	printk(KERN_ERR "\n\npmd %03u entries:\n------------------\n\n",
+		my_idx);	
+
+	pmd_gpa = pud_gpa(pud_entry);
+	ret = gv_gpa2hpa(cxt, pmd_gpa, &pmd_hpa);
+	if (ret) 
+		printk(KERN_ERR "bad pmd gpa address 0x%lx from pud entry 0x%lx\n", gpa_val(pmd_gpa), pud_val(*pud_entry));
+
+	for (idx = 0; idx < 512; idx++) {
+		entry = ((pmd_t *)hpa2va(pmd_hpa)) + idx;
+		printk(KERN_ERR "%03u %lx\n", idx, pmd_val(*entry));
+	}
+
+	for (idx = 0; idx < 512; idx++) {
+		entry = ((pmd_t *)hpa2va(pmd_hpa)) + idx;
+		if (pmd_present(*entry)) {
+			gv_debug_pt(cxt, entry, idx);
+		}
+	}
+}
+
+static void gv_debug_pud(struct create_module_cxt *cxt,
+			pgd_t *pgd_entry, unsigned my_idx)
+{
+	unsigned idx;
+	pud_t *entry;
+	gpa_t pud_gpa;
+	hpa_t pud_hpa;
+	int ret;
+
+	printk(KERN_ERR "\n\npud %03u entries:\n------------------\n\n",
+		my_idx);	
+
+	pud_gpa = pgd_gpa(pgd_entry);
+	ret = gv_gpa2hpa(cxt, pud_gpa, &pud_hpa);
+	if (ret) 
+		printk(KERN_ERR "bad pud gpa address 0x%lx from pgd entry 0x%lx\n", gpa_val(pud_gpa), pgd_val(*pgd_entry));
+
+	for (idx = 0; idx < 512; idx++) {
+		entry = ((pud_t *)hpa2va(pud_hpa)) + idx;
+		printk(KERN_ERR "%03u %lx\n", idx, pud_val(*entry));
+	}
+
+	for (idx = 0; idx < 512; idx++) {
+		entry = ((pud_t *)hpa2va(pud_hpa)) + idx;
+		if (pud_present(*entry)) {
+			gv_debug_pmd(cxt, entry, idx);
+		}
+	}
+}
+
+static void gv_debug_pgd(struct create_module_cxt *cxt)
+{
+	unsigned idx;
+	pgd_t *entry;
+
+	printk(KERN_ERR "pgd entries:\n------------------\n\n");
+
+	for (idx = 0; idx < 512; idx++) {
+		entry = cxt->root + idx;
+		printk(KERN_ERR "%03u %lx\n", idx, pgd_val(*entry));
+	}
+
+	for (idx = 0; idx < 512; idx++) {
+		entry = cxt->root + idx;
+		if (pgd_present(*entry)) {
+			gv_debug_pud(cxt, entry, idx);
+		}
+	}
+}
+
+void gv_debug(struct create_module_cxt *cxt)
+{
+	/*
+	 * Walk pgd
+	 */
+	printk(KERN_ERR "dumping gv tables\n------------------------\n\n");
+	gv_debug_pgd(cxt);
+}
+
+/* -------------------------------------------------- */
+
 static int map_module(cptr_t lcd, struct create_module_cxt *cxt,
 		struct lcd_module_info *mi)
 {
@@ -1321,6 +1481,7 @@ static int setup_addr_space(cptr_t lcd, struct lcd_module_info *mi)
 {
 	struct create_module_cxt *cxt;
 	int ret;
+	cptr_t slot;
 	/*
 	 * Set up guest virtual cxt
 	 */
@@ -1353,6 +1514,13 @@ static int setup_addr_space(cptr_t lcd, struct lcd_module_info *mi)
 	 * Remove our references to the guest virtual paging memory, so
 	 * the pages will be freed when the lcd is torn down.
 	 */
+	/* temp ! */
+	ret = __lcd_alloc_cptr(cxt->cache, &slot);
+	if (ret) {
+		LCD_ERR("cptr alloc");
+		goto fail4;
+	}
+	LCD_MSG("next slot = 0x%lx", cptr_val(slot));
 	cxt_destroy(cxt);
 
 	return 0;
@@ -1405,7 +1573,7 @@ int lcd_create_module_lcd(cptr_t *slot_out, char *mname,
 	 * Configure lcd
 	 */
 	ret = lcd_config(*slot_out, (*mi)->init, 
-			gva_add(LCD_STACK_GVA, (4 << 10) - 1),
+			gva_add(LCD_STACK_GVA, LCD_STACK_SIZE - 1), /* stack */
 			LCD_GV_PAGING_MEM_GPA);
 	if (ret) {
 		LCD_ERR("failed to config lcd");
@@ -1445,9 +1613,13 @@ void lcd_destroy_module_lcd(cptr_t lcd, struct lcd_module_info *mi,
 {
 	/*
 	 * See tear down comments in lcd_create_module_lcd
+	 *
+	 * We *must* delete the lcd first before unloading the module.
+	 * Otherwise, if the lcd is still running, it will use the freed
+	 * module pages.
 	 */
-	lcd_unload_module(mi, mloader_endpoint);
 	lcd_cap_delete(lcd);
+	lcd_unload_module(mi, mloader_endpoint);
 }
 
 /* INIT / EXIT -------------------------------------------------- */
@@ -1464,5 +1636,36 @@ void __kliblcd_exit(void)
 {
 	return;
 }
+
+/* EXPORTS -------------------------------------------------- */
+
+EXPORT_SYMBOL(lcd_alloc_cptr);
+EXPORT_SYMBOL(lcd_free_cptr);
+EXPORT_SYMBOL(klcd_add_page);
+EXPORT_SYMBOL(klcd_rm_page);
+EXPORT_SYMBOL(lcd_enter);
+EXPORT_SYMBOL(lcd_exit);
+EXPORT_SYMBOL(lcd_page_alloc);
+EXPORT_SYMBOL(lcd_gfp);
+EXPORT_SYMBOL(lcd_create_sync_endpoint);
+EXPORT_SYMBOL(lcd_send);
+EXPORT_SYMBOL(lcd_recv);
+EXPORT_SYMBOL(lcd_call);
+EXPORT_SYMBOL(lcd_reply);
+EXPORT_SYMBOL(lcd_create);
+EXPORT_SYMBOL(lcd_config);
+EXPORT_SYMBOL(lcd_run);
+EXPORT_SYMBOL(lcd_cap_grant);
+EXPORT_SYMBOL(lcd_cap_page_grant_map);
+EXPORT_SYMBOL(lcd_cap_delete);
+EXPORT_SYMBOL(lcd_cap_revoke);
+EXPORT_SYMBOL(lcd_load_module);
+EXPORT_SYMBOL(lcd_unload_module);
+EXPORT_SYMBOL(lcd_create_module_lcd);
+EXPORT_SYMBOL(lcd_destroy_module_lcd);
+
+/* (exports for register access are in that macro at the top) */
+
+/* TEST / DEBUG -------------------------------------------------- */
 
 #include "tests/kliblcd-tests.c"

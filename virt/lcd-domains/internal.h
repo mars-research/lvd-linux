@@ -6,8 +6,10 @@
 #include <linux/types.h>
 #include <linux/spinlock.h>
 
-#include <asm/lcd-domains-arch.h>
+#include <asm/lcd-domains/lcd-domains.h>
 #include <lcd-domains/types.h>
+#include <lcd-domains/utcb.h>
+#include <lcd-domains/syscall.h>
 
 /* --------------------------------------------------
  * DEBUG
@@ -52,59 +54,6 @@ static inline void __lcd_warn(char *file, int lineno, char *fmt, ...)
  * See Documentation/lcd-domains/cap.txt.
  */
 
-#define LCD_CPTR_DEPTH_BITS  2    /* max depth of 3, zero indexed         */
-#define LCD_CPTR_FANOUT_BITS 2    /* each level fans out by a factor of 4 */
-#define LCD_CPTR_SLOT_BITS   2    /* each node contains 4 cap slots       */
-#define LCD_CNODE_TABLE_NUM_SLOTS ((1 << LCD_CPTR_SLOT_BITS) + \
-					(1 << LCD_CPTR_FANOUT_BITS))
-#define LCD_CPTR_LEVEL_SHIFT (((1 << LCD_CPTR_DEPTH_BITS) - 1) * \
-				LCD_CPTR_FANOUT_BITS + LCD_CPTR_SLOT_BITS)
-
-static inline unsigned long lcd_cptr_slot(cptr_t c)
-{
-	/*
-	 * Mask off low bits
-	 */ 
-	return cptr_val(c) & ((1 << LCD_CPTR_SLOT_BITS) - 1);
-}
-
-/* 
- * Gives fanout index for going *from* lvl to lvl + 1, where 
- * 0 <= lvl < 2^LCD_CPTR_DEPTH_BITS - 1 (i.e., we can't go anywhere
- * if lvl = 2^LCD_CPTR_DEPTH_BITS - 1, because we are at the deepest
- * level).
- */
-static inline unsigned long lcd_cptr_fanout(cptr_t c, int lvl)
-{
-	unsigned long i;
-
-	BUG_ON(lvl >= (1 << LCD_CPTR_DEPTH_BITS) - 1);
-
-	i = cptr_val(c);
-	/*
-	 * Shift and mask off bits at correct section
-	 */
-	i >>= (lvl * LCD_CPTR_FANOUT_BITS + LCD_CPTR_SLOT_BITS);
-	i &= ((1 << LCD_CPTR_FANOUT_BITS) - 1);
-
-	return i;
-}
-/*
- * Gives depth/level of cptr, zero indexed (0 means the root cnode table)
- */
-static inline unsigned long lcd_cptr_level(cptr_t c)
-{
-	unsigned long i;
-
-	i = cptr_val(c);
-	/*
-	 * Shift and mask
-	 */
-	i >>= LCD_CPTR_LEVEL_SHIFT;
-	i &= ((1 << LCD_CPTR_DEPTH_BITS) - 1);
-
-	return i;
-}
 
 /* 
  * --------------------------------------------------
@@ -245,29 +194,6 @@ int __lcd_cnode_get(struct cspace *cspace, cptr_t cap, struct cnode **cnode);
 void __lcd_cnode_put(struct cnode *c);
 
 
-/*
- * --------------------------------------------------
- *
- * UTCB - user thread control block
- *
- * This is the message buffer mapped inside the LCD.
- *
- *   -- mr are general registers and are just copied during a send/recv
- *   -- cr are capability pointer registers, and the corresponding 
- *      capabilities are granted during a send/recv
- *
- * NOTE: This needs to fit inside a page (4 KBs). It goes at the bottom
- * of the lcd's stack (so it should be reasonably small).
- */
-
-#define LCD_NUM_REGS 8
-
-struct lcd_utcb {
-	u64 mr[LCD_NUM_REGS];
-	cptr_t cr[LCD_NUM_REGS];
-};
-
-
 /* 
  * --------------------------------------------------
  *
@@ -279,8 +205,7 @@ struct lcd_utcb {
 
 #define	LCD_STATUS_EMBRYO     0
 #define	LCD_STATUS_CONFIGED   1
-#define	LCD_STATUS_SUSPENDED  2
-#define	LCD_STATUS_RUNNING    3
+#define	LCD_STATUS_RUNNING    2
 #define	LCD_STATUS_DEAD       4
 
 
@@ -307,12 +232,6 @@ struct lcd {
 	 * My corresponding kthread
 	 */
 	struct task_struct *kthread;
-	/*
-	 * Completions so other lcd's can wait till an lcd is fully
-	 * suspended. (Similar technique used for kthreads - 
-	 * see kernel/kthread.c.)
-	 */
-	struct completion suspended;
 	/*
 	 * The arch-dependent parts of the lcd (e.g., the ept). (This needs
 	 * to be aligned properly, so we use a pointer instead of embedding
@@ -360,22 +279,27 @@ struct lcd {
 };
 
 /* similar to task structs */
-#define set_lcd_status(lcd, status_value)		\
-	do {						\
-	atomic_set(&(lcd)->status, (status_value));	\
-	smp_mb();					\
+#define set_lcd_status(lcd, status_value)			\
+	do {							\
+		atomic_set(&(lcd)->status, (status_value));	\
+		smp_mb();					\
 	} while(0);					
 #define get_lcd_status(lcd) (atomic_read(&(lcd)->status))
 #define lcd_status_embryo(lcd) \
 	(get_lcd_status(lcd) == LCD_STATUS_EMBRYO)
 #define lcd_status_configed(lcd) \
 	(get_lcd_status(lcd) == LCD_STATUS_CONFIGED)
-#define lcd_status_suspended(lcd) \
-	(get_lcd_status(lcd) == LCD_STATUS_SUSPENDED)
 #define lcd_status_running(lcd) \
 	(get_lcd_status(lcd) == LCD_STATUS_RUNNING)
 #define lcd_status_dead(lcd) \
 	(get_lcd_status(lcd) == LCD_STATUS_DEAD)
+
+#define set_lcd_xmit(lcd, xmit_val)				\
+	do {							\
+		atomic_set(&(lcd)->xmit_flag, (xmit_val));	\
+		smp_mb();					\
+	} while(0);
+#define get_lcd_xmit(lcd) (atomic_read(&(lcd)->xmit_flag))
 
 /*
  * --------------------------------------------------
@@ -405,7 +329,6 @@ int __lcd_create__(struct lcd **out);
 int __lcd_config(struct lcd *caller, cptr_t lcd, gva_t pc, gva_t sp, 
 		gpa_t gva_root);
 int __lcd_run(struct lcd *caller, cptr_t lcd);
-int __lcd_suspend(struct lcd *caller, cptr_t lcd);
 int __lcd_cap_grant_cheat(struct lcd *caller, cptr_t lcd, cptr_t src, 
 			cptr_t dest);
 int __lcd_cap_page_grant_map_cheat(struct lcd *caller, cptr_t lcd, 

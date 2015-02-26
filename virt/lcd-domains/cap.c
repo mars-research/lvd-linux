@@ -276,6 +276,12 @@ static int __lcd_cnode_lookup(struct cspace *cspace, cptr_t c, bool alloc,
 	struct cnode_table *new;
 
 	/*
+	 * If cptr is null, fail
+	 */
+	if (cptr_val(c) == cptr_val(LCD_CPTR_NULL))
+		return -EINVAL;
+
+	/*
 	 * Initialize to root cnode table
 	 */
 	old = cspace->cnode_table;
@@ -321,7 +327,6 @@ static int __lcd_cnode_get__(struct cspace *cspace, cptr_t c,
 	}
 	ret = __lcd_cnode_lookup(cspace, c, alloc, cnode);
 	if(ret) {
-		LCD_ERR("failed to create/find cnode");
 		ret = -ENOMEM;
 		goto fail2;
 	}
@@ -333,6 +338,8 @@ static int __lcd_cnode_get__(struct cspace *cspace, cptr_t c,
 	}
 
 	mutex_unlock(&cspace->lock);
+
+	return 0;
 
 fail2:
 	mutex_unlock(&cspace->lock);
@@ -359,8 +366,10 @@ int __lcd_cap_insert(struct cspace *cspace, cptr_t c, void *object,
 	 * Get cnode
 	 */
 	ret = __lcd_cnode_get__(cspace, c, true, &cnode);
-	if (ret)
+	if (ret) {
+		LCD_ERR("error getting cnode");
 		return ret;
+	}
 	/*
 	 * Set data
 	 */
@@ -510,7 +519,6 @@ static int try_delete_cnode(struct cspace *cspace, struct cnode *cnode)
 {
 	int last_node;
 	struct cdt_root_node *cdt_node;
-
 	/*
 	 * Try to lock the cdt
 	 */
@@ -520,7 +528,6 @@ static int try_delete_cnode(struct cspace *cspace, struct cnode *cnode)
 		 */
 		return 0;
 	}
-
 	/*
 	 * Get the cdt
 	 */

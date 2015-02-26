@@ -3,51 +3,70 @@
 OVERVIEW
 ==============================
 
-This code is in arch/x86/lcd-domains/ and 
-arch/x86/include/asm/lcd-domains-arch.h.
+This code is in arch/x86/lcd-domains/ and arch/x86/include/asm/lcd-domains/.
 
-The two main objects are struct lcd_arch and struct lcd_arch_thread, defined in
-arch/x86/include/asm/lcd-domains-arch.h.
+The main object is struct lcd_arch, defined in
+arch/x86/include/asm/lcd-domains/lcd-domains.h.
 
 struct lcd_arch contains the extended page table (EPT) guest physical address
-space information, and a list of the contained lcd_arch_thread's.
+space information, and data for the Intel VT-x virtual machine.
 
-struct lcd_arch_thread corresponds with an Intel VT-x virtual machine, and
-contains all state needed to manage it. Each lcd_arch_thread uses the EPT of
-its parent lcd_arch.
+See the comments in the header lcd-domains.h (above), and the test
+cases in arch/x86/lcd-domains/tests/ for more info.
 
-See the comments in the header lcd-domains-arch.h (above), and the test
-cases in arch/x86/lcd-domains/lcd-domains-arch-tests.c.
+========================================
+BUILD
+========================================
+
+main.c is built and linked via the arch-independent code make file inside
+virt/lcd-domains/Makefile. This is safe for the recursive make because only 
+one module - lcd-domains.ko - needs it.
+
+No configuration is necessary.
+
+========================================
+INTERRUPTS
+========================================
+
+All external interrupts and exceptions cause VM exits. We do not ack 
+external interrupts on vm exits (as before) because emulating interrupt
+handling for 64-bit is too hard and maybe even impossible to do in software.
+(We were using KVM's code before, but I think this is stale code that is never
+run anymore, because KVM does not ack interrupts on vm exit.)
+
+If you do allow an lcd to handle some interrupts, make sure the reschedule
+interrupt still causes a vm exit. We are relying on this (as does KVM) for
+forcing an lcd to exit so we can schedule a higher priority thread (notice
+the cond_resched inside the arch-independent code). You can see the 
+IRQ vectors for x86 inside arch/x86/include/asm/irq_vectors.h. The reschedule
+vector is a very high priority vector.
 
 ========================================
 EXAMPLE
 ========================================
 
-Here is an example how to set up one lcd_arch with one lcd_arch_thread, and
-run it (without the error checking).
-
+Here is an example how to set up one lcd_arch, and run it, without
+error checking:
 
 struct lcd_arch *lcd_arch;
-struct lcd_arch_thread *lcd_arch_thread;
-
 /*
  * Create the lcd_arch
  */
-lcd_arch = lcd_arch_create();
+lcd_arch_create(&lcd_arch);
 
-/* (...Allocate and map pages in the LCD...) */
-
-/*
- * Create and add a thread
- */
-lcd_arch_thread = lcd_arch_add_thread(lcd_arch);
-
-/* (...Set up the thread's program counter, etc...) */
+/* (...Allocate and map pages in the LCD using the ept functions...) */
 
 /*
- * Tear down the thread
+ * Set up the lcd_arch's program counter, stack pointer, etc.
  */
-lcd_arch_destroy_thread(lcd_arch_thread);
+lcd_arch_set_pc(lcd_arch, some_gva);
+lcd_arch_set_sp(lcd_arch, some_gva);
+lcd_arch_set_gva_root(lcd_arch, some_gpa);
+
+/*
+ * Run it
+ */
+lcd_arch_run(lcd_arch);
 
 /*
  * Tear down the LCD
@@ -92,7 +111,7 @@ LOCKING
 
 TODO: Some of the arch code is not thread safe.
 
-Locks are used on an lcd_arch's ept and its list of lcd_arch_threads.
+Locks are initialized but not yet used for the lcd_arch's ept.
 
 We use mutexes for now, so some functions are not safe to call from
 interrupt context (we can sleep when we lock a mutex).

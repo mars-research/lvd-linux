@@ -1,13 +1,6 @@
-menuconfig VIRTUALIZATION2
-	   bool "Virtualization (2)"
-	   depends on X86_64
-	   default y
-	   ---help---
-	   Virtualization for LCDs.
-
-if VIRTUALIZATION2
+menu "Virtualization (2)"
 
 source "virt/lcd-domains/Kconfig"
 
-endif
+endmenu
 

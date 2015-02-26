@@ -113,15 +113,13 @@ Step 3 - Reboot and install
 
 After rebooting the machine, select the new kernel to boot it.
 
-After booting, if you built the lcd system as modules, do:
+After booting, if you built the lcd system as a module, do:
 
-        [ 1 ] insmod ${MODULE_PATH}/arch/x86/lcd-domains/lcd-domains-arch.ko
-
-        [ 2 ] insmod ${MODULE_PATH}/virt/lcd-domains/lcd-domains.ko
+        sudo insmod ${MODULE_PATH}/virt/lcd-domains/lcd-domains.ko
 
 where ${MODULE_PATH} is something like /lib/modules/3.10.14/kernel.
 
-This will install the lcd system.
+This will install the lcd system. You can also use modprobe.
 
 You can now create an lcd using kliblcd. See 
 Documentation/lcd-domains/kliblcd.txt.

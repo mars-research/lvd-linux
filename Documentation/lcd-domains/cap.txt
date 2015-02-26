@@ -30,6 +30,21 @@ So, cspaces are contained in an LCD, but cdts have pointers that span across
 cspaces.
 
 ========================================
+RELEVANT FILES
+========================================
+
+   include/lcd-domains/types.h           -    cptr definition, simple functions,
+                                              cspace configuration macros
+
+   virt/lcd-domains/{internal.h, cap.c}  -    cspace implemementation
+
+   virt/lcd-domains/kliblcd.c            -    cptr cache implementation for
+                                              klcd's
+
+   arch/x86/lcd-domains/liblcd.c         -    cptr cache implementation for
+                                              regular lcd's
+
+========================================
 OPERATIONS
 ========================================
 
@@ -383,8 +398,6 @@ away until the cnode is locked and removed from the cspace and/or cdt).
 ========================================
 SPECIAL CPTRS / CAPABILITIES
 ========================================
-
-To be implemented soon:
 
 cptr 0 = null, always invalid
 cptr 1 = capability to lcd's endpoint for receiving replies

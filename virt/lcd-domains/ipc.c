@@ -137,7 +137,7 @@ static void copy_msg_cap(struct lcd *sender, struct lcd *receiver,
 	ret = __lcd_cap_grant(&sender->cspace, from_ptr,
 			&receiver->cspace, to_ptr);
 	if (ret) {
-		LCD_ERR("failed to transfer cap @ %llu in lcd %p to slot @ %llu in lcd %p",
+		LCD_ERR("failed to transfer cap @ 0x%lx in lcd %p to slot @ 0x%lx in lcd %p",
 			cptr_val(from_ptr), sender, cptr_val(to_ptr), 
 			receiver);
 	}
@@ -145,17 +145,16 @@ static void copy_msg_cap(struct lcd *sender, struct lcd *receiver,
 
 static void copy_msg_caps(struct lcd *sender, struct lcd *receiver)
 {
-	int i = 0;
 	cptr_t from, to;
-
-	from = sender->utcb->cr[i];
-	to = receiver->utcb->cr[i];
-
-	while (i < LCD_NUM_REGS && cptr_val(from) && cptr_val(to)) {
-		copy_msg_cap(sender, receiver, from, to);
-		i++;
+	int i;
+	for (i = 0; i < LCD_NUM_REGS; i++) {
+		/*
+		 * Grant on non-null cptrs
+		 */
 		from = sender->utcb->cr[i];
 		to = receiver->utcb->cr[i];
+		if (!cptr_is_null(from) && !cptr_is_null(to))
+			copy_msg_cap(sender, receiver, from, to);
 	}
 }
 
@@ -348,9 +347,18 @@ static int do_send(struct lcd *sender, struct cnode *cnode,
 	if (ret) {
 		LCD_ERR("transmit");
 		mutex_unlock(&sender->lock);
+		/*
+		 * Notify receiver and then unlock
+		 */
+		set_lcd_xmit(receiver, LCD_XMIT_FAILED);
+		wake_up_process(receiver->kthread);
 		mutex_unlock(&receiver->lock);
 		return ret;
 	}
+	/*
+	 * Tell receiver xmit was successful
+	 */
+	set_lcd_xmit(receiver, LCD_XMIT_SUCCESS);
 	wake_up_process(receiver->kthread);
 	/*
 	 * Unlock lcd's
@@ -378,7 +386,7 @@ int __lcd_send(struct lcd *caller, cptr_t endpoint)
 	 */
 	ret = get_ep(&caller->cspace, endpoint, &cnode, &ep);
 	if (ret) {
-		LCD_ERR("ep lookup");
+		LCD_ERR("ep lookup for cptr 0x%lx", cptr_val(endpoint));
 		goto fail1;
 	}
 	/* do_send does put on ep; we're not doing a call or reply */
@@ -459,10 +467,19 @@ static int do_recv(struct lcd *receiver, struct cnode *cnode,
 			sender->doing_reply);
 	if (ret) {
 		LCD_ERR("transmit");
+		/*
+		 * Notify sender, and unlock
+		 */
+		set_lcd_xmit(sender, LCD_XMIT_FAILED);
+		wake_up_process(sender->kthread);
 		mutex_unlock(&sender->lock);
 		mutex_unlock(&receiver->lock);
 		return ret;
 	}
+	/*
+	 * Tell sender the transmit is done
+	 */
+	set_lcd_xmit(sender, LCD_XMIT_SUCCESS);
 	wake_up_process(sender->kthread);
 	/*
 	 * Unlock lcd's
@@ -490,7 +507,7 @@ int __lcd_recv(struct lcd *caller, cptr_t endpoint)
 	 */
 	ret = get_ep(&caller->cspace, endpoint, &cnode, &ep);
 	if (ret) {
-		LCD_ERR("ep lookup");
+		LCD_ERR("ep lookup failed for cptr 0x%lx", cptr_val(endpoint));
 		goto fail1;
 	}
 	/* do_recv does put on ep */

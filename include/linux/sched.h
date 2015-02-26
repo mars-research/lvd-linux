@@ -1468,10 +1468,6 @@ struct task_struct {
 	atomic_t usage;
 	unsigned int flags;	/* per process flags, defined below */
 	unsigned int ptrace;
-#ifdef CONFIG_HAVE_LCD
-	struct lcd *lcd;
-	struct cptr_cache *cptr_cache;
-#endif
 #ifdef CONFIG_SMP
 	struct llist_node wake_entry;
 	int on_cpu;
@@ -1931,6 +1927,12 @@ struct task_struct {
 #ifdef CONFIG_MMU
 	struct task_struct *oom_reaper_list;
 #endif
+
+#ifdef CONFIG_HAVE_LCD
+	struct lcd *lcd;
+	struct cptr_cache *cptr_cache;
+#endif
+
 /* CPU-specific state of this task */
 	struct thread_struct thread;
 /*

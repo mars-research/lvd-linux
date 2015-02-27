@@ -1,6 +1,6 @@
 #include "cast.h"
 
-void CCSTFile::write()
+void CCSTFile::write(FILE *f)
 {
   /*
     for(std::vector<T>::iterator it = v.begin(); it != v.end(); ++it) {
@@ -8,7 +8,7 @@ void CCSTFile::write()
   for(std::vector<CCSTExDeclaration*>::iterator it = defs_.begin(); it != defs_.end(); ++it)
     {
       CCSTExDeclaration *ex_dec = *it;
-      ex_dec->write(this->out_file_);
+      ex_dec->write(f);
     }
 }
 
@@ -684,99 +684,259 @@ void CCSTPostFixExprAccess::write(FILE *f)
 
 void CCSTPostFixExprExpr::write(FILE *f)
 {
+  if(this->post_fix_expr_ == null || this->expr_ == null)
+    {
+      printf("error\n");
+      exit(0);
+    }
+  this->post_fix_expr_->write(f);
+  fprintf(f, "[ ");
+  this->expr_->write(f);
+  fprintf(f, " ]");
 }
 
 void CCSTPostFixExprAssnExpr::write(FILE *f)
 {
+  if(this->post_fix_expr_ == null)
+    {
+      printf("error\n");
+      exit(0);
+    }
+  // TODO really unsure
 }
 
 void CCSTPrimaryExpr::write(FILE *f)
 {
+  if(this->expr_ == null)
+    {
+      printf("error\n");
+      exit(0);
+    }
+  fprintf(f, "( ");
+  this->expr_->write(f);
+  fprintf(f, " )");
 }
 
-void CCSTString::write()
+void CCSTString::write(FILE *f)
 {
+  // how should this be stored exactly?
+  fprintf(f, "%s", this->string_);
 }
 
-void CCSTPrimaryExprId::write()
+void CCSTPrimaryExprId::write(FILE *f)
 {
+  fprintf(f, "%s", this->id_);
 }
 
 
 
-void CCSTInteger::write()
+void CCSTInteger::write(FILE *f)
 {
+  // todo
 }
 
-void CCSTChar::write()
+void CCSTChar::write(FILE *f)
 {
-  // TODO
+  fprintf(f, "%c", this->char_);
 }
 
-void CCSTFloat::write()
+void CCSTFloat::write(FILE *f)
 {
+  if(float_)
+    {
+      fprintf(f, "%f", this->f_);
+    }
+  else
+    {
+      fprintf(f, "%f", this->d_);
+    }
 }
 
-void CCSTEnumConst::write()
+void CCSTEnumConst::write(FILE *f)
 {
   //TODO
+  // unsure
 }
 
-void CCSTExpression::write()
+void CCSTExpression::write(FILE *f)
 {
+   for(std::vector<CCSTAssignExpr*>::iterator it = assn_exprs_.begin(); it != assn_exprs_.end(); ++it)
+	{
+	  CCSTAssignExpr *assn = *it;
+	  assn->write(f);
+	}
 }
 
 void CCSTAssignExpr::write()
 {
-  /*
-    <assignment-expression> ::= <conditional-expression>
-                          | <unary-expression> <assignment-operator> <assignment-expression>
-   */
-  // TODO
+  if(this->unary_expr_ == null || this->assn_op_ == null || this->assn_expr_ == null)
+    {
+      printf("error\n");
+      exit(0);
+    }
+  this->unary_expr_->write(f);
+  fprintf(f, " ");
+  this->assn_op_->write(f);
+  fprintf(f, " ");
+  this->assn_expr_->write(f);
 }
 
 void CCSTAssignOp::write()
 {
+  switch (this->op_)
+    {
+    case equal_t:
+      fprintf(f, "=");
+      break;
+    case mult_eq_t:
+      fprintf(f, "*=");
+      break;
+    case div_eq_t:
+      fprintf(f, "/=");
+      break;
+    case mod_eq_t:
+      fprintf(f, "%=");
+      break;
+    case plus_eq_t:
+      fprintf(f, "+=");
+      break;
+    case minus_eq_t:
+      fprintf(f, "-=");
+      break;
+    case lshift_eq_t:
+      fprintf(f, "<<=");
+      break;
+    case rshift_eq_t:
+      fprintf(f, ">>=");
+      break;
+    case and_eq_t:
+      fprintf(f, "&=");
+      break;
+    case xor_eq_t:
+      fprintf(f, "^=");
+      break;
+    case or_eq_t:
+      fprintf(f, "|=");
+      break;
+    case default:
+      {
+	printf("error\n");
+	exit(0);
+      }
+    }
 }
 
-void CCSTUnaryOp::write()
+void CCSTUnaryOp::write(FILE *f)
 {
+  switch (this->op_)
+    {
+    case bit_and_t:
+      fprintf(f, "&");
+      break;
+    case mult_t:
+      fprintf(f, "*");
+      break;
+    case plus_t:
+      fprintf(f, "+");
+      break;
+    case minus_t:
+      fprintf(f, "-");
+      break;
+    case tilde_t:
+      fprintf(f, "~");
+      break;
+    case bang_t:
+      fprintf(f, "!");
+      break;
+    case default:
+      {
+	printf("error\n");
+	exit(0);
+      }
+    }
 }
 
-void CCSTTypeName::write()
+void CCSTTypeName::write(FILE *f)
 {
+   for(std::vector<CCSTSpecifierQual*>::iterator it = spec_quals_.begin(); it != spec_quals_.end(); ++it)
+	{
+	  CCSTSpecifierQual *qual = *it;
+	  qual->write(f);
+	  fprintf(f, " ");
+	}
+   if(this->abs_dec_ != null)
+     {
+       this->abs_dec_->write(f);
+     }
 }
 
-void CCSTParamTypeList::write()
+void CCSTParamTypeList::write(FILE *f)
 {
+  if(this->p_list_ == null)
+    {
+      printf("error\n");
+      exit(0);
+    }
+  this->p_list_->write(f);
+  fprintf(f, " , ");
+  fprintf(f, "...");
 }
 
-void CCSTParamList::write()
+void CCSTParamList::write(FILE *f)
 {
+   for(std::vector<CCSTParamDeclaration*>::iterator it = p_dec_.begin(); it != p_dec_.end(); ++it)
+	{
+	  CCSTParamDeclaration *dec = *it;
+	  dec->write(f);
+	  fprintf(f, ", "); // should i be printing commas
+	}
 }
 
-void CCSTParamDeclaration::write()
+void CCSTParamDeclaration::write(FILE *f)
 {
-  /*
-    <parameter-declaration> ::= {<declaration-specifier>}+ <declarator>
-                          | {<declaration-specifier>}+ <abstract-declarator>
-                          | {<declaration-specifier>}+
-   */
-  // TODO
+  for(std::vector<CCSTDecSpecifier*>::iterator it = ids_.begin(); it != ids_.end(); ++it)
+    {
+      CCSTDecSpecifier *spec = *it;
+      spec->write(f);
+      fprintf(f, " ");
+    }
+  
+  if(this->dec_ == null && this->abs_dec_ == null)
+    {
+      // write nothing
+    }
+  else if(this->dec_ == null)
+    {
+      if(this->abs_dec_ == null)
+	{
+	  printf("error\n");
+	  exit(0);
+	}
+      this->abs_dec_->write(f);
+    }
+  else
+    {
+      this->dec_->write(f);
+    }
   
 }
 
-void CCSTAbstDeclarator::write()
+void CCSTAbstDeclarator::write(FILE *f)
 {
-  /*
-    <abstract-declarator> ::= <pointer>
-                        | <pointer> <direct-abstract-declarator>
-                        | <direct-abstract-declarator>
-   */
-  // TODO
+  if(this->p_ == null)
+    {
+      printf("error\n");
+      exit(0);
+    }
+  this->p_->write(f);
+  fprintf(f, " ");
+  if(this->d_abs_dec_ != null)
+    {
+      this->d_abs_dec->write(f);
+    }
 }
 
-void CCSTDirectAbstDeclarator::write()
+void CCSTDirectAbstDeclarator::write(FILE *f)
 {
   /*
     <direct-abstract-declarator> ::=  ( <abstract-declarator> )
@@ -784,33 +944,117 @@ void CCSTDirectAbstDeclarator::write()
                                | {<direct-abstract-declarator>}? ( {<parameter-type-list>|? )
    */
   // TODO
+  if(this->d_abs_dec_ == null && this->const_expr_ == null && this->param_type_list_ == null)
+    {
+      fprintf(f, "( ");
+      this->abs_dec_->write(f);
+      fprintf(f, " )");
+    }
+  else
+    {
+      if(this->d_abs_dec_ == null)
+	{
+	  printf("error\n");
+	  exit(0);
+	}
+      this->d_abs_dec->write(f);
+      if(this->const_expr_ == null)
+	{
+	  
+	  if(this->param_type_list_ == null)
+	    {
+	      printf("error\n");
+	      exit(0);
+	    }
+	  fprintf(f, " ( ");
+	  this->param_type_list_->write(f);
+	  fprintf(f, " )");
+      else
+	{
+	  fprintf(f, " [ ");
+	  this->const_expr_->write(f);
+	  fprintf(f, " ] ");
+	}
+    }
 }
 
-void CCSTEnumSpecifier::write()
+void CCSTEnumSpecifier::write(FILE *f)
 {
+  if(this->el_ == null)
+    {
+      fprintf(f, "enum ");
+      fprintf(f, "%s", this->id_);
+    }
+  else
+    {
+      fprintf(f, "enum ");
+      fprintf(f, "%s", this->id_);
+      fprintf(f, "{ ");
+      this->el_->write(f);
+      fprintf(F, " }");
+    }
 }
 
-void CCSTEnumeratorList::write()
+void CCSTEnumeratorList::write(FILE *f)
 {
+  for(std::vector<CCSTEnumerator*>::iterator it = list_.begin(); it != list_.end(); ++it)
+    {
+      CCSTEnumerator *l = *it;
+      l->write(f);
+      fprintf(f, ", ");
+    }
 }
 
-void CCSTEnumerator::write()
+void CCSTEnumerator::write(FILE *f)
 {
+  if(this->ce_ == null)
+    {
+      fprintf(f, "%s", this->id_);
+    }
+  else
+    {
+      fprintf(f, "%s", this->id_);
+      fprintf(f, " = ");
+      this->ce_->write(f);
+    }
 }
 
-void CCSTTypedefName::write()
+void CCSTTypedefName::write(FILE *f)
 {
+  fprintf(f, "%s", this->id_);
 }
 
-void CCSTDeclaration::write()
+void CCSTDeclaration::write(FILE *f)
 {
+  //?x
+  for(std::vector<CCSTDecSpecifier*>::iterator it = dec_spec_.begin(); it != dec_spec_.end(); ++it)
+    {
+      CCSTDecSpecifier *dec_spec = *it;
+      dec_spec->write(f);
+      fprintf(f, " ");
+    }
+  for(std::vector<CCSTInitDeclarator*>::iterator it = init_dec_.begin(); it != init_dec_.end(); ++it)
+    {
+      CCSTInitDeclarator *init_dec = *it;
+      init_dec->write(this->out_file_);
+      fprintf(f, " ");
+    }
 }
 
-void CCSTInitDeclarator::write()
+void CCSTInitDeclarator::write(FILE *f)
 {
+  // does inheritence cover just declarator case?
+  if(this->dec_ == null || this->init_ == null)
+    {
+      printf("error\n");
+      exit(0);
+    }
+  this->dec_->write(f);
+  fprintf(f, " = ");
+  this->init_->write(f);
 }
 
-void CCSTInitializer::write()
+void CCSTInitializer::write(FILE *f)
 {
   /*
     
@@ -820,94 +1064,191 @@ void CCSTInitializer::write()
    */
 
   // TODO
+  if(this->assn_expr_ == null)
+    {
+      if(this->init_list_ == null)
+	{
+	  printf("error\n");
+	  exit(0);
+	}
+      fprintf(f, "{ ");
+      this->init_list_->write(f);
+      fprintf(f, " }");
+    }
+  else
+    {
+      this->assn_expr_->write(f);
+    }
 }
 
-void CCSTInitializerList::write()
+void CCSTInitializerList::write(FILE *f)
 {
   // TODO
-}
-
-void CCSTCompoundStatement::write()
-{
-}
-
-void CCSTPlainLabelStatement::write()
-{
-}
-
-void CCSTCaseStatement::write()
-{
-}
-
-void CCSTExprStatement::write()
-{
-}
-
-void CCSTSelectionStatement::write()
-{
-}
-
-void CCSTIfStatement::write()
-{
-}
-
-void CCSTIfElseStatement::write()
-{
-}
-
-void CCSTSwitchStatement::write()
-{
+  for(std::vector<CCSTInitializer*>::iterator it = init_list_.begin(); it != init_list_.end(); ++it)
+    {
+      CCSTInitializer *init = *it;
+      init->write(f);
+      fprintf(f, ", ");
+    }
   
 }
 
-void CCSTWhileLoop::write()
+void CCSTCompoundStatement::write(FILE *f)
 {
-  // write while
-  // write (
-  this->cond_->write();
-  // write )
-  // should write { ?
-  this->body_->write();
-  // write }
+  fprintf(f, "{\n");
+  for(std::vector<CCSTDeclaration*>::iterator it = declarations_.begin(); it != declarations_.end(); ++it)
+    {
+      CCSTDeclaration *dec = *it;
+      dec->write(f);
+      fprintf(f, "\n");
+    }
+  for(std::vector<CCSTStatement*>::iterator it = statements_.begin(); it != statements_.end(); ++it)
+    {
+      CCSTStatement *state = *it;
+      state->write(f);
+      fprintf(f, "\n");
+    }
+  fprintf(f, "}");
 }
 
-void CCSTDoLoop::write()
+void CCSTPlainLabelStatement::write(FILE *f)
 {
-  // write do
-  // should write { here?
-  // write {
-  this->body_->write();
-  // write }
-  // write while
-  // write ( 
-  this->cond_->write();
-  // write ) 
-  // write ;
+  //todo
+  fprintf(f, "%s: ", this->id_);
+  this->stmnt_->write(f);
+  fprintf(f, ";");
 }
 
-void CCSTForLoop::write()
+void CCSTCaseStatement::write(FILE *f)
+{
+  fprintf(f, "case ");
+  this->case_label_->write(f);
+  fprintf(f, ":\n");
+  fprintf(f, "{\n");
+  this->body_->write(f);
+  fprintf(f, "\n}");
+}
+
+void CCSTExprStatement::write(FILE *f)
+{
+  // weird why the semicolon with no expression
+  if(this->expr_ != null)
+    {
+      this->expr_->write(f);
+    }
+  fprintf(f, ";");
+}
+
+void CCSTIfStatement::write(FILE *f)
+{
+  fprintf(f, "if");
+  fprintf(f, "( ");
+  if(this->cond_ == null)
+    {
+      printf("error\n");
+      exit(0);
+    }
+  this->cond_->write(f);
+  fprintf(f, " )");
+  fprintf(f, "\n");
+  fprintf(f, "{\n");
+  this->body_->write(f);
+  fprintf(f, "\n");
+  fprintf(f, "}");
+  fprintf(f, "\n");
+}
+
+void CCSTIfElseStatement::write(FILE *f)
+{
+  fprintf(f, "if");
+  fprintf(f, "( ");
+  if(this->cond_ == null)
+    {
+      printf("error\n");
+      exit(0);
+    }
+  this->cond_->write(f);
+  fprintf(f, " )");
+  fprintf(f, "\n");
+  fprintf(f, "{\n");
+  this->if_body_->write(f);
+  fprintf(f, "\n");
+  fprintf(f, "}");
+  fprintf(f, "\n");
+  fprintf(f, "else");
+  fprintf(f, "\n");
+  fprintf(f, "{\n");
+  this->else_body_->write(f);
+  fprintf(f, "\n}");
+}
+
+void CCSTSwitchStatement::write(FILE *f)
+{
+  if(this->expr_ == null)
+    {
+      printf("error\n");
+      exit(0);
+    }
+  fprintf(f, "switch ");
+  fprintf(f, "( ");
+  this->expr_->write(f);
+  fprintf(f, " )");
+  fprintf(f, "\n");
+  fprintf(f, "{\n");
+  this->body_->write(); // all cases?
+  fprintf(f, "\n}");
+}
+
+void CCSTWhileLoop::write(FILE *f)
+{
+  fprintf(f, "while");
+  fprintf(f, "( ");
+  this->cond_->write();
+  fprintf(f, " )");
+  fprintf(f, "\n");
+  fprintf(f, "{");
+  this->body_->write();
+  fprintf(f, "\n");
+  fprintf(f, "}");
+}
+
+void CCSTDoLoop::write(FILE *f)
+{
+  fprintf(f, "do\n");
+  fprintf(f, "{\n");
+  this->body_->write();
+  fprintf(f, "\n}\n");
+  fprintf(f, "while");
+  fprintf(f, "( ");
+  this->cond_->write();
+  fprintf(f, " )");
+  fprintf(f, ";");
+}
+
+void CCSTForLoop::write(FILE *f)
 {
   // write for (
-  if(this->init_ == null)
+  fprintf(f, "for");
+  fprintf(f, "( ");
+  if(this->init_ != null)
     this->init_->write();
-  // write ;
-  if(this->cond_ == null)
+  fprintf(f, ";");
+  if(this->cond_ != null)
     this->cond_->write();
-  // write ;
-  if(this->up_ == null)
+  fprintf(f, ";");
+  if(this->up_ != null)
     this->up_->write();
-  // write )
-  // should i write { here?
-  // write {
+  fprintf(f, " )\n");
+  fprintf(f, "{\n");
   this->body_->write();
-  // write }
+  fprintf(f, "\n}");
 }
 
 void CCSTGoto::write(FILE *f)
 {
-  // write goto
-  // write this->identifier_
-  // write ;
+  fprintf(f, "goto ");
+  fprintf(f, "%s", this->identifier_);
+  fprintf(f, ";");
 }
 
 void CCSTContinue::write(FILE *f)
@@ -925,12 +1266,11 @@ void CCSTReturn::write(FILE *f)
   if(this->expr_ == null)
     {
       fprintf(f, "return;");
-      // write return;
     }
   else
     {
-      // write return
+      fprintf(f, "return");
       this->expr_->write();
-      // write semicolon
+      fprintf(f, ";");
     }
 }

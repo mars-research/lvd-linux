@@ -738,7 +738,7 @@ class CCSTExpression : public CCSTBase
     <expression> ::= <assignment-expression>
                | <expression> , <assignment-expression>
    */
-  vector<CCSTAssignExpr> assn_exprs_;
+  vector<CCSTAssignExpr*> assn_exprs_;
  public:
   CCSTExpression(vector<CCSTAssignExpr> assn){this->assn_exprs = assn;}
   virtual void write();
@@ -807,7 +807,7 @@ class CCSTTypeName : public CCSTBase
   /*
     <type-name> ::= {<specifier-qualifier>}+ {<abstract-declarator>}?
    */
-  vector<CCSTSpecifierQual> spec_quals_;
+  vector<CCSTSpecifierQual*> spec_quals_;
   CCSTAbstDeclarator *abs_dec_;
  public:
   CCSTTypeName(vector<CCSTSpecifierQual spec_quals, CCSTAbstDeclarator *abs_dec){this->spec_quals_ = spec_quals; this->abs_dec_ = abs_dec;}
@@ -847,13 +847,13 @@ class CCSTParamDeclaration : public CCSTParamList
                           | {<declaration-specifier>}+ <abstract-declarator>
                           | {<declaration-specifier>}+
    */
-  vector<CCSTDecSpecifier> dec_specs_;
+  vector<CCSTDecSpecifier*> dec_specs_;
   CCSTDeclarator *dec_;
   CCSTAbstDeclarator *abs_dec_;
  public:
-  CCSTParamDeclaration(vector<CCSTDecSpecifier> dec_specs){this->dec_specs_ = dec_specs;}
-  CCSTParamDeclaration(vector<CCSTDecSpecifier> dec_specs, CCSTDeclarator *dec){this->dec_specs_ = dec_specs; this->dec_ = dec; this->abs_dec_ = abs_dec;}
-  CCSTParamDeclaration(vector<CCSTDecSpecifier> dec_specs, CCSTAbstDeclarator *abs_dec){this->dec_specs_ = dec_specs; this->abs_dec_ = abs_dec; this->dec_ = dec;}
+  CCSTParamDeclaration(vector<CCSTDecSpecifier*> dec_specs){this->dec_specs_ = dec_specs;}
+  CCSTParamDeclaration(vector<CCSTDecSpecifier*> dec_specs, CCSTDeclarator *dec){this->dec_specs_ = dec_specs; this->dec_ = dec; this->abs_dec_ = abs_dec;}
+  CCSTParamDeclaration(vector<CCSTDecSpecifier*> dec_specs, CCSTAbstDeclarator *abs_dec){this->dec_specs_ = dec_specs; this->abs_dec_ = abs_dec; this->dec_ = dec;}
   virtual void write();
 };
 
@@ -913,7 +913,7 @@ class CCSTEnumeratorList : public CCSTBase
 <enumerator-list> ::= <enumerator>
                     | <enumerator-list> , <enumerator>
    */
-  vector<CCSTEnumerator> list_;
+  vector<CCSTEnumerator*> list_;
  public:
   CCSTEnumeratorList(vector<CCSTEnumerator> list){this->list_ = list;}
   virtual void write();
@@ -948,10 +948,10 @@ class CCSTDeclaration : public CCSTExDeclaration
     <declaration> ::=  {<declaration-specifier>}+ {<init-declarator>}*
    */
  
-  vector<CCSTDecSpecifier> dec_spec_;
-  CCSTInitDeclarator *init_dec_;
+  vector<CCSTDecSpecifier*> dec_spec_;
+  vector<CCSTInitDeclarator*> init_dec_;
  public:
-  CCSTDeclaration(vector<CCSTDecSpecifier> dec_spec, CCSTInitDeclarator *init_dec){this->dec_spec_ = dec_spec; this->init_dec_ = init_dec;}
+  CCSTDeclaration(vector<CCSTDecSpecifier> dec_spec, vector<CCSTInitDeclarator*> init_dec){this->dec_spec_ = dec_spec; this->init_dec_ = init_dec;}
   virtual void write();
 };
 
@@ -979,8 +979,10 @@ class CCSTInitializer : public CCSTInitializerList
                 | { <initializer-list> , }
    */
   CCSTAssignExpr *assn_expr_;
+  CCSTInitializerList *init_list_;
  public:
   CCSTInitializer(CCSTAssignExpr *assn_expr){this->assn_expr_ = assn_expr;}
+  CCSTInitializer(CCSTInitializerList *init_list){this->init_list_ = init_list;}
   virtual void write();
 };
 
@@ -1002,8 +1004,8 @@ class CCSTCompoundStatement : public CCSTStatement
     <compound-statement> ::= { {<declaration>}* {<statement>}* }
    */
   // is this a body?
-  vector<CCSTDeclaration> declarations_;
-  vector<CCSTStatement> statements_;
+  vector<CCSTDeclaration*> declarations_;
+  vector<CCSTStatement*> statements_;
  public:
   CCSTCompoundStatement(vector<CCSTDeclaration> decs, vector<CCSTStatement> s){this->declarations_ = decs; this->statements_ = s;}
   virtual void write();

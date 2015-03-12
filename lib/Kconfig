@@ -550,4 +550,6 @@ config STACKDEPOT
 	bool
 	select STACKTRACE
 
+source "lib/thc/Kconfig"
+
 endmenu

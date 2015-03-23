@@ -1,0 +1,72 @@
+#lang racket
+
+
+;; just check if extention is .idl
+(define (is-test-case? path)
+  (let* ([split-path (string-split (path->string path) "/")]
+        [reversed (reverse split-path)]
+        [directory (cadr reversed)]
+        [file (car reversed)]
+        [ext (string-split file ".")])
+    (and (equal? directory "test_cases")
+         (equal? ext "idl"))))
+
+(define exec (string->path "../compiler"))
+
+(define test-cases
+  (with-handlers ([exn:fail? (lambda (exn) '())])
+    (find-files is-test-case? #f)))
+
+(define (run-server-header-test tests)
+  (if (empty? tests)
+      (void)
+      (let* ([test (path->string (car tests))]
+             [out-file (apply build-path (reverse (cons (string-append (car (reverse (string-split test "/")))
+                                                                       "server.h")
+                                                        (cdr (reverse (string-split test "/"))))))])
+        (displayln `(server header test: ,test) (current-error-port))
+        (system* exec "-serverheader" test out-file))))
+      
+
+(define (run-server-source-test tests)
+    (if (empty? tests)
+      (void)
+      (let* ([test (path->string (car tests))]
+             [out-file (apply build-path (reverse (cons (string-append (car (reverse (string-split test "/")))
+                                                                       "server.c")
+                                                        (cdr (reverse (string-split test "/"))))))])
+        (displayln `(server source test: ,test) (current-error-port))
+        (system* exec "-serversource" test out-file))))
+
+(define (run-client-header-test tests)
+    (if (empty? tests)
+      (void)
+      (let* ([test (path->string (car tests))]
+             [out-file (apply build-path (reverse (cons (string-append (car (reverse (string-split test "/")))
+                                                                       "client.h")
+                                                        (cdr (reverse (string-split test "/"))))))])
+        (displayln `(client header test: ,test) (current-error-port))
+        (system* exec "-clientheader" test out-file))))
+
+(define (run-client-source-test tests)
+    (if (empty? tests)
+      (void)
+      (let* ([test (path->string (car tests))]
+             [out-file (apply build-path (reverse (cons (string-append (car (reverse (string-split test "/")))
+                                                                       "client.c")
+                                                        (cdr (reverse (string-split test "/"))))))])
+        (displayln `(client source test: ,test) (current-error-port))
+        (system* exec "-clientsource" test out-file))))
+
+
+(define (run-tests tests)
+  (displayln "Running server header test")
+  (run-server-header-test tests)
+  (displayln "Running server source test")
+  (run-server-source-test tests)
+  (displayln "Running client header test")
+  (run-client-header-test tests)
+  (displayln "Running client source test")
+  (run-client-source-test tests))
+
+;;(run-tests test-cases)

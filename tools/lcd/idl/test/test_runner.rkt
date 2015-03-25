@@ -2,24 +2,25 @@
 
 
 ;; just check if extention is .idl
+;; all paths relative to current directory
 (define (is-test-case? path)
   (let* ([split-path (string-split (path->string path) "/")]
-        [reversed (reverse split-path)]
-        [directory (cadr reversed)]
-        [file (car reversed)]
-        [ext (string-split file ".")])
-    (and (equal? directory "test_cases")
-         (equal? ext "idl"))))
+        [reversed (reverse split-path)])
+    (if (empty? (cdr reversed))
+        #f
+        (and (equal? (cadr reversed) "test_cases")
+             (equal? (car (reverse (string-split (car reversed) ".")))
+                     "idl")))))
 
 (define exec (string->path "../compiler"))
 
 (define test-cases
-  (with-handlers ([exn:fail? (lambda (exn) '())])
-    (find-files is-test-case? #f)))
+ ;; (with-handlers ([exn:fail? (lambda (exn) '())])
+    (find-files is-test-case? #f))
 
 (define (run-server-header-test tests)
   (if (empty? tests)
-      (void)
+      (displayln "no tests")
       (let* ([test (path->string (car tests))]
              [out-file (apply build-path (reverse (cons (string-append (car (reverse (string-split test "/")))
                                                                        "server.h")
@@ -30,7 +31,7 @@
 
 (define (run-server-source-test tests)
     (if (empty? tests)
-      (void)
+      (displayln "no tests")
       (let* ([test (path->string (car tests))]
              [out-file (apply build-path (reverse (cons (string-append (car (reverse (string-split test "/")))
                                                                        "server.c")
@@ -69,4 +70,4 @@
   (displayln "Running client source test")
   (run-client-source-test tests))
 
-;;(run-tests test-cases)
+(run-tests test-cases)

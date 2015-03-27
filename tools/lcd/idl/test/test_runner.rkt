@@ -16,7 +16,9 @@
 
 (define test-cases
  ;; (with-handlers ([exn:fail? (lambda (exn) '())])
-    (find-files is-test-case? #f))
+  (map (lambda (p)
+         (build-path (current-directory) p))
+       (find-files is-test-case? #f)))
 
 (define (run-server-header-test tests)
   (if (empty? tests)

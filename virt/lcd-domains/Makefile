@@ -7,7 +7,7 @@ ccflags-y               	   += -Werror
 # The module
 obj-$(CONFIG_LCD_DOMAINS)	   += lcd-domains.o
 
-lcd-domains-y                      += main.o ipc.o kliblcd.o cap.o
+lcd-domains-y                      := main.o ipc.o kliblcd.o cap.o
 
 lcd-domains-y                      += ../../arch/$(ARCH)/lcd-domains/main.o
 

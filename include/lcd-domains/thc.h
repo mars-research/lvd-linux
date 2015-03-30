@@ -6,6 +6,7 @@
 //#include <stdint.h>
 //#include <stdlib.h>
 #include <lcd-domains/types.h>
+#include <linux/sched.h>
 
 #ifndef BARRELFISH
 typedef int errval_t;

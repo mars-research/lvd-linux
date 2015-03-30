@@ -63,6 +63,7 @@ struct sched_param {
 #ifdef CONFIG_HAVE_LCD
 struct lcd;
 struct cptr_cache;
+struct ptstate_t;
 #endif
 
 #include <asm/processor.h>
@@ -1468,6 +1469,11 @@ struct task_struct {
 	atomic_t usage;
 	unsigned int flags;	/* per process flags, defined below */
 	unsigned int ptrace;
+#ifdef CONFIG_HAVE_LCD
+	struct lcd *lcd;
+	struct cptr_cache *cptr_cache;
+	struct ptstate_t *ptstate; /* per thread state */
+#endif
 #ifdef CONFIG_SMP
 	struct llist_node wake_entry;
 	int on_cpu;
@@ -1926,11 +1932,6 @@ struct task_struct {
 	int pagefault_disabled;
 #ifdef CONFIG_MMU
 	struct task_struct *oom_reaper_list;
-#endif
-
-#ifdef CONFIG_HAVE_LCD
-	struct lcd *lcd;
-	struct cptr_cache *cptr_cache;
 #endif
 
 /* CPU-specific state of this task */

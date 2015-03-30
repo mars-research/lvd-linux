@@ -2,7 +2,7 @@
 # LCD ASYNC
 #
 
-config CONFIG_LAZY_THC
+config LAZY_THC
        bool "CONFIG LAZY THC"
        default y
        ---help---

@@ -331,7 +331,7 @@ static int test09(void)
 	/*
 	 * Create a new lcd
 	 */
-	ret = lcd_create_module_lcd(&lcd, "lcd_test_mod_load",
+	ret = lcd_create_module_lcd(&lcd, "lcd_test_mod_printk",
 				LCD_CPTR_NULL, &mi);
 	if (ret) {
 		LCD_ERR("create module lcd");

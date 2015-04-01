@@ -88,5 +88,14 @@ config LCD_TEST_MOD_IPC2_LCD2
        depends on LCD_TEST_MOD_IPC2
        default m
 
+# --------------------------------------------------
+
+config LCD_TEST_MOD_PRINTK
+       tristate "Basic test for lcd printk"
+       depends on LCD_DOMAINS
+       default m
+       ---help---
+       Tests printk'ing a few messages.
+
 endif
 

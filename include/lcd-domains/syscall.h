@@ -13,5 +13,6 @@
 #define	LCD_SYSCALL_RECV       2
 #define	LCD_SYSCALL_CALL       3
 #define	LCD_SYSCALL_REPLY      4
+#define	LCD_SYSCALL_PUTCHAR    5
 
 #endif /* LCD_DOMAINS_SYSCALL_H */

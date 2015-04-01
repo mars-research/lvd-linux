@@ -242,6 +242,38 @@ void __noreturn lcd_exit(int retval)
 		LCD_DO_SYSCALL(LCD_SYSCALL_EXIT); /* doesn't return */
 }
 
+/* LOW-LEVEL CONSOLE -------------------------------------------------- */
+
+int lcd_put_char(char c)
+{
+	lcd_set_r0(c);
+	return LCD_DO_SYSCALL(LCD_SYSCALL_PUTCHAR);
+}
+
+#include "vsnprintf.c"
+
+void lcd_printk(char *fmt, ...)
+{
+	va_list args;
+	char buf[512]; /* this is probably a bit big ... */
+	char *p;
+	/*
+	 * Convert fmt string to chars
+	 */
+	va_start(args, fmt);
+	lcd_vsnprintf(buf, 512, fmt, args);
+	va_end(args);
+	/*
+	 * Write char by char
+	 */
+	for (p = buf; *p; p++)
+		lcd_put_char(*p);
+	/*
+	 * Write null char
+	 */
+	lcd_put_char(0);
+}
+
 
 /* IPC -------------------------------------------------- */
 

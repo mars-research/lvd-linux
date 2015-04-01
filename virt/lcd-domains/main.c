@@ -251,6 +251,10 @@ int __lcd_create__(struct lcd **out)
 	 * Initialize send/recv queue list element
 	 */
 	INIT_LIST_HEAD(&lcd->endpoint_queue);
+	/*
+	 * Initialize console cursor
+	 */
+	lcd->console_cursor = 0;
 
 	*out = lcd;
 
@@ -802,6 +806,46 @@ lock_skip:
 
 /* LCD EXECUTION -------------------------------------------------- */
 
+static int __lcd_put_char(struct lcd *lcd)
+{
+	char c;
+	/*
+	 * Char is in r0
+	 */
+	c = __lcd_r0(lcd->utcb);
+	/*
+	 * Put char in lcd's console buff
+	 */
+	lcd->console_buff[lcd->console_cursor] = c;
+	/*
+	 * Bump cursor and check
+	 */
+	lcd->console_cursor++;
+	if (c == 0) {
+		/*
+		 * End of string; printk to host and reset buff
+		 */
+		printk(KERN_INFO "message from lcd %p: %s\n",
+			lcd, lcd->console_buff);
+		lcd->console_cursor = 0;
+		return 0;
+	}
+	if (lcd->console_cursor >= LCD_CONSOLE_BUFF_SIZE - 1) {
+		/*
+		 * Filled buffer; empty it.
+		 */
+		lcd->console_buff[LCD_CONSOLE_BUFF_SIZE - 1] = 0;
+		printk(KERN_INFO "(incomplete) message from lcd %p: %s\n",
+			lcd, lcd->console_buff);
+		lcd->console_cursor = 0;
+		return 0;
+	}
+	/*
+	 * Otherwise, char stays buffered
+	 */
+	return 0;
+}
+
 static int lcd_handle_syscall(struct lcd *lcd, int *lcd_ret)
 {
 	int syscall_id;
@@ -818,6 +862,13 @@ static int lcd_handle_syscall(struct lcd *lcd, int *lcd_ret)
 		 */
 		*lcd_ret = (int)__lcd_r0(lcd->utcb);
 		ret = 1;
+		break;
+	case LCD_SYSCALL_PUTCHAR:
+		/*
+		 * Put char and possibly print on host
+		 */
+		ret = __lcd_put_char(lcd);
+		lcd_arch_set_syscall_ret(lcd->lcd_arch, ret);
 		break;
 	case LCD_SYSCALL_SEND:
 		/*

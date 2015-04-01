@@ -64,6 +64,11 @@ kernel source,
             -- go into Virtualization (2) and select Lightweight Capability
                Domains and Intel Support for LCDs
             -- it is recommended you build them as modules, for debugging
+            -- ** important ** : go into Processor type and features, and
+               turn off the stack protector feature (-fstack-protector);
+               otherwise, gcc will compile kernel code (include the modules
+               that are going inside lcd's) to use a stack protector, and
+               the lcd's are not configured for that
 
     [ 2 ] exit and save the configuration
 

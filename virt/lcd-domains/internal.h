@@ -215,6 +215,8 @@ enum lcd_xmit_status {
 	LCD_XMIT_FAILED  = 2, /* when send/recv failed    */
 };
 
+#define LCD_CONSOLE_BUFF_SIZE 512
+
 struct lcd {
 	/*
 	 * Lock
@@ -276,6 +278,11 @@ struct lcd {
 	 * then check if the lcd is in the queue.
 	 */
 	struct list_head endpoint_queue;
+	/*
+	 * Console
+	 */
+	char console_buff[LCD_CONSOLE_BUFF_SIZE];
+	unsigned console_cursor;
 };
 
 /* similar to task structs */

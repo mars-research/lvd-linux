@@ -220,7 +220,7 @@ Keyword		=     	"out" {{ int * x = (int *) malloc(sizeof(int));
 Start		=	k:Keyword Spacing COMMA Spacing {{ value = k; }}
 
 Specification	=	s:Start* l:Last {{
-			std::vector<bool> specs (4, false);
+			std::vector<bool>* specs = new std::vector<bool>(4, false);
 			for(Value::iterator it = s.getValues().begin(); it != s.getValues().end(); it ++)
 			{
 				const Value & v = *it;
@@ -230,20 +230,22 @@ Specification	=	s:Start* l:Last {{
 					printf("error x is null\n");
 					exit(0);       
 				}
-				specs[*x -1] = true;
-				 
+				specs->at(*x -1) = true;
 			}
 			int * y = (int *) l.getValue();
 			if(!y) { printf("error y is null\n"); exit(0); }
-			specs[*y-1] = true;
-			value = &specs; }}
+			specs->at(*y-1) = true;
+			value = specs; }}
 
-ProjField	=	OPENS Spacing s:Specification CLOSES Spacing t:Type_form id:Identifier Spacing SEMI Spacing {{ int * spec = (int *)s.getValue();
+ProjField	=	OPENS Spacing s:Specification CLOSES Spacing t:Type_form id:Identifier Spacing SEMI Spacing {{ 
 			bool in = false; bool out = false; bool bind = false; bool alloc = false;
 			std::vector<bool>* specs = (std::vector<bool>*) s.getValue();
-			int i = 0;
+			printf("In Proj field\n");
+			int i = 1;
+			printf("%zu", specs->size());
 			for(std::vector<bool>::iterator it = specs->begin(); it != specs->end(); it ++)
 			{
+				printf("in for loop\n");
 				if(*it)
 				{
 				if(i == 0)
@@ -254,8 +256,10 @@ ProjField	=	OPENS Spacing s:Specification CLOSES Spacing t:Type_form id:Identifi
 				     bind = true;
 				else
 					alloc = true;
-				}			
+				}				
+				i += 1;
 			}
+			printf("about to construct projection field\n");
 			value = new ProjectionField(in, out, alloc, bind, (Type *) t.getValue(), (char *) id.getValue()); }}
 
 

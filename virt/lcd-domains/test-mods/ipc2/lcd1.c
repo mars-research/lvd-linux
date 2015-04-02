@@ -2,16 +2,25 @@
  * lcd1.c - code for lcd1 in ipc test
  */
 
+#include <lcd-domains/liblcd-config.h>
+
 #include <linux/module.h>
 #include <linux/kernel.h>
-#include <asm/lcd-domains/liblcd.h>
+#include <lcd-domains/liblcd.h>
 
-#include "../../../../arch/x86/lcd-domains/liblcd.c"
+#include <lcd-domains/liblcd-hacks.h>
+
+cptr_t ep;
 
 static int do_send(void)
 {
 	lcd_set_r0(12345);
-	return lcd_send(__cptr(0x10d));
+	return lcd_send(ep);
+}
+
+static void get_endpoint(void)
+{
+	ep = *((cptr_t *)gva_val(LCD_BOOT_PAGES_GVA));
 }
 
 static int __noreturn __init lcd1_init(void) 
@@ -20,6 +29,8 @@ static int __noreturn __init lcd1_init(void)
 	r = lcd_enter();
 	if (r)
 		goto out;
+
+	get_endpoint();
 
 	r = do_send();
 

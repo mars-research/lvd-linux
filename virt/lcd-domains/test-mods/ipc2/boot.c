@@ -8,13 +8,21 @@
 #include <linux/module.h>
 #include <linux/kernel.h>
 
+static void do_boot_params(struct lcd_info *mi, cptr_t dest)
+{
+	/*
+	 * The only thing the lcd needs is the cptr to the endpoint
+	 */
+	*((cptr_t *)mi->boot_page_base) = dest;
+}
 
 static int boot_main(void)
 {
 	int ret;
 	cptr_t endpoint;
 	cptr_t lcd1, lcd2;
-	struct lcd_module_info *mi1, *mi2;
+	cptr_t dest1, dest2;
+	struct lcd_info *mi1, *mi2;
 	/*
 	 * Enter lcd mode
 	 */
@@ -50,35 +58,53 @@ static int boot_main(void)
 		goto fail4;
 	}
 	/*
-	 * Grant access to endpoint for both lcd's
+	 * Alloc dest slots
 	 */
-	ret = lcd_cap_grant(lcd1, endpoint, __cptr(0x10d));
+	ret = __lcd_alloc_cptr(mi1->cache, &dest1);
 	if (ret) {
-		LIBLCD_ERR("failed to grant endpoint to lcd1");
+		LIBLCD_ERR("failed to alloc cptr");
 		goto fail5;
 	}
-	ret = lcd_cap_grant(lcd2, endpoint, __cptr(0x10d));
+	ret = __lcd_alloc_cptr(mi2->cache, &dest2);
 	if (ret) {
-		LIBLCD_ERR("failed to grant endpoint to lcd2");
+		LIBLCD_ERR("failed to alloc cptr");
 		goto fail6;
 	}
+	/*
+	 * Grant access to endpoint for both lcd's
+	 */
+	ret = lcd_cap_grant(lcd1, endpoint, dest1);
+	if (ret) {
+		LIBLCD_ERR("failed to grant endpoint to lcd1");
+		goto fail7;
+	}
+	ret = lcd_cap_grant(lcd2, endpoint, dest2);
+	if (ret) {
+		LIBLCD_ERR("failed to grant endpoint to lcd2");
+		goto fail8;
+	}
+	/*
+	 * Set up boot info
+	 */
+	do_boot_params(mi1, dest1);
+	do_boot_params(mi2, dest2);
 	/*
 	 * Run lcd's
 	 */
 	ret = lcd_run(lcd1);
 	if (ret) {
 		LIBLCD_ERR("failed to start lcd1");
-		goto fail7;
+		goto fail8;
 	}
 	ret = lcd_run(lcd2);
 	if (ret) {
 		LIBLCD_ERR("failed to start lcd2");
-		goto fail8;
+		goto fail9;
 	}
 	/*
-	 * Wait for 2 seconds
+	 * Wait for 4 seconds
 	 */
-	msleep(2000);
+	msleep(4000);
 	/*
 	 * Tear everything down
 	 */
@@ -86,6 +112,7 @@ static int boot_main(void)
 	goto out;
 
 out:
+fail9:
 fail8:
 fail7:
 fail6:

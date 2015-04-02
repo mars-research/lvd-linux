@@ -65,3 +65,29 @@ The following transitions are an error (return non-zero), and have no effect:
 
 Some of these may be too restrictive, and could change in the future (e.g.,
 allow re-config).
+
+========================================
+CREATING AN LCD
+========================================
+
+This code is the most complicated part of kliblcd.c. We package up all of the
+context and data for setting up a module LCD inside struct lcd_info. This
+contains lists of pages we've mapped in the LCD, the temporary cptr
+cache we're using to set up the LCD's cspace, and so on. This is done so
+that we can properly boot the LCD and tear everything down later.
+
+There are two main parts: loading the module and setting up the VM.
+
+Loading the module happens in:
+
+   lcd_load_module
+
+Setting up the VM happens in:
+
+   lcd_create_module_lcd
+
+lcd_create_module_lcd loads the module and sets up the LCD's address space.
+The caller can then finish the boot process by populating the boot info
+pages for the LCD, providing it with endpoints, and so on.
+
+See the examples in test-mods/ for usage.

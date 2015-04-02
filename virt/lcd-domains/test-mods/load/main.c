@@ -1,10 +1,11 @@
-#include <linux/module.h>
-#include <linux/kernel.h>
-#include <asm/lcd-domains/liblcd.h>
-
-#include "../../../../arch/x86/lcd-domains/liblcd.c"
-
 /*
+ * Simple LCD load test. This just spins in an infinite loop, so
+ * whoever boots this code should make sure they kill it after
+ * so much time.
+ *
+ * IMPORTANT: This code *does not* expect to be booted so that
+ * it can use kmalloc, page alloc, etc.
+ *
  * IMPORTANT: This module should be compiled without
  * optimizations (see Makefile in this directory).
  * Otherwise, the loop in foo will be optimized away and
@@ -21,6 +22,15 @@
  * is loaded. You can look at the relocation info in the
  * .ko elf file with readelf -a.
  */
+
+#include <lcd-domains/liblcd-config.h>
+
+#include <linux/module.h>
+#include <linux/kernel.h>
+#include <lcd-domains/liblcd.h>
+
+#include <lcd-domains/liblcd-hacks.h>
+
 
 static int foo(int x)
 {

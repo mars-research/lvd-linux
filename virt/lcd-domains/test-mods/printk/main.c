@@ -1,8 +1,19 @@
+/*
+ * Simple test for lcd_printk.
+ *
+ * IMPORTANT: This code *does not* expect to be
+ * booted to use kmalloc, page alloc, etc., so if you
+ * try to add kmalloc in here, make sure whoever boots
+ * this code sets up things properly!
+ */
+
+#include <lcd-domains/liblcd-config.h>
+
 #include <linux/module.h>
 #include <linux/kernel.h>
-#include <asm/lcd-domains/liblcd.h>
+#include <lcd-domains/liblcd.h>
 
-#include "../../../../arch/x86/lcd-domains/liblcd.c"
+#include <lcd-domains/liblcd-hacks.h>
 
 static int __noreturn __init test_init(void) 
 {

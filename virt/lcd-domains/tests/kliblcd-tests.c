@@ -121,14 +121,14 @@ fail1:
 static int test05(void)
 {
 	int ret;
-	struct lcd_module_info *mi;
+	struct lcd_info *mi;
 
 	ret = lcd_enter();
 	if (ret) {
 		LCD_ERR("enter");
 		goto fail1;
 	}
-	ret = lcd_load_module("lcd_test_mod_load", LCD_CPTR_NULL, &mi);
+	ret = lcd_load_module("lcd_test_mod_printk", LCD_CPTR_NULL, &mi);
 	if (ret) {
 		LCD_ERR("lcd load module");
 		goto fail2;
@@ -162,7 +162,7 @@ static int test06(void)
 		LCD_ERR("cptr alloc");
 		goto fail2;
 	}
-	if (cptr_val(c) != 1) {
+	if (cptr_val(c) != 3) {
 		LCD_ERR("unexpected cptr %llu", cptr_val(c));
 		goto fail3;
 	}
@@ -249,7 +249,7 @@ static int test08(void)
 	 * Alloc enough to fill root
 	 */
 	top = 1 << LCD_CPTR_SLOT_BITS;
-	for (i = 1; i < top; i++) {
+	for (i = 3; i < top; i++) {
 		ret = __lcd_alloc_cptr(cache, &c);
 		if (ret) {
 			LCD_ERR("cache alloc at %d", i);
@@ -284,13 +284,13 @@ static int test08(void)
 	 * Free root
 	 */
 	top = 1 << LCD_CPTR_SLOT_BITS;
-	for (i = 1; i < top; i++)
+	for (i = 3; i < top; i++)
 		__lcd_free_cptr(cache, __cptr(i));
 	/*
 	 * Re-alloc enough to fill root
 	 */
 	top = 1 << LCD_CPTR_SLOT_BITS;
-	for (i = 1; i < top; i++) {
+	for (i = 3; i < top; i++) {
 		ret = __lcd_alloc_cptr(cache, &c);
 		if (ret) {
 			LCD_ERR("cache alloc at %d", i);
@@ -316,10 +316,9 @@ fail1:
 static int test09(void)
 {
 	int ret;
-	struct lcd_module_info *mi;
+	struct lcd_info *mi;
 	cptr_t lcd;
 
-	LCD_MSG("\n\nin test09------------------------\n\n");
 	/*
 	 * Enter lcd mode
 	 */

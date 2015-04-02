@@ -593,6 +593,14 @@ void __lcd_cap_delete(struct cspace *cspace, cptr_t c)
 	int ret;
 
 	/*
+	 * Fail for null
+	 */
+	if (cptr_is_null(c)) {
+		LCD_ERR("trying to delete null cptr");
+		return;
+	}
+
+	/*
 	 * This entire thing has to go in a loop - we need to release
 	 * the lock on cnode and try again until we can lock the cdt.
 	 */
@@ -700,6 +708,15 @@ int __lcd_cap_grant(struct cspace *cspacesrc, cptr_t c_src,
 	int ret;
 
 	/*
+	 * Fail for null
+	 */
+	if (cptr_is_null(c_src) || cptr_is_null(c_dst)) {
+		LCD_ERR("trying to grant with a null cptr");
+		return -EINVAL;
+	}
+
+
+	/*
 	 * This entire thing has to go in a loop - we need to release
 	 * the lock on (at least) the source cnode and try again until we can 
 	 * lock the cdt containing the source cnode.
@@ -784,6 +801,7 @@ int __lcd_cap_grant_page(struct cspace *cspacesrc, cptr_t c_src,
 {
 	struct cnode *cnode;
 	int ret;
+
 	/*
 	 * Do regular grant
 	 */
@@ -925,6 +943,15 @@ int __lcd_cap_revoke(struct cspace *cspace, cptr_t c)
 {
 	struct cnode *cnode;
 	int ret;
+
+	/*
+	 * Fail for null
+	 */
+	if (cptr_is_null(c)) {
+		LCD_ERR("trying to delete null cptr");
+		return -EINVAL;
+	}
+
 	/*
 	 * This whole thing needs to go in a loop - we need to release the
 	 * cnode and keep trying until we can lock the cdt that contains it.

@@ -31,3 +31,8 @@ in the upstream kernel after we branched off version 3.10.14. You might
 see - watchdog: timeout on eth0 (bnx2) etc. etc. And you may lose connectivity
 and possibly a hang (if you're trying to access a file via nfs).
 
+-- There may be bad interactions with KVM code if you load it. This might
+be the source of the bad hang, but I'm not sure.
+
+-- See also some of the tips in liblcd.txt: Notes & Suggestions when debugging
+page faults, etc. inside an LCD.

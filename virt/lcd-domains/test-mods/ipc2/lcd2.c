@@ -2,16 +2,20 @@
  * lcd2.c - code for lcd2 in ipc test
  */
 
+#include <lcd-domains/liblcd-config.h>
+
 #include <linux/module.h>
 #include <linux/kernel.h>
-#include <asm/lcd-domains/liblcd.h>
+#include <lcd-domains/liblcd.h>
 
-#include "../../../../arch/x86/lcd-domains/liblcd.c"
+#include <lcd-domains/liblcd-hacks.h>
+
+cptr_t ep;
 
 static int do_recv(void)
 {
 	int ret;
-	ret = lcd_recv(__cptr(0x10d));
+	ret = lcd_recv(ep);
 	if (ret)
 		return ret;
 	else if (lcd_r0() != 12345)
@@ -20,12 +24,19 @@ static int do_recv(void)
 		return 0;
 }
 
+static void get_endpoint(void)
+{
+	ep = *((cptr_t *)gva_val(LCD_BOOT_PAGES_GVA));
+}
+
 static int __noreturn __init lcd2_init(void) 
 {
 	int r;
 	r = lcd_enter();
 	if (r)
 		goto out;
+
+	get_endpoint();
 
 	r = do_recv();
 

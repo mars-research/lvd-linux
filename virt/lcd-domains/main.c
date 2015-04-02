@@ -197,6 +197,49 @@ fail1:
 	return ret;
 }
 
+int __klcd_pages_zalloc(struct lcd *klcd, cptr_t *slots, 
+			hpa_t *hp_base_out, hva_t *hv_base_out,
+			unsigned order)
+{
+	int ret;
+	struct page *p;
+	int i, j;
+	/*
+	 * Allocate a page
+	 */
+	p = alloc_pages(GFP_KERNEL, order);
+	if (!p) {
+		LCD_ERR("alloc failed");
+		ret = -ENOMEM;
+		goto fail1;
+	}
+	memset(page_address(p), 0, (1 << order) * PAGE_SIZE);
+	/*
+	 * Insert them into klcd's cspace
+	 */
+	for (i = 0; i < (1 << order); i++) {
+		ret = __lcd_cap_insert(&klcd->cspace, slots[i], 
+				p + i, LCD_CAP_TYPE_PAGE);
+		if (ret) {
+			LCD_ERR("insert");
+			goto fail2;
+		}
+	}
+	/*
+	 * Store addresses
+	 */
+	*hv_base_out = va2hva(page_address(p));
+	*hp_base_out = hva2hpa(*hv_base_out);
+
+	return 0;
+
+fail2:
+	for (j = 0; j < i; j++)
+		__lcd_cap_delete(&klcd->cspace, slots[i]);
+	__free_pages(p, order);
+fail1:
+	return ret;
+}
 
 /* IPC -------------------------------------------------- */
 
@@ -840,9 +883,162 @@ static int __lcd_put_char(struct lcd *lcd)
 		lcd->console_cursor = 0;
 		return 0;
 	}
+	return 0;
+}
+
+static int do_page_alloc(struct lcd *lcd)
+{
+	int ret;
+	cptr_t c;
+	struct page *p;
 	/*
-	 * Otherwise, char stays buffered
+	 * Get dest slot
 	 */
+	c = __lcd_cr0(lcd->utcb);
+	/*
+	 * Allocate a zero'd page
+	 */
+	p = alloc_page(GFP_KERNEL);
+	if (!p) {
+		LCD_ERR("alloc failed");
+		ret = -ENOMEM;
+		goto fail1;
+	}
+	memset(page_address(p), 0, PAGE_SIZE);
+	/*
+	 * Insert into lcd's cspace
+	 */
+	ret = __lcd_cap_insert(&lcd->cspace, c, p, LCD_CAP_TYPE_PAGE);
+	if (ret) {
+		LCD_ERR("insert");
+		goto fail2;
+	}
+
+	return 0;
+
+fail2:
+	__free_pages(p, 0);
+fail1:
+	return ret;
+}
+
+static int do_page_map(struct lcd *lcd)
+{
+	int ret;
+	cptr_t page;
+	gpa_t gpa;
+	struct page *page_struct;
+	struct cnode *page_cnode;
+	/*
+	 * Get dest to map
+	 */
+	gpa = __gpa(__lcd_r0(lcd->utcb));
+	/*
+	 * Get page cptr
+	 */
+	page = __lcd_cr0(lcd->utcb);
+	/*
+	 * Look up page in lcd's cspace
+	 */
+	ret = lcd_get_page(&lcd->cspace, page, &page_cnode, &page_struct);
+	if (ret)
+		goto fail1;
+	/*
+	 * If page is already mapped, fail
+	 */
+	if (page_cnode->is_mapped) {
+		LCD_ERR("page already mapped");
+		ret = -EINVAL;
+		lcd_put_page(page_cnode, page_struct);
+		goto fail2;
+	}
+	/*
+	 * Map page
+	 */
+	ret = gp_map(lcd, gpa, va2hpa(page_address(page_struct)));
+	if (ret) {
+		LCD_ERR("map");
+		lcd_put_page(page_cnode, page_struct);
+		goto fail3;
+	}
+	/*
+	 * Mark page as mapped, and where it's mapped
+	 */
+	page_cnode->is_mapped = 1;
+	page_cnode->where_mapped = gpa;
+	/*
+	 * Release page cnode, etc.
+	 */
+	lcd_put_page(page_cnode, page_struct);
+
+	return 0;
+
+fail3:
+fail2:
+fail1:
+	return ret;
+}
+
+static int do_page_unmap(struct lcd *lcd)
+{
+	int ret;
+	cptr_t page;
+	gpa_t gpa;
+	struct page *page_struct;
+	struct cnode *page_cnode;
+	/*
+	 * Get dest to unmap
+	 */
+	gpa = __gpa(__lcd_r0(lcd->utcb));
+	/*
+	 * Get page cptr
+	 */
+	page = __lcd_cr0(lcd->utcb);
+	/*
+	 * Look up page in lcd's cspace
+	 */
+	ret = lcd_get_page(&lcd->cspace, page, &page_cnode, &page_struct);
+	if (ret)
+		goto fail1;
+	/*
+	 * If page is not mapped, fail
+	 */
+	if (!page_cnode->is_mapped || 
+		gpa_val(page_cnode->where_mapped) != gpa_val(gpa)) {
+		LCD_ERR("page not mapped or mapped elsewhere");
+		ret = -EINVAL;
+		lcd_put_page(page_cnode, page_struct);
+		goto fail2;
+	}
+	/*
+	 * Unmap page
+	 */
+	gp_unmap(lcd, gpa);
+	/*
+	 * Mark page as not mapped
+	 */
+	page_cnode->is_mapped = 0;
+	/*
+	 * Release page cnode, etc.
+	 */
+	lcd_put_page(page_cnode, page_struct);
+
+	return 0;
+
+fail2:
+fail1:
+	return ret;
+}
+
+static int do_cap_delete(struct lcd *lcd)
+{
+	cptr_t slot;
+	/*
+	 * Get cptr
+	 */
+	slot = __lcd_cr0(lcd->utcb);
+	__lcd_cap_delete(&lcd->cspace, slot);
+
 	return 0;
 }
 
@@ -853,7 +1049,8 @@ static int lcd_handle_syscall(struct lcd *lcd, int *lcd_ret)
 	int ret;
 	
 	syscall_id = lcd_arch_get_syscall_num(lcd->lcd_arch);
-	LCD_MSG("got syscall %d from lcd %p", syscall_id, lcd);
+	if (syscall_id != LCD_SYSCALL_PUTCHAR)
+		LCD_MSG("got syscall %d from lcd %p", syscall_id, lcd);
 
 	switch (syscall_id) {
 	case LCD_SYSCALL_EXIT:
@@ -925,6 +1122,34 @@ static int lcd_handle_syscall(struct lcd *lcd, int *lcd_ret)
 		ret = __lcd_reply(lcd);
 		lcd_arch_set_syscall_ret(lcd->lcd_arch, ret);
 		break;
+	case LCD_SYSCALL_PAGE_ALLOC:
+		/*
+		 * Do page alloc
+		 */
+		ret = do_page_alloc(lcd);
+		lcd_arch_set_syscall_ret(lcd->lcd_arch, ret);
+		break;
+	case LCD_SYSCALL_PAGE_MAP:
+		/*
+		 * Do page map
+		 */
+		ret = do_page_map(lcd);
+		lcd_arch_set_syscall_ret(lcd->lcd_arch, ret);
+		break;
+	case LCD_SYSCALL_PAGE_UNMAP:
+		/*
+		 * Do page unmap
+		 */
+		ret = do_page_unmap(lcd);
+		lcd_arch_set_syscall_ret(lcd->lcd_arch, ret);
+		break;
+	case LCD_SYSCALL_CAP_DELETE:
+		/*
+		 * Do cap delete
+		 */
+		ret = do_cap_delete(lcd);
+		lcd_arch_set_syscall_ret(lcd->lcd_arch, ret);
+		break;
 	default:
 		LCD_ERR("unimplemented syscall %d", syscall_id);
 		ret = -ENOSYS;
@@ -959,11 +1184,12 @@ static int lcd_kthread_run_once(struct lcd *lcd, int *lcd_ret)
 		ret = -ENOSYS;
 		goto out;
 	case LCD_ARCH_STATUS_CR3_ACCESS:
-		LCD_ERR("cr3 access");
-		ret = -ENOSYS;
+		/*
+		 * Continue
+		 */
+		ret = 0;
 		goto out;
 	case LCD_ARCH_STATUS_SYSCALL:
-		LCD_MSG("syscall");
 		ret = lcd_handle_syscall(lcd, lcd_ret);
 		goto out;
 	}
@@ -1020,6 +1246,8 @@ static int lcd_kthread_main(void *data) /* data is NULL */
 	int lcd_ret = 0;
 
 	current_lcd = current->lcd;
+	
+	LCD_MSG("entered kthread");
 
 	/*
 	 * Enter run loop, check after each iteration if we should stop

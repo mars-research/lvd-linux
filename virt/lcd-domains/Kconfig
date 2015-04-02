@@ -38,7 +38,9 @@ config LCD_TEST_MOD_LOAD
        depends on LCD_DOMAINS
        default m
        ---help---
-       Simple infinite loop - don't run outside lcd, it never quits!
+       Simple infinite loop - don't run outside lcd, it never quits! This
+       doesn't have a separate boot module. It's meant to be booted by e.g.
+       a test case in the lcd tests suite.
 
 # --------------------------------------------------
 
@@ -96,6 +98,27 @@ config LCD_TEST_MOD_PRINTK
        default m
        ---help---
        Tests printk'ing a few messages.
+
+# --------------------------------------------------
+
+config LCD_TEST_MOD_MM
+       bool "Memory management example"
+       depends on LCD_DOMAINS
+       default y
+       select LCD_TEST_MOD_MM_BOOT
+       select LCD_TEST_MOD_MM_LCD
+       ---help---
+       Big memory management example.
+
+config LCD_TEST_MOD_MM_BOOT
+       tristate
+       depends on LCD_TEST_MOD_MM
+       default m
+
+config LCD_TEST_MOD_MM_LCD
+       tristate
+       depends on LCD_TEST_MOD_MM
+       default m
 
 endif
 

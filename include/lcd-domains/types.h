@@ -98,6 +98,13 @@ static inline unsigned long lcd_cptr_level(cptr_t c)
 	return i;
 }
 
+/* CPTR CACHE -------------------------------------------------- */
+
+struct cptr_cache {
+	unsigned long *bmaps[1 << LCD_CPTR_DEPTH_BITS];
+};
+
+
 /* ADDRESS SPACE TYPES ---------------------------------------- */
 
 /* XXX: Assumes host and guest run in 64-bit mode */
@@ -199,5 +206,57 @@ static inline hpa_t hva2hpa(hva_t hva)
 {
 	return (hpa_t){ (unsigned long)__pa(hva2va(hva)) };
 }
+
+/* BOOT INFO -------------------------------------------------- */
+
+#define LCD_BOOT_PAGES_ORDER 2
+
+#define LCD_GV_PAGING_MEM_GPA __gpa(1 << 20)
+#define LCD_GV_PAGING_MEM_SIZE (4 << 20)
+#define LCD_BOOT_PAGES_GPA gpa_add(LCD_GV_PAGING_MEM_GPA, \
+					LCD_GV_PAGING_MEM_SIZE)
+#define LCD_BOOT_PAGES_SIZE ((1 << LCD_BOOT_PAGES_ORDER) * (4 << 10))
+#define LCD_STACK_GPA gpa_add(LCD_BOOT_PAGES_GPA, LCD_BOOT_PAGES_SIZE)
+#define LCD_STACK_SIZE (4 << 10)
+#define LCD_MODULE_GPA gpa_add(LCD_STACK_GPA, LCD_STACK_SIZE)
+#define LCD_GV_PAGING_MEM_GVA __gva(gpa_val(LCD_GV_PAGING_MEM_GPA))
+#define LCD_BOOT_PAGES_GVA __gva(gpa_val(LCD_BOOT_PAGES_GPA))
+#define LCD_STACK_GVA __gva(gpa_val(LCD_STACK_GPA))
+
+/* Hack for now to make boot easier */
+
+#define LCD_BMAP0_SIZE (1 << (LCD_CPTR_SLOT_BITS + 0 * LCD_CPTR_FANOUT_BITS))
+#define LCD_BMAP1_SIZE (1 << (LCD_CPTR_SLOT_BITS + 1 * LCD_CPTR_FANOUT_BITS))
+#define LCD_BMAP2_SIZE (1 << (LCD_CPTR_SLOT_BITS + 2 * LCD_CPTR_FANOUT_BITS))
+#define LCD_BMAP3_SIZE (1 << (LCD_CPTR_SLOT_BITS + 3 * LCD_CPTR_FANOUT_BITS))
+
+struct lcd_boot_info_for_page {
+	cptr_t my_cptr;
+	gpa_t page_gpa;
+};
+
+struct lcd_boot_info {
+	/*
+	 * Bootstrap cptr cache --------------------
+	 *
+	 * level 0
+	 */
+	unsigned long bmap0[LCD_BMAP0_SIZE];
+	/* level 1 */
+	unsigned long bmap1[LCD_BMAP1_SIZE];
+	/* level 2 */
+	unsigned long bmap2[LCD_BMAP2_SIZE];
+	/* level 3 */
+	unsigned long bmap3[LCD_BMAP3_SIZE];
+	/*
+	 * Bootstrap page info --------------------
+	 */
+	unsigned num_boot_mem_pi;
+	unsigned num_paging_mem_pi;
+	unsigned num_free_mem_pi;
+	struct lcd_boot_info_for_page *boot_mem_pi_start;
+	struct lcd_boot_info_for_page *paging_mem_pi_start;
+	struct lcd_boot_info_for_page *free_mem_pi_start;
+};
 
 #endif   /* LCD_DOMAINS_TYPES_H */

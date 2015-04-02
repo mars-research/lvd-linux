@@ -51,11 +51,6 @@ __KLCD_MK_REG_ACCESS(7)
 
 /* CPTR CACHE -------------------------------------------------- */
 
-struct cptr_cache {
-	unsigned long *bmaps[1 << LCD_CPTR_DEPTH_BITS];
-	struct mutex lock;
-};
-
 static int cptr_cache_init(struct cptr_cache **out)
 {
 	struct cptr_cache *cache;
@@ -93,14 +88,11 @@ static int cptr_cache_init(struct cptr_cache **out)
 		}
 	}
 	/*
-	 * Init cache lock
-	 */
-	mutex_init(&cache->lock);
-	/*
-	 * Mark null cptr as allocated
+	 * Mark reserved cptr's as allocated
 	 */
 	set_bit(0, cache->bmaps[0]);
-
+	set_bit(1, cache->bmaps[0]);
+	set_bit(2, cache->bmaps[0]);
 
 	*out = cache;
 
@@ -148,7 +140,7 @@ static int __lcd_alloc_cptr_from_bmap(unsigned long *bmap, int size,
 	return 1; /* signal we are done */
 }
 
-static int __lcd_alloc_cptr(struct cptr_cache *cptr_cache, cptr_t *free_cptr)
+int __klcd_alloc_cptr(struct cptr_cache *cptr_cache, cptr_t *free_cptr)
 {
 	int ret;
 	int depth;
@@ -156,12 +148,6 @@ static int __lcd_alloc_cptr(struct cptr_cache *cptr_cache, cptr_t *free_cptr)
 	unsigned long *bmap;
 	unsigned long idx;
 	int size;
-
-	ret = mutex_lock_interruptible(&cptr_cache->lock); 
-	if (ret) {
-		LCD_ERR("interrupted");
-		goto fail1;
-	}
 
 	depth = 0;
 	do {
@@ -171,8 +157,6 @@ static int __lcd_alloc_cptr(struct cptr_cache *cptr_cache, cptr_t *free_cptr)
 		done = __lcd_alloc_cptr_from_bmap(bmap, size, &idx);
 		depth++;
 	} while (!done && depth < (1 << LCD_CPTR_DEPTH_BITS));
-
-	mutex_unlock(&cptr_cache->lock);
 
 	if (!done) {
 		/*
@@ -193,22 +177,15 @@ static int __lcd_alloc_cptr(struct cptr_cache *cptr_cache, cptr_t *free_cptr)
 	return 0; 
 
 fail2:
-fail1:
 	return ret;
 }
 
-static void __lcd_free_cptr(struct cptr_cache *cptr_cache, cptr_t c)
+void __klcd_free_cptr(struct cptr_cache *cptr_cache, cptr_t c)
 {
-	int ret;
 	unsigned long *bmap;
 	unsigned long bmap_idx;
 	unsigned long level;
 
-	ret = mutex_lock_interruptible(&cptr_cache->lock);
-	if (ret) {
-		LCD_ERR("interrupted");
-		return;
-	}
 	/*
 	 * Get the correct level bitmap
 	 */
@@ -224,17 +201,15 @@ static void __lcd_free_cptr(struct cptr_cache *cptr_cache, cptr_t c)
 	 */
 	clear_bit(bmap_idx, bmap);
 
-	mutex_unlock(&cptr_cache->lock);
-
 	return; 
 }
 
-int lcd_alloc_cptr(cptr_t *free_slot)
+int klcd_alloc_cptr(cptr_t *free_slot)
 {
 	return __lcd_alloc_cptr(current->cptr_cache, free_slot);
 }
 
-void lcd_free_cptr(cptr_t c)
+void klcd_free_cptr(cptr_t c)
 {
 	__lcd_free_cptr(current->cptr_cache, c);
 }
@@ -282,7 +257,7 @@ void klcd_rm_page(cptr_t slot)
 
 /* LCD ENTER / EXIT -------------------------------------------------- */
 
-int lcd_enter(void)
+int klcd_enter(void)
 {
 	int ret;
 	/*
@@ -306,7 +281,7 @@ fail1:
 	return ret;
 }
 
-void lcd_exit(int retval)
+void klcd_exit(int retval)
 {
 	/*
 	 * Return value is ignored for now
@@ -348,7 +323,7 @@ fail1:
 	return ret;
 }
 
-int lcd_page_alloc(cptr_t *slot_out, gpa_t gpa)
+int klcd_page_alloc(cptr_t *slot_out, gpa_t gpa)
 {
 	hpa_t hpa;
 	hva_t hva;
@@ -359,7 +334,61 @@ int lcd_page_alloc(cptr_t *slot_out, gpa_t gpa)
 	return __lcd_page_alloc(slot_out, &hpa, &hva);
 }
 
-int lcd_gfp(cptr_t *slot_out, gpa_t *gpa_out, gva_t *gva_out)
+int __klcd_pages_zalloc(struct lcd *klcd, cptr_t *slots, 
+			hpa_t *hp_base_out, hva_t *hv_base_out,
+			unsigned order);
+
+static int lcd_pages_alloc(cptr_t **slots_out, hpa_t *hp_base_out, 
+			hva_t *hv_base_out, unsigned order)
+{
+	int ret;
+	int i, j;
+	cptr_t *slots;
+	/*
+	 * Allocate cptr mem
+	 */
+	slots = kmalloc(sizeof(cptr_t) * (1 << order), GFP_KERNEL);
+	if (!slots) {
+		LCD_ERR("out of mem");
+		ret = -ENOMEM;
+		goto fail1;
+	}
+	/*
+	 * Get cptr's from cache
+	 */
+	for (i = 0; i < (1 << order); i++) {
+		ret = lcd_alloc_cptr(&slots[i]);
+		if (ret) {
+			LCD_ERR("alloc cptr");
+			goto fail2;
+		}
+	}
+	/*
+	 * Get free pages
+	 */
+	ret = __klcd_pages_zalloc(current->lcd, slots, hp_base_out, hv_base_out,
+				order);
+	if (ret) {
+		LCD_ERR("pages alloc");
+		goto fail3;
+	}
+
+	*slots_out = slots;
+
+	return 0;
+
+fail3:
+fail2:
+	for (j = 0; j < i; j++)
+		lcd_free_cptr(slots[i]);
+	kfree(slots);
+fail1:
+	return ret;
+
+
+}
+
+int klcd_gfp(cptr_t *slot_out, gpa_t *gpa_out, gva_t *gva_out)
 {
 	hpa_t hpa;
 	hva_t hva;
@@ -378,7 +407,7 @@ fail1:
 
 /* IPC -------------------------------------------------- */
 
-int lcd_create_sync_endpoint(cptr_t *slot_out)
+int klcd_create_sync_endpoint(cptr_t *slot_out)
 {
 	int ret;
 	/*
@@ -404,22 +433,22 @@ fail1:
 	return ret;
 }
 
-int lcd_send(cptr_t endpoint)
+int klcd_send(cptr_t endpoint)
 {
 	return __lcd_send(current->lcd, endpoint);
 }
 
-int lcd_recv(cptr_t endpoint)
+int klcd_recv(cptr_t endpoint)
 {
 	return __lcd_recv(current->lcd, endpoint);
 }
 
-int lcd_call(cptr_t endpoint)
+int klcd_call(cptr_t endpoint)
 {
 	return __lcd_call(current->lcd, endpoint);
 }
 
-int lcd_reply(void)
+int klcd_reply(void)
 {
 	return __lcd_reply(current->lcd);
 }
@@ -428,7 +457,7 @@ int lcd_reply(void)
 /* LCD CREATE / CONFIG -------------------------------------------------- */
 
 
-int lcd_create(cptr_t *slot_out, gpa_t stack)
+int klcd_create(cptr_t *slot_out, gpa_t stack)
 {
 	int ret;
 	/*
@@ -449,12 +478,12 @@ fail1:
 	return ret;
 }
 
-int lcd_config(cptr_t lcd, gva_t pc, gva_t sp, gpa_t gva_root)
+int klcd_config(cptr_t lcd, gva_t pc, gva_t sp, gpa_t gva_root)
 {
 	return __lcd_config(current->lcd, lcd, pc, sp, gva_root);
 }
 
-int lcd_run(cptr_t lcd)
+int klcd_run(cptr_t lcd)
 {
 	return __lcd_run(current->lcd, lcd);
 }
@@ -462,18 +491,18 @@ int lcd_run(cptr_t lcd)
 
 /* CAPABILITIES -------------------------------------------------- */
 
-int lcd_cap_grant(cptr_t lcd, cptr_t src, cptr_t dest)
+int klcd_cap_grant(cptr_t lcd, cptr_t src, cptr_t dest)
 {
 	return __lcd_cap_grant_cheat(current->lcd, lcd, src, dest);
 }
 
-int lcd_cap_page_grant_map(cptr_t lcd, cptr_t page, cptr_t dest, gpa_t gpa)
+int klcd_cap_page_grant_map(cptr_t lcd, cptr_t page, cptr_t dest, gpa_t gpa)
 {
 	return __lcd_cap_page_grant_map_cheat(current->lcd, lcd, page, dest, 
 					gpa);
 }
 
-void lcd_cap_delete(cptr_t slot)
+void klcd_cap_delete(cptr_t slot)
 {
 	/*
 	 * Delete capability from cspace
@@ -485,7 +514,7 @@ void lcd_cap_delete(cptr_t slot)
 	lcd_free_cptr(slot);
 }
 
-int lcd_cap_revoke(cptr_t slot)
+int klcd_cap_revoke(cptr_t slot)
 {
 	/*
 	 * Revoke child capabilities
@@ -612,8 +641,87 @@ static void free_module_pages(struct list_head *mpages_list)
 	}
 }
 
-int lcd_load_module(char *mname, cptr_t mloader_endpoint, 
-		struct lcd_module_info **mi)
+static int init_lcd_info(struct lcd_info **mi)
+{
+	struct lcd_info *i;
+	int ret;
+	/*
+	 * Alloc 
+	 */
+	i = kzalloc(sizeof(*i), GFP_KERNEL);
+	if (!i) {
+		ret = -ENOMEM;
+		goto fail0;
+	}
+	/*
+	 * Init list for module pages
+	 */
+	INIT_LIST_HEAD(&i->mpages_list);
+	/*
+	 * Initialize cap cache
+	 */
+	ret = cptr_cache_init(&i->cache);
+	if (ret)
+		goto fail1;
+	/*
+	 * Init list for boot page infos
+	 */
+	INIT_LIST_HEAD(&i->boot_mem_list);
+	INIT_LIST_HEAD(&i->paging_mem_list);
+	INIT_LIST_HEAD(&i->free_mem_list);
+
+	*mi = i;
+
+	return 0;
+
+fail1:
+	kfree(i);
+fail0:
+	return ret;
+}
+
+static void free_lcd_info(struct lcd_info *i)
+{
+	struct list_head *cursor, *next;
+	struct lcd_page_info_list_elem *e;
+	/*
+	 * Destroy cptr cache
+	 */
+	cptr_cache_destroy(i->cache);
+	/*
+	 * Free page info's
+	 */
+	list_for_each_safe(cursor, next, &i->boot_mem_list) {
+		e = list_entry(cursor, struct lcd_page_info_list_elem, list);
+		kfree(e);
+	}
+	list_for_each_safe(cursor, next, &i->paging_mem_list) {
+		e = list_entry(cursor, struct lcd_page_info_list_elem, list);
+		kfree(e);
+	}
+	list_for_each_safe(cursor, next, &i->free_mem_list) {
+		e = list_entry(cursor, struct lcd_page_info_list_elem, list);
+		kfree(e);
+	}
+	/*
+	 * Depending on how far we got, we may need to free the
+	 * boot page cptr's
+	 */
+	if (i->boot_page_cptrs)
+		kfree(i->boot_page_cptrs);
+	/*
+	 * Any remaining pages allocated will be freed when the lcd is torn 
+	 * down (e.g., boot pages)
+	 */
+
+	/*
+	 * Free lcd info
+	 */
+	kfree(i);
+}
+
+int klcd_load_module(char *mname, cptr_t mloader_endpoint, 
+		struct lcd_info **mi)
 {
 	int ret;
 	/*
@@ -621,13 +729,10 @@ int lcd_load_module(char *mname, cptr_t mloader_endpoint,
 	 * code.
 	 */
 	struct module *m;
-	
-	*mi = kmalloc(sizeof(**mi), GFP_KERNEL);
-	if (!*mi) {
-		ret = -ENOMEM;
+
+	ret = init_lcd_info(mi);
+	if (ret)
 		goto fail0;
-	}
-	INIT_LIST_HEAD(&(*mi)->mpages_list);
 	/*
 	 * Load module in host
 	 */
@@ -647,6 +752,8 @@ int lcd_load_module(char *mname, cptr_t mloader_endpoint,
 	if (ret) {
 		goto fail3;
 	}
+	LCD_MSG("module %s init @ 0x%lx core @ 0x%lx",
+		mname, m->module_init, m->module_core);
 	/*
 	 * Copy name and module init address
 	 */
@@ -659,12 +766,12 @@ fail3:
 fail2:
 	free_module_pages(&(*mi)->mpages_list);
 fail1:
-	kfree(*mi);
+	free_lcd_info(*mi);
 fail0:
 	return ret;
 }
 
-void lcd_unload_module(struct lcd_module_info *mi, cptr_t mloader_endpoint)
+void klcd_unload_module(struct lcd_info *mi, cptr_t mloader_endpoint)
 {
 	int ret;
 	/*
@@ -695,7 +802,7 @@ free_mi:
 	/*
 	 * Free lcd module info
 	 */
-	kfree(mi);
+	free_lcd_info(mi);
 }
 
 /* GUEST VIRTUAL PAGING SETUP ----------------------------------- */
@@ -744,9 +851,11 @@ struct create_module_cxt {
 	unsigned int counter;
 	pgd_t *root;
 	struct cptr_cache *cache;
+	struct list_head paging_mem_infos;
 };
 
-static int cxt_init(struct create_module_cxt **cxt_out)
+static int cxt_init(struct create_module_cxt **cxt_out,
+		struct lcd_info *mi)
 {
 	int ret;
 	/*
@@ -761,18 +870,14 @@ static int cxt_init(struct create_module_cxt **cxt_out)
 		goto fail1;
 	}
 	/*
-	 * Set up cptr cache
+	 * Store ref to cptr cache
 	 */
-	ret = cptr_cache_init(&(*cxt_out)->cache);
-	if (ret) {
-		LCD_ERR("cache init");
-		goto fail2;
-	}
+	(*cxt_out)->cache = mi->cache;
+
+	INIT_LIST_HEAD(&(*cxt_out)->paging_mem_infos);
 
 	return 0;
 
-fail2:
-	kfree(*cxt_out);
 fail1:
 	return ret;
 }
@@ -791,10 +896,6 @@ static void cxt_destroy(struct create_module_cxt *cxt)
 		lcd_cap_delete(c);
 	}
 	/*
-	 * Tear down cptr cache
-	 */
-	cptr_cache_destroy(cxt->cache);
-	/*
 	 * Free cxt
 	 */
 	kfree(cxt);
@@ -808,6 +909,7 @@ static int gv_gfp(cptr_t lcd, struct create_module_cxt *cxt, gpa_t *gpa_out)
 	gva_t gva;
 	hpa_t hpa;
 	cptr_t dest_slot;
+	struct lcd_page_info_list_elem *e;
 	/*
 	 * Ensure we still have room
 	 */
@@ -857,9 +959,22 @@ static int gv_gfp(cptr_t lcd, struct create_module_cxt *cxt, gpa_t *gpa_out)
 	 * Bump page counter
 	 */
 	cxt->counter++;
+	/*
+	 * Store in list of page info's
+	 */
+	e = kmalloc(sizeof(*e), GFP_KERNEL);
+	if (!e) {
+		LCD_ERR("malloc page info");
+		goto fail5;
+	}
+	INIT_LIST_HEAD(&e->list);
+	e->my_cptr = dest_slot;
+	e->page_gpa = *gpa_out;
+	list_add(&e->list, &cxt->paging_mem_infos);
 
 	return 0;
 
+fail5: /* lcd should be torn down, everything will be freed then */
 fail4:
 	__lcd_free_cptr(cxt->cache, dest_slot);
 fail3:
@@ -1402,7 +1517,7 @@ void gv_debug(struct create_module_cxt *cxt)
 /* -------------------------------------------------- */
 
 static int map_module(cptr_t lcd, struct create_module_cxt *cxt,
-		struct lcd_module_info *mi)
+		struct lcd_info *mi)
 {
 	struct list_head *cursor;
 	struct lcd_module_page *mp;
@@ -1410,6 +1525,7 @@ static int map_module(cptr_t lcd, struct create_module_cxt *cxt,
 	gpa_t gpa;
 	int ret = 0;
 	cptr_t dest_slot;
+	struct lcd_page_info_list_elem *e;
 
 	offset = 0;
 
@@ -1453,15 +1569,30 @@ static int map_module(cptr_t lcd, struct create_module_cxt *cxt,
 			goto fail3;
 		}
 		/*
+		 * Set up page info - this is going in free mem area (at least
+		 * in the guest physical free mem area)
+		 */
+		e = kmalloc(sizeof(*e), GFP_KERNEL);
+		if (!e) {
+			LCD_ERR("alloc page info");
+			goto fail4;
+		}
+		INIT_LIST_HEAD(&e->list);
+		e->my_cptr = dest_slot;
+		e->page_gpa = gpa;
+		list_add(&e->list, &mi->free_mem_list);
+		/*
 		 * Bump offset
 		 */
 		offset += PAGE_SIZE;
 	}
 
+fail4:
 fail3:
 fail2:
 fail1:
 	return ret;	/* we failed; pages will be unmapped when lcd is
+			 * destroyed, page infos, etc. freed when lcd_info
 			 * destroyed */
 }
 
@@ -1477,15 +1608,92 @@ static int map_gv_memory_and_stack(cptr_t lcd, struct create_module_cxt *cxt)
 				gpa_val(LCD_GV_PAGING_MEM_GPA)) >> PAGE_SHIFT);
 }
 
-static int setup_addr_space(cptr_t lcd, struct lcd_module_info *mi)
+static int do_boot_pages(cptr_t lcd, struct lcd_info *mi,
+			struct create_module_cxt *cxt)
+{
+	int i;
+	int ret;
+	cptr_t *slots;
+	hpa_t hp_base_out;
+	hva_t hv_base_out;
+	struct lcd_page_info_list_elem *e;
+	unsigned long offset;
+	gpa_t gpa;
+	cptr_t dest_slot;
+	/*
+	 * Allocate the boot pages on the host
+	 */
+	ret = lcd_pages_alloc(&slots, &hp_base_out, &hv_base_out,
+			LCD_BOOT_PAGES_ORDER);
+	if (ret) {
+		LCD_ERR("pages alloc");
+		goto fail1;
+	}
+	mi->boot_page_cptrs = slots;
+	mi->boot_page_base = hva2va(hv_base_out);
+	/*
+	 * Grant and map them in the lcd
+	 */	
+	offset = 0;
+	for (i = 0; i < (1 << LCD_BOOT_PAGES_ORDER); i++) {
+		gpa = gpa_add(LCD_BOOT_PAGES_GPA, offset);
+		/*
+		 * Alloc slot in dest
+		 */
+		ret = __lcd_alloc_cptr(cxt->cache, &dest_slot);
+		if (ret) {
+			LCD_ERR("alloc failed");
+			goto fail2;
+		}
+		/*
+		 * Grant and map in lcd's guest physical
+		 */
+		ret = lcd_cap_page_grant_map(lcd, slots[i],
+					dest_slot,
+					gpa);
+		if (ret) {
+			LCD_ERR("couldn't map boot page in lcd's gp");
+			goto fail3;
+		}
+		/*
+		 * Will be mapped in guest virtual along with the stack
+		 * and paging mem pages ...
+		 */
+		/*
+		 * Set up page info
+		 */
+		e = kmalloc(sizeof(*e), GFP_KERNEL);
+		if (!e) {
+			LCD_ERR("alloc page info");
+			goto fail4;
+		}
+		INIT_LIST_HEAD(&e->list);
+		e->my_cptr = dest_slot;
+		e->page_gpa = gpa;
+		list_add(&e->list, &mi->boot_mem_list);
+		/*
+		 * Bump offset
+		 */
+		offset += PAGE_SIZE;
+	}
+fail4:
+fail3:
+fail2:
+fail1:
+	return ret;	/* we failed; pages will be unmapped when lcd is
+			 * destroyed, page infos, cptrs, etc. freed when 
+			 * lcd_info destroyed */
+}
+
+static int setup_addr_space(cptr_t lcd, struct lcd_info *mi)
 {
 	struct create_module_cxt *cxt;
 	int ret;
-	cptr_t slot;
+	int i;
 	/*
 	 * Set up guest virtual cxt
 	 */
-	ret = cxt_init(&cxt);
+	ret = cxt_init(&cxt, mi);
 	if (ret)
 		goto fail1;
 	/*
@@ -1503,33 +1711,45 @@ static int setup_addr_space(cptr_t lcd, struct lcd_module_info *mi)
 		goto fail3;
 	}
 	/*
-	 * Map guest virtual paging memory and stack/utcb
+	 * Set up boot pages
+	 */
+	ret = do_boot_pages(lcd, mi, cxt);
+	if (ret) {
+		LCD_ERR("setting up boot pages");
+		goto fail4;
+	}
+	/*
+	 * Map guest virtual paging memory, boot page, and stack/utcb
 	 */
 	ret = map_gv_memory_and_stack(lcd, cxt);
 	if (ret) {
 		LCD_ERR("mapping paging mem");
-		goto fail4;
+		goto fail5;
 	}
+	/*
+	 * Copy over list of paging mem infos before we kill cxt
+	 */
+	list_splice(&cxt->paging_mem_infos, &mi->paging_mem_list);
 	/*
 	 * Remove our references to the guest virtual paging memory, so
 	 * the pages will be freed when the lcd is torn down.
 	 */
-	/* temp ! */
-	ret = __lcd_alloc_cptr(cxt->cache, &slot);
-	if (ret) {
-		LCD_ERR("cptr alloc");
-		goto fail4;
-	}
-	LCD_MSG("next slot = 0x%lx", cptr_val(slot));
 	cxt_destroy(cxt);
 
 	return 0;
 
+fail5:
+	/* Delete our caps to boot pages. When lcd is destroyed, they
+	 * will then be freed.
+	 */
+	for (i = 0; i < (1 << LCD_BOOT_PAGES_ORDER); i++)
+		lcd_cap_delete(mi->boot_page_cptrs[i]);
 fail4:
 fail3:
 fail2:
-	/* gv_destroy just removes our caps to the gv paging pages; gv paging 
-	 * mem will be freed when lcd is destroyed.
+	/* gv_destroy just removes our caps to the gv paging pages and boot
+	 * pages; gv paging mem, boot pages, etc. will be freed when lcd is 
+	 * destroyed.
 	 *
 	 * module pages will be freed when lcd_unload_module is called
 	 */
@@ -1538,8 +1758,8 @@ fail1:
 	return ret;		
 }
 
-int lcd_create_module_lcd(cptr_t *slot_out, char *mname, 
-			cptr_t mloader_endpoint, struct lcd_module_info **mi)
+int klcd_create_module_lcd(cptr_t *slot_out, char *mname, 
+			cptr_t mloader_endpoint, struct lcd_info **mi)
 			
 {
 	int ret;
@@ -1608,7 +1828,7 @@ fail0:
 	return ret;
 }
 
-void lcd_destroy_module_lcd(cptr_t lcd, struct lcd_module_info *mi,
+void klcd_destroy_module_lcd(cptr_t lcd, struct lcd_info *mi,
 			cptr_t mloader_endpoint)
 {
 	/*
@@ -1639,30 +1859,32 @@ void __kliblcd_exit(void)
 
 /* EXPORTS -------------------------------------------------- */
 
-EXPORT_SYMBOL(lcd_alloc_cptr);
-EXPORT_SYMBOL(lcd_free_cptr);
+EXPORT_SYMBOL(__klcd_alloc_cptr);
+EXPORT_SYMBOL(__klcd_free_cptr);
+EXPORT_SYMBOL(klcd_alloc_cptr);
+EXPORT_SYMBOL(klcd_free_cptr);
 EXPORT_SYMBOL(klcd_add_page);
 EXPORT_SYMBOL(klcd_rm_page);
-EXPORT_SYMBOL(lcd_enter);
-EXPORT_SYMBOL(lcd_exit);
-EXPORT_SYMBOL(lcd_page_alloc);
-EXPORT_SYMBOL(lcd_gfp);
-EXPORT_SYMBOL(lcd_create_sync_endpoint);
-EXPORT_SYMBOL(lcd_send);
-EXPORT_SYMBOL(lcd_recv);
-EXPORT_SYMBOL(lcd_call);
-EXPORT_SYMBOL(lcd_reply);
-EXPORT_SYMBOL(lcd_create);
-EXPORT_SYMBOL(lcd_config);
-EXPORT_SYMBOL(lcd_run);
-EXPORT_SYMBOL(lcd_cap_grant);
-EXPORT_SYMBOL(lcd_cap_page_grant_map);
-EXPORT_SYMBOL(lcd_cap_delete);
-EXPORT_SYMBOL(lcd_cap_revoke);
-EXPORT_SYMBOL(lcd_load_module);
-EXPORT_SYMBOL(lcd_unload_module);
-EXPORT_SYMBOL(lcd_create_module_lcd);
-EXPORT_SYMBOL(lcd_destroy_module_lcd);
+EXPORT_SYMBOL(klcd_enter);
+EXPORT_SYMBOL(klcd_exit);
+EXPORT_SYMBOL(klcd_page_alloc);
+EXPORT_SYMBOL(klcd_gfp);
+EXPORT_SYMBOL(klcd_create_sync_endpoint);
+EXPORT_SYMBOL(klcd_send);
+EXPORT_SYMBOL(klcd_recv);
+EXPORT_SYMBOL(klcd_call);
+EXPORT_SYMBOL(klcd_reply);
+EXPORT_SYMBOL(klcd_create);
+EXPORT_SYMBOL(klcd_config);
+EXPORT_SYMBOL(klcd_run);
+EXPORT_SYMBOL(klcd_cap_grant);
+EXPORT_SYMBOL(klcd_cap_page_grant_map);
+EXPORT_SYMBOL(klcd_cap_delete);
+EXPORT_SYMBOL(klcd_cap_revoke);
+EXPORT_SYMBOL(klcd_load_module);
+EXPORT_SYMBOL(klcd_unload_module);
+EXPORT_SYMBOL(klcd_create_module_lcd);
+EXPORT_SYMBOL(klcd_destroy_module_lcd);
 
 /* (exports for register access are in that macro at the top) */
 

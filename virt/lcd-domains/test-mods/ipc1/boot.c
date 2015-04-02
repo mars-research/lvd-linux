@@ -9,12 +9,21 @@
 #include <linux/module.h>
 #include <linux/kernel.h>
 
+static void do_boot_params(struct lcd_info *mi, cptr_t dest)
+{
+	/*
+	 * The only thing the lcd needs is the cptr to the endpoint
+	 */
+	*((cptr_t *)mi->boot_page_base) = dest;
+}
+
 static int boot_main(void)
 {
 	int ret;
 	cptr_t endpoint;
 	cptr_t lcd;
-	struct lcd_module_info *mi;
+	struct lcd_info *mi;
+	cptr_t dest;
 	/*
 	 * Enter lcd mode
 	 */
@@ -41,20 +50,32 @@ static int boot_main(void)
 		goto fail3;
 	}
 	/*
-	 * Grant access to endpoint
+	 * Allocate a cptr for the lcd to hold the endpoint
 	 */
-	ret = lcd_cap_grant(lcd, endpoint, __cptr(0x10d));
+	ret = __lcd_alloc_cptr(mi->cache, &dest);
 	if (ret) {
-		LIBLCD_ERR("failed to grant endpoint to lcd");
+		LIBLCD_ERR("failed to alloc dest slot");
 		goto fail4;
 	}
+	/*
+	 * Grant access to endpoint
+	 */
+	ret = lcd_cap_grant(lcd, endpoint, dest);
+	if (ret) {
+		LIBLCD_ERR("failed to grant endpoint to lcd");
+		goto fail5;
+	}
+	/*
+	 * Set up boot info
+	 */
+	do_boot_params(mi, dest);
 	/*
 	 * Run lcd
 	 */
 	ret = lcd_run(lcd);
 	if (ret) {
 		LIBLCD_ERR("failed to start lcd");
-		goto fail5;
+		goto fail7;
 	}
 	/*
 	 * Do a send, followed by a receive
@@ -63,12 +84,12 @@ static int boot_main(void)
 	ret = lcd_send(endpoint);
 	if (ret) {
 		LIBLCD_ERR("failed to do first send");
-		goto fail6;
+		goto fail8;
 	}
 	ret = lcd_recv(endpoint);
 	if (ret) {
 		LIBLCD_ERR("recv failed");
-		goto fail7;
+		goto fail9;
 	}
 	/*
 	 * Check value in message reg r0
@@ -76,8 +97,12 @@ static int boot_main(void)
 	if (lcd_r0() != 5678) {
 		LIBLCD_ERR("unexpected value 0x%lx in reg r0",
 			lcd_r0());
-		goto fail8;
+		goto fail10;
 	}
+	/*
+	 * Hang out for a second for lcd to exit
+	 */
+	msleep(1000);
 	/*
 	 * Tear everything down
 	 */
@@ -85,9 +110,10 @@ static int boot_main(void)
 	goto out;
 
 out:
+fail10:
+fail9:
 fail8:
 fail7:
-fail6:
 fail5:
 	/* 
 	 * No need to "ungrant" - everything is taken care of during tear

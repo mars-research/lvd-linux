@@ -7,8 +7,9 @@ RootScope::RootScope()
 {
    // init builtin int types
   this->types_ = new std::map<std::string, Type*>();
-
+  
   // instert for each builtin in type, add size to type if not done alreayd
+  this->types_->insert(std::pair<std::string,Type*>("void", new VoidType()));
   this->types_->insert( std::pair<std::string,Type*>("char"
 					       , new IntegerType("char", false, sizeof(char))));
   this->types_->insert( std::pair<std::string,Type*>("unsigned char"
@@ -42,7 +43,8 @@ RootScope* RootScope::instance()
 
 Type * RootScope::lookup_symbol(const char * sym, int* err)
 {
-  std::string temp = sym;
+  std::string temp(sym);
+  
   if(this->types_->find(temp) == this->types_->end())
     {
       *err = 0;
@@ -57,7 +59,8 @@ Type * RootScope::lookup_symbol(const char * sym, int* err)
 
 int RootScope::insert_symbol(const char* sym, Type * value)
 {
-  std::string temp = sym;
+  std::string temp(sym);
+  printf("insert %s\n",temp.c_str());
   std::pair<std::map<std::string,Type*>::iterator,bool> ret;
   ret = types_->insert(std::pair<std::string, Type*>(temp, value));
   
@@ -67,7 +70,7 @@ int RootScope::insert_symbol(const char* sym, Type * value)
 // file scope
 Type* FileScope::lookup_symbol(const char* sym, int* err)
 {
-  std::string temp = sym;
+  std::string temp(sym);
   
   if(this->types_->find(temp) == this->types_->end())
     {
@@ -83,7 +86,7 @@ Type* FileScope::lookup_symbol(const char* sym, int* err)
 
 int FileScope::insert_symbol(const char* sym, Type* value)
 {
-  std::string temp = sym;
+  std::string temp(sym);
   // redefinition of something at root scope?
   std::pair<std::map<std::string,Type*>::iterator, bool> ret;
   // filescope map not rootscope

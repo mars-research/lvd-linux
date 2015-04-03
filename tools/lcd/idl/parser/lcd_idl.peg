@@ -22,7 +22,7 @@ code: {{
       {	   
       	   printf("in getType type is: %s\n", type);
       	   int err;
-      	   RootScope* rs = RootScope::instance();
+      	   FileScope* rs = current_file_scope();
 	   Type* val = rs->lookup_symbol(type, &err);
 	   if(!val)
 	   {	
@@ -73,10 +73,12 @@ IdentStart	=	[abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ_]
 
 IdentCont	=	IdentStart | [0123456789]
 
-File		=	Spacing v:Verbatim? t:Things* <eof> {{
-			std::vector<Rpc *>* rpcs = new std::vector<Rpc *>;
+File		=	Spacing v:Verbatim? d:Type_Definitions* t:Rpc* <eof> {{
+			std::vector<Rpc *>* rpcs = new std::vector<Rpc*>();
+			printf("in file matched everything\n");
 			for(Value::iterator it = t.getValues().begin(); it != t.getValues().end(); it ++)
 			{
+				printf("in this loop");
 				const Value & v = *it;
 				Rpc * rp = (Rpc *) v.getValue();
 				rpcs->push_back(rp);
@@ -144,7 +146,7 @@ String		=	<ascii 34> l:any_letter+ <ascii 34> {{
 
 any_letter	=	[_.,/?<>'; =:%`!@#$^&*()-+{}|\\ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789]
 
-Things		=	Typedef | Rpc | Projection
+Type_Definitions=	Typedef | Projection
 
 Include		=	"#include" Space+ "<" Spacing f:Identifier Spacing ">" Spacing {{
 			std::ostringstream total;
@@ -180,7 +182,9 @@ Parameters	=	f:FirstParam* l:LastParam {{
 
 Rpc		=	"rpc" Space+ t:Type_form id1:Identifier Spacing OPEN p:Parameters CLOSE SEMI Spacing {{
 			printf("rpc value of id is: %s\n", (char *) id1.getValue());
-			value = new Rpc((Type *) t.getValue(), (char *) id1.getValue(), (std::vector<Parameter *> *) p.getValue()); }}  
+			Rpc* r = new Rpc((Type *) t.getValue(), (char *) id1.getValue(), (std::vector<Parameter *> *) p.getValue());
+			printf("after rpc\n");
+			value = r; }}  
 
 
 
@@ -301,13 +305,14 @@ unsigned_type	=	"unsigned" Space+ "int" Space+ {{ value = getType("unsigned int"
 
 type 		=	unsigned_type
 			| signed_type
+			| "void" Space+ {{ value = getType("void"); }}
 
 ## just ignore the modules ones, not supporting right now
 
 Spacing		=	Space*
 
 Type_form	=	"projection" Space+ n:Identifier Space* "*" Spacing {{
-			printf("name is: %s\n", (char*)n.getValue());
+			printf("projection pointer name is: %s\n", (char*)n.getValue());
 			 printf("calling getType 2\n");
 			value = new PointerType(getType((char*)n.getValue())); }}
 			| "projection" Space+ name:Identifier Space+ {{ 

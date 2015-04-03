@@ -22,6 +22,20 @@ const char* Typedef::type()
   return alias_;
 }
 
+VoidType::VoidType()
+{
+}
+
+void VoidType::accept(ASTVisitor* worker)
+{
+  worker->visit(this);
+}
+
+const char* VoidType::type()
+{
+  return "void";
+}
+
 IntegerType::IntegerType(const char* type, bool un, int size)
 {
   this->type_ = type;

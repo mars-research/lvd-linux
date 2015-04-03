@@ -73,6 +73,15 @@ class Typedef : public Type
   // virtual void marshal();
 };
 
+class VoidType : public Type
+{
+ public:
+  VoidType();
+  virtual void accept(ASTVisitor *worker);
+  virtual int num() {return 5;}
+  virtual const char* type();
+};
+
 class IntegerType : public Type
 {
   bool unsigned_;
@@ -157,7 +166,7 @@ class Parameter : public Base
 
 class Rpc : public Base
 {
-  const char* enum_name;
+  const char* enum_name_;
   M_rpc* marshal_caller;
   M_rpc* marshal_callee;
   Type* ret_type_;
@@ -170,8 +179,8 @@ class Rpc : public Base
   Type* return_type();
   std::vector<Parameter*>* parameters();
   virtual void accept(ASTVisitor *worker);
-  const char* enum_name() {return "TODO";}
-  const char* callee_name() {return "TOdo";}
+  const char* enum_name();
+  const char* callee_name();
 };
 
 
@@ -231,6 +240,7 @@ class ASTVisitor
   virtual void visit(ProjectionType *proj_type) = 0;
   virtual void visit(PointerType *pointer_type) = 0;
   virtual void visit(IntegerType *integer_type) = 0;
+  virtual void visit(VoidType *vt) = 0;
 };
 
 #endif

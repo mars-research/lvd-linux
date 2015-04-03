@@ -1,4 +1,5 @@
 #include "ccst.h"
+#include <string.h>
 
 /* ClientCCSTHeaderVisitor */
 
@@ -107,9 +108,45 @@ CCSTFile* ServerCCSTHeaderVisitor::visit(File *file)
   // #endif
   // enum-specifier: enum id 
   std::vector<CCSTExDeclaration*> definitions; // = new std::vector<CCSTExDeclaration*>();
-  definitions.push_back(construct_enum(file));
+  // check if there are rpcs
+  if(!file->rpc_defs()->empty())
+    {
+      printf("rpc not empty\n");
+      definitions.push_back(construct_enum(file));
+      // function callee function declarations
+      std::vector<Rpc*>* rpcs = file->rpc_defs();
+      for(std::vector<Rpc*>::iterator it = rpcs->begin(); it != rpcs->end(); it ++)
+	{
+	  definitions.push_back(construct_callee_declaration((Rpc*) *it));
+	}
+    }
   CCSTFile *c_file = new CCSTFile(definitions);
   return c_file;
+}
+
+CCSTExDeclaration* construct_callee_declaration(Rpc* r)
+{
+  std::vector<CCSTDecSpecifier*> *specifier = new std::vector<CCSTDecSpecifier*>();
+  specifier->push_back(new CCSTSimpleTypeSpecifier(int_t));
+  char * callee_name = (char*) malloc((strlen(r->name())+strlen("_callee")+1)*sizeof(char));
+  sprintf(callee_name, "%s%s", r->name(), "_callee");
+  CCSTDirectDecId* id = new CCSTDirectDecId(callee_name);
+  
+  std::vector<CCSTDecSpecifier*> *s = new std::vector<CCSTDecSpecifier*>();
+  s->push_back(new  CCSTSimpleTypeSpecifier(void_t));
+  CCSTParamDeclaration *parameter = new CCSTParamDeclaration(s);
+  
+  std::vector<CCSTParamDeclaration*> *p_decs = new std::vector<CCSTParamDeclaration*>();
+  p_decs->push_back(parameter);
+  CCSTParamList *param_list = new CCSTParamList(p_decs);
+
+  CCSTDirectDecParamTypeList *params = new CCSTDirectDecParamTypeList(id, param_list); 
+    
+  CCSTDeclarator* declarator = new CCSTDeclarator(NULL, params);
+  std::vector<CCSTInitDeclarator*> *init_declarator = new std::vector<CCSTInitDeclarator*>();
+  init_declarator->push_back(declarator);
+  CCSTDeclaration *func_declaration = new CCSTDeclaration(specifier, init_declarator);
+  return func_declaration;
 }
 
 CCSTExDeclaration* construct_enum(File *f)
@@ -252,6 +289,7 @@ void CCSTFuncDef::write(FILE *f)
     }
   // write body
   this->body_->write(f);
+  fprintf(f, "\n");
 }
 
 CCSTDeclaration::CCSTDeclaration(std::vector<CCSTDecSpecifier*> *specifier, std::vector<CCSTInitDeclarator*> *decs)
@@ -259,24 +297,6 @@ CCSTDeclaration::CCSTDeclaration(std::vector<CCSTDecSpecifier*> *specifier, std:
   this->specifier_ = specifier; 
   this->decs_ = decs;
 }
-/*
-void CCSTDeclaration::write(FILE *f)
-{
-  for(std::vector<CCSTDecSpecifier*>::iterator it = specifier_->begin(); it != specifier_->end(); ++it)
-    {
-      CCSTDecSpecifier *ds = *it;
-      ds->write(f);
-    }
-  if(this->decs_ != NULL)
-    {
-      for(std::vector<CCSTInitDeclarator*>::iterator it = decs_->begin(); it != decs_->end(); ++it)
-	{
-	  CCSTInitDeclarator *ds = *it;
-	  ds->write(f);
-	}
-    }
-  // anything else
-  } */
 
 CCSTStoClassSpecifier::CCSTStoClassSpecifier(sto_class_t val)
 {
@@ -1567,14 +1587,14 @@ CCSTParamList::CCSTParamList()
   //todo
 }
 
-CCSTParamList::CCSTParamList(std::vector<CCSTParamDeclaration*> p_dec)
+CCSTParamList::CCSTParamList(std::vector<CCSTParamDeclaration*>* p_dec)
 {
   this->p_dec_ = p_dec;
 }
 
 void CCSTParamList::write(FILE *f)
 {
-   for(std::vector<CCSTParamDeclaration*>::iterator it = p_dec_.begin(); it != p_dec_.end(); ++it)
+   for(std::vector<CCSTParamDeclaration*>::iterator it = p_dec_->begin(); it != p_dec_->end(); ++it)
 	{
 	  CCSTParamDeclaration *dec = *it;
 	  dec->write(f);
@@ -1587,21 +1607,21 @@ CCSTParamDeclaration::CCSTParamDeclaration()
   //todo
 }
 
-CCSTParamDeclaration::CCSTParamDeclaration(std::vector<CCSTDecSpecifier*> dec_specs)
+CCSTParamDeclaration::CCSTParamDeclaration(std::vector<CCSTDecSpecifier*>* dec_specs)
 {
   this->dec_specs_ = dec_specs;
   this->dec_ = NULL;
   this->abs_dec_ = NULL;
 }
 
-CCSTParamDeclaration::CCSTParamDeclaration(std::vector<CCSTDecSpecifier*> dec_specs, CCSTDeclarator *dec)
+CCSTParamDeclaration::CCSTParamDeclaration(std::vector<CCSTDecSpecifier*> *dec_specs, CCSTDeclarator *dec)
 {
   this->dec_specs_ = dec_specs; 
   this->dec_ = dec; 
   this->abs_dec_ = NULL;
 }
 
-CCSTParamDeclaration::CCSTParamDeclaration(std::vector<CCSTDecSpecifier*> dec_specs, CCSTAbstDeclarator *abs_dec)
+CCSTParamDeclaration::CCSTParamDeclaration(std::vector<CCSTDecSpecifier*> *dec_specs, CCSTAbstDeclarator *abs_dec)
 {
   this->dec_specs_ = dec_specs; 
   this->abs_dec_ = abs_dec; 
@@ -1610,7 +1630,7 @@ CCSTParamDeclaration::CCSTParamDeclaration(std::vector<CCSTDecSpecifier*> dec_sp
 
 void CCSTParamDeclaration::write(FILE *f)
 {
-  for(std::vector<CCSTDecSpecifier*>::iterator it = dec_specs_.begin(); it != dec_specs_.end(); ++it)
+  for(std::vector<CCSTDecSpecifier*>::iterator it = dec_specs_->begin(); it != dec_specs_->end(); ++it)
     {
       CCSTDecSpecifier *spec = *it;
       spec->write(f);
@@ -1840,6 +1860,8 @@ void CCSTDeclaration::write(FILE *f)
       init_dec->write(f);
       fprintf(f, " ");
     }
+  fprintf(f, ";");
+  fprintf(f, "\n");
 }
 
 CCSTInitDeclarator::CCSTInitDeclarator(CCSTDeclarator *dec, CCSTInitializer *init)

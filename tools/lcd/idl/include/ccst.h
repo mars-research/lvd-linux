@@ -88,7 +88,6 @@ class CCSTExprStatement;
 class CCSTSelectionStatement;
 class CCSTIfStatement;
 class CCSTIfElseStatement;
-
 class CCSTSwitchStatement;
 class CCSTIterationStmnt;
 
@@ -112,6 +111,7 @@ class CCSTBase
 CCSTExDeclaration* construct_enum(File *f);
 CCSTEnumeratorList* construct_enumlist(std::vector<Rpc *>* rps);
 char* string_to_upper(const char* str);
+CCSTExDeclaration* construct_callee_declaration(Rpc *r);
 
 class ASTToCCSTVisitor
 {
@@ -200,7 +200,24 @@ class CCSTExDeclaration : public CCSTBase
   virtual void write(FILE *f) = 0;
 };
 
-class CCSTDeclarator : public CCSTBase // this seems incorrect
+class CCSTDeclarator;
+class CCSTInitDeclarator : public CCSTBase
+{
+  /*
+    
+<init-declarator> ::= <declarator>
+                    | <declarator> = <initializer>
+   */
+  CCSTDeclarator *dec_;
+  CCSTInitializer *init_;
+ public:
+  CCSTInitDeclarator() {};
+  CCSTInitDeclarator(CCSTDeclarator *dec, CCSTInitializer *init); //{this->dec_ = dec; this->init_ = init;}
+  CCSTInitDeclarator(CCSTDeclarator *dec); //{this->dec_ = dec; this->init_ = NULL;}
+  virtual void write(FILE *f);
+};
+
+class CCSTDeclarator : public CCSTInitDeclarator // this seems incorrect
 {
   /*
     <declarator> ::= {<pointer>}? <direct-declarator>
@@ -1074,10 +1091,10 @@ class CCSTParamList : public CCSTParamTypeList
                    | <parameter-list> , <parameter-declaration>
 
   */
-  std::vector<CCSTParamDeclaration*> p_dec_;
+  std::vector<CCSTParamDeclaration*>* p_dec_;
  public:
   CCSTParamList();
-  CCSTParamList(std::vector<CCSTParamDeclaration*> p_dec); //{this->p_dec_ = p_dec;}
+  CCSTParamList(std::vector<CCSTParamDeclaration*>* p_dec); //{this->p_dec_ = p_dec;}
   virtual void write(FILE *f);
 };
 
@@ -1088,14 +1105,14 @@ class CCSTParamDeclaration : public CCSTParamList
                           | {<declaration-specifier>}+ <abstract-declarator>
                           | {<declaration-specifier>}+
    */
-  std::vector<CCSTDecSpecifier*> dec_specs_;
+  std::vector<CCSTDecSpecifier*>* dec_specs_;
   CCSTDeclarator *dec_;
   CCSTAbstDeclarator *abs_dec_;
  public:
   CCSTParamDeclaration();
-  CCSTParamDeclaration(std::vector<CCSTDecSpecifier*> dec_specs); //{this->dec_specs_ = dec_specs;}
-  CCSTParamDeclaration(std::vector<CCSTDecSpecifier*> dec_specs, CCSTDeclarator *dec); //{this->dec_specs_ = dec_specs; this->dec_ = dec; this->abs_dec_ = abs_dec;}
-  CCSTParamDeclaration(std::vector<CCSTDecSpecifier*> dec_specs, CCSTAbstDeclarator *abs_dec); //{this->dec_specs_ = dec_specs; this->abs_dec_ = abs_dec; this->dec_ = dec;}
+  CCSTParamDeclaration(std::vector<CCSTDecSpecifier*>* dec_specs); //{this->dec_specs_ = dec_specs;}
+  CCSTParamDeclaration(std::vector<CCSTDecSpecifier*>* dec_specs, CCSTDeclarator *dec); //{this->dec_specs_ = dec_specs; this->dec_ = dec; this->abs_dec_ = abs_dec;}
+  CCSTParamDeclaration(std::vector<CCSTDecSpecifier*>* dec_specs, CCSTAbstDeclarator *abs_dec); //{this->dec_specs_ = dec_specs; this->abs_dec_ = abs_dec; this->dec_ = dec;}
   virtual void write(FILE *f);
 };
 
@@ -1175,20 +1192,7 @@ class CCSTTypedefName : public CCSTTypeSpecifier
   virtual void write(FILE *f);
 };
 
-class CCSTInitDeclarator : public CCSTBase
-{
-  /*
-    
-<init-declarator> ::= <declarator>
-                    | <declarator> = <initializer>
-   */
-  CCSTDeclarator *dec_;
-  CCSTInitializer *init_;
- public:
-  CCSTInitDeclarator(CCSTDeclarator *dec, CCSTInitializer *init); //{this->dec_ = dec; this->init_ = init;}
-  CCSTInitDeclarator(CCSTDeclarator *dec); //{this->dec_ = dec; this->init_ = NULL;}
-  virtual void write(FILE *f);
-};
+
 
 class CCSTInitializerList : public CCSTBase
 {

@@ -224,7 +224,7 @@ ServerCCSTSourceVisitor::ServerCCSTSourceVisitor()
 }
 CCSTFile* ServerCCSTSourceVisitor::visit(File *file)
 {
-  
+   
 }
 CCSTFile* ServerCCSTSourceVisitor::visit(ProjectionField *proj_field)
 {
@@ -1594,12 +1594,18 @@ CCSTParamList::CCSTParamList(std::vector<CCSTParamDeclaration*>* p_dec)
 
 void CCSTParamList::write(FILE *f)
 {
-   for(std::vector<CCSTParamDeclaration*>::iterator it = p_dec_->begin(); it != p_dec_->end(); ++it)
+  if(!p_dec_->empty())
+    {
+      p_dec_->at(0)->write(f);
+      
+      for(std::vector<CCSTParamDeclaration*>::iterator it = p_dec_->begin()+1; it != p_dec_->end(); ++it)
 	{
+	  fprintf(f,", ");
 	  CCSTParamDeclaration *dec = *it;
 	  dec->write(f);
-	  fprintf(f, ", "); // should i be printing commas
+	  //	  fprintf(f, ", "); // should i be printing commas
 	}
+    }
 }
 
 CCSTParamDeclaration::CCSTParamDeclaration()
@@ -1800,11 +1806,15 @@ CCSTEnumeratorList::CCSTEnumeratorList(std::vector<CCSTEnumerator*> *list)
 
 void CCSTEnumeratorList::write(FILE *f)
 {
-  for(std::vector<CCSTEnumerator*>::iterator it = list_->begin(); it != list_->end(); ++it)
+  if(!list_->empty())
     {
-      CCSTEnumerator *l = *it;
-      l->write(f);
-      fprintf(f, ", ");
+      list_->at(0)->write(f);
+      for(std::vector<CCSTEnumerator*>::iterator it = list_->begin()+1; it != list_->end(); ++it)
+	{
+	  fprintf(f, ",\n");
+	  CCSTEnumerator *l = *it;
+	  l->write(f);
+	}
     }
 }
 

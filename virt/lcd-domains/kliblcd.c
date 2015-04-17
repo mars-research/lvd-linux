@@ -1758,6 +1758,44 @@ fail1:
 	return ret;		
 }
 
+static int do_call_endpoint(cptr_t lcd)
+{
+	cptr_t call_endpoint;
+	int ret;
+	/*
+	 * Create an endpoint for the lcd, for its call endpoint.
+	 *
+	 * This will temporarily go in the caller's (the code creating the
+	 * lcd) cspace.
+	 */
+	ret = lcd_create_sync_endpoint(&call_endpoint);
+	if (ret) {
+		LCD_ERR("failed to create call endpoint");
+		goto fail1;
+	}
+	/*
+	 * Grant access to call endpoint in reserved slot
+	 */
+	ret = lcd_cap_grant(lcd, call_endpoint, LCD_CPTR_CALL_ENDPOINT);
+	if (ret) {
+		LCD_ERR("failed to grant call endpoint");
+		goto fail2;
+	}
+
+	ret = 0;
+
+	goto out;
+out:
+fail2:
+	/*
+	 * Delete cap to call endpoint, lcd becomes sole owner (or if 
+	 * we failed, endpoint gets freed)
+	 */
+	lcd_cap_delete(call_endpoint);
+fail1:
+	return ret;
+}
+
 int klcd_create_module_lcd(cptr_t *slot_out, char *mname, 
 			cptr_t mloader_endpoint, struct lcd_info **mi)
 			
@@ -1800,10 +1838,19 @@ int klcd_create_module_lcd(cptr_t *slot_out, char *mname,
 		goto fail3;
 	}
 	/*
+	 * Provide the lcd with a call endpoint
+	 */
+	ret = do_call_endpoint(*slot_out);
+	if (ret) {
+		LCD_ERR("failed to set up call endpoint");
+		goto fail4;
+	}
+	/*
 	 * Done!
 	 */
 	return 0;
 
+fail4:
 fail3:
 fail2:
 	/* 
@@ -1840,6 +1887,197 @@ void klcd_destroy_module_lcd(cptr_t lcd, struct lcd_info *mi,
 	 */
 	lcd_cap_delete(lcd);
 	lcd_unload_module(mi, mloader_endpoint);
+}
+
+/* BOOT INFO -------------------------------------------------- */
+
+static void dump_page_infos(struct list_head *page_infos,
+			struct lcd_boot_info *bi,
+			struct lcd_boot_info_for_page *dest)
+{
+	struct lcd_page_info_list_elem *e;
+	struct list_head *cursor;
+	unsigned idx;
+	/*
+	 * Write page information into boot info pages
+	 */
+	idx = 0;
+	list_for_each(cursor, page_infos) {
+		e = list_entry(cursor, struct lcd_page_info_list_elem, list);
+		dest[idx].my_cptr = e->my_cptr;
+		dest[idx].page_gpa = e->page_gpa;
+		idx++;
+	}
+}
+
+static void dump_cptr_cache(struct cptr_cache *cache,
+			struct lcd_boot_info *bi)
+{
+	/*
+	 * Dump cptr cache info in boot page
+	 */
+	memcpy(bi->bmap0, cache->bmaps[0], sizeof(bi->bmap0));
+	memcpy(bi->bmap1, cache->bmaps[1], sizeof(bi->bmap1));
+	memcpy(bi->bmap2, cache->bmaps[2], sizeof(bi->bmap2));
+	memcpy(bi->bmap3, cache->bmaps[3], sizeof(bi->bmap3));
+}
+
+static inline size_t page_infos_offset(void)
+{
+	size_t info_align;
+	size_t offset;
+	/*
+	 * This may be too paranoid.
+	 *
+	 * The page infos go after the struct lcd_boot_info in the boot
+	 * info pages, and I want to make sure they are written with the
+	 * correct alignment.
+	 *
+	 * I'm using a static inline here instead of a macro for ease. All of
+	 * these calculations can be done at compile time.
+	 *
+	 * ----------
+	 *
+	 * Calculate the alignment of the struct. It must be a power of
+	 * 2, or else the alignment trick with the bit masking won't work
+	 * correctly.
+	 */
+	info_align = __alignof__(struct lcd_boot_info_for_page);
+	BUILD_BUG_ON(info_align & (info_align - 1)); /* not a power of 2 */
+	/*
+	 * Calculate the number of bytes in the struct lcd_boot_info.
+	 */
+	offset = sizeof(struct lcd_boot_info);
+	/*
+	 * Calculate the address of the first byte we can start writing
+	 * page infos into.
+	 */ 
+	info_align--;
+	offset = (offset + info_align) & ~info_align;
+	/*
+	 * Return the offset
+	 */
+	return offset;
+}
+
+static int dump_check(struct lcd_info *mi,
+		size_t pi_offset,
+		unsigned *num_boot_mem_pi,
+		unsigned *num_paging_mem_pi,
+		unsigned *num_free_mem_pi)
+{
+	unsigned num;
+	struct list_head *cursor;
+	unsigned long sz;
+	/*
+	 * Count number of page infos for each category
+	 */
+	num = 0;
+	list_for_each(cursor, &mi->boot_mem_list) {
+		num++;
+	}
+	*num_boot_mem_pi = num;
+	num = 0;
+	list_for_each(cursor, &mi->paging_mem_list) {
+		num++;
+	}
+	*num_paging_mem_pi = num;
+	num = 0;
+	list_for_each(cursor, &mi->free_mem_list) {
+		num++;
+	}
+	*num_free_mem_pi = num;
+	/*
+	 * We will need pi_offset (this contains the lcd_boot_info struct)
+	 * plus the bytes for the page infos.
+	 */
+	sz = pi_offset;
+	sz += *num_boot_mem_pi   * sizeof(struct lcd_boot_info_for_page);
+	sz += *num_paging_mem_pi * sizeof(struct lcd_boot_info_for_page);
+	sz += *num_free_mem_pi   * sizeof(struct lcd_boot_info_for_page);
+	if (sz >= ((1 << LCD_BOOT_PAGES_ORDER) << PAGE_SHIFT))
+		return -EINVAL;
+	else
+		return 0;
+}
+
+static unsigned long adjust_addr(unsigned long old, unsigned long my_base)
+{
+	unsigned long offset;
+	/*
+	 * Calculate offset into boot pages
+	 */
+	offset = old - my_base;
+	/*
+	 * Add offset to the address of the start of the lcd's boot pages
+	 */
+	return gva_val(LCD_BOOT_PAGES_GVA) + offset;
+}
+
+int klcd_dump_boot_info(struct lcd_info *mi)
+{
+	struct lcd_boot_info *bi;
+	size_t pi_offset;
+	struct lcd_boot_info_for_page *dest;
+	int ret;
+
+	bi = (struct lcd_boot_info *)mi->boot_page_base;
+	
+	/*
+	 * Calculate the offset into the boot info pages where we should
+	 * write the page infos.
+	 */
+	pi_offset = page_infos_offset();
+	/*
+	 * Ensure we have enough room to dump all of the boot info
+	 */
+	ret = dump_check(mi, pi_offset,
+			&bi->num_boot_mem_pi,
+			&bi->num_paging_mem_pi,
+			&bi->num_free_mem_pi);
+	if (ret) {
+		LCD_ERR("not enough room to put info in boot info pages");
+		goto fail1;
+	}
+	/*
+	 * Dump cptr cache info
+	 */
+	dump_cptr_cache(mi->cache, bi);
+	/*
+	 * Dump page info's
+	 */
+	dest = (struct lcd_boot_info_for_page *)(((char *)bi) + pi_offset);
+
+	bi->boot_mem_pi_start = dest;
+	dump_page_infos(&mi->boot_mem_list, bi, dest);
+	dest += bi->num_boot_mem_pi;
+
+	bi->paging_mem_pi_start = dest;
+	dump_page_infos(&mi->paging_mem_list, bi, dest);
+	dest += bi->num_paging_mem_pi;
+
+	bi->free_mem_pi_start = dest;
+	dump_page_infos(&mi->free_mem_list, bi, dest);
+
+	/*
+	 * Adjust addresses for lcd address space
+	 */
+	bi->boot_mem_pi_start = (struct lcd_boot_info_for_page *)
+		adjust_addr((unsigned long)bi->boot_mem_pi_start,
+			(unsigned long)mi->boot_page_base);
+
+	bi->paging_mem_pi_start = (struct lcd_boot_info_for_page *)
+		adjust_addr((unsigned long)bi->paging_mem_pi_start,
+			(unsigned long)mi->boot_page_base);
+
+	bi->free_mem_pi_start = (struct lcd_boot_info_for_page *)
+		adjust_addr((unsigned long)bi->free_mem_pi_start,
+			(unsigned long)mi->boot_page_base);
+
+	return 0;
+
+fail1:
+	return ret;
 }
 
 /* INIT / EXIT -------------------------------------------------- */
@@ -1885,6 +2123,7 @@ EXPORT_SYMBOL(klcd_load_module);
 EXPORT_SYMBOL(klcd_unload_module);
 EXPORT_SYMBOL(klcd_create_module_lcd);
 EXPORT_SYMBOL(klcd_destroy_module_lcd);
+EXPORT_SYMBOL(klcd_dump_boot_info);
 
 /* (exports for register access are in that macro at the top) */
 

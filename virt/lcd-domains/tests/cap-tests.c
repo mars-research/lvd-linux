@@ -502,18 +502,25 @@ int cap_tests(void)
 {
 	if (test01())
 		return -1;
+	LCD_MSG("test01 passed");
 	if (test02())
 		return -1;
+	LCD_MSG("test02 passed");
 	if (test03())
 		return -1;
+	LCD_MSG("test03 passed");
 	if (test04())
 		return -1;
+	LCD_MSG("test04 passed");
 	if (test05())
 		return -1;
+	LCD_MSG("test05 passed");
 	if (test06())
 		return -1;
+	LCD_MSG("test06 passed");
 	if (test07())
 		return -1;
+	LCD_MSG("test07 passed");
 	if (test08())
 		return -1;
 	LCD_MSG("all cap.c tests passed!");

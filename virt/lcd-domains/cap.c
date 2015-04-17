@@ -28,6 +28,12 @@ struct cdt_cache_t {
 
 static struct cdt_cache_t cdt_cache;
 
+/*
+ * This is used in a hack to make the cnode table slab caches
+ * work. See init cspace routine.
+ */
+static u64 cspace_id = 0;
+
 /**
  * Allocates a new cdt root node using the cdt cache.
  */
@@ -117,13 +123,25 @@ fail1:
 int __lcd_cap_init_cspace(struct cspace *cspace)
 {
 	int ret;
+	char name[32];
 
 	mutex_init(&cspace->lock);
 
 	/*
-	 * Initialize the cnode table cache
+	 * Initialize the cnode table cache. We can't use the
+	 * KMEM_CACHE macro because we need to use unique names. This
+	 * is kind of hacky right now. (If you don't use a unique name,
+	 * you might get an error/crash when you destroy the kmem cache
+	 * for multiple lcd's. This is because slabs are tied to sysfs, and
+	 * it complains when it tries to remove slabs with the same name.)
 	 */
-	cspace->cnode_table_cache = KMEM_CACHE(cnode_table, 0);
+	snprintf(name, 32, "cspace%llu", cspace_id);
+	cspace->cnode_table_cache = kmem_cache_create(
+		name,
+		sizeof(struct cnode_table),
+		__alignof__(struct cnode_table),
+		0,
+		NULL);
 	if(!cspace->cnode_table_cache) {
 		LCD_ERR("failed to allocate cnode_table slab");
 		return -ENOMEM;
@@ -144,6 +162,8 @@ int __lcd_cap_init_cspace(struct cspace *cspace)
 	}
 
 	cspace->state = ALLOCATION_VALID;
+
+	cspace_id++;
 	
 	return 0;
 }
@@ -367,7 +387,8 @@ int __lcd_cap_insert(struct cspace *cspace, cptr_t c, void *object,
 	 */
 	ret = __lcd_cnode_get__(cspace, c, true, &cnode);
 	if (ret) {
-		LCD_ERR("error getting cnode");
+		LCD_ERR("error getting cnode for cptr 0x%lx",
+			cptr_val(c));
 		return ret;
 	}
 	/*
@@ -1098,6 +1119,11 @@ static void cspace_tear_down(struct cspace *cspace)
 		list_del(&t->table_list);
 		kmem_cache_free(cspace->cnode_table_cache, t);
 	}
+
+	/*
+	 * Get rid of the table cache
+	 */
+	kmem_cache_destroy(cspace->cnode_table_cache);
 
 	return;
 }

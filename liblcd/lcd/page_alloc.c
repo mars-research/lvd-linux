@@ -53,7 +53,6 @@ int lcd_page_alloc(cptr_t *slot_out)
 		lcd_printk("lcd_page_alloc: no cptrs left");
 		goto fail1;
 	}
-	lcd_printk("lcd_alloc_page: cptr is 0x%lx", cptr_val(page));
 	/*
 	 * Do sys call
 	 */
@@ -916,7 +915,7 @@ static void get_mem_boot_info(void)
 	 * The boot info is in the boot info page, mapped when the lcd
 	 * is built.
 	 */
-	bi = (struct lcd_boot_info *)gva_val(LCD_BOOT_PAGES_GVA);
+	bi = lcd_get_boot_info();
 	/*
 	 * Extract the page info data, store in globals (declared in this
 	 * file).
@@ -959,7 +958,6 @@ static void init_page_alloc_data(void)
 		idx = gpa_val(boot_mem_pi_start[i].page_gpa);
 		idx -= gpa_val(LCD_BOOT_PAGES_GPA);
 		idx >>= PAGE_SHIFT;
-		lcd_printk("boot mem idx is %d", idx);
 		boot_cptrs[idx] = boot_mem_pi_start[i].my_cptr;
 	}
 	/*
@@ -986,67 +984,6 @@ static void init_page_alloc_data(void)
 	}
 }
 
-static void page_alloc_test(void)
-{
-	int ret;
-	gva_t pages[10];
-	int i;
-	int j;
-	int *loc;
-	/*
-	 * Allocate ten pages
-	 */
-	for (i = 0; i < 10; i++) {
-		ret = lcd_alloc_page(&pages[i]);
-		if (ret) {
-			lcd_printk("mem_test: failed to alloc page");
-			goto fail1;
-		}
-	}
-	/*
-	 * Write and read each one, make sure we don't fault.
-	 */
-	for (i = 0; i < 10; i++) {
-		loc = (int *)gva_val(pages[i]);
-		*loc = i;
-	}
-	for (i = 0; i < 10; i++) {
-		loc = (int *)gva_val(pages[i]);
-		if (*loc != i) {
-			lcd_printk("mem_test: unexpected val %d != %d",
-				*loc, i);
-			i = 10;
-			goto fail1;
-		}
-	}
-
-	/*
-	 * Free the pages
-	 */
-	i = 10;
-	lcd_printk("mem test passed!");
-	goto out;
-
-out:
-fail1:
-	for (j = 0; j < i; j++)
-		lcd_free_page(pages[j]);
-
-	return;
-}
-
-static void kmalloc_test(void)
-{
-	struct page *p;
-
-	p = kmalloc(sizeof(*p), GFP_KERNEL);
-	if (!p) {
-		lcd_printk("kmalloc_test: got null");
-		return;
-	}
-	kfree(p);
-}
-
 void cpucache_init(void);
 
 static void __init_refok kmalloc_init(void)
@@ -1056,7 +993,7 @@ static void __init_refok kmalloc_init(void)
 	cpucache_init();
 }
 
-void lcd_mem_init(void)
+int lcd_mem_init(void)
 {
 	/*
 	 * Extract page info from boot info page
@@ -1066,22 +1003,14 @@ void lcd_mem_init(void)
 	 * Initialize bitmap and page2cptr globals
 	 */
 	init_page_alloc_data();
-	lcd_printk("lcd_mem_init: done with init_page_alloc_data");
 	/*
 	 * Set up the pgd pointer
 	 */
 	setup_pgd();
 	/*
-	 * Run page alloc tests
-	 */
-	page_alloc_test();
-	lcd_printk("lcd_mem_init: done with page alloc tests");
-	/*
 	 * Init kmalloc
 	 */
 	kmalloc_init();
-	lcd_printk("lcd_mem_init: done with kmalloc_init");
 
-	kmalloc_test();
-	lcd_printk("lcd_mem_init: done with kmalloc tests");
+	return 0;
 }

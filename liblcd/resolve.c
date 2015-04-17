@@ -79,12 +79,6 @@ int ftrace_raw_output_prep(struct trace_iterator *iter,
 	lcd_printk("resolve.c: trying to call dummy ftrace_raw_output_prep!");
 	return 0;
 }
-
-void might_fault(void)
-{
-	lcd_printk("resolve.c: trying to call dummy might_fault!");
-	return;
-}
                
 void perf_tp_event(u64 addr, u64 count, void *record,
 		int entry_size, struct pt_regs *regs,

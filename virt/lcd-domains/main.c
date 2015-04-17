@@ -1049,8 +1049,8 @@ static int lcd_handle_syscall(struct lcd *lcd, int *lcd_ret)
 	int ret;
 	
 	syscall_id = lcd_arch_get_syscall_num(lcd->lcd_arch);
-	if (syscall_id != LCD_SYSCALL_PUTCHAR)
-		LCD_MSG("got syscall %d from lcd %p", syscall_id, lcd);
+
+	LCD_DEBUG(LCD_DEBUG_MSG, "got syscall %d from lcd %p", syscall_id, lcd);
 
 	switch (syscall_id) {
 	case LCD_SYSCALL_EXIT:

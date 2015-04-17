@@ -20,7 +20,7 @@ static int do_send(void)
 
 static void get_endpoint(void)
 {
-	ep = *((cptr_t *)gva_val(LCD_BOOT_PAGES_GVA));
+	ep = lcd_get_boot_info()->cptrs[0];
 }
 
 static int __noreturn __init lcd1_init(void) 

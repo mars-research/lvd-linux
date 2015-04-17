@@ -14,14 +14,6 @@ config LCD_DOMAINS
 config HAVE_LCD
        bool
 
-config LCD_DEBUG
-       tristate "LCD Debug"
-       depends on LCD_DOMAINS
-       default m
-       ---help---
-       Simple debug module that just dumps stack on all cpu's.
-
-
 
 menuconfig LCD_TEST_MOD
 	   bool "Test Modules"
@@ -34,13 +26,44 @@ if LCD_TEST_MOD
 # --------------------------------------------------
 
 config LCD_TEST_MOD_LOAD
-       tristate "Basic load test"
+       bool "Basic load test with infinite loop"
        depends on LCD_DOMAINS
-       default m
+       default y
+       select LCD_TEST_MOD_LOAD_BOOT
+       select LCD_TEST_MOD_LOAD_LCD
        ---help---
-       Simple infinite loop - don't run outside lcd, it never quits! This
-       doesn't have a separate boot module. It's meant to be booted by e.g.
-       a test case in the lcd tests suite.
+       Simple infinite loop - don't run outside lcd, it never quits!
+
+config LCD_TEST_MOD_LOAD_BOOT
+       tristate
+       depends on LCD_TEST_MOD_LOAD
+       default m
+
+config LCD_TEST_MOD_LOAD_LCD
+       tristate
+       depends on LCD_TEST_MOD_LOAD
+       default m
+
+# --------------------------------------------------
+
+config LCD_TEST_MOD_LIBLCD_TESTS
+       bool "Tests for liblcd"
+       depends on LCD_DOMAINS
+       default y
+       select LCD_TEST_MOD_LIBLCD_TESTS_BOOT
+       select LCD_TEST_MOD_LIBLCD_TESTS_LCD
+       ---help---
+       Tests for code in liblcd - page allocator, kmalloc, etc.
+
+config LCD_TEST_MOD_LIBLCD_TESTS_BOOT
+       tristate
+       depends on LCD_TEST_MOD_LIBLCD_TESTS
+       default m
+
+config LCD_TEST_MOD_LIBLCD_TESTS_LCD
+       tristate
+       depends on LCD_TEST_MOD_LIBLCD_TESTS
+       default m
 
 # --------------------------------------------------
 
@@ -91,34 +114,6 @@ config LCD_TEST_MOD_IPC2_LCD2
        default m
 
 # --------------------------------------------------
-
-config LCD_TEST_MOD_PRINTK
-       tristate "Basic test for lcd printk"
-       depends on LCD_DOMAINS
-       default m
-       ---help---
-       Tests printk'ing a few messages.
-
-# --------------------------------------------------
-
-config LCD_TEST_MOD_MM
-       bool "Memory management example"
-       depends on LCD_DOMAINS
-       default y
-       select LCD_TEST_MOD_MM_BOOT
-       select LCD_TEST_MOD_MM_LCD
-       ---help---
-       Big memory management example.
-
-config LCD_TEST_MOD_MM_BOOT
-       tristate
-       depends on LCD_TEST_MOD_MM
-       default m
-
-config LCD_TEST_MOD_MM_LCD
-       tristate
-       depends on LCD_TEST_MOD_MM
-       default m
 
 endif
 

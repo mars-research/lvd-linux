@@ -1,5 +1,6 @@
 
-lib-y    +=  $(addprefix lcd/, cap.o enterexit.o ipc.o page_alloc.o printk.o)
+lib-y    +=  $(addprefix lcd/, cap.o enterexit.o ipc.o page_alloc.o printk.o \
+				dstore.o tests.o)
 
 lib-y    +=  $(addprefix lib/, find_next_bit.o kstrtox.o string.o \
 			       vsprintf.o ctype.o hexdump.o       \

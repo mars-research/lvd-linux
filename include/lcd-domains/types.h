@@ -8,7 +8,7 @@
 #ifndef LCD_DOMAINS_TYPES_H
 #define LCD_DOMAINS_TYPES_H
 
-/* todo: need to eliminate this host header : */
+#include <linux/kernel.h>
 #include <asm/page.h>
 
 /* CPTRs -------------------------------------------------- */
@@ -103,7 +103,6 @@ static inline unsigned long lcd_cptr_level(cptr_t c)
 struct cptr_cache {
 	unsigned long *bmaps[1 << LCD_CPTR_DEPTH_BITS];
 };
-
 
 /* ADDRESS SPACE TYPES ---------------------------------------- */
 
@@ -207,7 +206,7 @@ static inline hpa_t hva2hpa(hva_t hva)
 	return (hpa_t){ (unsigned long)__pa(hva2va(hva)) };
 }
 
-/* BOOT INFO -------------------------------------------------- */
+/* BOOT ADDRESS SPACE & INFO ------------------------------------------- */
 
 #define LCD_BOOT_PAGES_ORDER 2
 
@@ -223,17 +222,27 @@ static inline hpa_t hva2hpa(hva_t hva)
 #define LCD_BOOT_PAGES_GVA __gva(gpa_val(LCD_BOOT_PAGES_GPA))
 #define LCD_STACK_GVA __gva(gpa_val(LCD_STACK_GPA))
 
-/* Hack for now to make boot easier */
+#define LCD_NUM_BOOT_CPTRS 8
+
+struct lcd_boot_info_for_page {
+	cptr_t my_cptr;
+	gpa_t page_gpa;
+};
+
+/* 
+ * Hack for now to make boot easier, used in liblcd/lcd/cap.c for cptr
+ * cache.
+ */
 
 #define LCD_BMAP0_SIZE (1 << (LCD_CPTR_SLOT_BITS + 0 * LCD_CPTR_FANOUT_BITS))
 #define LCD_BMAP1_SIZE (1 << (LCD_CPTR_SLOT_BITS + 1 * LCD_CPTR_FANOUT_BITS))
 #define LCD_BMAP2_SIZE (1 << (LCD_CPTR_SLOT_BITS + 2 * LCD_CPTR_FANOUT_BITS))
 #define LCD_BMAP3_SIZE (1 << (LCD_CPTR_SLOT_BITS + 3 * LCD_CPTR_FANOUT_BITS))
 
-struct lcd_boot_info_for_page {
-	cptr_t my_cptr;
-	gpa_t page_gpa;
-};
+#define LCD_BMAP0_NUM_LONGS BITS_TO_LONGS(LCD_BMAP0_SIZE)
+#define LCD_BMAP1_NUM_LONGS BITS_TO_LONGS(LCD_BMAP1_SIZE)
+#define LCD_BMAP2_NUM_LONGS BITS_TO_LONGS(LCD_BMAP2_SIZE)
+#define LCD_BMAP3_NUM_LONGS BITS_TO_LONGS(LCD_BMAP3_SIZE)
 
 struct lcd_boot_info {
 	/*
@@ -241,13 +250,13 @@ struct lcd_boot_info {
 	 *
 	 * level 0
 	 */
-	unsigned long bmap0[LCD_BMAP0_SIZE];
+	unsigned long bmap0[LCD_BMAP0_NUM_LONGS];
 	/* level 1 */
-	unsigned long bmap1[LCD_BMAP1_SIZE];
+	unsigned long bmap1[LCD_BMAP1_NUM_LONGS];
 	/* level 2 */
-	unsigned long bmap2[LCD_BMAP2_SIZE];
+	unsigned long bmap2[LCD_BMAP2_NUM_LONGS];
 	/* level 3 */
-	unsigned long bmap3[LCD_BMAP3_SIZE];
+	unsigned long bmap3[LCD_BMAP3_NUM_LONGS];
 	/*
 	 * Bootstrap page info --------------------
 	 */
@@ -257,6 +266,10 @@ struct lcd_boot_info {
 	struct lcd_boot_info_for_page *boot_mem_pi_start;
 	struct lcd_boot_info_for_page *paging_mem_pi_start;
 	struct lcd_boot_info_for_page *free_mem_pi_start;
+	/*
+	 * Other capabilities (e.g., endpoints)
+	 */
+	cptr_t cptrs[LCD_NUM_BOOT_CPTRS];
 };
 
 #endif   /* LCD_DOMAINS_TYPES_H */

@@ -8,14 +8,6 @@
 #include <linux/module.h>
 #include <linux/kernel.h>
 
-static void do_boot_params(struct lcd_info *mi, cptr_t dest)
-{
-	/*
-	 * The only thing the lcd needs is the cptr to the endpoint
-	 */
-	*((cptr_t *)mi->boot_page_base) = dest;
-}
-
 static int boot_main(void)
 {
 	int ret;
@@ -86,20 +78,33 @@ static int boot_main(void)
 	/*
 	 * Set up boot info
 	 */
-	do_boot_params(mi1, dest1);
-	do_boot_params(mi2, dest2);
+	ret = lcd_dump_boot_info(mi1);
+	if (ret) {
+		LIBLCD_ERR("dump boot info 1");
+		goto fail9;
+	}
+	ret = lcd_dump_boot_info(mi2);
+	if (ret) {
+		LIBLCD_ERR("dump boot info 2");
+		goto fail9;
+	}
+	/*
+	 * Store dest cptrs for endpoint
+	 */
+	to_boot_info(mi1)->cptrs[0] = dest1;
+	to_boot_info(mi2)->cptrs[0] = dest2;
 	/*
 	 * Run lcd's
 	 */
 	ret = lcd_run(lcd1);
 	if (ret) {
 		LIBLCD_ERR("failed to start lcd1");
-		goto fail8;
+		goto fail10;
 	}
 	ret = lcd_run(lcd2);
 	if (ret) {
 		LIBLCD_ERR("failed to start lcd2");
-		goto fail9;
+		goto fail11;
 	}
 	/*
 	 * Wait for 4 seconds
@@ -112,6 +117,8 @@ static int boot_main(void)
 	goto out;
 
 out:
+fail11:
+fail10:
 fail9:
 fail8:
 fail7:

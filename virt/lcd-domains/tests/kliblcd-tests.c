@@ -120,34 +120,6 @@ fail1:
 
 static int test05(void)
 {
-	int ret;
-	struct lcd_info *mi;
-
-	ret = lcd_enter();
-	if (ret) {
-		LCD_ERR("enter");
-		goto fail1;
-	}
-	ret = lcd_load_module("lcd_test_mod_printk", LCD_CPTR_NULL, &mi);
-	if (ret) {
-		LCD_ERR("lcd load module");
-		goto fail2;
-	}
-
-	lcd_unload_module(mi, LCD_CPTR_NULL);
-
-	lcd_exit(0);
-
-	return 0;
-
-fail2:
-	lcd_exit(0);
-fail1:
-	return ret;
-}
-
-static int test06(void)
-{
 	struct cptr_cache *cache;
 	int ret;
 	cptr_t c;
@@ -189,7 +161,7 @@ static cptr_t set_lvl(cptr_t c, int lvl)
 	return __cptr(cptr_val(c) | (lvl << LCD_CPTR_LEVEL_SHIFT));
 }
 
-static int test07(void)
+static int test06(void)
 {
 	cptr_t c;
 	if (lcd_cptr_slot(__cptr(0)) != 0) {
@@ -232,7 +204,7 @@ static int test07(void)
 	return 0;
 }
 
-static int test08(void)
+static int test07(void)
 {
 	struct cptr_cache *cache;
 	int ret;
@@ -313,56 +285,6 @@ fail1:
 	return ret;
 }
 
-static int test09(void)
-{
-	int ret;
-	struct lcd_info *mi;
-	cptr_t lcd;
-
-	/*
-	 * Enter lcd mode
-	 */
-	ret = lcd_enter();
-	if (ret) {
-		LCD_ERR("enter");
-		goto fail1;
-	}
-	/*
-	 * Create a new lcd
-	 */
-	ret = lcd_create_module_lcd(&lcd, "lcd_test_mod_printk",
-				LCD_CPTR_NULL, &mi);
-	if (ret) {
-		LCD_ERR("create module lcd");
-		goto fail2;
-	}
-	/*
-	 * Run it
-	 */
-	ret = lcd_run(lcd);
-	if (ret) {
-		LCD_ERR("run lcd");
-		goto fail3;
-	}
-	/*
-	 * Wait for 4 seconds
-	 */
-	msleep(4000);
-	/*
-	 * Tear everything down
-	 */
-	ret = 0;
-	goto out;
-
-out:
-fail3:
-	lcd_destroy_module_lcd(lcd, mi, LCD_CPTR_NULL);
-fail2:
-	lcd_exit(0);
-fail1:
-	return ret;
-}
-
 int kliblcd_tests(void)
 {
 	if (test01())
@@ -378,10 +300,6 @@ int kliblcd_tests(void)
 	if (test06())
 		return -1;
 	if (test07())
-		return -1;
-	if (test08())
-		return -1;
-	if (test09())
 		return -1;
 	LCD_MSG("all kliblcd tests passed!");
 	return 0;

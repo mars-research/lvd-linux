@@ -9,7 +9,8 @@
 
 /*
  * XXX: This is hardwired for a depth of 3 (4 levels) so that we
- * don't depend kmalloc. If you change the cspace depth, table size, 
+ * don't depend kmalloc (we need the cptr cache before kmalloc is
+ * up and running). If you change the cspace depth, table size, 
  * etc., you will need to change this.
  *
  * XXX: We don't use a lock because this is only used by one thread, for now.
@@ -33,39 +34,20 @@ struct cptr_cache_2 {
 static struct cptr_cache_2 cptr_cache;
 
 
-void lcd_init_cptr(void)
+int lcd_init_cptr(void)
 {
-	cptr_t test;
 	struct lcd_boot_info *bi;
-	int r;
 	/*
 	 * Read from boot param page
 	 */
-	bi = (struct lcd_boot_info *)gva_val(LCD_BOOT_PAGES_GVA);
-
-	lcd_printk("bi is 0x%lx", (unsigned long)bi);
-	lcd_printk("cptr cache is 0x%lx", (unsigned long)&cptr_cache);
+	bi = lcd_get_boot_info();
 
 	memcpy(cptr_cache.bmap0, bi->bmap0, sizeof(bi->bmap0));
 	memcpy(cptr_cache.bmap1, bi->bmap1, sizeof(bi->bmap1));
 	memcpy(cptr_cache.bmap2, bi->bmap2, sizeof(bi->bmap2));
 	memcpy(cptr_cache.bmap3, bi->bmap3, sizeof(bi->bmap3));
 
-	lcd_printk("done with memcpy");
-	/*
-	 * Test
-	 */
-	r = lcd_alloc_cptr(&test);
-	if (r) {
-		lcd_printk("cptr alloc err ret = %d", r);
-		return;
-	}
-	lcd_printk("got cptr 0x%lx", cptr_val(test));
-	lcd_free_cptr(test);
-
-	lcd_printk("ctpr init done");
-
-	return;
+	return 0;
 }
 
 static int __lcd_alloc_cptr_from_bmap(unsigned long *bmap, int size,
@@ -96,22 +78,26 @@ static int __lcd_alloc_cptr(struct cptr_cache_2 *cache, cptr_t *free_cptr)
 	/*
 	 * Can't use a loop since we didn't kmalloc the bitmaps
 	 */
-	done = __lcd_alloc_cptr_from_bmap(cache->bmap0, LCD_BMAP0_SIZE, &idx);
+	done = __lcd_alloc_cptr_from_bmap(cache->bmap0, 
+					LCD_BMAP0_SIZE, &idx);
 	if (done) {
 		depth = 0;
 		goto found;
 	}
-	done = __lcd_alloc_cptr_from_bmap(cache->bmap1, LCD_BMAP1_SIZE, &idx);
+	done = __lcd_alloc_cptr_from_bmap(cache->bmap1, 
+					LCD_BMAP1_SIZE, &idx);
 	if (done) {
 		depth = 1;
 		goto found;
 	}
-	done = __lcd_alloc_cptr_from_bmap(cache->bmap2, LCD_BMAP2_SIZE, &idx);
+	done = __lcd_alloc_cptr_from_bmap(cache->bmap2, 
+					LCD_BMAP2_SIZE, &idx);
 	if (done) {
 		depth = 2;
 		goto found;
 	}
-	done = __lcd_alloc_cptr_from_bmap(cache->bmap3, LCD_BMAP3_SIZE, &idx);
+	done = __lcd_alloc_cptr_from_bmap(cache->bmap3, 
+					LCD_BMAP3_SIZE, &idx);
 	if (done) {
 		depth = 3;
 		goto found;

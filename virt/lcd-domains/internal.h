@@ -16,7 +16,7 @@
  * --------------------------------------------------
  */
 
-#define LCD_DEBUG 0
+#define LCD_DEBUG_LVL 0
 
 #define LCD_ERR(msg...) __lcd_err(__FILE__, __LINE__, msg)
 static inline void __lcd_err(char *file, int lineno, char *fmt, ...)
@@ -45,6 +45,25 @@ static inline void __lcd_warn(char *file, int lineno, char *fmt, ...)
 	vprintk(fmt, args);
 	va_end(args);
 }
+
+#define LCD_DEBUG_ERR  1
+#define LCD_DEBUG_WARN 2
+#define LCD_DEBUG_MSG  3
+
+#define LCD_DEBUG(lvl, msg...) {					\
+	if (lvl <= LCD_DEBUG_LVL)					\
+		__lcd_debug(__FILE__, __LINE__, msg);			\
+	}
+		
+static inline void __lcd_debug(char *file, int lineno, char *fmt, ...)
+{
+	va_list args;
+	printk(KERN_ERR "lcd-domains: %s:%d: debug: ", file, lineno);
+	va_start(args, fmt);
+	vprintk(fmt, args);
+	va_end(args);
+}
+
 
 /*
  * --------------------------------------------------

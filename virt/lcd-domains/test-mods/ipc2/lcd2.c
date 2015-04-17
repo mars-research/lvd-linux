@@ -26,7 +26,7 @@ static int do_recv(void)
 
 static void get_endpoint(void)
 {
-	ep = *((cptr_t *)gva_val(LCD_BOOT_PAGES_GVA));
+	ep = lcd_get_boot_info()->cptrs[0];
 }
 
 static int __noreturn __init lcd2_init(void) 

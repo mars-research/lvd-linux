@@ -9,14 +9,6 @@
 #include <linux/module.h>
 #include <linux/kernel.h>
 
-static void do_boot_params(struct lcd_info *mi, cptr_t dest)
-{
-	/*
-	 * The only thing the lcd needs is the cptr to the endpoint
-	 */
-	*((cptr_t *)mi->boot_page_base) = dest;
-}
-
 static int boot_main(void)
 {
 	int ret;
@@ -68,7 +60,12 @@ static int boot_main(void)
 	/*
 	 * Set up boot info
 	 */
-	do_boot_params(mi, dest);
+	ret = lcd_dump_boot_info(mi);
+	if (ret) {
+		LIBLCD_ERR("dump boot info");
+		goto fail6;
+	}
+	to_boot_info(mi)->cptrs[0] = dest;
 	/*
 	 * Run lcd
 	 */
@@ -100,9 +97,9 @@ static int boot_main(void)
 		goto fail10;
 	}
 	/*
-	 * Hang out for a second for lcd to exit
+	 * Hang out for a few seconds for lcd to exit
 	 */
-	msleep(1000);
+	msleep(3000);
 	/*
 	 * Tear everything down
 	 */
@@ -114,6 +111,7 @@ fail10:
 fail9:
 fail8:
 fail7:
+fail6:
 fail5:
 	/* 
 	 * No need to "ungrant" - everything is taken care of during tear

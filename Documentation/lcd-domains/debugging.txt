@@ -1,6 +1,6 @@
 
 ========================================
-EXPERIENCES
+RANDOM EXPERIENCES
 ========================================
 
 -- If your code fails, but e.g. modprobe or insmod hangs, the cpu may
@@ -36,3 +36,15 @@ be the source of the bad hang, but I'm not sure.
 
 -- See also some of the tips in liblcd.txt: Notes & Suggestions when debugging
 page faults, etc. inside an LCD.
+
+-- If you get linking errors or redefined symbol errors, you might be using
+a different configuration than what I used when I set up liblcd. You will
+need to either change your configuration, or modify liblcd to resolve the
+symbol errors. (This is one reason why we should build liblcd in a separate
+tree, in the future.)
+
+-- If you have lock dep turned on with `proving correctness', you will
+get some warnings when you load the LCD module. This is because the code
+in main.c and cap.c uses some wild locking that could possibly lead to
+deadlocks (it hasn't yet). So lockdep dumps warnings. I haven't bothered
+inserting the code to prevent lock dep from complaining.

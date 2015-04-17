@@ -49,6 +49,7 @@ int klcd_create_module_lcd(cptr_t *slot_out, char *mname,
 			cptr_t mloader_endpoint, struct lcd_info **mi);
 void klcd_destroy_module_lcd(cptr_t lcd, struct lcd_info *mi,
 			cptr_t mloader_endpoint);
+int klcd_dump_boot_info(struct lcd_info *mi);
 
 
 /* DEBUG ------------------------------------------------------------ */
@@ -428,6 +429,11 @@ struct lcd_info {
 	struct list_head free_mem_list;
 };
 
+static inline struct lcd_boot_info * to_boot_info(struct lcd_info *mi)
+{
+	return (struct lcd_boot_info *)mi->boot_page_base;
+}
+
 static inline int lcd_load_module(char *mname, cptr_t mloader_endpoint, 
 				struct lcd_info **mi)
 {
@@ -563,5 +569,9 @@ static inline void lcd_destroy_module_lcd(cptr_t lcd, struct lcd_info *mi,
 	return klcd_destroy_module_lcd(lcd, mi, mloader_endpoint);
 }
 
+static inline int lcd_dump_boot_info(struct lcd_info *mi)
+{
+	return klcd_dump_boot_info(mi);
+}
 
 #endif  /* LCD_DOMAINS_KLIBLCD_H */

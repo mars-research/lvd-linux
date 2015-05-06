@@ -1,0 +1,13 @@
+#
+# LCD ASYNC
+#
+
+config LAZY_THC
+       bool "CONFIG LAZY THC"
+       default y
+       ---help---
+       LAZY ASYNC Implementation
+
+
+
+

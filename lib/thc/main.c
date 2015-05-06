@@ -8,14 +8,35 @@
 
 #include <linux/init.h>
 #include <linux/module.h>
+#include <lcd-domains/thc.h>
+#include <lcd-domains/thcinternal.h>
+#include <lcd-domains/thcsync.h>
+void foo1(void);
+void foo2(void);
+bool testFlag = false;
 
-int __init api_init(void)
+void foo1(void) {
+	printk(KERN_ERR "lcd async entering foo1");
+	while (testFlag == false) {
+		printk(KERN_ERR "lcd async yielding to foo2");
+		THCYield();
+	}
+	printk(KERN_ERR "lcd async foo1 complete");
+}
+
+void foo2(void) {
+	printk(KERN_ERR "lcd async entering foo2");
+	testFlag = true;
+}
+
+static int __init api_init(void)
 {
+	DO_FINISH(ASYNC(foo1();foo2();););
 	printk(KERN_ERR "lcd async entering module");
 	return 0;
 }
 
-void __exit api_exit(void)
+static void __exit api_exit(void)
 {
 	printk(KERN_ERR "lcd async exiting module");
 	return;

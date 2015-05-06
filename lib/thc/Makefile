@@ -1,4 +1,4 @@
-obj-$(CONFIG_LAZY_THC)     += thc.o
-thc-y                      := main.o thc.o thcsync.o
+obj-$(CONFIG_LAZY_THC)     += async.o
+async-y                    := main.o thc.o thcsync.o
 
 

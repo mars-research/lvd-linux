@@ -63,6 +63,8 @@ struct sched_param {
 #ifdef CONFIG_HAVE_LCD
 struct lcd;
 struct cptr_cache;
+#endif
+#ifdef CONFIG_LAZY_THC
 struct ptstate_t;
 #endif
 
@@ -1472,6 +1474,8 @@ struct task_struct {
 #ifdef CONFIG_HAVE_LCD
 	struct lcd *lcd;
 	struct cptr_cache *cptr_cache;
+#endif
+#ifdef CONFIG_LAZY_THC
 	struct ptstate_t *ptstate; /* per thread state */
 #endif
 #ifdef CONFIG_SMP

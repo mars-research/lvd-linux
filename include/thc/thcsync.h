@@ -4,7 +4,7 @@
 #ifdef BARRELFISH
 #include <barrelfish/barrelfish.h>
 #endif
-#include <assert.h>
+//#include <assert.h>
 
 // Configuration options:
 
@@ -20,7 +20,7 @@
 // Lists of waiters
 
 struct thc_waiter {
-  awe_t             *waiter;
+  struct awe_t             *waiter;
   struct thc_waiter *next;
 };
 
@@ -48,7 +48,7 @@ static inline void thc_latch_acquire(struct thc_latch *l) {
 }
 
 static inline void thc_latch_release(struct thc_latch *l) {
-  assert(l->c == 1);
+  //assert(l->c == 1);
   l->c = 0;
 }
 

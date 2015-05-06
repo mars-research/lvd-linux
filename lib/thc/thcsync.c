@@ -2,20 +2,12 @@
 // Synchronization primitives
 //
 
-#include <stdlib.h>
-#include <stdio.h>
-#include <string.h>
-#include <assert.h>
+//#include <stdlib.h>
+//#include <stdio.h>
+//#include <string.h>
+//#include <assert.h>
 
-#ifdef BARRELFISH
-#include <thc/thc.h>
-#elif defined(_MSC_VER)
-#define WIN32_LEAN_AND_MEAN
-#include <Windows.h>
-#include <thc/thc.h>
-#else
-#include "thc.h"
-#endif
+#include <lcd-domains/thc.h>
 
 #define NOT_REACHED assert(0 && "Not reached")
 #define DEBUGPRINTF debug_printf
@@ -100,17 +92,18 @@ static void thc_sem_p_x_cancel_fn(void *c) {
   } else {
     // Cancelation won any wake/cancel race: remove the waiter so
     // that it cannot receive a subsequent V.
-    DEBUG_SYNC(DEBUGPRINTF(DEBUG_SYNC_PREFIX "Looking for wait-queue entry %p\n", cinf->waiter_info));
-    cinf -> was_canceled = 1;
     struct thc_waiter **qptr = &(cinf->sem->q);
+	//DEBUG_SYNC(DEBUGPRINTF(DEBUG_SYNC_PREFIX "Looking for wait-queue entry %p\n", cinf->waiter_info));
+    cinf -> was_canceled = 1;
+    
     while ((*qptr) != NULL && *qptr != cinf->waiter_info) {
       qptr = &((*qptr)->next);
     }
-    assert((*qptr) != NULL && "Could not find waiter entry on cancel");
+    //assert((*qptr) != NULL && "Could not find waiter entry on cancel");
     DEBUG_SYNC(DEBUGPRINTF(DEBUG_SYNC_PREFIX "Removed wait-queue entry (now %p -> %p)\n", qptr, (*qptr)->next));
     *qptr = (*qptr)->next;
 
-    DEBUG_SYNC(DEBUGPRINTF(DEBUG_SYNC_PREFIX "Waking p_x operation\n"));
+    //DEBUG_SYNC(DEBUGPRINTF(DEBUG_SYNC_PREFIX "Waking p_x operation\n"));
     THCSchedule(cinf->waiter_info->waiter);
   }
 
@@ -118,12 +111,12 @@ static void thc_sem_p_x_cancel_fn(void *c) {
 }
 
 errval_t thc_sem_p_x(thc_sem_t *s) {
+  int canceled = 0;
   // Return THC_CANCELED if already requested
   if (THCIsCancelRequested()) {
     return THC_CANCELED;
   }
 
-  int canceled = 0;
   thc_latch_acquire(&s->l);
   DEBUG_SYNC(DEBUGPRINTF(DEBUG_SYNC_PREFIX "thc_sem_p_x(%p) %d\n", s, s->val));
   if (s->val == 0) {
@@ -160,13 +153,14 @@ void thc_sem_v(thc_sem_t *s) {
   thc_latch_acquire(&s->l);
   DEBUG_SYNC(DEBUGPRINTF(DEBUG_SYNC_PREFIX "thc_sem_v(%p)\n", s));
   if (s->q != NULL) {
+	awe_t *to_wake;
     struct thc_waiter *w = s->q;
     s->q = w->next;
     DEBUG_SYNC(DEBUGPRINTF(DEBUG_SYNC_PREFIX "thc_sem_v waking %p\n", w));
     // NB: unlink the waiter structure before scheduling: they may
     // run immediately on a concurrent thread, and de-allcoate the
     // waiter structure.
-    awe_t *to_wake = w->waiter;
+    to_wake = w->waiter;
     // NULL out waiter; signals to the cancelation function
     // that they lost a wake-up/cancel race
     w->waiter = NULL; 
@@ -264,19 +258,20 @@ static void thc_condvar_wait_x_cancel_fn(void *c) {
     // return.
     DEBUG_SYNC(DEBUGPRINTF(DEBUG_SYNC_PREFIX "Cancelation lost wake/cancel race\n"));
   } else {
-    // Cancelation won any wake/cancel race: remove the waiter so
-    // that it cannot receive a subsequent notify.
-    DEBUG_SYNC(DEBUGPRINTF(DEBUG_SYNC_PREFIX "Looking for wait-queue entry %p\n", cinf->waiter_info));
-    cinf -> was_canceled = 1;
     struct thc_waiter **qptr = &(cinf->cv->q);
+	// Cancelation won any wake/cancel race: remove the waiter so
+    // that it cannot receive a subsequent notify.
+    //DEBUG_SYNC(DEBUGPRINTF(DEBUG_SYNC_PREFIX "Looking for wait-queue entry %p\n", cinf->waiter_info));
+    cinf -> was_canceled = 1;
+    
     while ((*qptr) != NULL && *qptr != cinf->waiter_info) {
       qptr = &((*qptr)->next);
     }
-    assert((*qptr) != NULL && "Could not find waiter entry on cancel");
-    DEBUG_SYNC(DEBUGPRINTF(DEBUG_SYNC_PREFIX "Removed wait-queue entry (now %p -> %p)\n", qptr, (*qptr)->next));
+    //assert((*qptr) != NULL && "Could not find waiter entry on cancel");
+    //DEBUG_SYNC(DEBUGPRINTF(DEBUG_SYNC_PREFIX "Removed wait-queue entry (now %p -> %p)\n", qptr, (*qptr)->next));
     *qptr = (*qptr)->next;
 
-    DEBUG_SYNC(DEBUGPRINTF(DEBUG_SYNC_PREFIX "Waking condvar_wait_x operation\n"));
+    //DEBUG_SYNC(DEBUGPRINTF(DEBUG_SYNC_PREFIX "Waking condvar_wait_x operation\n"));
     THCSchedule(cinf->waiter_info->waiter);
   }
 
@@ -284,38 +279,38 @@ static void thc_condvar_wait_x_cancel_fn(void *c) {
 }
 
 errval_t thc_condvar_wait_x(thc_condvar_t *cv, thc_lock_t *lock) {
-  // Return THC_CANCELED if already requested
-  if (THCIsCancelRequested()) {
-    return THC_CANCELED;
-  }
-
   int canceled = 0;
   struct thc_cv_cancel_info cinf;
   cancel_item_t ci;
   struct thc_waiter w;
   thc_condvar_wait0_info_t info;
+  // Return THC_CANCELED if already requested
+  if (THCIsCancelRequested()) {
+    return THC_CANCELED;
+  }
+
   thc_latch_acquire(&cv->l);
-  DEBUG_SYNC(DEBUGPRINTF(DEBUG_SYNC_PREFIX "thc_condvar_wait(%p,%p)\n", cv, lock));
+  //DEBUG_SYNC(DEBUGPRINTF(DEBUG_SYNC_PREFIX "thc_condvar_wait(%p,%p)\n", cv, lock));
   cinf.waiter_info = &w;
   cinf.cv = cv;
   cinf.was_canceled = 0;
   w.next = cv->q;
   cv->q = &w;
-  DEBUG_SYNC(DEBUGPRINTF(DEBUG_SYNC_PREFIX "thc_condvar_wait sleeping %p\n", &w));
+  //DEBUG_SYNC(DEBUGPRINTF(DEBUG_SYNC_PREFIX "thc_condvar_wait sleeping %p\n", &w));
   info.cv = cv;
   info.lock = lock;
   THCAddCancelItem(&ci, &thc_condvar_wait_x_cancel_fn, (void*)&cinf);
-  DEBUG_SYNC(DEBUGPRINTF(DEBUG_SYNC_PREFIX "Adding cancel item\n"));
+  //DEBUG_SYNC(DEBUGPRINTF(DEBUG_SYNC_PREFIX "Adding cancel item\n"));
   THCSuspendThen(&w.waiter, thc_condvar_wait0, (void*)&info); // Sleep ......
   canceled = cinf.was_canceled;
   if (!canceled) {
     if (!THCCancelItemRan(&ci)) {
-      DEBUG_SYNC(DEBUGPRINTF(DEBUG_SYNC_PREFIX "Removing cancel item\n"));
+      //DEBUG_SYNC(DEBUGPRINTF(DEBUG_SYNC_PREFIX "Removing cancel item\n"));
       THCRemoveCancelItem(&ci);
     }
   }
 
-  DEBUG_SYNC(DEBUGPRINTF(DEBUG_SYNC_PREFIX "thc_condvar_wait retaking lock %p\n", lock));
+  //DEBUG_SYNC(DEBUGPRINTF(DEBUG_SYNC_PREFIX "thc_condvar_wait retaking lock %p\n", lock));
   thc_latch_acquire(&cv->l);
   thc_lock_acquire(lock);
   thc_latch_release(&cv->l);
@@ -339,8 +334,9 @@ void thc_condvar_signal(thc_condvar_t *cv) {
 }
 
 void thc_condvar_broadcast(thc_condvar_t *cv) {
+  struct thc_waiter *w;
   thc_latch_acquire(&cv->l);
-  struct thc_waiter *w = cv->q;
+  w = cv->q;
   while (w != NULL) {
     awe_t *to_wake = w->waiter;
     // NULL out waiter; signals to the cancelation function
@@ -527,7 +523,7 @@ uint64_t thc_seq_ticket(thc_seq_t *seq) {
       break;
     }
   } while(1);
-  assert((result >= 0) && "URK!  Sequencer wrapped");
+  //assert((result >= 0) && "URK!  Sequencer wrapped");
   return result;
 #endif
 }

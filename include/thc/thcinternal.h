@@ -6,9 +6,10 @@
 /***********************************************************************/
 
 typedef struct ptstate_t PTState_t;
-typedef struct stack_t stack_t;
+typedef struct thcstack_t thcstack_t;
 typedef struct finish_t finish_t;
-
+struct thc_latch;
+typedef void (*THCIdleFn_t)(void *);
 // Definition of an AWE, asynchronous work element.  This definition must
 // match the assembly-language definitions at the bottom of thc.c which
 // access fields in the AWE structure.
@@ -42,8 +43,8 @@ struct awe_t {
   // Fields used by the runtime system to link together AWEs, e.g.,
   // on a thread's run-queue, or on a list of waiters on a
   // synchronization object.
-  awe_t *prev;
-  awe_t *next;
+  struct awe_t *prev;
+  struct awe_t *next;
 };
 
 /***********************************************************************/
@@ -66,22 +67,22 @@ struct finish_list_t {
 struct finish_t {
   void           *old_sp;    /* stack pointer when entering do {} finish */ 
   unsigned long   count;
-  awe_t          *finish_awe;
+  struct awe_t          *finish_awe;
   int             fb_kind;
   int             cancel_requested;
   finish_list_t   start_node;
   finish_list_t   end_node;
   finish_t       *enclosing_fb;
   void           *enclosing_lazy_stack;
-  cancel_item_t  *cancel_item;
+  struct cancel_item_t  *cancel_item;
 };
 
 /***********************************************************************/
 
 // Per-thread runtime system state
 
-struct stack_t {
-  stack_t *next;
+struct thcstack_t {
+  struct thcstack_t *next;
 };
 
 struct ptstate_t {
@@ -89,8 +90,8 @@ struct ptstate_t {
   // Thread-local fields: .............................................
 
   // Head/tail sentinels of the dispatch list
-  awe_t aweHead;
-  awe_t aweTail;
+  struct awe_t aweHead;
+  struct awe_t aweTail;
 
   // Immediately-enclosing finish block for the currently running code
   finish_t *current_fb;
@@ -119,10 +120,10 @@ struct ptstate_t {
   void *pendingFree;
 
   // AWE to enter for the dispatch loop on this thread
-  awe_t dispatch_awe;
+  struct awe_t dispatch_awe;
 
   // Free stacks for re-use
-  stack_t *free_stacks;
+  struct thcstack_t *free_stacks;
 
 
 #ifndef NDEBUG
@@ -157,8 +158,8 @@ struct ptstate_t {
   // Head/tail sentinels of the remote dispatch list on which other
   // threads place AWEs that they have unblocks but which belong to
   // this thread
-  awe_t aweRemoteHead;
-  awe_t aweRemoteTail;
+  struct awe_t aweRemoteHead;
+  struct awe_t aweRemoteTail;
 };
 
 typedef void (*THCContFn_t)(void *cont, void *args);
@@ -171,8 +172,8 @@ void _thc_endasync(void *f, void *s);
 void _thc_startfinishblock(finish_t *fb, int fb_kind);
 void _thc_endfinishblock(finish_t *fb, void *stack);
 void _thc_do_cancel_request(finish_t *fb);
-void _thc_callcont(awe_t *awe, THCContFn_t fn, void *args) __attribute__((returns_twice));
-int  _thc_schedulecont(awe_t *awe) __attribute__((returns_twice));
+void _thc_callcont(struct awe_t *awe, THCContFn_t fn, void *args) __attribute__((returns_twice));
+int  _thc_schedulecont(struct awe_t *awe) __attribute__((returns_twice));
 void _thc_lazy_awe_marker(void);
 void _thc_pendingfree(void);
 

@@ -1749,7 +1749,7 @@ void CCSTPlainLabelStatement::write(FILE *f)
   fprintf(f, ";");
 }
 
-CCSTCaseStatement::CCSTCaseStatement(CCSTConstExpr *c, CCSTStatement *body)
+CCSTCaseStatement::CCSTCaseStatement(CCSTCondExpr *c, CCSTStatement *body)
 {
   this->case_label_ = c; 
   this->body_ = body;

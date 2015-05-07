@@ -1008,10 +1008,10 @@ void CCSTPostFixExprExpr::write(FILE *f)
   fprintf(f, " ]");
 }
 
-CCSTPostFixExprAssnExpr::CCSTPostFixExprAssnExpr(CCSTPostFixExpr *post_fix_expr, CCSTAssignExpr *assn_expr)
+CCSTPostFixExprAssnExpr::CCSTPostFixExprAssnExpr(CCSTPostFixExpr *post_fix_expr, std::vector<CCSTAssignExpr*> args)
 {
   this->post_fix_expr_ = post_fix_expr; 
-  this->assn_expr_ = assn_expr;
+  this->args_ = args;
 }
 
 void CCSTPostFixExprAssnExpr::write(FILE *f)

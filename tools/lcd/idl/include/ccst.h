@@ -566,7 +566,7 @@ class CCSTAssignExpr : public CCSTExpression
 };
 
 
-class CCSTCondExpr : public CCSTAssignExpr
+class CCSTCondExpr : public CCSTAssignExpr, 
 {
   /*
     <conditional-expression> ::= <logical-or-expression>
@@ -643,7 +643,7 @@ class CCSTAndExpr : public CCSTXorExpr
   /*
     
     <and-expression> ::= <equality-expression>
-    | <and-expression> & <equality-expression>
+                      | <and-expression> & <equality-expression>
    */
   CCSTAndExpr *and_;
   CCSTEqExpr *eq_;
@@ -811,7 +811,7 @@ class CCSTUnaryExprOpOp : public CCSTUnaryExpr
   virtual void write(FILE *f);
 };
 
-class CCSTUnaryExprSizeOf : public CCSTCastExpr
+class CCSTUnaryExprSizeOf : public CCSTUnaryExpr
 {
   /*
     <unary-expression> ::= <postfix-expression>
@@ -901,7 +901,7 @@ class CCSTPostFixExprExpr : public CCSTPostFixExpr
   CCSTExpression *expr_;
  public:
   CCSTPostFixExprExpr();
-  CCSTPostFixExprExpr(CCSTPostFixExpr *post_fix_expr, CCSTExpression *expr); //{this->post_fix_expr_ = post_fix_expr; this->expr_ = expr;}
+  CCSTPostFixExprExpr(CCSTPostFixExpr *post_fix_expr, CCSTExpression *expr);
   virtual void write(FILE *f);
 };
 
@@ -917,10 +917,10 @@ class CCSTPostFixExprAssnExpr : public CCSTPostFixExpr
                        | <postfix-expression> --
    */
   CCSTPostFixExpr *post_fix_expr_;
-  CCSTAssignExpr *assn_expr_;
+  std::vector<CCSTAssignExpr*> args_;
  public:
   CCSTPostFixExprAssnExpr();
-  CCSTPostFixExprAssnExpr(CCSTPostFixExpr *post_fix_expr, CCSTAssignExpr *assn_expr); //{this->post_fix_expr_ = post_fix_expr; this->assn_expr_ = assn_expr;}
+  CCSTPostFixExprAssnExpr(CCSTPostFixExpr *post_fix_expr, std::vector<CCSTAssignExpr*> args); //{this->post_fix_expr_ = post_fix_expr; this->assn_expr_ = assn_expr;}
   virtual void write(FILE *f);
 };
 
@@ -1274,10 +1274,10 @@ class CCSTPlainLabelStatement : public CCSTLabeledStatement
 
 class CCSTCaseStatement : public CCSTLabeledStatement
 {
-  CCSTConstExpr *case_label_;
+  CCSTCondExpr *case_label_;
   CCSTStatement *body_;
  public:
-  CCSTCaseStatement(CCSTConstExpr *c, CCSTStatement *body); //{this->case_label_ = c; this->body_ = body;}
+  CCSTCaseStatement(CCSTCondExpr *c, CCSTStatement *body); //{this->case_label_ = c; this->body_ = body;}
   virtual void write(FILE *f);
 };
 

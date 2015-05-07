@@ -1765,6 +1765,19 @@ void CCSTCaseStatement::write(FILE *f)
   fprintf(f, "\n}");
 }
 
+void CCSTDefaultLabelStatement::write(FILE *f)
+{
+  fprintf(f, "default:\n");
+  fprintf(f, "{\n");
+  this->body_->write(f);
+  fprintf(f, "\n}");
+}
+
+CCSTDefaultLabelStatement::CCSTDefaultLabelStatement(CCSTStatement* body)
+{
+  this->body_ = body;
+}
+
 CCSTExprStatement::CCSTExprStatement(CCSTExpression *expr)
 {
   this->expr_ = expr;

@@ -915,7 +915,7 @@ class CCSTPostFixExprAssnExpr : public CCSTPostFixExpr
                        | <postfix-expression> -> <identifier>
                        | <postfix-expression> ++
                        | <postfix-expression> --
-   */
+  */
   CCSTPostFixExpr *post_fix_expr_;
   std::vector<CCSTAssignExpr*> args_;
  public:
@@ -1261,6 +1261,14 @@ class CCSTLabeledStatement : public CCSTStatement
    */
  public:
   virtual void write(FILE *f) = 0;
+};
+
+class CCSTDefaultLabelStatement : public CCSTLabeledStatement
+{
+  CCSTStatement* body_;
+ public:
+  CCSTDefaultLabelStatement(CCSTStatement* body);
+  virtual void write(FILE *f);
 };
 
 class CCSTPlainLabelStatement : public CCSTLabeledStatement

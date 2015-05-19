@@ -63,13 +63,10 @@ void thc_done(void);
 	FORCE_FRAME_POINTER_USE;						\
     GET_STACK_POINTER(_fb_info->old_sp);				\
     _thc_startfinishblock(_fb_info, _IS_NX);				\
-	printk(KERN_ERR "lcd async DO_FINISH will now execute code"); \
     do { _CODE } while (0);                                             \
-	printk(KERN_ERR "lcd async DO_FINISH finished execurint code\n");\
     GET_STACK_POINTER(_fb_curr_stack);					\
     _thc_endfinishblock(_fb_info, _fb_curr_stack);			\
     if (_fb_info->old_sp != _fb_curr_stack) {				\
-	  printk(KERN_ERR "lcd async DO_FINISH restoring stack pointer\n"); \
       RESTORE_OLD_STACK_POINTER(_fb_info->old_sp);			\
       _thc_pendingfree();						\
     }									\
@@ -104,7 +101,6 @@ void thc_done(void);
 #define ASYNC_(_BODY, _C)						\
   do {									\
     awe_t _awe;                                                         \
-	printk(KERN_ERR "\nlcd async address of awe: %p\n", &_awe); \
     extern void * CONT_RET_FN_NAME(_C) (void);	         		\
 									\
     _awe.status     = LAZY_AWE;						\
@@ -117,23 +113,14 @@ void thc_done(void);
       void *_my_fb = _fb_info;						\
       _awe.current_fb = _my_fb;						\
       INIT_LAZY_AWE(awe, &_thc_lazy_awe_marker);			\
-	  /* Muktesh code change starts */ \
-	  char *ptr = awe->ebp; \
-	  printk(KERN_ERR "lcd async value of  awe ptr in function: %p\n", awe); \
-	  ptr = ptr + 16;\
-	  awe_t **awe_ptr = (awe_t **)ptr;\
-	  printk(KERN_ERR "lcd async value on stack: %p\n", *awe_ptr); \
-	  /* Muktesh Code Change Ends */ \
       do { _BODY; } while (0);						\
       /* If return address is NULLed then we blocked */			\
       if (__builtin_return_address(0) == NULL) {			\
 	/* thc_startasync is performed lazily, we should run */		\
 	/* _thc_endasync if we blocked*/				\
-	 printk(KERN_ERR "lcd async calling into endasync\n"); \
 	_thc_endasync(_my_fb, __builtin_frame_address(0)+(2*__WORD_SIZE));\
       }									\
       /* Otherwise, return */						\
-	  printk(KERN_ERR "lcd async nested fn complete now returning\n"); \      
       RETURN_CONT(CONT_RET_FN_STRING(_C));				\
     }									\
     SCHEDULE_CONT(&_awe, _thc_nested_async);                            \
@@ -141,7 +128,6 @@ void thc_done(void);
       "      .globl  " CONT_RET_FN_STRING(_C) "\n\t"			\
       " " CONT_RET_FN_STRING(_C) ":            \n\t"			\
     );                                                                  \
-	printk(KERN_ERR "lcd async ASYNC Complete\n");									\
   } while (0)
 
 #else // EAGER_THC

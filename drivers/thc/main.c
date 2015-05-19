@@ -18,7 +18,12 @@ void foo2(void);
 noinline void foo1(void) {
 	printk(KERN_ERR "lcd async entering foo1\n");
 	printk(KERN_ERR "lcd async yielding to foo2\n");
-	THCYield();	
+	int count = 0;
+	while (count < 2) {
+	 printk(KERN_ERR "lcd async Yielding\n");
+	 THCYield();	
+	 count++;
+	}
 	printk(KERN_ERR "lcd async foo1 complete\n");
 }
 

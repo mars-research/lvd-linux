@@ -244,7 +244,6 @@ void *_thc_allocstack(void) {
 #ifndef NDEBUG
   pts->stacksAllocated ++;
 #endif
-  printk(KERN_ERR "lcd async Creating a new stack: %p\n", result);
   return result;
 }
 
@@ -389,9 +388,16 @@ static void thc_dispatch_loop(void) {
   DEBUG_DISPATCH(DEBUGPRINTF(DEBUG_DISPATCH_PREFIX "> dispatch_loop\n"));
 
   thc_pendingfree(pts);
+
+  // TBD: 
+  // Scotty needs to provide some mechanism to check for which AWE is ready for execution
+  // we should pick up that awe instead of moving ahead with our code.
+  // This is necessary as if we using async within an infinite while loop we will never
+  // come back to check for what has been completed.
+  // AI: Muktesh, Scotty
+
   // Pick up work passed to us from other threads
   if (pts->aweRemoteHead.next != &pts->aweRemoteTail) {
-    printk(KERN_ERR "lcd async thc_dispatch_loop other threads");
 	awe_t *tmp = pts->aweHead.next;
     thc_pts_lock(pts);
     // Move remote list into our local list
@@ -406,7 +412,6 @@ static void thc_dispatch_loop(void) {
   } 
   
   if (pts->aweHead.next == &pts->aweTail) {
-    printk(KERN_ERR "lcd async thc_dispatch_loop nothing to execute");
     awe_t idle_awe;
 	void *idle_stack = _thc_allocstack();
 	DEBUG_DISPATCH(DEBUGPRINTF(DEBUG_DISPATCH_PREFIX "  queue empty\n"));
@@ -589,6 +594,11 @@ static void init_lazy_awe (void ** lazy_awe_fp) {
 
   // Get the saved awe
   awe_t *awe = THC_LAZY_FRAME_AWE(lazy_awe_fp);
+  // if we had created and scheduled the continuation
+  // of this async no need to do it again
+  if (awe->status != LAZY_AWE) {
+	return;
+  }
   //DEBUG_AWE(DEBUGPRINTF(DEBUG_AWE_PREFIX " found lazy awe %p @ frameptr %p",
   //			awe, lazy_awe_fp));
   // Scrub nested return, lazy awe will now return through dispatch loop
@@ -613,10 +623,6 @@ static void check_for_lazy_awe (void * ebp) {
   while (frame_ptr != NULL && ret_addr != NULL) {
     if (ret_addr == &_thc_lazy_awe_marker) {
 		printk(KERN_ERR "\nlcd async the awe marker is found\n");
-		char *cptr = (char *)frame_ptr;
-		cptr = cptr + 16;
-		awe_t **awe_ptr = (awe_t **)cptr;
-		printk(KERN_ERR "lcd async content on stack: %p\n", *awe_ptr);
         init_lazy_awe(frame_ptr);
 		break;
     }
@@ -713,7 +719,6 @@ static void _thc_endfinishblock0(void *a, void *f) {
                            fb, a));
   //assert(fb->finish_awe == NULL);
   fb->finish_awe = a;
-  printk(KERN_ERR "lcd async endfinishblock trying to dispatch\n");
   thc_dispatch(awe->pts);
   NOT_REACHED;
 }
@@ -778,7 +783,7 @@ void _thc_do_cancel_request(finish_t *fb) {
 }
 
 void _thc_endfinishblock(finish_t *fb, void *stack) {
-	printk(KERN_ERR "lcd async endfinishblock executing\n");
+  printk(KERN_ERR "lcd async endfinishblock executing\n");
   PTState_t *pts = PTS();
   DEBUG_FINISH(DEBUGPRINTF(DEBUG_FINISH_PREFIX "> EndFinishBlock(%p)\n",
                            fb));
@@ -795,7 +800,6 @@ void _thc_endfinishblock(finish_t *fb, void *stack) {
     printk(KERN_ERR "lcd async endfinishblock has pending AWE\n");
     CALL_CONT_LAZY((unsigned char*)&_thc_endfinishblock0, fb);
   }
-  printk(KERN_ERR "lcd async endfinishblock reached A\n");
   //assert(fb->count == 0);
   //assert(fb->cancel_item == NULL);
   //assert(fb->start_node.next == &(fb->end_node));
@@ -840,7 +844,7 @@ void _thc_startasync(void *f, void *stack) {
 }
 
 void _thc_endasync(void *f, void *s) {
-	printk(KERN_ERR "lcd async endasync is starting\n");
+  printk(KERN_ERR "lcd async endasync is starting\n");
   finish_t *fb = (finish_t*)f;
   PTState_t *pts = PTS();
 #ifndef NDEBUG
@@ -874,9 +878,7 @@ void _thc_endasync(void *f, void *s) {
 	  printk(KERN_ERR "lcd async ESP: %p\n", fb -> finish_awe->esp);
       thc_schedule_local(fb -> finish_awe);
       fb -> finish_awe = NULL;
-	} else {
-		printk(KERN_ERR "lcd async no finish awe\n");
-	} 
+	}  
   } else {
 		printk(KERN_ERR "lcd async no pending AWE on finish block\n");
   }
@@ -913,10 +915,6 @@ void THCIncRecvCount(void) {
 __attribute__ ((unused))
 static void thc_yield_with_cont(void *a, void *arg) {
   awe_t *awe = (awe_t*)a; 
-  printk(KERN_ERR "lcd async the pending AWE EIP: %p\n", awe->eip);
-  printk(KERN_ERR "lcd async the pending AWE EBP: %p\n", awe->ebp);
-  printk(KERN_ERR "lcd async the pending AWE ESP: %p\n", awe->esp);
-  
   awe->lazy_stack = awe->pts->curr_lazy_stack;
   // check if we have yielded within a lazy awe
   check_for_lazy_awe(awe->ebp);
@@ -925,9 +923,7 @@ static void thc_yield_with_cont(void *a, void *arg) {
 }
 
 void THCYield(void) {
-  printk(KERN_ERR "lcd async THCYield Starting:\n");
   CALL_CONT_LAZY((void*)&thc_yield_with_cont, NULL);
-  printk(KERN_ERR "lcd async THCYield returning:\n");
 }
 
 __attribute__ ((unused))
@@ -1033,15 +1029,15 @@ static inline void thc_schedule_local(awe_t *awe) {
   PTState_t *awe_pts;
   //DEBUG_AWE(DEBUGPRINTF(DEBUG_AWE_PREFIX "> THCSchedule(%p)\n",
   //                      awe));
-  printk(KERN_ERR "lcd async within schedule local\n");
+  printk(KERN_ERR "lcd async Schedule Local adding AWE to front\n");
   awe_pts = awe->pts;
   awe->prev = &(awe_pts->aweHead);
   awe->next = awe_pts->aweHead.next;
   awe_pts->aweHead.next->prev = awe;
   awe_pts->aweHead.next = awe;
-  printk(KERN_ERR "lcd async SchedFront AWE EIP: %p\n", awe->eip);
-  printk(KERN_ERR "lcd async SchedFront AWE EBP: %p\n", awe->ebp);
-  printk(KERN_ERR "lcd async SchedFront AWE ESP: %p\n", awe->esp);
+  printk(KERN_ERR "lcd async AWE EIP: %p\n", awe->eip);
+  printk(KERN_ERR "lcd async AWE EBP: %p\n", awe->ebp);
+  printk(KERN_ERR "lcd async AWE ESP: %p\n", awe->esp);
   //DEBUG_AWE(DEBUGPRINTF(DEBUG_AWE_PREFIX "  added AWE between %p %p\n",
   //                      awe->prev, awe->next));
   //DEBUG_AWE(DEBUGPRINTF(DEBUG_AWE_PREFIX "< THCSchedule\n"));

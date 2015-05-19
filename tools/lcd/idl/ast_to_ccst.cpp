@@ -3,13 +3,15 @@
 #include <stdarg.h>
 #include <stdlib.h>
 #include <stdio.h>
-
+#include <errno.h>
+#include <cstdlib>
 /* taken from Scott Bauer 
  * Will be moved to more appropriate place
  */
-static void AssertionFailure(char *exp, char *file, int line, const char* format, ... )
+static void AssertionFailure(std::string exp, std::string file, int line, const char* format, ...)
+//static void AssertionFailure(char *exp, char *file, int line, const char* format, ... )
 {
-  printf("Assertion '%s' failed at line %d of file %s\n", exp, line, file);
+  printf("Assertion '%s' failed at line %d of file %s\n", exp.c_str(), line, file.c_str());
   printf("Error is %s\n", strerror(errno));
   va_list args;
   va_start(args, format);
@@ -24,40 +26,51 @@ static void AssertionFailure(char *exp, char *file, int line, const char* format
 #define Assert(exp, format, ...) if (exp) ; else AssertionFailure( #exp, __FILE__,  __LINE__, format, ##__VA_ARGS__ ) 
 
 /* example
-
+   
    #ifndef LCD_PROTOTYPE_MANUFACTURER_IDL_H
-#define LCD_PROTOTYPE_MANUFACTURER_IDL_H
-
-enum manufacturer_interface_enum {
-	MANUFACTURER_MK_ENGINE,
-	MANUFACTURER_MK_AUTOMOBILE,
-	MANUFACTURER_FREE_ENGINE,
-	MANUFACTURER_FREE_AUTOMOBILE,
-	MANUFACTURER_DIE,
-};
-
- Locations of manufacturer's boot cptrs 
-#define MANUFACTURER_DEALER_INTERFACE_CAP 31
-
-#endif
- */
+   #define LCD_PROTOTYPE_MANUFACTURER_IDL_H
+   
+   enum manufacturer_interface_enum {
+   MANUFACTURER_MK_ENGINE,
+   MANUFACTURER_MK_AUTOMOBILE,
+   MANUFACTURER_FREE_ENGINE,
+   MANUFACTURER_FREE_AUTOMOBILE,
+   MANUFACTURER_DIE,
+   };
+   
+   Locations of manufacturer's boot cptrs 
+   #define MANUFACTURER_DEALER_INTERFACE_CAP 31
+   
+   #endif
+*/
 
 /* producing:
-
-declaration --> declaration-specifier --> type-specifier --> enum-specifier
-
-enum-specifier: enum id { enumerator-list };
-
-enumerator-list = enumerator
-                | enumerator-list , enumerator
-
-enumerator = id
-           | id = constant-expression
- */
-ServerCCSTHeaderVisitor::ServerCCSTHeaderVisitor()
+   
+   declaration --> declaration-specifier --> type-specifier --> enum-specifier
+   
+   enum-specifier: enum id { enumerator-list };
+   
+   enumerator-list = enumerator
+   | enumerator-list , enumerator
+   
+   enumerator = id
+   | id = constant-expression
+*/
+CCSTFile* generate_client_header(File* f)
 {
 }
-CCSTFile* ServerCCSTHeaderVisitor::visit(File *file)
+
+CCSTFile* generate_client_source(File* f)
+{
+  
+  std::vector<CCSTExDeclaration*> definitions;
+  
+  
+  CCSTFile *c_file = new CCSTFile(definitions);
+  return c_file;
+}
+
+CCSTFile* generate_server_header(File *file)
 {
   // #ifndef
   // #define
@@ -82,8 +95,8 @@ CCSTFile* ServerCCSTHeaderVisitor::visit(File *file)
 
 CCSTExDeclaration* construct_callee_declaration(Rpc* r)
 {
-  std::vector<CCSTDecSpecifier*> *specifier = new std::vector<CCSTDecSpecifier*>();
-  specifier->push_back(new CCSTSimpleTypeSpecifier(int_t));
+  std::vector<CCSTDecSpecifier*> specifier; // = new std::vector<CCSTDecSpecifier*>();
+  specifier.push_back(new CCSTSimpleTypeSpecifier(int_t));
   char * callee_name = (char*) malloc((strlen(r->name())+strlen("_callee")+1)*sizeof(char));
   sprintf(callee_name, "%s%s", r->name(), "_callee");
   CCSTDirectDecId* id = new CCSTDirectDecId(callee_name);
@@ -99,10 +112,10 @@ CCSTExDeclaration* construct_callee_declaration(Rpc* r)
   CCSTDirectDecParamTypeList *params = new CCSTDirectDecParamTypeList(id, param_list); 
     
   CCSTDeclarator* declarator = new CCSTDeclarator(NULL, params);
-  std::vector<CCSTInitDeclarator*> *init_declarator = new std::vector<CCSTInitDeclarator*>();
-  init_declarator->push_back(declarator);
+  std::vector<CCSTInitDeclarator*> init_declarator; // = new std::vector<CCSTInitDeclarator*>();
+  init_declarator.push_back(declarator);
   CCSTDeclaration *func_declaration = new CCSTDeclaration(specifier, init_declarator);
-
+  
   return func_declaration;
 }
 
@@ -111,9 +124,10 @@ CCSTExDeclaration* construct_enum(File *f)
   const char* enum_name = "todo";
   CCSTEnumeratorList *el = construct_enumlist(f->rpc_defs());
   CCSTEnumSpecifier *e = new CCSTEnumSpecifier(enum_name, el);
-  std::vector<CCSTDecSpecifier*> *tmp = new std::vector<CCSTDecSpecifier*>();
-  tmp->push_back(e);
-  CCSTDeclaration *declaration = new CCSTDeclaration(tmp, new std::vector<CCSTInitDeclarator*>());
+  std::vector<CCSTDecSpecifier*> tmp; // = new std::vector<CCSTDecSpecifier*>();
+  tmp.push_back(e);
+  std::vector<CCSTInitDeclarator*> empty;
+  CCSTDeclaration *declaration = new CCSTDeclaration(tmp, empty);
   
   return declaration;
 }
@@ -139,7 +153,7 @@ CCSTEnumeratorList* construct_enumlist(std::vector<Rpc *>* rps)
   return enum_list;
 }
 
-char* string_to_upper(const char* str)
+char* string_to_upper(char* str)
 {
   char* ret = (char*) malloc((sizeof(str)+1)*sizeof(char));
   int i;
@@ -154,11 +168,8 @@ char* string_to_upper(const char* str)
 
 /* ServerCCSTSourceVisitor */
 
-ServerCCSTSourceVisitor::ServerCCSTSourceVisitor()
-{
-}
 
-CCSTFile* ServerCCSTSourceVisitor::visit(File *file)
+CCSTFile* generate_server_source(File *file)
 {
   // <function-definition> is CCSTFuncDef
   // CCSTDecSpecifier* is <type-specifier> is CCSTTypeSpecifier
@@ -169,11 +180,31 @@ CCSTFile* ServerCCSTSourceVisitor::visit(File *file)
   // CCSTStatement for body
 
   // see notes in notebook
-  
+
+  /*  
   std::vector<CCSTExDeclaration*> defs;
   CCSTFuncDef* exec_loop = create_exec_loop(file->rpc_defs());
   defs.push_back(exec_loop);
   return new CCSTFile(defs);
+  */
+
+  std::vector<CCSTExDeclaration*> definitions;
+  
+  // dispatch
+  /*
+  create_function_definition(create_function_declaration()
+			     ,create_dispatch_loop_body(file->rpc_defs()));
+  */
+  std::vector<Rpc*> *rps = file->rpc_defs();
+  for(std::vector<Rpc*>::iterator it = rps->begin(); it != rps->end(); it ++)
+     {
+       Rpc* r_tmp = (Rpc*) *it;
+       definitions.push_back(new CCSTFuncDef(construct_callee_declaration(r_tmp)
+					     ,create_callee_body(r_tmp)));
+     }
+   
+   CCSTFile *c_file = new CCSTFile(definitions);
+   return c_file;
 }
 
 /* ------------------------ new ---------------------------- */
@@ -182,7 +213,7 @@ CCSTFile* ServerCCSTSourceVisitor::visit(File *file)
 
 int count_nested_pointer(Type *p)
 {
-  if(p->num != 3)
+  if(p->num() != 3)
     return 0;
   else
     {
@@ -200,7 +231,7 @@ CCSTPointer* create_pointer(int p_count)
 {
   if(p_count == 0)
     return 0x0;
-
+  
   if(p_count == 1)
     return new CCSTPointer();
   
@@ -213,19 +244,19 @@ CCSTPointer* create_pointer(int p_count)
  */
 CCSTFuncDef* create_function_definition(CCSTDeclaration* function_declaration, CCSTCompoundStatement *body)
 {
-  Assert(function_declaration->decs_->size() == 1, "Error: More than one initializer/declarator in function declaration");
-
-  CCSTDeclarator *func = dynamic_cast<CCSTDeclarator*>(function_declaration->decs_->at(0));
+  Assert(function_declaration->decs_.size() == 1, "Error: More than one initializer/declarator in function declaration");
+  
+  CCSTDeclarator *func = dynamic_cast<CCSTDeclarator*>(function_declaration->decs_.at(0));
   Assert(func != 0, "Error: dynamic cast from CCSTInitDeclarator to CCSTDeclarator has failed!");
-
+  
   std::vector<CCSTDeclaration*> decs; // not sure what this is for. unnecessary?
-
+  
   return new CCSTFuncDef(function_declaration->specifier_, func, decs, body);
 }
 
 CCSTParamTypeList* create_parameter_list()
 {
-
+  
 }
 
 /* creates a function declaration
@@ -233,21 +264,19 @@ CCSTParamTypeList* create_parameter_list()
  */
 CCSTDeclaration* create_function_declaration(Rpc* r)
 {
-  std::vector<CCSTDecSpecifier*> *specifier = new std::vector<CCSTDecSpecifier*>(); // return type
-  specifier->push_back( ); // use a visitor to get return type);
-
-
-  std::vector<CCSTInitDeclarator*> *func = new std::vector<CCSTInitDeclarator*>(); // pointer name, params
+  std::vector<CCSTDecSpecifier*> specifier = get_type(r->return_type());
+  
+  std::vector<CCSTInitDeclarator*> func; // = new std::vector<CCSTInitDeclarator*>(); // pointer name, params
   int pointer_count = count_nested_pointer(r->return_type());
-
+  
   CCSTPointer *p = create_pointer(pointer_count);
   
   CCSTDirectDecId *name = new CCSTDirectDecId(r->name());
   CCSTParamTypeList *param_list = create_parameter_list();
   CCSTDirectDecParamTypeList *name_params = new CCSTDirectDecParamTypeList(name, param_list);
-
-  func->push_back(new CCSTDeclarator(p, name_params));
-
+  
+  func.push_back(new CCSTDeclarator(p, name_params));
+  
   return new CCSTDeclaration(specifier, func);
 }
 
@@ -257,60 +286,124 @@ CCSTDeclaration* create_function_declaration(Rpc* r)
  * need name
  * need params
  */
+
+
 CCSTDeclaration* create_function_declaration()
 {
-
 }
 
 /* specific function body creators */
 
-CCSTCompoundStatement* create_exec_loop_body()
-{
-  /*
-  std::vector<CCSTDecSpecifier*> *s = new std::vector<CCSTDecSpecifier*>();
-  std::vector<CCSTInitDeclarator*> *d = new std::vector<CCSTInitDeclarator*>();
-  s->push_back(new CCSTSimpleTypeSpecifier(int_t));
-  d->push_back(new CCSTDeclarator(null, new CCSTDirectDecId("ret")));
+CCSTCompoundStatement* create_dispatch_loop_body(std::vector<Rpc*>* rps)
+{  
+  
   std::vector<CCSTDeclaration*> decs_in_body;
+  // int ret; 
+  std::vector<CCSTDecSpecifier*> s;// = new std::vector<CCSTDecSpecifier*>();
+  std::vector<CCSTInitDeclarator*> d;// = new std::vector<CCSTInitDeclarator*>();
+  s.push_back(new CCSTSimpleTypeSpecifier(int_t));
+  d.push_back(new CCSTDeclarator(0x0, new CCSTDirectDecId("ret")));
   decs_in_body.push_back(new CCSTDeclaration(s,d));
+  // Declare a variable of type int with name ret
+  
+  
+  /* body statement, switch*/
 
-  std::vector<CCSTStatement*> body_statements;
 
-  // switch CCSTSelectionStatement
-  // case is CCSTLabeledStatement
+  /*  lcd_recv(manufacturer_interface_cap) */
+  /* check ret value, begin */
+  std::vector<CCSTAssignExpr*> args;
+  args.push_back( new CCSTPrimaryExprId("manufacturer_interface_cap"));
+  CCSTAssignExpr* init_ret = new CCSTAssignExpr(new CCSTPrimaryExprId("ret")
+						 , new CCSTAssignOp(equal_t)
+						 , new CCSTPostFixExprAssnExpr(new CCSTPrimaryExprId("lcd_recv")
+									       ,args));
+  /* check ret value, end */
 
-  std::vector<CCSTDeclaration*> empty; // not needed
+  /* if ret begin */
+  CCSTIfStatement* if_stmt = new CCSTIfStatement(new CCSTPrimaryExprId("ret")
+						 , new CCSTGoto("out"));
+  /* if ret end */
+
+
+  
+  /* switch statement begin */
   std::vector<CCSTStatement*> cases;
   for(std::vector<Rpc*>::iterator it = rps->begin(); it != rps->end(); it ++)
     {
-      Rpc *r = *it;
-      // this should be done elsewhere, the enum name, leave here for now, but move it
-      char* upper_name = string_to_upper(r->name());
-      char* enum_name = (char*)malloc((strlen(upper_name)+strlen("_CALLEE_T")+1)*sizeof(char));
+      Rpc* r_tmp = (Rpc*) *it;
       
-      sprintf(enum_name, "%s_CALLEE_T", upper_name);
+      std::vector<CCSTDeclaration*> case_dec_empty;
 
-      char* callee_name = (char*)malloc( (strlen(r->name)+1+strlen("_callee"))*sizeof(char));
-      sprintf(callee_name, "%s_callee", r->name);
-      
-      CCSTConstExpr* case_name = new CCSTConstExpr(new CCSTPrimaryExprId(enum_name));
-      // for body of case
-      std::vector<CCSTDeclaration*> case_declarations;
-      std::vector<CCSTStatement*> case_statements;
+      std::vector<CCSTStatement*> case_body_stmts;
+      std::vector<CCSTAssignExpr*> msg_args;
+      msg_args.push_back(new CCSTString("FILL IN MESSAGE"));
+      case_body_stmts.push_back(new CCSTExprStatement( new CCSTPostFixExprAssnExpr(new CCSTPrimaryExprId("LCD_MSG")
+										   , msg_args)));
 
-      CCSTPrimaryExprId* r = new CCSTPrimaryExprId("ret");
-      CCSTAssignOp* eq = new CCSTAssignOp(equal_t);
-      // make call to whatever_callee()
-      CCSTPostFixExprAssnExpr * func_call = new CCSTPostFixExprAssnExpr(new CCSTPrimaryExprId(callee_name), new CCSTAssignExpr(NULL));
-      
-      cases.push_back( new CCSTCaseStatement(case_name, new CCSTCompoundStatement(case_declarations, case_statements)));
+      // make call to callee. 
+      std::vector<CCSTAssignExpr*> args_empty;
+      case_body_stmts.push_back(new CCSTExprStatement( new CCSTAssignExpr(new CCSTPrimaryExprId("ret")
+						   , new CCSTAssignOp(equal_t)
+						   , new CCSTPostFixExprAssnExpr(new CCSTPrimaryExprId(r_tmp->callee_name())
+										 , args_empty))));
+
+      case_body_stmts.push_back(new CCSTBreak());
+      CCSTCompoundStatement* case_body = new CCSTCompoundStatement(case_dec_empty
+								   , case_body_stmts);
+      CCSTCaseStatement* tmp_case =  new CCSTCaseStatement(new CCSTPrimaryExprId(r_tmp->enum_name())
+							   , case_body);
+      cases.push_back(tmp_case);
     }
+  /* adding a default case */
 
-  CCSTSwitchStatement* dispatch = new CCSTSwitchStatement(new CCSTPrimaryExprId("ret"), new CCSTCompoundStatement(empty, ));
+  std::vector<CCSTDeclaration*> default_dec_empty;
+  std::vector<CCSTStatement*> default_stmts;
+  std::vector<CCSTAssignExpr*> lcd_msg_args;
+  lcd_msg_args.push_back(new CCSTString("Error unknown function"));
+  default_stmts.push_back(new CCSTExprStatement( new CCSTPostFixExprAssnExpr(new CCSTPrimaryExprId("LCD_MSG")
+									     , lcd_msg_args)));
+  default_stmts.push_back(new CCSTGoto("out"));
+  CCSTCompoundStatement* default_body =  new CCSTCompoundStatement(default_dec_empty
+								   , default_stmts);
+  CCSTDefaultLabelStatement* default_case = new CCSTDefaultLabelStatement( new CCSTExprStatement( new CCSTString("finish") ));
+  cases.push_back(default_case);
+  /* end of adding default case */
 
+  std::vector<CCSTDeclaration*> switch_dec_empty;
+  CCSTCompoundStatement* switch_body = new CCSTCompoundStatement(switch_dec_empty, cases);
+  CCSTSwitchStatement* dispatch = new CCSTSwitchStatement(new CCSTPrimaryExprId("ret")
+							  , switch_body);
+  /* switch statement end */
+
+  /* error checking if begin */
+  CCSTIfStatement* error_if = new CCSTIfStatement(new CCSTPrimaryExprId("ret")
+						  , new CCSTGoto("out"));
+  /* error checking if end */
+
+    /* for loop begin */
+  std::vector<CCSTDeclaration*> for_declarations_empty;
+  std::vector<CCSTStatement*> for_body_statements;
+  for_body_statements.push_back(new CCSTExprStatement( init_ret));
+  for_body_statements.push_back(if_stmt);
+  for_body_statements.push_back(dispatch);
+  for_body_statements.push_back(error_if);
+  CCSTCompoundStatement *for_body = new CCSTCompoundStatement(for_declarations_empty, for_body_statements);
+  CCSTForLoop* for_loop = new CCSTForLoop(0x0, 0x0, 0x0, for_body); 
+
+  /* for loop end */
+
+  /* labeled statement, out, begin */
+  CCSTPlainLabelStatement* out_label = new CCSTPlainLabelStatement("out", new CCSTReturn());
+  // doesn't return anything;
+  /* labeled statement, out , end */
   
-  CCSTCompoundStatement *body = new CCSTCompoundStatement(decs_in_body, body_statements);
-*/
+  /* put body together */
+  std::vector<CCSTStatement*> body_statements;
+  body_statements.push_back(for_loop);
+  body_statements.push_back(out_label);
+  return new CCSTCompoundStatement(decs_in_body, body_statements);
+  /* body complete */
 }
 
 
@@ -338,6 +431,112 @@ CCSTCompoundStatement* create_caller_body(Rpc *r)
   // return result
 }
 
+
+/*
+ * Takes a Type and returns the CAST equivalent
+ * Didn't feel it was necessary to write a visitor
+ * When this will do essentially the same thing.
+ * Slightly grosser than visitor because must do casting
+ */
+std::vector<CCSTDecSpecifier*> get_type(Type *t)
+{
+  std::vector<CCSTDecSpecifier*> ret;
+  switch (t->num())
+    {
+    case 1: // typedef
+      {
+	// Choice.  use "real type" or use user defined type
+	// and put typedef at top of file.
+	// go with this, will make code more readable
+	
+	Typedef *td = dynamic_cast<Typedef*>(t);
+	CCSTTypedefName *tmp = new CCSTTypedefName(td->alias());
+	ret.push_back(tmp);
+	return ret;
+      }
+    case 2: // Integer type
+      {
+	IntegerType *it = dynamic_cast<IntegerType*>(t);
+	return get_integer_type(it);
+      }
+    case 3: // Pointer Type
+      {
+	// don't "care" about pointer at this point,
+	// return type that it is a pointer to
+	PointerType *pt = dynamic_cast<PointerType*>(t);
+	return get_type(pt);
+      }
+    case 4: // Projection Type
+      {
+	
+	break;
+      }
+    case 5: // Void Type
+      {
+	ret.push_back( new CCSTSimpleTypeSpecifier(void_t));
+	return ret;
+      }
+    default:
+      {
+	printf("error");
+      }
+    }
+}
+
+std::vector<CCSTDecSpecifier*> get_integer_type(IntegerType *it)
+{
+  std::vector<CCSTDecSpecifier*> ret;
+  if(it->is_unsigned())
+    {
+      ret.push_back(new CCSTSimpleTypeSpecifier(unsigned_t));
+    }
+  
+  switch (it->int_type())
+    {
+    case pt_char_t:
+      {
+	ret.push_back(new CCSTSimpleTypeSpecifier(char_t));
+	break;
+      }
+    case pt_short_t:
+      {
+	ret.push_back(new CCSTSimpleTypeSpecifier(short_t));
+	break;
+      }
+    case pt_int_t:
+      {
+	ret.push_back(new CCSTSimpleTypeSpecifier(int_t));
+	break;
+      }
+    case pt_long_t:
+      {
+	ret.push_back(new CCSTSimpleTypeSpecifier(long_t));
+	break;
+      }
+    case pt_longlong_t:
+      {
+	ret.push_back(new CCSTSimpleTypeSpecifier(long_t));
+	ret.push_back(new CCSTSimpleTypeSpecifier(long_t));
+	break;
+      }
+    case pt_capability_t:
+      {
+	ret.push_back(new CCSTTypedefName("capability_t"));
+	break;
+      }
+    default:
+      {
+	printf("todo");
+      }
+    }
+  return ret;
+}
+
+
+
+
+/*
+// move to new file
 CCSTDeclaration* container_struct_declaration()
 {
   // needs to contain actual struct
@@ -346,3 +545,4 @@ CCSTDeclaration* container_struct_declaration()
  
   // what else
 }
+*/

@@ -102,6 +102,33 @@ class CCSTContinue;
 class CCSTBreak;
 class CCSTReturn;
 
+/* helper functions */
+CCSTExDeclaration* construct_callee_declaration(Rpc* r);
+CCSTExDeclaration* construct_enum(File *f);
+const char* construct_enum_name();
+CCSTEnumeratorList* construct_enumlist(std::vector<Rpc*>* rps);
+char* string_to_upper(char* str);
+int count_nested_pointer(Type* p);
+CCSTPointer* create_pointer(int p_count);
+CCSTFuncDef* create_function_definition(CCSTDeclaration* function_declaration, CCSTCompoundStatement *body);
+CCSTParamTypeList* create_parameter_list();
+CCSTDeclaration* create_function_declaration(Rpc* r);
+CCSTDeclaration* create_function_declaration();
+CCSTCompoundStatement* create_dispatch_loop_body(std::vector<Rpc*>* rps);
+CCSTCompoundStatement* create_callee_body(Rpc *r);
+CCSTCompoundStatement* create_caller_body(Rpc* r);
+std::vector<CCSTDecSpecifier*> get_type(Type *t);
+std::vector<CCSTDecSpecifier*> get_integer_type(IntegerType *it);
+
+
+/* "code generators"*/
+CCSTFile* generate_server_header(File* f);
+CCSTFile* generate_server_source(File* f);
+CCSTFile* generate_client_header(File* f);
+CCSTFile* generate_client_source(File* f);
+
+/* "code generators" end */
+
 class CCSTBase
 {
  public:
@@ -112,75 +139,6 @@ CCSTExDeclaration* construct_enum(File *f);
 CCSTEnumeratorList* construct_enumlist(std::vector<Rpc *>* rps);
 char* string_to_upper(const char* str);
 CCSTExDeclaration* construct_callee_declaration(Rpc *r);
-
-class ASTToCCSTVisitor
-{
- public:
-  virtual CCSTFile* visit(File *file) =0;
-  virtual CCSTFile* visit(ProjectionField *proj_field) =0;
-  virtual CCSTFile* visit(Rpc *rpc)=0;
-  virtual CCSTFile* visit(Parameter *parameter)=0;
-  virtual CCSTFile* visit(Typedef *type_def)=0;
-  virtual CCSTFile* visit(ProjectionType *proj_type)=0;
-  virtual CCSTFile* visit(PointerType *pointer_type)=0;
-  virtual CCSTFile* visit(IntegerType *integer_type)=0;
-};
-
-class ClientCCSTHeaderVisitor : public ASTToCCSTVisitor
-{
- public:
-  ClientCCSTHeaderVisitor();
-  virtual CCSTFile* visit(File *file);
-  virtual CCSTFile* visit(ProjectionField *proj_field);
-  virtual CCSTFile* visit(Rpc *rpc);
-  virtual CCSTFile* visit(Parameter *parameter);
-  virtual CCSTFile* visit(Typedef *type_def);
-  virtual CCSTFile* visit(ProjectionType *proj_type);
-  virtual CCSTFile* visit(PointerType *pointer_type);
-  virtual CCSTFile* visit(IntegerType *integer_type);
-};
-
-class ClientCCSTSourceVisitor : public ASTToCCSTVisitor
-{
- public:
-  ClientCCSTSourceVisitor();
-  virtual CCSTFile* visit(File *file);
-  virtual CCSTFile* visit(ProjectionField *proj_field);
-  virtual CCSTFile* visit(Rpc *rpc);
-  virtual CCSTFile* visit(Parameter *parameter);
-  virtual CCSTFile* visit(Typedef *type_def);
-  virtual CCSTFile* visit(ProjectionType *proj_type);
-  virtual CCSTFile* visit(PointerType *pointer_type);
-  virtual CCSTFile* visit(IntegerType *integer_type);
-};
-
-class ServerCCSTHeaderVisitor : public ASTToCCSTVisitor
-{
- public:
-  ServerCCSTHeaderVisitor();
-  virtual CCSTFile* visit(File *file);
-  virtual CCSTFile* visit(ProjectionField *proj_field);
-  virtual CCSTFile* visit(Rpc *rpc);
-  virtual CCSTFile* visit(Parameter *parameter);
-  virtual CCSTFile* visit(Typedef *type_def);
-  virtual CCSTFile* visit(ProjectionType *proj_type);
-  virtual CCSTFile* visit(PointerType *pointer_type);
-  virtual CCSTFile* visit(IntegerType *integer_type);
-};
-
-class ServerCCSTSourceVisitor : public ASTToCCSTVisitor
-{
- public:
-  ServerCCSTSourceVisitor();
-  virtual CCSTFile* visit(File *file);
-  virtual CCSTFile* visit(ProjectionField *proj_field);
-  virtual CCSTFile* visit(Rpc *rpc);
-  virtual CCSTFile* visit(Parameter *parameter);
-  virtual CCSTFile* visit(Typedef *type_def);
-  virtual CCSTFile* visit(ProjectionType *proj_type);
-  virtual CCSTFile* visit(PointerType *pointer_type);
-  virtual CCSTFile* visit(IntegerType *integer_type);
-};
 
 class CCSTFile : public CCSTBase
 {
@@ -248,10 +206,11 @@ class CCSTDeclaration : public CCSTExDeclaration
   /*
     <declaration> ::=  {<declaration-specifier>}+ {<init-declarator>}*
    */
-  std::vector<CCSTDecSpecifier*> *specifier_;
-  std::vector<CCSTInitDeclarator*> *decs_;
+
  public:
-  CCSTDeclaration(std::vector<CCSTDecSpecifier*> *specifier, std::vector<CCSTInitDeclarator*> *decs); //{this->specifier_ = specifier; this->decs_ = decs;}
+  std::vector<CCSTDecSpecifier*>specifier_;
+  std::vector<CCSTInitDeclarator*> decs_;
+  CCSTDeclaration(std::vector<CCSTDecSpecifier*> specifier, std::vector<CCSTInitDeclarator*> decs); //{this->specifier_ = specifier; this->decs_ = decs;}
   virtual void write(FILE *f);
 };
 
@@ -566,7 +525,7 @@ class CCSTAssignExpr : public CCSTExpression
 };
 
 
-class CCSTCondExpr : public CCSTAssignExpr, 
+class CCSTCondExpr : public CCSTAssignExpr
 {
   /*
     <conditional-expression> ::= <logical-or-expression>

@@ -45,7 +45,7 @@ void CCSTFuncDef::write(FILE *f)
   fprintf(f, "\n");
 }
 
-CCSTDeclaration::CCSTDeclaration(std::vector<CCSTDecSpecifier*> *specifier, std::vector<CCSTInitDeclarator*> *decs)
+CCSTDeclaration::CCSTDeclaration(std::vector<CCSTDecSpecifier*> specifier, std::vector<CCSTInitDeclarator*> decs)
 {
   this->specifier_ = specifier; 
   this->decs_ = decs;
@@ -1611,13 +1611,13 @@ void CCSTTypedefName::write(FILE *f)
 void CCSTDeclaration::write(FILE *f)
 {
   //?x
-  for(std::vector<CCSTDecSpecifier*>::iterator it = specifier_->begin(); it != specifier_->end(); ++it)
+  for(std::vector<CCSTDecSpecifier*>::iterator it = specifier_.begin(); it != specifier_.end(); ++it)
     {
       CCSTDecSpecifier *dec_spec = *it;
       dec_spec->write(f);
       fprintf(f, " ");
     }
-  for(std::vector<CCSTInitDeclarator*>::iterator it = decs_->begin(); it != decs_->end(); ++it)
+  for(std::vector<CCSTInitDeclarator*>::iterator it = decs_.begin(); it != decs_.end(); ++it)
     {
       CCSTInitDeclarator *init_dec = *it;
       init_dec->write(f);
@@ -1967,6 +1967,10 @@ void CCSTBreak::write(FILE *f)
   fprintf(f, "break");
 }
 
+CCSTReturn::CCSTReturn()
+{
+  this->expr_ = NULL;
+}
 CCSTReturn::CCSTReturn(CCSTExpression *expr)
 {
   this->expr_ = expr;

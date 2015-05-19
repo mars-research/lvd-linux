@@ -9,7 +9,7 @@
 #include "marshal_op.h"
 
 
-enum PrimType { kChar = 1, kShort, kInt, kLong, kLongLong, kCapability};
+enum PrimType {pt_char_t, pt_short_t, pt_int_t, pt_long_t, pt_longlong_t, pt_capability_t};
 
 class ASTVisitor;
 
@@ -85,14 +85,15 @@ class VoidType : public Type
 class IntegerType : public Type
 {
   bool unsigned_;
-  const char* type_;
+  PrimType type_;
   int size_;
   
  public:
-  IntegerType(const char* type, bool un, int size);
+  IntegerType(PrimType type, bool un, int size);
   virtual void accept(ASTVisitor *worker);
   virtual const char* type();
-  bool unsigned_huh();
+  PrimType int_type();
+  bool is_unsigned();
   virtual int num() {return 2;}
   ~IntegerType(){printf("inttype destructor\n");}
 };
@@ -170,12 +171,12 @@ class Rpc : public Base
   M_rpc* marshal_caller;
   M_rpc* marshal_callee;
   Type* ret_type_;
-  const char* name_;
+  char* name_;
   std::vector<Parameter* >* params_;
 
  public:
-  Rpc(Type* return_type, const char* name, std::vector<Parameter* >* parameters);
-  const char* name();
+  Rpc(Type* return_type, char* name, std::vector<Parameter* >* parameters);
+  char* name();
   Type* return_type();
   std::vector<Parameter*>* parameters();
   virtual void accept(ASTVisitor *worker);

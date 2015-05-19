@@ -11,27 +11,27 @@ RootScope::RootScope()
   // instert for each builtin in type, add size to type if not done alreayd
   this->types_->insert(std::pair<std::string,Type*>("void", new VoidType()));
   this->types_->insert( std::pair<std::string,Type*>("char"
-					       , new IntegerType("char", false, sizeof(char))));
+					       , new IntegerType(pt_char_t, false, sizeof(char))));
   this->types_->insert( std::pair<std::string,Type*>("unsigned char"
-					       , new IntegerType("unsigned char", true, sizeof(char))));
+					       , new IntegerType(pt_char_t, true, sizeof(char))));
   this->types_->insert( std::pair<std::string,Type*>("short"
-					      , new IntegerType("short", false, sizeof(short))));
+					      , new IntegerType(pt_short_t, false, sizeof(short))));
   this->types_->insert( std::pair<std::string,Type*>("unsigned short"
-					      , new IntegerType("unsigned short", true, sizeof(short))));
+					      , new IntegerType(pt_short_t, true, sizeof(short))));
   this->types_->insert( std::pair<std::string,Type*>("int"
-					      , new IntegerType("int", false, sizeof(int))));
+					      , new IntegerType(pt_int_t, false, sizeof(int))));
   this->types_->insert( std::pair<std::string,Type*>("unsigned int"
-					      , new IntegerType("unsigned int", true, sizeof(int))));
+					      , new IntegerType(pt_int_t, true, sizeof(int))));
   this->types_->insert( std::pair<std::string,Type*>("long"
-					      , new IntegerType("long", false, sizeof(long))));
+					      , new IntegerType(pt_long_t, false, sizeof(long))));
   this->types_->insert( std::pair<std::string,Type*>("unsigned long"
-					      , new IntegerType("unsigned long", true, sizeof(long))));
+					      , new IntegerType(pt_long_t, true, sizeof(long))));
   this->types_->insert( std::pair<std::string,Type*>("long long"
-					      , new IntegerType("long long", false, sizeof(long long))));
+					      , new IntegerType(pt_longlong_t, false, sizeof(long long))));
   this->types_->insert( std::pair<std::string,Type*>("unsigned long long"
-					      , new IntegerType("unsigned long long", true, sizeof(long long))));
+					      , new IntegerType(pt_longlong_t, true, sizeof(long long))));
   this->types_->insert( std::pair<std::string,Type*>("capability"
-					       , new IntegerType("capability_t", false, sizeof(int))));
+					       , new IntegerType(pt_capability_t, false, sizeof(int))));
 }
 
 RootScope* RootScope::instance()

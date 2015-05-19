@@ -36,7 +36,7 @@ const char* VoidType::type()
   return "void";
 }
 
-IntegerType::IntegerType(const char* type, bool un, int size)
+IntegerType::IntegerType(PrimType type, bool un, int size)
 {
   this->type_ = type;
   this->unsigned_ = un;
@@ -50,10 +50,15 @@ void IntegerType::accept(ASTVisitor* worker)
 
 const char* IntegerType::type()
 {
+  return "todo";
+}
+
+PrimType IntegerType::int_type()
+{
   return this->type_;
 }
 
-bool IntegerType::unsigned_huh()
+bool IntegerType::is_unsigned()
 {
   return unsigned_;
 }
@@ -173,7 +178,7 @@ const char* Parameter::unmarshal()
   return ret.str().c_str();
 }
 
-Rpc::Rpc(Type* return_type, const char* name, std::vector<Parameter* >* parameters)
+Rpc::Rpc(Type* return_type, char* name, std::vector<Parameter* >* parameters)
 {
   this->ret_type_ = return_type;
   this->name_ = name;
@@ -182,7 +187,7 @@ Rpc::Rpc(Type* return_type, const char* name, std::vector<Parameter* >* paramete
   this->marshal_callee = new M_rpc();
 }
 
-const char* Rpc::name()
+ char* Rpc::name()
 {
   return name_;
 }
@@ -195,6 +200,14 @@ Type* Rpc::return_type()
 void Rpc::accept(ASTVisitor* worker)
 {
   worker->visit(this);
+}
+
+const char* Rpc::callee_name()
+{
+}
+
+const char* Rpc::enum_name()
+{
 }
 
 std::vector<Parameter*>* Rpc::parameters()

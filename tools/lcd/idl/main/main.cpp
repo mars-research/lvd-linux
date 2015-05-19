@@ -1,11 +1,11 @@
 #include "lcd_ast.h"
 #include "lcd_idl.h"
-#include "gen_visitor.h"
 #include "error.h"
 #include <stdio.h>
 #include <stdlib.h>
 #include <iostream>
 #include <string.h>
+#include "ccst.h"
 
 
 int main(int argc, char ** argv)
@@ -28,27 +28,54 @@ int main(int argc, char ** argv)
 	}
       //   char* out_option = argv[3];
       char* out_file = argv[3];
+      printf("out file: %s\n", out_file);
       FILE* of = fopen(out_file, "w");
+      // options
+      // -serverheader
+      // -serversource
+      // -clientheader
+      // -clientsource
       if(!of)
 	{
 	  printf("Error: unable to open %s for writing\n", out_file);
+	  perror("error");
 	  // cleanup
 	  exit(0);
 	}
-      if(!strcmp(argv[1],"-header"))
+      if(!strcmp(argv[1],"-serverheader"))
 	{
-	  printf("in option\n");
-	  HeaderVisitor* hv = new HeaderVisitor(of);
-	  printf("have created hv\n");
-	  tree->accept(hv);
-	  printf("have finished hv\n");
+	  printf("todo\n");
+	  // create a "serverCCSTHeaderVisitor"
+	  // call visit and pass File as parameter
+	  // this should return a CCSTBase
+	  // call write on this, with a file as parameter, where we want to write to
+	  CCSTFile* ccst_tree = generate_server_header(tree);
+	  ccst_tree->write(of);
+	  printf("completed header source writing\n");
 	}
-      else if(!strcmp(argv[1],"-source"))
+      else if(!strcmp(argv[1],"-serversource"))
 	{
-	  printf("in source\n");
-	  Callee_SourceVisitor* sv = new Callee_SourceVisitor(of);
-	  tree->accept(sv);
-	  printf("have finished sv\n");
+	  printf("todo\n");
+
+	  CCSTFile* ccst_tree = generate_server_source(tree);
+	  ccst_tree->write(of);
+	  printf("completed server source writing\n");
+	}
+      else if(!strcmp(argv[1], "-clientheader"))
+	{
+	  printf("todo\n");
+	  
+	  CCSTFile* ccst_tree = generate_client_header(tree);
+	  ccst_tree->write(of);
+	  printf("completed client header writing\n");
+	}
+      else if(!strcmp(argv[1], "-clientsource"))
+	{
+	  printf("todo\n");
+	  
+	  CCSTFile* ccst_tree = generate_client_source(tree);
+	  ccst_tree->write(of);
+	  printf("completed client source writing\n");
 	}
       else
 	{

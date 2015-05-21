@@ -119,7 +119,7 @@ CCSTCompoundStatement* create_callee_body(Rpc *r);
 CCSTCompoundStatement* create_caller_body(Rpc* r);
 std::vector<CCSTDecSpecifier*> get_type(Type *t);
 std::vector<CCSTDecSpecifier*> get_integer_type(IntegerType *it);
-
+CCSTDeclaration* unmarshal_parameter(Parameter *p, const char *param_tmp_name);
 
 /* "code generators"*/
 CCSTFile* generate_server_header(File* f);

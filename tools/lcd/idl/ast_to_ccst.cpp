@@ -426,26 +426,12 @@ CCSTCompoundStatement* create_callee_body(Rpc *r)
   for(std::vector<Parameter*>::iterator it = params->begin(); it != params->end(); it ++)
     {
       Parameter *p = (Parameter*) *it;
-      Type *t = p->type();
+      const char* param_tmp_name = "_param1";
+      CCSTDeclaration *tmp = unmarshal_parameter(p, "param_tmp_name");
       
-      
-      CCSTPointer *__p = 0x0;
-      if(t->num() == 3) // check if a pointer
-	{
-	  __p = create_pointer(count_nested_pointer(t));
-	}
-      
-      std::vector<CCSTAssignExpr*> args;
-      const char *param_name = "_param1";
-      CCSTInitDeclarator *id = new CCSTInitDeclarator(new CCSTDeclarator(__p
-									 , new CCSTDirectDecId(param_name))
-						      , new CCSTInitializer( new CCSTPostFixExprAssnExpr( new CCSTPrimaryExprId("func_to_call")
-													  , args) ) );
-      
-      std::vector<CCSTInitDeclarator*> _tmp_;
-      _tmp_.push_back(id);
-      declarations.push_back( new CCSTDeclaration(get_type(t)
-						  , _tmp_));
+      CCSTPrimaryExprId *t = new CCSTPrimaryExprId(param_tmp_name);
+      unmarshalled_args.push_back(t);
+      declarations.push_back(tmp);
     }
 
   // pulled out params make function call
@@ -472,7 +458,35 @@ CCSTCompoundStatement* create_callee_body(Rpc *r)
 						   , real_call_decs);
   
   declarations.push_back(ret_value);
+
+  // check return value
+
+ 
   return new CCSTCompoundStatement(declarations, statements);
+}
+
+CCSTDeclaration* unmarshal_parameter(Parameter *p, const char *param_tmp_name)
+{
+  Type *t = p->type();
+  
+  
+  CCSTPointer *__p = 0x0;
+  if(t->num() == 3) // check if a pointer
+    {
+      __p = create_pointer(count_nested_pointer(t));
+    }
+  
+  std::vector<CCSTAssignExpr*> args;
+  const char *param_name = param_tmp_name;
+  CCSTInitDeclarator *id = new CCSTInitDeclarator(new CCSTDeclarator(__p
+								     , new CCSTDirectDecId(param_name))
+						  , new CCSTInitializer( new CCSTPostFixExprAssnExpr( new CCSTPrimaryExprId("func_to_call")
+												      , args) ) );
+  
+  std::vector<CCSTInitDeclarator*> _tmp_;
+  _tmp_.push_back(id);
+  return  new CCSTDeclaration(get_type(t)
+			      , _tmp_);
 }
 
 

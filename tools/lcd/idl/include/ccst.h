@@ -103,7 +103,7 @@ class CCSTBreak;
 class CCSTReturn;
 
 /* helper functions */
-CCSTExDeclaration* construct_callee_declaration(Rpc* r);
+CCSTDeclaration* construct_callee_declaration(Rpc* r);
 CCSTExDeclaration* construct_enum(File *f);
 const char* construct_enum_name();
 CCSTEnumeratorList* construct_enumlist(std::vector<Rpc*>* rps);
@@ -138,7 +138,7 @@ class CCSTBase
 CCSTExDeclaration* construct_enum(File *f);
 CCSTEnumeratorList* construct_enumlist(std::vector<Rpc *>* rps);
 char* string_to_upper(const char* str);
-CCSTExDeclaration* construct_callee_declaration(Rpc *r);
+//CCSTExDeclaration* construct_callee_declaration(Rpc *r);
 
 class CCSTFile : public CCSTBase
 {

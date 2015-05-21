@@ -93,7 +93,7 @@ CCSTFile* generate_server_header(File *file)
   return c_file;
 }
 
-CCSTExDeclaration* construct_callee_declaration(Rpc* r)
+CCSTDeclaration* construct_callee_declaration(Rpc* r)
 {
   std::vector<CCSTDecSpecifier*> specifier; // = new std::vector<CCSTDecSpecifier*>();
   specifier.push_back(new CCSTSimpleTypeSpecifier(int_t));
@@ -199,8 +199,8 @@ CCSTFile* generate_server_source(File *file)
   for(std::vector<Rpc*>::iterator it = rps->begin(); it != rps->end(); it ++)
      {
        Rpc* r_tmp = (Rpc*) *it;
-       definitions.push_back(new CCSTFuncDef(construct_callee_declaration(r_tmp)
-					     ,create_callee_body(r_tmp)));
+       definitions.push_back( create_function_definition(construct_callee_declaration(r_tmp)
+							,create_callee_body(r_tmp)));
      }
    
    CCSTFile *c_file = new CCSTFile(definitions);
@@ -414,8 +414,65 @@ CCSTCompoundStatement* create_callee_body(Rpc *r)
 {
   // unmarshal parameters based on marshal data.
   // which says where params are stored.
+  
+  std::vector<CCSTDeclaration*> declarations;
+  std::vector<CCSTStatement*> statements;
+  
+  // loop through params, declare a tmp and pull out marshal value
+  std::vector<Parameter*> *params = r->parameters();
+  std::vector<char*> param_names;
 
-  // 
+  std::vector<CCSTAssignExpr*> unmarshalled_args;
+  for(std::vector<Parameter*>::iterator it = params->begin(); it != params->end(); it ++)
+    {
+      Parameter *p = (Parameter*) *it;
+      Type *t = p->type();
+      
+      
+      CCSTPointer *__p = 0x0;
+      if(t->num() == 3) // check if a pointer
+	{
+	  __p = create_pointer(count_nested_pointer(t));
+	}
+      
+      std::vector<CCSTAssignExpr*> args;
+      const char *param_name = "_param1";
+      CCSTInitDeclarator *id = new CCSTInitDeclarator(new CCSTDeclarator(__p
+									 , new CCSTDirectDecId(param_name))
+						      , new CCSTInitializer( new CCSTPostFixExprAssnExpr( new CCSTPrimaryExprId("func_to_call")
+													  , args) ) );
+      
+      std::vector<CCSTInitDeclarator*> _tmp_;
+      _tmp_.push_back(id);
+      declarations.push_back( new CCSTDeclaration(get_type(t)
+						  , _tmp_));
+    }
+
+  // pulled out params make function call
+
+  CCSTInitializer *call = new CCSTInitializer( new CCSTPostFixExprAssnExpr( new CCSTPrimaryExprId(r->name())
+									    ,unmarshalled_args ) );
+  CCSTPointer *pp = 0x0;
+  if(r->return_type()->num() == 3)
+    {
+      pp = create_pointer(count_nested_pointer(r->return_type()));
+    }
+  
+  CCSTDeclarator *ret_value_name = new CCSTDeclarator(pp
+						      , new CCSTDirectDecId("ret") );
+
+  std::vector<CCSTDecSpecifier*> real_call_specifier;
+  std::vector<CCSTInitDeclarator*> real_call_decs;
+  
+  real_call_specifier = get_type(r->return_type());
+  real_call_decs.push_back(new CCSTInitDeclarator(ret_value_name
+						  , call));
+  
+  CCSTDeclaration *ret_value = new CCSTDeclaration(real_call_specifier
+						   , real_call_decs);
+  
+  declarations.push_back(ret_value);
+  return new CCSTCompoundStatement(declarations, statements);
 }
 
 

@@ -619,16 +619,16 @@ static void check_for_lazy_awe (void * ebp) {
   void **frame_ptr  = (void **) ebp;
   void *ret_addr    = THC_LAZY_FRAME_RET(frame_ptr);
   //DEBUG_AWE(DEBUGPRINTF(DEBUG_AWE_PREFIX "> CheckForLazyAWE (ebp=%p)\n", ebp));
-
   while (frame_ptr != NULL && ret_addr != NULL) {
-    if (ret_addr == &_thc_lazy_awe_marker) {
+	if (ret_addr == &_thc_lazy_awe_marker) {
 		printk(KERN_ERR "\nlcd async the awe marker is found\n");
-        init_lazy_awe(frame_ptr);
-		break;
+		init_lazy_awe(frame_ptr);
+		//break;
     }
-	
     frame_ptr = (void **) THC_LAZY_FRAME_PREV(frame_ptr);
-    ret_addr   = THC_LAZY_FRAME_RET(frame_ptr);
+	if (frame_ptr != NULL) {
+		ret_addr   = THC_LAZY_FRAME_RET(frame_ptr);	
+    }
   } 
   //DEBUG_AWE(DEBUGPRINTF(DEBUG_AWE_PREFIX "< CheckForLazyAWE\n"));
 }

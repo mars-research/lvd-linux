@@ -1021,7 +1021,23 @@ void CCSTPostFixExprAssnExpr::write(FILE *f)
       printf("error\n");
       exit(0);
     }
-  // TODO really unsure
+  
+  this->post_fix_expr_->write(f);
+  fprintf(f, "(");
+  std::vector<CCSTAssignExpr*> args = this->args_;
+  if(!args.empty())
+    {
+      args.at(0)->write(f);
+      
+      for(std::vector<CCSTAssignExpr*>::iterator it = args.begin()+1; it != args.end(); ++it)
+	{
+	  fprintf(f,", ");
+	  CCSTAssignExpr *arg = *it;
+	  arg->write(f);
+	 }
+    }
+  fprintf(f, ")");
+  
 }
 
 CCSTPrimaryExpr::CCSTPrimaryExpr()

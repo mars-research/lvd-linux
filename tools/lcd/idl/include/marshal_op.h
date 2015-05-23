@@ -157,6 +157,9 @@ int store_register_mapping[] = {REG0, REG1, REG2, REG3, REG4, REG5, REG6, REG7, 
 			    ,REG50, REG51, REG52, REG53, REG54, REG55, REG56, REG57, REG58, REG59
 			    ,REG60, REG61, REG62, REG63, REG64};
 
+const char* access_register_mapping(int register_index) {return access_register_mapping[register_index];}
+const char* store_register_mapping(int register_index) {return store_register_mapping[register_index];}
+
 class M_info
 {
  public:
@@ -181,6 +184,7 @@ class M_type : public M_info
   // can add more necessary info later
  public:
   M_type();
+  int register() {return this->register_;}
   void set_size(size_t s);
   void set_register(int reg);
 };

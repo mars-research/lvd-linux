@@ -17,11 +17,6 @@ const char* Typedef::alias()
   return this->alias_;
 }
 
-const char* Typedef::type()
-{
-  return alias_;
-}
-
 VoidType::VoidType()
 {
 }
@@ -29,11 +24,6 @@ VoidType::VoidType()
 void VoidType::accept(ASTVisitor* worker)
 {
   worker->visit(this);
-}
-
-const char* VoidType::type()
-{
-  return "void";
 }
 
 IntegerType::IntegerType(PrimType type, bool un, int size)
@@ -46,11 +36,6 @@ IntegerType::IntegerType(PrimType type, bool un, int size)
 void IntegerType::accept(ASTVisitor* worker)
 {
   worker->visit(this);
-}
-
-const char* IntegerType::type()
-{
-  return "todo";
 }
 
 PrimType IntegerType::int_type()
@@ -71,17 +56,6 @@ PointerType::PointerType(Type* type)
 void PointerType::accept(ASTVisitor* worker)
 {
   worker->visit(this);
-}
-
-Type* PointerType::p_type()
-{
-  return this->type_;
-}
-
-const char* PointerType::type()
-{
-  // may need *
-  return this->type_->type();
 }
 
 ProjectionField::ProjectionField(bool in, bool out, bool alloc, bool bind, Type* field_type, const char* field_name)
@@ -114,7 +88,7 @@ void ProjectionField::accept(ASTVisitor* worker)
   worker->visit(this);
 }
 
-ProjectionType::ProjectionType(const char* id, const char* real_type, std::vector<ProjectionField*>* fields)
+ProjectionType::ProjectionType(const char* id, const char* real_type, std::vector<ProjectionField*> fields)
 {
   this->id_ = id; this->real_type_ = real_type; this->fields_ = fields;
 }
@@ -135,12 +109,6 @@ const char* ProjectionType::real_type()
   return this->real_type_;
 }
 
-// may never be used
-const char* ProjectionType::type()
-{
-  return this->real_type_;
-}
-
 Parameter::Parameter(Type* type, const char* name)
 {
   this->type_ = type;
@@ -152,39 +120,19 @@ void Parameter::accept(ASTVisitor* worker)
   worker->visit(this);
 }
 
-Type* Parameter::type()
-{
-  return this->type_;
-}
-
 const char* Parameter::name()
 {
   return this->name_;
 }
 
-const char* Parameter::marshal()
-{
-  //allocate?
-  std::ostringstream ret;
-  ret << "lcd_store_r?( " << this->name_ << " );";
-  return ret.str().c_str();
-}
 
-const char* Parameter::unmarshal()
-{
-  // allocate?
-  std::ostringstream ret;
-  ret << this->name_ << " = " << "( " << this->type_->type() << " ) " << "lcd_r?()";
-  return ret.str().c_str();
-}
 
 Rpc::Rpc(Type* return_type, char* name, std::vector<Parameter* >* parameters)
 {
   this->ret_type_ = return_type;
   this->name_ = name;
   this->params_ = parameters;
-  this->marshal_caller = new M_rpc();
-  this->marshal_callee = new M_rpc();
+  this->marshal_info_ = new M_rpc();
 }
 
  char* Rpc::name()

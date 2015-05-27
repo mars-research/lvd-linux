@@ -3,27 +3,7 @@
 #include <stdarg.h>
 #include <stdlib.h>
 #include <stdio.h>
-#include <errno.h>
-#include <cstdlib>
-/* taken from Scott Bauer 
- * Will be moved to more appropriate place
- */
-static void AssertionFailure(std::string exp, std::string file, int line, const char* format, ...)
-//static void AssertionFailure(char *exp, char *file, int line, const char* format, ... )
-{
-  printf("Assertion '%s' failed at line %d of file %s\n", exp.c_str(), line, file.c_str());
-  printf("Error is %s\n", strerror(errno));
-  va_list args;
-  va_start(args, format);
-  vfprintf(stdout, format, args);
-  va_end(args);
-  exit(EXIT_FAILURE);
-}
-
-/* taken from Scott Bauer 
- * Will be moved to more appropriate place
- */
-#define Assert(exp, format, ...) if (exp) ; else AssertionFailure( #exp, __FILE__,  __LINE__, format, ##__VA_ARGS__ ) 
+#include "assert.h"
 
 /* example
    
@@ -171,6 +151,7 @@ char* string_to_upper(char* str)
 
 CCSTFile* generate_server_source(File *file)
 {
+  printf("In generate_server_source\n");
   // <function-definition> is CCSTFuncDef
   // CCSTDecSpecifier* is <type-specifier> is CCSTTypeSpecifier
   // <declarator> is CCSTDeclarator
@@ -204,6 +185,7 @@ CCSTFile* generate_server_source(File *file)
      }
    
    CCSTFile *c_file = new CCSTFile(definitions);
+   printf("in server source gen\n");
    return c_file;
 }
 
@@ -218,7 +200,7 @@ int count_nested_pointer(Type *p)
   else
     {
       PointerType *tmp = dynamic_cast<PointerType*>(p);
-      return 1 + count_nested_pointer(tmp->p_type());
+      return 1 + count_nested_pointer(tmp->type());
     }
 }
 
@@ -444,8 +426,9 @@ CCSTCompoundStatement* create_callee_body(Rpc *r)
       pp = create_pointer(count_nested_pointer(r->return_type()));
     }
   
+  const char *ret_name = "ret";
   CCSTDeclarator *ret_value_name = new CCSTDeclarator(pp
-						      , new CCSTDirectDecId("ret") );
+						      , new CCSTDirectDecId(ret_name) );
 
   std::vector<CCSTDecSpecifier*> real_call_specifier;
   std::vector<CCSTInitDeclarator*> real_call_decs;
@@ -459,9 +442,12 @@ CCSTCompoundStatement* create_callee_body(Rpc *r)
   
   declarations.push_back(ret_value);
 
-  // check return value
-
- 
+  // marshal return value
+  std::vector<CCSTAssignExpr*> ret_arg;
+  ret_arg.push_back(new CCSTPrimaryExprId(ret_name));
+  CCSTPostFixExprAssnExpr *marshal_ret = new CCSTPostFixExprAssnExpr(new CCSTPrimaryExprId("func_name")
+								     ,ret_arg);
+  statements.push_back(new CCSTExprStatement(marshal_ret));
   return new CCSTCompoundStatement(declarations, statements);
 }
 
@@ -478,6 +464,8 @@ CCSTDeclaration* unmarshal_parameter(Parameter *p, const char *param_tmp_name)
   
   std::vector<CCSTAssignExpr*> args;
   const char *param_name = param_tmp_name;
+
+  // int reg_where_marshalled = t->
   CCSTInitDeclarator *id = new CCSTInitDeclarator(new CCSTDeclarator(__p
 								     , new CCSTDirectDecId(param_name))
 						  , new CCSTInitializer( new CCSTPostFixExprAssnExpr( new CCSTPrimaryExprId("func_to_call")
@@ -488,7 +476,6 @@ CCSTDeclaration* unmarshal_parameter(Parameter *p, const char *param_tmp_name)
   return  new CCSTDeclaration(get_type(t)
 			      , _tmp_);
 }
-
 
 /* body for a caller function
  * does marshaling, ipc, etc
@@ -535,7 +522,7 @@ std::vector<CCSTDecSpecifier*> get_type(Type *t)
 	// don't "care" about pointer at this point,
 	// return type that it is a pointer to
 	PointerType *pt = dynamic_cast<PointerType*>(t);
-	return get_type(pt);
+	return get_type(pt->type());
       }
     case 4: // Projection Type
       {

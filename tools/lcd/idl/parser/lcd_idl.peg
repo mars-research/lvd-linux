@@ -189,12 +189,12 @@ Rpc		=	"rpc" Space+ t:Type_form id1:Identifier Spacing OPEN p:Parameters CLOSE S
 
 
 
-Projection	=	"projection" Space+ id:Identifier Spacing "<" Spacing t:Proj_type ">" Spacing OPENC Spacing p:ProjField+ CLOSEC Spacing {{ std::vector<ProjectionField *>* p_fields = new std::vector<ProjectionField *>;
+Projection	=	"projection" Space+ id:Identifier Spacing "<" Spacing t:Proj_type ">" Spacing OPENC Spacing p:ProjField+ CLOSEC Spacing {{ std::vector<ProjectionField *> p_fields;
 			for(Value::iterator it = p.getValues().begin(); it != p.getValues().end(); it ++)
 			{
 				const Value & v = *it;
 				ProjectionField * p = (ProjectionField *) v.getValue();
-				p_fields->push_back(p);
+				p_fields.push_back(p);
 			} 
 			// insert projection into rootscope for now
 			ProjectionType * val = new ProjectionType((char* ) id.getValue(), (char* ) t.getValue(), p_fields);

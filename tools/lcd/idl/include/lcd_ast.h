@@ -13,6 +13,9 @@ enum PrimType {pt_char_t, pt_short_t, pt_int_t, pt_long_t, pt_longlong_t, pt_cap
 
 class ASTVisitor;
 
+class M_rpc;
+class M_type;
+
 class Base
 {
 };
@@ -23,8 +26,7 @@ class Type : public Base
  public:
   virtual void accept(ASTVisitor *worker) = 0;
   virtual int num() = 0;
-  virtual const char* type() = 0;
-  virtual ~Type(){printf("type destructor\n");}
+  // virtual ~Type(){printf("type destructor\n");}
 };
 
 class Scope : public Base
@@ -67,7 +69,7 @@ class Typedef : public Type
  public:
   Typedef(const char* alias, Type* type);
   virtual void accept(ASTVisitor *worker);
-  virtual const char* type();
+  Type* type() { return this->type_; }
   const char* alias();
   virtual int num() {return 1;}
   // virtual void marshal();
@@ -79,7 +81,6 @@ class VoidType : public Type
   VoidType();
   virtual void accept(ASTVisitor *worker);
   virtual int num() {return 5;}
-  virtual const char* type();
 };
 
 class IntegerType : public Type
@@ -91,7 +92,6 @@ class IntegerType : public Type
  public:
   IntegerType(PrimType type, bool un, int size);
   virtual void accept(ASTVisitor *worker);
-  virtual const char* type();
   PrimType int_type();
   bool is_unsigned();
   virtual int num() {return 2;}
@@ -109,8 +109,7 @@ class PointerType : public Type
  public:
   PointerType(Type* type);
   virtual void accept(ASTVisitor *worker);
-  virtual const char* type();
-  Type* p_type();
+  Type* type() { return this->type_; }
   virtual int num() {return 3;}
   ~PointerType(){printf("pointer type destructor\n");}
 };
@@ -126,7 +125,8 @@ class ProjectionField : public Base
   
  public:
   ProjectionField(bool in, bool out, bool alloc, bool bind, Type* field_type, const char* field_name);
-  ~ProjectionField();
+  ~ProjectionField(); 
+  Type* type() { return this->field_type_; }
   bool in();
   bool out();
   bool alloc();
@@ -138,15 +138,14 @@ class ProjectionType : public Type // complex type
 {
   const char* id_; 
   const char* real_type_;
-  std::vector<ProjectionField*>* fields_;
+  std::vector<ProjectionField*> fields_;
 
  public:
-  ProjectionType(const char* id, const char* real_type, std::vector<ProjectionField*>* fields);
+  ProjectionType(const char* id, const char* real_type, std::vector<ProjectionField*> fields);
   virtual void accept(ASTVisitor *worker);
-  virtual const char* type();
   const char* id();
   const char* real_type();
-  
+  std::vector<ProjectionField*> fields() { return this->fields_; }
   virtual int num() {return 4;}
   ~ProjectionType(){printf("projection type destructor\n");}
 };
@@ -155,22 +154,28 @@ class Parameter : public Base
 {
   Type* type_;
   const char* name_;
+  int register_;
+  
  public:
   Parameter(Type* type, const char* name);
   ~Parameter();
   virtual void accept(ASTVisitor *worker);
-  Type* type();
+  Type* type() { return this->type_; }
+  int get_register() { return this->register_; }
+  void set_register(int r) { this->register_ = r; }
   const char* name();
-  const char* marshal();
-  const char* unmarshal();
 };
 
 class Rpc : public Base
 {
   const char* enum_name_;
-  M_rpc* marshal_caller;
-  M_rpc* marshal_callee;
+  M_rpc* marshal_info_;
+  
+  /* special case */
   Type* ret_type_;
+  int ret_register_;
+  /* -------------- */
+
   char* name_;
   std::vector<Parameter* >* params_;
 
@@ -178,6 +183,8 @@ class Rpc : public Base
   Rpc(Type* return_type, char* name, std::vector<Parameter* >* parameters);
   char* name();
   Type* return_type();
+  int ret_register() { return this->ret_register_; }
+  void set_ret_register(int r) { this->ret_register_ = r; }
   std::vector<Parameter*>* parameters();
   virtual void accept(ASTVisitor *worker);
   const char* enum_name();

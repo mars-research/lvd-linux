@@ -140,25 +140,27 @@
 
 
 #include <stdlib.h>
+#include "assert.h"
+#include "lcd_ast.h"
 
-int access_register_mapping[] = {REG0, REG1, REG2, REG3, REG4, REG5, REG6, REG7, REG8, REG9
+static const char* access_register_mapping_[] = {REG0, REG1, REG2, REG3, REG4, REG5, REG6, REG7, REG8, REG9
 			    ,REG10, REG11, REG12, REG13, REG14, REG15, REG16, REG17, REG18, REG19
 			    ,REG20, REG21, REG22, REG23, REG24, REG25, REG26, REG27, REG28, REG29
 			    ,REG30, REG31, REG32, REG33, REG34, REG35, REG36, REG37, REG38, REG39
 			    ,REG40, REG41, REG42, REG43, REG44, REG45, REG46, REG47, REG48, REG49
 			    ,REG50, REG51, REG52, REG53, REG54, REG55, REG56, REG57, REG58, REG59
-			    ,REG60, REG61, REG62, REG63, REG64};
+			    ,REG60, REG61, REG62, REG63};
 
-int store_register_mapping[] = {REG0, REG1, REG2, REG3, REG4, REG5, REG6, REG7, REG8, REG9
+static const char* store_register_mapping_[] = {REG0, REG1, REG2, REG3, REG4, REG5, REG6, REG7, REG8, REG9
 			    ,REG10, REG11, REG12, REG13, REG14, REG15, REG16, REG17, REG18, REG19
 			    ,REG20, REG21, REG22, REG23, REG24, REG25, REG26, REG27, REG28, REG29
 			    ,REG30, REG31, REG32, REG33, REG34, REG35, REG36, REG37, REG38, REG39
 			    ,REG40, REG41, REG42, REG43, REG44, REG45, REG46, REG47, REG48, REG49
 			    ,REG50, REG51, REG52, REG53, REG54, REG55, REG56, REG57, REG58, REG59
-			    ,REG60, REG61, REG62, REG63, REG64};
+			    ,REG60, REG61, REG62, REG63};
 
-const char* access_register_mapping(int register_index) {return access_register_mapping[register_index];}
-const char* store_register_mapping(int register_index) {return store_register_mapping[register_index];}
+const char* access_register_mapping(int register_index);
+const char* store_register_mapping(int register_index);
 
 class M_info
 {
@@ -166,27 +168,37 @@ class M_info
   size_t size_;
 };
 
+class Type;
+class IntegerType;
+class ProjectionType;
+class ProjectionField;
+
 class M_rpc : public M_info
 {
-  int* regs;
+  int* calling_regs;
+  int* return_regs;
+  
   int* cap_regs;
+
+  int integer_allocate_register(IntegerType *it);
+  std::vector<int> projection_allocate_registers(ProjectionType *pt);
+  std::vector<int> proj_field_allocate_registers(ProjectionField *pf);
   
  public:
   M_rpc();
-  int allocate_register(int reg);
-  int next_free_register();
+  std::vector<int> allocate_registers(Type *t);
+
+  int next_free_calling_register();
+  int next_free_return_register();
   void init();
 };
 
+
 class M_type : public M_info
-{ 
-  int register_;
-  // can add more necessary info later
+{
  public:
   M_type();
-  int register() {return this->register_;}
   void set_size(size_t s);
-  void set_register(int reg);
 };
 
 #endif

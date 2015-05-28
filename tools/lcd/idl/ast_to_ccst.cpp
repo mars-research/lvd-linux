@@ -58,13 +58,13 @@ CCSTFile* generate_server_header(File *file)
   // enum-specifier: enum id 
   std::vector<CCSTExDeclaration*> definitions; // = new std::vector<CCSTExDeclaration*>();
   // check if there are rpcs
-  if(!file->rpc_defs()->empty())
+  if(!file->rpc_defs().empty())
     {
       printf("rpc not empty\n");
       definitions.push_back(construct_enum(file));
       // function callee function declarations
-      std::vector<Rpc*>* rpcs = file->rpc_defs();
-      for(std::vector<Rpc*>::iterator it = rpcs->begin(); it != rpcs->end(); it ++)
+      std::vector<Rpc*> rpcs = file->rpc_defs();
+      for(std::vector<Rpc*>::iterator it = rpcs.begin(); it != rpcs.end(); it ++)
 	{
 	  definitions.push_back(construct_callee_declaration((Rpc*) *it));
 	}
@@ -117,11 +117,11 @@ const char* construct_enum_name()
   return "todo";
 }
 
-CCSTEnumeratorList* construct_enumlist(std::vector<Rpc *>* rps)
+CCSTEnumeratorList* construct_enumlist(std::vector<Rpc *> rps)
 {
   // list of functions to put in enum.
   std::vector<CCSTEnumerator*>* list = new std::vector<CCSTEnumerator*>();
-  for(std::vector<Rpc*>::iterator it = rps->begin(); it != rps->end(); it ++)
+  for(std::vector<Rpc*>::iterator it = rps.begin(); it != rps.end(); it ++)
     {
       Rpc *r = *it;
       char* upper_name = string_to_upper(r->name());
@@ -176,8 +176,8 @@ CCSTFile* generate_server_source(File *file)
   create_function_definition(create_function_declaration()
 			     ,create_dispatch_loop_body(file->rpc_defs()));
   */
-  std::vector<Rpc*> *rps = file->rpc_defs();
-  for(std::vector<Rpc*>::iterator it = rps->begin(); it != rps->end(); it ++)
+  std::vector<Rpc*> rps = file->rpc_defs();
+  for(std::vector<Rpc*>::iterator it = rps.begin(); it != rps.end(); it ++)
      {
        Rpc* r_tmp = (Rpc*) *it;
        definitions.push_back( create_function_definition(construct_callee_declaration(r_tmp)
@@ -401,11 +401,11 @@ CCSTCompoundStatement* create_callee_body(Rpc *r)
   std::vector<CCSTStatement*> statements;
   
   // loop through params, declare a tmp and pull out marshal value
-  std::vector<Parameter*> *params = r->parameters();
+  std::vector<Parameter*> params = r->parameters();
   std::vector<char*> param_names;
 
   std::vector<CCSTAssignExpr*> unmarshalled_args;
-  for(std::vector<Parameter*>::iterator it = params->begin(); it != params->end(); it ++)
+  for(std::vector<Parameter*>::iterator it = params.begin(); it != params.end(); it ++)
     {
       Parameter *p = (Parameter*) *it;
       const char* param_tmp_name = "_param1";

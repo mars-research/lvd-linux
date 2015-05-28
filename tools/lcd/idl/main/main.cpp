@@ -6,7 +6,7 @@
 #include <iostream>
 #include <string.h>
 #include "ccst.h"
-
+#include "marshal_visitor.h"
 
 int main(int argc, char ** argv)
 {
@@ -30,11 +30,7 @@ int main(int argc, char ** argv)
       char* out_file = argv[3];
       printf("out file: %s\n", out_file);
       FILE* of = fopen(out_file, "w");
-      // options
-      // -serverheader
-      // -serversource
-      // -clientheader
-      // -clientsource
+      
       if(!of)
 	{
 	  printf("Error: unable to open %s for writing\n", out_file);
@@ -45,10 +41,10 @@ int main(int argc, char ** argv)
       if(!strcmp(argv[1],"-serverheader"))
 	{
 	  printf("todo\n");
-	  // create a "serverCCSTHeaderVisitor"
-	  // call visit and pass File as parameter
-	  // this should return a CCSTBase
-	  // call write on this, with a file as parameter, where we want to write to
+
+	  MarshalVisitor* mv = new MarshalVisitor();
+	  tree->accept(mv);
+
 	  CCSTFile* ccst_tree = generate_server_header(tree);
 	  ccst_tree->write(of);
 	  printf("completed header source writing\n");

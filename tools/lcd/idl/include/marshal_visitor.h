@@ -1,13 +1,10 @@
 #ifndef _MARSHAL_
 #define _MARHSAL_
-#include "visitor.h"
+#include "lcd_ast.h"
+
 
 class MarshalVisitor : public ASTVisitor
 {
-  bool regs[LCD_MAX_REGS];
-  bool cap_regs[LCD_MAX_CAP_REGS];
-  int find_free_reg();
-  void set_reg_used(int reg);
  public:
   virtual void visit(File *file);
   // virtual void visit(Message *message);
@@ -18,9 +15,10 @@ class MarshalVisitor : public ASTVisitor
 
   // Types
   virtual void visit(ProjectionType *proj_type);
-  virtual void visit(IntegerType *this);
-  virtual void visit(PointerType *this);
-  virtual void visit(Typedef* this);
+  virtual void visit(IntegerType *t);
+  virtual void visit(PointerType *t);
+  virtual void visit(Typedef* t);
+  virtual void visit(VoidType *vt);
   MarshalVisitor();
 };
 
@@ -36,9 +34,9 @@ class packVisitor : public ASTVisitor
 
   // Types
   virtual void visit(ProjectionType *proj_type);
-  virtual void visit(IntegerType *this);
-  virtual void visit(PointerType *this);
-  virtual void visit(Typedef* this);
+  virtual void visit(IntegerType *t);
+  virtual void visit(PointerType *t);
+  virtual void visit(Typedef* t);
   packVisitor();
 };
 

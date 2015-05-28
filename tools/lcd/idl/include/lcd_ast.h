@@ -154,15 +154,15 @@ class Parameter : public Base
 {
   Type* type_;
   const char* name_;
-  int register_;
+  std::vector<int> registers_;
   
  public:
   Parameter(Type* type, const char* name);
   ~Parameter();
   virtual void accept(ASTVisitor *worker);
   Type* type() { return this->type_; }
-  int get_register() { return this->register_; }
-  void set_register(int r) { this->register_ = r; }
+  std::vector<int> get_registers() { return this->registers_; }
+  void set_registers(std::vector<int> r) { this->registers_ = r; }
   const char* name();
 };
 
@@ -177,16 +177,17 @@ class Rpc : public Base
   /* -------------- */
 
   char* name_;
-  std::vector<Parameter* >* params_;
+  std::vector<Parameter* > params_;
 
  public:
-  Rpc(Type* return_type, char* name, std::vector<Parameter* >* parameters);
+  Rpc(Type* return_type, char* name, std::vector<Parameter* > parameters);
   char* name();
   Type* return_type();
   int ret_register() { return this->ret_register_; }
   void set_ret_register(int r) { this->ret_register_ = r; }
-  std::vector<Parameter*>* parameters();
+  std::vector<Parameter*> parameters();
   virtual void accept(ASTVisitor *worker);
+  M_rpc* marshal_info() { return this->marshal_info_; }
   const char* enum_name();
   const char* callee_name();
 };
@@ -225,13 +226,13 @@ class File : public Base
 {
   const char* verbatim_;
   FileScope * scope_; // has pointer to root scope
-  std::vector<Rpc *>* rpc_defs_;
+  std::vector<Rpc *> rpc_defs_;
   // std::vector<Message *>* message_defs_;
   
  public:
-  File(const char* verbatim, FileScope* fs, std::vector<Rpc* >* rpc_definitions);
+  File(const char* verbatim, FileScope* fs, std::vector<Rpc* > rpc_definitions);
   virtual void accept(ASTVisitor *worker);
-  std::vector<Rpc*>* rpc_defs();
+  std::vector<Rpc*> rpc_defs();
   
 };
 

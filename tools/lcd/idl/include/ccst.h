@@ -106,7 +106,7 @@ class CCSTReturn;
 CCSTDeclaration* construct_callee_declaration(Rpc* r);
 CCSTExDeclaration* construct_enum(File *f);
 const char* construct_enum_name();
-CCSTEnumeratorList* construct_enumlist(std::vector<Rpc*>* rps);
+CCSTEnumeratorList* construct_enumlist(std::vector<Rpc*> rps);
 char* string_to_upper(char* str);
 int count_nested_pointer(Type* p);
 CCSTPointer* create_pointer(int p_count);

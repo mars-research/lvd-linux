@@ -127,7 +127,7 @@ const char* Parameter::name()
 
 
 
-Rpc::Rpc(Type* return_type, char* name, std::vector<Parameter* >* parameters)
+Rpc::Rpc(Type* return_type, char* name, std::vector<Parameter* > parameters)
 {
   this->ret_type_ = return_type;
   this->name_ = name;
@@ -158,12 +158,12 @@ const char* Rpc::enum_name()
 {
 }
 
-std::vector<Parameter*>* Rpc::parameters()
+std::vector<Parameter*> Rpc::parameters()
 {
   return params_;
 }
 
-File::File(const char* verbatim, FileScope* fs, std::vector<Rpc* >* rpc_definitions)
+File::File(const char* verbatim, FileScope* fs, std::vector<Rpc* > rpc_definitions)
 {
   this->verbatim_ = verbatim;
   this->scope_ = fs;
@@ -175,7 +175,7 @@ void File::accept(ASTVisitor* worker)
   worker->visit(this);
 }
 
-std::vector<Rpc*>* File::rpc_defs()
+std::vector<Rpc*> File::rpc_defs()
 {
   return this->rpc_defs_;
 }

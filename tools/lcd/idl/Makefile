@@ -6,12 +6,12 @@ idl = parser/lcd_idl.cpp include/lcd_idl.h
 CXXFLAGS = -g -Iinclude/
 CXX = g++
 
-objects = lcd_ast.o main.o lcd_idl.o scope.o error.o marshal_op.o ccst.o ast_to_ccst.o
+objects = lcd_ast.o main.o lcd_idl.o scope.o error.o marshal_op.o ccst.o ast_to_ccst.o marshal_visitor.o
 
 $(bin): $(objects) 
 	$(CXX) $(LDFLAGS) -o $@ $^ $(LDLIBS)
 
-main.o: main/main.cpp include/lcd_ast.h include/lcd_idl.h include/error.h include/marshal_op.h include/ccst.h
+main.o: main/main.cpp include/lcd_ast.h include/lcd_idl.h include/error.h include/marshal_op.h include/ccst.h include/marshal_visitor.h
 	$(CXX) $(CXXFLAGS) -c -o $@ $(filter-out %.h,$^)
 
 error.o: error/error.cpp include/error.h
@@ -27,6 +27,9 @@ lcd_idl.o: $(idl) include/lcd_ast.h
 	$(CXX) $(CXXFLAGS) -c -o $@ $(filter-out %.h,$^)
 
 scope.o: ast/scope.cpp include/lcd_ast.h
+	$(CXX) $(CXXFLAGS) -c -o $@ $(filter-out %.h,$^)
+
+marshal_visitor.o: marshal_visitor.cpp include/marshal_visitor.h
 	$(CXX) $(CXXFLAGS) -c -o $@ $(filter-out %.h,$^)
 
 marshal_op.o: marshal_op.cpp include/marshal_op.h include/lcd_ast.h include/assert.h

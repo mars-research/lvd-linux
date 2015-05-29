@@ -409,11 +409,11 @@ CCSTCompoundStatement* create_callee_body(Rpc *r)
     {
       Parameter *p = (Parameter*) *it;
       const char* param_tmp_name = "_param1";
-      CCSTDeclaration *tmp = unmarshal_parameter(p, "param_tmp_name");
+      CCSTCompoundStatement *tmp = unmarshal_parameter(p);
       
       CCSTPrimaryExprId *t = new CCSTPrimaryExprId(param_tmp_name);
       unmarshalled_args.push_back(t);
-      declarations.push_back(tmp);
+      statements.push_back(tmp);
     }
 
   // pulled out params make function call
@@ -451,30 +451,100 @@ CCSTCompoundStatement* create_callee_body(Rpc *r)
   return new CCSTCompoundStatement(declarations, statements);
 }
 
-CCSTDeclaration* unmarshal_parameter(Parameter *p, const char *param_tmp_name)
+CCSTCompoundStatement* unmarshal_projection_parameter(Parameter *param, ProjectionType *pt)
+{
+  
+}
+
+CCSTTypeName* type_cast(Type *t)
+{
+  
+}
+
+CCSTCompoundStatement* unmarshal_pointer_parameter(Parameter *param, PointerType *pt)
+{
+  CCSTPointer *__p = create_pointer(count_nested_pointer(pt));
+  
+  std::vector<CCSTAssignExpr*> args;
+  
+  CCSTTypeName *type_name = type_cast(pt);
+  args.push_back(new CCSTUnaryExprSizeOf(type_name));
+
+  const char *param_name = param->name();
+  
+  
+  // malloc space for the pointer
+  CCSTDeclarator *name = new CCSTDeclarator(__p, new CCSTDirectDecId(param_name));
+  CCSTInitializer *init = new CCSTInitializer(new CCSTCastExpr(type_name
+							       , new CCSTPostFixExprAssnExpr(new CCSTPrimaryExprId("malloc")
+											     , args)));
+  CCSTInitDeclarator *get_value = new CCSTInitDeclarator(name
+							 ,init);
+  // malloced space.
+
+  // now put value in pointer
+  std::vector<CCSTAssignExpr*> assn_exprs;
+
+  // *name
+  CCSTUnaryExprCastExpr *set_value = new CCSTUnaryExprCastExpr(new CCSTUnaryOp(unary_mult_t)
+							       , new CCSTPrimaryExprId(param_name));
+
+  // value
+  // (type) lcd_r0()
+  std::vector<CCSTAssignExpr*> args2;
+  CCSTCastExpr *value = new CCSTCastExpr( type_cast(pt->type())
+					  , new CCSTPostFixExprAssnExpr(new CCSTPrimaryExprId("func_to_call")
+									, args2) ); 
+  
+  // combining them
+  // *name = value
+  CCSTAssignExpr *param_eq_value = new CCSTAssignExpr(set_value, new CCSTAssignOp(equal_t)
+						      , value);
+  assn_exprs.push_back(param_eq_value);
+  CCSTExprStatement *expr_stmt = new CCSTExprStatement(new CCSTExpression(assn_exprs));
+  // 
+
+
+  std::vector<CCSTInitDeclarator*> init_decs;
+  init_decs.push_back(get_value);
+  
+  CCSTDeclaration *declaration = new CCSTDeclaration(get_type(pt)
+						     , init_decs);
+  
+  std::vector<CCSTDeclaration*> comp_stmt_decs;
+  comp_stmt_decs.push_back(declaration);
+
+  std::vector<CCSTStatement*> comp_stmt_stmts;
+  comp_stmt_stmts.push_back(expr_stmt);
+  
+  return new CCSTCompoundStatement(comp_stmt_decs, comp_stmt_stmts);
+}
+
+CCSTCompoundStatement* unmarshal_parameter(Parameter *p)
 {
   Type *t = p->type();
   
-  
-  CCSTPointer *__p = 0x0;
-  if(t->num() == 3) // check if a pointer
+  switch(t->num())
     {
-      __p = create_pointer(count_nested_pointer(t));
+    case 3:
+      {
+	PointerType *pt = dynamic_cast<PointerType*>(t);
+	return unmarshal_pointer_parameter(p, pt);
+      }
+    case 4:
+      {
+	ProjectionType *pt = dynamic_cast<ProjectionType*>(t);
+	return unmarshal_projection_parameter(p, pt);
+      }
+    default:
+      {
+	
+      }
     }
-  
-  std::vector<CCSTAssignExpr*> args;
-  const char *param_name = param_tmp_name;
 
   // int reg_where_marshalled = t->
-  CCSTInitDeclarator *id = new CCSTInitDeclarator(new CCSTDeclarator(__p
-								     , new CCSTDirectDecId(param_name))
-						  , new CCSTInitializer( new CCSTPostFixExprAssnExpr( new CCSTPrimaryExprId("func_to_call")
-												      , args) ) );
-  
-  std::vector<CCSTInitDeclarator*> _tmp_;
-  _tmp_.push_back(id);
-  return  new CCSTDeclaration(get_type(t)
-			      , _tmp_);
+
+
 }
 
 /* body for a caller function

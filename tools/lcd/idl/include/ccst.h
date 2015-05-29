@@ -121,6 +121,12 @@ std::vector<CCSTDecSpecifier*> get_type(Type *t);
 std::vector<CCSTDecSpecifier*> get_integer_type(IntegerType *it);
 CCSTDeclaration* unmarshal_parameter(Parameter *p, const char *param_tmp_name);
 
+CCSTTypeName* type_cast(Type *t);
+
+CCSTCompoundStatement* unmarshal_pointer_parameter(Parameter *param, ProjectionType *pt);
+CCSTCompoundStatement* unmarshal_projection_parameter(Parameter *param, PointerType *pt);
+CCSTCompoundStatement* unmarshal_parameter(Parameter *p);
+
 /* "code generators"*/
 CCSTFile* generate_server_header(File* f);
 CCSTFile* generate_server_source(File* f);
@@ -743,6 +749,7 @@ class CCSTUnaryExprCastExpr : public CCSTUnaryExpr
                      | sizeof <unary-expression>
                      | sizeof <type-name>
    */
+  // *name
   CCSTUnaryOp *unary_op_;
   CCSTCastExpr *cast_expr_;
  public:

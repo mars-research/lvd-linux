@@ -18,7 +18,8 @@ code: {{
 	}
 	return fs_instance;
       }
-      Type * getType(const char* type)
+
+           Type * getType(const char* type)
       {	   
       	   printf("in getType type is: %s\n", type);
       	   int err;
@@ -37,7 +38,29 @@ code: {{
 	     return 0; // continue execution
 	   }
 	    return val;
-      }				
+      }	
+
+      Type* count_pointers(Value v, const char* type)
+      {
+	   Type *t = getType(type);
+	   printf("here22222\n");
+	   for(Value::iterator it = v.getValues().begin(); it != v.getValues().end(); it++)
+	   {
+		const Value & v = *it;
+		char star = (char) (intptr_t) v.getValue();
+		if(star == '*')
+		{
+		 printf("here333\n");
+		 t = new PointerType(t);		
+		}
+		else
+		{
+			printf("Not a star\n");
+		}
+	   }
+	   printf("here444\n");
+	   return t;	
+      }			
 
       void insertType(const char * sym, Type * val) // should this be void?
       {
@@ -67,6 +90,7 @@ Identifier	=	i1:IdentStart i2:IdentCont* {{
 				std::string str = total.str();
 				printf("identifier is: %s\n", str.c_str());
 		   		value.value = malloc(str.length()+1);
+				printf("hereeeee\n");
 				strncpy((char*)value.value, str.c_str(), str.length()+1); }}
 
 IdentStart	=	[abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ_]
@@ -293,18 +317,32 @@ Line_comment	=	Line_comm_start Line_comm_rest
 
 Line_comm_end	=	"\n"
 
-signed_type	=	"int" Space+{{ value = getType("int");}}
-			| "char" Space+ {{ value = getType("char"); }}   
-			| "capability" Space+ {{ value = getType("capability"); }}
-			| "short" Space+ {{ value = getType("short");}}
-			| "long" Space+ "long" Space+ {{ value = getType("long long");}}
-			| "long" Space+ {{ value = getType("long"); }}
+star = [*]
 
-unsigned_type	=	"unsigned" Space+ "int" Space+ {{ value = getType("unsigned int"); }} 
-			| "unsigned" Space+ "char" Space+ {{ value = getType("unsigned char"); }} 
-			| "unsigned" Space+ "short" Space+ {{ value = getType("unsigned long"); }} 
-			| "unsigned" Space+ "long" Space+ "long" Space+ {{ value = getType("unsigned long long"); }}
-			| "unsigned" Space+ "long" Space+ {{ value = getType("unsigned long"); }}  
+signed_type	=	"int" Space* ps:star* Space+{{ value = count_pointers(ps, "int");}}
+			| "char" Space* ps:star* Space+ {{ value = count_pointers(ps, "char"); }}   
+			| "capability" Space+ {{ value = getType("capability"); }}
+			| "short" Space* ps:star* Space+ {{ value = count_pointers(ps, "short");}}
+			| "long"  Space+ "long" Space* ps:star* Space+ {{ value = count_pointers(ps, "long long");}}
+			| "long" Space* ps:star* Space+ {{ value = count_pointers(ps, "long"); }}
+
+			| "int" Space+ ps:star* Space*{{ value = count_pointers(ps, "int");}}
+			| "char" Space+ ps:star* Space*{{ value = count_pointers(ps, "char"); }}   
+			| "short" Space+ ps:star* Space* {{ value = count_pointers(ps, "short");}}
+			| "long" Space+ "long" Space+ ps:star* Space* {{ value = count_pointers(ps, "long long");}}
+			| "long"  Space+ ps:star* Space*{{ value = count_pointers(ps, "long"); }}
+
+unsigned_type	=	"unsigned" Space+ "int" ps:star* Space+ {{ value = count_pointers(ps, "unsigned int"); }} 
+			| "unsigned" Space+ "char" ps:star* Space+ {{ value = count_pointers(ps, "unsigned char"); }} 
+			| "unsigned" Space+ "short" ps:star* Space+ {{ value = count_pointers(ps, "unsigned long"); }} 
+			| "unsigned" Space+ "long" Space+ "long" ps:star* Space+ {{ value = count_pointers(ps, "unsigned long long"); }}
+			| "unsigned" Space+ "long" ps:star* Space+ {{ value = count_pointers(ps, "unsigned long"); }}
+			| "unsigned" Space+ "int" Space+ ps:star* {{ value = count_pointers(ps, "unsigned int"); }} 
+			| "unsigned" Space+ "char" Space+ ps:star* {{ value = count_pointers(ps, "unsigned char"); }} 
+			| "unsigned" Space+ "short" Space+ ps:star* {{ value = count_pointers(ps, "unsigned long"); }} 
+			| "unsigned" Space+ "long" Space+ "long" Space+ ps:star* {{ value = count_pointers(ps, "unsigned long long"); }}
+			| "unsigned" Space+ "long" Space+ ps:star* {{ value = count_pointers(ps, "unsigned long"); }}  
+  
 
 type 		=	unsigned_type
 			| signed_type

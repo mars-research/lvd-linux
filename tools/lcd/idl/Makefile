@@ -11,16 +11,16 @@ objects = lcd_ast.o main.o lcd_idl.o scope.o error.o marshal_op.o ccst.o ast_to_
 $(bin): $(objects) 
 	$(CXX) $(LDFLAGS) -o $@ $^ $(LDLIBS)
 
-main.o: main/main.cpp include/lcd_ast.h include/lcd_idl.h include/error.h include/marshal_op.h include/ccst.h include/marshal_visitor.h
+main.o: main/main.cpp include/lcd_ast.h include/lcd_idl.h include/error.h include/ccst.h include/marshal_visitor.h
 	$(CXX) $(CXXFLAGS) -c -o $@ $(filter-out %.h,$^)
 
 error.o: error/error.cpp include/error.h
 	$(CXX) $(CXXFLAGS) -c -o $@ $(filter-out %.h,$^)
 
-ast_to_ccst.o: ast_to_ccst.cpp include/ccst.h
+ast_to_ccst.o: ast_to_ccst.cpp include/ccst.h include/marshal_op.h
 	$(CXX) $(CXXFLAGS) -c -o $@ $(filter-out %.h,$^)
 
-ccst.o: ccst.cpp include/ccst.h
+ccst.o: ccst.cpp include/ccst.h include/marshal_op.h
 	$(CXX) $(CXXFLAGS) -c -o $@ $(filter-out %.h,$^)
 
 lcd_idl.o: $(idl) include/lcd_ast.h 

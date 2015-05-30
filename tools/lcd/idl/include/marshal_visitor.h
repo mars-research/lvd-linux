@@ -1,5 +1,5 @@
 #ifndef _MARSHAL_
-#define _MARHSAL_
+#define _MARSHAL_
 #include "lcd_ast.h"
 
 

@@ -2,7 +2,7 @@
 #define CAST_H
 
 #include "lcd_ast.h"
-
+#include "assert.h"
 
 class CCSTFile;
 class CCSTAssignExpr;

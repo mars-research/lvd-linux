@@ -41,8 +41,11 @@ void CCSTFuncDef::write(FILE *f)
       ds->write(f);
     }
   // write body
+  fprintf(f, "\n");
+  fprintf(f, "{\n");
   this->body_->write(f);
   fprintf(f, "\n");
+  fprintf(f, "}");
 }
 
 CCSTDeclaration::CCSTDeclaration(std::vector<CCSTDecSpecifier*> specifier, std::vector<CCSTInitDeclarator*> decs)
@@ -253,6 +256,7 @@ CCSTDeclarator::CCSTDeclarator(CCSTPointer *pointer, CCSTDirectDeclarator *d_dec
 
 void CCSTDeclarator::write(FILE *f)
 {
+  
   if(this->pointer_ != NULL)
     {
       this->pointer_->write(f);
@@ -415,6 +419,7 @@ void CCSTDirectDecIdList::write(FILE *f)
 
 CCSTCondExpr::CCSTCondExpr()
 {
+  // printf("incomplete cond expr\n"); 
   //todo
 }
 
@@ -427,6 +432,7 @@ CCSTCondExpr::CCSTCondExpr(CCSTLogicalOrExpr *log_or_expr, CCSTExpression *expr,
 
 void CCSTCondExpr::write(FILE *f)
 {
+  printf("incomplete cond expr\n");
   //todo
 }
 
@@ -447,6 +453,7 @@ void CCSTConstExpr::write(FILE *f)
 
 CCSTLogicalOrExpr::CCSTLogicalOrExpr()
 {
+  
   //todo
 }
 
@@ -859,9 +866,7 @@ void CCSTUnaryExprCastExpr::write(FILE *f)
       exit(0);
     }
   this->unary_op_->write(f);
-  fprintf(f, " ( ");
   this->cast_expr_->write(f);
-  fprintf(f, " )");
 }
 
 CCSTUnaryExprOpOp::CCSTUnaryExprOpOp(incr_decr_ops op, CCSTUnaryExpr *unary_expr)
@@ -1159,6 +1164,7 @@ CCSTEnumConst::CCSTEnumConst()
 
 void CCSTEnumConst::write(FILE *f)
 {
+  printf("incomplete enum const\n");
   //TODO
   // unsure
 }
@@ -1184,7 +1190,9 @@ void CCSTExpression::write(FILE *f)
 
 CCSTAssignExpr::CCSTAssignExpr()
 {
-  //todo
+  this->unary_expr_ = 0x0; 
+  this->assn_op_ = 0x0; 
+  this->assn_expr_ = 0x0;
 }
 
 CCSTAssignExpr::CCSTAssignExpr(CCSTUnaryExpr *unary_expr, CCSTAssignOp *assn_op, CCSTAssignExpr *assn_expr)
@@ -1623,10 +1631,9 @@ void CCSTTypedefName::write(FILE *f)
   fprintf(f, "%s", this->id_);
 }
 
-//todo
+
 void CCSTDeclaration::write(FILE *f)
 {
-  //?x
   for(std::vector<CCSTDecSpecifier*>::iterator it = specifier_.begin(); it != specifier_.end(); ++it)
     {
       CCSTDecSpecifier *dec_spec = *it;
@@ -1671,11 +1678,13 @@ void CCSTInitDeclarator::write(FILE *f)
 CCSTInitializer::CCSTInitializer(CCSTAssignExpr *assn_expr)
 {
   this->assn_expr_ = assn_expr;
+  this->init_list_ = 0x0;
 }
 
 CCSTInitializer::CCSTInitializer(CCSTInitializerList *init_list)
 {
   this->init_list_ = init_list;
+  this->assn_expr_ = 0x0;
 }
 
 void CCSTInitializer::write(FILE *f)
@@ -1735,20 +1744,20 @@ CCSTCompoundStatement::CCSTCompoundStatement(std::vector<CCSTDeclaration*> decs,
 
 void CCSTCompoundStatement::write(FILE *f)
 {
-  fprintf(f, "{\n");
-  for(std::vector<CCSTDeclaration*>::iterator it = declarations_.begin(); it != declarations_.end(); ++it)
+
+  for(std::vector<CCSTDeclaration*>::iterator it = this->declarations_.begin(); it != declarations_.end(); ++it)
     {
       CCSTDeclaration *dec = *it;
+      
       dec->write(f);
       fprintf(f, "\n");
     }
-  for(std::vector<CCSTStatement*>::iterator it = statements_.begin(); it != statements_.end(); ++it)
+  for(std::vector<CCSTStatement*>::iterator it = this->statements_.begin(); it != statements_.end(); ++it)
     {
       CCSTStatement *state = *it;
       state->write(f);
       fprintf(f, "\n");
     }
-  fprintf(f, "}");
 }
 
 CCSTPlainLabelStatement::CCSTPlainLabelStatement(const char* id, CCSTStatement *stmnt)

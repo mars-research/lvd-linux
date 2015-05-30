@@ -3,7 +3,6 @@
 #include <stdarg.h>
 #include <stdlib.h>
 #include <stdio.h>
-#include "assert.h"
 
 /* example
    
@@ -191,7 +190,15 @@ CCSTFile* generate_server_source(File *file)
 
 /* ------------------------ new ---------------------------- */
 
-
+Type* get_non_pointer_type(PointerType *p)
+{
+  Assert(p->type() != 0x0, "Error: pointer to null\n");
+  
+  if(p->type()->num() != 3)
+    return p->type();
+  PointerType *pt = dynamic_cast<PointerType*>(p->type());
+  return get_non_pointer_type(pt);
+}
 
 int count_nested_pointer(Type *p)
 {
@@ -408,10 +415,9 @@ CCSTCompoundStatement* create_callee_body(Rpc *r)
   for(std::vector<Parameter*>::iterator it = params.begin(); it != params.end(); it ++)
     {
       Parameter *p = (Parameter*) *it;
-      const char* param_tmp_name = "_param1";
       CCSTCompoundStatement *tmp = unmarshal_parameter(p);
       
-      CCSTPrimaryExprId *t = new CCSTPrimaryExprId(param_tmp_name);
+      CCSTPrimaryExprId *t = new CCSTPrimaryExprId(p->name());
       unmarshalled_args.push_back(t);
       statements.push_back(tmp);
     }
@@ -456,13 +462,106 @@ CCSTCompoundStatement* unmarshal_projection_parameter(Parameter *param, Projecti
   
 }
 
+std::vector<CCSTSpecifierQual*> integer_type_cast(IntegerType *it)
+{
+  std::vector<CCSTSpecifierQual*> spec_quals;
+
+  if(it->is_unsigned())
+    {
+      spec_quals.push_back(new CCSTSimpleTypeSpecifier(unsigned_t));
+    }
+  switch (it->int_type())
+    {
+    case pt_char_t:
+      {
+	spec_quals.push_back(new CCSTSimpleTypeSpecifier(char_t));
+	break;
+      }
+    case pt_short_t:
+      {
+	spec_quals.push_back(new CCSTSimpleTypeSpecifier(short_t));
+	break;
+      }
+    case pt_int_t:
+      {
+	spec_quals.push_back(new CCSTSimpleTypeSpecifier(int_t));
+	break;
+      }
+    case pt_long_t:
+      {
+	spec_quals.push_back(new CCSTSimpleTypeSpecifier(long_t));
+	break;
+      }
+    case pt_longlong_t:
+      {
+	spec_quals.push_back(new CCSTSimpleTypeSpecifier(long_t));
+	spec_quals.push_back(new CCSTSimpleTypeSpecifier(long_t));
+	break;
+      }
+    case pt_capability_t:
+      {
+	spec_quals.push_back(new CCSTTypedefName("capability_t"));
+	break;
+      }
+    default:
+      {
+	printf("todo\n");
+      }
+    }
+  return spec_quals;
+}
+
 CCSTTypeName* type_cast(Type *t)
 {
+  CCSTAbstDeclarator *pointers = 0x0;
+  std::vector<CCSTSpecifierQual*> spec_quals;
+  if(t->num() == 3)
+    {
+      // do pointer stuff....
+      pointers = new CCSTAbstDeclarator( create_pointer(count_nested_pointer(t)) , 0x0); 
+      
+      PointerType *p = dynamic_cast<PointerType*>(t);
+      t = get_non_pointer_type(p); // get first non pointer, write function for this
+    }
   
+  switch(t->num())
+    {
+    case 1: // typedef
+      {
+	Typedef *td = dynamic_cast<Typedef*>(t);
+	const char* name = td->alias();
+	spec_quals.push_back( new CCSTTypedefName(name) );
+	break;
+      }
+      case 2: // integer
+      {
+	IntegerType *it = dynamic_cast<IntegerType*>(t);
+	spec_quals = integer_type_cast(it);
+	break;
+      }
+    case 4: // projection
+      {
+	ProjectionType *pt = dynamic_cast<ProjectionType*>(t);
+	const char* name = pt->real_type();
+	spec_quals.push_back( new CCSTStructUnionSpecifier(struct_t, name) );
+	break;
+      }
+    case 5: // void
+      { // does this even happen?
+	printf("Warning: casting something as void\n");
+	spec_quals.push_back(new CCSTSimpleTypeSpecifier(void_t) );
+      }
+    default:
+      {
+	Assert(1 == 0, "Error: Should never get here\n");
+      }
+    }
+  return new CCSTTypeName(spec_quals, pointers);
 }
 
 CCSTCompoundStatement* unmarshal_pointer_parameter(Parameter *param, PointerType *pt)
 {
+  printf("Here in unmarshal_pointer_parameter\n");
   CCSTPointer *__p = create_pointer(count_nested_pointer(pt));
   
   std::vector<CCSTAssignExpr*> args;
@@ -483,8 +582,6 @@ CCSTCompoundStatement* unmarshal_pointer_parameter(Parameter *param, PointerType
   // malloced space.
 
   // now put value in pointer
-  std::vector<CCSTAssignExpr*> assn_exprs;
-
   // *name
   CCSTUnaryExprCastExpr *set_value = new CCSTUnaryExprCastExpr(new CCSTUnaryOp(unary_mult_t)
 							       , new CCSTPrimaryExprId(param_name));
@@ -492,16 +589,21 @@ CCSTCompoundStatement* unmarshal_pointer_parameter(Parameter *param, PointerType
   // value
   // (type) lcd_r0()
   std::vector<CCSTAssignExpr*> args2;
+  std::vector<int> regs = param->get_registers(); // assume for now all are integer
+  // will deal with projection soon
+
+
   CCSTCastExpr *value = new CCSTCastExpr( type_cast(pt->type())
-					  , new CCSTPostFixExprAssnExpr(new CCSTPrimaryExprId("func_to_call")
+					  , new CCSTPostFixExprAssnExpr(new CCSTPrimaryExprId(access_register_mapping(regs[0]))
 									, args2) ); 
   
   // combining them
   // *name = value
   CCSTAssignExpr *param_eq_value = new CCSTAssignExpr(set_value, new CCSTAssignOp(equal_t)
 						      , value);
-  assn_exprs.push_back(param_eq_value);
-  CCSTExprStatement *expr_stmt = new CCSTExprStatement(new CCSTExpression(assn_exprs));
+  std::vector<CCSTAssignExpr*> fuck;
+  fuck.push_back(param_eq_value);
+  CCSTExprStatement *expr_stmt = new CCSTExprStatement( new CCSTExpression(fuck));
   // 
 
 
@@ -509,7 +611,7 @@ CCSTCompoundStatement* unmarshal_pointer_parameter(Parameter *param, PointerType
   init_decs.push_back(get_value);
   
   CCSTDeclaration *declaration = new CCSTDeclaration(get_type(pt)
-						     , init_decs);
+						     , init_decs); // add to 
   
   std::vector<CCSTDeclaration*> comp_stmt_decs;
   comp_stmt_decs.push_back(declaration);
@@ -528,6 +630,7 @@ CCSTCompoundStatement* unmarshal_parameter(Parameter *p)
     {
     case 3:
       {
+	printf("here in pointer type\n");
 	PointerType *pt = dynamic_cast<PointerType*>(t);
 	return unmarshal_pointer_parameter(p, pt);
       }
@@ -538,7 +641,7 @@ CCSTCompoundStatement* unmarshal_parameter(Parameter *p)
       }
     default:
       {
-	
+	printf("here in default");
       }
     }
 

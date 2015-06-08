@@ -37,6 +37,8 @@ code: {{
 	     printf("Error looking up type: %s\n", type);
 	     return 0; // continue execution
 	   }
+
+	   printf("val num: %d\n", val->num());
 	    return val;
       }	
 
@@ -230,10 +232,7 @@ Projection	=	"projection" Space+ id:Identifier Spacing "<" Spacing t:Proj_type "
 		## what is the point of having a projection without at least one line
 
 Proj_type	=  	"struct" Space+ id:Identifier Spacing {{
-			std::ostringstream total;
-			total << "struct " << (char *) id.getValue();
-			std::string str = total.str();
-			value = &str[0]; }}
+			value = id;}}
 
 Keyword		=     	"out" {{ int * x = (int *) malloc(sizeof(int));
 			      *x = 1;
@@ -272,24 +271,18 @@ ProjField	=	OPENS Spacing s:Specification CLOSES Spacing t:Type_form id:Identifi
 			bool in = false; bool out = false; bool bind = false; bool alloc = false;
 			std::vector<bool>* specs = (std::vector<bool>*) s.getValue();
 			printf("In Proj field\n");
-			int i = 1;
+			int i = 0;
 			printf("%zu", specs->size());
-			for(std::vector<bool>::iterator it = specs->begin(); it != specs->end(); it ++)
-			{
-				printf("in for loop\n");
-				if(*it)
-				{
-				if(i == 0)
-				     out = true;
-				else if(i == 1)
-				     in = true;
-				else if(i == 2)
-				     bind = true;
-				else
-					alloc = true;
-				}				
-				i += 1;
-			}
+
+			if(specs->at(0) == true)
+					out = true;
+			if(specs->at(1) == true)
+					in = true;
+			if(specs->at(2) == true)
+					bind = true;
+			if(specs->at(3) == true)
+					alloc = true;		
+
 			printf("about to construct projection field\n");
 			value = new ProjectionField(in, out, alloc, bind, (Type *) t.getValue(), (char *) id.getValue()); }}
 

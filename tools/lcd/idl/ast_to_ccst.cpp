@@ -457,9 +457,59 @@ CCSTCompoundStatement* create_callee_body(Rpc *r)
   return new CCSTCompoundStatement(declarations, statements);
 }
 
-CCSTCompoundStatement* unmarshal_projection_parameter(Parameter *param, ProjectionType *pt)
+CCSTCompoundStatement* unmarshal_projection_parameter(Parameter *param, ProjectionType *pt, bool isPointer)
 {
+  printf("here in unmarshal proj parameter\n");
+  if(isPointer)
+    {
+      printf("proj is a pointer\n");
+      // For now malloc an instance of the struct
+      
+      std::vector<CCSTInitDeclarator*> d;
+      
+      CCSTPointer *__p = new CCSTPointer(); // just 1 pointer for now.
+      
+      CCSTDeclarator *name = new CCSTDeclarator(__p
+						, new CCSTDirectDecId(param->name()));
+      
+      std::vector<CCSTAssignExpr*> args;
   
+      printf("Right before type_cast call\n");
+      CCSTTypeName *type_name = type_cast(pt);
+
+      printf("just made type_cast call\n");
+      if(type_name == 0x0)
+	printf("type name is null\n");
+      args.push_back(new CCSTUnaryExprSizeOf(type_name));
+      
+      CCSTCastExpr *m =  new CCSTCastExpr(type_name
+					  , new CCSTPostFixExprAssnExpr(new CCSTPrimaryExprId("malloc")
+								       , args) );
+      
+      CCSTInitializer *malloc_call = new CCSTInitializer(m); //TODO right here
+      
+      CCSTInitDeclarator *init_struct = new CCSTInitDeclarator(name
+							       , malloc_call);
+      d.push_back(init_struct);
+      
+      CCSTDeclaration *new_struct = new CCSTDeclaration(get_projection_type(pt)
+							, d);
+      
+      // end malloc struct
+      
+
+      // not sure if above is totally correct
+      std::vector<CCSTDeclaration*> comp_decs;
+
+      comp_decs.push_back(new_struct);
+      std::vector<CCSTStatement*> comp_stmts;
+      
+      return new CCSTCompoundStatement(comp_decs, comp_stmts);
+      
+    }
+  printf("todo projection param\n");
+
+  // does C even use structs as params that are not pointesr to structs on heap?
 }
 
 std::vector<CCSTSpecifierQual*> integer_type_cast(IntegerType *it)
@@ -513,10 +563,15 @@ std::vector<CCSTSpecifierQual*> integer_type_cast(IntegerType *it)
 
 CCSTTypeName* type_cast(Type *t)
 {
+  printf("in type+cast\n");
   CCSTAbstDeclarator *pointers = 0x0;
   std::vector<CCSTSpecifierQual*> spec_quals;
+
+  if(t == 0x0)
+    printf("t is null\n");
   if(t->num() == 3)
     {
+      printf("type cast pointer\n");
       // do pointer stuff....
       pointers = new CCSTAbstDeclarator( create_pointer(count_nested_pointer(t)) , 0x0); 
       
@@ -524,6 +579,7 @@ CCSTTypeName* type_cast(Type *t)
       t = get_non_pointer_type(p); // get first non pointer, write function for this
     }
   
+  printf("in type castttt\n");
   switch(t->num())
     {
     case 1: // typedef
@@ -541,8 +597,11 @@ CCSTTypeName* type_cast(Type *t)
       }
     case 4: // projection
       {
+	printf("here in type cast\n");
 	ProjectionType *pt = dynamic_cast<ProjectionType*>(t);
 	const char* name = pt->real_type();
+
+	printf("projection name: %s\n", name);
 	spec_quals.push_back( new CCSTStructUnionSpecifier(struct_t, name) );
 	break;
       }
@@ -550,6 +609,7 @@ CCSTTypeName* type_cast(Type *t)
       { // does this even happen?
 	printf("Warning: casting something as void\n");
 	spec_quals.push_back(new CCSTSimpleTypeSpecifier(void_t) );
+	break;
       }
     default:
       {
@@ -562,7 +622,20 @@ CCSTTypeName* type_cast(Type *t)
 CCSTCompoundStatement* unmarshal_pointer_parameter(Parameter *param, PointerType *pt)
 {
   printf("Here in unmarshal_pointer_parameter\n");
-  CCSTPointer *__p = create_pointer(count_nested_pointer(pt));
+
+  // for now assume JUST ONE POINTER
+  
+  // need to check if it is a scalar type or a projection
+  if(pt->type()->num() == 4)
+    {
+      printf("is a projection\n");
+      ProjectionType *proj = dynamic_cast<ProjectionType*>(pt->type());
+      if(proj == 0x0)
+	printf("is null in unmarshal pointer\n");
+      return unmarshal_projection_parameter(param, proj, true); 
+    }
+
+  CCSTPointer *__p = create_pointer(count_nested_pointer(pt)); // doesn't really work because need first non-pointer inner type
   
   std::vector<CCSTAssignExpr*> args;
   
@@ -637,7 +710,7 @@ CCSTCompoundStatement* unmarshal_parameter(Parameter *p)
     case 4:
       {
 	ProjectionType *pt = dynamic_cast<ProjectionType*>(t);
-	return unmarshal_projection_parameter(p, pt);
+	return unmarshal_projection_parameter(p, pt, false);
       }
     default:
       {
@@ -699,8 +772,9 @@ std::vector<CCSTDecSpecifier*> get_type(Type *t)
       }
     case 4: // Projection Type
       {
-	
-	break;
+	printf("about to call projection type\n");
+	ProjectionType *pt = dynamic_cast<ProjectionType*>(t);
+	return get_projection_type(pt);
       }
     case 5: // Void Type
       {
@@ -712,6 +786,19 @@ std::vector<CCSTDecSpecifier*> get_type(Type *t)
 	printf("error");
       }
     }
+}
+
+std::vector<CCSTDecSpecifier*> get_projection_type(ProjectionType *pt)
+{
+  std::vector<CCSTDecSpecifier*> type_declaration;
+  
+
+  CCSTStructUnionSpecifier *struct_type = new CCSTStructUnionSpecifier(struct_t
+								       ,pt->real_type());
+  
+  type_declaration.push_back(struct_type);
+
+  return type_declaration;
 }
 
 std::vector<CCSTDecSpecifier*> get_integer_type(IntegerType *it)

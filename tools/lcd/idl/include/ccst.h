@@ -117,8 +117,11 @@ CCSTDeclaration* create_function_declaration();
 CCSTCompoundStatement* create_dispatch_loop_body(std::vector<Rpc*>* rps);
 CCSTCompoundStatement* create_callee_body(Rpc *r);
 CCSTCompoundStatement* create_caller_body(Rpc* r);
+
 std::vector<CCSTDecSpecifier*> get_type(Type *t);
 std::vector<CCSTDecSpecifier*> get_integer_type(IntegerType *it);
+std::vector<CCSTDecSpecifier*> get_projection_type(ProjectionType *pt);
+
 CCSTDeclaration* unmarshal_parameter(Parameter *p, const char *param_tmp_name);
 
 CCSTTypeName* type_cast(Type *t);
@@ -1208,7 +1211,7 @@ class CCSTCompoundStatement : public CCSTStatement
   /*
     <compound-statement> ::= { {<declaration>}* {<statement>}* }
    */
-  // is this a body?
+  // is this a body? not necessarily
   std::vector<CCSTDeclaration*> declarations_;
   std::vector<CCSTStatement*> statements_;
  public:

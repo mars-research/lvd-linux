@@ -7,9 +7,9 @@ Typedef::Typedef(const char* alias, Type* type)
   this->type_ = type; // need to allocate?
 }
 
-void Typedef::accept(ASTVisitor* worker)
+Marshal_type* Typedef::accept(MarshalVisitor *worker, Registers *data)
 {
-  worker->visit(this);
+  return worker->visit(this, data);
 }
 
 const char* Typedef::alias()
@@ -21,9 +21,9 @@ VoidType::VoidType()
 {
 }
 
-void VoidType::accept(ASTVisitor* worker)
+Marshal_type* VoidType::accept(MarshalVisitor *worker, Registers *data)
 {
-  worker->visit(this);
+  return worker->visit(this, data);
 }
 
 IntegerType::IntegerType(PrimType type, bool un, int size)
@@ -33,9 +33,9 @@ IntegerType::IntegerType(PrimType type, bool un, int size)
   this->size_ = size;
 }
 
-void IntegerType::accept(ASTVisitor* worker)
+Marshal_type* IntegerType::accept(MarshalVisitor* worker, Registers *data)
 {
-  worker->visit(this);
+  return worker->visit(this, data);
 }
 
 PrimType IntegerType::int_type()
@@ -53,9 +53,9 @@ PointerType::PointerType(Type* type)
   this->type_ = type;
 }
 
-void PointerType::accept(ASTVisitor* worker)
+Marshal_type* PointerType::accept(MarshalVisitor* worker, Registers *data)
 {
-  worker->visit(this);
+  return worker->visit(this, data);
 }
 
 ProjectionField::ProjectionField(bool in, bool out, bool alloc, bool bind, Type* field_type, const char* field_name)
@@ -83,9 +83,9 @@ bool ProjectionField::bind()
   return this->bind_;
 }
 
-void ProjectionField::accept(ASTVisitor* worker)
+Marshal_type* ProjectionField::accept(MarshalVisitor* worker, Registers *data)
 {
-  worker->visit(this);
+  return worker->visit(this, data);
 }
 
 ProjectionType::ProjectionType(const char* id, const char* real_type, std::vector<ProjectionField*> fields)
@@ -93,9 +93,9 @@ ProjectionType::ProjectionType(const char* id, const char* real_type, std::vecto
   this->id_ = id; this->real_type_ = real_type; this->fields_ = fields;
 }
 
-void ProjectionType::accept(ASTVisitor* worker)
+Marshal_type* ProjectionType::accept(MarshalVisitor* worker, Registers *data)
 {
-  worker->visit(this);
+  return worker->visit(this, data);
 }
 
 const char* ProjectionType::id()
@@ -115,9 +115,9 @@ Parameter::Parameter(Type* type, const char* name)
   this->name_ = name;
 }
 
-void Parameter::accept(ASTVisitor* worker)
+Marshal_type* Parameter::accept(MarshalVisitor* worker, Registers *data)
 {
-  worker->visit(this);
+  return worker->visit(this, data);
 }
 
 const char* Parameter::name()
@@ -129,10 +129,9 @@ const char* Parameter::name()
 
 Rpc::Rpc(Type* return_type, char* name, std::vector<Parameter* > parameters)
 {
-  this->ret_type_ = return_type;
+  this->ret_types_.push_back(return_type);
   this->name_ = name;
   this->params_ = parameters;
-  this->marshal_info_ = new M_rpc();
 }
 
  char* Rpc::name()
@@ -140,14 +139,9 @@ Rpc::Rpc(Type* return_type, char* name, std::vector<Parameter* > parameters)
   return name_;
 }
 
-Type* Rpc::return_type()
+Marshal_type* Rpc::accept(MarshalVisitor* worker, Registers *data)
 {
-  return ret_type_;
-}
-
-void Rpc::accept(ASTVisitor* worker)
-{
-  worker->visit(this);
+  return worker->visit(this, data);
 }
 
 const char* Rpc::callee_name()
@@ -170,9 +164,9 @@ File::File(const char* verbatim, FileScope* fs, std::vector<Rpc* > rpc_definitio
   this->rpc_defs_ = rpc_definitions;
 }
 
-void File::accept(ASTVisitor* worker)
+Marshal_type* File::accept(MarshalVisitor* worker, Registers *data)
 {
-  worker->visit(this);
+  return worker->visit(this, data);
 }
 
 std::vector<Rpc*> File::rpc_defs()

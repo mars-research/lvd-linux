@@ -103,6 +103,15 @@ class CCSTBreak;
 class CCSTReturn;
 
 /* helper functions */
+class Rpc;
+class File;
+class Type;
+class IntegerType;
+class ProjectionType;
+class PointerType;
+class Parameter;
+class ProjectionField;
+
 CCSTDeclaration* construct_callee_declaration(Rpc* r);
 CCSTExDeclaration* construct_enum(File *f);
 const char* construct_enum_name();
@@ -122,13 +131,16 @@ std::vector<CCSTDecSpecifier*> get_type(Type *t);
 std::vector<CCSTDecSpecifier*> get_integer_type(IntegerType *it);
 std::vector<CCSTDecSpecifier*> get_projection_type(ProjectionType *pt);
 
-CCSTDeclaration* unmarshal_parameter(Parameter *p, const char *param_tmp_name);
-
 CCSTTypeName* type_cast(Type *t);
 
-CCSTCompoundStatement* unmarshal_pointer_parameter(Parameter *param, ProjectionType *pt);
-CCSTCompoundStatement* unmarshal_projection_parameter(Parameter *param, PointerType *pt);
+CCSTCompoundStatement* unmarshal_pointer_parameter(const char* param_name, int reg, PointerType *pt);
+CCSTCompoundStatement* unmarshal_projection_parameter(Parameter *param, ProjectionType *pt);
 CCSTCompoundStatement* unmarshal_parameter(Parameter *p);
+CCSTCompoundStatement* unmarshal_parameter(const char* name, std::vector<int> reg, Type *t);
+CCSTCompoundStatement* unmarshal_projection_field(const char* name, int reg, ProjectionField *pf);
+
+CCSTExprStatement* set_value_in_struct(const char *s, const char *f, const char *p, bool isP);
+
 
 /* "code generators"*/
 CCSTFile* generate_server_header(File* f);
@@ -1216,6 +1228,7 @@ class CCSTCompoundStatement : public CCSTStatement
   std::vector<CCSTStatement*> statements_;
  public:
   CCSTCompoundStatement(std::vector<CCSTDeclaration*> decs, std::vector<CCSTStatement*> s); //{this->declarations_ = decs; this->statements_ = s;}
+  void add_statement(CCSTStatement *s) { this->statements_.push_back(s); }
   virtual void write(FILE *f);
 };
 

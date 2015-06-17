@@ -2,42 +2,31 @@
 #define _MARSHAL_
 #include "lcd_ast.h"
 
+class File;
+class ProjectionField;
+class Rpc;
+class Parameter;
+class ProjectionType;
+class IntegerType;
+class PointerType;
+class Typedef;
+class VoidType;
 
-class MarshalVisitor : public ASTVisitor
+class MarshalVisitor
 {
  public:
-  virtual void visit(File *file);
-  // virtual void visit(Message *message);
-  // virtual void visit(MessageField *message_field);
-  virtual void visit(ProjectionField *proj_field);
-  virtual void visit(Rpc *rpc);
-  virtual void visit(Parameter *parameter);
+  virtual Marshal_type* visit(File *file, Registers* data);
+  virtual Marshal_type* visit(ProjectionField *proj_field, Registers *data);
+  virtual Marshal_type* visit(Rpc *rpc, Registers *data);
+  virtual Marshal_type* visit(Parameter *parameter, Registers *data);
 
   // Types
-  virtual void visit(ProjectionType *proj_type);
-  virtual void visit(IntegerType *t);
-  virtual void visit(PointerType *t);
-  virtual void visit(Typedef* t);
-  virtual void visit(VoidType *vt);
+  virtual Marshal_type* visit(ProjectionType *proj_type, Registers *data);
+  virtual Marshal_type* visit(IntegerType *t, Registers *data);
+  virtual Marshal_type* visit(PointerType *t, Registers *data);
+  virtual Marshal_type* visit(Typedef* t, Registers *data);
+  virtual Marshal_type* visit(VoidType *vt, Registers *data);
   MarshalVisitor();
-};
-
-class packVisitor : public ASTVisitor
-{
- public:
-  virtual void visit(File *file);
-  // virtual void visit(Message *message);
-  // virtual void visit(MessageField *message_field);
-  virtual void visit(ProjectionField *proj_field);
-  virtual void visit(Rpc *rpc);
-  virtual void visit(Parameter *parameter);
-
-  // Types
-  virtual void visit(ProjectionType *proj_type);
-  virtual void visit(IntegerType *t);
-  virtual void visit(PointerType *t);
-  virtual void visit(Typedef* t);
-  packVisitor();
 };
 
 #endif

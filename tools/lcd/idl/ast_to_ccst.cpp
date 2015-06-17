@@ -457,7 +457,7 @@ CCSTCompoundStatement* create_callee_body(Rpc *r)
   return new CCSTCompoundStatement(declarations, statements);
 }
 
-CCSTCompoundStatement* unmarshal_projection_parameter(Parameter *param, ProjectionType *pt, bool isPointer)
+CCSTCompoundStatement* unmarshal_projection_parameter(const char* param_name, std::vector<int> reg , ProjectionType *pt, bool isPointer)
 {
   printf("here in unmarshal proj parameter\n");
   if(isPointer)
@@ -470,7 +470,7 @@ CCSTCompoundStatement* unmarshal_projection_parameter(Parameter *param, Projecti
       CCSTPointer *__p = new CCSTPointer(); // just 1 pointer for now.
       
       CCSTDeclarator *name = new CCSTDeclarator(__p
-						, new CCSTDirectDecId(param->name()));
+						, new CCSTDirectDecId( param_name ));
       
       std::vector<CCSTAssignExpr*> args;
   
@@ -502,9 +502,25 @@ CCSTCompoundStatement* unmarshal_projection_parameter(Parameter *param, Projecti
       std::vector<CCSTDeclaration*> comp_decs;
 
       comp_decs.push_back(new_struct);
+
+      /* putting each field in */
       std::vector<CCSTStatement*> comp_stmts;
+      std::vector<ProjectionField*> fields = pt->fields();
+      
+      int index = 0;
+      for(std::vector<ProjectionField*>::iterator it = fields.begin(); it != fields.end(); it ++)
+	{
+	  ProjectionField *pf = *it;
+	  comp_stmts.push_back( unmarshal_projection_field(pf->field_name(), reg.at(index), pf) );
+	  
+	  comp_stmts.push_back( set_value_in_struct(param_name, pf->field_name(), pf->field_name(), isPointer) );
+	}
       
       return new CCSTCompoundStatement(comp_decs, comp_stmts);
+      
+    }
+  else
+    {
       
     }
   printf("todo projection param\n");
@@ -619,108 +635,12 @@ CCSTTypeName* type_cast(Type *t)
   return new CCSTTypeName(spec_quals, pointers);
 }
 
-CCSTCompoundStatement* unmarshal_pointer_parameter(Parameter *param, PointerType *pt)
-{
-  printf("Here in unmarshal_pointer_parameter\n");
 
-  // for now assume JUST ONE POINTER
-  
-  // need to check if it is a scalar type or a projection
-  if(pt->type()->num() == 4)
-    {
-      printf("is a projection\n");
-      ProjectionType *proj = dynamic_cast<ProjectionType*>(pt->type());
-      if(proj == 0x0)
-	printf("is null in unmarshal pointer\n");
-      return unmarshal_projection_parameter(param, proj, true); 
-    }
-
-  CCSTPointer *__p = create_pointer(count_nested_pointer(pt)); // doesn't really work because need first non-pointer inner type
-  
-  std::vector<CCSTAssignExpr*> args;
-  
-  CCSTTypeName *type_name = type_cast(pt);
-  args.push_back(new CCSTUnaryExprSizeOf(type_name));
-
-  const char *param_name = param->name();
-  
-  
-  // malloc space for the pointer
-  CCSTDeclarator *name = new CCSTDeclarator(__p, new CCSTDirectDecId(param_name));
-  CCSTInitializer *init = new CCSTInitializer(new CCSTCastExpr(type_name
-							       , new CCSTPostFixExprAssnExpr(new CCSTPrimaryExprId("malloc")
-											     , args)));
-  CCSTInitDeclarator *get_value = new CCSTInitDeclarator(name
-							 ,init);
-  // malloced space.
-
-  // now put value in pointer
-  // *name
-  CCSTUnaryExprCastExpr *set_value = new CCSTUnaryExprCastExpr(new CCSTUnaryOp(unary_mult_t)
-							       , new CCSTPrimaryExprId(param_name));
-
-  // value
-  // (type) lcd_r0()
-  std::vector<CCSTAssignExpr*> args2;
-  std::vector<int> regs = param->get_registers(); // assume for now all are integer
-  // will deal with projection soon
-
-
-  CCSTCastExpr *value = new CCSTCastExpr( type_cast(pt->type())
-					  , new CCSTPostFixExprAssnExpr(new CCSTPrimaryExprId(access_register_mapping(regs[0]))
-									, args2) ); 
-  
-  // combining them
-  // *name = value
-  CCSTAssignExpr *param_eq_value = new CCSTAssignExpr(set_value, new CCSTAssignOp(equal_t)
-						      , value);
-  std::vector<CCSTAssignExpr*> fuck;
-  fuck.push_back(param_eq_value);
-  CCSTExprStatement *expr_stmt = new CCSTExprStatement( new CCSTExpression(fuck));
-  // 
-
-
-  std::vector<CCSTInitDeclarator*> init_decs;
-  init_decs.push_back(get_value);
-  
-  CCSTDeclaration *declaration = new CCSTDeclaration(get_type(pt)
-						     , init_decs); // add to 
-  
-  std::vector<CCSTDeclaration*> comp_stmt_decs;
-  comp_stmt_decs.push_back(declaration);
-
-  std::vector<CCSTStatement*> comp_stmt_stmts;
-  comp_stmt_stmts.push_back(expr_stmt);
-  
-  return new CCSTCompoundStatement(comp_stmt_decs, comp_stmt_stmts);
-}
-
+// change here too?
 CCSTCompoundStatement* unmarshal_parameter(Parameter *p)
 {
-  Type *t = p->type();
-  
-  switch(t->num())
-    {
-    case 3:
-      {
-	printf("here in pointer type\n");
-	PointerType *pt = dynamic_cast<PointerType*>(t);
-	return unmarshal_pointer_parameter(p, pt);
-      }
-    case 4:
-      {
-	ProjectionType *pt = dynamic_cast<ProjectionType*>(t);
-	return unmarshal_projection_parameter(p, pt, false);
-      }
-    default:
-      {
-	printf("here in default");
-      }
-    }
-
-  // int reg_where_marshalled = t->
-
-
+  // create visitor
+  return p->get_marshal_info()->accept(visitor, p->type());
 }
 
 /* body for a caller function
@@ -788,70 +708,6 @@ std::vector<CCSTDecSpecifier*> get_type(Type *t)
     }
 }
 
-std::vector<CCSTDecSpecifier*> get_projection_type(ProjectionType *pt)
-{
-  std::vector<CCSTDecSpecifier*> type_declaration;
-  
-
-  CCSTStructUnionSpecifier *struct_type = new CCSTStructUnionSpecifier(struct_t
-								       ,pt->real_type());
-  
-  type_declaration.push_back(struct_type);
-
-  return type_declaration;
-}
-
-std::vector<CCSTDecSpecifier*> get_integer_type(IntegerType *it)
-{
-  std::vector<CCSTDecSpecifier*> ret;
-  if(it->is_unsigned())
-    {
-      ret.push_back(new CCSTSimpleTypeSpecifier(unsigned_t));
-    }
-  
-  switch (it->int_type())
-    {
-    case pt_char_t:
-      {
-	ret.push_back(new CCSTSimpleTypeSpecifier(char_t));
-	break;
-      }
-    case pt_short_t:
-      {
-	ret.push_back(new CCSTSimpleTypeSpecifier(short_t));
-	break;
-      }
-    case pt_int_t:
-      {
-	ret.push_back(new CCSTSimpleTypeSpecifier(int_t));
-	break;
-      }
-    case pt_long_t:
-      {
-	ret.push_back(new CCSTSimpleTypeSpecifier(long_t));
-	break;
-      }
-    case pt_longlong_t:
-      {
-	ret.push_back(new CCSTSimpleTypeSpecifier(long_t));
-	ret.push_back(new CCSTSimpleTypeSpecifier(long_t));
-	break;
-      }
-    case pt_capability_t:
-      {
-	ret.push_back(new CCSTTypedefName("capability_t"));
-	break;
-      }
-    default:
-      {
-	printf("todo");
-      }
-    }
-  return ret;
-}
-
-
-
 
 /*
 // move to new file
@@ -864,3 +720,135 @@ CCSTDeclaration* container_struct_declaration()
   // what else
 }
 */
+
+
+/* code to unmarshal parameters */
+// This code will produce the CAST that unmarshals the params. instead of where it was before
+CCSTCompoundStatement* MarshalTypeVisitor::visit(Marshal_projection *data, Type *t)
+{
+  ProjectionType *pt = dynamic_cast<ProjectionType*>(t);
+  Assert(pt != 0x0, "Dynamic cast has failed!\n");
+
+  
+}
+
+CCSTCompoundStatement* MarshalTypeVisitor::visit(Marshal_integer *data, Type *t)
+{
+  IntegerType *pt = dynamic_cast<IntegerType*>(t);
+  Assert(pt != 0x0, "Dynamic cast has failed!\n");
+  
+  std::vector<CCSTDecSpecifier*>specifier = type(t);
+  
+  std::vector<CCSTInitDeclarator*> decs;
+  std::vector<CCSTAssignExpr*> empty_args;
+  CCSTPostFixExprAssnExpr *func_call = new CCSTPostFixExprAssnExpr(new CCSTPrimaryExprId(access_register_mapping(data->get_register()))
+								   ,empty_args);
+  
+  CCSTInitializer *init = new CCSTInitializer( new CCSTCastExpr(type_cast(t)
+								,func_call));
+  decs.push_back(new CCSTInitDeclarator(new CCSTDeclarator(0x0, new CCSTDirectDecId(data->get_name()))
+					,init));
+  
+  std::vector<CCSTDeclaration*> comp_declarations;
+  std::vector<CCSTStatement*> comp_statements;
+  comp_declarations.push_back(new CCSTDeclaration(specifier, decs));
+  return new CCSTCompoundStatement(comp_declarations, comp_statements);
+}
+
+CCSTCompoundStatement* MarshalTypeVisitor::visit(Marshal_void *data, Type *t)
+{
+  VoidType *pt = dynamic_cast<VoidType*>(t);
+  Assert(pt != 0x0, "Dynamic cast has failed!\n");
+}
+
+CCSTCompoundStatement* MarshalTypeVisitor::visit(Marshal_typedef *data, Type *t)
+{
+  Typedef *pt = dynamic_cast<Typedef*>(t);
+  Assert(pt != 0x0, "Dynamic cast has failed!\n");
+}
+
+ CCSTCompoundStatement* MarshalTypeVisitor::visit(Marshal_pointer *data, Type *t)
+{
+  PointerType *pt = dynamic_cast<PointerType*>(t);
+  Assert(pt != 0x0, "Dynamic cast has failed!\n");
+
+  CCSTPointer *__p = create_pointer(count_nested_pointer(pt));
+  Type *inner_t = get_non_pointer_type(pt);
+  
+  std::vector<CCSTDecSpecifier*>specifier = type(inner_t);
+  std::vector<CCSTInitDeclarator*> decs;
+  const char* pointer_param_name = (const char*) malloc(sizeof(char)*(strlen(data->get_name())+4));
+  sprintf(pointer_param_name, "%s_pt", data->get_name());
+  decs.push_back(new CCSTInitDeclarator( new CCSTDeclarator(__p
+							    , new CCSTDirectDecId(pointer_param_name))
+					 , new CCSTInitializer( new CCSTUnaryExprCastExpr(new CCSTUnaryOp(unary_bit_and_t), new CCSTPrimaryExprId(data->get_name())))));
+
+  CCSTCompoundStatement *c = data->get_m_type()->accept(this, inner_t);
+  std::vector<CCSTDeclaration*> comp_declarations;
+  comp_declarations.push_back(new CCSTDeclaration(specifier, decs));
+  std::vector<CCSTStatement*> comp_statements;
+  c->add_statement(new CCSTStatement(comp_declarations, comp_statements));
+  return c;
+}
+
+CCSTDecSpecifier* type(Type *t)
+{
+  std::vector<CCSTDecSpecifier*>specifier;
+  switch(t->num())
+    {
+    case 2: // int type case
+      {
+	switch (it->int_type())
+	  {
+	  case pt_char_t:
+	    {
+	      specifier.push_back(new CCSTSimpleTypeSpecifier(char_t));
+	      break;
+	    }
+	  case pt_short_t:
+	    {
+	      specifier.push_back(new CCSTSimpleTypeSpecifier(short_t));
+	      break;
+	    }
+	  case pt_int_t:
+	    {
+	      specifier.push_back(new CCSTSimpleTypeSpecifier(int_t));
+	      break;
+	    }
+	  case pt_long_t:
+	    {
+	      specifier.push_back( new CCSTSimpleTypeSpecifier(long_t));
+	      break;
+	    }
+	  case pt_longlong_t:
+	    {
+	      specifier.push_back(new CCSTSimpleTypeSpecifier(long_t));
+	      specifier.push_back(new CCSTSimpleTypeSpecifier(long_t));
+	      break;
+	    }
+	  case pt_capability_t:
+	    {
+	      specifier.push_back(new CCSTTypedefName("capability_t"));
+	      break;
+	    }
+	  default:
+	    {
+	      Assert(1 == 0, "Error: unknown type\n");
+	    }
+	  }
+	return specifier;
+      }
+    case 4: // struct
+      {
+	ProjectionType *pt = dynamic_cast<ProjectionType*>(t);
+	Assert(pt != 0x0, "Error: dynamic cast failed!\n");
+	specifier.push_back(new CCSTStructUnionSpecifier(struct_t, pt->real_type()));
+	return specifier;
+      }
+    default:
+      {
+	Assert(1 == 0, "Error: Not a struct or integer type.\n");
+      }
+    }
+}
+ 

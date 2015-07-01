@@ -28,6 +28,7 @@ CCSTFuncDef::CCSTFuncDef(std::vector<CCSTDecSpecifier*> specifiers, CCSTDeclarat
 
 void CCSTFuncDef::write(FILE *f)
 {
+  printf("here in function def\n");
   for(std::vector<CCSTDecSpecifier*>::iterator it = specifiers_.begin(); it != specifiers_.end(); ++it)
     {
       CCSTDecSpecifier *ds = *it;
@@ -967,11 +968,13 @@ CCSTPostFixExprAccess::CCSTPostFixExprAccess(CCSTPostFixExpr *post_fix_expr, acc
 {
   this->post_fix_expr_ = post_fix_expr; 
   this->op_ = op;
+  this->id_ = id;
 }
 
 void CCSTPostFixExprAccess::write(FILE *f)
 {
-  if(this->post_fix_expr_ == NULL || this->id_ == "")
+  printf("in post fix\n");
+  if(this->post_fix_expr_ == 0x0 || this->id_ == "")
     {
       printf("error\n");
       exit(0);
@@ -991,7 +994,10 @@ void CCSTPostFixExprAccess::write(FILE *f)
 	exit(0);
       }
     }
+  printf("at end\n");
+  printf("%s", this->id_);
   fprintf(f, "%s", this->id_);
+  printf("At real end\n");
 }
 
 CCSTPostFixExprExpr::CCSTPostFixExprExpr(CCSTPostFixExpr *post_fix_expr, CCSTExpression *expr)
@@ -1364,18 +1370,18 @@ CCSTParamList::CCSTParamList()
   //todo
 }
 
-CCSTParamList::CCSTParamList(std::vector<CCSTParamDeclaration*>* p_dec)
+CCSTParamList::CCSTParamList(std::vector<CCSTParamDeclaration*> p_dec)
 {
   this->p_dec_ = p_dec;
 }
 
 void CCSTParamList::write(FILE *f)
 {
-  if(!p_dec_->empty())
+  if(!p_dec_.empty())
     {
-      p_dec_->at(0)->write(f);
+      p_dec_.at(0)->write(f);
       
-      for(std::vector<CCSTParamDeclaration*>::iterator it = p_dec_->begin()+1; it != p_dec_->end(); ++it)
+      for(std::vector<CCSTParamDeclaration*>::iterator it = p_dec_.begin()+1; it != p_dec_.end(); ++it)
 	{
 	  fprintf(f,", ");
 	  CCSTParamDeclaration *dec = *it;
@@ -1801,6 +1807,10 @@ void CCSTDefaultLabelStatement::write(FILE *f)
 CCSTDefaultLabelStatement::CCSTDefaultLabelStatement(CCSTStatement* body)
 {
   this->body_ = body;
+}
+
+CCSTExprStatement::CCSTExprStatement()
+{
 }
 
 CCSTExprStatement::CCSTExprStatement(CCSTExpression *expr)

@@ -1,1 +1,5 @@
-rpc int foo(int a, int c, int b);
+rpc int foo(int* a, int *c, char *d);
+
+rpc void foo2(char *z, int b, long *a);
+
+rpc void init(int a);

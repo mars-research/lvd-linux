@@ -59,11 +59,13 @@
 
 
 (define (run-tests tests)
+  #|
   (displayln "Running server header test")
   (run-server-header-test tests))
-  #|
+|#
   (displayln "Running server source test")
-  (run-server-source-test tests)
+  (run-server-source-test tests))
+  #|
   (displayln "Running client header test")
   (run-client-header-test tests)
   (displayln "Running client source test")

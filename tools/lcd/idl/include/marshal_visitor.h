@@ -1,6 +1,8 @@
 #ifndef _MARSHAL_
 #define _MARSHAL_
 #include "lcd_ast.h"
+#include <string>
+#include <sstream>
 
 class File;
 class ProjectionField;
@@ -11,6 +13,12 @@ class IntegerType;
 class PointerType;
 class Typedef;
 class VoidType;
+class Marshal_type;
+class Registers;
+class FileScope;
+class RootScope;
+
+const char* ret_name_gen(char *name, int num);
 
 class MarshalVisitor
 {
@@ -26,6 +34,8 @@ class MarshalVisitor
   virtual Marshal_type* visit(PointerType *t, Registers *data);
   virtual Marshal_type* visit(Typedef* t, Registers *data);
   virtual Marshal_type* visit(VoidType *vt, Registers *data);
+  virtual Marshal_type* visit(FileScope *fs, Registers *data);
+  virtual Marshal_type* visit(RootScope *rs, Registers *data);
   MarshalVisitor();
 };
 

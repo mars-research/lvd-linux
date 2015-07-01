@@ -41,6 +41,11 @@ RootScope* RootScope::instance()
   return instance_;
 }
 
+Marshal_type* RootScope::accept(MarshalVisitor *visitor, Registers* reg)
+{
+  return visitor->visit(this, reg);
+}
+
 Type * RootScope::lookup_symbol(const char * sym, int* err)
 {
   std::string temp(sym);
@@ -98,5 +103,10 @@ FileScope::FileScope(RootScope* root)
 {
   this->root_ = root;
   this->types_ = new std::map<std::string, Type*>();
+}
+
+Marshal_type* FileScope::accept(MarshalVisitor *visitor, Registers *r)
+{
+  return visitor->visit(this, r);
 }
 

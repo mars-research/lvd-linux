@@ -30,14 +30,27 @@ Registers::Registers()
   init();
 }
 
+void Registers::init()
+{
+  int i;
+  for(i = 0; i < LCD_MAX_REGS; i ++)
+    {
+      regs_[i] = 0;
+    }
+  for(i = 0; i < LCD_MAX_CAP_REGS; i ++)
+    {
+      cap_regs_[i] = 0;
+    }
+}
+
 int Registers::allocate_next_free_register()
 {
   int i;
   for(i = 0; i < LCD_MAX_REGS; i ++)
     {
-      if(!calling_regs[i])
+      if(!regs_[i])
 	{
-	  calling_regs[i] = 1;
+	  regs_[i] = 1;
 	  return i;
 	}
     }
@@ -48,33 +61,29 @@ int Registers::allocate_next_free_register()
 /* marshal type code */
 
 // placed these here instead of header to avoid compilation errors
-CompoundStatement* Marshal_type::accept(MarshalTypeVisitor *worker, Type *t)
+
+CCSTCompoundStatement* Marshal_projection::accept(TypeVisitor *worker)
 {
-  return worker->accept(this, t);
+  return worker->visit(this);
 }
 
-CompoundStatement* Marshal_projection::accept(MarshalTypeVisitor *worker, Type *t)
+CCSTCompoundStatement* Marshal_integer::accept(TypeVisitor *worker)
 {
-  return worker->accept(this, t);
+  return worker->visit(this);
 }
 
-CompoundStatement* Marshal_integer::accept(MarshalTypeVisitor *worker, Type *t)
+CCSTCompoundStatement* Marshal_void::accept(TypeVisitor *worker)
 {
-  return worker->accept(this, t);
+  return worker->visit(this);
 }
 
-CompoundStatement* Marshal_void::accept(MarshalTypeVisitor *worker, Type *t)
+CCSTCompoundStatement* Marshal_typedef::accept(TypeVisitor *worker)
 {
-  return worker->accept(this, t);
+  return worker->visit(this);
 }
 
-CompoundStatement* Marshal_typedef::accept(MarshalTypeVisitor *worker, Type *t)
+CCSTCompoundStatement* Marshal_pointer::accept(TypeVisitor *worker)
 {
-  return worker->accept(this, t);
-}
-
-CompoundStatement* Marshal_pointer::accept(MarshalTypeVisitor *worker, Type *t)
-{
-  return worker->accept(this, t);
+  return worker->visit(this);
 }
 

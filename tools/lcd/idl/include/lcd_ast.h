@@ -176,8 +176,10 @@ class Rpc : public Base
   const char* enum_name_;
 
   /* special case */
-  std::vector<Type*> ret_types_; // can "Return" struct fields
-  std::vector<Marshal_type*> ret_marshal_info_;
+  Type* explicit_ret_type_;
+  std::vector<Type*> implicit_ret_types_; // can "Return" struct fields
+  Marshal_type *explicit_ret_marshal_info_;
+  std::vector<Marshal_type*> implicit_ret_marshal_info_;
   /* -------------- */
 
   char* name_;
@@ -186,8 +188,13 @@ class Rpc : public Base
  public:
   Rpc(Type* return_type, char* name, std::vector<Parameter* > parameters);
   char* name();
-  std::vector<Type*> return_types();
+  Type* explicit_return_type() { return this->explicit_ret_type_; }
+  std::vector<Type*> implicit_return_types() { return this->implicit_ret_types_; }
   std::vector<Parameter*> parameters();
+  std::vector<Marshal_type*> implicit_ret_marshal_info() { return this->implicit_ret_marshal_info_; }
+  void set_implicit_ret_marshal_info(std::vector<Marshal_type*> mt) { this->implicit_ret_marshal_info_ = mt; }
+  Marshal_type* explicit_ret_marshal_info() { return this->explicit_ret_marshal_info_; }
+  void set_explicit_ret_marshal_info(Marshal_type *mt) { this->explicit_ret_marshal_info_ = mt; }
   virtual Marshal_type* accept(MarshalVisitor *worker, Registers *data);
 
   const char* enum_name();

@@ -129,7 +129,7 @@ const char* Parameter::name()
 
 Rpc::Rpc(Type* return_type, char* name, std::vector<Parameter* > parameters)
 {
-  this->ret_types_.push_back(return_type);
+  this->explicit_ret_type_ = return_type;
   this->name_ = name;
   this->params_ = parameters;
 }
@@ -146,10 +146,16 @@ Marshal_type* Rpc::accept(MarshalVisitor* worker, Registers *data)
 
 const char* Rpc::callee_name()
 {
+  char * callee_name = (char*) malloc((strlen(this->name_)+strlen("_callee")+1)*sizeof(char));
+  sprintf(callee_name, "%s%s", this->name_, "_callee");
+  return callee_name;
 }
 
 const char* Rpc::enum_name()
-{
+{					       
+  char * callee_name = (char*) malloc((strlen(this->name_)+strlen("_enum")+1)*sizeof(char));
+  sprintf(callee_name, "%s%s", this->name_, "_enum");
+  return callee_name;
 }
 
 std::vector<Parameter*> Rpc::parameters()

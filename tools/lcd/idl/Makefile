@@ -3,8 +3,9 @@
 bin = compiler
 idl = parser/lcd_idl.cpp include/lcd_idl.h
 
-CXXFLAGS = -g -Iinclude/
+CXXFLAGS = -g -fsanitize=address  -fno-omit-frame-pointer -Iinclude/ -lasan
 CXX = g++
+LDFLAGS = -fsanitize=address
 
 objects = lcd_ast.o main.o lcd_idl.o scope.o error.o marshal_op.o ccst.o ast_to_ccst.o marshal_visitor.o
 

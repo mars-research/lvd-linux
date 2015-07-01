@@ -105,8 +105,8 @@ File		=	Spacing v:Verbatim? d:Type_Definitions* t:Rpc* <eof> {{
 			for(Value::iterator it = t.getValues().begin(); it != t.getValues().end(); it ++)
 			{
 				printf("in this loop");
-				const Value & v = *it;
-				Rpc * rp = (Rpc *) v.getValue();
+				const Value & v2 = *it;
+				Rpc * rp = (Rpc *) v2.getValue();
 				rpcs.push_back(rp);
 
 			}
@@ -172,7 +172,7 @@ String		=	<ascii 34> l:any_letter+ <ascii 34> {{
 
 any_letter	=	[_.,/?<>'; =:%`!@#$^&*()-+{}|\\ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789]
 
-Type_Definitions=	Typedef | Projection
+Type_Definitions =	Typedef | Projection {{ printf("done with projection\n"); }}
 
 Include		=	"#include" Space+ "<" Spacing f:Identifier Spacing ">" Spacing {{
 			std::ostringstream total;
@@ -195,16 +195,18 @@ LastParam	=	t:Type_form id:Identifier Spacing {{
 			printf("last param: id is %s\n", (char*) id.getValue());
 			value = new Parameter((Type *) t.getValue(), (char *) id.getValue()); }}
 
-Parameters	=	f:FirstParam* l:LastParam {{
+Parameters	=	f:FirstParam* l:LastParam {{ printf("in param\n");
 			std::vector<Parameter* >* params = new std::vector<Parameter*>();
 			for(Value::iterator it = f.getValues().begin(); it != f.getValues().end(); it ++)
 			{ 
+			
 				const Value & v = *it;
 				Parameter* p = (Parameter* ) v.getValue();
 				params->push_back(p);
 			}
 			params->push_back((Parameter* ) l.getValue());
 			value = params; }}
+
 
 Rpc		=	"rpc" Space+ t:Type_form id1:Identifier Spacing OPEN p:Parameters CLOSE SEMI Spacing {{
 			printf("rpc value of id is: %s\n", (char *) id1.getValue());
@@ -216,18 +218,21 @@ Rpc		=	"rpc" Space+ t:Type_form id1:Identifier Spacing OPEN p:Parameters CLOSE S
 			value = r; }}  
 
 
-
-
 Projection	=	"projection" Space+ id:Identifier Spacing "<" Spacing t:Proj_type ">" Spacing OPENC Spacing p:ProjField+ CLOSEC Spacing {{ std::vector<ProjectionField *> p_fields;
 			for(Value::iterator it = p.getValues().begin(); it != p.getValues().end(); it ++)
 			{
+				printf("here looping thorugh projection field\n");
 				const Value & v = *it;
-				ProjectionField * p = (ProjectionField *) v.getValue();
-				p_fields.push_back(p);
+				ProjectionField * p2 = (ProjectionField *) v.getValue();
+				p_fields.push_back(p2);
 			} 
 			// insert projection into rootscope for now
+			printf("creating projection\n");
 			ProjectionType * val = new ProjectionType((char* ) id.getValue(), (char* ) t.getValue(), p_fields);
+			printf("Created projection\n");
 			insertType((char*)id.getValue(), val);
+			printf("inserted type\n");
+			value = val;
 			 }}
 		## what is the point of having a projection without at least one line
 
@@ -327,7 +332,7 @@ signed_type	=	"int" Space* ps:star* Space+{{ value = count_pointers(ps, "int");}
 
 unsigned_type	=	"unsigned" Space+ "int" ps:star* Space+ {{ value = count_pointers(ps, "unsigned int"); }} 
 			| "unsigned" Space+ "char" ps:star* Space+ {{ value = count_pointers(ps, "unsigned char"); }} 
-			| "unsigned" Space+ "short" ps:star* Space+ {{ value = count_pointers(ps, "unsigned long"); }} 
+			| "unsigned" Space+ "short" ps:star* Space+ {{ value = count_pointers(ps, "unscd teigned long"); }} 
 			| "unsigned" Space+ "long" Space+ "long" ps:star* Space+ {{ value = count_pointers(ps, "unsigned long long"); }}
 			| "unsigned" Space+ "long" ps:star* Space+ {{ value = count_pointers(ps, "unsigned long"); }}
 			| "unsigned" Space+ "int" Space+ ps:star* {{ value = count_pointers(ps, "unsigned int"); }} 

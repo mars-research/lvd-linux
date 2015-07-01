@@ -19,6 +19,7 @@ int main(int argc, char ** argv)
     {
       char * file = argv[2];
       File * tree = (File *) Parser::parse(std::string(file));
+      printf("Created tree\n");
       ErrorReport* er = ErrorReport::instance();
       if(er->errors())
 	{
@@ -43,7 +44,7 @@ int main(int argc, char ** argv)
 	  printf("todo\n");
 
 	  MarshalVisitor* mv = new MarshalVisitor();
-	  tree->accept(mv);
+	  tree->accept(mv, 0x0);
 
 	  CCSTFile* ccst_tree = generate_server_header(tree);
 	  ccst_tree->write(of);
@@ -51,9 +52,12 @@ int main(int argc, char ** argv)
 	}
       else if(!strcmp(argv[1],"-serversource"))
 	{
-	  printf("todo\n");
 
+	  MarshalVisitor *mv = new MarshalVisitor();
+	  tree->accept(mv, 0x0);
+	  printf("hereeee\n");
 	  CCSTFile* ccst_tree = generate_server_source(tree);
+	  printf("completed tree\n");
 	  ccst_tree->write(of);
 	  printf("completed server source writing\n");
 	}

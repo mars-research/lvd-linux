@@ -1,4 +1,11 @@
 projection super_block <struct super_block> {
-  [out,in] int field1;
-  [out] char field2;
+  [in, out] int c;
+  [out] char *a;
+  [in] int z;
 }
+
+rpc void add_to_super_block(projection super_block *sb, int *z);
+
+rpc void foo(int *c, char a);
+
+rpc int foo2(projection super_block *sb, char *a);

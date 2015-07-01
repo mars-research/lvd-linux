@@ -74,6 +74,7 @@ class CCSTEnumSpecifier;
 class CCSTEnumeratorList;
 class CCSTEnumerator;
 class CCSTTypedefName;
+class CCSTExprStatement;
 
 class CCSTDeclaration;
 class CCSTInitDeclarator;
@@ -84,7 +85,6 @@ class CCSTStatement;
 class CCSTLabeledStatement;
 class CCSTPlainLabelStatement;
 class CCSTCaseStatement;
-class CCSTExprStatement;
 class CCSTSelectionStatement;
 class CCSTIfStatement;
 class CCSTIfElseStatement;
@@ -123,9 +123,10 @@ CCSTFuncDef* create_function_definition(CCSTDeclaration* function_declaration, C
 CCSTParamTypeList* create_parameter_list();
 CCSTDeclaration* create_function_declaration(Rpc* r);
 CCSTDeclaration* create_function_declaration();
-CCSTCompoundStatement* create_dispatch_loop_body(std::vector<Rpc*>* rps);
+CCSTCompoundStatement* create_dispatch_loop_body(std::vector<Rpc*> rps);
 CCSTCompoundStatement* create_callee_body(Rpc *r);
 CCSTCompoundStatement* create_caller_body(Rpc* r);
+CCSTDeclaration* create_dispatch_function_declaration();
 
 std::vector<CCSTDecSpecifier*> get_type(Type *t);
 std::vector<CCSTDecSpecifier*> get_integer_type(IntegerType *it);
@@ -133,11 +134,8 @@ std::vector<CCSTDecSpecifier*> get_projection_type(ProjectionType *pt);
 
 CCSTTypeName* type_cast(Type *t);
 
-CCSTCompoundStatement* unmarshal_pointer_parameter(const char* param_name, int reg, PointerType *pt);
-CCSTCompoundStatement* unmarshal_projection_parameter(Parameter *param, ProjectionType *pt);
+std::vector<CCSTDecSpecifier*>type(Type *t);
 CCSTCompoundStatement* unmarshal_parameter(Parameter *p);
-CCSTCompoundStatement* unmarshal_parameter(const char* name, std::vector<int> reg, Type *t);
-CCSTCompoundStatement* unmarshal_projection_field(const char* name, int reg, ProjectionField *pf);
 
 CCSTExprStatement* set_value_in_struct(const char *s, const char *f, const char *p, bool isP);
 
@@ -387,7 +385,7 @@ class CCSTAbstDeclarator : public CCSTBase
   virtual void write(FILE *f);
 };
 
-class CCSTPointer : public CCSTBase
+class CCSTPointer : public CCSTAbstDeclarator
 {
   /*
     <pointer> ::= * {<type-qualifier>}* {<pointer>}?
@@ -515,7 +513,35 @@ class CCSTConstExpr : public CCSTBase
   virtual void write(FILE *f);
 };
 
-class CCSTExpression : public CCSTBase
+class CCSTStatement : public CCSTBase
+{
+  /*
+    <statement> ::= <labeled-statement>
+              | <expression-statement>
+              | <compound-statement>
+              | <selection-statement>
+              | <iteration-statement>
+              | <jump-statement>
+   */
+ public:
+  virtual void write(FILE *f) = 0;
+};
+
+class CCSTExpression;
+
+class CCSTExprStatement : public CCSTStatement
+{
+  /*
+    <expression-statement> ::= {<expression>}? ;
+   */
+  CCSTExpression *expr_;
+ public:
+  CCSTExprStatement();
+  CCSTExprStatement(CCSTExpression *expr); //{this->expr_ = expr;}
+  virtual void write(FILE *f);
+};
+
+class CCSTExpression : public CCSTExprStatement
 {
   /*
     <expression> ::= <assignment-expression>
@@ -1072,10 +1098,10 @@ class CCSTParamList : public CCSTParamTypeList
                    | <parameter-list> , <parameter-declaration>
 
   */
-  std::vector<CCSTParamDeclaration*>* p_dec_;
+  std::vector<CCSTParamDeclaration*> p_dec_;
  public:
   CCSTParamList();
-  CCSTParamList(std::vector<CCSTParamDeclaration*>* p_dec); //{this->p_dec_ = p_dec;}
+  CCSTParamList(std::vector<CCSTParamDeclaration*> p_dec); //{this->p_dec_ = p_dec;}
   virtual void write(FILE *f);
 };
 
@@ -1204,20 +1230,6 @@ class CCSTInitializer : public CCSTInitializerList
   virtual void write(FILE *f);
 };
 
-class CCSTStatement : public CCSTBase
-{
-  /*
-    <statement> ::= <labeled-statement>
-              | <expression-statement>
-              | <compound-statement>
-              | <selection-statement>
-              | <iteration-statement>
-              | <jump-statement>
-   */
- public:
-  virtual void write(FILE *f) = 0;
-};
-
 class CCSTCompoundStatement : public CCSTStatement
 {
   /*
@@ -1271,16 +1283,7 @@ class CCSTCaseStatement : public CCSTLabeledStatement
   virtual void write(FILE *f);
 };
 
-class CCSTExprStatement : public CCSTStatement
-{
-  /*
-    <expression-statement> ::= {<expression>}? ;
-   */
-  CCSTExpression *expr_;
- public:
-  CCSTExprStatement(CCSTExpression *expr); //{this->expr_ = expr;}
-  virtual void write(FILE *f);
-};
+
 
 class CCSTSelectionStatement : public CCSTStatement
 {

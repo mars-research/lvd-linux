@@ -1,5 +1,12 @@
 /**
- * kliblcd.c - Code for microkernel interface for non-isolated code.
+ * create.c - Code for creating an LCD.
+ *
+ * This file is kind of giant because of all the code for setting up
+ * the LCD's address space (page tables). The address space set up
+ * code is logically part of kliblcd instead of the microkernel so that
+ * the microkernel remains simple. (The microkernel shouldn't need to
+ * know how to set up the LCD's address space. That's up to the creating
+ * LCD/KLCD.)
  *
  * Authors:
  *   Charlie Jacobsen  <charlesj@cs.utah.edu>
@@ -12,450 +19,7 @@
 #include <lcd-domains/utcb.h>
 #include <lcd-domains/types.h>
 #include <linux/mutex.h>
-#include "internal.h"
-
-/* KLCD REGISTER ACCESS -------------------------------------------------- */
-
-
-#define __KLCD_MK_REG_ACCESS(idx)					\
-u64 __klcd_r##idx(struct lcd *lcd)				        \
-{									\
-        return __lcd_r##idx(lcd->utcb);					\
-}									\
-void __klcd_set_r##idx(struct lcd *lcd, u64 val)			\
-{									\
-	__lcd_set_r##idx(lcd->utcb, val);				\
-}									\
-cptr_t __klcd_cr##idx(struct lcd *lcd)					\
-{									\
-        return __lcd_cr##idx(lcd->utcb);				\
-}								        \
-void __klcd_set_cr##idx(struct lcd *lcd, cptr_t val)			\
-{									\
-	__lcd_set_cr##idx(lcd->utcb, val);				\
-}									\
-EXPORT_SYMBOL(__klcd_r##idx);						\
-EXPORT_SYMBOL(__klcd_set_r##idx);					\
-EXPORT_SYMBOL(__klcd_cr##idx);						\
-EXPORT_SYMBOL(__klcd_set_cr##idx);
-
-__KLCD_MK_REG_ACCESS(0)
-__KLCD_MK_REG_ACCESS(1)
-__KLCD_MK_REG_ACCESS(2)
-__KLCD_MK_REG_ACCESS(3)
-__KLCD_MK_REG_ACCESS(4)
-__KLCD_MK_REG_ACCESS(5)
-__KLCD_MK_REG_ACCESS(6)
-__KLCD_MK_REG_ACCESS(7)
-
-
-/* CPTR CACHE -------------------------------------------------- */
-
-static int cptr_cache_init(struct cptr_cache **out)
-{
-	struct cptr_cache *cache;
-	int ret;
-	int i, j;
-	int nbits;
-	/*
-	 * Allocate the container
-	 */
-	cache = kzalloc(sizeof(*cache), GFP_KERNEL);
-	if (!cache) {
-		ret = -ENOMEM;
-		goto fail1;
-	}
-	/*
-	 * Allocate the bitmaps
-	 */
-	for (i = 0; i < (1 << LCD_CPTR_DEPTH_BITS); i++) {
-		/*
-		 * For level i, we use the slot bits plus i * fanout bits
-		 *
-		 * So e.g. for level 0, we use only slot bits, so there
-		 * are only 2^(num slot bits) cap slots at level 0.
-		 */
-		nbits = 1 << (LCD_CPTR_SLOT_BITS + i * LCD_CPTR_FANOUT_BITS);
-		/*
-		 * Alloc bitmap
-		 */
-		cache->bmaps[i] = kzalloc(sizeof(unsigned long) *
-					BITS_TO_LONGS(nbits),
-					GFP_KERNEL);
-		if (!cache->bmaps[i]) {
-			ret = -ENOMEM;
-			goto fail2; /* i = level we failed at */
-		}
-	}
-	/*
-	 * Mark reserved cptr's as allocated
-	 */
-	set_bit(0, cache->bmaps[0]);
-	set_bit(1, cache->bmaps[0]);
-	set_bit(2, cache->bmaps[0]);
-
-	*out = cache;
-
-	return 0;
-
-fail2:
-	for (j = 0; j < i; j++)
-		kfree(cache->bmaps[j]);
-	kfree(cache);
-fail1:
-	return ret;
-}
-
-static void cptr_cache_destroy(struct cptr_cache *cache)
-{
-	int i;
-	/*
-	 * Free bitmaps
-	 */
-	for (i = 0; i < (1 << LCD_CPTR_DEPTH_BITS); i++)
-		kfree(cache->bmaps[i]);
-	/*
-	 * Free container
-	 */
-	kfree(cache);
-}
-
-static int __lcd_alloc_cptr_from_bmap(unsigned long *bmap, int size,
-				unsigned long *out)
-{
-	unsigned long idx;
-	/*
-	 * Find next zero bit
-	 */
-	idx = find_first_zero_bit(bmap, size);
-	if (idx >= size)
-		return 0; /* signal we are full */
-	/*
-	 * Set bit to mark cptr as in use
-	 */
-	set_bit(idx, bmap);
-
-	*out = idx;
-
-	return 1; /* signal we are done */
-}
-
-int __klcd_alloc_cptr(struct cptr_cache *cptr_cache, cptr_t *free_cptr)
-{
-	int ret;
-	int depth;
-	int done;
-	unsigned long *bmap;
-	unsigned long idx;
-	int size;
-
-	depth = 0;
-	do {
-		bmap = cptr_cache->bmaps[depth];
-		size = 1 << (LCD_CPTR_SLOT_BITS + 
-			depth * LCD_CPTR_FANOUT_BITS);
-		done = __lcd_alloc_cptr_from_bmap(bmap, size, &idx);
-		depth++;
-	} while (!done && depth < (1 << LCD_CPTR_DEPTH_BITS));
-
-	if (!done) {
-		/*
-		 * Didn't find one
-		 */
-		LCD_ERR("out of cptrs");
-		ret = -ENOMEM;
-		goto fail2;
-	}
-	/*
-	 * Found one; dec depth back to what it was, and encode
-	 * depth in cptr
-	 */
-	depth--;
-	idx |= (depth << LCD_CPTR_LEVEL_SHIFT);
-	*free_cptr = __cptr(idx);
-
-	return 0; 
-
-fail2:
-	return ret;
-}
-
-void __klcd_free_cptr(struct cptr_cache *cptr_cache, cptr_t c)
-{
-	unsigned long *bmap;
-	unsigned long bmap_idx;
-	unsigned long level;
-
-	/*
-	 * Get the correct level bitmap
-	 */
-	level = lcd_cptr_level(c);
-	bmap = cptr_cache->bmaps[level];
-	/*
-	 * The bitmap index includes all fanout bits and the slot bits
-	 */
-	bmap_idx = ((1 << (LCD_CPTR_FANOUT_BITS * level + LCD_CPTR_SLOT_BITS))
-		- 1) & cptr_val(c);
-	/*
-	 * Clear the bit in the bitmap
-	 */
-	clear_bit(bmap_idx, bmap);
-
-	return; 
-}
-
-int klcd_alloc_cptr(cptr_t *free_slot)
-{
-	return __lcd_alloc_cptr(current->cptr_cache, free_slot);
-}
-
-void klcd_free_cptr(cptr_t c)
-{
-	__lcd_free_cptr(current->cptr_cache, c);
-}
-
-
-/* KLCD SPECIAL HANDLING -------------------------------------------------- */
-
-
-int klcd_add_page(struct page *p, cptr_t *slot_out)
-{
-	int ret;
-	/*
-	 * Alloc cptr
-	 */
-	ret = lcd_alloc_cptr(slot_out);
-	if (ret)
-		goto fail1;
-	/*
-	 * Insert page
-	 */
-	ret = __lcd_cap_insert(&current->lcd->cspace, *slot_out, p,
-			LCD_CAP_TYPE_KPAGE);
-	if (ret)
-		goto fail2;
-
-	return 0;
-
-fail2:
-	lcd_free_cptr(*slot_out);
-fail1:
-	return ret;
-}
-
-void klcd_rm_page(cptr_t slot)
-{
-	/*
-	 * Delete page from my cspace
-	 */
-	lcd_cap_delete(slot);
-	/*
-	 * Return cptr to cache
-	 */
-	lcd_free_cptr(slot);
-}
-
-/* LCD ENTER / EXIT -------------------------------------------------- */
-
-int klcd_enter(void)
-{
-	int ret;
-	/*
-	 * Set up cptr cache
-	 */
-	ret = cptr_cache_init(&current->cptr_cache);
-	if (ret) {
-		LCD_ERR("cptr cache init");
-		goto fail1;
-	}
-	ret = __klcd_enter();
-	if (ret) {
-		LCD_ERR("enter");
-		goto fail2;
-	}
-
-	return 0;
-fail2:
-	cptr_cache_destroy(current->cptr_cache);
-fail1:
-	return ret;
-}
-
-void klcd_exit(int retval)
-{
-	/*
-	 * Return value is ignored for now
-	 */
-
-	/*
-	 * Exit from lcd mode
-	 */
-	__klcd_exit();
-	/*
-	 * Destroy cptr cache
-	 */
-	cptr_cache_destroy(current->cptr_cache);
-}
-
-/* LOW LEVEL PAGE ALLOCATION ---------------------------------------- */
-
-static int __lcd_page_alloc(cptr_t *slot_out, hpa_t *hpa_out, hva_t *hva_out)
-{
-	int ret;
-	/*
-	 * Allocate a cptr
-	 */
-	ret = lcd_alloc_cptr(slot_out);
-	if (ret)
-		goto fail1;
-	/*
-	 * Get free page
-	 */
-	ret = __klcd_page_zalloc(current->lcd, *slot_out, hpa_out, hva_out);
-	if (ret)
-		goto fail2;
-
-	return 0;
-
-fail2:
-	lcd_free_cptr(*slot_out);
-fail1:
-	return ret;
-}
-
-int klcd_page_alloc(cptr_t *slot_out, gpa_t gpa)
-{
-	hpa_t hpa;
-	hva_t hva;
-	/*
-	 * Ignore gpa, since klcd's don't have control over where
-	 * page is mapped.
-	 */
-	return __lcd_page_alloc(slot_out, &hpa, &hva);
-}
-
-int __klcd_pages_zalloc(struct lcd *klcd, cptr_t *slots, 
-			hpa_t *hp_base_out, hva_t *hv_base_out,
-			unsigned order);
-
-static int lcd_pages_alloc(cptr_t **slots_out, hpa_t *hp_base_out, 
-			hva_t *hv_base_out, unsigned order)
-{
-	int ret;
-	int i, j;
-	cptr_t *slots;
-	/*
-	 * Allocate cptr mem
-	 */
-	slots = kmalloc(sizeof(cptr_t) * (1 << order), GFP_KERNEL);
-	if (!slots) {
-		LCD_ERR("out of mem");
-		ret = -ENOMEM;
-		goto fail1;
-	}
-	/*
-	 * Get cptr's from cache
-	 */
-	for (i = 0; i < (1 << order); i++) {
-		ret = lcd_alloc_cptr(&slots[i]);
-		if (ret) {
-			LCD_ERR("alloc cptr");
-			goto fail2;
-		}
-	}
-	/*
-	 * Get free pages
-	 */
-	ret = __klcd_pages_zalloc(current->lcd, slots, hp_base_out, hv_base_out,
-				order);
-	if (ret) {
-		LCD_ERR("pages alloc");
-		goto fail3;
-	}
-
-	*slots_out = slots;
-
-	return 0;
-
-fail3:
-fail2:
-	for (j = 0; j < i; j++)
-		lcd_free_cptr(slots[i]);
-	kfree(slots);
-fail1:
-	return ret;
-
-
-}
-
-int klcd_gfp(cptr_t *slot_out, gpa_t *gpa_out, gva_t *gva_out)
-{
-	hpa_t hpa;
-	hva_t hva;
-	int ret;
-	ret = __lcd_page_alloc(slot_out, &hpa, &hva);
-	if (ret)
-		goto fail1;
-	*gpa_out = __gpa(hpa_val(hpa));
-	*gva_out = __gva(hva_val(hva));
-
-	return 0;
-
-fail1:
-	return ret;
-}
-
-/* IPC -------------------------------------------------- */
-
-int klcd_create_sync_endpoint(cptr_t *slot_out)
-{
-	int ret;
-	/*
-	 * Alloc cptr
-	 */
-	ret = lcd_alloc_cptr(slot_out);
-	if (ret) {
-		LCD_ERR("cptr alloc");
-		goto fail1;
-	}
-	/*
-	 * Get new endpoint
-	 */
-	ret = __lcd_create_sync_endpoint(current->lcd, *slot_out);
-	if (ret)
-		goto fail2;
-
-	return 0;
-
-fail2:
-	lcd_free_cptr(*slot_out);
-fail1:
-	return ret;
-}
-
-int klcd_send(cptr_t endpoint)
-{
-	return __lcd_send(current->lcd, endpoint);
-}
-
-int klcd_recv(cptr_t endpoint)
-{
-	return __lcd_recv(current->lcd, endpoint);
-}
-
-int klcd_call(cptr_t endpoint)
-{
-	return __lcd_call(current->lcd, endpoint);
-}
-
-int klcd_reply(void)
-{
-	return __lcd_reply(current->lcd);
-}
-
-
-/* LCD CREATE / CONFIG -------------------------------------------------- */
-
+#include "../internal.h"
 
 int klcd_create(cptr_t *slot_out, gpa_t stack)
 {
@@ -486,43 +50,6 @@ int klcd_config(cptr_t lcd, gva_t pc, gva_t sp, gpa_t gva_root)
 int klcd_run(cptr_t lcd)
 {
 	return __lcd_run(current->lcd, lcd);
-}
-
-
-/* CAPABILITIES -------------------------------------------------- */
-
-int klcd_cap_grant(cptr_t lcd, cptr_t src, cptr_t dest)
-{
-	return __lcd_cap_grant_cheat(current->lcd, lcd, src, dest);
-}
-
-int klcd_cap_page_grant_map(cptr_t lcd, cptr_t page, cptr_t dest, gpa_t gpa)
-{
-	return __lcd_cap_page_grant_map_cheat(current->lcd, lcd, page, dest, 
-					gpa);
-}
-
-void klcd_cap_delete(cptr_t slot)
-{
-	/*
-	 * Delete capability from cspace
-	 */
-	__lcd_cap_delete(&current->lcd->cspace, slot);
-	/*
-	 * Return cptr
-	 */
-	lcd_free_cptr(slot);
-}
-
-int klcd_cap_revoke(cptr_t slot)
-{
-	/*
-	 * Revoke child capabilities
-	 *
-	 * XXX: How do the lcd's know these slots are now free? The microkernel
-	 * won't tell them.
-	 */
-	return __lcd_cap_revoke(&current->lcd->cspace, slot);
 }
 
 /* MODULE LOADING -------------------------------------------------- */
@@ -660,7 +187,7 @@ static int init_lcd_info(struct lcd_info **mi)
 	/*
 	 * Initialize cap cache
 	 */
-	ret = cptr_cache_init(&i->cache);
+	ret = klcd_init_cptr(&i->cache);
 	if (ret)
 		goto fail1;
 	/*
@@ -687,7 +214,7 @@ static void free_lcd_info(struct lcd_info *i)
 	/*
 	 * Destroy cptr cache
 	 */
-	cptr_cache_destroy(i->cache);
+	klcd_destroy_cptr(i->cache);
 	/*
 	 * Free page info's
 	 */
@@ -703,12 +230,6 @@ static void free_lcd_info(struct lcd_info *i)
 		e = list_entry(cursor, struct lcd_page_info_list_elem, list);
 		kfree(e);
 	}
-	/*
-	 * Depending on how far we got, we may need to free the
-	 * boot page cptr's
-	 */
-	if (i->boot_page_cptrs)
-		kfree(i->boot_page_cptrs);
 	/*
 	 * Any remaining pages allocated will be freed when the lcd is torn 
 	 * down (e.g., boot pages)
@@ -1613,7 +1134,6 @@ static int do_boot_pages(cptr_t lcd, struct lcd_info *mi,
 {
 	int i;
 	int ret;
-	cptr_t *slots;
 	hpa_t hp_base_out;
 	hva_t hv_base_out;
 	struct lcd_page_info_list_elem *e;
@@ -1623,13 +1143,12 @@ static int do_boot_pages(cptr_t lcd, struct lcd_info *mi,
 	/*
 	 * Allocate the boot pages on the host
 	 */
-	ret = lcd_pages_alloc(&slots, &hp_base_out, &hv_base_out,
+	ret = klcd_pages_alloc(mi->boot_page_cptrs, &hp_base_out, &hv_base_out,
 			LCD_BOOT_PAGES_ORDER);
 	if (ret) {
 		LCD_ERR("pages alloc");
 		goto fail1;
 	}
-	mi->boot_page_cptrs = slots;
 	mi->boot_page_base = hva2va(hv_base_out);
 	/*
 	 * Grant and map them in the lcd
@@ -1648,7 +1167,7 @@ static int do_boot_pages(cptr_t lcd, struct lcd_info *mi,
 		/*
 		 * Grant and map in lcd's guest physical
 		 */
-		ret = lcd_cap_page_grant_map(lcd, slots[i],
+		ret = lcd_cap_page_grant_map(lcd, mi->boot_page_cptrs[i],
 					dest_slot,
 					gpa);
 		if (ret) {
@@ -2080,53 +1599,14 @@ fail1:
 	return ret;
 }
 
-/* INIT / EXIT -------------------------------------------------- */
-
-static int kliblcd_tests(void);
-
-int __kliblcd_init(void)
-{
-	/* nothing else for now */
-	return kliblcd_tests();
-}
-
-void __kliblcd_exit(void)
-{
-	return;
-}
-
 /* EXPORTS -------------------------------------------------- */
 
-EXPORT_SYMBOL(__klcd_alloc_cptr);
-EXPORT_SYMBOL(__klcd_free_cptr);
-EXPORT_SYMBOL(klcd_alloc_cptr);
-EXPORT_SYMBOL(klcd_free_cptr);
-EXPORT_SYMBOL(klcd_add_page);
-EXPORT_SYMBOL(klcd_rm_page);
-EXPORT_SYMBOL(klcd_enter);
-EXPORT_SYMBOL(klcd_exit);
-EXPORT_SYMBOL(klcd_page_alloc);
-EXPORT_SYMBOL(klcd_gfp);
-EXPORT_SYMBOL(klcd_create_sync_endpoint);
-EXPORT_SYMBOL(klcd_send);
-EXPORT_SYMBOL(klcd_recv);
-EXPORT_SYMBOL(klcd_call);
-EXPORT_SYMBOL(klcd_reply);
 EXPORT_SYMBOL(klcd_create);
 EXPORT_SYMBOL(klcd_config);
 EXPORT_SYMBOL(klcd_run);
-EXPORT_SYMBOL(klcd_cap_grant);
-EXPORT_SYMBOL(klcd_cap_page_grant_map);
-EXPORT_SYMBOL(klcd_cap_delete);
-EXPORT_SYMBOL(klcd_cap_revoke);
 EXPORT_SYMBOL(klcd_load_module);
 EXPORT_SYMBOL(klcd_unload_module);
 EXPORT_SYMBOL(klcd_create_module_lcd);
 EXPORT_SYMBOL(klcd_destroy_module_lcd);
 EXPORT_SYMBOL(klcd_dump_boot_info);
 
-/* (exports for register access are in that macro at the top) */
-
-/* TEST / DEBUG -------------------------------------------------- */
-
-#include "tests/kliblcd-tests.c"

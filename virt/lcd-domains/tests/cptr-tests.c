@@ -1,27 +1,15 @@
 /**
- * Regression tests for kliblcd.c.
+ * Regression tests for cptr caches.
+ *
+ * These are a little bit more white box.
  */
 
-#include <linux/delay.h>
+
+#include <lcd-domains/kliblcd.h>
+#include "../internal.h"
+#include <lcd-domains/tests-util.h>
 
 static int test01(void)
-{
-	int ret;
-
-	ret = lcd_enter();
-	if (ret) {
-		LCD_ERR("enter");
-		goto fail1;
-	}
-	lcd_exit(0);
-	
-	return 0;
-
-fail1:
-	return ret;
-}
-
-static int test02(void)
 {
 	int ret;
 	cptr_t c;
@@ -49,87 +37,17 @@ fail1:
 	return ret;
 }
 
-static int test03(void)
+static int test02(void)
 {
 	int ret;
 	cptr_t c;
-	struct page *p;
-
-	p = alloc_page(GFP_KERNEL);
-	if (!p) {
-		LCD_ERR("alloc page");
-		ret = -ENOMEM;
-		goto fail0;
-	}
 
 	ret = lcd_enter();
 	if (ret) {
 		LCD_ERR("enter");
 		goto fail1;
 	}
-
-	ret = klcd_add_page(p, &c);
-	if (ret) {
-		LCD_ERR("klcd add page");
-		goto fail2;
-	}
-
-	klcd_rm_page(c);
-
-	lcd_exit(0);
-	
-	return 0;
-
-fail2:
-	lcd_exit(0);
-fail1:
-	__free_pages(p, 0);
-fail0:
-	return ret;
-}
-
-static int test04(void)
-{
-	int ret;
-	cptr_t c;
-	gpa_t gpa;
-	gva_t gva;
-
-	ret = lcd_enter();
-	if (ret) {
-		LCD_ERR("enter");
-		goto fail1;
-	}
-
-	ret = lcd_gfp(&c, &gpa, &gva);
-	if (ret) {
-		LCD_ERR("lcd gfp");
-		goto fail2;
-	}
-	lcd_cap_delete(c);
-
-	lcd_exit(0);
-	
-	return 0;
-
-fail2:
-	lcd_exit(0);
-fail1:
-	return ret;
-}
-
-static int test05(void)
-{
-	struct cptr_cache *cache;
-	int ret;
-	cptr_t c;
-
-	ret = cptr_cache_init(&cache);
-	if (ret) {
-		LCD_ERR("cache init");
-		goto fail1;
-	}
-	ret = __lcd_alloc_cptr(cache, &c);
+	ret = lcd_alloc_cptr(&c);
 	if (ret) {
 		LCD_ERR("cptr alloc");
 		goto fail2;
@@ -139,13 +57,13 @@ static int test05(void)
 		goto fail3;
 	}
 
-	cptr_cache_destroy(cache);
+	ret = 0;
+	goto out;
 
-	return 0;
-
+out:
 fail3:
 fail2:
-	cptr_cache_destroy(cache);
+	lcd_exit(0);
 fail1:
 	return ret;
 }
@@ -161,7 +79,7 @@ static cptr_t set_lvl(cptr_t c, int lvl)
 	return __cptr(cptr_val(c) | (lvl << LCD_CPTR_LEVEL_SHIFT));
 }
 
-static int test06(void)
+static int test03(void)
 {
 	cptr_t c;
 	if (lcd_cptr_slot(__cptr(0)) != 0) {
@@ -204,17 +122,16 @@ static int test06(void)
 	return 0;
 }
 
-static int test07(void)
+static int test04(void)
 {
-	struct cptr_cache *cache;
 	int ret;
 	cptr_t c;
 	int i;
 	int top;
 
-	ret = cptr_cache_init(&cache);
+	ret = lcd_enter();
 	if (ret) {
-		LCD_ERR("cache init");
+		LCD_ERR("lcd enter");
 		goto fail1;
 	}
 	/*
@@ -222,7 +139,7 @@ static int test07(void)
 	 */
 	top = 1 << LCD_CPTR_SLOT_BITS;
 	for (i = 3; i < top; i++) {
-		ret = __lcd_alloc_cptr(cache, &c);
+		ret = lcd_alloc_cptr(&c);
 		if (ret) {
 			LCD_ERR("cache alloc at %d", i);
 			goto fail2;
@@ -238,7 +155,7 @@ static int test07(void)
 	 */
 	top = (1 << LCD_CPTR_SLOT_BITS) * (1 << LCD_CPTR_FANOUT_BITS);
 	for (i = 0; i < top; i++) {
-		ret = __lcd_alloc_cptr(cache, &c);
+		ret = lcd_alloc_cptr(&c);
 		if (ret) {
 			LCD_ERR("cache alloc at %d", i);
 			goto fail2;
@@ -257,13 +174,13 @@ static int test07(void)
 	 */
 	top = 1 << LCD_CPTR_SLOT_BITS;
 	for (i = 3; i < top; i++)
-		__lcd_free_cptr(cache, __cptr(i));
+		lcd_free_cptr(__cptr(i));
 	/*
 	 * Re-alloc enough to fill root
 	 */
 	top = 1 << LCD_CPTR_SLOT_BITS;
 	for (i = 3; i < top; i++) {
-		ret = __lcd_alloc_cptr(cache, &c);
+		ret = lcd_alloc_cptr(&c);
 		if (ret) {
 			LCD_ERR("cache alloc at %d", i);
 			goto fail2;
@@ -275,32 +192,31 @@ static int test07(void)
 		}
 	}
 
-	cptr_cache_destroy(cache); /* no need to free */
+	ret = 0;
+	goto out;
 
-	return 0;
-
+out:
 fail2:
-	cptr_cache_destroy(cache);
+	lcd_exit(0);
 fail1:
 	return ret;
 }
 
-int kliblcd_tests(void)
+void cptr_tests(void)
 {
-	if (test01())
-		return -1;
-	if (test02())
-		return -1;
-	if (test03())
-		return -1;
-	if (test04())
-		return -1;
-	if (test05())
-		return -1;
-	if (test06())
-		return -1;
-	if (test07())
-		return -1;
-	LCD_MSG("all kliblcd tests passed!");
-	return 0;
+	int n = 0;
+	int total = 4;
+
+	RUN_TEST(test01, n);
+	RUN_TEST(test02, n);
+	RUN_TEST(test03, n);
+	RUN_TEST(test04, n);
+
+	if (n < total) {
+		LCD_MSG("%d of %d cptr tests failed",
+			(total - n), total);
+	} else {
+		LCD_MSG("all cptr tests passed!");
+	}
 }
+

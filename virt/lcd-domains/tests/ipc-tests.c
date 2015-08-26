@@ -1,38 +1,56 @@
 /**
- * Regression tests for ipc.c.
+ * Regression tests for ipc.
  */
+
+#include <lcd-domains/kliblcd.h>
+#include <lcd-domains/tests-util.h>
+#include "../internal.h"
 
 static int test01(void)
 {
 	int ret;
+	cptr_t c;
 
-	ret = __klcd_enter();
+	ret = lcd_enter();
 	if (ret) {
 		LCD_ERR("klcd enter");
 		goto fail1;
 	}
-	ret = __lcd_create_sync_endpoint(current->lcd, __cptr(5));
+	ret = lcd_alloc_cptr(&c);
 	if (ret) {
-		LCD_ERR("create sync endpoint");
+		LCD_ERR("alloc cptr");
 		goto fail2;
 	}
-	/* should delete and destroy endpoint */
-	__klcd_exit();
+	ret = lcd_create_sync_endpoint(&c);
+	if (ret) {
+		LCD_ERR("create sync endpoint");
+		goto fail3;
+	}
 
-	return 0;
+	ret = 0;
+	goto out;
 
+out:
+fail3:
 fail2:
-	__klcd_exit();
+	/* should delete and destroy endpoint, if applicable */
+	lcd_exit(0);
 fail1:
 	return ret;
 }
 
 
-static int ipc_tests(void)
+void ipc_tests(void)
 {
-	if (test01())
-		return -1;
+	int n = 0;
+	int total = 1;
 
-	LCD_MSG("all ipc tests passed!");
-	return 0;
+	RUN_TEST(test01, n);
+
+	if (n < total) {
+		LCD_ERR("%d of %d ipc tests failed",
+			(total - n), total);
+	} else {
+		LCD_MSG("all ipc tests passed!");
+	}
 }

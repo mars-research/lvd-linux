@@ -350,6 +350,9 @@ int __klcd_enter(void);
 void __klcd_exit(void);
 int __klcd_page_zalloc(struct lcd *klcd, cptr_t c, hpa_t *hpa_out,
 		hva_t *hva_out);
+int __klcd_pages_zalloc(struct lcd *klcd, cptr_t *slots, 
+			hpa_t *hp_base_out, hva_t *hv_base_out,
+			unsigned order);
 int __lcd_create(struct lcd *caller, cptr_t slot, gpa_t stack);
 int __lcd_create__(struct lcd **out);
 int __lcd_config(struct lcd *caller, cptr_t lcd, gva_t pc, gva_t sp, 

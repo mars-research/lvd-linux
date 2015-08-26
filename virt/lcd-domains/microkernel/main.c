@@ -25,7 +25,7 @@
 #include <asm/lcd-domains/lcd-domains.h>
 #include <lcd-domains/types.h>
 #include <lcd-domains/syscall.h>
-#include "internal.h"
+#include "../internal.h"
 #include <uapi/linux/lcd-domains.h>
 
 MODULE_LICENSE("GPL");
@@ -1358,8 +1358,6 @@ static struct sysrq_key_op sysrq_showlcds_op = {
 
 /* Init / Exit ---------------------------------------- */
 
-static int main_tests(void);
-
 static int __init lcd_init(void)
 {
 	int ret;
@@ -1397,17 +1395,11 @@ static int __init lcd_init(void)
 		LCD_ERR("failed to init kliblcd");
 		goto fail4;
 	}
-	/*
-	 * Run main's tests
-	 */
-	ret = main_tests();
-	if (ret)
-		goto fail5;
+
+	LCD_MSG("lcd microkernel initialized");
 
 	return 0;
 
-fail5:
-	__kliblcd_exit();
 fail4:
 	misc_deregister(&lcd_dev);
 fail3:
@@ -1430,13 +1422,11 @@ static void __exit lcd_exit(void)
 	__kliblcd_exit();
 	lcd_arch_exit();
 	unregister_sysrq_key('x', &sysrq_showlcds_op);
+
+	LCD_MSG("lcd microkernel exited");
 }
 
 /* EXPORTS ---------------------------------------- */
 
 module_init(lcd_init);
 module_exit(lcd_exit);
-
-/* DEBUGGING ---------------------------------------- */
-
-#include "tests/main-tests.c"

@@ -10,7 +10,7 @@
 #include <linux/sched.h>
 #include <linux/slab.h>
 #include <lcd-domains/types.h>
-#include "internal.h"
+#include "../internal.h"
 
 
 /* QUICK LOOKUP / LOCK -------------------------------------------------- */
@@ -636,12 +636,10 @@ void __lcd_sync_endpoint_destroy(struct lcd_sync_endpoint *e)
 
 /* INIT/EXIT -------------------------------------------------- */
 
-static int ipc_tests(void);
-
 int __lcd_ipc_init(void)
 {
-	/* nothing else to do during init, for now */
-	return ipc_tests();
+	/* Nothing to do for now */
+	return 0;
 }
 
 void __lcd_ipc_exit(void)
@@ -649,6 +647,3 @@ void __lcd_ipc_exit(void)
 	return;
 }
 
-/* DEBUGGING -------------------------------------------------- */
-
-#include "tests/ipc-tests.c"

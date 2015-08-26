@@ -793,127 +793,6 @@ static int setup_vmcs_config(struct vmx_vmcs_config *vmcs_conf)
 	return 0;
 }
 
-/* VMX INIT / EXIT -------------------------------------------------- */
-
-static int main_tests(void);
-
-int lcd_arch_init(void)
-{
-	int ret;
-	int cpu;
-
-	/*
-	 * Check For VMX Features
-	 */
-
-	if (!cpu_has_vmx()) {
-		LCD_ARCH_ERR("CPU does not support VMX\n");
-		return -EIO;
-	}
-
-	if (setup_vmcs_config(&vmcs_config) < 0)
-		return -EIO;
-
-	/*
-	 * Set up default MSR bitmap
-	 */
-
-	msr_bitmap = (unsigned long *)__get_free_page(GFP_KERNEL);
-	if (!msr_bitmap) {
-		ret = -ENOMEM;
-		goto failed1;
-	}	
-
-	memset(msr_bitmap, 0xff, PAGE_SIZE);
-	vmx_disable_intercept_for_msr(msr_bitmap, MSR_FS_BASE);
-	vmx_disable_intercept_for_msr(msr_bitmap, MSR_GS_BASE);
-
-	/*
-	 * Initialize VPID bitmap spinlock
-	 */
-	spin_lock_init(&vpids.lock);
-
-	/*
-	 * VPID 0 is reserved for host. See INVVPID instruction.
-	 */
-	set_bit(0, vpids.bitmap); 
-
-	/*
-	 * Allocate vmxon buffers for each cpu. A vmxon buffer is
-	 * (currently) the same size as a vmcs, so we can re-use
-	 * the vmx_alloc_vmcs routine.
-	 */
-
-	for_each_possible_cpu(cpu) {
-		struct lcd_arch_vmcs *vmxon_buf;
-
-		vmxon_buf = vmx_alloc_vmcs(cpu);
-		if (!vmxon_buf) {
-			vmx_free_vmxon_areas();
-			return -ENOMEM;
-		}
-
-		per_cpu(vmxon_area, cpu) = vmxon_buf;
-	}
-
-	/*
-	 * Turn on vmx on each cpu
-	 *
-	 * Note: on_each_cpu disables preemption
-	 */
-
-	atomic_set(&vmx_enable_failed, 0);
-	if (on_each_cpu(vmx_enable, NULL, 1)) {
-		LCD_ARCH_ERR("timeout waiting for VMX mode enable.\n");
-		ret = -EIO;
-		goto failed1; /* sadly we can't totally recover */
-	}
-
-	if (atomic_read(&vmx_enable_failed)) {
-		ret = -EBUSY;
-		goto failed2;
-	}
-
-	/*
-	 * Init lcd_arch_thread cache (using instead of kmalloc since
-	 * these structs need to be aligned properly)
-	 */
-	lcd_arch_cache = KMEM_CACHE(lcd_arch, 0);
-	if (!lcd_arch_cache) {
-		LCD_ARCH_ERR("failed to set up kmem cache\n");
-		ret = -ENOMEM;
-		goto failed3;
-	}
-
-	/*
-	 * Run tests
-	 */
-	if (main_tests()) {
-		ret = -1;
-		goto failed4;
-	}
-
-	return 0;
-
-failed4:
-	kmem_cache_destroy(lcd_arch_cache);
-failed3:
-failed2:
-	on_each_cpu(vmx_disable, NULL, 1);
-failed1:
-	vmx_free_vmxon_areas();
-	free_page((unsigned long)msr_bitmap);
-	return ret;
-}
-
-void lcd_arch_exit(void)
-{
-	on_each_cpu(vmx_disable, NULL, 1);
-	vmx_free_vmxon_areas();
-	free_page((unsigned long)msr_bitmap);
-	kmem_cache_destroy(lcd_arch_cache);
-}
-
 /* VMX EPT -------------------------------------------------- */
 
 /**
@@ -4438,6 +4317,115 @@ int lcd_arch_check(struct lcd_arch *t)
 	return 0;
 }
 
+/* VMX INIT / EXIT -------------------------------------------------- */
+
+int lcd_arch_init(void)
+{
+	int ret;
+	int cpu;
+
+	/*
+	 * Check For VMX Features
+	 */
+
+	if (!cpu_has_vmx()) {
+		LCD_ARCH_ERR("CPU does not support VMX\n");
+		return -EIO;
+	}
+
+	if (setup_vmcs_config(&vmcs_config) < 0)
+		return -EIO;
+
+	/*
+	 * Set up default MSR bitmap
+	 */
+
+	msr_bitmap = (unsigned long *)__get_free_page(GFP_KERNEL);
+	if (!msr_bitmap) {
+		ret = -ENOMEM;
+		goto failed1;
+	}	
+
+	memset(msr_bitmap, 0xff, PAGE_SIZE);
+	vmx_disable_intercept_for_msr(msr_bitmap, MSR_FS_BASE);
+	vmx_disable_intercept_for_msr(msr_bitmap, MSR_GS_BASE);
+
+	/*
+	 * Initialize VPID bitmap spinlock
+	 */
+	spin_lock_init(&vpids.lock);
+
+	/*
+	 * VPID 0 is reserved for host. See INVVPID instruction.
+	 */
+	set_bit(0, vpids.bitmap); 
+
+	/*
+	 * Allocate vmxon buffers for each cpu. A vmxon buffer is
+	 * (currently) the same size as a vmcs, so we can re-use
+	 * the vmx_alloc_vmcs routine.
+	 */
+
+	for_each_possible_cpu(cpu) {
+		struct lcd_arch_vmcs *vmxon_buf;
+
+		vmxon_buf = vmx_alloc_vmcs(cpu);
+		if (!vmxon_buf) {
+			vmx_free_vmxon_areas();
+			return -ENOMEM;
+		}
+
+		per_cpu(vmxon_area, cpu) = vmxon_buf;
+	}
+
+	/*
+	 * Turn on vmx on each cpu
+	 *
+	 * Note: on_each_cpu disables preemption
+	 */
+
+	atomic_set(&vmx_enable_failed, 0);
+	if (on_each_cpu(vmx_enable, NULL, 1)) {
+		LCD_ARCH_ERR("timeout waiting for VMX mode enable.\n");
+		ret = -EIO;
+		goto failed1; /* sadly we can't totally recover */
+	}
+
+	if (atomic_read(&vmx_enable_failed)) {
+		ret = -EBUSY;
+		goto failed2;
+	}
+
+	/*
+	 * Init lcd_arch_thread cache (using instead of kmalloc since
+	 * these structs need to be aligned properly)
+	 */
+	lcd_arch_cache = KMEM_CACHE(lcd_arch, 0);
+	if (!lcd_arch_cache) {
+		LCD_ARCH_ERR("failed to set up kmem cache\n");
+		ret = -ENOMEM;
+		goto failed3;
+	}
+
+	return 0;
+
+failed3:
+failed2:
+	on_each_cpu(vmx_disable, NULL, 1);
+failed1:
+	vmx_free_vmxon_areas();
+	free_page((unsigned long)msr_bitmap);
+	return ret;
+}
+
+void lcd_arch_exit(void)
+{
+	on_each_cpu(vmx_disable, NULL, 1);
+	vmx_free_vmxon_areas();
+	free_page((unsigned long)msr_bitmap);
+	kmem_cache_destroy(lcd_arch_cache);
+}
+
 /* EXPORTS -------------------------------------------------- */
 
 EXPORT_SYMBOL(lcd_arch_init);
@@ -4461,8 +4449,6 @@ EXPORT_SYMBOL(lcd_arch_set_gva_root);
 EXPORT_SYMBOL(lcd_arch_check);
 
 /* DEBUGGING -------------------------------------------------- */
-
-#include "tests/main-tests.c"
 
 int lcd_on_cpu = -1;
 int lcd_in_non_root = 0;

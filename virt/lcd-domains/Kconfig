@@ -14,6 +14,12 @@ config LCD_DOMAINS
 config HAVE_LCD
        bool
 
+config LCD_DOMAINS_TESTS
+       tristate "Tests of Light-weight Capability Domains"
+       depends on LCD_DOMAINS
+       default m
+       ---help---
+       Simple unit tests for lcd domains. Loading the module runs the tests.
 
 menuconfig LCD_TEST_MOD
 	   bool "Test Modules"

@@ -22,6 +22,8 @@ struct lcd_info;
 
 int __klcd_alloc_cptr(struct cptr_cache *cptr_cache, cptr_t *free_cptr);
 void __klcd_free_cptr(struct cptr_cache *cptr_cache, cptr_t c);
+int klcd_init_cptr(struct cptr_cache **c_out);
+void klcd_destroy_cptr(struct cptr_cache *c);
 int klcd_alloc_cptr(cptr_t *free_slot);
 void klcd_free_cptr(cptr_t c);
 int klcd_add_page(struct page *p, cptr_t *slot_out);
@@ -29,6 +31,8 @@ void klcd_rm_page(cptr_t slot);
 int klcd_enter(void);
 void klcd_exit(int retval);
 int klcd_page_alloc(cptr_t *slot_out, gpa_t gpa);
+int klcd_pages_alloc(cptr_t *slots_out, hpa_t *hp_base_out, 
+		hva_t *hv_base_out, unsigned order);
 int klcd_gfp(cptr_t *slot_out, gpa_t *gpa_out, gva_t *gva_out);
 int klcd_create_sync_endpoint(cptr_t *slot_out);
 int klcd_send(cptr_t endpoint);
@@ -168,6 +172,31 @@ static inline int lcd_page_alloc(cptr_t *slot_out, gpa_t gpa)
 {
 	return klcd_page_alloc(slot_out, gpa);
 }
+/**
+ * Allocate 2**order zero'd out pages, and put capabilities in slots_out.
+ * slots_out should be an array with at least 2**order slots. Returns
+ * guest physical and virtual addresses of first page. (For KLCDs, the
+ * guest physical and virtual will be == to the host physical and virtual.)
+ */
+static inline int lcd_pages_alloc(cptr_t *slots_out, gpa_t *gp_base_out, 
+				gva_t *gv_base_out, unsigned order)
+{
+	hpa_t hp_base_out;
+	hva_t hv_base_out;
+	int ret;
+
+	ret = klcd_pages_alloc(slots_out, &hp_base_out, &hv_base_out, order);
+	if (ret)
+		return ret;
+	/*
+	 * For KLCDs, gpa = hpa, gva = hva.
+	 */
+	*gp_base_out = __gpa(hpa_val(hp_base_out));
+	*gv_base_out = __gva(hva_val(hv_base_out));
+
+	return ret;
+}
+
 /**
  * Higher level routine to get a free page. Maps it in guest physical
  * and virtual address spaces. Returns slot and addresses.
@@ -326,7 +355,22 @@ static inline int lcd_cap_revoke(cptr_t slot)
 
 /* CPTR CACHE -------------------------------------------------- */
 
-
+/**
+ * Initialize the cptr cache.
+ *
+ * This should be called when an lcd boots.
+ */
+static inline int lcd_init_cptr(void)
+{
+	return klcd_init_cptr(&current->cptr_cache);
+}
+/**
+ * This should be called before an lcd exits.
+ */
+static inline void lcd_destroy_cptr(void)
+{
+	klcd_destroy_cptr(current->cptr_cache);
+}
 /**
  * Find an unused cptr (a cptr that refers to an unused cnode).
  */
@@ -341,11 +385,18 @@ static inline void lcd_free_cptr(cptr_t c)
 {
 	return klcd_free_cptr(c);
 }
+/**
+ * This is needed when an lcd is creating another lcd (it needs to set up
+ * the other lcd's cptr cache).
+ */
 static inline int __lcd_alloc_cptr(struct cptr_cache *cache, 
 				cptr_t *free_slot)
 {
 	return __klcd_alloc_cptr(cache, free_slot);
 }
+/**
+ * Same comment as __lcd_alloc_cptr.
+ */
 static inline void __lcd_free_cptr(struct cptr_cache *cache, cptr_t c)
 {
 	return __klcd_free_cptr(cache, c);
@@ -414,7 +465,7 @@ struct lcd_info {
 	/*
 	 * The creating lcd has a cptr to the boot page
 	 */
-	cptr_t *boot_page_cptrs;
+	cptr_t boot_page_cptrs[1 << LCD_BOOT_PAGES_ORDER];
 	/*
 	 * Boot mem page infos
 	 */

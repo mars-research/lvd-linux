@@ -12,7 +12,7 @@
 #include <linux/slab.h>
 #include <linux/delay.h>
 #include <lcd-domains/types.h>
-#include "internal.h"
+#include "../internal.h"
 
 static inline struct lcd * cspace_to_lcd(struct cspace *cspace)
 {
@@ -1173,8 +1173,6 @@ fail1:
 
 /* INIT / EXIT -------------------------------------------------- */
 
-static int cap_tests(void);
-
 int __lcd_cap_init(void)
 {
 	/*
@@ -1187,12 +1185,6 @@ int __lcd_cap_init(void)
 		return -ENOMEM;
 	}
 
-	/*
-	 * Run cap tests
-	 */
-	if (cap_tests())
-		return -1;
-
 	return 0;
 }
 
@@ -1200,5 +1192,3 @@ void __lcd_cap_exit(void)
 {
 	kmem_cache_destroy(cdt_cache.cdt_root_cache);
 }
-
-#include "tests/cap-tests.c"

@@ -2,17 +2,9 @@
  * Regression tests for lcd arch code.
  */
 
-static int test01(void)
-{
-	struct lcd_arch_vmcs *vmcs;
-	vmcs = vmx_alloc_vmcs(raw_smp_processor_id());
-	if (!vmcs) {
-		LCD_ARCH_ERR("failed");
-		return -1;
-	}
-	vmx_free_vmcs(vmcs);
-	return 0;
-}
+#include <asm/lcd-domains/lcd-domains.h>
+#include <lcd-domains/tests-util.h>
+#include <linux/gfp.h>
 
 static int test02(void)
 {
@@ -204,80 +196,19 @@ fail1:
 	return ret;
 }
 
-static int test05(void)
+void arch_tests(void)
 {
-	if (!vmx_addr_is_canonical(0UL)) {
-		LCD_ARCH_ERR("failed");
-		return -1;
-	}
-	if (vmx_addr_is_canonical(1UL << 63)) {
-		LCD_ARCH_ERR("failed");
-		return -1;
-	}
-	if (vmx_addr_is_canonical(0xFFFFUL << 48)) {
-		LCD_ARCH_ERR("failed");
-		return -1;
-	}
-	if (!vmx_addr_is_canonical(0xFFFF8UL << 44)) {
-		LCD_ARCH_ERR("failed");
-		return -1;
-	}
-	if (!vmx_addr_is_canonical(0x00007UL << 44)) {
-		LCD_ARCH_ERR("failed");
-		return -1;
-	}
-	
-	return 0;
-}
+	int n = 0;
+	int total = 3;
 
-static int test06(void)
-{
-	u32 width;
+	RUN_TEST(test02, n);
+	RUN_TEST(test03, n);
+	RUN_TEST(test04, n);
 
-	width = cpuid_eax(0x80000008) & 0xff;
-
-	if (vmx_bad_phys_addr(0xff)) {
-		LCD_ARCH_ERR("failed");
-		return -1;
+	if (n < total) {
+		LCD_ARCH_ERR("%d of %d arch tests failed",
+			(total - n), total);
+	} else {
+		LCD_ARCH_MSG("all lcd arch tests passed!");
 	}
-	
-	if (vmx_bad_phys_addr(1UL << (width - 1))) {
-		LCD_ARCH_ERR("failed");
-		return -1;
-	}
-	
-	if (!vmx_bad_phys_addr(1UL << width)) {
-		LCD_ARCH_ERR("failed");
-		return -1;
-	}
-
-	if (!vmx_bad_phys_addr(-1ULL)) {
-		LCD_ARCH_ERR("failed");
-		return -1;
-	}
-
-	if (width >= 40 && vmx_bad_phys_addr(0x30682f000)) {
-		LCD_ARCH_ERR("failed");
-		return -1;
-	}
-
-	return 0;
-}
-
-static int main_tests(void)
-{
-	if (test01())
-		return -1;
-	if (test02())
-		return -1;
-	if (test03())
-		return -1;
-	if (test04())
-		return -1;
-	if (test05())
-		return -1;
-	if (test06())
-		return -1;
-	LCD_ARCH_MSG("all lcd arch main tests passed!");
-	return 0;
 }

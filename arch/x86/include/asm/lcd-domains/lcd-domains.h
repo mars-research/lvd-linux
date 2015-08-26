@@ -5,6 +5,7 @@
 #include <linux/spinlock.h>
 #include <linux/bitmap.h>
 #include <lcd-domains/types.h>
+#include <linux/mutex.h>
 
 extern int lcd_on_cpu;
 extern int lcd_in_non_root;

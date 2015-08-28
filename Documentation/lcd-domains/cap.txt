@@ -272,7 +272,7 @@ final cnode table:
              bits = 11 = 3; so we follow the 3rd table slot to arrive
              at the cnode table in level 3
 
-We now use the cap lot index bits = 01 = 1 to look up the capability.
+We now use the cap slot index bits = 01 = 1 to look up the capability.
 
 Another example: if the cptr is
 
@@ -283,7 +283,7 @@ Starting in the root cnode table,
 
     [1] we see that the level = 01 = 1 > 0, so we look at the first pair of
         fanout bits = 01 = 1; we follow the pointer in the 1st table slot
-        to level
+        to level 1
 
     [2] we now see that the level of the cptr = the level we are at, 1, so
         we now use the slot bits to look up the slot in the table (11 = 3).

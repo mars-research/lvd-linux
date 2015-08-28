@@ -402,6 +402,79 @@ static inline void __lcd_free_cptr(struct cptr_cache *cache, cptr_t c)
 	return __klcd_free_cptr(cache, c);
 }
 
+/* DATA STORE -------------------------------------------------- */
+
+/* 
+ * Adapted from cptrs / capabilities.
+ */
+struct dstore;
+struct dstore_node;
+typedef struct { unsigned long dptr; } dptr_t;
+
+/**
+ * These tags are reserved.
+ */
+#define LCD_DSTORE_TAG_NULL 0
+#define LCD_DSTORE_TAG_DSTORE_NODE 1
+
+/**
+ * Initializes caches, etc. in data store subsystem. Should be called when
+ * LCD boots, but after the slab allocator is initialized.
+ */
+int lcd_dstore_init(void);
+/**
+ * Tears down caches, etc. in data store subsystem. Should be called before
+ * LCD exits (not critical right now).
+ */
+void lcd_dstore_exit(void);
+/**
+ * Sets up a data store.
+ */
+int lcd_dstore_init_dstore(struct dstore **out);
+/**
+ * Inserts object into data store. The caller can associate
+ * an arbitrary integer tag with the object so that it can do basic
+ * type checking. Tags 0 and 1 are reserved.
+ *
+ * Returns dptr where object is stored in out.
+ */
+int lcd_dstore_insert(struct dstore *dstore, void *object, int tag, 
+		dptr_t *out);
+/**
+ * Removes object from data store. Unlike capabilities, does not free object
+ * or do anything else; the caller is responsible for tracking that.
+ *
+ * Silently fails if no object is stored at d, or if d is invalid.
+ */
+void lcd_dstore_delete(struct dstore *dstore, dptr_t d);
+/**
+ * Tears down data store.
+ */
+void lcd_dstore_destroy(struct dstore *dstore);
+/**
+ * Look up object in dstore at d. Ensure it has tag. Returns dstore node
+ * containing object in out.
+ *
+ * ** THIS LOCKS THE DSTORE NODE. CALL A MATCHING lcd_dstore_put TO RELEASE **
+ *
+ * This can be used to synchronize multiple threads that are trying to
+ * look up the object and modify it.
+ *
+ * Returns non-zero if object not found, or if object found but has wrong
+ * tag.
+ */
+int lcd_dstore_get(struct dstore *dstore, dptr_t d, int tag, 
+		struct dstore_node **out);
+/**
+ * Extracts object from dstore node.
+ */
+void *lcd_dstore_node_object(struct dstore_node *n);
+/**
+ * Release the lock on the dstore object stored at d.
+ */
+void lcd_dstore_put(struct dstore_node *n);
+
+
 /* EXTRAS -------------------------------------------------- */
 
 

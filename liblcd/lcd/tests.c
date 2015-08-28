@@ -152,6 +152,7 @@ fail1:
 static int dstore_test(void)
 {
 	struct dstore *d1, *d2;
+	struct dstore_node *n;
 	int ret;
 	int i, j;
 	int objs_d1[10];
@@ -195,7 +196,8 @@ static int dstore_test(void)
 	 * Look up and check
 	 */
 	for (i = 0; i < 10; i++) {
-		ret = lcd_dstore_lookup(d1, dptrs_d1[i], 3, &obj);
+		ret = lcd_dstore_get(d1, dptrs_d1[i], 3, &n);
+		obj = lcd_dstore_node_object(n);
 		if (ret) {
 			LIBLCD_ERR("lookup object i = %d in d1", i);
 			goto fail5;
@@ -208,9 +210,11 @@ static int dstore_test(void)
 			LIBLCD_ERR("wrong value at i = %d in d1", i);
 			goto fail5;
 		}
+		lcd_dstore_put(n);
 	}
 	for (j = 0; j < 10; j++) {
-		ret = lcd_dstore_lookup(d2, dptrs_d2[j], 7, &obj);
+		ret = lcd_dstore_get(d2, dptrs_d2[j], 7, &n);
+		obj = lcd_dstore_node_object(n);
 		if (ret) {
 			LIBLCD_ERR("lookup object j = %d in d2", j);
 			goto fail6;
@@ -223,6 +227,7 @@ static int dstore_test(void)
 			LIBLCD_ERR("wrong value at j = %d in d2", j);
 			goto fail6;
 		}
+		lcd_dstore_put(n);
 	}
 	/*
 	 * Tear it all down

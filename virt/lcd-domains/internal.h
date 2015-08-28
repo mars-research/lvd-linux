@@ -363,6 +363,7 @@ int __lcd_cap_grant_cheat(struct lcd *caller, cptr_t lcd, cptr_t src,
 int __lcd_cap_page_grant_map_cheat(struct lcd *caller, cptr_t lcd, 
 				cptr_t page, cptr_t dest, gpa_t gpa);
 
+
 /* IPC -------------------------------------------------- */
 
 int __lcd_ipc_init(void);
@@ -400,5 +401,7 @@ void __lcd_kpage_destroy(struct page *p);
 void __lcd_destroy(struct lcd *owned_lcd);
 
 void __lcd_destroy__(struct lcd *owned_lcd);
+
+
 
 #endif /* LCD_DOMAINS_INTERNAL_H */

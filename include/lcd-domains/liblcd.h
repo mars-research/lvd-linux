@@ -288,139 +288,18 @@ static inline struct lcd_boot_info * lcd_get_boot_info(void)
  * this multithreaded in the future.
  */
 
+/* 
+ * Adapted from cptrs / capabilities.
+ */
+struct dstore;
+struct dstore_node;
 typedef struct { unsigned long dptr; } dptr_t;
 
-static inline dptr_t __dptr(unsigned long dptr)
-{
-	return (dptr_t){ dptr };
-}
-static inline unsigned long dptr_val(dptr_t d)
-{
-	return d.dptr;
-}
-
-#define LCD_DPTR_NULL (__dptr(0))
-
-static inline int dptr_is_null(dptr_t d)
-{
-	return dptr_val(d) == dptr_val(LCD_DPTR_NULL);
-}
-
-#define LCD_DPTR_DEPTH_BITS  2    /* max depth of 3, zero indexed         */
-#define LCD_DPTR_FANOUT_BITS 2    /* each level fans out by a factor of 4 */
-#define LCD_DPTR_SLOT_BITS   2    /* each node contains 4 slots           */
-#define LCD_DSTORE_NODE_TABLE_NUM_SLOTS ((1 << LCD_DPTR_SLOT_BITS) +	\
-						(1 << LCD_DPTR_FANOUT_BITS))
-#define LCD_DPTR_LEVEL_SHIFT (((1 << LCD_DPTR_DEPTH_BITS) - 1) * \
-				LCD_DPTR_FANOUT_BITS + LCD_DPTR_SLOT_BITS)
-
-static inline unsigned long lcd_dptr_slot(dptr_t d)
-{
-	/*
-	 * Mask off low bits
-	 */ 
-	return dptr_val(d) & ((1 << LCD_DPTR_SLOT_BITS) - 1);
-}
-
-/* 
- * Gives fanout index for going *from* lvl to lvl + 1, where 
- * 0 <= lvl < 2^LCD_DPTR_DEPTH_BITS - 1 (i.e., we can't go anywhere
- * if lvl = 2^LCD_DPTR_DEPTH_BITS - 1, because we are at the deepest
- * level).
+/**
+ * These tags are reserved.
  */
-static inline unsigned long lcd_dptr_fanout(dptr_t d, int lvl)
-{
-	unsigned long i;
-
-	i = dptr_val(d);
-	/*
-	 * Shift and mask off bits at correct section
-	 */
-	i >>= (lvl * LCD_DPTR_FANOUT_BITS + LCD_DPTR_SLOT_BITS);
-	i &= ((1 << LCD_DPTR_FANOUT_BITS) - 1);
-
-	return i;
-}
-/*
- * Gives depth/level of cptr, zero indexed (0 means the root cnode table)
- */
-static inline unsigned long lcd_dptr_level(dptr_t d)
-{
-	unsigned long i;
-
-	i = dptr_val(d);
-	/*
-	 * Shift and mask
-	 */
-	i >>= LCD_DPTR_LEVEL_SHIFT;
-	i &= ((1 << LCD_DPTR_DEPTH_BITS) - 1);
-
-	return i;
-}
-
-/* 
- * DPTR CACHE
- */
-struct dptr_cache {
-	unsigned long *bmaps[1 << LCD_DPTR_DEPTH_BITS];
-};
-
-/*
- * Data store
- */
-enum allocation_state {
-	ALLOCATION_INVALID,
-	ALLOCATION_VALID,
-	ALLOCATION_MARKED_FOR_DELETE,
-	ALLOCATION_REMOVED,
-};
-
-struct dstore_node;
-/*
- * (The dstore derivation tree, the analogue of the cdt, may be pointless
- * right now since we don't allow grant, etc. with data stores. But maybe
- * in the future ...)
- */
-struct ddt_root_node {
-	struct mutex lock;
-	struct dstore_node *root_node;
-	enum allocation_state state;
-};
-
 #define LCD_DSTORE_TAG_NULL 0
 #define LCD_DSTORE_TAG_DSTORE_NODE 1
-
-struct dstore;
-struct dstore_node {
-	struct mutex lock;
-	/*
-	 * dstore node data
-	 */
-	void *object;
-	int tag;
-	struct dstore *dstore;
-	/*
-	 * ddt data
-	 */
-	struct ddt_root_node *ddt_root;
-	struct list_head children;
-	struct list_head siblings;
-};
-
-struct dstore_node_table {
-	struct dstore_node dstore_node[LCD_DSTORE_NODE_TABLE_NUM_SLOTS];
-	uint8_t table_level;
-	struct list_head table_list;
-};
-
-struct dstore {
-	struct mutex lock;
-	enum allocation_state state;
-	struct dstore_node_table *root_table;
-	struct kmem_cache *dstore_node_table_cache;
-	struct dptr_cache *dptr_cache;
-	struct list_head table_list;
-};
 
 /**
  * Initializes caches, etc. in data store subsystem. Should be called when
@@ -433,7 +312,7 @@ int lcd_dstore_init(void);
  */
 void lcd_dstore_exit(void);
 /**
- * Sets up data store.
+ * Sets up a data store.
  */
 int lcd_dstore_init_dstore(struct dstore **out);
 /**
@@ -457,9 +336,28 @@ void lcd_dstore_delete(struct dstore *dstore, dptr_t d);
  */
 void lcd_dstore_destroy(struct dstore *dstore);
 /**
- * Look up object in dstore at d. Ensure it has tag.
+ * Look up object in dstore at d. Ensure it has tag. Returns dstore node
+ * containing object in out.
+ *
+ * ** THIS LOCKS THE DSTORE NODE. CALL A MATCHING lcd_dstore_put TO RELEASE **
+ *
+ * This can be used to synchronize multiple threads that are trying to
+ * look up the object and modify it.
+ *
+ * Returns non-zero if object not found, or if object found but has wrong
+ * tag.
  */
-int lcd_dstore_lookup(struct dstore *dstore, dptr_t d, int tag, void **out);
+int lcd_dstore_get(struct dstore *dstore, dptr_t d, int tag, 
+		struct dstore_node **out);
+/**
+ * Extracts object from dstore node.
+ */
+void *lcd_dstore_node_object(struct dstore_node *n);
+/**
+ * Release the lock on the dstore object stored at d.
+ */
+void lcd_dstore_put(struct dstore_node *n);
+
 
 /* TESTING -------------------------------------------------- */
 

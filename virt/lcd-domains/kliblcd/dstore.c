@@ -8,13 +8,9 @@
  * Adapted from the capability subsystem in the microkernel.
  */
 
-#include <lcd-domains/liblcd-config.h>
-
 #include <linux/slab.h>
 #include <linux/delay.h>
-#include <lcd-domains/liblcd.h>
-
-#include <lcd-domains/liblcd-hacks.h>
+#include <lcd-domains/kliblcd.h>
 
 /* CONFIGURATION ---------------------------------------- */
 
@@ -1098,3 +1094,14 @@ void lcd_dstore_exit(void)
 {
 	kmem_cache_destroy(ddt_cache.ddt_root_cache);
 }
+
+/* EXPORTS -------------------------------------------------- */
+
+EXPORT_SYMBOL(lcd_dstore_init);
+EXPORT_SYMBOL(lcd_dstore_exit);
+EXPORT_SYMBOL(lcd_dstore_init_dstore);
+EXPORT_SYMBOL(lcd_dstore_insert);
+EXPORT_SYMBOL(lcd_dstore_delete);
+EXPORT_SYMBOL(lcd_dstore_destroy);
+EXPORT_SYMBOL(lcd_dstore_get);
+EXPORT_SYMBOL(lcd_dstore_put);

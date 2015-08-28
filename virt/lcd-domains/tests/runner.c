@@ -11,6 +11,7 @@ void mem_tests(void);
 void cptr_tests(void);
 void enterexit_tests(void);
 void arch_tests(void);
+void dstore_tests(void);
 
 static int __init runner_init(void)
 {
@@ -20,6 +21,7 @@ static int __init runner_init(void)
 	cptr_tests();
 	enterexit_tests();
 	arch_tests();
+	dstore_tests();
 	return 0;
 }
 

@@ -7,18 +7,27 @@ CCSTCompoundStatement* unmarshal_parameter(Parameter *p)
   return p->get_marshal_info()->accept(visitor);
 }
 
-CCSTCompoundStatement* unmarshal_value()
+CCSTCompoundStatement* UnmarshalTypeVisitor::visit(Marshal_projection *data, const char *name)
 {
-  
+  // loop through fields.
+  for(std::vector<ProjectionField*>::iterator it = pt->fields().begin(); pt->fields().end(); it ++)
+    {
+      ProjectionField* pf = *it;
+      
+    }
 }
 
-
-/* code to unmarshal parameters */
+/*
 // This code will produce the CAST that unmarshals the params. instead of where it was before
-CCSTCompoundStatement* UnmarshalTypeVisitor::visit(Marshal_projection *data)
+CCSTCompoundStatement* UnmarshalTypeVisitor::visit(Marshal_projection *data, const char *name)
 {
   ProjectionType *pt = dynamic_cast<ProjectionType*>(data->get_type());
   Assert(pt != 0x0, "Error: Expected ProjectionType got something else.\n");
+
+  for(std::vector<ProjectionField*>::iterator it = pt->fields().begin(); pt->fields().end(); it ++)
+    {
+      
+    }
 
   std::vector<CCSTDeclaration*> declarations;
   std::vector<CCSTStatement*> statements;
@@ -65,6 +74,7 @@ CCSTCompoundStatement* UnmarshalTypeVisitor::visit(Marshal_projection *data)
     }
   return new CCSTCompoundStatement(declarations, statements);
 }
+*/
 
 CCSTCompoundStatement* UnmarshalTypeVisitor::visit(Marshal_integer *data)
 {

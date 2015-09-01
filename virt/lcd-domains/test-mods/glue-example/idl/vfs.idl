@@ -1,0 +1,181 @@
+/* TODO: Discuss errors.
+ *
+ * 1 - Projection type declared as taking arguments in more than one
+ *     instance. Is that a problem or an error?
+ * 2 - Name collisions
+ */
+
+/* Why do we need this include? */
+/* CHARLIE: Because the compiler needs to know where the original defs
+ * are. It needs the original defs in the glue code (to call the original
+ * functions, e.g. on the callee side). The other option is to have the
+ * idl compiler just generate declarations in the glue code so that
+ * including the original header is unnecessary. */
+include ../original/include/vfs.h;
+
+/* - I suggest to use "<" and ">" to improve readability, 
+   - "struct fs" which is used as part of the projection definition
+     is a verbatim C type, which is required so IDL can use it to 
+     generate typecast operations  
+
+     CHARLIE: I agree
+
+   - Projections and interfaces can take channels as constructor argurments.
+     A channel then is used by each function inside projection.  
+
+     CHARLIE: Our solution for passing channels into projections looks
+     complicated. This is why I advocated moving a projection that contains
+     function pointers out into a separate interface of some kind. In the
+     particular example below, I wasn't planning to associate an ipc channel
+     with a struct fs, so it seems weird to pull that out of its container
+     and pass that to the constructor for the fs_operations. It also seems
+     limiting (but maybe this is all that's needed anyway).
+
+   - rpc [alloc] -- means that caller and callee stubs have to be 
+     allocated dynamically
+
+     CHARLIE: What about function pointers that are passed directly into
+     functions? (I'm encountering this right now in the PMFS glue.)
+   
+   - I don't think we need "bind" --- all four operations on projections
+     (in, out, alloc, and dealloc), imply bind, no? Ok we might need 
+     bind when we run into exotic case later, but for now I removed it. 
+
+     CHARLIE: Yeah that makes sense for now.
+  
+   - I decided to have more explicit syntax for alloc and dealloc, 
+     specifically require to have explicit keywords (caller, callee) 
+     to specify more explicitly on which end the data structure needs to 
+     be allocated and deallocated (mostly to simplify the reasoning 
+     about code), e.g.: 
+
+     [out, alloc(caller)] - means allocate on the caller side, and is 
+     incorrect without the "out" specifier
+
+     [alloc(caller, calle)] -- allocate on both sides, for now this is 
+     only for the channels, since all other datastructures are allocated at 
+     least on one end
+ 
+     CHARLIE: Good idea
+
+
+*/
+
+/* - The interface needs a channel (or a capability to a channel) as a 
+     construction argument to identify which communication channel 
+     should be used by this interface. 
+   - module declares a static inteface, vfs_chnl is generated as a 
+     global vairable inside the module
+*/
+
+module vfs (channel vfs_chnl) {
+
+  projection <struct file_system> fs; 
+
+  projection <struct fs_ops> fs_ops (channel chnl) {
+
+	
+    /* I suggest we generate a capability field for binding remote 
+       copies automatically. The only case when we need to refer to 
+       the remote references explicitly is when we project the same 
+       data structure to two different domains, e.g., a file into VFS 
+       and block, but I'm not sure it's needed. 
+
+       The assumption is: each data structure has a shadow on the 
+       other end.    
+       */
+    // capability [bind] container->self; 
+
+    /* CHARLIE: Could the compiler just always generate two 
+     * capability/reference fields? One for my ref, one for the
+     * other domain's ref? And again as you say, this won't work
+     * as nicely when we have multiple domains.
+     */
+  
+    {
+        /* - [out, alloc(caller)] means the callee allocates the struct in the
+             original code; caller allocates their own private copy 
+    
+           - [in, alloc(callee)] means that the data structure is already allocated 
+             on the caller's side, but callee's glue code will allocate 
+             a shadow copy
+         */
+        projection <struct file> file {
+            /* this filed is automatically generated */
+	    /* CHARLIE: So you mean the IDL writer doesn't even put it here? */
+            //capability [bind] container->self;
+            int [out] id;
+        }
+
+        /* - I just want to show an alternative syntax for a function with 
+             implicit argument (chnl) 
+           - We just bind to the fs projection (no fields marshalled), fs is defined 
+             as a dummy projection above
+         */
+
+
+        rpc [alloc] int (*new_file) (channel chnl = chnl,
+				     projection fs *fs, // same as below
+				     projection file [alloc(caller)] **file_out); // is this supposed to be a file projection? type was partly missing before
+	/* CHARLIE: Yes it is */
+
+    }
+
+    {
+        /* - [in, dealloc] will instruct _only_ the caller's glue 
+           code to look up and free its private copy, the callee's 
+           copy will be deallocated as part of the rm_file() invocation
+           on the callee's side 
+
+           - the chnl is implicit here, it's taken from the projection
+        */
+      projection <struct file> file;  // still same problem.  Do not know what fields because the other projection file definition is in different scope.  
+
+      /* CHARLIE: Same problem means what? */
+
+        rpc [alloc] void (*rm_file) (projection fs *fs, // same as below
+				     projection file [dealloc(caller)] *file); // need to name the projection type.
+    }
+
+  }
+
+
+  {
+      /* REGISTER_FS */
+      projection <struct fs> fs {
+          int [in] id;
+          int [in, out] size;
+
+          /* - Instruct IDL that a new channel should be constructed
+ 
+             - What if we decide to register two fs implementations? Can we 
+               say that channel exists? For example, what if inside fs_ops 
+               one of the functions registers more fs_ops? 
+          */
+          channel [alloc (caller, callee)] container->chnl;
+
+	  /* CHARLIE: Does this mean the struct fs container should have
+	   * a channel attached or associated with it? What does this mean
+	   * in terms of the glue? Is this a completely new channel? */
+        
+          /* Pass the channel as a constructor argument into fs_ops */
+          projection fs_ops [alloc(callee)] *fs_ops (container->chnl);
+      }
+
+      rpc int register_fs(projection fs [alloc(callee)] *fs);
+  }
+
+  {
+      /* UNREGISTER_FS */
+      projection <struct fs> fs {
+          /* [dealloc (caller, callee)] -- means deallocate objects on both ends, this 
+             is in contrast to [dealloc (caller)] which means deallocate the shadow 
+             copy on the caller side only */
+          channel [dealloc(caller, callee)] container->chnl; 
+          projection fs_ops [dealloc(callee)] *fs_ops;
+      }
+
+      rpc int unregister_fs(projection fs [dealloc(callee)] *fs);
+  }
+
+}

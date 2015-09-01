@@ -29,22 +29,6 @@
 /* DPTR DEFS -------------------------------------------------- */
 
 
-static inline dptr_t __dptr(unsigned long dptr)
-{
-	return (dptr_t){ dptr };
-}
-static inline unsigned long dptr_val(dptr_t d)
-{
-	return d.dptr;
-}
-
-#define LCD_DPTR_NULL (__dptr(0))
-
-static inline int dptr_is_null(dptr_t d)
-{
-	return dptr_val(d) == dptr_val(LCD_DPTR_NULL);
-}
-
 static inline unsigned long lcd_dptr_slot(dptr_t d)
 {
 	/*

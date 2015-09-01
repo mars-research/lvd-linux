@@ -63,6 +63,14 @@ LCD_MK_REG_ACCESS(5)
 LCD_MK_REG_ACCESS(6)
 LCD_MK_REG_ACCESS(7)
 
+static inline u64 lcd_debug_reg(struct lcd_utcb *utcb)			\
+{									\
+	return __lcd_debug_reg(lcd_get_utcb());				\
+}									\
+static inline void lcd_set_debug_reg(u64 val)				\
+{									\
+	__lcd_set_debug_reg(lcd_get_utcb(), val);			\
+}									\
 
 /* LOW LEVEL SYSCALLS -------------------------------------------------- */
 
@@ -96,6 +104,7 @@ LCD_MK_SYSCALL(LCD_SYSCALL_PAGE_ALLOC)
 LCD_MK_SYSCALL(LCD_SYSCALL_PAGE_MAP)
 LCD_MK_SYSCALL(LCD_SYSCALL_PAGE_UNMAP)
 LCD_MK_SYSCALL(LCD_SYSCALL_CAP_DELETE)
+LCD_MK_SYSCALL(LCD_SYSCALL_SYNC_EP)
 
 #define __LCD_DO_SYSCALL(num) lcd_syscall_##num()
 #define LCD_DO_SYSCALL(name) __LCD_DO_SYSCALL(name)
@@ -293,7 +302,6 @@ static inline struct lcd_boot_info * lcd_get_boot_info(void)
  */
 struct dstore;
 struct dstore_node;
-typedef struct { unsigned long dptr; } dptr_t;
 
 /**
  * These tags are reserved.
@@ -332,7 +340,8 @@ int lcd_dstore_insert(struct dstore *dstore, void *object, int tag,
  */
 void lcd_dstore_delete(struct dstore *dstore, dptr_t d);
 /**
- * Tears down data store.
+ * Tears down data store and frees it (so the pointer arg is invalid
+ * after this call).
  */
 void lcd_dstore_destroy(struct dstore *dstore);
 /**

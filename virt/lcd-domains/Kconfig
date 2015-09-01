@@ -161,7 +161,45 @@ config LCD_TEST_MOD_PMFS_BOOT
 config LCD_TEST_MOD_PMFS_LCD
        tristate
        depends on LCD_TEST_MOD_PMFS
+
+menuconfig LCD_TEST_MOD_GLUE_EXAMPLE
+       bool "Example exercising IDL and glue"
+       depends on LCD_DOMAINS
+       default y
+       select LCD_TEST_MOD_GLUE_EXAMPLE_VFS
+       select LCD_TEST_MOD_GLUE_EXAMPLE_MINIX
+       select LCD_TEST_MOD_GLUE_EXAMPLE_BOOT
+       ---help---
+       Shows interoperation of IDL, glue code, LCD runtime, and more.
+
+if LCD_TEST_MOD_GLUE_EXAMPLE
+
+config ISOLATE_GLUE_EXAMPLE
+       bool "Run fake minix and vfs in isolation"
+       default y
+       ---help---
+       When set, the fake minix and vfs will be built so they can run in 
+       isolation. This will also build and link the glue code. When not set, 
+       the fake vfs and minix are built as regular kernel modules, and none 
+       of the glue code is linked with them.
+
+config LCD_TEST_MOD_GLUE_EXAMPLE_VFS
+       tristate
+       depends on LCD_TEST_MOD_GLUE_EXAMPLE
+       default m
+
+config LCD_TEST_MOD_GLUE_EXAMPLE_MINIX
+       tristate
+       depends on LCD_TEST_MOD_GLUE_EXAMPLE
+       default m
+
+config LCD_TEST_MOD_GLUE_EXAMPLE_BOOT
+       tristate
+       depends on LCD_TEST_MOD_GLUE_EXAMPLE && ISOLATE_GLUE_EXAMPLE
        default m
 
 endif
 
+# --------------------------------------------------
+
+endif

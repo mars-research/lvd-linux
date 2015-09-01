@@ -33,22 +33,6 @@
 /* DPTR DEFS -------------------------------------------------- */
 
 
-static inline dptr_t __dptr(unsigned long dptr)
-{
-	return (dptr_t){ dptr };
-}
-static inline unsigned long dptr_val(dptr_t d)
-{
-	return d.dptr;
-}
-
-#define LCD_DPTR_NULL (__dptr(0))
-
-static inline int dptr_is_null(dptr_t d)
-{
-	return dptr_val(d) == dptr_val(LCD_DPTR_NULL);
-}
-
 static inline unsigned long lcd_dptr_slot(dptr_t d)
 {
 	/*
@@ -684,6 +668,13 @@ int lcd_dstore_insert(struct dstore *dstore, void *object, int tag,
 	struct dstore_node *dstore_node;
 	int ret;
 	dptr_t d;
+
+	/* Ensure tag is not one of the reserved tags. */
+	if (tag == LCD_DSTORE_TAG_NULL ||
+		tag == LCD_DSTORE_TAG_DSTORE_NODE) {
+		return -EINVAL;
+	}
+
 	/*
 	 * Alloc a dptr
 	 */
@@ -692,6 +683,7 @@ int lcd_dstore_insert(struct dstore *dstore, void *object, int tag,
 		LIBLCD_ERR("error alloc dptr");
 		goto fail1;
 	}
+
 	/*
 	 * Get cnode
 	 */

@@ -45,13 +45,13 @@
 
 #undef panic
 #define panic(fmt, args...) do {			\
-	lcd_printk(fmt, args);				\
+	lcd_printk(fmt, ##args);				\
 	lcd_exit(-1);					\
 	} while(0)
 
 #undef printk
 #define printk(fmt, args...) do {		\
-	lcd_printk(fmt, args);			\
+	lcd_printk(fmt, ##args);			\
 	} while(0)
 
 #undef printk_ratelimit

@@ -1,0 +1,11 @@
+include "vfs.idl"
+
+module minix {
+   requires interface vfs(vfs_chan);
+}
+/* CHARLIE: Where does vfs_chan come from? (It sounds like
+ * you're saying the IDL compiler just auto generates a
+ * channel for the interface. But how does that work if
+ * multiple domains use this interface? What are the
+ * implications of that for the glue code generated for
+ * each domain? Does it matter? */

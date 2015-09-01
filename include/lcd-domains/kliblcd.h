@@ -414,7 +414,6 @@ static inline void __lcd_free_cptr(struct cptr_cache *cache, cptr_t c)
  */
 struct dstore;
 struct dstore_node;
-typedef struct { unsigned long dptr; } dptr_t;
 
 /**
  * These tags are reserved.

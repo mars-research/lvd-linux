@@ -1017,7 +1017,7 @@ static int __lcd_put_char(struct lcd *lcd)
 	/*
 	 * Char is in r0
 	 */
-	c = __lcd_r0(lcd->utcb);
+	c = __lcd_debug_reg(lcd->utcb);
 	/*
 	 * Put char in lcd's console buff
 	 */
@@ -1204,6 +1204,14 @@ static int do_cap_delete(struct lcd *lcd)
 	return 0;
 }
 
+static int do_create_sync_endpoint(struct lcd *lcd)
+{
+	cptr_t slot;
+
+	slot = __lcd_cr0(lcd->utcb);
+	return __lcd_create_sync_endpoint(lcd, slot);
+}
+
 static int lcd_handle_syscall(struct lcd *lcd, int *lcd_ret)
 {
 	int syscall_id;
@@ -1212,7 +1220,8 @@ static int lcd_handle_syscall(struct lcd *lcd, int *lcd_ret)
 	
 	syscall_id = lcd_arch_get_syscall_num(lcd->lcd_arch);
 
-	LCD_DEBUG(LCD_DEBUG_MSG, "got syscall %d from lcd %p", syscall_id, lcd);
+	LCD_DEBUG(LCD_DEBUG_VERB, 
+		"got syscall %d from lcd %p", syscall_id, lcd);
 
 	switch (syscall_id) {
 	case LCD_SYSCALL_EXIT:
@@ -1312,6 +1321,13 @@ static int lcd_handle_syscall(struct lcd *lcd, int *lcd_ret)
 		ret = do_cap_delete(lcd);
 		lcd_arch_set_syscall_ret(lcd->lcd_arch, ret);
 		break;
+	case LCD_SYSCALL_SYNC_EP:
+		/*
+		 * Create synchronous endpoint
+		 */
+		ret = do_create_sync_endpoint(lcd);
+		lcd_arch_set_syscall_ret(lcd->lcd_arch, ret);
+		break;
 	default:
 		LCD_ERR("unimplemented syscall %d", syscall_id);
 		ret = -ENOSYS;
@@ -1325,13 +1341,13 @@ static int lcd_kthread_run_once(struct lcd *lcd, int *lcd_ret)
 
 	ret = lcd_arch_run(lcd->lcd_arch);
 	if (ret < 0) {
-		LCD_ERR("running lcd");
+		LCD_ERR("running lcd %p", lcd);
 		goto out;
 	}
 
 	switch(ret) {
 	case LCD_ARCH_STATUS_PAGE_FAULT:
-		LCD_ERR("page fault");
+		LCD_ERR("page fault for lcd %p", lcd);
 		ret = -ENOSYS;
 		goto out;
 		break;

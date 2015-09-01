@@ -104,6 +104,26 @@ struct cptr_cache {
 	unsigned long *bmaps[1 << LCD_CPTR_DEPTH_BITS];
 };
 
+/* DPTRS -------------------------------------------------- */
+
+typedef struct { unsigned long dptr; } dptr_t;
+
+static inline dptr_t __dptr(unsigned long dptr)
+{
+	return (dptr_t){ dptr };
+}
+static inline unsigned long dptr_val(dptr_t d)
+{
+	return d.dptr;
+}
+
+#define LCD_DPTR_NULL (__dptr(0))
+
+static inline int dptr_is_null(dptr_t d)
+{
+	return dptr_val(d) == dptr_val(LCD_DPTR_NULL);
+}
+
 /* ADDRESS SPACE TYPES ---------------------------------------- */
 
 /* XXX: Assumes host and guest run in 64-bit mode */

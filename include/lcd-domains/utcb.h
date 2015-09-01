@@ -20,6 +20,7 @@
  *   -- mr are general registers and are just copied during a send/recv
  *   -- cr are capability pointer registers, and the corresponding 
  *      capabilities are granted during a send/recv
+ *   -- one debug register that won't squash the others
  *
  * NOTE: This needs to fit inside a page (4 KBs). It goes at the bottom
  * of the lcd's stack (so it should be reasonably small).
@@ -30,6 +31,7 @@
 struct lcd_utcb {
 	u64 mr[LCD_NUM_REGS];
 	cptr_t cr[LCD_NUM_REGS];
+	u64 debug_reg;
 };
 
 #define UTCB_MK_REG_ACCESS(idx)						\
@@ -58,5 +60,15 @@ UTCB_MK_REG_ACCESS(4)
 UTCB_MK_REG_ACCESS(5)
 UTCB_MK_REG_ACCESS(6)
 UTCB_MK_REG_ACCESS(7)
+
+static inline u64 __lcd_debug_reg(struct lcd_utcb *utcb)	        \
+{									\
+	return utcb->debug_reg;						\
+}									\
+static inline void __lcd_set_debug_reg(struct lcd_utcb *utcb, u64 val)	\
+{									\
+	utcb->debug_reg = val;						\
+}									\
+
 
 #endif /* LCD_DOMAINS_UTCB_H */

@@ -7,7 +7,7 @@
 
 int lcd_put_char(char c)
 {
-	lcd_set_r0(c);
+	lcd_set_debug_reg(c);
 	return LCD_DO_SYSCALL(LCD_SYSCALL_PUTCHAR);
 }
 

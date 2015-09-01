@@ -16,7 +16,7 @@
  * --------------------------------------------------
  */
 
-#define LCD_DEBUG_LVL 0
+#define LCD_DEBUG_LVL 1
 
 #define LCD_ERR(msg...) __lcd_err(__FILE__, __LINE__, msg)
 static inline void __lcd_err(char *file, int lineno, char *fmt, ...)
@@ -49,6 +49,7 @@ static inline void __lcd_warn(char *file, int lineno, char *fmt, ...)
 #define LCD_DEBUG_ERR  1
 #define LCD_DEBUG_WARN 2
 #define LCD_DEBUG_MSG  3
+#define LCD_DEBUG_VERB 4
 
 #define LCD_DEBUG(lvl, msg...) {					\
 	if (lvl <= LCD_DEBUG_LVL)					\

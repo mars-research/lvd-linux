@@ -237,6 +237,10 @@ static int find_cnode(struct cspace *cspace, struct cnode_table *old,
 		
 		return 1; /* signal we found the slot and are done */
 	} else {
+
+		LCD_DEBUG(LCD_DEBUG_ERR, "Error looking up cnode: ");
+		LCD_DEBUG(LCD_DEBUG_ERR, "   cnode type is %d, alloc is %d",
+			old->cnode[level_id].type, alloc);
 		/*
 		 * invalid indexing, etc.
 		 */
@@ -382,6 +386,7 @@ int __lcd_cap_insert(struct cspace *cspace, cptr_t c, void *object,
 {
 	struct cnode *cnode;
 	int ret;
+
 	/*
 	 * Get cnode
 	 */

@@ -18,6 +18,8 @@
 static int lookup_ep(struct cspace *cspace, cptr_t slot, struct cnode **cnode)
 {
 	int ret;
+
+
 	/*
 	 * Look up
 	 */
@@ -29,9 +31,9 @@ static int lookup_ep(struct cspace *cspace, cptr_t slot, struct cnode **cnode)
 	 */
 	if ((*cnode)->type != LCD_CAP_TYPE_SYNC_EP) {
 		LCD_ERR("not a sync ep");
+		ret = -EINVAL;
 		goto fail2;
 	}
-
 	return 0;
 
 fail2:
@@ -153,8 +155,9 @@ static void copy_msg_caps(struct lcd *sender, struct lcd *receiver)
 		 */
 		from = sender->utcb->cr[i];
 		to = receiver->utcb->cr[i];
-		if (!cptr_is_null(from) && !cptr_is_null(to))
+		if (!cptr_is_null(from) && !cptr_is_null(to)) {
 			copy_msg_cap(sender, receiver, from, to);
+		}
 	}
 }
 
@@ -235,6 +238,7 @@ static int wait_for_transmit(struct lcd *lcd, struct lcd_sync_endpoint *ep)
 			ret = 0;
 			goto out;
 		case LCD_XMIT_FAILED:
+			LCD_DEBUG(LCD_DEBUG_ERR, "xmit failed");
 			ret = -EIO;
 			goto out;
 		default:
@@ -251,6 +255,8 @@ static int wait_for_transmit(struct lcd *lcd, struct lcd_sync_endpoint *ep)
 		 * testing it ...
 		 */
 		if (lcd_status_dead(lcd)) {
+			LCD_DEBUG(LCD_DEBUG_ERR, 
+				"lcd died inside xmit loop");
 			ret = -EIO;
 			goto out;
 		}
@@ -268,6 +274,7 @@ static int wait_for_transmit(struct lcd *lcd, struct lcd_sync_endpoint *ep)
 		/*
 		 * We were interrupted
 		 */
+		LCD_DEBUG(LCD_DEBUG_ERR, "lcd xmit loop interrupted");
 		ret = -EINTR;
 		break;
 	}
@@ -280,12 +287,36 @@ out:
 	return ret;
 }
 
+static void debug_dump_utcb(struct lcd *lcd)
+{
+	int i;
+
+	printk(KERN_ERR "LCD %p UTCB DUMP\n", lcd);
+	printk(KERN_ERR "---------------------------------\n");
+	
+	/* General regs */
+	for (i = 0; i < LCD_NUM_REGS; i++) {
+		printk("  mr[%d] = %llx\n", i,
+			lcd->utcb->mr[i]);
+	}
+
+	/* Cptrs */
+	for (i = 0; i < LCD_NUM_REGS; i++) {
+		printk("  cr[%d] = %lx\n", i,
+			cptr_val(lcd->utcb->cr[i]));
+	}
+}
+
 static int do_send(struct lcd *sender, struct cnode *cnode, 
 		struct lcd_sync_endpoint *ep, int making_call,
 		int doing_reply)
 {
 	int ret;
 	struct lcd *receiver;
+
+	if (LCD_DEBUG_LVL >= 3)
+		debug_dump_utcb(sender);
+
 	if (list_empty(&ep->receivers)) {
 		/*
 		 * No one receiving; put myself in ep's sender list
@@ -408,6 +439,10 @@ static int do_recv(struct lcd *receiver, struct cnode *cnode,
 {
 	int ret;
 	struct lcd *sender;
+
+	if (LCD_DEBUG_LVL >= 3)
+		debug_dump_utcb(receiver);
+
 	if (list_empty(&ep->senders)) {
 		/*
 		 * No one sending; put myself in ep's receiver list

@@ -89,6 +89,7 @@ enum lcd_cap_type {
 	LCD_CAP_TYPE_PAGE,
 	LCD_CAP_TYPE_KPAGE,
 	LCD_CAP_TYPE_LCD,
+	LCD_CAP_TYPE_KLCD,
 	LCD_CAP_TYPE_CNODE,
 };
 
@@ -227,6 +228,10 @@ void __lcd_cnode_put(struct cnode *c);
 #define	LCD_STATUS_RUNNING    2
 #define	LCD_STATUS_DEAD       4
 
+enum lcd_type {
+	LCD_TYPE_ISOLATED,
+	LCD_TYPE_NONISOLATED,
+};
 
 enum lcd_xmit_status {
 	LCD_XMIT_INVALID = 0, /* when lcd is not in queue */
@@ -245,6 +250,10 @@ struct lcd {
 	 * (Pray for me that I will not get deadlocks)
 	 */
 	struct mutex lock;
+	/*
+	 * Type (isolated, non-isolated (klcd))
+	 */
+	enum lcd_type type;
 	/*
 	 * Status
 	 */
@@ -302,6 +311,11 @@ struct lcd {
 	 */
 	char console_buff[LCD_CONSOLE_BUFF_SIZE];
 	unsigned console_cursor;
+	/*
+	 * KLCD specifics
+	 * ==============
+	 */
+	int (*klcd_main)(void);
 };
 
 /* similar to task structs */
@@ -353,10 +367,16 @@ int __klcd_page_zalloc(struct lcd *klcd, cptr_t c, hpa_t *hpa_out,
 int __klcd_pages_zalloc(struct lcd *klcd, cptr_t *slots, 
 			hpa_t *hp_base_out, hva_t *hv_base_out,
 			unsigned order);
-int __lcd_create(struct lcd *caller, cptr_t slot, gpa_t stack);
+
+int __klcd_get_module(char *module_name, struct module **m);
+void __klcd_put_module(char *module_name);
+int __klcd_do_call_endpoint(cptr_t lcd);
+
+int __klcd_create_klcd(struct lcd *caller, cptr_t slot);
+int __lcd_create(struct lcd *caller, cptr_t slot);
 int __lcd_create__(struct lcd **out);
 int __lcd_config(struct lcd *caller, cptr_t lcd, gva_t pc, gva_t sp, 
-		gpa_t gva_root);
+		gpa_t gva_root, gpa_t stack_page);
 int __lcd_run(struct lcd *caller, cptr_t lcd);
 int __lcd_cap_grant_cheat(struct lcd *caller, cptr_t lcd, cptr_t src, 
 			cptr_t dest);
@@ -390,6 +410,7 @@ void __lcd_page_check(struct lcd *lcd, struct page *p, int is_mapped,
 void __lcd_kpage_check(struct lcd *lcd, struct page *p, int is_mapped, 
 		gpa_t where_mapped);
 void __lcd_check(struct lcd *owning_lcd, struct lcd *owned_lcd);
+void __lcd_check_klcd(struct lcd *owning_lcd, struct lcd *owned_klcd);
 
 /*
  * These are called by code in cap.c when the last capability goes
@@ -399,8 +420,8 @@ void __lcd_sync_endpoint_destroy(struct lcd_sync_endpoint *e);
 void __lcd_page_destroy(struct page *p);
 void __lcd_kpage_destroy(struct page *p);
 void __lcd_destroy(struct lcd *owned_lcd);
-
 void __lcd_destroy__(struct lcd *owned_lcd);
+void __lcd_destroy_klcd(struct lcd *owned_klcd);
 
 
 

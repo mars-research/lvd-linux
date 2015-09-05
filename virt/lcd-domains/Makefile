@@ -18,7 +18,8 @@ lcd-domains-y                      += kliblcd/init.o kliblcd/mem.o \
                                       kliblcd/ipc.o kliblcd/enterexit.o \
                                       kliblcd/create.o kliblcd/cap.o \
                                       kliblcd/cptr_cache.o \
-				      kliblcd/dstore.o
+				      kliblcd/dstore.o \
+				      kliblcd/create_klcd.o
 # Unit tests module
 obj-$(CONFIG_LCD_DOMAINS_TESTS)    += tests/
 

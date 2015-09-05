@@ -455,6 +455,17 @@ static void free_cnode_object(struct cspace *cspace, struct cnode *cnode)
 		}
 		__lcd_destroy(lcd);
 		break;
+	case LCD_CAP_TYPE_KLCD:
+		/*
+		 * Similar to LCD case.
+		 */
+		lcd = cnode->object;
+		if (unlikely(cspace_to_lcd(cspace) == current->lcd)) {
+			cnode->type = LCD_CAP_TYPE_FREE;
+			__lcd_cnode_put(cnode);
+		}
+		__lcd_destroy_klcd(lcd);
+		break;
 	default:
 		/* we don't expect to see invalid, free, or cnode types here */
 		LCD_ERR("unexpected cnode type %d", cnode->type);
@@ -480,6 +491,9 @@ static void update_microkernel(struct cspace *cspace, struct cnode *cnode)
 		break;
 	case LCD_CAP_TYPE_LCD:
 		__lcd_check(cspace_to_lcd(cspace), cnode->object);
+		break;
+	case LCD_CAP_TYPE_KLCD:
+		__lcd_check_klcd(cspace_to_lcd(cspace), cnode->object);
 		break;
 	default:
 		/* we don't expect to see invalid, free, or cnode types here */

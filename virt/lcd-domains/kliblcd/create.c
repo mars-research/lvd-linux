@@ -21,7 +21,7 @@
 #include <linux/mutex.h>
 #include "../internal.h"
 
-int klcd_create(cptr_t *slot_out, gpa_t stack)
+int klcd_create(cptr_t *slot_out)
 {
 	int ret;
 	/*
@@ -30,7 +30,7 @@ int klcd_create(cptr_t *slot_out, gpa_t stack)
 	ret = lcd_alloc_cptr(slot_out);
 	if (ret)
 		goto fail1;
-	ret = __lcd_create(current->lcd, *slot_out, stack);
+	ret = __lcd_create(current->lcd, *slot_out);
 	if (ret)
 		goto fail2;
 
@@ -42,9 +42,10 @@ fail1:
 	return ret;
 }
 
-int klcd_config(cptr_t lcd, gva_t pc, gva_t sp, gpa_t gva_root)
+int klcd_config(cptr_t lcd, gva_t pc, gva_t sp, gpa_t gva_root, 
+		gpa_t stack_page)
 {
-	return __lcd_config(current->lcd, lcd, pc, sp, gva_root);
+	return __lcd_config(current->lcd, lcd, pc, sp, gva_root, stack_page);
 }
 
 int klcd_run(cptr_t lcd)
@@ -58,7 +59,7 @@ int klcd_run(cptr_t lcd)
  * Loads module into host address space, and stores pointer to
  * struct module in lcd.
  */
-static int get_module(char *module_name, struct module **m)
+int __klcd_get_module(char *module_name, struct module **m)
 {
 	int ret;
 	struct module *m1;
@@ -100,6 +101,35 @@ fail2:
 fail1:
 	*m = NULL;
 	return ret;
+}
+
+void __klcd_put_module(char *module_name)
+{
+	int ret;
+	struct module *m;
+	/*
+	 * Delete module
+	 *
+	 * We need to look it up so we can do a put
+	 */
+ 	mutex_lock(&module_mutex);
+ 	m = find_module(module_name);
+ 	mutex_unlock(&module_mutex);
+	if (!m) {
+		LCD_ERR("couldn't find module");
+		goto fail;
+	}
+	module_put(m);
+	ret = do_sys_delete_module(module_name, 0, 1);
+	if (ret) {
+		LCD_ERR("deleting module");
+		goto fail;
+	}
+
+	goto out;
+out:
+fail:
+	return;
 }
 
 static int get_module_pages(hva_t hva, unsigned long size, 
@@ -257,7 +287,7 @@ int klcd_load_module(char *mname, cptr_t mloader_endpoint,
 	/*
 	 * Load module in host
 	 */
-	ret = get_module(mname, &m);
+	ret = __klcd_get_module(mname, &m);
 	if (ret)
 		goto fail1;
 	/*
@@ -294,32 +324,16 @@ fail0:
 
 void klcd_unload_module(struct lcd_info *mi, cptr_t mloader_endpoint)
 {
-	int ret;
 	/*
 	 * module loader endpoint ignored; use standard module loading system
-	 */
-	struct module *m;
-	/*
+	 *
 	 * Remove module pages from capability system
 	 */
 	free_module_pages(&mi->mpages_list);
 	/*
 	 * Delete module
-	 *
-	 * We need to look it up so we can do a put
 	 */
- 	mutex_lock(&module_mutex);
- 	m = find_module(mi->mname);
- 	mutex_unlock(&module_mutex);
-	if (!m) {
-		LCD_ERR("couldn't find module");
-		goto free_mi;
-	}
-	module_put(m);
-	ret = do_sys_delete_module(mi->mname, 0, 1);
-	if (ret)
-		LCD_ERR("deleting module");
-free_mi:
+	__klcd_put_module(mi->mname);
 	/*
 	 * Free lcd module info
 	 */
@@ -1277,7 +1291,7 @@ fail1:
 	return ret;		
 }
 
-static int do_call_endpoint(cptr_t lcd)
+int __klcd_do_call_endpoint(cptr_t lcd)
 {
 	cptr_t call_endpoint;
 	int ret;
@@ -1323,7 +1337,7 @@ int klcd_create_module_lcd(cptr_t *slot_out, char *mname,
 	/*
 	 * Create an empty lcd
 	 */
-	ret = lcd_create(slot_out, LCD_STACK_GPA);
+	ret = lcd_create(slot_out);
 	if (ret) {
 		LCD_ERR("lcd create failed");
 		goto fail0;
@@ -1351,7 +1365,8 @@ int klcd_create_module_lcd(cptr_t *slot_out, char *mname,
 	 */
 	ret = lcd_config(*slot_out, (*mi)->init, 
 			gva_add(LCD_STACK_GVA, LCD_STACK_SIZE - 1), /* stack */
-			LCD_GV_PAGING_MEM_GPA);
+			LCD_GV_PAGING_MEM_GPA,
+			LCD_STACK_GPA);
 	if (ret) {
 		LCD_ERR("failed to config lcd");
 		goto fail3;
@@ -1359,7 +1374,7 @@ int klcd_create_module_lcd(cptr_t *slot_out, char *mname,
 	/*
 	 * Provide the lcd with a call endpoint
 	 */
-	ret = do_call_endpoint(*slot_out);
+	ret = __klcd_do_call_endpoint(*slot_out);
 	if (ret) {
 		LCD_ERR("failed to set up call endpoint");
 		goto fail4;

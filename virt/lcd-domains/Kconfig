@@ -121,5 +121,26 @@ config LCD_TEST_MOD_IPC2_LCD2
 
 # --------------------------------------------------
 
+config LCD_TEST_MOD_CREATE_KLCD
+       bool "Create and load a klcd example"
+       depends on LCD_DOMAINS
+       default y
+       select LCD_TEST_MOD_CREATE_KLCD_BOOT
+       select LCD_TEST_MOD_CREATE_KLCD_KLCD
+       ---help---
+       Simple example showing how to load a kLCD.
+     
+config LCD_TEST_MOD_CREATE_KLCD_BOOT
+       tristate
+       depends on LCD_TEST_MOD_CREATE_KLCD
+       default m
+
+config LCD_TEST_MOD_CREATE_KLCD_KLCD
+       tristate
+       depends on LCD_TEST_MOD_CREATE_KLCD
+       default m
+
+# --------------------------------------------------
+
 endif
 

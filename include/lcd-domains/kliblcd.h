@@ -39,8 +39,9 @@ int klcd_send(cptr_t endpoint);
 int klcd_recv(cptr_t endpoint);
 int klcd_call(cptr_t endpoint);
 int klcd_reply(void);
-int klcd_create(cptr_t *slot_out, gpa_t stack);
-int klcd_config(cptr_t lcd, gva_t pc, gva_t sp, gpa_t gva_root);
+int klcd_create(cptr_t *slot_out);
+int klcd_config(cptr_t lcd, gva_t pc, gva_t sp, gpa_t gva_root,
+		gpa_t stack_page);
 int klcd_run(cptr_t lcd);
 int klcd_cap_grant(cptr_t lcd, cptr_t src, cptr_t dest);
 int klcd_cap_page_grant_map(cptr_t lcd, cptr_t page, cptr_t dest, gpa_t gpa);
@@ -254,15 +255,15 @@ static inline int lcd_reply(void)
 
 /**
  * Allocates lcd and does minimal initialization of hardware virtual
- * machine and lcd's cspace. Returns non-zero on error. Stack should be
- * the guest physical address where stack/utcb should be mapped (the 
- * microkernel will allocate a page for the stack/utcb - it can't trust
- * the caller, and the microkernel needs safe access to the utcb during
- * ipc).
+ * machine and lcd's cspace. Returns non-zero on error. 
+ *
+ * (The microkernel will allocate a page for the stack/utcb - it can't 
+ * trust the caller, and the microkernel needs safe access to the utcb during
+ * ipc.)
  */
-static inline int lcd_create(cptr_t *slot_out, gpa_t stack)
+static inline int lcd_create(cptr_t *slot_out)
 {
-	return klcd_create(slot_out, stack);
+	return klcd_create(slot_out);
 }
 /**
  * Configure lcd environment.
@@ -276,10 +277,14 @@ static inline int lcd_create(cptr_t *slot_out, gpa_t stack)
  * lcd_cap_page_grant_map.
  *
  * The lcd's cspace is configured using lcd_cap_grant.
+ *
+ * Stack should be the guest physical address where stack/utcb should be 
+ * mapped.
  */
-static inline int lcd_config(cptr_t lcd, gva_t pc, gva_t sp, gpa_t gva_root)
+static inline int lcd_config(cptr_t lcd, gva_t pc, gva_t sp, gpa_t gva_root,
+			gpa_t stack_page)
 {
-	return klcd_config(lcd, pc, sp, gva_root);
+	return klcd_config(lcd, pc, sp, gva_root, stack_page);
 }
 /**
  * Runs / resumes an lcd.
@@ -300,7 +305,7 @@ static inline int lcd_run(cptr_t lcd)
  *
  * Yes, I'm breaking from seL4 here by allowing grant to happen outside
  * of ipc.
-
+ *
  * It's for one special case: When the caller is
  * setting up an lcd and needs to map pages inside it, we need to put
  * capabilities to those pages in the lcd's cspace. Why? Because the microkernel
@@ -477,6 +482,31 @@ void lcd_dstore_put(struct dstore_node *n);
 
 /* EXTRAS -------------------------------------------------- */
 
+/**
+ * Create a non-isolated `LCD'. This essentially initializes everything
+ * except the low-level hardware VM container.
+ *
+ * The klcd can be configured etc. just like a regular lcd (program counter,
+ * stack - though you should probably use the same stack that was set up
+ * by the kernel when the kthread was created, and so on). You can grant
+ * the klcd caps too.
+ */
+int klcd_create_klcd(cptr_t *klcd_out);
+
+/**
+ * Create a non-isolated LCD. This basically loads a kernel module (with
+ * name mname) and creates a kernel thread to run its module init. This
+ * allows the caller to grant capabilities to a non-isolated thread.
+ */
+int klcd_create_module_klcd(cptr_t *slot_out, char *mname);
+
+/**
+ * Destroys non-isolated LCD / thread (it will have to wait until that
+ * thread exits the module's init, so this may block!). Unloads the
+ * module with name module_name. It's up to you to make sure you pass the
+ * same module name that you used in klcd_create_module_klcd.
+ */
+void klcd_destroy_module_klcd(cptr_t klcd, char *module_name);
 
 /**
  * When provided with an endpoint connected to a module loader, this routine

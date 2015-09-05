@@ -43,9 +43,10 @@ static int lookup_lcd(struct cspace *cspace, cptr_t slot, struct cnode **cnode)
 	if (ret)
 		goto fail1;
 	/*
-	 * Confirm it's an lcd
+	 * Confirm it's an lcd or klcd
 	 */
-	if ((*cnode)->type != LCD_CAP_TYPE_LCD) {
+	if ((*cnode)->type != LCD_CAP_TYPE_LCD &&
+		(*cnode)->type != LCD_CAP_TYPE_KLCD) {
 		LCD_ERR("not an lcd");
 		goto fail2;
 	}
@@ -271,6 +272,9 @@ int __lcd_create__(struct lcd **out)
 	int ret;
 	/*
 	 * Alloc lcd data structure
+	 *
+	 * (Because we're doing a zalloc, this will set the type, status,
+	 * and so on to "defaults".)
 	 */
 	lcd = kzalloc(sizeof(*lcd), GFP_KERNEL);
 	if (!lcd) {
@@ -311,7 +315,7 @@ fail1:
 
 static int lcd_kthread_main(void *data);
 
-int __lcd_create(struct lcd *caller, cptr_t slot, gpa_t stack)
+int __lcd_create(struct lcd *caller, cptr_t slot)
 {
 	struct lcd *lcd;
 	hva_t addr;
@@ -340,16 +344,6 @@ int __lcd_create(struct lcd *caller, cptr_t slot, gpa_t stack)
 		LCD_ERR("alloc page");
 		goto fail3;
 	}
-	LCD_MSG("stack page is %p",
-		virt_to_page(hva2va(addr)));
-	/*
-	 * Map in lcd
-	 */
-	ret = gp_map(lcd, stack, hva2hpa(addr));
-	if (ret) {
-		LCD_ERR("map");
-		goto fail4;
-	}
 	/*
 	 * Store ref in lcd struct's utcb
 	 */
@@ -360,7 +354,7 @@ int __lcd_create(struct lcd *caller, cptr_t slot, gpa_t stack)
 	lcd->kthread = kthread_create(lcd_kthread_main, NULL, "lcd");
 	if (!lcd->kthread) {
 		LCD_ERR("failed to create kthread");
-		goto fail5;
+		goto fail4;
 	}
 	/*
 	 * Bump reference count on kthread
@@ -376,18 +370,16 @@ int __lcd_create(struct lcd *caller, cptr_t slot, gpa_t stack)
 	ret = __lcd_cap_insert(&caller->cspace, slot, lcd, LCD_CAP_TYPE_LCD);
 	if (ret) {
 		LCD_ERR("insert");
-		goto fail6;
+		goto fail5;
 	}
 	/*
 	 * Done
 	 */
 	return 0;
 
-fail6:
+fail5:
 	kthread_stop(lcd->kthread); /* never ran, so should die */
 	put_task_struct(lcd->kthread);
-fail5:
-	gp_unmap(lcd, stack);
 fail4:
 	free_page(hva_val(addr));
 fail3:
@@ -398,8 +390,72 @@ fail1:
 	return ret;
 }
 
+static int __lcd_config_lcd(struct lcd *caller, struct lcd *lcd_struct, 
+			gva_t pc, gva_t sp, 
+			gpa_t gva_root, gpa_t stack_page)
+{
+	int ret;
+	hva_t stack_page_addr;
+	/*
+	 * If lcd is not an embryo, fail
+	 */
+	if (!lcd_status_embryo(lcd_struct)) {
+		LCD_ERR("cannot config: lcd not an embryo");
+		ret = -EINVAL;
+		goto fail1;
+	}
+	/*
+	 * Set pc, sp, gva_root
+	 */
+	lcd_arch_set_pc(lcd_struct->lcd_arch, pc);
+	lcd_arch_set_sp(lcd_struct->lcd_arch, sp);
+	lcd_arch_set_gva_root(lcd_struct->lcd_arch, gva_root);
+	/*
+	 * Map stack page in guest physical
+	 */
+	stack_page_addr = va2hva(lcd_struct->utcb);
+	ret = gp_map(lcd_struct, stack_page, hva2hpa(stack_page_addr));
+	if (ret) {
+		LCD_ERR("map");
+		goto fail2;
+	}
+	/*
+	 * Make sure lcd_arch has valid state
+	 */
+	ret = lcd_arch_check(lcd_struct->lcd_arch);
+	if (ret) {
+		LCD_ERR("bad lcd_arch state");
+		goto fail3;
+	}
+
+	return 0;
+
+fail3:
+	gp_unmap(lcd_struct, stack_page);
+fail2:
+fail1:
+	return ret;
+}
+
+int __lcd_config_klcd(struct lcd *caller, struct lcd *lcd_struct, 
+			gva_t pc, gva_t sp, 
+			gpa_t gva_root, gpa_t stack_page)
+{
+	/*
+	 * For now, we ignore everything except the program counter.
+	 *
+	 * The program counter is assumed to be a host virtual
+	 * address to a kernel module's init.
+	 *
+	 * (Recall that for klcd's, guest addresses = host addresses.)
+	 */
+	lcd_struct->klcd_main = hva2va(__hva(gva_val(pc)));
+
+	return 0;
+}
+
 int __lcd_config(struct lcd *caller, cptr_t lcd, gva_t pc, gva_t sp, 
-		gpa_t gva_root)
+		gpa_t gva_root, gpa_t stack_page)
 {
 	struct lcd *lcd_struct;
 	struct cnode *cnode;
@@ -411,40 +467,41 @@ int __lcd_config(struct lcd *caller, cptr_t lcd, gva_t pc, gva_t sp,
 	if (ret)
 		goto fail1;
 	/*
-	 * If lcd is not an embryo, fail
+	 * Switch on the type of the lcd (a regular lcd, klcd, ...)
 	 */
-	if (!lcd_status_embryo(lcd_struct)) {
-		LCD_ERR("cannot config: lcd not an embryo");
-		ret = -EINVAL;
-		goto fail2;
+	switch (cnode->type) {
+
+	case LCD_CAP_TYPE_LCD:
+		ret = __lcd_config_lcd(caller, lcd_struct, pc, sp, gva_root, 
+				stack_page);
+		break;
+	case LCD_CAP_TYPE_KLCD:
+		ret = __lcd_config_klcd(caller, lcd_struct, pc, sp, gva_root, 
+					stack_page);
+		break;
+	default:
+		/* shouldn't happend */
+		LCD_ERR("unexpected cnode type: %d",
+			cnode->type);
+		goto fail2;		
 	}
-	/*
-	 * Set pc, sp, gva_root
-	 */
-	lcd_arch_set_pc(lcd_struct->lcd_arch, pc);
-	lcd_arch_set_sp(lcd_struct->lcd_arch, sp);
-	lcd_arch_set_gva_root(lcd_struct->lcd_arch, gva_root);
-	/*
-	 * Make sure lcd_arch has valid state
-	 */
-	ret = lcd_arch_check(lcd_struct->lcd_arch);
 	if (ret) {
-		LCD_ERR("bad lcd_arch state");
-		goto fail3;
+		LCD_ERR("error config'ing lcd, ret = %d", ret);
+		goto fail2;
 	}
 	/*
 	 * Set status to configed
 	 */
 	set_lcd_status(lcd_struct, LCD_STATUS_CONFIGED);
+
+	ret = 0;
+	goto out;
+
+out:
+fail2:
 	/*
 	 * Unlock
 	 */
-	put_lcd(cnode, lcd_struct);
-
-	return 0;
-
-fail3:
-fail2:
 	put_lcd(cnode, lcd_struct);
 fail1:
 	return ret;
@@ -529,6 +586,10 @@ int __klcd_enter(void)
 	 * Mark lcd as running
 	 */
 	set_lcd_status(lcd, LCD_STATUS_RUNNING);
+	/*
+	 * Set type as non-isolated
+	 */
+	lcd->type = LCD_TYPE_NONISOLATED;
 
 	return 0;
 
@@ -587,6 +648,79 @@ lock_skip:
 	 */
 	current->lcd = NULL;
 }
+
+/* CREATE A KLCD (NON-ISOLATED LCD) ------------------------------ */
+
+int __klcd_create_klcd(struct lcd *caller, cptr_t slot)
+{
+	struct lcd *lcd;
+	hva_t addr;
+	int ret;
+	/*
+	 * Basic init of lcd
+	 */
+	ret = __lcd_create__(&lcd);
+	if (ret) {
+		LCD_ERR("lcd create");
+		goto fail1;
+	}
+	/*
+	 * Allocate a page for the stack/utcb
+	 */
+	addr = __hva(get_zeroed_page(GFP_KERNEL));
+	if (!hva_val(addr)) {
+		LCD_ERR("alloc page");
+		goto fail2;
+	}
+	/*
+	 * Store ref in lcd struct's utcb
+	 */
+	lcd->utcb = hva2va(addr);
+	/*
+	 * Create a kernel thread (won't run till we wake it up)
+	 */
+	lcd->kthread = kthread_create(lcd_kthread_main, NULL, "lcd");
+	if (!lcd->kthread) {
+		LCD_ERR("failed to create kthread");
+		goto fail3;
+	}
+	/*
+	 * Bump reference count on kthread
+	 */
+	get_task_struct(lcd->kthread);
+	/*
+	 * Store back reference to lcd
+	 */
+	lcd->kthread->lcd = lcd;
+	/*
+	 * Set type as non-isolated
+	 */
+	lcd->type = LCD_TYPE_NONISOLATED;
+	/*
+	 * Put in caller's cspace
+	 */
+	ret = __lcd_cap_insert(&caller->cspace, slot, lcd, 
+			LCD_CAP_TYPE_KLCD);
+	if (ret) {
+		LCD_ERR("insert");
+		goto fail4;
+	}
+	/*
+	 * Done
+	 */
+	return 0;
+
+fail4:
+	kthread_stop(lcd->kthread); /* never ran, so should die */
+	put_task_struct(lcd->kthread);
+fail3:
+	free_page(hva_val(addr));
+fail2:
+	__lcd_destroy__(lcd);
+fail1:
+	return ret;
+}
+
 
 /* CAPABILITIES -------------------------------------------------- */
 
@@ -731,6 +865,12 @@ void __lcd_check(struct lcd *owning_lcd, struct lcd *owned_lcd)
 	return;
 }
 
+void __lcd_check_klcd(struct lcd *owning_lcd, struct lcd *owned_klcd)
+{
+	/* no-op for now */
+	return;
+}
+
 /* endpoint check in ipc.c */
 
 
@@ -750,7 +890,7 @@ void __lcd_kpage_destroy(struct page *p)
 }
 
 /*
- * For lcd's with no underlying vm
+ * For lcd's with no underlying vm or kernel thread
  */
 void __lcd_destroy__(struct lcd *lcd)
 {
@@ -761,7 +901,10 @@ void __lcd_destroy__(struct lcd *lcd)
 	kfree(lcd);
 }
 
-void __lcd_destroy(struct lcd *lcd)
+/*
+ * For lcd's with no underlying vm
+ */
+void __lcd_destroy_do_non_arch(struct lcd *lcd)
 {
 	int ret;
 
@@ -835,6 +978,14 @@ lock_skip:
 	__lcd_cap_destroy_cspace(&lcd->cspace);
 	lcd->kthread = NULL;
 	lcd->utcb = NULL;
+}
+
+void __lcd_destroy(struct lcd *lcd)
+{
+	/*
+	 * Do bulk of it
+	 */
+	__lcd_destroy_do_non_arch(lcd);
 	/*
 	 * Tear down lcd_arch (ept, ...)
 	 */
@@ -846,6 +997,17 @@ lock_skip:
 	kfree(lcd);
 }
 
+void __lcd_destroy_klcd(struct lcd *owned_klcd)
+{
+	/*
+	 * Do bulk of it
+	 */
+	__lcd_destroy_do_non_arch(owned_klcd);
+	/*
+	 * Free lcd data structure
+	 */
+	kfree(owned_klcd);
+}
 
 /* LCD EXECUTION -------------------------------------------------- */
 
@@ -1239,26 +1401,21 @@ out:
 	return ret;
 }
 
-static int lcd_kthread_main(void *data) /* data is NULL */
+static int lcd_main_for_lcd(struct lcd *lcd)
 {
 	int ret;
-	struct lcd *current_lcd;
 	int lcd_ret = 0;
-
-	current_lcd = current->lcd;
-	
-	LCD_MSG("entered kthread");
-
 	/*
 	 * Enter run loop, check after each iteration if we should stop
 	 *
 	 * XXX: We're not giving the thread a chance to gracefully exit
 	 * for now (e.g., we could use a special upcall message to signal that 
-	 * it should terminate).
+	 * it should terminate). But maybe not ... it's up to the owners
+	 * of the LCD to notify it when it should tear down?
 	 */
 	for (;;) {
-		ret = lcd_kthread_run_once(current_lcd, &lcd_ret);
-		if (ret < 0 || lcd_should_stop(current_lcd)) {
+		ret = lcd_kthread_run_once(lcd, &lcd_ret);
+		if (ret < 0 || lcd_should_stop(lcd)) {
 			/* ret < 0 means fatal error */
 			/* lcd_should_stop means our parent told us to die */
 			return ret;
@@ -1272,6 +1429,34 @@ static int lcd_kthread_main(void *data) /* data is NULL */
 	}
 	
 	/* unreachable */
+}
+
+static int lcd_main_for_klcd(struct lcd *lcd)
+{
+	return lcd->klcd_main();
+}
+
+static int lcd_kthread_main(void *data) /* data is NULL */
+{
+	struct lcd *current_lcd;
+
+	current_lcd = current->lcd;
+
+	/*
+	 * TODO: If the LCD exits, and it is the only one that has a
+	 * reference to itself, we should tear it down.
+	 */
+	switch (current_lcd->type) {
+
+	case LCD_TYPE_ISOLATED:
+		return lcd_main_for_lcd(current_lcd);
+	case LCD_TYPE_NONISOLATED:
+		return lcd_main_for_klcd(current_lcd);
+	default:
+		LCD_ERR("unexpected lcd type = %d",
+			current_lcd->type);
+		return -EINVAL;
+	}
 }
 
 

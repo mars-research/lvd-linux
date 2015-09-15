@@ -28,6 +28,7 @@ class Type : public Base
  public:
   virtual Marshal_type* accept(MarshalVisitor *worker, Registers *data) = 0;
   virtual CCSTTypeName* accept(TypeNameVisitor *worker) = 0;
+  virtual CCSTStatement* accept(AllocateTypeVisitor *worker, Variable *v) = 0;
   virtual int num() = 0;
   
 };
@@ -88,6 +89,7 @@ class Typedef : public Type
   Typedef(const char* alias, Type* type);
   virtual Marshal_type* accept(MarshalVisitor *worker, Registers *data);
   virtual CCSTTypeName* accept(TypeNameVisitor *worker);
+  virtual CCSTStatement* accept(AllocateTypeVisitor *worker, Variable *v);
   Type* type();
   const char* alias();
   virtual int num();
@@ -100,6 +102,7 @@ class VoidType : public Type
   VoidType();
   virtual Marshal_type* accept(MarshalVisitor *worker, Registers *data);
   virtual CCSTTypeName* accept(TypeNameVisitor *worker);
+  virtual CCSTStatement* accept(AllocateTypeVisitor *worker, Variable *v);
   virtual int num();
 };
 
@@ -113,6 +116,7 @@ class IntegerType : public Type
   IntegerType(PrimType type, bool un, int size);
   virtual Marshal_type* accept(MarshalVisitor *worker, Registers *data);
   virtual CCSTTypeName* accept(TypeNameVisitor *worker);
+  virtual CCSTStatement* accept(AllocateTypeVisitor *worker, Variable *v);
   PrimType int_type();
   bool is_unsigned();
   virtual int num();
@@ -126,6 +130,7 @@ class PointerType : public Type
   PointerType(Type* type);
   virtual Marshal_type* accept(MarshalVisitor *worker, Registers *data);
   virtual CCSTTypeName* accept(TypeNameVisitor *worker);
+  virtual CCSTStatement* accept(AllocateTypeVisitor *worker, Variable *v);
   Type* type();
   virtual int num();
   ~PointerType(){printf("pointer type destructor\n");}
@@ -162,6 +167,7 @@ class ProjectionType : public Type // complex type
   ProjectionType(const char* id, const char* real_type, std::vector<ProjectionField*> fields);
   virtual Marshal_type* accept(MarshalVisitor *worker, Registers *data);
   virtual CCSTTypeName* accept(TypeNameVisitor *worker);
+  virtual CCSTStatement* accept(AllocateTypeVisitor *worker, Variable *v);
   const char* id();
   const char* real_type();
   std::vector<ProjectionField*> fields();
@@ -297,11 +303,11 @@ class AllocateTypeVisitor
   CCSTStatement* allocation_helper(ProjectionType *vt, Variable *v, int pointer_count);
  public:
   AllocateTypeVisitor();
-  CCSTStatement* visit(Typedef *td);
-  CCSTStatement* visit(VoidType *vt);
-  CCSTStatement* visit(IntegerType *it);
-  CCSTStatement* visit(PointerType *pt);
-  CCSTStatement* visit(ProjectionType *pt);
+  CCSTStatement* visit(Typedef *td, Variable *v);
+  CCSTStatement* visit(VoidType *vt, Variable *v);
+  CCSTStatement* visit(IntegerType *it, Variable *v);
+  CCSTStatement* visit(PointerType *pt, Variable *v);
+  CCSTStatement* visit(ProjectionType *pt, Variable *v);
   
   
 };

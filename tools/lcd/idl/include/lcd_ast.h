@@ -12,6 +12,7 @@
 class MarshalVisitor;
 
 enum PrimType {pt_char_t, pt_short_t, pt_int_t, pt_long_t, pt_longlong_t, pt_capability_t};
+enum type_k {};
 
 template<class T, class T2>
 class ASTVisitor;
@@ -26,8 +27,21 @@ class Type : public Base
 {
  public:
   virtual Marshal_type* accept(MarshalVisitor *worker, Registers *data) = 0;
+  virtual CCSTTypeName* accept(TypeNameVisitor *worker) = 0;
   virtual int num() = 0;
-  // virtual ~Type(){printf("type destructor\n");}
+  
+};
+
+class Variable : public Base
+{
+ public:
+  virtual Marshal_type* accept(MarshalVisitor *worker, Registers *data) = 0;
+  virtual Type* type() = 0;
+  virtual const char* identifier() = 0;
+  virtual void set_accessor(Variable *v) = 0;
+  virtual Variable* accessor() = 0;
+  virtual Marshal_type* marshal_info() = 0;
+  virtual Rpc* scope() = 0;
 };
 
 class Scope : public Base
@@ -73,9 +87,10 @@ class Typedef : public Type
  public:
   Typedef(const char* alias, Type* type);
   virtual Marshal_type* accept(MarshalVisitor *worker, Registers *data);
-  Type* type() { return this->type_; }
+  virtual CCSTTypeName* accept(TypeNameVisitor *worker);
+  Type* type();
   const char* alias();
-  virtual int num() {return 1;}
+  virtual int num();
   // virtual void marshal();
 };
 
@@ -84,7 +99,8 @@ class VoidType : public Type
  public:
   VoidType();
   virtual Marshal_type* accept(MarshalVisitor *worker, Registers *data);
-  virtual int num() {return 5;}
+  virtual CCSTTypeName* accept(TypeNameVisitor *worker);
+  virtual int num();
 };
 
 class IntegerType : public Type
@@ -96,47 +112,44 @@ class IntegerType : public Type
  public:
   IntegerType(PrimType type, bool un, int size);
   virtual Marshal_type* accept(MarshalVisitor *worker, Registers *data);
+  virtual CCSTTypeName* accept(TypeNameVisitor *worker);
   PrimType int_type();
   bool is_unsigned();
-  virtual int num() {return 2;}
+  virtual int num();
   ~IntegerType(){printf("inttype destructor\n");}
 };
-/*
-class CapabilityType : public IntegerType
-{
-  // is this needed?
-};
-*/
+
 class PointerType : public Type
 {
   Type* type_;
  public:
   PointerType(Type* type);
   virtual Marshal_type* accept(MarshalVisitor *worker, Registers *data);
-  Type* type() { return this->type_; }
-  virtual int num() {return 3;}
+  virtual CCSTTypeName* accept(TypeNameVisitor *worker);
+  Type* type();
+  virtual int num();
   ~PointerType(){printf("pointer type destructor\n");}
 };
 
-class ProjectionField : public Base
+class ProjectionField : public Variable //?
 {
   bool in_;
   bool out_;
-  bool alloc_;
-  bool bind_;
   Type* field_type_;
   const char* field_name_;
-  
+  Variable *accessor_; // 
+
  public:
-  ProjectionField(bool in, bool out, bool alloc, bool bind, Type* field_type, const char* field_name);
+  ProjectionField(bool in, bool out, bool alloc, bool bind, Type* field_type, const char* field_name, ProjectionType *container_projection);
   ~ProjectionField(); 
-  Type* type() { return this->field_type_; }
-  const char* field_name() { return this->field_name_; }
+  virtual Marshal_type* accept(MarshalVisitor *worker, Registers *data);
+  virtual Type* type();
+  virtual Rpc* scope();
+  virtual const char* identifier();
+  virtual void set_accessor(Variable *v);
+  virtual Variable* accessor();
   bool in();
   bool out();
-  bool alloc();
-  bool bind();
-  virtual Marshal_type* accept(MarshalVisitor *worker, Registers *data);
 };
 
 class ProjectionType : public Type // complex type
@@ -148,88 +161,106 @@ class ProjectionType : public Type // complex type
  public:
   ProjectionType(const char* id, const char* real_type, std::vector<ProjectionField*> fields);
   virtual Marshal_type* accept(MarshalVisitor *worker, Registers *data);
+  virtual CCSTTypeName* accept(TypeNameVisitor *worker);
   const char* id();
   const char* real_type();
-  std::vector<ProjectionField*> fields() { return this->fields_; }
-  virtual int num() { printf("calling projectiontype num\n"); return 4;}
+  std::vector<ProjectionField*> fields();
+  virtual int num();
   ~ProjectionType(){printf("projection type destructor\n");}
 };
 
-class Parameter : public Base
+
+class Parameter : public Variable
 {
   Type* type_;
   const char* name_;
   Marshal_type *marshal_info_;
-  
+  bool in_;
+  bool out_; 
+  bool alloc_;
+  bool bind_;
+  Variable *accessor_;
+  Rpc *function_;
+
  public:
   Parameter(Type* type, const char* name);
   ~Parameter();
   virtual Marshal_type* accept(MarshalVisitor *worker, Registers *data);
-  Type* type() { return this->type_; }
-  void set_marshal_info(Marshal_type* mt) { this->marshal_info_ = mt; }
-  Marshal_type* get_marshal_info() { return this->marshal_info_; }
-  const char* name();
+  virtual Type* type();
+  virtual Rpc* scope();
+  void set_marshal_info(Marshal_type* mt); // ??????????????????????????????
+  Marshal_type* marshal_info(); //???????????????????????????????????
+  virtual const char* identifier();
+  virtual void set_accessor(Variable *v);
+  virtual bool bind();
+  virtual bool alloc();
+  virtual bool in();
+  virtual bool out();
+  virtual Variable* accessor();
+};
+
+class ReturnVariable : public Variable
+{
+  const char* name_; // to be decided by a name space or something
+  Type* type_;
+  Marshal_type *marshal_info_;
+  Variable* accessor_;
+  Rpc* function_;
+  
+ public:
+  ReturnValue();
+  ReturnValue(Type* return_type);
+  void set_marshal_info(Marshal_type *mt);
+  Marshal_type* marshal_info();
+
+  virtual const char* identifier();
+  virtual Type* type();
+  virtual void set_accessor(Variable *v);
+  virtual Rpc* scope();
+  virtual Variable* accessor();
+};
+
+class ImplicitReturnVariable : public ReturnVariable
+{
+  Parameter* p_;
+  Marshal_type *marshal_info_;
+  Variable *accessor_;
+  Rpc* function_;
+
+ public:
+  ImplicitReturnValue(Parameter *p);
+  void set_marshal_info(Marshal_type *mt);
+  Marshal_type* marshal_info();
+
+  virtual void set_accessor(Variable *v);
+  virtual Type* type();
+  virtual const char* identifier();
+  virtual Rpc* scope();
+  virtual Variable* accessor();
 };
 
 class Rpc : public Base
 {
   const char* enum_name_;
-
-  /* special case */
-  Type* explicit_ret_type_;
-  std::vector<Type*> implicit_ret_types_; // can "Return" struct fields
-  Marshal_type *explicit_ret_marshal_info_;
-  std::vector<Marshal_type*> implicit_ret_marshal_info_;
+  SymbolTable *symbol_table_;
+  ReturnValue *explicit_return_;
+  std::vector<ImplicitReturnValue*> implicit_returns_;
   /* -------------- */
 
   char* name_;
-  std::vector<Parameter* > params_;
-
+  std::vector<Parameter* > parameters_;
+  std::vector<Parameter* > marshal_parameters_;
+  void set_implicit_returns();
  public:
-  Rpc(Type* return_type, char* name, std::vector<Parameter* > parameters);
+  Rpc(ReturnValue *return_value, char* name, std::vector<Parameter* > parameters);
   char* name();
-  Type* explicit_return_type() { return this->explicit_ret_type_; }
-  std::vector<Type*> implicit_return_types() { return this->implicit_ret_types_; }
-  std::vector<Parameter*> parameters();
-  std::vector<Marshal_type*> implicit_ret_marshal_info() { return this->implicit_ret_marshal_info_; }
-  void set_implicit_ret_marshal_info(std::vector<Marshal_type*> mt) { this->implicit_ret_marshal_info_ = mt; }
-  Marshal_type* explicit_ret_marshal_info() { return this->explicit_ret_marshal_info_; }
-  void set_explicit_ret_marshal_info(Marshal_type *mt) { this->explicit_ret_marshal_info_ = mt; }
-  virtual Marshal_type* accept(MarshalVisitor *worker, Registers *data);
-
   const char* enum_name();
   const char* callee_name();
+  std::vector<Parameter*> parameters();
+  virtual Marshal_type* accept(MarshalVisitor *worker, Registers *data);
+  ReturnValue *return_value();
+  SymbolTable* symbol_table();
 };
-
-
-
-/*
-class MessageField
-{
-  Type* field_type_;
-  char* field_name_;
-
- public:
-  MessageField(Type* field_type, char* field_name) {
-    this->field_type_ = field_type;
-    this->field_name_ = field_name; }
-  void accept(ASTVisitor *worker) { worker->visit(this); }
-};
-
-class Message : public  Definition
-{
-  char * name_;
-  std::vector<MessageField* >* fields_;
-
- public:
-  Message(char * name, std::vector<MessageField* >* fields) {
-    this->name_ = name;
-    this->fields_ = fields; }
-  DefinitionType get_definition_type() { return kMessage; }
-  void accept(ASTVisitor *worker) { worker->visit(this); }
-};
-*/
-
 
 class File : public Base
 {
@@ -245,22 +276,44 @@ class File : public Base
   
 };
 
-/*
-template<class T, class T2>
-  class ASTVisitor
+class TypeNameVisitor // generates CCSTTypeName for each type.
 {
  public:
-  virtual T* visit(File *file, T2 *data) = 0;
-  //  virtual T visit(Message *message) = 0;
-  // virtual T visit(MessageField *message_field) = 0;
-  virtual T* visit(ProjectionField *proj_field, T2 *data) = 0;
-  virtual T* visit(Rpc *rpc, T2 *data) = 0;
-  virtual T* visit(Parameter *parameter, T2 *data) = 0;
-  virtual T* visit(Typedef *type_def, T2 *data) = 0;
-  virtual T* visit(ProjectionType *proj_type, T2 *data) = 0;
-  virtual T* visit(PointerType *pointer_type, T2 *data) = 0;
-  virtual T* visit(IntegerType *integer_type, T2 *data) = 0;
-  virtual T* visit(VoidType *vt, T2 *data) = 0;
+  CCSTTypeName* visit(Typedef *td);
+  CCSTTypeName* visit(VoidType *vt);
+  CCSTTypeName* visit(IntegerType *it);
+  CCSTTypeName* visit(PointerType *pt);
+  CCSTTypeName* visit(ProjectionType *pt);
 };
-*/
+
+class AllocateTypeVisitor 
+{
+  Type* first_non_pointer(PointerType *pt);
+  int count_pointers(PointerType *pt);
+  bool pointer_to_struct(Type *t);
+  CCSTStatement* allocation_helper(IntegerType *it, Variable *v, int pointer_count);
+  CCSTStatement* allocation_helper(VoidType *vt, Variable *v, int pointer_count);
+  CCSTStatement* allocation_helper(Typedef *vt, Variable *v, int pointer_count);
+  CCSTStatement* allocation_helper(ProjectionType *vt, Variable *v, int pointer_count);
+ public:
+  AllocateTypeVisitor();
+  CCSTStatement* visit(Typedef *td);
+  CCSTStatement* visit(VoidType *vt);
+  CCSTStatement* visit(IntegerType *it);
+  CCSTStatement* visit(PointerType *pt);
+  CCSTStatement* visit(ProjectionType *pt);
+  
+  
+};
+
+class AllocateVariableVisitor 
+{
+ public:
+  AllocateVariableVisitor();
+  CCSTStatement* visit(ProjectionField *pf);
+  CCSTStatement* visit(Parameter *p);
+  CCSTStatement* visit(ReturnVariable *rv);
+  CCSTStatement* visit(ImplicitReturnVariable *irv);
+};
+
 #endif

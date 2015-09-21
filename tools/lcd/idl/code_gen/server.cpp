@@ -292,3 +292,29 @@ CCSTFile* generate_server_source(File *file)
    return c_file;
 }
 
+
+
+CCSTCompoundStatement* create_callee_body(Rpc *r)
+{
+  std::vector<Parameter*> parameters = r->parameters();
+  for(std::vector<Parameter*>::iterator it = parameters.begin(); it != parameters.end(); it ++) {
+    Parameter *p = (Parameter*) *it;
+    if(p->alloc()) {
+      AllocateVariableVisitor *worker = new AllocateVariableVisitor();
+      p->type()->accept(worker); // allocates space if needed. 
+    } else { // if not alloc must be bind?
+      // grab from some function. 
+    }
+
+    UnmarshalVariableVisitor *worker = new UnmarshalVariableVisitor();
+    p->accept(worker);
+    
+  }
+
+  // make real call.
+  
+  // for each implicit return, marshal
+
+  // marshal explicit return
+  
+}

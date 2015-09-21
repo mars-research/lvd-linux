@@ -1,5 +1,14 @@
 #include "ccst.h"
 
+CCSTPostFixExpr* access_variable(Variable *p)
+{
+  if(p->accessor() == 0x0) {
+    return new CCSTPrimaryExprId(p->identifier());
+  }
+  
+  return new CCSTPostFixExprAccess(access_parameter(p->accessor()), accessor, p->identifier()); 
+}
+
 CCSTExDeclaration* construct_enum(File *f)
 {
   const char* enum_name = "todo";

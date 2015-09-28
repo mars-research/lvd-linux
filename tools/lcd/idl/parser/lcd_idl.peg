@@ -99,7 +99,7 @@ IdentStart	=	[abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ_]
 
 IdentCont	=	IdentStart | [0123456789]
 
-File		=	Spacing v:Verbatim? d:Type_Definitions* t:Rpc* <eof> {{
+File		=	Spacing v:Verbatim? d:Type_Definitions* t:Interface* <eof> {{
 			std::vector<Rpc *> rpcs;
 			printf("in file matched everything\n");
 			for(Value::iterator it = t.getValues().begin(); it != t.getValues().end(); it ++)
@@ -111,6 +111,11 @@ File		=	Spacing v:Verbatim? d:Type_Definitions* t:Rpc* <eof> {{
 
 			}
 			  value = new File((char*) v.getValue(), current_file_scope(), rpcs); }}
+
+Interface	=	  "interface" Space+ id:Identifier Spacing OPEN globals:Parameters Spacing CLOSE Spacing OPENC Spacing d:Type_Definitions* r:Rpc* Spacing CLOSEC Spacing {{ // todo 
+			  }}
+
+
 
 Typedef		=	 "typedef" Spacing "<" Spacing rt:RealType Spacing "," Spacing mt:Type_form ">" Spacing id:Identifier Spacing {{ 
 			 Typedef * val = new Typedef((char*) rt.getValue(), (Type*) mt.getValue());
@@ -207,16 +212,22 @@ Parameters	=	f:FirstParam* l:LastParam {{ printf("in param\n");
 			params->push_back((Parameter* ) l.getValue());
 			value = params; }}
 
+function_pointer = 	"rpc" Space+ OPENS k:Keyword* CLOSES Spacing rt:Type_form Spacing OPEN Spacing "*" Spacing id:Identifer CLOSE Spacing OPEN p:Parameters CLOSE SEMI Spacing {{
+		 	      //todo
+			}}
 
 Rpc		=	"rpc" Space+ t:Type_form id1:Identifier Spacing OPEN p:Parameters CLOSE SEMI Spacing {{
-			printf("rpc value of id is: %s\n", (char *) id1.getValue());
+		//	printf("rpc value of id is: %s\n", (char *) id1.getValue());
 			std::vector<Parameter*>* params = (std::vector<Parameter*>*) p.getValue();
 			std::vector<Parameter*> params_ = *params;
-			printf("before rpc\n");
-			Rpc* r = new Rpc((Type *) t.getValue(), (char *) id1.getValue(), params_);
-			printf("after rpc\n");
+		//	printf("before rpc\n");
+			Rpc* r = new Rpc(new ReturnValue((Type *) t.getValue()), (char *) id1.getValue(), params_);
+			//printf("after rpc\n");
 			value = r; }}  
 
+Projection_constructor = "projection" Space+ id:Identifer Spacing "<" Spacing t:Proj_type ">" Spacing OPEN Spacing p:Parameters Spacing CLOSE Spacing OPENC Spacing // todo Spacing CLOSEC Spacing {{
+		       	 //todo
+		       }}
 
 Projection	=	"projection" Space+ id:Identifier Spacing "<" Spacing t:Proj_type ">" Spacing OPENC Spacing p:ProjField+ CLOSEC Spacing {{ std::vector<ProjectionField *> p_fields;
 			for(Value::iterator it = p.getValues().begin(); it != p.getValues().end(); it ++)
@@ -357,6 +368,8 @@ Type_form	=	"projection" Space+ n:Identifier Space* "*" Spacing {{
 			| "projection" Space+ name:Identifier Space+ {{ 
 			  printf("calling getType 1\n");
 			  value = getType((char*)name.getValue()); }}
+			| "channel" {{  // todo 
+			  }}
 			| type	
 
 

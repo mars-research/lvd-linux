@@ -373,6 +373,21 @@ Type_form	=	"projection" Space+ n:Identifier Space* "*" Spacing {{
 			| type	
 
 
+unnamed_lexical_scope = OPENC Spacing defs:Type_definitions* rpcs:Rpc* Spacing CLOSEC Spacing {{
+		      	      //todo not projection.
+			      // create a new unnamed scope.  
+			      // add these definitions
+			      // blah blah
+			      // return scope ?
+			      // surrounding scope will pass to this new scope itself. as outside scope
+			      // what about rpc?
+			      // rpc should point to this scope.
+			      // how will these new rpcs be added to list of all rpcs.?
+			}} 
+
+projection_unnamed_lexical_scope = OPENC Spacing defs:Type_definitions* fp:function_pointer* Spacing CLOSEC Spacing {{
+				   	 // mostly same concerns as above
+				   }}
 
 Space		=	" " | "\t" | EndOfLine
 EndOfLine	=	"\n" | "\r"

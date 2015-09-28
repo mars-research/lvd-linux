@@ -61,10 +61,84 @@ int Registers::allocate_next_free_register()
 /* marshal type code */
 
 // placed these here instead of header to avoid compilation errors
+Marshal_projection::Marshal_projection(ProjectionType *pt, std::vector<Marshal_type*> in_fields, std::vector<Marshal_type*> out_fields)
+{
+  this->pt_ = pt;
+  this->param_name_ = "";
+  this->in_fields_ = in_fields;
+  this->out_fields_ = out_fields;
+}
+
+void Marshal_projection::set_name(const char *name)
+{
+  this->param_name_ = name;
+}
+
+void Marshal_projection::set_register(int r)
+{
+  Assert(1 == 0, "Error: this operation is not allowed\n");
+}
+
+void Marshal_projection::get_register()
+{
+  Assert(1 == 0, "Error: this operation is not allowed\n");
+}
+
+std::vector<Marshal_type*> Marshal_projection::in_fields()
+{
+  return this->in_fields_;
+}
+
+std::vector<Marshal_type*> Marshal_projection::out_fields()
+{
+  return this->out_fields_;
+}
+
+Type* Marshal_projection::type()
+{
+  return (Type*) this->pt_;
+}
+
+const char* Marshal_projection::name()
+{
+  return this->param_name_;
+}
 
 CCSTCompoundStatement* Marshal_projection::accept(TypeVisitor *worker)
 {
   return worker->visit(this);
+}
+
+Marshal_integer::Marshal_integer(IntegerType *it, int r)
+{
+  this->it_ = it;
+  this->param_name_ = "";
+  this->register_ = r;
+}
+
+void Marshal_integer::set_register(int r)
+{
+  this->register_ = r;
+}
+
+int Marshal_integer::get_register()
+{
+  return this->register_;
+}
+
+void Marshal_integer::set_name(const char *name)
+{
+  this->param_name_ = name;
+}
+
+const char* Marshal_integer::name()
+{
+  return this->param_name_;
+}
+
+Type* Marshal_integer::type()
+{
+  return (Type*) this->it_;
 }
 
 CCSTCompoundStatement* Marshal_integer::accept(TypeVisitor *worker)
@@ -72,14 +146,116 @@ CCSTCompoundStatement* Marshal_integer::accept(TypeVisitor *worker)
   return worker->visit(this);
 }
 
+Marshal_void::Marshal_void(VoidType *vt)
+{
+  this->vt_ = vt;
+}
+
+void Marshal_void::set_register(int r)
+{
+  Assert(1 == 0, "Error: this operation is not allowed\n");
+}
+
+int Marshal_void::get_register()
+{
+  Assert(1 == 0, "Error: this operation is now allowed\n");
+}
+
+void Marshal_void::set_name(const char *name)
+{
+  this->param_name_ = name;
+}
+
+const char* Marshal_void::name()
+{
+  return this->param_name_;
+}
+
+Type* Marshal_void::get_type()
+{
+  return (Type*) this->vt_;
+}
+
 CCSTCompoundStatement* Marshal_void::accept(TypeVisitor *worker)
 {
   return worker->visit(this);
 }
 
+Marshal_typedef::Marshal_typedef(Typedef *t, Marshal_type *type)
+{
+  this->t_ = t;
+  this->true_type_ = type;
+}
+
+void Marshal_typedef::set_register(int r)
+{
+  true_type_->set_register(r):
+}
+
+int Marshal_typedef::get_register()
+{
+  return this->true_type_->get_register();
+}
+
+void Marshal_typedef::set_name(const char *name)
+{
+  this->param_name_ = name;
+  this->true_type_->set_name(name);
+}
+
+Type* Marshal_typedef::type()
+{
+  return (Type*) this->t_;
+}
+
+const char* Marshal_typedef::name()
+{
+  return this->param_name_;
+}
+
 CCSTCompoundStatement* Marshal_typedef::accept(TypeVisitor *worker)
 {
   return worker->visit(this);
+}
+
+Marshal_pointer::Marshal_pointer(PointerType *pt, Marshal_type *pointer_type)
+{
+  this->pt_ = pt;
+  this->m_type_ = pointer_type;
+}
+
+void Marshal_pointer::set_register(int r)
+{
+  m_type_->set_register(r);
+}
+
+int Marshal_pointer::get_register()
+{
+  return m_type_->get_register();
+}
+
+void Marshal_pointer::set_name(const char *name)
+{
+  //THINK ABOUT THIS
+  char* pointer_param_name = (char*) malloc(sizeof(char)*(strlen(name)+5));
+  sprintf(pointer_param_name, "%s_tmp", name);
+  this->m_type_->set_name(pointer_param_name); 
+  this->param_name_ = name; 
+}
+
+const char* Marshal_pointer::name()
+{
+  return this->param_name_;
+}
+
+Marshal_type* Marshal_pointer::m_type()
+{
+  return this->m_type_;
+}
+
+Type* Marshal_pointer::type()
+{
+  return (Type*) this->pt_;
 }
 
 CCSTCompoundStatement* Marshal_pointer::accept(TypeVisitor *worker)

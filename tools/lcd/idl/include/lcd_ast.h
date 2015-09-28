@@ -45,8 +45,12 @@ class Variable : public Base
   virtual Rpc* scope() = 0;
 };
 
-class Scope : public Base
+class LexicalScope : public Base
 {
+  LexicalScope *outer_scope_;
+  std::map<std::string, Type*> type_definitions_;
+  std::map<std::string, Rpc*> rpc_definitions_; // rpc or function pointer
+  
  public:
   virtual Type* lookup_symbol(const char* sym, int* err) =0;
   virtual int insert_symbol(const char* sym, Type* type) =0;

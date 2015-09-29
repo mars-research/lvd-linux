@@ -23,6 +23,33 @@ class Base
   virtual Marshal_type* accept(MarshalVisitor *worker, Registers *data) = 0;
 };
 
+class LexicalScope : public Base
+{
+  LexicalScope *outer_scope_;
+  std::map<std::string, Type*> type_definitions_;
+  std::vector<Rpc*> rpc_definitions_; // rpc or function pointer
+  std::vector<LexicalScope*> inner_scopes_;
+ public:
+  LexicalScope();
+  virtual Type* lookup(const char* sym, int* err);
+  virtual int insert(const char* sym, Type* type);
+};
+
+class GlobalScope : public LexicalScope
+{
+  static GlobalScope *instance_;
+  LexicalScope *outer_scope_;
+  std::map<std::string, Type*> type_definitions_;
+  std::vector<Rpc*> rpc_definitions_; // rpc or function pointer
+  std::vector<LexicalScope*> inner_scopes_;
+
+ public:
+  GlobalScope();
+  virtual Type* lookup(const char *symbol, int *err);
+  virtual int insert(const char *symbol, Type *type);
+  static GlobalScope* instance();
+};
+
 class Type : public Base
 {
  public:
@@ -44,45 +71,7 @@ class Variable : public Base
   virtual Marshal_type* marshal_info() = 0;
   virtual Rpc* scope() = 0;
 };
-
-class LexicalScope : public Base
-{
-  LexicalScope *outer_scope_;
-  std::map<std::string, Type*> type_definitions_;
-  std::map<std::string, Rpc*> rpc_definitions_; // rpc or function pointer
-  
- public:
-  virtual Type* lookup_symbol(const char* sym, int* err) =0;
-  virtual int insert_symbol(const char* sym, Type* type) =0;
-  virtual Marshal_type* accept(MarshalVisitor *worker, Registers *data) = 0;
-};
  
-class RootScope : public Scope
-{
-  static RootScope* instance_;
-  std::map<std::string,Type*>* types_;
-  void init_types();
-  RootScope(void);
-
- public:
-  static int test();
-  static RootScope* instance();
-  virtual Type* lookup_symbol(const char* sym, int* err);
-  virtual int insert_symbol(const char* sym, Type* type);
-  virtual Marshal_type* accept(MarshalVisitor *worker, Registers *data);
-};
-
-class FileScope : public Scope
-{
-  RootScope* root_;
-  std::map<std::string, Type*> *types_;
- public:
-  FileScope(RootScope* root);
-  virtual Type* lookup_symbol(const char* sym, int* err);
-  virtual int insert_symbol(const char* type, Type* t);
-  virtual Marshal_type* accept(MarshalVisitor *worker, Registers *data);
-};
-
 class Typedef : public Type
 {
   Type* type_;
@@ -272,18 +261,23 @@ class Rpc : public Base
   SymbolTable* symbol_table();
 };
 
-class File : public Base
+class Module : public Base
 {
-  const char* verbatim_;
-  FileScope * scope_; // has pointer to root scope
-  std::vector<Rpc *> rpc_defs_;
-  // std::vector<Message *>* message_defs_;
+  const char *verbatim_;
+  LexicalScope *module_scope_;
+  std::vector<Rpc*> rpc_defs_;
+ public:
+  File(const char* verbatim, LexicalScope* scope, std::vector<Rpc*> rpc_definitions);
+  std::vector<Rpc*> rpc_definitions();
+};
+
+class Project : public Base
+{
+  LexicalScope *project_scope_;
+  std::vector<Module*> project_modules_;
   
  public:
-  File(const char* verbatim, FileScope* fs, std::vector<Rpc* > rpc_definitions);
-  virtual Marshal_type* accept(MarshalVisitor *worker, Registers *data);
-  std::vector<Rpc*> rpc_defs();
-  
+  Project(LexicalScope global, std::vector<Module*> modules);
 };
 
 class TypeNameVisitor // generates CCSTTypeName for each type.
@@ -295,6 +289,8 @@ class TypeNameVisitor // generates CCSTTypeName for each type.
   CCSTTypeName* visit(PointerType *pt);
   CCSTTypeName* visit(ProjectionType *pt);
 };
+
+
 
 class AllocateTypeVisitor 
 {

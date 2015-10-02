@@ -42,6 +42,25 @@ GlobalScope* GlobalScope::instance()
   return instance_;
 }
 
+bool GlobalScope::insert(Rpc *r)
+{
+  std::string temp(r->name());
+  std::pair<std::string, std::vector<Parameter*> > p (temp, r->parameters());
+  std::pair<std::map<std::pair<std::string, std::vector<Parameter*> >, Rpc*>::iterator, bool> ret;
+  ret = this->rpc_definitions_.insert(std::pair<std::pair<std::string, std::vector<Parameter*> >, Rpc*>(p, r));
+  return ret.second;
+}
+
+bool GlobalScope::contains(const char *symbol)
+{
+  std::string temp(symbol);
+  if(this->type_definitions_.find(temp) == this->type_definitions_.end()) {
+    return false;
+  } else {
+    return true;
+  }
+}
+
 Type * GlobalScope::lookup(const char * sym, int* err)
 {
   std::string temp(sym);
@@ -58,7 +77,7 @@ Type * GlobalScope::lookup(const char * sym, int* err)
     }
 }
 
-int GlobalScope::insert(const char* sym, Type * value)
+bool GlobalScope::insert(const char* sym, Type * value)
 {
   std::string temp(sym);
   printf("insert %s\n",temp.c_str());
@@ -66,6 +85,22 @@ int GlobalScope::insert(const char* sym, Type * value)
   ret = type_definitions_.insert(std::pair<std::string, Type*>(temp, value));
   
   return ret.second;
+}
+
+void GlobalScope::set_outer_scope(LexicalScope *ls)
+{
+  printf("error:  attempt to set outer scope of global scope\n");
+  return;
+}
+
+void GlobalScope::add_inner_scope(LexicalScope *ls)
+{
+  this->inner_scopes_.push_back(ls);
+}
+
+void GlobalScope::add_inner_scopes(std::vector<LexicalScope*> scopes)
+{
+  printf("add inner scopes global scope todo\n");
 }
 
 /* -------------------------------------------------------------- */
@@ -75,11 +110,46 @@ LexicalScope::LexicalScope()
   this->outer_scope_ = 0x0;
 }
 
+LexicalScope::LexicalScope(LexicalScope *outer_scope)
+{
+  this->outer_scope_ = outer_scope;
+}
+
+bool LexicalScope::insert(Rpc *r)
+{
+  std::string temp(r->name());
+  std::pair<std::string, std::vector<Parameter*> > p (temp, r->parameters());
+  std::pair<std::map<std::pair<std::string, std::vector<Parameter*> >, Rpc*>::iterator, bool> ret;
+  ret = this->rpc_definitions_.insert(std::pair<std::pair<std::string, std::vector<Parameter*> >, Rpc*>(p, r));
+  return ret.second;
+}
+
+bool LexicalScope::contains(const char *symbol)
+{
+  std::string temp(symbol);
+  if(this->type_definitions_.find(temp) == this->type_definitions_.end()) {
+    if(this->outer_scope_ == 0x0) {
+      return false;
+    } else {
+      return this->outer_scope_->contains(symbol);
+    }
+  } else {
+    return true;
+  }
+
+}
+
+// is err needed if we just return null? when would null ever be valid?
 Type* LexicalScope::lookup(const char *symbol, int *err)
 {
   std::string temp(symbol);
   if(this->type_definitions_.find(temp) ==  this->type_definitions_.end()) {
-    return this->outer_scope_->lookup_symbol(symbol, err);
+    if(this->outer_scope_ == 0x0) {
+      *err = 0;
+      return 0x0;
+    } else {
+      return this->outer_scope_->lookup_symbol(symbol, err);
+    }
   }
   else {
     *err = 1;
@@ -87,13 +157,26 @@ Type* LexicalScope::lookup(const char *symbol, int *err)
   }
 }
 
-int LexicalScope::insert(const char *symbol, Type *type)
+bool LexicalScope::insert(const char *symbol, Type *type)
 {
-  std::string temp(sym);
-  printf("insert %s\n",temp.c_str());
+  std::string temp(symbol);
   std::pair<std::map<std::string,Type*>::iterator,bool> ret;
   ret = type_definitions_.insert(std::pair<std::string, Type*>(temp, value));
   
   return ret.second;
 }
 
+void LexicalScope::set_outer_scope(LexicalScope *ls)
+{
+  this->outer_scope_ = ls;
+}
+
+void LexicalScope::add_inner_scope(LexicalScope *ls)
+{
+  this->inner_scopes_.push_back(ls);
+}
+
+void LexicalScope::add_inner_scopes(std::vector<LexicalScope*> scopes)
+{
+  printf("error add inner scopes lexical scope todo\n");
+}

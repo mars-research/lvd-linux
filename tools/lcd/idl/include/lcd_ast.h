@@ -7,9 +7,14 @@
 #include <sstream>
 #include <stdio.h>
 #include "marshal_op.h"
-#include "marshal_visitor.h"
+#include "symbol_table.h"
 
 class MarshalVisitor;
+class TypeNameVisitor;
+class AllocateTypeVisitor;
+class Variable;
+
+
 
 enum PrimType {pt_char_t, pt_short_t, pt_int_t, pt_long_t, pt_longlong_t, pt_capability_t};
 enum type_k {};
@@ -20,19 +25,25 @@ class ASTVisitor;
 class Base
 {			  
  public:
-  virtual Marshal_type* accept(MarshalVisitor *worker, Registers *data) = 0;
+  // virtual Marshal_type* accept(MarshalVisitor *worker, Registers *data) = 0;
 };
 
 class LexicalScope : public Base
 {
   LexicalScope *outer_scope_;
   std::map<std::string, Type*> type_definitions_;
-  std::vector<Rpc*> rpc_definitions_; // rpc or function pointer
+  std::map<std::pair<std::string, std::vector<Parameter*> >, Rpc*> rpc_definitions_; // rpc or function pointer
   std::vector<LexicalScope*> inner_scopes_;
  public:
   LexicalScope();
-  virtual Type* lookup(const char* sym, int* err);
-  virtual int insert(const char* sym, Type* type);
+  LexicalScope(LexicalScope *outer_scope);
+  virtual bool insert(Rpc *r);
+  virtual Type* lookup(const char *sym, int* err);
+  virtual bool insert(const char *sym, Type* type);
+  virtual bool contains(const char *symbol);
+  virtual void set_outer_scope(LexicalScope *ls);
+  virtual void add_inner_scope(LexicalScope *ls);
+  virtual void add_inner_scopes(std::vector<LexicalScope*> scopes);
 };
 
 class GlobalScope : public LexicalScope
@@ -40,30 +51,35 @@ class GlobalScope : public LexicalScope
   static GlobalScope *instance_;
   LexicalScope *outer_scope_;
   std::map<std::string, Type*> type_definitions_;
-  std::vector<Rpc*> rpc_definitions_; // rpc or function pointer
+  std::map<std::pair<std::string, std::vector<Parameter*> >, Rpc*> rpc_definitions_; // rpc or function pointer
   std::vector<LexicalScope*> inner_scopes_;
 
  public:
   GlobalScope();
+  virtual bool insert(Rpc *r);
   virtual Type* lookup(const char *symbol, int *err);
-  virtual int insert(const char *symbol, Type *type);
+  virtual bool insert(const char *symbol, Type *type);
+  virtual bool contains(const char *symbol);
+  virtual void set_outer_scope(LexicalScope *ls);
+  virtual void add_inner_scope(LexicalScope *ls);
+  virtual void add_inner_scopes(std::vector<LexicalScope*> scopes);
   static GlobalScope* instance();
 };
 
 class Type : public Base
 {
  public:
-  virtual Marshal_type* accept(MarshalVisitor *worker, Registers *data) = 0;
+  // virtual Marshal_type* accept(MarshalVisitor *worker, Registers *data) = 0;
   virtual CCSTTypeName* accept(TypeNameVisitor *worker) = 0;
   virtual CCSTStatement* accept(AllocateTypeVisitor *worker, Variable *v) = 0;
   virtual int num() = 0;
-  
+  virtual const char* name() = 0;
 };
 
 class Variable : public Base
 {
  public:
-  virtual Marshal_type* accept(MarshalVisitor *worker, Registers *data) = 0;
+  // virtual Marshal_type* accept(MarshalVisitor *worker, Registers *data) = 0;
   virtual Type* type() = 0;
   virtual const char* identifier() = 0;
   virtual void set_accessor(Variable *v) = 0;
@@ -80,9 +96,10 @@ class Typedef : public Type
 
  public:
   Typedef(const char* alias, Type* type);
-  virtual Marshal_type* accept(MarshalVisitor *worker, Registers *data);
+  // virtual Marshal_type* accept(MarshalVisitor *worker, Registers *data);
   virtual CCSTTypeName* accept(TypeNameVisitor *worker);
   virtual CCSTStatement* accept(AllocateTypeVisitor *worker, Variable *v);
+  virtual const char* name();
   Type* type();
   const char* alias();
   virtual int num();
@@ -93,9 +110,10 @@ class VoidType : public Type
 {
  public:
   VoidType();
-  virtual Marshal_type* accept(MarshalVisitor *worker, Registers *data);
+  // virtual Marshal_type* accept(MarshalVisitor *worker, Registers *data);
   virtual CCSTTypeName* accept(TypeNameVisitor *worker);
   virtual CCSTStatement* accept(AllocateTypeVisitor *worker, Variable *v);
+  virtual const char* name();
   virtual int num();
 };
 
@@ -107,9 +125,10 @@ class IntegerType : public Type
   
  public:
   IntegerType(PrimType type, bool un, int size);
-  virtual Marshal_type* accept(MarshalVisitor *worker, Registers *data);
+  // virtual Marshal_type* accept(MarshalVisitor *worker, Registers *data);
   virtual CCSTTypeName* accept(TypeNameVisitor *worker);
   virtual CCSTStatement* accept(AllocateTypeVisitor *worker, Variable *v);
+  virtual const char* name();
   PrimType int_type();
   bool is_unsigned();
   virtual int num();
@@ -121,9 +140,10 @@ class PointerType : public Type
   Type* type_;
  public:
   PointerType(Type* type);
-  virtual Marshal_type* accept(MarshalVisitor *worker, Registers *data);
+  // virtual Marshal_type* accept(MarshalVisitor *worker, Registers *data);
   virtual CCSTTypeName* accept(TypeNameVisitor *worker);
   virtual CCSTStatement* accept(AllocateTypeVisitor *worker, Variable *v);
+  virtual const char* name();
   Type* type();
   virtual int num();
   ~PointerType(){printf("pointer type destructor\n");}
@@ -138,9 +158,9 @@ class ProjectionField : public Variable //?
   Variable *accessor_; // 
 
  public:
-  ProjectionField(bool in, bool out, bool alloc, bool bind, Type* field_type, const char* field_name, ProjectionType *container_projection);
+  ProjectionField(bool in, bool out, bool alloc, bool bind, Type* field_type, const char* field_name, Variable *container_projection);
   ~ProjectionField(); 
-  virtual Marshal_type* accept(MarshalVisitor *worker, Registers *data);
+  // virtual Marshal_type* accept(MarshalVisitor *worker, Registers *data);
   virtual Type* type();
   virtual Rpc* scope();
   virtual const char* identifier();
@@ -158,9 +178,10 @@ class ProjectionType : public Type // complex type
 
  public:
   ProjectionType(const char* id, const char* real_type, std::vector<ProjectionField*> fields);
-  virtual Marshal_type* accept(MarshalVisitor *worker, Registers *data);
+  // virtual Marshal_type* accept(MarshalVisitor *worker, Registers *data);
   virtual CCSTTypeName* accept(TypeNameVisitor *worker);
   virtual CCSTStatement* accept(AllocateTypeVisitor *worker, Variable *v);
+  virtual const char* name();
   const char* id();
   const char* real_type();
   std::vector<ProjectionField*> fields();
@@ -184,7 +205,7 @@ class Parameter : public Variable
  public:
   Parameter(Type* type, const char* name);
   ~Parameter();
-  virtual Marshal_type* accept(MarshalVisitor *worker, Registers *data);
+  // virtual Marshal_type* accept(MarshalVisitor *worker, Registers *data);
   virtual Type* type();
   virtual Rpc* scope();
   void set_marshal_info(Marshal_type* mt); // ??????????????????????????????
@@ -207,8 +228,8 @@ class ReturnVariable : public Variable
   Rpc* function_;
   
  public:
-  ReturnValue();
-  ReturnValue(Type* return_type);
+  ReturnVariable();
+  ReturnVariable(Type* return_type);
   void set_marshal_info(Marshal_type *mt);
   Marshal_type* marshal_info();
 
@@ -227,7 +248,7 @@ class ImplicitReturnVariable : public ReturnVariable
   Rpc* function_;
 
  public:
-  ImplicitReturnValue(Parameter *p);
+  ImplicitReturnVariable(Parameter *p);
   void set_marshal_info(Marshal_type *mt);
   Marshal_type* marshal_info();
 
@@ -242,8 +263,8 @@ class Rpc : public Base
 {
   const char* enum_name_;
   SymbolTable *symbol_table_;
-  ReturnValue *explicit_return_;
-  std::vector<ImplicitReturnValue*> implicit_returns_;
+  ReturnVariable *explicit_return_;
+  std::vector<ImplicitReturnVariable*> implicit_returns_;
   /* -------------- */
 
   char* name_;
@@ -251,24 +272,23 @@ class Rpc : public Base
   std::vector<Parameter* > marshal_parameters_;
   void set_implicit_returns();
  public:
-  Rpc(ReturnValue *return_value, char* name, std::vector<Parameter* > parameters);
+  Rpc(ReturnVariable *return_value, char* name, std::vector<Parameter* > parameters);
   char* name();
   const char* enum_name();
   const char* callee_name();
   std::vector<Parameter*> parameters();
-  virtual Marshal_type* accept(MarshalVisitor *worker, Registers *data);
-  ReturnValue *return_value();
+  // virtual Marshal_type* accept(MarshalVisitor *worker, Registers *data);
+  ReturnVariable *return_value();
   SymbolTable* symbol_table();
 };
 
 class Module : public Base
 {
-  const char *verbatim_;
+  // const char *verbatim_;
   LexicalScope *module_scope_;
-  std::vector<Rpc*> rpc_defs_;
  public:
-  File(const char* verbatim, LexicalScope* scope, std::vector<Rpc*> rpc_definitions);
-  std::vector<Rpc*> rpc_definitions();
+  Module(LexicalScope* scope);
+  std::vector<Rpc*> rpc_definitions();  
 };
 
 class Project : public Base
@@ -277,7 +297,7 @@ class Project : public Base
   std::vector<Module*> project_modules_;
   
  public:
-  Project(LexicalScope global, std::vector<Module*> modules);
+  Project(LexicalScope scope, std::vector<Module*> modules);
 };
 
 class TypeNameVisitor // generates CCSTTypeName for each type.
@@ -289,8 +309,6 @@ class TypeNameVisitor // generates CCSTTypeName for each type.
   CCSTTypeName* visit(PointerType *pt);
   CCSTTypeName* visit(ProjectionType *pt);
 };
-
-
 
 class AllocateTypeVisitor 
 {
@@ -316,6 +334,16 @@ class AllocateVariableVisitor
 {
  public:
   AllocateVariableVisitor();
+  CCSTStatement* visit(ProjectionField *pf);
+  CCSTStatement* visit(Parameter *p);
+  CCSTStatement* visit(ReturnVariable *rv);
+  CCSTStatement* visit(ImplicitReturnVariable *irv);
+};
+
+class AllocateRegisterVisitor
+{
+ public:
+  AllocateRegisterVisitor();
   CCSTStatement* visit(ProjectionField *pf);
   CCSTStatement* visit(Parameter *p);
   CCSTStatement* visit(ReturnVariable *rv);

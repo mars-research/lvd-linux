@@ -6,11 +6,12 @@ Typedef::Typedef(const char* alias, Type* type)
   this->alias_ = alias;
   this->type_ = type; // need to allocate?
 }
-
+/*
 Marshal_type* Typedef::accept(MarshalVisitor *worker, Registers *data)
 {
   return worker->visit(this, data);
 }
+*/
 
 CCSTStatement* Typedef::accept(AllocateTypeVisitor *worker, Variable *v)
 {
@@ -32,14 +33,20 @@ int Typedef::num()
   return 1;
 }
 
+const char* Typedef::name()
+{
+  return this->alias_;
+}
+
 VoidType::VoidType()
 {
 }
-
+/*
 Marshal_type* VoidType::accept(MarshalVisitor *worker, Registers *data)
 {
   return worker->visit(this, data);
 }
+*/
 
 CCSTStatement* VoidType::accept(AllocateTypeVisitor *worker, Variable *v)
 {
@@ -51,6 +58,11 @@ int VoidType::num()
   return 5;
 }
 
+const char* VoidType::name()
+{
+  return "void";
+}
+
 IntegerType::IntegerType(PrimType type, bool un, int size)
 {
   this->type_ = type;
@@ -58,10 +70,12 @@ IntegerType::IntegerType(PrimType type, bool un, int size)
   this->size_ = size;
 }
 
+/*
 Marshal_type* IntegerType::accept(MarshalVisitor* worker, Registers *data)
 {
   return worker->visit(this, data);
 }
+*/
 
 CCSTStatement* IntegerType::accept(AllocateTypeVisitor *worker, Variable *v)
 {
@@ -83,6 +97,12 @@ int IntegerType::num()
   return 2;
 }
 
+const char* IntegerType::name()
+{
+  printf("todo integer type name function.\n");
+  return "";
+}
+
 PointerType::PointerType(Type* type)
 {
   this->type_ = type;
@@ -98,31 +118,38 @@ Type* PointerType::type()
   return this->type_;
 }
 
+/*
 Marshal_type* PointerType::accept(MarshalVisitor* worker, Registers *data)
 {
   return worker->visit(this, data);
 }
+*/
 
 CCSTStatement* PointerType::accept(AllocateTypeVisitor *worker, Variable *v)
 {
   return worker->visit(this, v);
 }
 
-ProjectionField::ProjectionField(bool in, bool out, bool alloc, bool bind, Type* field_type, const char* field_name, ProjectionType *container_projection)
+const char* PointerType::name()
 {
-  this->in_ = in; 
-  this->out_ = out; 
-  this->alloc_ = alloc; 
-  this->bind_ = bind; 
-  this->field_type_ = field_type; 
-  this->field_name_ = field_name;
-  this->container_ = container_projection;
+  return this->type_->name();
 }
 
+ProjectionField::ProjectionField(bool in, bool out, bool alloc, bool bind, Type* field_type, const char* field_name, Variable *accessor)
+{
+  this->in_ = in; 
+  this->out_ = out;  
+  this->field_type_ = field_type; 
+  this->field_name_ = field_name;
+  this->accessor_ = accessor;
+}
+
+/*
 Marshal_type* ProjectionField::accept(MarshalVisitor* worker, Registers *data)
 {
   return worker->visit(this, data);
 }
+*/
 
 Type* ProjectionField::type()
 {
@@ -164,10 +191,12 @@ ProjectionType::ProjectionType(const char* id, const char* real_type, std::vecto
   this->id_ = id; this->real_type_ = real_type; this->fields_ = fields;
 }
 
+/*
 Marshal_type* ProjectionType::accept(MarshalVisitor* worker, Registers *data)
 {
   return worker->visit(this, data);
 }
+*/
 
 CCSTStatement* ProjectionType::accept(AllocateTypeVisitor *worker, Variable *v)
 {
@@ -195,16 +224,23 @@ int ProjectionType::num()
   return 4;
 }
 
+const char* ProjectionType::name()
+{
+  return this->id_;
+}
+
 Parameter::Parameter(Type* type, const char* name)
 {
   this->type_ = type;
   this->name_ = name;
 }
 
+/*
 Marshal_type* Parameter::accept(MarshalVisitor* worker, Registers *data)
 {
   return worker->visit(this, data);
 }
+*/
 
 const char* Parameter::identifier()
 {
@@ -287,12 +323,12 @@ Variable* ReturnVariable::accessor()
   return this->accessor_;
 }
 
-ImplicitReturnVariable::ImplicitReturnValue(Parameter *p)
+ImplicitReturnVariable::ImplicitReturnVariable(Parameter *p)
 {
   this->p_ = p;
 }
 
-void ImplicitReturnValue::set_marshal_info(Marshal_type *mt)
+void ImplicitReturnVariable::set_marshal_info(Marshal_type *mt)
 {
   this->marshal_info_ = mt;
 }
@@ -302,7 +338,7 @@ Marshal_type* ImplicitReturnVariable::marshal_info()
   return this->marshal_info_;
 }
 
-void ImplicitReturnVariable::set_accesor(Variable *v)
+void ImplicitReturnVariable::set_accessor(Variable *v)
 {
   this->accessor_ = v;
 }
@@ -331,7 +367,7 @@ Rpc::Rpc(ReturnVariable *return_value, char* name, std::vector<Parameter* > para
 {
   this->explicit_return_ = return_value;
   this->name_ = name;
-  this->params_ = parameters;
+  this->parameters_ = parameters;
   this->set_implicit_returns();
   this->symbol_table_ = new SymbolTable();
   
@@ -369,10 +405,12 @@ void Rpc::set_implicit_returns()
   return name_;
 }
 
+/*
 Marshal_type* Rpc::accept(MarshalVisitor* worker, Registers *data)
 {
   return worker->visit(this, data);
 }
+*/
 
 const char* Rpc::callee_name()
 {
@@ -390,22 +428,6 @@ const char* Rpc::enum_name()
 
 std::vector<Parameter*> Rpc::parameters()
 {
-  return params_;
+  return parameters_;
 }
 
-File::File(const char* verbatim, FileScope* fs, std::vector<Rpc* > rpc_definitions)
-{
-  this->verbatim_ = verbatim;
-  this->scope_ = fs;
-  this->rpc_defs_ = rpc_definitions;
-}
-
-Marshal_type* File::accept(MarshalVisitor* worker, Registers *data)
-{
-  return worker->visit(this, data);
-}
-
-std::vector<Rpc*> File::rpc_defs()
-{
-  return this->rpc_defs_;
-}

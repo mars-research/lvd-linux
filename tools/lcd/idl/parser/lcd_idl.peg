@@ -9,22 +9,34 @@ include: {{ #include "lcd_ast.h"
 	    #include <stdint.h> }}
 
 code: {{
-      static FileScope* fs_instance;
-      FileScope* current_file_scope()
+      LexicalScope *current_scope = 0x0;
+      LexicalScope *current_module_scope = 0x0;
+
+      void set_current_scope(LexicalScope *ls)
       {
-	if(!fs_instance)
-	{
-		fs_instance = new FileScope(RootScope::instance());
-	}
-	return fs_instance;
+          current_scope = ls;
       }
 
-           Type * getType(const char* type)
+      LexicalScope* get_current_scope()
+      {
+          return current_scope;
+      }
+
+      void set_current_module_scope(LexicalScope *ls)
+      {
+          current_module_scope = ls;
+      }
+
+      LexicalScope* get_current_module_scope()
+      {
+          return current_module_scope;
+      }
+
+      Type * getType(const char* type)
       {	   
-      	   printf("in getType type is: %s\n", type);
       	   int err;
-      	   FileScope* rs = current_file_scope();
-	   Type* val = rs->lookup_symbol(type, &err);
+	   LexicalScope *ls = get_current_scope();
+	   Type* val = ls->lookup_symbol(type, &err);
 	   if(!val)
 	   {	
 	   	printf("val is null\n");
@@ -37,22 +49,20 @@ code: {{
 	     printf("Error looking up type: %s\n", type);
 	     return 0; // continue execution
 	   }
-
-	   printf("val num: %d\n", val->num());
 	    return val;
       }	
 
       Type* count_pointers(Value v, const char* type)
       {
 	   Type *t = getType(type);
-	   printf("here22222\n");
+	   
 	   for(Value::iterator it = v.getValues().begin(); it != v.getValues().end(); it++)
 	   {
 		const Value & v = *it;
 		char star = (char) (intptr_t) v.getValue();
 		if(star == '*')
 		{
-		 printf("here333\n");
+		 
 		 t = new PointerType(t);		
 		}
 		else
@@ -60,24 +70,81 @@ code: {{
 			printf("Not a star\n");
 		}
 	   }
-	   printf("here444\n");
+	   
 	   return t;	
       }			
 
       void insertType(const char * sym, Type * val) // should this be void?
       {
-	FileScope *fs = current_file_scope();
-	int ret = fs->insert_symbol(sym, val);
+	LexicalScope *ls = get_current_scope();
+	bool ret = ls->insert_symbol(sym, val);
 	if(!ret)
 	{
-		ErrorReport* er = ErrorReport::instance();
-	     er->set_error();
+	    ErrorReport* er = ErrorReport::instance();
+	    er->set_error();
+	    printf("Error: type by name %s already exists in current scope.\n", type->name());
 	}
-	
       }	
 }}
 
 rules:
+
+
+File		=	Spacing v:Verbatim? GlobalScopeDefinitions t:Interface* <eof> {{
+			std::vector<Module*> modules;
+			// ignore verbatim for now		       
+			
+			for(Value::iterator it = t.getValues().begin(); it != t.getValues().end(); it ++) {
+			    const Value & v2 = *it;
+			    Module *m = (Module *) v2.getValue();
+			    modules.push_back(m);
+
+			}
+
+			value = new Project(GlobalScope::instance(), modules); }}
+
+GlobalScopeDefinitions =      Spacing d:Type_Definitions* Spacing {{
+		       	          for(Value::iterator it = d.getValues().begin(); it != d.getValues().end(); it ++) { 
+			    	      const Value & v2 = *it;
+			    	      Type *type = (Type*) v2.getValue();
+			    	      bool err = GlobalScope::instance()->insert(type->name(), type);
+				      if(!err) {
+				          printf("Error: definition already exists for a type of name %s in global scope.\n", type->name());
+				      }
+				  } 
+			      }}
+
+ModuleScopeDefinitions       =      Spacing d:Type_Definitions* Spacing {{
+		       	          // create a new current scope
+				  LexicalScope *new_scope = new LexicalScope(GlobalScope::instance());
+				  for(Value::iterator it = d.getValues().begin(); it != d.getValues().end(); it ++) { 
+			    	      const Value & v2 = *it;
+			    	      Type *type = (Type*) v2.getValue();
+			    	      bool err = new_scope->insert(type->name(), type);
+				      if(!err) {
+				          printf("Error: definition already exists for a type of name %s.\n", type->name());
+				      }
+				  }
+				  set_current_module_scope(new_scope);
+				  set_current_scope(new_scope);
+				  value = new_scope;
+			      }}
+
+UnnamedScopeDefinitions       =      Spacing d:Type_Definitions* Spacing {{
+		       	          // create a new current scope
+				  LexicalScope *new_scope = new LexicalScope(get_current_module_scope());			
+				  for(Value::iterator it = d.getValues().begin(); it != d.getValues().end(); it ++) { 
+			    	      const Value & v2 = *it;
+			    	      Type *type = (Type*) v2.getValue();
+			    	      bool err = new_scope->insert(type->name(), type);
+				      if(!err) {
+				          printf("Error: definition already exists for a type of name %s.\n", type->name());
+				      }
+				  }
+				  set_current_scope(new_scope);
+				  value = new_scope;
+			      }}
+
 
 Identifier	=	i1:IdentStart i2:IdentCont* {{ 
 			std::ostringstream total;
@@ -99,23 +166,20 @@ IdentStart	=	[abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ_]
 
 IdentCont	=	IdentStart | [0123456789]
 
-File		=	Spacing v:Verbatim? d:Type_Definitions* t:Interface* <eof> {{
-			std::vector<Rpc *> rpcs;
-			printf("in file matched everything\n");
-			for(Value::iterator it = t.getValues().begin(); it != t.getValues().end(); it ++)
-			{
-				printf("in this loop");
-				const Value & v2 = *it;
-				Rpc * rp = (Rpc *) v2.getValue();
-				rpcs.push_back(rp);
+unnamed_scope 	= 	Spacing OPENC Spacing s:UnnamedScopeDefinitions Rpc* Spacing CLOSEC Spacing {{
+			      value = s;
+			}}
 
-			}
-			  value = new File((char*) v.getValue(), current_file_scope(), rpcs); }}
+Interface	=	  "interface" Space+ id:Identifier Spacing OPEN globals:Parameters Spacing CLOSE Spacing OPENC Spacing s:ModuleScopeDefinitions Rpc* us:unnamed_scope* Spacing CLOSEC Spacing {{ 
+			      LexicalScope *module_scope = (LexicalScope*) s.getValue();
 
-Interface	=	  "interface" Space+ id:Identifier Spacing OPEN globals:Parameters Spacing CLOSE Spacing OPENC Spacing d:Type_Definitions* r:Rpc* Spacing CLOSEC Spacing {{ // todo 
+			      for(Value::iterator it = us.getValues().begin(); it != us.getValues().end(); it ++) {
+			          const Value & v2 = *it;
+				  LexicalScope *ls = (LexicalScope*) v2.getValue();
+				  module_scope->add_inner_scope(ls); 
+			      }	  
+			      value = new Module(module_scope); 
 			  }}
-
-
 
 Typedef		=	 "typedef" Spacing "<" Spacing rt:RealType Spacing "," Spacing mt:Type_form ">" Spacing id:Identifier Spacing {{ 
 			 Typedef * val = new Typedef((char*) rt.getValue(), (Type*) mt.getValue());
@@ -217,13 +281,15 @@ function_pointer = 	"rpc" Space+ OPENS k:Keyword* CLOSES Spacing rt:Type_form Sp
 			}}
 
 Rpc		=	"rpc" Space+ t:Type_form id1:Identifier Spacing OPEN p:Parameters CLOSE SEMI Spacing {{
-		//	printf("rpc value of id is: %s\n", (char *) id1.getValue());
-			std::vector<Parameter*>* params = (std::vector<Parameter*>*) p.getValue();
-			std::vector<Parameter*> params_ = *params;
-		//	printf("before rpc\n");
-			Rpc* r = new Rpc(new ReturnValue((Type *) t.getValue()), (char *) id1.getValue(), params_);
-			//printf("after rpc\n");
-			value = r; }}  
+			    std::vector<Parameter*>* params = (std::vector<Parameter*>*) p.getValue();
+			    std::vector<Parameter*> params_ = *params;
+			    Rpc* r = new Rpc(new ReturnValue((Type *) t.getValue()), (char *) id1.getValue(), params_);
+			    int err = get_current_scope()->insert(r);
+			    if(!err) {
+			        printf("Error rpc already in scope with this name %s.\n", rpc->name());
+		            }
+			    value = r; 
+			}}  
 
 Projection_constructor = "projection" Space+ id:Identifer Spacing "<" Spacing t:Proj_type ">" Spacing OPEN Spacing p:Parameters Spacing CLOSE Spacing OPENC Spacing // todo Spacing CLOSEC Spacing {{
 		       	 //todo
@@ -372,18 +438,6 @@ Type_form	=	"projection" Space+ n:Identifier Space* "*" Spacing {{
 			  }}
 			| type	
 
-
-unnamed_lexical_scope = OPENC Spacing defs:Type_definitions* rpcs:Rpc* Spacing CLOSEC Spacing {{
-		      	      //todo not projection.
-			      // create a new unnamed scope.  
-			      // add these definitions
-			      // blah blah
-			      // return scope ?
-			      // surrounding scope will pass to this new scope itself. as outside scope
-			      // what about rpc?
-			      // rpc should point to this scope.
-			      // how will these new rpcs be added to list of all rpcs.?
-			}} 
 
 projection_unnamed_lexical_scope = OPENC Spacing defs:Type_definitions* fp:function_pointer* Spacing CLOSEC Spacing {{
 				   	 // mostly same concerns as above

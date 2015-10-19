@@ -135,13 +135,12 @@ const char* PointerType::name()
   return this->type_->name();
 }
 
-ProjectionField::ProjectionField(bool in, bool out, bool alloc, bool bind, Type* field_type, const char* field_name, Variable *accessor)
+ProjectionField::ProjectionField(bool in, bool out, bool alloc, bool bind, Type* field_type, const char* field_name)
 {
   this->in_ = in; 
   this->out_ = out;  
   this->field_type_ = field_type; 
   this->field_name_ = field_name;
-  this->accessor_ = accessor;
 }
 
 /*

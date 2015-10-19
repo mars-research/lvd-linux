@@ -7,7 +7,7 @@
 class SymbolTable 
 {
   unsigned int last_tmp_;
-  vector<const char*> symbols_;
+  std::vector<const char*> symbols_;
  public:
   SymbolTable();
   const char* unique_tmp();

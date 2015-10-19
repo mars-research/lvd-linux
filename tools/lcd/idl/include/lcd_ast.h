@@ -158,7 +158,7 @@ class ProjectionField : public Variable //?
   Variable *accessor_; // 
 
  public:
-  ProjectionField(bool in, bool out, bool alloc, bool bind, Type* field_type, const char* field_name, Variable *container_projection);
+  ProjectionField(bool in, bool out, bool alloc, bool bind, Type* field_type, const char* field_name);
   ~ProjectionField(); 
   // virtual Marshal_type* accept(MarshalVisitor *worker, Registers *data);
   virtual Type* type();

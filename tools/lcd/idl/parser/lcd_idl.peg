@@ -182,8 +182,8 @@ Interface	=	  "interface" Space+ id:Identifier Spacing OPEN globals:Parameters S
 			  }}
 
 Typedef		=	 "typedef" Spacing "<" Spacing rt:RealType Spacing "," Spacing mt:Type_form ">" Spacing id:Identifier Spacing {{ 
-			 Typedef * val = new Typedef((char*) rt.getValue(), (Type*) mt.getValue());
-			 insertType((char*)id.getValue(),val);
+			     Typedef * val = new Typedef((char*) rt.getValue(), (Type*) mt.getValue());
+			     insertType((char*)id.getValue(),val);
 			 }}
 
 Verbatim	=	 "verbatim" Spacing "[" contents:VerbatimContent "]" {{ std::ostringstream total;
@@ -256,25 +256,26 @@ Include		=	"#include" Space+ "<" Spacing f:Identifier Spacing ">" Spacing {{
 			value = str.c_str(); }}
 
 FirstParam	=	t:Type_form id:Identifier Spacing COMMA Spacing {{
-			printf("first param: id is %s\n", (char*) id.getValue());
-			value = new Parameter((Type *) t.getValue(), (char *) id.getValue()); }} 
+			    value = new Parameter((Type *) t.getValue(), (char *) id.getValue()); 
+			}} 
 			  
 
 LastParam	=	t:Type_form id:Identifier Spacing {{
-			printf("last param: id is %s\n", (char*) id.getValue());
-			value = new Parameter((Type *) t.getValue(), (char *) id.getValue()); }}
+			    value = new Parameter((Type *) t.getValue(), (char *) id.getValue()); 
+			}}
 
-Parameters	=	f:FirstParam* l:LastParam {{ printf("in param\n");
-			std::vector<Parameter* >* params = new std::vector<Parameter*>();
-			for(Value::iterator it = f.getValues().begin(); it != f.getValues().end(); it ++)
-			{ 
+Parameters	=	f:FirstParam* l:LastParam {{
+			    std::vector<Parameter* >* params = new std::vector<Parameter*>();
+			    for(Value::iterator it = f.getValues().begin(); it != f.getValues().end(); it ++)
+			    { 
 			
 				const Value & v = *it;
 				Parameter* p = (Parameter* ) v.getValue();
 				params->push_back(p);
-			}
-			params->push_back((Parameter* ) l.getValue());
-			value = params; }}
+			    }
+			    params->push_back((Parameter* ) l.getValue());
+			    value = params; 
+			}}
 
 function_pointer = 	"rpc" Space+ OPENS k:Keyword* CLOSES Spacing rt:Type_form Spacing OPEN Spacing "*" Spacing id:Identifer CLOSE Spacing OPEN p:Parameters CLOSE SEMI Spacing {{
 		 	      //todo
@@ -283,17 +284,13 @@ function_pointer = 	"rpc" Space+ OPENS k:Keyword* CLOSES Spacing rt:Type_form Sp
 Rpc		=	"rpc" Space+ t:Type_form id1:Identifier Spacing OPEN p:Parameters CLOSE SEMI Spacing {{
 			    std::vector<Parameter*>* params = (std::vector<Parameter*>*) p.getValue();
 			    std::vector<Parameter*> params_ = *params;
-			    Rpc* r = new Rpc(new ReturnValue((Type *) t.getValue()), (char *) id1.getValue(), params_);
+			    Rpc* r = new Rpc(new ReturnVariable((Type *) t.getValue()), (char *) id1.getValue(), params_);
 			    int err = get_current_scope()->insert(r);
 			    if(!err) {
 			        printf("Error rpc already in scope with this name %s.\n", rpc->name());
 		            }
 			    value = r; 
 			}}  
-
-Projection_constructor = "projection" Space+ id:Identifer Spacing "<" Spacing t:Proj_type ">" Spacing OPEN Spacing p:Parameters Spacing CLOSE Spacing OPENC Spacing // todo Spacing CLOSEC Spacing {{
-		       	 //todo
-		       }}
 
 Projection	=	"projection" Space+ id:Identifier Spacing "<" Spacing t:Proj_type ">" Spacing OPENC Spacing p:ProjField+ CLOSEC Spacing {{ std::vector<ProjectionField *> p_fields;
 			for(Value::iterator it = p.getValues().begin(); it != p.getValues().end(); it ++)

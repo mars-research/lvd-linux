@@ -203,6 +203,7 @@ enum page_cache_mode {
 
 #define PAGE_KERNEL_IO			__pgprot(__PAGE_KERNEL_IO)
 #define PAGE_KERNEL_IO_NOCACHE		__pgprot(__PAGE_KERNEL_IO_NOCACHE)
+#define PAGE_KERNEL_IO_LARGE	__pgprot(__PAGE_KERNEL_IO | _PAGE_PSE)
 
 /*         xwr */
 #define __P000	PAGE_NONE

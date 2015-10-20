@@ -2820,6 +2820,24 @@ extern loff_t no_seek_end_llseek(struct file *, loff_t, int);
 extern int generic_file_open(struct inode * inode, struct file * filp);
 extern int nonseekable_open(struct inode * inode, struct file * filp);
 
+#ifdef CONFIG_FS_XIP
+extern ssize_t xip_file_read(struct file *filp, char __user *buf, size_t len,
+			     loff_t *ppos);
+extern int xip_file_mmap(struct file * file, struct vm_area_struct * vma);
+extern ssize_t xip_file_write(struct file *filp, const char __user *buf,
+			      size_t len, loff_t *ppos);
+extern int xip_truncate_page(struct address_space *mapping, loff_t from);
+extern ssize_t xip_file_aio_read(struct kiocb *iocb, const struct iovec *iov,
+				unsigned long nr_segs, loff_t pos);
+extern ssize_t xip_file_aio_write(struct kiocb *iocb, const struct iovec *iov,
+				unsigned long nr_segs, loff_t pos);
+#else
+static inline int xip_truncate_page(struct address_space *mapping, loff_t from)
+{
+	return 0;
+}
+#endif
+
 #ifdef CONFIG_BLOCK
 typedef void (dio_submit_t)(struct bio *bio, struct inode *inode,
 			    loff_t file_offset);

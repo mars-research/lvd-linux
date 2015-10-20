@@ -182,6 +182,7 @@ extern unsigned int kobjsize(const void *objp);
 #define VM_ACCOUNT	0x00100000	/* Is a VM accounted object */
 #define VM_NORESERVE	0x00200000	/* should the VM suppress accounting */
 #define VM_HUGETLB	0x00400000	/* Huge TLB Page VM */
+#define VM_XIP_HUGETLB	0x00800000
 #define VM_ARCH_1	0x01000000	/* Architecture-specific flag */
 #define VM_ARCH_2	0x02000000
 #define VM_DONTDUMP	0x04000000	/* Do not include in the core dump */
@@ -280,6 +281,11 @@ extern pgprot_t protection_map[16];
 #define FAULT_FLAG_USER		0x40	/* The fault originated in userspace */
 #define FAULT_FLAG_REMOTE	0x80	/* faulting for non current tsk/mm */
 #define FAULT_FLAG_INSTRUCTION  0x100	/* The fault was during an instruction fetch */
+
+static inline int is_xip_hugetlb_mapping(struct vm_area_struct *vma)
+{
+	return !!(vma->vm_flags & VM_XIP_HUGETLB);
+}
 
 /*
  * vm_fault is filled by the the pagefault handler and passed to the vma's
@@ -1277,6 +1283,13 @@ static inline int fixup_user_fault(struct task_struct *tsk,
 	return -EFAULT;
 }
 #endif
+
+extern pte_t *pte_alloc_pagesz(struct mm_struct *mm, unsigned long addr, 
+														unsigned long sz);
+extern pte_t *pte_offset_pagesz(struct mm_struct *mm, unsigned long addr, 
+														unsigned long *sz);
+extern void unmap_xip_hugetlb_range(struct vm_area_struct *vma,
+									unsigned long start, unsigned long end);
 
 extern int access_process_vm(struct task_struct *tsk, unsigned long addr, void *buf, int len, int write);
 extern int access_remote_vm(struct mm_struct *mm, unsigned long addr,

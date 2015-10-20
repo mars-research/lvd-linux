@@ -13,3 +13,5 @@ obj-$(CONFIG_LCD_TEST_MOD_IPC2)         += ipc2/
 obj-$(CONFIG_LCD_TEST_MOD_LIBLCD_TESTS) += liblcd-tests/
 
 obj-$(CONFIG_LCD_TEST_MOD_CREATE_KLCD)  += create-klcd/
+
+obj-$(CONFIG_LCD_TEST_MOD_PMFS)         += pmfs/

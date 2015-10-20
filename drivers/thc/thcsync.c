@@ -23,6 +23,7 @@
 void thc_latch_init(struct thc_latch *l) {
   l->c = 0;
 }
+EXPORT_SYMBOL(thc_latch_init);
 
 //......................................................................
 //

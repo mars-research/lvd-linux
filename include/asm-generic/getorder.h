@@ -5,7 +5,7 @@
 
 #include <linux/compiler.h>
 #include <linux/log2.h>
-
+#include <asm/page.h>
 /*
  * Runtime evaluation of get_order()
  */

@@ -238,6 +238,12 @@ static struct symbol *__add_symbol(const char *name, enum symbol_type type,
 			return NULL;
 	}
 
+	if (!name) {
+		print_location();
+		fprintf(stderr, "Unexpected symbol with NULL name\n");
+		return NULL;
+	}
+
 	h = crc32(name) % HASH_BUCKETS;
 	for (sym = symtab[h]; sym; sym = sym->hash_next) {
 		if (map_to_ns(sym->type) == map_to_ns(type) &&

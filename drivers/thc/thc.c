@@ -274,6 +274,7 @@ static void thc_pendingfree(PTState_t * pts) {
 void _thc_pendingfree(void) {
   thc_pendingfree(PTS());
 }
+EXPORT_SYMBOL(_thc_pendingfree);
 
 #ifdef CONFIG_LAZY_THC
 
@@ -596,16 +597,23 @@ static void init_lazy_awe (void ** lazy_awe_fp) {
   awe_t *awe = THC_LAZY_FRAME_AWE(lazy_awe_fp);
   // if we had created and scheduled the continuation
   // of this async no need to do it again
+
+  printk(KERN_ERR "\nthe value of the lazy frame awe is: %x\n", (int)awe);
+
   if (awe->status != LAZY_AWE) {
 	return;
   }
   //DEBUG_AWE(DEBUGPRINTF(DEBUG_AWE_PREFIX " found lazy awe %p @ frameptr %p",
   //			awe, lazy_awe_fp));
   // Scrub nested return, lazy awe will now return through dispatch loop
+
+  printk(KERN_ERR "\nscrubbing nested return (lazy_awe_fp)\n");
   THC_LAZY_FRAME_RET(lazy_awe_fp) = NULL;
+  printk(KERN_ERR "\ndone setting nested return, allocating lazy stack\n");
   //assert(awe->status == LAZY_AWE);
   // Allocate a new stack for this awe
   alloc_lazy_stack(awe);
+  printk(KERN_ERR "\ndone allocating lazy stack, starting async\n");
   // lazily start async block
   _thc_startasync(awe->current_fb, awe->lazy_stack);
   // schedule lazy awe
@@ -623,12 +631,16 @@ static void check_for_lazy_awe (void * ebp) {
 	if (ret_addr == &_thc_lazy_awe_marker) {
 		printk(KERN_ERR "\nlcd async the awe marker is found\n");
 		init_lazy_awe(frame_ptr);
+		printk(KERN_ERR "\nlazy_awe_initialzed.\n");
 		//break;
-    }
+    	}
+    printk(KERN_ERR "trying to get ebp\n");
     frame_ptr = (void **) THC_LAZY_FRAME_PREV(frame_ptr);
+    printk(KERN_ERR "frame_ptr is %llx\n", (unsigned long long)frame_ptr);
+    printk(KERN_ERR "got ebp\n");
 	if (frame_ptr != NULL) {
 		ret_addr   = THC_LAZY_FRAME_RET(frame_ptr);	
-    }
+    	}
   } 
   //DEBUG_AWE(DEBUGPRINTF(DEBUG_AWE_PREFIX "< CheckForLazyAWE\n"));
 }
@@ -649,11 +661,24 @@ static inline void check_for_lazy_awe (void * ebp) { }
 
 void _thc_startfinishblock(finish_t *fb, int fb_kind) {
   PTState_t *pts = PTS();
+
+  if( pts == NULL )
+  {
+	  printk(KERN_WARNING "PTS is NULL\n");
+	  return;
+  }
+
   finish_t *current_fb = pts->current_fb;
   DEBUG_FINISH(DEBUGPRINTF(DEBUG_FINISH_PREFIX "> StartFinishBlock (%p,%s)\n",
                            fb,
                            (fb_kind == 0) ? "FINISH" : "TOP-FINISH"));
-  //assert(PTS() && (PTS()->doneInit) && "Not initialized RTS");
+   if( fb == NULL )
+  {
+	  printk(KERN_WARNING "FB is NULL\n");
+	  return;
+  }
+
+ //assert(PTS() && (PTS()->doneInit) && "Not initialized RTS");
   fb -> count = 0;
   fb -> finish_awe = NULL;
   fb->cancel_item = NULL;
@@ -707,6 +732,7 @@ void _thc_startfinishblock(finish_t *fb, int fb_kind) {
   PTS()->finishBlocksStarted ++;
 #endif
 }
+EXPORT_SYMBOL(_thc_startfinishblock);
 
 __attribute__ ((unused))
 static void _thc_endfinishblock0(void *a, void *f) {
@@ -830,6 +856,8 @@ void _thc_endfinishblock(finish_t *fb, void *stack) {
   pts->finishBlocksEnded ++;
 #endif
 }
+EXPORT_SYMBOL(_thc_endfinishblock);
+
 
 void _thc_startasync(void *f, void *stack) {
   finish_t *fb = (finish_t*)f;
@@ -887,6 +915,7 @@ void _thc_endasync(void *f, void *s) {
   thc_dispatch(pts);
   NOT_REACHED;
 }
+EXPORT_SYMBOL(_thc_endasync);
 
 /***********************************************************************/
 
@@ -925,6 +954,7 @@ static void thc_yield_with_cont(void *a, void *arg) {
 void THCYield(void) {
   CALL_CONT_LAZY((void*)&thc_yield_with_cont, NULL);
 }
+EXPORT_SYMBOL(THCYield);
 
 __attribute__ ((unused))
 static void thc_yieldto_with_cont(void *a, void *arg) {
@@ -960,6 +990,7 @@ void THCYieldTo(awe_t *awe_ptr) {
     THCSchedule(awe_ptr);
   }
 }
+EXPORT_SYMBOL(THCYieldTo);
 
 void THCFinish(void) {
   thc_dispatch(PTS());
@@ -1208,6 +1239,7 @@ void thc_init(void) {
   PTS()->idle_args = NULL;
   PTS()->idle_stack = NULL;	
 }
+EXPORT_SYMBOL(thc_init);
 
 /*
 __attribute__((destructor))
@@ -1219,7 +1251,7 @@ static void thc_done(void) {
 void thc_done(void) {
   thc_end_rts();
 }
-
+EXPORT_SYMBOL(thc_done);
 
 //struct run_args {
 //  int argc;
@@ -1755,7 +1787,7 @@ void  _thc_lazy_awe_marker() {
   //assert(0 && "_thc_lazy_awe_marker not implemented for this architecture");
 }
 #endif
-
+EXPORT_SYMBOL(_thc_lazy_awe_marker);
 /***********************************************************************/
 
 // 4. Per-thread state

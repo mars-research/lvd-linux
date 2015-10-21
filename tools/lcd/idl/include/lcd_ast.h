@@ -87,6 +87,20 @@ class Variable : public Base
   virtual Marshal_type* marshal_info() = 0;
   virtual Rpc* scope() = 0;
 };
+
+class FunctionPointer : public Type
+{
+  const char *identifier_;
+  Type *return_type_;
+  std::vector<FPParameter*> parameters_;
+
+ public:
+  FunctionPointer(const char *id, Type *return_type, std::vector<FPParameter*> parameters);
+  virtual CCSTTypeName* accept(TypeNameVisitor *worker);
+  virtual CCSTStatement* accept(AllocateTypeVisitor *worker, Variable *v);
+  virtual int num();
+  virtual const char* name();
+};
  
 class Typedef : public Type
 {
@@ -189,7 +203,6 @@ class ProjectionType : public Type // complex type
   ~ProjectionType(){printf("projection type destructor\n");}
 };
 
-
 class Parameter : public Variable
 {
   Type* type_;
@@ -217,6 +230,13 @@ class Parameter : public Variable
   virtual bool in();
   virtual bool out();
   virtual Variable* accessor();
+};
+
+class FPParameter : public Parameter
+{
+  Type *type_;
+ public:
+  FPParameter(Type *type);
 };
 
 class ReturnVariable : public Variable

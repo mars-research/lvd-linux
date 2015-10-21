@@ -1,6 +1,34 @@
 #include "lcd_ast.h"
 #include <stdio.h>
 
+FunctionPointer::FunctionPointer(const char *id, Type *return_type, std::vector<FPParameter*> parameters)
+{
+  this->identifier_  = id;
+  this->return_type_ = return_type;
+  this->parameters_  = parameters;
+}
+
+CCSTTypeName* FunctionPointer::accept(TypeNameVisitor *worker)
+{
+  return worker->visit(this);
+}
+
+CCSTStatement* FunctionPointer::accept(AllocateTypeVisitor *worker, Variable *v)
+{
+  return worker->visit(this, v);
+}
+
+int FunctionPointer::num()
+{
+  printf("num todo for function pointer\n");
+  return -2;
+}
+
+const char* FunctionPointer::name()
+{
+  return this->identifier_;
+}
+
 Typedef::Typedef(const char* alias, Type* type)
 {
   this->alias_ = alias;
@@ -226,6 +254,27 @@ int ProjectionType::num()
 const char* ProjectionType::name()
 {
   return this->id_;
+}
+
+FPParameter::FPParameter(Type *type)
+{
+  this->type_ = type;
+}
+
+Type* FPParameter::type()
+{
+  return this->type_;
+}
+
+const char* FPParameter::identifier()
+{
+  Assert(1 == 0, "Error: operation not allowed on function pointer parameter\n");
+}
+
+Parameter::Parameter()
+{
+  this->type_ = null;
+  this->name_ = "";
 }
 
 Parameter::Parameter(Type* type, const char* name)

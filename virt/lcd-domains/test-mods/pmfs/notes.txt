@@ -1,0 +1,159 @@
+
+========================================
+Outstanding Issues
+========================================
+
+-- Some code uses the "constructor" (ctor) feature for slab caches. This is
+   only called once when a cache grows, and there is no matching
+   "destructor" when a cache shrinks. For an example, see the notes for
+   the glue code for VFS::init_inode_once.
+
+========================================
+Glue code containers in original code
+========================================
+
+Glue code expects objects that pass through the interface boundary
+to be wrapped in container structs. We have to identify what those
+objects are that pass through interfaces (many objects are internal
+to the subsystem, so it's not necessary to do this).
+
+PMFS (and other modules) will often wrap interface objects within 
+*their own* container structs. So, our container needs to wrap around 
+*their container* to preserve backward compatability.
+
+Also, the caller or the callee can allocate interface objects. For example,
+during mount, filesystems typically call the mount_bdev/mount_nodev helper
+functions in the vfs in super.c. These helper functions will ultimately
+allocate a struct super_block (in the case of mount_bdev, if one does 
+not already exist for the device).
+
+IDL notes: it doesn't seem like there's an easy way to automate this
+task (updating the original code to use glue code containers). Ideally,
+original code uses helpers to access some of these structs we're wrapping
+in containers, so we can just update the helpers. We *may* be able to automate 
+deciding which structs are caller/callee alloc'd.
+
+PMFS-Side Allocs
+----------------
+
+-- struct pmfs_inode_vfs
+   -- defined in fs/pmfs/pmfs.h
+   -- solution: use anonymous struct type in super.c (so we don't introduce
+      a name dependency inside the original pmfs code) when we create the
+      slab cache, and update the alloc/free helpers to unpack the
+      pmfs_inode_vfs from our glue container struct. The anonymous container
+      struct will add two 64-bit fields that the glue will use to hold
+      remote references (one for the vfs remote copy, and one for pmfs's
+      own copy)
+   -- updated:
+      -- fs/pmfs/super.c:init_inodecache
+      -- fs/pmfs/super.c:pmfs_alloc_inode
+      -- fs/pmfs/super.c:init_once (involved in alloc)
+      -- fs/pmfs/super.c:pmfs_i_callback (involved in dealloc)
+
+========================================
+PMFS --> VFS Calls TODO
+========================================
+
+-- init_inode_once
+   -- called in fs/pmfs/super.c:init_once
+   -- arg1 stateful: bind
+   -- !!interesting - this is only called *once* for the entire lifetime
+      of a page in the slab cache. This is a typical call path:
+
+            VFS                            PMFS
+            ---         |           |      ----
+                        |           |
+      sget {            |           |
+                        |           |
+           alloc_inode--|--.        |
+                        |  \        |
+      }                 |   '->-->--|-> alloc_inode {
+                        |           |
+                        |           |        kmem_cache_alloc(..., init_once)
+                        |           |                               |
+                        |           |   }                           V
+                        |           |                               |
+                        |           |                               V
+                        |           |                               |
+                        |           |      .--<--<--<--<--<---------'
+                        |           |      |
+                        |           |   init_once {
+                        |           |
+    init_inode_once { <-|-<--<--<---|--<--- init_inode_once
+                        |           |
+          ...           |           |   }
+                        |           |
+    }                   |           |
+                        |           |
+
+      In the picture, init_once is only called if the cache alloc causes the
+      cache to grow.
+    
+      My solution for now is to change the code in PMFS so that init_inode_once
+      is called every time. (I considered some alternatives, but they seemed to
+      require moving/copying the init_once from PMFS into the VFS glue == bad
+      idea probably.)
+
+   -- all of it (and the functions it calls) are initialization code
+      and don't use any fields in the struct inode passed to it by
+      pmfs (the caller)
+   -- the immediate caller (fs/pmfs/super.c:init_once) doesn't use the
+      inode, so it should be used under a lock (hopefully) and that's when
+      we can sync data if necessary
+   -- it may be wise to use a slab cache on the VFS side for the glue code
+      container structs
+
+-- bdi_init
+   -- called in fs/pmfs/super.c:init_pmfs_fs
+   -- arg1 stateful: alloc=caller, lifetime=PMFS LCD lifetime
+   -- need to marshal two fields, no function pointers
+
+-- register_filesystem
+   -- called in fs/pmfs/super.c:init_pmfs_fs
+   -- arg1 stateful: alloc=caller, lifetime=PMFS LCD lifetime
+   -- pmfs LCD init needs to be given a remote ref to its struct module,
+      and we need to create a glue container struct for a struct module,
+      install the remote ref there (THIS_MODULE or __this_module needs to
+      be redefined so it points to the struct module in the container)
+   -- need to marshal remote ref to module, filesystem name
+   -- need to set up caller/callee glue for function pointers ... but I think
+      only mount (even though it just calls VFS::mount_nodev, it passes a
+      function pointer). kill_sb == VFS::kill_anon_super, so we should be 
+      able to call that directly from VFS (VFS will take a semaphore on 
+      the super block, and we can maybe do cross-domain sync then).
+
+-- bdi_destroy
+   -- called in fs/pmfs/super.c:init_pmfs_fs,exit_pmfs_fs
+   -- arg1 stateful: bind, dealloc=caller alloc'd (free glue container on
+      VFS side)
+   -- no fields to marshal
+
+-- unregister_filesystem
+   -- called in fs/pmfs/super.c:init_pmfs_fs,exit_pmfs_fs
+   -- arg1 stateful: bind, dealloc=caller alloc'd
+   -- no fields to marshal (we marshalled everything during register,
+      and we didn't change anything during the life of the PMFS module, so
+      VFS has everything it needs)
+
+-- mount (function pointer in struct file_system_type that is passed
+   in register_filesystem invocation)
+   -- called in VFS - fs/super.c:mount_fs
+   -- arg1 stateful (file system type): bind 
+   -- arg2 marshal (flags): int arg 
+   -- arg3 no marshal (dev name): not used by pmfs
+   -- arg4 marshal (data - command line option string basically):
+               copy raw data into message regs? probably
+   
+-- 
+
+========================================
+Macros
+========================================
+
+Modules define and use special macros that lead to conditional
+compilation. For example, the PMFS module has CONFIG_PMFS_TEST
+to toggle on/off building testing code.
+
+It may be necessary to allow those macros to be toggled on/off
+still when we build a module for isolation.

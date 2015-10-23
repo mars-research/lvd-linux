@@ -982,8 +982,25 @@ struct pmfs_blocknode *pmfs_alloc_blocknode(struct super_block *sb)
 
 static struct inode *pmfs_alloc_inode(struct super_block *sb)
 {
+#ifdef LCD_ISOLATE
+	/*
+	 * We need to pull out the struct pmfs_inode_vfs from the
+	 * glue code container.
+	 */
+	struct {
+		struct pmfs_inode_vfs x;
+		u64 vfs_ref;
+		u64 pmfs_ref;
+	} *c = kmem_cache_alloc(pmfs_inode_cachep, GFP_NOFS);
+
+	struct pmfs_inode_vfs *vi = &c->x;	
+
+#else
+
 	struct pmfs_inode_vfs *vi = (struct pmfs_inode_vfs *)
 				     kmem_cache_alloc(pmfs_inode_cachep, GFP_NOFS);
+
+#endif
 
 	if (!vi)
 		return NULL;
@@ -995,7 +1012,25 @@ static void pmfs_i_callback(struct rcu_head *head)
 {
 	struct inode *inode = container_of(head, struct inode, i_rcu);
 
+#ifdef LCD_ISOLATE
+	/*
+	 * We need to ensure the entire glue code container struct is
+	 * freed. (This involves a "double container-of" operation.)
+	 */
+	kmem_cache_free(pmfs_inode_cachep, 
+			container_of(PMFS_I(inode),
+				struct {
+					struct pmfs_inode_vfs x;
+					u64 vfs_ref;
+					u64 pmfs_ref;
+				},
+				x));
+#else
+
 	kmem_cache_free(pmfs_inode_cachep, PMFS_I(inode));
+
+#endif
+
 }
 
 static void pmfs_destroy_inode(struct inode *inode)
@@ -1005,7 +1040,29 @@ static void pmfs_destroy_inode(struct inode *inode)
 
 static void init_once(void *foo)
 {
+#ifdef LCD_ISOLATE
+	/*
+	 * This is the "constructor" for the pmfs_inode_vfs slab cache
+	 * (called when an inode is allocated from the cache). We need to
+	 * initialize the remote refs to null values, and pull out the
+	 * struct pmfs_inode_vfs from the glue code container.
+	 */
+	struct {
+		struct pmfs_inode_vfs x;
+		u64 vfs_ref;
+		u64 pmfs_ref;
+	} *c = foo;
+
+	c->vfs_ref = 0; /* null */
+	c->pmfs_ref = 0; /* null */
+	
+	struct pmfs_inode_vfs *vi = &c->x;
+
+#else
+
 	struct pmfs_inode_vfs *vi = (struct pmfs_inode_vfs *)foo;
+
+#endif
 
 	vi->i_dir_start_lookup = 0;
 	INIT_LIST_HEAD(&vi->i_truncated);
@@ -1027,10 +1084,27 @@ static int __init init_blocknode_cache(void)
 
 static int __init init_inodecache(void)
 {
+#ifdef LCD_ISOLATE
+	/*
+	 * Objects in this slab cache pass through an interface boundary
+	 * (struct inode is inside struct pmfs_inode_vfs). Put inside glue 
+	 * code container struct that adds remote refs.
+	 */
+	pmfs_inode_cachep = kmem_cache_create("pmfs_inode_cache",
+					sizeof(struct {
+						struct pmfs_inode_vfs x;
+						u64 vfs_ref;
+						u64 pmfs_ref;
+					},
+						0, (SLAB_RECLAIM_ACCOUNT |
+							SLAB_MEM_SPREAD), 
+						init_once);
+#else
 	pmfs_inode_cachep = kmem_cache_create("pmfs_inode_cache",
 					       sizeof(struct pmfs_inode_vfs),
 					       0, (SLAB_RECLAIM_ACCOUNT |
 						   SLAB_MEM_SPREAD), init_once);
+#endif
 	if (pmfs_inode_cachep == NULL)
 		return -ENOMEM;
 	return 0;

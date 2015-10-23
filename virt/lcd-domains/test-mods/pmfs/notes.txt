@@ -9,6 +9,13 @@ Outstanding Issues
    the glue code for VFS::init_inode_once.
 
 ========================================
+VFS Loop
+========================================
+
+Need to have a thread running/listening on non-isol VFS side. Set that 
+up, etc.
+
+========================================
 Glue code containers in original code
 ========================================
 
@@ -136,6 +143,10 @@ PMFS --> VFS Calls TODO
       and we didn't change anything during the life of the PMFS module, so
       VFS has everything it needs)
 
+========================================
+VFS --> PMFS Calls TODO
+========================================
+
 -- mount (function pointer in struct file_system_type that is passed
    in register_filesystem invocation)
    -- called in VFS - fs/super.c:mount_fs
@@ -144,8 +155,6 @@ PMFS --> VFS Calls TODO
    -- arg3 no marshal (dev name): not used by pmfs
    -- arg4 marshal (data - command line option string basically):
                copy raw data into message regs? probably
-   
--- 
 
 ========================================
 Macros

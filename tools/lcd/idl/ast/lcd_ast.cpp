@@ -273,7 +273,7 @@ const char* FPParameter::identifier()
 
 Parameter::Parameter()
 {
-  this->type_ = null;
+  this->type_ = 0x0;
   this->name_ = "";
 }
 

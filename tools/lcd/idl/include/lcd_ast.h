@@ -14,8 +14,6 @@ class TypeNameVisitor;
 class AllocateTypeVisitor;
 class Variable;
 
-
-
 enum PrimType {pt_char_t, pt_short_t, pt_int_t, pt_long_t, pt_longlong_t, pt_capability_t};
 enum type_k {};
 
@@ -37,6 +35,7 @@ class LexicalScope : public Base
  public:
   LexicalScope();
   LexicalScope(LexicalScope *outer_scope);
+  virtual std::vector<Rpc*> rpc_in_scope();
   virtual bool insert(Rpc *r);
   virtual Type* lookup(const char *sym, int* err);
   virtual bool insert(const char *sym, Type* type);
@@ -56,6 +55,7 @@ class GlobalScope : public LexicalScope
 
  public:
   GlobalScope();
+  virtual std::vector<Rpc*> rpc_in_scope();
   virtual bool insert(Rpc *r);
   virtual Type* lookup(const char *symbol, int *err);
   virtual bool insert(const char *symbol, Type *type);
@@ -79,13 +79,59 @@ class Type : public Base
 class Variable : public Base
 {
  public:
-  // virtual Marshal_type* accept(MarshalVisitor *worker, Registers *data) = 0;
   virtual Type* type() = 0;
   virtual const char* identifier() = 0;
   virtual void set_accessor(Variable *v) = 0;
   virtual Variable* accessor() = 0;
   virtual Marshal_type* marshal_info() = 0;
   virtual Rpc* scope() = 0;
+};
+
+class GlobalVariable : public Variable
+{
+ public:
+  GlobalVariable(Type *type, const char *id);
+  virtual Type* type() = 0;
+  virtual const char* identifier() = 0;
+};
+
+class Parameter : public Variable
+{
+  Type* type_;
+  const char* name_;
+  Marshal_type *marshal_info_;
+  bool in_;
+  bool out_; 
+  bool alloc_;
+  bool bind_;
+  Variable *accessor_;
+  Rpc *function_;
+
+ public:
+  Parameter();
+  Parameter(Type* type, const char* name);
+  ~Parameter();
+  // virtual Marshal_type* accept(MarshalVisitor *worker, Registers *data);
+  virtual Type* type();
+  virtual Rpc* scope();
+  void set_marshal_info(Marshal_type* mt); // ??????????????????????????????
+  Marshal_type* marshal_info(); //???????????????????????????????????
+  virtual const char* identifier();
+  virtual void set_accessor(Variable *v);
+  virtual bool bind();
+  virtual bool alloc();
+  virtual bool in();
+  virtual bool out();
+  virtual Variable* accessor();
+};
+
+class FPParameter : public Parameter
+{
+  Type *type_;
+ public:
+  FPParameter(Type *type);
+  virtual Type* type();
+  virtual const char* identifier();
 };
 
 class FunctionPointer : public Type
@@ -190,8 +236,9 @@ class ProjectionType : public Type // complex type
   const char* id_; 
   const char* real_type_;
   std::vector<ProjectionField*> fields_;
-
+  std::vector<GlobalVariable*> init_variables_;
  public:
+  ProjectionType(const char* id, const char* real_type, std::vector<ProjectionField*> fields, std::vector<GlobalVariable*> init_variables);
   ProjectionType(const char* id, const char* real_type, std::vector<ProjectionField*> fields);
   // virtual Marshal_type* accept(MarshalVisitor *worker, Registers *data);
   virtual CCSTTypeName* accept(TypeNameVisitor *worker);
@@ -202,43 +249,6 @@ class ProjectionType : public Type // complex type
   std::vector<ProjectionField*> fields();
   virtual int num();
   ~ProjectionType(){printf("projection type destructor\n");}
-};
-
-class Parameter : public Variable
-{
-  Type* type_;
-  const char* name_;
-  Marshal_type *marshal_info_;
-  bool in_;
-  bool out_; 
-  bool alloc_;
-  bool bind_;
-  Variable *accessor_;
-  Rpc *function_;
-
- public:
-  Parameter();
-  Parameter(Type* type, const char* name);
-  ~Parameter();
-  // virtual Marshal_type* accept(MarshalVisitor *worker, Registers *data);
-  virtual Type* type();
-  virtual Rpc* scope();
-  void set_marshal_info(Marshal_type* mt); // ??????????????????????????????
-  Marshal_type* marshal_info(); //???????????????????????????????????
-  virtual const char* identifier();
-  virtual void set_accessor(Variable *v);
-  virtual bool bind();
-  virtual bool alloc();
-  virtual bool in();
-  virtual bool out();
-  virtual Variable* accessor();
-};
-
-class FPParameter : public Parameter
-{
-  Type *type_;
- public:
-  FPParameter(Type *type);
 };
 
 class ReturnVariable : public Variable
@@ -307,9 +317,10 @@ class Rpc : public Base
 class Module : public Base
 {
   // const char *verbatim_;
-  LexicalScope *module_scope_;
+  std::vector<GlobalVariable*> globals_;
+  std::vector<Rpc*> rpc_definitions_;
  public:
-  Module(LexicalScope* scope);
+  Module(std::vector<Rpc*> rpc_definitions, std::vector<GlobalVariable*> globals);
   std::vector<Rpc*> rpc_definitions();  
 };
 
@@ -330,6 +341,7 @@ class TypeNameVisitor // generates CCSTTypeName for each type.
   CCSTTypeName* visit(IntegerType *it);
   CCSTTypeName* visit(PointerType *pt);
   CCSTTypeName* visit(ProjectionType *pt);
+  CCSTTypeName* visit(FunctionPointer *fp);
 };
 
 class AllocateTypeVisitor 
@@ -348,8 +360,7 @@ class AllocateTypeVisitor
   CCSTStatement* visit(IntegerType *it, Variable *v);
   CCSTStatement* visit(PointerType *pt, Variable *v);
   CCSTStatement* visit(ProjectionType *pt, Variable *v);
-  
-  
+  CCSTStatement* visit(FunctionPointer *fp, Variable *v);
 };
 
 class AllocateVariableVisitor 

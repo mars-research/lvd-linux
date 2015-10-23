@@ -183,6 +183,10 @@ unnamed_scope 	= 	Spacing OPENC Spacing s:UnnamedScopeDefinitions Rpc* Spacing C
 			    value = s;
 			}}
 
+pc_unnamed_scope=	Spacing OPENC Spacing s:UnnamedScopeDefinitions p:ProjField* Spacing CLOSEC Spacing {{
+			    
+			}}
+
 Interface	=	  "interface" Space+ id:Identifier Spacing OPEN globals:Parameters Spacing CLOSE Spacing OPENC Spacing s:ModuleScopeDefinitions Rpc* us:unnamed_scope* Spacing CLOSEC Spacing {{ 
 			      LexicalScope *module_scope = (LexicalScope*) s.getValue();
 
@@ -281,7 +285,10 @@ FirstParam	=	t:Type_form id:Identifier Spacing COMMA Spacing {{
 FP_FirstParam	=	t:Type_form Spacing COMMA Spacing {{
 			    value = new FPParameter((Type*) t.getValue());  
 			}}
-			| FP_Parameter Spacing COMMA Spacing
+			| "rpc" Space+ rt:Type_form Spacing OPEN Spacing "*" Spacing id:Identifier CLOSE Spacing OPEN p:FP_Parameters CLOSE SEMI Spacing COMMA Spacing {{
+			    FunctionPointer *fp = new FunctionPointer((char*) id.getValue(), (Type*) rt.getValue(), (std::vector<FPParameter*>) *p.getValue());
+			    value = new FPParameter(fp);
+			}}
 			  
 LastParam	=	t:Type_form id:Identifier Spacing {{
 			    value = new Parameter((Type *) t.getValue(), (char *) id.getValue()); 
@@ -291,7 +298,10 @@ LastParam	=	t:Type_form id:Identifier Spacing {{
 FP_LastParam	=	t:Type_form Spacing {{
 			    value = new FPParameter((Type*) t.getValue());
 			}}
-			| FP_Parameter Spacing
+			|  "rpc" Space+ rt:Type_form Spacing OPEN Spacing "*" Spacing id:Identifier CLOSE Spacing OPEN p:FP_Parameters CLOSE SEMI Spacing {{
+			    FunctionPointer *fp = new FunctionPointer((char*) id.getValue(), (Type*) rt.getValue(), (std::vector<FPParameter*>) *p.getValue());
+			    value = new FPParameter(fp);
+			}}
 
 Parameters	=	f:FirstParam* l:LastParam {{
 			    std::vector<Parameter* > *params = new std::vector<FPParameter*>();

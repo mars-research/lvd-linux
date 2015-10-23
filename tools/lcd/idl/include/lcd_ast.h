@@ -186,6 +186,7 @@ class ProjectionField : public Variable //?
 
 class ProjectionType : public Type // complex type
 {
+  
   const char* id_; 
   const char* real_type_;
   std::vector<ProjectionField*> fields_;
@@ -216,6 +217,7 @@ class Parameter : public Variable
   Rpc *function_;
 
  public:
+  Parameter();
   Parameter(Type* type, const char* name);
   ~Parameter();
   // virtual Marshal_type* accept(MarshalVisitor *worker, Registers *data);

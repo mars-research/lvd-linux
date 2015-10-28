@@ -89,10 +89,12 @@ class Variable : public Base
 
 class GlobalVariable : public Variable
 {
+  Type *type_;
+  const char *id_;
  public:
   GlobalVariable(Type *type, const char *id);
-  virtual Type* type() = 0;
-  virtual const char* identifier() = 0;
+  virtual Type* type();
+  virtual const char* identifier();
 };
 
 class Parameter : public Variable
@@ -213,12 +215,17 @@ class ProjectionField : public Variable //?
 {
   bool in_;
   bool out_;
+  bool alloc_;
+  bool alloc_callee_;
+  bool alloc_caller_;
+  bool alloc_callee_caller_;
+
   Type* field_type_;
   const char* field_name_;
   Variable *accessor_; // 
 
  public:
-  ProjectionField(bool in, bool out, bool alloc, bool bind, Type* field_type, const char* field_name);
+  ProjectionField(Type* field_type, const char* field_name);
   ~ProjectionField(); 
   // virtual Marshal_type* accept(MarshalVisitor *worker, Registers *data);
   virtual Type* type();
@@ -226,8 +233,19 @@ class ProjectionField : public Variable //?
   virtual const char* identifier();
   virtual void set_accessor(Variable *v);
   virtual Variable* accessor();
+  void set_in(bool b);
+  void set_out(bool b);
+  void set_alloc(bool b);
+  void set_alloc_caller(bool b);
+  void set_alloc_callee(bool b);
+  void set_alloc_callee_caller(bool b);
+
   bool in();
   bool out();
+  bool alloc();
+  bool alloc_caller():
+  bool alloc_callee();
+  bool alloc_callee_caller();
 };
 
 class ProjectionType : public Type // complex type
@@ -322,6 +340,7 @@ class Module : public Base
  public:
   Module(std::vector<Rpc*> rpc_definitions, std::vector<GlobalVariable*> globals);
   std::vector<Rpc*> rpc_definitions();  
+  std::vector<GlobalVariable*> globals();
 };
 
 class Project : public Base

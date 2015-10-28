@@ -83,3 +83,18 @@ std::vector<Parameter*> Rpc::parameters()
   return parameters_;
 }
 
+Module::Module(std::vector<Rpc*> rpc_definitions, std::vector<GlobalVariable*> globals)
+{
+  this->rpc_definitions_ = rpc_definitions;
+  this->globals_ = globals;
+}
+
+std::vector<Rpc*> Module::rpc_definitions()
+{
+  return this->rpc_definitions_;
+}
+
+std::vector<GlobalVariable*> Module::globals()
+{
+  return this->globals_;
+}

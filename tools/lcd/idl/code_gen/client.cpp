@@ -9,8 +9,34 @@ CCSTFile* generate_client_header(File* f)
   
 }
 
-CCSTFile* generate_client_source(File* f)
+CCSTDeclaration* declare_static_variable(Variable *gv)
+{
+  
+  std::vector<CCSTDecSpecifier*> specifier;
+  specifier.push_back(new CCSTStoClassSpecifier(static_t));
+
+  std::vector<CCSTDecSpecifier*> type_for_global = type(gv->type());
+  specifier.insert(specifier.end(), type_for_global.begin(), type_for_global.end());
+
+  std::vector<CCSTInitDeclarator*> declarators;
+  declarators.push_back(new CCSTDeclarator( create_pointer( count_nested_pointer(gv->type())),
+					    new CCSTDirectDecId(gv->identifier())));
+  
+  return new CCSTDeclaration(specifier, declarators);
+}
+
+CCSTFile* generate_client_source(Module* f)
 { 
+  std::vector<CCSTExDeclaration*> definitions;
+
+  // declare globals
+  for(std::vector<GlobalVariable*>::iterator it = f->globals().begin(); it != f->globals().end(); it ++) {
+    GlobalVariable *gv = (GlobalVariable*) *it;
+    definitions.push_back(declare_static_variable(gv));
+  }
+
+  // create initialization function
+
   std::vector<CCSTExDeclaration*> definitions;
   for(std::vector<Rpc*>::iterator it = f->rpc_defs().begin(); it != f->rpc_defs().end(); it ++) {
     Rpc *r = (Rpc*) *it;

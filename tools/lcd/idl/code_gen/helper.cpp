@@ -1,5 +1,25 @@
 #include "ccst.h"
 
+/*
+  creates the C code for a container struct
+  for the projection provided
+ */
+CCSTDeclaration* container_struct(const char* name, ProjectionType *pt)
+{
+
+  CCSTStructDeclaration *container_field = new CCSTStructDeclaration();
+  CCSTStructUnionSpecifier *container = new CCSTStructUnionSpecifier(struct_t, name, container_fields);
+
+
+  std::vector<CCSTDecSpecifier*> struct_specifier;
+  struct_specifier.push_back(container);
+  std::vector<CCSTInitDeclarator*> empty;
+  return new CCSTDeclaration(struct_specifier, empty);
+}
+
+
+
+
 CCSTPostFixExpr* access_variable(Variable *p)
 {
   if(p->accessor() == 0x0) {
@@ -98,7 +118,7 @@ CCSTPointer* create_pointer(int p_count)
  * from a function declaration
  * and a body
  */
-CCSTFuncDef* create_function_definition(CCSTDeclaration* function_declaration, CCSTCompoundStatement *body)
+CCSTFuncDef* function_definition(CCSTDeclaration* function_declaration, CCSTCompoundStatement *body)
 {
   Assert(function_declaration->decs_.size() == 1, "Error: More than one initializer/declarator in function declaration");
   
@@ -118,7 +138,7 @@ CCSTParamTypeList* create_parameter_list()
 /* creates a function declaration
  * from an rpc, not callee
  */
-CCSTDeclaration* create_function_declaration(Rpc* r)
+CCSTDeclaration* function_declaration(Rpc* r)
 {
   std::vector<CCSTDecSpecifier*> specifier = type(r->explicit_return_type());
   

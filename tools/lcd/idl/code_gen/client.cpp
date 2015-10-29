@@ -37,11 +37,13 @@ CCSTFile* generate_client_source(Module* f)
 
   // create initialization function
 
+  
+
   std::vector<CCSTExDeclaration*> definitions;
   for(std::vector<Rpc*>::iterator it = f->rpc_defs().begin(); it != f->rpc_defs().end(); it ++) {
     Rpc *r = (Rpc*) *it;
-    definitions.push_back(create_function_definition(create_function_declaration(r)
-						     , create_caller_body(r)));
+    definitions.push_back(function_definition(function_declaration(r)
+						     ,caller_body(r)));
   }
   
   return new CCSTFile(definitions);

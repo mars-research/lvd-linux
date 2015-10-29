@@ -407,85 +407,101 @@ Projection	=	"projection" Space+ id:Identifier Spacing "<" Spacing t:Proj_type "
 Proj_type	=  	"struct" Space+ id:Identifier Spacing {{
 			value = id;}}
 
-Keyword		=     	"out" {{ int * x = (int *) malloc(sizeof(int));
-			      *x = 1;
-			      value = x; }}
-			| "in" {{ int * x = (int *) malloc(sizeof(int));
-			       *x = 2; 
-			       value = x; }}
-			| "bind" {{ int * x = (int *) malloc(sizeof(int));
-			  	 *x = 3; 
-			  	 value = x; }}
-			| "alloc" {{ int * x = (int *) malloc(sizeof(int));
-			  	  *x = 4;
-				  value = x; }}
+Keyword		=     	"out" {{ 
+			    int * x = (int *) malloc(sizeof(int));
+			    *x = 1;
+			    value = x; 
+			}}
+			| "in" {{ 
+			    int * x = (int *) malloc(sizeof(int));
+			    *x = 2; 
+			    value = x; 
+			}}
+			| "alloc" Spacing OPEN Spacing "caller" Spacing "," "callee" Spacing CLOSE {{
+			    int *x = (int*) malloc(sizeof(int)); 
+			    *x = 6;
+			    value = x;
+			}}
+			| "alloc" Spacing OPEN Spacing "caller" Spacing CLOSE {{
+			    int *x = (int*) malloc(sizeof(int));
+			    *x = 4;
+			    value = x;
+			}}
+			| "alloc" Spacing OPEN Spacing "callee" Spacing CLOSE {{
+			    int *x = (int*) malloc(sizeof(int));
+			    *x = 5;
+			    value = x;
+			}}
+			| "alloc" {{ 
+			    int * x = (int *) malloc(sizeof(int));
+			    *x = 3;
+			    value = x; 
+			}}  
 			
 Start		=	k:Keyword Spacing COMMA Spacing {{ value = k; }}
 
 Specification	=	s:Start* l:Last {{
-			std::vector<bool>* specs = new std::vector<bool>(4, false);
-			for(Value::iterator it = s.getValues().begin(); it != s.getValues().end(); it ++)
-			{
-				const Value & v = *it;
-				int* x = (int*) v.getValue();
-				if(!x)
-				{
-					printf("error x is null\n");
-					exit(0);       
-				}
-				specs->at(*x -1) = true;
+			    std::vector<bool>* specs = new std::vector<bool>(7, false);
+			    for(Value::iterator it = s.getValues().begin(); it != s.getValues().end(); it ++) {		    
+			    const Value & v = *it;
+			    int* x = (int*) v.getValue();
+			    if(!x) {
+			        printf("error x is null\n");
+				exit(0);       
+			    }
+			    specs->at(*x) = true;
 			}
-			int * y = (int *) l.getValue();
-			if(!y) { printf("error y is null\n"); exit(0); }
-			specs->at(*y-1) = true;
-			value = specs; }}
+			    int * y = (int *) l.getValue();
+			    if(!y) { 
+			        printf("error y is null\n"); exit(0); 
+			    }
+			    specs->at(*y) = true;
+			    value = specs; 
+			}}
 
 ProjField	=	t:Type_form Spacing OPENS Spacing s:Specification CLOSES Spacing id:Identifier Spacing SEMI Spacing {{ 
-			    bool in = false; bool out = false; bool bind = false; bool alloc = false;
 			    std::vector<bool>* specs = (std::vector<bool>*) s.getValue();
-			    int i = 0;
+			    ProjectionField *pf = new ProjectionField((Type *) t.getValue(), (char *) id.getValue());
 
-			    if(specs->at(0) == true) {
-			        out = true;
-			    }					
 			    if(specs->at(1) == true) {
-			        in = true;
-			    }					
-			    if(specs->at(2) == true) {
-			        bind = true;
-			    }
-			    if(specs->at(3) == true) {
-			        alloc = true;
+			        pf->set_out(true);
+			    } if(specs->at(2) == true) {
+			        pf->set_in(true);
+			    } if(specs->at(3) == true) {
+			        pf->set_alloc(true);
+			    } if(specs->at(4) == true) {
+			        pf->set_alloc_caller(true);
+			    } if(specs->at(5) == true) {
+			        pf->set_alloc_callee(true);
+			    } if(specs->at(6) == true) {
+			        pf->alloc_callee_caller(true);
 			    }
 
 			    std::vector<ProjectionField*> *fields = new std::vector<ProjectionField*>();
-			    fields->push_back(new ProjectionField(in, out, alloc, bind, (Type *) t.getValue(), (char *) id.getValue()))
+			    fields->push_back(pf);
 			    value = fields; 
 			}}
 			| "rpc" Space+ rt:Type_form Spacing OPENS Spacing s:Specification CLOSES Spacing OPEN Spacing "*" Spacing id:Identifier CLOSE Spacing OPEN p:FP_Parameters CLOSE SEMI Spacing {{
 
-			    bool in = false; bool out = false; bool bind = false; bool alloc = false;
-			    std::vector<bool>* specs = (std::vector<bool>*) s.getValue();
-			    printf("In Proj field\n");
-			    int i = 0;
-			    printf("%zu", specs->size());
-
-			    if(specs->at(0) == true) {
-			        out = true;
-			    }					
-			    if(specs->at(1) == true) {
-			        in = true;
-			    }					
-			    if(specs->at(2) == true) {
-			        bind = true;
-			    }
-			    if(specs->at(3) == true) {
-			        alloc = true;
-			    }
-
 			    FunctionPointer *fp = new FunctionPointer((char*) id.getValue(), (Type*) rt.getValue(), (std::vector<FPParameter*>) *p.getValue());
+			    ProjectionField *pf = new ProjectionField(fp, (char*) id.getValue());
+
+			     if(specs->at(1) == true) {
+			        pf->set_out(true);
+			    } if(specs->at(2) == true) {
+			        pf->set_in(true);
+			    } if(specs->at(3) == true) {
+			        pf->set_alloc(true);
+			    } if(specs->at(4) == true) {
+			        pf->set_alloc_caller(true);
+			    } if(specs->at(5) == true) {
+			        pf->set_alloc_callee(true);
+			    } if(specs->at(6) == true) {
+			        pf->alloc_callee_caller(true);
+			    }
+
 			    std::vector<ProjectionField*> *fields = new std::vector<ProjectionField*>();
-			    fields->push_back(new ProjectionField(in, out, alloc, bind, fp, (char*) id.getValue()));
+			    fields->push_back(pf);
 			    value = fields;
 			}}
 			| pc_unnamed_scope

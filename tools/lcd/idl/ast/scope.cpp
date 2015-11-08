@@ -54,7 +54,7 @@ bool GlobalScope::insert(Rpc *r)
 bool GlobalScope::contains(const char *symbol)
 {
   std::string temp(symbol);
-  if(this->type_definitions_.find(temp) == this->type_definitions_.end()) {
+  if(this->types_definitions_.find(temp) == this->types_definitions_.end()) {
     return false;
   } else {
     return true;
@@ -65,7 +65,7 @@ Type * GlobalScope::lookup(const char * sym, int* err)
 {
   std::string temp(sym);
   
-  if(this->types_definitions_.find(temp) == this->type_definitions_.end())
+  if(this->types_definitions_.find(temp) == this->types_definitions_.end())
     {
       *err = 0;
       return 0;
@@ -73,7 +73,7 @@ Type * GlobalScope::lookup(const char * sym, int* err)
   else
     {
       *err = 1;
-      return type_definitions_[temp];
+      return types_definitions_[temp];
     }
 }
 
@@ -82,7 +82,7 @@ bool GlobalScope::insert(const char* sym, Type * value)
   std::string temp(sym);
   printf("insert %s\n",temp.c_str());
   std::pair<std::map<std::string,Type*>::iterator,bool> ret;
-  ret = type_definitions_.insert(std::pair<std::string, Type*>(temp, value));
+  ret = types_definitions_.insert(std::pair<std::string, Type*>(temp, value));
   
   return ret.second;
 }
@@ -103,7 +103,19 @@ void GlobalScope::add_inner_scopes(std::vector<LexicalScope*> scopes)
   printf("add inner scopes global scope todo\n");
 }
 
+std::map<std::string, Type*> GlobalScope::type_definitions()
+{
+  return this->types_definitions_;
+}
+
+std::vector<LexicalScope*> GlobalScope::inner_scopes()
+{
+  return this->inner_scopes_;
+}
+
+
 /* -------------------------------------------------------------- */
+
 
 LexicalScope::LexicalScope()
 {
@@ -148,7 +160,7 @@ Type* LexicalScope::lookup(const char *symbol, int *err)
       *err = 0;
       return 0x0;
     } else {
-      return this->outer_scope_->lookup_symbol(symbol, err);
+      return this->outer_scope_->lookup(symbol, err);
     }
   }
   else {
@@ -161,7 +173,7 @@ bool LexicalScope::insert(const char *symbol, Type *type)
 {
   std::string temp(symbol);
   std::pair<std::map<std::string,Type*>::iterator,bool> ret;
-  ret = type_definitions_.insert(std::pair<std::string, Type*>(temp, value));
+  ret = type_definitions_.insert(std::pair<std::string, Type*>(temp, type));
   
   return ret.second;
 }
@@ -180,3 +192,14 @@ void LexicalScope::add_inner_scopes(std::vector<LexicalScope*> scopes)
 {
   printf("error add inner scopes lexical scope todo\n");
 }
+
+std::map<std::string, Type*> LexicalScope::type_definitions()
+{
+  return this->type_definitions_;
+}
+
+std::vector<LexicalScope*> LexicalScope::inner_scopes()
+{
+  return this->inner_scopes_;
+}
+

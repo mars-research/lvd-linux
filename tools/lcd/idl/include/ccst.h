@@ -53,7 +53,7 @@ class CCSTPostFixExprAssnExpr;
 class CCSTPrimaryExpr;
 class CCSTString;
 class CCSTPrimaryExprId;
-class CCSTConst;
+class CCSTConstant;
 
 class CCSTInteger;
 class CCSTChar;
@@ -102,62 +102,11 @@ class CCSTContinue;
 class CCSTBreak;
 class CCSTReturn;
 
-/* helper functions */
-class Rpc;
-class File;
-class Type;
-class IntegerType;
-class ProjectionType;
-class PointerType;
-class Parameter;
-class ProjectionField;
-
-CCSTDeclaration* construct_callee_declaration(Rpc* r);
-CCSTExDeclaration* construct_enum(File *f);
-const char* construct_enum_name();
-CCSTEnumeratorList* construct_enumlist(std::vector<Rpc*> rps);
-char* string_to_upper(char* str);
-int count_nested_pointer(Type* p);
-CCSTPointer* create_pointer(int p_count);
-CCSTFuncDef* create_function_definition(CCSTDeclaration* function_declaration, CCSTCompoundStatement *body);
-CCSTParamTypeList* create_parameter_list();
-CCSTDeclaration* create_function_declaration(Rpc* r);
-CCSTDeclaration* create_function_declaration();
-CCSTCompoundStatement* create_dispatch_loop_body(std::vector<Rpc*> rps);
-CCSTCompoundStatement* create_callee_body(Rpc *r);
-CCSTCompoundStatement* create_caller_body(Rpc* r);
-CCSTDeclaration* create_dispatch_function_declaration();
-
-std::vector<CCSTDecSpecifier*> get_type(Type *t);
-std::vector<CCSTDecSpecifier*> get_integer_type(IntegerType *it);
-std::vector<CCSTDecSpecifier*> get_projection_type(ProjectionType *pt);
-
-CCSTTypeName* type_cast(Type *t);
-
-std::vector<CCSTDecSpecifier*>type(Type *t);
-CCSTCompoundStatement* unmarshal_parameter(Parameter *p);
-
-CCSTExprStatement* set_value_in_struct(const char *s, const char *f, const char *p, bool isP);
-
-
-/* "code generators"*/
-CCSTFile* generate_server_header(File* f);
-CCSTFile* generate_server_source(File* f);
-CCSTFile* generate_client_header(File* f);
-CCSTFile* generate_client_source(File* f);
-
-/* "code generators" end */
-
 class CCSTBase
 {
  public:
   virtual void write(FILE *f) = 0;
 };
-
-CCSTExDeclaration* construct_enum(File *f);
-CCSTEnumeratorList* construct_enumlist(std::vector<Rpc *>* rps);
-char* string_to_upper(const char* str);
-//CCSTExDeclaration* construct_callee_declaration(Rpc *r);
 
 class CCSTFile : public CCSTBase
 {
@@ -964,7 +913,7 @@ class CCSTPrimaryExprId : public CCSTPrimaryExpr
   virtual void write(FILE *f);
 };
 
-class CCSTConst : public CCSTPrimaryExpr
+class CCSTConstant : public CCSTPrimaryExpr
 {
   /*
     <constant> ::= <integer-constant>
@@ -976,15 +925,16 @@ class CCSTConst : public CCSTPrimaryExpr
   virtual void write(FILE *f) = 0;
 };
 
-class CCSTInteger : public CCSTConst
+class CCSTInteger : public CCSTConstant
 {
-  // TODO
+  int integer_;
  public:
   CCSTInteger();
+  CCSTInteger(int i);
   virtual void write(FILE *f);
 };
 
-class CCSTChar : public CCSTConst
+class CCSTChar : public CCSTConstant
 {
   
   char c_;
@@ -994,7 +944,7 @@ class CCSTChar : public CCSTConst
   virtual void write(FILE *f);
 };
 
-class CCSTFloat : public CCSTConst
+class CCSTFloat : public CCSTConstant
 {
   
   float f_;
@@ -1007,7 +957,7 @@ class CCSTFloat : public CCSTConst
   virtual void write(FILE *f);
 };
 
-class CCSTEnumConst : public CCSTConst
+class CCSTEnumConst : public CCSTConstant
 {
   
   // values in enum?

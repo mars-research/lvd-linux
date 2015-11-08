@@ -8,11 +8,18 @@
 #include <stdio.h>
 #include "marshal_op.h"
 #include "symbol_table.h"
+#include "ccst.h"
 
+class CCSTStatement;
+class CCSTTypeName;
+class Marshal_type;
 class MarshalVisitor;
 class TypeNameVisitor;
 class AllocateTypeVisitor;
 class Variable;
+class Type;
+class Parameter;
+class Rpc;
 
 enum PrimType {pt_char_t, pt_short_t, pt_int_t, pt_long_t, pt_longlong_t, pt_capability_t};
 enum type_k {};
@@ -43,13 +50,15 @@ class LexicalScope : public Base
   virtual void set_outer_scope(LexicalScope *ls);
   virtual void add_inner_scope(LexicalScope *ls);
   virtual void add_inner_scopes(std::vector<LexicalScope*> scopes);
+  virtual std::map<std::string, Type*> type_definitions();
+  virtual std::vector<LexicalScope*> inner_scopes();
 };
 
 class GlobalScope : public LexicalScope
 {
   static GlobalScope *instance_;
   LexicalScope *outer_scope_;
-  std::map<std::string, Type*> type_definitions_;
+  std::map<std::string, Type*> types_definitions_;
   std::map<std::pair<std::string, std::vector<Parameter*> >, Rpc*> rpc_definitions_; // rpc or function pointer
   std::vector<LexicalScope*> inner_scopes_;
 
@@ -63,6 +72,8 @@ class GlobalScope : public LexicalScope
   virtual void set_outer_scope(LexicalScope *ls);
   virtual void add_inner_scope(LexicalScope *ls);
   virtual void add_inner_scopes(std::vector<LexicalScope*> scopes);
+  virtual std::map<std::string, Type*> type_definitions();
+  virtual std::vector<LexicalScope*> inner_scopes();
   static GlobalScope* instance();
 };
 
@@ -95,6 +106,10 @@ class GlobalVariable : public Variable
   GlobalVariable(Type *type, const char *id);
   virtual Type* type();
   virtual const char* identifier();
+  virtual void set_accessor(Variable *v);
+  virtual Variable* accessor();
+  virtual Marshal_type* marshal_info();
+  virtual Rpc* scope();
 };
 
 class Parameter : public Variable
@@ -233,6 +248,7 @@ class ProjectionField : public Variable //?
   virtual const char* identifier();
   virtual void set_accessor(Variable *v);
   virtual Variable* accessor();
+  virtual Marshal_type* marshal_info();
   void set_in(bool b);
   void set_out(bool b);
   void set_alloc(bool b);
@@ -243,7 +259,7 @@ class ProjectionField : public Variable //?
   bool in();
   bool out();
   bool alloc();
-  bool alloc_caller():
+  bool alloc_caller();
   bool alloc_callee();
   bool alloc_callee_caller();
 };
@@ -262,7 +278,6 @@ class ProjectionType : public Type // complex type
   virtual CCSTTypeName* accept(TypeNameVisitor *worker);
   virtual CCSTStatement* accept(AllocateTypeVisitor *worker, Variable *v);
   virtual const char* name();
-  const char* id();
   const char* real_type();
   std::vector<ProjectionField*> fields();
   virtual int num();
@@ -335,12 +350,14 @@ class Rpc : public Base
 class Module : public Base
 {
   // const char *verbatim_;
+  LexicalScope *module_scope_;
   std::vector<GlobalVariable*> globals_;
   std::vector<Rpc*> rpc_definitions_;
  public:
-  Module(std::vector<Rpc*> rpc_definitions, std::vector<GlobalVariable*> globals);
+  Module(std::vector<Rpc*> rpc_definitions, std::vector<GlobalVariable*> globals, LexicalScope *ls);
   std::vector<Rpc*> rpc_definitions();  
   std::vector<GlobalVariable*> globals();
+  LexicalScope *module_scope();
 };
 
 class Project : public Base

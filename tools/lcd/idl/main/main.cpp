@@ -6,20 +6,29 @@
 #include <iostream>
 #include <string.h>
 #include "ccst.h"
-#include "marshal_visitor.h"
+//#include "marshal_visitor.h"
 
 int main(int argc, char ** argv)
 {
+  bool pDebug = false;
+
   if(argc != 4)
     {
       printf("error in number of args\n");
       exit(0);
     }
+
   try
     {
       char * file = argv[2];
-      File * tree = (File *) Parser::parse(std::string(file));
-      printf("Created tree\n");
+      // add support for multiple files
+      // add option to specify which module to compile,
+      // or option for all
+      // put each module in a different file
+      Project * tree = (Project *) Parser::parse(std::string(file));
+
+      // 
+      // todo error reporting stuff
       ErrorReport* er = ErrorReport::instance();
       if(er->errors())
 	{
@@ -27,9 +36,14 @@ int main(int argc, char ** argv)
 	  // cleanup?
 	  exit(0);
 	}
-      //   char* out_option = argv[3];
+
+      if(pDebug) { printf("successfully parsed project.\n"); }
+      
+      // no longer specify file?
       char* out_file = argv[3];
-      printf("out file: %s\n", out_file);
+      
+      if(pDebug) { printf("Wring to file: %s.\n", out_file); }
+
       FILE* of = fopen(out_file, "w");
       
       if(!of)
@@ -42,39 +56,43 @@ int main(int argc, char ** argv)
       if(!strcmp(argv[1],"-serverheader"))
 	{
 	  printf("todo\n");
-
+	  /*
 	  MarshalVisitor* mv = new MarshalVisitor();
 	  tree->accept(mv, 0x0);
 
 	  CCSTFile* ccst_tree = generate_server_header(tree);
 	  ccst_tree->write(of);
+	  */
 	  printf("completed header source writing\n");
 	}
       else if(!strcmp(argv[1],"-serversource"))
 	{
-
+	  /*
 	  MarshalVisitor *mv = new MarshalVisitor();
 	  tree->accept(mv, 0x0);
 	  printf("hereeee\n");
 	  CCSTFile* ccst_tree = generate_server_source(tree);
 	  printf("completed tree\n");
 	  ccst_tree->write(of);
+	  */
 	  printf("completed server source writing\n");
 	}
       else if(!strcmp(argv[1], "-clientheader"))
 	{
 	  printf("todo\n");
-	  
+	  /*
 	  CCSTFile* ccst_tree = generate_client_header(tree);
 	  ccst_tree->write(of);
+	  */
 	  printf("completed client header writing\n");
 	}
       else if(!strcmp(argv[1], "-clientsource"))
 	{
 	  printf("todo\n");
-	  
+	  /*
 	  CCSTFile* ccst_tree = generate_client_source(tree);
 	  ccst_tree->write(of);
+	  */
 	  printf("completed client source writing\n");
 	}
       else

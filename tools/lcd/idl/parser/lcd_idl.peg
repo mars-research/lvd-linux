@@ -36,7 +36,7 @@ code: {{
       {	   
       	   int err;
 	   LexicalScope *ls = get_current_scope();
-	   Type* val = ls->lookup_symbol(type, &err);
+	   Type* val = ls->lookup(type, &err);
 	   if(!val)
 	   {	
 	   	printf("val is null\n");
@@ -77,12 +77,12 @@ code: {{
       void insertType(const char * sym, Type * val) // should this be void?
       {
 	LexicalScope *ls = get_current_scope();
-	bool ret = ls->insert_symbol(sym, val);
+	bool ret = ls->insert(sym, val);
 	if(!ret)
 	{
 	    ErrorReport* er = ErrorReport::instance();
 	    er->set_error();
-	    printf("Error: type by name %s already exists in current scope.\n", type->name());
+	    printf("Error: type by name %s already exists in current scope.\n", val->name());
 	}
       }	
 }}
@@ -186,16 +186,17 @@ pc_unnamed_scope=	Spacing OPENC Spacing s:UnnamedScopeDefinitions p:ProjField* S
 			    std::vector<ProjectionField*> *fields = new std::vector<ProjectionField*>();
 			    for(Value::iterator it = p.getValues().begin(); it != p.getValues().end(); it ++) {
 			        const Value & v = *it;
-				std::vector<ProjectionField*> *pf = (std::<ProjectionField*>*) v.getValue();
+				std::vector<ProjectionField*> *pf = (std::vector<ProjectionField*>*) v.getValue();
 				fields->insert(fields->end(), pf->begin(), pf->end());
 			    }
 			    value = fields;
 			}}
 
-Interface	=	  "interface" Space+ id:Identifier Spacing OPEN globals:Globals Spacing CLOSE Spacing OPENC Spacing s:ModuleScopeDefinitions r:Rpc* us:unnamed_scope* Spacing CLOSEC Spacing {{ 
+Interface	=	  "interface" Space+ id:Identifier Spacing OPEN gs:Globals Spacing CLOSE Spacing OPENC Spacing s:ModuleScopeDefinitions r:Rpc* us:unnamed_scope* Spacing CLOSEC Spacing {{ 
 			      LexicalScope *module_scope = (LexicalScope*) s.getValue();
 			      std::vector<Rpc*> rpcs;	 
-			      std::vector<GlobalVariable*> globals = (std::vector<GlobalVariable*>) *globals.getValue();  
+			      std::vector<GlobalVariable*> *globals = (std::vector<GlobalVariable*>*) gs.getValue();  
+			      std::vector<GlobalVariable*> globals2 = *globals;
 
 			      for(Value::iterator it = r.getValues().begin(); it != r.getValues().end(); it ++) {
 			          const Value & v2 = *it;
@@ -210,7 +211,7 @@ Interface	=	  "interface" Space+ id:Identifier Spacing OPEN globals:Globals Spac
 				  std::vector<Rpc*> rtemp = ls->rpc_in_scope();
 				  rpcs.insert(rpcs.end(), rtemp.begin(), rtemp.end());
 			      }	  
-			      value = new Module(rpcs, globals); 
+			      value = new Module(rpcs, globals2, module_scope); 
 			  }}
 
 Typedef		=	 "typedef" Spacing "<" Spacing rt:RealType Spacing "," Spacing mt:Type_form ">" Spacing id:Identifier Spacing {{ 
@@ -288,7 +289,8 @@ Include		 =	"#include" Space+ "<" Spacing f:Identifier Spacing ">" Spacing {{
 			value = str.c_str(); }}
 
 FP_Parameter	=	"rpc" Space+ rt:Type_form Spacing OPEN Spacing "*" Spacing id:Identifier CLOSE Spacing OPEN p:FP_Parameters CLOSE SEMI {{
-			    FunctionPointer *fp = new FunctionPointer((char*) id.getValue(), (Type*) rt.getValue(), (std::vector<FPParameter*>) *p.getValue());
+			    std::vector<FPParameter*> *fpparams = (std::vector<FPParameter*>*) p.getValue();
+			    FunctionPointer *fp = new FunctionPointer((char*) id.getValue(), (Type*) rt.getValue(), *fpparams);
 			    value = new Parameter(fp, (char *) id.getValue());
 			}}
 
@@ -301,7 +303,8 @@ FP_FirstParam	=	t:Type_form Spacing COMMA Spacing {{
 			    value = new FPParameter((Type*) t.getValue());  
 			}}
 			| "rpc" Space+ rt:Type_form Spacing OPEN Spacing "*" Spacing id:Identifier CLOSE Spacing OPEN p:FP_Parameters CLOSE SEMI Spacing COMMA Spacing {{
-			    FunctionPointer *fp = new FunctionPointer((char*) id.getValue(), (Type*) rt.getValue(), (std::vector<FPParameter*>) *p.getValue());
+			    std::vector<FPParameter*> *fpparams = (std::vector<FPParameter*>*) p.getValue();
+			    FunctionPointer *fp = new FunctionPointer((char*) id.getValue(), (Type*) rt.getValue(), *fpparams);
 			    value = new FPParameter(fp);
 			}}
 			  
@@ -314,12 +317,13 @@ FP_LastParam	=	t:Type_form Spacing {{
 			    value = new FPParameter((Type*) t.getValue());
 			}}
 			|  "rpc" Space+ rt:Type_form Spacing OPEN Spacing "*" Spacing id:Identifier CLOSE Spacing OPEN p:FP_Parameters CLOSE SEMI Spacing {{
-			    FunctionPointer *fp = new FunctionPointer((char*) id.getValue(), (Type*) rt.getValue(), (std::vector<FPParameter*>) *p.getValue());
+			    std::vector<FPParameter*> *fpparams = (std::vector<FPParameter*>*) p.getValue();
+			    FunctionPointer *fp = new FunctionPointer((char*) id.getValue(), (Type*) rt.getValue(), *fpparams);
 			    value = new FPParameter(fp);
 			}}
 
 Parameters	=	f:FirstParam* l:LastParam {{
-			    std::vector<Parameter* > *params = new std::vector<FPParameter*>();
+			    std::vector<Parameter* > *params = new std::vector<Parameter*>();
 			    for(Value::iterator it = f.getValues().begin(); it != f.getValues().end(); it ++)
 			    { 
 			
@@ -369,7 +373,7 @@ Rpc		=	"rpc" Space+ t:Type_form id1:Identifier Spacing OPEN p:Parameters CLOSE S
 			    Rpc* r = new Rpc(new ReturnVariable((Type *) t.getValue()), (char *) id1.getValue(), params_);
 			    int err = get_current_scope()->insert(r);
 			    if(!err) {
-			        printf("Error rpc already in scope with this name %s.\n", rpc->name());
+			        printf("Error rpc already in scope with this name %s.\n", r->name());
 		            }
 			    value = r; 
 			}}
@@ -378,10 +382,12 @@ Globals		=
 
 Projection_constructor =    "projection" Space+ id:Identifier Spacing "<" Spacing t:Proj_type ">" Spacing OPEN Spacing g:Globals Spacing CLOSE Spacing OPENC Spacing s:ProjectionScopeDefinitions p:ProjField* us:unnamed_scope* Spacing CLOSEC Spacing {{
 		       	        std::vector<ProjectionField*> fields;
-				std::vector<GlobalVariable*> globals = (std::vector<GlobalVariable*>) *g.getValue();
+				std::vector<GlobalVariable*> *globals_ = (std::vector<GlobalVariable*>*) g.getValue();
+				std::vector<GlobalVariable*> globals = *globals_;
 				for(Value::iterator it = p.getValues().begin(); it != p.getValues().end(); it ++) {
 				    const Value & v = *it;
-				    std::vector<ProjectionField*> tmp = (std::vector<ProjectionField*>) *v.getValue();
+				    std::vector<ProjectionField*> *tmp_ = (std::vector<ProjectionField*>*) v.getValue();
+				    std::vector<ProjectionField*> tmp = *tmp_;
 				    fields.insert(fields.end(), tmp.begin(), tmp.end());
 				}
 
@@ -395,7 +401,8 @@ Projection	=	"projection" Space+ id:Identifier Spacing "<" Spacing t:Proj_type "
 			    for(Value::iterator it = p.getValues().begin(); it != p.getValues().end(); it ++)
 			    {
 				const Value & v = *it;
-				std::vector<ProjectionField*> tmp = (std::vector<ProjectionField*>) *v.getValue();
+				std::vector<ProjectionField*> *tmp_ = (std::vector<ProjectionField*>*) v.getValue();
+				std::vector<ProjectionField*> tmp = *tmp_;
 				fields.insert(fields.end(), tmp.begin(), tmp.end());
 			    } 
 			    ProjectionType * val = new ProjectionType((char* ) id.getValue(), (char*) t.getValue(), fields);
@@ -474,7 +481,7 @@ ProjField	=	t:Type_form Spacing OPENS Spacing s:Specification CLOSES Spacing id:
 			    } if(specs->at(5) == true) {
 			        pf->set_alloc_callee(true);
 			    } if(specs->at(6) == true) {
-			        pf->alloc_callee_caller(true);
+			        pf->set_alloc_callee_caller(true);
 			    }
 
 			    std::vector<ProjectionField*> *fields = new std::vector<ProjectionField*>();
@@ -482,8 +489,9 @@ ProjField	=	t:Type_form Spacing OPENS Spacing s:Specification CLOSES Spacing id:
 			    value = fields; 
 			}}
 			| "rpc" Space+ rt:Type_form Spacing OPENS Spacing s:Specification CLOSES Spacing OPEN Spacing "*" Spacing id:Identifier CLOSE Spacing OPEN p:FP_Parameters CLOSE SEMI Spacing {{
-
-			    FunctionPointer *fp = new FunctionPointer((char*) id.getValue(), (Type*) rt.getValue(), (std::vector<FPParameter*>) *p.getValue());
+			    std::vector<bool> *specs = (std::vector<bool>*) s.getValue();
+			    std::vector<FPParameter*> *fpp = (std::vector<FPParameter*>*) p.getValue();
+			    FunctionPointer *fp = new FunctionPointer((char*) id.getValue(), (Type*) rt.getValue(), *fpp);
 			    ProjectionField *pf = new ProjectionField(fp, (char*) id.getValue());
 
 			     if(specs->at(1) == true) {
@@ -497,7 +505,7 @@ ProjField	=	t:Type_form Spacing OPENS Spacing s:Specification CLOSES Spacing id:
 			    } if(specs->at(5) == true) {
 			        pf->set_alloc_callee(true);
 			    } if(specs->at(6) == true) {
-			        pf->alloc_callee_caller(true);
+			        pf->set_alloc_callee_caller(true);
 			    }
 
 			    std::vector<ProjectionField*> *fields = new std::vector<ProjectionField*>();

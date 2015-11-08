@@ -202,11 +202,6 @@ CCSTStatement* ProjectionType::accept(AllocateTypeVisitor *worker, Variable *v)
   return worker->visit(this, v);
 }
 
-const char* ProjectionType::id()
-{
-  return this->id_;
-}
-
 // may never be used
 const char* ProjectionType::real_type()
 {

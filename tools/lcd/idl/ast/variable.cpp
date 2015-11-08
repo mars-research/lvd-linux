@@ -18,6 +18,29 @@ const char* GlobalVariable::identifier()
   return this->id_;
 }
 
+void GlobalVariable::set_accessor(Variable *v)
+{
+  printf("Error this operation not allowed\n");
+}
+
+Variable* GlobalVariable::accessor()
+{
+  printf("Error this operation is not allowed\n");
+  return 0x0;
+}
+
+Marshal_type* GlobalVariable::marshal_info()
+{
+  printf("global variable marshal_info not yet implemented\n");
+  return 0x0;
+}
+
+Rpc* GlobalVariable::scope()
+{
+  printf("Error: this operation not allowed\n");
+  return 0x0;
+}
+
 // probably more functions needed
 
 /* end */
@@ -220,6 +243,12 @@ void ProjectionField::set_accessor(Variable *v)
 Variable* ProjectionField::accessor()
 {
   return this->accessor_;
+}
+
+Marshal_type* ProjectionField::marshal_info()
+{
+  printf("projection field marshal info incomplete\n");
+  return 0x0;
 }
 
 void ProjectionField::set_in(bool b)

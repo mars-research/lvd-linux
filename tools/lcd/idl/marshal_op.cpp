@@ -79,9 +79,10 @@ void Marshal_projection::set_register(int r)
   Assert(1 == 0, "Error: this operation is not allowed\n");
 }
 
-void Marshal_projection::get_register()
+int Marshal_projection::get_register()
 {
   Assert(1 == 0, "Error: this operation is not allowed\n");
+  return 0;
 }
 
 std::vector<Marshal_type*> Marshal_projection::in_fields()
@@ -189,7 +190,7 @@ Marshal_typedef::Marshal_typedef(Typedef *t, Marshal_type *type)
 
 void Marshal_typedef::set_register(int r)
 {
-  true_type_->set_register(r):
+  true_type_->set_register(r);
 }
 
 int Marshal_typedef::get_register()

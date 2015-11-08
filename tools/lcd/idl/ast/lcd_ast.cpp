@@ -83,8 +83,9 @@ std::vector<Parameter*> Rpc::parameters()
   return parameters_;
 }
 
-Module::Module(std::vector<Rpc*> rpc_definitions, std::vector<GlobalVariable*> globals)
+Module::Module(std::vector<Rpc*> rpc_definitions, std::vector<GlobalVariable*> globals, LexicalScope *ls)
 {
+  this->module_scope_ = ls;
   this->rpc_definitions_ = rpc_definitions;
   this->globals_ = globals;
 }
@@ -97,4 +98,9 @@ std::vector<Rpc*> Module::rpc_definitions()
 std::vector<GlobalVariable*> Module::globals()
 {
   return this->globals_;
+}
+
+LexicalScope* Module::module_scope()
+{
+  return this->module_scope_;
 }

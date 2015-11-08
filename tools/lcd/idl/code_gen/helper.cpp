@@ -1,15 +1,44 @@
 #include "ccst.h"
+#include "code_gen.h"
 
 /*
   creates the C code for a container struct
   for the projection provided
  */
-CCSTDeclaration* container_struct(const char* name, ProjectionType *pt)
+CCSTDeclaration* container_struct_definition(const char* name, ProjectionType *pt, bool channel)
 {
+  // field for the real struct
+  // field for other side capability
+  // field for my ref capability
 
-  CCSTStructDeclaration *container_field = new CCSTStructDeclaration();
+  // optional channel
+  std::vector<CCSTStructDeclaration*> container_fields;
+  
+  std::vector<CCSTStructDeclarator*> real_struct_field;
+  real_struct_field.push_back(new CCSTStructDeclarator(new CCSTDeclarator(0x0, new CCSTDirectDecId(pt->real_type()))));
+  container_fields.push_back(new CCSTStructDeclaration(type(pt), real_struct_field));
+
+  std::vector<CCSTStructDeclarator*> remote_ref_field;
+  remote_ref_field.push_back(new CCSTStructDeclarator(new CCSTDeclarator(0x0, new CCSTDirectDecId("remote_ref"))));
+  
+  std::vector<CCSTDecSpecifier*> dptr_t;
+  dptr_t.push_back(new CCSTTypedefName("dptr_t"));
+  container_fields.push_back(new CCSTStructDeclaration(dptr_t, remote_ref_field));
+  
+  std::vector<CCSTStructDeclarator*> my_ref_field;
+  my_ref_field.push_back(new CCSTStructDeclarator(new CCSTDeclarator(0x0, new CCSTDirectDecId("my_ref"))));
+  container_fields.push_back(new CCSTStructDeclaration(dptr_t, my_ref_field));
+
+
+  if(channel) {
+    std::vector<CCSTDecSpecifier*> cptr_t;
+    cptr_t.push_back(new CCSTTypedefName("cptr_t"));
+    
+    std::vector<CCSTStructDeclarator*> channel_field;
+    channel_field.push_back(new CCSTStructDeclarator(new CCSTDeclarator(0x0, new CCSTDirectDecId("chnl"))));
+    container_fields.push_back(new CCSTStructDeclaration(cptr_t, channel_field));
+  }
   CCSTStructUnionSpecifier *container = new CCSTStructUnionSpecifier(struct_t, name, container_fields);
-
 
   std::vector<CCSTDecSpecifier*> struct_specifier;
   struct_specifier.push_back(container);
@@ -17,9 +46,95 @@ CCSTDeclaration* container_struct(const char* name, ProjectionType *pt)
   return new CCSTDeclaration(struct_specifier, empty);
 }
 
+CCSTDeclaration* typedef_declaration(Typedef *t)
+{
+  /*
+  std::vector<CCSTDecSpecifier*>specifier;
+  specifier.push_back(new CCSTStoClassSpecifier(typedef_t));
+  
+  std::vector<CCSTInitDeclarator*> decs;
 
+  */
+  // possibly unnecessary depending on if proper header files are included
 
+  printf("todo typedef\n");
+  return 0x0
+}
 
+CCSTAssignOp* equals() 
+{
+  return new CCSTAssignOp(equal_t);
+}
+
+/* 
+ * confirm this works
+ * returns a new string with _p on end.
+ */ 
+const char* parameter_name(const char* name) 
+{
+  int length = strlen(name);
+  char *new_str = (char*) malloc(sizeof(char)*(length+3));
+  
+  std::ostringstream total;
+  total << name << "_p";
+  strncpy(new_str, total.str().c_str(), length+3);
+  return new_str;
+}
+
+/*
+ * returns a new string with _container on the end.
+ */
+const char* container_name(const char* name)
+{
+  int length = strlen(name);
+  int length2 = strlen("_container");
+  char *new_str = (char*) malloc(sizeof(char)*(length+length2+1));
+
+  std::ostringstream total;
+  total << name << "_container";
+  strncpy(new_str, total.str().c_str(), length+length2+1);
+  return new_str;
+}
+
+/*
+ * takes the vector of global variables with also provides the parameters to the function.
+ */
+CCSTCompoundStatement* interface_init_function_body(std::vector<GlobalVariable*> globals)
+{
+  // set each global variable to a parameter.
+  std::vector<CCSTDeclaration*> body_declarations_empty;
+  std::vector<CCSTStatement*> body_statements;
+  
+  for(std::vector<GlobalVariable*>::iterator it = globals.begin(); it != globals.end(); it ++) {
+    GlobalVariable *g = *it;
+    body_statements.push_back(new CCSTAssignExpr(new CCSTPrimaryExprId(g->identifier())
+						 , equals()
+						 , new CCSTPrimaryExprId(parameter_name(g->identifier()))));
+  }
+  body_statements.push_back(new CCSTReturn(new CCSTInteger(0)));
+  return new CCSTCompoundStatement(body_declarations_empty, body_statements);
+}
+
+/* 
+ * CAST code to declare a static variable
+ */
+CCSTDeclaration* declare_static_variable(Variable *gv)
+{
+  
+  std::vector<CCSTDecSpecifier*> specifier;
+  specifier.push_back(new CCSTStoClassSpecifier(static_t));
+
+  std::vector<CCSTDecSpecifier*> type_for_global = type(gv->type());
+  specifier.insert(specifier.end(), type_for_global.begin(), type_for_global.end());
+
+  std::vector<CCSTInitDeclarator*> declarators;
+  declarators.push_back(new CCSTDeclarator( pointer( count_nested_pointer(gv->type())),
+					    new CCSTDirectDecId(gv->identifier())));
+  
+  return new CCSTDeclaration(specifier, declarators);
+}
+
+//??????????
 CCSTPostFixExpr* access_variable(Variable *p)
 {
   if(p->accessor() == 0x0) {
@@ -29,7 +144,7 @@ CCSTPostFixExpr* access_variable(Variable *p)
   return new CCSTPostFixExprAccess(access_parameter(p->accessor()), accessor, p->identifier()); 
 }
 
-CCSTExDeclaration* construct_enum(File *f)
+CCSTExDeclaration* construct_enum(Module *f)
 {
   const char* enum_name = "todo";
   CCSTEnumeratorList *el = construct_enumlist(f->rpc_defs());
@@ -42,7 +157,7 @@ CCSTExDeclaration* construct_enum(File *f)
   return declaration;
 }
 
-const char* construct_enum_name()
+const char* enum_name(const char *name)
 {
   return "todo";
 }
@@ -64,9 +179,9 @@ CCSTEnumeratorList* construct_enumlist(std::vector<Rpc *> rps)
   return enum_list;
 }
 
-char* string_to_upper(char* str)
+const char* string_to_upper(char* str)
 {
-  char* ret = (char*) malloc((sizeof(str)+1)*sizeof(char));
+  const char* ret = (char*) malloc((sizeof(str)+1)*sizeof(char));
   int i;
   for(i = 0; i < sizeof(str); i ++)
     {
@@ -103,7 +218,7 @@ int count_nested_pointer(Type *p)
  *    int * const name
  * int * volatile name
  */
-CCSTPointer* create_pointer(int p_count)
+CCSTPointer* pointer(int p_count)
 {
   if(p_count == 0)
     return 0x0;
@@ -111,7 +226,7 @@ CCSTPointer* create_pointer(int p_count)
   if(p_count == 1)
     return new CCSTPointer();
   
-  return new CCSTPointer(create_pointer(p_count - 1));
+  return new CCSTPointer(pointer(p_count - 1));
 }
 
 /* Creates a function definition
@@ -130,7 +245,7 @@ CCSTFuncDef* function_definition(CCSTDeclaration* function_declaration, CCSTComp
   return new CCSTFuncDef(function_declaration->specifier_, func, decs, body);
 }
 
-CCSTParamTypeList* create_parameter_list()
+CCSTParamTypeList* parameter_list()
 {
   
 }
@@ -145,7 +260,7 @@ CCSTDeclaration* function_declaration(Rpc* r)
   std::vector<CCSTInitDeclarator*> func; // = new std::vector<CCSTInitDeclarator*>(); // pointer name, params
   int pointer_count = count_nested_pointer(r->explicit_return_type());
   
-  CCSTPointer *p = create_pointer(pointer_count);
+  CCSTPointer *p = pointer(pointer_count);
   
   CCSTDirectDecId *name = new CCSTDirectDecId(r->name());
   CCSTParamTypeList *param_list = create_parameter_list();
@@ -238,7 +353,7 @@ CCSTTypeName* type_cast(Type *t)
     {
       printf("type cast pointer\n");
       // do pointer stuff....
-      pointers = new CCSTAbstDeclarator( create_pointer(count_nested_pointer(t)) , 0x0); 
+      pointers = new CCSTAbstDeclarator( pointer(count_nested_pointer(t)) , 0x0); 
       
       PointerType *p = dynamic_cast<PointerType*>(t);
       t = get_non_pointer_type(p); // get first non pointer, write function for this

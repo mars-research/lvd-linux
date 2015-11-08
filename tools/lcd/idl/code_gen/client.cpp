@@ -1,28 +1,13 @@
 #include "ccst.h"
+#include "code_gen.h"
 #include <string.h>
 #include <stdarg.h>
 #include <stdlib.h>
 #include <stdio.h>
 
-CCSTFile* generate_client_header(File* f)
+CCSTFile* generate_client_header(Module* f)
 {
   
-}
-
-CCSTDeclaration* declare_static_variable(Variable *gv)
-{
-  
-  std::vector<CCSTDecSpecifier*> specifier;
-  specifier.push_back(new CCSTStoClassSpecifier(static_t));
-
-  std::vector<CCSTDecSpecifier*> type_for_global = type(gv->type());
-  specifier.insert(specifier.end(), type_for_global.begin(), type_for_global.end());
-
-  std::vector<CCSTInitDeclarator*> declarators;
-  declarators.push_back(new CCSTDeclarator( create_pointer( count_nested_pointer(gv->type())),
-					    new CCSTDirectDecId(gv->identifier())));
-  
-  return new CCSTDeclaration(specifier, declarators);
 }
 
 CCSTFile* generate_client_source(Module* f)

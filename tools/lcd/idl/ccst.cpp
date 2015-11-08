@@ -1106,12 +1106,17 @@ void CCSTPrimaryExprId::write(FILE *f)
 
 CCSTInteger::CCSTInteger()
 {
-  // todo
+  this->integer_ = -1;
+}
+
+CCSTInteger::CCSTInteger(int i)
+{
+  this->integer_ = i;
 }
 
 void CCSTInteger::write(FILE *f)
 {
-  // todo
+  fprintf(f, "%d", this->integer_);
 }
 
 CCSTChar::CCSTChar()

@@ -288,35 +288,43 @@ Include		 =	"#include" Space+ "<" Spacing f:Identifier Spacing ">" Spacing {{
 			std::string str = total.str();
 			value = str.c_str(); }}
 
-FP_Parameter	=	"rpc" Space+ rt:Type_form Spacing OPEN Spacing "*" Spacing id:Identifier CLOSE Spacing OPEN p:FP_Parameters CLOSE SEMI {{
+FP_Parameter	=	"rpc" Space+ rt:Type_form pointers:star* Spacing OPEN Spacing "*" Spacing id:Identifier CLOSE Spacing OPEN p:FP_Parameters CLOSE SEMI {{
+			    // pointer todo for the return value.
+			    // change from return type in function pointer to return variable? todo
 			    std::vector<FPParameter*> *fpparams = (std::vector<FPParameter*>*) p.getValue();
 			    FunctionPointer *fp = new FunctionPointer((char*) id.getValue(), (Type*) rt.getValue(), *fpparams);
 			    value = new Parameter(fp, (char *) id.getValue());
 			}}
 
-FirstParam	=	t:Type_form id:Identifier Spacing COMMA Spacing {{
+FirstParam	=	t:Type_form pointers:star* Spacing id:Identifier Spacing COMMA Spacing {{
+			    // add pointer thing to parameter. todo
 			    value = new Parameter((Type *) t.getValue(), (char *) id.getValue()); 
 			}}
 			| FP_Parameter Spacing COMMA Spacing
 
-FP_FirstParam	=	t:Type_form Spacing COMMA Spacing {{
+FP_FirstParam	=	t:Type_form pointers:star* Spacing COMMA Spacing {{
+			    // change fpparameter to take a pointer field or something todo
 			    value = new FPParameter((Type*) t.getValue());  
 			}}
-			| "rpc" Space+ rt:Type_form Spacing OPEN Spacing "*" Spacing id:Identifier CLOSE Spacing OPEN p:FP_Parameters CLOSE SEMI Spacing COMMA Spacing {{
+			| "rpc" Space+ rt:Type_form pointers:star* Spacing OPEN Spacing "*" Spacing id:Identifier CLOSE Spacing OPEN p:FP_Parameters CLOSE SEMI Spacing COMMA Spacing {{
+			    // add pointer stuff todo
 			    std::vector<FPParameter*> *fpparams = (std::vector<FPParameter*>*) p.getValue();
 			    FunctionPointer *fp = new FunctionPointer((char*) id.getValue(), (Type*) rt.getValue(), *fpparams);
 			    value = new FPParameter(fp);
 			}}
 			  
-LastParam	=	t:Type_form id:Identifier Spacing {{
+LastParam	=	t:Type_form pointers:star* Spacing id:Identifier Spacing {{
+			    // todo add pointer to parameter
 			    value = new Parameter((Type *) t.getValue(), (char *) id.getValue()); 
 			}}
 			| FP_Parameter Spacing
 
-FP_LastParam	=	t:Type_form Spacing {{
+FP_LastParam	=	t:Type_form pointers:star* Spacing {{
+			    // todo add pointer to parameter
 			    value = new FPParameter((Type*) t.getValue());
 			}}
-			|  "rpc" Space+ rt:Type_form Spacing OPEN Spacing "*" Spacing id:Identifier CLOSE Spacing OPEN p:FP_Parameters CLOSE SEMI Spacing {{
+			|  "rpc" Space+ rt:Type_form pointers:star* Spacing OPEN Spacing "*" Spacing id:Identifier CLOSE Spacing OPEN p:FP_Parameters CLOSE SEMI Spacing {{
+			    // todo change return type to return variable and add pointer
 			    std::vector<FPParameter*> *fpparams = (std::vector<FPParameter*>*) p.getValue();
 			    FunctionPointer *fp = new FunctionPointer((char*) id.getValue(), (Type*) rt.getValue(), *fpparams);
 			    value = new FPParameter(fp);
@@ -335,11 +343,13 @@ Parameters	=	f:FirstParam* l:LastParam {{
 			    value = params; 
 			}}
 
-FirstGlobal	=	t:Type_form id:Identifier Spacing COMMA Spacing {{
+FirstGlobal	=	t:Type_form pointers:star* Spacing id:Identifier Spacing COMMA Spacing {{
+			    // add pointer to globalvariable todo
 			    value = new GlobalVariable((Type*) t.getValue(), (char*) id.getValue());
 			}}
 
-LastGlobal	=	t:Type_form id:Identifier Spacing {{
+LastGlobal	=	t:Type_form pointers:star* Spacing id:Identifier Spacing {{
+			    // add pointer to globalvariable todo
 			    value = new GlobalVariable((Type*) t.getValue(), (char*) id.getValue());
 			}}
 
@@ -367,7 +377,8 @@ FP_Parameters	=	f:FP_FirstParam* l:FP_LastParam {{
 			}}
 
 
-Rpc		=	"rpc" Space+ t:Type_form id1:Identifier Spacing OPEN p:Parameters CLOSE SEMI Spacing {{
+Rpc		=	"rpc" Space+ t:Type_form pointers:* Spacing id1:Identifier Spacing OPEN p:Parameters CLOSE SEMI Spacing {{
+			    // todo deal with pointer situation. change from return value to return variable and add pointer
 			    std::vector<Parameter*>* params = (std::vector<Parameter*>*) p.getValue();
 			    std::vector<Parameter*> params_ = *params;
 			    Rpc* r = new Rpc(new ReturnVariable((Type *) t.getValue()), (char *) id1.getValue(), params_);
@@ -466,7 +477,8 @@ Specification	=	s:Start* l:Last {{
 			    value = specs; 
 			}}
 
-ProjField	=	t:Type_form Spacing OPENS Spacing s:Specification CLOSES Spacing id:Identifier Spacing SEMI Spacing {{ 
+ProjField	=	t:Type_form pointers:star* Spacing OPENS Spacing s:Specification CLOSES Spacing id:Identifier Spacing SEMI Spacing {{ 
+			    // add pointer to projection field todo
 			    std::vector<bool>* specs = (std::vector<bool>*) s.getValue();
 			    ProjectionField *pf = new ProjectionField((Type *) t.getValue(), (char *) id.getValue());
 
@@ -488,7 +500,8 @@ ProjField	=	t:Type_form Spacing OPENS Spacing s:Specification CLOSES Spacing id:
 			    fields->push_back(pf);
 			    value = fields; 
 			}}
-			| "rpc" Space+ rt:Type_form Spacing OPENS Spacing s:Specification CLOSES Spacing OPEN Spacing "*" Spacing id:Identifier CLOSE Spacing OPEN p:FP_Parameters CLOSE SEMI Spacing {{
+			| "rpc" Space+ rt:Type_form pointers:star* Spacing OPENS Spacing s:Specification CLOSES Spacing OPEN Spacing "*" Spacing id:Identifier CLOSE Spacing OPEN p:FP_Parameters CLOSE SEMI Spacing {{
+			    // change from return value to return variable and add pointer todo
 			    std::vector<bool> *specs = (std::vector<bool>*) s.getValue();
 			    std::vector<FPParameter*> *fpp = (std::vector<FPParameter*>*) p.getValue();
 			    FunctionPointer *fp = new FunctionPointer((char*) id.getValue(), (Type*) rt.getValue(), *fpp);
@@ -539,48 +552,54 @@ Line_comm_end	=	"\n"
 
 star = [*]
 
-signed_type	=	"int" Space* ps:star* Space+{{ value = count_pointers(ps, "int");}}
-			| "char" Space* ps:star* Space+ {{ value = count_pointers(ps, "char"); }}   
-			| "capability" Space+ {{ value = getType("capability"); }}
-			| "short" Space* ps:star* Space+ {{ value = count_pointers(ps, "short");}}
-			| "long"  Space+ "long" Space* ps:star* Space+ {{ value = count_pointers(ps, "long long");}}
-			| "long" Space* ps:star* Space+ {{ value = count_pointers(ps, "long"); }}
+signed_type	=	"int" Spacing {{ 
+			    value = getType("int");
+			}}
+			| "char" {{ 
+			    value = getType("char"); 
+			}}   
+			| "capability" Spacing {{ 
+			    value = getType("capability"); 
+			}}
+			| "short" Spacing {{ 
+			    value = getType("short");
+			}}
+			| "long"  Space+ "long" Space* Spacing {{
+		 	    value = getType("long long");
+			}}
+			| "long" Spacing{{ 
+			    value = getType("long"); 
+			}}
 
-			| "int" Space+ ps:star* Space*{{ value = count_pointers(ps, "int");}}
-			| "char" Space+ ps:star* Space*{{ value = count_pointers(ps, "char"); }}   
-			| "short" Space+ ps:star* Space* {{ value = count_pointers(ps, "short");}}
-			| "long" Space+ "long" Space+ ps:star* Space* {{ value = count_pointers(ps, "long long");}}
-			| "long"  Space+ ps:star* Space*{{ value = count_pointers(ps, "long"); }}
-
-unsigned_type	=	"unsigned" Space+ "int" ps:star* Space+ {{ value = count_pointers(ps, "unsigned int"); }} 
-			| "unsigned" Space+ "char" ps:star* Space+ {{ value = count_pointers(ps, "unsigned char"); }} 
-			| "unsigned" Space+ "short" ps:star* Space+ {{ value = count_pointers(ps, "unscd teigned long"); }} 
-			| "unsigned" Space+ "long" Space+ "long" ps:star* Space+ {{ value = count_pointers(ps, "unsigned long long"); }}
-			| "unsigned" Space+ "long" ps:star* Space+ {{ value = count_pointers(ps, "unsigned long"); }}
-			| "unsigned" Space+ "int" Space+ ps:star* {{ value = count_pointers(ps, "unsigned int"); }} 
-			| "unsigned" Space+ "char" Space+ ps:star* {{ value = count_pointers(ps, "unsigned char"); }} 
-			| "unsigned" Space+ "short" Space+ ps:star* {{ value = count_pointers(ps, "unsigned long"); }} 
-			| "unsigned" Space+ "long" Space+ "long" Space+ ps:star* {{ value = count_pointers(ps, "unsigned long long"); }}
-			| "unsigned" Space+ "long" Space+ ps:star* {{ value = count_pointers(ps, "unsigned long"); }}  
-  
+unsigned_type	=	"unsigned" Space+ "int" Spacing {{ 
+			    value = getType("unsigned int"); 
+			}} 
+			| "unsigned" Space+ "char" Spacing {{ 
+			    value = getType("unsigned char"); 
+			}} 
+			| "unsigned" Space+ "short" Spacing {{ 
+			    value = getType("unsigned short"); 
+			}} 
+			| "unsigned" Space+ "long" Space+ "long" {{ 
+			    value = getType("unsigned long long"); 
+			}}
+			| "unsigned" Space+ "long" Spacing {{ 
+			    value = getType("unsigned long"); 
+			}}
 
 type 		=	unsigned_type
 			| signed_type
-			| "void" Space+ {{ value = getType("void"); }}
+			| "void" Spacing {{ value = getType("void"); }}
 
 ## just ignore the modules ones, not supporting right now
 
 Spacing		=	Space*
 
-Type_form	=	"projection" Space+ n:Identifier Space* "*" Spacing {{
-			printf("projection pointer name is: %s\n", (char*)n.getValue());
-			 printf("calling getType 2\n");
-			value = new PointerType(getType((char*)n.getValue())); }}
-			| "projection" Space+ name:Identifier Space+ {{ 
-			  printf("calling getType 1\n");
-			  value = getType((char*)name.getValue()); }}
+Type_form	=	"projection" Space+ n:Identifier Spacing {{
+			    value = getType((char*)n.getValue()); 
+			}}
 			| "channel" {{  // todo 
-			  }}
+			}}
 			| type	
 
 Space		=	" " | "\t" | EndOfLine

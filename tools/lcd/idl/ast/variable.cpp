@@ -2,10 +2,11 @@
 
 /* global variable */
 
-GlobalVariable::GlobalVariable(Type *type, const char *id)
+GlobalVariable::GlobalVariable(Type *type, const char *id, int pointer_count)
 {
   this->type_ = type;
   this->id_ = id;
+  this->pointer_count_ = pointer_count;
 }
 
 Type* GlobalVariable::type()
@@ -35,10 +36,71 @@ Marshal_type* GlobalVariable::marshal_info()
   return 0x0;
 }
 
-Rpc* GlobalVariable::scope()
+int GlobalVariable::pointer_count()
 {
-  printf("Error: this operation not allowed\n");
-  return 0x0;
+  return this->pointer_count_;
+}
+
+void GlobalVariable::set_in(bool b)
+{
+  printf("this operation is now allowed\n");
+}
+
+void GlobalVariable::set_out(bool b)
+{
+  printf("this operation is now allowed\n");
+}
+
+void GlobalVariable::set_alloc(bool b)
+{
+  printf("this operation is now allowed\n");
+}
+
+void GlobalVariable::set_alloc_caller(bool b)
+{
+  printf("this operation is now allowed\n");
+}
+
+void GlobalVariable::set_alloc_callee(bool b)
+{
+  printf("this operation is now allowed\n");
+}
+
+void GlobalVariable::set_alloc_callee_caller(bool b)
+{
+  printf("this operation is now allowed\n");
+}
+
+bool GlobalVariable::in()
+{
+  printf("this operation is now allowed\n");
+  return false;
+}
+
+bool GlobalVariable::out()
+{
+  printf("this operation is now allowed\n");
+  return false;
+}
+bool GlobalVariable::alloc()
+{
+  printf("this operation is now allowed\n");
+  return false;
+}
+bool GlobalVariable::alloc_caller()
+{
+  printf("this operation is now allowed\n");
+  return false;
+}
+bool GlobalVariable::alloc_callee()
+{
+  printf("this operation is now allowed\n");
+  return false;
+}
+bool GlobalVariable::alloc_callee_caller()
+{
+  printf("this operation is now allowed\n");
+  return false;
 }
 
 // probably more functions needed
@@ -51,12 +113,26 @@ Parameter::Parameter()
 {
   this->type_ = 0x0;
   this->name_ = "";
+  this->pointer_count_ = 0;
+  this->in_ = false;
+  this->out_ = false;
+  this->alloc_ = false;
+  this->alloc_callee_ = false;
+  this->alloc_caller_ = false;
+  this->alloc_callee_caller_ = false;
 }
 
-Parameter::Parameter(Type* type, const char* name)
+Parameter::Parameter(Type* type, const char* name, int pointer_count)
 {
   this->type_ = type;
   this->name_ = name;
+  this->pointer_count_ = pointer_count;
+  this->in_ = false;
+  this->out_ = false;
+  this->alloc_ = false;
+  this->alloc_callee_ = false;
+  this->alloc_caller_ = false;
+  this->alloc_callee_caller_ = false;
 }
 
 /*
@@ -76,9 +152,9 @@ Type* Parameter::type()
   return this->type_;
 }
 
-Rpc* Parameter::scope()
+int Parameter::pointer_count()
 {
-  return this->function_;
+  return this->pointer_count_;
 }
 
 void Parameter::set_accessor(Variable *v)
@@ -101,6 +177,65 @@ Marshal_type* Parameter::marshal_info()
   return this->marshal_info_;
 }
 
+void Parameter::set_in(bool b)
+{
+  this->in_ = b;
+}
+
+void Parameter::set_out(bool b)
+{
+  this->out_ = b;
+}
+
+void Parameter::set_alloc(bool b)
+{
+  this->alloc_ = b;
+}
+
+void Parameter::set_alloc_caller(bool b)
+{
+  this->alloc_caller_ = b;
+}
+
+void Parameter::set_alloc_callee(bool b)
+{
+  this->alloc_callee_ = b;
+}
+
+void Parameter::set_alloc_callee_caller(bool b)
+{
+  this->alloc_callee_caller_ = b;
+}
+
+bool Parameter::in()
+{
+  return this->in_;
+}
+
+bool Parameter::out()
+{
+  return this->out_;
+}
+
+bool Parameter::alloc()
+{
+  return this->alloc_;
+}
+
+bool Parameter::alloc_caller()
+{
+  return this->alloc_caller_;
+}
+bool Parameter::alloc_callee()
+{
+  return this->alloc_callee_;
+}
+
+bool Parameter::alloc_callee_caller()
+{
+  return this->alloc_callee_caller_;
+}
+
 /* end */
 
 /* Return Variable */
@@ -111,10 +246,11 @@ ReturnVariable::ReturnVariable()
 
 }
 
-ReturnVariable::ReturnVariable(Type *return_type)
+ReturnVariable::ReturnVariable(Type *return_type, int pointer_count)
 {
   this->type_ = return_type;
   this->name_ = "";
+  this->pointer_count_ = pointer_count;
 }
 
 void ReturnVariable::set_marshal_info(Marshal_type *mt)
@@ -142,14 +278,79 @@ void ReturnVariable::set_accessor(Variable *v)
   this->accessor_ = v;
 }
 
-Rpc* ReturnVariable::scope()
+int ReturnVariable::pointer_count()
 {
-  return this->function_;
+  return this->pointer_count_;
 }
 
 Variable* ReturnVariable::accessor()
 {
   return this->accessor_;
+}
+
+void ReturnVariable::set_in(bool b)
+{
+  printf("error this operation not allowed\n");
+}
+
+void ReturnVariable::set_out(bool b)
+{
+  printf("error this operation not allowed\n");
+}
+
+void ReturnVariable::set_alloc(bool b)
+{
+  printf("error this operation not allowed\n");
+}
+
+void ReturnVariable::set_alloc_caller(bool b)
+{
+  printf("error this operation not allowed\n");
+}
+
+void ReturnVariable::set_alloc_callee(bool b)
+{
+  printf("error this operation not allowed\n");
+}
+
+void ReturnVariable::set_alloc_callee_caller(bool b)
+{
+  printf("error this operation not allowed\n");
+}
+
+bool ReturnVariable::in()
+{
+  printf("error this operation not allowed\n");
+  return false;
+}
+
+bool ReturnVariable::out()
+{
+  printf("error this operation not allowed\n");
+  return false;
+}
+
+bool ReturnVariable::alloc()
+{
+  printf("error this operation not allowed\n");
+  return false;
+}
+
+bool ReturnVariable::alloc_caller()
+{
+  printf("error this operation not allowed\n");
+  return false;
+}
+bool ReturnVariable::alloc_callee()
+{
+  printf("error this operation not allowed\n");
+  return false;
+}
+
+bool ReturnVariable::alloc_callee_caller()
+{
+  printf("error this operation not allowed\n");
+  return false;
 }
 
 /* end */
@@ -187,9 +388,9 @@ const char* ImplicitReturnVariable::identifier()
   return this->p_->identifier();
 }
 
-Rpc* ImplicitReturnVariable::scope()
+int ImplicitReturnVariable::pointer_count()
 {
-  return this->function_;
+  return this->p_->pointer_count();
 }
 
 Variable* ImplicitReturnVariable::accessor()
@@ -197,11 +398,76 @@ Variable* ImplicitReturnVariable::accessor()
   return this->accessor_;
 }
 
+void ImplicitReturnVariable::set_in(bool b)
+{
+  printf("error this operation not allowed\n");
+}
+
+void ImplicitReturnVariable::set_out(bool b)
+{
+  printf("error this operation not allowed\n");
+}
+
+void ImplicitReturnVariable::set_alloc(bool b)
+{
+  printf("error this operation not allowed\n");
+}
+
+void ImplicitReturnVariable::set_alloc_caller(bool b)
+{
+  printf("error this operation not allowed\n");
+}
+
+void ImplicitReturnVariable::set_alloc_callee(bool b)
+{
+  printf("error this operation not allowed\n");
+}
+
+void ImplicitReturnVariable::set_alloc_callee_caller(bool b)
+{
+  printf("error this operation not allowed\n");
+}
+
+bool ImplicitReturnVariable::in()
+{
+  printf("error this operation not allowed\n");
+  return false;
+}
+
+bool ImplicitReturnVariable::out()
+{
+  printf("error this operation not allowed\n");
+  return false;
+}
+
+bool ImplicitReturnVariable::alloc()
+{
+  printf("error this operation not allowed\n");
+  return false;
+}
+
+bool ImplicitReturnVariable::alloc_caller()
+{
+  printf("error this operation not allowed\n");
+  return false;
+}
+bool ImplicitReturnVariable::alloc_callee()
+{
+  printf("error this operation not allowed\n");
+  return false;
+}
+
+bool ImplicitReturnVariable::alloc_callee_caller()
+{
+  printf("error this operation not allowed\n");
+  return false;
+}
+
 /* end */
 
 /* projection field */
 
-ProjectionField::ProjectionField(Type* field_type, const char* field_name)
+ProjectionField::ProjectionField(Type* field_type, const char* field_name, int pointer_count)
 {
   this->in_ = false; 
   this->out_ = false;
@@ -211,6 +477,7 @@ ProjectionField::ProjectionField(Type* field_type, const char* field_name)
   this->alloc_callee_caller_ = false;
   this->field_type_ = field_type; 
   this->field_name_ = field_name;
+  this->pointer_count_ = pointer_count;
 }
 
 /*
@@ -225,9 +492,9 @@ Type* ProjectionField::type()
   return this->field_type_;
 }
 
-Rpc* ProjectionField::scope()
+int ProjectionField::pointer_count()
 {
-  return this->accessor_->scope();
+  return this->pointer_count_;
 }
 
 const char* ProjectionField::identifier()

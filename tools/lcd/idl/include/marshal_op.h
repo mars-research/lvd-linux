@@ -249,22 +249,6 @@ class Marshal_typedef : public Marshal_type
   virtual CCSTCompoundStatement* accept(TypeVisitor *worker);
 };
 
-class Marshal_pointer : public Marshal_type
-{
-  Marshal_type *m_type_;
-  const char *param_name_;
-  PointerType *pt_;
- public:
-  Marshal_pointer(PointerType *pt, Marshal_type *pointer_type);
-  virtual void set_register(int r);
-  virtual int get_register();
-  virtual void set_name(const char *name);
-  virtual const char* name();
-  Marshal_type* m_type();
-  virtual Type* type();
-  virtual CCSTCompoundStatement* accept(TypeVisitor *worker);
-};
-
 class TypeVisitor
 {
  public:
@@ -272,7 +256,6 @@ class TypeVisitor
   virtual CCSTCompoundStatement* visit(Marshal_integer *data) = 0;
   virtual CCSTCompoundStatement* visit(Marshal_void *data) = 0;
   virtual CCSTCompoundStatement* visit(Marshal_typedef *data) = 0;
-  virtual CCSTCompoundStatement* visit(Marshal_pointer *data) = 0;
 };
 
 class VariableVisitor
@@ -292,7 +275,6 @@ class MarshalTypeVisitor : public TypeVisitor
   virtual CCSTCompoundStatement* visit(Marshal_integer *data);
   virtual CCSTCompoundStatement* visit(Marshal_void *data);
   virtual CCSTCompoundStatement* visit(Marshal_typedef *data);
-  virtual CCSTCompoundStatement* visit(Marshal_pointer *data);
 };
 
 class UnmarshalTypeVisitor : public TypeVisitor
@@ -303,7 +285,6 @@ class UnmarshalTypeVisitor : public TypeVisitor
   virtual CCSTCompoundStatement* visit(Marshal_integer *data);
   virtual CCSTCompoundStatement* visit(Marshal_void *data);
   virtual CCSTCompoundStatement* visit(Marshal_typedef *data);
-  virtual CCSTCompoundStatement* visit(Marshal_pointer *data);
 };
 
 

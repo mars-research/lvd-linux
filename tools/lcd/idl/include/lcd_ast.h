@@ -95,60 +95,108 @@ class Variable : public Base
   virtual void set_accessor(Variable *v) = 0;
   virtual Variable* accessor() = 0;
   virtual Marshal_type* marshal_info() = 0;
-  virtual Rpc* scope() = 0;
+  virtual int pointer_count();
+
+  virtual void set_in(bool b) = 0;
+  virtual void set_out(bool b) = 0;
+  virtual void set_alloc(bool b) = 0;
+  virtual void set_alloc_caller(bool b) = 0;
+  virtual void set_alloc_callee(bool b) = 0;
+  virtual void set_alloc_callee_caller(bool b) = 0;
+
+  virtual bool in() = 0;
+  virtual bool out() = 0;
+  virtual bool alloc() = 0;
+  virtual bool alloc_caller() = 0;
+  virtual bool alloc_callee() = 0;
+  virtual bool alloc_callee_caller() = 0;
+  
 };
 
 class GlobalVariable : public Variable
 {
   Type *type_;
   const char *id_;
+  int pointer_count_;
  public:
-  GlobalVariable(Type *type, const char *id);
+  GlobalVariable(Type *type, const char *id, int pointer_count);
   virtual Type* type();
   virtual const char* identifier();
   virtual void set_accessor(Variable *v);
   virtual Variable* accessor();
   virtual Marshal_type* marshal_info();
-  virtual Rpc* scope();
+  virtual int pointer_count();
+
+  virtual void set_in(bool b);
+  virtual void set_out(bool b);
+  virtual void set_alloc(bool b);
+  virtual void set_alloc_caller(bool b);
+  virtual void set_alloc_callee(bool b);
+  virtual void set_alloc_callee_caller(bool b);
+
+  virtual bool in();
+  virtual bool out();
+  virtual bool alloc();
+  virtual bool alloc_caller();
+  virtual bool alloc_callee();
+  virtual bool alloc_callee_caller();
+
 };
 
 class Parameter : public Variable
 {
+  bool in_;
+  bool out_;
+  bool alloc_;
+  bool alloc_callee_;
+  bool alloc_caller_;
+  bool alloc_callee_caller_;
+
   Type* type_;
   const char* name_;
   Marshal_type *marshal_info_;
-  bool in_;
-  bool out_; 
-  bool alloc_;
-  bool bind_;
   Variable *accessor_;
-  Rpc *function_;
+  int pointer_count_;
 
  public:
   Parameter();
-  Parameter(Type* type, const char* name);
+  Parameter(Type* type, const char* name, int pointer_count);
   ~Parameter();
   // virtual Marshal_type* accept(MarshalVisitor *worker, Registers *data);
   virtual Type* type();
-  virtual Rpc* scope();
   void set_marshal_info(Marshal_type* mt); // ??????????????????????????????
   Marshal_type* marshal_info(); //???????????????????????????????????
   virtual const char* identifier();
   virtual void set_accessor(Variable *v);
-  virtual bool bind();
-  virtual bool alloc();
+  virtual Variable* accessor();
+  virtual int pointer_count();
+  
+  virtual void set_in(bool b);
+  virtual void set_out(bool b);
+  virtual void set_alloc(bool b);
+  virtual void set_alloc_caller(bool b);
+  virtual void set_alloc_callee(bool b);
+  virtual void set_alloc_callee_caller(bool b);
+
   virtual bool in();
   virtual bool out();
-  virtual Variable* accessor();
+  virtual bool alloc();
+  virtual bool alloc_caller();
+  virtual bool alloc_callee();
+  virtual bool alloc_callee_caller();
 };
 
+
+// a parameter without a name
 class FPParameter : public Parameter
 {
   Type *type_;
+  int pointer_count_;
  public:
-  FPParameter(Type *type);
+  FPParameter(Type *type, int pointer_count);
   virtual Type* type();
   virtual const char* identifier();
+  virtual int pointer_count();
 };
 
 class FunctionPointer : public Type
@@ -212,20 +260,6 @@ class IntegerType : public Type
   ~IntegerType(){printf("inttype destructor\n");}
 };
 
-class PointerType : public Type
-{
-  Type* type_;
- public:
-  PointerType(Type* type);
-  // virtual Marshal_type* accept(MarshalVisitor *worker, Registers *data);
-  virtual CCSTTypeName* accept(TypeNameVisitor *worker);
-  virtual CCSTStatement* accept(AllocateTypeVisitor *worker, Variable *v);
-  virtual const char* name();
-  Type* type();
-  virtual int num();
-  ~PointerType(){printf("pointer type destructor\n");}
-};
-
 class ProjectionField : public Variable //?
 {
   bool in_;
@@ -238,30 +272,32 @@ class ProjectionField : public Variable //?
   Type* field_type_;
   const char* field_name_;
   Variable *accessor_; // 
+  int pointer_count_;
 
  public:
-  ProjectionField(Type* field_type, const char* field_name);
+  ProjectionField(Type* field_type, const char* field_name, int pointer_count);
   ~ProjectionField(); 
   // virtual Marshal_type* accept(MarshalVisitor *worker, Registers *data);
   virtual Type* type();
-  virtual Rpc* scope();
   virtual const char* identifier();
   virtual void set_accessor(Variable *v);
   virtual Variable* accessor();
   virtual Marshal_type* marshal_info();
-  void set_in(bool b);
-  void set_out(bool b);
-  void set_alloc(bool b);
-  void set_alloc_caller(bool b);
-  void set_alloc_callee(bool b);
-  void set_alloc_callee_caller(bool b);
+  virtual int pointer_count();
 
-  bool in();
-  bool out();
-  bool alloc();
-  bool alloc_caller();
-  bool alloc_callee();
-  bool alloc_callee_caller();
+  virtual void set_in(bool b);
+  virtual void set_out(bool b);
+  virtual void set_alloc(bool b);
+  virtual void set_alloc_caller(bool b);
+  virtual void set_alloc_callee(bool b);
+  virtual void set_alloc_callee_caller(bool b);
+
+  virtual bool in();
+  virtual bool out();
+  virtual bool alloc();
+  virtual bool alloc_caller();
+  virtual bool alloc_callee();
+  virtual bool alloc_callee_caller();
 };
 
 class ProjectionType : public Type // complex type
@@ -290,19 +326,33 @@ class ReturnVariable : public Variable
   Type* type_;
   Marshal_type *marshal_info_;
   Variable* accessor_;
-  Rpc* function_;
+  int pointer_count_;
   
  public:
   ReturnVariable();
-  ReturnVariable(Type* return_type);
+  ReturnVariable(Type* return_type, int pointer_count);
   void set_marshal_info(Marshal_type *mt);
   Marshal_type* marshal_info();
 
   virtual const char* identifier();
   virtual Type* type();
   virtual void set_accessor(Variable *v);
-  virtual Rpc* scope();
   virtual Variable* accessor();
+  virtual int pointer_count();
+
+  virtual void set_in(bool b);
+  virtual void set_out(bool b);
+  virtual void set_alloc(bool b);
+  virtual void set_alloc_caller(bool b);
+  virtual void set_alloc_callee(bool b);
+  virtual void set_alloc_callee_caller(bool b);
+
+  virtual bool in();
+  virtual bool out();
+  virtual bool alloc();
+  virtual bool alloc_caller();
+  virtual bool alloc_callee();
+  virtual bool alloc_callee_caller();
 };
 
 class ImplicitReturnVariable : public ReturnVariable
@@ -310,7 +360,6 @@ class ImplicitReturnVariable : public ReturnVariable
   Parameter* p_;
   Marshal_type *marshal_info_;
   Variable *accessor_;
-  Rpc* function_;
 
  public:
   ImplicitReturnVariable(Parameter *p);
@@ -320,8 +369,22 @@ class ImplicitReturnVariable : public ReturnVariable
   virtual void set_accessor(Variable *v);
   virtual Type* type();
   virtual const char* identifier();
-  virtual Rpc* scope();
   virtual Variable* accessor();
+  virutal int pointer_count();
+
+  virtual void set_in(bool b);
+  virtual void set_out(bool b);
+  virtual void set_alloc(bool b);
+  virtual void set_alloc_caller(bool b);
+  virtual void set_alloc_callee(bool b);
+  virtual void set_alloc_callee_caller(bool b);
+
+  virtual bool in();
+  virtual bool out();
+  virtual bool alloc();
+  virtual bool alloc_caller();
+  virtual bool alloc_callee();
+  virtual bool alloc_callee_caller();
 };
 
 class Rpc : public Base
@@ -375,7 +438,6 @@ class TypeNameVisitor // generates CCSTTypeName for each type.
   CCSTTypeName* visit(Typedef *td);
   CCSTTypeName* visit(VoidType *vt);
   CCSTTypeName* visit(IntegerType *it);
-  CCSTTypeName* visit(PointerType *pt);
   CCSTTypeName* visit(ProjectionType *pt);
   CCSTTypeName* visit(FunctionPointer *fp);
 };
@@ -394,7 +456,6 @@ class AllocateTypeVisitor
   CCSTStatement* visit(Typedef *td, Variable *v);
   CCSTStatement* visit(VoidType *vt, Variable *v);
   CCSTStatement* visit(IntegerType *it, Variable *v);
-  CCSTStatement* visit(PointerType *pt, Variable *v);
   CCSTStatement* visit(ProjectionType *pt, Variable *v);
   CCSTStatement* visit(FunctionPointer *fp, Variable *v);
 };

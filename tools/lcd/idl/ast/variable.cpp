@@ -578,5 +578,83 @@ bool ProjectionField::alloc_callee_caller()
   return this->alloc_callee_caller_;
 }
 
+FPParameter::FPParameter(Type *type, int pointer_count)
+{
+  this->type_ = type;
+  this->pointer_count_ = pointer_count;
+}
+
+Type* FPParameter::type()
+{
+  return this->type_;
+}
+
+const char* FPParameter::identifier()
+{
+  Assert(1 == 0, "Error: operation not allowed on function pointer parameter\n");
+}
+
+void FPParameter::set_in(bool b)
+{
+  printf("this operation is now allowed\n");
+}
+
+void FPParameter::set_out(bool b)
+{
+  printf("this operation is now allowed\n");
+}
+
+void FPParameter::set_alloc(bool b)
+{
+  printf("this operation is now allowed\n");
+}
+
+void FPParameter::set_alloc_caller(bool b)
+{
+  printf("this operation is now allowed\n");
+}
+
+void FPParameter::set_alloc_callee(bool b)
+{
+  printf("this operation is now allowed\n");
+}
+
+void FPParameter::set_alloc_callee_caller(bool b)
+{
+  printf("this operation is now allowed\n");
+}
+
+bool FPParameter::in()
+{
+  printf("this operation is now allowed\n");
+  return false;
+}
+
+bool FPParameter::out()
+{
+  printf("this operation is now allowed\n");
+  return false;
+}
+bool FPParameter::alloc()
+{
+  printf("this operation is now allowed\n");
+  return false;
+}
+bool FPParameter::alloc_caller()
+{
+  printf("this operation is now allowed\n");
+  return false;
+}
+bool FPParameter::alloc_callee()
+{
+  printf("this operation is now allowed\n");
+  return false;
+}
+bool FPParameter::alloc_callee_caller()
+{
+  printf("this operation is now allowed\n");
+  return false;
+}
+
 /* end */
 

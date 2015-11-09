@@ -188,6 +188,7 @@ class Parameter : public Variable
 
 
 // a parameter without a name
+// add to variables.cpp
 class FPParameter : public Parameter
 {
   Type *type_;
@@ -197,16 +198,30 @@ class FPParameter : public Parameter
   virtual Type* type();
   virtual const char* identifier();
   virtual int pointer_count();
+
+  virtual void set_in(bool b);
+  virtual void set_out(bool b);
+  virtual void set_alloc(bool b);
+  virtual void set_alloc_caller(bool b);
+  virtual void set_alloc_callee(bool b);
+  virtual void set_alloc_callee_caller(bool b);
+
+  virtual bool in();
+  virtual bool out();
+  virtual bool alloc();
+  virtual bool alloc_caller();
+  virtual bool alloc_callee();
+  virtual bool alloc_callee_caller();
 };
 
 class FunctionPointer : public Type
 {
   const char *identifier_;
-  Type *return_type_;
+  ReturnVariable *return_var_;
   std::vector<FPParameter*> parameters_;
 
  public:
-  FunctionPointer(const char *id, Type *return_type, std::vector<FPParameter*> parameters);
+  FunctionPointer(const char *id, ReturnVariable *return_var, std::vector<FPParameter*> parameters);
   virtual CCSTTypeName* accept(TypeNameVisitor *worker);
   virtual CCSTStatement* accept(AllocateTypeVisitor *worker, Variable *v);
   virtual int num();
@@ -370,7 +385,7 @@ class ImplicitReturnVariable : public ReturnVariable
   virtual Type* type();
   virtual const char* identifier();
   virtual Variable* accessor();
-  virutal int pointer_count();
+  virtual int pointer_count();
 
   virtual void set_in(bool b);
   virtual void set_out(bool b);
@@ -400,7 +415,7 @@ class Rpc : public Base
   std::vector<Parameter* > marshal_parameters_;
   void set_implicit_returns();
  public:
-  Rpc(ReturnVariable *return_value, char* name, std::vector<Parameter* > parameters);
+  Rpc(ReturnVariable *return_var, char* name, std::vector<Parameter* > parameters);
   char* name();
   const char* enum_name();
   const char* callee_name();

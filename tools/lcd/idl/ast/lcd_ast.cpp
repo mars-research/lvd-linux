@@ -1,20 +1,7 @@
 #include "lcd_ast.h"
 #include <stdio.h>
 
-FPParameter::FPParameter(Type *type)
-{
-  this->type_ = type;
-}
 
-Type* FPParameter::type()
-{
-  return this->type_;
-}
-
-const char* FPParameter::identifier()
-{
-  Assert(1 == 0, "Error: operation not allowed on function pointer parameter\n");
-}
 Rpc::Rpc(ReturnVariable *return_value, char* name, std::vector<Parameter* > parameters)
 {
   this->explicit_return_ = return_value;

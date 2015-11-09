@@ -52,26 +52,19 @@ code: {{
 	    return val;
       }	
 
-      Type* count_pointers(Value v, const char* type)
+      int count_pointers(Value v)
       {
-	   Type *t = getType(type);
-	   
-	   for(Value::iterator it = v.getValues().begin(); it != v.getValues().end(); it++)
-	   {
-		const Value & v = *it;
-		char star = (char) (intptr_t) v.getValue();
-		if(star == '*')
-		{
-		 
-		 t = new PointerType(t);		
-		}
-		else
-		{
-			printf("Not a star\n");
-		}
+          int count = 0;
+	   for(Value::iterator it = v.getValues().begin(); it != v.getValues().end(); it++) {
+	       const Value & v = *it;
+	       char star = (char) (intptr_t) v.getValue();
+	       if(star == '*') {
+	           count += 1;
+	       } else {
+	           printf("Not a star\n");
+	       }
 	   }
-	   
-	   return t;	
+	   return count;
       }			
 
       void insertType(const char * sym, Type * val) // should this be void?
@@ -289,39 +282,32 @@ Include		 =	"#include" Space+ "<" Spacing f:Identifier Spacing ">" Spacing {{
 			value = str.c_str(); }}
 
 FP_Parameter	=	"rpc" Space+ rt:Type_form pointers:star* Spacing OPEN Spacing "*" Spacing id:Identifier CLOSE Spacing OPEN p:FP_Parameters CLOSE SEMI {{
-			    // pointer todo for the return value.
-			    // change from return type in function pointer to return variable? todo
 			    std::vector<FPParameter*> *fpparams = (std::vector<FPParameter*>*) p.getValue();
-			    FunctionPointer *fp = new FunctionPointer((char*) id.getValue(), (Type*) rt.getValue(), *fpparams);
-			    value = new Parameter(fp, (char *) id.getValue());
+			    FunctionPointer *fp = new FunctionPointer((char*) id.getValue(), new ReturnVariable((Type*) rt.getValue(), count_pointers(pointers)), *fpparams);
+			    value = new Parameter(fp, (char *) id.getValue(), 1);
 			}}
 
 FirstParam	=	t:Type_form pointers:star* Spacing id:Identifier Spacing COMMA Spacing {{
-			    // add pointer thing to parameter. todo
-			    value = new Parameter((Type *) t.getValue(), (char *) id.getValue()); 
+			    value = new Parameter((Type *) t.getValue(), (char *) id.getValue(), count_pointers(pointers)); 
 			}}
 			| FP_Parameter Spacing COMMA Spacing
 
 FP_FirstParam	=	t:Type_form pointers:star* Spacing COMMA Spacing {{
-			    // change fpparameter to take a pointer field or something todo
-			    value = new FPParameter((Type*) t.getValue());  
+			    value = new FPParameter((Type*) t.getValue(), count_pointers(pointers));  
 			}}
 			| "rpc" Space+ rt:Type_form pointers:star* Spacing OPEN Spacing "*" Spacing id:Identifier CLOSE Spacing OPEN p:FP_Parameters CLOSE SEMI Spacing COMMA Spacing {{
-			    // add pointer stuff todo
 			    std::vector<FPParameter*> *fpparams = (std::vector<FPParameter*>*) p.getValue();
-			    FunctionPointer *fp = new FunctionPointer((char*) id.getValue(), (Type*) rt.getValue(), *fpparams);
-			    value = new FPParameter(fp);
+			    FunctionPointer *fp = new FunctionPointer((char*) id.getValue(), new ReturnVariable((Type*) rt.getValue(), count_pointers(pointers)), *fpparams);
+			    value = new FPParameter(fp, 1);
 			}}
 			  
 LastParam	=	t:Type_form pointers:star* Spacing id:Identifier Spacing {{
-			    // todo add pointer to parameter
-			    value = new Parameter((Type *) t.getValue(), (char *) id.getValue()); 
+			    value = new Parameter((Type *) t.getValue(), (char *) id.getValue(), count_pointers(pointers)); 
 			}}
 			| FP_Parameter Spacing
 
 FP_LastParam	=	t:Type_form pointers:star* Spacing {{
-			    // todo add pointer to parameter
-			    value = new FPParameter((Type*) t.getValue());
+			    value = new FPParameter((Type*) t.getValue(), count_pointers(pointers));
 			}}
 			|  "rpc" Space+ rt:Type_form pointers:star* Spacing OPEN Spacing "*" Spacing id:Identifier CLOSE Spacing OPEN p:FP_Parameters CLOSE SEMI Spacing {{
 			    // todo change return type to return variable and add pointer
@@ -344,13 +330,11 @@ Parameters	=	f:FirstParam* l:LastParam {{
 			}}
 
 FirstGlobal	=	t:Type_form pointers:star* Spacing id:Identifier Spacing COMMA Spacing {{
-			    // add pointer to globalvariable todo
-			    value = new GlobalVariable((Type*) t.getValue(), (char*) id.getValue());
+			    value = new GlobalVariable((Type*) t.getValue(), (char*) id.getValue(), count_pointers(pointers));
 			}}
 
 LastGlobal	=	t:Type_form pointers:star* Spacing id:Identifier Spacing {{
-			    // add pointer to globalvariable todo
-			    value = new GlobalVariable((Type*) t.getValue(), (char*) id.getValue());
+			    value = new GlobalVariable((Type*) t.getValue(), (char*) id.getValue(), count_pointers(pointers));
 			}}
 
 Globals 	=	f:FirstGlobal* l:LastGlobal {{
@@ -377,19 +361,16 @@ FP_Parameters	=	f:FP_FirstParam* l:FP_LastParam {{
 			}}
 
 
-Rpc		=	"rpc" Space+ t:Type_form pointers:* Spacing id1:Identifier Spacing OPEN p:Parameters CLOSE SEMI Spacing {{
-			    // todo deal with pointer situation. change from return value to return variable and add pointer
+Rpc		=	"rpc" Space+ t:Type_form pointers:star* Spacing id1:Identifier Spacing OPEN p:Parameters CLOSE SEMI Spacing {{
 			    std::vector<Parameter*>* params = (std::vector<Parameter*>*) p.getValue();
 			    std::vector<Parameter*> params_ = *params;
-			    Rpc* r = new Rpc(new ReturnVariable((Type *) t.getValue()), (char *) id1.getValue(), params_);
+			    Rpc* r = new Rpc(new ReturnVariable((Type *) t.getValue(), count_pointers(pointers)), (char *) id1.getValue(), params_);
 			    int err = get_current_scope()->insert(r);
 			    if(!err) {
 			        printf("Error rpc already in scope with this name %s.\n", r->name());
 		            }
 			    value = r; 
-			}}
-
-Globals		=	  
+			}}  
 
 Projection_constructor =    "projection" Space+ id:Identifier Spacing "<" Spacing t:Proj_type ">" Spacing OPEN Spacing g:Globals Spacing CLOSE Spacing OPENC Spacing s:ProjectionScopeDefinitions p:ProjField* us:unnamed_scope* Spacing CLOSEC Spacing {{
 		       	        std::vector<ProjectionField*> fields;
@@ -478,9 +459,8 @@ Specification	=	s:Start* l:Last {{
 			}}
 
 ProjField	=	t:Type_form pointers:star* Spacing OPENS Spacing s:Specification CLOSES Spacing id:Identifier Spacing SEMI Spacing {{ 
-			    // add pointer to projection field todo
 			    std::vector<bool>* specs = (std::vector<bool>*) s.getValue();
-			    ProjectionField *pf = new ProjectionField((Type *) t.getValue(), (char *) id.getValue());
+			    ProjectionField *pf = new ProjectionField((Type *) t.getValue(), (char *) id.getValue(), pointers_count(pointers));
 
 			    if(specs->at(1) == true) {
 			        pf->set_out(true);
@@ -501,11 +481,10 @@ ProjField	=	t:Type_form pointers:star* Spacing OPENS Spacing s:Specification CLO
 			    value = fields; 
 			}}
 			| "rpc" Space+ rt:Type_form pointers:star* Spacing OPENS Spacing s:Specification CLOSES Spacing OPEN Spacing "*" Spacing id:Identifier CLOSE Spacing OPEN p:FP_Parameters CLOSE SEMI Spacing {{
-			    // change from return value to return variable and add pointer todo
 			    std::vector<bool> *specs = (std::vector<bool>*) s.getValue();
 			    std::vector<FPParameter*> *fpp = (std::vector<FPParameter*>*) p.getValue();
-			    FunctionPointer *fp = new FunctionPointer((char*) id.getValue(), (Type*) rt.getValue(), *fpp);
-			    ProjectionField *pf = new ProjectionField(fp, (char*) id.getValue());
+			    FunctionPointer *fp = new FunctionPointer((char*) id.getValue(), new ReturnVariable((Type*) rt.getValue(), count_pointers(pointers)), *fpp);
+			    ProjectionField *pf = new ProjectionField(fp, (char*) id.getValue(), 1);
 
 			     if(specs->at(1) == true) {
 			        pf->set_out(true);

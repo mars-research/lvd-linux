@@ -2,10 +2,10 @@
 
 /* function pointer type*/
 
-FunctionPointer::FunctionPointer(const char *id, Type *return_type, std::vector<FPParameter*> parameters)
+FunctionPointer::FunctionPointer(const char *id, ReturnVariable *return_var, std::vector<FPParameter*> parameters)
 {
   this->identifier_  = id;
-  this->return_type_ = return_type;
+  this->return_var_ = return_var;
   this->parameters_  = parameters;
 }
 

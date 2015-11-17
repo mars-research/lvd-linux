@@ -16,5 +16,8 @@ lcd-test-mod-glue-example-vfs-$(CONFIG_ISOLATE_GLUE_EXAMPLE) += ../$(LIBLCD)
 lcd-test-mod-glue-example-vfs-$(CONFIG_ISOLATE_GLUE_EXAMPLE)  += glue/boot.o
 lcd-test-mod-glue-example-vfs-$(CONFIG_ISOLATE_GLUE_EXAMPLE)  += glue/vfs_callee.o
 
+# Run linker script through C preprocessor (so we can use macros)
+extra-y := glue/vfs_callee.lds
+
 # run link script
 ldflags-$(CONFIG_ISOLATE_GLUE_EXAMPLE) += -T $(srctree)/$(src)/glue/vfs_callee.lds

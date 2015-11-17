@@ -247,10 +247,6 @@ int register_fs(struct fs *fs)
 		lcd_exit(ret); /* abort */
 	}
 
-	LIBLCD_MSG("minix refs fs %lx fs ops %lx",
-		dptr_val(fs_container->my_ref),
-		dptr_val(fs_operations_container->my_ref));
-
 	/* IPC MARSHALING ---------------------------------------- */
 
 	/* COMPILER: Both projections were marked as alloc(callee), so

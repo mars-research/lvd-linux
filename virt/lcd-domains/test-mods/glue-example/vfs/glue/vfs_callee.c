@@ -13,6 +13,9 @@
 /* COMPILER: We probably always need the slab header. */
 #include <linux/slab.h>
 
+/* COMPILER: We need this for the trampolines. */
+#include <lcd-domains/trampoline.h>
+
 /* COMPILER: Since this header was included in vfs.idl, the include
  * is pasted here (the compiler does not need to be smart about paths - the
  * IDL writer needs to use relative or absolute paths that should just 
@@ -114,16 +117,16 @@ struct file_container {
  * The following named struct types are not required, but improve
  * readability. */
 
-struct new_file_container {
+struct new_file_hidden_args {
 	struct fs_operations_container *fs_operations_container;
 	struct dstore *dstore;
-	char new_file_func;
+	struct lcd_trampoline_handle *t_handle;
 };
 
-struct rm_file_container {
+struct rm_file_hidden_args {
 	struct fs_operations_container *fs_operations_container;
 	struct dstore *dstore;
-	char rm_file_func;
+	struct lcd_trampoline_handle *t_handle;
 };
 
 /* FUNCTION POINTERS -------------------------------------------------- */
@@ -145,7 +148,7 @@ struct rm_file_container {
  * used over the channel we invoke this on. */
 #define NEW_FILE 1
 int  noinline
-new_file(int id, struct file **file_out, 
+new_file(int id, struct file **file_out,
 	struct fs_operations_container *fs_operations_container,
 	struct dstore *dstore)
 {
@@ -233,57 +236,23 @@ new_file(int id, struct file **file_out,
 	return lcd_r0();
 }
 
-/* COMPILER: These three globals are generated for every function 
- * pointer / trampoline. */
-extern char new_file_trampoline_end[];
-unsigned long new_file_trampoline_size;
-unsigned long new_file_trampoline_offset;
-extern const unsigned long new_file_trampoline_addr_bits_loc;
-
-/* COMPILER: A trampoline is generated for each function pointer.
- * It goes into its own section (so we can calculate the size of
- * the function at link time). */
-int __attribute__((section(".new_file_trampoline.text")))
+LCD_TRAMPOLINE_DATA(new_file_trampoline);
+int 
+LCD_TRAMPOLINE_LINKAGE(new_file_trampoline)
 new_file_trampoline(int id, struct file **file_out)
 {
-	char *ip;
-	struct new_file_container *new_file_container;
 	int (*volatile new_filep)(int, struct file **,
 				struct fs_operations_container *,
 				struct dstore *);
+	struct new_file_hidden_args *hidden_args;
+
+	LCD_TRAMPOLINE_PROLOGUE(hidden_args, new_file_trampoline);
 
 	new_filep = new_file;
 
-	/* COMPILER: This assembly is generated just using the
-	 * name of the original function 
-	 * (i.e., [function_name]_trampoline_label). */
-	asm(
-                "jmp 1f \n\t"
-
-                "new_file_trampoline_addr: \n\t"
-                ".quad 0 \n\t"
-
-                ".pushsection .rodata \n\t"
-                ".global new_file_trampoline_addr_bits_loc \n\t"
-                "new_file_trampoline_addr_bits_loc: .quad new_file_trampoline_addr \n\t"
-                ".popsection \n\t"
-
-                "1: \n\t"
-                "movq -0xf(%%rip), %0 \n\t"
-		
-		: "=g"(ip)
-		::);
-
-	/* COMPILER: We extract the container and dstore variables from
-	 * our container, and invoke the caller glue code. */
-
-	new_file_container = container_of(ip,
-					struct new_file_container,
-					new_file_func);
-
 	return new_filep(id, file_out,
-			new_file_container->fs_operations_container,
-			new_file_container->dstore);
+			hidden_args->fs_operations_container,
+			hidden_args->dstore);
 }
 
 /* RM_FILE -------------------------------------------------- */
@@ -352,49 +321,23 @@ rm_file(struct file *file,
 	return;
 }
 
-extern char rm_file_trampoline_end[];
-unsigned long rm_file_trampoline_size;
-unsigned long rm_file_trampoline_offset;
-extern const unsigned long rm_file_trampoline_addr_bits_loc;
-
-void __attribute__((section(".rm_file_trampoline.text")))
+LCD_TRAMPOLINE_DATA(rm_file_trampoline);
+void 
+LCD_TRAMPOLINE_LINKAGE(rm_file_trampoline)
 rm_file_trampoline(struct file *file)
 {
-	char *ip;
-	struct rm_file_container *rm_file_container;
 	void (*volatile rm_filep)(struct file *,
 				struct fs_operations_container *,
 				struct dstore *);
+	struct new_file_hidden_args *hidden_args;
+
+	LCD_TRAMPOLINE_PROLOGUE(hidden_args, rm_file_trampoline);
 
 	rm_filep = rm_file;
 
-	asm(
-		"jmp 1f \n\t"
-
-		"rm_file_trampoline_addr: \n\t"
-                ".quad 0 \n\t"
-
-                ".pushsection .rodata \n\t"
-                ".global rm_file_trampoline_addr_bits_loc \n\t"
-                "rm_file_trampoline_addr_bits_loc: .quad rm_file_trampoline_addr \n\t"
-                ".popsection \n\t"
-
-                "1: \n\t"
-                "movq -0xf(%%rip), %0 \n\t"
-		
-		: "=g"(ip)
-		::);
-
-	/* COMPILER: We extract the container and dstore variables from
-	 * our container, and invoke the caller glue code. */
-
-	rm_file_container = container_of(ip,
-					struct rm_file_container,
-					rm_file_func);
-
 	rm_filep(file,
-		rm_file_container->fs_operations_container,
-		rm_file_container->dstore);
+		hidden_args->fs_operations_container,
+		hidden_args->dstore);
 }
 
 /* CALLEE CODE -------------------------------------------------- */
@@ -415,15 +358,14 @@ void register_fs_callee(void)
 	/* COMPILER: projection <struct fs_operations> is marked as
 	 * alloc(callee) and it contains function pointers, so we
 	 * will allocate trampolines for each one here. */
-	struct new_file_container *new_file_container;
-	struct rm_file_container *rm_file_container;
+	struct new_file_hidden_args *new_file_hidden_args;
+	struct rm_file_hidden_args *rm_file_hidden_args;
 
 	/* These are used below. */
 	int ret;
 	int register_fs_ret;
 	dptr_t fs_minix_ref;
 	dptr_t fs_operations_minix_ref;
-	unsigned long loc;
 
 	/* CONTAINER INIT ---------------------------------------- */
 
@@ -479,67 +421,57 @@ void register_fs_callee(void)
 	 * allocation. */
 	
 	/* COMPILER: As mentioned above, we need to allocate the trampolines
-	 * here, and install them in the struct fs_operations.
-	 *
-	 * sizeof(struct new_file_container) - 1 will just be the size of
-	 * any fields that are prepended before the trampoline's
-	 * prologue. new_file_trampoline_size is calculated in
-	 * init (using globals set by the linker). */
+	 * here, and install them in the struct fs_operations. */
 
 	/* alloc */
-	new_file_container = kzalloc(
-		(sizeof(*new_file_container) - 1) +
-		new_file_trampoline_size,
-		GFP_KERNEL);
-	if (!new_file_container) {
-		LIBLCD_ERR("kzalloc trampoline");
+	new_file_hidden_args = kzalloc(sizeof(*new_file_hidden_args),
+				GFP_KERNEL);
+	if (!new_file_hidden_args) {
+		LIBLCD_ERR("kzalloc hidden args");
 		lcd_exit(-1);
 	}
+	/* dup trampoline */
+	new_file_hidden_args->t_handle = 
+		LCD_DUP_TRAMPOLINE(new_file_trampoline);
+	if (!new_file_hidden_args->t_handle) {
+		LIBLCD_ERR("dup trampoline");
+		lcd_exit(-1);
+	}
+
+	/* Store hidden args above trampoline */
+	new_file_hidden_args->t_handle->hidden_args = new_file_hidden_args;
 	/* container */
-	new_file_container->fs_operations_container = fs_operations_container;
+	new_file_hidden_args->fs_operations_container = 
+		fs_operations_container;
 	/* data store */
-	new_file_container->dstore = minix_dstore;
-	/* copy trampoline bits */
-	memcpy((void*)&new_file_container->new_file_func,
-		(void *)new_file_trampoline,
-		new_file_trampoline_size);
-	/* patch address into trampoline instance */
-	loc = (unsigned long)&new_file_container->new_file_func;
-	memcpy(((char*)&new_file_container->new_file_func) +
-		new_file_trampoline_offset,
-		&loc,
-		sizeof(unsigned long));
-		
-	/* install in fs ops */
+	new_file_hidden_args->dstore = minix_dstore;
+	/* install trampoline in fs ops */
 	fs_operations_container->fs_operations.new_file =
-		(int (*)(int id, struct file**))&new_file_container->new_file_func;
+		LCD_HANDLE_TO_TRAMPOLINE(new_file_hidden_args->t_handle);
 
 	/* alloc */
-	rm_file_container = kzalloc(
-		(sizeof(*rm_file_container) - 1) +
-		rm_file_trampoline_size,
-		GFP_KERNEL);
-	if (!rm_file_container) {
-		LIBLCD_ERR("kzalloc trampoline");
+	rm_file_hidden_args = kzalloc(sizeof(*rm_file_hidden_args),
+				GFP_KERNEL);
+	if (!rm_file_hidden_args) {
+		LIBLCD_ERR("kzalloc hidden args");
 		lcd_exit(-1);
 	}
+	/* dup trampoline */
+	rm_file_hidden_args->t_handle = 
+		LCD_DUP_TRAMPOLINE(rm_file_trampoline);
+	if (!rm_file_hidden_args->t_handle) {
+		LIBLCD_ERR("dup trampoline");
+		lcd_exit(-1);
+	}
+	/* Store hidden args above trampoline */
+	rm_file_hidden_args->t_handle->hidden_args = rm_file_hidden_args;
 	/* container */
-	rm_file_container->fs_operations_container = fs_operations_container;
+	rm_file_hidden_args->fs_operations_container = fs_operations_container;
 	/* data store */
-	rm_file_container->dstore = minix_dstore;
-	/* copy trampoline bits */
-	memcpy((void *)&rm_file_container->rm_file_func,
-		(void *)rm_file_trampoline,
-		rm_file_trampoline_size);
-	/* patch address into trampoline instance */
-	loc = (unsigned long)&rm_file_container->rm_file_func;
-	memcpy(((char*)&rm_file_container->rm_file_func) +
-		rm_file_trampoline_offset,
-		&loc,
-		sizeof(unsigned long));
-
+	rm_file_hidden_args->dstore = minix_dstore;
+	/* install trampoline in fs ops */
 	fs_operations_container->fs_operations.rm_file =
-		(void (*)(struct file*))&rm_file_container->rm_file_func;
+		LCD_HANDLE_TO_TRAMPOLINE(rm_file_hidden_args->t_handle);
 
 	/* IPC UNMARSHALING ---------------------------------------- */
 
@@ -621,6 +553,8 @@ void unregister_fs_callee(void)
 	struct dstore_node *n;
 	dptr_t fs_minix_ref;
 	dptr_t fs_operations_minix_ref;
+	struct new_file_hidden_args *new_file_hidden_args;
+	struct rm_file_hidden_args *rm_file_hidden_args;
 
 	/* IPC UNMARSHALING ---------------------------------------- */
 
@@ -678,15 +612,19 @@ void unregister_fs_callee(void)
 	 * invoke delete once. */
 	lcd_cap_delete(fs_container->chnl);
 
-	/* COMPILER: Third, we free any trampolines that were created for
-	 * the projections we are destroying. In this case, two trampolines
-	 * were created for projection <struct fs_operations>. */
-	kfree(container_of((char *)fs_operations_container->fs_operations.new_file,
-				struct new_file_container,
-				new_file_func));
-	kfree(container_of((char *)fs_operations_container->fs_operations.rm_file,
-				struct rm_file_container,
-				rm_file_func));
+	/* COMPILER: Third, we free any trampolines and hidden args
+	 * that were created for the projections we are destroying. In this 
+	 * case, two trampolines were created for 
+	 * projection <struct fs_operations>. */
+	new_file_hidden_args = LCD_TRAMPOLINE_TO_HIDDEN_ARGS(
+		fs_operations_container->fs_operations.new_file);
+	rm_file_hidden_args = LCD_TRAMPOLINE_TO_HIDDEN_ARGS(
+		fs_operations_container->fs_operations.rm_file);
+
+	kfree(new_file_hidden_args->t_handle);
+	kfree(rm_file_hidden_args->t_handle);
+	kfree(new_file_hidden_args);
+	kfree(rm_file_hidden_args);
 
 	/* COMPILER: Finally, we free the projections themselves. */
 	kfree(fs_container);
@@ -728,20 +666,6 @@ int glue_vfs_init(cptr_t vfs_chnl, struct dispatch_ctx *ctx)
 
 	/* Add it to dispatch loop */
 	loop_ctx->add_channel(loop_ctx, &vfs_channel);
-
-
-	/* COMPILER: There are 2 function pointers total, hence 2
-	 * trampolines, hence 2 pairs of globals to initialize. */
-
-	new_file_trampoline_size = 
-		(unsigned long)new_file_trampoline_end - (unsigned long)new_file_trampoline;
-	new_file_trampoline_offset =
-		new_file_trampoline_addr_bits_loc - (unsigned long)new_file_trampoline;
-
-	rm_file_trampoline_size = 
-		(unsigned long)rm_file_trampoline_end - (unsigned long)rm_file_trampoline;
-	rm_file_trampoline_offset =
-		rm_file_trampoline_addr_bits_loc - (unsigned long)rm_file_trampoline;
 
 	/* Initialize minix data store */
 	ret = lcd_dstore_init_dstore(&minix_dstore);

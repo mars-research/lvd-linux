@@ -10,6 +10,8 @@
 
 #include <lcd-domains/liblcd-hacks.h>
 
+int init_pmfs_fs(void);
+void exit_pmfs_fs(void);
 
 static int __noreturn __init pmfs_lcd_init(void) 
 {
@@ -17,6 +19,14 @@ static int __noreturn __init pmfs_lcd_init(void)
 	r = lcd_enter();
 	if (r)
 		goto fail1;
+
+	r = init_pmfs_fs();
+	if (r)
+		goto fail1;
+
+	exit_pmfs_fs();
+
+
 fail1:
 	lcd_exit(r);
 }

@@ -1041,6 +1041,8 @@ static void pmfs_destroy_inode(struct inode *inode)
 static void init_once(void *foo)
 {
 #ifdef LCD_ISOLATE
+	struct pmfs_inode_vfs *vi;
+
 	/*
 	 * This is the "constructor" for the pmfs_inode_vfs slab cache
 	 * (called when an inode is allocated from the cache). We need to
@@ -1056,7 +1058,7 @@ static void init_once(void *foo)
 	c->vfs_ref = 0; /* null */
 	c->pmfs_ref = 0; /* null */
 	
-	struct pmfs_inode_vfs *vi = &c->x;
+	vi = &c->x;
 
 #else
 
@@ -1085,8 +1087,6 @@ static int __init init_blocknode_cache(void)
 static int __init init_inodecache(void)
 {
 #ifdef LCD_ISOLATE
-
-#error "It worked!"
 	/*
 	 * Objects in this slab cache pass through an interface boundary
 	 * (struct inode is inside struct pmfs_inode_vfs). Put inside glue 
@@ -1097,7 +1097,7 @@ static int __init init_inodecache(void)
 						struct pmfs_inode_vfs x;
 						u64 vfs_ref;
 						u64 pmfs_ref;
-					},
+					}),
 						0, (SLAB_RECLAIM_ACCOUNT |
 							SLAB_MEM_SPREAD), 
 						init_once);
@@ -1221,7 +1221,11 @@ static const struct export_operations pmfs_export_ops = {
 #ifndef LCD_ISOLATE
 static 
 #endif
-int __init init_pmfs_fs(void)
+int 
+#ifndef LCD_ISOLATE
+__init 
+#endif
+init_pmfs_fs(void)
 {
 	int rc = 0;
 
@@ -1261,7 +1265,11 @@ out1:
 #ifndef LCD_ISOLATE
 static 
 #endif
-void __exit exit_pmfs_fs(void)
+void 
+#ifndef LCD_ISOLATE
+__exit 
+#endif
+exit_pmfs_fs(void)
 {
 	unregister_filesystem(&pmfs_fs_type);
 	bdi_destroy(&pmfs_backing_dev_info);

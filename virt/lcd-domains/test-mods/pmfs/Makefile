@@ -3,7 +3,7 @@
 
 # Flag to toggle some coditional compilation in the original source code
 # for isolation
-CFLAGS_lcd-test-mod-pmfs-lcd.o  := -DLCD_ISOLATE
+ccflags-y := -DLCD_ISOLATE
 
 # The original code
 obj-$(CONFIG_LCD_TEST_MOD_PMFS_LCD)  += lcd-test-mod-pmfs-lcd.o

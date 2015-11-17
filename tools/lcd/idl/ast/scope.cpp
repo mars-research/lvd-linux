@@ -51,6 +51,12 @@ bool GlobalScope::insert(Rpc *r)
   return ret.second;
 }
 
+std::vector<Rpc*> GlobalScope::rpc_in_scope()
+{
+  std::vector<Rpc*> empty;
+  return empty;
+}
+
 bool GlobalScope::contains(const char *symbol)
 {
   std::string temp(symbol);
@@ -134,6 +140,13 @@ bool LexicalScope::insert(Rpc *r)
   std::pair<std::map<std::pair<std::string, std::vector<Parameter*> >, Rpc*>::iterator, bool> ret;
   ret = this->rpc_definitions_.insert(std::pair<std::pair<std::string, std::vector<Parameter*> >, Rpc*>(p, r));
   return ret.second;
+}
+
+std::vector<Rpc*> LexicalScope::rpc_in_scope()
+{
+  printf("rpc in scope lexical scope todo\n");
+  std::vector<Rpc*> empty;
+  return empty;
 }
 
 bool LexicalScope::contains(const char *symbol)

@@ -23,9 +23,8 @@ CCSTFile* generate_client_source(Module* f)
   // create initialization function
 
   
-
-  std::vector<CCSTExDeclaration*> definitions;
-  for(std::vector<Rpc*>::iterator it = f->rpc_defs().begin(); it != f->rpc_defs().end(); it ++) {
+  std::vector<Rpc*> rpcs = f->rpc_definitions();
+  for(std::vector<Rpc*>::iterator it = rpcs.begin(); it != rpcs.end(); it ++) {
     Rpc *r = (Rpc*) *it;
     definitions.push_back(function_definition(function_declaration(r)
 						     ,caller_body(r)));
@@ -34,17 +33,21 @@ CCSTFile* generate_client_source(Module* f)
   return new CCSTFile(definitions);
 }
 
-CCSTCompoundStatement* create_caller_body(Rpc *r)
+CCSTCompoundStatement* caller_body(Rpc *r)
 {
   std::vector<CCSTDeclaration*> declarations;
   std::vector<CCSTStatement*> statements = marshal_parameters(r->parameters());
 
   // implicit returns
-  std::vector<CCSTStatement*> uirs = unmarshal_implicit_return(r->implicit_ret_marshal_info());
-  statements.insert(statements.end(), uirs.begin(), uirs.end());
+
+  // replace with parameter loop
+  //std::vector<CCSTStatement*> uirs = unmarshal_implicit_return(r->implicit_ret_marshal_info());
+  //statements.insert(statements.end(), uirs.begin(), uirs.end());
   
-  if(r->explicit_return_type()->num() != 5) { // not void
-    Marshal_type *ret_info = r->explicit_ret_marshal_info();
+  ReturnVariable *rv = r->return_variable();
+
+  if(rv->type()->num() != 5) { // not void
+    // Marshal_type *ret_info = r->explicit_ret_marshal_info();
     
     
   }
@@ -52,7 +55,7 @@ CCSTCompoundStatement* create_caller_body(Rpc *r)
     statements.push_back(new CCSTReturn());
   }
 
-  return new CCSTCompoundstatement(declarations, statements);
+  return new CCSTCompoundStatement(declarations, statements);
   
 }
 
@@ -62,7 +65,7 @@ std::vector<CCSTStatement*> marshal_parameters(std::vector<Parameter*> params)
   
   for(std::vector<Parameter*>::iterator it = params.begin(); it != params.end(); it ++) {
     Parameter *p = (Parameter*) *it;
-    statements.push_back(marshal_parameter(p));
+    statements.push_back(marshal_variable(p));
   }
   
   return statements;
@@ -70,6 +73,7 @@ std::vector<CCSTStatement*> marshal_parameters(std::vector<Parameter*> params)
 
 std::vector<CCSTStatement*> unmarshal_implicit_return(std::vector<Parameter*> implicit_returns)
 {
+  /*
   std::vector<CCSTStatement*> statements;
   for(std::vector<Parameter*>::iterator it = implicit_returns.begin(); it != implicit_returns.end(); it ++) {
     Parameter *p = *it;
@@ -78,8 +82,10 @@ std::vector<CCSTStatement*> unmarshal_implicit_return(std::vector<Parameter*> im
   }
   
   return statements;
+  */
 }
 
+/*
 CCSTStatement* unmarshal_explicit_return(Marshal_type* return_info)
 {
   CCSTPointer *p = 0x0;
@@ -95,6 +101,7 @@ CCSTStatement* unmarshal_explicit_return(Marshal_type* return_info)
   s.push_back(ret_info->accept(visitor));
   s.push_back( new CCSTReturn(new CCSTPrimaryExprId("internal_ret")));
 }
+*/
 
 
 

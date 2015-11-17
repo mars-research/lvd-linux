@@ -312,8 +312,8 @@ FP_LastParam	=	t:Type_form pointers:star* Spacing {{
 			|  "rpc" Space+ rt:Type_form pointers:star* Spacing OPEN Spacing "*" Spacing id:Identifier CLOSE Spacing OPEN p:FP_Parameters CLOSE SEMI Spacing {{
 			    // todo change return type to return variable and add pointer
 			    std::vector<FPParameter*> *fpparams = (std::vector<FPParameter*>*) p.getValue();
-			    FunctionPointer *fp = new FunctionPointer((char*) id.getValue(), (Type*) rt.getValue(), *fpparams);
-			    value = new FPParameter(fp);
+			    FunctionPointer *fp = new FunctionPointer((char*) id.getValue(), new ReturnVariable((Type*) rt.getValue(), count_pointers(pointers)), *fpparams);
+			    value = new FPParameter(fp, 1);
 			}}
 
 Parameters	=	f:FirstParam* l:LastParam {{
@@ -460,7 +460,7 @@ Specification	=	s:Start* l:Last {{
 
 ProjField	=	t:Type_form pointers:star* Spacing OPENS Spacing s:Specification CLOSES Spacing id:Identifier Spacing SEMI Spacing {{ 
 			    std::vector<bool>* specs = (std::vector<bool>*) s.getValue();
-			    ProjectionField *pf = new ProjectionField((Type *) t.getValue(), (char *) id.getValue(), pointers_count(pointers));
+			    ProjectionField *pf = new ProjectionField((Type *) t.getValue(), (char *) id.getValue(), count_pointers(pointers));
 
 			    if(specs->at(1) == true) {
 			        pf->set_out(true);

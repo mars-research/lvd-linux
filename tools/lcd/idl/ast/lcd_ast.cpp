@@ -7,7 +7,6 @@ Rpc::Rpc(ReturnVariable *return_value, char* name, std::vector<Parameter* > para
   this->explicit_return_ = return_value;
   this->name_ = name;
   this->parameters_ = parameters;
-  this->set_implicit_returns();
   this->symbol_table_ = new SymbolTable();
   
   for(std::vector<Parameter*>::iterator it = parameters.begin(); it != parameters.end(); it ++)
@@ -17,26 +16,9 @@ Rpc::Rpc(ReturnVariable *return_value, char* name, std::vector<Parameter* > para
     }
 }
 
-ReturnVariable* Rpc::return_value()
+ReturnVariable* Rpc::return_variable()
 {
   return this->explicit_return_;
-}
-
-void Rpc::set_implicit_returns()
-{
-  
-  std::vector<ImplicitReturnVariable*> implicit_returns;
-
-  for(std::vector<Parameter*>::iterator it = this->parameters_.begin(); it != this->parameters_.end(); it ++)
-    {
-      Parameter *p = (Parameter*) *it;
-      
-      if(p->type()->num() == 3) // Pointer //make an enum......
-	{
-	  implicit_returns.push_back(new ImplicitReturnVariable(p));
-	}
-    }
-  this->implicit_returns_ = implicit_returns;
 }
 
  char* Rpc::name()
@@ -70,6 +52,22 @@ std::vector<Parameter*> Rpc::parameters()
   return parameters_;
 }
 
+void Rpc::prepare_marshal()
+{
+  MarshalPrepareVisitor *worker = new MarshalPrepareVisitor(new Registers());
+  
+  // marshal prepare for parameters as long as they are in or out
+  for(std::vector<Parameter*>::iterator it = this->parameters_.begin(); it != this->parameters_.end(); it ++) {
+    Parameter* p = *it;
+    if(p->in() || p->out()) {
+      p->prepare_marshal(worker);
+    }
+  }
+  
+  // marshal prepare for return value
+  this->explicit_return_->prepare_marshal(worker);
+}
+
 Module::Module(std::vector<Rpc*> rpc_definitions, std::vector<GlobalVariable*> globals, LexicalScope *ls)
 {
   this->module_scope_ = ls;
@@ -91,3 +89,26 @@ LexicalScope* Module::module_scope()
 {
   return this->module_scope_;
 }
+
+void Module::prepare_marshal()
+{
+  for(std::vector<Rpc*>::iterator it = this->rpc_definitions_.begin(); it != this->rpc_definitions_.end(); it ++) {
+    Rpc *r = *it;
+    r->prepare_marshal();
+  }
+}
+
+Project::Project(LexicalScope *scope, std::vector<Module*> modules)
+{
+  this->project_scope_ = scope;
+  this->project_modules_ = modules;
+}
+
+void Project::prepare_marshal()
+{
+  for(std::vector<Module*>::iterator it = this->project_modules_.begin(); it != this->project_modules_.end(); it ++) {
+    Module *m = *it;
+    m->prepare_marshal();
+  }
+}
+

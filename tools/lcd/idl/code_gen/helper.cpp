@@ -16,27 +16,27 @@ CCSTDeclaration* container_struct_definition(const char* name, ProjectionType *p
   
   std::vector<CCSTStructDeclarator*> real_struct_field;
   real_struct_field.push_back(new CCSTStructDeclarator(new CCSTDeclarator(0x0, new CCSTDirectDecId(pt->real_type()))));
-  container_fields.push_back(new CCSTStructDeclaration(type(pt), real_struct_field));
+  container_fields.push_back(new CCSTStructDeclaration(type(pt), new CCSTStructDecList(real_struct_field)));
 
   std::vector<CCSTStructDeclarator*> remote_ref_field;
   remote_ref_field.push_back(new CCSTStructDeclarator(new CCSTDeclarator(0x0, new CCSTDirectDecId("remote_ref"))));
   
-  std::vector<CCSTDecSpecifier*> dptr_t;
+  std::vector<CCSTSpecifierQual*> dptr_t;
   dptr_t.push_back(new CCSTTypedefName("dptr_t"));
-  container_fields.push_back(new CCSTStructDeclaration(dptr_t, remote_ref_field));
+  container_fields.push_back(new CCSTStructDeclaration(dptr_t, new CCSTStructDecList(remote_ref_field)));
   
   std::vector<CCSTStructDeclarator*> my_ref_field;
   my_ref_field.push_back(new CCSTStructDeclarator(new CCSTDeclarator(0x0, new CCSTDirectDecId("my_ref"))));
-  container_fields.push_back(new CCSTStructDeclaration(dptr_t, my_ref_field));
+  container_fields.push_back(new CCSTStructDeclaration(dptr_t, new CCSTStructDecList(my_ref_field)));
 
 
   if(channel) {
-    std::vector<CCSTDecSpecifier*> cptr_t;
+    std::vector<CCSTSpecifierQual*> cptr_t;
     cptr_t.push_back(new CCSTTypedefName("cptr_t"));
     
     std::vector<CCSTStructDeclarator*> channel_field;
     channel_field.push_back(new CCSTStructDeclarator(new CCSTDeclarator(0x0, new CCSTDirectDecId("chnl"))));
-    container_fields.push_back(new CCSTStructDeclaration(cptr_t, channel_field));
+    container_fields.push_back(new CCSTStructDeclaration(cptr_t, new CCSTStructDecList(channel_field)));
   }
   CCSTStructUnionSpecifier *container = new CCSTStructUnionSpecifier(struct_t, name, container_fields);
 
@@ -58,7 +58,7 @@ CCSTDeclaration* typedef_declaration(Typedef *t)
   // possibly unnecessary depending on if proper header files are included
 
   printf("todo typedef\n");
-  return 0x0
+  return 0x0;
 }
 
 CCSTAssignOp* equals() 
@@ -124,30 +124,21 @@ CCSTDeclaration* declare_static_variable(Variable *gv)
   std::vector<CCSTDecSpecifier*> specifier;
   specifier.push_back(new CCSTStoClassSpecifier(static_t));
 
-  std::vector<CCSTDecSpecifier*> type_for_global = type(gv->type());
+  std::vector<CCSTSpecifierQual*> type_for_global = type(gv->type());
   specifier.insert(specifier.end(), type_for_global.begin(), type_for_global.end());
 
   std::vector<CCSTInitDeclarator*> declarators;
-  declarators.push_back(new CCSTDeclarator( pointer( count_nested_pointer(gv->type())),
+  declarators.push_back(new CCSTDeclarator( pointer(gv->pointer_count()),
 					    new CCSTDirectDecId(gv->identifier())));
   
   return new CCSTDeclaration(specifier, declarators);
 }
 
-//??????????
-CCSTPostFixExpr* access_variable(Variable *p)
-{
-  if(p->accessor() == 0x0) {
-    return new CCSTPrimaryExprId(p->identifier());
-  }
-  
-  return new CCSTPostFixExprAccess(access_parameter(p->accessor()), accessor, p->identifier()); 
-}
-
 CCSTExDeclaration* construct_enum(Module *f)
 {
   const char* enum_name = "todo";
-  CCSTEnumeratorList *el = construct_enumlist(f->rpc_defs());
+  std::vector<Rpc*> rpcs = f->rpc_definitions();
+  CCSTEnumeratorList *el = construct_enumlist(rpcs);
   CCSTEnumSpecifier *e = new CCSTEnumSpecifier(enum_name, el);
   std::vector<CCSTDecSpecifier*> tmp; // = new std::vector<CCSTDecSpecifier*>();
   tmp.push_back(e);
@@ -170,7 +161,7 @@ CCSTEnumeratorList* construct_enumlist(std::vector<Rpc *> rps)
   for(std::vector<Rpc*>::iterator it = rps.begin(); it != rps.end(); it ++)
     {
       Rpc *r = *it;
-      char* upper_name = string_to_upper(r->name());
+      const char* upper_name = string_to_upper(r->name());
       char* enum_name = (char*)malloc((sizeof(upper_name)+9+1)*sizeof(char));
       sprintf(enum_name, "%s_CALLEE_T", upper_name);
       list->push_back(new CCSTEnumerator(enum_name));
@@ -181,7 +172,7 @@ CCSTEnumeratorList* construct_enumlist(std::vector<Rpc *> rps)
 
 const char* string_to_upper(char* str)
 {
-  const char* ret = (char*) malloc((sizeof(str)+1)*sizeof(char));
+  char* ret = (char*) malloc((sizeof(str)+1)*sizeof(char));
   int i;
   for(i = 0; i < sizeof(str); i ++)
     {
@@ -190,27 +181,6 @@ const char* string_to_upper(char* str)
     }
   ret[i] = '\0';
   return ret;
-}
-
-Type* get_non_pointer_type(PointerType *p)
-{
-  Assert(p->type() != 0x0, "Error: pointer to null\n");
-  
-  if(p->type()->num() != 3)
-    return p->type();
-  PointerType *pt = dynamic_cast<PointerType*>(p->type());
-  return get_non_pointer_type(pt);
-}
-
-int count_nested_pointer(Type *p)
-{
-  if(p->num() != 3)
-    return 0;
-  else
-    {
-      PointerType *tmp = dynamic_cast<PointerType*>(p);
-      return 1 + count_nested_pointer(tmp->type());
-    }
 }
 
 /* creates a pointer, or pointer to pointer, etc*/
@@ -255,15 +225,13 @@ CCSTParamTypeList* parameter_list()
  */
 CCSTDeclaration* function_declaration(Rpc* r)
 {
-  std::vector<CCSTDecSpecifier*> specifier = type(r->explicit_return_type());
+  std::vector<CCSTDecSpecifier*> specifier = type2(r->return_variable()->type());
   
   std::vector<CCSTInitDeclarator*> func; // = new std::vector<CCSTInitDeclarator*>(); // pointer name, params
-  int pointer_count = count_nested_pointer(r->explicit_return_type());
-  
-  CCSTPointer *p = pointer(pointer_count);
+  CCSTPointer *p = pointer(r->return_variable()->pointer_count());
   
   CCSTDirectDecId *name = new CCSTDirectDecId(r->name());
-  CCSTParamTypeList *param_list = create_parameter_list();
+  CCSTParamTypeList *param_list = parameter_list();
   CCSTDirectDecParamTypeList *name_params = new CCSTDirectDecParamTypeList(name, param_list);
   
   func.push_back(new CCSTDeclarator(p, name_params));
@@ -271,7 +239,7 @@ CCSTDeclaration* function_declaration(Rpc* r)
   return new CCSTDeclaration(specifier, func);
 }
 
-std::vector<CCSTDecSpecifier*> type(Type *t)
+std::vector<CCSTDecSpecifier*> type2(Type *t)
 {
   std::vector<CCSTDecSpecifier*>specifier;
   switch(t->num())
@@ -327,11 +295,72 @@ std::vector<CCSTDecSpecifier*> type(Type *t)
 	specifier.push_back(new CCSTStructUnionSpecifier(struct_t, pt->real_type()));
 	return specifier;
       }
-    case 3:
+    default:
       {
-	PointerType *pt = dynamic_cast<PointerType*>(t);
+	Assert(1 == 0, "Error: Not a struct or integer type.\n");
+      }
+    }
+}
+
+
+
+
+
+std::vector<CCSTSpecifierQual*> type(Type *t)
+{
+  std::vector<CCSTSpecifierQual*>specifier;
+  switch(t->num())
+    {
+    case 2: // int type case
+      {
+	IntegerType *it = dynamic_cast<IntegerType*>(t);
+	Assert(it != 0x0, "Error: dynamic cast failed!\n");
+	switch (it->int_type())
+	  {
+	  case pt_char_t:
+	    {
+	      specifier.push_back(new CCSTSimpleTypeSpecifier(char_t));
+	      break;
+	    }
+	  case pt_short_t:
+	    {
+	      specifier.push_back(new CCSTSimpleTypeSpecifier(short_t));
+	      break;
+	    }
+	  case pt_int_t:
+	    {
+	      specifier.push_back(new CCSTSimpleTypeSpecifier(int_t));
+	      break;
+	    }
+	  case pt_long_t:
+	    {
+	      specifier.push_back( new CCSTSimpleTypeSpecifier(long_t));
+	      break;
+	    }
+	  case pt_longlong_t:
+	    {
+	      specifier.push_back(new CCSTSimpleTypeSpecifier(long_t));
+	      specifier.push_back(new CCSTSimpleTypeSpecifier(long_t));
+	      break;
+	    }
+	  case pt_capability_t:
+	    {
+	      specifier.push_back(new CCSTTypedefName("capability_t"));
+	      break;
+	    }
+	  default:
+	    {
+	      Assert(1 == 0, "Error: unknown type\n");
+	    }
+	  }
+	return specifier;
+      }
+    case 4: // struct
+      {
+	ProjectionType *pt = dynamic_cast<ProjectionType*>(t);
 	Assert(pt != 0x0, "Error: dynamic cast failed!\n");
-	return type(pt->type());
+	specifier.push_back(new CCSTStructUnionSpecifier(struct_t, pt->real_type()));
+	return specifier;
       }
     default:
       {
@@ -341,25 +370,16 @@ std::vector<CCSTDecSpecifier*> type(Type *t)
 }
 
 
-CCSTTypeName* type_cast(Type *t)
+CCSTTypeName* type_cast(Type *t, int pointer_count)
 {
   printf("in type+cast\n");
-  CCSTAbstDeclarator *pointers = 0x0;
+  CCSTAbstDeclarator *pointers = new CCSTAbstDeclarator( pointer(pointer_count), 0x0);
   std::vector<CCSTSpecifierQual*> spec_quals;
 
-  if(t == 0x0)
+  if(t == 0x0) {
     printf("t is null\n");
-  if(t->num() == 3)
-    {
-      printf("type cast pointer\n");
-      // do pointer stuff....
-      pointers = new CCSTAbstDeclarator( pointer(count_nested_pointer(t)) , 0x0); 
-      
-      PointerType *p = dynamic_cast<PointerType*>(t);
-      t = get_non_pointer_type(p); // get first non pointer, write function for this
-    }
-  
-  printf("in type castttt\n");
+  }
+
   switch(t->num())
     {
     case 1: // typedef
@@ -447,4 +467,72 @@ std::vector<CCSTSpecifierQual*> integer_type_cast(IntegerType *it)
       }
     }
   return spec_quals;
+}
+
+
+CCSTUnaryOp* indirection()
+{
+  return new CCSTUnaryOp(unary_mult_t);
+}
+
+CCSTUnaryExprCastExpr* dereference(CCSTCastExpr *to_deref)
+{
+  return new CCSTUnaryExprCastExpr(indirection(), to_deref);
+}
+
+CCSTPostFixExpr* access(Variable *v)
+{
+  if(v->accessor() == 0x0) {
+    int pc = v->pointer_count();
+    if (pc > 1) {
+      int tmp = pc-1;
+      CCSTCastExpr* init = new CCSTPrimaryExprId(v->identifier());
+      while(tmp > 0) {
+	init = dereference(init);
+	tmp -= 1;
+      }
+      return new CCSTPrimaryExpr(init);
+    } else {
+      return new CCSTPrimaryExprId(v->identifier());
+    }
+  } else {
+    if (v->accessor()->pointer_count() == 0) {
+      int pc = v->pointer_count();
+      if (pc > 1) {
+	int tmp = pc-1;
+        CCSTCastExpr * init = new CCSTPostFixExprAccess(access(v->accessor()), object_access_t, v->identifier());
+	while(tmp > 0) {
+	  init = dereference(init);
+	  tmp -= 1;
+	}
+	return new CCSTPrimaryExpr(init);
+	
+      } else {
+	return new CCSTPostFixExprAccess(access(v->accessor()), object_access_t, v->identifier());
+      }
+    } else {
+      int pc = v->pointer_count();
+      if (pc > 1) {
+	int tmp = pc-1;
+	CCSTCastExpr *init = new CCSTPostFixExprAccess(access(v->accessor()), pointer_access_t, v->identifier());
+	while(tmp > 0) {
+	  init = dereference(init);
+	  tmp -= 1;
+	}
+	return new CCSTPrimaryExpr(init);
+      } else {
+	return new CCSTPostFixExprAccess(access(v->accessor()), pointer_access_t, v->identifier());
+      }
+    }
+  }
+}
+
+CCSTPrimaryExprId* function_name(const char *func_name)
+{
+  return new CCSTPrimaryExprId(func_name);
+}
+
+CCSTPostFixExprAssnExpr* function_call(CCSTPrimaryExprId *func_name, std::vector<CCSTAssignExpr*> args)
+{
+  return new CCSTPostFixExprAssnExpr(func_name, args);
 }

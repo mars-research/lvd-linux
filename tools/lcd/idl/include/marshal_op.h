@@ -149,6 +149,7 @@ const char* access_register_mapping(int register_index);
 const char* store_register_mapping(int register_index);
 
 class Type;
+class FunctionPointer;
 class Parameter;
 class IntegerType;
 class ProjectionType;
@@ -161,7 +162,6 @@ class File;
 class TypeVisitor;
 class CCSTCompoundStatement;
 class ReturnVariable;
-class ImplicitReturnVariable;
 
 class Registers
 {
@@ -178,135 +178,56 @@ class Registers
 class Marshal_type
 {
  public:
-  virtual const char* name() = 0;
-  virtual void set_name(const char *name) = 0;
   virtual void set_register(int r) = 0;
   virtual int get_register() = 0;
-  virtual Type* type() = 0;
-  virtual CCSTCompoundStatement* accept(TypeVisitor *worker) = 0;
 };
 
 class Marshal_projection : public Marshal_type
 {
-  std::vector<Marshal_type*> out_fields_;
-  // need in and out
-  std::vector<Marshal_type*> in_fields_;
-  const char* param_name_;
-  ProjectionType *pt_;
  public:
-  Marshal_projection(ProjectionType *pt, std::vector<Marshal_type*> in_fields, std::vector<Marshal_type*> out_fields);
-  virtual void set_name(const char *name);
+  Marshal_projection();
   virtual void set_register( int r);
   virtual int get_register();
-  std::vector<Marshal_type*> in_fields();
-  std::vector<Marshal_type*> out_fields();
-  virtual Type* type();
-  virtual const char* name();
-  virtual CCSTCompoundStatement* accept(TypeVisitor *worker);
 };
 
 class Marshal_integer : public Marshal_type
 {
   int register_;
-  const char *param_name_;
-  IntegerType *it_;
  public:
-  Marshal_integer(IntegerType *it, int r);
+  Marshal_integer(int r);
   virtual void set_register(int r);
-  virtual int get_register();
-  virtual void set_name(const char *name);
-  virtual const char* name();
-  virtual Type* type();
-  virtual CCSTCompoundStatement* accept(TypeVisitor *worker);
-};
+  virtual int get_register();};
 
 class Marshal_void : public Marshal_type
 {
-  VoidType *vt_;
-  const char *param_name_;
  public:
-  Marshal_void(VoidType *vt);
+  Marshal_void();
   virtual void set_register(int r);
   virtual int get_register();
-  virtual void set_name(const char *name);
-  virtual const char* name();
-  virtual Type* get_type();
-  virtual CCSTCompoundStatement* accept(TypeVisitor *worker);
 };
 
 class Marshal_typedef : public Marshal_type
 {
   Marshal_type *true_type_;
-  Typedef *t_;
-  const char *param_name_;
  public:
-  Marshal_typedef(Typedef *t, Marshal_type *type);
+  Marshal_typedef(Marshal_type *type);
   virtual void set_register(int r);
   virtual int get_register();
-  virtual void set_name(const char *name);
-  virtual Type* type();
-  virtual const char* name();
-  virtual CCSTCompoundStatement* accept(TypeVisitor *worker);
 };
 
-class TypeVisitor
+
+class MarshalPrepareVisitor
 {
+  Registers *registers_;
  public:
-  virtual CCSTCompoundStatement* visit(Marshal_projection *data) = 0;
-  virtual CCSTCompoundStatement* visit(Marshal_integer *data) = 0;
-  virtual CCSTCompoundStatement* visit(Marshal_void *data) = 0;
-  virtual CCSTCompoundStatement* visit(Marshal_typedef *data) = 0;
+  MarshalPrepareVisitor(Registers *r);
+  Marshal_type* visit(FunctionPointer *fp);
+  Marshal_type* visit(Typedef *td);
+  Marshal_type* visit(VoidType *vt);
+  Marshal_type* visit(IntegerType *it);
+  Marshal_type* visit(ProjectionType *pt);
 };
 
-class VariableVisitor
-{
- public:
-  virtual CCSTCompoundStatement* visit(Parameter *param) = 0;
-  virtual CCSTCompoundStatement* visit(ProjectionField *pf) = 0;
-  virtual CCSTCompoundStatement* visit(ImplicitReturnVariable *irv) = 0;
-  virtual CCSTCompoundStatement* visit(ReturnVariable *rv) = 0;
-};
-
-class MarshalTypeVisitor : public TypeVisitor
-{
- public:
-  MarshalTypeVisitor() {}
-  virtual CCSTCompoundStatement* visit(Marshal_projection *data);
-  virtual CCSTCompoundStatement* visit(Marshal_integer *data);
-  virtual CCSTCompoundStatement* visit(Marshal_void *data);
-  virtual CCSTCompoundStatement* visit(Marshal_typedef *data);
-};
-
-class UnmarshalTypeVisitor : public TypeVisitor
-{
- public:
-  UnmarshalTypeVisitor() {}
-  virtual CCSTCompoundStatement* visit(Marshal_projection *data);
-  virtual CCSTCompoundStatement* visit(Marshal_integer *data);
-  virtual CCSTCompoundStatement* visit(Marshal_void *data);
-  virtual CCSTCompoundStatement* visit(Marshal_typedef *data);
-};
-
-
-class MarshalVariableVisitor : public VariableVisitor
-{
- public:
-  MarshalVariableVisitor() {}
-  virtual CCSTCompoundStatement* visit(Parameter *param);
-  virtual CCSTCompoundStatement* visit(ProjectionField *pf);
-  virtual CCSTCompoundStatement* visit(ImplicitReturnVariable *irv);
-  virtual CCSTCompoundStatement* visit(ReturnVariable *rv);
-};
-
-class UnmarshalVariableVisitor : public VariableVisitor
-{
- public:
-  UnmarshalVariableVisitor() {}
-  virtual CCSTCompoundStatement* visit(Parameter *param);
-  virtual CCSTCompoundStatement* visit(ProjectionField *pf);
-  virtual CCSTCompoundStatement* visit(ImplicitReturnVariable *irv);
-  virtual CCSTCompoundStatement* visit(ReturnVariable *rv);
-};
 
 
 #endif

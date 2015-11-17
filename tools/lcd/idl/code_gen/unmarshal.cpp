@@ -1,6 +1,6 @@
-#include "ccst.h"
+#include "code_gen.h"
 
-CCSTStatement* UnmarshalVariableVisitor::visit(Variable *param)
+CCSTStatement* unmarshal_variable(Variable *param)
 {
   // get register
   // pull value out of register.
@@ -15,19 +15,12 @@ CCSTStatement* UnmarshalVariableVisitor::visit(Variable *param)
   TypeNameVisitor *worker = new TypeNameVisitor();
   CCSTTypeName *type_name = param->type()->accept(worker);
   
-  return new CCSTAssignExpr(access_variable(param), new CCSTAssignOp(equal_t)
-			    , new CCSTCastExpr(type_name, func_name));
+  // access(param) may not return something that is an object. may need to deref
+  return new CCSTAssignExpr(access(param), equals()
+			    , new CCSTCastExpr(type_name, new CCSTPrimaryExprId(func_name)));
 }
 
-CCSTPostFixExpr* access_variable(Variable *p)
-{
-  if(p->accessor() == 0x0) {
-    return new CCSTPrimaryExprId(p->identifier());
-  }
-  
-  return new CCSTPostFixExprAccess(access_parameter(p->accessor()), accessor, p->identifier()); 
-}
-
+// add a visitor for each type because projections will need extra.
 
 
 

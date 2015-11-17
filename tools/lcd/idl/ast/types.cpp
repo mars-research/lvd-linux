@@ -9,12 +9,17 @@ FunctionPointer::FunctionPointer(const char *id, ReturnVariable *return_var, std
   this->parameters_  = parameters;
 }
 
+Marshal_type* FunctionPointer::accept(MarshalPrepareVisitor *worker)
+{
+  return worker->visit(this);
+}
+
 CCSTTypeName* FunctionPointer::accept(TypeNameVisitor *worker)
 {
   return worker->visit(this);
 }
 
-CCSTStatement* FunctionPointer::accept(AllocateTypeVisitor *worker, Variable *v)
+CCSTStatement* FunctionPointer::accept(TypeVisitor *worker, Variable *v)
 {
   return worker->visit(this, v);
 }
@@ -40,14 +45,18 @@ Typedef::Typedef(const char* alias, Type* type)
   this->alias_ = alias;
   this->type_ = type; // need to allocate?
 }
-/*
-Marshal_type* Typedef::accept(MarshalVisitor *worker, Registers *data)
-{
-  return worker->visit(this, data);
-}
-*/
 
-CCSTStatement* Typedef::accept(AllocateTypeVisitor *worker, Variable *v)
+Marshal_type* Typedef::accept(MarshalPrepareVisitor *worker)
+{
+  return worker->visit(this);
+}
+
+CCSTTypeName* Typedef::accept(TypeNameVisitor *worker)
+{
+  return worker->visit(this);
+}
+
+CCSTStatement* Typedef::accept(TypeVisitor *worker, Variable *v)
 {
   return worker->visit(this, v);
 }
@@ -79,14 +88,18 @@ const char* Typedef::name()
 VoidType::VoidType()
 {
 }
-/*
-Marshal_type* VoidType::accept(MarshalVisitor *worker, Registers *data)
-{
-  return worker->visit(this, data);
-}
-*/
 
-CCSTStatement* VoidType::accept(AllocateTypeVisitor *worker, Variable *v)
+Marshal_type* VoidType::accept(MarshalPrepareVisitor *worker)
+{
+  return worker->visit(this);
+}
+
+CCSTTypeName* VoidType::accept(TypeNameVisitor *worker)
+{
+  return worker->visit(this);
+}
+
+CCSTStatement* VoidType::accept(TypeVisitor *worker, Variable *v)
 {
   return worker->visit(this, v);
 }
@@ -112,14 +125,17 @@ IntegerType::IntegerType(PrimType type, bool un, int size)
   this->size_ = size;
 }
 
-/*
-Marshal_type* IntegerType::accept(MarshalVisitor* worker, Registers *data)
+Marshal_type* IntegerType::accept(MarshalPrepareVisitor *worker)
 {
-  return worker->visit(this, data);
+  return worker->visit(this);
 }
-*/
 
-CCSTStatement* IntegerType::accept(AllocateTypeVisitor *worker, Variable *v)
+CCSTTypeName* IntegerType::accept(TypeNameVisitor *worker)
+{
+  return worker->visit(this);
+}
+
+CCSTStatement* IntegerType::accept(TypeVisitor *worker, Variable *v)
 {
   return worker->visit(this, v);
 }
@@ -147,42 +163,6 @@ const char* IntegerType::name()
 
 /* end */
 
-/* pointer type */
-
-PointerType::PointerType(Type* type)
-{
-  this->type_ = type;
-}
-
-int PointerType::num()
-{
-  return 3;
-}
-
-Type* PointerType::type()
-{
-  return this->type_;
-}
-
-/*
-Marshal_type* PointerType::accept(MarshalVisitor* worker, Registers *data)
-{
-  return worker->visit(this, data);
-}
-*/
-
-CCSTStatement* PointerType::accept(AllocateTypeVisitor *worker, Variable *v)
-{
-  return worker->visit(this, v);
-}
-
-const char* PointerType::name()
-{
-  return this->type_->name();
-}
-
-/* end */
-
 /* projection type */
 
 ProjectionType::ProjectionType(const char* id, const char* real_type, std::vector<ProjectionField*> fields)
@@ -190,14 +170,23 @@ ProjectionType::ProjectionType(const char* id, const char* real_type, std::vecto
   this->id_ = id; this->real_type_ = real_type; this->fields_ = fields;
 }
 
-/*
-Marshal_type* ProjectionType::accept(MarshalVisitor* worker, Registers *data)
+ProjectionType::ProjectionType(const char* id, const char* real_type, std::vector<ProjectionField*> fields, std::vector<GlobalVariable*> init_vars)
 {
-  return worker->visit(this, data);
+  this->id_ = id; this->real_type_ = real_type; this->fields_ = fields;
+  this->init_variables_ = init_vars;
 }
-*/
 
-CCSTStatement* ProjectionType::accept(AllocateTypeVisitor *worker, Variable *v)
+Marshal_type* ProjectionType::accept(MarshalPrepareVisitor *worker)
+{
+  return worker->visit(this);
+}
+
+CCSTTypeName* ProjectionType::accept(TypeNameVisitor *worker)
+{
+  return worker->visit(this);
+}
+
+CCSTStatement* ProjectionType::accept(TypeVisitor *worker, Variable *v)
 {
   return worker->visit(this, v);
 }

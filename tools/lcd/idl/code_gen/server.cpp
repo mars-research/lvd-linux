@@ -147,15 +147,19 @@ CCSTCompoundStatement* callee_body(Rpc *r)
     {
       Parameter *p = (Parameter*) *it;
       
-      statements.push_back(unmarshal_parameter(p));
+      statements.push_back(unmarshal_variable(p));
       CCSTPrimaryExprId *t = new CCSTPrimaryExprId(p->identifier());
       unmarshalled_args.push_back(t);
     }
 
   // make real call and get return value if there is one
+  ReturnVariable *rv = r->return_variable();
 
-  if(r->explicit_return_type()->num() != 5) // not void
+  /* redo everything after this? at least read through */
+
+  if(rv->type()->num() != 5) // not void
     {
+      /*
       Marshal_type *ret_info = r->explicit_ret_marshal_info();
 
       CCSTPointer *p = 0x0;
@@ -174,6 +178,7 @@ CCSTCompoundStatement* callee_body(Rpc *r)
       MarshalTypeVisitor *visitor = new MarshalTypeVisitor();
       cs.push_back(ret_info->accept(visitor));
       statements.push_back(new CCSTCompoundStatement(cd, cs));
+      */
     }
   else
     {
@@ -181,13 +186,7 @@ CCSTCompoundStatement* callee_body(Rpc *r)
     }
   
   // implicit returns
-  std::vector<Marshal_type*> implicit_ret_info = r->implicit_ret_marshal_info();
-  for(std::vector<Marshal_type*>::iterator it = implicit_ret_info.begin(); it != implicit_ret_info.end(); it ++)
-    {
-      Marshal_type *mt = *it;
-      MarshalTypeVisitor *visitor = new MarshalTypeVisitor();
-      statements.push_back(mt->accept(visitor));
-    }
+  // just loop through parameters
 
   std::vector<CCSTAssignExpr*> empty_args;
   statements.push_back(new CCSTPostFixExprAssnExpr(new CCSTPrimaryExprId("reply") , empty_args));

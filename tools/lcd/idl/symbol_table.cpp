@@ -17,9 +17,9 @@ SymbolTable::SymbolTable(std::vector<const char*> symbols)
  */
 const char* SymbolTable::unique_tmp()
 {
-  std::string str_tmp = "tmp" + std::to_string(this->last_tmp_ + 1);
-  char *tmp = (char*) malloc(sizof(char)*(str_tmp.length()+1));
-  std::strcpy(tmp, str_tmp.c_str());
+  std::string str_tmp = "tmp" + to_string(this->last_tmp_ + 1);
+  char *tmp = (char*) malloc(sizeof(char)*(str_tmp.length()+1));
+  strcpy(tmp, str_tmp.c_str());
   if(!contains(tmp)) {
     this->last_tmp_ += 1;
     this->insert(tmp);
@@ -74,4 +74,11 @@ int SymbolTable::insert(std::vector<const char*> symbols)
   
   this->symbols_.insert(this->symbols_.end(), symbols.begin(), symbols.end());
   return 0;
+}
+
+std::string SymbolTable::to_string(int val)
+{
+  std::ostringstream os;
+  os << val;
+  return os.str();
 }

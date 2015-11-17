@@ -9,6 +9,11 @@ GlobalVariable::GlobalVariable(Type *type, const char *id, int pointer_count)
   this->pointer_count_ = pointer_count;
 }
 
+void GlobalVariable::prepare_marshal(MarshalPrepareVisitor *worker)
+{
+  printf("global variable prepare marshal todo\n");
+}
+
 Type* GlobalVariable::type()
 {
   return this->type_;
@@ -30,10 +35,14 @@ Variable* GlobalVariable::accessor()
   return 0x0;
 }
 
+void GlobalVariable::set_marshal_info(Marshal_type *mt)
+{
+  this->marshal_info_ = mt;
+}
+
 Marshal_type* GlobalVariable::marshal_info()
 {
-  printf("global variable marshal_info not yet implemented\n");
-  return 0x0;
+  return this->marshal_info_;
 }
 
 int GlobalVariable::pointer_count()
@@ -135,12 +144,10 @@ Parameter::Parameter(Type* type, const char* name, int pointer_count)
   this->alloc_callee_caller_ = false;
 }
 
-/*
-Marshal_type* Parameter::accept(MarshalVisitor* worker, Registers *data)
+void Parameter::prepare_marshal(MarshalPrepareVisitor *worker)
 {
-  return worker->visit(this, data);
+  this->marshal_info_ = this->type_->accept(worker);
 }
-*/
 
 const char* Parameter::identifier()
 {
@@ -253,6 +260,11 @@ ReturnVariable::ReturnVariable(Type *return_type, int pointer_count)
   this->pointer_count_ = pointer_count;
 }
 
+void ReturnVariable::prepare_marshal(MarshalPrepareVisitor *worker)
+{
+  this->marshal_info_ = this->type_->accept(worker);
+}
+
 void ReturnVariable::set_marshal_info(Marshal_type *mt)
 {
   this->marshal_info_ = mt;
@@ -355,116 +367,6 @@ bool ReturnVariable::alloc_callee_caller()
 
 /* end */
 
-/* implicit return variable */
-
-
-ImplicitReturnVariable::ImplicitReturnVariable(Parameter *p)
-{
-  this->p_ = p;
-}
-
-void ImplicitReturnVariable::set_marshal_info(Marshal_type *mt)
-{
-  this->marshal_info_ = mt;
-}
-
-Marshal_type* ImplicitReturnVariable::marshal_info()
-{
-  return this->marshal_info_;
-}
-
-void ImplicitReturnVariable::set_accessor(Variable *v)
-{
-  this->accessor_ = v;
-}
-
-Type* ImplicitReturnVariable::type()
-{
-  return this->p_->type();
-}
-
-const char* ImplicitReturnVariable::identifier()
-{
-  return this->p_->identifier();
-}
-
-int ImplicitReturnVariable::pointer_count()
-{
-  return this->p_->pointer_count();
-}
-
-Variable* ImplicitReturnVariable::accessor()
-{
-  return this->accessor_;
-}
-
-void ImplicitReturnVariable::set_in(bool b)
-{
-  printf("error this operation not allowed\n");
-}
-
-void ImplicitReturnVariable::set_out(bool b)
-{
-  printf("error this operation not allowed\n");
-}
-
-void ImplicitReturnVariable::set_alloc(bool b)
-{
-  printf("error this operation not allowed\n");
-}
-
-void ImplicitReturnVariable::set_alloc_caller(bool b)
-{
-  printf("error this operation not allowed\n");
-}
-
-void ImplicitReturnVariable::set_alloc_callee(bool b)
-{
-  printf("error this operation not allowed\n");
-}
-
-void ImplicitReturnVariable::set_alloc_callee_caller(bool b)
-{
-  printf("error this operation not allowed\n");
-}
-
-bool ImplicitReturnVariable::in()
-{
-  printf("error this operation not allowed\n");
-  return false;
-}
-
-bool ImplicitReturnVariable::out()
-{
-  printf("error this operation not allowed\n");
-  return false;
-}
-
-bool ImplicitReturnVariable::alloc()
-{
-  printf("error this operation not allowed\n");
-  return false;
-}
-
-bool ImplicitReturnVariable::alloc_caller()
-{
-  printf("error this operation not allowed\n");
-  return false;
-}
-bool ImplicitReturnVariable::alloc_callee()
-{
-  printf("error this operation not allowed\n");
-  return false;
-}
-
-bool ImplicitReturnVariable::alloc_callee_caller()
-{
-  printf("error this operation not allowed\n");
-  return false;
-}
-
-/* end */
-
 /* projection field */
 
 ProjectionField::ProjectionField(Type* field_type, const char* field_name, int pointer_count)
@@ -480,12 +382,10 @@ ProjectionField::ProjectionField(Type* field_type, const char* field_name, int p
   this->pointer_count_ = pointer_count;
 }
 
-/*
-Marshal_type* ProjectionField::accept(MarshalVisitor* worker, Registers *data)
+void ProjectionField::prepare_marshal(MarshalPrepareVisitor *worker)
 {
-  return worker->visit(this, data);
+  this->marshal_info_ = this->field_type_->accept(worker);
 }
-*/
 
 Type* ProjectionField::type()
 {
@@ -512,10 +412,14 @@ Variable* ProjectionField::accessor()
   return this->accessor_;
 }
 
+void ProjectionField::set_marshal_info(Marshal_type *mt)
+{
+  this->marshal_info_ = mt;
+}
+
 Marshal_type* ProjectionField::marshal_info()
 {
-  printf("projection field marshal info incomplete\n");
-  return 0x0;
+  return this->marshal_info_;
 }
 
 void ProjectionField::set_in(bool b)
@@ -584,14 +488,34 @@ FPParameter::FPParameter(Type *type, int pointer_count)
   this->pointer_count_ = pointer_count;
 }
 
+void FPParameter::prepare_marshal(MarshalPrepareVisitor *worker)
+{
+  this->marshal_info_ = this->type_->accept(worker);
+}
+
 Type* FPParameter::type()
 {
   return this->type_;
 }
 
+int FPParameter::pointer_count()
+{
+  return this->pointer_count_;
+}
+
 const char* FPParameter::identifier()
 {
   Assert(1 == 0, "Error: operation not allowed on function pointer parameter\n");
+}
+
+void FPParameter::set_marshal_info(Marshal_type *mt)
+{
+  this->marshal_info_ = mt;
+}
+
+Marshal_type* FPParameter::marshal_info()
+{
+  return this->marshal_info_;
 }
 
 void FPParameter::set_in(bool b)

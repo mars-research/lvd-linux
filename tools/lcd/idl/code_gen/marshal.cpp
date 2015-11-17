@@ -1,28 +1,78 @@
-#include "ccst.h"
+#include "code_gen.h"
 
-CCSTStatement* MarshalVariableVisitor::visit(Variable *param)
+CCSTStatement* marshal_variable(Variable *param)
 {
-  if(param->type() == 4) {
-    Assert(0 == 1, "Error: variable to marshal cannot be of a complex type.\n");
-  }
-  
-  // need register.
-  int reg = param->marshal_info()->get_register();
-  const char* func_name = access_register_mapping(reg);
-  
-  // register_0((long) param)
-  std::vector<CCSTAssignExpr*> arguments;
-  
-  // type that we are castng to.
-  std::vector<CCSTSpecifierQual*> spec_quals;
-  spec_quals.push_back(new CCSTSimpleTypeSpecifier(long_t));
-  spec_quals.push_back(new CCSTSimpleTypeSpecifier(long_t));
-  
-  arguments.push_back(new CCSTCastExpr(new CCSTTypeName(spec_quals, 0x0)
-				       , access_variable(param))); // access here...
-  
-  //  a CCSTExpression/CCSTExprStatement
-  return new CCSTPostFixExprAssnExpr(new CCSTPrimaryExprId(func_name), arguments);
+  // todo
+}
+
+CCSTStatement* MarshalTypeVisitor::visit(FunctionPointer *fp, Variable *v)
+{
+  printf("Marshal function pointer not completed\n");
+  return 0x0;
 }
 
 
+CCSTStatement* MarshalTypeVisitor::visit(Typedef *td, Variable *v)
+{
+  // get register number
+  Marshal_type* mt = v->marshal_info();
+  
+  CCSTPostFixExpr* access_v = access(v);
+  
+  std::vector<CCSTAssignExpr*> arguments;
+  
+  if (v->pointer_count() > 0) {
+    arguments.push_back(dereference(access_v));
+  } else {
+    arguments.push_back(access_v);
+  }
+  return function_call( function_name( store_register_mapping(mt->get_register()))
+			, arguments);
+}
+
+CCSTStatement* MarshalTypeVisitor::visit(VoidType *vt, Variable *v)
+{
+  printf("Error: cannot marshal void type\n");
+  return 0x0;
+}
+
+CCSTStatement* MarshalTypeVisitor::visit(IntegerType *it, Variable *v)
+{
+  // get register number
+  Marshal_type* mt = v->marshal_info();
+ 
+  CCSTPostFixExpr* access_v = access(v);
+
+  std::vector<CCSTAssignExpr*> arguments;
+
+  if (v->pointer_count() > 0) {
+    arguments.push_back(dereference(access_v));
+  } else {
+    arguments.push_back(access_v);
+  }
+  return function_call( function_name( store_register_mapping(mt->get_register()))
+		 , arguments);
+}
+
+CCSTStatement* MarshalTypeVisitor::visit(ProjectionType *pt, Variable *v)
+{
+  std::vector<CCSTDeclaration*> declarations;
+  std::vector<CCSTStatement*> statements;
+
+  // if alloc caller
+
+  // if alloc callee
+
+  // marshal fields
+  std::vector<ProjectionField*> fields = pt->fields();
+  for(std::vector<ProjectionField*>::iterator it = fields.begin(); it != fields.end(); it ++) {
+    // marshal each field.
+    
+    ProjectionField *pf_tmp = *it;
+    statements.push_back(pf_tmp->type()->accept(this, pf_tmp));
+
+  }
+
+  // a channel???????
+  
+}

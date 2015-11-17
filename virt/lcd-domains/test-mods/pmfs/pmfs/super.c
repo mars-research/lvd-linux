@@ -1085,6 +1085,8 @@ static int __init init_blocknode_cache(void)
 static int __init init_inodecache(void)
 {
 #ifdef LCD_ISOLATE
+
+#error "It worked!"
 	/*
 	 * Objects in this slab cache pass through an interface boundary
 	 * (struct inode is inside struct pmfs_inode_vfs). Put inside glue 
@@ -1216,7 +1218,10 @@ static const struct export_operations pmfs_export_ops = {
 	.get_parent	= pmfs_get_parent,
 };
 
-static int __init init_pmfs_fs(void)
+#ifndef LCD_ISOLATE
+static 
+#endif
+int __init init_pmfs_fs(void)
 {
 	int rc = 0;
 
@@ -1253,7 +1258,10 @@ out1:
 	return rc;
 }
 
-static void __exit exit_pmfs_fs(void)
+#ifndef LCD_ISOLATE
+static 
+#endif
+void __exit exit_pmfs_fs(void)
 {
 	unregister_filesystem(&pmfs_fs_type);
 	bdi_destroy(&pmfs_backing_dev_info);
@@ -1266,5 +1274,7 @@ MODULE_AUTHOR("Intel Corporation <linux-pmfs@intel.com>");
 MODULE_DESCRIPTION("Persistent Memory File System");
 MODULE_LICENSE("GPL");
 
-/* module_init(init_pmfs_fs) */
-/* module_exit(exit_pmfs_fs) */
+#ifndef LCD_ISOLATE
+module_init(init_pmfs_fs)
+module_exit(exit_pmfs_fs)
+#endif

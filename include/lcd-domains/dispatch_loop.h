@@ -5,17 +5,8 @@
 #ifndef LCD_DOMAINS_DISPATCH_LOOP_H
 #define LCD_DOMAINS_DISPATCH_LOOP_H
 
-#ifdef LCD_ISOLATE
-#include <lcd-domains/liblcd-config.h>
-#endif
-
 #include <linux/list.h>
 #include <lcd-domains/types.h>
-
-#ifdef LCD_ISOLATE
-#include <lcd-domains/liblcd-hacks.h>
-#endif
-
 
 /**
  * This represents an ipc channel.

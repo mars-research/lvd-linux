@@ -142,25 +142,6 @@ config LCD_TEST_MOD_CREATE_KLCD_KLCD
 
 # --------------------------------------------------
 
-config LCD_TEST_MOD_PMFS
-       bool "Persistent Memory File System (PMFS) Example"
-       depends on LCD_DOMAINS
-       depends on HAS_IOMEM
-       select CRC16
-       default y
-       select LCD_TEST_MOD_PMFS_BOOT
-       select LCD_TEST_MOD_PMFS_LCD
-       ---help---
-       Isolation of PMFS file system.
-
-config LCD_TEST_MOD_PMFS_BOOT
-       tristate
-       depends on LCD_TEST_MOD_PMFS
-       default m
-
-config LCD_TEST_MOD_PMFS_LCD
-       tristate
-       depends on LCD_TEST_MOD_PMFS
 
 menuconfig LCD_TEST_MOD_GLUE_EXAMPLE
        bool "Example exercising IDL and glue"
@@ -199,6 +180,34 @@ config LCD_TEST_MOD_GLUE_EXAMPLE_BOOT
        default m
 
 endif
+# --------------------------------------------------
+
+config LCD_TEST_MOD_PMFS
+       bool "Persistent Memory File System (PMFS) Example"
+       depends on LCD_DOMAINS
+       depends on HAS_IOMEM
+       select CRC16
+       default y
+       select LCD_TEST_MOD_PMFS_BOOT
+       select LCD_TEST_MOD_PMFS_LCD
+       select LCD_TEST_MOD_PMFS_VFS
+       ---help---
+       Isolation of PMFS file system.
+
+config LCD_TEST_MOD_PMFS_BOOT
+       tristate
+       depends on LCD_TEST_MOD_PMFS
+       default m
+
+config LCD_TEST_MOD_PMFS_LCD
+       tristate
+       depends on LCD_TEST_MOD_PMFS
+       default m
+
+config LCD_TEST_MOD_PMFS_VFS
+       tristate
+       depends on LCD_TEST_MOD_PMFS
+       default m
 
 # --------------------------------------------------
 

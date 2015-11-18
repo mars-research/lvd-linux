@@ -82,19 +82,10 @@ int klcd_create_module_klcd(cptr_t *slot_out, char *mname)
 		goto fail2;
 	}
 	/*
-	 * Provide the lcd with a call endpoint
-	 */
-	ret = __klcd_do_call_endpoint(*slot_out);
-	if (ret) {
-		LCD_ERR("failed to set up call endpoint");
-		goto fail3;
-	}
-	/*
 	 * Done!
 	 */
 	return 0;
 
-fail3:
 fail2:
 	/* 
 	 * Remove module from host

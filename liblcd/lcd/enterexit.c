@@ -21,6 +21,15 @@ int lcd_enter(void)
 	}
 	LIBLCD_MSG("cptr cache ready");
 	/*
+         * Create our call endpoint (for call/reply interactions)               
+         */
+        ret = __lcd_create_sync_endpoint(LCD_CPTR_CALL_ENDPOINT);
+        if (ret) {
+                LIBLCD_ERR("creating call endpoint");
+                goto fail;
+        }
+        LIBLCD_MSG("call endpoint created and installed");
+	/*
 	 * Set up page alloc and kmalloc
 	 */
 	ret = lcd_mem_init();

@@ -587,9 +587,9 @@ int __klcd_enter(void)
 	 */
 	set_lcd_status(lcd, LCD_STATUS_RUNNING);
 	/*
-	 * Set type as non-isolated
+	 * Set type as "top" - a "root" LCD owned by no one (gasp!)
 	 */
-	lcd->type = LCD_TYPE_NONISOLATED;
+	lcd->type = LCD_TYPE_TOP;
 
 	return 0;
 
@@ -602,8 +602,17 @@ fail1:
 void __klcd_exit(void)
 {
 	struct lcd *lcd;
-	
+
 	lcd = current->lcd;
+	
+	if (lcd->type != LCD_TYPE_TOP) {
+		/*
+		 * The caller is a klcd that was created by someone
+		 * else. We will let their creator destroy them (when
+		 * they delete the capability to the klcd).
+		 */
+		return;
+	}
 
 	BUG_ON(lcd_status_dead(lcd)); /* lcd shouldn't be dead already */
 

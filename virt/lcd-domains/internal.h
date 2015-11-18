@@ -232,6 +232,7 @@ void __lcd_cnode_put(struct cnode *c);
 enum lcd_type {
 	LCD_TYPE_ISOLATED,
 	LCD_TYPE_NONISOLATED,
+	LCD_TYPE_TOP,
 };
 
 enum lcd_xmit_status {

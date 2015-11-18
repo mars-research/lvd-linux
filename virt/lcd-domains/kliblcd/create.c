@@ -1375,44 +1375,6 @@ fail1:
 	return ret;		
 }
 
-int __klcd_do_call_endpoint(cptr_t lcd)
-{
-	cptr_t call_endpoint;
-	int ret;
-	/*
-	 * Create an endpoint for the lcd, for its call endpoint.
-	 *
-	 * This will temporarily go in the caller's (the code creating the
-	 * lcd) cspace.
-	 */
-	ret = lcd_create_sync_endpoint(&call_endpoint);
-	if (ret) {
-		LCD_ERR("failed to create call endpoint");
-		goto fail1;
-	}
-	/*
-	 * Grant access to call endpoint in reserved slot
-	 */
-	ret = lcd_cap_grant(lcd, call_endpoint, LCD_CPTR_CALL_ENDPOINT);
-	if (ret) {
-		LCD_ERR("failed to grant call endpoint");
-		goto fail2;
-	}
-
-	ret = 0;
-
-	goto out;
-out:
-fail2:
-	/*
-	 * Delete cap to call endpoint, lcd becomes sole owner (or if 
-	 * we failed, endpoint gets freed)
-	 */
-	lcd_cap_delete(call_endpoint);
-fail1:
-	return ret;
-}
-
 int klcd_create_module_lcd(cptr_t *slot_out, char *mname, 
 			cptr_t mloader_endpoint, struct lcd_info **mi)
 			
@@ -1456,19 +1418,10 @@ int klcd_create_module_lcd(cptr_t *slot_out, char *mname,
 		goto fail3;
 	}
 	/*
-	 * Provide the lcd with a call endpoint
-	 */
-	ret = __klcd_do_call_endpoint(*slot_out);
-	if (ret) {
-		LCD_ERR("failed to set up call endpoint");
-		goto fail4;
-	}
-	/*
 	 * Done!
 	 */
 	return 0;
 
-fail4:
 fail3:
 fail2:
 	/* 

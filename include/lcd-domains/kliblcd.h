@@ -56,7 +56,7 @@ int klcd_create_module_lcd(cptr_t *slot_out, char *mname,
 void klcd_destroy_module_lcd(cptr_t lcd, struct lcd_info *mi,
 			cptr_t mloader_endpoint);
 int klcd_dump_boot_info(struct lcd_info *mi);
-
+struct lcd_utcb * klcd_get_utcb(void);
 
 /* DEBUG ------------------------------------------------------------ */
 
@@ -124,6 +124,13 @@ KLCD_MK_REG_ACCESS(4)
 KLCD_MK_REG_ACCESS(5)
 KLCD_MK_REG_ACCESS(6)
 KLCD_MK_REG_ACCESS(7)
+
+/* GET UTCB -------------------------------------------------- */
+
+static inline struct lcd_utcb * lcd_get_utcb(void)
+{
+	return klcd_get_utcb();
+}
 
 /* KLCD SPECIFICS -------------------------------------------------- */
 
@@ -385,6 +392,7 @@ static inline int lcd_init_cptr(void)
 static inline void lcd_destroy_cptr(void)
 {
 	klcd_destroy_cptr(current->cptr_cache);
+	current->cptr_cache = NULL;
 }
 /**
  * Find an unused cptr (a cptr that refers to an unused cnode).

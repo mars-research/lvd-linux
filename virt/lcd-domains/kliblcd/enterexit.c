@@ -14,23 +14,44 @@ int klcd_enter(void)
 {
 	int ret;
 	/*
-	 * Set up cptr cache
+	 * This sets up the runtime environment for non-isolated
+	 * threads.
+	 *
+	 * First, if we weren't created by another klcd, then
+	 * we should do __klcd_enter to set up our cspace, utcb,
+	 * and so on.
+	 */
+	if (!current->lcd) {
+		ret = __klcd_enter();
+		if (ret) {
+			LCD_ERR("enter");
+			goto fail1;
+		}
+	}
+	/*
+	 * Set up our cptr cache
 	 */
 	ret = lcd_init_cptr();
 	if (ret) {
 		LCD_ERR("cptr cache init");
-		goto fail1;
-	}
-	ret = __klcd_enter();
-	if (ret) {
-		LCD_ERR("enter");
 		goto fail2;
 	}
+	/*
+	 * Create our call endpoint (for receing rpc replies)
+	 */
+	ret = __lcd_create_sync_endpoint(current->lcd, LCD_CPTR_CALL_ENDPOINT);
+        if (ret) {
+                LIBLCD_ERR("creating call endpoint");
+                goto fail3;
+        }
 
 	return 0;
+
+fail3:
 fail2:
-	lcd_destroy_cptr();
 fail1:
+	/* This will do teardown */
+	klcd_exit(ret);
 	return ret;
 }
 
@@ -40,14 +61,21 @@ void klcd_exit(int retval)
 	 * Return value is ignored for now
 	 */
 
-	/*
-	 * Exit from lcd mode
-	 */
-	__klcd_exit();
-	/*
-	 * Destroy cptr cache
-	 */
-	lcd_destroy_cptr();
+	if (current->lcd) {
+		/*
+		 * Exit from lcd mode
+		 */
+		__klcd_exit();
+	}
+	if (current->cptr_cache) {
+		/*
+		 * Destroy cptr cache
+		 */
+		lcd_destroy_cptr();
+	}
+
+	/* (Call endpoint should be auto-destroyed when we do
+	 * __klcd_exit and destroy the cspace.) */
 }
 
 /* EXPORTS -------------------------------------------------- */

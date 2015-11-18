@@ -43,6 +43,13 @@ __KLCD_MK_REG_ACCESS(5)
 __KLCD_MK_REG_ACCESS(6)
 __KLCD_MK_REG_ACCESS(7)
 
+/* UTCB -------------------------------------------------- */
+
+struct lcd_utcb *klcd_get_utcb(void)
+{
+	return current->lcd->utcb;
+}
+
 /* IPC -------------------------------------------------- */
 
 int klcd_create_sync_endpoint(cptr_t *slot_out)
@@ -100,3 +107,4 @@ EXPORT_SYMBOL(klcd_send);
 EXPORT_SYMBOL(klcd_recv);
 EXPORT_SYMBOL(klcd_call);
 EXPORT_SYMBOL(klcd_reply);
+EXPORT_SYMBOL(klcd_get_utcb);

@@ -7,6 +7,9 @@
 /* COMPILER: This is always included. */
 #include <lcd-domains/liblcd.h>
 
+/* COMPILER: This is always included. */
+#include <lcd-domains/dispatch_loop.h>
+
 /* LOOP -------------------------------------------------- */
 
 /* COMPILER: For every channel a module listens on for function calls,
@@ -14,20 +17,6 @@
  * for NEW_FILE and RM_FILE. In general, channels will include those that
  * are part of interfaces and projections of function pointers. */
 #define MINIX_CHANNEL_TYPE 1
-
-/* COMPILER: These struct definitions are the same every time. (In the future,
- * we may move them to liblcd.) This is an object-oriented interface the
- * interface glue code will use to add channels to the dispatch loop. */
-struct ipc_channel {
-	int type;
-	cptr_t channel_cptr;
-	struct list_head channel_list;
-};
-struct dispatch_ctx {
-	struct list_head channel_list;
-	void (*add_channel)(struct dispatch_ctx *, struct ipc_channel *);
-	void (*rm_channel)(struct dispatch_ctx *, struct ipc_channel *);
-};
 
 #define NEW_FILE 1
 #define RM_FILE 2
@@ -117,16 +106,6 @@ static void loop(struct dispatch_ctx *ctx)
 	}
 }
 
-static void add_channel(struct dispatch_ctx *ctx, struct ipc_channel *channel)
-{
-	list_add(&channel->channel_list, &ctx->channel_list);
-}
-
-static void rm_channel(struct dispatch_ctx *ctx, struct ipc_channel *channel)
-{
-	list_del_init(&channel->channel_list);
-}
-
 /* INIT -------------------------------------------------- */
 
 int glue_vfs_init(cptr_t vfs_chnl, struct dispatch_ctx *ctx);
@@ -152,9 +131,7 @@ static int __init minix_lcd_boot(void)
 
 	/* COMPILER: Initialize dispatch loop context. This will be
 	 * passed to each piece of interface glue. */
-	INIT_LIST_HEAD(&ctx.channel_list);
-	ctx.add_channel = add_channel;
-	ctx.rm_channel = rm_channel;
+	init_dispatch_ctx(&ctx);
 
 	/* COMPILER: Because minix required vfs, whoever boots minix should
 	 * provide it with a capability to a channel for invoking vfs
@@ -188,6 +165,8 @@ static int __init minix_lcd_boot(void)
 
 	/* Call original exit. */
 	original_minix_lcd_exit();
+
+	
 
 	/* Done */
 	lcd_exit(0);

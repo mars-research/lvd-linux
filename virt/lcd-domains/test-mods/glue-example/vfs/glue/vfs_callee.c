@@ -10,6 +10,9 @@
  * for using the LIBLCD interface). */
 #include <lcd-domains/liblcd.h>
 
+/* COMPILER: This is always included. */
+#include <lcd-domains/dispatch_loop.h>
+
 /* COMPILER: We probably always need the slab header. */
 #include <linux/slab.h>
 
@@ -34,21 +37,11 @@
  * a domain id). */
 static struct dstore *minix_dstore;
 
-/* COMPILER: In general, we also should store a reference to the dispatch 
- * context so we can dynamically add channels to listen on at run time. In
- * this simple example, the vfs doesn't create any new channels to listen
- * on. */
-struct ipc_channel {
-	int type;
-	cptr_t channel_cptr;
-	int num_cptrs;
-	struct list_head channel_list;
-};
-struct dispatch_ctx {
-	struct list_head channel_list;
-	void (*add_channel)(struct dispatch_ctx *, struct ipc_channel *);
-	void (*rm_channel)(struct dispatch_ctx *, struct ipc_channel *);
-};
+/* COMPILER: It's possible, but maybe unlikely, that the callee code
+ * will dynamically add channels to the dispatch loop. We store a
+ * reference to it. (This is also convenient for init/teardown to
+ * add/remove the main channel to the dispatch loop.)
+ */
 static struct dispatch_ctx *loop_ctx;
 
 /* CONTAINER STRUCTS -------------------------------------------------- */
@@ -657,15 +650,12 @@ int glue_vfs_init(cptr_t vfs_chnl, struct dispatch_ctx *ctx)
 	int ret;
 
 	/* Set up ipc channel */
-	vfs_channel.type = VFS_CHANNEL_TYPE;
-	vfs_channel.channel_cptr = vfs_chnl;
-	vfs_channel.num_cptrs = 1;
-	INIT_LIST_HEAD(&vfs_channel.channel_list);
+	init_ipc_channel(&vfs_channel, VFS_CHANNEL_TYPE, vfs_chnl, 1);
 
 	loop_ctx = ctx;
 
 	/* Add it to dispatch loop */
-	loop_ctx->add_channel(loop_ctx, &vfs_channel);
+	loop_add_channel(loop_ctx, &vfs_channel);
 
 	/* Initialize minix data store */
 	ret = lcd_dstore_init_dstore(&minix_dstore);
@@ -684,5 +674,5 @@ void glue_vfs_exit(void)
 	/* We may as well remove the channel from the loop, though
 	 * it doesn't matter in this simple example. (In general, we
 	 * probably should.) */
-	loop_ctx->rm_channel(loop_ctx, &vfs_channel);
+	loop_rm_channel(loop_ctx, &vfs_channel);
 }

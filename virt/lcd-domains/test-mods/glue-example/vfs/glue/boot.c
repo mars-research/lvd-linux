@@ -7,22 +7,13 @@
 /* COMPILER: This is always included. */
 #include <lcd-domains/liblcd.h>
 
+/* COMPILER: This is always included. */
+#include <lcd-domains/dispatch_loop.h>
+
 /* LOOP -------------------------------------------------- */
 
 /* COMPILER: See notes in minix's boot.c. */
 #define VFS_CHANNEL_TYPE 1
-
-struct ipc_channel {
-	int type;
-	cptr_t channel_cptr;
-	int num_cptrs;
-	struct list_head channel_list;
-};
-struct dispatch_ctx {
-	struct list_head channel_list;
-	void (*add_channel)(struct dispatch_ctx *, struct ipc_channel *);
-	void (*rm_channel)(struct dispatch_ctx *, struct ipc_channel *);
-};
 
 #define REGISTER_FS 1
 #define UNREGISTER_FS 2
@@ -86,13 +77,13 @@ static int alloc_cptrs_for_channel(struct ipc_channel *c)
 	int ret;
 	cptr_t t;
 	
-	if (c->num_cptrs >= LCD_NUM_REGS - 1) {
+	if (c->expected_cptrs >= LCD_NUM_REGS - 1) {
 		LIBLCD_ERR("too many cptrs");
 		return -EINVAL;
 	}
 
 	/* First cr is reserved */
-	for (i = 0; i < c->num_cptrs; i++) {
+	for (i = 0; i < c->expected_cptrs; i++) {
 
 		ret = lcd_alloc_cptr(&t);
 		if (ret) {
@@ -148,16 +139,6 @@ static void loop(struct dispatch_ctx *ctx)
 	}
 }
 
-static void add_channel(struct dispatch_ctx *ctx, struct ipc_channel *channel)
-{
-	list_add(&channel->channel_list, &ctx->channel_list);
-}
-
-static void rm_channel(struct dispatch_ctx *ctx, struct ipc_channel *channel)
-{
-	list_del_init(&channel->channel_list);
-}
-
 /* INIT -------------------------------------------------- */
 
 int glue_vfs_init(cptr_t vfs_chnl, struct dispatch_ctx *ctx);
@@ -183,9 +164,7 @@ static int __init vfs_lcd_boot(void)
 
 	/* COMPILER: Initialize dispatch loop context. This will be
 	 * passed to each piece of interface glue. */
-	INIT_LIST_HEAD(&ctx.channel_list);
-	ctx.add_channel = add_channel;
-	ctx.rm_channel = rm_channel;
+	init_dispatch_ctx(&ctx);
 
 	/* COMPILER: Because minix required vfs, whoever boots vfs should
 	 * provide it with a capability to a channel for invoking vfs
@@ -224,6 +203,8 @@ static int __init vfs_lcd_boot(void)
 
 	/* Call original exit. */
 	original_vfs_lcd_exit();
+
+	glue_vfs_exit();
 
 	/* Done */
 	lcd_exit(0);

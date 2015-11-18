@@ -10,24 +10,14 @@
  * for using the LIBLCD interface). */
 #include <lcd-domains/liblcd.h>
 
+/* COMPILER: This header is always included. */
+#include <lcd-domains/dispatch_loop.h>
+
 /* COMPILER: Since this header was included in vfs.idl, the include
  * is pasted here (the compiler does not need to be smart about paths - the
  * IDL writer needs to use relative or absolute paths that should just 
  * work). */
 #include "../../include/vfs.h"
-
-/* Some struct defs. These should probably go in a header at some point
- * so we don't duplicate defs. */
-struct ipc_channel {
-	int type;
-	cptr_t channel_cptr;
-	struct list_head channel_list;
-};
-struct dispatch_ctx {
-	struct list_head channel_list;
-	void (*add_channel)(struct dispatch_ctx *, struct ipc_channel *);
-	void (*rm_channel)(struct dispatch_ctx *, struct ipc_channel *);
-};
 
 #define MINIX_CHANNEL_TYPE 1
 
@@ -55,6 +45,9 @@ struct dispatch_ctx {
  * linking at runtime if we really wanted to ...) */
 static cptr_t vfs_chnl;
 static struct dstore *vfs_dstore;
+
+/* COMPILER: We store a reference to the dispatch loop so we can 
+ * dynamically add channels to it (see e.g., register_fs below). */
 static struct dispatch_ctx *loop_ctx;
 
 int glue_vfs_init(cptr_t _vfs_channel, struct dispatch_ctx *ctx)
@@ -215,11 +208,12 @@ int register_fs(struct fs *fs)
 	 * with the channel we created above, so we initialize the
 	 * ipc channel here, and add it to the dispatch loop.
 	 */
-	fs_operations_container->chnl.type = MINIX_CHANNEL_TYPE;
-	fs_operations_container->chnl.channel_cptr = fs_container->chnl;
-	INIT_LIST_HEAD(&fs_operations_container->chnl.channel_list);
+	init_ipc_channel(&fs_operations_container->chnl,
+			MINIX_CHANNEL_TYPE, 
+			fs_container->chnl,
+			0);
 
-	loop_ctx->add_channel(loop_ctx, &fs_operations_container->chnl);
+	loop_add_channel(loop_ctx, &fs_operations_container->chnl);
 
 	/* COMPILER: Both projections were marked as alloc(callee) and
 	 * are hence already allocated on this side (caller side). So, we 
@@ -371,7 +365,7 @@ void unregister_fs(struct fs *fs)
 	 * (the dispatch loop is hacked to exit after receiving two messages,
 	 * and unregister_fs is invoked when we're exiting the module
 	 * entirely, after the dispatch loop is dead). */
-	loop_ctx->rm_channel(loop_ctx, &fs_operations_container->chnl);
+	loop_rm_channel(loop_ctx, &fs_operations_container->chnl);
 
 	lcd_cap_delete(fs_operations_container->chnl.channel_cptr);
 

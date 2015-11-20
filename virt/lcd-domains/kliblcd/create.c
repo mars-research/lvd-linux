@@ -132,14 +132,70 @@ fail:
 	return;
 }
 
+/* Helper used by get_module_pages. */
+static int page_contains(hva_t page_hva, void *protected_ptr)
+{
+	return (hva_val(page_hva) == 
+		(((unsigned long)(protected_ptr)) & PAGE_MASK));
+}
+
+/* Helper used by get_module_pages. */
+static int dup_page(hva_t hva_src, cptr_t *page_cptr)
+{
+	gpa_t gpa;
+	gva_t gva;
+	hva_t hva_dest;
+	int ret;
+	/*
+	 * Allocate a new page
+	 */
+	ret = lcd_gfp(page_cptr, &gpa, &gva);
+	if (ret)
+		goto fail1;
+	/*
+	 * For the host, gva == hva
+	 */
+	hva_dest = __hva(gva_val(gva));
+	/*
+	 * Copy over data
+	 */
+	memcpy(hva2va(hva_dest), hva2va(hva_src), PAGE_SIZE);
+
+	return 0;
+
+fail1:
+	return ret;
+}
+
+/**
+ * Adds the kernel module's pages to the caller's cspace,
+ * using klcd_add_page. Creates a list of metadata that
+ * represent the pages that make up the module.
+ *
+ * There is one exception: when protected_data is non-null, we check
+ * to see which module page it belongs to. For *this page*,
+ * we make a *copy*.
+ *
+ * Motivation: The struct module for a kernel module is allocated
+ * in the module's core. We don't want the host and the LCD
+ * to use the same copy. So, we make a copy of the page that
+ * contains the struct module. The host and LCD will now use
+ * their own copies.
+ *
+ * Fortunately, the page we alloc to do the copy is under
+ * capability access control, and when the caller deletes the
+ * last capability, the page will be freed.
+ */
 static int get_module_pages(hva_t hva, unsigned long size, 
-			struct list_head *mpage_list)
+			struct list_head *mpage_list,
+			void *protected_data)
 {
 	int ret;
 	unsigned long mapped;
 	struct page *p;
 	cptr_t pg_cptr;
 	struct lcd_module_page *mp;
+	int did_dup = 0;
 
 	mapped = 0;
 	while (mapped < size) {
@@ -148,11 +204,29 @@ static int get_module_pages(hva_t hva, unsigned long size,
 		 */
 		p = vmalloc_to_page(hva2va(hva));
 		/*
-		 * Add page to klcd
+		 * Check if need to make a copy of the page
 		 */
-		ret = klcd_add_page(p, &pg_cptr);
-		if (ret)
-			goto fail1;
+		if (protected_data && page_contains(hva, protected_data)) {
+			/*
+			 * Yes: the protected data is in this page.
+			 *
+			 * Make a copy
+			 */
+			ret = dup_page(hva, &pg_cptr);
+			if (ret)
+				goto fail1;
+			did_dup = 1;
+		} else {
+			/*
+			 * No: the protected data is not in this page.
+			 *
+			 * Just add the page to caller's cspace
+			 */
+			ret = klcd_add_page(p, &pg_cptr);
+			if (ret)
+				goto fail1;
+			did_dup = 0;
+		}
 		/*
 		 * Record in list of pages
 		 */
@@ -171,11 +245,19 @@ static int get_module_pages(hva_t hva, unsigned long size,
 		 */
 		mapped += PAGE_SIZE;
 		hva = hva_add(hva, PAGE_SIZE);
+
+		did_dup = 0;
 	}
 	return 0;
 
 fail2:
-	klcd_rm_page(pg_cptr);
+	/* Differentiating the two doesn't matter right now, but it
+	 * may in the future. (In both cases, we just delete the capability
+	 * and free the slot in the cptr cache.) */
+	if (did_dup)
+		lcd_free_page(pg_cptr);
+	else
+		klcd_rm_page(pg_cptr);
 fail1:
 	return ret; /* caller will free lcd_module_page's, etc. */
 }
@@ -294,12 +376,14 @@ int klcd_load_module(char *mname, cptr_t mloader_endpoint,
 	 * Get init and core pages
 	 */
 	ret = get_module_pages(va2hva(m->module_init), 
-			m->init_size, &(*mi)->mpages_list);
+			m->init_size, &(*mi)->mpages_list,
+			NULL);
 	if (ret) {
 		goto fail2;
 	}
 	ret = get_module_pages(va2hva(m->module_core), 
-			m->core_size, &(*mi)->mpages_list);
+			m->core_size, &(*mi)->mpages_list,
+			m);
 	if (ret) {
 		goto fail3;
 	}

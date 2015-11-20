@@ -146,9 +146,24 @@ fail1:
 	return ret;
 }
 
+int klcd_free_page(cptr_t page)
+{
+	/*
+	 * Delete from cspace
+	 */
+	lcd_cap_delete(page);
+	/*
+	 * Free the slot
+	 */
+	lcd_free_cptr(page);
+
+	return 0;
+}
+
 /* EXPORTS -------------------------------------------------- */
 
 EXPORT_SYMBOL(klcd_add_page);
 EXPORT_SYMBOL(klcd_rm_page);
 EXPORT_SYMBOL(klcd_page_alloc);
 EXPORT_SYMBOL(klcd_gfp);
+

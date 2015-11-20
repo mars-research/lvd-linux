@@ -34,6 +34,7 @@ int klcd_page_alloc(cptr_t *slot_out, gpa_t gpa);
 int klcd_pages_alloc(cptr_t *slots_out, hpa_t *hp_base_out, 
 		hva_t *hv_base_out, unsigned order);
 int klcd_gfp(cptr_t *slot_out, gpa_t *gpa_out, gva_t *gva_out);
+int klcd_free_page(cptr_t page);
 int klcd_create_sync_endpoint(cptr_t *slot_out);
 int klcd_send(cptr_t endpoint);
 int klcd_recv(cptr_t endpoint);
@@ -206,6 +207,15 @@ static inline int lcd_gfp(cptr_t *slot_out, gpa_t *gpa_out, gva_t *gva_out)
 {
 	return klcd_gfp(slot_out, gpa_out, gva_out);
 }
+
+/**
+ * Free a page allocated with lcd_gfp.
+ */
+static inline int lcd_free_page(cptr_t page)
+{
+	return klcd_free_page(page);
+}
+
 
 /* IPC -------------------------------------------------- */
 

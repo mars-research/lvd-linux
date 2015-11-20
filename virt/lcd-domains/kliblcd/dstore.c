@@ -361,7 +361,6 @@ static int make_empty_dstore_node_table(struct dstore *dstore,
 		INIT_LIST_HEAD(&new->dstore_node[i].siblings);
 		mutex_init(&new->dstore_node[i].lock);
 	}
-	
 	new->table_level = level;
 
 	/*
@@ -521,7 +520,6 @@ static int find_dstore_node(struct dstore *dstore,
 		*dstore_node = &old->dstore_node[level_id];
 		mutex_init(&(*dstore_node)->lock);
 		(*dstore_node)->dstore = dstore;
-		
 		return 1; /* signal we found the slot and are done */
 	} else {
 		/*
@@ -623,7 +621,6 @@ static int __lcd_dstore_node_get__(struct dstore *dstore, dptr_t d,
 	/*
 	 * Look up and lock dstore node
 	 */
-
 	ret = mutex_lock_interruptible(&dstore->lock);
 	if (ret) {
 		LIBLCD_ERR("interrupted");
@@ -641,13 +638,11 @@ static int __lcd_dstore_node_get__(struct dstore *dstore, dptr_t d,
 		ret = -ENOMEM;
 		goto fail2;
 	}
-	
 	ret = mutex_lock_interruptible(&(*dstore_node)->lock);
 	if (ret) {
 		LIBLCD_ERR("interrupted");
 		goto fail2;
 	}
-
 	mutex_unlock(&dstore->lock);
 
 	return 0;
@@ -692,7 +687,7 @@ int lcd_dstore_insert(struct dstore *dstore, void *object, int tag,
 	dstore_node->ddt_root = get_ddt_root();
 	dstore_node->ddt_root->root_node = dstore_node;
 	/*
-	 * Release node
+	 * Unlock dstore node
 	 */
 	lcd_dstore_put(dstore_node);
 
@@ -719,6 +714,7 @@ int lcd_dstore_get(struct dstore *dstore, dptr_t d, int tag,
 	/*
 	 * Get cnode
 	 */
+
 	ret = __lcd_dstore_node_get__(dstore, d, false, &dstore_node);
 	if (ret) {
 		LIBLCD_ERR("error getting dstore node");
@@ -901,7 +897,7 @@ void lcd_dstore_delete(struct dstore *dstore, dptr_t d)
 		 */
 		done = try_delete_dstore_node(dstore, dstore_node);
 		/*
-		 * Release node
+		 * Unlock dstore node
 		 */
 		lcd_dstore_put(dstore_node);
 
@@ -1097,3 +1093,4 @@ EXPORT_SYMBOL(lcd_dstore_delete);
 EXPORT_SYMBOL(lcd_dstore_destroy);
 EXPORT_SYMBOL(lcd_dstore_get);
 EXPORT_SYMBOL(lcd_dstore_put);
+EXPORT_SYMBOL(lcd_dstore_node_object);

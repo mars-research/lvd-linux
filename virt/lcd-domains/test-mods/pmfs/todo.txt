@@ -1,2 +1,4 @@
 
 1 - fix inode_init_once to fire every time we alloc an inode
+
+2 - fix microkernel/utcb: bitmap for successful cap transfers

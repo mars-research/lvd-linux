@@ -1164,12 +1164,42 @@ static struct dentry *pmfs_mount(struct file_system_type *fs_type,
 	return mount_nodev(fs_type, flags, data, pmfs_fill_super);
 }
 
+#ifdef LCD_ISOLATE
+
+/* We shouldn't need to include this struct def. Kind of ugly right now. */
+struct ipc_channel {
+	int type;
+	u64 channel_cptr;
+	struct list_head channel_list;
+	int expected_cptrs;
+};
+
+struct file_system_type_container {
+	struct file_system_type file_system_type;
+	u64 ref1;
+	u64 ref2;
+	struct ipc_channel c;
+};
+
+static struct file_system_type_container pmfs_fs_type_container = {
+	.file_system_type = {
+		.owner		= THIS_MODULE,
+		.name		= "pmfs",
+		.mount		= pmfs_mount,
+		.kill_sb	= kill_anon_super,
+	}
+};
+
+#else /* ! LCD_ISOLATE */
+
 static struct file_system_type pmfs_fs_type = {
 	.owner		= THIS_MODULE,
 	.name		= "pmfs",
 	.mount		= pmfs_mount,
 	.kill_sb	= kill_anon_super,
 };
+
+#endif
 
 static struct inode *pmfs_nfs_get_inode(struct super_block *sb,
 					 u64 ino, u32 generation)
@@ -1240,20 +1270,33 @@ init_pmfs_fs(void)
 	rc = init_inodecache();
 	if (rc)
 		goto out2;
-
+#if 0
 	rc = bdi_init(&pmfs_backing_dev_info);
 	if (rc)
 		goto out3;
+#endif
+
+#ifdef LCD_ISOLATE
+
+	rc = register_filesystem(&pmfs_fs_type_container.file_system_type);
+	if (rc)
+		goto out4;
+
+#else /* !LCD_ISOLATE */
 
 	rc = register_filesystem(&pmfs_fs_type);
 	if (rc)
 		goto out4;
 
+#endif
+
 	return 0;
 
 out4:
+#if 0
 	bdi_destroy(&pmfs_backing_dev_info);
 out3:
+#endif
 	destroy_inodecache();
 out2:
 	destroy_transaction_cache();
@@ -1271,18 +1314,29 @@ __exit
 #endif
 exit_pmfs_fs(void)
 {
+#ifdef LCD_ISOLATE
+
+	unregister_filesystem(&pmfs_fs_type_container.file_system_type);
+
+#else /* ! LCD_ISOLATE */
+
 	unregister_filesystem(&pmfs_fs_type);
+
+#endif
+
+#if 0
 	bdi_destroy(&pmfs_backing_dev_info);
+#endif
 	destroy_inodecache();
 	destroy_blocknode_cache();
 	destroy_transaction_cache();
 }
 
+#ifndef LCD_ISOLATE
 MODULE_AUTHOR("Intel Corporation <linux-pmfs@intel.com>");
 MODULE_DESCRIPTION("Persistent Memory File System");
 MODULE_LICENSE("GPL");
 
-#ifndef LCD_ISOLATE
 module_init(init_pmfs_fs)
 module_exit(exit_pmfs_fs)
 #endif

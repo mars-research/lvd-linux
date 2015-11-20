@@ -93,6 +93,7 @@ static int boot_main(void)
 		LIBLCD_ERR("dump boot info");
 		goto fail7;
 	}
+	to_boot_info(mi)->cptrs[0] = dest1;
 
 	/* RUN -------------------------------------------------- */
 

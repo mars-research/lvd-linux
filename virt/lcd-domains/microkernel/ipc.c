@@ -256,7 +256,7 @@ static int wait_for_transmit(struct lcd *lcd, struct lcd_sync_endpoint *ep)
 		 */
 		if (lcd_status_dead(lcd)) {
 			LCD_DEBUG(LCD_DEBUG_ERR, 
-				"lcd died inside xmit loop");
+				"lcd %p died inside xmit loop", lcd);
 			ret = -EIO;
 			goto out;
 		}

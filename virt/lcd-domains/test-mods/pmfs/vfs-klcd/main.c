@@ -15,32 +15,18 @@
 
 static struct dispatch_ctx ctx;
 
-#if 0
 static int dispatch_vfs_channel(struct ipc_channel *channel)
 {
 	switch (lcd_r0()) {
 
-	case REGISTER_FS:
-
-		LIBLCD_MSG("vfs received register_fs message");
-
-		register_fs_callee();
-		
-		/* HACK: (Instead of having another thread invoke
-		 * the registered fs's new and rm file functions.) */
-		do_stuff();
-
+	case REGISTER_FILESYSTEM:
+		return register_filesystem_callee();
 		break;
 
-	case UNREGISTER_FS:
-
-		LIBLCD_MSG("vfs received unregister_fs message");
-
-		unregister_fs_callee();
+	case UNREGISTER_FILESYSTEM:
+		return unregister_filesystem_callee();
 		break;
-
 	default:
-
 		LIBLCD_ERR("unexpected function label %d",
 			lcd_r0());
 		return -EINVAL;
@@ -48,12 +34,13 @@ static int dispatch_vfs_channel(struct ipc_channel *channel)
 
 	return 0;
 }
-#endif
 
 static int dispatch_channel(struct ipc_channel *channel)
 {
 	switch (channel->type) {
-
+		
+	case VFS_CHANNEL_TYPE:
+		return dispatch_vfs_channel(channel);
 	default:
 		
 		LIBLCD_ERR("unexpected channel type %d",
@@ -126,7 +113,8 @@ static void loop(struct dispatch_ctx *ctx)
 			}
 		}
 
-		msleep(500);
+		if (count >= 2)
+			return;
 	}
 }
 
@@ -136,6 +124,7 @@ static int __init vfs_klcd_init(void)
 {
 	int ret;
 	cptr_t vfs_chnl;
+	cptr_t unused;
 
 	/*
 	 * Set up cptr cache, etc.
@@ -143,6 +132,16 @@ static int __init vfs_klcd_init(void)
 	ret = lcd_enter();
 	if (ret) {
 		LIBLCD_ERR("lcd enter");
+		goto out;
+	}
+	/*
+	 * XXX: Hack: boot has used cptr 0x3, so we just alloc / mark
+	 * that slot as occupied, so we don't try to re-use it for
+	 * something else.
+	 */
+	ret = lcd_alloc_cptr(&unused);
+	if (ret) {
+		LIBLCD_ERR("alloc cptr");
 		goto out;
 	}
 	/*
@@ -190,3 +189,4 @@ static void __exit vfs_klcd_exit(void)
 
 module_init(vfs_klcd_init);
 module_exit(vfs_klcd_exit);
+MODULE_LICENSE("GPL");

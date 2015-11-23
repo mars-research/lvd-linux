@@ -691,6 +691,10 @@ int lcd_dstore_insert(struct dstore *dstore, void *object, int tag,
 	 */
 	dstore_node->ddt_root = get_ddt_root();
 	dstore_node->ddt_root->root_node = dstore_node;
+	/*
+	 * Release node
+	 */
+	lcd_dstore_put(dstore_node);
 
 	*out = d;
 
@@ -896,6 +900,10 @@ void lcd_dstore_delete(struct dstore *dstore, dptr_t d)
 		 * Delete the dstore node
 		 */
 		done = try_delete_dstore_node(dstore, dstore_node);
+		/*
+		 * Release node
+		 */
+		lcd_dstore_put(dstore_node);
 
 		if (!done) {
 			/*

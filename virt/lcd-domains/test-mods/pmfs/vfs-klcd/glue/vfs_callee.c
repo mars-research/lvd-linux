@@ -12,9 +12,9 @@
 
 /* GLOBALS -------------------------------------------------- */
 
-struct dispatch_ctx *loop_ctx;
-struct ipc_channel vfs_channel;
-struct dstore *pmfs_dstore;
+static struct dispatch_ctx *loop_ctx;
+static struct ipc_channel vfs_channel;
+static struct dstore *pmfs_dstore;
 
 /* INIT/EXIT -------------------------------------------------- */
 
@@ -222,6 +222,10 @@ int unregister_filesystem_callee(void)
 	 * Delete cap to pmfs channel
 	 */
 	lcd_cap_delete(fs_container->pmfs_channel);
+	/*
+	 * Free container
+	 */
+	kfree(fs_container);
 
 	/* IPC REPLY -------------------------------------------------- */
 

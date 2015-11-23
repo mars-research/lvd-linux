@@ -143,16 +143,12 @@ int unregister_filesystem(struct file_system_type *fs)
 
 	/* IPC CALL ---------------------------------------- */
 
-	LIBLCD_MSG("calling unregister fs");
-
 	lcd_set_r0(UNREGISTER_FS);
 	ret = lcd_call(vfs_chnl);
 	if (ret) {
 		LIBLCD_ERR("lcd_call");
 		lcd_exit(ret);
 	}
-
-	LIBLCD_MSG("done");
 
 	/* POST-IPC ---------------------------------------- */
 

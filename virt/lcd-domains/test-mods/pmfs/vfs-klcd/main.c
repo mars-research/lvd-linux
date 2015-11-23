@@ -26,6 +26,15 @@ static int dispatch_vfs_channel(struct ipc_channel *channel)
 	case UNREGISTER_FILESYSTEM:
 		return unregister_filesystem_callee();
 		break;
+
+	case BDI_INIT:
+		return bdi_init_callee();
+		break;
+
+	case BDI_DESTROY:
+		return bdi_destroy_callee();
+		break;
+
 	default:
 		LIBLCD_ERR("unexpected function label %d",
 			lcd_r0());
@@ -41,6 +50,7 @@ static int dispatch_channel(struct ipc_channel *channel)
 		
 	case VFS_CHANNEL_TYPE:
 		return dispatch_vfs_channel(channel);
+
 	default:
 		
 		LIBLCD_ERR("unexpected channel type %d",
@@ -113,7 +123,7 @@ static void loop(struct dispatch_ctx *ctx)
 			}
 		}
 
-		if (count >= 2)
+		if (count >= 4)
 			return;
 	}
 }
@@ -124,7 +134,7 @@ static int __init vfs_klcd_init(void)
 {
 	int ret;
 	cptr_t vfs_chnl;
-	cptr_t unused;
+	cptr_t bdi_chnl;
 
 	/*
 	 * Set up cptr cache, etc.
@@ -132,49 +142,68 @@ static int __init vfs_klcd_init(void)
 	ret = lcd_enter();
 	if (ret) {
 		LIBLCD_ERR("lcd enter");
-		goto out;
+		goto fail1;
 	}
 	/*
-	 * XXX: Hack: boot has used cptr 0x3, so we just alloc / mark
-	 * that slot as occupied, so we don't try to re-use it for
-	 * something else.
+	 * XXX: Hack: boot has used two cptrs, alloc'd in this
+	 * order:
+	 *
+	 *       vfs channel
+	 *       bdi channel
+	 *
+	 * The bdi channel is not used (until we get async)
 	 */
-	ret = lcd_alloc_cptr(&unused);
+	ret = lcd_alloc_cptr(&vfs_chnl);
 	if (ret) {
 		LIBLCD_ERR("alloc cptr");
-		goto out;
+		goto fail2;
+	}
+	ret = lcd_alloc_cptr(&bdi_chnl);
+	if (ret) {
+		LIBLCD_ERR("alloc cptr");
+		goto fail3;
 	}
 	/*
 	 * Initialize dispatch loop context
 	 */
 	init_dispatch_ctx(&ctx);
 	/*
-	 * For now, we hack the cptr thing. This code expects
-	 * the vfs channel to be in slot 3 (root table) in its cspace.
-	 */
-	vfs_chnl = __cptr(3);
-	/*
 	 * Initialize the vfs interface glue code
 	 */
 	ret = glue_vfs_init(vfs_chnl, &ctx);
 	if (ret) {
 		LIBLCD_ERR("vfs init");
-		goto out;
+		goto fail4;
+	}
+	/*
+	 * Initialize the bdi interface glue code
+	 */
+	ret = glue_bdi_init(vfs_chnl, &ctx);
+	if (ret) {
+		LIBLCD_ERR("bdi init");
+		goto fail5;
 	}
 	/*
 	 * Enter loop to listen for PMFS
 	 */
 	loop(&ctx);
 	/*
-	 * Fire vfs glue code exit to tear it down
+	 * Fire vfs and bdi glue code exit to tear them down
 	 */
 	glue_vfs_exit();
+	glue_bdi_exit();
 
-	ret = 0;
-	goto out;
+	lcd_exit(0);
+	
+	return 0;
 
-out:
+fail5:
+	glue_vfs_exit();
+fail4:
+fail3:
+fail2:
 	lcd_exit(ret);
+fail1:
 	return ret;
 }
 

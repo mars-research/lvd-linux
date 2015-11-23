@@ -86,6 +86,7 @@ static int __noreturn __init pmfs_lcd_init(void)
 {
 	int r = 0;
 	cptr_t vfs_chnl;
+//	cptr_t bdi_chnl;
 
 	r = lcd_enter();
 	if (r)
@@ -95,27 +96,38 @@ static int __noreturn __init pmfs_lcd_init(void)
 	 */
 	init_dispatch_ctx(&ctx);
 	/*
-	 * Get the vfs channel cptr from boot info
+	 * Get the vfs and bdi channel cptrs from boot info
 	 */
 	vfs_chnl = lcd_get_boot_info()->cptrs[0];
+//	bdi_chnl = lcd_get_boot_info()->cptrs[1];
 	/*
 	 * Initialize vfs glue
 	 */
 	r = glue_vfs_init(vfs_chnl, &ctx);
 	if (r) {
 		LIBLCD_ERR("vfs init");
-		goto fail1;
+		goto fail2;
 	}
+	/*
+	 * Initialize bdi glue
+	 */
+	r = glue_bdi_init(vfs_chnl, &ctx);
+	if (r) {
+		LIBLCD_ERR("bdi init");
+		goto fail3;
+	}
+
+	/* EXECUTE REAL CODE ---------------------------------------- */
 
 	/*
 	 * Initialize pmfs
 	 */
 	r = init_pmfs_fs();
 	if (r)
-		goto fail1;
+		goto fail4;
 
 
-	LIBLCD_ERR("SUCCESSFULLY REGISTERED PMFS!");
+	LIBLCD_MSG("SUCCESSFULLY REGISTERED PMFS!");
 
 	// loop(&ctx);
 
@@ -125,8 +137,20 @@ static int __noreturn __init pmfs_lcd_init(void)
 
 	exit_pmfs_fs();
 
-	LIBLCD_ERR("SUCCESSFULLY UNREGISTERED PMFS!");
+	LIBLCD_MSG("SUCCESSFULLY UNREGISTERED PMFS!");
 
+	/* REAL CODE DONE; CLEAN UP ---------------------------------------- */
+
+	glue_vfs_exit();
+	glue_bdi_exit();
+
+	lcd_exit(0); /* doesn't return */
+
+fail4:
+	glue_bdi_exit();
+fail3:
+	glue_vfs_exit();
+fail2:
 fail1:
 	lcd_exit(r);
 }

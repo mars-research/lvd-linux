@@ -9,7 +9,7 @@
 static int test01(void)
 {
 	int ret;
-	struct dstore *d;
+	struct dstore *d1, *d2;
 
 	ret = lcd_enter();
 	if (ret) {
@@ -17,19 +17,27 @@ static int test01(void)
 		goto fail1;
 	}
 	/*
-	 * Create and then destroy empty data store.
+	 * Create and then destroy empty data stores.
 	 */
-	ret = lcd_dstore_init_dstore(&d);
+	ret = lcd_dstore_init_dstore(&d1);
 	if (ret) {
 		LCD_ERR("create dstore");
 		goto fail2;
 	}
-	lcd_dstore_destroy(d);
+	ret = lcd_dstore_init_dstore(&d2);
+	if (ret) {
+		LCD_ERR("create dstore");
+		goto fail3;
+	}
+
 	
 	ret = 0;
 	goto out;
 
 out:
+	lcd_dstore_destroy(d2);
+fail3:
+	lcd_dstore_destroy(d1);
 fail2:
 	lcd_exit(0);
 fail1:

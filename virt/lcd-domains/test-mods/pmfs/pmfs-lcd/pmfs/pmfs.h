@@ -21,6 +21,7 @@
 #include <linux/pagemap.h>
 #include <linux/rcupdate.h>
 #include <linux/types.h>
+#include <linux/backing-dev.h>
 
 #include "journal.h"
 
@@ -601,7 +602,21 @@ extern const struct inode_operations pmfs_special_inode_operations;
 /* symlink.c */
 extern const struct inode_operations pmfs_symlink_inode_operations;
 
+#ifdef LCD_ISOLATE
+
+struct backing_dev_info_container {
+	struct backing_dev_info backing_dev_info;
+	u64 ref1;
+	u64 ref2;
+};
+
+extern struct backing_dev_info_container pmfs_backing_dev_info_container;
+
+#else /* !LCD_ISOLATE */
+
 extern struct backing_dev_info pmfs_backing_dev_info;
+
+#endif /* LCD_ISOLATE */
 
 int pmfs_check_integrity(struct super_block *sb,
 	struct pmfs_super_block *super);

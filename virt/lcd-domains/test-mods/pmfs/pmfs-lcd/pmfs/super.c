@@ -1270,11 +1270,20 @@ init_pmfs_fs(void)
 	rc = init_inodecache();
 	if (rc)
 		goto out2;
-#if 0
+
+#ifdef LCD_ISOLATE
+
+	rc = bdi_init(&pmfs_backing_dev_info_container.backing_dev_info);
+	if (rc)
+		goto out3;
+
+#else /* !LCD_ISOLATE */
+
 	rc = bdi_init(&pmfs_backing_dev_info);
 	if (rc)
 		goto out3;
-#endif
+
+#endif /* LCD_ISOLATE */
 
 #ifdef LCD_ISOLATE
 
@@ -1288,15 +1297,23 @@ init_pmfs_fs(void)
 	if (rc)
 		goto out4;
 
-#endif
+#endif /* LCD_ISOLATE */
 
 	return 0;
 
 out4:
-#if 0
+
+#ifdef LCD_ISOLATE
+
+	bdi_destroy(&pmfs_backing_dev_info_container.backing_dev_info);
+
+#else /* !LCD_ISOLATE */
+
 	bdi_destroy(&pmfs_backing_dev_info);
+
+#endif /* LCD_ISOLATE */
+
 out3:
-#endif
 	destroy_inodecache();
 out2:
 	destroy_transaction_cache();
@@ -1322,11 +1339,18 @@ exit_pmfs_fs(void)
 
 	unregister_filesystem(&pmfs_fs_type);
 
-#endif
+#endif /* LCD_ISOLATE */
 
-#if 0
+#ifdef LCD_ISOLATE
+
+	bdi_destroy(&pmfs_backing_dev_info_container.backing_dev_info);
+
+#else /* !LCD_ISOLATE */
+
 	bdi_destroy(&pmfs_backing_dev_info);
-#endif
+
+#endif /* LCD_ISOLATE */
+
 	destroy_inodecache();
 	destroy_blocknode_cache();
 	destroy_transaction_cache();

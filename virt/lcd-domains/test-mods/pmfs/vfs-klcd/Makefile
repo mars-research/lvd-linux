@@ -4,4 +4,5 @@ obj-$(CONFIG_LCD_TEST_MOD_PMFS_VFS)  += lcd-test-mod-pmfs-vfs.o
 lcd-test-mod-pmfs-vfs-y              += main.o
 
 # Glue
-lcd-test-mod-pmfs-vfs-y              += $(addprefix glue/, vfs_callee.o)
+lcd-test-mod-pmfs-vfs-y              += $(addprefix glue/, vfs_callee.o \
+							   bdi_callee.o)

@@ -14,8 +14,9 @@ static int boot_main(void)
 	struct lcd_info *mi;
 	cptr_t lcd;
 	cptr_t vfs;
-	cptr_t endpoint;
-	cptr_t dest1, dest2;
+	cptr_t vfs_chnl, bdi_chnl;
+	cptr_t pmfs_dest1, pmfs_dest2;
+	cptr_t vfs_dest1, vfs_dest2;
 
 	/*
 	 * Enter lcd mode
@@ -23,17 +24,25 @@ static int boot_main(void)
 	ret = lcd_enter();
 	if (ret) {
 		LIBLCD_ERR("enter");
-		goto fail1;
+		goto out;
 	}
 	/*
 	 * Create VFS channel
 	 */
-	ret = lcd_create_sync_endpoint(&endpoint);
+	ret = lcd_create_sync_endpoint(&vfs_chnl);
 	if (ret) {
-		LIBLCD_ERR("create endpoint");
-		goto fail2;
+		LIBLCD_ERR("create vfs endpoint");
+		goto lcd_exit;
 	}
-
+	/*
+	 * Create bdi channel
+	 */
+	ret = lcd_create_sync_endpoint(&bdi_chnl);
+	if (ret) {
+		LIBLCD_ERR("create bdi endpoint");
+		goto lcd_exit;
+	}
+	
 	/* CREATE LCDS -------------------------------------------------- */
 
 	/*
@@ -42,7 +51,7 @@ static int boot_main(void)
 	ret = klcd_create_module_klcd(&vfs, "lcd_test_mod_pmfs_vfs");
 	if (ret) {
 		LIBLCD_ERR("create vfs klcd");
-		goto fail2;
+		goto lcd_exit;
 	}
 	/*
 	 * Create pmfs lcd
@@ -51,38 +60,61 @@ static int boot_main(void)
 				LCD_CPTR_NULL, &mi);
 	if (ret) {
 		LIBLCD_ERR("create module lcd");
-		goto fail3;
+		goto destroy_vfs;
 	}
 
-	/* GRANT ENDPOINT TO PMFS ------------------------------ */
+	/* GRANT ENDPOINTS TO PMFS ------------------------------ */
 
 	/*
 	 * Alloc dest slot
 	 */
-	ret = __lcd_alloc_cptr(mi->cache, &dest1);
+	ret = __lcd_alloc_cptr(mi->cache, &pmfs_dest1);
 	if (ret) {
 		LIBLCD_ERR("failed to alloc cptr");
-		goto fail4;
+		goto destroy_both;
 	}
 	/*
 	 * Grant
 	 */
-	ret = lcd_cap_grant(lcd, endpoint, dest1);
+	ret = lcd_cap_grant(lcd, vfs_chnl, pmfs_dest1);
 	if (ret) {
-		LIBLCD_ERR("failed to grant endpoint to lcd1");
-		goto fail5;
+		LIBLCD_ERR("failed to grant vfs endpoint to pmfs");
+		goto destroy_both;
+	}
+	/*
+	 * Alloc dest slot
+	 */
+	ret = __lcd_alloc_cptr(mi->cache, &pmfs_dest2);
+	if (ret) {
+		LIBLCD_ERR("failed to alloc cptr");
+		goto destroy_both;
+	}
+	/*
+	 * Grant
+	 */
+	ret = lcd_cap_grant(lcd, bdi_chnl, pmfs_dest2);
+	if (ret) {
+		LIBLCD_ERR("failed to grant bdi endpoint to pmfs");
+		goto destroy_both;
 	}
 
 
-	/* GRANT ENDPOINT TO VFS ------------------------------ */
+	/* GRANT ENDPOINTS TO VFS ------------------------------ */
 
-	dest2 = __cptr(3);
-	ret = lcd_cap_grant(vfs, endpoint, dest2);
+	vfs_dest1 = __cptr(3);
+	ret = lcd_cap_grant(vfs, vfs_chnl, vfs_dest1);
 	if (ret) {
-		LIBLCD_ERR("failed to grant endpoint to vfs");
-		goto fail6;
+		LIBLCD_ERR("failed to grant vfs endpoint to vfs");
+		goto destroy_both;
 	}
-
+	vfs_dest2 = lcd_cptr_set_lvl(__cptr(0), 1);
+	vfs_dest2 = lcd_cptr_set_fanout(vfs_dest2, 0, 0);
+	vfs_dest2 = lcd_cptr_set_slot(vfs_dest2, 0);
+	ret = lcd_cap_grant(vfs, bdi_chnl, vfs_dest2);
+	if (ret) {
+		LIBLCD_ERR("failed to grant bdi endpoint to vfs");
+		goto destroy_both;
+	}
 	/* DUMP BOOT INFO FOR PMFS ------------------------------ */
 
 	/*
@@ -91,9 +123,10 @@ static int boot_main(void)
 	ret = lcd_dump_boot_info(mi);
 	if (ret) {
 		LIBLCD_ERR("dump boot info");
-		goto fail7;
+		goto destroy_both;
 	}
-	to_boot_info(mi)->cptrs[0] = dest1;
+	to_boot_info(mi)->cptrs[0] = pmfs_dest1;
+	to_boot_info(mi)->cptrs[1] = pmfs_dest2;
 
 	/* RUN -------------------------------------------------- */
 
@@ -103,7 +136,7 @@ static int boot_main(void)
 	ret = lcd_run(vfs);
 	if (ret) {
 		LIBLCD_ERR("run vfs");
-		goto fail8;
+		goto destroy_both;
 	}
 	/*
 	 * Run pmfs
@@ -111,7 +144,7 @@ static int boot_main(void)
 	ret = lcd_run(lcd);
 	if (ret) {
 		LIBLCD_ERR("run pmfs");
-		goto fail9;
+		goto destroy_both;
 	}
 	/*
 	 * Wait for 2 seconds
@@ -121,22 +154,16 @@ static int boot_main(void)
 	 * Tear everything down
 	 */
 	ret = 0;
-	goto out;
+	goto destroy_both;
 
-out:
-fail9:
-fail8:
-fail7:
-fail6:
-fail5:
-fail4:
+destroy_both:
 	lcd_destroy_module_lcd(lcd, mi, LCD_CPTR_NULL);
-fail3:
+destroy_vfs:
 	klcd_destroy_module_klcd(vfs, "lcd_test_mod_pmfs_vfs");
-fail2:
+lcd_exit:
 	/* frees endpoint */
 	lcd_exit(0);
-fail1:
+out:
 	return ret;
 }
 

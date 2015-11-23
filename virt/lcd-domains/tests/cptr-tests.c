@@ -68,17 +68,6 @@ fail1:
 	return ret;
 }
 
-static cptr_t set_fo(cptr_t c, unsigned fo, int lvl)
-{
-	return __cptr(cptr_val(c) | 
-		(fo << (LCD_CPTR_SLOT_BITS + lvl * LCD_CPTR_FANOUT_BITS)));
-}
-
-static cptr_t set_lvl(cptr_t c, int lvl)
-{
-	return __cptr(cptr_val(c) | (lvl << LCD_CPTR_LEVEL_SHIFT));
-}
-
 static int test03(void)
 {
 	cptr_t c;
@@ -92,8 +81,8 @@ static int test03(void)
 		return -1;
 	}
 	c = __cptr(0);
-	c = set_fo(c, (1 << LCD_CPTR_FANOUT_BITS) - 1, 0);
-	c = set_lvl(c, 1);
+	c = lcd_cptr_set_fanout(c, (1 << LCD_CPTR_FANOUT_BITS) - 1, 0);
+	c = lcd_cptr_set_lvl(c, 1);
 	if (lcd_cptr_fanout(c, 0) != ((1 << LCD_CPTR_FANOUT_BITS) - 1)) {
 		LCD_ERR("failed 3, fo = %llu", lcd_cptr_fanout(c, 0));
 		return -1;
@@ -103,9 +92,9 @@ static int test03(void)
 		return -1;
 	}
 	c = __cptr(0);
-	c = set_fo(c, 0, 0);
-	c = set_fo(c, (1 << LCD_CPTR_FANOUT_BITS) - 1, 1);
-	c = set_lvl(c, 2);
+	c = lcd_cptr_set_fanout(c, 0, 0);
+	c = lcd_cptr_set_fanout(c, (1 << LCD_CPTR_FANOUT_BITS) - 1, 1);
+	c = lcd_cptr_set_lvl(c, 2);
 	if (lcd_cptr_fanout(c, 0) != 0) {
 		LCD_ERR("failed 5");
 		return -1;

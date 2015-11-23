@@ -10,6 +10,7 @@
 
 #include <linux/kernel.h>
 #include <asm/page.h>
+#include <linux/bug.h>
 
 /* CPTRs -------------------------------------------------- */
 
@@ -96,6 +97,50 @@ static inline unsigned long lcd_cptr_level(cptr_t c)
 	i &= ((1 << LCD_CPTR_DEPTH_BITS) - 1);
 
 	return i;
+}
+
+
+static inline cptr_t lcd_cptr_set_slot(cptr_t c, unsigned slot)
+{
+	BUG_ON(slot >= (1 << LCD_CPTR_SLOT_BITS));
+	return __cptr(cptr_val(c) | slot);
+}
+
+static inline cptr_t lcd_cptr_set_fanout(cptr_t c, unsigned fanout_idx, 
+					int lvl)
+{
+	BUG_ON(lvl >= (1 << LCD_CPTR_DEPTH_BITS));
+	BUG_ON(fanout_idx >= (1 << LCD_CPTR_FANOUT_BITS));
+	return __cptr(cptr_val(c) | 
+		(fanout_idx << (LCD_CPTR_SLOT_BITS + 
+				lvl * LCD_CPTR_FANOUT_BITS)));
+}
+
+static inline cptr_t lcd_cptr_set_lvl(cptr_t c, int lvl)
+{
+	BUG_ON(lvl >= (1 << LCD_CPTR_DEPTH_BITS));
+	return __cptr(cptr_val(c) | (lvl << LCD_CPTR_LEVEL_SHIFT));
+}
+
+
+static inline cptr_t mk_cptr(unsigned long lvl, 
+			unsigned long fanouts[(1 << LCD_CPTR_DEPTH_BITS) - 1],
+			unsigned long slot)
+{
+	unsigned long result = 0;
+	int i;
+
+	result |= lvl << LCD_CPTR_LEVEL_SHIFT;
+	for (i = 0; i < lvl; i++) {
+		result |= 
+			(fanouts[i] << 
+				(lvl * LCD_CPTR_FANOUT_BITS + 
+					LCD_CPTR_SLOT_BITS));
+	}
+
+	result |= slot;
+
+	return __cptr(result);
 }
 
 /* CPTR CACHE -------------------------------------------------- */

@@ -1,0 +1,18 @@
+#
+# Build file for unit tests module
+#
+
+# Main target
+obj-m += lcd_tests.o
+
+# Arch independent tests
+lcd_tests-y += runner.o \
+               cap-tests.o \
+	       cptr-tests.o \
+	       ipc-tests.o \
+	       enterexit-tests.o \
+	       mem-tests.o \
+	       dstore-tests.o
+
+# Arch dependent tests
+lcd_tests-y += arch/$(ARCH)/arch-tests.o

@@ -957,13 +957,6 @@ endif
 # make sure no implicit rule kicks in
 $(sort $(vmlinux-deps)): $(vmlinux-dirs) ;
 
-# LIBLCD
-#
-# We do this before building anything else so that it's done
-# and we don't have any problems with recursive make.
-liblcd: prepare scripts
-	$(Q)$(MAKE) $(build)=$@
-
 # Handle descending into subdirectories listed in $(vmlinux-dirs)
 # Preset locale variables to speed up the build process. Limit locale
 # tweaks to this spot to avoid wrong language settings when running
@@ -971,7 +964,7 @@ liblcd: prepare scripts
 # Error messages still appears in the original language
 
 PHONY += $(vmlinux-dirs)
-$(vmlinux-dirs): prepare scripts liblcd
+$(vmlinux-dirs): prepare scripts
 	$(Q)$(MAKE) $(build)=$@
 
 define filechk_kernel.release

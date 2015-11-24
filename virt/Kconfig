@@ -1,6 +1,0 @@
-menu "Virtualization (2)"
-
-source "virt/lcd-domains/Kconfig"
-
-endmenu
-

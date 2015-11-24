@@ -56,10 +56,10 @@ static DECLARE_RWSEM(umhelper_sem);
 #ifdef CONFIG_MODULES
 
 /*
-	modprobe_path and lcd_modprobe_path is set via /proc/sys.
+	modprobe_path and lcd_insmod_path is set via /proc/sys.
 */
 char modprobe_path[KMOD_PATH_LEN] = "/sbin/modprobe";
-char lcd_modprobe_path[KMOD_PATH_LEN] = "/sbin/lcd-modprobe";
+char lcd_insmod_path[KMOD_PATH_LEN] = "/sbin/lcd-insmod";
 
 static void free_modprobe_argv(struct subprocess_info *info)
 {
@@ -67,7 +67,7 @@ static void free_modprobe_argv(struct subprocess_info *info)
 	kfree(info->argv);
 }
 
-static int call_modprobe(char *module_name, int wait, int for_lcd)
+static int call_modprobe(char *module_name, int wait)
 {
 	struct subprocess_info *info;
 	static char *envp[] = {
@@ -78,7 +78,7 @@ static int call_modprobe(char *module_name, int wait, int for_lcd)
 	};
 
 	char **argv = kmalloc(sizeof(char *[5]), GFP_KERNEL);
-	char *__modprobe_path = for_lcd ? lcd_modprobe_path : modprobe_path;
+	char *__modprobe_path = modprobe_path;
 	if (!argv)
 		goto out;
 
@@ -102,6 +102,52 @@ static int call_modprobe(char *module_name, int wait, int for_lcd)
 
 free_module_name:
 	kfree(module_name);
+free_argv:
+	kfree(argv);
+out:
+	return -ENOMEM;
+}
+
+static void free_lcd_insmod_argv(struct subprocess_info *info)
+{
+	kfree(info->argv[1]); /* check call_lcd_insmod() */
+	kfree(info->argv);
+}
+
+static int call_lcd_insmod(const char *module_name, int wait)
+{
+	struct subprocess_info *info;
+	static char *envp[] = {
+		"HOME=/",
+		"TERM=linux",
+		"PATH=/sbin:/usr/sbin:/bin:/usr/bin",
+		NULL
+	};
+	char *module_name_copy;
+
+	char **argv = kmalloc(sizeof(char *[3]), GFP_KERNEL);
+	char *__lcd_insmod_path = lcd_insmod_path;
+	if (!argv)
+		goto out;
+
+	module_name_copy = kstrdup(module_name, GFP_KERNEL);
+	if (!module_name_copy)
+		goto free_argv;
+
+	argv[0] = __lcd_insmod_path;
+	argv[1] = module_name_copy;	/* check free_lcd_insmod_argv() */
+	argv[2] = NULL;
+	
+	info = call_usermodehelper_setup(__lcd_insmod_path, argv, envp, 
+					GFP_KERNEL, NULL, free_lcd_insmod_argv, 
+					NULL);
+	if (!info)
+		goto free_module_name;
+
+	return call_usermodehelper_exec(info, wait | UMH_KILLABLE);
+
+free_module_name:
+	kfree(module_name_copy);
 free_argv:
 	kfree(argv);
 out:
@@ -146,15 +192,31 @@ int __do_request_module(bool wait, int for_lcd, const char *fmt, ...)
 	if (!modprobe_path[0])
 		return 0;
 
-	va_start(args, fmt);
-	ret = vsnprintf(module_name, MODULE_NAME_LEN, fmt, args);
-	va_end(args);
-	if (ret >= MODULE_NAME_LEN)
-		return -ENAMETOOLONG;
+	if (!for_lcd) {
+		/*
+		 * We're passing a full path to lcd-insmod, and we
+		 * don't want to do a dup of that path (it might be
+		 * big). This means you can't do the printf fmt style
+		 * request.
+		 */
+		va_start(args, fmt);
+		ret = vsnprintf(module_name, MODULE_NAME_LEN, fmt, args);
+		va_end(args);
+		if (ret >= MODULE_NAME_LEN)
+			return -ENAMETOOLONG;
 
-	ret = security_kernel_module_request(module_name);
-	if (ret)
-		return ret;
+		ret = security_kernel_module_request(module_name);
+		if (ret)
+			return ret;
+	} else {
+
+		va_start(args, fmt);
+		ret = vsnprintf(module_name, MODULE_NAME_LEN, "for-lcd", args);
+		va_end(args);
+		if (ret >= MODULE_NAME_LEN)
+			return -ENAMETOOLONG;
+
+	}
 
 	/* If modprobe needs a service that is in a module, we get a recursive
 	 * loop.  Limit the number of running kmod threads to max_threads/2 or
@@ -175,7 +237,7 @@ int __do_request_module(bool wait, int for_lcd, const char *fmt, ...)
 		if (kmod_loop_msg < 5) {
 			printk(KERN_ERR
 			       "request_module: runaway loop modprobe %s\n",
-			       module_name);
+				module_name);
 			kmod_loop_msg++;
 		}
 		atomic_dec(&kmod_concurrent);
@@ -184,8 +246,12 @@ int __do_request_module(bool wait, int for_lcd, const char *fmt, ...)
 
 	trace_module_request(module_name, wait, _RET_IP_);
 
-	ret = call_modprobe(module_name, wait ? UMH_WAIT_PROC : UMH_WAIT_EXEC,
-		for_lcd);
+	if (likely(!for_lcd))
+		ret = call_modprobe(module_name, 
+				wait ? UMH_WAIT_PROC : UMH_WAIT_EXEC);
+	else
+		ret = call_lcd_insmod(fmt, 
+				wait ? UMH_WAIT_PROC : UMH_WAIT_EXEC);
 
 	atomic_dec(&kmod_concurrent);
 	return ret;

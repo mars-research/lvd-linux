@@ -1,0 +1,14 @@
+
+# Main targets
+obj-m += lcd_test_mod_load_boot.o
+
+lcd_test_mod_load_boot-y             += boot.o
+
+obj-m  += lcd_test_mod_load_lcd.o
+
+lcd_test_mod_load_lcd-y              += lcd.o
+
+lcd_test_mod_load_lcd-y              += $(LIBLCD)
+
+# We don't want the loop to be optimized away
+CFLAGS_lcd.o = -O0

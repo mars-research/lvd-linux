@@ -60,13 +60,9 @@ struct sched_param {
 #include <linux/magic.h>
 #include <linux/cgroup-defs.h>
 
-#ifdef CONFIG_HAVE_LCD
+/* For LCDs */
 struct lcd;
 struct cptr_cache;
-#endif
-#ifdef CONFIG_LAZY_THC
-struct ptstate_t;
-#endif
 
 #include <asm/processor.h>
 
@@ -1937,6 +1933,8 @@ struct task_struct {
 #ifdef CONFIG_MMU
 	struct task_struct *oom_reaper_list;
 #endif
+	struct lcd *lcd;
+	struct cptr_cache *cptr_cache;
 
 /* CPU-specific state of this task */
 	struct thread_struct thread;

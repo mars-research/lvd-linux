@@ -1,0 +1,28 @@
+#
+# Build file for liblcd
+#
+
+# I hack KBUILD_CFLAGS so we don't have to do this in every kbuild file.
+KBUILD_CFLAGS := $(KBUILD_CFLAGS) $(LCD_DOMAINS_CFLAGS)
+
+lib-y    +=  $(addprefix lcd/, cap.o \
+			       enterexit.o \
+			       ipc.o \
+			       page_alloc.o \
+			       printk.o \
+			       dstore.o \
+			       tests.o)
+
+lib-y    +=  $(addprefix lib/, find_next_bit.o \
+			       kstrtox.o \
+			       string.o \
+			       vsprintf.o \
+			       ctype.o \
+			       hexdump.o       \
+			       reciprocal_div.o)
+
+lib-y    +=  $(addprefix mm/, slab.o \
+			      slab_common.o \
+			      util.o)
+
+lib-y    +=  resolve.o

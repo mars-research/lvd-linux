@@ -30,7 +30,7 @@
 
 #ifdef CONFIG_MODULES
 extern char modprobe_path[]; /* for sysctl */
-extern char lcd_modprobe_path[]; /* for sysctl */
+extern char lcd_insmod_path[]; /* for sysctl */
 /* modprobe exit status on success, -ve on error.  Return value
  * usually useless though. */
 extern __printf(3, 4)

@@ -12,7 +12,6 @@ if BLOCK
 
 config FS_IOMAP
 	bool
-	depends on EXT2_FS_XIP || PMFS_XIP || LCD_TEST_MOD_PMFS
 	default y
 
 source "fs/ext2/Kconfig"

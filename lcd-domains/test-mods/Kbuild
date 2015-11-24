@@ -1,0 +1,21 @@
+#
+# Modules for testing
+#
+
+# This should be built before entering this file (it will be
+# if you use the top level makefile in lcd-domains/Makefile)
+export LIBLCD = ../../liblcd/lib.a
+
+obj-m += load/
+
+obj-m += ipc1/
+
+obj-m += ipc2/
+
+obj-m += liblcd-tests/
+
+obj-m += create-klcd/
+
+obj-m += glue-example/
+
+obj-m += pmfs/

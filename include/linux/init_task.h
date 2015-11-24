@@ -15,12 +15,9 @@
 #include <net/net_namespace.h>
 #include <linux/sched/rt.h>
 
-#ifdef CONFIG_HAVE_LCD
+/* For LCDs */
 #define INIT_LCD(tsk) \
 	.lcd = NULL, .cptr_cache = NULL,	
-#else
-#define INIT_LCD_THREAD
-#endif
 
 #ifdef CONFIG_SMP
 # define INIT_PUSHABLE_TASKS(tsk)					\

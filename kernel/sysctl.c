@@ -658,8 +658,8 @@ static struct ctl_table kern_table[] = {
 		.proc_handler	= proc_dostring,
 	},
 	{
-		.procname	= "lcd-modprobe",
-		.data		= &lcd_modprobe_path,
+		.procname	= "lcd-insmod",
+		.data		= &lcd_insmod_path,
 		.maxlen		= KMOD_PATH_LEN,
 		.mode		= 0644,
 		.proc_handler	= proc_dostring,

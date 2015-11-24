@@ -1,0 +1,23 @@
+#
+# Build file for microkernel
+#
+
+# Main target (lcd_domains.ko)
+obj-m += lcd_domains.o
+
+# Arch independent code
+lcd_domains-y += main.o ipc.o cap.o
+
+# Arch dependent code
+lcd_domains-y += arch/$(ARCH)/main.o
+
+# kliblcd
+lcd_domains-y += $(addprefix ../kliblcd/, init.o \
+					  mem.o \
+                                          ipc.o \
+					  enterexit.o \
+                                          create.o \
+					  cap.o \
+                                      	  cptr_cache.o \
+				      	  dstore.o \
+				      	  create_klcd.o)

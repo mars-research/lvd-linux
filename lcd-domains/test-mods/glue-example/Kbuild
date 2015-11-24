@@ -1,0 +1,9 @@
+
+export CONFIG_ISOLATE_GLUE_EXAMPLE=y
+
+# Hack cflags
+KBUILD_CFLAGS += -DCONFIG_ISOLATE_GLUE_EXAMPLE
+
+obj-m += vfs/
+obj-m += minix/
+obj-m += isol-boot/

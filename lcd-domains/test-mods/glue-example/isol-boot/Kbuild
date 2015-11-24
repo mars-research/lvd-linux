@@ -1,0 +1,7 @@
+
+# BOOT --------------------------------------------------
+
+obj-m += lcd_test_mod_glue_example_boot.o
+
+lcd_test_mod_glue_example_boot-y    += main.o
+

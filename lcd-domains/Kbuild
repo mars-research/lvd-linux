@@ -1,0 +1,16 @@
+#
+# Top level build file for microkernel, tests, and test mods
+#
+# Note that: kliblcd is built with the microkernel, and
+# liblcd is built before touching anything else (so we
+# don't get recursive make issues).
+#
+
+# I hack KBUILD_CFLAGS so we don't have to do this in every kbuild file.
+KBUILD_CFLAGS := $(KBUILD_CFLAGS) $(LCD_DOMAINS_CFLAGS)
+
+# Dive into subdirs (note that kliblcd is built with microkernel)
+obj-m += microkernel/
+obj-m += tests/
+obj-m += test-mods/
+

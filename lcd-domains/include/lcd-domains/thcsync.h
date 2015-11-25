@@ -20,36 +20,36 @@
 // Lists of waiters
 
 struct thc_waiter {
-  struct awe_t             *waiter;
-  struct thc_waiter *next;
+	struct awe_t             *waiter;
+	struct thc_waiter *next;
 };
 
 // Latch for short-term mutual exclusion:
 
 struct thc_latch {
-  volatile int c;
+	volatile int c;
 };
 
 void thc_latch_init(struct thc_latch *l);
 
 static inline void thc_latch_acquire(struct thc_latch *l) {
 #ifdef _MSC_VER
-    C_ASSERT(sizeof(l->c) == sizeof(LONG));
-    while (InterlockedCompareExchange(reinterpret_cast<volatile long*>(&l->c), 1L, 0L) == 1) {
-    }
-    ;
+	C_ASSERT(sizeof(l->c) == sizeof(LONG));
+	while (InterlockedCompareExchange(reinterpret_cast<volatile long*>(&l->c), 1L, 0L) == 1) {
+	}
+	;
 #else
-  do {
-    if (__sync_bool_compare_and_swap(&l->c, 0, 1)) {
-      break;
-    }
-  } while (1);
+	do {
+		if (__sync_bool_compare_and_swap(&l->c, 0, 1)) {
+			break;
+		}
+	} while (1);
 #endif
 }
 
 static inline void thc_latch_release(struct thc_latch *l) {
-  //assert(l->c == 1);
-  l->c = 0;
+	//assert(l->c == 1);
+	l->c = 0;
 }
 
 // Public type provided by the synchronization primitives:
@@ -57,9 +57,9 @@ static inline void thc_latch_release(struct thc_latch *l) {
 // Counting semaphores.
 
 typedef struct {
-  struct thc_latch   l;
-  volatile int       val;
-  struct thc_waiter *q;
+	struct thc_latch   l;
+	volatile int       val;
+	struct thc_waiter *q;
 } thc_sem_t;
 
 void thc_sem_init(thc_sem_t *s, int val);
@@ -70,7 +70,7 @@ void thc_sem_v(thc_sem_t *s);       // val++;
 // Non-reentrant mutual exclusion locks.
 
 typedef struct {
-  thc_sem_t sem;
+	thc_sem_t sem;
 }  thc_lock_t;
 
 void thc_lock_init(thc_lock_t *l);
@@ -81,8 +81,8 @@ void thc_lock_release(thc_lock_t *l);
 // FIFO.  Signaller must hold lock held by waiter.
 
 typedef struct {
-  struct thc_latch   l;
-  struct thc_waiter *q;
+	struct thc_latch   l;
+	struct thc_waiter *q;
 } thc_condvar_t;
 
 void thc_condvar_init(thc_condvar_t *cv);
@@ -122,43 +122,43 @@ void thc_condvar_broadcast(thc_condvar_t *cv);
 typedef struct thc_queue_entry thc_queue_entry_t;
 
 struct thc_queue_entry {
-  int                bailed;
-  int                served;
-  thc_queue_entry_t *prev;
-  thc_queue_entry_t *next;
+	int                bailed;
+	int                served;
+	thc_queue_entry_t *prev;
+	thc_queue_entry_t *next;
 };
 
 typedef struct {
-  thc_lock_t        l;
-  thc_condvar_t     cv;
-  thc_queue_entry_t start;
-  thc_queue_entry_t end;
+	thc_lock_t        l;
+	thc_condvar_t     cv;
+	thc_queue_entry_t start;
+	thc_queue_entry_t end;
 } thc_queue_t;
 
 void thc_queue_init(thc_queue_t *tq);
 void thc_queue_enter(thc_queue_t *tq,
-                     thc_queue_entry_t *te);
+		thc_queue_entry_t *te);
 void thc_queue_await_turn(thc_queue_t *tq,
-                          thc_queue_entry_t *te);
+			thc_queue_entry_t *te);
 errval_t thc_queue_await_turn_x(thc_queue_t *tq,
                                 thc_queue_entry_t *te);
 int thc_queue_leave(thc_queue_t *tq,
-                    thc_queue_entry_t *te);
+		thc_queue_entry_t *te);
 
 // Event counts.
 
 typedef struct thc_ec_wait_list thc_ec_wait_list_t;
 
 struct thc_ec_wait_list {
-  awe_t              *waiter;
-  volatile uint64_t   v;
-  thc_ec_wait_list_t *next;
+	awe_t              *waiter;
+	volatile uint64_t   v;
+	thc_ec_wait_list_t *next;
 };
 
 typedef struct {
-  struct thc_latch    l;
-  volatile uint64_t   n;
-  thc_ec_wait_list_t *waiters;
+	struct thc_latch    l;
+	volatile uint64_t   n;
+	thc_ec_wait_list_t *waiters;
 } thc_ec_t;
 
 void thc_ec_init(thc_ec_t *ec);
@@ -169,7 +169,7 @@ void thc_ec_advance(thc_ec_t *ec, uint64_t d); // n+=d
 // Sequencers
 
 typedef struct {
-  volatile long n;
+	volatile long n;
 } thc_seq_t;
 
 void thc_seq_init(thc_seq_t *seq);

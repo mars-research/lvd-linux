@@ -27,10 +27,10 @@ void thc_done(void);
 //
 // Cancel.  _TAG is the name of an enclosig DO_FINISH block.
 
-#define CANCEL(_TAG)                                                    \
-  do {                                                                  \
-    _thc_do_cancel_request(_fb_info_ ## _TAG);                          \
-  }  while (0)
+#define CANCEL(_TAG)						\
+	do {							\
+		_thc_do_cancel_request(_fb_info_ ## _TAG);	\
+	}  while (0)
 
 // DO_FINISH block. Non-cancellable:
 
@@ -55,22 +55,22 @@ void thc_done(void);
 // DO_FINISH implementation:
 
 #define DO_FINISH__(_TAG,_CODE,_IS_NX)					\
-  do {                                                                  \
-    finish_t _fb;                                                       \
-    finish_t *_fb_info __attribute__((unused)) = &_fb;                  \
-    finish_t *_fb_info_ ## _TAG __attribute__((unused)) = _fb_info;     \
-    void *_fb_curr_stack __attribute__((unused));			\
-	FORCE_FRAME_POINTER_USE;						\
-    GET_STACK_POINTER(_fb_info->old_sp);				\
-    _thc_startfinishblock(_fb_info, _IS_NX);				\
-    do { _CODE } while (0);                                             \
-    GET_STACK_POINTER(_fb_curr_stack);					\
-    _thc_endfinishblock(_fb_info, _fb_curr_stack);			\
-    if (_fb_info->old_sp != _fb_curr_stack) {				\
-      RESTORE_OLD_STACK_POINTER(_fb_info->old_sp);			\
-      _thc_pendingfree();						\
-    }									\
-} while (0)
+	do {								\
+		finish_t _fb;						\
+		finish_t *_fb_info __attribute__((unused)) = &_fb;	\
+		finish_t *_fb_info_ ## _TAG __attribute__((unused)) = _fb_info;	\
+			void *_fb_curr_stack __attribute__((unused));	\
+			FORCE_FRAME_POINTER_USE;			\
+			GET_STACK_POINTER(_fb_info->old_sp);		\
+			_thc_startfinishblock(_fb_info, _IS_NX);	\
+			do { _CODE } while (0);				\
+			GET_STACK_POINTER(_fb_curr_stack);		\
+			_thc_endfinishblock(_fb_info, _fb_curr_stack);	\
+			if (_fb_info->old_sp != _fb_curr_stack) {	\
+				RESTORE_OLD_STACK_POINTER(_fb_info->old_sp); \
+				_thc_pendingfree();			\
+			}						\
+	} while (0)
 
 // The basic idea for ASYNC_ is that the contents of the block becomes
 // a nested function.  For the lazy implementation, we create an AWE for
@@ -99,50 +99,50 @@ void thc_done(void);
 //    to an increase in async cost by about 40 cycles (25 cycles -> 65 cycles) 
 //
 #define ASYNC_(_BODY, _C)						\
-  do {									\
-    awe_t _awe;                                                         \
-    extern void * CONT_RET_FN_NAME(_C) (void);	         		\
+	do {								\
+		awe_t _awe;						\
+		extern void * CONT_RET_FN_NAME(_C) (void);		\
 									\
-    _awe.status     = LAZY_AWE;						\
-    _awe.lazy_stack = NULL;						\
-    _awe.pts        = NULL;						\
+		_awe.status     = LAZY_AWE;				\
+		_awe.lazy_stack = NULL;					\
+		_awe.pts        = NULL;					\
 									\
-    /* Define nested function containing the body */			\
-      noinline auto void _thc_nested_async(FORCE_ARGS_STACK awe_t *awe) __asm__(NESTED_FN_STRING(_C)); \
-	  noinline void _thc_nested_async(FORCE_ARGS_STACK awe_t *awe) {  \
-      void *_my_fb = _fb_info;						\
-      _awe.current_fb = _my_fb;						\
-      INIT_LAZY_AWE(awe, &_thc_lazy_awe_marker);			\
-      do { _BODY; } while (0);						\
-      /* If return address is NULLed then we blocked */			\
-      if (__builtin_return_address(0) == NULL) {			\
-	/* thc_startasync is performed lazily, we should run */		\
-	/* _thc_endasync if we blocked*/				\
-	_thc_endasync(_my_fb, __builtin_frame_address(0)+(2*__WORD_SIZE));\
-      }									\
-      /* Otherwise, return */						\
-      RETURN_CONT(CONT_RET_FN_STRING(_C));				\
-    }									\
-    SCHEDULE_CONT(&_awe, _thc_nested_async);                            \
-    __asm__ volatile (							\
-      "      .globl  " CONT_RET_FN_STRING(_C) "\n\t"			\
-      " " CONT_RET_FN_STRING(_C) ":            \n\t"			\
-    );                                                                  \
-  } while (0)
+		/* Define nested function containing the body */	\
+		noinline auto void _thc_nested_async(FORCE_ARGS_STACK awe_t *awe) __asm__(NESTED_FN_STRING(_C)); \
+		noinline void _thc_nested_async(FORCE_ARGS_STACK awe_t *awe) { \
+			void *_my_fb = _fb_info;			\
+			_awe.current_fb = _my_fb;			\
+			INIT_LAZY_AWE(awe, &_thc_lazy_awe_marker);	\
+			do { _BODY; } while (0);			\
+			/* If return address is NULLed then we blocked */ \
+			if (__builtin_return_address(0) == NULL) {	\
+				/* thc_startasync is performed lazily, we should run */	\
+				/* _thc_endasync if we blocked*/	\
+				_thc_endasync(_my_fb, __builtin_frame_address(0)+(2*__WORD_SIZE)); \
+			}						\
+			/* Otherwise, return */				\
+			RETURN_CONT(CONT_RET_FN_STRING(_C));		\
+		}							\
+		SCHEDULE_CONT(&_awe, _thc_nested_async);		\
+		__asm__ volatile (					\
+			"      .globl  " CONT_RET_FN_STRING(_C) "\n\t"	\
+			" " CONT_RET_FN_STRING(_C) ":            \n\t"	\
+			);						\
+	} while (0)
 
 #else // EAGER_THC
 
 // DO_FINISH implementation:
 
 #define DO_FINISH__(_TAG,_CODE,_IS_NX)					\
-  do {                                                                  \
-    finish_t _fb;                                                       \
-    finish_t *_fb_info __attribute__((unused)) = &_fb;                  \
-    finish_t *_fb_info_ ## _TAG __attribute__((unused)) = _fb_info;     \
-    _thc_startfinishblock(_fb_info, _IS_NX);				\
-    do { _CODE } while (0);                                             \
-    _thc_endfinishblock(_fb_info, NULL);				\
-} while (0)
+	do {								\
+		finish_t _fb;						\
+		finish_t *_fb_info __attribute__((unused)) = &_fb;	\
+		finish_t *_fb_info_ ## _TAG __attribute__((unused)) = _fb_info;	\
+			_thc_startfinishblock(_fb_info, _IS_NX);	\
+			do { _CODE } while (0);				\
+			_thc_endfinishblock(_fb_info, NULL);		\
+	} while (0)
 
 // The basic idea for ASYNC_ is that the contents of the block becomes
 // a nested function.  We create an AWE for the continuation of the
@@ -172,31 +172,31 @@ void thc_done(void);
 //    In particular, the swizzle function is called with the same
 //    static chain as the underlying nested function.
 #define ASYNC_(_BODY, _C)						\
-  do {									\
-    awe_t _awe;                                                         \
-    void *_new_stack = _thc_allocstack();		       		\
-    _awe.current_fb = _fb_info;						\
-    /* Define nested function containing the body */			\
-    auto void _thc_nested_async(void) __asm__(NESTED_FN_STRING(_C));    \
-    __attribute__((noinline,used)) void _thc_nested_async(void) {       \
-      void *_my_fb = _fb_info;						\
-      void *_my_stack = _new_stack;                                     \
-      _thc_startasync(_my_fb, _my_stack);                               \
-      do { _BODY; } while (0);						\
-      _thc_endasync(_my_fb, _my_stack);					\
-      assert(0 && "_thc_endasync returned");				\
-    }									\
+	do {								\
+		awe_t _awe;						\
+		void *_new_stack = _thc_allocstack();			\
+		_awe.current_fb = _fb_info;				\
+		/* Define nested function containing the body */	\
+		auto void _thc_nested_async(void) __asm__(NESTED_FN_STRING(_C)); \
+		__attribute__((noinline,used)) void _thc_nested_async(void) { \
+			void *_my_fb = _fb_info;			\
+			void *_my_stack = _new_stack;			\
+			_thc_startasync(_my_fb, _my_stack);		\
+			do { _BODY; } while (0);			\
+			_thc_endasync(_my_fb, _my_stack);		\
+			assert(0 && "_thc_endasync returned");		\
+		}							\
                                                                         \
-    /* Define function to enter _nested on a new stack */               \
-    auto void _swizzle(void) __asm__(SWIZZLE_FN_STRING(_C));            \
-    SWIZZLE_DEF(_swizzle, _new_stack, NESTED_FN_STRING(_C));            \
+		/* Define function to enter _nested on a new stack */	\
+		auto void _swizzle(void) __asm__(SWIZZLE_FN_STRING(_C)); \
+		SWIZZLE_DEF(_swizzle, _new_stack, NESTED_FN_STRING(_C)); \
                                                                         \
-    /* Add AWE for our continuation, then run "_nested" on new stack */	\
-    if (!SCHEDULE_CONT(&_awe)) {                                        \
-      _swizzle();							\
-      assert(0 && "_swizzle returned");					\
-    }                                                                   \
-  } while (0)
+		/* Add AWE for our continuation, then run "_nested" on new stack */ \
+		if (!SCHEDULE_CONT(&_awe)) {				\
+			_swizzle();					\
+			assert(0 && "_swizzle returned");		\
+		}							\
+	} while (0)
 
 #endif // CONFIG_LAZY_THC
 
@@ -277,11 +277,11 @@ void THCYieldTo(awe_t *awe_ptr);
 typedef void (*THCCancelFn_t)(void *);
 typedef struct cancel_item_t cancel_item_t;
 struct cancel_item_t {
-  THCCancelFn_t   fn;
-  void           *arg;
-  int             was_run;
-  cancel_item_t  *prev;
-  cancel_item_t  *next;
+	THCCancelFn_t   fn;
+	void           *arg;
+	int             was_run;
+	cancel_item_t  *prev;
+	cancel_item_t  *next;
 };
 
 void THCAddCancelItem(cancel_item_t *ci, THCCancelFn_t fn, void *arg);

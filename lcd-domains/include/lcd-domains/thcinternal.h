@@ -15,36 +15,36 @@ typedef void (*THCIdleFn_t)(void *);
 // access fields in the AWE structure.
 
 enum awe_status {
-  EAGER_AWE = 0,
-  LAZY_AWE,
-  NEEDS_LAZY_STACK,
-  ALLOCATED_LAZY_STACK
+	EAGER_AWE = 0,
+	LAZY_AWE,
+	NEEDS_LAZY_STACK,
+	ALLOCATED_LAZY_STACK
 };
 
 struct awe_t {
-  // Fields representing the code to run when the AWE is executed.
-  void  *eip;
-  void  *ebp;
-  void  *esp;
+	// Fields representing the code to run when the AWE is executed.
+	void  *eip;
+	void  *ebp;
+	void  *esp;
 
-  // Can be EAGER_ASYNC, LAZY_ASYNC or NEEDS_LASY_STACK
-  enum awe_status status;
+	// Can be EAGER_ASYNC, LAZY_ASYNC or NEEDS_LASY_STACK
+	enum awe_status status;
 
-  // Stack which is allocated if awe is caller yields to this AWE.
-  void  *lazy_stack; 
+	// Stack which is allocated if awe is caller yields to this AWE.
+	void  *lazy_stack; 
 
-  // Link from an AWE to the per-thread state for the thread it
-  // runs in.
-  PTState_t *pts;
+	// Link from an AWE to the per-thread state for the thread it
+	// runs in.
+	PTState_t *pts;
 
-  // Link from an AWE to the immediately-enclosing finish
-  finish_t *current_fb;
+	// Link from an AWE to the immediately-enclosing finish
+	finish_t *current_fb;
 
-  // Fields used by the runtime system to link together AWEs, e.g.,
-  // on a thread's run-queue, or on a list of waiters on a
-  // synchronization object.
-  struct awe_t *prev;
-  struct awe_t *next;
+	// Fields used by the runtime system to link together AWEs, e.g.,
+	// on a thread's run-queue, or on a list of waiters on a
+	// synchronization object.
+	struct awe_t *prev;
+	struct awe_t *next;
 };
 
 /***********************************************************************/
@@ -59,22 +59,22 @@ struct awe_t {
 typedef struct finish_list_t finish_list_t;
 
 struct finish_list_t {
-  finish_list_t  *prev;
-  finish_list_t  *next;
-  finish_t       *fb;
+	finish_list_t  *prev;
+	finish_list_t  *next;
+	finish_t       *fb;
 };
 
 struct finish_t {
-  void           *old_sp;    /* stack pointer when entering do {} finish */ 
-  unsigned long   count;
-  struct awe_t          *finish_awe;
-  int             fb_kind;
-  int             cancel_requested;
-  finish_list_t   start_node;
-  finish_list_t   end_node;
-  finish_t       *enclosing_fb;
-  void           *enclosing_lazy_stack;
-  struct cancel_item_t  *cancel_item;
+	void           *old_sp;    /* stack pointer when entering do {} finish */ 
+	unsigned long   count;
+	struct awe_t          *finish_awe;
+	int             fb_kind;
+	int             cancel_requested;
+	finish_list_t   start_node;
+	finish_list_t   end_node;
+	finish_t       *enclosing_fb;
+	void           *enclosing_lazy_stack;
+	struct cancel_item_t  *cancel_item;
 };
 
 /***********************************************************************/
@@ -82,84 +82,84 @@ struct finish_t {
 // Per-thread runtime system state
 
 struct thcstack_t {
-  struct thcstack_t *next;
+	struct thcstack_t *next;
 };
 
 struct ptstate_t {
 
-  // Thread-local fields: .............................................
+	// Thread-local fields: .............................................
 
-  // Head/tail sentinels of the dispatch list
-  struct awe_t aweHead;
-  struct awe_t aweTail;
+	// Head/tail sentinels of the dispatch list
+	struct awe_t aweHead;
+	struct awe_t aweTail;
 
-  // Immediately-enclosing finish block for the currently running code
-  finish_t *current_fb;
+	// Immediately-enclosing finish block for the currently running code
+	finish_t *current_fb;
 
-  // Initialization / termination flags
-  int doneInit;
-  int shouldExit;
+	// Initialization / termination flags
+	int doneInit;
+	int shouldExit;
 
-  // Stack that the thread's dispatch loop will run on
-  void *dispatchStack;
+	// Stack that the thread's dispatch loop will run on
+	void *dispatchStack;
 
-  // If we are running on a lazily allocated stack, this will point to its start
-  void *curr_lazy_stack;
+	// If we are running on a lazily allocated stack, this will point to its start
+	void *curr_lazy_stack;
 
-  // Function to execute whenever the dispatch loop is idle (e.g.,
-  // to block the thread until an incoming message which might change
-  // the state of the dispatch loop).
-  THCIdleFn_t idle_fn;
-  void *idle_args;
-  void *idle_stack;
+	// Function to execute whenever the dispatch loop is idle (e.g.,
+	// to block the thread until an incoming message which might change
+	// the state of the dispatch loop).
+	THCIdleFn_t idle_fn;
+	void *idle_args;
+	void *idle_stack;
 
-  // Stack to be de-allocated on the next execution of the dispatch loop
-  // (an async call terminates by re-entering the dispatch loop with
-  // pendingFree set to the stack it was using.  It cannot dealloacte
-  // its own stack while it is in use).
-  void *pendingFree;
+	// Stack to be de-allocated on the next execution of the dispatch loop
+	// (an async call terminates by re-entering the dispatch loop with
+	// pendingFree set to the stack it was using.  It cannot dealloacte
+	// its own stack while it is in use).
+	void *pendingFree;
 
-  // AWE to enter for the dispatch loop on this thread
-  struct awe_t dispatch_awe;
+	// AWE to enter for the dispatch loop on this thread
+	struct awe_t dispatch_awe;
 
-  // Free stacks for re-use
-  struct thcstack_t *free_stacks;
+	// Free stacks for re-use
+	struct thcstack_t *free_stacks;
 
 
 #ifndef NDEBUG
-  // Debugging statistics
-  int stackMemoriesAllocated;
-  int stackMemoriesDeallocated;
-  int stacksAllocated;
-  int stacksDeallocated;
-  int finishBlocksStarted;
-  int finishBlocksEnded;
-  int asyncCallsStarted;
-  int asyncCallsEnded;
-  int aweCreated;
-  int aweResumed;
-  int idleStarted;
-  int idleComplete;
-  int cancelsRequested;
-  int cancelsAdded;
-  int cancelsRun;
-  int cancelsRemoved;
-  int getTls;
-  int lock;
-  int sendCount;
-  int recvCount;
+	// Debugging statistics
+	int stackMemoriesAllocated;
+	int stackMemoriesDeallocated;
+	int stacksAllocated;
+	int stacksDeallocated;
+	int finishBlocksStarted;
+	int finishBlocksEnded;
+	int asyncCallsStarted;
+	int asyncCallsEnded;
+	int aweCreated;
+	int aweResumed;
+	int idleStarted;
+	int idleComplete;
+	int cancelsRequested;
+	int cancelsAdded;
+	int cancelsRun;
+	int cancelsRemoved;
+	int getTls;
+	int lock;
+	int sendCount;
+	int recvCount;
 #endif
 
-  // Shared fields: ...................................................
+	// Shared fields: ...................................................
 
-  // Latch protecting the dispatch list
-  struct thc_latch latch;
+	// Latch protecting the dispatch list
+	struct thc_latch latch;
 
-  // Head/tail sentinels of the remote dispatch list on which other
-  // threads place AWEs that they have unblocks but which belong to
-  // this thread
-  struct awe_t aweRemoteHead;
-  struct awe_t aweRemoteTail;
+	// Head/tail sentinels of the remote dispatch list on which other
+	// threads place AWEs that they have unblocks but which belong to
+	// this thread
+	struct awe_t aweRemoteHead;
+	struct awe_t aweRemoteTail;
 };
 
 typedef void (*THCContFn_t)(void *cont, void *args);
@@ -190,15 +190,15 @@ extern int _end_text_nx;
 
 #if defined(__x86_64__) 
 #define KILL_CALLEE_SAVES()						\
-  __asm__ volatile ("" : : : "rbx", "r12", "r13", "r14", "r15",         \
-		    "memory", "cc")
+	__asm__ volatile ("" : : : "rbx", "r12", "r13", "r14", "r15",	\
+			"memory", "cc")
 #elif defined(__i386__)
 #ifdef __pic__
 #define KILL_CALLEE_SAVES()					        \
-  __asm__ volatile ("" : : : "edi", "esi", "esp", "memory", "cc")
+	__asm__ volatile ("" : : : "edi", "esi", "esp", "memory", "cc")
 #else
 #define KILL_CALLEE_SAVES()						\
-  __asm__ volatile ("" : : : "ebx", "edi", "esi", "esp", "memory", "cc")
+	__asm__ volatile ("" : : : "ebx", "edi", "esi", "esp", "memory", "cc")
 #endif
 #elif defined(__arm__)
 // see ARM Procedure Call Standard (APCS): 5.1 Machine Registers
@@ -207,21 +207,21 @@ extern int _end_text_nx;
 //  . v7 is the PIC register
 //
 #if defined(__pic__)
-    #define KILL_CALLEE_SAVES()                                           \
-    __asm__ volatile ("" : : : "sp",                                      \
-                         "v1", "v2", "v3", "v4", "v5", "v6",              \
-                         "s16", "s17", "s18", "s19", "s20", "s21", "s22", \
-                         "s23", "s24", "s25", "s26", "s27", "s28", "s29", \
-                         "s30", "31",                                     \
-                         "memory")
+#define KILL_CALLEE_SAVES()						\
+	__asm__ volatile ("" : : : "sp",				\
+			"v1", "v2", "v3", "v4", "v5", "v6",		\
+			"s16", "s17", "s18", "s19", "s20", "s21", "s22", \
+			"s23", "s24", "s25", "s26", "s27", "s28", "s29", \
+			"s30", "31",					\
+			"memory")
 #else // same as before, but including v7
-    #define KILL_CALLEE_SAVES()                                           \
-    __asm__ volatile ("" : : : "sp",                                      \
-                         "v1", "v2", "v3", "v4", "v5", "v6", "v7",        \
-                         "s16", "s17", "s18", "s19", "s20", "s21", "s22", \
-                         "s23", "s24", "s25", "s26", "s27", "s28", "s29", \
-                         "s30", "31",                                     \
-                         "memory")
+#define KILL_CALLEE_SAVES()						\
+	__asm__ volatile ("" : : : "sp",				\
+			"v1", "v2", "v3", "v4", "v5", "v6", "v7",	\
+			"s16", "s17", "s18", "s19", "s20", "s21", "s22", \
+			"s23", "s24", "s25", "s26", "s27", "s28", "s29", \
+			"s30", "31",					\
+			"memory")
 
 #endif
 #else
@@ -240,8 +240,8 @@ extern int _end_text_nx;
 #if defined(__x86_64__) 
 /* Force args on stack - there must be a better way of doing this, but */
 /* regparam(0) doesn't work on x86_64                                  */
-#define FORCE_ARGS_STACK      void*__a, void*__b, void*__c, void*__d, \
-                              void*__e, void*__f,
+#define FORCE_ARGS_STACK      void*__a, void*__b, void*__c, void*__d,	\
+		void*__e, void*__f,
 #define FORCE_ARGS_STACK_CALL NULL, NULL, NULL, NULL, NULL, NULL,
 #elif defined(__i386__)                             
 #define FORCE_ARGS_STACK      
@@ -254,24 +254,24 @@ extern int _end_text_nx;
 #endif
 
 #define FORCE_FRAME_POINTER_USE                                         \
-    /* Do a zero byte alloca to force local variable access via ebp  */ \
-    /* Note, this does not add any code (even with -O0.              */ \
-    __builtin_alloca(0)                                                
+	/* Do a zero byte alloca to force local variable access via ebp  */ \
+	/* Note, this does not add any code (even with -O0.              */ \
+	__builtin_alloca(0)                                                
 
 #if defined(__x86_64__) 
-#define GET_STACK_POINTER(STACK_PTR)					\
-  __asm__ volatile ("movq %%rsp, %0       \n\t"				\
-		    : "=m"(STACK_PTR) : )
-#define RESTORE_OLD_STACK_POINTER(OLD_STACK_PTR)			\
-  __asm__ volatile ("movq %0, %%rsp       \n\t"				\
-		    : : "m"(OLD_STACK_PTR))
+#define GET_STACK_POINTER(STACK_PTR)			\
+	__asm__ volatile ("movq %%rsp, %0       \n\t"	\
+			: "=m"(STACK_PTR) : )
+#define RESTORE_OLD_STACK_POINTER(OLD_STACK_PTR)	\
+	__asm__ volatile ("movq %0, %%rsp       \n\t"	\
+			: : "m"(OLD_STACK_PTR))
 #elif defined(__i386__)
-#define GET_STACK_POINTER(STACK_PTR)					\
-  __asm__ volatile ("movl %%esp, %0       \n\t"				\
-		    : "=m"(STACK_PTR) : )
-#define RESTORE_OLD_STACK_POINTER(OLD_STACK_PTR)			\
-  __asm__ volatile ("movl %0, %%esp       \n\t"				\
-		    : : "m"(OLD_STACK_PTR))
+#define GET_STACK_POINTER(STACK_PTR)			\
+	__asm__ volatile ("movl %%esp, %0       \n\t"	\
+			: "=m"(STACK_PTR) : )
+#define RESTORE_OLD_STACK_POINTER(OLD_STACK_PTR)	\
+	__asm__ volatile ("movl %0, %%esp       \n\t"	\
+			: : "m"(OLD_STACK_PTR))
 #elif defined(__arm__)
 #define GET_STACK_POINTER(_) assert(0 && "THC not yet implemented on ARM")
 #define RESTORE_OLD_STACK_POINTER(_) assert(0 && "THC not yet implemented on ARM")
@@ -298,35 +298,35 @@ extern int _end_text_nx;
 
 #if defined(__x86_64__)
 #define INIT_LAZY_AWE(AWE_PTR, LAZY_MARKER)				\
-  __asm__ volatile (							\
-    " movq 8(%%rbp), %%rsi       \n\t"					\
-    " movq %%rsi,    0(%0)       \n\t" /* RIP   (our return address) */	\
-    " movq 0(%%rbp), %%rsi       \n\t"					\
-    " movq %%rsi,    8(%0)       \n\t" /* RBP                        */	\
-    " movq %1,       8(%%rbp)    \n\t" /* put marker as ret address  */ \
-    : : "r"((AWE_PTR)), "r"((LAZY_MARKER)) : "rsi" );
+	__asm__ volatile (						\
+		" movq 8(%%rbp), %%rsi       \n\t"			\
+		" movq %%rsi,    0(%0)       \n\t" /* RIP   (our return address) */ \
+		" movq 0(%%rbp), %%rsi       \n\t"			\
+		" movq %%rsi,    8(%0)       \n\t" /* RBP                        */ \
+		" movq %1,       8(%%rbp)    \n\t" /* put marker as ret address  */ \
+		: : "r"((AWE_PTR)), "r"((LAZY_MARKER)) : "rsi" );
 #define RETURN_CONT(JMP_ADDR)			                        \
-  __asm__ volatile (							\
-    " movq %rbp, %rsp            \n\t" /* free frame                 */ \
-    " popq %rbp                  \n\t" /* restore rbp                */ \
-    " jmp  " JMP_ADDR "          \n\t" /* jump to continuation       */ \
-    );
+	__asm__ volatile (						\
+		" movq %rbp, %rsp            \n\t" /* free frame                 */ \
+		" popq %rbp                  \n\t" /* restore rbp                */ \
+		" jmp  " JMP_ADDR "          \n\t" /* jump to continuation       */ \
+		);
 #elif defined(__i386__)
 #define INIT_LAZY_AWE(AWE_PTR, LAZY_MARKER)				\
-  __asm__ volatile (							\
-    " movl 4(%%ebp), %%esi       \n\t"					\
-    " movl %%esi,    0(%0)       \n\t" /* EIP   (our return address) */	\
-    " movl 0(%%ebp), %%esi       \n\t"					\
-    " movl %%esi,    4(%0)       \n\t" /* EBP                        */	\
-    " movl %1,       4(%%ebp)    \n\t" /* put marker as ret address  */ \
-    : : "r"((AWE_PTR)), "r"((LAZY_MARKER)) : "esi" );
+	__asm__ volatile (						\
+		" movl 4(%%ebp), %%esi       \n\t"			\
+		" movl %%esi,    0(%0)       \n\t" /* EIP   (our return address) */ \
+		" movl 0(%%ebp), %%esi       \n\t"			\
+		" movl %%esi,    4(%0)       \n\t" /* EBP                        */ \
+		" movl %1,       4(%%ebp)    \n\t" /* put marker as ret address  */ \
+		: : "r"((AWE_PTR)), "r"((LAZY_MARKER)) : "esi" );
 #define RETURN_CONT(JMP_ADDR)			                        \
-  __asm__ volatile (							\
-    " movl %ebp, %esp            \n\t" /* free frame                 */ \
-    " popl %ebp                  \n\t" /* restore ebp                */ \
-    " addl $4, %esp              \n\t" /* clean up stack for callee  */ \
-    " jmp  " JMP_ADDR "          \n\t" /* jump to continuation       */ \
-    );
+	__asm__ volatile (						\
+		" movl %ebp, %esp            \n\t" /* free frame                 */ \
+		" popl %ebp                  \n\t" /* restore ebp                */ \
+		" addl $4, %esp              \n\t" /* clean up stack for callee  */ \
+		" jmp  " JMP_ADDR "          \n\t" /* jump to continuation       */ \
+		);
 #elif defined(__arm__)
 
 // *** NOTEs for the adventurous: porting lazy THC to ARM
@@ -358,44 +358,44 @@ extern int _end_text_nx;
 /***********************************************************************/
 
 #define SCHEDULE_CONT(_AWE_PTR, NESTED_FUNC)			\
-  ({								\
-    KILL_CALLEE_SAVES();					\
-	uint64_t savedRAX; \
-	__asm__ __volatile__( \
-	"movq %%rbx, %0\n\t" \
-    "movq %1, %%rbx\n\t" \
-    "push %%rbx\n\t" \
-	"movq %0, %%rbx\n\t" \
-	:"=r"(savedRAX) \
-	:"r"(_AWE_PTR) \
-    ); \
-    NESTED_FUNC(FORCE_ARGS_STACK_CALL _AWE_PTR);               \
-	__asm__ __volatile__( \
-	"movq %%rbx, %0\n\t" \
-    "pop %%rbx\n\t" \
-	"movq %0, %%rbx\n\t" \
-	:"=r"(savedRAX) \
-    ); \
-  })
+	({							\
+		KILL_CALLEE_SAVES();				\
+		uint64_t savedRAX;				\
+		__asm__ __volatile__(				\
+			"movq %%rbx, %0\n\t"			\
+			"movq %1, %%rbx\n\t"			\
+			"push %%rbx\n\t"			\
+			"movq %0, %%rbx\n\t"			\
+			:"=r"(savedRAX)				\
+			:"r"(_AWE_PTR)				\
+			);					\
+		NESTED_FUNC(FORCE_ARGS_STACK_CALL _AWE_PTR);	\
+		__asm__ __volatile__(				\
+			"movq %%rbx, %0\n\t"			\
+			"pop %%rbx\n\t"				\
+			"movq %0, %%rbx\n\t"			\
+			:"=r"(savedRAX)				\
+			);					\
+	})
 
-#define CALL_CONT(_FN,_ARG)                                     \
-  do {                                                          \
-    awe_t _awe;                                                 \
-    _awe.status     = EAGER_AWE;				\
-    _awe.lazy_stack = NULL;					\
-    KILL_CALLEE_SAVES();                                        \
-    _thc_callcont(&_awe, (THCContFn_t)(_FN), (_ARG));           \
-  } while (0)
+#define CALL_CONT(_FN,_ARG)						\
+		do {							\
+			awe_t _awe;					\
+			_awe.status     = EAGER_AWE;			\
+			_awe.lazy_stack = NULL;				\
+			KILL_CALLEE_SAVES();				\
+			_thc_callcont(&_awe, (THCContFn_t)(_FN), (_ARG)); \
+		} while (0)
 
 
-#define CALL_CONT_LAZY(_FN,_ARG)                                \
-  do {                                                          \
-    awe_t _awe;                                                 \
-    _awe.status     = LAZY_AWE;					\
-    _awe.lazy_stack = NULL;					\
-    KILL_CALLEE_SAVES();                                        \
-    _thc_callcont(&_awe, (THCContFn_t)(_FN), (_ARG));           \
-  } while (0)
+#define CALL_CONT_LAZY(_FN,_ARG)					\
+	do {								\
+		awe_t _awe;						\
+		_awe.status     = LAZY_AWE;				\
+		_awe.lazy_stack = NULL;					\
+		KILL_CALLEE_SAVES();					\
+		_thc_callcont(&_awe, (THCContFn_t)(_FN), (_ARG));	\
+	} while (0)
 
 /***********************************************************************/
 
@@ -416,31 +416,31 @@ extern int _end_text_nx;
 
 #if (defined(__x86_64__) && (defined(linux) || defined(BARRELFISH)))
 #define SWIZZLE_DEF_(_NAME,_NS,_FN)                                     \
-  __attribute__((noinline)) void _NAME(void) {                          \
-    __asm__ volatile("movq %0, %%rdi      \n\t" /* put NS to %rdi   */  \
-                     "subq $8, %%rdi      \n\t" /* fix NS address   */  \
-                     "movq %%rsp, (%%rdi) \n\t" /* store sp to NS   */  \
-                     "movq %%rdi, %%rsp   \n\t" /* set sp to NS     */  \
-                     "call " _FN "        \n\t" /* call _FN         */  \
-                     "popq %%rsp          \n\t" /* restore old sp   */  \
-                     :                                                  \
-                     : "m" (_NS)                                        \
-                     : "memory", "cc", "rsi", "rdi");                   \
-  }
+	__attribute__((noinline)) void _NAME(void) {			\
+		__asm__ volatile("movq %0, %%rdi      \n\t" /* put NS to %rdi   */ \
+				"subq $8, %%rdi      \n\t" /* fix NS address   */ \
+				"movq %%rsp, (%%rdi) \n\t" /* store sp to NS   */ \
+				"movq %%rdi, %%rsp   \n\t" /* set sp to NS     */ \
+				"call " _FN "        \n\t" /* call _FN         */ \
+				"popq %%rsp          \n\t" /* restore old sp   */ \
+				:					\
+				: "m" (_NS)				\
+				: "memory", "cc", "rsi", "rdi");	\
+	}
 #define SWIZZLE_DEF(_NAME,_NS,_FN) SWIZZLE_DEF_(_NAME,_NS,_FN)
 #elif (defined(__i386__) && (defined(linux) || defined(BARRELFISH)))
 #define SWIZZLE_DEF(_NAME,_NS,_FN)                                      \
-  __attribute__((noinline)) void _NAME(void) {                          \
-    __asm__ volatile("movl %0, %%edx           \n\t"			\
-                     "subl $4, %%edx           \n\t"			\
-                     "movl %%esp, (%%edx)      \n\t"			\
-                     "movl %%edx, %%esp        \n\t"			\
-                     "call " _FN "             \n\t"			\
-                     "pop %%esp                \n\t"			\
-                     :							\
-                     : "m" (_NS)                                        \
-                     : "memory", "cc", "eax", "edx");			\
-  }
+	__attribute__((noinline)) void _NAME(void) {			\
+		__asm__ volatile("movl %0, %%edx           \n\t"	\
+				"subl $4, %%edx           \n\t"		\
+				"movl %%esp, (%%edx)      \n\t"		\
+				"movl %%edx, %%esp        \n\t"		\
+				"call " _FN "             \n\t"		\
+				"pop %%esp                \n\t"		\
+				:					\
+				: "m" (_NS)				\
+				: "memory", "cc", "eax", "edx");	\
+	}
 #elif defined(__arm__) && (defined(linux) || defined(BARRELFISH))
 
 // Notes:
@@ -451,37 +451,37 @@ extern int _end_text_nx;
 //   deprecated."
 // - This can probably be optimized
 //
-#define SWIZZLE_DEF(_NAME, _NS, _FN)                                          \
-    __attribute__((noinline)) void _NAME(void) {                              \
-    __asm__ volatile("ldr r0, %0      \n\t" /* set r0 to new stack */         \
-                     "mov r1, sp      \n\t" /* set r1 to old stack */         \
-                     "stmdb r0!, {r1} \n\t" /* save old stack to new stack */ \
-                     "mov sp, r0      \n\t" /* set sp to new stack */         \
-                     "bl " _FN "      \n\t" /* call _FN */                    \
-                     "ldmia sp, {r1}  \n\t" /* old stack pointer to r1 */     \
-                     "mov sp, r1      \n\t" /* restore stack pointer */       \
-                     :                                                        \
-                     : "m" (_NS)                                              \
-                     : "memory", "r0", "r1");                                 \
-    }
+#define SWIZZLE_DEF(_NAME, _NS, _FN)					\
+	__attribute__((noinline)) void _NAME(void) {			\
+		__asm__ volatile("ldr r0, %0      \n\t" /* set r0 to new stack */ \
+				"mov r1, sp      \n\t" /* set r1 to old stack */ \
+				"stmdb r0!, {r1} \n\t" /* save old stack to new stack */ \
+				"mov sp, r0      \n\t" /* set sp to new stack */ \
+				"bl " _FN "      \n\t" /* call _FN */	\
+				"ldmia sp, {r1}  \n\t" /* old stack pointer to r1 */ \
+				"mov sp, r1      \n\t" /* restore stack pointer */ \
+				:					\
+				: "m" (_NS)				\
+				: "memory", "r0", "r1");		\
+	}
 #else
 #error "No definition of SWIZZLE_DEF for THC"
 #endif
 
 /***********************************************************************/
 
-#define SCHEDULE_CONT(_AWE_PTR)                 \
-  ({                                            \
-    KILL_CALLEE_SAVES();                        \
-    _thc_schedulecont((awe_t*)_AWE_PTR);        \
-  })
+#define SCHEDULE_CONT(_AWE_PTR)				\
+	({						\
+		KILL_CALLEE_SAVES();			\
+		_thc_schedulecont((awe_t*)_AWE_PTR);	\
+	})
 
-#define CALL_CONT(_FN,_ARG)                                     \
-  do {                                                          \
-    awe_t _awe;                                                 \
-    KILL_CALLEE_SAVES();                                        \
-    _thc_callcont(&_awe, (THCContFn_t)(_FN), (_ARG));           \
-  } while (0)
+#define CALL_CONT(_FN,_ARG)						\
+	do {								\
+		awe_t _awe;						\
+		KILL_CALLEE_SAVES();					\
+		_thc_callcont(&_awe, (THCContFn_t)(_FN), (_ARG));	\
+	} while (0)
 
 // no lazy CALL_CONT in the eager version
 #define CALL_CONT_LAZY CALL_CONT

@@ -1467,13 +1467,6 @@ struct task_struct {
 	atomic_t usage;
 	unsigned int flags;	/* per process flags, defined below */
 	unsigned int ptrace;
-#ifdef CONFIG_HAVE_LCD
-	struct lcd *lcd;
-	struct cptr_cache *cptr_cache;
-#endif
-#ifdef CONFIG_LAZY_THC
-	struct ptstate_t *ptstate; /* per thread state */
-#endif
 #ifdef CONFIG_SMP
 	struct llist_node wake_entry;
 	int on_cpu;

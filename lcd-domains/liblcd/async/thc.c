@@ -29,15 +29,16 @@
 #include <barrelfish/waitset.h>
 #include <thc/thc.h>
 #elif LCD_DOMAINS
+#include <lcd-domains/liblcd-config.h>
 #include <lcd-domains/thc.h>
 #include <lcd-domains/thcsync.h>
 #include <lcd-domains/thcinternal.h>
 #include <asm/page.h>
 #include <linux/slab.h>
+#include <lcd-domains/liblcd-hacks.h>
 #else
 #include "thc.h"
 #endif
-
 
 #define NOT_REACHED /*assert(0 && "Not reached")*/
 
@@ -53,6 +54,10 @@
 #define DEBUGPRINTF printk
 #else
 #define DEBUGPRINTF printf
+#endif
+
+#ifdef LCD_DOMAINS
+#define assert(XX) do { BUG_ON(!(XX)); } while(0)
 #endif
 
 //#define DEBUG_STATS(XX)
@@ -111,6 +116,11 @@ static inline void thc_schedule_local(awe_t *awe);
 
 // Per-thread state
 
+/* For LCDs, we just use a global variable for the per-thread state (PTS). */
+#ifdef LCD_DOMAINS
+struct PTState_t ptstate;
+#endif
+
 static PTState_t *PTS(void) {
 	PTState_t *pts = thc_get_pts_0();
 #ifndef NDEBUG
@@ -122,11 +132,19 @@ static PTState_t *PTS(void) {
 }
 
 static void InitPTS(void) {
-	current->ptstate = kzalloc(sizeof(PTState_t), GFP_KERNEL);
-	memset(current->ptstate, 0, sizeof(PTState_t));
-	thc_latch_init(&(current->ptstate->latch));
-	//assert((PTS() == NULL) && "PTS already initialized");
-	thc_set_pts_0(current->ptstate);
+	assert((PTS() == NULL) && "PTS already initialized");
+#ifdef LCD_DOMAINS
+	PTState_t *pts = kzalloc(sizeof(PTState_t), GFP_KERNEL);
+	if (!pts) {
+		LIBLCD_ERR("No memory for async per thread state! Exiting.");
+		lcd_exit(-ENOMEM);
+	}
+#else
+	PTState_t *pts = malloc(sizeof(PTState_t));
+	memset(pts, 0, sizeof(PTState_t));
+#endif
+	thc_latch_init(&(pts->latch));
+	thc_set_pts_0(pts);
 }
 
 static void thc_pts_lock(PTState_t *t) {
@@ -144,70 +162,68 @@ static void thc_pts_unlock(PTState_t *t) {
 #ifdef NDEBUG
 static void thc_print_pts_stats(PTState_t *t, int clear) { }
 #else
-//static struct thc_latch debug_latch = {0};
-static void thc_print_pts_stats(PTState_t *t, int clear) {}
-/*
-  {
-  thc_latch_acquire(&debug_latch);
+static struct thc_latch debug_latch = {0};
+static void thc_print_pts_stats(PTState_t *t, int clear)
+{
+	thc_latch_acquire(&debug_latch);
 
-  DEBUG_STATS(DEBUGPRINTF(DEBUG_STATS_PREFIX "----------------------------------------\n"));
-  DEBUG_STATS(DEBUGPRINTF(DEBUG_STATS_PREFIX "  %c stacks         %8d %8d\n",
-  (t->stacksAllocated == t->stacksDeallocated) ? ' ' : '*',
-  t->stacksAllocated, t->stacksDeallocated));
-  DEBUG_STATS(DEBUGPRINTF(DEBUG_STATS_PREFIX "  %c stack memories %8d %8d\n",
-  (t->stackMemoriesAllocated == t->stackMemoriesDeallocated) ? ' ' : '*',
-  t->stackMemoriesAllocated, t->stackMemoriesDeallocated));
-  DEBUG_STATS(DEBUGPRINTF(DEBUG_STATS_PREFIX "  %c finish blocks  %8d %8d\n",
-  (t->finishBlocksStarted == t->finishBlocksEnded) ? ' ' : '*',
-  t->finishBlocksStarted, t->finishBlocksEnded));
-  DEBUG_STATS(DEBUGPRINTF(DEBUG_STATS_PREFIX "  %c async calls    %8d %8d\n",
-  (t->asyncCallsStarted == t->asyncCallsEnded) ? ' ' : '*',
-  t->asyncCallsStarted, t->asyncCallsEnded));
-  DEBUG_STATS(DEBUGPRINTF(DEBUG_STATS_PREFIX "  %c awe            %8d %8d\n",
-  (t->aweCreated == t->aweResumed) ? ' ' : '*',
-  t->aweCreated, t->aweResumed));
-  DEBUG_STATS(DEBUGPRINTF(DEBUG_STATS_PREFIX "  %c idle           %8d %8d\n",
-  (t->idleStarted == t->idleComplete) ? ' ' : '*',
-  t->idleStarted, t->idleComplete));
-  DEBUG_STATS(DEBUGPRINTF(DEBUG_STATS_PREFIX "    get-tls        %8d\n",
-  t->getTls));
-  DEBUG_STATS(DEBUGPRINTF(DEBUG_STATS_PREFIX "    lock           %8d\n",
-  t->lock));
-  DEBUG_STATS(DEBUGPRINTF(DEBUG_STATS_PREFIX "    cancels        %8d\n",
-  t->cancelsRequested));
-  DEBUG_STATS(DEBUGPRINTF(DEBUG_STATS_PREFIX "  %c actions        %8d %8d %8d\n",
-  (t->cancelsAdded == (t->cancelsRun + t->cancelsRemoved)) ? ' ' : '*',
-  t->cancelsAdded, t->cancelsRun, t->cancelsRemoved));
-  DEBUG_STATS(DEBUGPRINTF(DEBUG_STATS_PREFIX "    message send   %8d\n",
-  t->sendCount));
-  DEBUG_STATS(DEBUGPRINTF(DEBUG_STATS_PREFIX "    message recv   %8d\n",
-  t->recvCount));
-  DEBUG_STATS(DEBUGPRINTF(DEBUG_STATS_PREFIX "----------------------------------------\n"));
+	DEBUG_STATS(DEBUGPRINTF(DEBUG_STATS_PREFIX "----------------------------------------\n"));
+	DEBUG_STATS(DEBUGPRINTF(DEBUG_STATS_PREFIX "  %c stacks         %8d %8d\n",
+					(t->stacksAllocated == t->stacksDeallocated) ? ' ' : '*',
+					t->stacksAllocated, t->stacksDeallocated));
+	DEBUG_STATS(DEBUGPRINTF(DEBUG_STATS_PREFIX "  %c stack memories %8d %8d\n",
+					(t->stackMemoriesAllocated == t->stackMemoriesDeallocated) ? ' ' : '*',
+					t->stackMemoriesAllocated, t->stackMemoriesDeallocated));
+	DEBUG_STATS(DEBUGPRINTF(DEBUG_STATS_PREFIX "  %c finish blocks  %8d %8d\n",
+					(t->finishBlocksStarted == t->finishBlocksEnded) ? ' ' : '*',
+					t->finishBlocksStarted, t->finishBlocksEnded));
+	DEBUG_STATS(DEBUGPRINTF(DEBUG_STATS_PREFIX "  %c async calls    %8d %8d\n",
+					(t->asyncCallsStarted == t->asyncCallsEnded) ? ' ' : '*',
+					t->asyncCallsStarted, t->asyncCallsEnded));
+	DEBUG_STATS(DEBUGPRINTF(DEBUG_STATS_PREFIX "  %c awe            %8d %8d\n",
+					(t->aweCreated == t->aweResumed) ? ' ' : '*',
+					t->aweCreated, t->aweResumed));
+	DEBUG_STATS(DEBUGPRINTF(DEBUG_STATS_PREFIX "  %c idle           %8d %8d\n",
+					(t->idleStarted == t->idleComplete) ? ' ' : '*',
+					t->idleStarted, t->idleComplete));
+	DEBUG_STATS(DEBUGPRINTF(DEBUG_STATS_PREFIX "    get-tls        %8d\n",
+					t->getTls));
+	DEBUG_STATS(DEBUGPRINTF(DEBUG_STATS_PREFIX "    lock           %8d\n",
+					t->lock));
+	DEBUG_STATS(DEBUGPRINTF(DEBUG_STATS_PREFIX "    cancels        %8d\n",
+					t->cancelsRequested));
+	DEBUG_STATS(DEBUGPRINTF(DEBUG_STATS_PREFIX "  %c actions        %8d %8d %8d\n",
+					(t->cancelsAdded == (t->cancelsRun + t->cancelsRemoved)) ? ' ' : '*',
+					t->cancelsAdded, t->cancelsRun, t->cancelsRemoved));
+	DEBUG_STATS(DEBUGPRINTF(DEBUG_STATS_PREFIX "    message send   %8d\n",
+					t->sendCount));
+	DEBUG_STATS(DEBUGPRINTF(DEBUG_STATS_PREFIX "    message recv   %8d\n",
+					t->recvCount));
+	DEBUG_STATS(DEBUGPRINTF(DEBUG_STATS_PREFIX "----------------------------------------\n"));
 
-  if (clear) {
-  t->stacksAllocated -= t->stacksDeallocated;
-  t->stacksDeallocated = 0;
-  t->stackMemoriesAllocated -= t->stackMemoriesDeallocated;
-  t->stackMemoriesDeallocated = 0;
-  t->finishBlocksStarted -= t->finishBlocksEnded;
-  t->finishBlocksEnded = 0;
-  t->asyncCallsStarted -= t->asyncCallsEnded;
-  t->asyncCallsEnded = 0;
-  t->aweCreated -= t->aweResumed;
-  t->aweResumed = 0;
-  t->idleStarted -= t->idleComplete;
-  t->idleComplete = 0;
-  t->getTls = 0;
-  t->lock = 0;
-  t->cancelsRequested = 0;
-  t->cancelsAdded = 0;
-  t->cancelsRun = 0;
-  t->cancelsRemoved = 0;
-  }
+	if (clear) {
+		t->stacksAllocated -= t->stacksDeallocated;
+		t->stacksDeallocated = 0;
+		t->stackMemoriesAllocated -= t->stackMemoriesDeallocated;
+		t->stackMemoriesDeallocated = 0;
+		t->finishBlocksStarted -= t->finishBlocksEnded;
+		t->finishBlocksEnded = 0;
+		t->asyncCallsStarted -= t->asyncCallsEnded;
+		t->asyncCallsEnded = 0;
+		t->aweCreated -= t->aweResumed;
+		t->aweResumed = 0;
+		t->idleStarted -= t->idleComplete;
+		t->idleComplete = 0;
+		t->getTls = 0;
+		t->lock = 0;
+		t->cancelsRequested = 0;
+		t->cancelsAdded = 0;
+		t->cancelsRun = 0;
+		t->cancelsRemoved = 0;
+	}
 
-  thc_latch_release(&debug_latch);
-  }
-*/
+	thc_latch_release(&debug_latch);
+}
 #endif
 
 /***********************************************************************/
@@ -231,10 +247,10 @@ static void thc_print_pts_stats(PTState_t *t, int clear) {}
 void *_thc_allocstack(void) {
 	PTState_t *pts = PTS();
 	void *result = NULL;
-	//DEBUG_STACK(DEBUGPRINTF(DEBUG_STACK_PREFIX "> AllocStack\n"));
+	DEBUG_STACK(DEBUGPRINTF(DEBUG_STACK_PREFIX "> AllocStack\n"));
 	if (pts->free_stacks != NULL) {
 		// Re-use previously freed stack
-		//DEBUG_STACK(DEBUGPRINTF(DEBUG_STACK_PREFIX "  Re-using free stack\n"));
+		DEBUG_STACK(DEBUGPRINTF(DEBUG_STACK_PREFIX "  Re-using free stack\n"));
 		struct thcstack_t *r = pts->free_stacks;
 		pts->free_stacks = pts->free_stacks->next;
 		result = ((void*)r) + sizeof(struct thcstack_t);
@@ -244,7 +260,7 @@ void *_thc_allocstack(void) {
 		pts->stackMemoriesAllocated ++;
 #endif
 	}
-	// DEBUG_STACK(DEBUGPRINTF(DEBUG_STACK_PREFIX "< AllocStack = %p\n", result));
+	DEBUG_STACK(DEBUGPRINTF(DEBUG_STACK_PREFIX "< AllocStack = %p\n", result));
 #ifndef NDEBUG
 	pts->stacksAllocated ++;
 #endif
@@ -256,10 +272,10 @@ void *_thc_allocstack(void) {
 void _thc_freestack(void *s) {
 	PTState_t *pts = PTS();
 	struct thcstack_t *stack = (struct thcstack_t*)(s - sizeof(struct thcstack_t));
-	//DEBUG_STACK(DEBUGPRINTF(DEBUG_STACK_PREFIX "> FreeStack(%p)\n", stack));
+	DEBUG_STACK(DEBUGPRINTF(DEBUG_STACK_PREFIX "> FreeStack(%p)\n", stack));
 	stack->next = pts->free_stacks;
 	pts->free_stacks = stack;
-	//DEBUG_STACK(DEBUGPRINTF(DEBUG_STACK_PREFIX "< FreeStack\n"));
+	DEBUG_STACK(DEBUGPRINTF(DEBUG_STACK_PREFIX "< FreeStack\n"));
 #ifndef NDEBUG
 	pts->stacksDeallocated ++;
 #endif
@@ -278,42 +294,42 @@ static void thc_pendingfree(PTState_t * pts) {
 void _thc_pendingfree(void) {
 	thc_pendingfree(PTS());
 }
-EXPORT_SYMBOL(_thc_pendingfree);
 
 #ifdef CONFIG_LAZY_THC
 
 // This checks whether the awe's lazy stack is finished with (according to 
-// the provided esp, and puts it on pending free list if so.
+// the provided esp), and puts it on pending free list if so.
 
 static void check_lazy_stack_finished (PTState_t *pts, void *esp) {
-	//assert(pts->curr_lazy_stack);
-	//DEBUG_STACK(DEBUGPRINTF(DEBUG_STACK_PREFIX
-	//			  "> CheckLazyStackFinished(s=%p,esp+buf=%p)\n",
-	//			  pts->curr_lazy_stack, esp + LAZY_STACK_BUFFER));
+	assert(pts->curr_lazy_stack);
+	DEBUG_STACK(DEBUGPRINTF(DEBUG_STACK_PREFIX
+					"> CheckLazyStackFinished(s=%p,esp+buf=%p)\n",
+					pts->curr_lazy_stack, 
+					esp + LAZY_STACK_BUFFER));
 	if ((esp + LAZY_STACK_BUFFER) == pts->curr_lazy_stack) {
 		// nothing on lazy stack, we can safely free it
-		//DEBUG_STACK(DEBUGPRINTF(DEBUG_STACK_PREFIX "  freeing lazy stack %p\n", 
-		//		    pts->curr_lazy_stack));
-		//assert(pts->pendingFree == NULL);
+		DEBUG_STACK(DEBUGPRINTF(DEBUG_STACK_PREFIX "  freeing lazy stack %p\n", 
+						pts->curr_lazy_stack));
+		assert(pts->pendingFree == NULL);
 		pts->pendingFree = pts->curr_lazy_stack;
 	}
-	//DEBUG_STACK(DEBUGPRINTF(DEBUG_STACK_PREFIX "< CheckLazyStackFinished()\n"));
+	DEBUG_STACK(DEBUGPRINTF(DEBUG_STACK_PREFIX "< CheckLazyStackFinished()\n"));
 }
 
 // Allocate a lazy stack for this awe's continuation to execute on.
 
 static void alloc_lazy_stack (awe_t *awe) {
 	void * new_esp;
-	//DEBUG_STACK(DEBUGPRINTF(DEBUG_STACK_PREFIX "> AllocLazyStack(awe=%p)\n", 
-	//			  awe));
-	// assert(awe->status == LAZY_AWE && !awe->lazy_stack);
+	DEBUG_STACK(DEBUGPRINTF(DEBUG_STACK_PREFIX "> AllocLazyStack(awe=%p)\n", 
+					awe));
+	assert(awe->status == LAZY_AWE && !awe->lazy_stack);
 	awe->lazy_stack = _thc_allocstack();
 	new_esp =  awe->lazy_stack - LAZY_STACK_BUFFER;
 	*((void **) new_esp) = awe->esp;
 	awe->esp = new_esp;
 	awe->status = ALLOCATED_LAZY_STACK;
-	//DEBUG_STACK(DEBUGPRINTF(DEBUG_STACK_PREFIX "< AllocLazyStack(awe=%p,s=%p)\n",
-	//			  awe, awe->lazy_stack));
+	DEBUG_STACK(DEBUGPRINTF(DEBUG_STACK_PREFIX "< AllocLazyStack(awe=%p,s=%p)\n",
+					awe, awe->lazy_stack));
 }
 
 #else // EAGER_THC
@@ -330,20 +346,19 @@ static inline void check_lazy_stack_finished (PTState_t *pts, awe_t *awe) {
 // just a wrapper around the arch-os specific function.
 
 void _thc_onaltstack(void *stacktop, void *fn, void *args) {
-	//DEBUG_STACK(DEBUGPRINTF(DEBUG_STACK_PREFIX "> OnAltStack(%p, %p, %p)\n",
-	//                        stacktop, fn, args));
+	DEBUG_STACK(DEBUGPRINTF(DEBUG_STACK_PREFIX "> OnAltStack(%p, %p, %p)\n",
+					stacktop, fn, args));
 
 	thc_on_alt_stack_0(stacktop, fn, args);
 
-	//DEBUG_STACK(DEBUGPRINTF(DEBUG_STACK_PREFIX "< OnAltStack\n"));
+	DEBUG_STACK(DEBUGPRINTF(DEBUG_STACK_PREFIX "< OnAltStack\n"));
 }
 
 /***********************************************************************/
 
 static void thc_run_idle_fn(void) {
-	void *s;
 	PTState_t *pts = PTS();
-	s = pts->idle_stack;
+	void *s = pts->idle_stack;
 #ifndef NDEBUG
 	pts->idleStarted++;
 #endif
@@ -363,7 +378,7 @@ static void re_init_dispatch_awe(void *a, void *arg) {
 	PTState_t *pts = PTS();
 	awe_t *awe = (awe_t *)a;
 	pts->dispatch_awe = *awe;
-	//assert(awe->status == EAGER_AWE && !pts->curr_lazy_stack);
+	assert(awe->status == EAGER_AWE && !pts->curr_lazy_stack);
 #ifndef NDEBUG
 	// Do not count dispatch AWE in the debugging stats (it is created 
 	// once and then resumed once per dispatch-loop entry, so it obscures
@@ -384,7 +399,7 @@ static void re_init_dispatch_awe(void *a, void *arg) {
 
 static void thc_dispatch_loop(void) {
 	PTState_t *pts = PTS();
-	awe_t *awe;
+
 	// Re-initialize pts->dispatch_awe to this point, just after we have
 	// read PTS.  This will save the per-thread-state access on future
 	// executions of the function.
@@ -393,13 +408,6 @@ static void thc_dispatch_loop(void) {
 	DEBUG_DISPATCH(DEBUGPRINTF(DEBUG_DISPATCH_PREFIX "> dispatch_loop\n"));
 
 	thc_pendingfree(pts);
-
-	// TBD: 
-	// Scotty needs to provide some mechanism to check for which AWE is ready for execution
-	// we should pick up that awe instead of moving ahead with our code.
-	// This is necessary as if we using async within an infinite while loop we will never
-	// come back to check for what has been completed.
-	// AI: Muktesh, Scotty
 
 	// Pick up work passed to us from other threads
 	if (pts->aweRemoteHead.next != &pts->aweRemoteTail) {
@@ -417,10 +425,10 @@ static void thc_dispatch_loop(void) {
 	} 
   
 	if (pts->aweHead.next == &pts->aweTail) {
-		awe_t idle_awe;
-		void *idle_stack = _thc_allocstack();
 		DEBUG_DISPATCH(DEBUGPRINTF(DEBUG_DISPATCH_PREFIX "  queue empty\n"));
-		//assert(pts->idle_fn != NULL && "Dispatch loop idle, and no idle_fn work");
+		assert(pts->idle_fn != NULL && "Dispatch loop idle, and no idle_fn work");
+		void *idle_stack = _thc_allocstack();
+		awe_t idle_awe;
 		// Set start of stack-frame marker
 		*((void**)(idle_stack - LAZY_STACK_BUFFER + __WORD_SIZE)) = NULL;
 		thc_awe_init(&idle_awe, &thc_run_idle_fn, idle_stack-LAZY_STACK_BUFFER,
@@ -435,7 +443,9 @@ static void thc_dispatch_loop(void) {
 #endif
 		pts->curr_lazy_stack = NULL;
 		DEBUG_DISPATCH(DEBUGPRINTF(DEBUG_DISPATCH_PREFIX "  executing idle function\n"));
+#ifdef LCD_DOMAINS
 		printk(KERN_ERR "lcd async thc_dispatch_loop executing idle awe\n");
+#endif
 		thc_awe_execute_0(&idle_awe);
 		NOT_REACHED;
 	}
@@ -451,10 +461,12 @@ static void thc_dispatch_loop(void) {
 #ifndef NDEBUG
 	pts->aweResumed ++;
 #endif
+#ifdef LCD_DOMAINS
 	printk(KERN_ERR "lcd async thc_dispatch_loop will now execute AWE\n");
 	printk(KERN_ERR "lcd async thc_dispatch_loop EIP: %p\n", awe->eip);
 	printk(KERN_ERR "lcd async thc_dispatch_loop EBP: %p\n", awe->ebp);
 	printk(KERN_ERR "lcd async thc_dispatch_loop ESP: %p\n", awe->esp);
+#endif
 	thc_awe_execute_0(awe);
 }
 
@@ -483,7 +495,7 @@ static void thc_init_dispatch_loop(void) {
 
 static void thc_exit_dispatch_loop(void) {
 	PTState_t *pts = PTS();
-	//assert(!pts->shouldExit);
+	assert(!pts->shouldExit);
 	pts->shouldExit = 1;
 	// Wait for idle loop to finish
 	while (pts->aweHead.next != &(pts->aweTail)) {
@@ -491,8 +503,8 @@ static void thc_exit_dispatch_loop(void) {
 	}
 	// Exit
 	thc_pts_lock(pts);
-	//assert((pts->aweHead.next == &(pts->aweTail)) && 
-	//       "Dispatch queue not empty at exit");
+	assert((pts->aweHead.next == &(pts->aweTail)) && 
+			"Dispatch queue not empty at exit");
 	DEBUG_INIT(DEBUGPRINTF(DEBUG_INIT_PREFIX
 				"  NULLing out dispatch AWE\n"));
 	thc_awe_init(&pts->dispatch_awe, NULL, NULL, NULL);
@@ -505,13 +517,13 @@ static void thc_exit_dispatch_loop(void) {
 // the caller's)
 
 static void thc_dispatch(PTState_t *pts) {
-	//assert(pts && pts->doneInit && "Not initialized RTS");
+	assert(pts && pts->doneInit && "Not initialized RTS");
 	thc_awe_execute_0(&pts->dispatch_awe);
 }
 
 static void thc_start_rts(void) {
 	InitPTS();
-	//assert(PTS() && (!PTS()->doneInit) && "Already initialized RTS");
+	assert(PTS() && (!PTS()->doneInit) && "Already initialized RTS");
 	DEBUG_INIT(DEBUGPRINTF(DEBUG_INIT_PREFIX "> Starting\n"));
 	thc_init_dispatch_loop();
 	PTS()->doneInit = 1;
@@ -520,7 +532,7 @@ static void thc_start_rts(void) {
 
 static void thc_end_rts(void) {
 	PTState_t *pts = PTS();
-	//assert(pts->doneInit && "Not initialized RTS");
+	assert(pts->doneInit && "Not initialized RTS");
 	DEBUG_INIT(DEBUGPRINTF(DEBUG_INIT_PREFIX "> Ending\n"));
 	thc_exit_dispatch_loop();
 
@@ -599,25 +611,27 @@ static void init_lazy_awe (void ** lazy_awe_fp) {
 
 	// Get the saved awe
 	awe_t *awe = THC_LAZY_FRAME_AWE(lazy_awe_fp);
-	// if we had created and scheduled the continuation
-	// of this async no need to do it again
 
+#ifdef LCD_DOMAINS
 	printk(KERN_ERR "\nthe value of the lazy frame awe is: %x\n", (int)awe);
+#endif
 
-	if (awe->status != LAZY_AWE) {
-		return;
-	}
-	//DEBUG_AWE(DEBUGPRINTF(DEBUG_AWE_PREFIX " found lazy awe %p @ frameptr %p",
-	//			awe, lazy_awe_fp));
+	DEBUG_AWE(DEBUGPRINTF(DEBUG_AWE_PREFIX " found lazy awe %p @ frameptr %p",
+				awe, lazy_awe_fp));
 	// Scrub nested return, lazy awe will now return through dispatch loop
-
+#ifdef LCD_DOMAINS
 	printk(KERN_ERR "\nscrubbing nested return (lazy_awe_fp)\n");
+#endif
 	THC_LAZY_FRAME_RET(lazy_awe_fp) = NULL;
+#ifdef LCD_DOMAINS
 	printk(KERN_ERR "\ndone setting nested return, allocating lazy stack\n");
-	//assert(awe->status == LAZY_AWE);
+#endif
+	assert(awe->status == LAZY_AWE);
 	// Allocate a new stack for this awe
 	alloc_lazy_stack(awe);
+#ifdef LCD_DOMAINS
 	printk(KERN_ERR "\ndone allocating lazy stack, starting async\n");
+#endif
 	// lazily start async block
 	_thc_startasync(awe->current_fb, awe->lazy_stack);
 	// schedule lazy awe
@@ -628,25 +642,33 @@ static void init_lazy_awe (void ** lazy_awe_fp) {
 // they are found.
 
 static void check_for_lazy_awe (void * ebp) {
+	DEBUG_AWE(DEBUGPRINTF(DEBUG_AWE_PREFIX "> CheckForLazyAWE (ebp=%p)\n", ebp));
 	void **frame_ptr  = (void **) ebp;
 	void *ret_addr    = THC_LAZY_FRAME_RET(frame_ptr);
-	//DEBUG_AWE(DEBUGPRINTF(DEBUG_AWE_PREFIX "> CheckForLazyAWE (ebp=%p)\n", ebp));
 	while (frame_ptr != NULL && ret_addr != NULL) {
 		if (ret_addr == &_thc_lazy_awe_marker) {
+#ifdef LCD_DOMAINS			
 			printk(KERN_ERR "\nlcd async the awe marker is found\n");
+#endif
 			init_lazy_awe(frame_ptr);
+#ifdef LCD_DOMAINS
 			printk(KERN_ERR "\nlazy_awe_initialzed.\n");
-			//break;
+#endif
 		}
+#ifdef LCD_DOMAINS
 		printk(KERN_ERR "trying to get ebp\n");
+#endif
 		frame_ptr = (void **) THC_LAZY_FRAME_PREV(frame_ptr);
+#ifdef LCD_DOMAINS
 		printk(KERN_ERR "frame_ptr is %llx\n", (unsigned long long)frame_ptr);
 		printk(KERN_ERR "got ebp\n");
+
 		if (frame_ptr != NULL) {
 			ret_addr   = THC_LAZY_FRAME_RET(frame_ptr);	
 		}
-	} 
-	//DEBUG_AWE(DEBUGPRINTF(DEBUG_AWE_PREFIX "< CheckForLazyAWE\n"));
+#endif
+	}
+	DEBUG_AWE(DEBUGPRINTF(DEBUG_AWE_PREFIX "< CheckForLazyAWE\n"));
 }
 
 #else  // CONFIG_EAGER_THC
@@ -665,24 +687,12 @@ static inline void check_for_lazy_awe (void * ebp) { }
 
 void _thc_startfinishblock(finish_t *fb, int fb_kind) {
 	PTState_t *pts = PTS();
-
-	if( pts == NULL )
-	{
-		printk(KERN_WARNING "PTS is NULL\n");
-		return;
-	}
-
+	assert(PTS() && (PTS()->doneInit) && "Not initialized RTS");
 	finish_t *current_fb = pts->current_fb;
 	DEBUG_FINISH(DEBUGPRINTF(DEBUG_FINISH_PREFIX "> StartFinishBlock (%p,%s)\n",
 					fb,
 					(fb_kind == 0) ? "FINISH" : "TOP-FINISH"));
-	if( fb == NULL )
-	{
-		printk(KERN_WARNING "FB is NULL\n");
-		return;
-	}
-
-	//assert(PTS() && (PTS()->doneInit) && "Not initialized RTS");
+	assert(fb && "FB is NULL");
 	fb -> count = 0;
 	fb -> finish_awe = NULL;
 	fb->cancel_item = NULL;
@@ -720,8 +730,8 @@ void _thc_startfinishblock(finish_t *fb, int fb_kind) {
 	if (current_fb != NULL) {
 		DEBUG_FINISH(DEBUGPRINTF(DEBUG_FINISH_PREFIX "  Splicing between [%p]<->[%p]\n",
 						(current_fb->end_node.prev), &(current_fb->end_node)));
-		//assert(current_fb->end_node.prev->next = &(current_fb->end_node));
-		//assert(current_fb->start_node.next->prev = &(current_fb->start_node));
+		assert(current_fb->end_node.prev->next = &(current_fb->end_node));
+		assert(current_fb->start_node.next->prev = &(current_fb->start_node));
 		current_fb->end_node.prev->next = &(fb->start_node);
 		fb->start_node.prev = current_fb->end_node.prev;
 		fb->end_node.next = &(current_fb->end_node);
@@ -736,7 +746,6 @@ void _thc_startfinishblock(finish_t *fb, int fb_kind) {
 	PTS()->finishBlocksStarted ++;
 #endif
 }
-EXPORT_SYMBOL(_thc_startfinishblock);
 
 __attribute__ ((unused))
 static void _thc_endfinishblock0(void *a, void *f) {
@@ -747,7 +756,7 @@ static void _thc_endfinishblock0(void *a, void *f) {
   
 	DEBUG_FINISH(DEBUGPRINTF(DEBUG_FINISH_PREFIX "  Waiting f=%p awe=%p\n",
 					fb, a));
-	//assert(fb->finish_awe == NULL);
+	assert(fb->finish_awe == NULL);
 	fb->finish_awe = a;
 	thc_dispatch(awe->pts);
 	NOT_REACHED;
@@ -766,7 +775,7 @@ static void thc_run_cancel_actions(PTState_t *pts, finish_t *fb) {
 #ifndef NDEBUG
 			pts->cancelsRun ++;
 #endif
-			//assert(ci->was_run == 0);
+			assert(ci->was_run == 0);
 			ci->was_run = 1;
 			(*ci->fn)(ci->arg);
 			ci = nci;
@@ -789,8 +798,8 @@ void _thc_do_cancel_request(finish_t *fb) {
 	while (fl->fb != fb) {
 		DEBUG_FINISH(DEBUGPRINTF(DEBUG_FINISH_PREFIX "  Looking at nested FB %p kind %d\n",
 						fl->fb, (int)fl->fb->fb_kind));
-		//assert(fl->prev == NULL || fl->prev->next == fl);
-		//assert(fl->next == NULL || fl->next->prev == fl);
+		assert(fl->prev == NULL || fl->prev->next == fl);
+		assert(fl->next == NULL || fl->next->prev == fl);
 		if (fl->fb->fb_kind == FB_KIND_TOP_FINISH) {
 			// We have found a non-nested cancel block.  This occurs when there is an
 			// intervening non-cancelable function between (i) the block we are currently
@@ -813,31 +822,37 @@ void _thc_do_cancel_request(finish_t *fb) {
 }
 
 void _thc_endfinishblock(finish_t *fb, void *stack) {
+#ifdef LCD_DOMAINS
 	printk(KERN_ERR "lcd async endfinishblock executing\n");
+#endif
 	PTState_t *pts = PTS();
 	DEBUG_FINISH(DEBUGPRINTF(DEBUG_FINISH_PREFIX "> EndFinishBlock(%p)\n",
 					fb));
-	//assert((pts->doneInit) && "Not initialized RTS");
+	assert((pts->doneInit) && "Not initialized RTS");
 	DEBUG_FINISH(DEBUGPRINTF(DEBUG_FINISH_PREFIX "  count=%d\n",
 					(int)fb->count));
 
 	if (fb->count == 0) {
 		// Zero first time.  Check there's not an AWE waiting.
-		//assert(fb->finish_awe == NULL);
+		assert(fb->finish_awe == NULL);
+#ifdef LCD_DOMAINS
 		printk(KERN_ERR "lcd async endfinishblock count is zero\n");
+#endif
 	} else {
 		// Non-zero first time, add ourselves as the waiting AWE.
+#ifdef LCD_DOMAINS
 		printk(KERN_ERR "lcd async endfinishblock has pending AWE\n");
+#endif
 		CALL_CONT_LAZY((unsigned char*)&_thc_endfinishblock0, fb);
 	}
-	//assert(fb->count == 0);
-	//assert(fb->cancel_item == NULL);
-	//assert(fb->start_node.next == &(fb->end_node));
-	//assert(fb->end_node.prev == &(fb->start_node));
+	assert(fb->count == 0);
+	assert(fb->cancel_item == NULL);
+	assert(fb->start_node.next == &(fb->end_node));
+	assert(fb->end_node.prev == &(fb->start_node));
 	if (fb->start_node.prev == NULL) {
 		// No enclosing finish block
 		DEBUG_FINISH(DEBUGPRINTF(DEBUG_FINISH_PREFIX "  No enclosing FB\n"));
-		//assert(fb->end_node.next == NULL);
+		assert(fb->end_node.next == NULL);
 	} else {
 		// Remove from enclosing finish block's list
 		DEBUG_FINISH(DEBUGPRINTF(DEBUG_FINISH_PREFIX "  Removing from between [%p]<->[%p]\n",
@@ -860,8 +875,6 @@ void _thc_endfinishblock(finish_t *fb, void *stack) {
 	pts->finishBlocksEnded ++;
 #endif
 }
-EXPORT_SYMBOL(_thc_endfinishblock);
-
 
 void _thc_startasync(void *f, void *stack) {
 	finish_t *fb = (finish_t*)f;
@@ -876,7 +889,9 @@ void _thc_startasync(void *f, void *stack) {
 }
 
 void _thc_endasync(void *f, void *s) {
+#ifdef LCD_DOMAINS
 	printk(KERN_ERR "lcd async endasync is starting\n");
+#endif
 	finish_t *fb = (finish_t*)f;
 	PTState_t *pts = PTS();
 #ifndef NDEBUG
@@ -884,14 +899,14 @@ void _thc_endasync(void *f, void *s) {
 #endif
 	DEBUG_FINISH(DEBUGPRINTF(DEBUG_FINISH_PREFIX "> EndAsync(%p,%p)\n",
 					fb, s));
-	//assert(fb->count > 0);
+	assert(fb->count > 0);
 	fb->count --;
 	DEBUG_FINISH(DEBUGPRINTF(DEBUG_FINISH_PREFIX "  count now %d\n",
 					(int)fb->count));
-	//assert(pts->pendingFree == NULL);
+	assert(pts->pendingFree == NULL);
 
 #ifdef CONFIG_LAZY_THC
-	//assert(__builtin_return_address(1) == NULL); /* Should have been nulled */
+	assert(__builtin_return_address(1) == NULL); /* Should have been nulled */
 	/* Check whether we are running on a lazy stack, and can dispose of it */
 	if (pts->curr_lazy_stack && s != fb->old_sp) {
 		check_lazy_stack_finished(pts, s);
@@ -904,22 +919,27 @@ void _thc_endasync(void *f, void *s) {
 		if (fb -> finish_awe) {
 			DEBUG_FINISH(DEBUGPRINTF(DEBUG_FINISH_PREFIX "  waiting AWE %p\n",
 							fb->finish_awe));
+#ifdef LCD_DOMAINS
 			printk(KERN_ERR "lcd async scheduling finish awe\n");
 			printk(KERN_ERR "lcd async EIP: %p\n", fb -> finish_awe->eip);
 			printk(KERN_ERR "lcd async EBP: %p\n", fb -> finish_awe->ebp);
 			printk(KERN_ERR "lcd async ESP: %p\n", fb -> finish_awe->esp);
+#endif
 			thc_schedule_local(fb -> finish_awe);
 			fb -> finish_awe = NULL;
 		}  
-	} else {
+	}
+#ifdef LCD_DOMAINS
+	else {
+		
 		printk(KERN_ERR "lcd async no pending AWE on finish block\n");
 	}
+#endif
 
 	DEBUG_FINISH(DEBUGPRINTF(DEBUG_FINISH_PREFIX "< EndAsync\n"));
 	thc_dispatch(pts);
 	NOT_REACHED;
 }
-EXPORT_SYMBOL(_thc_endasync);
 
 /***********************************************************************/
 
@@ -947,6 +967,11 @@ void THCIncRecvCount(void) {
 
 __attribute__ ((unused))
 static void thc_yield_with_cont(void *a, void *arg) {
+	DEBUG_YIELD(DEBUGPRINTF(DEBUG_YIELD_PREFIX "! %p (%p,%p,%p) yield\n",
+					a,
+					((awe_t*)a)->eip,
+					((awe_t*)a)->ebp,
+					((awe_t*)a)->esp));
 	awe_t *awe = (awe_t*)a; 
 	awe->lazy_stack = awe->pts->curr_lazy_stack;
 	// check if we have yielded within a lazy awe
@@ -958,7 +983,6 @@ static void thc_yield_with_cont(void *a, void *arg) {
 void THCYield(void) {
 	CALL_CONT_LAZY((void*)&thc_yield_with_cont, NULL);
 }
-EXPORT_SYMBOL(THCYield);
 
 __attribute__ ((unused))
 static void thc_yieldto_with_cont(void *a, void *arg) {
@@ -994,7 +1018,6 @@ void THCYieldTo(awe_t *awe_ptr) {
 		THCSchedule(awe_ptr);
 	}
 }
-EXPORT_SYMBOL(THCYieldTo);
 
 void THCFinish(void) {
 	thc_dispatch(PTS());
@@ -1062,20 +1085,24 @@ void THCSuspendThen(awe_t **awe_ptr_ptr, THCThenFn_t fn, void *arg) {
 
 static inline void thc_schedule_local(awe_t *awe) {
 	PTState_t *awe_pts;
-	//DEBUG_AWE(DEBUGPRINTF(DEBUG_AWE_PREFIX "> THCSchedule(%p)\n",
-	//                      awe));
+	DEBUG_AWE(DEBUGPRINTF(DEBUG_AWE_PREFIX "> THCSchedule(%p)\n",
+				awe));
+#ifdef LCD_DOMAINS
 	printk(KERN_ERR "lcd async Schedule Local adding AWE to front\n");
+#endif
 	awe_pts = awe->pts;
 	awe->prev = &(awe_pts->aweHead);
 	awe->next = awe_pts->aweHead.next;
 	awe_pts->aweHead.next->prev = awe;
 	awe_pts->aweHead.next = awe;
+#ifdef LCD_DOMAINS
 	printk(KERN_ERR "lcd async AWE EIP: %p\n", awe->eip);
 	printk(KERN_ERR "lcd async AWE EBP: %p\n", awe->ebp);
 	printk(KERN_ERR "lcd async AWE ESP: %p\n", awe->esp);
-	//DEBUG_AWE(DEBUGPRINTF(DEBUG_AWE_PREFIX "  added AWE between %p %p\n",
-	//                      awe->prev, awe->next));
-	//DEBUG_AWE(DEBUGPRINTF(DEBUG_AWE_PREFIX "< THCSchedule\n"));
+#endif
+	DEBUG_AWE(DEBUGPRINTF(DEBUG_AWE_PREFIX "  added AWE between %p %p\n",
+				awe->prev, awe->next));
+	DEBUG_AWE(DEBUGPRINTF(DEBUG_AWE_PREFIX "< THCSchedule\n"));
 }
 
 void THCSchedule(awe_t *awe) {
@@ -1109,15 +1136,17 @@ void THCScheduleBack(awe_t *awe) {
 	PTState_t *awe_pts = awe->pts;
 	DEBUG_AWE(DEBUGPRINTF(DEBUG_AWE_PREFIX "> THCSchedule(%p)\n",
 				awe));
-	//assert(awe_pts == PTS());
+	assert(awe_pts == PTS());
 	awe_pts = awe->pts;
 	awe->prev = awe_pts->aweTail.prev;
 	awe->next = &(awe_pts->aweTail);
 	awe_pts->aweTail.prev->next = awe;
 	awe_pts->aweTail.prev = awe;
+#ifdef LCD_DOMAINS
 	printk(KERN_ERR "lcd async SchedBack AWE EIP: %p\n", awe->eip);
 	printk(KERN_ERR "lcd async SchedBack AWE EBP: %p\n", awe->ebp);
 	printk(KERN_ERR "lcd async SchedBack AWE ESP: %p\n", awe->esp);
+#endif
 }
 
 void THCAddCancelItem(cancel_item_t *ci, THCCancelFn_t fn, void *arg) {
@@ -1128,7 +1157,7 @@ void THCAddCancelItem(cancel_item_t *ci, THCCancelFn_t fn, void *arg) {
 	ci->arg = arg;
 	ci->was_run = 0;
 	fb = pts->current_fb;
-	//assert(fb != NULL && "Current fb NULL");
+	assert(fb != NULL && "Current fb NULL");
 	DEBUG_CANCEL(DEBUGPRINTF(DEBUG_CANCEL_PREFIX "  FB %p\n", fb));
 	ci->next = fb->cancel_item;
 	fb->cancel_item = ci;
@@ -1144,13 +1173,12 @@ void THCRemoveCancelItem(cancel_item_t *ci) {
 	cancel_item_t **cip = &(fb->cancel_item);
 	DEBUG_CANCEL(DEBUGPRINTF(DEBUG_CANCEL_PREFIX "> THCRemoveCancelItem(%p) from FB %p\n", 
 					ci, fb));
-	//assert(fb != NULL && "Current fb NULL");
-	//assert(!ci->was_run);
-  
+	assert(fb != NULL && "Current fb NULL");
+	assert(!ci->was_run);
 	while (*cip != NULL && *cip != ci) {
 		cip = &((*cip)->next);
 	}
-	//assert(*cip != NULL && "Cancel-item not found during remove");
+	assert(*cip != NULL && "Cancel-item not found during remove");
 	*cip = ci->next;
 #ifndef NDEBUG
 	PTS()->cancelsRemoved ++;
@@ -1227,35 +1255,22 @@ static void IdleFn(void *arg) {
 	}
 }
 
-/*
-  __attribute__((constructor))
-  static void thc_init(void) {
-  thc_start_rts();
-  PTS()->idle_fn = IdleFn;
-  PTS()->idle_args = NULL;
-  PTS()->idle_stack = NULL;
-  }
-*/
-
+#ifndef LCD_DOMAINS
+__attribute__((constructor))
+#endif
 void thc_init(void) {
 	thc_start_rts();
 	PTS()->idle_fn = IdleFn;
 	PTS()->idle_args = NULL;
-	PTS()->idle_stack = NULL;	
+	PTS()->idle_stack = NULL;
 }
-EXPORT_SYMBOL(thc_init);
 
-/*
-  __attribute__((destructor))
-  static void thc_done(void) {
-  thc_end_rts();
-  }
-*/
-
+#ifndef LCD_DOMAINS
+__attribute__((destructor))
+#endif
 void thc_done(void) {
 	thc_end_rts();
 }
-EXPORT_SYMBOL(thc_done);
 
 //struct run_args {
 //  int argc;
@@ -1314,8 +1329,8 @@ static void *thc_alloc_new_stack_0(void) {
 	if (!res) {
 		error_exit(TEXT("VirtualAlloc(MEM_RESERVE)"));
 	}
-	//DEBUG_STACK(DEBUGPRINTF(DEBUG_STACK_PREFIX "  Reserved %p..%p\n",
-	//                        res, res+STACK_COMMIT_BYTES+STACK_GUARD_BYTES));
+	DEBUG_STACK(DEBUGPRINTF(DEBUG_STACK_PREFIX "  Reserved %p..%p\n",
+					res, res+STACK_COMMIT_BYTES+STACK_GUARD_BYTES));
 	void *com = VirtualAlloc(res + STACK_GUARD_BYTES,
 				STACK_COMMIT_BYTES,
 				MEM_COMMIT,
@@ -1323,38 +1338,35 @@ static void *thc_alloc_new_stack_0(void) {
 	if (!com) {
 		error_exit(TEXT("VirtualAlloc(MEM_COMMIT)"));
 	}
-	//DEBUG_STACK(DEBUGPRINTF(DEBUG_STACK_PREFIX "  Committed %p..%p\n",
-	com, com+STACK_COMMIT_BYTES));
-void *result = com + STACK_COMMIT_BYTES;
-return result;
+	DEBUG_STACK(DEBUGPRINTF(DEBUG_STACK_PREFIX "  Committed %p..%p\n",
+					com, com+STACK_COMMIT_BYTES));
+	void *result = com + STACK_COMMIT_BYTES;
+	return result;
 }
 #elif defined(linux)
-//#include <sys/mman.h>
-//#include <errno.h>
+#include <sys/mman.h>
+#include <errno.h>
 
 static void *thc_alloc_new_stack_0(void) {
-	void *res = kmalloc(STACK_COMMIT_BYTES + STACK_GUARD_BYTES, GFP_KERNEL);
-	if (res == NULL)
-		printk(KERN_ERR "lcd async stack allocation failed\n");
+	void *res = mmap(NULL,
+			STACK_COMMIT_BYTES + STACK_GUARD_BYTES,
+			PROT_READ | PROT_WRITE,
+			MAP_PRIVATE | MAP_ANONYMOUS,
+			0, 0);
+	if (!res) {
+		fprintf(stderr, "URK: mmap returned errno=%d\n", errno);
+		exit(-1);
+	}
 
-	/*void *res = mmap(NULL,
-	  STACK_COMMIT_BYTES + STACK_GUARD_BYTES,
-	  PROT_READ | PROT_WRITE,
-	  MAP_PRIVATE | MAP_ANONYMOUS,
-	  0, 0);*/
-	//if (!res) {
-	//  //fprintf(stderr, "URK: mmap returned errno=%d\n", errno);
-	//  exit(-1);
-	//}
+	DEBUG_STACK(DEBUGPRINTF(DEBUG_STACK_PREFIX "  mmap %p..%p\n",
+					res, 
+					res+STACK_COMMIT_BYTES+STACK_GUARD_BYTES));
 
-	//DEBUG_STACK(DEBUGPRINTF(DEBUG_STACK_PREFIX "  mmap %p..%p\n",
-	//                        res, res+STACK_COMMIT_BYTES+STACK_GUARD_BYTES));
-
-	//int r = mprotect(res, STACK_GUARD_BYTES, PROT_NONE);
-	//if (r) {
-	//  // fprintf(stderr, "URK: mprotect returned errno=%d\n", errno);
-	//  exit(-1);
-	//}
+	int r = mprotect(res, STACK_GUARD_BYTES, PROT_NONE);
+	if (r) {
+		fprintf(stderr, "URK: mprotect returned errno=%d\n", errno);
+		exit(-1);
+	}
 
 	res += STACK_GUARD_BYTES + STACK_COMMIT_BYTES;
 	return res;
@@ -1376,6 +1388,18 @@ static void *thc_alloc_new_stack_0(void) {
 
 	return res + STACK_GUARD_BYTES + STACK_COMMIT_BYTES;
 }
+#elif defined(LCD_DOMAINS)
+static void *thc_alloc_new_stack_0(void) 
+{
+	void *res = kmalloc(STACK_COMMIT_BYTES + STACK_GUARD_BYTES, GFP_KERNEL);
+	if (!res) {
+		LIBLCD_ERR("lcd async stack allocation failed");
+		return NULL;
+	}
+	/* Note that sizeof(void) = 1 not 8. */
+	res += STACK_GUARD_BYTES + STACK_COMMIT_BYTES;
+	return res;
+}
 #else
 #error No definition for _thc_alloc_new_stack_0
 #endif
@@ -1384,7 +1408,8 @@ static void *thc_alloc_new_stack_0(void) {
 
 // 2. Execution on an alternative stack
 
-#if (defined(__x86_64__) && (defined(linux) || defined(BARRELFISH)))
+#if (defined(__x86_64__) && \
+	(defined(linux) || defined(BARRELFISH) || defined(LCD_DOMAINS)))
 // Callee invoked via Linux x64 conventions (args in EDI)
 
 /*
@@ -1478,7 +1503,8 @@ void thc_on_alt_stack_0(void *stack,
 //     and the register used for return values (e.g., EAX) is
 //     initialized to non-0.
 
-#if (defined(__x86_64__) && (defined(linux) || defined(BARRELFISH)))
+#if (defined(__x86_64__) && \
+	(defined(linux) || defined(BARRELFISH) || defined(LCD_DOMAINS)))
 /*
   static void thc_awe_execute_0(awe_t *awe)    // rdi
 */
@@ -1801,29 +1827,82 @@ volatile int TlsInitLatch = 0;
 volatile DWORD TlsIndex = 0;
 
 static PTState_t *thc_get_pts_0(void) {
-	return current->ptstate;  
+	if (!TlsIndex) {
+		do {
+			if (__sync_bool_compare_and_swap(&TlsInitLatch, 0, 1)) {
+				break;
+			}
+		} while (1);
+		if (!TlsIndex) {
+			TlsIndex = TlsAlloc();
+			if (TlsIndex == TLS_OUT_OF_INDEXES) {
+				error_exit("TlsAlloc failed");
+			}
+		}
+		TlsInitLatch = 0;
+	}
+
+	return (PTState_t *) (TlsGetValue(TlsIndex));
 }
 
 static void thc_set_pts_0(PTState_t *st) {
-	/*if (!TlsIndex) {
-	  DWORD index = TlsAlloc();
-	  if (index == TLS_OUT_OF_INDEXES) {
-	  error_exit("TlsAlloc failed");
-	  }
-	  }
+	if (!TlsIndex) {
+		DWORD index = TlsAlloc();
+		if (index == TLS_OUT_OF_INDEXES) {
+			error_exit("TlsAlloc failed");
+		}
+	}
 
-	  if (!TlsSetValue(TlsIndex, st)) {
-	  error_exit("TlsSetValue failed");
-	  }*/
+	if (!TlsSetValue(TlsIndex, st)) {
+		error_exit("TlsSetValue failed");
+	}
 }
 #elif defined(BARRELFISH)
 static PTState_t *thc_get_pts_0(void) {
-	return current->ptstate;
+	return (PTState_t*)thread_get_tls();
 }
 
 static void thc_set_pts_0(PTState_t *st) {
-	/*thread_set_tls((void*)st);*/
+	thread_set_tls((void*)st);
 }
+#elif defined(linux)
+volatile int TlsInitLatch = 0;
+volatile int TlsDoneInit = 0;
+pthread_key_t TlsKey = 0;
+
+static PTState_t *thc_get_pts_0(void) {
+	if (!TlsDoneInit) {
+		do {
+			if (__sync_bool_compare_and_swap(&TlsInitLatch, 0, 1)) {
+				break;
+			}
+		} while (1);
+		if (!TlsDoneInit) {
+			int r = pthread_key_create(&TlsKey, NULL);
+			assert((!r) && "pthread_key_create failed");
+			TlsDoneInit = 1;
+		}
+		TlsInitLatch = 0;
+	}
+
+	return (PTState_t *) (pthread_getspecific(TlsKey));
+}
+
+static void thc_set_pts_0(PTState_t *st) {
+	assert(TlsDoneInit);
+	pthread_setspecific(TlsKey, (void*)st);
+}
+#elif defined(LCD_DOMAINS)
+static PTState_t *thc_get_pts_0(void) {
+	return current->ptstate;
+}
+static void thc_set_pts_0(PTState_t *st) {
+	current->ptstate = st;
+}
+#else
+#error No definition for thc_get_pts_0
+#endif
+
 #elif defined(linux)
 volatile int TlsInitLatch = 0;
 volatile int TlsDoneInit = 0;

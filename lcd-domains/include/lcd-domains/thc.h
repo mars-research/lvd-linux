@@ -3,10 +3,14 @@
 #ifndef _THC_H_
 #define _THC_H_
 
-//#include <stdint.h>
-//#include <stdlib.h>
+#ifdef LCD_DOMAINS
+#include <lcd-domains/liblcd-config.h>
 #include <lcd-domains/types.h>
 #include <linux/sched.h>
+#else
+#include <stdint.h>
+#include <stdlib.h>
+#endif
 
 #ifndef BARRELFISH
 typedef int errval_t;

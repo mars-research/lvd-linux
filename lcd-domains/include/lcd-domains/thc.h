@@ -6,7 +6,7 @@
 #ifdef LCD_DOMAINS
 #include <lcd-domains/liblcd-config.h>
 #include <lcd-domains/types.h>
-#include <linux/sched.h>
+#define assert(XX) do { BUG_ON(!(XX)); } while(0)
 #else
 #include <stdint.h>
 #include <stdlib.h>

@@ -24,17 +24,20 @@
 
 static inline struct lcd_utcb * lcd_get_utcb(void)
 {
-	struct lcd_utcb *out;
-	/*
-	 * The utcb is in the bottom of the stack page. All we have to
-	 * do is mask off the low 12 bits to get the address.
+	/* 
+	 * UTCB is no longer on the stack. It's at a fixed global
+	 * address.
+	 *
+	 * Why? The async runtime messes with stacks, so we can't assume
+	 * the utcb is sitting at the bottom of the current stack page
+	 * (masking off bits).
+	 *
+	 * Obviously this won't work if we have more than one thread using
+	 * the guest physical/virtual address spaces. So we may have to 
+	 * revisit this. (Our utlimate goal is to avoid a global message
+	 * buffer altogether.)
 	 */
-	asm volatile(
-		"movq %%rsp, %0 \n\t"
-		"andq $0xFFFFFFFFFFFFF000, %0 \n\t"
-		: "=g" (out)
-		::);
-	return out;
+	return (struct lcd_utcb *)gva_val(LCD_UTCB_GVA);
 }
 
 #define LCD_MK_REG_ACCESS(idx)						\

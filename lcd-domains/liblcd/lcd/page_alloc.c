@@ -30,12 +30,15 @@ static pgd_t *root;
 static struct page page_structs[LCD_FREE_MEM_BMAP_SIZE];
 
 static cptr_t boot_cptrs[1 << LCD_BOOT_PAGES_ORDER];
+static cptr_t stack_cptrs[1 << LCD_STACK_PAGES_ORDER];
 
 /* From boot info page */
 unsigned num_boot_mem_pi;
+unsigned num_stack_mem_pi;
 unsigned num_paging_mem_pi;
 unsigned num_free_mem_pi;
 struct lcd_boot_info_for_page *boot_mem_pi_start;
+struct lcd_boot_info_for_page *stack_mem_pi_start;
 struct lcd_boot_info_for_page *paging_mem_pi_start;
 struct lcd_boot_info_for_page *free_mem_pi_start;
 
@@ -921,9 +924,11 @@ static void get_mem_boot_info(void)
 	 * file).
 	 */
 	num_boot_mem_pi = bi->num_boot_mem_pi;
+	num_stack_mem_pi = bi->num_stack_mem_pi;
 	num_paging_mem_pi = bi->num_paging_mem_pi;
 	num_free_mem_pi = bi->num_free_mem_pi;
 	boot_mem_pi_start = bi->boot_mem_pi_start;
+	stack_mem_pi_start = bi->stack_mem_pi_start;
 	paging_mem_pi_start = bi->paging_mem_pi_start;
 	free_mem_pi_start = bi->free_mem_pi_start;
 }
@@ -946,6 +951,7 @@ static void init_page_alloc_data(void)
 	 * Zero out data
 	 */
 	memset(boot_cptrs, 0, sizeof(boot_cptrs));
+	memset(stack_cptrs, 0, sizeof(stack_cptrs));
 	memset(paging_mem_bmap, 0, sizeof(paging_mem_bmap));
 	memset(paging_mem_page2cptr, 0, sizeof(paging_mem_page2cptr));
 	memset(free_mem_page2cptr, 0, sizeof(free_mem_page2cptr));
@@ -959,6 +965,15 @@ static void init_page_alloc_data(void)
 		idx -= gpa_val(LCD_BOOT_PAGES_GPA);
 		idx >>= PAGE_SHIFT;
 		boot_cptrs[idx] = boot_mem_pi_start[i].my_cptr;
+	}
+	/*
+	 * Stack mem pages
+	 */
+	for (i = 0; i < num_stack_mem_pi; i++) {
+		idx = gpa_val(stack_mem_pi_start[i].page_gpa);
+		idx -= gpa_val(LCD_STACK_GPA);
+		idx >>= PAGE_SHIFT;
+		stack_cptrs[idx] = stack_mem_pi_start[i].my_cptr;
 	}
 	/*
 	 * Set up paging mem bitmap

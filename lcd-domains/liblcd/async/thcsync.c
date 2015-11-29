@@ -15,14 +15,12 @@
 #define WIN32_LEAN_AND_MEAN
 #include <Windows.h>
 #include <thc/thc.h>
-#else
-#include "thc.h"
-#endif
-
-#ifdef LCD_DOMAINS
+#elif LCD_DOMAINS
 #include <lcd-domains/liblcd-config.h>
 #include <lcd-domains/thc.h>
 #include <lcd-domains/liblcd-hacks.h>
+#else
+#include "thc.h"
 #endif
 
 #define NOT_REACHED assert(0 && "Not reached")

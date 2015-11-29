@@ -337,7 +337,7 @@ int __lcd_create(struct lcd *caller, cptr_t slot)
 		goto fail2;
 	}
 	/*
-	 * Allocate a page for the stack/utcb
+	 * Allocate a page for the utcb
 	 */
 	addr = __hva(get_zeroed_page(GFP_KERNEL));
 	if (!hva_val(addr)) {
@@ -392,10 +392,10 @@ fail1:
 
 static int __lcd_config_lcd(struct lcd *caller, struct lcd *lcd_struct, 
 			gva_t pc, gva_t sp, 
-			gpa_t gva_root, gpa_t stack_page)
+			gpa_t gva_root, gpa_t utcb_page)
 {
 	int ret;
-	hva_t stack_page_addr;
+	hva_t utcb_page_addr;
 	/*
 	 * If lcd is not an embryo, fail
 	 */
@@ -411,10 +411,10 @@ static int __lcd_config_lcd(struct lcd *caller, struct lcd *lcd_struct,
 	lcd_arch_set_sp(lcd_struct->lcd_arch, sp);
 	lcd_arch_set_gva_root(lcd_struct->lcd_arch, gva_root);
 	/*
-	 * Map stack page in guest physical
+	 * Map utcb page in guest physical
 	 */
-	stack_page_addr = va2hva(lcd_struct->utcb);
-	ret = gp_map(lcd_struct, stack_page, hva2hpa(stack_page_addr));
+	utcb_page_addr = va2hva(lcd_struct->utcb);
+	ret = gp_map(lcd_struct, utcb_page, hva2hpa(utcb_page_addr));
 	if (ret) {
 		LCD_ERR("map");
 		goto fail2;
@@ -431,7 +431,7 @@ static int __lcd_config_lcd(struct lcd *caller, struct lcd *lcd_struct,
 	return 0;
 
 fail3:
-	gp_unmap(lcd_struct, stack_page);
+	gp_unmap(lcd_struct, utcb_page);
 fail2:
 fail1:
 	return ret;
@@ -439,7 +439,7 @@ fail1:
 
 int __lcd_config_klcd(struct lcd *caller, struct lcd *lcd_struct, 
 			gva_t pc, gva_t sp, 
-			gpa_t gva_root, gpa_t stack_page)
+			gpa_t gva_root, gpa_t utcb_page)
 {
 	/*
 	 * For now, we ignore everything except the program counter.
@@ -455,7 +455,7 @@ int __lcd_config_klcd(struct lcd *caller, struct lcd *lcd_struct,
 }
 
 int __lcd_config(struct lcd *caller, cptr_t lcd, gva_t pc, gva_t sp, 
-		gpa_t gva_root, gpa_t stack_page)
+		gpa_t gva_root, gpa_t utcb_page)
 {
 	struct lcd *lcd_struct;
 	struct cnode *cnode;
@@ -473,14 +473,14 @@ int __lcd_config(struct lcd *caller, cptr_t lcd, gva_t pc, gva_t sp,
 
 	case LCD_CAP_TYPE_LCD:
 		ret = __lcd_config_lcd(caller, lcd_struct, pc, sp, gva_root, 
-				stack_page);
+				utcb_page);
 		break;
 	case LCD_CAP_TYPE_KLCD:
 		ret = __lcd_config_klcd(caller, lcd_struct, pc, sp, gva_root, 
-					stack_page);
+					utcb_page);
 		break;
 	default:
-		/* shouldn't happend */
+		/* shouldn't happen */
 		LCD_ERR("unexpected cnode type: %d",
 			cnode->type);
 		goto fail2;		

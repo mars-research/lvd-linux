@@ -43,9 +43,9 @@ fail1:
 }
 
 int klcd_config(cptr_t lcd, gva_t pc, gva_t sp, gpa_t gva_root, 
-		gpa_t stack_page)
+		gpa_t utcb_page)
 {
-	return __lcd_config(current->lcd, lcd, pc, sp, gva_root, stack_page);
+	return __lcd_config(current->lcd, lcd, pc, sp, gva_root, utcb_page);
 }
 
 int klcd_run(cptr_t lcd)
@@ -342,6 +342,7 @@ static int init_lcd_info(struct lcd_info **mi)
 	 * Init list for boot page infos
 	 */
 	INIT_LIST_HEAD(&i->boot_mem_list);
+	INIT_LIST_HEAD(&i->stack_mem_list);
 	INIT_LIST_HEAD(&i->paging_mem_list);
 	INIT_LIST_HEAD(&i->free_mem_list);
 
@@ -370,6 +371,10 @@ static void free_lcd_info(struct lcd_info *i)
 		e = list_entry(cursor, struct lcd_page_info_list_elem, list);
 		kfree(e);
 	}
+	list_for_each_safe(cursor, next, &i->stack_mem_list) {
+		e = list_entry(cursor, struct lcd_page_info_list_elem, list);
+		kfree(e);
+	}
 	list_for_each_safe(cursor, next, &i->paging_mem_list) {
 		e = list_entry(cursor, struct lcd_page_info_list_elem, list);
 		kfree(e);
@@ -380,7 +385,9 @@ static void free_lcd_info(struct lcd_info *i)
 	}
 	/*
 	 * Any remaining pages allocated will be freed when the lcd is torn 
-	 * down (e.g., boot pages)
+	 * down (e.g., boot pages) because it is the sole owner (for example,
+	 * when we allocated pages for the stack, we deleted the cap in our
+	 * cspace so that the lcd is the sole owner)
 	 */
 
 	/*
@@ -1253,14 +1260,38 @@ fail1:
 
 static int map_gv_memory_and_stack(cptr_t lcd, struct create_module_cxt *cxt)
 {
+	int ret;
+	gpa_t utcb_top;
 	/*
-	 * Map paging mem and stack/utcb
+	 * Map paging mem, boot mem, and utcb first
 	 */
-	return gv_map_range(lcd, cxt,
+	utcb_top = gpa_add(LCD_UTCB_GPA, LCD_UTCB_SIZE);
+	ret = gv_map_range(lcd, cxt,
 			LCD_GV_PAGING_MEM_GVA,
 			LCD_GV_PAGING_MEM_GPA,
-			(gpa_val(LCD_MODULE_GPA) - 
+			(gpa_val(utcb_top) - 
 				gpa_val(LCD_GV_PAGING_MEM_GPA)) >> PAGE_SHIFT);
+	if (ret) {
+		LCD_ERR("map 1");
+		goto fail1;
+	}
+	/*
+	 * Map stack (skip over guard page)
+	 */
+	ret = gv_map_range(lcd, cxt,
+			LCD_STACK_GVA,
+			LCD_STACK_GPA,
+			(LCD_STACK_SIZE) >> PAGE_SHIFT);
+	if (ret) {
+		LCD_ERR("map 2");
+		goto fail2;
+	}
+
+	return 0;
+
+fail2:
+fail1:
+	return ret; /* everything freed when LCD is destroyed */
 }
 
 static int do_boot_pages(cptr_t lcd, struct lcd_info *mi,
@@ -1274,14 +1305,15 @@ static int do_boot_pages(cptr_t lcd, struct lcd_info *mi,
 	unsigned long offset;
 	gpa_t gpa;
 	cptr_t dest_slot;
+	cptr_t boot_pages_cptrs[1 << LCD_BOOT_PAGES_ORDER];
 	/*
 	 * Allocate the boot pages on the host
 	 */
-	ret = klcd_pages_alloc(mi->boot_page_cptrs, &hp_base_out, &hv_base_out,
+	ret = klcd_pages_alloc(boot_pages_cptrs, &hp_base_out, &hv_base_out,
 			LCD_BOOT_PAGES_ORDER);
 	if (ret) {
 		LCD_ERR("pages alloc");
-		goto fail1;
+		goto out1;
 	}
 	mi->boot_page_base = hva2va(hv_base_out);
 	/*
@@ -1296,17 +1328,17 @@ static int do_boot_pages(cptr_t lcd, struct lcd_info *mi,
 		ret = __lcd_alloc_cptr(cxt->cache, &dest_slot);
 		if (ret) {
 			LCD_ERR("alloc failed");
-			goto fail2;
+			goto out2;
 		}
 		/*
 		 * Grant and map in lcd's guest physical
 		 */
-		ret = lcd_cap_page_grant_map(lcd, mi->boot_page_cptrs[i],
+		ret = lcd_cap_page_grant_map(lcd, boot_pages_cptrs[i],
 					dest_slot,
 					gpa);
 		if (ret) {
 			LCD_ERR("couldn't map boot page in lcd's gp");
-			goto fail3;
+			goto out2;
 		}
 		/*
 		 * Will be mapped in guest virtual along with the stack
@@ -1318,7 +1350,7 @@ static int do_boot_pages(cptr_t lcd, struct lcd_info *mi,
 		e = kmalloc(sizeof(*e), GFP_KERNEL);
 		if (!e) {
 			LCD_ERR("alloc page info");
-			goto fail4;
+			goto out2;
 		}
 		INIT_LIST_HEAD(&e->list);
 		e->my_cptr = dest_slot;
@@ -1329,11 +1361,104 @@ static int do_boot_pages(cptr_t lcd, struct lcd_info *mi,
 		 */
 		offset += PAGE_SIZE;
 	}
-fail4:
-fail3:
-fail2:
-fail1:
-	return ret;	/* we failed; pages will be unmapped when lcd is
+
+	goto out2;
+
+out2:
+	/*
+	 * Make sure we delete our capabilities to the alloc'd
+	 * boot pages. Those that were granted to the LCD (perhaps
+	 * during failure) will be freed when the LCD is torn down. Those
+	 * that weren't will be freed right now.
+	 */
+	for (i = 0; i < (1 << LCD_BOOT_PAGES_ORDER); i++)
+		lcd_cap_delete(boot_pages_cptrs[i]);
+out1:
+	return ret;	/* if we failed, pages will be unmapped when lcd is
+			 * destroyed, page infos, cptrs, etc. freed when 
+			 * lcd_info destroyed */
+}
+
+static int do_stack_pages(cptr_t lcd, struct lcd_info *mi,
+			struct create_module_cxt *cxt)
+{
+	int i;
+	int ret;
+	hpa_t hp_base_out;
+	hva_t hv_base_out;
+	struct lcd_page_info_list_elem *e;
+	unsigned long offset;
+	gpa_t gpa;
+	cptr_t dest_slot;
+	cptr_t stack_pages_cptrs[1 << LCD_STACK_PAGES_ORDER];
+	/*
+	 * Allocate the stack pages on the host
+	 */
+	ret = klcd_pages_alloc(stack_pages_cptrs, &hp_base_out, &hv_base_out,
+			LCD_STACK_PAGES_ORDER);
+	if (ret) {
+		LCD_ERR("pages alloc");
+		goto out1;
+	}
+	/*
+	 * Grant and map them in the lcd
+	 */	
+	offset = 0;
+	for (i = 0; i < (1 << LCD_STACK_PAGES_ORDER); i++) {
+		gpa = gpa_add(LCD_STACK_GPA, offset);
+		/*
+		 * Alloc slot in dest
+		 */
+		ret = __lcd_alloc_cptr(cxt->cache, &dest_slot);
+		if (ret) {
+			LCD_ERR("alloc failed");
+			goto out2;
+		}
+		/*
+		 * Grant and map in lcd's guest physical
+		 */
+		ret = lcd_cap_page_grant_map(lcd, stack_pages_cptrs[i],
+					dest_slot,
+					gpa);
+		if (ret) {
+			LCD_ERR("couldn't map stack page in lcd's gp");
+			goto out2;
+		}
+		/*
+		 * Will be mapped in guest virtual along with the boot
+		 * and paging mem pages ...
+		 */
+		/*
+		 * Set up page info
+		 */
+		e = kmalloc(sizeof(*e), GFP_KERNEL);
+		if (!e) {
+			LCD_ERR("alloc page info");
+			goto out2;
+		}
+		INIT_LIST_HEAD(&e->list);
+		e->my_cptr = dest_slot;
+		e->page_gpa = gpa;
+		list_add(&e->list, &mi->stack_mem_list);
+		/*
+		 * Bump offset
+		 */
+		offset += PAGE_SIZE;
+	}
+
+	goto out2;
+
+out2:
+	/*
+	 * Make sure we delete our capabilities to the alloc'd
+	 * pages. Those that were granted to the LCD (perhaps
+	 * during failure) will be freed when the LCD is torn down. Those
+	 * that weren't will be freed right now.
+	 */
+	for (i = 0; i < (1 << LCD_STACK_PAGES_ORDER); i++)
+		lcd_cap_delete(stack_pages_cptrs[i]);
+out1:
+	return ret;	/* if we failed, pages will be unmapped when lcd is
 			 * destroyed, page infos, cptrs, etc. freed when 
 			 * lcd_info destroyed */
 }
@@ -1342,7 +1467,6 @@ static int setup_addr_space(cptr_t lcd, struct lcd_info *mi)
 {
 	struct create_module_cxt *cxt;
 	int ret;
-	int i;
 	/*
 	 * Set up guest virtual cxt
 	 */
@@ -1372,12 +1496,20 @@ static int setup_addr_space(cptr_t lcd, struct lcd_info *mi)
 		goto fail4;
 	}
 	/*
-	 * Map guest virtual paging memory, boot page, and stack/utcb
+	 * Set up stack pages
+	 */
+	ret = do_stack_pages(lcd, mi, cxt);
+	if (ret) {
+		LCD_ERR("setting up stack pages");
+		goto fail5;
+	}
+	/*
+	 * Map guest virtual paging memory, boot pages, utcb, and stack
 	 */
 	ret = map_gv_memory_and_stack(lcd, cxt);
 	if (ret) {
 		LCD_ERR("mapping paging mem");
-		goto fail5;
+		goto fail6;
 	}
 	/*
 	 * Copy over list of paging mem infos before we kill cxt
@@ -1391,17 +1523,13 @@ static int setup_addr_space(cptr_t lcd, struct lcd_info *mi)
 
 	return 0;
 
+fail6:
 fail5:
-	/* Delete our caps to boot pages. When lcd is destroyed, they
-	 * will then be freed.
-	 */
-	for (i = 0; i < (1 << LCD_BOOT_PAGES_ORDER); i++)
-		lcd_cap_delete(mi->boot_page_cptrs[i]);
 fail4:
 fail3:
 fail2:
-	/* gv_destroy just removes our caps to the gv paging pages and boot
-	 * pages; gv paging mem, boot pages, etc. will be freed when lcd is 
+	/* gv_destroy just removes our caps to the gv paging pages; 
+	 * boot pages, etc. will be freed when lcd is 
 	 * destroyed.
 	 *
 	 * module pages will be freed when lcd_unload_module is called
@@ -1448,7 +1576,7 @@ int klcd_create_module_lcd(cptr_t *slot_out, char *mdir, char *mname,
 	ret = lcd_config(*slot_out, (*mi)->init, 
 			gva_add(LCD_STACK_GVA, LCD_STACK_SIZE - 1), /* stack */
 			LCD_GV_PAGING_MEM_GPA,
-			LCD_STACK_GPA);
+			LCD_UTCB_GPA);
 	if (ret) {
 		LCD_ERR("failed to config lcd");
 		goto fail3;
@@ -1570,6 +1698,7 @@ static inline size_t page_infos_offset(void)
 static int dump_check(struct lcd_info *mi,
 		size_t pi_offset,
 		unsigned *num_boot_mem_pi,
+		unsigned *num_stack_mem_pi,
 		unsigned *num_paging_mem_pi,
 		unsigned *num_free_mem_pi)
 {
@@ -1584,6 +1713,11 @@ static int dump_check(struct lcd_info *mi,
 		num++;
 	}
 	*num_boot_mem_pi = num;
+	num = 0;
+	list_for_each(cursor, &mi->stack_mem_list) {
+		num++;
+	}
+	*num_stack_mem_pi = num;
 	num = 0;
 	list_for_each(cursor, &mi->paging_mem_list) {
 		num++;
@@ -1600,6 +1734,7 @@ static int dump_check(struct lcd_info *mi,
 	 */
 	sz = pi_offset;
 	sz += *num_boot_mem_pi   * sizeof(struct lcd_boot_info_for_page);
+	sz += *num_stack_mem_pi  * sizeof(struct lcd_boot_info_for_page);
 	sz += *num_paging_mem_pi * sizeof(struct lcd_boot_info_for_page);
 	sz += *num_free_mem_pi   * sizeof(struct lcd_boot_info_for_page);
 	if (sz >= ((1 << LCD_BOOT_PAGES_ORDER) << PAGE_SHIFT))
@@ -1640,6 +1775,7 @@ int klcd_dump_boot_info(struct lcd_info *mi)
 	 */
 	ret = dump_check(mi, pi_offset,
 			&bi->num_boot_mem_pi,
+			&bi->num_stack_mem_pi,
 			&bi->num_paging_mem_pi,
 			&bi->num_free_mem_pi);
 	if (ret) {
@@ -1659,6 +1795,10 @@ int klcd_dump_boot_info(struct lcd_info *mi)
 	dump_page_infos(&mi->boot_mem_list, bi, dest);
 	dest += bi->num_boot_mem_pi;
 
+	bi->stack_mem_pi_start = dest;
+	dump_page_infos(&mi->stack_mem_list, bi, dest);
+	dest += bi->num_stack_mem_pi;
+
 	bi->paging_mem_pi_start = dest;
 	dump_page_infos(&mi->paging_mem_list, bi, dest);
 	dest += bi->num_paging_mem_pi;
@@ -1671,6 +1811,10 @@ int klcd_dump_boot_info(struct lcd_info *mi)
 	 */
 	bi->boot_mem_pi_start = (struct lcd_boot_info_for_page *)
 		adjust_addr((unsigned long)bi->boot_mem_pi_start,
+			(unsigned long)mi->boot_page_base);
+
+	bi->stack_mem_pi_start = (struct lcd_boot_info_for_page *)
+		adjust_addr((unsigned long)bi->stack_mem_pi_start,
 			(unsigned long)mi->boot_page_base);
 
 	bi->paging_mem_pi_start = (struct lcd_boot_info_for_page *)

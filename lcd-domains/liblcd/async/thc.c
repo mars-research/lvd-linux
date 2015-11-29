@@ -56,10 +56,6 @@
 #define DEBUGPRINTF printf
 #endif
 
-#ifdef LCD_DOMAINS
-#define assert(XX) do { BUG_ON(!(XX)); } while(0)
-#endif
-
 //#define DEBUG_STATS(XX)
 #define DEBUG_STATS(XX) do{ XX; } while (0)
 #define DEBUG_STATS_PREFIX        "         stats:    "
@@ -68,7 +64,7 @@
 
 #ifdef VERBOSE_DEBUG
 #define DEBUG_YIELD(XX) do{ XX; } while (0)
-#define DEBUG_STACK(XX) do{ XX; } while (0)
+#define DEBUG_STACK_THC(XX) do{ XX; } while (0)
 #define DEBUG_AWE(XX) do{ XX; } while (0)
 #define DEBUG_FINISH(XX) do{ XX; } while (0)
 #define DEBUG_CANCEL(XX) do{ XX; } while (0)
@@ -76,7 +72,7 @@
 #define DEBUG_DISPATCH(XX) do{ XX; } while (0)
 #else
 #define DEBUG_YIELD(XX)
-#define DEBUG_STACK(XX)
+#define DEBUG_STACK_THC(XX)
 #define DEBUG_AWE(XX)
 #define DEBUG_FINISH(XX) 
 #define DEBUG_CANCEL(XX)
@@ -118,7 +114,7 @@ static inline void thc_schedule_local(awe_t *awe);
 
 /* For LCDs, we just use a global variable for the per-thread state (PTS). */
 #ifdef LCD_DOMAINS
-struct PTState_t ptstate;
+PTState_t *__my_ptstate;
 #endif
 
 static PTState_t *PTS(void) {
@@ -132,7 +128,6 @@ static PTState_t *PTS(void) {
 }
 
 static void InitPTS(void) {
-	assert((PTS() == NULL) && "PTS already initialized");
 #ifdef LCD_DOMAINS
 	PTState_t *pts = kzalloc(sizeof(PTState_t), GFP_KERNEL);
 	if (!pts) {
@@ -143,6 +138,7 @@ static void InitPTS(void) {
 	PTState_t *pts = malloc(sizeof(PTState_t));
 	memset(pts, 0, sizeof(PTState_t));
 #endif
+	assert((PTS() == NULL) && "PTS already initialized");
 	thc_latch_init(&(pts->latch));
 	thc_set_pts_0(pts);
 }
@@ -247,11 +243,11 @@ static void thc_print_pts_stats(PTState_t *t, int clear)
 void *_thc_allocstack(void) {
 	PTState_t *pts = PTS();
 	void *result = NULL;
-	DEBUG_STACK(DEBUGPRINTF(DEBUG_STACK_PREFIX "> AllocStack\n"));
+	DEBUG_STACK_THC(DEBUGPRINTF(DEBUG_STACK_PREFIX "> AllocStack\n"));
 	if (pts->free_stacks != NULL) {
 		// Re-use previously freed stack
-		DEBUG_STACK(DEBUGPRINTF(DEBUG_STACK_PREFIX "  Re-using free stack\n"));
 		struct thcstack_t *r = pts->free_stacks;
+		DEBUG_STACK_THC(DEBUGPRINTF(DEBUG_STACK_PREFIX "  Re-using free stack\n"));
 		pts->free_stacks = pts->free_stacks->next;
 		result = ((void*)r) + sizeof(struct thcstack_t);
 	} else {
@@ -260,7 +256,7 @@ void *_thc_allocstack(void) {
 		pts->stackMemoriesAllocated ++;
 #endif
 	}
-	DEBUG_STACK(DEBUGPRINTF(DEBUG_STACK_PREFIX "< AllocStack = %p\n", result));
+	DEBUG_STACK_THC(DEBUGPRINTF(DEBUG_STACK_PREFIX "< AllocStack = %p\n", result));
 #ifndef NDEBUG
 	pts->stacksAllocated ++;
 #endif
@@ -272,10 +268,10 @@ void *_thc_allocstack(void) {
 void _thc_freestack(void *s) {
 	PTState_t *pts = PTS();
 	struct thcstack_t *stack = (struct thcstack_t*)(s - sizeof(struct thcstack_t));
-	DEBUG_STACK(DEBUGPRINTF(DEBUG_STACK_PREFIX "> FreeStack(%p)\n", stack));
+	DEBUG_STACK_THC(DEBUGPRINTF(DEBUG_STACK_PREFIX "> FreeStack(%p)\n", stack));
 	stack->next = pts->free_stacks;
 	pts->free_stacks = stack;
-	DEBUG_STACK(DEBUGPRINTF(DEBUG_STACK_PREFIX "< FreeStack\n"));
+	DEBUG_STACK_THC(DEBUGPRINTF(DEBUG_STACK_PREFIX "< FreeStack\n"));
 #ifndef NDEBUG
 	pts->stacksDeallocated ++;
 #endif
@@ -302,25 +298,25 @@ void _thc_pendingfree(void) {
 
 static void check_lazy_stack_finished (PTState_t *pts, void *esp) {
 	assert(pts->curr_lazy_stack);
-	DEBUG_STACK(DEBUGPRINTF(DEBUG_STACK_PREFIX
+	DEBUG_STACK_THC(DEBUGPRINTF(DEBUG_STACK_PREFIX
 					"> CheckLazyStackFinished(s=%p,esp+buf=%p)\n",
 					pts->curr_lazy_stack, 
 					esp + LAZY_STACK_BUFFER));
 	if ((esp + LAZY_STACK_BUFFER) == pts->curr_lazy_stack) {
 		// nothing on lazy stack, we can safely free it
-		DEBUG_STACK(DEBUGPRINTF(DEBUG_STACK_PREFIX "  freeing lazy stack %p\n", 
+		DEBUG_STACK_THC(DEBUGPRINTF(DEBUG_STACK_PREFIX "  freeing lazy stack %p\n", 
 						pts->curr_lazy_stack));
 		assert(pts->pendingFree == NULL);
 		pts->pendingFree = pts->curr_lazy_stack;
 	}
-	DEBUG_STACK(DEBUGPRINTF(DEBUG_STACK_PREFIX "< CheckLazyStackFinished()\n"));
+	DEBUG_STACK_THC(DEBUGPRINTF(DEBUG_STACK_PREFIX "< CheckLazyStackFinished()\n"));
 }
 
 // Allocate a lazy stack for this awe's continuation to execute on.
 
 static void alloc_lazy_stack (awe_t *awe) {
 	void * new_esp;
-	DEBUG_STACK(DEBUGPRINTF(DEBUG_STACK_PREFIX "> AllocLazyStack(awe=%p)\n", 
+	DEBUG_STACK_THC(DEBUGPRINTF(DEBUG_STACK_PREFIX "> AllocLazyStack(awe=%p)\n", 
 					awe));
 	assert(awe->status == LAZY_AWE && !awe->lazy_stack);
 	awe->lazy_stack = _thc_allocstack();
@@ -328,7 +324,7 @@ static void alloc_lazy_stack (awe_t *awe) {
 	*((void **) new_esp) = awe->esp;
 	awe->esp = new_esp;
 	awe->status = ALLOCATED_LAZY_STACK;
-	DEBUG_STACK(DEBUGPRINTF(DEBUG_STACK_PREFIX "< AllocLazyStack(awe=%p,s=%p)\n",
+	DEBUG_STACK_THC(DEBUGPRINTF(DEBUG_STACK_PREFIX "< AllocLazyStack(awe=%p,s=%p)\n",
 					awe, awe->lazy_stack));
 }
 
@@ -346,12 +342,12 @@ static inline void check_lazy_stack_finished (PTState_t *pts, awe_t *awe) {
 // just a wrapper around the arch-os specific function.
 
 void _thc_onaltstack(void *stacktop, void *fn, void *args) {
-	DEBUG_STACK(DEBUGPRINTF(DEBUG_STACK_PREFIX "> OnAltStack(%p, %p, %p)\n",
+	DEBUG_STACK_THC(DEBUGPRINTF(DEBUG_STACK_PREFIX "> OnAltStack(%p, %p, %p)\n",
 					stacktop, fn, args));
 
 	thc_on_alt_stack_0(stacktop, fn, args);
 
-	DEBUG_STACK(DEBUGPRINTF(DEBUG_STACK_PREFIX "< OnAltStack\n"));
+	DEBUG_STACK_THC(DEBUGPRINTF(DEBUG_STACK_PREFIX "< OnAltStack\n"));
 }
 
 /***********************************************************************/
@@ -399,6 +395,7 @@ static void re_init_dispatch_awe(void *a, void *arg) {
 
 static void thc_dispatch_loop(void) {
 	PTState_t *pts = PTS();
+	awe_t *awe;
 
 	// Re-initialize pts->dispatch_awe to this point, just after we have
 	// read PTS.  This will save the per-thread-state access on future
@@ -425,12 +422,12 @@ static void thc_dispatch_loop(void) {
 	} 
   
 	if (pts->aweHead.next == &pts->aweTail) {
-		DEBUG_DISPATCH(DEBUGPRINTF(DEBUG_DISPATCH_PREFIX "  queue empty\n"));
-		assert(pts->idle_fn != NULL && "Dispatch loop idle, and no idle_fn work");
 		void *idle_stack = _thc_allocstack();
 		awe_t idle_awe;
 		// Set start of stack-frame marker
 		*((void**)(idle_stack - LAZY_STACK_BUFFER + __WORD_SIZE)) = NULL;
+		DEBUG_DISPATCH(DEBUGPRINTF(DEBUG_DISPATCH_PREFIX "  queue empty\n"));
+		assert(pts->idle_fn != NULL && "Dispatch loop idle, and no idle_fn work");
 		thc_awe_init(&idle_awe, &thc_run_idle_fn, idle_stack-LAZY_STACK_BUFFER,
 			idle_stack-LAZY_STACK_BUFFER);
 #ifndef NDEBUG
@@ -449,6 +446,7 @@ static void thc_dispatch_loop(void) {
 		thc_awe_execute_0(&idle_awe);
 		NOT_REACHED;
 	}
+
 	awe = pts->aweHead.next;
 
 	DEBUG_DISPATCH(DEBUGPRINTF(DEBUG_DISPATCH_PREFIX "  got AWE %p "
@@ -687,8 +685,8 @@ static inline void check_for_lazy_awe (void * ebp) { }
 
 void _thc_startfinishblock(finish_t *fb, int fb_kind) {
 	PTState_t *pts = PTS();
-	assert(PTS() && (PTS()->doneInit) && "Not initialized RTS");
 	finish_t *current_fb = pts->current_fb;
+	assert(PTS() && (PTS()->doneInit) && "Not initialized RTS");
 	DEBUG_FINISH(DEBUGPRINTF(DEBUG_FINISH_PREFIX "> StartFinishBlock (%p,%s)\n",
 					fb,
 					(fb_kind == 0) ? "FINISH" : "TOP-FINISH"));
@@ -730,8 +728,8 @@ void _thc_startfinishblock(finish_t *fb, int fb_kind) {
 	if (current_fb != NULL) {
 		DEBUG_FINISH(DEBUGPRINTF(DEBUG_FINISH_PREFIX "  Splicing between [%p]<->[%p]\n",
 						(current_fb->end_node.prev), &(current_fb->end_node)));
-		assert(current_fb->end_node.prev->next = &(current_fb->end_node));
-		assert(current_fb->start_node.next->prev = &(current_fb->start_node));
+		assert(current_fb->end_node.prev->next == &(current_fb->end_node));
+		assert(current_fb->start_node.next->prev == &(current_fb->start_node));
 		current_fb->end_node.prev->next = &(fb->start_node);
 		fb->start_node.prev = current_fb->end_node.prev;
 		fb->end_node.next = &(current_fb->end_node);
@@ -822,10 +820,10 @@ void _thc_do_cancel_request(finish_t *fb) {
 }
 
 void _thc_endfinishblock(finish_t *fb, void *stack) {
+	PTState_t *pts = PTS();
 #ifdef LCD_DOMAINS
 	printk(KERN_ERR "lcd async endfinishblock executing\n");
 #endif
-	PTState_t *pts = PTS();
 	DEBUG_FINISH(DEBUGPRINTF(DEBUG_FINISH_PREFIX "> EndFinishBlock(%p)\n",
 					fb));
 	assert((pts->doneInit) && "Not initialized RTS");
@@ -889,11 +887,11 @@ void _thc_startasync(void *f, void *stack) {
 }
 
 void _thc_endasync(void *f, void *s) {
+	finish_t *fb = (finish_t*)f;
+	PTState_t *pts = PTS();
 #ifdef LCD_DOMAINS
 	printk(KERN_ERR "lcd async endasync is starting\n");
 #endif
-	finish_t *fb = (finish_t*)f;
-	PTState_t *pts = PTS();
 #ifndef NDEBUG
 	pts->asyncCallsEnded ++;
 #endif
@@ -967,13 +965,13 @@ void THCIncRecvCount(void) {
 
 __attribute__ ((unused))
 static void thc_yield_with_cont(void *a, void *arg) {
+	awe_t *awe = (awe_t*)a; 
+	awe->lazy_stack = awe->pts->curr_lazy_stack;
 	DEBUG_YIELD(DEBUGPRINTF(DEBUG_YIELD_PREFIX "! %p (%p,%p,%p) yield\n",
 					a,
 					((awe_t*)a)->eip,
 					((awe_t*)a)->ebp,
 					((awe_t*)a)->esp));
-	awe_t *awe = (awe_t*)a; 
-	awe->lazy_stack = awe->pts->curr_lazy_stack;
 	// check if we have yielded within a lazy awe
 	check_for_lazy_awe(awe->ebp);
 	THCScheduleBack(awe);
@@ -1329,7 +1327,7 @@ static void *thc_alloc_new_stack_0(void) {
 	if (!res) {
 		error_exit(TEXT("VirtualAlloc(MEM_RESERVE)"));
 	}
-	DEBUG_STACK(DEBUGPRINTF(DEBUG_STACK_PREFIX "  Reserved %p..%p\n",
+	DEBUG_STACK_THC(DEBUGPRINTF(DEBUG_STACK_PREFIX "  Reserved %p..%p\n",
 					res, res+STACK_COMMIT_BYTES+STACK_GUARD_BYTES));
 	void *com = VirtualAlloc(res + STACK_GUARD_BYTES,
 				STACK_COMMIT_BYTES,
@@ -1338,10 +1336,22 @@ static void *thc_alloc_new_stack_0(void) {
 	if (!com) {
 		error_exit(TEXT("VirtualAlloc(MEM_COMMIT)"));
 	}
-	DEBUG_STACK(DEBUGPRINTF(DEBUG_STACK_PREFIX "  Committed %p..%p\n",
+	DEBUG_STACK_THC(DEBUGPRINTF(DEBUG_STACK_PREFIX "  Committed %p..%p\n",
 					com, com+STACK_COMMIT_BYTES));
 	void *result = com + STACK_COMMIT_BYTES;
 	return result;
+}
+#elif defined(LCD_DOMAINS)
+static void *thc_alloc_new_stack_0(void) 
+{
+	void *res = kmalloc(STACK_COMMIT_BYTES + STACK_GUARD_BYTES, GFP_KERNEL);
+	if (!res) {
+		LIBLCD_ERR("lcd async stack allocation failed");
+		return NULL;
+	}
+	/* Note that sizeof(void) = 1 not 8. */
+	res += STACK_GUARD_BYTES + STACK_COMMIT_BYTES;
+	return res;
 }
 #elif defined(linux)
 #include <sys/mman.h>
@@ -1358,7 +1368,7 @@ static void *thc_alloc_new_stack_0(void) {
 		exit(-1);
 	}
 
-	DEBUG_STACK(DEBUGPRINTF(DEBUG_STACK_PREFIX "  mmap %p..%p\n",
+	DEBUG_STACK_THC(DEBUGPRINTF(DEBUG_STACK_PREFIX "  mmap %p..%p\n",
 					res, 
 					res+STACK_COMMIT_BYTES+STACK_GUARD_BYTES));
 
@@ -1387,18 +1397,6 @@ static void *thc_alloc_new_stack_0(void) {
 	//       res + STACK_GUARD_BYTES, res + STACK_GUARD_BYTES + STACK_COMMIT_BYTES);
 
 	return res + STACK_GUARD_BYTES + STACK_COMMIT_BYTES;
-}
-#elif defined(LCD_DOMAINS)
-static void *thc_alloc_new_stack_0(void) 
-{
-	void *res = kmalloc(STACK_COMMIT_BYTES + STACK_GUARD_BYTES, GFP_KERNEL);
-	if (!res) {
-		LIBLCD_ERR("lcd async stack allocation failed");
-		return NULL;
-	}
-	/* Note that sizeof(void) = 1 not 8. */
-	res += STACK_GUARD_BYTES + STACK_COMMIT_BYTES;
-	return res;
 }
 #else
 #error No definition for _thc_alloc_new_stack_0
@@ -1865,6 +1863,13 @@ static PTState_t *thc_get_pts_0(void) {
 static void thc_set_pts_0(PTState_t *st) {
 	thread_set_tls((void*)st);
 }
+#elif defined(LCD_DOMAINS)
+static PTState_t *thc_get_pts_0(void) {
+	return __my_ptstate;
+}
+static void thc_set_pts_0(PTState_t *st) {
+	__my_ptstate = st;
+}
 #elif defined(linux)
 volatile int TlsInitLatch = 0;
 volatile int TlsDoneInit = 0;
@@ -1892,35 +1897,9 @@ static void thc_set_pts_0(PTState_t *st) {
 	assert(TlsDoneInit);
 	pthread_setspecific(TlsKey, (void*)st);
 }
-#elif defined(LCD_DOMAINS)
-static PTState_t *thc_get_pts_0(void) {
-	return current->ptstate;
-}
-static void thc_set_pts_0(PTState_t *st) {
-	current->ptstate = st;
-}
 #else
 #error No definition for thc_get_pts_0
 #endif
-
-#elif defined(linux)
-volatile int TlsInitLatch = 0;
-volatile int TlsDoneInit = 0;
-
-static PTState_t *thc_get_pts_0(void) {
-	return current->ptstate;
-}
-
-static void thc_set_pts_0(PTState_t *st) {
-/*  
-    assert(TlsDoneInit);
-    pthread_setspecific(TlsKey, (void*)st);
-*/
-}
-#else
-#error No definition for thc_get_pts_0
-#endif
-
 
 /**********************************************************************/
 

@@ -42,7 +42,7 @@ int klcd_call(cptr_t endpoint);
 int klcd_reply(void);
 int klcd_create(cptr_t *slot_out);
 int klcd_config(cptr_t lcd, gva_t pc, gva_t sp, gpa_t gva_root,
-		gpa_t stack_page);
+		gpa_t utcb_page);
 int klcd_run(cptr_t lcd);
 int klcd_cap_grant(cptr_t lcd, cptr_t src, cptr_t dest);
 int klcd_cap_page_grant_map(cptr_t lcd, cptr_t page, cptr_t dest, gpa_t gpa);
@@ -295,13 +295,13 @@ static inline int lcd_create(cptr_t *slot_out)
  *
  * The lcd's cspace is configured using lcd_cap_grant.
  *
- * Stack should be the guest physical address where stack/utcb should be 
+ * utcb_page should be the guest physical address where the utcb should be 
  * mapped.
  */
 static inline int lcd_config(cptr_t lcd, gva_t pc, gva_t sp, gpa_t gva_root,
-			gpa_t stack_page)
+			gpa_t utcb_page)
 {
-	return klcd_config(lcd, pc, sp, gva_root, stack_page);
+	return klcd_config(lcd, pc, sp, gva_root, utcb_page);
 }
 /**
  * Runs / resumes an lcd.
@@ -582,13 +582,13 @@ struct lcd_info {
 	 */
 	char *boot_page_base;
 	/*
-	 * The creating lcd has a cptr to the boot page
-	 */
-	cptr_t boot_page_cptrs[1 << LCD_BOOT_PAGES_ORDER];
-	/*
 	 * Boot mem page infos
 	 */
 	struct list_head boot_mem_list;
+	/*
+	 * Stack page infos
+	 */
+	struct list_head stack_mem_list;
 	/*
 	 * Paging mem page infos
 	 */
@@ -636,85 +636,10 @@ static inline void lcd_unload_module(struct lcd_info *mi,
  * you don't pass the capability to any other lcd, etc., this will stop and 
  * destroy the lcd.
  *
- * Guest Physical Memory Layout
- * ============================
+ * Address Spaces
+ * ==============
  *
- * No gdt/tss/idt for now (easier). See Documentation/lcd-domains/vmx.txt.
- *
- * From bottom to top,
- *
- *   -- The bottom 1 MB is unmapped / reserved in case the module is expecting 
- *      the standard physical memory layout of a PC. (Of course, it or its 
- *      creator would need to map something there to emulate that memory.) No
- *      memory mapped here for the gcc stack protector, so make sure you have
- *      that turned off when building the code for the lcd.
- *
- *   -- Guest virtual page tables come next, 4 MBs. This puts a (big) upper 
- *      limit on the size of the module that can be mapped. The page tables
- *      in the hierarchy are allocated on demand as the module is mapped.
- *
- *   -- The stack/UTCB used by the initial thread when the lcd boots. (The
- *      microkernel manages this page.)
- *
- *   -- The module itself.
- *
- *   -- A huge chunk of free/unmapped guest physical memory available to the
- *      module.
- *
- *   -- The upper part is unusable (see Intel SDM V3 28.2.2). The last
- *      usable byte is at 0x0000 FFFF FFFF FFFF.
- *
- *                   +---------------------------+ 0xFFFF FFFF FFFF FFFF
- *                   |         Unusable          |
- *                   +---------------------------+ 0x0000 FFFF FFFF FFFF
- *                   |                           |
- *                   :           Free            :
- *                   |                           |
- *                   +---------------------------+ (variable)
- *                   |                           |
- *                   :          Module           :
- *                   |                           |
- *                   +---------------------------+ 0x0000 0000 0050 2000
- *                   |        Stack/UTCB         |
- *                   |          (4 KBs)          |
- *                   +---------------------------+ 0x0000 0000 0050 1000
- *                   |        Boot Info          |
- *                   |          (4 KBs)          |
- *                   +---------------------------+ 0x0000 0000 0050 0000
- *                   | Guest Virtual Page Tables | 
- *                   |        (4 MBs max)        |
- *                   +---------------------------+ 0x0000 0000 0010 0000
- *                   |       Free / Unmapped     | 
- *                   |          (1 MB)           |
- *                   +---------------------------+ 0x0000 0000 0000 0000
- *
- * Guest Virtual Memory Layout
- * ===========================
- *
- * The lower part has the same layout as the guest physical.
- *
- * The module is mapped per the guest virtual addresses in the lcd_module_page
- * list returned from the module loader, so that relinking is unnecessary.
- * 
- *                   +---------------------------+ 0xFFFF FFFF FFFF FFFF
- *  The module       |                           |
- *  gets mapped      |        Upper Part         |
- *  somewhere in     :       (mostly free)       :
- *  here  -------->  |                           |
- *                   |                           |
- *                   +---------------------------+ 0x0000 0000 0050 1000
- *                   |        Stack/UTCB         |
- *                   |          (4 KBs)          |
- *                   +---------------------------+ 0x0000 0000 0050 2000
- *                   |        Boot info          |
- *                   |          (4 KBs)          |
- *                   +---------------------------+ 0x0000 0000 0050 0000
- *                   | Guest Virtual Page Tables | 
- *                   |        (4 MBs max)        |
- *                   +---------------------------+ 0x0000 0000 0010 0000
- *                   |       Free / Unmapped     | 
- *                   |          (1 MB)           |
- *                   +---------------------------+ 0x0000 0000 0000 0000
+ * See types.h.
  *
  * Initial CSPACE
  * ==============

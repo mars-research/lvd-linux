@@ -8,7 +8,6 @@
 #ifdef LCD_DOMAINS
 #include <lcd-domains/liblcd-config.h>
 #include <lcd-domains/types.h>
-#define assert(XX) do { BUG_ON(!XX); } while(0)
 #else /* ! LCD_DOMAINS */
 #include <assert.h>
 #endif /* LCD_DOMAINS */

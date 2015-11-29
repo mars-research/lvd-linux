@@ -5,6 +5,9 @@
 # I hack KBUILD_CFLAGS so we don't have to do this in every kbuild file.
 KBUILD_CFLAGS := $(KBUILD_CFLAGS) $(LCD_DOMAINS_CFLAGS)
 
+# for async code conditional compilation
+ccflags-y := -DLCD_DOMAINS
+
 lib-y    +=  $(addprefix lcd/, cap.o \
 			       enterexit.o \
 			       ipc.o \
@@ -12,6 +15,9 @@ lib-y    +=  $(addprefix lcd/, cap.o \
 			       printk.o \
 			       dstore.o \
 			       tests.o)
+
+lib-y    +=  $(addprefix async/, thc.o \
+	     		 	 thcsync.o)
 
 lib-y    +=  $(addprefix lib/, find_next_bit.o \
 			       kstrtox.o \

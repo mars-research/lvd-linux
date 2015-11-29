@@ -18,8 +18,11 @@
 #define LCD_FREE_MEM_SIZE (16 << 20)
 #define LCD_FREE_MEM_BMAP_SIZE (LCD_FREE_MEM_SIZE >> PAGE_SHIFT)
 
-/* Controls the biggest chunk of pages we can alloc - 2^3 = 8 */
-#define LCD_FREE_MEM_MAX_ORDER 3
+/* Controls the biggest chunk of pages we can alloc. This is ultimately
+ * configured in liblcd-config.h under CONFIG_FORCE_MAX_ZONEORDER.
+ * NOTE: This needs to be small enough so that the stack frame for
+ * allocating pages isn't too big. */
+#define LCD_FREE_MEM_MAX_ORDER MAX_ORDER
 
 static DECLARE_BITMAP(paging_mem_bmap, LCD_GV_PAGING_MEM_BMAP_SIZE);
 static cptr_t paging_mem_page2cptr[LCD_GV_PAGING_MEM_BMAP_SIZE];
@@ -789,6 +792,14 @@ int lcd_alloc_pages(unsigned order, gva_t *base_out)
 	int ret;
 	unsigned i, j;
 	/*
+	 * Check that order isn't too big
+	 */
+	if (order > LCD_FREE_MEM_MAX_ORDER) {
+		lcd_printk("lcd_alloc_pages: order %d is too big",
+			order);
+		return -ENOMEM;
+	}
+	/*
 	 * Get pages from microkernel
 	 */
 	for (i = 0; i < (1 << order); i++) {
@@ -964,6 +975,7 @@ static void init_page_alloc_data(void)
 		idx = gpa_val(boot_mem_pi_start[i].page_gpa);
 		idx -= gpa_val(LCD_BOOT_PAGES_GPA);
 		idx >>= PAGE_SHIFT;
+		BUG_ON(idx >= (1 << LCD_BOOT_PAGES_ORDER));
 		boot_cptrs[idx] = boot_mem_pi_start[i].my_cptr;
 	}
 	/*
@@ -973,6 +985,7 @@ static void init_page_alloc_data(void)
 		idx = gpa_val(stack_mem_pi_start[i].page_gpa);
 		idx -= gpa_val(LCD_STACK_GPA);
 		idx >>= PAGE_SHIFT;
+		BUG_ON(idx >= (1 << LCD_STACK_PAGES_ORDER));
 		stack_cptrs[idx] = stack_mem_pi_start[i].my_cptr;
 	}
 	/*
@@ -984,6 +997,7 @@ static void init_page_alloc_data(void)
 		idx = gpa_val(paging_mem_pi_start[i].page_gpa);
 		idx -= gpa_val(LCD_GV_PAGING_MEM_BASE);
 		idx >>= PAGE_SHIFT;
+		BUG_ON(idx >= LCD_GV_PAGING_MEM_BMAP_SIZE);
 		set_bit(idx, paging_mem_bmap);
 		paging_mem_page2cptr[idx] = paging_mem_pi_start[i].my_cptr;
 	}
@@ -994,6 +1008,7 @@ static void init_page_alloc_data(void)
 		idx = gpa_val(free_mem_pi_start[i].page_gpa);
 		idx -= gpa_val(LCD_FREE_MEM_BASE);
 		idx >>= PAGE_SHIFT;
+		BUG_ON(idx >= LCD_FREE_MEM_BMAP_SIZE);
 		set_bit(idx, free_mem_bmap);
 		free_mem_page2cptr[idx] = free_mem_pi_start[i].my_cptr;
 	}

@@ -149,6 +149,34 @@ fail1:
 	return ret;
 }
 
+static int kmalloc_big_test(void)
+{
+	void *x;
+
+	/* Alloc 24 pages */
+	x = kmalloc(24 << PAGE_SHIFT, GFP_KERNEL);
+	if (!x) {
+		LIBLCD_ERR("kmalloc failed");
+		return -1;
+	}
+	kfree(x);
+	return 0;
+}
+
+static int kmalloc_bigbig_test(void)
+{
+	void *x;
+
+	/* This alloc should fail. */
+	x = kmalloc(KMALLOC_MAX_SIZE + 1, GFP_KERNEL);
+	if (x) {
+		LIBLCD_ERR("kmalloc should have failed");
+		kfree(x);
+		return -1;
+	}
+	return 0;
+}
+
 static int dstore_test(void)
 {
 	struct dstore *d1, *d2;
@@ -268,6 +296,18 @@ int lcd_run_tests(void)
 		return ret;
 	}
 	LIBLCD_MSG("kmalloc test passed!");
+	ret = kmalloc_big_test();
+	if (ret) {
+		LIBLCD_ERR("kmalloc big test failed");
+		return ret;
+	}
+	LIBLCD_MSG("kmalloc big test passed!");
+	ret = kmalloc_bigbig_test();
+	if (ret) {
+		LIBLCD_ERR("kmalloc bigbig test failed");
+		return ret;
+	}
+	LIBLCD_MSG("kmalloc bigbig test passed!");
 	ret = dstore_test();
 	if (ret) {
 		LIBLCD_ERR("dstore test failed");

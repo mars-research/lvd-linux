@@ -352,24 +352,24 @@ static inline hpa_t hva2hpa(hva_t hva)
  *  somewhere in     :       (mostly free)       :
  *  here  -------->  |                           |
  *                   |                           |
- *                   +---------------------------+ 0x0000 0000 0150 4000
+ *                   +---------------------------+ 0x0000 0000 0150 8000
  *                   |                           |
  *                   |           Heap            |
  *                   :         (16 MBs)          :
  *                   |                           |
- *                   +---------------------------+ 0x0000 0000 0050 4000
+ *                   +---------------------------+ 0x0000 0000 0050 8000
  *                   |           Stack           |
- *                   |          (4 KBs)          |
- *                   +---------------------------+ 0x0000 0000 0050 3000
+ *                   |          (8 KBs)          |
+ *                   +---------------------------+ 0x0000 0000 0050 6000
  *                   |         Guard page        |
  *                   |        (not mapped)       |
  *                   |          (4 KBs)          |
- *                   +---------------------------+ 0x0000 0000 0050 2000
+ *                   +---------------------------+ 0x0000 0000 0050 5000
  *                   |           UTCB            |
  *                   |          (4 KBs)          |
- *                   +---------------------------+ 0x0000 0000 0050 1000
+ *                   +---------------------------+ 0x0000 0000 0050 4000
  *                   |        Boot info          |
- *                   |          (4 KBs)          |
+ *                   |         (16 KBs)          |
  *                   +---------------------------+ 0x0000 0000 0050 0000
  *                   | Guest Virtual Page Tables | 
  *                   |        (4 MBs max)        |
@@ -380,7 +380,7 @@ static inline hpa_t hva2hpa(hva_t hva)
  */
 
 #define LCD_BOOT_PAGES_ORDER 2
-#define LCD_STACK_PAGES_ORDER 0
+#define LCD_STACK_PAGES_ORDER 1
 
 /* guest physical addresses */
 #define LCD_GV_PAGING_MEM_GPA __gpa(1 << 20) /* low 1 MB is empty */

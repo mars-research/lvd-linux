@@ -125,6 +125,11 @@ int lcd_enter(void);
  */
 void __noreturn lcd_exit(int retval);
 
+/**
+ * Exit from lcd. Doesn't try to tear down anything. Just does
+ * exit syscall immediately.
+ */
+void __noreturn lcd_abort(void);
 
 /* LOW LEVEL PAGE ALLOC -------------------------------------------------- */
 

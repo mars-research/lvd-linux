@@ -52,13 +52,15 @@
 #define DEBUGPRINTF debug_printf
 #elif LCD_DOMAINS
 #define DEBUGPRINTF printk
+#undef KERN_ERR
+#define KERN_ERR ""
 #else
 #define DEBUGPRINTF printf
 #endif
 
 //#define DEBUG_STATS(XX)
 #define DEBUG_STATS(XX) do{ XX; } while (0)
-#define DEBUG_STATS_PREFIX        "         stats:    "
+#define DEBUG_STATS_PREFIX        "    stats:    "
 
 //#define VERBOSE_DEBUG
 
@@ -162,8 +164,13 @@ static struct thc_latch debug_latch = {0};
 static void thc_print_pts_stats(PTState_t *t, int clear)
 {
 	thc_latch_acquire(&debug_latch);
-
-	DEBUG_STATS(DEBUGPRINTF(DEBUG_STATS_PREFIX "----------------------------------------\n"));
+#ifdef LCD_DOMAINS
+	printk(KERN_ERR "---------------\n");
+	printk(KERN_ERR "  THC STATS    \n");
+	printk(KERN_ERR "---------------\n");
+#else
+	DEBUG_STATS(DEBUGPRINTF(DEBUG_STATS_PREFIX "------------------------------\n"));
+#endif
 	DEBUG_STATS(DEBUGPRINTF(DEBUG_STATS_PREFIX "  %c stacks         %8d %8d\n",
 					(t->stacksAllocated == t->stacksDeallocated) ? ' ' : '*',
 					t->stacksAllocated, t->stacksDeallocated));
@@ -521,6 +528,7 @@ static void thc_dispatch(PTState_t *pts) {
 
 static void thc_start_rts(void) {
 	InitPTS();
+	printk("Initialized PTS!");
 	assert(PTS() && (!PTS()->doneInit) && "Already initialized RTS");
 	DEBUG_INIT(DEBUGPRINTF(DEBUG_INIT_PREFIX "> Starting\n"));
 	thc_init_dispatch_loop();
@@ -611,7 +619,7 @@ static void init_lazy_awe (void ** lazy_awe_fp) {
 	awe_t *awe = THC_LAZY_FRAME_AWE(lazy_awe_fp);
 
 #ifdef LCD_DOMAINS
-	printk(KERN_ERR "\nthe value of the lazy frame awe is: %x\n", (int)awe);
+	printk(KERN_ERR "\nthe value of the lazy frame awe is: 0x%p\n", awe);
 #endif
 
 	DEBUG_AWE(DEBUGPRINTF(DEBUG_AWE_PREFIX " found lazy awe %p @ frameptr %p",
@@ -640,9 +648,9 @@ static void init_lazy_awe (void ** lazy_awe_fp) {
 // they are found.
 
 static void check_for_lazy_awe (void * ebp) {
-	DEBUG_AWE(DEBUGPRINTF(DEBUG_AWE_PREFIX "> CheckForLazyAWE (ebp=%p)\n", ebp));
 	void **frame_ptr  = (void **) ebp;
 	void *ret_addr    = THC_LAZY_FRAME_RET(frame_ptr);
+	DEBUG_AWE(DEBUGPRINTF(DEBUG_AWE_PREFIX "> CheckForLazyAWE (ebp=%p)\n", ebp));
 	while (frame_ptr != NULL && ret_addr != NULL) {
 		if (ret_addr == &_thc_lazy_awe_marker) {
 #ifdef LCD_DOMAINS			
@@ -1347,8 +1355,17 @@ static void *thc_alloc_new_stack_0(void)
 	void *res = kmalloc(STACK_COMMIT_BYTES + STACK_GUARD_BYTES, GFP_KERNEL);
 	if (!res) {
 		LIBLCD_ERR("lcd async stack allocation failed");
-		return NULL;
+		/*
+		 * The rest of the async code isn't prepared to
+		 * handle a failed malloc (boo), so we die inside
+		 * here. (We could certainly patch up the code in the
+		 * future.)
+		 */
+		lcd_abort();
 	}
+
+	printk("kmalloc'd stack");
+
 	/* Note that sizeof(void) = 1 not 8. */
 	res += STACK_GUARD_BYTES + STACK_COMMIT_BYTES;
 	return res;

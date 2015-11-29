@@ -1,7 +1,7 @@
 
 #include <lcd-domains/liblcd-config.h>
 #include <lcd-domains/liblcd.h>
-
+#include <lcd-domains/thc.h>
 #include <lcd-domains/liblcd-hacks.h>
 
 int lcd_enter(void)
@@ -47,6 +47,14 @@ int lcd_enter(void)
 		goto fail;
 	}
 	LIBLCD_MSG("data store subystem ready");
+	/*
+	 * Set up async runtime
+	 */
+	thc_init();
+
+	lcd_printk("===============");
+	lcd_printk("  LCD BOOTED   ");
+	lcd_printk("===============");
 
 	return 0;
 
@@ -56,11 +64,26 @@ fail:
 
 void __noreturn lcd_exit(int retval)
 {
+	lcd_printk("=================");
+	lcd_printk("LCD SHUTTING DOWN");
+	lcd_printk("=================");
+
 	/*
-	 * For now, don't tear anything down, just exit.
+	 * For now, just tear down async so we can make sure
+	 * it all worked.
 	 */
+	thc_done();
+
 	LIBLCD_MSG("exiting");
 	lcd_set_r0(retval);
+	for(;;)
+		LCD_DO_SYSCALL(LCD_SYSCALL_EXIT); /* doesn't return */
+}
+
+void __noreturn lcd_abort(void)
+{
+	LIBLCD_MSG("aborting");
+	lcd_set_r0(-EIO);
 	for(;;)
 		LCD_DO_SYSCALL(LCD_SYSCALL_EXIT); /* doesn't return */
 }

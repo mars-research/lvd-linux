@@ -19,3 +19,5 @@ obj-m += create-klcd/
 obj-m += glue-example/
 
 obj-m += pmfs/
+
+obj-m += async/

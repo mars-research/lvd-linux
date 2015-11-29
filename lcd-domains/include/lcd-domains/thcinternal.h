@@ -359,8 +359,8 @@ extern int _end_text_nx;
 
 #define SCHEDULE_CONT(_AWE_PTR, NESTED_FUNC)			\
 	({							\
-		KILL_CALLEE_SAVES();				\
 		uint64_t savedRAX;				\
+		KILL_CALLEE_SAVES();				\
 		__asm__ __volatile__(				\
 			"movq %%rbx, %0\n\t"			\
 			"movq %1, %%rbx\n\t"			\

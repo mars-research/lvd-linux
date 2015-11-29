@@ -55,6 +55,7 @@
 #undef CONFIG_SMP
 #undef CONFIG_KALLSYMS
 #undef CONFIG_SWAP
+#undef CONFIG_TRANSPARENT_HUGEPAGE
 
 #ifndef CONFIG_SLAB
 #define CONFIG_SLAB
@@ -64,6 +65,9 @@
 #define CONFIG_NR_CPUS 1
 
 #undef CONFIG_NODES_SHIFT /* force max numnodes to 1 */
+
+#undef CONFIG_FORCE_MAX_ZONEORDER
+#define CONFIG_FORCE_MAX_ZONEORDER 6
 
 /*
  * Set include guards to force using our includes.

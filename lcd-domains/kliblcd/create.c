@@ -1574,7 +1574,7 @@ int klcd_create_module_lcd(cptr_t *slot_out, char *mdir, char *mname,
 	 * Configure lcd
 	 */
 	ret = lcd_config(*slot_out, (*mi)->init, 
-			gva_add(LCD_STACK_GVA, LCD_STACK_SIZE - 1), /* stack */
+			gva_add(LCD_STACK_GVA, LCD_STACK_SIZE), /* stack */
 			LCD_GV_PAGING_MEM_GPA,
 			LCD_UTCB_GPA);
 	if (ret) {

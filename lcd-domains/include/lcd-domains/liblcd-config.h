@@ -66,6 +66,9 @@
 
 #undef CONFIG_NODES_SHIFT /* force max numnodes to 1 */
 
+/* This controls the largest kmalloc cache and the maximum allowed
+ * number of contiguous pages you can alloc. Please update documentation
+ * elsewhere if you change this. */
 #undef CONFIG_FORCE_MAX_ZONEORDER
 #define CONFIG_FORCE_MAX_ZONEORDER 6
 

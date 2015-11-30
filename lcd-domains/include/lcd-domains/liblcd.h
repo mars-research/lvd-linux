@@ -171,6 +171,10 @@ void lcd_unmap_page(cptr_t page_cptr, gva_t page);
  * Allocates 2^order pages. These will be properly mapped in gv and gp
  * address spaces (so you're done). Returns gv address of first page
  * in base_out.
+ *
+ * NOTE: The maximum order is configured in liblcd-config.h under
+ * CONFIG_FORCE_MAX_ZONEORDER. It is currently 6 (so the largest you
+ * can allocate is 2^6 = 64 pages, or 256 KBs).
  */
 int lcd_alloc_pages(unsigned order, gva_t *base_out);
 /**

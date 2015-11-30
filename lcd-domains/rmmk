@@ -1,0 +1,3 @@
+#! /bin/bash
+
+sudo rmmod microkernel/lcd_domains.ko

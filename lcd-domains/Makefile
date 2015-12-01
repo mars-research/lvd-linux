@@ -20,7 +20,7 @@ the_rest: liblcd
 liblcd:
 	$(MAKE) -C .. M=$(PWD)/liblcd -j8
 
-clean: module_init_tools_clean
+clean: 
 	$(MAKE) -C .. M=$(PWD) clean
 	$(MAKE) -C .. M=$(PWD)/liblcd clean
 

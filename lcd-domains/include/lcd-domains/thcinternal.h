@@ -356,7 +356,7 @@ extern int _end_text_nx;
 #endif
 
 /***********************************************************************/
-
+#if 0
 #define SCHEDULE_CONT(_AWE_PTR, NESTED_FUNC)			\
 	({							\
 		uint64_t savedRAX;				\
@@ -376,6 +376,13 @@ extern int _end_text_nx;
 			"movq %0, %%rbx\n\t"			\
 			:"=r"(savedRAX)				\
 			);					\
+	})
+#endif
+
+#define SCHEDULE_CONT(_AWE_PTR, NESTED_FUNC)			\
+	({							\
+		KILL_CALLEE_SAVES();				\
+		NESTED_FUNC(FORCE_ARGS_STACK_CALL _AWE_PTR);	\
 	})
 
 #define CALL_CONT(_FN,_ARG)						\

@@ -11,21 +11,21 @@
 
 #include <lcd-domains/liblcd-hacks.h>
 
-static void f1(void)
+void f1(void)
 {
 	LIBLCD_MSG("called f1, yielding...");
 	THCYield();
 	LIBLCD_MSG("back in f1 from yield");
 }
 
-static void f2(void)
+void f2(void)
 {
 	LIBLCD_MSG("called f2, yielding...");
 	THCYield();
 	LIBLCD_MSG("back in f2 from yield");
 }
 
-static void do_stuff(void)
+void do_stuff(void)
 {
 	DO_FINISH(
 

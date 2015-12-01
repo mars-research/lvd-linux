@@ -33,7 +33,6 @@
 #include <lcd-domains/thc.h>
 #include <lcd-domains/thcsync.h>
 #include <lcd-domains/thcinternal.h>
-#include <asm/page.h>
 #include <linux/slab.h>
 #include <lcd-domains/liblcd-hacks.h>
 #else
@@ -63,6 +62,7 @@
 #define DEBUG_STATS_PREFIX        "    stats:    "
 
 //#define VERBOSE_DEBUG
+#define NDEBUG /* undef this to turn on debugging */
 
 #ifdef VERBOSE_DEBUG
 #define DEBUG_YIELD(XX) do{ XX; } while (0)
@@ -165,9 +165,9 @@ static void thc_print_pts_stats(PTState_t *t, int clear)
 {
 	thc_latch_acquire(&debug_latch);
 #ifdef LCD_DOMAINS
-	printk(KERN_ERR "---------------\n");
-	printk(KERN_ERR "  THC STATS    \n");
-	printk(KERN_ERR "---------------\n");
+	DEBUG_STATS(DEBUGPRINTF("---------------\n"));
+	DEBUG_STATS(DEBUGPRINTF("  THC STATS    \n"));
+	DEBUG_STATS(DEBUGPRINTF("---------------\n"));
 #else
 	DEBUG_STATS(DEBUGPRINTF(DEBUG_STATS_PREFIX "------------------------------\n"));
 #endif
@@ -447,9 +447,6 @@ static void thc_dispatch_loop(void) {
 #endif
 		pts->curr_lazy_stack = NULL;
 		DEBUG_DISPATCH(DEBUGPRINTF(DEBUG_DISPATCH_PREFIX "  executing idle function\n"));
-#ifdef LCD_DOMAINS
-		printk(KERN_ERR "lcd async thc_dispatch_loop executing idle awe\n");
-#endif
 		thc_awe_execute_0(&idle_awe);
 		NOT_REACHED;
 	}
@@ -465,12 +462,6 @@ static void thc_dispatch_loop(void) {
 	awe->next->prev = &(pts->aweHead);
 #ifndef NDEBUG
 	pts->aweResumed ++;
-#endif
-#ifdef LCD_DOMAINS
-	printk(KERN_ERR "lcd async thc_dispatch_loop will now execute AWE\n");
-	printk(KERN_ERR "lcd async thc_dispatch_loop EIP: %p\n", awe->eip);
-	printk(KERN_ERR "lcd async thc_dispatch_loop EBP: %p\n", awe->ebp);
-	printk(KERN_ERR "lcd async thc_dispatch_loop ESP: %p\n", awe->esp);
 #endif
 	thc_awe_execute_0(awe);
 }
@@ -618,25 +609,21 @@ static void init_lazy_awe (void ** lazy_awe_fp) {
 	// Get the saved awe
 	awe_t *awe = THC_LAZY_FRAME_AWE(lazy_awe_fp);
 
-#ifdef LCD_DOMAINS
-	printk(KERN_ERR "\nthe value of the lazy frame awe is: 0x%p\n", awe);
-#endif
-
 	DEBUG_AWE(DEBUGPRINTF(DEBUG_AWE_PREFIX " found lazy awe %p @ frameptr %p",
 				awe, lazy_awe_fp));
 	// Scrub nested return, lazy awe will now return through dispatch loop
 #ifdef LCD_DOMAINS
-	printk(KERN_ERR "\nscrubbing nested return (lazy_awe_fp)\n");
+	DEBUG_AWE(DEBUGPRINTF(DEBUG_AWE_PREFIX " scrubbing return address (set to null to indicate we blocked\n"));
 #endif
 	THC_LAZY_FRAME_RET(lazy_awe_fp) = NULL;
-#ifdef LCD_DOMAINS
-	printk(KERN_ERR "\ndone setting nested return, allocating lazy stack\n");
-#endif
 	assert(awe->status == LAZY_AWE);
 	// Allocate a new stack for this awe
+#ifdef LCD_DOMAINS
+	DEBUG_AWE(DEBUGPRINTF(DEBUG_AWE_PREFIX " alloc'ing and setting its lazy stack\n"));
+#endif
 	alloc_lazy_stack(awe);
 #ifdef LCD_DOMAINS
-	printk(KERN_ERR "\ndone allocating lazy stack, starting async\n");
+	DEBUG_AWE(DEBUGPRINTF(DEBUG_AWE_PREFIX " adding awe to dispatch queue...\n"));
 #endif
 	// lazily start async block
 	_thc_startasync(awe->current_fb, awe->lazy_stack);
@@ -652,26 +639,34 @@ static void check_for_lazy_awe (void * ebp) {
 	void *ret_addr    = THC_LAZY_FRAME_RET(frame_ptr);
 	DEBUG_AWE(DEBUGPRINTF(DEBUG_AWE_PREFIX "> CheckForLazyAWE (ebp=%p)\n", ebp));
 	while (frame_ptr != NULL && ret_addr != NULL) {
+#ifdef LCD_DOMAINS
+		DEBUG_AWE(DEBUGPRINTF(DEBUG_AWE_PREFIX ">   stack frame (%p) return ip (%p)\n",
+					frame_ptr, ret_addr));
+#endif
 		if (ret_addr == &_thc_lazy_awe_marker) {
 #ifdef LCD_DOMAINS			
-			printk(KERN_ERR "\nlcd async the awe marker is found\n");
+			DEBUG_AWE(DEBUGPRINTF(DEBUG_AWE_PREFIX ">   found a lazy awe\n"));
 #endif
 			init_lazy_awe(frame_ptr);
 #ifdef LCD_DOMAINS
-			printk(KERN_ERR "\nlazy_awe_initialzed.\n");
+			DEBUG_AWE(DEBUGPRINTF(DEBUG_AWE_PREFIX ">   finished initializing it\n"));
 #endif
 		}
-#ifdef LCD_DOMAINS
-		printk(KERN_ERR "trying to get ebp\n");
-#endif
 		frame_ptr = (void **) THC_LAZY_FRAME_PREV(frame_ptr);
 #ifdef LCD_DOMAINS
-		printk(KERN_ERR "frame_ptr is %llx\n", (unsigned long long)frame_ptr);
-		printk(KERN_ERR "got ebp\n");
-
+		/*
+		 * This might be a bug in the original implementation.
+		 * The original authors didn't check frame_ptr != NULL
+		 * before deref'ing to get the return address. Muktesh
+		 * caught this.
+		 */
 		if (frame_ptr != NULL) {
-			ret_addr   = THC_LAZY_FRAME_RET(frame_ptr);	
+			ret_addr = THC_LAZY_FRAME_RET(frame_ptr);	
+		} else {
+			DEBUG_AWE(DEBUGPRINTF(DEBUG_AWE_PREFIX "  reached last frame on this stack, no more awe's to check, exiting stack walk\n"));
 		}
+#else
+		ret_addr   = THC_LAZY_FRAME_RET(frame_ptr);
 #endif
 	}
 	DEBUG_AWE(DEBUGPRINTF(DEBUG_AWE_PREFIX "< CheckForLazyAWE\n"));
@@ -829,9 +824,6 @@ void _thc_do_cancel_request(finish_t *fb) {
 
 void _thc_endfinishblock(finish_t *fb, void *stack) {
 	PTState_t *pts = PTS();
-#ifdef LCD_DOMAINS
-	printk(KERN_ERR "lcd async endfinishblock executing\n");
-#endif
 	DEBUG_FINISH(DEBUGPRINTF(DEBUG_FINISH_PREFIX "> EndFinishBlock(%p)\n",
 					fb));
 	assert((pts->doneInit) && "Not initialized RTS");
@@ -842,12 +834,13 @@ void _thc_endfinishblock(finish_t *fb, void *stack) {
 		// Zero first time.  Check there's not an AWE waiting.
 		assert(fb->finish_awe == NULL);
 #ifdef LCD_DOMAINS
-		printk(KERN_ERR "lcd async endfinishblock count is zero\n");
+		DEBUG_FINISH(DEBUGPRINTF(DEBUG_FINISH_PREFIX "  no async's to wait for\n"));
 #endif
 	} else {
 		// Non-zero first time, add ourselves as the waiting AWE.
 #ifdef LCD_DOMAINS
-		printk(KERN_ERR "lcd async endfinishblock has pending AWE\n");
+		DEBUG_FINISH(DEBUGPRINTF(DEBUG_FINISH_PREFIX "  do-finish block has a pending awe/async\n"));
+		DEBUG_FINISH(DEBUGPRINTF(DEBUG_FINISH_PREFIX "  create a continuation for this spot; the last async will schedule us and we'll pick back up from here\n"));
 #endif
 		CALL_CONT_LAZY((unsigned char*)&_thc_endfinishblock0, fb);
 	}
@@ -897,9 +890,6 @@ void _thc_startasync(void *f, void *stack) {
 void _thc_endasync(void *f, void *s) {
 	finish_t *fb = (finish_t*)f;
 	PTState_t *pts = PTS();
-#ifdef LCD_DOMAINS
-	printk(KERN_ERR "lcd async endasync is starting\n");
-#endif
 #ifndef NDEBUG
 	pts->asyncCallsEnded ++;
 #endif
@@ -926,10 +916,7 @@ void _thc_endasync(void *f, void *s) {
 			DEBUG_FINISH(DEBUGPRINTF(DEBUG_FINISH_PREFIX "  waiting AWE %p\n",
 							fb->finish_awe));
 #ifdef LCD_DOMAINS
-			printk(KERN_ERR "lcd async scheduling finish awe\n");
-			printk(KERN_ERR "lcd async EIP: %p\n", fb -> finish_awe->eip);
-			printk(KERN_ERR "lcd async EBP: %p\n", fb -> finish_awe->ebp);
-			printk(KERN_ERR "lcd async ESP: %p\n", fb -> finish_awe->esp);
+			DEBUG_FINISH(DEBUGPRINTF(DEBUG_FINISH_PREFIX "  scheduling finish block's awe\n"));
 #endif
 			thc_schedule_local(fb -> finish_awe);
 			fb -> finish_awe = NULL;
@@ -937,8 +924,7 @@ void _thc_endasync(void *f, void *s) {
 	}
 #ifdef LCD_DOMAINS
 	else {
-		
-		printk(KERN_ERR "lcd async no pending AWE on finish block\n");
+		DEBUG_FINISH(DEBUGPRINTF(DEBUG_FINISH_PREFIX " still have pending awes for finished block\n"));
 	}
 #endif
 
@@ -1094,18 +1080,14 @@ static inline void thc_schedule_local(awe_t *awe) {
 	DEBUG_AWE(DEBUGPRINTF(DEBUG_AWE_PREFIX "> THCSchedule(%p)\n",
 				awe));
 #ifdef LCD_DOMAINS
-	printk(KERN_ERR "lcd async Schedule Local adding AWE to front\n");
+	DEBUG_AWE(DEBUGPRINTF(DEBUG_AWE_PREFIX "> awe eip(%p), ebp(%p), esp(%p)\n",
+				awe->eip, awe->ebp, awe->esp));
 #endif
 	awe_pts = awe->pts;
 	awe->prev = &(awe_pts->aweHead);
 	awe->next = awe_pts->aweHead.next;
 	awe_pts->aweHead.next->prev = awe;
 	awe_pts->aweHead.next = awe;
-#ifdef LCD_DOMAINS
-	printk(KERN_ERR "lcd async AWE EIP: %p\n", awe->eip);
-	printk(KERN_ERR "lcd async AWE EBP: %p\n", awe->ebp);
-	printk(KERN_ERR "lcd async AWE ESP: %p\n", awe->esp);
-#endif
 	DEBUG_AWE(DEBUGPRINTF(DEBUG_AWE_PREFIX "  added AWE between %p %p\n",
 				awe->prev, awe->next));
 	DEBUG_AWE(DEBUGPRINTF(DEBUG_AWE_PREFIX "< THCSchedule\n"));
@@ -1142,17 +1124,16 @@ void THCScheduleBack(awe_t *awe) {
 	PTState_t *awe_pts = awe->pts;
 	DEBUG_AWE(DEBUGPRINTF(DEBUG_AWE_PREFIX "> THCSchedule(%p)\n",
 				awe));
+#ifdef LCD_DOMAINS
+	DEBUG_AWE(DEBUGPRINTF(DEBUG_AWE_PREFIX "> awe eip(%p), ebp(%p), esp(%p)\n",
+				awe->eip, awe->ebp, awe->esp));
+#endif
 	assert(awe_pts == PTS());
 	awe_pts = awe->pts;
 	awe->prev = awe_pts->aweTail.prev;
 	awe->next = &(awe_pts->aweTail);
 	awe_pts->aweTail.prev->next = awe;
 	awe_pts->aweTail.prev = awe;
-#ifdef LCD_DOMAINS
-	printk(KERN_ERR "lcd async SchedBack AWE EIP: %p\n", awe->eip);
-	printk(KERN_ERR "lcd async SchedBack AWE EBP: %p\n", awe->ebp);
-	printk(KERN_ERR "lcd async SchedBack AWE ESP: %p\n", awe->esp);
-#endif
 }
 
 void THCAddCancelItem(cancel_item_t *ci, THCCancelFn_t fn, void *arg) {
@@ -1363,8 +1344,6 @@ static void *thc_alloc_new_stack_0(void)
 		 */
 		lcd_abort();
 	}
-
-	printk("kmalloc'd stack");
 
 	/* Note that sizeof(void) = 1 not 8. */
 	res += STACK_GUARD_BYTES + STACK_COMMIT_BYTES;

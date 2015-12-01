@@ -9,3 +9,5 @@ obj-m  += lcd_test_mod_async_lcd.o
 lcd_test_mod_async_lcd-y              += lcd.o
 
 lcd_test_mod_async_lcd-y              += $(LIBLCD)
+
+ccflags-y := -fno-ipa-sra -fno-ipa-cp

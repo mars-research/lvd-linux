@@ -21,6 +21,7 @@ typedef int errval_t;
 void thc_init(void);
 void thc_done(void);
 
+
 // The implementation of do..finish relies on shadowing so that 
 // _fb_info always refers to the closest enclosing do..finish block.
 #pragma GCC diagnostic ignored "-Wshadow"
@@ -126,6 +127,12 @@ void thc_done(void);
 		_awe.status     = LAZY_AWE;				\
 		_awe.lazy_stack = NULL;					\
 		_awe.pts        = NULL;					\
+									\
+		__asm__ volatile("nop \n\t");				\
+		__asm__ volatile("nop \n\t");				\
+		__asm__ volatile("nop \n\t");				\
+		__asm__ volatile("nop \n\t");				\
+		__asm__ volatile("nop \n\t");				\
 									\
 		SCHEDULE_CONT(&_awe, _thc_nested_async);		\
 		__asm__ volatile (					\
@@ -299,6 +306,8 @@ int THCIsCancelRequested(void);
 void THCDumpStats(int clear_stats);
 void THCIncSendCount(void);
 void THCIncRecvCount(void);
+
+/*......................................................................*/
 
 /*......................................................................*/
 

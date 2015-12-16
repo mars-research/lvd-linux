@@ -68,8 +68,9 @@ void Rpc::prepare_marshal()
   this->explicit_return_->prepare_marshal(worker);
 }
 
-Module::Module(std::vector<Rpc*> rpc_definitions, std::vector<GlobalVariable*> globals, LexicalScope *ls)
+Module::Module(const char *id, std::vector<Rpc*> rpc_definitions, std::vector<GlobalVariable*> globals, LexicalScope *ls)
 {
+  this->module_name_ = id;
   this->module_scope_ = ls;
   this->rpc_definitions_ = rpc_definitions;
   this->globals_ = globals;
@@ -98,10 +99,16 @@ void Module::prepare_marshal()
   }
 }
 
-Project::Project(LexicalScope *scope, std::vector<Module*> modules)
+const char* Module::identifier()
+{
+  return this->module_name_;
+}
+
+Project::Project(LexicalScope *scope, std::vector<Module*> modules, std::vector<Include*> includes)
 {
   this->project_scope_ = scope;
   this->project_modules_ = modules;
+  this->project_includes_ = includes;
 }
 
 void Project::prepare_marshal()
@@ -110,5 +117,16 @@ void Project::prepare_marshal()
     Module *m = *it;
     m->prepare_marshal();
   }
+}
+
+std::vector<Module*> Project::modules()
+{
+  return this->project_modules_;
+}
+
+Include::Include(bool relative, const char *path)
+{
+  this->relative_ = relative;
+  this->path_ = path;
 }
 

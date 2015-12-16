@@ -119,6 +119,10 @@ std::vector<LexicalScope*> GlobalScope::inner_scopes()
   return this->inner_scopes_;
 }
 
+LexicalScope* GlobalScope::outer_scope()
+{
+  return this->outer_scope_;
+}
 
 /* -------------------------------------------------------------- */
 
@@ -216,3 +220,7 @@ std::vector<LexicalScope*> LexicalScope::inner_scopes()
   return this->inner_scopes_;
 }
 
+LexicalScope* LexicalScope::outer_scope()
+{
+  return this->outer_scope_;
+}

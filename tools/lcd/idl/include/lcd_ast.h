@@ -53,6 +53,7 @@ class LexicalScope : public Base
   virtual void add_inner_scopes(std::vector<LexicalScope*> scopes);
   virtual std::map<std::string, Type*> type_definitions();
   virtual std::vector<LexicalScope*> inner_scopes();
+  virtual LexicalScope* outer_scope();
 };
 
 class GlobalScope : public LexicalScope
@@ -76,6 +77,7 @@ class GlobalScope : public LexicalScope
   virtual std::map<std::string, Type*> type_definitions(); // x
   virtual std::vector<LexicalScope*> inner_scopes(); // x
   static GlobalScope* instance(); // x
+  virtual LexicalScope* outer_scope();
 };
 
 class Type : public Base
@@ -102,18 +104,17 @@ class Variable : public Base
 
   virtual void set_in(bool b) = 0;
   virtual void set_out(bool b) = 0;
-  virtual void set_alloc(bool b) = 0;
   virtual void set_alloc_caller(bool b) = 0;
   virtual void set_alloc_callee(bool b) = 0;
-  virtual void set_alloc_callee_caller(bool b) = 0;
+  virtual void set_dealloc_caller(bool b) = 0;
+  virtual void set_dealloc_callee(bool b) = 0;
 
   virtual bool in() = 0;
   virtual bool out() = 0;
-  virtual bool alloc() = 0;
   virtual bool alloc_caller() = 0;
   virtual bool alloc_callee() = 0;
-  virtual bool alloc_callee_caller() = 0;
-  
+  virtual bool dealloc_caller() = 0;
+  virtual bool dealloc_callee() = 0;
 };
 
 class GlobalVariable : public Variable
@@ -136,17 +137,17 @@ class GlobalVariable : public Variable
 
   virtual void set_in(bool b);
   virtual void set_out(bool b);
-  virtual void set_alloc(bool b);
   virtual void set_alloc_caller(bool b);
   virtual void set_alloc_callee(bool b);
-  virtual void set_alloc_callee_caller(bool b);
+  virtual void set_dealloc_caller(bool b);
+  virtual void set_dealloc_callee(bool b);
 
   virtual bool in();
   virtual bool out();
-  virtual bool alloc();
   virtual bool alloc_caller();
   virtual bool alloc_callee();
-  virtual bool alloc_callee_caller();
+  virtual bool dealloc_caller();
+  virtual bool dealloc_callee();
 
 };
 
@@ -154,10 +155,10 @@ class Parameter : public Variable
 {
   bool in_;
   bool out_;
-  bool alloc_;
   bool alloc_callee_;
   bool alloc_caller_;
-  bool alloc_callee_caller_;
+  bool dealloc_callee_;
+  bool dealloc_caller_;
 
   Type* type_;
   const char* name_;
@@ -180,17 +181,18 @@ class Parameter : public Variable
   
   virtual void set_in(bool b);
   virtual void set_out(bool b);
-  virtual void set_alloc(bool b);
   virtual void set_alloc_caller(bool b);
   virtual void set_alloc_callee(bool b);
-  virtual void set_alloc_callee_caller(bool b);
+  virtual void set_dealloc_caller(bool b);
+  virtual void set_dealloc_callee(bool b);  
 
   virtual bool in();
   virtual bool out();
-  virtual bool alloc();
   virtual bool alloc_caller();
   virtual bool alloc_callee();
-  virtual bool alloc_callee_caller();
+  virtual bool dealloc_caller();
+  virtual bool dealloc_callee();
+  
 };
 
 
@@ -212,17 +214,17 @@ class FPParameter : public Parameter
 
   virtual void set_in(bool b);
   virtual void set_out(bool b);
-  virtual void set_alloc(bool b);
   virtual void set_alloc_caller(bool b);
   virtual void set_alloc_callee(bool b);
-  virtual void set_alloc_callee_caller(bool b);
+  virtual void set_dealloc_caller(bool b);
+  virtual void set_dealloc_callee(bool b);
 
   virtual bool in();
   virtual bool out();
-  virtual bool alloc();
   virtual bool alloc_caller();
   virtual bool alloc_callee();
-  virtual bool alloc_callee_caller();
+  virtual bool dealloc_caller();
+  virtual bool dealloc_callee();
 };
 
 class ReturnVariable : public Variable
@@ -248,27 +250,27 @@ class ReturnVariable : public Variable
 
   virtual void set_in(bool b);
   virtual void set_out(bool b);
-  virtual void set_alloc(bool b);
   virtual void set_alloc_caller(bool b);
   virtual void set_alloc_callee(bool b);
-  virtual void set_alloc_callee_caller(bool b);
+  virtual void set_dealloc_caller(bool b);
+  virtual void set_dealloc_callee(bool b);
 
   virtual bool in();
   virtual bool out();
-  virtual bool alloc();
   virtual bool alloc_caller();
   virtual bool alloc_callee();
-  virtual bool alloc_callee_caller();
+  virtual bool dealloc_caller();
+  virtual bool dealloc_callee();
 };
 
 class FunctionPointer : public Type
 {
   const char *identifier_;
   ReturnVariable *return_var_;
-  std::vector<FPParameter*> parameters_;
+  std::vector<Parameter*> parameters_;
 
  public:
-  FunctionPointer(const char *id, ReturnVariable *return_var, std::vector<FPParameter*> parameters);
+  FunctionPointer(const char *id, ReturnVariable *return_var, std::vector<Parameter*> parameters);
   virtual Marshal_type* accept(MarshalPrepareVisitor *worker);
   virtual CCSTTypeName* accept(TypeNameVisitor *worker);
   virtual CCSTStatement* accept(TypeVisitor *worker, Variable *v);
@@ -292,6 +294,17 @@ class Typedef : public Type
   const char* alias();
   virtual int num();
   // virtual void marshal();
+};
+
+class Channel : public Type 
+{
+ public:
+  Channel();
+  virtual Marshal_type* accept(MarshalPrepareVisitor *worker);
+  virtual CCSTTypeName* accept(TypeNameVisitor *worker);
+  virtual CCSTStatement* accept(TypeVisitor *worker, Variable *v);
+  virtual const char* name();
+  virtual int num();
 };
 
 class VoidType : public Type
@@ -327,10 +340,10 @@ class ProjectionField : public Variable //?
 {
   bool in_;
   bool out_;
-  bool alloc_;
   bool alloc_callee_;
   bool alloc_caller_;
-  bool alloc_callee_caller_;
+  bool dealloc_callee_;
+  bool dealloc_caller_;
 
   Type* field_type_;
   const char* field_name_;
@@ -352,17 +365,18 @@ class ProjectionField : public Variable //?
 
   virtual void set_in(bool b);
   virtual void set_out(bool b);
-  virtual void set_alloc(bool b);
   virtual void set_alloc_caller(bool b);
   virtual void set_alloc_callee(bool b);
-  virtual void set_alloc_callee_caller(bool b);
+  virtual void set_dealloc_caller(bool b);
+  virtual void set_dealloc_callee(bool b);
 
   virtual bool in();
   virtual bool out();
-  virtual bool alloc();
   virtual bool alloc_caller();
   virtual bool alloc_callee();
-  virtual bool alloc_callee_caller();
+  virtual bool dealloc_caller();
+  virtual bool dealloc_callee();
+
 };
 
 class ProjectionType : public Type // complex type
@@ -409,25 +423,37 @@ class Rpc : public Base
 class Module : public Base
 {
   // const char *verbatim_;
+  const char* module_name_;
   LexicalScope *module_scope_;
   std::vector<GlobalVariable*> globals_;
   std::vector<Rpc*> rpc_definitions_;
  public:
-  Module(std::vector<Rpc*> rpc_definitions, std::vector<GlobalVariable*> globals, LexicalScope *ls);
+  Module(const char* id, std::vector<Rpc*> rpc_definitions, std::vector<GlobalVariable*> globals, LexicalScope *ls);
   std::vector<Rpc*> rpc_definitions();  
   std::vector<GlobalVariable*> globals();
   LexicalScope *module_scope();
   void prepare_marshal();
+  const char* identifier();
+};
+
+class Include : public Base
+{
+  bool relative_; // true if "" false for <>
+  const char *path_;
+ public:
+  Include(bool relative, const char* path);
 };
 
 class Project : public Base
 {
   LexicalScope *project_scope_;
   std::vector<Module*> project_modules_;
+  std::vector<Include*> project_includes_;
   
  public:
-  Project(LexicalScope *scope, std::vector<Module*> modules);
+  Project(LexicalScope *scope, std::vector<Module*> modules, std::vector<Include*> includes);
   void prepare_marshal();
+  std::vector<Module*> modules();
 };
 
 class TypeNameVisitor // generates CCSTTypeName for each type.
@@ -438,6 +464,7 @@ class TypeNameVisitor // generates CCSTTypeName for each type.
   CCSTTypeName* visit(IntegerType *it);
   CCSTTypeName* visit(ProjectionType *pt);
   CCSTTypeName* visit(FunctionPointer *fp);
+  CCSTTypeName* visit(Channel *c);
 };
 
 class TypeVisitor
@@ -448,6 +475,7 @@ class TypeVisitor
   virtual CCSTStatement* visit(VoidType *vt, Variable *v) = 0;
   virtual CCSTStatement* visit(IntegerType *it, Variable *v) = 0;
   virtual CCSTStatement* visit(ProjectionType *pt, Variable *v) = 0;
+  virtual CCSTStatement* visit(Channel *c, Variable *v) = 0;
 };
 
 class AllocateTypeVisitor : public TypeVisitor    
@@ -463,6 +491,7 @@ class AllocateTypeVisitor : public TypeVisitor
   virtual CCSTStatement* visit(VoidType *vt, Variable *v);
   virtual CCSTStatement* visit(IntegerType *it, Variable *v);
   virtual CCSTStatement* visit(ProjectionType *pt, Variable *v);
+  virtual CCSTStatement* visit(Channel *c, Variable *v);
 };
 
 class MarshalTypeVisitor : public TypeVisitor
@@ -474,6 +503,7 @@ class MarshalTypeVisitor : public TypeVisitor
   virtual CCSTStatement* visit(VoidType *vt, Variable *v);
   virtual CCSTStatement* visit(IntegerType *it, Variable *v);
   virtual CCSTStatement* visit(ProjectionType *pt, Variable *v);
+  virtual CCSTStatement* visit(Channel *c, Variable *v);
 };
 
 

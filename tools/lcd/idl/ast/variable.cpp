@@ -52,65 +52,69 @@ int GlobalVariable::pointer_count()
 
 void GlobalVariable::set_in(bool b)
 {
-  printf("this operation is now allowed\n");
+  printf("this operation is not allowed\n");
 }
 
 void GlobalVariable::set_out(bool b)
 {
-  printf("this operation is now allowed\n");
-}
-
-void GlobalVariable::set_alloc(bool b)
-{
-  printf("this operation is now allowed\n");
+  printf("this operation is not allowed\n");
 }
 
 void GlobalVariable::set_alloc_caller(bool b)
 {
-  printf("this operation is now allowed\n");
+  printf("this operation is not allowed\n");
 }
 
 void GlobalVariable::set_alloc_callee(bool b)
 {
-  printf("this operation is now allowed\n");
+  printf("this operation is not allowed\n");
 }
 
-void GlobalVariable::set_alloc_callee_caller(bool b)
+void GlobalVariable::set_dealloc_caller(bool b)
 {
-  printf("this operation is now allowed\n");
+  printf("this operation is not allowed\n");
+}
+
+void GlobalVariable::set_dealloc_callee(bool b)
+{
+  printf("this operation is not allowed\n");
 }
 
 bool GlobalVariable::in()
 {
-  printf("this operation is now allowed\n");
+  printf("this operation is not allowed\n");
   return false;
 }
 
 bool GlobalVariable::out()
 {
-  printf("this operation is now allowed\n");
+  printf("this operation is not allowed\n");
   return false;
 }
-bool GlobalVariable::alloc()
-{
-  printf("this operation is now allowed\n");
-  return false;
-}
+
 bool GlobalVariable::alloc_caller()
 {
-  printf("this operation is now allowed\n");
+  printf("this operation is not allowed\n");
   return false;
 }
 bool GlobalVariable::alloc_callee()
 {
-  printf("this operation is now allowed\n");
+  printf("this operation is not allowed\n");
   return false;
 }
-bool GlobalVariable::alloc_callee_caller()
+
+bool GlobalVariable::dealloc_caller()
 {
-  printf("this operation is now allowed\n");
+  printf("this operation is not allowed\n");
   return false;
 }
+
+bool GlobalVariable::dealloc_callee()
+{
+  printf("this operation is not allowed\n");
+  return false;
+}
+
 
 // probably more functions needed
 
@@ -125,10 +129,10 @@ Parameter::Parameter()
   this->pointer_count_ = 0;
   this->in_ = false;
   this->out_ = false;
-  this->alloc_ = false;
   this->alloc_callee_ = false;
   this->alloc_caller_ = false;
-  this->alloc_callee_caller_ = false;
+  this->dealloc_callee_ = false;
+  this->dealloc_caller_ = false;
 }
 
 Parameter::Parameter(Type* type, const char* name, int pointer_count)
@@ -138,10 +142,10 @@ Parameter::Parameter(Type* type, const char* name, int pointer_count)
   this->pointer_count_ = pointer_count;
   this->in_ = false;
   this->out_ = false;
-  this->alloc_ = false;
   this->alloc_callee_ = false;
   this->alloc_caller_ = false;
-  this->alloc_callee_caller_ = false;
+  this->dealloc_callee_ = false;
+  this->dealloc_caller_ = false;
 }
 
 void Parameter::prepare_marshal(MarshalPrepareVisitor *worker)
@@ -194,11 +198,6 @@ void Parameter::set_out(bool b)
   this->out_ = b;
 }
 
-void Parameter::set_alloc(bool b)
-{
-  this->alloc_ = b;
-}
-
 void Parameter::set_alloc_caller(bool b)
 {
   this->alloc_caller_ = b;
@@ -209,9 +208,14 @@ void Parameter::set_alloc_callee(bool b)
   this->alloc_callee_ = b;
 }
 
-void Parameter::set_alloc_callee_caller(bool b)
+void Parameter::set_dealloc_caller(bool b)
 {
-  this->alloc_callee_caller_ = b;
+  this->dealloc_caller_ = b;
+}
+
+void Parameter::set_dealloc_callee(bool b)
+{
+  this->dealloc_callee_ = b;
 }
 
 bool Parameter::in()
@@ -224,11 +228,6 @@ bool Parameter::out()
   return this->out_;
 }
 
-bool Parameter::alloc()
-{
-  return this->alloc_;
-}
-
 bool Parameter::alloc_caller()
 {
   return this->alloc_caller_;
@@ -238,9 +237,14 @@ bool Parameter::alloc_callee()
   return this->alloc_callee_;
 }
 
-bool Parameter::alloc_callee_caller()
+bool Parameter::dealloc_caller()
 {
-  return this->alloc_callee_caller_;
+  return this->dealloc_caller_;
+}
+
+bool Parameter::dealloc_callee()
+{
+  return this->dealloc_callee_;
 }
 
 /* end */
@@ -310,11 +314,6 @@ void ReturnVariable::set_out(bool b)
   printf("error this operation not allowed\n");
 }
 
-void ReturnVariable::set_alloc(bool b)
-{
-  printf("error this operation not allowed\n");
-}
-
 void ReturnVariable::set_alloc_caller(bool b)
 {
   printf("error this operation not allowed\n");
@@ -325,7 +324,12 @@ void ReturnVariable::set_alloc_callee(bool b)
   printf("error this operation not allowed\n");
 }
 
-void ReturnVariable::set_alloc_callee_caller(bool b)
+void ReturnVariable::set_dealloc_caller(bool b)
+{
+  printf("error this operation not allowed\n");
+}
+
+void ReturnVariable::set_dealloc_callee(bool b)
 {
   printf("error this operation not allowed\n");
 }
@@ -342,12 +346,6 @@ bool ReturnVariable::out()
   return false;
 }
 
-bool ReturnVariable::alloc()
-{
-  printf("error this operation not allowed\n");
-  return false;
-}
-
 bool ReturnVariable::alloc_caller()
 {
   printf("error this operation not allowed\n");
@@ -359,7 +357,13 @@ bool ReturnVariable::alloc_callee()
   return false;
 }
 
-bool ReturnVariable::alloc_callee_caller()
+bool ReturnVariable::dealloc_caller()
+{
+  printf("error this operation not allowed\n");
+  return false;
+}
+
+bool ReturnVariable::dealloc_callee()
 {
   printf("error this operation not allowed\n");
   return false;
@@ -373,10 +377,10 @@ ProjectionField::ProjectionField(Type* field_type, const char* field_name, int p
 {
   this->in_ = false; 
   this->out_ = false;
-  this->alloc_ = false;
   this->alloc_callee_ = false;
   this->alloc_caller_ = false;
-  this->alloc_callee_caller_ = false;
+  this->dealloc_callee_ = false;
+  this->dealloc_caller_ = false;
   this->field_type_ = field_type; 
   this->field_name_ = field_name;
   this->pointer_count_ = pointer_count;
@@ -432,11 +436,6 @@ void ProjectionField::set_out(bool b)
   this->out_ = b;
 }
 
-void ProjectionField::set_alloc(bool b)
-{
-  this->alloc_ = b;
-}
-
 void ProjectionField::set_alloc_callee(bool b)
 {
   this->alloc_callee_ = b;
@@ -447,9 +446,14 @@ void ProjectionField::set_alloc_caller(bool b)
   this->alloc_caller_ = b;
 }
 
-void ProjectionField::set_alloc_callee_caller(bool b)
+void ProjectionField::set_dealloc_caller(bool b)
 {
-  this->alloc_callee_caller_ = b;
+  this->dealloc_caller_ = b;
+}
+
+void ProjectionField::set_dealloc_callee(bool b)
+{
+  this->dealloc_callee_ = b;
 }
 
 bool ProjectionField::in()
@@ -462,11 +466,6 @@ bool ProjectionField::out()
   return this->out_;
 }
 
-bool ProjectionField::alloc()
-{
-  return this->alloc_;
-}
-
 bool ProjectionField::alloc_callee()
 {
   return this->alloc_callee_;
@@ -477,9 +476,14 @@ bool ProjectionField::alloc_caller()
   return this->alloc_caller_;
 }
 
-bool ProjectionField::alloc_callee_caller()
+bool ProjectionField::dealloc_caller()
 {
-  return this->alloc_callee_caller_;
+  return this->dealloc_caller_;
+}
+
+bool ProjectionField::dealloc_callee()
+{
+  return this->dealloc_callee_;
 }
 
 FPParameter::FPParameter(Type *type, int pointer_count)
@@ -528,11 +532,6 @@ void FPParameter::set_out(bool b)
   printf("this operation is now allowed\n");
 }
 
-void FPParameter::set_alloc(bool b)
-{
-  printf("this operation is now allowed\n");
-}
-
 void FPParameter::set_alloc_caller(bool b)
 {
   printf("this operation is now allowed\n");
@@ -543,7 +542,12 @@ void FPParameter::set_alloc_callee(bool b)
   printf("this operation is now allowed\n");
 }
 
-void FPParameter::set_alloc_callee_caller(bool b)
+void FPParameter::set_dealloc_caller(bool b)
+{
+  printf("this operation is now allowed\n");
+}
+
+void FPParameter::set_dealloc_callee(bool b)
 {
   printf("this operation is now allowed\n");
 }
@@ -559,11 +563,7 @@ bool FPParameter::out()
   printf("this operation is now allowed\n");
   return false;
 }
-bool FPParameter::alloc()
-{
-  printf("this operation is now allowed\n");
-  return false;
-}
+
 bool FPParameter::alloc_caller()
 {
   printf("this operation is now allowed\n");
@@ -574,7 +574,14 @@ bool FPParameter::alloc_callee()
   printf("this operation is now allowed\n");
   return false;
 }
-bool FPParameter::alloc_callee_caller()
+
+bool FPParameter::dealloc_caller()
+{
+  printf("this operation is now allowed\n");
+  return false;
+}
+
+bool FPParameter::dealloc_callee()
 {
   printf("this operation is now allowed\n");
   return false;

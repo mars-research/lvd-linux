@@ -411,6 +411,8 @@ void __lcd_page_check(struct lcd *lcd, struct page *p, int is_mapped,
 		gpa_t where_mapped);
 void __lcd_kpage_check(struct lcd *lcd, struct page *p, int is_mapped, 
 		gpa_t where_mapped);
+void __lcd_hpa_check(struct lcd *lcd, unsigned long hpa, int is_mapped, 
+		gpa_t where_mapped);
 void __lcd_check(struct lcd *owning_lcd, struct lcd *owned_lcd);
 void __lcd_check_klcd(struct lcd *owning_lcd, struct lcd *owned_klcd);
 
@@ -421,6 +423,7 @@ void __lcd_check_klcd(struct lcd *owning_lcd, struct lcd *owned_klcd);
 void __lcd_sync_endpoint_destroy(struct lcd_sync_endpoint *e);
 void __lcd_page_destroy(struct page *p);
 void __lcd_kpage_destroy(struct page *p);
+void __lcd_hpa_destroy(unsigned long hpa);
 void __lcd_destroy(struct lcd *owned_lcd);
 void __lcd_destroy__(struct lcd *owned_lcd);
 void __lcd_destroy_klcd(struct lcd *owned_klcd);

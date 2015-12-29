@@ -1,0 +1,11 @@
+
+# Main targets
+obj-m += lcd_test_mod_string_example_boot.o
+
+lcd_test_mod_string_example_boot-y             += boot.o
+
+obj-m  += lcd_test_mod_string_example_lcd.o
+
+lcd_test_mod_string_example_lcd-y              += lcd.o
+
+lcd_test_mod_string_example_lcd-y              += $(LIBLCD)

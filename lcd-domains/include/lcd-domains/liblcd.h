@@ -145,28 +145,68 @@ int lcd_mem_init(void);
 int lcd_page_alloc(cptr_t *slot_out);
 /**
  * Map page at guest physical address gpa.
+ *
+ * THIS IS A WRAPPER AROUND THE LOWER LEVEL HYPERCALL. Use the more
+ * friendly functions below.
  */
 int lcd_page_map(cptr_t page, gpa_t gpa);
 /**
  * Unmap page at guest physical address gpa.
+ *
+ * THIS IS A WRAPPER AROUND THE LOWER LEVEL HYPERCALL. Use the more
+ * friendly functions below.
  */
 int lcd_page_unmap(cptr_t page, gpa_t gpa);
 /**
- * Maps pages in guest virtual *and* physical address spaces.
+ * FRIENDLY
+ *
+ * Map 2^order pages in the "heap". (This function will find a free
+ * place to put them. Think: mmap, but for guest physical.) Returns
+ * the physical address of the starting point where the pages were
+ * mapped.
  */
-int lcd_map_pages(cptr_t *pages, gva_t *base_out, unsigned order);
+int lcd_map_pages_phys(cptr_t *pages, gpa_t *base_out, unsigned order);
 /**
- * Maps page in gv and gp address spaces.
+ * FRIENDLY
+ *
+ * Unmap 2^order pages that were previously mapped in the "heap" via
+ * lcd_map_pages_phys.
  */
-int lcd_map_page(cptr_t page_cptr, gva_t *gva_out);
+void lcd_unmap_pages_phys(cptr_t *pages, gpa_t base, unsigned order);
 /**
- * Unmaps pages in gv and gp address spaces.
+ * FRIENDLY
+ *
+ * Map 2^order pages in the guest physical *and* virtual address spaces
+ * of the caller. The pages will be mapped in the "heap". Returns the
+ * virtual address of the starting point of the pages.
  */
-void lcd_unmap_pages(cptr_t *pages, gva_t base, unsigned order);
+int lcd_map_pages_both(cptr_t *pages, gva_t *base_out, unsigned order);
 /**
- * Unmaps page in gv and gp address spaces.
+ * FRIENDLY
+ *
+ * Unmap 2^order pages in both address spaces (pages should have been
+ * previously mapped via lcd_map_pages_both).
  */
-void lcd_unmap_page(cptr_t page_cptr, gva_t page);
+void lcd_unmap_pages_both(cptr_t *pages, gva_t base, unsigned order);
+/**
+ * The following just call the above functions
+ */
+static inline int lcd_map_page_phys(cptr_t page_cptr, gpa_t *gpa_out)
+{
+	return lcd_map_pages_phys(&page_cptr, gpa_out, 0);
+}
+static inline int lcd_map_page_both(cptr_t page_cptr, gva_t *gva_out)
+{
+	return lcd_map_pages_both(&page_cptr, gva_out, 0);
+}
+static inline void lcd_unmap_page_phys(cptr_t page_cptr, gpa_t gpa)
+{
+	lcd_unmap_pages_phys(&page_cptr, gpa, 0);
+}
+static inline void lcd_unmap_page_both(cptr_t page_cptr, gva_t gva)
+{
+	lcd_unmap_pages_both(&page_cptr, gva, 0);
+}
 /**
  * Allocates 2^order pages. These will be properly mapped in gv and gp
  * address spaces (so you're done). Returns gv address of first page
@@ -216,6 +256,37 @@ struct page * lcd_alloc_pages_exact_node(int nid, gfp_t gfp_mask,
  * Necessary to satisfy slab dependency.
  */
 void lcd_free_memcg_kmem_pages(unsigned long addr, unsigned int order);
+
+/**
+ * Get the cptr for the page that contains data, and the offset
+ * into the page. If data + len goes beyond the page, returns
+ * EINVAL. _virt_ takes a guest virtual address, _phys_ takes a 
+ * guest physical address.
+ *
+ * For isolated code, this function just does a look up in
+ * the giant map/array that translates pages -> cptr's.
+ *
+ * You MUST call lcd_addr_to_page_cptr_cleanup below when you no
+ * longer are sharing the page with someone else.
+ */
+int lcd_phys_addr_to_page_cptr(unsigned long data, unsigned long len, 
+			cptr_t *page_cptr_out, unsigned long *offset_out);
+int lcd_virt_addr_to_page_cptr(char *data, unsigned long len, 
+			cptr_t *page_cptr_out, unsigned long *offset_out);
+
+/**
+ * This function should be called when you are no longer using the
+ * page returned from the lookup functions above (phys/virt addr to page cptr).
+ *
+ * For isolated code, right now, this is a no-op.
+ *
+ * For the motivation, see the non-isolated code counterpart in the
+ * kliblcd.h header.
+ */
+static inline int lcd_addr_to_page_cptr_cleanup(cptr_t page_cptr)
+{
+	return 0;
+}
 
 /* IPC -------------------------------------------------- */
 

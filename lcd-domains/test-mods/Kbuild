@@ -12,12 +12,14 @@ obj-m += ipc1/
 
 obj-m += ipc2/
 
-obj-m += liblcd-tests/
+obj-m += liblcd_tests/
 
-obj-m += create-klcd/
+obj-m += create_klcd/
 
-obj-m += glue-example/
+obj-m += glue_example/
 
 obj-m += pmfs/
 
 obj-m += async/
+
+obj-m += string_example/

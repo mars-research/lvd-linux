@@ -36,7 +36,7 @@ static int boot_main(void)
 	/* ---------- Create LCDs ---------- */
 
 	ret = lcd_create_module_lcd(&vfs_lcd, 
-				LCD_DIR("glue-example/vfs"),
+				LCD_DIR("glue_example/vfs"),
 				"lcd_test_mod_glue_example_vfs",
 				LCD_CPTR_NULL, &vfs_mi);
 	if (ret) {
@@ -44,7 +44,7 @@ static int boot_main(void)
 		goto fail3;
 	}
 	ret = lcd_create_module_lcd(&minix_lcd, 
-				LCD_DIR("glue-example/minix"),
+				LCD_DIR("glue_example/minix"),
 				"lcd_test_mod_glue_example_minix",
 				LCD_CPTR_NULL, &minix_mi);
 	if (ret) {

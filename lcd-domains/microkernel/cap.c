@@ -437,7 +437,8 @@ static void free_cnode_object(struct cspace *cspace, struct cnode *cnode)
 		break;
 	case LCD_CAP_TYPE_KPAGE:
 		/*
-		 * No lcd's should have page mapped
+		 * !! LCD's may still have page mapped if it was 
+		 * "volunteered" multiple times.
 		 */
 		__lcd_kpage_destroy(cnode->object);
 		break;

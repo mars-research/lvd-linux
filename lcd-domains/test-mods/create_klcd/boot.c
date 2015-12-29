@@ -25,7 +25,7 @@ static int boot_main(void)
 	 * Create a new klcd
 	 */
 	ret = klcd_create_module_klcd(&klcd,
-				LCD_DIR("create-klcd"),
+				LCD_DIR("create_klcd"),
 				"lcd_test_mod_create_klcd_klcd");
 	if (ret) {
 		LIBLCD_ERR("create module klcd");

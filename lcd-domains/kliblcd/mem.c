@@ -160,10 +160,160 @@ int klcd_free_page(cptr_t page)
 	return 0;
 }
 
+/* ADDR -> CPTR ---------------------------------------- */
+
+static int fits_in_page(unsigned long data, unsigned long len)
+{
+	return (data & PAGE_MASK) == ((data + len) & PAGE_MASK);
+}
+
+int klcd_phys_addr_to_page_cptr(unsigned long data, unsigned long len, 
+				cptr_t *page_cptr_out, 
+				unsigned long *offset_out)
+{
+	int ret;
+	struct page *p;
+	/*
+	 * Make sure data doesn't trail off page
+	 */
+	if (!fits_in_page(data, len)) {
+		LIBLCD_ERR("data (pa=%lx,len=%lx) spans more than one page",
+			data, len);
+		ret = -EINVAL;
+		goto fail1;
+	}
+	/*
+	 * Get struct page for physical address
+	 */
+	p = pfn_to_page(data >> PAGE_SHIFT);
+	if (!p) {
+		LIBLCD_ERR("error getting page for pa=%lx", data);
+		ret = -EINVAL;
+		goto fail2;
+	}
+	/*
+	 * "Volunteer" page
+	 */
+	ret = klcd_add_page(p, page_cptr_out);
+	if (ret)
+		goto fail3;
+	/*
+	 * Calculate offset into page
+	 */
+	*offset_out = data & ~PAGE_MASK;
+
+	return 0;
+
+fail3:
+fail2:
+fail1:
+	return ret;
+}
+
+int klcd_virt_addr_to_page_cptr(char *data, unsigned long len, 
+				cptr_t *page_cptr_out, 
+				unsigned long *offset_out)
+{
+	/*
+	 * Use physical address for look up
+	 */
+	return lcd_phys_addr_to_page_cptr(__pa(data),
+					len,
+					page_cptr_out, 
+					offset_out);
+}
+
+int klcd_addr_to_page_cptr_cleanup(cptr_t page_cptr)
+{
+	klcd_rm_page(page_cptr);
+	return 0;
+}
+
+/* PAGE MAPPING ---------------------------------------- */
+
+int klcd_map_pages_phys(cptr_t *pages, gpa_t *base_out, unsigned order)
+{
+	int ret;
+	struct cnode *cnode;
+	unsigned long hpa;
+	/*
+	 * Look up first page
+	 */
+	ret = __lcd_cnode_get(&current->lcd->cspace, pages[0], &cnode);
+	if (ret) {
+		LCD_ERR("couldn't find page in caller's cspace");
+		goto fail1;
+	}
+	/*
+	 * Confirm it's a page, and get the physical address.
+	 */
+	switch (cnode->type) {
+	case LCD_CAP_TYPE_PAGE:
+		hpa = __pa(page_address(cnode->object));
+		break;
+	case LCD_CAP_TYPE_KPAGE:
+		hpa = __pa(page_address(cnode->object));
+		break;
+	default:
+		LCD_ERR("not a page");
+		goto fail2;
+	}
+
+	*base_out = __gpa(hpa); /* gpa == hpa for non-isolated code */
+
+	ret = 0;
+	goto out;
+
+out:
+fail2:
+	__lcd_cnode_put(cnode);
+fail1:
+	return ret;
+}
+
+int klcd_map_pages_both(cptr_t *pages, gva_t *base_out, unsigned order)
+{
+	int ret;
+	gpa_t gpa_base;
+	/*
+	 * "Map" it in physical, and get the base phys address.
+	 *
+	 * (This basically boils down to just looking up the physical
+	 * address of the pages. The pages are assumed to be contiguous.)
+	 */
+	ret = klcd_map_pages_phys(pages, &gpa_base, order);
+	if (ret) {
+		LCD_ERR("error 'mapping' in phys");
+		goto fail1;
+	}
+
+#ifndef CONFIG_HIGHMEM
+	/*
+	 * For e.g. x86_64, all of phys memory is already mapped in
+	 * the kernel's address space. (See Documentation/x86/x86_64/mm.txt.)
+	 * So, we can just return the page's address.
+	 *
+	 * Remember that gva == hva for non-isolated code.
+	 */
+	*base_out = __gva(hva_val(va2hva(__va(gpa_val(gpa_base)))));
+#else /* CONFIG_HIGHMEM */
+	#error "We don't support this kind of arch right now."
+#endif
+
+	return 0;
+
+fail1:
+	return ret;
+}
+
 /* EXPORTS -------------------------------------------------- */
 
 EXPORT_SYMBOL(klcd_add_page);
 EXPORT_SYMBOL(klcd_rm_page);
 EXPORT_SYMBOL(klcd_page_alloc);
 EXPORT_SYMBOL(klcd_gfp);
-
+EXPORT_SYMBOL(klcd_phys_addr_to_page_cptr);
+EXPORT_SYMBOL(klcd_virt_addr_to_page_cptr);
+EXPORT_SYMBOL(klcd_addr_to_page_cptr_cleanup);
+EXPORT_SYMBOL(klcd_map_pages_both);
+EXPORT_SYMBOL(klcd_map_pages_phys);

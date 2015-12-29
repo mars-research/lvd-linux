@@ -33,8 +33,19 @@ void klcd_exit(int retval);
 int klcd_page_alloc(cptr_t *slot_out, gpa_t gpa);
 int klcd_pages_alloc(cptr_t *slots_out, hpa_t *hp_base_out, 
 		hva_t *hv_base_out, unsigned order);
+int klcd_phys_addr_to_page_cptr(unsigned long data, 
+				unsigned long len, 
+				cptr_t *page_cptr_out, 
+				unsigned long *offset_out);
+int klcd_virt_addr_to_page_cptr(char *data, unsigned long len, 
+				cptr_t *page_cptr_out, 
+				unsigned long *offset_out);
+int klcd_addr_to_page_cptr_cleanup(cptr_t page_cptr);
 int klcd_gfp(cptr_t *slot_out, gpa_t *gpa_out, gva_t *gva_out);
 int klcd_free_page(cptr_t page);
+int klcd_map_pages_phys(cptr_t *pages, gpa_t *base_out, unsigned order);
+int klcd_map_pages_both(cptr_t *pages, gva_t *base_out, unsigned order);
+void klcd_unmap_pages_both(cptr_t *pages, gva_t base, unsigned order);
 int klcd_create_sync_endpoint(cptr_t *slot_out);
 int klcd_send(cptr_t endpoint);
 int klcd_recv(cptr_t endpoint);
@@ -221,6 +232,134 @@ static inline int lcd_gfp(cptr_t *slot_out, gpa_t *gpa_out, gva_t *gva_out)
 static inline int lcd_free_page(cptr_t page)
 {
 	return klcd_free_page(page);
+}
+
+/* ADDR -> CPTR TRANSLATION ------------------------------ */
+
+/**
+ * Get the cptr for the page that contains data, and the offset
+ * into the page. If data + len goes beyond the page, returns
+ * EINVAL. _virt_ takes a guest virtual address, _phys_ takes a 
+ * guest physical address.
+ *
+ * For non-isolated code, these functions will determine the
+ * page that contains the data and "volunteer" the page to the
+ * microkernel for cspace management (i.e., will insert the page
+ * into the caller's cspace).
+ *
+ * This is why it is IMPORTANT that you call lcd_addr_to_page_cptr_cleanup
+ * when you are finished sharing the page (perhaps you have revoked
+ * access to it). This will "unvolunteer" the page, removing it from
+ * the caller's cspace. (It's not the end of the world if you don't
+ * call lcd_addr_to_page_cptr_cleanup, you'll just have pages floating around
+ * in your cspace that you may not have expected to see there.)
+ *
+ * (Further NOTE: if you call this function multiple times with the
+ * same pointer, or multiple pointers inside the same page, the page
+ * will be inserted multiple times inside the caller's cspace. Yes, we
+ * could keep track of whether a page has been inserted already, but it
+ * leads to a bit of memory and compute overhead that I'm avoiding for now.)
+ */
+static inline int lcd_phys_addr_to_page_cptr(unsigned long data, 
+					unsigned long len, 
+					cptr_t *page_cptr_out, 
+					unsigned long *offset_out)
+{
+	return klcd_phys_addr_to_page_cptr(data, len, page_cptr_out, 
+					offset_out);
+}
+static inline int lcd_virt_addr_to_page_cptr(char *data, unsigned long len, 
+					cptr_t *page_cptr_out, 
+					unsigned long *offset_out)
+{
+	return klcd_virt_addr_to_page_cptr(data, len, 
+					page_cptr_out, offset_out);
+}
+
+/**
+ * This function should be called when you are no longer using the
+ * page returned from the lookup functions above (phys/virt addr to page cptr).
+ *
+ * For the motivation, see the doc for the address lookup functions above.
+ */
+static inline int lcd_addr_to_page_cptr_cleanup(cptr_t page_cptr)
+{
+	return klcd_addr_to_page_cptr_cleanup(page_cptr);
+}
+
+/* PAGE MAPPING ---------------------------------------- */
+
+/**
+ * "Map" 2^order pages in caller's physical address space. For
+ * non-isolated code, the pages will already be available in the
+ * physical address space (non-isolated code has access to host
+ * physical). This function just locates where the pages are, and
+ * returns the address in base_out. (Note that gpa == hpa for non-isolated
+ * code.)
+ *
+ * This function assumes the pages are contiguous in host physical.
+ */
+static inline int lcd_map_pages_phys(cptr_t *pages, gpa_t *base_out, 
+				unsigned order)
+{
+	return klcd_map_pages_phys(pages, base_out, order);
+}
+/**
+ * "Unmap" 2^order pages that were previously mapped via lcd_map_pages_phys.
+ * Note that this is a no-op for non-isolated code, and is only here to
+ * make non-isolated and isolated code symmetric (for isolated code,
+ * this function is meaningful, as it will update the isolated code's
+ * guest physical address space).
+ */
+static inline void lcd_unmap_pages_phys(cptr_t *pages, gpa_t base, 
+					unsigned order)
+{
+	return;
+}
+/**
+ * Map 2^order pages in the guest physical *and* virtual address spaces
+ * of the caller. Returns the virtual address of the starting point of the 
+ * pages.
+ *
+ * Note: For 64-bit x86 (current implementation), this is basically
+ * just a lookup. No mapping is done. (The pages are already mapped. See
+ * Documentation/x86/x86_64/mm.txt.)
+ */
+static inline int lcd_map_pages_both(cptr_t *pages, gva_t *base_out, 
+				unsigned order)
+{
+	return klcd_map_pages_both(pages, base_out, order);
+}
+/**
+ * Unmap 2^order pages in both address spaces.
+ *
+ * For 64-bit x86 (current implementation), this is a no-op. (The pages
+ * are always mapped. See note for lcd_map_pages_both.)
+ */
+static inline void lcd_unmap_pages_both(cptr_t *pages, gva_t base, 
+					unsigned order)
+{
+	return;
+}
+
+/**
+ * The following just call the above functions
+ */
+static inline int lcd_map_page_phys(cptr_t page_cptr, gpa_t *gpa_out)
+{
+	return lcd_map_pages_phys(&page_cptr, gpa_out, 0);
+}
+static inline int lcd_map_page_both(cptr_t page_cptr, gva_t *gva_out)
+{
+	return lcd_map_pages_both(&page_cptr, gva_out, 0);
+}
+static inline void lcd_unmap_page_phys(cptr_t page_cptr, gpa_t gpa)
+{
+	lcd_unmap_pages_phys(&page_cptr, gpa, 0);
+}
+static inline void lcd_unmap_page_both(cptr_t page_cptr, gva_t gva)
+{
+	lcd_unmap_pages_both(&page_cptr, gva, 0);
 }
 
 

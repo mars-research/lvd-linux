@@ -674,7 +674,7 @@ static int check_get_idx(gva_t base, unsigned long *out, unsigned order)
 
 /* INTERFACE -------------------------------------------------- */
 
-int lcd_map_pages(cptr_t *pages, gva_t *base_out, unsigned order)
+int lcd_map_pages_phys(cptr_t *pages, gpa_t *base_out, unsigned order)
 {
 	unsigned long idx;
 	unsigned long base;
@@ -685,7 +685,7 @@ int lcd_map_pages(cptr_t *pages, gva_t *base_out, unsigned order)
 	idx = find_first_zero_bits(free_mem_bmap, LCD_FREE_MEM_BMAP_SIZE,
 				order);
 	if (idx >= LCD_FREE_MEM_BMAP_SIZE) {
-		lcd_printk("lcd_map_pages: not enough mem for %d pages",
+		lcd_printk("lcd_map_pages_phys: not enough mem for %d pages",
 			(1 << order));
 		ret = -ENOMEM;
 		goto fail1;
@@ -701,68 +701,44 @@ int lcd_map_pages(cptr_t *pages, gva_t *base_out, unsigned order)
 	 */
 	ret = do_mk_map_pages(pages, __gpa(base), order);
 	if (ret) {
-		lcd_printk("map_page: failed to map in gp");
+		lcd_printk("lcd_map_pages_phys: failed to map in gp");
 		goto fail2;
-	}
-	/*
-	 * Map page in gv there, gv addr = gp addr
-	 */
-	ret = gv_map_pages(__gva(base), __gpa(base), order);
-	if (ret) {
-		lcd_printk("map_page: failed to map in guest virtual");
-		goto fail3;
 	}
 	/*
 	 * Update page -> cptr correspondences
 	 */
 	update_page2cptr(idx, pages, order);
 
-	*base_out = __gva(base);
+	*base_out = __gpa(base);
 	
 	return 0;
 
-fail3:
-	do_mk_unmap_pages(pages, gpa_add(LCD_FREE_MEM_BASE, idx << PAGE_SHIFT),
-			order);
 fail2:
 	clear_bits(idx, free_mem_bmap, order);
 fail1:
 	return ret;
-
-
 }
 
-int lcd_map_page(cptr_t page_cptr, gva_t *gva_out)
-{
-	return lcd_map_pages(&page_cptr, gva_out, 0);
-}
-
-static void lcd_do_unmap_pages(cptr_t *pages, gva_t base, unsigned order)
+void lcd_unmap_pages_phys(cptr_t *pages, gpa_t base, unsigned order)
 {
 	int ret;
 	unsigned long idx;
 	/*
-	 * Get index to base page in free area
+	 * Get index to base page in free area.
+	 *
+	 * XXX: Remember gpa == gva in heap area.
 	 */
-	ret = check_get_idx(base, &idx, order);
+	ret = check_get_idx(__gva(gpa_val(base)), &idx, order);
 	if (ret) {
-		lcd_printk("lcd_do_unmap_pages: bad base/order");
+		lcd_printk("lcd_unmap_pages_phys: bad base/order");
 		goto out;
 	}
 	/*
 	 * Tell microkernel to unmap in guest physical
 	 */
-	ret = do_mk_unmap_pages(pages, __gpa(gva_val(base)), order);
+	ret = do_mk_unmap_pages(pages, base, order);
 	if (ret) {
-		lcd_printk("lcd_do_unmap_pages: failed to unmap in gp");
-		goto out;
-	}
-	/*
-	 * Unmap in guest virtual
-	 */
-	ret = gv_unmap_pages(base, order);
-	if (ret) {
-		lcd_printk("lcd_do_unmap_pages: failed to unmap in gv");
+		lcd_printk("lcd_unmap_pages_phys: failed to unmap in gp");
 		goto out;
 	}
 	/*
@@ -776,14 +752,58 @@ out:
 	return;
 }
 
-void lcd_unmap_pages(cptr_t *pages, gva_t base, unsigned order)
+int lcd_map_pages_both(cptr_t *pages, gva_t *base_out, unsigned order)
 {
-	lcd_do_unmap_pages(pages, base, order);
+	gpa_t gpa_base;
+	int ret;
+	/*
+	 * Map in guest physical first
+	 */
+	ret = lcd_map_pages_phys(pages, &gpa_base, order);
+	if (ret) {
+		lcd_printk("lcd_map_pages_both: error mapping in gpa");
+		goto fail1;
+	}
+	/*
+	 * Map in guest virtual next, gv addr = gp addr
+	 */
+	ret = gv_map_pages(__gva(gpa_val(gpa_base)), gpa_base, order);
+	if (ret) {
+		lcd_printk("lcd_map_pages_both: failed to map in guest virtual");
+		goto fail2;
+	}
+
+	*base_out = __gva(gpa_val(gpa_base));
+	
+	return 0;
+
+fail2:
+	lcd_unmap_pages_phys(pages, gpa_base, order);
+fail1:
+	return ret;
 }
 
-void lcd_unmap_page(cptr_t page_cptr, gva_t page)
+void lcd_unmap_pages_both(cptr_t *pages, gva_t base, unsigned order)
 {
-	lcd_unmap_pages(&page_cptr, page, 0);
+	int ret;
+	/*
+	 * Unmap in guest physical first, gpa == gva
+	 */
+	lcd_unmap_pages_phys(pages, __gpa(gva_val(base)), order);
+	/*
+	 * Unmap in gva.
+	 *
+	 * XXX: If we fail here, may be in inconsistent state: mappings
+	 * still in guest virtual, but no mappings in guest physical.
+	 */
+	ret = gv_unmap_pages(base, order);
+	if (ret) {
+		lcd_printk("lcd_unmap_pages_both: failed to unmap in gv");
+		goto out;
+	}
+
+out:
+	return;
 }
 
 int lcd_alloc_pages(unsigned order, gva_t *base_out)
@@ -812,7 +832,7 @@ int lcd_alloc_pages(unsigned order, gva_t *base_out)
 	/*
 	 * Map them
 	 */
-	ret = lcd_map_pages(pages, base_out, order);
+	ret = lcd_map_pages_both(pages, base_out, order);
 	if (ret) {
 		lcd_printk("lcd_alloc_pages: failed to map");
 		goto fail1;
@@ -847,7 +867,7 @@ void lcd_free_pages(gva_t base, unsigned order)
 	/*
 	 * Do unmap
 	 */
-	lcd_do_unmap_pages(&free_mem_page2cptr[idx], base, order);
+	lcd_unmap_pages_both(&free_mem_page2cptr[idx], base, order);
 }
 
 void lcd_free_page(gva_t page)
@@ -919,6 +939,97 @@ void lcd_free_memcg_kmem_pages(unsigned long addr, unsigned int order)
 {
 	lcd_free_pages(__gva(addr), order);
 }
+
+/* ADDR -> CPTR TRANSLATION ---------------------------------------- */
+
+static int fits_in_page(unsigned long data, unsigned long len)
+{
+	return (data & PAGE_MASK) == ((data + len) & PAGE_MASK);
+}
+
+int lcd_phys_addr_to_page_cptr(unsigned long data, unsigned long len, 
+			cptr_t *page_cptr_out, unsigned long *offset_out)
+{
+	unsigned long pg_addr;
+	unsigned long pg_idx;
+	int ret;
+	/*
+	 * Mask off bits
+	 */
+	pg_addr = data & PAGE_MASK;
+	/*
+	 * See if in range
+	 */
+	if (pg_addr < gpa_val(LCD_FREE_MEM_BASE) ||
+		pg_addr >= (gpa_val(LCD_FREE_MEM_BASE) + LCD_FREE_MEM_SIZE)) {
+		LIBLCD_ERR("page addr %lx outside of heap, not allowed",
+			pg_addr);
+		ret = -EINVAL;
+		goto fail1;
+	}
+	/*
+	 * Make sure data doesn't trail off page
+	 */
+	if (!fits_in_page(data, len)) {
+		LIBLCD_ERR("data (pa=%lx,len=%lx) spans more than one page",
+			data, len);
+		ret = -EINVAL;
+		goto fail2;
+	}
+	/*
+	 * Translate to cptr
+	 */
+	pg_idx = (pg_addr - gpa_val(LCD_FREE_MEM_BASE)) >> PAGE_SHIFT;
+	*page_cptr_out = free_mem_page2cptr[pg_idx];
+	/*
+	 * Calculate offset into page
+	 */
+	*offset_out = data & ~PAGE_MASK;
+
+	return 0;
+
+fail2:
+fail1:
+	return ret;
+}
+
+int lcd_virt_addr_to_page_cptr(char *data, unsigned long len, 
+			cptr_t *page_cptr_out, unsigned long *offset_out)
+{
+	int ret;
+	gpa_t gpa;
+	pte_t *pte;
+	/*
+	 * Translate virtual -> physical. Unfortunately, this requires
+	 * a page walk because the module and the rest of the heap are
+	 * in two different parts of the virtual address space. 
+	 * (For most of the heap, gva == gpa, but not the module.)
+	 */
+	ret = gv_walk(__gva((unsigned long)data), &pte);
+	if (ret) {
+		LIBLCD_ERR("err getting pte for gva %p", data);
+		goto fail1;
+	}
+	if (!pte_present(*pte)) {
+		LIBLCD_ERR("no mapping for gva %p", data);
+		ret = -EINVAL;
+		goto fail2;
+	}
+	gpa = gpa_add(gv_get(pte),
+		((unsigned long)data) & ~PAGE_MASK); /* add offset into pg */
+	/*
+	 * Use physical address for look up
+	 */
+	return lcd_phys_addr_to_page_cptr(gpa_val(gpa),
+					len,
+					page_cptr_out, 
+					offset_out);
+
+fail2:
+fail1:
+	return ret;
+}
+
 
 /* BOOT SETUP -------------------------------------------------- */
 

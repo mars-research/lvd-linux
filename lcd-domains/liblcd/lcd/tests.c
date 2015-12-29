@@ -275,6 +275,35 @@ fail1:
 	return ret;
 }
 
+static char *cptr_lookup_str = "foo";
+
+static int cptr_lookup_test(void)
+{
+	int ret;
+	cptr_t pg_cptr = { 0 };
+	unsigned long off = 0;
+
+	ret = lcd_virt_addr_to_page_cptr(cptr_lookup_str,
+					strlen(cptr_lookup_str),
+					&pg_cptr,
+					&off);
+	if (ret) {
+		LIBLCD_ERR("failed lookup");
+		goto fail1;
+	}
+	if (cptr_is_null(pg_cptr)) {
+		LIBLCD_ERR("bad cptr");
+		ret = -1;
+		goto fail2;
+	}
+
+	return 0;
+
+fail2:
+fail1:
+	return ret;
+}
+
 int lcd_run_tests(void)
 {
 	int ret;
@@ -314,6 +343,14 @@ int lcd_run_tests(void)
 		return ret;
 	}
 	LIBLCD_MSG("dstore test passed!");
+	ret = cptr_lookup_test();
+	if (ret) {
+		LIBLCD_ERR("cptr lookup test failed");
+		return ret;
+	}
+	LIBLCD_MSG("cptr lookup test passed!");
+
+	LIBLCD_MSG("ALL LIBLCD TESTS PASSED");
 
 	return 0;
 }

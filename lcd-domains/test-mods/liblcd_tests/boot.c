@@ -26,7 +26,7 @@ static int boot_main(void)
 	 * Create lcd
 	 */
 	ret = lcd_create_module_lcd(&lcd, 
-				LCD_DIR("liblcd-tests"),
+				LCD_DIR("liblcd_tests"),
 				"lcd_test_mod_liblcd_tests_lcd",
 				LCD_CPTR_NULL, &mi);
 	if (ret) {

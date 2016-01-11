@@ -50,6 +50,25 @@ int GlobalVariable::pointer_count()
   return this->pointer_count_;
 }
 
+void GlobalVariable::resolve_types(LexicalScope *ls)
+{
+  // check if unresolved
+  if(this->type_->num() != 8) {
+    return;
+  }
+  
+  int err;
+  Type *t = ls->lookup(this->type_->name(), &err);
+  if(t == 0x0) {
+    printf("Error: could not resolve type %s\n", this->type_->name());
+    return;
+  } 
+  
+  // and set
+  this->type_ = t;
+  return;
+}
+
 void GlobalVariable::set_in(bool b)
 {
   printf("this operation is not allowed\n");
@@ -188,6 +207,25 @@ Marshal_type* Parameter::marshal_info()
   return this->marshal_info_;
 }
 
+void Parameter::resolve_types(LexicalScope *ls)
+{
+  // check if unresolved
+  if(this->type_->num() != 8) {
+    return;
+  }
+  
+  int err;
+  Type *t = ls->lookup(this->type_->name(), &err);
+  if(t == 0x0) {
+    printf("Error: could not resolve type %s\n", this->type_->name());
+    return;
+  } 
+  
+  // and set
+  this->type_ = t;
+  return;
+}
+
 void Parameter::set_in(bool b)
 {
   this->in_ = b;
@@ -297,6 +335,25 @@ void ReturnVariable::set_accessor(Variable *v)
 int ReturnVariable::pointer_count()
 {
   return this->pointer_count_;
+}
+
+void ReturnVariable::resolve_types(LexicalScope *ls)
+{
+  // check if unresolved
+  if(this->type_->num() != 8) {
+    return;
+  }
+  
+  int err;
+  Type *t = ls->lookup(this->type_->name(), &err);
+  if(t == 0x0) {
+    printf("Error: could not resolve type %s\n", this->type_->name());
+    return;
+  } 
+  
+  // and set
+  this->type_ = t;
+  return;
 }
 
 Variable* ReturnVariable::accessor()
@@ -426,6 +483,25 @@ Marshal_type* ProjectionField::marshal_info()
   return this->marshal_info_;
 }
 
+void ProjectionField::resolve_types(LexicalScope *ls)
+{
+  // check if unresolved
+  if(this->field_type_->num() != 8) {
+    return;
+  }
+  
+  int err;
+  Type *t = ls->lookup(this->field_type_->name(), &err);
+  if(t == 0x0) {
+    printf("Error: could not resolve type %s\n", this->field_type_->name());
+    return;
+  } 
+  
+  // and set
+  this->field_type_ = t;
+  return;
+}
+
 void ProjectionField::set_in(bool b)
 {
   this->in_ = b;
@@ -520,6 +596,25 @@ void FPParameter::set_marshal_info(Marshal_type *mt)
 Marshal_type* FPParameter::marshal_info()
 {
   return this->marshal_info_;
+}
+
+void FPParameter::resolve_types(LexicalScope *ls)
+{
+  // check if null
+  if(this->type_->num() != 8) {
+    return;
+  }
+  
+  int err;
+  Type *t = ls->lookup(this->type_->name(), &err);
+  if(t == 0x0) {
+    printf("Error: could not resolve type %s\n", this->type_->name());
+    return;
+  } 
+  
+  // and set
+  this->type_ = t;
+  return;
 }
 
 void FPParameter::set_in(bool b)

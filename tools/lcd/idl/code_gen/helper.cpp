@@ -1,6 +1,42 @@
 #include "ccst.h"
 #include "code_gen.h"
 
+// for debugging purposes
+char* type_number_to_name(int num)
+{
+  switch(num) {
+  case 1:
+    {
+      return "typedef type";
+    }
+  case 2: 
+    {
+      return "integer type";
+    }
+  case 4:
+    {
+      return "projection type";
+    }
+  case 5:
+    {
+      return "void type";
+    }
+  case 6:
+    {
+      return "channel type";
+    }
+  case 7: 
+    {
+      return "function pointer type";
+    }
+  case 8:
+    {
+      return "unresolved type";
+    }
+
+  }
+}
+
 /*
   creates the C code for a container struct
   for the projection provided
@@ -170,7 +206,7 @@ CCSTEnumeratorList* construct_enumlist(std::vector<Rpc *> rps)
   return enum_list;
 }
 
-const char* string_to_upper(char* str)
+const char* string_to_upper(const char* str)
 {
   char* ret = (char*) malloc((sizeof(str)+1)*sizeof(char));
   int i;
@@ -239,78 +275,89 @@ CCSTDeclaration* function_declaration(Rpc* r)
   return new CCSTDeclaration(specifier, func);
 }
 
+
+// constructs a type declaration from a name instead of a type object
+std::vector<CCSTDecSpecifier*> struct_type(const char *type_name)
+{
+  std::vector<CCSTDecSpecifier*> specifier;
+  specifier.push_back(new CCSTStructUnionSpecifier(struct_t, type_name));
+  return specifier;
+}
+
 std::vector<CCSTDecSpecifier*> type2(Type *t)
 {
   std::vector<CCSTDecSpecifier*>specifier;
-  switch(t->num())
+  switch(t->num())  {
+  case 2: // int type case
     {
-    case 2: // int type case
-      {
-	IntegerType *it = dynamic_cast<IntegerType*>(t);
-	Assert(it != 0x0, "Error: dynamic cast failed!\n");
-	switch (it->int_type())
+      IntegerType *it = dynamic_cast<IntegerType*>(t);
+      Assert(it != 0x0, "Error: dynamic cast failed!\n");
+      switch (it->int_type())
+	{
+	case pt_char_t:
 	  {
-	  case pt_char_t:
-	    {
-	      specifier.push_back(new CCSTSimpleTypeSpecifier(char_t));
-	      break;
-	    }
-	  case pt_short_t:
-	    {
-	      specifier.push_back(new CCSTSimpleTypeSpecifier(short_t));
-	      break;
-	    }
-	  case pt_int_t:
-	    {
-	      specifier.push_back(new CCSTSimpleTypeSpecifier(int_t));
-	      break;
-	    }
-	  case pt_long_t:
-	    {
-	      specifier.push_back( new CCSTSimpleTypeSpecifier(long_t));
-	      break;
-	    }
-	  case pt_longlong_t:
-	    {
-	      specifier.push_back(new CCSTSimpleTypeSpecifier(long_t));
-	      specifier.push_back(new CCSTSimpleTypeSpecifier(long_t));
-	      break;
-	    }
-	  case pt_capability_t:
-	    {
-	      specifier.push_back(new CCSTTypedefName("capability_t"));
-	      break;
-	    }
-	  default:
-	    {
-	      Assert(1 == 0, "Error: unknown type\n");
-	    }
+	    specifier.push_back(new CCSTSimpleTypeSpecifier(char_t));
+	    break;
 	  }
-	return specifier;
-      }
-    case 4: // struct
-      {
-	ProjectionType *pt = dynamic_cast<ProjectionType*>(t);
-	Assert(pt != 0x0, "Error: dynamic cast failed!\n");
-	specifier.push_back(new CCSTStructUnionSpecifier(struct_t, pt->real_type()));
-	return specifier;
-      }
-    default:
-      {
-	Assert(1 == 0, "Error: Not a struct or integer type.\n");
-      }
+	case pt_short_t:
+	  {
+	    specifier.push_back(new CCSTSimpleTypeSpecifier(short_t));
+	    break;
+	  }
+	case pt_int_t:
+	  {
+	    specifier.push_back(new CCSTSimpleTypeSpecifier(int_t));
+	    break;
+	  }
+	case pt_long_t:
+	  {
+	    specifier.push_back( new CCSTSimpleTypeSpecifier(long_t));
+	    break;
+	  }
+	case pt_longlong_t:
+	  {
+	    specifier.push_back(new CCSTSimpleTypeSpecifier(long_t));
+	    specifier.push_back(new CCSTSimpleTypeSpecifier(long_t));
+	    break;
+	  }
+	case pt_capability_t:
+	  {
+	    specifier.push_back(new CCSTTypedefName("capability_t"));
+	    break;
+	  }
+	default:
+	  {
+	    Assert(1 == 0, "Error: unknown type\n");
+	  }
+	}
+      return specifier;
     }
+  case 4: // struct
+    {
+      ProjectionType *pt = dynamic_cast<ProjectionType*>(t);
+      Assert(pt != 0x0, "Error: dynamic cast failed!\n");
+      specifier.push_back(new CCSTStructUnionSpecifier(struct_t, pt->real_type()));
+      return specifier;
+    }
+  default:
+    {
+      Assert(1 == 0, "Error: Not a struct or integer type.\n");
+    }
+  }
 }
-
-
-
-
 
 std::vector<CCSTSpecifierQual*> type(Type *t)
 {
-  std::vector<CCSTSpecifierQual*>specifier;
-  switch(t->num())
+  std::vector<CCSTSpecifierQual*> specifier;
+
+  int num = t->num();
+  switch(num)
     {
+    case 1:
+      {
+	// typedef
+	// todo
+      }
     case 2: // int type case
       {
 	IntegerType *it = dynamic_cast<IntegerType*>(t);
@@ -362,9 +409,30 @@ std::vector<CCSTSpecifierQual*> type(Type *t)
 	specifier.push_back(new CCSTStructUnionSpecifier(struct_t, pt->real_type()));
 	return specifier;
       }
+    case 5:
+      {
+	// void type
+	// todo
+	specifier.push_back(new CCSTSimpleTypeSpecifier(void_t));
+	return specifier;
+      }
+    case 6:
+      {
+	// channel type
+	// cptr_t define this somewhere for easy change
+	specifier.push_back(new CCSTTypedefName("cptr_t"));
+	return specifier;
+      }
+    case 7:
+      {
+	// function pointer type
+	// todo
+	// where is support in grammar
+      }
     default:
       {
-	Assert(1 == 0, "Error: Not a struct or integer type.\n");
+	printf("Received %s instead of struct or integer\n", type_number_to_name(num));
+	Assert(1 == 0, "Error: Not a struct or integer type. \n");
       }
     }
 }

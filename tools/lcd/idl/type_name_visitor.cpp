@@ -6,6 +6,12 @@ CCSTTypeName* TypeNameVisitor::visit(Typedef *td)
   return td->type()->accept(this);
 }
 
+CCSTTypeName* TypeNameVisitor::visit(Channel *c)
+{
+  printf(" type name visitor channel todo!\n");
+  return 0x0;
+}
+
 CCSTTypeName* TypeNameVisitor::visit(VoidType *vt)
 {
   CCSTPointer *pt = 0x0;
@@ -58,7 +64,7 @@ CCSTTypeName* TypeNameVisitor::visit(ProjectionType *proj)
   return new CCSTTypeName(sq, pt);
 }
 
-CCSTTypeName* TypeNameVisitor::visit(FunctionPointer *fp)
+CCSTTypeName* TypeNameVisitor::visit(Function *fp)
 {
   printf("type name visitor function pointer todo\n");
   return 0x0;

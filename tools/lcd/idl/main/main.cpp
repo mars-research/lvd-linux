@@ -6,13 +6,14 @@
 #include <iostream>
 #include <string.h>
 #include "ccst.h"
+#include "code_gen.h"
 //#include "marshal_visitor.h"
 
 int main(int argc, char ** argv)
 {
   bool pDebug = false;
 
-  if(argc != 4)
+  if(argc != 3)
     {
       printf("error in number of args\n");
       exit(0);
@@ -40,19 +41,12 @@ int main(int argc, char ** argv)
       if(pDebug) { printf("successfully parsed project.\n"); }
       
       // no longer specify file?
-      char* out_file = argv[3];
+      //  char* out_file = argv[3];
       
-      if(pDebug) { printf("Wring to file: %s.\n", out_file); }
+      // if(pDebug) { printf("Wring to file: %s.\n", out_file); }
 
-      FILE* of = fopen(out_file, "w");
+      // FILE* of = fopen(out_file, "w");
       
-      if(!of)
-	{
-	  printf("Error: unable to open %s for writing\n", out_file);
-	  perror("error");
-	  // cleanup
-	  exit(0);
-	}
       if(!strcmp(argv[1],"-serverheader"))
 	{
 	  printf("todo\n");
@@ -67,15 +61,13 @@ int main(int argc, char ** argv)
 	}
       else if(!strcmp(argv[1],"-serversource"))
 	{
+	  tree->prepare_marshal();
 	  /*
-	  MarshalVisitor *mv = new MarshalVisitor();
-	  tree->accept(mv, 0x0);
-	  printf("hereeee\n");
 	  CCSTFile* ccst_tree = generate_server_source(tree);
 	  printf("completed tree\n");
 	  ccst_tree->write(of);
-	  */
 	  printf("completed server source writing\n");
+	  */
 	}
       else if(!strcmp(argv[1], "-clientheader"))
 	{
@@ -88,12 +80,31 @@ int main(int argc, char ** argv)
 	}
       else if(!strcmp(argv[1], "-clientsource"))
 	{
-	  printf("todo\n");
-	  /*
-	  CCSTFile* ccst_tree = generate_client_source(tree);
-	  ccst_tree->write(of);
-	  */
+	  tree->function_pointer_to_rpc();
+	  tree->resolve_types(); // resolve types that weren't resolved during parsing
+	  tree->prepare_marshal();
+	  
+	  std::vector<Module*> project_modules = tree->modules();
+	  for(std::vector<Module*>::iterator it = project_modules.begin(); it != project_modules.end(); it ++) {
+	    Module *m = *it;
+	    if (m == 0x0) {
+	      printf("Module is null\n");
+	      exit(0);
+	    }
+
+	    FILE *of = fopen(m->identifier(), "w");
+	    if(!of)
+	      {
+		printf("Error: unable to open %s for writing\n", m->identifier());
+		perror("error");
+		// cleanup
+		exit(0);
+	      }
+	    CCSTFile* ccst_tree = generate_client_source(m);
+	    ccst_tree->write(of);
+	  }
 	  printf("completed client source writing\n");
+	  
 	}
       else
 	{

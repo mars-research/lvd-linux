@@ -61,17 +61,8 @@ int Registers::allocate_next_free_register()
 /* marshal type code */
 
 // placed these here instead of header to avoid compilation errors
-Marshal_projection::Marshal_projection(ProjectionType *pt, std::vector<Marshal_type*> in_fields, std::vector<Marshal_type*> out_fields)
+Marshal_projection::Marshal_projection()
 {
-  this->pt_ = pt;
-  this->param_name_ = "";
-  this->in_fields_ = in_fields;
-  this->out_fields_ = out_fields;
-}
-
-void Marshal_projection::set_name(const char *name)
-{
-  this->param_name_ = name;
 }
 
 void Marshal_projection::set_register(int r)
@@ -85,35 +76,8 @@ int Marshal_projection::get_register()
   return 0;
 }
 
-std::vector<Marshal_type*> Marshal_projection::in_fields()
+Marshal_integer::Marshal_integer(int r)
 {
-  return this->in_fields_;
-}
-
-std::vector<Marshal_type*> Marshal_projection::out_fields()
-{
-  return this->out_fields_;
-}
-
-Type* Marshal_projection::type()
-{
-  return (Type*) this->pt_;
-}
-
-const char* Marshal_projection::name()
-{
-  return this->param_name_;
-}
-
-CCSTCompoundStatement* Marshal_projection::accept(TypeVisitor *worker)
-{
-  return worker->visit(this);
-}
-
-Marshal_integer::Marshal_integer(IntegerType *it, int r)
-{
-  this->it_ = it;
-  this->param_name_ = "";
   this->register_ = r;
 }
 
@@ -127,29 +91,8 @@ int Marshal_integer::get_register()
   return this->register_;
 }
 
-void Marshal_integer::set_name(const char *name)
+Marshal_void::Marshal_void()
 {
-  this->param_name_ = name;
-}
-
-const char* Marshal_integer::name()
-{
-  return this->param_name_;
-}
-
-Type* Marshal_integer::type()
-{
-  return (Type*) this->it_;
-}
-
-CCSTCompoundStatement* Marshal_integer::accept(TypeVisitor *worker)
-{
-  return worker->visit(this);
-}
-
-Marshal_void::Marshal_void(VoidType *vt)
-{
-  this->vt_ = vt;
 }
 
 void Marshal_void::set_register(int r)
@@ -162,29 +105,8 @@ int Marshal_void::get_register()
   Assert(1 == 0, "Error: this operation is now allowed\n");
 }
 
-void Marshal_void::set_name(const char *name)
+Marshal_typedef::Marshal_typedef(Marshal_type *type)
 {
-  this->param_name_ = name;
-}
-
-const char* Marshal_void::name()
-{
-  return this->param_name_;
-}
-
-Type* Marshal_void::get_type()
-{
-  return (Type*) this->vt_;
-}
-
-CCSTCompoundStatement* Marshal_void::accept(TypeVisitor *worker)
-{
-  return worker->visit(this);
-}
-
-Marshal_typedef::Marshal_typedef(Typedef *t, Marshal_type *type)
-{
-  this->t_ = t;
   this->true_type_ = type;
 }
 
@@ -198,69 +120,60 @@ int Marshal_typedef::get_register()
   return this->true_type_->get_register();
 }
 
-void Marshal_typedef::set_name(const char *name)
+/* Marshal Prepare visitor code */
+
+MarshalPrepareVisitor::MarshalPrepareVisitor(Registers *r)
 {
-  this->param_name_ = name;
-  this->true_type_->set_name(name);
+  this->registers_ = r;
 }
 
-Type* Marshal_typedef::type()
+Marshal_type* MarshalPrepareVisitor::visit(Channel *c)
 {
-  return (Type*) this->t_;
+  printf("marshal prepare visitor channel todo!\n");
+  return 0x0;
 }
 
-const char* Marshal_typedef::name()
+Marshal_type* MarshalPrepareVisitor::visit(Function *fp)
 {
-  return this->param_name_;
+  printf("Error: cannot allocate a register for functino pointer\n");
+  return 0x0;
 }
 
-CCSTCompoundStatement* Marshal_typedef::accept(TypeVisitor *worker)
+Marshal_type* MarshalPrepareVisitor::visit(Typedef *td)
 {
-  return worker->visit(this);
+  Marshal_type *tmp = td->type()->accept(this);
+  return new Marshal_typedef(tmp);
 }
 
-Marshal_pointer::Marshal_pointer(PointerType *pt, Marshal_type *pointer_type)
+Marshal_type* MarshalPrepareVisitor::visit(VoidType *vt)
 {
-  this->pt_ = pt;
-  this->m_type_ = pointer_type;
+  printf("Error: cannot allocate a register for void type\n");
+  return new Marshal_void();
 }
 
-void Marshal_pointer::set_register(int r)
+Marshal_type* MarshalPrepareVisitor::visit(IntegerType *it)
 {
-  m_type_->set_register(r);
+  int r = this->registers_->allocate_next_free_register();
+  
+  if (r == -1) {
+    Assert(1 == 0, "Error: have run out of registers\n");
+  }
+  
+  return new Marshal_integer(r);
 }
 
-int Marshal_pointer::get_register()
+Marshal_type* MarshalPrepareVisitor::visit(ProjectionType *pt)
 {
-  return m_type_->get_register();
+  std::vector<ProjectionField*> fields = pt->fields();
+  
+  for(std::vector<ProjectionField*>::iterator it = fields.begin(); it != fields.end(); it ++) {
+    ProjectionField *pf = *it;
+    if (pf == 0x0) {
+      Assert(1 == 0, "Error: null pointer in MarshalPrepareVisit visit ProjectionType\n");
+    }
+    
+    pf->set_marshal_info( pf->type()->accept(this) );
+  }
+  
+  return new Marshal_projection();
 }
-
-void Marshal_pointer::set_name(const char *name)
-{
-  //THINK ABOUT THIS
-  char* pointer_param_name = (char*) malloc(sizeof(char)*(strlen(name)+5));
-  sprintf(pointer_param_name, "%s_tmp", name);
-  this->m_type_->set_name(pointer_param_name); 
-  this->param_name_ = name; 
-}
-
-const char* Marshal_pointer::name()
-{
-  return this->param_name_;
-}
-
-Marshal_type* Marshal_pointer::m_type()
-{
-  return this->m_type_;
-}
-
-Type* Marshal_pointer::type()
-{
-  return (Type*) this->pt_;
-}
-
-CCSTCompoundStatement* Marshal_pointer::accept(TypeVisitor *worker)
-{
-  return worker->visit(this);
-}
-

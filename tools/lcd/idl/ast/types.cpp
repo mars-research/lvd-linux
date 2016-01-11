@@ -2,40 +2,116 @@
 
 /* function pointer type*/
 
-FunctionPointer::FunctionPointer(const char *id, ReturnVariable *return_var, std::vector<FPParameter*> parameters)
+Function::Function(const char *id, ReturnVariable *return_var, std::vector<Parameter*> parameters)
 {
   this->identifier_  = id;
   this->return_var_ = return_var;
   this->parameters_  = parameters;
 }
 
-Marshal_type* FunctionPointer::accept(MarshalPrepareVisitor *worker)
+Marshal_type* Function::accept(MarshalPrepareVisitor *worker)
 {
   return worker->visit(this);
 }
 
-CCSTTypeName* FunctionPointer::accept(TypeNameVisitor *worker)
+CCSTTypeName* Function::accept(TypeNameVisitor *worker)
 {
   return worker->visit(this);
 }
 
-CCSTStatement* FunctionPointer::accept(TypeVisitor *worker, Variable *v)
+CCSTStatement* Function::accept(TypeVisitor *worker, Variable *v)
 {
   return worker->visit(this, v);
 }
 
-int FunctionPointer::num()
+int Function::num()
 {
   printf("num todo for function pointer\n");
-  return -2;
+  return 7;
 }
 
-const char* FunctionPointer::name()
+const char* Function::name()
 {
   return this->identifier_;
 }
 
+void Function::resolve_types(LexicalScope *ls)
+{
+  return;
+}
+
+Rpc* Function::to_rpc(LexicalScope *ls)
+{
+  return new Rpc(this->return_var_, this->identifier_, this->parameters_, ls);
+}
+
 /* end */
+
+UnresolvedType::UnresolvedType(const char *name)
+{
+  this->type_name_ = name;
+}
+
+Marshal_type* UnresolvedType::accept(MarshalPrepareVisitor *worker)
+{
+  // todo
+}
+
+CCSTTypeName* UnresolvedType::accept(TypeNameVisitor *worker)
+{
+  // todo
+}
+
+CCSTStatement* UnresolvedType::accept(TypeVisitor *worker, Variable *v)
+{
+  // todo
+}
+
+int UnresolvedType::num()
+{
+  return 8;
+}
+
+const char* UnresolvedType::name()
+{
+  return this->type_name_;
+}
+
+void UnresolvedType::resolve_types(LexicalScope *ls)
+{
+  return;
+}
+
+
+Channel::Channel()
+{
+}
+
+Marshal_type* Channel::accept(MarshalPrepareVisitor *worker)
+{
+  return worker->visit(this);
+}
+CCSTTypeName* Channel::accept(TypeNameVisitor *worker)
+{
+  return worker->visit(this);
+}
+CCSTStatement* Channel::accept(TypeVisitor *worker, Variable *v)
+{
+  return worker->visit(this, v);
+}
+const char* Channel::name()
+{
+  return "channel";
+}
+int Channel::num()
+{
+  return 6;
+}
+
+void Channel::resolve_types(LexicalScope *ls)
+{
+  return;
+}
 
 /* typedef type */
 
@@ -81,6 +157,11 @@ const char* Typedef::name()
   return this->alias_;
 }
 
+void Typedef::resolve_types(LexicalScope *ls)
+{
+  return;
+}
+
 /* end */
 
 /* void type */
@@ -112,6 +193,11 @@ int VoidType::num()
 const char* VoidType::name()
 {
   return "void";
+}
+
+void VoidType::resolve_types(LexicalScope *ls)
+{
+  return;
 }
 
 /* end */
@@ -159,6 +245,11 @@ const char* IntegerType::name()
 {
   printf("todo integer type name function.\n");
   return "";
+}
+
+void IntegerType::resolve_types(LexicalScope *ls)
+{
+  return;
 }
 
 /* end */
@@ -210,6 +301,14 @@ int ProjectionType::num()
 const char* ProjectionType::name()
 {
   return this->id_;
+}
+
+void ProjectionType::resolve_types(LexicalScope *ls)
+{
+  for(std::vector<ProjectionField*>::iterator it = this->fields_.begin(); it != this->fields_.end(); it ++) {
+    ProjectionField *pf = (ProjectionField*) *it;
+    pf->resolve_types(ls);
+  }
 }
 
 /* end */

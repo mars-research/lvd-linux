@@ -38,7 +38,7 @@ class LexicalScope : public Base
 {
   LexicalScope *outer_scope_;
   std::map<std::string, Type*> type_definitions_;
-  std::map<std::pair<std::string, std::vector<Parameter*> >, Rpc*> rpc_definitions_; // rpc or function pointer
+  std::map<std::pair<std::string, std::vector<Parameter*> >, Rpc*> rpc_definitions_; // rpc or function pointer. why do we keep this? 
   std::vector<LexicalScope*> inner_scopes_;
  public:
   LexicalScope();
@@ -54,13 +54,15 @@ class LexicalScope : public Base
   virtual std::map<std::string, Type*> type_definitions();
   virtual std::vector<LexicalScope*> inner_scopes();
   virtual LexicalScope* outer_scope();
+  virtual void resolve_types();
+  virtual std::vector<Rpc*> function_pointer_to_rpc();
 };
 
 class GlobalScope : public LexicalScope
 {
   static GlobalScope *instance_;
   LexicalScope *outer_scope_;
-  std::map<std::string, Type*> types_definitions_;
+  std::map<std::string, Type*> type_definitions_;
   std::map<std::pair<std::string, std::vector<Parameter*> >, Rpc*> rpc_definitions_; // rpc or function pointer
   std::vector<LexicalScope*> inner_scopes_;
 
@@ -78,6 +80,8 @@ class GlobalScope : public LexicalScope
   virtual std::vector<LexicalScope*> inner_scopes(); // x
   static GlobalScope* instance(); // x
   virtual LexicalScope* outer_scope();
+  virtual void resolve_types();
+  virtual std::vector<Rpc*> function_pointer_to_rpc();
 };
 
 class Type : public Base
@@ -88,6 +92,20 @@ class Type : public Base
   virtual CCSTStatement* accept(TypeVisitor *worker, Variable *v) = 0;
   virtual int num() = 0;
   virtual const char* name() = 0;
+  virtual void resolve_types(LexicalScope *ls) = 0;
+};
+
+class UnresolvedType : public Type
+{
+  const char *type_name_;
+ public:
+  UnresolvedType(const char* type_name);
+  virtual Marshal_type* accept(MarshalPrepareVisitor *worker);
+  virtual CCSTTypeName* accept(TypeNameVisitor *worker); // need to add unresolved type to these visitors.
+  virtual CCSTStatement* accept(TypeVisitor *worker, Variable *v);
+  virtual int num();
+  virtual const char* name();
+  virtual void resolve_types(LexicalScope *ls);
 };
 
 class Variable : public Base
@@ -101,6 +119,7 @@ class Variable : public Base
   virtual Marshal_type* marshal_info() = 0;
   virtual int pointer_count() = 0;
   virtual void prepare_marshal(MarshalPrepareVisitor *worker) = 0;
+  virtual void resolve_types(LexicalScope *ls) = 0;
 
   virtual void set_in(bool b) = 0;
   virtual void set_out(bool b) = 0;
@@ -127,6 +146,7 @@ class GlobalVariable : public Variable
  public:
   GlobalVariable(Type *type, const char *id, int pointer_count);
   virtual void prepare_marshal(MarshalPrepareVisitor *worker);
+  virtual void resolve_types(LexicalScope *ls);
   virtual Type* type();
   virtual const char* identifier();
   virtual void set_accessor(Variable *v);
@@ -134,6 +154,7 @@ class GlobalVariable : public Variable
   virtual void set_marshal_info(Marshal_type *mt);
   virtual Marshal_type* marshal_info();
   virtual int pointer_count();
+  
 
   virtual void set_in(bool b);
   virtual void set_out(bool b);
@@ -171,6 +192,7 @@ class Parameter : public Variable
   Parameter(Type* type, const char* name, int pointer_count);
   ~Parameter();
   virtual void prepare_marshal(MarshalPrepareVisitor *worker);
+  virtual void resolve_types(LexicalScope *ls);
   virtual Type* type();
   virtual void set_marshal_info(Marshal_type* mt);
   virtual Marshal_type* marshal_info(); 
@@ -178,6 +200,7 @@ class Parameter : public Variable
   virtual void set_accessor(Variable *v);
   virtual Variable* accessor();
   virtual int pointer_count();
+  
   
   virtual void set_in(bool b);
   virtual void set_out(bool b);
@@ -211,6 +234,8 @@ class FPParameter : public Parameter
   virtual void set_marshal_info(Marshal_type *mt);
   virtual Marshal_type* marshal_info();
   virtual void prepare_marshal(MarshalPrepareVisitor *worker);
+  virtual void resolve_types(LexicalScope *ls);
+
 
   virtual void set_in(bool b);
   virtual void set_out(bool b);
@@ -241,12 +266,13 @@ class ReturnVariable : public Variable
   virtual void set_marshal_info(Marshal_type *mt);
   virtual Marshal_type* marshal_info();
   virtual void prepare_marshal(MarshalPrepareVisitor *worker);
-
+  virtual void resolve_types(LexicalScope *ls);
   virtual const char* identifier();
   virtual Type* type();
   virtual void set_accessor(Variable *v);
   virtual Variable* accessor();
   virtual int pointer_count();
+  
 
   virtual void set_in(bool b);
   virtual void set_out(bool b);
@@ -263,19 +289,21 @@ class ReturnVariable : public Variable
   virtual bool dealloc_callee();
 };
 
-class FunctionPointer : public Type
+class Function : public Type
 {
   const char *identifier_;
   ReturnVariable *return_var_;
   std::vector<Parameter*> parameters_;
 
  public:
-  FunctionPointer(const char *id, ReturnVariable *return_var, std::vector<Parameter*> parameters);
+  Function(const char *id, ReturnVariable *return_var, std::vector<Parameter*> parameters);
   virtual Marshal_type* accept(MarshalPrepareVisitor *worker);
   virtual CCSTTypeName* accept(TypeNameVisitor *worker);
   virtual CCSTStatement* accept(TypeVisitor *worker, Variable *v);
   virtual int num();
   virtual const char* name();
+  virtual void resolve_types(LexicalScope *ls);
+  Rpc* to_rpc(LexicalScope *ls);
 };
  
 class Typedef : public Type
@@ -293,6 +321,7 @@ class Typedef : public Type
   Type* type();
   const char* alias();
   virtual int num();
+  virtual void resolve_types(LexicalScope *ls);
   // virtual void marshal();
 };
 
@@ -305,6 +334,7 @@ class Channel : public Type
   virtual CCSTStatement* accept(TypeVisitor *worker, Variable *v);
   virtual const char* name();
   virtual int num();
+  virtual void resolve_types(LexicalScope *ls);
 };
 
 class VoidType : public Type
@@ -316,6 +346,7 @@ class VoidType : public Type
   virtual CCSTStatement* accept(TypeVisitor *worker, Variable *v);
   virtual const char* name();
   virtual int num();
+  virtual void resolve_types(LexicalScope *ls);
 };
 
 class IntegerType : public Type
@@ -333,6 +364,7 @@ class IntegerType : public Type
   PrimType int_type();
   bool is_unsigned();
   virtual int num();
+  virtual void resolve_types(LexicalScope *ls);
   ~IntegerType(){printf("inttype destructor\n");}
 };
 
@@ -361,7 +393,10 @@ class ProjectionField : public Variable //?
   virtual void set_marshal_info(Marshal_type *mt); // add to .cpp file
   virtual Marshal_type* marshal_info(); // make sure all variables have
   virtual void prepare_marshal(MarshalPrepareVisitor *worker);
+  virtual void resolve_types(LexicalScope *ls);
   virtual int pointer_count();
+  
+
 
   virtual void set_in(bool b);
   virtual void set_out(bool b);
@@ -384,7 +419,7 @@ class ProjectionType : public Type // complex type
   
   const char* id_; 
   const char* real_type_;
-  std::vector<ProjectionField*> fields_;
+  std::vector<ProjectionField*> fields_; 
   std::vector<GlobalVariable*> init_variables_;
  public:
   ProjectionType(const char* id, const char* real_type, std::vector<ProjectionField*> fields, std::vector<GlobalVariable*> init_variables);
@@ -396,6 +431,7 @@ class ProjectionType : public Type // complex type
   const char* real_type();
   std::vector<ProjectionField*> fields();
   virtual int num();
+  virtual void resolve_types(LexicalScope *ls);
   ~ProjectionType(){printf("projection type destructor\n");}
 };
 
@@ -404,20 +440,22 @@ class Rpc : public Base
   const char* enum_name_;
   SymbolTable *symbol_table_;
   ReturnVariable *explicit_return_;
+  LexicalScope *current_scope_;
   /* -------------- */
 
-  char* name_;
+  const char* name_;
   std::vector<Parameter* > parameters_;
   std::vector<Parameter* > marshal_parameters_; // wtf is this
  public:
-  Rpc(ReturnVariable *return_var, char* name, std::vector<Parameter* > parameters);
-  char* name();
+  Rpc(ReturnVariable *return_var, const char* name, std::vector<Parameter* > parameters, LexicalScope *current_scope);
+  const char* name();
   const char* enum_name();
   const char* callee_name();
   std::vector<Parameter*> parameters();
   ReturnVariable *return_variable();
   SymbolTable* symbol_table();
   void prepare_marshal();
+  void resolve_types();
 };
 
 class Module : public Base
@@ -433,6 +471,8 @@ class Module : public Base
   std::vector<GlobalVariable*> globals();
   LexicalScope *module_scope();
   void prepare_marshal();
+  void resolve_types();
+  void function_pointer_to_rpc();
   const char* identifier();
 };
 
@@ -453,6 +493,8 @@ class Project : public Base
  public:
   Project(LexicalScope *scope, std::vector<Module*> modules, std::vector<Include*> includes);
   void prepare_marshal();
+  void resolve_types();
+  void function_pointer_to_rpc();
   std::vector<Module*> modules();
 };
 
@@ -463,14 +505,14 @@ class TypeNameVisitor // generates CCSTTypeName for each type.
   CCSTTypeName* visit(VoidType *vt);
   CCSTTypeName* visit(IntegerType *it);
   CCSTTypeName* visit(ProjectionType *pt);
-  CCSTTypeName* visit(FunctionPointer *fp);
+  CCSTTypeName* visit(Function *fp);
   CCSTTypeName* visit(Channel *c);
 };
 
 class TypeVisitor
 {
  public:
-  virtual CCSTStatement* visit(FunctionPointer *fp, Variable *v) = 0;
+  virtual CCSTStatement* visit(Function *fp, Variable *v) = 0;
   virtual CCSTStatement* visit(Typedef *td, Variable *v) = 0;
   virtual CCSTStatement* visit(VoidType *vt, Variable *v) = 0;
   virtual CCSTStatement* visit(IntegerType *it, Variable *v) = 0;
@@ -486,7 +528,7 @@ class AllocateTypeVisitor : public TypeVisitor
   CCSTStatement* allocation_helper(ProjectionType *vt, Variable *v, int pointer_count);
  public:
   AllocateTypeVisitor();
-  virtual CCSTStatement* visit(FunctionPointer *fp, Variable *v);
+  virtual CCSTStatement* visit(Function *fp, Variable *v);
   virtual CCSTStatement* visit(Typedef *td, Variable *v);
   virtual CCSTStatement* visit(VoidType *vt, Variable *v);
   virtual CCSTStatement* visit(IntegerType *it, Variable *v);
@@ -498,16 +540,13 @@ class MarshalTypeVisitor : public TypeVisitor
 {
  public:
   MarshalTypeVisitor();
-  virtual CCSTStatement* visit(FunctionPointer *fp, Variable *v);
+  virtual CCSTStatement* visit(Function *fp, Variable *v);
   virtual CCSTStatement* visit(Typedef *td, Variable *v);
   virtual CCSTStatement* visit(VoidType *vt, Variable *v);
   virtual CCSTStatement* visit(IntegerType *it, Variable *v);
   virtual CCSTStatement* visit(ProjectionType *pt, Variable *v);
   virtual CCSTStatement* visit(Channel *c, Variable *v);
 };
-
-
-
 
 class AllocateVariableVisitor 
 {

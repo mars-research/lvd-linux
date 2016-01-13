@@ -209,6 +209,11 @@ Marshal_type* Parameter::marshal_info()
 
 void Parameter::resolve_types(LexicalScope *ls)
 {
+  printf("Parameter name is %s\n", this->name_);
+  if(this->type_ == 0x0) {
+    printf("value is null\n");
+    return;
+  }
   // check if unresolved
   if(this->type_->num() != 8) {
     return;

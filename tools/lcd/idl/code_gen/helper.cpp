@@ -120,6 +120,7 @@ const char* parameter_name(const char* name)
 /*
  * returns a new string with _container on the end.
  */
+/*
 const char* container_name(const char* name)
 {
   int length = strlen(name);
@@ -131,6 +132,7 @@ const char* container_name(const char* name)
   strncpy(new_str, total.str().c_str(), length+length2+1);
   return new_str;
 }
+*/
 
 /*
  * takes the vector of global variables with also provides the parameters to the function.
@@ -251,13 +253,18 @@ CCSTFuncDef* function_definition(CCSTDeclaration* function_declaration, CCSTComp
   return new CCSTFuncDef(function_declaration->specifier_, func, decs, body);
 }
 
-CCSTParamTypeList* parameter_list()
+CCSTParamTypeList* parameter_list(std::vector<Parameter*> params)
 {
-  
+  std::vector<CCSTParamDeclaration*> param_decs;
+  for(std::vector<Parameter*>::iterator it = params.begin(); it != params.end(); it ++) {
+    Parameter *p = (Parameter*) *it;
+    param_decs.push_back(new CCSTParamDeclaration(type2(p->type()), new CCSTDeclarator(pointer(p->pointer_count()), new CCSTDirectDecId(p->identifier()))));
+  }
+
+  return new CCSTParamList(param_decs);
 }
 
-/* creates a function declaration
- * from an rpc, not callee
+/* creates a function declaration from an rpc
  */
 CCSTDeclaration* function_declaration(Rpc* r)
 {
@@ -267,14 +274,13 @@ CCSTDeclaration* function_declaration(Rpc* r)
   CCSTPointer *p = pointer(r->return_variable()->pointer_count());
   
   CCSTDirectDecId *name = new CCSTDirectDecId(r->name());
-  CCSTParamTypeList *param_list = parameter_list();
+  CCSTParamTypeList *param_list = parameter_list(r->parameters());
   CCSTDirectDecParamTypeList *name_params = new CCSTDirectDecParamTypeList(name, param_list);
   
   func.push_back(new CCSTDeclarator(p, name_params));
   
   return new CCSTDeclaration(specifier, func);
 }
-
 
 // constructs a type declaration from a name instead of a type object
 std::vector<CCSTDecSpecifier*> struct_type(const char *type_name)
@@ -287,7 +293,13 @@ std::vector<CCSTDecSpecifier*> struct_type(const char *type_name)
 std::vector<CCSTDecSpecifier*> type2(Type *t)
 {
   std::vector<CCSTDecSpecifier*>specifier;
-  switch(t->num())  {
+  int num = t->num();
+  switch(num)  {
+  case 1:
+    {
+      // typdef 
+      // todo
+    }
   case 2: // int type case
     {
       IntegerType *it = dynamic_cast<IntegerType*>(t);
@@ -339,8 +351,24 @@ std::vector<CCSTDecSpecifier*> type2(Type *t)
       specifier.push_back(new CCSTStructUnionSpecifier(struct_t, pt->real_type()));
       return specifier;
     }
+  case 5:
+    {
+      specifier.push_back(new CCSTSimpleTypeSpecifier(void_t));
+      return specifier;
+    }
+  case 6:
+    {
+      specifier.push_back(new CCSTTypedefName("cptr_t"));
+      return specifier;
+    }
+  case 7:
+    {
+      // function pointer type
+      // todo
+    }
   default:
     {
+      printf("Received %s instead of struct or integer\n", type_number_to_name(num));
       Assert(1 == 0, "Error: Not a struct or integer type.\n");
     }
   }

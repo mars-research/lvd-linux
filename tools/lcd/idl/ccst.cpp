@@ -1401,21 +1401,21 @@ CCSTParamDeclaration::CCSTParamDeclaration()
   //todo
 }
 
-CCSTParamDeclaration::CCSTParamDeclaration(std::vector<CCSTDecSpecifier*>* dec_specs)
+CCSTParamDeclaration::CCSTParamDeclaration(std::vector<CCSTDecSpecifier*> dec_specs)
 {
   this->dec_specs_ = dec_specs;
   this->dec_ = NULL;
   this->abs_dec_ = NULL;
 }
 
-CCSTParamDeclaration::CCSTParamDeclaration(std::vector<CCSTDecSpecifier*> *dec_specs, CCSTDeclarator *dec)
+CCSTParamDeclaration::CCSTParamDeclaration(std::vector<CCSTDecSpecifier*> dec_specs, CCSTDeclarator *dec)
 {
   this->dec_specs_ = dec_specs; 
   this->dec_ = dec; 
   this->abs_dec_ = NULL;
 }
 
-CCSTParamDeclaration::CCSTParamDeclaration(std::vector<CCSTDecSpecifier*> *dec_specs, CCSTAbstDeclarator *abs_dec)
+CCSTParamDeclaration::CCSTParamDeclaration(std::vector<CCSTDecSpecifier*> dec_specs, CCSTAbstDeclarator *abs_dec)
 {
   this->dec_specs_ = dec_specs; 
   this->abs_dec_ = abs_dec; 
@@ -1424,7 +1424,7 @@ CCSTParamDeclaration::CCSTParamDeclaration(std::vector<CCSTDecSpecifier*> *dec_s
 
 void CCSTParamDeclaration::write(FILE *f)
 {
-  for(std::vector<CCSTDecSpecifier*>::iterator it = dec_specs_->begin(); it != dec_specs_->end(); ++it)
+  for(std::vector<CCSTDecSpecifier*>::iterator it = dec_specs_.begin(); it != dec_specs_.end(); ++it)
     {
       CCSTDecSpecifier *spec = *it;
       spec->write(f);

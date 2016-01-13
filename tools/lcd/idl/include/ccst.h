@@ -1062,14 +1062,14 @@ class CCSTParamDeclaration : public CCSTParamList
                           | {<declaration-specifier>}+ <abstract-declarator>
                           | {<declaration-specifier>}+
    */
-  std::vector<CCSTDecSpecifier*>* dec_specs_;
+  std::vector<CCSTDecSpecifier*> dec_specs_;
   CCSTDeclarator *dec_;
   CCSTAbstDeclarator *abs_dec_;
  public:
   CCSTParamDeclaration();
-  CCSTParamDeclaration(std::vector<CCSTDecSpecifier*>* dec_specs); //{this->dec_specs_ = dec_specs;}
-  CCSTParamDeclaration(std::vector<CCSTDecSpecifier*>* dec_specs, CCSTDeclarator *dec); //{this->dec_specs_ = dec_specs; this->dec_ = dec; this->abs_dec_ = abs_dec;}
-  CCSTParamDeclaration(std::vector<CCSTDecSpecifier*>* dec_specs, CCSTAbstDeclarator *abs_dec); //{this->dec_specs_ = dec_specs; this->abs_dec_ = abs_dec; this->dec_ = dec;}
+  CCSTParamDeclaration(std::vector<CCSTDecSpecifier*> dec_specs); //{this->dec_specs_ = dec_specs;}
+  CCSTParamDeclaration(std::vector<CCSTDecSpecifier*> dec_specs, CCSTDeclarator *dec); //{this->dec_specs_ = dec_specs; this->dec_ = dec; this->abs_dec_ = abs_dec;}
+  CCSTParamDeclaration(std::vector<CCSTDecSpecifier*> dec_specs, CCSTAbstDeclarator *abs_dec); //{this->dec_specs_ = dec_specs; this->abs_dec_ = abs_dec; this->dec_ = dec;}
   virtual void write(FILE *f);
 };
 

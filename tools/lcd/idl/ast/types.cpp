@@ -1,6 +1,17 @@
 #include "lcd_ast.h"
 
 /* function pointer type*/
+const char* container_name(const char* name)
+{
+  int length = strlen(name);
+  int length2 = strlen("_container");
+  char *new_str = (char*) malloc(sizeof(char)*(length+length2+1));
+  
+  std::ostringstream total;
+  total << name << "_container";
+  strncpy(new_str, total.str().c_str(), length+length2+1);
+  return new_str;
+}
 
 Function::Function(const char *id, ReturnVariable *return_var, std::vector<Parameter*> parameters)
 {
@@ -40,9 +51,30 @@ void Function::resolve_types(LexicalScope *ls)
   return;
 }
 
-Rpc* Function::to_rpc(LexicalScope *ls)
+Rpc* Function::to_rpc(LexicalScope *ls, ProjectionType *pt)
 {
-  return new Rpc(this->return_var_, this->identifier_, this->parameters_, ls);
+  // adding extra parameters here. but maybe depending on needs this could be done at parse time
+  // and these extra parameters can be added to the Function.
+  std::vector<Parameter*> new_parameters;
+  new_parameters.insert(new_parameters.end(), this->parameters_.begin(), this->parameters_.end());
+  int err;
+  Type *dstore = ls->lookup("dstore", &err);
+  if(dstore == 0x0) {
+    printf("Error: dstore is not in scope\n");
+  }
+  new_parameters.push_back(new Parameter(dstore, "dstore", 1));
+
+  const char* c_name = container_name(pt->name());
+  Type *container = ls->lookup(c_name, &err);
+  if(container == 0x0) {
+    printf("Error: container is not in scope\n");
+  }
+
+  new_parameters.push_back(new Parameter(container, c_name, 1));
+
+  Rpc* tmp = new Rpc(this->return_var_, this->identifier_, new_parameters, ls);
+  tmp->set_function_pointer_defined(true);
+  return tmp;
 }
 
 /* end */

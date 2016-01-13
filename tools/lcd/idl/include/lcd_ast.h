@@ -22,6 +22,7 @@ class Variable;
 class Type;
 class Parameter;
 class Rpc;
+class ProjectionType;
 
 enum PrimType {pt_char_t, pt_short_t, pt_int_t, pt_long_t, pt_longlong_t, pt_capability_t};
 enum type_k {};
@@ -303,7 +304,7 @@ class Function : public Type
   virtual int num();
   virtual const char* name();
   virtual void resolve_types(LexicalScope *ls);
-  Rpc* to_rpc(LexicalScope *ls);
+  Rpc* to_rpc(LexicalScope *ls, ProjectionType *pt);
 };
  
 class Typedef : public Type
@@ -446,8 +447,10 @@ class Rpc : public Base
   const char* name_;
   std::vector<Parameter* > parameters_;
   std::vector<Parameter* > marshal_parameters_; // wtf is this
+  bool function_pointer_defined_;
  public:
   Rpc(ReturnVariable *return_var, const char* name, std::vector<Parameter* > parameters, LexicalScope *current_scope);
+  void set_function_pointer_defined(bool b);
   const char* name();
   const char* enum_name();
   const char* callee_name();

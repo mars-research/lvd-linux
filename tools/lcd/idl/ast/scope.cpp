@@ -33,6 +33,24 @@ GlobalScope::GlobalScope()
 					      , new IntegerType(pt_longlong_t, true, sizeof(long long))));
   this->type_definitions_.insert( std::pair<std::string,Type*>("capability"
 					       , new IntegerType(pt_capability_t, false, sizeof(int))));
+  // dptpr_t
+  std::vector<ProjectionField*> fields;
+  int err;
+  fields.push_back(new ProjectionField(this->lookup("unsigned long", &err), "dptr", 0)); // unsigned long dptr;
+  this->type_definitions_.insert( std::pair<std::string, Type*>("dptr_t"
+								, new Typedef("dptr_t", new ProjectionType("", "", fields))));
+  
+  // cptr_t
+  std::vector<ProjectionField*> fields2;
+  fields2.push_back(new ProjectionField(this->lookup("unsigned long", &err), "cptr", 0)); // unsigned long cptr;
+  this->type_definitions_.insert( std::pair<std::string, Type*>("cptr_t"
+								, new Typedef("cptr_t", new ProjectionType("", "", fields2))));
+
+
+  // dstore no fields
+  std::vector<ProjectionField*> fields3;
+  this->type_definitions_.insert(std::pair<std::string, Type*>("dstore"
+							       , new ProjectionType("dstore", "dstore", fields3)));
 }
 
 GlobalScope* GlobalScope::instance()
@@ -138,7 +156,34 @@ void GlobalScope::resolve_types()
 
 std::vector<Rpc*> GlobalScope::function_pointer_to_rpc()
 {
+  std::vector<Rpc*> rpcs;
+  for(std::map<std::string, Type*>::iterator it = this->type_definitions_.begin(); it != this->type_definitions_.end(); it ++) {
+    Type *t = it->second;
+    
+    if(t->num() == 4) { // projection type
+      ProjectionType *pt = dynamic_cast<ProjectionType*>(t);
+      Assert(pt != 0x0, "Error: dynamic cast to projection type failed!\n");
+      std::vector<ProjectionField*> fields = pt->fields();
+      
+      for(std::vector<ProjectionField*>::iterator it = fields.begin(); it != fields.end(); it ++) {
+	ProjectionField *pf = (ProjectionField*) *it;
+	
+	if(pf->type()->num() == 7) { // function pointer field
+	  Function *f = dynamic_cast<Function*>(pf->type());
+	  rpcs.push_back(f->to_rpc(this, pt));
+	}
+      }
+    }
+    // continue
+  }
   
+  for(std::vector<LexicalScope*>::iterator it2 = this->inner_scopes_.begin(); it2 != this->inner_scopes_.end(); it2 ++) {
+    LexicalScope *ls = (LexicalScope*) *it2;
+    std::vector<Rpc*> tmp_rpcs = ls->function_pointer_to_rpc();
+    rpcs.insert(rpcs.end(), tmp_rpcs.begin(), tmp_rpcs.end());
+  }
+  
+  return rpcs;
 }
 
 /* -------------------------------------------------------------- */
@@ -270,7 +315,7 @@ std::vector<Rpc*> LexicalScope::function_pointer_to_rpc()
 
 	if(pf->type()->num() == 7) { // function pointer field
 	  Function *f = dynamic_cast<Function*>(pf->type());
-	  rpcs.push_back(f->to_rpc(this));
+	  rpcs.push_back(f->to_rpc(this, pt));
 	}
       }
     }

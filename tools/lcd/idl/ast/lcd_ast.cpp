@@ -17,6 +17,11 @@ Rpc::Rpc(ReturnVariable *return_value, const char* name, std::vector<Parameter* 
     }
 }
 
+void Rpc::set_function_pointer_defined(bool b)
+{
+  this->function_pointer_defined_ = b;
+}
+
 ReturnVariable* Rpc::return_variable()
 {
   return this->explicit_return_;

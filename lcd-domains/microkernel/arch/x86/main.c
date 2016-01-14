@@ -864,12 +864,19 @@ static void vmx_epte_set(lcd_arch_epte_t *epte, hpa_t a, int level)
 	*epte = 0;
 	*epte = (hpa_val(a) & VMX_EPTE_ADDR_MASK) | VMX_EPT_ALL_MASK;
 	if (level == 3) {
-		/*
-		 * Page table entry. Set EPT memory type to write back
-		 * and ignore page attribute table.
-		 */
-		*epte |= (VMX_EPT_IPAT_BIT |
-			(VMX_EPTE_MT_WB << VMX_EPT_MT_EPTE_SHIFT));
+		
+		/* 
+ 		 * To support ioremap, effective memory type used for 
+ 		 * guest-physical address will be a combination of 
+ 		 * EPT and PAT. Since MTRRs have no effect on memory
+ 		 * type used for an access to a guest-physical address,
+ 		 * we use the EPT memory type and allow PAT memory type
+ 		 * to be set explictly. See table 11-7 in section 11.5.2.2
+ 		 * & section 28.2.5.2 of the Intel Software Developer 
+ 		 * Manual Vol 3 for effective memory type.
+ 		 */
+		*epte |= VMX_EPTE_MT_WB << VMX_EPT_MT_EPTE_SHIFT;
+		*epte &= ~VMX_EPT_IPAT_BIT;
 	}
 }
 

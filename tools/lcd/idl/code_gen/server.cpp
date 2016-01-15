@@ -227,8 +227,8 @@ CCSTDeclaration* callee_declaration(Rpc* r)
   sprintf(callee_name, "%s%s", r->name(), "_callee");
   CCSTDirectDecId* id = new CCSTDirectDecId(callee_name);
   
-  std::vector<CCSTDecSpecifier*> *s = new std::vector<CCSTDecSpecifier*>();
-  s->push_back(new  CCSTSimpleTypeSpecifier(void_t));
+  std::vector<CCSTDecSpecifier*> s;
+  s.push_back(new  CCSTSimpleTypeSpecifier(void_t));
   CCSTParamDeclaration *parameter = new CCSTParamDeclaration(s);
   
   std::vector<CCSTParamDeclaration*> p_decs; // = new std::vector<CCSTParamDeclaration*>();
@@ -256,12 +256,39 @@ CCSTDeclaration* callee_declaration(Rpc* r)
 CCSTFile* generate_server_source(Module *m)
 {
   std::vector<CCSTExDeclaration*> definitions;
-  
+
   // includes. todo
 
+  // need to print containers. but scopes container possibly duplicate projections definitions.
+
+  // this feels mildy "hacky"
+  // for each projection look up its container int the environment and print its declaration
+  // if no container int the environment, don't print
+  std::map<std::string, Type*> module_types = m->module_scope()->all_type_definitions();
+  for(std::map<std::string, Type*>::iterator it = module_types.begin(); it != module_types.end(); it ++) {
+    Type *t = (Type*) it->second;
+
+    if(t->num() == 4) {
+      ProjectionType *pt = dynamic_cast<ProjectionType*>(t);
+      Assert(pt != 0x0, "Error: dynamic cast to projection type failed!\n");
+      
+      if(module_types.find(container_name(pt->name())) != module_types.end()) { // found the container
+	
+	ProjectionType *pt_container = dynamic_cast<ProjectionType*>(module_types[container_name(pt->name())]);
+	Assert(pt_container != 0x0, "Error: dynamic cast to projection type failed\n");
+	
+	std::vector<CCSTDecSpecifier*> specifier;
+	specifier.push_back(struct_declaration(pt_container));
+	std::vector<CCSTInitDeclarator*> empty;
+	definitions.push_back(new CCSTDeclaration(specifier, empty));
+      }
+    }
+  }
+
+
   // globals.
-  std::vector<GlobalVariable*> globals_to_declare = m->globals();
-  for(std::vector<GlobalVariable*>::iterator it = globals_to_declare.begin(); it != globals_to_declare.end(); it ++) {
+  std::vector<GlobalVariable*> globals = m->globals();
+  for(std::vector<GlobalVariable*>::iterator it = globals.begin(); it != globals.end(); it ++) {
     GlobalVariable *gv = *it;
     definitions.push_back(declare_static_variable(gv));
   }
@@ -270,6 +297,7 @@ CCSTFile* generate_server_source(Module *m)
 
 
   // also typedefs.
+  /*
   std::map<std::string, Type*> module_type_definitions = m->module_scope()->type_definitions();
   
   for(std::map<std::string, Type*>::iterator it = module_type_definitions.begin(); it != module_type_definitions.end(); it ++) {
@@ -279,7 +307,7 @@ CCSTFile* generate_server_source(Module *m)
       {
 	/*
 	  definitions.push_back(typedef_declaration(t));
-	*/
+	
 	break;
       }
     case 4: // projection
@@ -312,12 +340,18 @@ CCSTFile* generate_server_source(Module *m)
   create_function_definition(create_function_declaration()
 			     ,create_dispatch_loop_body(file->rpc_defs()));
   */
+
   std::vector<Rpc*> rps = m->rpc_definitions();
   for(std::vector<Rpc*>::iterator it = rps.begin(); it != rps.end(); it ++)
      {
        Rpc* r_tmp = (Rpc*) *it;
-       definitions.push_back( function_definition(callee_declaration(r_tmp)
-							,callee_body(r_tmp)));
+       if(r_tmp->function_pointer_defined()) {
+	 definitions.push_back( function_definition(function_declaration(r_tmp)
+						    ,caller_body(r_tmp)));
+       } else {
+	 definitions.push_back( function_definition(callee_declaration(r_tmp)
+						    ,callee_body(r_tmp)));
+       }
      }
    
   definitions.push_back( function_definition(dispatch_function_declaration()

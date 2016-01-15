@@ -37,50 +37,6 @@ char* type_number_to_name(int num)
   }
 }
 
-/*
-  creates the C code for a container struct
-  for the projection provided
- */
-CCSTDeclaration* container_struct_definition(const char* name, ProjectionType *pt, bool channel)
-{
-  // field for the real struct
-  // field for other side capability
-  // field for my ref capability
-
-  // optional channel
-  std::vector<CCSTStructDeclaration*> container_fields;
-  
-  std::vector<CCSTStructDeclarator*> real_struct_field;
-  real_struct_field.push_back(new CCSTStructDeclarator(new CCSTDeclarator(0x0, new CCSTDirectDecId(pt->real_type()))));
-  container_fields.push_back(new CCSTStructDeclaration(type(pt), new CCSTStructDecList(real_struct_field)));
-
-  std::vector<CCSTStructDeclarator*> remote_ref_field;
-  remote_ref_field.push_back(new CCSTStructDeclarator(new CCSTDeclarator(0x0, new CCSTDirectDecId("remote_ref"))));
-  
-  std::vector<CCSTSpecifierQual*> dptr_t;
-  dptr_t.push_back(new CCSTTypedefName("dptr_t"));
-  container_fields.push_back(new CCSTStructDeclaration(dptr_t, new CCSTStructDecList(remote_ref_field)));
-  
-  std::vector<CCSTStructDeclarator*> my_ref_field;
-  my_ref_field.push_back(new CCSTStructDeclarator(new CCSTDeclarator(0x0, new CCSTDirectDecId("my_ref"))));
-  container_fields.push_back(new CCSTStructDeclaration(dptr_t, new CCSTStructDecList(my_ref_field)));
-
-
-  if(channel) {
-    std::vector<CCSTSpecifierQual*> cptr_t;
-    cptr_t.push_back(new CCSTTypedefName("cptr_t"));
-    
-    std::vector<CCSTStructDeclarator*> channel_field;
-    channel_field.push_back(new CCSTStructDeclarator(new CCSTDeclarator(0x0, new CCSTDirectDecId("chnl"))));
-    container_fields.push_back(new CCSTStructDeclaration(cptr_t, new CCSTStructDecList(channel_field)));
-  }
-  CCSTStructUnionSpecifier *container = new CCSTStructUnionSpecifier(struct_t, name, container_fields);
-
-  std::vector<CCSTDecSpecifier*> struct_specifier;
-  struct_specifier.push_back(container);
-  std::vector<CCSTInitDeclarator*> empty;
-  return new CCSTDeclaration(struct_specifier, empty);
-}
 
 CCSTDeclaration* typedef_declaration(Typedef *t)
 {
@@ -383,8 +339,8 @@ std::vector<CCSTSpecifierQual*> type(Type *t)
     {
     case 1:
       {
-	// typedef
-	// todo
+	specifier.push_back(new CCSTTypedefName(t->name()));
+	break;
       }
     case 2: // int type case
       {
@@ -456,10 +412,11 @@ std::vector<CCSTSpecifierQual*> type(Type *t)
 	// function pointer type
 	// todo
 	// where is support in grammar
+	break;
       }
     default:
       {
-	printf("Received %s instead of struct or integer\n", type_number_to_name(num));
+	printf("Received %s with name %s instead of struct or integer\n", type_number_to_name(num), t->name());
 	Assert(1 == 0, "Error: Not a struct or integer type. \n");
       }
     }
@@ -631,4 +588,22 @@ CCSTPrimaryExprId* function_name(const char *func_name)
 CCSTPostFixExprAssnExpr* function_call(CCSTPrimaryExprId *func_name, std::vector<CCSTAssignExpr*> args)
 {
   return new CCSTPostFixExprAssnExpr(func_name, args);
+}
+
+/* 
+ * given a projection, returns a struct declaration for the projection name 
+ * including the projection fields.
+ */
+CCSTStructUnionSpecifier* struct_declaration(ProjectionType *pt)
+{
+  std::vector<CCSTStructDeclaration*> field_decs;
+
+  std::vector<ProjectionField*> fields = pt->fields();
+  for(std::vector<ProjectionField*>::iterator it = fields.begin(); it != fields.end(); it ++) {
+    ProjectionField *pf = (ProjectionField*) *it;
+    field_decs.push_back(new CCSTStructDeclaration( type(pf->type())
+						    , new CCSTStructDeclarator( new CCSTDeclarator( pointer(pf->pointer_count()), new CCSTDirectDecId(pf->identifier())))));
+  }
+  
+  return new CCSTStructUnionSpecifier(struct_t, pt->name(), field_decs);
 }

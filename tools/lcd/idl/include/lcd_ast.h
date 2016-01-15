@@ -57,6 +57,9 @@ class LexicalScope : public Base
   virtual LexicalScope* outer_scope();
   virtual void resolve_types();
   virtual std::vector<Rpc*> function_pointer_to_rpc();
+  virtual std::map<std::string, Type*> all_type_definitions();
+  virtual std::map<std::string, Type*> all_types_outer();
+  virtual std::map<std::string, Type*> all_types_inner();
 };
 
 class GlobalScope : public LexicalScope
@@ -66,7 +69,6 @@ class GlobalScope : public LexicalScope
   std::map<std::string, Type*> type_definitions_;
   std::map<std::pair<std::string, std::vector<Parameter*> >, Rpc*> rpc_definitions_; // rpc or function pointer
   std::vector<LexicalScope*> inner_scopes_;
-
  public:
   GlobalScope();
   virtual std::vector<Rpc*> rpc_in_scope();
@@ -83,6 +85,9 @@ class GlobalScope : public LexicalScope
   virtual LexicalScope* outer_scope();
   virtual void resolve_types();
   virtual std::vector<Rpc*> function_pointer_to_rpc();
+  virtual std::map<std::string, Type*> all_type_definitions();
+  virtual std::map<std::string, Type*> all_types_outer();
+  virtual std::map<std::string, Type*> all_types_inner();
 };
 
 class Type : public Base
@@ -312,9 +317,10 @@ class Typedef : public Type
   Type* type_;
   const char* alias_;
   char* marshal_info_;
+  const char* identifier_;
 
  public:
-  Typedef(const char* alias, Type* type);
+  Typedef(const char* id, const char* alias, Type* type);
   virtual Marshal_type* accept(MarshalPrepareVisitor *worker);
   virtual CCSTTypeName* accept(TypeNameVisitor *worker);
   virtual CCSTStatement* accept(TypeVisitor *worker, Variable *v);
@@ -451,6 +457,7 @@ class Rpc : public Base
  public:
   Rpc(ReturnVariable *return_var, const char* name, std::vector<Parameter* > parameters, LexicalScope *current_scope);
   void set_function_pointer_defined(bool b);
+  bool function_pointer_defined();
   const char* name();
   const char* enum_name();
   const char* callee_name();

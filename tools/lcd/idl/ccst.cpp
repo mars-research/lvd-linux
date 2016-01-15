@@ -29,6 +29,7 @@ CCSTFuncDef::CCSTFuncDef(std::vector<CCSTDecSpecifier*> specifiers, CCSTDeclarat
 void CCSTFuncDef::write(FILE *f)
 {
   printf("here in function def\n");
+  fprintf(f, "\n");
   for(std::vector<CCSTDecSpecifier*>::iterator it = specifiers_.begin(); it != specifiers_.end(); ++it)
     {
       CCSTDecSpecifier *ds = *it;
@@ -47,6 +48,7 @@ void CCSTFuncDef::write(FILE *f)
   this->body_->write(f);
   fprintf(f, "\n");
   fprintf(f, "}");
+  fprintf(f, "\n");
 }
 
 CCSTDeclaration::CCSTDeclaration(std::vector<CCSTDecSpecifier*> specifier, std::vector<CCSTInitDeclarator*> decs)
@@ -203,6 +205,11 @@ void CCSTStructDeclaration::write(FILE *f)
   
 }
 
+CCSTStructDecList::CCSTStructDecList()
+{
+  // todo
+}
+
 CCSTStructDecList::CCSTStructDecList(std::vector<CCSTStructDeclarator*> struct_decs)
 {
   this->struct_decs_ = struct_decs;
@@ -216,6 +223,11 @@ void CCSTStructDecList::write(FILE *f)
 	  ds->write(f);
 	  fprintf(f, ", "); // if last do not write ,
 	}
+}
+CCSTStructDeclarator::CCSTStructDeclarator()
+{
+  this->dec_ = NULL;
+  this->expr_ = NULL;
 }
 
 CCSTStructDeclarator::CCSTStructDeclarator(CCSTDeclarator *dec)
@@ -323,7 +335,7 @@ CCSTDirectDecId::CCSTDirectDecId(const char* id)
 
 void CCSTDirectDecId::write(FILE *f)
 {
-  fprintf(f, " %s ", this->id_);
+  fprintf(f, "%s", this->id_);
 }
 
 CCSTDirectDecDec::CCSTDirectDecDec(CCSTDeclarator *dec)
@@ -1391,7 +1403,6 @@ void CCSTParamList::write(FILE *f)
 	  fprintf(f,", ");
 	  CCSTParamDeclaration *dec = *it;
 	  dec->write(f);
-	  //	  fprintf(f, ", "); // should i be printing commas
 	}
     }
 }
@@ -1657,7 +1668,7 @@ void CCSTDeclaration::write(FILE *f)
       init_dec->write(f);
       fprintf(f, " ");
     }
-  fprintf(f, ";");
+  // fprintf(f, ";");
   fprintf(f, "\n");
 }
 

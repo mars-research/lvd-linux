@@ -59,15 +59,34 @@ int main(int argc, char ** argv)
 	  */
 	  printf("completed header source writing\n");
 	}
-      else if(!strcmp(argv[1],"-serversource"))
+      else if(!strcmp(argv[1],"-serversource")) // callee
 	{
+	  
+	  tree->function_pointer_to_rpc();
+	  tree->resolve_types();
 	  tree->prepare_marshal();
-	  /*
-	  CCSTFile* ccst_tree = generate_server_source(tree);
-	  printf("completed tree\n");
-	  ccst_tree->write(of);
-	  printf("completed server source writing\n");
-	  */
+
+	  std::vector<Module*> project_modules = tree->modules();
+	  for(std::vector<Module*>::iterator it = project_modules.begin(); it != project_modules.end(); it ++) {
+	    Module *m = *it;
+	    if (m == 0x0) {
+	      printf("Module is null\n");
+	      exit(0);
+	    }
+
+	    FILE *of = fopen(m->identifier(), "w");
+	    if(!of)
+	      {
+		printf("Error: unable to open %s for writing\n", m->identifier());
+		perror("error");
+		// cleanup
+		exit(0);
+	      }
+	    CCSTFile* ccst_tree = generate_server_source(m);
+	    ccst_tree->write(of);
+	  }
+
+	  printf("Completed Server source writing\n");
 	}
       else if(!strcmp(argv[1], "-clientheader"))
 	{
@@ -78,8 +97,8 @@ int main(int argc, char ** argv)
 	  */
 	  printf("completed client header writing\n");
 	}
-      else if(!strcmp(argv[1], "-clientsource"))
-	{
+      else if(!strcmp(argv[1], "-clientsource")) // caller
+	{ 
 	  tree->function_pointer_to_rpc();
 	  tree->resolve_types(); // resolve types that weren't resolved during parsing
 	  tree->prepare_marshal();

@@ -148,8 +148,9 @@ void Channel::resolve_types(LexicalScope *ls)
 /* typedef type */
 
 
-Typedef::Typedef(const char* alias, Type* type)
+Typedef::Typedef(const char* id, const char* alias, Type* type)
 {
+  this->identifier_ = id;
   this->alias_ = alias;
   this->type_ = type; // need to allocate?
 }
@@ -186,7 +187,7 @@ int Typedef::num()
 
 const char* Typedef::name()
 {
-  return this->alias_;
+  return this->identifier_;
 }
 
 void Typedef::resolve_types(LexicalScope *ls)

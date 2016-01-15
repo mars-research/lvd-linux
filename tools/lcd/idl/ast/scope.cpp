@@ -38,13 +38,13 @@ GlobalScope::GlobalScope()
   int err;
   fields.push_back(new ProjectionField(this->lookup("unsigned long", &err), "dptr", 0)); // unsigned long dptr;
   this->type_definitions_.insert( std::pair<std::string, Type*>("dptr_t"
-								, new Typedef("dptr_t", new ProjectionType("", "", fields))));
+								, new Typedef("dptr_t", "", new ProjectionType("", "", fields))));
   
   // cptr_t
   std::vector<ProjectionField*> fields2;
   fields2.push_back(new ProjectionField(this->lookup("unsigned long", &err), "cptr", 0)); // unsigned long cptr;
   this->type_definitions_.insert( std::pair<std::string, Type*>("cptr_t"
-								, new Typedef("cptr_t", new ProjectionType("", "", fields2))));
+								, new Typedef("cptr_t", "", new ProjectionType("", "", fields2))));
 
 
   // dstore no fields
@@ -97,6 +97,7 @@ Type * GlobalScope::lookup(const char * sym, int* err)
   else
     {
       *err = 1;
+      printf("In lookup for type %s is %p\n", sym, type_definitions_[temp]);
       return type_definitions_[temp];
     }
 }
@@ -107,7 +108,7 @@ bool GlobalScope::insert(const char* sym, Type * value)
   printf("insert %s\n",temp.c_str());
   std::pair<std::map<std::string,Type*>::iterator,bool> ret;
   ret = type_definitions_.insert(std::pair<std::string, Type*>(temp, value));
-  
+  printf("In insert pointer for type %s is %p\n", sym, value);
   return ret.second;
 }
 
@@ -186,6 +187,41 @@ std::vector<Rpc*> GlobalScope::function_pointer_to_rpc()
   return rpcs;
 }
 
+std::map<std::string, Type*> GlobalScope::all_types_outer()
+{
+    return this->type_definitions_;
+}
+
+std::map<std::string, Type*> GlobalScope::all_types_inner()
+{
+  std::map<std::string, Type*> all_defs (this->type_definitions_);
+
+  for(std::vector<LexicalScope*>::iterator it2 = this->inner_scopes_.begin(); it2 != this->inner_scopes_.end(); it2 ++) {
+    LexicalScope *ls = (LexicalScope*) *it2;
+    std::map<std::string, Type*> tmp = ls->all_types_inner();
+    all_defs.insert(tmp.begin(), tmp.end());
+  }
+  
+  return all_defs;
+}
+
+/*
+ * returns a map of all type definitions, including those from inner scopes
+ */
+std::map<std::string, Type*> GlobalScope::all_type_definitions()
+{
+  std::map<std::string, Type*> all_defs (this->type_definitions_);
+  
+  for(std::vector<LexicalScope*>::iterator it2 = this->inner_scopes_.begin(); it2 != this->inner_scopes_.end(); it2 ++) {
+    LexicalScope *ls = (LexicalScope*) *it2;
+    std::map<std::string, Type*> tmp = ls->all_types_inner();
+    all_defs.insert(tmp.begin(), tmp.end());
+  }
+  
+  return all_defs;
+}
+
+
 /* -------------------------------------------------------------- */
 
 
@@ -244,16 +280,17 @@ Type* LexicalScope::lookup(const char *symbol, int *err)
   }
   else {
     *err = 1;
+    printf("In lookup for type %s is %p\n", symbol, type_definitions_[temp]);
     return type_definitions_[temp];
   }
 }
 
 bool LexicalScope::insert(const char *symbol, Type *type)
 {
-  std::string temp(symbol);
+  std::string temp(symbol); 
   std::pair<std::map<std::string,Type*>::iterator,bool> ret;
   ret = type_definitions_.insert(std::pair<std::string, Type*>(temp, type));
-  
+  printf("In insert pointer for type %s is %p\n", symbol, type);
   return ret.second;
 }
 
@@ -329,4 +366,51 @@ std::vector<Rpc*> LexicalScope::function_pointer_to_rpc()
   }
   
   return rpcs;
+}
+
+std::map<std::string, Type*> LexicalScope::all_types_outer()
+{
+  if (this->outer_scope_ == 0x0) {
+    return this->type_definitions_;
+  }
+  
+  std::map<std::string, Type*> all_defs (this->type_definitions_);
+
+  std::map<std::string, Type*> outer_defs = this->outer_scope_->all_types_outer();
+  all_defs.insert(outer_defs.begin(), outer_defs.end());
+  return all_defs;
+}
+
+std::map<std::string, Type*> LexicalScope::all_types_inner()
+{
+  std::map<std::string, Type*> all_defs (this->type_definitions_);
+
+  for(std::vector<LexicalScope*>::iterator it2 = this->inner_scopes_.begin(); it2 != this->inner_scopes_.end(); it2 ++) {
+    LexicalScope *ls = (LexicalScope*) *it2;
+    std::map<std::string, Type*> tmp = ls->all_types_inner();
+    all_defs.insert(tmp.begin(), tmp.end());
+  }
+  
+  return all_defs;
+}
+
+/*
+ * returns a map of all type definitions, including those from inner scopes
+ */
+std::map<std::string, Type*> LexicalScope::all_type_definitions()
+{
+  std::map<std::string, Type*> all_defs (this->type_definitions_);
+  
+  if(this->outer_scope_ != 0x0) {
+    std::map<std::string, Type*> tmp = this->outer_scope_->all_types_outer();
+    all_defs.insert(tmp.begin(), tmp.end());
+  }
+  
+  for(std::vector<LexicalScope*>::iterator it2 = this->inner_scopes_.begin(); it2 != this->inner_scopes_.end(); it2 ++) {
+    LexicalScope *ls = (LexicalScope*) *it2;
+    std::map<std::string, Type*> tmp = ls->all_types_inner();
+    all_defs.insert(tmp.begin(), tmp.end());
+  }
+  
+  return all_defs;
 }

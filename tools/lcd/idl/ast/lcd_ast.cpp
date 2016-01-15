@@ -22,6 +22,11 @@ void Rpc::set_function_pointer_defined(bool b)
   this->function_pointer_defined_ = b;
 }
 
+bool Rpc::function_pointer_defined()
+{
+  return this->function_pointer_defined_;
+}
+
 ReturnVariable* Rpc::return_variable()
 {
   return this->explicit_return_;

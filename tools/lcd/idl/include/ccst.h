@@ -294,13 +294,14 @@ class CCSTStructDecList : public CCSTBase
    */
   std::vector<CCSTStructDeclarator*> struct_decs_;
  public:
+  CCSTStructDecList();
   CCSTStructDecList(std::vector<CCSTStructDeclarator*> struct_decs); //{this->struct_decs_ = struct_decs;}
   virtual void write(FILE *f);
 };
 
 
 
-class CCSTStructDeclarator : public CCSTBase
+class CCSTStructDeclarator : public CCSTStructDecList
 {
   /*
   <struct-declarator> ::= <declarator>
@@ -310,6 +311,7 @@ class CCSTStructDeclarator : public CCSTBase
   CCSTDeclarator *dec_;
   CCSTConstExpr *expr_;
  public:
+  CCSTStructDeclarator();
   CCSTStructDeclarator(CCSTDeclarator *dec); //{this->dec_ = dec; this->expr_ = NULL;}
   CCSTStructDeclarator(CCSTDeclarator *dec, CCSTConstExpr *expr); //{this->dec_ = dec; this->expr_ = expr;}
   CCSTStructDeclarator(CCSTConstExpr *expr); //{this->dec_ = NULL; this->expr_ = expr;}

@@ -11,6 +11,12 @@ lcd_domains-y += main.o ipc.o cap.o
 # Arch dependent code
 lcd_domains-y += arch/$(ARCH)/main.o
 
+# libcap
+lcd_domains-y += ../libcap.out.microkernel/lib/libcap.a
+
+# add libcap headers to include path
+ccflags-y += -I../libcap.out.microkernel/include
+
 # kliblcd
 lcd_domains-y += $(addprefix ../kliblcd/, init.o \
 					  mem.o \

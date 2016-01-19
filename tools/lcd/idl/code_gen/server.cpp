@@ -285,6 +285,24 @@ CCSTFile* generate_server_source(Module *m)
     }
   }
 
+  // print trampoline structs
+  std::vector<Rpc*> rpcs = m->rpc_definitions();
+  for(std::vector<Rpc*>::iterator it = rpcs.begin(); it != rpcs.end(); it ++) {
+    Rpc *r = *it;
+    if (r->function_pointer_defined()) {
+      int err;
+      Type *t = r->current_scope()->lookup(hidden_args_name(r->name()), &err);
+      Assert(t != 0x0, "Error: failure looking up type\n");
+      ProjectionType *pt = dynamic_cast<ProjectionType*>(t);
+      Assert(t != 0x0, "Error: dynamic cast to projection type failed!\n");
+
+      std::vector<CCSTDecSpecifier*> specifier;
+      specifier.push_back(struct_declaration(pt));
+      std::vector<CCSTInitDeclarator*> empty;
+      definitions.push_back(new CCSTDeclaration(specifier, empty));
+    }
+  }
+
 
   // globals.
   std::vector<GlobalVariable*> globals = m->globals();

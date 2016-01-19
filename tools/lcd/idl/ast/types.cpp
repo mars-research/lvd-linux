@@ -1,16 +1,26 @@
 #include "lcd_ast.h"
 
-/* function pointer type*/
-const char* container_name(const char* name)
+const char* new_name(const char* name, const char* suffix)
 {
   int length = strlen(name);
-  int length2 = strlen("_container");
+  int length2 = strlen(suffix);
   char *new_str = (char*) malloc(sizeof(char)*(length+length2+1));
   
   std::ostringstream total;
-  total << name << "_container";
+  total << name << suffix;
   strncpy(new_str, total.str().c_str(), length+length2+1);
   return new_str;
+}
+
+/* function pointer type*/
+const char* container_name(const char* name)
+{
+  return new_name(name, "_container");
+}
+
+const char* hidden_args_name(const char* name)
+{
+  return new_name(name, "_hidden_args");
 }
 
 Function::Function(const char *id, ReturnVariable *return_var, std::vector<Parameter*> parameters)
@@ -47,6 +57,11 @@ const char* Function::name()
 }
 
 void Function::resolve_types(LexicalScope *ls)
+{
+  return;
+}
+
+void Function::create_trampoline_structs(LexicalScope *ls)
 {
   return;
 }
@@ -114,6 +129,10 @@ void UnresolvedType::resolve_types(LexicalScope *ls)
   return;
 }
 
+void UnresolvedType::create_trampoline_structs(LexicalScope *ls)
+{
+  return;
+}
 
 Channel::Channel()
 {
@@ -141,6 +160,11 @@ int Channel::num()
 }
 
 void Channel::resolve_types(LexicalScope *ls)
+{
+  return;
+}
+
+void Channel::create_trampoline_structs(LexicalScope *ls)
 {
   return;
 }
@@ -195,6 +219,11 @@ void Typedef::resolve_types(LexicalScope *ls)
   return;
 }
 
+void Typedef::create_trampoline_structs(LexicalScope *ls)
+{
+  return; //todo?
+}
+
 /* end */
 
 /* void type */
@@ -229,6 +258,11 @@ const char* VoidType::name()
 }
 
 void VoidType::resolve_types(LexicalScope *ls)
+{
+  return;
+}
+
+void VoidType::create_trampoline_structs(LexicalScope *ls)
 {
   return;
 }
@@ -281,6 +315,11 @@ const char* IntegerType::name()
 }
 
 void IntegerType::resolve_types(LexicalScope *ls)
+{
+  return;
+}
+
+void IntegerType::create_trampoline_structs(LexicalScope *ls)
 {
   return;
 }
@@ -341,6 +380,27 @@ void ProjectionType::resolve_types(LexicalScope *ls)
   for(std::vector<ProjectionField*>::iterator it = this->fields_.begin(); it != this->fields_.end(); it ++) {
     ProjectionField *pf = (ProjectionField*) *it;
     pf->resolve_types(ls);
+  }
+}
+
+void ProjectionType::create_trampoline_structs(LexicalScope *ls)
+{
+  for(std::vector<ProjectionField*>::iterator it = this->fields_.begin(); it != this->fields_.end(); it ++) {
+    ProjectionField *pf = (ProjectionField*) *it;
+    if (pf->type()->num() == 7) { // function pointer
+      Function *f = dynamic_cast<Function*>(pf->type());
+      Assert(f != 0x0, "Error: dynamic cast to function type failed!\n");
+      
+      std::vector<ProjectionField*> trampoline_fields;
+      int err;
+      trampoline_fields.push_back(new ProjectionField(ls->lookup(container_name(this->name()), &err)
+						      ,container_name(this->name()), 1)); // container field
+      trampoline_fields.push_back(new ProjectionField(ls->lookup("dstore", &err), "dstore", 1)); // dstore field
+      trampoline_fields.push_back(new ProjectionField(ls->lookup("lcd_trampoline_handle", &err), "t_handle", 1)); // lcd_trampoline handle field
+
+      const char* trampoline_struct_name = hidden_args_name(f->name());
+      ls->insert(trampoline_struct_name, new ProjectionType(trampoline_struct_name, trampoline_struct_name, trampoline_fields));
+    }
   }
 }
 

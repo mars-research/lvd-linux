@@ -51,6 +51,10 @@ GlobalScope::GlobalScope()
   std::vector<ProjectionField*> fields3;
   this->type_definitions_.insert(std::pair<std::string, Type*>("dstore"
 							       , new ProjectionType("dstore", "dstore", fields3)));
+
+  std::vector<ProjectionField*> fields4;
+  this->type_definitions_.insert(std::pair<std::string, Type*>("lcd_trampoline_handle"
+							       , new ProjectionType("lcd_trampoline_handle", "lcd_trampoline_handle", fields4)));
 }
 
 GlobalScope* GlobalScope::instance()
@@ -152,6 +156,19 @@ void GlobalScope::resolve_types()
   for(std::vector<LexicalScope*>::iterator it = this->inner_scopes_.begin(); it != this->inner_scopes_.end(); it ++) {
     LexicalScope *ls = (LexicalScope*) *it;
     ls->resolve_types();
+  }
+}
+
+// just call parent.......
+void GlobalScope::create_trampoline_structs()
+{
+  for(std::map<std::string, Type*>::iterator it = this->type_definitions_.begin(); it != this->type_definitions_.end(); it ++) {
+    it->second->create_trampoline_structs(this);
+  }
+
+  for(std::vector<LexicalScope*>::iterator it = this->inner_scopes_.begin(); it != this->inner_scopes_.end(); it ++) {
+    LexicalScope *ls = (LexicalScope*) *it;
+    ls->create_trampoline_structs();
   }
 }
 
@@ -333,6 +350,18 @@ void LexicalScope::resolve_types()
   for(std::vector<LexicalScope*>::iterator it = this->inner_scopes_.begin(); it != this->inner_scopes_.end(); it ++) {
     LexicalScope *ls = (LexicalScope*) *it;
     ls->resolve_types();
+  }
+}
+
+void LexicalScope::create_trampoline_structs()
+{
+  for(std::map<std::string, Type*>::iterator it = this->type_definitions_.begin(); it != this->type_definitions_.end(); it ++) {
+    it->second->create_trampoline_structs(this);
+  }
+
+  for(std::vector<LexicalScope*>::iterator it = this->inner_scopes_.begin(); it != this->inner_scopes_.end(); it ++) {
+    LexicalScope *ls = (LexicalScope*) *it;
+    ls->create_trampoline_structs();
   }
 }
 

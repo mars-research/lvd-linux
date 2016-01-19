@@ -30,6 +30,10 @@ enum type_k {};
 template<class T, class T2>
 class ASTVisitor;
 
+const char* new_name(const char* name, const char* suffix);
+const char* container_name(const char* name);
+const char* hidden_args_name(const char* name);
+
 class Base
 {			  
  public:
@@ -56,6 +60,7 @@ class LexicalScope : public Base
   virtual std::vector<LexicalScope*> inner_scopes();
   virtual LexicalScope* outer_scope();
   virtual void resolve_types();
+  virtual void create_trampoline_structs();
   virtual std::vector<Rpc*> function_pointer_to_rpc();
   virtual std::map<std::string, Type*> all_type_definitions();
   virtual std::map<std::string, Type*> all_types_outer();
@@ -84,6 +89,7 @@ class GlobalScope : public LexicalScope
   static GlobalScope* instance(); // x
   virtual LexicalScope* outer_scope();
   virtual void resolve_types();
+  virtual void create_trampoline_structs();
   virtual std::vector<Rpc*> function_pointer_to_rpc();
   virtual std::map<std::string, Type*> all_type_definitions();
   virtual std::map<std::string, Type*> all_types_outer();
@@ -99,6 +105,7 @@ class Type : public Base
   virtual int num() = 0;
   virtual const char* name() = 0;
   virtual void resolve_types(LexicalScope *ls) = 0;
+  virtual void create_trampoline_structs(LexicalScope *ls) = 0;
 };
 
 class UnresolvedType : public Type
@@ -112,6 +119,7 @@ class UnresolvedType : public Type
   virtual int num();
   virtual const char* name();
   virtual void resolve_types(LexicalScope *ls);
+  virtual void create_trampoline_structs(LexicalScope *ls);
 };
 
 class Variable : public Base
@@ -310,6 +318,7 @@ class Function : public Type
   virtual const char* name();
   virtual void resolve_types(LexicalScope *ls);
   Rpc* to_rpc(LexicalScope *ls, ProjectionType *pt);
+  virtual void create_trampoline_structs(LexicalScope *ls);
 };
  
 class Typedef : public Type
@@ -330,6 +339,7 @@ class Typedef : public Type
   virtual int num();
   virtual void resolve_types(LexicalScope *ls);
   // virtual void marshal();
+  virtual void create_trampoline_structs(LexicalScope *ls);
 };
 
 class Channel : public Type 
@@ -342,6 +352,7 @@ class Channel : public Type
   virtual const char* name();
   virtual int num();
   virtual void resolve_types(LexicalScope *ls);
+  virtual void create_trampoline_structs(LexicalScope *ls);
 };
 
 class VoidType : public Type
@@ -354,6 +365,7 @@ class VoidType : public Type
   virtual const char* name();
   virtual int num();
   virtual void resolve_types(LexicalScope *ls);
+  virtual void create_trampoline_structs(LexicalScope *ls);
 };
 
 class IntegerType : public Type
@@ -373,6 +385,7 @@ class IntegerType : public Type
   virtual int num();
   virtual void resolve_types(LexicalScope *ls);
   ~IntegerType(){printf("inttype destructor\n");}
+  virtual void create_trampoline_structs(LexicalScope *ls);
 };
 
 class ProjectionField : public Variable //?
@@ -440,6 +453,7 @@ class ProjectionType : public Type // complex type
   virtual int num();
   virtual void resolve_types(LexicalScope *ls);
   ~ProjectionType(){printf("projection type destructor\n");}
+  virtual void create_trampoline_structs(LexicalScope *ls);
 };
 
 class Rpc : public Base
@@ -466,6 +480,8 @@ class Rpc : public Base
   SymbolTable* symbol_table();
   void prepare_marshal();
   void resolve_types();
+  void create_trampoline_structs();
+  LexicalScope *current_scope();
 };
 
 class Module : public Base
@@ -483,6 +499,7 @@ class Module : public Base
   void prepare_marshal();
   void resolve_types();
   void function_pointer_to_rpc();
+  void create_trampoline_structs();
   const char* identifier();
 };
 
@@ -505,6 +522,7 @@ class Project : public Base
   void prepare_marshal();
   void resolve_types();
   void function_pointer_to_rpc();
+  void create_trampoline_structs();
   std::vector<Module*> modules();
 };
 

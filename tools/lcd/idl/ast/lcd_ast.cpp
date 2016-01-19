@@ -44,6 +44,11 @@ Marshal_type* Rpc::accept(MarshalVisitor* worker, Registers *data)
 }
 */
 
+LexicalScope* Rpc::current_scope()
+{
+  return this->current_scope_;
+}
+
 const char* Rpc::callee_name()
 {
   char * callee_name = (char*) malloc((strlen(this->name_)+strlen("_callee")+1)*sizeof(char));
@@ -89,6 +94,25 @@ void Rpc::resolve_types()
   
   // marshal prepare for return value
   this->explicit_return_->resolve_types(this->current_scope_);
+}
+
+void Rpc::create_trampoline_structs()
+{
+  for(std::vector<Parameter*>::iterator it = this->parameters_.begin(); it != this->parameters_.end(); it ++) {
+    Parameter* p = *it;
+    if (p->type()->num() == 7) {
+      Function *f = dynamic_cast<Function*>(p->type());
+      Assert(f != 0x0, "Error: dynamic cast to function type failed!\n");
+
+      std::vector<ProjectionField*> trampoline_fields;
+      int err;
+      trampoline_fields.push_back(new ProjectionField(this->current_scope_->lookup("dstore", &err), "dstore", 1)); // dstore field
+      trampoline_fields.push_back(new ProjectionField(this->current_scope_->lookup("lcd_trampoline_handle", &err), "t_handle", 1)); // lcd_trampoline handle field
+      
+      const char* trampoline_struct_name = hidden_args_name(f->name());
+      this->current_scope_->insert(trampoline_struct_name, new ProjectionType(trampoline_struct_name, trampoline_struct_name, trampoline_fields));
+    }
+  }
 }
 
 Module::Module(const char *id, std::vector<Rpc*> rpc_definitions, std::vector<GlobalVariable*> globals, LexicalScope *ls)
@@ -139,6 +163,18 @@ void Module::function_pointer_to_rpc()
   this->rpc_definitions_.insert(this->rpc_definitions_.end(), rpcs.begin(), rpcs.end());
 }
 
+void Module::create_trampoline_structs()
+{
+  this->module_scope_->create_trampoline_structs();
+  // loop through rpc definitions
+  // todo
+  
+  for(std::vector<Rpc*>::iterator it = this->rpc_definitions_.begin(); it != this->rpc_definitions_.end(); it ++) {
+    Rpc *r = *it;
+    r->create_trampoline_structs();
+  }
+}
+
 const char* Module::identifier()
 {
   return this->module_name_;
@@ -176,6 +212,16 @@ void Project::function_pointer_to_rpc()
   for(std::vector<Module*>::iterator it = this->project_modules_.begin(); it != this->project_modules_.end(); it ++) {
     Module *m = *it;
     m->function_pointer_to_rpc();
+  }
+}
+
+void Project::create_trampoline_structs()
+{
+  // todo
+
+  for(std::vector<Module*>::iterator it = this->project_modules_.begin(); it != this->project_modules_.end(); it ++) {
+    Module *m = *it;
+    m->create_trampoline_structs();
   }
 }
 

@@ -61,7 +61,7 @@ int main(int argc, char ** argv)
 	}
       else if(!strcmp(argv[1],"-serversource")) // callee
 	{
-	  
+	  tree->create_trampoline_structs();
 	  tree->function_pointer_to_rpc();
 	  tree->resolve_types();
 	  tree->prepare_marshal();

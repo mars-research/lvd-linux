@@ -6,7 +6,7 @@
 obj-m += lcd_domains.o
 
 # Arch independent code
-lcd_domains-y += main.o ipc.o cap.o
+lcd_domains-y += main.o ipc.o cap_types.o
 
 # Arch dependent code
 lcd_domains-y += arch/$(ARCH)/main.o

@@ -65,162 +65,84 @@ static inline void __lcd_debug(char *file, int lineno, char *fmt, ...)
 	va_end(args);
 }
 
-
-/*
- * --------------------------------------------------
- * CAPABILITIES
+/* --------------------------------------------------
+ * LCD MICROKERNEL CAPABILITY TYPES
  * --------------------------------------------------
  *
- * See Documentation/lcd-domains/cap.txt.
+ * cap_types.c
  */
+enum lcd_microkernel_type_id {
+	LCD_MICROKERNEL_TYPE_ID_PAGE,
+	LCD_MICROKERNEL_TYPE_ID_VOLUNTEERED_PAGE,
+	LCD_MICROKERNEL_TYPE_ID_DEV_MEM,
+	LCD_MICROKERNEL_TYPE_ID_SYNC_EP,
+	LCD_MICROKERNEL_TYPE_ID_LCD,
+	LCD_MICROKERNEL_TYPE_ID_KLCD,
 
+	LCD_MICROKERNEL_NUM_CAP_TYPES,
+};
 
-/* 
- * --------------------------------------------------
+extern struct cap_type_system *lcd_libcap_type_system;
+
+/**
+ * __lcd_init_cap_types -- Initialize data structures for libcap type system
  *
- * CNODES
- * 
+ * Initializes the cap_type_system that is shared by all LCD cspaces. Should
+ * be invoked when the microkernel initializes. Returns non-zero if init
+ * fails.
+ */
+int __lcd_init_cap_types(void);
+/**
+ * __lcd_exit_cap_types -- Destroy/tear down data structures for type system
+ *
+ * Should be invoked before microkernel module is uninstalled from host.
+ */
+void __lcd_exit_cap_types(void);
+/**
+ * __lcd_get_libcap_type -- Translate our type id to libcap's type id
+ * @t_id: one of the type id enum values
+ *
+ * Motivation: You need to know the libcap type id in order to insert
+ * an object in a cspace.
+ */
+cap_type_t __lcd_get_libcap_type(enum lcd_microkernel_type_id t_id);
+
+/* --------------------------------------------------
+ * MEMORY
+ * --------------------------------------------------
  */
 
-
-enum lcd_cap_type {
-	LCD_CAP_TYPE_INVALID,
-	LCD_CAP_TYPE_FREE,
-	LCD_CAP_TYPE_SYNC_EP,
-	LCD_CAP_TYPE_PAGE,
-	LCD_CAP_TYPE_KPAGE,
-	LCD_CAP_TYPE_LCD,
-	LCD_CAP_TYPE_KLCD,
-	LCD_CAP_TYPE_CNODE,
-};
-
-enum allocation_state {
-	ALLOCATION_INVALID,
-	ALLOCATION_VALID,
-	ALLOCATION_MARKED_FOR_DELETE,
-	ALLOCATION_REMOVED,
-};
-
-struct cnode;
-struct cdt_root_node {
-	struct mutex lock;
-	struct cnode *cnode;
-	enum allocation_state state;
-};
-
-struct cspace;
-struct cnode {
-	struct mutex lock;
-	/*
-	 * cnode data
-	 */
-	enum lcd_cap_type type;
-	void *object;
-	struct cspace *cspace;
-	/*
-	 * cdt data
-	 */
-	struct cdt_root_node *cdt_root;
-	struct list_head children;
-	struct list_head siblings;
-	/*
-	 * Page-specific cnodes (temporary!)
-	 * =================================
-	 *
-	 * We need to keep track of if and where the page is mapped so we
-	 * know how to unmap it when the lcd deletes/loses this capability.
-	 *
-	 * We impose the constraint that pages can only be mapped *once* in an 
-	 * lcd's ept, so we only need one gpa. 
-	 */
+/**
+ * struct lcd_mapping_metadata
+ *
+ * This is used as cnode metadata in cspaces to record whether
+ * a page capability has been mapped in an LCD's address
+ * space, and if so, where. This information is needed when
+ * the capability is revoked or deleted, so that we can
+ * unmap the pages from the LCD's guest physical address space.
+ */
+struct lcd_mapping_metadata {
 	int is_mapped;
 	gpa_t where_mapped;
 };
-
-struct cnode_table {
-	struct cnode cnode[LCD_CNODE_TABLE_NUM_SLOTS];
-	uint8_t table_level;
-	struct list_head table_list;
+/**
+ * struct lcd_memory_object
+ *
+ * This is used as a wrapper around struct page and arbitrary
+ * host physical addresses, so that we can track the size of the
+ * memory region. This is the object that is inserted into an LCD's
+ * cspace (rather than a struct page, say). We don't store an extra 
+ * type field because this information is stored in the cspace.
+ */
+struct lcd_memory_object {
+	void *object;
+	unsigned int order;
 };
-
-struct cspace {
-	struct mutex lock;
-	enum allocation_state state;
-	struct cnode_table *cnode_table;
-	struct kmem_cache *cnode_table_cache;
-	struct list_head table_list;
-};
-
-/**
- * Initializes caches, etc. in capability subsystem. Called when microkernel
- * intializes.
- */
-int __lcd_cap_init(void);
-/**
- * Tears down caches, etc. in capability subsystem. Called when microkernel
- * is exiting.
- */
-void __lcd_cap_exit(void);
-/**
- * Sets up cspace - initializes lock, root cnode table, etc.
- */
-int __lcd_cap_init_cspace(struct cspace *cspace);
-/**
- * Inserts object data into cspace at cnode pointed at by c.
- */
-int __lcd_cap_insert(struct cspace *cspace, cptr_t c, void *object, 
-		enum lcd_cap_type type);
-/**
- * Deletes object data from cspace at cnode pointed at by c.
- *
- * Updates the state of the microkernel to reflect rights change (e.g., if
- * a cnode for a page is deleted, and the page is mapped, the page will be
- * unmapped).
- *
- * If this is the last cnode that refers to the object, the object is
- * destroyed.
- */
-void __lcd_cap_delete(struct cspace *cspace, cptr_t c);
-/**
- * Copies cnode data in src cnode at c_src to dest cnode at c_dst. The dest
- * cnode will be a child of the src cnode in the cdt containing src cnode.
- */
-int __lcd_cap_grant(struct cspace *cspacesrc, cptr_t c_src, 
-		struct cspace *cspacedst, cptr_t c_dst);
-int __lcd_cap_grant_page(struct cspace *cspacesrc, cptr_t c_src, 
-			struct cspace *cspacedst, cptr_t c_dst, gpa_t gpa);
-/**
- * Equivalent to calling lcd_cap_delete on all of the cnode's children. 
- *
- * ** Does not delete the cnode itself. **
- */
-int __lcd_cap_revoke(struct cspace *cspace, cptr_t c);
-/**
- * Equivalent to calling lcd_cap_delete on all cnodes in cspace. Frees up
- * all cnode tables, etc.
- */
-void __lcd_cap_destroy_cspace(struct cspace *cspace);
-/**
- * Looks up and locks cnode at c in cspace.
- *
- * ** Must match with lcd_cnode_put. **
- *
- * ** Interrupts and preemption *are not* disabled. **
- *    (so we can easily get out of deadlocks while debugging)
- */
-int __lcd_cnode_get(struct cspace *cspace, cptr_t cap, struct cnode **cnode);
-/**
- * Unlocks cnode.
- */
-void __lcd_cnode_put(struct cnode *c);
-
 
 /* 
  * --------------------------------------------------
  *
  * LCDs - lightweight capability domain
- *
- * See Documentation/lcd-domains/lcd.txt
  */
 
 
@@ -273,7 +195,7 @@ struct lcd {
 	/*
 	 * The LCD's cspace
 	 */
-	struct cspace cspace;
+	struct cspace *cspace;
 	/*
 	 * Message Passing
 	 * ===============
@@ -395,39 +317,6 @@ int __lcd_send(struct lcd *caller, cptr_t endpoint);
 int __lcd_recv(struct lcd *caller, cptr_t endpoint);
 int __lcd_call(struct lcd *caller, cptr_t endpoint);
 int __lcd_reply(struct lcd *caller);
-
-
-/* CHECK & DESTROY  -------------------------------------------------- */
-
-/*
- * These are executed by code in cap.c when a capability to an object
- * is revoked. It gives the microkernel a chance to update any state (like
- * removing an lcd from an endpoint queue, unmapping a page, etc.). If the
- * final capability is revoked, these are called, followed by the appropriate
- * destroy routine below.
- */
-void __lcd_sync_endpoint_check(struct lcd *lcd, struct lcd_sync_endpoint *e);
-void __lcd_page_check(struct lcd *lcd, struct page *p, int is_mapped, 
-		gpa_t where_mapped);
-void __lcd_kpage_check(struct lcd *lcd, struct page *p, int is_mapped, 
-		gpa_t where_mapped);
-void __lcd_hpa_check(struct lcd *lcd, unsigned long hpa, int is_mapped, 
-		gpa_t where_mapped);
-void __lcd_check(struct lcd *owning_lcd, struct lcd *owned_lcd);
-void __lcd_check_klcd(struct lcd *owning_lcd, struct lcd *owned_klcd);
-
-/*
- * These are called by code in cap.c when the last capability goes
- * away.
- */
-void __lcd_sync_endpoint_destroy(struct lcd_sync_endpoint *e);
-void __lcd_page_destroy(struct page *p);
-void __lcd_kpage_destroy(struct page *p);
-void __lcd_hpa_destroy(unsigned long hpa);
-void __lcd_destroy(struct lcd *owned_lcd);
-void __lcd_destroy__(struct lcd *owned_lcd);
-void __lcd_destroy_klcd(struct lcd *owned_klcd);
-
 
 
 #endif /* LCD_DOMAINS_INTERNAL_H */

@@ -1,0 +1,3 @@
+[submodule "lcd-domains/libcap"]
+	path = lcd-domains/libcap
+	url = git@gitlab.flux.utah.edu:xcap/libcap.git

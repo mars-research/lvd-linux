@@ -28,15 +28,18 @@ static void page_revoke(struct cspace *cspace, struct cnode *cnode,
 	struct lcd_memory_object *mo = (struct lcd_memory_object *)object;
 	/*
 	 * Check if page is mapped; if not, nothing to do.
+	 *
+	 * (m can be null in the edge case that we're revoking this
+	 * capability before we had a chance to store the metadata.)
 	 */
 	m = cap_cnode_metadata(cnode);
-	if (!m->is_mapped)
+	if (!m || !m->is_mapped)
 		goto out;
 	/*
 	 * Unmap it
 	 */
-	__lcd_unmap(cap_cspace_getowner(cspace), m->where_mapped,
-		mo->order);
+	__lcd_unmap_pages(cap_cspace_getowner(cspace), m->where_mapped,
+			1 << mo->order);
 
 out:
 	kfree(m);

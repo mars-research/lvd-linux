@@ -92,7 +92,7 @@ int __lcd_create_no_vm(struct lcd **out)
 	/*
 	 * Create a kernel thread (won't run till we wake it up)
 	 */
-	lcd->kthread = kthread_create(lcd_kthread_main, NULL, "lcd");
+	lcd->kthread = kthread_create(__lcd_kthread_main, NULL, "lcd");
 	if (!lcd->kthread) {
 		LCD_ERR("failed to create kthread");
 		goto fail2;
@@ -220,7 +220,7 @@ static int lookup_lcd(struct cspace *cspace, cptr_t slot, struct cnode **cnode)
 	return 0;
 
 fail2:
-	__lcd_cnode_put(*cnode);
+	cap_cnode_put(*cnode);
 fail1:
 	return ret;
 }
@@ -245,7 +245,7 @@ int __lcd_get(struct lcd *caller, cptr_t lcd, struct cnode **cnode,
 		goto fail2;
 	}
 	
-	return 0; /* caller should match with put_lcd */
+	return 0; /* caller should match with __lcd_put */
 
 fail2:
 	cap_cnode_put(*cnode);
@@ -291,7 +291,7 @@ static int config_lcd(struct lcd *caller, struct lcd *lcd_struct,
 	 * Map utcb page in guest physical
 	 */
 	utcb_page_addr = va2hva(lcd_struct->utcb);
-	ret = gp_map(lcd_struct, utcb_page, hva2hpa(utcb_page_addr));
+	ret = __lcd_map(lcd_struct, utcb_page, hva2hpa(utcb_page_addr));
 	if (ret) {
 		LCD_ERR("map");
 		goto fail2;

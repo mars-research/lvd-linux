@@ -131,10 +131,10 @@ struct lcd_mapping_metadata {
  * This is used as a wrapper around struct page and arbitrary
  * host physical addresses, so that we can track the size of the
  * memory region. This is the object that is inserted into an LCD's
- * cspace (rather than a struct page, say). We don't store an extra 
- * type field because this information is stored in the cspace.
+ * cspace (rather than a struct page, say).
  */
 struct lcd_memory_object {
+	enum lcd_microkernel_type_id sub_type;
 	void *object;
 	unsigned int order;
 };

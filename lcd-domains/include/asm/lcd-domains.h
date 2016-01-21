@@ -345,6 +345,22 @@ static inline u64 lcd_arch_get_syscall_num(struct lcd_arch *lcd)
 {
 	return lcd->regs[LCD_ARCH_REGS_RAX];
 }
+static inline u64 lcd_arch_get_syscall_arg0(struct lcd_arch *lcd)
+{
+	return lcd->regs[LCD_ARCH_REGS_R8];
+}
+static inline u64 lcd_arch_get_syscall_arg1(struct lcd_arch *lcd)
+{
+	return lcd->regs[LCD_ARCH_REGS_R9];
+}
+static inline u64 lcd_arch_get_syscall_arg2(struct lcd_arch *lcd)
+{
+	return lcd->regs[LCD_ARCH_REGS_R10];
+}
+static inline u64 lcd_arch_get_syscall_arg3(struct lcd_arch *lcd)
+{
+	return lcd->regs[LCD_ARCH_REGS_R11];
+}
 static inline void lcd_arch_set_syscall_ret(struct lcd_arch *lcd, u64 val)
 {
 	lcd->regs[LCD_ARCH_REGS_RAX] = val;

@@ -223,6 +223,11 @@ static int handle_syscall(struct lcd *lcd, int *lcd_ret)
 		LCD_ERR("unimplemented syscall %d", syscall_id);
 		ret = -ENOSYS;
 	}
+	/*
+	 * Store return value so LCD can get it
+	 */
+	lcd_arch_set_syscall_ret(lcd->lcd_arch, ret);
+
 	return ret;
 }
 

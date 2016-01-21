@@ -166,6 +166,16 @@ static void dev_mem_delete(struct cspace *cspace, struct cnode *cnode,
 	kfree(object);
 }
 
+static void sync_endpoint_delete(struct cspace *cspace, struct cnode *cnode,
+				void *object)
+{
+	/*
+	 * No one has a capability to the endpoint, so no one should
+	 * be in the queues; free object
+	 */
+	kfree(object);
+}
+
 static void lcd_delete(struct cspace *cspace, struct cnode *cnode,
 		void *object)
 {

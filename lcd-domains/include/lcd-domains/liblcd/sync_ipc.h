@@ -86,14 +86,14 @@ LCD_MK_REG_ACCESS(7)
 int lcd_create_sync_endpoint(cptr_t *slot_out);
 
 /**
- * __lcd_create_sync_endpoint -- Create synchronous ep, store cap in slot.
+ * _lcd_create_sync_endpoint -- Create synchronous ep, store cap in slot.
  * @slot: slot in caller's cspace where capability to new ep should be stored
  *
  * Similar to lcd_create_sync_endpoint, but the caller should have allocated
  * a slot in their cspace (at @slot) where the capability to the new
  * endpoint should be stored.
  */
-int __lcd_create_sync_endpoint(cptr_t slot);
+int _lcd_create_sync_endpoint(cptr_t slot);
 
 /**
  * lcd_sync_send -- synchronous IPC send

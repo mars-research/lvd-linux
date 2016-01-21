@@ -308,16 +308,17 @@ class Function : public Type
   const char *identifier_;
   ReturnVariable *return_var_;
   std::vector<Parameter*> parameters_;
+  LexicalScope *current_scope_;
 
  public:
-  Function(const char *id, ReturnVariable *return_var, std::vector<Parameter*> parameters);
+  Function(const char *id, ReturnVariable *return_var, std::vector<Parameter*> parameters, LexicalScope *ls);
   virtual Marshal_type* accept(MarshalPrepareVisitor *worker);
   virtual CCSTTypeName* accept(TypeNameVisitor *worker);
   virtual CCSTStatement* accept(TypeVisitor *worker, Variable *v);
   virtual int num();
   virtual const char* name();
   virtual void resolve_types(LexicalScope *ls);
-  Rpc* to_rpc(LexicalScope *ls, ProjectionType *pt);
+  Rpc* to_rpc(ProjectionType *pt);
   virtual void create_trampoline_structs(LexicalScope *ls);
 };
  

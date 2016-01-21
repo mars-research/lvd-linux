@@ -58,6 +58,11 @@ CCSTAssignOp* equals()
   return new CCSTAssignOp(equal_t);
 }
 
+CCSTUnaryOp* Not()
+{
+  return new CCSTUnaryOp(unary_bang_t);
+}
+
 /* 
  * confirm this works
  * returns a new string with _p on end.
@@ -585,9 +590,9 @@ CCSTPrimaryExprId* function_name(const char *func_name)
   return new CCSTPrimaryExprId(func_name);
 }
 
-CCSTPostFixExprAssnExpr* function_call(CCSTPrimaryExprId *func_name, std::vector<CCSTAssignExpr*> args)
+CCSTPostFixExprAssnExpr* function_call(const char *func_name, std::vector<CCSTAssignExpr*> args)
 {
-  return new CCSTPostFixExprAssnExpr(func_name, args);
+  return new CCSTPostFixExprAssnExpr(new CCSTPrimaryExprId(func_name), args);
 }
 
 /* 

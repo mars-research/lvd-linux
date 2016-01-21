@@ -32,7 +32,7 @@ CCSTStatement* MarshalTypeVisitor::visit(Typedef *td, Variable *v)
   } else {
     arguments.push_back(access_v);
   }
-  return function_call( function_name( store_register_mapping(mt->get_register()))
+  return function_call(store_register_mapping(mt->get_register())
 			, arguments);
 }
 
@@ -56,7 +56,7 @@ CCSTStatement* MarshalTypeVisitor::visit(IntegerType *it, Variable *v)
   } else {
     arguments.push_back(access_v);
   }
-  return function_call( function_name( store_register_mapping(mt->get_register()))
+  return function_call( store_register_mapping(mt->get_register())
 		 , arguments);
 }
 

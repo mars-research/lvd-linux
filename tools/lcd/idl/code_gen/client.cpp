@@ -90,18 +90,70 @@ CCSTCompoundStatement* caller_body(Rpc *r)
   // allocate necessary container shit
   
   /* code that loops through parameters and allocates/initializes whatever necessary before marshalling*/
+  
+  // loop through params, declare a tmp and pull out marshal value
   std::vector<Parameter*> params = r->parameters();
-  for(std::vector<Parameter*>::iterator it = params.begin(); it != params.end(); it ++) {
-    Parameter *p = *it;
-    if(p->in()) {
-      statements.push_back(helper(p)); // declare, alloc, init parameters as necessary
-      // helper is incomplete
+
+  // for each parameter that is ia projection -- & is alloc
+  for(std::vector<Parameter*>::iterator it = params.begin(); it != params.end(); it ++)
+    {
+      Parameter *p = *it;
+      if(p->type()->num() == 4 && p->alloc_caller()) {
+	ProjectionType *pt = dynamic_cast<ProjectionType*>(p->type());
+	Assert(pt != 0x0, "Error: dynamic cast to Projection type failed!\n");
+
+	// lookup container struct
+	int err;
+	const char* container_name_ = container_name(pt->name());
+	Type *container_tmp = r->current_scope()->lookup(container_name_, &err);
+	printf("looked up container %s for function %s. pointer for regular projection %p\n", container_name_, r->name(), r->current_scope()->lookup(pt->name(), &err)); 
+	Assert(container_tmp != 0x0, "Error: could not find container in environment\n");
+	ProjectionType *container = dynamic_cast<ProjectionType*>(container_tmp);
+	Assert(container != 0x0, "Error: dynamic cast to Projection type failed!\n");
+	
+	// declare instance of container
+	std::vector<CCSTInitDeclarator*> decs;
+	decs.push_back(new CCSTDeclarator(new CCSTPointer(), new CCSTDirectDecId(container_name_)));
+	CCSTDeclaration *container_declaration = new CCSTDeclaration(type2(container), decs);
+	// finish declaring instance of container 
+	
+	declarations.push_back(container_declaration);
+	
+	// 	file_container = kzalloc(sizeof(*file_container), GFP_KERNEL);
+	std::vector<CCSTAssignExpr*> kzalloc_args;
+	kzalloc_args.push_back(new CCSTUnaryExprSizeOf(new CCSTUnaryExprCastExpr(new CCSTUnaryOp(unary_mult_t), new CCSTPrimaryExprId(container_name_))));
+	kzalloc_args.push_back(new CCSTEnumConst("GFP_KERNEL"));
+	
+
+	statements.push_back(new CCSTAssignExpr(new CCSTPrimaryExprId(container_name_), equals(), function_call("kzalloc", kzalloc_args)));
+
+	// if null
+	// LIBLCD_ERR("kzalloc");
+	//	lcd_exit(-1); /* abort */
+	std::vector<CCSTDeclaration*> if_body_declarations;
+	std::vector<CCSTStatement*> if_body_statements;
+	
+	std::vector<CCSTAssignExpr*> liblcd_err_args;
+	liblcd_err_args.push_back(new CCSTString("kzalloc"));
+	if_body_statements.push_back(function_call("LIBLCD_ERR", liblcd_err_args));
+	std::vector<CCSTAssignExpr*> lcd_exit_args;
+	lcd_exit_args.push_back(new CCSTInteger(-1));
+	if_body_statements.push_back(function_call("lcd_exit", lcd_exit_args));
+	CCSTCompoundStatement *if_body = new CCSTCompoundStatement(if_body_declarations, if_body_statements);
+	statements.push_back(new CCSTIfStatement(new CCSTUnaryExprCastExpr(Not(), new CCSTPrimaryExprId(container_name_))
+						 , if_body));
+
+
+      
+	// insert into dstore
+      // do error checking
+      }
     }
-  }
+
 
   /* end of this code, could go in own function maybe?*/
 
-
+  /*
   std::vector<CCSTStatement*> statements_tmp = marshal_in_parameters(r->parameters());
   
   statements.insert(statements.end(), statements_tmp.begin(), statements_tmp.end());
@@ -122,7 +174,7 @@ CCSTCompoundStatement* caller_body(Rpc *r)
   else {
     statements.push_back(new CCSTReturn());
   }
-
+  */
   return new CCSTCompoundStatement(declarations, statements);
   
 }

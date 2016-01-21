@@ -23,11 +23,12 @@ const char* hidden_args_name(const char* name)
   return new_name(name, "_hidden_args");
 }
 
-Function::Function(const char *id, ReturnVariable *return_var, std::vector<Parameter*> parameters)
+Function::Function(const char *id, ReturnVariable *return_var, std::vector<Parameter*> parameters, LexicalScope *ls)
 {
   this->identifier_  = id;
   this->return_var_ = return_var;
   this->parameters_  = parameters;
+  this->current_scope_ = ls;
 }
 
 Marshal_type* Function::accept(MarshalPrepareVisitor *worker)
@@ -66,28 +67,28 @@ void Function::create_trampoline_structs(LexicalScope *ls)
   return;
 }
 
-Rpc* Function::to_rpc(LexicalScope *ls, ProjectionType *pt)
+Rpc* Function::to_rpc(ProjectionType *pt)
 {
   // adding extra parameters here. but maybe depending on needs this could be done at parse time
   // and these extra parameters can be added to the Function.
   std::vector<Parameter*> new_parameters;
   new_parameters.insert(new_parameters.end(), this->parameters_.begin(), this->parameters_.end());
   int err;
-  Type *dstore = ls->lookup("dstore", &err);
+  Type *dstore = this->current_scope_->lookup("dstore", &err);
   if(dstore == 0x0) {
     printf("Error: dstore is not in scope\n");
   }
   new_parameters.push_back(new Parameter(dstore, "dstore", 1));
 
   const char* c_name = container_name(pt->name());
-  Type *container = ls->lookup(c_name, &err);
+  Type *container = this->current_scope_->lookup(c_name, &err);
   if(container == 0x0) {
     printf("Error: container is not in scope\n");
   }
 
   new_parameters.push_back(new Parameter(container, c_name, 1));
 
-  Rpc* tmp = new Rpc(this->return_var_, this->identifier_, new_parameters, ls);
+  Rpc* tmp = new Rpc(this->return_var_, this->identifier_, new_parameters, this->current_scope_);
   tmp->set_function_pointer_defined(true);
   return tmp;
 }

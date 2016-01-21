@@ -140,57 +140,62 @@ CCSTCompoundStatement* callee_body(Rpc *r)
   
   // loop through params, declare a tmp and pull out marshal value
   std::vector<Parameter*> params = r->parameters();
-  std::vector<char*> param_names;
 
-  std::vector<CCSTAssignExpr*> unmarshalled_args;
+  // for each parameter that is ia projection -- & is alloc
   for(std::vector<Parameter*>::iterator it = params.begin(); it != params.end(); it ++)
     {
-      Parameter *p = (Parameter*) *it;
+      Parameter *p = *it;
+      if(p->type()->num() == 4 && p->alloc_caller()) {
+	ProjectionType *pt = dynamic_cast<ProjectionType*>(p->type());
+	Assert(pt != 0x0, "Error: dynamic cast to Projection type failed!\n");
+
+	// lookup container struct
+	int err;
+	const char* container_name_ = container_name(pt->name());
+	Type *container_tmp = r->current_scope()->lookup(container_name_, &err);
+	Assert(container_tmp != 0x0, "Error: could not find container in environment\n");
+	ProjectionType *container = dynamic_cast<ProjectionType*>(container_tmp);
+	Assert(container != 0x0, "Error: dynamic cast to Projection type failed!\n");
+	
+	// declare instance of container
+	std::vector<CCSTInitDeclarator*> decs;
+	decs.push_back(new CCSTDeclarator(new CCSTPointer(), new CCSTDirectDecId(container_name_)));
+	CCSTDeclaration *container_declaration = new CCSTDeclaration(type2(container), decs);
+	// finish declaring instance of container 
+	
+	declarations.push_back(container_declaration);
+	
+	// 	file_container = kzalloc(sizeof(*file_container), GFP_KERNEL);
+	std::vector<CCSTAssignExpr*> kzalloc_args;
+	kzalloc_args.push_back(new CCSTUnaryExprSizeOf(new CCSTUnaryExprCastExpr(new CCSTUnaryOp(unary_mult_t), new CCSTPrimaryExprId(container_name_))));
+	kzalloc_args.push_back(new CCSTEnumConst("GFP_KERNEL"));
+	
+
+	statements.push_back(new CCSTAssignExpr(new CCSTPrimaryExprId(container_name_), equals(), function_call("kzalloc", kzalloc_args)));
+
+	// if null
+	// LIBLCD_ERR("kzalloc");
+	//	lcd_exit(-1); /* abort */
+	std::vector<CCSTDeclaration*> if_body_declarations;
+	std::vector<CCSTStatement*> if_body_statements;
+	
+	std::vector<CCSTAssignExpr*> liblcd_err_args;
+	liblcd_err_args.push_back(new CCSTString("kzalloc"));
+	if_body_statements.push_back(function_call("LIBLCD_ERR", liblcd_err_args));
+	std::vector<CCSTAssignExpr*> lcd_exit_args;
+	lcd_exit_args.push_back(new CCSTInteger(-1));
+	if_body_statements.push_back(function_call("lcd_exit", lcd_exit_args));
+	CCSTCompoundStatement *if_body = new CCSTCompoundStatement(if_body_declarations, if_body_statements);
+	statements.push_back(new CCSTIfStatement(new CCSTUnaryExprCastExpr(Not(), new CCSTPrimaryExprId(container_name_))
+						 , if_body));
+
+
       
-      statements.push_back(unmarshal_variable(p));
-      CCSTPrimaryExprId *t = new CCSTPrimaryExprId(p->identifier());
-      unmarshalled_args.push_back(t);
+	// insert into dstore
+      // do error checking
+      }
     }
 
-  // make real call and get return value if there is one
-  ReturnVariable *rv = r->return_variable();
-
-  /* redo everything after this? at least read through */
-
-  if(rv->type()->num() != 5) // not void
-    {
-      /*
-      Marshal_type *ret_info = r->explicit_ret_marshal_info();
-
-      CCSTPointer *p = 0x0;
-      if(r->explicit_return_type()->num() == 3)
-	p = new CCSTPointer();
-
-      std::vector<CCSTDecSpecifier*> ret_type = type(r->explicit_return_type());
-      std::vector<CCSTInitDeclarator*> inits;
-      inits.push_back(new CCSTInitDeclarator(new CCSTDeclarator(p, new CCSTDirectDecId(ret_info->get_name()))
-					      , new CCSTInitializer( new CCSTPostFixExprAssnExpr(new CCSTPrimaryExprId(r->name()) , unmarshalled_args))));
-
-      std::vector<CCSTDeclaration*> cd;
-      std::vector<CCSTStatement*> cs;
-      
-      cd.push_back(new CCSTDeclaration(ret_type, inits));
-      MarshalTypeVisitor *visitor = new MarshalTypeVisitor();
-      cs.push_back(ret_info->accept(visitor));
-      statements.push_back(new CCSTCompoundStatement(cd, cs));
-      */
-    }
-  else
-    {
-      statements.push_back(new CCSTPostFixExprAssnExpr(new CCSTPrimaryExprId(r->name()) ,unmarshalled_args));
-    }
-  
-  // implicit returns
-  // just loop through parameters
-
-  std::vector<CCSTAssignExpr*> empty_args;
-  statements.push_back(new CCSTPostFixExprAssnExpr(new CCSTPrimaryExprId("reply") , empty_args));
-  
   return new CCSTCompoundStatement(declarations, statements);
 }
 
@@ -284,7 +289,7 @@ CCSTFile* generate_server_source(Module *m)
       }
     }
   }
-
+  
   // print trampoline structs
   std::vector<Rpc*> rpcs = m->rpc_definitions();
   for(std::vector<Rpc*>::iterator it = rpcs.begin(); it != rpcs.end(); it ++) {
@@ -302,7 +307,7 @@ CCSTFile* generate_server_source(Module *m)
       definitions.push_back(new CCSTDeclaration(specifier, empty));
     }
   }
-
+  
 
   // globals.
   std::vector<GlobalVariable*> globals = m->globals();

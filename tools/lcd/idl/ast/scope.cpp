@@ -188,7 +188,7 @@ std::vector<Rpc*> GlobalScope::function_pointer_to_rpc()
 	
 	if(pf->type()->num() == 7) { // function pointer field
 	  Function *f = dynamic_cast<Function*>(pf->type());
-	  rpcs.push_back(f->to_rpc(this, pt));
+	  rpcs.push_back(f->to_rpc(pt));
 	}
       }
     }
@@ -381,7 +381,7 @@ std::vector<Rpc*> LexicalScope::function_pointer_to_rpc()
 
 	if(pf->type()->num() == 7) { // function pointer field
 	  Function *f = dynamic_cast<Function*>(pf->type());
-	  rpcs.push_back(f->to_rpc(this, pt));
+	  rpcs.push_back(f->to_rpc(pt));
 	}
       }
     }

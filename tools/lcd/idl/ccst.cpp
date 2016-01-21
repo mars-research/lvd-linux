@@ -1187,9 +1187,7 @@ CCSTEnumConst::CCSTEnumConst()
 
 void CCSTEnumConst::write(FILE *f)
 {
-  printf("incomplete enum const\n");
-  //TODO
-  // unsure
+  fprintf(f, "%s", this->enum_val_);
 }
 
 CCSTExpression::CCSTExpression()

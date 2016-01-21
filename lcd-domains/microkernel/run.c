@@ -37,7 +37,7 @@ static int handle_syscall_cap_delete(struct lcd *lcd)
 	return cap_delete(lcd->cspace, object);
 }
 
-static int handle_syscall_pages_map(struct lcd *lcd)
+static int handle_syscall_munmap(struct lcd *lcd)
 {
 	cptr_t mem_object;
 	/*
@@ -50,7 +50,7 @@ static int handle_syscall_pages_map(struct lcd *lcd)
 	return __lcd_unmap_memory_object(caller, mem_object);
 }
 
-static int handle_syscall_pages_map(struct lcd *lcd)
+static int handle_syscall_mmap(struct lcd *lcd)
 {
 	cptr_t mem_object;
 	gpa_t base;
@@ -207,11 +207,11 @@ static int handle_syscall(struct lcd *lcd, int *lcd_ret)
 	case LCD_SYSCALL_PAGES_ALLOC:
 		ret = handle_syscall_pages_alloc(lcd);
 		break;
-	case LCD_SYSCALL_PAGES_MAP:
-		ret = handle_syscall_pages_map(lcd);
+	case LCD_SYSCALL_MMAP:
+		ret = handle_syscall_mmap(lcd);
 		break;
-	case LCD_SYSCALL_PAGE_UNMAP:
-		ret = handle_syscall_pages_unmap(lcd);
+	case LCD_SYSCALL_MUNMAP:
+		ret = handle_syscall_munmap(lcd);
 		break;
 	case LCD_SYSCALL_CAP_DELETE:
 		ret = handle_syscall_cap_delete(lcd);
@@ -371,4 +371,45 @@ int __lcd_kthread_main(void *data) /* data is NULL */
 			current_lcd->type);
 		return -EINVAL;
 	}
+}
+
+/* RUN -------------------------------------------------- */
+
+int __lcd_run(struct lcd *caller, cptr_t lcd)
+{
+	struct lcd *lcd_struct;
+	struct cnode *cnode;
+	int ret;
+	/*
+	 * Look up and lock
+	 */
+	ret = __lcd_get(caller, lcd, &cnode, &lcd_struct);
+	if (ret)
+		goto fail1;
+	/*
+	 * If lcd is not in config state, fail
+	 */
+	if (!lcd_status_configed(lcd_struct)) {
+		LCD_DEBUG(LCD_DEBUG_ERR,
+			"cannot run: lcd is in state %d",
+			get_lcd_status(lcd_struct));
+		ret = -EINVAL;
+		goto fail2;
+	}
+	/*
+	 * This will run the kthread for the first time
+	 */
+	set_lcd_status(lcd_struct, LCD_STATUS_RUNNING);
+	wake_up_process(lcd_struct->kthread);
+	/*
+	 * Unlock
+	 */
+	__lcd_put(caller, cnode, lcd_struct);
+
+	return 0;
+
+fail2:
+	__lcd_put(caller, cnode, lcd_struct);
+fail1:
+	return ret;
 }

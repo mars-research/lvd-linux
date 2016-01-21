@@ -99,63 +99,63 @@ MODULE_DESCRIPTION("LCD driver");
 /* 	__lcd_cnode_put(cnode); */
 /* } */
 
-static int lookup_page(struct cspace *cspace, cptr_t slot, struct cnode **cnode)
-{
-	int ret;
-	/*
-	 * Look up
-	 */
-	ret = __lcd_cnode_get(cspace, slot, cnode);
-	if (ret)
-		goto fail1;
-	/*
-	 * Confirm it's an lcd
-	 */
-	if ((*cnode)->type != LCD_CAP_TYPE_PAGE &&
-		(*cnode)->type != LCD_CAP_TYPE_KPAGE) {
-		LCD_ERR("not an lcd");
-		goto fail2;
-	}
+/* static int lookup_page(struct cspace *cspace, cptr_t slot, struct cnode **cnode) */
+/* { */
+/* 	int ret; */
+/* 	/\* */
+/* 	 * Look up */
+/* 	 *\/ */
+/* 	ret = __lcd_cnode_get(cspace, slot, cnode); */
+/* 	if (ret) */
+/* 		goto fail1; */
+/* 	/\* */
+/* 	 * Confirm it's an lcd */
+/* 	 *\/ */
+/* 	if ((*cnode)->type != LCD_CAP_TYPE_PAGE && */
+/* 		(*cnode)->type != LCD_CAP_TYPE_KPAGE) { */
+/* 		LCD_ERR("not an lcd"); */
+/* 		goto fail2; */
+/* 	} */
 
-	return 0;
+/* 	return 0; */
 
-fail2:
-	__lcd_cnode_put(*cnode);
-fail1:
-	return ret;
-}
+/* fail2: */
+/* 	__lcd_cnode_put(*cnode); */
+/* fail1: */
+/* 	return ret; */
+/* } */
 
-static int lcd_get_page(struct cspace *cspace, cptr_t page, 
-			struct cnode **cnode, struct page **page_struct)
-{
-	int ret;
-	/*
-	 * Look up and lock cnode containing page
-	 */
-	ret = lookup_page(cspace, page, cnode);
-	if (ret)
-		goto fail1;
-	*page_struct = (*cnode)->object;
-	/*
-	 * XXX: for now, we assume we won't be touching any of the page
-	 * fields - we just look up for mapping / unmapping etc.
-	 */
+/* static int lcd_get_page(struct cspace *cspace, cptr_t page,  */
+/* 			struct cnode **cnode, struct page **page_struct) */
+/* { */
+/* 	int ret; */
+/* 	/\* */
+/* 	 * Look up and lock cnode containing page */
+/* 	 *\/ */
+/* 	ret = lookup_page(cspace, page, cnode); */
+/* 	if (ret) */
+/* 		goto fail1; */
+/* 	*page_struct = (*cnode)->object; */
+/* 	/\* */
+/* 	 * XXX: for now, we assume we won't be touching any of the page */
+/* 	 * fields - we just look up for mapping / unmapping etc. */
+/* 	 *\/ */
 	
-	return 0; /* caller should match with put_page */
+/* 	return 0; /\* caller should match with put_page *\/ */
 
-fail1:
-	return ret;
-}
+/* fail1: */
+/* 	return ret; */
+/* } */
 
-static void lcd_put_page(struct cnode *cnode, struct page *page)
-{
-	/*
-	 * (no unlock on page - see get_page)
-	 *
-	 * Release cnode
-	 */
-	__lcd_cnode_put(cnode);
-}
+/* static void lcd_put_page(struct cnode *cnode, struct page *page) */
+/* { */
+/* 	/\* */
+/* 	 * (no unlock on page - see get_page) */
+/* 	 * */
+/* 	 * Release cnode */
+/* 	 *\/ */
+/* 	__lcd_cnode_put(cnode); */
+/* } */
 
 
 /* LOW LEVEL PAGE ALLOC -------------------------------------------------- */
@@ -250,21 +250,21 @@ fail1:
 /* LCD CREATE / CONFIG -------------------------------------------------- */
 
 
-static int gp_map(struct lcd *lcd, gpa_t gpa, hpa_t hpa)
-{
-	/* 
-	 * Create, and do not overwrite
-	 */
-	return lcd_arch_ept_map(lcd->lcd_arch, gpa, hpa, 1, 0);
-}
+/* static int gp_map(struct lcd *lcd, gpa_t gpa, hpa_t hpa) */
+/* { */
+/* 	/\*  */
+/* 	 * Create, and do not overwrite */
+/* 	 *\/ */
+/* 	return lcd_arch_ept_map(lcd->lcd_arch, gpa, hpa, 1, 0); */
+/* } */
 
-static void gp_unmap(struct lcd *lcd, gpa_t gpa)
-{
-	int ret;
-	ret = lcd_arch_ept_unmap(lcd->lcd_arch, gpa);
-	if (ret)
-		LCD_ERR("some error unmapping");
-}
+/* static void gp_unmap(struct lcd *lcd, gpa_t gpa) */
+/* { */
+/* 	int ret; */
+/* 	ret = lcd_arch_ept_unmap(lcd->lcd_arch, gpa); */
+/* 	if (ret) */
+/* 		LCD_ERR("some error unmapping"); */
+/* } */
 
 /* int __lcd_create__(struct lcd **out) */
 /* { */
@@ -313,7 +313,7 @@ static void gp_unmap(struct lcd *lcd, gpa_t gpa)
 /* 	return ret; */
 /* } */
 
-static int lcd_kthread_main(void *data);
+/* static int lcd_kthread_main(void *data); */
 
 /* int __lcd_create(struct lcd *caller, cptr_t slot) */
 /* { */
@@ -507,43 +507,43 @@ static int lcd_kthread_main(void *data);
 /* 	return ret; */
 /* } */
 
-int __lcd_run(struct lcd *caller, cptr_t lcd)
-{
-	struct lcd *lcd_struct;
-	struct cnode *cnode;
-	int ret;
-	/*
-	 * Look up and lock
-	 */
-	ret = get_lcd(&caller->cspace, lcd, &cnode, &lcd_struct);
-	if (ret)
-		goto fail1;
-	/*
-	 * If lcd is not in config state, fail
-	 */
-	if (!lcd_status_configed(lcd_struct)) {
-		LCD_ERR("cannot run: lcd is in state %d",
-			get_lcd_status(lcd_struct));
-		ret = -EINVAL;
-		goto fail2;
-	}
-	/*
-	 * this will run the kthread for the first time
-	 */
-	set_lcd_status(lcd_struct, LCD_STATUS_RUNNING);
-	wake_up_process(lcd_struct->kthread);
-	/*
-	 * Unlock
-	 */
-	put_lcd(cnode, lcd_struct);
+/* int __lcd_run(struct lcd *caller, cptr_t lcd) */
+/* { */
+/* 	struct lcd *lcd_struct; */
+/* 	struct cnode *cnode; */
+/* 	int ret; */
+/* 	/\* */
+/* 	 * Look up and lock */
+/* 	 *\/ */
+/* 	ret = get_lcd(&caller->cspace, lcd, &cnode, &lcd_struct); */
+/* 	if (ret) */
+/* 		goto fail1; */
+/* 	/\* */
+/* 	 * If lcd is not in config state, fail */
+/* 	 *\/ */
+/* 	if (!lcd_status_configed(lcd_struct)) { */
+/* 		LCD_ERR("cannot run: lcd is in state %d", */
+/* 			get_lcd_status(lcd_struct)); */
+/* 		ret = -EINVAL; */
+/* 		goto fail2; */
+/* 	} */
+/* 	/\* */
+/* 	 * this will run the kthread for the first time */
+/* 	 *\/ */
+/* 	set_lcd_status(lcd_struct, LCD_STATUS_RUNNING); */
+/* 	wake_up_process(lcd_struct->kthread); */
+/* 	/\* */
+/* 	 * Unlock */
+/* 	 *\/ */
+/* 	put_lcd(cnode, lcd_struct); */
 
-	return 0;
+/* 	return 0; */
 
-fail2:
-	put_lcd(cnode, lcd_struct);
-fail1:
-	return ret;
-}
+/* fail2: */
+/* 	put_lcd(cnode, lcd_struct); */
+/* fail1: */
+/* 	return ret; */
+/* } */
 
 /* KLCD ENTER / EXIT -------------------------------------------------- */
 
@@ -733,111 +733,111 @@ lock_skip:
 
 /* CAPABILITIES -------------------------------------------------- */
 
-int __lcd_cap_grant_cheat(struct lcd *caller, cptr_t lcd, cptr_t src, 
-			cptr_t dest)
-{
-	struct lcd *lcd_struct;
-	struct cnode *cnode;
-	int ret;
-	/*
-	 * Look up and lock
-	 */
-	ret = get_lcd(&caller->cspace, lcd, &cnode, &lcd_struct);
-	if (ret)
-		goto fail1;
-	/*
-	 * If lcd is not an embryo or in config'd state, fail - we only allow 
-	 * direct grants when the lcd is being set up
-	 */
-	if (!lcd_status_embryo(lcd_struct) &&
-		!lcd_status_configed(lcd_struct)) {
-		LCD_ERR("lcd is not an embryo or configd");
-		ret = -EINVAL;
-		goto fail2;
-	}
-	/*
-	 * Do regular grant
-	 */
-	ret = __lcd_cap_grant(&caller->cspace, src,
-			&lcd_struct->cspace, dest);
-	if (ret)
-		goto fail3;
-	/*
-	 * Put
-	 */
-	put_lcd(cnode, lcd_struct);
+/* int __lcd_cap_grant_cheat(struct lcd *caller, cptr_t lcd, cptr_t src,  */
+/* 			cptr_t dest) */
+/* { */
+/* 	struct lcd *lcd_struct; */
+/* 	struct cnode *cnode; */
+/* 	int ret; */
+/* 	/\* */
+/* 	 * Look up and lock */
+/* 	 *\/ */
+/* 	ret = get_lcd(&caller->cspace, lcd, &cnode, &lcd_struct); */
+/* 	if (ret) */
+/* 		goto fail1; */
+/* 	/\* */
+/* 	 * If lcd is not an embryo or in config'd state, fail - we only allow  */
+/* 	 * direct grants when the lcd is being set up */
+/* 	 *\/ */
+/* 	if (!lcd_status_embryo(lcd_struct) && */
+/* 		!lcd_status_configed(lcd_struct)) { */
+/* 		LCD_ERR("lcd is not an embryo or configd"); */
+/* 		ret = -EINVAL; */
+/* 		goto fail2; */
+/* 	} */
+/* 	/\* */
+/* 	 * Do regular grant */
+/* 	 *\/ */
+/* 	ret = __lcd_cap_grant(&caller->cspace, src, */
+/* 			&lcd_struct->cspace, dest); */
+/* 	if (ret) */
+/* 		goto fail3; */
+/* 	/\* */
+/* 	 * Put */
+/* 	 *\/ */
+/* 	put_lcd(cnode, lcd_struct); */
 
-	return 0;
+/* 	return 0; */
 
-fail3:
-fail2:
-	put_lcd(cnode, lcd_struct);
-fail1:
-	return ret;
-}
+/* fail3: */
+/* fail2: */
+/* 	put_lcd(cnode, lcd_struct); */
+/* fail1: */
+/* 	return ret; */
+/* } */
 
-int __lcd_cap_page_grant_map_cheat(struct lcd *caller, cptr_t lcd, 
-				cptr_t page, cptr_t dest, gpa_t gpa)
-{
-	struct lcd *lcd_struct;
-	struct page *page_struct;
-	struct cnode *lcd_cnode;
-	struct cnode *page_cnode;
-	int ret;
-	/*
-	 * Look up and lock lcd and page, in that order (gulp)
-	 */
-	ret = get_lcd(&caller->cspace, lcd, &lcd_cnode, &lcd_struct);
-	if (ret)
-		goto fail1;
-	/*
-	 * If lcd is not an embryo, fail - we only allow direct grants when
-	 * the lcd is being set up
-	 */
-	if (!lcd_status_embryo(lcd_struct)) {
-		LCD_ERR("lcd is not an embryo");
-		ret = -EINVAL;
-		goto fail2;
-	}
-	ret = lcd_get_page(&caller->cspace, page, &page_cnode, &page_struct);
-	if (ret)
-		goto fail3;
-	/*
-	 * Map page
-	 */
-	ret = gp_map(lcd_struct, gpa, va2hpa(page_address(page_struct)));
-	if (ret) {
-		LCD_ERR("map");
-		lcd_put_page(page_cnode, page_struct);
-		goto fail4;
-	}
-	/*
-	 * Release page cnode, so that grant can go through
-	 */
-	__lcd_cnode_put(page_cnode);
-	/*
-	 * Do regular grant
-	 */
-	ret = __lcd_cap_grant_page(&caller->cspace, page,
-				&lcd_struct->cspace, dest, gpa);
-	if (ret)
-		goto fail5;
-	/*
-	 * Put lcd
-	 */
-	put_lcd(lcd_cnode, lcd_struct);
+/* int __lcd_cap_page_grant_map_cheat(struct lcd *caller, cptr_t lcd,  */
+/* 				cptr_t page, cptr_t dest, gpa_t gpa) */
+/* { */
+/* 	struct lcd *lcd_struct; */
+/* 	struct page *page_struct; */
+/* 	struct cnode *lcd_cnode; */
+/* 	struct cnode *page_cnode; */
+/* 	int ret; */
+/* 	/\* */
+/* 	 * Look up and lock lcd and page, in that order (gulp) */
+/* 	 *\/ */
+/* 	ret = get_lcd(&caller->cspace, lcd, &lcd_cnode, &lcd_struct); */
+/* 	if (ret) */
+/* 		goto fail1; */
+/* 	/\* */
+/* 	 * If lcd is not an embryo, fail - we only allow direct grants when */
+/* 	 * the lcd is being set up */
+/* 	 *\/ */
+/* 	if (!lcd_status_embryo(lcd_struct)) { */
+/* 		LCD_ERR("lcd is not an embryo"); */
+/* 		ret = -EINVAL; */
+/* 		goto fail2; */
+/* 	} */
+/* 	ret = lcd_get_page(&caller->cspace, page, &page_cnode, &page_struct); */
+/* 	if (ret) */
+/* 		goto fail3; */
+/* 	/\* */
+/* 	 * Map page */
+/* 	 *\/ */
+/* 	ret = gp_map(lcd_struct, gpa, va2hpa(page_address(page_struct))); */
+/* 	if (ret) { */
+/* 		LCD_ERR("map"); */
+/* 		lcd_put_page(page_cnode, page_struct); */
+/* 		goto fail4; */
+/* 	} */
+/* 	/\* */
+/* 	 * Release page cnode, so that grant can go through */
+/* 	 *\/ */
+/* 	__lcd_cnode_put(page_cnode); */
+/* 	/\* */
+/* 	 * Do regular grant */
+/* 	 *\/ */
+/* 	ret = __lcd_cap_grant_page(&caller->cspace, page, */
+/* 				&lcd_struct->cspace, dest, gpa); */
+/* 	if (ret) */
+/* 		goto fail5; */
+/* 	/\* */
+/* 	 * Put lcd */
+/* 	 *\/ */
+/* 	put_lcd(lcd_cnode, lcd_struct); */
 
-	return 0;
+/* 	return 0; */
 
-fail5:
-	gp_unmap(lcd_struct, gpa);
-fail4:
-fail3:
-fail2:
-	put_lcd(lcd_cnode, lcd_struct);
-fail1:
-	return ret;
-}
+/* fail5: */
+/* 	gp_unmap(lcd_struct, gpa); */
+/* fail4: */
+/* fail3: */
+/* fail2: */
+/* 	put_lcd(lcd_cnode, lcd_struct); */
+/* fail1: */
+/* 	return ret; */
+/* } */
 
 /* rest is in cap.c */
 
@@ -1020,473 +1020,471 @@ fail1:
 
 /* LCD EXECUTION -------------------------------------------------- */
 
-static int __lcd_put_char(struct lcd *lcd)
-{
-	char c;
-	/*
-	 * Char is in r0
-	 */
-	c = __lcd_debug_reg(lcd->utcb);
-	/*
-	 * Put char in lcd's console buff
-	 */
-	lcd->console_buff[lcd->console_cursor] = c;
-	/*
-	 * Bump cursor and check
-	 */
-	lcd->console_cursor++;
-	if (c == 0) {
-		/*
-		 * End of string; printk to host and reset buff
-		 */
-		printk(KERN_INFO "message from lcd %p: %s\n",
-			lcd, lcd->console_buff);
-		lcd->console_cursor = 0;
-		return 0;
-	}
-	if (lcd->console_cursor >= LCD_CONSOLE_BUFF_SIZE - 1) {
-		/*
-		 * Filled buffer; empty it.
-		 */
-		lcd->console_buff[LCD_CONSOLE_BUFF_SIZE - 1] = 0;
-		printk(KERN_INFO "(incomplete) message from lcd %p: %s\n",
-			lcd, lcd->console_buff);
-		lcd->console_cursor = 0;
-		return 0;
-	}
-	return 0;
-}
+/* static int __lcd_put_char(struct lcd *lcd) */
+/* { */
+/* 	char c; */
+/* 	/\* */
+/* 	 * Char is in r0 */
+/* 	 *\/ */
+/* 	c = __lcd_debug_reg(lcd->utcb); */
+/* 	/\* */
+/* 	 * Put char in lcd's console buff */
+/* 	 *\/ */
+/* 	lcd->console_buff[lcd->console_cursor] = c; */
+/* 	/\* */
+/* 	 * Bump cursor and check */
+/* 	 *\/ */
+/* 	lcd->console_cursor++; */
+/* 	if (c == 0) { */
+/* 		/\* */
+/* 		 * End of string; printk to host and reset buff */
+/* 		 *\/ */
+/* 		printk(KERN_INFO "message from lcd %p: %s\n", */
+/* 			lcd, lcd->console_buff); */
+/* 		lcd->console_cursor = 0; */
+/* 		return 0; */
+/* 	} */
+/* 	if (lcd->console_cursor >= LCD_CONSOLE_BUFF_SIZE - 1) { */
+/* 		/\* */
+/* 		 * Filled buffer; empty it. */
+/* 		 *\/ */
+/* 		lcd->console_buff[LCD_CONSOLE_BUFF_SIZE - 1] = 0; */
+/* 		printk(KERN_INFO "(incomplete) message from lcd %p: %s\n", */
+/* 			lcd, lcd->console_buff); */
+/* 		lcd->console_cursor = 0; */
+/* 		return 0; */
+/* 	} */
+/* 	return 0; */
+/* } */
 
-static int do_page_alloc(struct lcd *lcd)
-{
-	int ret;
-	cptr_t c;
-	struct page *p;
-	/*
-	 * Get dest slot
-	 */
-	c = __lcd_cr0(lcd->utcb);
-	/*
-	 * Allocate a zero'd page
-	 */
-	p = alloc_page(GFP_KERNEL);
-	if (!p) {
-		LCD_ERR("alloc failed");
-		ret = -ENOMEM;
-		goto fail1;
-	}
-	memset(page_address(p), 0, PAGE_SIZE);
-	/*
-	 * Insert into lcd's cspace
-	 */
-	ret = __lcd_cap_insert(&lcd->cspace, c, p, LCD_CAP_TYPE_PAGE);
-	if (ret) {
-		LCD_ERR("insert");
-		goto fail2;
-	}
+/* static int do_page_alloc(struct lcd *lcd) */
+/* { */
+/* 	int ret; */
+/* 	cptr_t c; */
+/* 	struct page *p; */
+/* 	/\* */
+/* 	 * Get dest slot */
+/* 	 *\/ */
+/* 	c = __lcd_cr0(lcd->utcb); */
+/* 	/\* */
+/* 	 * Allocate a zero'd page */
+/* 	 *\/ */
+/* 	p = alloc_page(GFP_KERNEL); */
+/* 	if (!p) { */
+/* 		LCD_ERR("alloc failed"); */
+/* 		ret = -ENOMEM; */
+/* 		goto fail1; */
+/* 	} */
+/* 	memset(page_address(p), 0, PAGE_SIZE); */
+/* 	/\* */
+/* 	 * Insert into lcd's cspace */
+/* 	 *\/ */
+/* 	ret = __lcd_cap_insert(&lcd->cspace, c, p, LCD_CAP_TYPE_PAGE); */
+/* 	if (ret) { */
+/* 		LCD_ERR("insert"); */
+/* 		goto fail2; */
+/* 	} */
 
-	return 0;
+/* 	return 0; */
 
-fail2:
-	__free_pages(p, 0);
-fail1:
-	return ret;
-}
+/* fail2: */
+/* 	__free_pages(p, 0); */
+/* fail1: */
+/* 	return ret; */
+/* } */
 
-static int do_page_map(struct lcd *lcd)
-{
-	int ret;
-	cptr_t page;
-	gpa_t gpa;
-	struct page *page_struct;
-	struct cnode *page_cnode;
-	/*
-	 * Get dest to map
-	 */
-	gpa = __gpa(__lcd_r0(lcd->utcb));
-	/*
-	 * Get page cptr
-	 */
-	page = __lcd_cr0(lcd->utcb);
-	/*
-	 * Look up page in lcd's cspace
-	 */
-	ret = lcd_get_page(&lcd->cspace, page, &page_cnode, &page_struct);
-	if (ret)
-		goto fail1;
-	/*
-	 * If page is already mapped, fail
-	 */
-	if (page_cnode->is_mapped) {
-		LCD_ERR("page already mapped");
-		ret = -EINVAL;
-		lcd_put_page(page_cnode, page_struct);
-		goto fail2;
-	}
-	/*
-	 * Map page
-	 */
-	ret = gp_map(lcd, gpa, va2hpa(page_address(page_struct)));
-	if (ret) {
-		LCD_ERR("map");
-		lcd_put_page(page_cnode, page_struct);
-		goto fail3;
-	}
-	/*
-	 * Mark page as mapped, and where it's mapped
-	 */
-	page_cnode->is_mapped = 1;
-	page_cnode->where_mapped = gpa;
-	/*
-	 * Release page cnode, etc.
-	 */
-	lcd_put_page(page_cnode, page_struct);
+/* static int do_page_map(struct lcd *lcd) */
+/* { */
+/* 	int ret; */
+/* 	cptr_t page; */
+/* 	gpa_t gpa; */
+/* 	struct page *page_struct; */
+/* 	struct cnode *page_cnode; */
+/* 	/\* */
+/* 	 * Get dest to map */
+/* 	 *\/ */
+/* 	gpa = __gpa(__lcd_r0(lcd->utcb)); */
+/* 	/\* */
+/* 	 * Get page cptr */
+/* 	 *\/ */
+/* 	page = __lcd_cr0(lcd->utcb); */
+/* 	/\* */
+/* 	 * Look up page in lcd's cspace */
+/* 	 *\/ */
+/* 	ret = lcd_get_page(&lcd->cspace, page, &page_cnode, &page_struct); */
+/* 	if (ret) */
+/* 		goto fail1; */
+/* 	/\* */
+/* 	 * If page is already mapped, fail */
+/* 	 *\/ */
+/* 	if (page_cnode->is_mapped) { */
+/* 		LCD_ERR("page already mapped"); */
+/* 		ret = -EINVAL; */
+/* 		lcd_put_page(page_cnode, page_struct); */
+/* 		goto fail2; */
+/* 	} */
+/* 	/\* */
+/* 	 * Map page */
+/* 	 *\/ */
+/* 	ret = gp_map(lcd, gpa, va2hpa(page_address(page_struct))); */
+/* 	if (ret) { */
+/* 		LCD_ERR("map"); */
+/* 		lcd_put_page(page_cnode, page_struct); */
+/* 		goto fail3; */
+/* 	} */
+/* 	/\* */
+/* 	 * Mark page as mapped, and where it's mapped */
+/* 	 *\/ */
+/* 	page_cnode->is_mapped = 1; */
+/* 	page_cnode->where_mapped = gpa; */
+/* 	/\* */
+/* 	 * Release page cnode, etc. */
+/* 	 *\/ */
+/* 	lcd_put_page(page_cnode, page_struct); */
 
-	return 0;
+/* 	return 0; */
 
-fail3:
-fail2:
-fail1:
-	return ret;
-}
+/* fail3: */
+/* fail2: */
+/* fail1: */
+/* 	return ret; */
+/* } */
 
-static int do_page_unmap(struct lcd *lcd)
-{
-	int ret;
-	cptr_t page;
-	gpa_t gpa;
-	struct page *page_struct;
-	struct cnode *page_cnode;
-	/*
-	 * Get dest to unmap
-	 */
-	gpa = __gpa(__lcd_r0(lcd->utcb));
-	/*
-	 * Get page cptr
-	 */
-	page = __lcd_cr0(lcd->utcb);
-	/*
-	 * Look up page in lcd's cspace
-	 */
-	ret = lcd_get_page(&lcd->cspace, page, &page_cnode, &page_struct);
-	if (ret)
-		goto fail1;
-	/*
-	 * If page is not mapped, fail
-	 */
-	if (!page_cnode->is_mapped || 
-		gpa_val(page_cnode->where_mapped) != gpa_val(gpa)) {
-		LCD_ERR("page not mapped or mapped elsewhere");
-		ret = -EINVAL;
-		lcd_put_page(page_cnode, page_struct);
-		goto fail2;
-	}
-	/*
-	 * Unmap page
-	 */
-	gp_unmap(lcd, gpa);
-	/*
-	 * Mark page as not mapped
-	 */
-	page_cnode->is_mapped = 0;
-	/*
-	 * Release page cnode, etc.
-	 */
-	lcd_put_page(page_cnode, page_struct);
+/* static int do_page_unmap(struct lcd *lcd) */
+/* { */
+/* 	int ret; */
+/* 	cptr_t page; */
+/* 	gpa_t gpa; */
+/* 	struct page *page_struct; */
+/* 	struct cnode *page_cnode; */
+/* 	/\* */
+/* 	 * Get dest to unmap */
+/* 	 *\/ */
+/* 	gpa = __gpa(__lcd_r0(lcd->utcb)); */
+/* 	/\* */
+/* 	 * Get page cptr */
+/* 	 *\/ */
+/* 	page = __lcd_cr0(lcd->utcb); */
+/* 	/\* */
+/* 	 * Look up page in lcd's cspace */
+/* 	 *\/ */
+/* 	ret = lcd_get_page(&lcd->cspace, page, &page_cnode, &page_struct); */
+/* 	if (ret) */
+/* 		goto fail1; */
+/* 	/\* */
+/* 	 * If page is not mapped, fail */
+/* 	 *\/ */
+/* 	if (!page_cnode->is_mapped ||  */
+/* 		gpa_val(page_cnode->where_mapped) != gpa_val(gpa)) { */
+/* 		LCD_ERR("page not mapped or mapped elsewhere"); */
+/* 		ret = -EINVAL; */
+/* 		lcd_put_page(page_cnode, page_struct); */
+/* 		goto fail2; */
+/* 	} */
+/* 	/\* */
+/* 	 * Unmap page */
+/* 	 *\/ */
+/* 	gp_unmap(lcd, gpa); */
+/* 	/\* */
+/* 	 * Mark page as not mapped */
+/* 	 *\/ */
+/* 	page_cnode->is_mapped = 0; */
+/* 	/\* */
+/* 	 * Release page cnode, etc. */
+/* 	 *\/ */
+/* 	lcd_put_page(page_cnode, page_struct); */
 
-	return 0;
+/* 	return 0; */
 
-fail2:
-fail1:
-	return ret;
-}
+/* fail2: */
+/* fail1: */
+/* 	return ret; */
+/* } */
 
-static int do_cap_delete(struct lcd *lcd)
-{
-	cptr_t slot;
-	/*
-	 * Get cptr
-	 */
-	slot = __lcd_cr0(lcd->utcb);
-	__lcd_cap_delete(&lcd->cspace, slot);
+/* static int do_cap_delete(struct lcd *lcd) */
+/* { */
+/* 	cptr_t slot; */
+/* 	/\* */
+/* 	 * Get cptr */
+/* 	 *\/ */
+/* 	slot = __lcd_cr0(lcd->utcb); */
+/* 	__lcd_cap_delete(&lcd->cspace, slot); */
 
-	return 0;
-}
+/* 	return 0; */
+/* } */
 
-static int do_create_sync_endpoint(struct lcd *lcd)
-{
-	cptr_t slot;
+/* static int do_create_sync_endpoint(struct lcd *lcd) */
+/* { */
+/* 	cptr_t slot; */
 
-	slot = __lcd_cr0(lcd->utcb);
-	return __lcd_create_sync_endpoint(lcd, slot);
-}
+/* 	slot = __lcd_cr0(lcd->utcb); */
+/* 	return __lcd_create_sync_endpoint(lcd, slot); */
+/* } */
 
-static int lcd_handle_syscall(struct lcd *lcd, int *lcd_ret)
-{
-	int syscall_id;
-	cptr_t endpoint;
-	int ret;
+/* static int lcd_handle_syscall(struct lcd *lcd, int *lcd_ret) */
+/* { */
+/* 	int syscall_id; */
+/* 	cptr_t endpoint; */
+/* 	int ret; */
 	
-	syscall_id = lcd_arch_get_syscall_num(lcd->lcd_arch);
+/* 	syscall_id = lcd_arch_get_syscall_num(lcd->lcd_arch); */
 
-	LCD_DEBUG(LCD_DEBUG_VERB, 
-		"got syscall %d from lcd %p", syscall_id, lcd);
+/* 	LCD_DEBUG(LCD_DEBUG_VERB,  */
+/* 		"got syscall %d from lcd %p", syscall_id, lcd); */
 
-	switch (syscall_id) {
-	case LCD_SYSCALL_EXIT:
-		/*
-		 * Return value to signal exit
-		 */
-		*lcd_ret = (int)__lcd_r0(lcd->utcb);
-		ret = 1;
-		break;
-	case LCD_SYSCALL_PUTCHAR:
-		/*
-		 * Put char and possibly print on host
-		 */
-		ret = __lcd_put_char(lcd);
-		lcd_arch_set_syscall_ret(lcd->lcd_arch, ret);
-		break;
-	case LCD_SYSCALL_SEND:
-		/*
-		 * Get endpoint
-		 */
-		endpoint = __lcd_cr0(lcd->utcb);
-		/*
-		 * Null out that register so that it's not transferred
-		 * during ipc
-		 */
-		__lcd_set_cr0(lcd->utcb, LCD_CPTR_NULL);
-		/*
-		 * Do send, and set ret val
-		 */
-		ret = __lcd_send(lcd, endpoint);
-		lcd_arch_set_syscall_ret(lcd->lcd_arch, ret);
-		break;
-	case LCD_SYSCALL_RECV:
-		/*
-		 * Get endpoint
-		 */
-		endpoint = __lcd_cr0(lcd->utcb);
-		/*
-		 * Null out that register so that it's not transferred
-		 * during ipc
-		 */
-		__lcd_set_cr0(lcd->utcb, LCD_CPTR_NULL);
-		/*
-		 * Do recv
-		 */
-		ret = __lcd_recv(lcd, endpoint);
-		lcd_arch_set_syscall_ret(lcd->lcd_arch, ret);
-		break;
-	case LCD_SYSCALL_CALL:
-		/*
-		 * Get endpoint
-		 */
-		endpoint = __lcd_cr0(lcd->utcb);
-		/*
-		 * Null out that register so that it's not transferred
-		 * during ipc
-		 */
-		__lcd_set_cr0(lcd->utcb, LCD_CPTR_NULL);
-		/*
-		 * Do call
-		 */
-		ret = __lcd_call(lcd, endpoint);
-		lcd_arch_set_syscall_ret(lcd->lcd_arch, ret);
-		break;
-	case LCD_SYSCALL_REPLY:
-		/*
-		 * No endpoint arg; just do reply
-		 */
-		ret = __lcd_reply(lcd);
-		lcd_arch_set_syscall_ret(lcd->lcd_arch, ret);
-		break;
-	case LCD_SYSCALL_PAGE_ALLOC:
-		/*
-		 * Do page alloc
-		 */
-		ret = do_page_alloc(lcd);
-		lcd_arch_set_syscall_ret(lcd->lcd_arch, ret);
-		break;
-	case LCD_SYSCALL_PAGE_MAP:
-		/*
-		 * Do page map
-		 */
-		ret = do_page_map(lcd);
-		lcd_arch_set_syscall_ret(lcd->lcd_arch, ret);
-		break;
-	case LCD_SYSCALL_PAGE_UNMAP:
-		/*
-		 * Do page unmap
-		 */
-		ret = do_page_unmap(lcd);
-		lcd_arch_set_syscall_ret(lcd->lcd_arch, ret);
-		break;
-	case LCD_SYSCALL_CAP_DELETE:
-		/*
-		 * Do cap delete
-		 */
-		ret = do_cap_delete(lcd);
-		lcd_arch_set_syscall_ret(lcd->lcd_arch, ret);
-		break;
-	case LCD_SYSCALL_SYNC_EP:
-		/*
-		 * Create synchronous endpoint
-		 */
-		ret = do_create_sync_endpoint(lcd);
-		lcd_arch_set_syscall_ret(lcd->lcd_arch, ret);
-		break;
-	default:
-		LCD_ERR("unimplemented syscall %d", syscall_id);
-		ret = -ENOSYS;
-	}
-	return ret;
-}
+/* 	switch (syscall_id) { */
+/* 	case LCD_SYSCALL_EXIT: */
+/* 		/\* */
+/* 		 * Return value to signal exit */
+/* 		 *\/ */
+/* 		*lcd_ret = (int)__lcd_r0(lcd->utcb); */
+/* 		ret = 1; */
+/* 		break; */
+/* 	case LCD_SYSCALL_PUTCHAR: */
+/* 		/\* */
+/* 		 * Put char and possibly print on host */
+/* 		 *\/ */
+/* 		ret = __lcd_put_char(lcd); */
+/* 		lcd_arch_set_syscall_ret(lcd->lcd_arch, ret); */
+/* 		break; */
+/* 	case LCD_SYSCALL_SEND: */
+/* 		/\* */
+/* 		 * Get endpoint */
+/* 		 *\/ */
+/* 		endpoint = __lcd_cr0(lcd->utcb); */
+/* 		/\* */
+/* 		 * Null out that register so that it's not transferred */
+/* 		 * during ipc */
+/* 		 *\/ */
+/* 		__lcd_set_cr0(lcd->utcb, LCD_CPTR_NULL); */
+/* 		/\* */
+/* 		 * Do send, and set ret val */
+/* 		 *\/ */
+/* 		ret = __lcd_send(lcd, endpoint); */
+/* 		lcd_arch_set_syscall_ret(lcd->lcd_arch, ret); */
+/* 		break; */
+/* 	case LCD_SYSCALL_RECV: */
+/* 		/\* */
+/* 		 * Get endpoint */
+/* 		 *\/ */
+/* 		endpoint = __lcd_cr0(lcd->utcb); */
+/* 		/\* */
+/* 		 * Null out that register so that it's not transferred */
+/* 		 * during ipc */
+/* 		 *\/ */
+/* 		__lcd_set_cr0(lcd->utcb, LCD_CPTR_NULL); */
+/* 		/\* */
+/* 		 * Do recv */
+/* 		 *\/ */
+/* 		ret = __lcd_recv(lcd, endpoint); */
+/* 		lcd_arch_set_syscall_ret(lcd->lcd_arch, ret); */
+/* 		break; */
+/* 	case LCD_SYSCALL_CALL: */
+/* 		/\* */
+/* 		 * Get endpoint */
+/* 		 *\/ */
+/* 		endpoint = __lcd_cr0(lcd->utcb); */
+/* 		/\* */
+/* 		 * Null out that register so that it's not transferred */
+/* 		 * during ipc */
+/* 		 *\/ */
+/* 		__lcd_set_cr0(lcd->utcb, LCD_CPTR_NULL); */
+/* 		/\* */
+/* 		 * Do call */
+/* 		 *\/ */
+/* 		ret = __lcd_call(lcd, endpoint); */
+/* 		lcd_arch_set_syscall_ret(lcd->lcd_arch, ret); */
+/* 		break; */
+/* 	case LCD_SYSCALL_REPLY: */
+/* 		/\* */
+/* 		 * No endpoint arg; just do reply */
+/* 		 *\/ */
+/* 		ret = __lcd_reply(lcd); */
+/* 		lcd_arch_set_syscall_ret(lcd->lcd_arch, ret); */
+/* 		break; */
+/* 	case LCD_SYSCALL_PAGE_ALLOC: */
+/* 		/\* */
+/* 		 * Do page alloc */
+/* 		 *\/ */
+/* 		ret = do_page_alloc(lcd); */
+/* 		lcd_arch_set_syscall_ret(lcd->lcd_arch, ret); */
+/* 		break; */
+/* 	case LCD_SYSCALL_PAGE_MAP: */
+/* 		/\* */
+/* 		 * Do page map */
+/* 		 *\/ */
+/* 		ret = do_page_map(lcd); */
+/* 		lcd_arch_set_syscall_ret(lcd->lcd_arch, ret); */
+/* 		break; */
+/* 	case LCD_SYSCALL_PAGE_UNMAP: */
+/* 		/\* */
+/* 		 * Do page unmap */
+/* 		 *\/ */
+/* 		ret = do_page_unmap(lcd); */
+/* 		lcd_arch_set_syscall_ret(lcd->lcd_arch, ret); */
+/* 		break; */
+/* 	case LCD_SYSCALL_CAP_DELETE: */
+/* 		/\* */
+/* 		 * Do cap delete */
+/* 		 *\/ */
+/* 		ret = do_cap_delete(lcd); */
+/* 		lcd_arch_set_syscall_ret(lcd->lcd_arch, ret); */
+/* 		break; */
+/* 	case LCD_SYSCALL_SYNC_EP: */
+/* 		/\* */
+/* 		 * Create synchronous endpoint */
+/* 		 *\/ */
+/* 		ret = do_create_sync_endpoint(lcd); */
+/* 		lcd_arch_set_syscall_ret(lcd->lcd_arch, ret); */
+/* 		break; */
+/* 	default: */
+/* 		LCD_ERR("unimplemented syscall %d", syscall_id); */
+/* 		ret = -ENOSYS; */
+/* 	} */
+/* 	return ret; */
+/* } */
 
-static int lcd_kthread_run_once(struct lcd *lcd, int *lcd_ret)
-{
-	int ret;
+/* static int lcd_kthread_run_once(struct lcd *lcd, int *lcd_ret) */
+/* { */
+/* 	int ret; */
 
-	ret = lcd_arch_run(lcd->lcd_arch);
-	if (ret < 0) {
-		LCD_ERR("running lcd %p", lcd);
-		goto out;
-	}
+/* 	ret = lcd_arch_run(lcd->lcd_arch); */
+/* 	if (ret < 0) { */
+/* 		LCD_ERR("running lcd %p", lcd); */
+/* 		goto out; */
+/* 	} */
 
-	switch(ret) {
-	case LCD_ARCH_STATUS_PAGE_FAULT:
-		LCD_ERR("page fault for lcd %p", lcd);
-		ret = -ENOSYS;
-		goto out;
-		break;
-	case LCD_ARCH_STATUS_EXT_INTR:
-		/*
-		 * Continue
-		 */
-		ret = 0;
-		goto out;
-	case LCD_ARCH_STATUS_EPT_FAULT:
-		LCD_ERR("ept fault");
-		ret = -ENOSYS;
-		goto out;
-	case LCD_ARCH_STATUS_CR3_ACCESS:
-		/*
-		 * Continue
-		 */
-		ret = 0;
-		goto out;
-	case LCD_ARCH_STATUS_SYSCALL:
-		ret = lcd_handle_syscall(lcd, lcd_ret);
-		goto out;
-	}
+/* 	switch(ret) { */
+/* 	case LCD_ARCH_STATUS_PAGE_FAULT: */
+/* 		LCD_ERR("page fault for lcd %p", lcd); */
+/* 		ret = -ENOSYS; */
+/* 		goto out; */
+/* 		break; */
+/* 	case LCD_ARCH_STATUS_EXT_INTR: */
+/* 		/\* */
+/* 		 * Continue */
+/* 		 *\/ */
+/* 		ret = 0; */
+/* 		goto out; */
+/* 	case LCD_ARCH_STATUS_EPT_FAULT: */
+/* 		LCD_ERR("ept fault"); */
+/* 		ret = -ENOSYS; */
+/* 		goto out; */
+/* 	case LCD_ARCH_STATUS_CR3_ACCESS: */
+/* 		/\* */
+/* 		 * Continue */
+/* 		 *\/ */
+/* 		ret = 0; */
+/* 		goto out; */
+/* 	case LCD_ARCH_STATUS_SYSCALL: */
+/* 		ret = lcd_handle_syscall(lcd, lcd_ret); */
+/* 		goto out; */
+/* 	} */
 	
-	/*
-	 * Sleep if we don't have full preemption turned on, and someone
-	 * else should have a turn.
-	 */
-#ifndef CONFIG_PREEMPT
-	cond_resched();
-#endif	
+/* 	/\* */
+/* 	 * Sleep if we don't have full preemption turned on, and someone */
+/* 	 * else should have a turn. */
+/* 	 *\/ */
+/* #ifndef CONFIG_PREEMPT */
+/* 	cond_resched(); */
+/* #endif	 */
 
-out:
-	return ret;
-}
+/* out: */
+/* 	return ret; */
+/* } */
 
-static int lcd_should_stop(struct lcd *lcd)
-{
-	int ret;
+/* static int lcd_should_stop(struct lcd *lcd) */
+/* { */
+/* 	int ret; */
 
-	/*
-	 * Check our status
-	 */
-	switch(get_lcd_status(lcd)) {
+/* 	/\* */
+/* 	 * Check our status */
+/* 	 *\/ */
+/* 	switch(get_lcd_status(lcd)) { */
 
-	case LCD_STATUS_DEAD:
-		/*
-		 * We're dead; return 1 to signal to caller.
-		 * (kthread_should_stop would also become true at some
-		 * later point)
-		 */
-		ret = 1;
-		goto out;
-	case LCD_STATUS_RUNNING:
-		/*
-		 * The lcd should start or continue running; return 0
-		 * to signal that
-		 */
-		ret = 0;
-		goto out;
-	default:
-		BUG(); /* shouldn't be in any other state */
-		ret = 1;
-		goto out;
-	}
-out:
-	return ret;
-}
+/* 	case LCD_STATUS_DEAD: */
+/* 		/\* */
+/* 		 * We're dead; return 1 to signal to caller. */
+/* 		 * (kthread_should_stop would also become true at some */
+/* 		 * later point) */
+/* 		 *\/ */
+/* 		ret = 1; */
+/* 		goto out; */
+/* 	case LCD_STATUS_RUNNING: */
+/* 		/\* */
+/* 		 * The lcd should start or continue running; return 0 */
+/* 		 * to signal that */
+/* 		 *\/ */
+/* 		ret = 0; */
+/* 		goto out; */
+/* 	default: */
+/* 		BUG(); /\* shouldn't be in any other state *\/ */
+/* 		ret = 1; */
+/* 		goto out; */
+/* 	} */
+/* out: */
+/* 	return ret; */
+/* } */
 
-static int lcd_main_for_lcd(struct lcd *lcd)
-{
-	int ret;
-	int lcd_ret = 0;
-	/*
-	 * Enter run loop, check after each iteration if we should stop
-	 *
-	 * XXX: We're not giving the thread a chance to gracefully exit
-	 * for now (e.g., we could use a special upcall message to signal that 
-	 * it should terminate). But maybe not ... it's up to the owners
-	 * of the LCD to notify it when it should tear down?
-	 */
-	for (;;) {
-		ret = lcd_kthread_run_once(lcd, &lcd_ret);
-		if (ret < 0 || lcd_should_stop(lcd)) {
-			/* ret < 0 means fatal error */
-			/* lcd_should_stop means our parent told us to die */
-			return ret;
-		} else if (ret == 1) {
-			/* lcd exited */
-			return lcd_ret;
-		} else {
-			/* ret = 0; continue */
-			continue;
-		}
-	}
+/* static int lcd_main_for_lcd(struct lcd *lcd) */
+/* { */
+/* 	int ret; */
+/* 	int lcd_ret = 0; */
+/* 	/\* */
+/* 	 * Enter run loop, check after each iteration if we should stop */
+/* 	 * */
+/* 	 * XXX: We're not giving the thread a chance to gracefully exit */
+/* 	 * for now (e.g., we could use a special upcall message to signal that  */
+/* 	 * it should terminate). But maybe not ... it's up to the owners */
+/* 	 * of the LCD to notify it when it should tear down? */
+/* 	 *\/ */
+/* 	for (;;) { */
+/* 		ret = lcd_kthread_run_once(lcd, &lcd_ret); */
+/* 		if (ret < 0 || lcd_should_stop(lcd)) { */
+/* 			/\* ret < 0 means fatal error *\/ */
+/* 			/\* lcd_should_stop means our parent told us to die *\/ */
+/* 			return ret; */
+/* 		} else if (ret == 1) { */
+/* 			/\* lcd exited *\/ */
+/* 			return lcd_ret; */
+/* 		} else { */
+/* 			/\* ret = 0; continue *\/ */
+/* 			continue; */
+/* 		} */
+/* 	} */
 	
-	/* unreachable */
-}
+/* 	/\* unreachable *\/ */
+/* } */
 
-static int lcd_main_for_klcd(struct lcd *lcd)
-{
-	return lcd->klcd_main();
-}
+/* static int lcd_main_for_klcd(struct lcd *lcd) */
+/* { */
+/* 	return lcd->klcd_main(); */
+/* } */
 
-static int lcd_kthread_main(void *data) /* data is NULL */
-{
-	struct lcd *current_lcd;
+/* static int lcd_kthread_main(void *data) /\* data is NULL *\/ */
+/* { */
+/* 	struct lcd *current_lcd; */
 
-	current_lcd = current->lcd;
+/* 	current_lcd = current->lcd; */
 
-	/*
-	 * TODO: If the LCD exits, and it is the only one that has a
-	 * reference to itself, we should tear it down.
-	 */
-	switch (current_lcd->type) {
+/* 	/\* */
+/* 	 * TODO: If the LCD exits, and it is the only one that has a */
+/* 	 * reference to itself, we should tear it down. */
+/* 	 *\/ */
+/* 	switch (current_lcd->type) { */
 
-	case LCD_TYPE_ISOLATED:
-		return lcd_main_for_lcd(current_lcd);
-	case LCD_TYPE_NONISOLATED:
-		return lcd_main_for_klcd(current_lcd);
-	default:
-		LCD_ERR("unexpected lcd type = %d",
-			current_lcd->type);
-		return -EINVAL;
-	}
-}
-
+/* 	case LCD_TYPE_ISOLATED: */
+/* 		return lcd_main_for_lcd(current_lcd); */
+/* 	case LCD_TYPE_NONISOLATED: */
+/* 		return lcd_main_for_klcd(current_lcd); */
+/* 	default: */
+/* 		LCD_ERR("unexpected lcd type = %d", */
+/* 			current_lcd->type); */
+/* 		return -EINVAL; */
+/* 	} */
+/* } */
 
 /* IOCTL -------------------------------------------------- */
-
 
 /**
  * Does insmod syscall on behalf of user code call to ioctl.

@@ -18,13 +18,13 @@ static void do_insert_pages(struct lcd *caller, struct page *p,
 	/*
 	 * Set up metadata
 	 */
-	mo = kmalloc(sizeof(*mo));
+	mo = kmalloc(sizeof(*mo), GFP_KERNEL);
 	if (!mo) {
 		LCD_ERR("kmalloc error");
 		ret = -ENOMEM;
 		goto fail1;
 	}
-	meta = kzalloc(sizeof(*meta)); /* set is_mapped = 0 */
+	meta = kzalloc(sizeof(*meta), GFP_KERNEL); /* set is_mapped = 0 */
 	if (!meta) {
 		LCD_ERR("kmalloc error");
 		ret = -ENOMEM;
@@ -368,4 +368,56 @@ fail2:
 	__lcd_put_memory_object(caller, cnode, mo);
 fail1:
 	return;
+}
+
+/* GRANT -------------------------------------------------- */
+
+int __lcd_grant_memory_object(struct lcd *src, struct lcd *dest,
+			cptr_t c_src, cptr_t c_dest)
+{
+	int ret;
+	struct lcd_mapping_metadata *meta;
+	struct cnode *cnode;
+	/*
+	 * Do grant
+	 */
+	ret = cap_grant(src->cspace, c_src,
+			dest->cspace, c_dest);
+	if (ret) {
+		LCD_DEBUG(LCD_DEBUG_ERR,
+			"grant failed");
+		goto fail1;
+	}
+	/*
+	 * Init metadata
+	 */
+	meta = kzalloc(sizeof(*meta), GFP_KERNEL); /* sets is_mapped = 0 */
+	if (!meta) {
+		LCD_ERR("malloc failed");
+		goto fail2;
+	}
+	/*
+	 * Look up cnode in dest so we can store metadata
+	 */
+	ret = cap_cnode_get(dest->cspace, c_dest, &cnode);
+	if (ret) {
+		LCD_DEBUG(LCD_DEBUG_ERR, "cnode get failed");
+		goto fail3;
+	}
+	cap_cnode_set_metadata(cnode, meta);
+	cap_cnode_put(cnode);
+	/*
+	 * ==================================================
+	 * After this point, meta is owned by libcap and will be
+	 * freed when the capability is revoked (via the revoke callback).
+	 */
+
+	return 0;
+
+fail3:
+	kfree(meta);
+fail2:
+	cap_delete(dest->cspace, c_dest);
+fail1:
+	return ret;
 }

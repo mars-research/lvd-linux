@@ -384,6 +384,102 @@ fail1:
 	return ret;
 }
 
+/* CSPACE AND ADDRESS SPACE CONFIG ------------------------------ */
+
+int __lcd_memory_grant_and_map(struct lcd *caller, cptr_t lcd, 
+			cptr_t mo_cptr, cptr_t dest_slot, gpa_t base)
+{
+	struct lcd *lcd_struct;
+	struct lcd_memory_object *mo;
+	struct cnode *lcd_cnode;
+	struct cnode *mo_cnode;
+	int ret;
+	/*
+	 * Look up and lock lcd
+	 */
+	ret = __lcd_get(caller, lcd, &lcd_cnode, &lcd_struct);
+	if (ret)
+		goto fail1;
+	/*
+	 * If lcd is not an embryo, fail - we only allow direct grants when
+	 * the lcd is being set up
+	 */
+	if (!lcd_status_embryo(lcd_struct)) {
+		LCD_ERR("lcd is not an embryo");
+		ret = -EINVAL;
+		goto fail2;
+	}
+	/*
+	 * Grant lcd a capability to memory object
+	 */
+	ret = __lcd_grant_memory_object(caller, lcd, mo_cptr, dest_slot);
+	if (ret)
+		goto fail2;
+	/*
+	 * Map in lcd's address space
+	 *
+	 * (There are a couple redundant cspace lookups here. Rather
+	 * than optimize prematurely and mash some of these operations
+	 * together, I'll keep things more sane and understandable,
+	 * separated.)
+	 */
+	ret = __lcd_map_memory_object(lcd, dest_slot, base);
+	if (ret)
+		goto fail3;
+	/*
+	 * Put lcd
+	 */
+	__lcd_put(caller, lcd_cnode, lcd_struct);
+
+	return 0;
+
+fail3:
+	cap_delete(lcd->cspace, dest_cptr);
+fail2:
+	__lcd_put(lcd_cnode, lcd_struct);
+fail1:
+	return ret;
+}
+
+int __lcd_cap_grant(struct lcd *caller, cptr_t lcd, cptr_t src, cptr_t dest)
+{
+	struct lcd *lcd_struct;
+	struct cnode *lcd_cnode;
+	int ret;
+	/*
+	 * Look up and lock lcd
+	 */
+	ret = __lcd_get(caller, lcd, &lcd_cnode, &lcd_struct);
+	if (ret)
+		goto fail1;
+	/*
+	 * If lcd is not an embryo, fail - we only allow direct grants when
+	 * the lcd is being set up
+	 */
+	if (!lcd_status_embryo(lcd_struct)) {
+		LCD_ERR("lcd is not an embryo");
+		ret = -EINVAL;
+		goto fail2;
+	}
+	/*
+	 * Grant lcd the capability
+	 */
+	ret = cap_grant(caller->cspace, src, lcd->cspace, dest);
+	if (ret)
+		goto fail2;
+	/*
+	 * Put lcd
+	 */
+	__lcd_put(caller, lcd_cnode, lcd_struct);
+
+	return 0;
+
+fail2:
+	__lcd_put(lcd_cnode, lcd_struct);
+fail1:
+	return ret;
+}
+
 /* DESTROY -------------------------------------------------- */
 
 static void mark_lcd_as_dead(struct lcd *lcd)

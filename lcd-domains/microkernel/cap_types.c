@@ -37,6 +37,11 @@ static void page_revoke(struct cspace *cspace, struct cnode *cnode,
 		goto out;
 	/*
 	 * Unmap it
+	 *
+	 * XXX: This assumes the cspace is for an isolated LCD. For now,
+	 * this is true, because the liblcd interface doesn't allow kLCDs
+	 * to map memory. (They don't need to for RAM because it's already
+	 * mapped in their address space. But they would for dev mem.)
 	 */
 	__lcd_unmap_pages(cap_cspace_getowner(cspace), m->where_mapped,
 			1 << mo->order);

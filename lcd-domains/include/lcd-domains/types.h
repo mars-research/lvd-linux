@@ -104,4 +104,29 @@ static inline hpa_t hpa_add(hpa_t hpa, unsigned long off)
 	return __hpa(hpa_val(hpa) + off);
 }
 
+/* MACRO HELPERS -------------------------------------------------- */
+
+/* This may not be the ideal place for this stuff. */
+
+/* Motivated by original module name max */
+#define LCD_MODULE_NAME_MAX (64 - sizeof(unsigned long))
+
+/* 
+ * Max absolute path size to lcd kernel module .ko, i.e., a full
+ * path like:
+ *
+ *    /foo/bar/baz/the_module.ko
+ *
+ * Note that the name part (the_module) must be less or equal to
+ * LCD_MODULE_NAME_MAX.
+ */
+#define LCD_MPATH_SIZE 256
+
+#define LCD_TEST_MODS_PATH \
+	"/local/disk2/xcap-git/lcd-domains/test-mods"
+
+#define LCD_DIR(subpath) \
+	LCD_TEST_MODS_PATH "/" subpath
+
+
 #endif /* LCD_DOMAINS_TYPES_H */

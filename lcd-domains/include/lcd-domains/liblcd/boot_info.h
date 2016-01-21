@@ -41,4 +41,14 @@ struct lcd_boot_info {
 	cptr_t cptrs[LCD_NUM_BOOT_CPTRS];
 };
 
+/**
+ * lcd_get_boot_info -- Return the bootstrap info
+ *
+ * When executing inside an LCD, invoke this function, and it will
+ * return a pointer to the LCD's bootstrap data.
+ *
+ * For non-isolated code, this function returns NULL.
+ */
+struct lcd_boot_info * lcd_get_boot_info(void);
+
 #endif /* LCD_DOMAINS_BOOTINFO_H */

@@ -66,6 +66,43 @@ static inline void __lcd_debug(char *file, int lineno, char *fmt, ...)
 }
 
 /* --------------------------------------------------
+ * INTERNAL ADDRESS CONVERSIONS
+ * --------------------------------------------------
+ *
+ * This used to be in the types.h header, but it only
+ * makes sense for internal microkernel calculations.
+ */
+
+static inline hpa_t pa2hpa(unsigned long pa)
+{
+	return (hpa_t){ pa };
+}
+static inline hpa_t va2hpa(void *va)
+{
+	return (hpa_t){ __pa(va) };
+}
+static inline void * hpa2va(hpa_t hpa)
+{
+	return __va(hpa_val(hpa));
+}
+static inline hva_t hpa2hva(hpa_t hpa)
+{
+	return (hva_t){ (unsigned long)__va(hpa.hpa) };
+}
+static inline void * hva2va(hva_t hva)
+{
+	return (void *)hva_val(hva);
+}
+static inline hva_t va2hva(void *va)
+{
+	return __hva((unsigned long)va);
+}
+static inline hpa_t hva2hpa(hva_t hva)
+{
+	return (hpa_t){ (unsigned long)__pa(hva2va(hva)) };
+}
+
+/* --------------------------------------------------
  * LCD MICROKERNEL CAPABILITY TYPES
  * --------------------------------------------------
  *

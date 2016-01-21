@@ -9,61 +9,166 @@
 #include <linux/kthread.h>
 #include "internal.h"
 
-static int __lcd_put_char(struct lcd *lcd)
+/* SYSCALL HANDLERS -------------------------------------------------- */
+
+static int handle_syscall_create_sync_ep(struct lcd *lcd)
+{
+	cptr_t slot;
+	/*
+	 * Get slot where to store new sync endpoint
+	 */
+	slot = __cptr(lcd_arch_get_syscall_arg0(lcd->lcd_arch));
+	/*
+	 * Create sync ipc endpoint
+	 */
+	return __lcd_create_sync_endpoint(lcd, slot);
+}
+
+static int handle_syscall_cap_delete(struct lcd *lcd)
+{
+	cptr_t object;
+	/*
+	 * Get object cptr
+	 */
+	object = __cptr(lcd_arch_get_syscall_arg0(lcd->lcd_arch));
+	/*
+	 * Delete from lcd's cspace
+	 */
+	return cap_delete(lcd->cspace, object);
+}
+
+static int handle_syscall_pages_map(struct lcd *lcd)
+{
+	cptr_t mem_object;
+	/*
+	 * Get memory object cptr
+	 */
+	mem_object = __cptr(lcd_arch_get_syscall_arg0(lcd->lcd_arch));
+	/*
+	 * Do unmap
+	 */
+	return __lcd_unmap_memory_object(caller, mem_object);
+}
+
+static int handle_syscall_pages_map(struct lcd *lcd)
+{
+	cptr_t mem_object;
+	gpa_t base;
+	/*
+	 * Get memory object cptr and the base gpa where the memory
+	 * object should be mapped.
+	 */
+	mem_object = __cptr(lcd_arch_get_syscall_arg0(lcd->lcd_arch));
+	base = __gpa(lcd_arch_get_syscall_arg1(lcd->lcd_arch));
+	/*
+	 * Do map
+	 */
+	return __lcd_map_memory_object(caller, mem_object, base);
+}
+
+static int handle_syscall_pages_alloc(struct lcd *lcd)
+{
+	cptr_t slot;
+	unsigned int flags;
+	unsigned int order;
+	/*
+	 * Get slot where to store alloc'd pages, flags,
+	 * and order
+	 */
+	slot = __cptr(lcd_arch_get_syscall_arg0(lcd->lcd_arch));
+	flags = (unsigned int)lcd_arch_get_syscall_arg1(lcd->lcd_arch);
+	order = (unsigned int)lcd_arch_get_syscall_arg2(lcd->lcd_arch);
+	/*
+	 * Do page alloc
+	 */
+	return __lcd_alloc_pages(lcd, slot, flags, order);
+}
+
+static int handle_syscall_pages_alloc_exact_node(struct lcd *lcd)
+{
+	cptr_t slot;
+	int nid;
+	unsigned int flags;
+	unsigned int order;
+	/*
+	 * Get slot where to store alloc'd pages, node id, flags,
+	 * and order
+	 */
+	slot = __cptr(lcd_arch_get_syscall_arg0(lcd->lcd_arch));
+	nid = (int)lcd_arch_get_syscall_arg1(lcd->lcd_arch);
+	flags = (unsigned int)lcd_arch_get_syscall_arg2(lcd->lcd_arch);
+	order = (unsigned int)lcd_arch_get_syscall_arg3(lcd->lcd_arch);
+	/*
+	 * Do page alloc
+	 */
+	return __lcd_alloc_pages_exact_node(lcd, slot, nid, flags, order);
+}
+
+static int handle_syscall_reply(struct lcd *lcd)
+{
+	/*
+	 * No endpoint arg; just do reply
+	 */
+	return __lcd_reply(lcd);
+}
+
+static int handle_syscall_call(struct lcd *lcd)
+{
+	cptr_t endpoint;
+	/*
+	 * Get endpoint
+	 */
+	endpoint = __cptr(lcd_arch_get_syscall_arg0(lcd->lcd_arch));
+	/*
+	 * Do synchronous ipc call
+	 */
+	return __lcd_call(lcd, endpoint);
+}
+
+static int handle_syscall_recv(struct lcd *lcd)
+{
+	cptr_t endpoint;
+	/*
+	 * Get endpoint
+	 */
+	endpoint = __cptr(lcd_arch_get_syscall_arg0(lcd->lcd_arch));
+	/*
+	 * Do synchronous ipc recv
+	 */
+	return __lcd_recv(lcd, endpoint);
+}
+
+static int handle_syscall_send(struct lcd *lcd)
+{
+	cptr_t endpoint;
+	/*
+	 * Get endpoint
+	 */
+	endpoint = __cptr(lcd_arch_get_syscall_arg0(lcd->lcd_arch));
+	/*
+	 * Do synchronous ipc send
+	 */
+	return __lcd_send(lcd, endpoint);
+}
+
+static int handle_syscall_putchar(struct lcd *lcd)
 {
 	char c;
 	/*
-	 * Char is in r0
+	 * Put char and possibly print on host
 	 */
-	c = __lcd_debug_reg(lcd->utcb);
-	/*
-	 * Put char in lcd's console buff
-	 */
-	lcd->console_buff[lcd->console_cursor] = c;
-	/*
-	 * Bump cursor and check
-	 */
-	lcd->console_cursor++;
-	if (c == 0) {
-		/*
-		 * End of string; printk to host and reset buff
-		 */
-		printk(KERN_INFO "message from lcd %p: %s\n",
-			lcd, lcd->console_buff);
-		lcd->console_cursor = 0;
-		return 0;
-	}
-	if (lcd->console_cursor >= LCD_CONSOLE_BUFF_SIZE - 1) {
-		/*
-		 * Filled buffer; empty it.
-		 */
-		lcd->console_buff[LCD_CONSOLE_BUFF_SIZE - 1] = 0;
-		printk(KERN_INFO "(incomplete) message from lcd %p: %s\n",
-			lcd, lcd->console_buff);
-		lcd->console_cursor = 0;
-		return 0;
-	}
-	return 0;
+	c = (char)lcd_arch_get_syscall_arg0(lcd->lcd_arch);
+	return __lcd_put_char(lcd, c);
 }
 
-static int do_cap_delete(struct lcd *lcd)
+static int handle_syscall_exit(struct lcd *lcd, int *lcd_ret)
 {
-	cptr_t slot;
+	unsigned long arg0;
 	/*
-	 * Get cptr
+	 * LCD's exit value in arg0
 	 */
-	slot = __lcd_cr0(lcd->utcb);
-	__lcd_cap_delete(&lcd->cspace, slot);
-
-	return 0;
-}
-
-static int do_create_sync_endpoint(struct lcd *lcd)
-{
-	cptr_t slot;
-
-	slot = __lcd_cr0(lcd->utcb);
-	return __lcd_create_sync_endpoint(lcd, slot);
+	*lcd_ret = (int)lcd_arch_get_syscall_arg0(lcd->lcd_arch);
+	return 1; /* signal LCD has exited */
 }
 
 static int handle_syscall(struct lcd *lcd, int *lcd_ret)
@@ -79,110 +184,40 @@ static int handle_syscall(struct lcd *lcd, int *lcd_ret)
 
 	switch (syscall_id) {
 	case LCD_SYSCALL_EXIT:
-		/*
-		 * Return value to signal exit
-		 */
-		*lcd_ret = (int)__lcd_r0(lcd->utcb);
-		ret = 1;
+		ret = handle_syscall_exit(lcd, lcd_ret);
 		break;
 	case LCD_SYSCALL_PUTCHAR:
-		/*
-		 * Put char and possibly print on host
-		 */
-		ret = __lcd_put_char(lcd);
-		lcd_arch_set_syscall_ret(lcd->lcd_arch, ret);
+		ret = handle_syscall_putchar(lcd);
 		break;
 	case LCD_SYSCALL_SEND:
-		/*
-		 * Get endpoint
-		 */
-		endpoint = __lcd_cr0(lcd->utcb);
-		/*
-		 * Null out that register so that it's not transferred
-		 * during ipc
-		 */
-		__lcd_set_cr0(lcd->utcb, LCD_CPTR_NULL);
-		/*
-		 * Do send, and set ret val
-		 */
-		ret = __lcd_send(lcd, endpoint);
-		lcd_arch_set_syscall_ret(lcd->lcd_arch, ret);
+		ret = handle_syscall_send(lcd);
 		break;
 	case LCD_SYSCALL_RECV:
-		/*
-		 * Get endpoint
-		 */
-		endpoint = __lcd_cr0(lcd->utcb);
-		/*
-		 * Null out that register so that it's not transferred
-		 * during ipc
-		 */
-		__lcd_set_cr0(lcd->utcb, LCD_CPTR_NULL);
-		/*
-		 * Do recv
-		 */
-		ret = __lcd_recv(lcd, endpoint);
-		lcd_arch_set_syscall_ret(lcd->lcd_arch, ret);
+		ret = handle_syscall_recv(lcd);
 		break;
 	case LCD_SYSCALL_CALL:
-		/*
-		 * Get endpoint
-		 */
-		endpoint = __lcd_cr0(lcd->utcb);
-		/*
-		 * Null out that register so that it's not transferred
-		 * during ipc
-		 */
-		__lcd_set_cr0(lcd->utcb, LCD_CPTR_NULL);
-		/*
-		 * Do call
-		 */
-		ret = __lcd_call(lcd, endpoint);
-		lcd_arch_set_syscall_ret(lcd->lcd_arch, ret);
+		ret = handle_syscall_call(lcd);
 		break;
 	case LCD_SYSCALL_REPLY:
-		/*
-		 * No endpoint arg; just do reply
-		 */
-		ret = __lcd_reply(lcd);
-		lcd_arch_set_syscall_ret(lcd->lcd_arch, ret);
+		ret = handle_syscall_reply(lcd);
 		break;
-	case LCD_SYSCALL_PAGE_ALLOC:
-		/*
-		 * Do page alloc
-		 */
-		ret = __lcd_alloc_pages(lcd, __lcd_cr0(lcd->utcb),
-					GFP_KERNEL, 0);
-		__lcd_set_cr0(lcd->utcb, LCD_CPTR_NULL);
-		lcd_arch_set_syscall_ret(lcd->lcd_arch, ret);
+	case LCD_SYSCALL_PAGES_ALLOC_EXACT_NODE:
+		ret = handle_syscall_pages_alloc_exact_node(lcd);
 		break;
-	case LCD_SYSCALL_PAGE_MAP:
-		/*
-		 * Do page map
-		 */
-		ret = do_page_map(lcd);
-		lcd_arch_set_syscall_ret(lcd->lcd_arch, ret);
+	case LCD_SYSCALL_PAGES_ALLOC:
+		ret = handle_syscall_pages_alloc(lcd);
+		break;
+	case LCD_SYSCALL_PAGES_MAP:
+		ret = handle_syscall_pages_map(lcd);
 		break;
 	case LCD_SYSCALL_PAGE_UNMAP:
-		/*
-		 * Do page unmap
-		 */
-		ret = do_page_unmap(lcd);
-		lcd_arch_set_syscall_ret(lcd->lcd_arch, ret);
+		ret = handle_syscall_pages_unmap(lcd);
 		break;
 	case LCD_SYSCALL_CAP_DELETE:
-		/*
-		 * Do cap delete
-		 */
-		ret = do_cap_delete(lcd);
-		lcd_arch_set_syscall_ret(lcd->lcd_arch, ret);
+		ret = handle_syscall_cap_delete(lcd);
 		break;
-	case LCD_SYSCALL_SYNC_EP:
-		/*
-		 * Create synchronous endpoint
-		 */
-		ret = do_create_sync_endpoint(lcd);
-		lcd_arch_set_syscall_ret(lcd->lcd_arch, ret);
+	case LCD_SYSCALL_CREATE_SYNC_EP:
+		ret = handle_syscall_create_sync_ep(lcd);
 		break;
 	default:
 		LCD_ERR("unimplemented syscall %d", syscall_id);
@@ -190,6 +225,8 @@ static int handle_syscall(struct lcd *lcd, int *lcd_ret)
 	}
 	return ret;
 }
+
+/* RUN LOOP -------------------------------------------------- */
 
 static int run_once(struct lcd *lcd, int *lcd_ret)
 {
@@ -224,7 +261,7 @@ static int run_once(struct lcd *lcd, int *lcd_ret)
 		ret = 0;
 		goto out;
 	case LCD_ARCH_STATUS_SYSCALL:
-		ret = lcd_handle_syscall(lcd, lcd_ret);
+		ret = handle_syscall(lcd, lcd_ret);
 		goto out;
 	}
 	
@@ -307,6 +344,10 @@ static int main_for_klcd(struct lcd *lcd)
 {
 	return lcd->klcd_main();
 }
+
+/* KTHREAD MAIN -------------------------------------------------- */
+
+/* This is what the dedicated per-LCD kernel thread runs as its main. */
 
 int __lcd_kthread_main(void *data) /* data is NULL */
 {

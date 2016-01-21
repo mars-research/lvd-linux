@@ -1,24 +1,25 @@
 /* 
- * syscall.h
+ * syscall.h -- Syscall IDs
  *
- * Author: Charles Jacobsen <charlesj@cs.utah.edu>
  * Copyright: University of Utah
- *
  */
 #ifndef LCD_DOMAINS_SYSCALL_H
 #define LCD_DOMAINS_SYSCALL_H
 
-#define	LCD_SYSCALL_EXIT       0
-#define	LCD_SYSCALL_SEND       1
-#define	LCD_SYSCALL_RECV       2
-#define	LCD_SYSCALL_CALL       3
-#define	LCD_SYSCALL_REPLY      4
-#define	LCD_SYSCALL_PUTCHAR    5
-#define	LCD_SYSCALL_PAGE_ALLOC 6
-#define	LCD_SYSCALL_PAGE_MAP   7
-#define	LCD_SYSCALL_PAGE_UNMAP 8
-#define	LCD_SYSCALL_CAP_DELETE 9
-#define	LCD_SYSCALL_SYNC_EP    10
-
+enum lcd_syscall {
+	LCD_SYSCALL_EXIT,
+	LCD_SYSCALL_PUTCHAR,
+	LCD_SYSCALL_SEND,
+	LCD_SYSCALL_RECV,
+	LCD_SYSCALL_CALL,
+	LCD_SYSCALL_REPLY,
+	LCD_SYSCALL_CREATE_SYNC_EP,
+	LCD_SYSCALL_PAGES_ALLOC_EXACT_NODE,
+	LCD_SYSCALL_PAGES_ALLOC,
+	LCD_SYSCALL_MMAP,
+	LCD_SYSCALL_MUNMAP,
+	LCD_SYSCALL_CAP_DELETE,
+	LCD_SYSCALL_CAP_REVOKE,
+};
 
 #endif /* LCD_DOMAINS_SYSCALL_H */

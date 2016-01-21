@@ -24,6 +24,19 @@ static int handle_syscall_create_sync_ep(struct lcd *lcd)
 	return __lcd_create_sync_endpoint(lcd, slot);
 }
 
+static int handle_syscall_cap_revoke(struct lcd *lcd)
+{
+	cptr_t object;
+	/*
+	 * Get object cptr
+	 */
+	object = __cptr(lcd_arch_get_syscall_arg0(lcd->lcd_arch));
+	/*
+	 * Do revoke
+	 */
+	return cap_revoke(lcd->cspace, object);
+}
+
 static int handle_syscall_cap_delete(struct lcd *lcd)
 {
 	cptr_t object;
@@ -201,6 +214,9 @@ static int handle_syscall(struct lcd *lcd, int *lcd_ret)
 	case LCD_SYSCALL_REPLY:
 		ret = handle_syscall_reply(lcd);
 		break;
+	case LCD_SYSCALL_CREATE_SYNC_EP:
+		ret = handle_syscall_create_sync_ep(lcd);
+		break;
 	case LCD_SYSCALL_PAGES_ALLOC_EXACT_NODE:
 		ret = handle_syscall_pages_alloc_exact_node(lcd);
 		break;
@@ -216,8 +232,8 @@ static int handle_syscall(struct lcd *lcd, int *lcd_ret)
 	case LCD_SYSCALL_CAP_DELETE:
 		ret = handle_syscall_cap_delete(lcd);
 		break;
-	case LCD_SYSCALL_CREATE_SYNC_EP:
-		ret = handle_syscall_create_sync_ep(lcd);
+	case LCD_SYSCALL_CAP_REVOKE:
+		ret = handle_syscall_cap_revoke(lcd);
 		break;
 	default:
 		LCD_ERR("unimplemented syscall %d", syscall_id);

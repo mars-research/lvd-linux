@@ -133,8 +133,12 @@ struct page *lcd_alloc_pages(unsigned int flags, unsigned int order);
  * lcd_free_pages -- Free pages allocated via lcd_alloc_pages
  * @base: pointer to first struct page in the chunk
  * @order: chunk is of size 2^order pages
+ *
+ * Note: If you grant another LCD access to the pages, this will
+ * only kill the mappings in your address spaces and delete the
+ * capability from your cspace.
  */
-void lcd_free_pages(struct page *base);
+void lcd_free_pages(struct page *base, unsigned int order);
 
 /* HIGH-LEVEL MAP/UNMAP ---------------------------------------- */
 
@@ -295,7 +299,7 @@ int lcd_volunteer_pages(struct page *base, unsigned int order,
  * a cptr to a synchronous endpoint capability, for example, and it would
  * get deleted from the caller's cspace.
  */
-int lcd_unvolunteer_pages(cptr_t pages);
+void lcd_unvolunteer_pages(cptr_t pages);
 
 /* "VOLUNTEERING" DEVICE MEMORY ---------------------------------------- */
 
@@ -322,7 +326,7 @@ int lcd_unvolunteer_pages(cptr_t pages);
  * guest physical == host physical by convention (so a non-isolated thread
  * can cast an hpa to a gpa and it will do the right thing).
  */
-int lcd_volunteer_dev_mem(gpa_t base, unsigned int order,
+void lcd_volunteer_dev_mem(gpa_t base, unsigned int order,
 			cptr_t *slot_out);
 /**
  * lcd_unvolunteer_dev_mem -- Remove device memory from the capability system

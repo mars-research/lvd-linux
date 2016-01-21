@@ -15,6 +15,8 @@
 
 #include <libcap.h>
 
+/* CAPABILITIES -------------------------------------------------- */
+
 /**
  * lcd_cap_delete -- Delete the capability in slot from caller's cspace
  * @slot: the cptr to the capability to delete
@@ -44,5 +46,20 @@ void lcd_cap_delete(cptr_t slot);
  * Returns non-zero if revocation failed, in whole or in part.
  */
 int lcd_cap_revoke(cptr_t slot);
+
+/* CPTRs -------------------------------------------------- */
+
+/* These are convenience functions. */
+
+/**
+ * lcd_cptr_alloc -- allocate a slot from the caller's dedicated cptr cache
+ * @slot_out: the slot allocated
+ */
+int lcd_cptr_alloc(cptr_t *slot_out);
+/**
+ * lcd_cptr_free -- free a slot
+ * @slot: the slot to free
+ */
+void lcd_cptr_free(cptr_t slot);
 
 #endif /* LCD_DOMAINS_CAP_H */

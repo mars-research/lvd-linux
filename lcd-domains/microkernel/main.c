@@ -547,116 +547,116 @@ fail1:
 
 /* KLCD ENTER / EXIT -------------------------------------------------- */
 
-int __klcd_enter(void)
-{
-	/*
-	 * A klcd doesn't have an underlying hardware vm.
-	 *
-	 * It has everything else though - cspace, utcb, etc.
-	 *
-	 * (kliblcd sets up the thread's cptr cache)
-	 */
-	struct lcd *lcd;
-	int ret;
-	/*
-	 * Bare init
-	 */
-	ret = __lcd_create__(&lcd);
-	if (ret) {
-		LCD_ERR("lcd create error");
-		goto fail1;
-	}
-	/*
-	 * Allocate a page for the thread's utcb
-	 */
-	lcd->utcb = hva2va(__hva(get_zeroed_page(GFP_KERNEL)));
-	if (!lcd->utcb) {
-		LCD_ERR("utcb alloc");
-		goto fail2;
-	}
-	/*
-	 * Store in calling thread's lcd field
-	 */
-	current->lcd = lcd;
-	/*
-	 * Store reference to calling thread in lcd
-	 */
-	lcd->kthread = current;
-	/*
-	 * Mark lcd as running
-	 */
-	set_lcd_status(lcd, LCD_STATUS_RUNNING);
-	/*
-	 * Set type as "top" - a "root" LCD owned by no one (gasp!)
-	 */
-	lcd->type = LCD_TYPE_TOP;
+/* int __klcd_enter(void) */
+/* { */
+/* 	/\* */
+/* 	 * A klcd doesn't have an underlying hardware vm. */
+/* 	 * */
+/* 	 * It has everything else though - cspace, utcb, etc. */
+/* 	 * */
+/* 	 * (kliblcd sets up the thread's cptr cache) */
+/* 	 *\/ */
+/* 	struct lcd *lcd; */
+/* 	int ret; */
+/* 	/\* */
+/* 	 * Bare init */
+/* 	 *\/ */
+/* 	ret = __lcd_create__(&lcd); */
+/* 	if (ret) { */
+/* 		LCD_ERR("lcd create error"); */
+/* 		goto fail1; */
+/* 	} */
+/* 	/\* */
+/* 	 * Allocate a page for the thread's utcb */
+/* 	 *\/ */
+/* 	lcd->utcb = hva2va(__hva(get_zeroed_page(GFP_KERNEL))); */
+/* 	if (!lcd->utcb) { */
+/* 		LCD_ERR("utcb alloc"); */
+/* 		goto fail2; */
+/* 	} */
+/* 	/\* */
+/* 	 * Store in calling thread's lcd field */
+/* 	 *\/ */
+/* 	current->lcd = lcd; */
+/* 	/\* */
+/* 	 * Store reference to calling thread in lcd */
+/* 	 *\/ */
+/* 	lcd->kthread = current; */
+/* 	/\* */
+/* 	 * Mark lcd as running */
+/* 	 *\/ */
+/* 	set_lcd_status(lcd, LCD_STATUS_RUNNING); */
+/* 	/\* */
+/* 	 * Set type as "top" - a "root" LCD owned by no one (gasp!) */
+/* 	 *\/ */
+/* 	lcd->type = LCD_TYPE_TOP; */
 
-	return 0;
+/* 	return 0; */
 
-fail2:
-	__lcd_destroy__(lcd);
-fail1:
-	return ret;
-}
+/* fail2: */
+/* 	__lcd_destroy__(lcd); */
+/* fail1: */
+/* 	return ret; */
+/* } */
 
-void __klcd_exit(void)
-{
-	struct lcd *lcd;
+/* void __klcd_exit(void) */
+/* { */
+/* 	struct lcd *lcd; */
 
-	lcd = current->lcd;
+/* 	lcd = current->lcd; */
 	
-	if (lcd->type != LCD_TYPE_TOP) {
-		/*
-		 * The caller is a klcd that was created by someone
-		 * else. We will let their creator destroy them (when
-		 * they delete the capability to the klcd).
-		 */
-		return;
-	}
+/* 	if (lcd->type != LCD_TYPE_TOP) { */
+/* 		/\* */
+/* 		 * The caller is a klcd that was created by someone */
+/* 		 * else. We will let their creator destroy them (when */
+/* 		 * they delete the capability to the klcd). */
+/* 		 *\/ */
+/* 		return; */
+/* 	} */
 
-	BUG_ON(lcd_status_dead(lcd)); /* lcd shouldn't be dead already */
+/* 	BUG_ON(lcd_status_dead(lcd)); /\* lcd shouldn't be dead already *\/ */
 
-	/*
-	 * Like lcd destroy, but simpler.
-	 *
-	 * Since the caller is the thread itself, we can assume it is
-	 * not in an endpoint queue.
-	 *
-	 * We still use some care and mark the lcd as dead (even though
-	 * the thread itself isn't going away), so that endpoints handle
-	 * the lcd properly, etc.
-	 */
-	if (mutex_lock_interruptible(&lcd->lock)) {
-		/*
-		 * This is probably not ideal
-		 */
-		LCD_ERR("interrupted, continuing with lcd stop (gulp) ...");
-		set_lcd_status(lcd, LCD_STATUS_DEAD);
-		goto lock_skip;
-	}
+/* 	/\* */
+/* 	 * Like lcd destroy, but simpler. */
+/* 	 * */
+/* 	 * Since the caller is the thread itself, we can assume it is */
+/* 	 * not in an endpoint queue. */
+/* 	 * */
+/* 	 * We still use some care and mark the lcd as dead (even though */
+/* 	 * the thread itself isn't going away), so that endpoints handle */
+/* 	 * the lcd properly, etc. */
+/* 	 *\/ */
+/* 	if (mutex_lock_interruptible(&lcd->lock)) { */
+/* 		/\* */
+/* 		 * This is probably not ideal */
+/* 		 *\/ */
+/* 		LCD_ERR("interrupted, continuing with lcd stop (gulp) ..."); */
+/* 		set_lcd_status(lcd, LCD_STATUS_DEAD); */
+/* 		goto lock_skip; */
+/* 	} */
 	
-	set_lcd_status(lcd, LCD_STATUS_DEAD);
+/* 	set_lcd_status(lcd, LCD_STATUS_DEAD); */
 	
-	mutex_unlock(&lcd->lock);
+/* 	mutex_unlock(&lcd->lock); */
 
-lock_skip:
-	/*
-	 * Tear down cspace.
-	 */
-	__lcd_cap_destroy_cspace(&lcd->cspace);
-	/*
-	 * Free the stack page
-	 */
-	free_page((unsigned long)lcd->utcb);
-	/*
-	 * Finish
-	 */
-	kfree(lcd);
-	/*
-	 * Null it out
-	 */
-	current->lcd = NULL;
-}
+/* lock_skip: */
+/* 	/\* */
+/* 	 * Tear down cspace. */
+/* 	 *\/ */
+/* 	__lcd_cap_destroy_cspace(&lcd->cspace); */
+/* 	/\* */
+/* 	 * Free the stack page */
+/* 	 *\/ */
+/* 	free_page((unsigned long)lcd->utcb); */
+/* 	/\* */
+/* 	 * Finish */
+/* 	 *\/ */
+/* 	kfree(lcd); */
+/* 	/\* */
+/* 	 * Null it out */
+/* 	 *\/ */
+/* 	current->lcd = NULL; */
+/* } */
 
 /* CREATE A KLCD (NON-ISOLATED LCD) ------------------------------ */
 

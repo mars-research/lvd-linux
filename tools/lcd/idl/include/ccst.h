@@ -102,10 +102,14 @@ class CCSTContinue;
 class CCSTBreak;
 class CCSTReturn;
 
+#define INDENT 4
+
+const char* indentation(int level);
+
 class CCSTBase
 {
  public:
-  virtual void write(FILE *f) = 0;
+  virtual void write(FILE *f, int indent) = 0;
 };
 
 class CCSTFile : public CCSTBase
@@ -113,7 +117,7 @@ class CCSTFile : public CCSTBase
   std::vector<CCSTExDeclaration*> defs_;
  public:
   CCSTFile(std::vector<CCSTExDeclaration*> defs); //{this->defs_ = defs;}
-  virtual void write(FILE *f);
+  virtual void write(FILE *f, int indent);
 };
 
 class CCSTExDeclaration : public CCSTBase
@@ -123,7 +127,7 @@ class CCSTExDeclaration : public CCSTBase
                          | <declaration>
   */
  public:
-  virtual void write(FILE *f) = 0;
+  virtual void write(FILE *f, int indent) = 0;
 };
 
 class CCSTDeclarator;
@@ -140,7 +144,7 @@ class CCSTInitDeclarator : public CCSTBase
   CCSTInitDeclarator() {};
   CCSTInitDeclarator(CCSTDeclarator *dec, CCSTInitializer *init); //{this->dec_ = dec; this->init_ = init;}
   CCSTInitDeclarator(CCSTDeclarator *dec); //{this->dec_ = dec; this->init_ = NULL;}
-  virtual void write(FILE *f);
+  virtual void write(FILE *f, int indent);
 };
 
 class CCSTDeclarator : public CCSTInitDeclarator // this seems incorrect
@@ -152,7 +156,7 @@ class CCSTDeclarator : public CCSTInitDeclarator // this seems incorrect
   CCSTDirectDeclarator *d_dec_;
  public:
   CCSTDeclarator(CCSTPointer *pointer, CCSTDirectDeclarator *d_dec); //{this->pointer_ = pointer; this->d_dec_ = d_dec;}
-  virtual void write(FILE *f);
+  virtual void write(FILE *f, int indent);
 };
 
 class CCSTFuncDef : public CCSTExDeclaration
@@ -166,7 +170,7 @@ class CCSTFuncDef : public CCSTExDeclaration
   CCSTCompoundStatement *body_;
  public:
   CCSTFuncDef(std::vector<CCSTDecSpecifier*> specifiers, CCSTDeclarator *ret, std::vector<CCSTDeclaration*> decs, CCSTCompoundStatement *body); //{this->specifiers_ = specifiers; this->ret_ = ret; this->decs_ = decs; this->body_ = body;}
-  virtual void write(FILE *f);
+  virtual void write(FILE *f, int indent);
 };
 
 class CCSTDeclaration : public CCSTExDeclaration
@@ -179,7 +183,7 @@ class CCSTDeclaration : public CCSTExDeclaration
   std::vector<CCSTDecSpecifier*>specifier_;
   std::vector<CCSTInitDeclarator*> decs_;
   CCSTDeclaration(std::vector<CCSTDecSpecifier*> specifier, std::vector<CCSTInitDeclarator*> decs); //{this->specifier_ = specifier; this->decs_ = decs;}
-  virtual void write(FILE *f);
+  virtual void write(FILE *f, int indent);
 };
 
 class CCSTDecSpecifier : public CCSTBase
@@ -190,7 +194,7 @@ class CCSTDecSpecifier : public CCSTBase
                           | <type-qualifier>
    */
  public:
-  virtual void write(FILE *f) = 0;
+  virtual void write(FILE *f, int indent) = 0;
 
 };
 
@@ -209,7 +213,7 @@ class CCSTStoClassSpecifier : public CCSTDecSpecifier
   sto_class_t val_;
  public:
   CCSTStoClassSpecifier(sto_class_t val); //{this->val_ = val;}
-  virtual void write(FILE *f);
+  virtual void write(FILE *f, int indent);
 };
 
 class CCSTSpecifierQual : public CCSTDecSpecifier
@@ -219,7 +223,7 @@ class CCSTSpecifierQual : public CCSTDecSpecifier
                         | <type-qualifier>
    */
  public:
-  virtual void write(FILE *f) = 0;
+  virtual void write(FILE *f, int indent) = 0;
 };
 
 
@@ -244,7 +248,7 @@ class CCSTTypeSpecifier : public CCSTSpecifierQual // slightly different from c_
 
    */
  public:
-  virtual void write(FILE *f) = 0;
+  virtual void write(FILE *f, int indent) = 0;
 };
 
 class CCSTSimpleTypeSpecifier : public CCSTTypeSpecifier
@@ -252,7 +256,7 @@ class CCSTSimpleTypeSpecifier : public CCSTTypeSpecifier
   type_spec_t type_;
  public:
   CCSTSimpleTypeSpecifier(type_spec_t type); //{this->type_ = type;}
-  virtual void write(FILE *f);
+  virtual void write(FILE *f, int indent);
 };
 
 enum struct_union_t {struct_t, union_t}; // probably unecessary
@@ -271,7 +275,7 @@ class CCSTStructUnionSpecifier : public CCSTTypeSpecifier
   CCSTStructUnionSpecifier(struct_union_t s_or_u, const char* id); //{this->s_or_u_ = s_or_u; this->id_ = id;}
   CCSTStructUnionSpecifier(struct_union_t s_or_u, const char* id, std::vector<CCSTStructDeclaration*> struct_dec); //{this->s_or_u_ = s_or_u; this->id_ = id; this->struct_dec_ = struct_dec;}
   CCSTStructUnionSpecifier(struct_union_t s_or_u, std::vector<CCSTStructDeclaration*> struct_dec); //{this->s_or_u_ = s_or_u; this->id_ = ""; this->struct_dec_ = struct_dec;}
-  virtual void write(FILE *f);
+  virtual void write(FILE *f, int indent);
 };
 
 class CCSTStructDeclaration : public CCSTBase
@@ -283,7 +287,7 @@ class CCSTStructDeclaration : public CCSTBase
   CCSTStructDecList *dec_list_;
  public:
   CCSTStructDeclaration(std::vector<CCSTSpecifierQual*> spec_qual, CCSTStructDecList *dec_list); //{this->spec_qual_ = spec_qual; this->dec_list_ = dec_list;}
-  virtual void write(FILE *f);
+  virtual void write(FILE *f, int indent);
 };
 
 class CCSTStructDecList : public CCSTBase
@@ -296,7 +300,7 @@ class CCSTStructDecList : public CCSTBase
  public:
   CCSTStructDecList();
   CCSTStructDecList(std::vector<CCSTStructDeclarator*> struct_decs); //{this->struct_decs_ = struct_decs;}
-  virtual void write(FILE *f);
+  virtual void write(FILE *f, int indent);
 };
 
 
@@ -315,7 +319,7 @@ class CCSTStructDeclarator : public CCSTStructDecList
   CCSTStructDeclarator(CCSTDeclarator *dec); //{this->dec_ = dec; this->expr_ = NULL;}
   CCSTStructDeclarator(CCSTDeclarator *dec, CCSTConstExpr *expr); //{this->dec_ = dec; this->expr_ = expr;}
   CCSTStructDeclarator(CCSTConstExpr *expr); //{this->dec_ = NULL; this->expr_ = expr;}
-  virtual void write(FILE *f);
+  virtual void write(FILE *f, int indent);
 };
 
 // probably does not need to be a class.
@@ -333,7 +337,7 @@ class CCSTAbstDeclarator : public CCSTBase
  public:
   CCSTAbstDeclarator();
   CCSTAbstDeclarator(CCSTPointer *p, CCSTDirectAbstDeclarator *d_abs_dec); //{this->p_ = p; this->d_abs_dec_ = d_abs_dec;}
-  virtual void write(FILE *f);
+  virtual void write(FILE *f, int indent);
 };
 
 class CCSTPointer : public CCSTAbstDeclarator
@@ -349,7 +353,7 @@ class CCSTPointer : public CCSTAbstDeclarator
   CCSTPointer(); //{this->p_ = NULL;}
   CCSTPointer(std::vector<type_qualifier> type_q); //{this->type_q_ = type_q; this->p_ = NULL;}
   CCSTPointer(CCSTPointer *p); //{this->p_ = p;}
-  virtual void write(FILE *f);
+  virtual void write(FILE *f, int indent);
 };
 
 
@@ -364,7 +368,7 @@ class CCSTDirectDeclarator : public CCSTBase
                       | <direct-declarator> ( {<identifier>}* )
    */
  public:
-  virtual void write(FILE *f) = 0;
+  virtual void write(FILE *f, int indent) = 0;
   
 };
 
@@ -380,7 +384,7 @@ class CCSTDirectDecId : public CCSTDirectDeclarator
   const char* id_;
  public:
   CCSTDirectDecId(const char* id); //{this->id_ = id;}
-  virtual void write(FILE *f);
+  virtual void write(FILE *f, int indent);
 
 };
 
@@ -396,7 +400,7 @@ class CCSTDirectDecDec : public CCSTDirectDeclarator
   CCSTDeclarator *dec_;
  public:
   CCSTDirectDecDec(CCSTDeclarator *dec); //{this->dec_ = dec;}
-  virtual void write(FILE *f);
+  virtual void write(FILE *f, int indent);
   
 };
 class CCSTDirectDecConstExpr : public CCSTDirectDeclarator
@@ -413,7 +417,7 @@ class CCSTDirectDecConstExpr : public CCSTDirectDeclarator
  public:
   CCSTDirectDecConstExpr(CCSTDirectDeclarator *direct_dec, CCSTConstExpr *const_expr); //{this->direct_dec_ = direct_dec; this->const_expr_ = const_expr;}
   CCSTDirectDecConstExpr(CCSTDirectDeclarator *direct_dec); //{this->direct_dec_ = direct_dec; this->const_expr_ = NULL;}
-  virtual void write(FILE *f);
+  virtual void write(FILE *f, int indent);
 
 };
 
@@ -430,7 +434,7 @@ class CCSTDirectDecParamTypeList : public CCSTDirectDeclarator
   CCSTParamTypeList *p_t_list_;
  public:
   CCSTDirectDecParamTypeList(CCSTDirectDeclarator *direct_dec, CCSTParamTypeList *p_t_list); //{this->direct_dec_ = direct_dec; this->p_t_list_ = p_t_list;}
-  virtual void write(FILE *f);
+  virtual void write(FILE *f, int indent);
 
 };
 
@@ -447,7 +451,7 @@ class CCSTDirectDecIdList : public CCSTDirectDeclarator
   std::vector<char *> ids_;
  public:
   CCSTDirectDecIdList(CCSTDirectDeclarator *direct_dec, std::vector<char*> ids); //{this->direct_dec_ = direct_dec; this->ids_ = ids;}
-  virtual void write(FILE *f);
+  virtual void write(FILE *f, int indent);
   
 };
 
@@ -461,7 +465,7 @@ class CCSTConstExpr : public CCSTBase
   CCSTCondExpr *cond_expr_;
  public:
   CCSTConstExpr(CCSTCondExpr *cond_expr); //{this->cond_expr_ = cond_expr;}
-  virtual void write(FILE *f);
+  virtual void write(FILE *f, int indent);
 };
 
 class CCSTStatement : public CCSTBase
@@ -475,7 +479,7 @@ class CCSTStatement : public CCSTBase
               | <jump-statement>
    */
  public:
-  virtual void write(FILE *f) = 0;
+  virtual void write(FILE *f, int indent) = 0;
 };
 
 class CCSTExpression;
@@ -489,7 +493,7 @@ class CCSTExprStatement : public CCSTStatement
  public:
   CCSTExprStatement();
   CCSTExprStatement(CCSTExpression *expr); //{this->expr_ = expr;}
-  virtual void write(FILE *f);
+  virtual void write(FILE *f, int indent);
 };
 
 class CCSTExpression : public CCSTExprStatement
@@ -502,7 +506,7 @@ class CCSTExpression : public CCSTExprStatement
  public:
   CCSTExpression();
   CCSTExpression(std::vector<CCSTAssignExpr*> assn); //{this->assn_exprs_ = assn;}
-  virtual void write(FILE *f);
+  virtual void write(FILE *f, int indent);
 };
 
 
@@ -519,7 +523,7 @@ class CCSTAssignExpr : public CCSTExpression
  public:
     CCSTAssignExpr();
   CCSTAssignExpr(CCSTUnaryExpr *unary_expr, CCSTAssignOp *assn_op, CCSTAssignExpr *assn_expr); //{this->unary_expr_ = unary_expr; this->assn_op_ = assn_op; this->assn_expr_ = assn_expr; }
-  virtual void write(FILE *f);
+  virtual void write(FILE *f, int indent);
 };
 
 
@@ -535,7 +539,7 @@ class CCSTCondExpr : public CCSTAssignExpr
  public:
   CCSTCondExpr();
   CCSTCondExpr(CCSTLogicalOrExpr *log_or_expr, CCSTExpression *expr, CCSTCondExpr *cond_expr); //{this->log_or_expr_ = log_or_expr; this->expr_ = expr; this->cond_expr_ = cond_expr;}
-  virtual void write(FILE *f);
+  virtual void write(FILE *f, int indent);
 };
 
 class CCSTLogicalOrExpr : public CCSTCondExpr
@@ -549,7 +553,7 @@ class CCSTLogicalOrExpr : public CCSTCondExpr
  public:
   CCSTLogicalOrExpr();
   CCSTLogicalOrExpr(CCSTLogicalOrExpr *or__, CCSTLogicalAndExpr *and__); //{this->and_ = and__; this->or_ = or__;}
-  virtual void write(FILE *f);
+  virtual void write(FILE *f, int indent);
 };
 
 class CCSTLogicalAndExpr : public CCSTLogicalOrExpr
@@ -563,7 +567,7 @@ class CCSTLogicalAndExpr : public CCSTLogicalOrExpr
  public:
   CCSTLogicalAndExpr();
   CCSTLogicalAndExpr(CCSTLogicalAndExpr *and__, CCSTInclusiveOrExpr *or__); //{this->and_ = and; this->or_ = or;}
-  virtual void write(FILE *f);
+  virtual void write(FILE *f, int indent);
 };
 
 class CCSTInclusiveOrExpr : public CCSTLogicalAndExpr
@@ -577,7 +581,7 @@ class CCSTInclusiveOrExpr : public CCSTLogicalAndExpr
  public:
   CCSTInclusiveOrExpr();
   CCSTInclusiveOrExpr(CCSTInclusiveOrExpr *in_or, CCSTXorExpr *xor__); //{this->in_or_ = in_or; this->xor_ = xor;}
-  virtual void write(FILE *f);
+  virtual void write(FILE *f, int indent);
 
 };
 
@@ -592,7 +596,7 @@ class CCSTXorExpr : public CCSTInclusiveOrExpr
  public:
   CCSTXorExpr();
   CCSTXorExpr(CCSTXorExpr *xor__, CCSTAndExpr *and__); //{this->xor_ = xor; this->and_ = and;}
-  virtual void write(FILE *f);
+  virtual void write(FILE *f, int indent);
 };
 
 class CCSTAndExpr : public CCSTXorExpr
@@ -607,7 +611,7 @@ class CCSTAndExpr : public CCSTXorExpr
  public:
   CCSTAndExpr();
   CCSTAndExpr(CCSTAndExpr *and__, CCSTEqExpr *eq); //{this->and_ = and; this->eq_ = eq;}
-  virtual void write(FILE *f);
+  virtual void write(FILE *f, int indent);
 };
 
 class CCSTEqExpr : public CCSTAndExpr
@@ -623,7 +627,7 @@ class CCSTEqExpr : public CCSTAndExpr
  public:
   CCSTEqExpr();
   CCSTEqExpr(bool equal, CCSTEqExpr *eq_expr, CCSTRelationalExpr *r_expr); //{this->equal_ = equal; this->eq_expr_ = eq_expr; this->r_expr_ = r_expr;}
-  virtual void write(FILE *f);
+  virtual void write(FILE *f, int indent);
   
 };
 
@@ -645,7 +649,7 @@ class CCSTRelationalExpr : public CCSTEqExpr
  public:
   CCSTRelationalExpr();
   CCSTRelationalExpr(relational_op op, CCSTRelationalExpr *r_expr, CCSTShiftExpr *s_expr); //{this->op_ = op; this->r_expr_ = r_expr; this->s_expr_ = s_expr;}
-  virtual void write(FILE *f);
+  virtual void write(FILE *f, int indent);
   
 };
 
@@ -664,7 +668,7 @@ class CCSTShiftExpr : public CCSTRelationalExpr
  public:
   CCSTShiftExpr();
   CCSTShiftExpr(shift_op shift, CCSTShiftExpr *s_expr, CCSTAdditiveExpr *a_expr); //{this->shift_ = shift; this->s_expr_ = s_expr; this->a_expr_ = a_expr;}
-  virtual void write(FILE *f);
+  virtual void write(FILE *f, int indent);
 };
 
 enum additive_op { plus_t, minus_t};
@@ -681,7 +685,7 @@ class CCSTAdditiveExpr : public CCSTShiftExpr
  public:
   CCSTAdditiveExpr();
   CCSTAdditiveExpr(additive_op op, CCSTAdditiveExpr *a_expr, CCSTMultExpr *m_expr); //{this->op_ = op; this->a_expr_ = a_expr; this->m_expr_ = m_expr;}
-  virtual void write(FILE *f);
+  virtual void write(FILE *f, int indent);
 };
 
 enum mult_op {multiply_t, divide_t, mod_t};
@@ -700,7 +704,7 @@ class CCSTMultExpr : public CCSTAdditiveExpr
  public:
   CCSTMultExpr();
   CCSTMultExpr(mult_op op, CCSTMultExpr *m_expr, CCSTCastExpr *c_expr); //{this->op_ = op; this->m_expr_ = m_expr; this->c_expr_ = c_expr;}
-  virtual void write(FILE *f);
+  virtual void write(FILE *f, int indent);
 };
 
 class CCSTCastExpr : public CCSTMultExpr
@@ -714,7 +718,7 @@ class CCSTCastExpr : public CCSTMultExpr
  public:
   CCSTCastExpr();
   CCSTCastExpr(CCSTTypeName *cast_type, CCSTCastExpr *cast_expr); //{this->cast_type_ = cast_type; this->cast_expr_ = cast_expr;}
-  virtual void write(FILE *f);
+  virtual void write(FILE *f, int indent);
 };
 
 class CCSTUnaryExpr : public CCSTCastExpr
@@ -728,7 +732,7 @@ class CCSTUnaryExpr : public CCSTCastExpr
                      | sizeof <type-name>
    */
  public:
-  virtual void write(FILE *f) = 0;
+  virtual void write(FILE *f, int indent) = 0;
 };
 
 class CCSTUnaryExprCastExpr : public CCSTUnaryExpr
@@ -747,7 +751,7 @@ class CCSTUnaryExprCastExpr : public CCSTUnaryExpr
  public:
   CCSTUnaryExprCastExpr();
   CCSTUnaryExprCastExpr(CCSTUnaryOp *unary_op, CCSTCastExpr *cast_expr); //{this->unary_op_ = unary_op; this->cast_expr_ = cast_expr;}
-  virtual void write(FILE *f);
+  virtual void write(FILE *f, int indent);
 };
 
 enum incr_decr_ops {increment_t, decrement_t};
@@ -766,7 +770,7 @@ class CCSTUnaryExprOpOp : public CCSTUnaryExpr
  public:
   CCSTUnaryExprOpOp();
   CCSTUnaryExprOpOp(incr_decr_ops op, CCSTUnaryExpr *unary_expr); //{this->unary_expr_ = unary_expr; this->op_ = op;}
-  virtual void write(FILE *f);
+  virtual void write(FILE *f, int indent);
 };
 
 class CCSTUnaryExprSizeOf : public CCSTUnaryExpr
@@ -785,7 +789,7 @@ class CCSTUnaryExprSizeOf : public CCSTUnaryExpr
   CCSTUnaryExprSizeOf();
   CCSTUnaryExprSizeOf(CCSTUnaryExpr *unary_expr); //{this->unary_expr_ = unary_expr; this->type_name_ = NULL;}
   CCSTUnaryExprSizeOf(CCSTTypeName *type_name); //{this->type_name_  = type_name; this->unary_expr_ = NULL;}
-  virtual void write(FILE *f);
+  virtual void write(FILE *f, int indent);
 };
 
 class CCSTPostFixExpr : public CCSTUnaryExpr
@@ -800,7 +804,7 @@ class CCSTPostFixExpr : public CCSTUnaryExpr
                        | <postfix-expression> --
    */
  public:
-  virtual void write(FILE *f) = 0;
+  virtual void write(FILE *f, int indent) = 0;
 };
 
 class CCSTPostFixExprOpOp : public CCSTPostFixExpr
@@ -819,7 +823,7 @@ class CCSTPostFixExprOpOp : public CCSTPostFixExpr
  public:
  CCSTPostFixExprOpOp();
  CCSTPostFixExprOpOp(CCSTPostFixExpr *post_fix_expr, incr_decr_ops op); //{this->post_fix_expr_ = post_fix_expr; this->op_ = op;}
-  virtual void write(FILE *f);
+  virtual void write(FILE *f, int indent);
 };
 
 enum accessor {pointer_access_t, object_access_t};
@@ -841,7 +845,7 @@ class CCSTPostFixExprAccess : public CCSTPostFixExpr
  public:
   CCSTPostFixExprAccess();
   CCSTPostFixExprAccess(CCSTPostFixExpr *post_fix_expr, accessor op, const char * id); //{this->post_fix_expr_ = post_fix_expr; this->op_ = op;}
-  virtual void write(FILE *f);
+  virtual void write(FILE *f, int indent);
 };
 
 class CCSTPostFixExprExpr : public CCSTPostFixExpr
@@ -860,7 +864,7 @@ class CCSTPostFixExprExpr : public CCSTPostFixExpr
  public:
   CCSTPostFixExprExpr();
   CCSTPostFixExprExpr(CCSTPostFixExpr *post_fix_expr, CCSTExpression *expr);
-  virtual void write(FILE *f);
+  virtual void write(FILE *f, int indent);
 };
 
 class CCSTPostFixExprAssnExpr : public CCSTPostFixExpr
@@ -879,7 +883,7 @@ class CCSTPostFixExprAssnExpr : public CCSTPostFixExpr
  public:
   CCSTPostFixExprAssnExpr();
   CCSTPostFixExprAssnExpr(CCSTPostFixExpr *post_fix_expr, std::vector<CCSTAssignExpr*> args); //{this->post_fix_expr_ = post_fix_expr; this->assn_expr_ = assn_expr;}
-  virtual void write(FILE *f);
+  virtual void write(FILE *f, int indent);
 };
 
 class CCSTPrimaryExpr : public CCSTPostFixExpr
@@ -894,7 +898,7 @@ class CCSTPrimaryExpr : public CCSTPostFixExpr
  public:
   CCSTPrimaryExpr();
   CCSTPrimaryExpr(CCSTExpression *expr); //{this->expr_ = expr;}
-  virtual void write(FILE *f);
+  virtual void write(FILE *f, int indent);
 };
 
 class CCSTString : public CCSTPrimaryExpr
@@ -903,7 +907,7 @@ class CCSTString : public CCSTPrimaryExpr
  public:
   CCSTString();
   CCSTString(const char* string); //{this->string_ = string;}
-  virtual void write(FILE *f);
+  virtual void write(FILE *f, int indent);
 };
 
 class CCSTPrimaryExprId : public CCSTPrimaryExpr
@@ -912,7 +916,7 @@ class CCSTPrimaryExprId : public CCSTPrimaryExpr
  public:
   CCSTPrimaryExprId();
   CCSTPrimaryExprId(const char* id); //{this->id_ = id;}
-  virtual void write(FILE *f);
+  virtual void write(FILE *f, int indent);
 };
 
 class CCSTConstant : public CCSTPrimaryExpr
@@ -924,7 +928,7 @@ class CCSTConstant : public CCSTPrimaryExpr
              | <enumeration-constant>
    */
  public:
-  virtual void write(FILE *f) = 0;
+  virtual void write(FILE *f, int indent) = 0;
 };
 
 class CCSTInteger : public CCSTConstant
@@ -933,7 +937,7 @@ class CCSTInteger : public CCSTConstant
  public:
   CCSTInteger();
   CCSTInteger(int i);
-  virtual void write(FILE *f);
+  virtual void write(FILE *f, int indent);
 };
 
 class CCSTChar : public CCSTConstant
@@ -943,7 +947,7 @@ class CCSTChar : public CCSTConstant
  public:
   CCSTChar();
   CCSTChar(char c); //{this->c_ = c;}
-  virtual void write(FILE *f);
+  virtual void write(FILE *f, int indent);
 };
 
 class CCSTFloat : public CCSTConstant
@@ -956,7 +960,7 @@ class CCSTFloat : public CCSTConstant
   CCSTFloat();
   CCSTFloat(float f); //{this->f_ = f; this->float_ = true;}
   CCSTFloat(double d); //{this->d_ = d; this->float_ = false;}
-  virtual void write(FILE *f);
+  virtual void write(FILE *f, int indent);
 };
 
 class CCSTEnumConst : public CCSTConstant
@@ -967,7 +971,7 @@ class CCSTEnumConst : public CCSTConstant
  public:
   CCSTEnumConst();
   CCSTEnumConst(const char* enum_val); //{this->enum_val_ = enum_val;}
-  virtual void write(FILE *f);
+  virtual void write(FILE *f, int indent);
 };
 
 enum assign_op {equal_t, mult_eq_t, div_eq_t, mod_eq_t, plus_eq_t, minus_eq_t, lshift_eq_t,
@@ -993,7 +997,7 @@ class CCSTAssignOp  : public CCSTBase
  public:
   CCSTAssignOp();
   CCSTAssignOp(assign_op op); //{this->op_ = op;}
-  virtual void write(FILE *f);
+  virtual void write(FILE *f, int indent);
 };
 
 enum unary_op {unary_bit_and_t, unary_mult_t, unary_plus_t, unary_minus_t, unary_tilde_t, unary_bang_t};
@@ -1013,7 +1017,7 @@ class CCSTUnaryOp : public CCSTBase
  public:
   CCSTUnaryOp();
   CCSTUnaryOp(unary_op op); //{this->op_ = op;}
-  virtual void write(FILE *f);
+  virtual void write(FILE *f, int indent);
 };
 
 class CCSTTypeName : public CCSTBase
@@ -1026,7 +1030,7 @@ class CCSTTypeName : public CCSTBase
  public:
   CCSTTypeName();
   CCSTTypeName(std::vector<CCSTSpecifierQual*> spec_quals, CCSTAbstDeclarator *abs_dec); //{this->spec_quals_ = spec_quals; this->abs_dec_ = abs_dec;}
-  virtual void write(FILE *f);
+  virtual void write(FILE *f, int indent);
 };
 
 class CCSTParamTypeList : public CCSTBase
@@ -1040,7 +1044,7 @@ class CCSTParamTypeList : public CCSTBase
  public:
   CCSTParamTypeList();
   CCSTParamTypeList(CCSTParamList *p_list, bool ellipsis); //{this->p_list_ = p_list; ellipsis_ = ellipsis;}
-  virtual void write(FILE *f);
+  virtual void write(FILE *f, int indent);
 };
 
 class CCSTParamList : public CCSTParamTypeList
@@ -1054,7 +1058,7 @@ class CCSTParamList : public CCSTParamTypeList
  public:
   CCSTParamList();
   CCSTParamList(std::vector<CCSTParamDeclaration*> p_dec); //{this->p_dec_ = p_dec;}
-  virtual void write(FILE *f);
+  virtual void write(FILE *f, int indent);
 };
 
 class CCSTParamDeclaration : public CCSTParamList
@@ -1072,7 +1076,7 @@ class CCSTParamDeclaration : public CCSTParamList
   CCSTParamDeclaration(std::vector<CCSTDecSpecifier*> dec_specs); //{this->dec_specs_ = dec_specs;}
   CCSTParamDeclaration(std::vector<CCSTDecSpecifier*> dec_specs, CCSTDeclarator *dec); //{this->dec_specs_ = dec_specs; this->dec_ = dec; this->abs_dec_ = abs_dec;}
   CCSTParamDeclaration(std::vector<CCSTDecSpecifier*> dec_specs, CCSTAbstDeclarator *abs_dec); //{this->dec_specs_ = dec_specs; this->abs_dec_ = abs_dec; this->dec_ = dec;}
-  virtual void write(FILE *f);
+  virtual void write(FILE *f, int indent);
 };
 
 class CCSTDirectAbstDeclarator : public CCSTAbstDeclarator
@@ -1092,7 +1096,7 @@ class CCSTDirectAbstDeclarator : public CCSTAbstDeclarator
   CCSTDirectAbstDeclarator(CCSTAbstDeclarator *abs_dec); //{this->abs_dec_ = abs_dec;}
   CCSTDirectAbstDeclarator(CCSTDirectAbstDeclarator *d_abs_dec, CCSTConstExpr *const_expr); //{this->d_abs_dec_ = d_abs_dec; this->const_expr_ = const_expr;}
   CCSTDirectAbstDeclarator(CCSTDirectAbstDeclarator *d_abs_dec, CCSTParamTypeList *param_type_list); //{this->d_abs_dec_ = d_abs_dec; this->param_type_list_ = param_type_list;}
-  virtual void write(FILE *f);
+  virtual void write(FILE *f, int indent);
 };
 
 class CCSTEnumSpecifier : public CCSTTypeSpecifier
@@ -1109,7 +1113,7 @@ class CCSTEnumSpecifier : public CCSTTypeSpecifier
   CCSTEnumSpecifier(const char* id, CCSTEnumeratorList *el); //{this->id_ = id; this->el_ = el;}
   CCSTEnumSpecifier(const char* id); //{this->id_ = id; this->el_ = NULL;}
   CCSTEnumSpecifier(CCSTEnumeratorList *el); //{this->el_ = el; this->id_ = "";}
-  virtual void write(FILE *f);
+  virtual void write(FILE *f, int indent);
 };
 
 class CCSTEnumeratorList : public CCSTBase
@@ -1123,7 +1127,7 @@ class CCSTEnumeratorList : public CCSTBase
  public:
   CCSTEnumeratorList();
   CCSTEnumeratorList(std::vector<CCSTEnumerator*> *list); //{this->list_ = list;}
-  virtual void write(FILE *f);
+  virtual void write(FILE *f, int indent);
 };
 
 class CCSTEnumerator : public CCSTEnumeratorList
@@ -1137,7 +1141,7 @@ class CCSTEnumerator : public CCSTEnumeratorList
  public:
   CCSTEnumerator(const char* id, CCSTConstExpr *ce); //{this->id_ = id; this->ce_ = ce;}
   CCSTEnumerator(const char* id); //{this->id_ = id; this->ce_ = NULL;}
-  virtual void write(FILE *f);
+  virtual void write(FILE *f, int indent);
 };
 
 class CCSTTypedefName : public CCSTTypeSpecifier
@@ -1148,7 +1152,7 @@ class CCSTTypedefName : public CCSTTypeSpecifier
   const char* id_;
  public:
   CCSTTypedefName(const char* name); //{this->id_ = name;}
-  virtual void write(FILE *f);
+  virtual void write(FILE *f, int indent);
 };
 
 
@@ -1163,7 +1167,7 @@ class CCSTInitializerList : public CCSTBase
  public:
   CCSTInitializerList();
   CCSTInitializerList(std::vector<CCSTInitializer*> init_list); //{this->init_list_ = init_list;}
-  virtual void write(FILE *f);
+  virtual void write(FILE *f, int indent);
 };
 
 class CCSTInitializer : public CCSTInitializerList
@@ -1179,7 +1183,7 @@ class CCSTInitializer : public CCSTInitializerList
  public:
   CCSTInitializer(CCSTAssignExpr *assn_expr); //{this->assn_expr_ = assn_expr;}
   CCSTInitializer(CCSTInitializerList *init_list); //{this->init_list_ = init_list;}
-  virtual void write(FILE *f);
+  virtual void write(FILE *f, int indent);
 };
 
 class CCSTCompoundStatement : public CCSTStatement
@@ -1193,7 +1197,7 @@ class CCSTCompoundStatement : public CCSTStatement
  public:
   CCSTCompoundStatement(std::vector<CCSTDeclaration*> decs, std::vector<CCSTStatement*> s); //{this->declarations_ = decs; this->statements_ = s;}
   void add_statement(CCSTStatement *s) { this->statements_.push_back(s); }
-  virtual void write(FILE *f);
+  virtual void write(FILE *f, int indent);
 };
 
 
@@ -1206,7 +1210,7 @@ class CCSTLabeledStatement : public CCSTStatement
                       | default : <statement>
    */
  public:
-  virtual void write(FILE *f) = 0;
+  virtual void write(FILE *f, int indent) = 0;
 };
 
 class CCSTDefaultLabelStatement : public CCSTLabeledStatement
@@ -1214,7 +1218,7 @@ class CCSTDefaultLabelStatement : public CCSTLabeledStatement
   CCSTStatement* body_;
  public:
   CCSTDefaultLabelStatement(CCSTStatement* body);
-  virtual void write(FILE *f);
+  virtual void write(FILE *f, int indent);
 };
 
 class CCSTPlainLabelStatement : public CCSTLabeledStatement
@@ -1223,7 +1227,7 @@ class CCSTPlainLabelStatement : public CCSTLabeledStatement
   CCSTStatement *stmnt_;
  public:
   CCSTPlainLabelStatement(const char* id, CCSTStatement *stmnt); //{this->id_ = id; this->stmnt_ = stmnt;}
-  virtual void write(FILE *f);
+  virtual void write(FILE *f, int indent);
 };
 
 class CCSTCaseStatement : public CCSTLabeledStatement
@@ -1232,7 +1236,7 @@ class CCSTCaseStatement : public CCSTLabeledStatement
   CCSTStatement *body_;
  public:
   CCSTCaseStatement(CCSTCondExpr *c, CCSTStatement *body); //{this->case_label_ = c; this->body_ = body;}
-  virtual void write(FILE *f);
+  virtual void write(FILE *f, int indent);
 };
 
 
@@ -1244,7 +1248,7 @@ class CCSTSelectionStatement : public CCSTStatement
                         | if ( <expression> ) <statement> else <statement>
                         | switch ( <expression> ) <statement>
    */
-  virtual void write(FILE *f) = 0;
+  virtual void write(FILE *f, int indent) = 0;
 };
 
 class CCSTIfStatement : public CCSTSelectionStatement
@@ -1253,7 +1257,7 @@ class CCSTIfStatement : public CCSTSelectionStatement
   CCSTStatement *body_;
  public:
   CCSTIfStatement(CCSTExpression *cond, CCSTStatement *body); //{this->cond_ = cond; this->body_ = body;}
-  virtual void write(FILE *f);
+  virtual void write(FILE *f, int indent);
 };
 
 class CCSTIfElseStatement : public CCSTSelectionStatement
@@ -1263,7 +1267,7 @@ class CCSTIfElseStatement : public CCSTSelectionStatement
   CCSTStatement *else_body_;
  public:
   CCSTIfElseStatement(CCSTExpression *cond, CCSTStatement *if_body, CCSTStatement *else_body); //{this->cond_ = cond; this->if_body_ = if_body; this->else_body_ = else_body;}
-  virtual void write(FILE *f);
+  virtual void write(FILE *f, int indent);
 };
 
 class CCSTSwitchStatement : public CCSTSelectionStatement
@@ -1272,7 +1276,7 @@ class CCSTSwitchStatement : public CCSTSelectionStatement
   CCSTStatement *body_;
  public:
   CCSTSwitchStatement(CCSTExpression *expr, CCSTStatement *body); //{this->expr_ = expr; this->body_ = body;}
-  virtual void write(FILE *f);
+  virtual void write(FILE *f, int indent);
 };
 
 class CCSTIterationStmnt : public CCSTStatement
@@ -1283,7 +1287,7 @@ class CCSTIterationStmnt : public CCSTStatement
                         | for ( {<expression>}? ; {<expression>}? ; {<expression>}? ) <statement>
    */
  public:
-  virtual void write(FILE *f) = 0;
+  virtual void write(FILE *f, int indent) = 0;
 };
 
 class CCSTWhileLoop : public CCSTIterationStmnt
@@ -1292,7 +1296,7 @@ class CCSTWhileLoop : public CCSTIterationStmnt
   CCSTStatement *body_;
  public:
   CCSTWhileLoop(CCSTExpression *cond, CCSTStatement *body); //{this->cond_ = cond; this->body_ = body;}
-  virtual void write(FILE *f);
+  virtual void write(FILE *f, int indent);
 };
 
 class CCSTDoLoop : public CCSTIterationStmnt
@@ -1301,7 +1305,7 @@ class CCSTDoLoop : public CCSTIterationStmnt
   CCSTStatement * body_;
  public:
   CCSTDoLoop(CCSTStatement *body, CCSTExpression *cond); //{this->body_ = body; this->cond_ = cond;}
-  virtual void write(FILE *f);
+  virtual void write(FILE *f, int indent);
 };
 
 class CCSTForLoop : public CCSTIterationStmnt
@@ -1312,7 +1316,7 @@ class CCSTForLoop : public CCSTIterationStmnt
   CCSTStatement *body_;
  public:
   CCSTForLoop(CCSTExpression *init, CCSTExpression *cond, CCSTExpression *up, CCSTStatement *body); //{ this->init_ = init; this->cond_ = cond; this->up_ = up; this->body_ = body;}
-  virtual void write(FILE *f);
+  virtual void write(FILE *f, int indent);
 };
 
 class CCSTJumpStmnt : public CCSTStatement
@@ -1325,7 +1329,7 @@ class CCSTJumpStmnt : public CCSTStatement
    */
   
  public:
-  virtual void write(FILE *f) = 0; //?
+  virtual void write(FILE *f, int indent) = 0; //?
   
 };
 
@@ -1334,7 +1338,7 @@ class CCSTGoto : public CCSTJumpStmnt
   const char* identifier_;
  public:
   CCSTGoto(const char* id); // {this->identifier_ = id;}
-  virtual void write(FILE *f);
+  virtual void write(FILE *f, int indent);
   
 };
 
@@ -1342,14 +1346,14 @@ class CCSTContinue : public CCSTJumpStmnt
 {
  public:
   CCSTContinue();
-  virtual void write(FILE *f);
+  virtual void write(FILE *f, int indent);
 };
 
 class CCSTBreak : public CCSTJumpStmnt
 {
  public:
   CCSTBreak();
-  virtual void write(FILE *f);
+  virtual void write(FILE *f, int indent);
 };
 
 class CCSTReturn : public CCSTJumpStmnt
@@ -1358,7 +1362,7 @@ class CCSTReturn : public CCSTJumpStmnt
  public:
   CCSTReturn(CCSTExpression *expr);// {this->expr_ = expr;}
   CCSTReturn(); // {this->expr_ = NULL;}
-  virtual void write(FILE *f);
+  virtual void write(FILE *f, int indent);
 };
 
 #endif

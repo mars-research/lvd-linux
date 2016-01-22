@@ -83,7 +83,7 @@ int main(int argc, char ** argv)
 		exit(0);
 	      }
 	    CCSTFile* ccst_tree = generate_server_source(m);
-	    ccst_tree->write(of);
+	    ccst_tree->write(of, 0);
 	  }
 
 	  printf("Completed Server source writing\n");
@@ -120,7 +120,7 @@ int main(int argc, char ** argv)
 		exit(0);
 	      }
 	    CCSTFile* ccst_tree = generate_client_source(m);
-	    ccst_tree->write(of);
+	    ccst_tree->write(of, 0);
 	  }
 	  printf("completed client source writing\n");
 	  

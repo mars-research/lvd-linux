@@ -159,7 +159,7 @@ fail1:
 	return ret;
 }
 
-int __klcd_create_klcd(struct lcd *caller, cptr_t slot)
+int __lcd_create_klcd(struct lcd *caller, cptr_t slot)
 {
 	struct lcd *lcd;
 	int ret;

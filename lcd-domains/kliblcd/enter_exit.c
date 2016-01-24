@@ -13,6 +13,7 @@ int lcd_enter(void)
 	int ret;
 	struct lcd *lcd;
 	struct cptr_cache *cache;
+	cptr_t unused;
 	/*
 	 * This sets up the runtime environment for non-isolated
 	 * threads.
@@ -49,12 +50,25 @@ int lcd_enter(void)
 		goto fail3;
 	}
 	/*
+	 * Reserve first two slots for call/reply caps (just alloc them)
+	 */
+	ret = cptr_alloc(cache, &unused);
+	if (ret) {
+		LCD_ERR("cptr cache alloc1");
+		goto fail4;
+	}
+	ret = cptr_alloc(cache, &unused);
+	if (ret) {
+		LCD_ERR("cptr cache alloc2");
+		goto fail5;
+	}
+	/*
 	 * Create our call endpoint (for receiving rpc replies)
 	 */
 	ret = __lcd_create_sync_endpoint(current->lcd, LCD_CPTR_CALL_ENDPOINT);
         if (ret) {
                 LCD_ERR("creating call endpoint");
-                goto fail4;
+                goto fail6;
         }
 
 	return 0;

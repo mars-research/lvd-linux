@@ -75,27 +75,27 @@ int lcd_config_registers(cptr_t lcd, gva_t pc, gva_t sp, gpa_t gva_root,
 				 gpa_t utcb_page);
 
 /**
- * lcd_page_grant_and_map -- Grant LCD access to pages, and map it in its
- *                           *guest physical* address space
+ * lcd_memory_grant_and_map -- Grant LCD access to memory object, and map it 
+ *                             in its *guest physical* address space
  * @lcd: the LCD to configure
- * @page: cptr to pages capability in *caller* cspace
- * @dest_slot: slot in LCD's cspace where pages capability copied to
- * @base: starting guest physical address where chunk of pages mapped
+ * @mo: cptr to memory object capability in *caller* cspace
+ * @dest_slot: slot in LCD's cspace where capability copied/granted to
+ * @base: starting guest physical address where memory should be mapped
  *
  * This function combines two operations because we want to enforce the
- * invariant that an LCD has a page mapped in its address space only if
- * it has a capability to that page. (Of course, it can have capabilities
- * to pages that aren't mapped.)
+ * invariant that an LCD has a memory mapped in its address space only if
+ * it has a capability to that memory. (Of course, it can have capabilities
+ * to memory that isn't mapped.)
  *
  * The caller is responsible for knowing what slots are free in the LCD's
  * cspace.
  *
- * If the chunk of pages referenced by the pages capability does not fit
+ * If the memory referenced by the capability does not fit
  * in the LCD's guest physical address space, starting at @base, then
  * this function fails.
  */
-int lcd_page_grant_and_map(cptr_t lcd, cptr_t page, cptr_t dest_slot,
-				   gpa_t base);
+int lcd_memory_grant_and_map(cptr_t lcd, cptr_t mo, cptr_t dest_slot,
+			gpa_t base);
 
 /**
  * lcd_cap_grant -- Grant the LCD a capability (config its cspace)

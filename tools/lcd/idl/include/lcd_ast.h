@@ -455,6 +455,7 @@ class ProjectionType : public Type // complex type
   virtual void resolve_types(LexicalScope *ls);
   ~ProjectionType(){printf("projection type destructor\n");}
   virtual void create_trampoline_structs(LexicalScope *ls);
+  ProjectionField* get_field(const char* field_name);
 };
 
 class Rpc : public Base

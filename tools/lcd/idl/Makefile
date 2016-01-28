@@ -12,7 +12,7 @@ objects = lcd_ast.o main.o lcd_idl.o scope.o symbol_table.o variable.o types.o t
 $(bin): $(objects) 
 	$(CXX) $(LDFLAGS) -o $@ $^ $(LDLIBS)
 
-main.o: main/main.cpp include/lcd_ast.h include/lcd_idl.h include/error.h include/ccst.h
+main.o: main/main.cpp include/lcd_ast.h include/lcd_idl.h include/error.h include/ccst.h include/code_gen.h
 	$(CXX) $(CXXFLAGS) -c -o $@ $(filter-out %.h,$^)
 
 error.o: error/error.cpp include/error.h

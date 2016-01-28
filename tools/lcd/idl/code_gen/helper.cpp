@@ -251,6 +251,14 @@ std::vector<CCSTDecSpecifier*> struct_type(const char *type_name)
   return specifier;
 }
 
+std::vector<CCSTDecSpecifier*> int_type()
+{
+  std::vector<CCSTDecSpecifier*>specifier;
+  specifier.push_back(new CCSTSimpleTypeSpecifier(int_t));
+  
+  return specifier;
+}
+
 std::vector<CCSTDecSpecifier*> type2(Type *t)
 {
   std::vector<CCSTDecSpecifier*>specifier;
@@ -612,3 +620,21 @@ CCSTStructUnionSpecifier* struct_declaration(ProjectionType *pt)
   
   return new CCSTStructUnionSpecifier(struct_t, pt->name(), field_decs);
 }
+
+CCSTIfStatement* if_cond_fail(CCSTExpression *cond, const char *err_msg)
+{
+  std::vector<CCSTDeclaration*> if_body_declarations;
+  std::vector<CCSTStatement*> if_body_statements;
+  
+  std::vector<CCSTAssignExpr*> liblcd_err_args;
+  liblcd_err_args.push_back(new CCSTString(err_msg));
+  if_body_statements.push_back(function_call("LIBLCD_ERR", liblcd_err_args));
+
+  std::vector<CCSTAssignExpr*> lcd_exit_args;
+  lcd_exit_args.push_back(new CCSTInteger(-1));
+  if_body_statements.push_back(function_call("lcd_exit", lcd_exit_args));
+
+  CCSTCompoundStatement *if_body = new CCSTCompoundStatement(if_body_declarations, if_body_statements);
+  return new CCSTIfStatement(cond, if_body);
+}
+

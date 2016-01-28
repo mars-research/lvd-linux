@@ -94,6 +94,11 @@ CCSTCompoundStatement* caller_body(Rpc *r)
   // loop through params, declare a tmp and pull out marshal value
   std::vector<Parameter*> params = r->parameters();
 
+  std::vector<CCSTInitDeclarator*> err_decs;
+  err_decs.push_back(new CCSTDeclarator(0x0, new CCSTDirectDecId("err")));
+  CCSTDeclaration *err_variable = new CCSTDeclaration(int_type(), err_decs);
+  declarations.push_back(err_variable);
+
   // for each parameter that is ia projection -- & is alloc
   for(std::vector<Parameter*>::iterator it = params.begin(); it != params.end(); it ++)
     {
@@ -130,23 +135,30 @@ CCSTCompoundStatement* caller_body(Rpc *r)
 	// if null
 	// LIBLCD_ERR("kzalloc");
 	//	lcd_exit(-1); /* abort */
-	std::vector<CCSTDeclaration*> if_body_declarations;
-	std::vector<CCSTStatement*> if_body_statements;
-	
-	std::vector<CCSTAssignExpr*> liblcd_err_args;
-	liblcd_err_args.push_back(new CCSTString("kzalloc"));
-	if_body_statements.push_back(function_call("LIBLCD_ERR", liblcd_err_args));
-	std::vector<CCSTAssignExpr*> lcd_exit_args;
-	lcd_exit_args.push_back(new CCSTInteger(-1));
-	if_body_statements.push_back(function_call("lcd_exit", lcd_exit_args));
-	CCSTCompoundStatement *if_body = new CCSTCompoundStatement(if_body_declarations, if_body_statements);
-	statements.push_back(new CCSTIfStatement(new CCSTUnaryExprCastExpr(Not(), new CCSTPrimaryExprId(container_name_))
-						 , if_body));
+	statements.push_back(if_cond_fail(new CCSTUnaryExprCastExpr(Not(), new CCSTPrimaryExprId(container_name_))
+					  , "kzalloc"));
 
 
-      
 	// insert into dstore
       // do error checking
+	// err = lcd_dstore_insert...
+	std::vector<CCSTAssignExpr*> dstore_insert_args;
+	dstore_insert_args.push_back(new CCSTPrimaryExprId("dstore")); // lookup this name in the future.
+	dstore_insert_args.push_back(new CCSTPrimaryExprId(container_name_)); // what we are inserting
+
+	dstore_insert_args.push_back(new CCSTEnumConst("STRUCT_FILE_TAG")); // this part is not clear
+
+	ProjectionField *my_ref_field = container->get_field("my_ref");
+	Assert(my_ref_field != 0x0, "Error: could not find field in projection\n");
+
+	dstore_insert_args.push_back(access(my_ref_field));	
+
+	// insert into dstore
+	statements.push_back(new CCSTAssignExpr(new CCSTPrimaryExprId("err"), equals(), function_call("lcd_dstore_insert", dstore_insert_args)));
+      
+	// do error checking
+	statements.push_back(if_cond_fail(new CCSTPrimaryExprId("err"), "dstore"));
+	
       }
     }
 

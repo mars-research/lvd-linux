@@ -132,71 +132,7 @@ CCSTCompoundStatement* dispatch_loop_body(std::vector<Rpc*> rps)
  */
 CCSTCompoundStatement* callee_body(Rpc *r)
 {
-  // unmarshal parameters based on marshal data.
-  // which says where params are stored.
-  
-  std::vector<CCSTDeclaration*> declarations;
-  std::vector<CCSTStatement*> statements;
-  
-  // loop through params, declare a tmp and pull out marshal value
-  std::vector<Parameter*> params = r->parameters();
-
-  // for each parameter that is ia projection -- & is alloc
-  for(std::vector<Parameter*>::iterator it = params.begin(); it != params.end(); it ++)
-    {
-      Parameter *p = *it;
-      if(p->type()->num() == 4 && p->alloc_caller()) {
-	ProjectionType *pt = dynamic_cast<ProjectionType*>(p->type());
-	Assert(pt != 0x0, "Error: dynamic cast to Projection type failed!\n");
-
-	// lookup container struct
-	int err;
-	const char* container_name_ = container_name(pt->name());
-	Type *container_tmp = r->current_scope()->lookup(container_name_, &err);
-	Assert(container_tmp != 0x0, "Error: could not find container in environment\n");
-	ProjectionType *container = dynamic_cast<ProjectionType*>(container_tmp);
-	Assert(container != 0x0, "Error: dynamic cast to Projection type failed!\n");
-	
-	// declare instance of container
-	std::vector<CCSTInitDeclarator*> decs;
-	decs.push_back(new CCSTDeclarator(new CCSTPointer(), new CCSTDirectDecId(container_name_)));
-	CCSTDeclaration *container_declaration = new CCSTDeclaration(type2(container), decs);
-	// finish declaring instance of container 
-	
-	declarations.push_back(container_declaration);
-	
-	// 	file_container = kzalloc(sizeof(*file_container), GFP_KERNEL);
-	std::vector<CCSTAssignExpr*> kzalloc_args;
-	kzalloc_args.push_back(new CCSTUnaryExprSizeOf(new CCSTUnaryExprCastExpr(new CCSTUnaryOp(unary_mult_t), new CCSTPrimaryExprId(container_name_))));
-	kzalloc_args.push_back(new CCSTEnumConst("GFP_KERNEL"));
-	
-
-	statements.push_back(new CCSTAssignExpr(new CCSTPrimaryExprId(container_name_), equals(), function_call("kzalloc", kzalloc_args)));
-
-	// if null
-	// LIBLCD_ERR("kzalloc");
-	//	lcd_exit(-1); /* abort */
-	std::vector<CCSTDeclaration*> if_body_declarations;
-	std::vector<CCSTStatement*> if_body_statements;
-	
-	std::vector<CCSTAssignExpr*> liblcd_err_args;
-	liblcd_err_args.push_back(new CCSTString("kzalloc"));
-	if_body_statements.push_back(function_call("LIBLCD_ERR", liblcd_err_args));
-	std::vector<CCSTAssignExpr*> lcd_exit_args;
-	lcd_exit_args.push_back(new CCSTInteger(-1));
-	if_body_statements.push_back(function_call("lcd_exit", lcd_exit_args));
-	CCSTCompoundStatement *if_body = new CCSTCompoundStatement(if_body_declarations, if_body_statements);
-	statements.push_back(new CCSTIfStatement(new CCSTUnaryExprCastExpr(Not(), new CCSTPrimaryExprId(container_name_))
-						 , if_body));
-
-
-      
-	// insert into dstore
-      // do error checking
-      }
-    }
-
-  return new CCSTCompoundStatement(declarations, statements);
+  printf("callee body todo\n");
 }
 
 
@@ -372,6 +308,7 @@ CCSTFile* generate_server_source(Module *m)
 	 definitions.push_back( function_definition(function_declaration(r_tmp)
 						    ,caller_body(r_tmp)));
        } else {
+	 printf("doing callee_declaration\n");
 	 definitions.push_back( function_definition(callee_declaration(r_tmp)
 						    ,callee_body(r_tmp)));
        }
@@ -383,32 +320,3 @@ CCSTFile* generate_server_source(Module *m)
    printf("in server source gen\n");
    return c_file;
 }
-
-
-// one
-
-/*
-CCSTCompoundStatement* create_callee_body(Rpc *r)
-{
-  std::vector<Parameter*> parameters = r->parameters();
-  for(std::vector<Parameter*>::iterator it = parameters.begin(); it != parameters.end(); it ++) {
-    Parameter *p = (Parameter*) *it;
-    if(p->alloc()) {
-      AllocateVariableVisitor *worker = new AllocateVariableVisitor();
-      p->type()->accept(worker); // allocates space if needed. 
-    } else { // if not alloc must be bind?
-      // grab from some function. 
-    }
-
-    UnmarshalVariableVisitor *worker = new UnmarshalVariableVisitor();
-    p->accept(worker);
-    
-  }
-
-  // make real call.
-  
-  // for each implicit return, marshal
-
-  // marshal explicit return
-  
-  } */

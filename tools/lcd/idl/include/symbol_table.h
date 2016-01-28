@@ -2,7 +2,10 @@
 #define SYMBOL_TABLE_H
 
 #include <vector>
+#include <string.h>
 #include <string>
+#include <stdlib.h>
+#include <sstream>
 
 class SymbolTable 
 {
@@ -10,10 +13,12 @@ class SymbolTable
   std::vector<const char*> symbols_;
  public:
   SymbolTable();
+  SymbolTable(std::vector<const char*> symbols);
   const char* unique_tmp();
-  bool contains();
-  void insert(const char *symbol);
-  void insert(std::vector<const char*> symbols);
+  bool contains(const char *symbol);
+  int insert(const char *symbol);
+  int insert(std::vector<const char*> symbols);
+  std::string to_string(int value);
 };
 
 #endif

@@ -405,5 +405,16 @@ void ProjectionType::create_trampoline_structs(LexicalScope *ls)
   }
 }
 
+ProjectionField* ProjectionType::get_field(const char *field_name)
+{
+  for(std::vector<ProjectionField*>::iterator it = this->fields_.begin(); it != this->fields_.end(); it ++) {
+    ProjectionField *pf = *it;
+    if (strcmp(field_name, pf->identifier()) == 0) {
+      return pf;
+    }
+  }
+  return 0x0;
+}
+
 /* end */
 

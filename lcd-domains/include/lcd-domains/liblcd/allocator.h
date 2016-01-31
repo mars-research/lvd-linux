@@ -60,9 +60,10 @@ struct allocator_callbacks {
 
 struct lcd_page_allocator {
 
+	unsigned int nr_pages_order;
 	unsigned int min_order;
+	unsigned int metadata_malloc_order;
 	unsigned int max_order;
-	unsigned int backing_order;
 	int embed_metadata;
 
 	struct list_head *free_lists;

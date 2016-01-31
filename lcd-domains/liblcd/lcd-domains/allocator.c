@@ -10,10 +10,133 @@
 
 #include <lcd-domains/liblcd.h>
 
+/* MISC ------------------------------------------------------------ */
+
+unsigned int pa_nr_free_lists(struct lcd_page_allocator *pa)
+{
+	return pa->max_order - pa->min_order + 1;
+}
+
+unsigned long pa_nr_page_blocks(struct lcd_page_allocator *pa)
+{
+	/* 2^nr_pages_order  /  2^min_order */
+	return (1UL << (pa->nr_pages_order - pa->min_order));
+}
+
 /* ALLOCATOR INIT -------------------------------------------------- */
 
+static struct lcd_page_allocator* 
+init_struct_pa(void *metadata_addr,
+	unsigned long nr_pages_order,
+	unsigned int min_order,
+	unsigned int metadata_malloc_order,
+	unsigned int max_order,
+	const struct lcd_page_allocator_cbs *cbs,
+	int embed_metadata)
+{
+	struct lcd_page_allocator *pa = metadata_addr;
 
+	pa->nr_pages_order = nr_pages_order;
+	pa->min_order = min_order;
+	pa->metadata_malloc_order = metadata_malloc_order;
+	pa->max_order = max_order;
+	pa->cbs = cbs;
+	pa->embed_metadata = embed_metadata;
 
+	return pa;
+}
+
+void init_free_list_heads(struct lcd_page_allocator *pa)
+{
+	unsigned int i;
+	struct list_head *free_lists;
+	/*
+	 * The free lists are just after the struct lcd_page_allocator
+	 * (plus some alignment)
+	 */
+	free_lists = (struct list_head *)ALIGN(((void *)pa) + sizeof(*pa),
+					sizeof(struct list_head));
+	pa->free_lists = free_lists;
+	/*
+	 * Initialize each one
+	 */
+	for (i = 0; i < pa_nr_free_lists(pa); i++)
+		INIT_LIST_HEAD(&free_lists[i]);
+}
+
+void init_page_blocks(struct lcd_page_allocator *pa)
+{
+	struct lcd_page_block *cursor;
+	unsigned long i;
+	/*
+	 * The array of lcd_page_block's comes after the free list heads
+	 * (plus some alignment)
+	 */
+	cursor = (struct lcd_page_block *)ALIGN(
+		(void *)(pa->free_lists) +
+		pa_nr_free_lists(pa) * sizeof(struct list_head),
+		sizeof(struct lcd_page_block));
+	/*
+	 * Zero out the array
+	 */
+	memset(cursor, 0, 
+		pa_nr_page_blocks(pa) * sizeof(struct lcd_page_block));
+	/*
+	 * Initialize each one's buddy list head, and free the page, so
+	 * the allocator will build up the free lists.
+	 */
+	for (i = 0; i < pa_nr_page_blocks(pa); i++) {
+		INIT_LIST_HEAD(&cursor[i].buddly_list);
+		lcd_page_allocator_free(pa, 
+					&cursor[i],
+					0);
+	}
+}
+
+static int allocator_init(void *metadata_addr,
+			unsigned long nr_pages_order,
+			unsigned int min_order,
+			unsigned int metadata_malloc_order,
+			unsigned int max_order,
+			const struct lcd_page_allocator_cbs *cbs,
+			int embed_metadata,
+			struct lcd_page_allocator **pa_out)
+{
+	struct lcd_page_allocator *pa;
+	/*
+	 * Init top level struct
+	 */
+	pa = init_struct_pa(metadata_addr,
+			nr_pages_order,
+			min_order,
+			max_order,
+			cbs,
+			embed_metadata);
+	/*
+	 * Init free list heads
+	 */
+	init_free_list_heads(pa);
+	/*
+	 * Init the array of page blocks
+	 */
+	init_page_blocks(pa);
+	/*
+	 * If the metadata is embedded, allocate enough page blocks
+	 * to cover it
+	 */
+	if (embed_metadata) {
+		ret = alloc_metadata_page_blocks(pa);
+		if (ret)
+			goto fail1;
+	}
+
+	*pa_out = pa;
+
+	return 0;
+
+fail1:
+	return ret;
+}
 
 /* METADATA FREE -------------------------------------------------- */
 
@@ -199,6 +322,8 @@ static unsigned long calc_metadata_size(unsigned int nr_pages_order,
 	return 0;
 }
 
+/* INTERFACE -------------------------------------------------- */
+
 int lcd_page_allocator_create(unsigned long nr_pages_order,
 			unsigned int min_order,
 			unsigned int metadata_malloc_order,
@@ -236,7 +361,13 @@ int lcd_page_allocator_create(unsigned long nr_pages_order,
 	/*
 	 * Initialize allocator
 	 */
-	ret = allocator_init(metadata_addr, pa_out);
+	ret = allocator_init(metadata_addr, 
+			nr_pages_order,
+			min_order,
+			metadata_malloc_order,
+			max_order,
+			cbs,
+			embed_metadata);
 	if (ret)
 		goto fail3;
 

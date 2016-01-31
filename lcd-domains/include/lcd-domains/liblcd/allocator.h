@@ -25,12 +25,6 @@
  *                   - during destroy, 
  *     -- problem - alloc tree nodes during heap init . */
 
-struct lcd_mem_chunk {
-	struct list_head buddy_list;
-	unsigned int order;
-	struct lcd_resource_node *n;
-};
-
 struct lcd_free_lists {
 	unsigned int min_order, notify_order, max_order;
 	struct lcd_mem_chunk *free_lists;
@@ -51,8 +45,10 @@ struct lcd_free_lists {
 			struct lcd_mem_chunk *mc);
 };
 
-struct lcd_page_allocator {
-	struct lcd_free_lists fl;
+struct lcd_page_block {
+	struct list_head buddy_list;
+	unsigned int order;
+	struct lcd_resource_node *n;
 };
 
 struct allocator_callbacks {
@@ -61,6 +57,20 @@ struct allocator_callbacks {
 	/* init alloc */
 	/* exit dealloc */
 };
+
+struct lcd_page_allocator {
+
+	unsigned int min_order;
+	unsigned int max_order;
+	unsigned int backing_order;
+	int embed_metadata;
+
+	struct list_head *free_lists;
+	unsigned int nr_page_blocks_free;
+
+	const struct lcd_page_allocator_cbs *cbs;
+};
+
 
 int mk_page_allocator(
 	unsigned long nr_pages_order,

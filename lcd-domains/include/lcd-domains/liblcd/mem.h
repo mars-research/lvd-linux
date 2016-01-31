@@ -388,6 +388,16 @@ int lcd_unvolunteer_dev_mem(cptr_t devmem);
  */
 int lcd_phys_to_cptr(gpa_t paddr, cptr_t *c_out, unsigned int *order_out);
 /**
+ * lcd_phys_to_resource_node -- Look up the struct lcd_resource_node for the
+ *                              memory object that contains guest physical
+ *                              address @paddr
+ * @paddr: the physical address to search for
+ * @n_out: out param, the lcd resource node found
+ *
+ * Similar caveats as lcd_phys_to_cptr.
+ */
+int lcd_phys_to_resource_node(gpa_t paddr, struct lcd_resource_node **n);
+/**
  * lcd_virt_to_cptr -- Look up the cptr for memory object that contains
  *                     guest virtual address @vaddr
  * @vaddr: the virtual address to search for

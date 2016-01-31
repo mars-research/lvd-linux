@@ -47,6 +47,30 @@ struct lcd_resource_node {
 	cptr_t cptr;
 };
 
+static inline unsigned long
+lcd_resource_node_start(struct lcd_resource_node *n)
+{
+	return n->it_node.start;
+}
+
+static inline unsigned long
+lcd_resource_node_last(struct lcd_resource_node *n)
+{
+	return n->it_node.last;
+}
+
+static inline unsigned long 
+lcd_resource_node_order(struct lcd_resource_node *n)
+{
+	return n->nr_pages_order;
+}
+
+static inline cptr_t
+lcd_resource_node_cptr(struct lcd_resource_node *n)
+{
+	return n->cptr;
+}
+
 /* INTERFACE -------------------------------------------------- */
 
 /**

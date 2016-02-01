@@ -15,15 +15,20 @@
 
 /* MISC ------------------------------------------------------------ */
 
-unsigned int pa_nr_free_lists(struct lcd_page_allocator *pa)
+static unsigned int pa_nr_free_lists(struct lcd_page_allocator *pa)
 {
 	return pa->max_order - pa->min_order + 1;
 }
 
-unsigned long pa_nr_page_blocks(struct lcd_page_allocator *pa)
+static unsigned long pa_nr_page_blocks(struct lcd_page_allocator *pa)
 {
 	/* 2^nr_pages_order  /  2^min_order */
 	return (1UL << (pa->nr_pages_order - pa->min_order));
+}
+
+static int pb_is_free(struct lcd_page_block *pb)
+{
+	return !list_empty(&buddy->buddy_list);
 }
 
 /* ALLOC ------------------------------------------------------------ */
@@ -176,7 +181,7 @@ static inline int pb_is_buddy(struct lcd_page_block *pb,
 			struct lcd_page_block *buddy,
 			int order)
 {
-	if (list_empty(&buddy->buddy_list)) {
+	if (!pb_is_free(buddy)) {
 		/* Not in a free list; buddy is in use. */
 		return 0;
 	}
@@ -421,6 +426,12 @@ static int alloc_metadata_page_blocks(struct lcd_page_allocator *pa,
 	}
 	pb->n = n;
 	/*
+	 * Remember offset to first non-metadata page block
+	 */
+	pa->first_non_metadata_pb_idx = 
+		(pb + (1UL << tail_order) - pa->pb_array) / 
+		sizeof(struct lcd_page_block);
+	/*
 	 * All page blocks that contain metadata have been allocated,
 	 * and resource nodes have been installed.
 	 */
@@ -509,7 +520,7 @@ static void free_metadata(void *metadata_addr,
 			LIBLCD_ERR("error looking up metadata resource node for gpa = %lx", gpa_val(addr));
 			continue;
 		}
-		cbs->free_unmap_metadata_memory_chunk(n);
+		cbs->free_unmap_metadata_memory_chunk(cbs, n);
 	}
 }
 
@@ -539,7 +550,8 @@ static void* malloc_metadata(unsigned int alloc_order,
 		/*
 		 * Allocate and map a memory chunk
 		 */
-		ret = cbs->alloc_map_metadata_memory_chunk(alloc_order,
+		ret = cbs->alloc_map_metadata_memory_chunk(cbs,
+							alloc_order,
 							i * (1UL << alloc_order), 
 							&n);
 		if (ret) {
@@ -558,7 +570,7 @@ static void* malloc_metadata(unsigned int alloc_order,
 
 fail1:
 	for (j = 0; j < i; j++)
-		cbs->free_unmap_metadata_memory_chunk(n);
+		cbs->free_unmap_metadata_memory_chunk(cbs, n);
 	return NULL;
 }
 
@@ -721,6 +733,32 @@ fail1:
 
 }
 
+void lcd_page_allocator_destroy(struct lcd_page_allocator *pa)
+{
+	struct lcd_page_block *cursor;
+	unsigned long i;
+
+	cursor = pa->pb_array;
+	/*
+	 * Iterate over all page blocks, and if it's not free,
+	 * free it. This may move neighbors ahead in the 
+	 * giant array into the free lists.
+	 *
+	 * We do this so that it triggers the free callbacks.
+	 *
+	 * Skip over metadata (if we try to delete resources that contain
+	 * metadata while we're tearing everything down, we'll crash).
+	 */
+	for (i = pa->embed_metadata_offset; i < pa_nr_page_blocks(pa); i++) {
+		if (!pb_is_free(&cursor[i]))
+			lcd_page_allocator_free(pa, &cursor[i], 0);
+	}
+	/*
+	 * The caller is responsible for freeing the metadata
+	 */
+	return;
+}
+
 void lcd_page_allocator_free(struct lcd_page_allocator *pa,
 			struct lcd_page_block *pb,
 			unsigned int order)
@@ -752,4 +790,22 @@ fail2:
 	do_free(pa, pb, order);
 fail1:
 	return NULL;
+}
+
+unsigned long lcd_page_block_to_offset(struct lcd_page_allocator *pa,
+				struct lcd_page_block *pb)
+{
+	unsigned long offset;
+
+	offset = (pb - pa->pb_array) / sizeof(struct lcd_page_block);
+	
+	/* Each page block is 2^min_order bytes of mem */
+	return offset << pa->min_order;
+}
+
+struct lcd_page_block*
+lcd_offset_to_page_block(struct lcd_page_allocator *pa,
+			unsigned long offset)
+{
+	return &pa->pb_array[offset >> pa->min_order];
 }

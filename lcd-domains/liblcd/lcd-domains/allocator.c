@@ -132,6 +132,34 @@ fail:
 
 /* FREE ------------------------------------------------------------ */
 
+static void pb_unbacking(struct lcd_page_allocator *pa, 
+			struct lcd_page_block *pb, unsigned int order)
+{
+	unsigned long offset;
+	/*
+	 * If:
+	 *      1 - the page block is at the beginning of a resource node
+	 *      2 - its order is at least as big as the resource node's order
+	 *      3 - the caller provided a free call back
+	 *
+	 * invoke the free callback so that the caller can free / unmap the
+	 * backing memory.
+	 */
+	if (!(pb->n != NULL && 
+			order >= pb->n->order &&
+			pa->cbs.free_unmap_regular_mem_chunk))
+		return;
+
+	offset = lcd_page_block_to_offset(pa, pb);
+
+	pa->cbs.free_unmap_regular_mem_chunk(pa, pb, pb->n, offset, order);
+	/*
+	 * NULL out the page block's resource node so we know it's not
+	 * backed anymore
+	 */
+	pb->n = NULL;
+}
+
 /* mm/page_alloc.c: __find_buddy_index */
 static inline unsigned long
 __find_buddy_index(unsigned long pb_idx, unsigned int order)
@@ -211,7 +239,18 @@ static void do_free(struct lcd_page_allocator *pa,
 		pb = pb + (combined_idx - pb_idx);
 		pb_idx = combined_idx;
 		order++;
+		/*
+		 * ----------------------------------------
+		 *
+		 * Check if we need to free / unmap the backing memory
+		 */
+		pb_unbacking(pa, pb, order);
 	}
+	/*
+	 * Check one more time if we need to free / unmap the backing memory
+	 * (in case the resource node's order is max order)
+	 */
+	pb_unbacking(pa, pb, order);
 	/*
 	 * Install coalesced page block in correct free list
 	 */

@@ -5,6 +5,9 @@
  *
  * Draws from design and code of Linux buddy allocator.
  *
+ * Our lcd_page_allocator is like a Linux zone. (Linux uses
+ * a buddy allocator per zone.)
+ *
  * Copyright: University of Utah
  */
 
@@ -101,7 +104,7 @@ alloc_page_blocks(struct lcd_page_allocator *pa, unsigned int order)
 	 * possible.
 	 */
 	for (current_order = order; 
-	     current_order < pa->max_order; 
+	     current_order <= pa->max_order; 
 	     current_order++) {
 
 		free_list_idx = current_order - pa->min_order;
@@ -118,7 +121,7 @@ alloc_page_blocks(struct lcd_page_allocator *pa, unsigned int order)
 		 * Remove page blocks from free list, and do any
 		 * necessary splitting. (It's important to do
 		 * list_del_init, because for us, we check if a page block's
-		 * buddy list is empty to see if its free.)
+		 * buddy list is empty to see if it's free.)
 		 */
 		list_del_init(&pb->buddy_list);
 		pa->nr_page_blocks_free -= (1UL << current_order);
@@ -253,10 +256,12 @@ static void do_free(struct lcd_page_allocator *pa,
 	 */
 	pb_unbacking(pa, pb, order);
 	/*
-	 * Install coalesced page block in correct free list
+	 * Install coalesced page block in correct free list. (It's
+	 * important we do list_add_tail because the init code
+	 * expects the page block chunks to be in memory order.)
 	 */
 	pb->order = order;
-	list_add(&pb->buddy_list, 
+	list_add_tail(&pb->buddy_list, 
 		&pa->free_lists[order - pa->min_order]);
 	pa->nr_page_blocks_free += (1UL << order);
 }
@@ -340,17 +345,90 @@ void init_page_blocks(struct lcd_page_allocator *pa)
 	}
 }
 
-static int alloc_metadata_page_blocks(struct lcd_page_allocator *pa)
+static int alloc_metadata_page_blocks(struct lcd_page_allocator *pa,
+				unsigned long metadata_sz)
 {
-
-	/* Alloc in chunks of 2^max_order; this should go from 
-
-	/* Do phys -> resource node */
-
-	/* Install node */
+	struct lcd_page_block *pb;
+	struct lcd_resource_node *n;
+	gpa_t metadata_base;
+	unsigned long offset;
+	unsigned int tail_order;
+	/*
+	 * If we encounter an error, we just fail because this will
+	 * trigger a full page allocator tear down.
+	 *
+	 * --------------------------------------------------
+	 *
+	 * pa points to beginning of metadata. Remember,
+	 * guest virtual == guest physical inside an LCD.
+	 */
+	metadata_base = __gpa((unsigned long)pa);
+	/*
+	 * Allocate the big chunks first
+	 */
+	while (metadata_sz > (1UL << pa->max_order)) {
+		/*
+		 * Allocate 2^max_order bytes
+		 */
+		pb = alloc_page_blocks(pa, pa->max_order);
+		if (!pb) {
+			LIBLCD_ERR("error allocating blocks for metadata");
+			return -EIO;
+		}
+		/*
+		 * Look up the resource node for this chunk of memory
+		 */
+		offset = lcd_page_block_to_offset(pa, pb);
+		ret = lcd_phys_to_resource_node(
+			gpa_add(metadata_base, offset),
+			&n);
+		if (ret) {
+			LIBLCD_ERR("error looking up metadata resource node");
+			return -EIO;
+		}
+		/*
+		 * Install resource node in page block
+		 */
+		pb->n = n;
+		/*
+		 * Shift to next 2^max_order chunk
+		 */
+		metadata_sz -= (1UL << pa->max_order);
+	}
+	/*
+	 * Allocate the remainder, rounded up to the closest power of 2
+	 * page blocks. (This means the remaining page blocks will be used
+	 * for real allocs.)
+	 */
+	tail_order = 0;
+	while (metadata_sz >>= 1)
+		tail_order++;
+	pb = alloc_page_blocks(pa, tail_order);
+	if (!pb) {
+		LIBLCD_ERR("error allocating page blocks for metadata");
+		return -EIO;
+	}
+	/*
+	 * Look up and install resource node for remainder
+	 */
+	offset = lcd_page_block_to_offset(pa, pb);
+	ret = lcd_phys_to_resource_node(
+		gpa_add(metadata_base, offset),
+		&n);
+	if (ret) {
+		LIBLCD_ERR("error looking up metadata resource node");
+		return -EIO;
+	}
+	pb->n = n;
+	/*
+	 * All page blocks that contain metadata have been allocated,
+	 * and resource nodes have been installed.
+	 */
+	return 0;
 }
 
 static int allocator_init(void *metadata_addr,
+			unsigned long metadata_sz,
 			unsigned long nr_pages_order,
 			unsigned int min_order,
 			unsigned int metadata_malloc_order,
@@ -383,7 +461,7 @@ static int allocator_init(void *metadata_addr,
 	 * for something else).
 	 */
 	if (embed_metadata) {
-		ret = alloc_metadata_page_blocks(pa);
+		ret = alloc_metadata_page_blocks(pa, metadata_sz);
 		if (ret)
 			goto fail1;
 	}
@@ -619,7 +697,8 @@ int lcd_page_allocator_create(unsigned long nr_pages_order,
 	/*
 	 * Initialize allocator
 	 */
-	ret = allocator_init(metadata_addr, 
+	ret = allocator_init(metadata_addr,
+			metadata_sz,
 			nr_pages_order,
 			min_order,
 			metadata_malloc_order,

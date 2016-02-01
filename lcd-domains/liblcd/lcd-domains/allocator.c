@@ -23,6 +23,97 @@ unsigned long pa_nr_page_blocks(struct lcd_page_allocator *pa)
 	return (1UL << (pa->nr_pages_order - pa->min_order));
 }
 
+/* FREE ------------------------------------------------------------ */
+
+/* mm/page_alloc.c: __find_buddy_index */
+static inline unsigned long
+__find_buddy_index(unsigned long pb_idx, unsigned int order)
+{
+	return pb_idx ^ (1 << order);
+}
+
+/* mm/page_alloc.c: page_is_buddy */
+static inline int pb_is_buddy(struct lcd_page_block *pb, 
+			struct lcd_page_block *buddy,
+			int order)
+{
+	if (list_empty(&buddy->buddy_list)) {
+		/* Not in a free list; buddy is in use. */
+		return 0;
+	}
+	if (buddy->order != order) {
+		/* Buddy sitting on smaller free list, so we can't
+		 * coalesce yet. */
+		return 0;
+	}
+
+	return 1;
+}
+
+static void do_free(struct lcd_page_allocator *pa,
+		struct lcd_page_block *pb,
+		unsigned int order)
+{
+	unsigned long pb_idx;
+	unsigned long combined_idx;
+	unsigned long buddy_idx;
+	struct lcd_page_block *buddy;
+	/*
+	 * Calculate index of page block in giant array. Should
+	 * be a multiple of 2^order.
+	 */
+	pb_idx = (pb - pa->pb_array) / sizeof(struct lcd_page_block);
+	BUG_ON(pb_idx & ((1 << order) - 1));
+	/*
+	 * Coalesce
+	 */
+	while (order < pa->max_order) {
+		/*
+		 * Get buddy page block
+		 */
+		buddy_idx = __find_buddy_index(pb_idx, order);
+		buddy = pb + (buddy_idx - pb_idx);
+		if (!pb_is_buddy(pb, buddy, order))
+			break;
+		/*
+		 * Our buddy is free; merge with it and move up one order.
+		 *
+		 * 1 - Remove from its current free list
+		 */
+		list_del(&buddy->buddy_list);
+		/*
+		 * 2 - Dec the total number of free page blocks as we
+		 *     are removing it from its current free list. (We will
+		 *     inc the total at the end.)
+		 */
+		pa->nr_page_blocks_free -= (1UL << order);
+		/*
+		 * 3 - Reset its order to 0
+		 */
+		buddy->order = 0;
+		/*
+		 * 4 - Throw away the lowest order set bit to give the
+		 *     index of pb + buddy in the array
+		 */
+		combined_idx = buddy_idx & pb_idx;
+		/*
+		 * 5 - Shift to that new point in the array (this should be
+		 *     either buddy or pb, depending on which comes first),
+		 *     and go to the next order level.
+		 */
+		pb = pb + (combined_idx - pb_idx);
+		pb_idx = combined_idx;
+		order++;
+	}
+	/*
+	 * Install coalesced page block in correct free list
+	 */
+	pb->order = order;
+	list_add(&pb->buddy_list, 
+		&pa->free_lists[order - pa->min_order]);
+	pa->nr_page_blocks_free += (1UL << order);
+}
+
 /* ALLOCATOR INIT -------------------------------------------------- */
 
 static struct lcd_page_allocator* 
@@ -81,6 +172,7 @@ void init_page_blocks(struct lcd_page_allocator *pa)
 	 */
 	memset(cursor, 0, 
 		pa_nr_page_blocks(pa) * sizeof(struct lcd_page_block));
+	pa->pb_array = cursor;
 	/*
 	 * Initialize each one's buddy list head, and free the page, so
 	 * the allocator will build up the free lists.
@@ -382,4 +474,30 @@ fail2:
 fail1:
 	return ret;
 
+}
+
+void lcd_page_allocator_free(struct lcd_page_allocator *pa,
+			struct lcd_page_block *pb,
+			unsigned int order)
+{
+	do_free(pa, pb, order);
+}
+
+struct lcd_page_block*
+lcd_page_allocator_alloc(struct lcd_page_allocator *pa,
+			unsigned int order)
+{
+
+
+	/* check that order is allowed */
+
+	/* call internal alloc */
+
+	/* check if returned page block is on max_order boundary,
+	 * and if so, whether it's backed, and if not, if pa's
+	 * backing cb is non-null, fire it, add resource node
+	 * to page block
+	 */
+
+	/* return it */
 }

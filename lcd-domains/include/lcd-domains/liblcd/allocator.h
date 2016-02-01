@@ -67,7 +67,9 @@ struct lcd_page_allocator {
 	int embed_metadata;
 
 	struct list_head *free_lists;
-	unsigned int nr_page_blocks_free;
+	unsigned long nr_page_blocks_free;
+
+	struct lcd_page_block *pb_array;
 
 	const struct lcd_page_allocator_cbs *cbs;
 };

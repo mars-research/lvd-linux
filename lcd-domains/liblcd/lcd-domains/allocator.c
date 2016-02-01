@@ -23,6 +23,113 @@ unsigned long pa_nr_page_blocks(struct lcd_page_allocator *pa)
 	return (1UL << (pa->nr_pages_order - pa->min_order));
 }
 
+/* ALLOC ------------------------------------------------------------ */
+
+static int pb_backing(struct lcd_page_allocator *pa, 
+		struct lcd_page_block *pb, unsigned int order)
+{
+	struct lcd_resource_node *n;
+	unsigned long offset;
+	int ret;
+	/*
+	 * If we alloc'd from the maximum order free list, and
+	 * pa has a backing callback, invoke it to get
+	 * memory to back this set of page blocks.
+	 */
+	if (!(order == pa->max_order && pa->cbs.alloc_map_regular_mem_chunk))
+		return;
+
+	offset = lcd_page_block_to_offset(pa, pb);
+
+	ret = pa->cbs.alloc_map_regular_mem_chunk(pa, pb, offset, order, &n);
+	if (ret) {
+		LIBLCD_ERR("failed to get backing mem for page block");
+		return ret;
+	}
+	/*
+	 * Install resource node in page block
+	 */
+	pb->n = n;
+
+	return 0;
+}
+
+/* Compare with mm/page_alloc.c: expand */ 
+static void pb_expand(struct lcd_page_allocator *pa, struct lcd_page_block *pb,
+		unsigned int lo, unsigned int hi, struct list_head *free_list)
+{
+
+	unsigned long size = 1UL << high;
+	/*
+	 * Split up into smaller chunks
+	 */
+	while (high > low) {
+		/*
+		 * Shift to next smaller free list
+		 */
+		free_list--;
+		high--;
+		size >>= 1;
+		/*
+		 * This will split off the end
+		 */
+		list_add(&pb[size].buddy_list, free_list);
+		pa->nr_page_blocks_free += size;
+		pb[size].order = high;
+	}
+}
+
+/* Compare with mm/page_alloc.c: __rmqueue_smallest */
+static lcd_page_block *
+alloc_page_blocks(struct lcd_page_allocator *pa, unsigned int order)
+{
+	unsigned int current_order;
+	unsigned int idx;
+	struct lcd_page_block *pb;
+	struct list_head *free_list;
+	/*
+	 * Look for a non-empty free list, starting from the smallest
+	 * possible.
+	 */
+	for (current_order = order; 
+	     current_order < pa->max_order; 
+	     current_order++) {
+
+		free_list_idx = current_order - pa->min_order;
+		free_list = &pa->free_lists[free_list_idx];
+
+		if (list_empty(free_list))
+			continue;
+		/*
+		 * Found one
+		 */
+		pb = list_entry(free_list.next, struct lcd_page_block,
+				buddy_list);
+		/*
+		 * Do the backing first, because this may fail. (Otherwise,
+		 * we would have to undo all of the splitting below.)
+		 */
+		ret = pb_backing(pa, pb, current_order);
+		if (ret)
+			goto fail;
+		/*
+		 * Ok, page blocks are backed now, or caller is taking on
+		 * that responsibility.
+		 *
+		 * Remove page blocks from free list, and do any
+		 * necessary splitting.
+		 */
+		list_del(&pb->buddy_list);
+		pa->nr_page_blocks_free -= (1UL << current_order);
+		pb_expand(pa, pb, order, current_order, free_list);
+
+		return pb;
+	}
+
+fail:
+	return NULL;
+}
+
 /* FREE ------------------------------------------------------------ */
 
 /* mm/page_alloc.c: __find_buddy_index */
@@ -487,17 +594,5 @@ struct lcd_page_block*
 lcd_page_allocator_alloc(struct lcd_page_allocator *pa,
 			unsigned int order)
 {
-
-
-	/* check that order is allowed */
-
-	/* call internal alloc */
-
-	/* check if returned page block is on max_order boundary,
-	 * and if so, whether it's backed, and if not, if pa's
-	 * backing cb is non-null, fire it, add resource node
-	 * to page block
-	 */
-
-	/* return it */
+	return alloc_page_blocks(pa, order);
 }

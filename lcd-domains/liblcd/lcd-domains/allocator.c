@@ -26,24 +26,33 @@ unsigned long pa_nr_page_blocks(struct lcd_page_allocator *pa)
 /* ALLOC ------------------------------------------------------------ */
 
 static int pb_backing(struct lcd_page_allocator *pa, 
-		struct lcd_page_block *pb, unsigned int order)
+		struct lcd_page_block *pb)
 {
 	struct lcd_resource_node *n;
 	unsigned long offset;
 	int ret;
 	/*
-	 * If we alloc'd from the maximum order free list, and
-	 * pa has a backing callback, invoke it to get
-	 * memory to back this set of page blocks.
+	 * If:
+	 *     1 - Caller wants us to do demand paging (callback is not NULL)
+	 *     2 - The page block chunk we just allocated falls on a
+	 *         max order boundary
+	 *     3 - The first page block does not have a resource node (the
+	 *         memory is not backed)
+	 *
+	 * then invoke the alloc callback.
 	 */
-	if (!(order == pa->max_order && pa->cbs.alloc_map_regular_mem_chunk))
-		return;
-
+	if (!pa->alloc_map_regular_mem_chunk) /* no demand paging */
+		return 0;
 	offset = lcd_page_block_to_offset(pa, pb);
+	if (offset & ((1UL << pa->max_order) - 1)) /* not on boundary */
+		return 0;
+	if (pb->n) /* already backed */
+		return 0;
 
-	ret = pa->cbs.alloc_map_regular_mem_chunk(pa, pb, offset, order, &n);
+	ret = pa->cbs.alloc_map_regular_mem_chunk(pa, pb, offset, 
+						pa->max_order, &n);
 	if (ret) {
-		LIBLCD_ERR("failed to get backing mem for page block");
+		LIBLCD_ERR("failed to get backing mem for page blocks");
 		return ret;
 	}
 	/*
@@ -105,21 +114,13 @@ alloc_page_blocks(struct lcd_page_allocator *pa, unsigned int order)
 		 */
 		pb = list_entry(free_list.next, struct lcd_page_block,
 				buddy_list);
-		/*
-		 * Do the backing first, because this may fail. (Otherwise,
-		 * we would have to undo all of the splitting below.)
-		 */
-		ret = pb_backing(pa, pb, current_order);
-		if (ret)
-			goto fail;
-		/*
-		 * Ok, page blocks are backed now, or caller is taking on
-		 * that responsibility.
-		 *
+		/* 
 		 * Remove page blocks from free list, and do any
-		 * necessary splitting.
+		 * necessary splitting. (It's important to do
+		 * list_del_init, because for us, we check if a page block's
+		 * buddy list is empty to see if its free.)
 		 */
-		list_del(&pb->buddy_list);
+		list_del_init(&pb->buddy_list);
 		pa->nr_page_blocks_free -= (1UL << current_order);
 		pb_expand(pa, pb, order, current_order, free_list);
 
@@ -320,15 +321,33 @@ void init_page_blocks(struct lcd_page_allocator *pa)
 		pa_nr_page_blocks(pa) * sizeof(struct lcd_page_block));
 	pa->pb_array = cursor;
 	/*
-	 * Initialize each one's buddy list head, and free the page, so
-	 * the allocator will build up the free lists.
+	 * Initialize each one's buddy list head, and add it to the 
+	 * min order free list. (We have to add it to the min free
+	 * list because the allocator won't consider a page block
+	 * free if its buddy list is empty.) Then free each one to trigger full
+	 * coalescing. (Freeing just the first page block won't trigger
+	 * full coalescing, because the buddy allocator assumes that
+	 * maximal coalescing has been done when free is called.)
 	 */
 	for (i = 0; i < pa_nr_page_blocks(pa); i++) {
-		INIT_LIST_HEAD(&cursor[i].buddly_list);
+		INIT_LIST_HEAD(&cursor[i].buddy_list);
+		list_add(&cursor[i].buddy_list, &pa->free_lists[0]);
+	}
+	for (i = 0; i < pa_nr_page_blocks(pa); i++) {
 		lcd_page_allocator_free(pa, 
 					&cursor[i],
 					0);
 	}
+}
+
+static int alloc_metadata_page_blocks(struct lcd_page_allocator *pa)
+{
+
+	/* Alloc in chunks of 2^max_order; this should go from 
+
+	/* Do phys -> resource node */
+
+	/* Install node */
 }
 
 static int allocator_init(void *metadata_addr,
@@ -360,7 +379,8 @@ static int allocator_init(void *metadata_addr,
 	init_page_blocks(pa);
 	/*
 	 * If the metadata is embedded, allocate enough page blocks
-	 * to cover it
+	 * to cover it (so that we don't try to use those page blocks
+	 * for something else).
 	 */
 	if (embed_metadata) {
 		ret = alloc_metadata_page_blocks(pa);
@@ -633,5 +653,24 @@ struct lcd_page_block*
 lcd_page_allocator_alloc(struct lcd_page_allocator *pa,
 			unsigned int order)
 {
-	return alloc_page_blocks(pa, order);
+	struct lcd_page_block *pb;
+	/*
+	 * Alloc the page blocks
+	 */
+	pb = alloc_page_blocks(pa, order);
+	if (!pb)
+		goto fail1;
+	/*
+	 * Suck in backing memory / demand page if necessary
+	 */
+	ret = pb_backing(pa, pb);
+	if (ret)
+		goto fail2;
+
+	return pb;
+
+fail2:
+	do_free(pa, pb, order);
+fail1:
+	return NULL;
 }

@@ -13,6 +13,7 @@ int lcd_enter(void)
 	int ret;
 	struct lcd *lcd;
 	struct cptr_cache *cache;
+	struct lcd_resource_tree *t;
 	cptr_t unused;
 	/*
 	 * This sets up the runtime environment for non-isolated
@@ -70,9 +71,28 @@ int lcd_enter(void)
                 LCD_ERR("creating call endpoint");
                 goto fail6;
         }
+	/*
+	 * Set up resource trees
+	 */
+	ret = lcd_alloc_init_resource_tree(&t);
+	if (ret) {
+		LCD_ERR("creating resource tree");
+		goto fail7;
+	}
+	current->lcd_resource_trees[0] = t;	
+	ret = lcd_alloc_init_resource_tree(&t);
+	if (ret) {
+		LCD_ERR("creating resource tree");
+		goto fail8;
+	}
+	current->lcd_resource_trees[1] = t;	
 
 	return 0;
 
+fail8:
+fail7:
+fail6:
+fail5:
 fail4:
 fail3:
 fail2:
@@ -112,8 +132,14 @@ void lcd_exit(int retval)
 		do_destroy_lcd(current->lcd);
 	if (current->cptr_cache)
 		do_destroy_cptr_cache(current->cptr_cache);
+	if (current->lcd_resource_trees[0])
+		lcd_destroy_free_resource_tree(current->lcd_resource_trees[0]);
+	if (current->lcd_resource_trees[1])
+		lcd_destroy_free_resource_tree(current->lcd_resource_trees[1]);
 	current->lcd = NULL;
 	current->cptr_cache = NULL;
+	current->lcd_resource_trees[0] = NULL;
+	current->lcd_resource_trees[1] = NULL;
 	/* (Call endpoint should be auto-destroyed when we destroy
 	 * the LCD because this will destroy its cspace. So long as
 	 * the LCD didn't grant the endpoint to someone.) */

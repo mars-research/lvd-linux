@@ -17,7 +17,9 @@
 
 /* For LCDs */
 #define INIT_LCD(tsk) \
-	.lcd = NULL, .cptr_cache = NULL,	
+	.lcd = NULL, \
+	.cptr_cache = NULL, \
+	.lcd_resource_trees[0] = NULL, .lcd_resource_trees[1] = NULL,
 
 #ifdef CONFIG_SMP
 # define INIT_PUSHABLE_TASKS(tsk)					\

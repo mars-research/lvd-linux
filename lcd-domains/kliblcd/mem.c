@@ -8,6 +8,72 @@
 #include <lcd-domains/liblcd.h>
 #include "../microkernel/internal.h"
 
+/* RESOURCE TREES -------------------------------------------------- */
+
+/* There are two trees: One for RAM and device memory (host physical
+ * addresses), one for vmalloc (host virtual addresses for memory that
+ * need not be contiguous). */
+#define LCD_RESOURCE_TREE_RAM_IDX      0
+#define LCD_RESOURCE_TREE_DEV_MEM_IDX  0
+#define LCD_RESOURCE_TREE_VMALLOC_IDX  1
+
+int lcd_alloc_init_resource_tree(struct lcd_resource_tree **t_out)
+{
+	int ret;
+	struct lcd_resource_tree *t;
+	/*
+	 * Create an empty resource tree for address -> cptr
+	 * translation.
+	 */
+	t = kzalloc(sizeof(struct lcd_resource_tree),
+					GFP_KERNEL);
+	if (!t){
+		LCD_ERR("alloc'ing resource tree");
+		ret = -ENOMEM;
+		goto fail1;
+	}
+	/*
+	 * Initialize it
+	 */
+	ret = lcd_resource_tree_init(t);
+	if (ret) {
+		LCD_ERR("error initializing resource tree");
+		goto fail2;
+	}
+
+	*t_out = t;
+
+	return 0;
+
+fail2:
+	kfree(t);
+fail1:
+	return ret;
+}
+
+void lcd_destroy_free_resource_tree(struct lcd_resource_tree *t)
+{
+	struct lcd_resource_node *n, *next;
+	/*
+	 * Destroy all of the nodes that are still lying around in the
+	 * tree.
+	 */
+	n = lcd_resource_tree_first(t);
+	while (n) {
+		/*
+		 * If this node was kmalloc'd, kfree it.
+		 */
+		next = lcd_resource_tree_next(n);
+		if (lcd_resource_node_flags(n) & LCD_RESOURCE_NODE_KMALLOC)
+			kfree(n);
+		n = next;
+	}
+	/*
+	 * Free the root (for kliblcd, this is always kmalloc'd)
+	 */
+	kfree(t);
+}
+
 /* LOW-LEVEL PAGE ALLOC -------------------------------------------------- */
 
 int _lcd_alloc_pages_exact_node(int nid, unsigned int flags, 
@@ -135,7 +201,7 @@ struct page *lcd_alloc_pages(unsigned int flags, unsigned int order)
 	/*
 	 * Do lower-level alloc so that pages go into caller's cspace
 	 */
-	ret = _lcd_alloc_pages_node(flags, order, &slot);
+	ret = _lcd_alloc_pages(flags, order, &slot);
 	if (ret) {
 		LIBLCD_ERR("lower level alloc failed");
 		goto fail1;

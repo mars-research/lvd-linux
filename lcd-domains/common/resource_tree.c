@@ -70,10 +70,14 @@ lcd_resource_tree_first(struct lcd_resource_tree *t)
 struct lcd_resource_node *
 lcd_resource_tree_next(struct lcd_resource_node *n)
 {
-	return container_of(
-		container_of(rb_next(n), struct interval_tree_node, rb),
-		struct lcd_resource_node,
-		it_node);
+	struct rb_node *rb_node = rb_next(&n->it_node.rb);
+	if (rb_node) {
+		return container_of(
+			container_of(rb_node, struct interval_tree_node, rb),
+			struct lcd_resource_node,
+			it_node);
+	} else
+		return NULL;
 }
 
 void lcd_resource_tree_remove(struct lcd_resource_tree *t,

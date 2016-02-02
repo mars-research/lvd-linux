@@ -40,11 +40,20 @@ struct lcd_resource_tree {
  *
  * You are responsible for allocating these things and freeing
  * them when you're done with them.
+ *
+ * You can use flags in any way you wish. Some common flags are
+ * defined below.
  */
 struct lcd_resource_node {
 	struct interval_tree_node it_node;
 	unsigned long nr_pages_order;
 	cptr_t cptr;
+	unsigned int flags;
+};
+
+enum {
+	LCD_RESOURCE_NODE_STATIC  = 0, /* resource node statically alloc'd */
+	LCD_RESOURCE_NODE_KMALLOC = 1, /* resource node alloc'd via kmallc */
 };
 
 static inline unsigned long
@@ -69,6 +78,12 @@ static inline cptr_t
 lcd_resource_node_cptr(struct lcd_resource_node *n)
 {
 	return n->cptr;
+}
+
+static inline unsigned int
+lcd_resource_node_flags(struct lcd_resource_node *n)
+{
+	return n->flags;
 }
 
 /* INTERFACE -------------------------------------------------- */

@@ -63,6 +63,7 @@ struct sched_param {
 /* For LCDs */
 struct lcd;
 struct cptr_cache;
+struct lcd_resource_tree;
 
 #include <asm/processor.h>
 
@@ -1928,6 +1929,7 @@ struct task_struct {
 #endif
 	struct lcd *lcd;
 	struct cptr_cache *cptr_cache;
+	struct lcd_resource_tree *lcd_resource_trees[2];
 
 /* CPU-specific state of this task */
 	struct thread_struct thread;

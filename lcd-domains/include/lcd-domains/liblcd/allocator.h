@@ -1,7 +1,3 @@
-TODO
--- fix min/max order usage
--- fix metadata malloc order for pb init
-
 /*
  * allocator.h
  *
@@ -43,8 +39,12 @@ TODO
  * 2^min_order memory, where min_order is the minimum order used
  * in the configuration of the lcd_page_allocator.
  *
- * When this struct is on a free list, order is non-zero and
- * buddy_list is non-empty.
+ * When this struct is on a free list, buddy_list is non-empty.
+ *
+ * In free lists, block_order is set on the first page block 
+ * in a free chunk of page blocks. It means that 2^block_order
+ * page blocks are contiguous (or 2^(block_order + min_order)
+ * pages are contiguous).
  *
  * The usage of lcd_resource_node is a bit more complex. It's
  * related to the memory used to back a chunk of address space.
@@ -52,7 +52,7 @@ TODO
  * more details.
  */
 struct lcd_page_block {
-	unsigned int order;
+	unsigned int block_order;
 	struct lcd_resource_node *n;
 	struct list_head buddy_list;
 };
@@ -69,8 +69,8 @@ struct lcd_page_allocator_cbs {
 
 	int (*alloc_map_metadata_memory_chunk)(
 		struct lcd_page_allocator_cbs*,
-		unsigned int,
 		unsigned long,
+		unsigned int,
 		struct lcd_resource_node**);
 
 	void (*free_unmap_metadata_memory_chunk)(
@@ -80,8 +80,8 @@ struct lcd_page_allocator_cbs {
 	int (*alloc_map_regular_mem_chunk)(
 		struct lcd_page_allocator *,
 		struct lcd_page_block *,
-		unsigned long offset,
-		unsigned int order,
+		unsigned long,
+		unsigned int,
 		struct lcd_resource_node **);
 
 	void (*free_unmap_regular_mem_chunk)(

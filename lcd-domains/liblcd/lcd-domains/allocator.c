@@ -79,6 +79,10 @@ static void pb_expand(struct lcd_page_allocator *pa, struct lcd_page_block *pb,
 	unsigned long size = 1UL << high;
 	/*
 	 * Split up into smaller chunks
+	 *
+	 * (Note: Unlike the original Linux expand, this is in terms
+	 * of *page blocks* and not pages. Recall that each page block
+	 * represents 2^min_order pages.)
 	 */
 	while (high > low) {
 		/*
@@ -112,8 +116,8 @@ alloc_page_blocks(struct lcd_page_allocator *pa, unsigned int order)
 	     current_order <= pa->max_order; 
 	     current_order++) {
 
-		free_list_idx = current_order - pa->min_order;
-		free_list = &pa->free_lists[free_list_idx];
+		block_order = current_order - pa->min_order;
+		free_list = &pa->free_lists[block_order];
 
 		if (list_empty(free_list))
 			continue;
@@ -129,8 +133,9 @@ alloc_page_blocks(struct lcd_page_allocator *pa, unsigned int order)
 		 * buddy list is empty to see if it's free.)
 		 */
 		list_del_init(&pb->buddy_list);
-		pa->nr_page_blocks_free -= (1UL << current_order);
-		pb_expand(pa, pb, order, current_order, free_list);
+		pa->nr_page_blocks_free -= (1UL << block_order);
+		pb_expand(pa, pb, order - pa->min_order, block_order, 
+			free_list);
 
 		return pb;
 	}
@@ -171,21 +176,21 @@ static void pb_unbacking(struct lcd_page_allocator *pa,
 
 /* mm/page_alloc.c: __find_buddy_index */
 static inline unsigned long
-__find_buddy_index(unsigned long pb_idx, unsigned int order)
+__find_buddy_index(unsigned long pb_idx, unsigned int block_order)
 {
-	return pb_idx ^ (1 << order);
+	return pb_idx ^ (1 << block_order);
 }
 
 /* mm/page_alloc.c: page_is_buddy */
 static inline int pb_is_buddy(struct lcd_page_block *pb, 
 			struct lcd_page_block *buddy,
-			int order)
+			int block_order)
 {
 	if (!pb_is_free(buddy)) {
 		/* Not in a free list; buddy is in use. */
 		return 0;
 	}
-	if (buddy->order != order) {
+	if (buddy->block_order != block_order) {
 		/* Buddy sitting on smaller free list, so we can't
 		 * coalesce yet. */
 		return 0;
@@ -202,12 +207,18 @@ static void do_free(struct lcd_page_allocator *pa,
 	unsigned long combined_idx;
 	unsigned long buddy_idx;
 	struct lcd_page_block *buddy;
+	unsigned int block_order;
+	/*
+	 * Calculate order in terms of blocks (e.g.,
+	 * order = min_order corresponds to block_order = 0)
+	 */
+	block_order = order - pa->min_order;
 	/*
 	 * Calculate index of page block in giant array. Should
 	 * be a multiple of 2^order.
 	 */
 	pb_idx = (pb - pa->pb_array) / sizeof(struct lcd_page_block);
-	BUG_ON(pb_idx & ((1 << order) - 1));
+	BUG_ON(pb_idx & ((1 << block_order) - 1));
 	/*
 	 * Coalesce
 	 */
@@ -215,9 +226,9 @@ static void do_free(struct lcd_page_allocator *pa,
 		/*
 		 * Get buddy page block
 		 */
-		buddy_idx = __find_buddy_index(pb_idx, order);
+		buddy_idx = __find_buddy_index(pb_idx, block_order);
 		buddy = pb + (buddy_idx - pb_idx);
-		if (!pb_is_buddy(pb, buddy, order))
+		if (!pb_is_buddy(pb, buddy, block_order))
 			break;
 		/*
 		 * Our buddy is free; merge with it and move up one order.
@@ -230,11 +241,11 @@ static void do_free(struct lcd_page_allocator *pa,
 		 *     are removing it from its current free list. (We will
 		 *     inc the total at the end.)
 		 */
-		pa->nr_page_blocks_free -= (1UL << order);
+		pa->nr_page_blocks_free -= (1UL << block_order);
 		/*
-		 * 3 - Reset its order to 0
+		 * 3 - Reset its block order to 0
 		 */
-		buddy->order = 0;
+		buddy->block_order = 0;
 		/*
 		 * 4 - Throw away the lowest order set bit to give the
 		 *     index of pb + buddy in the array
@@ -248,6 +259,7 @@ static void do_free(struct lcd_page_allocator *pa,
 		pb = pb + (combined_idx - pb_idx);
 		pb_idx = combined_idx;
 		order++;
+		block_order++;
 		/*
 		 * ----------------------------------------
 		 *
@@ -265,10 +277,10 @@ static void do_free(struct lcd_page_allocator *pa,
 	 * important we do list_add_tail because the init code
 	 * expects the page block chunks to be in memory order.)
 	 */
-	pb->order = order;
+	pb->block_order = block_order;
 	list_add_tail(&pb->buddy_list, 
-		&pa->free_lists[order - pa->min_order]);
-	pa->nr_page_blocks_free += (1UL << order);
+		&pa->free_lists[block_order]);
+	pa->nr_page_blocks_free += (1UL << block_order);
 }
 
 /* ALLOCATOR INIT -------------------------------------------------- */
@@ -371,11 +383,11 @@ static int alloc_metadata_page_blocks(struct lcd_page_allocator *pa,
 	/*
 	 * Allocate the big chunks first
 	 */
-	while (metadata_sz > (1UL << pa->max_order)) {
+	while (metadata_sz > (1UL << (pa->metadata_malloc_order + PAGE_SIZE))) {
 		/*
 		 * Allocate 2^max_order bytes
 		 */
-		pb = alloc_page_blocks(pa, pa->max_order);
+		pb = alloc_page_blocks(pa, pa->metadata_malloc_order);
 		if (!pb) {
 			LIBLCD_ERR("error allocating blocks for metadata");
 			return -EIO;
@@ -398,7 +410,7 @@ static int alloc_metadata_page_blocks(struct lcd_page_allocator *pa,
 		/*
 		 * Shift to next 2^max_order chunk
 		 */
-		metadata_sz -= (1UL << pa->max_order);
+		metadata_sz -= (1UL << (pa->metadata_malloc_order + PAGE_SIZE));
 	}
 	/*
 	 * Allocate the remainder, rounded up to the closest power of 2
@@ -406,6 +418,7 @@ static int alloc_metadata_page_blocks(struct lcd_page_allocator *pa,
 	 * for real allocs.)
 	 */
 	tail_order = 0;
+	metadata_sz >> PAGE_SHIFT;
 	while (metadata_sz >>= 1)
 		tail_order++;
 	pb = alloc_page_blocks(pa, tail_order);
@@ -501,7 +514,8 @@ static void free_metadata(void *metadata_addr,
 	/*
 	 * Calculate number of memory chunks we need to free
 	 */
-	nr_blocks = ALIGN(metadata_sz, (1UL << alloc_order)) >> alloc_order;
+	nr_blocks = ALIGN(metadata_sz, (1UL << (alloc_order + PAGE_SIZE)));
+	nr_blocks >>= (alloc_order + PAGE_SIZE);
 	/*
 	 * Calculate starting guest physical address where metadata is
 	 *
@@ -512,7 +526,7 @@ static void free_metadata(void *metadata_addr,
 	 * Look up chunks, and pass to free callback
 	 */
 	for (i = 0; i < nr_blocks; i++) {
-		addr = gpa_add(base, i * (1UL << alloc_order));
+		addr = gpa_add(base, i * (1UL << (alloc_order + PAGE_SIZE)));
 		ret = lcd_phys_to_resource_node(
 			addr,
 			&n);
@@ -550,10 +564,11 @@ static void* malloc_metadata(unsigned int alloc_order,
 		/*
 		 * Allocate and map a memory chunk
 		 */
-		ret = cbs->alloc_map_metadata_memory_chunk(cbs,
-							alloc_order,
-							i * (1UL << alloc_order), 
-							&n);
+		ret = cbs->alloc_map_metadata_memory_chunk(
+			cbs,
+			i * (1UL << (alloc_order + PAGE_SIZE)), 
+			alloc_order,
+			&n);
 		if (ret) {
 			LIBLCD_ERR("error allocating metadata chunk %ul of %ul", i, nr_blocks);
 			goto fail1;
@@ -615,12 +630,16 @@ static unsigned long calc_metadata_size(unsigned int nr_pages_order,
 		LIBLCD_ERR("min order > max order, impossible");
 		return -EINVAL;
 	}
-	if (unlikely(embed_metadata && min_order > metadata_malloc_order)) {
-		LIBLCD_ERR("trying to embed metadata, and min_order > metadata malloc order, impossible");
+	if (unlikely(min_order > metadata_malloc_order)) {
+		LIBLCD_ERR("min_order > metadata malloc order, impossible");
 		return -EINVAL;
 	}
-	if (unlikely(embed_metadata && metadata_malloc_order > max_order)) {
-		LIBLCD_ERR("trying to embed metadata, and metadata malloc order > max order, impossible");
+	if (unlikely(metadata_malloc_order > max_order)) {
+		LIBLCD_ERR("metadata malloc order > max order, impossible");
+		return -EINVAL;
+	}
+	if (unlikely(embed_metadata && metadata_malloc_order == max_order)) {
+		LIBLCD_ERR("trying to embed metadata, but metadata malloc order != max order, not allowed");
 		return -EINVAL;
 	}
 	if (unlikely(max_order > nr_pages_order)) {
@@ -658,7 +677,7 @@ static unsigned long calc_metadata_size(unsigned int nr_pages_order,
 	 *
 	 *    1 - metadata to fit in memory area if we are embedding it
 	 */
-	if (embed_metadata && rslt > (1UL << nr_pages_order)) {
+	if (embed_metadata && rslt > (1UL << (nr_pages_order + PAGE_SIZE))) {
 		LIBLCD_ERR("trying to embed metadata, but it won't fit in the memory area; either increase the memory area size, or adjust other params so there is less metadata");
 		return -EINVAL;
 	}

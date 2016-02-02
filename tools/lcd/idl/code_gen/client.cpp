@@ -83,21 +83,42 @@ CCSTStatement* helper(Variable *p)
   
 }
 
+CCSTCompoundStatement* function_pointer_caller_body(Rpc *f)
+{
+  std::vector<CCSTDeclaration*> declarations;
+  std::vector<CCSTStatement*> statements;
+
+  std::vector<Parameter*> params = f->parameters();
+
+  // allocate container structs if necessary
+  for(std::vector<Parameter*>::iterator it = params.begin(); it != params.end(); it ++) {
+    Parameter *p = *it;
+    
+    if(p->type()->num() == 4 && p->alloc_caller()) {
+      ProjectionType *pt = dynamic_cast<ProjectionType*>(p->type());
+      Assert(pt != 0x0, "Error: dynamic cast to Projection type failed!\n");
+      statements.push_back(alloc_init_containers_driver(pt, f->current_scope(), "caller"));
+    }
+  }
+
+  // allocate trampolines
+
+  // marshal parameters
+
+  
+
+}
+
 CCSTCompoundStatement* caller_body(Rpc *r)
 {
   std::vector<CCSTDeclaration*> declarations;
   std::vector<CCSTStatement*> statements;
-  // allocate necessary container shit
+  // allocate necessary container things
   
   /* code that loops through parameters and allocates/initializes whatever necessary before marshalling*/
   
   // loop through params, declare a tmp and pull out marshal value
   std::vector<Parameter*> params = r->parameters();
-
-  std::vector<CCSTInitDeclarator*> err_decs;
-  err_decs.push_back(new CCSTDeclarator(0x0, new CCSTDirectDecId("err")));
-  CCSTDeclaration *err_variable = new CCSTDeclaration(int_type(), err_decs);
-  declarations.push_back(err_variable);
 
   // for each parameter that is ia projection -- & is alloc
   for(std::vector<Parameter*>::iterator it = params.begin(); it != params.end(); it ++)
@@ -106,87 +127,42 @@ CCSTCompoundStatement* caller_body(Rpc *r)
       if(p->type()->num() == 4 && p->alloc_caller()) {
 	ProjectionType *pt = dynamic_cast<ProjectionType*>(p->type());
 	Assert(pt != 0x0, "Error: dynamic cast to Projection type failed!\n");
-
-	// lookup container struct
-	int err;
-	const char* container_name_ = container_name(pt->name());
-	Type *container_tmp = r->current_scope()->lookup(container_name_, &err);
-	printf("looked up container %s for function %s. pointer for regular projection %p\n", container_name_, r->name(), r->current_scope()->lookup(pt->name(), &err)); 
-	Assert(container_tmp != 0x0, "Error: could not find container in environment\n");
-	ProjectionType *container = dynamic_cast<ProjectionType*>(container_tmp);
-	Assert(container != 0x0, "Error: dynamic cast to Projection type failed!\n");
-	
-	// declare instance of container
-	std::vector<CCSTInitDeclarator*> decs;
-	decs.push_back(new CCSTDeclarator(new CCSTPointer(), new CCSTDirectDecId(container_name_)));
-	CCSTDeclaration *container_declaration = new CCSTDeclaration(type2(container), decs);
-	// finish declaring instance of container 
-	
-	declarations.push_back(container_declaration);
-	
-	// 	file_container = kzalloc(sizeof(*file_container), GFP_KERNEL);
-	std::vector<CCSTAssignExpr*> kzalloc_args;
-	kzalloc_args.push_back(new CCSTUnaryExprSizeOf(new CCSTUnaryExprCastExpr(new CCSTUnaryOp(unary_mult_t), new CCSTPrimaryExprId(container_name_))));
-	kzalloc_args.push_back(new CCSTEnumConst("GFP_KERNEL"));
-	
-
-	statements.push_back(new CCSTAssignExpr(new CCSTPrimaryExprId(container_name_), equals(), function_call("kzalloc", kzalloc_args)));
-
-	// if null
-	// LIBLCD_ERR("kzalloc");
-	//	lcd_exit(-1); /* abort */
-	statements.push_back(if_cond_fail(new CCSTUnaryExprCastExpr(Not(), new CCSTPrimaryExprId(container_name_))
-					  , "kzalloc"));
-
-
-	// insert into dstore
-      // do error checking
-	// err = lcd_dstore_insert...
-	std::vector<CCSTAssignExpr*> dstore_insert_args;
-	dstore_insert_args.push_back(new CCSTPrimaryExprId("dstore")); // lookup this name in the future.
-	dstore_insert_args.push_back(new CCSTPrimaryExprId(container_name_)); // what we are inserting
-
-	dstore_insert_args.push_back(new CCSTEnumConst("STRUCT_FILE_TAG")); // this part is not clear
-
-	ProjectionField *my_ref_field = container->get_field("my_ref");
-	Assert(my_ref_field != 0x0, "Error: could not find field in projection\n");
-
-	dstore_insert_args.push_back(access(my_ref_field));	
-
-	// insert into dstore
-	statements.push_back(new CCSTAssignExpr(new CCSTPrimaryExprId("err"), equals(), function_call("lcd_dstore_insert", dstore_insert_args)));
-      
-	// do error checking
-	statements.push_back(if_cond_fail(new CCSTPrimaryExprId("err"), "dstore"));
-	
+	statements.push_back(alloc_init_containers_driver(pt, r->current_scope(), "caller"));
       }
     }
 
+  // marshal parameters.
 
-  /* end of this code, could go in own function maybe?*/
-
+  // if function pointer pass reference to container
+  // which will be a parameter.... so don't need to check... thank god
   /*
-  std::vector<CCSTStatement*> statements_tmp = marshal_in_parameters(r->parameters());
-  
-  statements.insert(statements.end(), statements_tmp.begin(), statements_tmp.end());
-
-  // implicit returns
-
-  // replace with parameter loop
-  //std::vector<CCSTStatement*> uirs = unmarshal_implicit_return(r->implicit_ret_marshal_info());
-  //statements.insert(statements.end(), uirs.begin(), uirs.end());
-  
-  ReturnVariable *rv = r->return_variable();
-
-  if(rv->type()->num() != 5) { // not void
-    // Marshal_type *ret_info = r->explicit_ret_marshal_info();
-    
-    
-  }
-  else {
-    statements.push_back(new CCSTReturn());
+  std::vector<Variable*> marshal_params = r->marshal_parameters;
+  for(std::vector<Variable*>::iterator it = marshal_params.begin(); it != marshal_params.end(); it ++) {
+    Variable *mp = *it;
+    if (mp->type()->num() == 4) { // is a projection and we need to pass a reference.
+      ProjectionType *pt = dynamic_cast<ProjectionType*>(mp->type());
+      Assert(pt != 0x0, "Error: dynamic cast to projection failed!\n");
+      
+      std::vector<ProjectionField*> pt_fields = pt->fields();
+      for(std::vector<ProjectionField*>::iterator it2 = pt_fields.begin(); it2 != pt_fields.end(); it2 ++) {
+	ProjectionField *pf = *it2;
+	if (pf->in()) { // marshal this field
+	  
+	  std::vector<CCSTAssignExpr*> register_args;
+	  register_args.push_back(access(pf)); // pass field marked in.
+	  statements.push_back(function_call(access_register_mapping(pf->marshal_info()->get_register())
+					     , register_args));
+	}
+      }
+    } else {
+      std::vector<CCSTAssignExpr*> register_args;
+      register_args.push_back(access(mp));
+      statements.push_back(function_call(access_register_mapping(mp->marshal_info()->get_register())
+								 , register_args));
+    }
   }
   */
+
   return new CCSTCompoundStatement(declarations, statements);
   
 }

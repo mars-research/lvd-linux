@@ -158,9 +158,10 @@ static int lookup_memory_object(struct cspace *cspace, cptr_t slot,
 	 */
 	t = cap_cnode_type(*cnode);
 	if (t != __lcd_get_libcap_type(LCD_MICROKERNEL_TYPE_ID_PAGE) &&
-		t != __lcd_get_libcap_type(LCD_MICROKERNEL_TYPE_ID_KPAGE) &&
-		t != __lcd_get_libcap_type(LCD_MICROKERNEL_TYPE_ID_DEV_MEM)) {
-		LCD_ERR("not a page");
+		t != __lcd_get_libcap_type(LCD_MICROKERNEL_TYPE_ID_VOLUNTEERED_PAGE) &&
+		t != __lcd_get_libcap_type(LCD_MICROKERNEL_TYPE_ID_VOLUNTEERED_DEV_MEM) &&
+		t != __lcd_get_libcap_type(LCD_MICROKERNEL_TYPE_ID_VOLUNTEERED_VMALLOC_MEM)) {
+		LCD_ERR("not a memory object");
 		goto fail2;
 	}
 

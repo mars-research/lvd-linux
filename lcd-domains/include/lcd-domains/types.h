@@ -351,9 +351,6 @@ struct lcd_boot_info {
  */
 #define LCD_MPATH_SIZE 256
 
-#define LCD_TEST_MODS_PATH \
-	"/local/disk2/xcap-git/lcd-domains/test-mods"
-
 #define LCD_DIR(subpath) \
 	LCD_TEST_MODS_PATH "/" subpath
 

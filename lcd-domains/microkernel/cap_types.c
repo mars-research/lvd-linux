@@ -27,27 +27,14 @@ static void page_revoke(struct cspace *cspace, struct cnode *cnode,
 	struct lcd_mapping_metadata *m;
 	struct lcd_memory_object *mo = (struct lcd_memory_object *)object;
 	/*
-	 * Check if page is mapped; if not, nothing to do.
-	 *
-	 * (m can be null in the edge case that we're revoking this
-	 * capability before we had a chance to store the metadata.)
+	 * Unmap memory object
 	 */
-	m = cap_cnode_metadata(cnode);
-	if (!m || !m->is_mapped)
-		goto out;
+	__lcd_do_unmap_memory_object(cap_cspace_getowner(cspace), mo, m);
 	/*
-	 * Unmap it
-	 *
-	 * XXX: This assumes the cspace is for an isolated LCD. For now,
-	 * this is true, because the liblcd interface doesn't allow kLCDs
-	 * to map memory. (They don't need to for RAM because it's already
-	 * mapped in their address space. But they would for dev mem.)
+	 * Free metadata
 	 */
-	__lcd_unmap_pages(cap_cspace_getowner(cspace), m->where_mapped,
-			1 << mo->order);
-
-out:
-	kfree(m);
+	if (m)
+		kfree(m);
 }
 
 static void volunteered_page_revoke(struct cspace *cspace, struct cnode *cnode,
@@ -56,8 +43,14 @@ static void volunteered_page_revoke(struct cspace *cspace, struct cnode *cnode,
 	page_revoke(cspace, cnode, object);
 }
 
-static void dev_mem_revoke(struct cspace *cspace, struct cnode *cnode,
-			void *object)
+static void volunteered_dev_mem_revoke(struct cspace *cspace, 
+				struct cnode *cnode, void *object)
+{
+	page_revoke(cspace, cnode, object);
+}
+
+static void volunteered_vmalloc_mem_revoke(struct cspace *cspace, 
+					struct cnode *cnode, void *object)
 {
 	page_revoke(cspace, cnode, object);
 }
@@ -156,8 +149,8 @@ static void volunteered_page_delete(struct cspace *cspace, struct cnode *cnode,
 	kfree(object);
 }
 
-static void dev_mem_delete(struct cspace *cspace, struct cnode *cnode,
-			void *object)
+static void volunteered_dev_mem_delete(struct cspace *cspace, 
+				struct cnode *cnode, void *object)
 {
 	/*
 	 * The device memory itself (e.g., high memory, ISA memory) shouldn't
@@ -167,6 +160,16 @@ static void dev_mem_delete(struct cspace *cspace, struct cnode *cnode,
 	 * required in the future.
 	 *
 	 * Free the struct memory_object.
+	 */
+	kfree(object);
+}
+
+static void volunteered_vmalloc_mem_delete(struct cspace *cspace, 
+					struct cnode *cnode, void *object)
+{
+	/*
+	 * Just like volunteered pages, the original volunteer is
+	 * responsible for freeing the memory.
 	 */
 	kfree(object);
 }
@@ -212,9 +215,16 @@ static struct type_ops_id mk_type_ops_id[LCD_MICROKERNEL_NUM_CAP_TYPES] = {
 	},
 	{
 		{
-			.name = "device memory",
-			.delete = dev_mem_delete,
-			.revoke = dev_mem_revoke,
+			.name = "volunteered device memory",
+			.delete = volunteered_dev_mem_delete,
+			.revoke = volunteered_dev_mem_revoke,
+		}
+	},
+	{
+		{
+			.name = "volunteered vmalloc memory",
+			.delete = volunteered_vmalloc_mem_delete,
+			.revoke = volunteered_vmalloc_mem_revoke,
 		}
 	},
 	{

@@ -209,8 +209,8 @@ void __lcd_put_memory_object(struct lcd *caller, struct cnode *cnode,
 
 /* MAPPING -------------------------------------------------- */
 
-static int memory_object_hpa(struct lcd_memory_object *mo,
-			hpa_t *hpa_base)
+static int contiguous_memory_object_hpa(struct lcd_memory_object *mo,
+					hpa_t *hpa_base)
 {
 	hpa_t hpa_base;
 
@@ -219,7 +219,7 @@ static int memory_object_hpa(struct lcd_memory_object *mo,
 	case LCD_MICROKERNEL_TYPE_ID_VOLUNTEERED_PAGE:
 		*hpa_base = va2hpa(page_address(mo->object));
 		break;
-	case LCD_MICROKERNEL_TYPE_ID_DEV_MEM:
+	case LCD_MICROKERNEL_TYPE_ID_VOLUNTEERED_DEV_MEM:
 		*hpa_base = hpa_val((unsigned long)mo->object);
 		break;
 	default:
@@ -231,66 +231,78 @@ static int memory_object_hpa(struct lcd_memory_object *mo,
 	return 0;
 }
 
-int __lcd_map_pages(struct lcd *caller, gpa_t gpa, hpa_t hpa,
-		unsigned int num_pages)
+static int isolated_map_vmalloc_mem(struct lcd *lcd, 
+				struct lcd_memory_object *vmalloc_mo,
+				gpa_t base)
 {
+	int ret, err_ret;
+	hva_t vmalloc_base, hva;
+	gpa_t gpa;
+	unsigned long i, j;
+	struct page *p;
 	/*
-	 * Only isolated VMs should be landing here.
+	 * The base host virtual address is stored in the object
 	 */
-	BUG_ON(caller->type != LCD_ISOLATED);
-	/* 
-	 * Create, and do not overwrite
+	vmalloc_base = __hva((unsigned long)vmalloc_mo->object);
+	/*
+	 * Map each page, one at a time
 	 */
-	return lcd_arch_ept_map_range(caller->lcd_arch, gpa, hpa, num_pages);
+	for (i = 0; i < (1UL << mo->order); i++) {
+		hva = hva_add(vmalloc_base, i * PAGE_SIZE);
+		gpa = gpa_add(base, i * PAGE_SIZE);
+		/*
+		 * Get the corresponding host page 
+		 */
+		p = vmalloc_to_page(hva2va(hva));
+		/*
+		 * Map it in the LCD's guest physical
+		 */
+		ret = lcd_arch_ept_map(lcd->lcd_arch, gpa,
+				va2hpa(page_address(p)),
+				1, 0);
+		if (ret) {
+			LCD_ERR("error mapping vmalloc page in LCD");
+			goto fail1;
+		}
+	}
+	
+	return 0;
+
+fail1:
+	/*
+	 * Unmap pages that were mapped
+	 */
+	for (j = 0; j < i; j++) {
+		hva = hva_add(vmalloc_base, j * PAGE_SIZE);
+		gpa = gpa_add(base, j * PAGE_SIZE);
+		/*
+		 * Get the corresponding host page 
+		 */
+		p = vmalloc_to_page(hva2va(hva));
+		/*
+		 * Unmap it from the LCD's guest physical
+		 */
+		err_ret = lcd_arch_ept_unmap(lcd->lcd_arch, gpa);
+		if (err_ret)
+			LCD_ERR("double fault: error unmapping vmalloc page in LCD");
+	}
+
+	return ret;
 }
 
-void __lcd_unmap_pages(struct lcd *caller, gpa_t gpa, unsigned int num_pages)
-{
-	/*
-	 * Only isolated VMs should be landing here.
-	 */
-	BUG_ON(caller->type != LCD_ISOLATED);
-	int ret;
-	ret = lcd_arch_ept_unmap_range(caller->lcd_arch, gpa, num_pages);
-	if (ret)
-		LCD_DEBUG(LCD_DEBUG_ERR, 
-			"some error unmapping");
-}
-
-int __lcd_map_memory_object(struct lcd *caller, cptr_t mo_cptr, gpa_t base)
+static int isolated_map_contiguous_mem(struct lcd *lcd, 
+				struct lcd_memory_object *mo,
+				gpa_t base)
 {
 	int ret;
-	struct lcd_memory_object *mo;
-	struct lcd_mapping_metadata *meta;
-	struct cnode *cnode;
-	hpa_t base_hpa;
-	/*
-	 * Look up memory object in caller's cspace
-	 */
-	ret = __lcd_get_memory_object(caller->cspace, mo_cptr, &cnode, &mo);
-	if (ret)
-		goto fail1;
-	meta = cap_cnode_metadata(cnode);
-	/*
-	 * If memory object is already mapped, fail
-	 */
-	if (!meta) {
-		LCD_ERR("lookup before meta set?");
-		ret = -EIO;
-		goto fail2;
-	}
-	if (meta->is_mapped) {
-		LCD_ERR("memory object already mapped");
-		ret = -EINVAL;
-		goto fail2;
-	}
+	hpa_t hpa_base;
 	/*
 	 * Get host physical address of start of memory object
 	 */
-	ret = memory_object_hpa(mo, &hpa_base);
+	ret = contiguous_memory_object_hpa(mo, &hpa_base);
 	if (ret) {
 		LCD_ERR("invalid memory object");
-		goto fail2;
+		goto fail1;
 	}
 	/*
 	 * Map memory object.
@@ -300,16 +312,115 @@ int __lcd_map_memory_object(struct lcd *caller, cptr_t mo_cptr, gpa_t base)
 	 * with it because we allow the LCD to use the PAT to control
 	 * caching, and we always map memory as WB in guest physical.
 	 */
-	ret = __lcd_map_pages(lcd, gpa, hpa_base, 1 << mo->order)
+	ret = lcd_arch_ept_map_range(lcd->lcd_arch, base, hpa_base,
+				1 << mo->order);
 	if (ret) {
 		LCD_ERR("map");
 		goto fail2;
 	}
+	
+fail2:
+fail1:
+	return ret;
+}
+
+static int isolated_map_memory_object(struct lcd *lcd, 
+				struct lcd_memory_object *mo,
+				struct lcd_mapping_metadata *meta,
+				gpa_t base)
+{
+	/*
+	 * The mapping process depends on the memory object type
+	 * (physical memory, vmalloc memory, etc.)
+	 */
+	switch (mo->sub_type) {
+	case LCD_MICROKERNEL_TYPE_ID_PAGE:
+	case LCD_MICROKERNEL_TYPE_ID_VOLUNTEERED_PAGE:
+	case LCD_MICROKERNEL_TYPE_ID_VOLUNTEERED_DEV_MEM:
+		return isolated_map_contiguous_mem(lcd, mo, meta, base);
+	case LCD_MICROKERNEL_TYPE_ID_VOLUNTEERED_VMALLOC_MEM:
+		return isolated_map_vmalloc_mem(lcd, mo, meta, base);
+	default:
+		LCD_ERR("unexpected memory object type %d", mo->sub_type);
+		return -EINVAL;
+	}
+}
+
+int __lcd_do_map_memory_object(struct lcd *lcd, 
+			struct lcd_memory_object *mo,
+			struct lcd_mapping_metadata *meta,
+			gpa_t base)
+{
+	int ret;
+	/*
+	 * If memory object is already mapped, fail
+	 */
+	if (!meta) {
+		LCD_ERR("lookup before meta set?");
+		ret = -EIO;
+		goto out;
+	}
+	if (meta->is_mapped) {
+		LCD_ERR("memory object already mapped");
+		ret = -EINVAL;
+		goto out;
+	}
+	/*
+	 * We need to handle mapping differently depending on
+	 * the LCD type (isolated vs non-isolated)
+	 */
+	switch (lcd->type) {
+	case LCD_TYPE_ISOLATED:
+		ret = isolated_map_memory_object(lcd, mo, meta, base);
+		break;
+	case LCD_TYPE_NONISOLATED:
+	case LCD_TYPE_TOP:
+		/*
+		 * For now, map is a no-op for non-isolated code. (All host 
+		 * physical is available to non-isolated code. Recall that
+		 * this function is about mapping in physical, not virtual.)
+		 */
+		ret = 0;
+		goto out;
+	default:
+		LCD_ERR("unrecognized lcd type %d", lcd->type);
+		ret = -EINVAL;
+		break;
+	}
+	if (ret)
+		goto out;
 	/*
 	 * Mark page as mapped, and where it's mapped
 	 */
 	meta->is_mapped = 1;
-	meta->where_mapped = gpa;
+	meta->where_mapped = base;
+
+	ret = 0;
+	goto out;
+
+out:
+	return ret;
+}
+
+int __lcd_map_memory_object(struct lcd *caller, cptr_t mo_cptr, gpa_t base)
+{
+	int ret;
+	struct lcd_mapping_metadata *meta;
+	struct lcd_memory_object *mo;
+	struct cnode *cnode;
+	/*
+	 * Look up memory object and metadata in caller's cspace
+	 */
+	ret = __lcd_get_memory_object(caller->cspace, mo_cptr, &cnode, &mo);
+	if (ret)
+		goto fail1;
+	meta = cap_cnode_metadata(cnode);
+	/*
+	 * Do the map
+	 */
+	ret = __lcd_do_map_memory_object(caller, mo, meta, base);
+	if (ret)
+		goto fail3;
 	/*
 	 * Release cnode, etc.
 	 */
@@ -317,9 +428,117 @@ int __lcd_map_memory_object(struct lcd *caller, cptr_t mo_cptr, gpa_t base)
 
 	return 0;
 
+fail3:
 fail2:
 	__lcd_put_memory_object(caller, cnode, mo);
 fail1:
+	return ret;
+}	
+
+/* UNMAPPING -------------------------------------------------- */
+
+static void isolated_unmap_vmalloc_mem(struct lcd *lcd, 
+				struct lcd_memory_object *vmalloc_mo,
+				struct lcd_mapping_metadata *meta)
+{
+	int ret;
+	/*
+	 * Unmapping is easier, because we mapped the vmalloc memory
+	 * in one contiguous chunk.
+	 */
+	ret = lcd_arch_ept_unmap_range(lcd->lcd_arch,
+				meta->where_mapped,
+				vmalloc_mo->order);
+	if (ret)
+		LCD_DEBUG(LCD_DEBUG_ERR, 
+			"some error unmapping");
+}
+
+static void isolated_unmap_contiguous_mem(struct lcd *lcd, 
+					struct lcd_memory_object *mo,
+					struct lcd_mapping_metadata *meta)
+{
+	/*
+	 * Unmap memory object
+	 */
+	ret = lcd_arch_ept_unmap_range(lcd->lcd_arch, meta->where_mapped, 
+				1UL << mo->order);
+	if (ret)
+		LCD_DEBUG(LCD_DEBUG_ERR, 
+			"some error unmapping");
+}
+
+static void isolated_unmap_memory_object(struct lcd *lcd,
+					struct lcd_memory_object *mo,
+					struct lcd_mapping_metadata *meta)
+{
+	/*
+	 * The unmapping process depends on the memory object type
+	 * (physical memory, vmalloc memory, etc.)
+	 */
+	switch (mo->sub_type) {
+	case LCD_MICROKERNEL_TYPE_ID_PAGE:
+	case LCD_MICROKERNEL_TYPE_ID_VOLUNTEERED_PAGE:
+	case LCD_MICROKERNEL_TYPE_ID_VOLUNTEERED_DEV_MEM:
+		return isolated_unmap_contiguous_mem(lcd, mo, meta);
+	case LCD_MICROKERNEL_TYPE_ID_VOLUNTEERED_VMALLOC_MEM:
+		return isolated_unmap_vmalloc_mem(lcd, mo, meta);
+	default:
+		LCD_ERR("unexpected memory object type %d", mo->sub_type);
+		return -EINVAL;
+	}
+}
+
+void __lcd_do_unmap_memory_object(struct lcd *caller, 
+				struct lcd_memory_object *mo,
+				struct lcd_mapping_metadata *meta)
+{
+	/*
+	 * If memory object is not mapped, silently do nothing
+	 */
+	if (!meta) {
+		LCD_DEBUG(LCD_DEBUG_MSG,
+			"lookup before meta set?");
+		goto out;
+	}
+	if (!meta->is_mapped) {
+		LCD_DEBUG(LCD_DEBUG_MSG,
+			"memory object not mapped");
+		goto out;
+	}
+	/*
+	 * We need to handle unmapping differently depending on
+	 * the LCD type (isolated vs non-isolated)
+	 */
+	switch (lcd->type) {
+	case LCD_TYPE_ISOLATED:
+		ret = isolated_unmap_memory_object(lcd, mo, meta);
+		break;
+	case LCD_TYPE_NONISOLATED:
+	case LCD_TYPE_TOP:
+		/*
+		 * For now, unmap is a no-op for non-isolated code. (All host 
+		 * physical is available to non-isolated code. Recall that
+		 * this function is about unmapping in physical, not virtual.)
+		 */
+		ret = 0;
+		goto out;
+	default:
+		LCD_ERR("unrecognized lcd type %d", lcd->type);
+		ret = -EINVAL;
+		break;
+	}
+	if (ret)
+		goto out;
+	/*
+	 * Mark memory object as not mapped
+	 */
+	meta->is_mapped = 0;
+
+	ret = 0;
+	goto out;
+
+out:
 	return ret;
 }
 
@@ -338,25 +557,11 @@ void __lcd_unmap_memory_object(struct lcd *caller, cptr_t mo_cptr)
 		goto fail1;
 	meta = cap_cnode_metadata(cnode);
 	/*
-	 * If memory object is not mapped, fail
+	 * Do the unmap
 	 */
-	if (!meta) {
-		LCD_ERR("lookup before meta set?");
+	ret = __lcd_do_unmap_memory_object(caller, mo, meta);
+	if (ret)
 		goto fail2;
-	}
-	if (!meta->is_mapped) {
-		LCD_DEBUG(LCD_DEBUG_ERR,
-			"memory object not mapped");
-		goto fail2;
-	}
-	/*
-	 * Unmap memory object
-	 */
-	__lcd_unmap_pages(caller, meta->where_mapped, 1 << mo->order);
-	/*
-	 * Mark memory object as not mapped
-	 */
-	meta->is_mapped = 0;
 	/*
 	 * Release cnode, etc.
 	 */

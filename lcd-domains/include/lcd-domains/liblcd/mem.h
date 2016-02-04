@@ -80,10 +80,11 @@ int _lcd_alloc_pages(unsigned int flags, unsigned int order,
  * If @mo or @gpa is invalid, returns non-zero (e.g., @mo doesn't
  * refer to a memory object capability).
  *
- * Note: If the caller is running in the non-isolated host (not inside
- * an LCD), this function is a no-op. (All host addresses are already
- * accessible to kLCDs. You can use lcd_map_phys to get the host physical
- * address where the memory is.)
+ * IMPORTANT: If the caller is running in the non-isolated host (not inside
+ * an LCD), the memory is already mapped in the caller's physical
+ * address space (all host physical is available). However, calling
+ * this function is still necessary because it updates the internal
+ * resource tree used for address -> cptr translation.
  *
  * Note: If @mo is already mapped, the call will fail (multiple mappings
  * is currently not supported).
@@ -98,7 +99,15 @@ int _lcd_mmap(cptr_t mo, gpa_t base);
  * guest physical address space. If the pages aren't mapped, silently
  * fails / does nothing.
  *
- * Note: If the caller is a non-isolated thread, this function is a no-op.
+ * IMPORTANT: If the caller is a non-isolated thread, this will remove
+ * the memory object from the internal resource tree used for
+ * address -> cptr translation. If you don't do it, kliblcd will give
+ * you wrong results (it'll just affect you, not other kLCDs).
+ *
+ * You may wonder: why don't we pass just the guest physical address
+ * that we want unmapped? Answer: the microkernel needs to keep track
+ * of where memory objects are mapped (so that if rights are revoked,
+ * it knows how to unmap them).
  */
 void _lcd_munmap(cptr_t mo);
 

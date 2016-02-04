@@ -11,13 +11,10 @@
 #include <linux/mutex.h>
 #include "internal.h"
 
-static struct mutex lcd_physical_mem_itree_lock;
-static struct mutex lcd_vmalloc_mem_itree_lock;
 static struct lcd_mem_itree lcd_physical_mem_itree;
 static struct lcd_mem_itree lcd_vmalloc_mem_itree;
 
 static int do_mem_itree_insert(struct lcd_mem_itree *tree,
-			struct mutex *tree_lock,
 			struct lcd_memory_object *mo, unsigned int flags)
 {
 	struct lcd_memory_itree_node *n;
@@ -29,15 +26,20 @@ static int do_mem_itree_insert(struct lcd_mem_itree *tree,
 		LCD_ERR("kzalloc node");
 		return -ENOMEM;
 	}
-	/*
-	 * Insert into interval tree
-	 */
+	mutex_init(&n->lock);
 	n->mo = mo;
 	n->flags = flags;
-
-	mutex_lock(tree_lock);
+	/*
+	 * Set up the start and end address, using memory object
+	 */
+	n->it_node.start = __lcd_memory_object_start(mo);
+	n->it_node.last = __lcd_memory_object_last(mo);
+	/*
+	 * Insert into tree
+	 */
+	mutex_lock(&tree->lock);
 	interval_tree_insert(&n->it_node, &tree->root);
-	mutex_unlock(tree_lock);
+	mutex_unlock(&tree->lock);
 
 	return 0;
 }
@@ -49,12 +51,10 @@ int __lcd_mem_itree_insert(struct lcd_memory_object *mo, unsigned int flags)
 	case LCD_MICROKERNEL_TYPE_ID_VOLUNTEERED_PAGE:
 	case LCD_MICROKERNEL_TYPE_ID_VOLUNTEERED_DEV_MEM:
 		return do_mem_itree_insert(&lcd_physical_mem_itree,
-					&lcd_physical_mem_itree_lock,
 					mo,
 					flags);
 	case LCD_MICROKERNEL_TYPE_ID_VOLUNTEERED_VMALLOC_MEM:
 		return do_mem_itree_insert(&lcd_vmalloc_mem_itree, 
-					&lcd_vmalloc_mem_itree_lock,
 					mo,
 					flags);
 	default:
@@ -63,8 +63,7 @@ int __lcd_mem_itree_insert(struct lcd_memory_object *mo, unsigned int flags)
 	}
 }
 
-static int do_mem_itree_lookup(struct lcd_mem_itree *tree,
-			struct mutex *tree_lock,
+static int do_mem_itree_lookup_nolock(struct lcd_mem_itree *tree,
 			unsigned long addr,
 			struct lcd_mem_itree_node **node_out)
 {
@@ -75,19 +74,33 @@ static int do_mem_itree_lookup(struct lcd_mem_itree *tree,
 	 */
 	struct interval_tree_node *match;
 
-	mutex_lock(tree_lock);
 	match = interval_tree_first(&tree->root, addr, addr);
-	mutex_unlock(tree_lock);
 	if (match) {
-		n_out = container_of(match, struct lcd_mem_itree_node,
-				it_node);
+		node_out = container_of(match, struct lcd_mem_itree_node,
+					it_node);
+		mutex_lock(&(*node_out)->lock);
 		return 0;
 	} else {
 		return -1; /* not found */
 	}
 }
 
-int __lcd_mem_itree_lookup(unsigned long addr,
+static int do_mem_itree_lookup(struct lcd_mem_itree *tree,
+			unsigned long addr,
+			struct lcd_mem_itree_node **node_out)
+{
+	int ret;
+
+	mutex_lock(&tree->lock);
+
+	ret = do_mem_itree_lookup(tree, addr, node_out);
+
+	mutex_unlock(&tree->lock);
+
+	return ret;
+}
+
+int __lcd_mem_itree_get(unsigned long addr,
 			enum lcd_microkernel_type_id type,
 			struct lcd_mem_itree_node **node_out)
 {
@@ -96,12 +109,10 @@ int __lcd_mem_itree_lookup(unsigned long addr,
 	case LCD_MICROKERNEL_TYPE_ID_VOLUNTEERED_PAGE:
 	case LCD_MICROKERNEL_TYPE_ID_VOLUNTEERED_DEV_MEM:
 		return do_mem_itree_lookup(&lcd_physical_mem_itree, 
-					&lcd_physical_mem_itree_lock,
 					addr,
 					node_out);
 	case LCD_MICROKERNEL_TYPE_ID_VOLUNTEERED_VMALLOC_MEM:
 		return do_mem_itree_lookup(&lcd_vmalloc_mem_itree,
-					&lcd_vmalloc_mem_itree_lock,
 					addr,
 					node_out);
 	default:
@@ -110,31 +121,54 @@ int __lcd_mem_itree_lookup(unsigned long addr,
 	}
 }
 
-static void do_mem_itree_delete(struct lcd_mem_itree *tree,
-				struct mutex *tree_lock,
-				struct lcd_mem_itree_node *node)
+int __lcd_mem_itree_put(struct lcd_mem_itree_node *node)
 {
-	mutex_lock(tree_lock);
-	interval_tree_remove(&node->it_node, &tree->root);
-	mutex_unlock(tree_lock);
+	mutex_unlock(&node->lock);
 }
 
-void __lcd_mem_itree_delete(struct lcd_mem_itree_node *node)
+static void do_mem_itree_delete(struct lcd_mem_itree *tree,
+				struct lcd_memory_object *mo)
 {
-	switch (node->mo->sub_type) {
+	struct lcd_mem_itree_node *node;
+	int ret;
+
+	mutex_lock(&tree->lock);
+
+	/*
+	 * Find the tree node that contains the memory object
+	 */
+	ret = do_mem_itree_lookup_nolock(tree,
+					__lcd_memory_object_start(mo),
+					&node);
+	if (ret) {
+		LCD_ERR("couldn't find memory object in tree, skipping delete");
+		mutex_unlock(&tree->lock);
+		BUG();
+		return;
+	}
+	/*
+	 * We now have the node locked and the tree locked, so no one
+	 * can have a reference. Free to unlock and delete tree node.
+	 */
+	interval_tree_remove(&node->it_node, &tree->root);
+
+	kfree(node);
+
+	mutex_unlock(&tree->lock);
+}
+
+void __lcd_mem_itree_delete(struct lcd_memory_object *mo)
+{
+	switch (mo->sub_type) {
 	case LCD_MICROKERNEL_TYPE_ID_PAGE:
 	case LCD_MICROKERNEL_TYPE_ID_VOLUNTEERED_PAGE:
 	case LCD_MICROKERNEL_TYPE_ID_VOLUNTEERED_DEV_MEM:
-		return do_mem_itree_delete(&lcd_physical_mem_itree, 
-					&lcd_physical_mem_itree_lock,
-					node);
+		return do_mem_itree_delete(&lcd_physical_mem_itree, mo);
 	case LCD_MICROKERNEL_TYPE_ID_VOLUNTEERED_VMALLOC_MEM:
-		return do_mem_itree_delete(&lcd_vmalloc_mem_itree, 
-					&lcd_vmalloc_mem_itree_lock,
-					node);
+		return do_mem_itree_delete(&lcd_vmalloc_mem_itree, mo);
 	default:
 		LCD_ERR("unexpected memory object type %d", 
-			node->mo->sub_type);
+			mo->sub_type);
 	}
 }
 
@@ -145,8 +179,8 @@ int __lcd_mem_itree_init(void)
 	 */
 	lcd_physical_mem_itree.root = RB_ROOT;
 	lcd_vmalloc_mem_itree.root = RB_ROOT;
-	mutex_init(&lcd_physical_mem_itree_lock);
-	mutex_init(&lcd_vmalloc_mem_itree_lock);
+	mutex_init(&lcd_physical_mem_itree.lock);
+	mutex_init(&lcd_vmalloc_mem_itree.lock);
 
 	return 0;
 }

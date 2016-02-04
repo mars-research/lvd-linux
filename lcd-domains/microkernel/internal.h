@@ -438,7 +438,35 @@ struct lcd_memory_object {
 	void *object;
 	unsigned int order;
 };
-
+/**
+ * __lcd_memory_object_start -- Starting address (memory-object dependent)
+ * @mo: the memory object
+ *
+ * This computes the starting address of the memory object. If the
+ * memory object is for physical memory, the address is a physical address.
+ * If for vmalloc memory, the address is a host virtual address.
+ */
+unsigned long __lcd_memory_object_start(struct lcd_memory_object *mo);
+/**
+ * __lcd_memory_object_size -- Computes the size in bytes of the memory
+ *                             object
+ * @mo: the memory object
+ *
+ * For physical memory, this will be the amount of contiguous physical memory
+ * spanned by the memory object. For vmalloc memory, this will be the amount
+ * of *host virtual address space* spanned by the object.
+ *
+ * Memory objects are assumed to be page-aligned.
+ */
+unsigned long __lcd_memory_object_size(struct lcd_memory_object *mo);
+/**
+ * __lcd_memory_object_last -- Computes the address of the last valid byte
+ *                             in the memory object
+ * @mo: the memory object
+ *
+ * This is just start + size - 1.
+ */
+unsigned long __lcd_memory_object_last(struct lcd_memory_object *mo);
 /**
  * __lcd_alloc_pages_exact_node -- Alloc host pages and insert into caller's
  *                                 cspace
@@ -575,6 +603,7 @@ void __lcd_mem_exit(void)
  */
 struct lcd_mem_itree {
 	struct rb_root root;
+	struct mutex lock;
 };
 /**
  * struct lcd_mem_itree_node
@@ -582,11 +611,16 @@ struct lcd_mem_itree {
  * Node in the lcd_mem_itree. Contains pointer to the memory object
  * itself (the physical pages, device memory address, vmalloc address,
  * etc.).
+ *
+ * XXX: The lock here might be unnecessary (if we always use itree nodes
+ * under other related locks - like cnode locks). And it could potentially
+ * lead to deadlocks. (So many lockz ...)
  */
 struct lcd_mem_itree_node {
 	struct interval_tree_node it_node;
 	struct lcd_memory_object *mo;
 	unsigned int flags;
+	struct mutex lock;
 };
 /**
  * __lcd_mem_itree_insert -- Insert a memory object into the appropriate
@@ -601,8 +635,8 @@ struct lcd_mem_itree_node {
  */
 int __lcd_mem_itree_insert(struct lcd_memory_object *mo, unsigned int flags);
 /**
- * __lcd_mem_itree_lookup -- Search for a node in the appropriate tree
- *                           for a memory object that contains address
+ * __lcd_mem_itree_get -- Search for a node in the appropriate tree
+ *                        for a memory object that contains address
  * @addr: address to search for
  * @type: the memory object type to search for
  * @node_out: out param, the tree node, if found
@@ -610,16 +644,25 @@ int __lcd_mem_itree_insert(struct lcd_memory_object *mo, unsigned int flags);
  * If searching for physical memory (pages, device memory), @addr is
  * a physical address. If searching for vmalloc memory, @addr is a host
  * virtual address.
+ *
+ * IMPORTANT: Locks the node itself. You should call __lcd_mem_itree_put
+ * to release lock.
  */
-int __lcd_mem_itree_lookup(unsigned long addr,
+int __lcd_mem_itree_get(unsigned long addr,
 			enum lcd_microkernel_type_id type,
 			struct lcd_mem_itree_node **node_out);
 /**
- * __lcd_mem_itree_delete -- Delete a node from its containing memory interval
- *                           tree
- * @node: the node to delete
+ * __lcd_mem_itree_put -- Release lock on node
  */
-int __lcd_mem_itree_delete(struct lcd_mem_itree_node *node);
+int __lcd_mem_itree_put(struct lcd_mem_itree_node *node);
+/**
+ * __lcd_mem_itree_delete -- Remove memory object from its containing memory 
+ *                           interval tree
+ * @mo: the memory object to delete
+ *
+ * BUG_ON @mo is not found in the proper tree
+ */
+void __lcd_mem_itree_delete(struct lcd_memory_object *mo);
 /**
  * __lcd_mem_itree_init -- Call this when the microkernel initializes
  *

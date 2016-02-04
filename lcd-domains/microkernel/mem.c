@@ -7,6 +7,36 @@
 #include <linux/slab.h>
 #include "internal.h"
 
+/* MEMORY OBJECT HELPERS -------------------------------------------------- */
+
+unsigned long __lcd_memory_object_start(struct lcd_memory_object *mo)
+{
+	switch (mo->sub_type) {
+	case LCD_MICROKERNEL_TYPE_ID_PAGE:
+	case LCD_MICROKERNEL_TYPE_ID_VOLUNTEERED_PAGE:
+		return va2hpa(page_address(mo->object));
+	case LCD_MICROKERNEL_TYPE_ID_VOLUNTEERED_DEV_MEM:
+	case LCD_MICROKERNEL_TYPE_ID_VOLUNTEERED_VMALLOC_MEM:
+		return (unsigned long)mo->object;
+	default:
+		LCD_ERR("unexpected memory object type %d",
+			mo->sub_type);
+		/* Return an invalid physical address */
+		return ~(0UL);
+	}
+}
+
+unsigned long __lcd_memory_object_size(struct lcd_memory_object *mo)
+{
+	return (1UL << mo->order) << PAGE_SHIFT;
+}
+
+unsigned long __lcd_memory_object_last(struct lcd_memory_object *mo)
+{
+	return __lcd_memory_object_start(mo) + 
+		__lcd_memory_object_size(mo) - 1;
+}
+
 /* ALLOC -------------------------------------------------- */
 
 static void do_insert_pages(struct lcd *caller, struct page *p, 
@@ -34,6 +64,14 @@ static void do_insert_pages(struct lcd *caller, struct page *p,
 	mo->object = p;
 	mo->order = order;
 	/*
+	 * Insert memory object into global interval tree
+	 */
+	ret = __lcd_mem_itree_insert(mo, 0);
+	if (ret) {
+		LCD_ERR("memory itree insert failed");
+		goto fail3;
+	}
+	/*
 	 * Insert into caller's cspace
 	 */
 	ret = cap_insert(caller->cspace, slot, 
@@ -41,7 +79,7 @@ static void do_insert_pages(struct lcd *caller, struct page *p,
 			__lcd_get_libcap_type(LCD_MICROKERNEL_TYPE_ID_PAGE));
 	if (ret) {
 		LCD_ERR("insert");
-		goto fail3;
+		goto fail4;
 	}
 	/*
 	 * ================================================
@@ -70,6 +108,8 @@ static void do_insert_pages(struct lcd *caller, struct page *p,
 	 */
 	return 0;
 
+fail4:
+	__lcd_mem_itree_delete(mo);
 fail3:
 	kfree(meta);
 fail2:

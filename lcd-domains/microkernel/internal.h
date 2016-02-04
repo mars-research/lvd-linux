@@ -542,7 +542,6 @@ void __lcd_unmap_memory_object(struct lcd *caller, cptr_t mo_cptr);
  */
 int __lcd_grant_memory_object(struct lcd *src, struct lcd *dest,
 			cptr_t c_src, cptr_t c_dest);
-
 /**
  * __lcd_mem_init -- Call this when the microkernel initializes
  *
@@ -557,6 +556,83 @@ int __lcd_mem_init(void)
  * Tears down memory management internals.
  */
 void __lcd_mem_exit(void)
+
+/* --------------------------------------------------
+ * GLOBAL MEMORY INTERVAL TREE
+ * --------------------------------------------------
+ *
+ * mem_itree.c
+ *
+ * See more doc in that file.
+ */
+
+/**
+ * struct lcd_mem_itree
+ *
+ * Global (across all LCDs) interval tree for tracking the
+ * host memory that is under the microkernel's capability
+ * system.
+ */
+struct lcd_mem_itree {
+	struct rb_root root;
+};
+/**
+ * struct lcd_mem_itree_node
+ *
+ * Node in the lcd_mem_itree. Contains pointer to the memory object
+ * itself (the physical pages, device memory address, vmalloc address,
+ * etc.).
+ */
+struct lcd_mem_itree_node {
+	struct interval_tree_node it_node;
+	struct lcd_memory_object *mo;
+	unsigned int flags;
+};
+/**
+ * __lcd_mem_itree_insert -- Insert a memory object into the appropriate
+ *                           interval tree
+ * @mo: the memory object to insert
+ * @flags: the flags to store in the tree node
+ *
+ * If the memory object already exists in the tree, you will get duplicates.
+ * This is an internal function. It's up to you to make sure you did the
+ * lookup check first. (We don't do this check for every insert or else this
+ * would be slow.)
+ */
+int __lcd_mem_itree_insert(struct lcd_memory_object *mo, unsigned int flags);
+/**
+ * __lcd_mem_itree_lookup -- Search for a node in the appropriate tree
+ *                           for a memory object that contains address
+ * @addr: address to search for
+ * @type: the memory object type to search for
+ * @node_out: out param, the tree node, if found
+ *
+ * If searching for physical memory (pages, device memory), @addr is
+ * a physical address. If searching for vmalloc memory, @addr is a host
+ * virtual address.
+ */
+int __lcd_mem_itree_lookup(unsigned long addr,
+			enum lcd_microkernel_type_id type,
+			struct lcd_mem_itree_node **node_out);
+/**
+ * __lcd_mem_itree_delete -- Delete a node from its containing memory interval
+ *                           tree
+ * @node: the node to delete
+ */
+int __lcd_mem_itree_delete(struct lcd_mem_itree_node *node);
+/**
+ * __lcd_mem_itree_init -- Call this when the microkernel initializes
+ *
+ * Initializes global memory interval tree.
+ */
+int __lcd_mem_itree_init(void);
+
+/**
+ * __lcd_mem_itree_exit -- Call this when the microkernel is exiting
+ *
+ * Tears down global memory interval tree.
+ */
+void __lcd_mem_itree_exit(void);
 
 /* --------------------------------------------------
  * RUNNING LCDs

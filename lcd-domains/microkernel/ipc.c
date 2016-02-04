@@ -12,7 +12,7 @@
 
 /* CREATE -------------------------------------------------- */
 
-int __lcd_create_sync_endpoint(struct lcd *caller, cptr_t slot)
+int __lcd_create_sync_endpoint__(struct lcd_sync_endpoint **ep_out)
 {
 	struct lcd_sync_endpoint *e;
 	int ret;
@@ -34,6 +34,28 @@ int __lcd_create_sync_endpoint(struct lcd *caller, cptr_t slot)
 	 * Set up lock
 	 */
 	mutex_init(&e->lock);
+
+	return 0;
+
+fail1:
+	return ret;
+}
+
+void __lcd_destroy_sync_endpoint__(struct lcd_sync_endpoint *ep)
+{
+	kfree(ep);
+}
+
+int __lcd_create_sync_endpoint(struct lcd *caller, cptr_t slot)
+{
+	struct lcd_sync_endpoint *e;
+	int ret;
+	/*
+	 * Create it
+	 */
+	ret = __lcd_create_sync_endpoint__(&e);
+	if (ret)
+		goto fail1;
 	/*
 	 * Insert into caller's cspace
 	 */
@@ -48,13 +70,10 @@ int __lcd_create_sync_endpoint(struct lcd *caller, cptr_t slot)
 	return 0;
 
 fail2:
-	kfree(e);
+	__lcd_destroy_sync_endpoint(e);
 fail1:
 	return ret;
 }
-
-/* Destroy is trivial, and happens in the delete callback for the
- * sync endpoint capability type. */
 
 /* LOOKUP -------------------------------------------------- */
 

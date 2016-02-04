@@ -179,9 +179,9 @@ static void sync_endpoint_delete(struct cspace *cspace, struct cnode *cnode,
 {
 	/*
 	 * No one has a capability to the endpoint, so no one should
-	 * be in the queues; free object
+	 * be in the queues; destroy endpoint
 	 */
-	kfree(object);
+	__lcd_destroy_sync_endpoint__(object);
 }
 
 static void lcd_delete(struct cspace *cspace, struct cnode *cnode,

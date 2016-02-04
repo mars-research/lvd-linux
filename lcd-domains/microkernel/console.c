@@ -3,6 +3,8 @@
  *
  * Copyright: University of Utah
  */
+
+#include <linux/printk.h>
 #include "internal.h"
 
 int __lcd_put_char(struct lcd *lcd, char c)
@@ -35,4 +37,22 @@ int __lcd_put_char(struct lcd *lcd, char c)
 		return 0;
 	}
 	return 0;
+}
+
+/* INIT/EXIT ------------------------------------------------------------ */
+
+int __lcd_console_init(void)
+{
+	/*
+	 * Nothing for now
+	 */
+	return 0;
+}
+
+void __lcd_console_exit(void)
+{
+	/*
+	 * Nothing for now
+	 */
+	return;
 }

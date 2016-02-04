@@ -429,3 +429,21 @@ fail2:
 fail1:
 	return ret;
 }
+
+/* INIT/EXIT -------------------------------------------------- */
+
+int __lcd_run_init(void)
+{
+	/*
+	 * Nothing for now
+	 */
+	return 0;
+}
+
+void __lcd_run_exit(void)
+{
+	/*
+	 * Nothing for now
+	 */
+	return;
+}

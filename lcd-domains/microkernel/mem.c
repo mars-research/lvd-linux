@@ -627,3 +627,21 @@ fail2:
 fail1:
 	return ret;
 }
+
+/* INIT/EXIT -------------------------------------------------- */
+
+int __lcd_mem_init(void)
+{
+	/*
+	 * Nothing for now
+	 */
+	return 0;
+}
+
+void __lcd_mem_exit(void)
+{
+	/*
+	 * Nothing for now
+	 */
+	return;
+}

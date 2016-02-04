@@ -634,15 +634,15 @@ static int vmx_setup_pat_msr(unsigned char pat_entry, unsigned char pat_type)
 
 	if (pat_entry < MAX_PAT_ENTRY) {
 		LCD_ARCH_ERR("Invalid PAT entry, cannot setup PAT MSR \n");
-		return -EINVAL
+		return -EINVAL;
 	}
 	
-	if(pat_type > VALID_PAT_TYPE && (!(1 << pat_type) & 0xF3)) {
+	if(pat_type > VALID_PAT_TYPE && !((1 << pat_type) & 0xF3)) {
 		LCD_ARCH_ERR("Not a valid PAT type, cannot setup PAT MSR \n");
 		return -EINVAL;
 	}
 
-	vmcs_readl(GUEST_IA32_PAT, pat);
+	pat = vmcs_readl(GUEST_IA32_PAT);
 	pat |= (pat_type << (pat_entry * 8));
 	vmcs_writel(GUEST_IA32_PAT, pat);
 	return 0;

@@ -122,7 +122,11 @@ static void klcd_revoke(struct cspace *cspace, struct cnode *cnode,
 static void page_delete(struct cspace *cspace, struct cnode *cnode,
 			void *object)
 {
-	struct lcd_memory_object *mo = (struct lcd_memory_object *)object;
+	struct lcd_memory_object *mo = object;
+	/*
+	 * Remove memory object from global memory interval tree
+	 */
+	__lcd_mem_itree_delete(mo);
 	/*
 	 * Pages should be unmapped from all LCDs and not in use
 	 * by any code. Free them.
@@ -137,6 +141,11 @@ static void page_delete(struct cspace *cspace, struct cnode *cnode,
 static void volunteered_page_delete(struct cspace *cspace, struct cnode *cnode,
 				void *object)
 {
+	struct lcd_memory_object *mo = object;
+	/*
+	 * Remove memory object from global memory interval tree
+	 */
+	__lcd_mem_itree_delete(mo);
 	/*
 	 * Do not free the actual pages. The thread that "volunteered" 
 	 * the pages is responsible for freeing them after they are removed
@@ -146,12 +155,17 @@ static void volunteered_page_delete(struct cspace *cspace, struct cnode *cnode,
 	 * stored in the cspace, and contains a further pointer to the
 	 * struct page).
 	 */
-	kfree(object);
+	kfree(mo);
 }
 
 static void volunteered_dev_mem_delete(struct cspace *cspace, 
 				struct cnode *cnode, void *object)
 {
+	struct lcd_memory_object *mo = object;
+	/*
+	 * Remove memory object from global memory interval tree
+	 */
+	__lcd_mem_itree_delete(mo);
 	/*
 	 * The device memory itself (e.g., high memory, ISA memory) shouldn't
 	 * need to be "freed".
@@ -161,17 +175,22 @@ static void volunteered_dev_mem_delete(struct cspace *cspace,
 	 *
 	 * Free the struct memory_object.
 	 */
-	kfree(object);
+	kfree(mo);
 }
 
 static void volunteered_vmalloc_mem_delete(struct cspace *cspace, 
 					struct cnode *cnode, void *object)
 {
+	struct lcd_memory_object *mo = object;
+	/*
+	 * Remove memory object from global memory interval tree
+	 */
+	__lcd_mem_itree_delete(mo);
 	/*
 	 * Just like volunteered pages, the original volunteer is
 	 * responsible for freeing the memory.
 	 */
-	kfree(object);
+	kfree(mo);
 }
 
 static void sync_endpoint_delete(struct cspace *cspace, struct cnode *cnode,

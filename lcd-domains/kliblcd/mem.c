@@ -224,31 +224,6 @@ static void mo_remove_from_trees(struct task_struct *t,
 	}
 }
 
-static int phys_addr_to_mo_cptr(struct task_struct *t,
-				unsigned long addr, 
-				cptr_t *mo_cptr)
-{
-	int ret;
-	struct lcd_resource_node *n;
-	/*
-	 * Look in RAM/devmem tree
-	 */
-	ret = lcd_resource_tree_search(
-		t->lcd_resource_trees[LCD_RESOURCE_TREE_RAM_IDX],
-		addr,
-		&n);
-	if (ret) {
-		LIBLCD_ERR("address not found");
-		goto fail1;
-	}
-	/*
-	 * Pull out memory object cptr
-	 */
-	mo_cptr = n->cptr;
-
-	return 0;
-}
-
 /* LOW-LEVEL PAGE ALLOC -------------------------------------------------- */
 
 int _lcd_alloc_pages_exact_node(int nid, unsigned int flags, 
@@ -614,6 +589,7 @@ int lcd_map_virt(gpa_t base, unsigned int order, gva_t *gva_out)
 {
 	int ret;
 	cptr_t mo_cptr;
+	unsigned int mo_order;
 	/*
 	 * On x86_64, all RAM is mapped already.
 	 *
@@ -626,7 +602,7 @@ int lcd_map_virt(gpa_t base, unsigned int order, gva_t *gva_out)
 	 *
 	 * guest virtual == host virtual for non-isolated
 	 */
-	ret = phys_addr_to_mo_cptr(current, gpa_val(base), &mo_cptr);
+	ret = lcd_phys_to_cptr(base, &mo_cptr, &mo_order);
 	if (ret) {
 		LIBLCD_ERR("phys not mapped?");
 		goto fail1;
@@ -665,13 +641,14 @@ void lcd_unmap_phys(gpa_t base, unsigned int order)
 {
 	int ret;
 	cptr_t mo_cptr;
+	unsigned int mo_order;
 	/*
 	 * No real unmapping needs to be done, but we need to
 	 * update the resource tree.
 	 *
 	 * Look up cptr for physical memory
 	 */
-	ret = phys_addr_to_mo_cptr(current, gpa_val(base), &mo_cptr);
+	ret = lcd_phys_to_cptr(base, &mo_cptr, &mo_order);
 	if (ret) {
 		LIBLCD_ERR("phys not mapped?");
 		return;
@@ -750,17 +727,61 @@ void lcd_unvolunteer_dev_mem(cptr_t devmem)
 
 int lcd_phys_to_cptr(gpa_t paddr, cptr_t *c_out, unsigned int *order_out)
 {
-	/* rb tree lookup */
+	int ret;
+	struct lcd_resource_node *n;
+	/*
+	 * Look in RAM/devmem tree
+	 *
+	 * (For vmalloc mem, should use lcd_virt_to_cptr.)
+	 */
+	ret = lcd_resource_tree_search(
+		current->lcd_resource_trees[LCD_RESOURCE_TREE_RAM_IDX],
+		gpa_val(paddr),
+		&n);
+	if (ret) {
+		LIBLCD_ERR("address not found");
+		goto fail1;
+	}
+	/*
+	 * Pull out memory object cptr and order
+	 */
+	*c_out = n->cptr;
+	*order_out = n->order;
+
+	return 0;
+
+fail1:
+	return ret;
 }
 
 int lcd_virt_to_cptr(gva_t vaddr, cptr_t *c_out, unsigned int *order_out)
 {
 	gpa_t gpa;
+	struct lcd_resource_node *n;
 	/*
-	 * Translate virtual-> physical. guest phys = host phys.
+	 * Look in vmalloc tree first
 	 */
-	gpa = __gpa(hpa_val(hva2hpa(__hva(gva_val(vaddr)))));
-	return lcd_phys_to_cptr(gpa, c_out, order_out);
+	ret = lcd_resource_tree_search(
+		current->lcd_resource_trees[LCD_RESOURCE_TREE_VMALLOC_IDX],
+		gva_val(vaddr),
+		&n);
+	if (ret) {
+		/* 
+		 * Not found in vmalloc tree
+		 *
+		 * Translate virtual-> physical and try physical tree.
+		 * guest phys = host phys.
+		 */
+		gpa = __gpa(hpa_val(hva2hpa(__hva(gva_val(vaddr)))));
+		return lcd_phys_to_cptr(gpa, c_out, order_out);
+	}
+	/*
+	 * Pull out memory object cptr and order
+	 */
+	*c_out = n->cptr;
+	*order_out = n->order;
+
+	return 0;
 }
 
 /* MISCELLANEOUS -------------------------------------------------- */

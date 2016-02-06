@@ -691,21 +691,86 @@ void lcd_unmap_both(gva_t base, unsigned int order)
 	lcd_unmap_phys(base_gpa, order);
 }
 
+/* VOLUNTEER HELPERS -------------------------------------------------- */
+
+static int volunteer_mem_obj(struct task_struct *t,
+			void *mem_obj, unsigned long addr,
+			unsigned int order,
+			enum lcd_microkernel_type_id sub_type,
+			cptr_t *slot_out)
+{
+	int ret;
+	struct lcd_mem_itree_node *n;
+	cptr_t slot;
+	struct lcd_memory_object *mo;
+	/*
+	 * Check if object has already been volunteered
+	 *
+	 * XXX: Admittedly, this check is weak because someone else
+	 * may have volunteered some subset of the pages now being
+	 * volunteered, etc. etc. Non-isolated code is trusted ...
+	 */
+	ret = __lcd_mem_itree_get(addr, sub_type, &n);
+	if (!ret) {
+		__lcd_mem_itree_put(n);
+		LIBLCD_ERR("memory has already been volunteered");
+		ret = -EINVAL;
+		goto fail1;
+	}
+	/*
+	 * Memory object not volunteered; alloc a cptr and insert
+	 * into caller's cspace and global memory interval tree
+	 */
+	ret = lcd_cptr_alloc(&slot);
+	if (ret) {
+		LIBLCD_ERR("cptr alloc failed");
+		goto fail2;
+	}
+	ret = __lcd_insert_memory_object(t->lcd, base, order, sub_type, &mo);
+	if (ret) {
+		LIBLCD_ERR("error inserting new memory object");
+		goto fail3;
+	}
+	/*
+	 * ==================================================
+	 * capability subystem owns pages after this point;
+	 * to free up everything, call lcd_cap_delete on the cptr
+	 */
+
+	*slot_out = slot;
+
+fail3:
+	lcd_free_cptr(slot);
+fail2:
+fail1:
+	return ret;
+}
+
+static void unvolunteer_mem_obj(cptr_t mo_cptr)
+{
+	/*
+	 * So long as the caller revoked all access to the memory
+	 * object, this triggers removal from the memory interval tree,
+	 * and frees up internal data (struct lcd_memory_object,
+	 * metadata, and so on).
+	 */
+	lcd_cap_delete(mo_cptr);
+}
+
 /* "VOLUNTEERING" PAGES ---------------------------------------- */
 
 int lcd_volunteer_pages(struct page *base, unsigned int order,
 			cptr_t *slot_out)
 {
-	/* insert into cspace */
-
-	/* insert into *global* rb tree */
+	return volunteer_mem_obj(current, base,
+				page_pfn(base), order,
+				LCD_MICROKERNEL_TYPE_ID_PAGE,
+				slot_out);
 }
 
 void lcd_unvolunteer_pages(cptr_t pages)
 {
-	/* update rb tree? */
-
-	lcd_cap_delete(pages);
+	unvolunteer_mem_obj(pages);
 }
 
 /* "VOLUNTEERING" DEVICE MEMORY ---------------------------------------- */
@@ -713,14 +778,31 @@ void lcd_unvolunteer_pages(cptr_t pages)
 int lcd_volunteer_dev_mem(gpa_t base, unsigned int order,
 			cptr_t *slot_out)
 {
-	/* insert into cspace */
-
-	/* insert into rb tree */
+	return volunteer_mem_obj(current, (void *)gpa_val(base),
+				gpa_val(base), order,
+				LCD_MICROKERNEL_TYPE_ID_DEV_MEM,
+				slot_out);
 }
 
 void lcd_unvolunteer_dev_mem(cptr_t devmem)
 {
-	lcd_cap_delete(devmem);
+	unvolunteer_mem_obj(devmem);
+}
+
+/* "VOLUNTEERING" VMALLOC MEMORY ---------------------------------------- */
+
+int lcd_volunteer_vmalloc_mem(gva_t base, unsigned int order,
+			cptr_t *slot_out)
+{
+	return volunteer_mem_obj(current, (void *)gva_val(base),
+				gva_val(base), order,
+				LCD_MICROKERNEL_TYPE_ID_VMALLOC_MEM,
+				slot_out);
+}
+
+void lcd_unvolunteer_vmalloc_mem(cptr_t vmalloc_mem)
+{
+	unvolunteer_mem_obj(vmalloc_mem);
 }
 
 /* ADDRESS -> CPTR TRANSLATION ---------------------------------------- */

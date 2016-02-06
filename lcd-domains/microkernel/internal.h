@@ -468,6 +468,28 @@ unsigned long __lcd_memory_object_size(struct lcd_memory_object *mo);
  */
 unsigned long __lcd_memory_object_last(struct lcd_memory_object *mo);
 /**
+ * __lcd_insert_memory_object -- Insert memory object into LCD's cspace, and
+ *                               into the global memory interval tree
+ * @caller: the LCD in whose cspace we should insert the capability 
+ * @mem_obj: the memory object (struct page*, unsigned long for dev mem, etc.)
+ * @order: mem_obj is 2^order pages
+ * @sub_type: the microkernel type id for memory object
+ * @mo_out: out param, the created memory object (data structure)
+ *
+ * This sets up all of the internal data structures used to represent
+ * and track the memory object.
+ *
+ * The data structures are torn down at the following points -
+ *
+ *    1 - per-cnode metadata -- during cap revoke
+ *    2 - struct lcd memory object removal from global memory interval
+ *        tree and delete the struct itself -- during cap delete
+ */
+int __lcd_insert_memory_object(struct lcd *caller, void *mem_obj,
+			unsigned int order,
+			enum lcd_microkernel_type_id sub_type,
+			struct lcd_memory_object **mo_out);
+/**
  * __lcd_alloc_pages_exact_node -- Alloc host pages and insert into caller's
  *                                 cspace
  * @caller: the LCD whose cspace we should insert into
@@ -654,7 +676,7 @@ int __lcd_mem_itree_get(unsigned long addr,
 /**
  * __lcd_mem_itree_put -- Release lock on node
  */
-int __lcd_mem_itree_put(struct lcd_mem_itree_node *node);
+void __lcd_mem_itree_put(struct lcd_mem_itree_node *node);
 /**
  * __lcd_mem_itree_delete -- Remove memory object from its containing memory 
  *                           interval tree

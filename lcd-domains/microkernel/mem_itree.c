@@ -121,7 +121,7 @@ int __lcd_mem_itree_get(unsigned long addr,
 	}
 }
 
-int __lcd_mem_itree_put(struct lcd_mem_itree_node *node)
+void __lcd_mem_itree_put(struct lcd_mem_itree_node *node)
 {
 	mutex_unlock(&node->lock);
 }

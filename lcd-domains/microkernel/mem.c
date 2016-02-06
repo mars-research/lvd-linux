@@ -37,10 +37,10 @@ unsigned long __lcd_memory_object_last(struct lcd_memory_object *mo)
 		__lcd_memory_object_size(mo) - 1;
 }
 
-/* ALLOC -------------------------------------------------- */
-
-static void do_insert_pages(struct lcd *caller, struct page *p, 
-			unsigned int order)
+int __lcd_insert_memory_object(struct lcd *caller, void *mem_obj,
+			unsigned int order,
+			enum lcd_microkernel_type_id sub_type,
+			struct lcd_memory_object **mo_out)
 {
 	struct lcd_memory_object *mo;
 	struct lcd_mapping_metadata *meta;
@@ -60,8 +60,8 @@ static void do_insert_pages(struct lcd *caller, struct page *p,
 		ret = -ENOMEM;
 		goto fail2;
 	}
-	mo->sub_type = LCD_MICROKERNEL_TYPE_ID_PAGE;
-	mo->object = p;
+	mo->sub_type = sub_type;
+	mo->object = mem_obj;
 	mo->order = order;
 	/*
 	 * Insert memory object into global interval tree
@@ -76,7 +76,7 @@ static void do_insert_pages(struct lcd *caller, struct page *p,
 	 */
 	ret = cap_insert(caller->cspace, slot, 
 			mo, 
-			__lcd_get_libcap_type(LCD_MICROKERNEL_TYPE_ID_PAGE));
+			__lcd_get_libcap_type(sub_type));
 	if (ret) {
 		LCD_ERR("insert");
 		goto fail4;
@@ -106,6 +106,9 @@ static void do_insert_pages(struct lcd *caller, struct page *p,
 	 * After this point, meta is now also managed implicitly
 	 * by libcap.
 	 */
+
+	*mo_out = mo;
+
 	return 0;
 
 fail4:
@@ -118,11 +121,14 @@ fail1:
 	return ret;
 }
 
+/* ALLOC -------------------------------------------------- */
+
 int __lcd_alloc_pages_exact_node(struct lcd *caller, cptr_t slot, int nid,
 				unsigned int flags, unsigned int order)
 {
 	int ret;
 	struct page *p;
+	struct lcd_memory_object *unused;
 	/*
 	 * Allocate zero'd pages on node
 	 */
@@ -135,7 +141,9 @@ int __lcd_alloc_pages_exact_node(struct lcd *caller, cptr_t slot, int nid,
 	/*
 	 * Insert into caller's cspace
 	 */
-	ret = do_insert_pages(caller, p, order);
+	ret = __lcd_insert_memory_object(caller, p, order,
+					LCD_MICROKERNEL_TYPE_ID_PAGE,
+					&unused);
 	if (ret) {
 		LCD_ERR("failed to insert page capability into caller's cspace");
 		goto fail2;
@@ -154,6 +162,7 @@ int __lcd_alloc_pages(struct lcd *caller, cptr_t slot,
 {
 	int ret;
 	struct page *p;
+	struct lcd_memory_object *unused;
 	/*
 	 * Allocate zero'd pages
 	 */
@@ -166,7 +175,9 @@ int __lcd_alloc_pages(struct lcd *caller, cptr_t slot,
 	/*
 	 * Insert into caller's cspace
 	 */
-	ret = do_insert_pages(caller, p, order);
+	ret = __lcd_insert_memory_object(caller, p, order,
+					LCD_MICROKERNEL_TYPE_ID_PAGE,
+					&unused);
 	if (ret) {
 		LCD_ERR("failed to insert page capability into caller's cspace");
 		goto fail2;

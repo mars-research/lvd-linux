@@ -122,6 +122,8 @@ void _lcd_munmap(cptr_t mo);
  * Allocate 2^order pages from the heap. Returns pointer to the struct
  * page for the first page in the chunk.
  *
+ * You can look up the cptr for the page via lcd_phys_to_cptr.
+ *
  * Note: If you want to share pages with another LCD, it's recommended
  * that you use the lower level _lcd_alloc_pages. See its documentation.
  *
@@ -173,8 +175,10 @@ void lcd_free_pages(struct page *base, unsigned int order);
  * and the pages are already technically accessible to the caller (but the
  * caller probably won't know the physical address of the pages - they just
  * have the opaque cptr_t for the pages). So, for non-isolated code, this
- * function doesn't really do much. The guest physical address returned
- * is actually the host physical address of the pages.
+ * function doesn't really do much (it adds the pages to an internal
+ * data structure so you can still do address -> cptr translation,
+ * however). The guest physical address returned is actually the host 
+ * physical address of the pages.
  *
  * Note: If pages is already mapped, this call will fail (the microkernel
  * does not support multiple mappings).
@@ -230,7 +234,8 @@ int lcd_map_both(cptr_t pages, unsigned int order, gva_t *gva_out);
  * Unmap pages from caller's physical address space. (This is like kunmap,
  * but for physical memory.)
  *
- * Note: For non-isolated code, this is a no-op.
+ * Note: For non-isolated code, this doesn't need to do any unmapping (but
+ * some internal data structures are updated, so it's important you call it).
  */
 void lcd_unmap_phys(gpa_t base, unsigned int order);
 /**
@@ -250,8 +255,6 @@ void lcd_unmap_virt(gva_t base, unsigned int order);
  *
  * This is lcd_unmap_phys and lcd_unmap_virt put together, and will
  * kill the mappings set up by lcd_map_both.
- *
- * Note: For non-isolated code, this is a no-op.
  */
 void lcd_unmap_both(gva_t base, unsigned int order);
 
@@ -274,6 +277,14 @@ void lcd_unmap_both(gva_t base, unsigned int order);
  * your cspace so you can then grant access to it to the LCD. This is what
  * this function does.
  *
+ * IMPORTANT: No checks are in place to ensure you don't insert the same
+ * pages multiple times. kLCDs are trusted to do the right thing.
+ *
+ * IMPORTANT 2: If you plan to do address -> cptr translation, you should
+ * call lcd_phys_map or lcd_virt_map. (Otherwise, some internal data structures
+ * -- resource trees -- will not be updated, and address -> cptr translation
+ * will fail.)
+ *
  * To remove the pages from the capability system, you should revoke access to 
  * them and then call lcd_unvolunteer_pages (this is, for now, just
  * a wrapper around lcd_cap_delete).
@@ -285,8 +296,6 @@ void lcd_unmap_both(gva_t base, unsigned int order);
  * have a double-free, since the module loader always tries to free the
  * pages as well.)
  *
- * IMPORTANT: No checks are in place to ensure you don't insert the same
- * pages multiple times. kLCDs are trusted to do the right thing.
  */
 int lcd_volunteer_pages(struct page *base, unsigned int order,
 			cptr_t *slot_out);
@@ -294,8 +303,9 @@ int lcd_volunteer_pages(struct page *base, unsigned int order,
  * lcd_unvolunteer_pages -- Remove pages from the capability system
  * @pages: cptr to pages capability to be removed
  *
- * Deletes pages from caller's cspace. (This is just a wrapper around
- * lcd_cap_delete.)
+ * Deletes pages from caller's cspace. Updates some important internal
+ * data structures that are used for tracking host resources that have been
+ * volunteered (so it's important you call this).
  *
  * IMPORTANT: This function does not attempt to remove the pages from
  * any other cspaces. It is the caller's responsibility to track and
@@ -335,24 +345,56 @@ void lcd_unvolunteer_pages(cptr_t pages);
  * guest physical == host physical by convention (so a non-isolated thread
  * can cast an hpa to a gpa and it will do the right thing).
  */
-void lcd_volunteer_dev_mem(gpa_t base, unsigned int order,
+int lcd_volunteer_dev_mem(gpa_t base, unsigned int order,
 			cptr_t *slot_out);
 /**
  * lcd_unvolunteer_dev_mem -- Remove device memory from the capability system
  * @devmem: cptr to device memory capability to be removed
  *
- * Deletes device mem from caller's cspace. (This is just a wrapper around
- * lcd_cap_delete.)
- *
- * IMPORTANT: This function does not attempt to remove the device memory from
- * any other cspaces. It is the caller's responsibility to track and
- * revoke access.
- *
- * NOTE: This doesn't do any type checking. You could potentially pass in
- * a cptr to a synchronous endpoint capability, for example, and it would
- * get deleted from the caller's cspace.
+ * Similar to lcd_unvolunteer_pages.
  */
-int lcd_unvolunteer_dev_mem(cptr_t devmem);
+void lcd_unvolunteer_dev_mem(cptr_t devmem);
+
+/* "VOLUNTEERING" VMALLOC MEMORY ---------------------------------------- */
+
+/**
+ * lcd_volunteer_vmalloc_mem -- Bring vmalloc memory into the cspace access 
+ *                              control system
+ * @base: the virtual address at the start of the chunk of *virtually*
+ *        contiguous vmalloc memory
+ * @order: there are 2^order pages of vmalloc memory being volunteered
+ * @slot_out: out param, where the memory was stored in the caller's cspace
+ *
+ * Note: This only makes sense for non-isolated code. For isolated code,
+ * all memory objects it has access to are in its cspace, and so
+ * this function is equivalent to lcd_virt_to_cptr (see its documentation).
+ *
+ * Inserts vmalloc memory into the caller's cspace. Motivation: This is
+ * used when we load a module in the host for an LCD. The module
+ * loader uses vmalloc to set aside memory. Rather than create a capability
+ * for each individual page (as we did before), we create a capability that
+ * refers to the set of discontiguous pages. The object is the base *virtual*
+ * address of the vmalloc memory. Note that vmalloc memory allocations are
+ * page aligned.
+ *
+ * Of course, we risk the same memory being volunteered as regular RAM (via
+ * lcd_volunteer_page above). It's up to the non-isolated code not to do
+ * that (non-isolated code is trusted after all).
+ *
+ * The rest of the notes are equivalent to lcd_volunteer_pages; same ideas.
+ *
+ * Note: For non-isolated code, guest virtual == host virtual.
+ */
+int lcd_volunteer_vmalloc_mem(gva_t base, unsigned int order,
+			cptr_t *slot_out);
+/**
+ * lcd_unvolunteer_vmalloc_mem -- Remove vmalloc memory from the capability 
+ *                                system
+ * @vmalloc_mem: cptr to vmalloc memory capability to be removed
+ *
+ * Similar to lcd_unvolunteer_pages.
+ */
+void lcd_unvolunteer_vmalloc_mem(cptr_t vmalloc_mem);
 
 /* ADDRESS -> CPTR TRANSLATION ---------------------------------------- */
 

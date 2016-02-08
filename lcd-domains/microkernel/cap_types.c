@@ -21,7 +21,7 @@ struct type_ops_id {
 
 /* REVOCATION CALLBACKS ---------------------------------------- */
 
-static void page_revoke(struct cspace *cspace, struct cnode *cnode,
+static void mem_object_revoke(struct cspace *cspace, struct cnode *cnode,
 			void *object)
 {
 	struct lcd_mapping_metadata *m;
@@ -37,22 +37,34 @@ static void page_revoke(struct cspace *cspace, struct cnode *cnode,
 		kfree(m);
 }
 
+static void page_revoke(struct cspace *cspace, struct cnode *cnode,
+			void *object)
+{
+	mem_object_revoke(cspace, cnode, object);
+}
+
+static void vmalloc_mem_revoke(struct cspace *cspace, struct cnode *cnode,
+			void *object)
+{
+	mem_object_revoke(cspace, cnode, object);
+}
+
 static void volunteered_page_revoke(struct cspace *cspace, struct cnode *cnode,
 				void *object)
 {
-	page_revoke(cspace, cnode, object);
+	mem_object_revoke(cspace, cnode, object);
 }
 
 static void volunteered_dev_mem_revoke(struct cspace *cspace, 
 				struct cnode *cnode, void *object)
 {
-	page_revoke(cspace, cnode, object);
+	mem_object_revoke(cspace, cnode, object);
 }
 
 static void volunteered_vmalloc_mem_revoke(struct cspace *cspace, 
 					struct cnode *cnode, void *object)
 {
-	page_revoke(cspace, cnode, object);
+	mem_object_revoke(cspace, cnode, object);
 }
 
 static void sync_endpoint_revoke(struct cspace *cspace, struct cnode *cnode,
@@ -132,6 +144,25 @@ static void page_delete(struct cspace *cspace, struct cnode *cnode,
 	 * by any code. Free them.
 	 */
 	__free_pages(mo->object, mo->order);
+	/*
+	 * Free mo, no one else should have a reference.
+	 */
+	kfree(mo);
+}
+
+static void vmalloc_mem_delete(struct cspace *cspace, struct cnode *cnode,
+			void *object)
+{
+	struct lcd_memory_object *mo = object;
+	/*
+	 * Remove memory object from global memory interval tree
+	 */
+	__lcd_mem_itree_delete(mo);
+	/*
+	 * vmalloc memory should be unmapped from all LCDs and not in use
+	 * by any code. Free it.
+	 */
+	vfree(mo->object);
 	/*
 	 * Free mo, no one else should have a reference.
 	 */
@@ -223,6 +254,13 @@ static struct type_ops_id mk_type_ops_id[LCD_MICROKERNEL_NUM_CAP_TYPES] = {
 			.name = "page",
 			.delete = page_delete,
 			.revoke = page_revoke,
+		}
+	},
+	{
+		{
+			.name = "vmalloc memory",
+			.delete = vmalloc_mem_delete,
+			.revoke = vmalloc_mem_revoke,
 		}
 	},
 	{

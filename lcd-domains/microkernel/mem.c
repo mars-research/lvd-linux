@@ -192,6 +192,41 @@ fail1:
 	return ret;
 }
 
+/* VMALLOC -------------------------------------------------- */
+
+int __lcd_vmalloc(struct lcd *caller, cptr_t slot, unsigned int order)
+{
+	int ret;
+	void *vptr;
+	struct lcd_memory_object *unused;
+	/*
+	 * Allocate zero'd out vmalloc pages
+	 */
+	vptr = vzalloc(1UL << (order + PAGE_SIZE));
+	if (!vptr) {
+		LCD_ERR("vzalloc failed");
+		ret = -ENOMEM;
+		goto fail1;
+	}
+	/*
+	 * Insert into caller's cspace
+	 */
+	ret = __lcd_insert_memory_object(caller, vptr, order,
+					LCD_MICROKERNEL_TYPE_ID_VMALLOC_MEM,
+					&unused);
+	if (ret) {
+		LCD_ERR("failed to insert vmalloc mem capability into caller's cspace");
+		goto fail2;
+	}
+
+	return 0;
+
+fail2:
+	vfree(vptr);
+fail1:
+	return ret;
+}
+
 /* LOOKUP -------------------------------------------------- */
 
 static int lookup_memory_object(struct cspace *cspace, cptr_t slot, 

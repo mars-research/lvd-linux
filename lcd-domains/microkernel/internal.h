@@ -370,6 +370,7 @@ void __lcd_destroy(struct lcd *lcd);
  */
 enum lcd_microkernel_type_id {
 	LCD_MICROKERNEL_TYPE_ID_PAGE,
+	LCD_MICROKERNEL_TYPE_ID_VMALLOC_MEM,
 	LCD_MICROKERNEL_TYPE_ID_VOLUNTEERED_PAGE,
 	LCD_MICROKERNEL_TYPE_ID_VOLUNTEERED_DEV_MEM,
 	LCD_MICROKERNEL_TYPE_ID_VOLUNTEERED_VMALLOC_MEM,
@@ -508,7 +509,15 @@ int __lcd_alloc_pages_exact_node(struct lcd *caller, cptr_t slot, int nid,
  */
 int __lcd_alloc_pages(struct lcd *caller, cptr_t slot,
 		unsigned int flags, unsigned int order);
-
+/**
+ * __lcd_vmalloc -- Allocate host vmalloc memory for caller
+ *
+ * Arguments similar to __lcd_alloc_pages.
+ *
+ * Unlike regular vmalloc, the allocation size must be a power of
+ * 2 pages.
+ */
+int __lcd_vmalloc(struct lcd *caller, cptr_t slot, unsigned int order);
 /**
  * __lcd_get_memory_object -- Look up memory object in LCD's cspace
  * @caller: LCD whose cspace we should look in

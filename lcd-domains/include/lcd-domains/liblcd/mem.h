@@ -58,6 +58,17 @@ int _lcd_alloc_pages_exact_node(int nid, unsigned int flags, unsigned int order,
  */
 int _lcd_alloc_pages(unsigned int flags, unsigned int order,
 		cptr_t *slot_out);
+/**
+ * _lcd_vmalloc -- Low-level vmalloc out into microkernel
+ * @sz: size in bytes of amount to allocate
+ * @slot_out: out param, cptr to vmalloc memory capability in caller's cspace
+ *
+ * Allocate pages that aren't necessarily contiguous in host
+ * physical. @sz is rounded up so that @sz is a page-multiple,
+ * and the page-multiple is a power of 2 (@sz = 2^(order + page_size)
+ * for some order >= 0).
+ */
+int _lcd_vmalloc(size_t sz, cptr_t *slot_out);
 
 /* 
  * What about free pages? Use lcd_cap_revoke and/or lcd_cap_delete with 
@@ -150,6 +161,21 @@ struct page *lcd_alloc_pages(unsigned int flags, unsigned int order);
  * capability from your cspace.
  */
 void lcd_free_pages(struct page *base, unsigned int order);
+/**
+ * lcd_vmalloc -- Allocate memory that is not necessarily physical contiguous
+ * @sz: size in bytes of amount to allocate
+ *
+ * Allocate pages that aren't necessarily contiguous in guest
+ * physical or host physical. @sz is rounded up so that @sz is a 
+ * page-multiple, and the page-multiple is a power of 2 
+ * (@sz = 2^(order + page_size) for some order >= 0).
+ */
+void* lcd_vmalloc(size_t sz);
+/**
+ * lcd_vfree -- Free memory allocated via lcd_vmalloc.
+ * @ptr: pointer to start memory allocated via lcd_vmalloc
+ */
+void lcd_vfree(void *ptr);
 
 /* HIGH-LEVEL MAP/UNMAP ---------------------------------------- */
 

@@ -15,6 +15,7 @@ unsigned long __lcd_memory_object_start(struct lcd_memory_object *mo)
 	case LCD_MICROKERNEL_TYPE_ID_PAGE:
 	case LCD_MICROKERNEL_TYPE_ID_VOLUNTEERED_PAGE:
 		return va2hpa(page_address(mo->object));
+	case LCD_MICROKERNEL_TYPE_ID_VMALLOC_MEM:
 	case LCD_MICROKERNEL_TYPE_ID_VOLUNTEERED_DEV_MEM:
 	case LCD_MICROKERNEL_TYPE_ID_VOLUNTEERED_VMALLOC_MEM:
 		return (unsigned long)mo->object;
@@ -209,6 +210,7 @@ static int lookup_memory_object(struct cspace *cspace, cptr_t slot,
 	 */
 	t = cap_cnode_type(*cnode);
 	if (t != __lcd_get_libcap_type(LCD_MICROKERNEL_TYPE_ID_PAGE) &&
+		t != __lcd_get_libcap_type(LCD_MICROKERNEL_TYPE_ID_VMALLOC_MEM) &&
 		t != __lcd_get_libcap_type(LCD_MICROKERNEL_TYPE_ID_VOLUNTEERED_PAGE) &&
 		t != __lcd_get_libcap_type(LCD_MICROKERNEL_TYPE_ID_VOLUNTEERED_DEV_MEM) &&
 		t != __lcd_get_libcap_type(LCD_MICROKERNEL_TYPE_ID_VOLUNTEERED_VMALLOC_MEM)) {
@@ -390,6 +392,7 @@ static int isolated_map_memory_object(struct lcd *lcd,
 	case LCD_MICROKERNEL_TYPE_ID_VOLUNTEERED_PAGE:
 	case LCD_MICROKERNEL_TYPE_ID_VOLUNTEERED_DEV_MEM:
 		return isolated_map_contiguous_mem(lcd, mo, meta, base);
+	case LCD_MICROKERNEL_TYPE_ID_VMALLOC_MEM:
 	case LCD_MICROKERNEL_TYPE_ID_VOLUNTEERED_VMALLOC_MEM:
 		return isolated_map_vmalloc_mem(lcd, mo, meta, base);
 	default:
@@ -533,6 +536,7 @@ static void isolated_unmap_memory_object(struct lcd *lcd,
 	case LCD_MICROKERNEL_TYPE_ID_VOLUNTEERED_PAGE:
 	case LCD_MICROKERNEL_TYPE_ID_VOLUNTEERED_DEV_MEM:
 		return isolated_unmap_contiguous_mem(lcd, mo, meta);
+	case LCD_MICROKERNEL_TYPE_ID_VMALLOC_MEM:
 	case LCD_MICROKERNEL_TYPE_ID_VOLUNTEERED_VMALLOC_MEM:
 		return isolated_unmap_vmalloc_mem(lcd, mo, meta);
 	default:

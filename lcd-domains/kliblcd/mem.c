@@ -131,6 +131,7 @@ static int mo_insert_in_trees(struct task_struct *t,
 			t->lcd_resource_trees[LCD_RESOURCE_TREE_DEV_MEM_IDX],
 			mo,
 			mo_cptr);
+	case LCD_MICROKERNEL_TYPE_ID_VMALLOC_MEM:
 	case LCD_MICROKERNEL_TYPE_ID_VOLUNTEERED_VMALLOC_MEM:
 		return mo_insert_in_tree(
 			t->lcd_resource_trees[LCD_RESOURCE_TREE_VMALLOC_MEM_IDX],
@@ -167,6 +168,7 @@ static int mo_in_trees(struct task_struct *t, struct lcd_memory_object *mo)
 		return mo_in_tree(
 			t->lcd_resource_trees[LCD_RESOURCE_TREE_DEV_MEM_IDX],
 			mo);
+	case LCD_MICROKERNEL_TYPE_ID_VMALLOC_MEM:
 	case LCD_MICROKERNEL_TYPE_ID_VOLUNTEERED_VMALLOC_MEM:
 		return mo_in_tree(
 			t->lcd_resource_trees[LCD_RESOURCE_TREE_VMALLOC_MEM_IDX],
@@ -213,6 +215,7 @@ static void mo_remove_from_trees(struct task_struct *t,
 		return mo_remove_from_tree(
 			t->lcd_resource_trees[LCD_RESOURCE_TREE_DEV_MEM_IDX],
 			mo);
+	case LCD_MICROKERNEL_TYPE_ID_VMALLOC_MEM:
 	case LCD_MICROKERNEL_TYPE_ID_VOLUNTEERED_VMALLOC_MEM:
 		return mo_remove_from_tree(
 			t->lcd_resource_trees[LCD_RESOURCE_TREE_VMALLOC_MEM_IDX],

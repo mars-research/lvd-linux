@@ -53,6 +53,7 @@ int __lcd_mem_itree_insert(struct lcd_memory_object *mo, unsigned int flags)
 		return do_mem_itree_insert(&lcd_physical_mem_itree,
 					mo,
 					flags);
+	case LCD_MICROKERNEL_TYPE_ID_VMALLOC_MEM:
 	case LCD_MICROKERNEL_TYPE_ID_VOLUNTEERED_VMALLOC_MEM:
 		return do_mem_itree_insert(&lcd_vmalloc_mem_itree, 
 					mo,
@@ -111,6 +112,7 @@ int __lcd_mem_itree_get(unsigned long addr,
 		return do_mem_itree_lookup(&lcd_physical_mem_itree, 
 					addr,
 					node_out);
+	case LCD_MICROKERNEL_TYPE_ID_VMALLOC_MEM:
 	case LCD_MICROKERNEL_TYPE_ID_VOLUNTEERED_VMALLOC_MEM:
 		return do_mem_itree_lookup(&lcd_vmalloc_mem_itree,
 					addr,
@@ -164,6 +166,7 @@ void __lcd_mem_itree_delete(struct lcd_memory_object *mo)
 	case LCD_MICROKERNEL_TYPE_ID_VOLUNTEERED_PAGE:
 	case LCD_MICROKERNEL_TYPE_ID_VOLUNTEERED_DEV_MEM:
 		return do_mem_itree_delete(&lcd_physical_mem_itree, mo);
+	case LCD_MICROKERNEL_TYPE_ID_VMALLOC_MEM:
 	case LCD_MICROKERNEL_TYPE_ID_VOLUNTEERED_VMALLOC_MEM:
 		return do_mem_itree_delete(&lcd_vmalloc_mem_itree, mo);
 	default:

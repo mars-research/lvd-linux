@@ -293,6 +293,38 @@ fail1:
 	return ret;
 }
 
+int _lcd_vmalloc(unsigned int order, cptr_t *slot_out)
+{
+	struct lcd *lcd = current->lcd;
+	cptr_t slot;
+	int ret;
+	unsigned int order;
+	/*
+	 * Allocate a slot in caller's cspace
+	 */
+	ret = lcd_cptr_alloc(&slot);
+	if (ret) {
+		LIBLCD_ERR("cptr alloc failed");
+		goto fail1;
+	}
+	/*
+	 * Allocate vmalloc memory
+	 */
+	ret = __lcd_vmalloc(lcd, slot, order);
+	if (ret) {
+		LIBLCD_ERR("alloc pages failed");
+		goto fail2;
+	}
+
+	*slot_out = slot;
+	return 0;
+
+fail2:
+	lcd_cptr_free(slot);
+fail1:
+	return ret;
+}
+
 /* LOW-LEVEL MAP -------------------------------------------------- */
 
 int __lcd_mmap(struct lcd *lcd, struct lcd_memory_object *mo, 
@@ -542,6 +574,86 @@ void lcd_free_pages(struct page *base, unsigned int order)
 	 * Free pages
 	 */
 	lcd_cap_delete(page_cptr);
+}
+
+void* lcd_vmalloc(unsigned long sz)
+{
+	struct lcd *lcd = current->lcd;
+	unsigned int order;
+	unsigned int log_sz;
+	int ret;
+	cptr_t slot;
+	struct lcd_memory_object *mo;
+	struct cnode *cnode;
+	void *vptr = NULL;
+	/*
+	 * Convert to order
+	 */
+	order = ilog2(sz);
+	if (sz & ((1UL << order) - 1))
+		order++; /* round up */
+	/*
+	 * Do lower-level vmalloc so that mem goes into caller's cspace
+	 */
+	ret = _lcd_vmalloc(order, &slot);
+	if (ret) {
+		LIBLCD_ERR("lower level vmalloc failed");
+		goto fail1;
+	}
+	/*
+	 * "Map" memory object in caller's physical address space
+	 * (all this really does is put the allocated vmalloc mem in the
+	 * proper resource tree)
+	 */
+	ret = _lcd_mmap(slot, __gpa(0));
+	if (ret) {
+		LIBLCD_ERR("internal error: putting mem obj in tree");
+		goto fail2;
+	}
+	/*
+	 * Look up memory object so we can get vptr
+	 */
+	ret = __lcd_get_memory_object(lcd, slot, &cnode, &mo);
+	if (ret) {
+		LIBLCD_ERR("internal error: mem lookup failed");
+		goto fail3;
+	}
+	vptr = mo->object;
+	__lcd_put_memory_object(lcd, cnode, mo);
+
+	return vptr;
+
+fail3:
+	_lcd_munmap(slot);
+fail2:
+	lcd_cap_delete(slot); /* frees vmalloc mem, etc. */
+fail1:
+	return NULL;
+}
+
+void lcd_vfree(void *vptr)
+{
+	cptr_t vmalloc_mem_cptr;
+	int ret;
+	gpa_t gpa;
+	unsigned int unused;
+	/*
+	 * Resolve vptr to cptr
+	 */
+	ret = lcd_virt_to_cptr(__gva((unsigned long)vptr),
+			&vmalloc_mem_cptr, &unused);
+	if (ret) {
+		LIBLCD_ERR("warning: vmaloc mem not found, so not freed");
+		return;
+	}
+	/*
+	 * Remove vmalloc mem from resource tree ("unmap")
+	 */
+	_lcd_munmap(vmalloc_mem_cptr);
+	/*
+	 * Free vmalloc mem
+	 */
+	lcd_cap_delete(vmalloc_mem_cptr);
 }
 
 /* HIGH-LEVEL MAP/UNMAP ---------------------------------------- */

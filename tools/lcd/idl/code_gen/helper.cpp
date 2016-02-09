@@ -86,19 +86,17 @@ const char* parameter_name(const char* name)
 /*
  * returns a new string with _container on the end.
  */
-/*
-const char* container_name(const char* name)
+const char* trampoline_func_name(const char* name)
 {
   int length = strlen(name);
-  int length2 = strlen("_container");
+  int length2 = strlen("_trampoline");
   char *new_str = (char*) malloc(sizeof(char)*(length+length2+1));
 
   std::ostringstream total;
-  total << name << "_container";
+  total << name << "_trampoline";
   strncpy(new_str, total.str().c_str(), length+length2+1);
   return new_str;
 }
-*/
 
 /*
  * takes the vector of global variables with also provides the parameters to the function.
@@ -643,7 +641,7 @@ CCSTIfStatement* if_cond_fail(CCSTExpression *cond, const char *err_msg)
   return new CCSTIfStatement(cond, if_body);
 }
 
-CCSTCompoundStatement* alloc_init_containers_driver(ProjectionType *pt, LexicalScope *ls, const char *side)
+CCSTCompoundStatement* alloc_init_containers_driver(Variable *v, ProjectionType *pt, LexicalScope *ls, const char *side)
 {
   std::vector<CCSTDeclaration*> declarations;
   std::vector<CCSTStatement*> statements;
@@ -653,34 +651,28 @@ CCSTCompoundStatement* alloc_init_containers_driver(ProjectionType *pt, LexicalS
   CCSTDeclaration *err_variable = new CCSTDeclaration(int_type(), err_decs);
   declarations.push_back(err_variable);
 
-  statements.push_back(alloc_init_containers(pt, ls, side));
+  statements.push_back(alloc_init_containers(v, pt, ls, side));
   return new CCSTCompoundStatement(declarations, statements);
 }
 
 // need to pass scope!
-CCSTCompoundStatement* alloc_init_containers(ProjectionType *pt, LexicalScope *ls, const char *side) 
+CCSTCompoundStatement* alloc_init_containers(Variable *v, ProjectionType *pt, LexicalScope *ls, const char *side) 
 {
   std::vector<CCSTDeclaration*> declarations;
   std::vector<CCSTStatement*> statements;
 
   // declare container
-  int err;
   const char* container_name_ = container_name(pt->name());
-  Type *container_tmp = ls->lookup(container_name_, &err); // fix
-  Assert(container_tmp != 0x0, "Error: could not find container in environment\n");
-  ProjectionType *container = dynamic_cast<ProjectionType*>(container_tmp);
-  Assert(container != 0x0, "Error: dynamic cast to Projection type failed!\n");
-  
-  std::vector<CCSTInitDeclarator*> decs;
-  decs.push_back(new CCSTDeclarator(new CCSTPointer(), new CCSTDirectDecId(container_name_)));
-  CCSTDeclaration *container_declaration = new CCSTDeclaration(type2(container), decs);
-  declarations.push_back(container_declaration);
+  declarations.push_back(struct_pointer_declaration(container_name_, container_name_, ls));
 
+  int err;
+  Type* container_tmp = ls->lookup(container_name_, &err);
+  Assert(container_tmp != 0x0, "Error: could not find type in scope\n");
+  ProjectionType *container = dynamic_cast<ProjectionType*>(container_tmp);
+  Assert(container != 0x0, "Error: dynamic cast to projection failed\n");
+  
   // alloc
-  std::vector<CCSTAssignExpr*> kzalloc_args;
-  kzalloc_args.push_back(new CCSTUnaryExprSizeOf(new CCSTUnaryExprCastExpr(new CCSTUnaryOp(unary_mult_t), new CCSTPrimaryExprId(container_name_))));
-  kzalloc_args.push_back(new CCSTEnumConst("GFP_KERNEL"));
-  statements.push_back(new CCSTAssignExpr(new CCSTPrimaryExprId(container_name_), equals(), function_call("kzalloc", kzalloc_args)));
+  statements.push_back(kzalloc_structure(container_name_, container_name_));
 
   // error check
   // if null
@@ -714,16 +706,17 @@ CCSTCompoundStatement* alloc_init_containers(ProjectionType *pt, LexicalScope *l
   std::vector<ProjectionField*> fields = pt->fields();
   for(std::vector<ProjectionField*>::iterator it = fields.begin(); it != fields.end(); it ++) {
     ProjectionField *pf = *it;
+    pf->set_accessor(v);
     if(pf->type()->num() == 4 && alloc_caller(pf, side)) {
       ProjectionType *pt2 = dynamic_cast<ProjectionType*>(pf->type());
       Assert(pt2 != 0x0, "Error: dynamic cast to Projection type failed!\n");
       
-      statements.push_back(alloc_init_containers(pt2, ls, side)); 
+      statements.push_back(alloc_init_containers(pf, pt2, ls, side)); 
 
       // need to link/init
       
       // need to access this field, but from the container....
-      Assert(pf->accessor() != 0x0, "Error: field does not have a surrounding variable");
+      Assert(pf->accessor() != 0x0, "Error: field %s does not have a surrounding variable\n", pf->identifier());
       Variable *sv = pf->accessor()->accessor();
       pf->accessor()->set_accessor(tmp);
 
@@ -748,6 +741,131 @@ CCSTCompoundStatement* alloc_init_containers(ProjectionType *pt, LexicalScope *l
   }
 
   return new CCSTCompoundStatement(declarations, statements);
+}
+
+CCSTCompoundStatement* alloc_init_trampoline(Variable *v, ProjectionType *pt, LexicalScope *ls)
+{
+  std::vector<CCSTDeclaration*> declarations;
+  std::vector<CCSTStatement*> statements;
+
+  int err;
+  Type *container_type = ls->lookup(container_name(pt->name()), &err);
+  Assert(container_type != 0x0, "Error: could not find projection in scope\n");
+  ProjectionType *container = dynamic_cast<ProjectionType*>(container_type);
+  Assert(container != 0x0, "Error: dynamic cast to projection failed\n");
+  Parameter *tmp_container = new Parameter(container, container_name(pt->name()), 1);
+
+  std::vector<ProjectionField*> fields = pt->fields();
+  for(std::vector<ProjectionField*>::iterator it = fields.begin(); it != fields.end(); it ++) {
+
+    ProjectionField *pf = *it;
+    pf->set_accessor(v);
+    if (pf->type()->num() == 4) {
+      ProjectionType *pt = dynamic_cast<ProjectionType*>(pf->type());
+      Assert(pt != 0x0, "Error: dynamic cast to ProjectionType failed.\n");
+      statements.push_back(alloc_init_trampoline(pf, pt, ls));
+    } else if (pf->type()->num() == 7) {
+      // declare trampoline container
+      const char* tramp_name = hidden_args_name( pf->type()->name() ); // todo
+      declarations.push_back(struct_pointer_declaration(tramp_name, tramp_name, ls)); // ls todo
+    
+      // alloc
+      statements.push_back(kzalloc_structure(tramp_name, tramp_name));
+    
+      // error checking				
+      statements.push_back(if_cond_fail(new CCSTUnaryExprCastExpr(Not(), new CCSTPrimaryExprId(tramp_name))
+					, "kzalloc"));
+
+      // dup trampoline
+      /* 
+	 rm_file_hidden_args->t_handle = 
+	 LCD_DUP_TRAMPOLINE(rm_file_trampoline);
+	 if (!rm_file_hidden_args->t_handle) {
+	 LIBLCD_ERR("dup trampoline");
+	 lcd_exit(-1);
+	 } */
+      int err;
+      Type *tmp_trampoline = ls->lookup(tramp_name, &err);
+      Assert(tmp_trampoline != 0x0, "Error: could not find trampline in environment\n");
+      ProjectionType *trampoline = dynamic_cast<ProjectionType*>(tmp_trampoline);
+      Assert(trampoline != 0x0, "Error: dynamic cast to Projection type failed!\n");
+
+      Parameter *tmp = new Parameter(trampoline, tramp_name, 1);
+      ProjectionField *t_handle_pf = trampoline->get_field("t_handle");
+      Assert(pf != 0x0, "Error: could not find field in projection\n");
+      pf->set_accessor(tmp);
+  
+      std::vector<CCSTAssignExpr*> dup_args;
+      dup_args.push_back(new CCSTPrimaryExprId(trampoline_func_name( pf->type()->name() )));
+      statements.push_back(new CCSTAssignExpr(access(t_handle_pf), equals(), function_call("LCD_DUP_TRAMPOLINE", dup_args))); // access t_handle
+  
+      // error check duplication
+      statements.push_back(if_cond_fail(access(t_handle_pf), "dup trampoline"));
+
+      // link t_handle hidden args with trampoline
+      Assert(t_handle_pf->type()->num() == 4, "Error: field is not a projection\n"); 
+      ProjectionType *tmp_t_handle = dynamic_cast<ProjectionType*>(t_handle_pf->type());
+      Assert(tmp_t_handle != 0x0, "Error: dynamic cast to projection failed\n");
+      
+      ProjectionField *ha_tmp = tmp_t_handle->get_field("hidden_args"); // use projeciton type not field.
+      Assert(ha_tmp != 0x0, "Error: could not find field in projection\n"); // could easily make get field function handle this
+      statements.push_back(new CCSTAssignExpr(access(ha_tmp), equals(), new CCSTPrimaryExprId(tramp_name))); // todo
+
+      // link trampoline container field. with container
+      ProjectionField *c_tmp = trampoline->get_field(container_name(pt->name())); // todo
+      Assert(c_tmp != 0x0, "Error: could not find field in projection");
+      c_tmp->set_accessor(tmp);
+      statements.push_back(new CCSTAssignExpr(access(c_tmp), equals(), new CCSTPrimaryExprId(container_name(pt->name())))); // todo
+
+      // link data store
+      ProjectionField *d_tmp = trampoline->get_field("dstore"); // todo
+      Assert(d_tmp != 0x0, "Error: could not find field in projection");
+      d_tmp->set_accessor(tmp);
+      statements.push_back(new CCSTAssignExpr(access(d_tmp), equals(), new CCSTPrimaryExprId("dstore_name_todo"))); // todo
+
+      // install trampoline in struct container function pointer.?
+      // todo access field
+      std::vector<CCSTAssignExpr*> handle_to_tramp_args;
+      handle_to_tramp_args.push_back(access(t_handle_pf)); // pf defined on line 770
+
+      // need to access this field. from its struct's container
+      Assert(pf->accessor() != 0x0, "Error: accessor field is null\n");
+      Variable *tmp_var = pf->accessor()->accessor();
+      pf->accessor()->set_accessor(tmp_container);
+      statements.push_back(new CCSTAssignExpr(access(pf), equals(), function_call("LCD_HANDLE_TO_TRAMPOLINE", handle_to_tramp_args)));
+
+      pf->accessor()->set_accessor(tmp_var);
+
+    }
+  }
+  return new CCSTCompoundStatement(declarations, statements);
+}
+
+/*
+ * looks up structure and returns a declaration for a variable 
+ * with name var_name that is a pointer to struct with name struct_name
+ */
+CCSTDeclaration* struct_pointer_declaration(const char* struct_name, const char* var_name, LexicalScope *ls)
+{
+  int err;
+  Type *struct_tmp = ls->lookup(struct_name, &err); // fix
+  Assert(struct_tmp != 0x0, "Error: could not find container in environment\n");
+  ProjectionType *struct_ = dynamic_cast<ProjectionType*>(struct_tmp);
+  Assert(struct_ != 0x0, "Error: dynamic cast to Projection type failed!\n");
+  
+  std::vector<CCSTInitDeclarator*> decs;
+  decs.push_back(new CCSTDeclarator(new CCSTPointer(), new CCSTDirectDecId(var_name)));
+  return new CCSTDeclaration(type2(struct_), decs);
+}
+
+CCSTStatement* kzalloc_structure(const char* struct_name, const char* var_name)
+{
+  // alloc
+  std::vector<CCSTAssignExpr*> kzalloc_args;
+  kzalloc_args.push_back(new CCSTUnaryExprSizeOf(new CCSTUnaryExprCastExpr(new CCSTUnaryOp(unary_mult_t)
+									   , new CCSTPrimaryExprId(struct_name))));
+  kzalloc_args.push_back(new CCSTEnumConst("GFP_KERNEL"));
+  return new CCSTAssignExpr(new CCSTPrimaryExprId(var_name), equals(), function_call("kzalloc", kzalloc_args));
 }
 
 bool alloc_caller(Variable *v, const char *side)

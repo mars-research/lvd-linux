@@ -112,7 +112,6 @@ File		=	Spacing i:Include* GlobalScopeDefinitions t:Interface* <eof> {{
 			}}
 
 GlobalScopeDefinitions =      d:Type_Definitions* {{
-		       	          printf("matched global scope definitions\n");
 		       	          for(Value::iterator it = d.getValues().begin(); it != d.getValues().end(); it ++) { 
 			    	      const Value & v2 = *it;
 			    	      Type *type = (Type*) v2.getValue();
@@ -152,7 +151,6 @@ Identifier	=	i1:IdentStart i2:IdentCont* {{
 		   	    }
 			    std::string str = total.str();
 		   	    value.value = malloc(str.length()+1);
-			    printf("matched identifier %s\n", str.c_str());
 			    strncpy((char*)value.value, str.c_str(), str.length()+1); 
 			}}
 
@@ -160,10 +158,17 @@ IdentStart	=	[abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ_-]
 
 IdentCont	=	IdentStart | [0123456789]
 
-unnamed_scope 	= 	s:unnamed_scope_special d:Type_Definitions* Rpc* Spacing CLOSEC Spacing {{
-			    printf("matched an unnamed scope\n");
+unnamed_scope 	= 	s:unnamed_scope_special d:Type_Definitions* r:Rpc* Spacing CLOSEC Spacing {{
+		            
+			    std::vector<Rpc*> *rpcs = new std::vector<Rpc*>();
+			    for(Value::iterator it = r.getValues().begin(); it != r.getValues().end(); it ++) {
+			        const Value &v = *it;
+				Rpc *r = (Rpc*) v.getValue();
+				rpcs->push_back(r);
+			    }
+		
 			    set_current_scope(get_current_scope()->outer_scope()); // leaving current scope
-			    value = s;
+			    value = rpcs;
 			}}
 			
 unnamed_scope_special = Spacing OPENC Spacing {{
@@ -186,9 +191,9 @@ pc_unnamed_scope=	s:unnamed_scope_special d:Type_Definitions* p:ProjField* Spaci
 			    value = fields;
 			}}
 
-Interface	=	  m:Interface_special Space+ id:Identifier Spacing OPEN gs:Globals? Spacing CLOSE Spacing OPENC Spacing d:Type_Definitions* r:Rpc* unnamed_scope* Spacing CLOSEC Spacing {{ 
+Interface	=	  m:Interface_special Space+ id:Identifier Spacing OPEN gs:Globals? Spacing CLOSE Spacing OPENC Spacing d:Type_Definitions* r:Rpc* r2:unnamed_scope* Spacing CLOSEC Spacing {{ 
 			      LexicalScope *module_scope = (LexicalScope*) m.getValue();
-			      std::vector<Rpc*> rpcs;	 
+			      std::vector<Rpc*> rpcs;				
 			      std::vector<GlobalVariable*> *globals = (std::vector<GlobalVariable*>*) gs.getValue();  
 			      std::vector<GlobalVariable*> globals2 = *globals;
 
@@ -196,6 +201,12 @@ Interface	=	  m:Interface_special Space+ id:Identifier Spacing OPEN gs:Globals? 
 			          const Value & v2 = *it;
 				  Rpc *r2 = (Rpc*) v2.getValue();
 				  rpcs.push_back(r2);
+			      }
+
+			      for(Value::iterator it = r2.getValues().begin(); it != r2.getValues().end(); it ++) {
+			          const Value & v2 = *it;
+				  std::vector<Rpc*> *r_tmp = (std::vector<Rpc*>*) v2.getValue();
+				  rpcs.insert(rpcs.end(), r_tmp->begin(), r_tmp->end());
 			      }
 
 			      set_current_scope(get_current_scope()->outer_scope()); // leaving current scope	  
@@ -284,7 +295,7 @@ Include		 =	"include" Space+ "<" Spacing p:Pathname Spacing ">" Spacing{{
 			    value = new Include(false, (char*) p.getValue());
 			}}
 
-FP_Parameter	=	"rpc" Spacing s:Specification? rt:Type_form pointers:star* Spacing OPEN Spacing "*" Spacing id:Identifier Spacing CLOSE Spacing OPEN p:Parameters CLOSE {{
+FP_Parameter	=	"rpc" Spacing s:Specification? rt:Type_form pointers:star* Spacing OPEN Spacing "*" Spacing id:Identifier Spacing CLOSE Spacing OPEN Spacing p:Parameters CLOSE {{
 			    std::vector<Parameter*> *params = (std::vector<Parameter*>*) p.getValue();
 			    Function *fp = new Function((char*) id.getValue(), new ReturnVariable((Type*) rt.getValue(), count_pointers(pointers)), *params, get_current_scope());
 			    
@@ -385,7 +396,7 @@ FP_FirstParam	=	t:Type_form s:Specification? pointers:star* Spacing COMMA Spacin
 
 			    value = fp;  
 			}}
-			| "rpc" Space+ rt:Type_form pointers:star* Spacing OPEN Spacing "*" Spacing id:Identifier Spacing CLOSE Spacing OPEN p:Parameters CLOSE SEMI Spacing COMMA Spacing {{
+			| "rpc" Space+ rt:Type_form pointers:star* Spacing OPEN Spacing "*" Spacing id:Identifier Spacing CLOSE Spacing OPEN Spacing p:Parameters CLOSE SEMI Spacing COMMA Spacing {{
 			    std::vector<Parameter*> *params = (std::vector<Parameter*>*) p.getValue();
 			    Function *fp = new Function((char*) id.getValue(), new ReturnVariable((Type*) rt.getValue(), count_pointers(pointers)), *params, get_current_scope());
 			    value = new FPParameter(fp, 1);
@@ -449,7 +460,7 @@ FP_LastParam	=	t:Type_form s:Specification? pointers:star* Spacing {{
 
 			    value = fp;
 			}}
-			|  "rpc" Space+ rt:Type_form pointers:star* Spacing OPEN Spacing "*" Spacing id:Identifier Spacing CLOSE Spacing OPEN p:Parameters CLOSE SEMI Spacing {{
+			|  "rpc" Space+ rt:Type_form pointers:star* Spacing OPEN Spacing "*" Spacing id:Identifier Spacing CLOSE Spacing OPEN Spacing p:Parameters CLOSE SEMI Spacing {{
 			    // todo change return type to return variable and add pointer
 			    std::vector<Parameter*> *params = (std::vector<Parameter*>*) p.getValue();
 			    Function *fp = new Function((char*) id.getValue(), new ReturnVariable((Type*) rt.getValue(), count_pointers(pointers)), *params, get_current_scope());
@@ -521,6 +532,7 @@ Rpc		=	"rpc" Space+ t:Type_form pointers:star* Spacing id1:Identifier Spacing OP
 			    std::vector<Parameter*> params_ = *params;
 			    Rpc* r = new Rpc(new ReturnVariable((Type *) t.getValue(), count_pointers(pointers)), (char *) id1.getValue(), params_, get_current_scope());
 			    
+			    printf("creating an rpc\n");
 			    /*
 			    int err = get_current_scope()->insert(r);
 			    if(!err) {
@@ -531,7 +543,6 @@ Rpc		=	"rpc" Space+ t:Type_form pointers:star* Spacing id1:Identifier Spacing OP
 			}}  
 
 Projection_constructor =    s:Projection_constructor_special Spacing "<" Spacing t:Proj_type Spacing ">" Spacing id:Identifier Spacing OPEN Spacing g:Globals? Spacing CLOSE Spacing OPENC Spacing d:Type_Definitions* p:ProjField* Spacing CLOSEC Spacing {{
-		                printf("matched a projection constructor\n");
 		       	        std::vector<ProjectionField*> fields;
 				std::vector<GlobalVariable*> *globals_ = (std::vector<GlobalVariable*>*) g.getValue();
 				std::vector<GlobalVariable*> globals = *globals_;
@@ -568,7 +579,6 @@ Projection_constructor_special = "projection" {{
 				 }} 
 
 Projection	=	"projection" Spacing "<" Spacing t:Proj_type Spacing ">" Spacing id:Identifier Spacing OPENC Spacing p:ProjField* CLOSEC Spacing {{ 
-			    printf("matched a projection\n");
 			    std::vector<ProjectionField *> fields;
 			    for(Value::iterator it = p.getValues().begin(); it != p.getValues().end(); it ++)
 			    {
@@ -624,7 +634,6 @@ Keyword		=     	"out" {{
 			    value = x;
 			}}
 			| "alloc" {{
-			    printf("matched alloc keyword\n"); 
 			    int *x = (int *) malloc(sizeof(int));
 			    *x = 3;
 			    value = x; 
@@ -703,7 +712,6 @@ ProjField	=	"projection" Space+ id:Identifier Spacing s:Specification? pointers:
 			    
 			}}
 			| t:Type_form Spacing s:Specification? pointers:star* Spacing id:Identifier Spacing SEMI Spacing {{ 
-			    printf("matched a regular projection field\n");
 
 			    ProjectionField *pf = new ProjectionField((Type *) t.getValue(), (char *) id.getValue(), count_pointers(pointers));
 
@@ -734,7 +742,7 @@ ProjField	=	"projection" Space+ id:Identifier Spacing s:Specification? pointers:
 			    fields->push_back(pf);
 			    value = fields; 
 			}}
-			| "rpc" Spacing s:Specification? rt:Type_form pointers:star* Spacing OPEN Spacing "*" Spacing id:Identifier Spacing CLOSE Spacing OPEN p:Parameters CLOSE SEMI Spacing {{
+			| "rpc" Spacing s:Specification? rt:Type_form pointers:star* Spacing OPEN Spacing "*" Spacing id:Identifier Spacing CLOSE Spacing OPEN Spacing p:Parameters CLOSE SEMI Spacing {{
 			    printf("matched a function pointer field\n");
 			    
 			    std::vector<Parameter*> *params = (std::vector<Parameter*>*) p.getValue();
@@ -822,7 +830,6 @@ Type_form	=	"projection" Space+ n:Identifier Spacing {{
 			    value = getType((char*)n.getValue()); 
 			}}
 			| "channel" Spacing {{  // todo
-			    printf("matched a channel type\n"); 
 			    value = new Channel();
 			}}
 			| type	

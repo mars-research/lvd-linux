@@ -132,7 +132,38 @@ CCSTCompoundStatement* dispatch_loop_body(std::vector<Rpc*> rps)
  */
 CCSTCompoundStatement* callee_body(Rpc *r)
 {
-  printf("callee body todo\n");
+  std::vector<CCSTDeclaration*> declarations;
+  std::vector<CCSTStatement*> statements;
+  // allocate necessary container things
+  
+  /* code that loops through parameters and allocates/initializes whatever necessary before marshalling*/
+  
+  // loop through params, declare a tmp and pull out marshal value
+  std::vector<Parameter*> params = r->parameters();
+
+  // for each parameter that is ia projection -- & is alloc
+  for(std::vector<Parameter*>::iterator it = params.begin(); it != params.end(); it ++)
+    {
+      Parameter *p = *it;
+      if(p->type()->num() == 4 && p->alloc_callee()) {
+	ProjectionType *pt = dynamic_cast<ProjectionType*>(p->type());
+	Assert(pt != 0x0, "Error: dynamic cast to Projection type failed!\n");
+	statements.push_back(alloc_init_containers_driver(p, pt, r->current_scope(), "callee"));
+      }
+    }
+
+  // trampoline allocation
+  for(std::vector<Parameter*>::iterator it = params.begin(); it != params.end(); it ++) {
+    Parameter *p = *it;
+    if(p->type()->num() == 4) { // may need to check alloc/dealloc in future
+      ProjectionType *pt = dynamic_cast<ProjectionType*>(p->type());
+      Assert(pt != 0x0, "Error: dynamic cast to Projection type failed\n");
+      printf("calling alloc trampoline\n");
+      statements.push_back(alloc_init_trampoline(p, pt, r->current_scope()));
+    }
+  }
+
+    return new CCSTCompoundStatement(declarations, statements);
 }
 
 
@@ -314,8 +345,8 @@ CCSTFile* generate_server_source(Module *m)
        }
      }
    
-  definitions.push_back( function_definition(dispatch_function_declaration()
-						   , dispatch_loop_body(rps)));
+  //  definitions.push_back( function_definition(dispatch_function_declaration()
+  //						   , dispatch_loop_body(rps)));
    CCSTFile *c_file = new CCSTFile(definitions);
    printf("in server source gen\n");
    return c_file;

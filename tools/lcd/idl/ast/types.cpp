@@ -48,7 +48,6 @@ CCSTStatement* Function::accept(TypeVisitor *worker, Variable *v)
 
 int Function::num()
 {
-  printf("num todo for function pointer\n");
   return 7;
 }
 

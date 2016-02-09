@@ -53,6 +53,8 @@ GlobalScope::GlobalScope()
 							       , new ProjectionType("dstore", "dstore", fields3)));
 
   std::vector<ProjectionField*> fields4;
+  fields4.push_back(new ProjectionField(this->lookup("void", &err), "hidden_args", 1));
+  //fields4.push_back( char trampoline[0]); 
   this->type_definitions_.insert(std::pair<std::string, Type*>("lcd_trampoline_handle"
 							       , new ProjectionType("lcd_trampoline_handle", "lcd_trampoline_handle", fields4)));
 }

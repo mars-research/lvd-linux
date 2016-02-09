@@ -468,10 +468,12 @@ class Rpc : public Base
 
   const char* name_;
   std::vector<Parameter* > parameters_;
-  std::vector<Parameter* > marshal_parameters_; // wtf is this
   bool function_pointer_defined_;
+  void construct_marshal_parameters();
+  std::vector<Variable*> construct_projection_parameters(ProjectionType *pt);
  public:
   Rpc(ReturnVariable *return_var, const char* name, std::vector<Parameter* > parameters, LexicalScope *current_scope);
+  std::vector<Variable*> marshal_parameters; // wtf is this
   void set_function_pointer_defined(bool b);
   bool function_pointer_defined();
   const char* name();

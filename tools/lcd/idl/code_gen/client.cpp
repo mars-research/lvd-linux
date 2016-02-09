@@ -97,7 +97,7 @@ CCSTCompoundStatement* function_pointer_caller_body(Rpc *f)
     if(p->type()->num() == 4 && p->alloc_caller()) {
       ProjectionType *pt = dynamic_cast<ProjectionType*>(p->type());
       Assert(pt != 0x0, "Error: dynamic cast to Projection type failed!\n");
-      statements.push_back(alloc_init_containers_driver(pt, f->current_scope(), "caller"));
+      statements.push_back(alloc_init_containers_driver(p, pt, f->current_scope(), "caller"));
     }
   }
 
@@ -127,9 +127,10 @@ CCSTCompoundStatement* caller_body(Rpc *r)
       if(p->type()->num() == 4 && p->alloc_caller()) {
 	ProjectionType *pt = dynamic_cast<ProjectionType*>(p->type());
 	Assert(pt != 0x0, "Error: dynamic cast to Projection type failed!\n");
-	statements.push_back(alloc_init_containers_driver(pt, r->current_scope(), "caller"));
+	statements.push_back(alloc_init_containers_driver(p, pt, r->current_scope(), "caller"));
       }
     }
+
 
   // marshal parameters.
 

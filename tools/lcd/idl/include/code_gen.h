@@ -36,8 +36,11 @@ const char* struct_name(ProjectionType *pt); // complete
 
 
 // helper.cpp
-CCSTCompoundStatement* alloc_init_containers_driver(ProjectionType *pt, LexicalScope *ls, const char* side); // complete
-CCSTCompoundStatement* alloc_init_containers(ProjectionType *pf, LexicalScope *ls, const char* side); // complete
+CCSTDeclaration* struct_pointer_declaration(const char* struct_name, const char* var_name, LexicalScope *ls); // complete
+CCSTStatement* kzalloc_structure(const char*struct_name, const char* var_name); // complete
+CCSTCompoundStatement* alloc_init_containers_driver(Variable *v, ProjectionType *pt, LexicalScope *ls, const char* side); // complete
+CCSTCompoundStatement* alloc_init_containers(Variable *v, ProjectionType *pt, LexicalScope *ls, const char* side); // complete
+CCSTCompoundStatement* alloc_init_trampoline(Variable *v, ProjectionType *pt, LexicalScope *ls); // complete-ish 
 bool alloc_caller(Variable *v, const char* side); // complete
 CCSTStructUnionSpecifier* struct_declaration(ProjectionType *pt); // complete
 CCSTDeclaration* declare_and_initialize_container_struct(Variable *v); // complete

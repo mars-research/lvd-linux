@@ -8,7 +8,7 @@ export LCD_DOMAINS_CFLAGS=-Werror \
 			  -I$(LCD_DOMAINS_INCLUDE) \
 			  -DLCD_DOMAINS \
 			  -DCONFIG_LAZY_THC \
-			  -DLCD_TEST_MODS_PATH=\"$(PWD)/test-mods\"
+			  -DLCD_TEST_MODS_PATH="\"$(PWD)/test-mods\""
 
 # Don't print "Entering directory..." etc.
 MAKEFLAGS += --no-print-directory

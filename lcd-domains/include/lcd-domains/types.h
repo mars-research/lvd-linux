@@ -272,7 +272,7 @@ static inline hpa_t hva2hpa(hva_t hva)
 #define LCD_MODULE_GPA gpa_add(LCD_STACK_GPA, LCD_STACK_SIZE)
 /* Unused area in between heap and ioremap space */
 #define LCD_IOREMAP_GPA_BASE __gpa(0xc9UL << 40)
-#define LCD_IOREMAP_GPA_SIZE (1UL << 45) /* 32 TB set aside for ioremap */
+#define LCD_IOREMAP_GPA_SIZE (1UL << 24) /* 16 MB set aside for ioremap */
 
 /* guest virtual addresses */
 #define LCD_GV_PAGING_MEM_GVA __gva(gpa_val(LCD_GV_PAGING_MEM_GPA))

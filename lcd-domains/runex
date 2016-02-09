@@ -1,4 +1,4 @@
-#! /bin/bash
+#! /bin/bash -e
 
 sudo dmesg -c > /dev/null
 sudo insmod test-mods/$@/lcd_test_mod_$@_boot.ko

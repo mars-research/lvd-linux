@@ -632,12 +632,12 @@ static int vmx_setup_pat_msr(unsigned char pat_entry, unsigned char pat_type)
 {
 	u64 pat = 0;
 
-	if (pat_entry < MAX_PAT_ENTRY) {
+	if (pat_entry > MAX_PAT_ENTRY) {
 		LCD_ARCH_ERR("Invalid PAT entry, cannot setup PAT MSR \n");
 		return -EINVAL;
 	}
 	
-	if(pat_type > VALID_PAT_TYPE && !((1 << pat_type) & 0xF3)) {
+	if(pat_type > VALID_PAT_TYPE) {
 		LCD_ARCH_ERR("Not a valid PAT type, cannot setup PAT MSR \n");
 		return -EINVAL;
 	}
@@ -3560,6 +3560,36 @@ static int vmx_check_addr_size(struct lcd_arch *t)
 	return 0;
 }
 
+static int vmx_check_pat_msr(struct lcd_arch *t)
+{
+	u64 pat;
+	unsigned char val;
+	unsigned int i;
+
+	pat = vmcs_readl(GUEST_IA32_PAT);
+
+	/*
+	 * Ensure each entry is 0 (UC), 1 (WC), 4 (WT), 5 (WP),
+	 * 6 (WB), or 7 (UC-)
+	 */
+	for (i = 0; i <= MAX_PAT_ENTRY; i++) {
+
+		val = (pat & (0xFFUL << (i * 8))) >> (i * 8);
+		if (val != 0UL && 
+			val != 1UL && 
+			val != 4UL &&
+			val != 5UL &&
+			val != 6UL &&
+			val != 7UL) {
+			LCD_ARCH_ERR("Invalid pat type %d in PAT idx %d",
+				val, i);
+			return -1;
+		}
+	}
+
+	return 0;
+}
+
 static int vmx_check_guest_ctrl_regs(struct lcd_arch *t)
 {
 	u64 act64;
@@ -3671,8 +3701,8 @@ static int vmx_check_guest_ctrl_regs(struct lcd_arch *t)
 	 * pat msr
 	 */
 	if (vmx_entry_has(t, VM_ENTRY_LOAD_IA32_PAT)) {
-		LCD_ARCH_ERR("vmentry pat msr load check not implemented");
-		return -1;
+		if (vmx_check_pat_msr(t))
+			return -1;
 	}
 
 	/*

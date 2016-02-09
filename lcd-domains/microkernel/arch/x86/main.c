@@ -2213,13 +2213,15 @@ static void dump_lcd_arch(struct lcd_arch *lcd)
 	unsigned long flags;
 
 	vmx_get_cpu(lcd);
-	lcd->regs[LCD_ARCH_REGS_RIP] = vmcs_readl(GUEST_RIP);
-	lcd->regs[LCD_ARCH_REGS_RSP] = vmcs_readl(GUEST_RSP);
+	lcd->regs.rip = vmcs_readl(GUEST_RIP);
+	lcd->regs.rsp = vmcs_readl(GUEST_RSP);
 	flags = vmcs_readl(GUEST_RFLAGS);
 	vmx_put_cpu(lcd);
 
 	printk(KERN_ERR "---- Begin LCD Arch Dump ----\n");
 	printk(KERN_ERR "CPU %d VPID %d\n", lcd->cpu, lcd->vpid);
+
+	/*
 	printk(KERN_ERR "RIP 0x%016llx RFLAGS 0x%08lx\n",
 	       lcd->regs[LCD_ARCH_REGS_RIP], flags);
 	printk(KERN_ERR "RAX 0x%016llx RCX 0x%016llx\n",
@@ -2246,6 +2248,7 @@ static void dump_lcd_arch(struct lcd_arch *lcd)
 	printk(KERN_ERR "R14 0x%016llx R15 0x%016llx\n",
 			lcd->regs[LCD_ARCH_REGS_R14], 
 		lcd->regs[LCD_ARCH_REGS_R15]);
+	*/
 
 	/* printk(KERN_ERR "Dumping Stack Contents...\n"); */
 	/* sp = (unsigned long *) vcpu->regs[VCPU_REGS_RSP]; */
@@ -2398,12 +2401,50 @@ static int vmx_handle_control_reg(struct lcd_arch *lcd_arch)
 			/*
 			 * Move to
 			 */
-			vmcs_writel(GUEST_CR3, lcd_arch->regs[general_reg]);
+			switch (general_reg){
+				case 0: vmcs_writel(GUEST_CR3, lcd_arch->regs.rax); break;
+				case 1: vmcs_writel(GUEST_CR3, lcd_arch->regs.rcx); break;
+				case 2: vmcs_writel(GUEST_CR3, lcd_arch->regs.rdx); break;
+				case 3: vmcs_writel(GUEST_CR3, lcd_arch->regs.rbx); break;
+				case 4: vmcs_writel(GUEST_CR3, lcd_arch->regs.rsp); break;
+				case 5: vmcs_writel(GUEST_CR3, lcd_arch->regs.rbp); break;
+				case 6: vmcs_writel(GUEST_CR3, lcd_arch->regs.rsi); break;
+				case 7: vmcs_writel(GUEST_CR3, lcd_arch->regs.rdi); break;
+				case 8: vmcs_writel(GUEST_CR3, lcd_arch->regs.r8); break;
+				case 9: vmcs_writel(GUEST_CR3, lcd_arch->regs.r9); break;
+				case 10: vmcs_writel(GUEST_CR3, lcd_arch->regs.r10); break;
+				case 11: vmcs_writel(GUEST_CR3, lcd_arch->regs.r11); break;
+				case 12: vmcs_writel(GUEST_CR3, lcd_arch->regs.r12); break;
+				case 13: vmcs_writel(GUEST_CR3, lcd_arch->regs.r13); break;
+				case 14: vmcs_writel(GUEST_CR3, lcd_arch->regs.r14); break;
+				case 15: vmcs_writel(GUEST_CR3, lcd_arch->regs.r15); break;
+				default: LCD_ARCH_ERR("Unknown general register in CR3 access:%d", general_reg);
+			}
 		} else {
 			/*
 			 * Move from
 			 */
-			lcd_arch->regs[general_reg] = vmcs_readl(GUEST_CR3);
+			switch (general_reg){
+				case 0: lcd_arch->regs.rax = vmcs_readl(GUEST_CR3); break;
+				case 1: lcd_arch->regs.rcx = vmcs_readl(GUEST_CR3); break;
+				case 2: lcd_arch->regs.rdx = vmcs_readl(GUEST_CR3); break;
+				case 3: lcd_arch->regs.rbx = vmcs_readl(GUEST_CR3); break;
+				case 4: lcd_arch->regs.rsp = vmcs_readl(GUEST_CR3); break;
+				case 5: lcd_arch->regs.rbp = vmcs_readl(GUEST_CR3); break;
+				case 6: lcd_arch->regs.rsi = vmcs_readl(GUEST_CR3); break;
+				case 7: lcd_arch->regs.rdi = vmcs_readl(GUEST_CR3); break;
+				case 8: lcd_arch->regs.r8 = vmcs_readl(GUEST_CR3); break;
+				case 9: lcd_arch->regs.r9 = vmcs_readl(GUEST_CR3); break;
+				case 10: lcd_arch->regs.r10 = vmcs_readl(GUEST_CR3); break;
+				case 11: lcd_arch->regs.r11 = vmcs_readl(GUEST_CR3); break;
+				case 12: lcd_arch->regs.r12 = vmcs_readl(GUEST_CR3); break;
+				case 13: lcd_arch->regs.r13 = vmcs_readl(GUEST_CR3); break;
+				case 14: lcd_arch->regs.r14 = vmcs_readl(GUEST_CR3); break;
+				case 15: lcd_arch->regs.r15 = vmcs_readl(GUEST_CR3); break;
+
+				default: LCD_ARCH_ERR("Unknown general register in CR3 access:%d", general_reg);
+			}
+
 		}
 		/*
 		 * Step past instruction that caused exit
@@ -2716,35 +2757,35 @@ static void __noclone vmx_enter(struct lcd_arch *lcd_arch)
 		  [fail]"i"(offsetof(struct lcd_arch, fail)),
 		  [host_rsp]"i"(offsetof(struct lcd_arch, host_rsp)),
 		  [rax]"i"(offsetof(struct lcd_arch, 
-					  regs[LCD_ARCH_REGS_RAX])),
+					  regs.rax)),
 		  [rbx]"i"(offsetof(struct lcd_arch, 
-					  regs[LCD_ARCH_REGS_RBX])),
+					  regs.rbx)),
 		  [rcx]"i"(offsetof(struct lcd_arch, 
-					  regs[LCD_ARCH_REGS_RCX])),
+					  regs.rcx)),
 		  [rdx]"i"(offsetof(struct lcd_arch, 
-					  regs[LCD_ARCH_REGS_RDX])),
+					  regs.rdx)),
 		  [rsi]"i"(offsetof(struct lcd_arch, 
-					  regs[LCD_ARCH_REGS_RSI])),
+					  regs.rsi)),
 		  [rdi]"i"(offsetof(struct lcd_arch, 
-					  regs[LCD_ARCH_REGS_RDI])),
+					  regs.rdi)),
 		  [rbp]"i"(offsetof(struct lcd_arch, 
-					  regs[LCD_ARCH_REGS_RBP])),
+					  regs.rbp)),
 		  [r8]"i"(offsetof(struct lcd_arch, 
-					  regs[LCD_ARCH_REGS_R8])),
+					  regs.r8)),
 		  [r9]"i"(offsetof(struct lcd_arch, 
-					  regs[LCD_ARCH_REGS_R9])),
+					  regs.r9)),
 		  [r10]"i"(offsetof(struct lcd_arch, 
-					  regs[LCD_ARCH_REGS_R10])),
+					  regs.r10)),
 		  [r11]"i"(offsetof(struct lcd_arch, 
-					  regs[LCD_ARCH_REGS_R11])),
+					  regs.r11)),
 		  [r12]"i"(offsetof(struct lcd_arch, 
-					  regs[LCD_ARCH_REGS_R12])),
+					  regs.r12)),
 		  [r13]"i"(offsetof(struct lcd_arch, 
-					  regs[LCD_ARCH_REGS_R13])),
+					  regs.r13)),
 		  [r14]"i"(offsetof(struct lcd_arch, 
-					  regs[LCD_ARCH_REGS_R14])),
+					  regs.r14)),
 		  [r15]"i"(offsetof(struct lcd_arch, 
-					  regs[LCD_ARCH_REGS_R15])),
+					  regs.r15)),
 		  [cr2]"i"(offsetof(struct lcd_arch, cr2)),
 		  [wordsize]"i"(sizeof(ulong))
 		: "cc", "memory"
@@ -2844,7 +2885,7 @@ out:
 
 int lcd_arch_set_pc(struct lcd_arch *lcd_arch, gva_t a)
 {
-	lcd_arch->regs[LCD_ARCH_REGS_RIP] = gva_val(a);
+	lcd_arch->regs.rip = gva_val(a);
 	/*
 	 * Must load vmcs to modify it
 	 */
@@ -2856,7 +2897,7 @@ int lcd_arch_set_pc(struct lcd_arch *lcd_arch, gva_t a)
 
 int lcd_arch_set_sp(struct lcd_arch *lcd_arch, gva_t a)
 {
-	lcd_arch->regs[LCD_ARCH_REGS_RSP] = gva_val(a);
+	lcd_arch->regs.rsp = gva_val(a);
 	/*
 	 * Must load vmcs to modify it
 	 */

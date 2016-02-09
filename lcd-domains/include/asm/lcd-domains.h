@@ -53,25 +53,46 @@ struct lcd_arch_vmcs {
 
 #define LCD_ARCH_NUM_AUTOLOAD_MSRS 1
 
-enum lcd_arch_reg {
-	LCD_ARCH_REGS_RAX = 0,
-	LCD_ARCH_REGS_RCX = 1,
-	LCD_ARCH_REGS_RDX = 2,
-	LCD_ARCH_REGS_RBX = 3,
-	LCD_ARCH_REGS_RSP = 4,
-	LCD_ARCH_REGS_RBP = 5,
-	LCD_ARCH_REGS_RSI = 6,
-	LCD_ARCH_REGS_RDI = 7,
-	LCD_ARCH_REGS_R8 = 8,
-	LCD_ARCH_REGS_R9 = 9,
-	LCD_ARCH_REGS_R10 = 10,
-	LCD_ARCH_REGS_R11 = 11,
-	LCD_ARCH_REGS_R12 = 12,
-	LCD_ARCH_REGS_R13 = 13,
-	LCD_ARCH_REGS_R14 = 14,
-	LCD_ARCH_REGS_R15 = 15,
-	LCD_ARCH_REGS_RIP,
-	LCD_ARCH_NUM_REGS
+#if defined(__GNUC__) && !defined(__STRICT_ANSI__)
+/* Anonymous union includes both 32- and 64-bit names (e.g., eax/rax). */
+#define __DECL_REG(name) union { \
+    uint64_t r ## name, e ## name; \
+    uint32_t _e ## name; \
+}
+#else
+/* Non-gcc sources must always use the proper 64-bit name (e.g., rax). */
+#define __DECL_REG(name) uint64_t r ## name
+#endif
+
+struct cpu_user_regs {
+    uint64_t r15;
+    uint64_t r14;
+    uint64_t r13;
+    uint64_t r12;
+    __DECL_REG(bp);
+    __DECL_REG(bx);
+    uint64_t r11;
+    uint64_t r10;
+    uint64_t r9;
+    uint64_t r8;
+    __DECL_REG(ax);
+    __DECL_REG(cx);
+    __DECL_REG(dx);
+    __DECL_REG(si);
+    __DECL_REG(di);
+    uint32_t error_code;    /* private */
+    uint32_t entry_vector;  /* private */
+    __DECL_REG(ip);
+    uint16_t cs, _pad0[1];
+    uint8_t  saved_upcall_mask;
+    uint8_t  _pad1[3];
+    __DECL_REG(flags);      /* rflags.IF == !saved_upcall_mask */
+    __DECL_REG(sp);
+    uint16_t ss, _pad2[3];
+    uint16_t es, _pad3[3];
+    uint16_t ds, _pad4[3];
+    uint16_t fs, _pad5[3]; /* Non-zero => takes precedence over fs_base.     */
+    uint16_t gs, _pad6[3]; /* Non-zero => takes precedence over gs_base_usr. */
 };
 
 #define LCD_ARCH_EPT_WALK_LENGTH 4
@@ -180,7 +201,7 @@ struct lcd_arch {
 	 * Stuff we need to save explicitly
 	 */
 	u64 host_rsp;
-	u64 regs[LCD_ARCH_NUM_REGS];
+	struct cpu_user_regs regs;
 	u64 cr2;
 
 	int shutdown;
@@ -343,7 +364,7 @@ int lcd_arch_set_gva_root(struct lcd_arch *lcd_arch, gpa_t a);
  */
 static inline u64 lcd_arch_get_syscall_num(struct lcd_arch *lcd)
 {
-	return lcd->regs[LCD_ARCH_REGS_RAX];
+	return lcd->regs.rax;
 }
 static inline u64 lcd_arch_get_syscall_arg0(struct lcd_arch *lcd)
 {
@@ -363,7 +384,7 @@ static inline u64 lcd_arch_get_syscall_arg3(struct lcd_arch *lcd)
 }
 static inline void lcd_arch_set_syscall_ret(struct lcd_arch *lcd, u64 val)
 {
-	lcd->regs[LCD_ARCH_REGS_RAX] = val;
+	lcd->regs.rax = val;
 }
 
 #endif  /* _ASM_X86_LCD_DOMAINS_ARCH_H */

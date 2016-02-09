@@ -6,6 +6,8 @@
 # if you use the top level makefile in lcd-domains/Makefile)
 export LIBLCD = ../../liblcd/lib.a
 
+obj-m += bug/
+
 obj-m += load/
 
 obj-m += ipc1/

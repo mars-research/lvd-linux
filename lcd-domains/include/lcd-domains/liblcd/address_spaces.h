@@ -10,133 +10,199 @@
 #define LCD_DOMAINS_ADDRESS_SPACES_H
 
 #include <lcd-domains/types.h>
+#include <lcd-domains/liblcd/boot_info.h>
 
 /*
  * Guest Physical Memory Layout
  * ============================
  *
- * No gdt/tss/idt for now (easier). See Documentation/lcd-domains/vmx.txt.
+ * This is the guest physical address space layout the LCD boots
+ * with. It is of course free to modify it (using the capabilities
+ * to the memory).
+ *
+ * No gdt/tss/idt for now (easier).
  *
  * From bottom to top,
  *
- *   -- The bottom 1 MB is unmapped / reserved in case the module is expecting 
- *      the standard physical memory layout of a PC. (Of course, it or its 
- *      creator would need to map something there to emulate that memory.) No
- *      memory mapped here for the gcc stack protector, so make sure you have
- *      that turned off when building the code for the lcd.
+ *   -- The bottom 1 GB is unmapped / reserved. (This could be used
+ *      for BIOS memory-mapped information, low DMA, etc. in the
+ *      future.) This conveniently causes EPT faults for null physical
+ *      addresses.
  *
- *   -- Guest virtual page tables come next, 4 MBs. This puts a (big) upper 
- *      limit on the size of the module that can be mapped. The page tables
- *      in the hierarchy are allocated on demand as the module is mapped.
+ *   -- 1 GB miscellaneous (only beginning part is mapped in guest physical):
  *
- *   -- The UTCB used by the initial thread when the lcd boots. (The
- *      microkernel manages this page.)
+ *          -- UTCB (microkernel manages this page)
+ *          -- Bootstrap info pages
+ *          -- Bootstrap guest virtual address space page tables
  *
- *   -- The stack
+ *   -- 1 GB HOLE (unmapped)
  *
- *   -- Heap. The module is put at the beginning of the heap.
+ *   -- 1 GB for initial stack region (only top part is mapped):
  *
- *   -- A huge chunk of free/unmapped guest physical memory available to the
- *      module.
+ *          -- Stack starts at the top
+ *
+ *   -- 1 GB HOLE (unmapped)
+ *
+ *   -- 1 GB for heap region (unmapped at boot; only bottom part is used)
+ *
+ *   -- 2 GB HOLE (unmapped)
+ *
+ *   -- 256 GB for ioremap region (unmapped at boot)
+ *
+ *   -- 2 GB HOLE (unmapped)
+ *
+ *   -- 2 GB for kernel module mapping area. The kernel module itself
+ *      is mapped at the correct offset into this area so that
+ *      the guest virtual mapping can use huge 1 GB pages.
  *
  *   -- The upper part is unusable (see Intel SDM V3 28.2.2). The last
- *      usable byte is at 0x0000 FFFF FFFF FFFF.
+ *      usable byte is at 0x0000 FFFF FFFF FFFF. This is why we can't do
+ *      a direct map of the kernel module.
  *
- *                   +---------------------------+ 0xFFFF FFFF FFFF FFFF
- *                   |         Unusable          |
- *                   +---------------------------+ 0x0000 FFFF FFFF FFFF
- *                   |                           |
- *                   :           Free            :
- *                   |                           |
- *                   +---------------------------+ 0x0000 0000 0150 8000
- *                   |                           |
- *                   |           Heap            |
- *                   |      (module mapped       |
- *                   |       at the bottom)      |
- *                   :         (16 MBs)          :
- *                   |                           |
- *                   +---------------------------+ 0x0000 0000 0050 8000
- *                   |           Stack           |
- *                   |          (8 KBs)          |
- *                   +---------------------------+ 0x0000 0000 0050 6000
- *                   |         Guard page        |
- *                   |        (not mapped)       |
- *                   |          (4 KBs)          |
- *                   +---------------------------+ 0x0000 0000 0050 5000
- *                   |           UTCB            |
- *                   |          (4 KBs)          |
- *                   +---------------------------+ 0x0000 0000 0050 4000
- *                   |        Boot info          |
- *                   |         (16 KBs)          |
- *                   +---------------------------+ 0x0000 0000 0050 0000
- *                   | Guest Virtual Page Tables | 
- *                   |        (4 MBs max)        |
- *                   +---------------------------+ 0x0000 0000 0010 0000
- *                   |       Free / Unmapped     | 
- *                   |          (1 MB)           |
- *                   +---------------------------+ 0x0000 0000 0000 0000
+ *              +---------------------------+ 0xFFFF FFFF FFFF FFFF
+ *              |         Unusable          |
+ *              +---------------------------+ 0x0000 FFFF FFFF FFFF
+ *              |                           |
+ *              :           Free            :
+ *              |                           |
+ *              +---------------------------+ 0x0000 0080 0000 0000 (512 GB)
+ *              |       Kernel Module       |
+ *              |    (code, bss, rodata)    |
+ *              |          (2 GB)           |
+ *              +---------------------------+ 0x0000 007f 8000 0000 (510 GB)
+ *              |       HOLE / Unmapped     | 
+ *              |         (246 GB)          |
+ *              +---------------------------+ 0x0000 0042 0000 0000 (264 GB) 
+ *              |       ioremap region      |                    
+ *              |         (256 GB)          |
+ *              +---------------------------+ 0x0000 0002 0000 0000 (8 GB)
+ *              |       HOLE / Unmapped     | 
+ *              |          (2 GB)           |
+ *              +---------------------------+ 0x0000 0001 8000 0000 (6 GB)
+ *              |        Heap Region        | 
+ *              |          (1 GB)           |
+ *              +---------------------------+ 0x0000 0001 4000 0000 (5 GB)
+ *              |       HOLE / Unmapped     | 
+ *              |          (1 GB)           |
+ *              +---------------------------+ 0x0000 0001 0000 0000 (4 GB)
+ *              |     Initial Stack Region  |
+ *              |          (1 GB)           |
+ *              +---------------------------+ 0x0000 0000 c000 0000 (3 GB)
+ *              |       HOLE / Unmapped     | 
+ *              |          (1 GB)           |
+ *              +---------------------------+ 0x0000 0000 8000 0000 (2 GB)
+ *              |     UTCB and Bootstrap    |
+ *              |          (1 GB)           |
+ *              +---------------------------+ 0x0000 0000 4000 0000 (1 GB)
+ *              |       Free / Unmapped     | 
+ *              |          (1 GB)           |
+ *              +---------------------------+ 0x0000 0000 0000 0000 (0 GB)
  *
  * Guest Virtual Memory Layout
  * ===========================
  *
- * The lower part has the same layout as the guest physical.
+ * The layout is simple: the physical address space is mapped once in the
+ * high 512 GB range. This puts the kernel module mapping area in the high
+ * 2 GBs, the same as on the host (for x86_64 anyway).
  *
- * The module is mapped per the guest virtual addresses in the lcd_module_page
- * list returned from the module loader, so that relinking is unnecessary.
- * 
- *                   +---------------------------+ 0xFFFF FFFF FFFF FFFF
- *  The module       |                           |
- *  gets mapped      |        Upper Part         |
- *  somewhere in     :       (mostly free)       :
- *  here  -------->  |                           |
- *                   |                           |
- *                   +---------------------------+ 0x0000 0000 0150 8000
- *                   |                           |
- *                   |           Heap            |
- *                   :         (16 MBs)          :
- *                   |                           |
- *                   +---------------------------+ 0x0000 0000 0050 8000
- *                   |           Stack           |
- *                   |          (8 KBs)          |
- *                   +---------------------------+ 0x0000 0000 0050 6000
- *                   |         Guard page        |
- *                   |        (not mapped)       |
- *                   |          (4 KBs)          |
- *                   +---------------------------+ 0x0000 0000 0050 5000
- *                   |           UTCB            |
- *                   |          (4 KBs)          |
- *                   +---------------------------+ 0x0000 0000 0050 4000
- *                   |        Boot info          |
- *                   |         (16 KBs)          |
- *                   +---------------------------+ 0x0000 0000 0050 0000
- *                   | Guest Virtual Page Tables | 
- *                   |        (4 MBs max)        |
- *                   +---------------------------+ 0x0000 0000 0010 0000
- *                   |       Free / Unmapped     | 
- *                   |          (1 MB)           |
- *                   +---------------------------+ 0x0000 0000 0000 0000
+ *              +---------------------------+ 0xFFFF FFFF FFFF FFFF
+ *              |       Kernel Module       |
+ *              |    (code, bss, rodata)    |
+ *              |          (2 GB)           |        \
+ *              +---------------------------+        |
+ *              |                           |        |
+ *              |      ioremap, heap,       |        |
+ *              :       stack, utcb,        :          512 GBs
+ *              :           etc.            :        |
+ *              |                           |        |
+ *              |                           |        |
+ *              +---------------------------+        /
+ *              |     Unmapped in physical  |
+ *              |          (1 GB)           |
+ *              +---------------------------+ 0xFFFF FF7F FFFF FFFF 
+ *              |                           |           
+ *              |                           |
+ *              :                           :
+ *              :        Unmapped           :
+ *              :                           :
+ *              |                           |
+ *              |                           |         
+ *              +---------------------------+ 0x0000 0000 0000 0000
+ *
+ * Everything else is unmapped. We use huge 1 GB pages. This means there
+ * are only two 4 KB pages needed to set up the entire guest virtual
+ * address space.
+ *
+ * (Why don't we map everything in the high physical range so we can
+ * identity map? Answer: The high part of the physical address space is
+ * unusable.)
  */
 
-#define LCD_BOOT_PAGES_ORDER 2
-#define LCD_STACK_PAGES_ORDER 1
+#define LCD_UTCB_SIZE (1UL << 12) /* ......................... 4  KBs   */
+#define LCD_BOOTSTRAP_PAGES_SIZE \
+	(ALIGN(sizeof(struct lcd_boot_info), PAGE_SIZE)) /* .. variable */
+#define LCD_BOOTSTRAP_PAGE_TABLES_SIZE (2 * (1UL << 12)) /* .. 8  KBs   */
+#define LCD_STACK_SIZE (2 * (1UL << 12)) /* .................. 8  KBs   */
+#define LCD_HEAP_SIZE (16UL << 20) /* ........................ 16 MBs   */
+#define LCD_IOREMAP_SIZE (16UL << 20) /* ..................... 16 MBs   */
 
-/* guest physical addresses */
-#define LCD_GV_PAGING_MEM_GPA __gpa(1 << 20) /* low 1 MB is empty */
-#define LCD_GV_PAGING_MEM_SIZE (4 << 20)
-#define LCD_BOOT_PAGES_GPA gpa_add(LCD_GV_PAGING_MEM_GPA, \
-					LCD_GV_PAGING_MEM_SIZE)
-#define LCD_BOOT_PAGES_SIZE ((1 << LCD_BOOT_PAGES_ORDER) * (4 << 10))
-#define LCD_UTCB_GPA gpa_add(LCD_BOOT_PAGES_GPA, LCD_BOOT_PAGES_SIZE)
-#define LCD_UTCB_SIZE (4 << 10)
-#define LCD_UTCB_STACK_GAP (4 << 10) /* guard page, not mapped */
-#define LCD_STACK_GPA gpa_add(LCD_UTCB_GPA, LCD_UTCB_SIZE + LCD_UTCB_STACK_GAP)
-#define LCD_STACK_SIZE ((1 << LCD_STACK_PAGES_ORDER) * (4 << 10))
-#define LCD_MODULE_GPA gpa_add(LCD_STACK_GPA, LCD_STACK_SIZE)
+#define LCD_MISC_REGION_OFFSET (1UL << 30)
+#define LCD_UTCB_OFFSET LCD_MISC_REGION_OFFSET
+#define LCD_BOOTSTRAP_PAGES_OFFSET (LCD_UTCB_OFFSET + LCD_UTCB_SIZE)
+#define LCD_BOOTSTRAP_PAGE_TABLES_OFFSET \
+	(LCD_BOOTSTRAP_PAGES_OFFSET + LCD_BOOTSTRAP_PAGES_SIZE)
 
-/* guest virtual addresses */
-#define LCD_GV_PAGING_MEM_GVA __gva(gpa_val(LCD_GV_PAGING_MEM_GPA))
-#define LCD_BOOT_PAGES_GVA __gva(gpa_val(LCD_BOOT_PAGES_GPA))
-#define LCD_UTCB_GVA __gva(gpa_val(LCD_UTCB_GPA))
-#define LCD_STACK_GVA __gva(gpa_val(LCD_STACK_GPA))
+/* HOLE */
+
+#define LCD_STACK_REGION_OFFSET (3UL << 30)
+#define LCD_STACK_OFFSET \
+	(LCD_STACK_REGION_OFFSET + (1UL << 30) - LCD_STACK_SIZE)
+
+/* HOLE */
+
+#define LCD_HEAP_REGION_OFFSET (5UL << 30)
+#define LCD_HEAP_OFFSET LCD_HEAP_REGION_OFFSET
+
+/* HOLE */
+
+#define LCD_IOREMAP_REGION_OFFSET (8UL << 30)
+#define LCD_IOREMAP_OFFSET LCD_IOREMAP_REGION_OFFSET
+
+/* HOLE */
+
+#define LCD_KERNEL_MODULE_REGION_OFFSET (510UL << 30)
+#define LCD_KERNEL_MODULE_OFFSET LCD_KERNEL_MODULE_REGION_OFFSET
+
+/* Addresses */
+
+#define LCD_PHYS_BASE (0UL)
+#define LCD_VIRT_BASE (0xFFFFFF7FFFFFFFFFUL)
+
+#define LCD_UTCB_GP_ADDR __gpa(LCD_PHYS_BASE + LCD_UTCB_OFFSET)
+#define LCD_UTCB_GV_ADDR __gva(LCD_VIRT_BASE + LCD_UTCB_OFFSET)
+
+#define LCD_BOOTSTRAP_PAGES_GP_ADDR \
+	__gpa(LCD_PHYS_BASE + LCD_BOOTSTRAP_PAGES_OFFSET)
+#define LCD_BOOTSTRAP_PAGES_GV_ADDR \
+	__gpa(LCD_VIRT_BASE + LCD_BOOTSTRAP_PAGES_OFFSET)
+
+#define LCD_BOOTSTRAP_PAGE_TABLES_GP_ADDR \
+	__gpa(LCD_PHYS_BASE + LCD_BOOTSTRAP_PAGE_TABLES_OFFSET)
+#define LCD_BOOTSTRAP_PAGE_TABLES_GV_ADDR \
+	__gpa(LCD_VIRT_BASE + LCD_BOOTSTRAP_PAGE_TABLES_OFFSET)
+
+#define LCD_STACK_GP_ADDR __gpa(LCD_PHYS_BASE + LCD_STACK_OFFSET)
+#define LCD_STACK_GV_ADDR __gpa(LCD_VIRT_BASE + LCD_STACK_OFFSET)
+
+#define LCD_HEAP_GP_ADDR __gpa(LCD_PHYS_BASE + LCD_HEAP_OFFSET)
+#define LCD_HEAP_GV_ADDR __gpa(LCD_VIRT_BASE + LCD_HEAP_OFFSET)
+
+#define LCD_IOREMAP_GP_ADDR __gpa(LCD_PHYS_BASE + LCD_IOREMAP_OFFSET)
+#define LCD_IOREMAP_GV_ADDR __gpa(LCD_VIRT_BASE + LCD_IOREMAP_OFFSET)
+
+#define LCD_KERNEL_MODULE_GP_ADDR \
+	__gpa(LCD_PHYS_BASE + LCD_KERNEL_MODULE_OFFSET)
+#define LCD_KERNEL_MODULE_GV_ADDR \
+	__gpa(LCD_VIRT_BASE + LCD_KERNEL_MODULE_OFFSET)
 
 #endif /* LCD_DOMAINS_ADDRESS_SPACES_H */

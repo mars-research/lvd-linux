@@ -25,16 +25,13 @@ struct lcd_boot_info {
 	 */
 	struct cptr_cache cptr_cache;
 	/*
-	 * Bootstrap page info
+	 * Capabilities to memory objects
 	 */
-	unsigned num_boot_mem_pi;
-	unsigned num_stack_mem_pi;
-	unsigned num_paging_mem_pi;
-	unsigned num_free_mem_pi;
-	struct lcd_boot_info_for_page *boot_mem_pi_start;
-	struct lcd_boot_info_for_page *stack_mem_pi_start;
-	struct lcd_boot_info_for_page *paging_mem_pi_start;
-	struct lcd_boot_info_for_page *free_mem_pi_start;
+	cptr_t module_init_cptr;
+	cptr_t module_core_cptr;
+	cptr_t stack_cptr;
+	cptr_t gv_pgd_cptr;
+	cptr_t gv_pud_cptr;
 	/*
 	 * Other capabilities (e.g., endpoints)
 	 */

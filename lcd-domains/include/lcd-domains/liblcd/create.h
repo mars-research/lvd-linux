@@ -8,15 +8,15 @@
  *    - lcd_config_registers - set the LCD's %rip, %rsp, etc.
  *
  *    - lcd_memory_grant_and_map - configure LCD's guest physical address
- *                               space; set up LCD's guest physical address 
- *                               space
+ *                                 space; set up LCD's guest physical address 
+ *                                 space
  *
  *    - lcd_cap_grant - configure LCD's initial cspace; 
  *                      grant LCD a capability (e.g. to a sync endpoint)
  *
- *    - to_boot_info  - get bootstrap memory for LCD; you can store
- *                      data inside this memory, and the LCD will be able
- *                      to access it when it boots; see boot.h
+ *    - lcd_to_boot_info  - get bootstrap memory for LCD; you can store
+ *                          data inside this memory, and the LCD will be able
+ *                          to access it when it boots; see boot_info.h
  *
  * Copyright: University of Utah
  */

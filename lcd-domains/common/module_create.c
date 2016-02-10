@@ -218,7 +218,7 @@ fail1: /* just return non-zero ret; caller will free mem */
 	return ret;
 }
 
-static int init_create_ctx(struct lcd_create_ctx **ctx_out)
+static int init_create_ctx(struct lcd_create_ctx **ctx_out, char *mname)
 {
 	struct lcd_create_ctx *ctx;
 	/*
@@ -230,6 +230,8 @@ static int init_create_ctx(struct lcd_create_ctx **ctx_out)
 		ret = -ENOMEM;
 		goto fail1;
 	}
+
+	strncpy(ctx->mname, mname, LCD_MODULE_NAME_MAX);
 
 	*ctx_out = ctx;
 
@@ -281,13 +283,21 @@ static int get_pages_for_lcd(struct lcd_create_ctx *ctx)
 	memset(lcd_page_address(p1), 0, LCD_BOOTSTRAP_PAGES_SIZE);
 	ctx->lcd_boot_info = lcd_page_address(p1);
 	/*
+	 * Initialize boot cptr cache
+	 */
+	ret = cptr_cache_init(lcd_to_boot_cptr_cache(ctx));
+	if (ret) {
+		LIBLCD_ERR("failed to init cptr cache");
+		goto fail2;
+	}
+	/*
 	 * Alloc boot page tables
 	 */
 	p2 = lcd_alloc_pages(0, LCD_BOOTSTRAP_PAGE_TABLES_ORDER);
 	if (!p) {
 		LIBLCD_ERR("alloc boot page tables failed");
 		ret = -ENOMEM;
-		goto fail2;
+		goto fail3;
 	}
 	memset(lcd_page_address(p2), 0, LCD_BOOTSTRAP_PAGE_TABLES_SIZE);
 	ctx->gv_pgd = lcd_page_address(p2);
@@ -299,15 +309,17 @@ static int get_pages_for_lcd(struct lcd_create_ctx *ctx)
 	if (!p3) {
 		LIBLCD_ERR("alloc stack pages failed");
 		ret = -ENOMEM;
-		goto fail3;
+		goto fail4;
 	}
 	memset(lcd_page_address(p3), 0, LCD_STACK_SIZE);
 	ctx->stack = lcd_page_address(p3);
 
 	return 0;
 
-fail3:
+fail4:
 	lcd_free_pages(p2, LCD_BOOTSTRAP_PAGE_TABLES_ORDER);
+fail3:
+	cptr_cache_destroy(lcd_to_boot_cptr_cache(ctx));
 fail2:
 	lcd_free_pages(p1, LCD_BOOTSTRAP_PAGES_ORDER);
 fail1:
@@ -325,7 +337,7 @@ int lcd_create_module_lcd(char *mdir, char *mname, cptr_t *lcd_out,
 	/*
 	 * Initialize create ctx
 	 */
-	ret = init_create_ctx(&ctx);
+	ret = init_create_ctx(&ctx, mname);
 	if (ret) {
 		LIBLCD_ERR("error creating ctx");
 		goto fail1;
@@ -372,6 +384,16 @@ int lcd_create_module_lcd(char *mdir, char *mname, cptr_t *lcd_out,
 	/*
 	 * Configure initial control registers, etc. for LCD
 	 */
+	ret = lcd_config_registers(lcd, m_init_link_addr,
+				/* implicity put a null return address */
+				gva_add(LCD_STACK_GV_ADDR,
+					LCD_STACK_SIZE - sizeof(void *)),
+				LCD_BOOTSTRAP_PAGE_TABLES_GV_ADDR,
+				LCD_UTCB_GP_ADDR);
+	if (ret) {
+		LIBLCD_ERR("error configuring LCDs registers");
+		goto fail6;
+	}
 
 	/*
 	 * Return context and lcd
@@ -381,6 +403,7 @@ int lcd_create_module_lcd(char *mdir, char *mname, cptr_t *lcd_out,
 
 	return 0;
 
+fail6:
 fail5:
 	lcd_cap_delete(lcd);
 fail4:

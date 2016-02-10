@@ -1130,6 +1130,29 @@ int lcd_arch_ept_gpa_to_hpa(struct lcd_arch *lcd, gpa_t ga, hpa_t *ha_out)
 	return 0;
 }
 
+int lcd_arch_ept_gpa_to_hva(struct lcd_arch *lcd, unsigned long gva, unsigned long *hva_out)
+{
+	int ret;
+	lcd_arch_epte_t *ept_entry;
+
+	ret = lcd_arch_ept_walk(lcd, __gpa(gva), 0, &ept_entry);
+	if (ret) { 
+		return ret;
+        };
+
+	/*
+	 * Confirm the entry is present
+	 */
+	if (!vmx_epte_present(*ept_entry)) {
+		LCD_ARCH_ERR("gpa %lx is not mapped\n",
+			gva);
+		return -EINVAL;
+	}	
+
+
+        *hva_out = (unsigned long)hpa2va(lcd_arch_ept_hpa(ept_entry)) + (((unsigned long) gva) & (PAGE_SIZE - 1));
+	return 0;
+}
 /**
  * Recursively frees all present entries in dir at level, and
  * the page containing the dir. The recursion depth is limited to 3 - 4 stack

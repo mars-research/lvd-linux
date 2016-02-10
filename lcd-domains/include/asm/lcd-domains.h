@@ -285,6 +285,10 @@ enum lcd_arch_status {
  */
 int lcd_arch_ept_walk(struct lcd_arch *lcd, gpa_t a, int create,
 		lcd_arch_epte_t **epte_out);
+
+int lcd_arch_ept_gpa_to_hva(struct lcd_arch *lcd, unsigned long gva, 
+		unsigned long *hva_out);
+
 /**
  * Set the guest physical => host physical mapping in the ept entry.
  */

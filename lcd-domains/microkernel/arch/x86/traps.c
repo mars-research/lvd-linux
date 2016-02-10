@@ -24,6 +24,8 @@
  * Gareth Hughes <gareth@valinux.com>, May 2000
  */
 
+#include <linux/module.h>
+#include <linux/kallsyms.h>
 #include <asm/lcd-domains.h>
 
 static int debug_stack_lines = 20;
@@ -121,7 +123,7 @@ static void show_guest_stack(struct vcpu *v, const struct cpu_user_regs *regs)
  *                                                                                                                                                                                       */                                                                                                                                                                                   
 static inline unsigned int get_stack_page(unsigned long sp)                                                                                                                           
 {                                                                                                                                                                                     
-	    return (sp & (LCD_STACK_SIZE-1)) >> PAGE_SHIFT;                                                                                                                                       
+	return (sp & (LCD_STACK_SIZE-1)) >> PAGE_SHIFT;                                                                                                                                       
 }
 
 /*
@@ -141,8 +143,7 @@ unsigned long get_stack_trace_bottom(unsigned long sp)
     switch ( get_stack_page(sp) )
     {
     case 0 ... 2:
-        return ROUNDUP(sp, PAGE_SIZE) -
-            offsetof(struct cpu_user_regs, es) - sizeof(unsigned long);
+        return ROUNDUP(sp, PAGE_SIZE) - sizeof(unsigned long);
     default:
         return sp - sizeof(unsigned long);
     }
@@ -160,7 +161,6 @@ unsigned long get_stack_dump_bottom(unsigned long sp)
     }
 }
 
-#if 0
 #if !defined(CONFIG_FRAME_POINTER)
 
 /*
@@ -168,25 +168,47 @@ unsigned long get_stack_dump_bottom(unsigned long sp)
  * caller convenience, this has the same prototype as its alternative, and
  * simply ignores the base pointer parameter.
  */
-static void _show_trace(unsigned long sp, unsigned long __maybe_unused bp)
+static void _show_trace(struct lcd_arch *lcd, unsigned long sp, unsigned long __maybe_unused bp)
 {
-    unsigned long *stack = (unsigned long *)sp, addr;
+    unsigned long *stack = (unsigned long *)sp, stack_hva, addr, addr_hva;
     unsigned long *bottom = (unsigned long *)get_stack_trace_bottom(sp);
+    char symname[KSYM_SYMBOL_LEN];
+   
+
+    printk("Warrning: no frame pointers, stack might be innacurate\n");
 
     while ( stack <= bottom )
     {
-        addr = *stack++;
-        if ( is_active_kernel_text(addr) )
-            printk("   [<%p>] %pS\n", _p(addr), _p(addr));
+
+	ret = lcd_arch_ept_gpa_to_hva(lcd, (unsigned long) stack, &stack_hva);
+        if (ret) { 
+	    LCD_ARCH_ERR("Failed to resolve guest stack gpa into hpa\n");
+	    return;
+        };
+
+        addr = *(unsigned long *)stack_hva;
+	stack++;
+
+	ret = lcd_arch_ept_gpa_to_hva(lcd, (unsigned long) addr, &addr_hva);
+        if (ret) { 
+	    LCD_ARCH_ERR("Failed to resolve guest stack gpa into hpa\n");
+	    return;
+        };
+
+       	//if (lookup_symbol_name((unsigned long)addr_hva, symname)>= 0)
+	if (sprint_symbol(symname, (unsigned long)addr_hva)>= 0)
+
+		printk("[<%p>] %pS, %s", _p(addr), _p(addr), symname);
+
     }
 }
 
 #else
-
 /* Stack trace from frames in the stack, using frame pointers */
-static void _show_trace(unsigned long sp, unsigned long bp)
+static void _show_trace(struct lcd_arch *lcd, unsigned long sp, unsigned long bp)
 {
-    unsigned long *frame, next, addr;
+    unsigned long *frame, next, addr, addr_hva, hva;
+    int ret; 
 
     /* Bounds for range of valid frame pointer. */
     unsigned long low = sp, high = get_stack_trace_bottom(sp);
@@ -196,52 +218,90 @@ static void _show_trace(unsigned long sp, unsigned long bp)
 
     for ( ; ; )
     {
+	//printk("next:%p, low:%p, high:%p\n", _p(next), _p(low), _p(high));
+
         /* Valid frame pointer? */
         if ( (next < low) || (next >= high) )
         {
+	    //printk("Exception frame\n");
             /*
              * Exception stack frames have a different layout, denoted by an
              * inverted frame pointer.
              */
             next = ~next;
-            if ( (next < low) || (next >= high) )
+            if ( (next < low) || (next >= high) ) {
                 break;
+	    };
             frame = (unsigned long *)next;
-            next  = frame[0];
-            addr  = frame[(offsetof(struct cpu_user_regs, eip) -
-                           offsetof(struct cpu_user_regs, ebp))
-                         / BYTES_PER_LONG];
+            
+	    //next  = frame[0];
+            ret = lcd_arch_ept_gpa_to_hva(lcd, (unsigned long) &frame[0], &hva);
+            if (ret) { 
+	        LCD_ARCH_ERR("Failed to resolve guest stack gpa into hpa\n");
+	        return;
+            };
+            next = *(unsigned long *)hva;
+
+	    //addr  = frame[(offsetof(struct cpu_user_regs, eip) -
+            //               offsetof(struct cpu_user_regs, ebp))
+            //             / BYTES_PER_LONG];
+            ret = lcd_arch_ept_gpa_to_hva(lcd, (unsigned long) &frame[(offsetof(struct cpu_user_regs, eip) - offsetof(struct cpu_user_regs, ebp)) / BYTES_PER_LONG], &hva);
+            if (ret) { 
+	        LCD_ARCH_ERR("Failed to resolve guest stack gpa into hpa\n");
+	        return;
+            };
+            addr = *(unsigned long *)hva;
+
         }
         else
         {
             /* Ordinary stack frame. */
+	    //printk("Normal frame\n");
             frame = (unsigned long *)next;
-            next  = frame[0];
-            addr  = frame[1];
+            //next  = frame[0];
+            ret = lcd_arch_ept_gpa_to_hva(lcd, (unsigned long) &frame[0], &hva);
+            if (ret) { 
+	        LCD_ARCH_ERR("Failed to resolve guest stack gpa into hpa\n");
+	        return;
+            };
+            next = *(unsigned long *)hva;
+            //addr  = frame[1];
+            ret = lcd_arch_ept_gpa_to_hva(lcd, (unsigned long) &frame[1], &hva);
+            if (ret) { 
+	        LCD_ARCH_ERR("Failed to resolve guest stack gpa into hpa\n");
+	        return;
+            };
+            addr = *(unsigned long *)hva;
+
         }
 
+	//ret = lcd_arch_ept_gpa_to_hva(lcd, (unsigned long) addr, &addr_hva);
+        //if (ret) { 
+	//    LCD_ARCH_ERR("Failed to resolve guest stack gpa into hpa\n");
+	//    return;
+        //};
+        addr_hva = addr; 
         printk("   [<%p>] %pS\n", _p(addr), _p(addr));
+
 
         low = (unsigned long)&frame[2];
     }
 }
 
 #endif
-#endif
 
-#if 0
-static void show_trace(const struct cpu_user_regs *regs)
+static void show_trace(struct lcd_arch *lcd, const struct cpu_user_regs *regs)
 {
     unsigned long *sp = ESP_BEFORE_EXCEPTION(regs);
 
-    printk("Xen call trace:\n");
+    printk("LCD call trace:\n");
 
     /*
      * If RIP looks sensible, or the top of the stack doesn't, print RIP at
      * the top of the stack trace.
      */
-    if ( is_active_kernel_text(regs->rip) ||
-         !is_active_kernel_text(*sp) )
+    //if ( is_active_kernel_text(regs->rip) ||
+    //     !is_active_kernel_text(*sp) )
         printk("   [<%p>] %pS\n", _p(regs->rip), _p(regs->rip));
     /*
      * Else RIP looks bad but the top of the stack looks good.  Perhaps we
@@ -249,25 +309,23 @@ static void show_trace(const struct cpu_user_regs *regs)
      * return address; print it and skip past so _show_trace() doesn't print
      * it again.
      */
-    else
-    {
-        printk("   [<%p>] %pS\n", _p(*sp), _p(*sp));
-        sp++;
-    }
+    //else
+    //{
+    //    printk("   [<%p>] %pS\n", _p(*sp), _p(*sp));
+    //    sp++;
+    //}
 
-    _show_trace((unsigned long)sp, regs->rbp);
+    _show_trace(lcd, (unsigned long)sp, regs->rbp);
 
     printk("\n");
 }
 
-#endif
 
 void show_stack(struct lcd_arch *lcd, const struct cpu_user_regs *regs)
 {
-    unsigned long *stack = ESP_BEFORE_EXCEPTION(regs), *stack_bottom, *hva_stack, addr;
+    unsigned long *stack = ESP_BEFORE_EXCEPTION(regs), *stack_bottom, stack_hva, data;
     
     int i, ret;
-    lcd_arch_epte_t *epte;
 
     printk("LCD stack trace from "__OP"sp=%p:\n  ", stack);
 
@@ -279,25 +337,25 @@ void show_stack(struct lcd_arch *lcd, const struct cpu_user_regs *regs)
         if ( (i != 0) && ((i % stack_words_per_line) == 0) )
             printk("\n  ");
 
-        ret = lcd_arch_ept_walk(lcd, __gpa((unsigned long)stack), 0, &epte);
+        ret = lcd_arch_ept_gpa_to_hva(lcd, (unsigned long) stack, &stack_hva);
         if (ret) { 
 	    LCD_ARCH_ERR("Failed to resolve guest stack gpa into hpa\n");
 	    return;
         };
 
-        hva_stack = hpa2va(lcd_arch_ept_hpa(epte)) + (((unsigned long) stack) & (PAGE_SIZE - 1));
-	//printk("hva_stack:%p, stack:%p\n", hva_stack, stack);
+	//printk("hva_stack:%p, stack:%p\n", (unsigned long *)stack_hva, stack);
 
-        addr = *hva_stack;
+        data = *(unsigned long *)stack_hva;
 	stack++;
 
-        printk(" %016lx", addr);
+        printk(" %016lx", data);
     }
     if ( i == 0 )
         printk("Stack empty.");
+
     printk("\n");
 
-   // show_trace(regs);
+    show_trace(lcd, regs);
 }
 
 #if 0

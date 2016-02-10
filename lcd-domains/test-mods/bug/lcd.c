@@ -27,11 +27,7 @@
 
 #include <lcd-domains/liblcd-hacks.h>
 
-
-
-static int __noreturn __init test_init(void) 
-{
-	int r;
+void foo5(void) {
         unsigned char stack_array [] = {1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 1, 2, 3, 4};
 	register long rax asm ("rax");
 	register long rbx asm ("rbx");
@@ -47,11 +43,6 @@ static int __noreturn __init test_init(void)
 	register long r13 asm ("r13");
 	register long r14 asm ("r14");
 	register long r15 asm ("r15");
-
-
-	r = lcd_enter();
-	if (r)
-		goto fail1;
 
 	rax = 1; 
 	rbx = 2;
@@ -72,6 +63,37 @@ static int __noreturn __init test_init(void)
 
 	rax = stack_array[0];
 
+	return;
+};
+
+void foo4 (void) {
+	foo5();
+	return;
+}
+
+void foo3 (void) {
+	foo4();
+	return;
+}
+void foo2 (void) {
+	foo3();
+	return;
+}
+
+void foo1 (void) {
+	foo2();
+	return;
+}
+
+static int __noreturn __init test_init(void) 
+{
+	int r;
+
+	r = lcd_enter();
+	if (r)
+		goto fail1;
+
+	foo1();
 fail1:
 	lcd_exit(r);
 }

@@ -76,7 +76,7 @@ int __kliblcd_module_host_load(char *mdir, char *module_name,
 
 	kfree(mpath);
 
-	return ret;
+	return 0;
 
 fail3:
 	ret = do_sys_delete_module(module_name, 0, 1);

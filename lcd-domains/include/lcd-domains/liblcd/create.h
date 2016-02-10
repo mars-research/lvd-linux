@@ -215,6 +215,12 @@ void lcd_destroy_create_ctx(struct lcd_create_ctx *ctx);
  *
  * Obviously, isolated code cannot create a klcd, so this function
  * fails for isolated code.
+ *
+ * IMPORTANT: Unlike the isolated LCD version, you must call 
+ * lcd_destroy_module_klcd to kill the kLCD (this tells the kLCD
+ * thread to stop, waits for it to exit, and then it unloads the
+ * kernel module). If instead you just do lcd_cap_delete on the klcd
+ * capability, the module would remain loaded in the host.
  */
 int lcd_create_module_klcd(char *mdir, char *mname, cptr_t *klcd);
 

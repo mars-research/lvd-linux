@@ -123,14 +123,14 @@ struct lcd_create_ctx {
 	 */
 	char mname[LCD_MODULE_NAME_MAX];
 	/*
-	 * cptr's to capabilities in *creator's* cspace for
-	 * memory allocated for new LCD
-	 */
-	struct lcd_boot_cptrs creator_cptrs;
-	/*
-	 * Pointer to struct lcd_boot_info pages on host
+	 * All of these are *creator-relative* addresses
 	 */
 	struct lcd_boot_info *lcd_boot_info;
+	pgd_t *gv_pgd;
+	pgd_t *gv_pud;
+	void *stack;
+	void *m_init_bits;
+	void *m_core_bits;
 };
 
 /**

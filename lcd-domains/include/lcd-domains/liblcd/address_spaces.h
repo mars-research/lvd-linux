@@ -156,6 +156,24 @@
 #error "struct lcd_boot_info won't fit in bootstrap pages. Add more pages."
 #endif
 
+#if (LCD_BOOTSTRAP_PAGE_TABLES_SIZE >> PAGE_SHIFT != 2)
+#error "We need exactly two page tables for the gv address space."
+#endif
+
+#if ((LCD_STACK_SIZE >> PAGE_SHIFT) & \
+	((LCD_STACK_SIZE >> PAGE_SHIFT) - 1))
+#error "Number of LCD stack pages needs to be a power-of-two multiple."
+#endif
+
+/* Orders (for convenience) */
+
+#define LCD_BOOTSTRAP_PAGES_ORDER \
+	(ilog(LCD_BOOTSTRAP_PAGES_SIZE >> PAGE_SHIFT))
+#define LCD_BOOTSTRAP_PAGE_TABLES_ORDER \
+	(ilog(LCD_BOOTSTRAP_PAGE_TABLES_SIZE >> PAGE_SHIFT))
+#define LCD_STACK_ORDER \
+	(ilog(LCD_STACK_SIZE >> PAGE_SHIFT))
+
 /* Offsets. */
 
 #define LCD_MISC_REGION_OFFSET (1UL << 30)

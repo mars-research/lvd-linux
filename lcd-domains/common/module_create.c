@@ -413,3 +413,13 @@ fail2:
 fail1:
 	return ret;
 }
+
+void lcd_destroy_create_ctx(struct lcd_create_ctx *ctx)
+{
+	destroy_create_ctx(ctx);
+}
+
+/* EXPORTS -------------------------------------------------- */
+
+EXPORT_SYMBOL(lcd_create_module_lcd);
+EXPORT_SYMBOL(lcd_destroy_create_ctx);

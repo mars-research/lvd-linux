@@ -184,25 +184,21 @@ lcd_to_boot_cptr_cache(struct lcd_create_ctx *ctx)
 	return cxt->lcd_boot_info->cptr_cache;
 }
 /**
- * lcd_dump_boot_info -- Dump information in lcd_create_ctx into bootstrap
- * @ctx: the lcd create context returned from lcd_create_module_lcd
+ * lcd_destroy_create_ctx -- Tear down lcd_create_ctx returned from
+ *                           lcd_create_module_lcd
+ * @ctx: the ctx to destroy
  *
- * This will dump information the LCD needs in order to bootstrap itself -
- * cptrs for capabilities in its cspace, the initial cptr cache, and so on.
- *
- * You should call this before running the LCD.
+ * This *releases* all of the memory used to initialize the new LCD.
+ * It will not destroy the new LCD itself, and since the LCD was granted
+ * capabilities to the boot and stack pages, module pages, and so on,
+ * it will continue to have access to them. Only when you delete
+ * the lcd capability will this trigger the full tear down (so long
+ * as no one else was granted the lcd capability).
  */
-int lcd_dump_boot_info(struct lcd_create_ctx *ctx);
+void lcd_destroy_create_ctx(struct lcd_create_ctx *ctx);
 
-/**
- * lcd_destroy_module_lcd -- Tear down an LCD that had a kernel module loaded
- * @lcd: cptr to the lcd capability (the LCD)
- * @ctx: the lcd_create_ctx used during lcd create (returned from
- *       lcd_create_module_lcd)
- *
- * This will also free up the @ctx.
- */
-void lcd_destroy_module_lcd(cptr_t lcd, struct lcd_create_ctx *ctx);
+/* What about lcd_destroy_module_lcd? Use lcd_cap_delete on the lcd
+ * capability. */
 
 /* HIGHER-LEVEL KLCD CREATE FROM KERNEL MODULE -------------------- */
 

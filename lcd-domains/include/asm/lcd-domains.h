@@ -391,10 +391,14 @@ static inline void lcd_arch_set_syscall_ret(struct lcd_arch *lcd, u64 val)
 
 /* Stack and register state */
 
-void lcd_show_execution_state(const struct cpu_user_regs *regs);
+void lcd_show_execution_state(struct lcd_arch *lcd, const struct cpu_user_regs *regs);
 void lcd_show_registers(const struct cpu_user_regs *regs);
 
-
+#define ROUNDUP(x, a) (((x) + (a) - 1) & ~((a) - 1))
+#define BYTES_PER_LONG (BITS_PER_LONG/8)
+/* For generic assembly code: use macros to define operation/operand sizes. */                                                                                                        
+#define __OS          "q"  /* Operation Suffix */                                                                                                                                     
+#define __OP          "r"  /* Operand Prefix */ 
 
 
 #endif  /* _ASM_X86_LCD_DOMAINS_ARCH_H */

@@ -26,8 +26,9 @@
 
 #include <asm/lcd-domains.h>
 
-//static int debug_stack_lines = 20;
+static int debug_stack_lines = 20;
 
+#define _p(_x) ((void *)(unsigned long)(_x))
 #define stack_words_per_line 4
 #define ESP_BEFORE_EXCEPTION(regs) ((unsigned long *)regs->rsp)
 
@@ -112,6 +113,17 @@ static void show_guest_stack(struct vcpu *v, const struct cpu_user_regs *regs)
     printk("\n");
 }
 
+#endif
+
+/*                                                                                                                                                                                    
+ *                                                                                                                                                                                     * Identify which stack page the stack pointer is on.  Returns an index                                                                                                               
+ *                                                                                                                                                                                      * as per the comment above.                                                                                                                                                          
+ *                                                                                                                                                                                       */                                                                                                                                                                                   
+static inline unsigned int get_stack_page(unsigned long sp)                                                                                                                           
+{                                                                                                                                                                                     
+	    return (sp & (LCD_STACK_SIZE-1)) >> PAGE_SHIFT;                                                                                                                                       
+}
+
 /*
  * Notes for get_stack_trace_bottom() and get_stack_dump_bottom()
  *
@@ -120,20 +132,6 @@ static void show_guest_stack(struct vcpu *v, const struct cpu_user_regs *regs)
  *   frame and saved register state at the top.  The interesting bound for a
  *   trace is the word adjacent to this, while the bound for a dump is the
  *   very top, including the exception frame.
- *
- * Stack pages 3, 4 and 5:
- *   None of these are particularly interesting.  With MEMORY_GUARD, page 5 is
- *   explicitly not present, so attempting to dump or trace it is
- *   counterproductive.  Without MEMORY_GUARD, it is possible for a call chain
- *   to use the entire primary stack and wander into page 5.  In this case,
- *   consider these pages an extension of the primary stack to aid debugging
- *   hopefully rare situations where the primary stack has effective been
- *   overflown.
- *
- * Stack pages 6 and 7:
- *   These form the primary stack, and have a cpu_info at the top.  For a
- *   trace, the interesting bound is adjacent to the cpu_info, while for a
- *   dump, the entire cpu_info is interesting.
  *
  * For the cases where the stack should not be inspected, pretend that the
  * passed stack pointer is already out of reasonable bounds.
@@ -145,14 +143,6 @@ unsigned long get_stack_trace_bottom(unsigned long sp)
     case 0 ... 2:
         return ROUNDUP(sp, PAGE_SIZE) -
             offsetof(struct cpu_user_regs, es) - sizeof(unsigned long);
-
-#ifndef MEMORY_GUARD
-    case 3 ... 5:
-#endif
-    case 6 ... 7:
-        return ROUNDUP(sp, STACK_SIZE) -
-            sizeof(struct cpu_info) - sizeof(unsigned long);
-
     default:
         return sp - sizeof(unsigned long);
     }
@@ -165,17 +155,12 @@ unsigned long get_stack_dump_bottom(unsigned long sp)
     case 0 ... 2:
         return ROUNDUP(sp, PAGE_SIZE) - sizeof(unsigned long);
 
-#ifndef MEMORY_GUARD
-    case 3 ... 5:
-#endif
-    case 6 ... 7:
-        return ROUNDUP(sp, STACK_SIZE) - sizeof(unsigned long);
-
     default:
         return sp - sizeof(unsigned long);
     }
 }
 
+#if 0
 #if !defined(CONFIG_FRAME_POINTER)
 
 /*
@@ -242,7 +227,9 @@ static void _show_trace(unsigned long sp, unsigned long bp)
 }
 
 #endif
+#endif
 
+#if 0
 static void show_trace(const struct cpu_user_regs *regs)
 {
     unsigned long *sp = ESP_BEFORE_EXCEPTION(regs);
@@ -273,15 +260,16 @@ static void show_trace(const struct cpu_user_regs *regs)
     printk("\n");
 }
 
-void show_stack(const struct cpu_user_regs *regs)
+#endif
+
+void show_stack(struct lcd_arch *lcd, const struct cpu_user_regs *regs)
 {
-    unsigned long *stack = ESP_BEFORE_EXCEPTION(regs), *stack_bottom, addr;
-    int i;
+    unsigned long *stack = ESP_BEFORE_EXCEPTION(regs), *stack_bottom, *hva_stack, addr;
+    
+    int i, ret;
+    lcd_arch_epte_t *epte;
 
-    if ( guest_mode(regs) )
-        return show_guest_stack(current, regs);
-
-    printk("Xen stack trace from "__OP"sp=%p:\n  ", stack);
+    printk("LCD stack trace from "__OP"sp=%p:\n  ", stack);
 
     stack_bottom = _p(get_stack_dump_bottom(regs->rsp));
 
@@ -290,16 +278,29 @@ void show_stack(const struct cpu_user_regs *regs)
     {
         if ( (i != 0) && ((i % stack_words_per_line) == 0) )
             printk("\n  ");
-        addr = *stack++;
-        printk(" %p", _p(addr));
+
+        ret = lcd_arch_ept_walk(lcd, __gpa((unsigned long)stack), 0, &epte);
+        if (ret) { 
+	    LCD_ARCH_ERR("Failed to resolve guest stack gpa into hpa\n");
+	    return;
+        };
+
+        hva_stack = hpa2va(lcd_arch_ept_hpa(epte)) + (((unsigned long) stack) & (PAGE_SIZE - 1));
+	//printk("hva_stack:%p, stack:%p\n", hva_stack, stack);
+
+        addr = *hva_stack;
+	stack++;
+
+        printk(" %016lx", addr);
     }
     if ( i == 0 )
         printk("Stack empty.");
     printk("\n");
 
-    show_trace(regs);
+   // show_trace(regs);
 }
 
+#if 0
 void show_stack_overflow(unsigned int cpu, const struct cpu_user_regs *regs)
 {
 #ifdef MEMORY_GUARD
@@ -311,7 +312,7 @@ void show_stack_overflow(unsigned int cpu, const struct cpu_user_regs *regs)
 
     printk("Valid stack range: %p-%p, sp=%p, tss.esp0=%p\n",
            (void *)esp_top, (void *)esp_bottom, (void *)esp,
-           (void *)per_cpu(init_tss, cpu).esp0);
+           D
 
     /* Trigger overflow trace if %esp is within 512 bytes of the guard page. */
     if ( ((unsigned long)(esp - esp_top) > 512) &&
@@ -341,14 +342,14 @@ static void _lcd_show_registers(
     printk("RIP:    %04x:[<%016llx>]", regs->cs, regs->rip);
     //if ( context == CTXT_hypervisor )
     //    printk(" %pS", _p(regs->rip));
-    printk("\nRFLAGS: %016llx   ", regs->rflags);
+    printk("RFLAGS: %016llx   \n", regs->rflags);
    // if ( (context == CTXT_pv_guest) && v && v->vcpu_info )
     //    printk("EM: %d   ", !!vcpu_info(v, evtchn_upcall_mask));
     //printk("CONTEXT: %s", context_names[context]);
     //if ( v && !is_idle_vcpu(v) )
     //    printk(" (%pv)", v);
 
-    printk("\nrax: %016llx   rbx: %016llx   rcx: %016llx\n",
+    printk("rax: %016llx   rbx: %016llx   rcx: %016llx\n",
            regs->rax, regs->rbx, regs->rcx);
     printk("rdx: %016llx   rsi: %016llx   rdi: %016llx\n",
            regs->rdx, regs->rsi, regs->rdi);
@@ -390,10 +391,10 @@ void lcd_show_registers(const struct cpu_user_regs *regs)
 
 }
 
-void lcd_show_execution_state(const struct cpu_user_regs *regs)
+void lcd_show_execution_state(struct lcd_arch *lcd, const struct cpu_user_regs *regs)
 {
     lcd_show_registers(regs);
-    //show_stack(regs);
+    show_stack(lcd, regs);
 }
 
 #if 0

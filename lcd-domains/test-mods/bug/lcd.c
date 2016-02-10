@@ -32,7 +32,7 @@
 static int __noreturn __init test_init(void) 
 {
 	int r;
-
+        unsigned char stack_array [] = {1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 1, 2, 3, 4};
 	register long rax asm ("rax");
 	register long rbx asm ("rbx");
 	register long rcx asm ("rcx");
@@ -69,6 +69,8 @@ static int __noreturn __init test_init(void)
 	r15 = 0xe;
 
 	jiffies_to_clock_t(100000);
+
+	rax = stack_array[0];
 
 fail1:
 	lcd_exit(r);

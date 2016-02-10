@@ -7,7 +7,7 @@
  *
  *    - lcd_config_registers - set the LCD's %rip, %rsp, etc.
  *
- *    - lcd_page_grant_and_map - configure LCD's guest physical address
+ *    - lcd_memory_grant_and_map - configure LCD's guest physical address
  *                               space; set up LCD's guest physical address 
  *                               space
  *
@@ -163,17 +163,26 @@ int lcd_create_module_lcd(char *mdir, char *mname, cptr_t *lcd,
 			struct lcd_create_ctx **ctx);
 
 /**
- * to_boot_info -- Extract lcd_boot_info from create context
+ * lcd_to_boot_info -- Extract lcd_boot_info from create context
  * @ctx: the lcd create ctx returned from lcd_create_module_lcd
  *
  * Use this to pull out the struct. Then you can store your own values
  * in the fields for dumping the info.
  */
-static inline struct lcd_boot_info * to_boot_info(struct lcd_create_ctx *ctx)
+static inline struct lcd_boot_info * 
+lcd_to_boot_info(struct lcd_create_ctx *ctx)
 {
 	return cxt->lcd_boot_info;
 }
-
+/**
+ * lcd_to_boot_cptr_cache -- Extract new LCD's bootstrap cptr cache
+ * @ctx: the lcd create ctx returned from lcd_create_module_lcd
+ */
+static inline struct cptr_cache * 
+lcd_to_boot_cptr_cache(struct lcd_create_ctx *ctx)
+{
+	return cxt->lcd_boot_info->cptr_cache;
+}
 /**
  * lcd_dump_boot_info -- Dump information in lcd_create_ctx into bootstrap
  * @ctx: the lcd create context returned from lcd_create_module_lcd

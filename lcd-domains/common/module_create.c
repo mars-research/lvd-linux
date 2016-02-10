@@ -7,16 +7,118 @@
  * Copyright: University of Utah
  */
 
+static int do_grant_and_map_for_mem(cptr_t lcd, struct lcd_create_ctx *ctx,
+				void *mem, gpa_t map_base,
+				cptr_t *dest)
+{
+	int ret;
+	cptr_t mo;
+	unsigned int order;
+	/*
+	 * Look up the cptr for the *creator*
+	 */
+	ret = lcd_virt_to_cptr(__gva((unsigned long)mem), &mo, &order);
+	if (ret) {
+		LIBLCD_ERR("lookup failed");
+		goto fail1;
+	}
+	/*
+	 * Alloc a cptr in the new LCD cptr cache
+	 */
+	ret = cptr_alloc(lcd_to_boot_cptr_cache(ctx), dest);
+	if (ret) {
+		LIBLCD_ERR("cptr alloc failed");
+		goto fail2;
+	}
+	/*
+	 * Grant and map the memory
+	 */
+	ret = lcd_memory_grant_and_map(lcd, mo, *dest, map_base);
+	if (ret) {
+		LIBLCD_ERR("grant and map failed");
+		goto fail3;
+	}
+
+	return 0;
+
+fail3:
+	cptr_free(lcd_to_boot_cptr_cache(ctx), *dest);
+fail2:
+fail1:
+	return ret;
+}
+
+static int do_kernel_module_grant_map(cptr_t lcd, struct lcd_create_ctx *ctx,
+				gva_t m_init_link_addr, gva_t m_core_link_addr)
+{
+	unsigned long offset;
+	cptr_t *c;
+	/*
+	 * Map module init and core at correct offsets
+	 */
+	offset = gva_val(m_init_link_addr) - 
+		gva_val(LCD_KERNEL_MODULE_REGION_GV_ADDR);
+	c = &(lcd_to_boot_info(ctx)->lcd_boot_cptrs.module_init);
+	ret = do_grant_and_map_for_mem(lcd, ctx, ctx->m_init_bits,
+				gpa_add(LCD_KERNEL_MODULE_REGION_GP_ADDR,
+					offset),
+				c);
+	if (ret)
+		goto fail1;
+
+	offset = gva_val(m_core_link_addr) - 
+		gva_val(LCD_KERNEL_MODULE_REGION_GV_ADDR);
+	c = &(lcd_to_boot_info(ctx)->lcd_boot_cptrs.module_core);
+	ret = do_grant_and_map_for_mem(lcd, ctx, ctx->m_core_bits,
+				gpa_add(LCD_KERNEL_MODULE_REGION_GP_ADDR,
+					offset),
+				c);
+	if (ret)
+		goto fail2;
+
+fail2:
+fail1:
+	return ret;
+}
+
 static int setup_phys_addr_space(cptr_t lcd, struct lcd_create_ctx *ctx,
 				gva_t m_init_link_addr, gva_t m_core_link_addr)
 {
 	int ret;
+	cptr_t *c;
+	/*
+	 * Map and grant bootstrap pages, page tables, and stack
+	 */
+	c = &(lcd_to_boot_info(ctx)->lcd_boot_cptrs.boot_pages);
+	ret = do_grant_and_map_for_mem(lcd, ctx, ctx->lcd_boot_info,
+				LCD_BOOTSTRAP_PAGES_GP_ADDR, c);
+	if (ret)
+		goto fail1;
+	c = &(lcd_to_boot_info(ctx)->lcd_boot_cptrs.gv);
+	ret = do_grant_and_map_for_mem(lcd, ctx, ctx->pgd,
+				LCD_BOOTSTRAP_PAGE_TABLES_GP_ADDR, c);
+	if (ret)
+		goto fail2;
+	c = &(lcd_to_boot_info(ctx)->lcd_boot_cptrs.stack);
+	ret = do_grant_and_map_for_mem(lcd, ctx, ctx->stack,
+				LCD_STACK_GP_ADDR, c);
+	if (ret)
+		goto fail3;
+	/*
+	 * Map and grant kernel module
+	 */
+	ret = do_kernel_module_grant_map(lcd, ctx,
+					m_init_link_addr, m_core_link_addr);
+	if (ret)
+		goto fail4;
+	
+	return 0;
 
-
-
-
-
-
+fail4:  /* Just return; caller should kill new LCD and free up resources. */
+fail3:
+fail2:
+fail1:
+	return ret;
 }
 
 static int setup_addr_spaces(cptr_t lcd, struct lcd_create_ctx *ctx,
@@ -24,7 +126,8 @@ static int setup_addr_spaces(cptr_t lcd, struct lcd_create_ctx *ctx,
 {
 	int ret;
 	/*
-	 * Set up physical address space
+	 * Set up physical address space (except UTCB - that's done
+	 * via lcd_config)
 	 */
 	ret = setup_phys_addr_space(lcd, cxt, m_init_link_addr, 
 				m_core_link_addr);
@@ -98,6 +201,9 @@ static int get_pages_for_lcd(struct lcd_create_ctx *ctx)
 {
 	struct page *p1, *p2, *p3;
 	/*
+	 * We explicity zero things out. If this code is used inside
+	 * an LCD, it may not zero out the alloc'd pages.
+	 *
 	 * Alloc boot pages
 	 */
 	p1 = lcd_alloc_pages(0, LCD_BOOTSTRAP_PAGES_ORDER);
@@ -106,6 +212,7 @@ static int get_pages_for_lcd(struct lcd_create_ctx *ctx)
 		ret = -ENOMEM;
 		goto fail1;
 	}
+	memset(lcd_page_address(p1), 0, LCD_BOOTSTRAP_PAGES_SIZE);
 	ctx->lcd_boot_info = lcd_page_address(p1);
 	/*
 	 * Alloc boot page tables
@@ -116,6 +223,7 @@ static int get_pages_for_lcd(struct lcd_create_ctx *ctx)
 		ret = -ENOMEM;
 		goto fail2;
 	}
+	memset(lcd_page_address(p2), 0, LCD_BOOTSTRAP_PAGE_TABLES_SIZE);
 	ctx->gv_pgd = lcd_page_address(p2);
 	ctx->gv_pud = lcd_page_address(p2 + 1);
 	/*
@@ -127,6 +235,7 @@ static int get_pages_for_lcd(struct lcd_create_ctx *ctx)
 		ret = -ENOMEM;
 		goto fail3;
 	}
+	memset(lcd_page_address(p3), 0, LCD_STACK_SIZE);
 	ctx->stack = lcd_page_address(p3);
 
 	return 0;

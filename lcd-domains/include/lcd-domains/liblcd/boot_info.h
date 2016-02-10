@@ -15,12 +15,11 @@
 #define LCD_NUM_BOOT_CPTRS 8
 
 struct lcd_boot_cptrs {
-	cptr_t module_init_cptr;
-	cptr_t module_core_cptr;
-	cptr_t boot_pages_cptr;
-	cptr_t stack_cptr;
-	cptr_t gv_pgd_cptr;
-	cptr_t gv_pud_cptr;
+	cptr_t module_init;
+	cptr_t module_core;
+	cptr_t boot_pages;
+	cptr_t stack;
+	cptr_t gv;
 };
 
 struct lcd_boot_info {

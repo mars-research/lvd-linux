@@ -121,6 +121,78 @@ fail1:
 	return ret;
 }
 
+static void setup_lcd_pud(struct lcd_create_ctx *ctx)
+{
+	/*
+	 * This assumes the PAT has Writeback in PAT0, Uncacheable in PAT1.
+	 *
+	 * See Intel SDM V3 11.12.3 for how PAT indexing is done.
+	 */
+	unsigned int i;
+	unsigned int ioremap_offset = LCD_IOREMAP_REGION_OFFSET >> 30;
+	unsigned int after_ioremap_offset = ioremap_offset +
+		LCD_IOREMAP_REGION_SIZE >> 30;
+	pteval_t wb_flags = _PAGE_PRESENT | _PAGE_RW | _PAGE_PSE;
+	pteval_t uc_flags = _PAGE_PRESENT | _PAGE_RW | _PAGE_PSE | _PAGE_PWT;
+	pud_t *pud_entry;
+	/*
+	 * Map first GBs as write back
+	 */
+	for (i = 0; i < ioremap_offset; i++) {
+		pud_entry = &ctx->pud[i];
+		set_pud(pud_entry,
+			(LCD_PHYS_BASE + i * (1UL << 30)) | wb_flags)
+	}
+	/*
+	 * Map ioremap GBs as uncacheable
+	 */
+	for (i = ioremap_offset; i < after_ioremap_offset; i++) {
+		pud_entry = &ctx->pud[i];
+		set_pud(pud_entry,
+			(LCD_PHYS_BASE + i * (1UL << 30)) | uc_flags)
+	}
+	/*
+	 * Map remaining GBs as write back
+	 */
+	for (i = after_ioremap_offset; i < 512; i++) {
+		pud_entry = &ctx->pud[i];
+		set_pud(pud_entry,
+			(LCD_PHYS_BASE + i * (1UL << 30)) | wb_flags)
+	}
+}
+
+static void setup_lcd_pgd(struct lcd_create_ctx *ctx)
+{
+	pgd_t *pgd_entry;
+	gpa_t pud_gpa;
+	pteval_t flags = 0;
+
+	pgd_entry = &ctx->pgd[511]; /* only map last pud for high 512 GBs */
+
+	/* pud comes after pgd */
+	pud_gpa = gpa_add(LCD_BOOTSTRAP_PAGE_TABLES_GP_ADDR, PAGE_SIZE);
+
+	flags |= _PAGE_PRESENT;
+	flags |= _PAGE_RW;
+
+	set_pgd(pgd_entry,
+		__pgd(gpa_val(pud_gpa) | flags))
+}
+
+static void setup_virt_addr_space(struct lcd_create_ctx *ctx)
+{
+	/*
+	 * pgd and pud (PML4 and PDPT) should already be zero'd out
+	 *
+	 * Set up root pgd
+	 */
+	setup_lcd_pgd(ctx);
+	/*
+	 * Set up pud (only one for high 512 GBs)
+	 */
+	setup_lcd_pud(ctx);
+}
+
 static int setup_addr_spaces(cptr_t lcd, struct lcd_create_ctx *ctx,
 			gva_t m_init_link_addr, gva_t m_core_link_addr)
 {
@@ -138,17 +210,11 @@ static int setup_addr_spaces(cptr_t lcd, struct lcd_create_ctx *ctx,
 	/*
 	 * Set up virtual address space
 	 */
-	ret = setup_virt_addr_space(lcd, cxt, m_init_link_addr, 
-				m_core_link_addr);
-	if (ret) {
-		LIBLCD_ERR("error setting up virt addr space");
-		goto fail2;
-	}
+	setup_virt_addr_space(cxt);
 
 	return 0;
 
-fail2:  /* just return non-zero ret; caller will free mem */
-fail1:
+fail1: /* just return non-zero ret; caller will free mem */
 	return ret;
 }
 

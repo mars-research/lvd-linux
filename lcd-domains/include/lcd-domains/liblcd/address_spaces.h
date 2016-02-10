@@ -140,10 +140,10 @@
 
 /* Sizes. The heap and ioremap are not mapped/backed at boot. */
 
-#define LCD_UTCB_SIZE (1UL << 12) /* ......................... 4  KBs */
-#define LCD_BOOTSTRAP_PAGES_SIZE (2 * (1UL << 12)) /* ........ 8  KBs */
-#define LCD_BOOTSTRAP_PAGE_TABLES_SIZE (2 * (1UL << 12)) /* .. 8  KBs */
-#define LCD_STACK_SIZE (2 * (1UL << 12)) /* .................. 8  KBs */
+#define LCD_UTCB_SIZE PAGE_SIZE /* ........................... 4  KBs */
+#define LCD_BOOTSTRAP_PAGES_SIZE (2 * PAGE_SIZE) /* .......... 8  KBs */
+#define LCD_BOOTSTRAP_PAGE_TABLES_SIZE (2 * PAGE_SIZE) /* .... 8  KBs */
+#define LCD_STACK_SIZE (2 * PAGE_SIZE) /* .................... 8  KBs */
 #define LCD_HEAP_SIZE (16UL << 20) /* ........................ 16 MBs */
 #define LCD_IOREMAP_SIZE (16UL << 20) /* ..................... 16 MBs */
 
@@ -197,6 +197,7 @@
 
 #define LCD_IOREMAP_REGION_OFFSET (8UL << 30)
 #define LCD_IOREMAP_OFFSET LCD_IOREMAP_REGION_OFFSET
+#define LCD_IOREMAP_REGION_SIZE (256UL << 30)
 
 /* HOLE */
 

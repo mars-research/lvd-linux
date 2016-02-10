@@ -1,0 +1,443 @@
+/******************************************************************************
+ * arch/x86/traps.c
+ * 
+ * Modifications to Linux original are copyright (c) 2002-2004, K A Fraser
+ * 
+ * This program is free software; you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License as published by
+ * the Free Software Foundation; either version 2 of the License, or
+ * (at your option) any later version.
+ * 
+ * This program is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ * GNU General Public License for more details.
+ * 
+ * You should have received a copy of the GNU General Public License
+ * along with this program; If not, see <http://www.gnu.org/licenses/>.
+ */
+
+/*
+ *  Copyright (C) 1991, 1992  Linus Torvalds
+ *
+ *  Pentium III FXSR, SSE support
+ * Gareth Hughes <gareth@valinux.com>, May 2000
+ */
+
+#include <asm/lcd-domains.h>
+
+//static int debug_stack_lines = 20;
+
+#define stack_words_per_line 4
+#define ESP_BEFORE_EXCEPTION(regs) ((unsigned long *)regs->rsp)
+
+#if 0
+
+static void show_guest_stack(struct vcpu *v, const struct cpu_user_regs *regs)
+{
+    int i;
+    unsigned long *stack, addr;
+    unsigned long mask = STACK_SIZE;
+
+    /* Avoid HVM as we don't know what the stack looks like. */
+    if ( is_hvm_vcpu(v) )
+        return;
+
+    if ( is_pv_32bit_vcpu(v) )
+    {
+        compat_show_guest_stack(v, regs, debug_stack_lines);
+        return;
+    }
+
+    if ( vm86_mode(regs) )
+    {
+        stack = (unsigned long *)((regs->ss << 4) + (regs->esp & 0xffff));
+        printk("Guest stack trace from ss:sp = %04x:%04x (VM86)\n  ",
+               regs->ss, (uint16_t)(regs->esp & 0xffff));
+    }
+    else
+    {
+        stack = (unsigned long *)regs->esp;
+        printk("Guest stack trace from "__OP"sp=%p:\n  ", stack);
+    }
+
+    if ( !access_ok(stack, sizeof(*stack)) )
+    {
+        printk("Guest-inaccessible memory.\n");
+        return;
+    }
+
+    if ( v != current )
+    {
+        struct vcpu *vcpu;
+
+        ASSERT(guest_kernel_mode(v, regs));
+        vcpu = maddr_get_owner(read_cr3()) == v->domain ? v : NULL;
+        if ( !vcpu )
+        {
+            stack = do_page_walk(v, (unsigned long)stack);
+            if ( (unsigned long)stack < PAGE_SIZE )
+            {
+                printk("Inaccessible guest memory.\n");
+                return;
+            }
+            mask = PAGE_SIZE;
+        }
+    }
+
+    for ( i = 0; i < (debug_stack_lines*stack_words_per_line); i++ )
+    {
+        if ( (((long)stack - 1) ^ ((long)(stack + 1) - 1)) & mask )
+            break;
+        if ( __get_user(addr, stack) )
+        {
+            if ( i != 0 )
+                printk("\n    ");
+            printk("Fault while accessing guest memory.");
+            i = 1;
+            break;
+        }
+        if ( (i != 0) && ((i % stack_words_per_line) == 0) )
+            printk("\n  ");
+        printk(" %p", _p(addr));
+        stack++;
+    }
+    if ( mask == PAGE_SIZE )
+    {
+        BUILD_BUG_ON(PAGE_SIZE == STACK_SIZE);
+        unmap_domain_page(stack);
+    }
+    if ( i == 0 )
+        printk("Stack empty.");
+    printk("\n");
+}
+
+/*
+ * Notes for get_stack_trace_bottom() and get_stack_dump_bottom()
+ *
+ * Stack pages 0, 1 and 2:
+ *   These are all 1-page IST stacks.  Each of these stacks have an exception
+ *   frame and saved register state at the top.  The interesting bound for a
+ *   trace is the word adjacent to this, while the bound for a dump is the
+ *   very top, including the exception frame.
+ *
+ * Stack pages 3, 4 and 5:
+ *   None of these are particularly interesting.  With MEMORY_GUARD, page 5 is
+ *   explicitly not present, so attempting to dump or trace it is
+ *   counterproductive.  Without MEMORY_GUARD, it is possible for a call chain
+ *   to use the entire primary stack and wander into page 5.  In this case,
+ *   consider these pages an extension of the primary stack to aid debugging
+ *   hopefully rare situations where the primary stack has effective been
+ *   overflown.
+ *
+ * Stack pages 6 and 7:
+ *   These form the primary stack, and have a cpu_info at the top.  For a
+ *   trace, the interesting bound is adjacent to the cpu_info, while for a
+ *   dump, the entire cpu_info is interesting.
+ *
+ * For the cases where the stack should not be inspected, pretend that the
+ * passed stack pointer is already out of reasonable bounds.
+ */
+unsigned long get_stack_trace_bottom(unsigned long sp)
+{
+    switch ( get_stack_page(sp) )
+    {
+    case 0 ... 2:
+        return ROUNDUP(sp, PAGE_SIZE) -
+            offsetof(struct cpu_user_regs, es) - sizeof(unsigned long);
+
+#ifndef MEMORY_GUARD
+    case 3 ... 5:
+#endif
+    case 6 ... 7:
+        return ROUNDUP(sp, STACK_SIZE) -
+            sizeof(struct cpu_info) - sizeof(unsigned long);
+
+    default:
+        return sp - sizeof(unsigned long);
+    }
+}
+
+unsigned long get_stack_dump_bottom(unsigned long sp)
+{
+    switch ( get_stack_page(sp) )
+    {
+    case 0 ... 2:
+        return ROUNDUP(sp, PAGE_SIZE) - sizeof(unsigned long);
+
+#ifndef MEMORY_GUARD
+    case 3 ... 5:
+#endif
+    case 6 ... 7:
+        return ROUNDUP(sp, STACK_SIZE) - sizeof(unsigned long);
+
+    default:
+        return sp - sizeof(unsigned long);
+    }
+}
+
+#if !defined(CONFIG_FRAME_POINTER)
+
+/*
+ * Stack trace from pointers found in stack, unaided by frame pointers.  For
+ * caller convenience, this has the same prototype as its alternative, and
+ * simply ignores the base pointer parameter.
+ */
+static void _show_trace(unsigned long sp, unsigned long __maybe_unused bp)
+{
+    unsigned long *stack = (unsigned long *)sp, addr;
+    unsigned long *bottom = (unsigned long *)get_stack_trace_bottom(sp);
+
+    while ( stack <= bottom )
+    {
+        addr = *stack++;
+        if ( is_active_kernel_text(addr) )
+            printk("   [<%p>] %pS\n", _p(addr), _p(addr));
+    }
+}
+
+#else
+
+/* Stack trace from frames in the stack, using frame pointers */
+static void _show_trace(unsigned long sp, unsigned long bp)
+{
+    unsigned long *frame, next, addr;
+
+    /* Bounds for range of valid frame pointer. */
+    unsigned long low = sp, high = get_stack_trace_bottom(sp);
+
+    /* The initial frame pointer. */
+    next = bp;
+
+    for ( ; ; )
+    {
+        /* Valid frame pointer? */
+        if ( (next < low) || (next >= high) )
+        {
+            /*
+             * Exception stack frames have a different layout, denoted by an
+             * inverted frame pointer.
+             */
+            next = ~next;
+            if ( (next < low) || (next >= high) )
+                break;
+            frame = (unsigned long *)next;
+            next  = frame[0];
+            addr  = frame[(offsetof(struct cpu_user_regs, eip) -
+                           offsetof(struct cpu_user_regs, ebp))
+                         / BYTES_PER_LONG];
+        }
+        else
+        {
+            /* Ordinary stack frame. */
+            frame = (unsigned long *)next;
+            next  = frame[0];
+            addr  = frame[1];
+        }
+
+        printk("   [<%p>] %pS\n", _p(addr), _p(addr));
+
+        low = (unsigned long)&frame[2];
+    }
+}
+
+#endif
+
+static void show_trace(const struct cpu_user_regs *regs)
+{
+    unsigned long *sp = ESP_BEFORE_EXCEPTION(regs);
+
+    printk("Xen call trace:\n");
+
+    /*
+     * If RIP looks sensible, or the top of the stack doesn't, print RIP at
+     * the top of the stack trace.
+     */
+    if ( is_active_kernel_text(regs->rip) ||
+         !is_active_kernel_text(*sp) )
+        printk("   [<%p>] %pS\n", _p(regs->rip), _p(regs->rip));
+    /*
+     * Else RIP looks bad but the top of the stack looks good.  Perhaps we
+     * followed a wild function pointer? Lets assume the top of the stack is a
+     * return address; print it and skip past so _show_trace() doesn't print
+     * it again.
+     */
+    else
+    {
+        printk("   [<%p>] %pS\n", _p(*sp), _p(*sp));
+        sp++;
+    }
+
+    _show_trace((unsigned long)sp, regs->rbp);
+
+    printk("\n");
+}
+
+void show_stack(const struct cpu_user_regs *regs)
+{
+    unsigned long *stack = ESP_BEFORE_EXCEPTION(regs), *stack_bottom, addr;
+    int i;
+
+    if ( guest_mode(regs) )
+        return show_guest_stack(current, regs);
+
+    printk("Xen stack trace from "__OP"sp=%p:\n  ", stack);
+
+    stack_bottom = _p(get_stack_dump_bottom(regs->rsp));
+
+    for ( i = 0; i < (debug_stack_lines*stack_words_per_line) &&
+              (stack <= stack_bottom); i++ )
+    {
+        if ( (i != 0) && ((i % stack_words_per_line) == 0) )
+            printk("\n  ");
+        addr = *stack++;
+        printk(" %p", _p(addr));
+    }
+    if ( i == 0 )
+        printk("Stack empty.");
+    printk("\n");
+
+    show_trace(regs);
+}
+
+void show_stack_overflow(unsigned int cpu, const struct cpu_user_regs *regs)
+{
+#ifdef MEMORY_GUARD
+    unsigned long esp = regs->rsp;
+    unsigned long esp_top, esp_bottom;
+
+    esp_bottom = (esp | (STACK_SIZE - 1)) + 1;
+    esp_top    = esp_bottom - PRIMARY_STACK_SIZE;
+
+    printk("Valid stack range: %p-%p, sp=%p, tss.esp0=%p\n",
+           (void *)esp_top, (void *)esp_bottom, (void *)esp,
+           (void *)per_cpu(init_tss, cpu).esp0);
+
+    /* Trigger overflow trace if %esp is within 512 bytes of the guard page. */
+    if ( ((unsigned long)(esp - esp_top) > 512) &&
+         ((unsigned long)(esp_top - esp) > 512) )
+    {
+        printk("No stack overflow detected. Skipping stack trace.\n");
+        return;
+    }
+
+    if ( esp < esp_top )
+        esp = esp_top;
+
+    printk("Xen stack overflow (dumping trace %p-%p):\n",
+           (void *)esp, (void *)esp_bottom);
+
+    _show_trace(esp, regs->rbp);
+
+    printk("\n");
+#endif
+}
+#endif
+
+static void _lcd_show_registers(
+    const struct cpu_user_regs *regs, unsigned long crs[8])
+{
+
+    printk("RIP:    %04x:[<%016llx>]", regs->cs, regs->rip);
+    //if ( context == CTXT_hypervisor )
+    //    printk(" %pS", _p(regs->rip));
+    printk("\nRFLAGS: %016llx   ", regs->rflags);
+   // if ( (context == CTXT_pv_guest) && v && v->vcpu_info )
+    //    printk("EM: %d   ", !!vcpu_info(v, evtchn_upcall_mask));
+    //printk("CONTEXT: %s", context_names[context]);
+    //if ( v && !is_idle_vcpu(v) )
+    //    printk(" (%pv)", v);
+
+    printk("\nrax: %016llx   rbx: %016llx   rcx: %016llx\n",
+           regs->rax, regs->rbx, regs->rcx);
+    printk("rdx: %016llx   rsi: %016llx   rdi: %016llx\n",
+           regs->rdx, regs->rsi, regs->rdi);
+    printk("rbp: %016llx   rsp: %016llx   r8:  %016llx\n",
+           regs->rbp, regs->rsp, regs->r8);
+    printk("r9:  %016llx   r10: %016llx   r11: %016llx\n",
+           regs->r9,  regs->r10, regs->r11);
+    //if ( !(regs->entry_vector & TRAP_regs_partial) )
+    {
+        printk("r12: %016llx   r13: %016llx   r14: %016llx\n",
+               regs->r12, regs->r13, regs->r14);
+        printk("r15: %016llx   cr0: %016lx   cr4: %016lx\n",
+               regs->r15, crs[0], crs[4]);
+    }
+      
+    printk("cr3: %016lx   cr2: %016lx\n", crs[3], crs[2]);
+    printk("ds: %04x   es: %04x   fs: %04x   gs: %04x   "
+           "ss: %04x   cs: %04x\n",
+           regs->ds, regs->es, regs->fs,
+           regs->gs, regs->ss, regs->cs);
+}
+
+void lcd_show_registers(const struct cpu_user_regs *regs)
+{
+    struct cpu_user_regs fault_regs = *regs;
+    unsigned long fault_crs[8];
+
+    {
+        //fault_crs[0] = read_cr0();
+        //fault_crs[3] = read_cr3();
+        //fault_crs[4] = read_cr4();
+        //fault_regs.ds = read_sreg(ds);
+        //fault_regs.es = read_sreg(es);
+        //fault_regs.fs = read_sreg(fs);
+        //fault_regs.gs = read_sreg(gs);
+    }
+
+    _lcd_show_registers(&fault_regs, fault_crs);
+
+}
+
+void lcd_show_execution_state(const struct cpu_user_regs *regs)
+{
+    lcd_show_registers(regs);
+    //show_stack(regs);
+}
+
+#if 0
+void vcpu_show_execution_state(struct vcpu *v)
+{
+    printk("*** Dumping Dom%d vcpu#%d state: ***\n",
+           v->domain->domain_id, v->vcpu_id);
+
+    if ( v == current )
+    {
+        show_execution_state(guest_cpu_user_regs());
+        return;
+    }
+
+    vcpu_pause(v); /* acceptably dangerous */
+
+    vcpu_show_registers(v);
+    if ( guest_kernel_mode(v, &v->arch.user_regs) )
+        show_guest_stack(v, &v->arch.user_regs);
+
+    vcpu_unpause(v);
+}
+#endif
+
+//static const char *trapstr(unsigned int trapnr)
+//{
+//    static const char * const strings[] = {
+//        "divide error", "debug", "nmi", "bkpt", "overflow", "bounds",
+//        "invalid opcode", "device not available", "double fault",
+//        "coprocessor segment", "invalid tss", "segment not found",
+//        "stack error", "general protection fault", "page fault",
+//        "spurious interrupt", "coprocessor error", "alignment check",
+//        "machine check", "simd error", "virtualisation exception"
+//    };
+//
+//    return trapnr < ARRAY_SIZE(strings) ? strings[trapnr] : "???";
+//}
+
+/*
+ * Local variables:
+ * mode: C
+ * c-file-style: "BSD"
+ * c-basic-offset: 4
+ * tab-width: 4
+ * indent-tabs-mode: nil
+ * End:
+ */

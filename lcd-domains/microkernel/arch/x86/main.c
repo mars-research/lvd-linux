@@ -2250,6 +2250,7 @@ static void dump_lcd_arch(struct lcd_arch *lcd)
 		lcd->regs[LCD_ARCH_REGS_R15]);
 	*/
 
+	lcd_show_execution_state(&lcd->regs);
 	/* printk(KERN_ERR "Dumping Stack Contents...\n"); */
 	/* sp = (unsigned long *) vcpu->regs[VCPU_REGS_RSP]; */
 	/* for (i = 0; i < STACK_DEPTH; i++) */

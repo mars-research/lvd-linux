@@ -43,6 +43,8 @@ static inline void __lcd_arch_warn(char *file, int lineno, char *fmt, ...)
 }
 
 
+
+
 /* LCD ARCH DATA STRUCTURES ---------------------------------------- */
 
 struct lcd_arch_vmcs {
@@ -386,5 +388,13 @@ static inline void lcd_arch_set_syscall_ret(struct lcd_arch *lcd, u64 val)
 {
 	lcd->regs.rax = val;
 }
+
+/* Stack and register state */
+
+void lcd_show_execution_state(const struct cpu_user_regs *regs);
+void lcd_show_registers(const struct cpu_user_regs *regs);
+
+
+
 
 #endif  /* _ASM_X86_LCD_DOMAINS_ARCH_H */

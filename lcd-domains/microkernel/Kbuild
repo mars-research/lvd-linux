@@ -10,6 +10,7 @@ lcd_domains-y += main.o ipc.o cap_types.o
 
 # Arch dependent code
 lcd_domains-y += arch/$(ARCH)/main.o
+lcd_domains-y += arch/$(ARCH)/traps.o
 
 # libcap
 lcd_domains-y += ../libcap.out.microkernel/lib/libcap.a

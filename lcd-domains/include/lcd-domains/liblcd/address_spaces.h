@@ -138,13 +138,25 @@
  * unusable.)
  */
 
-#define LCD_UTCB_SIZE (1UL << 12) /* ......................... 4  KBs   */
-#define LCD_BOOTSTRAP_PAGES_SIZE \
-	(ALIGN(sizeof(struct lcd_boot_info), PAGE_SIZE)) /* .. variable */
-#define LCD_BOOTSTRAP_PAGE_TABLES_SIZE (2 * (1UL << 12)) /* .. 8  KBs   */
-#define LCD_STACK_SIZE (2 * (1UL << 12)) /* .................. 8  KBs   */
-#define LCD_HEAP_SIZE (16UL << 20) /* ........................ 16 MBs   */
-#define LCD_IOREMAP_SIZE (16UL << 20) /* ..................... 16 MBs   */
+/* Sizes. The heap and ioremap are not mapped/backed at boot. */
+
+#define LCD_UTCB_SIZE (1UL << 12) /* ......................... 4  KBs */
+#define LCD_BOOTSTRAP_PAGES_SIZE (2 * (1UL << 12)) /* ........ 8  KBs */
+#define LCD_BOOTSTRAP_PAGE_TABLES_SIZE (2 * (1UL << 12)) /* .. 8  KBs */
+#define LCD_STACK_SIZE (2 * (1UL << 12)) /* .................. 8  KBs */
+#define LCD_HEAP_SIZE (16UL << 20) /* ........................ 16 MBs */
+#define LCD_IOREMAP_SIZE (16UL << 20) /* ..................... 16 MBs */
+
+#if ((LCD_BOOTSTRAP_PAGES_SIZE >> PAGE_SHIFT) & \
+	((LCD_BOOTSTRAP_PAGES_SIZE >> PAGE_SHIFT) - 1))
+#error "LCD Bootstrap pages must be a power-of-two number of pages."
+#endif
+
+#if sizeof(struct lcd_boot_info) > LCD_BOOTSTRAP_PAGES_SIZE
+#error "struct lcd_boot_info won't fit in bootstrap pages. Add more pages."
+#endif
+
+/* Offsets. */
 
 #define LCD_MISC_REGION_OFFSET (1UL << 30)
 #define LCD_UTCB_OFFSET LCD_MISC_REGION_OFFSET

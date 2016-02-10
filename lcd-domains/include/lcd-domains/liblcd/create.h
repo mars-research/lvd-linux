@@ -26,6 +26,7 @@
 #include <linux/list.h>
 #include <libcap.h>
 #include <lcd-domains/types.h>
+#include <lcd-domains/liblcd/boot_info.h>
 
 
 /* LOW-LEVEL CREATE, CONFIG, RUN ---------------------------------------- */
@@ -113,8 +114,6 @@ int lcd_run(cptr_t lcd);
 
 /* HIGHER-LEVEL LCD CREATE FROM KERNEL MODULE ------------------------------ */
 
-struct lcd_boot_info;
-
 /**
  * This context is used during LCD creation / destruction.
  */
@@ -124,37 +123,14 @@ struct lcd_create_ctx {
 	 */
 	char mname[LCD_MODULE_NAME_MAX];
 	/*
-	 * Where to point the program counter to run the module's init
+	 * cptr's to capabilities in *creator's* cspace for
+	 * memory allocated for new LCD
 	 */
-	gva_t init;
+	struct lcd_boot_cptrs creator_cptrs;
 	/*
-	 * List of the module's pages
+	 * Pointer to struct lcd_boot_info pages on host
 	 */
-	struct list_head mpages_list;
-	/*
-	 * Temporary cptr cache for properly setting up the LCD's cspace
-	 */
-	struct cptr_cache *cache;
-	/*
-	 * Pointer to beginning of boot pages
-	 */
-	char *boot_page_base;
-	/*
-	 * Boot mem page infos
-	 */
-	struct list_head boot_mem_list;
-	/*
-	 * Stack page infos
-	 */
-	struct list_head stack_mem_list;
-	/*
-	 * Paging mem page infos
-	 */
-	struct list_head paging_mem_list;
-	/*
-	 * Free mem page infos
-	 */
-	struct list_head free_mem_list;
+	struct lcd_boot_info *lcd_boot_info;
 };
 
 /**
@@ -195,7 +171,7 @@ int lcd_create_module_lcd(char *mdir, char *mname, cptr_t *lcd,
  */
 static inline struct lcd_boot_info * to_boot_info(struct lcd_create_ctx *ctx)
 {
-	return (struct lcd_boot_info *)ctx->boot_page_base;
+	return cxt->lcd_boot_info;
 }
 
 /**

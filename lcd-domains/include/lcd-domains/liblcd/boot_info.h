@@ -12,12 +12,15 @@
 #include <libcap.h>
 #include <lcd-domains/types.h>
 
-struct lcd_boot_info_for_page {
-	cptr_t my_cptr;
-	gpa_t page_gpa;
-};
-
 #define LCD_NUM_BOOT_CPTRS 8
+
+struct lcd_boot_cptrs {
+	cptr_t module_init_cptr;
+	cptr_t module_core_cptr;
+	cptr_t stack_cptr;
+	cptr_t gv_pgd_cptr;
+	cptr_t gv_pud_cptr;
+};
 
 struct lcd_boot_info {
 	/*
@@ -27,11 +30,7 @@ struct lcd_boot_info {
 	/*
 	 * Capabilities to memory objects
 	 */
-	cptr_t module_init_cptr;
-	cptr_t module_core_cptr;
-	cptr_t stack_cptr;
-	cptr_t gv_pgd_cptr;
-	cptr_t gv_pud_cptr;
+	struct lcd_boot_cptrs lcd_boot_cptrs;
 	/*
 	 * Other capabilities (e.g., endpoints)
 	 */

@@ -1,15 +1,9 @@
 /*
- * Simple LCD load test. This just spins in an infinite loop, so
- * whoever boots this code should make sure they kill it after
- * so much time.
+ * LCD BUG() and oops test. This LCD crashes to generate a
+ * kernel oops. 
  *
  * IMPORTANT: This code *does not* expect to be booted so that
  * it can use kmalloc, page alloc, etc.
- *
- * IMPORTANT: This module should be compiled without
- * optimizations (see Makefile in this directory).
- * Otherwise, the loop in foo will be optimized away and
- * we won't fully test the code.
  *
  * You may want to inspect the .ko before running with
  * objdump -d.
@@ -23,6 +17,8 @@
  * .ko elf file with readelf -a.
  */
 
+#include <linux/jiffies.h>
+
 #include <lcd-domains/liblcd-config.h>
 
 #include <linux/module.h>
@@ -32,23 +28,47 @@
 #include <lcd-domains/liblcd-hacks.h>
 
 
-static int foo(int x)
-{
-	while (1)
-		x = 2;
-
-	return x + 5;
-}
 
 static int __noreturn __init test_init(void) 
 {
 	int r;
+
+	register long rax asm ("rax");
+	register long rbx asm ("rbx");
+	register long rcx asm ("rcx");
+	register long rdx asm ("rdx");
+	register long rdi asm ("rdi");
+	register long rsi asm ("rsi");
+	register long r8 asm ("r8");
+	register long r9 asm ("r9");
+	register long r10 asm ("r10");
+	register long r11 asm ("r11");
+	register long r12 asm ("r12");
+	register long r13 asm ("r13");
+	register long r14 asm ("r14");
+	register long r15 asm ("r15");
+
+
 	r = lcd_enter();
 	if (r)
 		goto fail1;
 
-	r = foo(10); /* never returns */
+	rax = 1; 
+	rbx = 2;
+	rcx = 3;
+	rdx = 4;
+	rsi = 5;
+	rdi = 6;
+	r8 = 7;
+	r9 = 8;
+	r10 = 9;
+	r11 = 0xa;
+	r12 = 0xb;
+	r13 = 0xc;
+	r14 = 0xd;
+	r15 = 0xe;
 
+	jiffies_to_clock_t(100000);
 
 fail1:
 	lcd_exit(r);

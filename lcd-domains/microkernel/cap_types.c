@@ -6,6 +6,7 @@
 #include <linux/gfp.h>
 #include <linux/list.h>
 #include <linux/bitops.h>
+#include <linux/slab.h>
 #include <libcap.h>
 #include "internal.h"
 
@@ -21,11 +22,15 @@ struct type_ops_id {
 
 /* REVOCATION CALLBACKS ---------------------------------------- */
 
-static void mem_object_revoke(struct cspace *cspace, struct cnode *cnode,
+static int mem_object_revoke(struct cspace *cspace, struct cnode *cnode,
 			void *object)
 {
 	struct lcd_mapping_metadata *m;
 	struct lcd_memory_object *mo = (struct lcd_memory_object *)object;
+	/*
+	 * Extract metadata
+	 */
+	m = cap_cnode_metadata(cnode);
 	/*
 	 * Unmap memory object
 	 */
@@ -35,39 +40,41 @@ static void mem_object_revoke(struct cspace *cspace, struct cnode *cnode,
 	 */
 	if (m)
 		kfree(m);
+
+	return 0;
 }
 
-static void page_revoke(struct cspace *cspace, struct cnode *cnode,
+static int page_revoke(struct cspace *cspace, struct cnode *cnode,
 			void *object)
 {
-	mem_object_revoke(cspace, cnode, object);
+	return mem_object_revoke(cspace, cnode, object);
 }
 
-static void vmalloc_mem_revoke(struct cspace *cspace, struct cnode *cnode,
+static int vmalloc_mem_revoke(struct cspace *cspace, struct cnode *cnode,
 			void *object)
 {
-	mem_object_revoke(cspace, cnode, object);
+	return mem_object_revoke(cspace, cnode, object);
 }
 
-static void volunteered_page_revoke(struct cspace *cspace, struct cnode *cnode,
+static int volunteered_page_revoke(struct cspace *cspace, struct cnode *cnode,
 				void *object)
 {
-	mem_object_revoke(cspace, cnode, object);
+	return mem_object_revoke(cspace, cnode, object);
 }
 
-static void volunteered_dev_mem_revoke(struct cspace *cspace, 
+static int volunteered_dev_mem_revoke(struct cspace *cspace, 
 				struct cnode *cnode, void *object)
 {
-	mem_object_revoke(cspace, cnode, object);
+	return mem_object_revoke(cspace, cnode, object);
 }
 
-static void volunteered_vmalloc_mem_revoke(struct cspace *cspace, 
+static int volunteered_vmalloc_mem_revoke(struct cspace *cspace, 
 					struct cnode *cnode, void *object)
 {
-	mem_object_revoke(cspace, cnode, object);
+	return mem_object_revoke(cspace, cnode, object);
 }
 
-static void sync_endpoint_revoke(struct cspace *cspace, struct cnode *cnode,
+static int sync_endpoint_revoke(struct cspace *cspace, struct cnode *cnode,
 				void *object)
 {
 	int ret;
@@ -112,26 +119,26 @@ static void sync_endpoint_revoke(struct cspace *cspace, struct cnode *cnode,
 out2:
 	mutex_unlock(&e->lock);
 out1:
-	return;
+	return 0;
 }
 
-static void lcd_revoke(struct cspace *cspace, struct cnode *cnode,
+static int lcd_revoke(struct cspace *cspace, struct cnode *cnode,
 		void *object)
 {
 	/* no-op for now */
-	return;
+	return 0;
 }
 
-static void klcd_revoke(struct cspace *cspace, struct cnode *cnode,
+static int klcd_revoke(struct cspace *cspace, struct cnode *cnode,
 			void *object)
 {
 	/* no-op for now */
-	return;
+	return 0;
 }
 
 /* DELETE CALLBACKS ---------------------------------------- */
 
-static void page_delete(struct cspace *cspace, struct cnode *cnode,
+static int page_delete(struct cspace *cspace, struct cnode *cnode,
 			void *object)
 {
 	struct lcd_memory_object *mo = object;
@@ -148,9 +155,11 @@ static void page_delete(struct cspace *cspace, struct cnode *cnode,
 	 * Free mo, no one else should have a reference.
 	 */
 	kfree(mo);
+
+	return 0;
 }
 
-static void vmalloc_mem_delete(struct cspace *cspace, struct cnode *cnode,
+static int vmalloc_mem_delete(struct cspace *cspace, struct cnode *cnode,
 			void *object)
 {
 	struct lcd_memory_object *mo = object;
@@ -167,9 +176,11 @@ static void vmalloc_mem_delete(struct cspace *cspace, struct cnode *cnode,
 	 * Free mo, no one else should have a reference.
 	 */
 	kfree(mo);
+
+	return 0;
 }
 
-static void volunteered_page_delete(struct cspace *cspace, struct cnode *cnode,
+static int volunteered_page_delete(struct cspace *cspace, struct cnode *cnode,
 				void *object)
 {
 	struct lcd_memory_object *mo = object;
@@ -187,9 +198,11 @@ static void volunteered_page_delete(struct cspace *cspace, struct cnode *cnode,
 	 * struct page).
 	 */
 	kfree(mo);
+
+	return 0;
 }
 
-static void volunteered_dev_mem_delete(struct cspace *cspace, 
+static int volunteered_dev_mem_delete(struct cspace *cspace, 
 				struct cnode *cnode, void *object)
 {
 	struct lcd_memory_object *mo = object;
@@ -207,9 +220,11 @@ static void volunteered_dev_mem_delete(struct cspace *cspace,
 	 * Free the struct memory_object.
 	 */
 	kfree(mo);
+	
+	return 0;
 }
 
-static void volunteered_vmalloc_mem_delete(struct cspace *cspace, 
+static int volunteered_vmalloc_mem_delete(struct cspace *cspace, 
 					struct cnode *cnode, void *object)
 {
 	struct lcd_memory_object *mo = object;
@@ -222,9 +237,11 @@ static void volunteered_vmalloc_mem_delete(struct cspace *cspace,
 	 * responsible for freeing the memory.
 	 */
 	kfree(mo);
+
+	return 0;
 }
 
-static void sync_endpoint_delete(struct cspace *cspace, struct cnode *cnode,
+static int sync_endpoint_delete(struct cspace *cspace, struct cnode *cnode,
 				void *object)
 {
 	/*
@@ -232,18 +249,24 @@ static void sync_endpoint_delete(struct cspace *cspace, struct cnode *cnode,
 	 * be in the queues; destroy endpoint
 	 */
 	__lcd_destroy_sync_endpoint__(object);
+
+	return 0;
 }
 
-static void lcd_delete(struct cspace *cspace, struct cnode *cnode,
+static int lcd_delete(struct cspace *cspace, struct cnode *cnode,
 		void *object)
 {
 	__lcd_destroy(object);
+	
+	return 0;
 }
 
-static void klcd_delete(struct cspace *cspace, struct cnode *cnode,
+static int klcd_delete(struct cspace *cspace, struct cnode *cnode,
 			void *object)
 {
 	__lcd_destroy(object);
+
+	return 0;
 }
 
 /* INTERNAL DATA -------------------------------------------------- */
@@ -319,7 +342,8 @@ inline cap_type_t __lcd_get_libcap_type(enum lcd_microkernel_type_id t_id)
 int __lcd_init_cap_types(void)
 {
 	int ret;
-	cap_type_t type_id;
+	int i;
+	cap_type_t libcap_type;
 	/*
 	 * Alloc and init microkernel type system
 	 */
@@ -328,7 +352,7 @@ int __lcd_init_cap_types(void)
 		LCD_ERR("alloc microkernel type system failed");
 		goto fail1;
 	}
-	ret = cap_type_system_init(lcd_libcap_type_system)
+	ret = cap_type_system_init(lcd_libcap_type_system);
 	if (ret) {
 		LCD_ERR("init microkernel type system failed");
 		goto fail2;

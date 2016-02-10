@@ -3,6 +3,7 @@
 # since we have a kbuild file)
 #
 
+export LCD_DOMAINS_SRC_DIR=$(PWD)
 export LCD_DOMAINS_INCLUDE=$(PWD)/include
 export LCD_DOMAINS_CFLAGS=-Werror \
 			  -I$(LCD_DOMAINS_INCLUDE) \
@@ -13,9 +14,11 @@ export LCD_DOMAINS_CFLAGS=-Werror \
 # Don't print "Entering directory..." etc.
 MAKEFLAGS += --no-print-directory
 
-all: liblcd the_rest
+#all: liblcd the_rest
+all: the_rest
 
-the_rest: liblcd libcap.microkernel
+#the_rest: liblcd libcap.microkernel
+the_rest: libcap.microkernel
 	$(MAKE) -C .. M=$(PWD) -j8
 
 liblcd: libcap.lcd

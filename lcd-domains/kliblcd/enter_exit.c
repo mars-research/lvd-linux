@@ -39,13 +39,13 @@ int lcd_enter(void)
 	/*
 	 * Set up our cptr cache
 	 */
-	ret = cap_cptr_cache_alloc(&cache);
+	ret = cptr_cache_alloc(&cache);
 	if (ret) {
 		LCD_ERR("cptr cache alloc");
 		goto fail2;
 	}
 	current->cptr_cache = cache;
-	ret = cap_cptr_cache_init(cache);
+	ret = cptr_cache_init(cache);
 	if (ret) {
 		LCD_ERR("cptr cache init");
 		goto fail3;
@@ -119,8 +119,8 @@ static void do_destroy_lcd(struct lcd *lcd)
 
 static void do_destroy_cptr_cache(struct cptr_cache *c)
 {
-	cap_cptr_cache_destroy(c);
-	cap_cptr_cache_free(c);
+	cptr_cache_destroy(c);
+	cptr_cache_free(c);
 }
 
 void lcd_exit(int retval)

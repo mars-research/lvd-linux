@@ -483,6 +483,20 @@ int lcd_phys_to_resource_node(gpa_t paddr, struct lcd_resource_node **n);
  */
 int lcd_virt_to_cptr(gva_t vaddr, cptr_t *c_out, unsigned int *order_out);
 
+/* RESOURCE TREES -------------------------------------------------- */
+
+/**
+ * lcd_alloc_init_resource_tree -- Create an empty resource tree
+ * @t_out: out param, the new tree
+ */
+int lcd_alloc_init_resource_tree(struct lcd_resource_tree **t_out);
+
+/**
+ * lcd_destroy_free_resource_tree -- Destroy tree
+ * @t: the tree to destroy
+ */
+void lcd_destroy_free_resource_tree(struct lcd_resource_tree *t);
+
 /* MISCELLANEOUS -------------------------------------------------- */
 
 /**

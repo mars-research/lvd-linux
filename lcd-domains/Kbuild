@@ -11,6 +11,6 @@ KBUILD_CFLAGS := $(KBUILD_CFLAGS) $(LCD_DOMAINS_CFLAGS)
 
 # Dive into subdirs (note that kliblcd is built with microkernel)
 obj-m += microkernel/
-obj-m += tests/
-obj-m += test-mods/
+#obj-m += tests/
+#obj-m += test-mods/
 

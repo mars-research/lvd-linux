@@ -9,6 +9,7 @@
 
 #include <linux/interval_tree.h>
 #include <linux/mutex.h>
+#include <linux/slab.h>
 #include "internal.h"
 
 static struct lcd_mem_itree lcd_physical_mem_itree;
@@ -17,7 +18,7 @@ static struct lcd_mem_itree lcd_vmalloc_mem_itree;
 static int do_mem_itree_insert(struct lcd_mem_itree *tree,
 			struct lcd_memory_object *mo, unsigned int flags)
 {
-	struct lcd_memory_itree_node *n;
+	struct lcd_mem_itree_node *n;
 	/*
 	 * Create a new node
 	 */
@@ -61,6 +62,7 @@ int __lcd_mem_itree_insert(struct lcd_memory_object *mo, unsigned int flags)
 	default:
 		LCD_ERR("unexpected memory object type %d", 
 			mo->sub_type);
+		return -EINVAL;
 	}
 }
 
@@ -75,9 +77,9 @@ static int do_mem_itree_lookup_nolock(struct lcd_mem_itree *tree,
 	 */
 	struct interval_tree_node *match;
 
-	match = interval_tree_first(&tree->root, addr, addr);
+	match = interval_tree_iter_first(&tree->root, addr, addr);
 	if (match) {
-		node_out = container_of(match, struct lcd_mem_itree_node,
+		*node_out = container_of(match, struct lcd_mem_itree_node,
 					it_node);
 		mutex_lock(&(*node_out)->lock);
 		return 0;

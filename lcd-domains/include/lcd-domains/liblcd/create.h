@@ -172,7 +172,7 @@ int lcd_create_module_lcd(char *mdir, char *mname, cptr_t *lcd,
 static inline struct lcd_boot_info * 
 lcd_to_boot_info(struct lcd_create_ctx *ctx)
 {
-	return cxt->lcd_boot_info;
+	return ctx->lcd_boot_info;
 }
 /**
  * lcd_to_boot_cptr_cache -- Extract new LCD's bootstrap cptr cache
@@ -181,7 +181,7 @@ lcd_to_boot_info(struct lcd_create_ctx *ctx)
 static inline struct cptr_cache * 
 lcd_to_boot_cptr_cache(struct lcd_create_ctx *ctx)
 {
-	return cxt->lcd_boot_info->cptr_cache;
+	return &ctx->lcd_boot_info->cptr_cache;
 }
 /**
  * lcd_destroy_create_ctx -- Tear down lcd_create_ctx returned from

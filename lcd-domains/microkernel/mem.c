@@ -5,6 +5,7 @@
  * Copyright: University of Utah
  */
 #include <linux/slab.h>
+#include <linux/mm.h>
 #include "internal.h"
 
 /* MEMORY OBJECT HELPERS -------------------------------------------------- */
@@ -14,7 +15,7 @@ unsigned long __lcd_memory_object_start(struct lcd_memory_object *mo)
 	switch (mo->sub_type) {
 	case LCD_MICROKERNEL_TYPE_ID_PAGE:
 	case LCD_MICROKERNEL_TYPE_ID_VOLUNTEERED_PAGE:
-		return va2hpa(page_address(mo->object));
+		return hpa_val(va2hpa(page_address(mo->object)));
 	case LCD_MICROKERNEL_TYPE_ID_VMALLOC_MEM:
 	case LCD_MICROKERNEL_TYPE_ID_VOLUNTEERED_DEV_MEM:
 	case LCD_MICROKERNEL_TYPE_ID_VOLUNTEERED_VMALLOC_MEM:
@@ -38,7 +39,8 @@ unsigned long __lcd_memory_object_last(struct lcd_memory_object *mo)
 		__lcd_memory_object_size(mo) - 1;
 }
 
-int __lcd_insert_memory_object(struct lcd *caller, void *mem_obj,
+int __lcd_insert_memory_object(struct lcd *caller, cptr_t slot,
+			void *mem_obj,
 			unsigned int order,
 			enum lcd_microkernel_type_id sub_type,
 			struct lcd_memory_object **mo_out)
@@ -46,6 +48,7 @@ int __lcd_insert_memory_object(struct lcd *caller, void *mem_obj,
 	struct lcd_memory_object *mo;
 	struct lcd_mapping_metadata *meta;
 	struct cnode *cnode;
+	int ret;
 	/*
 	 * Set up metadata
 	 */
@@ -142,7 +145,7 @@ int __lcd_alloc_pages_exact_node(struct lcd *caller, cptr_t slot, int nid,
 	/*
 	 * Insert into caller's cspace
 	 */
-	ret = __lcd_insert_memory_object(caller, p, order,
+	ret = __lcd_insert_memory_object(caller, slot, p, order,
 					LCD_MICROKERNEL_TYPE_ID_PAGE,
 					&unused);
 	if (ret) {
@@ -176,7 +179,7 @@ int __lcd_alloc_pages(struct lcd *caller, cptr_t slot,
 	/*
 	 * Insert into caller's cspace
 	 */
-	ret = __lcd_insert_memory_object(caller, p, order,
+	ret = __lcd_insert_memory_object(caller, slot, p, order,
 					LCD_MICROKERNEL_TYPE_ID_PAGE,
 					&unused);
 	if (ret) {
@@ -211,7 +214,7 @@ int __lcd_vmalloc(struct lcd *caller, cptr_t slot, unsigned int order)
 	/*
 	 * Insert into caller's cspace
 	 */
-	ret = __lcd_insert_memory_object(caller, vptr, order,
+	ret = __lcd_insert_memory_object(caller, slot, vptr, order,
 					LCD_MICROKERNEL_TYPE_ID_VMALLOC_MEM,
 					&unused);
 	if (ret) {
@@ -269,7 +272,7 @@ int __lcd_get_memory_object(struct lcd *caller, cptr_t mo_cptr,
 	/*
 	 * Look up and lock cnode containing memory object
 	 */
-	ret = lookup_memory_object(cspace, mo_cptr, cnode);
+	ret = lookup_memory_object(caller->cspace, mo_cptr, cnode);
 	if (ret)
 		goto fail1;
 	*mo_out = cap_cnode_object(*cnode);
@@ -301,15 +304,13 @@ void __lcd_put_memory_object(struct lcd *caller, struct cnode *cnode,
 static int contiguous_memory_object_hpa(struct lcd_memory_object *mo,
 					hpa_t *hpa_base)
 {
-	hpa_t hpa_base;
-
 	switch (mo->sub_type) {
 	case LCD_MICROKERNEL_TYPE_ID_PAGE:
 	case LCD_MICROKERNEL_TYPE_ID_VOLUNTEERED_PAGE:
 		*hpa_base = va2hpa(page_address(mo->object));
 		break;
 	case LCD_MICROKERNEL_TYPE_ID_VOLUNTEERED_DEV_MEM:
-		*hpa_base = hpa_val((unsigned long)mo->object);
+		*hpa_base = __hpa((unsigned long)mo->object);
 		break;
 	default:
 		LCD_ERR("unexpected memory object type: %d\n",
@@ -336,7 +337,7 @@ static int isolated_map_vmalloc_mem(struct lcd *lcd,
 	/*
 	 * Map each page, one at a time
 	 */
-	for (i = 0; i < (1UL << mo->order); i++) {
+	for (i = 0; i < (1UL << vmalloc_mo->order); i++) {
 		hva = hva_add(vmalloc_base, i * PAGE_SIZE);
 		gpa = gpa_add(base, i * PAGE_SIZE);
 		/*
@@ -415,7 +416,6 @@ fail1:
 
 static int isolated_map_memory_object(struct lcd *lcd, 
 				struct lcd_memory_object *mo,
-				struct lcd_mapping_metadata *meta,
 				gpa_t base)
 {
 	/*
@@ -426,10 +426,10 @@ static int isolated_map_memory_object(struct lcd *lcd,
 	case LCD_MICROKERNEL_TYPE_ID_PAGE:
 	case LCD_MICROKERNEL_TYPE_ID_VOLUNTEERED_PAGE:
 	case LCD_MICROKERNEL_TYPE_ID_VOLUNTEERED_DEV_MEM:
-		return isolated_map_contiguous_mem(lcd, mo, meta, base);
+		return isolated_map_contiguous_mem(lcd, mo, base);
 	case LCD_MICROKERNEL_TYPE_ID_VMALLOC_MEM:
 	case LCD_MICROKERNEL_TYPE_ID_VOLUNTEERED_VMALLOC_MEM:
-		return isolated_map_vmalloc_mem(lcd, mo, meta, base);
+		return isolated_map_vmalloc_mem(lcd, mo, base);
 	default:
 		LCD_ERR("unexpected memory object type %d", mo->sub_type);
 		return -EINVAL;
@@ -461,7 +461,7 @@ int __lcd_do_map_memory_object(struct lcd *lcd,
 	 */
 	switch (lcd->type) {
 	case LCD_TYPE_ISOLATED:
-		ret = isolated_map_memory_object(lcd, mo, meta, base);
+		ret = isolated_map_memory_object(lcd, mo, base);
 		break;
 	case LCD_TYPE_NONISOLATED:
 	case LCD_TYPE_TOP:
@@ -501,7 +501,7 @@ int __lcd_map_memory_object(struct lcd *caller, cptr_t mo_cptr, gpa_t base)
 	/*
 	 * Look up memory object and metadata in caller's cspace
 	 */
-	ret = __lcd_get_memory_object(caller->cspace, mo_cptr, &cnode, &mo);
+	ret = __lcd_get_memory_object(caller, mo_cptr, &cnode, &mo);
 	if (ret)
 		goto fail1;
 	meta = cap_cnode_metadata(cnode);
@@ -510,7 +510,7 @@ int __lcd_map_memory_object(struct lcd *caller, cptr_t mo_cptr, gpa_t base)
 	 */
 	ret = __lcd_do_map_memory_object(caller, mo, meta, base);
 	if (ret)
-		goto fail3;
+		goto fail2;
 	/*
 	 * Release cnode, etc.
 	 */
@@ -518,7 +518,6 @@ int __lcd_map_memory_object(struct lcd *caller, cptr_t mo_cptr, gpa_t base)
 
 	return 0;
 
-fail3:
 fail2:
 	__lcd_put_memory_object(caller, cnode, mo);
 fail1:
@@ -548,6 +547,7 @@ static void isolated_unmap_contiguous_mem(struct lcd *lcd,
 					struct lcd_memory_object *mo,
 					struct lcd_mapping_metadata *meta)
 {
+	int ret;
 	/*
 	 * Unmap memory object
 	 */
@@ -576,7 +576,7 @@ static void isolated_unmap_memory_object(struct lcd *lcd,
 		return isolated_unmap_vmalloc_mem(lcd, mo, meta);
 	default:
 		LCD_ERR("unexpected memory object type %d", mo->sub_type);
-		return -EINVAL;
+		return;
 	}
 }
 
@@ -590,20 +590,20 @@ void __lcd_do_unmap_memory_object(struct lcd *caller,
 	if (!meta) {
 		LCD_DEBUG(LCD_DEBUG_MSG,
 			"lookup before meta set?");
-		goto out;
+		return;
 	}
 	if (!meta->is_mapped) {
 		LCD_DEBUG(LCD_DEBUG_MSG,
 			"memory object not mapped");
-		goto out;
+		return;
 	}
 	/*
 	 * We need to handle unmapping differently depending on
 	 * the LCD type (isolated vs non-isolated)
 	 */
-	switch (lcd->type) {
+	switch (caller->type) {
 	case LCD_TYPE_ISOLATED:
-		ret = isolated_unmap_memory_object(lcd, mo, meta);
+		isolated_unmap_memory_object(caller, mo, meta);
 		break;
 	case LCD_TYPE_NONISOLATED:
 	case LCD_TYPE_TOP:
@@ -612,47 +612,34 @@ void __lcd_do_unmap_memory_object(struct lcd *caller,
 		 * physical is available to non-isolated code. Recall that
 		 * this function is about unmapping in physical, not virtual.)
 		 */
-		ret = 0;
-		goto out;
+		return;
 	default:
-		LCD_ERR("unrecognized lcd type %d", lcd->type);
-		ret = -EINVAL;
-		break;
+		LCD_ERR("unrecognized lcd type %d", caller->type);
+		return;
 	}
-	if (ret)
-		goto out;
 	/*
 	 * Mark memory object as not mapped
 	 */
 	meta->is_mapped = 0;
-
-	ret = 0;
-	goto out;
-
-out:
-	return ret;
 }
 
 void __lcd_unmap_memory_object(struct lcd *caller, cptr_t mo_cptr)
 {
 	int ret;
-	gpa_t gpa;
 	struct lcd_memory_object *mo;
 	struct lcd_mapping_metadata *meta;
 	struct cnode *cnode;
 	/*
 	 * Look up memory object in caller's cspace
 	 */
-	ret = __lcd_get_memory_object(caller->cspace, mo_cptr, &cnode, &mo);
+	ret = __lcd_get_memory_object(caller, mo_cptr, &cnode, &mo);
 	if (ret)
 		goto fail1;
 	meta = cap_cnode_metadata(cnode);
 	/*
 	 * Do the unmap
 	 */
-	ret = __lcd_do_unmap_memory_object(caller, mo, meta);
-	if (ret)
-		goto fail2;
+	__lcd_do_unmap_memory_object(caller, mo, meta);
 	/*
 	 * Release cnode, etc.
 	 */
@@ -660,8 +647,6 @@ void __lcd_unmap_memory_object(struct lcd *caller, cptr_t mo_cptr)
 
 	return;
 
-fail2:
-	__lcd_put_memory_object(caller, cnode, mo);
 fail1:
 	return;
 }

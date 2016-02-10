@@ -6,6 +6,7 @@
 
 #include <libcap.h>
 #include <lcd-domains/liblcd.h>
+#include "../microkernel/internal.h"
 
 struct lcd_utcb *lcd_get_utcb(void)
 {
@@ -62,6 +63,6 @@ int lcd_sync_call(cptr_t endpoint)
 
 int lcd_sync_reply(void)
 {
-	return __lcd_reply(current->lcd, endpoint);
+	return __lcd_reply(current->lcd);
 }
 

@@ -6,6 +6,7 @@
 
 #include <libcap.h>
 #include <lcd-domains/liblcd.h>
+#include "../microkernel/internal.h"
 
 void lcd_cap_delete(cptr_t slot)
 {

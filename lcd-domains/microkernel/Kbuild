@@ -6,7 +6,15 @@
 obj-m += lcd_domains.o
 
 # Arch independent code
-lcd_domains-y += main.o ipc.o cap_types.o
+lcd_domains-y += \
+	      cap_types.o \
+	      console.o \
+	      create.o \
+	      ipc.o \
+	      main.o \
+	      mem.o \
+	      mem_itree.o \
+	      run.o
 
 # Arch dependent code
 lcd_domains-y += arch/$(ARCH)/main.o
@@ -16,15 +24,18 @@ lcd_domains-y += arch/$(ARCH)/traps.o
 lcd_domains-y += ../libcap.out.microkernel/lib/libcap.a
 
 # add libcap headers to include path
-ccflags-y += -I../libcap.out.microkernel/include
+ccflags-y += -I$(LCD_DOMAINS_SRC_DIR)/libcap.out.microkernel/include
 
 # kliblcd
-lcd_domains-y += $(addprefix ../kliblcd/, init.o \
-					  mem.o \
-                                          ipc.o \
-					  enterexit.o \
-                                          create.o \
-					  cap.o \
-                                      	  cptr_cache.o \
-				      	  dstore.o \
-				      	  create_klcd.o)
+lcd_domains-y += $(addprefix ../kliblcd/, \
+	      boot_info.o \
+	      cap.o \
+	      console.o \
+	      create.o \
+	      enter_exit.o \
+	      mem.o \
+	      module_create_klcd.o \
+	      module_load.o \
+	      sync_ipc.o \
+	      )
+

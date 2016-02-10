@@ -27,6 +27,8 @@
 #include <linux/module.h>
 #include <linux/kernel.h>
 
+#include "../../internal.h"
+
 
 /* VMX DATA STRUCTURES -------------------------------------------------- */
 

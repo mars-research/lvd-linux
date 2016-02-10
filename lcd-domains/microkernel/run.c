@@ -47,7 +47,9 @@ static int handle_syscall_cap_delete(struct lcd *lcd)
 	/*
 	 * Delete from lcd's cspace
 	 */
-	return cap_delete(lcd->cspace, object);
+	cap_delete(lcd->cspace, object);
+
+	return 0;
 }
 
 static int handle_syscall_munmap(struct lcd *lcd)
@@ -60,7 +62,9 @@ static int handle_syscall_munmap(struct lcd *lcd)
 	/*
 	 * Do unmap
 	 */
-	return __lcd_unmap_memory_object(caller, mem_object);
+	__lcd_unmap_memory_object(lcd, mem_object);
+	
+	return 0;
 }
 
 static int handle_syscall_mmap(struct lcd *lcd)
@@ -76,7 +80,7 @@ static int handle_syscall_mmap(struct lcd *lcd)
 	/*
 	 * Do map
 	 */
-	return __lcd_map_memory_object(caller, mem_object, base);
+	return __lcd_map_memory_object(lcd, mem_object, base);
 }
 
 static int handle_syscall_pages_alloc(struct lcd *lcd)
@@ -176,7 +180,6 @@ static int handle_syscall_putchar(struct lcd *lcd)
 
 static int handle_syscall_exit(struct lcd *lcd, int *lcd_ret)
 {
-	unsigned long arg0;
 	/*
 	 * LCD's exit value in arg0
 	 */
@@ -187,7 +190,6 @@ static int handle_syscall_exit(struct lcd *lcd, int *lcd_ret)
 static int handle_syscall(struct lcd *lcd, int *lcd_ret)
 {
 	int syscall_id;
-	cptr_t endpoint;
 	int ret;
 	
 	syscall_id = lcd_arch_get_syscall_num(lcd->lcd_arch);

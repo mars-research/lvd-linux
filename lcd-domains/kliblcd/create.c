@@ -1050,7 +1050,7 @@ static int gv_map(cptr_t lcd, struct create_module_cxt *cxt,
  * Note! Call lcd_mm_gva_init before mapping any gva's.
  */
 
-#include <liblcd.h>
+#include <libcap.h>
 #include <lcd-domains/liblcd.h>
 #include "../microkernel/internal.h"
 
@@ -1106,7 +1106,7 @@ int lcd_create_klcd(cptr_t *klcd)
 		goto fail2;
 	}
 
-	*lcd = slot;
+	*klcd = slot;
 
 	return 0;
 
@@ -1123,7 +1123,7 @@ int lcd_config_registers(cptr_t lcd, gva_t pc, gva_t sp, gpa_t gva_root,
 }
 
 int lcd_memory_grant_and_map(cptr_t lcd, cptr_t mo, cptr_t dest_slot,
-			gpa_t base);
+			gpa_t base)
 {
 	return __lcd_memory_grant_and_map(current->lcd, lcd, mo,
 					dest_slot, base);

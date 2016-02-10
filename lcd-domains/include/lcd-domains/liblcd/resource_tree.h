@@ -11,9 +11,11 @@
  *
  * Copyright: University of Utah
  */
+#ifndef LCD_DOMAINS_RESOURCE_TREE_H
+#define LCD_DOMAINS_RESOURCE_TREE_H
 
 #include <libcap.h>
-#include <linux/rb_tree.h>
+#include <linux/rbtree.h>
 #include <linux/interval_tree.h>
 
 /**
@@ -164,3 +166,5 @@ lcd_resource_tree_next(struct lcd_resource_node *n);
  */
 void lcd_resource_tree_remove(struct lcd_resource_tree *t,
 			struct lcd_resource_node *n);
+
+#endif /* LCD_DOMAINS_RESOURCE_TREE_H */

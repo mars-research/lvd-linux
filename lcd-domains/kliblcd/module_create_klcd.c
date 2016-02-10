@@ -7,6 +7,7 @@
  */
 
 #include <lcd-domains/liblcd.h>
+#include "../microkernel/internal.h"
 #include "internal.h"
 
 int lcd_create_module_klcd(char *mdir, char *mname, cptr_t *klcd_out)
@@ -36,11 +37,11 @@ int lcd_create_module_klcd(char *mdir, char *mname, cptr_t *klcd_out)
 	 * We pass null values for most arguments, as these aren't
 	 * used for kLCDs.
 	 */
-	ret = lcd_config(klcd,
-			__gva(hva_val(va2hva(m->init))), 
-			__gva(0),
-			__gpa(0),
-			__gpa(0));
+	ret = lcd_config_registers(klcd,
+				__gva(hva_val(va2hva(m->init))), 
+				__gva(0),
+				__gpa(0),
+				__gpa(0));
 	if (ret) {
 		LCD_ERR("failed to config klcd");
 		goto fail3;

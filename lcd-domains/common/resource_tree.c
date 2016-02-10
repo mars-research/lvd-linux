@@ -42,7 +42,7 @@ int lcd_resource_tree_search(struct lcd_resource_tree *t,
 	 */
 	struct interval_tree_node *match;
 
-	match = interval_tree_first(&t->root, addr, addr);
+	match = interval_tree_iter_first(&t->root, addr, addr);
 	if (match) {
 		n_out = container_of(match, struct lcd_resource_node,
 				it_node);

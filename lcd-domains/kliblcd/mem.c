@@ -4,6 +4,8 @@
  * Copyright: University of Utah
  */
 
+#include <linux/slab.h>
+#include <linux/mm.h>
 #include <libcap.h>
 #include <lcd-domains/liblcd.h>
 #include "../microkernel/internal.h"
@@ -134,7 +136,7 @@ static int mo_insert_in_trees(struct task_struct *t,
 	case LCD_MICROKERNEL_TYPE_ID_VMALLOC_MEM:
 	case LCD_MICROKERNEL_TYPE_ID_VOLUNTEERED_VMALLOC_MEM:
 		return mo_insert_in_tree(
-			t->lcd_resource_trees[LCD_RESOURCE_TREE_VMALLOC_MEM_IDX],
+			t->lcd_resource_trees[LCD_RESOURCE_TREE_VMALLOC_IDX],
 			mo,
 			mo_cptr);
 	default:
@@ -171,7 +173,7 @@ static int mo_in_trees(struct task_struct *t, struct lcd_memory_object *mo)
 	case LCD_MICROKERNEL_TYPE_ID_VMALLOC_MEM:
 	case LCD_MICROKERNEL_TYPE_ID_VOLUNTEERED_VMALLOC_MEM:
 		return mo_in_tree(
-			t->lcd_resource_trees[LCD_RESOURCE_TREE_VMALLOC_MEM_IDX],
+			t->lcd_resource_trees[LCD_RESOURCE_TREE_VMALLOC_IDX],
 			mo);
 	default:
 		LCD_ERR("unexpected memory object type %d",
@@ -208,17 +210,17 @@ static void mo_remove_from_trees(struct task_struct *t,
 	switch (mo->sub_type) {
 	case LCD_MICROKERNEL_TYPE_ID_PAGE:
 	case LCD_MICROKERNEL_TYPE_ID_VOLUNTEERED_PAGE:
-		return mo_remove_from_tree(
+		mo_remove_from_tree(
 			t->lcd_resource_trees[LCD_RESOURCE_TREE_RAM_IDX],
 			mo);
 	case LCD_MICROKERNEL_TYPE_ID_VOLUNTEERED_DEV_MEM:
-		return mo_remove_from_tree(
+		mo_remove_from_tree(
 			t->lcd_resource_trees[LCD_RESOURCE_TREE_DEV_MEM_IDX],
 			mo);
 	case LCD_MICROKERNEL_TYPE_ID_VMALLOC_MEM:
 	case LCD_MICROKERNEL_TYPE_ID_VOLUNTEERED_VMALLOC_MEM:
-		return mo_remove_from_tree(
-			t->lcd_resource_trees[LCD_RESOURCE_TREE_VMALLOC_MEM_IDX],
+		mo_remove_from_tree(
+			t->lcd_resource_trees[LCD_RESOURCE_TREE_VMALLOC_IDX],
 			mo);
 	default:
 		LCD_ERR("unexpected memory object type %d",
@@ -298,7 +300,6 @@ int _lcd_vmalloc(unsigned int order, cptr_t *slot_out)
 	struct lcd *lcd = current->lcd;
 	cptr_t slot;
 	int ret;
-	unsigned int order;
 	/*
 	 * Allocate a slot in caller's cspace
 	 */
@@ -327,8 +328,8 @@ fail1:
 
 /* LOW-LEVEL MAP -------------------------------------------------- */
 
-int __lcd_mmap(struct lcd *lcd, struct lcd_memory_object *mo, 
-	cptr_t mo_cptr, gpa_t base)
+static int __lcd_mmap(struct lcd *lcd, struct lcd_memory_object *mo, 
+		struct cnode *cnode, cptr_t mo_cptr, gpa_t base)
 {
 	int ret;
 	/*
@@ -351,8 +352,8 @@ int __lcd_mmap(struct lcd *lcd, struct lcd_memory_object *mo,
 	 * "Map" in physical address space (this is a no-op for
 	 * non-isolated code right now)
 	 */
-	ret = __lcd_mem_object_map(lcd, mo, cap_cnode_metadata(cnode),
-				__gpa(0));
+	ret = __lcd_do_map_memory_object(lcd, mo, cap_cnode_metadata(cnode),
+					__gpa(0));
 	if (ret) {
 		LIBLCD_ERR("physical map failed");
 		goto fail3;
@@ -367,7 +368,7 @@ fail1:
 	return ret;
 }
 
-int _lcd_mmap(cptr_t mo, gpa_t base)
+int _lcd_mmap(cptr_t mo_cptr, gpa_t base)
 {
 	struct lcd_memory_object *mo;
 	struct cnode *cnode;
@@ -379,7 +380,7 @@ int _lcd_mmap(cptr_t mo, gpa_t base)
 	 *	
 	 * Get and lock the memory object
 	 */
-	ret = __lcd_get_memory_object(current->lcd, mo,	&cnode, &mo);
+	ret = __lcd_get_memory_object(current->lcd, mo_cptr, &cnode, &mo);
 	if (ret) {
 		LIBLCD_ERR("error looking up memory object");
 		goto fail1;
@@ -387,7 +388,7 @@ int _lcd_mmap(cptr_t mo, gpa_t base)
 	/*
 	 * Do the map
 	 */
-	ret = __lcd_mmap(lcd, mo, mo_cptr, base);
+	ret = __lcd_mmap(current->lcd, mo, cnode, mo_cptr, base);
 	if (ret) {
 		LIBLCD_ERR("error mapping mem object");
 		goto fail2;
@@ -405,8 +406,8 @@ fail1:
 	return ret;
 }
 
-void __lcd_munmap(struct lcd *lcd, struct lcd_memory_object *mo,
-		struct cnode *mo_cnode)
+static void __lcd_munmap(struct lcd *lcd, struct lcd_memory_object *mo,
+			struct cnode *mo_cnode)
 {
 	/*
 	 * Remove from resource trees
@@ -416,8 +417,8 @@ void __lcd_munmap(struct lcd *lcd, struct lcd_memory_object *mo,
 	 * "Unmap" from physical address space (this is a no-op for
 	 * non-isolated code right now)
 	 */
-	__lcd_mem_object_unmap(current->lcd, mo,
-			cap_cnode_metadata(cnode));
+	__lcd_do_unmap_memory_object(current->lcd, mo,
+				cap_cnode_metadata(mo_cnode));
 }
 
 void _lcd_munmap(cptr_t mo_cptr)
@@ -580,7 +581,6 @@ void* lcd_vmalloc(unsigned long sz)
 {
 	struct lcd *lcd = current->lcd;
 	unsigned int order;
-	unsigned int log_sz;
 	int ret;
 	cptr_t slot;
 	struct lcd_memory_object *mo;
@@ -635,7 +635,6 @@ void lcd_vfree(void *vptr)
 {
 	cptr_t vmalloc_mem_cptr;
 	int ret;
-	gpa_t gpa;
 	unsigned int unused;
 	/*
 	 * Resolve vptr to cptr
@@ -662,6 +661,8 @@ int lcd_map_phys(cptr_t pages, unsigned int order, gpa_t *base_out)
 {
 	int ret;
 	struct page *p;
+	struct cnode *cnode;
+	struct lcd_memory_object *mo;
 	/*
 	 * Ignore order, etc., since non-isolated code already has
 	 * access to all physical memory. (We could maybe check that
@@ -670,7 +671,7 @@ int lcd_map_phys(cptr_t pages, unsigned int order, gpa_t *base_out)
 	 * Look up memory object so we can get struct page pointer,
 	 * and then translate to physical address
 	 */
-	ret = __lcd_get_memory_object(current->lcd, slot, &cnode, &mo);
+	ret = __lcd_get_memory_object(current->lcd, pages, &cnode, &mo);
 	if (ret) {
 		LIBLCD_ERR("internal error: mem lookup failed");
 		goto fail1;
@@ -678,7 +679,7 @@ int lcd_map_phys(cptr_t pages, unsigned int order, gpa_t *base_out)
 	/*
 	 * "Map" the pages (adds pages to proper resource tree)
 	 */
-	ret = __lcd_mmap(current->lcd, mo, cnode, __gpa(0));
+	ret = __lcd_mmap(current->lcd, mo, cnode, pages, __gpa(0));
 	if (ret) {
 		LIBLCD_ERR("error mapping pages in resource tree");
 		goto fail2;
@@ -841,7 +842,8 @@ static int volunteer_mem_obj(struct task_struct *t,
 		LIBLCD_ERR("cptr alloc failed");
 		goto fail2;
 	}
-	ret = __lcd_insert_memory_object(t->lcd, base, order, sub_type, &mo);
+	ret = __lcd_insert_memory_object(t->lcd, slot, mem_obj,
+					order, sub_type, &mo);
 	if (ret) {
 		LIBLCD_ERR("error inserting new memory object");
 		goto fail3;
@@ -855,7 +857,7 @@ static int volunteer_mem_obj(struct task_struct *t,
 	*slot_out = slot;
 
 fail3:
-	lcd_free_cptr(slot);
+	lcd_cptr_free(slot);
 fail2:
 fail1:
 	return ret;
@@ -878,8 +880,8 @@ int lcd_volunteer_pages(struct page *base, unsigned int order,
 			cptr_t *slot_out)
 {
 	return volunteer_mem_obj(current, base,
-				page_pfn(base), order,
-				LCD_MICROKERNEL_TYPE_ID_PAGE,
+				page_to_pfn(base), order,
+				LCD_MICROKERNEL_TYPE_ID_VOLUNTEERED_PAGE,
 				slot_out);
 }
 
@@ -895,7 +897,7 @@ int lcd_volunteer_dev_mem(gpa_t base, unsigned int order,
 {
 	return volunteer_mem_obj(current, (void *)gpa_val(base),
 				gpa_val(base), order,
-				LCD_MICROKERNEL_TYPE_ID_DEV_MEM,
+				LCD_MICROKERNEL_TYPE_ID_VOLUNTEERED_DEV_MEM,
 				slot_out);
 }
 
@@ -911,7 +913,7 @@ int lcd_volunteer_vmalloc_mem(gva_t base, unsigned int order,
 {
 	return volunteer_mem_obj(current, (void *)gva_val(base),
 				gva_val(base), order,
-				LCD_MICROKERNEL_TYPE_ID_VMALLOC_MEM,
+				LCD_MICROKERNEL_TYPE_ID_VOLUNTEERED_VMALLOC_MEM,
 				slot_out);
 }
 
@@ -943,7 +945,7 @@ int lcd_phys_to_cptr(gpa_t paddr, cptr_t *c_out, unsigned int *order_out)
 	 * Pull out memory object cptr and order
 	 */
 	*c_out = n->cptr;
-	*order_out = n->order;
+	*order_out = n->nr_pages_order;
 
 	return 0;
 
@@ -955,6 +957,7 @@ int lcd_virt_to_cptr(gva_t vaddr, cptr_t *c_out, unsigned int *order_out)
 {
 	gpa_t gpa;
 	struct lcd_resource_node *n;
+	int ret;
 	/*
 	 * Look in vmalloc tree first
 	 */
@@ -976,7 +979,7 @@ int lcd_virt_to_cptr(gva_t vaddr, cptr_t *c_out, unsigned int *order_out)
 	 * Pull out memory object cptr and order
 	 */
 	*c_out = n->cptr;
-	*order_out = n->order;
+	*order_out = n->nr_pages_order;
 
 	return 0;
 }

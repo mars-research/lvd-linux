@@ -6,7 +6,9 @@
  * Copyright: University of Utah
  */
 
+#include <linux/slab.h>
 #include <lcd-domains/liblcd.h>
+#include "../microkernel/internal.h"
 
 /* HOST LOAD/UNLOAD -------------------------------------------------- */
 

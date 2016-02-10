@@ -12,6 +12,7 @@
 #include <linux/sched.h>
 #include <linux/types.h>
 #include <linux/spinlock.h>
+#include <linux/interval_tree.h>
 
 #include <asm/lcd-domains.h>
 #include <lcd-domains/types.h>
@@ -232,6 +233,10 @@ static inline hva_t va2hva(void *va)
 static inline hpa_t hva2hpa(hva_t hva)
 {
 	return (hpa_t){ (unsigned long)__pa(hva2va(hva)) };
+}
+static inline hva_t pa2hva(unsigned long pa)
+{
+	return hpa2hva(pa2hpa(pa));
 }
 
 /* --------------------------------------------------
@@ -472,6 +477,7 @@ unsigned long __lcd_memory_object_last(struct lcd_memory_object *mo);
  * __lcd_insert_memory_object -- Insert memory object into LCD's cspace, and
  *                               into the global memory interval tree
  * @caller: the LCD in whose cspace we should insert the capability 
+ * @slot: where to insert new capability
  * @mem_obj: the memory object (struct page*, unsigned long for dev mem, etc.)
  * @order: mem_obj is 2^order pages
  * @sub_type: the microkernel type id for memory object
@@ -486,7 +492,8 @@ unsigned long __lcd_memory_object_last(struct lcd_memory_object *mo);
  *    2 - struct lcd memory object removal from global memory interval
  *        tree and delete the struct itself -- during cap delete
  */
-int __lcd_insert_memory_object(struct lcd *caller, void *mem_obj,
+int __lcd_insert_memory_object(struct lcd *caller, 
+			cptr_t slot, void *mem_obj,
 			unsigned int order,
 			enum lcd_microkernel_type_id sub_type,
 			struct lcd_memory_object **mo_out);
@@ -607,14 +614,14 @@ int __lcd_grant_memory_object(struct lcd *src, struct lcd *dest,
  * Initializes global data structures etc. used in the memory management
  * code.
  */
-int __lcd_mem_init(void)
+int __lcd_mem_init(void);
 
 /**
  * __lcd_mem_exit -- Call this when the microkernel is exiting
  *
  * Tears down memory management internals.
  */
-void __lcd_mem_exit(void)
+void __lcd_mem_exit(void);
 
 /* --------------------------------------------------
  * GLOBAL MEMORY INTERVAL TREE
@@ -756,7 +763,7 @@ void __lcd_run_exit(void);
  * If the LCD's buffer fills up, or if @c = '\0', the LCD's buffer
  * is dumped to the host kernel logs.
  */
-int __lcd_put_char(struct lcd *lcd, char c)
+int __lcd_put_char(struct lcd *lcd, char c);
 
 /**
  * __lcd_console_init -- Invoke when microkernel initializes
@@ -766,7 +773,7 @@ int __lcd_console_init(void);
 /**
  * __lcd_console_exit -- Invoke when microkernel exits
  */
-void __lcd_console_exit(void)
+void __lcd_console_exit(void);
 
 /*
  * --------------------------------------------------

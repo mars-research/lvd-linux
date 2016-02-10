@@ -59,7 +59,7 @@ int __lcd_create_sync_endpoint(struct lcd *caller, cptr_t slot)
 	/*
 	 * Insert into caller's cspace
 	 */
-	ret = cap_insert(&caller->cspace, slot, e,
+	ret = cap_insert(caller->cspace, slot, e,
 			__lcd_get_libcap_type(
 				LCD_MICROKERNEL_TYPE_ID_SYNC_EP));
 	if (ret) {
@@ -70,7 +70,7 @@ int __lcd_create_sync_endpoint(struct lcd *caller, cptr_t slot)
 	return 0;
 
 fail2:
-	__lcd_destroy_sync_endpoint(e);
+	__lcd_destroy_sync_endpoint__(e);
 fail1:
 	return ret;
 }
@@ -112,10 +112,10 @@ int __lcd_get_sync_endpoint(struct lcd *caller, cptr_t sync_ep_cptr,
 	/*
 	 * Look up and lock cnode containing endpoint
 	 */
-	ret = lookup_ep(cspace, endpoint, cnode);
+	ret = lookup_ep(caller->cspace, sync_ep_cptr, cnode);
 	if (ret)
 		goto fail1;
-	*e = cap_cnode_object(cnode);
+	*e = cap_cnode_object(*cnode);
 	/*
 	 * Lock endpoint struct
 	 */
@@ -139,7 +139,7 @@ void __lcd_put_sync_endpoint(struct lcd *caller, struct cnode *cnode,
 	/*
 	 * Unlock endpoint
 	 */
-	mutex_unlock(&ep->lock);
+	mutex_unlock(&e->lock);
 	/*
 	 * Release cnode
 	 */
@@ -318,7 +318,7 @@ static void debug_dump_utcb(struct lcd *lcd)
 	
 	/* General regs */
 	for (i = 0; i < LCD_NUM_REGS; i++) {
-		printk("  mr[%d] = %llx\n", i,
+		printk("  mr[%d] = %lx\n", i,
 			lcd->utcb->mr[i]);
 	}
 
@@ -446,7 +446,7 @@ int __lcd_send(struct lcd *caller, cptr_t endpoint)
 	return 0;
 
 fail2:
-	__lcd_put_sync_endpoint(caller, &cnode, &ep);
+	__lcd_put_sync_endpoint(caller, cnode, ep);
 fail1:
 	return ret;
 }
@@ -612,7 +612,8 @@ int __lcd_reply(struct lcd *caller)
 				&cnode, &ep);
 	if (ret) {
 		LCD_DEBUG(LCD_DEBUG_ERR,
-			"ep lookup failed for cptr 0x%lx", cptr_val(endpoint));
+			"ep lookup failed for cptr 0x%lx", 
+			cptr_val(LCD_CPTR_REPLY_ENDPOINT));
 		goto fail1;
 	}
 	/* do_send does put on ep; we're doing a reply */

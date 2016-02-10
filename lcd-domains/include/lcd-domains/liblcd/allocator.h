@@ -65,6 +65,7 @@ struct lcd_page_block {
  *
  * See lcd_page_allocator_create for more details.
  */
+struct lcd_page_allocator;
 struct lcd_page_allocator_cbs {
 
 	int (*alloc_map_metadata_memory_chunk)(

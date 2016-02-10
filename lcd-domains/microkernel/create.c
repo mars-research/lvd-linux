@@ -139,7 +139,7 @@ int __lcd_create(struct lcd *caller, cptr_t slot)
 	/*
 	 * Put in caller's cspace
 	 */
-	ret = cap_insert(&caller->cspace, slot, 
+	ret = cap_insert(caller->cspace, slot, 
 			lcd,
 			__lcd_get_libcap_type(LCD_MICROKERNEL_TYPE_ID_LCD));
 	if (ret) {
@@ -178,8 +178,9 @@ int __lcd_create_klcd(struct lcd *caller, cptr_t slot)
 	/*
 	 * Put in caller's cspace
 	 */
-	ret = __lcd_cap_insert(&caller->cspace, slot, lcd, 
-			LCD_CAP_TYPE_KLCD);
+	ret = cap_insert(caller->cspace, slot, 
+			lcd,
+			__lcd_get_libcap_type(LCD_MICROKERNEL_TYPE_ID_LCD));
 	if (ret) {
 		LCD_ERR("insert");
 		goto fail2;
@@ -291,7 +292,9 @@ static int config_lcd(struct lcd *caller, struct lcd *lcd_struct,
 	 * Map utcb page in guest physical
 	 */
 	utcb_page_addr = va2hva(lcd_struct->utcb);
-	ret = __lcd_map(lcd_struct, utcb_page, hva2hpa(utcb_page_addr));
+	ret = lcd_arch_ept_map(lcd_struct->lcd_arch, utcb_page, 
+			hva2hpa(utcb_page_addr),
+			1, 0);
 	if (ret) {
 		LCD_ERR("map");
 		goto fail2;
@@ -308,7 +311,7 @@ static int config_lcd(struct lcd *caller, struct lcd *lcd_struct,
 	return 0;
 
 fail3:
-	__lcd_unmap(lcd_struct, utcb_page);
+	lcd_arch_ept_unmap(lcd_struct->lcd_arch, utcb_page);
 fail2:
 fail1:
 	return ret;
@@ -340,7 +343,7 @@ int __lcd_config(struct lcd *caller, cptr_t lcd, gva_t pc, gva_t sp,
 	/*
 	 * Look up and lock
 	 */
-	ret = __lcd_get(caller->cspace, lcd, &cnode, &lcd_struct);
+	ret = __lcd_get(caller, lcd, &cnode, &lcd_struct);
 	if (ret)
 		goto fail1;
 	/*
@@ -349,12 +352,12 @@ int __lcd_config(struct lcd *caller, cptr_t lcd, gva_t pc, gva_t sp,
 	switch (lcd_struct->type) {
 
 	case LCD_TYPE_ISOLATED:
-		ret = __lcd_config_lcd(caller, lcd_struct, pc, sp, gva_root, 
+		ret = config_lcd(caller, lcd_struct, pc, sp, gva_root, 
 				utcb_page);
 		break;
 	case LCD_TYPE_NONISOLATED:
-		ret = __lcd_config_klcd(caller, lcd_struct, pc, sp, gva_root, 
-					utcb_page);
+		ret = config_klcd(caller, lcd_struct, pc, sp, gva_root, 
+				utcb_page);
 		break;
 	default:
 		/* shouldn't happen */
@@ -390,9 +393,7 @@ int __lcd_memory_grant_and_map(struct lcd *caller, cptr_t lcd,
 			cptr_t mo_cptr, cptr_t dest_slot, gpa_t base)
 {
 	struct lcd *lcd_struct;
-	struct lcd_memory_object *mo;
 	struct cnode *lcd_cnode;
-	struct cnode *mo_cnode;
 	int ret;
 	/*
 	 * Look up and lock lcd
@@ -412,7 +413,8 @@ int __lcd_memory_grant_and_map(struct lcd *caller, cptr_t lcd,
 	/*
 	 * Grant lcd a capability to memory object
 	 */
-	ret = __lcd_grant_memory_object(caller, lcd, mo_cptr, dest_slot);
+	ret = __lcd_grant_memory_object(caller, lcd_struct, 
+					mo_cptr, dest_slot);
 	if (ret)
 		goto fail2;
 	/*
@@ -423,7 +425,7 @@ int __lcd_memory_grant_and_map(struct lcd *caller, cptr_t lcd,
 	 * together, I'll keep things more sane and understandable,
 	 * separated.)
 	 */
-	ret = __lcd_map_memory_object(lcd, dest_slot, base);
+	ret = __lcd_map_memory_object(lcd_struct, dest_slot, base);
 	if (ret)
 		goto fail3;
 	/*
@@ -434,9 +436,9 @@ int __lcd_memory_grant_and_map(struct lcd *caller, cptr_t lcd,
 	return 0;
 
 fail3:
-	cap_delete(lcd->cspace, dest_cptr);
+	cap_delete(lcd_struct->cspace, dest_slot);
 fail2:
-	__lcd_put(lcd_cnode, lcd_struct);
+	__lcd_put(caller, lcd_cnode, lcd_struct);
 fail1:
 	return ret;
 }
@@ -464,7 +466,7 @@ int __lcd_cap_grant(struct lcd *caller, cptr_t lcd, cptr_t src, cptr_t dest)
 	/*
 	 * Grant lcd the capability
 	 */
-	ret = cap_grant(caller->cspace, src, lcd->cspace, dest);
+	ret = cap_grant(caller->cspace, src, lcd_struct->cspace, dest);
 	if (ret)
 		goto fail2;
 	/*
@@ -475,7 +477,7 @@ int __lcd_cap_grant(struct lcd *caller, cptr_t lcd, cptr_t src, cptr_t dest)
 	return 0;
 
 fail2:
-	__lcd_put(lcd_cnode, lcd_struct);
+	__lcd_put(caller, lcd_cnode, lcd_struct);
 fail1:
 	return ret;
 }
@@ -545,7 +547,6 @@ void __lcd_destroy_no_vm_no_thread(struct lcd *lcd)
 
 void __lcd_destroy_no_vm(struct lcd *lcd)
 {
-	int ret;
 	/*
 	 * ORDER IS IMPORTANT:
 	 *

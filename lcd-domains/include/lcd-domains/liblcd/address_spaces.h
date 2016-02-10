@@ -147,23 +147,26 @@
 #define LCD_HEAP_SIZE (16UL << 20) /* ........................ 16 MBs */
 #define LCD_IOREMAP_SIZE (16UL << 20) /* ..................... 16 MBs */
 
-#if ((LCD_BOOTSTRAP_PAGES_SIZE >> PAGE_SHIFT) & \
-	((LCD_BOOTSTRAP_PAGES_SIZE >> PAGE_SHIFT) - 1))
-#error "LCD Bootstrap pages must be a power-of-two number of pages."
-#endif
+static inline void
+__lcd_build_checks__(void)
+{
+	/* 
+	 * This function is for build checks only. (We can't put
+	 * build bug on's in the top level.)
+	 */
 
-#if sizeof(struct lcd_boot_info) > LCD_BOOTSTRAP_PAGES_SIZE
-#error "struct lcd_boot_info won't fit in bootstrap pages. Add more pages."
-#endif
+	/* LCD Bootstrap pages must be a power-of-two number of pages */
+	BUILD_BUG_ON_NOT_POWER_OF_2(LCD_BOOTSTRAP_PAGES_SIZE >> PAGE_SHIFT);
 
-#if (LCD_BOOTSTRAP_PAGE_TABLES_SIZE >> PAGE_SHIFT != 2)
-#error "We need exactly two page tables for the gv address space."
-#endif
+	/* lcd_boot_info won't fit in bootstrap pages. Add more pages. */
+	BUILD_BUG_ON(sizeof(struct lcd_boot_info) > LCD_BOOTSTRAP_PAGES_SIZE);
 
-#if ((LCD_STACK_SIZE >> PAGE_SHIFT) & \
-	((LCD_STACK_SIZE >> PAGE_SHIFT) - 1))
-#error "Number of LCD stack pages needs to be a power-of-two multiple."
-#endif
+	/* We need exactly two page tables for the gv address space. */
+	BUILD_BUG_ON(LCD_BOOTSTRAP_PAGE_TABLES_SIZE >> PAGE_SHIFT != 2);
+	
+	/* Number of LCD stack pages needs to be a power-of-two multiple. */
+	BUILD_BUG_ON_NOT_POWER_OF_2(LCD_STACK_SIZE >> PAGE_SHIFT);
+}
 
 /* Orders (for convenience) */
 

@@ -7,6 +7,13 @@
  * Copyright: University of Utah
  */
 
+#include <lcd_config/pre_hook.h>
+
+#include <libcap.h>
+#include <lcd-domains/liblcd.h>
+
+#include <lcd_config/post_hook.h>
+
 static int do_grant_and_map_for_mem(cptr_t lcd, struct lcd_create_ctx *ctx,
 				void *mem, gpa_t map_base,
 				cptr_t *dest)

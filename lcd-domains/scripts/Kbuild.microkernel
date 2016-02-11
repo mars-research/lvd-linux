@@ -1,0 +1,49 @@
+#
+# Kernel build file for microkernel
+#
+
+# Paths are all relative to the microkernel build dir.
+
+# Main target (lcd_domains.ko)
+obj-m += lcd_domains.o
+
+# Arch independent code
+lcd_domains-y += $(addprefix microkernel/, \
+	      cap_types.o \
+	      console.o \
+	      create.o \
+	      ipc.o \
+	      main.o \
+	      mem.o \
+	      mem_itree.o \
+	      run.o \
+              )
+
+# Arch dependent code
+lcd_domains-y += $(addprefix arch/$(ARCH)/microkernel,
+              main.o \
+              )
+
+# kliblcd (built into microkernel .ko)
+lcd_domains-y += $(addprefix kliblcd/, \
+	      boot_info.o \
+	      cap.o \
+	      console.o \
+	      create.o \
+	      enter_exit.o \
+	      mem.o \
+	      module_create_klcd.o \
+	      module_load.o \
+	      sync_ipc.o \
+	      )
+
+# libcap (microkernel and kliblcd share libcap. We get away with this
+# because this build of libcap does not use global cap types.)
+lcd_domains-y += libcap.install/lib/libcap.a
+
+# Extra includes
+ccflags-y += \
+          -I$(LCD_DOMAINS_TOP_SRC_DIR)/include \
+          -I$(LCD_DOMAINS_TOP_SRC_DIR)/arch/$(ARCH)/include \
+          -I$(MICROKERNEL_BUILD_DIR)/libcap.install/include \
+          -I$(LCD_DOMAINS_TOP_SRC_DIR)/config/non_isolated

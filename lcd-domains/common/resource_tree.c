@@ -7,11 +7,15 @@
  * Copyright: University of Utah
  */
 
+#include <lcd_config/pre_hook.h>
+
 #include <linux/slab.h>
 #include <linux/interval_tree.h>
 #include <linux/rb_tree.h>
 #include <libcap.h>
 #include <lcd-domains/liblcd.h>
+
+#include <lcd_config/post_hook.h>
 
 int lcd_resource_tree_init(struct lcd_resource_tree *t)
 {

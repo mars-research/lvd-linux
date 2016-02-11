@@ -6,9 +6,9 @@
  * will run in "LCD mode".
  */
 
-#include <lcd-domains/liblcd.h>
-#include "../microkernel/internal.h"
-#include "internal.h"
+#include <liblcd/liblcd.h>
+#include <lcd_domains/microkernel.h>
+#include <lcd_domains/kliblcd.h>
 
 int lcd_create_module_klcd(char *mdir, char *mname, cptr_t *klcd_out)
 {

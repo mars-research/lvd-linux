@@ -8,7 +8,7 @@
 #include <linux/bitops.h>
 #include <linux/slab.h>
 #include <libcap.h>
-#include "internal.h"
+#include <lcd_domains/microkernel.h>
 
 struct cap_type_system *lcd_libcap_type_system;
 

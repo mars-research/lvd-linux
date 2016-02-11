@@ -1051,8 +1051,8 @@ static int gv_map(cptr_t lcd, struct create_module_cxt *cxt,
  */
 
 #include <libcap.h>
-#include <lcd-domains/liblcd.h>
-#include "../microkernel/internal.h"
+#include <liblcd/liblcd.h>
+#include <lcd_domains/microkernel.h>
 
 int lcd_create(cptr_t *lcd)
 {

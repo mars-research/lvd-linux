@@ -17,9 +17,9 @@
 #include <asm/pgtable.h>
 #include <linux/sysrq.h>
 
-#include <lcd-domains/types.h>
-#include <uapi/lcd-domains.h>
-#include "internal.h"
+#include <lcd_domains/types.h>
+#include <uapi/lcd_domains.h>
+#include <lcd_domains/microkernel.h>
 
 MODULE_LICENSE("GPL");
 MODULE_DESCRIPTION("LCD driver");

@@ -5,7 +5,7 @@
  */
 
 #include <linux/printk.h>
-#include "internal.h"
+#include <lcd_domains/microkernel.h>
 
 int __lcd_put_char(struct lcd *lcd, char c)
 {

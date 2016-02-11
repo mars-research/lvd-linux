@@ -13,7 +13,7 @@
 #include <linux/interval_tree.h>
 #include <linux/rb_tree.h>
 #include <libcap.h>
-#include <lcd-domains/liblcd.h>
+#include <liblcd/liblcd.h>
 
 #include <lcd_config/post_hook.h>
 

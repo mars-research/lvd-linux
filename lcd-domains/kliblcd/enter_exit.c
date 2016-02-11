@@ -5,8 +5,8 @@
  */
 
 #include <libcap.h>
-#include <lcd-domains/liblcd.h>
-#include "../microkernel/internal.h"
+#include <liblcd/liblcd.h>
+#include <lcd_domains/microkernel.h>
 
 int lcd_enter(void)
 {

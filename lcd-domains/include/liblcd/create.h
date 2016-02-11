@@ -25,8 +25,8 @@
 
 #include <linux/list.h>
 #include <libcap.h>
-#include <lcd-domains/types.h>
-#include <lcd-domains/liblcd/boot_info.h>
+#include <lcd_domains/types.h>
+#include <liblcd/boot_info.h>
 
 
 /* LOW-LEVEL CREATE, CONFIG, RUN ---------------------------------------- */

@@ -10,7 +10,7 @@
 #define LCD_DOMAINS_BOOTINFO_H
 
 #include <libcap.h>
-#include <lcd-domains/types.h>
+#include <lcd_domains/types.h>
 
 #define LCD_NUM_BOOT_CPTRS 8
 

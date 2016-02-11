@@ -9,8 +9,8 @@
 #ifndef LCD_DOMAINS_ADDRESS_SPACES_H
 #define LCD_DOMAINS_ADDRESS_SPACES_H
 
-#include <lcd-domains/types.h>
-#include <lcd-domains/liblcd/boot_info.h>
+#include <lcd_domains/types.h>
+#include <liblcd/boot_info.h>
 
 /*
  * Guest Physical Memory Layout

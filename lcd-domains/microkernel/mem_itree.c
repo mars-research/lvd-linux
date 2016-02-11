@@ -10,7 +10,7 @@
 #include <linux/interval_tree.h>
 #include <linux/mutex.h>
 #include <linux/slab.h>
-#include "internal.h"
+#include <lcd_domains/microkernel.h>
 
 static struct lcd_mem_itree lcd_physical_mem_itree;
 static struct lcd_mem_itree lcd_vmalloc_mem_itree;

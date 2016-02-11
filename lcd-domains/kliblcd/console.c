@@ -5,7 +5,7 @@
  */
 
 #include <linux/printk.h>
-#include <lcd-domains/liblcd.h>
+#include <liblcd/liblcd.h>
 
 void lcd_printk(char *fmt, ...)
 {

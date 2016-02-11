@@ -14,7 +14,7 @@
 #include <asm/vmx.h>
 #include <uapi/asm/vmx.h>
 #include <asm/desc.h>
-#include <asm/lcd-domains.h>
+#include <asm/lcd_domains/main.h>
 
 #include <linux/bitmap.h>
 #include <linux/spinlock.h>
@@ -27,7 +27,7 @@
 #include <linux/module.h>
 #include <linux/kernel.h>
 
-#include "../../internal.h"
+#include <lcd_domains/microkernel.h>
 
 
 /* VMX DATA STRUCTURES -------------------------------------------------- */

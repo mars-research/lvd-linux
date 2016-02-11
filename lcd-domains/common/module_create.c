@@ -10,7 +10,7 @@
 #include <lcd_config/pre_hook.h>
 
 #include <libcap.h>
-#include <lcd-domains/liblcd.h>
+#include <liblcd/liblcd.h>
 
 #include <lcd_config/post_hook.h>
 

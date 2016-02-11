@@ -7,7 +7,7 @@
 #include <linux/slab.h>
 #include <linux/sched.h>
 #include <linux/kthread.h>
-#include "internal.h"
+#include <lcd_domains/microkernel.h>
 
 /* SYSCALL HANDLERS -------------------------------------------------- */
 

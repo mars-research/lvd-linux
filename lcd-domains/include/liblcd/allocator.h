@@ -28,7 +28,7 @@
  */
 
 #include <linux/list.h>
-#include <lcd-domains/liblcd/resource_tree.h>
+#include <liblcd/resource_tree.h>
 
 /* STRUCT DEFS -------------------------------------------------- */
 

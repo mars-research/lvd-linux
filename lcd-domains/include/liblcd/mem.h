@@ -16,7 +16,7 @@
 
 #include <linux/mm_types.h>
 #include <libcap.h>
-#include <lcd-domains/types.h>
+#include <lcd_domains/types.h>
 
 /* LOW-LEVEL PAGE ALLOC -------------------------------------------------- */
 

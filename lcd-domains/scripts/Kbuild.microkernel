@@ -4,6 +4,11 @@
 
 # Paths are all relative to the microkernel build dir.
 
+# This single line of magic makes it so we can do an out of src tree
+# build. It has to do with how and where this Kbuild file is included
+# in the kernel build system.
+src = $(LCD_DOMAINS_TOP_SRC_DIR)
+
 # Main target (lcd_domains.ko)
 obj-m += lcd_domains.o
 
@@ -20,7 +25,7 @@ lcd_domains-y += $(addprefix microkernel/, \
               )
 
 # Arch dependent code
-lcd_domains-y += $(addprefix arch/$(ARCH)/microkernel,
+lcd_domains-y += $(addprefix arch/$(ARCH)/microkernel/, \
               main.o \
               )
 

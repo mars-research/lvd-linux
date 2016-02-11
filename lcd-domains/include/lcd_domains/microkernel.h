@@ -14,10 +14,10 @@
 #include <linux/spinlock.h>
 #include <linux/interval_tree.h>
 
-#include <asm/lcd-domains.h>
-#include <lcd-domains/types.h>
-#include <lcd-domains/liblcd/sync_ipc.h>
-#include <lcd-domains/liblcd/syscall.h>
+#include <asm/lcd_domains/main.h>
+#include <lcd_domains/types.h>
+#include <liblcd/sync_ipc.h>
+#include <liblcd/syscall.h>
 
 /* --------------------------------------------------
  * DEBUG

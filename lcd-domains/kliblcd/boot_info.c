@@ -4,7 +4,7 @@
  * Copyright: University of Utah
  */
 
-#include <lcd-domains/liblcd.h>
+#include <liblcd/liblcd.h>
 
 struct lcd_boot_info * lcd_get_boot_info(void)
 {

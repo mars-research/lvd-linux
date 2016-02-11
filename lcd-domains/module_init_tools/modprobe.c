@@ -43,7 +43,7 @@
 #include <syslog.h>
 
 /* for lcd init module */
-#include "../include/uapi/lcd-domains.h"
+#include "../include/uapi/lcd_domains.h"
 #include <sys/ioctl.h>
 
 #include "util.h"

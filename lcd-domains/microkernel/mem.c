@@ -6,7 +6,7 @@
  */
 #include <linux/slab.h>
 #include <linux/mm.h>
-#include "internal.h"
+#include <lcd_domains/microkernel.h>
 
 /* MEMORY OBJECT HELPERS -------------------------------------------------- */
 

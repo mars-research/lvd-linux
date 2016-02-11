@@ -31,23 +31,25 @@ MICROKERNEL_BUILD_DIRS=$(foreach dir,$(MICROKERNEL_DIRS),\
 
 microkernel: libcap.microkernel $(MICROKERNEL_BUILD_DIR)/Kbuild | \
 	$(MICROKERNEL_BUILD_DIRS)
-	$(MAKE) -C .. M=$(PWD)/$(MICROKERNEL_BUILD_DIR) -j8
+	$(MAKE) -C .. M=$(MICROKERNEL_BUILD_DIR) -j8
 
 libcap.microkernel: $(MICROKERNEL_BUILD_DIR)/libcap.build/Makefile \
 	| $(MICROKERNEL_BUILD_DIRS)
 	$(MAKE) -C $(MICROKERNEL_BUILD_DIR)/libcap.build && \
 	$(MAKE) -C $(MICROKERNEL_BUILD_DIR)/libcap.build install
 
-$(MICROKERNEL_BUILD_DIR)/libcap.build/Makefile: libcap/configure
+$(MICROKERNEL_BUILD_DIR)/libcap.build/Makefile: libcap/configure | \
+	$(MICROKERNEL_BUILD_DIRS)
 	cd $(MICROKERNEL_BUILD_DIR)/libcap.build && \
-	$(LCD_DOMAINS_TOP_SRC_DIR)/libcap/configure && \
+	$(LCD_DOMAINS_TOP_SRC_DIR)/libcap/configure \
 	PLATFORM=kernel --disable-test-build \
 	--disable-global-cap-types \
 	--with-kernel-headers=$(LCD_DOMAINS_TOP_SRC_DIR)/.. \
 	--disable-kernel-module \
 	--prefix=$(MICROKERNEL_BUILD_DIR)/libcap.install
 
-$(MICROKERNEL_BUILD_DIR)/Kbuild: $(MICROKERNEL_BUILD_DIRS)
+$(MICROKERNEL_BUILD_DIR)/Kbuild: scripts/Kbuild.microkernel | \
+	$(MICROKERNEL_BUILD_DIRS)
 	cp scripts/Kbuild.microkernel $(MICROKERNEL_BUILD_DIR)/Kbuild
 
 $(MICROKERNEL_BUILD_DIRS):

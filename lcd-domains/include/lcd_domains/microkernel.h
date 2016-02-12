@@ -26,6 +26,9 @@
 
 #define LCD_DEBUG_LVL 1
 
+/* Controls debug msg output for microkernel's libcap */
+#define LCD_LIBCAP_DEBUG_LVL 0
+
 #define LCD_ERR(msg...) __lcd_err(__FILE__, __LINE__, msg)
 static inline void __lcd_err(char *file, int lineno, char *fmt, ...)
 {

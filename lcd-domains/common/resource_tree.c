@@ -11,7 +11,7 @@
 
 #include <linux/slab.h>
 #include <linux/interval_tree.h>
-#include <linux/rb_tree.h>
+#include <linux/rbtree.h>
 #include <libcap.h>
 #include <liblcd/liblcd.h>
 
@@ -48,7 +48,7 @@ int lcd_resource_tree_search(struct lcd_resource_tree *t,
 
 	match = interval_tree_iter_first(&t->root, addr, addr);
 	if (match) {
-		n_out = container_of(match, struct lcd_resource_node,
+		*n_out = container_of(match, struct lcd_resource_node,
 				it_node);
 		return 0;
 	} else {

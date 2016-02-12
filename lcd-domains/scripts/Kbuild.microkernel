@@ -42,6 +42,12 @@ lcd_domains-y += $(addprefix kliblcd/, \
 	      sync_ipc.o \
 	      )
 
+# code shared by kliblcd and isolated liblcd
+lcd_domains-y += $(addprefix common/, \
+	      resource_tree.o \
+	      module_create.o \
+	      )
+
 # libcap (microkernel and kliblcd share libcap. We get away with this
 # because this build of libcap does not use global cap types.)
 lcd_domains-y += libcap.install/lib/libcap.a

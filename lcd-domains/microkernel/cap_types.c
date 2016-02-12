@@ -12,6 +12,10 @@
 
 struct cap_type_system *lcd_libcap_type_system;
 
+/* CAP DEBUGGING -------------------------------------------------- */
+
+int cap_debug_level = LCD_LIBCAP_DEBUG_LVL;
+
 /* ------------------------------------------------------------ */
 
 /* struct for internal use to store all information about a type. */

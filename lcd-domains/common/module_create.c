@@ -9,6 +9,8 @@
 
 #include <lcd_config/pre_hook.h>
 
+#include <linux/slab.h>
+#include <linux/mm.h>
 #include <libcap.h>
 #include <liblcd/liblcd.h>
 
@@ -60,6 +62,7 @@ static int do_kernel_module_grant_map(cptr_t lcd, struct lcd_create_ctx *ctx,
 {
 	unsigned long offset;
 	cptr_t *c;
+	int ret;
 	/*
 	 * Map module init and core at correct offsets
 	 */
@@ -102,7 +105,7 @@ static int setup_phys_addr_space(cptr_t lcd, struct lcd_create_ctx *ctx,
 	if (ret)
 		goto fail1;
 	c = &(lcd_to_boot_info(ctx)->lcd_boot_cptrs.gv);
-	ret = do_grant_and_map_for_mem(lcd, ctx, ctx->pgd,
+	ret = do_grant_and_map_for_mem(lcd, ctx, ctx->gv_pgd,
 				LCD_BOOTSTRAP_PAGE_TABLES_GP_ADDR, c);
 	if (ret)
 		goto fail2;
@@ -137,8 +140,8 @@ static void setup_lcd_pud(struct lcd_create_ctx *ctx)
 	 */
 	unsigned int i;
 	unsigned int ioremap_offset = LCD_IOREMAP_REGION_OFFSET >> 30;
-	unsigned int after_ioremap_offset = ioremap_offset +
-		LCD_IOREMAP_REGION_SIZE >> 30;
+	unsigned int after_ioremap_offset = (ioremap_offset +
+					LCD_IOREMAP_REGION_SIZE) >> 30;
 	pteval_t wb_flags = _PAGE_PRESENT | _PAGE_RW | _PAGE_PSE;
 	pteval_t uc_flags = _PAGE_PRESENT | _PAGE_RW | _PAGE_PSE | _PAGE_PWT;
 	pud_t *pud_entry;
@@ -146,25 +149,25 @@ static void setup_lcd_pud(struct lcd_create_ctx *ctx)
 	 * Map first GBs as write back
 	 */
 	for (i = 0; i < ioremap_offset; i++) {
-		pud_entry = &ctx->pud[i];
+		pud_entry = &ctx->gv_pud[i];
 		set_pud(pud_entry,
-			(LCD_PHYS_BASE + i * (1UL << 30)) | wb_flags)
+			__pud((LCD_PHYS_BASE + i * (1UL << 30)) | wb_flags));
 	}
 	/*
 	 * Map ioremap GBs as uncacheable
 	 */
 	for (i = ioremap_offset; i < after_ioremap_offset; i++) {
-		pud_entry = &ctx->pud[i];
+		pud_entry = &ctx->gv_pud[i];
 		set_pud(pud_entry,
-			(LCD_PHYS_BASE + i * (1UL << 30)) | uc_flags)
+			__pud((LCD_PHYS_BASE + i * (1UL << 30)) | uc_flags));
 	}
 	/*
 	 * Map remaining GBs as write back
 	 */
 	for (i = after_ioremap_offset; i < 512; i++) {
-		pud_entry = &ctx->pud[i];
+		pud_entry = &ctx->gv_pud[i];
 		set_pud(pud_entry,
-			(LCD_PHYS_BASE + i * (1UL << 30)) | wb_flags)
+			__pud((LCD_PHYS_BASE + i * (1UL << 30)) | wb_flags));
 	}
 }
 
@@ -174,7 +177,7 @@ static void setup_lcd_pgd(struct lcd_create_ctx *ctx)
 	gpa_t pud_gpa;
 	pteval_t flags = 0;
 
-	pgd_entry = &ctx->pgd[511]; /* only map last pud for high 512 GBs */
+	pgd_entry = &ctx->gv_pgd[511]; /* only map last pud for high 512 GBs */
 
 	/* pud comes after pgd */
 	pud_gpa = gpa_add(LCD_BOOTSTRAP_PAGE_TABLES_GP_ADDR, PAGE_SIZE);
@@ -183,7 +186,7 @@ static void setup_lcd_pgd(struct lcd_create_ctx *ctx)
 	flags |= _PAGE_RW;
 
 	set_pgd(pgd_entry,
-		__pgd(gpa_val(pud_gpa) | flags))
+		__pgd(gpa_val(pud_gpa) | flags));
 }
 
 static void setup_virt_addr_space(struct lcd_create_ctx *ctx)
@@ -208,7 +211,7 @@ static int setup_addr_spaces(cptr_t lcd, struct lcd_create_ctx *ctx,
 	 * Set up physical address space (except UTCB - that's done
 	 * via lcd_config)
 	 */
-	ret = setup_phys_addr_space(lcd, cxt, m_init_link_addr, 
+	ret = setup_phys_addr_space(lcd, ctx, m_init_link_addr, 
 				m_core_link_addr);
 	if (ret) {
 		LIBLCD_ERR("error setting up phys addr space");
@@ -217,7 +220,7 @@ static int setup_addr_spaces(cptr_t lcd, struct lcd_create_ctx *ctx,
 	/*
 	 * Set up virtual address space
 	 */
-	setup_virt_addr_space(cxt);
+	setup_virt_addr_space(ctx);
 
 	return 0;
 
@@ -228,6 +231,7 @@ fail1: /* just return non-zero ret; caller will free mem */
 static int init_create_ctx(struct lcd_create_ctx **ctx_out, char *mname)
 {
 	struct lcd_create_ctx *ctx;
+	int ret;
 	/*
 	 * Alloc ctx
 	 */
@@ -256,15 +260,15 @@ static void destroy_create_ctx(struct lcd_create_ctx *ctx)
 	 * pages will be freed by microkernel.
 	 */
 	if (ctx->m_init_bits)
-		lcd_module_release(ctx->m_init_bits, ctx->m_core_bits);
+		lcd_release_module(ctx->m_init_bits, ctx->m_core_bits);
 	if (ctx->stack)
-		lcd_free_pages(lcd_virt_to_page(ctx->stack),
+		lcd_free_pages(lcd_virt_to_head_page(ctx->stack),
 			LCD_STACK_ORDER);
 	if (ctx->gv_pgd)
-		lcd_free_pages(lcd_virt_to_page(ctx->gv_pgd),
+		lcd_free_pages(lcd_virt_to_head_page(ctx->gv_pgd),
 			LCD_BOOTSTRAP_PAGE_TABLES_ORDER);
 	if (ctx->lcd_boot_info)
-		lcd_free_pages(lcd_virt_to_page(ctx->lcd_boot_info),
+		lcd_free_pages(lcd_virt_to_head_page(ctx->lcd_boot_info),
 			LCD_BOOTSTRAP_PAGES_ORDER);
 	/*
 	 * Free the ctx
@@ -275,6 +279,7 @@ static void destroy_create_ctx(struct lcd_create_ctx *ctx)
 static int get_pages_for_lcd(struct lcd_create_ctx *ctx)
 {
 	struct page *p1, *p2, *p3;
+	int ret;
 	/*
 	 * We explicity zero things out. If this code is used inside
 	 * an LCD, it may not zero out the alloc'd pages.
@@ -301,7 +306,7 @@ static int get_pages_for_lcd(struct lcd_create_ctx *ctx)
 	 * Alloc boot page tables
 	 */
 	p2 = lcd_alloc_pages(0, LCD_BOOTSTRAP_PAGE_TABLES_ORDER);
-	if (!p) {
+	if (!p2) {
 		LIBLCD_ERR("alloc boot page tables failed");
 		ret = -ENOMEM;
 		goto fail3;
@@ -360,7 +365,7 @@ int lcd_create_module_lcd(char *mdir, char *mname, cptr_t *lcd_out,
 	/*
 	 * Load kernel module into caller's address space
 	 */
-	ret = lcd_module_load(mdir, mname,
+	ret = lcd_load_module(mdir, mname,
 			&ctx->m_init_bits, &ctx->m_core_bits,
 			&m_init_cptr, &m_core_cptr,
 			&m_init_link_addr, &m_core_link_addr);
@@ -382,7 +387,7 @@ int lcd_create_module_lcd(char *mdir, char *mname, cptr_t *lcd_out,
 	/*
 	 * Set up address spaces
 	 */
-	ret = setup_addr_spaces(lcd, cxt, m_init_link_addr, 
+	ret = setup_addr_spaces(lcd, ctx, m_init_link_addr, 
 				m_core_link_addr);
 	if (ret) {
 		LIBLCD_ERR("error setting up address spaces");
@@ -395,7 +400,7 @@ int lcd_create_module_lcd(char *mdir, char *mname, cptr_t *lcd_out,
 				/* implicity put a null return address */
 				gva_add(LCD_STACK_GV_ADDR,
 					LCD_STACK_SIZE - sizeof(void *)),
-				LCD_BOOTSTRAP_PAGE_TABLES_GV_ADDR,
+				LCD_BOOTSTRAP_PAGE_TABLES_GP_ADDR,
 				LCD_UTCB_GP_ADDR);
 	if (ret) {
 		LIBLCD_ERR("error configuring LCDs registers");
@@ -405,7 +410,7 @@ int lcd_create_module_lcd(char *mdir, char *mname, cptr_t *lcd_out,
 	/*
 	 * Return context and lcd
 	 */
-	*cxt_out = cxt;
+	*ctx_out = ctx;
 	*lcd_out = lcd;
 
 	return 0;

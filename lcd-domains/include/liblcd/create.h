@@ -127,7 +127,7 @@ struct lcd_create_ctx {
 	 */
 	struct lcd_boot_info *lcd_boot_info;
 	pgd_t *gv_pgd;
-	pgd_t *gv_pud;
+	pud_t *gv_pud;
 	void *stack;
 	void *m_init_bits;
 	void *m_core_bits;

@@ -1,5 +1,3 @@
 *Module.symvers
-libcap.build.lcd
-libcap.build.microkernel
-libcap.out.lcd
-libcap.out.microkernel
+microkernel_build
+

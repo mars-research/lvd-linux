@@ -197,7 +197,7 @@ obj-$(CONFIG_PERCPU_TEST) += percpu_test.o
 # Always include interval tree (for LCD Domains)
 obj-y += interval_tree.o
 
-interval_tree_test-objs := interval_tree_test_main.o
+interval_tree_test-objs := interval_tree_test_main.o interval_tree.o
 
 obj-$(CONFIG_ASN1) += asn1_decoder.o
 

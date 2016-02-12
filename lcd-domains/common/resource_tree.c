@@ -10,12 +10,27 @@
 #include <lcd_config/pre_hook.h>
 
 #include <linux/slab.h>
-#include <linux/interval_tree.h>
 #include <linux/rbtree.h>
+#include <linux/interval_tree.h>
+#include <linux/interval_tree_generic.h>
 #include <libcap.h>
 #include <liblcd/liblcd.h>
 
 #include <lcd_config/post_hook.h>
+
+/*
+ * Interval tree functions are not exported (in lib/interval_tree.c), 
+ * so we just make our own (this is necessary for liblcd anyway).
+ */
+
+#define START(node) ((node)->start)
+#define LAST(node)  ((node)->last)
+
+INTERVAL_TREE_DEFINE(struct interval_tree_node, rb,
+		     unsigned long, __subtree_last,
+		     START, LAST,, interval_tree)
+
+/* RESOURCE TREES -------------------------------------------------- */ 
 
 int lcd_resource_tree_init(struct lcd_resource_tree *t)
 {

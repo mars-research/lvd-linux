@@ -65,7 +65,7 @@ libcap/configure:
 # clean
 
 clean: 
-	$(MAKE) -C .. M=$(PWD)/$(MICROKERNEL_BUILD_DIR) clean
+	$(MAKE) -C .. M=$(MICROKERNEL_BUILD_DIR) clean
 	if test -d $(MICROKERNEL_BUILD_DIR)/libcap.build; then \
 		$(MAKE) -C $(MICROKERNEL_BUILD_DIR)/libcap.build clean; \
 	fi

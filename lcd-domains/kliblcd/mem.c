@@ -1006,6 +1006,6 @@ void *lcd_page_address(const struct page *page)
 
 void lcd_free_memcg_kmem_pages(unsigned long addr, unsigned int order)
 {
-	/* Non-isolated code probably won't ever call this. */
-	free_memcg_kmem_pages(addr, order);
+	/* Non-isolated code probably should never call this. */
+	BUG();
 }

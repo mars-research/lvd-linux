@@ -9,15 +9,9 @@
 #include <lcd_config/pre_hook.h>
 
 #include <linux/kernel.h> /* for vsnprintf */
+#include <asm/lcd_domains/liblcd.h>
 
 #include <lcd_config/post_hook.h>
-
-static lcd_sys_put_char(char c)
-{
-	
-	lcd_set_debug_reg(c);
-	return LCD_DO_SYSCALL(LCD_SYSCALL_PUTCHAR);
-}
 
 void lcd_printk(char *fmt, ...)
 {
@@ -34,9 +28,9 @@ void lcd_printk(char *fmt, ...)
 	 * Write char by char
 	 */
 	for (p = buf; *p; p++)
-		lcd_put_char(*p);
+		lcd_syscall_putchar(*p);
 	/*
 	 * Write null char
 	 */
-	lcd_put_char(0);
+	lcd_syscall_putchar(0);
 }

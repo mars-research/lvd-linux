@@ -130,39 +130,17 @@ CCSTCompoundStatement* caller_body(Rpc *r)
 	statements.push_back(alloc_init_containers_driver(p, pt, r->current_scope(), "caller"));
       }
     }
-
-
-  // marshal parameters.
-
-  // if function pointer pass reference to container
-  // which will be a parameter.... so don't need to check... thank god
-  /*
+  
+  // marshal_parameters
   std::vector<Variable*> marshal_params = r->marshal_parameters;
+  printf("going to loop through marshal params\n");
   for(std::vector<Variable*>::iterator it = marshal_params.begin(); it != marshal_params.end(); it ++) {
-    Variable *mp = *it;
-    if (mp->type()->num() == 4) { // is a projection and we need to pass a reference.
-      ProjectionType *pt = dynamic_cast<ProjectionType*>(mp->type());
-      Assert(pt != 0x0, "Error: dynamic cast to projection failed!\n");
-      
-      std::vector<ProjectionField*> pt_fields = pt->fields();
-      for(std::vector<ProjectionField*>::iterator it2 = pt_fields.begin(); it2 != pt_fields.end(); it2 ++) {
-	ProjectionField *pf = *it2;
-	if (pf->in()) { // marshal this field
-	  
-	  std::vector<CCSTAssignExpr*> register_args;
-	  register_args.push_back(access(pf)); // pass field marked in.
-	  statements.push_back(function_call(access_register_mapping(pf->marshal_info()->get_register())
-					     , register_args));
-	}
-      }
-    } else {
-      std::vector<CCSTAssignExpr*> register_args;
-      register_args.push_back(access(mp));
-      statements.push_back(function_call(access_register_mapping(mp->marshal_info()->get_register())
-								 , register_args));
-    }
+    Variable *v = *it;
+    printf("calling marshal variable for var %s\n", v->identifier());
+    statements.push_back(marshal_variable(v));    
   }
-  */
+
+  // marshal_variable(variable);
 
   return new CCSTCompoundStatement(declarations, statements);
   

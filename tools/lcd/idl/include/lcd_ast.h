@@ -470,10 +470,10 @@ class Rpc : public Base
   std::vector<Parameter* > parameters_;
   bool function_pointer_defined_;
   void construct_marshal_parameters();
-  std::vector<Variable*> construct_projection_parameters(ProjectionType *pt);
+  std::vector<Variable*> construct_projection_parameters(ProjectionType *pt, bool alloc);
  public:
   Rpc(ReturnVariable *return_var, const char* name, std::vector<Parameter* > parameters, LexicalScope *current_scope);
-  std::vector<Variable*> marshal_parameters; // wtf is this
+  std::vector<Variable*> marshal_parameters;
   void set_function_pointer_defined(bool b);
   bool function_pointer_defined();
   const char* name();

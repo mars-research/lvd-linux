@@ -1,7 +1,6 @@
 #include "lcd_ast.h"
 #include <stdio.h>
 
-
 Rpc::Rpc(ReturnVariable *return_value, const char* name, std::vector<Parameter* > parameters, LexicalScope *current_scope)
 {
   this->explicit_return_ = return_value;
@@ -15,6 +14,75 @@ Rpc::Rpc(ReturnVariable *return_value, const char* name, std::vector<Parameter* 
       Parameter *p = (Parameter*) *it;
       this->symbol_table_->insert(p->identifier());
     }
+  construct_marshal_parameters();
+}
+
+void Rpc::construct_marshal_parameters()
+{
+  std::vector<Variable*> marshal_parameters;
+
+  for(std::vector<Parameter*>::iterator it = this->parameters_.begin(); it != this->parameters_.end(); it ++) {
+    Parameter *p = *it;
+    if (p->type()->num() == 4 && (p->alloc_caller() || p->alloc_callee())) {
+      ProjectionType *pt = dynamic_cast<ProjectionType*>(p->type());
+      Assert(pt != 0x0, "Error: dynamic cast to projection type failed.\n");
+      std::vector<Variable*> tmp_params = construct_projection_parameters(pt, p->alloc_callee() || p->alloc_caller());
+      marshal_parameters.insert(marshal_parameters.end(), tmp_params.begin(), tmp_params.end());
+    } else if (p->in()) {
+      marshal_parameters.push_back(p);
+    }
+  }
+  this->marshal_parameters = marshal_parameters;
+}
+
+std::vector<Variable*> Rpc::construct_projection_parameters(ProjectionType *pt, bool alloc)
+{
+  std::vector<Variable*> marshal_parameters;
+  // insert container ref here. // TODOOOO
+  int err;
+  Type* container_tmp = this->current_scope_->lookup(container_name(pt->name()), &err);
+  if(container_tmp == 0x0) {
+    printf("Error could not find container struct for %s\n", pt->name());
+    return marshal_parameters;
+  }
+  ProjectionType *container = dynamic_cast<ProjectionType*>(container_tmp);
+  Assert(container != 0x0, "Error: dynamic cast to projection type failed.\n");
+  if(alloc) {
+    ProjectionField *my_ref_field = container->get_field("my_ref");
+    Assert(my_ref_field != 0x0, "Error: could not find field %s in projection.\n", "my_ref");
+    ProjectionType* my_ref_field_struct = dynamic_cast<ProjectionType*>(my_ref_field->type());
+    Assert(my_ref_field_struct != 0x0, "Error: dynamic cast to projection type failed.\n");
+    
+    ProjectionField *dptr = my_ref_field_struct->get_field("dptr");
+    Assert(dptr != 0x0, "Error: could not find field %s in projection. \n", "dptr");
+
+    marshal_parameters.push_back(dptr);
+  } else {
+    ProjectionField *other_ref_field = container->get_field("other_ref");
+    Assert(other_ref_field != 0x0, "Error: could not find field %s in projection.\n", "other_ref");
+    ProjectionType *other_ref_field_struct = dynamic_cast<ProjectionType*>(other_ref_field->type());
+    Assert(other_ref_field_struct != 0x0, "Error: dynamic cast to projection type failed.\n");
+    
+    ProjectionField *dptr = other_ref_field_struct->get_field("dptr");
+    Assert(dptr != 0x0, "Error: could not find field %s in projection.\n", "dptr");
+
+    marshal_parameters.push_back(dptr);
+  }
+
+  std::vector<ProjectionField*> fields = pt->fields();
+  for(std::vector<ProjectionField*>::iterator it = fields.begin(); it != fields.end(); it ++) {
+    ProjectionField *pf = *it;
+    if (pf->type()->num() == 4 && (pf->alloc_caller() || pf->alloc_callee())) {
+      ProjectionType *pt_tmp = dynamic_cast<ProjectionType*>(pf->type());
+      Assert(pt_tmp != 0x0, "Error: dynamic cast to Projection type failed.\n");
+      std::vector<Variable*> tmp_params = construct_projection_parameters(pt_tmp
+									  , pf->alloc_callee() || pf->alloc_caller());
+      marshal_parameters.insert(marshal_parameters.end(), tmp_params.begin(), tmp_params.end());
+    } else if (pf->in()) {
+      marshal_parameters.push_back(pf);
+    }
+  }
+  return marshal_parameters;
 }
 
 void Rpc::set_function_pointer_defined(bool b)
@@ -73,11 +141,11 @@ void Rpc::prepare_marshal()
   MarshalPrepareVisitor *worker = new MarshalPrepareVisitor(new Registers());
   
   // marshal prepare for parameters as long as they are in or out
-  for(std::vector<Parameter*>::iterator it = this->parameters_.begin(); it != this->parameters_.end(); it ++) {
-    Parameter* p = *it;
-    if(p->in() || p->out()) {
-      p->prepare_marshal(worker);
-    }
+  for(std::vector<Variable*>::iterator it = this->marshal_parameters.begin(); it != this->marshal_parameters.end(); it ++) {
+    Variable* v = *it;
+    //  if(v->in() || v->out()) {
+      v->prepare_marshal(worker);
+      // }
   }
   
   // marshal prepare for return value

@@ -38,13 +38,13 @@ GlobalScope::GlobalScope()
   int err;
   fields.push_back(new ProjectionField(this->lookup("unsigned long", &err), "dptr", 0)); // unsigned long dptr;
   this->type_definitions_.insert( std::pair<std::string, Type*>("dptr_t"
-								, new Typedef("dptr_t", "", new ProjectionType("", "", fields))));
+								, new ProjectionType("dptr_t", "dptr_t", fields)));
   
   // cptr_t
   std::vector<ProjectionField*> fields2;
   fields2.push_back(new ProjectionField(this->lookup("unsigned long", &err), "cptr", 0)); // unsigned long cptr;
   this->type_definitions_.insert( std::pair<std::string, Type*>("cptr_t"
-								, new Typedef("cptr_t", "", new ProjectionType("", "", fields2))));
+								, new ProjectionType("cptr_t", "cptr_t", fields2)));
 
 
   // dstore no fields

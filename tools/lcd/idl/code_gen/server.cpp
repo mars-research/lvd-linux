@@ -336,6 +336,7 @@ CCSTFile* generate_server_source(Module *m)
      {
        Rpc* r_tmp = (Rpc*) *it;
        if(r_tmp->function_pointer_defined()) {
+	 printf("doing function pointer def\n");
 	 definitions.push_back( function_definition(function_declaration(r_tmp)
 						    ,caller_body(r_tmp)));
        } else {

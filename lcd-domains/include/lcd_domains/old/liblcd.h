@@ -75,42 +75,6 @@ static inline void lcd_set_debug_reg(u64 val)				\
 	__lcd_set_debug_reg(lcd_get_utcb(), val);			\
 }									\
 
-/* LOW LEVEL SYSCALLS -------------------------------------------------- */
-
-/**
- * Low level syscall routines.
- */
-
-#define __LCD_MK_SYSCALL(num)						\
-static inline int lcd_syscall_##num(void)	                        \
-{									\
-        long ret;							\
-	asm volatile(							\
-		"movq $" #num ", %%rax \n\t" /* move syscall into rax */\
-		"vmcall \n\t"                /* do vmcall (exit vm)   */\
-		"movq %%rax, %0 \n\t"        /* get return value      */\
-		: "=g" (ret)						\
-		:							\
-		: "rax");						\
-	return (int)ret;						\
-}									
-
-#define LCD_MK_SYSCALL(name) __LCD_MK_SYSCALL(name)
-
-LCD_MK_SYSCALL(LCD_SYSCALL_EXIT)
-LCD_MK_SYSCALL(LCD_SYSCALL_SEND)
-LCD_MK_SYSCALL(LCD_SYSCALL_RECV)
-LCD_MK_SYSCALL(LCD_SYSCALL_CALL)
-LCD_MK_SYSCALL(LCD_SYSCALL_REPLY)
-LCD_MK_SYSCALL(LCD_SYSCALL_PUTCHAR)
-LCD_MK_SYSCALL(LCD_SYSCALL_PAGE_ALLOC)
-LCD_MK_SYSCALL(LCD_SYSCALL_PAGE_MAP)
-LCD_MK_SYSCALL(LCD_SYSCALL_PAGE_UNMAP)
-LCD_MK_SYSCALL(LCD_SYSCALL_CAP_DELETE)
-LCD_MK_SYSCALL(LCD_SYSCALL_SYNC_EP)
-
-#define __LCD_DO_SYSCALL(num) lcd_syscall_##num()
-#define LCD_DO_SYSCALL(name) __LCD_DO_SYSCALL(name)
 
 
 /* ENTER / EXIT FROM LCD -------------------------------------------------- */

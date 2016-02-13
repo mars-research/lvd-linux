@@ -24,6 +24,34 @@ static int handle_syscall_create_sync_ep(struct lcd *lcd)
 	return __lcd_create_sync_endpoint(lcd, slot);
 }
 
+static int handle_syscall_create(struct lcd *lcd)
+{
+	cptr_t lcd_slot;
+	/*
+	 * Args
+	 */
+	lcd_slot = __cptr(lcd_arch_get_syscall_arg0(lcd->lcd_arch));
+	/*
+	 * Do create
+	 */
+	return __lcd_create(lcd, lcd_slot);
+}
+
+static int handle_syscall_cap_grant(struct lcd *lcd)
+{
+	cptr_t lcd, src, dest;
+	/*
+	 * Args
+	 */
+	dest_lcd = __cptr(lcd_arch_get_syscall_arg0(lcd->lcd_arch));
+	src = __cptr(lcd_arch_get_syscall_arg1(lcd->lcd_arch));
+	dest = __cptr(lcd_arch_get_syscall_arg2(lcd->lcd_arch));
+	/*
+	 * Do grant
+	 */
+	return __lcd_cap_grant(lcd, dest_lcd, src, dest);
+}
+
 static int handle_syscall_cap_revoke(struct lcd *lcd)
 {
 	cptr_t object;
@@ -50,6 +78,44 @@ static int handle_syscall_cap_delete(struct lcd *lcd)
 	cap_delete(lcd->cspace, object);
 
 	return 0;
+}
+
+static int handle_syscall_config_registers(struct lcd *lcd)
+{
+	cptr_t dest_lcd;
+	gva_t pc, sp;
+	gpa_t gva_root, utcb_page;
+	/*
+	 * Args
+	 */
+	dest_lcd = __cptr(lcd_arch_get_syscall_arg0(lcd->lcd_arch));
+	pc = __gva(lcd_arch_get_syscall_arg1(lcd->lcd_arch));
+	sp = __gva(lcd_arch_get_syscall_arg2(lcd->lcd_arch));
+	gva_root = __gpa(lcd_arch_get_syscall_arg3(lcd->lcd_arch));
+	utcb_page = __gpa(lcd_arch_get_syscall_arg4(lcd->lcd_arch));
+	/*
+	 * Do config
+	 */
+	return __lcd_config_registers(lcd, dest_lcd, pc, sp, gva_root,
+				utcb_page);
+}
+
+static int handle_syscall_memory_grant_and_map(struct lcd *lcd)
+{
+	cptr_t dest_lcd, mo_cptr, dest_slot;
+	gpa_t base;
+	/*
+	 * Args
+	 */
+	dest_lcd = __cptr(lcd_arch_get_syscall_arg0(lcd->lcd_arch));
+	mo_cptr = __cptr(lcd_arch_get_syscall_arg1(lcd->lcd_arch));
+	dest_slot = __cptr(lcd_arch_get_syscall_arg2(lcd->lcd_arch));
+	base = __gpa(lcd_arch_get_syscall_arg3(lcd->lcd_arch));
+	/*
+	 * Do grant map
+	 */
+	return __lcd_memory_grant_and_map(lcd, dest_lcd, mo_cptr,
+					dest_slot, base);
 }
 
 static int handle_syscall_munmap(struct lcd *lcd)
@@ -81,6 +147,21 @@ static int handle_syscall_mmap(struct lcd *lcd)
 	 * Do map
 	 */
 	return __lcd_map_memory_object(lcd, mem_object, base);
+}
+
+static int handle_syscall_vmalloc(struct lcd *lcd)
+{
+	cptr_t slot;
+	unsigned int order;
+	/*
+	 * Get slot where to store alloc'd pages and order
+	 */
+	slot = __cptr(lcd_arch_get_syscall_arg0(lcd->lcd_arch));
+	order = (unsigned int)lcd_arch_get_syscall_arg1(lcd->lcd_arch);
+	/*
+	 * Do vmalloc
+	 */
+	return __lcd_vmalloc(lcd, slot, order);
 }
 
 static int handle_syscall_pages_alloc(struct lcd *lcd)
@@ -121,7 +202,7 @@ static int handle_syscall_pages_alloc_exact_node(struct lcd *lcd)
 	return __lcd_alloc_pages_exact_node(lcd, slot, nid, flags, order);
 }
 
-static int handle_syscall_reply(struct lcd *lcd)
+static int handle_syscall_sync_reply(struct lcd *lcd)
 {
 	/*
 	 * No endpoint arg; just do reply
@@ -129,7 +210,7 @@ static int handle_syscall_reply(struct lcd *lcd)
 	return __lcd_reply(lcd);
 }
 
-static int handle_syscall_call(struct lcd *lcd)
+static int handle_syscall_sync_call(struct lcd *lcd)
 {
 	cptr_t endpoint;
 	/*
@@ -142,7 +223,7 @@ static int handle_syscall_call(struct lcd *lcd)
 	return __lcd_call(lcd, endpoint);
 }
 
-static int handle_syscall_recv(struct lcd *lcd)
+static int handle_syscall_sync_recv(struct lcd *lcd)
 {
 	cptr_t endpoint;
 	/*
@@ -155,7 +236,7 @@ static int handle_syscall_recv(struct lcd *lcd)
 	return __lcd_recv(lcd, endpoint);
 }
 
-static int handle_syscall_send(struct lcd *lcd)
+static int handle_syscall_sync_send(struct lcd *lcd)
 {
 	cptr_t endpoint;
 	/*
@@ -166,6 +247,19 @@ static int handle_syscall_send(struct lcd *lcd)
 	 * Do synchronous ipc send
 	 */
 	return __lcd_send(lcd, endpoint);
+}
+
+static int handle_syscall_run(struct lcd *lcd)
+{
+	cptr_t dest_lcd;
+	/*
+	 * Args
+	 */
+	dest_lcd = __cptr(lcd_arch_get_syscall_arg0(lcd->lcd_arch));
+	/*
+	 * Run it
+	 */
+	return __lcd_run(lcd, dest_lcd);
 }
 
 static int handle_syscall_putchar(struct lcd *lcd)
@@ -198,23 +292,44 @@ static int handle_syscall(struct lcd *lcd, int *lcd_ret)
 		"got syscall %d from lcd %p", syscall_id, lcd);
 
 	switch (syscall_id) {
-	case LCD_SYSCALL_EXIT:
-		ret = handle_syscall_exit(lcd, lcd_ret);
+	case LCD_SYSCALL_CAP_DELETE:
+		ret = handle_syscall_cap_delete(lcd);
+		break;
+	case LCD_SYSCALL_CAP_REVOKE:
+		ret = handle_syscall_cap_revoke(lcd);
+		break;
+	case LCD_SYSCALL_CAP_GRANT:
+		ret = handle_syscall_cap_grant(lcd);
 		break;
 	case LCD_SYSCALL_PUTCHAR:
 		ret = handle_syscall_putchar(lcd);
 		break;
-	case LCD_SYSCALL_SEND:
-		ret = handle_syscall_send(lcd);
+	case LCD_SYSCALL_CREATE:
+		ret = handle_syscall_create(lcd);
 		break;
-	case LCD_SYSCALL_RECV:
-		ret = handle_syscall_recv(lcd);
+	case LCD_SYSCALL_CONFIG_REGISTERS:
+		ret = handle_syscall_config_registers(lcd);
 		break;
-	case LCD_SYSCALL_CALL:
-		ret = handle_syscall_call(lcd);
+	case LCD_SYSCALL_MEMORY_GRANT_AND_MAP:
+		ret = handle_syscall_memory_grant_and_map(lcd);
 		break;
-	case LCD_SYSCALL_REPLY:
-		ret = handle_syscall_reply(lcd);
+	case LCD_SYSCALL_RUN:
+		ret = handle_syscall_run(lcd);
+		break;
+	case LCD_SYSCALL_EXIT:
+		ret = handle_syscall_exit(lcd, lcd_ret);
+		break;
+	case LCD_SYSCALL_SYNC_SEND:
+		ret = handle_syscall_sync_send(lcd);
+		break;
+	case LCD_SYSCALL_SYNC_RECV:
+		ret = handle_syscall_sync_recv(lcd);
+		break;
+	case LCD_SYSCALL_SYNC_CALL:
+		ret = handle_syscall_sync_call(lcd);
+		break;
+	case LCD_SYSCALL_SYNC_REPLY:
+		ret = handle_syscall_sync_reply(lcd);
 		break;
 	case LCD_SYSCALL_CREATE_SYNC_EP:
 		ret = handle_syscall_create_sync_ep(lcd);
@@ -225,17 +340,14 @@ static int handle_syscall(struct lcd *lcd, int *lcd_ret)
 	case LCD_SYSCALL_PAGES_ALLOC:
 		ret = handle_syscall_pages_alloc(lcd);
 		break;
+	case LCD_SYSCALL_VMALLOC:
+		ret = handle_syscall_vmalloc(lcd);
+		break;
 	case LCD_SYSCALL_MMAP:
 		ret = handle_syscall_mmap(lcd);
 		break;
 	case LCD_SYSCALL_MUNMAP:
 		ret = handle_syscall_munmap(lcd);
-		break;
-	case LCD_SYSCALL_CAP_DELETE:
-		ret = handle_syscall_cap_delete(lcd);
-		break;
-	case LCD_SYSCALL_CAP_REVOKE:
-		ret = handle_syscall_cap_revoke(lcd);
 		break;
 	default:
 		LCD_ERR("unimplemented syscall %d", syscall_id);

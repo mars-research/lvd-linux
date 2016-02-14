@@ -103,7 +103,6 @@ static int mo_insert_in_tree(struct lcd_resource_tree *t,
 		goto fail1;
 	}
 	n->cptr = mo_cptr;
-	n->nr_pages_order = mo->order;
 	n->it_node.start = __lcd_memory_object_start(mo);
 	n->it_node.last = __lcd_memory_object_last(mo);
 	/*
@@ -549,7 +548,7 @@ void lcd_free_pages(struct page *base, unsigned int order)
 	cptr_t page_cptr;
 	int ret;
 	gpa_t gpa;
-	unsigned int actual_order;
+	unsigned long actual_size;
 	/*
 	 * Translate page to physical address.
 	 *
@@ -560,12 +559,12 @@ void lcd_free_pages(struct page *base, unsigned int order)
 	/*
 	 * Resolve pages to cptr
 	 */
-	ret = lcd_phys_to_cptr(gpa, &page_cptr, &actual_order);
+	ret = lcd_phys_to_cptr(gpa, &page_cptr, &actual_size);
 	if (ret) {
 		LIBLCD_ERR("warning: pages not found, so not freed");
 		return;
 	}
-	if (order != actual_order)
+	if (order != ilog2(actual_size >> PAGE_SHIFT))
 		LIBLCD_ERR("warning: order doesn't match actual order");
 	/*
 	 * Remove pages from resource tree ("unmap")
@@ -705,7 +704,7 @@ int lcd_map_virt(gpa_t base, unsigned int order, gva_t *gva_out)
 {
 	int ret;
 	cptr_t mo_cptr;
-	unsigned int mo_order;
+	unsigned long mo_size;
 	/*
 	 * On x86_64, all RAM is mapped already.
 	 *
@@ -718,7 +717,7 @@ int lcd_map_virt(gpa_t base, unsigned int order, gva_t *gva_out)
 	 *
 	 * guest virtual == host virtual for non-isolated
 	 */
-	ret = lcd_phys_to_cptr(base, &mo_cptr, &mo_order);
+	ret = lcd_phys_to_cptr(base, &mo_cptr, &mo_size);
 	if (ret) {
 		LIBLCD_ERR("phys not mapped?");
 		goto fail1;
@@ -757,14 +756,14 @@ void lcd_unmap_phys(gpa_t base, unsigned int order)
 {
 	int ret;
 	cptr_t mo_cptr;
-	unsigned int mo_order;
+	unsigned long mo_size;
 	/*
 	 * No real unmapping needs to be done, but we need to
 	 * update the resource tree.
 	 *
 	 * Look up cptr for physical memory
 	 */
-	ret = lcd_phys_to_cptr(base, &mo_cptr, &mo_order);
+	ret = lcd_phys_to_cptr(base, &mo_cptr, &mo_size);
 	if (ret) {
 		LIBLCD_ERR("phys not mapped?");
 		return;
@@ -924,7 +923,7 @@ void lcd_unvolunteer_vmalloc_mem(cptr_t vmalloc_mem)
 
 /* ADDRESS -> CPTR TRANSLATION ---------------------------------------- */
 
-int lcd_phys_to_cptr(gpa_t paddr, cptr_t *c_out, unsigned int *order_out)
+int lcd_phys_to_cptr(gpa_t paddr, cptr_t *c_out, unsigned long *size_out)
 {
 	int ret;
 	struct lcd_resource_node *n;
@@ -945,7 +944,7 @@ int lcd_phys_to_cptr(gpa_t paddr, cptr_t *c_out, unsigned int *order_out)
 	 * Pull out memory object cptr and order
 	 */
 	*c_out = n->cptr;
-	*order_out = n->nr_pages_order;
+	*size_out = lcd_resource_node_size(n);
 
 	return 0;
 
@@ -953,7 +952,7 @@ fail1:
 	return ret;
 }
 
-int lcd_virt_to_cptr(gva_t vaddr, cptr_t *c_out, unsigned int *order_out)
+int lcd_virt_to_cptr(gva_t vaddr, cptr_t *c_out, unsigned long *size_out)
 {
 	gpa_t gpa;
 	struct lcd_resource_node *n;
@@ -973,13 +972,13 @@ int lcd_virt_to_cptr(gva_t vaddr, cptr_t *c_out, unsigned int *order_out)
 		 * guest phys = host phys.
 		 */
 		gpa = __gpa(hpa_val(hva2hpa(__hva(gva_val(vaddr)))));
-		return lcd_phys_to_cptr(gpa, c_out, order_out);
+		return lcd_phys_to_cptr(gpa, c_out, size_out);
 	}
 	/*
 	 * Pull out memory object cptr and order
 	 */
 	*c_out = n->cptr;
-	*order_out = n->nr_pages_order;
+	*size_out = lcd_resource_node_size(n);
 
 	return 0;
 }
@@ -1008,4 +1007,16 @@ void lcd_free_memcg_kmem_pages(unsigned long addr, unsigned int order)
 {
 	/* Non-isolated code probably should never call this. */
 	BUG();
+}
+
+/* ADDRESS TRANSLATION -------------------------------------------------- */
+
+gpa_t lcd_gva2gpa(gva_t gva)
+{
+	return __gpa(__pa((void *)gva_val(gva)));
+}
+
+gva_t lcd_gpa2gva(gpa_t gpa)
+{
+	return __gva((unsigned long)__va(gpa_val(gpa)));
 }

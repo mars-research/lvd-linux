@@ -48,14 +48,13 @@ struct lcd_resource_tree {
  */
 struct lcd_resource_node {
 	struct interval_tree_node it_node;
-	unsigned long nr_pages_order;
 	cptr_t cptr;
 	unsigned int flags;
 };
 
 enum {
-	LCD_RESOURCE_NODE_STATIC  = 0, /* resource node statically alloc'd */
-	LCD_RESOURCE_NODE_KMALLOC = 1, /* resource node alloc'd via kmallc */
+	LCD_RESOURCE_NODE_STATIC  = 1, /* resource node statically alloc'd */
+	LCD_RESOURCE_NODE_KMALLOC = 2, /* resource node alloc'd via kmallc */
 };
 
 static inline unsigned long
@@ -71,9 +70,9 @@ lcd_resource_node_last(struct lcd_resource_node *n)
 }
 
 static inline unsigned long 
-lcd_resource_node_order(struct lcd_resource_node *n)
+lcd_resource_node_size(struct lcd_resource_node *n)
 {
-	return n->nr_pages_order;
+	return lcd_resource_node_last(n) - lcd_resource_node_start(n) + 1;
 }
 
 static inline cptr_t

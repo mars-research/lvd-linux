@@ -427,7 +427,7 @@ void lcd_unvolunteer_vmalloc_mem(cptr_t vmalloc_mem);
  *                     guest physical address @paddr
  * @paddr: the physical address to search for
  * @c_out: out param containing cptr to memory capability that contains @paddr
- * @order_out: the memory object has size 2^order pages
+ * @size_out: the memory object is size bytes
  *
  * If @paddr meets these conditions:
  *
@@ -461,7 +461,7 @@ void lcd_unvolunteer_vmalloc_mem(cptr_t vmalloc_mem);
  * (There is no way to get a cptr to a capability to individual pages
  * in a chunk, since the microkernel doesn't currently support this.)
  */
-int lcd_phys_to_cptr(gpa_t paddr, cptr_t *c_out, unsigned int *order_out);
+int lcd_phys_to_cptr(gpa_t paddr, cptr_t *c_out, unsigned long *size_out);
 /**
  * lcd_phys_to_resource_node -- Look up the struct lcd_resource_node for the
  *                              memory object that contains guest physical
@@ -477,11 +477,11 @@ int lcd_phys_to_resource_node(gpa_t paddr, struct lcd_resource_node **n);
  *                     guest virtual address @vaddr
  * @vaddr: the virtual address to search for
  * @c_out: out param containing cptr to memory capability that contains @paddr
- * @order_out: the memory object has size 2^order pages
+ * @size_out: the memory object is size bytes
  *
  * Similar to lcd_phys_to_cptr. Similar error conditions.
  */
-int lcd_virt_to_cptr(gva_t vaddr, cptr_t *c_out, unsigned int *order_out);
+int lcd_virt_to_cptr(gva_t vaddr, cptr_t *c_out, unsigned long *size_out);
 
 /* RESOURCE TREES -------------------------------------------------- */
 

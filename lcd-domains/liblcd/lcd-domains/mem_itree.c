@@ -14,8 +14,6 @@
 
 #include <lcd_config/post_hook.h>
 
-#define LCD_NR_BOOT_RESOURCE_NODES 16
-
 static struct lcd_resource_tree itree;
 static struct lcd_resource_node boot_nodes[LCD_NR_BOOT_RESOURCE_NODES];
 static unsigned int boot_nodes_brk;
@@ -81,6 +79,12 @@ int __liblcd_mem_itree_insert(gpa_t start, unsigned long size,
 
 fail1:
 	return -ENOMEM;
+}
+
+void __liblcd_mem_itree_delete(struct lcd_resource_node *n)
+{
+	lcd_resource_tree_remove(&itree, n);
+	free_itree_node(n);
 }
 
 int lcd_phys_to_resource_node(gpa_t paddr, struct lcd_resource_node **n_out)

@@ -6,8 +6,8 @@
  *
  * Copyright: University of Utah
  */
-#ifndef LCD_DOMAINS_BOOTINFO_H
-#define LCD_DOMAINS_BOOTINFO_H
+#ifndef LIBLCD_BOOTINFO_H
+#define LIBLCD_BOOTINFO_H
 
 #include <libcap.h>
 #include <lcd_domains/types.h>
@@ -47,4 +47,4 @@ struct lcd_boot_info {
  */
 struct lcd_boot_info * lcd_get_boot_info(void);
 
-#endif /* LCD_DOMAINS_BOOTINFO_H */
+#endif /* LIBLCD_BOOTINFO_H */

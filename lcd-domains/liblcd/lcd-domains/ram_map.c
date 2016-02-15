@@ -119,7 +119,118 @@ static inline struct lcd_page_block *ram_addr_to_page_block(gva_t addr)
 
 /* INTERFACE -------------------------------------------------- */
 
+static int do_map_into_phys(cptr_t pages, unsigned int order, gpa_t *base_out)
+{
+	int ret;
+	struct lcd_page_block *pb;
+	gpa_t addr;
+	/*
+	 * Adjust order so that it's >= LCD_RAM_MAP_MIN_ORDER
+	 */
+	if (order < LCD_RAM_MAP_MIN_ORDER)
+		order = LCD_RAM_MAP_MIN_ORDER;
+	/*
+	 * Try to alloc a block of phys address space
+	 */
+	pb = lcd_page_allocator_alloc(ram_map_allocator, order);
+	if (!pb) {
+		LIBLCD_ERR("failed to get free ram map region");
+		ret = -ENOMEM;
+		goto fail1;
+	}
+	addr = lcd_gva2gpa(ram_page_block_to_addr(pb));
+	/*
+	 * Got some; map in guest physical
+	 */
+	ret = _lcd_mmap(pages, order, addr);
+	if (ret) {
+		LIBLCD_ERR("failed to map in guest physical");
+		goto fail2;
+	}
+	/*
+	 * Insert address range into tree so we can do address -> cptr
+	 * translation.
+	 */
+	ret = __liblcd_mem_itree_insert(
+		addr,
+		(1UL << (order + PAGE_SHIFT)),
+		pages);
+	if (ret) {
+		LIBLCD_ERR("failed to insert in mem itree");
+		goto fail3;
+	}
 
+	*base_out = addr;
+
+	return 0;
+
+fail3:
+	_lcd_munmap(pages, addr);
+fail2:
+	lcd_page_allocator_free(ram_map_allocator, pb, order);
+fail1:
+	return ret;
+
+}
+
+int lcd_map_phys(cptr_t pages, unsigned int order, gpa_t *base_out)
+{
+	return do_map_into_phys(pages, order, base_out)
+}
+
+int lcd_map_virt(cptr_t pages, unsigned int order, gva_t *gva_out)
+{
+	gpa_t gpa;
+	int ret;
+
+	ret = do_map_into_phys(pages, order, &gpa);
+	if (ret)
+		return ret;
+	*gva_out = lcd_gpa2gva(gpa);
+
+	return 0;
+}
+
+static void do_unmap_from_phys(gpa_t base, unsigned int order)
+{
+	int ret;
+	struct lcd_resource_node *n;
+	cptr_t pages;
+	/*
+	 * Resolve address to resource node
+	 */
+	ret = lcd_phys_to_resource_node(base, &n);
+	if (ret) { 
+		LIBLCD_ERR("error looking up resource node");
+		return;
+	}
+	pages = n->cptr;
+	/*
+	 * Remove from tree
+	 */
+	__liblcd_mem_itree_delete(n);
+	/*
+	 * Free address block from RAM region
+	 */
+	lcd_page_allocator_free(
+		ram_map_allocator,
+		ram_addr_to_page_block(lcd_gpa2gva(base)));
+	/*
+	 * Unmap from guest physical
+	 */
+	_lcd_munmap(pages, order);
+}
+
+void lcd_unmap_phys(gpa_t base, unsigned int order)
+{
+	do_unmap_from_phys(base, order);
+}
+
+void lcd_unmap_virt(gva_t base, unsigned int order)
+{
+	gpa_t gp_base = lcd_gva2gpa(base);
+	do_unmap_from_phys(gp_base, order);
+}
 
 /* INIT/EXIT ---------------------------------------- */
 

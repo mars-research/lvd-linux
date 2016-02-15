@@ -41,4 +41,27 @@ int __liblcd_mem_itree_insert(gpa_t start, unsigned long size,
  */
 void __liblcd_mem_itree_delete(struct lcd_resource_node *n);
 
+/* 
+ * HEAP CONFIGURATION --------------------------------------------------
+ *
+ * Heap is 2^12 pages, or 16 MBs.
+ *
+ * The minimum you can allocate from the heap is 4 KBs (2^0 = 1 page).
+ *
+ * The maximum you can allocate from the heap is 4 MBs (2^10 = 1024 pages).
+ */
+#define LCD_HEAP_NR_PAGES_ORDER 12
+#define LCD_HEAP_SIZE (1UL << (LCD_HEAP_NR_PAGES_ORDER + PAGE_SHIFT))
+#define LCD_HEAP_MIN_ORDER 0
+#define LCD_HEAP_MAX_ORDER 10
+
+/* MEMORY SUBSYSTEM INTERNALS ------------------------------ */
+
+/**
+ * __liblcd_mem_init -- Call during boot after mem itree initialized
+ *
+ * This initializes the heap allocator.
+ */
+int __liblcd_mem_init(void);
+
 #endif /* LCD_DOMAINS_LIBLCD_H */

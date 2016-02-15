@@ -8,13 +8,6 @@
 #ifndef LCD_DOMAINS_TYPES_H
 #define LCD_DOMAINS_TYPES_H
 
-/**
- * Return value to signal that a host/non-isolated resource (like a page)
- * is not part of the capability system (i.e., is not in any thread's
- * cspace).
- */
-#define LCD_ERR_NOT_VOLUNTEERED (-512)
-
 /*
  * Extra reserved cnodes:
  *

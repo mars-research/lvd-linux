@@ -69,28 +69,28 @@ struct lcd_page_allocator;
 struct lcd_page_allocator_cbs {
 
 	int (*alloc_map_metadata_memory_chunk)(
-		struct lcd_page_allocator_cbs*,
-		unsigned long,
-		unsigned int,
-		struct lcd_resource_node**);
+		struct lcd_page_allocator_cbs *this,
+		unsigned long mapping_offset,
+		unsigned int alloc_order,
+		struct lcd_resource_node **n_out);
 
 	void (*free_unmap_metadata_memory_chunk)(
-		struct lcd_page_allocator_cbs*,
-		struct lcd_resource_node*);
+		struct lcd_page_allocator_cbs *this,
+		struct lcd_resource_node *n_to_delete);
 					
 	int (*alloc_map_regular_mem_chunk)(
-		struct lcd_page_allocator *,
-		struct lcd_page_block *,
-		unsigned long,
-		unsigned int,
-		struct lcd_resource_node **);
+		struct lcd_page_allocator *this_page_allocator,
+		struct lcd_page_block *destination_page_block,
+		unsigned long mapping_offset,
+		unsigned int alloc_order,
+		struct lcd_resource_node **n_out);
 
 	void (*free_unmap_regular_mem_chunk)(
-		struct lcd_page_allocator *,
-		struct lcd_page_block *,
-		struct lcd_resource_node *,
-		unsigned long,
-		unsigned int);
+		struct lcd_page_allocator *this_page_allocator,
+		struct lcd_page_block *containing_page_block,
+		struct lcd_resource_node *n_to_delete,
+		unsigned long mapping_offset,
+		unsigned int memory_order);
 };
 
 /**
@@ -217,16 +217,16 @@ struct lcd_page_allocator {
  *      -- alloc_map_regular_mem_chunk
  *              This will be called when:
  *                   1 - It is non-NULL; and
- *                   2 - 2^max_order pages are free; and
- *                   3 - We try to allocate pages, and this leads to
- *                       allocating those 2^max_order pages, or some
+ *                   2 - 2^max_order page blocks are free; and
+ *                   3 - We try to allocate, and this leads to
+ *                       allocating those 2^max_order page blocks, or some
  *                       subset thereof
  *              This is the demand paging in action. We want to allocate
  *              pages from a 2^max_order-page region of memory, but it's
  *              not backed by real memory. This function should allocate
  *              the real memory, and map it in so the pages become backed.
  *
- *              This function will provided with the calling page allocator,
+ *              This function will be provided with the calling page allocator,
  *              the page block at the beginning of the 2^max_order chunk,
  *              the offset into the memory area where the memory should be
  *              mapped, and the size (for now, will always be 

@@ -47,9 +47,13 @@
  *
  *   -- 2 GB HOLE (unmapped)
  *
+ *   -- 8 GB for RAM memory mapping region (think: kmap)
+ *
+ *   -- 48 GB HOLE (unmapped)
+ *
  *   -- 256 GB for ioremap region (unmapped at boot)
  *
- *   -- 2 GB HOLE (unmapped)
+ *   -- 190 GB HOLE (unmapped)
  *
  *   -- 2 GB for kernel module mapping area. The kernel module itself
  *      is mapped at the correct offset into this area so that
@@ -71,10 +75,18 @@
  *              |          (2 GB)           |
  *              +---------------------------+ 0x0000 007f 8000 0000 (510 GB)
  *              |       HOLE / Unmapped     | 
- *              |         (246 GB)          |
- *              +---------------------------+ 0x0000 0042 0000 0000 (264 GB) 
- *              |       ioremap region      |                    
- *              |         (256 GB)          |
+ *              |          (190 GB)         |
+ *              +---------------------------+ 0x0000 0050 0000 0000 (320 GB) 
+ *              |       ioremap Region      |                    
+ *              |       (64 GB aligned)     |                    
+ *              |          (256 GB)         |
+ *              +---------------------------+ 0x0000 0010 0000 0000 (64 GB)
+ *              |       HOLE / Unmapped     | 
+ *              |          (48 GB)          |
+ *              +---------------------------+ 0x0000 0004 0000 0000 (16 GB) 
+ *              |       RAM Map Region      |                    
+ *              |       (8 GB aligned)      |                    
+ *              |          (8 GB)           |
  *              +---------------------------+ 0x0000 0002 0000 0000 (8 GB)
  *              |       HOLE / Unmapped     | 
  *              |          (2 GB)           |
@@ -138,14 +150,21 @@
  * unusable.)
  */
 
-/* Sizes. The heap and ioremap are not mapped/backed at boot. */
+/* Region sizes */
+
+#define LCD_MISC_REGION_SIZE (1UL << 30) /* .................... 1 GB    */
+#define LCD_STACK_REGION_SIZE (1UL << 30) /* ................... 1 GB    */
+#define LCD_HEAP_REGION_SIZE (1UL << 30) /* .................... 1 GB    */
+#define LCD_RAM_MAP_REGION_SIZE (1UL << 30) /* ................. 8 GBs   */
+#define LCD_IOREMAP_REGION_SIZE (256UL << 30) /* ............... 256 GBs */
+#define LCD_KERNEL_MODULE_REGION_SIZE (2UL << 30) /* ........... 2 GBs   */
+
+/* Component Sizes. */
 
 #define LCD_UTCB_SIZE PAGE_SIZE /* ........................... 4  KBs */
 #define LCD_BOOTSTRAP_PAGES_SIZE (2 * PAGE_SIZE) /* .......... 8  KBs */
 #define LCD_BOOTSTRAP_PAGE_TABLES_SIZE (2 * PAGE_SIZE) /* .... 8  KBs */
 #define LCD_STACK_SIZE (2 * PAGE_SIZE) /* .................... 8  KBs */
-#define LCD_HEAP_SIZE (16UL << 20) /* ........................ 16 MBs */
-#define LCD_IOREMAP_SIZE (16UL << 20) /* ..................... 16 MBs */
 
 static inline void
 __lcd_build_checks__(void)
@@ -187,24 +206,33 @@ __lcd_build_checks__(void)
 
 /* HOLE */
 
-#define LCD_STACK_REGION_OFFSET (3UL << 30)
+#define LCD_STACK_REGION_OFFSET \
+	(LCD_MISC_REGION_OFFSET + LCD_MISC_REGION_SIZE + 1UL << 30)
 #define LCD_STACK_OFFSET \
-	(LCD_STACK_REGION_OFFSET + (1UL << 30) - LCD_STACK_SIZE)
+	(LCD_STACK_REGION_OFFSET + LCD_STACK_REGION_SIZE - LCD_STACK_SIZE)
 
 /* HOLE */
 
-#define LCD_HEAP_REGION_OFFSET (5UL << 30)
+#define LCD_HEAP_REGION_OFFSET \
+	(LCD_STACK_REGION_OFFSET + LCD_STACK_REGION_SIZE + (1UL << 30))
 #define LCD_HEAP_OFFSET LCD_HEAP_REGION_OFFSET
 
 /* HOLE */
 
-#define LCD_IOREMAP_REGION_OFFSET (8UL << 30)
-#define LCD_IOREMAP_OFFSET LCD_IOREMAP_REGION_OFFSET
-#define LCD_IOREMAP_REGION_SIZE (256UL << 30)
+#define LCD_RAM_MAP_REGION_OFFSET \
+	(LCD_HEAP_REGION_OFFSET + LCD_HEAP_REGION_SIZE + (2UL << 30))
+#define LCD_RAM_MAP_OFFSET LCD_RAM_MAP_REGION_OFFSET
 
 /* HOLE */
 
-#define LCD_KERNEL_MODULE_REGION_OFFSET (510UL << 30)
+#define LCD_IOREMAP_REGION_OFFSET \
+	(LCD_RAM_MAP_REGION_OFFSET + LCD_RAM_MAP_REGION_SIZE + (48UL << 30))
+#define LCD_IOREMAP_OFFSET LCD_IOREMAP_REGION_OFFSET
+
+/* HOLE */
+
+#define LCD_KERNEL_MODULE_REGION_OFFSET \
+	(LCD_IOREMAP_REGION_OFFSET + LCD_IOREMAP_REGION_SIZE + (190UL << 30))
 
 /* Addresses */
 
@@ -229,6 +257,9 @@ __lcd_build_checks__(void)
 
 #define LCD_HEAP_GP_ADDR __gpa(LCD_PHYS_BASE + LCD_HEAP_OFFSET)
 #define LCD_HEAP_GV_ADDR __gva(LCD_VIRT_BASE + LCD_HEAP_OFFSET)
+
+#define LCD_RAM_MAP_GP_ADDR __gpa(LCD_PHYS_BASE + LCD_RAM_MAP_OFFSET)
+#define LCD_RAM_MAP_GV_ADDR __gva(LCD_VIRT_BASE + LCD_RAM_MAP_OFFSET)
 
 #define LCD_IOREMAP_GP_ADDR __gpa(LCD_PHYS_BASE + LCD_IOREMAP_OFFSET)
 #define LCD_IOREMAP_GV_ADDR __gva(LCD_VIRT_BASE + LCD_IOREMAP_OFFSET)

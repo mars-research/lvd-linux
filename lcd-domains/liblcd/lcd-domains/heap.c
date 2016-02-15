@@ -113,58 +113,6 @@ fail1:
 	return ret;
 }
 
-int _lcd_mmap(cptr_t mo, unsigned int order, gpa_t base)
-{
-	int ret;
-	/*
-	 * Do low level syscall to map memory object
-	 */
-	ret = lcd_syscall_mmap(mo, base);
-	if (ret) {
-		LIBLCD_ERR("low level mmap failed");
-		goto fail1;
-	}
-	/*
-	 * Insert into resource tree (unlike kliblcd, all of our
-	 * memory objects are always contiguous in guest physical)
-	 */
-	ret = __liblcd_mem_itree_insert(base, (1UL << (PAGE_SHIFT + order)),
-					mo);
-	if (ret) {
-		LIBLCD_ERR("error inserting into mem itree");
-		goto fail2;
-	}
-
-	return 0;
-
-fail2:
-	lcd_syscall_munmap(mo);
-fail1:
-	return ret;
-}
-
-void _lcd_munmap(cptr_t mo, gpa_t base)
-{
-	int ret;
-	struct lcd_resource_node *n;
-	/*
-	 * Look up resource node for memory object in itree
-	 */
-	ret = lcd_phys_to_resource_node(base, &n);
-	if (ret) {
-		LIBLCD_ERR("couldn't find memory object in tree");
-		return;
-	}
-	/*
-	 * Remove from tree
-	 */
-	__liblcd_mem_itree_delete(n);
-	/*
-	 * Unmap memory object
-	 */
-	lcd_syscall_munmap(mo);
-}
-
 /* PAGE ALLOCATOR INTERNALS ---------------------------------------- */
 
 static int 
@@ -260,13 +208,6 @@ heap_free_unmap_regular_mem_chunk(struct lcd_page_allocator *pa,
 	heap_free_unmap_metadata_memory_chunk(&pa->cbs, n_to_delete);
 }
 
-struct lcd_page_allocator_cbs heap_page_allocator_cbs = {
-	.alloc_map_metadata_memory_chunk = heap_alloc_map_metadata_memory_chunk,
-	.free_unmap_metadata_memory_chunk = heap_free_unmap_metadata_memory_chunk,
-	.alloc_map_regular_mem_chunk = heap_alloc_map_regular_mem_chunk,
-	.free_unmap_regular_mem_chunk = heap_free_unmap_regular_mem_chunk,
-};
-
 static inline gva_t heap_page_block_to_addr(struct lcd_page_block *pb)
 {
 	return gva_add(LCD_HEAP_GV_ADDR, 
@@ -306,93 +247,6 @@ static inline struct lcd_page_block *heap_struct_page_to_page_block(
 {
 	return heap_addr_to_page_block(
 		heap_struct_page_to_addr(p));
-}
-
-static int setup_struct_page_array(void)
-{
-	struct lcd_page_block *pb;
-	unsigned int order;
-	unsigned long bytes;
-	/*
-	 * Compute number of struct pages we need
-	 */
-	bytes = roundup_pow_of_two((1UL << LCD_HEAP_NR_PAGES_ORDER) *
-				sizeof(struct page));
-	order = ilog2(bytes >> PAGE_SHIFT);
-	/*
-	 * Do the alloc
-	 */
-	pb = lcd_page_allocator_alloc(heap_allocator, order);
-	if (!pb) {
-		LIBLCD_ERR("error setting up struct page array for heap");
-		ret = -ENOMEM;
-		goto fail1;
-	}
-	/*
-	 * Zero out the array (unnecessary right now, but just in case)
-	 */
-	heap_page_array = (void *)gva_val(lcd_page_block_to_addr(pb));
-	memset(heap_page_array,
-		0,
-		(1 << (order + PAGE_SHIFT)));
-
-	return 0;
-
-fail1:
-	return ret;
-}
-
-void cpucache_init(void);
-
-static void __init_refok kmalloc_init(void)
-{
-	kmem_cache_init();
-	kmem_cache_init_late();
-	cpucache_init();
-}
-
-static int init_heap(void)
-{
-	int ret;
-	/*
-	 * Create new page allocator in heap region
-	 */
-	ret = lcd_page_allocator_create(LCD_HEAP_SIZE,
-					LCD_HEAP_MIN_ORDER,
-					LCD_HEAP_MAX_ORDER,
-					LCD_HEAP_MAX_ORDER,
-					&heap_page_allocator_cbs,
-					1, /* embed metadata */
-					&heap_allocator);
-	if (ret) {
-		LIBLCD_ERR("error initializing heap allocator");
-		goto fail1;
-	}
-	/*
-	 * Set up struct page array
-	 */
-	ret = setup_struct_page_array();
-	if (ret) {
-		LIBLCD_ERR("error setting up struct page array for heap");
-		goto fail2;
-	}
-	/*
-	 * Initialize kmalloc
-	 */
-	kmalloc_init();
-	/*
-	 * Inform mem itree the page and slab allocators are up (and so
-	 * it can start using kmalloc for allocating nodes)
-	 */
-	__liblcd_mem_itree_booted();
-
-	return 0;
-
-fail2:
-	lcd_page_allocator_destroy(heap_allocator);
-	heap_allocator = NULL;
-fail1:
-	return ret;
 }
 
 /* PAGE ALLOC INTERFACE ---------------------------------------- */
@@ -499,18 +353,96 @@ gva_t lcd_gpa2gva(gpa_t gpa)
 
 /* INIT/EXIT -------------------------------------------------- */
 
-int __liblcd_mem_init(void)
+static int setup_struct_page_array(void)
 {
-	int ret;
-	
-	ret = init_heap();
-	if (ret) {
-		LIBLCD_ERR("heap init failed");
+	struct lcd_page_block *pb;
+	unsigned int order;
+	unsigned long bytes;
+	/*
+	 * Compute number of struct pages we need
+	 */
+	bytes = roundup_pow_of_two((1UL << LCD_HEAP_NR_PAGES_ORDER) *
+				sizeof(struct page));
+	order = ilog2(bytes >> PAGE_SHIFT);
+	/*
+	 * Do the alloc
+	 */
+	pb = lcd_page_allocator_alloc(heap_allocator, order);
+	if (!pb) {
+		LIBLCD_ERR("error setting up struct page array for heap");
+		ret = -ENOMEM;
 		goto fail1;
 	}
+	/*
+	 * Zero out the array (unnecessary right now, but just in case)
+	 */
+	heap_page_array = (void *)gva_val(lcd_page_block_to_addr(pb));
+	memset(heap_page_array,
+		0,
+		(1 << (order + PAGE_SHIFT)));
 
 	return 0;
 
+fail1:
+	return ret;
+}
+
+void cpucache_init(void);
+
+static void __init_refok kmalloc_init(void)
+{
+	kmem_cache_init();
+	kmem_cache_init_late();
+	cpucache_init();
+}
+
+struct lcd_page_allocator_cbs heap_page_allocator_cbs = {
+	.alloc_map_metadata_memory_chunk = heap_alloc_map_metadata_memory_chunk,
+	.free_unmap_metadata_memory_chunk = heap_free_unmap_metadata_memory_chunk,
+	.alloc_map_regular_mem_chunk = heap_alloc_map_regular_mem_chunk,
+	.free_unmap_regular_mem_chunk = heap_free_unmap_regular_mem_chunk,
+};
+
+int __liblcd_heap_init(void)
+{
+	int ret;
+	/*
+	 * Create new page allocator in heap region
+	 */
+	ret = lcd_page_allocator_create(LCD_HEAP_SIZE,
+					LCD_HEAP_MIN_ORDER,
+					LCD_HEAP_MAX_ORDER,
+					LCD_HEAP_MAX_ORDER,
+					&heap_page_allocator_cbs,
+					1, /* embed metadata */
+					&heap_allocator);
+	if (ret) {
+		LIBLCD_ERR("error initializing heap allocator");
+		goto fail1;
+	}
+	/*
+	 * Set up struct page array
+	 */
+	ret = setup_struct_page_array();
+	if (ret) {
+		LIBLCD_ERR("error setting up struct page array for heap");
+		goto fail2;
+	}
+	/*
+	 * Initialize kmalloc
+	 */
+	kmalloc_init();
+	/*
+	 * Inform mem itree the page and slab allocators are up (and so
+	 * it can start using kmalloc for allocating nodes)
+	 */
+	__liblcd_mem_itree_booted();
+
+	return 0;
+
+fail2:
+	lcd_page_allocator_destroy(heap_allocator);
+	heap_allocator = NULL;
 fail1:
 	return ret;
 }

@@ -79,6 +79,7 @@ int _lcd_vmalloc(unsigned int order, cptr_t *slot_out);
 /**
  * _lcd_mmap -- Low-level memory mapping, calls into microkernel
  * @mo: cptr to memory object capability (e.g., pages)
+ * @order: the memory object is 2^order pages in size
  * @base: starting guest physical address where memory should be mapped
  *
  * Purpose: Maps the memory referred to by the @mo cptr_t in the caller's
@@ -88,6 +89,10 @@ int _lcd_vmalloc(unsigned int order, cptr_t *slot_out);
  * In either environment, this call (or a higher-level counterpart, like
  * lcd_map_phys) is necessary before you try to do address -> cptr
  * translation via lcd_phys_to_cptr (even for non-isolated code).
+ *
+ * Note: for isolated code, the microkernel ignores the @order argument.
+ * It is still needed though for isolated liblcd so that it knows how
+ * big the memory object is (it can't "ask" the microkernel).
  *
  * Non-isolated code notes
  * -----------------------
@@ -118,7 +123,7 @@ int _lcd_vmalloc(unsigned int order, cptr_t *slot_out);
  * Furthermore, @base has an existing mapping, or the @mo won't
  * fit, the microkernel will reject the mapping.
  */
-int _lcd_mmap(cptr_t mo, gpa_t base);
+int _lcd_mmap(cptr_t mo, unsigned int order, gpa_t base);
 
 /**
  * _lcd_munmap -- Low-level unmapping, calls into microkernel

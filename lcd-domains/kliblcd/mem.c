@@ -327,15 +327,15 @@ fail1:
 	return ret;
 }
 
-int _lcd_mmap(cptr_t mo_cptr, gpa_t base)
+int _lcd_mmap(cptr_t mo_cptr, unsigned int order, gpa_t base)
 {
 	gpa_t unused;
 	/*
 	 * We cheat and use lcd_map_phys since all it does is add
 	 * the memory object to the physical address space resource
-	 * tree. For non-isolated, @order is ignored.
+	 * tree.
 	 */
-	return lcd_map_phys(mo_cptr, 0, &unused);
+	return lcd_map_phys(mo_cptr, order, &unused);
 }
 
 static void do_phys_unmap(struct lcd *lcd, struct lcd_memory_object *mo,
@@ -353,12 +353,14 @@ static void do_phys_unmap(struct lcd *lcd, struct lcd_memory_object *mo,
 				cap_cnode_metadata(mo_cnode));
 }
 
-void _lcd_munmap(cptr_t mo_cptr)
+void _lcd_munmap(cptr_t mo_cptr, gpa_t base)
 {
 	struct lcd_memory_object *mo;
 	struct cnode *cnode;
 	int ret;
 	/*
+	 * Ignore base
+	 *
 	 * Get and lock the memory object
 	 */
 	ret = __lcd_get_memory_object(current->lcd, mo_cptr, &cnode, &mo);
@@ -422,7 +424,8 @@ struct page *lcd_alloc_pages_exact_node(int nid, unsigned int flags,
 	return p;
 
 fail3:
-	_lcd_munmap(slot);
+	/* gpa is ignored for non-isolated */
+	_lcd_munmap(slot, __gpa(0));
 fail2:
 	lcd_cap_delete(slot); /* frees pages, etc. */
 fail1:
@@ -469,7 +472,8 @@ struct page *lcd_alloc_pages(unsigned int flags, unsigned int order)
 	return p;
 
 fail3:
-	_lcd_munmap(slot);
+	/* gpa is ignored for non-isolated */
+	_lcd_munmap(slot, __gpa(0));
 fail2:
 	lcd_cap_delete(slot); /* frees pages, etc. */
 fail1:
@@ -501,8 +505,10 @@ void lcd_free_pages(struct page *base, unsigned int order)
 		LIBLCD_ERR("warning: order doesn't match actual order");
 	/*
 	 * Remove pages from resource tree ("unmap")
+	 *
+	 * gpa is ignored for non-isolated
 	 */
-	_lcd_munmap(page_cptr);
+	_lcd_munmap(page_cptr, __gpa(0));
 	/*
 	 * Free pages
 	 */
@@ -556,7 +562,8 @@ void* lcd_vmalloc(unsigned long sz)
 	return vptr;
 
 fail3:
-	_lcd_munmap(slot);
+	/* gpa is ignored for non-isolated */
+	_lcd_munmap(slot, __gpa(0));
 fail2:
 	lcd_cap_delete(slot); /* frees vmalloc mem, etc. */
 fail1:
@@ -579,8 +586,10 @@ void lcd_vfree(void *vptr)
 	}
 	/*
 	 * Remove vmalloc mem from resource tree ("unmap")
+	 *
+	 * gpa is ignored for non-isolated
 	 */
-	_lcd_munmap(vmalloc_mem_cptr);
+	_lcd_munmap(vmalloc_mem_cptr, __gpa(0));
 	/*
 	 * Free vmalloc mem
 	 */
@@ -708,8 +717,10 @@ void lcd_unmap_phys(gpa_t base, unsigned int order)
 	}
 	/*
 	 * Remove from resource tree
+	 *
+	 * gpa is ignored for non-isolated
 	 */
-	_lcd_munmap(mo_cptr);
+	_lcd_munmap(mo_cptr, __gpa(0));
 }
 
 void lcd_unmap_virt(gva_t base, unsigned int order)
@@ -730,8 +741,10 @@ void lcd_unmap_virt(gva_t base, unsigned int order)
 	}
 	/*
 	 * Remove memory object from resource tree
+	 *
+	 * gpa is ignored for non-isolated
 	 */
-	_lcd_munmap(mo_cptr);
+	_lcd_munmap(mo_cptr, __gpa(0));
 }
 
 /* VOLUNTEER HELPERS -------------------------------------------------- */

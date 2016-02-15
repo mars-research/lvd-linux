@@ -78,8 +78,12 @@ int __liblcd_heap_init(void);
  *
  * The maximum address space block you can allocate from the RAM map
  * area is 1 GB (2^18 = 262,144 pages).
+ *
+ * In hindsight, maybe a simple bitmap would have been just as good
+ * here since there are only 8GB/64MB = 128 allocation blocks. Oh well.
  */
-#define LCD_RAM_MAP_NR_PAGES_ORDER 26
+#define LCD_RAM_MAP_NR_PAGES_ORDER \
+	(ilog2(LCD_RAM_MAP_REGION_SIZE >> PAGE_SHIFT))
 #define LCD_RAM_MAP_SIZE LCD_RAM_MAP_REGION_SIZE
 #define LCD_RAM_MAP_MIN_ORDER 14
 #define LCD_RAM_MAP_MAX_ORDER 18

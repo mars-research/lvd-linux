@@ -115,15 +115,43 @@ fail1:
 
 /* PAGE ALLOCATOR INTERNALS ---------------------------------------- */
 
-static int 
-heap_alloc_map_metadata_memory_chunk(struct lcd_page_allocator_cbs *cbs,
-				unsigned long mapping_offset,
-				unsigned int alloc_order,
-				struct lcd_resource_node **n_out)
+static void __do_one_heap_free(struct lcd_resource_node *n)
+{
+	cptr_t pages = n->cptr;
+	gpa_t base = __gpa(lcd_resource_node_start(n));
+	/*
+	 * Unmap from guest physical
+	 */
+	_lcd_munmap(pages, base);
+	/*
+	 * Remove from resource tree
+	 */
+	__liblcd_mem_itree_delete(n);
+	/*
+	 * Free pages from host
+	 */
+	lcd_cap_delete(pages);
+}
+
+static void do_one_heap_free(gpa_t dest)
+{
+	int ret;
+	struct lcd_resource_node *n;
+	/*
+	 * Use resource tree to look up node for memory object
+	 */
+	ret = lcd_phys_to_resource_node(dest, &n);
+	if (ret) {
+		LIBLCD_ERR("error looking up resource node");
+		return;
+	}
+	__do_one_heap_free(n);
+}
+
+static int do_one_heap_alloc(gpa_t dest, unsigned int alloc_order)
 {
 	int ret;
 	cptr_t pages;
-	gpa_t dest = gpa_add(LCD_HEAP_GP_ADDR, mapping_offset);
 	/*
 	 * Do low-level page alloc out into microkernel
 	 */
@@ -140,43 +168,72 @@ heap_alloc_map_metadata_memory_chunk(struct lcd_page_allocator_cbs *cbs,
 		LIBLCD_ERR("low level mmap failed");
 		goto fail2;
 	}
-	/*
-	 * Look up resource node for new pages
-	 */
-	ret = lcd_phys_to_resource_node(dest, n_out);
-	if (ret) {
-		LIBLCD_ERR("failed to get new resource node");
-		goto fail3;
-	}
 
 	return 0;
 
-fail3:
-	_lcd_munmap(pages, dest);
 fail2:
 	lcd_cap_delete(pages);
 fail1:
 	return ret;
 }
 
+static int 
+heap_alloc_map_metadata_memory_chunk(struct lcd_page_allocator_cbs *cbs,
+				unsigned int alloc_order,
+				unsigned long metadata_sz,
+				void **metadata_addr)
+{
+	int ret;
+	unsigned long i, j;
+	unsigned long nr_allocs;
+	unsigned total;
+	gpa_t dest;
+
+	/*
+	 * Since we are embedding, we need to allocate in 2^alloc_order
+	 * chunks of pages.
+	 */
+
+	total = ALIGN(metadata_sz, (1UL << (alloc_order + PAGE_SHIFT)));
+	nr_allocs = total >> (alloc_order + PAGE_SHIFT); /* > 0 */
+
+	for (i = 0; i < nr_allocs; i++) {
+
+		dest = gpa_add(LCD_HEAP_GP_ADDR, 
+			i * (1UL << (alloc_order + PAGE_SHIFT)));
+
+		ret = do_one_heap_meta_alloc(dest, alloc_order);
+		if (ret) {
+			LIBLCD_ERR("metadata alloca failed at i = %lx", i);
+			goto fail1;
+		}
+
+	}
+	
+	*metadata_addr = (void *)gva_val(LCD_HEAP_GV_ADDR);
+
+	return 0;
+
+fail1:
+	for (j = 0; j < i; j++) {
+
+		dest = gpa_add(LCD_HEAP_GP_ADDR, 
+			j * (1UL << (alloc_order + PAGE_SHIFT)));
+
+		do_one_heap_free(dest);
+
+	}
+
+	return ret;
+}
+
 static void
 heap_free_unmap_metadata_memory_chunk(struct lcd_page_allocator_cbs *cbs,
-				struct lcd_resource_node *n_to_delete)
+				void *metadata_addr,
+				unsigned long metadata_sz,
+				unsigned int alloc_order)
 {
-	cptr_t pages = n_to_delete->cptr;
-	gpa_t base = __gpa(lcd_resource_node_start(n_to_delete));
-	/*
-	 * Unmap from guest physical
-	 */
-	_lcd_munmap(pages, base);
-	/*
-	 * Remove from resource tree
-	 */
-	__liblcd_mem_itree_delete(n_to_delete);
-	/*
-	 * Free pages from host
-	 */
-	lcd_cap_delete(pages);
+	do_one_heap_free(lcd_gva2gpa(__gva((unsigned long)metadata_addr)));
 }
 
 static int 
@@ -186,12 +243,9 @@ heap_alloc_map_regular_mem_chunk(struct lcd_page_allocator *pa,
 				unsigned int alloc_order,
 				struct lcd_resource_node **n_out)
 {
-	/*
-	 * For now, we just re-use the metadata func, since there
-	 * is no difference.
-	 */
-	return heap_alloc_map_metadata_memory_chunk(&pa->cbs, mapping_offset,
-						alloc_order, n_out);
+	gpa_t dest = gpa_add(LCD_HEAP_GP_ADDR, mapping_offset);
+
+	return do_one_heap_alloc(dest, alloc_order);
 }
 
 static void
@@ -201,11 +255,7 @@ heap_free_unmap_regular_mem_chunk(struct lcd_page_allocator *pa,
 				unsigned long mapping_offset,
 				unsigned int order)
 {
-	/*
-	 * Again, we re-use the metadata funcs since they're the same
-	 * right now.
-	 */
-	heap_free_unmap_metadata_memory_chunk(&pa->cbs, n_to_delete);
+	__do_one_heap_free(n_to_delete);
 }
 
 static inline gva_t heap_page_block_to_addr(struct lcd_page_block *pb)
@@ -397,8 +447,8 @@ static void __init_refok kmalloc_init(void)
 }
 
 struct lcd_page_allocator_cbs heap_page_allocator_cbs = {
-	.alloc_map_metadata_memory_chunk = heap_alloc_map_metadata_memory_chunk,
-	.free_unmap_metadata_memory_chunk = heap_free_unmap_metadata_memory_chunk,
+	.alloc_map_metadata_memory = heap_alloc_map_metadata_memory,
+	.free_unmap_metadata_memory = heap_free_unmap_metadata_memory,
 	.alloc_map_regular_mem_chunk = heap_alloc_map_regular_mem_chunk,
 	.free_unmap_regular_mem_chunk = heap_free_unmap_regular_mem_chunk,
 };
@@ -409,9 +459,8 @@ int __liblcd_heap_init(void)
 	/*
 	 * Create new page allocator in heap region
 	 */
-	ret = lcd_page_allocator_create(LCD_HEAP_SIZE,
+	ret = lcd_page_allocator_create(LCD_HEAP_NR_PAGES_ORDER,
 					LCD_HEAP_MIN_ORDER,
-					LCD_HEAP_MAX_ORDER,
 					LCD_HEAP_MAX_ORDER,
 					&heap_page_allocator_cbs,
 					1, /* embed metadata */
@@ -441,7 +490,7 @@ int __liblcd_heap_init(void)
 	return 0;
 
 fail2:
-	lcd_page_allocator_destroy(heap_allocator);
+	lcd_page_allocator_destroy(heap_allocator); /* frees metadata */
 	heap_allocator = NULL;
 fail1:
 	return ret;

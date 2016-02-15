@@ -102,14 +102,14 @@ struct lcd_page_allocator_cbs {
  * trying to understand the internals.
  */
 struct lcd_page_allocator {
+
+	/* Size of metadata in bytes (includes this struct) */
+	unsigned long metadata_sz;
 	
 	/* The page allocator covers 2^nr_pages_order pages of memory. */
 	unsigned int nr_pages_order;
 	/* The minimum number of pages you can allocate is 2^min_order. */
 	unsigned int min_order;
-	/* The maximum number of pages during metadata allocation that
-	 * will be attempted is 2^metadata_malloc_order. */
-	unsigned int metadata_malloc_order;
 	/* The maximum number of pages you can allocate is 2^max_order. */
 	unsigned int max_order;
 
@@ -181,24 +181,34 @@ struct lcd_page_allocator {
  * map and allocation interface that the page allocator will call out
  * to at specific times:
  *
- *	 -- alloc_map_metadata_memory_chunk
+ *	 -- alloc_map_metadata_memory
  *              This is called when the code is allocating memory for
  *              the page allocator metadata (the struct lcd_page_allocator,
- *              the giant array of page blocks, etc.). The code will
- *              only try to allocate in chunks of 2^metadata_malloc_order
- *              pages.
+ *              the giant array of page blocks, etc.).
  *
- *              This function is expected to allocate the real memory and
- *              map it at the correct offset. The function will be provided
- *              with the size (2^order) and the offset from the beginning.
- *              The function is expected to map offsets contiguously.
+ *              This function is expected to allocate the real memory needed
+ *              for the metadata.
  *
- *              IMPORTANT #1: If you wanted metadata embedded, you should map
+ *              This function will be invoked only once, with the
+ *              required memory specified as an argument (sz).
+ *
+ *              IMPORTANT #1: If you are embedding the metadata in the 
+ *              page allocator's memory region, you must allocate the
+ *              memory in chunks of 2^max_order pages. First, the metadata
+ *              memory you allocate must be a multiple of 2^max_order pages
+ *              because the remainder that is unused by the metadata will
+ *              be shared with real data. Second, during initialization,
+ *              the code will attach these chunks of memory to the
+ *              appropriate page block ranges, and it expects the memory
+ *              to be chunked in 2^max_order page chunks. (Just take my
+ *              word for it for now haha).
+ *
+ *              IMPORTANT #2: If you wanted metadata embedded, you should map
  *              the memory from the beginning of the memory area. If you
  *              get this wrong, it's not a serious problem, so long as you
  *              are consistent.
  *
- *              IMPORTANT #2: You should ensure that the starting address
+ *              IMPORTANT #3: You should ensure that the starting address
  *              of the metadata is aligned at a 2^max_order-page boundary
  *              (i.e., 2^max_order * 4096 byte boundary). If you don't,
  *              things will still sort of work, but when you allocate pages,
@@ -206,13 +216,13 @@ struct lcd_page_allocator {
  *              4 KBs of memory, but it won't be aligned at multiples
  *              of 0x1000).
  *
- *              Return lcd_resource_node that refers to allocated memory
- *              as an out parameter.
+ *              Return pointer to start of metadata memory as an out
+ *              parameter (void **).
  *
- *      -- free_unmap_metadata_memory_chunk
- *              Free memory allocated for metadata. This is only called
- *              in error situations during initialization to free up
- *              allocated memory.
+ *      -- free_unmap_metadata_memory
+ *              Free memory allocated for metadata. This is called when
+ *              the page allocator is destroyed (error situations in
+ *              initialization or during tear down).
  *
  *      -- alloc_map_regular_mem_chunk
  *              This will be called when:
@@ -274,7 +284,6 @@ struct lcd_page_allocator {
  */
 int lcd_page_allocator_create(unsigned long nr_pages_order,
 			unsigned int min_order,
-			unsigned int metadata_malloc_order,
 			unsigned int max_order,
 			const struct lcd_page_allocator_cbs *cbs,
 			int embed_metadata,
@@ -288,11 +297,9 @@ int lcd_page_allocator_create(unsigned long nr_pages_order,
  * memory area - except those that contain metadata (if the page allocator
  * was configured for embedding metadata).
  *
- * IMPORTANT: The caller is responsible for freeing the resources that
- * contain the page allocator metadata. This may involve traversing
- * a resource tree and deleting the nodes that refer to the pages
- * that contain the metadata (and returning the memory to the host).
- * Or it may mean returning the pages to *another* page allocator.
+ * This will invoke the free_unmap_metadata_memory callback so that
+ * the caller can free up metadata memory allocated for the page 
+ * allocator at the right point in allocator tear down.
  */
 void lcd_page_allocator_destroy(struct lcd_page_allocator *pa);
 

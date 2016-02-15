@@ -287,18 +287,18 @@ static void do_free(struct lcd_page_allocator *pa,
 
 static struct lcd_page_allocator* 
 init_struct_pa(void *metadata_addr,
+	unsigned long metadata_sz,
 	unsigned long nr_pages_order,
 	unsigned int min_order,
-	unsigned int metadata_malloc_order,
 	unsigned int max_order,
 	const struct lcd_page_allocator_cbs *cbs,
 	int embed_metadata)
 {
 	struct lcd_page_allocator *pa = metadata_addr;
 
+	pa->metadata_sz = metadata_sz;
 	pa->nr_pages_order = nr_pages_order;
 	pa->min_order = min_order;
-	pa->metadata_malloc_order = metadata_malloc_order;
 	pa->max_order = max_order;
 	pa->cbs = cbs;
 	pa->embed_metadata = embed_metadata;
@@ -383,11 +383,11 @@ static int alloc_metadata_page_blocks(struct lcd_page_allocator *pa,
 	/*
 	 * Allocate the big chunks first
 	 */
-	while (metadata_sz > (1UL << (pa->metadata_malloc_order + PAGE_SIZE))) {
+	while (metadata_sz > (1UL << (pa->max_order + PAGE_SIZE))) {
 		/*
 		 * Allocate 2^max_order bytes
 		 */
-		pb = alloc_page_blocks(pa, pa->metadata_malloc_order);
+		pb = alloc_page_blocks(pa, pa->max_order);
 		if (!pb) {
 			LIBLCD_ERR("error allocating blocks for metadata");
 			return -EIO;
@@ -410,7 +410,7 @@ static int alloc_metadata_page_blocks(struct lcd_page_allocator *pa,
 		/*
 		 * Shift to next 2^max_order chunk
 		 */
-		metadata_sz -= (1UL << (pa->metadata_malloc_order + PAGE_SIZE));
+		metadata_sz -= (1UL << (pa->max_order + PAGE_SIZE));
 	}
 	/*
 	 * Allocate the remainder, rounded up to the closest power of 2
@@ -455,7 +455,6 @@ static int allocator_init(void *metadata_addr,
 			unsigned long metadata_sz,
 			unsigned long nr_pages_order,
 			unsigned int min_order,
-			unsigned int metadata_malloc_order,
 			unsigned int max_order,
 			const struct lcd_page_allocator_cbs *cbs,
 			int embed_metadata,
@@ -466,6 +465,7 @@ static int allocator_init(void *metadata_addr,
 	 * Init top level struct
 	 */
 	pa = init_struct_pa(metadata_addr,
+			metadata_sz,
 			nr_pages_order,
 			min_order,
 			max_order,
@@ -501,92 +501,32 @@ fail1:
 /* METADATA FREE -------------------------------------------------- */
 
 static void free_metadata(void *metadata_addr,
-			unsigned int alloc_order,
 			unsigned long metadata_sz,
+			unsigned int alloc_order,
 			const struct lcd_page_allocator_cbs *cbs)
 {
-	struct lcd_resource_node *n;
-	unsigned long nr_blocks;
-	unsigned long i;
-	int ret;
-	gpa_t base;
-	gpa_t addr;
-	/*
-	 * Calculate number of memory chunks we need to free
-	 */
-	nr_blocks = ALIGN(metadata_sz, (1UL << (alloc_order + PAGE_SIZE)));
-	nr_blocks >>= (alloc_order + PAGE_SIZE);
-	/*
-	 * Calculate starting guest physical address where metadata is
-	 *
-	 * XXX: Assumes guest virtual == guest physical
-	 */
-	base = __gpa((unsigned long)metadata_addr);
-	/*
-	 * Look up chunks, and pass to free callback
-	 */
-	for (i = 0; i < nr_blocks; i++) {
-		addr = gpa_add(base, i * (1UL << (alloc_order + PAGE_SIZE)));
-		ret = lcd_phys_to_resource_node(
-			addr,
-			&n);
-		if (ret) {
-			LIBLCD_ERR("error looking up metadata resource node for gpa = %lx", gpa_val(addr));
-			continue;
-		}
-		cbs->free_unmap_metadata_memory_chunk(cbs, n);
-	}
+	cbs->free_unmap_metadata_memory(cbs, metadata_addr, metadat_sz,
+					alloc_order);
 }
 
 /* METADATA MALLOC -------------------------------------------------- */
-
-static void* get_start_addr(struct lcd_resource_node *n)
-{
-	/* Assumes guest virtual == guest physical */
-	return (void *)gpa_val(lcd_resource_node_start);
-}
 
 static void* malloc_metadata(unsigned int alloc_order,
 			unsigned long metadata_sz,
 			const struct lcd_page_allocator_cbs *cbs)
 {
-	struct lcd_resource_node *n;
-	unsigned long nr_blocks;
-	unsigned long i, j;
 	int ret;
 	void *out;
 	/*
-	 * Calculate number of memory chunks we need, rounded up.
+	 * Get memory
 	 */
-	nr_blocks = ALIGN(metadata_sz, (1UL << alloc_order)) >> alloc_order;
-	
-	for (i = 0; i < nr_blocks; i++) {
-		/*
-		 * Allocate and map a memory chunk
-		 */
-		ret = cbs->alloc_map_metadata_memory_chunk(
-			cbs,
-			i * (1UL << (alloc_order + PAGE_SIZE)), 
-			alloc_order,
-			&n);
-		if (ret) {
-			LIBLCD_ERR("error allocating metadata chunk %ul of %ul", i, nr_blocks);
-			goto fail1;
-		}
-		/*
-		 * For first chunk, remember starting address (beginning
-		 * of metadata).
-		 */
-		if (i == 0)
-			out = get_start_addr(n)
+	ret = cbs->alloc_map_metadata_memory(cbs, alloc_order, metadata_sz,
+					&out);
+	if (ret) {
+		LIBLCD_ERR("failed to get metadata memory");
+		return NULL;
 	}
-
 	return out;
-
-fail1:
-	for (j = 0; j < i; j++)
-		cbs->free_unmap_metadata_memory_chunk(cbs, n);
-	return NULL;
 }
 
 /* METADATA SIZE CALCULATIONS ------------------------------ */
@@ -599,7 +539,6 @@ static unsigned long calc_nr_lcd_page_blocks(unsigned int nr_pages_order,
 
 static unsigned long calc_metadata_size(unsigned int nr_pages_order,
 					unsigned int min_order,
-					unsigned int metadata_malloc_order,
 					unsigned int max_order,
 					int embed_metadata,
 					unsigned long *metadata_sz_out)
@@ -612,38 +551,14 @@ static unsigned long calc_metadata_size(unsigned int nr_pages_order,
 	 *
 	 *    min_order <= max_order <= nr_pages_order
 	 *
-	 * Furthermore, if we are embedding the metadata into the memory
-	 * area, the metadata malloc order must satisfy:
-	 *
-	 *    min_order <= metadata_malloc_order <= max_order
-	 *
-	 * This is because we will mark those page blocks that contain
-	 * metadata as occupied. It needs to make sense for the page
-	 * allocator; the page allocator uses an internal algorithm to
-	 * track a correspondence between page blocks and resource nodes.
-	 * A resource node cannot span less than 2^min_order memory or
-	 * more than 2^max_order memory.
-	 *
 	 * We don't use BUG_ON's so that we don't crash the caller.
 	 */
 	if (unlikely(min_order > max_order)) {
 		LIBLCD_ERR("min order > max order, impossible");
 		return -EINVAL;
 	}
-	if (unlikely(min_order > metadata_malloc_order)) {
-		LIBLCD_ERR("min_order > metadata malloc order, impossible");
-		return -EINVAL;
-	}
-	if (unlikely(metadata_malloc_order > max_order)) {
-		LIBLCD_ERR("metadata malloc order > max order, impossible");
-		return -EINVAL;
-	}
-	if (unlikely(embed_metadata && metadata_malloc_order == max_order)) {
-		LIBLCD_ERR("trying to embed metadata, but metadata malloc order != max order, not allowed");
-		return -EINVAL;
-	}
 	if (unlikely(max_order > nr_pages_order)) {
-		LIBLCD_ERR("trying to embed metadata, and max order > total memory area order, impossible");
+		LIBLCD_ERR("max order > total memory area order, impossible");
 		return -EINVAL;
 	}
 	/*
@@ -693,7 +608,6 @@ static unsigned long calc_metadata_size(unsigned int nr_pages_order,
 
 int lcd_page_allocator_create(unsigned long nr_pages_order,
 			unsigned int min_order,
-			unsigned int metadata_malloc_order,
 			unsigned int max_order,
 			const struct lcd_page_allocator_cbs *cbs,
 			int embed_metadata,
@@ -709,7 +623,6 @@ int lcd_page_allocator_create(unsigned long nr_pages_order,
 	 */
 	ret = calc_metadata_size(nr_pages_order,
 				min_order,
-				metadata_malloc_order,
 				max_order,
 				embed_metadata,
 				&metadata_sz);
@@ -718,7 +631,7 @@ int lcd_page_allocator_create(unsigned long nr_pages_order,
 	/*
 	 * Get memory for metadata
 	 */
-	metadata_addr = malloc_metadata(metadata_malloc_order,
+	metadata_addr = malloc_metadata(max_order,
 					metadata_sz,
 					cbs);
 	if (!metadata_addr) {
@@ -732,7 +645,6 @@ int lcd_page_allocator_create(unsigned long nr_pages_order,
 			metadata_sz,
 			nr_pages_order,
 			min_order,
-			metadata_malloc_order,
 			max_order,
 			cbs,
 			embed_metadata);
@@ -742,10 +654,7 @@ int lcd_page_allocator_create(unsigned long nr_pages_order,
 	return 0;
 
 fail3:
-	free_metadata(metadata_addr,
-		metadata_malloc_order,
-		metadata_sz,
-		cbs);
+	free_metadata(metadata_addr, metadata_sz, max_order, cbs);
 fail2:
 fail1:
 	return ret;
@@ -773,8 +682,11 @@ void lcd_page_allocator_destroy(struct lcd_page_allocator *pa)
 			lcd_page_allocator_free(pa, &cursor[i], 0);
 	}
 	/*
-	 * The caller is responsible for freeing the metadata
+	 * Free metadata (pa becomes invalid as this call is executed)
 	 */
+	free_metadata(pa, pa->metadata_sz, pa->max_order, pa->cbs);
+	pa = NULL;
+
 	return;
 }
 

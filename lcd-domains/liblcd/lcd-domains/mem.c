@@ -294,6 +294,20 @@ static inline gva_t heap_struct_page_to_addr(struct page *p)
 	return gva_add(LCD_HEAP_GV_ADDR, idx * PAGE_SIZE);
 }
 
+static inline struct page *heap_page_block_to_struct_page(
+	struct lcd_page_block *pb)
+{
+	return heap_addr_to_struct_page(
+		heap_page_block_to_addr(pb));
+}
+
+static inline struct lcd_page_block *heap_struct_page_to_page_block(
+	struct page *p)
+{
+	return heap_addr_to_page_block(
+		heap_struct_page_to_addr(p));
+}
+
 static int setup_struct_page_array(void)
 {
 	struct lcd_page_block *pb;
@@ -379,6 +393,56 @@ fail2:
 	heap_allocator = NULL;
 fail1:
 	return ret;
+}
+
+/* PAGE ALLOC INTERFACE ---------------------------------------- */
+
+struct page *lcd_alloc_pages_exact_node(int nid, unsigned int flags, 
+					unsigned int order)
+{
+	/*
+	 * For now, we ignore the node id (not numa aware).
+	 */
+	return lcd_alloc_pages(flags, order);
+}
+
+struct page *lcd_alloc_pages(unsigned int flags, unsigned int order)
+{
+	struct lcd_page_block *pb;
+	/*
+	 * Do heap alloc. Flags are ignored for now.
+	 */
+	pb = lcd_page_allocator_alloc(heap_allocator, order);
+	if (!pb) {
+		LIBLCD_ERR("alloc failed");
+		goto fail1;
+	}
+	/*
+	 * Convert to struct page
+	 */
+	return heap_page_block_to_struct_page(pb);
+
+fail1:
+	return NULL;
+}
+
+void lcd_free_pages(struct page *base, unsigned int order)
+{
+	lcd_page_allocator_free(heap_allocator,
+				lcd_struct_page_to_page_block(base),
+				order);
+}
+
+void* lcd_vmalloc(unsigned long sz)
+{
+	/* Not implemented for now */
+	BUG();
+}
+
+void lcd_vfree(void *ptr)
+{
+	/* Not implemented for now */
+	BUG();
 }
 
 /* VOLUNTEERING -------------------------------------------------- */

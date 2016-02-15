@@ -233,7 +233,27 @@ heap_free_unmap_metadata_memory_chunk(struct lcd_page_allocator_cbs *cbs,
 				unsigned long metadata_sz,
 				unsigned int alloc_order)
 {
-	do_one_heap_free(lcd_gva2gpa(__gva((unsigned long)metadata_addr)));
+	unsigned long i;
+	unsigned long nr_frees;
+	unsigned total;
+	gpa_t dest;
+
+	/*
+	 * Ignore the metadata address; should be at predefined spot.
+	 *
+	 * We alloc'd the metadata in chunks; free them.
+	 */
+
+	total = ALIGN(metadata_sz, (1UL << (alloc_order + PAGE_SHIFT)));
+	nr_allocs = total >> (alloc_order + PAGE_SHIFT); /* > 0 */
+
+	for (i = 0; i < nr_allocs; i++) {
+		dest = gpa_add(LCD_HEAP_GP_ADDR, 
+			i * (1UL << (alloc_order + PAGE_SHIFT)));
+		do_one_heap_free(dest);
+	}
+
+	return;
 }
 
 static int 

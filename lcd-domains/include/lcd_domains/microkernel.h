@@ -477,6 +477,22 @@ unsigned long __lcd_memory_object_size(struct lcd_memory_object *mo);
  */
 unsigned long __lcd_memory_object_last(struct lcd_memory_object *mo);
 /**
+ * __lcd_memory_object_is_contiguous -- Returns non-zero if memory is
+ *                                      contiguous in host's physical mem
+ * @mo: the memory object
+ *
+ * For things like vmalloc memory, this returns 0 (for non-contiguous).
+ */
+int __lcd_memory_object_is_contiguous(struct lcd_memory_object *mo);
+/**
+ * __lcd_memory_object_is_ram -- Return non-zero for non-devmem
+ */
+int __lcd_memory_object_is_ram(struct lcd_memory_object *mo);
+/**
+ * __lcd_memory_object_hva -- Return host virtual address of start of mem obj
+ */
+hva_t __lcd_memory_object_hva(struct lcd_memory_object *mo);
+/**
  * __lcd_insert_memory_object -- Insert memory object into LCD's cspace, and
  *                               into the global memory interval tree
  * @caller: the LCD in whose cspace we should insert the capability 

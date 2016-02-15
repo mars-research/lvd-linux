@@ -39,6 +39,43 @@ unsigned long __lcd_memory_object_last(struct lcd_memory_object *mo)
 		__lcd_memory_object_size(mo) - 1;
 }
 
+int __lcd_memory_object_is_contiguous(struct lcd_memory_object *mo)
+{
+	switch (mo->sub_type) {
+	case LCD_MICROKERNEL_TYPE_ID_PAGE:
+	case LCD_MICROKERNEL_TYPE_ID_VOLUNTEERED_PAGE:
+	case LCD_MICROKERNEL_TYPE_ID_VOLUNTEERED_DEV_MEM:
+		return 1;
+	case LCD_MICROKERNEL_TYPE_ID_VMALLOC_MEM:
+	case LCD_MICROKERNEL_TYPE_ID_VOLUNTEERED_VMALLOC_MEM:
+		return 0;
+	default:
+		LCD_ERR("unexpected memory object type %d", mo->sub_type);
+		BUG();
+	}
+}
+
+int __lcd_memory_object_is_ram(struct lcd_memory_object *mo)
+{
+	return mo->sub_type != LCD_MICROKERNEL_TYPE_ID_VOLUNTEERED_DEV_MEM;
+}
+
+hva_t __lcd_memory_object_hva(struct lcd_memory_object *mo)
+{
+	switch (mo->sub_type) {
+	case LCD_MICROKERNEL_TYPE_ID_PAGE:
+	case LCD_MICROKERNEL_TYPE_ID_VOLUNTEERED_PAGE:
+	case LCD_MICROKERNEL_TYPE_ID_VOLUNTEERED_DEV_MEM:
+		return pa2hva(__lcd_memory_object_start(mo));
+	case LCD_MICROKERNEL_TYPE_ID_VMALLOC_MEM:
+	case LCD_MICROKERNEL_TYPE_ID_VOLUNTEERED_VMALLOC_MEM:
+		return va2hva(__lcd_memory_object_start(mo));
+	default:
+		LCD_ERR("unexpected memory object type %d", mo->sub_type);
+		BUG();
+	}
+}
+
 int __lcd_insert_memory_object(struct lcd *caller, cptr_t slot,
 			void *mem_obj,
 			unsigned int order,
@@ -422,18 +459,10 @@ static int isolated_map_memory_object(struct lcd *lcd,
 	 * The mapping process depends on the memory object type
 	 * (physical memory, vmalloc memory, etc.)
 	 */
-	switch (mo->sub_type) {
-	case LCD_MICROKERNEL_TYPE_ID_PAGE:
-	case LCD_MICROKERNEL_TYPE_ID_VOLUNTEERED_PAGE:
-	case LCD_MICROKERNEL_TYPE_ID_VOLUNTEERED_DEV_MEM:
+	if (__lcd_memory_object_is_contiguous(mo))
 		return isolated_map_contiguous_mem(lcd, mo, base);
-	case LCD_MICROKERNEL_TYPE_ID_VMALLOC_MEM:
-	case LCD_MICROKERNEL_TYPE_ID_VOLUNTEERED_VMALLOC_MEM:
+	else
 		return isolated_map_vmalloc_mem(lcd, mo, base);
-	default:
-		LCD_ERR("unexpected memory object type %d", mo->sub_type);
-		return -EINVAL;
-	}
 }
 
 int __lcd_do_map_memory_object(struct lcd *lcd, 
@@ -566,18 +595,10 @@ static void isolated_unmap_memory_object(struct lcd *lcd,
 	 * The unmapping process depends on the memory object type
 	 * (physical memory, vmalloc memory, etc.)
 	 */
-	switch (mo->sub_type) {
-	case LCD_MICROKERNEL_TYPE_ID_PAGE:
-	case LCD_MICROKERNEL_TYPE_ID_VOLUNTEERED_PAGE:
-	case LCD_MICROKERNEL_TYPE_ID_VOLUNTEERED_DEV_MEM:
+	if (__lcd_memory_object_is_contiguous(mo))
 		return isolated_unmap_contiguous_mem(lcd, mo, meta);
-	case LCD_MICROKERNEL_TYPE_ID_VMALLOC_MEM:
-	case LCD_MICROKERNEL_TYPE_ID_VOLUNTEERED_VMALLOC_MEM:
+	else
 		return isolated_unmap_vmalloc_mem(lcd, mo, meta);
-	default:
-		LCD_ERR("unexpected memory object type %d", mo->sub_type);
-		return;
-	}
 }
 
 void __lcd_do_unmap_memory_object(struct lcd *caller, 

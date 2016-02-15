@@ -13,9 +13,8 @@
 /* RESOURCE TREES -------------------------------------------------- */
 
 /* 
- * There are two trees: One for RAM and device memory (host physical
- * addresses), one for vmalloc (host virtual addresses for memory that
- * need not be contiguous).
+ * There are two trees: One for contiguous memory (RAM and device memory)
+ * and one for non-contiguous memory (vmalloc).
  *
  * For now, resource trees are per-thread (these are not the same
  * thing as the global memory interval tree). So, we don't use any
@@ -23,12 +22,10 @@
  *
  * We also expect non-isolated code to not be too tricky. For example,
  * we don't expect it to insert host memory as RAM and VMALLOC memory
- * simultaneously (one piece of physical memory, but also mapped via
- * vmalloc). Non-isolated code is trusted after all ...
+ * simultaneously. Non-isolated code is trusted after all ...
  */
-#define LCD_RESOURCE_TREE_RAM_IDX      0
-#define LCD_RESOURCE_TREE_DEV_MEM_IDX  0
-#define LCD_RESOURCE_TREE_VMALLOC_IDX  1
+#define LCD_RESOURCE_TREE_CONTIGUOUS      0
+#define LCD_RESOURCE_TREE_NON_CONTIGUOUS  1
 
 int lcd_alloc_init_resource_tree(struct lcd_resource_tree **t_out)
 {
@@ -120,29 +117,16 @@ static int mo_insert_in_trees(struct task_struct *t,
 			struct lcd_memory_object *mo,
 			cptr_t mo_cptr)
 {
-	switch (mo->sub_type) {
-	case LCD_MICROKERNEL_TYPE_ID_PAGE:
-	case LCD_MICROKERNEL_TYPE_ID_VOLUNTEERED_PAGE:
+	if (__lcd_memory_object_is_contiguous(mo))
 		return mo_insert_in_tree(
-			t->lcd_resource_trees[LCD_RESOURCE_TREE_RAM_IDX],
+			t->lcd_resource_trees[LCD_RESOURCE_TREE_CONTIGUOUS],
 			mo,
 			mo_cptr);
-	case LCD_MICROKERNEL_TYPE_ID_VOLUNTEERED_DEV_MEM:
+	else
 		return mo_insert_in_tree(
-			t->lcd_resource_trees[LCD_RESOURCE_TREE_DEV_MEM_IDX],
+			t->lcd_resource_trees[LCD_RESOURCE_TREE_NON_CONTIGUOUS],
 			mo,
 			mo_cptr);
-	case LCD_MICROKERNEL_TYPE_ID_VMALLOC_MEM:
-	case LCD_MICROKERNEL_TYPE_ID_VOLUNTEERED_VMALLOC_MEM:
-		return mo_insert_in_tree(
-			t->lcd_resource_trees[LCD_RESOURCE_TREE_VMALLOC_IDX],
-			mo,
-			mo_cptr);
-	default:
-		LCD_ERR("unexpected memory object type %d",
-			mo->sub_type);
-		return -EINVAL;
-	}
 }
 
 static int mo_in_tree(struct lcd_resource_tree *t, 
@@ -159,26 +143,14 @@ static int mo_in_tree(struct lcd_resource_tree *t,
 
 static int mo_in_trees(struct task_struct *t, struct lcd_memory_object *mo)
 {
-	switch (mo->sub_type) {
-	case LCD_MICROKERNEL_TYPE_ID_PAGE:
-	case LCD_MICROKERNEL_TYPE_ID_VOLUNTEERED_PAGE:
+	if (__lcd_memory_object_is_contiguous(mo))
 		return mo_in_tree(
-			t->lcd_resource_trees[LCD_RESOURCE_TREE_RAM_IDX],
+			t->lcd_resource_trees[LCD_RESOURCE_TREE_CONTIGUOUS],
 			mo);
-	case LCD_MICROKERNEL_TYPE_ID_VOLUNTEERED_DEV_MEM:
+	else
 		return mo_in_tree(
-			t->lcd_resource_trees[LCD_RESOURCE_TREE_DEV_MEM_IDX],
+			t->lcd_resource_trees[LCD_RESOURCE_TREE_NON_CONTIGUOUS],
 			mo);
-	case LCD_MICROKERNEL_TYPE_ID_VMALLOC_MEM:
-	case LCD_MICROKERNEL_TYPE_ID_VOLUNTEERED_VMALLOC_MEM:
-		return mo_in_tree(
-			t->lcd_resource_trees[LCD_RESOURCE_TREE_VMALLOC_IDX],
-			mo);
-	default:
-		LCD_ERR("unexpected memory object type %d",
-			mo->sub_type);
-		return -EINVAL;
-	}
 }
 
 static void mo_remove_from_tree(struct lcd_resource_tree *tree, 
@@ -206,26 +178,14 @@ static void mo_remove_from_tree(struct lcd_resource_tree *tree,
 static void mo_remove_from_trees(struct task_struct *t, 
 				struct lcd_memory_object *mo)
 {
-	switch (mo->sub_type) {
-	case LCD_MICROKERNEL_TYPE_ID_PAGE:
-	case LCD_MICROKERNEL_TYPE_ID_VOLUNTEERED_PAGE:
+	if (__lcd_memory_object_is_contiguous(mo))
 		mo_remove_from_tree(
-			t->lcd_resource_trees[LCD_RESOURCE_TREE_RAM_IDX],
+			t->lcd_resource_trees[LCD_RESOURCE_TREE_CONTIGUOUS],
 			mo);
-	case LCD_MICROKERNEL_TYPE_ID_VOLUNTEERED_DEV_MEM:
+	else
 		mo_remove_from_tree(
-			t->lcd_resource_trees[LCD_RESOURCE_TREE_DEV_MEM_IDX],
+			t->lcd_resource_trees[LCD_RESOURCE_TREE_NON_CONTIGUOUS],
 			mo);
-	case LCD_MICROKERNEL_TYPE_ID_VMALLOC_MEM:
-	case LCD_MICROKERNEL_TYPE_ID_VOLUNTEERED_VMALLOC_MEM:
-		mo_remove_from_tree(
-			t->lcd_resource_trees[LCD_RESOURCE_TREE_VMALLOC_IDX],
-			mo);
-	default:
-		LCD_ERR("unexpected memory object type %d",
-			mo->sub_type);
-		return;
-	}
 }
 
 /* LOW-LEVEL PAGE ALLOC -------------------------------------------------- */
@@ -327,7 +287,7 @@ fail1:
 
 /* LOW-LEVEL MAP -------------------------------------------------- */
 
-static int __lcd_mmap(struct lcd *lcd, struct lcd_memory_object *mo, 
+static int do_map_phys(struct lcd *lcd, struct lcd_memory_object *mo, 
 		struct cnode *cnode, cptr_t mo_cptr, gpa_t base)
 {
 	int ret;
@@ -369,43 +329,16 @@ fail1:
 
 int _lcd_mmap(cptr_t mo_cptr, gpa_t base)
 {
-	struct lcd_memory_object *mo;
-	struct cnode *cnode;
-	int ret;
+	gpa_t unused;
 	/*
-	 * Ignore gpa arg - non-isolated code cannot change physical
-	 * mappings
-	 *
-	 *	
-	 * Get and lock the memory object
+	 * We cheat and use lcd_map_phys since all it does is add
+	 * the memory object to the physical address space resource
+	 * tree. For non-isolated, @order is ignored.
 	 */
-	ret = __lcd_get_memory_object(current->lcd, mo_cptr, &cnode, &mo);
-	if (ret) {
-		LIBLCD_ERR("error looking up memory object");
-		goto fail1;
-	}
-	/*
-	 * Do the map
-	 */
-	ret = __lcd_mmap(current->lcd, mo, cnode, mo_cptr, base);
-	if (ret) {
-		LIBLCD_ERR("error mapping mem object");
-		goto fail2;
-	}
-	/*
-	 * Release locks
-	 */
-	__lcd_put_memory_object(current->lcd, cnode, mo);
-
-	return 0;
-
-fail2:
-	__lcd_put_memory_object(current->lcd, cnode, mo);
-fail1:
-	return ret;
+	return lcd_map_phys(mo_cptr, 0, &unused);
 }
 
-static void __lcd_munmap(struct lcd *lcd, struct lcd_memory_object *mo,
+static void do_phys_unmap(struct lcd *lcd, struct lcd_memory_object *mo,
 			struct cnode *mo_cnode)
 {
 	/*
@@ -436,7 +369,7 @@ void _lcd_munmap(cptr_t mo_cptr)
 	/*
 	 * Do the unmap
 	 */
-	__lcd_munmap(current->lcd, mo, cnode);
+	do_phys_unmap(current->lcd, mo, cnode);
 	/*
 	 * Release locks
 	 */
@@ -676,14 +609,21 @@ int lcd_map_phys(cptr_t pages, unsigned int order, gpa_t *base_out)
 		goto fail1;
 	}
 	/*
-	 * "Map" the pages (adds pages to proper resource tree)
+	 * Ensure the memory object is for contiguous memory
 	 */
-	ret = __lcd_mmap(current->lcd, mo, cnode, pages, __gpa(0));
-	if (ret) {
-		LIBLCD_ERR("error mapping pages in resource tree");
+	if (!__lcd_memory_object_is_contiguous(mo)) {
+		LIBLCD_ERR("memory object is not contiguous; use lcd_map_virt instead");
+		ret = -EINVAL;
 		goto fail2;
 	}
-
+	/*
+	 * "Map" the pages (adds pages to proper resource tree)
+	 */
+	ret = __lcd_mmap(current->lcd, mo, cnode, pages);
+	if (ret) {
+		LIBLCD_ERR("error mapping pages in resource tree");
+		goto fail3;
+	}
 	p = mo->object;
 	/* guest physical == host physical for non-isolated */
 	*base_out = __gpa(hpa_val(va2hpa(page_address(p))));
@@ -694,62 +634,60 @@ int lcd_map_phys(cptr_t pages, unsigned int order, gpa_t *base_out)
 	
 	return 0;
 
+fail3:
 fail2:
 	__lcd_put_memory_object(current->lcd, cnode, mo);
 fail1:
 	return ret;
 }
 
-int lcd_map_virt(gpa_t base, unsigned int order, gva_t *gva_out)
+int lcd_map_virt(cptr_t pages, unsigned int order, gva_t *gva_out)
 {
 	int ret;
-	cptr_t mo_cptr;
-	unsigned long mo_size;
+	struct page *p;
+	struct cnode *cnode;
+	struct lcd_memory_object *mo;
 	/*
-	 * On x86_64, all RAM is mapped already.
+	 * Ignore order
 	 *
-	 * But we still check to ensure non-isolated code has
-	 * access to physical address via capabilities and has
-	 * it mapped in its resource tree.
-	 *
-	 * XXX: For arch's with smaller virtual address spaces, 
-	 * we need to kmap or similar.
-	 *
-	 * guest virtual == host virtual for non-isolated
+	 * Look up memory object so we can get virtual address.
 	 */
-	ret = lcd_phys_to_cptr(base, &mo_cptr, &mo_size);
+	ret = __lcd_get_memory_object(current->lcd, pages, &cnode, &mo);
 	if (ret) {
-		LIBLCD_ERR("phys not mapped?");
+		LIBLCD_ERR("internal error: mem lookup failed");
 		goto fail1;
 	}
 	/*
-	 * If we got a "hit", then there's no need to get the actual
-	 * memory object (base is guest physical == host physical for
-	 * non-isolated)
+	 * Ensure this is RAM mem (lcd_map_virt doesn't do ioremap)
 	 */
+	if (!__lcd_memory_object_is_ram(mo)) {
+		LIBLCD_ERR("cannot use lcd_map_virt for dev mem");
+		goto fail2;
+	}
+	/*
+	 * "Map" the memory (adds pages to proper resource tree)
+	 */
+	ret = __lcd_mmap(current->lcd, mo, cnode, pages);
+	if (ret) {
+		LIBLCD_ERR("error mapping pages in resource tree");
+		goto fail3;
+	}
 	
-	*gva_out = __gva(hva_val(pa2hva(gpa_val(base))));
+	/* guest virtual == host virtual for non-isolated */
+	*base_out = __gva(hva_val(__lcd_memory_object_hva(mo)));
+
+	/*
+	 * Release memory object
+	 */
+	__lcd_put_memory_object(current->lcd, cnode, mo);
 	
 	return 0;
 
+fail3:
+fail2:
+	__lcd_put_memory_object(current->lcd, cnode, mo);
 fail1:
 	return ret;
-}
-
-int lcd_map_both(cptr_t pages, unsigned int order, gva_t *gva_out)
-{
-	int ret;
-	gpa_t gpa;
-	/*
-	 * "Map" in physical (this is more like cptr -> phys addr)
-	 */
-	ret = lcd_map_phys(pages, order, &gpa);
-	if (ret)
-		return ret;
-	/*
-	 * "Map" in virtual
-	 */
-	return lcd_map_virt(gpa, order, gva_out);
 }
 
 void lcd_unmap_phys(gpa_t base, unsigned int order)
@@ -776,34 +714,24 @@ void lcd_unmap_phys(gpa_t base, unsigned int order)
 
 void lcd_unmap_virt(gva_t base, unsigned int order)
 {
+	int ret;
+	cptr_t mo_cptr;
+	unsigned long mo_size;
 	/*
-	 * This is truly a no-op because all we did in lcd_map_virt
-	 * was just check if the caller has the physical address in
-	 * its resource tree.
+	 * No real unmapping needs to be done, but we need to
+	 * update the resource tree.
 	 *
-	 * XXX: At least for x86_64. For arch's with smaller virtual
-	 * address spaces, we need to kunmap or similar.
+	 * Look up cptr for virtual memory
 	 */
-}
-
-void lcd_unmap_both(gva_t base, unsigned int order)
-{
-	gpa_t base_gpa;
+	ret = lcd_virt_to_cptr(base, &mo_cptr, &mo_size);
+	if (ret) {
+		LIBLCD_ERR("virt not mapped?");
+		return;
+	}
 	/*
-	 * Get base as a physical address
-	 *
-	 * guest virtual == host virtual, and
-	 * guest physical == host physical for non-isolated
+	 * Remove memory object from resource tree
 	 */
-	base_gpa = __gpa(hpa_val(hva2hpa(__hva(gva_val(base)))));
-	/*
-	 * Unmap in virtual
-	 */
-	lcd_unmap_virt(base, order);
-	/*
-	 * Unmap in physical
-	 */
-	lcd_unmap_phys(base_gpa, order);
+	_lcd_munmap(mo_cptr);
 }
 
 /* VOLUNTEER HELPERS -------------------------------------------------- */
@@ -933,7 +861,7 @@ int lcd_phys_to_cptr(gpa_t paddr, cptr_t *c_out, unsigned long *size_out)
 	 * (For vmalloc mem, should use lcd_virt_to_cptr.)
 	 */
 	ret = lcd_resource_tree_search(
-		current->lcd_resource_trees[LCD_RESOURCE_TREE_RAM_IDX],
+		current->lcd_resource_trees[LCD_RESOURCE_TREE_CONTIGUOUS],
 		gpa_val(paddr),
 		&n);
 	if (ret) {
@@ -958,10 +886,10 @@ int lcd_virt_to_cptr(gva_t vaddr, cptr_t *c_out, unsigned long *size_out)
 	struct lcd_resource_node *n;
 	int ret;
 	/*
-	 * Look in vmalloc tree first
+	 * Look in non-contiguous mem tree first
 	 */
 	ret = lcd_resource_tree_search(
-		current->lcd_resource_trees[LCD_RESOURCE_TREE_VMALLOC_IDX],
+		current->lcd_resource_trees[LCD_RESOURCE_TREE_NON_CONTIGUOUS],
 		gva_val(vaddr),
 		&n);
 	if (ret) {

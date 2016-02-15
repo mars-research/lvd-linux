@@ -81,22 +81,42 @@ int _lcd_vmalloc(unsigned int order, cptr_t *slot_out);
  * @mo: cptr to memory object capability (e.g., pages)
  * @base: starting guest physical address where memory should be mapped
  *
- * Maps the memory referred to by the @mo cptr_t in the caller's
- * guest physical address space, starting at @base. If @mo is
- * already mapped, @base has an existing mapping, or the @mo won't
- * fit, this call fails.
+ * Purpose: Maps the memory referred to by the @mo cptr_t in the caller's
+ * guest physical address space, starting at @base. The semantics is a
+ * bit different though depending on the environment.
  *
- * If @mo or @gpa is invalid, returns non-zero (e.g., @mo doesn't
- * refer to a memory object capability).
+ * In either environment, this call (or a higher-level counterpart, like
+ * lcd_map_phys) is necessary before you try to do address -> cptr
+ * translation via lcd_phys_to_cptr (even for non-isolated code).
  *
- * IMPORTANT: If the caller is running in the non-isolated host (not inside
- * an LCD), the memory is already mapped in the caller's physical
- * address space (all host physical is available). However, calling
- * this function is still necessary because it updates the internal
- * resource tree used for address -> cptr translation.
+ * Non-isolated code notes
+ * -----------------------
  *
- * Note: If @mo is already mapped, the call will fail (multiple mappings
- * is currently not supported).
+ * For non-isolated code, all physical memory is already accessible. This
+ * function ignores @base and just inserts the memory object into the
+ * caller's internal physical address space resource tree.
+ *
+ * If @mo refers to vmalloc memory, this function fails. You should use
+ * lcd_map_virt for vmalloc memory. (See lcd_map_virt's documentation
+ * for why.)
+ *
+ * (Unlike isolated code, some memory objects - vmalloc memory in 
+ * particular - can be discontiguous in the host's physical address 
+ * space. This is why, internally, kliblcd needs to use two resource
+ * trees - one for contiguous physical memory, the other for physically
+ * discontiguous but virtually contiguous memory.)
+ * 
+ * Isolated code notes
+ * -------------------
+ *
+ * For isolated code, maps memory object at @base. If the memory
+ * object capability has already been used to map the memory
+ * object, this call fails. (The microkernel only allows the
+ * memory object to be mapped once per capability that the LCD
+ * has.)
+ *
+ * Furthermore, @base has an existing mapping, or the @mo won't
+ * fit, the microkernel will reject the mapping.
  */
 int _lcd_mmap(cptr_t mo, gpa_t base);
 
@@ -104,19 +124,34 @@ int _lcd_mmap(cptr_t mo, gpa_t base);
  * _lcd_munmap -- Low-level unmapping, calls into microkernel
  * @mo: cptr to memory object capability
  *
- * Unmaps the memory referred to by the @mo cptr_t in the caller's
- * guest physical address space. If the pages aren't mapped, silently
- * fails / does nothing.
- *
- * IMPORTANT: If the caller is a non-isolated thread, this will remove
- * the memory object from the internal resource tree used for
- * address -> cptr translation. If you don't do it, kliblcd will give
- * you wrong results (it'll just affect you, not other kLCDs).
+ * Purpose: Unmaps the memory referred to by the @mo cptr_t in the caller's
+ * guest physical address space. If the memory object isn't mapped,
+ * silently fails / does nothing.
  *
  * You may wonder: why don't we pass just the guest physical address
  * that we want unmapped? Answer: the microkernel needs to keep track
  * of where memory objects are mapped (so that if rights are revoked,
  * it knows how to unmap them).
+ *
+ * The semantics is a bit different depending on the environment.
+ *
+ * Non-isolated code notes
+ * -----------------------
+ *
+ * If the caller is a non-isolated thread, this will remove
+ * the memory object from the internal resource tree used for
+ * address -> cptr translation. If you don't do it, kliblcd will give
+ * you wrong results (it'll just affect you, not other kLCDs).
+ *
+ * However, no "unmapping" is actually done (memory objects are
+ * always mapped in the host).
+ *
+ * Isolated code notes
+ * -------------------
+ *
+ * For isolated code, this will actually unmap in the physical address
+ * space, and remove from the internal resource tree used for
+ * address -> cptr translation.
  */
 void _lcd_munmap(cptr_t mo);
 
@@ -183,36 +218,47 @@ void lcd_vfree(void *ptr);
  * @order: there are 2^order pages to map
  * @base_out: out param, guest physical address where pages were mapped
  *
- * IMPORTANT: This should not be used for ioremap-like functionality. This
- * function will not set up the memory types / cache behavior properly for 
- * device memory.
- *
  * Map pages in a free part of the physical address space. Returns
  * the (guest) physical address where the pages were mapped. (This is
  * kind of like kmap, but for the guest physical address space.)
  *
- * If @order is not the true order of @pages, you may get odd behavior.
- * (Internally, @order is going to be used to find a free spot in the
- * address space.)
+ * If @pages has already been mapped, the microkernel will reject the
+ * map request, and this call will fail. (While this isn't necessary
+ * for non-isolated code, the same is true, in order to mirror the 
+ * semantics of isolated code, and to prevent duplicate inserts into 
+ * the internal resource tree.)
  *
- * Note: For non-isolated code, guest physical == host physical (by convention),
+ * Non-isolated code notes
+ * -----------------------
+ *
+ * For non-isolated code, guest physical == host physical (by convention),
  * and the pages are already technically accessible to the caller (but the
  * caller probably won't know the physical address of the pages - they just
  * have the opaque cptr_t for the pages). So, for non-isolated code, this
- * function doesn't really do much (it adds the pages to an internal
- * data structure so you can still do address -> cptr translation,
- * however). The guest physical address returned is actually the host 
+ * function won't do any mapping.
+ *
+ * However, it *will* add the memory object to the caller's internal
+ * physical address space resource tree. So later, you will be able
+ * to invoke lcd_phys_to_cptr and look up the pages cptr (i.e., do
+ * address -> cptr translation).
+ *
+ * Note that since guest physical == host physical for non-isolated
+ * code, the guest physical address returned is actually the host 
  * physical address of the pages.
  *
- * Note: If pages is already mapped, this call will fail (the microkernel
- * does not support multiple mappings).
+ * Isolated code notes
+ * -------------------
+ *
+ * If @order is not the true order of @pages, you may get odd behavior.
+ * (Internally, @order is going to be used to find a free spot in the
+ * address space.)
  */
 int lcd_map_phys(cptr_t pages, unsigned int order, gpa_t *base_out);
 /**
- * lcd_map_virt -- Map a physical address range in caller's virtual address
- *                 space
- * @base: base guest physical address of memory to map
- * @order: physical address range is 2^order pages
+ * lcd_map_virt -- Map pages in a free part of the physical and virtual 
+ *                 address spaces (does both for you)
+ * @pages: cptr to pages memory object
+ * @order: there are 2^order pages
  * @gva_out: out param, where the memory was mapped in the virtual address 
  *           space
  *
@@ -220,36 +266,36 @@ int lcd_map_phys(cptr_t pages, unsigned int order, gpa_t *base_out);
  * It will not set up memory types for io mem (e.g., marking memory as
  * uncacheable).
  *
- * This is like kmap. You already have guest physical memory, and you just
- * want to map it in a free spot in the caller's virtual address space.
+ * This is similar to lcd_map_phys, but also maps the memory in the
+ * caller's virtual address space.
  *
- * Note: For non-isolated code, at least on x86_64, all physical memory
- * is already mapped, so this function won't really do much. Further
- * note that guest virtual == host virtual, by convention - so the guest
- * virtual address returned is actually a host virtual address for
- * non-isolated code.
+ * Non-isolated code notes
+ * -----------------------
  *
- * Note: Mapping the same chunk of memory more than once can lead to
- * undefined behavior inside the LCD. (The LCD data structures do not
- * support more than one mapping, and we don't try to check if there
- * already is a mapping. Linux doesn't support multiple mappings of RAM
- * either, fyi. Doing so would break page_address, for example, as
- * it would for us.)
+ * For non-isolated code, at least on x86_64, all physical memory
+ * is already mapped, so this function won't do any extra virtual 
+ * mapping. 
+ *
+ * It *will* add the memory object to the caller's internal resource
+ * tree, so you will be able to invoke lcd_virt_to_cptr.
+ *
+ * Further note that guest virtual == host virtual, by convention - 
+ * so the guest virtual address returned is actually a host virtual 
+ * address.
+ *
+ * NOTE: You *must* call this for "mapping" vmalloc memory instead
+ * of lcd_map_phys. Why? It has to do with the fact that vmalloc memory 
+ * cannot be "made" contiguous in a non-isolated thread's physical 
+ * address space (the internal logic would break since the physical
+ * memory behind the vmalloc memory is not contiguous).
+ *
+ * Isolated code notes
+ * -------------------
+ *
+ * If @order doesn't match the true order of the pages memory object,
+ * you may get weird behavior.
  */
-int lcd_map_virt(gpa_t base, unsigned int order, gva_t *gva_out);
-/**
- * lcd_map_both -- Map pages in a free place in caller's physical and 
- *                 virtual address spaces.
- * @pages: cptr to pages capability
- * @order: 2^order pages
- * @gva_out: out param, (guest) virtual address where pages were mapped
- *
- * Map @pages in both address spaces so you can start using the memory.
- *
- * This is lcd_map_phys and lcd_map_virt put together, with the same
- * caveats.
- */
-int lcd_map_both(cptr_t pages, unsigned int order, gva_t *gva_out);
+int lcd_map_virt(cptr_t pages, unsigned int order, gva_t *gva_out);
 /**
  * lcd_unmap_phys -- Unmap pages from physical address space
  * @base: guest physical address where pages are mapped
@@ -269,18 +315,11 @@ void lcd_unmap_phys(gpa_t base, unsigned int order);
  *
  * Unmap memory from caller's virtual address space. (This is like kunmap.)
  *
- * Note: For non-isolated code, this is a no-op.
+ * Note: For non-isolated code, again, this won't unmap anything, but it
+ * will update some internal data structures, so it's important you call
+ * it.
  */
 void lcd_unmap_virt(gva_t base, unsigned int order);
-/**
- * lcd_unmap_both -- Kill the guest virtual and physical mappings
- * @base: guest virtual address where pages are mapped
- * @order: 2^order pages are mapped there
- *
- * This is lcd_unmap_phys and lcd_unmap_virt put together, and will
- * kill the mappings set up by lcd_map_both.
- */
-void lcd_unmap_both(gva_t base, unsigned int order);
 
 /* "VOLUNTEERING" PAGES ---------------------------------------- */
 

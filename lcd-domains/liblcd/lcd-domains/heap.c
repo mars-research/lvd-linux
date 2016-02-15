@@ -369,6 +369,30 @@ void lcd_vfree(void *ptr)
 	BUG();
 }
 
+struct page *lcd_virt_to_head_page(const void *addr)
+{
+	unsigned long i_addr = (unsigned long)addr;
+
+	/* If outside heap, error out and return NULL */
+	if (i_addr < gva_val(LCD_HEAP_GV_ADDR) ||
+		i_addr >= gva_val(LCD_HEAP_GV_ADDR) + LCD_HEAP_SIZE) {
+		LIBLCD_ERR("address %p falls outside heap; only addresses in the heap can be converted to a struct page pointer (we don't use the costly struct page metadata for all bits of the physical address space)", addr);
+		return NULL;
+	}
+
+	return heap_addr_to_struct_page(__gva((unsigned long)addr));
+}
+
+void *lcd_page_address(const struct page *page)
+{
+	return (void *)gva_val(heap_struct_page_to_addr(page));
+}
+
+void lcd_free_memcg_kmem_pages(unsigned long addr, unsigned int order)
+{
+	lcd_free_pages(heap_addr_to_struct_page(__gva(addr)), order);
+}
+
 /* VOLUNTEERING -------------------------------------------------- */
 
 int lcd_volunteer_pages(struct page *base, unsigned int order,

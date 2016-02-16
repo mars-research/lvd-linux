@@ -1,11 +1,13 @@
 
-#include <lcd-domains/liblcd-config.h>
+#include <lcd_config/pre_hook.h>
 
 #include <linux/compiler.h>
 #include <linux/spinlock_types.h>
 #include <linux/ftrace_event.h>
 #include <linux/perf_event.h>
-#include <lcd-domains/liblcd.h>
+#include <liblcd/liblcd.h>
+
+#include <lcd_config/post_hook.h>
 
 /*
  * Some globals to resolve
@@ -36,50 +38,6 @@ void warn_slowpath_null(const char *file, int line)
 		file, line);
 }
 
-void __lockfunc _raw_spin_lock(raw_spinlock_t *lock)
-{
-	lcd_printk("resolve.c: called dummy _raw_spin_lock!");
-	return;
-}
-
-void __lockfunc _raw_spin_unlock(raw_spinlock_t *lock)
-{
-	lcd_printk("resolve.c: called dummy _raw_spin_unlock!");
-	return;
-}
-
-
-int filter_current_check_discard(struct ring_buffer *buffer,
-				struct ftrace_event_call *call, void *rec,
-				struct ring_buffer_event *event)
-{
-	lcd_printk("resolve.c: trying to call dummy filter_current_check_discard!");
-	return 0;
-}
-
-int ftrace_event_reg(struct ftrace_event_call *call,
-		enum trace_reg type, void *data)
-{
-	lcd_printk("resolve.c: trying to call dummy ftrace_event_reg!");
-	return 0;
-}
-
-const char *ftrace_print_flags_seq(struct trace_seq *p, const char *delim,
-				unsigned long flags,
-				const struct trace_print_flags *flag_array)
-{
-	lcd_printk("resolve.c: trying to call dummy ftrace_print_flags_seq!");
-	return NULL;
-}
-
-
-int ftrace_raw_output_prep(struct trace_iterator *iter,
-			struct trace_event *event)
-{
-	lcd_printk("resolve.c: trying to call dummy ftrace_raw_output_prep!");
-	return 0;
-}
-               
 void perf_tp_event(u64 addr, u64 count, void *record,
 		int entry_size, struct pt_regs *regs,
 		struct hlist_head *head, int rctx,
@@ -100,39 +58,6 @@ void *ring_buffer_event_data(struct ring_buffer_event *event)
 {
 	lcd_printk("resolve.c: trying to call dummy ring_buffer_event_data!");
 	return NULL;
-}
-
-
-void trace_buffer_unlock_commit(struct ring_buffer *buffer,
-				struct ring_buffer_event *event,
-				unsigned long flags, int pc)
-{
-	lcd_printk("resolve.c: trying to call dummy trace_buffer_unlock_commit!");
-	return;
-}
-               
-int trace_define_field(struct ftrace_event_call *call, const char *type,
-		const char *name, int offset, int size, int is_signed,
-		int filter_type)
-{
-	lcd_printk("resolve.c: trying to call dummy trace_define_field!");
-	return 0;
-}
-                 
-struct ring_buffer_event *
-trace_event_buffer_lock_reserve(struct ring_buffer **current_rb,
-				struct ftrace_event_file *ftrace_file,
-				int type, unsigned long len,
-				unsigned long flags, int pc)
-{
-	lcd_printk("resolve.c: trying to call dummy trace_event_buffer_lock_reserve!");
-	return NULL;
-}
- 
-int trace_event_raw_init(struct ftrace_event_call *call)
-{
-	lcd_printk("resolve.c: trying to call dummy trace_event_raw_init!");
-	return 0;
 }
 
 long strnlen_user(const char __user *str, long count)

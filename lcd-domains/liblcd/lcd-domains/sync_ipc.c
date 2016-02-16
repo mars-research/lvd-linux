@@ -7,10 +7,12 @@
 #include <lcd_config/pre_hook.h>
 
 #include <liblcd/sync_ipc.h>
+#include <asm/lcd_domains/liblcd.h>
+#include <liblcd/cap.h>
 
 #include <lcd_config/post_hook.h>
 
-int __lcd_create_sync_endpoint(cptr_t slot)
+int _lcd_create_sync_endpoint(cptr_t slot)
 {
 	return lcd_syscall_create_sync_ep(slot);
 }
@@ -21,7 +23,7 @@ int lcd_create_sync_endpoint(cptr_t *slot_out)
 	/*
 	 * Alloc cptr
 	 */
-	ret = lcd_alloc_cptr(slot_out);
+	ret = lcd_cptr_alloc(slot_out);
 	if (ret) {
 		LIBLCD_ERR("cptr alloc");
 		goto fail1;
@@ -29,7 +31,7 @@ int lcd_create_sync_endpoint(cptr_t *slot_out)
 	/*
 	 * Get new endpoint
 	 */
-	ret = __lcd_create_sync_endpoint(*slot_out);
+	ret = _lcd_create_sync_endpoint(*slot_out);
 	if (ret) {
 		LIBLCD_ERR("create sync endpoint");
 		goto fail2;
@@ -38,7 +40,7 @@ int lcd_create_sync_endpoint(cptr_t *slot_out)
 	return 0;
 
 fail2:
-	lcd_free_cptr(*slot_out);
+	lcd_cptr_free(*slot_out);
 fail1:
 	return ret;
 }

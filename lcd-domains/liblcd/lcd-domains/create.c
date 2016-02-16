@@ -9,6 +9,7 @@
 #include <lcd_config/pre_hook.h>
 
 #include <liblcd/create.h>
+#include <asm/lcd_domains/liblcd.h>
 
 #include <lcd_config/post_hook.h>
 
@@ -62,7 +63,7 @@ int lcd_memory_grant_and_map(cptr_t lcd, cptr_t mo, cptr_t dest_slot,
 
 int lcd_cap_grant(cptr_t lcd, cptr_t src, cptr_t dest)
 {
-	return lcd_syscall_grant(lcd, src, dest);
+	return lcd_syscall_cap_grant(lcd, src, dest);
 }
 
 int lcd_run(cptr_t lcd)

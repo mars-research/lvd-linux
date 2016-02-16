@@ -11,7 +11,7 @@
  * Copyright: University of Utah
  */
 
-#include <lcd-domains/liblcd.h>
+#include <liblcd/liblcd.h>
 
 /* MISC ------------------------------------------------------------ */
 
@@ -28,7 +28,7 @@ static unsigned long pa_nr_page_blocks(struct lcd_page_allocator *pa)
 
 static int pb_is_free(struct lcd_page_block *pb)
 {
-	return !list_empty(&buddy->buddy_list);
+	return !list_empty(&pb->buddy_list);
 }
 
 /* ALLOC ------------------------------------------------------------ */
@@ -49,7 +49,7 @@ static int pb_backing(struct lcd_page_allocator *pa,
 	 *
 	 * then invoke the alloc callback.
 	 */
-	if (!pa->alloc_map_regular_mem_chunk) /* no demand paging */
+	if (!pa->cbs->alloc_map_regular_mem_chunk) /* no demand paging */
 		return 0;
 	offset = lcd_page_block_to_offset(pa, pb);
 	if (offset & ((1UL << pa->max_order) - 1)) /* not on boundary */
@@ -57,7 +57,7 @@ static int pb_backing(struct lcd_page_allocator *pa,
 	if (pb->n) /* already backed */
 		return 0;
 
-	ret = pa->cbs.alloc_map_regular_mem_chunk(pa, pb, offset, 
+	ret = pa->cbs->alloc_map_regular_mem_chunk(pa, pb, offset, 
 						pa->max_order, &n);
 	if (ret) {
 		LIBLCD_ERR("failed to get backing mem for page blocks");
@@ -76,7 +76,7 @@ static void pb_expand(struct lcd_page_allocator *pa, struct lcd_page_block *pb,
 		unsigned int lo, unsigned int hi, struct list_head *free_list)
 {
 
-	unsigned long size = 1UL << high;
+	unsigned long size = 1UL << hi;
 	/*
 	 * Split up into smaller chunks
 	 *
@@ -84,28 +84,27 @@ static void pb_expand(struct lcd_page_allocator *pa, struct lcd_page_block *pb,
 	 * of *page blocks* and not pages. Recall that each page block
 	 * represents 2^min_order pages.)
 	 */
-	while (high > low) {
+	while (hi > lo) {
 		/*
 		 * Shift to next smaller free list
 		 */
 		free_list--;
-		high--;
+		hi--;
 		size >>= 1;
 		/*
 		 * This will split off the end
 		 */
 		list_add(&pb[size].buddy_list, free_list);
 		pa->nr_page_blocks_free += size;
-		pb[size].order = high;
+		pb[size].block_order = hi;
 	}
 }
 
 /* Compare with mm/page_alloc.c: __rmqueue_smallest */
-static lcd_page_block *
+static struct lcd_page_block *
 alloc_page_blocks(struct lcd_page_allocator *pa, unsigned int order)
 {
-	unsigned int current_order;
-	unsigned int idx;
+	unsigned int current_order, block_order;
 	struct lcd_page_block *pb;
 	struct list_head *free_list;
 	/*
@@ -124,7 +123,7 @@ alloc_page_blocks(struct lcd_page_allocator *pa, unsigned int order)
 		/*
 		 * Found one
 		 */
-		pb = list_entry(free_list.next, struct lcd_page_block,
+		pb = list_entry(free_list->next, struct lcd_page_block,
 				buddy_list);
 		/* 
 		 * Remove page blocks from free list, and do any
@@ -140,7 +139,7 @@ alloc_page_blocks(struct lcd_page_allocator *pa, unsigned int order)
 		return pb;
 	}
 
-fail:
+	/* No luck */
 	return NULL;
 }
 
@@ -160,13 +159,13 @@ static void pb_unbacking(struct lcd_page_allocator *pa,
 	 * backing memory.
 	 */
 	if (!(pb->n != NULL && 
-			order >= pb->n->order &&
-			pa->cbs.free_unmap_regular_mem_chunk))
+			(1UL << order) >= lcd_resource_node_size(pb->n) &&
+			pa->cbs->free_unmap_regular_mem_chunk))
 		return;
 
 	offset = lcd_page_block_to_offset(pa, pb);
 
-	pa->cbs.free_unmap_regular_mem_chunk(pa, pb, pb->n, offset, order);
+	pa->cbs->free_unmap_regular_mem_chunk(pa, pb, pb->n, offset, order);
 	/*
 	 * NULL out the page block's resource node so we know it's not
 	 * backed anymore
@@ -314,8 +313,9 @@ void init_free_list_heads(struct lcd_page_allocator *pa)
 	 * The free lists are just after the struct lcd_page_allocator
 	 * (plus some alignment)
 	 */
-	free_lists = (struct list_head *)ALIGN(((void *)pa) + sizeof(*pa),
-					sizeof(struct list_head));
+	free_lists = (struct list_head *)ALIGN(
+		(unsigned long)(((void *)pa) + sizeof(*pa)),
+		sizeof(struct list_head));
 	pa->free_lists = free_lists;
 	/*
 	 * Initialize each one
@@ -333,8 +333,9 @@ void init_page_blocks(struct lcd_page_allocator *pa)
 	 * (plus some alignment)
 	 */
 	cursor = (struct lcd_page_block *)ALIGN(
-		(void *)(pa->free_lists) +
-		pa_nr_free_lists(pa) * sizeof(struct list_head),
+		(unsigned long)(
+			(void *)(pa->free_lists) +
+			pa_nr_free_lists(pa) * sizeof(struct list_head)),
 		sizeof(struct lcd_page_block));
 	/*
 	 * Zero out the array
@@ -370,6 +371,7 @@ static int alloc_metadata_page_blocks(struct lcd_page_allocator *pa,
 	gpa_t metadata_base;
 	unsigned long offset;
 	unsigned int tail_order;
+	int ret;
 	/*
 	 * If we encounter an error, we just fail because this will
 	 * trigger a full page allocator tear down.
@@ -418,7 +420,7 @@ static int alloc_metadata_page_blocks(struct lcd_page_allocator *pa,
 	 * for real allocs.)
 	 */
 	tail_order = 0;
-	metadata_sz >> PAGE_SHIFT;
+	metadata_sz >>= PAGE_SHIFT;
 	while (metadata_sz >>= 1)
 		tail_order++;
 	pb = alloc_page_blocks(pa, tail_order);
@@ -460,6 +462,7 @@ static int allocator_init(void *metadata_addr,
 			int embed_metadata,
 			struct lcd_page_allocator **pa_out)
 {
+	int ret;
 	struct lcd_page_allocator *pa;
 	/*
 	 * Init top level struct
@@ -505,7 +508,7 @@ static void free_metadata(void *metadata_addr,
 			unsigned int alloc_order,
 			const struct lcd_page_allocator_cbs *cbs)
 {
-	cbs->free_unmap_metadata_memory(cbs, metadata_addr, metadat_sz,
+	cbs->free_unmap_metadata_memory(cbs, metadata_addr, metadata_sz,
 					alloc_order);
 }
 
@@ -545,7 +548,6 @@ static unsigned long calc_metadata_size(unsigned int nr_pages_order,
 {
 	unsigned int i;
 	unsigned long rslt = 0;
-	unsigned int backing_order = max_order;
 	/*
 	 * Sanity check values before we do any calculations. Must have:
 	 *
@@ -570,7 +572,7 @@ static unsigned long calc_metadata_size(unsigned int nr_pages_order,
 	/*
 	 * Align for struct list_head
 	 */
-	ALIGN(rslt, sizeof(struct list_head));
+	rslt = ALIGN(rslt, sizeof(struct list_head));
 	/*
 	 * Free list list_heads, one for each allowed order.
 	 */
@@ -579,7 +581,7 @@ static unsigned long calc_metadata_size(unsigned int nr_pages_order,
 	/*
 	 * Align for struct lcd_page_block
 	 */
-	ALIGN(rslt, sizeof(struct lcd_page_block));
+	rslt = ALIGN(rslt, sizeof(struct lcd_page_block));
 	/*
 	 * Giant array of struct lcd_page_blocks
 	 */
@@ -647,7 +649,8 @@ int lcd_page_allocator_create(unsigned long nr_pages_order,
 			min_order,
 			max_order,
 			cbs,
-			embed_metadata);
+			embed_metadata,
+			pa_out);
 	if (ret)
 		goto fail3;
 
@@ -677,7 +680,8 @@ void lcd_page_allocator_destroy(struct lcd_page_allocator *pa)
 	 * Skip over metadata (if we try to delete resources that contain
 	 * metadata while we're tearing everything down, we'll crash).
 	 */
-	for (i = pa->embed_metadata_offset; i < pa_nr_page_blocks(pa); i++) {
+	for (i = pa->first_non_metadata_pb_idx; 
+	     i < pa_nr_page_blocks(pa); i++) {
 		if (!pb_is_free(&cursor[i]))
 			lcd_page_allocator_free(pa, &cursor[i], 0);
 	}
@@ -701,6 +705,7 @@ struct lcd_page_block*
 lcd_page_allocator_alloc(struct lcd_page_allocator *pa,
 			unsigned int order)
 {
+	int ret;
 	struct lcd_page_block *pb;
 	/*
 	 * Alloc the page blocks

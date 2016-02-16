@@ -17,12 +17,7 @@
 #ifndef LIBLCD__MM_INTERNAL_H
 #define LIBLCD__MM_INTERNAL_H
 
-/* BEGIN LCD */
-#include <lcd-domains/liblcd-config.h>
-/* END LCD */
-
 #include <linux/mm.h>
-
 
 void free_pgtables(struct mmu_gather *tlb, struct vm_area_struct *start_vma,
 		unsigned long floor, unsigned long ceiling);

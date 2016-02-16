@@ -26,6 +26,8 @@
  * a general allocator? Would also need a background thingamajig for
  * shrinking faulted in mem that's not being used).
  */
+#ifndef LIBLCD_ALLOCATOR_H
+#define LIBLCD_ALLOCATOR_H
 
 #include <linux/list.h>
 #include <liblcd/resource_tree.h>
@@ -68,15 +70,17 @@ struct lcd_page_block {
 struct lcd_page_allocator;
 struct lcd_page_allocator_cbs {
 
-	int (*alloc_map_metadata_memory_chunk)(
-		struct lcd_page_allocator_cbs *this,
-		unsigned long mapping_offset,
+	int (*alloc_map_metadata_memory)(
+		const struct lcd_page_allocator_cbs *this,
 		unsigned int alloc_order,
-		struct lcd_resource_node **n_out);
+		unsigned long metadata_sz,
+		void **metadata_addr_out);
 
-	void (*free_unmap_metadata_memory_chunk)(
-		struct lcd_page_allocator_cbs *this,
-		struct lcd_resource_node *n_to_delete);
+	void (*free_unmap_metadata_memory)(
+		const struct lcd_page_allocator_cbs *this,
+		void *metadata_addr,
+		unsigned long metadata_sz,
+		unsigned int alloc_order);
 					
 	int (*alloc_map_regular_mem_chunk)(
 		struct lcd_page_allocator *this_page_allocator,
@@ -373,3 +377,5 @@ unsigned long lcd_page_block_to_offset(struct lcd_page_allocator *pa,
 struct lcd_page_block*
 lcd_offset_to_page_block(struct lcd_page_allocator *pa,
 			unsigned long offset);
+
+#endif /* LIBLCD_ALLOCATOR_H */

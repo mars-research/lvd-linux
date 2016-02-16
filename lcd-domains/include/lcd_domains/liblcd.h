@@ -8,6 +8,11 @@
 #ifndef LCD_DOMAINS_LIBLCD_H
 #define LCD_DOMAINS_LIBLCD_H
 
+#include <libcap.h>
+#include <lcd_domains/types.h>
+#include <liblcd/resource_tree.h>
+#include <liblcd/address_spaces.h>
+
 /* GLOBAL MEMORY TREE -------------------------------------------------- */
 
 #define LCD_NR_BOOT_RESOURCE_NODES 16
@@ -95,5 +100,15 @@ int __liblcd_heap_init(void);
  */
 int __liblcd_ram_map_init(void);
 
+/* MISC -------------------------------------------------- */
+
+/**
+ * __liblcd_pa -- Convert void* guest virtual to an unsigned long physical addr
+ * @addr: address to convert
+ */
+static inline unsigned long __liblcd_pa(void *addr)
+{
+	return (unsigned long)(addr) - LCD_VIRT_BASE;
+}
 
 #endif /* LCD_DOMAINS_LIBLCD_H */

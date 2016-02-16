@@ -8,6 +8,7 @@
 #ifndef ASM_LCD_DOMAINS_LIBLCD_H
 #define ASM_LCD_DOMAINS_LIBLCD_H
 
+#include <libcap.h>
 #include <lcd_domains/types.h>
 #include <liblcd/syscall.h>
 
@@ -139,9 +140,9 @@ static inline int lcd_syscall_cap_grant(cptr_t lcd, cptr_t src, cptr_t dest)
 				cptr_val(lcd), cptr_val(src), cptr_val(dest));
 }
 
-static inline int lcd_syscall_put_char(char c)
+static inline int lcd_syscall_putchar(char c)
 {
-	return lcd_syscall_one_arg(LCD_SYSCALL_PUT_CHAR, c);
+	return lcd_syscall_one_arg(LCD_SYSCALL_PUTCHAR, c);
 }
 
 static inline int lcd_syscall_create(cptr_t lcd_slot)
@@ -204,19 +205,19 @@ static inline int lcd_syscall_create_sync_ep(cptr_t slot)
 	return lcd_syscall_one_arg(LCD_SYSCALL_CREATE_SYNC_EP, cptr_val(slot));
 }
 
-static inline int lcd_syscall_pages_alloc_exact_node(cptr_t slot, int nid,
+static inline int lcd_syscall_alloc_pages_exact_node(cptr_t slot, int nid,
 						unsigned int flags,
 						unsigned int order)
 {
-	return lcd_syscall_four_args(LCD_SYSCALL_PAGES_ALLOC_EXACT_NODE, 
+	return lcd_syscall_four_args(LCD_SYSCALL_ALLOC_PAGES_EXACT_NODE, 
 				cptr_val(slot), nid, flags, order);
 }
 
-static inline int lcd_syscall_pages_alloc(cptr_t slot,
+static inline int lcd_syscall_alloc_pages(cptr_t slot,
 					unsigned int flags,
 					unsigned int order)
 {
-	return lcd_syscall_three_args(LCD_SYSCALL_PAGES_ALLOC, 
+	return lcd_syscall_three_args(LCD_SYSCALL_ALLOC_PAGES, 
 				cptr_val(slot), flags, order);
 }
 

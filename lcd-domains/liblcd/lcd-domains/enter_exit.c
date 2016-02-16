@@ -9,7 +9,9 @@
 #include <lcd_config/pre_hook.h>
 
 #include <liblcd/enter_exit.h>
+#include <liblcd/thc.h>
 #include <lcd_domains/liblcd.h>
+#include <asm/lcd_domains/liblcd.h>
 
 #include <lcd_config/post_hook.h>
 
@@ -25,7 +27,7 @@ int lcd_enter(void)
 	 *
          * Create our call endpoint (for call/reply interactions)               
          */
-        ret = __lcd_create_sync_endpoint(LCD_CPTR_CALL_ENDPOINT);
+        ret = _lcd_create_sync_endpoint(LCD_CPTR_CALL_ENDPOINT);
         if (ret) {
                 LIBLCD_ERR("creating call endpoint");
                 goto fail;

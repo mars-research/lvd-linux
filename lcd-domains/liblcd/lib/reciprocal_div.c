@@ -1,6 +1,6 @@
 
 /* BEGIN LCD */
-#include <lcd-domains/liblcd-config.h>
+#include <lcd_config/pre_hook.h>
 /* END LCD */
 
 #include <asm/div64.h>
@@ -8,7 +8,7 @@
 #include <linux/export.h>
 
 /* BEGIN LCD */
-#include <lcd-domains/liblcd-hacks.h>
+#include <lcd_config/post_hook.h>
 /* END LCD */
 
 u32 reciprocal_value(u32 k)

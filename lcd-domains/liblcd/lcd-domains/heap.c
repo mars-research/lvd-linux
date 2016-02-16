@@ -8,8 +8,11 @@
 #include <lcd_config/pre_hook.h>
 
 #include <linux/mm.h>
+#include <linux/slab.h>
 #include <liblcd/mem.h>
 #include <liblcd/allocator.h>
+#include <asm/lcd_domains/liblcd.h>
+#include <lcd_domains/liblcd.h>
 
 #include <lcd_config/post_hook.h>
 
@@ -34,7 +37,7 @@ int _lcd_alloc_pages_exact_node(int nid, unsigned int flags, unsigned int order,
 	/*
 	 * Alloc pages
 	 */
-	ret = lcd_syscall_alloc_pages_exact_node(nid, flags, order, &slot);
+	ret = lcd_syscall_alloc_pages_exact_node(slot, nid, flags, order);
 	if (ret) {
 		LIBLCD_ERR("alloc pages syscall failed");
 		goto fail2;
@@ -66,7 +69,7 @@ int _lcd_alloc_pages(unsigned int flags, unsigned int order,
 	/*
 	 * Alloc pages
 	 */
-	ret = lcd_syscall_alloc_pages(flags, order, &slot);
+	ret = lcd_syscall_alloc_pages(slot, flags, order);
 	if (ret) {
 		LIBLCD_ERR("alloc pages syscall failed");
 		goto fail2;
@@ -97,7 +100,7 @@ int _lcd_vmalloc(unsigned int order, cptr_t *slot_out)
 	/*
 	 * Alloc pages
 	 */
-	ret = lcd_syscall_vmalloc(order, &slot);
+	ret = lcd_syscall_vmalloc(slot, order);
 	if (ret) {
 		LIBLCD_ERR("vmalloc syscall failed");
 		goto fail2;
@@ -178,7 +181,7 @@ fail1:
 }
 
 static int 
-heap_alloc_map_metadata_memory_chunk(struct lcd_page_allocator_cbs *cbs,
+heap_alloc_map_metadata_memory(const struct lcd_page_allocator_cbs *cbs,
 				unsigned int alloc_order,
 				unsigned long metadata_sz,
 				void **metadata_addr)
@@ -202,7 +205,7 @@ heap_alloc_map_metadata_memory_chunk(struct lcd_page_allocator_cbs *cbs,
 		dest = gpa_add(LCD_HEAP_GP_ADDR, 
 			i * (1UL << (alloc_order + PAGE_SHIFT)));
 
-		ret = do_one_heap_meta_alloc(dest, alloc_order);
+		ret = do_one_heap_alloc(dest, alloc_order);
 		if (ret) {
 			LIBLCD_ERR("metadata alloca failed at i = %lx", i);
 			goto fail1;
@@ -228,7 +231,7 @@ fail1:
 }
 
 static void
-heap_free_unmap_metadata_memory_chunk(struct lcd_page_allocator_cbs *cbs,
+heap_free_unmap_metadata_memory(const struct lcd_page_allocator_cbs *cbs,
 				void *metadata_addr,
 				unsigned long metadata_sz,
 				unsigned int alloc_order)
@@ -245,9 +248,9 @@ heap_free_unmap_metadata_memory_chunk(struct lcd_page_allocator_cbs *cbs,
 	 */
 
 	total = ALIGN(metadata_sz, (1UL << (alloc_order + PAGE_SHIFT)));
-	nr_allocs = total >> (alloc_order + PAGE_SHIFT); /* > 0 */
+	nr_frees = total >> (alloc_order + PAGE_SHIFT); /* > 0 */
 
-	for (i = 0; i < nr_allocs; i++) {
+	for (i = 0; i < nr_frees; i++) {
 		dest = gpa_add(LCD_HEAP_GP_ADDR, 
 			i * (1UL << (alloc_order + PAGE_SHIFT)));
 		do_one_heap_free(dest);
@@ -298,7 +301,7 @@ static inline struct page *heap_addr_to_struct_page(gva_t addr)
 	return &heap_page_array[idx];
 }
 
-static inline gva_t heap_struct_page_to_addr(struct page *p)
+static inline gva_t heap_struct_page_to_addr(const struct page *p)
 {
 	unsigned long idx;
 	idx = p - heap_page_array;
@@ -313,7 +316,7 @@ static inline struct page *heap_page_block_to_struct_page(
 }
 
 static inline struct lcd_page_block *heap_struct_page_to_page_block(
-	struct page *p)
+	const struct page *p)
 {
 	return heap_addr_to_page_block(
 		heap_struct_page_to_addr(p));
@@ -353,7 +356,7 @@ fail1:
 void lcd_free_pages(struct page *base, unsigned int order)
 {
 	lcd_page_allocator_free(heap_allocator,
-				lcd_struct_page_to_page_block(base),
+				heap_struct_page_to_page_block(base),
 				order);
 }
 
@@ -361,6 +364,7 @@ void* lcd_vmalloc(unsigned long sz)
 {
 	/* Not implemented for now */
 	BUG();
+	return NULL;
 }
 
 void lcd_vfree(void *ptr)
@@ -452,6 +456,7 @@ static int setup_struct_page_array(void)
 	struct lcd_page_block *pb;
 	unsigned int order;
 	unsigned long bytes;
+	int ret;
 	/*
 	 * Compute number of struct pages we need
 	 */
@@ -470,7 +475,7 @@ static int setup_struct_page_array(void)
 	/*
 	 * Zero out the array (unnecessary right now, but just in case)
 	 */
-	heap_page_array = (void *)gva_val(lcd_page_block_to_addr(pb));
+	heap_page_array = (void *)gva_val(heap_page_block_to_addr(pb));
 	memset(heap_page_array,
 		0,
 		(1 << (order + PAGE_SHIFT)));

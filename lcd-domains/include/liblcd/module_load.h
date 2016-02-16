@@ -7,6 +7,7 @@
  */
 
 #include <libcap.h>
+#include <lcd_domains/types.h>
 
 /**
  * lcd_load_module -- Load a kernel module from disk

@@ -4,9 +4,12 @@
 #define _THC_H_
 
 #ifdef LCD_DOMAINS
-#include <lcd-domains/liblcd-config.h>
-#include <lcd-domains/types.h>
-#define assert(XX) do { BUG_ON(!(XX)); } while(0)
+#include <linux/types.h>
+#include <lcd_domains/types.h>
+#include <liblcd/console.h>
+#define assert(XX) do { \
+	lcd_printk("assertion failure at %s:%d\n", __FILE__, __LINE__); \
+	} while(0)
 #else
 #include <stdint.h>
 #include <stdlib.h>

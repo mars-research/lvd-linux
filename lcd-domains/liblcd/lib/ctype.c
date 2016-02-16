@@ -5,7 +5,7 @@
  */
 
 /* BEGIN LCD */
-#include <lcd-domains/liblcd-config.h>
+#include <lcd_config/pre_hook.h>
 /* END LCD */
 
 #include <linux/ctype.h>
@@ -13,7 +13,7 @@
 #include <linux/export.h>
 
 /* BEGIN LCD */
-#include <lcd-domains/liblcd-hacks.h>
+#include <lcd_config/post_hook.h>
 /* END LCD */
 
 const unsigned char _ctype[] = {

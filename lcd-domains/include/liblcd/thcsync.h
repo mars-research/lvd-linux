@@ -6,8 +6,7 @@
 #endif
 
 #ifdef LCD_DOMAINS
-#include <lcd-domains/liblcd-config.h>
-#include <lcd-domains/types.h>
+#include <lcd_domains/types.h>
 #else /* ! LCD_DOMAINS */
 #include <assert.h>
 #endif /* LCD_DOMAINS */

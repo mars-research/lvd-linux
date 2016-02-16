@@ -10,7 +10,7 @@
 /* END LCD */
 
 /* BEGIN LCD */
-#include <lcd-domains/liblcd-config.h>
+#include <lcd_config/pre_hook.h>
 /* END LCD */
 
 #include <linux/slab.h>
@@ -29,7 +29,7 @@
 #include <trace/events/kmem.h>
 
 /* BEGIN LCD */
-#include <lcd-domains/liblcd-hacks.h>
+#include <lcd_config/post_hook.h>
 /* END LCD */
 
 /**

@@ -8,6 +8,8 @@
 
 #include <lcd_config/pre_hook.h>
 
+#include <linux/slab.h>
+#include <linux/module.h>
 #include <liblcd/resource_tree.h>
 #include <liblcd/boot_info.h>
 #include <lcd_domains/liblcd.h>
@@ -145,7 +147,7 @@ static int add_boot_memory(void)
 	n->it_node.start = __liblcd_pa(THIS_MODULE->module_init);
 	n->it_node.last = n->it_node.start + THIS_MODULE->init_size - 1;
 	n->cptr = lcd_get_boot_info()->lcd_boot_cptrs.module_init;
-	lcd_tree_insert(&itree, n);
+	lcd_resource_tree_insert(&itree, n);
 	/*
 	 * Add module core
 	 */
@@ -155,7 +157,7 @@ static int add_boot_memory(void)
 	n->it_node.start = __liblcd_pa(THIS_MODULE->module_core);
 	n->it_node.last = n->it_node.start + THIS_MODULE->core_size - 1;
 	n->cptr = lcd_get_boot_info()->lcd_boot_cptrs.module_core;
-	lcd_tree_insert(&itree, n);
+	lcd_resource_tree_insert(&itree, n);
 	/*
 	 * Add bootstrap pages
 	 */
@@ -166,7 +168,7 @@ static int add_boot_memory(void)
 	n->it_node.last = gpa_val(LCD_BOOTSTRAP_PAGES_GP_ADDR) + 
 		LCD_BOOTSTRAP_PAGES_SIZE - 1;
 	n->cptr = lcd_get_boot_info()->lcd_boot_cptrs.boot_pages;
-	lcd_tree_insert(&itree, n);
+	lcd_resource_tree_insert(&itree, n);
 	/*
 	 * Add stack pages
 	 */
@@ -177,7 +179,7 @@ static int add_boot_memory(void)
 	n->it_node.last = gpa_val(LCD_STACK_GP_ADDR) + 
 		LCD_STACK_SIZE - 1;
 	n->cptr = lcd_get_boot_info()->lcd_boot_cptrs.stack;
-	lcd_tree_insert(&itree, n);
+	lcd_resource_tree_insert(&itree, n);
 	/*
 	 * Add boot guest virtual page tables
 	 */
@@ -188,7 +190,9 @@ static int add_boot_memory(void)
 	n->it_node.last = gpa_val(LCD_BOOTSTRAP_PAGE_TABLES_GP_ADDR) + 
 		LCD_BOOTSTRAP_PAGE_TABLES_SIZE - 1;
 	n->cptr = lcd_get_boot_info()->lcd_boot_cptrs.gv;
-	lcd_tree_insert(&itree, n);
+	lcd_resource_tree_insert(&itree, n);
+
+	return 0;
 
 fail5:
 fail4:
@@ -217,4 +221,10 @@ int __liblcd_mem_itree_init(void)
 		LIBLCD_ERR("failed to add resource nodes for boot mem");
 		goto fail2;
 	}
+
+	return 0;
+
+fail2:
+fail1:
+	return ret;
 }

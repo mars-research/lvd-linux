@@ -87,10 +87,10 @@ LIBLCD_BUILD_DIR=$(LCD_BUILD_DIR)/liblcd_build
 export LIBLCD_BUILD_DIR
 
 LIBLCD_DIRS= \
-	lcd-domains \
-	lcd-domains/async \
-	mm \
-	lib \
+	liblcd/lcd-domains \
+	liblcd/lcd-domains/async \
+	liblcd/mm \
+	liblcd/lib \
 	libcap.build \
 	libcap.install \
 	common

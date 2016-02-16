@@ -17,7 +17,7 @@
  */
 
 /* BEGIN LCD */
-#include <lcd-domains/liblcd-config.h>
+#include <lcd_config/pre_hook.h>
 /* END LCD */
 
 #include <linux/ctype.h>
@@ -30,7 +30,7 @@
 #include "kstrtox.h"
 
 /* BEGIN LCD */
-#include <lcd-domains/liblcd-hacks.h>
+#include <lcd_config/post_hook.h>
 /* END LCD */
 
 const char *_parse_integer_fixup_radix(const char *s, unsigned int *base)

@@ -1,10 +1,6 @@
 #ifndef LIBLCD_MM_SLAB_H
 #define LIBLCD_MM_SLAB_H
 
-/* BEGIN LCD */
-#include <lcd-domains/liblcd-config.h>
-/* END LCD */
-
 /*
  * Internal slab definitions
  */

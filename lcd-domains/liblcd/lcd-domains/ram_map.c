@@ -7,8 +7,11 @@
 
 #include <lcd_config/pre_hook.h>
 
+#include <linux/slab.h>
 #include <liblcd/allocator.h>
 #include <liblcd/mem.h>
+#include <asm/lcd_domains/liblcd.h>
+#include <lcd_domains/liblcd.h>
 
 #include <lcd_config/post_hook.h>
 
@@ -71,7 +74,7 @@ void _lcd_munmap(cptr_t mo, gpa_t base)
 /* RAM MAP INTERNALS ---------------------------------------- */
 
 static int 
-ram_alloc_map_metadata_memory(struct lcd_page_allocator_cbs *cbs,
+ram_alloc_map_metadata_memory(const struct lcd_page_allocator_cbs *cbs,
 			unsigned int alloc_order,
 			unsigned long metadata_sz,
 			void **metadata_addr)
@@ -93,7 +96,7 @@ fail1:
 }
 
 static void
-ram_free_unmap_metadata_memory(struct lcd_page_allocator_cbs *cbs,
+ram_free_unmap_metadata_memory(const struct lcd_page_allocator_cbs *cbs,
 			void *metadata_addr,
 			unsigned long metadata_sz,
 			unsigned int alloc_order)
@@ -170,12 +173,11 @@ fail2:
 	lcd_page_allocator_free(ram_map_allocator, pb, order);
 fail1:
 	return ret;
-
 }
 
 int lcd_map_phys(cptr_t pages, unsigned int order, gpa_t *base_out)
 {
-	return do_map_into_phys(pages, order, base_out)
+	return do_map_into_phys(pages, order, base_out);
 }
 
 int lcd_map_virt(cptr_t pages, unsigned int order, gva_t *gva_out)
@@ -214,11 +216,12 @@ static void do_unmap_from_phys(gpa_t base, unsigned int order)
 	 */
 	lcd_page_allocator_free(
 		ram_map_allocator,
-		ram_addr_to_page_block(lcd_gpa2gva(base)));
+		ram_addr_to_page_block(lcd_gpa2gva(base)),
+		order);
 	/*
 	 * Unmap from guest physical
 	 */
-	_lcd_munmap(pages, order);
+	_lcd_munmap(pages, base);
 }
 
 void lcd_unmap_phys(gpa_t base, unsigned int order)
@@ -255,4 +258,9 @@ int __liblcd_ram_map_init(void)
 		LIBLCD_ERR("failed to initialize RAM map allocator");
 		goto fail1;
 	}
+
+	return 0;
+
+fail1:
+	return ret;
 }

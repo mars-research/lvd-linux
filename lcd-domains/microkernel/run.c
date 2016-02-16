@@ -334,10 +334,10 @@ static int handle_syscall(struct lcd *lcd, int *lcd_ret)
 	case LCD_SYSCALL_CREATE_SYNC_EP:
 		ret = handle_syscall_create_sync_ep(lcd);
 		break;
-	case LCD_SYSCALL_PAGES_ALLOC_EXACT_NODE:
+	case LCD_SYSCALL_ALLOC_PAGES_EXACT_NODE:
 		ret = handle_syscall_pages_alloc_exact_node(lcd);
 		break;
-	case LCD_SYSCALL_PAGES_ALLOC:
+	case LCD_SYSCALL_ALLOC_PAGES:
 		ret = handle_syscall_pages_alloc(lcd);
 		break;
 	case LCD_SYSCALL_VMALLOC:

@@ -287,8 +287,8 @@ fail1:
 
 /* LOW-LEVEL MAP -------------------------------------------------- */
 
-static int do_map_phys(struct lcd *lcd, struct lcd_memory_object *mo, 
-		struct cnode *cnode, cptr_t mo_cptr, gpa_t base)
+static int do_map(struct lcd *lcd, struct lcd_memory_object *mo, 
+		struct cnode *cnode, cptr_t mo_cptr)
 {
 	int ret;
 	/*
@@ -405,7 +405,7 @@ struct page *lcd_alloc_pages_exact_node(int nid, unsigned int flags,
 	 * (all this really does is put the allocated pages in the
 	 * proper resource tree)
 	 */
-	ret = _lcd_mmap(slot, __gpa(0));
+	ret = _lcd_mmap(slot, order, __gpa(0));
 	if (ret) {
 		LIBLCD_ERR("internal error: putting mem obj in tree");
 		goto fail2;
@@ -453,7 +453,7 @@ struct page *lcd_alloc_pages(unsigned int flags, unsigned int order)
 	 * (all this really does is put the allocated pages in the
 	 * proper resource tree)
 	 */
-	ret = _lcd_mmap(slot, __gpa(0));
+	ret = _lcd_mmap(slot, order, __gpa(0));
 	if (ret) {
 		LIBLCD_ERR("internal error: putting mem obj in tree");
 		goto fail2;
@@ -543,7 +543,7 @@ void* lcd_vmalloc(unsigned long sz)
 	 * (all this really does is put the allocated vmalloc mem in the
 	 * proper resource tree)
 	 */
-	ret = _lcd_mmap(slot, __gpa(0));
+	ret = _lcd_mmap(slot, order, __gpa(0));
 	if (ret) {
 		LIBLCD_ERR("internal error: putting mem obj in tree");
 		goto fail2;
@@ -574,7 +574,7 @@ void lcd_vfree(void *vptr)
 {
 	cptr_t vmalloc_mem_cptr;
 	int ret;
-	unsigned int unused;
+	unsigned long unused;
 	/*
 	 * Resolve vptr to cptr
 	 */
@@ -628,7 +628,7 @@ int lcd_map_phys(cptr_t pages, unsigned int order, gpa_t *base_out)
 	/*
 	 * "Map" the pages (adds pages to proper resource tree)
 	 */
-	ret = __lcd_mmap(current->lcd, mo, cnode, pages);
+	ret = do_map(current->lcd, mo, cnode, pages);
 	if (ret) {
 		LIBLCD_ERR("error mapping pages in resource tree");
 		goto fail3;
@@ -653,7 +653,6 @@ fail1:
 int lcd_map_virt(cptr_t pages, unsigned int order, gva_t *gva_out)
 {
 	int ret;
-	struct page *p;
 	struct cnode *cnode;
 	struct lcd_memory_object *mo;
 	/*
@@ -676,14 +675,14 @@ int lcd_map_virt(cptr_t pages, unsigned int order, gva_t *gva_out)
 	/*
 	 * "Map" the memory (adds pages to proper resource tree)
 	 */
-	ret = __lcd_mmap(current->lcd, mo, cnode, pages);
+	ret = do_map(current->lcd, mo, cnode, pages);
 	if (ret) {
 		LIBLCD_ERR("error mapping pages in resource tree");
 		goto fail3;
 	}
 	
 	/* guest virtual == host virtual for non-isolated */
-	*base_out = __gva(hva_val(__lcd_memory_object_hva(mo)));
+	*gva_out = __gva(hva_val(__lcd_memory_object_hva(mo)));
 
 	/*
 	 * Release memory object

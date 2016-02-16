@@ -133,10 +133,11 @@ int _lcd_mmap(cptr_t mo, unsigned int order, gpa_t base);
  * guest physical address space. If the memory object isn't mapped,
  * silently fails / does nothing.
  *
- * You may wonder: why don't we pass just the guest physical address
- * that we want unmapped? Answer: the microkernel needs to keep track
- * of where memory objects are mapped (so that if rights are revoked,
- * it knows how to unmap them).
+ * Although the microkernel doesn't use the guest physical address (it
+ * tracks where the memory object is mapped internally), liblcd
+ * needs the address so it can update some internal data structures
+ * (we can cheat with kliblcd since kliblcd can talk directly to the
+ * microkernel internally).
  *
  * The semantics is a bit different depending on the environment.
  *
@@ -158,7 +159,7 @@ int _lcd_mmap(cptr_t mo, unsigned int order, gpa_t base);
  * space, and remove from the internal resource tree used for
  * address -> cptr translation.
  */
-void _lcd_munmap(cptr_t mo);
+void _lcd_munmap(cptr_t mo, gpa_t base);
 
 /* HIGH-LEVEL ALLOC/FREE ---------------------------------------- */
 

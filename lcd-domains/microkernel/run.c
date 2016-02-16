@@ -39,7 +39,7 @@ static int handle_syscall_create(struct lcd *lcd)
 
 static int handle_syscall_cap_grant(struct lcd *lcd)
 {
-	cptr_t lcd, src, dest;
+	cptr_t dest_lcd, src, dest;
 	/*
 	 * Args
 	 */
@@ -96,8 +96,8 @@ static int handle_syscall_config_registers(struct lcd *lcd)
 	/*
 	 * Do config
 	 */
-	return __lcd_config_registers(lcd, dest_lcd, pc, sp, gva_root,
-				utcb_page);
+	return __lcd_config(lcd, dest_lcd, pc, sp, gva_root,
+			utcb_page);
 }
 
 static int handle_syscall_memory_grant_and_map(struct lcd *lcd)

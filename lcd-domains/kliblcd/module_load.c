@@ -130,7 +130,7 @@ static int dup_module_pages(hva_t pages_base, unsigned long size,
 {
 	int ret;
 	void *dup_pages;
-	unsigned int unused;
+	unsigned long unused;
 	/*
 	 * Alloc dup pages, and memcpy the bits over
 	 */

@@ -1,0 +1,67 @@
+#
+# Kernel build file for liblcd
+# 
+
+# Paths are all relative to the liblcd build dir (exported
+# and available in this file as $(LIBLCD_BUILD_DIR)).
+
+# This single line of magic makes it so we can do an out of src tree
+# build. It has to do with how and where this Kbuild file is included
+# in the kernel build system.
+src = $(LCD_DOMAINS_TOP_SRC_DIR)/liblcd
+
+lib-y    +=  $(addprefix lcd-domains/, \
+	 allocator.o \
+	 boot_info.o \
+	 cap.o \
+	 console.o \
+	 create.o \
+	 enter_exit.o \
+	 heap.o \
+	 mem_itree.o \
+	 module_load.o \
+	 ram_map.o \
+	 sync_ipc.o \
+	 )
+
+# Soon this will be module'd like libcap
+lib-y    +=  $(addprefix lcd-domains/async/, \
+	 thc.o \
+	 thcsync.o \
+	 )
+
+lib-y    +=  $(addprefix lib/, \
+	 find_next_bit.o \
+	 kstrtox.o \
+	 string.o \
+	 vsprintf.o \
+	 ctype.o \
+	 hexdump.o \
+	 reciprocal_div.o \
+	 )
+
+lib-y    +=  $(addprefix mm/, 
+	slab.o \
+	slab_common.o \
+	util.o \
+	)
+
+lib-y    +=  resolve.o
+
+# code shared by kliblcd and isolated liblcd
+lib-y    += $(addprefix common/, \
+	resource_tree.o \
+	module_create.o \
+	)
+
+# libcap
+lib-y    += libcap.install/lib/libcap.a
+
+# Extra includes
+ccflags-y += \
+	$(LCD_DOMAINS_CFLAGS) \
+	-I$(LCD_DOMAINS_TOP_SRC_DIR)/include \
+	-I$(LCD_DOMAINS_TOP_SRC_DIR)/arch/$(ARCH)/include \
+	-I$(LIBLCD_BUILD_DIR)/libcap.install/include \
+	-I$(LCD_DOMAINS_TOP_SRC_DIR)/config/isolated \
+	-DCONFIG_LAZY_THC

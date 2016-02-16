@@ -1,6 +1,15 @@
+/*
+ * post_hook.h
+ *
+ * #include this file after all #include's in a source
+ * file. Do not #include this in a header.
+ *
+ * This overwrites macros, defs, etc. that the top-level
+ * kernel puts in place that we want to change for the
+ * isolated environment.
+ */
 
-#include <lcd-domains/liblcd-config.h>
-#include <lcd-domains/liblcd.h>
+#include <liblcd/liblcd.h>
 
 /*
  * Misc macros, etc.

@@ -17,8 +17,11 @@
 #                            under version control though, FYI.)
 #
 
+# Common top-level vars used throughout
 LCD_DOMAINS_TOP_SRC_DIR=$(PWD)
 export LCD_DOMAINS_TOP_SRC_DIR
+export LCD_DOMAINS_CFLAGS=-Werror \
+			  -DLCD_DOMAINS
 
 # Don't print "Entering directory..." etc.
 MAKEFLAGS += --no-print-directory
@@ -29,10 +32,12 @@ MAKEFLAGS += --no-print-directory
 # in our Kbuild files.)
 ARCH=x86
 
+LCD_BUILD_DIR=$(LCD_DOMAINS_TOP_SRC_DIR)/build
+
 # ------------------------------------------------------------
 # Microkernel build setup
 
-MICROKERNEL_BUILD_DIR=$(LCD_DOMAINS_TOP_SRC_DIR)/microkernel_build
+MICROKERNEL_BUILD_DIR=$(LCD_BUILD_DIR)/microkernel_build
 export MICROKERNEL_BUILD_DIR
 
 MICROKERNEL_DIRS= \
@@ -76,6 +81,49 @@ $(MICROKERNEL_BUILD_DIRS):
 	mkdir -p $@
 
 # ------------------------------------------------------------
+# LIBLCD build setup
+
+LIBLCD_BUILD_DIR=$(LCD_BUILD_DIR)/liblcd_build
+export LIBLCD_BUILD_DIR
+
+LIBLCD_DIRS= \
+	lcd-domains \
+	lcd-domains/async \
+	mm \
+	lib \
+	libcap.build \
+	libcap.install \
+	common
+LIBLCD_BUILD_DIRS=$(foreach dir,$(LIBLCD_DIRS),\
+	$(LIBLCD_BUILD_DIR)/$(dir))
+
+LIBLCD_LIBCAP=$(LIBLCD_BUILD_DIR)/libcap.install/lib/libcap.a
+
+liblcd: $(LIBLCD_BUILD_DIR)/Kbuild $(LIBLCD_LIBCAP) | \
+	$(LIBLCD_BUILD_DIRS)
+	$(MAKE) -C .. M=$(LIBLCD_BUILD_DIR) -j8
+
+libcap.liblcd: $(LIBLCD_BUILD_DIR)/libcap.build/Makefile
+	$(MAKE) -C $(LIBLCD_BUILD_DIR)/libcap.build && \
+	$(MAKE) -C $(LIBLCD_BUILD_DIR)/libcap.build install
+
+$(LIBLCD_BUILD_DIR)/libcap.build/Makefile: libcap/configure | \
+	$(LIBLCD_BUILD_DIRS)
+	cd $(LIBLCD_BUILD_DIR)/libcap.build && \
+	$(LCD_DOMAINS_TOP_SRC_DIR)/libcap/configure \
+	PLATFORM=kernel --disable-test-build \
+	--with-kernel-headers=$(LCD_DOMAINS_TOP_SRC_DIR)/.. \
+	--disable-kernel-module \
+	--prefix=$(LIBLCD_BUILD_DIR)/libcap.install
+
+$(LIBLCD_BUILD_DIR)/Kbuild: scripts/Kbuild.liblcd | \
+	$(LIBLCD_BUILD_DIRS)
+	cp scripts/Kbuild.liblcd $(LIBLCD_BUILD_DIR)/Kbuild
+
+$(LIBLCD_BUILD_DIRS):
+	mkdir -p $@
+
+# ------------------------------------------------------------
 # Some libcap tidbits
 
 libcap/configure: libcap/configure.ac
@@ -86,15 +134,26 @@ libcap/configure: libcap/configure.ac
 
 clean: 
 	$(MAKE) -C .. M=$(MICROKERNEL_BUILD_DIR) clean
+	$(MAKE) -C .. M=$(LIBLCD_BUILD_DIR) clean
 	if test -d $(MICROKERNEL_BUILD_DIR)/libcap.build; then \
 		$(MAKE) -C $(MICROKERNEL_BUILD_DIR)/libcap.build clean; \
 	fi
+	if test -d $(LIBLCD_BUILD_DIR)/libcap.build; then \
+		$(MAKE) -C $(LIBLCD_BUILD_DIR)/libcap.build clean; \
+	fi
 	rm -rf $(MICROKERNEL_BUILD_DIR)/libcap.install
+	rm -rf $(LIBLCD_BUILD_DIR)/libcap.install
 
 distclean:
-	rm -rf $(MICROKERNEL_BUILD_DIR)
+	rm -rf $(LCD_BUILD_DIR)
 
 # ------------------------------------------------------------
 # phonies
 
-.PHONY: microkernel libcap.microkernel clean distclean
+.PHONY: \
+	microkernel \
+	libcap.microkernel \
+	liblcd \
+	libcap.liblcd \
+	clean \
+	distclean

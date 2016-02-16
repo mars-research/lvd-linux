@@ -29,12 +29,12 @@
 #include <barrelfish/waitset.h>
 #include <thc/thc.h>
 #elif LCD_DOMAINS
-#include <lcd-domains/liblcd-config.h>
-#include <lcd-domains/thc.h>
-#include <lcd-domains/thcsync.h>
-#include <lcd-domains/thcinternal.h>
+#include <lcd_config/pre_hook.h>
+#include <liblcd/thc.h>
+#include <liblcd/thcsync.h>
+#include <liblcd/thcinternal.h>
 #include <linux/slab.h>
-#include <lcd-domains/liblcd-hacks.h>
+#include <lcd_config/post_hook.h>
 #else
 #include "thc.h"
 #endif

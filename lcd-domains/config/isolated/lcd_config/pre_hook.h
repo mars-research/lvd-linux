@@ -1,6 +1,16 @@
 /*
- * Ensure we use the right config
+ * pre_hook.h
+ *
+ * This should be included at the top of every source
+ * file that could possibly be built for the isolated
+ * environment. It ensures the build configuration
+ * is correct.
+ *
+ * This file should never be put in a header itself, only
+ * in .c files. (We want this file to be included exactly
+ * once before all other code.)
  */
+
 #undef CONFIG_DEBUG_OBJECTS
 #undef CONFIG_KMEMCHECK
 #undef CONFIG_DEBUG_KMEMLEAK

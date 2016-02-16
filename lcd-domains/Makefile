@@ -1,6 +1,21 @@
 #
 # Top-level makefile for building everything LCD-related.
 #
+# TARGETS:
+#
+#    libcap.microkernel  --  Build libcap for the microkernel
+#
+#    microkernel         --  Build the LCD microkernel and kLIBLCD
+#
+#    clean               --  Remove built object files and local
+#                            install directories. But doesn't delete
+#                            config'd build directories.
+#
+#    distclean           --  Deletes all object files and build directories.
+#                            Does NOT delete files created by autoconf. You
+#                            need to manually delete those. (These are not
+#                            under version control though, FYI.)
+#
 
 LCD_DOMAINS_TOP_SRC_DIR=$(PWD)
 export LCD_DOMAINS_TOP_SRC_DIR
@@ -19,6 +34,7 @@ ARCH=x86
 
 MICROKERNEL_BUILD_DIR=$(LCD_DOMAINS_TOP_SRC_DIR)/microkernel_build
 export MICROKERNEL_BUILD_DIR
+
 MICROKERNEL_DIRS= \
 	microkernel \
 	kliblcd \
@@ -29,12 +45,16 @@ MICROKERNEL_DIRS= \
 MICROKERNEL_BUILD_DIRS=$(foreach dir,$(MICROKERNEL_DIRS),\
 	$(MICROKERNEL_BUILD_DIR)/$(dir))
 
-microkernel: libcap.microkernel $(MICROKERNEL_BUILD_DIR)/Kbuild | \
+MICROKERNEL_LIBCAP=$(MICROKERNEL_BUILD_DIR)/libcap.install/src/platform/kernel/libcap.a
+
+microkernel: $(MICROKERNEL_BUILD_DIR)/Kbuild $(MICROKERNEL_LIBCAP) | \
 	$(MICROKERNEL_BUILD_DIRS)
 	$(MAKE) -C .. M=$(MICROKERNEL_BUILD_DIR) -j8
 
-libcap.microkernel: $(MICROKERNEL_BUILD_DIR)/libcap.build/Makefile \
-	| $(MICROKERNEL_BUILD_DIRS)
+# (We don't combine this with the LCD microkernel build, because install
+# triggers every time, and as a result, triggers a full microkernel
+# rebuild.)
+libcap.microkernel: $(MICROKERNEL_BUILD_DIR)/libcap.build/Makefile
 	$(MAKE) -C $(MICROKERNEL_BUILD_DIR)/libcap.build && \
 	$(MAKE) -C $(MICROKERNEL_BUILD_DIR)/libcap.build install
 
@@ -58,7 +78,7 @@ $(MICROKERNEL_BUILD_DIRS):
 # ------------------------------------------------------------
 # Some libcap tidbits
 
-libcap/configure:
+libcap/configure: libcap/configure.ac
 	cd libcap && ./autogen.sh
 
 # ------------------------------------------------------------
@@ -69,6 +89,7 @@ clean:
 	if test -d $(MICROKERNEL_BUILD_DIR)/libcap.build; then \
 		$(MAKE) -C $(MICROKERNEL_BUILD_DIR)/libcap.build clean; \
 	fi
+	rm -rf $(MICROKERNEL_BUILD_DIR)/libcap.install
 
 distclean:
 	rm -rf $(MICROKERNEL_BUILD_DIR)

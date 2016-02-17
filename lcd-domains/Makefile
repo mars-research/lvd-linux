@@ -1,11 +1,28 @@
 #
 # Top-level makefile for building everything LCD-related.
 #
-# TARGETS:
+# TARGETS (all phony):
+#
+#    all                 --  Build microkernel, liblcd, and all
+#                            test modules/examples
 #
 #    libcap.microkernel  --  Build libcap for the microkernel
 #
-#    microkernel         --  Build the LCD microkernel and kLIBLCD
+#    microkernel         --  Build the LCD microkernel and kLIBLCD;
+#                            depends on libcap.microkernel being exec'd
+#                            from prior make run (we don't list this as
+#                            a target dependency because otherwise it triggers
+#                            a full microkernel re-build every time)
+#
+#    libcap.liblcd       --  Build libcap for isolated liblcd library kernel
+#
+#    liblcd              --  Build liblcd library kernel;
+#                            depends on libcap.liblcd being exec'd from
+#                            prior make run
+#
+#    test_mods           --  Builds all of the test modules/examples. It 
+#                            depends on liblcd target being exec'd from 
+#                            prior make run.
 #
 #    clean               --  Remove built object files and local
 #                            install directories. But doesn't delete
@@ -32,7 +49,15 @@ MAKEFLAGS += --no-print-directory
 # in our Kbuild files.)
 ARCH=x86
 
-LCD_BUILD_DIR=$(LCD_DOMAINS_TOP_SRC_DIR)/build
+LCD_BUILD_DIR_REL=build
+LCD_BUILD_DIR=$(LCD_DOMAINS_TOP_SRC_DIR)/$(LCD_BUILD_DIR_REL)
+
+# ------------------------------------------------------------
+# all targets
+
+# build_all.sh does the right target sequencing
+all:
+	scripts/build_all.sh
 
 # ------------------------------------------------------------
 # Microkernel build setup
@@ -54,17 +79,14 @@ MICROKERNEL_LIBCAP=$(MICROKERNEL_BUILD_DIR)/libcap.install/lib/libcap.a
 MICROKERNEL_LIBCAP_CFLAGS= \
 	"-DLCD_DOMAINS -I$(LCD_DOMAINS_TOP_SRC_DIR)/include -I$(LCD_DOMAINS_TOP_SRC_DIR)/config/non_isolated"
 
-microkernel: $(MICROKERNEL_BUILD_DIR)/Kbuild $(MICROKERNEL_LIBCAP) | \
-	$(MICROKERNEL_BUILD_DIRS)
-	$(MAKE) -C .. M=$(MICROKERNEL_BUILD_DIR) -j8
+microkernel: $(MICROKERNEL_BUILD_DIR)/Kbuild | \
+	$(MICROKERNEL_LIBCAP) $(MICROKERNEL_BUILD_DIRS)
+	$(MAKE) -C .. M=$(MICROKERNEL_BUILD_DIR) $(MAKEFLAGS)
 
-# (We don't combine this with the LCD microkernel build, because install
-# triggers every time, and as a result, triggers a full microkernel
-# rebuild.)
 libcap.microkernel: $(MICROKERNEL_BUILD_DIR)/libcap.build/Makefile
 	$(MAKE) -C $(MICROKERNEL_BUILD_DIR)/libcap.build \
-		CFLAGS=$(MICROKERNEL_LIBCAP_CFLAGS) && \
-	$(MAKE) -C $(MICROKERNEL_BUILD_DIR)/libcap.build install
+		CFLAGS=$(MICROKERNEL_LIBCAP_CFLAGS) $(MAKEFLAGS) && \
+	$(MAKE) -C $(MICROKERNEL_BUILD_DIR)/libcap.build install $(MAKEFLAGS)
 
 $(MICROKERNEL_BUILD_DIR)/libcap.build/Makefile: libcap/configure | \
 	$(MICROKERNEL_BUILD_DIRS)
@@ -81,7 +103,8 @@ $(MICROKERNEL_BUILD_DIR)/Kbuild: scripts/Kbuild.microkernel | \
 	cp scripts/Kbuild.microkernel $(MICROKERNEL_BUILD_DIR)/Kbuild
 
 $(MICROKERNEL_BUILD_DIRS):
-	mkdir -p $@
+	@echo "  MKDIR      $@"
+	@mkdir -p $@
 
 # ------------------------------------------------------------
 # LIBLCD build setup
@@ -110,20 +133,18 @@ LIBLCD_LIBCAP_CFLAGS= \
 # I mash this in one line for now.
 LIBLCD_AR_SCRIPT="CREATE $(LIBLCD_BUILD_DIR)/liblcd.a\nADDLIB $(LIBLCD_BUILD_DIR)/lib.a\nADDLIB $(LIBLCD_BUILD_DIR)/libcap.install/lib/libcap.a\nSAVE\nEND\n"
 
-liblcd: $(LIBLCD_BUILD_DIR)/liblcd.a
-
-$(LIBLCD_BUILD_DIR)/liblcd.a: $(LIBLCD_BUILD_DIR)/lib.a $(LIBLCD_LIBCAP)
+liblcd: $(LIBLCD_BUILD_DIR)/lib.a | $(LIBLCD_LIBCAP)
 	@echo "  AR      $@"
 	@echo $(LIBLCD_AR_SCRIPT) | ar -M
 
 $(LIBLCD_BUILD_DIR)/lib.a: $(LIBLCD_BUILD_DIR)/Kbuild | \
 	$(LIBLCD_BUILD_DIRS)
-	$(MAKE) -C .. M=$(LIBLCD_BUILD_DIR) -j8
+	$(MAKE) -C .. M=$(LIBLCD_BUILD_DIR) $(MAKEFLAGS)
 
 libcap.liblcd: $(LIBLCD_BUILD_DIR)/libcap.build/Makefile
 	$(MAKE) -C $(LIBLCD_BUILD_DIR)/libcap.build \
-	CFLAGS=$(LIBLCD_LIBCAP_CFLAGS) && \
-	$(MAKE) -C $(LIBLCD_BUILD_DIR)/libcap.build install
+	CFLAGS=$(LIBLCD_LIBCAP_CFLAGS) $(MAKEFLAGS) && \
+	$(MAKE) -C $(LIBLCD_BUILD_DIR)/libcap.build install $(MAKEFLAGS)
 
 $(LIBLCD_BUILD_DIR)/libcap.build/Makefile: libcap/configure | \
 	$(LIBLCD_BUILD_DIRS)
@@ -139,7 +160,45 @@ $(LIBLCD_BUILD_DIR)/Kbuild: scripts/Kbuild.liblcd | \
 	cp scripts/Kbuild.liblcd $(LIBLCD_BUILD_DIR)/Kbuild
 
 $(LIBLCD_BUILD_DIRS):
-	mkdir -p $@
+	@echo "  MKDIR      $@"
+	@mkdir -p $@
+
+# ------------------------------------------------------------
+# Test modules/examples
+
+LCD_TEST_MODULES_DIR=$(PWD)/test_mods
+export LCD_TEST_MODULES_DIR
+
+LCD_TEST_MODULES_BUILD_DIR=$(LCD_BUILD_DIR)/test_mods
+export LCD_TEST_MODULES_BUILD_DIR
+
+# Collect all of the example directories and kbuilds
+TEST_MODULES_DIRS=$(shell cd $(LCD_TEST_MODULES_DIR) && \
+	find . -mindepth 1 -type d)
+TEST_MODULES_KBUILDS=$(shell cd $(LCD_TEST_MODULES_DIR) && \
+	find . -name "Kbuild")
+
+TEST_MODULES_BUILD_DIRS=$(foreach dir,$(TEST_MODULES_DIRS), \
+	$(LCD_TEST_MODULES_BUILD_DIR)/$(dir))
+TEST_MODULES_BUILD_KBUILDS=$(foreach kb,$(TEST_MODULES_KBUILDS), \
+	$(LCD_TEST_MODULES_BUILD_DIR)/$(kb))
+
+test_mods: $(TEST_MODULES_BUILD_KBUILDS) $(TEST_MODULES_BUILD_DIRS) | \
+	$(LIBLCD_BUILD_DIR)/liblcd.a
+	$(MAKE) -C .. M=$(LCD_TEST_MODULES_BUILD_DIR) $(MAKEFLAGS)
+
+# This rule does the external source hack (define "src" in Kbuild file)
+$(LCD_TEST_MODULES_BUILD_DIR)/%/Kbuild: $(LCD_TEST_MODULES_DIR)/%/Kbuild | \
+	$(TEST_MODULES_BUILD_DIRS)
+	@echo "  KBUILD     $^"
+	@printf "#\n# BEGIN: Auto-generated part. ('src =' line auto-generated).\n#\n\n" > $@ && \
+	printf "src = $(shell dirname `readlink -f $^`)\n\n" >> $@ && \
+	printf "#\n# END: Auto-generated part.\n#\n\n" >> $@ && \
+	cat $^ >> $@
+
+$(TEST_MODULES_BUILD_DIRS):
+	@echo "  MKDIR      $@"
+	@mkdir -p $@
 
 # ------------------------------------------------------------
 # Some libcap tidbits
@@ -165,6 +224,7 @@ clean:
 	fi
 	rm -rf $(MICROKERNEL_BUILD_DIR)/libcap.install
 	rm -rf $(LIBLCD_BUILD_DIR)/libcap.install
+	rm -rf $(LCD_TEST_MODULES_BUILD_DIR)
 
 distclean:
 	rm -rf $(LCD_BUILD_DIR)
@@ -177,5 +237,6 @@ distclean:
 	libcap.microkernel \
 	liblcd \
 	libcap.liblcd \
+	test_mods \
 	clean \
 	distclean

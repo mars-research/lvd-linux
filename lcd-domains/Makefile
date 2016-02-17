@@ -106,7 +106,19 @@ LIBLCD_LIBCAP=$(LIBLCD_BUILD_DIR)/libcap.install/lib/libcap.a
 LIBLCD_LIBCAP_CFLAGS= \
 	"-DLCD_DOMAINS -I$(LCD_DOMAINS_TOP_SRC_DIR)/include -I$(LCD_DOMAINS_TOP_SRC_DIR)/config/isolated"
 
-liblcd: $(LIBLCD_BUILD_DIR)/Kbuild $(LIBLCD_LIBCAP) | \
+LIBLCD_AR_SCRIPT= \
+	"CREATE $(LIBLCD_BUILD_DIR)/liblcd.a\n" \
+	"ADDLIB $(LIBLCD_BUILD_DIR)/lib.a\n" \
+	"ADDLIB $(LIBLCD_BUILD_DIR)/libcap.install/lib/libcap.a\n" \
+	"SAVE\n" \
+	"END\n"
+
+liblcd: $(LIBLCD_BUILD_DIR)/liblcd.a
+
+$(LIBLCD_BUILD_DIR)/liblcd.a: $(LIBLCD_BUILD_DIR)/lib.a $(LIBLCD_LIBCAP)
+	echo $(LIBLCD_AR_SCRIPT) | ar -M
+
+$(LIBLCD_BUILD_DIR)/lib.a: $(LIBLCD_BUILD_DIR)/Kbuild | \
 	$(LIBLCD_BUILD_DIRS)
 	$(MAKE) -C .. M=$(LIBLCD_BUILD_DIR) -j8
 

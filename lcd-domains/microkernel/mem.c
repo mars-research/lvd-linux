@@ -69,7 +69,7 @@ hva_t __lcd_memory_object_hva(struct lcd_memory_object *mo)
 		return pa2hva(__lcd_memory_object_start(mo));
 	case LCD_MICROKERNEL_TYPE_ID_VMALLOC_MEM:
 	case LCD_MICROKERNEL_TYPE_ID_VOLUNTEERED_VMALLOC_MEM:
-		return va2hva(__lcd_memory_object_start(mo));
+		return __hva(__lcd_memory_object_start(mo));
 	default:
 		LCD_ERR("unexpected memory object type %d", mo->sub_type);
 		BUG();

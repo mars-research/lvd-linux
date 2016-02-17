@@ -52,8 +52,7 @@ MICROKERNEL_BUILD_DIRS=$(foreach dir,$(MICROKERNEL_DIRS),\
 
 MICROKERNEL_LIBCAP=$(MICROKERNEL_BUILD_DIR)/libcap.install/lib/libcap.a
 MICROKERNEL_LIBCAP_CFLAGS= \
-	-DLCD_DOMAINS \
-	-I$(LCD_DOMAINS_TOP_SRC_DIR)/config/non_isolated
+	"-DLCD_DOMAINS -I$(LCD_DOMAINS_TOP_SRC_DIR)/include -I$(LCD_DOMAINS_TOP_SRC_DIR)/config/non_isolated"
 
 microkernel: $(MICROKERNEL_BUILD_DIR)/Kbuild $(MICROKERNEL_LIBCAP) | \
 	$(MICROKERNEL_BUILD_DIRS)
@@ -106,17 +105,16 @@ LIBLCD_LIBCAP=$(LIBLCD_BUILD_DIR)/libcap.install/lib/libcap.a
 LIBLCD_LIBCAP_CFLAGS= \
 	"-DLCD_DOMAINS -I$(LCD_DOMAINS_TOP_SRC_DIR)/include -I$(LCD_DOMAINS_TOP_SRC_DIR)/config/isolated"
 
-LIBLCD_AR_SCRIPT= \
-	"CREATE $(LIBLCD_BUILD_DIR)/liblcd.a\n" \
-	"ADDLIB $(LIBLCD_BUILD_DIR)/lib.a\n" \
-	"ADDLIB $(LIBLCD_BUILD_DIR)/libcap.install/lib/libcap.a\n" \
-	"SAVE\n" \
-	"END\n"
+# There isn't a nice easy way to multiline this, and I want access to the
+# LIBLCD_BUILD_DIR variable (so I don't want to create a separate file); so 
+# I mash this in one line for now.
+LIBLCD_AR_SCRIPT="CREATE $(LIBLCD_BUILD_DIR)/liblcd.a\nADDLIB $(LIBLCD_BUILD_DIR)/lib.a\nADDLIB $(LIBLCD_BUILD_DIR)/libcap.install/lib/libcap.a\nSAVE\nEND\n"
 
 liblcd: $(LIBLCD_BUILD_DIR)/liblcd.a
 
 $(LIBLCD_BUILD_DIR)/liblcd.a: $(LIBLCD_BUILD_DIR)/lib.a $(LIBLCD_LIBCAP)
-	echo $(LIBLCD_AR_SCRIPT) | ar -M
+	@echo "  AR      $@"
+	@echo $(LIBLCD_AR_SCRIPT) | ar -M
 
 $(LIBLCD_BUILD_DIR)/lib.a: $(LIBLCD_BUILD_DIR)/Kbuild | \
 	$(LIBLCD_BUILD_DIRS)

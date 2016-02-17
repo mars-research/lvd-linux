@@ -54,8 +54,7 @@ lib-y += $(addprefix common/, \
 	module_create.o \
 	)
 
-# libcap
-lib-y += libcap.install/lib/libcap.a
+# libcap is linked in with ar script
 
 # Extra includes
 ccflags-y += \

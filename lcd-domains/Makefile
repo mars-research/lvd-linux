@@ -51,6 +51,9 @@ MICROKERNEL_BUILD_DIRS=$(foreach dir,$(MICROKERNEL_DIRS),\
 	$(MICROKERNEL_BUILD_DIR)/$(dir))
 
 MICROKERNEL_LIBCAP=$(MICROKERNEL_BUILD_DIR)/libcap.install/lib/libcap.a
+MICROKERNEL_LIBCAP_CFLAGS= \
+	-DLCD_DOMAINS \
+	-I$(LCD_DOMAINS_TOP_SRC_DIR)/config/non_isolated
 
 microkernel: $(MICROKERNEL_BUILD_DIR)/Kbuild $(MICROKERNEL_LIBCAP) | \
 	$(MICROKERNEL_BUILD_DIRS)
@@ -60,7 +63,8 @@ microkernel: $(MICROKERNEL_BUILD_DIR)/Kbuild $(MICROKERNEL_LIBCAP) | \
 # triggers every time, and as a result, triggers a full microkernel
 # rebuild.)
 libcap.microkernel: $(MICROKERNEL_BUILD_DIR)/libcap.build/Makefile
-	$(MAKE) -C $(MICROKERNEL_BUILD_DIR)/libcap.build && \
+	$(MAKE) -C $(MICROKERNEL_BUILD_DIR)/libcap.build \
+		CFLAGS=$(MICROKERNEL_LIBCAP_CFLAGS) && \
 	$(MAKE) -C $(MICROKERNEL_BUILD_DIR)/libcap.build install
 
 $(MICROKERNEL_BUILD_DIR)/libcap.build/Makefile: libcap/configure | \
@@ -99,12 +103,17 @@ LIBLCD_BUILD_DIRS=$(foreach dir,$(LIBLCD_DIRS),\
 
 LIBLCD_LIBCAP=$(LIBLCD_BUILD_DIR)/libcap.install/lib/libcap.a
 
+LIBLCD_LIBCAP_CFLAGS= \
+	-DLCD_DOMAINS \
+	-I$(LCD_DOMAINS_TOP_SRC_DIR)/config/isolated
+
 liblcd: $(LIBLCD_BUILD_DIR)/Kbuild $(LIBLCD_LIBCAP) | \
 	$(LIBLCD_BUILD_DIRS)
 	$(MAKE) -C .. M=$(LIBLCD_BUILD_DIR) -j8
 
 libcap.liblcd: $(LIBLCD_BUILD_DIR)/libcap.build/Makefile
-	$(MAKE) -C $(LIBLCD_BUILD_DIR)/libcap.build && \
+	$(MAKE) -C $(LIBLCD_BUILD_DIR)/libcap.build \
+		CFLAGS=$(LIBLCD_LIBCAP_CFLAGS) && \
 	$(MAKE) -C $(LIBLCD_BUILD_DIR)/libcap.build install
 
 $(LIBLCD_BUILD_DIR)/libcap.build/Makefile: libcap/configure | \

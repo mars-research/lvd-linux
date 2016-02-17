@@ -104,8 +104,7 @@ LIBLCD_BUILD_DIRS=$(foreach dir,$(LIBLCD_DIRS),\
 LIBLCD_LIBCAP=$(LIBLCD_BUILD_DIR)/libcap.install/lib/libcap.a
 
 LIBLCD_LIBCAP_CFLAGS= \
-	-DLCD_DOMAINS \
-	-I$(LCD_DOMAINS_TOP_SRC_DIR)/config/isolated
+	"-DLCD_DOMAINS -I$(LCD_DOMAINS_TOP_SRC_DIR)/include -I$(LCD_DOMAINS_TOP_SRC_DIR)/config/isolated"
 
 liblcd: $(LIBLCD_BUILD_DIR)/Kbuild $(LIBLCD_LIBCAP) | \
 	$(LIBLCD_BUILD_DIRS)
@@ -113,7 +112,7 @@ liblcd: $(LIBLCD_BUILD_DIR)/Kbuild $(LIBLCD_LIBCAP) | \
 
 libcap.liblcd: $(LIBLCD_BUILD_DIR)/libcap.build/Makefile
 	$(MAKE) -C $(LIBLCD_BUILD_DIR)/libcap.build \
-		CFLAGS=$(LIBLCD_LIBCAP_CFLAGS) && \
+	CFLAGS=$(LIBLCD_LIBCAP_CFLAGS) && \
 	$(MAKE) -C $(LIBLCD_BUILD_DIR)/libcap.build install
 
 $(LIBLCD_BUILD_DIR)/libcap.build/Makefile: libcap/configure | \
@@ -121,8 +120,8 @@ $(LIBLCD_BUILD_DIR)/libcap.build/Makefile: libcap/configure | \
 	cd $(LIBLCD_BUILD_DIR)/libcap.build && \
 	$(LCD_DOMAINS_TOP_SRC_DIR)/libcap/configure \
 	PLATFORM=kernel --disable-test-build \
-	--with-kernel-headers=$(LCD_DOMAINS_TOP_SRC_DIR)/.. \
 	--disable-kernel-module \
+	--with-kernel-headers=$(LCD_DOMAINS_TOP_SRC_DIR)/.. \
 	--prefix=$(LIBLCD_BUILD_DIR)/libcap.install
 
 $(LIBLCD_BUILD_DIR)/Kbuild: scripts/Kbuild.liblcd | \
@@ -142,8 +141,12 @@ libcap/configure: libcap/configure.ac
 # clean
 
 clean: 
-	$(MAKE) -C .. M=$(MICROKERNEL_BUILD_DIR) clean
-	$(MAKE) -C .. M=$(LIBLCD_BUILD_DIR) clean
+	if test -e $(MICROKERNEL_BUILD_DIR)/Makefile; then \
+		$(MAKE) -C .. M=$(MICROKERNEL_BUILD_DIR) clean; \
+	fi
+	if test -e $(LIBLCD_BUILD_DIR)/Makefile; then \
+		$(MAKE) -C .. M=$(LIBLCD_BUILD_DIR) clean; \
+	fi
 	if test -d $(MICROKERNEL_BUILD_DIR)/libcap.build; then \
 		$(MAKE) -C $(MICROKERNEL_BUILD_DIR)/libcap.build clean; \
 	fi

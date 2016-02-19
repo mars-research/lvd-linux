@@ -2,4 +2,7 @@
 # Top-level test mods Kbuild file
 #
 
+export ISOLATED_CC_FLAGS=-I$(LCD_DOMAINS_TOP_SRC_DIR)/lcd_config/isolated
+export NON_ISOLATED_CC_FLAGS= # empty for now
+
 obj-m += liblcd_test/

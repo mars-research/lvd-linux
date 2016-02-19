@@ -344,6 +344,7 @@ struct lcd_boot_info {
  */
 #define LCD_MPATH_SIZE 256
 
+/* LCD_TEST_MODS_PATH set in top-level Makefile via -D */
 #define LCD_DIR(subpath) \
 	LCD_TEST_MODS_PATH "/" subpath
 

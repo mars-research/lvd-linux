@@ -98,8 +98,6 @@ enum lcd_xmit_status {
 	LCD_XMIT_FAILED  = 2, /* when send/recv failed    */
 };
 
-#define LCD_CONSOLE_BUFF_SIZE 512
-
 struct lcd {
 	/*
 	 * Lock

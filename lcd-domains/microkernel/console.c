@@ -26,11 +26,11 @@ int __lcd_put_char(struct lcd *lcd, char c)
 		lcd->console_cursor = 0;
 		return 0;
 	}
-	if (lcd->console_cursor >= LCD_CONSOLE_BUFF_SIZE - 1) {
+	if (lcd->console_cursor >= LCD_PRINTK_BUFF_SIZE - 1) {
 		/*
 		 * Filled buffer; empty it.
 		 */
-		lcd->console_buff[LCD_CONSOLE_BUFF_SIZE - 1] = 0;
+		lcd->console_buff[LCD_PRINTK_BUFF_SIZE - 1] = 0;
 		printk(KERN_INFO "(incomplete) message from lcd %p: %s\n",
 			lcd, lcd->console_buff);
 		lcd->console_cursor = 0;

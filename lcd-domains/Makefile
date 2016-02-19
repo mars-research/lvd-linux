@@ -39,6 +39,7 @@ LCD_DOMAINS_TOP_SRC_DIR=$(PWD)
 export LCD_DOMAINS_TOP_SRC_DIR
 export LCD_DOMAINS_CFLAGS=-Werror \
 			  -DLCD_DOMAINS
+			  -DLCD_TEST_MODS_PATH="$(PWD)/build/test_mods"
 
 # Don't print "Entering directory..." etc.
 MAKEFLAGS += --no-print-directory
@@ -191,7 +192,8 @@ test_mods: $(TEST_MODULES_BUILD_KBUILDS) $(TEST_MODULES_BUILD_DIRS) | \
 $(LCD_TEST_MODULES_BUILD_DIR)/%/Kbuild: $(LCD_TEST_MODULES_DIR)/%/Kbuild | \
 	$(TEST_MODULES_BUILD_DIRS)
 	@echo "  KBUILD     $^"
-	@printf "#\n# BEGIN: Auto-generated part. ('src =' line auto-generated).\n#\n\n" > $@ && \
+	@printf "#\n# BEGIN: Auto-generated part.\n#\n\n" > $@ && \
+	printf "LIBLCD = 
 	printf "src = $(shell dirname `readlink -f $^`)\n\n" >> $@ && \
 	printf "#\n# END: Auto-generated part.\n#\n\n" >> $@ && \
 	cat $^ >> $@

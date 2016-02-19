@@ -54,6 +54,12 @@ LCD_BUILD_DIR_REL=build
 LCD_BUILD_DIR=$(LCD_DOMAINS_TOP_SRC_DIR)/$(LCD_BUILD_DIR_REL)
 
 # ------------------------------------------------------------
+# CSPACE configuration
+
+LCD_CSPACE_DEPTH_BITS=2 # depth = 4
+LCD_CSPACE_CNODE_TABLE_BITS=3 # cnode tables have 8 slots
+
+# ------------------------------------------------------------
 # all targets
 
 # build_all.sh does the right target sequencing
@@ -97,7 +103,9 @@ $(MICROKERNEL_BUILD_DIR)/libcap.build/Makefile: libcap/configure | \
 	--disable-global-cap-types \
 	--with-kernel-headers=$(LCD_DOMAINS_TOP_SRC_DIR)/.. \
 	--disable-kernel-module \
-	--prefix=$(MICROKERNEL_BUILD_DIR)/libcap.install
+	--prefix=$(MICROKERNEL_BUILD_DIR)/libcap.install \
+	CSPACE_DEPTH_BITS=$(LCD_CSPACE_DEPTH_BITS) \
+	CSPACE_CNODE_TABLE_BITS=$(LCD_CSPACE_CNODE_TABLE_BITS)
 
 $(MICROKERNEL_BUILD_DIR)/Kbuild: scripts/Kbuild.microkernel | \
 	$(MICROKERNEL_BUILD_DIRS)
@@ -154,7 +162,9 @@ $(LIBLCD_BUILD_DIR)/libcap.build/Makefile: libcap/configure | \
 	PLATFORM=kernel --disable-test-build \
 	--disable-kernel-module \
 	--with-kernel-headers=$(LCD_DOMAINS_TOP_SRC_DIR)/.. \
-	--prefix=$(LIBLCD_BUILD_DIR)/libcap.install
+	--prefix=$(LIBLCD_BUILD_DIR)/libcap.install \
+	CSPACE_DEPTH_BITS=$(LCD_CSPACE_DEPTH_BITS) \
+	CSPACE_CNODE_TABLE_BITS=$(LCD_CSPACE_CNODE_TABLE_BITS)
 
 $(LIBLCD_BUILD_DIR)/Kbuild: scripts/Kbuild.liblcd | \
 	$(LIBLCD_BUILD_DIRS)

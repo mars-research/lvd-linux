@@ -1,3 +1,4 @@
 #! /bin/bash
 
-sudo insmod microkernel/lcd_domains.ko
+sudo dmesg -c > /dev/null
+sudo insmod build/microkernel_build/lcd_domains.ko

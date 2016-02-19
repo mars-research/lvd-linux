@@ -141,37 +141,44 @@ static int __init lcd_init(void)
 		LCD_ERR("failed to init ipc subsystem");
 		goto fail3;
 	}
+	ret = __lcd_mem_itree_init();
+	if (ret) {
+		LCD_ERR("failed to init global mem itree");
+		goto fail4;
+	}
 	ret = __lcd_mem_init();
 	if (ret) {
 		LCD_ERR("failed to init memory subsystem");
-		goto fail4;
+		goto fail5;
 	}
 	ret = __lcd_run_init();
 	if (ret) {
 		LCD_ERR("failed to init run loop subsystem");
-		goto fail5;
+		goto fail6;
 	}
 	ret = __lcd_console_init();
 	if (ret) {
 		LCD_ERR("failed to init console subsystem");
-		goto fail6;
+		goto fail7;
 	}
 	ret = misc_register(&lcd_dev);
 	if (ret) {
 		LCD_ERR("misc device register failed, ret = %d", ret);
-		goto fail7;
+		goto fail8;
 	}
 
 	LCD_MSG("lcd microkernel initialized");
 
 	return 0;
 
-fail7:
+fail8:
 	__lcd_console_exit();
-fail6:
+fail7:
 	__lcd_run_exit();
-fail5:
+fail6:
 	__lcd_mem_exit();
+fail5:
+	__lcd_mem_itree_exit();
 fail4:
 	__lcd_ipc_exit();
 fail3:
@@ -192,6 +199,7 @@ static void __exit lcd_exit(void)
 	__lcd_console_exit();
 	__lcd_run_exit();
 	__lcd_mem_exit();
+	__lcd_mem_itree_exit();
 	__lcd_ipc_exit();
 	__lcd_exit_cap_types();
 	cap_fini();

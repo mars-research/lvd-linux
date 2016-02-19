@@ -1,8 +1,8 @@
 
-obj-m  += lcd_test_mod_liblcd_tests_lcd.o
+obj-m  += lcd_test_mod_liblcd_test_lcd.o
 
-lcd_test_mod_liblcd_tests_lcd-y              += lcd.o
+lcd_test_mod_liblcd_test_lcd-y              += lcd.o
 
-lcd_test_mod_liblcd_tests_lcd-y              += $(LIBLCD)
+lcd_test_mod_liblcd_test_lcd-y              += $(LIBLCD)
 
 ccflags-y += $(ISOLATED_CC_FLAGS)

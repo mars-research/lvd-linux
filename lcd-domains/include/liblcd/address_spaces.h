@@ -161,12 +161,13 @@
 
 /* Component Sizes. */
 
-#define LCD_UTCB_SIZE PAGE_SIZE /* ........................... 4  KBs */
-#define LCD_BOOTSTRAP_PAGES_SIZE (2 * PAGE_SIZE) /* .......... 8  KBs */
-#define LCD_BOOTSTRAP_PAGE_TABLES_SIZE (2 * PAGE_SIZE) /* .... 8  KBs */
-#define LCD_STACK_SIZE (2 * PAGE_SIZE) /* .................... 8  KBs */
+#define LCD_UTCB_SIZE PAGE_SIZE /* ........................... 4 KBs */
+#define LCD_BOOTSTRAP_PAGES_SIZE (1 * PAGE_SIZE) /* .......... 4 KBs */
+#define LCD_BOOTSTRAP_PAGE_TABLES_SIZE (2 * PAGE_SIZE) /* .... 8 KBs */
+#define LCD_STACK_SIZE (2 * PAGE_SIZE) /* .................... 8 KBs */
 
 static inline void
+__attribute__((used)) /* required so that this func is processed */
 __lcd_build_checks__(void)
 {
 	/* 

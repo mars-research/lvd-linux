@@ -1,6 +1,6 @@
 
-obj-m += lcd_test_mod_liblcd_tests_boot.o
+obj-m += lcd_test_mod_liblcd_test_boot.o
 
-lcd_test_mod_liblcd_tests_boot-y             += boot.o
+lcd_test_mod_liblcd_test_boot-y             += boot.o
 
 ccflags-y += $(NON_ISOLATED_CC_FLAGS)

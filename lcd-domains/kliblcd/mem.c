@@ -960,3 +960,35 @@ gva_t lcd_gpa2gva(gpa_t gpa)
 {
 	return __gva((unsigned long)__va(gpa_val(gpa)));
 }
+
+/* EXPORTS -------------------------------------------------- */
+
+EXPORT_SYMBOL(lcd_alloc_init_resource_tree);
+EXPORT_SYMBOL(lcd_destroy_free_resource_tree);
+EXPORT_SYMBOL(_lcd_alloc_pages_exact_node);
+EXPORT_SYMBOL(_lcd_alloc_pages);
+EXPORT_SYMBOL(_lcd_vmalloc);
+EXPORT_SYMBOL(_lcd_mmap);
+EXPORT_SYMBOL(_lcd_munmap);
+EXPORT_SYMBOL(lcd_alloc_pages_exact_node);
+EXPORT_SYMBOL(lcd_alloc_pages);
+EXPORT_SYMBOL(lcd_free_pages);
+EXPORT_SYMBOL(lcd_vmalloc);
+EXPORT_SYMBOL(lcd_vfree);
+EXPORT_SYMBOL(lcd_map_phys);
+EXPORT_SYMBOL(lcd_map_virt);
+EXPORT_SYMBOL(lcd_unmap_phys);
+EXPORT_SYMBOL(lcd_unmap_virt);
+EXPORT_SYMBOL(lcd_volunteer_pages);
+EXPORT_SYMBOL(lcd_unvolunteer_pages);
+EXPORT_SYMBOL(lcd_volunteer_dev_mem);
+EXPORT_SYMBOL(lcd_unvolunteer_dev_mem);
+EXPORT_SYMBOL(lcd_volunteer_vmalloc_mem);
+EXPORT_SYMBOL(lcd_unvolunteer_vmalloc_mem);
+EXPORT_SYMBOL(lcd_phys_to_cptr);
+EXPORT_SYMBOL(lcd_virt_to_cptr);
+EXPORT_SYMBOL(lcd_virt_to_head_page);
+EXPORT_SYMBOL(lcd_page_address);
+EXPORT_SYMBOL(lcd_free_memcg_kmem_pages);
+EXPORT_SYMBOL(lcd_gva2gpa);
+EXPORT_SYMBOL(lcd_gpa2gva);

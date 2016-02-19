@@ -13,6 +13,11 @@
 #include <liblcd/resource_tree.h>
 #include <liblcd/address_spaces.h>
 
+/* LIBCAP DEBUG -------------------------------------------------- */
+
+/* Controls debug msg output for liblcd's libcap */
+#define LIBLCD_LIBCAP_DEBUG_LVL 0
+
 /* GLOBAL MEMORY TREE -------------------------------------------------- */
 
 #define LCD_NR_BOOT_RESOURCE_NODES 16

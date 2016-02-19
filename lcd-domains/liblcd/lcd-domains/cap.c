@@ -7,9 +7,16 @@
 #include <lcd_config/pre_hook.h>
 
 #include <asm/lcd_domains/liblcd.h>
+#include <lcd_domains/liblcd.h>
 #include <liblcd/cap.h>
 
 #include <lcd_config/post_hook.h>
+
+/* CAP DEBUGGING -------------------------------------------------- */
+
+int cap_debug_level = LIBLCD_LIBCAP_DEBUG_LVL;
+
+/* FUNCTIONS -------------------------------------------------- */
 
 void lcd_cap_delete(cptr_t slot)
 {

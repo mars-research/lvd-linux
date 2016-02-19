@@ -66,3 +66,12 @@ int lcd_sync_reply(void)
 	return __lcd_reply(current->lcd);
 }
 
+/* EXPORTS -------------------------------------------------- */
+
+EXPORT_SYMBOL(lcd_get_utcb);
+EXPORT_SYMBOL(_lcd_create_sync_endpoint);
+EXPORT_SYMBOL(lcd_create_sync_endpoint);
+EXPORT_SYMBOL(lcd_sync_send);
+EXPORT_SYMBOL(lcd_sync_recv);
+EXPORT_SYMBOL(lcd_sync_call);
+EXPORT_SYMBOL(lcd_sync_reply);

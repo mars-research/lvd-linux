@@ -38,8 +38,8 @@
 LCD_DOMAINS_TOP_SRC_DIR=$(PWD)
 export LCD_DOMAINS_TOP_SRC_DIR
 export LCD_DOMAINS_CFLAGS=-Werror \
-			  -DLCD_DOMAINS
-			  -DLCD_TEST_MODS_PATH="$(PWD)/build/test_mods"
+			  -DLCD_DOMAINS \
+			  -DLCD_TEST_MODS_PATH="\"$(PWD)/build/test_mods\""
 
 # Don't print "Entering directory..." etc.
 MAKEFLAGS += --no-print-directory
@@ -184,16 +184,19 @@ TEST_MODULES_BUILD_DIRS=$(foreach dir,$(TEST_MODULES_DIRS), \
 TEST_MODULES_BUILD_KBUILDS=$(foreach kb,$(TEST_MODULES_KBUILDS), \
 	$(LCD_TEST_MODULES_BUILD_DIR)/$(kb))
 
+KLIBLCD_SYMBOLS=$(MICROKERNEL_BUILD_DIR)/Module.symvers
+
 test_mods: $(TEST_MODULES_BUILD_KBUILDS) $(TEST_MODULES_BUILD_DIRS) | \
 	$(LIBLCD_BUILD_DIR)/liblcd.a
-	$(MAKE) -C .. M=$(LCD_TEST_MODULES_BUILD_DIR) $(MAKEFLAGS)
+	$(MAKE) -C .. M=$(LCD_TEST_MODULES_BUILD_DIR) \
+	KBUILD_EXTRA_SYMBOLS=$(KLIBLCD_SYMBOLS) $(MAKEFLAGS)
 
 # This rule does the external source hack (define "src" in Kbuild file)
 $(LCD_TEST_MODULES_BUILD_DIR)/%/Kbuild: $(LCD_TEST_MODULES_DIR)/%/Kbuild | \
 	$(TEST_MODULES_BUILD_DIRS)
 	@echo "  KBUILD     $^"
 	@printf "#\n# BEGIN: Auto-generated part.\n#\n\n" > $@ && \
-	printf "LIBLCD = 
+	printf "LIBLCD = $(shell scripts/relpath.py $(LIBLCD_BUILD_DIR)/liblcd.a $(shell dirname $(shell readlink -f $@)))\n\n" >> $@ && \
 	printf "src = $(shell dirname `readlink -f $^`)\n\n" >> $@ && \
 	printf "#\n# END: Auto-generated part.\n#\n\n" >> $@ && \
 	cat $^ >> $@

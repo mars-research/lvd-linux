@@ -232,3 +232,8 @@ void lcd_release_module(void *m_init_bits, void *m_core_bits)
 	dedup_module_pages(m_init_bits);
 	dedup_module_pages(m_core_bits);
 }
+
+/* EXPORTS -------------------------------------------------- */
+
+EXPORT_SYMBOL(lcd_load_module);
+EXPORT_SYMBOL(lcd_release_module);

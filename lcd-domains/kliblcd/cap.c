@@ -27,3 +27,10 @@ void lcd_cptr_free(cptr_t slot)
 {
 	cptr_free(current->cptr_cache, slot);
 }
+
+/* EXPORTS -------------------------------------------------- */
+
+EXPORT_SYMBOL(lcd_cap_delete);
+EXPORT_SYMBOL(lcd_cap_revoke);
+EXPORT_SYMBOL(lcd_cptr_alloc);
+EXPORT_SYMBOL(lcd_cptr_free);

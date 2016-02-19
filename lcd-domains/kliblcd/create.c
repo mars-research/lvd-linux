@@ -1138,3 +1138,12 @@ int lcd_run(cptr_t lcd)
 {
 	return __lcd_run(current->lcd, lcd);
 }
+
+/* EXPORTS -------------------------------------------------- */
+
+EXPORT_SYMBOL(lcd_create);
+EXPORT_SYMBOL(lcd_create_klcd);
+EXPORT_SYMBOL(lcd_config_registers);
+EXPORT_SYMBOL(lcd_memory_grant_and_map);
+EXPORT_SYMBOL(lcd_cap_grant);
+EXPORT_SYMBOL(lcd_run);

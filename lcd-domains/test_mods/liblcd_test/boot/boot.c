@@ -23,9 +23,9 @@ static int boot_main(void)
 	/*
 	 * Create lcd
 	 */
-	ret = lcd_create_module_lcd(&lcd, 
-				LCD_DIR("liblcd_tests/lcd"),
+	ret = lcd_create_module_lcd(LCD_DIR("liblcd_tests/lcd"),
 				"lcd_test_mod_liblcd_tests_lcd",
+				&lcd, 
 				&ctx);
 	if (ret) {
 		LIBLCD_ERR("failed to create lcd");

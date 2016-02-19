@@ -15,6 +15,7 @@ struct cap_type_system *lcd_libcap_type_system;
 /* CAP DEBUGGING -------------------------------------------------- */
 
 int cap_debug_level = LCD_LIBCAP_DEBUG_LVL;
+EXPORT_SYMBOL(cap_debug_level);
 
 /* ------------------------------------------------------------ */
 

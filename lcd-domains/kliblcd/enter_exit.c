@@ -149,3 +149,9 @@ void lcd_abort(void)
 {
 	lcd_exit(-EIO);
 }
+
+/* EXPORTS -------------------------------------------------- */
+
+EXPORT_SYMBOL(lcd_enter);
+EXPORT_SYMBOL(lcd_exit);
+EXPORT_SYMBOL(lcd_abort);

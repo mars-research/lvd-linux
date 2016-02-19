@@ -166,7 +166,7 @@ struct lcd {
 	/*
 	 * Console
 	 */
-	char console_buff[LCD_CONSOLE_BUFF_SIZE];
+	char console_buff[LCD_PRINTK_BUFF_SIZE];
 	unsigned console_cursor;
 	/*
 	 * KLCD specifics

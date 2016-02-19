@@ -14,3 +14,7 @@ void lcd_printk(char *fmt, ...)
 	vprintk(fmt, args);
 	va_end(args);
 }
+
+/* EXPORTS -------------------------------------------------- */
+
+EXPORT_SYMBOL(lcd_printk);

@@ -66,7 +66,7 @@ int lcd_enter(void)
 	/*
 	 * Create our call endpoint (for receiving rpc replies)
 	 */
-	ret = __lcd_create_sync_endpoint(current->lcd, LCD_CPTR_CALL_ENDPOINT);
+	ret = _lcd_create_sync_endpoint(LCD_CPTR_CALL_ENDPOINT);
         if (ret) {
                 LCD_ERR("creating call endpoint");
                 goto fail6;

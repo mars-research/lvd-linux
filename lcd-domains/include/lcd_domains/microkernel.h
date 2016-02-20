@@ -375,14 +375,20 @@ void __lcd_destroy(struct lcd *lcd);
  * cap_types.c
  */
 enum lcd_microkernel_type_id {
-	LCD_MICROKERNEL_TYPE_ID_PAGE,
+	/*
+	 * XXX: If you change these, or the order, make sure you
+	 * update the internal array in cap_types.c (otherwise, you'll
+	 * mess up the types assigned to objects inserted in cspaces,
+	 * and the wrong delete/revoke callbacks will fire).
+	 */
+	LCD_MICROKERNEL_TYPE_ID_PAGE = 0,
 	LCD_MICROKERNEL_TYPE_ID_VMALLOC_MEM,
 	LCD_MICROKERNEL_TYPE_ID_VOLUNTEERED_PAGE,
 	LCD_MICROKERNEL_TYPE_ID_VOLUNTEERED_DEV_MEM,
 	LCD_MICROKERNEL_TYPE_ID_VOLUNTEERED_VMALLOC_MEM,
-	LCD_MICROKERNEL_TYPE_ID_SYNC_EP,
 	LCD_MICROKERNEL_TYPE_ID_LCD,
 	LCD_MICROKERNEL_TYPE_ID_KLCD,
+	LCD_MICROKERNEL_TYPE_ID_SYNC_EP,
 
 	LCD_MICROKERNEL_NUM_CAP_TYPES,
 };

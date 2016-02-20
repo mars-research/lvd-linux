@@ -11,6 +11,7 @@
 void lcd_cap_delete(cptr_t slot)
 {
 	cap_delete(current->lcd->cspace, slot);
+	lcd_cptr_free(slot);
 }
 
 int lcd_cap_revoke(cptr_t slot)

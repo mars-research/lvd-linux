@@ -276,6 +276,33 @@ static void destroy_create_ctx(struct lcd_create_ctx *ctx)
 	kfree(ctx);
 }
 
+static int do_cptr_cache_init(struct cptr_cache *cache)
+{
+	int ret;
+	cptr_t unused;
+
+	ret = cptr_cache_init(cache);
+	if (ret) {
+		LIBLCD_ERR("error init'ing cptr cache");
+		return ret;
+	}
+	/*
+	 * Reserve first two slots for call/reply caps (just alloc them)
+	 */
+	ret = cptr_alloc(cache, &unused);
+	if (ret) {
+		LIBLCD_ERR("cptr cache alloc1");
+		return ret;
+	}
+	ret = cptr_alloc(cache, &unused);
+	if (ret) {
+		LIBLCD_ERR("cptr cache alloc2");
+		return ret;
+	}
+
+	return 0;
+}
+
 static int get_pages_for_lcd(struct lcd_create_ctx *ctx)
 {
 	struct page *p1, *p2, *p3;
@@ -297,7 +324,7 @@ static int get_pages_for_lcd(struct lcd_create_ctx *ctx)
 	/*
 	 * Initialize boot cptr cache
 	 */
-	ret = cptr_cache_init(lcd_to_boot_cptr_cache(ctx));
+	ret = do_cptr_cache_init(lcd_to_boot_cptr_cache(ctx));
 	if (ret) {
 		LIBLCD_ERR("failed to init cptr cache");
 		goto fail2;

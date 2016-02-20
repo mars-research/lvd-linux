@@ -35,6 +35,8 @@ int __lcd_create_sync_endpoint__(struct lcd_sync_endpoint **ep_out)
 	 */
 	mutex_init(&e->lock);
 
+	*ep_out = e;
+
 	return 0;
 
 fail1:

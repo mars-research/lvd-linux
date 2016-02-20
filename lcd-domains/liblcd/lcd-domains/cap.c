@@ -21,6 +21,7 @@ int cap_debug_level = LIBLCD_LIBCAP_DEBUG_LVL;
 void lcd_cap_delete(cptr_t slot)
 {
 	lcd_syscall_cap_delete(slot);
+	lcd_cptr_free(slot);
 }
 
 int lcd_cap_revoke(cptr_t slot)

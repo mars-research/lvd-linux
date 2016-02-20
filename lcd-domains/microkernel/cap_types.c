@@ -269,7 +269,7 @@ static int lcd_delete(struct cspace *cspace, struct cnode *cnode,
 static int klcd_delete(struct cspace *cspace, struct cnode *cnode,
 			void *object)
 {
-	__lcd_destroy(object);
+	__lcd_destroy_no_vm(object);
 
 	return 0;
 }

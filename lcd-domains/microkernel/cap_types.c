@@ -7,6 +7,7 @@
 #include <linux/list.h>
 #include <linux/bitops.h>
 #include <linux/slab.h>
+#include <linux/log2.h>
 #include <libcap.h>
 #include <lcd_domains/microkernel.h>
 
@@ -155,7 +156,7 @@ static int page_delete(struct cspace *cspace, struct cnode *cnode,
 	 * Pages should be unmapped from all LCDs and not in use
 	 * by any code. Free them.
 	 */
-	__free_pages(mo->object, mo->order);
+	__free_pages(mo->object, ilog2(mo->nr_pages));
 	/*
 	 * Free mo, no one else should have a reference.
 	 */

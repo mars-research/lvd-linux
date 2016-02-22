@@ -13,6 +13,7 @@ void lcd_printk(char *fmt, ...)
 	va_start(args, fmt);
 	vprintk(fmt, args);
 	va_end(args);
+	printk("\n"); /* flush */
 }
 
 /* EXPORTS -------------------------------------------------- */

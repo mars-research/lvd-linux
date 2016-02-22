@@ -43,6 +43,11 @@ int __lcd_create_no_vm_no_thread(struct lcd **out)
 		goto fail3;
 	}
 	/*
+	 * Store backref (this is used during delete and revoke callbacks,
+	 * for example, to resolve cspace -> owning lcd)
+	 */
+	cap_cspace_setowner(lcd->cspace, lcd);
+	/*
 	 * Set up synchronous ipc utcb
 	 */
 	lcd->utcb = hva2va(__hva(get_zeroed_page(GFP_KERNEL)));

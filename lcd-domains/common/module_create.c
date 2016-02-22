@@ -65,6 +65,10 @@ static int do_kernel_module_grant_map(cptr_t lcd, struct lcd_create_ctx *ctx,
 	int ret;
 	/*
 	 * Map module init and core at correct offsets
+	 *
+	 * XXX: Assumes init and core link addresses come from
+	 * the host's module mem area. 
+	 * (LCD_KERNEL_MODULE_REGION_GV_ADDR = 
 	 */
 	offset = gva_val(m_init_link_addr) - 
 		gva_val(LCD_KERNEL_MODULE_REGION_GV_ADDR);
@@ -76,7 +80,7 @@ static int do_kernel_module_grant_map(cptr_t lcd, struct lcd_create_ctx *ctx,
 	if (ret)
 		goto fail1;
 
-	offset = gva_val(m_core_link_addr) - 
+	offset = gva_val(m_core_link_addr) -
 		gva_val(LCD_KERNEL_MODULE_REGION_GV_ADDR);
 	c = &(lcd_to_boot_info(ctx)->lcd_boot_cptrs.module_core);
 	ret = do_grant_and_map_for_mem(lcd, ctx, ctx->m_core_bits,

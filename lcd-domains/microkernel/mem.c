@@ -30,7 +30,7 @@ unsigned long __lcd_memory_object_start(struct lcd_memory_object *mo)
 
 unsigned long __lcd_memory_object_size(struct lcd_memory_object *mo)
 {
-	return (1UL << mo->order) << PAGE_SHIFT;
+	return mo->nr_pages << PAGE_SHIFT;
 }
 
 unsigned long __lcd_memory_object_last(struct lcd_memory_object *mo)
@@ -78,7 +78,7 @@ hva_t __lcd_memory_object_hva(struct lcd_memory_object *mo)
 
 int __lcd_insert_memory_object(struct lcd *caller, cptr_t slot,
 			void *mem_obj,
-			unsigned int order,
+			unsigned long nr_pages,
 			enum lcd_microkernel_type_id sub_type,
 			struct lcd_memory_object **mo_out)
 {
@@ -103,7 +103,7 @@ int __lcd_insert_memory_object(struct lcd *caller, cptr_t slot,
 	}
 	mo->sub_type = sub_type;
 	mo->object = mem_obj;
-	mo->order = order;
+	mo->nr_pages = nr_pages;
 	/*
 	 * Insert memory object into global interval tree
 	 */
@@ -182,7 +182,7 @@ int __lcd_alloc_pages_exact_node(struct lcd *caller, cptr_t slot, int nid,
 	/*
 	 * Insert into caller's cspace
 	 */
-	ret = __lcd_insert_memory_object(caller, slot, p, order,
+	ret = __lcd_insert_memory_object(caller, slot, p, (1UL << order),
 					LCD_MICROKERNEL_TYPE_ID_PAGE,
 					&unused);
 	if (ret) {
@@ -216,7 +216,7 @@ int __lcd_alloc_pages(struct lcd *caller, cptr_t slot,
 	/*
 	 * Insert into caller's cspace
 	 */
-	ret = __lcd_insert_memory_object(caller, slot, p, order,
+	ret = __lcd_insert_memory_object(caller, slot, p, (1UL << order),
 					LCD_MICROKERNEL_TYPE_ID_PAGE,
 					&unused);
 	if (ret) {
@@ -234,7 +234,7 @@ fail1:
 
 /* VMALLOC -------------------------------------------------- */
 
-int __lcd_vmalloc(struct lcd *caller, cptr_t slot, unsigned int order)
+int __lcd_vmalloc(struct lcd *caller, cptr_t slot, unsigned long nr_pages)
 {
 	int ret;
 	void *vptr;
@@ -242,7 +242,7 @@ int __lcd_vmalloc(struct lcd *caller, cptr_t slot, unsigned int order)
 	/*
 	 * Allocate zero'd out vmalloc pages
 	 */
-	vptr = vzalloc(1UL << (order + PAGE_SIZE));
+	vptr = vzalloc(nr_pages << PAGE_SHIFT);
 	if (!vptr) {
 		LCD_ERR("vzalloc failed");
 		ret = -ENOMEM;
@@ -251,7 +251,7 @@ int __lcd_vmalloc(struct lcd *caller, cptr_t slot, unsigned int order)
 	/*
 	 * Insert into caller's cspace
 	 */
-	ret = __lcd_insert_memory_object(caller, slot, vptr, order,
+	ret = __lcd_insert_memory_object(caller, slot, vptr, nr_pages,
 					LCD_MICROKERNEL_TYPE_ID_VMALLOC_MEM,
 					&unused);
 	if (ret) {
@@ -374,7 +374,7 @@ static int isolated_map_vmalloc_mem(struct lcd *lcd,
 	/*
 	 * Map each page, one at a time
 	 */
-	for (i = 0; i < (1UL << vmalloc_mo->order); i++) {
+	for (i = 0; i < vmalloc_mo->nr_pages; i++) {
 		hva = hva_add(vmalloc_base, i * PAGE_SIZE);
 		gpa = gpa_add(base, i * PAGE_SIZE);
 		/*
@@ -440,7 +440,7 @@ static int isolated_map_contiguous_mem(struct lcd *lcd,
 	 * caching, and we always map memory as WB in guest physical.
 	 */
 	ret = lcd_arch_ept_map_range(lcd->lcd_arch, base, hpa_base,
-				1 << mo->order);
+				mo->nr_pages);
 	if (ret) {
 		LCD_ERR("map");
 		goto fail2;
@@ -566,7 +566,7 @@ static void isolated_unmap_vmalloc_mem(struct lcd *lcd,
 	 */
 	ret = lcd_arch_ept_unmap_range(lcd->lcd_arch,
 				meta->where_mapped,
-				vmalloc_mo->order);
+				vmalloc_mo->nr_pages);
 	if (ret)
 		LCD_DEBUG(LCD_DEBUG_ERR, 
 			"some error unmapping");
@@ -581,7 +581,7 @@ static void isolated_unmap_contiguous_mem(struct lcd *lcd,
 	 * Unmap memory object
 	 */
 	ret = lcd_arch_ept_unmap_range(lcd->lcd_arch, meta->where_mapped, 
-				1UL << mo->order);
+				mo->nr_pages);
 	if (ret)
 		LCD_DEBUG(LCD_DEBUG_ERR, 
 			"some error unmapping");

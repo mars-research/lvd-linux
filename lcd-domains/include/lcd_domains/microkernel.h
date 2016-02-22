@@ -37,6 +37,7 @@ static inline void __lcd_err(char *file, int lineno, char *fmt, ...)
 	va_start(args, fmt);
 	vprintk(fmt, args);
 	va_end(args);
+	printk("\n");
 }
 #define LCD_MSG(msg...) __lcd_msg(__FILE__, __LINE__, msg)
 static inline void __lcd_msg(char *file, int lineno, char *fmt, ...)
@@ -46,6 +47,7 @@ static inline void __lcd_msg(char *file, int lineno, char *fmt, ...)
 	va_start(args, fmt);
 	vprintk(fmt, args);
 	va_end(args);
+	printk("\n");
 }
 #define LCD_WARN(msg...) __lcd_warn(__FILE__, __LINE__, msg)
 static inline void __lcd_warn(char *file, int lineno, char *fmt, ...)
@@ -55,6 +57,7 @@ static inline void __lcd_warn(char *file, int lineno, char *fmt, ...)
 	va_start(args, fmt);
 	vprintk(fmt, args);
 	va_end(args);
+	printk("\n");
 }
 
 #define LCD_DEBUG_ERR  1
@@ -449,7 +452,7 @@ struct lcd_mapping_metadata {
 struct lcd_memory_object {
 	enum lcd_microkernel_type_id sub_type;
 	void *object;
-	unsigned int order;
+	unsigned long nr_pages;
 };
 /**
  * __lcd_memory_object_start -- Starting address (memory-object dependent)
@@ -502,7 +505,7 @@ hva_t __lcd_memory_object_hva(struct lcd_memory_object *mo);
  * @caller: the LCD in whose cspace we should insert the capability 
  * @slot: where to insert new capability
  * @mem_obj: the memory object (struct page*, unsigned long for dev mem, etc.)
- * @order: mem_obj is 2^order pages
+ * @nr_pages: mem_obj nr_pages pages (nr_pages * PAGE_SIZE bytes)
  * @sub_type: the microkernel type id for memory object
  * @mo_out: out param, the created memory object (data structure)
  *
@@ -517,7 +520,7 @@ hva_t __lcd_memory_object_hva(struct lcd_memory_object *mo);
  */
 int __lcd_insert_memory_object(struct lcd *caller, 
 			cptr_t slot, void *mem_obj,
-			unsigned int order,
+			unsigned long nr_pages,
 			enum lcd_microkernel_type_id sub_type,
 			struct lcd_memory_object **mo_out);
 /**
@@ -544,10 +547,11 @@ int __lcd_alloc_pages(struct lcd *caller, cptr_t slot,
  *
  * Arguments similar to __lcd_alloc_pages.
  *
- * Unlike regular vmalloc, the allocation size must be a power of
- * 2 pages.
+ * The allocation size must be a multiple of PAGE_SIZE (@nr_pages). This
+ * is what real vmalloc does, even though it accepts byte granularity
+ * sizes as argument.
  */
-int __lcd_vmalloc(struct lcd *caller, cptr_t slot, unsigned int order);
+int __lcd_vmalloc(struct lcd *caller, cptr_t slot, unsigned long nr_pages);
 /**
  * __lcd_get_memory_object -- Look up memory object in LCD's cspace
  * @caller: LCD whose cspace we should look in

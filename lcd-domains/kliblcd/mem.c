@@ -254,7 +254,7 @@ fail1:
 	return ret;
 }
 
-int _lcd_vmalloc(unsigned int order, cptr_t *slot_out)
+int _lcd_vmalloc(unsigned long nr_pages, cptr_t *slot_out)
 {
 	struct lcd *lcd = current->lcd;
 	cptr_t slot;
@@ -270,7 +270,7 @@ int _lcd_vmalloc(unsigned int order, cptr_t *slot_out)
 	/*
 	 * Allocate vmalloc memory
 	 */
-	ret = __lcd_vmalloc(lcd, slot, order);
+	ret = __lcd_vmalloc(lcd, slot, nr_pages);
 	if (ret) {
 		LIBLCD_ERR("alloc pages failed");
 		goto fail2;
@@ -392,6 +392,7 @@ struct page *lcd_alloc_pages_exact_node(int nid, unsigned int flags,
 	struct lcd_memory_object *mo;
 	struct cnode *cnode;
 	struct page *p = NULL;
+	gpa_t unused;
 	/*
 	 * Do lower-level alloc so that pages go into caller's cspace
 	 */
@@ -405,7 +406,7 @@ struct page *lcd_alloc_pages_exact_node(int nid, unsigned int flags,
 	 * (all this really does is put the allocated pages in the
 	 * proper resource tree)
 	 */
-	ret = _lcd_mmap(slot, order, __gpa(0));
+	ret = lcd_map_phys(slot, order, &unused);
 	if (ret) {
 		LIBLCD_ERR("internal error: putting mem obj in tree");
 		goto fail2;
@@ -440,6 +441,7 @@ struct page *lcd_alloc_pages(unsigned int flags, unsigned int order)
 	struct lcd_memory_object *mo;
 	struct cnode *cnode;
 	struct page *p = NULL;
+	gpa_t unused;
 	/*
 	 * Do lower-level alloc so that pages go into caller's cspace
 	 */
@@ -453,7 +455,7 @@ struct page *lcd_alloc_pages(unsigned int flags, unsigned int order)
 	 * (all this really does is put the allocated pages in the
 	 * proper resource tree)
 	 */
-	ret = _lcd_mmap(slot, order, __gpa(0));
+	ret = lcd_map_phys(slot, order, &unused);
 	if (ret) {
 		LIBLCD_ERR("internal error: putting mem obj in tree");
 		goto fail2;
@@ -518,22 +520,21 @@ void lcd_free_pages(struct page *base, unsigned int order)
 void* lcd_vmalloc(unsigned long sz)
 {
 	struct lcd *lcd = current->lcd;
-	unsigned int order;
+	unsigned long nr_pages;
 	int ret;
 	cptr_t slot;
 	struct lcd_memory_object *mo;
 	struct cnode *cnode;
 	void *vptr = NULL;
+	gva_t unused;
 	/*
-	 * Convert to order
+	 * Convert to number of pages, rounding up
 	 */
-	order = ilog2(sz);
-	if (sz & ((1UL << order) - 1))
-		order++; /* round up */
+	nr_pages = ALIGN(sz, PAGE_SIZE) >> PAGE_SHIFT;
 	/*
 	 * Do lower-level vmalloc so that mem goes into caller's cspace
 	 */
-	ret = _lcd_vmalloc(order, &slot);
+	ret = _lcd_vmalloc(nr_pages, &slot);
 	if (ret) {
 		LIBLCD_ERR("lower level vmalloc failed");
 		goto fail1;
@@ -542,8 +543,10 @@ void* lcd_vmalloc(unsigned long sz)
 	 * "Map" memory object in caller's physical address space
 	 * (all this really does is put the allocated vmalloc mem in the
 	 * proper resource tree)
+	 *
+	 * Order is ignored for now for non-isolated
 	 */
-	ret = _lcd_mmap(slot, order, __gpa(0));
+	ret = lcd_map_virt(slot, 0xbad, &unused);
 	if (ret) {
 		LIBLCD_ERR("internal error: putting mem obj in tree");
 		goto fail2;
@@ -750,7 +753,7 @@ void lcd_unmap_virt(gva_t base, unsigned int order)
 
 static int volunteer_mem_obj(struct task_struct *t,
 			void *mem_obj, unsigned long addr,
-			unsigned int order,
+			unsigned long nr_pages,
 			enum lcd_microkernel_type_id sub_type,
 			cptr_t *slot_out)
 {
@@ -782,7 +785,7 @@ static int volunteer_mem_obj(struct task_struct *t,
 		goto fail2;
 	}
 	ret = __lcd_insert_memory_object(t->lcd, slot, mem_obj,
-					order, sub_type, &mo);
+					nr_pages, sub_type, &mo);
 	if (ret) {
 		LIBLCD_ERR("error inserting new memory object");
 		goto fail3;
@@ -819,7 +822,7 @@ int lcd_volunteer_pages(struct page *base, unsigned int order,
 			cptr_t *slot_out)
 {
 	return volunteer_mem_obj(current, base,
-				page_to_pfn(base), order,
+				page_to_pfn(base), (1UL << order),
 				LCD_MICROKERNEL_TYPE_ID_VOLUNTEERED_PAGE,
 				slot_out);
 }
@@ -835,7 +838,7 @@ int lcd_volunteer_dev_mem(gpa_t base, unsigned int order,
 			cptr_t *slot_out)
 {
 	return volunteer_mem_obj(current, (void *)gpa_val(base),
-				gpa_val(base), order,
+				gpa_val(base), (1UL << order),
 				LCD_MICROKERNEL_TYPE_ID_VOLUNTEERED_DEV_MEM,
 				slot_out);
 }
@@ -847,11 +850,11 @@ void lcd_unvolunteer_dev_mem(cptr_t devmem)
 
 /* "VOLUNTEERING" VMALLOC MEMORY ---------------------------------------- */
 
-int lcd_volunteer_vmalloc_mem(gva_t base, unsigned int order,
+int lcd_volunteer_vmalloc_mem(gva_t base, unsigned long nr_pages,
 			cptr_t *slot_out)
 {
 	return volunteer_mem_obj(current, (void *)gva_val(base),
-				gva_val(base), order,
+				gva_val(base), nr_pages,
 				LCD_MICROKERNEL_TYPE_ID_VOLUNTEERED_VMALLOC_MEM,
 				slot_out);
 }

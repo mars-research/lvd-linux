@@ -85,7 +85,7 @@ fail1:
 	return ret;
 }
 
-int _lcd_vmalloc(unsigned int order, cptr_t *slot_out)
+int _lcd_vmalloc(unsigned long nr_pages, cptr_t *slot_out)
 {
 	cptr_t slot;
 	int ret;
@@ -100,7 +100,7 @@ int _lcd_vmalloc(unsigned int order, cptr_t *slot_out)
 	/*
 	 * Alloc pages
 	 */
-	ret = lcd_syscall_vmalloc(slot, order);
+	ret = lcd_syscall_vmalloc(slot, nr_pages);
 	if (ret) {
 		LIBLCD_ERR("vmalloc syscall failed");
 		goto fail2;

@@ -152,16 +152,16 @@ static int handle_syscall_mmap(struct lcd *lcd)
 static int handle_syscall_vmalloc(struct lcd *lcd)
 {
 	cptr_t slot;
-	unsigned int order;
+	unsigned long nr_pages;
 	/*
 	 * Get slot where to store alloc'd pages and order
 	 */
 	slot = __cptr(lcd_arch_get_syscall_arg0(lcd->lcd_arch));
-	order = (unsigned int)lcd_arch_get_syscall_arg1(lcd->lcd_arch);
+	nr_pages = lcd_arch_get_syscall_arg1(lcd->lcd_arch);
 	/*
 	 * Do vmalloc
 	 */
-	return __lcd_vmalloc(lcd, slot, order);
+	return __lcd_vmalloc(lcd, slot, nr_pages);
 }
 
 static int handle_syscall_pages_alloc(struct lcd *lcd)

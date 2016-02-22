@@ -61,13 +61,13 @@ int _lcd_alloc_pages(unsigned int flags, unsigned int order,
 		cptr_t *slot_out);
 /**
  * _lcd_vmalloc -- Low-level vmalloc out into microkernel
- * @order: allocate 2^order vmalloc pages
+ * @nr_pages: allocate nr_pages pages (nr_pages * PAGE_SIZE bytes)
  * @slot_out: out param, cptr to vmalloc memory capability in caller's cspace
  *
  * Allocate pages that aren't necessarily contiguous in host
  * physical. Pages are zero'd out.
  */
-int _lcd_vmalloc(unsigned int order, cptr_t *slot_out);
+int _lcd_vmalloc(unsigned long nr_pages, cptr_t *slot_out);
 
 /* 
  * What about free pages? Use lcd_cap_revoke and/or lcd_cap_delete with 
@@ -207,8 +207,7 @@ void lcd_free_pages(struct page *base, unsigned int order);
  *
  * Allocate pages that aren't necessarily contiguous in guest
  * physical or host physical. @sz is rounded up so that @sz is a 
- * page-multiple, and the page-multiple is a power of 2 
- * (@sz = 2^(order + page_size) for some order >= 0).
+ * page-multiple (just like regular vmalloc).
  */
 void* lcd_vmalloc(unsigned long sz);
 /**
@@ -432,20 +431,14 @@ void lcd_unvolunteer_dev_mem(cptr_t devmem);
  *                              control system
  * @base: the virtual address at the start of the chunk of *virtually*
  *        contiguous vmalloc memory
- * @order: there are 2^order pages of vmalloc memory being volunteered
+ * @nr_pages: there are nr_pages pages of vmalloc memory being volunteered
  * @slot_out: out param, where the memory was stored in the caller's cspace
  *
  * Note: This only makes sense for non-isolated code. For isolated code,
  * all memory objects it has access to are in its cspace, and so
  * this function is equivalent to lcd_virt_to_cptr (see its documentation).
  *
- * Inserts vmalloc memory into the caller's cspace. Motivation: This is
- * used when we load a module in the host for an LCD. The module
- * loader uses vmalloc to set aside memory. Rather than create a capability
- * for each individual page (as we did before), we create a capability that
- * refers to the set of discontiguous pages. The object is the base *virtual*
- * address of the vmalloc memory. Note that vmalloc memory allocations are
- * page aligned.
+ * Inserts vmalloc memory into the caller's cspace.
  *
  * Of course, we risk the same memory being volunteered as regular RAM (via
  * lcd_volunteer_page above). It's up to the non-isolated code not to do
@@ -455,7 +448,7 @@ void lcd_unvolunteer_dev_mem(cptr_t devmem);
  *
  * Note: For non-isolated code, guest virtual == host virtual.
  */
-int lcd_volunteer_vmalloc_mem(gva_t base, unsigned int order,
+int lcd_volunteer_vmalloc_mem(gva_t base, unsigned long nr_pages,
 			cptr_t *slot_out);
 /**
  * lcd_unvolunteer_vmalloc_mem -- Remove vmalloc memory from the capability 

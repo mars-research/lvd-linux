@@ -115,7 +115,9 @@
  *
  * The layout is simple: the physical address space is mapped once in the
  * high 512 GB range. This puts the kernel module mapping area in the high
- * 2 GBs, the same as on the host (for x86_64 anyway).
+ * 2 GBs, the same as on the host (for x86_64 anyway - see
+ * Documentation/x86/x86_64/mm.txt, arch/x86/include/asm/page_64_types.h,
+ * and arch/x86/include/asm/pgtable_64_types.h).
  *
  *              +---------------------------+ 0xFFFF FFFF FFFF FFFF
  *              |       Kernel Module       |
@@ -155,7 +157,7 @@
 #define LCD_MISC_REGION_SIZE (1UL << 30) /* .................... 1 GB    */
 #define LCD_STACK_REGION_SIZE (1UL << 30) /* ................... 1 GB    */
 #define LCD_HEAP_REGION_SIZE (1UL << 30) /* .................... 1 GB    */
-#define LCD_RAM_MAP_REGION_SIZE (1UL << 30) /* ................. 8 GBs   */
+#define LCD_RAM_MAP_REGION_SIZE (8UL << 30) /* ................. 8 GBs   */
 #define LCD_IOREMAP_REGION_SIZE (256UL << 30) /* ............... 256 GBs */
 #define LCD_KERNEL_MODULE_REGION_SIZE (2UL << 30) /* ........... 2 GBs   */
 
@@ -165,28 +167,6 @@
 #define LCD_BOOTSTRAP_PAGES_SIZE (1 * PAGE_SIZE) /* .......... 4 KBs */
 #define LCD_BOOTSTRAP_PAGE_TABLES_SIZE (2 * PAGE_SIZE) /* .... 8 KBs */
 #define LCD_STACK_SIZE (2 * PAGE_SIZE) /* .................... 8 KBs */
-
-static inline void
-__attribute__((used)) /* required so that this func is processed */
-__lcd_build_checks__(void)
-{
-	/* 
-	 * This function is for build checks only. (We can't put
-	 * build bug on's in the top level.)
-	 */
-
-	/* LCD Bootstrap pages must be a power-of-two number of pages */
-	BUILD_BUG_ON_NOT_POWER_OF_2(LCD_BOOTSTRAP_PAGES_SIZE >> PAGE_SHIFT);
-
-	/* lcd_boot_info won't fit in bootstrap pages. Add more pages. */
-	BUILD_BUG_ON(sizeof(struct lcd_boot_info) > LCD_BOOTSTRAP_PAGES_SIZE);
-
-	/* We need exactly two page tables for the gv address space. */
-	BUILD_BUG_ON(LCD_BOOTSTRAP_PAGE_TABLES_SIZE >> PAGE_SHIFT != 2);
-	
-	/* Number of LCD stack pages needs to be a power-of-two multiple. */
-	BUILD_BUG_ON_NOT_POWER_OF_2(LCD_STACK_SIZE >> PAGE_SHIFT);
-}
 
 /* Orders (for convenience) */
 
@@ -238,7 +218,7 @@ __lcd_build_checks__(void)
 /* Addresses */
 
 #define LCD_PHYS_BASE (0UL)
-#define LCD_VIRT_BASE (0xFFFFFF7FFFFFFFFFUL)
+#define LCD_VIRT_BASE (0xFFFFFF8000000000UL)
 
 #define LCD_UTCB_GP_ADDR (__gpa(LCD_PHYS_BASE + LCD_UTCB_OFFSET))
 #define LCD_UTCB_GV_ADDR (__gva(LCD_VIRT_BASE + LCD_UTCB_OFFSET))
@@ -269,6 +249,40 @@ __lcd_build_checks__(void)
 	(__gpa(LCD_PHYS_BASE + LCD_KERNEL_MODULE_REGION_OFFSET))
 #define LCD_KERNEL_MODULE_REGION_GV_ADDR \
 	(__gva(LCD_VIRT_BASE + LCD_KERNEL_MODULE_REGION_OFFSET))
+
+/* ASSERTIONS -------------------------------------------------- */
+
+
+static inline void
+__attribute__((used)) /* required so that this func is processed */
+__lcd_build_checks__(void)
+{
+	/* 
+	 * This function is for build checks only. (We can't put
+	 * build bug on's in the top level.)
+	 */
+
+	/* LCD Bootstrap pages must be a power-of-two number of pages */
+	BUILD_BUG_ON_NOT_POWER_OF_2(LCD_BOOTSTRAP_PAGES_SIZE >> PAGE_SHIFT);
+
+	/* lcd_boot_info won't fit in bootstrap pages. Add more pages. */
+	BUILD_BUG_ON(sizeof(struct lcd_boot_info) > LCD_BOOTSTRAP_PAGES_SIZE);
+
+	/* We need exactly two page tables for the gv address space. */
+	BUILD_BUG_ON(LCD_BOOTSTRAP_PAGE_TABLES_SIZE >> PAGE_SHIFT != 2);
+	
+	/* Number of LCD stack pages needs to be a power-of-two multiple. */
+	BUILD_BUG_ON_NOT_POWER_OF_2(LCD_STACK_SIZE >> PAGE_SHIFT);
+
+	/* We use the host module loader for loading .ko's and we
+	 * don't relink (it's possible but not worth it right now).
+	 * So the kernel module region gv address needs to match the
+	 * starting gv address for the kernel map in the host. */
+	BUILD_BUG_ON(gva_val(LCD_KERNEL_MODULE_REGION_GV_ADDR) != 
+		__START_KERNEL_map);
+}
+
+/* HELPERS -------------------------------------------------- */
 
 /**
  * lcd_gva2gpa -- Convert a guest virtual to a guest physical address

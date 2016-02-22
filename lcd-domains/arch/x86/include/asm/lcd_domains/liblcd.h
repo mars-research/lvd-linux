@@ -222,10 +222,10 @@ static inline int lcd_syscall_alloc_pages(cptr_t slot,
 }
 
 static inline int lcd_syscall_vmalloc(cptr_t slot,
-				unsigned int order)
+				unsigned long nr_pages)
 {
 	return lcd_syscall_two_args(LCD_SYSCALL_VMALLOC, 
-				cptr_val(slot), order);
+				cptr_val(slot), nr_pages);
 }
 
 static inline int lcd_syscall_mmap(cptr_t mo_cptr, gpa_t base)

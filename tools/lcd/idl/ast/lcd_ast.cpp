@@ -8,6 +8,7 @@ Rpc::Rpc(ReturnVariable *return_value, const char* name, std::vector<Parameter* 
   this->parameters_ = parameters;
   this->symbol_table_ = new SymbolTable();
   this->current_scope_ = current_scope;
+  this->tag_ = 0;
   
   for(std::vector<Parameter*>::iterator it = parameters.begin(); it != parameters.end(); it ++)
     {
@@ -15,6 +16,16 @@ Rpc::Rpc(ReturnVariable *return_value, const char* name, std::vector<Parameter* 
       this->symbol_table_->insert(p->identifier());
     }
   construct_marshal_parameters();
+}
+
+unsigned int Rpc::tag()
+{
+  return this->tag_;
+}
+
+void Rpc::set_tag(unsigned int t)
+{
+  this->tag_ = t;
 }
 
 void Rpc::construct_marshal_parameters()
@@ -243,6 +254,15 @@ void Module::create_trampoline_structs()
   }
 }
 
+void Module::generate_function_tags(Project *p)
+{
+  for(std::vector<Rpc*>::iterator it = this->rpc_definitions_.begin(); it != this->rpc_definitions_.end(); it ++) {
+    Rpc *r = *it;
+    
+    r->set_tag(p->get_next_tag());
+  }
+}
+
 const char* Module::identifier()
 {
   return this->module_name_;
@@ -253,6 +273,7 @@ Project::Project(LexicalScope *scope, std::vector<Module*> modules, std::vector<
   this->project_scope_ = scope;
   this->project_modules_ = modules;
   this->project_includes_ = includes;
+  this->last_tag_ = 0;
 }
 
 void Project::prepare_marshal()
@@ -293,9 +314,23 @@ void Project::create_trampoline_structs()
   }
 }
 
+void Project::generate_function_tags()
+{
+  for(std::vector<Module*>::iterator it = this->project_modules_.begin(); it != this->project_modules_.end(); it ++) {
+    Module *m = *it;
+    m->generate_function_tags(this);
+  }
+}
+
 std::vector<Module*> Project::modules()
 {
   return this->project_modules_;
+}
+
+unsigned int Project::get_next_tag()
+{
+  this->last_tag_ += 1;
+  return this->last_tag_;
 }
 
 Include::Include(bool relative, const char *path)
@@ -303,4 +338,5 @@ Include::Include(bool relative, const char *path)
   this->relative_ = relative;
   this->path_ = path;
 }
+
 

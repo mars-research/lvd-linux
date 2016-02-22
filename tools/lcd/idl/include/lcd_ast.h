@@ -23,6 +23,7 @@ class Type;
 class Parameter;
 class Rpc;
 class ProjectionType;
+class Project;
 
 enum PrimType {pt_char_t, pt_short_t, pt_int_t, pt_long_t, pt_longlong_t, pt_capability_t};
 enum type_k {};
@@ -460,12 +461,11 @@ class ProjectionType : public Type // complex type
 
 class Rpc : public Base
 {
-  const char* enum_name_;
+  unsigned int tag_;
   SymbolTable *symbol_table_;
   ReturnVariable *explicit_return_;
   LexicalScope *current_scope_;
   /* -------------- */
-
   const char* name_;
   std::vector<Parameter* > parameters_;
   bool function_pointer_defined_;
@@ -473,6 +473,8 @@ class Rpc : public Base
   std::vector<Variable*> construct_projection_parameters(ProjectionType *pt, bool alloc);
  public:
   Rpc(ReturnVariable *return_var, const char* name, std::vector<Parameter* > parameters, LexicalScope *current_scope);
+  unsigned int tag();
+  void set_tag(unsigned int t);
   std::vector<Variable*> marshal_parameters;
   void set_function_pointer_defined(bool b);
   bool function_pointer_defined();
@@ -504,6 +506,7 @@ class Module : public Base
   void resolve_types();
   void function_pointer_to_rpc();
   void create_trampoline_structs();
+  void generate_function_tags(Project *p);
   const char* identifier();
 };
 
@@ -520,6 +523,7 @@ class Project : public Base
   LexicalScope *project_scope_;
   std::vector<Module*> project_modules_;
   std::vector<Include*> project_includes_;
+  unsigned int last_tag_;
   
  public:
   Project(LexicalScope *scope, std::vector<Module*> modules, std::vector<Include*> includes);
@@ -527,7 +531,9 @@ class Project : public Base
   void resolve_types();
   void function_pointer_to_rpc();
   void create_trampoline_structs();
+  void generate_function_tags();
   std::vector<Module*> modules();
+  unsigned int get_next_tag();
 };
 
 class TypeNameVisitor // generates CCSTTypeName for each type.

@@ -63,6 +63,7 @@ int main(int argc, char ** argv)
 	{
 	  tree->create_trampoline_structs();
 	  tree->function_pointer_to_rpc();
+	  tree->generate_function_tags();
 	  tree->resolve_types();
 	  tree->prepare_marshal();
 

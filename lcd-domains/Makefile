@@ -251,6 +251,7 @@ distclean:
 	microkernel \
 	libcap.microkernel \
 	liblcd \
+	$(LIBLCD_BUILD_DIR)/lib.a \
 	libcap.liblcd \
 	test_mods \
 	clean \

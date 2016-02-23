@@ -72,3 +72,35 @@ void __lockfunc _raw_spin_unlock_irqrestore(raw_spinlock_t *lock,
 	lcd_printk("resolve.c: trying to call dummy _raw_spin_unlock_irqrestore!");
 	return;
 }
+
+/* MUTEXES ------------------------------------------------------------ */
+
+void __mutex_init(struct mutex *lock, const char *name, 
+		struct lock_class_key *key)
+{
+	return;
+}
+
+void mutex_lock(struct mutex *lock)
+{
+	return;
+}
+
+int mutex_lock_interruptible(struct mutex *lock)
+{
+	return 0;
+}
+
+int mutex_trylock(struct mutex *lock)
+{
+	return 1;
+}
+
+void mutex_unlock(struct mutex *lock)
+{
+	return;
+}
+
+/* SCHEDULING ------------------------------------------------------------ */
+
+int _cond_resched(void) { return 0; } /* Never signal reschedule */

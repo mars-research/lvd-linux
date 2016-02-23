@@ -425,7 +425,7 @@ void lcd_unvolunteer_dev_mem(cptr_t devmem)
 	return;
 }
 
-int lcd_volunteer_vmalloc_mem(gva_t base, unsigned int order,
+int lcd_volunteer_vmalloc_mem(gva_t base, unsigned long nr_pages,
 			cptr_t *slot_out)
 {
 	unsigned long size;

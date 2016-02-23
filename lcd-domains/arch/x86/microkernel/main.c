@@ -2388,10 +2388,37 @@ static int vmx_handle_vmcall(struct lcd_arch *lcd_arch)
 static int vmx_handle_ept(struct lcd_arch *lcd_arch)
 {
 	/*
-	 * Intel SDM V3 27.2.1
-	 *
-	 * TODO: Microkernel will handle it.
+	 * Intel SDM V3 27.2.1 - 27.2.2
 	 */
+	LCD_ARCH_ERR("\n");
+	printk("   ept violation: \n");
+	printk("        guest physical addr: 0x%lx\n",
+		vmcs_readl(GUEST_PHYSICAL_ADDRESS));
+	if (lcd_arch->exit_qualification & (1UL << 7))
+		printk("        linear addr: 0x%lx\n",
+			vmcs_readl(GUEST_LINEAR_ADDRESS));
+	else
+		printk("        linear address not available");
+	printk("        faulting %%rip: 0x%lx\n",
+		vmcs_readl(GUEST_RIP));
+	if (lcd_arch->exit_qualification & (1UL << 0))
+		printk("        attempted read\n");
+	if (lcd_arch->exit_qualification & (1UL << 1))
+		printk("        attempted write\n");
+	if (lcd_arch->exit_qualification & (1UL << 2))
+		printk("        attempted instruction fetch\n");
+	if (lcd_arch->exit_qualification & (1UL << 3))
+		printk("        ept says this page is readable\n");
+	if (lcd_arch->exit_qualification & (1UL << 4))
+		printk("        ept says this page is writeable\n");
+	if (lcd_arch->exit_qualification & (1UL << 5))
+		printk("        ept says this page is executable\n");
+	if (lcd_arch->exit_qualification & (1UL << 8))
+		printk("        guest virtual page walk succeeded, but the ept translation failed\n\n");
+	else
+		printk("        violation occurred during guest virtual page walk (before reaching the final guest physical address)\n\n");
+
+
 	return LCD_ARCH_STATUS_EPT_FAULT;
 }
 
@@ -2628,6 +2655,7 @@ static int vmx_handle_other_exits(struct lcd_arch *lcd_arch)
 	case EXIT_REASON_VMCALL:
 		ret = vmx_handle_vmcall(lcd_arch);
 		break;
+	case EXIT_REASON_EPT_MISCONFIG:
 	case EXIT_REASON_EPT_VIOLATION:
 		ret = vmx_handle_ept(lcd_arch);
 		break;

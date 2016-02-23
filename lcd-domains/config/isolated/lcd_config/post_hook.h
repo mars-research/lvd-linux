@@ -157,21 +157,6 @@
 #undef put_online_cpus
 #define put_online_cpus() do { } while(0)
 
-#undef mutex_init
-#define mutex_init(x) do { } while(0)
-
-#undef mutex_lock
-#define mutex_lock(x) do { } while(0)
-
-#undef mutex_trylock
-#define mutex_trylock(x) 1
-
-#undef mutex_unlock
-#define mutex_unlock(x) do { } while(0)
-
-#undef mutex_lock_interruptible
-#define mutex_lock_interruptible(x) 0
-
 #undef spin_lock_init
 #define spin_lock_init(x) do { } while(0)
 
@@ -322,4 +307,3 @@ static inline void force_up_write(void *x)
 
 #undef page_address
 #define page_address(page) lcd_page_address(page)
-

@@ -38,6 +38,7 @@ lib-y += $(addprefix liblcd/lib/, \
 	ctype.o \
 	hexdump.o \
 	reciprocal_div.o \
+	rbtree.o \
 	)
 
 lib-y += $(addprefix liblcd/mm/, \

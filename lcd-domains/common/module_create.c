@@ -16,6 +16,66 @@
 
 #include <lcd_config/post_hook.h>
 
+/* MEMORY REGIONS -------------------------------------------------- */
+
+/*
+ * This assumes the PAT has Writeback in PAT0, Uncacheable in PAT1.
+ *
+ * See Intel SDM V3 11.12.3 for how PAT indexing is done.
+ */
+#define LCD_UNCACHEABLE_FLAGS (_PAGE_PRESENT | _PAGE_RW | _PAGE_PWT)
+#define LCD_WRITEBACK_FLAGS (_PAGE_PRESENT | _PAGE_RW)
+
+struct lcd_mem_region {
+	const char *name;
+	unsigned long offset;
+	unsigned long size;
+	pteval_t flags;
+};
+
+#define LCD_NR_MEM_REGIONS 6
+
+static struct lcd_mem_region lcd_mem_regions[LCD_NR_MEM_REGIONS] = {
+	{
+		"miscellaneous",
+		.offset = LCD_MISC_REGION_OFFSET,
+		.size =   LCD_MISC_REGION_SIZE,
+		.flags =  LCD_WRITEBACK_FLAGS,
+	},
+	{
+		"stack",
+		.offset = LCD_STACK_REGION_OFFSET,
+		.size =   LCD_STACK_REGION_SIZE,
+		.flags =  LCD_WRITEBACK_FLAGS,
+	},
+	{
+		"heap",
+		.offset = LCD_HEAP_REGION_OFFSET,
+		.size =   LCD_HEAP_REGION_SIZE,
+		.flags =  LCD_WRITEBACK_FLAGS,
+	},
+	{
+		"ram map",
+		.offset = LCD_RAM_MAP_REGION_OFFSET,
+		.size =   LCD_RAM_MAP_REGION_SIZE,
+		.flags =  LCD_WRITEBACK_FLAGS,
+	},
+	{
+		"ioremap",
+		.offset = LCD_IOREMAP_REGION_OFFSET,
+		.size =   LCD_IOREMAP_REGION_SIZE,
+		.flags =  LCD_UNCACHEABLE_FLAGS,
+	},
+	{
+		"kernel module",
+		.offset = LCD_KERNEL_MODULE_REGION_OFFSET,
+		.size =   LCD_KERNEL_MODULE_REGION_SIZE,
+		.flags =  LCD_WRITEBACK_FLAGS,
+	},
+};
+
+/* ------------------------------------------------------------ */
+
 static int do_grant_and_map_for_mem(cptr_t lcd, struct lcd_create_ctx *ctx,
 				void *mem, gpa_t map_base,
 				cptr_t *dest)
@@ -109,7 +169,7 @@ static int setup_phys_addr_space(cptr_t lcd, struct lcd_create_ctx *ctx,
 	if (ret)
 		goto fail1;
 	c = &(lcd_to_boot_info(ctx)->lcd_boot_cptrs.gv);
-	ret = do_grant_and_map_for_mem(lcd, ctx, ctx->gv_pgd,
+	ret = do_grant_and_map_for_mem(lcd, ctx, ctx->gv_pg_tables,
 				LCD_BOOTSTRAP_PAGE_TABLES_GP_ADDR, c);
 	if (ret)
 		goto fail2;
@@ -135,53 +195,82 @@ fail1:
 	return ret;
 }
 
-static void setup_lcd_pud(struct lcd_create_ctx *ctx)
+static void setup_lcd_pmd(struct lcd_mem_region *reg, pmd_t *pmd,
+			unsigned int gigabyte_idx)
 {
-	/*
-	 * This assumes the PAT has Writeback in PAT0, Uncacheable in PAT1.
-	 *
-	 * See Intel SDM V3 11.12.3 for how PAT indexing is done.
-	 */
-	unsigned int i;
-	unsigned int ioremap_offset = LCD_IOREMAP_REGION_OFFSET >> 30;
-	unsigned int after_ioremap_offset = (LCD_IOREMAP_REGION_OFFSET +
-					LCD_IOREMAP_REGION_SIZE) >> 30;
-	pteval_t wb_flags = _PAGE_PRESENT | _PAGE_RW | _PAGE_PSE;
-	pteval_t uc_flags = _PAGE_PRESENT | _PAGE_RW | _PAGE_PSE | _PAGE_PWT;
-	pud_t *pud_entry;
-	/*
-	 * Map first GBs as write back
-	 */
-	for (i = 0; i < ioremap_offset; i++) {
-		pud_entry = &ctx->gv_pud[i];
-		set_pud(pud_entry,
-			__pud((LCD_PHYS_BASE + i * (1UL << 30)) | wb_flags));
-	}
-	/*
-	 * Map ioremap GBs as uncacheable
-	 */
-	for (i = ioremap_offset; i < after_ioremap_offset; i++) {
-		pud_entry = &ctx->gv_pud[i];
-		set_pud(pud_entry,
-			__pud((LCD_PHYS_BASE + i * (1UL << 30)) | uc_flags));
-	}
-	/*
-	 * Map remaining GBs as write back
-	 */
-	for (i = after_ioremap_offset; i < 512; i++) {
-		pud_entry = &ctx->gv_pud[i];
-		set_pud(pud_entry,
-			__pud((LCD_PHYS_BASE + i * (1UL << 30)) | wb_flags));
+	unsigned int k;
+	unsigned long gp;
+
+	for (k = 0; k < 512; k++) {
+		/*
+		 * Guest physical address we put in the table entry is:
+		 *
+		 *    base + 
+		 *    offset to the 1GB region for this pmd +
+		 *    offset for this table entry (some multiple of 2MBs)
+		 */
+		gp = LCD_PHYS_BASE + gigabyte_idx * (1UL << 30) +
+			k * (1UL << 21);
+		set_pmd(&pmd[k], __pmd(gp | reg->flags));
 	}
 }
 
-static void setup_lcd_pgd(struct lcd_create_ctx *ctx)
+static void setup_lcd_pmds(pmd_t *pmds)
+{
+	unsigned int i, j, lo, hi;
+	pmd_t *pmd_entry;
+	struct lcd_mem_region *reg;
+	/*
+	 * Map each memory region, filling out entire pmd's so that we're
+	 * mapping multiples of 1GB
+	 */
+	pmd_entry = pmds;
+	for (i = 0; i < LCD_NR_MEM_REGIONS; i++) {
+		reg = &lcd_mem_regions[i];
+		/*
+		 * Set up enough pmd's to fill in memory region
+		 */
+		lo = reg->offset >> 30;
+		hi = lo + (reg->size >> 30);
+		for (j = lo; j < hi; j++) {
+			setup_lcd_pmd(reg, pmd_entry, j);
+			pmd_entry += 512;
+		}
+	}
+
+}
+
+static void setup_lcd_pud(pud_t *pud)
+{
+	unsigned int i, j, lo, hi;
+	pud_t *pud_entry;
+	struct lcd_mem_region *reg;
+	/*
+	 * Map each memory region
+	 */
+	for (i = 0; i < LCD_NR_MEM_REGIONS; i++) {
+		reg = &lcd_mem_regions[i];
+		/*
+		 * Map entire memory region (some are bigger than 1GB)
+		 */
+		lo = reg->offset >> 30;
+		hi = lo + (reg->size >> 30);
+		for (j = lo; j < hi; j++) {
+			pud_entry = &pud[j];
+			set_pud(pud_entry,
+				__pud((LCD_PHYS_BASE + j * (1UL << 30)) | 
+					reg->flags));
+		}
+	}
+}
+
+static void setup_lcd_pgd(pgd_t *pgd)
 {
 	pgd_t *pgd_entry;
 	gpa_t pud_gpa;
 	pteval_t flags = 0;
 
-	pgd_entry = &ctx->gv_pgd[511]; /* only map last pud for high 512 GBs */
+	pgd_entry = &pgd[511]; /* only map last pud for high 512 GBs */
 
 	/* pud comes after pgd */
 	pud_gpa = gpa_add(LCD_BOOTSTRAP_PAGE_TABLES_GP_ADDR, PAGE_SIZE);
@@ -193,53 +282,22 @@ static void setup_lcd_pgd(struct lcd_create_ctx *ctx)
 		__pgd(gpa_val(pud_gpa) | flags));
 }
 
-static void dump_virt_pud(pud_t *pud)
-{
-	unsigned idx;
-	pud_t *entry;
-
-	printk("\n\n   pud 511 entries:\n------------------\n\n");
-
-	for (idx = 0; idx < 512; idx++) {
-		entry = &pud[idx];
-		printk("   %03u %lx\n", idx, pud_val(*entry));
-	}
-}
-
-static void dump_virt_pgd(pgd_t *pgd)
-{
-	unsigned int idx;
-	pgd_t *entry;
-
-	printk("   pgd entries:\n------------------\n\n");
-
-	for (idx = 0; idx < 512; idx++) {
-		entry = &pgd[idx];
-		printk("   %03u %lx\n", idx, pgd_val(*entry));
-	}
-}
-
-void dump_virt_addr_space(struct lcd_create_ctx *ctx)
-{
-	printk("DUMP LCD VIRT PAGE TABLES:\n");
-	dump_virt_pgd(ctx->gv_pgd);
-	dump_virt_pud(ctx->gv_pud);
-}
-
 static void setup_virt_addr_space(struct lcd_create_ctx *ctx)
 {
 	/*
-	 * pgd and pud (PML4 and PDPT) should already be zero'd out
+	 * page tables should already be zero'd out
 	 *
 	 * Set up root pgd
 	 */
-	setup_lcd_pgd(ctx);
+	setup_lcd_pgd(ctx->gv_pg_tables);
 	/*
 	 * Set up pud (only one for high 512 GBs)
 	 */
-	setup_lcd_pud(ctx);
-
-	dump_virt_addr_space(ctx);
+	setup_lcd_pud(ctx->gv_pg_tables + 512); /* skip over pgd */
+	/*
+	 * Set up pmd's (one for each 1GB region)
+	 */
+	setup_lcd_pmds(ctx->gv_pg_tables + 1024); /* skip over pgd and pud */
 }
 
 static int setup_addr_spaces(cptr_t lcd, struct lcd_create_ctx *ctx,
@@ -378,8 +436,7 @@ static int get_pages_for_lcd(struct lcd_create_ctx *ctx)
 		goto fail3;
 	}
 	memset(lcd_page_address(p2), 0, LCD_BOOTSTRAP_PAGE_TABLES_SIZE);
-	ctx->gv_pgd = lcd_page_address(p2);
-	ctx->gv_pud = lcd_page_address(p2 + 1);
+	ctx->gv_pg_tables = lcd_page_address(p2);
 	/*
 	 * Alloc stack
 	 */

@@ -45,15 +45,15 @@
  *
  *   -- 1 GB for heap region (unmapped at boot; only bottom part is used)
  *
- *   -- 2 GB HOLE (unmapped)
+ *   -- 1 GB HOLE (unmapped)
  *
- *   -- 8 GB for RAM memory mapping region (think: kmap)
+ *   -- 1 GB for RAM memory mapping region (think: kmap)
  *
- *   -- 48 GB HOLE (unmapped)
+ *   -- 1 GB HOLE (unmapped)
  *
- *   -- 256 GB for ioremap region (unmapped at boot)
+ *   -- 1 GB for ioremap region (unmapped at boot)
  *
- *   -- 190 GB HOLE (unmapped)
+ *   -- 500 GB HOLE (unmapped)
  *
  *   -- 2 GB for kernel module mapping area. The kernel module itself
  *      is mapped at the correct offset into this area so that
@@ -75,21 +75,19 @@
  *              |          (2 GB)           |
  *              +---------------------------+ 0x0000 007f 8000 0000 (510 GB)
  *              |       HOLE / Unmapped     | 
- *              |          (190 GB)         |
- *              +---------------------------+ 0x0000 0050 0000 0000 (320 GB) 
+ *              |          (500 GB)         |
+ *              +---------------------------+ 0x0000 0002 8000 0000 (10 GB) 
  *              |       ioremap Region      |                    
- *              |       (64 GB aligned)     |                    
- *              |          (256 GB)         |
- *              +---------------------------+ 0x0000 0010 0000 0000 (64 GB)
+ *              |          (1 GB)           |
+ *              +---------------------------+ 0x0000 0002 4000 0000 (9 GB)
  *              |       HOLE / Unmapped     | 
- *              |          (48 GB)          |
- *              +---------------------------+ 0x0000 0004 0000 0000 (16 GB) 
+ *              |          (1 GB)           |
+ *              +---------------------------+ 0x0000 0002 0000 0000 (8 GB) 
  *              |       RAM Map Region      |                    
- *              |       (8 GB aligned)      |                    
- *              |          (8 GB)           |
- *              +---------------------------+ 0x0000 0002 0000 0000 (8 GB)
+ *              |          (1 GB)           |
+ *              +---------------------------+ 0x0000 0001 c000 0000 (7 GB)
  *              |       HOLE / Unmapped     | 
- *              |          (2 GB)           |
+ *              |          (1 GB)           |
  *              +---------------------------+ 0x0000 0001 8000 0000 (6 GB)
  *              |        Heap Region        | 
  *              |          (1 GB)           |
@@ -143,8 +141,8 @@
  *              |                           |         
  *              +---------------------------+ 0x0000 0000 0000 0000
  *
- * Everything else is unmapped. We use huge 1 GB pages. This means there
- * are only two 4 KB pages needed to set up the entire guest virtual
+ * Everything else is unmapped. We use 2MB pages. This means there
+ * are only 10-20 4 KB pages needed to set up the entire guest virtual
  * address space.
  *
  * (Why don't we map everything in the high physical range so we can
@@ -154,19 +152,19 @@
 
 /* Region sizes */
 
-#define LCD_MISC_REGION_SIZE (1UL << 30) /* .................... 1 GB    */
-#define LCD_STACK_REGION_SIZE (1UL << 30) /* ................... 1 GB    */
-#define LCD_HEAP_REGION_SIZE (1UL << 30) /* .................... 1 GB    */
-#define LCD_RAM_MAP_REGION_SIZE (8UL << 30) /* ................. 8 GBs   */
-#define LCD_IOREMAP_REGION_SIZE (256UL << 30) /* ............... 256 GBs */
-#define LCD_KERNEL_MODULE_REGION_SIZE (2UL << 30) /* ........... 2 GBs   */
+#define LCD_MISC_REGION_SIZE (1UL << 30) /* .................... 1 GB  */
+#define LCD_STACK_REGION_SIZE (1UL << 30) /* ................... 1 GB  */
+#define LCD_HEAP_REGION_SIZE (1UL << 30) /* .................... 1 GB  */
+#define LCD_RAM_MAP_REGION_SIZE (1UL << 30) /* ................. 1 GB  */
+#define LCD_IOREMAP_REGION_SIZE (1L << 30) /* .................  1 GB  */
+#define LCD_KERNEL_MODULE_REGION_SIZE (2UL << 30) /* ........... 2 GBs */
 
 /* Component Sizes. */
 
-#define LCD_UTCB_SIZE PAGE_SIZE /* ........................... 4 KBs */
-#define LCD_BOOTSTRAP_PAGES_SIZE (1 * PAGE_SIZE) /* .......... 4 KBs */
-#define LCD_BOOTSTRAP_PAGE_TABLES_SIZE (2 * PAGE_SIZE) /* .... 8 KBs */
-#define LCD_STACK_SIZE (2 * PAGE_SIZE) /* .................... 8 KBs */
+#define LCD_UTCB_SIZE PAGE_SIZE /* ........................... 4  KBs */
+#define LCD_BOOTSTRAP_PAGES_SIZE (1 * PAGE_SIZE) /* .......... 4  KBs */
+#define LCD_BOOTSTRAP_PAGE_TABLES_SIZE (16 * PAGE_SIZE) /* ... 64 KBs */
+#define LCD_STACK_SIZE (2 * PAGE_SIZE) /* .................... 8  KBs */
 
 /* Orders (for convenience) */
 
@@ -201,19 +199,19 @@
 /* HOLE */
 
 #define LCD_RAM_MAP_REGION_OFFSET \
-	(LCD_HEAP_REGION_OFFSET + LCD_HEAP_REGION_SIZE + (2UL << 30))
+	(LCD_HEAP_REGION_OFFSET + LCD_HEAP_REGION_SIZE + (1UL << 30))
 #define LCD_RAM_MAP_OFFSET LCD_RAM_MAP_REGION_OFFSET
 
 /* HOLE */
 
 #define LCD_IOREMAP_REGION_OFFSET \
-	(LCD_RAM_MAP_REGION_OFFSET + LCD_RAM_MAP_REGION_SIZE + (48UL << 30))
+	(LCD_RAM_MAP_REGION_OFFSET + LCD_RAM_MAP_REGION_SIZE + (1UL << 30))
 #define LCD_IOREMAP_OFFSET LCD_IOREMAP_REGION_OFFSET
 
 /* HOLE */
 
 #define LCD_KERNEL_MODULE_REGION_OFFSET \
-	(LCD_IOREMAP_REGION_OFFSET + LCD_IOREMAP_REGION_SIZE + (190UL << 30))
+	(LCD_IOREMAP_REGION_OFFSET + LCD_IOREMAP_REGION_SIZE + (500UL << 30))
 
 /* Addresses */
 
@@ -269,7 +267,7 @@ __lcd_build_checks__(void)
 	BUILD_BUG_ON(sizeof(struct lcd_boot_info) > LCD_BOOTSTRAP_PAGES_SIZE);
 
 	/* We need exactly two page tables for the gv address space. */
-	BUILD_BUG_ON(LCD_BOOTSTRAP_PAGE_TABLES_SIZE >> PAGE_SHIFT != 2);
+	BUILD_BUG_ON(LCD_BOOTSTRAP_PAGE_TABLES_SIZE >> PAGE_SHIFT != 16);
 	
 	/* Number of LCD stack pages needs to be a power-of-two multiple. */
 	BUILD_BUG_ON_NOT_POWER_OF_2(LCD_STACK_SIZE >> PAGE_SHIFT);
@@ -280,6 +278,11 @@ __lcd_build_checks__(void)
 	 * starting gv address for the kernel map in the host. */
 	BUILD_BUG_ON(gva_val(LCD_KERNEL_MODULE_REGION_GV_ADDR) != 
 		__START_KERNEL_map);
+
+	/* All memory should fit into 512 GBs. This is because we only
+	 * use one pud (internally in common/module_create.c). */
+	BUILD_BUG_ON((LCD_KERNEL_MODULE_REGION_OFFSET + 
+			LCD_KERNEL_MODULE_REGION_SIZE) >= (512UL << 30));
 }
 
 /* HELPERS -------------------------------------------------- */

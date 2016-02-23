@@ -126,8 +126,7 @@ struct lcd_create_ctx {
 	 * All of these are *creator-relative* addresses
 	 */
 	struct lcd_boot_info *lcd_boot_info;
-	pgd_t *gv_pgd;
-	pud_t *gv_pud;
+	void *gv_pg_tables;
 	void *stack;
 	void *m_init_bits;
 	void *m_core_bits;

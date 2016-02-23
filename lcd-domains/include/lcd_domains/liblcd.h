@@ -75,28 +75,31 @@ int __liblcd_heap_init(void);
 /* 
  * RAM MAPPING --------------------------------------------------
  *
- * RAM mapping area is 8 GBs (2^26 pages).
+ * RAM mapping area is 1 GB (2^18 pages).
  *
  * The minimum address space block you can allocate from the RAM map
- * area is 64 MBs (2^14 = 16,384 pages). This leads to a lot of internal
+ * area is 2 MBs (2^9 = 512 pages). This leads to a lot of internal
  * fragmentation, but this is tolerable, so long as we don't need to
- * map RAM more than 100 or so times. (The actual memory object will
- * likely be considerably smaller than 64 MBs, so only the first
+ * map RAM more than 200 or so times. (The actual memory object will
+ * likely be considerably smaller than 2 MBs, so only the first
  * few KBs may actually be backed/mapped in guest physical. But the
- * entire 64 MB region will be considered occupied by the internal
+ * entire 2 MB region will be considered occupied by the internal
  * RAM map allocator.)
  *
  * The maximum address space block you can allocate from the RAM map
- * area is 1 GB (2^18 = 262,144 pages).
+ * area is 256 MB (2^16 = 65,536 pages).
  *
  * In hindsight, maybe a simple bitmap would have been just as good
- * here since there are only 8GB/64MB = 128 allocation blocks. Oh well.
+ * here since there are only 1GB/64MB = 512 allocation blocks. Oh well. (These
+ * mapping regions were originally gonna be a lot bigger, but I had
+ * to switch over to 2MB guest virtual pages instead of 1GB pages. Etc.
+ * etc.)
  */
 #define LCD_RAM_MAP_NR_PAGES_ORDER \
 	(ilog2(LCD_RAM_MAP_REGION_SIZE >> PAGE_SHIFT))
 #define LCD_RAM_MAP_SIZE LCD_RAM_MAP_REGION_SIZE
-#define LCD_RAM_MAP_MIN_ORDER 14
-#define LCD_RAM_MAP_MAX_ORDER 18
+#define LCD_RAM_MAP_MIN_ORDER 9
+#define LCD_RAM_MAP_MAX_ORDER 16
 
 /**
  * __liblcd_ram_map_init -- Call during boot after heap initialized

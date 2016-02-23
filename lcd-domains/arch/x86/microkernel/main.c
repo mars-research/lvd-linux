@@ -2418,6 +2418,7 @@ static int vmx_handle_ept(struct lcd_arch *lcd_arch)
 	else
 		printk("        violation occurred during guest virtual page walk (before reaching the final guest physical address)\n\n");
 
+	dump_lcd_arch(lcd_arch);
 
 	return LCD_ARCH_STATUS_EPT_FAULT;
 }

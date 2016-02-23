@@ -144,7 +144,7 @@ static void setup_lcd_pud(struct lcd_create_ctx *ctx)
 	 */
 	unsigned int i;
 	unsigned int ioremap_offset = LCD_IOREMAP_REGION_OFFSET >> 30;
-	unsigned int after_ioremap_offset = (ioremap_offset +
+	unsigned int after_ioremap_offset = (LCD_IOREMAP_REGION_OFFSET +
 					LCD_IOREMAP_REGION_SIZE) >> 30;
 	pteval_t wb_flags = _PAGE_PRESENT | _PAGE_RW | _PAGE_PSE;
 	pteval_t uc_flags = _PAGE_PRESENT | _PAGE_RW | _PAGE_PSE | _PAGE_PWT;
@@ -193,6 +193,39 @@ static void setup_lcd_pgd(struct lcd_create_ctx *ctx)
 		__pgd(gpa_val(pud_gpa) | flags));
 }
 
+static void dump_virt_pud(pud_t *pud)
+{
+	unsigned idx;
+	pud_t *entry;
+
+	printk("\n\n   pud 511 entries:\n------------------\n\n");
+
+	for (idx = 0; idx < 512; idx++) {
+		entry = &pud[idx];
+		printk("   %03u %lx\n", idx, pud_val(*entry));
+	}
+}
+
+static void dump_virt_pgd(pgd_t *pgd)
+{
+	unsigned int idx;
+	pgd_t *entry;
+
+	printk("   pgd entries:\n------------------\n\n");
+
+	for (idx = 0; idx < 512; idx++) {
+		entry = &pgd[idx];
+		printk("   %03u %lx\n", idx, pgd_val(*entry));
+	}
+}
+
+void dump_virt_addr_space(struct lcd_create_ctx *ctx)
+{
+	printk("DUMP LCD VIRT PAGE TABLES:\n");
+	dump_virt_pgd(ctx->gv_pgd);
+	dump_virt_pud(ctx->gv_pud);
+}
+
 static void setup_virt_addr_space(struct lcd_create_ctx *ctx)
 {
 	/*
@@ -205,6 +238,8 @@ static void setup_virt_addr_space(struct lcd_create_ctx *ctx)
 	 * Set up pud (only one for high 512 GBs)
 	 */
 	setup_lcd_pud(ctx);
+
+	dump_virt_addr_space(ctx);
 }
 
 static int setup_addr_spaces(cptr_t lcd, struct lcd_create_ctx *ctx,

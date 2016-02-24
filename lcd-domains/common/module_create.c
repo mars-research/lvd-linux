@@ -74,7 +74,7 @@ static struct lcd_mem_region lcd_mem_regions[LCD_NR_MEM_REGIONS] = {
 	},
 };
 
-/* ------------------------------------------------------------ */
+/* PHYSICAL ADDRESS SPACE -------------------------------------------------- */
 
 static int do_grant_and_map_for_mem(cptr_t lcd, struct lcd_create_ctx *ctx,
 				void *mem, gpa_t map_base,
@@ -195,6 +195,30 @@ fail1:
 	return ret;
 }
 
+/* VIRTUAL ADDRESS SPACE ------------------------------ */
+
+static void dump_pg_table(unsigned long *pgtable)
+{
+	unsigned int i;
+	for (i = 0; i < 512; i++)
+		printk("     %03u: 0x%016lx\n", i, pgtable[i]);
+}
+
+void lcd_dump_virt_addr_space(struct lcd_create_ctx *ctx)
+{
+	unsigned int i;
+	LIBLCD_MSG("  DUMP LCD GUEST VIRTUAL PAGE TABLES:");
+	
+	for (i = 0; i < LCD_BOOTSTRAP_PAGE_TABLES_SIZE >> PAGE_SHIFT; i++) {
+		/*
+		 * XXX: Assumes 512 entries per table, 8 bytes/entry
+		 */
+		printk("\n     page table %d\n     -------------------\n",
+			i);
+		dump_pg_table(ctx->gv_pg_tables + i * 512 * 8);
+	}
+}
+
 static void setup_lcd_pmd(struct lcd_mem_region *reg, pmd_t *pmd,
 			unsigned int gigabyte_idx)
 {
@@ -211,7 +235,7 @@ static void setup_lcd_pmd(struct lcd_mem_region *reg, pmd_t *pmd,
 		 */
 		gp = LCD_PHYS_BASE + gigabyte_idx * (1UL << 30) +
 			k * (1UL << 21);
-		set_pmd(&pmd[k], __pmd(gp | reg->flags));
+		set_pmd(&pmd[k], __pmd(gp | reg->flags | _PAGE_PSE));
 	}
 }
 
@@ -245,21 +269,26 @@ static void setup_lcd_pud(pud_t *pud)
 	unsigned int i, j, lo, hi;
 	pud_t *pud_entry;
 	struct lcd_mem_region *reg;
+	gpa_t pmd_gpa;
 	/*
-	 * Map each memory region
+	 * pmd's come after pgd and pud
+	 */
+	pmd_gpa = gpa_add(LCD_BOOTSTRAP_PAGE_TABLES_GP_ADDR, 2 * PAGE_SIZE);
+	/*
+	 * Point to correct pmd's for each memory region
 	 */
 	for (i = 0; i < LCD_NR_MEM_REGIONS; i++) {
 		reg = &lcd_mem_regions[i];
 		/*
-		 * Map entire memory region (some are bigger than 1GB)
+		 * Point to correct pmd's
 		 */
 		lo = reg->offset >> 30;
 		hi = lo + (reg->size >> 30);
 		for (j = lo; j < hi; j++) {
 			pud_entry = &pud[j];
 			set_pud(pud_entry,
-				__pud((LCD_PHYS_BASE + j * (1UL << 30)) | 
-					reg->flags));
+				__pud(gpa_val(pmd_gpa) | reg->flags));
+			pmd_gpa = gpa_add(pmd_gpa, PAGE_SIZE);
 		}
 	}
 }
@@ -285,19 +314,27 @@ static void setup_lcd_pgd(pgd_t *pgd)
 static void setup_virt_addr_space(struct lcd_create_ctx *ctx)
 {
 	/*
+	 * XXX: Assumes 512 entries / table
+	 */
+	void *cursor = ctx->gv_pg_tables;
+	/*
 	 * page tables should already be zero'd out
 	 *
 	 * Set up root pgd
 	 */
-	setup_lcd_pgd(ctx->gv_pg_tables);
+	setup_lcd_pgd(cursor);
+	cursor += 512 * sizeof(pgd_t);
 	/*
 	 * Set up pud (only one for high 512 GBs)
+	 * (skip over pgd)
 	 */
-	setup_lcd_pud(ctx->gv_pg_tables + 512); /* skip over pgd */
+	setup_lcd_pud(cursor);
+	cursor += 512 * sizeof(pud_t);
 	/*
 	 * Set up pmd's (one for each 1GB region)
+	 * (skip over pgd and pud)
 	 */
-	setup_lcd_pmds(ctx->gv_pg_tables + 1024); /* skip over pgd and pud */
+	setup_lcd_pmds(cursor);
 }
 
 static int setup_addr_spaces(cptr_t lcd, struct lcd_create_ctx *ctx,
@@ -324,6 +361,8 @@ static int setup_addr_spaces(cptr_t lcd, struct lcd_create_ctx *ctx,
 fail1: /* just return non-zero ret; caller will free mem */
 	return ret;
 }
+
+/* -------------------------------------------------- */
 
 static int init_create_ctx(struct lcd_create_ctx **ctx_out, char *mname)
 {
@@ -361,8 +400,8 @@ static void destroy_create_ctx(struct lcd_create_ctx *ctx)
 	if (ctx->stack)
 		lcd_free_pages(lcd_virt_to_head_page(ctx->stack),
 			LCD_STACK_ORDER);
-	if (ctx->gv_pgd)
-		lcd_free_pages(lcd_virt_to_head_page(ctx->gv_pgd),
+	if (ctx->gv_pg_tables)
+		lcd_free_pages(lcd_virt_to_head_page(ctx->gv_pg_tables),
 			LCD_BOOTSTRAP_PAGE_TABLES_ORDER);
 	if (ctx->lcd_boot_info)
 		lcd_free_pages(lcd_virt_to_head_page(ctx->lcd_boot_info),

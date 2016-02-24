@@ -282,7 +282,7 @@ __lcd_build_checks__(void)
 	/* All memory should fit into 512 GBs. This is because we only
 	 * use one pud (internally in common/module_create.c). */
 	BUILD_BUG_ON((LCD_KERNEL_MODULE_REGION_OFFSET + 
-			LCD_KERNEL_MODULE_REGION_SIZE) >= (512UL << 30));
+			LCD_KERNEL_MODULE_REGION_SIZE) > (512UL << 30));
 }
 
 /* HELPERS -------------------------------------------------- */

@@ -14,9 +14,7 @@ static int __noreturn __init liblcd_test_lcd_init(void)
 {
 	int r = 0;
 	r = lcd_enter();
-
 	goto out;
-
 out:
 	lcd_exit(r);
 }

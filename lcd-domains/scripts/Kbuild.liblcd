@@ -64,4 +64,5 @@ ccflags-y += \
 	-I$(LCD_DOMAINS_TOP_SRC_DIR)/arch/$(ARCH)/include \
 	-I$(LIBLCD_BUILD_DIR)/libcap.install/include \
 	-I$(LCD_DOMAINS_TOP_SRC_DIR)/config/isolated \
-	-DCONFIG_LAZY_THC
+	-DCONFIG_LAZY_THC \
+	-DMODULE

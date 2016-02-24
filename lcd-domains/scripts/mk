@@ -1,0 +1,6 @@
+#! /bin/bash
+
+# Reload microkernel
+
+scripts/rmmk
+scripts/insmk

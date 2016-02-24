@@ -19,7 +19,7 @@
 static inline int lcd_syscall_no_args(int id)
 {
         long ret;
-	asm(
+	asm volatile(
 		"movq %1, %%rax \n\t"
 		"vmcall \n\t"
 		"movq %%rax, %0 \n\t"
@@ -32,7 +32,7 @@ static inline int lcd_syscall_no_args(int id)
 static inline int lcd_syscall_one_arg(int id, unsigned long arg0)
 {
         long ret;
-	asm(
+	asm volatile(
 		"movq %2, %%r8 \n\t"
 		"movq %1, %%rax \n\t"
 		"vmcall \n\t"
@@ -48,7 +48,7 @@ static inline int lcd_syscall_two_args(int id,
 				unsigned long arg1)
 {
         long ret;
-	asm(
+	asm volatile(
 		"movq %3, %%r9 \n\t"
 		"movq %2, %%r8 \n\t"
 		"movq %1, %%rax \n\t"
@@ -66,7 +66,7 @@ static inline int lcd_syscall_three_args(int id,
 					unsigned long arg2)
 {
         long ret;
-	asm(
+	asm volatile(
 		"movq %4, %%r10 \n\t"
 		"movq %3, %%r9 \n\t"
 		"movq %2, %%r8 \n\t"
@@ -86,7 +86,7 @@ static inline int lcd_syscall_four_args(int id,
 					unsigned long arg3)
 {
         long ret;
-	asm(
+	asm volatile(
 		"movq %5, %%r11 \n\t"
 		"movq %4, %%r10 \n\t"
 		"movq %3, %%r9 \n\t"
@@ -108,7 +108,7 @@ static inline int lcd_syscall_five_args(int id,
 					unsigned long arg4)
 {
         long ret;
-	asm(
+	asm volatile(
 		"movq %6, %%r12 \n\t"
 		"movq %5, %%r11 \n\t"
 		"movq %4, %%r10 \n\t"

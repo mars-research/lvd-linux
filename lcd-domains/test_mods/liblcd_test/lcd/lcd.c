@@ -17,7 +17,7 @@ static int cptr_test(void)
 	int ret;
 
 	for (i = 0; i < 10; i++) {
-		ret = lcd_alloc_cptr(&cptrs[i]);
+		ret = lcd_cptr_alloc(&cptrs[i]);
 		if (ret) {
 			LIBLCD_ERR("failed at i = %d", i);
 			goto fail;
@@ -35,7 +35,7 @@ static int cptr_test(void)
 out:
 fail:
 	for (j = 0; j < i; j++)
-		lcd_free_cptr(cptrs[j]);
+		lcd_cptr_free(cptrs[j]);
 
 	return ret;
 }

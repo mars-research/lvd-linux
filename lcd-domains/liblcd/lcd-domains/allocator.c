@@ -154,14 +154,15 @@ static void pb_unbacking(struct lcd_page_allocator *pa,
 	/*
 	 * If:
 	 *      1 - the page block is at the beginning of a resource node
-	 *      2 - its order is at least as big as the resource node's order
+	 *      2 - its page order is at least as big as the resource node's 
+	 *          size
 	 *      3 - the caller provided a free call back
 	 *
 	 * invoke the free callback so that the caller can free / unmap the
 	 * backing memory.
 	 */
 	if (!(pb->n != NULL && 
-			(1UL << order) >= lcd_resource_node_size(pb->n) &&
+			(1UL << (order + PAGE_SHIFT)) >= lcd_resource_node_size(pb->n) &&
 			pa->cbs->free_unmap_regular_mem_chunk))
 		return;
 

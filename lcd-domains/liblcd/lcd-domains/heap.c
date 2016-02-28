@@ -151,7 +151,8 @@ static void do_one_heap_free(gpa_t dest)
 	__do_one_heap_free(n);
 }
 
-static int do_one_heap_alloc(gpa_t dest, unsigned int alloc_order)
+static int do_one_heap_alloc(gpa_t dest, unsigned int alloc_order,
+			struct lcd_resource_node **n_out)
 {
 	int ret;
 	cptr_t pages;
@@ -171,9 +172,19 @@ static int do_one_heap_alloc(gpa_t dest, unsigned int alloc_order)
 		LIBLCD_ERR("low level mmap failed");
 		goto fail2;
 	}
+	/*
+	 * Get the resource node for the mapped memory
+	 */
+	ret = lcd_phys_to_resource_node(dest, n_out);
+	if (ret) {
+		LIBLCD_ERR("error getting resource node");
+		goto fail3;
+	}
 
 	return 0;
 
+fail3:
+	_lcd_munmap(pages, dest);
 fail2:
 	lcd_cap_delete(pages);
 fail1:
@@ -191,6 +202,7 @@ heap_alloc_map_metadata_memory(const struct lcd_page_allocator_cbs *cbs,
 	unsigned long nr_allocs;
 	unsigned total;
 	gpa_t dest;
+	struct lcd_resource_node *unused;
 
 	/*
 	 * Since we are embedding, we need to allocate in 2^alloc_order
@@ -204,7 +216,7 @@ heap_alloc_map_metadata_memory(const struct lcd_page_allocator_cbs *cbs,
 		dest = gpa_add(LCD_HEAP_GP_ADDR, 
 			i * (1UL << (alloc_order + PAGE_SHIFT)));
 
-		ret = do_one_heap_alloc(dest, alloc_order);
+		ret = do_one_heap_alloc(dest, alloc_order, &unused);
 		if (ret) {
 			LIBLCD_ERR("metadata alloca failed at i = %lx", i);
 			goto fail1;
@@ -267,7 +279,7 @@ heap_alloc_map_regular_mem_chunk(struct lcd_page_allocator *pa,
 {
 	gpa_t dest = gpa_add(LCD_HEAP_GP_ADDR, mapping_offset);
 
-	return do_one_heap_alloc(dest, alloc_order);
+	return do_one_heap_alloc(dest, alloc_order, n_out);
 }
 
 static void

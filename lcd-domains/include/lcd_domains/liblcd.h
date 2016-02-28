@@ -8,6 +8,7 @@
 #ifndef LCD_DOMAINS_LIBLCD_H
 #define LCD_DOMAINS_LIBLCD_H
 
+#include <linux/mmzone.h>
 #include <libcap.h>
 #include <lcd_domains/types.h>
 #include <liblcd/resource_tree.h>
@@ -58,12 +59,14 @@ void __liblcd_mem_itree_delete(struct lcd_resource_node *n);
  *
  * The minimum you can allocate from the heap is 4 KBs (2^0 = 1 page).
  *
- * The maximum you can allocate from the heap is 4 MBs (2^10 = 1024 pages).
+ * The maximum you can allocate from the heap is determined by the
+ * host's configuration (MAX_ORDER - 1; MAX_ORDER is defined in 
+ * linux/mmzone.h at the top). For x86_64, this is 4 MBs (2^10 = 1024 pages).
  */
 #define LCD_HEAP_NR_PAGES_ORDER 12
 #define LCD_HEAP_SIZE (1UL << (LCD_HEAP_NR_PAGES_ORDER + PAGE_SHIFT))
 #define LCD_HEAP_MIN_ORDER 0
-#define LCD_HEAP_MAX_ORDER 10
+#define LCD_HEAP_MAX_ORDER (MAX_ORDER - 1)
 
 /**
  * __liblcd_heap_init -- Call during boot after mem itree initialized

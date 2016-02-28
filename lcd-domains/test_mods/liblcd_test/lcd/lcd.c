@@ -6,6 +6,7 @@
 
 #include <linux/module.h>
 #include <linux/kernel.h>
+#include <linux/slab.h>
 #include <liblcd/liblcd.h>
 
 #include <lcd_config/post_hook.h>
@@ -90,6 +91,10 @@ static int page_alloc_test(void)
 	unsigned long n;
 	unsigned char *ptr;
 
+	/*
+	 * This test is config dependent, unfortunately ...
+	 */
+
 	for (i = 0; i < 15; i++) {
 		allocs[i] = lcd_alloc_pages(0, orders[alloc_order[i]]);
 		if (!allocs[i]) {
@@ -132,6 +137,30 @@ fail:
 	for (j = 0; j < i; j++)
 		lcd_free_pages(allocs[j], orders[alloc_order[j]]);
 	return ret;
+}
+
+static int big_page_alloc_test(void)
+{
+	struct page *base;
+	/*
+	 * Try to allocate the maximum (should succeed)
+	 */
+	base = lcd_alloc_pages(0, MAX_ORDER - 1);
+	if (!base) {
+		LIBLCD_ERR("big page alloc failed");
+		return -1;
+	}
+	/*
+	 * Touch all of it
+	 */
+	memset(lcd_page_address(base), 0, 
+		(1UL << (MAX_ORDER - 1 + PAGE_SHIFT)));
+	/*
+	 * Free em
+	 */
+	lcd_free_pages(base, MAX_ORDER - 1);
+
+	return 0;
 }
 
 struct a {
@@ -178,7 +207,8 @@ struct bstruct {
 static int kmem_cache_test(void)
 {
 	struct kmem_cache *cache;
-	int i, j;
+	int i, j, k;
+	int ret;
 	struct bstruct *bs[8];
 	/*
 	 * Set up kmem cache
@@ -204,7 +234,7 @@ static int kmem_cache_test(void)
 	 * Touch all the mem
 	 */
 	for (k = 0; k < 8; k++)
-		memset(bs[i], 0, sizeof(struct bstruct));
+		memset(bs[k], 0, sizeof(struct bstruct));
 
 	ret = 0;
 	goto out;
@@ -243,6 +273,13 @@ static int __noreturn __init liblcd_test_lcd_init(void)
 		goto out;
 	}
 	LIBLCD_MSG("page alloc tests passed!");
+
+	ret = big_page_alloc_test();
+	if (ret) {
+		LIBLCD_ERR("big page alloc test failed!");
+		goto out;
+	}
+	LIBLCD_MSG("big page alloc test passed!");
 
 	ret = kmalloc_test();
 	if (ret) {

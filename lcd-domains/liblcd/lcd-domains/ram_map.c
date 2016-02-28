@@ -58,7 +58,8 @@ void _lcd_munmap(cptr_t mo, gpa_t base)
 	 */
 	ret = lcd_phys_to_resource_node(base, &n);
 	if (ret) {
-		LIBLCD_ERR("couldn't find memory object in tree");
+		LIBLCD_ERR("couldn't find memory object in tree; base gpa is 0x%lx",
+			gpa_val(base));
 		return;
 	}
 	/*

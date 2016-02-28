@@ -7,8 +7,11 @@
 #include <linux/types.h>
 #include <lcd_domains/types.h>
 #include <liblcd/console.h>
-#define assert(XX) do { \
-	lcd_printk("assertion failure at %s:%d\n", __FILE__, __LINE__); \
+#define assert(XX) do {							\
+		if (!(XX)) {						\
+			lcd_printk("assertion failure at %s:%d\n",	\
+				__FILE__, __LINE__);			\
+		}							\
 	} while(0)
 #else
 #include <stdint.h>

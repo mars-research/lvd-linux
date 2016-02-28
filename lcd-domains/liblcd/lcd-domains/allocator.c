@@ -386,10 +386,12 @@ void init_page_blocks(struct lcd_page_allocator *pa)
 	for (i = 0; i < pa_nr_page_blocks(pa); i++)
 		INIT_LIST_HEAD(&cursor[i].buddy_list);
 
-	for (i = 0; i < pa_nr_page_blocks(pa); i += (1UL << (pa->max_order))) {
-		cursor[i].block_order = pa->max_order;
+	for (i = 0; 
+	     i < pa_nr_page_blocks(pa); 
+	     i += (1UL << (pa->max_order - pa->min_order))) {
+		cursor[i].block_order = pa->max_order - pa->min_order;
 		list_add_tail(&cursor[i].buddy_list,
-			&pa->free_lists[pa->max_order]);
+			&pa->free_lists[pa->max_order - pa->min_order]);
 	}
 }
 

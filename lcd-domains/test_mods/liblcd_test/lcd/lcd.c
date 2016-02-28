@@ -79,6 +79,62 @@ out:
 	return ret;
 }
 
+static int page_alloc_test(void)
+{
+	int ret;
+	const int nr_allocs = 15;
+	struct page *allocs[nr_allocs];
+	unsigned int orders[nr_allocs] = { 0, 1, 1, 1, 2, 3, 4, 4, 5, 6, 7, 7, 7, 8, 9 };
+	unsigned int alloc_order[nr_allocs] = { 12, 5, 4, 11, 2, 9, 15, 1, 10, 8, 0, 13, 7, 6, 14, 3 };
+	unsigned int order;
+	int i, j, k;
+	unsigned long n;
+	unsigned char *ptr;
+
+	for (i = 0; i < nr_allocs; i++) {
+		allocs[i] = lcd_alloc_pages(0, orders[alloc_order[i]]);
+		if (!allocs[i]) {
+			LIBLCD_ERR("page alloc order = %d, iteration %d failed",
+				orders[alloc_order[i]], i);
+			goto fail;
+		}
+		
+		/*
+		 * Fill with some data
+		 */
+		memset(lcd_page_address(base), order, 
+			(1UL << (order + PAGE_SHIFT)));
+	}
+	/*
+	 * Check them
+	 */
+	for (k = 0; k < nr_allocs; k++) {
+
+		order = orders[alloc_order[k]];
+		ptr = lcd_page_address(allocs[k]);
+
+		for (n = 0; n < (1UL << (order + PAGE_SHIFT)); n++) {
+			if (ptr[n] != order) {
+				LIBLCD_ERR("bad byte at idx 0x%lx for order %d: expected %d, but found %d",
+					n, order, order, ptr[n]);
+			}
+		}
+
+	}
+
+	ret = 0;
+	/*
+	 * Free em
+	 */
+	goto out;
+	
+out:
+fail:
+	for (j = 0; j < i; j++)
+		lcd_free_pages(allocs[j], orders[alloc_order[j]]);
+	return ret;
+}
+
 static int __noreturn __init liblcd_test_lcd_init(void) 
 {
 	int ret = 0;
@@ -90,12 +146,20 @@ static int __noreturn __init liblcd_test_lcd_init(void)
 		goto out;
 	}
 	LIBLCD_MSG("cptr tests passed!");
+
 	ret = low_level_page_alloc_test();
 	if (ret) {
 		LIBLCD_ERR("low level page alloc tests failed!");
 		goto out;
 	}
 	LIBLCD_MSG("low level page alloc tests passed!");
+
+	ret = page_alloc_test();
+	if (ret) {
+		LIBLCD_ERR("page alloc tests failed!");
+		goto out;
+	}
+	LIBLCD_MSG("page alloc tests passed!");
 
 	
 	goto out;

@@ -134,6 +134,90 @@ fail:
 	return ret;
 }
 
+struct a {
+	int x, y, z;
+	char buff[512];
+};
+
+static int kmalloc_test(void)
+{
+	struct a *x;
+	int i;
+	int ret;
+	/*
+	 * Alloc 10 copies of struct a
+	 */
+	x = kmalloc(sizeof(struct a) * 10, GFP_KERNEL);
+	if (!x) {
+		LIBLCD_ERR("kmalloc failed");
+		ret = -1;
+		goto fail1;
+	}
+	/*
+	 * Touch all of the alloc'd memory
+	 */
+	for (i = 0; i < 10; i++) {
+		x[i].x = 2 * i + 1;
+		x[i].y = 3 * i + 1;
+		x[i].z = 4 * i + 1;
+		memset(&x[i].buff, 0, 512);
+	}
+	kfree(x);
+
+	return 0;
+
+fail1:
+	return ret;
+}
+
+struct bstruct {
+	int x, y, z;
+	char buff[512];
+};
+
+static int kmem_cache_test(void)
+{
+	struct kmem_cache *cache;
+	int i, j;
+	struct bstruct *bs[8];
+	/*
+	 * Set up kmem cache
+	 */
+	cache = KMEM_CACHE(bstruct, 0);
+	if (!cache) {
+		LIBLCD_ERR("kmem cache create failed");
+		ret = -1;
+		goto fail1;
+	}
+	/*
+	 * Alloc 8 b's
+	 */
+	for (i = 0; i < 8; i++) {
+		bs[i] = kmem_cache_zalloc(cache, GFP_KERNEL);
+		if (!bs[i]) {
+			LIBLCD_ERR("kmem cache alloc failed at idx %d", i);
+			ret = -1;
+			goto fail2;
+		}
+	}
+	/*
+	 * Touch all the mem
+	 */
+	for (k = 0; k < 8; k++)
+		memset(bs[i], 0, sizeof(struct bstruct));
+
+	ret = 0;
+	goto out;
+
+out:
+fail2:
+	for (j = 0; j < i; j++)
+		kmem_cache_free(cache, bs[j]);
+	kmem_cache_destroy(cache);
+fail1:
+	return ret;
+}
+
 static int __noreturn __init liblcd_test_lcd_init(void) 
 {
 	int ret = 0;
@@ -160,10 +244,27 @@ static int __noreturn __init liblcd_test_lcd_init(void)
 	}
 	LIBLCD_MSG("page alloc tests passed!");
 
+	ret = kmalloc_test();
+	if (ret) {
+		LIBLCD_ERR("kmalloc test failed!");
+		goto out;
+	}
+	LIBLCD_MSG("kmalloc tests passed!");
+
+	ret =  kmem_cache_test();
+	if (ret) {
+		LIBLCD_ERR("kmem cache tests failed!");
+		goto out;
+	}
+	LIBLCD_MSG("kmem cache tests passed!");
+
+	LIBLCD_MSG("ALL LIBLCD TESTS PASSED!");
 	
 	goto out;
 
 out:
+	if (ret)
+		LIBLCD_ERR("AT LEAST ONE LIBLCD TEST FAILS!");
 	lcd_exit(ret);
 }
 

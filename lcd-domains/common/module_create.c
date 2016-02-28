@@ -185,7 +185,7 @@ static int setup_phys_addr_space(cptr_t lcd, struct lcd_create_ctx *ctx,
 					m_init_link_addr, m_core_link_addr);
 	if (ret)
 		goto fail4;
-	
+
 	return 0;
 
 fail4:  /* Just return; caller should kill new LCD and free up resources. */
@@ -568,7 +568,6 @@ int lcd_create_module_lcd(char *mdir, char *mname, cptr_t *lcd_out,
 		LIBLCD_ERR("error configuring LCDs registers");
 		goto fail6;
 	}
-
 	/*
 	 * Return context and lcd
 	 */

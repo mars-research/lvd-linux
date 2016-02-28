@@ -183,6 +183,18 @@ lcd_to_boot_cptr_cache(struct lcd_create_ctx *ctx)
 	return &ctx->lcd_boot_info->cptr_cache;
 }
 /**
+ * lcd_dump_virt_addr_space -- Print the virtual addr space in @ctx
+ *
+ * This is for debugging the virtual address space set up. Invoking this
+ * function will dump the virtual page tables set up for the LCD (the data
+ * in @ctx->gv_page_tables). This does not do page walks via %cr3. In the
+ * future, this function could be implemented differently for isolated
+ * and non-isolated code. Non-isolated code could use the EPTs to resolve
+ * guest physical to host physical, and do a full %cr3 based traversal (this
+ * isn't possible for isolated code since it can't access EPTs).
+ */
+void lcd_dump_virt_addr_space(struct lcd_create_ctx *ctx);
+/**
  * lcd_destroy_create_ctx -- Tear down lcd_create_ctx returned from
  *                           lcd_create_module_lcd
  * @ctx: the ctx to destroy

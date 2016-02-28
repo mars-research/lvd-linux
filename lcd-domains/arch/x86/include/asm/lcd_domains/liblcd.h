@@ -39,7 +39,7 @@ static inline int lcd_syscall_one_arg(int id, unsigned long arg0)
 		"movq %%rax, %0 \n\t"
 		: "=g" (ret)
 		: "g" (id), "g" (arg0)
-		: "rax");
+		: "rax", "r8");
 	return (int)ret;
 }
 
@@ -56,7 +56,7 @@ static inline int lcd_syscall_two_args(int id,
 		"movq %%rax, %0 \n\t"
 		: "=g" (ret)
 		: "g" (id), "g" (arg0), "g" (arg1)
-		: "rax");
+		: "rax", "r8", "r9");
 	return (int)ret;
 }
 
@@ -75,7 +75,7 @@ static inline int lcd_syscall_three_args(int id,
 		"movq %%rax, %0 \n\t"
 		: "=g" (ret)
 		: "g" (id), "g" (arg0), "g" (arg1), "g" (arg2)
-		: "rax");
+		: "rax", "r8", "r9", "r10");
 	return (int)ret;
 }
 
@@ -96,7 +96,7 @@ static inline int lcd_syscall_four_args(int id,
 		"movq %%rax, %0 \n\t"
 		: "=g" (ret)
 		: "g" (id), "g" (arg0), "g" (arg1), "g" (arg2), "g" (arg3)
-		: "rax");
+		: "rax", "r8", "r9", "r10", "r11");
 	return (int)ret;
 }
 
@@ -120,7 +120,7 @@ static inline int lcd_syscall_five_args(int id,
 		: "=g" (ret)
 		: "g" (id), "g" (arg0), "g" (arg1), "g" (arg2), "g" (arg3),
 		  "g" (arg4)
-		: "rax");
+		: "rax", "r8", "r9", "r10", "r11", "r12");
 	return (int)ret;
 }
 
@@ -140,7 +140,7 @@ static inline int lcd_syscall_cap_grant(cptr_t lcd, cptr_t src, cptr_t dest)
 				cptr_val(lcd), cptr_val(src), cptr_val(dest));
 }
 
-static inline int lcd_syscall_putchar(char c)
+static inline int lcd_syscall_putchar(unsigned char c)
 {
 	return lcd_syscall_one_arg(LCD_SYSCALL_PUTCHAR, c);
 }

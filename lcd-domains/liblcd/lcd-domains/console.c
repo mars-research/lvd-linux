@@ -13,17 +13,14 @@
 
 #include <lcd_config/post_hook.h>
 
-void lcd_printk(char *fmt, ...)
+void _lcd_printk(const char *fmt, va_list args)
 {
-	va_list args;
-	char buf[512]; /* this is probably a bit big ... */
-	char *p;
+	unsigned char buf[512]; /* this is probably a bit big ... */
+	unsigned char *p;
 	/*
 	 * Convert fmt string to chars
 	 */
-	va_start(args, fmt);
 	vsnprintf(buf, 512, fmt, args);
-	va_end(args);
 	/*
 	 * Write char by char
 	 */
@@ -33,4 +30,15 @@ void lcd_printk(char *fmt, ...)
 	 * Write null char
 	 */
 	lcd_syscall_putchar(0);
+}
+
+void lcd_printk(const char *fmt, ...)
+{
+	va_list args;
+	/*
+	 * Convert fmt string to chars
+	 */
+	va_start(args, fmt);
+	_lcd_printk(fmt, args);
+	va_end(args);
 }

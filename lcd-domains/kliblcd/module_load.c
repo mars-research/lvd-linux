@@ -208,7 +208,7 @@ int lcd_load_module(char *mdir, char *mname,
 	*m_init_link_addr = __gva((unsigned long)m->module_init);
 	*m_core_link_addr = __gva((unsigned long)m->module_core);
 
-	LCD_MSG("Loaded %s.ko: ", mname);
+	LIBLCD_MSG("Loaded %s.ko: ", mname);
 	printk("    init addr 0x%p init size 0x%x\n",
 		m->module_init, m->init_size);
 	printk("    core addr 0x%p core size 0x%x\n",

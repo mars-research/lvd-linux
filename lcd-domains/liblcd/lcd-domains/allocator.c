@@ -385,7 +385,7 @@ static int alloc_metadata_page_blocks(struct lcd_page_allocator *pa,
 	/*
 	 * Allocate the big chunks first
 	 */
-	while (metadata_sz > (1UL << (pa->max_order + PAGE_SIZE))) {
+	while (metadata_sz > (1UL << (pa->max_order + PAGE_SHIFT))) {
 		/*
 		 * Allocate 2^max_order bytes
 		 */
@@ -412,7 +412,7 @@ static int alloc_metadata_page_blocks(struct lcd_page_allocator *pa,
 		/*
 		 * Shift to next 2^max_order chunk
 		 */
-		metadata_sz -= (1UL << (pa->max_order + PAGE_SIZE));
+		metadata_sz -= (1UL << (pa->max_order + PAGE_SHIFT));
 	}
 	/*
 	 * Allocate the remainder, rounded up to the closest power of 2
@@ -594,7 +594,7 @@ static unsigned long calc_metadata_size(unsigned int nr_pages_order,
 	 *
 	 *    1 - metadata to fit in memory area if we are embedding it
 	 */
-	if (embed_metadata && rslt > (1UL << (nr_pages_order + PAGE_SIZE))) {
+	if (embed_metadata && rslt > (1UL << (nr_pages_order + PAGE_SHIFT))) {
 		LIBLCD_ERR("trying to embed metadata, but it won't fit in the memory area; either increase the memory area size, or adjust other params so there is less metadata");
 		return -EINVAL;
 	}

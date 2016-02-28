@@ -56,6 +56,8 @@ LCD_BUILD_DIR=$(LCD_DOMAINS_TOP_SRC_DIR)/$(LCD_BUILD_DIR_REL)
 # ------------------------------------------------------------
 # CSPACE configuration
 
+# Since non-isolated code sets up the boot cptr cache for isolated code
+# you need to use the same config for both environments.
 LCD_CSPACE_DEPTH_BITS=2 # depth = 4
 LCD_CSPACE_CNODE_TABLE_BITS=3 # cnode tables have 8 slots
 
@@ -64,7 +66,7 @@ LCD_CSPACE_CNODE_TABLE_BITS=3 # cnode tables have 8 slots
 
 # build_all.sh does the right target sequencing
 all:
-	scripts/build_all.sh
+	scripts/build_all.sh $(MAKEFLAGS)
 
 # ------------------------------------------------------------
 # Microkernel build setup
@@ -135,7 +137,7 @@ LIBLCD_BUILD_DIRS=$(foreach dir,$(LIBLCD_DIRS),\
 LIBLCD_LIBCAP=$(LIBLCD_BUILD_DIR)/libcap.install/lib/libcap.a
 
 LIBLCD_LIBCAP_CFLAGS= \
-	"-DLCD_DOMAINS -I$(LCD_DOMAINS_TOP_SRC_DIR)/include -I$(LCD_DOMAINS_TOP_SRC_DIR)/config/isolated"
+	"-DLCD_DOMAINS -DCPTR_CACHE_LOCK_PADDING_SIZE=8 -I$(LCD_DOMAINS_TOP_SRC_DIR)/include -I$(LCD_DOMAINS_TOP_SRC_DIR)/config/isolated"
 
 # There isn't a nice easy way to multiline this, and I want access to the
 # LIBLCD_BUILD_DIR variable (so I don't want to create a separate file); so 

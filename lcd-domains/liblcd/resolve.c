@@ -104,3 +104,14 @@ void mutex_unlock(struct mutex *lock)
 /* SCHEDULING ------------------------------------------------------------ */
 
 int _cond_resched(void) { return 0; } /* Never signal reschedule */
+
+/* PRINTK -------------------------------------------------- */
+
+int printk(const char *fmt, ...)
+{
+	va_list args;
+	va_start(args, fmt);
+	_lcd_printk(fmt, args);
+	va_end(args);
+	return 0;
+}

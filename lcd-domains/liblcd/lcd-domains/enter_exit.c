@@ -15,6 +15,8 @@
 
 #include <lcd_config/post_hook.h>
 
+static int thc_initialized;
+
 int lcd_enter(void)
 {
 	int ret;
@@ -25,8 +27,7 @@ int lcd_enter(void)
 	 * on failure (and everything will get torn down and freed
 	 * then).
 	 *
-         * Create our call endpoint (for call/reply interactions)               
-         */
+         * Create our call endpoint (for call/reply interactions)                       */
         ret = _lcd_create_sync_endpoint(LCD_CPTR_CALL_ENDPOINT);
         if (ret) {
                 LIBLCD_ERR("creating call endpoint");
@@ -73,6 +74,8 @@ int lcd_enter(void)
 	 * Set up async runtime
 	 */
 	thc_init();
+	thc_initialized = 1;
+	LIBLCD_MSG("async runtime initialized");
 
 	lcd_printk("===============");
 	lcd_printk("  LCD BOOTED   ");
@@ -94,7 +97,8 @@ void __noreturn lcd_exit(int retval)
 	 * For now, just tear down async so we can make sure
 	 * it all worked.
 	 */
-	thc_done();
+	if (thc_initialized)
+		thc_done();
 
 	LIBLCD_MSG("exiting");
 

@@ -58,11 +58,6 @@
 	lcd_exit(-1);					\
 	} while(0)
 
-#undef printk
-#define printk(fmt, args...) do {		\
-	lcd_printk(fmt, ##args);			\
-	} while(0)
-
 #undef printk_ratelimit
 #define printk_ratelimit() true
 

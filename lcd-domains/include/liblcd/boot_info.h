@@ -11,6 +11,7 @@
 
 #include <libcap.h>
 #include <lcd_domains/types.h>
+#include <liblcd/console.h>
 
 #define LCD_NUM_BOOT_CPTRS 8
 
@@ -46,5 +47,30 @@ struct lcd_boot_info {
  * For non-isolated code, this function returns NULL.
  */
 struct lcd_boot_info * lcd_get_boot_info(void);
+/**
+ * lcd_dump_boot_info -- Print the bits in the lcd_boot_info
+ *
+ * This is for debugging.
+ */
+static inline void lcd_dump_boot_info(struct lcd_boot_info *b)
+{
+	unsigned long idx;
+	unsigned char *bits = (char *)b;
+	/*
+	 * This isn't ideal for printing, but it needs to be useable
+	 * before kmalloc etc. is available. (Can't alloc a string
+	 * buffer and sprintf into it.)
+	 */
+	LIBLCD_MSG("  DUMPING lcd_boot_info bits:");
+	for (idx = 0; idx < sizeof(struct lcd_boot_info); idx++) {
+		if (idx % 10 == 0)
+			printk(KERN_ERR "\n    ");
+		/* We do the hex manually because vsnprintf if used inside
+		 * the isolated liblcd, and it outputs the data in a weird
+		 * way. */
+		printk(KERN_ERR "%02x ", bits[idx]);
+	}
+	printk(KERN_ERR "\n");  
+}
 
 #endif /* LIBLCD_BOOTINFO_H */

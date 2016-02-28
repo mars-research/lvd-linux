@@ -82,16 +82,15 @@ out:
 static int page_alloc_test(void)
 {
 	int ret;
-	const int nr_allocs = 15;
-	struct page *allocs[nr_allocs];
-	unsigned int orders[nr_allocs] = { 0, 1, 1, 1, 2, 3, 4, 4, 5, 6, 7, 7, 7, 8, 9 };
-	unsigned int alloc_order[nr_allocs] = { 12, 5, 4, 11, 2, 9, 15, 1, 10, 8, 0, 13, 7, 6, 14, 3 };
+	struct page *allocs[15];
+	unsigned int orders[15] = { 0, 1, 1, 1, 2, 3, 4, 4, 5, 6, 7, 7, 7, 8, 9 };
+	unsigned int alloc_order[15] = { 12, 5, 4, 11, 2, 9, 1, 10, 8, 0, 13, 7, 6, 14, 3 };
 	unsigned int order;
 	int i, j, k;
 	unsigned long n;
 	unsigned char *ptr;
 
-	for (i = 0; i < nr_allocs; i++) {
+	for (i = 0; i < 15; i++) {
 		allocs[i] = lcd_alloc_pages(0, orders[alloc_order[i]]);
 		if (!allocs[i]) {
 			LIBLCD_ERR("page alloc order = %d, iteration %d failed",
@@ -102,13 +101,13 @@ static int page_alloc_test(void)
 		/*
 		 * Fill with some data
 		 */
-		memset(lcd_page_address(base), order, 
-			(1UL << (order + PAGE_SHIFT)));
+		memset(lcd_page_address(allocs[i]), orders[alloc_order[i]], 
+			(1UL << (orders[alloc_order[i]] + PAGE_SHIFT)));
 	}
 	/*
 	 * Check them
 	 */
-	for (k = 0; k < nr_allocs; k++) {
+	for (k = 0; k < 15; k++) {
 
 		order = orders[alloc_order[k]];
 		ptr = lcd_page_address(allocs[k]);

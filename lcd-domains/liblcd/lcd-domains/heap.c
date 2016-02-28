@@ -196,7 +196,6 @@ heap_alloc_map_metadata_memory(const struct lcd_page_allocator_cbs *cbs,
 	 * Since we are embedding, we need to allocate in 2^alloc_order
 	 * chunks of pages.
 	 */
-
 	total = ALIGN(metadata_sz, (1UL << (alloc_order + PAGE_SHIFT)));
 	nr_allocs = total >> (alloc_order + PAGE_SHIFT); /* > 0 */
 

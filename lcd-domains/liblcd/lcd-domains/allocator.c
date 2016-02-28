@@ -52,8 +52,10 @@ static int pb_backing(struct lcd_page_allocator *pa,
 	if (!pa->cbs->alloc_map_regular_mem_chunk) /* no demand paging */
 		return 0;
 	offset = lcd_page_block_to_offset(pa, pb);
-	if (offset & ((1UL << pa->max_order) - 1)) /* not on boundary */
+	if (offset & ((1UL << (pa->max_order + PAGE_SHIFT)) - 1)) {
+		/* not on boundary */
 		return 0;
+	}
 	if (pb->n) /* already backed */
 		return 0;
 
@@ -216,7 +218,7 @@ static void do_free(struct lcd_page_allocator *pa,
 	 * Calculate index of page block in giant array. Should
 	 * be a multiple of 2^order.
 	 */
-	pb_idx = (pb - pa->pb_array) / sizeof(struct lcd_page_block);
+	pb_idx = pb - pa->pb_array;
 	BUG_ON(pb_idx & ((1 << block_order) - 1));
 	/*
 	 * Coalesce
@@ -234,7 +236,7 @@ static void do_free(struct lcd_page_allocator *pa,
 		 *
 		 * 1 - Remove from its current free list
 		 */
-		list_del(&buddy->buddy_list);
+		list_del_init(&buddy->buddy_list);
 		/*
 		 * 2 - Dec the total number of free page blocks as we
 		 *     are removing it from its current free list. (We will
@@ -283,6 +285,39 @@ static void do_free(struct lcd_page_allocator *pa,
 }
 
 /* ALLOCATOR INIT -------------------------------------------------- */
+
+#if 0
+static void check_free_lists(struct lcd_page_allocator *pa)
+{
+	unsigned idx;
+	struct list_head *cursor;
+	struct lcd_page_block *pb;
+
+	for (idx = pa->min_order; idx <= pa->max_order; idx++) {
+		if (list_empty(&pa->free_lists[idx])){
+			LIBLCD_ERR("LIST order=%d EMPTY", idx);
+			continue;
+		}
+		LIBLCD_ERR("LIST order=%d NOT EMPTY", idx);
+
+		if (idx >= pa->max_order - 2) {
+			list_for_each(cursor, &pa->free_lists[idx - pa->min_order]) {
+
+				pb = list_entry(cursor, struct lcd_page_block,
+						buddy_list);
+				LIBLCD_ERR("head pb idx 0x%lx, group order %d",
+					pb - pa->pb_array,
+					pb->block_order);
+			}
+		}
+
+	}
+
+
+	LIBLCD_ERR("DONE");
+
+}
+#endif
 
 static struct lcd_page_allocator* 
 init_struct_pa(void *metadata_addr,
@@ -344,22 +379,17 @@ void init_page_blocks(struct lcd_page_allocator *pa)
 		pa_nr_page_blocks(pa) * sizeof(struct lcd_page_block));
 	pa->pb_array = cursor;
 	/*
-	 * Initialize each one's buddy list head, and add it to the 
-	 * min order free list. (We have to add it to the min free
-	 * list because the allocator won't consider a page block
-	 * free if its buddy list is empty.) Then free each one to trigger full
-	 * coalescing. (Freeing just the first page block won't trigger
-	 * full coalescing, because the buddy allocator assumes that
-	 * maximal coalescing has been done when free is called.)
+	 * Initialize each one's buddy list head, and put the
+	 * max_order page block boundaries in the largest-sized
+	 * free list.
 	 */
-	for (i = 0; i < pa_nr_page_blocks(pa); i++) {
+	for (i = 0; i < pa_nr_page_blocks(pa); i++)
 		INIT_LIST_HEAD(&cursor[i].buddy_list);
-		list_add(&cursor[i].buddy_list, &pa->free_lists[0]);
-	}
-	for (i = 0; i < pa_nr_page_blocks(pa); i++) {
-		lcd_page_allocator_free(pa, 
-					&cursor[i],
-					0);
+
+	for (i = 0; i < pa_nr_page_blocks(pa); i += (1UL << (pa->max_order))) {
+		cursor[i].block_order = pa->max_order;
+		list_add_tail(&cursor[i].buddy_list,
+			&pa->free_lists[pa->max_order]);
 	}
 }
 
@@ -381,7 +411,7 @@ static int alloc_metadata_page_blocks(struct lcd_page_allocator *pa,
 	 * pa points to beginning of metadata. Remember,
 	 * guest virtual == guest physical inside an LCD.
 	 */
-	metadata_base = __gpa((unsigned long)pa);
+	metadata_base = lcd_gva2gpa(__gva((unsigned long)pa));
 	/*
 	 * Allocate the big chunks first
 	 */
@@ -419,10 +449,9 @@ static int alloc_metadata_page_blocks(struct lcd_page_allocator *pa,
 	 * page blocks. (This means the remaining page blocks will be used
 	 * for real allocs.)
 	 */
-	tail_order = 0;
-	metadata_sz >>= PAGE_SHIFT;
-	while (metadata_sz >>= 1)
-		tail_order++;
+	metadata_sz = ALIGN(metadata_sz,
+			(1UL << (pa->min_order + PAGE_SHIFT)));
+	tail_order = ilog2(metadata_sz >> (pa->min_order + PAGE_SHIFT));
 	pb = alloc_page_blocks(pa, tail_order);
 	if (!pb) {
 		LIBLCD_ERR("error allocating page blocks for metadata");
@@ -444,12 +473,12 @@ static int alloc_metadata_page_blocks(struct lcd_page_allocator *pa,
 	 * Remember offset to first non-metadata page block
 	 */
 	pa->first_non_metadata_pb_idx = 
-		(pb + (1UL << tail_order) - pa->pb_array) / 
-		sizeof(struct lcd_page_block);
+		pb + (1UL << tail_order) - pa->pb_array;
 	/*
 	 * All page blocks that contain metadata have been allocated,
 	 * and resource nodes have been installed.
 	 */
+
 	return 0;
 }
 
@@ -733,15 +762,15 @@ unsigned long lcd_page_block_to_offset(struct lcd_page_allocator *pa,
 {
 	unsigned long offset;
 
-	offset = (pb - pa->pb_array) / sizeof(struct lcd_page_block);
+	offset = pb - pa->pb_array;
 	
-	/* Each page block is 2^min_order bytes of mem */
-	return offset << pa->min_order;
+	/* Each page block is 2^(min_order + PAGE_SHIFT) bytes of mem */
+	return offset << (pa->min_order + PAGE_SHIFT);
 }
 
 struct lcd_page_block*
 lcd_offset_to_page_block(struct lcd_page_allocator *pa,
 			unsigned long offset)
 {
-	return &pa->pb_array[offset >> pa->min_order];
+	return &pa->pb_array[offset >> (pa->min_order + PAGE_SHIFT)];
 }

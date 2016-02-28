@@ -173,11 +173,6 @@ static int handle_syscall_pages_alloc(struct lcd *lcd)
 	 * Get slot where to store alloc'd pages, flags,
 	 * and order
 	 */
-	LCD_ERR("syscall args: %lx, %lx, %lx",
-		lcd_arch_get_syscall_arg0(lcd->lcd_arch),
-		lcd_arch_get_syscall_arg1(lcd->lcd_arch),
-		lcd_arch_get_syscall_arg2(lcd->lcd_arch));
-
 	slot = __cptr(lcd_arch_get_syscall_arg0(lcd->lcd_arch));
 	flags = (unsigned int)lcd_arch_get_syscall_arg1(lcd->lcd_arch);
 	order = (unsigned int)lcd_arch_get_syscall_arg2(lcd->lcd_arch);

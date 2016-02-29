@@ -33,8 +33,8 @@ static int boot_main(void)
 	/*
 	 * Create lcd
 	 */
-	ret = lcd_create_module_lcd(LCD_DIR("liblcd_test/lcd"),
-				"lcd_test_mod_liblcd_test_lcd",
+	ret = lcd_create_module_lcd(LCD_DIR("ipc1/lcd"),
+				"lcd_test_mod_ipc1_lcd",
 				&lcd, 
 				&ctx);
 	if (ret) {
@@ -60,7 +60,7 @@ static int boot_main(void)
 	/*
 	 * Store cptr in boot area
 	 */
-	lcd_to_boot_info(ctx)->ctprs[0] = dest;
+	lcd_to_boot_info(ctx)->cptrs[0] = dest;
 	/*
 	 * Run lcd
 	 */
@@ -72,13 +72,14 @@ static int boot_main(void)
 	/*
 	 * Do a send, followed by a receive
 	 */
+	LIBLCD_MSG("sending 0x%lx to LCD", 1234);
 	lcd_set_r0(1234);
-	ret = lcd_send(endpoint);
+	ret = lcd_sync_send(endpoint);
 	if (ret) {
 		LIBLCD_ERR("failed to do first send");
 		goto fail7;
 	}
-	ret = lcd_recv(endpoint);
+	ret = lcd_sync_recv(endpoint);
 	if (ret) {
 		LIBLCD_ERR("recv failed");
 		goto fail8;
@@ -86,6 +87,7 @@ static int boot_main(void)
 	/*
 	 * Check value in message reg r0
 	 */
+	LIBLCD_MSG("got 0x%lx from LCD", lcd_r0());
 	if (lcd_r0() != 5678) {
 		LIBLCD_ERR("unexpected value 0x%lx in reg r0",
 			lcd_r0());

@@ -12,7 +12,8 @@ export ISOLATED_CC_FLAGS= \
 	$(COMMON_CC_FLAGS) \
 	-I$(LIBLCD_BUILD_DIR)/libcap.install/include \
 	-I$(LCD_DOMAINS_TOP_SRC_DIR)/config/isolated \
-	-DLCD_ISOLATE
+	-DLCD_ISOLATE \
+	-DCPTR_CACHE_LOCK_PADDING_SIZE=8
 
 export NON_ISOLATED_CC_FLAGS= \
 	$(COMMON_CC_FLAGS) \
@@ -23,3 +24,4 @@ export NON_ISOLATED_CC_FLAGS= \
 
 obj-m += liblcd_test/
 obj-m += load/
+obj-m += ipc1/

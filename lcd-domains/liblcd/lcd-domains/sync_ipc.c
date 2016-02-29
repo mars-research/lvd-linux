@@ -12,6 +12,12 @@
 
 #include <lcd_config/post_hook.h>
 
+struct lcd_utcb *
+lcd_get_utcb(void)
+{
+	return (struct lcd_utcb *)gva_val(LCD_UTCB_GV_ADDR);
+}
+
 int _lcd_create_sync_endpoint(cptr_t slot)
 {
 	return lcd_syscall_create_sync_ep(slot);

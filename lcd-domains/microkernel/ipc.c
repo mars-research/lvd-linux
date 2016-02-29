@@ -95,6 +95,7 @@ static int lookup_ep(struct cspace *cspace, cptr_t slot, struct cnode **cnode)
 	t = cap_cnode_type(*cnode);
 	if (t != __lcd_get_libcap_type(LCD_MICROKERNEL_TYPE_ID_SYNC_EP)) {
 		LCD_ERR("not a sync ipc endpoint");
+		ret = -EINVAL;
 		goto fail2;
 	}
 

@@ -290,6 +290,7 @@ static int lookup_memory_object(struct cspace *cspace, cptr_t slot,
 		t != __lcd_get_libcap_type(LCD_MICROKERNEL_TYPE_ID_VOLUNTEERED_DEV_MEM) &&
 		t != __lcd_get_libcap_type(LCD_MICROKERNEL_TYPE_ID_VOLUNTEERED_VMALLOC_MEM)) {
 		LCD_ERR("not a memory object");
+		ret = -EINVAL;
 		goto fail2;
 	}
 

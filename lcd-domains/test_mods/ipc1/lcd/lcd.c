@@ -15,16 +15,18 @@ cptr_t ep;
 
 static int do_send(u64 val)
 {
+	LIBLCD_MSG("sending 0x%llx to boot module", val);
 	lcd_set_r0(val);
-	return lcd_send(ep);
+	return lcd_sync_send(ep);
 }
 
 static int do_recv(void)
 {
 	int ret;
-	ret = lcd_recv(ep);
+	ret = lcd_sync_recv(ep);
 	if (ret)
 		return ret;
+	LIBLCD_MSG("got 0x%lx from boot module", lcd_r0());
 	if (lcd_r0() != 1234)
 		return 1234;
 	return 0;
@@ -42,9 +44,9 @@ static int __noreturn __init ipc1_lcd_init(void)
 
 	get_endpoint();
 
-	r = do_recv();
+	ret = do_recv();
 
-	r = do_send(5678);
+	ret = do_send(5678);
 	
 	goto out;
 

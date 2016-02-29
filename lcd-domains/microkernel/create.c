@@ -220,6 +220,7 @@ static int lookup_lcd(struct cspace *cspace, cptr_t slot, struct cnode **cnode)
 	if (t != __lcd_get_libcap_type(LCD_MICROKERNEL_TYPE_ID_LCD) &&
 		t != __lcd_get_libcap_type(LCD_MICROKERNEL_TYPE_ID_KLCD)) {
 		LCD_ERR("not an lcd");
+		ret = -EINVAL;
 		goto fail2;
 	}
 
@@ -463,8 +464,8 @@ int __lcd_cap_grant(struct lcd *caller, cptr_t lcd, cptr_t src, cptr_t dest)
 	 * If lcd is not an embryo, fail - we only allow direct grants when
 	 * the lcd is being set up
 	 */
-	if (!lcd_status_embryo(lcd_struct)) {
-		LCD_ERR("lcd is not an embryo");
+	if (lcd_status_dead(lcd_struct)) {
+		LCD_ERR("lcd is dead, cannot do grant");
 		ret = -EINVAL;
 		goto fail2;
 	}

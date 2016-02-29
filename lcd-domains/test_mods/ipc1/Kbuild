@@ -1,11 +1,3 @@
 
-# Main targets
-obj-m += lcd_test_mod_ipc1_boot.o
-
-lcd_test_mod_ipc1_boot-y             += boot.o
-
-obj-m  += lcd_test_mod_ipc1_lcd.o
-
-lcd_test_mod_ipc1_lcd-y              += lcd.o
-
-lcd_test_mod_ipc1_lcd-y              += $(LIBLCD)
+obj-m += boot/
+obj-m += lcd/

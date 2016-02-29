@@ -248,6 +248,75 @@ fail1:
 	return ret;
 }
 
+static int ram_map_tests(void)
+{
+	cptr_t pages[10];
+	unsigned int orders[10] = { 0, 1, 2, 3, 4, 5, 6, 7, 8, 9 };
+	unsigned int alloc_order[10] = { 5, 9, 3, 2, 8, 7, 1, 0, 4, 6 };
+	gva_t gvas[10];
+	unsigned int i, j, k, n;
+	int ret;
+	unsigned char *ptr;
+	/*
+	 * Low level allocs
+	 */
+	for (i = 0; i < 10; i++) {
+		ret = _lcd_alloc_pages(&pages[alloc_order[i]], 
+				0, orders[alloc_order[i]]);
+		if (ret) {
+			LIBLCD_ERR("low level alloc failed");
+			goto fail1;
+		}
+	}
+	/*
+	 * Map pages
+	 */
+	for (k = 0; k < 10; k++) {
+		/*
+		 * Map
+		 */
+		ret = lcd_map_virt(pages[alloc_order[k]],
+				orders[alloc_order[k]],
+				&gvas[alloc_order[k]]);
+		if (ret) {
+			LIBLCD_ERR("map failed");
+			goto fail2;
+		}
+		/*
+		 * Touch all of the memory
+		 */
+		memset((void *)gva_val(gvas[alloc_order[k]]), 
+			orders[alloc_order[k]],
+			(1UL << (PAGE_SHIFT + orders[alloc_order[k]])));
+	}
+	/*
+	 * Check
+	 */
+	for (j = 0; j < 10; j++) {
+		ptr = (void *)gva_val(gvas[alloc_order[j]]);
+		for (n = 0; n < 10; n++) {
+			if (ptr[n] != orders[alloc_order[j]]) {
+				LIBLCD_ERR("bad byte at idx 0x%lx for order %d: expected %d, but found %d",
+					n, order, order, ptr[n]);
+			}
+		}
+	}
+
+	ret = 0;
+	goto out;
+
+out:	
+fail2:
+	for (j = 0; j < k; j++)
+		lcd_unmap_virt(gvas[alloc_order[j]],
+			orders[alloc_order[j]]);
+fail1:
+	for (j = 0; j < i; j++)
+		lcd_cap_delete(pages[alloc_order[j]]);
+
+	return ret;
+}
+
 static int __noreturn __init liblcd_test_lcd_init(void) 
 {
 	int ret = 0;
@@ -294,6 +363,13 @@ static int __noreturn __init liblcd_test_lcd_init(void)
 		goto out;
 	}
 	LIBLCD_MSG("kmem cache tests passed!");
+
+	ret =  ram_map_test();
+	if (ret) {
+		LIBLCD_ERR("ram map test failed!");
+		goto out;
+	}
+	LIBLCD_MSG("ram map test passed!");
 
 	LIBLCD_MSG("ALL LIBLCD TESTS PASSED!");
 	

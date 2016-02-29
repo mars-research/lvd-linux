@@ -1,14 +1,15 @@
-/**
- * lcd.c - code for lcd in ipc test
+/*
+ * lcd.c - code for isolated LCD in liblcd test
  */
 
-#include <lcd-domains/liblcd-config.h>
+#include <lcd_config/pre_hook.h>
 
 #include <linux/module.h>
 #include <linux/kernel.h>
-#include <lcd-domains/liblcd.h>
+#include <linux/slab.h>
+#include <liblcd/liblcd.h>
 
-#include <lcd-domains/liblcd-hacks.h>
+#include <lcd_config/post_hook.h>
 
 cptr_t ep;
 
@@ -34,29 +35,27 @@ static void get_endpoint(void)
 	ep = lcd_get_boot_info()->cptrs[0];
 }
 
-static int __noreturn __init ipc_lcd_init(void) 
+static int __noreturn __init ipc1_lcd_init(void) 
 {
-	int r;
-	r = lcd_enter();
-	if (r)
-		goto out;
-	
+	int ret = 0;
+	ret = lcd_enter();
+
 	get_endpoint();
 
 	r = do_recv();
 
 	r = do_send(5678);
-
+	
 	goto out;
 
 out:
-	lcd_exit(r);
+	lcd_exit(ret);
 }
 
-static void ipc_lcd_exit(void)
+static void ipc1_lcd_exit(void)
 {
 	return;
 }
 
-module_init(ipc_lcd_init);
-module_exit(ipc_lcd_exit);
+module_init(ipc1_lcd_init);
+module_exit(ipc1_lcd_exit);

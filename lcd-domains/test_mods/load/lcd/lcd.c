@@ -23,13 +23,13 @@
  * .ko elf file with readelf -a.
  */
 
-#include <lcd-domains/liblcd-config.h>
+#include <lcd_config/pre_hook.h>
 
 #include <linux/module.h>
 #include <linux/kernel.h>
-#include <lcd-domains/liblcd.h>
+#include <liblcd/liblcd.h>
 
-#include <lcd-domains/liblcd-hacks.h>
+#include <lcd_config/post_hook.h>
 
 
 static int foo(int x)

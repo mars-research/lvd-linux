@@ -3,54 +3,45 @@
  *
  */
 
-#include <lcd-domains/kliblcd.h>
 #include <linux/delay.h>
 #include <linux/module.h>
 #include <linux/kernel.h>
+#include <liblcd/liblcd.h>
 
 static int boot_main(void)
 {
 	int ret;
-	struct lcd_info *mi;
 	cptr_t lcd;
-
+	struct lcd_create_ctx *ctx;
 	/*
-	 * Enter lcd mode
+	 * Enter LCD mode
 	 */
 	ret = lcd_enter();
 	if (ret) {
-		LIBLCD_ERR("enter");
+		LIBLCD_ERR("lcd enter failed");
 		goto fail1;
 	}
 	/*
-	 * Create a new lcd
+	 * Create lcd
 	 */
-	ret = lcd_create_module_lcd(&lcd,
-				LCD_DIR("load"),
+	ret = lcd_create_module_lcd(LCD_DIR("load/lcd"),
 				"lcd_test_mod_load_lcd",
-				LCD_CPTR_NULL, &mi);
+				&lcd, 
+				&ctx);
 	if (ret) {
-		LIBLCD_ERR("create module lcd");
+		LIBLCD_ERR("failed to create lcd");
 		goto fail2;
 	}
 	/*
-	 * Set up boot info
-	 */
-	ret = lcd_dump_boot_info(mi);
-	if (ret) {
-		LIBLCD_ERR("dump boot info");
-		goto fail3;
-	}
-	/*
-	 * Run it
+	 * Run lcd
 	 */
 	ret = lcd_run(lcd);
 	if (ret) {
-		LIBLCD_ERR("run lcd");
-		goto fail4;
+		LIBLCD_ERR("failed to start lcd");
+		goto fail3;
 	}
 	/*
-	 * Wait for 4 seconds
+	 * Hang out for four seconds
 	 */
 	msleep(4000);
 	/*
@@ -59,10 +50,13 @@ static int boot_main(void)
 	ret = 0;
 	goto out;
 
+	/*
+	 * Everything torn down / freed during destroy / exit.
+	 */
 out:
-fail4:
 fail3:
-	lcd_destroy_module_lcd(lcd, mi, LCD_CPTR_NULL);
+	lcd_cap_delete(lcd);
+	lcd_destroy_create_ctx(ctx);
 fail2:
 	lcd_exit(0);
 fail1:

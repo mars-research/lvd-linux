@@ -22,3 +22,4 @@ export NON_ISOLATED_CC_FLAGS= \
 # Examples
 
 obj-m += liblcd_test/
+obj-m += load/

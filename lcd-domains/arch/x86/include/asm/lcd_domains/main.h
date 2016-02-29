@@ -354,6 +354,13 @@ int lcd_arch_ept_gpa_to_hpa(struct lcd_arch *lcd, gpa_t ga, hpa_t *ha_out);
  */
 int lcd_arch_set_pc(struct lcd_arch *lcd_arch, gva_t a);
 /**
+ * Read LCD's %rip
+ */
+static inline u64 lcd_arch_get_pc(struct lcd_arch *lcd)
+{
+	return lcd->regs[LCD_ARCH_REGS_RIP];
+}
+/**
  * Set the lcd's stack pointer to the guest virtual address
  * a.
  */

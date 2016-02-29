@@ -127,10 +127,6 @@ static void __do_one_heap_free(struct lcd_resource_node *n)
 	 */
 	_lcd_munmap(pages, base);
 	/*
-	 * Remove from resource tree
-	 */
-	__liblcd_mem_itree_delete(n);
-	/*
 	 * Free pages from host
 	 */
 	lcd_cap_delete(pages);
@@ -489,7 +485,7 @@ static int setup_struct_page_array(void)
 	heap_page_array = (void *)gva_val(heap_page_block_to_addr(pb));
 	memset(heap_page_array,
 		0,
-		(1 << (order + PAGE_SHIFT)));
+		(1UL << (order + PAGE_SHIFT)));
 
 	return 0;
 

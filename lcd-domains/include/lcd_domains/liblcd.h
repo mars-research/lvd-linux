@@ -51,6 +51,10 @@ int __liblcd_mem_itree_insert(gpa_t start, unsigned long size,
  * @n is no longer a valid pointer after this call.
  */
 void __liblcd_mem_itree_delete(struct lcd_resource_node *n);
+/**
+ * __liblcd_mem_itree_dump -- Print memory itree to console, for debugging
+ */
+void __liblcd_mem_itree_dump(void);
 
 /* 
  * HEAP --------------------------------------------------

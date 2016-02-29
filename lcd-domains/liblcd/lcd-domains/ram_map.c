@@ -23,6 +23,16 @@ int _lcd_mmap(cptr_t mo, unsigned int order, gpa_t base)
 {
 	int ret;
 	/*
+	 * BEWARE: This code is a bit fragile. You must do the actual
+	 * map *before* inserting into the memory interval tree. This
+	 * is because the mem itree code uses kmalloc (after we've
+	 * booted). Scenario: the heap is calling this function to map
+	 * fresh pages; mem itree is going to call kmalloc before
+	 * this function returns; kmalloc may need to grow the slab
+	 * cache, which leads into the heap again; but if we've alloc'd
+	 * and mapped the pages, it should all be OK. Just a bit
+	 * of scary and risky recursion.
+	 *
 	 * Do low level syscall to map memory object
 	 */
 	ret = lcd_syscall_mmap(mo, base);
@@ -90,6 +100,7 @@ ram_alloc_map_metadata_memory(const struct lcd_page_allocator_cbs *cbs,
 		ret = -ENOMEM;
 		goto fail1;
 	}
+	
 	return 0;
 
 fail1:
@@ -151,25 +162,11 @@ static int do_map_into_phys(cptr_t pages, unsigned int order, gpa_t *base_out)
 		LIBLCD_ERR("failed to map in guest physical");
 		goto fail2;
 	}
-	/*
-	 * Insert address range into tree so we can do address -> cptr
-	 * translation.
-	 */
-	ret = __liblcd_mem_itree_insert(
-		addr,
-		(1UL << (order + PAGE_SHIFT)),
-		pages);
-	if (ret) {
-		LIBLCD_ERR("failed to insert in mem itree");
-		goto fail3;
-	}
 
 	*base_out = addr;
 
 	return 0;
 
-fail3:
-	_lcd_munmap(pages, addr);
 fail2:
 	lcd_page_allocator_free(ram_map_allocator, pb, order);
 fail1:
@@ -200,6 +197,11 @@ static void do_unmap_from_phys(gpa_t base, unsigned int order)
 	struct lcd_resource_node *n;
 	cptr_t pages;
 	/*
+	 * Adjust order so that it's >= LCD_RAM_MAP_MIN_ORDER
+	 */
+	if (order < LCD_RAM_MAP_MIN_ORDER)
+		order = LCD_RAM_MAP_MIN_ORDER;
+	/*
 	 * Resolve address to resource node
 	 */
 	ret = lcd_phys_to_resource_node(base, &n);
@@ -208,10 +210,6 @@ static void do_unmap_from_phys(gpa_t base, unsigned int order)
 		return;
 	}
 	pages = n->cptr;
-	/*
-	 * Remove from tree
-	 */
-	__liblcd_mem_itree_delete(n);
 	/*
 	 * Free address block from RAM region
 	 */

@@ -166,4 +166,10 @@ lcd_resource_tree_next(struct lcd_resource_node *n);
 void lcd_resource_tree_remove(struct lcd_resource_tree *t,
 			struct lcd_resource_node *n);
 
+/**
+ * lcd_resource_tree_dump -- Print resource tree to console, for debugging
+ * @t: tree to dump
+ */
+void lcd_resource_tree_dump(struct lcd_resource_tree *t);
+
 #endif /* LCD_DOMAINS_RESOURCE_TREE_H */

@@ -105,6 +105,32 @@ void lcd_resource_tree_remove(struct lcd_resource_tree *t,
 	interval_tree_remove(&n->it_node, &t->root);
 }
 
+void lcd_resource_tree_dump(struct lcd_resource_tree *t)
+{
+	struct lcd_resource_node *cursor;
+
+	LIBLCD_MSG("  DUMPING RESOURCE TREE 0x%p:", t);
+
+	cursor = lcd_resource_tree_first(t);
+	while (cursor) {
+		printk("  node:\n");
+		printk("    start: 0x%lx\n",
+			lcd_resource_node_start(cursor));
+		printk("    last: 0x%lx\n",
+			lcd_resource_node_last(cursor));
+		printk("    size: 0x%lx\n",
+			lcd_resource_node_size(cursor));
+		printk("    cptr: 0x%lx\n",
+			cptr_val(lcd_resource_node_cptr(cursor)));
+		printk("    flags: 0x%x\n",
+			lcd_resource_node_flags(cursor));
+
+		cursor = lcd_resource_tree_next(cursor);
+	}
+
+	LIBLCD_MSG("  END RESOURCE TREE DUMP");
+}
+
 /* EXPORTS -------------------------------------------------- */
 
 EXPORT_SYMBOL(lcd_resource_tree_init);
@@ -113,3 +139,4 @@ EXPORT_SYMBOL(lcd_resource_tree_search);
 EXPORT_SYMBOL(lcd_resource_tree_first);
 EXPORT_SYMBOL(lcd_resource_tree_next);
 EXPORT_SYMBOL(lcd_resource_tree_remove);
+EXPORT_SYMBOL(lcd_resource_tree_dump);

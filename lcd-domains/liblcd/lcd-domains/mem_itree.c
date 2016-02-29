@@ -44,6 +44,16 @@ static struct lcd_resource_node *alloc_itree_node(void)
 	struct lcd_resource_node *n;
 
 	if (likely(mem_itree_booted)) {
+		/*
+		 * XXX: Be careful here. The heap may be calling into
+		 * here when it is growing itself (alloc'ing fresh
+		 * pages, and inserting the cptr into the resource tree).
+		 * This call to kzalloc may recursively lead *back into*
+		 * the heap to grow a slab cache for kmalloc. This
+		 * recursion is OK because of how the heap maps the
+		 * new pages (it maps them first *before* inserting them
+		 * into the mem itree). See ram_map.c:_lcd_mmap.
+		 */
 		n = kzalloc(sizeof(struct lcd_resource_node), GFP_KERNEL);
 		if (!n) {
 			LIBLCD_ERR("kmalloc failed");
@@ -87,6 +97,11 @@ void __liblcd_mem_itree_delete(struct lcd_resource_node *n)
 {
 	lcd_resource_tree_remove(&itree, n);
 	free_itree_node(n);
+}
+
+void __liblcd_mem_itree_dump(void)
+{
+	lcd_resource_tree_dump(&itree);
 }
 
 int lcd_phys_to_resource_node(gpa_t paddr, struct lcd_resource_node **n_out)

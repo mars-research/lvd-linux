@@ -29,21 +29,15 @@
  * work). */
 #include "../../include/vfs.h"
 
+/* COMPILER: We include the internal header that provides defs for
+ * cspace activities. */
+#include "vfs_internal.h"
+
 /* COMPILER: This header always comes after all other headers (it redefines
  * certain things for the isolated environment, etc.) */
 #include <lcd_config/post_hook.h>
 
 /* INIT -------------------------------------------------- */
-
-/* (Init is at bottom of file in this case.) */
-
-/* COMPILER: We need to figure out what to do in general. In this example,
- * I will use just one data store (for minix, the caller), and I'll just
- * init the data store in the init function. In general, we
- * may want to use seL4-style badges. The caller code could create a new
- * data store for each badge it sees (each badge roughly corresponds to
- * a domain id). */
-static struct dstore *minix_dstore;
 
 /* COMPILER: It's possible, but maybe unlikely, that the callee code
  * will dynamically add channels to the dispatch loop. We store a
@@ -51,32 +45,6 @@ static struct dstore *minix_dstore;
  * add/remove the main channel to the dispatch loop.)
  */
 static struct dispatch_ctx *loop_ctx;
-
-/* CONTAINER STRUCTS -------------------------------------------------- */
-
-/* COMPILER: See notes in vfs_caller.c for projections. */
-
-struct fs_container {
-	struct fs fs;
-	dptr_t minix_ref;
-	dptr_t my_ref;
-	cptr_t chnl;
-};
-struct fs_operations_container {
-	struct fs_operations fs_operations;
-	dptr_t minix_ref;
-	dptr_t my_ref;
-	cptr_t chnl;
-};
-struct file_container {
-	struct file file;
-	dptr_t minix_ref;
-	dptr_t my_ref;
-};
-
-#define STRUCT_FS_TAG 2
-#define STRUCT_FS_OPERATIONS_TAG 3
-#define STRUCT_FILE_TAG 4
 
 /* TRAMPOLINE CONTAINERS ---------------------------------------- */
 
@@ -94,14 +62,14 @@ struct file_container {
  *
  *    struct trampoline_container {
  *       struct some_other_container *c;
- *       struct dstore *d;
+ *       struct cspace *cspace;
  *       char func[0];
  *    };
  *
  * c points to some other container that has information the trampoline
  * will use to translate the function invocation into IPC.
  *
- * d points to a data store that the glue code should use to store
+ * cspace points to a data store that the glue code should use to store
  * any new objects it has to create (see new_file).
  *
  * func contains the first byte of the first instruction inside the
@@ -120,13 +88,13 @@ struct file_container {
 
 struct new_file_hidden_args {
 	struct fs_operations_container *fs_operations_container;
-	struct dstore *dstore;
+	struct cspace *cspace;
 	struct lcd_trampoline_handle *t_handle;
 };
 
 struct rm_file_hidden_args {
 	struct fs_operations_container *fs_operations_container;
-	struct dstore *dstore;
+	struct cspace *cspace;
 	struct lcd_trampoline_handle *t_handle;
 };
 

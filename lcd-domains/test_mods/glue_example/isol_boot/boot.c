@@ -1,13 +1,17 @@
 /*
- * main.c - non-isolated kernel module, does setup
+ * boot.c - non-isolated kernel module, does setup
  *          when fake minix and vfs are to be launched
  *          in isolated containers
  */
 
-#include <lcd-domains/kliblcd.h>
+#include <lcd_config/pre_hook.h>
+
+#include <liblcd/liblcd.h>
 #include <linux/delay.h>
 #include <linux/module.h>
 #include <linux/kernel.h>
+
+#include <lcd_config/post_hook.h>
 
 static int boot_main(void)
 {
@@ -15,13 +19,13 @@ static int boot_main(void)
 	cptr_t vfs_chnl;
 	cptr_t vfs_chnl_domain_cptr, minix_chnl_domain_cptr;
 	cptr_t vfs_lcd, minix_lcd;
-	struct lcd_info *vfs_mi, *minix_mi;
+	struct lcd_create_ctx *vfs_ctx, *minix_ctx;
 	/*
 	 * Enter lcd mode
 	 */
 	ret = lcd_enter();
 	if (ret) {
-		LIBLCD_ERR("klcd enter failed");
+		LIBLCD_ERR("lcd enter failed");
 		goto fail1;
 	}
 
@@ -35,18 +39,18 @@ static int boot_main(void)
 
 	/* ---------- Create LCDs ---------- */
 
-	ret = lcd_create_module_lcd(&vfs_lcd, 
-				LCD_DIR("glue_example/vfs"),
+	ret = lcd_create_module_lcd(LCD_DIR("glue_example/vfs"),
 				"lcd_test_mod_glue_example_vfs",
-				LCD_CPTR_NULL, &vfs_mi);
+				&vfs_lcd,
+				&vfs_ctx);
 	if (ret) {
 		LIBLCD_ERR("failed to create vfs lcd");
 		goto fail3;
 	}
-	ret = lcd_create_module_lcd(&minix_lcd, 
-				LCD_DIR("glue_example/minix"),
+	ret = lcd_create_module_lcd(LCD_DIR("glue_example/minix"),
 				"lcd_test_mod_glue_example_minix",
-				LCD_CPTR_NULL, &minix_mi);
+				&minix_lcd,
+				&minix_ctx);
 	if (ret) {
 		LIBLCD_ERR("failed to create minix lcd");
 		goto fail4;
@@ -54,7 +58,7 @@ static int boot_main(void)
 
 	/* ---------- Grant caps ---------- */
 
-	ret = __lcd_alloc_cptr(vfs_mi->cache, &vfs_chnl_domain_cptr);
+	ret = cptr_alloc(vfs_ctx->cache, &vfs_chnl_domain_cptr);
 	if (ret) {
 		LIBLCD_ERR("alloc cptr");
 		goto fail5;
@@ -64,7 +68,7 @@ static int boot_main(void)
 		LIBLCD_ERR("grant");
 		goto fail6;
 	}
-	ret = __lcd_alloc_cptr(minix_mi->cache, &minix_chnl_domain_cptr);
+	ret = cptr_alloc(minix_ctx->cache, &minix_chnl_domain_cptr);
 	if (ret) {
 		LIBLCD_ERR("alloc cptr");
 		goto fail7;
@@ -77,19 +81,9 @@ static int boot_main(void)
 	
 	/* ---------- Set up boot info ---------- */
 
-	ret = lcd_dump_boot_info(vfs_mi);
-	if (ret) {
-		LIBLCD_ERR("dump vfs boot info");
-		goto fail8;
-	}
-	to_boot_info(vfs_mi)->cptrs[0] = vfs_chnl_domain_cptr;
+	lcd_to_boot_info(vfs_ctx)->cptrs[0] = vfs_chnl_domain_cptr;
 
-	ret = lcd_dump_boot_info(minix_mi);
-	if (ret) {
-		LIBLCD_ERR("dump minix boot info");
-		goto fail9;
-	}
-	to_boot_info(minix_mi)->cptrs[0] = minix_chnl_domain_cptr;
+	lcd_to_boot_info(minix_mi)->cptrs[0] = minix_chnl_domain_cptr;
 
 
 	/* ---------- RUN! ---------- */
@@ -131,9 +125,11 @@ fail8:
 fail7:
 fail6:
 fail5:
-	lcd_destroy_module_lcd(minix_lcd, minix_mi, LCD_CPTR_NULL);
+	lcd_cap_delete(minix_lcd);
+	lcd_destroy_create_ctx(minix_ctx);
 fail4:
-	lcd_destroy_module_lcd(vfs_lcd, vfs_mi, LCD_CPTR_NULL);
+	lcd_cap_delete(vfs_lcd);
+	lcd_destroy_create_ctx(vfs_ctx);
 fail3:
 fail2:
 	lcd_exit(0); /* will free endpoints */

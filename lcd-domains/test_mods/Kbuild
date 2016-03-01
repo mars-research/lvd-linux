@@ -26,3 +26,4 @@ obj-m += liblcd_test/
 obj-m += load/
 obj-m += ipc1/
 obj-m += ipc2/
+obj-m += async/

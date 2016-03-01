@@ -1,0 +1,6 @@
+
+obj-m += lcd_test_mod_create_klcd_boot.o
+
+lcd_test_mod_create_klcd_boot-y             += boot.o
+
+ccflags-y += $(NON_ISOLATED_CC_FLAGS)

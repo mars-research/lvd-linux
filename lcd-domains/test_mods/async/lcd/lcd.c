@@ -1,15 +1,15 @@
-/**
- * lcd.c - code for lcd in ipc test
+/*
+ * lcd.c - code for isolated LCD in liblcd test
  */
 
-#include <lcd-domains/liblcd-config.h>
+#include <lcd_config/pre_hook.h>
 
 #include <linux/module.h>
 #include <linux/kernel.h>
-#include <lcd-domains/liblcd.h>
-#include <lcd-domains/thc.h>
+#include <linux/slab.h>
+#include <liblcd/liblcd.h>
 
-#include <lcd-domains/liblcd-hacks.h>
+#include <lcd_config/post_hook.h>
 
 void f1(void)
 {

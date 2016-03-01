@@ -1,11 +1,14 @@
 /*
- * Simple kLCD test
+ * klcd.c - code for kLCD
  */
+
+#include <lcd_config/pre_hook.h>
 
 #include <linux/module.h>
 #include <linux/kernel.h>
-#include <lcd-domains/kliblcd.h>
-#include <linux/printk.h>
+#include <liblcd/liblcd.h>
+
+#include <lcd_config/post_hook.h>
 
 static int foo(void)
 {

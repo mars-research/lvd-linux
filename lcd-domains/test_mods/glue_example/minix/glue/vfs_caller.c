@@ -6,18 +6,29 @@
 
 /* HEADERS -------------------------------------------------- */
 
+/* COMPILER: This goes before any includes */
+#include <lcd_config/pre_hook.h>
+
 /* COMPILER: This header is always included (contains declarations and defns
  * for using the LIBLCD interface). */
-#include <lcd-domains/liblcd.h>
+#include <liblcd/liblcd.h>
 
 /* COMPILER: This header is always included. */
-#include <lcd-domains/dispatch_loop.h>
+#include <liblcd/dispatch_loop.h>
 
 /* COMPILER: Since this header was included in vfs.idl, the include
  * is pasted here (the compiler does not need to be smart about paths - the
  * IDL writer needs to use relative or absolute paths that should just 
  * work). */
 #include "../../include/vfs.h"
+
+/* COMPILER: We include the internal header that provides defs for
+ * cspace activities. */
+#include "vfs_internal.h"
+
+/* COMPILER: This header always comes after all other headers (it redefines
+ * certain things for the isolated environment, etc.) */
+#include <lcd_config/post_hook.h>
 
 #define MINIX_CHANNEL_TYPE 1
 
@@ -34,7 +45,7 @@
  * for storing objects and corresponding references that the callee (vfs
  * in this example) will use to refer to those objects.
  *
- * COMPILER: For now, assume that there is one data store for
+ * COMPILER: For now, assume that there is one glue cspace for
  * every channel argument.
  *
  * NOTE: We have to use globals since C functions in the original interface
@@ -44,7 +55,7 @@
  * unmodified code anyway. (Yes, we could get fancy and do some dynamic 
  * linking at runtime if we really wanted to ...) */
 static cptr_t vfs_chnl;
-static struct dstore *vfs_dstore;
+static struct glue_cspace *vfs_cspace;
 
 /* COMPILER: We store a reference to the dispatch loop so we can 
  * dynamically add channels to it (see e.g., register_fs below). */
@@ -63,9 +74,9 @@ int glue_vfs_init(cptr_t _vfs_channel, struct dispatch_ctx *ctx)
 	vfs_chnl = _vfs_channel;
 
 	/* Initialize data store. */
-	ret = lcd_dstore_init_dstore(&vfs_dstore);
+	ret = vfs_cap_create(&vfs_cspace);
 	if (ret) {
-		LIBLCD_ERR("dstore init");
+		LIBLCD_ERR("cspace init");
 		return ret;
 	}
 
@@ -82,7 +93,7 @@ int glue_vfs_init(cptr_t _vfs_channel, struct dispatch_ctx *ctx)
 void glue_vfs_exit(void)
 {
 	/* Free vfs data store. */
-	lcd_dstore_destroy(vfs_dstore);
+	vfs_cap_destroy(vfs_dstore);
 }
 
 /* CONTAINER STRUCTS -------------------------------------------------- */
@@ -94,7 +105,7 @@ void glue_vfs_exit(void)
 /* COMPILER: For *every* struct type used in a projection, we generate
  * a container struct definition that has the following fields:
  *   -- the original struct
- *   -- two dptr_t fields: one for the remote reference the caller will
+ *   -- two cptr_t fields: one for the remote reference the caller will
  *      use to refer to the callee's private copy, and one for the reference 
  *      the callee uses to refer to the caller's private copy
  *   -- any arguments to the projection (right now, these fields will
@@ -114,29 +125,21 @@ void glue_vfs_exit(void)
  */
 struct fs_container {
 	struct fs fs;
-	dptr_t vfs_ref;
-	dptr_t my_ref;
+	cptr_t vfs_ref;
+	cptr_t my_ref;
 	cptr_t chnl;
 };
 struct fs_operations_container {
 	struct fs_operations fs_operations;
-	dptr_t vfs_ref;
-	dptr_t my_ref;
+	cptr_t vfs_ref;
+	cptr_t my_ref;
 	struct ipc_channel chnl;
 };
 struct file_container {
 	struct file file;
-	dptr_t vfs_ref;
-	dptr_t my_ref;
+	cptr_t vfs_ref;
+	cptr_t my_ref;
 };
-
-/* COMPILER: Create a unique tag/id for each struct type used in a projection.
- * In this case, there are three. (You don't have to give them names, but
- * I'm doing so for readability.)
- */
-#define STRUCT_FS_TAG 2
-#define STRUCT_FS_OPERATIONS_TAG 3
-#define STRUCT_FILE_TAG 4
 
 /* REGISTER_FS -------------------------------------------------- */
 
@@ -217,27 +220,26 @@ int register_fs(struct fs *fs)
 
 	/* COMPILER: Both projections were marked as alloc(callee) and
 	 * are hence already allocated on this side (caller side). So, we 
-	 * go ahead and insert them into the data store to get remote 
+	 * go ahead and insert them into the glue cspace to get remote 
 	 * references the callee will use to refer to our copy.
 	 *
 	 * Since this function (register_fs) uses vfs_chnl, we will
-	 * use vfs_dstore to store the objects and create the remote
+	 * use vfs_cspace to store the objects and create the remote
 	 * references.
 	 */
-	ret = lcd_dstore_insert(vfs_dstore, 
-					fs_container,
-					STRUCT_FS_TAG, 
-					&fs_container->my_ref);
+	ret = vfs_cap_insert_fs_type(vfs_cspace, 
+				fs_container,
+				&fs_container->my_ref);
 	if (ret) {
-		LIBLCD_ERR("lcd_dstore_insert");
+		LIBLCD_ERR("insert");
 		lcd_exit(ret); /* abort */
 	}
-	ret = lcd_dstore_insert(vfs_dstore, 
-					fs_operations_container,
-					STRUCT_FS_OPERATIONS_TAG,
-					&fs_operations_container->my_ref);
+	ret = vfs_cap_insert_fs_operations_type(
+		vfs_cspace, 
+		fs_operations_container,
+		&fs_operations_container->my_ref);
 	if (ret) {
-		LIBLCD_ERR("lcd_dstore_insert");
+		LIBLCD_ERR("insert");
 		lcd_exit(ret); /* abort */
 	}
 
@@ -253,8 +255,8 @@ int register_fs(struct fs *fs)
 	 *
 	 * TODO: Use a message instead of the "global" registers.
 	 */
-	lcd_set_r1(dptr_val(fs_container->my_ref));
-	lcd_set_r2(dptr_val(fs_operations_container->my_ref));
+	lcd_set_r1(cptr_val(fs_container->my_ref));
+	lcd_set_r2(cptr_val(fs_operations_container->my_ref));
 	lcd_set_r3(fs->id);
 	lcd_set_r4(fs->size);
 
@@ -276,9 +278,9 @@ int register_fs(struct fs *fs)
 	 * the vfs_chnl.
 	 */
 	LIBLCD_MSG("minix calling register_fs in vfs");
-	ret = lcd_call(vfs_chnl);
+	ret = lcd_sync_call(vfs_chnl);
 	if (ret) {
-		LIBLCD_ERR("lcd_call");
+		LIBLCD_ERR("lcd_sync_call");
 		lcd_exit(ret); /* abort */
 	}
 
@@ -290,8 +292,8 @@ int register_fs(struct fs *fs)
 	 * expect remote references to come back. (You can decide on what
 	 * order they should come back in).
 	 */
-	fs_container->vfs_ref = __dptr(lcd_r1());
-	fs_operations_container->vfs_ref = __dptr(lcd_r2());
+	fs_container->vfs_ref = __cptr(lcd_r1());
+	fs_operations_container->vfs_ref = __cptr(lcd_r2());
 
 	/* COMPILER: projection <struct fs> had size marked as [out].
 	 *
@@ -334,15 +336,15 @@ void unregister_fs(struct fs *fs)
 
 	/* COMPILER: We pass all remote references to projections that
 	 * are reachable from the function arguments. */
-	lcd_set_r1(dptr_val(fs_container->vfs_ref));
-	lcd_set_r2(dptr_val(fs_operations_container->vfs_ref));
+	lcd_set_r1(cptr_val(fs_container->vfs_ref));
+	lcd_set_r2(cptr_val(fs_operations_container->vfs_ref));
 
 	/* IPC CALL ---------------------------------------- */
 
 	LIBLCD_MSG("minix calling unregister_fs");
 
 	lcd_set_r0(UNREGISTER_FS);
-	ret = lcd_call(vfs_chnl);
+	ret = lcd_sync_call(vfs_chnl);
 	if (ret) {
 		LIBLCD_ERR("lcd_call");
 		lcd_exit(ret); /* abort */
@@ -376,8 +378,8 @@ void unregister_fs(struct fs *fs)
 	 *
 	 * Furthermore, we use vfs_dstore since it is associated with
 	 * vfs_chnl. */
-	lcd_dstore_delete(vfs_dstore, fs_container->my_ref);
-	lcd_dstore_delete(vfs_dstore, fs_operations_container->my_ref);
+	vfs_cap_remove(vfs_dstore, fs_container->my_ref);
+	vfs_cap_remove(vfs_dstore, fs_operations_container->my_ref);
 
 	/* (Nothing to return since this is a void function.) */
 }
@@ -416,10 +418,9 @@ void new_file_callee(void)
 	/* These are used in code below. */
 	int ret;
 	int new_file_ret;
-	dptr_t fs_operations_ref;
-	dptr_t file_remote_ref;
-	dptr_t file_my_ref = LCD_DPTR_NULL;
-	struct dstore_node *n;
+	cptr_t fs_operations_ref;
+	cptr_t file_remote_ref;
+	cptr_t file_my_ref = LCD_DPTR_NULL;
 	int id;
 
 	/* IPC UNMARSHALING ---------------------------------------- */
@@ -432,28 +433,28 @@ void new_file_callee(void)
 	 *
 	 * We also expect the id param to be marshaled. */
 
-	fs_operations_ref = __dptr(lcd_r1());
-	file_remote_ref = __dptr(lcd_r2());
+	fs_operations_ref = __cptr(lcd_r1());
+	file_remote_ref = __cptr(lcd_r2());
 	id = lcd_r3();
 
 	/* BIND CONTAINERS ---------------------------------------- */
 
-	/* Look up containers from data store using references passed
+	/* Look up containers from glue cspace using references passed
 	 * by caller. */
 	
-	/* COMPILER: We use vfs_dstore to resolve references to
+	/* COMPILER: We use vfs_cspace to resolve references to
 	 * our private copies because the projections we are looking up
 	 * were passed to the domain on the other side connected to
 	 * the vfs channel. */
 	
-	ret = lcd_dstore_get(vfs_dstore, fs_operations_ref,
-			STRUCT_FS_OPERATIONS_TAG, &n);
+	ret = vfs_cap_lookup_fs_operations_type(
+		vfs_cspace, 
+		fs_operations_ref,
+		&fs_operations_container);
 	if (ret) {
-		LIBLCD_ERR("lcd_dstore_get");
+		LIBLCD_ERR("lookup");
 		lcd_exit(ret);
 	}
-	fs_operations_container = lcd_dstore_node_object(n);
-	lcd_dstore_put(n);
 
 	/* INVOKE NEW_FILE ---------------------------------------- */
 
@@ -494,12 +495,11 @@ void new_file_callee(void)
 	 * they are indistinguishable for us) is the one invoking this
 	 * function via IPC. */
 
-	ret = lcd_dstore_insert(vfs_dstore, 
+	ret = vfs_cap_insert_file_type(vfs_cspace, 
 				file_container,
-				STRUCT_FILE_TAG, 
 				&file_container->my_ref);
 	if (ret) {
-		LIBLCD_ERR("lcd_dstore_insert");
+		LIBLCD_ERR("insert");
 		lcd_exit(ret);
 	}
 	file_my_ref = file_container->my_ref;
@@ -516,7 +516,7 @@ null_file:
 	/* COMPILER: The caller always expects a remote refernce when
 	 * a projection is marked as alloc (in this case,
 	 * projection <struct file>). */
-	lcd_set_r1(dptr_val(file_my_ref));
+	lcd_set_r1(cptr_val(file_my_ref));
 
 	/* COMPILER: Marshal return value in r0. */
 	lcd_set_r0(new_file_ret);
@@ -525,9 +525,9 @@ null_file:
 
 	LIBLCD_MSG("minix replying to vfs (new_file return)");
 
-	ret = lcd_reply();
+	ret = lcd_sync_reply();
 	if (ret) {
-		LIBLCD_ERR("lcd_reply");
+		LIBLCD_ERR("lcd_sync_reply");
 		lcd_exit(ret);
 	}
 }
@@ -546,7 +546,6 @@ void rm_file_callee(void)
 	int ret;
 	dptr_t fs_operations_ref;
 	dptr_t file_ref;
-	struct dstore_node *n;
 
 	/* IPC UNMARSHALING ---------------------------------------- */
 
@@ -555,34 +554,34 @@ void rm_file_callee(void)
 	 * function arguments in the IDL spec, nor is it the container
 	 * for this function. */
 
-	fs_operations_ref = __dptr(lcd_r1());
-	file_ref = __dptr(lcd_r2());
+	fs_operations_ref = __cptr(lcd_r1());
+	file_ref = __cptr(lcd_r2());
 
 	/* GET CONTAINERS ---------------------------------------- */
 
 	/* Look up containers from data store using references passed
 	 * by caller. */
 	
-	/* COMPILER: We use vfs_dstore for reasons explained in
+	/* COMPILER: We use vfs_cspace for reasons explained in
 	 * new_file_callee. */
 	
-	ret = lcd_dstore_get(vfs_dstore, fs_operations_ref,
-			STRUCT_FS_OPERATIONS_TAG, &n);
+	ret = vfs_cap_lookup_fs_operations_type(
+		vfs_cspace, 
+		fs_operations_ref,
+		&fs_operations_container);
 	if (ret) {
-		LIBLCD_ERR("lcd_dstore_get");
+		LIBLCD_ERR("lookup");
 		lcd_exit(ret);
 	}
-	fs_operations_container = lcd_dstore_node_object(n);
-	lcd_dstore_put(n);
 
-	ret = lcd_dstore_get(vfs_dstore, file_ref,
-			STRUCT_FILE_TAG, &n);
+	ret = vfs_cap_lookup_file(
+		vfs_cspace, 
+		file_ref,
+		&file_container);
 	if (ret) {
-		LIBLCD_ERR("lcd_dstore_get");
+		LIBLCD_ERR("lookup");
 		lcd_exit(ret);
 	}
-	file_container = lcd_dstore_node_object(n);
-	lcd_dstore_put(n);
 
 	/* INVOKE RM_FILE ---------------------------------------- */
 
@@ -598,10 +597,10 @@ void rm_file_callee(void)
 	/* COMPILER: The projection <struct file> was marked as
 	 * dealloc(caller), so we expect both sides to deallocate here.
 	 * The callee will dealloc their private copy. We must remove it
-	 * from the data store though (it's ok to do this after the
+	 * from the glue cspace though (it's ok to do this after the
 	 * container was freed). */
 
-	lcd_dstore_delete(vfs_dstore, file_ref);
+	vfs_cap_delete(vfs_cspace, file_ref);
 
 	/* IPC MARSHALING ---------------------------------------- */
 
@@ -611,9 +610,9 @@ void rm_file_callee(void)
 
 	LIBLCD_MSG("minix replying to vfs (rm_file return)");
 
-	ret = lcd_reply();
+	ret = lcd_sync_reply();
 	if (ret) {
-		LIBLCD_ERR("lcd_reply");
+		LIBLCD_ERR("lcd_sync_reply");
 		lcd_exit(ret);
 	}
 }

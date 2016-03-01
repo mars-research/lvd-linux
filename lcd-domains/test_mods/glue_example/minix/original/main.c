@@ -28,7 +28,7 @@ static int minix_new_file(int id, struct file **file_out) {
 #endif
 
 	if (id != 179) {
-		LIBLCD_ERR("unexpected file id");
+		printk(KERN_ERR "unexpected file id");
 		return -EINVAL;
 	}
 

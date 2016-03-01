@@ -8,6 +8,7 @@
 #include <linux/kernel.h>
 #include <linux/slab.h>
 #include <liblcd/liblcd.h>
+#include <liblcd/thc.h>
 
 #include <lcd_config/post_hook.h>
 

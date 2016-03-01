@@ -185,7 +185,7 @@ int __lcd_create_klcd(struct lcd *caller, cptr_t slot)
 	 */
 	ret = cap_insert(caller->cspace, slot, 
 			lcd,
-			__lcd_get_libcap_type(LCD_MICROKERNEL_TYPE_ID_LCD));
+			__lcd_get_libcap_type(LCD_MICROKERNEL_TYPE_ID_KLCD));
 	if (ret) {
 		LCD_ERR("insert");
 		goto fail2;

@@ -22,7 +22,7 @@ static int boot_main(void)
 	/*
 	 * Create klcd
 	 */
-	ret = lcd_create_module_klcd(LCD_DIR("create_klcd/lcd"),
+	ret = lcd_create_module_klcd(LCD_DIR("create_klcd/klcd"),
 				"lcd_test_mod_create_klcd_klcd",
 				&klcd);
 	if (ret) {

@@ -24,4 +24,3 @@ else
 	ccflags-y += $(NON_ISOLATED_CC_FLAGS)
 
 endif
-

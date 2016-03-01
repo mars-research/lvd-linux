@@ -6,7 +6,7 @@
 #define LCD_DOMAINS_DISPATCH_LOOP_H
 
 #include <linux/list.h>
-#include <lcd-domains/types.h>
+#include <libcap.h>
 
 /**
  * This represents an ipc channel.

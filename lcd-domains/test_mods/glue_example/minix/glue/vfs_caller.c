@@ -93,53 +93,8 @@ int glue_vfs_init(cptr_t _vfs_channel, struct dispatch_ctx *ctx)
 void glue_vfs_exit(void)
 {
 	/* Free vfs data store. */
-	vfs_cap_destroy(vfs_dstore);
+	vfs_cap_destroy(vfs_cspace);
 }
-
-/* CONTAINER STRUCTS -------------------------------------------------- */
-
-/* COMPILER: It's not required to define these as named structs (you could
- * use anonymous structs if you wish). But for readability, I'm using named
- * structs in this example. */
-
-/* COMPILER: For *every* struct type used in a projection, we generate
- * a container struct definition that has the following fields:
- *   -- the original struct
- *   -- two cptr_t fields: one for the remote reference the caller will
- *      use to refer to the callee's private copy, and one for the reference 
- *      the callee uses to refer to the caller's private copy
- *   -- any arguments to the projection (right now, these fields will
- *      always be cptr_t's to ipc channels)
- *   -- any fields ever allocated in any use of the projection (right now,
- *      these fields will always be cptr_t's to ipc channels)
- *
- * In this example, there are 3 struct types: struct fs, 
- * struct fs_operations, and struct file. One of the projections for 
- * struct fs allocates a channel and stores it in the chnl field, so we
- * add "chnl" to the fields for the container struct for struct fs. 
- *
- * One of the projections for struct fs_operations takes an argument named
- * "chnl", so we add that field to the conatiner struct. NOTE: We wrap
- * the cptr inside a struct ipc_channel, since this is the data structure
- * required for interfacing with the dispatch loop.
- */
-struct fs_container {
-	struct fs fs;
-	cptr_t vfs_ref;
-	cptr_t my_ref;
-	cptr_t chnl;
-};
-struct fs_operations_container {
-	struct fs_operations fs_operations;
-	cptr_t vfs_ref;
-	cptr_t my_ref;
-	struct ipc_channel chnl;
-};
-struct file_container {
-	struct file file;
-	cptr_t vfs_ref;
-	cptr_t my_ref;
-};
 
 /* REGISTER_FS -------------------------------------------------- */
 
@@ -302,7 +257,7 @@ int register_fs(struct fs *fs)
 	fs_container->fs.size = lcd_r3();
 
 	/* Clear capability register */
-	lcd_set_cr1(LCD_CPTR_NULL);
+	lcd_set_cr1(CAP_CPTR_NULL);
 
 	/* COMPILER: Since register_fs returns a scalar value, r0 contains 
 	 * the return value from the callee.
@@ -376,10 +331,10 @@ void unregister_fs(struct fs *fs)
 	 * for freeing the structs themselves since they were only marked
 	 * "dealloc(callee)".
 	 *
-	 * Furthermore, we use vfs_dstore since it is associated with
+	 * Furthermore, we use vfs_cspace since it is associated with
 	 * vfs_chnl. */
-	vfs_cap_remove(vfs_dstore, fs_container->my_ref);
-	vfs_cap_remove(vfs_dstore, fs_operations_container->my_ref);
+	vfs_cap_remove(vfs_cspace, fs_container->my_ref);
+	vfs_cap_remove(vfs_cspace, fs_operations_container->my_ref);
 
 	/* (Nothing to return since this is a void function.) */
 }
@@ -420,7 +375,7 @@ void new_file_callee(void)
 	int new_file_ret;
 	cptr_t fs_operations_ref;
 	cptr_t file_remote_ref;
-	cptr_t file_my_ref = LCD_DPTR_NULL;
+	cptr_t file_my_ref = CAP_CPTR_NULL;
 	int id;
 
 	/* IPC UNMARSHALING ---------------------------------------- */
@@ -489,7 +444,7 @@ void new_file_callee(void)
 				file);
 	file_container->vfs_ref = file_remote_ref;
 
-	/* COMPILER: We use vfs_dstore to carry out the next
+	/* COMPILER: We use vfs_cspace to carry out the next
 	 * operation - inserting into it - because we know the vfs
 	 * domain (or some domain vfs granted rights to the channel to -
 	 * they are indistinguishable for us) is the one invoking this
@@ -544,8 +499,8 @@ void rm_file_callee(void)
 
 	/* These are used in code below. */
 	int ret;
-	dptr_t fs_operations_ref;
-	dptr_t file_ref;
+	cptr_t fs_operations_ref;
+	cptr_t file_ref;
 
 	/* IPC UNMARSHALING ---------------------------------------- */
 
@@ -574,7 +529,7 @@ void rm_file_callee(void)
 		lcd_exit(ret);
 	}
 
-	ret = vfs_cap_lookup_file(
+	ret = vfs_cap_lookup_file_type(
 		vfs_cspace, 
 		file_ref,
 		&file_container);
@@ -600,7 +555,7 @@ void rm_file_callee(void)
 	 * from the glue cspace though (it's ok to do this after the
 	 * container was freed). */
 
-	vfs_cap_delete(vfs_cspace, file_ref);
+	vfs_cap_remove(vfs_cspace, file_ref);
 
 	/* IPC MARSHALING ---------------------------------------- */
 

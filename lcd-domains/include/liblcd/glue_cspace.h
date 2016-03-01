@@ -75,7 +75,7 @@ static inline void glue_cspace_destroy_free(struct glue_cspace *gc)
 }
 
 static inline int glue_cspace_insert(struct glue_cspace *gc, void *object,
-				cap_type_t type, cptr_t **out)
+				cap_type_t type, cptr_t *out)
 {
 	cptr_t c;
 	int ret;
@@ -123,7 +123,7 @@ fail:
 	return ret;
 }
 
-static inline int glue_cspace_remove(struct glue_cspace *gc, cptr_t c)
+static inline void glue_cspace_remove(struct glue_cspace *gc, cptr_t c)
 {
 	/* Assumes no grants, etc. were done. */
 	cap_delete(gc->cspace, c);

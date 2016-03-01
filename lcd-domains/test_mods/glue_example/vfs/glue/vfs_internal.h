@@ -10,10 +10,13 @@
 #include <libcap.h>
 
 /* COMPILER: We need this for glue cspaces. */
-#include <libcap/glue_cspace.h>
+#include <liblcd/glue_cspace.h>
 
 /* COMPILER: We need this for vfs types. */
 #include "../../include/vfs.h"
+
+/* COMPILER: We need this for ipc_channel type */
+#include <liblcd/dispatch_loop.h>
 
 /* CONTAINER STRUCTS -------------------------------------------------- */
 

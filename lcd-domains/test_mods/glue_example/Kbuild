@@ -3,14 +3,12 @@
 # Set it to nothing to build code for normal operation.
 export ISOLATE_GLUE_EXAMPLE=y
 
-obj-m += vfs/
-obj-m += minix/
-
 ifeq ($(ISOLATE_GLUE_EXAMPLE),y)
 
 	obj-m += isol_boot/
-	$(ISOLATED_CC_FLAGS) += -DISOLATE_GLUE_EXAMPLE
+	ISOLATED_CC_FLAGS += -DISOLATE_GLUE_EXAMPLE	
 
 endif
 
-
+obj-m += vfs/
+obj-m += minix/

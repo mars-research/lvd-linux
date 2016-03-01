@@ -26,6 +26,9 @@
 /* COMPILER: We probably need this for vfs types. */
 #include "../../include/vfs.h"
 
+/* COMPILER: Bring in container defs, etc. */
+#include "vfs_internal.h"
+
 /* COMPILER: This header always comes after all other headers (it redefines
  * certain things for the isolated environment, etc.) */
 #include <lcd_config/post_hook.h>
@@ -110,22 +113,22 @@ static struct type_ops_id vfs_libcap_type_ops[VFS_NR_TYPES] = {
 	{
 		{
 			.name = "fs",
-			.delete = fs_delete,
-			.revoke = fs_revoke,
+			.delete = fs_container_delete,
+			.revoke = fs_container_revoke,
 		}
 	},
 	{
 		{
 			.name = "fs_operations",
-			.delete = fs_operations_delete,
-			.revoke = fs_operations_revoke,
+			.delete = fs_operations_container_delete,
+			.revoke = fs_operations_container_revoke,
 		}
 	},
 	{
 		{
 			.name = "file",
-			.delete = file_delete,
-			.revoke = file_revoke,
+			.delete = file_container_delete,
+			.revoke = file_container_revoke,
 		}
 	},
 };
@@ -164,7 +167,7 @@ int vfs_cap_init(void)
 			&vfs_libcap_type_ops[i].ops);
 		if (libcap_type == CAP_TYPE_ERR) {
 			LIBLCD_ERR("failed to register vfs cap type %s",
-				vfs_libcap_type_ops[i].name);
+				vfs_libcap_type_ops[i].ops.name);
 			ret = -EIO;
 			goto fail3;
 		}
@@ -243,9 +246,9 @@ int vfs_cap_lookup_fs_type(
 	cptr_t c,
 	struct fs_container **fs_container)
 {
-	return glue_cspace_lookup(gc, c, 
+	return glue_cspace_lookup(cspace, c, 
 				vfs_libcap_type_ops[VFS_TYPE_FS].libcap_type,
-				fs_container);
+				(void **)fs_container);
 }
 
 int vfs_cap_lookup_fs_operations_type(
@@ -254,9 +257,9 @@ int vfs_cap_lookup_fs_operations_type(
 	struct fs_operations_container **fs_operations_container)
 {
 	return glue_cspace_lookup(
-		gc, c, 
+		cspace, c, 
 		vfs_libcap_type_ops[VFS_TYPE_FS_OPERATIONS].libcap_type,
-		fs_operations_container);
+		(void **)fs_operations_container);
 }
 
 int vfs_cap_lookup_file_type(
@@ -265,9 +268,9 @@ int vfs_cap_lookup_file_type(
 	struct file_container **file_container)
 {
 	return glue_cspace_lookup(
-		gc, c, 
+		cspace, c, 
 		vfs_libcap_type_ops[VFS_TYPE_FILE].libcap_type,
-		file_container);
+		(void **)file_container);
 }
 
 void vfs_cap_remove(

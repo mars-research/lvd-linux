@@ -411,7 +411,7 @@ void register_fs_callee(void)
 	new_file_hidden_args->fs_operations_container = 
 		fs_operations_container;
 	/* data store */
-	new_file_hidden_args->cspace = cspace;
+	new_file_hidden_args->cspace = minix_cspace;
 	/* install trampoline in fs ops */
 	fs_operations_container->fs_operations.new_file =
 		LCD_HANDLE_TO_TRAMPOLINE(new_file_hidden_args->t_handle);
@@ -435,7 +435,7 @@ void register_fs_callee(void)
 	/* container */
 	rm_file_hidden_args->fs_operations_container = fs_operations_container;
 	/* data store */
-	rm_file_hidden_args->cspace = cspace;
+	rm_file_hidden_args->cspace = minix_cspace;
 	/* install trampoline in fs ops */
 	fs_operations_container->fs_operations.rm_file =
 		LCD_HANDLE_TO_TRAMPOLINE(rm_file_hidden_args->t_handle);
@@ -472,7 +472,7 @@ void register_fs_callee(void)
 	fs_operations_container->chnl = lcd_cr1();
 
 	/* Clear cr1 */
-	lcd_set_cr1(LCD_CPTR_NULL);
+	lcd_set_cr1(CAP_CPTR_NULL);
 
 	/* INVOKE REGISTER_FS ---------------------------------------- */
 
@@ -517,8 +517,8 @@ void unregister_fs_callee(void)
 
 	/* These are used below. */
 	int ret;
-	dptr_t fs_minix_ref;
-	dptr_t fs_operations_minix_ref;
+	cptr_t fs_minix_ref;
+	cptr_t fs_operations_minix_ref;
 	struct new_file_hidden_args *new_file_hidden_args;
 	struct rm_file_hidden_args *rm_file_hidden_args;
 

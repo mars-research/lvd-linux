@@ -10,13 +10,41 @@
 #include <libcap.h>
 
 /* COMPILER: We need this for glue cspaces. */
-#include <libcap/glue_cspace.h>
+#include <liblcd/glue_cspace.h>
 
 /* COMPILER: We need this for vfs types. */
 #include "../../include/vfs.h"
 
+/* COMPILER: We need this for ipc_channel type */
+#include <liblcd/dispatch_loop.h>
+
 /* CONTAINER STRUCTS -------------------------------------------------- */
 
+/* COMPILER: It's not required to define these as named structs (you could
+ * use anonymous structs if you wish). But for readability, I'm using named
+ * structs in this example. */
+
+/* COMPILER: For *every* struct type used in a projection, we generate
+ * a container struct definition that has the following fields:
+ *   -- the original struct
+ *   -- two cptr_t fields: one for the remote reference the caller will
+ *      use to refer to the callee's private copy, and one for the reference 
+ *      the callee uses to refer to the caller's private copy
+ *   -- any arguments to the projection (right now, these fields will
+ *      always be cptr_t's to ipc channels)
+ *   -- any fields ever allocated in any use of the projection (right now,
+ *      these fields will always be cptr_t's to ipc channels)
+ *
+ * In this example, there are 3 struct types: struct fs, 
+ * struct fs_operations, and struct file. One of the projections for 
+ * struct fs allocates a channel and stores it in the chnl field, so we
+ * add "chnl" to the fields for the container struct for struct fs. 
+ *
+ * One of the projections for struct fs_operations takes an argument named
+ * "chnl", so we add that field to the conatiner struct. NOTE: We wrap
+ * the cptr inside a struct ipc_channel, since this is the data structure
+ * required for interfacing with the dispatch loop.
+ */
 struct fs_container {
 	struct fs fs;
 	cptr_t vfs_ref;
@@ -27,7 +55,7 @@ struct fs_operations_container {
 	struct fs_operations fs_operations;
 	cptr_t vfs_ref;
 	cptr_t my_ref;
-	cptr_t chnl;
+	struct ipc_channel chnl;
 };
 struct file_container {
 	struct file file;

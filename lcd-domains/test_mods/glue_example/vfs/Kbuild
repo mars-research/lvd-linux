@@ -6,6 +6,8 @@ obj-m += lcd_test_mod_glue_example_vfs.o
 # original code
 lcd_test_mod_glue_example_vfs-y      += original/main.o
 
+LCD_VFS_BUILD_PATH = $(LCD_TEST_MODULES_BUILD_DIR)/glue_example/vfs
+
 # if we're isolating ...
 ifeq ($(ISOLATE_GLUE_EXAMPLE),y)
 
@@ -24,7 +26,7 @@ ifeq ($(ISOLATE_GLUE_EXAMPLE),y)
 	extra-y := glue/vfs_callee.lds
 
 	# run link script
-	ldflags-y += -T $(src)/glue/vfs_callee.lds
+	ldflags-y += -T $(LCD_VFS_BUILD_PATH)/glue/vfs_callee.lds
 
 else
 

@@ -91,7 +91,7 @@ static int alloc_cptrs_for_channel(struct ipc_channel *c)
 	/* First cr is reserved */
 	for (i = 0; i < c->expected_cptrs; i++) {
 
-		ret = lcd_alloc_cptr(&t);
+		ret = lcd_cptr_alloc(&t);
 		if (ret) {
 			LIBLCD_ERR("alloc cptr");
 			return ret;

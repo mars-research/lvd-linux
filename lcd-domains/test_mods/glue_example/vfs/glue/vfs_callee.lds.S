@@ -4,7 +4,7 @@
 /* NOTE: The Linux build system is gonna put a bunch of crap and warnings
  * at the top of the auto-generated vfs_callee.lds. Just ignore it really. */
 
-#include <lcd-domains/trampoline_link.h>
+#include <liblcd/trampoline_link.h>
  
 SECTIONS
 {

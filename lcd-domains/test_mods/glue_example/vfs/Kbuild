@@ -1,0 +1,29 @@
+
+# VFS --------------------------------------------------
+
+obj-m += lcd_test_mod_glue_example_vfs.o
+
+# original code
+lcd_test_mod_glue_example_vfs-y      += original/main.o
+
+# if we're isolating ...
+
+# link with liblcd
+lcd_test_mod_glue_example_vfs-$(ISOLATE_GLUE_EXAMPLE) += $(LIBLCD)
+
+# link with glue
+lcd_test_mod_glue_example_vfs-$(ISOLATE_GLUE_EXAMPLE)  += glue/boot.o
+lcd_test_mod_glue_example_vfs-$(ISOLATE_GLUE_EXAMPLE)  += glue/vfs_callee.o
+
+# Run linker script through C preprocessor (so we can use macros)
+cppflags-$(ISOLATE_GLUE_EXAMPLE) := $(ISOLATED_CC_FLAGS)
+extra-$(ISOLATE_GLUE_EXAMPLE) := glue/vfs_callee.lds
+
+# run link script
+ldflags-$(ISOLATE_GLUE_EXAMPLE) += -T $(src)/glue/vfs_callee.lds
+
+ifeq($ISOLATE_GLUE_EXAMPLE,m)
+    cc-flags-y := $(ISOLATED_CC_FLAGS)
+else
+    cc-flags-y := $(NON_ISOLATED_CC_FLAGS)
+endif

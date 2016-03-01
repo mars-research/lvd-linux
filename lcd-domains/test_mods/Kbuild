@@ -29,3 +29,4 @@ obj-m += ipc1/
 obj-m += ipc2/
 obj-m += async/
 obj-m += create_klcd/
+obj-m += glue_example/

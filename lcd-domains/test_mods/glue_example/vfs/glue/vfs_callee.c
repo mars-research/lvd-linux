@@ -6,24 +6,32 @@
 
 /* HEADERS -------------------------------------------------- */
 
+/* COMPILER: This header is always included, and MUST be included before
+ * any other code (controls compilation and configuration of code). */
+#include <lcd_config/pre_hook.h>
+
 /* COMPILER: This header is always included (contains declarations and defns
  * for using the LIBLCD interface). */
-#include <lcd-domains/liblcd.h>
+#include <liblcd/liblcd.h>
 
 /* COMPILER: This is always included. */
-#include <lcd-domains/dispatch_loop.h>
+#include <liblcd/dispatch_loop.h>
 
 /* COMPILER: We probably always need the slab header. */
 #include <linux/slab.h>
 
 /* COMPILER: We need this for the trampolines. */
-#include <lcd-domains/trampoline.h>
+#include <liblcd/trampoline.h>
 
 /* COMPILER: Since this header was included in vfs.idl, the include
  * is pasted here (the compiler does not need to be smart about paths - the
  * IDL writer needs to use relative or absolute paths that should just 
  * work). */
 #include "../../include/vfs.h"
+
+/* COMPILER: This header always comes after all other headers (it redefines
+ * certain things for the isolated environment, etc.) */
+#include <lcd_config/post_hook.h>
 
 /* INIT -------------------------------------------------- */
 

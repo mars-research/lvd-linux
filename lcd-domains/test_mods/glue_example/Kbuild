@@ -1,0 +1,12 @@
+
+# Set this to m to build code for isolation (along with boot module).
+# Set it to nothing to build code for normal operation.
+ISOLATE_GLUE_EXAMPLE=m
+
+ifeq($(ISOLATE_GLUE_EXAMPLE),m)
+    $(ISOLATED_CC_FLAGS) += -DISOLATE_GLUE_EXAMPLE
+endif
+
+obj-m += vfs/
+obj-m += minix/
+obj-$(ISOLATE_GLUE_EXAMPLE) += isol_boot/

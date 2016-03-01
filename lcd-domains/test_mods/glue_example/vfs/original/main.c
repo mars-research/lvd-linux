@@ -2,9 +2,7 @@
  * main.c - implementation of fake vfs
  */
 
-#ifdef CONFIG_ISOLATE_GLUE_EXAMPLE
-#include <lcd-domains/liblcd-config.h>
-#endif
+#include <lcd_config/pre_hook.h>
 
 #include <linux/kernel.h>
 #include <linux/module.h>
@@ -12,9 +10,7 @@
 
 #include "../../include/vfs.h"
 
-#ifdef CONFIG_ISOLATE_GLUE_EXAMPLE
-#include <lcd-domains/liblcd-hacks.h>
-#endif
+#include <lcd_config/post_hook.h>
 
 static struct fs *minix_fs = NULL;
 
@@ -52,7 +48,7 @@ int register_fs(struct fs *fs) {
 }
 
 int 
-#ifndef CONFIG_ISOLATE_GLUE_EXAMPLE
+#ifndef ISOLATE_GLUE_EXAMPLE
 __init 
 #endif
 original_vfs_lcd_init(void) {
@@ -63,7 +59,7 @@ original_vfs_lcd_init(void) {
 }
 
 void 
-#ifndef CONFIG_ISOLATE_GLUE_EXAMPLE
+#ifndef ISOLATE_GLUE_EXAMPLE
 __exit 
 #endif
 original_vfs_lcd_exit(void) {
@@ -75,7 +71,7 @@ original_vfs_lcd_exit(void) {
 
 /* There can only be one pair of init/exit. The glue will define an
  * init/exit when we isolate. */
-#ifndef CONFIG_ISOLATE_GLUE_EXAMPLE
+#ifndef ISOLATE_GLUE_EXAMPLE
 module_init(original_vfs_lcd_init);
 module_exit(original_vfs_lcd_exit);
 #endif

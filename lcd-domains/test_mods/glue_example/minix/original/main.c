@@ -2,9 +2,7 @@
  * main.c - implementation of fake minix
  */
 
-#ifdef CONFIG_ISOLATE_GLUE_EXAMPLE
-#include <lcd-domains/liblcd-config.h>
-#endif
+#include <lcd_config/pre_hook.h>
 
 #include <linux/kernel.h>
 #include <linux/module.h>
@@ -12,11 +10,9 @@
 
 #include "../../include/vfs.h"
 
-#ifdef CONFIG_ISOLATE_GLUE_EXAMPLE
-#include <lcd-domains/liblcd-hacks.h>
-#endif
+#include <lcd_config/post_hook.h>
 
-#ifdef CONFIG_ISOLATE_GLUE_EXAMPLE
+#ifdef ISOLATE_GLUE_EXAMPLE
 struct file_container {
 	struct file file;
 	u64 e1;
@@ -27,7 +23,7 @@ struct file_container {
 static int minix_new_file(int id, struct file **file_out) {
 
 	struct file *f;
-#ifdef CONFIG_ISOLATE_GLUE_EXAMPLE
+#ifdef ISOLATE_GLUE_EXAMPLE
 	struct file_container *file_container;
 #endif
 
@@ -36,7 +32,7 @@ static int minix_new_file(int id, struct file **file_out) {
 		return -EINVAL;
 	}
 
-#ifdef CONFIG_ISOLATE_GLUE_EXAMPLE
+#ifdef ISOLATE_GLUE_EXAMPLE
 	f = NULL;
 	file_container = kmalloc(sizeof(*f), GFP_KERNEL);
 	if (file_container)
@@ -69,7 +65,7 @@ static void minix_rm_file(struct file *file) {
 
 }
 
-#ifdef CONFIG_ISOLATE_GLUE_EXAMPLE
+#ifdef ISOLATE_GLUE_EXAMPLE
 
 /* Ideally, we shouldn't bring these in to unmodified code. I
  * converted e.g. cptr --> u64 to avoid bringing in those defs. */
@@ -104,7 +100,7 @@ static struct fs_container minix_fs_container = {
 	}
 };
 
-#else /* !CONFIG_ISOLATE_GLUE_EXAMPLE */
+#else /* !ISOLATE_GLUE_EXAMPLE */
 
 static struct fs_operations minix_fs_ops = {
 	.new_file = minix_new_file,
@@ -120,14 +116,14 @@ static struct fs minix_fs = {
 
 
 int 
-#ifndef CONFIG_ISOLATE_GLUE_EXAMPLE
+#ifndef ISOLATE_GLUE_EXAMPLE
 __init 
 #endif
 original_minix_lcd_init(void) {
 	/*
 	 * Register.
 	 */
-#ifdef CONFIG_ISOLATE_GLUE_EXAMPLE
+#ifdef ISOLATE_GLUE_EXAMPLE
 	return register_fs(&minix_fs_container.fs);
 #else
 	return register_fs(&minix_fs);
@@ -135,21 +131,21 @@ original_minix_lcd_init(void) {
 }
 
 void 
-#ifndef CONFIG_ISOLATE_GLUE_EXAMPLE
+#ifndef ISOLATE_GLUE_EXAMPLE
 __exit 
 #endif
 original_minix_lcd_exit(void) {
 	/*
 	 * Unregister.
 	 */
-#ifdef CONFIG_ISOLATE_GLUE_EXAMPLE
+#ifdef ISOLATE_GLUE_EXAMPLE
 	unregister_fs(&minix_fs_container.fs);
 #else
 	unregister_fs(&minix_fs);
 #endif
 }
 
-#ifndef CONFIG_ISOLATE_GLUE_EXAMPLE
+#ifndef ISOLATE_GLUE_EXAMPLE
 module_init(original_minix_lcd_init);
 module_exit(original_minix_lcd_exit);
 #endif

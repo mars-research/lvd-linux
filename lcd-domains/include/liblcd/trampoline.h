@@ -6,12 +6,8 @@
 #ifndef LCD_DOMAINS_TRAMPOLINE_H
 #define LCD_DOMAINS_TRAMPOLINE_H
 
-#include <lcd-domains/liblcd-config.h>
-
 #include <linux/slab.h>
 #include <linux/kernel.h>
-
-#include <lcd-domains/liblcd-hacks.h>
 
 /**
  * This struct is literally the trampoline. In memory,

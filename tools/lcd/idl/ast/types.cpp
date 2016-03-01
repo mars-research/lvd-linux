@@ -1,28 +1,5 @@
 #include "lcd_ast.h"
 
-const char* new_name(const char* name, const char* suffix)
-{
-  int length = strlen(name);
-  int length2 = strlen(suffix);
-  char *new_str = (char*) malloc(sizeof(char)*(length+length2+1));
-  
-  std::ostringstream total;
-  total << name << suffix;
-  strncpy(new_str, total.str().c_str(), length+length2+1);
-  return new_str;
-}
-
-/* function pointer type*/
-const char* container_name(const char* name)
-{
-  return new_name(name, "_container");
-}
-
-const char* hidden_args_name(const char* name)
-{
-  return new_name(name, "_hidden_args");
-}
-
 Function::Function(const char *id, ReturnVariable *return_var, std::vector<Parameter*> parameters, LexicalScope *ls)
 {
   this->identifier_  = id;

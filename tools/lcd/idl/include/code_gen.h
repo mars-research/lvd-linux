@@ -86,6 +86,8 @@ CCSTDeclaration* function_declaration(Rpc *r); // complete
 
 CCSTParamTypeList* parameter_list(std::vector<Parameter*> params); // complete
 
+CCSTCompoundStatement* trampoline_function_body(Rpc *r); // complete.
+CCSTDeclaration* trampoline_function_declaration(Rpc *r); // incomplete.
 
 // needed functions.
 // creates a function declaration from a return type, a name and parameters

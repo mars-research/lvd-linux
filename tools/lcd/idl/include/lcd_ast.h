@@ -471,6 +471,7 @@ class Rpc : public Base
   bool function_pointer_defined_;
   void construct_marshal_parameters();
   std::vector<Variable*> construct_projection_parameters(ProjectionType *pt, bool alloc);
+
  public:
   Rpc(ReturnVariable *return_var, const char* name, std::vector<Parameter* > parameters, LexicalScope *current_scope);
   unsigned int tag();

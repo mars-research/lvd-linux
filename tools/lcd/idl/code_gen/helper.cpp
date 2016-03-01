@@ -68,19 +68,36 @@ CCSTUnaryOp* reference()
   return new CCSTUnaryOp(unary_bit_and_t);
 }
 
+const char* new_name(const char* name, const char* suffix)
+{
+  int length = strlen(name);
+  int length2 = strlen(suffix);
+  char *new_str = (char*) malloc(sizeof(char)*(length+length2+1));
+  
+  std::ostringstream total;
+  total << name << suffix;
+  strncpy(new_str, total.str().c_str(), length+length2+1);
+  return new_str;
+}
+
+/* function pointer type*/
+const char* container_name(const char* name)
+{
+  return new_name(name, "_container");
+}
+
+const char* hidden_args_name(const char* name)
+{
+  return new_name(name, "_hidden_args");
+}
+
 /* 
  * confirm this works
  * returns a new string with _p on end.
  */ 
 const char* parameter_name(const char* name) 
 {
-  int length = strlen(name);
-  char *new_str = (char*) malloc(sizeof(char)*(length+3));
-  
-  std::ostringstream total;
-  total << name << "_p";
-  strncpy(new_str, total.str().c_str(), length+3);
-  return new_str;
+  return new_name(name, "_p");
 }
 
 /*
@@ -88,14 +105,7 @@ const char* parameter_name(const char* name)
  */
 const char* trampoline_func_name(const char* name)
 {
-  int length = strlen(name);
-  int length2 = strlen("_trampoline");
-  char *new_str = (char*) malloc(sizeof(char)*(length+length2+1));
-
-  std::ostringstream total;
-  total << name << "_trampoline";
-  strncpy(new_str, total.str().c_str(), length+length2+1);
-  return new_str;
+  return new_name(name, "_trampoline");
 }
 
 /*
@@ -877,3 +887,106 @@ bool alloc_caller(Variable *v, const char *side)
   return v->alloc_callee();
 }
 
+// function pointer trampoline code
+
+CCSTDeclaration* trampoline_function_declaration(Rpc* r)
+{
+  /*
+  LCD_TRAMPOLINE_DATA(new_file_trampoline);
+  int 
+  LCD_TRAMPOLINE_LINKAGE(new_file_trampoline)
+  new_file_trampoline(int id, struct file **file_out)
+  */
+  std::vector<CCSTDecSpecifier*>specifier = type2(r->return_variable()->type());
+  
+  
+  std::vector<CCSTInitDeclarator*> decs;
+
+  std::vector<CCSTParamDeclaration*> tramp_func_params;
+
+  std::vector<Parameter*> parameters = r->parameters();
+  for(std::vector<Parameter*>::iterator it = parameters.begin(); it != parameters.end()-2; it ++) {
+    Parameter *p = *it;
+    
+  }
+  std::vector<Parameter*> real_parameters(parameters.begin(), parameters.end()-2);
+  
+  decs.push_back(new CCSTDeclarator(pointer(r->return_variable()->pointer_count())
+				    , new CCSTDirectDecParamTypeList(new CCSTDirectDecId(trampoline_func_name(r->name()))
+								     , parameter_list(real_parameters))));
+  return new CCSTDeclaration(specifier, decs);
+}
+
+CCSTCompoundStatement* trampoline_function_body(Rpc* r)
+{
+  std::vector<CCSTDeclaration*> declarations;
+  std::vector<CCSTStatement*> statements;
+  // todo new function poitner name
+  
+  // declare a new function pointer
+  std::vector<CCSTDecSpecifier*> new_fp_specifier = type2(r->return_variable()->type());
+
+  std::vector<CCSTInitDeclarator*> new_fp_decs;
+
+  /* loop through rpc parameters and add them to the parameters for the new fp*/
+  std::vector<CCSTParamDeclaration*> func_pointer_params;
+
+  std::vector<Parameter*> parameters = r->parameters();
+  for(std::vector<Parameter*>::iterator it = parameters.begin(); it != parameters.end(); it ++) {
+    Parameter *p = *it;
+
+    std::vector<CCSTDecSpecifier*> fp_param_tmp = type2(p->type());
+    func_pointer_params.push_back(new CCSTParamDeclaration(fp_param_tmp));
+  }
+
+  /* declare new function pointer */
+  std::vector<type_qualifier> pointer_type_qualifier;
+  pointer_type_qualifier.push_back(volatile_t);
+
+  new_fp_decs.push_back(new CCSTDeclarator(0x0
+					   , new CCSTDirectDecParamTypeList(new CCSTDirectDecDec(new CCSTDeclarator(new CCSTPointer(pointer_type_qualifier)
+														    , new CCSTDirectDecId("new_fp"))) // todo
+									    , new CCSTParamList(func_pointer_params))));
+
+  declarations.push_back(new CCSTDeclaration(new_fp_specifier, new_fp_decs));
+  
+  // declare a hidden args instance
+
+  // 	struct new_file_hidden_args *hidden_args;
+  declarations.push_back(struct_pointer_declaration(hidden_args_name(r->name()), "hidden_args", r->current_scope()));
+
+  // LCD_TRAMPOLINE_PROLOGUE
+
+  std::vector<CCSTAssignExpr*> lcd_tramp_prolog_args;
+  lcd_tramp_prolog_args.push_back(new CCSTPrimaryExprId("hidden_args"));
+  lcd_tramp_prolog_args.push_back(new CCSTPrimaryExprId(trampoline_func_name(r->name())));
+  // LCD_TRAMPOLINE_PROLOGUE(hidden_args, new_file_trampoline);
+  statements.push_back(function_call("LCD_TRAMPOLINE_PROLOGUE", lcd_tramp_prolog_args));
+
+  // set new function pointer equal to glue code for function pointer
+  // new_filep = new_file;
+  statements.push_back(new CCSTAssignExpr(new CCSTPrimaryExprId("new_fp"), equals(), new CCSTPrimaryExprId(r->name())));
+
+  // return call from new function pointer
+  std::vector<CCSTAssignExpr*> new_fp_args;
+  for(std::vector<Parameter*>::iterator it = parameters.begin(); it != parameters.end()-2; it ++) {
+    Parameter *p = *it;
+    new_fp_args.push_back(new CCSTPrimaryExprId(p->identifier()));
+  }
+  
+  ProjectionType *hidden_args_param = dynamic_cast<ProjectionType*>(parameters.at(parameters.size()-2)->type());
+
+  Assert(hidden_args_param != 0x0, "Error: dynamic cast to Projection type failed!\n");
+  ProjectionField *container_field = hidden_args_param->get_field("container");
+  if(container_field != 0x0) {
+    new_fp_args.push_back(access(container_field));
+  }
+
+  ProjectionField *dstore_field = hidden_args_param->get_field("dstore");
+  if(dstore_field != 0x0) {
+    new_fp_args.push_back(access(dstore_field));
+  }
+  statements.push_back(new CCSTReturn(function_call("new_fp", new_fp_args)));
+
+  return new CCSTCompoundStatement(declarations, statements);
+}

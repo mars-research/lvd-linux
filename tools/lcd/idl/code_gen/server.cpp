@@ -339,6 +339,9 @@ CCSTFile* generate_server_source(Module *m)
 	 printf("doing function pointer def\n");
 	 definitions.push_back( function_definition(function_declaration(r_tmp)
 						    ,caller_body(r_tmp)));
+
+	 definitions.push_back( function_definition(trampoline_function_declaration(r_tmp)
+						    , trampoline_function_body(r_tmp)));
        } else {
 	 printf("doing callee_declaration\n");
 	 definitions.push_back( function_definition(callee_declaration(r_tmp)

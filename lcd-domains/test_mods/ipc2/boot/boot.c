@@ -1,12 +1,11 @@
-/**
- * boot.c - non-isolated kernel module, does setup
- *
+/*
+ * boot.c - non-isolated boot module
  */
 
-#include <lcd-domains/kliblcd.h>
 #include <linux/delay.h>
 #include <linux/module.h>
 #include <linux/kernel.h>
+#include <liblcd/liblcd.h>
 
 static int boot_main(void)
 {
@@ -14,17 +13,17 @@ static int boot_main(void)
 	cptr_t endpoint;
 	cptr_t lcd1, lcd2;
 	cptr_t dest1, dest2;
-	struct lcd_info *mi1, *mi2;
+	struct lcd_create_ctx *ctx1, *ctx2;
 	/*
-	 * Enter lcd mode
+	 * Enter LCD mode
 	 */
 	ret = lcd_enter();
 	if (ret) {
-		LIBLCD_ERR("klcd enter failed");
+		LIBLCD_ERR("lcd enter failed");
 		goto fail1;
 	}
 	/*
-	 * Create an endpoint for two lcd's
+	 * Create an endpoint
 	 */
 	ret = lcd_create_sync_endpoint(&endpoint);
 	if (ret) {
@@ -32,43 +31,40 @@ static int boot_main(void)
 		goto fail2;
 	}
 	/*
-	 * Create lcd 1
+	 * Create lcds
 	 */
-	ret = lcd_create_module_lcd(&lcd1, 
-				LCD_DIR("ipc2"),
+	ret = lcd_create_module_lcd(LCD_DIR("ipc12/lcd1"),
 				"lcd_test_mod_ipc2_lcd1",
-				LCD_CPTR_NULL, &mi1);
+				&lcd1, 
+				&ctx1);
 	if (ret) {
 		LIBLCD_ERR("failed to create lcd1");
 		goto fail3;
 	}
-	/*
-	 * Create lcd 2
-	 */
-	ret = lcd_create_module_lcd(&lcd2, 
-				LCD_DIR("ipc2"),
+	ret = lcd_create_module_lcd(LCD_DIR("ipc12/lcd2"),
 				"lcd_test_mod_ipc2_lcd2",
-				LCD_CPTR_NULL, &mi2);
+				&lcd2, 
+				&ctx2);
 	if (ret) {
 		LIBLCD_ERR("failed to create lcd2");
 		goto fail4;
 	}
 	/*
-	 * Alloc dest slots
+	 * --------------------------------------------------
+	 * Grant cap to endpoint
+	 *
+	 * Allocate cptrs
 	 */
-	ret = __lcd_alloc_cptr(mi1->cache, &dest1);
+	ret = cptr_alloc(lcd_to_boot_cptr_cache(ctx1), &dest1);
 	if (ret) {
-		LIBLCD_ERR("failed to alloc cptr");
+		LIBLCD_ERR("failed to alloc dest slot");
 		goto fail5;
 	}
-	ret = __lcd_alloc_cptr(mi2->cache, &dest2);
+	ret = cptr_alloc(lcd_to_boot_cptr_cache(ctx2), &dest2);
 	if (ret) {
-		LIBLCD_ERR("failed to alloc cptr");
+		LIBLCD_ERR("failed to alloc dest slot");
 		goto fail6;
 	}
-	/*
-	 * Grant access to endpoint for both lcd's
-	 */
 	ret = lcd_cap_grant(lcd1, endpoint, dest1);
 	if (ret) {
 		LIBLCD_ERR("failed to grant endpoint to lcd1");
@@ -79,61 +75,52 @@ static int boot_main(void)
 		LIBLCD_ERR("failed to grant endpoint to lcd2");
 		goto fail8;
 	}
+
+	lcd_to_boot_info(ctx1)->cptrs[0] = dest1;
+	lcd_to_boot_info(ctx2)->cptrs[0] = dest2;
 	/*
-	 * Set up boot info
-	 */
-	ret = lcd_dump_boot_info(mi1);
-	if (ret) {
-		LIBLCD_ERR("dump boot info 1");
-		goto fail9;
-	}
-	ret = lcd_dump_boot_info(mi2);
-	if (ret) {
-		LIBLCD_ERR("dump boot info 2");
-		goto fail9;
-	}
-	/*
-	 * Store dest cptrs for endpoint
-	 */
-	to_boot_info(mi1)->cptrs[0] = dest1;
-	to_boot_info(mi2)->cptrs[0] = dest2;
-	/*
+	 * --------------------------------------------------
 	 * Run lcd's
+	 *
 	 */
 	ret = lcd_run(lcd1);
 	if (ret) {
 		LIBLCD_ERR("failed to start lcd1");
-		goto fail10;
+		goto fail9;
 	}
 	ret = lcd_run(lcd2);
 	if (ret) {
 		LIBLCD_ERR("failed to start lcd2");
-		goto fail11;
+		goto fail10;
 	}
 	/*
-	 * Wait for 4 seconds
+	 * Hang out for a few seconds
 	 */
-	msleep(4000);
+	msleep(3000);
 	/*
 	 * Tear everything down
 	 */
 	ret = 0;
 	goto out;
 
+	/*
+	 * Everything torn down / freed during destroy / exit.
+	 */
 out:
-fail11:
 fail10:
 fail9:
 fail8:
 fail7:
 fail6:
 fail5:
-	lcd_destroy_module_lcd(lcd2, mi2, LCD_CPTR_NULL);
+	lcd_cap_delete(lcd2);
+	lcd_destroy_create_ctx(ctx2); /* tears down LCD 2 */
 fail4:
-	lcd_destroy_module_lcd(lcd1, mi1, LCD_CPTR_NULL);
+	lcd_cap_delete(lcd1);
+	lcd_destroy_create_ctx(ctx1); /* tears down LCD 1 */
 fail3:
 fail2:
-	lcd_exit(0); /* will free endpoint */
+	lcd_exit(0); /* tears down everything else */
 fail1:
 	return ret;
 }

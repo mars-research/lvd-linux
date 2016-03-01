@@ -1,0 +1,4 @@
+
+obj-m += boot/
+obj-m += lcd1/
+obj-m += lcd2/

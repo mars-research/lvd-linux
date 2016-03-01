@@ -25,3 +25,4 @@ export NON_ISOLATED_CC_FLAGS= \
 obj-m += liblcd_test/
 obj-m += load/
 obj-m += ipc1/
+obj-m += ipc2/

@@ -1,21 +1,22 @@
-/**
- * lcd1.c - code for lcd1 in ipc test
+/*
+ * lcd.c - code for isolated LCD in liblcd test
  */
 
-#include <lcd-domains/liblcd-config.h>
+#include <lcd_config/pre_hook.h>
 
 #include <linux/module.h>
 #include <linux/kernel.h>
-#include <lcd-domains/liblcd.h>
+#include <linux/slab.h>
+#include <liblcd/liblcd.h>
 
-#include <lcd-domains/liblcd-hacks.h>
+#include <lcd_config/post_hook.h>
 
 cptr_t ep;
 
 static int do_send(void)
 {
 	lcd_set_r0(12345);
-	return lcd_send(ep);
+	return lcd_sync_send(ep);
 }
 
 static void get_endpoint(void)

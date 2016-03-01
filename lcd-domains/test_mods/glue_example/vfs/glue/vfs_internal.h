@@ -39,9 +39,9 @@ int vfs_cap_init(void);
 
 int vfs_cap_create(struct glue_cspace **cspace);
 
-int vfs_cap_destroy(struct glue_cspace *cspace);
+void vfs_cap_destroy(struct glue_cspace *cspace);
 
-int vfs_cap_exit(void);
+void vfs_cap_exit(void);
 
 int vfs_cap_insert_fs_type(
 	struct glue_cspace *cspace, 
@@ -57,5 +57,25 @@ int vfs_cap_insert_file_type(
 	struct glue_cspace *cspace, 
 	struct file_container *file_container,
 	cptr_t *c_out);
+
+int vfs_cap_lookup_fs_type(
+	struct glue_cspace *cspace, 
+	cptr_t c,
+	struct fs_container **fs_container);
+
+int vfs_cap_lookup_fs_operations_type(
+	struct glue_cspace *cspace, 
+	cptr_t c,
+	struct fs_operations_container **fs_operations_container);
+
+int vfs_cap_lookup_file_type(
+	struct glue_cspace *cspace, 
+	cptr_t c,
+	struct file_container **file_container);
+
+void vfs_cap_remove(
+	struct glue_cspace *cspace, 
+	cptr_t c);
+
 
 #endif /* LCD_VFS_INTERNAL_H */

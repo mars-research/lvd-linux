@@ -98,6 +98,31 @@ fail1:
 	return ret;
 }
 
+static inline int glue_cspace_lookup(struct glue_cspace *gc, cptr_t c,
+				cap_type_t expected_type,
+				void **object_out)
+{
+	int ret;
+	struct cnode *cnode;
+	
+	/* Assumes caller doesn't need locking semantics for cnodes. */
+
+	ret = cap_cnode_get(gc->cspace, c, &cnode);
+	if (ret) 
+		goto fail;
+	if (cap_cnode_type(cnode) != expected_type) {
+		ret = -EINVAL;
+		cap_cnode_put(cnode);
+	}
+	*object_out = cap_cnode_object(cnode);
+	cap_cnode_put(cnode);
+
+	return 0;
+
+fail:
+	return ret;
+}
+
 static inline int glue_cspace_remove(struct glue_cspace *gc, cptr_t c)
 {
 	/* Assumes no grants, etc. were done. */

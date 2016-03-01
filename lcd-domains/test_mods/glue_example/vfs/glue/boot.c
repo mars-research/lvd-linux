@@ -4,11 +4,17 @@
 
 /* HEADERS -------------------------------------------------- */
 
-/* COMPILER: This is always included. */
-#include <lcd-domains/liblcd.h>
+/* COMPILER: This is always included before any other includes. */
+#include <lcd_config/pre_hook.h>
 
 /* COMPILER: This is always included. */
-#include <lcd-domains/dispatch_loop.h>
+#include <liblcd/liblcd.h>
+
+/* COMPILER: This is always included. */
+#include <liblcd/dispatch_loop.h>
+
+/* COMPILER: This is always included after all includes. */
+#include <lcd_config/post_hook.h>
 
 /* LOOP -------------------------------------------------- */
 
@@ -119,7 +125,7 @@ static void loop(struct dispatch_ctx *ctx)
 				return;
 			}
 			
-			ret = lcd_recv(channel->channel_cptr);
+			ret = lcd_sync_recv(channel->channel_cptr);
 			if (ret) {
 				LIBLCD_ERR("lcd recv");
 				return;

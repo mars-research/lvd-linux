@@ -189,7 +189,7 @@ void vfs_cap_destroy(struct glue_cspace *cspace)
 	glue_cspace_destroy_free(cspace);
 }
 
-int vfs_cap_exit(void)
+void vfs_cap_exit(void)
 {
 	/*
 	 * Destroy and free type system if necessary
@@ -233,4 +233,43 @@ int vfs_cap_insert_file_type(
 		file_container,  
 		vfs_libcap_type_ops[VFS_TYPE_FILE].libcap_type,
 		c_out);
+}
+
+int vfs_cap_lookup_fs_type(
+	struct glue_cspace *cspace, 
+	cptr_t c,
+	struct fs_container **fs_container)
+{
+	return glue_cspace_lookup(gc, c, 
+				vfs_libcap_type_ops[VFS_TYPE_FS].libcap_type,
+				fs_container);
+}
+
+int vfs_cap_lookup_fs_operations_type(
+	struct glue_cspace *cspace, 
+	cptr_t c,
+	struct fs_operations_container **fs_operations_container)
+{
+	return glue_cspace_lookup(
+		gc, c, 
+		vfs_libcap_type_ops[VFS_TYPE_FS_OPERATIONS].libcap_type,
+		fs_operations_container);
+}
+
+int vfs_cap_lookup_file_type(
+	struct glue_cspace *cspace, 
+	cptr_t c,
+	struct file_container **file_container)
+{
+	return glue_cspace_lookup(
+		gc, c, 
+		vfs_libcap_type_ops[VFS_TYPE_FILE].libcap_type,
+		file_container);
+}
+
+void vfs_cap_remove(
+	struct glue_cspace *cspace, 
+	cptr_t c)
+{
+	glue_cspace_remove(cspace, c);
 }

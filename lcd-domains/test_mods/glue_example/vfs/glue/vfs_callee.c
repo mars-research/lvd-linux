@@ -39,6 +39,11 @@
 
 /* INIT -------------------------------------------------- */
 
+/* COMPILER: Somehow we need to allow for one cspace per register_fs.
+ * Not sure how to indicate that in IDL, and how glue code can
+ * resolve an ipc message -> cspace. (Perhaps seL4 badges.) */
+static struct glue_cspace *minix_cspace;
+
 /* COMPILER: It's possible, but maybe unlikely, that the callee code
  * will dynamically add channels to the dispatch loop. We store a
  * reference to it. (This is also convenient for init/teardown to
@@ -88,13 +93,13 @@ static struct dispatch_ctx *loop_ctx;
 
 struct new_file_hidden_args {
 	struct fs_operations_container *fs_operations_container;
-	struct cspace *cspace;
+	struct glue_cspace *cspace;
 	struct lcd_trampoline_handle *t_handle;
 };
 
 struct rm_file_hidden_args {
 	struct fs_operations_container *fs_operations_container;
-	struct cspace *cspace;
+	struct glue_cspace *cspace;
 	struct lcd_trampoline_handle *t_handle;
 };
 
@@ -108,7 +113,7 @@ struct rm_file_hidden_args {
 /* COMPILER: This stub is called by the trampoline (see below).
  * It always has the same signature - plus the extra arguments:
  *   1 - the pointer to the container struct
- *   2 - the pointer to the data store to use
+ *   2 - the pointer to the glue_cspace to use for handling remote refs
  *
  * Here, the container struct is struct fs_operations_container.
  *
@@ -119,7 +124,7 @@ struct rm_file_hidden_args {
 int  noinline
 new_file(int id, struct file **file_out,
 	struct fs_operations_container *fs_operations_container,
-	struct dstore *dstore)
+	struct glue_cspace *cspace)
 {
 	/* VARIABLE DECLARATIONS ------------------------------ */
 
@@ -146,11 +151,11 @@ new_file(int id, struct file **file_out,
 	/* COMPILER: We insert the file container into the data store
 	 * we were provided with. */
 	
-	ret = lcd_dstore_insert(dstore, file_container,
-				STRUCT_FILE_TAG, 
+	ret = vfs_cap_insert_file_type(cspace, 
+				file_container,
 				&file_container->my_ref);
 	if (ret) {
-		LIBLCD_ERR("dstore insert");
+		LIBLCD_ERR("cspace insert");
 		lcd_exit(-1); /* abort */
 	}
 
@@ -159,11 +164,11 @@ new_file(int id, struct file **file_out,
 	/* COMPILER: We always send the remote ref to the struct that
 	 * contains this function pointer (so the callee can resolve
 	 * to the real function pointer). */
-	lcd_set_r1(dptr_val(fs_operations_container->minix_ref));
+	lcd_set_r1(cptr_val(fs_operations_container->minix_ref));
 
 	/* COMPILER: projection <struct file> is marked as alloc, so we
 	 * pass our ref here. */
-	lcd_set_r2(dptr_val(file_container->my_ref));
+	lcd_set_r2(cptr_val(file_container->my_ref));
 
 	/* COMPILER: We marshal the scalar id arg. */
 	lcd_set_r3(id);
@@ -179,7 +184,7 @@ new_file(int id, struct file **file_out,
 
 	LIBLCD_MSG("vfs calling new_file (dest = minix)");
 
-	ret = lcd_call(fs_operations_container->chnl);
+	ret = lcd_sync_call(fs_operations_container->chnl);
 	if (ret) {
 		LIBLCD_ERR("lcd call");
 		lcd_exit(-1);
@@ -189,7 +194,7 @@ new_file(int id, struct file **file_out,
 
 	/* COMPILER: projection <struct file> was marked as alloc, so
 	 * we expect a remote ref here from the callee. */
-	file_container->minix_ref = __dptr(lcd_r1());
+	file_container->minix_ref = __cptr(lcd_r1());
 
 	/* COMPILER: id on struct file marked as [out], so we expect that
 	 * next. */
@@ -212,7 +217,7 @@ new_file_trampoline(int id, struct file **file_out)
 {
 	int (*volatile new_filep)(int, struct file **,
 				struct fs_operations_container *,
-				struct dstore *);
+				struct glue_cspace *);
 	struct new_file_hidden_args *hidden_args;
 
 	LCD_TRAMPOLINE_PROLOGUE(hidden_args, new_file_trampoline);
@@ -221,7 +226,7 @@ new_file_trampoline(int id, struct file **file_out)
 
 	return new_filep(id, file_out,
 			hidden_args->fs_operations_container,
-			hidden_args->dstore);
+			hidden_args->cspace);
 }
 
 /* RM_FILE -------------------------------------------------- */
@@ -230,7 +235,7 @@ new_file_trampoline(int id, struct file **file_out)
 void noinline
 rm_file(struct file *file,
 	struct fs_operations_container *fs_operations_container,
-	struct dstore *dstore)
+	struct glue_cspace *cspace)
 {
 	/* VARIABLE DECLARATIONS ------------------------------ */
 
@@ -252,11 +257,11 @@ rm_file(struct file *file,
 
 	/* COMPILER: We always pass a ref to the projection that contains
 	 * this function pointer. */
-	lcd_set_r1(dptr_val(fs_operations_container->minix_ref));
+	lcd_set_r1(cptr_val(fs_operations_container->minix_ref));
 
 	/* COMPILER: There is only *one* projection reachable from the
 	 * arguments. */
-	lcd_set_r2(dptr_val(file_container->minix_ref));
+	lcd_set_r2(cptr_val(file_container->minix_ref));
 
 	/* IPC CALL ---------------------------------------- */
 
@@ -267,7 +272,7 @@ rm_file(struct file *file,
 	 * so we use its channel. */
 
 	LIBLCD_MSG("vfs calling rm_file (dest = minix)");
-	ret = lcd_call(fs_operations_container->chnl);
+	ret = lcd_sync_call(fs_operations_container->chnl);
 	if (ret) {
 		LIBLCD_ERR("lcd_call");
 		lcd_exit(ret); /* abort */
@@ -281,7 +286,7 @@ rm_file(struct file *file,
 
 	/* COMPILER: projection <struct file> marked as dealloc(caller),
 	 * so we remove our copy from the data store and free it. */
-	lcd_dstore_delete(dstore, file_container->my_ref);
+	vfs_cap_remove(cspace, file_container->my_ref);
 	kfree(file_container);
 
 	/* ---------------------------------------- */
@@ -297,7 +302,7 @@ rm_file_trampoline(struct file *file)
 {
 	void (*volatile rm_filep)(struct file *,
 				struct fs_operations_container *,
-				struct dstore *);
+				struct glue_cspace *);
 	struct new_file_hidden_args *hidden_args;
 
 	LCD_TRAMPOLINE_PROLOGUE(hidden_args, rm_file_trampoline);
@@ -306,7 +311,7 @@ rm_file_trampoline(struct file *file)
 
 	rm_filep(file,
 		hidden_args->fs_operations_container,
-		hidden_args->dstore);
+		hidden_args->cspace);
 }
 
 /* CALLEE CODE -------------------------------------------------- */
@@ -333,8 +338,8 @@ void register_fs_callee(void)
 	/* These are used below. */
 	int ret;
 	int register_fs_ret;
-	dptr_t fs_minix_ref;
-	dptr_t fs_operations_minix_ref;
+	cptr_t fs_minix_ref;
+	cptr_t fs_operations_minix_ref;
 
 	/* CONTAINER INIT ---------------------------------------- */
 
@@ -345,24 +350,18 @@ void register_fs_callee(void)
 
 	/* COMPILER: Two projections were marked as alloc(callee). We 
 	 * allocate the containers here, and insert them into the
-	 * data store.
-	 *
-	 * XXX: In general, there will be some kind of logic for determing
-	 * which data store to use, or even setting up a new data store.
-	 * We can discuss more at some point. For this simple example,
-	 * the glue just assumes the caller is minix, and uses the global. */
+	 * new cspace. */
 
 	fs_container = kzalloc(sizeof(*fs_container), GFP_KERNEL);
 	if (!fs_container) {
 		LIBLCD_ERR("kzalloc fs container");
 		lcd_exit(-1); /* abort */
 	}
-	ret = lcd_dstore_insert(minix_dstore,
+	ret = vfs_cap_insert_fs_type(minix_cspace,
 				fs_container,
-				STRUCT_FS_TAG,
 				&fs_container->my_ref);
 	if (ret) {
-		LIBLCD_ERR("dstore insert fs container");
+		LIBLCD_ERR("cspace insert fs container");
 		lcd_exit(-1);
 	}
 
@@ -372,12 +371,11 @@ void register_fs_callee(void)
 		LIBLCD_ERR("kzalloc fs ops container");
 		lcd_exit(-1); /* abort */
 	}
-	ret = lcd_dstore_insert(minix_dstore,
+	ret = vfs_cap_insert_fs_operations_type(minix_cspace,
 				fs_operations_container,
-				STRUCT_FS_OPERATIONS_TAG,
 				&fs_operations_container->my_ref);
 	if (ret) {
-		LIBLCD_ERR("dstore insert");
+		LIBLCD_ERR("cspace insert");
 		lcd_exit(-1);
 	}
 
@@ -413,7 +411,7 @@ void register_fs_callee(void)
 	new_file_hidden_args->fs_operations_container = 
 		fs_operations_container;
 	/* data store */
-	new_file_hidden_args->dstore = minix_dstore;
+	new_file_hidden_args->cspace = cspace;
 	/* install trampoline in fs ops */
 	fs_operations_container->fs_operations.new_file =
 		LCD_HANDLE_TO_TRAMPOLINE(new_file_hidden_args->t_handle);
@@ -437,7 +435,7 @@ void register_fs_callee(void)
 	/* container */
 	rm_file_hidden_args->fs_operations_container = fs_operations_container;
 	/* data store */
-	rm_file_hidden_args->dstore = minix_dstore;
+	rm_file_hidden_args->cspace = cspace;
 	/* install trampoline in fs ops */
 	fs_operations_container->fs_operations.rm_file =
 		LCD_HANDLE_TO_TRAMPOLINE(rm_file_hidden_args->t_handle);
@@ -447,8 +445,8 @@ void register_fs_callee(void)
 	/* COMPILER: There are two projections passed, so we expect
 	 * 2 remote references (to minix's copies) here. */
 
-	fs_minix_ref = __dptr(lcd_r1());
-	fs_operations_minix_ref = __dptr(lcd_r2());
+	fs_minix_ref = __cptr(lcd_r1());
+	fs_operations_minix_ref = __cptr(lcd_r2());
 
 	fs_container->minix_ref = fs_minix_ref;
 	fs_operations_container->minix_ref = fs_operations_minix_ref;
@@ -488,8 +486,8 @@ void register_fs_callee(void)
 	/* COMPILER: There are two projections that were marked as
 	 * alloc, so we pass back our reference here. */
 
-	lcd_set_r1(dptr_val(fs_container->my_ref));
-	lcd_set_r2(dptr_val(fs_operations_container->my_ref));
+	lcd_set_r1(cptr_val(fs_container->my_ref));
+	lcd_set_r2(cptr_val(fs_operations_container->my_ref));
 
 	/* COMPILER: size was marked as [out] in projection <struct fs>, so
 	 * we pass that back here. */
@@ -499,9 +497,9 @@ void register_fs_callee(void)
 	/* IPC REPLY -------------------------------------------------- */
 
 	LIBLCD_MSG("vfs replying to register_fs caller");
-	ret = lcd_reply();
+	ret = lcd_sync_reply();
 	if (ret) {
-		LIBLCD_ERR("lcd_reply");
+		LIBLCD_ERR("lcd_sync_reply");
 		lcd_exit(-1);
 	}
 }
@@ -519,7 +517,6 @@ void unregister_fs_callee(void)
 
 	/* These are used below. */
 	int ret;
-	struct dstore_node *n;
 	dptr_t fs_minix_ref;
 	dptr_t fs_operations_minix_ref;
 	struct new_file_hidden_args *new_file_hidden_args;
@@ -530,35 +527,29 @@ void unregister_fs_callee(void)
 	/* COMPILER: There are 2 projections reachable from the arguments
 	 * in the IDL spec, so we expect refs here. */
 
-	fs_minix_ref = __dptr(lcd_r1());
-	fs_operations_minix_ref = __dptr(lcd_r2());
+	fs_minix_ref = __cptr(lcd_r1());
+	fs_operations_minix_ref = __cptr(lcd_r2());
 
 	/* CONTAINER INIT ---------------------------------------- */
 
 	/* COMPILER: The projections aren't marked as alloc, so we look them
 	 * up (we expect they already exist on our side). */
 
-	ret = lcd_dstore_get(minix_dstore,
-			fs_minix_ref,
-			STRUCT_FS_TAG,
-			&n);
+	ret = vfs_cap_lookup_fs_type(minix_cspace,
+				fs_minix_ref,
+				&fs_container);
 	if (ret) {
 		LIBLCD_ERR("lookup");
 		lcd_exit(-1);
 	}
-	fs_container = lcd_dstore_node_object(n);
-	lcd_dstore_put(n);
 
-	ret = lcd_dstore_get(minix_dstore,
-			fs_operations_minix_ref,
-			STRUCT_FS_OPERATIONS_TAG,
-			&n);
+	ret = vfs_cap_lookup_fs_operations_type(minix_cspace,
+						fs_operations_minix_ref,
+						&fs_operations_container);
 	if (ret) {
 		LIBLCD_ERR("lookup");
 		lcd_exit(-1);
 	}
-	fs_operations_container = lcd_dstore_node_object(n);
-	lcd_dstore_put(n);
 
 	/* INVOKE UNREGISTER_FS ---------------------------------------- */
 
@@ -570,8 +561,8 @@ void unregister_fs_callee(void)
 	 * we do that here (unregister_fs didn't do any dealloc). */
 
 	/* COMPILER: First, we remove them from the data store. */
-	lcd_dstore_delete(minix_dstore, fs_container->my_ref);
-	lcd_dstore_delete(minix_dstore, fs_operations_container->my_ref);
+	vfs_cap_remove(minix_cspace, fs_container->my_ref);
+	vfs_cap_remove(minix_cspace, fs_operations_container->my_ref);
 	
 	/* COMPILER: Second, we delete any capabilities from the cspace
 	 * that are stored in the container.
@@ -602,9 +593,9 @@ void unregister_fs_callee(void)
 	/* IPC REPLY -------------------------------------------------- */
 
 	LIBLCD_MSG("vfs replying to unregister_fs caller");
-	ret = lcd_reply();
+	ret = lcd_sync_reply();
 	if (ret) {
-		LIBLCD_ERR("lcd_reply");
+		LIBLCD_ERR("lcd_sync_reply");
 		lcd_exit(-1);
 	}
 }
@@ -616,7 +607,7 @@ void unregister_fs_callee(void)
  *
  * This will also initialize the globals for the trampolines.
  *
- * XXX: In this simple example, it also initializes a data store,
+ * XXX: In this simple example, it also initializes a cspace,
  * but in the future, this may not be done in init. */
 #define VFS_CHANNEL_TYPE 1
 static struct ipc_channel vfs_channel;
@@ -634,9 +625,9 @@ int glue_vfs_init(cptr_t vfs_chnl, struct dispatch_ctx *ctx)
 	loop_add_channel(loop_ctx, &vfs_channel);
 
 	/* Initialize minix data store */
-	ret = lcd_dstore_init_dstore(&minix_dstore);
+	ret = vfs_cap_create(&minix_cspace);
 	if (ret) {
-		LIBLCD_ERR("dstore init");
+		LIBLCD_ERR("cspace init");
 		return ret;
 	}
 
@@ -645,7 +636,7 @@ int glue_vfs_init(cptr_t vfs_chnl, struct dispatch_ctx *ctx)
 
 void glue_vfs_exit(void)
 {
-	lcd_dstore_destroy(minix_dstore);
+	vfs_cap_destroy(minix_cspace);
 
 	/* We may as well remove the channel from the loop, though
 	 * it doesn't matter in this simple example. (In general, we

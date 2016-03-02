@@ -91,8 +91,8 @@ int __liblcd_mem_itree_insert(gpa_t start, unsigned long size,
 		LIBLCD_ERR("failed to get a node");
 		goto fail1;
 	}
-	n->it_node.start = gpa_val(start);
-	n->it_node.last = gpa_val(start) + size - 1;
+	n->start = gpa_val(start);
+	n->last = gpa_val(start) + size - 1;
 	n->cptr = mem_cptr;
 	lcd_resource_tree_insert(&itree, n);
 
@@ -119,8 +119,10 @@ int lcd_phys_to_resource_node(gpa_t paddr, struct lcd_resource_node **n_out)
 	int ret;
 	/*
 	 * Lookup
+	 *
+	 * For liblcd, we only expect one match.
 	 */
-	ret = lcd_resource_tree_search(&itree, gpa_val(paddr), &n);
+	ret = lcd_resource_tree_search_addr(&itree, gpa_val(paddr), &n);
 	if (ret) {
 		LIBLCD_ERR("lookup failed");
 		goto fail1;

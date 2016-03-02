@@ -100,8 +100,8 @@ static int mo_insert_in_tree(struct lcd_resource_tree *t,
 		goto fail1;
 	}
 	n->cptr = mo_cptr;
-	n->it_node.start = __lcd_memory_object_start(mo);
-	n->it_node.last = __lcd_memory_object_last(mo);
+	n->start = __lcd_memory_object_start(mo);
+	n->last = __lcd_memory_object_last(mo);
 	/*
 	 * Insert into tree
 	 */
@@ -129,30 +129,6 @@ static int mo_insert_in_trees(struct task_struct *t,
 			mo_cptr);
 }
 
-static int mo_in_tree(struct lcd_resource_tree *t, 
-		struct lcd_memory_object *mo)
-{
-	struct lcd_resource_node *unused;
-	/*
-	 * Returns zero if search found something
-	 */
-	return lcd_resource_tree_search(t,
-					__lcd_memory_object_start(mo),
-					&unused) == 0;
-}
-
-static int mo_in_trees(struct task_struct *t, struct lcd_memory_object *mo)
-{
-	if (__lcd_memory_object_is_contiguous(mo))
-		return mo_in_tree(
-			t->lcd_resource_trees[LCD_RESOURCE_TREE_CONTIGUOUS],
-			mo);
-	else
-		return mo_in_tree(
-			t->lcd_resource_trees[LCD_RESOURCE_TREE_NON_CONTIGUOUS],
-			mo);
-}
-
 static void mo_remove_from_tree(struct lcd_resource_tree *tree, 
 				struct lcd_memory_object *mo,
 				cptr_t mo_cptr)
@@ -161,9 +137,13 @@ static void mo_remove_from_tree(struct lcd_resource_tree *tree,
 	int ret;
 	/*
 	 * Look up node in tree
+	 *
+	 * We use the address *and* cptr because we may have mapped
+	 * the same interval more than once.
 	 */
 	ret = lcd_resource_tree_search(tree,
 				__lcd_memory_object_start(mo),
+				mo_cptr,
 				&node);
 	if (ret) {
 		LIBLCD_ERR("couldn't find memory object, not mapped?");
@@ -177,16 +157,19 @@ static void mo_remove_from_tree(struct lcd_resource_tree *tree,
 }
 
 static void mo_remove_from_trees(struct task_struct *t, 
-				struct lcd_memory_object *mo)
+				struct lcd_memory_object *mo,
+				cptr_t mo_cptr)
 {
 	if (__lcd_memory_object_is_contiguous(mo))
 		mo_remove_from_tree(
 			t->lcd_resource_trees[LCD_RESOURCE_TREE_CONTIGUOUS],
-			mo);
+			mo,
+			mo_cptr);
 	else
 		mo_remove_from_tree(
 			t->lcd_resource_trees[LCD_RESOURCE_TREE_NON_CONTIGUOUS],
-			mo);
+			mo,
+			mo_cptr);
 }
 
 /* LOW-LEVEL PAGE ALLOC -------------------------------------------------- */
@@ -342,7 +325,8 @@ static void do_phys_unmap(struct lcd *lcd, struct lcd_memory_object *mo,
 	/*
 	 * Remove from resource trees
 	 */
-	mo_remove_from_trees(current, mo, cap_cnode_cptr(mo_cnode));
+	mo_remove_from_trees(current, mo, cap_cnode_cptr(mo_cnode),
+			cap_cnode_cptr(mo_cnode));
 	/*
 	 * "Unmap" from physical address space (this is a no-op for
 	 * non-isolated code right now)

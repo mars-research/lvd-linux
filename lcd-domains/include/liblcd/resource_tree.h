@@ -137,9 +137,9 @@ int lcd_resource_tree_search(struct lcd_resource_tree *t,
  * @addr (this should only happen in the same interval has been inserted
  * more than once), the first node found is returned.
  */
-int lcd_resource_tree_search(struct lcd_resource_tree *t,
-			unsigned long addr,
-			struct lcd_resource_node **n_out);
+int lcd_resource_tree_search_addr(struct lcd_resource_tree *t,
+				unsigned long addr,
+				struct lcd_resource_node **n_out);
 
 /**
  * lcd_resource_tree_first -- Return first node in tree

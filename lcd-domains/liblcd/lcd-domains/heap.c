@@ -409,10 +409,10 @@ void lcd_free_memcg_kmem_pages(unsigned long addr, unsigned int order)
 int lcd_volunteer_pages(struct page *base, unsigned int order,
 			cptr_t *slot_out)
 {
-	unsigned long size;
+	unsigned long size, unused;
 	return lcd_phys_to_cptr(
 		lcd_gva2gpa(__gva((unsigned long)lcd_page_address(base))), 
-		slot_out, &size);
+		slot_out, &size, &unused);
 }
 
 void lcd_unvolunteer_pages(cptr_t pages)
@@ -423,8 +423,8 @@ void lcd_unvolunteer_pages(cptr_t pages)
 int lcd_volunteer_dev_mem(gpa_t base, unsigned int order,
 			cptr_t *slot_out)
 {
-	unsigned long size;
-	return lcd_phys_to_cptr(base, slot_out, &size);
+	unsigned long size, unused;
+	return lcd_phys_to_cptr(base, slot_out, &size, &unused);
 }
 
 void lcd_unvolunteer_dev_mem(cptr_t devmem)
@@ -435,8 +435,8 @@ void lcd_unvolunteer_dev_mem(cptr_t devmem)
 int lcd_volunteer_vmalloc_mem(gva_t base, unsigned long nr_pages,
 			cptr_t *slot_out)
 {
-	unsigned long size;
-	return lcd_virt_to_cptr(base, slot_out, &size);
+	unsigned long size, unused;
+	return lcd_virt_to_cptr(base, slot_out, &size, &unused);
 }
 
 void lcd_unvolunteer_vmalloc_mem(cptr_t vmalloc_mem)

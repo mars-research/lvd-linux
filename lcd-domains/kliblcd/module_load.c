@@ -130,7 +130,7 @@ static int dup_module_pages(hva_t pages_base, unsigned long size,
 {
 	int ret;
 	void *dup_pages;
-	unsigned long unused;
+	unsigned long unused1, unused2;
 	/*
 	 * Alloc dup pages, and memcpy the bits over
 	 */
@@ -146,7 +146,7 @@ static int dup_module_pages(hva_t pages_base, unsigned long size,
 	 */
 	ret = lcd_virt_to_cptr(__gva((unsigned long)dup_pages),
 			dup_pages_cap_out,
-			&unused);
+			&unused1, &unused2);
 	if (ret) {
 		LIBLCD_ERR("vmalloc mem object lookup failed");
 		goto fail2;

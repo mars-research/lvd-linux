@@ -138,7 +138,8 @@ int lcd_virt_to_resource_node(gva_t vaddr, struct lcd_resource_node **n)
 	return lcd_phys_to_resource_node(lcd_gva2gpa(vaddr), n);
 }
 
-int lcd_phys_to_cptr(gpa_t paddr, cptr_t *c_out, unsigned long *size_out)
+int lcd_phys_to_cptr(gpa_t paddr, cptr_t *c_out, unsigned long *size_out,
+		unsigned long *offset_out)
 {
 	struct lcd_resource_node *n;
 	int ret;
@@ -148,6 +149,7 @@ int lcd_phys_to_cptr(gpa_t paddr, cptr_t *c_out, unsigned long *size_out)
 		return ret;
 	*c_out = n->cptr;
 	*size_out = lcd_resource_node_size(n);
+	*offset_out = gpa_val(paddr) - lcd_resource_node_start(n);
 
 	return 0;
 }

@@ -467,6 +467,7 @@ void lcd_unvolunteer_vmalloc_mem(cptr_t vmalloc_mem);
  * @paddr: the physical address to search for
  * @c_out: out param containing cptr to memory capability that contains @paddr
  * @size_out: the memory object is size bytes
+ * @offset_out: the offset that @paddr is in the memory object, in bytes
  *
  * If @paddr meets these conditions:
  *
@@ -500,7 +501,8 @@ void lcd_unvolunteer_vmalloc_mem(cptr_t vmalloc_mem);
  * (There is no way to get a cptr to a capability to individual pages
  * in a chunk, since the microkernel doesn't currently support this.)
  */
-int lcd_phys_to_cptr(gpa_t paddr, cptr_t *c_out, unsigned long *size_out);
+int lcd_phys_to_cptr(gpa_t paddr, cptr_t *c_out, unsigned long *size_out,
+		unsigned long *offset_out);
 /**
  * lcd_phys_to_resource_node -- Look up the struct lcd_resource_node for the
  *                              memory object that contains guest physical
@@ -517,10 +519,12 @@ int lcd_phys_to_resource_node(gpa_t paddr, struct lcd_resource_node **n);
  * @vaddr: the virtual address to search for
  * @c_out: out param containing cptr to memory capability that contains @paddr
  * @size_out: the memory object is size bytes
+ * @offset_out: the offset that @vaddr is in the memory object, in bytes
  *
  * Similar to lcd_phys_to_cptr. Similar error conditions.
  */
-int lcd_virt_to_cptr(gva_t vaddr, cptr_t *c_out, unsigned long *size_out);
+int lcd_virt_to_cptr(gva_t vaddr, cptr_t *c_out, unsigned long *size_out,
+		unsigned long *offset_out);
 /**
  * lcd_virt_to_resource_node -- Similar to lcd_phys_to_resource_node, 
  *                              but @vaddr is a virtual address

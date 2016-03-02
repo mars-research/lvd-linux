@@ -487,7 +487,7 @@ void lcd_free_pages(struct page *base, unsigned int order)
 	cptr_t page_cptr;
 	int ret;
 	gpa_t gpa;
-	unsigned long actual_size;
+	unsigned long actual_size, unused;
 	/*
 	 * Translate page to physical address.
 	 *
@@ -498,7 +498,7 @@ void lcd_free_pages(struct page *base, unsigned int order)
 	/*
 	 * Resolve pages to cptr
 	 */
-	ret = lcd_phys_to_cptr(gpa, &page_cptr, &actual_size);
+	ret = lcd_phys_to_cptr(gpa, &page_cptr, &actual_size, &unused);
 	if (ret) {
 		LIBLCD_ERR("warning: pages not found, so not freed");
 		return;
@@ -577,12 +577,12 @@ void lcd_vfree(void *vptr)
 {
 	cptr_t vmalloc_mem_cptr;
 	int ret;
-	unsigned long unused;
+	unsigned long unused1, unused2;
 	/*
 	 * Resolve vptr to cptr
 	 */
 	ret = lcd_virt_to_cptr(__gva((unsigned long)vptr),
-			&vmalloc_mem_cptr, &unused);
+			&vmalloc_mem_cptr, &unused1, &unused2);
 	if (ret) {
 		LIBLCD_ERR("warning: vmaloc mem not found, so not freed");
 		return;
@@ -705,14 +705,14 @@ void lcd_unmap_phys(gpa_t base, unsigned int order)
 {
 	int ret;
 	cptr_t mo_cptr;
-	unsigned long mo_size;
+	unsigned long mo_size, unused;
 	/*
 	 * No real unmapping needs to be done, but we need to
 	 * update the resource tree.
 	 *
 	 * Look up cptr for physical memory
 	 */
-	ret = lcd_phys_to_cptr(base, &mo_cptr, &mo_size);
+	ret = lcd_phys_to_cptr(base, &mo_cptr, &mo_size, &unused);
 	if (ret) {
 		LIBLCD_ERR("phys not mapped?");
 		return;
@@ -729,14 +729,14 @@ void lcd_unmap_virt(gva_t base, unsigned int order)
 {
 	int ret;
 	cptr_t mo_cptr;
-	unsigned long mo_size;
+	unsigned long mo_size, unused;
 	/*
 	 * No real unmapping needs to be done, but we need to
 	 * update the resource tree.
 	 *
 	 * Look up cptr for virtual memory
 	 */
-	ret = lcd_virt_to_cptr(base, &mo_cptr, &mo_size);
+	ret = lcd_virt_to_cptr(base, &mo_cptr, &mo_size, &unused);
 	if (ret) {
 		LIBLCD_ERR("virt not mapped?");
 		return;
@@ -879,7 +879,8 @@ int lcd_phys_to_resource_node(gpa_t paddr, struct lcd_resource_node **n)
 		n);
 }
 
-int lcd_phys_to_cptr(gpa_t paddr, cptr_t *c_out, unsigned long *size_out)
+int lcd_phys_to_cptr(gpa_t paddr, cptr_t *c_out, unsigned long *size_out,
+		unsigned long *offset_out)
 {
 	int ret;
 	struct lcd_resource_node *n;
@@ -896,6 +897,7 @@ int lcd_phys_to_cptr(gpa_t paddr, cptr_t *c_out, unsigned long *size_out)
 	 */
 	*c_out = n->cptr;
 	*size_out = lcd_resource_node_size(n);
+	*offset_out = gpa_val(paddr) - lcd_resource_node_start(n);
 
 	return 0;
 
@@ -903,7 +905,8 @@ fail1:
 	return ret;
 }
 
-int lcd_virt_to_resource_node(gva_t vaddr, struct lcd_resource_node **n)
+int virt_to_resource_node(gva_t vaddr, struct lcd_resource_node **n,
+			int *tree_id)
 {
 	gpa_t gpa;
 	int ret;
@@ -922,20 +925,30 @@ int lcd_virt_to_resource_node(gva_t vaddr, struct lcd_resource_node **n)
 		 * guest phys = host phys.
 		 */
 		gpa = __gpa(hpa_val(hva2hpa(__hva(gva_val(vaddr)))));
+		*tree_id = LCD_RESOURCE_TREE_CONTIGUOUS;
 		return lcd_phys_to_resource_node(gpa, n);
 	}
 
+	*tree_id = LCD_RESOURCE_TREE_NON_CONTIGUOUS;
+
 	return ret;
+}
+
+int lcd_virt_to_resource_node(gva_t vaddr, struct lcd_resource_node **n)
+{
+	int unused;
+	return virt_to_resource_node(vaddr, n, &unused);
 }
 
 int lcd_virt_to_cptr(gva_t vaddr, cptr_t *c_out, unsigned long *size_out)
 {
 	struct lcd_resource_node *n;
 	int ret;
+	int tree_id;
 	/*
 	 * Resolve to resource node
 	 */
-	ret = lcd_virt_to_resource_node(vaddr, &n);
+	ret = virt_to_resource_node(vaddr, &n, &tree_id);
 	if (ret) {
 		LIBLCD_ERR("address not found");
 		goto fail1;
@@ -945,6 +958,13 @@ int lcd_virt_to_cptr(gva_t vaddr, cptr_t *c_out, unsigned long *size_out)
 	 */
 	*c_out = n->cptr;
 	*size_out = lcd_resource_node_size(n);
+	if (tree_id == LCD_RESOURCE_TREE_NON_CONTIGUOUS) {
+		/* Assumes only virtual addresses in non-contig tree */
+		*offset_out = gva_val(vaddr) - lcd_resource_node_start(n);
+	} else {
+		*offset_out = gpa_val(lcd_gva2gpa(vaddr)) - 
+			lcd_resource_node_start(n);
+	}
 
 	return 0;
 

@@ -68,21 +68,21 @@ fail1:
 static int do_send(cptr_t endpoint, char *data, int len)
 {
 	int ret;
-	struct lcd_resource_node *n;
-	unsigned long offset;
+	unsigned long offset, size;
+	cptr_t page;
 	/*
 	 * Get the cptr for the page that contains data
 	 */
-	ret = lcd_virt_to_resource_node(__gva((unsigned long)data), &n);
+	ret = lcd_virt_to_cptr(__gva((unsigned long)data), &page, 
+			&size, &offset);
 	if (ret) {
 		LIBLCD_ERR("lcd virt addr to page cptr failed");
 		goto fail1;
 	}
-	offset = __pa(data) - lcd_resource_node_start(n);
 	/*
 	 * Set up message for grant
 	 */
-	lcd_set_cr1(n->cptr);
+	lcd_set_cr1(page);
 	lcd_set_r0(offset);
 	ret = lcd_sync_send(endpoint);
 	if (ret) {

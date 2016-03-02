@@ -876,7 +876,7 @@ int lcd_phys_to_resource_node(gpa_t paddr, struct lcd_resource_node **n)
 	return lcd_resource_tree_search(
 		current->lcd_resource_trees[LCD_RESOURCE_TREE_CONTIGUOUS],
 		gpa_val(paddr),
-		&n);
+		n);
 }
 
 int lcd_phys_to_cptr(gpa_t paddr, cptr_t *c_out, unsigned long *size_out)
@@ -913,7 +913,7 @@ int lcd_virt_to_resource_node(gva_t vaddr, struct lcd_resource_node **n)
 	ret = lcd_resource_tree_search(
 		current->lcd_resource_trees[LCD_RESOURCE_TREE_NON_CONTIGUOUS],
 		gva_val(vaddr),
-		&n);
+		n);
 	if (ret) {
 		/* 
 		 * Not found in vmalloc tree
@@ -947,6 +947,9 @@ int lcd_virt_to_cptr(gva_t vaddr, cptr_t *c_out, unsigned long *size_out)
 	*size_out = lcd_resource_node_size(n);
 
 	return 0;
+
+fail1:
+	return ret;
 }
 
 /* MISCELLANEOUS -------------------------------------------------- */
@@ -1012,7 +1015,9 @@ EXPORT_SYMBOL(lcd_unvolunteer_dev_mem);
 EXPORT_SYMBOL(lcd_volunteer_vmalloc_mem);
 EXPORT_SYMBOL(lcd_unvolunteer_vmalloc_mem);
 EXPORT_SYMBOL(lcd_phys_to_cptr);
+EXPORT_SYMBOL(lcd_phys_to_resource_node);
 EXPORT_SYMBOL(lcd_virt_to_cptr);
+EXPORT_SYMBOL(lcd_virt_to_resource_node);
 EXPORT_SYMBOL(lcd_virt_to_head_page);
 EXPORT_SYMBOL(lcd_page_address);
 EXPORT_SYMBOL(lcd_free_memcg_kmem_pages);

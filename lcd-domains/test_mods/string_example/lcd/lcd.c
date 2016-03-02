@@ -55,8 +55,6 @@ static int do_recv(cptr_t endpoint, char **data)
 	 */
 	*data = (char *)(gva_val(page) + offset);
 
-	*page_cptr_out = page_cptr;
-
 	return 0;
 
 fail3:
@@ -80,11 +78,11 @@ static int do_send(cptr_t endpoint, char *data, int len)
 		LIBLCD_ERR("lcd virt addr to page cptr failed");
 		goto fail1;
 	}
-	offset = ((unsigned long)data) - lcd_resource_node_start(n);
+	offset = __pa(data) - lcd_resource_node_start(n);
 	/*
 	 * Set up message for grant
 	 */
-	lcd_set_cr1(p);
+	lcd_set_cr1(n->cptr);
 	lcd_set_r0(offset);
 	ret = lcd_sync_send(endpoint);
 	if (ret) {

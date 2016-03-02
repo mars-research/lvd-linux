@@ -476,9 +476,17 @@ int __lcd_do_map_memory_object(struct lcd *lcd,
 	 * If memory object is already mapped, fail
 	 */
 	if (!meta) {
-		LCD_ERR("lookup before meta set?");
-		ret = -EIO;
-		goto out;
+		/*
+		 * First time mapping; init metadata
+		 *
+		 * zalloc sets is_mapped = 0
+		 */
+		meta = kzalloc(sizeof(*meta), GFP_KERNEL); 
+		if (!meta) {
+			LCD_ERR("malloc failed");
+			ret = -ENOMEM;
+			goto out;
+		}
 	}
 	if (meta->is_mapped) {
 		LCD_ERR("memory object already mapped");
@@ -611,7 +619,7 @@ void __lcd_do_unmap_memory_object(struct lcd *caller,
 	 */
 	if (!meta) {
 		LCD_DEBUG(LCD_DEBUG_MSG,
-			"lookup before meta set?");
+			"meta is NULL; memory never mapped");
 		return;
 	}
 	if (!meta->is_mapped) {

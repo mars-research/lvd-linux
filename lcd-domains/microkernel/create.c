@@ -419,17 +419,12 @@ int __lcd_memory_grant_and_map(struct lcd *caller, cptr_t lcd,
 	/*
 	 * Grant lcd a capability to memory object
 	 */
-	ret = __lcd_grant_memory_object(caller, lcd_struct, 
-					mo_cptr, dest_slot);
+	ret = cap_grant(caller->cspace, mo_cptr,
+			lcd_struct->cspace, dest_slot);
 	if (ret)
 		goto fail2;
 	/*
 	 * Map in lcd's address space
-	 *
-	 * (There are a couple redundant cspace lookups here. Rather
-	 * than optimize prematurely and mash some of these operations
-	 * together, I'll keep things more sane and understandable,
-	 * separated.)
 	 */
 	ret = __lcd_map_memory_object(lcd_struct, dest_slot, base);
 	if (ret)

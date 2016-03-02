@@ -302,3 +302,6 @@ static inline void force_up_write(void *x)
 
 #undef page_address
 #define page_address(page) lcd_page_address(page)
+
+#undef __pa
+#define __pa(vaddr) gpa_val(lcd_gva2gpa(__gva((unsigned long)vaddr)))

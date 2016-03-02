@@ -7,8 +7,7 @@
 #include <linux/kernel.h>
 #include <liblcd/liblcd.h>
 
-static int do_recv(cptr_t endpoint, cptr_t *page_cptr_out,
-		char **data)
+static int do_recv(cptr_t endpoint, char **data)
 {
 	int ret;
 	cptr_t page_cptr;
@@ -50,8 +49,6 @@ static int do_recv(cptr_t endpoint, cptr_t *page_cptr_out,
 	 */
 	*data = (char *)(gva_val(page) + offset);
 
-	*page_cptr_out = page_cptr;
-
 	return 0;
 
 fail3:
@@ -75,7 +72,7 @@ static int do_send(cptr_t endpoint, char *data, int len)
 		LIBLCD_ERR("lcd virt addr to page cptr failed");
 		goto fail1;
 	}
-	offset = ((unsigned long)data) - lcd_resource_node_start(n);
+	offset = __pa(data) - lcd_resource_node_start(n);
 	/*
 	 * Set up message for grant
 	 */
@@ -109,11 +106,11 @@ static int do_stuff(cptr_t endpoint)
 		ret = -ENOMEM;
 		goto fail1;
 	}
-	memset(page_address(p), 0, PAGE_SIZE);
+	memset(lcd_page_address(p), 0, PAGE_SIZE);
 	/*
 	 * Write some data at an offset into the page
 	 */
-	str = page_address(p) + 64;
+	str = lcd_page_address(p) + 64;
 	*(str + 0) = 'h';
 	*(str + 1) = 'e';
 	*(str + 2) = 'l';
@@ -172,6 +169,7 @@ static int boot_main(void)
 	int ret;
 	cptr_t lcd;
 	struct lcd_create_ctx *ctx;
+	cptr_t endpoint, dest;
 	/*
 	 * Enter LCD mode
 	 */

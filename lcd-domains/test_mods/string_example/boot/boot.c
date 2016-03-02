@@ -62,39 +62,34 @@ fail1:
 	return ret;
 }
 
-static int do_send(cptr_t endpoint, char *data, int len,
-		cptr_t *page_out)
+static int do_send(cptr_t endpoint, char *data, int len)
 {
 	int ret;
-	cptr_t p;
-	unsigned long size;
+	struct lcd_resource_node *n;
+	unsigned long offset;
 	/*
 	 * Get the cptr for the page that contains data
 	 */
-	ret = lcd_virt_to_cptr(__gva((unsigned long)data), &p, &size);
+	ret = lcd_virt_to_resource_node(__gva((unsigned long)data), &n);
 	if (ret) {
 		LIBLCD_ERR("lcd virt addr to page cptr failed");
 		goto fail1;
 	}
+	offset = ((unsigned long)data) - lcd_resource_node_start(n);
 	/*
 	 * Set up message for grant
 	 */
-	lcd_set_cr1(p);
+	lcd_set_cr1(n->cptr);
 	lcd_set_r0(offset);
-	ret = lcd_send(endpoint);
+	ret = lcd_sync_send(endpoint);
 	if (ret) {
 		LIBLCD_ERR("send failed");
 		goto fail2;
 	}
-	/*
-	 * Return cptr to page involved in lookup.
-	 */
-	*page_out = p;
 
 	return 0;
 
 fail2:
-	lcd_addr_to_page_cptr_cleanup(p);	
 fail1:
 	return ret;
 }
@@ -105,7 +100,6 @@ static int do_stuff(cptr_t endpoint)
 	struct page *p;
 	char *str;
 	char *data;
-	cptr_t page1, page2, page3;
 	/*
 	 * Allocate a page
 	 */
@@ -129,7 +123,7 @@ static int do_stuff(cptr_t endpoint)
 	/*
 	 * "send" the string to the lcd
 	 */
-	ret = do_send(endpoint, str, 6, &page1);
+	ret = do_send(endpoint, str, 6);
 	if (ret) {
 		LIBLCD_ERR("do first send failed");
 		goto fail2;
@@ -137,7 +131,7 @@ static int do_stuff(cptr_t endpoint)
 	/*
 	 * receive it back
 	 */
-	ret = do_recv(endpoint, &page2, &data);
+	ret = do_recv(endpoint, &data);
 	if (ret) {
 		LIBLCD_ERR("do recv failed");
 		goto fail3;
@@ -150,7 +144,7 @@ static int do_stuff(cptr_t endpoint)
 	/*
 	 * send it again
 	 */
-	ret = do_send(endpoint, data, strlen(data), &page3);
+	ret = do_send(endpoint, data, strlen(data));
 	if (ret) {
 		LIBLCD_ERR("do second send failed");
 		goto fail5;

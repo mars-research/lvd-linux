@@ -1,19 +1,19 @@
-/**
- * lcd.c - code for lcd in ipc test
+/*
+ * lcd.c - code for isolated LCD in liblcd test
  */
 
-#include <lcd-domains/liblcd-config.h>
+#include <lcd_config/pre_hook.h>
 
 #include <linux/module.h>
 #include <linux/kernel.h>
-#include <lcd-domains/liblcd.h>
+#include <linux/slab.h>
+#include <liblcd/liblcd.h>
 
-#include <lcd-domains/liblcd-hacks.h>
+#include <lcd_config/post_hook.h>
 
 cptr_t ep;
 
-static int do_recv(cptr_t endpoint, cptr_t *page_cptr_out,
-		char **data)
+static int do_recv(cptr_t endpoint, char **data)
 {
 	int ret;
 	cptr_t page_cptr;
@@ -22,7 +22,7 @@ static int do_recv(cptr_t endpoint, cptr_t *page_cptr_out,
 	/*
 	 * Prepare to receive a page that contains data
 	 */
-	ret = lcd_alloc_cptr(&page_cptr);
+	ret = lcd_cptr_alloc(&page_cptr);
 	if (ret) {
 		LIBLCD_ERR("alloc cptr failed");
 		goto fail1;
@@ -31,7 +31,7 @@ static int do_recv(cptr_t endpoint, cptr_t *page_cptr_out,
 	/*
 	 * Listen for message from boot
 	 */
-	ret = lcd_recv(endpoint);
+	ret = lcd_sync_recv(endpoint);
 	if (ret) {
 		LIBLCD_ERR("recv failed");
 		goto fail2;
@@ -43,7 +43,7 @@ static int do_recv(cptr_t endpoint, cptr_t *page_cptr_out,
 	/*
 	 * Map page
 	 */
-	ret = lcd_map_page_both(page_cptr, &page);
+	ret = lcd_map_virt(page_cptr, 0, &page);
 	if (ret) {
 		LIBLCD_ERR("failed to map page");
 		goto fail3;
@@ -62,44 +62,39 @@ static int do_recv(cptr_t endpoint, cptr_t *page_cptr_out,
 fail3:
 	lcd_cap_delete(page_cptr);
 fail2:
-	lcd_free_cptr(page_cptr);
+	lcd_cptr_free(page_cptr);
 fail1:
 	return ret;
 }
 
-static int do_send(cptr_t endpoint, char *data, int len,
-		cptr_t *page_out)
+static int do_send(cptr_t endpoint, char *data, int len)
 {
 	int ret;
-	cptr_t p;
+	struct lcd_resource_node *n;
 	unsigned long offset;
 	/*
 	 * Get the cptr for the page that contains data
 	 */
-	ret = lcd_virt_addr_to_page_cptr(data, len, &p, &offset);
+	ret = lcd_virt_to_resource_node(__gva((unsigned long)data), &n);
 	if (ret) {
 		LIBLCD_ERR("lcd virt addr to page cptr failed");
 		goto fail1;
 	}
+	offset = ((unsigned long)data) - lcd_resource_node_start(n);
 	/*
 	 * Set up message for grant
 	 */
 	lcd_set_cr1(p);
 	lcd_set_r0(offset);
-	ret = lcd_send(endpoint);
+	ret = lcd_sync_send(endpoint);
 	if (ret) {
 		LIBLCD_ERR("send failed");
 		goto fail2;
 	}
-	/*
-	 * Return cptr to page involved in lookup.
-	 */
-	*page_out = p;
 
 	return 0;
 
 fail2:
-	lcd_addr_to_page_cptr_cleanup(p);	
 fail1:
 	return ret;
 }
@@ -108,11 +103,10 @@ static void do_stuff(void)
 {
 	int ret;
 	char *data1, *data2;
-	cptr_t page1, page2, page3;
 	/*
 	 * "recv" the string from boot
 	 */
-	ret = do_recv(ep, &page1, &data1);
+	ret = do_recv(ep, &data1);
 	if (ret) {
 		LIBLCD_ERR("do first recv failed");
 		goto fail1;
@@ -126,7 +120,7 @@ static void do_stuff(void)
 	/*
 	 * send it back to boot
 	 */
-	ret = do_send(ep, data1, strlen(data1), &page2);
+	ret = do_send(ep, data1, strlen(data1));
 	if (ret) {
 		LIBLCD_ERR("send failed");
 		goto fail3;
@@ -134,7 +128,7 @@ static void do_stuff(void)
 	/*
 	 * recv it again
 	 */
-	ret = do_recv(ep, &page3, &data2);
+	ret = do_recv(ep, &data2);
 	if (ret) {
 		LIBLCD_ERR("do second recv failed");
 		goto fail4;

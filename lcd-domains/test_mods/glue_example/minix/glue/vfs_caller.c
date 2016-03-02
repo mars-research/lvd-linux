@@ -570,8 +570,6 @@ void rm_file_callee(void)
 	 * from the glue cspace though (it's ok to do this after the
 	 * container was freed). */
 
-	printk("glue sizeof file_container is 0x%lx", sizeof(*file_container));
-
 	vfs_cap_remove(vfs_cspace, file_ref);
 
 	/* IPC MARSHALING ---------------------------------------- */

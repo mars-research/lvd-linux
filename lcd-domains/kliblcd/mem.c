@@ -154,7 +154,8 @@ static int mo_in_trees(struct task_struct *t, struct lcd_memory_object *mo)
 }
 
 static void mo_remove_from_tree(struct lcd_resource_tree *tree, 
-				struct lcd_memory_object *mo)
+				struct lcd_memory_object *mo,
+				cptr_t mo_cptr)
 {
 	struct lcd_resource_node *node;
 	int ret;
@@ -292,37 +293,34 @@ static int do_map(struct lcd *lcd, struct lcd_memory_object *mo,
 {
 	int ret;
 	/*
-	 * Check if it's already in a resource tree
+	 * "Map" in physical address space (this only marks the
+	 * memory as mapped for non-isolated code right now)
 	 */
-	if (mo_in_trees(current, mo)) {
-		LIBLCD_ERR("memory object already mapped");
-		ret = -EINVAL;
+	ret = __lcd_do_map_memory_object(lcd, mo, cap_cnode_metadata(cnode),
+					__gpa(0));
+	if (ret) {
+		LIBLCD_ERR("physical map failed");
 		goto fail1;
 	}
 	/*
-	 * No; put it in the correct one, depending on its type
+	 * Insert into proper resource tree, depending on its type
+	 *
+	 * XXX: If the same memory object gets inserted more than
+	 * once, we can end up with duplicates in the trees. This occurs
+	 * when non-isolated code has multiple capabilities to the
+	 * same memory object. This is OK for now (address -> cptr 
+	 * translation just needs some cptr, size, offset, etc.).
 	 */
 	ret = mo_insert_in_trees(current, mo, mo_cptr);
 	if (ret) {
 		LIBLCD_ERR("insert into resource tree failed");
 		goto fail2;
 	}
-	/*
-	 * "Map" in physical address space (this is a no-op for
-	 * non-isolated code right now)
-	 */
-	ret = __lcd_do_map_memory_object(lcd, mo, cap_cnode_metadata(cnode),
-					__gpa(0));
-	if (ret) {
-		LIBLCD_ERR("physical map failed");
-		goto fail3;
-	}
 
 	return 0;
 
-fail3:
-	mo_remove_from_trees(current, mo);
 fail2:
+	__lcd_do_unmap_memory_object(lcd, mo, cap_cnode_metadata(cnode));
 fail1:
 	return ret;
 }
@@ -344,7 +342,7 @@ static void do_phys_unmap(struct lcd *lcd, struct lcd_memory_object *mo,
 	/*
 	 * Remove from resource trees
 	 */
-	mo_remove_from_trees(current, mo);
+	mo_remove_from_trees(current, mo, cap_cnode_cptr(mo_cnode));
 	/*
 	 * "Unmap" from physical address space (this is a no-op for
 	 * non-isolated code right now)
@@ -940,7 +938,8 @@ int lcd_virt_to_resource_node(gva_t vaddr, struct lcd_resource_node **n)
 	return virt_to_resource_node(vaddr, n, &unused);
 }
 
-int lcd_virt_to_cptr(gva_t vaddr, cptr_t *c_out, unsigned long *size_out)
+int lcd_virt_to_cptr(gva_t vaddr, cptr_t *c_out, unsigned long *size_out,
+		unsigned long *offset_out)
 {
 	struct lcd_resource_node *n;
 	int ret;

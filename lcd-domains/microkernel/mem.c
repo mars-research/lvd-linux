@@ -489,8 +489,7 @@ int __lcd_do_map_memory_object(struct lcd *lcd,
 		}
 	}
 	if (meta->is_mapped) {
-		LCD_ERR("memory object already mapped");
-		ret = -EINVAL;
+		ret = -EALREADYMAPPED;
 		goto out;
 	}
 	/*
@@ -508,8 +507,7 @@ int __lcd_do_map_memory_object(struct lcd *lcd,
 		 * physical is available to non-isolated code. Recall that
 		 * this function is about mapping in physical, not virtual.)
 		 */
-		ret = 0;
-		goto out;
+		break;
 	default:
 		LCD_ERR("unrecognized lcd type %d", lcd->type);
 		ret = -EINVAL;
@@ -519,6 +517,9 @@ int __lcd_do_map_memory_object(struct lcd *lcd,
 		goto out;
 	/*
 	 * Mark page as mapped, and where it's mapped
+	 *
+	 * (So that isolated and non-isolated code have the same semantics
+	 * here, in both cases we indicate the memory object as mapped.)
 	 */
 	meta->is_mapped = 1;
 	meta->where_mapped = base;
@@ -642,7 +643,7 @@ void __lcd_do_unmap_memory_object(struct lcd *caller,
 		 * physical is available to non-isolated code. Recall that
 		 * this function is about unmapping in physical, not virtual.)
 		 */
-		return;
+		break;
 	default:
 		LCD_ERR("unrecognized lcd type %d", caller->type);
 		return;

@@ -82,11 +82,12 @@ static int do_grant_and_map_for_mem(cptr_t lcd, struct lcd_create_ctx *ctx,
 {
 	int ret;
 	cptr_t mo;
-	unsigned long size;
+	unsigned long size, offset;
 	/*
 	 * Look up the cptr for the *creator*
 	 */
-	ret = lcd_virt_to_cptr(__gva((unsigned long)mem), &mo, &size);
+	ret = lcd_virt_to_cptr(__gva((unsigned long)mem), &mo, &size,
+			&offset);
 	if (ret) {
 		LIBLCD_ERR("lookup failed");
 		goto fail1;

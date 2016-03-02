@@ -350,4 +350,9 @@ struct lcd_boot_info {
 
 #define LCD_PRINTK_BUFF_SIZE 512
 
+/* EXTRA ERRORS ------------------------------------------------------------ */
+
+#define EALREADYMAPPED (512)
+
+
 #endif /* LCD_DOMAINS_TYPES_H */

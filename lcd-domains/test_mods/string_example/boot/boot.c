@@ -35,7 +35,7 @@ static int do_recv(cptr_t endpoint, char **data)
 	 */
 	offset = lcd_r0();
 	/*
-	 * Map page
+	 * Try to map page
 	 */
 	ret = lcd_map_virt(page_cptr, 0, &page);
 	if (ret) {

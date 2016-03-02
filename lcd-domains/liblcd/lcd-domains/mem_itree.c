@@ -154,9 +154,11 @@ int lcd_phys_to_cptr(gpa_t paddr, cptr_t *c_out, unsigned long *size_out,
 	return 0;
 }
 
-int lcd_virt_to_cptr(gva_t vaddr, cptr_t *c_out, unsigned long *size_out)
+int lcd_virt_to_cptr(gva_t vaddr, cptr_t *c_out, unsigned long *size_out,
+		unsigned long *offset_out)
 {
-	return lcd_phys_to_cptr(lcd_gva2gpa(vaddr), c_out, size_out);
+	return lcd_phys_to_cptr(lcd_gva2gpa(vaddr), c_out, size_out,
+				offset_out);
 }
 
 /* INIT -------------------------------------------------- */

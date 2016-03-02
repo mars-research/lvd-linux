@@ -133,6 +133,11 @@ fail1:
 	return ret;
 }
 
+int lcd_virt_to_resource_node(gva_t vaddr, struct lcd_resource_node **n)
+{
+	return lcd_phys_to_resource_node(lcd_gva2gpa(vaddr), n);
+}
+
 int lcd_phys_to_cptr(gpa_t paddr, cptr_t *c_out, unsigned long *size_out)
 {
 	struct lcd_resource_node *n;

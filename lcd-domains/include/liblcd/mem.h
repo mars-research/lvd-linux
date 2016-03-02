@@ -521,6 +521,11 @@ int lcd_phys_to_resource_node(gpa_t paddr, struct lcd_resource_node **n);
  * Similar to lcd_phys_to_cptr. Similar error conditions.
  */
 int lcd_virt_to_cptr(gva_t vaddr, cptr_t *c_out, unsigned long *size_out);
+/**
+ * lcd_virt_to_resource_node -- Similar to lcd_phys_to_resource_node, 
+ *                              but @vaddr is a virtual address
+ */
+int lcd_virt_to_resource_node(gva_t vaddr, struct lcd_resource_node **n);
 
 /* RESOURCE TREES -------------------------------------------------- */
 

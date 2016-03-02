@@ -866,19 +866,27 @@ void lcd_unvolunteer_vmalloc_mem(cptr_t vmalloc_mem)
 
 /* ADDRESS -> CPTR TRANSLATION ---------------------------------------- */
 
+int lcd_phys_to_resource_node(gpa_t paddr, struct lcd_resource_node **n)
+{
+	/*
+	 * Look in RAM/devmem tree
+	 *
+	 * (For vmalloc mem, should use lcd_virt_to_resource_node.)
+	 */
+	return lcd_resource_tree_search(
+		current->lcd_resource_trees[LCD_RESOURCE_TREE_CONTIGUOUS],
+		gpa_val(paddr),
+		&n);
+}
+
 int lcd_phys_to_cptr(gpa_t paddr, cptr_t *c_out, unsigned long *size_out)
 {
 	int ret;
 	struct lcd_resource_node *n;
 	/*
-	 * Look in RAM/devmem tree
-	 *
-	 * (For vmalloc mem, should use lcd_virt_to_cptr.)
+	 * Resolve to resource node
 	 */
-	ret = lcd_resource_tree_search(
-		current->lcd_resource_trees[LCD_RESOURCE_TREE_CONTIGUOUS],
-		gpa_val(paddr),
-		&n);
+	ret = lcd_phys_to_resource_node(paddr, &n);
 	if (ret) {
 		LIBLCD_ERR("address not found");
 		goto fail1;
@@ -895,13 +903,12 @@ fail1:
 	return ret;
 }
 
-int lcd_virt_to_cptr(gva_t vaddr, cptr_t *c_out, unsigned long *size_out)
+int lcd_virt_to_resource_node(gva_t vaddr, struct lcd_resource_node **n)
 {
 	gpa_t gpa;
-	struct lcd_resource_node *n;
 	int ret;
 	/*
-	 * Look in non-contiguous mem tree first
+	 * Look in non-contiguous mem first
 	 */
 	ret = lcd_resource_tree_search(
 		current->lcd_resource_trees[LCD_RESOURCE_TREE_NON_CONTIGUOUS],
@@ -915,7 +922,23 @@ int lcd_virt_to_cptr(gva_t vaddr, cptr_t *c_out, unsigned long *size_out)
 		 * guest phys = host phys.
 		 */
 		gpa = __gpa(hpa_val(hva2hpa(__hva(gva_val(vaddr)))));
-		return lcd_phys_to_cptr(gpa, c_out, size_out);
+		return lcd_phys_to_resource_node(gpa, n);
+	}
+
+	return ret;
+}
+
+int lcd_virt_to_cptr(gva_t vaddr, cptr_t *c_out, unsigned long *size_out)
+{
+	struct lcd_resource_node *n;
+	int ret;
+	/*
+	 * Resolve to resource node
+	 */
+	ret = lcd_virt_to_resource_node(vaddr, &n);
+	if (ret) {
+		LIBLCD_ERR("address not found");
+		goto fail1;
 	}
 	/*
 	 * Pull out memory object cptr and order

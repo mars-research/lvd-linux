@@ -5,7 +5,8 @@
  * by the microkernel and accessible to a thread. This
  * is primarily used for doing address -> cptr translation.
  *
- * We re-use interval trees from Linux.
+ * We use red-black trees from Linux. Intervals stored in
+ * the tree are assumed to be non-overlapping.
  *
  * No locking (just like the other bare bones data structures).
  *
@@ -16,7 +17,6 @@
 
 #include <libcap.h>
 #include <linux/rbtree.h>
-#include <linux/interval_tree.h>
 
 /**
  * struct lcd_resource_tree
@@ -35,19 +35,20 @@ struct lcd_resource_tree {
  * Represents node in LCD resource interval tree. Before
  * you insert this node into the tree, you should initialize:
  *
- *    -- it_node's start and last (see linux/interval_tree.h)
- *    -- nr_pages_order: the size of the memory resource is 
- *       2^nr_pages_order
+ *    -- start and last
  *    -- cptr is the cptr to the capability in the thread's cspace
+ *    -- flags
  *
- * You are responsible for allocating these things and freeing
+ * You are responsible for allocating nodes and freeing
  * them when you're done with them.
  *
  * You can use flags in any way you wish. Some common flags are
  * defined below.
  */
 struct lcd_resource_node {
-	struct interval_tree_node it_node;
+	struct rb_node rb_node;
+	unsigned long start;
+	unsigned long last;
 	cptr_t cptr;
 	unsigned int flags;
 };
@@ -60,13 +61,13 @@ enum {
 static inline unsigned long
 lcd_resource_node_start(struct lcd_resource_node *n)
 {
-	return n->it_node.start;
+	return n->start;
 }
 
 static inline unsigned long
 lcd_resource_node_last(struct lcd_resource_node *n)
 {
-	return n->it_node.last;
+	return n->last;
 }
 
 static inline unsigned long 
@@ -110,12 +111,31 @@ void lcd_resource_tree_insert(struct lcd_resource_tree *t,
 			struct lcd_resource_node *n);
 
 /**
- * lcd_resource_tree_search -- See if @addr is contained in an interval in tree
+ * lcd_resource_tree_search -- See if (@addr,@cptr) pair is contained in an 
+ *                             interval in tree
+ * @t: the tree to search in
+ * @addr: the address to search for
+ * @cptr: the cptr to search for
+ * @n_out: out param, interval containing @addr if found
+ *
+ * Returns 0 if found, -1 if not found. @addr need not be the starting
+ * address of the interval, just some address in the interval you are
+ * searching for.
+ */
+int lcd_resource_tree_search(struct lcd_resource_tree *t,
+			unsigned long addr,
+			cptr_t cptr,
+			struct lcd_resource_node **n_out);
+/**
+ * lcd_resource_tree_search_addr -- See if @addr is contained in an interval 
+ *                                  in tree
  * @t: the tree to search in
  * @addr: the address to search for
  * @n_out: out param, interval containing @addr if found
  *
- * Returns 0 if found, -1 if not found.
+ * Returns 0 if found, -1 if not found. If more than one interval contains
+ * @addr (this should only happen in the same interval has been inserted
+ * more than once), the first node found is returned.
  */
 int lcd_resource_tree_search(struct lcd_resource_tree *t,
 			unsigned long addr,

@@ -73,14 +73,26 @@ int glue_vfs_init(cptr_t _vfs_channel, struct dispatch_ctx *ctx)
 	 * on it later. */
 	vfs_chnl = _vfs_channel;
 
+	/* Initialize cap code */
+	ret = vfs_cap_init();
+	if (ret) {
+		LIBLCD_ERR("init cap code");
+		goto fail1;
+	}
+
 	/* Initialize data store. */
 	ret = vfs_cap_create(&vfs_cspace);
 	if (ret) {
 		LIBLCD_ERR("cspace init");
-		return ret;
+		goto fail2;
 	}
 
 	return 0;
+
+fail2:
+	vfs_cap_exit();
+fail1:
+	return ret;
 }
 
 /* EXIT -------------------------------------------------- */
@@ -94,6 +106,9 @@ void glue_vfs_exit(void)
 {
 	/* Free vfs data store. */
 	vfs_cap_destroy(vfs_cspace);
+
+	/* Tear down cap code */
+	vfs_cap_exit();
 }
 
 /* REGISTER_FS -------------------------------------------------- */
@@ -554,6 +569,8 @@ void rm_file_callee(void)
 	 * The callee will dealloc their private copy. We must remove it
 	 * from the glue cspace though (it's ok to do this after the
 	 * container was freed). */
+
+	printk("glue sizeof file_container is 0x%lx", sizeof(*file_container));
 
 	vfs_cap_remove(vfs_cspace, file_ref);
 

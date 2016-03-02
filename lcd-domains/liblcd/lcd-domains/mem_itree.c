@@ -20,13 +20,14 @@ static struct lcd_resource_tree itree;
 static struct lcd_resource_node boot_nodes[LCD_NR_BOOT_RESOURCE_NODES];
 static unsigned int boot_nodes_brk;
 static int mem_itree_booted;
+static struct kmem_cache *node_cache;
 
 static void free_itree_node(struct lcd_resource_node *n)
 {
 	if (n->flags & LCD_RESOURCE_NODE_STATIC)
 		return; /* node came from boot node array */
 	else
-		kfree(n);
+		kmem_cache_free(node_cache, n);
 }
 
 static struct lcd_resource_node *early_alloc_itree_node(void)
@@ -49,14 +50,22 @@ static struct lcd_resource_node *alloc_itree_node(void)
 		 * here when it is growing itself (alloc'ing fresh
 		 * pages, and inserting the cptr into the resource tree).
 		 * This call to kzalloc may recursively lead *back into*
-		 * the heap to grow a slab cache for kmalloc. This
-		 * recursion is OK because of how the heap maps the
+		 * the heap to grow our kmem_cache. This
+		 * recursion is OK because (1) of how the heap maps the
 		 * new pages (it maps them first *before* inserting them
-		 * into the mem itree). See ram_map.c:_lcd_mmap.
+		 * into the mem itree; see ram_map.c:_lcd_mmap); (2) even
+		 * if this call to zalloc leads to *another* call back in
+		 * here, the recursion should bottom out on the second
+		 * call because the slab cache shouldn't need to grow
+		 * by much.
+		 *
+		 * Furthermore, we are using a slab cache separated from
+		 * the rest of the code (so we can't screw up someone
+		 * else calling kmalloc, etc.).
 		 */
-		n = kzalloc(sizeof(struct lcd_resource_node), GFP_KERNEL);
+		n = kmem_cache_zalloc(node_cache, GFP_KERNEL);
 		if (!n) {
-			LIBLCD_ERR("kmalloc failed");
+			LIBLCD_ERR("alloc failed");
 			return NULL;
 		}
 		n->flags = LCD_RESOURCE_NODE_KMALLOC;
@@ -148,6 +157,10 @@ int lcd_virt_to_cptr(gva_t vaddr, cptr_t *c_out, unsigned long *size_out)
 void __liblcd_mem_itree_booted(void)
 {
 	mem_itree_booted = 1;
+	/*
+	 * Set up kmem cache
+	 */
+	node_cache = KMEM_CACHE(lcd_resource_node, 0);
 }
 
 static int add_boot_memory(void)

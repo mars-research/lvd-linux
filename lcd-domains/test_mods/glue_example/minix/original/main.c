@@ -32,9 +32,11 @@ static int minix_new_file(int id, struct file **file_out) {
 		return -EINVAL;
 	}
 
+	printk("sizeof file_container is 0x%lx", sizeof(*file_container));
+
 #ifdef ISOLATE_GLUE_EXAMPLE
 	f = NULL;
-	file_container = kmalloc(sizeof(*f), GFP_KERNEL);
+	file_container = kmalloc(sizeof(*file_container), GFP_KERNEL);
 	if (file_container)
 		f = &file_container->file;
 #else
@@ -62,7 +64,6 @@ static void minix_rm_file(struct file *file) {
 
 	kfree(file);
 	return;
-
 }
 
 #ifdef ISOLATE_GLUE_EXAMPLE

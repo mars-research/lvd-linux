@@ -624,14 +624,26 @@ int glue_vfs_init(cptr_t vfs_chnl, struct dispatch_ctx *ctx)
 	/* Add it to dispatch loop */
 	loop_add_channel(loop_ctx, &vfs_channel);
 
+	/* Initialize cap code */
+	ret = vfs_cap_init();
+	if (ret) {
+		LIBLCD_ERR("init cap code");
+		goto fail1;
+	}
+
 	/* Initialize minix data store */
 	ret = vfs_cap_create(&minix_cspace);
 	if (ret) {
 		LIBLCD_ERR("cspace init");
-		return ret;
+		goto fail2;
 	}
 
 	return 0;
+
+fail2:
+	vfs_cap_exit();
+fail1:
+	return ret;
 }
 
 void glue_vfs_exit(void)
@@ -642,4 +654,7 @@ void glue_vfs_exit(void)
 	 * it doesn't matter in this simple example. (In general, we
 	 * probably should.) */
 	loop_rm_channel(loop_ctx, &vfs_channel);
+	
+	/* Tear down cap code */
+	vfs_cap_exit();
 }

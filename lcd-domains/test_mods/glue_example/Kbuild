@@ -5,7 +5,7 @@ export ISOLATE_GLUE_EXAMPLE=y
 
 ifeq ($(ISOLATE_GLUE_EXAMPLE),y)
 
-	obj-m += isol_boot/
+	obj-m += boot/
 	ISOLATED_CC_FLAGS += -DISOLATE_GLUE_EXAMPLE	
 
 endif

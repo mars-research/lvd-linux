@@ -521,6 +521,7 @@ int lcd_create_module_lcd(char *mdir, char *mname, cptr_t *lcd_out,
 	cptr_t m_init_cptr, m_core_cptr;
 	gva_t m_init_link_addr, m_core_link_addr;
 	unsigned long m_init_size, m_core_size;
+	unsigned long m_struct_module_core_offset;
 	struct lcd_create_ctx *ctx;
 	cptr_t lcd;
 	/*
@@ -546,7 +547,8 @@ int lcd_create_module_lcd(char *mdir, char *mname, cptr_t *lcd_out,
 			&ctx->m_init_bits, &ctx->m_core_bits,
 			&m_init_cptr, &m_core_cptr,
 			&m_init_link_addr, &m_core_link_addr,
-			&m_init_size, &m_core_size);
+			&m_init_size, &m_core_size,
+			&m_struct_module_core_offset);
 	if (ret) {
 		LIBLCD_ERR("error loading kernel module");
 		goto fail3;
@@ -585,6 +587,21 @@ int lcd_create_module_lcd(char *mdir, char *mname, cptr_t *lcd_out,
 		LIBLCD_ERR("error configuring LCDs registers");
 		goto fail6;
 	}
+#ifndef LCD_ISOLATE
+	/*
+	 * For non-isolated code running this, we also remember where
+	 * the struct module copy is located so we can do stack traces.
+	 *
+	 * Recall that gva == hva for non-isolated.
+	 */
+	ret = lcd_set_struct_module_hva(lcd, 
+					__hva(gva_val(m_core_link_addr) +
+						m_struct_module_core_offset));
+	if (ret) {
+		LIBLCD_ERR("error setting struct module hva");
+		goto fail7;
+	}
+#endif
 	/*
 	 * Return context and lcd
 	 */
@@ -593,6 +610,9 @@ int lcd_create_module_lcd(char *mdir, char *mname, cptr_t *lcd_out,
 
 	return 0;
 
+#ifdef LCD_ISOLATE
+fail7:
+#endif
 fail6:
 fail5:
 	lcd_cap_delete(lcd);

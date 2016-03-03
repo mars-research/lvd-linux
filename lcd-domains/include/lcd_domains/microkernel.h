@@ -804,6 +804,33 @@ void __lcd_console_exit(void);
 
 /*
  * --------------------------------------------------
+ * ADDRESS -> SYMBOL RESOLUTION
+ * --------------------------------------------------
+ *
+ * ksym.c
+ */
+
+/**
+ * __lcd_set_struct_module_hva -- Set pointer to the struct module for @lcd
+ * @caller: LCD doing the setting
+ * @lcd: LCD who is using struct module
+ * @module_addr: host virtual address of the struct module copy
+ *
+ * For motivation, see liblcd version of this function.
+ */
+int __lcd_set_struct_module_hva(struct lcd *caller, cptr_t lcd, 
+				hva_t module_addr);
+/**
+ * __lcd_hva_to_symbol -- Resolve a host virtual address to a symbol name
+ * @module: the struct module to use for module symbol resolution
+ * @hva: the address to resolve
+ *
+ * Returns the pointer to the symbol string.
+ */
+const char* __lcd_hva_to_symbol(struct module *module, hva_t hva);
+
+/*
+ * --------------------------------------------------
  * SYNCHRONOUS IPC
  * --------------------------------------------------
  *

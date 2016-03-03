@@ -21,7 +21,8 @@ int lcd_load_module(char *mdir, char *mname,
 		gva_t *m_init_link_addr,
 		gva_t *m_core_link_addr,
 		unsigned long *m_init_size,
-		unsigned long *m_core_size)
+		unsigned long *m_core_size,
+		unsigned long *m_struct_module_core_offset)
 {
 	return -ENOSYS; /* not implemented */
 }

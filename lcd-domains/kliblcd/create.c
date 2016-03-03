@@ -1134,6 +1134,11 @@ int lcd_cap_grant(cptr_t lcd, cptr_t src, cptr_t dest)
 	return __lcd_cap_grant(current->lcd, lcd, src, dest);
 }
 
+int lcd_set_struct_module_hva(cptr_t lcd, hva_t hva)
+{
+	return __lcd_set_struct_module_hva(current->lcd, lcd, hva);
+}
+
 int lcd_run(cptr_t lcd)
 {
 	return __lcd_run(current->lcd, lcd);
@@ -1147,3 +1152,4 @@ EXPORT_SYMBOL(lcd_config_registers);
 EXPORT_SYMBOL(lcd_memory_grant_and_map);
 EXPORT_SYMBOL(lcd_cap_grant);
 EXPORT_SYMBOL(lcd_run);
+EXPORT_SYMBOL(lcd_set_struct_module_hva);

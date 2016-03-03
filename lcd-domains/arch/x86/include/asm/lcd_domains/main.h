@@ -222,6 +222,12 @@ struct lcd_arch {
 		struct vmx_msr_entry *host;
 #endif
 	} msr_autoload;
+
+	/*
+	 * Pointer to struct module inside LCD container. We need this
+	 * for resolving addresses to symbol names for stack traces.
+	 */
+	struct module *kernel_module;
 };
 
 /**

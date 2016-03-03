@@ -66,6 +66,11 @@ int lcd_cap_grant(cptr_t lcd, cptr_t src, cptr_t dest)
 	return lcd_syscall_cap_grant(lcd, src, dest);
 }
 
+int lcd_set_struct_module_hva(cptr_t lcd, hva_t hva)
+{
+	return -ENOSYS; /* not allowed in isolated (for now I suppose) */
+}
+
 int lcd_run(cptr_t lcd)
 {
 	return lcd_syscall_run(lcd);

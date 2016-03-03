@@ -2,15 +2,15 @@
  * main.c - runs when pmfs lcd boots
  */
 
-#include <lcd-domains/liblcd-config.h>
+#include <lcd_config/pre_hook.h>
 
 #include <linux/module.h>
 #include <linux/kernel.h>
-#include <lcd-domains/liblcd.h>
-#include <lcd-domains/dispatch_loop.h>
+#include <liblcd/liblcd.h>
+#include <liblcd/dispatch_loop.h>
 #include "internal.h"
 
-#include <lcd-domains/liblcd-hacks.h>
+#include <lcd_config/post_hook.h>
 
 /* LOOP ---------------------------------------- */
 

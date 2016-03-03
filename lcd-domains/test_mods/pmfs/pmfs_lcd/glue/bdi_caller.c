@@ -2,12 +2,20 @@
  * bdi_caller.c - caller side of bdi interface
  */
 
+#include <lcd_config/pre_hook.h>
+
 #include <linux/backing-dev.h>
-#include <lcd-domains/liblcd.h>
+
+#include <liblcd/liblcd.h>
+#include <liblcd/glue_cspace.h>
+#include <liblcd/ipc_channel.h>
+#include <liblcd/dispatch_loop.h>
 #include "../internal.h"
 
+#include <lcd_config/post_hook.h>
+
 static cptr_t bdi_chnl;
-static struct dstore *bdi_dstore;
+static struct glue_cspace *bdi_cspace;
 //static struct dispatch_ctx *loop_ctx;
 
 /* INIT/EXIT -------------------------------------------------- */
@@ -25,9 +33,9 @@ int glue_bdi_init(cptr_t _bdi_channel, struct dispatch_ctx *ctx)
 	bdi_chnl = _bdi_channel;
 
 	/* Initialize data store. */
-	ret = lcd_dstore_init_dstore(&bdi_dstore);
+	ret = glue_cap_create(&bdi_cspace);
 	if (ret) {
-		LIBLCD_ERR("dstore init");
+		LIBLCD_ERR("create");
 		return ret;
 	}
 
@@ -37,9 +45,9 @@ int glue_bdi_init(cptr_t _bdi_channel, struct dispatch_ctx *ctx)
 void glue_bdi_exit(void)
 {
 	/*
-	 * Free bdi data store
+	 * Free bdi cspace
 	 */
-	lcd_dstore_destroy(bdi_dstore);
+	glue_cap_destroy(bdi_cspace);
 }
 
 /* CALLER FUNCTIONS -------------------------------------------------- */
@@ -59,19 +67,19 @@ int bdi_init(struct backing_dev_info *bdi)
 	 * INSERT INTO DATA STORE ------------------------------
 	 *
 	 */
-	ret = lcd_dstore_insert(bdi_dstore, 
-				bdi_container,
-				STRUCT_BACKING_DEV_INFO_TAG, 
-				&bdi_container->my_ref);
+	ret = glue_cap_insert_backing_dev_info_type(
+		bdi_cspace, 
+		bdi_container,
+		&bdi_container->my_ref);
 	if (ret) {
-		LIBLCD_ERR("lcd_dstore_insert");
+		LIBLCD_ERR("insert");
 		lcd_exit(ret); /* abort */
 	}
 	/*
 	 * IPC MARSHALING --------------------------------------------------
 	 *
 	 */
-	lcd_set_r1(dptr_val(bdi_container->my_ref));
+	lcd_set_r1(cptr_val(bdi_container->my_ref));
 	lcd_set_r2(bdi_container->backing_dev_info.ra_pages);
 	lcd_set_r3(bdi_container->backing_dev_info.capabilities);
 	/*
@@ -79,7 +87,7 @@ int bdi_init(struct backing_dev_info *bdi)
 	 */
 
 	lcd_set_r0(BDI_INIT);
-	ret = lcd_call(bdi_chnl);
+	ret = lcd_sync_call(bdi_chnl);
 	if (ret) {
 		LIBLCD_ERR("lcd_call");
 		lcd_exit(ret);
@@ -90,10 +98,10 @@ int bdi_init(struct backing_dev_info *bdi)
 	/*
 	 * We expect a remote ref coming back
 	 */
-	bdi_container->bdi_ref = __dptr(lcd_r1());
+	bdi_container->bdi_ref = __cptr(lcd_r1());
 
 	/* Clear capability register */
-	lcd_set_cr1(LCD_CPTR_NULL);
+	lcd_set_cr1(CAP_CPTR_NULL);
 
 	/*
 	 * Pass back return value
@@ -115,12 +123,12 @@ void bdi_destroy(struct backing_dev_info *bdi)
 	/*
 	 * Pass remote ref to bdi's copy
 	 */
-	lcd_set_r1(dptr_val(bdi_container->bdi_ref));
+	lcd_set_r1(cptr_val(bdi_container->bdi_ref));
 
 	/* IPC CALL ---------------------------------------- */
 
 	lcd_set_r0(BDI_DESTROY);
-	ret = lcd_call(bdi_chnl);
+	ret = lcd_sync_call(bdi_chnl);
 	if (ret) {
 		LIBLCD_ERR("lcd_call");
 		lcd_exit(ret);
@@ -131,7 +139,7 @@ void bdi_destroy(struct backing_dev_info *bdi)
 	/*
 	 * Remove bdi from data store
 	 */
-	lcd_dstore_delete(bdi_dstore, bdi_container->my_ref);
+	glue_cap_remove(bdi_cspace, bdi_container->my_ref);
 	/*
 	 * (no return value)
 	 */

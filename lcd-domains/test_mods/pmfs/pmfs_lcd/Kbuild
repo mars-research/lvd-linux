@@ -1,6 +1,3 @@
-# Flag to toggle some coditional compilation in the original source code
-# for isolation
-ccflags-y := -DLCD_ISOLATE
 
 obj-m  += lcd_test_mod_pmfs_lcd.o
 
@@ -23,9 +20,11 @@ lcd_test_mod_pmfs_lcd-y              += $(addprefix pmfs/, bbuild.o \
 
 
 # LIBLCD
-lcd_test_mod_pmfs_lcd-y              += ../$(LIBLCD)
+lcd_test_mod_pmfs_lcd-y              += $(LIBLCD)
 
 # Glue
 lcd_test_mod_pmfs_lcd-y              += $(addprefix glue/, \
 							   vfs_caller.o \
 							   bdi_caller.o)
+
+ccflags-y += $(ISOLATED_CC_FLAGS)

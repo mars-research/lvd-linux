@@ -2,3 +2,5 @@
 obj-m += lcd_test_mod_pmfs_boot.o
 
 lcd_test_mod_pmfs_boot-y             += main.o
+
+ccflags-y += $(NON_ISOLATED_CC_FLAGS)

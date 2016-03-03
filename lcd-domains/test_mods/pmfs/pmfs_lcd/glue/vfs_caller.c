@@ -2,14 +2,23 @@
  * vfs_caller.c - caller side of vfs interface
  */
 
+#include <lcd_config/pre_hook.h>
+
 #include <linux/fs.h>
-#include <lcd-domains/liblcd.h>
+
+#include <libcap.h>
+#include <liblcd/liblcd.h>
+#include <liblcd/dispatch_loop.h>
+#include <liblcd/ipc_channel.h>
+#include <liblcd/glue_cspace.h>
 #include "../internal.h"
+
+#include <lcd_config/post_hook.h>
 
 /* GLOBALS -------------------------------------------------- */
 
 static cptr_t vfs_chnl;
-static struct dstore *vfs_dstore;
+static struct glue_cspace *vfs_cspace;
 static struct dispatch_ctx *loop_ctx;
 
 /* INIT/EXIT -------------------------------------------------- */
@@ -26,10 +35,17 @@ int glue_vfs_init(cptr_t _vfs_channel, struct dispatch_ctx *ctx)
 	 * on it later. */
 	vfs_chnl = _vfs_channel;
 
-	/* Initialize data store. */
-	ret = lcd_dstore_init_dstore(&vfs_dstore);
+	/* Initialize cspace system */
+	ret = glue_cap_init();
 	if (ret) {
-		LIBLCD_ERR("dstore init");
+		LIBLCD_ERR("cap init");
+		return ret;
+	}
+
+	/* Initialize glue cspace. */
+	ret = glue_cap_create(&vfs_cspace);
+	if (ret) {
+		LIBLCD_ERR("glue cspace init");
 		return ret;
 	}
 
@@ -39,9 +55,10 @@ int glue_vfs_init(cptr_t _vfs_channel, struct dispatch_ctx *ctx)
 void glue_vfs_exit(void)
 {
 	/*
-	 * Free vfs data store
+	 * Free vfs glue cspace and tear down cap system
 	 */
-	lcd_dstore_destroy(vfs_dstore);
+	glue_cap_destroy(vfs_dstore);
+	glue_cap_exit();
 }
 
 /* CALLER FUNCTIONS -------------------------------------------------- */
@@ -77,19 +94,19 @@ int register_filesystem(struct file_system_type *fs)
 	 * INSERT INTO DATA STORE ------------------------------
 	 *
 	 */
-	ret = lcd_dstore_insert(vfs_dstore, 
-				fs_container,
-				STRUCT_FILE_SYSTEM_TYPE_TAG, 
-				&fs_container->my_ref);
+	ret = glue_cap_insert_file_system_type_type(
+		vfs_cspace, 
+		fs_container,
+		&fs_container->my_ref);
 	if (ret) {
-		LIBLCD_ERR("lcd_dstore_insert");
+		LIBLCD_ERR("insert");
 		lcd_exit(ret); /* abort */
 	}
 	/*
 	 * IPC MARSHALING --------------------------------------------------
 	 *
 	 */
-	lcd_set_r1(dptr_val(fs_container->my_ref));
+	lcd_set_r1(cptr_val(fs_container->my_ref));
 	/*
 	 * XXX: We don't even pass the name string (otherwise the callee
 	 * needs to keep track of a pesky 5 byte alloc). We just hard
@@ -103,7 +120,7 @@ int register_filesystem(struct file_system_type *fs)
 	 */
 
 	lcd_set_r0(REGISTER_FS);
-	ret = lcd_call(vfs_chnl);
+	ret = lcd_sync_call(vfs_chnl);
 	if (ret) {
 		LIBLCD_ERR("lcd_call");
 		lcd_exit(ret);
@@ -114,10 +131,10 @@ int register_filesystem(struct file_system_type *fs)
 	/*
 	 * We expect a remote ref coming back
 	 */
-	fs_container->vfs_ref = __dptr(lcd_r1());
+	fs_container->vfs_ref = __cptr(lcd_r1());
 
 	/* Clear capability register */
-	lcd_set_cr1(LCD_CPTR_NULL);
+	lcd_set_cr1(CAP_CPTR_NULL);
 
 	/*
 	 * Pass back return value
@@ -139,12 +156,12 @@ int unregister_filesystem(struct file_system_type *fs)
 	/*
 	 * Pass remote ref to vfs's copy
 	 */
-	lcd_set_r1(dptr_val(fs_container->vfs_ref));
+	lcd_set_r1(cptr_val(fs_container->vfs_ref));
 
 	/* IPC CALL ---------------------------------------- */
 
 	lcd_set_r0(UNREGISTER_FS);
-	ret = lcd_call(vfs_chnl);
+	ret = lcd_sync_call(vfs_chnl);
 	if (ret) {
 		LIBLCD_ERR("lcd_call");
 		lcd_exit(ret);
@@ -161,7 +178,7 @@ int unregister_filesystem(struct file_system_type *fs)
 	/*
 	 * Remove fs type from data store
 	 */
-	lcd_dstore_delete(vfs_dstore, fs_container->my_ref);
+	glue_cap_remove(vfs_cspace, fs_container->my_ref);
 	/*
 	 * Pass back return value
 	 */

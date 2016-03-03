@@ -1,5 +1,0 @@
-
-obj-m     += boot/
-obj-m     += pmfs-lcd/
-obj-m     += vfs-klcd/
-

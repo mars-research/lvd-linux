@@ -46,7 +46,7 @@ int glue_vfs_init(cptr_t vfs_chnl, struct dispatch_ctx *ctx)
 	ret = glue_cap_create(&pmfs_cspace);
 	if (ret) {
 		LIBLCD_ERR("create");
-		return ret;
+		goto fail2;
 	}
 
 	return 0;
@@ -176,7 +176,7 @@ fail1:
 	/* XXX: For now, we assume the grant was successful, so we need
 	 * to delete the cap and free the cptr */
 	lcd_cap_delete(lcd_cr1());
-	lcd_free_cptr(lcd_cr1());
+	lcd_cptr_free(lcd_cr1());
 	/* Clear cr1 */
 	lcd_set_cr1(CAP_CPTR_NULL);
 	return ret;

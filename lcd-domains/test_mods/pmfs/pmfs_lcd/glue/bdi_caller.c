@@ -8,7 +8,6 @@
 
 #include <liblcd/liblcd.h>
 #include <liblcd/glue_cspace.h>
-#include <liblcd/ipc_channel.h>
 #include <liblcd/dispatch_loop.h>
 #include "../internal.h"
 

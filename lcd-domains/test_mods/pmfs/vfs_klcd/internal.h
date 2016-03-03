@@ -9,6 +9,7 @@
 
 #include <liblcd/liblcd.h>
 #include <liblcd/dispatch_loop.h>
+#include <liblcd/glue_cspace.h>
 
 /* MACROS -------------------------------------------------- */
 
@@ -88,7 +89,7 @@ int glue_cap_insert_file_system_type_type(
 
 int glue_cap_insert_backing_dev_info_type(
 	struct glue_cspace *cspace, 
-	struct back_dev_info_container *backing_dev_info_container,
+	struct backing_dev_info_container *backing_dev_info_container,
 	cptr_t *c_out);
 
 int glue_cap_lookup_file_system_type_type(

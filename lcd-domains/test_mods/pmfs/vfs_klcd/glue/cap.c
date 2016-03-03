@@ -25,6 +25,7 @@ struct type_ops_id {
 enum glue_type {
 	GLUE_TYPE_FILE_SYSTEM_TYPE,
 	GLUE_TYPE_BACKING_DEV_INFO,
+	GLUE_NR_TYPES,
 };
 
 static int dummy_func(struct cspace *cspace, struct cnode *cnode,
@@ -33,7 +34,7 @@ static int dummy_func(struct cspace *cspace, struct cnode *cnode,
 	return 0;
 }
 
-static struct type_ops_id glue_libcap_type_ops[PMFS_NR_TYPES] = {
+static struct type_ops_id glue_libcap_type_ops[GLUE_NR_TYPES] = {
 	{
 		{
 			.name = "struct file_system_type",

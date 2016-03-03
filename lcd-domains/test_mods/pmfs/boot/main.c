@@ -12,7 +12,6 @@
 #include <libcap.h>
 #include <liblcd/liblcd.h>
 #include <liblcd/dispatch_loop.h>
-#include <liblcd/ipc_channel.h>
 
 #include <lcd_config/post_hook.h>
 
@@ -131,8 +130,8 @@ static int boot_main(void)
 	/*
 	 * Set up boot info for pmfs lcd
 	 */
-	to_boot_info(mi)->cptrs[0] = pmfs_dest1;
-	to_boot_info(mi)->cptrs[1] = pmfs_dest2;
+	lcd_to_boot_info(ctx)->cptrs[0] = pmfs_dest1;
+	lcd_to_boot_info(ctx)->cptrs[1] = pmfs_dest2;
 
 	/* RUN -------------------------------------------------- */
 

@@ -6,6 +6,7 @@ lcd_test_mod_pmfs_vfs-y              += main.o
 
 # Glue
 lcd_test_mod_pmfs_vfs-y              += $(addprefix glue/, vfs_callee.o \
-							   bdi_callee.o)
+							   bdi_callee.o \
+							   cap.o)
 
 ccflags-y := $(NON_ISOLATED_CC_FLAGS)

@@ -31,3 +31,4 @@ obj-m += async/
 obj-m += create_klcd/
 obj-m += glue_example/
 obj-m += string_example/
+obj-m += pmfs/

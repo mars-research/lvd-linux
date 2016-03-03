@@ -142,8 +142,7 @@ int bdi_destroy_callee(void)
 {
 	struct backing_dev_info_container *bdi_container;
 	int ret;
-	struct dstore_node *n;
-	dptr_t ref;
+	cptr_t ref;
 
 	/* IPC UNMARSHALING ---------------------------------------- */
 

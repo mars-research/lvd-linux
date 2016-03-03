@@ -9,7 +9,6 @@
 #include <libcap.h>
 #include <liblcd/liblcd.h>
 #include <liblcd/dispatch_loop.h>
-#include <liblcd/ipc_channel.h>
 #include <liblcd/glue_cspace.h>
 #include "../internal.h"
 
@@ -57,7 +56,7 @@ void glue_vfs_exit(void)
 	/*
 	 * Free vfs glue cspace and tear down cap system
 	 */
-	glue_cap_destroy(vfs_dstore);
+	glue_cap_destroy(vfs_cspace);
 	glue_cap_exit();
 }
 

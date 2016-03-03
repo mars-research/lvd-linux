@@ -2852,8 +2852,8 @@ static void __noclone vmx_enter(struct lcd_arch *lcd_arch)
 
 	clear_non_root();
 
-	lcd_arch->regs[LCD_ARCH_REGS_RIP] = vmcs_readl(GUEST_RIP);
-	lcd_arch->regs[LCD_ARCH_REGS_RSP] = vmcs_readl(GUEST_RSP);
+	lcd_arch->regs.rip = vmcs_readl(GUEST_RIP);
+	lcd_arch->regs.rsp = vmcs_readl(GUEST_RSP);
 
 	if (unlikely(lcd_arch->fail)) {
 		/*

@@ -285,10 +285,6 @@ enum lcd_arch_status {
  */
 int lcd_arch_ept_walk(struct lcd_arch *lcd, gpa_t a, int create,
 		lcd_arch_epte_t **epte_out);
-
-int lcd_arch_ept_gpa_to_hva(struct lcd_arch *lcd, unsigned long gva, 
-		unsigned long *hva_out);
-
 /**
  * Set the guest physical => host physical mapping in the ept entry.
  */
@@ -349,6 +345,20 @@ int lcd_arch_ept_unmap_range(struct lcd_arch *lcd, gpa_t ga_start,
  */
 int lcd_arch_ept_gpa_to_hpa(struct lcd_arch *lcd, gpa_t ga, hpa_t *ha_out);
 /**
+ * Translate guest physical address to host virtual.
+ */
+static inline int lcd_arch_ept_gpa_to_hva(struct lcd_arch *lcd, gpa_t gpa,
+			hva_t *hva_out)
+{
+	hpa_t hpa;
+	int ret;
+	ret = lcd_arch_ept_gpa_to_hpa(lcd, gpa, &hpa);
+	if (ret)
+		return ret;
+	*hva_out = hpa2hva(hpa);
+	return 0;
+}
+/**
  * Set the lcd's program counter to the guest virtual address
  * a.
  */
@@ -358,7 +368,7 @@ int lcd_arch_set_pc(struct lcd_arch *lcd_arch, gva_t a);
  */
 static inline u64 lcd_arch_get_pc(struct lcd_arch *lcd)
 {
-	return lcd->regs[LCD_ARCH_REGS_RIP];
+	return lcd->regs.rip;
 }
 /**
  * Set the lcd's stack pointer to the guest virtual address
@@ -381,23 +391,23 @@ static inline u64 lcd_arch_get_syscall_num(struct lcd_arch *lcd)
 }
 static inline u64 lcd_arch_get_syscall_arg0(struct lcd_arch *lcd)
 {
-	return lcd->regs[LCD_ARCH_REGS_R8];
+	return lcd->regs.r8;
 }
 static inline u64 lcd_arch_get_syscall_arg1(struct lcd_arch *lcd)
 {
-	return lcd->regs[LCD_ARCH_REGS_R9];
+	return lcd->regs.r9;
 }
 static inline u64 lcd_arch_get_syscall_arg2(struct lcd_arch *lcd)
 {
-	return lcd->regs[LCD_ARCH_REGS_R10];
+	return lcd->regs.r10;
 }
 static inline u64 lcd_arch_get_syscall_arg3(struct lcd_arch *lcd)
 {
-	return lcd->regs[LCD_ARCH_REGS_R11];
+	return lcd->regs.r11;
 }
 static inline u64 lcd_arch_get_syscall_arg4(struct lcd_arch *lcd)
 {
-	return lcd->regs[LCD_ARCH_REGS_R12];
+	return lcd->regs.r12;
 }
 static inline void lcd_arch_set_syscall_ret(struct lcd_arch *lcd, u64 val)
 {

@@ -448,12 +448,12 @@ void lcd_unvolunteer_vmalloc_mem(cptr_t vmalloc_mem)
 
 gpa_t lcd_gva2gpa(gva_t gva)
 {
-	return __gpa(LCD_PHYS_BASE + (gva_val(gva) - LCD_VIRT_BASE));
+	return isolated_lcd_gva2gpa(gva);
 }
 
 gva_t lcd_gpa2gva(gpa_t gpa)
 {
-	return __gva(LCD_VIRT_BASE + (gpa_val(gpa) - LCD_PHYS_BASE));
+	return isolated_lcd_gpa2gva(gpa);
 }
 
 /* INIT/EXIT -------------------------------------------------- */

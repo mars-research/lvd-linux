@@ -26,13 +26,14 @@
 
 #include <linux/module.h>
 #include <linux/kallsyms.h>
-#include <asm/lcd-domains.h>
+#include <asm/lcd_domains/main.h>
+#include <liblcd/address_spaces.h>
 
 static int debug_stack_lines = 20;
 
 #define _p(_x) ((void *)(unsigned long)(_x))
 #define stack_words_per_line 4
-#define ESP_BEFORE_EXCEPTION(regs) ((unsigned long *)regs->rsp)
+#define ESP_BEFORE_EXCEPTION(regs) ((unsigned long)regs->rsp)
 
 #if 0
 
@@ -116,15 +117,6 @@ static void show_guest_stack(struct vcpu *v, const struct cpu_user_regs *regs)
 }
 
 #endif
-
-/*                                                                                                                                                                                    
- *                                                                                                                                                                                     * Identify which stack page the stack pointer is on.  Returns an index                                                                                                               
- *                                                                                                                                                                                      * as per the comment above.                                                                                                                                                          
- *                                                                                                                                                                                       */                                                                                                                                                                                   
-static inline unsigned int get_stack_page(unsigned long sp)                                                                                                                           
-{                                                                                                                                                                                     
-	return (sp & (LCD_STACK_SIZE-1)) >> PAGE_SHIFT;                                                                                                                                       
-}
 
 /*
  * Notes for get_stack_trace_bottom() and get_stack_dump_bottom()
@@ -321,27 +313,41 @@ static void show_trace(struct lcd_arch *lcd, const struct cpu_user_regs *regs)
 }
 
 
-void show_stack(struct lcd_arch *lcd, const struct cpu_user_regs *regs)
+void lcd_show_stack(struct lcd_arch *lcd, const struct cpu_user_regs *regs)
 {
-    unsigned long *stack = ESP_BEFORE_EXCEPTION(regs), *stack_bottom, stack_hva, data;
+    /*
+     * In order to handle async cactus stacks, the stack bottom is
+     * always taken to be %rsp - wordsize.
+     */
+    gva_t stack_gva = __gva((unsigned long)regs->rsp);
+    gpa_t stack_gpa;
+    hva_t stack_hva;
+    gva_t stack_bottom_gva = __gva(gva_val(stack) - sizeof(unsigned long));
+    unsigned long data;
     
     int i, ret;
 
-    printk("LCD stack trace from "__OP"sp=%p:\n  ", stack);
-
-    stack_bottom = _p(get_stack_dump_bottom(regs->rsp));
+    printk("LCD stack trace from "__OP"sp=0x%lx:\n  ", gva_val(stack));
 
     for ( i = 0; i < (debug_stack_lines*stack_words_per_line) &&
-              (stack <= stack_bottom); i++ )
+              (gva_val(stack_gva) <= gva_val(stack_bottom_gva)); i++ )
     {
         if ( (i != 0) && ((i % stack_words_per_line) == 0) )
             printk("\n  ");
-
-        ret = lcd_arch_ept_gpa_to_hva(lcd, (unsigned long) stack, &stack_hva);
+        /*
+         * Resolve gva ==> gpa
+         */
+        stack_gpa = isolated_lcd_gva2gpa(stack_gva);
+        /*
+         * Resolve gpa ==> hva so we can read the memory there
+         */
+        ret = lcd_arch_ept_gpa_to_hva(lcd, stack_gpa, &stack_hva);
         if (ret) { 
-	    LCD_ARCH_ERR("Failed to resolve guest stack gpa into hpa\n");
-	    return;
-        };
+            LCD_ARCH_ERR("Failed to resolve guest stack gpa into hpa\n");
+            return;
+        }
+        /*
+         * 
 
 	//printk("hva_stack:%p, stack:%p\n", (unsigned long *)stack_hva, stack);
 
@@ -449,10 +455,11 @@ void lcd_show_registers(const struct cpu_user_regs *regs)
 
 }
 
-void lcd_show_execution_state(struct lcd_arch *lcd, const struct cpu_user_regs *regs)
+void lcd_show_execution_state(struct lcd_arch *lcd, 
+                              const struct cpu_user_regs *regs)
 {
     lcd_show_registers(regs);
-    show_stack(lcd, regs);
+    lcd_show_stack(lcd, regs);
 }
 
 #if 0
@@ -490,13 +497,3 @@ void vcpu_show_execution_state(struct vcpu *v)
 //
 //    return trapnr < ARRAY_SIZE(strings) ? strings[trapnr] : "???";
 //}
-
-/*
- * Local variables:
- * mode: C
- * c-file-style: "BSD"
- * c-basic-offset: 4
- * tab-width: 4
- * indent-tabs-mode: nil
- * End:
- */

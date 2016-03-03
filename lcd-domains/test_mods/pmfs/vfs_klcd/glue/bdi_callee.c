@@ -3,16 +3,20 @@
  *
  */
 
-#include <lcd-domains/dispatch_loop.h>
-#include <lcd-domains/kliblcd.h>
+#include <lcd_config/pre_hook.h>
+
+#include <liblcd/dispatch_loop.h>
+#include <liblcd/liblcd.h>
 #include <linux/slab.h>
 #include "../internal.h"
+
+#include <lcd_config/post_hook.h>
 
 /* GLOBALS -------------------------------------------------- */
 
 //static struct dispatch_ctx *loop_ctx;
 //static struct ipc_channel bdi_channel;
-static struct dstore *pmfs_dstore;
+static struct glue_cspace *pmfs_cspace;
 
 /* INIT/EXIT -------------------------------------------------- */
 
@@ -31,9 +35,9 @@ int glue_bdi_init(cptr_t bdi_chnl, struct dispatch_ctx *ctx)
 	/* Initialize pmfs data store. (This obviously doesn't generalize
 	 * well. In general, the data store should be set up upon receiving
 	 * a register call?) */
-	ret = lcd_dstore_init_dstore(&pmfs_dstore);
+	ret = glue_cap_create(&pmfs_cspace);
 	if (ret) {
-		LIBLCD_ERR("dstore init");
+		LIBLCD_ERR("create");
 		return ret;
 	}
 
@@ -45,7 +49,7 @@ void glue_bdi_exit(void)
 	/*
 	 * Destroy pmfs data stroe
 	 */
-	lcd_dstore_destroy(pmfs_dstore);
+	glue_cap_destroy(pmfs_cspace);
 	/*
 	 * Remove vfs channel from loop
 	 */
@@ -69,10 +73,10 @@ int bdi_init_callee(void)
 		goto fail1;
 	}
 
-	ret = lcd_dstore_insert(pmfs_dstore,
-				bdi_container,
-				STRUCT_BACKING_DEV_INFO_TAG,
-				&bdi_container->my_ref);
+	ret = glue_cap_insert_backing_dev_info_type(
+		pmfs_cspace,
+		bdi_container,
+		&bdi_container->my_ref);
 	if (ret) {
 		LIBLCD_ERR("dstore insert bdi container");
 		goto fail2;
@@ -87,7 +91,7 @@ int bdi_init_callee(void)
 	 * other unused fields.)
 	 *
 	 */
-	bdi_container->pmfs_ref = __dptr(lcd_r1());
+	bdi_container->pmfs_ref = __cptr(lcd_r1());
 	bdi_container->backing_dev_info.ra_pages = lcd_r2();
 	bdi_container->backing_dev_info.capabilities = lcd_r3();
 
@@ -112,13 +116,13 @@ int bdi_init_callee(void)
 	/*
 	 * Pass back a ref to our copy
 	 */
-	lcd_set_r1(dptr_val(bdi_container->my_ref));
+	lcd_set_r1(cptr_val(bdi_container->my_ref));
 
 	/* IPC REPLY -------------------------------------------------- */
 
-	ret = lcd_reply();
+	ret = lcd_sync_reply();
 	if (ret) {
-		LIBLCD_ERR("lcd_reply");
+		LIBLCD_ERR("lcd_sync_reply");
 		goto fail4;
 	}
 
@@ -127,7 +131,7 @@ int bdi_init_callee(void)
 fail4:
 	bdi_destroy(&bdi_container->backing_dev_info);
 fail3:
-	lcd_dstore_delete(pmfs_dstore, bdi_container->my_ref);
+	glue_cap_remove(pmfs_cspace, bdi_container->my_ref);
 fail2:
 	kfree(bdi_container);
 fail1:
@@ -147,20 +151,18 @@ int bdi_destroy_callee(void)
 	 * We expect one ref to our copy
 	 */
 
-	ref = __dptr(lcd_r1());
+	ref = __cptr(lcd_r1());
 
 	/* LOOK UP CONTAINER  ---------------------------------------- */
 
-	ret = lcd_dstore_get(pmfs_dstore,
-			ref,
-			STRUCT_BACKING_DEV_INFO_TAG,
-			&n);
+	ret = glue_cap_lookup_backing_dev_info_type(
+		pmfs_cspace,
+		ref,
+		&bdi_container);
 	if (ret) {
 		LIBLCD_ERR("lookup");
 		goto out;
 	}
-	bdi_container = lcd_dstore_node_object(n);
-	lcd_dstore_put(n);
 
 	/* CALL REAL FUNCTION ---------------------------------------- */
 
@@ -171,7 +173,7 @@ int bdi_destroy_callee(void)
 	/*
 	 * Remove from data store
 	 */
-	lcd_dstore_delete(pmfs_dstore, bdi_container->my_ref);
+	glue_cap_remove(pmfs_cspace, bdi_container->my_ref);
 	/*
 	 * Free container
 	 */
@@ -183,7 +185,7 @@ int bdi_destroy_callee(void)
 	goto out;
 
 out:
-	if (lcd_reply())
+	if (lcd_sync_reply())
 		LIBLCD_ERR("double fault");
 	return ret;
 }

@@ -4,8 +4,6 @@
 #ifndef PMFS_LCD_INTERNAL_H
 #define PMFS_LCD_INTERNAL_H
 
-#include <lcd_config/pre_hook.h>
-
 #include <linux/fs.h>
 #include <linux/backing-dev.h>
 
@@ -13,8 +11,6 @@
 #include <liblcd/glue_cspace.h>
 #include <liblcd/liblcd.h>
 #include <liblcd/dispatch_loop.h>
-
-#include <lcd_config/post_hook.h>
 
 /* MACROS/FLAGS -------------------------------------------------- */
 

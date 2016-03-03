@@ -7,8 +7,8 @@
 #include <linux/fs.h>
 #include <linux/backing-dev.h>
 
-#include <lcd-domains/kliblcd.h>
-#include <lcd-domains/dispatch_loop.h>
+#include <liblcd/liblcd.h>
+#include <liblcd/dispatch_loop.h>
 
 /* MACROS -------------------------------------------------- */
 
@@ -22,23 +22,19 @@
 #define BDI_INIT 3
 #define BDI_DESTROY 4
 
-/* Struct tags */
-#define STRUCT_FILE_SYSTEM_TYPE_TAG 2
-#define STRUCT_BACKING_DEV_INFO_TAG 3
-
 /* STRUCT DEFS -------------------------------------------------- */
 
 struct file_system_type_container {
 	struct file_system_type file_system_type;
-	dptr_t my_ref;
-	dptr_t pmfs_ref;
+	cptr_t my_ref;
+	cptr_t pmfs_ref;
 	cptr_t pmfs_channel;
 };
 
 struct backing_dev_info_container {
 	struct backing_dev_info backing_dev_info;
-	dptr_t my_ref;
-	dptr_t pmfs_ref;
+	cptr_t my_ref;
+	cptr_t pmfs_ref;
 	/* no channel since pmfs doesn't implement fn ptrs */
 };
 
@@ -75,5 +71,38 @@ void glue_bdi_exit(void);
 int bdi_init_callee(void);
 int bdi_destroy_callee(void);
 
+/* CSPACES ------------------------------------------------------------ */
+
+int glue_cap_init(void);
+
+int glue_cap_create(struct glue_cspace **cspace);
+
+void glue_cap_destroy(struct glue_cspace *cspace);
+
+void glue_cap_exit(void);
+
+int glue_cap_insert_file_system_type_type(
+	struct glue_cspace *cspace, 
+	struct file_system_type_container *file_system_type_container,
+	cptr_t *c_out);
+
+int glue_cap_insert_backing_dev_info_type(
+	struct glue_cspace *cspace, 
+	struct back_dev_info_container *backing_dev_info_container,
+	cptr_t *c_out);
+
+int glue_cap_lookup_file_system_type_type(
+	struct glue_cspace *cspace, 
+	cptr_t c,
+	struct file_system_type_container **file_system_type_container);
+
+int glue_cap_lookup_backing_dev_info_type(
+	struct glue_cspace *cspace, 
+	cptr_t c,
+	struct backing_dev_info_container **backing_dev_info_container);
+
+void glue_cap_remove(
+	struct glue_cspace *cspace, 
+	cptr_t c);
 
 #endif /* VFS_KLCD_INTERNAL_H */

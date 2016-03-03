@@ -2,14 +2,18 @@
  * main.c - module init/exit for vfs klcd
  */
 
+#include <lcd_config/pre_hook.h>
+
 #include <linux/module.h>
 #include <linux/kernel.h>
-#include <lcd-domains/kliblcd.h>
-#include <lcd-domains/dispatch_loop.h>
+#include <liblcd/liblcd.h>
+#include <liblcd/dispatch_loop.h>
 #include <linux/kthread.h>
 #include <linux/delay.h>
 
 #include "internal.h"
+
+#include <lcd_config/post_hook.h>
 
 /* LOOP -------------------------------------------------- */
 
@@ -73,7 +77,7 @@ static int alloc_cptrs_for_channel(struct ipc_channel *c)
 	/* First cr is reserved */
 	for (i = 0; i < c->expected_cptrs; i++) {
 
-		ret = lcd_alloc_cptr(&t);
+		ret = lcd_cptr_alloc(&t);
 		if (ret) {
 			LIBLCD_ERR("alloc cptr");
 			return ret;
@@ -110,7 +114,7 @@ static void loop(struct dispatch_ctx *ctx)
 				return;
 			}
 			
-			ret = lcd_recv(channel->channel_cptr);
+			ret = lcd_sync_recv(channel->channel_cptr);
 			if (ret) {
 				LIBLCD_ERR("lcd recv");
 				return;
@@ -153,12 +157,12 @@ static int __init vfs_klcd_init(void)
 	 *
 	 * The bdi channel is not used (until we get async)
 	 */
-	ret = lcd_alloc_cptr(&vfs_chnl);
+	ret = lcd_cptr_alloc(&vfs_chnl);
 	if (ret) {
 		LIBLCD_ERR("alloc cptr");
 		goto fail2;
 	}
-	ret = lcd_alloc_cptr(&bdi_chnl);
+	ret = lcd_cptr_alloc(&bdi_chnl);
 	if (ret) {
 		LIBLCD_ERR("alloc cptr");
 		goto fail3;

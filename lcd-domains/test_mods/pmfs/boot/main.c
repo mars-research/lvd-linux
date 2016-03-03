@@ -3,21 +3,28 @@
  *
  */
 
-#include <lcd-domains/kliblcd.h>
+#include <lcd_config/pre_hook.h>
+
 #include <linux/delay.h>
 #include <linux/module.h>
 #include <linux/kernel.h>
 
+#include <libcap.h>
+#include <liblcd/liblcd.h>
+#include <liblcd/dispatch_loop.h>
+#include <liblcd/ipc_channel.h>
+
+#include <lcd_config/post_hook.h>
+
 static int boot_main(void)
 {
 	int ret;
-	struct lcd_info *mi;
+	struct lcd_create_ctx *ctx;
 	cptr_t lcd;
 	cptr_t vfs;
 	cptr_t vfs_chnl, bdi_chnl;
 	cptr_t pmfs_dest1, pmfs_dest2;
 	cptr_t vfs_dest1, vfs_dest2;
-
 	/*
 	 * Enter lcd mode
 	 */
@@ -48,9 +55,9 @@ static int boot_main(void)
 	/*
 	 * Create vfs klcd
 	 */
-	ret = klcd_create_module_klcd(&vfs, 
-				LCD_DIR("pmfs/vfs-klcd"),
-				"lcd_test_mod_pmfs_vfs");
+	ret = lcd_create_module_klcd(LCD_DIR("pmfs/vfs_klcd"),
+				"lcd_test_mod_pmfs_vfs",
+				&vfs);
 	if (ret) {
 		LIBLCD_ERR("create vfs klcd");
 		goto lcd_exit;
@@ -58,10 +65,10 @@ static int boot_main(void)
 	/*
 	 * Create pmfs lcd
 	 */
-	ret = lcd_create_module_lcd(&lcd, 
-				LCD_DIR("pmfs/pmfs-lcd"),
+	ret = lcd_create_module_lcd(LCD_DIR("pmfs/pmfs_lcd"),
 				"lcd_test_mod_pmfs_lcd",
-				LCD_CPTR_NULL, &mi);
+				&lcd,
+				&ctx);
 	if (ret) {
 		LIBLCD_ERR("create module lcd");
 		goto destroy_vfs;
@@ -72,7 +79,7 @@ static int boot_main(void)
 	/*
 	 * Alloc dest slot
 	 */
-	ret = __lcd_alloc_cptr(mi->cache, &pmfs_dest1);
+	ret = cptr_alloc(lcd_to_boot_cptr_cache(ctx), &pmfs_dest1);
 	if (ret) {
 		LIBLCD_ERR("failed to alloc cptr");
 		goto destroy_both;
@@ -88,7 +95,7 @@ static int boot_main(void)
 	/*
 	 * Alloc dest slot
 	 */
-	ret = __lcd_alloc_cptr(mi->cache, &pmfs_dest2);
+	ret = cptr_alloc(lcd_to_boot_cptr_cache(ctx), &pmfs_dest2);
 	if (ret) {
 		LIBLCD_ERR("failed to alloc cptr");
 		goto destroy_both;
@@ -102,8 +109,9 @@ static int boot_main(void)
 		goto destroy_both;
 	}
 
-
 	/* GRANT ENDPOINTS TO VFS ------------------------------ */
+
+	/* Hack for now */
 
 	vfs_dest1 = __cptr(3);
 	ret = lcd_cap_grant(vfs, vfs_chnl, vfs_dest1);
@@ -111,24 +119,18 @@ static int boot_main(void)
 		LIBLCD_ERR("failed to grant vfs endpoint to vfs");
 		goto destroy_both;
 	}
-	vfs_dest2 = lcd_cptr_set_lvl(__cptr(0), 1);
-	vfs_dest2 = lcd_cptr_set_fanout(vfs_dest2, 0, 0);
-	vfs_dest2 = lcd_cptr_set_slot(vfs_dest2, 0);
+	vfs_dest2 = __cptr((1UL << 8)); /* slot = 0, fanout = 0, level = 1 */
 	ret = lcd_cap_grant(vfs, bdi_chnl, vfs_dest2);
 	if (ret) {
 		LIBLCD_ERR("failed to grant bdi endpoint to vfs");
 		goto destroy_both;
 	}
+
 	/* DUMP BOOT INFO FOR PMFS ------------------------------ */
 
 	/*
-	 * Set up boot info
+	 * Set up boot info for pmfs lcd
 	 */
-	ret = lcd_dump_boot_info(mi);
-	if (ret) {
-		LIBLCD_ERR("dump boot info");
-		goto destroy_both;
-	}
 	to_boot_info(mi)->cptrs[0] = pmfs_dest1;
 	to_boot_info(mi)->cptrs[1] = pmfs_dest2;
 
@@ -161,9 +163,10 @@ static int boot_main(void)
 	goto destroy_both;
 
 destroy_both:
-	lcd_destroy_module_lcd(lcd, mi, LCD_CPTR_NULL);
+	lcd_cap_delete(lcd);
+	lcd_destroy_create_ctx(ctx);
 destroy_vfs:
-	klcd_destroy_module_klcd(vfs, "lcd_test_mod_pmfs_vfs");
+	lcd_destroy_module_klcd(vfs, "lcd_test_mod_pmfs_vfs");
 lcd_exit:
 	/* frees endpoint */
 	lcd_exit(0);

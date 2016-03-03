@@ -1,7 +1,7 @@
 /*
  * cap.c
  *
- * cspace code for pmfs
+ * cspace code for vfs
  */
 
 #include <lcd_config/pre_hook.h>

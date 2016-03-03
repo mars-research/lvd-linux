@@ -3,18 +3,22 @@
  *
  */
 
-#include <lcd-domains/dispatch_loop.h>
-#include <lcd-domains/kliblcd.h>
+#include <lcd_config/pre_hook.h>
+
+#include <liblcd/dispatch_loop.h>
+#include <liblcd/liblcd.h>
 #include <linux/module.h>
 #include <linux/mutex.h>
 #include <linux/slab.h>
 #include "../internal.h"
 
+#include <lcd_config/post_hook.h>
+
 /* GLOBALS -------------------------------------------------- */
 
 static struct dispatch_ctx *loop_ctx;
 static struct ipc_channel vfs_channel;
-static struct dstore *pmfs_dstore;
+static struct glue_cspace *pmfs_cspace;
 
 /* INIT/EXIT -------------------------------------------------- */
 
@@ -33,13 +37,24 @@ int glue_vfs_init(cptr_t vfs_chnl, struct dispatch_ctx *ctx)
 	/* Initialize pmfs data store. (This obviously doesn't generalize
 	 * well. In general, the data store should be set up upon receiving
 	 * a register call?) */
-	ret = lcd_dstore_init_dstore(&pmfs_dstore);
+	ret = glue_cap_init();
 	if (ret) {
-		LIBLCD_ERR("dstore init");
+		LIBLCD_ERR("cap init");
+		goto fail1;
+	}
+
+	ret = glue_cap_create(&pmfs_cspace);
+	if (ret) {
+		LIBLCD_ERR("create");
 		return ret;
 	}
 
 	return 0;
+
+fail2:
+	glue_cap_exit();
+fail1:
+	return ret;
 }
 
 void glue_vfs_exit(void)
@@ -47,11 +62,13 @@ void glue_vfs_exit(void)
 	/*
 	 * Destroy pmfs data stroe
 	 */
-	lcd_dstore_destroy(pmfs_dstore);
+	glue_cap_destroy(pmfs_cspace);
 	/*
 	 * Remove vfs channel from loop
 	 */
 	loop_rm_channel(loop_ctx, &vfs_channel);
+
+	glue_cap_exit();
 }
 
 /* FUNCTIONS -------------------------------------------------- */
@@ -72,10 +89,10 @@ int register_filesystem_callee(void)
 		goto fail1;
 	}
 
-	ret = lcd_dstore_insert(pmfs_dstore,
-				fs_container,
-				STRUCT_FILE_SYSTEM_TYPE_TAG,
-				&fs_container->my_ref);
+	ret = glue_cap_insert_file_system_type_type(
+		pmfs_cspace,
+		fs_container,
+		&fs_container->my_ref);
 	if (ret) {
 		LIBLCD_ERR("dstore insert fs container");
 		goto fail2;
@@ -90,7 +107,7 @@ int register_filesystem_callee(void)
 	 * now, and just hard code it for pmfs. (Otherwise, we have to
 	 * track a pesky 5 byte alloc.)
 	 */
-	fs_container->pmfs_ref = __dptr(lcd_r1());
+	fs_container->pmfs_ref = __cptr(lcd_r1());
 	fs_container->file_system_type.name = "pmfs";
 	/*
 	 * Get cptr to pmfs channel (the channel we will use to invoke
@@ -131,15 +148,15 @@ int register_filesystem_callee(void)
 	/*
 	 * Pass back a ref to our copy
 	 */
-	lcd_set_r1(dptr_val(fs_container->my_ref));
+	lcd_set_r1(cptr_val(fs_container->my_ref));
 	/*
 	 * Clear cr1
 	 */
-	lcd_set_cr1(LCD_CPTR_NULL);
+	lcd_set_cr1(CAP_CPTR_NULL);
 
 	/* IPC REPLY -------------------------------------------------- */
 
-	ret = lcd_reply();
+	ret = lcd_sync_reply();
 	if (ret) {
 		LIBLCD_ERR("lcd_reply");
 		goto fail5;
@@ -152,7 +169,7 @@ fail5:
 		LIBLCD_ERR("double fault");
 fail4:
 fail3:
-	lcd_dstore_delete(pmfs_dstore, fs_container->my_ref);
+	glue_cap_remove(pmfs_cspace, fs_container->my_ref);
 fail2:
 	kfree(fs_container);
 fail1:
@@ -161,7 +178,7 @@ fail1:
 	lcd_cap_delete(lcd_cr1());
 	lcd_free_cptr(lcd_cr1());
 	/* Clear cr1 */
-	lcd_set_cr1(LCD_CPTR_NULL);
+	lcd_set_cr1(CAP_CPTR_NULL);
 	return ret;
 }
 
@@ -169,8 +186,7 @@ int unregister_filesystem_callee(void)
 {
 	struct file_system_type_container *fs_container;
 	int ret;
-	struct dstore_node *n;
-	dptr_t ref;
+	cptr_t ref;
 
 	/* CLEAR UNUSED SLOT ------------------------------ */
 	
@@ -180,8 +196,8 @@ int unregister_filesystem_callee(void)
 	 * could be a vulnerability (caller could grant us something
 	 * and fill up the slot). */
 
-	lcd_free_cptr(lcd_cr1());
-	lcd_set_cr1(LCD_CPTR_NULL);
+	lcd_cptr_free(lcd_cr1());
+	lcd_set_cr1(CAP_CPTR_NULL);
 
 	/* IPC UNMARSHALING ---------------------------------------- */
 
@@ -189,20 +205,18 @@ int unregister_filesystem_callee(void)
 	 * We expect one ref to our copy
 	 */
 
-	ref = __dptr(lcd_r1());
+	ref = __cptr(lcd_r1());
 
 	/* LOOK UP CONTAINER  ---------------------------------------- */
 
-	ret = lcd_dstore_get(pmfs_dstore,
-			ref,
-			STRUCT_FILE_SYSTEM_TYPE_TAG,
-			&n);
+	ret = glue_cap_lookup_file_system_type_type(
+		pmfs_cspace,
+		ref,
+		&fs_container);
 	if (ret) {
 		LIBLCD_ERR("lookup");
 		goto out;
 	}
-	fs_container = lcd_dstore_node_object(n);
-	lcd_dstore_put(n);
 
 	/* CALL REAL FUNCTION ---------------------------------------- */
 
@@ -217,7 +231,7 @@ int unregister_filesystem_callee(void)
 	/*
 	 * Remove from data store
 	 */
-	lcd_dstore_delete(pmfs_dstore, fs_container->my_ref);
+	glue_cap_remove(pmfs_cspace, fs_container->my_ref);
 	/*
 	 * Delete cap to pmfs channel
 	 */
@@ -235,7 +249,7 @@ int unregister_filesystem_callee(void)
 
 out:
 	lcd_set_r0(ret);
-	if (lcd_reply())
+	if (lcd_sync_reply())
 		LIBLCD_ERR("double fault");
 	return ret;
 }

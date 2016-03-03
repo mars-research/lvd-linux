@@ -1181,9 +1181,17 @@ struct file_system_type_container {
 	struct ipc_channel c;
 };
 
+struct module_container {
+	struct module module;
+	u64 ref1;
+	u64 ref2;
+};
+
+static struct module_container module_container;
+
 static struct file_system_type_container pmfs_fs_type_container = {
 	.file_system_type = {
-		.owner		= THIS_MODULE,
+		.owner		= &module_container.module,
 		.name		= "pmfs",
 		.mount		= pmfs_mount,
 		.kill_sb	= kill_anon_super,

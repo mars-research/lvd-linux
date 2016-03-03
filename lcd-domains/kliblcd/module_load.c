@@ -173,7 +173,9 @@ int lcd_load_module(char *mdir, char *mname,
 		cptr_t *m_init_pages,
 		cptr_t *m_core_pages,
 		gva_t *m_init_link_addr,
-		gva_t *m_core_link_addr)
+		gva_t *m_core_link_addr,
+		unsigned long *m_init_size,
+		unsigned long *m_core_size)
 {
 	int ret;
 	struct module *m;
@@ -207,6 +209,8 @@ int lcd_load_module(char *mdir, char *mname,
 	 */
 	*m_init_link_addr = __gva((unsigned long)m->module_init);
 	*m_core_link_addr = __gva((unsigned long)m->module_core);
+	*m_init_size = m->init_size;
+	*m_core_size = m->core_size;
 
 	LIBLCD_MSG("Loaded %s.ko: ", mname);
 	printk("    init addr 0x%p init size 0x%x\n",

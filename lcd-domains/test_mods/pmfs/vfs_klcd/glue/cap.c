@@ -25,6 +25,7 @@ struct type_ops_id {
 enum glue_type {
 	GLUE_TYPE_FILE_SYSTEM_TYPE,
 	GLUE_TYPE_BACKING_DEV_INFO,
+	GLUE_TYPE_MODULE,
 	GLUE_NR_TYPES,
 };
 
@@ -45,6 +46,13 @@ static struct type_ops_id glue_libcap_type_ops[GLUE_NR_TYPES] = {
 	{
 		{
 			.name = "struct backing_dev_info",
+			.delete = dummy_func,
+			.revoke = dummy_func,
+		}
+	},
+	{
+		{
+			.name = "struct module",
 			.delete = dummy_func,
 			.revoke = dummy_func,
 		}
@@ -140,6 +148,16 @@ int glue_cap_insert_backing_dev_info_type(
 				c_out);
 }
 
+int glue_cap_insert_module_type(
+	struct glue_cspace *cspace, 
+	struct module_container *module_container,
+	cptr_t *c_out)
+{
+	return glue_cspace_insert(cspace, module_container,  
+				glue_libcap_type_ops[GLUE_TYPE_MODULE].libcap_type,
+				c_out);
+}
+
 int glue_cap_lookup_file_system_type_type(
 	struct glue_cspace *cspace, 
 	cptr_t c,
@@ -159,6 +177,17 @@ int glue_cap_lookup_backing_dev_info_type(
 		cspace, c, 
 		glue_libcap_type_ops[GLUE_TYPE_BACKING_DEV_INFO].libcap_type,
 		(void **)backing_dev_info_container);
+}
+
+int glue_cap_lookup_module_type(
+	struct glue_cspace *cspace, 
+	cptr_t c,
+	struct module_container **module_container)
+{
+	return glue_cspace_lookup(
+		cspace, c, 
+		glue_libcap_type_ops[GLUE_TYPE_MODULE].libcap_type,
+		(void **)module_container);
 }
 
 void glue_cap_remove(

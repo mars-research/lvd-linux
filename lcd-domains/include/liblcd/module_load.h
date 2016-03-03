@@ -17,6 +17,8 @@
  *               virtual address space
  * @m_init_pages: cptr to memory object capability for init bits
  * @m_init_link_addr: the address that the module's init code was linked for
+ * @m_init_size: size in bytes of the module init part of the image
+ * @m_core_size: size in bytes of the module core part of the image
  *
  * The *_core_* out params have similar meaning.
  *
@@ -35,7 +37,9 @@ int lcd_load_module(char *mdir, char *mname,
 		cptr_t *m_init_pages,
 		cptr_t *m_core_pages,
 		gva_t *m_init_link_addr,
-		gva_t *m_core_link_addr);
+		gva_t *m_core_link_addr,
+		unsigned long *m_init_size,
+		unsigned long *m_core_size);
 /**
  * lcd_release_module -- Unmap module bits and cap delete the pages
  * @m_init_bits: virtual address of pages that contain module's init

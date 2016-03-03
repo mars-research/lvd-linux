@@ -183,8 +183,8 @@ static int add_boot_memory(void)
 	n = alloc_itree_node();
 	if (!n)
 		goto fail1;
-	n->start = __liblcd_pa(THIS_MODULE->module_init);
-	n->last = n->start + THIS_MODULE->init_size - 1;
+	n->start = gpa_val(lcd_gva2gpa(lcd_get_boot_info()->module_init_base));
+	n->last = n->start + lcd_get_boot_info()->module_init_size - 1;
 	n->cptr = lcd_get_boot_info()->lcd_boot_cptrs.module_init;
 	lcd_resource_tree_insert(&itree, n);
 	/*
@@ -193,8 +193,8 @@ static int add_boot_memory(void)
 	n = alloc_itree_node();
 	if (!n)
 		goto fail2;
-	n->start = __liblcd_pa(THIS_MODULE->module_core);
-	n->last = n->start + THIS_MODULE->core_size - 1;
+	n->start = gpa_val(lcd_gva2gpa(lcd_get_boot_info()->module_core_base));
+	n->last = n->start + lcd_get_boot_info()->module_core_size - 1;
 	n->cptr = lcd_get_boot_info()->lcd_boot_cptrs.module_core;
 	lcd_resource_tree_insert(&itree, n);
 	/*

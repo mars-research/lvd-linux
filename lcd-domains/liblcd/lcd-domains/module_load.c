@@ -19,7 +19,9 @@ int lcd_load_module(char *mdir, char *mname,
 		cptr_t *m_init_pages,
 		cptr_t *m_core_pages,
 		gva_t *m_init_link_addr,
-		gva_t *m_core_link_addr)
+		gva_t *m_core_link_addr,
+		unsigned long *m_init_size,
+		unsigned long *m_core_size)
 {
 	return -ENOSYS; /* not implemented */
 }

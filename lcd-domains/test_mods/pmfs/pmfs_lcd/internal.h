@@ -6,6 +6,7 @@
 
 #include <linux/fs.h>
 #include <linux/backing-dev.h>
+#include <linux/module.h>
 
 #include <libcap.h>
 #include <liblcd/glue_cspace.h>
@@ -39,6 +40,12 @@ struct backing_dev_info_container {
 	/* no channel since pmfs doesn't implement function ptrs */
 };
 
+struct module_container {
+	struct module module;
+	cptr_t my_ref;
+	cptr_t vfs_ref;
+};
+
 /* FUNCTIONS -------------------------------------------------- */
 
 int glue_vfs_init(cptr_t _vfs_channel, struct dispatch_ctx *ctx);
@@ -69,6 +76,11 @@ int glue_cap_insert_backing_dev_info_type(
 	struct backing_dev_info_container *backing_dev_info_container,
 	cptr_t *c_out);
 
+int glue_cap_insert_module_type(
+	struct glue_cspace *cspace, 
+	struct module_container *module_container,
+	cptr_t *c_out);
+
 int glue_cap_lookup_file_system_type_type(
 	struct glue_cspace *cspace, 
 	cptr_t c,
@@ -78,6 +90,11 @@ int glue_cap_lookup_backing_dev_info_type(
 	struct glue_cspace *cspace, 
 	cptr_t c,
 	struct backing_dev_info_container **backing_dev_info_container);
+
+int glue_cap_lookup_module_type(
+	struct glue_cspace *cspace, 
+	cptr_t c,
+	struct module_container **module_container);
 
 void glue_cap_remove(
 	struct glue_cspace *cspace, 

@@ -20,7 +20,7 @@ int lcd_enter(void)
 	 * threads.
 	 *
 	 * First, if we weren't created by another klcd, then we
-	 * need to init our cspace, utcb, and so on.
+	 * need to init our lcd, cspace, utcb, and so on.
 	 */
 	if (!current->lcd) {
 		ret = __lcd_create_no_vm_no_thread(&lcd);
@@ -106,7 +106,9 @@ static void do_destroy_lcd(struct lcd *lcd)
 {
 	switch (lcd->type) {
 	case LCD_TYPE_NONISOLATED:
-		__lcd_destroy_no_vm(lcd);
+		/*
+		 * The guy who created us will tear our LCD down
+		 */
 		return;
 	case LCD_TYPE_TOP:
 		__lcd_destroy_no_vm_no_thread(lcd);

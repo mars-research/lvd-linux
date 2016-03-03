@@ -119,7 +119,9 @@ fail1:
 }
 
 static int do_kernel_module_grant_map(cptr_t lcd, struct lcd_create_ctx *ctx,
-				gva_t m_init_link_addr, gva_t m_core_link_addr)
+				gva_t m_init_link_addr, gva_t m_core_link_addr,
+				unsigned long m_init_size,
+				unsigned long m_core_size)
 {
 	unsigned long offset;
 	cptr_t *c;
@@ -151,13 +153,20 @@ static int do_kernel_module_grant_map(cptr_t lcd, struct lcd_create_ctx *ctx,
 	if (ret)
 		goto fail2;
 
+	lcd_to_boot_info(ctx)->module_init_base = m_init_link_addr;
+	lcd_to_boot_info(ctx)->module_core_base = m_core_link_addr;
+	lcd_to_boot_info(ctx)->module_init_size = m_init_size;
+	lcd_to_boot_info(ctx)->module_core_size = m_core_size;
+
 fail2:
 fail1:
 	return ret;
 }
 
 static int setup_phys_addr_space(cptr_t lcd, struct lcd_create_ctx *ctx,
-				gva_t m_init_link_addr, gva_t m_core_link_addr)
+				gva_t m_init_link_addr, gva_t m_core_link_addr,
+				unsigned long m_init_size,
+				unsigned long m_core_size)
 {
 	int ret;
 	cptr_t *c;
@@ -183,7 +192,8 @@ static int setup_phys_addr_space(cptr_t lcd, struct lcd_create_ctx *ctx,
 	 * Map and grant kernel module
 	 */
 	ret = do_kernel_module_grant_map(lcd, ctx,
-					m_init_link_addr, m_core_link_addr);
+					m_init_link_addr, m_core_link_addr,
+					m_init_size, m_core_size);
 	if (ret)
 		goto fail4;
 
@@ -339,7 +349,9 @@ static void setup_virt_addr_space(struct lcd_create_ctx *ctx)
 }
 
 static int setup_addr_spaces(cptr_t lcd, struct lcd_create_ctx *ctx,
-			gva_t m_init_link_addr, gva_t m_core_link_addr)
+			gva_t m_init_link_addr, gva_t m_core_link_addr,
+			unsigned long m_init_size,
+			unsigned long m_core_size)
 {
 	int ret;
 	/*
@@ -347,7 +359,8 @@ static int setup_addr_spaces(cptr_t lcd, struct lcd_create_ctx *ctx,
 	 * via lcd_config)
 	 */
 	ret = setup_phys_addr_space(lcd, ctx, m_init_link_addr, 
-				m_core_link_addr);
+				m_core_link_addr,
+				m_init_size, m_core_size);
 	if (ret) {
 		LIBLCD_ERR("error setting up phys addr space");
 		goto fail1;
@@ -507,6 +520,7 @@ int lcd_create_module_lcd(char *mdir, char *mname, cptr_t *lcd_out,
 	int ret;
 	cptr_t m_init_cptr, m_core_cptr;
 	gva_t m_init_link_addr, m_core_link_addr;
+	unsigned long m_init_size, m_core_size;
 	struct lcd_create_ctx *ctx;
 	cptr_t lcd;
 	/*
@@ -531,7 +545,8 @@ int lcd_create_module_lcd(char *mdir, char *mname, cptr_t *lcd_out,
 	ret = lcd_load_module(mdir, mname,
 			&ctx->m_init_bits, &ctx->m_core_bits,
 			&m_init_cptr, &m_core_cptr,
-			&m_init_link_addr, &m_core_link_addr);
+			&m_init_link_addr, &m_core_link_addr,
+			&m_init_size, &m_core_size);
 	if (ret) {
 		LIBLCD_ERR("error loading kernel module");
 		goto fail3;
@@ -551,7 +566,8 @@ int lcd_create_module_lcd(char *mdir, char *mname, cptr_t *lcd_out,
 	 * Set up address spaces
 	 */
 	ret = setup_addr_spaces(lcd, ctx, m_init_link_addr, 
-				m_core_link_addr);
+				m_core_link_addr,
+				m_init_size, m_core_size);
 	if (ret) {
 		LIBLCD_ERR("error setting up address spaces");
 		goto fail5;

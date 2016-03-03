@@ -18,13 +18,19 @@ static int foo(void)
 
 static int __init my_init(void) 
 {
-	/*
-	 * Unlike other examples, the kLCD is already running in "LCD" mode,
-	 * so we don't do lcd_enter / lcd_exit.
-	 */
+	int ret;
+
+	ret = lcd_enter();
+	if (ret) {
+		LIBLCD_ERR("enter failed");
+		goto out;
+	}
+
 	foo();
 
-	return 0;
+out:
+	lcd_exit(ret);
+	return ret;
 }
 
 /* 

@@ -29,6 +29,13 @@ struct lcd_boot_info {
 	 */
 	struct cptr_cache cptr_cache;
 	/*
+	 * Module init and core addresses and sizes
+	 */
+	gva_t module_init_base;
+	gva_t module_core_base;
+	unsigned long module_init_size;
+	unsigned long module_core_size;
+	/*
 	 * Capabilities to memory objects
 	 */
 	struct lcd_boot_cptrs lcd_boot_cptrs;

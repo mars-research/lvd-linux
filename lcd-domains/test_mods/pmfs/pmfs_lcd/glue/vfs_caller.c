@@ -65,14 +65,18 @@ void glue_vfs_exit(void)
 int register_filesystem(struct file_system_type *fs)
 {
 	struct file_system_type_container *fs_container;
+	struct module_container *module_container;
 	int ret;
 	cptr_t endpoint;
 	/*
-	 * Get container
+	 * Get containers
 	 */
 	fs_container = container_of(fs, 
 				struct file_system_type_container,
 				file_system_type);
+	module_container = container_of(fs->owner,
+					struct module_container,
+					module);
 	/*
 	 * SET UP CHANNEL ----------------------------------------
 	 *
@@ -101,11 +105,21 @@ int register_filesystem(struct file_system_type *fs)
 		LIBLCD_ERR("insert");
 		lcd_exit(ret); /* abort */
 	}
+	ret = glue_cap_insert_module_type(
+		vfs_cspace, 
+		module_container,
+		&module_container->my_ref);
+	if (ret) {
+		LIBLCD_ERR("insert");
+		lcd_exit(ret); /* abort */
+	}
+
 	/*
 	 * IPC MARSHALING --------------------------------------------------
 	 *
 	 */
 	lcd_set_r1(cptr_val(fs_container->my_ref));
+	lcd_set_r2(cptr_val(module_container->my_ref));
 	/*
 	 * XXX: We don't even pass the name string (otherwise the callee
 	 * needs to keep track of a pesky 5 byte alloc). We just hard
@@ -131,6 +145,7 @@ int register_filesystem(struct file_system_type *fs)
 	 * We expect a remote ref coming back
 	 */
 	fs_container->vfs_ref = __cptr(lcd_r1());
+	module_container->vfs_ref = __cptr(lcd_r2());
 
 	/* Clear capability register */
 	lcd_set_cr1(CAP_CPTR_NULL);
@@ -145,17 +160,22 @@ int unregister_filesystem(struct file_system_type *fs)
 {
 	int ret;
 	struct file_system_type_container *fs_container;
+	struct module_container *module_container;
 
 	fs_container = container_of(fs,
 				struct file_system_type_container,
 				file_system_type);
+	module_container = container_of(fs->owner,
+					struct module_container,
+					module);
 
 	/* IPC MARSHALING ---------------------------------------- */
 
 	/*
-	 * Pass remote ref to vfs's copy
+	 * Pass remote refs to vfs's copies
 	 */
 	lcd_set_r1(cptr_val(fs_container->vfs_ref));
+	lcd_set_r2(cptr_val(module_container->vfs_ref));
 
 	/* IPC CALL ---------------------------------------- */
 
@@ -175,9 +195,10 @@ int unregister_filesystem(struct file_system_type *fs)
 
 	lcd_cap_delete(fs_container->chnl.channel_cptr);
 	/*
-	 * Remove fs type from data store
+	 * Remove fs type and module from data store
 	 */
 	glue_cap_remove(vfs_cspace, fs_container->my_ref);
+	glue_cap_remove(vfs_cspace, module_container->my_ref);
 	/*
 	 * Pass back return value
 	 */

@@ -76,11 +76,11 @@ void glue_vfs_exit(void)
 int register_filesystem_callee(void)
 {
 	struct file_system_type_container *fs_container;
+	struct module_container *module_container;
 	int ret;
-	struct module *pmfs_module;
 
 	/*
-	 * SET UP CONTAINER ----------------------------------------
+	 * SET UP CONTAINERS ----------------------------------------
 	 */
 	fs_container = kzalloc(sizeof(*fs_container), GFP_KERNEL);
 	if (!fs_container) {
@@ -98,14 +98,33 @@ int register_filesystem_callee(void)
 		goto fail2;
 	}
 
+
+	module_container = kzalloc(sizeof(*module_container), GFP_KERNEL);
+	if (!module_container) {
+		LIBLCD_ERR("kzalloc module container");
+		ret = -ENOMEM;
+		goto fail3;
+	}
+
+	ret = glue_cap_insert_module_type(
+		pmfs_cspace,
+		module_container,
+		&module_container->my_ref);
+	if (ret) {
+		LIBLCD_ERR("insert");
+		goto fail4;
+	}
+
 	/* IPC UNMARSHALING ---------------------------------------- */
 	
 	/*
-	 * Ref comes first. 
+	 * Refs come first. 
 	 *
-	 * XXX: We don't even bother passing the name for
-	 * now, and just hard code it for pmfs. (Otherwise, we have to
-	 * track a pesky 5 byte alloc.)
+	 * struct file_system_type
+	 * -----------------------
+	 *
+	 * XXX: We don't bother passing fs name for now. Just hard code
+	 * it to "pmfs".
 	 */
 	fs_container->pmfs_ref = __cptr(lcd_r1());
 	fs_container->file_system_type.name = "pmfs";
@@ -115,17 +134,13 @@ int register_filesystem_callee(void)
 	 */
 	fs_container->pmfs_channel = lcd_cr1();
 	/*
-	 * XXX Hack: Look up struct module for pmfs
+	 * struct module
+	 * -------------
+	 *
+	 * Pull out remote ref, and link with fs type
 	 */
-	mutex_lock(&module_mutex);
-	pmfs_module = find_module("lcd_test_mod_pmfs_lcd");
-	mutex_unlock(&module_mutex);	
-	if (!pmfs_module) {
-		LIBLCD_ERR("couldn't find module");
-		ret = -EIO;
-		goto fail3;
-	}
-	fs_container->file_system_type.owner = pmfs_module;
+	module_container->pmfs_ref = __cptr(lcd_r2());
+	fs_container->file_system_type.owner = &module_container->module;
 
 	/*
 	 * CALL REAL REGISTER_FILESYSTEM ------------------------------
@@ -134,7 +149,7 @@ int register_filesystem_callee(void)
 	ret = register_filesystem(&fs_container->file_system_type);
 	if (ret) {
 		LIBLCD_ERR("register fs failed");
-		goto fail4;
+		goto fail5;
 	}
 
 	/*
@@ -146,9 +161,10 @@ int register_filesystem_callee(void)
 	 */
 	lcd_set_r0(ret);
 	/*
-	 * Pass back a ref to our copy
+	 * Pass back a ref to our copies
 	 */
 	lcd_set_r1(cptr_val(fs_container->my_ref));
+	lcd_set_r2(cptr_val(module_container->my_ref));
 	/*
 	 * Clear cr1
 	 */
@@ -159,15 +175,18 @@ int register_filesystem_callee(void)
 	ret = lcd_sync_reply();
 	if (ret) {
 		LIBLCD_ERR("lcd_reply");
-		goto fail5;
+		goto fail6;
 	}
 
 	return 0;
 
-fail5:
+fail6:
 	if (unregister_filesystem(&fs_container->file_system_type) != 0)
 		LIBLCD_ERR("double fault");
+fail5:
+	glue_cap_remove(pmfs_cspace, module_container->my_ref);
 fail4:
+	kfree(module_container);
 fail3:
 	glue_cap_remove(pmfs_cspace, fs_container->my_ref);
 fail2:
@@ -185,8 +204,9 @@ fail1:
 int unregister_filesystem_callee(void)
 {
 	struct file_system_type_container *fs_container;
+	struct module_container *module_container;
 	int ret;
-	cptr_t ref;
+	cptr_t fs_ref, m_ref;
 
 	/* CLEAR UNUSED SLOT ------------------------------ */
 	
@@ -202,17 +222,27 @@ int unregister_filesystem_callee(void)
 	/* IPC UNMARSHALING ---------------------------------------- */
 
 	/*
-	 * We expect one ref to our copy
+	 * We expect refs to our copies
 	 */
 
-	ref = __cptr(lcd_r1());
+	fs_ref = __cptr(lcd_r1());
+	m_ref = __cptr(lcd_r2());
 
-	/* LOOK UP CONTAINER  ---------------------------------------- */
+	/* LOOK UP CONTAINERS  ---------------------------------------- */
 
 	ret = glue_cap_lookup_file_system_type_type(
 		pmfs_cspace,
-		ref,
+		fs_ref,
 		&fs_container);
+	if (ret) {
+		LIBLCD_ERR("lookup");
+		goto out;
+	}
+
+	ret = glue_cap_lookup_module_type(
+		pmfs_cspace,
+		m_ref,
+		&module_container);
 	if (ret) {
 		LIBLCD_ERR("lookup");
 		goto out;
@@ -232,14 +262,16 @@ int unregister_filesystem_callee(void)
 	 * Remove from data store
 	 */
 	glue_cap_remove(pmfs_cspace, fs_container->my_ref);
+	glue_cap_remove(pmfs_cspace, module_container->my_ref);
 	/*
 	 * Delete cap to pmfs channel
 	 */
 	lcd_cap_delete(fs_container->pmfs_channel);
 	/*
-	 * Free container
+	 * Free containers
 	 */
 	kfree(fs_container);
+	kfree(module_container);
 
 	/* IPC REPLY -------------------------------------------------- */
 

@@ -5,6 +5,7 @@
 #define VFS_KLCD_INTERNAL_H
 
 #include <linux/fs.h>
+#include <linux/module.h>
 #include <linux/backing-dev.h>
 
 #include <liblcd/liblcd.h>
@@ -30,6 +31,12 @@ struct file_system_type_container {
 	cptr_t my_ref;
 	cptr_t pmfs_ref;
 	cptr_t pmfs_channel;
+};
+
+struct module_container {
+	struct module module;
+	cptr_t my_ref;
+	cptr_t pmfs_ref;
 };
 
 struct backing_dev_info_container {
@@ -92,6 +99,11 @@ int glue_cap_insert_backing_dev_info_type(
 	struct backing_dev_info_container *backing_dev_info_container,
 	cptr_t *c_out);
 
+int glue_cap_insert_module_type(
+	struct glue_cspace *cspace, 
+	struct module_container *module_container,
+	cptr_t *c_out);
+
 int glue_cap_lookup_file_system_type_type(
 	struct glue_cspace *cspace, 
 	cptr_t c,
@@ -101,6 +113,11 @@ int glue_cap_lookup_backing_dev_info_type(
 	struct glue_cspace *cspace, 
 	cptr_t c,
 	struct backing_dev_info_container **backing_dev_info_container);
+
+int glue_cap_lookup_module_type(
+	struct glue_cspace *cspace, 
+	cptr_t c,
+	struct module_container **module_container);
 
 void glue_cap_remove(
 	struct glue_cspace *cspace, 

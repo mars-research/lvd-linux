@@ -183,8 +183,8 @@ static int add_boot_memory(void)
 	n = alloc_itree_node();
 	if (!n)
 		goto fail1;
-	n->it_node.start = __liblcd_pa(THIS_MODULE->module_init);
-	n->it_node.last = n->it_node.start + THIS_MODULE->init_size - 1;
+	n->start = __liblcd_pa(THIS_MODULE->module_init);
+	n->last = n->start + THIS_MODULE->init_size - 1;
 	n->cptr = lcd_get_boot_info()->lcd_boot_cptrs.module_init;
 	lcd_resource_tree_insert(&itree, n);
 	/*
@@ -193,8 +193,8 @@ static int add_boot_memory(void)
 	n = alloc_itree_node();
 	if (!n)
 		goto fail2;
-	n->it_node.start = __liblcd_pa(THIS_MODULE->module_core);
-	n->it_node.last = n->it_node.start + THIS_MODULE->core_size - 1;
+	n->start = __liblcd_pa(THIS_MODULE->module_core);
+	n->last = n->start + THIS_MODULE->core_size - 1;
 	n->cptr = lcd_get_boot_info()->lcd_boot_cptrs.module_core;
 	lcd_resource_tree_insert(&itree, n);
 	/*
@@ -203,8 +203,8 @@ static int add_boot_memory(void)
 	n = alloc_itree_node();
 	if (!n)
 		goto fail3;
-	n->it_node.start = gpa_val(LCD_BOOTSTRAP_PAGES_GP_ADDR);
-	n->it_node.last = gpa_val(LCD_BOOTSTRAP_PAGES_GP_ADDR) + 
+	n->start = gpa_val(LCD_BOOTSTRAP_PAGES_GP_ADDR);
+	n->last = gpa_val(LCD_BOOTSTRAP_PAGES_GP_ADDR) + 
 		LCD_BOOTSTRAP_PAGES_SIZE - 1;
 	n->cptr = lcd_get_boot_info()->lcd_boot_cptrs.boot_pages;
 	lcd_resource_tree_insert(&itree, n);
@@ -214,8 +214,8 @@ static int add_boot_memory(void)
 	n = alloc_itree_node();
 	if (!n)
 		goto fail4;
-	n->it_node.start = gpa_val(LCD_STACK_GP_ADDR);
-	n->it_node.last = gpa_val(LCD_STACK_GP_ADDR) + 
+	n->start = gpa_val(LCD_STACK_GP_ADDR);
+	n->last = gpa_val(LCD_STACK_GP_ADDR) + 
 		LCD_STACK_SIZE - 1;
 	n->cptr = lcd_get_boot_info()->lcd_boot_cptrs.stack;
 	lcd_resource_tree_insert(&itree, n);
@@ -225,8 +225,8 @@ static int add_boot_memory(void)
 	n = alloc_itree_node();
 	if (!n)
 		goto fail5;
-	n->it_node.start = gpa_val(LCD_BOOTSTRAP_PAGE_TABLES_GP_ADDR);
-	n->it_node.last = gpa_val(LCD_BOOTSTRAP_PAGE_TABLES_GP_ADDR) + 
+	n->start = gpa_val(LCD_BOOTSTRAP_PAGE_TABLES_GP_ADDR);
+	n->last = gpa_val(LCD_BOOTSTRAP_PAGE_TABLES_GP_ADDR) + 
 		LCD_BOOTSTRAP_PAGE_TABLES_SIZE - 1;
 	n->cptr = lcd_get_boot_info()->lcd_boot_cptrs.gv;
 	lcd_resource_tree_insert(&itree, n);

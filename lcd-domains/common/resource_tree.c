@@ -139,17 +139,17 @@ static inline int node_cmp(struct lcd_resource_node *n1,
 {
 	unsigned long left_addr = lcd_resource_node_start(n1);
 	unsigned long right_addr = lcd_resource_node_start(n2);
-	unsigned long left_cptr = cptr_val(lcd_resource_node_cptr(n1)),
-	unsigned long right_cptr = cptr_val(lcd_resource_node_cptr(n2)),
+	unsigned long left_cptr = cptr_val(lcd_resource_node_cptr(n1));
+	unsigned long right_cptr = cptr_val(lcd_resource_node_cptr(n2));
 
 	/* Sort in dictionary order on (start addr, cptr val) */
 	if (left_addr < right_addr)
 		return -1;
 	if (right_addr < left_addr)
 		return 1;
-	if (cptr_val(left_cptr) < cptr_val(right_cptr))
+	if (left_cptr < right_cptr)
 		return -1;
-	if (cptr_val(right_cptr) < cptr_val(left_cptr))
+	if (left_cptr > right_cptr)
 		return 1;
 	return 0; /* equal */
 }
@@ -165,16 +165,16 @@ static inline int overlapping_non_equal_intervals(
 	struct lcd_resource_node *n2)
 {
 	int ret = in_interval(lcd_resource_node_start(n1),
-			lcd_resrouce_node_start(n2),
-			lcd_resrouce_node_last(n2)) ||
+			lcd_resource_node_start(n2),
+			lcd_resource_node_last(n2)) ||
 		in_interval(lcd_resource_node_start(n2),
-			lcd_resrouce_node_start(n1),
-			lcd_resrouce_node_last(n2));
+			lcd_resource_node_start(n1),
+			lcd_resource_node_last(n1));
 	if (unlikely(ret))
 		ret = (lcd_resource_node_start(n1) != 
-			lcd_resrouce_node_start(n2)) ||
+			lcd_resource_node_start(n2)) ||
 			(lcd_resource_node_last(n1) != 
-				lcd_resrouce_node_last(n2));
+				lcd_resource_node_last(n2));
 	return ret;
 }
 
@@ -184,19 +184,24 @@ void lcd_resource_tree_insert(struct lcd_resource_tree *t,
 	/*
 	 * This code was adapted from the rbtree documentation.
 	 */
-  	struct rb_node **new = &(t->root->rb_node), *parent = NULL;
+  	struct rb_node **new = &(t->root.rb_node), *parent = NULL;
 
   	/* Figure out where to put new node */
   	while (*new) {
   		struct lcd_resource_node *this = 
 			container_of(*new, struct lcd_resource_node, rb_node);
+		int result;
 
 		/* We don't allow overlapping intervals *unless* the intervals
 		 * are identical */
-		if (unlikely(overlapping_non_equal_intervals(n, this)))
+		if (unlikely(overlapping_non_equal_intervals(n, this))) {
+			LIBLCD_ERR("OVERLAPPING INTERVALS:");
+			lcd_resource_node_dump(n);
+			lcd_resource_node_dump(this);
 			BUG();
+		}
 
-  		int result = node_cmp(n, this);
+  		result = node_cmp(n, this);
 
 		parent = *new;
   		if (result < 0)
@@ -212,7 +217,7 @@ void lcd_resource_tree_insert(struct lcd_resource_tree *t,
 
   	/* Add new node and rebalance tree. */
   	rb_link_node(&n->rb_node, parent, new);
-  	rb_insert_color(&n->rb_node, root);
+  	rb_insert_color(&n->rb_node, &t->root);
 }
 
 int lcd_resource_tree_search(struct lcd_resource_tree *t,
@@ -220,7 +225,7 @@ int lcd_resource_tree_search(struct lcd_resource_tree *t,
 			cptr_t cptr,
 			struct lcd_resource_node **n_out)
 {
-	struct rb_node *node = t->root->rb_node;
+	struct rb_node *node = t->root.rb_node;
 
   	while (node) {
   		struct lcd_resource_node *this = 
@@ -245,7 +250,7 @@ int lcd_resource_tree_search_addr(struct lcd_resource_tree *t,
 			unsigned long addr,
 			struct lcd_resource_node **n_out)
 {
-	struct rb_node *node = t->root->rb_node;
+	struct rb_node *node = t->root.rb_node;
 
   	while (node) {
   		struct lcd_resource_node *this = 
@@ -298,6 +303,21 @@ void lcd_resource_tree_remove(struct lcd_resource_tree *t,
 	rb_erase(&n->rb_node, &t->root);
 }
 
+void lcd_resource_node_dump(struct lcd_resource_node *n)
+{
+	printk("  node:\n");
+	printk("    start: 0x%lx\n",
+		lcd_resource_node_start(n));
+	printk("    last: 0x%lx\n",
+		lcd_resource_node_last(n));
+	printk("    size: 0x%lx\n",
+		lcd_resource_node_size(n));
+	printk("    cptr: 0x%lx\n",
+		cptr_val(lcd_resource_node_cptr(n)));
+	printk("    flags: 0x%x\n",
+		lcd_resource_node_flags(n));
+}
+
 void lcd_resource_tree_dump(struct lcd_resource_tree *t)
 {
 	struct lcd_resource_node *cursor;
@@ -306,17 +326,8 @@ void lcd_resource_tree_dump(struct lcd_resource_tree *t)
 
 	cursor = lcd_resource_tree_first(t);
 	while (cursor) {
-		printk("  node:\n");
-		printk("    start: 0x%lx\n",
-			lcd_resource_node_start(cursor));
-		printk("    last: 0x%lx\n",
-			lcd_resource_node_last(cursor));
-		printk("    size: 0x%lx\n",
-			lcd_resource_node_size(cursor));
-		printk("    cptr: 0x%lx\n",
-			cptr_val(lcd_resource_node_cptr(cursor)));
-		printk("    flags: 0x%x\n",
-			lcd_resource_node_flags(cursor));
+
+		lcd_resource_node_dump(cursor);
 
 		cursor = lcd_resource_tree_next(cursor);
 	}

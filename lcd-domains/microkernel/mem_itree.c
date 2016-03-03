@@ -7,10 +7,29 @@
  * Copyright: University of Utah
  */
 
+#include <linux/rbtree.h>
 #include <linux/interval_tree.h>
+#include <linux/interval_tree_generic.h>
 #include <linux/mutex.h>
 #include <linux/slab.h>
 #include <lcd_domains/microkernel.h>
+
+/* INTERVAL TREE DEFs -------------------------------------------------- */
+
+/*
+ * The lib/interval_tree.c does not export its functions, so we just
+ * declare our own here.
+ */
+
+#define START(node) ((node)->start)
+#define LAST(node)  ((node)->last)
+
+INTERVAL_TREE_DEFINE(struct interval_tree_node, rb,
+		     unsigned long, __subtree_last,
+		     START, LAST,, interval_tree)
+
+/* ------------------------------------------------------------ */
+
 
 static struct lcd_mem_itree lcd_physical_mem_itree;
 static struct lcd_mem_itree lcd_vmalloc_mem_itree;

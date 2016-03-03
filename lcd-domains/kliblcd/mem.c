@@ -325,8 +325,7 @@ static void do_phys_unmap(struct lcd *lcd, struct lcd_memory_object *mo,
 	/*
 	 * Remove from resource trees
 	 */
-	mo_remove_from_trees(current, mo, cap_cnode_cptr(mo_cnode),
-			cap_cnode_cptr(mo_cnode));
+	mo_remove_from_trees(current, mo, cap_cnode_cptr(mo_cnode));
 	/*
 	 * "Unmap" from physical address space (this is a no-op for
 	 * non-isolated code right now)
@@ -855,7 +854,7 @@ int lcd_phys_to_resource_node(gpa_t paddr, struct lcd_resource_node **n)
 	 *
 	 * (For vmalloc mem, should use lcd_virt_to_resource_node.)
 	 */
-	return lcd_resource_tree_search(
+	return lcd_resource_tree_search_addr(
 		current->lcd_resource_trees[LCD_RESOURCE_TREE_CONTIGUOUS],
 		gpa_val(paddr),
 		n);
@@ -895,7 +894,7 @@ int virt_to_resource_node(gva_t vaddr, struct lcd_resource_node **n,
 	/*
 	 * Look in non-contiguous mem first
 	 */
-	ret = lcd_resource_tree_search(
+	ret = lcd_resource_tree_search_addr(
 		current->lcd_resource_trees[LCD_RESOURCE_TREE_NON_CONTIGUOUS],
 		gva_val(vaddr),
 		n);

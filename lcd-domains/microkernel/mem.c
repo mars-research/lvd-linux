@@ -507,6 +507,7 @@ int __lcd_do_map_memory_object(struct lcd *lcd,
 		 * physical is available to non-isolated code. Recall that
 		 * this function is about mapping in physical, not virtual.)
 		 */
+		ret = 0;
 		break;
 	default:
 		LCD_ERR("unrecognized lcd type %d", lcd->type);

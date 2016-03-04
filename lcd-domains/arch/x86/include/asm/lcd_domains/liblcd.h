@@ -1,7 +1,7 @@
 /*
  * liblcd.h
  *
- * Low-level arch-dependent liblcd details.
+ * Low-level arch-dependent liblcd-internal details.
  *
  * Copyright: University of Utah
  */

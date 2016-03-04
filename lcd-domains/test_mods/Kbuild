@@ -6,7 +6,9 @@
 
 COMMON_CC_FLAGS= \
 	$(LCD_DOMAINS_CFLAGS) \
-	-I$(LCD_DOMAINS_TOP_SRC_DIR)/include
+	-I$(LCD_DOMAINS_TOP_SRC_DIR)/include \
+	-I$(LCD_DOMAINS_TOP_SRC_DIR)/arch/$(ARCH)/include
+
 		 
 export ISOLATED_CC_FLAGS= \
 	$(COMMON_CC_FLAGS) \

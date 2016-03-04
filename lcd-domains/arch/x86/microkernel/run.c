@@ -17,9 +17,6 @@ static void dump_lcd_arch(struct lcd_arch *lcd)
 	unsigned long flags;
 
 	vmx_get_cpu(lcd);
-	lcd->regs.rip = vmcs_readl(GUEST_RIP);
-	lcd->regs.rsp = vmcs_readl(GUEST_RSP);
-	flags = vmcs_readl(GUEST_RFLAGS);
 	vmx_put_cpu(lcd);
 
 	printk(KERN_ERR "---- Begin LCD Arch Dump ----\n");
@@ -150,7 +147,7 @@ static int vmx_handle_ept(struct lcd_arch *lcd_arch)
 	else
 		printk("        violation occurred during guest virtual page walk (before reaching the final guest physical address)\n\n");
 
-	dump_lcd_arch(lcd_arch);
+	__lcd_arch_dump_lcd(lcd_arch);
 
 	return LCD_ARCH_STATUS_EPT_FAULT;
 }
@@ -656,7 +653,7 @@ out:
 	 * If there was an error, dump the lcd's state.
 	 */
 	if (ret < 0)
-		dump_lcd_arch(lcd_arch);
+		lcd_arch_dump_lcd(lcd_arch);
 
 	return ret;
 }

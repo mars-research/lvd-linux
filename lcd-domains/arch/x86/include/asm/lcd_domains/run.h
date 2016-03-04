@@ -76,6 +76,10 @@ static inline void lcd_arch_set_syscall_ret(struct lcd_arch *lcd, u64 val)
  * Registers, stack, stack trace.
  */
 void lcd_arch_dump_lcd(struct lcd_arch *lcd);
+/**
+ * Dump LCD inside a wrapping vmx_get_cpu/vmx_put_cpu.
+ */
+void __lcd_arch_dump_lcd(struct lcd_arch *lcd);
 
 /* Some internal data used by run */
 

@@ -58,7 +58,14 @@ struct lcd_arch_regs {
 	u64 cr2;
 	u64 cr3;
 	u64 cr4;
-	u64 cr8;
+
+	u16 tr;
+	u64 tr_base;
+	u32 tr_limit;
+	u64 gdtr_base;
+	u32 gdtr_limit;
+	u64 idtr_base;
+	u32 idtr_limit;
 };
 
 #define LCD_ARCH_NUM_AUTOLOAD_MSRS 1

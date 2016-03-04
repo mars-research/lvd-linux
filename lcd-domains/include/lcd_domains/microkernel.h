@@ -831,7 +831,8 @@ int __lcd_set_struct_module_hva(struct lcd *caller, cptr_t lcd,
  *
  * Sister function: kernel/kallsyms.c:__sprint_symbol.
  */
-int __lcd_sprint_symbol(char *buffer, hva_t hva, struct module *extra_module);
+unsigned long
+__lcd_sprint_symbol(char *buffer, hva_t hva, struct module *extra_module);
 
 /*
  * --------------------------------------------------

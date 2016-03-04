@@ -66,7 +66,8 @@ static inline int in_module(struct module *module, hva_t hva)
 	return 0;	
 }
 
-int __lcd_sprint_symbol(char *buffer, hva_t hva, struct module *extra_module)
+unsigned long
+__lcd_sprint_symbol(char *buffer, hva_t hva, struct module *extra_module)
 {
 	const char *sym_name;
 	char *modname = NULL;

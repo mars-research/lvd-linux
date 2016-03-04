@@ -1,4 +1,5 @@
 #include "lcd_ast.h"
+#include "utils.h"
 #include <stdio.h>
 
 Rpc::Rpc(ReturnVariable *return_value, const char* name, std::vector<Parameter* > parameters, LexicalScope *current_scope)

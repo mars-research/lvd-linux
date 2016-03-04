@@ -821,13 +821,17 @@ void __lcd_console_exit(void);
 int __lcd_set_struct_module_hva(struct lcd *caller, cptr_t lcd, 
 				hva_t module_addr);
 /**
- * __lcd_hva_to_symbol -- Resolve a host virtual address to a symbol name
+ * __lcd_sprint_symbol -- Resolve a host virtual address to a symbol name
+ * @buffer: char buff to print symbol info to; must be at least KSYM_SYMBOL_LEN 
+ *          in length
  * @module: the struct module to use for module symbol resolution
  * @hva: the address to resolve
  *
- * Returns the pointer to the symbol string.
+ * Returns length of string data written to @buffer.
+ *
+ * Sister function: kernel/kallsyms.c:__sprint_symbol.
  */
-const char* __lcd_hva_to_symbol(struct module *module, hva_t hva);
+int __lcd_sprint_symbol(char *buffer, hva_t hva, struct module *extra_module);
 
 /*
  * --------------------------------------------------

@@ -12,59 +12,6 @@
 
 DEFINE_PER_CPU(struct lcd_arch *, local_lcd_arch);
 
-static void dump_lcd_arch(struct lcd_arch *lcd)
-{
-	unsigned long flags;
-
-	vmx_get_cpu(lcd);
-	vmx_put_cpu(lcd);
-
-	printk(KERN_ERR "---- Begin LCD Arch Dump ----\n");
-	printk(KERN_ERR "CPU %d VPID %d\n", lcd->cpu, lcd->vpid);
-
-	/*
-	printk(KERN_ERR "RIP 0x%016llx RFLAGS 0x%08lx\n",
-	       lcd->regs[LCD_ARCH_REGS_RIP], flags);
-	printk(KERN_ERR "RAX 0x%016llx RCX 0x%016llx\n",
-			lcd->regs[LCD_ARCH_REGS_RAX], 
-		lcd->regs[LCD_ARCH_REGS_RCX]);
-	printk(KERN_ERR "RDX 0x%016llx RBX 0x%016llx\n",
-			lcd->regs[LCD_ARCH_REGS_RDX], 
-		lcd->regs[LCD_ARCH_REGS_RBX]);
-	printk(KERN_ERR "RSP 0x%016llx RBP 0x%016llx\n",
-			lcd->regs[LCD_ARCH_REGS_RSP], 
-		lcd->regs[LCD_ARCH_REGS_RBP]);
-	printk(KERN_ERR "RSI 0x%016llx RDI 0x%016llx\n",
-			lcd->regs[LCD_ARCH_REGS_RSI], 
-		lcd->regs[LCD_ARCH_REGS_RDI]);
-	printk(KERN_ERR "R8  0x%016llx R9  0x%016llx\n",
-			lcd->regs[LCD_ARCH_REGS_R8], 
-		lcd->regs[LCD_ARCH_REGS_R9]);
-	printk(KERN_ERR "R10 0x%016llx R11 0x%016llx\n",
-			lcd->regs[LCD_ARCH_REGS_R10], 
-		lcd->regs[LCD_ARCH_REGS_R11]);
-	printk(KERN_ERR "R12 0x%016llx R13 0x%016llx\n",
-			lcd->regs[LCD_ARCH_REGS_R12], 
-		lcd->regs[LCD_ARCH_REGS_R13]);
-	printk(KERN_ERR "R14 0x%016llx R15 0x%016llx\n",
-			lcd->regs[LCD_ARCH_REGS_R14], 
-		lcd->regs[LCD_ARCH_REGS_R15]);
-	*/
-
-//	lcd_show_execution_state(lcd, &lcd->regs);
-	/* printk(KERN_ERR "Dumping Stack Contents...\n"); */
-	/* sp = (unsigned long *) vcpu->regs[VCPU_REGS_RSP]; */
-	/* for (i = 0; i < STACK_DEPTH; i++) */
-	/* 	if (get_user(val, &sp[i])) */
-	/* 		printk(KERN_INFO "vmx: RSP%+-3ld ?\n", */
-	/* 			i * sizeof(long)); */
-	/* 	else */
-	/* 		printk(KERN_INFO "vmx: RSP%+-3ld 0x%016lx\n", */
-	/* 			i * sizeof(long), val); */
-
-	printk(KERN_ERR "---- End LCD Arch Dump ----\n");
-}
-
 static inline int vmx_exit_intr(struct lcd_arch *lcd_arch)
 {
 	return (lcd_arch->exit_reason == EXIT_REASON_EXTERNAL_INTERRUPT) ||

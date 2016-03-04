@@ -11,6 +11,7 @@
 
 #include <lcd_domains/microkernel.h>
 #include <asm/lcd_domains/microkernel.h>
+#include <asm/liblcd/address_spaces.h>
 
 /* This controls how many stack addresses we print out */
 #define debug_stack_lines 20 /* 20 lines max */
@@ -27,7 +28,8 @@ static inline gva_t stack_bottom(gva_t sp)
 	return __gva(ALIGN(gva_val(sp), LCD_STACK_SIZE));
 }
 
-static inline int stack_addr_gva2hva(gva_t gva, hva_t *hva_out)
+static inline int stack_addr_gva2hva(struct lcd_arch *lcd, gva_t gva, 
+				hva_t *hva_out)
 {
 	gpa_t gpa;
 	/*
@@ -37,7 +39,7 @@ static inline int stack_addr_gva2hva(gva_t gva, hva_t *hva_out)
 	/*
 	 * Resolve gpa ==> hva so we can read the memory there
 	 */
-	return lcd_arch_ept_gpa_to_hva(lcd, gpa, &hva_out);
+	return lcd_arch_ept_gpa_to_hva(lcd, gpa, hva_out);
 }
 
 static int print_one_addr(gva_t addr, struct lcd_arch *lcd)
@@ -48,16 +50,27 @@ static int print_one_addr(gva_t addr, struct lcd_arch *lcd)
 	/*
 	 * Resolve address on stack to hva
 	 */
-	ret = stack_addr_gva2hva(addr, &addr_hva);
+	ret = stack_addr_gva2hva(lcd, addr, &addr_hva);
 	if (ret)
 		return ret;
 	/*
 	 * Resove address to symbol info
 	 */
 	if (__lcd_sprint_symbol(symname, addr_hva, lcd->kernel_module))
-		printk("[<0x%016x>] %s", symname);
+		printk("[<0x%016lx>] %s", gva_val(addr), symname);
 	return 0;
 }
+
+
+#if !defined(CONFIG_FRAME_POINTER)
+
+/*
+ * I don't think this case ever happens on x86, but just in case ...
+ *
+ * Stack trace from pointers found in stack, unaided by frame pointers.  For
+ * caller convenience, this has the same prototype as its alternative, and
+ * simply ignores the base pointer parameter.
+ */
 
 static int do_one_trace(gva_t ptr, struct lcd_arch *lcd)
 {
@@ -67,7 +80,7 @@ static int do_one_trace(gva_t ptr, struct lcd_arch *lcd)
 	/*
 	 * Resolve current stack pointer to hva
 	 */
-	ret = stack_addr_gva2hva(sp, &stack_hva);
+	ret = stack_addr_gva2hva(lcd, ptr, &ptr_hva);
 	if (ret) { 
 		LCD_ERR("Failed to resolve guest gva 0x%lx into hva\n",
 			gva_val(ptr));
@@ -76,7 +89,7 @@ static int do_one_trace(gva_t ptr, struct lcd_arch *lcd)
 	/*
 	 * Resolve address on stack to hva
 	 */
-	addr = __gva(*(unsigned long *)hva_val(stack_hva));
+	addr = __gva(*(unsigned long *)hva_val(ptr_hva));
 	ret = print_one_addr(addr, lcd);
 	if (ret) {
 		LCD_ERR("Failed to resolve guest addr 0x%lx into hva\n",
@@ -85,14 +98,6 @@ static int do_one_trace(gva_t ptr, struct lcd_arch *lcd)
 	}
 }
 
-#if !defined(CONFIG_FRAME_POINTER)
-/*
- * I don't think this case ever happens on x86, but just in case ...
- *
- * Stack trace from pointers found in stack, unaided by frame pointers.  For
- * caller convenience, this has the same prototype as its alternative, and
- * simply ignores the base pointer parameter.
- */
 static void _show_trace(struct lcd_arch *lcd, gva_t sp,
 			gva_t __maybe_unused bp)
 {
@@ -140,10 +145,10 @@ static void _show_trace(struct lcd_arch *lcd, gva_t sp,
 		/*
 		 * Resolve frame gva ==> hva
 		 */
-		ret = stack_addr_gva2hva(frame_gva, &frame_hva);
+		ret = stack_addr_gva2hva(lcd, frame_gva, &frame_hva);
 		if (ret) {
 			LCD_ERR("Error translating gva 0x%lx to hva\n",
-				gval_val(frame_gva));
+				gva_val(frame_gva));
 			return;
 		}
 		/*
@@ -158,7 +163,7 @@ static void _show_trace(struct lcd_arch *lcd, gva_t sp,
 		if (ret) {
 			LCD_ERR("Failed to resolve guest addr 0x%lx into hva\n",
 				gva_val(ret_addr));
-			return ret;
+			return;
 		}
 	}
 }
@@ -166,34 +171,31 @@ static void _show_trace(struct lcd_arch *lcd, gva_t sp,
 
 static void show_trace(struct lcd_arch *lcd)
 {
-	int ret;
-
 	printk("LCD call trace:\n");
 	/*
 	 * Try to resolve the current %rip to a symbol (the current
 	 * function we crashed in)
 	 */
-	print_one_addr(__gva((unsigned long)lcd->regs->rip), lcd);
+	print_one_addr(__gva((unsigned long)lcd->regs.rip), lcd);
 	/*
 	 * Try to resolve addresses on stack to function symbols
 	 */
-	_show_trace(lcd, __gva((unsigned long)lcd->regs->rsp), 
-		__gva((unsigned long)lcd->regs->rbp));
+	_show_trace(lcd, __gva((unsigned long)lcd->regs.rsp), 
+		__gva((unsigned long)lcd->regs.rbp));
 
 	printk("\n");
 }
 
-static void show_stack(struct lcd_arch *lcd)
+static void lcd_show_stack(struct lcd_arch *lcd)
 {
-	gva_t stack_gva = __gva((unsigned long)lcd->regs->rsp);
-	gpa_t stack_gpa;
+	gva_t stack_gva = __gva((unsigned long)lcd->regs.rsp);
 	hva_t stack_hva;
 	gva_t stack_bottom_gva = stack_bottom(stack_gva);
 	unsigned long data;
     
 	int i, ret;
 
-	printk("LCD stack trace from rsp=0x%lx:\n  ", gva_val(stack));
+	printk("LCD stack trace from rsp=0x%lx:\n  ", gva_val(stack_gva));
 
 	for (i = 0; i < (debug_stack_lines * stack_words_per_line) &&
 		     (gva_val(stack_gva) <= gva_val(stack_bottom_gva)); i++ ) {
@@ -203,7 +205,7 @@ static void show_stack(struct lcd_arch *lcd)
 		/*
 		 * gva ==> hva
 		 */
-		ret = stack_addr_gva2hva(stack_gva, &stack_hva);
+		ret = stack_addr_gva2hva(lcd, stack_gva, &stack_hva);
 		if (ret) { 
 			LCD_ERR("Failed to resolve guest stack gva 0x%lx into hpa\n",
 				gva_val(stack_gva));
@@ -217,7 +219,7 @@ static void show_stack(struct lcd_arch *lcd)
 		/*
 		 * Go to next word-size slot on stack
 		 */
-		stack_gva = hva_add(stack_gva, sizeof(unsigned long));
+		stack_gva = gva_add(stack_gva, sizeof(unsigned long));
 	}
 
 	if (i == 0)
@@ -242,18 +244,18 @@ static void show_registers(const struct lcd_arch_regs *regs)
 		regs->r9,  regs->r10, regs->r11);
         printk("r12: %016llx   r13: %016llx   r14: %016llx\n",
 		regs->r12, regs->r13, regs->r14);
-        printk("r15: %016llx   cr0: %016lx   cr4: %016lx\n",
+        printk("r15: %016llx   cr0: %016llx   cr4: %016llx\n",
 		regs->r15, regs->cr0, regs->cr4);
-	printk("cr3: %016lx   cr2: %016lx\n", regs->cr3, regs->cr2);
+	printk("cr3: %016llx   cr2: %016llx\n", regs->cr3, regs->cr2);
 	printk("ds: %04x   es: %04x   fs: %04x   gs: %04x   "
 		"ss: %04x   cs: %04x\n",
 		regs->ds, regs->es, regs->fs,
 		regs->gs, regs->ss, regs->cs);
-	printk("tr: %04x  tr base: %016lx   tr limit: %08x\n",
+	printk("tr: %04x  tr base: %016llx   tr limit: %08x\n",
 		regs->tr, regs->tr_base, regs->tr_limit);
-	printk("gdtr base: %016lx   gdtr limit: %08x\n",
+	printk("gdtr base: %016llx   gdtr limit: %08x\n",
 		regs->gdtr_base, regs->gdtr_limit);
-	printk("idtr base: %016lx   idtr limit: %08x\n",
+	printk("idtr base: %016llx   idtr limit: %08x\n",
 		regs->idtr_base, regs->idtr_limit);
 }
 
@@ -264,7 +266,7 @@ static void update_regs(struct lcd_arch *lcd)
 {
 	lcd->regs.rip = vmcs_readl(GUEST_RIP);
 	lcd->regs.rsp = vmcs_readl(GUEST_RSP);
-	lcd->regs.flags = vmcs_readl(GUEST_RFLAGS);
+	lcd->regs.rflags = vmcs_readl(GUEST_RFLAGS);
 
 	lcd->regs.cr0 = vmcs_readl(GUEST_CR0);
 	lcd->regs.cr3 = vmcs_readl(GUEST_CR3);
@@ -291,7 +293,7 @@ void __lcd_arch_dump_lcd(struct lcd_arch *lcd)
 
 	update_regs(lcd);
 	show_registers(&lcd->regs);
-	show_stack(lcd);
+	lcd_show_stack(lcd);
 	show_trace(lcd);
 
 	printk(KERN_ERR "---- End LCD Arch Dump ----\n");

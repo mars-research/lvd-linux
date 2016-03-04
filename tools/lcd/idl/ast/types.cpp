@@ -1,4 +1,5 @@
 #include "lcd_ast.h"
+#include "utils.h"
 
 Function::Function(const char *id, ReturnVariable *return_var, std::vector<Parameter*> parameters, LexicalScope *ls)
 {
@@ -371,7 +372,7 @@ void ProjectionType::create_trampoline_structs(LexicalScope *ls)
       std::vector<ProjectionField*> trampoline_fields;
       int err;
       trampoline_fields.push_back(new ProjectionField(ls->lookup(container_name(this->name()), &err)
-						      ,container_name(this->name()), 1)); // container field
+						      ,"container", 1)); // container field
       trampoline_fields.push_back(new ProjectionField(ls->lookup("dstore", &err), "dstore", 1)); // dstore field
       trampoline_fields.push_back(new ProjectionField(ls->lookup("lcd_trampoline_handle", &err), "t_handle", 1)); // lcd_trampoline handle field
 

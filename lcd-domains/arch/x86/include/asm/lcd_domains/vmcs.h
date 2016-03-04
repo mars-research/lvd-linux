@@ -75,7 +75,7 @@ static __always_inline u64 vmcs_read64(unsigned long field)
 	return vmcs_readl(field);
 }
 
-static void vmcs_writel(unsigned long field, unsigned long value)
+static inline void vmcs_writel(unsigned long field, unsigned long value)
 {
 	u8 error;
 
@@ -88,17 +88,17 @@ static void vmcs_writel(unsigned long field, unsigned long value)
 	}
 }
 
-static void vmcs_write16(unsigned long field, u16 value)
+static inline void vmcs_write16(unsigned long field, u16 value)
 {
 	vmcs_writel(field, value);
 }
 
-static void vmcs_write32(unsigned long field, u32 value)
+static inline void vmcs_write32(unsigned long field, u32 value)
 {
 	vmcs_writel(field, value);
 }
 
-static void vmcs_write64(unsigned long field, u64 value)
+static inline void vmcs_write64(unsigned long field, u64 value)
 {
 	vmcs_writel(field, value);
 }
@@ -113,6 +113,6 @@ void vmx_get_cpu(struct lcd_arch *lcd_arch);
  *
  * Enables preemption.
  */
-static void vmx_put_cpu(struct lcd_arch *lcd_arch);
+void vmx_put_cpu(struct lcd_arch *lcd_arch);
 
 #endif /* ASM_X86_LCD_DOMAINS_VMCS_H */

@@ -7,6 +7,7 @@
 #include <linux/slab.h>
 #include <linux/mm.h>
 #include <lcd_domains/microkernel.h>
+#include <asm/lcd_domains/ept.h>
 
 /* MEMORY OBJECT HELPERS -------------------------------------------------- */
 

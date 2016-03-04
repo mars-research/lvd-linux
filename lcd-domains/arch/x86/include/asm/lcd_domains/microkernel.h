@@ -27,5 +27,6 @@
 #include <asm/lcd_domains/create.h>
 #include <asm/lcd_domains/init.h>
 #include <asm/lcd_domains/run.h>
+#include <asm/lcd_domains/vmcs.h>
 
 #endif  /* ASM_X86_LCD_DOMAINS_MICROKERNEL_H */

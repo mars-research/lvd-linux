@@ -8,12 +8,13 @@
 
 #include <lcd_domains/microkernel.h>
 #include <linux/module.h>
+#include <linux/kallsyms.h>
 
 int __lcd_set_struct_module_hva(struct lcd *caller, cptr_t lcd, 
 				hva_t module_addr)
 {
 	struct cnode *cnode;
-	struct lcd lcd_struct;
+	struct lcd *lcd_struct;
 	int ret;
 	/*
 	 * Look up LCD
@@ -26,7 +27,7 @@ int __lcd_set_struct_module_hva(struct lcd *caller, cptr_t lcd,
 	/*
 	 * If it doesn't have an lcd_arch, fail (no underlying VM)
 	 */
-	if (!lcd->lcd_arch) {
+	if (!lcd_struct->lcd_arch) {
 		LCD_ERR("no vm");
 		ret = -EINVAL;
 		goto fail2;
@@ -34,7 +35,7 @@ int __lcd_set_struct_module_hva(struct lcd *caller, cptr_t lcd,
 	/*
 	 * Store module address in lcd_arch
 	 */
-	lcd->lcd_arch->kernel_module = hva2va(module_addr);
+	lcd_struct->lcd_arch->kernel_module = hva2va(module_addr);
 
 	__lcd_put(caller, cnode, lcd_struct);
 
@@ -71,6 +72,7 @@ int __lcd_sprint_symbol(char *buffer, hva_t hva, struct module *extra_module)
 	char *modname = NULL;
 	unsigned long offset;
 	unsigned long size;
+	unsigned long len;
 	/*
 	 * This code is motivated by kernel/kallsyms.c:__sprint_symbol
 	 */
@@ -95,7 +97,7 @@ int __lcd_sprint_symbol(char *buffer, hva_t hva, struct module *extra_module)
 		if (!sym_name)
 			return sprintf(buffer, "0x%lx", hva_val(hva));
 		if (sym_name != buffer)
-			strcpy(buffer, name);
+			strcpy(buffer, sym_name);
 	}
 	/*
 	 * According to doc in kernel/kallsyms.c:sprint_backtrace,

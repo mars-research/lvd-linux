@@ -14,7 +14,7 @@
 #include <linux/spinlock.h>
 #include <linux/interval_tree.h>
 
-#include <asm/lcd_domains/main.h>
+#include <asm/lcd_domains/types.h>
 #include <lcd_domains/types.h>
 #include <liblcd/sync_ipc.h>
 #include <liblcd/syscall.h>

@@ -803,4 +803,13 @@ static inline bool module_sig_ok(struct module *module)
 }
 #endif	/* CONFIG_MODULE_SIG */
 
+//FIXME: Syscalls already defined. Remove this
+int do_sys_delete_module(const char *name, unsigned int flags, int for_lcd);
+int do_sys_init_module(void __user *umod, unsigned long len,
+		const char __user *uargs, int for_lcd);
+const char *get_ksymbol(struct module *mod,
+			unsigned long addr,
+			unsigned long *size,
+			unsigned long *offset);
+
 #endif /* _LINUX_MODULE_H */

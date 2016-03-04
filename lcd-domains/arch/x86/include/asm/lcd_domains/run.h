@@ -77,4 +77,16 @@ static inline void lcd_arch_set_syscall_ret(struct lcd_arch *lcd, u64 val)
  */
 void lcd_arch_dump_lcd(struct lcd_arch *lcd);
 
+/* Some internal data used by run */
+
+/*
+ * Declared in inline assembly in vmx_enter
+ *
+ * This is how we remember what instruction to return to after the
+ * LCD VM exits.
+ */
+extern const unsigned long vmx_return;
+
+extern DEFINE_PER_CPU(struct lcd_arch *, local_lcd_arch);
+
 #endif /* ASM_X86_LCD_DOMAINS_RUN_H */

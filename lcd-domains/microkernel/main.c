@@ -20,6 +20,7 @@
 #include <lcd_domains/types.h>
 #include <uapi/lcd_domains.h>
 #include <lcd_domains/microkernel.h>
+#include <asm/lcd_domains/init.h>
 
 MODULE_LICENSE("GPL");
 MODULE_DESCRIPTION("LCD driver");
@@ -84,40 +85,12 @@ static struct miscdevice lcd_dev = {
 	&lcd_chardev_ops,
 };
 
-/* SYSRQ debugging -------------------------------------------------- */
-
-static void sysrq_handle_showlcds(int key)
-{
-	printk(KERN_ERR "==========BEGIN LCD SYSRQ INFO==========\n");
-	printk(KERN_ERR "Is there an LCD in non-root? %s\n",
-		lcd_in_non_root ? "yes" : "no");
-	if (lcd_in_non_root) {
-		printk(KERN_ERR "And it's running on cpu %d\n",
-			lcd_on_cpu);
-	}
-	printk(KERN_ERR "==========END LCD SYSRQ INFO==========\n");
-}
-
-static struct sysrq_key_op sysrq_showlcds_op = {
-	.handler	= sysrq_handle_showlcds,
-	.help_msg	= "show-lcd-info(x)",
-	.action_msg	= "Show LCD Info",
-};
-
 /* Init / Exit ---------------------------------------- */
 
 static int __init lcd_init(void)
 {
 	int ret;
 
-	/*
-	 * Register sysrq handler before we do *anything*
-	 */
-	ret = register_sysrq_key('x', &sysrq_showlcds_op);
-	if (ret) {
-		LCD_ERR("failed to register sysrq key");
-		goto failkey;
-	}
 	/*
 	 * Initialize each of the subsystems
 	 */
@@ -188,8 +161,6 @@ fail2:
 fail1:
 	lcd_arch_exit();
 fail0:
-	unregister_sysrq_key('x', &sysrq_showlcds_op);
-failkey:
 	return ret;
 }
 
@@ -204,7 +175,6 @@ static void __exit lcd_exit(void)
 	__lcd_exit_cap_types();
 	cap_fini();
 	lcd_arch_exit();
-	unregister_sysrq_key('x', &sysrq_showlcds_op);
 
 	LCD_MSG("lcd microkernel exited");
 }

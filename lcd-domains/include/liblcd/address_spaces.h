@@ -10,7 +10,7 @@
 #define LIBLCD_ADDRESS_SPACES_H
 
 #include <lcd_domains/types.h>
-#include <asm/lcd_domains/address_spaces.h> /* contains layouts */
+#include <asm/liblcd/address_spaces.h> /* contains layouts */
 
 /* HELPERS -------------------------------------------------- */
 

@@ -337,6 +337,7 @@ const char *kallsyms_lookup(unsigned long addr,
 	return module_address_lookup(addr, symbolsize, offset, modname,
 				     namebuf);
 }
+EXPORT_SYMBOL(kallsyms_lookup);
 
 int lookup_symbol_name(unsigned long addr, char *symname)
 {

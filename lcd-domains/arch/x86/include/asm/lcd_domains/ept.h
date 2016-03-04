@@ -9,9 +9,8 @@
 #ifndef ASM_X86_LCD_DOMAINS_EPT_H
 #define ASM_X86_LCD_DOMAINS_EPT_H
 
+#include <lcd_domains/microkernel.h>
 #include <asm/lcd_domains/types.h>
-
-hva_t hpa2hva(hpa_t hpa);
 
 /**
  * Lookup ept entry for guest physical address a.

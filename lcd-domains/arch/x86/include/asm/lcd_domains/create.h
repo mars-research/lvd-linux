@@ -9,6 +9,7 @@
 #ifndef ASM_X86_LCD_DOMAINS_CREATE_H
 #define ASM_X86_LCD_DOMAINS_CREATE_H
 
+#include <lcd_domains/types.h>
 #include <asm/lcd_domains/types.h>
 #include <linux/slab.h>
 
@@ -59,5 +60,8 @@ extern struct kmem_cache *lcd_arch_cache;
 extern struct lcd_vmcs_config lcd_global_vmcs_config;
 extern unsigned long *lcd_global_msr_bitmap;
 extern struct lcd_vpids lcd_vpids;
+
+#define MAX_PAT_ENTRY	7
+#define VALID_PAT_TYPE	7
 
 #endif /* ASM_X86_LCD_DOMAINS_CREATE_H */

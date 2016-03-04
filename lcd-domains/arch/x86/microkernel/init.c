@@ -7,9 +7,14 @@
  * Copyright: University of Utah
  */
 
+#include <linux/tboot.h>
+#include <asm/vmx.h>
+#include <asm/virtext.h>
+
 #include <lcd_domains/types.h>
-#include <asm/lcd_domains/types.h>
+#include <asm/lcd_domains/microkernel.h>
 #include <lcd_domains/microkernel.h>
+
 
 struct lcd_vmx_capability lcd_vmx_capability;
 static atomic_t vmx_enable_failed;
@@ -111,7 +116,7 @@ static void vmx_disable_intercept_for_msr(unsigned long *msr_bitmap, u32 msr)
 /**
  * Checks and sets basic vmcs settings (vmxon region size, etc.)
  */
-static int vmcs_config_basic_settings(struct lcd_vmx_vmcs_config *vmcs_conf)
+static int vmcs_config_basic_settings(struct lcd_vmcs_config *vmcs_conf)
 {
 	u32 msr_low;
 	u32 msr_high;
@@ -144,7 +149,7 @@ static int vmcs_config_basic_settings(struct lcd_vmx_vmcs_config *vmcs_conf)
 		return -EIO;
 
 	vmcs_conf->size  = msr_high & 0x1fff;
-	vmcs_conf->order = get_order(vmcs_config.size);
+	vmcs_conf->order = get_order(lcd_global_vmcs_config.size);
 	vmcs_conf->revision_id = msr_low;
 	return 0;
 }
@@ -203,37 +208,12 @@ static int adjust_vmx_controls(u32 *controls, u32 reserved_mask, u32 msr)
 	return 0;
 }
 
-#define MAX_PAT_ENTRY	7
-#define VALID_PAT_TYPE	7
-/**
- * Sets up a corresponding PAT entry	
- */
-static int vmx_setup_pat_msr(unsigned char pat_entry, unsigned char pat_type)
-{
-	u64 pat = 0;
-
-	if (pat_entry > MAX_PAT_ENTRY) {
-		LCD_ERR("Invalid PAT entry, cannot setup PAT MSR \n");
-		return -EINVAL;
-	}
-	
-	if(pat_type > VALID_PAT_TYPE) {
-		LCD_ERR("Not a valid PAT type, cannot setup PAT MSR \n");
-		return -EINVAL;
-	}
-
-	pat = vmcs_readl(GUEST_IA32_PAT);
-	pat |= (pat_type << (pat_entry * 8));
-	vmcs_writel(GUEST_IA32_PAT, pat);
-	return 0;
-}
-
 /**
  * Populates default settings in vmcs_conf for
  * vm entries, vm exits, vm execution (e.g., interrupt handling),
  * etc. for all lcd types.
  */
-static int setup_vmcs_config(struct lcd_vmx_vmcs_config *vmcs_conf)
+static int setup_vmcs_config(struct lcd_vmcs_config *vmcs_conf)
 {
 	u32 pin_based_exec_controls;
 	u32 primary_proc_based_exec_controls;
@@ -338,7 +318,7 @@ static int setup_vmcs_config(struct lcd_vmx_vmcs_config *vmcs_conf)
 	 * Remember the EPT and VPID capabilities
 	 */
 	rdmsr(MSR_IA32_VMX_EPT_VPID_CAP,
-		vmx_capability.ept, vmx_capability.vpid);
+		lcd_vmx_capability.ept, lcd_vmx_capability.vpid);
 
 
 	/*

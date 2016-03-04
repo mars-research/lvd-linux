@@ -610,7 +610,7 @@ int lcd_create_module_lcd(char *mdir, char *mname, cptr_t *lcd_out,
 
 	return 0;
 
-#ifdef LCD_ISOLATE
+#ifndef LCD_ISOLATE
 fail7:
 #endif
 fail6:

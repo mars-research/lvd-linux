@@ -8,7 +8,13 @@
  */
 
 #include <asm/vmx.h>
-#include <asm/lcd_domains/create.h>
+#include <linux/mm.h>
+#include <linux/spinlock.h>
+#include <asm/desc.h>
+
+#include <asm/lcd_domains/microkernel.h>
+#include <lcd_domains/microkernel.h>
+#include <asm/liblcd/address_spaces.h>
 
 /* These are initialized by init.c */
 struct kmem_cache *lcd_arch_cache;
@@ -284,7 +290,7 @@ static void vmx_setup_vmcs_msr(struct lcd_arch *lcd_arch)
 	 *
 	 * Intel SDM V3 24.6.9, 31.10.1
 	 */
-	vmcs_write64(MSR_BITMAP, __pa(msr_bitmap));
+	vmcs_write64(MSR_BITMAP, __pa(lcd_global_msr_bitmap));
 	
 	/*
 	 * MSR Load / Store areas
@@ -318,6 +324,38 @@ static void vmx_setup_vmcs_msr(struct lcd_arch *lcd_arch)
 		e = &lcd_arch->msr_autoload.guest[i];
 		e->index = autoload_msrs[i];
 	}
+}
+
+enum vmx_pat_type {
+	PAT_UC = 0,             /* uncached */
+        PAT_WC = 1,             /* Write combining */
+        PAT_WT = 4,             /* Write Through */
+        PAT_WP = 5,             /* Write Protected */
+        PAT_WB = 6,             /* Write Back (default) */
+        PAT_UC_MINUS = 7,       /* UC, but can be overriden by MTRR */
+};
+
+/**
+ * Sets up a corresponding PAT entry	
+ */
+static int vmx_setup_pat_msr(unsigned char pat_entry, unsigned char pat_type)
+{
+	u64 pat = 0;
+
+	if (pat_entry > MAX_PAT_ENTRY) {
+		LCD_ERR("Invalid PAT entry, cannot setup PAT MSR \n");
+		return -EINVAL;
+	}
+	
+	if(pat_type > VALID_PAT_TYPE) {
+		LCD_ERR("Not a valid PAT type, cannot setup PAT MSR \n");
+		return -EINVAL;
+	}
+
+	pat = vmcs_readl(GUEST_IA32_PAT);
+	pat |= (pat_type << (pat_entry * 8));
+	vmcs_writel(GUEST_IA32_PAT, pat);
+	return 0;
 }
 
 /**
@@ -592,16 +630,18 @@ static void vmx_setup_vmcs_guest_settings(struct lcd_arch *lcd_arch)
 	 * Execution controls
 	 */
 	vmcs_write32(PIN_BASED_VM_EXEC_CONTROL,
-		vmcs_config.pin_based_exec_controls);
+		lcd_global_vmcs_config.pin_based_exec_controls);
 	vmcs_write32(CPU_BASED_VM_EXEC_CONTROL,
-		vmcs_config.primary_proc_based_exec_controls);
+		lcd_global_vmcs_config.primary_proc_based_exec_controls);
 	vmcs_write32(SECONDARY_VM_EXEC_CONTROL,
-		vmcs_config.secondary_proc_based_exec_controls);
+		lcd_global_vmcs_config.secondary_proc_based_exec_controls);
 	/*
 	 * Entry / Exit controls
 	 */
-	vmcs_write32(VM_ENTRY_CONTROLS, vmcs_config.vmentry_controls);
-	vmcs_write32(VM_EXIT_CONTROLS, vmcs_config.vmexit_controls);
+	vmcs_write32(VM_ENTRY_CONTROLS, 
+		lcd_global_vmcs_config.vmentry_controls);
+	vmcs_write32(VM_EXIT_CONTROLS, 
+		lcd_global_vmcs_config.vmexit_controls);
 	/*
 	 * EPT
 	 *
@@ -758,8 +798,8 @@ void vmx_get_cpu(struct lcd_arch *lcd_arch)
 			/*
 			 * Invalidate any vpid or ept cache lines
 			 */
-			invvpid_single_context(lcd_arch->vpid);
-			invept_single_context(lcd_arch->ept.vmcs_ptr);
+			lcd_arch_ept_invvpid(lcd_arch->vpid);
+			lcd_arch_ept_invept(lcd_arch->ept.vmcs_ptr);
 
 			/*
 			 * lcd_arch is not in launched state
@@ -802,13 +842,13 @@ static int vmx_allocate_vpid(struct lcd_arch *lcd_arch)
 
 	lcd_arch->vpid = 0;
 	
-	spin_lock(&vpids.lock);
-	vpid = find_first_zero_bit(vpids.bitmap, VMX_NR_VPIDS);
+	spin_lock(&lcd_vpids.lock);
+	vpid = find_first_zero_bit(lcd_vpids.bitmap, VMX_NR_VPIDS);
 	if (vpid < VMX_NR_VPIDS) {
 		lcd_arch->vpid = vpid;
-		__set_bit(vpid, vpids.bitmap);
+		__set_bit(vpid, lcd_vpids.bitmap);
 	}
-	spin_unlock(&vpids.lock);
+	spin_unlock(&lcd_vpids.lock);
 
 	return vpid >= VMX_NR_VPIDS;
 }
@@ -818,10 +858,10 @@ static int vmx_allocate_vpid(struct lcd_arch *lcd_arch)
  */
 static void vmx_free_vpid(struct lcd_arch *lcd_arch)
 {
-	spin_lock(&vpids.lock);
+	spin_lock(&lcd_vpids.lock);
 	if (lcd_arch->vpid != 0)
-		__clear_bit(lcd_arch->vpid, vpids.bitmap);
-	spin_unlock(&vpids.lock);
+		__clear_bit(lcd_arch->vpid, lcd_vpids.bitmap);
+	spin_unlock(&lcd_vpids.lock);
 }
 
 int lcd_arch_create(struct lcd_arch **out)

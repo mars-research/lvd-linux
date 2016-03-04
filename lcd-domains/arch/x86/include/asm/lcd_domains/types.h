@@ -8,6 +8,7 @@
 #ifndef ASM_X86_LCD_DOMAINS_TYPES_H
 #define ASM_X86_LCD_DOMAINS_TYPES_H
 
+#include <asm/vmx.h>
 #include <linux/mutex.h>
 #include <linux/module.h>
 
@@ -131,7 +132,7 @@ struct lcd_arch {
 	 * Stuff we need to save explicitly
 	 */
 	u64 host_rsp;
-	struct lcd_regs regs;
+	struct lcd_arch_regs regs;
 
 	int shutdown;
 	int ret_code;

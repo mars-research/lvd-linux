@@ -11,11 +11,13 @@
  */
 
 #include <linux/kernel.h>
+#include <asm/vmx.h>
+
 #include <lcd_domains/types.h>
 #include <asm/lcd_domains/types.h>
 #include <lcd_domains/microkernel.h>
-#include <asm/lcd_domains/vmcs.h>
-#include <asm/vmx.h>
+#include <asm/lcd_domains/microkernel.h>
+
 
 static inline u16 vmx_get16(struct lcd_arch *t, u64 field)
 {
@@ -316,12 +318,12 @@ static int vmx_check_exec_ctrls(struct lcd_arch *t)
 	if (vmx_has_sec_exec(t) && 
 		vmx_sec_exec_has(t, SECONDARY_EXEC_ENABLE_EPT)) {
 		act64 = vmx_getl(t, EPT_POINTER);
-		if (!(vmx_capability.ept & VMX_EPTP_UC_BIT) &&
+		if (!(lcd_vmx_capability.ept & VMX_EPTP_UC_BIT) &&
 			(((act64 & ((1UL << VMX_EPT_MT_EPTE_SHIFT) - 1)) == 0))) {
 			LCD_ERR("ept uncacheable not supported");
 			return -1;
 		}
-		if (!(vmx_capability.ept & VMX_EPTP_WB_BIT) &&
+		if (!(lcd_vmx_capability.ept & VMX_EPTP_WB_BIT) &&
 			(((act64 & ((1UL << VMX_EPT_MT_EPTE_SHIFT) - 1)) == 6))) {
 			LCD_ERR("ept write-back not supported");
 			return -1;
@@ -331,7 +333,7 @@ static int vmx_check_exec_ctrls(struct lcd_arch *t)
 			return -1;
 		}
 		if ((act64 & VMX_EPT_AD_ENABLE_BIT) &
-			!(vmx_capability.ept & VMX_EPT_AD_BIT)) {
+			!(lcd_vmx_capability.ept & VMX_EPT_AD_BIT)) {
 			LCD_ERR("ept access/dirty bit not supported");
 			return -1;
 		}

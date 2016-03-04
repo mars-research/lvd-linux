@@ -23,6 +23,7 @@ lcd_domains-y += $(addprefix microkernel/, \
 	      mem.o \
 	      mem_itree.o \
 	      run.o \
+	      ksym.o \
               )
 
 # Arch dependent code

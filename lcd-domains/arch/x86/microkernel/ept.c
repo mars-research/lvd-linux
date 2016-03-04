@@ -6,35 +6,36 @@
  * Copyright: University of Utah
  */
 
+#include <linux/mm.h>
 #include <lcd_domains/types.h>
 #include <asm/lcd_domains/types.h>
-#include <asm/lcd_domains/ept.h>
+#include <asm/lcd_domains/microkernel.h>
 
 /* INVEPT / INVVPID --------------------------------------------------*/
 
 static inline bool cpu_has_vmx_invvpid_single(void)
 {
-	return vmx_capability.vpid & VMX_VPID_EXTENT_SINGLE_CONTEXT_BIT;
+	return lcd_vmx_capability.vpid & VMX_VPID_EXTENT_SINGLE_CONTEXT_BIT;
 }
 
 static inline bool cpu_has_vmx_invvpid_global(void)
 {
-	return vmx_capability.vpid & VMX_VPID_EXTENT_GLOBAL_CONTEXT_BIT;
+	return lcd_vmx_capability.vpid & VMX_VPID_EXTENT_GLOBAL_CONTEXT_BIT;
 }
 
 static inline bool cpu_has_vmx_invept_context(void)
 {
-	return vmx_capability.ept & VMX_EPT_EXTENT_CONTEXT_BIT;
+	return lcd_vmx_capability.ept & VMX_EPT_EXTENT_CONTEXT_BIT;
 }
 
 static inline bool cpu_has_vmx_invept_global(void)
 {
-	return vmx_capability.ept & VMX_EPT_EXTENT_GLOBAL_BIT;
+	return lcd_vmx_capability.ept & VMX_EPT_EXTENT_GLOBAL_BIT;
 }
 
 static inline bool cpu_has_vmx_ept_ad_bits(void)
 {
-	return vmx_capability.ept & VMX_EPT_AD_BIT;
+	return lcd_vmx_capability.ept & VMX_EPT_AD_BIT;
 }
 
 static inline void __invept(int ext, u64 eptp)
@@ -183,14 +184,6 @@ enum vmx_epte_mts {
 	VMX_EPTE_MT_WB = 6, /* write back */
 };
 
-enum vmx_pat_type {
-	PAT_UC = 0,             /* uncached */
-        PAT_WC = 1,             /* Write combining */
-        PAT_WT = 4,             /* Write Through */
-        PAT_WP = 5,             /* Write Protected */
-        PAT_WB = 6,             /* Write Back (default) */
-        PAT_UC_MINUS = 7,       /* UC, but can be overriden by MTRR */
-};
 /**
  * Sets address in epte along with default access settings. Since
  * we are using a page walk length of 4, epte's at all levels have
@@ -578,5 +571,5 @@ static void debug_ept_lvl(lcd_arch_epte_t *dir, int lvl, int idx)
 
 void lcd_arch_ept_dump(struct lcd_arch *lcd)
 {
-	debug_ept_lvl(t->ept.root, 0, 0);
+	debug_ept_lvl(lcd->ept.root, 0, 0);
 }

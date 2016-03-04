@@ -7,6 +7,9 @@
 #include <linux/slab.h>
 #include <linux/kthread.h>
 #include <lcd_domains/microkernel.h>
+#include <asm/lcd_domains/create.h>
+#include <asm/lcd_domains/ept.h>
+#include <asm/lcd_domains/check.h>
 
 /* CREATE -------------------------------------------------- */
 

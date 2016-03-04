@@ -8,13 +8,9 @@
 
 #include <lcd_domains/types.h>
 #include <asm/lcd_domains/types.h>
-#include <asm/lcd_domains/run.h>
+#include <asm/lcd_domains/microkernel.h>
 
-static DEFINE_PER_CPU(struct lcd_arch *, local_lcd_arch);
-/*
- * Declared in inline assembly in vmx_enter
- */
-extern const unsigned long vmx_return;
+DEFINE_PER_CPU(struct lcd_arch *, local_lcd_arch);
 
 static void dump_lcd_arch(struct lcd_arch *lcd)
 {

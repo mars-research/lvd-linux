@@ -8,6 +8,8 @@
 #include <linux/sched.h>
 #include <linux/kthread.h>
 #include <lcd_domains/microkernel.h>
+#include <asm/lcd_domains/run.h>
+#include <asm/lcd_domains/create.h>
 
 /* SYSCALL HANDLERS -------------------------------------------------- */
 

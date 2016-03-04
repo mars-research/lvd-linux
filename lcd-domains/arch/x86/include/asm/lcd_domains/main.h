@@ -55,46 +55,47 @@ struct lcd_arch_vmcs {
 
 #define LCD_ARCH_NUM_AUTOLOAD_MSRS 1
 
-#if defined(__GNUC__) && !defined(__STRICT_ANSI__)
-/* Anonymous union includes both 32- and 64-bit names (e.g., eax/rax). */
-#define __DECL_REG(name) union { \
-    uint64_t r ## name, e ## name; \
-    uint32_t _e ## name; \
-}
-#else
-/* Non-gcc sources must always use the proper 64-bit name (e.g., rax). */
-#define __DECL_REG(name) uint64_t r ## name
-#endif
+/* We can get fancy with unions so you can access lower bits and such,
+ * but until we need that, lets just stick with a vanilla 64-bit value. */
+#define LCD_DECL_REG(name) \
+	u64 r ## name
 
-struct cpu_user_regs {
-    uint64_t r15;
-    uint64_t r14;
-    uint64_t r13;
-    uint64_t r12;
-    __DECL_REG(bp);
-    __DECL_REG(bx);
-    uint64_t r11;
-    uint64_t r10;
-    uint64_t r9;
-    uint64_t r8;
-    __DECL_REG(ax);
-    __DECL_REG(cx);
-    __DECL_REG(dx);
-    __DECL_REG(si);
-    __DECL_REG(di);
-    uint32_t error_code;    /* private */
-    uint32_t entry_vector;  /* private */
-    __DECL_REG(ip);
-    uint16_t cs, _pad0[1];
-    uint8_t  saved_upcall_mask;
-    uint8_t  _pad1[3];
-    __DECL_REG(flags);      /* rflags.IF == !saved_upcall_mask */
-    __DECL_REG(sp);
-    uint16_t ss, _pad2[3];
-    uint16_t es, _pad3[3];
-    uint16_t ds, _pad4[3];
-    uint16_t fs, _pad5[3]; /* Non-zero => takes precedence over fs_base.     */
-    uint16_t gs, _pad6[3]; /* Non-zero => takes precedence over gs_base_usr. */
+#define LCD_DECL_64_REG(name) \
+	u64 r ## name
+
+struct lcd_regs {
+
+	LCD_DECL_REG(ax);
+	LCD_DECL_REG(bx);
+	LCD_DECL_REG(cx);
+	LCD_DECL_REG(dx);
+	LCD_DECL_REG(si);
+	LCD_DECL_REG(di);
+	LCD_DECL_REG(ip);
+	LCD_DECL_REG(bp);
+	LCD_DECL_REG(sp);
+	LCD_DECL_REG(flags);
+	LCD_DECL_64_REG(8);
+	LCD_DECL_64_REG(9);
+	LCD_DECL_64_REG(10);
+	LCD_DECL_64_REG(11);
+	LCD_DECL_64_REG(12);
+	LCD_DECL_64_REG(13);
+	LCD_DECL_64_REG(14);
+	LCD_DECL_64_REG(15);
+
+	u16 cs;
+	u16 ss;
+	u16 es;
+	u16 ds;
+	u16 fs;
+	u16 gs;
+
+	u64 cr0;
+	u64 cr2;
+	u64 cr3;
+	u64 cr4;
+	u64 cr8;
 };
 
 #define LCD_ARCH_EPT_WALK_LENGTH 4
@@ -203,8 +204,7 @@ struct lcd_arch {
 	 * Stuff we need to save explicitly
 	 */
 	u64 host_rsp;
-	struct cpu_user_regs regs;
-	u64 cr2;
+	struct lcd_regs regs;
 
 	int shutdown;
 	int ret_code;

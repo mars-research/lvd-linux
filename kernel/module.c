@@ -3432,6 +3432,11 @@ static noinline int do_init_module(struct module *mod, int for_lcd)
 #ifdef CONFIG_KALLSYMS
 	/* Switch to core kallsyms now init is done: kallsyms may be walking! */
 	rcu_assign_pointer(mod->kallsyms, &mod->core_kallsyms);
+	if (!for_lcd) {
+		mod->num_symtab = mod->core_num_syms;
+		mod->symtab = mod->core_symtab;
+		mod->strtab = mod->core_strtab;
+	}
 #endif
 	module_enable_ro(mod, true);
 	mod_tree_remove_init(mod);
@@ -4054,6 +4059,7 @@ const char *get_ksymbol(struct module *mod,
 		*offset = addr - kallsyms->symtab[best].st_value;
 	return symname(kallsyms, best);
 }
+EXPORT_SYMBOL(get_ksymbol);
 
 /* For kallsyms to ask for address resolution.  NULL means not found.  Careful
  * not to lock to avoid deadlock on oopses, simply disable preemption. */

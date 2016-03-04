@@ -47,64 +47,6 @@ fail1:
 	return ret;
 }
 
-static inline const char *adjust_addr(const char *addr, struct module *mod,
-				hva_t new_m_core_addr)
-{
-	/* unsigned long offset; */
-	/*
-	 * Compute offset into module's core
-	 */
-	return addr;
-	/* offset = ((unsigned long)addr) - ((unsigned long)mod->module_core); */
-	/* /\* */
-	/*  * Add to new core location */
-	/*  *\/ */
-	/* return (const char *)(hva_val(new_m_core_addr) + offset); */
-}
-
-static const char *get_ksymbol(struct module *mod,
-			hva_t addr,
-			unsigned long *size,
-			unsigned long *offset)
-{
-	unsigned int i, best = 0;
-	unsigned long nextval;
-
-	/* At worse, next value is at end of module */
-	if (within_module_init(hva_val(addr), mod))
-		nextval = (unsigned long)mod->module_init+mod->init_text_size;
-	else
-		nextval = (unsigned long)mod->module_core+mod->core_text_size;
-
-	/* Scan for closest preceding symbol, and next symbol. (ELF
-	   starts real symbols at 1). */
-	for (i = 1; i < mod->num_symtab; i++) {
-		if (mod->symtab[i].st_shndx == SHN_UNDEF)
-			continue;
-
-		/* We ignore unnamed symbols: they're uninformative
-		 * and inserted at a whim. */
-		if (mod->symtab[i].st_value <= hva_val(addr)
-			&& mod->symtab[i].st_value > mod->symtab[best].st_value && 
-			*(mod->strtab + mod->symtab[i].st_name) != '\0')
-				best = i;
-		if (mod->symtab[i].st_value > hva_val(addr)
-			&& mod->symtab[i].st_value < nextval
-			&& *(mod->strtab + mod->symtab[i].st_name) != '\0')
-			nextval = mod->symtab[i].st_value;
-	}
-
-	if (!best)
-		return NULL;
-
-	if (size)
-		*size = nextval - mod->symtab[best].st_value;
-	if (offset)
-		*offset = hva_val(addr) - mod->symtab[best].st_value;
-	return mod->strtab + mod->symtab[best].st_name;
-}
-
-
 static inline int in_module(struct module *module, hva_t hva)
 {
 	/*
@@ -125,7 +67,13 @@ __lcd_sprint_symbol(char *buffer, hva_t hva, struct module *extra_module)
 	unsigned long len;
 	/*
 	 * This code is motivated by kernel/kallsyms.c:__sprint_symbol
+	 *
+	 * According to doc in kernel/kallsyms.c:sprint_backtrace,
+	 * we need to subtract 1 from the address to handle noreturn gcc
+	 * optimizations.
 	 */
+	hva = __hva(hva_val(hva) - 1);
+
 	if (extra_module && in_module(extra_module, hva)) {
 		/*
 		 * Symbol lands in our special LCD .ko image; look up
@@ -134,7 +82,7 @@ __lcd_sprint_symbol(char *buffer, hva_t hva, struct module *extra_module)
 		 * XXX: Danger: This is for debug only. The struct module
 		 * is mapped inside an LCD which could mess with it.
 		 */
-		sym_name = get_ksymbol(extra_module, hva,
+		sym_name = get_ksymbol(extra_module, hva_val(hva),
 				&size, &offset);
 		if (!sym_name)
 			return 0;
@@ -152,11 +100,7 @@ __lcd_sprint_symbol(char *buffer, hva_t hva, struct module *extra_module)
 			strcpy(buffer, sym_name);
 	}
 	/*
-	 * According to doc in kernel/kallsyms.c:sprint_backtrace,
-	 * we need to add 1 to the address to handle noreturn gcc
-	 * optimizations.
-	 *
-	 * Since we always use this code for backtrace, always inc by 1
+	 * Since we subtracted 1 from the address, add 1 to the offset
 	 */
 	offset += 1;
 	len = strlen(buffer);

@@ -1134,9 +1134,9 @@ int lcd_cap_grant(cptr_t lcd, cptr_t src, cptr_t dest)
 	return __lcd_cap_grant(current->lcd, lcd, src, dest);
 }
 
-int lcd_set_struct_module_hva(cptr_t lcd, hva_t hva)
+int lcd_set_struct_module_hva(cptr_t lcd, struct module *mod)
 {
-	return __lcd_set_struct_module_hva(current->lcd, lcd, hva);
+	return __lcd_set_struct_module_hva(current->lcd, lcd, mod);
 }
 
 int lcd_run(cptr_t lcd)

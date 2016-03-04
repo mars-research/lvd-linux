@@ -105,10 +105,13 @@ int lcd_memory_grant_and_map(cptr_t lcd, cptr_t mo, cptr_t dest_slot,
  * @dest: slot in LCD's cspace where capability should be stored
  */
 int lcd_cap_grant(cptr_t lcd, cptr_t src, cptr_t dest);
+
+struct module;
+
 /**
  * lcd_set_struct_module_hva -- Remember the hva of the struct module copy
  * @lcd: LCD that is using the module
- * @hva: the host virtual address of the struct module copy
+ * @mod: the host virtual address of the struct module copy
  *
  * Motivation: We unload the modules from the host now after they have been
  * loaded into the LCD. But the struct module is still around, its just in
@@ -120,7 +123,7 @@ int lcd_cap_grant(cptr_t lcd, cptr_t src, cptr_t dest);
  *
  * For isolated code calling this function, also returns error.
  */
-int lcd_set_struct_module_hva(cptr_t lcd, hva_t hva);
+int lcd_set_struct_module_hva(cptr_t lcd, struct module *mod);
 /**
  * lcd_run -- Run an LCD
  * @lcd: the LCD to run

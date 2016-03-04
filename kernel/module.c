@@ -4054,7 +4054,6 @@ const char *get_ksymbol(struct module *mod,
 		*offset = addr - kallsyms->symtab[best].st_value;
 	return symname(kallsyms, best);
 }
-EXPORT_SYMBOL(get_ksymbol);
 
 /* For kallsyms to ask for address resolution.  NULL means not found.  Careful
  * not to lock to avoid deadlock on oopses, simply disable preemption. */

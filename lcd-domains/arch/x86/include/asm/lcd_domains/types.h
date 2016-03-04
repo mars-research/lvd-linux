@@ -11,6 +11,7 @@
 #include <asm/vmx.h>
 #include <linux/mutex.h>
 #include <linux/module.h>
+#include <lcd_domains/types.h>
 
 struct lcd_arch_vmcs {
 	u32 revision_id;

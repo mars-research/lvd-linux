@@ -29,6 +29,15 @@ static inline gva_t stack_bottom(gva_t sp)
 		sizeof(unsigned long));
 }
 
+static inline gva_t stack_trace_bottom(gva_t sp)
+{
+	gva_t sbottom = stack_bottom(sp);
+	/*
+	 * We don't want to look up the 0x0 ret addr
+	 */
+	return __gva(gva_val(sbottom) - sizeof(unsigned long));
+}
+
 static inline int stack_addr_gva2hva(struct lcd_arch *lcd, gva_t gva, 
 				hva_t *hva_out)
 {
@@ -45,20 +54,18 @@ static inline int stack_addr_gva2hva(struct lcd_arch *lcd, gva_t gva,
 
 static int print_one_addr(gva_t addr, struct lcd_arch *lcd)
 {
-	int ret;
-	hva_t addr_hva;
 	char symname[KSYM_SYMBOL_LEN];
 	/*
-	 * Resolve address on stack to hva
-	 */
-	ret = stack_addr_gva2hva(lcd, addr, &addr_hva);
-	if (ret)
-		return ret;
-	/*
 	 * Resove address to symbol info
+	 *
+	 * Since we map the code in the same location inside
+	 * the LCD as it is in the host, gva == hva!
 	 */
-	if (__lcd_sprint_symbol(symname, addr_hva, lcd->kernel_module))
-		printk("[<0x%016lx>] %s", gva_val(addr), symname);
+	if (__lcd_sprint_symbol(symname, __hva(gva_val(addr)), 
+					lcd->kernel_module))
+		printk("   [<0x%016lx>] %s\n", gva_val(addr), symname);
+	else
+		printk("   [<0x%016lx>] ??\n", gva_val(addr));
 	return 0;
 }
 
@@ -103,7 +110,7 @@ static void _show_trace(struct lcd_arch *lcd, gva_t sp,
 			gva_t __maybe_unused bp)
 {
 	hva_t stack_hva;
-	gva_t stack_bottom_gva = stack_bottom(sp);
+	gva_t stack_bottom_gva = stack_trace_bottom(sp);
 	gva_t addr;
 	hva_t addr_hva;
 
@@ -131,7 +138,7 @@ static void _show_trace(struct lcd_arch *lcd, gva_t sp,
 	int ret; 
 
 	/* Bounds for range of valid frame pointer. */
-	gva_t low = sp, high = stack_bottom(sp);
+	gva_t low = sp, high = stack_trace_bottom(sp);
 
 	/* The initial frame pointer. */
 	frame_gva = bp;

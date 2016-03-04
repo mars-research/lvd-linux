@@ -9,6 +9,7 @@
 
 #include <lcd_config/pre_hook.h>
 
+#include <linux/module.h>
 #include <linux/slab.h>
 #include <linux/mm.h>
 #include <libcap.h>
@@ -515,14 +516,29 @@ fail1:
 }
 
 #ifndef LCD_ISOLATE
+
+static void fix_struct_module_addrs(struct module *mod, void *m_core_bits)
+{
+	unsigned long symtab_offset, strtab_offset;
+	/*
+	 * Point symbol table and string table to new home
+	 */
+	symtab_offset = ((unsigned long)mod->symtab) -
+		((unsigned long)mod->module_core);
+	strtab_offset = ((unsigned long)mod->strtab) -
+		((unsigned long)mod->module_core);
+	mod->symtab = m_core_bits + symtab_offset;
+	mod->strtab = m_core_bits + strtab_offset;
+}
+
 static int set_struct_module(cptr_t lcd, void *m_core_bits,
 			unsigned long m_struct_module_core_offset)
 {
-	hva_t m_hva;
+	struct module *mod = m_core_bits + m_struct_module_core_offset;
 
-	m_hva = __hva((unsigned long)(m_core_bits + 
-					m_struct_module_core_offset));
-	return lcd_set_struct_module_hva(lcd, m_hva);
+	fix_struct_module_addrs(mod, m_core_bits);
+
+	return lcd_set_struct_module_hva(lcd, mod);
 }
 #endif
 

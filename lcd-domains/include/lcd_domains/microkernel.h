@@ -814,18 +814,19 @@ void __lcd_console_exit(void);
  * __lcd_set_struct_module_hva -- Set pointer to the struct module for @lcd
  * @caller: LCD doing the setting
  * @lcd: LCD who is using struct module
- * @module_addr: host virtual address of the struct module copy
+ * @mod: host virtual address of the struct module copy
  *
  * For motivation, see liblcd version of this function.
  */
 int __lcd_set_struct_module_hva(struct lcd *caller, cptr_t lcd, 
-				hva_t module_addr);
+				struct module *mod);
 /**
  * __lcd_sprint_symbol -- Resolve a host virtual address to a symbol name
  * @buffer: char buff to print symbol info to; must be at least KSYM_SYMBOL_LEN 
  *          in length
  * @module: the struct module to use for module symbol resolution
  * @hva: the address to resolve
+ * @new_m_core_addr: the host virtual address where the core is now mapped
  *
  * Returns length of string data written to @buffer.
  *

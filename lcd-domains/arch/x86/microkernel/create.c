@@ -7,6 +7,7 @@
  * Copyright: University of Utah
  */
 
+#include <asm/vmx.h>
 #include <asm/lcd_domains/create.h>
 
 /* These are initialized by init.c */
@@ -15,7 +16,9 @@ struct lcd_vmcs_config lcd_global_vmcs_config;
 unsigned long *lcd_global_msr_bitmap;
 struct lcd_vpids lcd_vpids;
 
-static void lcd_arch_free_vmcs(struct lcd_arch_vmcs *vmcs)
+/* VMCS ALLOC/FREE ---------------------------------------- */
+
+void lcd_arch_free_vmcs(struct lcd_arch_vmcs *vmcs)
 {
 	free_pages((unsigned long)vmcs, lcd_global_vmcs_config.order);
 }
@@ -705,12 +708,7 @@ static void __vmx_get_cpu_helper(void *ptr)
 		__get_cpu_var(local_lcd_arch) = NULL;
 }
 
-/**
- * Loads t on the calling cpu.
- *
- * Disables preemption. Call vmx_put_cpu() when finished.
- */
-static void vmx_get_cpu(struct lcd_arch *lcd_arch)
+void vmx_get_cpu(struct lcd_arch *lcd_arch)
 {
 	int cur_cpu;
 
@@ -788,12 +786,7 @@ static void vmx_get_cpu(struct lcd_arch *lcd_arch)
 	}
 }
 
-/**
- * Match with vmx_get_cpu.
- *
- * Enables preemption.
- */
-static void vmx_put_cpu(struct lcd_arch *lcd_arch)
+void vmx_put_cpu(struct lcd_arch *lcd_arch)
 {
 	put_cpu();
 }
@@ -847,7 +840,7 @@ int lcd_arch_create(struct lcd_arch **out)
 	/*
 	 * Set up ept
 	 */
-	ret = vmx_init_ept(lcd_arch);
+	ret = lcd_arch_ept_init(lcd_arch);
 	if (ret) {
 		LCD_ERR("setting up etp");
 		goto fail_ept;
@@ -855,7 +848,7 @@ int lcd_arch_create(struct lcd_arch **out)
 	/*
 	 * Alloc vmcs
 	 */
-	lcd_arch->vmcs = vmx_alloc_vmcs(raw_smp_processor_id());
+	lcd_arch->vmcs = lcd_arch_alloc_vmcs(raw_smp_processor_id());
 	if (!lcd_arch->vmcs) {
 		LCD_ERR("failed to alloc vmcs\n");
 		ret = -ENOMEM;
@@ -886,9 +879,9 @@ int lcd_arch_create(struct lcd_arch **out)
 	return 0;
 
 fail_vpid:
-	vmx_free_vmcs(lcd_arch->vmcs);
+	lcd_arch_free_vmcs(lcd_arch->vmcs);
 fail_vmcs:
-	vmx_free_ept(lcd_arch);
+	lcd_arch_ept_free(lcd_arch);
 fail_ept:
 	kmem_cache_free(lcd_arch_cache, lcd_arch);
 fail_alloc:
@@ -913,8 +906,8 @@ void lcd_arch_destroy(struct lcd_arch *lcd_arch)
 	 *
 	 * XXX: No lock on ept
 	 */
-	invvpid_single_context(lcd_arch->vpid);
-	invept_single_context(lcd_arch->ept.vmcs_ptr);
+	lcd_arch_ept_invvpid(lcd_arch->vpid);
+	lcd_arch_ept_invept(lcd_arch->ept.vmcs_ptr);
 	/*
 	 * VM clear on this cpu
 	 */
@@ -928,8 +921,8 @@ void lcd_arch_destroy(struct lcd_arch *lcd_arch)
 	 * Free remaining junk
 	 */
 	vmx_free_vpid(lcd_arch);
-	vmx_free_vmcs(lcd_arch->vmcs);
-	vmx_free_ept(lcd_arch);
+	lcd_arch_free_vmcs(lcd_arch->vmcs);
+	lcd_arch_ept_free(lcd_arch);
 	kmem_cache_free(lcd_arch_cache, lcd_arch);
 }
 
@@ -961,6 +954,8 @@ static void vmx_pack_desc(struct desc_struct *desc, u64 base, u64 limit,
 	desc->g    = g;
 }
 #endif
+
+/* RUNTIME CONFIGURATION -------------------------------------------------- */
 
 int lcd_arch_set_pc(struct lcd_arch *lcd_arch, gva_t a)
 {

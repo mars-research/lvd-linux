@@ -27,7 +27,11 @@ lcd_domains-y += $(addprefix microkernel/, \
 
 # Arch dependent code
 lcd_domains-y += $(addprefix arch/$(ARCH)/microkernel/, \
-              main.o \
+              init.o \
+              create.o \
+              ept.o \
+              run.o \
+              check.o \
               )
 
 # kliblcd (built into microkernel .ko)

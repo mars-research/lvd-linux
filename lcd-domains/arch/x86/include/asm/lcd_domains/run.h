@@ -9,6 +9,9 @@
 #ifndef ASM_X86_LCD_DOMAINS_RUN_H
 #define ASM_X86_LCD_DOMAINS_RUN_H
 
+#include <lcd_domains/types.h>
+#include <asm/lcd_domains/types.h>
+
 /**
  * Runs lcd_arch on the calling cpu. (If the LCD is active on
  * a different cpu, it will become inactive there.) Kernel
@@ -34,32 +37,9 @@ enum lcd_arch_status {
 	LCD_ARCH_STATUS_SYSCALL    = 4,
 };
 
-/**
- * Set the lcd's program counter to the guest virtual address
- * a.
- */
-int lcd_arch_set_pc(struct lcd_arch *lcd_arch, gva_t a);
-/**
- * Read LCD's %rip
- */
-static inline u64 lcd_arch_get_pc(struct lcd_arch *lcd)
-{
-	return lcd->regs.rip;
-}
-/**
- * Set the lcd's stack pointer to the guest virtual address
- * a.
- */
-int lcd_arch_set_sp(struct lcd_arch *lcd_arch, gva_t a);
-/**
- * Set the lcd's gva root pointer (for x86, %cr3) to the
- * guest physical address a.
- */
-int lcd_arch_set_gva_root(struct lcd_arch *lcd_arch, gpa_t a);
-
 /*
- * Accessor Macro for syscalls
- * ===========================
+ * Accessor Macros for syscalls
+ * ============================
  */
 static inline u64 lcd_arch_get_syscall_num(struct lcd_arch *lcd)
 {
@@ -90,9 +70,11 @@ static inline void lcd_arch_set_syscall_ret(struct lcd_arch *lcd, u64 val)
 	lcd->regs.rax = val;
 }
 
-/* Stack and register state */
-
-void lcd_show_execution_state(struct lcd_arch *lcd, const struct cpu_user_regs *regs);
-void lcd_show_registers(const struct cpu_user_regs *regs);
+/**
+ * Dump LCD executation state to console.
+ *
+ * Registers, stack, stack trace.
+ */
+void lcd_arch_dump_lcd(struct lcd_arch *lcd);
 
 #endif /* ASM_X86_LCD_DOMAINS_RUN_H */

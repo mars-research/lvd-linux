@@ -3,6 +3,13 @@
  *
  * Functions for accessing an LCD's vmcs.
  *
+ * IMPORTANT: Before doing a vmcs_read or vmcs_write, you *must* load
+ * the VMCS on the calling CPU. To do this, call vmx_get_cpu/vmx_put_cpu:
+ *
+ *           vmx_get_cpu(lcd);
+ *           vmcs_readl(...some field...);
+ *           vmx_put_cpu(lcd);
+ *
  * Copyright: University of Utah
  */
 #ifndef ASM_X86_LCD_DOMAINS_VMCS_H
@@ -95,5 +102,17 @@ static void vmcs_write64(unsigned long field, u64 value)
 {
 	vmcs_writel(field, value);
 }
+/**
+ * Loads t on the calling cpu.
+ *
+ * Disables preemption. Call vmx_put_cpu() when finished.
+ */
+void vmx_get_cpu(struct lcd_arch *lcd_arch);
+/**
+ * Match with vmx_get_cpu.
+ *
+ * Enables preemption.
+ */
+static void vmx_put_cpu(struct lcd_arch *lcd_arch);
 
 #endif /* ASM_X86_LCD_DOMAINS_VMCS_H */

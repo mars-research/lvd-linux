@@ -118,6 +118,22 @@ static inline void invvpid_single_context(u16 vpid)
 		invvpid_global_context();		
 }
 
+void lcd_arch_ept_global_invalidate(void)
+{
+	invvpid_global_context();
+	invept_global_context();
+}
+
+void lcd_arch_ept_invvpid(u16 vpid)
+{
+	invvpid_single_context(vpid);
+}
+
+void lcd_arch_ept_invept(u64 eptp)
+{
+	invept_single_context(eptp);
+}
+
 /* EPT  -------------------------------------------------- */
 
 /**

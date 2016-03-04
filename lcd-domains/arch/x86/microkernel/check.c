@@ -10,6 +10,12 @@
  * Copyright: University of Utah
  */
 
+#include <linux/kernel.h>
+#include <lcd_domains/types.h>
+#include <asm/lcd_domains/types.h>
+#include <lcd_domains/microkernel.h>
+#include <asm/lcd_domains/vmcs.h>
+#include <asm/vmx.h>
 
 static inline u16 vmx_get16(struct lcd_arch *t, u64 field)
 {

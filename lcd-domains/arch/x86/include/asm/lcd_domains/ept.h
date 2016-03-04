@@ -97,7 +97,15 @@ static inline int lcd_arch_ept_gpa_to_hva(struct lcd_arch *lcd, gpa_t gpa,
 /**
  * Invalidate all EPT mappings.
  */
-int lcd_arch_ept_global_invalidate(void);
+void lcd_arch_ept_global_invalidate(void);
+/**
+ * Invalidate mappings for VPID only
+ */
+void lcd_arch_ept_invvpid(u16 vpid);
+/**
+ * Invalidate mappings for EPT pointer only.
+ */
+void lcd_arch_ept_invept(u64 eptp);
 /**
  * Initializes the EPT's root global page directory page, the
  * VMCS pointer, and the spinlock.

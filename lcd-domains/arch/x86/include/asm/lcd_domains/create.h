@@ -9,6 +9,9 @@
 #ifndef ASM_X86_LCD_DOMAINS_CREATE_H
 #define ASM_X86_LCD_DOMAINS_CREATE_H
 
+#include <asm/lcd_domains/types.h>
+#include <linux/slab.h>
+
 /**
  * Creates the arch-dependent part of an LCD (e.g., the ept).
  */
@@ -17,14 +20,31 @@ int lcd_arch_create(struct lcd_arch **out);
  * Tears down arch-dep part of LCD.
  *
  * IMPORTANT: When the ept is torn down, any host memory that is still mapped
- * will be freed. This is for convenience. But beware.
+ * will *not* be freed. Beware.
  */
 void lcd_arch_destroy(struct lcd_arch *lcd_arch);
 /**
- * Does logical consistency checks (e.g., runs through checks
- * listed in Intel SDM V3 26.1, 26.2, and 26.3).
+ * Set the lcd's program counter to the guest virtual address
+ * a.
  */
-int lcd_arch_check(struct lcd_arch *lcd_arch);
+int lcd_arch_set_pc(struct lcd_arch *lcd_arch, gva_t a);
+/**
+ * Read LCD's %rip
+ */
+static inline u64 lcd_arch_get_pc(struct lcd_arch *lcd)
+{
+	return lcd->regs.rip;
+}
+/**
+ * Set the lcd's stack pointer to the guest virtual address
+ * a.
+ */
+int lcd_arch_set_sp(struct lcd_arch *lcd_arch, gva_t a);
+/**
+ * Set the lcd's gva root pointer (for x86, %cr3) to the
+ * guest physical address a.
+ */
+int lcd_arch_set_gva_root(struct lcd_arch *lcd_arch, gpa_t a);
 /**
  * Allocate memory for the VMCS for an LCD.
  */

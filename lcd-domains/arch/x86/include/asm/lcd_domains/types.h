@@ -178,9 +178,4 @@ struct lcd_vpids {
 	spinlock_t lock;
 };
 
-extern struct lcd_vmcs_config lcd_global_vmcs_config;
-extern struct lcd_vmx_capability lcd_vmx_capability;
-extern unsigned long *lcd_global_msr_bitmap;
-extern struct lcd_vpids lcd_vpids;
-
 #endif /* ASM_X86_LCD_DOMAINS_TYPES_H */

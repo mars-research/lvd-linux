@@ -58,7 +58,7 @@ static void dump_lcd_arch(struct lcd_arch *lcd)
 		lcd->regs[LCD_ARCH_REGS_R15]);
 	*/
 
-	lcd_show_execution_state(lcd, &lcd->regs);
+//	lcd_show_execution_state(lcd, &lcd->regs);
 	/* printk(KERN_ERR "Dumping Stack Contents...\n"); */
 	/* sp = (unsigned long *) vcpu->regs[VCPU_REGS_RSP]; */
 	/* for (i = 0; i < STACK_DEPTH; i++) */
@@ -91,53 +91,6 @@ static inline unsigned int vmx_exit_intr_type(struct lcd_arch *lcd_arch)
 static inline unsigned int vmx_exit_intr_vector(struct lcd_arch *lcd_arch)
 {
 	return lcd_arch->exit_intr_info & INTR_INFO_VECTOR_MASK;
-}
-
-static int find_highest(unsigned *vals)
-{
-	int i;
-	int j;
-
-	for (i = APIC_ISR_NR - 1; i >= 0; i--) {
-		for (j = 31; j >= 0; j--) {
-			if (vals[i] & (1 << j)) {
-				return i * 32 + j;
-			}
-		}
-	}
-	return 0;
-}
-
-/**
- * For debugging external interrupts. This will print the bits set in
- * the ISR in the local apic for the calling cpu, and determine the
- * highest priority bit set.
- */
-void print_ext_intr_info(unsigned vector)
-{
-	int i;
-	unsigned values[APIC_ISR_NR];
-	unsigned long flags;
-	int max;
-	
-	local_irq_save(flags);
-
-	for (i = APIC_ISR_NR - 1; i >= 0; i--) {
-		values[i] = apic_read(APIC_ISR + i*0x10);
-	}
-
-	max = find_highest(values);
-
-	local_irq_restore(flags);
-
-	for (i = APIC_ISR_NR - 1; i >= 0; i--) {
-		printk("apic isr is 0x%08x\n", values[i]);
-	}
-	printk("and I am %d\n", vector);
-
-	if (max != vector) {
-		printk("unexpected max vec %d, I am %d\n", max, vector);
-	}
 }
 
 /**
@@ -457,20 +410,12 @@ static int vmx_handle_other_exits(struct lcd_arch *lcd_arch)
 
 /* VMX RUN -------------------------------------------------- */
 
-static void trace_in_non_root(void);
-static void clear_non_root(void);
-
-
 /**
  * Low-level vmx launch / resume to enter non-root mode on cpu with
  * the current vmcs.
  */
 static void __noclone vmx_enter(struct lcd_arch *lcd_arch)
 {
-	/*
-	 * before we enter
-	 */
-	trace_in_non_root();
 	asm(
 		/* 
 		 * Store host registers on stack (all other regs are
@@ -624,7 +569,7 @@ static void __noclone vmx_enter(struct lcd_arch *lcd_arch)
 					  regs.r14)),
 		  [r15]"i"(offsetof(struct lcd_arch, 
 					  regs.r15)),
-		  [cr2]"i"(offsetof(struct lcd_arch, cr2)),
+		  [cr2]"i"(offsetof(struct lcd_arch, regs.cr2)),
 		  [wordsize]"i"(sizeof(ulong))
 		: "cc", "memory"
 		  , "rax", "rdx", "rbx", "rdi", "rsi"
@@ -632,8 +577,6 @@ static void __noclone vmx_enter(struct lcd_arch *lcd_arch)
 		);
 
 	lcd_arch->launched = 1;
-
-	clear_non_root();
 
 	lcd_arch->regs.rip = vmcs_readl(GUEST_RIP);
 	lcd_arch->regs.rsp = vmcs_readl(GUEST_RSP);

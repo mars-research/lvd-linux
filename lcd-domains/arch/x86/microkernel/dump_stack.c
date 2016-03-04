@@ -69,6 +69,34 @@ static int print_one_addr(gva_t addr, struct lcd_arch *lcd)
 	return 0;
 }
 
+static void maybe_print_top_stack(gva_t sp, struct lcd_arch *lcd)
+{
+	char symname[KSYM_SYMBOL_LEN];
+	int ret;
+	hva_t sp_hva;
+	gva_t addr;
+	/*
+	 * Try to resolve sp to hva
+	 */
+	ret = stack_addr_gva2hva(lcd, sp, &sp_hva);
+	if (ret)
+		return;
+	/*
+	 * Read value at that spot
+	 */
+	addr = __gva(*(unsigned long*)hva_val(sp_hva));
+	/*
+	 * Resove address to symbol info
+	 *
+	 * Since we map the code in the same location inside
+	 * the LCD as it is in the host, gva == hva!
+	 */
+	if (__lcd_sprint_symbol(symname, __hva(gva_val(addr)), 
+					lcd->kernel_module))
+		printk("   [<0x%016lx>] %s\n", gva_val(addr), symname);
+	return;
+}
+
 
 #if !defined(CONFIG_FRAME_POINTER)
 
@@ -185,6 +213,12 @@ static void show_trace(struct lcd_arch *lcd)
 	 * function we crashed in)
 	 */
 	print_one_addr(__gva((unsigned long)lcd->regs.rip), lcd);
+	/*
+	 * In case we faulted on a function call, we won't have
+	 * a stack frame set up, but the return address will be
+	 * sitting there. Print it if so.
+	 */
+	maybe_print_top_stack(__gva((unsigned long)lcd->regs.rsp), lcd);
 	/*
 	 * Try to resolve addresses on stack to function symbols
 	 */

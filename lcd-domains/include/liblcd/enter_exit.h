@@ -10,6 +10,8 @@
 #ifndef LCD_DOMAINS_ENTER_EXIT_H
 #define LCD_DOMAINS_ENTER_EXIT_H
 
+#include <linux/kernel.h>
+
 #ifdef LCD_ISOLATE
 #define LCD_MAYBE_NORETURN __noreturn
 #else

@@ -461,16 +461,8 @@ static int main_for_lcd(struct lcd *lcd)
 	 */
 	for (;;) {
 		ret = run_once(lcd, &lcd_ret);
-		if (ret < 0) {
-			/* ret < 0 means fatal error */
-			LCD_MSG("LCD 0x%p exited with error %d; program counter at exit was: 0x%llx\n",
-				lcd, lcd_arch_get_pc(lcd->lcd_arch));
+		if (ret < 0 || should_stop(lcd)) {
 			return ret;
-		} else if (should_stop(lcd)) {
-			/* ret < 0 means fatal error */
-			LCD_MSG("LCD 0x%p stopped; program counter at exit was: 0x%llx\n",
-				lcd, lcd_arch_get_pc(lcd->lcd_arch));
-			return 0;
 		} else if (ret == 1) {
 			/* lcd exited */
 			return lcd_ret;

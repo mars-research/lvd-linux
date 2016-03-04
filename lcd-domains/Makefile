@@ -86,7 +86,7 @@ MICROKERNEL_BUILD_DIRS=$(foreach dir,$(MICROKERNEL_DIRS),\
 
 MICROKERNEL_LIBCAP=$(MICROKERNEL_BUILD_DIR)/libcap.install/lib/libcap.a
 MICROKERNEL_LIBCAP_CFLAGS= \
-	"-DLCD_DOMAINS -I$(LCD_DOMAINS_TOP_SRC_DIR)/include -I$(LCD_DOMAINS_TOP_SRC_DIR)/arch/$(ARCH)/include -I$(LCD_DOMAINS_TOP_SRC_DIR)/config/non_isolated"
+	"-Wall -DLCD_DOMAINS -I$(LCD_DOMAINS_TOP_SRC_DIR)/include -I$(LCD_DOMAINS_TOP_SRC_DIR)/arch/$(ARCH)/include -I$(LCD_DOMAINS_TOP_SRC_DIR)/config/non_isolated"
 
 microkernel: $(MICROKERNEL_BUILD_DIR)/Kbuild | \
 	$(MICROKERNEL_LIBCAP) $(MICROKERNEL_BUILD_DIRS)
@@ -137,7 +137,7 @@ LIBLCD_BUILD_DIRS=$(foreach dir,$(LIBLCD_DIRS),\
 LIBLCD_LIBCAP=$(LIBLCD_BUILD_DIR)/libcap.install/lib/libcap.a
 
 LIBLCD_LIBCAP_CFLAGS= \
-	"-DLCD_DOMAINS -DCPTR_CACHE_LOCK_PADDING_SIZE=8 -I$(LCD_DOMAINS_TOP_SRC_DIR)/include -I$(LCD_DOMAINS_TOP_SRC_DIR)/arch/$(ARCH)/include -I$(LCD_DOMAINS_TOP_SRC_DIR)/config/isolated"
+	"-Wall -DLCD_DOMAINS -DLCD_ISOLATE -DCPTR_CACHE_LOCK_PADDING_SIZE=8 -I$(LCD_DOMAINS_TOP_SRC_DIR)/include -I$(LCD_DOMAINS_TOP_SRC_DIR)/arch/$(ARCH)/include -I$(LCD_DOMAINS_TOP_SRC_DIR)/config/isolated"
 
 # There isn't a nice easy way to multiline this, and I want access to the
 # LIBLCD_BUILD_DIR variable (so I don't want to create a separate file); so 

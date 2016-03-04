@@ -221,6 +221,7 @@ int lcd_load_module(char *mdir, char *mname,
 		m->module_init, m->init_size);
 	printk("    core addr 0x%p core size 0x%x\n",
 		m->module_core, m->core_size);
+
 	/*
 	 * Unload module from host -- we don't need the host module
 	 * loader to hang onto it now that we've got the program

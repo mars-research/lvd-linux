@@ -2573,6 +2573,27 @@ static bool is_core_symbol(const Elf_Sym *src, const Elf_Shdr *sechdrs,
 	return true;
 }
 
+static bool is_init_symbol(const Elf_Sym *src, const Elf_Shdr *sechdrs,
+			unsigned int shnum)
+{
+	const Elf_Shdr *sec;
+
+	if (src->st_shndx == SHN_UNDEF
+	    || src->st_shndx >= shnum
+	    || !src->st_name)
+		return false;
+
+	sec = sechdrs + src->st_shndx;
+	if (!(sec->sh_flags & SHF_ALLOC)
+#ifndef CONFIG_KALLSYMS_ALL
+	    || !(sec->sh_flags & SHF_EXECINSTR)
+#endif
+	    || !(sec->sh_entsize & INIT_OFFSET_MASK))
+		return false;
+
+	return true;
+}
+
 /*
  * We only allocate and copy the strings needed by the parts of symtab
  * we keep.  This is simple, but has the effect of making multiple
@@ -2631,7 +2652,8 @@ static void layout_symtab(struct module *mod, struct load_info *info)
  * be appended to the init section.  Later we switch to the cut-down
  * core-only ones.
  */
-static void add_kallsyms(struct module *mod, const struct load_info *info)
+static void add_kallsyms(struct module *mod, const struct load_info *info,
+			int for_lcd)
 {
 	unsigned int i, ndst;
 	const Elf_Sym *src;
@@ -2648,18 +2670,18 @@ static void add_kallsyms(struct module *mod, const struct load_info *info)
 	mod->kallsyms->strtab = (void *)info->sechdrs[info->index.str].sh_addr;
 
 	/* Set types up while we still have access to sections. */
-	for (i = 0; i < mod->kallsyms->num_symtab; i++)
-		mod->kallsyms->symtab[i].st_info
-			= elf_type(&mod->kallsyms->symtab[i], info);
+	for (i = 0; i < mod->num_symtab; i++)
+		mod->symtab[i].st_info = elf_type(&mod->symtab[i], info);
 
-	/* Now populate the cut down core kallsyms for after init. */
-	mod->core_kallsyms.symtab = dst = mod->core_layout.base + info->symoffs;
-	mod->core_kallsyms.strtab = s = mod->core_layout.base + info->stroffs;
-	src = mod->kallsyms->symtab;
-	for (ndst = i = 0; i < mod->kallsyms->num_symtab; i++) {
-		if (i == 0 || is_livepatch_module(mod) ||
-		    is_core_symbol(src+i, info->sechdrs, info->hdr->e_shnum,
-				   info->index.pcpu)) {
+	mod->core_symtab = dst = mod->module_core + info->symoffs;
+	mod->core_strtab = s = mod->module_core + info->stroffs;
+	src = mod->symtab;
+	for (ndst = i = 0; i < mod->num_symtab; i++) {
+		if (i == 0 ||
+			is_core_symbol(src+i, info->sechdrs, info->hdr->e_shnum) ||
+			(for_lcd && is_init_symbol(src+i, 
+						info->sechdrs, 
+						info->hdr->e_shnum))) {
 			dst[ndst] = src[i];
 			dst[ndst++].st_name = s - mod->core_kallsyms.strtab;
 			s += strlcpy(s, &mod->kallsyms->strtab[src[i].st_name],
@@ -2673,7 +2695,8 @@ static inline void layout_symtab(struct module *mod, struct load_info *info)
 {
 }
 
-static void add_kallsyms(struct module *mod, const struct load_info *info)
+static void add_kallsyms(struct module *mod, const struct load_info *info,
+			int for_lcd)
 {
 }
 #endif /* CONFIG_KALLSYMS */
@@ -3300,7 +3323,8 @@ int __weak module_finalize(const Elf_Ehdr *hdr,
 	return 0;
 }
 
-static int post_relocation(struct module *mod, const struct load_info *info)
+static int post_relocation(struct module *mod, const struct load_info *info,
+			int for_lcd)
 {
 	/* Sort exception table now relocations are done. */
 	sort_extable(mod->extable, mod->extable + mod->num_exentries);
@@ -3310,7 +3334,7 @@ static int post_relocation(struct module *mod, const struct load_info *info)
 		       info->sechdrs[info->index.pcpu].sh_size);
 
 	/* Setup kallsyms-specific fields. */
-	add_kallsyms(mod, info);
+	add_kallsyms(mod, info, for_lcd);
 
 	/* Arch-specific module finalizing. */
 	return module_finalize(info->hdr, info->sechdrs, mod);
@@ -3848,7 +3872,7 @@ static int load_lcd(struct load_info *info, const char __user *uargs,
 	if (err < 0)
 		goto free_modinfo;
 
-	err = post_relocation(mod, info);
+	err = post_relocation(mod, info, for_lcd);
 	if (err < 0)
 		goto free_modinfo;
 

@@ -3,6 +3,7 @@
 
 #include "lcd_ast.h"
 #include "ccst.h"
+#include "utils.h"
 
 #define CONTAINER_OF "container_of"
 
@@ -36,11 +37,13 @@ const char* struct_name(ProjectionType *pt); // complete
 
 
 // helper.cpp
+CCSTUnaryOp* reference();
+char* type_number_to_name(int num);
 CCSTDeclaration* struct_pointer_declaration(const char* struct_name, const char* var_name, LexicalScope *ls); // complete
 CCSTStatement* kzalloc_structure(const char*struct_name, const char* var_name); // complete
 CCSTCompoundStatement* alloc_init_containers_driver(Variable *v, ProjectionType *pt, LexicalScope *ls, const char* side); // complete
 CCSTCompoundStatement* alloc_init_containers(Variable *v, ProjectionType *pt, LexicalScope *ls, const char* side); // complete
-CCSTCompoundStatement* alloc_init_trampoline(Variable *v, ProjectionType *pt, LexicalScope *ls); // complete-ish 
+CCSTCompoundStatement* alloc_init_hidden_args_struct(Variable *v, ProjectionType *pt, LexicalScope *ls); // complete-ish 
 bool alloc_caller(Variable *v, const char* side); // complete
 CCSTStructUnionSpecifier* struct_declaration(ProjectionType *pt); // complete
 CCSTDeclaration* declare_and_initialize_container_struct(Variable *v); // complete
@@ -61,12 +64,6 @@ CCSTPostFixExprAssnExpr* function_call(const char* func_name, std::vector<CCSTAs
 CCSTUnaryOp* Not();
 CCSTIfStatement* if_cond_fail(CCSTExpression *cond, const char *err_msg); // complete
 std::vector<CCSTDecSpecifier*> int_type(); // complete
-
-// name creators
-const char* parameter_name(const char *name); // complete
-const char* container_name(const char *name); // complete
-const char* enum_name(const char *name); // todo totally incomplete
-const char* string_to_upper(const char *str); //???????? const or not? this function seems retarded.
 
 CCSTPointer* pointer(int p_count); // complete
 

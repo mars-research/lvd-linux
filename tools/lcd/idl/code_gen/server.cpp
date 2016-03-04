@@ -159,7 +159,7 @@ CCSTCompoundStatement* callee_body(Rpc *r)
       ProjectionType *pt = dynamic_cast<ProjectionType*>(p->type());
       Assert(pt != 0x0, "Error: dynamic cast to Projection type failed\n");
       printf("calling alloc trampoline\n");
-      statements.push_back(alloc_init_trampoline(p, pt, r->current_scope()));
+      statements.push_back(alloc_init_hidden_args_struct(p, pt, r->current_scope()));
     }
   }
 

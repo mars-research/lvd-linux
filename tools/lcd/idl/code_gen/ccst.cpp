@@ -2036,7 +2036,7 @@ void CCSTReturn::write(FILE *f, int indent)
     }
   else
     {
-      fprintf(f, "%sreturn", indentation(indent));
+      fprintf(f, "%sreturn ", indentation(indent));
       this->expr_->write(f, 0);
       fprintf(f, ";");
     }

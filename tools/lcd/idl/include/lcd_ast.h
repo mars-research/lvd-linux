@@ -31,10 +31,6 @@ enum type_k {};
 template<class T, class T2>
 class ASTVisitor;
 
-const char* new_name(const char* name, const char* suffix);
-const char* container_name(const char* name);
-const char* hidden_args_name(const char* name);
-
 class Base
 {			  
  public:

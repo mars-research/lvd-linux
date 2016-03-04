@@ -15,7 +15,7 @@
 
 /* This controls how many stack addresses we print out */
 #define debug_stack_lines 20 /* 20 lines max */
-#define stack_words_per_line 4 /* 4 addresses per line */
+#define stack_words_per_line 3 /* 3 addresses per line */
 
 static inline gva_t stack_bottom(gva_t sp)
 {
@@ -25,7 +25,8 @@ static inline gva_t stack_bottom(gva_t sp)
 	 *
 	 * ALIGN rounds *up* to the next multiple of LCD_STACK_SIZE.
 	 */
-	return __gva(ALIGN(gva_val(sp), LCD_STACK_SIZE));
+	return __gva(ALIGN(gva_val(sp), LCD_STACK_SIZE) - 
+		sizeof(unsigned long));
 }
 
 static inline int stack_addr_gva2hva(struct lcd_arch *lcd, gva_t gva, 
@@ -195,7 +196,7 @@ static void lcd_show_stack(struct lcd_arch *lcd)
     
 	int i, ret;
 
-	printk("LCD stack trace from rsp=0x%lx:\n  ", gva_val(stack_gva));
+	printk("LCD stack from rsp=0x%lx:\n  ", gva_val(stack_gva));
 
 	for (i = 0; i < (debug_stack_lines * stack_words_per_line) &&
 		     (gva_val(stack_gva) <= gva_val(stack_bottom_gva)); i++ ) {
@@ -225,38 +226,47 @@ static void lcd_show_stack(struct lcd_arch *lcd)
 	if (i == 0)
 		printk("Stack empty.");
 
-	printk("\n");
+	printk("\n\n");
 }
 
 
 static void show_registers(const struct lcd_arch_regs *regs)
 
 {
-	printk("RIP:    %04x:[<%016llx>]", regs->cs, regs->rip);
+	printk("RIP:    %04x:[<%016llx>]\n", regs->cs, regs->rip);
 	printk("RFLAGS: %016llx   \n", regs->rflags);
-	printk("rax: %016llx   rbx: %016llx   rcx: %016llx\n",
-		regs->rax, regs->rbx, regs->rcx);
-	printk("rdx: %016llx   rsi: %016llx   rdi: %016llx\n",
-		regs->rdx, regs->rsi, regs->rdi);
-	printk("rbp: %016llx   rsp: %016llx   r8:  %016llx\n",
-		regs->rbp, regs->rsp, regs->r8);
-	printk("r9:  %016llx   r10: %016llx   r11: %016llx\n",
-		regs->r9,  regs->r10, regs->r11);
-        printk("r12: %016llx   r13: %016llx   r14: %016llx\n",
-		regs->r12, regs->r13, regs->r14);
-        printk("r15: %016llx   cr0: %016llx   cr4: %016llx\n",
-		regs->r15, regs->cr0, regs->cr4);
-	printk("cr3: %016llx   cr2: %016llx\n", regs->cr3, regs->cr2);
-	printk("ds: %04x   es: %04x   fs: %04x   gs: %04x   "
-		"ss: %04x   cs: %04x\n",
-		regs->ds, regs->es, regs->fs,
+	printk("rax: %016llx   rbx: %016llx\n",
+		regs->rax, regs->rbx);
+	printk("rcx: %016llx   rdx: %016llx\n",
+		regs->rcx, regs->rdx);
+	printk("rsi: %016llx   rdi: %016llx\n",
+		regs->rsi, regs->rdi);
+	printk("rbp: %016llx   rsp: %016llx\n",
+		regs->rbp, regs->rsp);
+	printk("r8:  %016llx   r9:  %016llx\n",
+		regs->r8, regs->r9);
+	printk("r10: %016llx   r11: %016llx\n",
+		regs->r10, regs->r11);
+        printk("r12: %016llx   r13: %016llx\n",
+		regs->r12, regs->r13);
+        printk("r14: %016llx   r15: %016llx\n",
+		regs->r14, regs->r15);
+        printk("cr0: %016llx   cr4: %016llx\n",
+		regs->cr0, regs->cr4);
+	printk("cr3: %016llx   cr2: %016llx\n", 
+		regs->cr3, regs->cr2);
+	printk("ds: %04x   es: %04x   fs: %04x\n",
+		regs->ds, regs->es, regs->fs);
+	printk("gs: %04x   ss: %04x   cs: %04x\n",
 		regs->gs, regs->ss, regs->cs);
-	printk("tr: %04x  tr base: %016llx   tr limit: %08x\n",
-		regs->tr, regs->tr_base, regs->tr_limit);
+	printk("tr: %04x\n", regs->tr);
+	printk("tr base:   %016llx   tr limit:   %08x\n",
+		regs->tr_base, regs->tr_limit);
 	printk("gdtr base: %016llx   gdtr limit: %08x\n",
 		regs->gdtr_base, regs->gdtr_limit);
 	printk("idtr base: %016llx   idtr limit: %08x\n",
 		regs->idtr_base, regs->idtr_limit);
+	printk("\n");
 }
 
 /**

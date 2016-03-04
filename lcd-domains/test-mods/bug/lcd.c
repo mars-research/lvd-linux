@@ -2,19 +2,8 @@
  * LCD BUG() and oops test. This LCD crashes to generate a
  * kernel oops. 
  *
- * IMPORTANT: This code *does not* expect to be booted so that
- * it can use kmalloc, page alloc, etc.
- *
- * You may want to inspect the .ko before running with
- * objdump -d.
- *
- * NOTE: If you disassemble the .ko, you will notice
- * callq's that are not patched to jump to the correct
- * place (e.g., they just jump to the next instruction). 
- * This is not an error. The module loading code
- * patches these calls so that they work when the module
- * is loaded. You can look at the relocation info in the
- * .ko elf file with readelf -a.
+ * This code *must* be compiled with optimizations turned off, or
+ * else it won't do what we want.
  */
 
 #include <linux/jiffies.h>

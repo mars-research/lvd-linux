@@ -242,11 +242,8 @@ int lcd_arch_ept_walk(struct lcd_arch *lcd, gpa_t a, int create,
 
 		if (!vmx_epte_present(dir[idx])) {
 			
-			if (!create) {
-				LCD_ERR("attempted lookup for unmapped gpa %lx, create was not allowed\n",
-					gpa_val(a));
+			if (!create)
 				return -ENOENT;
-			}
 			/*
 			 * Get host virtual addr of fresh page, and
 			 * set the epte's addr to the host physical addr

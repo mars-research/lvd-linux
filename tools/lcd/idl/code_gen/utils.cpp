@@ -65,13 +65,20 @@ CCSTUnaryExprCastExpr* dereference(CCSTCastExpr *to_deref)
   return new CCSTUnaryExprCastExpr(indirection(), to_deref);
 }
 
+bool alloc_callee(Variable *v, const char* side)
+{
+  if (strcmp(side, "callee") == 0) {
+    return v->alloc_callee();
+  }
+  return false;
+}
+
 bool alloc_caller(Variable *v, const char *side)
 {
   if(strcmp(side, "caller") == 0) {
     return v->alloc_caller();
   }
-  
-  return v->alloc_callee();
+  return false;
 }
 
 CCSTPrimaryExprId* function_name(const char *func_name)

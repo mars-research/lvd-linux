@@ -5,6 +5,77 @@
  * code related to container structures.
  */
 
+// declares and initializes an instance of the container struct for the struct
+// that this variable is a type of. uses the container structs name as the name of the variable
+CCSTCompoundStatement* declare_and_initialize_container_struct(Variable *v, ProjectionType *pt, LexicalScope *ls, const char *side)
+{
+  std::vector<CCSTDeclaration*> declarations;
+  std::vector<CCSTStatement*> statements;
+
+  // if we are on callee side, and it is alloc callee, we call alloc
+  // otherwise we do container_of
+
+  if(alloc_caller(v, side) || alloc_callee(v, side)) {
+    statements.push_back(alloc_init_containers(v, pt, ls, side));
+
+  } else { // container of
+    // declare container
+    const char* container_name_ = container_name(pt->name());
+    declarations.push_back(struct_pointer_declaration(container_name_, container_name_, ls));
+    
+    statements.push_back(new CCSTAssignExpr(new CCSTPrimaryExprId(container_name_), equals()
+					    , function_call("container_of", container_of_args( access(v), struct_name(pt), pt->real_type()))));
+  }
+
+  int err;
+  const char* container_name_ = container_name(pt->name());
+  Assert(ls->lookup(container_name_, &err) != 0x0, "Error: could not find type in scope\n");
+  ProjectionType *container = dynamic_cast<ProjectionType*>(ls->lookup(container_name_, &err));
+  Assert(container != 0x0, "Error: dynamic cast to projection failed\n");
+  
+  // loop through this projection's fields
+  Parameter *tmp = new Parameter(container, container_name_, 1); // to access from.
+  std::vector<ProjectionField*> fields = pt->fields();
+  for(std::vector<ProjectionField*>::iterator it = fields.begin(); it != fields.end(); it ++) {
+    ProjectionField *pf = *it;
+    if(pf->type()->num() == 4) {
+      ProjectionType *pt_tmp = dynamic_cast<ProjectionType*>(pf->type());
+      Assert(pt_tmp != 0x0, "Error: dynamic cast to Projection type failed!\n");
+      
+      pf->set_accessor(v);
+      statements.push_back(declare_and_initialize_container_struct(pf, pt_tmp, ls, side));
+      
+      // link/init these fields
+      Variable *sv = pf->accessor()->accessor();
+      pf->accessor()->set_accessor(tmp);
+      
+      const char* container_name_2 = container_name(pt_tmp->name());
+      
+      Assert(ls->lookup(container_name_2, &err) != 0x0, "Error: could not find container in environment.\n");
+      ProjectionType *pt_container = dynamic_cast<ProjectionType*>(ls->lookup(container_name_2, &err));
+      Assert(pt_container != 0x0, "Error: dynamic cast to Projection type failed!\n");
+      
+      ProjectionField *pf_tmp = pt_container->get_field(pt_tmp->name());
+      Parameter *tmp_param = new Parameter(pt_container, container_name_2, 1);
+      
+      pf_tmp->set_accessor(tmp_param);
+      statements.push_back(new CCSTAssignExpr(access(pf), equals(), new CCSTUnaryExprCastExpr(reference(), access(pf_tmp))));
+      
+    }
+  }
+  
+  return new CCSTCompoundStatement(declarations, statements);
+}
+
+
+std::vector<CCSTAssignExpr*> container_of_args(CCSTPostFixExpr *struct_pointer, const char* type_name, const char* field_name)
+{
+  std::vector<CCSTAssignExpr*> args;
+  args.push_back( struct_pointer);
+  args.push_back( new CCSTPrimaryExprId(type_name));
+  args.push_back( new CCSTPrimaryExprId(field_name));
+  return args;
+}
 
 CCSTCompoundStatement* alloc_init_containers(Variable *v, ProjectionType *pt, LexicalScope *ls, const char *side) 
 {
@@ -16,24 +87,18 @@ CCSTCompoundStatement* alloc_init_containers(Variable *v, ProjectionType *pt, Le
   declarations.push_back(struct_pointer_declaration(container_name_, container_name_, ls));
 
   int err;
-  Type* container_tmp = ls->lookup(container_name_, &err);
-  Assert(container_tmp != 0x0, "Error: could not find type in scope\n");
-  ProjectionType *container = dynamic_cast<ProjectionType*>(container_tmp);
+  Assert(ls->lookup(container_name_, &err) != 0x0, "Error: could not find type in scope\n");
+  ProjectionType *container = dynamic_cast<ProjectionType*>(ls->lookup(container_name_, &err));
   Assert(container != 0x0, "Error: dynamic cast to projection failed\n");
   
   // alloc
   statements.push_back(kzalloc_structure(container_name_, container_name_));
 
   // error check
-  // if null
-  // LIBLCD_ERR("kzalloc");
-  //	lcd_exit(-1); /* abort */
   statements.push_back(if_cond_fail(new CCSTUnaryExprCastExpr(Not(), new CCSTPrimaryExprId(container_name_))
 				    , "kzalloc"));
-
   // insert into dstore
   // do error checking
-  // err = lcd_dstore_insert...
   std::vector<CCSTAssignExpr*> dstore_insert_args;
   dstore_insert_args.push_back(new CCSTPrimaryExprId("dstore")); // lookup this name in the future.
   dstore_insert_args.push_back(new CCSTPrimaryExprId(container_name_)); // what we are inserting
@@ -50,45 +115,6 @@ CCSTCompoundStatement* alloc_init_containers(Variable *v, ProjectionType *pt, Le
   
   // do error checking
   statements.push_back(if_cond_fail(new CCSTPrimaryExprId("err"), "dstore"));
-
-
-  Parameter *tmp = new Parameter(container, container_name_, 1);
-  std::vector<ProjectionField*> fields = pt->fields();
-  for(std::vector<ProjectionField*>::iterator it = fields.begin(); it != fields.end(); it ++) {
-    ProjectionField *pf = *it;
-    pf->set_accessor(v);
-    if(pf->type()->num() == 4 && alloc_caller(pf, side)) {
-      ProjectionType *pt2 = dynamic_cast<ProjectionType*>(pf->type());
-      Assert(pt2 != 0x0, "Error: dynamic cast to Projection type failed!\n");
-      
-      statements.push_back(alloc_init_containers(pf, pt2, ls, side)); 
-
-      // need to link/init
-      
-      // need to access this field, but from the container....
-      Assert(pf->accessor() != 0x0, "Error: field %s does not have a surrounding variable\n", pf->identifier());
-      Variable *sv = pf->accessor()->accessor();
-      pf->accessor()->set_accessor(tmp);
-
-      // 1. get container for this field
-      const char* container_name2 = container_name(pt2->name());
-      Type *container_tmp2 = ls->lookup(container_name2, &err); // fix
-      Assert(container_tmp2 != 0x0, "Error: could not find container in environment\n");
-      ProjectionType *container2 = dynamic_cast<ProjectionType*>(container_tmp2);
-      Assert(container2 != 0x0, "Error: dynamic cast to Projection type failed!\n");
-  
-      // 2. in container look up field
-      ProjectionField *tmp_pf = container2->get_field(pt2->name()); // make sure name returns the name i think it does
-
-      // 3. create a tmp variable
-      Parameter *tmp2 = new Parameter(container2, container_name2, 1);
-      
-      // 4. set accessor in field.
-      tmp_pf->set_accessor(tmp2);
-      statements.push_back(new CCSTAssignExpr(access(pf), equals(), new CCSTUnaryExprCastExpr(reference() ,access(tmp_pf)))); // doing "&" may be wrong... put in function that checks
-    }
-    
-  }
 
   return new CCSTCompoundStatement(declarations, statements);
 }

@@ -40,49 +40,6 @@ CCSTFile* generate_client_source(Module* f)
   return new CCSTFile(definitions);
 }
 
-CCSTStatement* helper(Variable *p)
-{
-  
-  Type *t = p->type();
-  switch (t->num()) {
-    
-  case 1: { // typedef
-    break;
-  }
-  case 2: { // integer
-    break;
-  }
-  case 4: { // projection
-    std::vector<CCSTDeclaration*> declarations;
-    std::vector<CCSTStatement*> statements;
-    
-    ProjectionType *pt = dynamic_cast<ProjectionType*>(t);
-    Assert(pt != 0x0, "Error: dynamic cast failed\n");
-    if(!p->alloc_caller()) {
-      declarations.push_back(declare_and_initialize_container_struct(p));
-    } else {
-      //todo
-      printf("todo\n");
-      // what does this mean
-    }
-    // call for fields of struct
-    std::vector<ProjectionField*> fields = pt->fields();
-    for(std::vector<ProjectionField*>::iterator it = fields.begin(); it != fields.end(); it ++) {
-      ProjectionField *pf = *it;
-      statements.push_back(helper(pf));
-    }
-    return new CCSTCompoundStatement(declarations, statements);
-  }
-  case 5: { // void 
-    break;
-  }
-  default: {
-    printf("Must be a function pointer\n");
-  }
-  }
-  
-}
-
 CCSTCompoundStatement* function_pointer_caller_body(Rpc *f)
 {
   std::vector<CCSTDeclaration*> declarations;
@@ -146,37 +103,7 @@ CCSTCompoundStatement* caller_body(Rpc *r)
   
 }
 
-// declares and initializes an instance of the container struct for the struct
-// that this variable is a type of. uses the container structs name as the name of the variable
-CCSTDeclaration* declare_and_initialize_container_struct(Variable *v)
-{
-  if(v->type()->num() != 4) {
-    Assert(1 == 0, "error cannot declare a construct struct for a non struct\n");
-  } 
-  ProjectionType *pt = dynamic_cast<ProjectionType*>(v->type());
-  Assert(pt != 0x0, "Error: dynamic cast to projection type failed\n");
-  
-  std::vector<CCSTDecSpecifier*> specifier = struct_type(container_name(v->type()->name()));
-  
-  std::vector<CCSTInitDeclarator*> decs;
-  
-  decs.push_back(new CCSTInitDeclarator( new CCSTDeclarator( new CCSTPointer()
-							     , new CCSTDirectDecId(container_name(v->type()->name())))
-					 , new CCSTInitializer( new CCSTPostFixExprAssnExpr( function_name(CONTAINER_OF), container_of_args( access(v), struct_name(pt), pt->real_type())))));
 
-  CCSTDeclaration *declare_init_container = new CCSTDeclaration(specifier, decs);
-  return declare_init_container;
-}
-
-
-std::vector<CCSTAssignExpr*> container_of_args(CCSTPostFixExpr *struct_pointer, const char* type_name, const char* field_name)
-{
-  std::vector<CCSTAssignExpr*> args;
-  args.push_back( struct_pointer);
-  args.push_back( new CCSTPrimaryExprId(type_name));
-  args.push_back( new CCSTPrimaryExprId(field_name));
-  return args;
-}
 
 // marshals all of the parameters that are declared as "in"
 // just calls marshal_variable

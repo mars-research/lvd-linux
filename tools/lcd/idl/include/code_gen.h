@@ -42,8 +42,10 @@ char* type_number_to_name(int num);
 CCSTDeclaration* struct_pointer_declaration(const char* struct_name, const char* var_name, LexicalScope *ls); // complete
 CCSTStatement* kzalloc_structure(const char*struct_name, const char* var_name); // complete
 CCSTCompoundStatement* alloc_init_containers_driver(Variable *v, ProjectionType *pt, LexicalScope *ls, const char* side); // complete
+CCSTCompoundStatement* declare_and_initialize_container_struct(Variable *v, ProjectionType *pt, LexicalScope *ls, const char* side); // complete
 CCSTCompoundStatement* alloc_init_containers(Variable *v, ProjectionType *pt, LexicalScope *ls, const char* side); // complete
-CCSTCompoundStatement* alloc_init_hidden_args_struct(Variable *v, ProjectionType *pt, LexicalScope *ls); // complete-ish 
+CCSTCompoundStatement* alloc_init_hidden_args_struct(Variable *v, ProjectionType *pt, LexicalScope *ls); // complete-ish
+bool alloc_callee(Variable *v, const char* side); // complete 
 bool alloc_caller(Variable *v, const char* side); // complete
 CCSTStructUnionSpecifier* struct_declaration(ProjectionType *pt); // complete
 CCSTDeclaration* declare_and_initialize_container_struct(Variable *v); // complete

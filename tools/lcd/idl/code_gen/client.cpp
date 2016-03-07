@@ -77,94 +77,65 @@ CCSTCompoundStatement* caller_body(Rpc *r)
   // loop through params, declare a tmp and pull out marshal value
   std::vector<Parameter*> params = r->parameters();
 
-  // for each parameter that is ia projection -- & is alloc
+  // for each parameter that is ia projection
   for(std::vector<Parameter*>::iterator it = params.begin(); it != params.end(); it ++)
     {
       Parameter *p = *it;
-      if(p->type()->num() == 4 && p->alloc_caller()) {
+      if(p->type()->num() == 4) {
 	ProjectionType *pt = dynamic_cast<ProjectionType*>(p->type());
 	Assert(pt != 0x0, "Error: dynamic cast to Projection type failed!\n");
-	statements.push_back(alloc_init_containers_driver(p, pt, r->current_scope(), "caller"));
+	statements.push_back(declare_and_initialize_container_struct(p, pt, r->current_scope(), "caller"));
       }
     }
+
+  /* TODO: projection channel allocation */
+  /* TODO: what about function pointers */
   
   // marshal_parameters
   std::vector<Variable*> marshal_params = r->marshal_parameters;
-  printf("going to loop through marshal params\n");
   for(std::vector<Variable*>::iterator it = marshal_params.begin(); it != marshal_params.end(); it ++) {
     Variable *v = *it;
-    printf("calling marshal variable for var %s\n", v->identifier());
     statements.push_back(marshal_variable(v));    
   }
 
-  // marshal_variable(variable);
+  /* TODO: make remote call using appropriate channel */
+  
+  /* unmarshal appropriate parameters and return value */
+  
+  /* Only thing that might need to be allocated is the return value */
+
+  /* TODO: possibly allocate return value */
+  const char* ret_var_name = "ret_val";
+
+  std::vector<Variable*> unmarshal_params = r->unmarshal_parameters;
+  for(std::vector<Variable*>::iterator it = unmarshal_params.begin(); it != unmarshal_params.end(); it ++) {
+    Variable *v = *it;
+    statements.push_back(unmarshal_variable(v));
+  }
+
+  /* unmarshal explicit return value */
+  if(r->return_variable()->type()->num() != 5) { // check if not void.
+    /* 
+     * This adds some complexity because in this case we DO NOT have a list of things that need 
+     * to be unmarshalled like for the params.  
+     * Could just add this to the list of things to unmarshal and treat as special at that time.
+     * Make sure to set up special accessor that is the one we will allocate here.
+     */
+
+  }
+
+  /* TODO:  clear capability registers? */
+
+  /* return value to caller */
+  if(r->return_variable()->type()->num() != 5) {
+    statements.push_back(new CCSTReturn(new CCSTPrimaryExprId(ret_var_name)));
+  } else {
+    statements.push_back(new CCSTReturn());
+  }
 
   return new CCSTCompoundStatement(declarations, statements);
   
 }
-
-
-
-// marshals all of the parameters that are declared as "in"
-// just calls marshal_variable
-std::vector<CCSTStatement*> marshal_in_parameters(std::vector<Parameter*> params)
-{
-  std::vector<CCSTStatement*> statements;
-  
-  for(std::vector<Parameter*>::iterator it = params.begin(); it != params.end(); it ++) {
-    Parameter *p = (Parameter*) *it;
-    if(p->in()) {
-      statements.push_back(marshal_variable(p));
-    }
-  }
-  
-  return statements;
-}
-
-const char* struct_name(ProjectionType *pt)
-{
-  const char *struct_name = pt->real_type();
-  int len = strlen(struct_name);
-  int len2 = strlen("struct ");
-  char *new_str = (char*) malloc(sizeof(char)*(len+len2+1));
-  
-  std::ostringstream total;
-  total << "struct " << struct_name;
-  strncpy(new_str, total.str().c_str(), len+len2+1);
-  return new_str;
-}
-
-std::vector<CCSTStatement*> unmarshal_implicit_return(std::vector<Parameter*> implicit_returns)
-{
-  /*
-  std::vector<CCSTStatement*> statements;
-  for(std::vector<Parameter*>::iterator it = implicit_returns.begin(); it != implicit_returns.end(); it ++) {
-    Parameter *p = *it;
-    UnmarshalTypeVisitor *visitor = new UnmarshalTypeVisitor();
-    statements.push_back(mt->accept(visitor));  
-  }
-  
-  return statements;
-  */
-}
-
-/*
-CCSTStatement* unmarshal_explicit_return(Marshal_type* return_info)
-{
-  CCSTPointer *p = 0x0;
-  if(r->explicit_return_type()->num() == 3) {
-    p = new CCSTPointer();
-  }
-  std::vector<CCSTDecSpecifier*> ret_type = type(r->explicit_return_type());
-  
-  
-  UnmarshalTypeVisitor *visitor = new UnmarshalTypeVisitor();
-
-  std::vector<CCSTDeclaration*> d; std::vector<CCSTStatement*> s;
-  s.push_back(ret_info->accept(visitor));
-  s.push_back( new CCSTReturn(new CCSTPrimaryExprId("internal_ret")));
-}
-*/
 
 
 

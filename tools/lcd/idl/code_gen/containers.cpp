@@ -16,7 +16,7 @@ CCSTCompoundStatement* declare_and_initialize_container_struct(Variable *v, Proj
   // otherwise we do container_of
 
   if(alloc_caller(v, side) || alloc_callee(v, side)) {
-    statements.push_back(alloc_init_containers(v, pt, ls, side));
+    statements.push_back(alloc_init_containers_driver(v, pt, ls, side));
 
   } else { // container of
     // declare container
@@ -24,7 +24,7 @@ CCSTCompoundStatement* declare_and_initialize_container_struct(Variable *v, Proj
     declarations.push_back(struct_pointer_declaration(container_name_, container_name_, ls));
     
     statements.push_back(new CCSTAssignExpr(new CCSTPrimaryExprId(container_name_), equals()
-					    , function_call("container_of", container_of_args( access(v), struct_name(pt), pt->real_type()))));
+					    , function_call("container_of", container_of_args( access(v), struct_name(pt->real_type()), pt->real_type()))));
   }
 
   int err;

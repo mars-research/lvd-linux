@@ -1,11 +1,13 @@
 #include "code_gen.h"
 
+/*
+ * Want this code to be as dumb as possible.
+ * The complexity for deciding what to unmarshal occurs previously.
+ * Assume structure a variable belongs to has been previously allocated, at the obvious name.
+ * This function should never be called on a variable whose type is a projection.
+ */
 CCSTStatement* unmarshal_variable(Variable *param)
 {
-  // get register
-  // pull value out of register.
-  // ASSUME THE STRUCTURE A VARIABLE BELONGS TO HAS ALREADY BEEN ALLOCATED OR GRABBED.
-  
   // set value to param, which has already been allocated or whatever.
   // for example: param = (type) get_reg0();
   
@@ -19,9 +21,6 @@ CCSTStatement* unmarshal_variable(Variable *param)
   return new CCSTAssignExpr(access(param), equals()
 			    , new CCSTCastExpr(type_name, new CCSTPrimaryExprId(func_name)));
 }
-
-// add a visitor for each type because projections will need extra.
-
 
 
 

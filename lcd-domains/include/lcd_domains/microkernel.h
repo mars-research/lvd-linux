@@ -30,7 +30,7 @@
 #define LCD_LIBCAP_DEBUG_LVL 0
 
 #define LCD_ERR(msg...) __lcd_err(__FILE__, __LINE__, msg)
-static inline void __lcd_err(char *file, int lineno, char *fmt, ...)
+static void __maybe_unused __lcd_err(char *file, int lineno, char *fmt, ...)
 {
 	va_list args;
 	printk(KERN_ERR "lcd-domains: %s:%d: error: ", file, lineno);
@@ -40,7 +40,7 @@ static inline void __lcd_err(char *file, int lineno, char *fmt, ...)
 	printk("\n");
 }
 #define LCD_MSG(msg...) __lcd_msg(__FILE__, __LINE__, msg)
-static inline void __lcd_msg(char *file, int lineno, char *fmt, ...)
+static void __maybe_unused  __lcd_msg(char *file, int lineno, char *fmt, ...)
 {
 	va_list args;
 	printk(KERN_ERR "lcd-domains: %s:%d: note: ", file, lineno);
@@ -50,7 +50,7 @@ static inline void __lcd_msg(char *file, int lineno, char *fmt, ...)
 	printk("\n");
 }
 #define LCD_WARN(msg...) __lcd_warn(__FILE__, __LINE__, msg)
-static inline void __lcd_warn(char *file, int lineno, char *fmt, ...)
+static void __maybe_unused  __lcd_warn(char *file, int lineno, char *fmt, ...)
 {
 	va_list args;
 	printk(KERN_ERR "lcd-domains: %s:%d: warning: ", file, lineno);
@@ -70,7 +70,7 @@ static inline void __lcd_warn(char *file, int lineno, char *fmt, ...)
 		__lcd_debug(__FILE__, __LINE__, msg);			\
 	}
 		
-static inline void __lcd_debug(char *file, int lineno, char *fmt, ...)
+static void __maybe_unused __lcd_debug(char *file, int lineno, char *fmt, ...)
 {
 	va_list args;
 	printk(KERN_ERR "lcd-domains: %s:%d: debug: ", file, lineno);

@@ -108,6 +108,19 @@ int __liblcd_heap_init(void);
 #define LCD_RAM_MAP_MIN_ORDER 9
 #define LCD_RAM_MAP_MAX_ORDER 16
 
+/*
+ * IOREMAP area ----------------------------------------------------
+ *
+ * Ioremap area is 1GB - 2^18 pages * 4096 bytes
+ *
+ * Minimum address space block comprises of 2^0 pages - 1 * 4096 bytes
+ * Maximum address space block comprises of 2^8 pages - 256 * 4096 = 1MB
+ *
+ */ 
+#define LCD_IOREMAP_NR_PAGES_ORDER \
+	(ilog2(LCD_IOREMAP_REGION_SIZE >> PAGE_SHIFT))
+#define LCD_IOREMAP_MIN_ORDER 0
+#define LCD_IOREMAP_MAX_ORDER 8
 /**
  * __liblcd_ram_map_init -- Call during boot after heap initialized
  *

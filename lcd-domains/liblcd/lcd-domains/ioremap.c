@@ -55,13 +55,14 @@ int _lcd_ioremap(cptr_t phys_addr, unsigned int size, gpa_t *base) {
                 goto exit_mmap;
         }
 
-        ret = __liblcd_mem_itree_insert(base, (1UL << (PAGE_SHIFT + order)),
+        ret = __liblcd_mem_itree_insert(addr, (1UL << (PAGE_SHIFT + order)),
                                         phys_addr);
         if (ret) {
                 LIBLCD_ERR("error inserting into mem itree");
                 goto exit_itree_insert;
         }
 
+	*base = addr;
 	return ret;
 
 exit_itree_insert:
@@ -79,6 +80,7 @@ void _lcd_iounmap(gpa_t phys_addr, unsigned long size)
         int ret;
         struct lcd_resource_node *n; 
 	unsigned int order = 0;
+	cptr_t phys;
 
 	order = ilog2(size >> PAGE_SHIFT);
 
@@ -91,14 +93,16 @@ void _lcd_iounmap(gpa_t phys_addr, unsigned long size)
                 return;
         }
 
+	phys = n->cptr;
+
         lcd_page_allocator_free(
-                ioremapmap_allocator,
+                ioremap_allocator,
                 ioremap_addr_to_page_block(phys_addr),
                 order);
 
         __liblcd_mem_itree_delete(n);
         
-	lcd_syscall_munmap(phys_addr);
+	lcd_syscall_munmap(phys);
 }
 
 static int
@@ -113,14 +117,13 @@ alloc_ioremap_metadata_memory(const struct lcd_page_allocator_cbs *cbs,
         if (!*metadata_addr) {
                 LIBLCD_ERR("error getting metadata mem for ioremap");
                 ret = -ENOMEM;
-                goto exit;
         }
 
         return ret;
 }
 
 static void
-ram_free_unmap_metadata_memory(const struct lcd_page_allocator_cbs *cbs,
+free_ioremap_metadata_memory(const struct lcd_page_allocator_cbs *cbs,
                         void *metadata_addr,
                         unsigned long metadata_sz,
                         unsigned int alloc_order)

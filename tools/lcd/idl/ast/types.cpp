@@ -77,19 +77,19 @@ UnresolvedType::UnresolvedType(const char *name)
   this->type_name_ = name;
 }
 
-Marshal_type* UnresolvedType::accept(MarshalPrepareVisitor *worker)
-{
-  // todo
-}
-
 CCSTTypeName* UnresolvedType::accept(TypeNameVisitor *worker)
 {
-  // todo
+  return worker->visit(this);
 }
 
 CCSTStatement* UnresolvedType::accept(TypeVisitor *worker, Variable *v)
 {
-  // todo
+  return worker->visit(this, v);
+}
+
+Marshal_type* UnresolvedType::accept(MarshalPrepareVisitor *worker)
+{
+  return worker->visit(this);
 }
 
 int UnresolvedType::num()

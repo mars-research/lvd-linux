@@ -129,6 +129,7 @@ class Variable : public Base
   virtual void set_marshal_info(Marshal_type *mt) = 0;
   virtual Marshal_type* marshal_info() = 0;
   virtual int pointer_count() = 0;
+  virtual void set_pointer_count(int pcount) = 0;
   virtual void prepare_marshal(MarshalPrepareVisitor *worker) = 0;
   virtual void resolve_types(LexicalScope *ls) = 0;
 
@@ -165,7 +166,7 @@ class GlobalVariable : public Variable
   virtual void set_marshal_info(Marshal_type *mt);
   virtual Marshal_type* marshal_info();
   virtual int pointer_count();
-  
+  virtual void set_pointer_count(int pcount);
 
   virtual void set_in(bool b);
   virtual void set_out(bool b);
@@ -211,7 +212,7 @@ class Parameter : public Variable
   virtual void set_accessor(Variable *v);
   virtual Variable* accessor();
   virtual int pointer_count();
-  
+  virtual void set_pointer_count(int pcount);
   
   virtual void set_in(bool b);
   virtual void set_out(bool b);
@@ -242,6 +243,7 @@ class FPParameter : public Parameter
   virtual Type* type();
   virtual const char* identifier();
   virtual int pointer_count();
+  virtual void set_pointer_count(int pcount);
   virtual void set_marshal_info(Marshal_type *mt);
   virtual Marshal_type* marshal_info();
   virtual void prepare_marshal(MarshalPrepareVisitor *worker);
@@ -283,7 +285,7 @@ class ReturnVariable : public Variable
   virtual void set_accessor(Variable *v);
   virtual Variable* accessor();
   virtual int pointer_count();
-  
+  virtual void set_pointer_count(int pcount);
 
   virtual void set_in(bool b);
   virtual void set_out(bool b);
@@ -413,7 +415,7 @@ class ProjectionField : public Variable //?
   virtual void prepare_marshal(MarshalPrepareVisitor *worker);
   virtual void resolve_types(LexicalScope *ls);
   virtual int pointer_count();
-  
+  virtual void set_pointer_count(int pcount);
 
 
   virtual void set_in(bool b);
@@ -475,7 +477,9 @@ class Rpc : public Base
   unsigned int tag();
   void set_tag(unsigned int t);
   std::vector<Variable*> marshal_parameters;
+  std::vector<Variable*> marshal_references;
   std::vector<Variable*> unmarshal_parameters;
+  std::vector<Variable*> unmarshal_references;
   void set_function_pointer_defined(bool b);
   bool function_pointer_defined();
   const char* name();
@@ -539,6 +543,7 @@ class Project : public Base
 class TypeNameVisitor // generates CCSTTypeName for each type.
 {
  public:
+  CCSTTypeName* visit(UnresolvedType *ut);
   CCSTTypeName* visit(Typedef *td);
   CCSTTypeName* visit(VoidType *vt);
   CCSTTypeName* visit(IntegerType *it);
@@ -550,6 +555,7 @@ class TypeNameVisitor // generates CCSTTypeName for each type.
 class TypeVisitor
 {
  public:
+  virtual CCSTStatement* visit(UnresolvedType *ut, Variable *v) = 0;
   virtual CCSTStatement* visit(Function *fp, Variable *v) = 0;
   virtual CCSTStatement* visit(Typedef *td, Variable *v) = 0;
   virtual CCSTStatement* visit(VoidType *vt, Variable *v) = 0;
@@ -560,48 +566,15 @@ class TypeVisitor
 
 class AllocateTypeVisitor : public TypeVisitor    
 {
-  CCSTStatement* allocation_helper(IntegerType *it, Variable *v, int pointer_count);
-  CCSTStatement* allocation_helper(VoidType *vt, Variable *v, int pointer_count);
-  CCSTStatement* allocation_helper(Typedef *vt, Variable *v, int pointer_count);
-  CCSTStatement* allocation_helper(ProjectionType *vt, Variable *v, int pointer_count);
  public:
   AllocateTypeVisitor();
+  virtual CCSTStatement* visit(UnresolvedType *ut, Variable *v);
   virtual CCSTStatement* visit(Function *fp, Variable *v);
   virtual CCSTStatement* visit(Typedef *td, Variable *v);
   virtual CCSTStatement* visit(VoidType *vt, Variable *v);
   virtual CCSTStatement* visit(IntegerType *it, Variable *v);
   virtual CCSTStatement* visit(ProjectionType *pt, Variable *v);
   virtual CCSTStatement* visit(Channel *c, Variable *v);
-};
-
-class MarshalTypeVisitor : public TypeVisitor
-{
- public:
-  MarshalTypeVisitor();
-  virtual CCSTStatement* visit(Function *fp, Variable *v);
-  virtual CCSTStatement* visit(Typedef *td, Variable *v);
-  virtual CCSTStatement* visit(VoidType *vt, Variable *v);
-  virtual CCSTStatement* visit(IntegerType *it, Variable *v);
-  virtual CCSTStatement* visit(ProjectionType *pt, Variable *v);
-  virtual CCSTStatement* visit(Channel *c, Variable *v);
-};
-
-class AllocateVariableVisitor 
-{
- public:
-  AllocateVariableVisitor();
-  CCSTStatement* visit(ProjectionField *pf);
-  CCSTStatement* visit(Parameter *p);
-  CCSTStatement* visit(ReturnVariable *rv);
-};
-
-class AllocateRegisterVisitor
-{
- public:
-  AllocateRegisterVisitor();
-  CCSTStatement* visit(ProjectionField *pf);
-  CCSTStatement* visit(Parameter *p);
-  CCSTStatement* visit(ReturnVariable *rv);
 };
 
 #endif

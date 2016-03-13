@@ -10,6 +10,7 @@
 
 #include <liblcd/enter_exit.h>
 #include <thc.h>
+#include <libfipc.h>
 #include <lcd_domains/liblcd.h>
 #include <asm/lcd_domains/liblcd.h>
 
@@ -71,8 +72,21 @@ int lcd_enter(void)
 	}
 	LIBLCD_MSG("libcap initialized");
 	/*
+	 * Initialize libfipc
+	 */
+	ret = fipc_init();
+	if (ret) {
+		LIBLCD_ERR("failed to init libfipc");
+		goto fail;
+	}
+	/*
 	 * Set up async runtime
 	 */
+	ret = thc_global_init();
+	if (ret) {
+		LIBLCD_ERR("failed to init libasync");
+		goto fail;
+	}
 	thc_init();
 	thc_initialized = 1;
 	LIBLCD_MSG("async runtime initialized");

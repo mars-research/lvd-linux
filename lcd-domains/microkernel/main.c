@@ -21,6 +21,9 @@
 #include <uapi/lcd_domains.h>
 #include <lcd_domains/microkernel.h>
 #include <asm/lcd_domains/init.h>
+#include <libcap.h>
+#include <libfipc.h>
+#include <thc.h>
 
 MODULE_LICENSE("GPL");
 MODULE_DESCRIPTION("LCD driver");
@@ -139,11 +142,25 @@ static int __init lcd_init(void)
 		LCD_ERR("misc device register failed, ret = %d", ret);
 		goto fail8;
 	}
+	ret = fipc_init();
+	if (ret) {
+		LCD_ERR("error initializing libfipc, ret = %d", ret);
+		goto fail9;
+	}
+	ret = thc_global_init();
+	if (ret) {
+		LCD_ERR("error initialing libasync, ret = %d", ret);
+		goto fail10;
+	}
 
 	LCD_MSG("lcd microkernel initialized");
 
 	return 0;
 
+fail10:
+	fipc_fini();
+fail9:
+	misc_deregister(&lcd_dev);	
 fail8:
 	__lcd_console_exit();
 fail7:
@@ -166,6 +183,8 @@ fail0:
 
 static void __exit lcd_exit(void)
 {
+	thc_global_fini();
+	fipc_fini();
 	misc_deregister(&lcd_dev);
 	__lcd_console_exit();
 	__lcd_run_exit();

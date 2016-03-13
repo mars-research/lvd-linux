@@ -59,12 +59,9 @@ lcd_domains-y += $(addprefix common/, \
 # because this build of libcap does not use global cap types.)
 lcd_domains-y += libcap.install/lib/libcap.a
 
+# libfipc and libasync
+lcd_domains-y += libfipc.install/lib/libfipc.a
+lcd_domains-y += libasync.install/lib/libasync.a
+
 # Extra includes
-ccflags-y += \
-	$(LCD_DOMAINS_CFLAGS) \
-	-I$(LCD_DOMAINS_TOP_SRC_DIR)/include \
-	-I$(LCD_DOMAINS_TOP_SRC_DIR)/arch/$(ARCH)/include \
-	-I$(MICROKERNEL_BUILD_DIR)/libcap.install/include \
-	-I$(MICROKERNEL_BUILD_DIR)/libfipc.install/include \
-	-I$(MICROKERNEL_BUILD_DIR)/libasync.install/include \
-	-I$(LCD_DOMAINS_TOP_SRC_DIR)/config/non_isolated
+ccflags-y += $(MICROKERNEL_CFLAGS)

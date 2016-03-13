@@ -7,6 +7,7 @@
 #include <libcap.h>
 #include <liblcd/liblcd.h>
 #include <lcd_domains/microkernel.h>
+#include <thc.h>
 
 int lcd_enter(void)
 {
@@ -85,7 +86,11 @@ int lcd_enter(void)
 		LCD_ERR("creating resource tree");
 		goto fail8;
 	}
-	current->lcd_resource_trees[1] = t;	
+	current->lcd_resource_trees[1] = t;
+	/*
+	 * Set up thc runtime
+	 */
+	thc_init();
 
 	return 0;
 
@@ -138,10 +143,14 @@ void lcd_exit(int retval)
 		lcd_destroy_free_resource_tree(current->lcd_resource_trees[0]);
 	if (current->lcd_resource_trees[1])
 		lcd_destroy_free_resource_tree(current->lcd_resource_trees[1]);
+	if (current->ptstate)
+		thc_done();
+
 	current->lcd = NULL;
 	current->cptr_cache = NULL;
 	current->lcd_resource_trees[0] = NULL;
 	current->lcd_resource_trees[1] = NULL;
+	current->ptstate = NULL;
 	/* (Call endpoint should be auto-destroyed when we destroy
 	 * the LCD because this will destroy its cspace. So long as
 	 * the LCD didn't grant the endpoint to someone.) */

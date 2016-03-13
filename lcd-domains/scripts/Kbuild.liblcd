@@ -52,14 +52,4 @@ lib-y += $(addprefix common/, \
 # libcap is linked in with ar script
 
 # Extra includes
-ccflags-y += \
-	$(LCD_DOMAINS_CFLAGS) \
-	-I$(LCD_DOMAINS_TOP_SRC_DIR)/include \
-	-I$(LCD_DOMAINS_TOP_SRC_DIR)/arch/$(ARCH)/include \
-	-I$(LIBLCD_BUILD_DIR)/libcap.install/include \
-	-I$(LIBLCD_BUILD_DIR)/libfipc.install/include \
-	-I$(LIBLCD_BUILD_DIR)/libasync.install/include \
-	-I$(LCD_DOMAINS_TOP_SRC_DIR)/config/isolated \
-	-DCONFIG_LAZY_THC \
-	-DMODULE \
-	-DLCD_ISOLATE
+ccflags-y += $(LIBLCD_CFLAGS)

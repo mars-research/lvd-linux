@@ -48,9 +48,12 @@
 # Common top-level vars used throughout
 LCD_DOMAINS_TOP_SRC_DIR=$(PWD)
 export LCD_DOMAINS_TOP_SRC_DIR
-export LCD_DOMAINS_CFLAGS=-Werror \
-			  -DLCD_DOMAINS \
-			  -DLCD_TEST_MODS_PATH="\"$(PWD)/build/test_mods\""
+export LCD_DOMAINS_CFLAGS=\
+	-Werror \
+	-Wall \
+	-DLCD_DOMAINS \
+	-DLINUX_KERNEL \
+	-DLCD_TEST_MODS_PATH=\"$(PWD)/build/test_mods\"
 
 # Don't print "Entering directory..." etc.
 MAKEFLAGS += --no-print-directory
@@ -85,6 +88,17 @@ all:
 MICROKERNEL_BUILD_DIR=$(LCD_BUILD_DIR)/microkernel_build
 export MICROKERNEL_BUILD_DIR
 
+MICROKERNEL_CFLAGS= \
+	$(LCD_DOMAINS_CFLAGS) \
+	-I$(LCD_DOMAINS_TOP_SRC_DIR)/include \
+	-I$(LCD_DOMAINS_TOP_SRC_DIR)/arch/$(ARCH)/include \
+	-I$(MICROKERNEL_BUILD_DIR)/libcap.install/include \
+	-I$(MICROKERNEL_BUILD_DIR)/libfipc.install/include \
+	-I$(MICROKERNEL_BUILD_DIR)/libasync.install/include \
+	-I$(LCD_DOMAINS_TOP_SRC_DIR)/config/non_isolated \
+	-DLINUX_KERNEL_MODULE
+export MICROKERNEL_CFLAGS
+
 MICROKERNEL_DIRS= \
 	microkernel \
 	kliblcd \
@@ -99,12 +113,11 @@ MICROKERNEL_DIRS= \
 MICROKERNEL_BUILD_DIRS=$(foreach dir,$(MICROKERNEL_DIRS),\
 	$(MICROKERNEL_BUILD_DIR)/$(dir))
 
-MICROKERNEL_LIB_CFLAGS= \
-	"-Wall -DLCD_DOMAINS -I$(LCD_DOMAINS_TOP_SRC_DIR)/include -I$(LCD_DOMAINS_TOP_SRC_DIR)/arch/$(ARCH)/include -I$(LCD_DOMAINS_TOP_SRC_DIR)/config/non_isolated"
+MICROKERNEL_LIB_CFLAGS= $(MICROKERNEL_CFLAGS)
 
 MICROKERNEL_LIBCAP=$(MICROKERNEL_BUILD_DIR)/libcap.install/lib/libcap.a
 MICROKERNEL_LIBFIPC=$(MICROKERNEL_BUILD_DIR)/libfipc.install/lib/libfipc.a
-MICROKERNEL_LIBASYNC=$(MICROKERNEL_BUILD_DIR)/libcap.install/lib/libasync.a
+MICROKERNEL_LIBASYNC=$(MICROKERNEL_BUILD_DIR)/libasync.install/lib/libasync.a
 
 microkernel: $(MICROKERNEL_BUILD_DIR)/Kbuild | \
 	$(MICROKERNEL_LIBCAP) $(MICROKERNEL_LIBFIPC) $(MICROKERNEL_LIBASYNC) \
@@ -113,7 +126,7 @@ microkernel: $(MICROKERNEL_BUILD_DIR)/Kbuild | \
 
 libcap.microkernel: $(MICROKERNEL_BUILD_DIR)/libcap.build/Makefile
 	$(MAKE) -C $(MICROKERNEL_BUILD_DIR)/libcap.build \
-		CFLAGS=$(MICROKERNEL_LIB_CFLAGS) $(MAKEFLAGS) && \
+		CFLAGS="$(MICROKERNEL_LIB_CFLAGS)" $(MAKEFLAGS) && \
 	$(MAKE) -C $(MICROKERNEL_BUILD_DIR)/libcap.build install $(MAKEFLAGS)
 
 $(MICROKERNEL_BUILD_DIR)/libcap.build/Makefile: libcap/configure | \
@@ -130,20 +143,20 @@ $(MICROKERNEL_BUILD_DIR)/libcap.build/Makefile: libcap/configure | \
 
 libfipc.microkernel: $(MICROKERNEL_BUILD_DIR)/libfipc.build/Makefile
 	$(MAKE) -C $(MICROKERNEL_BUILD_DIR)/libfipc.build \
-		CFLAGS=$(MICROKERNEL_LIB_CFLAGS) $(MAKEFLAGS) && \
+		CFLAGS="$(MICROKERNEL_LIB_CFLAGS)" $(MAKEFLAGS) && \
 	$(MAKE) -C $(MICROKERNEL_BUILD_DIR)/libfipc.build install $(MAKEFLAGS)
 
 $(MICROKERNEL_BUILD_DIR)/libfipc.build/Makefile: \
 	libasync/fast-ipc-module/configure | \
 	$(MICROKERNEL_BUILD_DIRS)
 	cd $(MICROKERNEL_BUILD_DIR)/libfipc.build && \
-	$(LCD_DOMAINS_TOP_SRC_DIR)/libfipc/configure \
+	$(LCD_DOMAINS_TOP_SRC_DIR)/libasync/fast-ipc-module/configure \
 	--with-kernel-headers=$(LCD_DOMAINS_TOP_SRC_DIR)/.. \
 	--prefix=$(MICROKERNEL_BUILD_DIR)/libfipc.install
 
 libasync.microkernel: $(MICROKERNEL_BUILD_DIR)/libasync.build/Makefile
 	$(MAKE) -C $(MICROKERNEL_BUILD_DIR)/libasync.build \
-		CFLAGS=$(MICROKERNEL_LIB_CFLAGS) $(MAKEFLAGS) && \
+		CFLAGS="$(MICROKERNEL_LIB_CFLAGS)" $(MAKEFLAGS) && \
 	$(MAKE) -C $(MICROKERNEL_BUILD_DIR)/libasync.build install $(MAKEFLAGS)
 
 $(MICROKERNEL_BUILD_DIR)/libasync.build/Makefile: libasync/configure | \
@@ -168,10 +181,24 @@ $(MICROKERNEL_BUILD_DIRS):
 LIBLCD_BUILD_DIR=$(LCD_BUILD_DIR)/liblcd_build
 export LIBLCD_BUILD_DIR
 
+LIBLCD_CFLAGS=\
+	$(LCD_DOMAINS_CFLAGS) \
+	-I$(LCD_DOMAINS_TOP_SRC_DIR)/include \
+	-I$(LCD_DOMAINS_TOP_SRC_DIR)/arch/$(ARCH)/include \
+	-I$(LIBLCD_BUILD_DIR)/libcap.install/include \
+	-I$(LIBLCD_BUILD_DIR)/libfipc.install/include \
+	-I$(LIBLCD_BUILD_DIR)/libasync.install/include \
+	-I$(LCD_DOMAINS_TOP_SRC_DIR)/config/isolated \
+	-DCONFIG_LAZY_THC \
+	-DMODULE \
+	-DLCD_ISOLATE \
+	-DCPTR_CACHE_LOCK_PADDING_SIZE=8
+export LIBLCD_CFLAGS
+
 LIBLCD_DIRS=$(shell cd liblcd && find . -mindepth 1 -type d)
 LIBLCD_DIRS:=$(foreach d,$(LIBLCD_DIRS),liblcd/$(d))
 LIBLCD_DIRS:= \
-	$(LIBLCD_DIRS)
+	$(LIBLCD_DIRS) \
 	libcap.build \
 	libcap.install \
 	libfipc.build \
@@ -186,8 +213,7 @@ LIBLCD_LIBCAP=$(LIBLCD_BUILD_DIR)/libcap.install/lib/libcap.a
 LIBLCD_LIBFIPC=$(LIBLCD_BUILD_DIR)/libfipc.install/lib/libfipc.a
 LIBLCD_LIBFIPC=$(LIBLCD_BUILD_DIR)/libasync.install/lib/libasync.a
 
-LIBLCD_LIB_CFLAGS= \
-	"-Wall -DLCD_DOMAINS -DLCD_ISOLATE -DCPTR_CACHE_LOCK_PADDING_SIZE=8 -I$(LCD_DOMAINS_TOP_SRC_DIR)/include -I$(LCD_DOMAINS_TOP_SRC_DIR)/arch/$(ARCH)/include -I$(LCD_DOMAINS_TOP_SRC_DIR)/config/isolated"
+LIBLCD_LIB_CFLAGS= $(LIBLCD_CFLAGS)
 
 # There isn't a nice easy way to multiline this, and I want access to the
 # LIBLCD_BUILD_DIR variable (so I don't want to create a separate file); so 
@@ -205,7 +231,7 @@ $(LIBLCD_BUILD_DIR)/lib.a: $(LIBLCD_BUILD_DIR)/Kbuild | \
 
 libcap.liblcd: $(LIBLCD_BUILD_DIR)/libcap.build/Makefile
 	$(MAKE) -C $(LIBLCD_BUILD_DIR)/libcap.build \
-	CFLAGS=$(LIBLCD_LIB_CFLAGS) $(MAKEFLAGS) && \
+	CFLAGS="$(LIBLCD_LIB_CFLAGS)" $(MAKEFLAGS) && \
 	$(MAKE) -C $(LIBLCD_BUILD_DIR)/libcap.build install $(MAKEFLAGS)
 
 $(LIBLCD_BUILD_DIR)/libcap.build/Makefile: libcap/configure | \
@@ -221,20 +247,20 @@ $(LIBLCD_BUILD_DIR)/libcap.build/Makefile: libcap/configure | \
 
 libfipc.liblcd: $(LIBLCD_BUILD_DIR)/libfipc.build/Makefile
 	$(MAKE) -C $(LIBLCD_BUILD_DIR)/libfipc.build \
-	CFLAGS=$(LIBLCD_LIB_CFLAGS) $(MAKEFLAGS) && \
+	CFLAGS="$(LIBLCD_LIB_CFLAGS)" $(MAKEFLAGS) && \
 	$(MAKE) -C $(LIBLCD_BUILD_DIR)/libfipc.build install $(MAKEFLAGS)
 
 $(LIBLCD_BUILD_DIR)/libfipc.build/Makefile: \
 	libasync/fast-ipc-module/configure | \
 	$(LIBLCD_BUILD_DIRS)
 	cd $(LIBLCD_BUILD_DIR)/libfipc.build && \
-	$(LCD_DOMAINS_TOP_SRC_DIR)/libfipc/configure \
+	$(LCD_DOMAINS_TOP_SRC_DIR)/libasync/fast-ipc-module/configure \
 	--with-kernel-headers=$(LCD_DOMAINS_TOP_SRC_DIR)/.. \
 	--prefix=$(LIBLCD_BUILD_DIR)/libfipc.install
 
 libasync.liblcd: $(LIBLCD_BUILD_DIR)/libasync.build/Makefile
 	$(MAKE) -C $(LIBLCD_BUILD_DIR)/libasync.build \
-	CFLAGS=$(LIBLCD_LIB_CFLAGS) $(MAKEFLAGS) && \
+	CFLAGS="$(LIBLCD_LIB_CFLAGS)" $(MAKEFLAGS) && \
 	$(MAKE) -C $(LIBLCD_BUILD_DIR)/libasync.build install $(MAKEFLAGS)
 
 $(LIBLCD_BUILD_DIR)/libasync.build/Makefile: libasync/configure | \

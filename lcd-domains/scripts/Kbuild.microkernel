@@ -65,4 +65,6 @@ ccflags-y += \
 	-I$(LCD_DOMAINS_TOP_SRC_DIR)/include \
 	-I$(LCD_DOMAINS_TOP_SRC_DIR)/arch/$(ARCH)/include \
 	-I$(MICROKERNEL_BUILD_DIR)/libcap.install/include \
+	-I$(MICROKERNEL_BUILD_DIR)/libfipc.install/include \
+	-I$(MICROKERNEL_BUILD_DIR)/libasync.install/include \
 	-I$(LCD_DOMAINS_TOP_SRC_DIR)/config/non_isolated

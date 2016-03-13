@@ -13,6 +13,8 @@ COMMON_CC_FLAGS= \
 export ISOLATED_CC_FLAGS= \
 	$(COMMON_CC_FLAGS) \
 	-I$(LIBLCD_BUILD_DIR)/libcap.install/include \
+	-I$(LIBLCD_BUILD_DIR)/libfipc.install/include \
+	-I$(LIBLCD_BUILD_DIR)/libasync.install/include \
 	-I$(LCD_DOMAINS_TOP_SRC_DIR)/config/isolated \
 	-DLCD_ISOLATE \
 	-DCONFIG_LAZY_THC \
@@ -21,6 +23,8 @@ export ISOLATED_CC_FLAGS= \
 export NON_ISOLATED_CC_FLAGS= \
 	$(COMMON_CC_FLAGS) \
 	-I$(MICROKERNEL_BUILD_DIR)/libcap.install/include \
+	-I$(MICROKERNEL_BUILD_DIR)/libfipc.install/include \
+	-I$(MICROKERNEL_BUILD_DIR)/libasync.install/include \
 	-I$(LCD_DOMAINS_TOP_SRC_DIR)/config/non_isolated
 
 # Examples

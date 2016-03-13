@@ -9,7 +9,7 @@
 #include <lcd_config/pre_hook.h>
 
 #include <liblcd/enter_exit.h>
-#include <liblcd/thc.h>
+#include <thc.h>
 #include <lcd_domains/liblcd.h>
 #include <asm/lcd_domains/liblcd.h>
 

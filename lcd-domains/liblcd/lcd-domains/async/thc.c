@@ -20,7 +20,9 @@
 #include <stdio.h>
 #include <string.h>
 #include <assert.h>
+#ifdef linux
 #include <pthread.h>
+#endif
 #endif
 
 #ifdef BARRELFISH
@@ -30,16 +32,14 @@
 #include <thc/thc.h>
 #elif LCD_DOMAINS
 #include <lcd_config/pre_hook.h>
-#include <liblcd/thc.h>
-#include <liblcd/thcsync.h>
-#include <liblcd/thcinternal.h>
 #include <linux/slab.h>
+#include <thc.h>
 #include <lcd_config/post_hook.h>
 #else
-#include "thc.h"
+#include <thc.h>
 #endif
 
-#define NOT_REACHED /*assert(0 && "Not reached")*/
+#define NOT_REACHED assert(0 && "Not reached")
 
 /* It is necessary to set the esp of a lazy awe some way into it's lazy */
 /* allocated stack, so that it can pass arguments below its current esp */
@@ -237,8 +237,16 @@ static void thc_print_pts_stats(PTState_t *t, int clear)
 // but which is not currently in use.  It is placed at the top of the
 // memory reserved for the stack.
 
-#define STACK_COMMIT_BYTES (16*4096)
-#define STACK_GUARD_BYTES  (1*4096)
+#ifndef THC_NR_STACK_COMMIT_PAGES
+#define THC_NR_STACK_COMMIT_PAGES 16
+#endif
+
+#ifndef THC_NR_STACK_GUARD_PAGES
+#define THC_NR_STACK_GUARD_PAGES 1
+#endif
+
+#define STACK_COMMIT_BYTES (THC_NR_STACK_COMMIT_PAGES*4096)
+#define STACK_GUARD_BYTES  (THC_NR_STACK_GUARD_PAGES*4096)
 
 // Allocate a new stack, returning an address just above the top of
 // the committed region.  The stack comprises STACK_COMMIT_BYTES

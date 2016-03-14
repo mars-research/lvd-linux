@@ -591,4 +591,34 @@ void *lcd_page_address(const struct page *page);
  */
 void lcd_free_memcg_kmem_pages(unsigned long addr, unsigned int order);
 
+/**
+* lcd_ioremap_phys -- Map host device memory to guest physical region
+*
+* @phys_addr: Capability to device memory
+* @size: size of memory region in bytes
+* @base: guest physical memory address returned by the function
+*
+* The function converts the size in bytes into order (no of pages).
+*/
+int lcd_ioremap_phys(cptr_t phys_addr, unsigned int size, gpa_t *base);
+
+/**
+* lcd_iounmap_phys - Unmap the device memory region from guest physical region
+*
+* @phys_addr - guest physical address to be unmapped
+* @size - number of bytes to be unmapped
+*/
+void lcd_iounmap_phys(gpa_t phys_addr, unsigned long size);
+
+/**
+* lcd_ioremap -- Returns the guest virtual address mapped for the corresponding
+* guest physical address
+*
+* @phys_addr - guest physical address returned from lcd_ioremap_phys
+* @size - number of bytes. This parameter is not used, kept for 
+*	providing compatibility to actual linux kernel's interface
+*
+* returns the guest virtual address
+*/
+void *lcd_ioremap(unsigned long phys_addr, unsigned int size);
 #endif /* LCD_DOMAINS_MEM_H */

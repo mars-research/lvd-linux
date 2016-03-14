@@ -28,7 +28,7 @@ static inline struct lcd_page_block *ioremap_addr_to_page_block(gpa_t addr)
                 gpa_val(addr) - gpa_val(LCD_IOREMAP_GP_ADDR));
 }
 
-int _lcd_ioremap(cptr_t phys_addr, unsigned int size, gpa_t *base) {
+int lcd_ioremap_phys(cptr_t phys_addr, unsigned int size, gpa_t *base) {
 	
 	unsigned int order = 0;
 	struct lcd_page_block *pb = NULL;
@@ -75,7 +75,7 @@ exit:
 	return ret;
 }
 
-void _lcd_iounmap(gpa_t phys_addr, unsigned long size)
+void lcd_iounmap_phys(gpa_t phys_addr, unsigned long size)
 {
         int ret;
         struct lcd_resource_node *n; 
@@ -146,7 +146,7 @@ int __liblcd__ioremap_init(void)
                                         0, /* don't embed metadata */
                                         &ioremap_allocator);
         if (ret) {
-                LIBLCD_ERR("failed to initialize RAM map allocator");
+                LIBLCD_ERR("failed to initialize ioremap map allocator");
                 goto exit;
         }
 

@@ -156,7 +156,7 @@
 #define LCD_STACK_REGION_SIZE (1UL << 30) /* ................... 1 GB  */
 #define LCD_HEAP_REGION_SIZE (1UL << 30) /* .................... 1 GB  */
 #define LCD_RAM_MAP_REGION_SIZE (1UL << 30) /* ................. 1 GB  */
-#define LCD_IOREMAP_REGION_SIZE (1L << 30) /* .................  1 GB  */
+#define LCD_IOREMAP_REGION_SIZE (1UL << 30) /* .................  1 GB  */
 #define LCD_KERNEL_MODULE_REGION_SIZE (2UL << 30) /* ........... 2 GBs */
 
 /* Component Sizes. */

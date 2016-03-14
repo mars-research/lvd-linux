@@ -64,6 +64,17 @@ lcd_enter(void)
 		goto fail;
 	}
 	LIBLCD_MSG("RAM map initialized");
+
+	/*
+	 * Initialize ioremap map
+	 */
+	ret = __liblcd__ioremap_init();
+        if (ret) {
+                LIBLCD_ERR("failed to initialize ioremap map");
+                goto fail;
+        }
+        LIBLCD_MSG("ioremap map initialized");
+
 	/*
 	 * Initialize libcap
 	 */

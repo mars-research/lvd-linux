@@ -156,7 +156,7 @@ $(MICROKERNEL_BUILD_DIR)/libfipc.build/Makefile: \
 
 libasync.microkernel: $(MICROKERNEL_BUILD_DIR)/libasync.build/Makefile
 	$(MAKE) -C $(MICROKERNEL_BUILD_DIR)/libasync.build \
-		CFLAGS="$(MICROKERNEL_LIB_CFLAGS)" $(MAKEFLAGS) && \
+		CFLAGS="$(MICROKERNEL_LIB_CFLAGS) -DNDEBUG" $(MAKEFLAGS) && \
 	$(MAKE) -C $(MICROKERNEL_BUILD_DIR)/libasync.build install $(MAKEFLAGS)
 
 $(MICROKERNEL_BUILD_DIR)/libasync.build/Makefile: libasync/configure | \
@@ -260,7 +260,7 @@ $(LIBLCD_BUILD_DIR)/libfipc.build/Makefile: \
 
 libasync.liblcd: $(LIBLCD_BUILD_DIR)/libasync.build/Makefile
 	$(MAKE) -C $(LIBLCD_BUILD_DIR)/libasync.build \
-	CFLAGS="$(LIBLCD_LIB_CFLAGS)" $(MAKEFLAGS) && \
+	CFLAGS="$(LIBLCD_LIB_CFLAGS) -DNDEBUG" $(MAKEFLAGS) && \
 	$(MAKE) -C $(LIBLCD_BUILD_DIR)/libasync.build install $(MAKEFLAGS)
 
 $(LIBLCD_BUILD_DIR)/libasync.build/Makefile: libasync/configure | \

@@ -1,107 +1,147 @@
 /*
- * main.c
- *
- * Contains init/exit for rpc test
+ * boot.c - non-isolated boot module
  */
 
-#include <libfipc.h>
-#include <linux/kernel.h>
-#include <linux/module.h>
 #include <linux/delay.h>
-#include "../test_helpers.h"
-#include "rpc.h"
+#include <linux/module.h>
+#include <linux/kernel.h>
+#include <liblcd/liblcd.h>
 
-#define CALLER_CPU 1
-#define CALLEE_CPU 3
-#define CHANNEL_ORDER 2 /* channel is 2^CHANNEL_ORDER pages */
-
-MODULE_LICENSE("GPL");
-
-static int setup_and_run_test(void)
+static int boot_main(void)
 {
 	int ret;
-	struct fipc_ring_channel *caller_header, *callee_header;
-	struct task_struct *caller_thread, *callee_thread;
+	cptr_t endpoint;
+	cptr_t lcd1, lcd2;
+	cptr_t dest1, dest2;
+	struct lcd_create_ctx *ctx1, *ctx2;
 	/*
-	 * Initialize fipc
+	 * Enter LCD mode
 	 */
-	ret = fipc_init();
+	ret = lcd_enter();
 	if (ret) {
-		pr_err("Error init'ing libfipc, ret = %d\n", ret);
-		goto fail0;
-	}
-	/*
-	 * Set up channel
-	 */
-	ret = test_fipc_create_channel(CHANNEL_ORDER, &caller_header, 
-				&callee_header);
-	if (ret) {
-		pr_err("Error creating channel, ret = %d\n", ret);
+		LIBLCD_ERR("lcd enter failed");
 		goto fail1;
 	}
 	/*
-	 * Set up threads
+	 * Create an endpoint
 	 */
-	caller_thread = test_fipc_spawn_thread_with_channel(caller_header, 
-							caller,
-							CALLER_CPU);
-	if (!caller_thread) {
-		pr_err("Error setting up caller thread\n");
+	ret = lcd_create_sync_endpoint(&endpoint);
+	if (ret) {
+		LIBLCD_ERR("failed to create endpoint");
 		goto fail2;
 	}
-	callee_thread = test_fipc_spawn_thread_with_channel(callee_header, 
-							callee,
-							CALLEE_CPU);
-	if (!callee_thread) {
-		pr_err("Error setting up callee thread\n");
+	/*
+	 * Create lcds
+	 */
+	ret = lcd_create_module_lcd(LCD_DIR("async_rpc/caller_lcd"),
+				"lcd_test_mod_async_rpc_caller_lcd",
+				&lcd1, 
+				&ctx1);
+	if (ret) {
+		LIBLCD_ERR("failed to create lcd1");
 		goto fail3;
 	}
+	ret = lcd_create_module_lcd(LCD_DIR("async_rpc/callee_lcd"),
+				"lcd_test_mod_async_rpc_callee_lcd",
+				&lcd2, 
+				&ctx2);
+	if (ret) {
+		LIBLCD_ERR("failed to create lcd2");
+		goto fail4;
+	}
 	/*
-	 * Wake them up; they will run until they exit.
+	 * --------------------------------------------------
+	 * Grant cap to endpoint
+	 *
+	 * Allocate cptrs
 	 */
-	wake_up_process(caller_thread);
-	wake_up_process(callee_thread);
-	msleep(1000);
+	ret = cptr_alloc(lcd_to_boot_cptr_cache(ctx1), &dest1);
+	if (ret) {
+		LIBLCD_ERR("failed to alloc dest slot");
+		goto fail5;
+	}
+	ret = cptr_alloc(lcd_to_boot_cptr_cache(ctx2), &dest2);
+	if (ret) {
+		LIBLCD_ERR("failed to alloc dest slot");
+		goto fail6;
+	}
+	ret = lcd_cap_grant(lcd1, endpoint, dest1);
+	if (ret) {
+		LIBLCD_ERR("failed to grant endpoint to lcd1");
+		goto fail7;
+	}
+	ret = lcd_cap_grant(lcd2, endpoint, dest2);
+	if (ret) {
+		LIBLCD_ERR("failed to grant endpoint to lcd2");
+		goto fail8;
+	}
+
+	lcd_to_boot_info(ctx1)->cptrs[0] = dest1;
+	lcd_to_boot_info(ctx2)->cptrs[0] = dest2;
 	/*
-	 * Wait for them to complete, so we can tear things down
+	 * --------------------------------------------------
+	 * Run lcd's
+	 *
 	 */
-	ret = test_fipc_wait_for_thread(caller_thread);
-	if (ret)
-		pr_err("Caller returned non-zero exit status %d\n", ret);
-	ret = test_fipc_wait_for_thread(callee_thread);
-	if (ret)
-		pr_err("Callee returned non-zero exit status %d\n", ret);
+	ret = lcd_run(lcd1);
+	if (ret) {
+		LIBLCD_ERR("failed to start lcd1");
+		goto fail9;
+	}
+	ret = lcd_run(lcd2);
+	if (ret) {
+		LIBLCD_ERR("failed to start lcd2");
+		goto fail10;
+	}
 	/*
-	 * Tear things down
+	 * Hang out for a few seconds
 	 */
-	test_fipc_free_channel(CHANNEL_ORDER, caller_header, callee_header);
+	msleep(3000);
+	/*
+	 * Tear everything down
+	 */
+	ret = 0;
+	goto out;
 
-	fipc_fini();
-
-	return 0;
-
+	/*
+	 * Everything torn down / freed during destroy / exit.
+	 */
+out:
+fail10:
+fail9:
+fail8:
+fail7:
+fail6:
+fail5:
+	lcd_cap_delete(lcd2);
+	lcd_destroy_create_ctx(ctx2); /* tears down LCD 2 */
+fail4:
+	lcd_cap_delete(lcd1);
+	lcd_destroy_create_ctx(ctx1); /* tears down LCD 1 */
 fail3:
-	test_fipc_release_thread(caller_thread);
 fail2:
-	test_fipc_free_channel(CHANNEL_ORDER, caller_header, callee_header);
+	lcd_exit(0); /* tears down everything else */
 fail1:
-	fipc_fini();
-fail0:
 	return ret;
 }
 
-static int __init rpc_init(void)
+static int __init boot_init(void)
 {
-	int ret = 0;
+	int ret;
 
-	ret = setup_and_run_test();
+	LCD_MAIN({
 
-        return ret;
+			ret = boot_main();
+
+		});
+
+	return ret;
 }
-static void __exit rpc_rmmod(void)
+
+static void boot_exit(void)
 {
-	return;
+	/* nothing to do */
 }
 
-module_init(rpc_init);
-module_exit(rpc_rmmod);
+module_init(boot_init);
+module_exit(boot_exit);

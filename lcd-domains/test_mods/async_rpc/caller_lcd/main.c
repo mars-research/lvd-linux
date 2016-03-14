@@ -6,19 +6,22 @@
  * Copyright: University of Utah
  */
 
-#include <linux/random.h>
-#include "rpc.h"
+#include <lcd_config/pre_hook.h>
+
+#include <liblcd/liblcd.h>
+#include "../rpc.h"
+#include <libfipc.h>
 #include <thc_ipc.h>
 #include <thc.h>
-#include <thcinternal.h>
 #include <awe_mapper.h>
-#include "../test_helpers.h"
+
+#include <lcd_config/post_hook.h>
 
 static inline int send_and_get_response(
 	struct fipc_ring_channel *chan,
 	struct fipc_message *request,
 	struct fipc_message **response,
-    uint32_t msg_id)
+	uint32_t msg_id)
 {
 	int ret;
 	struct fipc_message *resp;
@@ -34,13 +37,12 @@ static inline int send_and_get_response(
 	/*
 	 * Try to get the response
 	 */
-    ret = thc_ipc_recv(chan, msg_id, &resp);
+	ret = thc_ipc_recv(chan, msg_id, &resp);
 	if (ret) {
 		pr_err("failed to get a response, ret = %d\n", ret);
 		goto fail2;
 	}
 	*response = resp;
-    printk(KERN_ERR "got result\n");
 
 	return 0;
 
@@ -102,7 +104,7 @@ async_add_nums(struct fipc_ring_channel *chan, unsigned long trans,
 {
 	struct fipc_message *request;
 	struct fipc_message *response;
-    uint32_t msg_id;
+	uint32_t msg_id;
 	int ret;
 	/*
 	 * Set up request
@@ -112,10 +114,10 @@ async_add_nums(struct fipc_ring_channel *chan, unsigned long trans,
 		pr_err("Error getting send message, ret = %d\n", ret);
 		goto fail;
 	}
-    msg_id                = awe_mapper_create_id();
+	msg_id = awe_mapper_create_id();
 
-    THC_MSG_TYPE(request) = msg_type_request;
-    THC_MSG_ID(request)   = msg_id;
+	THC_MSG_TYPE(request) = msg_type_request;
+	THC_MSG_ID(request)   = msg_id;
 	set_fn_type(request, ADD_NUMS);
 	fipc_set_reg0(request, trans);
 	fipc_set_reg1(request, res1);
@@ -140,40 +142,183 @@ fail:
 	return ret;
 }
 
-int caller(void *_caller_channel_header)
+static int caller(struct fipc_ring_channel *caller_channel_header)
 {
-    struct fipc_ring_channel *chan = _caller_channel_header;
 	unsigned long transaction_id = 0;
 	int ret = 0;
-    volatile void ** frame = (volatile void**)__builtin_frame_address(0);
-    volatile void *ret_addr = *(frame + 1);
-    *(frame + 1) = NULL;
-
-    thc_init();
 	/*
 	 * Add nums
 	 */
-    DO_FINISH({
-        while(transaction_id < TRANSACTIONS)
-        {
-            ASYNC({
-                transaction_id++;
-                ret = async_add_nums(chan, transaction_id, 1000);
+	while(transaction_id < TRANSACTIONS)
+	{
+		ASYNC({
+				transaction_id++;
+				ret = async_add_nums(chan, 
+						transaction_id, 1000);
 
-                if (ret) {
-                    pr_err("error doing null invocation, ret = %d, exiting...\n",
-                        ret);
-                }
-            });
+				if (ret) {
+					LIBLCD_ERR("error doing null invocation, ret = %d, exiting...\n",
+						ret);
+				}
+			});
 
-        }
-    });
-	pr_err("Complete\n");
-    thc_done();
+	}
 
-    *(frame + 1) = ret_addr;
+	LIBLCD_MSG("Caller async rpc complete");
+
 	return ret;
 }
 
+static int setup_channel(cptr_t *buf1_ctpr_out, cptr_t *buf2_cptr_out,
+			struct fipc_ring_channel **chnl_out)
+{
+	int ret;
+	cptr_t buf1_cptr, buf2_cptr;
+	gva_t buf1_addr, buf2_addr;
+	struct fipc_ring_channel *chnl;
+	unsigned int pg_order = ASYNC_RPC_EXAMPLE_BUFFER_ORDER - PAGE_SHIFT;
+	/*
+	 * Allocate buffers
+	 *
+	 * (We use the lower level alloc. If we used the heap, even though
+	 * we may alloc only 1 - 2 pages, we would end up sharing around
+	 * 4 MB chunks of memory, since the heap uses coarse microkernel
+	 * allocations.)
+	 */
+	ret = _lcd_alloc_pages(GFP_KERNEL, 
+			pg_order,
+			&buf1_cptr);
+	if (ret) {
+		LIBLCD_ERR("buf1 alloc");
+		goto fail1;
+	}
+	ret = _lcd_alloc_pages(GFP_KERNEL, 
+			pg_order,
+			&buf2_cptr);
+	if (ret) {
+		LIBLCD_ERR("buf2 alloc");
+		goto fail2;
+	}
+	/*
+	 * Map them somewhere
+	 */
+	ret = lcd_map_virt(buf1_cptr, pg_order, &buf1_addr);
+	if (ret) {
+		LIBLCD_ERR("error mapping buf1");
+		goto fail3;
+	}
+	ret = lcd_map_virt(buf2_cptr, pg_order, &buf2_addr);
+	if (ret) {
+		LIBLCD_ERR("error mapping buf2");
+		goto fail4;
+	}
+	/*
+	 * Prep buffers for rpc
+	 */
+	ret = fipc_prep_buffers(ASYNC_RPC_EXAMPLE_BUFFER_ORDER,
+				(void *)gva_val(buf1_addr),
+				(void *)gva_val(buf2_addr));
+	if (ret) {
+		LIBLCD_ERR("prep buffers");
+		goto fail5;
+	}
+	/*
+	 * Alloc and init channel header
+	 */
+	chnl = kmalloc(sizeof(*chnl), GFP_KERNEL);
+	if (!chnl) {
+		ret = -ENOMEM;
+		LIBLCD_ERR("chnl alloc");
+		goto fail6;
+	}
+	ret = fipc_ring_channel_init(chnl, ASYNC_RPC_EXAMPLE_BUFFER_ORDER,
+				(void *)gva_val(buf1_addr),
+				(void *)gva_val(buf2_addr));
+	if (ret) {
+		LIBLCD_ERR("ring chnl init");
+		goto fail7;
+	}
 
+	*buf1_ctpr_out = buf1_cptr;
+	*buf2_cptr_out = buf2_cptr;
+	*chnl_out = chnl;
 
+	return 0;
+
+fail7:
+fail6:
+fail5:
+fail4:
+fail3:
+fail2:
+fail1:
+	/* we just fail; everything will be torn down when we die */
+	return ret; 
+}
+
+static int grant_buffs_to_callee(cptr_t sync_chnl, cptr_t tx, cptr_t rx)
+{
+	lcd_set_cr0(rx); /* caller rx == callee tx */
+	lcd_set_cr1(tx); /* caller tx == callee rx */
+
+	return lcd_sync_send(sync_chnl);
+}
+
+static int caller_main(void)
+{
+	int ret;
+	cptr_t tx, rx;
+	/*
+	 * Boot
+	 */
+	ret = lcd_enter();
+	if (ret)
+		goto out;
+	/*
+	 * Set up async ipc channel, and grant access to callee
+	 *
+	 * We expect the sync ipc channel to be in our boot info
+	 */
+	ret = setup_channel(&tx, &rx, &chnl);
+	if (ret)
+		goto out;
+	ret = grant_buffs_to_callee(lcd_get_boot_info()->ctprs[0],
+				tx, rx);
+	if (ret)
+		goto out;
+	/*
+	 * Do ipc
+	 */
+	DO_FINISH({
+			ret = caller(chnl);
+
+		});
+	/*
+	 * Done; just exit (everything will be torn down when we die)
+	 */
+	goto out;
+	       
+out:
+	lcd_exit(ret);
+}
+
+static int __init async_rpc_caller_init(void)
+{
+	int ret;
+
+	LCD_MAIN({
+
+			ret = caller_main();
+
+		});
+
+	return ret;
+}
+
+static void __exit async_rpc_caller_exit(void)
+{
+	return;
+}
+
+module_init(async_rpc_caller_init);
+module_exit(async_rpc_caller_exit);

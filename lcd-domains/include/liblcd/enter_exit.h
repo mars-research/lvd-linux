@@ -24,6 +24,9 @@
  * No matter if you are isolated or non-isolated, this should be called 
  * before you invoked any other functions in the liblcd interface.
  *
+ * IMPORTANT: It is highly recommended that you use the LCD_MAIN macro
+ * (see below).
+ *
  * Semantics:
  *
  *    -- Isolated code: this bootstraps the environment inside the container
@@ -33,7 +36,54 @@
  *                          start creating LCDs, doing ipc, etc.
  */
 int lcd_enter(void);
-
+/**
+ * LCD_MAIN -- Tweaks the stack so that libasync works correctly
+ *
+ * Here is a usage example:
+ *
+ *        static int my_main(void)
+ *        {
+ *                 int ret;
+ *
+ *                 ret = lcd_enter();
+ *
+ *                 // Do some things
+ *
+ *                 lcd_exit(ret);
+ *
+ *                 return ret; // lcd_exit returns for non-isolated
+ *        }
+ *
+ *        int __init my_module_init(void)
+ *        {
+ *             int ret;
+ *
+ *             LCD_MAIN({
+ *
+ *                     ret = my_main();
+ *
+ *             });
+ *
+ *             return ret;
+ *        }
+ *        module_init(my_module_init);
+ *
+ */
+#define LCD_MAIN(_CODE)	do {						\
+									\
+		/* NULL out return address on stack so that libasync */ \
+		/* will stop stack walk here.			     */ \
+		volatile void *__saved_ret_addr =			\
+			*(((void **)__builtin_frame_address(0)) + 1);	\
+		*(((void **)__builtin_frame_address(0)) + 1) = NULL;	\
+									\
+		do { _CODE } while(0);					\
+									\
+		/* Restore old return address to stack. */		\
+		*(((void **)__builtin_frame_address(0)) + 1) =		\
+			__saved_ret_addr;				\
+									\
+	} while (0);
 /**
  * lcd_exit -- Exit from LCD (mode) with return value
  *
@@ -46,7 +96,10 @@ int lcd_enter(void);
  * regular user-level exit).
  */
 void LCD_MAYBE_NORETURN lcd_exit(int retval);
-
+#define LCD_EXIT() ({							\
+	*((volatile void**)__builtin_frame_address(0) + 1) = NULL;	\
+	lcd_enter();							\
+		})
 /**
  * lcd_abort -- Abruptly exit from LCD
  *

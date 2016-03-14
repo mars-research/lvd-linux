@@ -6,11 +6,16 @@
  * Copyright: University of Utah
  */
 
-#include <linux/kernel.h>
+#include <lcd_config/pre_hook.h>
+
+#include <liblcd/liblcd.h>
+#include "../rpc.h"
 #include <libfipc.h>
-#include "rpc.h"
-#include "../test_helpers.h"
 #include <thc_ipc.h>
+#include <thc.h>
+#include <awe_mapper.h>
+
+#include <lcd_config/post_hook.h>
 
 /*
  * We use "noinline" because we want the function call to actually
@@ -86,8 +91,8 @@ static inline int send_response(struct fipc_ring_channel *chnl,
 		return ret;
 	}
     
-    THC_MSG_TYPE(response) = msg_type_response;
-    THC_MSG_ID(response)   = THC_MSG_ID(recvd_msg);
+	THC_MSG_TYPE(response) = msg_type_response;
+	THC_MSG_ID(response)   = THC_MSG_ID(recvd_msg);
 	set_fn_type(response, type);
 	response->regs[0] = val;
 
@@ -100,11 +105,10 @@ static inline int send_response(struct fipc_ring_channel *chnl,
 	return 0;
 }
 
-int callee(void *_callee_channel_header)
+int callee(struct fipc_ring_channel *callee_channel_header)
 {
 	int ret = 0;
 	unsigned long temp_res;
-        struct fipc_ring_channel *chan = _callee_channel_header;
 	struct fipc_message *recvd_msg;
 	unsigned long transaction_id = 0;
 	enum fn_type type;
@@ -179,3 +183,149 @@ int callee(void *_callee_channel_header)
 out:
 	return ret;
 }
+
+static int setup_channel(cptr_t tx_cptr, cptr_t rx_cptr,
+			struct fipc_ring_channel **chnl_out)
+{
+	int ret;
+	gva_t tx_addr, rx_addr;
+	struct fipc_ring_channel *chnl;
+	unsigned int pg_order = ASYNC_RPC_EXAMPLE_BUFFER_ORDER - PAGE_SHIFT;
+	/*
+	 * Map buffers somewhere
+	 */
+	ret = lcd_map_virt(tx_cptr, pg_order, &tx_addr);
+	if (ret) {
+		LIBLCD_ERR("error mapping tx");
+		goto fail1;
+	}
+	ret = lcd_map_virt(rx_cptr, pg_order, &rx_addr);
+	if (ret) {
+		LIBLCD_ERR("error mapping rx");
+		goto fail2;
+	}
+	/*
+	 * Alloc and init channel header (buffers already prep'd by caller)
+	 */
+	chnl = kmalloc(sizeof(*chnl), GFP_KERNEL);
+	if (!chnl) {
+		ret = -ENOMEM;
+		LIBLCD_ERR("chnl alloc");
+		goto fail3;
+	}
+	ret = fipc_ring_channel_init(chnl, ASYNC_RPC_EXAMPLE_BUFFER_ORDER,
+				(void *)gva_val(tx_addr),
+				(void *)gva_val(rx_addr));
+	if (ret) {
+		LIBLCD_ERR("ring chnl init");
+		goto fail4;
+	}
+
+	*chnl_out = chnl;
+
+	return 0;
+
+fail4:
+fail3:
+fail2:
+fail1:
+	/* we just fail; everything will be torn down when we die */
+	return ret; 
+}
+
+static int get_buffers(cptr_t sync_chnl, cptr_t *tx, cptr_t *rx)
+{
+	int ret;
+	/*
+	 * Alloc cptr's for buffers
+	 */
+	ret = lcd_cptr_alloc(tx);
+	if (ret) {
+		LIBLCD_ERR("cptr alloc 1");
+		goto fail1;
+	}
+	ret = lcd_cptr_alloc(rx);
+	if (ret) {
+		LIBLCD_ERR("cptr alloc 2");
+		goto fail2;
+	}
+	/*
+	 * Prepare to receive capabilities
+	 */
+	lcd_set_cr0(*tx); /* caller sends our tx in cr0 */
+	lcd_set_cr1(*rx); /* caller sends our rx in cr1 */
+
+	ret = lcd_sync_recv(sync_chnl);
+	if (ret) {
+		LIBLCD_ERR("sync recv failed");
+		goto fail3;
+	}
+
+	return 0;
+
+fail1:
+fail2:
+fail3:
+	return ret; /* we just tear down anyway */
+}
+
+static int callee_main(void)
+{
+	int ret;
+	cptr_t tx, rx;
+	struct fipc_ring_channel *chnl;
+	/*
+	 * Boot LCD
+	 */
+	ret = lcd_enter();
+	if (ret)
+		goto out;
+	/*
+	 * Get the ipc buffers from the caller, and set up our channel header
+	 */
+	ret = get_buffers(lcd_get_boot_info()->cptrs[0],
+			&tx, &rx);
+	if (ret)
+		goto out;
+	ret = setup_channel(tx, rx, &chnl);
+	if (ret)
+		goto out;
+	/*
+	 * Do async ipc
+	 */
+	DO_FINISH({
+			
+			ret = callee(chnl);
+
+		});
+	/*
+	 * Done (everything is just torn down when we die; we could write
+	 * tear down code, but there's no point, and just adds irrelevant
+	 * complexity)
+	 */
+	goto out;
+
+out:
+	lcd_exit(ret);
+}
+
+static int __init async_rpc_callee_init(void)
+{
+	int ret;
+
+	LCD_MAIN({
+
+			ret = callee_main();
+
+		});
+
+	return ret;
+}
+
+static void __exit async_rpc_callee_exit(void)
+{
+	return;
+}
+
+module_init(async_rpc_callee_init);
+module_exit(async_rpc_callee_exit);

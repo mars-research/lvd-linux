@@ -5,8 +5,8 @@
  *
  * Copyright: University of Utah
  */
-#ifndef LIBFIPC_RPC_TEST_H
-#define LIBFIPC_RPC_TEST_H
+#ifndef LCD_ASYNC_RPC_TEST_H
+#define LCD_ASYNC_RPC_TEST_H
 
 #include <libfipc.h>
 
@@ -23,9 +23,8 @@ enum fn_type {
 /* must be divisible by 6... because I call 6 functions in the callee.c */
 #define TRANSACTIONS 60
 
-/* thread main functions */
-int callee(void *_callee_channel_header);
-int caller(void *_caller_channel_header);
+/* Each buffer is 2^ASYNC_RPC_BUFFER_ORDER bytes. Must be >= PAGE_SHIFT. */
+#define ASYNC_RPC_EXAMPLE_BUFFER_ORDER 12
 
 static inline
 int
@@ -41,4 +40,34 @@ set_fn_type(struct fipc_message *msg, enum fn_type type)
 	fipc_set_flags(msg, type);
 }
 
-#endif /* LIBFIPC_RPC_TEST_H */
+static inline
+int
+test_fipc_blocking_recv_start(struct fipc_ring_channel *chnl, 
+			struct fipc_message **out)
+{
+	int ret;
+	for (;;) {
+		/* Poll until we get a message or error */
+		ret = fipc_recv_msg_start(chnl, out);
+		if (!ret || ret != -EWOULDBLOCK)
+			return ret;
+		cpu_relax();
+	}
+}
+
+static inline
+int
+test_fipc_blocking_send_start(struct fipc_ring_channel *chnl, 
+			struct fipc_message **out)
+{
+	int ret;
+	for (;;) {
+		/* Poll until we get a free slot or error */
+		ret = fipc_send_msg_start(chnl, out);
+		if (!ret || ret != -EWOULDBLOCK)
+			return ret;
+		cpu_relax();
+	}
+}
+
+#endif /* LCD_ASYNC_RPC_TEST_H */

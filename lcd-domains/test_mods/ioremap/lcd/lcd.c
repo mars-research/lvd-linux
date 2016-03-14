@@ -16,12 +16,13 @@
 gpa_t addr;
 cptr_t page;
 
-static int ioremap_test_lcd_init(void)
+static int __init ioremap_test_lcd_init(void)
 {
 	unsigned long phys_addr;
 	void *virt_addr;
-
+	int ret = 0;
 	
+	ret = lcd_enter();
 	/* only a single page */
 	ret = _lcd_alloc_pages(0, 0, &page);
 	if(ret) {
@@ -29,7 +30,7 @@ static int ioremap_test_lcd_init(void)
 		goto exit;
 	}
 
-	ret = _lcd_ioremap(page, 4096, &addr);
+	ret = lcd_ioremap_phys(page, 4096, &addr);
 	if(ret) {
 	 	LIBLCD_ERR("__ioremap failed with %d", ret);
 		goto ioremap_exit;
@@ -45,22 +46,24 @@ static int ioremap_test_lcd_init(void)
 	printk("virt_addr %p \n",virt_addr);
 	/*We should be able to touch address here */
 	memset(virt_addr,0xAB, 4096);
-	printk("val @ virtaddr- %x \n", *(virt_addr+40));
+	printk("val @ virtaddr- %x \n", *((unsigned char *)virt_addr+40));
 	
+	lcd_exit(ret);
+	return ret;
 
 ioremap_va_exit:
-	_lcd_iounmap(addr, 4096);
+	lcd_iounmap_phys(addr, 4096);
 
 ioremap_exit:
 	lcd_cap_delete(page);
 exit:
+	lcd_exit(ret);
 	return ret;
 }
 
 static void ioremap_test_lcd_exit(void)
 {
-	lcd_cap_delete(page);
-	_lcd_iounmap(addr, 4096);
+	return;
 }
 module_init(ioremap_test_lcd_init);
 module_exit(ioremap_test_lcd_exit);

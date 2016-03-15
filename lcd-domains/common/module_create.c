@@ -606,7 +606,8 @@ int lcd_create_module_lcd(char *mdir, char *mname, cptr_t *lcd_out,
 	 * Configure initial control registers, etc. for LCD
 	 */
 	ret = lcd_config_registers(lcd, m_init_link_addr,
-				/* implicity put a null return address */
+				/* implicity put a null return address and
+				 * frame address */
 				gva_add(LCD_STACK_GV_ADDR,
 					LCD_STACK_SIZE - sizeof(void *)),
 				LCD_BOOTSTRAP_PAGE_TABLES_GP_ADDR,

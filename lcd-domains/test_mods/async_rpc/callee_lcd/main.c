@@ -181,6 +181,8 @@ int callee(struct fipc_ring_channel *chan)
 		}
 	}
 
+	LIBLCD_MSG("Callee is done");
+
 out:
 	return ret;
 }
@@ -271,7 +273,7 @@ fail1:
 	return ret; /* we just tear down anyway */
 }
 
-static int callee_main(void)
+static int __noreturn callee_main(void)
 {
 	int ret;
 	cptr_t tx, rx;

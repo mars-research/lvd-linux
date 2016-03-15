@@ -2601,7 +2601,8 @@ static bool is_init_symbol(const Elf_Sym *src, const Elf_Shdr *sechdrs,
  * linux-kernel thread starting with
  * <73defb5e4bca04a6431392cc341112b1@localhost>.
  */
-static void layout_symtab(struct module *mod, struct load_info *info)
+static void layout_symtab(struct module *mod, struct load_info *info,
+			int for_lcd)
 {
 	Elf_Shdr *symsect = info->sechdrs + info->index.sym;
 	Elf_Shdr *strsect = info->sechdrs + info->index.str;
@@ -2617,11 +2618,16 @@ static void layout_symtab(struct module *mod, struct load_info *info)
 	src = (void *)info->hdr + symsect->sh_offset;
 	nsrc = symsect->sh_size / sizeof(*src);
 
-	/* Compute total space required for the core symbols' strtab. */
+	/* Compute total space required for the core symbols' strtab.
+	 *  -- And if the module is for an LCD, we include init 
+	 * symbols too! yippee!
+	 */
 	for (ndst = i = 0; i < nsrc; i++) {
-		if (i == 0 || is_livepatch_module(mod) ||
-		    is_core_symbol(src+i, info->sechdrs, info->hdr->e_shnum,
-				   info->index.pcpu)) {
+		if (i == 0 ||
+		    is_core_symbol(src+i, info->sechdrs, info->hdr->e_shnum) ||
+			(for_lcd && is_init_symbol(src+i, 
+						info->sechdrs, 
+						info->hdr->e_shnum))) {
 			strtab_size += strlen(&info->strtab[src[i].st_name])+1;
 			ndst++;
 		}
@@ -3254,7 +3260,8 @@ static bool blacklisted(char *module_name)
 }
 core_param(module_blacklist, module_blacklist, charp, 0400);
 
-static struct module *layout_and_allocate(struct load_info *info, int flags)
+static struct module *layout_and_allocate(struct load_info *info, int flags,
+					int for_lcd)
 {
 	/* Module within temporary copy. */
 	struct module *mod;
@@ -3294,7 +3301,7 @@ static struct module *layout_and_allocate(struct load_info *info, int flags)
 	   this is done generically; there doesn't appear to be any
 	   special cases for the architectures. */
 	layout_sections(mod, info);
-	layout_symtab(mod, info);
+	layout_symtab(mod, info, for_lcd);
 
 	/* Allocate and move to the final place */
 	err = move_module(mod, info);
@@ -3820,7 +3827,7 @@ static int load_lcd(struct load_info *info, const char __user *uargs,
 		goto free_copy;
 
 	/* Figure out module layout, and allocate all the memory. */
-	mod = layout_and_allocate(info, flags);
+	mod = layout_and_allocate(info, flags, for_lcd);
 	if (IS_ERR(mod)) {
 		err = PTR_ERR(mod);
 		goto free_copy;

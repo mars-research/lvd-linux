@@ -68,10 +68,14 @@ int lcd_enter(void);
  *        }
  *        module_init(my_module_init);
  *
+ * Implementation Note: Isolated code has a 0 return address at the
+ * top (beginning) of every stack, so this hack is only necessary for
+ * non-isolated code right now.
  */
-#define LCD_MAIN(_CODE)	do { _CODE} while(0)
-#if 0
-do {						\
+#ifdef LCD_ISOLATE
+#define LCD_MAIN(_CODE)	do { _CODE } while(0)
+#else
+#define LCD_MAIN(_CODE)	do {						\
 									\
 		/* NULL out return address on stack so that libasync */ \
 		/* will stop stack walk here.			     */ \

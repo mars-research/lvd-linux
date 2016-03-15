@@ -269,7 +269,7 @@ static int grant_buffs_to_callee(cptr_t sync_chnl, cptr_t tx, cptr_t rx)
 	return lcd_sync_send(sync_chnl);
 }
 
-static int caller_main(void)
+static int __noreturn caller_main(void)
 {
 	int ret;
 	cptr_t tx = {0}, rx = {0};

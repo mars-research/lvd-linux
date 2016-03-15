@@ -311,7 +311,7 @@ out:
 	lcd_exit(ret);
 }
 
-static int __init async_rpc_callee_init(void)
+static int async_rpc_callee_init(void)
 {
 	int ret;
 

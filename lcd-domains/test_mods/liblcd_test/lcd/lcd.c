@@ -319,7 +319,7 @@ fail1:
 	return ret;
 }
 
-static int __noreturn __init liblcd_test_lcd_init(void) 
+static int __noreturn liblcd_test_lcd_init(void) 
 {
 	int ret = 0;
 	ret = lcd_enter();
@@ -383,10 +383,23 @@ out:
 	lcd_exit(ret);
 }
 
+static void __liblcd_test_lcd_init(void)
+{
+	int ret;
+
+	LCD_MAIN({
+
+			ret = liblcd_test_lcd_init();
+
+		});
+
+	return ret;
+}
+
 static void liblcd_test_lcd_exit(void)
 {
 	return;
 }
 
-module_init(liblcd_test_lcd_init);
+module_init(__liblcd_test_lcd_init);
 module_exit(liblcd_test_lcd_exit);

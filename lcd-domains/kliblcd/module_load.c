@@ -176,6 +176,7 @@ int lcd_load_module(char *mdir, char *mname,
 		gva_t *m_core_link_addr,
 		unsigned long *m_init_size,
 		unsigned long *m_core_size,
+		gva_t *m_init_func_addr,
 		unsigned long *m_struct_module_core_offset)
 {
 	int ret;
@@ -213,6 +214,7 @@ int lcd_load_module(char *mdir, char *mname,
 	*m_core_link_addr = __gva((unsigned long)m->module_core);
 	*m_init_size = m->init_size;
 	*m_core_size = m->core_size;
+	*m_init_func_addr = __gva((unsigned long)m->init);
 	*m_struct_module_core_offset = 
 		((unsigned long)m) - ((unsigned long)m->module_core);
 

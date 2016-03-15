@@ -134,7 +134,7 @@ static void loop(struct dispatch_ctx *ctx)
 
 /* INIT / EXIT ---------------------------------------- */
 
-static int __init vfs_klcd_init(void) 
+static int vfs_klcd_init(void) 
 {
 	int ret;
 	cptr_t vfs_chnl;
@@ -211,6 +211,19 @@ fail1:
 	return ret;
 }
 
+static int __vfs_klcd_init(void)
+{
+	int ret;
+
+	LCD_MAIN({
+
+			ret = vfs_klcd_init();
+
+		});
+
+	return ret;
+}
+
 /* 
  * make module loader happy (so we can unload). we don't actually call
  * this before unloading the lcd (yet)
@@ -220,6 +233,6 @@ static void __exit vfs_klcd_exit(void)
 	return;
 }
 
-module_init(vfs_klcd_init);
+module_init(__vfs_klcd_init);
 module_exit(vfs_klcd_exit);
 MODULE_LICENSE("GPL");

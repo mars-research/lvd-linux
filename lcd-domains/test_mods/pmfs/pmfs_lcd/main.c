@@ -82,7 +82,7 @@ void exit_pmfs_fs(void);
 
 struct dispatch_ctx ctx;
 
-static int __noreturn __init pmfs_lcd_init(void) 
+static int __noreturn pmfs_lcd_init(void) 
 {
 	int r = 0;
 	cptr_t vfs_chnl;
@@ -155,11 +155,24 @@ fail1:
 	lcd_exit(r);
 }
 
+static int __pmfs_lcd_init(void)
+{
+	int ret;
+
+	LCD_MAIN({
+
+			ret = pmfs_lcd_init();
+
+		});
+
+	return ret;
+}
+
 static void __exit pmfs_lcd_exit(void)
 {
 	return;
 }
 
-module_init(pmfs_lcd_init);
+module_init(__pmfs_lcd_init);
 module_exit(pmfs_lcd_exit);
 MODULE_LICENSE("GPL");

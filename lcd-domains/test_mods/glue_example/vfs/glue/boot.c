@@ -155,7 +155,7 @@ void original_vfs_lcd_exit(void);
 
 static struct dispatch_ctx ctx;
 
-static int __init vfs_lcd_boot(void)
+static int vfs_lcd_boot(void)
 {
 	int ret;
 	cptr_t vfs_chnl;
@@ -216,10 +216,23 @@ static int __init vfs_lcd_boot(void)
 	lcd_exit(0);
 }
 
+static int vfs_lcd_init(void)
+{
+	int ret;
+
+	LCD_MAIN({
+
+			ret = vfs_lcd_boot();
+
+		});
+	
+	return ret;
+}
+
 static void __exit vfs_lcd_exit(void)
 {
 	/* Never called, for now. */
 }
 
-module_init(vfs_lcd_boot);
+module_init(vfs_lcd_init);
 module_exit(vfs_lcd_exit);

@@ -122,10 +122,23 @@ fail1:
 	return ret;
 }
 
+static int boot_init(void)
+{
+	int ret;
+	
+	LCD_MAIN({
+
+			ret = boot_main();
+
+		});
+
+	return ret;
+}
+
 static void boot_exit(void)
 {
 	/* nothing to do */
 }
 
-module_init(boot_main);
+module_init(boot_init);
 module_exit(boot_exit);

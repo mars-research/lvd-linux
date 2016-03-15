@@ -74,7 +74,7 @@ void foo1 (void) {
 	return;
 }
 
-static int __noreturn __init test_init(void) 
+static int __noreturn test_init(void) 
 {
 	int r;
 
@@ -87,6 +87,19 @@ fail1:
 	lcd_exit(r);
 }
 
+static int __test_init(void)
+{
+	int ret;
+
+	LCD_MAIN({
+
+			ret = test_init();
+
+		});
+
+	return ret;
+}
+
 /* 
  * make module loader happy (so we can unload). we don't actually call
  * this before unloading the lcd (yet)
@@ -96,5 +109,5 @@ static void __exit test_exit(void)
 	return;
 }
 
-module_init(test_init);
+module_init(__test_init);
 module_exit(test_exit);

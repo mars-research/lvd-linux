@@ -45,7 +45,7 @@ void do_stuff(void)
 	LIBLCD_MSG("out of do-finish");
 }
 
-static int __noreturn __init async_lcd_init(void) 
+static int __noreturn async_lcd_init(void) 
 {
 	int r = 0;
 	r = lcd_enter();
@@ -60,10 +60,23 @@ out:
 	lcd_exit(r);
 }
 
+static int __async_lcd_init(void)
+{
+	int ret;
+
+	LCD_MAIN({
+
+			ret = async_lcd_init();
+
+		});
+
+	return ret;
+}
+
 static void async_lcd_exit(void)
 {
 	return;
 }
 
-module_init(async_lcd_init);
+module_init(__async_lcd_init);
 module_exit(async_lcd_exit);

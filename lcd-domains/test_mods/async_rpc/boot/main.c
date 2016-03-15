@@ -125,7 +125,7 @@ fail1:
 	return ret;
 }
 
-static int __init boot_init(void)
+static int boot_init(void)
 {
 	int ret;
 

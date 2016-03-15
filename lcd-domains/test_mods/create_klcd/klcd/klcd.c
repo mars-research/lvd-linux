@@ -16,7 +16,7 @@ static int foo(void)
 	return 10;
 }
 
-static int __init my_init(void) 
+static int my_init(void) 
 {
 	int ret;
 
@@ -33,6 +33,19 @@ out:
 	return ret;
 }
 
+static int __my_init(void)
+{
+	int ret;
+
+	LCD_MAIN({
+
+			ret = my_init();
+
+		});
+
+	return ret;
+}
+
 /* 
  * make module loader happy (so we can unload). we don't actually call
  * this before unloading the lcd (yet)
@@ -42,5 +55,5 @@ static void __exit my_exit(void)
 	return;
 }
 
-module_init(my_init);
+module_init(__my_init);
 module_exit(my_exit);

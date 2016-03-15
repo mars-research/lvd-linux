@@ -24,7 +24,7 @@ static void get_endpoint(void)
 	ep = lcd_get_boot_info()->cptrs[0];
 }
 
-static int __noreturn __init lcd1_init(void) 
+static int __noreturn lcd1_init(void) 
 {
 	int r;
 	r = lcd_enter();
@@ -42,10 +42,23 @@ out:
 	lcd_exit(r);
 }
 
+static int __lcd1_init(void)
+{
+	int ret;
+
+	LCD_MAIN({
+
+			ret = lcd1_init();
+
+		});
+
+	return ret;
+}
+
 static void lcd1_exit(void)
 {
 	return;
 }
 
-module_init(lcd1_init);
+module_init(__lcd1_init);
 module_exit(lcd1_exit);

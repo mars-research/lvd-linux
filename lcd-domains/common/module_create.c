@@ -547,7 +547,7 @@ int lcd_create_module_lcd(char *mdir, char *mname, cptr_t *lcd_out,
 {
 	int ret;
 	cptr_t m_init_cptr, m_core_cptr;
-	gva_t m_init_link_addr, m_core_link_addr;
+	gva_t m_init_link_addr, m_core_link_addr, m_init_func_addr;
 	unsigned long m_init_size, m_core_size;
 	unsigned long m_struct_module_core_offset;
 	struct lcd_create_ctx *ctx;
@@ -576,6 +576,7 @@ int lcd_create_module_lcd(char *mdir, char *mname, cptr_t *lcd_out,
 			&m_init_cptr, &m_core_cptr,
 			&m_init_link_addr, &m_core_link_addr,
 			&m_init_size, &m_core_size,
+			&m_init_func_addr,
 			&m_struct_module_core_offset);
 	if (ret) {
 		LIBLCD_ERR("error loading kernel module");
@@ -605,7 +606,7 @@ int lcd_create_module_lcd(char *mdir, char *mname, cptr_t *lcd_out,
 	/*
 	 * Configure initial control registers, etc. for LCD
 	 */
-	ret = lcd_config_registers(lcd, m_init_link_addr,
+	ret = lcd_config_registers(lcd, m_init_func_addr,
 				/* implicity put a null return address and
 				 * frame address */
 				gva_add(LCD_STACK_GV_ADDR,

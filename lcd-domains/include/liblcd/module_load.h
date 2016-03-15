@@ -19,6 +19,7 @@
  * @m_init_link_addr: the address that the module's init code was linked for
  * @m_init_size: size in bytes of the module init part of the image
  * @m_core_size: size in bytes of the module core part of the image
+ * @m_init_func_addr: where the module's init routine is
  * @m_struct_module_core_offset: offset into .ko's core where struct module
  *                               is located
  *
@@ -42,6 +43,7 @@ int lcd_load_module(char *mdir, char *mname,
 		gva_t *m_core_link_addr,
 		unsigned long *m_init_size,
 		unsigned long *m_core_size,
+		gva_t *m_init_func_addr,
 		unsigned long *m_struct_module_core_offset);
 /**
  * lcd_release_module -- Unmap module bits and cap delete the pages

@@ -383,7 +383,7 @@ out:
 	lcd_exit(ret);
 }
 
-static void __liblcd_test_lcd_init(void)
+static int __liblcd_test_lcd_init(void)
 {
 	int ret;
 

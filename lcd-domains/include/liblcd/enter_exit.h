@@ -69,21 +69,31 @@ int lcd_enter(void);
  *        module_init(my_module_init);
  *
  */
-#define LCD_MAIN(_CODE)	do {						\
+#define LCD_MAIN(_CODE)	do { _CODE} while(0)
+#if 0
+do {						\
 									\
 		/* NULL out return address on stack so that libasync */ \
 		/* will stop stack walk here.			     */ \
-		volatile void *__saved_ret_addr =			\
-			*(((void **)__builtin_frame_address(0)) + 1);	\
-		*(((void **)__builtin_frame_address(0)) + 1) = NULL;	\
+		/*						     */	\
+		/* XXX: A touch of arch-dependent code here, but     */	\
+		/* no biggie. When I used gcc's			     */	\
+		/* __builtin_frame_address it broke (gcc null'd out  */	\
+		/* the return address, but didn't restore it ... ?)  */	\
+		/*						     */	\
+		volatile void **__frame_ptr;				\
+		volatile void *__saved_ret_addr;			\
+		asm ("movq %%rbp, %0" : "=g"(__frame_ptr) ::);		\
+		__saved_ret_addr = *(__frame_ptr + 1);			\
+		*(__frame_ptr + 1) = NULL;				\
 									\
 		do { _CODE } while(0);					\
 									\
 		/* Restore old return address to stack. */		\
-		*(((void **)__builtin_frame_address(0)) + 1) =		\
-			__saved_ret_addr;				\
+		*(__frame_ptr + 1) = __saved_ret_addr;			\
 									\
 	} while (0);
+#endif
 /**
  * lcd_exit -- Exit from LCD (mode) with return value
  *

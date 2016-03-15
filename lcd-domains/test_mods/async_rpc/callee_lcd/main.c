@@ -8,6 +8,7 @@
 
 #include <lcd_config/pre_hook.h>
 
+#include <linux/slab.h>
 #include <liblcd/liblcd.h>
 #include "../rpc.h"
 #include <libfipc.h>
@@ -105,7 +106,7 @@ static inline int send_response(struct fipc_ring_channel *chnl,
 	return 0;
 }
 
-int callee(struct fipc_ring_channel *callee_channel_header)
+int callee(struct fipc_ring_channel *chan)
 {
 	int ret = 0;
 	unsigned long temp_res;
@@ -209,14 +210,15 @@ static int setup_channel(cptr_t tx_cptr, cptr_t rx_cptr,
 	 */
 	chnl = kmalloc(sizeof(*chnl), GFP_KERNEL);
 	if (!chnl) {
-		ret = -ENOMEM;
 		LIBLCD_ERR("chnl alloc");
+		ret = -ENOMEM;
 		goto fail3;
 	}
 	ret = fipc_ring_channel_init(chnl, ASYNC_RPC_EXAMPLE_BUFFER_ORDER,
 				(void *)gva_val(tx_addr),
 				(void *)gva_val(rx_addr));
 	if (ret) {
+
 		LIBLCD_ERR("ring chnl init");
 		goto fail4;
 	}
@@ -263,9 +265,9 @@ static int get_buffers(cptr_t sync_chnl, cptr_t *tx, cptr_t *rx)
 
 	return 0;
 
-fail1:
-fail2:
 fail3:
+fail2:
+fail1:
 	return ret; /* we just tear down anyway */
 }
 
@@ -273,7 +275,7 @@ static int callee_main(void)
 {
 	int ret;
 	cptr_t tx, rx;
-	struct fipc_ring_channel *chnl;
+	struct fipc_ring_channel *chnl = NULL;
 	/*
 	 * Boot LCD
 	 */
@@ -293,11 +295,9 @@ static int callee_main(void)
 	/*
 	 * Do async ipc
 	 */
-	DO_FINISH({
-			
-			ret = callee(chnl);
-
-		});
+	ret = callee(chnl);
+	if (ret)
+		goto out;
 	/*
 	 * Done (everything is just torn down when we die; we could write
 	 * tear down code, but there's no point, and just adds irrelevant

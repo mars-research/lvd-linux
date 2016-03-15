@@ -8,6 +8,7 @@
 
 #include <lcd_config/pre_hook.h>
 
+#include <linux/slab.h>
 #include <liblcd/liblcd.h>
 #include "../rpc.h"
 #include <libfipc.h>
@@ -142,34 +143,37 @@ fail:
 	return ret;
 }
 
-static int caller(struct fipc_ring_channel *caller_channel_header)
+static int caller(struct fipc_ring_channel *chan)
 {
 	unsigned long transaction_id = 0;
 	int ret = 0;
 	/*
 	 * Add nums
 	 */
-	while(transaction_id < TRANSACTIONS)
-	{
-		ASYNC({
-				transaction_id++;
-				ret = async_add_nums(chan, 
-						transaction_id, 1000);
+	DO_FINISH({
+			while(transaction_id < TRANSACTIONS)
+			{
+				ASYNC({
+						transaction_id++;
+						ret = async_add_nums(chan, 
+								transaction_id, 1000);
 
-				if (ret) {
-					LIBLCD_ERR("error doing null invocation, ret = %d, exiting...\n",
-						ret);
-				}
-			});
+						if (ret) {
+							LIBLCD_ERR("error doing null invocation, ret = %d, exiting...\n",
+								ret);
+						}
+					});
+				
+			}
 
-	}
+		});
 
 	LIBLCD_MSG("Caller async rpc complete");
 
 	return ret;
 }
 
-static int setup_channel(cptr_t *buf1_ctpr_out, cptr_t *buf2_cptr_out,
+static int setup_channel(cptr_t *buf1_cptr_out, cptr_t *buf2_cptr_out,
 			struct fipc_ring_channel **chnl_out)
 {
 	int ret;
@@ -199,6 +203,7 @@ static int setup_channel(cptr_t *buf1_ctpr_out, cptr_t *buf2_cptr_out,
 		LIBLCD_ERR("buf2 alloc");
 		goto fail2;
 	}
+
 	/*
 	 * Map them somewhere
 	 */
@@ -239,7 +244,7 @@ static int setup_channel(cptr_t *buf1_ctpr_out, cptr_t *buf2_cptr_out,
 		goto fail7;
 	}
 
-	*buf1_ctpr_out = buf1_cptr;
+	*buf1_cptr_out = buf1_cptr;
 	*buf2_cptr_out = buf2_cptr;
 	*chnl_out = chnl;
 
@@ -267,7 +272,8 @@ static int grant_buffs_to_callee(cptr_t sync_chnl, cptr_t tx, cptr_t rx)
 static int caller_main(void)
 {
 	int ret;
-	cptr_t tx, rx;
+	cptr_t tx = {0}, rx = {0};
+	struct fipc_ring_channel *chnl = NULL;
 	/*
 	 * Boot
 	 */
@@ -282,17 +288,16 @@ static int caller_main(void)
 	ret = setup_channel(&tx, &rx, &chnl);
 	if (ret)
 		goto out;
-	ret = grant_buffs_to_callee(lcd_get_boot_info()->ctprs[0],
+	ret = grant_buffs_to_callee(lcd_get_boot_info()->cptrs[0],
 				tx, rx);
 	if (ret)
 		goto out;
 	/*
 	 * Do ipc
 	 */
-	DO_FINISH({
-			ret = caller(chnl);
-
-		});
+	ret = caller(chnl);
+	if (ret)
+		goto out;
 	/*
 	 * Done; just exit (everything will be torn down when we die)
 	 */

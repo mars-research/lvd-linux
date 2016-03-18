@@ -5,8 +5,16 @@
 # are set there.
 #
 
+CLANG_PATH=clang
+export LLVM_COMPILER=$(CLANG_PATH)
+
+WLLVM_DIR=/home/charlie/work/flux/wllvm
+export WLLVM_DIR
+
 LIBDEKER_BUILD_DIR=$(LCD_BUILD_DIR)/libdeker_build
 export LIBDEKER_BUILD_DIR
+
+LIBDEKER_WEAK_ATTR=\"__attribute__((weak))\"
 
 LIBDEKER_BASE_CFLAGS=\
 	$(LCD_DOMAINS_CFLAGS) \
@@ -23,7 +31,8 @@ LIBDEKER_CFLAGS= \
 	$(LIBDEKER_BASE_CFLAGS) \
 	-I$(LIBDEKER_BUILD_DIR)/libcap.install/include \
 	-I$(LIBDEKER_BUILD_DIR)/libfipc.install/include \
-	-I$(LIBDEKER_BUILD_DIR)/libasync.install/include
+	-I$(LIBDEKER_BUILD_DIR)/libasync.install/include \
+        -DLIBDEKER_FUNC_ATTR=$(LIBDEKER_WEAK_ATTR)
 
 export LIBDEKER_CFLAGS
 
@@ -45,52 +54,63 @@ LIBDEKER_LIBCAP=$(LIBDEKER_BUILD_DIR)/libcap.install/lib/libcap.a
 LIBDEKER_LIBFIPC=$(LIBDEKER_BUILD_DIR)/libfipc.install/lib/libfipc.a
 LIBDEKER_LIBFIPC=$(LIBDEKER_BUILD_DIR)/libasync.install/lib/libasync.a
 
-LIBDEKER_WEAK_ATTR=\"__attribute__((weak))\"
-
 LIBDEKER_LIB_CFLAGS= $(LIBDEKER_BASE_CFLAGS)
 
-liblcd: $(LIBLCD_BUILD_DIR)/lib.a | $(LIBLCD_LIBCAP) $(LIBLCD_LIBFIPC) \
-	$(LIBLCD_LIBASYNC)
+# There isn't a nice easy way to multiline this, and I want access to the
+# LIBDEKER_BUILD_DIR variable (so I don't want to create a separate file); so 
+# I mash this in one line for now.
+LIBDEKER_AR_SCRIPT="CREATE $(LIBDEKER_BUILD_DIR)/libdeker.a\nADDLIB $(LIBDEKER_BUILD_DIR)/lib.a\nADDLIB $(LIBDEKER_BUILD_DIR)/libcap.install/lib/libcap.a\nADDLIB $(LIBDEKER_BUILD_DIR)/libfipc.install/lib/libfipc.a\nADDLIB $(LIBDEKER_BUILD_DIR)/libasync.install/lib/libasync.a\nSAVE\nEND\n"
+
+libdeker.bc: libdeker
+	$(WLLVM_DIR)/extract-bc $(LIBDEKER_BUILD_DIR)/libdeker.a
+
+libdeker: $(LIBDEKER_BUILD_DIR)/lib.a | $(LIBDEKER_LIBCAP) $(LIBDEKER_LIBFIPC) \
+	$(LIBDEKER_LIBASYNC)
 	@echo "  AR      $@"
-	@echo $(LIBLCD_AR_SCRIPT) | ar -M
+	@echo $(LIBDEKER_AR_SCRIPT) | ar -M
 
-$(LIBLCD_BUILD_DIR)/lib.a: $(LIBLCD_BUILD_DIR)/Kbuild | \
-	$(LIBLCD_BUILD_DIRS)
-	$(MAKE) -C .. M=$(LIBLCD_BUILD_DIR) $(MAKEFLAGS)
+$(LIBDEKER_BUILD_DIR)/lib.a: $(LIBDEKER_BUILD_DIR)/Kbuild | \
+	$(LIBDEKER_BUILD_DIRS)
+	$(MAKE) -C .. M=$(LIBDEKER_BUILD_DIR) $(MAKEFLAGS)
 
-libcap.liblcd: $(LIBLCD_BUILD_DIR)/libcap.build/Makefile
+libcap.libdeker: $(LIBLCD_BUILD_DIR)/libcap.build/Makefile
 	$(MAKE) -C $(LIBLCD_BUILD_DIR)/libcap.build \
+	CC=$(WLLVM_DIR)/wllvm \
 	CFLAGS="$(LIBLCD_LIB_CFLAGS)" $(MAKEFLAGS) && \
 	$(MAKE) -C $(LIBLCD_BUILD_DIR)/libcap.build install $(MAKEFLAGS)
 
-$(LIBLCD_BUILD_DIR)/libcap.build/Makefile: libcap/configure | \
-	$(LIBLCD_BUILD_DIRS)
-	cd $(LIBLCD_BUILD_DIR)/libcap.build && \
+$(LIBDEKER_BUILD_DIR)/libcap.build/Makefile: libcap/configure | \
+	$(LIBDEKER_BUILD_DIRS)
+	cd $(LIBDEKER_BUILD_DIR)/libcap.build && \
 	$(LCD_DOMAINS_TOP_SRC_DIR)/libcap/configure \
 	PLATFORM=kernel --disable-test-build \
 	--disable-kernel-module \
 	--with-kernel-headers=$(LCD_DOMAINS_TOP_SRC_DIR)/.. \
-	--prefix=$(LIBLCD_BUILD_DIR)/libcap.install \
+	--prefix=$(LIBDEKER_BUILD_DIR)/libcap.install \
 	CSPACE_DEPTH_BITS=$(LCD_CSPACE_DEPTH_BITS) \
-	CSPACE_CNODE_TABLE_BITS=$(LCD_CSPACE_CNODE_TABLE_BITS)
+	CSPACE_CNODE_TABLE_BITS=$(LCD_CSPACE_CNODE_TABLE_BITS) \
+	CC=$(WLLVM_DIR)/wllvm
 
-libfipc.liblcd: $(LIBLCD_BUILD_DIR)/libfipc.build/Makefile
-	$(MAKE) -C $(LIBLCD_BUILD_DIR)/libfipc.build \
-	CFLAGS="$(LIBLCD_LIB_CFLAGS) -I$(LIBLCD_BUILD_DIR)/libcap.install/include" $(MAKEFLAGS) && \
-	$(MAKE) -C $(LIBLCD_BUILD_DIR)/libfipc.build install $(MAKEFLAGS)
+libfipc.libdeker: $(LIBDEKER_BUILD_DIR)/libfipc.build/Makefile
+	$(MAKE) -C $(LIBDEKER_BUILD_DIR)/libfipc.build \
+	CC=$(WLLVM_DIR)/wllvm \
+	CFLAGS="$(LIBDEKER_LIB_CFLAGS) -I$(LIBDEKER_BUILD_DIR)/libcap.install/include" $(MAKEFLAGS) && \
+	$(MAKE) -C $(LIBDEKER_BUILD_DIR)/libfipc.build install $(MAKEFLAGS)
 
-$(LIBLCD_BUILD_DIR)/libfipc.build/Makefile: \
+$(LIBDEKER_BUILD_DIR)/libfipc.build/Makefile: \
 	libasync/fast-ipc-module/configure | \
-	$(LIBLCD_BUILD_DIRS)
-	cd $(LIBLCD_BUILD_DIR)/libfipc.build && \
+	$(LIBDEKER_BUILD_DIRS)
+	cd $(LIBDEKER_BUILD_DIR)/libfipc.build && \
 	$(LCD_DOMAINS_TOP_SRC_DIR)/libasync/fast-ipc-module/configure \
 	--with-kernel-headers=$(LCD_DOMAINS_TOP_SRC_DIR)/.. \
-	--prefix=$(LIBLCD_BUILD_DIR)/libfipc.install
+	--prefix=$(LIBDEKER_BUILD_DIR)/libfipc.install \
+	CC=$(WLLVM_DIR)/wllvm
 
-libasync.liblcd: $(LIBLCD_BUILD_DIR)/libasync.build/Makefile
-	$(MAKE) -C $(LIBLCD_BUILD_DIR)/libasync.build \
-	CFLAGS="$(LIBLCD_LIB_CFLAGS) -I$(LIBLCD_BUILD_DIR)/libcap.install/include -I$(LIBLCD_BUILD_DIR)/libfipc.install/include -DNDEBUG" $(MAKEFLAGS) && \
-	$(MAKE) -C $(LIBLCD_BUILD_DIR)/libasync.build install $(MAKEFLAGS)
+libasync.libdeker: $(LIBDEKER_BUILD_DIR)/libasync.build/Makefile
+	$(MAKE) -C $(LIBDEKER_BUILD_DIR)/libasync.build \
+	CC=$(WLLVM_DIR)/wllvm \
+	CFLAGS="$(LIBDEKER_LIB_CFLAGS) -I$(LIBDEKER_BUILD_DIR)/libcap.install/include -I$(LIBDEKER_BUILD_DIR)/libfipc.install/include -DNDEBUG" $(MAKEFLAGS) && \
+	$(MAKE) -C $(LIBDEKER_BUILD_DIR)/libasync.build install $(MAKEFLAGS)
 
 $(LIBDEKER_BUILD_DIR)/libasync.build/Makefile: libasync/configure | \
 	$(LIBDEKER_BUILD_DIRS)
@@ -99,7 +119,7 @@ $(LIBDEKER_BUILD_DIR)/libasync.build/Makefile: libasync/configure | \
 	--with-kernel-headers=$(LCD_DOMAINS_TOP_SRC_DIR)/.. \
 	--with-libfipc=$(LIBDEKER_BUILD_DIR)/libfipc.install \
 	--prefix=$(LIBDEKER_BUILD_DIR)/libasync.install \
-
+	CC=$(WLLVM_DIR)/wllvm
 
 $(LIBDEKER_BUILD_DIR)/Kbuild: scripts/Kbuild.libdeker | \
 	$(LIBDEKER_BUILD_DIRS)

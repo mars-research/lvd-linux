@@ -1,0 +1,43 @@
+#
+# Kernel build file for libdeker
+# 
+
+# Paths are all relative to the libdeker build dir (exported
+# and available in this file as $(LIBDEKER_BUILD_DIR)).
+
+# This single line of magic makes it so we can do an out of src tree
+# build. It has to do with how and where this Kbuild file is included
+# in the kernel build system.
+src = $(LCD_DOMAINS_TOP_SRC_DIR)
+
+# Force the kernel build to use wllvm (whole program llvm) with clang
+export LLVM_COMPILER=$(CLANG_PATH)
+export CC=$(WLLVM_DIR)/wllvm
+
+# ------------------------------------------------------------
+
+lib-y += $(addprefix libdeker/, \
+      main.o \
+      )
+
+lib-y += $(addprefix libdeker/lcd-domains/, \
+      sync_ipc.o \
+      )
+
+ccflags-y += $(LIBDEKER_CFLAGS)
+
+# ------------------------------------------------------------
+
+# Sanitize KBUILD_CFLAGS (otherwise clang has a fit when it doesn't recognize
+# command line options)
+UNRECOGNIZED_CFLAGS := -fno-delete-null-pointer-checks \
+	    	       -mpreferred-stack-boundary=3 \
+	      	       -maccumulate-outgoing-args \
+	      	       -fconserve-stack \
+		       -Wno-unused-but-set-variable \
+		       -mtune=generic
+
+KBUILD_CFLAGS := $(filter-out $(UNRECOGNIZED_CFLAGS), $(KBUILD_CFLAGS))
+
+# Tell kernel not to use "asm goto" (clang does not support that)
+KBUILD_CFLAGS := $(filter-out  -DCC_HAVE_ASM_GOTO, $(KBUILD_CFLAGS))

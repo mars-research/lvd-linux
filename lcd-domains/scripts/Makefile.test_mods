@@ -1,0 +1,45 @@
+#
+# test modules/examples build
+#
+# This is included in the top-level Makefile, and some
+# variables are defined there.
+# 
+
+LCD_TEST_MODULES_DIR=$(PWD)/test_mods
+export LCD_TEST_MODULES_DIR
+
+LCD_TEST_MODULES_BUILD_DIR=$(LCD_BUILD_DIR)/test_mods
+export LCD_TEST_MODULES_BUILD_DIR
+
+# Collect all of the example directories and kbuilds
+TEST_MODULES_DIRS=$(shell cd $(LCD_TEST_MODULES_DIR) && \
+	find . -mindepth 1 -type d)
+TEST_MODULES_KBUILDS=$(shell cd $(LCD_TEST_MODULES_DIR) && \
+	find . -name "Kbuild")
+
+TEST_MODULES_BUILD_DIRS=$(foreach dir,$(TEST_MODULES_DIRS), \
+	$(LCD_TEST_MODULES_BUILD_DIR)/$(dir))
+TEST_MODULES_BUILD_KBUILDS=$(foreach kb,$(TEST_MODULES_KBUILDS), \
+	$(LCD_TEST_MODULES_BUILD_DIR)/$(kb))
+
+KLIBLCD_SYMBOLS=$(MICROKERNEL_BUILD_DIR)/Module.symvers
+
+test_mods: $(TEST_MODULES_BUILD_KBUILDS) $(TEST_MODULES_BUILD_DIRS) | \
+	$(LIBLCD_BUILD_DIR)/liblcd.a
+	$(MAKE) -C .. M=$(LCD_TEST_MODULES_BUILD_DIR) \
+	KBUILD_EXTRA_SYMBOLS=$(KLIBLCD_SYMBOLS) $(MAKEFLAGS)
+
+# This rule does the external source hack (define "src" in Kbuild file)
+$(LCD_TEST_MODULES_BUILD_DIR)/%/Kbuild: $(LCD_TEST_MODULES_DIR)/%/Kbuild | \
+	$(TEST_MODULES_BUILD_DIRS)
+	@echo "  KBUILD     $^"
+	@printf "#\n# BEGIN: Auto-generated part.\n#\n\n" > $@ && \
+	printf "LIBLCD = $(shell scripts/relpath.py $(LIBLCD_BUILD_DIR)/liblcd.a $(shell dirname $(shell readlink -f $@)))\n\n" >> $@ && \
+	printf "src = $(shell dirname `readlink -f $^`)\n\n" >> $@ && \
+	printf "#\n# END: Auto-generated part.\n#\n\n" >> $@ && \
+	cat $^ >> $@
+
+$(TEST_MODULES_BUILD_DIRS):
+	@echo "  MKDIR      $@"
+	@mkdir -p $@
+

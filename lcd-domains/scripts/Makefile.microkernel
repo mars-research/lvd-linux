@@ -1,0 +1,99 @@
+#
+# LCD microkernel build
+#
+# This is included in the top-level Makefile, and some
+# variables are defined there.
+#
+
+MICROKERNEL_BUILD_DIR=$(LCD_BUILD_DIR)/microkernel_build
+export MICROKERNEL_BUILD_DIR
+
+MICROKERNEL_BASE_CFLAGS= \
+	$(LCD_DOMAINS_CFLAGS) \
+	-I$(LCD_DOMAINS_TOP_SRC_DIR)/include \
+	-I$(LCD_DOMAINS_TOP_SRC_DIR)/arch/$(ARCH)/include \
+	-I$(LCD_DOMAINS_TOP_SRC_DIR)/config/non_isolated \
+	-DLINUX_KERNEL_MODULE
+MICROKERNEL_CFLAGS= \
+	$(MICROKERNEL_BASE_CFLAGS) \
+	-I$(MICROKERNEL_BUILD_DIR)/libcap.install/include \
+	-I$(MICROKERNEL_BUILD_DIR)/libfipc.install/include \
+	-I$(MICROKERNEL_BUILD_DIR)/libasync.install/include \
+
+export MICROKERNEL_CFLAGS
+
+MICROKERNEL_DIRS= \
+	microkernel \
+	kliblcd \
+	libcap.build \
+	libcap.install \
+	libfipc.build \
+	libfipc.install \
+	libasync.build \
+	libasync.install \
+	common \
+	arch/$(ARCH)/microkernel
+MICROKERNEL_BUILD_DIRS=$(foreach dir,$(MICROKERNEL_DIRS),\
+	$(MICROKERNEL_BUILD_DIR)/$(dir))
+
+MICROKERNEL_LIB_CFLAGS= $(MICROKERNEL_BASE_CFLAGS)
+
+MICROKERNEL_LIBCAP=$(MICROKERNEL_BUILD_DIR)/libcap.install/lib/libcap.a
+MICROKERNEL_LIBFIPC=$(MICROKERNEL_BUILD_DIR)/libfipc.install/lib/libfipc.a
+MICROKERNEL_LIBASYNC=$(MICROKERNEL_BUILD_DIR)/libasync.install/lib/libasync.a
+
+microkernel: $(MICROKERNEL_BUILD_DIR)/Kbuild | \
+	$(MICROKERNEL_LIBCAP) $(MICROKERNEL_LIBFIPC) $(MICROKERNEL_LIBASYNC) \
+	$(MICROKERNEL_BUILD_DIRS)
+	$(MAKE) -C .. M=$(MICROKERNEL_BUILD_DIR) $(MAKEFLAGS)
+
+libcap.microkernel: $(MICROKERNEL_BUILD_DIR)/libcap.build/Makefile
+	$(MAKE) -C $(MICROKERNEL_BUILD_DIR)/libcap.build \
+		CFLAGS="$(MICROKERNEL_LIB_CFLAGS)" $(MAKEFLAGS) && \
+	$(MAKE) -C $(MICROKERNEL_BUILD_DIR)/libcap.build install $(MAKEFLAGS)
+
+$(MICROKERNEL_BUILD_DIR)/libcap.build/Makefile: libcap/configure | \
+	$(MICROKERNEL_BUILD_DIRS)
+	cd $(MICROKERNEL_BUILD_DIR)/libcap.build && \
+	$(LCD_DOMAINS_TOP_SRC_DIR)/libcap/configure \
+	PLATFORM=kernel --disable-test-build \
+	--disable-global-cap-types \
+	--with-kernel-headers=$(LCD_DOMAINS_TOP_SRC_DIR)/.. \
+	--disable-kernel-module \
+	--prefix=$(MICROKERNEL_BUILD_DIR)/libcap.install \
+	CSPACE_DEPTH_BITS=$(LCD_CSPACE_DEPTH_BITS) \
+	CSPACE_CNODE_TABLE_BITS=$(LCD_CSPACE_CNODE_TABLE_BITS)
+
+libfipc.microkernel: $(MICROKERNEL_BUILD_DIR)/libfipc.build/Makefile
+	$(MAKE) -C $(MICROKERNEL_BUILD_DIR)/libfipc.build \
+		CFLAGS="$(MICROKERNEL_LIB_CFLAGS) -I$(MICROKERNEL_BUILD_DIR)/libcap.install/include" $(MAKEFLAGS) && \
+	$(MAKE) -C $(MICROKERNEL_BUILD_DIR)/libfipc.build install $(MAKEFLAGS)
+
+$(MICROKERNEL_BUILD_DIR)/libfipc.build/Makefile: \
+	libasync/fast-ipc-module/configure | \
+	$(MICROKERNEL_BUILD_DIRS)
+	cd $(MICROKERNEL_BUILD_DIR)/libfipc.build && \
+	$(LCD_DOMAINS_TOP_SRC_DIR)/libasync/fast-ipc-module/configure \
+	--with-kernel-headers=$(LCD_DOMAINS_TOP_SRC_DIR)/.. \
+	--prefix=$(MICROKERNEL_BUILD_DIR)/libfipc.install
+
+libasync.microkernel: $(MICROKERNEL_BUILD_DIR)/libasync.build/Makefile
+	$(MAKE) -C $(MICROKERNEL_BUILD_DIR)/libasync.build \
+		CFLAGS="$(MICROKERNEL_LIB_CFLAGS) -I$(MICROKERNEL_BUILD_DIR)/libcap.install/include -I$(MICROKERNEL_BUILD_DIR)/libfipc.install/include -DNDEBUG" $(MAKEFLAGS) && \
+	$(MAKE) -C $(MICROKERNEL_BUILD_DIR)/libasync.build install $(MAKEFLAGS)
+
+$(MICROKERNEL_BUILD_DIR)/libasync.build/Makefile: libasync/configure | \
+	$(MICROKERNEL_BUILD_DIRS)
+	cd $(MICROKERNEL_BUILD_DIR)/libasync.build && \
+	$(LCD_DOMAINS_TOP_SRC_DIR)/libasync/configure \
+	--with-kernel-headers=$(LCD_DOMAINS_TOP_SRC_DIR)/.. \
+	--with-libfipc=$(MICROKERNEL_BUILD_DIR)/libfipc.install \
+	--prefix=$(MICROKERNEL_BUILD_DIR)/libasync.install
+
+$(MICROKERNEL_BUILD_DIR)/Kbuild: scripts/Kbuild.microkernel | \
+	$(MICROKERNEL_BUILD_DIRS)
+	cp scripts/Kbuild.microkernel $(MICROKERNEL_BUILD_DIR)/Kbuild
+
+$(MICROKERNEL_BUILD_DIRS):
+	@echo "  MKDIR      $@"
+	@mkdir -p $@

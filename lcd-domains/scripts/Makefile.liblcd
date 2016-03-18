@@ -12,23 +12,17 @@ LIBLCD_BASE_CFLAGS=\
 	$(LCD_DOMAINS_CFLAGS) \
 	-I$(LCD_DOMAINS_TOP_SRC_DIR)/include \
 	-I$(LCD_DOMAINS_TOP_SRC_DIR)/arch/$(ARCH)/include \
-	-I$(LIBLCD_BUILD_DIR)/libcap.install/include \
-	-I$(LIBLCD_BUILD_DIR)/libfipc.install/include \
-	-I$(LIBLCD_BUILD_DIR)/libasync.install/include \
 	-I$(LCD_DOMAINS_TOP_SRC_DIR)/config/isolated \
 	-DCONFIG_LAZY_THC \
 	-DMODULE \
 	-DLCD_ISOLATE \
 	-DCPTR_CACHE_LOCK_PADDING_SIZE=8
+
 LIBLCD_CFLAGS= \
 	$(LIBLCD_BASE_CFLAGS) \
-	-I$(LCD_DOMAINS_TOP_SRC_DIR)/include \
-	-I$(LCD_DOMAINS_TOP_SRC_DIR)/arch/$(ARCH)/include \
-	-I$(LCD_DOMAINS_TOP_SRC_DIR)/config/isolated \
-	-DCONFIG_LAZY_THC \
-	-DMODULE \
-	-DLCD_ISOLATE \
-	-DCPTR_CACHE_LOCK_PADDING_SIZE=8
+	-I$(LIBLCD_BUILD_DIR)/libcap.install/include \
+	-I$(LIBLCD_BUILD_DIR)/libfipc.install/include \
+	-I$(LIBLCD_BUILD_DIR)/libasync.install/include
 
 export LIBLCD_CFLAGS
 
@@ -50,6 +44,8 @@ LIBLCD_LIBCAP=$(LIBLCD_BUILD_DIR)/libcap.install/lib/libcap.a
 LIBLCD_LIBFIPC=$(LIBLCD_BUILD_DIR)/libfipc.install/lib/libfipc.a
 LIBLCD_LIBFIPC=$(LIBLCD_BUILD_DIR)/libasync.install/lib/libasync.a
 
+LIBLCD_WEAK_ATTR=\"__attribute__((weak))\"
+
 LIBLCD_LIB_CFLAGS= $(LIBLCD_BASE_CFLAGS)
 
 # There isn't a nice easy way to multiline this, and I want access to the
@@ -68,7 +64,8 @@ $(LIBLCD_BUILD_DIR)/lib.a: $(LIBLCD_BUILD_DIR)/Kbuild | \
 
 libcap.liblcd: $(LIBLCD_BUILD_DIR)/libcap.build/Makefile
 	$(MAKE) -C $(LIBLCD_BUILD_DIR)/libcap.build \
-	CFLAGS="$(LIBLCD_LIB_CFLAGS)" $(MAKEFLAGS) && \
+	CFLAGS="$(LIBLCD_LIB_CFLAGS) -DLIBCAP_FUNC_ATTR=$(LIBLCD_WEAK_ATTR)" \
+	$(MAKEFLAGS) && \
 	$(MAKE) -C $(LIBLCD_BUILD_DIR)/libcap.build install $(MAKEFLAGS)
 
 $(LIBLCD_BUILD_DIR)/libcap.build/Makefile: libcap/configure | \
@@ -84,7 +81,7 @@ $(LIBLCD_BUILD_DIR)/libcap.build/Makefile: libcap/configure | \
 
 libfipc.liblcd: $(LIBLCD_BUILD_DIR)/libfipc.build/Makefile
 	$(MAKE) -C $(LIBLCD_BUILD_DIR)/libfipc.build \
-	CFLAGS="$(LIBLCD_LIB_CFLAGS) -I$(LIBLCD_BUILD_DIR)/libcap.install/include" $(MAKEFLAGS) && \
+	CFLAGS="$(LIBLCD_LIB_CFLAGS) -I$(LIBLCD_BUILD_DIR)/libcap.install/include -DLIBFIPC_FUNC_ATTR=$(LIBLCD_WEAK_ATTR)" $(MAKEFLAGS) && \
 	$(MAKE) -C $(LIBLCD_BUILD_DIR)/libfipc.build install $(MAKEFLAGS)
 
 $(LIBLCD_BUILD_DIR)/libfipc.build/Makefile: \
@@ -97,7 +94,7 @@ $(LIBLCD_BUILD_DIR)/libfipc.build/Makefile: \
 
 libasync.liblcd: $(LIBLCD_BUILD_DIR)/libasync.build/Makefile
 	$(MAKE) -C $(LIBLCD_BUILD_DIR)/libasync.build \
-	CFLAGS="$(LIBLCD_LIB_CFLAGS) -I$(LIBLCD_BUILD_DIR)/libcap.install/include -I$(LIBLCD_BUILD_DIR)/libfipc.install/include -DNDEBUG" $(MAKEFLAGS) && \
+	CFLAGS="$(LIBLCD_LIB_CFLAGS) -I$(LIBLCD_BUILD_DIR)/libcap.install/include -I$(LIBLCD_BUILD_DIR)/libfipc.install/include -DNDEBUG -DLIBASYNC_FUNC_ATTR=$(LIBLCD_WEAK_ATTR)" $(MAKEFLAGS) && \
 	$(MAKE) -C $(LIBLCD_BUILD_DIR)/libasync.build install $(MAKEFLAGS)
 
 $(LIBLCD_BUILD_DIR)/libasync.build/Makefile: libasync/configure | \
@@ -106,7 +103,7 @@ $(LIBLCD_BUILD_DIR)/libasync.build/Makefile: libasync/configure | \
 	$(LCD_DOMAINS_TOP_SRC_DIR)/libasync/configure \
 	--with-kernel-headers=$(LCD_DOMAINS_TOP_SRC_DIR)/.. \
 	--with-libfipc=$(LIBLCD_BUILD_DIR)/libfipc.install \
-	--prefix=$(LIBLCD_BUILD_DIR)/libasync.install \
+	--prefix=$(LIBLCD_BUILD_DIR)/libasync.install
 
 $(LIBLCD_BUILD_DIR)/Kbuild: scripts/Kbuild.liblcd | \
 	$(LIBLCD_BUILD_DIRS)

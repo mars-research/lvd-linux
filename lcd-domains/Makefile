@@ -89,7 +89,7 @@ include scripts/Makefile.liblcd
 # ------------------------------------------------------------
 # LIBDEKER build setup
 
-ifneq ($(DEKER,)
+ifneq ($(DEKER),)
 include scripts/Makefile.libdeker
 endif
 

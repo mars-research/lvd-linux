@@ -48,7 +48,7 @@ int register_fs(struct fs *fs) {
 }
 
 int 
-#ifndef ISOLATE_GLUE_EXAMPLE
+#ifndef LCD_ISOLATE
 __init 
 #endif
 original_vfs_lcd_init(void) {
@@ -59,7 +59,7 @@ original_vfs_lcd_init(void) {
 }
 
 void 
-#ifndef ISOLATE_GLUE_EXAMPLE
+#ifndef LCD_ISOLATE
 __exit 
 #endif
 original_vfs_lcd_exit(void) {
@@ -71,7 +71,7 @@ original_vfs_lcd_exit(void) {
 
 /* There can only be one pair of init/exit. The glue will define an
  * init/exit when we isolate. */
-#ifndef ISOLATE_GLUE_EXAMPLE
+#ifndef LCD_ISOLATE
 module_init(original_vfs_lcd_init);
 module_exit(original_vfs_lcd_exit);
 #endif

@@ -5,4 +5,4 @@ lcd_test_mod_string_example_lcd-y              += lcd.o
 
 lcd_test_mod_string_example_lcd-y              += $(LIBLCD)
 
-ccflags-y += $(ISOLATED_CC_FLAGS)
+ccflags-y += $(ISOLATED_CFLAGS)

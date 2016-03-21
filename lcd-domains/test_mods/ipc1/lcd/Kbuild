@@ -3,6 +3,6 @@ obj-m  += lcd_test_mod_ipc1_lcd.o
 
 lcd_test_mod_ipc1_lcd-y              += lcd.o
 
-lcd_test_mod_ipc1_lcd-y              += $(LIBLCD)
+lcd_test_mod_ipc1_lcd-y += $(LIBLCD)
 
-ccflags-y += $(ISOLATED_CC_FLAGS)
+ccflags-y += $(ISOLATED_CFLAGS)

@@ -28,4 +28,4 @@ lcd_test_mod_pmfs_lcd-y              += $(addprefix glue/, \
 							   bdi_caller.o \
 							   cap.o )
 
-ccflags-y += $(ISOLATED_CC_FLAGS)
+ccflags-y += $(ISOLATED_CFLAGS)

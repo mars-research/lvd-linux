@@ -12,7 +12,7 @@
 
 #include <lcd_config/post_hook.h>
 
-#ifdef ISOLATE_GLUE_EXAMPLE
+#ifdef LCD_ISOLATE
 struct file_container {
 	struct file file;
 	u64 e1;
@@ -23,7 +23,7 @@ struct file_container {
 static int minix_new_file(int id, struct file **file_out) {
 
 	struct file *f;
-#ifdef ISOLATE_GLUE_EXAMPLE
+#ifdef LCD_ISOLATE
 	struct file_container *file_container;
 #endif
 
@@ -34,7 +34,7 @@ static int minix_new_file(int id, struct file **file_out) {
 
 	printk("sizeof file_container is 0x%lx", sizeof(*file_container));
 
-#ifdef ISOLATE_GLUE_EXAMPLE
+#ifdef LCD_ISOLATE
 	f = NULL;
 	file_container = kmalloc(sizeof(*file_container), GFP_KERNEL);
 	if (file_container)
@@ -66,7 +66,7 @@ static void minix_rm_file(struct file *file) {
 	return;
 }
 
-#ifdef ISOLATE_GLUE_EXAMPLE
+#ifdef LCD_ISOLATE
 
 /* Ideally, we shouldn't bring these in to unmodified code. I
  * converted e.g. cptr --> u64 to avoid bringing in those defs. */
@@ -101,7 +101,7 @@ static struct fs_container minix_fs_container = {
 	}
 };
 
-#else /* !ISOLATE_GLUE_EXAMPLE */
+#else /* !LCD_ISOLATE */
 
 static struct fs_operations minix_fs_ops = {
 	.new_file = minix_new_file,
@@ -117,14 +117,14 @@ static struct fs minix_fs = {
 
 
 int 
-#ifndef ISOLATE_GLUE_EXAMPLE
+#ifndef LCD_ISOLATE
 __init 
 #endif
 original_minix_lcd_init(void) {
 	/*
 	 * Register.
 	 */
-#ifdef ISOLATE_GLUE_EXAMPLE
+#ifdef LCD_ISOLATE
 	return register_fs(&minix_fs_container.fs);
 #else
 	return register_fs(&minix_fs);
@@ -132,21 +132,21 @@ original_minix_lcd_init(void) {
 }
 
 void 
-#ifndef ISOLATE_GLUE_EXAMPLE
+#ifndef LCD_ISOLATE
 __exit 
 #endif
 original_minix_lcd_exit(void) {
 	/*
 	 * Unregister.
 	 */
-#ifdef ISOLATE_GLUE_EXAMPLE
+#ifdef LCD_ISOLATE
 	unregister_fs(&minix_fs_container.fs);
 #else
 	unregister_fs(&minix_fs);
 #endif
 }
 
-#ifndef ISOLATE_GLUE_EXAMPLE
+#ifndef LCD_ISOLATE
 module_init(original_minix_lcd_init);
 module_exit(original_minix_lcd_exit);
 #endif

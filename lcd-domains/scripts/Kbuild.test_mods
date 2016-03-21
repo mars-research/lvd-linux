@@ -8,6 +8,8 @@
 # See scripts/Makefile.test_mods.
 #
 
+include $(LCD_TEST_MODULES_BUILD_DIR)/Kbuild.config
+
 # Examples
 
 obj-m += liblcd_test/

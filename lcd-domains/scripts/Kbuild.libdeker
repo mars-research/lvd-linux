@@ -30,14 +30,4 @@ ccflags-y += $(LIBDEKER_CFLAGS)
 
 # Sanitize KBUILD_CFLAGS (otherwise clang has a fit when it doesn't recognize
 # command line options)
-UNRECOGNIZED_CFLAGS := -fno-delete-null-pointer-checks \
-	    	       -mpreferred-stack-boundary=3 \
-	      	       -maccumulate-outgoing-args \
-	      	       -fconserve-stack \
-		       -Wno-unused-but-set-variable \
-		       -mtune=generic
-
-KBUILD_CFLAGS := $(filter-out $(UNRECOGNIZED_CFLAGS), $(KBUILD_CFLAGS))
-
-# Tell kernel not to use "asm goto" (clang does not support that)
-KBUILD_CFLAGS := $(filter-out  -DCC_HAVE_ASM_GOTO, $(KBUILD_CFLAGS))
+KBUILD_CFLAGS := $(filter-out $(LIBDEKER_BAD_CFLAGS), $(KBUILD_CFLAGS))

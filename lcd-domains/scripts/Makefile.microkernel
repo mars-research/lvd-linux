@@ -97,3 +97,23 @@ $(MICROKERNEL_BUILD_DIR)/Kbuild: scripts/Kbuild.microkernel | \
 $(MICROKERNEL_BUILD_DIRS):
 	@echo "  MKDIR      $@"
 	@mkdir -p $@
+
+clean-microkernel: clean-mk-libcap clean-mk-libfipc clean-mk-libasync
+	if test -e $(MICROKERNEL_BUILD_DIR)/Kbuild; then \
+		$(MAKE) -C .. M=$(MICROKERNEL_BUILD_DIR) clean; \
+	fi
+
+clean-mk-lib%:
+	if test -d $(MICROKERNEL_BUILD_DIR)/$(subst clean-mk-,,$@).build; then \
+		$(MAKE) -C $(MICROKERNEL_BUILD_DIR)/$(subst clean-mk-,,$@).build clean; \
+	fi
+	rm -rf $(MICROKERNEL_BUILD_DIR)/$(subst clean-mk-,,$@).install
+
+clean += clean-microkernel
+
+.PHONY += \
+	microkernel \
+	libcap.microkernel \
+	libfipc.microkernel \
+	libasync.microkernel \
+	clean-microkernel

@@ -112,3 +112,24 @@ $(LIBLCD_BUILD_DIR)/Kbuild: scripts/Kbuild.liblcd | \
 $(LIBLCD_BUILD_DIRS):
 	@echo "  MKDIR      $@"
 	@mkdir -p $@
+
+clean-liblcd: clean-liblcd-libcap clean-liblcd-libfipc clean-liblcd-libasync
+	if test -e $(LIBLCD_BUILD_DIR)/Kbuild; then \
+		$(MAKE) -C .. M=$(LIBLCD_BUILD_DIR) clean; \
+	fi
+
+clean-liblcd-lib%:
+	if test -d $(LIBLCD_BUILD_DIR)/$(subst clean-liblcd-,,$@).build; then \
+		$(MAKE) -C $(LIBLCD_BUILD_DIR)/$(subst clean-liblcd-,,$@).build clean; \
+	fi
+	rm -rf $(LIBLCD_BUILD_DIR)/$(subst clean-liblcd-,,$@).install
+
+clean += clean-liblcd
+
+.PHONY += \
+	liblcd \
+	$(LIBLCD_BUILD_DIR)/lib.a \
+	libcap.liblcd \
+	libfipc.liblcd \
+	libasync.liblcd \
+	clean-liblcd

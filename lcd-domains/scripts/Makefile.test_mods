@@ -24,17 +24,52 @@ TEST_MODULES_BUILD_KBUILDS=$(foreach kb,$(TEST_MODULES_KBUILDS), \
 
 KLIBLCD_SYMBOLS=$(MICROKERNEL_BUILD_DIR)/Module.symvers
 
-test_mods: $(TEST_MODULES_BUILD_KBUILDS) $(TEST_MODULES_BUILD_DIRS) | \
-	$(LIBLCD_BUILD_DIR)/liblcd.a
+# ------------------------------------------------------------
+# LIBDEKER toggling
+
+ifneq ($(DEKER),)
+
+DEKER_BUILD=y
+
+ISOLATED_CC_FLAGS=$(LIBDEKER_CFLAGS)
+
+LIBKERNEL_PATH_CMD:=$(shell scripts/relpath.py $(LIBDEKER_BUILD_DIR)/libdeker.a $(shell dirname $(shell readlink -f $@))) $(shell scripts/relpath.py $(LIBLCD_BUILD_DIR)/liblcd.a $(shell dirname $(shell readlink -f $@)))
+
+MAYBE_LIBDEKER=$(LIBDEKER_BUILD_PATH)/libdeker/libdeker.a
+
+LCD_TEST_MODS_KBUILD_BAD_CFLAGS=$(LIBDEKER_BAD_CFLAGS)
+
+else # ! DEKER
+
+DEKER_BUILD=n
+
+ISOLATED_CC_FLAGS=$(LIBLCD_CFLAGS)
+
+LIBKERNEL_PATH_CMD:=$(shell scripts/relpath.py $(LIBLCD_BUILD_DIR)/liblcd.a $(shell dirname $(shell readlink -f $@)))
+
+endif
+
+export NON_ISOLATED_CC_FLAGS=$(MICROKERNEL_CFLAGS)
+export ISOLATED_CC_FLAGS
+export DEKER_BUILD
+
+test_mods: $(LCD_TEST_MODULES_BUILD_DIR)/Kbuild \
+	$(TEST_MODULES_BUILD_KBUILDS) | \
+	$(LIBLCD_BUILD_DIR)/liblcd.a $(TEST_MODULES_BUILD_DIRS) \
+	$(MAYBE_LIBDEKER)  
 	$(MAKE) -C .. M=$(LCD_TEST_MODULES_BUILD_DIR) \
 	KBUILD_EXTRA_SYMBOLS=$(KLIBLCD_SYMBOLS) $(MAKEFLAGS)
+
+$(LCD_TEST_MODULES_BUILD_DIR)/Kbuild: scripts/Kbuild.test_mods | \
+	$(TEST_MODULES_BUILD_DIRS)
+	cp scripts/Kbuild.test_mods $(LCD_TEST_MODULES_BUILD_DIR)/Kbuild
 
 # This rule does the external source hack (define "src" in Kbuild file)
 $(LCD_TEST_MODULES_BUILD_DIR)/%/Kbuild: $(LCD_TEST_MODULES_DIR)/%/Kbuild | \
 	$(TEST_MODULES_BUILD_DIRS)
 	@echo "  KBUILD     $^"
 	@printf "#\n# BEGIN: Auto-generated part.\n#\n\n" > $@ && \
-	printf "LIBLCD = $(shell scripts/relpath.py $(LIBLCD_BUILD_DIR)/liblcd.a $(shell dirname $(shell readlink -f $@)))\n\n" >> $@ && \
+	printf "LIBKERNEL = $(LIBKERNEL_PATH_CMD)\n\n" >> $@ && \
 	printf "src = $(shell dirname `readlink -f $^`)\n\n" >> $@ && \
 	printf "#\n# END: Auto-generated part.\n#\n\n" >> $@ && \
 	cat $^ >> $@
@@ -43,3 +78,13 @@ $(TEST_MODULES_BUILD_DIRS):
 	@echo "  MKDIR      $@"
 	@mkdir -p $@
 
+clean-test_mods:
+	if test -e $(LCD_TEST_MODULES_BUILD_DIR)/Kbuild; then \
+		$(MAKE) -C .. M=$(LCD_TEST_MODULES_BUILD_DIR) clean; \
+	fi
+
+clean += clean-test_mods
+
+.PHONY += \
+	test_mods \
+	clean-test_mods

@@ -9,34 +9,25 @@
 #    all                 --  Build microkernel, liblcd, and all
 #                            test modules/examples
 #
-#    libcap.microkernel  --  Build libcap for the microkernel
+#    libcap.X,           --  Build libcap/libfipc/libasync for X, where X is
+#    libfipc.X,                   microkernel
+#    libasync.X                   liblcd
+#                                 libdeker
 #
-#    libfipc.microkernel --  Build libfipc for the non-isolated environment
+#                            libasync.X depends on libfipc.X being built.
 #
-#    libasync.microkernel--  Build libasync for the non-isolated environment;
-#                            depends on libfipc.microkernel
+#    microkernel         --  Build the LCD microkernel and kLIBLCD; depends
+#                            on libcap/libfipc/libasync microkernel builds.
 #
-#    microkernel         --  Build the LCD microkernel and kLIBLCD;
-#                            depends on libcap, libfipc, libasync 
-#                            non-isolated builds being done
-#                            from prior make run (we don't list this as
-#                            a target dependency because otherwise it triggers
-#                            a full microkernel re-build every time)
+#    liblcd              --  Build liblcd library kernel; depends on
+#                            on libcap/libfipc/libasync liblcd builds.
 #
-#    libcap.liblcd       --  Build libcap for isolated liblcd library kernel
+#    libdeker            --  Build libdeker; depends on
+#                            on libcap/libfipc/libasync libdeker builds.
 #
-#    libfipc.liblcd      --  Build libfipc for the isolated environment
-#
-#    libasync.liblcd     --  Build libasync for the isolated environment;
-#                            depends on libfipc.liblcd
-#
-#    liblcd              --  Build liblcd library kernel;
-#                            depends on libcap, libfipc, and libasync builds
-#                            being exec'd from prior make run
-#
-#    test_mods           --  Builds all of the test modules/examples. It 
-#                            depends on liblcd target being exec'd from 
-#                            prior make run.
+#    test_mods           --  Builds all of the test modules/examples. If
+#                            DEKER is set, isolated test modules require
+#                            libdeker; otherwise, they require liblcd.
 #
 #    clean               --  Remove built object files and local
 #                            install directories. But doesn't delete
@@ -96,6 +87,13 @@ include scripts/Makefile.microkernel
 include scripts/Makefile.liblcd
 
 # ------------------------------------------------------------
+# LIBDEKER build setup
+
+ifneq ($(DEKER,)
+include scripts/Makefile.libdeker
+endif
+
+# ------------------------------------------------------------
 # Test modules/examples
 
 include scripts/Makefile.test_mods
@@ -115,34 +113,7 @@ libasync/configure: libasync/configure.ac
 # ------------------------------------------------------------
 # clean
 
-clean-microkernel:
-	if test -e $(MICROKERNEL_BUILD_DIR)/Kbuild; then \
-		$(MAKE) -C .. M=$(MICROKERNEL_BUILD_DIR) clean; \
-	fi
-
-clean--liblcd:
-	if test -e $(LIBLCD_BUILD_DIR)/Kbuild; then \
-		$(MAKE) -C .. M=$(LIBLCD_BUILD_DIR) clean; \
-	fi
-
-clean-lib%:
-	if test -d $(MICROKERNEL_BUILD_DIR)/$(subst clean-,,$@).build; then \
-		$(MAKE) -C $(MICROKERNEL_BUILD_DIR)/$(subst clean-,,$@).build clean; \
-	fi
-	if test -d $(LIBLCD_BUILD_DIR)/$(subst clean-,,$@).build; then \
-		$(MAKE) -C $(LIBLCD_BUILD_DIR)/$(subst clean-,,$@).build clean; \
-	fi
-	rm -rf $(MICROKERNEL_BUILD_DIR)/$(subst clean-,,$@).install
-	rm -rf $(LIBLCD_BUILD_DIR)/$(subst clean-,,$@).install
-
-clean-testmods:
-	if test -e $(LCD_TEST_MODULES_BUILD_DIR)/Kbuild; then \
-		$(MAKE) -C .. M=$(LCD_TEST_MODULES_BUILD_DIR) clean; \
-	fi
-
-clean: clean-microkernel clean--liblcd \
-	clean-libcap clean-libfipc clean-libasync \
-	clean-testmods
+# (clean is set in included makefiles above)
 
 distclean:
 	rm -rf $(LCD_BUILD_DIR)
@@ -150,20 +121,6 @@ distclean:
 # ------------------------------------------------------------
 # phonies
 
-.PHONY: \
-	microkernel \
-	libcap.microkernel \
-	libfipc.microkernel \
-	libasync.microkernel \
-	liblcd \
-	$(LIBLCD_BUILD_DIR)/lib.a \
-	libcap.liblcd \
-	libfipc.liblcd \
-	libasync.liblcd \
-	test_mods \
-	clean \
-	clean-microkernel \
-	clean--liblcd \
-	clean-testmods \
+.PHONY +=  \
 	clean \
 	distclean

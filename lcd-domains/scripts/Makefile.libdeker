@@ -34,7 +34,16 @@ LIBDEKER_CFLAGS= \
 	-I$(LIBDEKER_BUILD_DIR)/libasync.install/include \
         -DLIBDEKER_FUNC_ATTR=$(LIBDEKER_WEAK_ATTR)
 
-export LIBDEKER_CFLAGS
+LIBDEKER_BAD_CFLAGS= \
+	-fno-delete-null-pointer-checks \
+	-mpreferred-stack-boundary=3 \
+	-maccumulate-outgoing-args \
+	-fconserve-stack \
+	-Wno-unused-but-set-variable \
+	-mtune=generic \
+	-DCC_HAVE_ASM_GOTO
+
+export LIBDEKER_CFLAGS LIBDEKER_BAD_CFLAGS
 
 LIBDEKER_DIRS=$(shell cd libdeker && find . -mindepth 1 -type d)
 LIBDEKER_DIRS:=$(foreach d,$(LIBDEKER_DIRS),libdeker/$(d))
@@ -129,4 +138,24 @@ $(LIBDEKER_BUILD_DIRS):
 	@echo "  MKDIR      $@"
 	@mkdir -p $@
 
+clean-libdeker: clean-libdeker-libcap clean-libdeker-libfipc \
+                clean-libdeker-libasync
+	if test -e $(LIBDEKER_BUILD_DIR)/Kbuild; then \
+		$(MAKE) -C .. M=$(LIBDEKER_BUILD_DIR) clean; \
+	fi
+
+clean-libdeker-lib%:
+	if test -d $(LIBLCD_BUILD_DIR)/$(subst clean-libdeker-,,$@).build; then \
+		$(MAKE) -C $(LIBLCD_BUILD_DIR)/$(subst clean-libdeker-,,$@).build clean; \
+	fi
+	rm -rf $(LIBDEKER_BUILD_DIR)/$(subst clean-libdeker-,,$@).install
+
+clean += clean-libdeker
+
+.PHONY += \
+	libdeker \
+	libcap.libdeker \
+	libfipc.libdeker \
+	libasync.libdeker \
+	clean-libdeker
 

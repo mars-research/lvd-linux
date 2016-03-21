@@ -1,12 +1,8 @@
 #
 # Top-level test mods Kbuild file
 #
-# Some of these variables are exported from the top-level Makefile.
-#
 
-export ISOLATED_CC_FLAGS= $(LIBLCD_CFLAGS)
-
-export NON_ISOLATED_CC_FLAGS= $(MICROKERNEL_CFLAGS)
+include Kbuild.config
 
 # Examples
 

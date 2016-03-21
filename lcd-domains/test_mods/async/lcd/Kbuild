@@ -3,6 +3,6 @@ obj-m  += lcd_test_mod_async_lcd.o
 
 lcd_test_mod_async_lcd-y              += lcd.o
 
-lcd_test_mod_async_lcd-y              += $(LIBLCD)
+lcd_test_mod_async_lcd-$(LCD_CONFIG_ASYNC_LCD_ISOLATED) += $(LIBLCD)
 
-ccflags-y += $(ISOLATED_CC_FLAGS)
+ccflags-$(LCD_CONFIG_ASYNC_LCD_ISOLATED) += $(ISOLATED_CFLAGS)

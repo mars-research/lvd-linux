@@ -574,9 +574,7 @@ int strtobool(const char *s, bool *res)
 }
 EXPORT_SYMBOL(strtobool);
 
-/* BEGIN LCD */
-//#ifndef __HAVE_ARCH_MEMSET
-/* END LCD */
+#ifndef __HAVE_ARCH_MEMSET
 /**
  * memset - Fill a region of memory with the given value
  * @s: Pointer to the start of the area.
@@ -594,13 +592,9 @@ void *memset(void *s, int c, size_t count)
 	return s;
 }
 EXPORT_SYMBOL(memset);
-/* BEGIN LCD */
-//#endif
-/* END LCD */
+#endif
 
-/* BEGIN LCD */
-//#ifndef __HAVE_ARCH_MEMCPY
-/* END LCD */
+#ifndef __HAVE_ARCH_MEMCPY
 /**
  * memcpy - Copy one area of memory to another
  * @dest: Where to copy to
@@ -620,13 +614,9 @@ void *memcpy(void *dest, const void *src, size_t count)
 	return dest;
 }
 EXPORT_SYMBOL(memcpy);
-/* BEGIN LCD */
-//#endif
-/* END LCD */
+#endif
 
-/* BEGIN LCD */
-//#ifndef __HAVE_ARCH_MEMMOVE
-/* END LCD */
+#ifndef __HAVE_ARCH_MEMMOVE
 /**
  * memmove - Copy one area of memory to another
  * @dest: Where to copy to
@@ -656,9 +646,7 @@ void *memmove(void *dest, const void *src, size_t count)
 	return dest;
 }
 EXPORT_SYMBOL(memmove);
-/* BEGIN LCD */
-//#endif
-/* END LCD */
+#endif
 
 #ifndef __HAVE_ARCH_MEMCMP
 /**

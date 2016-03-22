@@ -62,7 +62,7 @@ struct lcd_boot_info * lcd_get_boot_info(void);
 static inline void lcd_dump_boot_info(struct lcd_boot_info *b)
 {
 	unsigned long idx;
-	unsigned char *bits = (char *)b;
+	unsigned char *bits = (unsigned char *)b;
 	/*
 	 * This isn't ideal for printing, but it needs to be useable
 	 * before kmalloc etc. is available. (Can't alloc a string

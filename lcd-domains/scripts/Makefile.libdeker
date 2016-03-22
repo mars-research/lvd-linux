@@ -20,6 +20,20 @@ export LIBDEKER_BUILD_DIR
 
 LIBDEKER_WEAK_ATTR='__attribute__((weak))'
 
+# We need to turn off the -Wuninitialized error. The uninitialized() macro
+# defined in include/linux/compiler-gcc.h doesn't work with clang.
+
+# Turn off -Wpointer-sign error. This ignores pointer casts like:
+#     char *y = ...
+#     unsigned char *x = (unsigned char *)y;
+
+# Turn off -Wgnu-variable-sized-type-not-at-end. gcc allows variable-sized
+# types to *not* be at the end of a struct, but clang/normal C doesn't.
+
+# Turn off -Wunused-function. clang warns about unused static inlines, but
+# gcc doesn't. There's enough of them that it's easier for now just to turn
+# off this warning.
+
 LIBDEKER_BASE_CFLAGS=\
 	$(LCD_DOMAINS_CFLAGS) \
 	-I$(LCD_DOMAINS_TOP_SRC_DIR)/include \
@@ -30,7 +44,16 @@ LIBDEKER_BASE_CFLAGS=\
 	-DMODULE \
 	-DLCD_ISOLATE \
 	-DCPTR_CACHE_LOCK_PADDING_SIZE=8 \
-	-DDEKER
+	-DDEKER=1 \
+	-Wno-uninitialized \
+	-Wno-pointer-sign \
+	-Wno-gnu-variable-sized-type-not-at-end \
+	-Wno-unused-function \
+	-DHAVE_INLINE \
+	-DHAVE_BUILTIN_EXPECT \
+	-DHAVE_BUILTIN_MEMCPY \
+	-DHAVE_BUILTIN_VA_START \
+	-DHAVE_BUILTIN_OBJECT_SIZE
 
 LIBDEKER_CFLAGS= \
 	$(LIBDEKER_BASE_CFLAGS) \
@@ -46,13 +69,14 @@ LIBDEKER_BAD_CFLAGS= \
 	-fconserve-stack \
 	-Wno-unused-but-set-variable \
 	-mtune=generic \
-	-DCC_HAVE_ASM_GOTO
+	-DCC_HAVE_ASM_GOTO \
+	-gdwarf-2
 
 export LIBDEKER_CFLAGS LIBDEKER_BAD_CFLAGS
 
 LIBDEKER_DIRS=$(shell cd libdeker && find . -mindepth 1 -type d)
 LIBDEKER_DIRS:=$(foreach d,$(LIBDEKER_DIRS),libdeker/$(d))
-LIBLCD_FOR_DEKER_DIRS=$(foreach d,$(LIBLCD_DIRS),liblcd_build/liblcd/$(d))
+LIBLCD_FOR_DEKER_DIRS=$(foreach d,$(LIBLCD_DIRS),liblcd_build/$(d))
 LIBDEKER_DIRS:= \
 	$(LIBDEKER_DIRS) \
 	libcap.build \
@@ -76,34 +100,34 @@ LIBDEKER_LIB_CFLAGS= $(LIBDEKER_BASE_CFLAGS)
 # I mash this in one line for now.
 LIBLCD_FOR_DEKER_AR_SCRIPT="CREATE $(LIBDEKER_BUILD_DIR)/liblcd_build/liblcd.a\nADDLIB $(LIBDEKER_BUILD_DIR)/liblcd_build/lib.a\nADDLIB $(LIBDEKER_BUILD_DIR)/libcap.install/lib/libcap.a\nADDLIB $(LIBDEKER_BUILD_DIR)/libfipc.install/lib/libfipc.a\nADDLIB $(LIBDEKER_BUILD_DIR)/libasync.install/lib/libasync.a\nSAVE\nEND\n"
 
-$(LIBDEKER_BUILD_DIR)/libdeker.a.bc: libdeker
-	$(WLLVM_EXTRACT_BC_PATH) $(LIBDEKER_BUILD_DIR)/libdeker.a \
-	--output $@
+$(LIBDEKER_BUILD_DIR)/libdeker.bca: libdeker
+	$(WLLVM_EXTRACT_BC_PATH) $(LIBDEKER_BUILD_DIR)/libdeker.a
 
 libdeker: $(LIBDEKER_BUILD_DIR)/lib.a
 	@echo "  AR      $@"
 	@echo $(LIBDEKER_AR_SCRIPT) | ar -M
 
-$(LIBDEKER_BUILD_DIR)/liblcd_build/liblcd.a.bc: liblcd_for_deker
-	$(WLLVM_EXTRACT_BC_PATH) $(LIBLCD_BUILD_DIR)/liblcd_build/liblcd.a \
-	--output $@
+$(LIBDEKER_BUILD_DIR)/liblcd_build/liblcd.bca: liblcd_for_deker
+	$(WLLVM_EXTRACT_BC_PATH) $(LIBLCD_BUILD_DIR)/liblcd_build/liblcd.a
 
 liblcd_for_deker: $(LIBDEKER_BUILD_DIR)/liblcd_build/lib.a | \
 	$(LIBDEKER_LIBCAP) $(LIBDEKER_LIBFIPC) $(LIBDEKER_LIBASYNC)
-	@echo "  AR      $@"
+	@echo "  AR      liblcd.a"
 	@echo $(LIBLCD_FOR_DEKER_AR_SCRIPT) | ar -M
 
 $(LIBDEKER_BUILD_DIR)/liblcd_build/lib.a: \
 	$(LIBDEKER_BUILD_DIR)/liblcd_build/Kbuild | \
 	$(LIBDEKER_LIBCAP) $(LIBDEKER_LIBFIPC) $(LIBDEKER_LIBASYNC)
 	$(MAKE) -C .. M=$(LIBDEKER_BUILD_DIR)/liblcd_build $(MAKEFLAGS) \
-	LIBLCD_CFLAGS=$(LIBDEKER_CFLAGS)
+	LIBLCD_CFLAGS="$(LIBDEKER_CFLAGS)"
 
-$(LIBDEKER_BUILD_DIR)/liblcd_build/Kbuild: scripts/Kbuild.liblcd
+$(LIBDEKER_BUILD_DIR)/liblcd_build/Kbuild: scripts/Kbuild.liblcd | \
+	$(LIBDEKER_BUILD_DIRS)
 	@echo "  KBUILD  $@"
 	@printf "# This part is auto prepended by Makefile.libdeker:\n\n" > $@ && \
 	printf "export CC=$(WLLVM_PATH)\n" >> $@ && \
-	printf "KBUILD_CFLAGS := $$(filter-out $$(LIBDEKER_BAD_CFLAGS), $$(KBUILD_CFLAGS))\n" >> $@ && \
+	printf 'KBUILD_CFLAGS := $$(filter-out $$(LIBDEKER_BAD_CFLAGS), $$(KBUILD_CFLAGS))\n' >> $@ && \
+	printf 'KBUILD_AFLAGS := $$(filter-out $$(LIBDEKER_BAD_CFLAGS), $$(KBUILD_AFLAGS))\n' >> $@ && \
 	printf "\n# End of auto prepended part\n\n" >> $@ && \
 	cat $< >> $@
 
@@ -111,12 +135,13 @@ $(LIBDEKER_BUILD_DIR)/lib.a: $(LIBDEKER_BUILD_DIR)/Kbuild | \
 	$(LIBDEKER_BUILD_DIRS)
 	$(MAKE) -C .. M=$(LIBDEKER_BUILD_DIR) $(MAKEFLAGS)
 
-libcap.libdeker: $(LIBLCD_BUILD_DIR)/libcap.build/Makefile
-	$(MAKE) -C $(LIBLCD_BUILD_DIR)/libcap.build \
+libcap.libdeker: $(LIBDEKER_BUILD_DIR)/libcap.build/Makefile
+	$(MAKE) -C $(LIBDEKER_BUILD_DIR)/libcap.build \
 	CC=$(WLLVM_PATH) \
-	CFLAGS="$(LIBLCD_LIB_CFLAGS)" $(MAKEFLAGS) && \
-        LIBCAP_BAD_CFLAGS="$(LIBDEKER_BAD_CFLAGS)" && \
-	$(MAKE) -C $(LIBLCD_BUILD_DIR)/libcap.build install $(MAKEFLAGS)
+	CFLAGS="$(LIBDEKER_LIB_CFLAGS)" \
+	LIBCAP_BAD_CFLAGS="$(LIBDEKER_BAD_CFLAGS)" \
+	$(MAKEFLAGS) && \
+	$(MAKE) -C $(LIBDEKER_BUILD_DIR)/libcap.build install $(MAKEFLAGS)
 
 $(LIBDEKER_BUILD_DIR)/libcap.build/Makefile: libcap/configure | \
 	$(LIBDEKER_BUILD_DIRS)
@@ -133,8 +158,9 @@ $(LIBDEKER_BUILD_DIR)/libcap.build/Makefile: libcap/configure | \
 libfipc.libdeker: $(LIBDEKER_BUILD_DIR)/libfipc.build/Makefile
 	$(MAKE) -C $(LIBDEKER_BUILD_DIR)/libfipc.build \
 	CC=$(WLLVM_PATH) \
-	CFLAGS="$(LIBDEKER_LIB_CFLAGS) -I$(LIBDEKER_BUILD_DIR)/libcap.install/include" $(MAKEFLAGS) && \
-        LIBFIPC_BAD_CFLAGS="$(LIBDEKER_BAD_CFLAGS)" && \
+	CFLAGS="$(LIBDEKER_LIB_CFLAGS) -I$(LIBDEKER_BUILD_DIR)/libcap.install/include" \
+        LIBFIPC_BAD_CFLAGS="$(LIBDEKER_BAD_CFLAGS)" \
+	$(MAKEFLAGS) && \
 	$(MAKE) -C $(LIBDEKER_BUILD_DIR)/libfipc.build install $(MAKEFLAGS)
 
 $(LIBDEKER_BUILD_DIR)/libfipc.build/Makefile: \
@@ -149,8 +175,9 @@ $(LIBDEKER_BUILD_DIR)/libfipc.build/Makefile: \
 libasync.libdeker: $(LIBDEKER_BUILD_DIR)/libasync.build/Makefile
 	$(MAKE) -C $(LIBDEKER_BUILD_DIR)/libasync.build \
 	CC=$(WLLVM_PATH) \
-	CFLAGS="$(LIBDEKER_LIB_CFLAGS) -I$(LIBDEKER_BUILD_DIR)/libcap.install/include -I$(LIBDEKER_BUILD_DIR)/libfipc.install/include -DNDEBUG" $(MAKEFLAGS) && \
-        LIBASYNC_BAD_CFLAGS="$(LIBDEKER_BAD_CFLAGS)" && \
+	CFLAGS="$(LIBDEKER_LIB_CFLAGS) -I$(LIBDEKER_BUILD_DIR)/libcap.install/include -I$(LIBDEKER_BUILD_DIR)/libfipc.install/include -DNDEBUG" \
+        LIBASYNC_BAD_CFLAGS="$(LIBDEKER_BAD_CFLAGS)" \
+	$(MAKEFLAGS) && \
 	$(MAKE) -C $(LIBDEKER_BUILD_DIR)/libasync.build install $(MAKEFLAGS)
 
 $(LIBDEKER_BUILD_DIR)/libasync.build/Makefile: libasync/configure | \
@@ -193,7 +220,9 @@ clean += clean-libdeker
 
 .PHONY += \
 	libdeker \
+	$(LIBDEKER_BUILD_DIR)/lib.a \
 	liblcd_for_deker \
+	$(LIBDEKER_BUILD_DIR)/liblcd_build/lib.a \
 	libcap.libdeker \
 	libfipc.libdeker \
 	libasync.libdeker \

@@ -41,6 +41,12 @@ lib-y += $(addprefix liblcd/mm/, \
 	util.o \
 	)
 
+lib-y += $(addprefix liblcd/arch/x86/lib/, \
+      memset_64.o \
+      memcpy_64.o \
+      memmove_64.o \
+      )
+
 lib-y += liblcd/resolve.o
 
 # code shared by kliblcd and isolated liblcd

@@ -44,7 +44,7 @@ LIBLCD_LIBCAP=$(LIBLCD_BUILD_DIR)/libcap.install/lib/libcap.a
 LIBLCD_LIBFIPC=$(LIBLCD_BUILD_DIR)/libfipc.install/lib/libfipc.a
 LIBLCD_LIBFIPC=$(LIBLCD_BUILD_DIR)/libasync.install/lib/libasync.a
 
-LIBLCD_WEAK_ATTR=\"__attribute__((weak))\"
+LIBLCD_WEAK_ATTR='__attribute__((weak))'
 
 LIBLCD_LIB_CFLAGS= $(LIBLCD_BASE_CFLAGS)
 
@@ -117,6 +117,7 @@ clean-liblcd: clean-liblcd-libcap clean-liblcd-libfipc clean-liblcd-libasync
 	if test -e $(LIBLCD_BUILD_DIR)/Kbuild; then \
 		$(MAKE) -C .. M=$(LIBLCD_BUILD_DIR) clean; \
 	fi
+	rm -f $(LIBLCD_BUILD_DIR)/liblcd.a
 
 clean-liblcd-lib%:
 	if test -d $(LIBLCD_BUILD_DIR)/$(subst clean-liblcd-,,$@).build; then \

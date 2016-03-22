@@ -1,0 +1,16 @@
+#
+# libdeker dummy targets
+#
+
+libdeker:
+liblcd_for_deker:
+libcap.libdeker:
+libfipc.libdeker:
+libasync.libdeker:
+
+.PHONY += \
+	libdeker \
+	liblcd_for_deker \
+	libcap.libdeker \
+	libfipc.libdeker \
+	libasync.libdeker

@@ -91,6 +91,8 @@ include scripts/Makefile.liblcd
 
 ifneq ($(DEKER),)
 include scripts/Makefile.libdeker
+else # ! DEKER
+include scripts/Makefile.libdeker.dummy
 endif
 
 # ------------------------------------------------------------

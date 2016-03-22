@@ -11,8 +11,7 @@
 src = $(LCD_DOMAINS_TOP_SRC_DIR)
 
 # Force the kernel build to use wllvm (whole program llvm) with clang
-export LLVM_COMPILER=$(CLANG_PATH)
-export CC=$(WLLVM_DIR)/wllvm
+export CC=$(WLLVM_PATH)
 
 # ------------------------------------------------------------
 

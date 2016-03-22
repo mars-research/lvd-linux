@@ -6,7 +6,8 @@ obj-m += lcd_test_mod_glue_example_vfs.o
 # original code
 lcd_test_mod_glue_example_vfs-y      += original/main.o
 
-# if we're isolating ...
+# ISOLATED CONFIG --------------------------------------------------
+
 lcd_test_mod_glue_example_vfs-$(LCD_CONFIG_GLUE_EXAMPLE_VFS_ISOLATED) += \
 	glue/boot.o
 lcd_test_mod_glue_example_vfs-$(LCD_CONFIG_GLUE_EXAMPLE_VFS_ISOLATED) += \
@@ -25,6 +26,26 @@ extra-$(LCD_CONFIG_GLUE_EXAMPLE_VFS_ISOLATED) := glue/vfs_callee.lds
 ldflags-$(LCD_CONFIG_GLUE_EXAMPLE_VFS_ISOLATED) += \
 	-T $(LCD_TEST_MODULES_BUILD_DIR)/glue_example/vfs/glue/vfs_callee.lds
 
-# Not isolating ...
+# NONISOLATED CONFIG --------------------------------------------------
+
 ccflags-$(LCD_CONFIG_GLUE_EXAMPLE_VFS_NONISOLATED) += $(NONISOLATED_CFLAGS)
 
+# DEKER CONFIG --------------------------------------------------
+
+lcd_test_mod_glue_example_vfs-$(LCD_CONFIG_GLUE_EXAMPLE_VFS_DEKER) += \
+	glue/boot.o
+lcd_test_mod_glue_example_vfs-$(LCD_CONFIG_GLUE_EXAMPLE_VFS_DEKER) += \
+	glue/vfs_callee.o
+lcd_test_mod_glue_example_vfs-$(LCD_CONFIG_GLUE_EXAMPLE_VFS_DEKER) += \
+	glue/vfs_cap.o
+lcd_test_mod_glue_example_vfs-$(LCD_CONFIG_GLUE_EXAMPLE_VFS_DEKER) += \
+	$(LIBDEKER) $(LIBLCD)
+ccflags-$(LCD_CONFIG_GLUE_EXAMPLE_VFS_DEKER) += $(DEKER_CFLAGS)
+
+# Run linker script through C preprocessor (so we can use macros)
+cppflags-$(LCD_CONFIG_GLUE_EXAMPLE_VFS_DEKER) := $(DEKER_CFLAGS)
+extra-$(LCD_CONFIG_GLUE_EXAMPLE_VFS_DEKER) := glue/vfs_callee.lds
+
+# run link script
+ldflags-$(LCD_CONFIG_GLUE_EXAMPLE_VFS_DEKER) += \
+	-T $(LCD_TEST_MODULES_BUILD_DIR)/glue_example/vfs/glue/vfs_callee.lds

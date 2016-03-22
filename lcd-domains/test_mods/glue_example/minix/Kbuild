@@ -6,7 +6,8 @@ obj-m += lcd_test_mod_glue_example_minix.o
 # original code
 lcd_test_mod_glue_example_minix-y    += original/main.o
 
-# conditional compile, whether we're isolating or not
+# ISOLATED BUILD CONFIG ----------------------------------------
+
 lcd_test_mod_glue_example_minix-$(LCD_CONFIG_GLUE_EXAMPLE_MINIX_ISOLATED) += \
 	glue/boot.o
 lcd_test_mod_glue_example_minix-$(LCD_CONFIG_GLUE_EXAMPLE_MINIX_ISOLATED) += \
@@ -17,5 +18,18 @@ lcd_test_mod_glue_example_minix-$(LCD_CONFIG_GLUE_EXAMPLE_MINIX_ISOLATED) += \
 	$(LIBLCD)
 ccflags-$(LCD_CONFIG_GLUE_EXAMPLE_MINIX_ISOLATED) += $(ISOLATED_CFLAGS)
 
-# not isolating :
+# NONISOLATED BUILD CONFIG ----------------------------------------
+
 ccflags-$(LCD_CONFIG_GLUE_EXAMPLE_MINIX_NONISOLATED) += $(NONISOLATED_CFLAGS)
+
+# DEKER BUILD CONFIG --------------------------------------------------
+
+lcd_test_mod_glue_example_minix-$(LCD_CONFIG_GLUE_EXAMPLE_MINIX_DEKER) += \
+	glue/boot.o
+lcd_test_mod_glue_example_minix-$(LCD_CONFIG_GLUE_EXAMPLE_MINIX_DEKER) += \
+	glue/vfs_caller.o
+lcd_test_mod_glue_example_minix-$(LCD_CONFIG_GLUE_EXAMPLE_MINIX_DEKER) += \
+	glue/vfs_cap.o
+lcd_test_mod_glue_example_minix-$(LCD_CONFIG_GLUE_EXAMPLE_MINIX_DEKER) += \
+	$(LIBDEKER) $(LIBLCD)
+ccflags-$(LCD_CONFIG_GLUE_EXAMPLE_MINIX_DEKER) += $(DEKER_CFLAGS)

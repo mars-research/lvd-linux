@@ -21,8 +21,8 @@ create_klcd/boot nonisolated
 create_klcd/klcd nonisolated
 
 glue_example/boot nonisolated
-glue_example/minix isolated
-glue_example/vfs isolated
+glue_example/minix deker
+glue_example/vfs deker
 
 ipc1/boot nonisolated
 ipc1/lcd isolated

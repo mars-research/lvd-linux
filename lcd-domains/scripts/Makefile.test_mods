@@ -24,8 +24,6 @@ TEST_MODULES_BUILD_KBUILDS=$(foreach kb,$(TEST_MODULES_KBUILDS), \
 
 KLIBLCD_SYMBOLS=$(MICROKERNEL_BUILD_DIR)/Module.symvers
 
-LIBLCD_PATH_CMD=$(shell scripts/relpath.py $(LIBLCD_BUILD_DIR)/liblcd.a $(shell dirname $(shell readlink -f $@)))
-
 # ------------------------------------------------------------
 # CFLAGS for each build configuration
 
@@ -38,9 +36,16 @@ export DEKER_CFLAGS=$(LIBDEKER_CFLAGS)
 
 ifneq ($(DEKER),)
 
+# We use a clang-compiled version of liblcd
+LIBLCD_PATH_CMD=$(shell scripts/relpath.py $(LIBDEKER_BUILD_DIR)/liblcd_build/liblcd.a $(shell dirname $(shell readlink -f $@)))
+
 LIBDEKER_PATH_CMD=$(shell scripts/relpath.py $(LIBDEKER_BUILD_DIR)/libdeker.a $(shell dirname $(shell readlink -f $@)))
 
 MAYBE_LIBDEKER=$(LIBDEKER_BUILD_PATH)/libdeker/libdeker.a
+
+else
+
+LIBLCD_PATH_CMD=$(shell scripts/relpath.py $(LIBDLCD_BUILD_DIR)/liblcd.a $(shell dirname $(shell readlink -f $@)))
 
 endif
 

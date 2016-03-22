@@ -115,7 +115,7 @@ static int do_mem_itree_lookup(struct lcd_mem_itree *tree,
 
 	mutex_lock(&tree->lock);
 
-	ret = do_mem_itree_lookup(tree, addr, node_out);
+	ret = do_mem_itree_lookup_nolock(tree, addr, node_out);
 
 	mutex_unlock(&tree->lock);
 

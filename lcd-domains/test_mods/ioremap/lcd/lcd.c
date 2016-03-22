@@ -23,13 +23,16 @@ static int __init ioremap_test_lcd_init(void)
 	int ret = 0;
 	
 	ret = lcd_enter();
+
+#if 0
 	/* only a single page */
 	ret = _lcd_alloc_pages(0, 0, &page);
 	if(ret) {
 		LIBLCD_ERR("low level alloc failed");	
 		goto exit;
 	}
-
+#endif
+	page = lcd_get_boot_info()->cptrs[0];
 	ret = lcd_ioremap_phys(page, 4096, &addr);
 	if(ret) {
 	 	LIBLCD_ERR("__ioremap failed with %d", ret);
@@ -45,8 +48,8 @@ static int __init ioremap_test_lcd_init(void)
 	
 	printk("virt_addr %p \n",virt_addr);
 	/*We should be able to touch address here */
-	memset(virt_addr,0xAB, 4096);
-	printk("val @ virtaddr- %x \n", *((unsigned char *)virt_addr+40));
+	//memset(virt_addr,0xAB, 4096);
+	printk("val @ virtaddr- %x \n", *((unsigned int *)(virt_addr+0x808)));
 	
 	lcd_exit(ret);
 	return ret;
@@ -56,7 +59,7 @@ ioremap_va_exit:
 
 ioremap_exit:
 	lcd_cap_delete(page);
-exit:
+//exit:
 	lcd_exit(ret);
 	return ret;
 }

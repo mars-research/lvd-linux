@@ -1,4 +1,4 @@
 
-obj-m += boot/
-obj-m += caller_lcd/
-obj-m += callee_lcd/
+obj-$(LCD_CONFIG_BUILD_ASYNC_RPC_BOOT) += boot/
+obj-$(LCD_CONFIG_BUILD_ASYNC_RPC_CALLER_LCD) += caller_lcd/
+obj-$(LCD_CONFIG_BUILD_ASYNC_RPC_CALLEE_LCD) += callee_lcd/

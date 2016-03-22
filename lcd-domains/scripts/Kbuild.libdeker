@@ -13,16 +13,22 @@ src = $(LCD_DOMAINS_TOP_SRC_DIR)
 # ------------------------------------------------------------
 
 lib-y += $(addprefix libdeker/, \
-      main.o \
+      smack.o \
       )
 
 lib-y += $(addprefix libdeker/lcd-domains/, \
       sync_ipc.o \
+      enter_exit.o \
+      console.o \
       )
 
-lib-y += $(addprefix $(LIBDEKER_BUILD_DIR)/libdeker, \
-      smack.o \
-      )
+# Don't include this in the static lib.a. Modules built for deker
+# always need to include this, and the functions in deker_rt.o won't
+# get sucked in if we put them in a lib.a (if nothing in the module
+# calls the functions, like "main").
+extra-y += $(addprefix libdeker/, \
+	deker_rt.o \
+	)
 
 ccflags-y += $(LIBDEKER_CFLAGS)
 

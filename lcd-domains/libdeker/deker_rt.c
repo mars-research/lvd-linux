@@ -1,5 +1,5 @@
 /*
- * main.c
+ * deker_rt.c
  *
  * This contains the main function, as required by Smack.
  */
@@ -10,7 +10,8 @@
 
 #include <lcd_config/post_hook.h>
 
-int main(void)
+int 
+main(void)
 {
 	return init_module();
 }

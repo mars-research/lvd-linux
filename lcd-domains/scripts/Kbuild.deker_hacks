@@ -8,3 +8,4 @@ export CC=$(WLLVM_PATH)
 
 # Remove cflags that clang throws a fit about
 KBUILD_CFLAGS := $(filter-out $(LIBDEKER_BAD_CFLAGS), $(KBUILD_CFLAGS))
+KBUILD_AFLAGS := $(filter-out $(LIBDEKER_BAD_CFLAGS), $(KBUILD_AFLAGS))

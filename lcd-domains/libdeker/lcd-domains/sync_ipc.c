@@ -14,5 +14,12 @@ int
 LIBDEKER_FUNC_ATTR
 lcd_sync_send(cptr_t c)
 {
-	return 12345;
+	return 0;
+}
+
+int 
+LIBDEKER_FUNC_ATTR
+lcd_sync_reply(void)
+{
+	return 0;
 }

@@ -109,9 +109,9 @@ clean-mk-lib%:
 	fi
 	rm -rf $(MICROKERNEL_BUILD_DIR)/$(subst clean-mk-,,$@).install
 
-clean += clean-microkernel
+clean: clean-microkernel
 
-.PHONY += \
+.PHONY: \
 	microkernel \
 	libcap.microkernel \
 	libfipc.microkernel \

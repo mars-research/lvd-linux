@@ -32,7 +32,9 @@ void _lcd_printk(const char *fmt, va_list args)
 	lcd_syscall_putchar(0);
 }
 
-void lcd_printk(const char *fmt, ...)
+void 
+LIBLCD_FUNC_ATTR
+lcd_printk(const char *fmt, ...)
 {
 	va_list args;
 	/*

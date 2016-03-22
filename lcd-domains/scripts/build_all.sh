@@ -16,4 +16,4 @@ make libasync.libdeker $@
 make liblcd_for_deker $@
 make libdeker
 
-make test_mods $@
+make test_mods_deker $@

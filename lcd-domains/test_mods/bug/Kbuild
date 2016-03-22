@@ -1,0 +1,3 @@
+
+obj-$(LCD_CONFIG_BUILD_BUG_BOOT) += boot/
+obj-$(LCD_CONFIG_BUILD_BUG_LCD) += lcd/

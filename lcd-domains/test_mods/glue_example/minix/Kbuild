@@ -35,5 +35,7 @@ lcd_test_mod_glue_example_minix-$(LCD_CONFIG_GLUE_EXAMPLE_MINIX_DEKER) += \
 lcd_test_mod_glue_example_minix-$(LCD_CONFIG_GLUE_EXAMPLE_MINIX_DEKER) += \
 	glue/vfs_cap.o
 lcd_test_mod_glue_example_minix-$(LCD_CONFIG_GLUE_EXAMPLE_MINIX_DEKER) += \
+	$(LIBDEKER_RUNTIME)
+lcd_test_mod_glue_example_minix-$(LCD_CONFIG_GLUE_EXAMPLE_MINIX_DEKER) += \
 	$(LIBDEKER)
 ccflags-$(LCD_CONFIG_GLUE_EXAMPLE_MINIX_DEKER) += $(DEKER_CFLAGS)

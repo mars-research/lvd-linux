@@ -43,6 +43,8 @@ lcd_test_mod_glue_example_vfs-$(LCD_CONFIG_GLUE_EXAMPLE_VFS_DEKER) += \
 lcd_test_mod_glue_example_vfs-$(LCD_CONFIG_GLUE_EXAMPLE_VFS_DEKER) += \
 	glue/vfs_cap.o
 lcd_test_mod_glue_example_vfs-$(LCD_CONFIG_GLUE_EXAMPLE_VFS_DEKER) += \
+	$(LIBDEKER_RUNTIME)
+lcd_test_mod_glue_example_vfs-$(LCD_CONFIG_GLUE_EXAMPLE_VFS_DEKER) += \
 	$(LIBDEKER)
 ccflags-$(LCD_CONFIG_GLUE_EXAMPLE_VFS_DEKER) += $(DEKER_CFLAGS)
 

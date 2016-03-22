@@ -18,7 +18,9 @@
 
 static int thc_initialized;
 
-int lcd_enter(void)
+int 
+LIBLCD_FUNC_ATTR
+lcd_enter(void)
 {
 	int ret;
 	/*
@@ -101,7 +103,9 @@ fail:
 	return ret;
 }
 
-void __noreturn lcd_exit(int retval)
+void 
+LIBLCD_FUNC_ATTR
+__noreturn lcd_exit(int retval)
 {
 	lcd_printk("=================");
 	lcd_printk("LCD SHUTTING DOWN");

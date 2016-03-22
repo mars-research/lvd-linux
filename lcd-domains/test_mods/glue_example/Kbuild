@@ -1,4 +1,4 @@
 
-obj-m += boot/
-obj-m += vfs/
-obj-m += minix/
+obj-$(LCD_CONFIG_BUILD_GLUE_EXAMPLE_BOOT) += boot/
+obj-$(LCD_CONFIG_BUILD_GLUE_EXAMPLE_VFS) += vfs/
+obj-$(LCD_CONFIG_BUILD_GLUE_EXAMPLE_MINIX) += minix/

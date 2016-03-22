@@ -46,7 +46,7 @@ struct lcd_trampoline_handle {
  * trampoline you write.
  */
 #define LCD_TRAMPOLINE_PROLOGUE(hidden_args, fname) {	\
-    void **__ip;                       \
+    void **__ip;                      \
     asm(			      \
         "jmp 1f \n\t"		      \
 				      \
@@ -59,10 +59,11 @@ struct lcd_trampoline_handle {
         /* This next bit may not be portable. It assumes that */  \
         /* the following instruction is 7 bytes. RIP-relative */  \
         /* addressing is relative to the *next* instruction.  */  \
-        "movq -0xf(%%rip), %0 \n\t" \
+        "movq -0xf(%%rip), %%rax \n\t" \
+        "movq %%rax, %0 \n\t" \
 		                    \
 		: "=g"(__ip)   \
-		::);           \
+		:: "rax");           \
     hidden_args = *(__ip - 1);	\
 }
 

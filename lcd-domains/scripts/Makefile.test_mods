@@ -34,7 +34,7 @@ export DEKER_CFLAGS=$(LIBDEKER_CFLAGS)
 # ------------------------------------------------------------
 # LIBLCD
 
-LIBLCD_PATH_CMD=$(shell scripts/relpath.py $(LIBDLCD_BUILD_DIR)/liblcd.a $(shell dirname $(shell readlink -f $@)))
+LIBLCD_PATH_CMD=$(shell scripts/relpath.py $(LIBLCD_BUILD_DIR)/liblcd.a $(shell dirname $(shell readlink -f $@)))
 
 # ------------------------------------------------------------
 # LIBDEKER
@@ -47,7 +47,9 @@ ifneq ($(DEKER),)
 
 LIBDEKER_PATH_CMD=$(shell scripts/relpath.py $(LIBDEKER_BUILD_DIR)/libdeker.a $(shell dirname $(shell readlink -f $@))) $(shell scripts/relpath.py $(LIBDEKER_BUILD_DIR)/liblcd_build/liblcd.a $(shell dirname $(shell readlink -f $@)))
 
-MAYBE_LIBDEKER=$(LIBDEKER_BUILD_PATH)/libdeker/libdeker.a
+LIBDEKER_RUNTIME_PATH_CMD=$(shell scripts/relpath.py $(LIBDEKER_BUILD_DIR)/libdeker/deker_rt.o $(shell dirname $(shell readlink -f $@)))
+
+MAYBE_LIBDEKER=$(LIBDEKER_BUILD_DIR)/libdeker.a
 
 endif
 
@@ -57,16 +59,20 @@ endif
 ifneq ($(DEKER),)
 
 test_mods_deker: test_mods
-	scripts/deker_mod_post.sh test_mods/config \
+	@echo "  DEKER MODPOST"
+	@scripts/deker_mod_post.sh test_mods/config \
 	$(WLLVM_EXTRACT_BC_PATH)
+
+else:
+
+test_mods_deker: test_mods
 
 endif
 
 test_mods: $(LCD_TEST_MODULES_BUILD_DIR)/Kbuild \
 	$(LCD_TEST_MODULES_BUILD_DIR)/Kbuild.config \
 	$(TEST_MODULES_BUILD_KBUILDS) | \
-	$(LIBLCD_BUILD_DIR)/liblcd.a $(TEST_MODULES_BUILD_DIRS) \
-	$(MAYBE_LIBDEKER)  
+	$(TEST_MODULES_BUILD_DIRS)
 	$(MAKE) -C .. M=$(LCD_TEST_MODULES_BUILD_DIR) \
 	KBUILD_EXTRA_SYMBOLS=$(KLIBLCD_SYMBOLS) $(MAKEFLAGS)
 
@@ -76,6 +82,7 @@ $(LCD_TEST_MODULES_BUILD_DIR)/%/Kbuild: $(LCD_TEST_MODULES_DIR)/%/Kbuild | \
 	@printf "#\n# BEGIN: Auto-generated part.\n#\n" > $@ && \
 	printf "\n" >> $@ && \
 	printf "LIBDEKER=$(LIBDEKER_PATH_CMD)\n" >> $@ && \
+	printf "LIBDEKER_RUNTIME=$(LIBDEKER_RUNTIME_PATH_CMD)\n" >> $@ && \
 	printf "LIBLCD=$(LIBLCD_PATH_CMD)\n" >> $@ && \
 	printf "src=$(shell dirname `readlink -f $<`)\n" >> $@ && \
 	printf "\n" >> $@ && \
@@ -101,8 +108,8 @@ clean-test_mods:
 		$(MAKE) -C .. M=$(LCD_TEST_MODULES_BUILD_DIR) clean; \
 	fi
 
-clean += clean-test_mods
+clean: clean-test_mods
 
-.PHONY += \
+.PHONY: \
 	test_mods \
 	clean-test_mods

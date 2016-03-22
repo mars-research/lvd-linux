@@ -19,6 +19,7 @@ NF == 0 { next }
 # Print out build config define for all others
 { 
     gsub(/\//, "_", $1)
+    print "export LCD_CONFIG_BUILD_" toupper($1) "=m";
     print "export LCD_CONFIG_" toupper($1) "_" toupper($2) "=y";
 }
 

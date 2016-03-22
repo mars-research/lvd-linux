@@ -8,6 +8,8 @@
 LIBLCD_BUILD_DIR=$(LCD_BUILD_DIR)/liblcd_build
 export LIBLCD_BUILD_DIR
 
+LIBLCD_WEAK_ATTR=
+
 LIBLCD_BASE_CFLAGS=\
 	$(LCD_DOMAINS_CFLAGS) \
 	-I$(LCD_DOMAINS_TOP_SRC_DIR)/include \
@@ -16,7 +18,8 @@ LIBLCD_BASE_CFLAGS=\
 	-DCONFIG_LAZY_THC \
 	-DMODULE \
 	-DLCD_ISOLATE \
-	-DCPTR_CACHE_LOCK_PADDING_SIZE=8
+	-DCPTR_CACHE_LOCK_PADDING_SIZE=8 \
+	-DLIBLCD_FUNC_ATTR=$(LIBLCD_WEAK_ATTR)
 
 LIBLCD_CFLAGS= \
 	$(LIBLCD_BASE_CFLAGS) \
@@ -43,8 +46,6 @@ LIBLCD_BUILD_DIRS=$(foreach dir,$(LIBLCD_DIRS),\
 LIBLCD_LIBCAP=$(LIBLCD_BUILD_DIR)/libcap.install/lib/libcap.a
 LIBLCD_LIBFIPC=$(LIBLCD_BUILD_DIR)/libfipc.install/lib/libfipc.a
 LIBLCD_LIBFIPC=$(LIBLCD_BUILD_DIR)/libasync.install/lib/libasync.a
-
-LIBLCD_WEAK_ATTR=
 
 LIBLCD_LIB_CFLAGS= $(LIBLCD_BASE_CFLAGS)
 
@@ -125,9 +126,9 @@ clean-liblcd-lib%:
 	fi
 	rm -rf $(LIBLCD_BUILD_DIR)/$(subst clean-liblcd-,,$@).install
 
-clean += clean-liblcd
+clean: clean-liblcd
 
-.PHONY += \
+.PHONY: \
 	liblcd \
 	$(LIBLCD_BUILD_DIR)/lib.a \
 	libcap.liblcd \

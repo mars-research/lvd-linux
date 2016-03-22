@@ -35,6 +35,12 @@ LIBDEKER_WEAK_ATTR='__attribute__((weak))'
 # gcc doesn't. There's enough of them that it's easier for now just to turn
 # off this warning.
 
+# Turn off -Wtautological-compare. clang warns of comparisons that are
+# always true/false.
+
+# Turn off -Wundef. Smack uses some undefined macros in the wrong way and
+# clang complains.
+
 LIBDEKER_BASE_CFLAGS=\
 	$(LCD_DOMAINS_CFLAGS) \
 	-I$(LCD_DOMAINS_TOP_SRC_DIR)/include \
@@ -50,19 +56,22 @@ LIBDEKER_BASE_CFLAGS=\
 	-Wno-pointer-sign \
 	-Wno-gnu-variable-sized-type-not-at-end \
 	-Wno-unused-function \
+	-Wno-tautological-compare \
+	-Wno-undef \
 	-DHAVE_INLINE \
 	-DHAVE_BUILTIN_EXPECT \
 	-DHAVE_BUILTIN_MEMCPY \
 	-DHAVE_BUILTIN_VA_START \
-	-DHAVE_BUILTIN_OBJECT_SIZE
+	-DHAVE_BUILTIN_OBJECT_SIZE \
+        -DLIBDEKER_FUNC_ATTR=$(LIBDEKER_WEAK_ATTR) \
+	-DLIBLCD_FUNC_ATTR=$(LIBDEKER_WEAK_ATTR)
+
 
 LIBDEKER_CFLAGS= \
 	$(LIBDEKER_BASE_CFLAGS) \
 	-I$(LIBDEKER_BUILD_DIR)/libcap.install/include \
 	-I$(LIBDEKER_BUILD_DIR)/libfipc.install/include \
-	-I$(LIBDEKER_BUILD_DIR)/libasync.install/include \
-        -DLIBDEKER_FUNC_ATTR=$(LIBDEKER_WEAK_ATTR) \
-	-DLIBLCD_FUNC_ATTR=$(LIBDEKER_WEAK_ATTR)
+	-I$(LIBDEKER_BUILD_DIR)/libasync.install/include
 
 LIBDEKER_BAD_CFLAGS= \
 	-fno-delete-null-pointer-checks \
@@ -104,15 +113,8 @@ LIBDEKER_LIB_CFLAGS= $(LIBDEKER_BASE_CFLAGS)
 # I mash this in one line for now.
 LIBLCD_FOR_DEKER_AR_SCRIPT="CREATE $(LIBDEKER_BUILD_DIR)/liblcd_build/liblcd.a\nADDLIB $(LIBDEKER_BUILD_DIR)/liblcd_build/lib.a\nADDLIB $(LIBDEKER_BUILD_DIR)/libcap.install/lib/libcap.a\nADDLIB $(LIBDEKER_BUILD_DIR)/libfipc.install/lib/libfipc.a\nADDLIB $(LIBDEKER_BUILD_DIR)/libasync.install/lib/libasync.a\nSAVE\nEND\n"
 
-$(LIBDEKER_BUILD_DIR)/libdeker.bca: libdeker
-	$(WLLVM_EXTRACT_BC_PATH) $(LIBDEKER_BUILD_DIR)/libdeker.a
-
 libdeker: $(LIBDEKER_BUILD_DIR)/lib.a
-	@echo "  AR      $@"
-	@echo $(LIBDEKER_AR_SCRIPT) | ar -M
-
-$(LIBDEKER_BUILD_DIR)/liblcd_build/liblcd.bca: liblcd_for_deker
-	$(WLLVM_EXTRACT_BC_PATH) $(LIBLCD_BUILD_DIR)/liblcd_build/liblcd.a
+	cp $< $(LIBDEKER_BUILD_DIR)/libdeker.a
 
 liblcd_for_deker: $(LIBDEKER_BUILD_DIR)/liblcd_build/lib.a | \
 	$(LIBDEKER_LIBCAP) $(LIBDEKER_LIBFIPC) $(LIBDEKER_LIBASYNC)
@@ -129,18 +131,16 @@ $(LIBDEKER_BUILD_DIR)/liblcd_build/Kbuild: scripts/Kbuild.liblcd | \
 	$(LIBDEKER_BUILD_DIRS)
 	@echo "  KBUILD  $@"
 	@printf "# This part is auto prepended by Makefile.libdeker:\n\n" > $@ && \
-	printf "export CC=$(WLLVM_PATH)\n" >> $@ && \
-	printf 'KBUILD_CFLAGS := $$(filter-out $$(LIBDEKER_BAD_CFLAGS), $$(KBUILD_CFLAGS))\n' >> $@ && \
-	printf 'KBUILD_AFLAGS := $$(filter-out $$(LIBDEKER_BAD_CFLAGS), $$(KBUILD_AFLAGS))\n' >> $@ && \
+	printf 'include $$(DEKER_KBUILD_CONFIG)' >> $@ && \
 	printf "\n# End of auto prepended part\n\n" >> $@ && \
 	cat $< >> $@
 
-$(LIBDEKER_BUILD_DIR)/lib.a: $(LIBDEKER_BUILD_DIR)/Kbuild | \
+$(LIBDEKER_BUILD_DIR)/lib.a: $(LIBDEKER_BUILD_DIR)/Kbuild \
+	libdeker/smack.c | \
 	$(LIBDEKER_BUILD_DIRS)
 	$(MAKE) -C .. M=$(LIBDEKER_BUILD_DIR) $(MAKEFLAGS)
 
-$(LIBDEKER_BUILD_DIR)/libdeker/smack.c: $(SMACK_LIB_PATH)/smack.c | \
-	$(LIBDEKER_BUILD_DIRS)
+libdeker/smack.c: $(SMACK_LIB_PATH)/smack.c
 	ln -s $< $@
 
 libcap.libdeker: $(LIBDEKER_BUILD_DIR)/libcap.build/Makefile
@@ -217,6 +217,7 @@ clean-libdeker: clean-libdeker-libcap clean-libdeker-libfipc \
 	rm -f $(LIBDEKER_BUILD_DIR)/libdeker.a.bc
 	rm -f $(LIBDEKER_BUILD_DIR)/liblcd_build/liblcd.a
 	rm -f $(LIBDEKER_BUILD_DIR)/liblcd_build/liblcd.a.bc
+	rm -f libdeker/smack.c
 
 clean-libdeker-lib%:
 	if test -d $(LIBDEKER_BUILD_DIR)/$(subst clean-libdeker-,,$@).build; then \
@@ -224,9 +225,9 @@ clean-libdeker-lib%:
 	fi
 	rm -rf $(LIBDEKER_BUILD_DIR)/$(subst clean-libdeker-,,$@).install
 
-clean += clean-libdeker
+clean: clean-libdeker
 
-.PHONY += \
+.PHONY: \
 	libdeker \
 	$(LIBDEKER_BUILD_DIR)/lib.a \
 	liblcd_for_deker \

@@ -117,12 +117,13 @@ libasync/configure: libasync/configure.ac
 
 # (clean is set in included makefiles above)
 
-distclean:
+distclean: clean
 	rm -rf $(LCD_BUILD_DIR)
 
 # ------------------------------------------------------------
 # phonies
 
-.PHONY +=  \
+.PHONY:  \
 	clean \
 	distclean
+

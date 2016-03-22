@@ -115,6 +115,7 @@ libcap.libdeker: $(LIBLCD_BUILD_DIR)/libcap.build/Makefile
 	$(MAKE) -C $(LIBLCD_BUILD_DIR)/libcap.build \
 	CC=$(WLLVM_PATH) \
 	CFLAGS="$(LIBLCD_LIB_CFLAGS)" $(MAKEFLAGS) && \
+        LIBCAP_BAD_CFLAGS="$(LIBDEKER_BAD_CFLAGS)" && \
 	$(MAKE) -C $(LIBLCD_BUILD_DIR)/libcap.build install $(MAKEFLAGS)
 
 $(LIBDEKER_BUILD_DIR)/libcap.build/Makefile: libcap/configure | \
@@ -133,6 +134,7 @@ libfipc.libdeker: $(LIBDEKER_BUILD_DIR)/libfipc.build/Makefile
 	$(MAKE) -C $(LIBDEKER_BUILD_DIR)/libfipc.build \
 	CC=$(WLLVM_PATH) \
 	CFLAGS="$(LIBDEKER_LIB_CFLAGS) -I$(LIBDEKER_BUILD_DIR)/libcap.install/include" $(MAKEFLAGS) && \
+        LIBFIPC_BAD_CFLAGS="$(LIBDEKER_BAD_CFLAGS)" && \
 	$(MAKE) -C $(LIBDEKER_BUILD_DIR)/libfipc.build install $(MAKEFLAGS)
 
 $(LIBDEKER_BUILD_DIR)/libfipc.build/Makefile: \
@@ -148,6 +150,7 @@ libasync.libdeker: $(LIBDEKER_BUILD_DIR)/libasync.build/Makefile
 	$(MAKE) -C $(LIBDEKER_BUILD_DIR)/libasync.build \
 	CC=$(WLLVM_PATH) \
 	CFLAGS="$(LIBDEKER_LIB_CFLAGS) -I$(LIBDEKER_BUILD_DIR)/libcap.install/include -I$(LIBDEKER_BUILD_DIR)/libfipc.install/include -DNDEBUG" $(MAKEFLAGS) && \
+        LIBASYNC_BAD_CFLAGS="$(LIBDEKER_BAD_CFLAGS)" && \
 	$(MAKE) -C $(LIBDEKER_BUILD_DIR)/libasync.build install $(MAKEFLAGS)
 
 $(LIBDEKER_BUILD_DIR)/libasync.build/Makefile: libasync/configure | \

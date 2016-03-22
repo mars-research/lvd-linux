@@ -24,6 +24,10 @@ ccflags-$(LCD_CONFIG_GLUE_EXAMPLE_MINIX_NONISOLATED) += $(NONISOLATED_CFLAGS)
 
 # DEKER BUILD CONFIG --------------------------------------------------
 
+ifneq ($(LCD_CONFIG_GLUE_EXAMPLE_MINIX_DEKER),)
+include $(DEKER_KBUILD_CONFIG)
+endif
+
 lcd_test_mod_glue_example_minix-$(LCD_CONFIG_GLUE_EXAMPLE_MINIX_DEKER) += \
 	glue/boot.o
 lcd_test_mod_glue_example_minix-$(LCD_CONFIG_GLUE_EXAMPLE_MINIX_DEKER) += \
@@ -31,5 +35,5 @@ lcd_test_mod_glue_example_minix-$(LCD_CONFIG_GLUE_EXAMPLE_MINIX_DEKER) += \
 lcd_test_mod_glue_example_minix-$(LCD_CONFIG_GLUE_EXAMPLE_MINIX_DEKER) += \
 	glue/vfs_cap.o
 lcd_test_mod_glue_example_minix-$(LCD_CONFIG_GLUE_EXAMPLE_MINIX_DEKER) += \
-	$(LIBDEKER) $(LIBLCD)
+	$(LIBDEKER)
 ccflags-$(LCD_CONFIG_GLUE_EXAMPLE_MINIX_DEKER) += $(DEKER_CFLAGS)

@@ -10,9 +10,6 @@
 # in the kernel build system.
 src = $(LCD_DOMAINS_TOP_SRC_DIR)
 
-# Force the kernel build to use wllvm (whole program llvm) with clang
-export CC=$(WLLVM_PATH)
-
 # ------------------------------------------------------------
 
 lib-y += $(addprefix libdeker/, \
@@ -23,10 +20,12 @@ lib-y += $(addprefix libdeker/lcd-domains/, \
       sync_ipc.o \
       )
 
+lib-y += $(addprefix $(LIBDEKER_BUILD_DIR)/libdeker, \
+      smack.o \
+      )
+
 ccflags-y += $(LIBDEKER_CFLAGS)
 
 # ------------------------------------------------------------
 
-# Sanitize KBUILD_CFLAGS (otherwise clang has a fit when it doesn't recognize
-# command line options)
-KBUILD_CFLAGS := $(filter-out $(LIBDEKER_BAD_CFLAGS), $(KBUILD_CFLAGS))
+include $(DEKER_KBUILD_CONFIG)

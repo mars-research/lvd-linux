@@ -1,0 +1,10 @@
+#
+# Some kbuild bits that need to be included in kernel code built for deker
+# (with clang).
+#
+
+# Hack kernel build to use wllvm/clang (kernel build tries to force gcc)
+export CC=$(WLLVM_PATH)
+
+# Remove cflags that clang throws a fit about
+KBUILD_CFLAGS := $(filter-out $(LIBDEKER_BAD_CFLAGS), $(KBUILD_CFLAGS))

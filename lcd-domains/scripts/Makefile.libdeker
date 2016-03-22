@@ -14,6 +14,7 @@ export WLLVM_PATH
 WLLVM_EXTRACT_BC_PATH ?= extract-bc
 
 SMACK_INCLUDE_PATH ?= /usr/local/share/smack/include
+SMACK_LIB_PATH ?= /usr/local/share/smack/lib
 
 LIBDEKER_BUILD_DIR=$(LCD_BUILD_DIR)/libdeker_build
 export LIBDEKER_BUILD_DIR
@@ -60,7 +61,8 @@ LIBDEKER_CFLAGS= \
 	-I$(LIBDEKER_BUILD_DIR)/libcap.install/include \
 	-I$(LIBDEKER_BUILD_DIR)/libfipc.install/include \
 	-I$(LIBDEKER_BUILD_DIR)/libasync.install/include \
-        -DLIBDEKER_FUNC_ATTR=$(LIBDEKER_WEAK_ATTR)
+        -DLIBDEKER_FUNC_ATTR=$(LIBDEKER_WEAK_ATTR) \
+	-DLIBLCD_FUNC_ATTR=$(LIBDEKER_WEAK_ATTR)
 
 LIBDEKER_BAD_CFLAGS= \
 	-fno-delete-null-pointer-checks \
@@ -72,7 +74,9 @@ LIBDEKER_BAD_CFLAGS= \
 	-DCC_HAVE_ASM_GOTO \
 	-gdwarf-2
 
-export LIBDEKER_CFLAGS LIBDEKER_BAD_CFLAGS
+DEKER_KBUILD_CONFIG=$(LCD_DOMAINS_TOP_SRC_DIR)/scripts/Kbuild.deker_hacks
+
+export LIBDEKER_CFLAGS LIBDEKER_BAD_CFLAGS DEKER_KBUILD_CONFIG
 
 LIBDEKER_DIRS=$(shell cd libdeker && find . -mindepth 1 -type d)
 LIBDEKER_DIRS:=$(foreach d,$(LIBDEKER_DIRS),libdeker/$(d))
@@ -134,6 +138,10 @@ $(LIBDEKER_BUILD_DIR)/liblcd_build/Kbuild: scripts/Kbuild.liblcd | \
 $(LIBDEKER_BUILD_DIR)/lib.a: $(LIBDEKER_BUILD_DIR)/Kbuild | \
 	$(LIBDEKER_BUILD_DIRS)
 	$(MAKE) -C .. M=$(LIBDEKER_BUILD_DIR) $(MAKEFLAGS)
+
+$(LIBDEKER_BUILD_DIR)/libdeker/smack.c: $(SMACK_LIB_PATH)/smack.c | \
+	$(LIBDEKER_BUILD_DIRS)
+	ln -s $< $@
 
 libcap.libdeker: $(LIBDEKER_BUILD_DIR)/libcap.build/Makefile
 	$(MAKE) -C $(LIBDEKER_BUILD_DIR)/libcap.build \

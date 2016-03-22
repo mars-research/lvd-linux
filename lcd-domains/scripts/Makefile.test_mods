@@ -32,25 +32,35 @@ export ISOLATED_CFLAGS=$(LIBLCD_CFLAGS)
 export DEKER_CFLAGS=$(LIBDEKER_CFLAGS)
 
 # ------------------------------------------------------------
+# LIBLCD
+
+LIBLCD_PATH_CMD=$(shell scripts/relpath.py $(LIBDLCD_BUILD_DIR)/liblcd.a $(shell dirname $(shell readlink -f $@)))
+
+# ------------------------------------------------------------
 # LIBDEKER
 
 ifneq ($(DEKER),)
 
-# We use a clang-compiled version of liblcd
-LIBLCD_PATH_CMD=$(shell scripts/relpath.py $(LIBDEKER_BUILD_DIR)/liblcd_build/liblcd.a $(shell dirname $(shell readlink -f $@)))
+# We use the clang-compiled version of liblcd, and libdeker. They are
+# listed in the link order: libdeker liblcd so that the linker will choose
+# the weak symbols from libdeker over the same symbols in liblcd.
 
-LIBDEKER_PATH_CMD=$(shell scripts/relpath.py $(LIBDEKER_BUILD_DIR)/libdeker.a $(shell dirname $(shell readlink -f $@)))
+LIBDEKER_PATH_CMD=$(shell scripts/relpath.py $(LIBDEKER_BUILD_DIR)/libdeker.a $(shell dirname $(shell readlink -f $@))) $(shell scripts/relpath.py $(LIBDEKER_BUILD_DIR)/liblcd_build/liblcd.a $(shell dirname $(shell readlink -f $@)))
 
 MAYBE_LIBDEKER=$(LIBDEKER_BUILD_PATH)/libdeker/libdeker.a
-
-else
-
-LIBLCD_PATH_CMD=$(shell scripts/relpath.py $(LIBDLCD_BUILD_DIR)/liblcd.a $(shell dirname $(shell readlink -f $@)))
 
 endif
 
 # ------------------------------------------------------------
 # Targets
+
+ifneq ($(DEKER),)
+
+test_mods_deker: test_mods
+	scripts/deker_mod_post.sh test_mods/config \
+	$(WLLVM_EXTRACT_BC_PATH)
+
+endif
 
 test_mods: $(LCD_TEST_MODULES_BUILD_DIR)/Kbuild \
 	$(LCD_TEST_MODULES_BUILD_DIR)/Kbuild.config \

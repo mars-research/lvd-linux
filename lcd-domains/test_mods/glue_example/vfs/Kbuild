@@ -32,6 +32,10 @@ ccflags-$(LCD_CONFIG_GLUE_EXAMPLE_VFS_NONISOLATED) += $(NONISOLATED_CFLAGS)
 
 # DEKER CONFIG --------------------------------------------------
 
+ifneq ($(LCD_CONFIG_GLUE_EXAMPLE_VFS_DEKER),)
+include $(DEKER_KBUILD_CONFIG)
+endif
+
 lcd_test_mod_glue_example_vfs-$(LCD_CONFIG_GLUE_EXAMPLE_VFS_DEKER) += \
 	glue/boot.o
 lcd_test_mod_glue_example_vfs-$(LCD_CONFIG_GLUE_EXAMPLE_VFS_DEKER) += \
@@ -39,7 +43,7 @@ lcd_test_mod_glue_example_vfs-$(LCD_CONFIG_GLUE_EXAMPLE_VFS_DEKER) += \
 lcd_test_mod_glue_example_vfs-$(LCD_CONFIG_GLUE_EXAMPLE_VFS_DEKER) += \
 	glue/vfs_cap.o
 lcd_test_mod_glue_example_vfs-$(LCD_CONFIG_GLUE_EXAMPLE_VFS_DEKER) += \
-	$(LIBDEKER) $(LIBLCD)
+	$(LIBDEKER)
 ccflags-$(LCD_CONFIG_GLUE_EXAMPLE_VFS_DEKER) += $(DEKER_CFLAGS)
 
 # Run linker script through C preprocessor (so we can use macros)

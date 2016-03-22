@@ -44,7 +44,7 @@ LIBLCD_LIBCAP=$(LIBLCD_BUILD_DIR)/libcap.install/lib/libcap.a
 LIBLCD_LIBFIPC=$(LIBLCD_BUILD_DIR)/libfipc.install/lib/libfipc.a
 LIBLCD_LIBFIPC=$(LIBLCD_BUILD_DIR)/libasync.install/lib/libasync.a
 
-LIBLCD_WEAK_ATTR='__attribute__((weak))'
+LIBLCD_WEAK_ATTR=
 
 LIBLCD_LIB_CFLAGS= $(LIBLCD_BASE_CFLAGS)
 

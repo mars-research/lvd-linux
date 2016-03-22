@@ -778,6 +778,7 @@ static int volunteer_mem_obj(struct task_struct *t,
 	 */
 
 	*slot_out = slot;
+	return 0;
 
 fail3:
 	lcd_cptr_free(slot);

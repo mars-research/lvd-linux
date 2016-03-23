@@ -190,6 +190,12 @@ static inline int lcd_syscall_sync_recv(cptr_t endpoint)
 	return lcd_syscall_one_arg(LCD_SYSCALL_SYNC_RECV, cptr_val(endpoint));
 }
 
+static inline int lcd_syscall_sync_poll_recv(cptr_t endpoint)
+{
+	return lcd_syscall_one_arg(LCD_SYSCALL_SYNC_POLL_RECV, 
+				cptr_val(endpoint));
+}
+
 static inline int lcd_syscall_sync_call(cptr_t endpoint)
 {
 	return lcd_syscall_one_arg(LCD_SYSCALL_SYNC_CALL, cptr_val(endpoint));

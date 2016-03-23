@@ -455,7 +455,8 @@ fail1:
 }
 
 static int do_recv(struct lcd *receiver, struct cnode *cnode, 
-		struct lcd_sync_endpoint *ep)
+		struct lcd_sync_endpoint *ep,
+		int polling)
 {
 	int ret;
 	struct lcd *sender;
@@ -464,6 +465,11 @@ static int do_recv(struct lcd *receiver, struct cnode *cnode,
 		debug_dump_utcb(receiver);
 
 	if (list_empty(&ep->senders)) {
+		/*
+		 * If we're polling, don't wait
+		 */
+		if (polling)
+			return -EWOULDBLOCK;
 		/*
 		 * No one sending; put myself in ep's receiver list
 		 */
@@ -561,9 +567,39 @@ int __lcd_recv(struct lcd *caller, cptr_t endpoint)
 		goto fail1;
 	}
 	/* do_recv does put on ep */
-	ret = do_recv(caller, cnode, ep);
+	ret = do_recv(caller, cnode, ep, 0);
 	if (ret) {
 		LCD_ERR("failed receive");
+		goto fail2;
+	}
+
+	return 0;
+
+fail2:
+	__lcd_put_sync_endpoint(caller, cnode, ep);
+fail1:
+	return ret;
+}
+
+int __lcd_poll_recv(struct lcd *caller, cptr_t endpoint)
+{
+	struct lcd_sync_endpoint *ep;
+	struct cnode *cnode;
+	int ret;
+	/*
+	 * Look up and lock endpoint
+	 */
+	ret = __lcd_get_sync_endpoint(caller, endpoint, &cnode, &ep);
+	if (ret) {
+		LCD_DEBUG(LCD_DEBUG_ERR,
+			"ep lookup failed for cptr 0x%lx", cptr_val(endpoint));
+		goto fail1;
+	}
+	/* do_recv does put on ep */
+	ret = do_recv(caller, cnode, ep, 1);
+	if (ret) {
+		if (ret != -EWOULDBLOCK)
+			LCD_ERR("failed receive");
 		goto fail2;
 	}
 

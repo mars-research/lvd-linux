@@ -899,6 +899,10 @@ int __lcd_send(struct lcd *caller, cptr_t endpoint);
  */
 int __lcd_recv(struct lcd *caller, cptr_t endpoint);
 /**
+ * __lcd_poll_recv -- Non-blocking sync ipc receive
+ */
+int __lcd_poll_recv(struct lcd *caller, cptr_t endpoint);
+/**
  * __lcd_call -- Sync IPC call
  * @caller: LCD doing the calling
  * @endpoint: cptr to sync IPC endpoint

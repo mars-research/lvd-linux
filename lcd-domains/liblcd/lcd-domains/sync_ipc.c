@@ -70,6 +70,13 @@ lcd_sync_recv(cptr_t endpoint)
 	return lcd_syscall_sync_recv(endpoint);
 }
 
+int
+LIBLCD_FUNC_ATTR
+lcd_sync_poll_recv(cptr_t endpoint)
+{
+	return lcd_syscall_sync_poll_recv(endpoint);
+}
+
 int 
 LIBLCD_FUNC_ATTR
 lcd_sync_call(cptr_t endpoint)

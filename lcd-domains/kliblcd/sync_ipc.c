@@ -56,6 +56,11 @@ int lcd_sync_recv(cptr_t endpoint)
 	return __lcd_recv(current->lcd, endpoint);
 }
 
+int lcd_sync_poll_recv(cptr_t endpoint)
+{
+	return __lcd_poll_recv(current->lcd, endpoint);
+}
+
 int lcd_sync_call(cptr_t endpoint)
 {
 	return __lcd_call(current->lcd, endpoint);

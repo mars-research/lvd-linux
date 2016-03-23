@@ -127,6 +127,18 @@ int lcd_sync_send(cptr_t endpoint);
 int lcd_sync_recv(cptr_t endpoint);
 
 /**
+ * lcd_sync_poll_recv -- non-blocking synchronous IPC receive
+ * @endpoint: cptr to the IPC channel
+ *
+ * This is like lcd_sync_recv, but if there is no sender waiting, immediately
+ * returns, rather than blocking.
+ *
+ * If there is no sender (i.e., nothing was received), returns
+ * -EWOULDBLOCK.
+ */
+int lcd_sync_poll_recv(cptr_t endpoint);
+
+/**
  * lcd_sync_call -- synchronous IPC call
  * @endpoint: cptr to a capability for a synchronous IPC channel/endpoint
  *

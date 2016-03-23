@@ -7,86 +7,25 @@
 #include <linux/module.h>
 #include <linux/kernel.h>
 #include <liblcd/liblcd.h>
-#include <liblcd/dispatch_loop.h>
+#include <liblcd/sync_ipc_poll.h>
 #include "internal.h"
 
 #include <lcd_config/post_hook.h>
 
 /* LOOP ---------------------------------------- */
 
-#if 0
-static int dispatch_minix_channel(struct ipc_channel *channel)
-{
-	switch (lcd_r0()) {
 
-	default:
-
-		LIBLCD_ERR("unexpected function label %d",
-			lcd_r0());
-		return -EINVAL;
-	}
-
-	return 0;
-}
-
-
-static int dispatch_channel(struct ipc_channel *channel)
-{
-	switch (channel->type) {
-
-	default:
-		
-		LIBLCD_ERR("unexpected channel type %d",
-			channel->type);
-		return -EINVAL;
-	}
-}
-
-static void loop(struct dispatch_ctx *ctx)
-{
-	struct list_head *cursor;
-	struct ipc_channel *channel;
-	int ret;
-	
-	int count = 0;
-
-	for (;;) {
-
-		count += 1;
-
-		list_for_each(cursor, &ctx->channel_list) {
-
-			channel = list_entry(cursor,
-					struct ipc_channel,
-					channel_list);
-			
-			ret = lcd_recv(channel->channel_cptr);
-			if (ret) {
-				LIBLCD_ERR("lcd recv");
-				return;
-			}
-
-			ret = dispatch_channel(channel);
-			if (ret) {
-				LIBLCD_ERR("dispatch channel");
-				return;
-			}
-		}
-	}
-}
-#endif
 /* INIT/EXIT -------------------------------------------------- */
 
 int init_pmfs_fs(void);
 void exit_pmfs_fs(void);
 
-struct dispatch_ctx ctx;
+struct lcd_sync_channel_group group;
 
 static int __noreturn pmfs_lcd_init(void) 
 {
 	int r = 0;
 	cptr_t vfs_chnl;
-//	cptr_t bdi_chnl;
 
 	r = lcd_enter();
 	if (r)
@@ -94,27 +33,18 @@ static int __noreturn pmfs_lcd_init(void)
 	/*
 	 * Initialize dispatch loop context
 	 */
-	init_dispatch_ctx(&ctx);
+	lcd_sync_channel_group_init(&group);
 	/*
-	 * Get the vfs and bdi channel cptrs from boot info
+	 * Get the vfs channel cptr from boot info
 	 */
 	vfs_chnl = lcd_get_boot_info()->cptrs[0];
-//	bdi_chnl = lcd_get_boot_info()->cptrs[1];
 	/*
 	 * Initialize vfs glue
 	 */
-	r = glue_vfs_init(vfs_chnl, &ctx);
+	r = glue_vfs_init(vfs_chnl, &group);
 	if (r) {
 		LIBLCD_ERR("vfs init");
 		goto fail2;
-	}
-	/*
-	 * Initialize bdi glue
-	 */
-	r = glue_bdi_init(vfs_chnl, &ctx);
-	if (r) {
-		LIBLCD_ERR("bdi init");
-		goto fail3;
 	}
 
 	/* EXECUTE REAL CODE ---------------------------------------- */
@@ -124,12 +54,10 @@ static int __noreturn pmfs_lcd_init(void)
 	 */
 	r = init_pmfs_fs();
 	if (r)
-		goto fail4;
+		goto fail3;
 
 
 	LIBLCD_MSG("SUCCESSFULLY REGISTERED PMFS!");
-
-	// loop(&ctx);
 
 	/*
 	 * Tear down pmfs
@@ -142,12 +70,9 @@ static int __noreturn pmfs_lcd_init(void)
 	/* REAL CODE DONE; CLEAN UP ---------------------------------------- */
 
 	glue_vfs_exit();
-	glue_bdi_exit();
 
 	lcd_exit(0); /* doesn't return */
 
-fail4:
-	glue_bdi_exit();
 fail3:
 	glue_vfs_exit();
 fail2:

@@ -11,7 +11,7 @@
 #include <libcap.h>
 #include <liblcd/glue_cspace.h>
 #include <liblcd/liblcd.h>
-#include <liblcd/dispatch_loop.h>
+#include <liblcd/sync_ipc_poll.h>
 
 /* MACROS/FLAGS -------------------------------------------------- */
 
@@ -30,7 +30,7 @@ struct file_system_type_container {
 	struct file_system_type file_system_type;
 	cptr_t my_ref;
 	cptr_t vfs_ref;
-	struct ipc_channel chnl;
+	struct lcd_sync_channel_group_item chnl;
 };
 
 struct backing_dev_info_container {
@@ -48,13 +48,11 @@ struct module_container {
 
 /* FUNCTIONS -------------------------------------------------- */
 
-int glue_vfs_init(cptr_t _vfs_channel, struct dispatch_ctx *ctx);
+int dispatch_fs_channel(struct lcd_sync_channel_group_item *chnl);
+
+int glue_vfs_init(cptr_t _vfs_channel, struct lcd_sync_channel_group *group);
 
 void glue_vfs_exit(void);
-
-int glue_bdi_init(cptr_t _bdi_channel, struct dispatch_ctx *ctx);
-
-void glue_bdi_exit(void);
 
 /* CSPACES ------------------------------------------------------------ */
 

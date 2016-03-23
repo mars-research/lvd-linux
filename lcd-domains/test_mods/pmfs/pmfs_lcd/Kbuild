@@ -25,7 +25,7 @@ lcd_test_mod_pmfs_lcd-y              += $(LIBLCD)
 # Glue
 lcd_test_mod_pmfs_lcd-y              += $(addprefix glue/, \
 							   vfs_caller.o \
-							   bdi_caller.o \
+							   dispatch.o \
 							   cap.o )
 
 ccflags-y += $(ISOLATED_CFLAGS)

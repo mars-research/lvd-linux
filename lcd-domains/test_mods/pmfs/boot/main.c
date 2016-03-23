@@ -11,7 +11,6 @@
 
 #include <libcap.h>
 #include <liblcd/liblcd.h>
-#include <liblcd/dispatch_loop.h>
 
 #include <lcd_config/post_hook.h>
 
@@ -21,9 +20,9 @@ static int boot_main(void)
 	struct lcd_create_ctx *ctx;
 	cptr_t lcd;
 	cptr_t vfs;
-	cptr_t vfs_chnl, bdi_chnl;
-	cptr_t pmfs_dest1, pmfs_dest2;
-	cptr_t vfs_dest1, vfs_dest2;
+	cptr_t vfs_chnl;
+	cptr_t pmfs_dest1;
+	cptr_t vfs_dest1;
 	/*
 	 * Enter lcd mode
 	 */
@@ -38,14 +37,6 @@ static int boot_main(void)
 	ret = lcd_create_sync_endpoint(&vfs_chnl);
 	if (ret) {
 		LIBLCD_ERR("create vfs endpoint");
-		goto lcd_exit;
-	}
-	/*
-	 * Create bdi channel
-	 */
-	ret = lcd_create_sync_endpoint(&bdi_chnl);
-	if (ret) {
-		LIBLCD_ERR("create bdi endpoint");
 		goto lcd_exit;
 	}
 	
@@ -73,7 +64,7 @@ static int boot_main(void)
 		goto destroy_vfs;
 	}
 
-	/* GRANT ENDPOINTS TO PMFS ------------------------------ */
+	/* GRANT ENDPOINT TO PMFS ------------------------------ */
 
 	/*
 	 * Alloc dest slot
@@ -91,24 +82,8 @@ static int boot_main(void)
 		LIBLCD_ERR("failed to grant vfs endpoint to pmfs");
 		goto destroy_both;
 	}
-	/*
-	 * Alloc dest slot
-	 */
-	ret = cptr_alloc(lcd_to_boot_cptr_cache(ctx), &pmfs_dest2);
-	if (ret) {
-		LIBLCD_ERR("failed to alloc cptr");
-		goto destroy_both;
-	}
-	/*
-	 * Grant
-	 */
-	ret = lcd_cap_grant(lcd, bdi_chnl, pmfs_dest2);
-	if (ret) {
-		LIBLCD_ERR("failed to grant bdi endpoint to pmfs");
-		goto destroy_both;
-	}
 
-	/* GRANT ENDPOINTS TO VFS ------------------------------ */
+	/* GRANT ENDPOINT TO VFS ------------------------------ */
 
 	/* Hack for now */
 
@@ -118,12 +93,6 @@ static int boot_main(void)
 		LIBLCD_ERR("failed to grant vfs endpoint to vfs");
 		goto destroy_both;
 	}
-	vfs_dest2 = __cptr((1UL << 8)); /* slot = 0, fanout = 0, level = 1 */
-	ret = lcd_cap_grant(vfs, bdi_chnl, vfs_dest2);
-	if (ret) {
-		LIBLCD_ERR("failed to grant bdi endpoint to vfs");
-		goto destroy_both;
-	}
 
 	/* DUMP BOOT INFO FOR PMFS ------------------------------ */
 
@@ -131,7 +100,6 @@ static int boot_main(void)
 	 * Set up boot info for pmfs lcd
 	 */
 	lcd_to_boot_info(ctx)->cptrs[0] = pmfs_dest1;
-	lcd_to_boot_info(ctx)->cptrs[1] = pmfs_dest2;
 
 	/* RUN -------------------------------------------------- */
 

@@ -8,7 +8,7 @@
 
 #include <libcap.h>
 #include <liblcd/liblcd.h>
-#include <liblcd/dispatch_loop.h>
+#include <liblcd/sync_ipc_poll.h>
 #include <liblcd/glue_cspace.h>
 #include "../internal.h"
 
@@ -18,17 +18,17 @@
 
 static cptr_t vfs_chnl;
 static struct glue_cspace *vfs_cspace;
-static struct dispatch_ctx *loop_ctx;
+static struct lcd_sync_channel_group *group;
 
 /* INIT/EXIT -------------------------------------------------- */
 
-int glue_vfs_init(cptr_t _vfs_channel, struct dispatch_ctx *ctx)
+int glue_vfs_init(cptr_t _vfs_channel, struct lcd_sync_channel_group *_group)
 {
 	int ret;
 
 	/* Store a reference to the dispatch loop context, so we
 	 * can dynamically add channels to the loop later. */
-	loop_ctx = ctx;
+	group = _group;
 
 	/* Store reference to vfs channel so we can invoke functions
 	 * on it later. */
@@ -91,8 +91,9 @@ int register_filesystem(struct file_system_type *fs)
 	/*
 	 * Install in dispatch loop
 	 */
-	init_ipc_channel(&fs_container->chnl, PMFS_CHANNEL_TYPE, endpoint, 0);
-	loop_add_channel(loop_ctx, &fs_container->chnl);
+	lcd_sync_channel_group_item_init(&fs_container->chnl, endpoint, 0,
+					dispatch_fs_channel);
+	lcd_sync_channel_group_add(group, &fs_container->chnl);
 	/*
 	 * INSERT INTO DATA STORE ------------------------------
 	 *
@@ -127,7 +128,7 @@ int register_filesystem(struct file_system_type *fs)
 	 *
 	 * Will grant cap to endpoint
 	 */
-	lcd_set_cr1(endpoint);
+	lcd_set_cr0(endpoint);
 	/*
 	 * IPC CALL ----------------------------------------
 	 */
@@ -148,7 +149,7 @@ int register_filesystem(struct file_system_type *fs)
 	module_container->vfs_ref = __cptr(lcd_r2());
 
 	/* Clear capability register */
-	lcd_set_cr1(CAP_CPTR_NULL);
+	lcd_set_cr0(CAP_CPTR_NULL);
 
 	/*
 	 * Pass back return value
@@ -191,7 +192,7 @@ int unregister_filesystem(struct file_system_type *fs)
 	/*
 	 * Destroy pmfs channel, remove from dispatch loop
 	 */
-	loop_rm_channel(loop_ctx, &fs_container->chnl);
+	lcd_sync_channel_group_remove(group, &fs_container->chnl);
 
 	lcd_cap_delete(fs_container->chnl.channel_cptr);
 	/*
@@ -203,4 +204,93 @@ int unregister_filesystem(struct file_system_type *fs)
 	 * Pass back return value
 	 */
 	return lcd_r0();
+}
+
+int bdi_init(struct backing_dev_info *bdi)
+{
+	struct backing_dev_info_container *bdi_container;
+	int ret;
+	/*
+	 * Get container
+	 */
+	bdi_container = container_of(bdi, 
+				struct backing_dev_info_container,
+				backing_dev_info);
+	/*
+	 * INSERT INTO DATA STORE ------------------------------
+	 *
+	 */
+	ret = glue_cap_insert_backing_dev_info_type(
+		vfs_cspace, 
+		bdi_container,
+		&bdi_container->my_ref);
+	if (ret) {
+		LIBLCD_ERR("insert");
+		lcd_exit(ret); /* abort */
+	}
+	/*
+	 * IPC MARSHALING --------------------------------------------------
+	 *
+	 */
+	lcd_set_r1(cptr_val(bdi_container->my_ref));
+	lcd_set_r2(bdi_container->backing_dev_info.ra_pages);
+	lcd_set_r3(bdi_container->backing_dev_info.capabilities);
+	/*
+	 * IPC CALL ----------------------------------------
+	 */
+
+	lcd_set_r0(BDI_INIT);
+	ret = lcd_sync_call(vfs_chnl);
+	if (ret) {
+		LIBLCD_ERR("lcd_call");
+		lcd_exit(ret);
+	}
+
+	/* IPC UNMARSHALING ---------------------------------------- */
+
+	/*
+	 * We expect a remote ref coming back
+	 */
+	bdi_container->bdi_ref = __cptr(lcd_r1());
+
+	/*
+	 * Pass back return value
+	 */
+	return lcd_r0();
+}
+
+void bdi_destroy(struct backing_dev_info *bdi)
+{
+	int ret;
+	struct backing_dev_info_container *bdi_container;
+
+	bdi_container = container_of(bdi,
+				struct backing_dev_info_container,
+				backing_dev_info);
+
+	/* IPC MARSHALING ---------------------------------------- */
+
+	/*
+	 * Pass remote ref to bdi's copy
+	 */
+	lcd_set_r1(cptr_val(bdi_container->bdi_ref));
+
+	/* IPC CALL ---------------------------------------- */
+
+	lcd_set_r0(BDI_DESTROY);
+	ret = lcd_sync_call(vfs_chnl);
+	if (ret) {
+		LIBLCD_ERR("lcd_call");
+		lcd_exit(ret);
+	}
+
+	/* POST-IPC ---------------------------------------- */
+
+	/*
+	 * Remove bdi from data store
+	 */
+	glue_cap_remove(vfs_cspace, bdi_container->my_ref);
+	/*
+	 * (no return value)
+	 */
 }

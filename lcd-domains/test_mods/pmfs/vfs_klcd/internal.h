@@ -9,7 +9,7 @@
 #include <linux/backing-dev.h>
 
 #include <liblcd/liblcd.h>
-#include <liblcd/dispatch_loop.h>
+#include <liblcd/sync_ipc_poll.h>
 #include <liblcd/glue_cspace.h>
 
 /* MACROS -------------------------------------------------- */
@@ -51,12 +51,14 @@ struct backing_dev_info_container {
  * ============================================================
  */
 
-/* VFS -------------------------------------------------- */
+int dispatch_vfs_channel(struct lcd_sync_channel_group_item *chnl);
+
+/* -------------------------------------------------- */
 
 /*
  * Initializes vfs_callee glue code 
  */
-int glue_vfs_init(cptr_t, struct dispatch_ctx *);
+int glue_vfs_init(cptr_t, struct lcd_sync_channel_group *);
 /*
  * Tears down vfs_callee glue code
  */
@@ -64,17 +66,6 @@ void glue_vfs_exit(void);
 
 int register_filesystem_callee(void);
 int unregister_filesystem_callee(void);
-
-/* BDI -------------------------------------------------- */
-
-/*
- * Initializes bdi_callee glue code 
- */
-int glue_bdi_init(cptr_t, struct dispatch_ctx *);
-/*
- * Tears down bdi_callee glue code
- */
-void glue_bdi_exit(void);
 
 int bdi_init_callee(void);
 int bdi_destroy_callee(void);

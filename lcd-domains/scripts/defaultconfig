@@ -1,0 +1,48 @@
+#
+# This file is parsed by scripts/conf.awk.
+#
+# Lines that start with '#' are ignored. Empty lines are
+# also ignored.
+#
+# This file determines how a module is built and linked.
+#
+
+async/boot nonisolated
+async/lcd isolated
+
+async_rpc/boot nonisolated
+async_rpc/caller isolated
+async_rpc/callee isolated
+
+bug/boot nonisolated
+bug/lcd isolated   
+
+create_klcd/boot nonisolated
+create_klcd/klcd nonisolated
+
+glue_example/boot nonisolated
+glue_example/minix isolated
+glue_example/vfs isolated
+
+ipc1/boot nonisolated
+ipc1/lcd isolated
+
+ipc2/boot nonisolated
+ipc2/lcd1 isolated
+ipc2/lcd2 isolated
+
+liblcd_test/boot nonisolated
+liblcd_test/lcd isolated
+
+load/boot nonisolated
+load/lcd isolated
+
+pmfs/boot nonisolated
+pmfs/pmfs_lcd isolated
+pmfs/vfs_klcd nonisolated
+
+string_example/boot nonisolated
+string_example/lcd isolated
+
+llvm_example/boot nonisolated
+llvm_example/lcd isolated

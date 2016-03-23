@@ -99,6 +99,9 @@ $(LCD_TEST_MODULES_BUILD_DIR)/Kbuild.config: test_mods/config | \
 	$(TEST_MODULES_BUILD_DIRS)
 	cat test_mods/config | awk -f scripts/conf.awk > $@
 
+test_mods/config: scripts/defaultconfig
+	cp scripts/defaultconfig test_mods/config
+
 $(TEST_MODULES_BUILD_DIRS):
 	@echo "  MKDIR      $@"
 	@mkdir -p $@

@@ -234,7 +234,7 @@ int register_fs(struct fs *fs)
 	 * the channel we created.
 	 */
 
-	lcd_set_cr1(fs_container->chnl);
+	lcd_set_cr0(fs_container->chnl);
 	
 	/* IPC CALL ---------------------------------------- */
 
@@ -271,7 +271,7 @@ int register_fs(struct fs *fs)
 	fs_container->fs.size = lcd_r3();
 
 	/* Clear capability register */
-	lcd_set_cr1(CAP_CPTR_NULL);
+	lcd_set_cr0(CAP_CPTR_NULL);
 
 	/* COMPILER: Since register_fs returns a scalar value, r0 contains 
 	 * the return value from the callee.

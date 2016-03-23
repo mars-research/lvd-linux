@@ -10,6 +10,7 @@
 
 #include <linux/list.h>
 #include <libcap.h>
+#include <liblcd/liblcd.h>
 #include <liblcd/sync_ipc_poll.h>
 
 #include <lcd_config/post_hook.h>
@@ -72,8 +73,6 @@ static int alloc_cptrs_for_channel(struct lcd_sync_channel_group_item *c)
 	
 	return 0;
 }
-
-			free_cptrs_for_channel(cursor);
 
 static void free_cptrs_for_channel(struct lcd_sync_channel_group_item *c)
 {

@@ -47,7 +47,7 @@ static void loop(struct lcd_sync_channel_group *group)
 
 /* INIT -------------------------------------------------- */
 
-int glue_vfs_init(cptr_t vfs_chnl, struct dispatch_ctx *ctx);
+int glue_vfs_init(cptr_t vfs_chnl, struct lcd_sync_channel_group *group);
 void glue_vfs_exit(void);
 
 int original_vfs_lcd_init(void);

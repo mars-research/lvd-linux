@@ -16,7 +16,7 @@
 #include "../../include/vfs.h"
 
 /* COMPILER: We need this for ipc_channel type */
-#include <liblcd/dispatch_loop.h>
+#include <liblcd/sync_ipc_poll.h>
 
 /* CONTAINER STRUCTS -------------------------------------------------- */
 

@@ -462,7 +462,7 @@ void register_fs_callee(void)
 	 * projection <struct fs> in the IDL, so we expect a capability
 	 * to the channel here. */
 
-	fs_container->chnl = lcd_cr1();
+	fs_container->chnl = lcd_cr0();
 	
 	/* COMPILER: projection <struct fs_operations> takes a capability
 	 * to a channel as an argument, so we expect that here as
@@ -470,10 +470,10 @@ void register_fs_callee(void)
 	 * since the capability stored in the fs container may not be
 	 * the same.) */
 
-	fs_operations_container->chnl = lcd_cr1();
+	fs_operations_container->chnl = lcd_cr0();
 
 	/* Clear cr1 */
-	lcd_set_cr1(CAP_CPTR_NULL);
+	lcd_set_cr0(CAP_CPTR_NULL);
 
 	/* INVOKE REGISTER_FS ---------------------------------------- */
 
@@ -593,6 +593,10 @@ void unregister_fs_callee(void)
 	kfree(fs_operations_container);
 
 	/* IPC REPLY -------------------------------------------------- */
+
+	/* Clear cptr that was allocated */
+	lcd_cptr_free(lcd_cr0());
+	lcd_set_cr0(CAP_CPTR_NULL);
 
 	LIBLCD_MSG("vfs replying to unregister_fs caller");
 	ret = lcd_sync_reply();

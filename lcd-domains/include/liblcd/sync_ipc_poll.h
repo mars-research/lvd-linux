@@ -18,6 +18,15 @@ struct lcd_sync_channel_group_item {
 	int (*dispatch_fn)(struct lcd_sync_channel_group_item *);
 };
 
+static inline
+struct lcd_sync_channel_group_item *
+lcd_sync_channel_group_item_next(struct lcd_sync_channel_group_item *c)
+{
+	return container_of(c->channel_list.next,
+			struct lcd_sync_channel_group_item,
+			channel_list);
+}
+
 struct lcd_sync_channel_group {
 	struct list_head channels;
 	int size;

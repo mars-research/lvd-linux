@@ -14,7 +14,7 @@
 #include <liblcd/liblcd.h>
 
 /* COMPILER: This header is always included. */
-#include <liblcd/dispatch_loop.h>
+#include <liblcd/sync_ipc_poll.h>
 
 /* COMPILER: Since this header was included in vfs.idl, the include
  * is pasted here (the compiler does not need to be smart about paths - the
@@ -29,8 +29,6 @@
 /* COMPILER: This header always comes after all other headers (it redefines
  * certain things for the isolated environment, etc.) */
 #include <lcd_config/post_hook.h>
-
-#define MINIX_CHANNEL_TYPE 1
 
 /* INIT -------------------------------------------------- */
 
@@ -59,15 +57,15 @@ static struct glue_cspace *vfs_cspace;
 
 /* COMPILER: We store a reference to the dispatch loop so we can 
  * dynamically add channels to it (see e.g., register_fs below). */
-static struct dispatch_ctx *loop_ctx;
+static struct lcd_sync_channel_group *group;
 
-int glue_vfs_init(cptr_t _vfs_channel, struct dispatch_ctx *ctx)
+int glue_vfs_init(cptr_t _vfs_channel, struct lcd_sync_channel_group *_group)
 {
 	int ret;
 
 	/* Store a reference to the dispatch loop context, so we
 	 * can dynamically add channels to the loop later. */
-	loop_ctx = ctx;
+	group = _group;
 
 	/* Store reference to vfs channel so we can invoke functions
 	 * on it later. */
@@ -124,6 +122,7 @@ void glue_vfs_exit(void)
  * infer which channel should be used for a function.) Also, you don't
  * have to use a name, but I'm doing so for readability. */
 #define REGISTER_FS 1
+static int dispatch_minix_channel(struct lcd_sync_channel_group_item *chnl);
 int register_fs(struct fs *fs)
 {
 	/* VARIABLE DECLARATIONS ---------------------------------------- */
@@ -181,12 +180,12 @@ int register_fs(struct fs *fs)
 	 * with the channel we created above, so we initialize the
 	 * ipc channel here, and add it to the dispatch loop.
 	 */
-	init_ipc_channel(&fs_operations_container->chnl,
-			MINIX_CHANNEL_TYPE, 
-			fs_container->chnl,
-			0);
+	lcd_sync_channel_group_item_init(&fs_operations_container->chnl,
+					fs_container->chnl, 0,
+					dispatch_minix_channel);
 
-	loop_add_channel(loop_ctx, &fs_operations_container->chnl);
+	lcd_sync_channel_group_add(group,
+				&fs_operations_container->chnl);
 
 	/* COMPILER: Both projections were marked as alloc(callee) and
 	 * are hence already allocated on this side (caller side). So, we 
@@ -337,7 +336,7 @@ void unregister_fs(struct fs *fs)
 	 * (the dispatch loop is hacked to exit after receiving two messages,
 	 * and unregister_fs is invoked when we're exiting the module
 	 * entirely, after the dispatch loop is dead). */
-	loop_rm_channel(loop_ctx, &fs_operations_container->chnl);
+	lcd_sync_channel_group_remove(group, &fs_operations_container->chnl);
 
 	lcd_cap_delete(fs_operations_container->chnl.channel_cptr);
 
@@ -367,6 +366,7 @@ void unregister_fs(struct fs *fs)
 
 /* NEW_FILE (function pointer) ---------------------------------------- */
 
+#define NEW_FILE 1
 void new_file_callee(void)
 {
 	/* VARIABLE DECLARATIONS ---------------------------------------- */
@@ -504,6 +504,7 @@ null_file:
 
 /* RM_FILE (function pointer) ---------------------------------------- */
 
+#define RM_FILE 2
 void rm_file_callee(void)
 {
 	/* VARIABLE DECLARATIONS ---------------------------------------- */
@@ -585,4 +586,32 @@ void rm_file_callee(void)
 		LIBLCD_ERR("lcd_sync_reply");
 		lcd_exit(ret);
 	}
+}
+
+static int dispatch_minix_channel(struct lcd_sync_channel_group_item *chnl)
+{
+	switch (lcd_r0()) {
+
+	case NEW_FILE:
+
+		LIBLCD_MSG("minix got new_file message");
+
+		new_file_callee();
+		break;
+
+	case RM_FILE:
+
+		LIBLCD_MSG("minix got rm_file message");
+
+		rm_file_callee();
+		break;
+
+	default:
+
+		LIBLCD_ERR("unexpected function label %d",
+			lcd_r0());
+		return -EINVAL;
+	}
+
+	return 0;
 }

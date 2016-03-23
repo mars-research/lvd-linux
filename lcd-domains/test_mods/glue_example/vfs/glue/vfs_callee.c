@@ -15,7 +15,7 @@
 #include <liblcd/liblcd.h>
 
 /* COMPILER: This is always included. */
-#include <liblcd/dispatch_loop.h>
+#include <liblcd/sync_ipc_poll.h>
 
 /* COMPILER: We probably always need the slab header. */
 #include <linux/slab.h>
@@ -49,7 +49,7 @@ static struct glue_cspace *minix_cspace;
  * reference to it. (This is also convenient for init/teardown to
  * add/remove the main channel to the dispatch loop.)
  */
-static struct dispatch_ctx *loop_ctx;
+static struct lcd_sync_channel_group *group;
 
 /* TRAMPOLINE CONTAINERS ---------------------------------------- */
 
@@ -321,6 +321,7 @@ rm_file_trampoline(struct file *file)
 
 /* REGISTER_FS -------------------------------------------------- */
 
+#define REGISTER_FS 1
 void register_fs_callee(void)
 {
 	/* VARIABLE DECLARATIONS ---------------------------------------- */
@@ -506,6 +507,7 @@ void register_fs_callee(void)
 
 /* UNREGISTER_FS -------------------------------------------------- */
 
+#define UNREGISTER_FS 2
 void unregister_fs_callee(void)
 {
 	/* VARIABLE DECLARACTIONS ---------------------------------------- */
@@ -609,39 +611,46 @@ void unregister_fs_callee(void)
  *
  * XXX: In this simple example, it also initializes a cspace,
  * but in the future, this may not be done in init. */
-#define VFS_CHANNEL_TYPE 1
-static struct ipc_channel vfs_channel;
 
-int glue_vfs_init(cptr_t vfs_chnl, struct dispatch_ctx *ctx)
+static struct lcd_sync_channel_group_item vfs_channel;
+static int dispatch_vfs_channel(struct lcd_sync_channel_group_item *channel);
+
+int glue_vfs_init(cptr_t vfs_chnl, struct lcd_sync_channel_group *_group)
 {
 	int ret;
 
 	/* Set up ipc channel */
-	init_ipc_channel(&vfs_channel, VFS_CHANNEL_TYPE, vfs_chnl, 1);
+	ret = lcd_sync_channel_group_item_init(&vfs_channel, vfs_chnl, 1,
+					dispatch_vfs_channel);
+	if (ret) {
+		LIBLCD_ERR("init channel item");
+		goto fail1;
+	}
 
-	loop_ctx = ctx;
+	group = _group;
 
 	/* Add it to dispatch loop */
-	loop_add_channel(loop_ctx, &vfs_channel);
+	lcd_sync_channel_group_add(group, &vfs_channel);
 
 	/* Initialize cap code */
 	ret = vfs_cap_init();
 	if (ret) {
 		LIBLCD_ERR("init cap code");
-		goto fail1;
+		goto fail2;
 	}
 
 	/* Initialize minix data store */
 	ret = vfs_cap_create(&minix_cspace);
 	if (ret) {
 		LIBLCD_ERR("cspace init");
-		goto fail2;
+		goto fail3;
 	}
 
 	return 0;
 
-fail2:
+fail3:
 	vfs_cap_exit();
+fail2:
 fail1:
 	return ret;
 }
@@ -653,8 +662,43 @@ void glue_vfs_exit(void)
 	/* We may as well remove the channel from the loop, though
 	 * it doesn't matter in this simple example. (In general, we
 	 * probably should.) */
-	loop_rm_channel(loop_ctx, &vfs_channel);
+	lcd_sync_channel_group_remove(group, &vfs_channel);
 	
 	/* Tear down cap code */
 	vfs_cap_exit();
+}
+
+void do_stuff(void);
+
+static int dispatch_vfs_channel(struct lcd_sync_channel_group_item *channel)
+{
+	switch (lcd_r0()) {
+
+	case REGISTER_FS:
+
+		LIBLCD_MSG("vfs received register_fs message");
+
+		register_fs_callee();
+		
+		/* HACK: (Instead of having another thread invoke
+		 * the registered fs's new and rm file functions.) */
+		do_stuff();
+
+		break;
+
+	case UNREGISTER_FS:
+
+		LIBLCD_MSG("vfs received unregister_fs message");
+
+		unregister_fs_callee();
+		break;
+
+	default:
+
+		LIBLCD_ERR("unexpected function label %d",
+			lcd_r0());
+		return -EINVAL;
+	}
+
+	return 0;
 }

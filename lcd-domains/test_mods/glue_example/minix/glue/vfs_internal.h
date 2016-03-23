@@ -16,7 +16,7 @@
 #include "../../include/vfs.h"
 
 /* COMPILER: We need this for ipc_channel type */
-#include <liblcd/dispatch_loop.h>
+#include <liblcd/sync_ipc_poll.h>
 
 /* CONTAINER STRUCTS -------------------------------------------------- */
 
@@ -55,7 +55,7 @@ struct fs_operations_container {
 	struct fs_operations fs_operations;
 	cptr_t vfs_ref;
 	cptr_t my_ref;
-	struct ipc_channel chnl;
+	struct lcd_sync_channel_group_item chnl;
 };
 struct file_container {
 	struct file file;

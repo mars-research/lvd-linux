@@ -11,99 +11,33 @@
 #include <liblcd/liblcd.h>
 
 /* COMPILER: This is always included. */
-#include <liblcd/dispatch_loop.h>
+#include <liblcd/sync_ipc_poll.h>
 
 /* COMPILER: This always goes after all includes */
 #include <lcd_config/post_hook.h>
 
 /* LOOP -------------------------------------------------- */
 
-/* COMPILER: For every channel a module listens on for function calls,
- * there is a channel type. In this example, minix listens on one channel
- * for NEW_FILE and RM_FILE. In general, channels will include those that
- * are part of interfaces and projections of function pointers. */
-#define MINIX_CHANNEL_TYPE 1
-
-#define NEW_FILE 1
-#define RM_FILE 2
-void new_file_callee(void);
-void rm_file_callee(void);
-
-static int dispatch_minix_channel(struct ipc_channel *channel)
+static void loop(struct lcd_sync_channel_group *group)
 {
-	switch (lcd_r0()) {
-
-	case NEW_FILE:
-
-		LIBLCD_MSG("minix got new_file message");
-
-		new_file_callee();
-		break;
-
-	case RM_FILE:
-
-		LIBLCD_MSG("minix got rm_file message");
-
-		rm_file_callee();
-		break;
-
-	default:
-
-		LIBLCD_ERR("unexpected function label %d",
-			lcd_r0());
-		return -EINVAL;
-	}
-
-	return 0;
-}
-
-static int dispatch_channel(struct ipc_channel *channel)
-{
-	switch (channel->type) {
-
-	case MINIX_CHANNEL_TYPE:
-		
-		return dispatch_minix_channel(channel);
-
-	default:
-		
-		LIBLCD_ERR("unexpected channel type %d",
-			channel->type);
-		return -EINVAL;
-	}
-}
-
-static void loop(struct dispatch_ctx *ctx)
-{
-	struct list_head *cursor;
-	struct ipc_channel *channel;
+	struct lcd_sync_channel_group_item *chnl = NULL;
 	int ret;
-	
 	int count = 0;
 
 	for (;;) {
 
 		count += 1;
 
-		list_for_each(cursor, &ctx->channel_list) {
-
-			channel = list_entry(cursor,
-					struct ipc_channel,
-					channel_list);
-			
-			ret = lcd_sync_recv(channel->channel_cptr);
-			if (ret) {
-				LIBLCD_ERR("lcd recv");
-				return;
-			}
-
-			ret = dispatch_channel(channel);
-			if (ret) {
-				LIBLCD_ERR("dispatch channel");
-				return;
-			}
+		ret = lcd_sync_channel_group_recv(group, chnl, &chnl);
+		if (ret) {
+			LIBLCD_ERR("lcd recv");
+			return;
 		}
-		
+
+		chnl->dispatch_fn(chnl);
+
+		chnl = lcd_sync_channel_group_item_next(chnl);
+
 		/* HACK: Break out of this loop after we receive two
 		 * calls: one to new_file and one to rm_file. We'll
 		 * exit, and then unregister_fs will fire. */
@@ -120,7 +54,7 @@ void glue_vfs_exit(void);
 int original_minix_lcd_init(void);
 void original_minix_lcd_exit(void);
 
-static struct dispatch_ctx ctx;
+static struct lcd_sync_channel_group group;
 
 static int minix_lcd_boot(void)
 {
@@ -137,7 +71,7 @@ static int minix_lcd_boot(void)
 
 	/* COMPILER: Initialize dispatch loop context. This will be
 	 * passed to each piece of interface glue. */
-	init_dispatch_ctx(&ctx);
+	lcd_sync_channel_group_init(&group);
 
 	/* COMPILER: Because minix required vfs, whoever boots minix should
 	 * provide it with a capability to a channel for invoking vfs
@@ -146,7 +80,7 @@ static int minix_lcd_boot(void)
 
 	/* COMPILER: We initialize all interfaces next with all
 	 * dependencies. */
-	ret = glue_vfs_init(vfs_chnl, &ctx);
+	ret = glue_vfs_init(vfs_chnl, &group);
 	if (ret) {
 		LIBLCD_ERR("vfs init");
 		lcd_exit(ret);
@@ -167,7 +101,7 @@ static int minix_lcd_boot(void)
 	}
 
 	/* Enter loop. */
-	loop(&ctx);
+	loop(&group);
 
 	/* Call original exit. */
 	original_minix_lcd_exit();

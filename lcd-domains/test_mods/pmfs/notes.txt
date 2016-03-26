@@ -166,3 +166,106 @@ to toggle on/off building testing code.
 
 It may be necessary to allow those macros to be toggled on/off
 still when we build a module for isolation.
+
+
+------------------------------------------------------------
+------------------------------------------------------------
+
+PMFS Undefineds:
+----------------
+
+X arch_get_unmapped_area_sz -- needed for file xip
+X autoremove_wake_function -- needed for log cleaner bg
+                 U boot_cpu_data
+                 U call_rcu_sched
+                 U capable
+                 U clear_inode
+                 U clear_nlink
+                 U __copy_user_nocache
+                 U crc16
+                 U current_kernel_time
+                 U d_instantiate
+                 U d_make_root
+                 U d_obtain_alias
+                 U drop_nlink
+                 U d_splice_alias
+                 U dump_stack
+                 U file_remove_suid
+                 U find_vma
+                 U finish_wait
+                 U generic_fh_to_dentry
+                 U generic_fh_to_parent
+                 U generic_file_llseek
+                 U generic_file_open
+                 U generic_fillattr
+                 U generic_read_dir
+                 U generic_write_checks
+                 U get_random_bytes
+                 U get_seconds
+                 U __get_user_4
+                 U iget_failed
+                 U iget_locked
+                 U ihold
+                 U inc_nlink
+                 U init_special_inode
+                 U __init_waitqueue_head
+                 U inode_change_ok
+                 U inode_init_once
+                 U inode_init_owner
+                 U inode_newsize_ok
+                 U inode_owner_or_capable
+                 U insert_inode_locked
+                 U iomem_resource
+                 U ioremap_cache
+                 U ioremap_cache_ro
+                 U ioremap_hpage_cache
+                 U ioremap_hpage_cache_ro
+                 U iounmap
+                 U iput
+                 U is_bad_inode
+                 U kill_anon_super
+                 U kthread_create_on_node
+                 U kthread_should_stop
+                 U kthread_stop
+                 U make_bad_inode
+                 U match_int
+                 U match_octal
+                 U match_token
+                 U memparse
+                 U mnt_drop_write_file
+                 U mnt_want_write_file
+                 U mount_nodev
+                 U new_inode
+                 U noop_fsync
+                 U panic
+                 U prepare_to_wait
+                 U pte_alloc_pagesz
+                 U ptep_set_access_flags
+                 U __put_user_4
+                 U ___ratelimit
+                 U _raw_spin_lock
+                 U _raw_spin_unlock
+                 U __release_region
+                 U __request_region
+                 U __sb_end_write
+                 U __sb_start_write
+                 U schedule
+                 U seq_printf
+                 U seq_puts
+                 U setattr_copy
+                 U set_memory_ro
+                 U set_memory_rw
+                 U set_nlink
+                 U __supported_pte_mask
+                 U touch_atime
+                 U truncate_inode_pages
+                 U unlock_new_inode
+                 U vfs_follow_link
+                 U vfs_readlink
+                 U vm_insert_mixed
+                 U vprintk
+                 U __wake_up
+                 U wake_up_process
+                 U xip_file_aio_read
+                 U xip_file_aio_write
+                 U xip_file_read

@@ -13,7 +13,6 @@ src = $(LCD_DOMAINS_TOP_SRC_DIR)
 # ------------------------------------------------------------
 
 lib-y += $(addprefix libdeker/, \
-      smack.o \
       )
 
 lib-y += $(addprefix libdeker/lcd-domains/, \
@@ -28,6 +27,7 @@ lib-y += $(addprefix libdeker/lcd-domains/, \
 # calls the functions, like "main").
 extra-y += $(addprefix libdeker/, \
 	deker_rt.o \
+	smack.o \
 	)
 
 ccflags-y += $(LIBDEKER_CFLAGS)

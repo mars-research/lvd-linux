@@ -47,7 +47,7 @@ ifneq ($(DEKER),)
 
 LIBDEKER_PATH_CMD=$(shell scripts/relpath.py $(LIBDEKER_BUILD_DIR)/libdeker.a $(shell dirname $(shell readlink -f $@))) $(shell scripts/relpath.py $(LIBDEKER_BUILD_DIR)/liblcd_build/liblcd.a $(shell dirname $(shell readlink -f $@)))
 
-LIBDEKER_RUNTIME_PATH_CMD=$(shell scripts/relpath.py $(LIBDEKER_BUILD_DIR)/libdeker/deker_rt.o $(shell dirname $(shell readlink -f $@)))
+LIBDEKER_RUNTIME_PATH_CMD=$(shell scripts/relpath.py $(LIBDEKER_BUILD_DIR)/libdeker/deker_rt.o $(shell dirname $(shell readlink -f $@))) $(shell scripts/relpath.py $(LIBDEKER_BUILD_DIR)/libdeker/smack.o $(shell dirname $(shell readlink -f $@)))
 
 MAYBE_LIBDEKER=$(LIBDEKER_BUILD_DIR)/libdeker.a
 

@@ -6,10 +6,11 @@
 #include <lcd_config/pre_hook.h>
 
 #include <linux/module.h>
-#include <smack.h>
+
 
 #include <lcd_config/post_hook.h>
 
+#include <smack.h>
 int 
 main(void)
 {

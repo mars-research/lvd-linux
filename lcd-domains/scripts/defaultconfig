@@ -46,3 +46,6 @@ string_example/lcd isolated
 
 llvm_example/boot nonisolated
 llvm_example/lcd isolated
+
+ioremap/boot nonisolated
+ioremap/lcd isolated

@@ -63,7 +63,7 @@ test_mods_deker: test_mods
 	@scripts/deker_mod_post.sh test_mods/config \
 	$(WLLVM_EXTRACT_BC_PATH)
 
-else:
+else
 
 test_mods_deker: test_mods
 
@@ -99,7 +99,7 @@ $(LCD_TEST_MODULES_BUILD_DIR)/Kbuild.config: test_mods/config | \
 	$(TEST_MODULES_BUILD_DIRS)
 	cat test_mods/config | awk -f scripts/conf.awk > $@
 
-test_mods/config: scripts/defaultconfig
+test_mods/config:
 	cp scripts/defaultconfig test_mods/config
 
 $(TEST_MODULES_BUILD_DIRS):

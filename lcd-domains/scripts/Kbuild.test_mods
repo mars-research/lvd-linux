@@ -24,3 +24,4 @@ obj-m += pmfs/
 obj-m += bug/
 obj-m += async_rpc/
 obj-m += llvm_example/
+obj-m += ioremap/

@@ -234,7 +234,7 @@ void lcd_unmap_virt(gva_t base, unsigned int order)
 	do_unmap_from_phys(gp_base, order);
 }
 
-void *lcd_ioremap_cache(resource_size_t phys_addr, unsigned long size)
+void *lcd_ioremap_cache(unsigned long phys_addr, unsigned long size)
 {
 	/* 
 	 * Assumes someone already mapped the memory; we just

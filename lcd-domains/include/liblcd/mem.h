@@ -621,4 +621,20 @@ void lcd_iounmap_phys(gpa_t phys_addr, unsigned long size);
 * returns the guest virtual address
 */
 void *lcd_ioremap(unsigned long phys_addr, unsigned int size);
+/**
+ * lcd_ioremap_cache -- Same as lcd_ioremap
+ *
+ * Assumes someone else (e.g. glue code) previously mapped the
+ * memory already using lcd_map_phys.
+ */
+void *lcd_ioremap_cache(unsigned long phys_addr, unsigned long size);
+/**
+ * lcd_iounmap -- No-op for now
+ *
+ * This is meant to fulfill the functionality of regular iounmap. But since
+ * lcd_ioremap doesn't do any mapping (just phys->virt translation), there
+ * is no mapping to undo.
+ */
+void lcd_iounmap(void *addr);
+
 #endif /* LCD_DOMAINS_MEM_H */

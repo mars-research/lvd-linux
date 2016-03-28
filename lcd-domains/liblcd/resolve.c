@@ -15,8 +15,11 @@
  *
  * We need a fake task struct for slab, inside kmem_freepages.
  */
-struct task_struct fake = {0};
-struct task_struct *current_task = &fake;
+struct cred fake_cred;
+struct task_struct fake_task = {
+	.cred = &fake_cred,
+};
+struct task_struct *current_task = &fake_task;
 /*
  * Make sure these cause trouble. This kernel_stack value is non-canonical,
  * so will hopefully cause a GP exception. This phys_base sets bits past
@@ -114,4 +117,49 @@ int printk(const char *fmt, ...)
 	_lcd_printk(fmt, args);
 	va_end(args);
 	return 0;
+}
+
+void get_random_bytes(void *buf, int nbytes)
+{
+	return;
+}
+
+unsigned long get_seconds(void)
+{
+	return 0;
+}
+
+void __init_waitqueue_head(wait_queue_head_t *q, const char *name, 
+			struct lock_class_key *k)
+{
+	return;
+}
+
+struct task_struct fake_kthread;
+struct task_struct *kthread_create_on_node(int (*threadfn)(void *data),
+					void *data, int node,
+					const char namefmt[],
+					...)
+{
+	return &fake_kthread;
+}
+
+bool kthread_should_stop(void)
+{
+	return true;
+}
+
+int kthread_stop(struct task_struct *k)
+{
+	return 0;
+}
+
+int wake_up_process(struct task_struct *tsk)
+{
+	return 0;
+}
+
+void __wake_up(wait_queue_head_t *q, unsigned int mode, int nr, void *key)
+{
+	return;
 }

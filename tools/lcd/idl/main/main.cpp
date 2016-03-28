@@ -65,7 +65,8 @@ int main(int argc, char ** argv)
 	  tree->function_pointer_to_rpc();
 	  tree->generate_function_tags();
 	  tree->resolve_types();
-	  tree->prepare_marshal();
+	  tree->create_container_variables(); // todo
+	  tree->prepare_marshal(); // need to modify to alloc space for container vars
 
 	  std::vector<Module*> project_modules = tree->modules();
 	  for(std::vector<Module*>::iterator it = project_modules.begin(); it != project_modules.end(); it ++) {
@@ -99,9 +100,12 @@ int main(int argc, char ** argv)
 	  printf("completed client header writing\n");
 	}
       else if(!strcmp(argv[1], "-clientsource")) // caller
-	{ 
+	{
+	  tree->create_trampoline_structs();
 	  tree->function_pointer_to_rpc();
+	  tree->generate_function_tags();
 	  tree->resolve_types(); // resolve types that weren't resolved during parsing
+	  tree->create_container_variables();
 	  tree->prepare_marshal();
 	  
 	  std::vector<Module*> project_modules = tree->modules();

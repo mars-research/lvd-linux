@@ -1,4 +1,5 @@
 #include "lcd_ast.h"
+#include "code_gen.h"
 
 /* global variable */
 
@@ -7,11 +8,16 @@ GlobalVariable::GlobalVariable(Type *type, const char *id, int pointer_count)
   this->type_ = type;
   this->id_ = id;
   this->pointer_count_ = pointer_count;
+  this->container_ = 0x0;
 }
 
 void GlobalVariable::prepare_marshal(MarshalPrepareVisitor *worker)
 {
-  printf("global variable prepare marshal todo\n");
+  if (this->container_ != 0x0) {
+    this->container_->prepare_marshal(worker);
+  }
+
+  this->marshal_info_ = this->type_->accept(worker);
 }
 
 Type* GlobalVariable::type()
@@ -22,6 +28,11 @@ Type* GlobalVariable::type()
 const char* GlobalVariable::identifier()
 {
   return this->id_;
+}
+
+void GlobalVariable::set_identifier(const char* id)
+{
+  this->id_ = id;
 }
 
 void GlobalVariable::set_accessor(Variable *v)
@@ -50,6 +61,11 @@ int GlobalVariable::pointer_count()
   return this->pointer_count_;
 }
 
+void GlobalVariable::set_pointer_count(int pcount)
+{
+  this->pointer_count_ = pcount;
+}
+
 void GlobalVariable::resolve_types(LexicalScope *ls)
 {
   // check if unresolved
@@ -67,6 +83,40 @@ void GlobalVariable::resolve_types(LexicalScope *ls)
   // and set
   this->type_ = t;
   return;
+}
+
+void GlobalVariable::create_container_variable(LexicalScope *ls)
+{
+  // lookup in scope the container for its type. 
+  int err;
+  Type *container_t = ls->lookup(container_name(this->type()->name()), &err);
+  Assert(container_t != 0x0, "Error: could not find container in scope\n");
+
+  ProjectionType *container = dynamic_cast<ProjectionType*>(container_t);
+  Assert(container != 0x0, "Error: could not dynamically cast to projection\n");
+
+  // really need to make variable non abstract and get rid of unnecessary variables.
+
+  const char* name = container_name(append_strings("_", construct_list_vars(this)));
+
+  Parameter *container_var = new Parameter(container, name, 1);
+
+  // save. 
+  this->container_ = container_var;
+
+  if(this->type()->num() == 4) {
+    ProjectionType *pt = dynamic_cast<ProjectionType*>(this->type());
+    Assert(pt != 0x0, "Error: dynamic cast to projection type failed\n");
+
+    std::vector<ProjectionField*> fields = pt->fields();
+    for(std::vector<ProjectionField*>::iterator it = fields.begin(); it != fields.end(); it ++) {
+      ProjectionField *pf = *it;
+      if(pf->pointer_count() > 0 && pf->type()->num() == 4) {
+	pf->create_container_variable(ls);
+      }
+    }
+
+  }
 }
 
 void GlobalVariable::set_in(bool b)
@@ -134,6 +184,11 @@ bool GlobalVariable::dealloc_callee()
   return false;
 }
 
+Variable* GlobalVariable::container()
+{
+  return this->container_;
+}
+
 
 // probably more functions needed
 
@@ -152,6 +207,7 @@ Parameter::Parameter()
   this->alloc_caller_ = false;
   this->dealloc_callee_ = false;
   this->dealloc_caller_ = false;
+  this->container_ = 0x0;
 }
 
 Parameter::Parameter(Type* type, const char* name, int pointer_count)
@@ -167,14 +223,68 @@ Parameter::Parameter(Type* type, const char* name, int pointer_count)
   this->dealloc_caller_ = false;
 }
 
+void Parameter::create_container_variable(LexicalScope *ls)
+{
+  // lookup in scope the container for its type. 
+  int err;
+  Type *container_t = ls->lookup(container_name(this->type()->name()), &err);
+  printf("Just looked up container %s\n", container_name(this->type()->name()));
+  Assert(container_t != 0x0, "Error: could not find container in scope\n");
+
+  ProjectionType *container = dynamic_cast<ProjectionType*>(container_t);
+  Assert(container != 0x0, "Error: could not dynamically cast to projection\n");
+
+  // really need to make variable non abstract and get rid of unnecessary variables.
+
+  const char* name = container_name(append_strings("_", construct_list_vars(this)));
+
+  Parameter *container_var = new Parameter(container, name, 1);
+
+  // save. 
+  this->container_ = container_var;
+
+  // recurse
+  if(this->type()->num() == 4) {
+    ProjectionType *pt = dynamic_cast<ProjectionType*>(this->type());
+    Assert(pt != 0x0, "Error: dynamic cast to projection type failed\n");
+
+    std::vector<ProjectionField*> fields = pt->fields();
+    for(std::vector<ProjectionField*>::iterator it = fields.begin(); it != fields.end(); it ++) {
+      ProjectionField *pf = *it;
+      printf("in create container variable have projection field %s\n, type is %d", pf->identifier(), pf->type()->num());
+      if((pf->pointer_count() > 0) && (pf->type()->num() == 4)) {
+	printf("projection field is pointer and projection\n");
+	pf->create_container_variable(ls);
+      }
+    }
+
+  }
+
+}
+
+Variable* Parameter::container()
+{
+  return this->container_;
+}
+
 void Parameter::prepare_marshal(MarshalPrepareVisitor *worker)
 {
+  // if 
+  if (this->container_ != 0x0) {
+    this->container_->prepare_marshal(worker);
+  }
+  
   this->marshal_info_ = this->type_->accept(worker);
 }
 
 const char* Parameter::identifier()
 {
   return this->name_;
+}
+
+void Parameter::set_identifier(const char* id)
+{
+  this->name_ = id;
 }
 
 Type* Parameter::type()
@@ -185,6 +295,11 @@ Type* Parameter::type()
 int Parameter::pointer_count()
 {
   return this->pointer_count_;
+}
+
+void Parameter::set_pointer_count(int pcount)
+{
+  this->pointer_count_ = pcount;
 }
 
 void Parameter::set_accessor(Variable *v)
@@ -305,10 +420,54 @@ ReturnVariable::ReturnVariable(Type *return_type, int pointer_count)
   this->type_ = return_type;
   this->name_ = "";
   this->pointer_count_ = pointer_count;
+  this->container_ = 0x0;
+}
+
+void ReturnVariable::create_container_variable(LexicalScope *ls)
+{
+  // lookup in scope the container for its type. 
+  int err;
+  Type *container_t = ls->lookup(container_name(this->type()->name()), &err);
+  Assert(container_t != 0x0, "Error: could not find container in scope\n");
+
+  ProjectionType *container = dynamic_cast<ProjectionType*>(container_t);
+  Assert(container != 0x0, "Error: could not dynamically cast to projection\n");
+
+  // really need to make variable non abstract and get rid of unnecessary variables.
+
+  const char* name = container_name(append_strings("_", construct_list_vars(this)));
+
+  ReturnVariable *container_var = new ReturnVariable(container, 1);
+
+  // save. 
+  this->container_ = container_var;
+
+  if(this->type()->num() == 4) {
+    ProjectionType *pt = dynamic_cast<ProjectionType*>(this->type());
+    Assert(pt != 0x0, "Error: dynamic cast to projection type failed\n");
+
+    std::vector<ProjectionField*> fields = pt->fields();
+    for(std::vector<ProjectionField*>::iterator it = fields.begin(); it != fields.end(); it ++) {
+      ProjectionField *pf = *it;
+      if(pf->pointer_count() > 0 && pf->type()->num() == 4) {
+	pf->create_container_variable(ls);
+      }
+    }
+
+  }
+}
+
+Variable* ReturnVariable::container()
+{
+  return this->container_;
 }
 
 void ReturnVariable::prepare_marshal(MarshalPrepareVisitor *worker)
 {
+  if (this->container_ != 0x0) {
+    this->container_->prepare_marshal(worker);
+  }
+  
   this->marshal_info_ = this->type_->accept(worker);
 }
 
@@ -327,6 +486,11 @@ const char* ReturnVariable::identifier()
   return this->name_;
 }
 
+void ReturnVariable::set_identifier(const char* id)
+{
+  this->name_ = id;
+}
+
 Type* ReturnVariable::type()
 {
   return this->type_;
@@ -340,6 +504,11 @@ void ReturnVariable::set_accessor(Variable *v)
 int ReturnVariable::pointer_count()
 {
   return this->pointer_count_;
+}
+
+void ReturnVariable::set_pointer_count(int pcount)
+{
+  this->pointer_count_ = pcount;
 }
 
 void ReturnVariable::resolve_types(LexicalScope *ls)
@@ -443,19 +612,64 @@ ProjectionField::ProjectionField(Type* field_type, const char* field_name, int p
   this->alloc_caller_ = false;
   this->dealloc_callee_ = false;
   this->dealloc_caller_ = false;
-  this->field_type_ = field_type; 
+  this->type_ = field_type; 
   this->field_name_ = field_name;
   this->pointer_count_ = pointer_count;
+  this->container_ = 0x0;
+}
+
+void ProjectionField::create_container_variable(LexicalScope *ls)
+{
+  // lookup in scope the container for its type. 
+  int err;
+  Type *container_t = ls->lookup(container_name(this->type()->name()), &err);
+  printf("looking up container %s in pf\n", container_name(this->type()->name()));
+  Assert(container_t != 0x0, "Error: could not find container in scope\n");
+
+  ProjectionType *container = dynamic_cast<ProjectionType*>(container_t);
+  Assert(container != 0x0, "Error: could not dynamically cast to projection\n");
+
+  // really need to make variable non abstract and get rid of unnecessary variables.
+
+  const char* name = container_name(append_strings("_", construct_list_vars(this)));
+
+  ProjectionField *container_var = new ProjectionField(container, name, 1);
+
+  // save. 
+  this->container_ = container_var;
+
+  if(this->type()->num() == 4) {
+    ProjectionType *pt = dynamic_cast<ProjectionType*>(this->type());
+    Assert(pt != 0x0, "Error: dynamic cast to projection type failed\n");
+
+    std::vector<ProjectionField*> fields = pt->fields();
+    for(std::vector<ProjectionField*>::iterator it = fields.begin(); it != fields.end(); it ++) {
+      ProjectionField *pf = *it;
+      if((pf->pointer_count() > 0) && (pf->type()->num() == 4)) {
+	pf->create_container_variable(ls);
+      }
+    }
+
+  }
+}
+
+Variable* ProjectionField::container()
+{
+  return this->container_;
 }
 
 void ProjectionField::prepare_marshal(MarshalPrepareVisitor *worker)
 {
-  this->marshal_info_ = this->field_type_->accept(worker);
+  if (this->container_ != 0x0) {
+    this->container_->prepare_marshal(worker);
+  }
+
+  this->marshal_info_ = this->type_->accept(worker);
 }
 
 Type* ProjectionField::type()
 {
-  return this->field_type_;
+  return this->type_;
 }
 
 int ProjectionField::pointer_count()
@@ -463,9 +677,19 @@ int ProjectionField::pointer_count()
   return this->pointer_count_;
 }
 
+void ProjectionField::set_pointer_count(int pcount)
+{
+  this->pointer_count_ = pcount;
+}
+
 const char* ProjectionField::identifier()
 {
   return this->field_name_;
+}
+
+void ProjectionField::set_identifier(const char* id)
+{
+  this->field_name_ = id;
 }
 
 void ProjectionField::set_accessor(Variable *v)
@@ -491,19 +715,19 @@ Marshal_type* ProjectionField::marshal_info()
 void ProjectionField::resolve_types(LexicalScope *ls)
 {
   // check if unresolved
-  if(this->field_type_->num() != 8) {
+  if(this->type_->num() != 8) {
     return;
   }
   
   int err;
-  Type *t = ls->lookup(this->field_type_->name(), &err);
+  Type *t = ls->lookup(this->type_->name(), &err);
   if(t == 0x0) {
-    printf("Error: could not resolve type %s\n", this->field_type_->name());
+    printf("Error: could not resolve type %s\n", this->type_->name());
     return;
   } 
   
   // and set
-  this->field_type_ = t;
+  this->type_ = t;
   return;
 }
 
@@ -571,10 +795,53 @@ FPParameter::FPParameter(Type *type, int pointer_count)
 {
   this->type_ = type;
   this->pointer_count_ = pointer_count;
+  this->container_ = 0x0;
+}
+
+void FPParameter::create_container_variable(LexicalScope *ls)
+{
+  // lookup in scope the container for its type. 
+  int err;
+  Type *container_t = ls->lookup(container_name(this->type()->name()), &err);
+  Assert(container_t != 0x0, "Error: could not find container in scope\n");
+
+  ProjectionType *container = dynamic_cast<ProjectionType*>(container_t);
+  Assert(container != 0x0, "Error: could not dynamically cast to projection\n");
+
+  // really need to make variable non abstract and get rid of unnecessary variables.
+
+  const char* name = container_name(append_strings("_", construct_list_vars(this)));
+
+  FPParameter *container_var = new FPParameter(container, 1);
+
+  // save. 
+  this->container_ = container_var;
+
+  if(this->type()->num() == 4) {
+    ProjectionType *pt = dynamic_cast<ProjectionType*>(this->type());
+    Assert(pt != 0x0, "Error: dynamic cast to projection type failed\n");
+
+    std::vector<ProjectionField*> fields = pt->fields();
+    for(std::vector<ProjectionField*>::iterator it = fields.begin(); it != fields.end(); it ++) {
+      ProjectionField *pf = *it;
+      if((pf->pointer_count() > 0) && (pf->type()->num() == 4)) {
+	pf->create_container_variable(ls);
+      }
+    }
+  }
+}
+
+Variable* FPParameter::container()
+{
+  return this->container_;
 }
 
 void FPParameter::prepare_marshal(MarshalPrepareVisitor *worker)
 {
+  if (this->container_ != 0x0) {
+    this->container_->prepare_marshal(worker);
+  }
+  
   this->marshal_info_ = this->type_->accept(worker);
 }
 
@@ -588,9 +855,19 @@ int FPParameter::pointer_count()
   return this->pointer_count_;
 }
 
+void FPParameter::set_pointer_count(int pcount)
+{
+  this->pointer_count_ = pcount;
+}
+
 const char* FPParameter::identifier()
 {
   Assert(1 == 0, "Error: operation not allowed on function pointer parameter\n");
+}
+
+void FPParameter::set_identifier(const char* id)
+{
+  return;
 }
 
 void FPParameter::set_marshal_info(Marshal_type *mt)

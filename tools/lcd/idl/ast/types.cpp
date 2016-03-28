@@ -49,7 +49,7 @@ Rpc* Function::to_rpc(ProjectionType *pt)
   // adding extra parameters here. but maybe depending on needs this could be done at parse time
   // and these extra parameters can be added to the Function.
   std::vector<Parameter*> new_parameters;
-  new_parameters.insert(new_parameters.end(), this->parameters_.begin(), this->parameters_.end());
+  // new_parameters.insert(new_parameters.end(), this->parameters_.begin(), this->parameters_.end());
   int err;
   Type *dstore = this->current_scope_->lookup("dstore", &err);
   if(dstore == 0x0) {
@@ -65,8 +65,9 @@ Rpc* Function::to_rpc(ProjectionType *pt)
 
   new_parameters.push_back(new Parameter(container, c_name, 1));
 
-  Rpc* tmp = new Rpc(this->return_var_, this->identifier_, new_parameters, this->current_scope_);
+  Rpc* tmp = new Rpc(this->return_var_, this->identifier_, this->parameters_, this->current_scope_);
   tmp->set_function_pointer_defined(true);
+  tmp->set_hidden_args(new_parameters);
   return tmp;
 }
 

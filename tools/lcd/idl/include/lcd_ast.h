@@ -124,6 +124,7 @@ class Variable : public Base
  public:
   virtual Type* type() = 0;
   virtual const char* identifier() = 0;
+  virtual void set_identifier(const char* id) = 0;
   virtual void set_accessor(Variable *v) = 0;
   virtual Variable* accessor() = 0;
   virtual void set_marshal_info(Marshal_type *mt) = 0;
@@ -132,6 +133,7 @@ class Variable : public Base
   virtual void set_pointer_count(int pcount) = 0;
   virtual void prepare_marshal(MarshalPrepareVisitor *worker) = 0;
   virtual void resolve_types(LexicalScope *ls) = 0;
+  virtual void create_container_variable(LexicalScope *ls) = 0;
 
   virtual void set_in(bool b) = 0;
   virtual void set_out(bool b) = 0;
@@ -146,6 +148,8 @@ class Variable : public Base
   virtual bool alloc_callee() = 0;
   virtual bool dealloc_caller() = 0;
   virtual bool dealloc_callee() = 0;
+
+  virtual Variable* container() = 0;
 };
 
 class GlobalVariable : public Variable
@@ -154,13 +158,17 @@ class GlobalVariable : public Variable
   const char *id_;
   int pointer_count_;
   Marshal_type *marshal_info_;
+  Variable *container_;
 
  public:
   GlobalVariable(Type *type, const char *id, int pointer_count);
+  virtual Variable* container();
   virtual void prepare_marshal(MarshalPrepareVisitor *worker);
   virtual void resolve_types(LexicalScope *ls);
+  virtual void create_container_variable(LexicalScope *ls);
   virtual Type* type();
   virtual const char* identifier();
+  virtual void set_identifier(const char* id);
   virtual void set_accessor(Variable *v);
   virtual Variable* accessor();
   virtual void set_marshal_info(Marshal_type *mt);
@@ -198,17 +206,21 @@ class Parameter : public Variable
   Marshal_type *marshal_info_;
   Variable *accessor_;
   int pointer_count_;
+  Variable *container_;
 
  public:
   Parameter();
   Parameter(Type* type, const char* name, int pointer_count);
   ~Parameter();
+  virtual Variable* container();
   virtual void prepare_marshal(MarshalPrepareVisitor *worker);
   virtual void resolve_types(LexicalScope *ls);
+  virtual void create_container_variable(LexicalScope *ls);
   virtual Type* type();
   virtual void set_marshal_info(Marshal_type* mt);
   virtual Marshal_type* marshal_info(); 
   virtual const char* identifier();
+  virtual void set_identifier(const char* id);
   virtual void set_accessor(Variable *v);
   virtual Variable* accessor();
   virtual int pointer_count();
@@ -238,17 +250,20 @@ class FPParameter : public Parameter
   Type *type_;
   int pointer_count_;
   Marshal_type *marshal_info_;
+  Variable *container_;
  public:
   FPParameter(Type *type, int pointer_count);
+  virtual Variable* container();
   virtual Type* type();
   virtual const char* identifier();
+  virtual void set_identifier(const char* id);
   virtual int pointer_count();
   virtual void set_pointer_count(int pcount);
   virtual void set_marshal_info(Marshal_type *mt);
   virtual Marshal_type* marshal_info();
   virtual void prepare_marshal(MarshalPrepareVisitor *worker);
   virtual void resolve_types(LexicalScope *ls);
-
+  virtual void create_container_variable(LexicalScope *ls);
 
   virtual void set_in(bool b);
   virtual void set_out(bool b);
@@ -272,15 +287,19 @@ class ReturnVariable : public Variable
   Marshal_type *marshal_info_;
   Variable* accessor_;
   int pointer_count_;
+  Variable *container_;
   
  public:
   ReturnVariable();
   ReturnVariable(Type* return_type, int pointer_count);
+  virtual Variable *container();
   virtual void set_marshal_info(Marshal_type *mt);
   virtual Marshal_type* marshal_info();
   virtual void prepare_marshal(MarshalPrepareVisitor *worker);
   virtual void resolve_types(LexicalScope *ls);
+  virtual void create_container_variable(LexicalScope *ls);
   virtual const char* identifier();
+  virtual void set_identifier(const char* id);
   virtual Type* type();
   virtual void set_accessor(Variable *v);
   virtual Variable* accessor();
@@ -397,23 +416,29 @@ class ProjectionField : public Variable //?
   bool dealloc_callee_;
   bool dealloc_caller_;
 
-  Type* field_type_;
+  Type* type_;
   const char* field_name_;
   Variable *accessor_; // 
   int pointer_count_;
   Marshal_type *marshal_info_;
+  Variable *container_;
+  const char* tmp_name_;
 
  public:
   ProjectionField(Type* field_type, const char* field_name, int pointer_count);
   ~ProjectionField(); 
+  const char* tmp_name();
+  virtual Variable *container();
   virtual Type* type();
   virtual const char* identifier();
+  virtual void set_identifier(const char* id);
   virtual void set_accessor(Variable *v);
   virtual Variable* accessor();
   virtual void set_marshal_info(Marshal_type *mt); // add to .cpp file
   virtual Marshal_type* marshal_info(); // make sure all variables have
   virtual void prepare_marshal(MarshalPrepareVisitor *worker);
   virtual void resolve_types(LexicalScope *ls);
+  virtual void create_container_variable(LexicalScope *ls);
   virtual int pointer_count();
   virtual void set_pointer_count(int pcount);
 
@@ -466,21 +491,16 @@ class Rpc : public Base
   /* -------------- */
   const char* name_;
   std::vector<Parameter* > parameters_;
+  std::vector<Parameter*> hidden_args_;
   bool function_pointer_defined_;
-  void construct_marshal_parameters();
-  void construct_unmarshal_parameters();
-  std::vector<Variable*> marshal_projection_parameters(ProjectionType *pt);
-  std::vector<Variable*> unmarshal_projection_parameters(ProjectionType *pt, bool alloc_callee);
+  std::vector<Variable*> marshal_projection_parameters(ProjectionType *pt, const char *direction);
   
  public:
   Rpc(ReturnVariable *return_var, const char* name, std::vector<Parameter* > parameters, LexicalScope *current_scope);
   unsigned int tag();
   void set_tag(unsigned int t);
-  std::vector<Variable*> marshal_parameters;
-  std::vector<Variable*> marshal_references;
-  std::vector<Variable*> unmarshal_parameters;
-  std::vector<Variable*> unmarshal_references;
   void set_function_pointer_defined(bool b);
+  void set_hidden_args(std::vector<Parameter*> hidden_args);
   bool function_pointer_defined();
   const char* name();
   const char* enum_name();
@@ -491,6 +511,7 @@ class Rpc : public Base
   void prepare_marshal();
   void resolve_types();
   void create_trampoline_structs();
+  void create_container_variables();
   LexicalScope *current_scope();
 };
 
@@ -511,6 +532,7 @@ class Module : public Base
   void function_pointer_to_rpc();
   void create_trampoline_structs();
   void generate_function_tags(Project *p);
+  void create_container_variables();
   const char* identifier();
 };
 
@@ -536,6 +558,7 @@ class Project : public Base
   void function_pointer_to_rpc();
   void create_trampoline_structs();
   void generate_function_tags();
+  void create_container_variables();
   std::vector<Module*> modules();
   unsigned int get_next_tag();
 };

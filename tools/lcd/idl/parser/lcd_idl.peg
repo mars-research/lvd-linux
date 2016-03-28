@@ -179,7 +179,16 @@ unnamed_scope_special = Spacing OPENC Spacing {{
 			    value = new_scope;
 			}}
 
-pc_unnamed_scope=	s:unnamed_scope_special d:Type_Definitions* p:ProjField* Spacing CLOSEC Spacing {{	
+pc_unnamed_scope_special = Spacing OPENC Spacing {{
+			    LexicalScope *tmp = get_current_scope();
+		      	    LexicalScope *new_scope = new LexicalScope(tmp);
+			    tmp->add_inner_scope(new_scope);
+			    set_current_scope(new_scope);
+			    value = new_scope;
+			 }}
+
+
+pc_unnamed_scope=	s:pc_unnamed_scope_special d:Type_Definitions* p:ProjField* Spacing CLOSEC Spacing {{	
 			    printf("matched a pc unnamed scope\n");
 			    std::vector<ProjectionField*> *fields = new std::vector<ProjectionField*>();
 			    for(Value::iterator it = p.getValues().begin(); it != p.getValues().end(); it ++) {
@@ -554,19 +563,25 @@ Projection_constructor =    s:Projection_constructor_special Spacing "<" Spacing
 				}
 
 				ProjectionType *val = new ProjectionType((char*) id.getValue(), (char*) t.getValue(), fields, globals);	
-				insertType((char*) id.getValue(), val);
 				
 				// creating constructor
 			    	std::vector<ProjectionField*> container_fields;
-			    	container_fields.push_back(new ProjectionField(getType((char*)id.getValue()), (char*)id.getValue(), 0));
-			    	container_fields.push_back(new ProjectionField(getType("dptr_t"), "other_ref", 0));
-			    	container_fields.push_back(new ProjectionField(getType("dptr_t"), "my_ref", 0));
+			    	container_fields.push_back(new ProjectionField(getType((char*)id.getValue()), (char*)t.getValue(), 0));
+				ProjectionField *other_ref = new ProjectionField(getType("dptr_t"), "other_ref", 0);
+				other_ref->set_out(true);
+			    	container_fields.push_back(other_ref);
+				ProjectionField *my_ref = new ProjectionField(getType("dptr_t"), "my_ref", 0);
+				my_ref->set_in(true);
+			    	container_fields.push_back(my_ref);
 			    	// may need to add extra fields here.
 			    	const char *container_name_str = container_name((char*)id.getValue());
 			    	ProjectionType * container = new ProjectionType(container_name_str, container_name_str, container_fields);
-			    	insertType(container_name_str, container);
+				printf("inserting container with name %s \n", container_name_str);
+			    	
 			    	// finished creating constructor
  				set_current_scope(get_current_scope()->outer_scope()); // leaving current scope
+				insertType((char*) id.getValue(), val); // insert projection constructor
+				insertType(container_name_str, container); // insert container
 				value = val;
 			    }}
 
@@ -592,12 +607,17 @@ Projection	=	"projection" Spacing "<" Spacing t:Proj_type Spacing ">" Spacing id
 
 			    // creating constructor
 			    std::vector<ProjectionField*> container_fields;
-			    container_fields.push_back(new ProjectionField(getType((char*)id.getValue()), (char*)id.getValue(), 0));
-			    container_fields.push_back(new ProjectionField(getType("dptr_t"), "other_ref", 0));
-			    container_fields.push_back(new ProjectionField(getType("dptr_t"), "my_ref", 0));
+			    container_fields.push_back(new ProjectionField(getType((char*)id.getValue()), (char*)t.getValue(), 0));
+			    ProjectionField *other_ref = new ProjectionField(getType("dptr_t"), "other_ref", 0);
+			    other_ref->set_out(true);
+			    container_fields.push_back(other_ref);
+			    ProjectionField *my_ref = new ProjectionField(getType("dptr_t"), "my_ref", 0);
+			    my_ref->set_in(true);
+			    container_fields.push_back(my_ref);
 			    // may need to add extra fields here.
 			    const char *container_name_str = container_name((char*)id.getValue());
 			    ProjectionType * container = new ProjectionType(container_name_str, container_name_str, container_fields);
+			    printf("inserting projection type with name %s", container_name_str);
 			    insertType(container_name_str, container);
 			    // finished creating constructor
  

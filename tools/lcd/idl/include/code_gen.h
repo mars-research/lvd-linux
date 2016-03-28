@@ -37,6 +37,7 @@ const char* struct_name(ProjectionType *pt); // complete
 
 
 // helper.cpp
+std::vector<const char*> construct_list_vars(Variable *v); // complete
 CCSTUnaryOp* reference();
 char* type_number_to_name(int num);
 CCSTDeclaration* struct_pointer_declaration(const char* struct_name, const char* var_name, LexicalScope *ls); // complete
@@ -45,6 +46,7 @@ CCSTCompoundStatement* alloc_init_containers_driver(Variable *v, ProjectionType 
 CCSTCompoundStatement* declare_and_initialize_container_struct(Variable *v, ProjectionType *pt, LexicalScope *ls, const char* side); // complete
 CCSTCompoundStatement* alloc_init_containers(Variable *v, ProjectionType *pt, LexicalScope *ls, const char* side); // complete
 CCSTCompoundStatement* alloc_init_hidden_args_struct(Variable *v, ProjectionType *pt, LexicalScope *ls); // complete-ish
+bool contains_function_pointer(ProjectionType *pt); //complete
 bool alloc_callee(Variable *v, const char* side); // complete 
 bool alloc_caller(Variable *v, const char* side); // complete
 CCSTStructUnionSpecifier* struct_declaration(ProjectionType *pt); // complete
@@ -93,12 +95,27 @@ CCSTDeclaration* trampoline_function_declaration(Rpc *r); // incomplete.
 
 // add marshal and unmarshal cpp files to this
 
-
 // unmarshal.cpp
-CCSTStatement* unmarshal_variable(Variable *v); // almost complete
+CCSTStatement* unmarshal_variable(Variable *v, const char* direction); // complete
+CCSTPostFixExprAssnExpr* unmarshal_variable(Variable *v); 
 
 // marshal.cpp
-CCSTStatement* marshal_variable(Variable *v); // empty
+CCSTStatement* marshal_variable(Variable *v, const char* direction); // complete
+CCSTStatement* marshal(CCSTPostFixExpr *v, int reg); // complete
 
+// containers.cpp
+CCSTStatement* declare_and_init_variable_callee(Variable *p);
+CCSTCompoundStatement* init_variable(Variable *v, const char* side);
+CCSTStatement* lookup_variable_container(Variable *v);
+CCSTStatement* alloc_insert_variable_container(Variable *v);
+
+// helpers
+ProjectionField* get_cptr_field(Variable *v);
+ProjectionField* real_field(Variable *v);
+ProjectionField* find_field(ProjectionType *pt, const char *field_name);
+CCSTStatement* declare_init_tmp_variable(ProjectionField *pf, const char* side);
+
+// variable_utils.cpp
+CCSTDeclaration* declare_variable(Variable *v);
 
 #endif

@@ -234,6 +234,24 @@ void lcd_unmap_virt(gva_t base, unsigned int order)
 	do_unmap_from_phys(gp_base, order);
 }
 
+void *lcd_ioremap_cache(resource_size_t phys_addr, unsigned long size)
+{
+	/* 
+	 * Assumes someone already mapped the memory; we just
+	 * translate phys -> virt.
+	 */
+	return (void *)gva_val(isolated_lcd_gpa2gva(__gpa(phys_addr)));
+}
+
+void lcd_iounmap(void *addr)
+{
+	/*
+	 * No-op. Someone (like the glue) will call a lower-level
+	 * phys unmap.
+	 */
+	return;
+}
+
 /* INIT/EXIT ---------------------------------------- */
 
 struct lcd_page_allocator_cbs ram_map_page_allocator_cbs = {

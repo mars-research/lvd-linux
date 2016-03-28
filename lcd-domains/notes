@@ -39,12 +39,12 @@ X NO-OP  DONE    U __init_waitqueue_head
                  U inode_newsize_ok
                  U inode_owner_or_capable
                  U insert_inode_locked
-X GLUE (GETTER)  U iomem_resource
-X LIBLCD         U ioremap_cache
-X LIBLCD         U ioremap_cache_ro
-X LIBLCD         U ioremap_hpage_cache
-X LIBLCD         U ioremap_hpage_cache_ro
-X LIBLCD         U iounmap
+X FAKE COPY DONE U iomem_resource
+X LIBLCD DONE    U ioremap_cache
+X LIBLCD DONE    U ioremap_cache_ro
+X LIBLCD DONE    U ioremap_hpage_cache
+X LIBLCD DONE    U ioremap_hpage_cache_ro
+X LIBLCD DONE    U iounmap
 X GLUE           U iput
                  U is_bad_inode
 X GLUE           U kill_anon_super
@@ -69,8 +69,8 @@ X GLUE           U mount_nodev
                  U ___ratelimit
                  U _raw_spin_lock
                  U _raw_spin_unlock
-X GLUE           U __release_region
-X GLUE           U __request_region
+X NO-OP DONE     U __release_region   XXX: Non-isol will need to grant during mount
+X NO-OP DONE     U __request_region
                  U __sb_end_write
                  U __sb_start_write
                  U schedule

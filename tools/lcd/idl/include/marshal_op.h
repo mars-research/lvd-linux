@@ -163,6 +163,8 @@ class File;
 class TypeVisitor;
 class CCSTCompoundStatement;
 class ReturnVariable;
+class Variable;
+class UnresolvedType;
 
 class Registers
 {
@@ -171,6 +173,7 @@ class Registers
   void init();
  public:
   Registers();
+  void init(Registers *r1, Registers *r2); // set union. 
   // finds next free register and set it as allocated;
   int allocate_next_free_register();
   
@@ -179,14 +182,17 @@ class Registers
 class Marshal_type
 {
  public:
+  virtual Marshal_type* clone() const = 0;
   virtual void set_register(int r) = 0;
   virtual int get_register() = 0;
 };
 
 class Marshal_projection : public Marshal_type
 {
+
  public:
   Marshal_projection();
+  virtual Marshal_type* clone() const { return new Marshal_projection(*this); }
   virtual void set_register( int r);
   virtual int get_register();
 };
@@ -196,6 +202,7 @@ class Marshal_integer : public Marshal_type
   int register_;
  public:
   Marshal_integer(int r);
+  virtual Marshal_type* clone() const { return new Marshal_integer(*this); }
   virtual void set_register(int r);
   virtual int get_register();};
 
@@ -203,6 +210,7 @@ class Marshal_void : public Marshal_type
 {
  public:
   Marshal_void();
+  virtual Marshal_type* clone() const { return new Marshal_void(*this); }
   virtual void set_register(int r);
   virtual int get_register();
 };
@@ -212,6 +220,8 @@ class Marshal_typedef : public Marshal_type
   Marshal_type *true_type_;
  public:
   Marshal_typedef(Marshal_type *type);
+  Marshal_typedef(const Marshal_typedef& other);
+  virtual Marshal_type* clone() const { return new Marshal_typedef(*this); }
   virtual void set_register(int r);
   virtual int get_register();
 };
@@ -219,9 +229,10 @@ class Marshal_typedef : public Marshal_type
 
 class MarshalPrepareVisitor
 {
-  Registers *registers_;
  public:
+  Registers *registers_;
   MarshalPrepareVisitor(Registers *r);
+  Marshal_type* visit(UnresolvedType *ut);
   Marshal_type* visit(Function *fp);
   Marshal_type* visit(Typedef *td);
   Marshal_type* visit(VoidType *vt);

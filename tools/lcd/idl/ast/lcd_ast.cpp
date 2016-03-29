@@ -227,6 +227,14 @@ void Rpc::resolve_types()
   this->explicit_return_->resolve_types(this->current_scope_);
 }
 
+void Rpc::copy_types()
+{
+  // copy parameters.
+  
+  // copy return type
+
+}
+
 void Rpc::create_trampoline_structs()
 {
   for(std::vector<Parameter*>::iterator it = this->parameters_.begin(); it != this->parameters_.end(); it ++) {
@@ -285,6 +293,14 @@ void Module::resolve_types()
   for(std::vector<Rpc*>::iterator it = this->rpc_definitions_.begin(); it != this->rpc_definitions_.end(); it ++) {
     Rpc *r = *it;
     r->resolve_types();
+  }
+}
+
+void Module::copy_types()
+{
+  for(std::vector<Rpc*>::iterator it = this->rpc_definitions_.begin(); it != this->rpc_definitions_.end(); it ++) {
+    Rpc *r = *it;
+    r->copy_types();
   }
 }
 
@@ -351,6 +367,14 @@ void Project::resolve_types()
   for(std::vector<Module*>::iterator it = this->project_modules_.begin(); it != this->project_modules_.end(); it ++) {
     Module *m = *it;
     m->resolve_types();
+  }
+}
+
+void Project::copy_types()
+{
+  for(std::vector<Module*>::iterator it = this->project_modules_.begin(); it != this->project_modules_.end(); it ++) {
+    Module *m = *it;
+    m->copy_types();
   }
 }
 

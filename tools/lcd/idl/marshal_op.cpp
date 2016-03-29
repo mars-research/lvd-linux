@@ -43,6 +43,18 @@ void Registers::init()
     }
 }
 
+void Registers::init(Registers *r1, Registers *r2)
+{
+  int i;
+  for(i = 0; i < LCD_MAX_REGS; i ++) {
+    regs_[i] = r1->regs_[i] + r2->regs_[i]; 
+  }
+
+  for(i = 0; i < LCD_MAX_CAP_REGS; i ++) {
+    cap_regs_[i] = r1->cap_regs_[i] + r2->cap_regs_[i];
+  }
+}
+
 int Registers::allocate_next_free_register()
 {
   int i;
@@ -110,6 +122,11 @@ Marshal_typedef::Marshal_typedef(Marshal_type *type)
   this->true_type_ = type;
 }
 
+Marshal_typedef::Marshal_typedef(const Marshal_typedef& other)
+{
+  this->true_type_ = other.true_type_->clone();
+}
+
 void Marshal_typedef::set_register(int r)
 {
   true_type_->set_register(r);
@@ -125,6 +142,11 @@ int Marshal_typedef::get_register()
 MarshalPrepareVisitor::MarshalPrepareVisitor(Registers *r)
 {
   this->registers_ = r;
+}
+
+Marshal_type* MarshalPrepareVisitor::visit(UnresolvedType *ut)
+{
+  Assert(1 == 0, "Error: cannot marshal an unresolved type\n");
 }
 
 Marshal_type* MarshalPrepareVisitor::visit(Channel *c)
@@ -164,6 +186,8 @@ Marshal_type* MarshalPrepareVisitor::visit(IntegerType *it)
 
 Marshal_type* MarshalPrepareVisitor::visit(ProjectionType *pt)
 {
+  // this doesn't work.
+  /*
   std::vector<ProjectionField*> fields = pt->fields();
   
   for(std::vector<ProjectionField*>::iterator it = fields.begin(); it != fields.end(); it ++) {
@@ -174,6 +198,6 @@ Marshal_type* MarshalPrepareVisitor::visit(ProjectionType *pt)
     
     pf->set_marshal_info( pf->type()->accept(this) );
   }
-  
+  */
   return new Marshal_projection();
 }

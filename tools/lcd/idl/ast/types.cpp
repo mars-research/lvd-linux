@@ -9,6 +9,27 @@ Function::Function(const char *id, ReturnVariable *return_var, std::vector<Param
   this->current_scope_ = ls;
 }
 
+Function::Function(const Function& other)
+{
+  // copy id
+  char* id_copy = (char*) malloc(sizeof(char)*(strlen(other.identifier_)+1));
+  strcpy(id_copy, other.identifier_);
+  this->identifier_ = id_copy;
+
+  // copy return var
+  this->return_var_ = new ReturnVariable(*other.return_var_);
+  // copy parameters
+  std::vector<Parameter*> parameters_copy;
+  for(std::vector<Parameter*>::const_iterator it = other.parameters_.begin(); it != other.parameters_.end(); it ++) {
+    Parameter *original = *it;
+    Parameter *copy = new Parameter(*original);
+  }
+  this->parameters_ = parameters_copy;
+
+  // don't need to copy scope
+  this->current_scope_ = other.current_scope_;
+}
+
 Marshal_type* Function::accept(MarshalPrepareVisitor *worker)
 {
   return worker->visit(this);
@@ -117,6 +138,11 @@ Channel::Channel()
 {
 }
 
+Channel::Channel(const Channel& other)
+{
+  
+}
+
 Marshal_type* Channel::accept(MarshalPrepareVisitor *worker)
 {
   return worker->visit(this);
@@ -156,6 +182,24 @@ Typedef::Typedef(const char* id, const char* alias, Type* type)
   this->identifier_ = id;
   this->alias_ = alias;
   this->type_ = type; // need to allocate?
+}
+
+Typedef::Typedef(const Typedef& other)
+{
+  // copy id
+  char* id_copy = (char*) malloc(sizeof(char)*(strlen(other.identifier_)+1));
+  strcpy(id_copy, other.identifier_);
+  this->identifier_ = id_copy;			      
+  // copy alias
+  char* alias_copy = (char*) malloc(sizeof(char)*(strlen(other.alias_)+1));
+  strcpy(alias_copy, other.alias_);
+  this->alias_ = alias_copy;
+  // copy Type
+  this->type_ = other.type_->clone();
+  // copy marshal info
+  char* marshal_info_copy = (char*) malloc(sizeof(char)*(strlen(other.marshal_info_)+1));
+  strcpy(marshal_info_copy, other.marshal_info_);
+  this->marshal_info_ = marshal_info_copy;
 }
 
 Marshal_type* Typedef::accept(MarshalPrepareVisitor *worker)
@@ -211,6 +255,11 @@ VoidType::VoidType()
 {
 }
 
+VoidType::VoidType(const VoidType& other)
+{
+  
+}
+
 Marshal_type* VoidType::accept(MarshalPrepareVisitor *worker)
 {
   return worker->visit(this);
@@ -255,6 +304,13 @@ IntegerType::IntegerType(PrimType type, bool un, int size)
   this->type_ = type;
   this->unsigned_ = un;
   this->size_ = size;
+}
+
+IntegerType::IntegerType(const IntegerType& other)
+{
+  this->unsigned_ = other.unsigned_;
+  this->type_ = other.type_;
+  this->size_ = other.size_;
 }
 
 Marshal_type* IntegerType::accept(MarshalPrepareVisitor *worker)
@@ -316,6 +372,34 @@ ProjectionType::ProjectionType(const char* id, const char* real_type, std::vecto
 {
   this->id_ = id; this->real_type_ = real_type; this->fields_ = fields;
   this->init_variables_ = init_vars;
+}
+
+ProjectionType::ProjectionType(const ProjectionType& other)
+{
+  // copy id
+  char* id_copy = (char*) malloc(sizeof(char)*(strlen(other.id_)+1));
+  strcpy(id_copy, other.id_);
+  this->id_ = id_copy;
+  // copy real_type_
+  char* real_type_copy = (char*) malloc(sizeof(char)*(strlen(other.real_type_)+1));
+  strcpy(real_type_copy, other.real_type_);
+  this->real_type_ = real_type_copy;
+  // copy fields_
+  std::vector<ProjectionField*> fields_copy;
+  for(std::vector<ProjectionField*>::const_iterator it = other.fields_.begin(); it != other.fields_.end(); it ++) {
+    ProjectionField *original = *it;
+    ProjectionField *copy = new ProjectionField(*original);
+    fields_copy.push_back(copy);
+  }
+  this->fields_ = fields_copy;
+  // copy init_variables;
+  std::vector<GlobalVariable*> init_vars_copy;
+  for(std::vector<GlobalVariable*>::const_iterator it = other.init_variables_.begin(); it != other.init_variables_.end(); it ++) {
+    GlobalVariable *original = *it;
+    GlobalVariable *copy = new GlobalVariable(*original);
+    init_vars_copy.push_back(copy);
+  }
+  this->init_variables_ = init_vars_copy;
 }
 
 Marshal_type* ProjectionType::accept(MarshalPrepareVisitor *worker)

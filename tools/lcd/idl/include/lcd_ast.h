@@ -96,6 +96,7 @@ class GlobalScope : public LexicalScope
 class Type : public Base
 {
  public:
+  virtual Type* clone() const = 0;
   virtual Marshal_type* accept(MarshalPrepareVisitor *worker) = 0;
   virtual CCSTTypeName* accept(TypeNameVisitor *worker) = 0;
   virtual CCSTStatement* accept(TypeVisitor *worker, Variable *v) = 0;
@@ -110,6 +111,8 @@ class UnresolvedType : public Type
   const char *type_name_;
  public:
   UnresolvedType(const char* type_name);
+  UnresolvedType(const UnresolvedType& other);
+  virtual Type* clone() const { return new UnresolvedType(*this); }
   virtual Marshal_type* accept(MarshalPrepareVisitor *worker);
   virtual CCSTTypeName* accept(TypeNameVisitor *worker); // need to add unresolved type to these visitors.
   virtual CCSTStatement* accept(TypeVisitor *worker, Variable *v);
@@ -122,6 +125,7 @@ class UnresolvedType : public Type
 class Variable : public Base
 {
  public:
+  virtual Variable* clone() const = 0;
   virtual Type* type() = 0;
   virtual const char* identifier() = 0;
   virtual void set_identifier(const char* id) = 0;
@@ -154,14 +158,15 @@ class Variable : public Base
 
 class GlobalVariable : public Variable
 {
+ public:
   Type *type_;
   const char *id_;
   int pointer_count_;
   Marshal_type *marshal_info_;
   Variable *container_;
-
- public:
   GlobalVariable(Type *type, const char *id, int pointer_count);
+  GlobalVariable(const GlobalVariable& other);
+  virtual Variable* clone() const { return new GlobalVariable(*this); }
   virtual Variable* container();
   virtual void prepare_marshal(MarshalPrepareVisitor *worker);
   virtual void resolve_types(LexicalScope *ls);
@@ -194,24 +199,25 @@ class GlobalVariable : public Variable
 
 class Parameter : public Variable
 {
+ public:
   bool in_;
   bool out_;
   bool alloc_callee_;
   bool alloc_caller_;
   bool dealloc_callee_;
   bool dealloc_caller_;
-
+  
   Type* type_;
   const char* name_;
   Marshal_type *marshal_info_;
   Variable *accessor_;
   int pointer_count_;
   Variable *container_;
-
- public:
   Parameter();
   Parameter(Type* type, const char* name, int pointer_count);
   ~Parameter();
+  Parameter(const Parameter& other);
+  virtual Variable* clone() const { return new Parameter(*this); }
   virtual Variable* container();
   virtual void prepare_marshal(MarshalPrepareVisitor *worker);
   virtual void resolve_types(LexicalScope *ls);
@@ -253,6 +259,8 @@ class FPParameter : public Parameter
   Variable *container_;
  public:
   FPParameter(Type *type, int pointer_count);
+  FPParameter(const FPParameter& other);
+  virtual Variable* clone() const { return new FPParameter(*this); }
   virtual Variable* container();
   virtual Type* type();
   virtual const char* identifier();
@@ -282,16 +290,17 @@ class FPParameter : public Parameter
 
 class ReturnVariable : public Variable
 {
+ public:
   const char* name_; // to be decided by a name space or something
   Type* type_;
   Marshal_type *marshal_info_;
   Variable* accessor_;
   int pointer_count_;
   Variable *container_;
-  
- public:
   ReturnVariable();
   ReturnVariable(Type* return_type, int pointer_count);
+  ReturnVariable(const ReturnVariable& other);
+  virtual Variable* clone() const { return new ReturnVariable(*this); }
   virtual Variable *container();
   virtual void set_marshal_info(Marshal_type *mt);
   virtual Marshal_type* marshal_info();
@@ -323,13 +332,14 @@ class ReturnVariable : public Variable
 
 class Function : public Type
 {
+ public:
   const char *identifier_;
   ReturnVariable *return_var_;
   std::vector<Parameter*> parameters_;
   LexicalScope *current_scope_;
-
- public:
   Function(const char *id, ReturnVariable *return_var, std::vector<Parameter*> parameters, LexicalScope *ls);
+  Function(const Function& other);
+  virtual Type* clone() const {return new Function(*this); }
   virtual Marshal_type* accept(MarshalPrepareVisitor *worker);
   virtual CCSTTypeName* accept(TypeNameVisitor *worker);
   virtual CCSTStatement* accept(TypeVisitor *worker, Variable *v);
@@ -342,13 +352,15 @@ class Function : public Type
  
 class Typedef : public Type
 {
+ public:
   Type* type_;
   const char* alias_;
   char* marshal_info_;
   const char* identifier_;
-
- public:
+  
   Typedef(const char* id, const char* alias, Type* type);
+  Typedef(const Typedef& other);
+  virtual Type* clone() const { return new Typedef(*this); }
   virtual Marshal_type* accept(MarshalPrepareVisitor *worker);
   virtual CCSTTypeName* accept(TypeNameVisitor *worker);
   virtual CCSTStatement* accept(TypeVisitor *worker, Variable *v);
@@ -365,6 +377,8 @@ class Channel : public Type
 {
  public:
   Channel();
+  Channel(const Channel& other);
+  virtual Type* clone() const { return new Channel(*this); }
   virtual Marshal_type* accept(MarshalPrepareVisitor *worker);
   virtual CCSTTypeName* accept(TypeNameVisitor *worker);
   virtual CCSTStatement* accept(TypeVisitor *worker, Variable *v);
@@ -378,6 +392,8 @@ class VoidType : public Type
 {
  public:
   VoidType();
+  VoidType(const VoidType& other);
+  virtual Type* clone() const { return new VoidType(*this); }
   virtual Marshal_type* accept(MarshalPrepareVisitor *worker);
   virtual CCSTTypeName* accept(TypeNameVisitor *worker);
   virtual CCSTStatement* accept(TypeVisitor *worker, Variable *v);
@@ -389,12 +405,13 @@ class VoidType : public Type
 
 class IntegerType : public Type
 {
+ public:
   bool unsigned_;
   PrimType type_;
   int size_;
-  
- public:
   IntegerType(PrimType type, bool un, int size);
+  IntegerType(const IntegerType& other);
+  virtual Type* clone() const { return new IntegerType(*this); }
   virtual Marshal_type* accept(MarshalPrepareVisitor *worker);
   virtual CCSTTypeName* accept(TypeNameVisitor *worker);
   virtual CCSTStatement* accept(TypeVisitor *worker, Variable *v);
@@ -409,6 +426,7 @@ class IntegerType : public Type
 
 class ProjectionField : public Variable //?
 {
+ public:
   bool in_;
   bool out_;
   bool alloc_callee_;
@@ -422,12 +440,10 @@ class ProjectionField : public Variable //?
   int pointer_count_;
   Marshal_type *marshal_info_;
   Variable *container_;
-  const char* tmp_name_;
-
- public:
   ProjectionField(Type* field_type, const char* field_name, int pointer_count);
   ~ProjectionField(); 
-  const char* tmp_name();
+  ProjectionField(const ProjectionField& other);
+  virtual Variable* clone() const { return new ProjectionField(*this); }
   virtual Variable *container();
   virtual Type* type();
   virtual const char* identifier();
@@ -461,14 +477,15 @@ class ProjectionField : public Variable //?
 
 class ProjectionType : public Type // complex type
 {
-  
+ public:
+  std::vector<GlobalVariable*> init_variables_;
   const char* id_; 
   const char* real_type_;
   std::vector<ProjectionField*> fields_; 
-  std::vector<GlobalVariable*> init_variables_;
- public:
   ProjectionType(const char* id, const char* real_type, std::vector<ProjectionField*> fields, std::vector<GlobalVariable*> init_variables);
   ProjectionType(const char* id, const char* real_type, std::vector<ProjectionField*> fields);
+  ProjectionType(const ProjectionType& other);
+  virtual Type* clone() const { return new ProjectionType(*this); }
   virtual Marshal_type* accept(MarshalPrepareVisitor *worker);
   virtual CCSTTypeName* accept(TypeNameVisitor *worker);
   virtual CCSTStatement* accept(TypeVisitor *worker, Variable *v);

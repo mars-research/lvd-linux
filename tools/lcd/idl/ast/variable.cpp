@@ -11,6 +11,26 @@ GlobalVariable::GlobalVariable(Type *type, const char *id, int pointer_count)
   this->container_ = 0x0;
 }
 
+GlobalVariable::GlobalVariable(const GlobalVariable& other)
+{
+  // copy type
+  this->type_ = other.type_->clone();
+  
+  // copy id
+  char* id_copy = (char*) malloc(sizeof(char)*(strlen(other.id_)+1));
+  strcpy(id_copy, other.id_);
+  this->id_ = id_copy;
+  // copy marshal info
+  this->marshal_info_ = other.marshal_info_->clone(); // copy for real?
+  
+  // copy container
+  if (other.container_ != 0x0) {
+    this->container_ = other.container_->clone();
+  } else {
+    this->container_ = 0x0;
+  }
+}
+
 void GlobalVariable::prepare_marshal(MarshalPrepareVisitor *worker)
 {
   if (this->container_ != 0x0) {
@@ -223,6 +243,29 @@ Parameter::Parameter(Type* type, const char* name, int pointer_count)
   this->dealloc_caller_ = false;
 }
 
+Parameter::Parameter(const Parameter& other)
+{
+  this->type_ = other.type_->clone();
+
+  // clone name
+  char* name_copy = (char*) malloc(sizeof(char)*(strlen(other.name_)+1));
+  strcpy(name_copy, other.name_);
+  this->name_ = name_copy;
+  this->pointer_count_ = other.pointer_count_;
+  this->in_ = other.in_;
+  this->out_ = other.out_;
+  this->alloc_callee_ = other.alloc_callee_;
+  this->alloc_caller_ = other.alloc_caller_;
+  this->dealloc_callee_ = other.dealloc_callee_;
+  this->dealloc_caller_ = other.dealloc_caller_;
+
+  if(other.container_ != 0x0) {
+    this->container_ = other.container_->clone();
+  } else {
+    this->container_ = 0x0;
+  }
+}
+
 void Parameter::create_container_variable(LexicalScope *ls)
 {
   // lookup in scope the container for its type. 
@@ -423,6 +466,32 @@ ReturnVariable::ReturnVariable(Type *return_type, int pointer_count)
   this->container_ = 0x0;
 }
 
+ReturnVariable::ReturnVariable(const ReturnVariable& other)
+{
+  // copy name
+  char* name_copy = (char*) malloc(sizeof(char)*(strlen(other.name_)+1));
+  strcpy(name_copy, other.name_);
+  this->name_ = name_copy;
+
+  // copy type
+  this->type_ = other.type_->clone();
+
+  // copy marshal info
+  this->marshal_info_ = other.marshal_info_->clone();
+
+  // copy accessor
+  this->accessor_ = other.accessor_;
+
+  this->pointer_count_ = other.pointer_count_;
+
+  if(other.container_ != 0x0) {
+    this->container_ = other.container_->clone();
+  } else {
+    this->container_ = 0x0;
+  }
+  
+}
+
 void ReturnVariable::create_container_variable(LexicalScope *ls)
 {
   // lookup in scope the container for its type. 
@@ -616,6 +685,36 @@ ProjectionField::ProjectionField(Type* field_type, const char* field_name, int p
   this->field_name_ = field_name;
   this->pointer_count_ = pointer_count;
   this->container_ = 0x0;
+}
+
+ProjectionField::ProjectionField(const ProjectionField& other)
+{
+  this->in_ = other.in_;
+  this->out_ = other.out_;
+  this->alloc_callee_ = other.alloc_callee_;
+  this->alloc_caller_ = other.alloc_caller_;
+  this->dealloc_callee_ = other.dealloc_callee_;
+  this->dealloc_caller_ = other.dealloc_caller_;
+  // copy Type
+  this->type_ = other.type_->clone();
+  // copy field name
+  char* field_name_copy = (char*) malloc(sizeof(char)*(strlen(other.field_name_)+1));
+  strcpy(field_name_copy, other.field_name_);
+  this->field_name_ = field_name_copy;
+
+  this->pointer_count_ = other.pointer_count_;
+
+  // copy marshal info
+  this->marshal_info_ = other.marshal_info_->clone();
+  // copy container;
+  if(other.container_ != 0x0) {
+    this->container_ = other.container_->clone();
+  } else {
+    this->container_ = 0x0;
+  }
+
+  // copy accessor
+  this->accessor_ = other.accessor_;
 }
 
 void ProjectionField::create_container_variable(LexicalScope *ls)

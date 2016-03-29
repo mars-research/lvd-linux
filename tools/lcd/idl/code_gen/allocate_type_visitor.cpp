@@ -1,6 +1,10 @@
 #include "lcd_ast.h"
 #include "code_gen.h"
 
+AllocateTypeVisitor::AllocateTypeVisitor()
+{
+}
+
 CCSTStatement* AllocateTypeVisitor::visit(Channel *c, Variable *v)
 {
   Assert(1 == 0, "Error: allocation for channel not implemented\n");
@@ -50,6 +54,11 @@ CCSTStatement* AllocateTypeVisitor::visit(IntegerType *it, Variable *v)
     
     v->set_pointer_count(p_count_save-p_count);
     statements.push_back(new CCSTAssignExpr(access(v), equals(), function_call("kzalloc", kzalloc_args)));
+
+    /* do error checking */
+    statements.push_back(if_cond_fail(new CCSTUnaryExprCastExpr(Not(), access(v))
+				      , "kzalloc"));
+    
     p_count -= 1;
   }
   v->set_pointer_count(p_count_save - p_count);
@@ -60,6 +69,11 @@ CCSTStatement* AllocateTypeVisitor::visit(IntegerType *it, Variable *v)
   kzalloc_args.push_back(new CCSTEnumConst("GFP_KERNEL"));
 
   statements.push_back(new CCSTAssignExpr(access(v), equals(), function_call("kzalloc", kzalloc_args)));
+
+  /* do error checking */
+  statements.push_back(if_cond_fail(new CCSTUnaryExprCastExpr(Not(), access(v))
+				    , "kzalloc"));
+
 
   v->set_pointer_count(p_count_save); // set back to what it was before
   return new CCSTCompoundStatement(declarations, statements);
@@ -85,6 +99,10 @@ CCSTStatement* AllocateTypeVisitor::visit(ProjectionType *pt, Variable *v)
     
     v->set_pointer_count(p_count_save-p_count);
     statements.push_back(new CCSTAssignExpr(access(v), equals(), function_call("kzalloc", kzalloc_args)));
+    /* do error checking */
+    statements.push_back(if_cond_fail(new CCSTUnaryExprCastExpr(Not(), access(v))
+				    , "kzalloc"));
+
     p_count -= 1; 
   }
   
@@ -98,6 +116,11 @@ CCSTStatement* AllocateTypeVisitor::visit(ProjectionType *pt, Variable *v)
 
   v->set_pointer_count(p_count_save-p_count);
   statements.push_back(new CCSTAssignExpr(access(v), equals(), function_call("kzalloc", kzalloc_args)));
+
+  /* do error checking */
+  statements.push_back(if_cond_fail(new CCSTUnaryExprCastExpr(Not(), access(v))
+				    , "kzalloc"));
+  
   
   v->set_pointer_count(p_count_save);
 

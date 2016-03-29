@@ -32,38 +32,42 @@ CCSTFile* generate_client_source(Module* f)
   // functions
   std::vector<Rpc*> rpcs = f->rpc_definitions();
   for(std::vector<Rpc*>::iterator it = rpcs.begin(); it != rpcs.end(); it ++) {
-    Rpc *r = (Rpc*) *it;
-    definitions.push_back(function_definition(function_declaration(r)
-						     ,caller_body(r)));
+    Rpc *r_tmp = (Rpc*) *it;
+    if(r_tmp->function_pointer_defined()) {
+      //    definitions.push_back(function_definition(callee_declaration(r_tmp)
+      //					, callee_body(r_tmp)));
+    } else {
+      definitions.push_back(function_definition(function_declaration(r_tmp)
+						,caller_body(r_tmp)));
+    }
   }
   
   return new CCSTFile(definitions);
 }
 
-CCSTCompoundStatement* function_pointer_caller_body(Rpc *f)
+std::vector<CCSTDeclaration*> declare_containers(Variable *v)
 {
   std::vector<CCSTDeclaration*> declarations;
-  std::vector<CCSTStatement*> statements;
-
-  std::vector<Parameter*> params = f->parameters();
-
-  // allocate container structs if necessary
-  for(std::vector<Parameter*>::iterator it = params.begin(); it != params.end(); it ++) {
-    Parameter *p = *it;
-    
-    if(p->type()->num() == 4 && p->alloc_caller()) {
-      ProjectionType *pt = dynamic_cast<ProjectionType*>(p->type());
-      Assert(pt != 0x0, "Error: dynamic cast to Projection type failed!\n");
-      statements.push_back(alloc_init_containers_driver(p, pt, f->current_scope(), "caller"));
-    }
+  
+  if(v->container() != 0x0) {
+    declarations.push_back(declare_variable(v->container()));
   }
 
-  // allocate trampolines
+  if(v->type()->num() == 4) {
+    ProjectionType *pt = dynamic_cast<ProjectionType*>(v->type());
+    Assert(pt != 0x0, "Error: dynamic cast to projection type failed.\n");
 
-  // marshal parameters
-
+    std::vector<ProjectionField*> fields = pt->fields();
+    for(std::vector<ProjectionField*>::iterator it = fields.begin(); it != fields.end(); it ++) {
+      ProjectionField *pf = *it;
+      if(pf->container() != 0x0) {
+	std::vector<CCSTDeclaration*> tmp = declare_containers(pf);
+	declarations.insert(declarations.end(), tmp.begin(), tmp.end());
+      }
+    }
+  }
   
-
+  return declarations;
 }
 
 CCSTCompoundStatement* caller_body(Rpc *r)
@@ -77,65 +81,72 @@ CCSTCompoundStatement* caller_body(Rpc *r)
   // loop through params, declare a tmp and pull out marshal value
   std::vector<Parameter*> params = r->parameters();
 
-  // for each parameter that is ia projection
+  // for every parameter that has a container. declare containers. then alloc or container of
   for(std::vector<Parameter*>::iterator it = params.begin(); it != params.end(); it ++)
     {
       Parameter *p = *it;
-      if(p->type()->num() == 4) {
-	ProjectionType *pt = dynamic_cast<ProjectionType*>(p->type());
-	Assert(pt != 0x0, "Error: dynamic cast to Projection type failed!\n");
-	statements.push_back(declare_and_initialize_container_struct(p, pt, r->current_scope(), "caller"));
+      if(p->container() != 0x0) {
+	// declare containers
+	std::vector<CCSTDeclaration*> tmp = declare_containers(p);
+	declarations.insert(declarations.end(), tmp.begin(), tmp.end());
+
+	statements.push_back(alloc_link_container_caller(p));
+
       }
     }
+  
 
   /* TODO: projection channel allocation */
   /* TODO: what about function pointers */
   
-  // marshal_parameters
-  std::vector<Variable*> marshal_params = r->marshal_parameters;
-  for(std::vector<Variable*>::iterator it = marshal_params.begin(); it != marshal_params.end(); it ++) {
-    Variable *v = *it;
-    statements.push_back(marshal_variable(v));    
+  /* marshal parameters */
+
+  std::vector<Parameter*> parameters = r->parameters();
+  for(std::vector<Parameter*>::iterator it = parameters.begin(); it != parameters.end(); it ++) {
+    Parameter *p = *it;
+    statements.push_back(marshal_variable(p, "in"));    
   }
 
-  /* TODO: make remote call using appropriate channel */
+  /* marshal function tag */
+  statements.push_back(marshal(new CCSTInteger(r->tag()), 0));
+
+  /* make remote call using appropriate channel */
+
+  std::vector<CCSTInitDeclarator*> ret_err;
+  ret_err.push_back(new CCSTDeclarator(0x0, new CCSTDirectDecId("ret_err")));
+  declarations.push_back(new CCSTDeclaration(int_type(), ret_err));
+
+  std::vector<CCSTAssignExpr*> lcd_sync_call_args;
+  lcd_sync_call_args.push_back(new CCSTPrimaryExprId("channel_id_TODO"));
+  statements.push_back( new CCSTAssignExpr( new CCSTPrimaryExprId("ret_err"), equals(), function_call("lcd_sync_call", lcd_sync_call_args)));
+
+  statements.push_back(if_cond_fail(new CCSTPrimaryExprId("ret_err"), "lcd_sync_call"));
   
   /* unmarshal appropriate parameters and return value */
-  
-  /* Only thing that might need to be allocated is the return value */
 
-  /* TODO: possibly allocate return value */
-  const char* ret_var_name = "ret_val";
-
-  std::vector<Variable*> unmarshal_params = r->unmarshal_parameters;
-  for(std::vector<Variable*>::iterator it = unmarshal_params.begin(); it != unmarshal_params.end(); it ++) {
-    Variable *v = *it;
-    statements.push_back(unmarshal_variable(v));
-  }
-
-  /* unmarshal explicit return value */
-  if(r->return_variable()->type()->num() != 5) { // check if not void.
-    /* 
-     * This adds some complexity because in this case we DO NOT have a list of things that need 
-     * to be unmarshalled like for the params.  
-     * Could just add this to the list of things to unmarshal and treat as special at that time.
-     * Make sure to set up special accessor that is the one we will allocate here.
-     */
-
+  for(std::vector<Parameter*>::iterator it = parameters.begin(); it != parameters.end(); it ++) {
+    Parameter *p = *it;
+    if(p->type()->num() != 5) {
+      printf("calling unmarshal for %s\n", p->identifier());
+      statements.push_back(unmarshal_variable(p, "out"));
+    }
   }
 
   /* TODO:  clear capability registers? */
 
   /* return value to caller */
   if(r->return_variable()->type()->num() != 5) {
-    statements.push_back(new CCSTReturn(new CCSTPrimaryExprId(ret_var_name)));
+    // TODO: declare return variable
+    statements.push_back(unmarshal_variable(r->return_variable(), ""));
+    statements.push_back(new CCSTReturn(new CCSTPrimaryExprId(r->return_variable()->identifier())));
   } else {
     statements.push_back(new CCSTReturn());
   }
-
-  return new CCSTCompoundStatement(declarations, statements);
   
+  return new CCSTCompoundStatement(declarations, statements);  
 }
+
+
 
 
 

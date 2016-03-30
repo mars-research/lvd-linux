@@ -1,6 +1,25 @@
 #include "ccst.h"
 #include "code_gen.h"
 
+
+/*
+ * a function that creates the vector of names to be appended together for a var.
+ */
+std::vector<const char*> construct_list_vars(Variable *v)
+{
+  std::vector<const char*> var_names;
+
+  if(v->accessor() == 0x0) {
+    var_names.push_back(v->identifier());
+  } else {
+    var_names = construct_list_vars(v->accessor());
+    var_names.push_back(v->identifier());
+  }
+
+  return var_names;
+} 
+
+
 // for debugging purposes
 char* type_number_to_name(int num)
 {
@@ -77,6 +96,38 @@ bool alloc_caller(Variable *v, const char *side)
 {
   if(strcmp(side, "caller") == 0) {
     return v->alloc_caller();
+  }
+  return false;
+}
+
+bool dealloc_caller(Variable *v, const char* side)
+{
+  if(strcmp(side, "caller") == 0) {
+    return v->dealloc_caller();
+  }
+  return false;
+}
+
+bool dealloc_callee(Variable *v, const char* side)
+{
+  if(strcmp(side, "callee") == 0) {
+    return v->dealloc_callee();
+  }
+  return false;
+}
+
+bool in(Variable *v, const char* side)
+{
+  if(strcmp(side, "callee") == 0) {
+    return v->in();
+  }
+  return false;
+}
+
+bool out(Variable *v, const char* side)
+{
+  if(strcmp(side, "caller") == 0) {
+    return v->out();
   }
   return false;
 }

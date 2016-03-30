@@ -15,14 +15,26 @@ CCSTFile* generate_client_source(Module* f)
   std::vector<CCSTExDeclaration*> definitions;
 
   // declare globals
-  std::vector<GlobalVariable*> globals = f->globals(); // if you odn't do this you get use after free heap issues
+  std::vector<GlobalVariable*> globals = f->channels(); // if you odn't do this you get use after free heap issues
 
   for(std::vector<GlobalVariable*>::iterator it = globals.begin(); it != globals.end(); it ++) {
     GlobalVariable *gv = (GlobalVariable*) *it;
     definitions.push_back(declare_static_variable(gv));
   }
 
+  // declare cspaces
+  std::vector<GlobalVariable*> cspaces = f->cspaces_;
+  for(std::vector<GlobalVariable*>::iterator it = cspaces.begin(); it != cspaces.end(); it ++) {
+    GlobalVariable *gv = *it;
+    definitions.push_back(declare_static_variable(gv));
+  }
+
+  // declare channel group
+  definitions.push_back(declare_static_variable(f->channel_group));
+
   // create initialization function
+  definitions.push_back(function_definition(interface_init_function_declaration(f)
+					    , interface_init_function_body(f)));
   
 
   // define container structs

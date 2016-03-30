@@ -57,6 +57,29 @@ GlobalScope::GlobalScope()
   //fields4.push_back( char trampoline[0]); 
   this->type_definitions_.insert(std::pair<std::string, Type*>("lcd_trampoline_handle"
 							       , new ProjectionType("lcd_trampoline_handle", "lcd_trampoline_handle", fields4)));
+
+  // cspace
+  std::vector<ProjectionField*> cspace_fields;
+  this->type_definitions_.insert(std::pair<std::string, Type*>("cspace"
+							       , new ProjectionType("cspace", "cspace", cspace_fields)));
+
+  // cptr_cache
+  std::vector<ProjectionField*> cptr_cache_fields;
+  this->type_definitions_.insert(std::pair<std::string, Type*>("cptr_cache"
+							       , new ProjectionType("cptr_cache", "cptr_cache", cptr_cache_fields)));
+
+  // glue_cspace
+  std::vector<ProjectionField*> glue_cspace_fields;
+  glue_cspace_fields.push_back(new ProjectionField(this->lookup("cspace", &err), "cspace", 1)); // cspace
+  glue_cspace_fields.push_back(new ProjectionField(this->lookup("cptr_cache", &err), "cptr_cache", 1)); // cptr_cache
+
+  this->type_definitions_.insert(std::pair<std::string, Type*>("glue_cspace"
+							       , new ProjectionType("glue_cspace", "glue_cspace", glue_cspace_fields)));
+
+  // lcd_sync_channel_group
+  std::vector<ProjectionField*> lcd_sync_channel_group_fields;
+  this->type_definitions_.insert(std::pair<std::string, Type*>("lcd_sync_channel_group"
+							       , new ProjectionType("lcd_sync_channel_group", "lcd_sync_channel_group", lcd_sync_channel_group_fields)));
 }
 
 GlobalScope* GlobalScope::instance()

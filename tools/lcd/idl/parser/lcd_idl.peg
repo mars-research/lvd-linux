@@ -200,11 +200,11 @@ pc_unnamed_scope=	s:pc_unnamed_scope_special d:Type_Definitions* p:ProjField* Sp
 			    value = fields;
 			}}
 
-Interface	=	  m:Interface_special Space+ id:Identifier Spacing OPEN gs:Globals? Spacing CLOSE Spacing OPENC Spacing d:Type_Definitions* r:Rpc* r2:unnamed_scope* Spacing CLOSEC Spacing {{ 
+Interface	=	  m:Interface_special Space+ id:Identifier Spacing OPEN chans:Channels Spacing CLOSE Spacing OPENC Spacing d:Type_Definitions* r:Rpc* r2:unnamed_scope* Spacing CLOSEC Spacing {{ 
 			      LexicalScope *module_scope = (LexicalScope*) m.getValue();
 			      std::vector<Rpc*> rpcs;				
-			      std::vector<GlobalVariable*> *globals = (std::vector<GlobalVariable*>*) gs.getValue();  
-			      std::vector<GlobalVariable*> globals2 = *globals;
+			      std::vector<GlobalVariable*> *channels = (std::vector<GlobalVariable*>*) chans.getValue();  
+			      std::vector<GlobalVariable*> channels2 = *channels;
 
 			      for(Value::iterator it = r.getValues().begin(); it != r.getValues().end(); it ++) {
 			          const Value & v2 = *it;
@@ -219,7 +219,7 @@ Interface	=	  m:Interface_special Space+ id:Identifier Spacing OPEN gs:Globals? 
 			      }
 
 			      set_current_scope(get_current_scope()->outer_scope()); // leaving current scope	  
-			      value = new Module((char*) id.getValue(), rpcs, globals2, module_scope); 
+			      value = new Module((char*) id.getValue(), rpcs, channels2, module_scope); 
 			  }}
 
 Interface_special =	  "module" {{
@@ -510,6 +510,26 @@ LastGlobal	=	t:Type_form pointers:star* Spacing id:Identifier Spacing {{
 			    value = new GlobalVariable((Type*) t.getValue(), (char*) id.getValue(), count_pointers(pointers));
 			}}
 
+FirstChannel    = "channel" Space+ id:Identifier Spacing COMMA Spacing {{
+		    value = new GlobalVariable(getType("cptr_t"), (char*) id.getValue(), 0);
+		}}
+
+LastChannel     = "channel" Space+ id:Identifier Spacing {{
+		    value = new GlobalVariable(getType("cptr_t"), (char*) id.getValue(), 0);
+		}}
+
+Channels        = f:FirstChannel* l:LastChannel {{
+		    std::vector<GlobalVariable*> *channels = new std::vector<GlobalVariable*>();
+
+		    for(Value::iterator it = f.getValues().begin(); it != f.getValues().end(); it ++) {
+			        const Value & v = *it;
+				GlobalVariable *gv = (GlobalVariable*) v.getValue();
+				channels->push_back(gv);
+			    }
+			    channels->push_back((GlobalVariable*) l.getValue());
+			    value = channels;
+		}}		  
+
 Globals 	=	f:FirstGlobal* l:LastGlobal {{
 		 	    printf("matched globals\n");
 			    std::vector<GlobalVariable*> *globals = new std::vector<GlobalVariable*>();
@@ -566,7 +586,7 @@ Projection_constructor =    s:Projection_constructor_special Spacing "<" Spacing
 				
 				// creating constructor
 			    	std::vector<ProjectionField*> container_fields;
-			    	container_fields.push_back(new ProjectionField(getType((char*)id.getValue()), (char*)t.getValue(), 0));
+			    	container_fields.push_back(new ProjectionField(getType((char*)id.getValue()), (char*)id.getValue(), 0));
 				ProjectionField *other_ref = new ProjectionField(getType("dptr_t"), "other_ref", 0);
 				other_ref->set_out(true);
 			    	container_fields.push_back(other_ref);
@@ -607,7 +627,7 @@ Projection	=	"projection" Spacing "<" Spacing t:Proj_type Spacing ">" Spacing id
 
 			    // creating constructor
 			    std::vector<ProjectionField*> container_fields;
-			    container_fields.push_back(new ProjectionField(getType((char*)id.getValue()), (char*)t.getValue(), 0));
+			    container_fields.push_back(new ProjectionField(getType((char*)id.getValue()), (char*)id.getValue(), 0));
 			    ProjectionField *other_ref = new ProjectionField(getType("dptr_t"), "other_ref", 0);
 			    other_ref->set_out(true);
 			    container_fields.push_back(other_ref);

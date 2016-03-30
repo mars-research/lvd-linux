@@ -52,6 +52,7 @@ bool alloc_caller(Variable *v, const char* side); // complete
 CCSTStructUnionSpecifier* struct_declaration(ProjectionType *pt); // complete
 CCSTDeclaration* declare_and_initialize_container_struct(Variable *v); // complete
 std::vector<CCSTAssignExpr*> container_of_args(CCSTPostFixExpr *struct_pointer, const char *type_name, const char *field_name); // complete
+std::vector<CCSTStatement*> container_of(Variable *v); // complete
 
 CCSTDeclaration* typedef_declaration(Typedef *t); // todo. totally not done
 CCSTAssignOp* equals(); // complete
@@ -67,6 +68,7 @@ CCSTPrimaryExprId* function_name(const char *func_name); // complete
 CCSTPostFixExprAssnExpr* function_call(const char* func_name, std::vector<CCSTAssignExpr*> args); // complete
 CCSTUnaryOp* Not();
 CCSTIfStatement* if_cond_fail(CCSTExpression *cond, const char *err_msg); // complete
+CCSTIfStatement* if_cond_fail_goto(CCSTExpression *cond, const char* err_msg, const char* goto_label); // complete
 std::vector<CCSTDecSpecifier*> int_type(); // complete
 
 CCSTPointer* pointer(int p_count); // complete
@@ -79,7 +81,8 @@ std::vector<CCSTSpecifierQual*> integer_type_cast(IntegerType *it); /// ????????
 
 
 // is this in the correct file?
-CCSTCompoundStatement* interface_init_function_body(std::vector<GlobalVariable*> globals); // complete
+CCSTCompoundStatement* interface_init_function_body(Module *m); // complete
+CCSTDeclaration* interface_init_function_declaration(Module *m); // 
 
 
 CCSTFuncDef* function_definition(CCSTDeclaration *function_declaration, CCSTCompoundStatement *body); // complete
@@ -107,7 +110,8 @@ CCSTStatement* marshal(CCSTPostFixExpr *v, int reg); // complete
 CCSTStatement* declare_and_init_variable_callee(Variable *p);
 CCSTCompoundStatement* init_variable(Variable *v, const char* side);
 CCSTStatement* lookup_variable_container(Variable *v);
-CCSTStatement* alloc_insert_variable_container(Variable *v);
+CCSTCompoundStatement* alloc_insert_variable_container(Variable *v);
+CCSTCompoundStatement* alloc_link_container_caller(Variable *v);
 
 // helpers
 ProjectionField* get_cptr_field(Variable *v);

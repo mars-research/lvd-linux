@@ -273,12 +273,31 @@ void Rpc::create_trampoline_structs()
   }
 }
 
-Module::Module(const char *id, std::vector<Rpc*> rpc_definitions, std::vector<GlobalVariable*> globals, LexicalScope *ls)
+Module::Module(const char *id, std::vector<Rpc*> rpc_definitions, std::vector<GlobalVariable*> channels, LexicalScope *ls)
 {
   this->module_name_ = id;
   this->module_scope_ = ls;
   this->rpc_definitions_ = rpc_definitions;
-  this->globals_ = globals;
+  this->channels_ = channels;
+
+  int err;
+  Type *cspace = this->module_scope_->lookup("glue_cspace", &err);
+  if(!cspace) {
+    cspace = new UnresolvedType("glue_cspace");
+  }
+  // create cspaces.
+  for(std::vector<GlobalVariable*>::iterator it = this->channels_.begin(); it != this->channels_.end(); it ++) {
+    GlobalVariable *gv = *it;
+    this->cspaces_.push_back(new GlobalVariable(cspace, cspace_name(gv->identifier()), 1));
+  }
+  
+  // create channel group
+  Type *group = this->module_scope_->lookup("lcd_sync_channel_group", &err);
+  if(!group) {
+    group = new UnresolvedType("lcd_sync_channel_group");
+  }
+
+  this->channel_group = new GlobalVariable(group, group_name(this->identifier()), 1);
 }
 
 std::vector<Rpc*> Module::rpc_definitions()
@@ -286,9 +305,9 @@ std::vector<Rpc*> Module::rpc_definitions()
   return this->rpc_definitions_;
 }
 
-std::vector<GlobalVariable*> Module::globals()
+std::vector<GlobalVariable*> Module::channels()
 {
-  return this->globals_;
+  return this->channels_;
 }
 
 LexicalScope* Module::module_scope()

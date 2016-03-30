@@ -9,19 +9,26 @@ GlobalVariable::GlobalVariable(Type *type, const char *id, int pointer_count)
   this->id_ = id;
   this->pointer_count_ = pointer_count;
   this->container_ = 0x0;
+  this->accessor_ = 0x0;
 }
 
 GlobalVariable::GlobalVariable(const GlobalVariable& other)
 {
   // copy type
   this->type_ = other.type_->clone();
+
+  this->accessor_ = other.accessor_;
   
   // copy id
   char* id_copy = (char*) malloc(sizeof(char)*(strlen(other.id_)+1));
   strcpy(id_copy, other.id_);
   this->id_ = id_copy;
   // copy marshal info
-  this->marshal_info_ = other.marshal_info_->clone(); // copy for real?
+  if (other.marshal_info_ != 0x0) {
+    this->marshal_info_ = other.marshal_info_->clone(); // copy for real?
+  } else {
+    this->marshal_info_ = 0x0;
+  }
   
   // copy container
   if (other.container_ != 0x0) {
@@ -57,7 +64,22 @@ void GlobalVariable::set_identifier(const char* id)
 
 void GlobalVariable::set_accessor(Variable *v)
 {
-  printf("Error this operation not allowed\n");
+  this->accessor_ = v;
+  
+  if(this->container_ != 0x0) {
+    this->container_->set_accessor(0x0);
+  }
+
+  if(this->type_->num() == 4) {
+    ProjectionType *pt = dynamic_cast<ProjectionType*>(this->type_);
+    Assert(pt != 0x0, "Error: dynamic cast to projection type failed\n");
+
+    std::vector<ProjectionField*> fields = pt->fields();
+    for(std::vector<ProjectionField*>::iterator it = fields.begin(); it != fields.end(); it ++) {
+      ProjectionField *pf = *it;
+      pf->set_accessor(this);
+    }
+  }
 }
 
 Variable* GlobalVariable::accessor()
@@ -348,6 +370,20 @@ void Parameter::set_pointer_count(int pcount)
 void Parameter::set_accessor(Variable *v)
 {
   this->accessor_ = v;
+  if(this->container_ != 0x0) {
+    this->container_->set_accessor(0x0);
+  }
+  
+  if(this->type_->num() == 4) {
+    ProjectionType *pt = dynamic_cast<ProjectionType*>(this->type_);
+    Assert(pt != 0x0, "Error: dynamic cast to projection type failed\n");
+    
+    std::vector<ProjectionField*> fields = pt->fields();
+    for(std::vector<ProjectionField*>::iterator it = fields.begin(); it != fields.end(); it ++) {
+      ProjectionField *pf = *it;
+      pf->set_accessor(this);
+    }
+  }
 }
 
 Variable* Parameter::accessor()
@@ -477,7 +513,11 @@ ReturnVariable::ReturnVariable(const ReturnVariable& other)
   this->type_ = other.type_->clone();
 
   // copy marshal info
-  this->marshal_info_ = other.marshal_info_->clone();
+  if(other.marshal_info_ != 0x0) {
+    this->marshal_info_ = other.marshal_info_->clone();
+  } else {
+    this->marshal_info_ = 0x0;
+  }
 
   // copy accessor
   this->accessor_ = other.accessor_;
@@ -568,6 +608,21 @@ Type* ReturnVariable::type()
 void ReturnVariable::set_accessor(Variable *v)
 {
   this->accessor_ = v;
+
+  if(this->container_ != 0x0) {
+    this->container_->set_accessor(0x0);
+  }
+
+  if(this->type_->num() == 4) {
+    ProjectionType *pt = dynamic_cast<ProjectionType*>(this->type_);
+    Assert(pt != 0x0, "Error: dynamic cast to projection type failed\n");
+    
+    std::vector<ProjectionField*> fields = pt->fields();
+    for(std::vector<ProjectionField*>::iterator it = fields.begin(); it != fields.end(); it ++) {
+      ProjectionField *pf = *it;
+      pf->set_accessor(this);
+    }
+  }
 }
 
 int ReturnVariable::pointer_count()
@@ -705,7 +760,11 @@ ProjectionField::ProjectionField(const ProjectionField& other)
   this->pointer_count_ = other.pointer_count_;
 
   // copy marshal info
-  this->marshal_info_ = other.marshal_info_->clone();
+  if(other.marshal_info_ != 0x0) {
+    this->marshal_info_ = other.marshal_info_->clone();
+  } else {
+    this->marshal_info_ = 0x0;
+  }
   // copy container;
   if(other.container_ != 0x0) {
     this->container_ = other.container_->clone();
@@ -794,6 +853,21 @@ void ProjectionField::set_identifier(const char* id)
 void ProjectionField::set_accessor(Variable *v)
 {
   this->accessor_ = v;
+
+  if (this->container_ != 0x0) {
+    this->container_->set_accessor(0x0);
+  }
+  
+  if(this->type_->num() == 4) {
+    ProjectionType *pt = dynamic_cast<ProjectionType*>(this->type_);
+    Assert(pt != 0x0, "Error: dynamic cast to projection type failed\n");
+    
+    std::vector<ProjectionField*> fields = pt->fields();
+    for(std::vector<ProjectionField*>::iterator it = fields.begin(); it != fields.end(); it ++) {
+      ProjectionField *pf = *it;
+      pf->set_accessor(this);
+    }
+  }
 }
 
 Variable* ProjectionField::accessor()
@@ -895,6 +969,24 @@ FPParameter::FPParameter(Type *type, int pointer_count)
   this->type_ = type;
   this->pointer_count_ = pointer_count;
   this->container_ = 0x0;
+}
+
+FPParameter::FPParameter(const FPParameter& other)
+{
+  // copy type
+  this->type_ = other.type_->clone();
+
+  // copy container
+  this->container_ = other.container_->clone();
+
+  // copy marshal info
+  if (other.marshal_info_ != 0x0) {
+    this->marshal_info_ = other.marshal_info_->clone();
+  } else {
+    this->marshal_info_ = 0x0;
+  }
+
+  this->pointer_count_ = other.pointer_count_;
 }
 
 void FPParameter::create_container_variable(LexicalScope *ls)

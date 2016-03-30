@@ -106,6 +106,8 @@ int main(int argc, char ** argv)
 	  tree->generate_function_tags();
 	  tree->resolve_types(); // resolve types that weren't resolved during parsing
 	  tree->create_container_variables();
+	  tree->copy_types();
+	  tree->set_accessors();
 	  tree->prepare_marshal();
 	  
 	  std::vector<Module*> project_modules = tree->modules();

@@ -230,9 +230,28 @@ void Rpc::resolve_types()
 void Rpc::copy_types()
 {
   // copy parameters.
+  for(std::vector<Parameter*>::iterator it = this->parameters_.begin(); it != this->parameters_.end(); it ++) {
+    Parameter *p = *it;
+    p->type_ = p->type_->clone();
+    if (p->container_ != 0x0) {
+      p->container_ = p->container_->clone();
+    }
+  }
   
   // copy return type
+  this->explicit_return_->type_ = this->explicit_return_->type_->clone();
+}
 
+void Rpc::set_accessors()
+{
+  // return variable
+  this->explicit_return_->set_accessor(0x0);
+
+  // parameters
+  for(std::vector<Parameter*>::iterator it = this->parameters_.begin(); it != this->parameters_.end(); it ++) {
+    Parameter *p = *it;
+    p->set_accessor(0x0);
+  }
 }
 
 void Rpc::create_trampoline_structs()
@@ -301,6 +320,14 @@ void Module::copy_types()
   for(std::vector<Rpc*>::iterator it = this->rpc_definitions_.begin(); it != this->rpc_definitions_.end(); it ++) {
     Rpc *r = *it;
     r->copy_types();
+  }
+}
+
+void Module::set_accessors()
+{
+  for(std::vector<Rpc*>::iterator it = this->rpc_definitions_.begin(); it != this->rpc_definitions_.end(); it ++) {
+    Rpc *r = *it;
+    r->set_accessors();
   }
 }
 
@@ -375,6 +402,14 @@ void Project::copy_types()
   for(std::vector<Module*>::iterator it = this->project_modules_.begin(); it != this->project_modules_.end(); it ++) {
     Module *m = *it;
     m->copy_types();
+  }
+}
+
+void Project::set_accessors()
+{
+  for(std::vector<Module*>::iterator it = this->project_modules_.begin(); it != this->project_modules_.end(); it ++) {
+    Module *m = *it;
+    m->set_accessors();
   }
 }
 

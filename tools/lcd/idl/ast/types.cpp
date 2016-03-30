@@ -99,6 +99,13 @@ UnresolvedType::UnresolvedType(const char *name)
   this->type_name_ = name;
 }
 
+UnresolvedType::UnresolvedType(const UnresolvedType& other)
+{
+  char* name_copy = (char*) malloc(sizeof(char)*(strlen(other.type_name_)+1));
+  strcpy(name_copy, other.type_name_);
+  this->type_name_ = name_copy;
+}
+
 CCSTTypeName* UnresolvedType::accept(TypeNameVisitor *worker)
 {
   return worker->visit(this);

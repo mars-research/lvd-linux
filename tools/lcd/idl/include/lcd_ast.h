@@ -108,8 +108,8 @@ class Type : public Base
 
 class UnresolvedType : public Type
 {
-  const char *type_name_;
  public:
+  const char *type_name_;
   UnresolvedType(const char* type_name);
   UnresolvedType(const UnresolvedType& other);
   virtual Type* clone() const { return new UnresolvedType(*this); }
@@ -164,6 +164,7 @@ class GlobalVariable : public Variable
   int pointer_count_;
   Marshal_type *marshal_info_;
   Variable *container_;
+  Variable *accessor_;
   GlobalVariable(Type *type, const char *id, int pointer_count);
   GlobalVariable(const GlobalVariable& other);
   virtual Variable* clone() const { return new GlobalVariable(*this); }
@@ -215,7 +216,6 @@ class Parameter : public Variable
   Variable *container_;
   Parameter();
   Parameter(Type* type, const char* name, int pointer_count);
-  ~Parameter();
   Parameter(const Parameter& other);
   virtual Variable* clone() const { return new Parameter(*this); }
   virtual Variable* container();
@@ -253,11 +253,11 @@ class Parameter : public Variable
 // add to variables.cpp
 class FPParameter : public Parameter
 {
+ public:
   Type *type_;
   int pointer_count_;
   Marshal_type *marshal_info_;
   Variable *container_;
- public:
   FPParameter(Type *type, int pointer_count);
   FPParameter(const FPParameter& other);
   virtual Variable* clone() const { return new FPParameter(*this); }
@@ -514,6 +514,7 @@ class Rpc : public Base
   
  public:
   Rpc(ReturnVariable *return_var, const char* name, std::vector<Parameter* > parameters, LexicalScope *current_scope);
+  void copy_types();
   unsigned int tag();
   void set_tag(unsigned int t);
   void set_function_pointer_defined(bool b);
@@ -529,6 +530,7 @@ class Rpc : public Base
   void resolve_types();
   void create_trampoline_structs();
   void create_container_variables();
+  void set_accessors();
   LexicalScope *current_scope();
 };
 
@@ -550,6 +552,8 @@ class Module : public Base
   void create_trampoline_structs();
   void generate_function_tags(Project *p);
   void create_container_variables();
+  void copy_types();
+  void set_accessors();
   const char* identifier();
 };
 
@@ -576,6 +580,8 @@ class Project : public Base
   void create_trampoline_structs();
   void generate_function_tags();
   void create_container_variables();
+  void copy_types();
+  void set_accessors();
   std::vector<Module*> modules();
   unsigned int get_next_tag();
 };

@@ -36,6 +36,9 @@ CCSTFile* generate_client_source(Module* f)
   definitions.push_back(function_definition(interface_init_function_declaration(f)
 					    , interface_init_function_body(f)));
   
+  // create exit function
+  definitions.push_back(function_definition(interface_exit_function_declaration(f)
+					    , interface_exit_function_body(f)));
 
   // define container structs
   

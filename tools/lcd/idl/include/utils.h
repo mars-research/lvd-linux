@@ -10,6 +10,7 @@ const char* container_name(const char* name);
 const char* insert_name(const char* name);
 const char* cap_init_name(const char* name);
 const char* cap_create_name(const char* name);
+const char* cap_destroy_name(const char* name);
 const char* cap_exit_name(const char* name);
 const char* cspace_name(const char* name);
 const char* group_name(const char* name);

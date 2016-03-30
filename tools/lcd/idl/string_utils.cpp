@@ -63,6 +63,11 @@ const char* cap_exit_name(const char* name)
   return new_name(name, "_cap_exit");
 }
 
+const char* cap_destroy_name(const char* name)
+{
+  return new_name(name, "_cap_destroy");
+}
+
 const char* cspace_name(const char* name)
 {
   return new_name(name, "_cspace");

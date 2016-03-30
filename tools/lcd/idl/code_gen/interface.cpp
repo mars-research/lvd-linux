@@ -6,7 +6,7 @@
  */
 
 
-/* TODO
+/*
  * 1. Always returns an int.
  * 2. name is glue_interfacename_init
  * 3. Params TODO. What params are always required, what is taken from IDL
@@ -126,7 +126,7 @@ CCSTDeclaration* interface_exit_function_declaration(Module *m)
   std::vector<CCSTDecSpecifier*> specifier;
   specifier.push_back(new CCSTSimpleTypeSpecifier(void_t));
 
-  CCSTDirectDecId *name = new CCSTDirectDecId(exit_name(m->identifier()));
+  CCSTDirectDecId *name = new CCSTDirectDecId(glue_name(exit_name(m->identifier())));
   CCSTParamList *param_list = new CCSTParamList(); // empty
   
   CCSTDirectDecParamTypeList *declaration = new CCSTDirectDecParamTypeList(name, param_list);
@@ -138,22 +138,38 @@ CCSTDeclaration* interface_exit_function_declaration(Module *m)
 }
 
 /*
- * TODO
+ * 
  * 1. Need to know what to tear-down.
  */
-CCSTCompoundStatement* interface_exit_function_body()
+CCSTCompoundStatement* interface_exit_function_body(Module *m)
 {
   /* 
      void glue_vfs_exit(void)
 {
-	lcd_dstore_destroy(minix_dstore);
+/* Free vfs data store. 
+	vfs_cap_destroy(vfs_cspace);
 
-	/* We may as well remove the channel from the loop, though
-	 * it doesn't matter in this simple example. (In general, we
-	 * probably should.) 
-	loop_rm_channel(loop_ctx, &vfs_channel);
+	/* Tear down cap code 
+	vfs_cap_exit();
 }
    */
+  std::vector<CCSTDeclaration*> body_declarations;
+  std::vector<CCSTStatement*> body_statements;
 
-  return 0x0;
+  // tear down all of the cspaces
+  std::vector<GlobalVariable*> cspaces = m->cspaces_;
+  for(std::vector<GlobalVariable*>::iterator it = cspaces.begin(); it != cspaces.end(); it ++) {
+    GlobalVariable *gv = *it;
+
+    std::vector<CCSTAssignExpr*> cap_destroy_args;
+    cap_destroy_args.push_back(new CCSTPrimaryExprId(gv->identifier()));
+    body_statements.push_back(function_call(cap_destroy_name(m->identifier())
+					    , cap_destroy_args));
+  }
+  // vfs cap exit
+  std::vector<CCSTAssignExpr*> cap_exit_args;
+  body_statements.push_back(function_call(cap_exit_name(m->identifier())
+					  , cap_exit_args));
+
+  return new CCSTCompoundStatement(body_declarations, body_statements);
 }

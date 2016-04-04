@@ -58,11 +58,23 @@ lcd_domains-y += $(addprefix common/, \
 
 # libcap (microkernel and kliblcd share libcap. We get away with this
 # because this build of libcap does not use global cap types.)
-lcd_domains-y += libcap.install/lib/libcap.a
+libcap_objs = $(wildcard $(MICROKERNEL_BUILD_DIR)/libcap.build/src/common/*.o)
+libcap_objs := $(notdir $(libcap_objs))
+libcap_objs := $(addprefix libcap.build/src/common/, $(libcap_objs))
+lcd_domains-y += $(libcap_objs)
 
 # libfipc and libasync
-lcd_domains-y += libfipc.install/lib/libfipc.a
-lcd_domains-y += libasync.install/lib/libasync.a
+libfipc_objs = $(wildcard \
+	     $(MICROKERNEL_BUILD_DIR)/libfipc.build/src/common/*.o)
+libfipc_objs := $(notdir $(libfipc_objs))
+libfipc_objs := $(addprefix libfipc.build/src/common/, $(libfipc_objs))
+lcd_domains-y += $(libfipc_objs)
+
+libasync_objs = $(wildcard \
+	      $(MICROKERNEL_BUILD_DIR)/libasync.build/src/common/*.o)
+libasync_objs := $(notdir $(libasync_objs))
+libasync_objs := $(addprefix libasync.build/src/common/, $(libasync_objs))
+lcd_domains-y += $(libasync_objs)
 
 # Extra includes
 ccflags-y += $(MICROKERNEL_CFLAGS)

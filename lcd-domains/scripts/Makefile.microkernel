@@ -50,7 +50,10 @@ microkernel: $(MICROKERNEL_BUILD_DIR)/Kbuild | \
 libcap.microkernel: $(MICROKERNEL_BUILD_DIR)/libcap.build/Makefile
 	$(MAKE) -C $(MICROKERNEL_BUILD_DIR)/libcap.build \
 		CFLAGS="$(MICROKERNEL_LIB_CFLAGS)" $(MAKEFLAGS) && \
-	$(MAKE) -C $(MICROKERNEL_BUILD_DIR)/libcap.build install $(MAKEFLAGS)
+	$(MAKE) -C $(MICROKERNEL_BUILD_DIR)/libcap.build install \
+	$(MAKEFLAGS) && \
+	cd $(MICROKERNEL_BUILD_DIR)/libcap.install/lib && \
+	ar x libcap.a
 
 $(MICROKERNEL_BUILD_DIR)/libcap.build/Makefile: libcap/configure | \
 	$(MICROKERNEL_BUILD_DIRS)
@@ -67,7 +70,10 @@ $(MICROKERNEL_BUILD_DIR)/libcap.build/Makefile: libcap/configure | \
 libfipc.microkernel: $(MICROKERNEL_BUILD_DIR)/libfipc.build/Makefile
 	$(MAKE) -C $(MICROKERNEL_BUILD_DIR)/libfipc.build \
 		CFLAGS="$(MICROKERNEL_LIB_CFLAGS) -I$(MICROKERNEL_BUILD_DIR)/libcap.install/include" $(MAKEFLAGS) && \
-	$(MAKE) -C $(MICROKERNEL_BUILD_DIR)/libfipc.build install $(MAKEFLAGS)
+	$(MAKE) -C $(MICROKERNEL_BUILD_DIR)/libfipc.build install \
+	$(MAKEFLAGS) && \
+	cd $(MICROKERNEL_BUILD_DIR)/libfipc.install/lib && \
+	ar x libfipc.a
 
 $(MICROKERNEL_BUILD_DIR)/libfipc.build/Makefile: \
 	libasync/fast-ipc-module/configure | \
@@ -80,7 +86,10 @@ $(MICROKERNEL_BUILD_DIR)/libfipc.build/Makefile: \
 libasync.microkernel: $(MICROKERNEL_BUILD_DIR)/libasync.build/Makefile
 	$(MAKE) -C $(MICROKERNEL_BUILD_DIR)/libasync.build \
 		CFLAGS="$(MICROKERNEL_LIB_CFLAGS) -I$(MICROKERNEL_BUILD_DIR)/libcap.install/include -I$(MICROKERNEL_BUILD_DIR)/libfipc.install/include -DNDEBUG" $(MAKEFLAGS) && \
-	$(MAKE) -C $(MICROKERNEL_BUILD_DIR)/libasync.build install $(MAKEFLAGS)
+	$(MAKE) -C $(MICROKERNEL_BUILD_DIR)/libasync.build install \
+	$(MAKEFLAGS) && \
+	cd $(MICROKERNEL_BUILD_DIR)/libasync.install/lib && \
+	ar x libasync.a
 
 $(MICROKERNEL_BUILD_DIR)/libasync.build/Makefile: libasync/configure | \
 	$(MICROKERNEL_BUILD_DIRS)

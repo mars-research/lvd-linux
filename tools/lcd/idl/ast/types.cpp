@@ -369,16 +369,23 @@ void IntegerType::create_trampoline_structs(LexicalScope *ls)
 /* end */
 
 /* projection type */
+ProjectionType::ProjectionType()
+{
+}
 
 ProjectionType::ProjectionType(const char* id, const char* real_type, std::vector<ProjectionField*> fields)
 {
-  this->id_ = id; this->real_type_ = real_type; this->fields_ = fields;
+  this->id_ = id; 
+  this->real_type_ = real_type; 
+  this->fields_ = fields;
 }
 
-ProjectionType::ProjectionType(const char* id, const char* real_type, std::vector<ProjectionField*> fields, std::vector<GlobalVariable*> init_vars)
+ProjectionType::ProjectionType(const char* id, const char* real_type, std::vector<ProjectionField*> fields, std::vector<ProjectionField*> channels)
 {
-  this->id_ = id; this->real_type_ = real_type; this->fields_ = fields;
-  this->init_variables_ = init_vars;
+  this->id_ = id; 
+  this->real_type_ = real_type; 
+  this->fields_ = fields;
+  this->channels_ = channels;
 }
 
 ProjectionType::ProjectionType(const ProjectionType& other)
@@ -400,13 +407,13 @@ ProjectionType::ProjectionType(const ProjectionType& other)
   }
   this->fields_ = fields_copy;
   // copy init_variables;
-  std::vector<GlobalVariable*> init_vars_copy;
-  for(std::vector<GlobalVariable*>::const_iterator it = other.init_variables_.begin(); it != other.init_variables_.end(); it ++) {
-    GlobalVariable *original = *it;
-    GlobalVariable *copy = new GlobalVariable(*original);
-    init_vars_copy.push_back(copy);
+  std::vector<ProjectionField*> channels;
+  for(std::vector<ProjectionField*>::const_iterator it = other.channels_.begin(); it != other.channels_.end(); it ++) {
+    ProjectionField *original = *it;
+    ProjectionField *copy = new ProjectionField(*original);
+    channels.push_back(copy);
   }
-  this->init_variables_ = init_vars_copy;
+  this->channels_ = channels;
 }
 
 Marshal_type* ProjectionType::accept(MarshalPrepareVisitor *worker)
@@ -483,6 +490,49 @@ ProjectionField* ProjectionType::get_field(const char *field_name)
     }
   }
   return 0x0;
+}
+
+
+/* projection constructor type*/
+ProjectionConstructorType::ProjectionConstructorType(const char* id, const char* real_type, std::vector<ProjectionField*> fields, std::vector<ProjectionField*> channels)
+{
+  this->id_ = id;
+  this->real_type_ = real_type;
+  this->fields_ = fields;
+  this->channels_ = channels;
+}
+
+ProjectionConstructorType::ProjectionConstructorType(const ProjectionType& other)
+{
+  // copy id
+  char* id_copy = (char*) malloc(sizeof(char)*(strlen(other.id_)+1));
+  strcpy(id_copy, other.id_);
+  this->id_ = id_copy;
+  // copy real_type_
+  char* real_type_copy = (char*) malloc(sizeof(char)*(strlen(other.real_type_)+1));
+  strcpy(real_type_copy, other.real_type_);
+  this->real_type_ = real_type_copy;
+  // copy fields_
+  std::vector<ProjectionField*> fields_copy;
+  for(std::vector<ProjectionField*>::const_iterator it = other.fields_.begin(); it != other.fields_.end(); it ++) {
+    ProjectionField *original = *it;
+    ProjectionField *copy = new ProjectionField(*original);
+    fields_copy.push_back(copy);
+  }
+  this->fields_ = fields_copy;
+  // copy init_variables;
+  std::vector<ProjectionField*> channels;
+  for(std::vector<ProjectionField*>::const_iterator it = other.channels_.begin(); it != other.channels_.end(); it ++) {
+    ProjectionField *original = *it;
+    ProjectionField *copy = new ProjectionField(*original);
+    channels.push_back(copy);
+  }
+  this->channels_ = channels;
+}
+
+int ProjectionConstructorType::num()
+{
+  return 9;
 }
 
 /* end */

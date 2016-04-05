@@ -478,11 +478,12 @@ class ProjectionField : public Variable //?
 class ProjectionType : public Type // complex type
 {
  public:
-  std::vector<GlobalVariable*> init_variables_;
+  std::vector<ProjectionField*> channels_;
   const char* id_; 
   const char* real_type_;
   std::vector<ProjectionField*> fields_; 
-  ProjectionType(const char* id, const char* real_type, std::vector<ProjectionField*> fields, std::vector<GlobalVariable*> init_variables);
+  ProjectionType();
+  ProjectionType(const char* id, const char* real_type, std::vector<ProjectionField*> fields, std::vector<ProjectionField*> channels);
   ProjectionType(const char* id, const char* real_type, std::vector<ProjectionField*> fields);
   ProjectionType(const ProjectionType& other);
   virtual Type* clone() const { return new ProjectionType(*this); }
@@ -497,6 +498,15 @@ class ProjectionType : public Type // complex type
   ~ProjectionType(){printf("projection type destructor\n");}
   virtual void create_trampoline_structs(LexicalScope *ls);
   ProjectionField* get_field(const char* field_name);
+};
+
+class ProjectionConstructorType : public ProjectionType 
+{
+ public:
+  ProjectionConstructorType(const char* id, const char* real_type, std::vector<ProjectionField*> fields, std::vector<ProjectionField*> channels);
+  ProjectionConstructorType(const ProjectionType& other);
+  virtual int num();
+  virtual Type* clone() const { return new ProjectionConstructorType(*this); }
 };
 
 class Rpc : public Base
@@ -539,12 +549,15 @@ class Module : public Base
   // const char *verbatim_;
   const char* module_name_;
   LexicalScope *module_scope_;
-  std::vector<GlobalVariable*> globals_;
+  std::vector<GlobalVariable*> channels_;
+   // create these from the channels in the constructor.
   std::vector<Rpc*> rpc_definitions_;
  public:
+  std::vector<GlobalVariable*> cspaces_;
+  GlobalVariable *channel_group;
   Module(const char* id, std::vector<Rpc*> rpc_definitions, std::vector<GlobalVariable*> globals, LexicalScope *ls);
   std::vector<Rpc*> rpc_definitions();  
-  std::vector<GlobalVariable*> globals();
+  std::vector<GlobalVariable*> channels();
   LexicalScope *module_scope();
   void prepare_marshal();
   void resolve_types();

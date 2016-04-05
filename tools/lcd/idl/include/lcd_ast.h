@@ -38,59 +38,39 @@ class Base
 
 class LexicalScope : public Base
 {
+ public:
   LexicalScope *outer_scope_;
   std::map<std::string, Type*> type_definitions_;
   std::map<std::pair<std::string, std::vector<Parameter*> >, Rpc*> rpc_definitions_; // rpc or function pointer. why do we keep this? 
   std::vector<LexicalScope*> inner_scopes_;
- public:
   LexicalScope();
   LexicalScope(LexicalScope *outer_scope);
-  virtual std::vector<Rpc*> rpc_in_scope();
-  virtual bool insert(Rpc *r);
-  virtual Type* lookup(const char *sym, int* err);
-  virtual bool insert(const char *sym, Type* type);
-  virtual bool contains(const char *symbol);
+  std::vector<Rpc*> rpc_in_scope();
+  bool insert(Rpc *r);
+  Type* lookup(const char *sym, int* err);
+  bool insert(const char *sym, Type* type);
+  bool contains(const char *symbol);
   virtual void set_outer_scope(LexicalScope *ls);
-  virtual void add_inner_scope(LexicalScope *ls);
-  virtual void add_inner_scopes(std::vector<LexicalScope*> scopes);
-  virtual std::map<std::string, Type*> type_definitions();
-  virtual std::vector<LexicalScope*> inner_scopes();
-  virtual LexicalScope* outer_scope();
-  virtual void resolve_types();
-  virtual void create_trampoline_structs();
-  virtual std::vector<Rpc*> function_pointer_to_rpc();
-  virtual std::map<std::string, Type*> all_type_definitions();
-  virtual std::map<std::string, Type*> all_types_outer();
-  virtual std::map<std::string, Type*> all_types_inner();
+  void add_inner_scope(LexicalScope *ls);
+  void add_inner_scopes(std::vector<LexicalScope*> scopes);
+  std::map<std::string, Type*> type_definitions();
+  std::vector<LexicalScope*> inner_scopes();
+  LexicalScope* outer_scope();
+  void resolve_types();
+  void create_trampoline_structs();
+  std::vector<Rpc*> function_pointer_to_rpc();
+  std::map<std::string, Type*> all_type_definitions();
+  std::map<std::string, Type*> all_types_outer();
+  std::map<std::string, Type*> all_types_inner();
 };
 
 class GlobalScope : public LexicalScope
 {
   static GlobalScope *instance_;
-  LexicalScope *outer_scope_;
-  std::map<std::string, Type*> type_definitions_;
-  std::map<std::pair<std::string, std::vector<Parameter*> >, Rpc*> rpc_definitions_; // rpc or function pointer
-  std::vector<LexicalScope*> inner_scopes_;
  public:
   GlobalScope();
-  virtual std::vector<Rpc*> rpc_in_scope();
-  virtual bool insert(Rpc *r); // x
-  virtual Type* lookup(const char *symbol, int *err); //x
-  virtual bool insert(const char *symbol, Type *type); // x
-  virtual bool contains(const char *symbol); // x
   virtual void set_outer_scope(LexicalScope *ls); // x
-  virtual void add_inner_scope(LexicalScope *ls); // x
-  virtual void add_inner_scopes(std::vector<LexicalScope*> scopes); // x
-  virtual std::map<std::string, Type*> type_definitions(); // x
-  virtual std::vector<LexicalScope*> inner_scopes(); // x
   static GlobalScope* instance(); // x
-  virtual LexicalScope* outer_scope();
-  virtual void resolve_types();
-  virtual void create_trampoline_structs();
-  virtual std::vector<Rpc*> function_pointer_to_rpc();
-  virtual std::map<std::string, Type*> all_type_definitions();
-  virtual std::map<std::string, Type*> all_types_outer();
-  virtual std::map<std::string, Type*> all_types_inner();
 };
 
 class Type : public Base

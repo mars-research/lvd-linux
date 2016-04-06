@@ -429,14 +429,6 @@ static int run_once(struct lcd *lcd, int *lcd_ret)
 		goto out;
 	}
 	
-	/*
-	 * Sleep if we don't have full preemption turned on, and someone
-	 * else should have a turn.
-	 */
-#ifndef CONFIG_PREEMPT
-	cond_resched();
-#endif	
-
 out:
 	return ret;
 }
@@ -497,6 +489,13 @@ static int main_for_lcd(struct lcd *lcd)
 			return lcd_ret;
 		} else {
 			/* ret = 0; continue */
+#ifndef CONFIG_PREEMPT
+			/*
+			 * Sleep if we don't have full preemption turned on, 
+			 * and someone else should have a turn.
+			 */
+			cond_resched();
+#endif
 			continue;
 		}
 	}

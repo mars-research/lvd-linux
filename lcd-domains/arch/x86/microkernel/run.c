@@ -190,32 +190,47 @@ static int vmx_handle_control_reg(struct lcd_arch *lcd_arch)
 static int vmx_handle_ext_intr(struct lcd_arch *lcd_arch)
 {
 	/*
-	 * We don't try to emulate hardware interrupt handling anymore. I
-	 * don't think the code in KVM is actually used anymore, because they
-	 * don't set the VM_EXIT_ACK_INTR_ON_EXIT vm exit control for
-	 * non-nested vm's. (So the interrupt emulation code is always skipped
-	 * and just re-enables interrupts.)
+	 * For simplicity, unlike KVM, we don't try to emulate hardware 
+	 * interrupt handling anymore. (Dune doesn't try to emulate either.) 
+	 * We set PIN_BASED_EXT_INTR_MASK so that external interrupts
+	 * cause an exit, but we *do not* set VM_EXIT_ACK_INTR_ON_EXIT
+	 * (KVM *does* set VM_EXIT_ACK_INTR_ON_EXIT). When the VM EXIT
+	 * is triggered by the external interrupt, we switch back to the 
+	 * host with interrupts disabled (%rflags is automatically zero'd
+	 * out, except the reserved bit - Intel SDM V3 27.5.3 - so this
+	 * means irqs are disabled right after the exit). We will not
+	 * handle a maskable interrupt until after we invoke
+	 * local_irq_enable in lcd_arch_run.
 	 *
-	 * This is what Dune does too - they don't try to emulate.
+	 * As for NMIs, we retrigger them via "int $2" (see
+	 * vmx_handle_nmi). It's possible another NMI can trigger before
+	 * we have a chance to invoke vmx_handle_nmi and trigger the
+	 * first nmi. It's ok for an NMI to trigger after we've returned
+	 * from VT-x non-root (i.e., somewhere in vmx_enter); the hardware
+	 * has already done the critical non-root --> root stuff.
 	 *
-	 * I made this choice when I realized our emulation code (and KVM's
-	 * code) is probably not switching to the per-cpu interrupt stack;
-	 * it's calling the interrupt handler with the same stack = bad idea
-	 * on x86_64! Could lead to stack overflows, or using the wrong
-	 * stack for certain exceptions/interrupts.
-	 * 
+	 * Part of my original motivation for not trying to emulate anymore
+	 * is that, if 64-bit stack switching is required, it's hard,
+	 * maybe even impossible, to emulate the interrupt using
+	 * software. But it looks like Linux never uses *hardware* stack 
+	 * switching for interrupts (only for certain exceptions, like NMIs, 
+	 * double faults, and so on; grep for set_intr_gate_ist for uses).
 	 * See:
 	 *
-	 * https://www.kernel.org/doc/Documentation/x86/x86_64/kernel-stacks
+	 *   https://www.kernel.org/doc/Documentation/x86/x86_64/kernel-stacks
 	 *
-	 * In order to correctly emulate, we would need to look up the correct
-	 * IST entry in the cpu's tss, and switch to the correct stack. But
-	 * I have a feeling that wouldn't be reliable ...
+	 * As the doc says, switching to the per-cpu interrupt stack is
+	 * done using *software*, rather than the 64-bit hardware IST
+	 * approach.
 	 *
-	 * So ... this code will probably never be called for now - because I
+	 * So to conclude, perhaps my doubts about emulating interrupts
+	 * were unfounded, and it's ok to do so. If you want to bring
+	 * the code back in, see arch/x86/kvm/vmx.c:vmx_handle_external_intr.
+	 *
+	 * Also note: this code should never be called for now - because I
 	 * turned off ack interrupts on vm exit, and hence
-	 * the interrupt info will be invalid in the case of an external
-	 * interrupt, and we check that before calling into here.
+	 * the interrupt info int the vmcs will be invalid in the case of 
+	 * an external interrupt, and we check that before calling into here.
 	 */
 	return LCD_ARCH_STATUS_EXT_INTR;
 }

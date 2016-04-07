@@ -494,15 +494,21 @@ ProjectionField* ProjectionType::get_field(const char *field_name)
 
 
 /* projection constructor type*/
-ProjectionConstructorType::ProjectionConstructorType(const char* id, const char* real_type, std::vector<ProjectionField*> fields, std::vector<ProjectionField*> channels)
+ProjectionConstructorType::ProjectionConstructorType(const char* id, const char* real_type, std::vector<ProjectionField*> fields, std::vector<ProjectionField*> channel_fields, std::vector<ProjectionField*> channel_params)
 {
   this->id_ = id;
   this->real_type_ = real_type;
   this->fields_ = fields;
-  this->channels_ = channels;
+  this->channels_ = channel_fields;
+  
+  for(std::vector<ProjectionField*>::iterator it = channel_params.begin(); it != channel_params.end(); it ++) {
+    ProjectionField *tmp = *it;
+    Variable *v = 0x0;
+    this->channel_params_.push_back(std::make_pair(tmp, v));
+  }
 }
 
-ProjectionConstructorType::ProjectionConstructorType(const ProjectionType& other)
+ProjectionConstructorType::ProjectionConstructorType(const ProjectionConstructorType& other)
 {
   // copy id
   char* id_copy = (char*) malloc(sizeof(char)*(strlen(other.id_)+1));
@@ -520,7 +526,7 @@ ProjectionConstructorType::ProjectionConstructorType(const ProjectionType& other
     fields_copy.push_back(copy);
   }
   this->fields_ = fields_copy;
-  // copy init_variables;
+  // copy CHANNELS;
   std::vector<ProjectionField*> channels;
   for(std::vector<ProjectionField*>::const_iterator it = other.channels_.begin(); it != other.channels_.end(); it ++) {
     ProjectionField *original = *it;
@@ -528,11 +534,97 @@ ProjectionConstructorType::ProjectionConstructorType(const ProjectionType& other
     channels.push_back(copy);
   }
   this->channels_ = channels;
+
+  // copy channel params
+  std::vector<std::pair<Variable*, Variable*> > channel_params;
+  for(std::vector<std::pair<Variable*,Variable*> >::const_iterator it = other.channel_params_.begin(); it != other.channel_params_.end(); it ++) {
+    std::pair<Variable*,Variable*> tmp = *it;
+    std::pair<Variable*,Variable*> copy (tmp);
+    channel_params.push_back(copy);
+  }
+
+  this->channel_params_ = channel_params;
 }
 
 int ProjectionConstructorType::num()
 {
   return 9;
+}
+
+void ProjectionConstructorType::initialize(std::vector<Variable*> chans)
+{
+  // check that chans is correct length;
+  
+  
+}
+
+/* initialize type */
+/* this is meant to be used with projection constructor type to initialize them after 
+ * type resolution and copying
+ * this is another place holder type like UnresolvedType
+ */
+
+InitializeType::InitializeType(Type *type, std::vector<Variable*> init_vals)
+{
+  this->type_ = type;
+  this->values_ = init_vals;
+}
+
+InitializeType::InitializeType(const InitializeType& other)
+{
+  this->values_ = other.values_;
+  this->type_ = other.clone();
+}
+
+Marshal_type* InitializeType::accept(MarshalPrepareVisitor *worker)
+{
+  return worker->visit(this);
+}
+
+CCSTTypeName* InitializeType::accept(TypeNameVisitor *worker)
+{
+  return worker->visit(this);
+}
+
+CCSTStatement* InitializeType::accept(TypeVisitor *worker, Variable *v)
+{
+  return worker->visit(this, v);
+}
+
+int InitializeType::num()
+{
+  return 10;
+}
+
+const char* InitializeType::name()
+{
+  return this->type_->name();
+}
+
+void InitializeType::resolve_types(LexicalScope *ls)
+{
+  for(std::vector<Variable*>::const_iterator it = this->values_.begin(); it != this->values_.end(); it ++) {
+    Variable *v = *it;
+    v->resolve_types(ls);
+  }
+
+  this->type_->resolve_types(ls);
+}
+
+void InitializeType::create_trampoline_structs(LexicalScope *ls)
+{
+  return;
+}
+
+void InitializeType::initialize()
+{
+  // check that type is a projectionconstructor
+  Assert(this->type_->num() == 9, "Error: cannot initialize a non-projection constructor type\n");
+  
+  ProjectionConstructorType *pct = dynamic_cast<ProjectionConstructorType*>(this->type_);
+  Assert(pct != 0x0, "Error: dynamic cast to projection constructor type failed\n");
+
+  pct->initialize(this->values_);
 }
 
 /* end */

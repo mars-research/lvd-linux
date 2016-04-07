@@ -136,3 +136,65 @@ CCSTStatement* AllocateTypeVisitor::visit(ProjectionType *pt, Variable *v)
 
   return new CCSTCompoundStatement(declarations, statements);
 }
+
+CCSTStatement* AllocateTypeVisitor::visit(ProjectionConstructorType *pt, Variable *v)
+{
+  std::vector<CCSTDeclaration*> declarations;
+  std::vector<CCSTStatement*> statements;
+
+  std::vector<CCSTSpecifierQual*> void_star_quals;
+  void_star_quals.push_back(new CCSTSimpleTypeSpecifier(void_t));
+  CCSTTypeName *void_star = new CCSTTypeName(void_star_quals, new CCSTPointer());
+
+  int p_count_save = v->pointer_count();
+  int p_count = v->pointer_count();
+
+  while(p_count > 1) {
+    std::vector<CCSTAssignExpr*> kzalloc_args;
+    kzalloc_args.push_back(new CCSTUnaryExprSizeOf(void_star));
+    kzalloc_args.push_back(new CCSTEnumConst("GFP_KERNEL"));
+    
+    v->set_pointer_count(p_count_save-p_count);
+    statements.push_back(new CCSTAssignExpr(access(v), equals(), function_call("kzalloc", kzalloc_args)));
+    /* do error checking */
+    statements.push_back(if_cond_fail(new CCSTUnaryExprCastExpr(Not(), access(v))
+				    , "kzalloc"));
+
+    p_count -= 1; 
+  }
+  
+  v->set_pointer_count(p_count_save);
+  /* allocate the actual structure now */
+  std::vector<CCSTAssignExpr*> kzalloc_args;
+
+  /* do sizeof(struct thing) */
+  kzalloc_args.push_back(new CCSTUnaryExprSizeOf(access(v)));
+  kzalloc_args.push_back(new CCSTEnumConst("GFP_KERNEL"));
+
+  v->set_pointer_count(p_count_save-p_count);
+  statements.push_back(new CCSTAssignExpr(access(v), equals(), function_call("kzalloc", kzalloc_args)));
+
+  /* do error checking */
+  statements.push_back(if_cond_fail(new CCSTUnaryExprCastExpr(Not(), access(v))
+				    , "kzalloc"));
+  
+  
+  v->set_pointer_count(p_count_save);
+
+  /* Now need to allocate fields */
+  std::vector<ProjectionField*> fields = pt->fields();
+  for(std::vector<ProjectionField*>::iterator it = fields.begin(); it != fields.end(); it ++) {
+    ProjectionField *pf = *it;
+
+    if (pf->pointer_count() > 0) {
+      statements.push_back(pf->type()->accept(this, pf));
+    }
+  }
+
+  return new CCSTCompoundStatement(declarations, statements);
+}
+
+CCSTStatement* AllocateTypeVisitor::visit(InitializeType *it, Variable *v)
+{
+  Assert( 1 == 0, "Error: cannot call allocate type on initialize type\n");
+}

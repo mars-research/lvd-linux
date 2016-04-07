@@ -201,3 +201,13 @@ Marshal_type* MarshalPrepareVisitor::visit(ProjectionType *pt)
   */
   return new Marshal_projection();
 }
+
+Marshal_type* MarshalPrepareVisitor::visit(ProjectionConstructorType *pct)
+{
+  return new Marshal_projection();
+}
+
+Marshal_type* MarshalPrepareVisitor::visit(InitializeType *it)
+{
+  Assert( 1 == 0, "Error: cannot prepare marshal for initialize type\n");
+}

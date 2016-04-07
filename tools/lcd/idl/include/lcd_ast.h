@@ -86,6 +86,25 @@ class Type : public Base
   virtual void create_trampoline_structs(LexicalScope *ls) = 0;
 };
 
+class InitializeType : public Type
+{
+ public:
+  Type* type_; // this is the type that WILL be initialized.  
+  std::vector<Variable*> values_; // this is what will initialize the type
+  InitializeType(Type *type, std::vector<Variable*> init_values);
+  InitializeType(const InitializeType& other);
+  virtual Type* clone() const { return new InitializeType(*this); }
+  virtual Marshal_type* accept(MarshalPrepareVisitor *worker);
+  virtual CCSTTypeName* accept(TypeNameVisitor *worker);
+  virtual CCSTStatement* accept(TypeVisitor *worker, Variable *v);
+  virtual int num();
+  virtual const char* name();
+  virtual void resolve_types(LexicalScope *ls);
+  virtual void create_trampoline_structs(LexicalScope *ls);
+
+  void initialize();
+};
+
 class UnresolvedType : public Type
 {
  public:
@@ -482,11 +501,13 @@ class ProjectionType : public Type // complex type
 
 class ProjectionConstructorType : public ProjectionType 
 {
+  std::vector<std::pair<Variable*, Variable*> > channel_params_;
  public:
-  ProjectionConstructorType(const char* id, const char* real_type, std::vector<ProjectionField*> fields, std::vector<ProjectionField*> channels);
-  ProjectionConstructorType(const ProjectionType& other);
+  ProjectionConstructorType(const char* id, const char* real_type, std::vector<ProjectionField*> fields, std::vector<ProjectionField*> channel_fields, std::vector<ProjectionField*> channel_params);
+  ProjectionConstructorType(const ProjectionConstructorType& other);
   virtual int num();
   virtual Type* clone() const { return new ProjectionConstructorType(*this); }
+  void initialize(std::vector<Variable*> chans);
 };
 
 class Rpc : public Base
@@ -589,6 +610,8 @@ class TypeNameVisitor // generates CCSTTypeName for each type.
   CCSTTypeName* visit(ProjectionType *pt);
   CCSTTypeName* visit(Function *fp);
   CCSTTypeName* visit(Channel *c);
+  CCSTTypeName* visit(ProjectionConstructorType *pct);
+  CCSTTypeName* visit(InitializeType *it);
 };
 
 class TypeVisitor
@@ -601,6 +624,8 @@ class TypeVisitor
   virtual CCSTStatement* visit(IntegerType *it, Variable *v) = 0;
   virtual CCSTStatement* visit(ProjectionType *pt, Variable *v) = 0;
   virtual CCSTStatement* visit(Channel *c, Variable *v) = 0;
+  virtual CCSTStatement* visit(ProjectionConstructorType *pct, Variable *v) = 0;
+  virtual CCSTStatement* visit(InitializeType *it, Variable *v) = 0;
 };
 
 class AllocateTypeVisitor : public TypeVisitor    
@@ -614,6 +639,8 @@ class AllocateTypeVisitor : public TypeVisitor
   virtual CCSTStatement* visit(IntegerType *it, Variable *v);
   virtual CCSTStatement* visit(ProjectionType *pt, Variable *v);
   virtual CCSTStatement* visit(Channel *c, Variable *v);
+  virtual CCSTStatement* visit(ProjectionConstructorType *pct, Variable *v);
+  virtual CCSTStatement* visit(InitializeType *it, Variable *v);
 };
 
 #endif

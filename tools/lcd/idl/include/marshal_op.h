@@ -165,6 +165,8 @@ class CCSTCompoundStatement;
 class ReturnVariable;
 class Variable;
 class UnresolvedType;
+class ProjectionConstructorType;
+class InitializeType;
 
 class Registers
 {
@@ -239,6 +241,8 @@ class MarshalPrepareVisitor
   Marshal_type* visit(IntegerType *it);
   Marshal_type* visit(ProjectionType *pt);
   Marshal_type* visit(Channel *c);
+  Marshal_type* visit(ProjectionConstructorType *pct);
+  Marshal_type* visit(InitializeType *it);
 };
 
 #endif

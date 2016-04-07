@@ -47,13 +47,13 @@
  *
  *   -- 1 GB HOLE (unmapped)
  *
- *   -- 1 GB for RAM memory mapping region (think: kmap)
+ *   -- 4 GB for RAM memory mapping region (think: kmap)
  *
  *   -- 1 GB HOLE (unmapped)
  *
  *   -- 1 GB for ioremap region (unmapped at boot)
  *
- *   -- 500 GB HOLE (unmapped)
+ *   -- 497 GB HOLE (unmapped)
  *
  *   -- 2 GB for kernel module mapping area. The kernel module itself
  *      is mapped at the correct offset into this area so that
@@ -75,16 +75,16 @@
  *              |          (2 GB)           |
  *              +---------------------------+ 0x0000 007f 8000 0000 (510 GB)
  *              |       HOLE / Unmapped     | 
- *              |          (500 GB)         |
- *              +---------------------------+ 0x0000 0002 8000 0000 (10 GB) 
+ *              |          (497 GB)         |
+ *              +---------------------------+ 0x0000 0003 4000 0000 (13 GB) 
  *              |       ioremap Region      |                    
  *              |          (1 GB)           |
- *              +---------------------------+ 0x0000 0002 4000 0000 (9 GB)
+ *              +---------------------------+ 0x0000 0003 0000 0000 (12 GB)
  *              |       HOLE / Unmapped     | 
  *              |          (1 GB)           |
- *              +---------------------------+ 0x0000 0002 0000 0000 (8 GB) 
+ *              +---------------------------+ 0x0000 0002 c000 0000 (11 GB) 
  *              |       RAM Map Region      |                    
- *              |          (1 GB)           |
+ *              |          (4 GB)           |
  *              +---------------------------+ 0x0000 0001 c000 0000 (7 GB)
  *              |       HOLE / Unmapped     | 
  *              |          (1 GB)           |
@@ -155,8 +155,8 @@
 #define LCD_MISC_REGION_SIZE (1UL << 30) /* .................... 1 GB  */
 #define LCD_STACK_REGION_SIZE (1UL << 30) /* ................... 1 GB  */
 #define LCD_HEAP_REGION_SIZE (1UL << 30) /* .................... 1 GB  */
-#define LCD_RAM_MAP_REGION_SIZE (1UL << 30) /* ................. 1 GB  */
-#define LCD_IOREMAP_REGION_SIZE (1UL << 30) /* .................  1 GB  */
+#define LCD_RAM_MAP_REGION_SIZE (4UL << 30) /* ................. 4 GBs */
+#define LCD_IOREMAP_REGION_SIZE (1UL << 30) /* ................. 1 GB  */
 #define LCD_KERNEL_MODULE_REGION_SIZE (2UL << 30) /* ........... 2 GBs */
 
 /* Component Sizes. */
@@ -211,7 +211,7 @@
 /* HOLE */
 
 #define LCD_KERNEL_MODULE_REGION_OFFSET \
-	(LCD_IOREMAP_REGION_OFFSET + LCD_IOREMAP_REGION_SIZE + (500UL << 30))
+	(LCD_IOREMAP_REGION_OFFSET + LCD_IOREMAP_REGION_SIZE + (497UL << 30))
 
 /* Addresses */
 

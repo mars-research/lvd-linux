@@ -82,7 +82,7 @@ int __liblcd_heap_init(void);
 /* 
  * RAM MAPPING --------------------------------------------------
  *
- * RAM mapping area is 1 GB (2^18 pages).
+ * RAM mapping area is 4 GB (2^20 pages).
  *
  * The minimum address space block you can allocate from the RAM map
  * area is 2 MBs (2^9 = 512 pages). This leads to a lot of internal
@@ -94,19 +94,13 @@ int __liblcd_heap_init(void);
  * RAM map allocator.)
  *
  * The maximum address space block you can allocate from the RAM map
- * area is 256 MB (2^16 = 65,536 pages).
- *
- * In hindsight, maybe a simple bitmap would have been just as good
- * here since there are only 1GB/64MB = 512 allocation blocks. Oh well. (These
- * mapping regions were originally gonna be a lot bigger, but I had
- * to switch over to 2MB guest virtual pages instead of 1GB pages. Etc.
- * etc.)
+ * area is 2 GB (2^19 = 524,288 pages).
  */
 #define LCD_RAM_MAP_NR_PAGES_ORDER \
 	(ilog2(LCD_RAM_MAP_REGION_SIZE >> PAGE_SHIFT))
 #define LCD_RAM_MAP_SIZE LCD_RAM_MAP_REGION_SIZE
 #define LCD_RAM_MAP_MIN_ORDER 9
-#define LCD_RAM_MAP_MAX_ORDER 16
+#define LCD_RAM_MAP_MAX_ORDER 19
 
 /*
  * IOREMAP area ----------------------------------------------------

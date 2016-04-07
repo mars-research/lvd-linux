@@ -67,6 +67,7 @@ struct lcd_trampoline_handle {
     hidden_args = *(__ip - 1);	\
 }
 
+#define LCD_TRAMPOLINE_SIZE(name) ((unsigned long)name##_size)
 
 /**
  * You should "call" this macro when you want to duplicate a trampoline.

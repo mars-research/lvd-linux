@@ -304,3 +304,8 @@ static inline void force_up_write(void *x)
 
 #undef __pa
 #define __pa(vaddr) gpa_val(lcd_gva2gpa(__gva((unsigned long)vaddr)))
+
+/* The "real" get_current tries to read a percpu variable that using
+ * the %gs segment register. */
+#undef get_current
+#define get_current() (current_task)

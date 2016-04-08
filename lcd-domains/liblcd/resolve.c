@@ -147,7 +147,7 @@ struct task_struct *kthread_create_on_node(int (*threadfn)(void *data),
 
 bool kthread_should_stop(void)
 {
-	return true;
+	return false;
 }
 
 int kthread_stop(struct task_struct *k)

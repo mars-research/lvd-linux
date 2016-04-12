@@ -17,6 +17,7 @@
  */
 struct cred fake_cred;
 struct task_struct fake_task = {
+	.pid = 12345678,
 	.cred = &fake_cred,
 };
 struct task_struct *current_task = &fake_task;
@@ -162,4 +163,55 @@ int wake_up_process(struct task_struct *tsk)
 void __wake_up(wait_queue_head_t *q, unsigned int mode, int nr, void *key)
 {
 	return;
+}
+
+/* IOREMAPs -------------------------------------------------- */
+
+void *ioremap_cache(resource_size_t phys_addr, unsigned long size)
+{
+	return lcd_ioremap_cache(phys_addr, size);
+}
+
+void *ioremap_cache_ro(resource_size_t phys_addr, unsigned long size)
+{
+	return lcd_ioremap_cache(phys_addr, size);
+}
+
+void *ioremap_hpage_cache(resource_size_t phys_addr, unsigned long size)
+{
+	return lcd_ioremap_cache(phys_addr, size);
+}
+
+void *ioremap_hpage_cache_ro(resource_size_t phys_addr, unsigned long size)
+{
+	return lcd_ioremap_cache(phys_addr, size);
+}
+
+void iounmap(volatile void __iomem *addr)
+{
+	lcd_iounmap((void *)addr);
+}
+
+void __release_region(struct resource *parent, resource_size_t start,
+		resource_size_t n)
+{
+	return;
+}
+
+struct resource iomem_resource;
+struct resource fake_resource;
+struct resource * __request_region(struct resource *parent,
+				resource_size_t start, resource_size_t n,
+				const char *name, int flags)
+{
+	return &fake_resource;
+}
+
+/* RCU ------------------------------------------------------------ */
+
+void call_rcu_sched(struct rcu_head *head,
+		void (*func)(struct rcu_head *rcu))
+{
+	/* Just call it */
+	func(head);
 }

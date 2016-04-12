@@ -319,6 +319,31 @@ fail1:
 	return ret;
 }
 
+static int task_struct_tests(void)
+{
+	if (!get_current()) {
+		LIBLCD_ERR("get_current returned null");
+		return -1;
+	}
+
+	if (!current) {
+		LIBLCD_ERR("current is null");
+		return -1;
+	}
+	
+	if (current->pid != 12345678) {
+		LIBLCD_ERR("current pid is %d", current->pid);
+		return -1;
+	}
+
+	if (!current_cred()) {
+		LIBLCD_ERR("current_cred returned null");
+		return -1;
+	}
+
+	return 0;
+}
+
 static int __noreturn liblcd_test_lcd_init(void) 
 {
 	int ret = 0;
@@ -372,6 +397,13 @@ static int __noreturn liblcd_test_lcd_init(void)
 		goto out;
 	}
 	LIBLCD_MSG("ram map test passed!");
+	
+	ret = task_struct_tests();
+	if (ret) {
+		LIBLCD_ERR("task struct tests failed!");
+		goto out;
+	}
+	LIBLCD_MSG("task struct tests passed!");
 
 	LIBLCD_MSG("ALL LIBLCD TESTS PASSED!");
 	

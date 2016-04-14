@@ -23,7 +23,7 @@ CCSTDeclaration* dispatch_function_declaration(); // todo complete
 CCSTFile* generate_client_header(Module *m); // todo empty, maybe unnecessary?
 CCSTFile* generate_client_source(Module *m); // todo complete
 
-CCSTCompoundStatement* caller_body(Rpc *r); // todo complete
+CCSTCompoundStatement* caller_body(Rpc *r, Module *); // todo complete
 
 std::vector<CCSTStatement*> marshal_in_parameters(std::vector<Parameter*> params); // complete
 
@@ -81,8 +81,12 @@ std::vector<CCSTSpecifierQual*> integer_type_cast(IntegerType *it); /// ????????
 
 
 // is this in the correct file?
-CCSTCompoundStatement* interface_init_function_body(Module *m); // complete
-CCSTDeclaration* interface_init_function_declaration(Module *m); // 
+CCSTCompoundStatement* caller_interface_init_function_body(Module *m); // complete
+CCSTCompoundStatement* callee_interface_init_function_body(Module *m); // complete
+CCSTDeclaration* interface_init_function_declaration(Module *m); // complete
+CCSTCompoundStatement* caller_interface_exit_function_body(Module *m); // complete
+CCSTCompoundStatement* callee_interface_exit_function_body(Module *m); // complete
+CCSTDeclaration* interface_exit_function_declaration(Module *m); // complete
 
 
 CCSTFuncDef* function_definition(CCSTDeclaration *function_declaration, CCSTCompoundStatement *body); // complete
@@ -121,5 +125,9 @@ CCSTStatement* declare_init_tmp_variable(ProjectionField *pf, const char* side);
 
 // variable_utils.cpp
 CCSTDeclaration* declare_variable(Variable *v);
+
+
+std::vector<CCSTStatement*> caller_allocate_channels(ProjectionType *pt);
+std::vector<CCSTStatement*> caller_initialize_channels(ProjectionType *pt);
 
 #endif

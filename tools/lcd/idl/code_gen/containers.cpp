@@ -37,6 +37,30 @@ std::vector<CCSTStatement*> container_of(Variable *v)
     }
   }
 
+  // insert into cspace................
+  ProjectionType *container = dynamic_cast<ProjectionType*>(v->container()->type());
+  Assert(container != 0x0, "Error: variables's container does not have type projection\n");
+  
+  ProjectionField *my_ref_field = container->get_field("my_ref");
+  Assert(my_ref_field != 0x0, "Error: could not find my_ref field in projection\n");
+  
+  std::vector<CCSTAssignExpr*> insert_args;
+  insert_args.push_back(new CCSTPrimaryExprId("cspace_todo"));
+  insert_args.push_back(new CCSTPrimaryExprId(v->container()->identifier()));
+  insert_args.push_back(new CCSTUnaryExprCastExpr(reference()
+						  , access(my_ref_field))); // & container->my_ref
+
+  ProjectionType *pt = dynamic_cast<ProjectionType*>(v->type());
+  Assert(pt != 0x0, "Error: dynamic cast to projection type failed.\n");
+
+  statements.push_back(new CCSTAssignExpr(new CCSTPrimaryExprId("err")
+					  , equals()
+					  , function_call(insert_name(pt->real_type()), insert_args)));
+
+  /* do error checking */
+  statements.push_back(if_cond_fail(new CCSTUnaryExprCastExpr(Not(), new CCSTPrimaryExprId("err"))
+				    , "lcd insert"));
+
   return statements;
 }
 
@@ -357,6 +381,8 @@ CCSTStatement* declare_init_tmp_variable(ProjectionField *pf, const char *side)
 */
 }
 
+
+// NEED TO INSERT INTO CSPCAE EVEN IF NOT ALLOC........... Wtfff
 CCSTCompoundStatement* alloc_link_container_caller(Variable *v)
 {
   printf("In alloc link container caller. variable is %s\n", v->identifier());
@@ -411,5 +437,93 @@ CCSTCompoundStatement* alloc_link_container_caller(Variable *v)
   
   return new CCSTCompoundStatement(declarations, statements);
 }
+
+
+// code to allocate channels
+std::vector<CCSTStatement*> caller_allocate_channels(ProjectionType *pt)
+{
+  std::vector<CCSTStatement*> statements;
+  
+  for(std::vector<ProjectionField*>::iterator it = pt->channels_.begin(); it != pt->channels_.end(); it ++) {
+    ProjectionField *pf = *it;
+    if(pf->alloc_caller()) { // allocate it.
+
+      // ret = lcd_create_sync_endpoint(&fs_container->chnl);
+      std::vector<CCSTAssignExpr*> lcd_create_sync_endpoint_args;
+      lcd_create_sync_endpoint_args.push_back(new CCSTUnaryExprCastExpr(reference()
+									, access(pf)));
+
+      statements.push_back(new CCSTAssignExpr(new CCSTPrimaryExprId("err")
+					      , equals()
+					      , function_call("lcd_create_sync_endpoint"
+							      , lcd_create_sync_endpoint_args)));
+
+      // error checking
+      statements.push_back(if_cond_fail(new CCSTPrimaryExprId("err"), "lcd_create_sync_endpointe"));
+    }
+  }
+
+  // recurse on fields.
+  for(std::vector<ProjectionField*>::iterator it = pt->fields_.begin(); it != pt->fields_.end(); it ++) {
+    ProjectionField *pf = *it;
+    if(pf->type_->num() == 4 || pf->type_->num() == 9) {
+      ProjectionType *tmp = dynamic_cast<ProjectionType*>(pf->type_);
+      Assert(tmp != 0x0, "Error: dynamic cast to projection type failed\n");
+      
+      std::vector<CCSTStatement*> tmp_statements = caller_allocate_channels(tmp);
+      statements.insert(statements.end(), tmp_statements.begin(), tmp_statements.end());
+    }
+  }
+
+  return statements;
+}
+
+std::vector<CCSTStatement*> caller_initialize_channels(ProjectionType *pt)
+{
+  std::vector<CCSTStatement*> statements;
+  
+  if(pt->num() == 9) {
+    ProjectionConstructorType *pct = dynamic_cast<ProjectionConstructorType*>(pt);
+    Assert(pct != 0x0, "Error: dynamic cast to projection constructor type failed\n");
+
+    for(std::vector<std::pair<Variable*, Variable*> >::iterator it = pct->channel_params_.begin(); it != pct->channel_params_.end(); it ++) {
+      std::pair<Variable*,Variable*> pair = *it;
+        
+      if(pair.second == 0x0) {
+	printf("pair.second is null, pair.first id is %s\n", pair.first->identifier());
+      }
+      /*
+	lcd_sync_channel_group_item_init(&fs_operations_container->chnl,
+	fs_container->chnl, 0,
+	dispatch_minix_channel);
+      */
+      std::vector<CCSTAssignExpr*> args;
+      args.push_back(new CCSTUnaryExprCastExpr(reference()
+					       , access(pair.first))); // what we are initializing
+      args.push_back(access(pair.second)); // what we are initializing it to
+      args.push_back(new CCSTInteger(0)); // expected c_ptrs how to determine?
+      args.push_back(new CCSTPrimaryExprId("function pointer todo")); // function pointer
+    
+      statements.push_back(function_call("lcd_sync_channel_group_item_init"
+					 , args));
+    }
+  }
+  
+  // recurse on fields.
+  for(std::vector<ProjectionField*>::iterator it = pt->fields_.begin(); it != pt->fields_.end(); it ++) {
+    ProjectionField *pf = *it;
+    if(pf->type_->num() == 4 || pf->type_->num() == 9) {
+      ProjectionType *tmp = dynamic_cast<ProjectionType*>(pf->type_);
+      Assert(tmp != 0x0, "Error: dynamic cast to projection type failed\n");
+      
+      std::vector<CCSTStatement*> tmp_statements = caller_initialize_channels(tmp);
+      statements.insert(statements.end(), tmp_statements.begin(), tmp_statements.end());
+    }
+  }
+
+  return statements;
+}
+
+
 
  

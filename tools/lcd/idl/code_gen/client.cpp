@@ -34,11 +34,11 @@ CCSTFile* generate_client_source(Module* f)
 
   // create initialization function
   definitions.push_back(function_definition(interface_init_function_declaration(f)
-					    , interface_init_function_body(f)));
+					    , caller_interface_init_function_body(f)));
   
   // create exit function
   definitions.push_back(function_definition(interface_exit_function_declaration(f)
-					    , interface_exit_function_body(f)));
+					    , caller_interface_exit_function_body(f)));
 
   // define container structs
   
@@ -53,7 +53,7 @@ CCSTFile* generate_client_source(Module* f)
       //					, callee_body(r_tmp)));
     } else {
       definitions.push_back(function_definition(function_declaration(r_tmp)
-						,caller_body(r_tmp)));
+						,caller_body(r_tmp, f)));
     }
   }
   
@@ -85,7 +85,12 @@ std::vector<CCSTDeclaration*> declare_containers(Variable *v)
   return declarations;
 }
 
-CCSTCompoundStatement* caller_body(Rpc *r)
+/*
+ * use module to get things like channels and cspaces.
+ * or add channel and cspace as a field to an rpc....
+ * that way each rpc can have its own channel or something....
+ */
+CCSTCompoundStatement* caller_body(Rpc *r, Module *m)
 {
   std::vector<CCSTDeclaration*> declarations;
   std::vector<CCSTStatement*> statements;
@@ -109,9 +114,34 @@ CCSTCompoundStatement* caller_body(Rpc *r)
 
       }
     }
-  
 
   /* TODO: projection channel allocation */
+  for(std::vector<Parameter*>::iterator it = params.begin(); it != params.end(); it ++) {
+    Parameter *p = *it;
+    
+    if(p->type_->num() == 4 || p->type_->num() == 9) { // if a projection
+      ProjectionType *pt = dynamic_cast<ProjectionType*>(p->type_);
+      Assert(pt != 0x0, "Error: dynamic cast to projection type failed\n");
+      std::vector<CCSTStatement*> tmp_statements = caller_allocate_channels(pt);
+      statements.insert(statements.end(), tmp_statements.begin(), tmp_statements.end());
+    }
+  }
+
+  // projection channel initialization
+  for(std::vector<Parameter*>::iterator it = params.begin(); it != params.end(); it ++) {
+    Parameter *p = *it;
+    
+    if(p->type_->num() == 4 || p->type_->num() == 9) {
+      ProjectionType *pt = dynamic_cast<ProjectionType*>(p->type_);
+      Assert(pt != 0x0, "Error: dynamic cast to projection type failed\n");
+      std::vector<CCSTStatement*> tmp_statements = caller_initialize_channels(pt);
+      statements.insert(statements.end(), tmp_statements.begin(), tmp_statements.end());
+    }
+  }
+
+  
+  // 
+
   /* TODO: what about function pointers */
   
   /* marshal parameters */
@@ -132,7 +162,7 @@ CCSTCompoundStatement* caller_body(Rpc *r)
   declarations.push_back(new CCSTDeclaration(int_type(), ret_err));
 
   std::vector<CCSTAssignExpr*> lcd_sync_call_args;
-  lcd_sync_call_args.push_back(new CCSTPrimaryExprId("channel_id_TODO"));
+  lcd_sync_call_args.push_back(new CCSTPrimaryExprId(m->channels().at(0)->identifier())); // first channel
   statements.push_back( new CCSTAssignExpr( new CCSTPrimaryExprId("ret_err"), equals(), function_call("lcd_sync_call", lcd_sync_call_args)));
 
   statements.push_back(if_cond_fail(new CCSTPrimaryExprId("ret_err"), "lcd_sync_call"));

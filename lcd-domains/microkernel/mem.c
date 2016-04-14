@@ -279,8 +279,10 @@ static int lookup_memory_object(struct cspace *cspace, cptr_t slot,
 	 * Look up
 	 */
 	ret = cap_cnode_get(cspace, slot, cnode);
-	if (ret)
+	if (ret) {
+		LCD_ERR("microkernel couldn't get memory object");
 		goto fail1;
+	}
 	/*
 	 * Confirm it's a memory object
 	 */
@@ -470,7 +472,8 @@ static int isolated_map_memory_object(struct lcd *lcd,
 int __lcd_do_map_memory_object(struct lcd *lcd, 
 			struct lcd_memory_object *mo,
 			struct lcd_mapping_metadata *meta,
-			gpa_t base)
+			gpa_t base,
+			struct cnode *cnode)
 {
 	int ret;
 	/*
@@ -488,6 +491,7 @@ int __lcd_do_map_memory_object(struct lcd *lcd,
 			ret = -ENOMEM;
 			goto out;
 		}
+		cap_cnode_set_metadata(cnode, meta);
 	}
 	if (meta->is_mapped) {
 		ret = -EALREADYMAPPED;
@@ -549,7 +553,7 @@ int __lcd_map_memory_object(struct lcd *caller, cptr_t mo_cptr, gpa_t base)
 	/*
 	 * Do the map
 	 */
-	ret = __lcd_do_map_memory_object(caller, mo, meta, base);
+	ret = __lcd_do_map_memory_object(caller, mo, meta, base, cnode);
 	if (ret)
 		goto fail2;
 	/*

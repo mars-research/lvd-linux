@@ -280,7 +280,7 @@ static int do_map(struct lcd *lcd, struct lcd_memory_object *mo,
 	 * memory as mapped for non-isolated code right now)
 	 */
 	ret = __lcd_do_map_memory_object(lcd, mo, cap_cnode_metadata(cnode),
-					__gpa(0));
+					__gpa(0), cnode);
 	if (ret) {
 		LIBLCD_ERR("physical map failed");
 		goto fail1;

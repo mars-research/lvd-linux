@@ -579,6 +579,7 @@ void __lcd_put_memory_object(struct lcd *caller, struct cnode *cnode,
  * @mo: the memory object to map
  * @meta: the per-LCD mapping metadata associated with the memory object
  * @base: the base physical address to map the memory object at
+ * @cnode: the cnode in the @lcd's cspace where @mo is
  *
  * Maps the memory object in a contiguous chunk of the LCD's physical
  * address space. Note: For non-isolated LCD's, this function is a no-op (all
@@ -590,7 +591,8 @@ void __lcd_put_memory_object(struct lcd *caller, struct cnode *cnode,
 int __lcd_do_map_memory_object(struct lcd *lcd, 
 			struct lcd_memory_object *mo,
 			struct lcd_mapping_metadata *meta,
-			gpa_t base);
+			gpa_t base,
+			struct cnode *cnode);
 
 /**
  * __lcd_map_memory_object -- See __lcd_do_map_memory_object.

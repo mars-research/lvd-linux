@@ -42,10 +42,12 @@ static int mem_object_revoke(struct cspace *cspace, struct cnode *cnode,
 	 */
 	__lcd_do_unmap_memory_object(cap_cspace_getowner(cspace), mo, m);
 	/*
-	 * Free metadata
+	 * Free metadata and null it
 	 */
 	if (m)
 		kfree(m);
+	
+	cap_cnode_set_metadata(cnode, NULL);
 
 	return 0;
 }

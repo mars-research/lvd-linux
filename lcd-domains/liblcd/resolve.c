@@ -215,3 +215,10 @@ void call_rcu_sched(struct rcu_head *head,
 	/* Just call it */
 	func(head);
 }
+
+/* DUMP STACK -------------------------------------------------- */
+
+void dump_stack(void)
+{
+	lcd_dump_stack();
+}

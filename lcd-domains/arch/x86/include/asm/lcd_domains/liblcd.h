@@ -245,5 +245,10 @@ static inline int lcd_syscall_munmap(cptr_t mo_cptr)
 	return lcd_syscall_one_arg(LCD_SYSCALL_MUNMAP, cptr_val(mo_cptr));
 }
 
+static inline void lcd_syscall_dump_stack(void)
+{
+	lcd_syscall_no_args(LCD_SYSCALL_DUMP_STACK);
+}
+
 
 #endif /* ASM_LCD_DOMAINS_LIBLCD_H */

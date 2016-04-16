@@ -19,6 +19,7 @@
 #define BUG() do {							\
 		lcd_printk("BUG! in %s:%s:%d", __FILE__, __func__,	\
 			__LINE__);					\
+		lcd_dump_stack();					\
 		lcd_exit(-1);						\
 	} while (0)
 
@@ -27,6 +28,7 @@
 	if (x) {							\
 		lcd_printk("BUG! in %s:%s:%d", __FILE__, __func__,	\
 			__LINE__);					\
+		lcd_dump_stack();					\
 		lcd_exit(-1);						\
 	}								\
 	} while (0)
@@ -63,9 +65,6 @@
 
 #undef kasprintf
 #define kasprintf(x, fmt, args...) ({ lcd_printk(fmt, args); (char *)1; });
-
-#undef dump_stack
-#define dump_stack() do { } while (0)
 
 #undef unlikely
 #define unlikely(x) x

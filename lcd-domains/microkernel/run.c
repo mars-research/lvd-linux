@@ -274,6 +274,13 @@ static int handle_syscall_putchar(struct lcd *lcd)
 	return __lcd_put_char(lcd, c);
 }
 
+static int handle_syscall_dump_stack(struct lcd *lcd)
+{
+	lcd_arch_dump_lcd(lcd->lcd_arch);
+
+	return 0;
+}
+
 static int handle_syscall_exit(struct lcd *lcd, int *lcd_ret)
 {
 	/*
@@ -350,6 +357,9 @@ static int handle_syscall(struct lcd *lcd, int *lcd_ret)
 		break;
 	case LCD_SYSCALL_MUNMAP:
 		ret = handle_syscall_munmap(lcd);
+		break;
+	case LCD_SYSCALL_DUMP_STACK:
+		ret = handle_syscall_dump_stack(lcd);
 		break;
 	default:
 		LCD_ERR("unimplemented syscall %d", syscall_id);

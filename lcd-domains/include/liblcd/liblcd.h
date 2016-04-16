@@ -20,5 +20,6 @@
 #include "resource_tree.h"
 #include "sync_ipc.h"
 #include "syscall.h"
+#include "trace.h"
 
 #endif /* LIBLCD_LIBLCD_H */

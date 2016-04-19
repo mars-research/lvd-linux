@@ -250,5 +250,14 @@ static inline void lcd_syscall_dump_stack(void)
 	lcd_syscall_no_args(LCD_SYSCALL_DUMP_STACK);
 }
 
+static inline void lcd_syscall_irq_disable(void)
+{
+	lcd_syscall_no_args(LCD_SYSCALL_IRQ_DISABLE);
+}
+
+static inline void lcd_syscall_irq_enable(void)
+{
+	lcd_syscall_no_args(LCD_SYSCALL_IRQ_ENABLE);
+}
 
 #endif /* ASM_LCD_DOMAINS_LIBLCD_H */

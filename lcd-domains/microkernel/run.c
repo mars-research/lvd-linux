@@ -290,6 +290,16 @@ static int handle_syscall_exit(struct lcd *lcd, int *lcd_ret)
 	return 1; /* signal LCD has exited */
 }
 
+static int handle_syscall_irq_disable(struct lcd *lcd)
+{
+	lcd_arch_irq_disable(lcd->lcd_arch);
+}
+
+static int handle_syscall_irq_enable(struct lcd *lcd)
+{
+	lcd_arch_irq_enable(lcd->lcd_arch);
+}
+
 static int handle_syscall(struct lcd *lcd, int *lcd_ret)
 {
 	int syscall_id;
@@ -361,6 +371,12 @@ static int handle_syscall(struct lcd *lcd, int *lcd_ret)
 	case LCD_SYSCALL_DUMP_STACK:
 		ret = handle_syscall_dump_stack(lcd);
 		break;
+	case LCD_SYSCALL_IRQ_DISABLE:
+		ret = handle_syscall_irq_disable(lcd);
+		break;
+	case LCD_SYSCALL_IRQ_ENABLE:
+		ret = handle_syscall_irq_enable(lcd);
+		break;
 	default:
 		LCD_ERR("unimplemented syscall %d", syscall_id);
 		ret = -ENOSYS;
@@ -374,7 +390,7 @@ static int handle_syscall(struct lcd *lcd, int *lcd_ret)
 }
 
 /* RUN LOOP -------------------------------------------------- */
-
+int icount = 0;
 static int run_once(struct lcd *lcd, int *lcd_ret)
 {
 	int ret;
@@ -396,6 +412,7 @@ static int run_once(struct lcd *lcd, int *lcd_ret)
 		 * Continue
 		 */
 		ret = 0;
+		icount++;
 		goto out;
 	case LCD_ARCH_STATUS_EPT_FAULT:
 		LCD_ERR("ept fault");
@@ -475,6 +492,7 @@ static int main_for_lcd(struct lcd *lcd)
 			lcd_arch_dump_lcd(lcd->lcd_arch);
 			return ret;
 		} else if (ret == 1) {
+			LCD_MSG("icount is %d", icount);
 			/* lcd exited */
 			return lcd_ret;
 		} else {

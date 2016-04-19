@@ -24,6 +24,7 @@ lib-y += $(addprefix liblcd/lcd-domains/, \
 	sync_ipc.o \
 	ioremap.o \
 	trace.o \
+	irq.o \
 	)
 
 lib-y += $(addprefix liblcd/lib/, \

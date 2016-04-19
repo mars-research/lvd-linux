@@ -1036,3 +1036,28 @@ int lcd_arch_set_gva_root(struct lcd_arch *lcd_arch, gpa_t a)
 	vmx_put_cpu(lcd_arch);
 	return 0;
 }
+
+void lcd_arch_irq_disable(struct lcd_arch *lcd_arch)
+{
+	/*
+	 * Clear pin based external interrupt bit. NMIs will still
+	 * cause an exit.
+	 */
+	vmx_get_cpu(lcd_arch);
+	vmcs_write32(PIN_BASED_VM_EXEC_CONTROL,
+		lcd_global_vmcs_config.pin_based_exec_controls &
+		~PIN_BASED_EXT_INTR_MASK);
+	vmx_put_cpu(lcd_arch);
+}
+
+void lcd_arch_irq_enable(struct lcd_arch *lcd_arch)
+{
+	/*
+	 * Set pin based external interrupt bit.
+	 */
+	vmx_get_cpu(lcd_arch);
+	vmcs_write32(PIN_BASED_VM_EXEC_CONTROL,
+		lcd_global_vmcs_config.pin_based_exec_controls &
+		PIN_BASED_EXT_INTR_MASK);
+	vmx_put_cpu(lcd_arch);
+}

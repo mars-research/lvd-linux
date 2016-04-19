@@ -54,6 +54,19 @@ struct lcd_arch_vmcs *lcd_arch_alloc_vmcs(int cpu);
  * Free @vmcs page(s).
  */
 void lcd_arch_free_vmcs(struct lcd_arch_vmcs *vmcs);
+/**
+ * Configure LCD so that external interrupts do not cause an
+ * unconditional exit.
+ */
+void lcd_arch_irq_disable(struct lcd_arch *lcd_arch);
+/**
+ * Configure LCD so that external interrupts *do* cause an
+ * unconditional exit.
+ *
+ * NOTE: Unlike local_irq_enable, this function *always*
+ * "re-enables" interrupts.
+ */
+void lcd_arch_irq_enable(struct lcd_arch *lcd_arch);
 
 /* Some internal data used in create */
 extern struct kmem_cache *lcd_arch_cache;

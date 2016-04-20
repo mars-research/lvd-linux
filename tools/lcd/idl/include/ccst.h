@@ -496,7 +496,7 @@ class CCSTExprStatement : public CCSTStatement
   virtual void write(FILE *f, int indent);
 };
 
-class CCSTExpression : public CCSTExprStatement
+class CCSTExpression : public CCSTBase
 {
   /*
     <expression> ::= <assignment-expression>

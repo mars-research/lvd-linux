@@ -28,8 +28,6 @@ CCSTFuncDef::CCSTFuncDef(std::vector<CCSTDecSpecifier*> specifiers, CCSTDeclarat
 
 void CCSTFuncDef::write(FILE *f, int indent)
 {
-  printf("here in function def\n");
-  // fprintf(f, "\n");
   for(std::vector<CCSTDecSpecifier*>::iterator it = specifiers_.begin(); it != specifiers_.end(); ++it)
     {
       CCSTDecSpecifier *ds = *it;
@@ -993,7 +991,6 @@ CCSTPostFixExprAccess::CCSTPostFixExprAccess(CCSTPostFixExpr *post_fix_expr, acc
 
 void CCSTPostFixExprAccess::write(FILE *f, int indent)
 {
-  printf("in post fix\n");
   if(this->post_fix_expr_ == 0x0 || this->id_ == "")
     {
       printf("error\n");
@@ -1014,10 +1011,7 @@ void CCSTPostFixExprAccess::write(FILE *f, int indent)
 	exit(0);
       }
     }
-  printf("at end\n");
-  printf("%s", this->id_);
   fprintf(f, "%s", this->id_);
-  printf("At real end\n");
 }
 
 CCSTPostFixExprExpr::CCSTPostFixExprExpr(CCSTPostFixExpr *post_fix_expr, CCSTExpression *expr)
@@ -1106,7 +1100,7 @@ CCSTString::CCSTString()
 void CCSTString::write(FILE *f, int indent)
 {
   // how should this be stored exactly?
-  fprintf(f, "%s%s", indentation(indent), this->string_);
+  fprintf(f, "%s\"%s\"", indentation(indent), this->string_);
 }
 
 CCSTPrimaryExprId::CCSTPrimaryExprId()
@@ -1243,7 +1237,6 @@ void CCSTAssignExpr::write(FILE *f, int indent)
   this->assn_op_->write(f, 0);
   fprintf(f, " ");
   this->assn_expr_->write(f, 0);
-  fprintf(f, ";\n");
 }
 
 CCSTAssignOp::CCSTAssignOp(assign_op op)
@@ -1676,7 +1669,7 @@ void CCSTDeclaration::write(FILE *f, int indent)
       fprintf(f, " ");
     }
   fprintf(f, ";");
-  fprintf(f, "\n\n");
+  fprintf(f, "\n");
 }
 
 CCSTInitDeclarator::CCSTInitDeclarator(CCSTDeclarator *dec, CCSTInitializer *init)
@@ -1800,7 +1793,6 @@ void CCSTPlainLabelStatement::write(FILE *f, int indent)
   //todo
   fprintf(f, "%s%s: ", indentation(indent), this->id_);
   this->stmnt_->write(f, 0);
-  fprintf(f, ";");
 }
 
 CCSTCaseStatement::CCSTCaseStatement(CCSTCondExpr *c, CCSTStatement *body)
@@ -1848,7 +1840,7 @@ void CCSTExprStatement::write(FILE *f, int indent)
     {
       this->expr_->write(f, indent);
     }
-  fprintf(f, ";");
+  fprintf(f, ";\n");
 }
 
 CCSTIfStatement::CCSTIfStatement(CCSTExpression *cond, CCSTStatement *body)
@@ -2007,7 +1999,7 @@ CCSTContinue::CCSTContinue()
 
 void CCSTContinue::write(FILE *f, int indent)
 {
-  fprintf(f, "%scontinue", indentation(indent));// write continue ;
+  fprintf(f, "%scontinue;", indentation(indent));// write continue ;
 }
 
 CCSTBreak::CCSTBreak()

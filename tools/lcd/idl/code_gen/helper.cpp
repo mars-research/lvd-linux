@@ -84,6 +84,7 @@ CCSTDeclaration* function_declaration(Rpc* r)
   return new CCSTDeclaration(specifier, func);
 }
 
+// 
 CCSTPostFixExpr* access(Variable *v)
 {
   if(v->accessor() == 0x0) {
@@ -138,11 +139,26 @@ CCSTIfStatement* if_cond_fail(CCSTExpression *cond, const char *err_msg)
   
   std::vector<CCSTAssignExpr*> liblcd_err_args;
   liblcd_err_args.push_back(new CCSTString(err_msg));
-  if_body_statements.push_back(function_call("LIBLCD_ERR", liblcd_err_args));
+  if_body_statements.push_back(new CCSTExprStatement( function_call("LIBLCD_ERR", liblcd_err_args)));
 
   std::vector<CCSTAssignExpr*> lcd_exit_args;
   lcd_exit_args.push_back(new CCSTInteger(-1));
-  if_body_statements.push_back(function_call("lcd_exit", lcd_exit_args));
+  if_body_statements.push_back(new CCSTExprStatement( function_call("lcd_exit", lcd_exit_args)));
+
+  CCSTCompoundStatement *if_body = new CCSTCompoundStatement(if_body_declarations, if_body_statements);
+  return new CCSTIfStatement(cond, if_body);
+}
+
+CCSTIfStatement* if_cond_fail_goto(CCSTExpression *cond, const char *err_msg, const char* goto_label)
+{
+  std::vector<CCSTDeclaration*> if_body_declarations;
+  std::vector<CCSTStatement*> if_body_statements;
+  
+  std::vector<CCSTAssignExpr*> liblcd_err_args;
+  liblcd_err_args.push_back(new CCSTString(err_msg));
+  if_body_statements.push_back(new CCSTExprStatement( function_call("LIBLCD_ERR", liblcd_err_args)));
+
+  if_body_statements.push_back(new CCSTGoto(goto_label));
 
   CCSTCompoundStatement *if_body = new CCSTCompoundStatement(if_body_declarations, if_body_statements);
   return new CCSTIfStatement(cond, if_body);

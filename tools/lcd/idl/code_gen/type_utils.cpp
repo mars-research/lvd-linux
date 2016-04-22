@@ -319,6 +319,7 @@ CCSTDeclaration* struct_pointer_declaration(const char* struct_name, const char*
 {
   int err;
   Type *struct_tmp = ls->lookup(struct_name, &err); // fix
+  printf("Looking up %s in environtment", struct_name);
   Assert(struct_tmp != 0x0, "Error: could not find container in environment\n");
   ProjectionType *struct_ = dynamic_cast<ProjectionType*>(struct_tmp);
   Assert(struct_ != 0x0, "Error: dynamic cast to Projection type failed!\n");
@@ -335,5 +336,5 @@ CCSTStatement* kzalloc_structure(const char* struct_name, const char* var_name)
   kzalloc_args.push_back(new CCSTUnaryExprSizeOf(new CCSTUnaryExprCastExpr(new CCSTUnaryOp(unary_mult_t)
 									   , new CCSTPrimaryExprId(struct_name))));
   kzalloc_args.push_back(new CCSTEnumConst("GFP_KERNEL"));
-  return new CCSTAssignExpr(new CCSTPrimaryExprId(var_name), equals(), function_call("kzalloc", kzalloc_args));
+  return new CCSTExprStatement( new CCSTAssignExpr(new CCSTPrimaryExprId(var_name), equals(), function_call("kzalloc", kzalloc_args)));
 }

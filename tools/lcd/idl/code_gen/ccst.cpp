@@ -1772,13 +1772,13 @@ void CCSTCompoundStatement::write(FILE *f, int indent)
       CCSTDeclaration *dec = *it;
       
       dec->write(f, indent);
-      fprintf(f, "\n");
+      //    fprintf(f, "\n");
     }
   for(std::vector<CCSTStatement*>::iterator it = this->statements_.begin(); it != statements_.end(); ++it)
     {
       CCSTStatement *state = *it;
       state->write(f, indent);
-      fprintf(f, "\n");
+      //   fprintf(f, "\n");
     }
 }
 

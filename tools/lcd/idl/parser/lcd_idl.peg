@@ -61,6 +61,21 @@ code: {{
 	   }
 	   return val;
       }	
+      
+      Variable* getVariable(const char* id)
+      {
+          int err;
+	  LexicalScope *ls = get_current_scope();
+	  if(!ls) {
+	  	  printf("current scope is null!\n");
+	  }
+	  Variable *v = ls->lookup_variable(id, &err);
+	  if(!v) {
+	      printf("could not find variable %s\n", id);
+	      return 0x0;
+	  }
+	  return v;
+      }     
 
       int count_pointers(Value v)
       {
@@ -76,7 +91,19 @@ code: {{
 	       }
 	   }
 	   return count;
-      }			
+      }	
+      
+      void insertVariable(Variable *v)
+      {
+          LexicalScope *ls = get_current_scope();
+	  bool ret = ls->insert(v);
+	  if(! ret)
+	  {
+	      ErrorReport* er = ErrorReport::instance();
+	      er->set_error();
+	      printf("Error: variable by name %s already exists in current scope.\n", v->identifier());	  
+	  }
+      }		
 
       void insertType(const char * sym, Type * val) // should this be void?
       {
@@ -88,7 +115,25 @@ code: {{
 	    er->set_error();
 	    printf("Error: type by name %s already exists in current scope.\n", val->name());
 	}
-      }	
+      }
+
+      const char* returnVarName()
+      {
+	  char* name = "ret";
+	  while(get_current_scope()->contains_identifier(name)) {
+	      // append _ on end of name
+	      
+	      int len1 = strlen(name);	
+	      int len2 = strlen("_");
+	      char* new_name = (char*) malloc(sizeof(char)*(len1+len2+1));
+
+	      std::ostringstream total;
+	      total << name << "_";
+	      strncpy(new_name, total.str().c_str(), len1+len2+1);
+	      name = new_name;
+	  }
+	  return name;
+      }     	
 }}
 
 rules:
@@ -304,10 +349,12 @@ Include		 =	"include" Space+ "<" Spacing p:Pathname Spacing ">" Spacing{{
 			    value = new Include(false, (char*) p.getValue());
 			}}
 
-FP_Parameter	=	"rpc" Spacing s:Specification? rt:Type_form pointers:star* Spacing OPEN Spacing "*" Spacing id:Identifier Spacing CLOSE Spacing OPEN Spacing p:Parameters CLOSE {{
+FP_Parameter	=	rpc_special Spacing s:Specification? rt:Type_form pointers:star* Spacing OPEN Spacing "*" Spacing id:Identifier Spacing CLOSE Spacing OPEN Spacing p:Parameters CLOSE {{
 			    std::vector<Parameter*> *params = (std::vector<Parameter*>*) p.getValue();
-			    Function *fp = new Function((char*) id.getValue(), new ReturnVariable((Type*) rt.getValue(), count_pointers(pointers)), *params, get_current_scope());
+			    Function *fp = new Function((char*) id.getValue(), new ReturnVariable((Type*) rt.getValue(), count_pointers(pointers), returnVarName())
+			    	     	       		, *params, get_current_scope());
 			    
+			    // fix this naming conflict
 			    Parameter *p = new Parameter(fp, (char *) id.getValue(), 1);
 
 			    if (s.getValue() != 0x0) {
@@ -332,12 +379,57 @@ FP_Parameter	=	"rpc" Spacing s:Specification? rt:Type_form pointers:star* Spacin
 				    p->set_dealloc_callee(true);
 				}
 			    }
-
+			    
+			    set_current_scope(get_current_scope()->outer_scope());
 			    value = p;
 			    
 			}}
 
-FirstParam	=	t:Type_form s:Specification? pointers:star* Spacing id:Identifier Spacing COMMA Spacing {{
+FirstParam	=	"projection" Space+ id:Identifier Spacing s:Specification? pointers:star* Spacing field_id:Identifier Spacing OPEN Spacing args:Arguments Spacing CLOSE Spacing COMMA Spacing {{
+			    
+			    std::vector<Variable*> *arguments = (std::vector<Variable*>*) args.getValue();
+			    InitializeType *it = new InitializeType(getType((char*) id.getValue()), *arguments);
+
+			    int p_count = count_pointers(pointers);
+			    Parameter *p = new Parameter(it, (char *) id.getValue(), p_count); 
+			    if (s.getValue() != 0x0) {
+			        std::vector<bool>* specs = (std::vector<bool>*) s.getValue();
+			        if(specs->at(1)) {
+			            p->set_out(true);
+			    	} if(specs->at(2)) {
+			            p->set_in(true);
+			    	} if(specs->at(4)) {
+			            p->set_alloc_caller(true);
+			    	} if(specs->at(5)) {
+			            p->set_alloc_callee(true);
+			    	} if(specs->at(6) || specs->at(3)) {
+			            p->set_alloc_callee(true);
+				    p->set_alloc_caller(true);
+			    	} if(specs->at(7) || specs->at(10)) {
+				    p->set_dealloc_callee(true);
+				    p->set_dealloc_caller(true);
+				} if (specs->at(8)) {
+				    p->set_dealloc_caller(true);
+				} if (specs->at(9)) {
+				    p->set_dealloc_callee(true);
+				}
+
+				if (p->alloc_callee()) {
+				   p->set_in(true);
+				   p->set_out(true);
+				} if (p->alloc_caller()) {
+				   p->set_in(true); // not sure correct
+				} if (p->dealloc_callee()) {
+				   p->set_in(true);
+				} if (p->dealloc_caller()) {
+				   p->set_in(true);  // not sure correct
+				}
+			    }
+			    
+			    value = p;    
+			}}	
+
+ 		|	  t:Type_form s:Specification? pointers:star* Spacing id:Identifier Spacing COMMA Spacing {{
 			    int p_count = count_pointers(pointers);
 			    Parameter *p = new Parameter((Type *) t.getValue(), (char *) id.getValue(), p_count); 
 			    
@@ -361,6 +453,17 @@ FirstParam	=	t:Type_form s:Specification? pointers:star* Spacing id:Identifier S
 				    p->set_dealloc_caller(true);
 				} if (specs->at(9)) {
 				    p->set_dealloc_callee(true);
+				}
+
+				if (p->alloc_callee()) {
+				   p->set_in(true);
+				   p->set_out(true);
+				} if (p->alloc_caller()) {
+				   p->set_in(true); // not sure correct
+				} if (p->dealloc_callee()) {
+				   p->set_in(true);
+				} if (p->dealloc_caller()) {
+				   p->set_in(true);  // not sure correct
 				}
 			    }
 			    
@@ -401,17 +504,75 @@ FP_FirstParam	=	t:Type_form s:Specification? pointers:star* Spacing COMMA Spacin
 				} if (specs->at(9)) {
 				    fp->set_dealloc_callee(true);
 				}
-			    }
 
+				if (fp->alloc_callee()) {
+				   fp->set_in(true);
+				   fp->set_out(true);
+				} if (fp->alloc_caller()) {
+				   fp->set_in(true); // not sure correct
+				} if (fp->dealloc_callee()) {
+				   fp->set_in(true);
+				} if (fp->dealloc_caller()) {
+				   fp->set_in(true);  // not sure correct
+				}
+			    }
+			    
 			    value = fp;  
 			}}
-			| "rpc" Space+ rt:Type_form pointers:star* Spacing OPEN Spacing "*" Spacing id:Identifier Spacing CLOSE Spacing OPEN Spacing p:Parameters CLOSE SEMI Spacing COMMA Spacing {{
+			| rpc_special Space+ rt:Type_form pointers:star* Spacing OPEN Spacing "*" Spacing id:Identifier Spacing CLOSE Spacing OPEN Spacing p:Parameters CLOSE SEMI Spacing COMMA Spacing {{
 			    std::vector<Parameter*> *params = (std::vector<Parameter*>*) p.getValue();
-			    Function *fp = new Function((char*) id.getValue(), new ReturnVariable((Type*) rt.getValue(), count_pointers(pointers)), *params, get_current_scope());
+			    Function *fp = new Function((char*) id.getValue(), new ReturnVariable((Type*) rt.getValue(), count_pointers(pointers), returnVarName())
+			                                , *params, get_current_scope());
+
+			    set_current_scope(get_current_scope()->outer_scope());
 			    value = new FPParameter(fp, 1);
 			}}
 			  
-LastParam	=	t:Type_form s:Specification? pointers:star* Spacing id:Identifier Spacing {{
+LastParam	=	"projection" Space+ id:Identifier Spacing s:Specification? pointers:star* Spacing field_id:Identifier Spacing OPEN Spacing args:Arguments Spacing CLOSE Spacing {{
+			    
+			    std::vector<Variable*> *arguments = (std::vector<Variable*>*) args.getValue();
+			    InitializeType *it = new InitializeType(getType((char*) id.getValue()), *arguments);
+
+			    int p_count = count_pointers(pointers);
+			    Parameter *p = new Parameter(it, (char *) id.getValue(), p_count); 
+			    if (s.getValue() != 0x0) {
+			        std::vector<bool>* specs = (std::vector<bool>*) s.getValue();
+			        if(specs->at(1)) {
+			            p->set_out(true);
+			    	} if(specs->at(2)) {
+			            p->set_in(true);
+			    	} if(specs->at(4)) {
+			            p->set_alloc_caller(true);
+			    	} if(specs->at(5)) {
+			            p->set_alloc_callee(true);
+			    	} if(specs->at(6) || specs->at(3)) {
+			            p->set_alloc_callee(true);
+				    p->set_alloc_caller(true);
+			    	} if(specs->at(7) || specs->at(10)) {
+				    p->set_dealloc_callee(true);
+				    p->set_dealloc_caller(true);
+				} if (specs->at(8)) {
+				    p->set_dealloc_caller(true);
+				} if (specs->at(9)) {
+				    p->set_dealloc_callee(true);
+				}
+
+				if (p->alloc_callee()) {
+				   p->set_in(true);
+				   p->set_out(true);
+				} if (p->alloc_caller()) {
+				   p->set_in(true); // not sure correct
+				} if (p->dealloc_callee()) {
+				   p->set_in(true);
+				} if (p->dealloc_caller()) {
+				   p->set_in(true);  // not sure correct
+				}
+			    }
+			    
+			    value = p;    
+			}}	
+
+ 		|   t:Type_form s:Specification? pointers:star* Spacing id:Identifier Spacing {{
 			    int p_count = count_pointers(pointers);
 			    Parameter *p = new Parameter((Type *) t.getValue(), (char *) id.getValue(), p_count); 
 			    			    
@@ -435,6 +596,17 @@ LastParam	=	t:Type_form s:Specification? pointers:star* Spacing id:Identifier Sp
 				    p->set_dealloc_caller(true);
 				} if (specs->at(9)) {
 				    p->set_dealloc_callee(true);
+				}
+
+				if (p->alloc_callee()) {
+				   p->set_in(true);
+				   p->set_out(true);
+				} if (p->alloc_caller()) {
+				   p->set_in(true); // not sure correct
+				} if (p->dealloc_callee()) {
+				   p->set_in(true);
+				} if (p->dealloc_caller()) {
+				   p->set_in(true);  // not sure correct
 				}
 			    }
 			
@@ -465,28 +637,54 @@ FP_LastParam	=	t:Type_form s:Specification? pointers:star* Spacing {{
 				} if (specs->at(9)) {
 				    fp->set_dealloc_callee(true);
 				}
+
+				if (fp->alloc_callee()) {
+				   fp->set_in(true);
+				   fp->set_out(true);
+				} if (fp->alloc_caller()) {
+				   fp->set_in(true); // not sure correct
+				} if (fp->dealloc_callee()) {
+				   fp->set_in(true);
+				} if (fp->dealloc_caller()) {
+				   fp->set_in(true);  // not sure correct
+				}
 			    }
 
 			    value = fp;
 			}}
-			|  "rpc" Space+ rt:Type_form pointers:star* Spacing OPEN Spacing "*" Spacing id:Identifier Spacing CLOSE Spacing OPEN Spacing p:Parameters CLOSE SEMI Spacing {{
+			|  rpc_special Space+ rt:Type_form pointers:star* Spacing OPEN Spacing "*" Spacing id:Identifier Spacing CLOSE Spacing OPEN Spacing p:Parameters CLOSE SEMI Spacing {{
 			    // todo change return type to return variable and add pointer
 			    std::vector<Parameter*> *params = (std::vector<Parameter*>*) p.getValue();
-			    Function *fp = new Function((char*) id.getValue(), new ReturnVariable((Type*) rt.getValue(), count_pointers(pointers)), *params, get_current_scope());
+			    Function *fp = new Function((char*) id.getValue(), new ReturnVariable((Type*) rt.getValue(), count_pointers(pointers), returnVarName())
+			                                , *params, get_current_scope());
+
+			    set_current_scope(get_current_scope()->outer_scope());
 			    value = new FPParameter(fp, 1);
 			}}
 
 Variable	=	Access | Identifier 
 
-FirstArg	=	Variable Spacing COMMA Spacing {{
-			    // todo
+FirstArg	=	id:Identifier Spacing COMMA Spacing {{
+			    // look up in scope.
+			    Variable *v = getVariable((char*) id.getValue());
+			    value = v;    
 			}}
-LastArg		=	Variable Spacing {{
-			    // todo
+LastArg		=	id:Identifier Spacing {{
+			    // lookup in scope
+			    Variable *v = getVariable((char*) id.getValue());
+			    value = v;
 			}}
 
 Arguments	=	first:FirstArg* last:LastArg {{
-			    // todo
+			    std::vector<Variable*> *args = new std::vector<Variable*>();
+			    for(Value::iterator it = first.getValues().begin(); it != first.getValues().end(); it ++) { 
+			        const Value &v = *it;
+				Variable *var = (Variable*) v.getValue();
+				args->push_back(var);    
+			    }
+
+			    args->push_back((Variable*) last.getValue());
+			    value = args;
 			}}
 
 Parameters	=	f:FirstParam* l:LastParam {{
@@ -496,6 +694,8 @@ Parameters	=	f:FirstParam* l:LastParam {{
 			
 				const Value & v = *it;
 				Parameter* p = (Parameter* ) v.getValue();
+				// put in scope too
+				insertVariable(p);
 				params->push_back(p);
 			    }
 			    params->push_back((Parameter* ) l.getValue());
@@ -511,11 +711,15 @@ LastGlobal	=	t:Type_form pointers:star* Spacing id:Identifier Spacing {{
 			}}
 
 FirstChannel    = "channel" Space+ id:Identifier Spacing COMMA Spacing {{
-		    value = new GlobalVariable(getType("cptr_t"), (char*) id.getValue(), 0);
+		    GlobalVariable *gv = new GlobalVariable(getType("cptr_t"), (char*) id.getValue(), 0);
+		    insertVariable(gv);
+		    value = gv;
 		}}
 
 LastChannel     = "channel" Space+ id:Identifier Spacing {{
-		    value = new GlobalVariable(getType("cptr_t"), (char*) id.getValue(), 0);
+		    GlobalVariable *gv = new GlobalVariable(getType("cptr_t"), (char*) id.getValue(), 0);
+		    insertVariable(gv);
+		    value = gv;
 		}}
 
 Channels        = f:FirstChannel* l:LastChannel {{
@@ -555,11 +759,20 @@ FP_Parameters	=	f:FP_FirstParam* l:FP_LastParam {{
 			    value = params;
 			}}
 
+rpc_special     =      "rpc" {{
+		           LexicalScope *tmp = get_current_scope();
+			   LexicalScope *new_scope = new LexicalScope(tmp);	
+			   // dont need to add to inner scope because rpc do not have type definitinos
+			   set_current_scope(new_scope);      
+			   value = new_scope;
+		       }}
 
-Rpc		=	"rpc" Space+ t:Type_form pointers:star* Spacing id1:Identifier Spacing OPEN p:Parameters CLOSE SEMI Spacing {{
+
+Rpc		=	rpc_special Space+ t:Type_form pointers:star* Spacing id1:Identifier Spacing OPEN p:Parameters CLOSE SEMI Spacing {{
 			    std::vector<Parameter*>* params = (std::vector<Parameter*>*) p.getValue();
 			    std::vector<Parameter*> params_ = *params;
-			    Rpc* r = new Rpc(new ReturnVariable((Type *) t.getValue(), count_pointers(pointers)), (char *) id1.getValue(), params_, get_current_scope());
+			    Rpc* r = new Rpc(new ReturnVariable((Type *) t.getValue(), count_pointers(pointers), returnVarName())
+			                                       , (char *) id1.getValue(), params_, get_current_scope());
 			    
 			    printf("creating an rpc\n");
 			    /*
@@ -568,13 +781,23 @@ Rpc		=	"rpc" Space+ t:Type_form pointers:star* Spacing id1:Identifier Spacing OP
 			        printf("Error rpc already in scope with this name %s.\n", r->name());
 		            }
 			    */
+
+			    set_current_scope(get_current_scope()->outer_scope()); // leaving current scope
 			    value = r; 
 			}}  
 
-Projection_constructor =    s:Projection_constructor_special Spacing "<" Spacing t:Proj_type Spacing ">" Spacing id:Identifier Spacing OPEN Spacing g:Globals? Spacing CLOSE Spacing OPENC Spacing d:Type_Definitions* p:ProjField* Spacing CLOSEC Spacing {{
+Projection_constructor =    s:Projection_constructor_special Spacing "<" Spacing t:Proj_type Spacing ">" Spacing id:Identifier Spacing OPEN Spacing c:ProjArgs Spacing CLOSE Spacing OPENC Spacing cf:ChanField* d:Type_Definitions* p:ProjField* Spacing CLOSEC Spacing {{
+		       	        std::vector<ProjectionField*> chan_fields;
+				for(Value::iterator it = c.getValues().begin(); it != c.getValues().end(); it ++) {
+			            const Value &v = *it;
+				    ProjectionField *pf = (ProjectionField*) v.getValue();	
+				    chan_fields.push_back(pf);
+			        }
+
+
 		       	        std::vector<ProjectionField*> fields;
-				std::vector<GlobalVariable*> *globals_ = (std::vector<GlobalVariable*>*) g.getValue();
-				std::vector<GlobalVariable*> globals = *globals_;
+				std::vector<ProjectionField*> *channels_ = (std::vector<ProjectionField*>*) c.getValue();
+				std::vector<ProjectionField*> channels = *channels_;
 				for(Value::iterator it = p.getValues().begin(); it != p.getValues().end(); it ++) {
 				    const Value & v = *it;
 				    std::vector<ProjectionField*> *tmp_ = (std::vector<ProjectionField*>*) v.getValue();
@@ -582,18 +805,20 @@ Projection_constructor =    s:Projection_constructor_special Spacing "<" Spacing
 				    fields.insert(fields.end(), tmp.begin(), tmp.end());
 				}
 
-				ProjectionType *val = new ProjectionType((char*) id.getValue(), (char*) t.getValue(), fields, globals);	
+				ProjectionConstructorType *val = new ProjectionConstructorType((char*) id.getValue(), (char*) t.getValue(), fields, chan_fields, channels);	
 				
-				// creating constructor
+				// creating container
 			    	std::vector<ProjectionField*> container_fields;
 			    	container_fields.push_back(new ProjectionField(getType((char*)id.getValue()), (char*)id.getValue(), 0));
-				ProjectionField *other_ref = new ProjectionField(getType("dptr_t"), "other_ref", 0);
+				ProjectionField *other_ref = new ProjectionField(getType("cptr_t"), "other_ref", 0);
 				other_ref->set_out(true);
 			    	container_fields.push_back(other_ref);
-				ProjectionField *my_ref = new ProjectionField(getType("dptr_t"), "my_ref", 0);
+				ProjectionField *my_ref = new ProjectionField(getType("cptr_t"), "my_ref", 0);
 				my_ref->set_in(true);
-			    	container_fields.push_back(my_ref);
-			    	// may need to add extra fields here.
+				container_fields.push_back(my_ref);
+				container_fields.insert(container_fields.end(), channels.begin(), channels.end());
+				container_fields.insert(container_fields.end(), chan_fields.begin(), chan_fields.end());
+			
 			    	const char *container_name_str = container_name((char*)id.getValue());
 			    	ProjectionType * container = new ProjectionType(container_name_str, container_name_str, container_fields);
 				printf("inserting container with name %s \n", container_name_str);
@@ -613,7 +838,15 @@ Projection_constructor_special = "projection" {{
 				     value = new_scope;
 				 }} 
 
-Projection	=	"projection" Spacing "<" Spacing t:Proj_type Spacing ">" Spacing id:Identifier Spacing OPENC Spacing p:ProjField* CLOSEC Spacing {{ 
+Projection	=	"projection" Spacing "<" Spacing t:Proj_type Spacing ">" Spacing id:Identifier Spacing OPENC Spacing c:ChanField* p:ProjField* CLOSEC Spacing {{
+
+			    std::vector<ProjectionField*> channels;
+			    for(Value::iterator it = c.getValues().begin(); it != c.getValues().end(); it ++) {
+			        const Value &v = *it;
+				ProjectionField *pf = (ProjectionField*) v.getValue();	
+				channels.push_back(pf);
+			    }
+ 
 			    std::vector<ProjectionField *> fields;
 			    for(Value::iterator it = p.getValues().begin(); it != p.getValues().end(); it ++)
 			    {
@@ -622,19 +855,20 @@ Projection	=	"projection" Spacing "<" Spacing t:Proj_type Spacing ">" Spacing id
 				std::vector<ProjectionField*> tmp = *tmp_;
 				fields.insert(fields.end(), tmp.begin(), tmp.end());
 			    } 
-			    ProjectionType * val = new ProjectionType((char* ) id.getValue(), (char*) t.getValue(), fields);
+			    ProjectionType * val = new ProjectionType((char* ) id.getValue(), (char*) t.getValue(), fields, channels);
 			    insertType((char*)id.getValue(), val);
 
 			    // creating constructor
 			    std::vector<ProjectionField*> container_fields;
 			    container_fields.push_back(new ProjectionField(getType((char*)id.getValue()), (char*)id.getValue(), 0));
-			    ProjectionField *other_ref = new ProjectionField(getType("dptr_t"), "other_ref", 0);
+			    ProjectionField *other_ref = new ProjectionField(getType("cptr_t"), "other_ref", 0);
 			    other_ref->set_out(true);
 			    container_fields.push_back(other_ref);
-			    ProjectionField *my_ref = new ProjectionField(getType("dptr_t"), "my_ref", 0);
+			    ProjectionField *my_ref = new ProjectionField(getType("cptr_t"), "my_ref", 0);
 			    my_ref->set_in(true);
 			    container_fields.push_back(my_ref);
-			    // may need to add extra fields here.
+			    container_fields.insert(container_fields.end(), channels.begin(), channels.end());	    
+
 			    const char *container_name_str = container_name((char*)id.getValue());
 			    ProjectionType * container = new ProjectionType(container_name_str, container_name_str, container_fields);
 			    printf("inserting projection type with name %s", container_name_str);
@@ -658,7 +892,7 @@ Keyword		=     	"out" {{
 			    *x = 2; 
 			    value = x; 
 			}}
-			| "alloc" Spacing OPEN Spacing "caller" Spacing "," "callee" Spacing CLOSE {{
+			| "alloc" Spacing OPEN Spacing "caller" Spacing "," Spacing "callee" Spacing CLOSE {{
 			    int *x = (int*) malloc(sizeof(int)); 
 			    *x = 6;
 			    value = x;
@@ -678,7 +912,7 @@ Keyword		=     	"out" {{
 			    *x = 3;
 			    value = x; 
 			}}
-			| "dealloc" Spacing OPEN Spacing "caller" Spacing "," "callee" Spacing CLOSE {{
+			| "dealloc" Spacing OPEN Spacing "caller" Spacing "," Spacing "callee" Spacing CLOSE {{
 			    int *x = (int*) malloc(sizeof(int));
 			    *x = 7;
 			    value = x;
@@ -720,8 +954,74 @@ Specification	=	OPENS Spacing s:Start* l:Last CLOSES Spacing {{
 			    value = specs; 
 			}}
 
+FirstProjArg    =      "channel" Space+ id:Identifier Spacing COMMA Spacing {{
+		           ProjectionField *pf = new ProjectionField(getType("cptr_t"), (char*) id.getValue(), 0);
+			   insertVariable(pf); 
+			   value = pf;
+		       }}
+
+LastProjArg     =      "channel" Space+ id:Identifier Spacing {{
+		           ProjectionField *pf = new ProjectionField(getType("cptr_t"), (char*) id.getValue(), 0);
+			   insertVariable(pf);
+			   value = pf;
+		       }}
+
+ProjArgs        =       f:FirstProjArg* l:LastProjArg {{
+			    std::vector<ProjectionField*> *channels = new std::vector<ProjectionField*>();
+
+		    	    for(Value::iterator it = f.getValues().begin(); it != f.getValues().end(); it ++) {
+			        const Value & v = *it;
+				ProjectionField *gv = (ProjectionField*) v.getValue();
+				channels->push_back(gv);
+			    }
+			    channels->push_back((ProjectionField*) l.getValue());
+			    value = channels;
+			}}
+
+ChanField       =       "channel" Space+ s:Specification? Spacing id:Identifier Spacing SEMI Spacing {{
+			    ProjectionField *pf = new ProjectionField(getType("cptr_t"), (char*) id.getValue(), 0);
+			    insertVariable(pf);
+			    if (s.getValue() != 0x0) {
+			        std::vector<bool>* specs = (std::vector<bool>*) s.getValue();
+			        if(specs->at(1)) {
+			            pf->set_out(true);
+			    	} if(specs->at(2)) {
+			            pf->set_in(true);
+			    	} if(specs->at(4)) {
+			            pf->set_alloc_caller(true);
+			    	} if(specs->at(5)) {
+			            pf->set_alloc_callee(true);
+			    	} if(specs->at(6) || specs->at(3)) {
+			            pf->set_alloc_callee(true);
+				    pf->set_alloc_caller(true);
+			    	} if(specs->at(7) || specs->at(10)) {
+				    pf->set_dealloc_callee(true);
+				    pf->set_dealloc_caller(true);
+				} if (specs->at(8)) {
+				    pf->set_dealloc_caller(true);
+				} if (specs->at(9)) {
+				    pf->set_dealloc_callee(true);
+				}
+
+				if (pf->alloc_callee()) {
+				   pf->set_in(true);
+				   pf->set_out(true);
+				} if (pf->alloc_caller()) {
+				   pf->set_in(true); // not sure correct
+				} if (pf->dealloc_callee()) {
+				   pf->set_in(true);
+				} if (pf->dealloc_caller()) {
+				   pf->set_in(true);  // not sure correct
+				}
+			    }
+
+			    value = pf;
+			}}
+
 ProjField	=	"projection" Space+ id:Identifier Spacing s:Specification? pointers:star* Spacing field_id:Identifier Spacing OPEN Spacing args:Arguments Spacing CLOSE Spacing SEMI Spacing {{
-			    ProjectionField *pf = new ProjectionField(getType((char*) id.getValue()), (char*) field_id.getValue(), count_pointers(pointers));
+			    std::vector<Variable*> *arguments = (std::vector<Variable*>*) args.getValue();
+		            InitializeType *it = new InitializeType(getType((char*) id.getValue()), *arguments);
+			    ProjectionField *pf = new ProjectionField(it, (char*) field_id.getValue(), count_pointers(pointers));
 			    
 			    if (s.getValue() != 0x0) {
 			        std::vector<bool>* specs = (std::vector<bool>*) s.getValue();
@@ -743,6 +1043,17 @@ ProjField	=	"projection" Space+ id:Identifier Spacing s:Specification? pointers:
 				    pf->set_dealloc_caller(true);
 				} if (specs->at(9)) {
 				    pf->set_dealloc_callee(true);
+				}
+
+				if (pf->alloc_callee()) {
+				   pf->set_in(true);
+				   pf->set_out(true);
+				} if (pf->alloc_caller()) {
+				   pf->set_in(true); // not sure correct
+				} if (pf->dealloc_callee()) {
+				   pf->set_in(true);
+				} if (pf->dealloc_caller()) {
+				   pf->set_in(true);  // not sure correct
 				}
 			    }
 
@@ -776,17 +1087,28 @@ ProjField	=	"projection" Space+ id:Identifier Spacing s:Specification? pointers:
 				} if (specs->at(9)) {
 				    pf->set_dealloc_callee(true);
 				}
+
+				if (pf->alloc_callee()) {
+				   pf->set_in(true);
+				   pf->set_out(true);
+				} if (pf->alloc_caller()) {
+				   pf->set_in(true); // not sure correct
+				} if (pf->dealloc_callee()) {
+				   pf->set_in(true);
+				} if (pf->dealloc_caller()) {
+				   pf->set_in(true);  // not sure correct
+				}
 			    }
 			    
 			    std::vector<ProjectionField*> *fields = new std::vector<ProjectionField*>();
 			    fields->push_back(pf);
 			    value = fields; 
 			}}
-			| "rpc" Spacing s:Specification? rt:Type_form pointers:star* Spacing OPEN Spacing "*" Spacing id:Identifier Spacing CLOSE Spacing OPEN Spacing p:Parameters CLOSE SEMI Spacing {{
-			    printf("matched a function pointer field\n");
-			    
+			| rpc_special Spacing s:Specification? rt:Type_form pointers:star* Spacing OPEN Spacing "*" Spacing id:Identifier Spacing CLOSE Spacing OPEN Spacing p:Parameters CLOSE SEMI Spacing {{
+
 			    std::vector<Parameter*> *params = (std::vector<Parameter*>*) p.getValue();
-			    Function *fp = new Function((char*) id.getValue(), new ReturnVariable((Type*) rt.getValue(), count_pointers(pointers)), *params, get_current_scope());
+			    Function *fp = new Function((char*) id.getValue(), new ReturnVariable((Type*) rt.getValue(), count_pointers(pointers), returnVarName())
+			                               , *params, get_current_scope());
 			    ProjectionField *pf = new ProjectionField(fp, (char*) id.getValue(), 1);
 
 			    if (s.getValue() != 0x0) {
@@ -814,6 +1136,8 @@ ProjField	=	"projection" Space+ id:Identifier Spacing s:Specification? pointers:
 
 			    std::vector<ProjectionField*> *fields = new std::vector<ProjectionField*>();
 			    fields->push_back(pf);
+
+			    set_current_scope(get_current_scope()->outer_scope());
 			    value = fields;
 			}}
 			| pc_unnamed_scope

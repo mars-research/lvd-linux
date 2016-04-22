@@ -41,12 +41,22 @@ class LexicalScope : public Base
  public:
   LexicalScope *outer_scope_;
   std::map<std::string, Type*> type_definitions_;
+  std::map<std::string, Variable*> variables_;
   std::map<std::pair<std::string, std::vector<Parameter*> >, Rpc*> rpc_definitions_; // rpc or function pointer. why do we keep this? 
+
+  std::vector<std::string> identifiers_; // new
+
   std::vector<LexicalScope*> inner_scopes_;
   LexicalScope();
   LexicalScope(LexicalScope *outer_scope);
   std::vector<Rpc*> rpc_in_scope();
   bool insert(Rpc *r);
+  bool insert(Variable *v);
+
+  bool insert_identifier(const char* id);
+  bool contains_identifier(const char* id);
+
+  Variable* lookup_variable(const char *sym, int* err);
   Type* lookup(const char *sym, int* err);
   bool insert(const char *sym, Type* type);
   bool contains(const char *symbol);
@@ -137,6 +147,7 @@ class Variable : public Base
   virtual void prepare_marshal(MarshalPrepareVisitor *worker) = 0;
   virtual void resolve_types(LexicalScope *ls) = 0;
   virtual void create_container_variable(LexicalScope *ls) = 0;
+  virtual void initialize_type() = 0;
 
   virtual void set_in(bool b) = 0;
   virtual void set_out(bool b) = 0;
@@ -180,6 +191,7 @@ class GlobalVariable : public Variable
   virtual Marshal_type* marshal_info();
   virtual int pointer_count();
   virtual void set_pointer_count(int pcount);
+  virtual void initialize_type();
 
   virtual void set_in(bool b);
   virtual void set_out(bool b);
@@ -230,6 +242,7 @@ class Parameter : public Variable
   virtual Variable* accessor();
   virtual int pointer_count();
   virtual void set_pointer_count(int pcount);
+  virtual void initialize_type();
   
   virtual void set_in(bool b);
   virtual void set_out(bool b);
@@ -271,6 +284,7 @@ class FPParameter : public Parameter
   virtual void prepare_marshal(MarshalPrepareVisitor *worker);
   virtual void resolve_types(LexicalScope *ls);
   virtual void create_container_variable(LexicalScope *ls);
+  virtual void initialize_type();
 
   virtual void set_in(bool b);
   virtual void set_out(bool b);
@@ -297,7 +311,7 @@ class ReturnVariable : public Variable
   int pointer_count_;
   Variable *container_;
   ReturnVariable();
-  ReturnVariable(Type* return_type, int pointer_count);
+  ReturnVariable(Type* return_type, int pointer_count, const char* id);
   ReturnVariable(const ReturnVariable& other);
   virtual Variable* clone() const { return new ReturnVariable(*this); }
   virtual Variable *container();
@@ -313,6 +327,7 @@ class ReturnVariable : public Variable
   virtual Variable* accessor();
   virtual int pointer_count();
   virtual void set_pointer_count(int pcount);
+  virtual void initialize_type();
 
   virtual void set_in(bool b);
   virtual void set_out(bool b);
@@ -456,7 +471,7 @@ class ProjectionField : public Variable //?
   virtual void create_container_variable(LexicalScope *ls);
   virtual int pointer_count();
   virtual void set_pointer_count(int pcount);
-
+  virtual void initialize_type();
 
   virtual void set_in(bool b);
   virtual void set_out(bool b);
@@ -497,16 +512,18 @@ class ProjectionType : public Type // complex type
   ~ProjectionType(){printf("projection type destructor\n");}
   virtual void create_trampoline_structs(LexicalScope *ls);
   ProjectionField* get_field(const char* field_name);
+  void initialize_type();
 };
 
 class ProjectionConstructorType : public ProjectionType 
 {
-  std::vector<std::pair<Variable*, Variable*> > channel_params_;
  public:
+  std::vector<std::pair<Variable*, Variable*> > channel_params_;
   ProjectionConstructorType(const char* id, const char* real_type, std::vector<ProjectionField*> fields, std::vector<ProjectionField*> channel_fields, std::vector<ProjectionField*> channel_params);
   ProjectionConstructorType(const ProjectionConstructorType& other);
   virtual int num();
   virtual Type* clone() const { return new ProjectionConstructorType(*this); }
+  virtual void resolve_types(LexicalScope *ls);
   void initialize(std::vector<Variable*> chans);
 };
 
@@ -542,6 +559,8 @@ class Rpc : public Base
   void create_trampoline_structs();
   void create_container_variables();
   void set_accessors();
+  void initialize_types();
+  void set_copy_container_accessors();
   LexicalScope *current_scope();
 };
 
@@ -568,6 +587,8 @@ class Module : public Base
   void create_container_variables();
   void copy_types();
   void set_accessors();
+  void initialize_types();
+  void set_copy_container_accessors();
   const char* identifier();
 };
 
@@ -596,6 +617,8 @@ class Project : public Base
   void create_container_variables();
   void copy_types();
   void set_accessors();
+  void initialize_types();
+  void set_copy_container_accessors();
   std::vector<Module*> modules();
   unsigned int get_next_tag();
 };

@@ -42,7 +42,14 @@ GlobalScope::GlobalScope()
   
   // cptr_t
   std::vector<ProjectionField*> fields2;
-  fields2.push_back(new ProjectionField(this->lookup("unsigned long", &err), "cptr", 0)); // unsigned long cptr;
+  ProjectionField *cptr = new ProjectionField(this->lookup("unsigned long", &err), "cptr", 0); // unsigned long cptr;
+  if(err == 0) {
+    printf("COULD NOT FIND UNSIGNED LONG\N");
+  }
+  cptr->set_in(true);
+  cptr->set_out(true);
+  fields2.push_back(cptr);
+  
   this->type_definitions_.insert( std::pair<std::string, Type*>("cptr_t"
 								, new ProjectionType("cptr_t", "cptr_t", fields2)));
 
@@ -108,6 +115,29 @@ LexicalScope::LexicalScope(LexicalScope *outer_scope)
   this->outer_scope_ = outer_scope;
 }
 
+bool LexicalScope::insert_identifier(const char* id)
+{
+  std::string temp(id);
+  if(this->contains_identifier(id)) {
+    return false;
+  }
+  this->identifiers_.push_back(temp);
+  return true;
+}
+
+bool LexicalScope::contains_identifier(const char* id)
+{
+  std::string temp(id);
+
+  for(std::vector<std::string>::iterator it = this->identifiers_.begin(); it != this->identifiers_.end(); it ++) {
+    std::string s = *it;
+    if (s.compare(temp) == 0) {
+      return true;
+    }
+  }
+  return false;
+}
+
 bool LexicalScope::insert(Rpc *r)
 {
   std::string temp(r->name());
@@ -115,6 +145,34 @@ bool LexicalScope::insert(Rpc *r)
   std::pair<std::map<std::pair<std::string, std::vector<Parameter*> >, Rpc*>::iterator, bool> ret;
   ret = this->rpc_definitions_.insert(std::pair<std::pair<std::string, std::vector<Parameter*> >, Rpc*>(p, r));
   return ret.second;
+}
+
+bool LexicalScope::insert(Variable *v)
+{
+  std::string temp(v->identifier());
+  std::pair<std::map<std::string,Variable*>::iterator,bool> ret;
+  ret = variables_.insert(std::pair<std::string, Variable*>(temp, v));
+
+  // insert into identifier
+  this->insert_identifier(v->identifier());
+  return ret.second;
+}
+
+Variable* LexicalScope::lookup_variable(const char *sym, int* err)
+{
+  std::string temp(sym);
+  if(this->variables_.find(temp) ==  this->variables_.end()) {
+    if(this->outer_scope_ == 0x0) {
+      *err = 0;
+      return 0x0;
+    } else {
+      return this->outer_scope_->lookup_variable(sym, err);
+    }
+  }
+  else {
+    *err = 1;
+    return variables_[temp];
+  }
 }
 
 std::vector<Rpc*> LexicalScope::rpc_in_scope()

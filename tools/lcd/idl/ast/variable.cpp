@@ -110,28 +110,92 @@ void GlobalVariable::set_pointer_count(int pcount)
 
 void GlobalVariable::resolve_types(LexicalScope *ls)
 {
-  // check if unresolved
-  if(this->type_->num() != 8) {
+  // need to rewrite to account for initializetype
+  Type *last = this->type_;
+  Type *tmp = this->type_;
+  
+  if(this->type_->num() == 10) {
+    Type *tmp = this->type_;
+    InitializeType *it = 0x0;
+    while(tmp->num() == 10) {
+      it = dynamic_cast<InitializeType*>(tmp);
+      Assert(it != 0x0, "Error: dynamic cast to initialize type failed\n");
+      tmp = it->type_;
+    }
+    
+    if(tmp->num() != 8) {
+      return;
+    }
+
+    int err;
+    Type *t = ls->lookup(tmp->name(), &err);
+    if(t == 0x0) {
+      printf("Error: could not resolve type %s\n", tmp->name());
+      return;
+    }
+
+    it->type_ = t;
+    return;
+
+  } else {
+
+    // check if unresolved
+    if(this->type_->num() != 8) {
+      return;
+    }
+    
+    int err;
+    Type *t = ls->lookup(this->type_->name(), &err);
+    if(t == 0x0) {
+      printf("Error: could not resolve type %s\n", this->type_->name());
+      return;
+    } 
+    
+    // and set
+    this->type_ = t;
     return;
   }
-  
-  int err;
-  Type *t = ls->lookup(this->type_->name(), &err);
-  if(t == 0x0) {
-    printf("Error: could not resolve type %s\n", this->type_->name());
-    return;
-  } 
-  
-  // and set
-  this->type_ = t;
-  return;
+}
+
+void GlobalVariable::initialize_type()
+{
+  if ( this->type_->num() == 10 ) {
+    InitializeType *it = dynamic_cast<InitializeType*>(this->type_);
+    Assert(it != 0x0, "Error: dynamic cast to Initialize type failed\n");
+    
+    it->initialize();
+    this->type_ = it->type_;
+  } else if (this->type_->num() == 4 || this->type_->num() == 9) {
+    ProjectionType *pt = dynamic_cast<ProjectionType*>(this->type_);
+    Assert(pt != 0x0, "Error: dynamic cast to Projection type failed\n");
+
+    pt->initialize_type();
+  }
 }
 
 void GlobalVariable::create_container_variable(LexicalScope *ls)
 {
+  if(this->pointer_count() <= 0 || (this->type_->num() != 4 && this->type_->num() != 9 && this->type_->num() != 10)) {
+    return;
+  }
+  Type *tmp = this->type_;
+
+  if(this->type_->num() == 10) { // initialize type
+    while(tmp->num() == 10) {
+      InitializeType *it = dynamic_cast<InitializeType*>(tmp);
+      Assert(it != 0x0, "Error: dynamic cast to initialize type failed\n");
+
+      tmp = it->type_;
+    }
+
+    if(tmp->num() != 4 && tmp->num() != 9) {
+      return;
+    }
+  }
+  
   // lookup in scope the container for its type. 
   int err;
-  Type *container_t = ls->lookup(container_name(this->type()->name()), &err);
+  Type *container_t = ls->lookup(container_name(tmp->name()), &err);
   Assert(container_t != 0x0, "Error: could not find container in scope\n");
 
   ProjectionType *container = dynamic_cast<ProjectionType*>(container_t);
@@ -142,22 +206,19 @@ void GlobalVariable::create_container_variable(LexicalScope *ls)
   const char* name = container_name(append_strings("_", construct_list_vars(this)));
 
   Parameter *container_var = new Parameter(container, name, 1);
+  container_var->set_in(this->in());
+  container_var->set_out(this->out());
 
   // save. 
   this->container_ = container_var;
-
-  if(this->type()->num() == 4) {
-    ProjectionType *pt = dynamic_cast<ProjectionType*>(this->type());
-    Assert(pt != 0x0, "Error: dynamic cast to projection type failed\n");
-
-    std::vector<ProjectionField*> fields = pt->fields();
-    for(std::vector<ProjectionField*>::iterator it = fields.begin(); it != fields.end(); it ++) {
-      ProjectionField *pf = *it;
-      if(pf->pointer_count() > 0 && pf->type()->num() == 4) {
-	pf->create_container_variable(ls);
-      }
-    }
-
+  
+  ProjectionType *pt = dynamic_cast<ProjectionType*>(tmp);
+  Assert(pt != 0x0, "Error: dynamic cast to projection type failed\n");
+  
+  std::vector<ProjectionField*> fields = pt->fields();
+  for(std::vector<ProjectionField*>::iterator it = fields.begin(); it != fields.end(); it ++) {
+    ProjectionField *pf = *it;
+    pf->create_container_variable(ls);
   }
 }
 
@@ -290,10 +351,28 @@ Parameter::Parameter(const Parameter& other)
 
 void Parameter::create_container_variable(LexicalScope *ls)
 {
+  if(this->pointer_count() <= 0 || (this->type_->num() != 4 && this->type_->num() != 9 && this->type_->num() != 10)) {
+    return;
+  }
+  Type *tmp = this->type_;
+
+  if(this->type_->num() == 10) { // initialize type
+    while(tmp->num() == 10) {
+      InitializeType *it = dynamic_cast<InitializeType*>(tmp);
+      Assert(it != 0x0, "Error: dynamic cast to initialize type failed\n");
+
+      tmp = it->type_;
+    }
+
+    if(tmp->num() != 4 && tmp->num() != 9) {
+      return;
+    }
+  }
+  
   // lookup in scope the container for its type. 
   int err;
-  Type *container_t = ls->lookup(container_name(this->type()->name()), &err);
-  printf("Just looked up container %s\n", container_name(this->type()->name()));
+  Type *container_t = ls->lookup(container_name(tmp->name()), &err);
+  printf("Just looked up container %s\n", container_name(tmp->name()));
   Assert(container_t != 0x0, "Error: could not find container in scope\n");
 
   ProjectionType *container = dynamic_cast<ProjectionType*>(container_t);
@@ -304,27 +383,22 @@ void Parameter::create_container_variable(LexicalScope *ls)
   const char* name = container_name(append_strings("_", construct_list_vars(this)));
 
   Parameter *container_var = new Parameter(container, name, 1);
+  container_var->set_in(this->in());
+  container_var->set_out(this->out());
 
   // save. 
   this->container_ = container_var;
 
   // recurse
-  if(this->type()->num() == 4) {
-    ProjectionType *pt = dynamic_cast<ProjectionType*>(this->type());
-    Assert(pt != 0x0, "Error: dynamic cast to projection type failed\n");
 
-    std::vector<ProjectionField*> fields = pt->fields();
-    for(std::vector<ProjectionField*>::iterator it = fields.begin(); it != fields.end(); it ++) {
-      ProjectionField *pf = *it;
-      printf("in create container variable have projection field %s\n, type is %d", pf->identifier(), pf->type()->num());
-      if((pf->pointer_count() > 0) && (pf->type()->num() == 4)) {
-	printf("projection field is pointer and projection\n");
-	pf->create_container_variable(ls);
-      }
-    }
-
+  ProjectionType *pt = dynamic_cast<ProjectionType*>(tmp);
+  Assert(pt != 0x0, "Error: dynamic cast to projection type failed\n");
+  
+  std::vector<ProjectionField*> fields = pt->fields();
+  for(std::vector<ProjectionField*>::iterator it = fields.begin(); it != fields.end(); it ++) {
+    ProjectionField *pf = *it;
+    pf->create_container_variable(ls);
   }
-
 }
 
 Variable* Parameter::container()
@@ -403,26 +477,67 @@ Marshal_type* Parameter::marshal_info()
 
 void Parameter::resolve_types(LexicalScope *ls)
 {
-  printf("Parameter name is %s\n", this->name_);
-  if(this->type_ == 0x0) {
-    printf("value is null\n");
+   // need to rewrite to account for initializetype
+  Type *last = this->type_;
+  Type *tmp = this->type_;
+  
+  if(this->type_->num() == 10) {
+    Type *tmp = this->type_;
+    InitializeType *it = 0x0;
+    while(tmp->num() == 10) {
+      it = dynamic_cast<InitializeType*>(tmp);
+      Assert(it != 0x0, "Error: dynamic cast to initialize type failed\n");
+      tmp = it->type_;
+    }
+    
+    if(tmp->num() != 8) {
+      return;
+    }
+
+    int err;
+    Type *t = ls->lookup(tmp->name(), &err);
+    if(t == 0x0) {
+      printf("Error: could not resolve type %s\n", tmp->name());
+      return;
+    }
+
+    it->type_ = t;
+    return;
+
+  } else {
+
+    // check if unresolved
+    if(this->type_->num() != 8) {
+      return;
+    }
+    
+    int err;
+    Type *t = ls->lookup(this->type_->name(), &err);
+    if(t == 0x0) {
+      printf("Error: could not resolve type %s\n", this->type_->name());
+      return;
+    } 
+    
+    // and set
+    this->type_ = t;
     return;
   }
-  // check if unresolved
-  if(this->type_->num() != 8) {
-    return;
+}
+
+void Parameter::initialize_type()
+{
+  if ( this->type_->num() == 10 ) {
+    InitializeType *it = dynamic_cast<InitializeType*>(this->type_);
+    Assert(it != 0x0, "Error: dynamic cast to Initialize type failed\n");
+    
+    it->initialize();
+    this->type_ = it->type_;
+  } else if (this->type_->num() == 4 || this->type_->num() == 9) {
+    ProjectionType *pt = dynamic_cast<ProjectionType*>(this->type_);
+    Assert(pt != 0x0, "Error: dynamic cast to Projection type failed\n");
+
+    pt->initialize_type();
   }
-  
-  int err;
-  Type *t = ls->lookup(this->type_->name(), &err);
-  if(t == 0x0) {
-    printf("Error: could not resolve type %s\n", this->type_->name());
-    return;
-  } 
-  
-  // and set
-  this->type_ = t;
-  return;
 }
 
 void Parameter::set_in(bool b)
@@ -494,10 +609,10 @@ ReturnVariable::ReturnVariable()
 
 }
 
-ReturnVariable::ReturnVariable(Type *return_type, int pointer_count)
+ReturnVariable::ReturnVariable(Type *return_type, int pointer_count, const char* id)
 {
   this->type_ = return_type;
-  this->name_ = "";
+  this->name_ = id;
   this->pointer_count_ = pointer_count;
   this->container_ = 0x0;
 }
@@ -534,9 +649,28 @@ ReturnVariable::ReturnVariable(const ReturnVariable& other)
 
 void ReturnVariable::create_container_variable(LexicalScope *ls)
 {
+    if(this->pointer_count() <= 0 || (this->type_->num() != 4 && this->type_->num() != 9 && this->type_->num() != 10)) {
+    return;
+  }
+  Type *tmp = this->type_;
+
+  if(this->type_->num() == 10) { // initialize type
+
+    while(tmp->num() == 10) {
+      InitializeType *it = dynamic_cast<InitializeType*>(tmp);
+      Assert(it != 0x0, "Error: dynamic cast to initialize type failed\n");
+
+      tmp = it->type_;
+    }
+
+    if(tmp->num() != 4 && tmp->num() != 9) {
+      return;
+    }
+  }
+
   // lookup in scope the container for its type. 
   int err;
-  Type *container_t = ls->lookup(container_name(this->type()->name()), &err);
+  Type *container_t = ls->lookup(container_name(tmp->name()), &err);
   Assert(container_t != 0x0, "Error: could not find container in scope\n");
 
   ProjectionType *container = dynamic_cast<ProjectionType*>(container_t);
@@ -546,23 +680,20 @@ void ReturnVariable::create_container_variable(LexicalScope *ls)
 
   const char* name = container_name(append_strings("_", construct_list_vars(this)));
 
-  ReturnVariable *container_var = new ReturnVariable(container, 1);
-
+  ReturnVariable *container_var = new ReturnVariable(container, 1, "");
+  container_var->set_in(this->in());
+  container_var->set_out(this->out());
+  
   // save. 
   this->container_ = container_var;
 
-  if(this->type()->num() == 4) {
-    ProjectionType *pt = dynamic_cast<ProjectionType*>(this->type());
-    Assert(pt != 0x0, "Error: dynamic cast to projection type failed\n");
-
-    std::vector<ProjectionField*> fields = pt->fields();
-    for(std::vector<ProjectionField*>::iterator it = fields.begin(); it != fields.end(); it ++) {
-      ProjectionField *pf = *it;
-      if(pf->pointer_count() > 0 && pf->type()->num() == 4) {
-	pf->create_container_variable(ls);
-      }
-    }
-
+  ProjectionType *pt = dynamic_cast<ProjectionType*>(tmp);
+  Assert(pt != 0x0, "Error: dynamic cast to projection type failed\n");
+  
+  std::vector<ProjectionField*> fields = pt->fields();
+  for(std::vector<ProjectionField*>::iterator it = fields.begin(); it != fields.end(); it ++) {
+    ProjectionField *pf = *it;
+    pf->create_container_variable(ls);
   }
 }
 
@@ -637,21 +768,67 @@ void ReturnVariable::set_pointer_count(int pcount)
 
 void ReturnVariable::resolve_types(LexicalScope *ls)
 {
-  // check if unresolved
-  if(this->type_->num() != 8) {
+ // need to rewrite to account for initializetype
+  Type *last = this->type_;
+  Type *tmp = this->type_;
+  
+  if(this->type_->num() == 10) {
+    Type *tmp = this->type_;
+    InitializeType *it = 0x0;
+    while(tmp->num() == 10) {
+      it = dynamic_cast<InitializeType*>(tmp);
+      Assert(it != 0x0, "Error: dynamic cast to initialize type failed\n");
+      tmp = it->type_;
+    }
+    
+    if(tmp->num() != 8) {
+      return;
+    }
+
+    int err;
+    Type *t = ls->lookup(tmp->name(), &err);
+    if(t == 0x0) {
+      printf("Error: could not resolve type %s\n", tmp->name());
+      return;
+    }
+
+    it->type_ = t;
+    return;
+
+  } else {
+
+    // check if unresolved
+    if(this->type_->num() != 8) {
+      return;
+    }
+    
+    int err;
+    Type *t = ls->lookup(this->type_->name(), &err);
+    if(t == 0x0) {
+      printf("Error: could not resolve type %s\n", this->type_->name());
+      return;
+    } 
+    
+    // and set
+    this->type_ = t;
     return;
   }
-  
-  int err;
-  Type *t = ls->lookup(this->type_->name(), &err);
-  if(t == 0x0) {
-    printf("Error: could not resolve type %s\n", this->type_->name());
-    return;
-  } 
-  
-  // and set
-  this->type_ = t;
-  return;
+}
+
+void ReturnVariable::initialize_type()
+{
+  if ( this->type_->num() == 10 ) {
+    InitializeType *it = dynamic_cast<InitializeType*>(this->type_);
+    Assert(it != 0x0, "Error: dynamic cast to Initialize type failed\n");
+    
+    it->initialize();
+    this->type_ = it->type_;
+  } else if (this->type_->num() == 4 || this->type_->num() == 9) {
+    ProjectionType *pt = dynamic_cast<ProjectionType*>(this->type_);
+    Assert(pt != 0x0, "Error: dynamic cast to Projection type failed\n");
+
+    pt->initialize_type();
+  }
 }
 
 Variable* ReturnVariable::accessor()
@@ -778,10 +955,28 @@ ProjectionField::ProjectionField(const ProjectionField& other)
 
 void ProjectionField::create_container_variable(LexicalScope *ls)
 {
+  if(this->pointer_count() <= 0 || (this->type_->num() != 4 && this->type_->num() != 9 && this->type_->num() != 10)) {
+    return;
+  }
+  Type *tmp = this->type_;
+  
+  if(this->type_->num() == 10) { // initialize type
+    while(tmp->num() == 10) {
+      InitializeType *it = dynamic_cast<InitializeType*>(tmp);
+      Assert(it != 0x0, "Error: dynamic cast to initialize type failed\n");
+      
+      tmp = it->type_;
+    }
+
+    if(tmp->num() != 4 && tmp->num() != 9) {
+      return;
+    }
+  }
+
   // lookup in scope the container for its type. 
   int err;
-  Type *container_t = ls->lookup(container_name(this->type()->name()), &err);
-  printf("looking up container %s in pf\n", container_name(this->type()->name()));
+  Type *container_t = ls->lookup(container_name(tmp->name()), &err);
+  printf("looking up container %s in pf\n", container_name(tmp->name()));
   Assert(container_t != 0x0, "Error: could not find container in scope\n");
 
   ProjectionType *container = dynamic_cast<ProjectionType*>(container_t);
@@ -792,22 +987,19 @@ void ProjectionField::create_container_variable(LexicalScope *ls)
   const char* name = container_name(append_strings("_", construct_list_vars(this)));
 
   ProjectionField *container_var = new ProjectionField(container, name, 1);
+  container_var->set_in(this->in());
+  container_var->set_out(this->out());
 
   // save. 
   this->container_ = container_var;
 
-  if(this->type()->num() == 4) {
-    ProjectionType *pt = dynamic_cast<ProjectionType*>(this->type());
-    Assert(pt != 0x0, "Error: dynamic cast to projection type failed\n");
-
-    std::vector<ProjectionField*> fields = pt->fields();
-    for(std::vector<ProjectionField*>::iterator it = fields.begin(); it != fields.end(); it ++) {
-      ProjectionField *pf = *it;
-      if((pf->pointer_count() > 0) && (pf->type()->num() == 4)) {
-	pf->create_container_variable(ls);
-      }
-    }
-
+  ProjectionType *pt = dynamic_cast<ProjectionType*>(tmp);
+  Assert(pt != 0x0, "Error: dynamic cast to projection type failed\n");
+  
+  std::vector<ProjectionField*> fields = pt->fields();
+  for(std::vector<ProjectionField*>::iterator it = fields.begin(); it != fields.end(); it ++) {
+    ProjectionField *pf = *it;
+    pf->create_container_variable(ls);
   }
 }
 
@@ -887,21 +1079,67 @@ Marshal_type* ProjectionField::marshal_info()
 
 void ProjectionField::resolve_types(LexicalScope *ls)
 {
-  // check if unresolved
-  if(this->type_->num() != 8) {
+ // need to rewrite to account for initializetype
+  Type *last = this->type_;
+  Type *tmp = this->type_;
+  
+  if(this->type_->num() == 10) {
+    Type *tmp = this->type_;
+    InitializeType *it = 0x0;
+    while(tmp->num() == 10) {
+      it = dynamic_cast<InitializeType*>(tmp);
+      Assert(it != 0x0, "Error: dynamic cast to initialize type failed\n");
+      tmp = it->type_;
+    }
+    
+    if(tmp->num() != 8) {
+      return;
+    }
+
+    int err;
+    Type *t = ls->lookup(tmp->name(), &err);
+    if(t == 0x0) {
+      printf("Error: could not resolve type %s\n", tmp->name());
+      return;
+    }
+
+    it->type_ = t;
+    return;
+
+  } else {
+
+    // check if unresolved
+    if(this->type_->num() != 8) {
+      return;
+    }
+    
+    int err;
+    Type *t = ls->lookup(this->type_->name(), &err);
+    if(t == 0x0) {
+      printf("Error: could not resolve type %s\n", this->type_->name());
+      return;
+    } 
+    
+    // and set
+    this->type_ = t;
     return;
   }
-  
-  int err;
-  Type *t = ls->lookup(this->type_->name(), &err);
-  if(t == 0x0) {
-    printf("Error: could not resolve type %s\n", this->type_->name());
-    return;
-  } 
-  
-  // and set
-  this->type_ = t;
-  return;
+}
+
+void ProjectionField::initialize_type()
+{
+  if ( this->type_->num() == 10 ) {
+    InitializeType *it = dynamic_cast<InitializeType*>(this->type_);
+    Assert(it != 0x0, "Error: dynamic cast to Initialize type failed\n");
+    
+    it->initialize();
+    this->type_ = it->type_;
+  } else if (this->type_->num() == 4 || this->type_->num() == 9) {
+    ProjectionType *pt = dynamic_cast<ProjectionType*>(this->type_);
+    Assert(pt != 0x0, "Error: dynamic cast to Projection type failed\n");
+
+    pt->initialize_type();
+  }
 }
 
 void ProjectionField::set_in(bool b)
@@ -991,9 +1229,27 @@ FPParameter::FPParameter(const FPParameter& other)
 
 void FPParameter::create_container_variable(LexicalScope *ls)
 {
+  if(this->pointer_count() <= 0 || (this->type_->num() != 4 && this->type_->num() != 9 && this->type_->num() != 10)) {
+    return;
+  }
+  Type *tmp = this->type_;
+  
+  if(this->type_->num() == 10) { // initialize type
+    while(tmp->num() == 10) {
+      InitializeType *it = dynamic_cast<InitializeType*>(tmp);
+      Assert(it != 0x0, "Error: dynamic cast to initialize type failed\n");
+
+      tmp = it->type_;
+    }
+
+    if(tmp->num() != 4 && tmp->num() != 9) {
+      return;
+    }
+  }
+
   // lookup in scope the container for its type. 
   int err;
-  Type *container_t = ls->lookup(container_name(this->type()->name()), &err);
+  Type *container_t = ls->lookup(container_name(tmp->name()), &err);
   Assert(container_t != 0x0, "Error: could not find container in scope\n");
 
   ProjectionType *container = dynamic_cast<ProjectionType*>(container_t);
@@ -1004,21 +1260,19 @@ void FPParameter::create_container_variable(LexicalScope *ls)
   const char* name = container_name(append_strings("_", construct_list_vars(this)));
 
   FPParameter *container_var = new FPParameter(container, 1);
+  container_var->set_in(this->in());
+  container_var->set_out(this->out());
 
   // save. 
   this->container_ = container_var;
 
-  if(this->type()->num() == 4) {
-    ProjectionType *pt = dynamic_cast<ProjectionType*>(this->type());
-    Assert(pt != 0x0, "Error: dynamic cast to projection type failed\n");
-
-    std::vector<ProjectionField*> fields = pt->fields();
-    for(std::vector<ProjectionField*>::iterator it = fields.begin(); it != fields.end(); it ++) {
-      ProjectionField *pf = *it;
-      if((pf->pointer_count() > 0) && (pf->type()->num() == 4)) {
-	pf->create_container_variable(ls);
-      }
-    }
+  ProjectionType *pt = dynamic_cast<ProjectionType*>(tmp);
+  Assert(pt != 0x0, "Error: dynamic cast to projection type failed\n");
+  
+  std::vector<ProjectionField*> fields = pt->fields();
+  for(std::vector<ProjectionField*>::iterator it = fields.begin(); it != fields.end(); it ++) {
+    ProjectionField *pf = *it;
+    pf->create_container_variable(ls);
   }
 }
 
@@ -1073,21 +1327,67 @@ Marshal_type* FPParameter::marshal_info()
 
 void FPParameter::resolve_types(LexicalScope *ls)
 {
-  // check if null
-  if(this->type_->num() != 8) {
+ // need to rewrite to account for initializetype
+  Type *last = this->type_;
+  Type *tmp = this->type_;
+  
+  if(this->type_->num() == 10) {
+    Type *tmp = this->type_;
+    InitializeType *it = 0x0;
+    while(tmp->num() == 10) {
+      it = dynamic_cast<InitializeType*>(tmp);
+      Assert(it != 0x0, "Error: dynamic cast to initialize type failed\n");
+      tmp = it->type_;
+    }
+    
+    if(tmp->num() != 8) {
+      return;
+    }
+
+    int err;
+    Type *t = ls->lookup(tmp->name(), &err);
+    if(t == 0x0) {
+      printf("Error: could not resolve type %s\n", tmp->name());
+      return;
+    }
+
+    it->type_ = t;
+    return;
+
+  } else {
+
+    // check if unresolved
+    if(this->type_->num() != 8) {
+      return;
+    }
+    
+    int err;
+    Type *t = ls->lookup(this->type_->name(), &err);
+    if(t == 0x0) {
+      printf("Error: could not resolve type %s\n", this->type_->name());
+      return;
+    } 
+    
+    // and set
+    this->type_ = t;
     return;
   }
-  
-  int err;
-  Type *t = ls->lookup(this->type_->name(), &err);
-  if(t == 0x0) {
-    printf("Error: could not resolve type %s\n", this->type_->name());
-    return;
-  } 
-  
-  // and set
-  this->type_ = t;
-  return;
+}
+
+void FPParameter::initialize_type()
+{
+  if ( this->type_->num() == 10 ) {
+    InitializeType *it = dynamic_cast<InitializeType*>(this->type_);
+    Assert(it != 0x0, "Error: dynamic cast to Initialize type failed\n");
+    
+    it->initialize();
+    this->type_ = it->type_;
+  } else if (this->type_->num() == 4 || this->type_->num() == 9) {
+    ProjectionType *pt = dynamic_cast<ProjectionType*>(this->type_);
+    Assert(pt != 0x0, "Error: dynamic cast to Projection type failed\n");
+
+    pt->initialize_type();
+  }
 }
 
 void FPParameter::set_in(bool b)

@@ -64,9 +64,17 @@ int main(int argc, char ** argv)
 	  tree->create_trampoline_structs();
 	  tree->function_pointer_to_rpc();
 	  tree->generate_function_tags();
-	  tree->resolve_types();
-	  tree->create_container_variables(); // todo
-	  tree->prepare_marshal(); // need to modify to alloc space for container vars
+	  tree->resolve_types(); // resolve types that weren't resolved during parsing
+	  tree->create_container_variables();
+	  
+	  tree->set_copy_container_accessors(); // TODO
+
+	  tree->copy_types();
+	  tree->initialize_types(); // for calling initialize o
+	  tree->set_accessors();
+	  tree->prepare_marshal();
+	  printf("done doing all setup\n");
+	  
 
 	  std::vector<Module*> project_modules = tree->modules();
 	  for(std::vector<Module*>::iterator it = project_modules.begin(); it != project_modules.end(); it ++) {
@@ -106,9 +114,14 @@ int main(int argc, char ** argv)
 	  tree->generate_function_tags();
 	  tree->resolve_types(); // resolve types that weren't resolved during parsing
 	  tree->create_container_variables();
+	  
+	  tree->set_copy_container_accessors(); // TODO
+
 	  tree->copy_types();
+	  tree->initialize_types(); // for calling initialize o
 	  tree->set_accessors();
 	  tree->prepare_marshal();
+	  printf("done doing all setup\n");
 	  
 	  std::vector<Module*> project_modules = tree->modules();
 	  for(std::vector<Module*>::iterator it = project_modules.begin(); it != project_modules.end(); it ++) {

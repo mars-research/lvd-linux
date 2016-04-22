@@ -11,7 +11,7 @@
 CCSTFile* generate_server_source(Module *m); // todo complete
 CCSTFile* generate_server_header(Module *m); // todo complete?
 
-CCSTCompoundStatement* callee_body(Rpc *r); // todo complete  2 functions in the file.....
+CCSTCompoundStatement* callee_body(Rpc *r, Module *m); // todo complete  2 functions in the file.....
 
 CCSTDeclaration* callee_declaration(Rpc *r); // todo complete
 
@@ -23,7 +23,7 @@ CCSTDeclaration* dispatch_function_declaration(); // todo complete
 CCSTFile* generate_client_header(Module *m); // todo empty, maybe unnecessary?
 CCSTFile* generate_client_source(Module *m); // todo complete
 
-CCSTCompoundStatement* caller_body(Rpc *r, Module *); // todo complete
+CCSTCompoundStatement* caller_body(Rpc *r, Module *m); // todo complete
 
 std::vector<CCSTStatement*> marshal_in_parameters(std::vector<Parameter*> params); // complete
 
@@ -45,14 +45,15 @@ CCSTStatement* kzalloc_structure(const char*struct_name, const char* var_name); 
 CCSTCompoundStatement* alloc_init_containers_driver(Variable *v, ProjectionType *pt, LexicalScope *ls, const char* side); // complete
 CCSTCompoundStatement* declare_and_initialize_container_struct(Variable *v, ProjectionType *pt, LexicalScope *ls, const char* side); // complete
 CCSTCompoundStatement* alloc_init_containers(Variable *v, ProjectionType *pt, LexicalScope *ls, const char* side); // complete
-CCSTCompoundStatement* alloc_init_hidden_args_struct(Variable *v, ProjectionType *pt, LexicalScope *ls); // complete-ish
+
+
 bool contains_function_pointer(ProjectionType *pt); //complete
 bool alloc_callee(Variable *v, const char* side); // complete 
 bool alloc_caller(Variable *v, const char* side); // complete
 CCSTStructUnionSpecifier* struct_declaration(ProjectionType *pt); // complete
 CCSTDeclaration* declare_and_initialize_container_struct(Variable *v); // complete
-std::vector<CCSTAssignExpr*> container_of_args(CCSTPostFixExpr *struct_pointer, const char *type_name, const char *field_name); // complete
-std::vector<CCSTStatement*> container_of(Variable *v); // complete
+
+
 
 CCSTDeclaration* typedef_declaration(Typedef *t); // todo. totally not done
 CCSTAssignOp* equals(); // complete
@@ -94,8 +95,7 @@ CCSTDeclaration* function_declaration(Rpc *r); // complete
 
 CCSTParamTypeList* parameter_list(std::vector<Parameter*> params); // complete
 
-CCSTCompoundStatement* trampoline_function_body(Rpc *r); // complete.
-CCSTDeclaration* trampoline_function_declaration(Rpc *r); // incomplete.
+
 
 // needed functions.
 // creates a function declaration from a return type, a name and parameters
@@ -103,31 +103,53 @@ CCSTDeclaration* trampoline_function_declaration(Rpc *r); // incomplete.
 // add marshal and unmarshal cpp files to this
 
 // unmarshal.cpp
-CCSTStatement* unmarshal_variable(Variable *v, const char* direction); // complete
 CCSTPostFixExprAssnExpr* unmarshal_variable(Variable *v); 
+std::vector<CCSTStatement*> unmarshal_variable_no_check(Variable *v); // complete
+std::vector<CCSTStatement*> unmarshal_variable_callee(Variable *v);
+std::vector<CCSTStatement*> unmarshal_variable_caller(Variable *v);
+std::vector<CCSTStatement*> unmarshal_container_refs_caller(Variable *v);
 
 // marshal.cpp
 CCSTStatement* marshal_variable(Variable *v, const char* direction); // complete
+std::vector<CCSTStatement*> marshal_variable_callee(Variable *v); // complete
+std::vector<CCSTStatement*> marshal_variable_no_check(Variable *v); // complete
 CCSTStatement* marshal(CCSTPostFixExpr *v, int reg); // complete
 
 // containers.cpp
-CCSTStatement* declare_and_init_variable_callee(Variable *p);
-CCSTCompoundStatement* init_variable(Variable *v, const char* side);
+std::vector<CCSTAssignExpr*> container_of_args(CCSTPostFixExpr *struct_pointer, const char *type_name, const char *field_name); // complete
+std::vector<CCSTStatement*> container_of(Variable *v, const char* cspace); // complete
+CCSTCompoundStatement* set_remote_ref(Variable *v); // complete
+CCSTCompoundStatement* allocate_and_link_containers_callee(Variable *v, const char* cspace);
 CCSTStatement* lookup_variable_container(Variable *v);
-CCSTCompoundStatement* alloc_insert_variable_container(Variable *v);
-CCSTCompoundStatement* alloc_link_container_caller(Variable *v);
-
-// helpers
+CCSTStatement* alloc_variable(Variable *v); // complete
+CCSTStatement* allocate_non_container_variables(Variable *v);
+CCSTCompoundStatement* alloc_insert_variable_container(Variable *v, const char* cspace);
 ProjectionField* get_cptr_field(Variable *v);
-ProjectionField* real_field(Variable *v);
 ProjectionField* find_field(ProjectionType *pt, const char *field_name);
-CCSTStatement* declare_init_tmp_variable(ProjectionField *pf, const char* side);
+CCSTCompoundStatement* alloc_link_container_caller(Variable *v, const char* cspace);
+std::vector<CCSTStatement*> caller_allocate_channels(ProjectionType *pt);
+std::vector<CCSTStatement*> caller_initialize_channels(ProjectionType *pt);
+std::vector<CCSTStatement*> dealloc_containers(Variable *v, const char* cspace);
+std::vector<CCSTStatement*> dealloc_containers_callee(Variable *v, const char* cspace, LexicalScope *ls);
+std::vector<CCSTStatement*> dealloc_containers_caller(Variable *v, const char* cspace, LexicalScope *ls);
+
 
 // variable_utils.cpp
 CCSTDeclaration* declare_variable(Variable *v);
+std::vector<CCSTDeclaration*> declare_variables_callee(Variable *v);
+std::vector<CCSTDeclaration*> declare_containers_only_callee(Variable *v);
 
 
-std::vector<CCSTStatement*> caller_allocate_channels(ProjectionType *pt);
-std::vector<CCSTStatement*> caller_initialize_channels(ProjectionType *pt);
+
+
+
+
+// trampoline.cpp
+CCSTCompoundStatement* trampoline_function_body(Rpc *r); // complete.
+CCSTDeclaration* trampoline_function_declaration(Rpc *r); // has a bug +.
+CCSTCompoundStatement* alloc_init_hidden_args_struct(ProjectionType *pt, Variable *v, LexicalScope *ls, Variable *cspace); // complete
+std::vector<CCSTDeclaration*> declare_hidden_args_structures(ProjectionType *pt, LexicalScope *ls); // complete
+
+// end trampoline.cpp
 
 #endif

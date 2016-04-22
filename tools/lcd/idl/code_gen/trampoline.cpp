@@ -26,7 +26,7 @@ CCSTDeclaration* trampoline_function_declaration(Rpc* r)
   std::vector<CCSTParamDeclaration*> tramp_func_params;
 
   std::vector<Parameter*> parameters = r->parameters();
-  for(std::vector<Parameter*>::iterator it = parameters.begin(); it != parameters.end()-2; it ++) {
+  for(std::vector<Parameter*>::iterator it = parameters.begin(); it < parameters.end()-2; it ++) {
     Parameter *p = *it;
     
   }
@@ -91,15 +91,17 @@ CCSTCompoundStatement* trampoline_function_body(Rpc* r)
   lcd_tramp_prolog_args.push_back(new CCSTPrimaryExprId("hidden_args"));
   lcd_tramp_prolog_args.push_back(new CCSTPrimaryExprId(trampoline_func_name(r->name())));
   // LCD_TRAMPOLINE_PROLOGUE(hidden_args, new_file_trampoline);
-  statements.push_back(function_call("LCD_TRAMPOLINE_PROLOGUE", lcd_tramp_prolog_args));
+  statements.push_back(new CCSTExprStatement( function_call("LCD_TRAMPOLINE_PROLOGUE", lcd_tramp_prolog_args)));
 
   // set new function pointer equal to glue code for function pointer
   // new_filep = new_file;
-  statements.push_back(new CCSTAssignExpr(new CCSTPrimaryExprId("new_fp"), equals(), new CCSTPrimaryExprId(r->name())));
+  statements.push_back(new CCSTExprStatement( new CCSTAssignExpr(new CCSTPrimaryExprId("new_fp"), equals(), new CCSTPrimaryExprId(r->name()))));
 
   // return call from new function pointer
   std::vector<CCSTAssignExpr*> new_fp_args;
-  for(std::vector<Parameter*>::iterator it = parameters.begin(); it != parameters.end()-2; it ++) {
+
+ 
+  for(std::vector<Parameter*>::iterator it = parameters.begin(); it < parameters.end()-2; it ++) {
     Parameter *p = *it;
     new_fp_args.push_back(new CCSTPrimaryExprId(p->identifier()));
   }
@@ -132,104 +134,148 @@ CCSTCompoundStatement* trampoline_function_body(Rpc* r)
   return new CCSTCompoundStatement(declarations, statements);
 }
 
-
-/*
- * 
- */
-CCSTCompoundStatement* alloc_init_hidden_args_struct(Variable *v, ProjectionType *pt, LexicalScope *ls)
+/* this function is grossly complex. try not to touch it.*/
+CCSTCompoundStatement* alloc_init_hidden_args_struct(ProjectionType *pt, Variable *v, LexicalScope *ls, Variable *cspace) 
 {
   std::vector<CCSTDeclaration*> declarations;
   std::vector<CCSTStatement*> statements;
 
-  int err;
-  Type *container_type = ls->lookup(container_name(pt->name()), &err);
-  Assert(container_type != 0x0, "Error: could not find projection in scope\n");
-  ProjectionType *container = dynamic_cast<ProjectionType*>(container_type);
-  Assert(container != 0x0, "Error: dynamic cast to projection failed\n");
-  Parameter *tmp_container = new Parameter(container, container_name(pt->name()), 1);
-
   std::vector<ProjectionField*> fields = pt->fields();
   for(std::vector<ProjectionField*>::iterator it = fields.begin(); it != fields.end(); it ++) {
-
     ProjectionField *pf = *it;
-    pf->set_accessor(v);
-    if (pf->type()->num() == 4) {
-      ProjectionType *pt = dynamic_cast<ProjectionType*>(pf->type());
-      Assert(pt != 0x0, "Error: dynamic cast to ProjectionType failed.\n");
-      statements.push_back(alloc_init_hidden_args_struct(pf, pt, ls));
-    } else if (pf->type()->num() == 7) {
-      // declare trampoline container
-      const char* tramp_name = hidden_args_name( pf->type()->name() ); // todo
-      declarations.push_back(struct_pointer_declaration(tramp_name, tramp_name, ls)); // ls todo
-    
-      // alloc
-      statements.push_back(kzalloc_structure(tramp_name, tramp_name));
-    
-      // error checking				
-      statements.push_back(if_cond_fail(new CCSTUnaryExprCastExpr(Not(), new CCSTPrimaryExprId(tramp_name))
-					, "kzalloc"));
+    if(pf->type()->num() == 7 && pf->alloc_callee()) {
+      // allocate hidden args structure 
+      statements.push_back(kzalloc_structure(hidden_args_name(pf->type()->name())
+					     ,hidden_args_name(append_strings("_"
+									      , construct_list_vars(pf)))));
+      // error check
+      statements.push_back(if_cond_fail(new CCSTUnaryExprCastExpr( Not()
+								   , new CCSTPrimaryExprId(hidden_args_name(append_strings("_"
+															   , construct_list_vars(pf)))))
+					, "kzalloc hidden args"));
 
-      // dup trampoline
-      /* 
-	 rm_file_hidden_args->t_handle = 
-	 LCD_DUP_TRAMPOLINE(rm_file_trampoline);
-	 if (!rm_file_hidden_args->t_handle) {
-	 LIBLCD_ERR("dup trampoline");
-	 lcd_exit(-1);
-	 } */
+      // duplicate the trampoline
+      // 1. get t_handle field from our hidden args field
       int err;
-      Type *tmp_trampoline = ls->lookup(tramp_name, &err);
-      Assert(tmp_trampoline != 0x0, "Error: could not find trampline in environment\n");
-      ProjectionType *trampoline = dynamic_cast<ProjectionType*>(tmp_trampoline);
-      Assert(trampoline != 0x0, "Error: dynamic cast to Projection type failed!\n");
-
-      Parameter *tmp = new Parameter(trampoline, tramp_name, 1);
-      ProjectionField *t_handle_pf = trampoline->get_field("t_handle");
-      Assert(pf != 0x0, "Error: could not find field in projection\n");
-      pf->set_accessor(tmp);
-  
-      std::vector<CCSTAssignExpr*> dup_args;
-      dup_args.push_back(new CCSTPrimaryExprId(trampoline_func_name( pf->type()->name() )));
-      statements.push_back(new CCSTAssignExpr(access(t_handle_pf), equals(), function_call("LCD_DUP_TRAMPOLINE", dup_args))); // access t_handle
-  
-      // error check duplication
-      statements.push_back(if_cond_fail(access(t_handle_pf), "dup trampoline"));
-
-      // link t_handle hidden args with trampoline
-      Assert(t_handle_pf->type()->num() == 4, "Error: field is not a projection\n"); 
-      ProjectionType *tmp_t_handle = dynamic_cast<ProjectionType*>(t_handle_pf->type());
-      Assert(tmp_t_handle != 0x0, "Error: dynamic cast to projection failed\n");
+      Type *hidden_args_type = ls->lookup(hidden_args_name(pf->type()->name()), &err);
+      Assert(hidden_args_type != 0x0, "Error: could not find a hidden args type in scope\n");
+      ProjectionType *hidden_args_structure = dynamic_cast<ProjectionType*>(hidden_args_type);
+      Assert(hidden_args_structure != 0x0, "Error: dynamic cast to projection type failed\n");
       
-      ProjectionField *ha_tmp = tmp_t_handle->get_field("hidden_args"); // use projeciton type not field.
-      Assert(ha_tmp != 0x0, "Error: could not find field in projection\n"); // could easily make get field function handle this
-      statements.push_back(new CCSTAssignExpr(access(ha_tmp), equals(), new CCSTPrimaryExprId(tramp_name))); // todo
+      ProjectionField *t_handle_field = hidden_args_structure->get_field("t_handle");
+      Assert(t_handle_field != 0x0, "Error: could not find t_handle field in projection\n");
 
-      // link trampoline container field. with container
-      ProjectionField *c_tmp = trampoline->get_field("container"); // todo
-      Assert(c_tmp != 0x0, "Error: could not find field in projection\n");
-      c_tmp->set_accessor(tmp);
-      statements.push_back(new CCSTAssignExpr(access(c_tmp), equals(), new CCSTPrimaryExprId(container_name(pt->name())))); // todo
+      Parameter *tmp_hidden_args_param = new Parameter(hidden_args_structure
+						       , hidden_args_name(append_strings("_"
+											 , construct_list_vars(pf))), 1);
+      
+      Variable *accessor_save = t_handle_field->accessor();
+      t_handle_field->set_accessor(tmp_hidden_args_param);
 
-      // link data store
-      ProjectionField *d_tmp = trampoline->get_field("dstore"); // todo
-      Assert(d_tmp != 0x0, "Error: could not find field in projection");
-      d_tmp->set_accessor(tmp);
-      statements.push_back(new CCSTAssignExpr(access(d_tmp), equals(), new CCSTPrimaryExprId("dstore_name_todo"))); // todo
+      //
+      std::vector<CCSTAssignExpr*> lcd_dup_args;
+      lcd_dup_args.push_back(new CCSTPrimaryExprId(trampoline_func_name(pf->type()->name()))); // trampoline function name
+      statements.push_back(new CCSTExprStatement( new CCSTAssignExpr(access(t_handle_field)
+								     , equals()
+								     , function_call("LCD_DUP_TRAMPOLINE"
+										     , lcd_dup_args))));
+						       
+      // error check the duplication
+      statements.push_back(if_cond_fail(new CCSTUnaryExprCastExpr( Not()
+								   , access(t_handle_field))
+					, "duplicate trampoline"));
 
-      // install trampoline in struct container function pointer.?
-      // todo access field
+      // store hidden args in trampoline aka t handle
+      ProjectionType *t_handle_structure = dynamic_cast<ProjectionType*>(t_handle_field->type());
+      Assert(t_handle_structure != 0x0, "Error: dynamic cast to projection type failed\n");
+
+      ProjectionField *t_handle_hidden_args_field = t_handle_structure->get_field("hidden_args");
+      Assert(t_handle_hidden_args_field != 0x0, "Error: could not find hidden_args field in t handle structure\n");
+
+      statements.push_back(new CCSTExprStatement( new CCSTAssignExpr( access(t_handle_hidden_args_field)
+								      , equals()
+								      , new CCSTPrimaryExprId(hidden_args_name(append_strings("_"
+															      , construct_list_vars(pf)))))));
+
+      // store container in hidden args
+      ProjectionField *hidden_args_container_field = hidden_args_structure->get_field("container");
+      Assert(hidden_args_container_field != 0x0, "Error: could not find container field in hidden args structure\n");
+
+      hidden_args_container_field->set_accessor(tmp_hidden_args_param);
+
+      statements.push_back(new CCSTExprStatement(new CCSTAssignExpr( access(hidden_args_container_field)
+								     , equals()
+								     , access(v->container()))));
+
+      // store data store in hidden args
+      ProjectionField *hidden_args_cspace_field = hidden_args_structure->get_field("cspace");
+      Assert(hidden_args_cspace_field != 0x0, "Error: could not find cspace field in hidden args structure\n");
+
+      hidden_args_cspace_field->set_accessor(tmp_hidden_args_param);
+      statements.push_back(new CCSTExprStatement(new CCSTAssignExpr( access(hidden_args_cspace_field)
+								     , equals()
+								     , access(cspace))));
+
+      // put trampoline in the container. last step
+      ProjectionType *v_container_type = dynamic_cast<ProjectionType*>(v->container()->type());
+      Assert(v_container_type != 0x0, "Error: dynamic cast to projection type failed\n");
+
+      ProjectionField *v_container_real_field = v_container_type->get_field(v->type()->name());
+      Assert(v_container_real_field != 0x0, "Error: could not find field in projection\n");
+      
+
+      ProjectionType *v_container_real_field_type = dynamic_cast<ProjectionType*>(v_container_real_field->type());
+      Assert(v_container_real_field_type != 0x0, "Error: dynamic cast to projection type failed\n");
+
+      ProjectionField *v_container_real_field_func_pointer = v_container_real_field_type->get_field(pf->identifier());
+      Assert(v_container_real_field_func_pointer != 0x0, "Error: could not find field in structure\n");
+
       std::vector<CCSTAssignExpr*> handle_to_tramp_args;
-      handle_to_tramp_args.push_back(access(t_handle_pf)); // pf defined on line 770
+      handle_to_tramp_args.push_back(access(t_handle_field));
+      statements.push_back(new CCSTExprStatement(new CCSTAssignExpr( access(v_container_real_field_func_pointer)
+								     , equals()
+								     , function_call("LCD_HANDLE_TO_TRAMPOLINE"
+										     , handle_to_tramp_args))));
 
-      // need to access this field. from its struct's container
-      Assert(pf->accessor() != 0x0, "Error: accessor field is null\n");
-      Variable *tmp_var = pf->accessor()->accessor();
-      pf->accessor()->set_accessor(tmp_container);
-      statements.push_back(new CCSTAssignExpr(access(pf), equals(), function_call("LCD_HANDLE_TO_TRAMPOLINE", handle_to_tramp_args)));
-
-      pf->accessor()->set_accessor(tmp_var);
-
+      t_handle_field->set_accessor(accessor_save);
+      // end of this if statement.
+    } else if (pf->type()->num() == 4 || pf->type()->num() == 9) {
+      // recurse
+      ProjectionType *pt_tmp = dynamic_cast<ProjectionType*>(pf->type());
+      statements.push_back(alloc_init_hidden_args_struct(pt_tmp, pf, ls, cspace));
     }
   }
+
   return new CCSTCompoundStatement(declarations, statements);
+}
+
+std::vector<CCSTDeclaration*> declare_hidden_args_structures(ProjectionType *pt, LexicalScope *ls)
+{
+  std::vector<CCSTDeclaration*> declarations;
+  
+  std::vector<ProjectionField*> fields = pt->fields();
+  for(std::vector<ProjectionField*>::iterator it = fields.begin(); it != fields.end(); it ++) {
+    ProjectionField *pf = *it;
+    
+    if(pf->type()->num() == 7) { // function
+      // declare
+      const char* hidden_args_struct_name = hidden_args_name(pf->type()->name());
+      const char* var_name = hidden_args_name(append_strings("_"
+							     , construct_list_vars(pf)));
+
+      declarations.push_back(struct_pointer_declaration(hidden_args_struct_name
+							, var_name
+							, ls));
+
+    } else if (pf->type()->num() == 4 || pf->type()->num() == 9) {
+      // recrurse
+      ProjectionType *pf_pt = dynamic_cast<ProjectionType*>(pf->type());
+      Assert(pf_pt != 0x0, "Error: dynamic cast to projection type failed\n");
+      
+      std::vector<CCSTDeclaration*> tmp_decs = declare_hidden_args_structures(pf_pt, ls);
+      declarations.insert(declarations.end(), tmp_decs.begin(), tmp_decs.end());
+    }
+  }
+  
+  return declarations;
 }

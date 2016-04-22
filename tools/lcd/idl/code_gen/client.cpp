@@ -110,12 +110,12 @@ CCSTCompoundStatement* caller_body(Rpc *r, Module *m)
 	std::vector<CCSTDeclaration*> tmp = declare_containers(p);
 	declarations.insert(declarations.end(), tmp.begin(), tmp.end());
 
-	statements.push_back(alloc_link_container_caller(p));
+	statements.push_back(alloc_link_container_caller(p, m->cspaces_.at(0)->identifier()));
 
       }
     }
 
-  /* TODO: projection channel allocation */
+  /* projection channel allocation */
   for(std::vector<Parameter*>::iterator it = params.begin(); it != params.end(); it ++) {
     Parameter *p = *it;
     
@@ -131,7 +131,7 @@ CCSTCompoundStatement* caller_body(Rpc *r, Module *m)
   for(std::vector<Parameter*>::iterator it = params.begin(); it != params.end(); it ++) {
     Parameter *p = *it;
     
-    if(p->type_->num() == 4 || p->type_->num() == 9) {
+    if((p->type_->num() == 4 || p->type_->num() == 9) && p->alloc_caller()) {
       ProjectionType *pt = dynamic_cast<ProjectionType*>(p->type_);
       Assert(pt != 0x0, "Error: dynamic cast to projection type failed\n");
       std::vector<CCSTStatement*> tmp_statements = caller_initialize_channels(pt);
@@ -149,7 +149,10 @@ CCSTCompoundStatement* caller_body(Rpc *r, Module *m)
   std::vector<Parameter*> parameters = r->parameters();
   for(std::vector<Parameter*>::iterator it = parameters.begin(); it != parameters.end(); it ++) {
     Parameter *p = *it;
-    statements.push_back(marshal_variable(p, "in"));    
+    if(p->in()) {
+      printf("going to marshal variable %s for function %s\n", p->identifier(), r->name());
+      statements.push_back(marshal_variable(p, "in"));    
+    }
   }
 
   /* marshal function tag */
@@ -157,32 +160,49 @@ CCSTCompoundStatement* caller_body(Rpc *r, Module *m)
 
   /* make remote call using appropriate channel */
 
-  std::vector<CCSTInitDeclarator*> ret_err;
-  ret_err.push_back(new CCSTDeclarator(0x0, new CCSTDirectDecId("ret_err")));
-  declarations.push_back(new CCSTDeclaration(int_type(), ret_err));
+  std::vector<CCSTInitDeclarator*> err;
+  err.push_back(new CCSTDeclarator(0x0, new CCSTDirectDecId("err")));
+  declarations.push_back(new CCSTDeclaration(int_type(), err));
 
   std::vector<CCSTAssignExpr*> lcd_sync_call_args;
   lcd_sync_call_args.push_back(new CCSTPrimaryExprId(m->channels().at(0)->identifier())); // first channel
-  statements.push_back( new CCSTAssignExpr( new CCSTPrimaryExprId("ret_err"), equals(), function_call("lcd_sync_call", lcd_sync_call_args)));
+  statements.push_back(new CCSTExprStatement( new CCSTAssignExpr( new CCSTPrimaryExprId("err"), equals(), function_call("lcd_sync_call", lcd_sync_call_args))));
 
-  statements.push_back(if_cond_fail(new CCSTPrimaryExprId("ret_err"), "lcd_sync_call"));
+  statements.push_back(if_cond_fail(new CCSTPrimaryExprId("err"), "lcd_sync_call"));
   
-  /* unmarshal appropriate parameters and return value */
 
+  /* unmarshal appropriate parameters and return value */
   for(std::vector<Parameter*>::iterator it = parameters.begin(); it != parameters.end(); it ++) {
     Parameter *p = *it;
     if(p->type()->num() != 5) {
-      printf("calling unmarshal for %s\n", p->identifier());
-      statements.push_back(unmarshal_variable(p, "out"));
+      if(p->out()) {
+	std::vector<CCSTStatement*> tmp_stmts = unmarshal_variable_caller(p);
+	statements.insert(statements.end(), tmp_stmts.begin(), tmp_stmts.end());
+
+	// unmarshal container things associated with this param
+	tmp_stmts = unmarshal_container_refs_caller(p);
+	statements.insert(statements.end(), tmp_stmts.begin(), tmp_stmts.end());
+      }
     }
   }
 
-  /* TODO:  clear capability registers? */
+  // if anything is marked dealloc. dealloc
+  for(std::vector<Parameter*>::iterator it = parameters.begin(); it != parameters.end(); it ++) {
+    Parameter *p = *it;   
+    std::vector<CCSTStatement*> tmp_statements = dealloc_containers_caller(p, m->cspaces_.at(0)->identifier(), r->current_scope());
+    statements.insert(statements.end(), tmp_statements.begin(), tmp_statements.end());
+  }
+
+  /* Todo:  clear capability registers? */
 
   /* return value to caller */
   if(r->return_variable()->type()->num() != 5) {
-    // TODO: declare return variable
-    statements.push_back(unmarshal_variable(r->return_variable(), ""));
+    // declare return var.
+    declarations.push_back(declare_variable(r->return_variable()));
+
+    // unmarshal return var
+    std::vector<CCSTStatement*> tmp_stmts = unmarshal_variable_no_check(r->return_variable());
+    statements.insert(statements.end(), tmp_stmts.begin(), tmp_stmts.end());
     statements.push_back(new CCSTReturn(new CCSTPrimaryExprId(r->return_variable()->identifier())));
   } else {
     statements.push_back(new CCSTReturn());

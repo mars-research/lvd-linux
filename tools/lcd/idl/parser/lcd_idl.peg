@@ -892,11 +892,6 @@ Keyword		=     	"out" {{
 			    *x = 2; 
 			    value = x; 
 			}}
-			| "alloc" Spacing OPEN Spacing "caller" Spacing "," Spacing "callee" Spacing CLOSE {{
-			    int *x = (int*) malloc(sizeof(int)); 
-			    *x = 6;
-			    value = x;
-			}}
 			| "alloc" Spacing OPEN Spacing "caller" Spacing CLOSE {{
 			    int *x = (int*) malloc(sizeof(int));
 			    *x = 4;
@@ -912,11 +907,6 @@ Keyword		=     	"out" {{
 			    *x = 3;
 			    value = x; 
 			}}
-			| "dealloc" Spacing OPEN Spacing "caller" Spacing "," Spacing "callee" Spacing CLOSE {{
-			    int *x = (int*) malloc(sizeof(int));
-			    *x = 7;
-			    value = x;
-			}}  
 			| "dealloc" Spacing OPEN Spacing "caller" Spacing CLOSE {{
 			    int *x = (int*) malloc(sizeof(int));
 			    *x = 8;
@@ -931,7 +921,22 @@ Keyword		=     	"out" {{
 			    int *x = (int*) malloc(sizeof(int));
 			    *x = 10;
 			    value = x;
-			}}							
+			}}
+			| "bind" {{
+			    int *x = (int*) malloc(sizeof(int));
+			    *x = 11;
+			    value = x;
+			}}	 
+			| "bind" Spacing OPEN Spacing "callee" Spacing CLOSE {{
+			    int *x = (int*) malloc(sizeof(int));
+			    *x = 12;
+			    value = x;
+			}}
+			| "bind" Spacing OPEN Spacing "caller" Spacing CLOSE {{
+			    int *x = (int*) malloc(sizeof(int));
+			    *x = 13;
+			    value = x;
+			}}	
 			
 Start		=	k:Keyword Spacing COMMA Spacing {{ value = k; }}
 

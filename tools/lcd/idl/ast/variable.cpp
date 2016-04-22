@@ -292,6 +292,27 @@ Variable* GlobalVariable::container()
   return this->container_;
 }
 
+void GlobalVariable::set_bind_caller(bool b)
+{
+  printf("this operation is not allowed\n");
+}
+
+void GlobalVariable::set_bind_callee(bool b)
+{
+  printf("this operation is not allowed\n");
+}
+
+bool GlobalVariable::bind_caller()
+{
+  printf("this operation is not allowed\n");
+  return false;
+}
+
+bool GlobalVariable::bind_callee()
+{
+  printf("this operation is not allowed\n");
+  return false;
+}
 
 // probably more functions needed
 
@@ -599,6 +620,26 @@ bool Parameter::dealloc_callee()
   return this->dealloc_callee_;
 }
 
+void Parameter::set_bind_caller(bool b)
+{
+  this->bind_caller_ = b;
+}
+
+void Parameter::set_bind_callee(bool b)
+{
+  this->bind_callee_ = b;
+}
+
+bool Parameter::bind_caller()
+{
+  return this->bind_caller_;
+}
+
+bool Parameter::bind_callee()
+{
+  return this->bind_callee_;
+}
+
 /* end */
 
 /* Return Variable */
@@ -898,6 +939,28 @@ bool ReturnVariable::dealloc_caller()
 bool ReturnVariable::dealloc_callee()
 {
   printf("error this operation not allowed\n");
+  return false;
+}
+
+void ReturnVariable::set_bind_caller(bool b)
+{
+  printf("this operation is not allowed\n");
+}
+
+void ReturnVariable::set_bind_callee(bool b)
+{
+  printf("this operation is not allowed\n");
+}
+
+bool ReturnVariable::bind_caller()
+{
+  printf("this operation is not allowed\n");
+  return false;
+}
+
+bool ReturnVariable::bind_callee()
+{
+  printf("this operation is not allowed\n");
   return false;
 }
 
@@ -1202,6 +1265,26 @@ bool ProjectionField::dealloc_callee()
   return this->dealloc_callee_;
 }
 
+void ProjectionField::set_bind_caller(bool b)
+{
+  this->bind_caller_ = b;
+}
+
+void ProjectionField::set_bind_callee(bool b)
+{
+  this->bind_callee_ = b;
+}
+
+bool ProjectionField::bind_caller()
+{
+  return this->bind_caller_;
+}
+
+bool ProjectionField::bind_callee()
+{
+  return this->bind_callee_;
+}
+
 FPParameter::FPParameter(Type *type, int pointer_count)
 {
   this->type_ = type;
@@ -1452,6 +1535,28 @@ bool FPParameter::dealloc_caller()
 bool FPParameter::dealloc_callee()
 {
   printf("this operation is now allowed\n");
+  return false;
+}
+
+void FPParameter::set_bind_caller(bool b)
+{
+  printf("this operation is not allowed\n");
+}
+
+void FPParameter::set_bind_callee(bool b)
+{
+  printf("this operation is not allowed\n");
+}
+
+bool FPParameter::bind_caller()
+{
+  printf("this operation is not allowed\n");
+  return false;
+}
+
+bool FPParameter::bind_callee()
+{
+  printf("this operation is not allowed\n");
   return false;
 }
 

@@ -155,6 +155,8 @@ class Variable : public Base
   virtual void set_alloc_callee(bool b) = 0;
   virtual void set_dealloc_caller(bool b) = 0;
   virtual void set_dealloc_callee(bool b) = 0;
+  virtual void set_bind_caller(bool b) = 0;
+  virtual void set_bind_callee(bool b) = 0;
 
   virtual bool in() = 0;
   virtual bool out() = 0;
@@ -162,6 +164,8 @@ class Variable : public Base
   virtual bool alloc_callee() = 0;
   virtual bool dealloc_caller() = 0;
   virtual bool dealloc_callee() = 0;
+  virtual bool bind_caller() = 0;
+  virtual bool bind_callee() = 0;
 
   virtual Variable* container() = 0;
 };
@@ -199,6 +203,8 @@ class GlobalVariable : public Variable
   virtual void set_alloc_callee(bool b);
   virtual void set_dealloc_caller(bool b);
   virtual void set_dealloc_callee(bool b);
+  virtual void set_bind_caller(bool b);
+  virtual void set_bind_callee(bool b);
 
   virtual bool in();
   virtual bool out();
@@ -206,7 +212,8 @@ class GlobalVariable : public Variable
   virtual bool alloc_callee();
   virtual bool dealloc_caller();
   virtual bool dealloc_callee();
-
+  virtual bool bind_caller();
+  virtual bool bind_callee();
 };
 
 class Parameter : public Variable
@@ -218,6 +225,8 @@ class Parameter : public Variable
   bool alloc_caller_;
   bool dealloc_callee_;
   bool dealloc_caller_;
+  bool bind_caller_; 
+  bool bind_callee_;
   
   Type* type_;
   const char* name_;
@@ -250,6 +259,8 @@ class Parameter : public Variable
   virtual void set_alloc_callee(bool b);
   virtual void set_dealloc_caller(bool b);
   virtual void set_dealloc_callee(bool b);  
+  virtual void set_bind_caller(bool b);
+  virtual void set_bind_callee(bool b);
 
   virtual bool in();
   virtual bool out();
@@ -257,7 +268,8 @@ class Parameter : public Variable
   virtual bool alloc_callee();
   virtual bool dealloc_caller();
   virtual bool dealloc_callee();
-  
+  virtual bool bind_caller();
+  virtual bool bind_callee();
 };
 
 
@@ -292,6 +304,8 @@ class FPParameter : public Parameter
   virtual void set_alloc_callee(bool b);
   virtual void set_dealloc_caller(bool b);
   virtual void set_dealloc_callee(bool b);
+  virtual void set_bind_caller(bool b);
+  virtual void set_bind_callee(bool b);
 
   virtual bool in();
   virtual bool out();
@@ -299,6 +313,8 @@ class FPParameter : public Parameter
   virtual bool alloc_callee();
   virtual bool dealloc_caller();
   virtual bool dealloc_callee();
+  virtual bool bind_caller();
+  virtual bool bind_callee();
 };
 
 class ReturnVariable : public Variable
@@ -335,6 +351,8 @@ class ReturnVariable : public Variable
   virtual void set_alloc_callee(bool b);
   virtual void set_dealloc_caller(bool b);
   virtual void set_dealloc_callee(bool b);
+  virtual void set_bind_caller(bool b);
+  virtual void set_bind_callee(bool b);
 
   virtual bool in();
   virtual bool out();
@@ -342,6 +360,8 @@ class ReturnVariable : public Variable
   virtual bool alloc_callee();
   virtual bool dealloc_caller();
   virtual bool dealloc_callee();
+  virtual bool bind_caller();
+  virtual bool bind_callee();
 };
 
 class Function : public Type
@@ -447,6 +467,8 @@ class ProjectionField : public Variable //?
   bool alloc_caller_;
   bool dealloc_callee_;
   bool dealloc_caller_;
+  bool bind_caller_;
+  bool bind_callee_;
 
   Type* type_;
   const char* field_name_;
@@ -479,6 +501,8 @@ class ProjectionField : public Variable //?
   virtual void set_alloc_callee(bool b);
   virtual void set_dealloc_caller(bool b);
   virtual void set_dealloc_callee(bool b);
+  virtual void set_bind_caller(bool b);
+  virtual void set_bind_callee(bool b);
 
   virtual bool in();
   virtual bool out();
@@ -486,6 +510,8 @@ class ProjectionField : public Variable //?
   virtual bool alloc_callee();
   virtual bool dealloc_caller();
   virtual bool dealloc_callee();
+  virtual bool bind_caller();
+  virtual bool bind_callee();
 
 };
 

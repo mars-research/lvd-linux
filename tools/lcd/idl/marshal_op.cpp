@@ -43,6 +43,18 @@ void Registers::init()
     }
 }
 
+void Registers::init(int regs_taken[], int len1, int caps_taken[], int len2)
+{
+  int i;
+  for(i = 0; i < LCD_MAX_REGS && i < len1; i ++) {
+    regs_[i] = regs_taken[i];
+  }
+
+  for(i = 0; i < LCD_MAX_CAP_REGS && i < len2; i ++) {
+    cap_regs_[i] = caps_taken[i];
+  }
+}
+
 void Registers::init(Registers *r1, Registers *r2)
 {
   int i;

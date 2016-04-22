@@ -176,6 +176,7 @@ class Registers
  public:
   Registers();
   void init(Registers *r1, Registers *r2); // set union. 
+  void init(int regs_taken[], int len_regs_taken, int caps_taken[], int len_caps_taken);
   // finds next free register and set it as allocated;
   int allocate_next_free_register();
   

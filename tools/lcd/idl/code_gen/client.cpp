@@ -49,8 +49,9 @@ CCSTFile* generate_client_source(Module* f)
   for(std::vector<Rpc*>::iterator it = rpcs.begin(); it != rpcs.end(); it ++) {
     Rpc *r_tmp = (Rpc*) *it;
     if(r_tmp->function_pointer_defined()) {
-      //    definitions.push_back(function_definition(callee_declaration(r_tmp)
-      //					, callee_body(r_tmp)));
+      printf("function pointer defined function\n");
+      definitions.push_back(function_definition(callee_declaration(r_tmp)
+						, callee_body(r_tmp, f)));
     } else {
       definitions.push_back(function_definition(function_declaration(r_tmp)
 						,caller_body(r_tmp, f)));
@@ -68,7 +69,7 @@ std::vector<CCSTDeclaration*> declare_containers(Variable *v)
     declarations.push_back(declare_variable(v->container()));
   }
 
-  if(v->type()->num() == 4) {
+  if(v->type()->num() == 4 || v->type()->num() == 9) {
     ProjectionType *pt = dynamic_cast<ProjectionType*>(v->type());
     Assert(pt != 0x0, "Error: dynamic cast to projection type failed.\n");
 

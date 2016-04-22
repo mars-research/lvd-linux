@@ -357,7 +357,7 @@ CCSTFile* generate_server_source(Module *m)
   for(std::map<std::string, Type*>::iterator it = module_types.begin(); it != module_types.end(); it ++) {
     Type *t = (Type*) it->second;
 
-    if(t->num() == 4) {
+    if(t->num() == 4 || t->num() == 9) {
       ProjectionType *pt = dynamic_cast<ProjectionType*>(t);
       Assert(pt != 0x0, "Error: dynamic cast to projection type failed!\n");
       

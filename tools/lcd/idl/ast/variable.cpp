@@ -70,7 +70,7 @@ void GlobalVariable::set_accessor(Variable *v)
     this->container_->set_accessor(0x0);
   }
 
-  if(this->type_->num() == 4) {
+  if(this->type_->num() == 4 || this->type_->num() == 9) {
     ProjectionType *pt = dynamic_cast<ProjectionType*>(this->type_);
     Assert(pt != 0x0, "Error: dynamic cast to projection type failed\n");
 
@@ -448,7 +448,7 @@ void Parameter::set_accessor(Variable *v)
     this->container_->set_accessor(0x0);
   }
   
-  if(this->type_->num() == 4) {
+  if(this->type_->num() == 4 || this->type_->num() == 9) {
     ProjectionType *pt = dynamic_cast<ProjectionType*>(this->type_);
     Assert(pt != 0x0, "Error: dynamic cast to projection type failed\n");
     
@@ -744,7 +744,7 @@ void ReturnVariable::set_accessor(Variable *v)
     this->container_->set_accessor(0x0);
   }
 
-  if(this->type_->num() == 4) {
+  if(this->type_->num() == 4 || this->type_->num() == 9) {
     ProjectionType *pt = dynamic_cast<ProjectionType*>(this->type_);
     Assert(pt != 0x0, "Error: dynamic cast to projection type failed\n");
     
@@ -1050,7 +1050,7 @@ void ProjectionField::set_accessor(Variable *v)
     this->container_->set_accessor(0x0);
   }
   
-  if(this->type_->num() == 4) {
+  if(this->type_->num() == 4 || this->type_->num() == 9) {
     ProjectionType *pt = dynamic_cast<ProjectionType*>(this->type_);
     Assert(pt != 0x0, "Error: dynamic cast to projection type failed\n");
     

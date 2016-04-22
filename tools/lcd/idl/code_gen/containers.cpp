@@ -23,7 +23,7 @@ std::vector<CCSTStatement*> container_of(Variable *v, const char* cspace)
 								  , equals()
 								  , function_call("container_of", container_of_args( access(v), struct_name(v->container()->type()->name()), v->type()->name())))));
   
-  if (v->type()->num() == 4) {
+  if (v->type()->num() == 4 || v->type()->num() == 9) {
     ProjectionType *pt = dynamic_cast<ProjectionType*>(v->type());
     Assert(pt != 0x0, "Error: dynamic cast failed\n");
 

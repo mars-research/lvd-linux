@@ -285,7 +285,7 @@ std::vector<Rpc*> LexicalScope::function_pointer_to_rpc()
   for(std::map<std::string, Type*>::iterator it = this->type_definitions_.begin(); it != this->type_definitions_.end(); it ++) {
     Type *t = it->second;
 
-    if(t->num() == 4) { // projection type
+    if(t->num() == 4 || t->num() == 9) { // projection type
       ProjectionType *pt = dynamic_cast<ProjectionType*>(t);
       Assert(pt != 0x0, "Error: dynamic cast to projection type failed!\n");
       std::vector<ProjectionField*> fields = pt->fields();

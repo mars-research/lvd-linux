@@ -35,18 +35,36 @@ std::vector<Variable*> Rpc::marshal_projection_parameters(ProjectionType *pt, co
   std::vector<ProjectionField*> fields = pt->fields();
   for(std::vector<ProjectionField*>::iterator it = fields.begin(); it != fields.end(); it ++) {
     ProjectionField *pf = *it;
-    if( (strcmp(direction, "in") == 0 && pf->in() && !pf->out())
-	|| (strcmp(direction, "out") == 0 && pf->out() && !pf->in())
+    if( (strcmp(direction, "in") == 0 && pf->in())
+	|| (strcmp(direction, "out") == 0 && pf->out())
 	|| (strcmp(direction, "inout") == 0 && pf->in() && pf->out())
 	|| strcmp(direction, "") == 0) {
 
-      if (pf->type()->num() == 4) {
+      if (pf->type()->num() == 4 || pf->type()->num() == 9) {
 	ProjectionType *pt_tmp = dynamic_cast<ProjectionType*>(pf->type());
 	Assert(pt_tmp != 0x0, "Error: dynamic cast to Projection type failed.\n");
 	std::vector<Variable*> tmp_params = marshal_projection_parameters(pt_tmp, direction);
 	marshal_parameters.insert(marshal_parameters.end(), tmp_params.begin(), tmp_params.end());
       } else {
 	marshal_parameters.push_back(pf);
+      }
+
+      if(pf->container() != 0x0) {
+	Variable *con = pf->container();
+	if( (strcmp(direction, "in") == 0 && con->in())
+	    || (strcmp(direction, "out") == 0 && con->out())
+	    || (strcmp(direction, "inout") == 0 && con->in() && pf->out())
+	    || strcmp(direction, "") == 0) {
+	  
+	  if (con->type()->num() == 4 || con->type()->num() == 9) {
+	    ProjectionType *pt_tmp = dynamic_cast<ProjectionType*>(con->type());
+	    Assert(pt_tmp != 0x0, "Error: dynamic cast to Projection type failed.\n");
+	    std::vector<Variable*> tmp_params = marshal_projection_parameters(pt_tmp, direction);
+	    marshal_parameters.insert(marshal_parameters.end(), tmp_params.begin(), tmp_params.end());
+	  } else {
+	    marshal_parameters.push_back(con);
+	  }
+	}
       }
     }
   }
@@ -59,9 +77,7 @@ void Rpc::create_container_variables()
   printf("in create container variables for %s\n", this->name_);
   for(std::vector<Parameter*>::iterator it = this->parameters_.begin(); it != this->parameters_.end(); it ++) {
     Parameter *p = *it;
-    if(p->pointer_count() > 0 && p->type()->num() == 4) { // is a pointer and is a container.
-      p->create_container_variable(this->current_scope());
-    }
+    p->create_container_variable(this->current_scope());
   }
 }
 
@@ -130,9 +146,10 @@ void Rpc::prepare_marshal()
   // sort our parameters
   for(std::vector<Parameter*>::iterator it = this->parameters_.begin(); it != this->parameters_.end(); it ++) {
     Parameter *p = *it;
+    printf("parameter we are going to marshal is %s\n", p->identifier());
     if(p->in() && !p->out()) {
       in_params.push_back(p);
-      if(p->type()->num() == 4) {
+      if(p->type()->num() == 4 || p->type()->num() == 9) {
 	ProjectionType *pt = dynamic_cast<ProjectionType*>(p->type());
 	Assert(pt != 0x0, "Error: dynamic cast to projection failed\n");
 	std::vector<Variable*> tmp = this->marshal_projection_parameters(pt, "in");
@@ -140,7 +157,7 @@ void Rpc::prepare_marshal()
       }
     } else if (!p->in() && p->out()) {
       out_params.push_back(p);
-      if(p->type()->num() == 4) {
+      if(p->type()->num() == 4 || p->type()->num() == 9) {
 	ProjectionType *pt = dynamic_cast<ProjectionType*>(p->type());
 	Assert(pt != 0x0, "Error: dynamic cast to projection failed\n");
 	std::vector<Variable*> tmp = this->marshal_projection_parameters(pt, "out");
@@ -148,7 +165,7 @@ void Rpc::prepare_marshal()
       }
     } else if (p->in() && p->out()) {
       in_out_params.push_back(p);
-      if(p->type()->num() == 4) {
+      if(p->type()->num() == 4 || p->type()->num() == 9) {
 	ProjectionType *pt = dynamic_cast<ProjectionType*>(p->type());
 	Assert(pt != 0x0, "Error: dynamic cast to projection failed\n");
 	// in 
@@ -165,11 +182,53 @@ void Rpc::prepare_marshal()
       }
       
     }
+
+    // have to do it for container too!!!
+    if(p->container() != 0x0) {
+      Variable *container = p->container();
+      printf("parameter container we are going to marshal is %s\n", p->container()->identifier());
+      
+      if(container->in() && !container->out()) {
+	in_params.push_back(container);
+	if(container->type()->num() == 4 || container->type()->num() == 9) {
+	  ProjectionType *pt = dynamic_cast<ProjectionType*>(container->type());
+	  Assert(pt != 0x0, "Error: dynamic cast to projection failed\n");
+	  std::vector<Variable*> tmp = this->marshal_projection_parameters(pt, "in");
+	  in_params.insert(in_params.end(), tmp.begin(), tmp.end());
+	}
+      } else if (!container->in() && container->out()) {
+	out_params.push_back(container);
+	if(container->type()->num() == 4 || container->type()->num() == 9) {
+	  ProjectionType *pt = dynamic_cast<ProjectionType*>(container->type());
+	  Assert(pt != 0x0, "Error: dynamic cast to projection failed\n");
+	  std::vector<Variable*> tmp = this->marshal_projection_parameters(pt, "out");
+	  out_params.insert(out_params.end(), tmp.begin(), tmp.end());
+	}
+      } else if (container->in() && container->out()) {
+	in_out_params.push_back(container);
+	if(container->type()->num() == 4 || container->type()->num() == 9) {
+	  ProjectionType *pt = dynamic_cast<ProjectionType*>(container->type());
+	  Assert(pt != 0x0, "Error: dynamic cast to projection failed\n");
+	  // in 
+	  std::vector<Variable*> tmp = this->marshal_projection_parameters(pt, "in");
+	  in_params.insert(in_params.end(), tmp.begin(), tmp.end());
+
+	  // out
+	  std::vector<Variable*> tmp2 = this->marshal_projection_parameters(pt, "out");
+	  out_params.insert(out_params.end(), tmp2.begin(), tmp2.end());
+
+	  // in out
+	  std::vector<Variable*> tmp3 = this->marshal_projection_parameters(pt, "inout");
+	  in_out_params.insert(in_out_params.end(), tmp3.begin(), tmp3.end());
+	}
+      
+      }
+    }
   }
 
   // assign register(s) to return value
   out_params.push_back(this->explicit_return_);
-  if(this->explicit_return_->type()->num() == 4) {
+  if(this->explicit_return_->type()->num() == 4 || this->explicit_return_->type()->num() == 9) {
     ProjectionType *pt = dynamic_cast<ProjectionType*>(this->explicit_return_->type());
     Assert(pt != 0x0, "Error: dynamic cast to projection failed\n");
     // in 
@@ -182,6 +241,9 @@ void Rpc::prepare_marshal()
 
   // marshal prepare the in parameters
   Registers *in_reg = new Registers();
+  int arr[1];
+  arr[0] = 1;
+  in_reg->init(arr, 1, 0x0, 0);
 
   MarshalPrepareVisitor *in_marshal_worker = new MarshalPrepareVisitor(in_reg);
   
@@ -193,6 +255,8 @@ void Rpc::prepare_marshal()
 
   // marshal prepare the out parameters
   Registers *out_reg = new Registers();
+  out_reg->init(arr, 1, 0x0, 0);
+
   MarshalPrepareVisitor *out_marshal_worker = new MarshalPrepareVisitor(out_reg);
 
   for(std::vector<Variable*>::iterator it = out_params.begin(); it != out_params.end(); it ++) {
@@ -254,6 +318,30 @@ void Rpc::set_accessors()
   }
 }
 
+void Rpc::set_copy_container_accessors()
+{
+  // return variable
+  this->explicit_return_->set_accessor(0x0);
+
+  // parameters
+  for(std::vector<Parameter*>::iterator it = this->parameters_.begin(); it != this->parameters_.end(); it ++) {
+    Parameter *p = *it;
+    p->set_accessor(0x0);
+  }
+}
+
+void Rpc::initialize_types()
+{
+  // parameters
+  for(std::vector<Parameter*>::iterator it = this->parameters_.begin(); it != this->parameters_.end(); it ++) {
+    Parameter *p = *it;
+    p->initialize_type();
+  }
+
+  // return variable
+  this->explicit_return_->initialize_type();
+}
+
 void Rpc::create_trampoline_structs()
 {
   for(std::vector<Parameter*>::iterator it = this->parameters_.begin(); it != this->parameters_.end(); it ++) {
@@ -264,7 +352,7 @@ void Rpc::create_trampoline_structs()
 
       std::vector<ProjectionField*> trampoline_fields;
       int err;
-      trampoline_fields.push_back(new ProjectionField(this->current_scope_->lookup("dstore", &err), "dstore", 1)); // dstore field
+      trampoline_fields.push_back(new ProjectionField(this->current_scope_->lookup("cspace", &err), "cspace", 1)); // dstore field
       trampoline_fields.push_back(new ProjectionField(this->current_scope_->lookup("lcd_trampoline_handle", &err), "t_handle", 1)); // lcd_trampoline handle field
       
       const char* trampoline_struct_name = hidden_args_name(f->name());
@@ -350,6 +438,14 @@ void Module::set_accessors()
   }
 }
 
+void Module::initialize_types()
+{
+  for(std::vector<Rpc*>::iterator it = this->rpc_definitions_.begin(); it != this->rpc_definitions_.end(); it ++) {
+    Rpc *r = *it;
+    r->initialize_types();
+  }
+}
+
 void Module::function_pointer_to_rpc()
 {
   std::vector<Rpc*> rpcs = this->module_scope()->function_pointer_to_rpc();
@@ -382,6 +478,14 @@ void Module::create_container_variables()
   for(std::vector<Rpc*>::iterator it = this->rpc_definitions_.begin(); it != this->rpc_definitions_.end(); it ++) {
     Rpc *r = *it;
     r->create_container_variables();
+  }
+}
+
+void Module::set_copy_container_accessors()
+{
+  for(std::vector<Rpc*>::iterator it = this->rpc_definitions_.begin(); it != this->rpc_definitions_.end(); it ++) {
+    Rpc *r = *it;
+    r->set_copy_container_accessors();
   }
 }
 
@@ -477,6 +581,22 @@ unsigned int Project::get_next_tag()
 {
   this->last_tag_ += 1;
   return this->last_tag_;
+}
+
+void Project::initialize_types()
+{
+  for(std::vector<Module*>::iterator it = this->project_modules_.begin(); it != this->project_modules_.end(); it ++) {
+    Module *m = *it;
+    m->initialize_types();
+  }
+}
+
+void Project::set_copy_container_accessors()
+{
+  for(std::vector<Module*>::iterator it = this->project_modules_.begin(); it != this->project_modules_.end(); it ++) {
+    Module *m = *it;
+    m->set_copy_container_accessors();
+  }
 }
 
 Include::Include(bool relative, const char *path)

@@ -246,6 +246,7 @@ const char* Typedef::name()
 
 void Typedef::resolve_types(LexicalScope *ls)
 {
+  // TODO
   return;
 }
 
@@ -458,6 +459,12 @@ void ProjectionType::resolve_types(LexicalScope *ls)
     ProjectionField *pf = (ProjectionField*) *it;
     pf->resolve_types(ls);
   }
+
+  // channels
+  for(std::vector<ProjectionField*>::iterator it = this->channels_.begin(); it != this->channels_.end(); it ++) {
+    ProjectionField *pf = *it;
+    pf->resolve_types(ls);
+  }
 }
 
 void ProjectionType::create_trampoline_structs(LexicalScope *ls)
@@ -472,7 +479,7 @@ void ProjectionType::create_trampoline_structs(LexicalScope *ls)
       int err;
       trampoline_fields.push_back(new ProjectionField(ls->lookup(container_name(this->name()), &err)
 						      ,"container", 1)); // container field
-      trampoline_fields.push_back(new ProjectionField(ls->lookup("dstore", &err), "dstore", 1)); // dstore field
+      trampoline_fields.push_back(new ProjectionField(ls->lookup("cspace", &err), "cspace", 1)); // dstore field
       trampoline_fields.push_back(new ProjectionField(ls->lookup("lcd_trampoline_handle", &err), "t_handle", 1)); // lcd_trampoline handle field
 
       const char* trampoline_struct_name = hidden_args_name(f->name());
@@ -492,6 +499,13 @@ ProjectionField* ProjectionType::get_field(const char *field_name)
   return 0x0;
 }
 
+void ProjectionType::initialize_type()
+{
+  for(std::vector<ProjectionField*>::iterator it = this->fields_.begin(); it != this->fields_.end(); it ++) {
+    ProjectionField *pf = *it;
+    pf->initialize_type();
+  }
+}
 
 /* projection constructor type*/
 ProjectionConstructorType::ProjectionConstructorType(const char* id, const char* real_type, std::vector<ProjectionField*> fields, std::vector<ProjectionField*> channel_fields, std::vector<ProjectionField*> channel_params)
@@ -553,9 +567,37 @@ int ProjectionConstructorType::num()
 
 void ProjectionConstructorType::initialize(std::vector<Variable*> chans)
 {
+  printf("calling initialize on a pct\n");
   // check that chans is correct length;
+  if(chans.size() != this->channel_params_.size()) {
+    Assert(1 == 0, "Error: required number of params and provided number do not match\n");
+  }
   
-  
+  // set them
+  for(int i = 0; i < chans.size(); i ++) {
+    this->channel_params_.at(i).second = chans.at(i);
+  }
+ 
+}
+
+void ProjectionConstructorType::resolve_types(LexicalScope *ls)
+{
+  for(std::vector<ProjectionField*>::iterator it = this->fields_.begin(); it != this->fields_.end(); it ++) {
+    ProjectionField *pf = (ProjectionField*) *it;
+    pf->resolve_types(ls);
+  }
+
+  // channels
+  for(std::vector<ProjectionField*>::iterator it = this->channels_.begin(); it != this->channels_.end(); it ++) {
+    ProjectionField *pf = *it;
+    pf->resolve_types(ls);
+  }
+
+  // chan params
+  for(std::vector<std::pair<Variable*,Variable*> >::iterator it = this->channel_params_.begin(); it != this->channel_params_.end(); it ++) {
+    std::pair<Variable*,Variable*> tmp = *it;
+    tmp.first->resolve_types(ls);
+  }
 }
 
 /* initialize type */
@@ -568,12 +610,14 @@ InitializeType::InitializeType(Type *type, std::vector<Variable*> init_vals)
 {
   this->type_ = type;
   this->values_ = init_vals;
+
+  // concerned initalize type vars wont see updates in constructor proj. from set accessors.
 }
 
 InitializeType::InitializeType(const InitializeType& other)
 {
   this->values_ = other.values_;
-  this->type_ = other.clone();
+  this->type_ = other.type_->clone();
 }
 
 Marshal_type* InitializeType::accept(MarshalPrepareVisitor *worker)

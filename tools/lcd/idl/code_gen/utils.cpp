@@ -52,6 +52,18 @@ char* type_number_to_name(int num)
     {
       return "unresolved type";
     }
+  case 9:
+    {
+      return "projection constructor type";
+    }
+  case 10:
+    {
+      return "initialize type";
+    }
+  default:
+    {
+      return "unrecognized";
+    }
 
   }
 }

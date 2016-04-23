@@ -85,6 +85,22 @@ std::vector<CCSTSpecifierQual*> type(Type *t)
 	// where is support in grammar
 	break;
       }
+    case 8:
+      {
+	Assert(1 == 0, "Error: unresolved type\n");
+	break;
+      }
+    case 9: // struct
+      {
+	ProjectionType *pt = dynamic_cast<ProjectionType*>(t);
+	Assert(pt != 0x0, "Error: dynamic cast failed!\n");
+	specifier.push_back(new CCSTStructUnionSpecifier(struct_t, pt->real_type()));
+	return specifier;
+      }
+    case 10:
+      {
+	Assert(1 == 0, "Error: initialize type\n");
+      }
     default:
       {
 	printf("Received %s with name %s instead of struct or integer\n", type_number_to_name(num), t->name());

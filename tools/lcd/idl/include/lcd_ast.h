@@ -562,11 +562,12 @@ class Rpc : public Base
   /* -------------- */
   const char* name_;
   std::vector<Parameter* > parameters_;
-  std::vector<Parameter*> hidden_args_;
+  
   bool function_pointer_defined_;
   std::vector<Variable*> marshal_projection_parameters(ProjectionType *pt, const char *direction);
   
  public:
+  std::vector<Parameter*> hidden_args_;
   Rpc(ReturnVariable *return_var, const char* name, std::vector<Parameter* > parameters, LexicalScope *current_scope);
   void copy_types();
   unsigned int tag();

@@ -72,11 +72,11 @@ Rpc* Function::to_rpc(ProjectionType *pt)
   std::vector<Parameter*> new_parameters;
   // new_parameters.insert(new_parameters.end(), this->parameters_.begin(), this->parameters_.end());
   int err;
-  Type *dstore = this->current_scope_->lookup("dstore", &err);
-  if(dstore == 0x0) {
+  Type *cspace = this->current_scope_->lookup("cspace", &err);
+  if(cspace == 0x0) {
     printf("Error: dstore is not in scope\n");
   }
-  new_parameters.push_back(new Parameter(dstore, "dstore", 1));
+  new_parameters.push_back(new Parameter(cspace, "cspace", 1));
 
   const char* c_name = container_name(pt->name());
   Type *container = this->current_scope_->lookup(c_name, &err);

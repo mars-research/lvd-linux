@@ -26,16 +26,10 @@ CCSTDeclaration* trampoline_function_declaration(Rpc* r)
   std::vector<CCSTParamDeclaration*> tramp_func_params;
   
   std::vector<Parameter*> parameters = r->parameters();
-  std::vector<Parameter*> real_parameters;
-  for(std::vector<Parameter*>::iterator it = parameters.begin(); it < parameters.end()-2; it ++) {
-    Parameter *p = *it;
-    real_parameters.push_back(p);
-  } 
-  printf("done calling real params tramp func dec\n");
-  
+
   decs.push_back(new CCSTDeclarator(pointer(r->return_variable()->pointer_count())
 				    , new CCSTDirectDecParamTypeList(new CCSTDirectDecId(trampoline_func_name(r->name()))
-								     , parameter_list(real_parameters))));
+								     , parameter_list(parameters))));
   printf("finishing tramp func dec\n");
   return new CCSTDeclaration(specifier, decs);
 }
@@ -63,6 +57,16 @@ CCSTCompoundStatement* trampoline_function_body(Rpc* r)
 
   std::vector<Parameter*> parameters = r->parameters();
   for(std::vector<Parameter*>::iterator it = parameters.begin(); it != parameters.end(); it ++) {
+    Parameter *p = *it;
+    
+    std::vector<CCSTDecSpecifier*> fp_param_tmp = type2(p->type());
+    func_pointer_params.push_back(new CCSTParamDeclaration(fp_param_tmp
+							   , new CCSTDeclarator(pointer(p->pointer_count()), new CCSTDirectDecId(""))));
+  }
+
+  // add hidden args to function pointer arg list
+  std::vector<Parameter*> hidden_args = r->hidden_args_;
+  for(std::vector<Parameter*>::iterator it = hidden_args.begin(); it != hidden_args.end(); it ++) {
     Parameter *p = *it;
     
     std::vector<CCSTDecSpecifier*> fp_param_tmp = type2(p->type());
@@ -103,7 +107,7 @@ CCSTCompoundStatement* trampoline_function_body(Rpc* r)
   std::vector<CCSTAssignExpr*> new_fp_args;
 
  
-  for(std::vector<Parameter*>::iterator it = parameters.begin(); it < parameters.end()-2; it ++) {
+  for(std::vector<Parameter*>::iterator it = parameters.begin(); it != parameters.end(); it ++) {
     Parameter *p = *it;
     new_fp_args.push_back(new CCSTPrimaryExprId(p->identifier()));
   }
@@ -115,6 +119,15 @@ CCSTCompoundStatement* trampoline_function_body(Rpc* r)
   Parameter *tmp_hidden_args = new Parameter(hidden_args_param, "hidden_args", 1);
 
   Assert(hidden_args_param != 0x0, "Error: dynamic cast to Projection type failed!\n");
+
+  ProjectionField *cspace_field = hidden_args_param->get_field("cspace");
+  if(cspace_field != 0x0) {
+    Variable *save_accessor = cspace_field->accessor();
+    cspace_field->set_accessor(tmp_hidden_args);
+    new_fp_args.push_back(access(cspace_field));
+    cspace_field->set_accessor(save_accessor);
+  }
+
   ProjectionField *container_field = hidden_args_param->get_field("container");
   if(container_field != 0x0) {
     Variable *save_accessor = container_field->accessor();
@@ -123,13 +136,7 @@ CCSTCompoundStatement* trampoline_function_body(Rpc* r)
     container_field->set_accessor(save_accessor);
   }
 
-  ProjectionField *dstore_field = hidden_args_param->get_field("dstore");
-  if(dstore_field != 0x0) {
-    Variable *save_accessor = dstore_field->accessor();
-    dstore_field->set_accessor(tmp_hidden_args);
-    new_fp_args.push_back(access(dstore_field));
-    dstore_field->set_accessor(save_accessor);
-  }
+  
 
   statements.push_back(new CCSTReturn(function_call("new_fp", new_fp_args)));
 

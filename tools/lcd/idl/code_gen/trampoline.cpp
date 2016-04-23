@@ -20,21 +20,23 @@ CCSTDeclaration* trampoline_function_declaration(Rpc* r)
   */
   std::vector<CCSTDecSpecifier*>specifier = type2(r->return_variable()->type());
   
-  
+  printf("done calling type2 tramp func dec\n");
   std::vector<CCSTInitDeclarator*> decs;
 
   std::vector<CCSTParamDeclaration*> tramp_func_params;
-
+  
   std::vector<Parameter*> parameters = r->parameters();
+  std::vector<Parameter*> real_parameters;
   for(std::vector<Parameter*>::iterator it = parameters.begin(); it < parameters.end()-2; it ++) {
     Parameter *p = *it;
-    
-  }
-  std::vector<Parameter*> real_parameters(parameters.begin(), parameters.end()-2);
+    real_parameters.push_back(p);
+  } 
+  printf("done calling real params tramp func dec\n");
   
   decs.push_back(new CCSTDeclarator(pointer(r->return_variable()->pointer_count())
 				    , new CCSTDirectDecParamTypeList(new CCSTDirectDecId(trampoline_func_name(r->name()))
 								     , parameter_list(real_parameters))));
+  printf("finishing tramp func dec\n");
   return new CCSTDeclaration(specifier, decs);
 }
 

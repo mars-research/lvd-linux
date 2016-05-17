@@ -228,7 +228,7 @@ class CCSTSpecifierQual : public CCSTDecSpecifier
 
 
 enum type_spec_t {void_t, char_t, short_t, int_t, long_t, float_t, double_t,
-		  signed_t, unsigned_t, other_t};
+		  signed_t, unsigned_t, other_t, bool_t};
 
 class CCSTTypeSpecifier : public CCSTSpecifierQual // slightly different from c_bnf
 {

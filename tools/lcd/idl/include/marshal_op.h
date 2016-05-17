@@ -167,6 +167,9 @@ class Variable;
 class UnresolvedType;
 class ProjectionConstructorType;
 class InitializeType;
+class BoolType;
+class DoubleType;
+class FloatType;
 
 class Registers
 {
@@ -188,6 +191,36 @@ class Marshal_type
   virtual Marshal_type* clone() const = 0;
   virtual void set_register(int r) = 0;
   virtual int get_register() = 0;
+};
+
+class Marshal_float : public Marshal_type
+{
+  int register_;
+ public:
+  Marshal_float(int r);
+  virtual Marshal_type* clone() const { return new Marshal_float(*this); }
+  virtual void set_register(int r);
+  virtual int get_register();
+};
+
+class Marshal_double : public Marshal_type
+{
+  int register_;
+ public:
+  Marshal_double(int r);
+  virtual Marshal_type* clone() const { return new Marshal_double(*this); }
+  virtual void set_register(int r);
+  virtual int get_register();
+};
+
+class Marshal_bool : public Marshal_type
+{
+  int register_;
+  public:
+  Marshal_bool(int r);
+  virtual Marshal_type* clone() const { return new Marshal_bool(*this); }
+  virtual void set_register(int r);
+  virtual int get_register();
 };
 
 class Marshal_projection : public Marshal_type
@@ -244,6 +277,9 @@ class MarshalPrepareVisitor
   Marshal_type* visit(Channel *c);
   Marshal_type* visit(ProjectionConstructorType *pct);
   Marshal_type* visit(InitializeType *it);
+  Marshal_type* visit(BoolType *bt);
+  Marshal_type* visit(DoubleType *dt);
+  Marshal_type* visit(FloatType *ft);
 };
 
 #endif

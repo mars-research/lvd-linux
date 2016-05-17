@@ -1,4 +1,4 @@
-start-symbol: File
+	start-symbol: File
 
 
 include: {{ #include "lcd_ast.h"
@@ -377,7 +377,15 @@ FP_Parameter	=	rpc_special Spacing s:Specification? rt:Type_form pointers:star* 
 				    p->set_dealloc_caller(true);
 				} if (specs->at(9)) {
 				    p->set_dealloc_callee(true);
+				} if (specs->at(11)) {
+				    p->set_bind_caller(true);
+				    p->set_bind_callee(true);
+				} if (specs->at(12)) {
+				    p->set_bind_callee(true);	
+				} if (specs->at(13)) {
+				    p->set_bind_caller(true);
 				}
+				
 			    }
 			    
 			    set_current_scope(get_current_scope()->outer_scope());
@@ -412,6 +420,13 @@ FirstParam	=	"projection" Space+ id:Identifier Spacing s:Specification? pointers
 				    p->set_dealloc_caller(true);
 				} if (specs->at(9)) {
 				    p->set_dealloc_callee(true);
+				} if (specs->at(11)) {
+				    p->set_bind_caller(true);	
+				    p->set_bind_callee(true);
+				} if (specs->at(12)) {
+				    p->set_bind_callee(true);
+				} if (specs->at(13)) {
+				    p->set_bind_caller(true);
 				}
 
 				if (p->alloc_callee()) {
@@ -423,6 +438,14 @@ FirstParam	=	"projection" Space+ id:Identifier Spacing s:Specification? pointers
 				   p->set_in(true);
 				} if (p->dealloc_caller()) {
 				   p->set_in(true);  // not sure correct
+				} if (p->bind_callee() && p->alloc_caller()) {
+				   p->set_out(true);   
+				} if (p->bind_caller()) {
+				   p->set_in(true);
+				} if (p->bind_callee() && p->alloc_caller()) {
+				   p->set_out(true);   
+				} if (p->bind_caller()) {
+				   p->set_in(true);
 				}
 			    }
 			    
@@ -453,6 +476,13 @@ FirstParam	=	"projection" Space+ id:Identifier Spacing s:Specification? pointers
 				    p->set_dealloc_caller(true);
 				} if (specs->at(9)) {
 				    p->set_dealloc_callee(true);
+				} if (specs->at(11)) {
+				    p->set_bind_caller(true);
+				    p->set_bind_callee(true);
+				} if (specs->at(12)) {
+				    p->set_bind_callee(true);	
+				} if (specs->at(13)) {
+				    p->set_bind_caller(true);
 				}
 
 				if (p->alloc_callee()) {
@@ -464,6 +494,10 @@ FirstParam	=	"projection" Space+ id:Identifier Spacing s:Specification? pointers
 				   p->set_in(true);
 				} if (p->dealloc_caller()) {
 				   p->set_in(true);  // not sure correct
+				} if (p->bind_callee() && p->alloc_caller()) {
+				   p->set_out(true);   
+				} if (p->bind_caller()) {
+				   p->set_in(true);
 				}
 			    }
 			    
@@ -503,6 +537,13 @@ FP_FirstParam	=	t:Type_form s:Specification? pointers:star* Spacing COMMA Spacin
 				    fp->set_dealloc_caller(true);
 				} if (specs->at(9)) {
 				    fp->set_dealloc_callee(true);
+				} if (specs->at(11)) {
+				    fp->set_bind_caller(true);	
+				    fp->set_bind_callee(true);
+				} if (specs->at(12)) {
+				    fp->set_bind_callee(true);
+				} if (specs->at(13)) {
+				    fp->set_bind_caller(true);
 				}
 
 				if (fp->alloc_callee()) {
@@ -514,6 +555,10 @@ FP_FirstParam	=	t:Type_form s:Specification? pointers:star* Spacing COMMA Spacin
 				   fp->set_in(true);
 				} if (fp->dealloc_caller()) {
 				   fp->set_in(true);  // not sure correct
+				} if (fp->bind_callee() && fp->alloc_caller()) {
+				   fp->set_out(true);   
+				} if (fp->bind_caller()) {
+				   fp->set_in(true);
 				}
 			    }
 			    
@@ -555,6 +600,13 @@ LastParam	=	"projection" Space+ id:Identifier Spacing s:Specification? pointers:
 				    p->set_dealloc_caller(true);
 				} if (specs->at(9)) {
 				    p->set_dealloc_callee(true);
+				} if (specs->at(11)) {
+				    p->set_bind_caller(true);
+				    p->set_bind_callee(true);
+				} if (specs->at(12)) {
+				    p->set_bind_callee(true);
+				} if (specs->at(13)) {
+				    p->set_bind_caller(true);
 				}
 
 				if (p->alloc_callee()) {
@@ -566,6 +618,10 @@ LastParam	=	"projection" Space+ id:Identifier Spacing s:Specification? pointers:
 				   p->set_in(true);
 				} if (p->dealloc_caller()) {
 				   p->set_in(true);  // not sure correct
+				} if (p->bind_callee() && p->alloc_caller()) {
+				   p->set_out(true);   
+				} if (p->bind_caller()) {
+				   p->set_in(true);
 				}
 			    }
 			    
@@ -596,6 +652,13 @@ LastParam	=	"projection" Space+ id:Identifier Spacing s:Specification? pointers:
 				    p->set_dealloc_caller(true);
 				} if (specs->at(9)) {
 				    p->set_dealloc_callee(true);
+				} if (specs->at(11)) {
+				    p->set_bind_caller(true);
+				    p->set_bind_callee(true);
+				} if (specs->at(12)) {
+				    p->set_bind_callee(true);
+				} if (specs->at(13)) {
+				    p->set_bind_caller(true);
 				}
 
 				if (p->alloc_callee()) {
@@ -607,6 +670,10 @@ LastParam	=	"projection" Space+ id:Identifier Spacing s:Specification? pointers:
 				   p->set_in(true);
 				} if (p->dealloc_caller()) {
 				   p->set_in(true);  // not sure correct
+				} if (p->bind_callee() && p->alloc_caller()) {
+				   p->set_out(true);   
+				} if (p->bind_caller()) {
+				   p->set_in(true);
 				}
 			    }
 			
@@ -636,6 +703,13 @@ FP_LastParam	=	t:Type_form s:Specification? pointers:star* Spacing {{
 				    fp->set_dealloc_caller(true);
 				} if (specs->at(9)) {
 				    fp->set_dealloc_callee(true);
+				} if (specs->at(11)) {
+				    fp->set_bind_caller(true);
+				    fp->set_bind_callee(true);
+				} if (specs->at(12)) {
+				    fp->set_bind_callee(true);
+				} if (specs->at(13)) {
+				    fp->set_bind_caller(true);
 				}
 
 				if (fp->alloc_callee()) {
@@ -647,6 +721,10 @@ FP_LastParam	=	t:Type_form s:Specification? pointers:star* Spacing {{
 				   fp->set_in(true);
 				} if (fp->dealloc_caller()) {
 				   fp->set_in(true);  // not sure correct
+				} if (fp->bind_callee() && fp->alloc_caller()) {
+				   fp->set_out(true);   
+				} if (fp->bind_caller()) {
+				   fp->set_in(true);
 				}
 			    }
 
@@ -702,14 +780,6 @@ Parameters	=	f:FirstParam* l:LastParam {{
 			    value = params; 
 			}}
 
-FirstGlobal	=	t:Type_form pointers:star* Spacing id:Identifier Spacing COMMA Spacing {{
-			    value = new GlobalVariable((Type*) t.getValue(), (char*) id.getValue(), count_pointers(pointers));
-			}}
-
-LastGlobal	=	t:Type_form pointers:star* Spacing id:Identifier Spacing {{
-			    value = new GlobalVariable((Type*) t.getValue(), (char*) id.getValue(), count_pointers(pointers));
-			}}
-
 FirstChannel    = "channel" Space+ id:Identifier Spacing COMMA Spacing {{
 		    GlobalVariable *gv = new GlobalVariable(getType("cptr_t"), (char*) id.getValue(), 0);
 		    insertVariable(gv);
@@ -734,18 +804,6 @@ Channels        = f:FirstChannel* l:LastChannel {{
 			    value = channels;
 		}}		  
 
-Globals 	=	f:FirstGlobal* l:LastGlobal {{
-		 	    printf("matched globals\n");
-			    std::vector<GlobalVariable*> *globals = new std::vector<GlobalVariable*>();
-			    for(Value::iterator it = f.getValues().begin(); it != f.getValues().end(); it ++) {
-			        const Value & v = *it;
-				GlobalVariable *gv = (GlobalVariable*) v.getValue();
-				globals->push_back(gv);
-			    }
-			    globals->push_back((GlobalVariable*) l.getValue());
-			    value = globals;
-			}}
-
 FP_Parameters	=	f:FP_FirstParam* l:FP_LastParam {{
 		            printf("matched fp parameters\n");
 			    std::vector<FPParameter* > *params = new std::vector<FPParameter*>();
@@ -768,7 +826,7 @@ rpc_special     =      "rpc" {{
 		       }}
 
 
-Rpc		=	rpc_special Space+ t:Type_form pointers:star* Spacing id1:Identifier Spacing OPEN p:Parameters CLOSE SEMI Spacing {{
+Rpc		=	rpc_special Space+ t:Type_form pointers:star* Spacing id1:Identifier Spacing OPEN Spacing p:Parameters CLOSE SEMI Spacing {{
 			    std::vector<Parameter*>* params = (std::vector<Parameter*>*) p.getValue();
 			    std::vector<Parameter*> params_ = *params;
 			    Rpc* r = new Rpc(new ReturnVariable((Type *) t.getValue(), count_pointers(pointers), returnVarName())
@@ -921,11 +979,6 @@ Keyword		=     	"out" {{
 			    int *x = (int*) malloc(sizeof(int));
 			    *x = 10;
 			    value = x;
-			}}
-			| "bind" {{
-			    int *x = (int*) malloc(sizeof(int));
-			    *x = 11;
-			    value = x;
 			}}	 
 			| "bind" Spacing OPEN Spacing "callee" Spacing CLOSE {{
 			    int *x = (int*) malloc(sizeof(int));
@@ -936,12 +989,17 @@ Keyword		=     	"out" {{
 			    int *x = (int*) malloc(sizeof(int));
 			    *x = 13;
 			    value = x;
-			}}	
+			}}
+			| "bind" {{
+			    int *x = (int*) malloc(sizeof(int));
+			    *x = 11;
+			    value = x;	
+			}}
 			
 Start		=	k:Keyword Spacing COMMA Spacing {{ value = k; }}
 
 Specification	=	OPENS Spacing s:Start* l:Last CLOSES Spacing {{
-			    std::vector<bool>* specs = new std::vector<bool>(11, false);
+			    std::vector<bool>* specs = new std::vector<bool>(14, false);
 			    for(Value::iterator it = s.getValues().begin(); it != s.getValues().end(); it ++) {		    
 			    const Value & v = *it;
 			    int* x = (int*) v.getValue();
@@ -1006,6 +1064,13 @@ ChanField       =       "channel" Space+ s:Specification? Spacing id:Identifier 
 				    pf->set_dealloc_caller(true);
 				} if (specs->at(9)) {
 				    pf->set_dealloc_callee(true);
+				} if (specs->at(11)) {
+				    pf->set_bind_caller(true);
+				    pf->set_bind_callee(true);	
+				} if (specs->at(12)) {
+				    pf->set_bind_callee(true);
+				} if (specs->at(13)) {
+				    pf->set_bind_caller(true);
 				}
 
 				if (pf->alloc_callee()) {
@@ -1017,6 +1082,10 @@ ChanField       =       "channel" Space+ s:Specification? Spacing id:Identifier 
 				   pf->set_in(true);
 				} if (pf->dealloc_caller()) {
 				   pf->set_in(true);  // not sure correct
+				} if (pf->bind_callee() && pf->alloc_caller()) {
+				   pf->set_out(true);   
+				} if (pf->bind_caller()) {
+				   pf->set_in(true);
 				}
 			    }
 
@@ -1048,6 +1117,13 @@ ProjField	=	"projection" Space+ id:Identifier Spacing s:Specification? pointers:
 				    pf->set_dealloc_caller(true);
 				} if (specs->at(9)) {
 				    pf->set_dealloc_callee(true);
+				} if (specs->at(11)) {
+				    pf->set_bind_caller(true);
+				    pf->set_bind_callee(true);	
+				} if (specs->at(12)) {
+				    pf->set_bind_callee(true);
+				} if (specs->at(13)) {
+				    pf->set_bind_caller(true);
 				}
 
 				if (pf->alloc_callee()) {
@@ -1059,6 +1135,10 @@ ProjField	=	"projection" Space+ id:Identifier Spacing s:Specification? pointers:
 				   pf->set_in(true);
 				} if (pf->dealloc_caller()) {
 				   pf->set_in(true);  // not sure correct
+				} if (pf->bind_callee() && pf->alloc_caller()) {
+				   pf->set_out(true);   
+				} if (pf->bind_caller()) {
+				   pf->set_in(true);
 				}
 			    }
 
@@ -1091,6 +1171,13 @@ ProjField	=	"projection" Space+ id:Identifier Spacing s:Specification? pointers:
 				    pf->set_dealloc_caller(true);
 				} if (specs->at(9)) {
 				    pf->set_dealloc_callee(true);
+				} if (specs->at(11)) {
+				    pf->set_bind_caller(true);
+				    pf->set_bind_callee(true);	
+				} if (specs->at(12)) {
+				    pf->set_bind_callee(true);	
+				} if (specs->at(13)) {
+				    pf->set_bind_caller(true);
 				}
 
 				if (pf->alloc_callee()) {
@@ -1102,6 +1189,10 @@ ProjField	=	"projection" Space+ id:Identifier Spacing s:Specification? pointers:
 				   pf->set_in(true);
 				} if (pf->dealloc_caller()) {
 				   pf->set_in(true);  // not sure correct
+				} if (pf->bind_callee() && pf->alloc_caller()) {
+				   pf->set_out(true);   
+				} if (pf->bind_caller()) {
+				   pf->set_in(true);
 				}
 			    }
 			    
@@ -1136,6 +1227,13 @@ ProjField	=	"projection" Space+ id:Identifier Spacing s:Specification? pointers:
 				    pf->set_dealloc_caller(true);
 				} if (specs->at(9)) {
 				    pf->set_dealloc_callee(true);
+				} if (specs->at(11)) {
+				    pf->set_bind_caller(true);
+				    pf->set_bind_callee(true);
+				} if (specs->at(12)) {
+				    pf->set_bind_callee(true);
+				} if (specs->at(13)) {
+				    pf->set_bind_caller(true);
 				}
 			    }
 
@@ -1171,6 +1269,15 @@ signed_type	=	"int" Spacing {{
 			}}
 			| "long" Spacing{{ 
 			    value = getType("long"); 
+			}}
+			| "float" Spacing {{
+			    value = getType("float");
+			}}		
+			| "double" Spacing {{
+			    value = getType("double");
+			}}
+			| "bool" Spacing {{
+			    value = getType("bool");
 			}}
 
 unsigned_type	=	"unsigned" Space+ "int" Spacing {{ 

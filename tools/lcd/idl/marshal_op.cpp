@@ -149,6 +149,51 @@ int Marshal_typedef::get_register()
   return this->true_type_->get_register();
 }
 
+Marshal_float::Marshal_float(int r)
+{
+  this->register_ = r;
+}
+
+void Marshal_float::set_register(int r)
+{
+  this->register_ = r;
+}
+
+int Marshal_float::get_register()
+{
+  return this->register_;
+}
+
+Marshal_double::Marshal_double(int r)
+{
+  this->register_ = r;
+}
+
+void Marshal_double::set_register(int r)
+{
+  this->register_ = r;
+}
+
+int Marshal_double::get_register()
+{
+  return this->register_;
+}
+
+Marshal_bool::Marshal_bool(int r)
+{
+  this->register_ = r;
+}
+
+void Marshal_bool::set_register(int r)
+{
+  this->register_ = r;
+}
+
+int Marshal_bool::get_register()
+{
+  return this->register_;
+}
+
 /* Marshal Prepare visitor code */
 
 MarshalPrepareVisitor::MarshalPrepareVisitor(Registers *r)
@@ -222,4 +267,37 @@ Marshal_type* MarshalPrepareVisitor::visit(ProjectionConstructorType *pct)
 Marshal_type* MarshalPrepareVisitor::visit(InitializeType *it)
 {
   Assert( 1 == 0, "Error: cannot prepare marshal for initialize type\n");
+}
+
+Marshal_type* MarshalPrepareVisitor::visit(BoolType *bt)
+{
+  int r = this->registers_->allocate_next_free_register();
+  
+  if (r == -1) {
+    Assert(1 == 0, "Error: have run out of registers\n");
+  }
+  
+  return new Marshal_bool(r);
+}
+
+Marshal_type* MarshalPrepareVisitor::visit(DoubleType *dt)
+{
+  int r = this->registers_->allocate_next_free_register();
+  
+  if (r == -1) {
+    Assert(1 == 0, "Error: have run out of registers\n");
+  }
+  
+  return new Marshal_double(r);
+}
+
+Marshal_type* MarshalPrepareVisitor::visit(FloatType *ft)
+{
+  int r = this->registers_->allocate_next_free_register();
+  
+  if (r == -1) {
+    Assert(1 == 0, "Error: have run out of registers\n");
+  }
+  
+  return new Marshal_float(r);
 }

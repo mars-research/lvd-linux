@@ -1,6 +1,123 @@
 #include "lcd_ast.h"
 #include "utils.h"
 
+FloatType::FloatType()
+{
+}
+
+Marshal_type* FloatType::accept(MarshalPrepareVisitor *worker)
+{
+  return worker->visit(this);
+}
+
+CCSTTypeName* FloatType::accept(TypeNameVisitor *worker)
+{
+  return worker->visit(this);
+}
+
+CCSTStatement* FloatType::accept(TypeVisitor *worker, Variable *v)
+{
+  return worker->visit(this, v);
+}
+
+int FloatType::num()
+{
+  return 13;
+}
+
+const char* FloatType::name()
+{
+  return "float";
+}
+
+void FloatType::resolve_types(LexicalScope *ls)
+{
+  return;
+}
+
+void FloatType::create_trampoline_structs(LexicalScope *ls)
+{
+  return;
+}
+
+DoubleType::DoubleType()
+{
+}
+
+Marshal_type* DoubleType::accept(MarshalPrepareVisitor *worker)
+{
+  return worker->visit(this);
+}
+
+CCSTTypeName* DoubleType::accept(TypeNameVisitor *worker)
+{
+  return worker->visit(this);
+}
+
+CCSTStatement* DoubleType::accept(TypeVisitor *worker, Variable *v)
+{
+  return worker->visit(this, v);
+}
+
+int DoubleType::num()
+{
+  return 12;
+}
+
+const char* DoubleType::name()
+{
+  return "double";
+}
+
+void DoubleType::resolve_types(LexicalScope *ls)
+{
+  return;
+}
+
+void DoubleType::create_trampoline_structs(LexicalScope *ls)
+{
+  return;
+}
+
+BoolType::BoolType()
+{ 
+}
+
+Marshal_type* BoolType::accept(MarshalPrepareVisitor *worker)
+{
+  return worker->visit(this);
+}
+
+CCSTTypeName* BoolType::accept(TypeNameVisitor *worker)
+{
+  return worker->visit(this);
+}
+
+CCSTStatement* BoolType::accept(TypeVisitor *worker, Variable *v)
+{
+  return worker->visit(this, v);
+}
+
+int BoolType::num()
+{
+  return 11;
+}
+
+const char* BoolType::name()
+{
+  return "bool";
+}
+
+void BoolType::resolve_types(LexicalScope *ls)
+{
+  return;
+}
+
+void BoolType::create_trampoline_structs(LexicalScope *ls)
+{
+  return;
+}
+
 Function::Function(const char *id, ReturnVariable *return_var, std::vector<Parameter*> parameters, LexicalScope *ls)
 {
   this->identifier_  = id;
@@ -84,7 +201,10 @@ Rpc* Function::to_rpc(ProjectionType *pt)
     printf("Error: container is not in scope\n");
   }
 
-  new_parameters.push_back(new Parameter(container, c_name, 1));
+  Parameter *container_param = new Parameter(container, c_name, 1);
+  container_param->set_in(true);
+
+  new_parameters.push_back(container_param);
 
   Rpc* tmp = new Rpc(this->return_var_, this->identifier_, this->parameters_, this->current_scope_);
   tmp->set_function_pointer_defined(true);

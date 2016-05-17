@@ -5,6 +5,150 @@ AllocateTypeVisitor::AllocateTypeVisitor()
 {
 }
 
+CCSTStatement* AllocateTypeVisitor::visit(FloatType *ft, Variable *v)
+{
+  std::vector<CCSTDeclaration*> declarations;
+  std::vector<CCSTStatement*> statements;
+
+  std::vector<CCSTSpecifierQual*> void_star_quals;
+  void_star_quals.push_back(new CCSTSimpleTypeSpecifier(void_t));
+
+  CCSTTypeName *void_star = new CCSTTypeName(void_star_quals, new CCSTPointer());
+
+  std::vector<CCSTSpecifierQual*> float_type_quals = type(ft);
+  CCSTTypeName *float_type = new CCSTTypeName(float_type_quals, 0x0);
+  
+  int p_count_save = v->pointer_count(); // total pointer count
+  int p_count = v->pointer_count();
+
+  while(p_count > 1) {
+    std::vector<CCSTAssignExpr*> kzalloc_args;
+    kzalloc_args.push_back(new CCSTUnaryExprSizeOf(void_star));
+    kzalloc_args.push_back(new CCSTEnumConst("GFP_KERNEL"));
+    
+    v->set_pointer_count(p_count_save-p_count+1); // 0 then 1. when its 1 it isnt derefing
+    statements.push_back(new CCSTExprStatement( new CCSTAssignExpr(access(v), equals(), function_call("kzalloc", kzalloc_args))));
+
+    /* do error checking */
+    statements.push_back(if_cond_fail(new CCSTUnaryExprCastExpr(Not(), access(v))
+				      , "kzalloc"));
+    
+    p_count -= 1;
+  }
+  v->set_pointer_count(p_count_save - p_count +1); // p count will either be 1 or will be p coutn save
+  std::vector<CCSTAssignExpr*> kzalloc_args;
+
+  /* do sizeof(*access(v))  */
+  kzalloc_args.push_back(new CCSTUnaryExprSizeOf(float_type));
+  kzalloc_args.push_back(new CCSTEnumConst("GFP_KERNEL"));
+
+  statements.push_back(new CCSTExprStatement( new CCSTAssignExpr(access(v), equals(), function_call("kzalloc", kzalloc_args))));
+
+  /* do error checking */
+  statements.push_back(if_cond_fail(new CCSTUnaryExprCastExpr(Not(), access(v))
+				    , "kzalloc"));
+
+
+  v->set_pointer_count(p_count_save); // set back to what it was before
+  return new CCSTCompoundStatement(declarations, statements);
+}
+
+CCSTStatement* AllocateTypeVisitor::visit(DoubleType *dt, Variable *v)
+{
+  std::vector<CCSTDeclaration*> declarations;
+  std::vector<CCSTStatement*> statements;
+
+  std::vector<CCSTSpecifierQual*> void_star_quals;
+  void_star_quals.push_back(new CCSTSimpleTypeSpecifier(void_t));
+
+  CCSTTypeName *void_star = new CCSTTypeName(void_star_quals, new CCSTPointer());
+
+  std::vector<CCSTSpecifierQual*> double_type_quals = type(dt);
+  CCSTTypeName *double_type = new CCSTTypeName(double_type_quals, 0x0);
+  
+  int p_count_save = v->pointer_count(); // total pointer count
+  int p_count = v->pointer_count();
+
+  while(p_count > 1) {
+    std::vector<CCSTAssignExpr*> kzalloc_args;
+    kzalloc_args.push_back(new CCSTUnaryExprSizeOf(void_star));
+    kzalloc_args.push_back(new CCSTEnumConst("GFP_KERNEL"));
+    
+    v->set_pointer_count(p_count_save-p_count+1); // 0 then 1. when its 1 it isnt derefing
+    statements.push_back(new CCSTExprStatement( new CCSTAssignExpr(access(v), equals(), function_call("kzalloc", kzalloc_args))));
+
+    /* do error checking */
+    statements.push_back(if_cond_fail(new CCSTUnaryExprCastExpr(Not(), access(v))
+				      , "kzalloc"));
+    
+    p_count -= 1;
+  }
+  v->set_pointer_count(p_count_save - p_count +1); // p count will either be 1 or will be p coutn save
+  std::vector<CCSTAssignExpr*> kzalloc_args;
+
+  /* do sizeof(*access(v))  */
+  kzalloc_args.push_back(new CCSTUnaryExprSizeOf(double_type));
+  kzalloc_args.push_back(new CCSTEnumConst("GFP_KERNEL"));
+
+  statements.push_back(new CCSTExprStatement( new CCSTAssignExpr(access(v), equals(), function_call("kzalloc", kzalloc_args))));
+
+  /* do error checking */
+  statements.push_back(if_cond_fail(new CCSTUnaryExprCastExpr(Not(), access(v))
+				    , "kzalloc"));
+
+
+  v->set_pointer_count(p_count_save); // set back to what it was before
+  return new CCSTCompoundStatement(declarations, statements);
+}
+
+CCSTStatement* AllocateTypeVisitor::visit(BoolType *bt, Variable *v)
+{
+  std::vector<CCSTDeclaration*> declarations;
+  std::vector<CCSTStatement*> statements;
+
+  std::vector<CCSTSpecifierQual*> void_star_quals;
+  void_star_quals.push_back(new CCSTSimpleTypeSpecifier(void_t));
+
+  CCSTTypeName *void_star = new CCSTTypeName(void_star_quals, new CCSTPointer());
+
+  std::vector<CCSTSpecifierQual*> bool_type_quals = type(bt);
+  CCSTTypeName *bool_type = new CCSTTypeName(bool_type_quals, 0x0);
+  
+  int p_count_save = v->pointer_count(); // total pointer count
+  int p_count = v->pointer_count();
+
+  while(p_count > 1) {
+    std::vector<CCSTAssignExpr*> kzalloc_args;
+    kzalloc_args.push_back(new CCSTUnaryExprSizeOf(void_star));
+    kzalloc_args.push_back(new CCSTEnumConst("GFP_KERNEL"));
+    
+    v->set_pointer_count(p_count_save-p_count+1); // 0 then 1. when its 1 it isnt derefing
+    statements.push_back(new CCSTExprStatement( new CCSTAssignExpr(access(v), equals(), function_call("kzalloc", kzalloc_args))));
+
+    /* do error checking */
+    statements.push_back(if_cond_fail(new CCSTUnaryExprCastExpr(Not(), access(v))
+				      , "kzalloc"));
+    
+    p_count -= 1;
+  }
+  v->set_pointer_count(p_count_save - p_count +1); // p count will either be 1 or will be p coutn save
+  std::vector<CCSTAssignExpr*> kzalloc_args;
+
+  /* do sizeof(*access(v))  */
+  kzalloc_args.push_back(new CCSTUnaryExprSizeOf(bool_type));
+  kzalloc_args.push_back(new CCSTEnumConst("GFP_KERNEL"));
+
+  statements.push_back(new CCSTExprStatement( new CCSTAssignExpr(access(v), equals(), function_call("kzalloc", kzalloc_args))));
+
+  /* do error checking */
+  statements.push_back(if_cond_fail(new CCSTUnaryExprCastExpr(Not(), access(v))
+				    , "kzalloc"));
+
+
+  v->set_pointer_count(p_count_save); // set back to what it was before
+  return new CCSTCompoundStatement(declarations, statements);
+}
+
 CCSTStatement* AllocateTypeVisitor::visit(Channel *c, Variable *v)
 {
   Assert(1 == 0, "Error: allocation for channel not implemented\n");

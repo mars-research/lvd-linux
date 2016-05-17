@@ -96,6 +96,48 @@ class Type : public Base
   virtual void create_trampoline_structs(LexicalScope *ls) = 0;
 };
 
+class FloatType : public Type
+{
+  public:
+  FloatType();
+  virtual Type* clone() const { return new FloatType(*this); }
+  virtual Marshal_type* accept(MarshalPrepareVisitor *worker);
+  virtual CCSTTypeName* accept(TypeNameVisitor *worker);
+  virtual CCSTStatement* accept(TypeVisitor *worker, Variable *v);
+  virtual int num();
+  virtual const char* name();
+  virtual void resolve_types(LexicalScope *ls);
+  virtual void create_trampoline_structs(LexicalScope *ls);
+};
+
+class DoubleType : public Type
+{
+ public:
+  DoubleType();
+  virtual Type* clone() const { return new DoubleType(*this); }
+  virtual Marshal_type* accept(MarshalPrepareVisitor *worker);
+  virtual CCSTTypeName* accept(TypeNameVisitor *worker);
+  virtual CCSTStatement* accept(TypeVisitor *worker, Variable *v);
+  virtual int num();
+  virtual const char* name();
+  virtual void resolve_types(LexicalScope *ls);
+  virtual void create_trampoline_structs(LexicalScope *ls);
+};
+
+class BoolType : public Type
+{
+  public:
+  BoolType();
+  virtual Type* clone() const { return new BoolType(*this); }
+  virtual Marshal_type* accept(MarshalPrepareVisitor *worker);
+  virtual CCSTTypeName* accept(TypeNameVisitor *worker);
+  virtual CCSTStatement* accept(TypeVisitor *worker, Variable *v);
+  virtual int num();
+  virtual const char* name();
+  virtual void resolve_types(LexicalScope *ls);
+  virtual void create_trampoline_structs(LexicalScope *ls);
+};
+
 class InitializeType : public Type
 {
  public:
@@ -662,6 +704,9 @@ class TypeNameVisitor // generates CCSTTypeName for each type.
   CCSTTypeName* visit(Channel *c);
   CCSTTypeName* visit(ProjectionConstructorType *pct);
   CCSTTypeName* visit(InitializeType *it);
+  CCSTTypeName* visit(BoolType *bt);
+  CCSTTypeName* visit(DoubleType *dt);
+  CCSTTypeName* visit(FloatType *ft);
 };
 
 class TypeVisitor
@@ -676,6 +721,9 @@ class TypeVisitor
   virtual CCSTStatement* visit(Channel *c, Variable *v) = 0;
   virtual CCSTStatement* visit(ProjectionConstructorType *pct, Variable *v) = 0;
   virtual CCSTStatement* visit(InitializeType *it, Variable *v) = 0;
+  virtual CCSTStatement* visit(BoolType *bt, Variable *v) = 0;
+  virtual CCSTStatement* visit(DoubleType *dt, Variable *v) = 0;
+  virtual CCSTStatement* visit(FloatType *ft, Variable *v) = 0;
 };
 
 class AllocateTypeVisitor : public TypeVisitor    
@@ -691,6 +739,9 @@ class AllocateTypeVisitor : public TypeVisitor
   virtual CCSTStatement* visit(Channel *c, Variable *v);
   virtual CCSTStatement* visit(ProjectionConstructorType *pct, Variable *v);
   virtual CCSTStatement* visit(InitializeType *it, Variable *v);
+  virtual CCSTStatement* visit(BoolType *bt, Variable *v);
+  virtual CCSTStatement* visit(DoubleType *dt, Variable *v);
+  virtual CCSTStatement* visit(FloatType *ft, Variable *v);
 };
 
 #endif

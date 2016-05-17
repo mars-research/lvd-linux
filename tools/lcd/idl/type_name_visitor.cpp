@@ -1,5 +1,32 @@
 #include "lcd_ast.h"
 
+CCSTTypeName* TypeNameVisitor::visit(FloatType *ft)
+{
+  CCSTPointer *pt = 0x0;
+  std::vector<CCSTSpecifierQual*> sq;
+  sq.push_back(new CCSTSimpleTypeSpecifier(float_t));
+
+  return new CCSTTypeName(sq, pt);
+}
+
+CCSTTypeName* TypeNameVisitor::visit(DoubleType *dt)
+{
+  CCSTPointer *pt = 0x0;
+  std::vector<CCSTSpecifierQual*> sq;
+  sq.push_back(new CCSTSimpleTypeSpecifier(double_t));
+
+  return new CCSTTypeName(sq, pt);
+}
+
+CCSTTypeName* TypeNameVisitor::visit(BoolType *bt)
+{
+  CCSTPointer *pt = 0x0;
+  std::vector<CCSTSpecifierQual*> sq;
+  sq.push_back(new CCSTSimpleTypeSpecifier(bool_t));
+
+  return new CCSTTypeName(sq, pt);
+}
+
 CCSTTypeName* TypeNameVisitor::visit(UnresolvedType *ut)
 {
   Assert(1 == 0, "Error: no type name for unresolved type.\n");

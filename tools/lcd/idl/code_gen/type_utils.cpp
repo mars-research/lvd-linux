@@ -101,6 +101,21 @@ std::vector<CCSTSpecifierQual*> type(Type *t)
       {
 	Assert(1 == 0, "Error: initialize type\n");
       }
+    case 11:
+      {
+	specifier.push_back(new CCSTSimpleTypeSpecifier(bool_t));
+	return specifier;
+      }
+    case 12:
+      {
+	specifier.push_back(new CCSTSimpleTypeSpecifier(double_t));
+	return specifier;
+      }
+    case 13:
+      {
+	specifier.push_back(new CCSTSimpleTypeSpecifier(float_t));
+	return specifier;
+      }
     default:
       {
 	printf("Received %s with name %s instead of struct or integer\n", type_number_to_name(num), t->name());
@@ -149,6 +164,21 @@ CCSTTypeName* type_cast(Type *t, int pointer_count)
       { // does this even happen?
 	printf("Warning: casting something as void\n");
 	spec_quals.push_back(new CCSTSimpleTypeSpecifier(void_t) );
+	break;
+      }
+    case 11:
+      {
+	spec_quals.push_back(new CCSTSimpleTypeSpecifier(bool_t));
+	break;
+      }
+    case 12:
+      {
+	spec_quals.push_back(new CCSTSimpleTypeSpecifier(double_t));
+	break;
+      }
+    case 13:
+      {
+	spec_quals.push_back(new CCSTSimpleTypeSpecifier(float_t));
 	break;
       }
     default:
@@ -300,6 +330,21 @@ std::vector<CCSTDecSpecifier*> type2(Type *t)
     {
       // function pointer type
       // todo
+    }
+  case 11:
+    {
+      specifier.push_back(new CCSTSimpleTypeSpecifier(bool_t));
+      return specifier;
+    }
+  case 12:
+    {
+      specifier.push_back(new CCSTSimpleTypeSpecifier(double_t));
+      return specifier;
+    }
+  case 13:
+    {
+      specifier.push_back(new CCSTSimpleTypeSpecifier(float_t));
+      return specifier;
     }
   default:
     {

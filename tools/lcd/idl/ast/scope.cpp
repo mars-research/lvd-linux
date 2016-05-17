@@ -10,7 +10,11 @@ GlobalScope::GlobalScope()
 
   // move this code to wherever we create the root scope.
   // instert for each builtin in type, add size to type if not done alreayd
-  this->type_definitions_.insert(std::pair<std::string,Type*>("void", new VoidType()));
+
+  this->type_definitions_.insert( std::pair<std::string, Type*>("bool", new BoolType()));
+  this->type_definitions_.insert( std::pair<std::string, Type*>("double", new DoubleType()));
+  this->type_definitions_.insert( std::pair<std::string, Type*>("float", new FloatType()));
+  this->type_definitions_.insert( std::pair<std::string,Type*>("void", new VoidType()));
   this->type_definitions_.insert( std::pair<std::string,Type*>("char"
 					       , new IntegerType(pt_char_t, false, sizeof(char))));
   this->type_definitions_.insert( std::pair<std::string,Type*>("unsigned char"

@@ -161,3 +161,4 @@ static void boot_exit(void)
 
 module_init(boot_init);
 module_exit(boot_exit);
+MODULE_LICENSE("GPL");

@@ -293,11 +293,13 @@ static int handle_syscall_exit(struct lcd *lcd, int *lcd_ret)
 static int handle_syscall_irq_disable(struct lcd *lcd)
 {
 	lcd_arch_irq_disable(lcd->lcd_arch);
+	return 0;
 }
 
 static int handle_syscall_irq_enable(struct lcd *lcd)
 {
 	lcd_arch_irq_enable(lcd->lcd_arch);
+	return 0;
 }
 
 static int handle_syscall(struct lcd *lcd, int *lcd_ret)

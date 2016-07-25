@@ -2,7 +2,7 @@
  * irq.c
  */
 #include <liblcd/irq.h>
-
+#include <linux/module.h>
 void lcd_irq_disable(void)
 {
 	return; /* no op */

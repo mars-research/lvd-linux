@@ -1,6 +1,22 @@
 Note: run make, then add #include <string> to the top of "lcd_idl.h",
 then run make again.
 
+To build compiler just run "make"
+
 To run compiler:
 
-./compiler input_file
+./compiler -option path-to-file
+
+options: 
+
+clientheader
+
+clientsource
+
+serverheader
+
+serversource
+
+
+The output file will be under module-name.c  or module-name.h   This is specified in the name 
+file, and could be changed to something more suitable.

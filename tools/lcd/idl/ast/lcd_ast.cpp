@@ -143,8 +143,14 @@ void Rpc::prepare_marshal()
   std::vector<Variable*> in_params;
   std::vector<Variable*> out_params;
   std::vector<Variable*> in_out_params;
+
+  std::vector<Parameter*> all_params = this->parameters_;
+  if(this->function_pointer_defined()) {
+    all_params.insert(all_params.end(), this->hidden_args_.begin(), this->hidden_args_.end());
+  }
+
   // sort our parameters
-  for(std::vector<Parameter*>::iterator it = this->parameters_.begin(); it != this->parameters_.end(); it ++) {
+  for(std::vector<Parameter*>::iterator it = all_params.begin(); it != all_params.end(); it ++) {
     Parameter *p = *it;
     printf("parameter we are going to marshal is %s\n", p->identifier());
     if(p->in() && !p->out()) {
@@ -225,6 +231,7 @@ void Rpc::prepare_marshal()
       }
     }
   }
+  
 
   // assign register(s) to return value
   out_params.push_back(this->explicit_return_);

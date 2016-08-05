@@ -124,6 +124,9 @@ void CCSTSimpleTypeSpecifier::write(FILE *f, int indent)
     case unsigned_t:
       fprintf(f, "%s ", "unsigned");
       break;
+    case bool_t:
+      fprintf(f, "%s ", "bool");
+      break;
     default:
       fprintf(f, "%s ", "error");
       break;

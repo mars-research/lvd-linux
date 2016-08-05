@@ -61,13 +61,14 @@ int main(int argc, char ** argv)
 	}
       else if(!strcmp(argv[1],"-serversource")) // callee
 	{
+	  tree->resolve_types();
 	  tree->create_trampoline_structs();
 	  tree->function_pointer_to_rpc();
 	  tree->generate_function_tags();
-	  tree->resolve_types(); // resolve types that weren't resolved during parsing
+	  // resolve types that weren't resolved during parsing
 	  tree->create_container_variables();
 	  
-	  tree->set_copy_container_accessors(); // TODO
+	  //	  tree->set_copy_container_accessors(); // TODO
 
 	  tree->copy_types();
 	  tree->initialize_types(); // for calling initialize o
@@ -84,7 +85,12 @@ int main(int argc, char ** argv)
 	      exit(0);
 	    }
 
-	    FILE *of = fopen(m->identifier(), "w");
+	    char* of_name = (char*) malloc(sizeof(char)*(strlen(m->identifier())+3));
+	    std::ostringstream total;
+	    total << m->identifier() << ".c";
+	    strncpy(of_name, total.str().c_str(), strlen(m->identifier())+3);
+
+	    FILE *of = fopen(of_name, "w");
 	    if(!of)
 	      {
 		printf("Error: unable to open %s for writing\n", m->identifier());
@@ -131,7 +137,12 @@ int main(int argc, char ** argv)
 	      exit(0);
 	    }
 
-	    FILE *of = fopen(m->identifier(), "w");
+	    char* of_name = (char*) malloc(sizeof(char)*(strlen(m->identifier())+3));
+	    std::ostringstream total;
+	    total << m->identifier() << ".c";
+	    strncpy(of_name, total.str().c_str(), strlen(m->identifier())+3);
+
+	    FILE *of = fopen(of_name, "w");
 	    if(!of)
 	      {
 		printf("Error: unable to open %s for writing\n", m->identifier());

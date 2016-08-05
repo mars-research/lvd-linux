@@ -92,6 +92,7 @@ CCSTDeclaration* interface_exit_function_declaration(Module *m); // complete
 
 CCSTFuncDef* function_definition(CCSTDeclaration *function_declaration, CCSTCompoundStatement *body); // complete
 CCSTDeclaration* function_declaration(Rpc *r); // complete
+CCSTDeclaration* function_pointer_function_declaration(Rpc *r);
 
 CCSTParamTypeList* parameter_list(std::vector<Parameter*> params); // complete
 

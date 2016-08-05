@@ -372,7 +372,7 @@ Parameter::Parameter(const Parameter& other)
 
 void Parameter::create_container_variable(LexicalScope *ls)
 {
-  if(this->pointer_count() <= 0 || (this->type_->num() != 4 && this->type_->num() != 9 && this->type_->num() != 10)) {
+  if(this->pointer_count() <= 0 || (this->type_->num() != 4 && this->type_->num() != 9 && this->type_->num() != 10) || (!this->bind_caller() && !this->bind_callee() && !this->alloc_caller() && !this->alloc_callee())) {
     return;
   }
   Type *tmp = this->type_;
@@ -1018,7 +1018,7 @@ ProjectionField::ProjectionField(const ProjectionField& other)
 
 void ProjectionField::create_container_variable(LexicalScope *ls)
 {
-  if(this->pointer_count() <= 0 || (this->type_->num() != 4 && this->type_->num() != 9 && this->type_->num() != 10)) {
+  if(this->pointer_count() <= 0 || (this->type_->num() != 4 && this->type_->num() != 9 && this->type_->num() != 10) || (!this->bind_caller() && !this->bind_callee() && !this->alloc_caller() && !this->alloc_callee())) {
     return;
   }
   Type *tmp = this->type_;

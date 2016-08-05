@@ -77,11 +77,39 @@ CCSTDeclaration* function_declaration(Rpc* r)
   
   CCSTDirectDecId *name = new CCSTDirectDecId(r->name());
   CCSTParamTypeList *param_list = parameter_list(r->parameters());
+
   CCSTDirectDecParamTypeList *name_params = new CCSTDirectDecParamTypeList(name, param_list);
   
   func.push_back(new CCSTDeclarator(p, name_params));
   
   return new CCSTDeclaration(specifier, func);
+}
+
+CCSTDeclaration* function_pointer_function_declaration(Rpc *r) 
+{
+  std::vector<CCSTDecSpecifier*> specifier = type2(r->return_variable()->type());
+  
+  std::vector<CCSTInitDeclarator*> func; // = new std::vector<CCSTInitDeclarator*>(); // pointer name, params
+  CCSTPointer *p = pointer(r->return_variable()->pointer_count());
+  
+  CCSTDirectDecId *name = new CCSTDirectDecId(r->name());
+
+  std::vector<Parameter*> all_params;
+
+  std::vector<Parameter*> r_parameters = r->parameters();
+  std::vector<Parameter*> r_hidden_args = r->hidden_args_;
+
+  all_params.insert(all_params.end(), r_parameters.begin(), r_parameters.end());
+  all_params.insert(all_params.end(), r_hidden_args.begin(), r_hidden_args.end());
+  
+  CCSTParamTypeList *param_list = parameter_list(all_params);
+
+  CCSTDirectDecParamTypeList *name_params = new CCSTDirectDecParamTypeList(name, param_list);
+  
+  func.push_back(new CCSTDeclarator(p, name_params));
+  
+  return new CCSTDeclaration(specifier, func);
+  
 }
 
 // 

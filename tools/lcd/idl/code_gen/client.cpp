@@ -53,8 +53,8 @@ CCSTFile* generate_client_source(Module* f)
       definitions.push_back(function_definition(callee_declaration(r_tmp)
 						, callee_body(r_tmp, f)));
     } else {
-      definitions.push_back(function_definition(function_declaration(r_tmp)
-						,caller_body(r_tmp, f)));
+      //   definitions.push_back(function_definition(function_declaration(r_tmp)
+      //					,caller_body(r_tmp, f)));
     }
   }
   
@@ -102,6 +102,14 @@ CCSTCompoundStatement* caller_body(Rpc *r, Module *m)
   // loop through params, declare a tmp and pull out marshal value
   std::vector<Parameter*> params = r->parameters();
 
+  
+  const char* cspace_to_use;
+  if(r->function_pointer_defined()) { // cspace is 1st hidden arg
+    cspace_to_use = r->hidden_args_.at(0)->identifier();
+  } else {
+    cspace_to_use =  m->cspaces_.at(0)->identifier();
+  }
+				     
   // for every parameter that has a container. declare containers. then alloc or container of
   for(std::vector<Parameter*>::iterator it = params.begin(); it != params.end(); it ++)
     {
@@ -111,7 +119,7 @@ CCSTCompoundStatement* caller_body(Rpc *r, Module *m)
 	std::vector<CCSTDeclaration*> tmp = declare_containers(p);
 	declarations.insert(declarations.end(), tmp.begin(), tmp.end());
 
-	statements.push_back(alloc_link_container_caller(p, m->cspaces_.at(0)->identifier()));
+	statements.push_back(alloc_link_container_caller(p, cspace_to_use));
 
       }
     }
@@ -155,6 +163,18 @@ CCSTCompoundStatement* caller_body(Rpc *r, Module *m)
       statements.push_back(marshal_variable(p, "in"));    
     }
   }
+  
+  /* if it is a function pointer need to marshal hidden args */
+  if (r->function_pointer_defined()) {
+    std::vector<Parameter*> hidden_args = r->hidden_args_;
+    for(std::vector<Parameter*>::iterator it = hidden_args.begin(); it != hidden_args.end(); it ++) {
+      Parameter *p = *it;
+      if(p->in()) {
+	printf("going to marshal hdiden arg %s for function %s\n", p->identifier(), r->name());
+	statements.push_back(marshal_variable(p, "in"));
+      }
+    }
+  }
 
   /* marshal function tag */
   statements.push_back(marshal(new CCSTInteger(r->tag()), 0));
@@ -187,10 +207,22 @@ CCSTCompoundStatement* caller_body(Rpc *r, Module *m)
     }
   }
 
+  /* if function pointer defined unmarshal hidden args*/
+  if(r->function_pointer_defined()) {
+    std::vector<Parameter*> hidden_args = r->hidden_args_;
+    for(std::vector<Parameter*>::iterator it = hidden_args.begin(); it != hidden_args.end(); it ++) {
+      Parameter *p = *it;
+      if(p->out()) {
+	std::vector<CCSTStatement*> tmp_stmts = unmarshal_variable_caller(p);
+	statements.insert(statements.end(), tmp_stmts.begin(), tmp_stmts.end());
+      }
+    }
+  }
+
   // if anything is marked dealloc. dealloc
   for(std::vector<Parameter*>::iterator it = parameters.begin(); it != parameters.end(); it ++) {
     Parameter *p = *it;   
-    std::vector<CCSTStatement*> tmp_statements = dealloc_containers_caller(p, m->cspaces_.at(0)->identifier(), r->current_scope());
+    std::vector<CCSTStatement*> tmp_statements = dealloc_containers_caller(p, cspace_to_use, r->current_scope());
     statements.insert(statements.end(), tmp_statements.begin(), tmp_statements.end());
   }
 

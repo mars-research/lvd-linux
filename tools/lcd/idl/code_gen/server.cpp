@@ -149,12 +149,21 @@ CCSTCompoundStatement* callee_body(Rpc *r, Module *m)
       declarations.insert(declarations.end(), tmp_decs.begin(), tmp_decs.end());
     }
 
+  if(r->function_pointer_defined()) {
+    std::vector<Parameter*> hidden_args = r->hidden_args_;
+    for(std::vector<Parameter*>::iterator it = hidden_args.begin(); it != hidden_args.end(); it ++) {
+      Parameter *p = *it;
+      // declare hiiden args.
+    }
+  }
+
   // TODO: unmarshal channel refs;
 
   // allocate/initiliaze and link these
   for(std::vector<Parameter*>::iterator it = params.begin(); it != params.end(); it ++)
     {
       Parameter *p = *it; // allocs and lookups but doesn't link yet.
+      printf("Parameter is %s\n", p->identifier());
       statements.push_back(allocate_and_link_containers_callee(p
 							       , m->cspaces_.at(0)->identifier()));
     }
@@ -406,15 +415,15 @@ CCSTFile* generate_server_source(Module *m)
        Rpc* r_tmp = (Rpc*) *it;
        if(r_tmp->function_pointer_defined()) {
 	 printf("doing function pointer def\n");
-	 	 definitions.push_back( function_definition(function_declaration(r_tmp)
-	 					    ,caller_body(r_tmp, m)));
-
-	 // need 	 definitions.push_back( function_definition(trampoline_function_declaration(r_tmp)
-	 //					    , trampoline_function_body(r_tmp)));
+	 definitions.push_back( function_definition(function_pointer_function_declaration(r_tmp)
+						    ,caller_body(r_tmp, m)));
+	 
+	 definitions.push_back( function_definition(trampoline_function_declaration(r_tmp)
+						    , trampoline_function_body(r_tmp)));
        } else {
 	 printf("doing callee_declaration\n");
-	 definitions.push_back( function_definition(callee_declaration(r_tmp)
-						    ,callee_body(r_tmp, m)));
+	 //	 definitions.push_back( function_definition(callee_declaration(r_tmp)
+	 //					    ,callee_body(r_tmp, m)));
        }
      }
    

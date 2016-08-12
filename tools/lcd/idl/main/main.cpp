@@ -9,14 +9,24 @@
 #include "code_gen.h"
 //#include "marshal_visitor.h"
 
+void print_usage() {
+    std::cerr << "Usage:\n  ./compiler [options] <idl file>\n"
+		    "Options:\n  -serverheader\t TODO (god knows)\n"
+		    "  -serversource\t generate callee code\n"
+		    "  -clientheader\t TODO (god knows)\n"
+		    "  -clientsource\t generate caller code\n";
+
+
+    exit(0);
+}
+
 int main(int argc, char ** argv)
 {
   bool pDebug = false;
 
   if(argc != 3)
     {
-      printf("error in number of args\n");
-      exit(0);
+      print_usage();
     }
 
   try

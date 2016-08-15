@@ -1,0 +1,11 @@
+#object files
+*.d
+*.pyc
+
+#parser generated files
+peg_peg.py
+parser/lcd_idl.cpp
+include/lcd_idl.h
+
+#main binary
+compiler

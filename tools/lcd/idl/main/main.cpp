@@ -95,10 +95,10 @@ int main(int argc, char ** argv)
 	      exit(0);
 	    }
 
-	    char* of_name = (char*) malloc(sizeof(char)*(strlen(m->identifier())+3));
+	    char* of_name = (char*) malloc(sizeof(char)*(strlen(m->identifier())+10));
 	    std::ostringstream total;
-	    total << m->identifier() << ".c";
-	    strncpy(of_name, total.str().c_str(), strlen(m->identifier())+3);
+	    total << m->identifier() << "_server.c";
+	    strncpy(of_name, total.str().c_str(), strlen(m->identifier())+10);
 
 	    FILE *of = fopen(of_name, "w");
 	    if(!of)
@@ -148,10 +148,10 @@ int main(int argc, char ** argv)
 	      exit(0);
 	    }
 
-	    char* of_name = (char*) malloc(sizeof(char)*(strlen(m->identifier())+3));
+	    char* of_name = (char*) malloc(sizeof(char)*(strlen(m->identifier())+10));
 	    std::ostringstream total;
-	    total << m->identifier() << ".c";
-	    strncpy(of_name, total.str().c_str(), strlen(m->identifier())+3);
+	    total << m->identifier() << "_client.c";
+	    strncpy(of_name, total.str().c_str(), strlen(m->identifier())+10);
 
 	    FILE *of = fopen(of_name, "w");
 	    if(!of)

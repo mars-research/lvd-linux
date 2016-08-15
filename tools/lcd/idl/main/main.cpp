@@ -110,6 +110,7 @@ int main(int argc, char ** argv)
 	      }
 	    CCSTFile* ccst_tree = generate_server_source(m);
 	    ccst_tree->write(of, 0);
+	    fclose(of);
 	  }
 
 	  printf("Completed Server source writing\n");
@@ -162,9 +163,9 @@ int main(int argc, char ** argv)
 	      }
 	    CCSTFile* ccst_tree = generate_client_source(m);
 	    ccst_tree->write(of, 0);
+	    fclose(of);
 	  }
 	  printf("completed client source writing\n");
-	  
 	}
       else
 	{

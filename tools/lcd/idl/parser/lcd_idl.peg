@@ -199,7 +199,7 @@ Identifier	=	i1:IdentStart i2:IdentCont* {{
 			    strncpy((char*)value.value, str.c_str(), str.length()+1); 
 			}}
 
-IdentStart	=	[abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ_-]
+IdentStart	=	[abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ_]
 
 IdentCont	=	IdentStart | [0123456789]
 

@@ -2037,8 +2037,20 @@ void CCSTReturn::write(FILE *f, int indent)
     }
 }
 
+// FIXME: How to handle this efficiently for multiple
+// levels? Surely we cannot waste memory by allocating.
+// May be some macro magic?
 const char* indentation(int level)
 {
+  switch (level) {
+    case 0:
+      return " ";
+    case 1:
+      return "\t";
+    case 2:
+      return "\t\t";
+  }
+#if 0
   int length = level*INDENT;
 
   char *spacing = (char*) malloc(sizeof(char)*(length+1));
@@ -2051,4 +2063,5 @@ const char* indentation(int level)
   }
   strncpy(spacing, total.str().c_str(), length+1);
   return spacing;
+#endif
 }

@@ -160,12 +160,12 @@ void CCSTStructUnionSpecifier::write(FILE *f, int indent)
     case struct_t:
       {
 	//  <struct-or-union> <identifier> what about this case
-	fprintf(f, "%s%s %s ", indentation(indent), "struct", this->id_);
+	fprintf(f, "%s %s", "struct", this->id_);
 	break;
       }
     case union_t:
       {
-	fprintf(f, "%s%s %s ", indentation(indent), "union", this->id_);
+	fprintf(f, "%s %s", "union", this->id_);
 	break;
       }
     default:
@@ -175,14 +175,14 @@ void CCSTStructUnionSpecifier::write(FILE *f, int indent)
     }
   if(!this->struct_dec_.empty())
     {
-      fprintf(f, "{\n");
+      fprintf(f, " {\n");
       for(std::vector<CCSTStructDeclaration*>::iterator it = struct_dec_.begin(); it != struct_dec_.end(); ++it)
 	{
 	  CCSTStructDeclaration *ds = *it;
-	  ds->write(f, indent+1);
-	  fprintf(f, "\n");
+	  ds->write(f, indent + 1);
+	  fprintf(f, ";\n");
 	}
-      fprintf(f, "%s}", indentation(indent));
+      fprintf(f, "}");
     }
 }
 
@@ -201,7 +201,7 @@ void CCSTStructDeclaration::write(FILE *f, int indent)
 	{
 	  CCSTSpecifierQual *ds = *it;
 	  ds->write(f, 0);
-	  fprintf(f, " ");
+	  //fprintf(f, " ");
 	  
 	}
     }
@@ -402,7 +402,7 @@ void CCSTDirectDecParamTypeList::write(FILE *f, int indent)
       exit(0);
     }
   this->direct_dec_->write(f, indent);
-  fprintf(f, "( ");
+  fprintf(f, "(");
   if(this->p_t_list_ == NULL)
     {
       printf("error\n");
@@ -1663,13 +1663,13 @@ void CCSTDeclaration::write(FILE *f, int indent)
     {
       CCSTDecSpecifier *dec_spec = *it;
       dec_spec->write(f, indent);
-      fprintf(f, " ");
+      //fprintf(f, " ");
     }
   for(std::vector<CCSTInitDeclarator*>::iterator it = decs_.begin(); it != decs_.end(); ++it)
     {
       CCSTInitDeclarator *init_dec = *it;
       init_dec->write(f, 0);
-      fprintf(f, " ");
+      //fprintf(f, " ");
     }
   fprintf(f, ";");
   fprintf(f, "\n");
@@ -1794,7 +1794,7 @@ CCSTPlainLabelStatement::CCSTPlainLabelStatement(const char* id, CCSTStatement *
 void CCSTPlainLabelStatement::write(FILE *f, int indent)
 {
   //todo
-  fprintf(f, "%s%s: ", indentation(indent), this->id_);
+  fprintf(f, "%s:\n", this->id_);
   this->stmnt_->write(f, 0);
 }
 
@@ -2031,16 +2031,16 @@ void CCSTReturn::write(FILE *f, int indent)
     }
   else
     {
-      fprintf(f, "%sreturn ", indentation(indent));
+      fprintf(f, "%sreturn", indentation(indent));
       this->expr_->write(f, 0);
-      fprintf(f, ";");
+      fprintf(f, ";\n");
     }
 }
 
 const char* indentation(int level)
 {
   int length = level*INDENT;
-  
+
   char *spacing = (char*) malloc(sizeof(char)*(length+1));
 
   std::ostringstream total;

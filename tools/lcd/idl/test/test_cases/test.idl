@@ -1,5 +1,7 @@
 #include <test>
 
+module test(channel c) {
+
 rpc int foo(capability cap, char v1, int v2);
 
 message foo_interface{
@@ -22,6 +24,7 @@ module name {
 
 rpc int foo2(projection name::super_block * sb);
 
+}
 
 
 

@@ -1,3 +1,0 @@
-typedef <struct foo, long long> foo_t
-
-typedef<projection bar, long long> bar_t

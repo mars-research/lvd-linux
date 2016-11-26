@@ -928,15 +928,16 @@ EXPORT_SYMBOL(module_refcount);
 /* This exists whether we can unload or not */
 static void free_module(struct module *mod);
 
-SYSCALL_DEFINE2(delete_module, const char __user *, name_user,
-		unsigned int, flags)
+
+int do_sys_delete_module(const char *name, unsigned int
+		flags, bool for_lcd)
 {
 	struct module *mod;
-
 	int ret, forced = 0;
 
 	if (!capable(CAP_SYS_MODULE) || modules_disabled)
 		return -EPERM;
+
 
 	if (mutex_lock_interruptible(&module_mutex) != 0)
 		return -EINTR;
@@ -2574,7 +2575,7 @@ static bool is_core_symbol(const Elf_Sym *src, const Elf_Shdr *sechdrs,
 }
 
 static bool is_init_symbol(const Elf_Sym *src, const Elf_Shdr *sechdrs,
-			unsigned int shnum)
+			unsigned int shnum, unsigned int pcpundx)
 {
 	const Elf_Shdr *sec;
 
@@ -2582,6 +2583,11 @@ static bool is_init_symbol(const Elf_Sym *src, const Elf_Shdr *sechdrs,
 	    || src->st_shndx >= shnum
 	    || !src->st_name)
 		return false;
+
+#ifdef CONFIG_KALLSYMS_ALL
+	if (src->st_shndx == pcpundx)
+		return true;
+#endif
 
 	sec = sechdrs + src->st_shndx;
 	if (!(sec->sh_flags & SHF_ALLOC)
@@ -2623,11 +2629,11 @@ static void layout_symtab(struct module *mod, struct load_info *info,
 	 * symbols too! yippee!
 	 */
 	for (ndst = i = 0; i < nsrc; i++) {
-		if (i == 0 ||
-		    is_core_symbol(src+i, info->sechdrs, info->hdr->e_shnum) ||
+		if (i == 0 || is_livepatch_module(mod) ||
+		    is_core_symbol(src+i, info->sechdrs, info->hdr->e_shnum, info->index.pcpu) ||
 			(for_lcd && is_init_symbol(src+i, 
 						info->sechdrs, 
-						info->hdr->e_shnum))) {
+						info->hdr->e_shnum, info->index.pcpu))) {
 			strtab_size += strlen(&info->strtab[src[i].st_name])+1;
 			ndst++;
 		}
@@ -2676,18 +2682,18 @@ static void add_kallsyms(struct module *mod, const struct load_info *info,
 	mod->kallsyms->strtab = (void *)info->sechdrs[info->index.str].sh_addr;
 
 	/* Set types up while we still have access to sections. */
-	for (i = 0; i < mod->num_symtab; i++)
-		mod->symtab[i].st_info = elf_type(&mod->symtab[i], info);
+	for (i = 0; i < mod->kallsyms->num_symtab; i++)
+		mod->kallsyms->symtab[i].st_info = elf_type(&mod->kallsyms->symtab[i], info);
 
-	mod->core_symtab = dst = mod->module_core + info->symoffs;
-	mod->core_strtab = s = mod->module_core + info->stroffs;
-	src = mod->symtab;
-	for (ndst = i = 0; i < mod->num_symtab; i++) {
-		if (i == 0 ||
-			is_core_symbol(src+i, info->sechdrs, info->hdr->e_shnum) ||
+	mod->core_kallsyms.symtab = dst = mod->core_layout.base + info->symoffs;
+	mod->core_kallsyms.strtab = s = mod->core_layout.base + info->stroffs;
+	src = mod->kallsyms->symtab;
+	for (ndst = i = 0; i < mod->kallsyms->num_symtab; i++) {
+		if (i == 0 || is_livepatch_module(mod) ||
+			is_core_symbol(src+i, info->sechdrs, info->hdr->e_shnum, info->index.pcpu) ||
 			(for_lcd && is_init_symbol(src+i, 
 						info->sechdrs, 
-						info->hdr->e_shnum))) {
+						info->hdr->e_shnum, info->index.pcpu))) {
 			dst[ndst] = src[i];
 			dst[ndst++].st_name = s - mod->core_kallsyms.strtab;
 			s += strlcpy(s, &mod->kallsyms->strtab[src[i].st_name],
@@ -3463,40 +3469,29 @@ static noinline int do_init_module(struct module *mod, int for_lcd)
 #ifdef CONFIG_KALLSYMS
 	/* Switch to core kallsyms now init is done: kallsyms may be walking! */
 	rcu_assign_pointer(mod->kallsyms, &mod->core_kallsyms);
-	if (!for_lcd) {
-		mod->num_symtab = mod->core_num_syms;
-		mod->symtab = mod->core_symtab;
-		mod->strtab = mod->core_strtab;
-	}
 #endif
 	module_enable_ro(mod, true);
-	mod_tree_remove_init(mod);
-	disable_ro_nx(&mod->init_layout);
-	module_arch_freeing_init(mod);
-	mod->init_layout.base = NULL;
-	mod->init_layout.size = 0;
-	mod->init_layout.ro_size = 0;
-	mod->init_layout.ro_after_init_size = 0;
-	mod->init_layout.text_size = 0;
 	/*
 	 * We want to free module_init, but be aware that kallsyms may be
 	 * walking this with preempt disabled.  In all the failure paths, we
 	 * call synchronize_sched(), but we don't want to slow down the success
 	 * path, so use actual RCU here.
 	 */
-	call_rcu_sched(&freeinit->rcu, do_free_init);
 	if (!for_lcd) {
+		call_rcu_sched(&freeinit->rcu, do_free_init);
 		/* 
 		 * Only free init code if we're not going to run in
 		 * an lcd. If we will run in an lcd, init code will
 		 * be deallocated via free_module in do_sys_delete_module.
 		 */
-		unset_module_init_ro_nx(mod);
-		module_free(mod, mod->module_init);
-		mod->module_init = NULL;
-		mod->init_size = 0;
-		mod->init_ro_size = 0;
-		mod->init_text_size = 0;
+		mod_tree_remove_init(mod);
+		disable_ro_nx(&mod->init_layout);
+		module_arch_freeing_init(mod);
+		mod->init_layout.base = NULL;
+		mod->init_layout.size = 0;
+		mod->init_layout.ro_size = 0;
+		mod->init_layout.ro_after_init_size = 0;
+		mod->init_layout.text_size = 0;
 	}
 	mutex_unlock(&module_mutex);
 	wake_up_all(&module_wq);
@@ -3646,7 +3641,7 @@ static int load_module(struct load_info *info, const char __user *uargs,
 		goto free_copy;
 
 	/* Figure out module layout, and allocate all the memory. */
-	mod = layout_and_allocate(info, flags);
+	mod = layout_and_allocate(info, flags, for_lcd);
 	if (IS_ERR(mod)) {
 		err = PTR_ERR(mod);
 		goto free_copy;
@@ -3701,7 +3696,7 @@ static int load_module(struct load_info *info, const char __user *uargs,
 	if (err < 0)
 		goto free_modinfo;
 
-	err = post_relocation(mod, info);
+	err = post_relocation(mod, info, for_lcd);
 	if (err < 0)
 		goto free_modinfo;
 
@@ -3757,7 +3752,7 @@ static int load_module(struct load_info *info, const char __user *uargs,
 	/* Done! */
 	trace_module_load(mod);
 
-	return do_init_module(mod);
+	return do_init_module(mod, for_lcd);
 
  sysfs_cleanup:
 	mod_sysfs_teardown(mod);
@@ -4053,7 +4048,12 @@ const char *get_ksymbol(struct module *mod,
 {
 	unsigned int i, best = 0;
 	unsigned long nextval;
-	struct mod_kallsyms *kallsyms = rcu_dereference_sched(mod->kallsyms);
+
+	/* FIXME: During 4.8 lcd merge, a null pointer exception is encountered
+	 * if rcu pointer is used. So, for now, let's switch to the actual
+	 * pointer. I am unaware of any repurcussions of this hack! - Vik
+	 */
+	struct mod_kallsyms *kallsyms = &mod->core_kallsyms;
 
 	/* At worse, next value is at end of module */
 	if (within_module_init(addr, mod))

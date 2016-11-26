@@ -97,7 +97,7 @@
 #define VM_EXIT_LOAD_IA32_EFER                  0x00200000
 #define VM_EXIT_SAVE_VMX_PREEMPTION_TIMER       0x00400000
 #define VM_EXIT_CLEAR_BNDCFGS                   0x00800000
-#define VM_EXIT_RESERVED_MASK                   0xFF836DFD
+#define VM_EXIT_RESERVED_MASK                   0xFF836DFB
 
 #define VM_EXIT_ALWAYSON_WITHOUT_TRUE_MSR	0x00036dff
 

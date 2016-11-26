@@ -112,7 +112,7 @@ void __kliblcd_module_host_unload(char *module_name)
 	module_put(m);
 	ret = do_sys_delete_module(module_name, 0, 1);
 	if (ret) {
-		LIBLCD_ERR("deleting module");
+		LIBLCD_ERR("Error deleting module from host %d", ret);
 		goto fail;
 	}
 
@@ -193,13 +193,13 @@ int lcd_load_module(char *mdir, char *mname,
 	 * like the struct module, the module's symbol table,
 	 * etc. that the host uses for certain operations).
 	 */
-	ret = dup_module_pages(va2hva(m->module_init), m->init_size,
+	ret = dup_module_pages(va2hva(m->init_layout.base), m->init_layout.size,
 			m_init_bits, m_init_pages);
 	if (ret) {
 		LIBLCD_ERR("failed to load module's init");
 		goto fail2;
 	}
-	ret = dup_module_pages(va2hva(m->module_core), m->core_size,
+	ret = dup_module_pages(va2hva(m->core_layout.base), m->core_layout.size,
 			m_core_bits, m_core_pages);
 	if (ret) {
 		LIBLCD_ERR("failed to load module's core");
@@ -210,19 +210,19 @@ int lcd_load_module(char *mdir, char *mname,
 	 * link base addresses), sizes, and location of struct
 	 * module in .ko image.
 	 */
-	*m_init_link_addr = __gva((unsigned long)m->module_init);
-	*m_core_link_addr = __gva((unsigned long)m->module_core);
-	*m_init_size = m->init_size;
-	*m_core_size = m->core_size;
+	*m_init_link_addr = __gva((unsigned long)m->init_layout.base);
+	*m_core_link_addr = __gva((unsigned long)m->core_layout.base);
+	*m_init_size = m->init_layout.size;
+	*m_core_size = m->core_layout.size;
 	*m_init_func_addr = __gva((unsigned long)m->init);
 	*m_struct_module_core_offset = 
-		((unsigned long)m) - ((unsigned long)m->module_core);
+		((unsigned long)m) - ((unsigned long)m->core_layout.base);
 
 	LIBLCD_MSG("Loaded %s.ko: ", mname);
 	printk("    init addr 0x%p init size 0x%x\n",
-		m->module_init, m->init_size);
+		m->init_layout.base, m->init_layout.size);
 	printk("    core addr 0x%p core size 0x%x\n",
-		m->module_core, m->core_size);
+		m->core_layout.base, m->core_layout.size);
 
 	/*
 	 * Unload module from host -- we don't need the host module

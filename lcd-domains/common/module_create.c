@@ -523,12 +523,12 @@ static void fix_struct_module_addrs(struct module *mod, void *m_core_bits)
 	/*
 	 * Point symbol table and string table to new home
 	 */
-	symtab_offset = ((unsigned long)mod->symtab) -
-		((unsigned long)mod->module_core);
-	strtab_offset = ((unsigned long)mod->strtab) -
-		((unsigned long)mod->module_core);
-	mod->symtab = m_core_bits + symtab_offset;
-	mod->strtab = m_core_bits + strtab_offset;
+	symtab_offset = ((unsigned long)mod->core_kallsyms.symtab) -
+		((unsigned long)mod->core_layout.base);
+	strtab_offset = ((unsigned long)mod->core_kallsyms.strtab) -
+		((unsigned long)mod->core_layout.base);
+	mod->core_kallsyms.symtab = m_core_bits + symtab_offset;
+	mod->core_kallsyms.strtab = m_core_bits + strtab_offset;
 }
 
 static int set_struct_module(cptr_t lcd, void *m_core_bits,

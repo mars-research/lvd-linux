@@ -26,7 +26,7 @@ lib-y += $(addprefix liblcd/lcd-domains/, \
 	)
 
 lib-y += $(addprefix liblcd/lib/, \
-	find_next_bit.o \
+	find_bit.o \
 	kstrtox.o \
 	string.o \
 	vsprintf.o \

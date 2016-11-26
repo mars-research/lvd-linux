@@ -51,31 +51,40 @@ static inline void vmcs_load(struct lcd_arch_vmcs *vmcs)
 		LCD_ERR("vmptrld %p/%llx failed\n", vmcs, hpa);
 }
 
-static __always_inline unsigned long vmcs_readl(unsigned long field)
+static __always_inline unsigned long __vmcs_readl(unsigned long field)
 {
 	unsigned long value;
 
 	asm volatile (ASM_VMX_VMREAD_RDX_RAX
-                : "=a"(value) : "d"(field) : "cc");
+		      : "=a"(value) : "d"(field) : "cc");
 	return value;
 }
 
 static __always_inline u16 vmcs_read16(unsigned long field)
 {
-	return vmcs_readl(field);
+	return __vmcs_readl(field);
 }
 
 static __always_inline u32 vmcs_read32(unsigned long field)
 {
-	return vmcs_readl(field);
+	return __vmcs_readl(field);
 }
 
 static __always_inline u64 vmcs_read64(unsigned long field)
 {
-	return vmcs_readl(field);
+#ifdef CONFIG_X86_64
+	return __vmcs_readl(field);
+#else
+	return __vmcs_readl(field) | ((u64)__vmcs_readl(field+1) << 32);
+#endif
 }
 
-static inline void vmcs_writel(unsigned long field, unsigned long value)
+static __always_inline unsigned long vmcs_readl(unsigned long field)
+{
+	return __vmcs_readl(field);
+}
+
+static inline void __vmcs_writel(unsigned long field, unsigned long value)
 {
 	u8 error;
 
@@ -88,20 +97,30 @@ static inline void vmcs_writel(unsigned long field, unsigned long value)
 	}
 }
 
-static inline void vmcs_write16(unsigned long field, u16 value)
+static __always_inline void vmcs_write16(unsigned long field, u16 value)
 {
-	vmcs_writel(field, value);
+	__vmcs_writel(field, value);
 }
 
-static inline void vmcs_write32(unsigned long field, u32 value)
+static __always_inline void vmcs_write32(unsigned long field, u32 value)
 {
-	vmcs_writel(field, value);
+	__vmcs_writel(field, value);
 }
 
-static inline void vmcs_write64(unsigned long field, u64 value)
+static __always_inline void vmcs_write64(unsigned long field, u64 value)
 {
-	vmcs_writel(field, value);
+	__vmcs_writel(field, value);
+#ifndef CONFIG_X86_64
+	asm volatile ("");
+	__vmcs_writel(field+1, value >> 32);
+#endif
 }
+
+static __always_inline void vmcs_writel(unsigned long field, unsigned long value)
+{
+	__vmcs_writel(field, value);
+}
+
 /**
  * Loads t on the calling cpu.
  *

@@ -3,7 +3,7 @@
 
 #include <linux/compiler.h>
 #include <linux/spinlock_types.h>
-#include <linux/ftrace_event.h>
+#include <linux/ring_buffer.h>
 #include <linux/perf_event.h>
 #include <liblcd/liblcd.h>
 
@@ -38,7 +38,7 @@ void warn_slowpath_null(const char *file, int line)
 		file, line);
 }
 
-void perf_tp_event(u64 addr, u64 count, void *record,
+void perf_tp_event(u16 event_type, u64 count, void *record,
 		int entry_size, struct pt_regs *regs,
 		struct hlist_head *head, int rctx,
 		struct task_struct *task)

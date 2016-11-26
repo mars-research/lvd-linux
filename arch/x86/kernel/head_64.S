@@ -491,8 +491,6 @@ ENTRY(phys_base)
 
 #include "../../x86/xen/xen-head.S"
 
-#include "../../x86/lcdguest/lcd-head.S"
-	
 	__PAGE_ALIGNED_BSS
 NEXT_PAGE(empty_zero_page)
 	.skip PAGE_SIZE

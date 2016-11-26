@@ -20,7 +20,6 @@
 #include <asm/tlbflush.h>
 #include <asm/pgalloc.h>
 #include <asm/pat.h>
-#include <asm/cpufeature.h>
 
 #include "physaddr.h"
 
@@ -80,9 +79,8 @@ static int __ioremap_check_ram(unsigned long start_pfn, unsigned long nr_pages,
  * have to convert them into an offset in a page-aligned mapping, but the
  * caller shouldn't need to know that small detail.
  */
-static void __iomem *___ioremap_caller(resource_size_t phys_addr,
-		unsigned long size, unsigned long prot_val, void *caller,
-				unsigned int hpages, unsigned int readonly)
+static void __iomem *__ioremap_caller(resource_size_t phys_addr,
+		unsigned long size, enum page_cache_mode pcm, void *caller)
 {
 	unsigned long offset, vaddr;
 	resource_size_t pfn, last_pfn, last_addr;
@@ -173,10 +171,6 @@ static void __iomem *___ioremap_caller(resource_size_t phys_addr,
 		break;
 	}
 
-	/* Map pages RO */
-	if (readonly)
-		prot = __pgprot((unsigned long)prot.pgprot & ~_PAGE_RW);
-
 	/*
 	 * Ok, go for it..
 	 */
@@ -189,16 +183,8 @@ static void __iomem *___ioremap_caller(resource_size_t phys_addr,
 	if (kernel_map_sync_memtype(phys_addr, size, pcm))
 		goto err_free_area;
 
-	if (hpages)
-	{
-		if (ioremap_hpage_range(vaddr, vaddr + size, phys_addr, prot))
+	if (ioremap_page_range(vaddr, vaddr + size, phys_addr, prot))
 			goto err_free_area;
-	}
-	else
-	{
-		if (ioremap_page_range(vaddr, vaddr + size, phys_addr, prot))
-			goto err_free_area;
-	}
 
 	ret_addr = (void __iomem *) (vaddr + offset);
 	mmiotrace_ioremap(unaligned_phys_addr, unaligned_size, ret_addr);
@@ -216,21 +202,6 @@ err_free_area:
 err_free_memtype:
 	free_memtype(phys_addr, phys_addr + size);
 	return NULL;
-}
-
-/*
- * Remap an arbitrary physical address space into the kernel virtual
- * address space. Needed when the kernel wants to access high addresses
- * directly.
- *
- * NOTE! We need to allow non-page-aligned mappings too: we will obviously
- * have to convert them into an offset in a page-aligned mapping, but the
- * caller shouldn't need to know that small detail.
- */
-static void __iomem *__ioremap_caller(resource_size_t phys_addr,
-		unsigned long size, unsigned long prot_val, void *caller)
-{
-	return ___ioremap_caller(phys_addr, size, prot_val, caller, 0, 0);
 }
 
 /**
@@ -340,42 +311,12 @@ EXPORT_SYMBOL(ioremap_wt);
 
 void __iomem *ioremap_cache(resource_size_t phys_addr, unsigned long size)
 {
+	/* Map using 4k pages */
 	return __ioremap_caller(phys_addr, size, _PAGE_CACHE_MODE_WB,
 				__builtin_return_address(0));
-void __iomem *
-ioremap_hpage_cache(resource_size_t phys_addr, unsigned long size)
-{
-	/* Map using hugepages */
-	return ___ioremap_caller(phys_addr, size, _PAGE_CACHE_WB,
-				__builtin_return_address(0), 1, 0);
-}
-EXPORT_SYMBOL(ioremap_hpage_cache);
-
-void __iomem *
-ioremap_hpage_cache_ro(resource_size_t phys_addr, unsigned long size)
-{
-	/* Map using hugepages */
-	return ___ioremap_caller(phys_addr, size, _PAGE_CACHE_WB,
-				__builtin_return_address(0), 1, 1);
-}
-EXPORT_SYMBOL(ioremap_hpage_cache_ro);
-
-void __iomem *ioremap_cache(resource_size_t phys_addr, unsigned long size)
-{
-	/* Map using 4k pages */
-	return ___ioremap_caller(phys_addr, size, _PAGE_CACHE_WB,
-				__builtin_return_address(0), 0, 0);
 }
 EXPORT_SYMBOL(ioremap_cache);
 
-void __iomem *ioremap_cache_ro(resource_size_t phys_addr, unsigned long size)
-{
-	/* Map using 4k pages */
-	return ___ioremap_caller(phys_addr, size, _PAGE_CACHE_WB,
-				__builtin_return_address(0), 0, 1);
-}
-
-EXPORT_SYMBOL(ioremap_cache_ro);
 void __iomem *ioremap_prot(resource_size_t phys_addr, unsigned long size,
 				unsigned long prot_val)
 {

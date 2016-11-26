@@ -150,27 +150,6 @@ void  __init early_alloc_pgt_buf(void)
 int after_bootmem;
 
 early_param_on_off("gbpages", "nogbpages", direct_gbpages, CONFIG_X86_DIRECT_GBPAGES);
-//FIXME: Pass it via early param
-// Place it here - should resolve after moving to v4.8
-int direct_gbpages
-#ifdef CONFIG_DIRECT_GBPAGES
-				= 1
-#endif
-;
-
-static void __init init_gbpages(void)
-{
-#ifdef CONFIG_X86_64
-	if (direct_gbpages && cpu_has_gbpages)
-		printk(KERN_INFO "Using GB pages for direct mapping\n");
-	else
-	{
-		printk(KERN_INFO "direct_gbpages(%d). cpu_has_gbpages(%d)."
-				"GB pages not supported.\n", direct_gbpages, cpu_has_gbpages);
-		direct_gbpages = 0;
-	}
-#endif
-}
 
 struct map_range {
 	unsigned long start;

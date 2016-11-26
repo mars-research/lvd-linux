@@ -13,6 +13,7 @@
 /* COMPILER: This is always included. */
 #include <liblcd/sync_ipc_poll.h>
 
+#include <linux/module.h>
 /* COMPILER: This always goes after all includes */
 #include <lcd_config/post_hook.h>
 

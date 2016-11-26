@@ -495,7 +495,7 @@ fail1:
 
 void cpucache_init(void);
 
-static void __init_refok kmalloc_init(void)
+static void __ref kmalloc_init(void)
 {
 	kmem_cache_init();
 	kmem_cache_init_late();

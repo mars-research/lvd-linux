@@ -31,7 +31,19 @@
 /* BEGIN LCD */
 #include <lcd_config/post_hook.h>
 /* END LCD */
+static inline unsigned long
+ex_fixup_addr(const struct exception_table_entry *x)
+{
+        return (unsigned long)&x->fixup + x->fixup;
+}
 
+bool ex_handler_fault(const struct exception_table_entry *fixup,
+                     struct pt_regs *regs, int trapnr)
+{
+        regs->ip = ex_fixup_addr(fixup);
+        regs->ax = trapnr;
+        return true;
+}
 /**
  * kstrdup - allocate space for and copy an existing string
  * @s: the string to duplicate

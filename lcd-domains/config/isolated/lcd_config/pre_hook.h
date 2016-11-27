@@ -86,3 +86,6 @@
 #define __MM_INTERNAL_H
 #endif
 
+#ifndef _LINUX_SLAB_DEF_H
+#define _LINUX_SLAB_DEF_H
+#endif

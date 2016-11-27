@@ -12,7 +12,7 @@
 
 #include <linux/kernel.h>
 #include <asm/vmx.h>
-
+#include <asm/tlbflush.h>
 #include <lcd_domains/types.h>
 #include <asm/lcd_domains/types.h>
 #include <lcd_domains/microkernel.h>
@@ -871,42 +871,42 @@ static int vmx_check_guest_ctrl_regs(struct lcd_arch *t)
 
 static inline int vmx_seg_type(u64 ar_bytes)
 {
-	return ar_bytes & AR_TYPE_MASK;
+	return ar_bytes & VMX_AR_TYPE_MASK;
 }
 
 static inline int vmx_desc_type(u64 ar_bytes)
 {
-	return (ar_bytes & AR_S_MASK) >> 3;
+	return (ar_bytes & VMX_AR_S_MASK) >> 3;
 }
 
 static inline int vmx_seg_dpl(u64 ar_bytes)
 {
-	return AR_DPL(ar_bytes);
+	return VMX_AR_DPL(ar_bytes);
 }
 
 static inline int vmx_seg_pres(u64 ar_bytes)
 {
-	return (ar_bytes & AR_P_MASK) != 0;
+	return (ar_bytes & VMX_AR_P_MASK) != 0;
 }
 
 static inline int vmx_seg_l_mode(u64 ar_bytes)
 {
-	return (ar_bytes & AR_L_MASK) != 0;
+	return (ar_bytes & VMX_AR_L_MASK) != 0;
 }
 
 static inline int vmx_seg_db(u64 ar_bytes)
 {
-	return (ar_bytes & AR_DB_MASK) != 0;
+	return (ar_bytes & VMX_AR_DB_MASK) != 0;
 }
 
 static inline int vmx_seg_gran(u64 ar_bytes)
 {
-	return (ar_bytes & AR_G_MASK) != 0;
+	return (ar_bytes & VMX_AR_G_MASK) != 0;
 }
 
 static inline int vmx_seg_usable(u64 ar_bytes)
 {
-	return (ar_bytes & AR_UNUSABLE_MASK) == 0;
+	return (ar_bytes & VMX_AR_UNUSABLE_MASK) == 0;
 }
 
 static inline int vmx_seg_bad_limit(u64 ar_bytes, u32 limit)
@@ -932,7 +932,7 @@ static inline int vmx_seg_usable_bad_lim(u64 ar_bytes, u32 limit)
 
 static inline int vmx_seg_resrv(u64 ar_bytes)
 {
-	return ar_bytes & AR_RESERVD_MASK;
+	return ar_bytes & VMX_AR_RESERVD_MASK;
 }
 
 static int vmx_check_guest_seg(struct lcd_arch *t)

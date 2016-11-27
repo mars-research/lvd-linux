@@ -8,6 +8,8 @@
  */
 
 #include <asm/vmx.h>
+#include <asm/tlbflush.h>
+
 #include <linux/mm.h>
 #include <linux/spinlock.h>
 #include <asm/desc.h>
@@ -194,7 +196,7 @@ static void vmx_setup_vmcs_host(struct lcd_arch *lcd_arch)
 	 * Intel SDM V3 2.5
 	 */
 	vmcs_writel(HOST_CR0, read_cr0() & ~X86_CR0_TS);
-	vmcs_writel(HOST_CR4, read_cr4());
+	vmcs_writel(HOST_CR4, cr4_read_shadow());
 	vmcs_writel(HOST_CR3, read_cr3());
 
 	/*
@@ -440,7 +442,7 @@ static void vmx_setup_vmcs_guest_regs(struct lcd_arch *lcd_arch)
 	if (boot_cpu_has(X86_FEATURE_PCID))
 		cr4 |= X86_CR4_PCIDE;
 	if (boot_cpu_has(X86_FEATURE_FSGSBASE))
-		cr4 |= X86_CR4_RDWRGSFS;
+		cr4 |= X86_CR4_FSGSBASE;
 	vmcs_writel(GUEST_CR4, cr4);
 	vmcs_writel(CR4_READ_SHADOW, cr4);
 
@@ -744,8 +746,8 @@ static void __vmx_get_cpu_helper(void *ptr)
 	lcd_arch = ptr;
 	BUG_ON(raw_smp_processor_id() != lcd_arch->cpu);
 	vmcs_clear(lcd_arch->vmcs);
-	if (__get_cpu_var(local_lcd_arch) == lcd_arch)
-		__get_cpu_var(local_lcd_arch) = NULL;
+	if (__this_cpu_read(local_lcd_arch) == lcd_arch)
+		this_cpu_write(local_lcd_arch, NULL);
 }
 
 void vmx_get_cpu(struct lcd_arch *lcd_arch)
@@ -769,9 +771,9 @@ void vmx_get_cpu(struct lcd_arch *lcd_arch)
 	 * Otherwise, we need to make t active
 	 * and current on this cpu.
 	 */
-	if (__get_cpu_var(local_lcd_arch) != lcd_arch) {
+	if (__this_cpu_read(local_lcd_arch) != lcd_arch) {
 
-		__get_cpu_var(local_lcd_arch) = lcd_arch;
+		this_cpu_write(local_lcd_arch, lcd_arch);
 
 		if (lcd_arch->cpu != cur_cpu) {
 
@@ -952,7 +954,7 @@ void lcd_arch_destroy(struct lcd_arch *lcd_arch)
 	 * VM clear on this cpu
 	 */
 	vmcs_clear(lcd_arch->vmcs);
-	__get_cpu_var(local_lcd_arch) = NULL;
+	this_cpu_write(local_lcd_arch, NULL);
 	/*
 	 * Preemption enabled
 	 */

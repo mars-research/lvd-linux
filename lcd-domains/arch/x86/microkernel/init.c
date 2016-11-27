@@ -415,9 +415,8 @@ static int __vmx_enable(struct lcd_arch_vmcs *vmxon_buf)
 	/*
 	 * We can't use vmx if someone else is
 	 */
-	if (read_cr4() & X86_CR4_VMXE)
+	if (cr4_read_shadow() & X86_CR4_VMXE)
 		return -EBUSY;
-	write_cr4(read_cr4() | X86_CR4_VMXE);
 
 	/*
 	 * Set MSR_IA32_FEATURE_CONTROL
@@ -433,6 +432,11 @@ static int __vmx_enable(struct lcd_arch_vmcs *vmxon_buf)
 		/* enable and lock */
 		wrmsrl(MSR_IA32_FEATURE_CONTROL, old | test_bits);
 	}
+
+	/*
+	 * set VMXE bit using this as opposed to directly writing cr4
+	 */
+	cr4_set_bits(X86_CR4_VMXE);
 
 	/*
 	 * Turn on vmx
@@ -456,7 +460,7 @@ static void vmx_enable(void *unused)
 	int ret;
 	struct lcd_arch_vmcs *vmxon_buf;
 
-	vmxon_buf = __get_cpu_var(vmxon_area);
+	vmxon_buf = __this_cpu_read(vmxon_area);
 	
 	/*
 	 * Turn on vmx
@@ -471,7 +475,7 @@ static void vmx_enable(void *unused)
 	 */
 	lcd_arch_ept_global_invalidate();
 
-	__get_cpu_var(vmx_enabled) = 1;
+	this_cpu_write(vmx_enabled, 1);
 
 	printk(KERN_INFO "VMX enabled on CPU %d\n",	
 		raw_smp_processor_id());
@@ -493,10 +497,17 @@ failed:
  */
 static void vmx_disable(void *unused)
 {
-	if (__get_cpu_var(vmx_enabled)) {
+	if (__this_cpu_read(vmx_enabled)) {
 		__vmxoff();
-		write_cr4(read_cr4() & ~X86_CR4_VMXE);
-		__get_cpu_var(vmx_enabled) = 0;
+		cr4_clear_bits(X86_CR4_VMXE);
+		if (cr4_read_shadow() & X86_CR4_VMXE)
+			LCD_ERR("VMX disabling failed on cpu %d\n",
+				raw_smp_processor_id());
+		else
+			LCD_MSG("VMX disabling Successful on cpu %d\n",
+				raw_smp_processor_id());
+
+		this_cpu_write(vmx_enabled, 0);
 	}
 }
 

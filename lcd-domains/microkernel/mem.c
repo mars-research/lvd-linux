@@ -120,7 +120,7 @@ int __lcd_insert_memory_object(struct lcd *caller, cptr_t slot,
 			mo, 
 			__lcd_get_libcap_type(sub_type));
 	if (ret) {
-		LCD_ERR("insert");
+		LCD_ERR("cap_insert failed with return code %d", ret);
 		goto fail4;
 	}
 	/*
@@ -174,7 +174,7 @@ int __lcd_alloc_pages_exact_node(struct lcd *caller, cptr_t slot, int nid,
 	/*
 	 * Allocate zero'd pages on node
 	 */
-	p = alloc_pages_exact_node(nid, flags | __GFP_ZERO, order);
+	p = __alloc_pages_node(nid, flags | __GFP_ZERO, order);
 	if (!p) {
 		LCD_ERR("alloc failed");
 		ret = -ENOMEM;

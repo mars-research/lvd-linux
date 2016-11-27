@@ -82,6 +82,8 @@ __lcd_sprint_symbol(char *buffer, hva_t hva, struct module *extra_module)
 		 * XXX: Danger: This is for debug only. The struct module
 		 * is mapped inside an LCD which could mess with it.
 		 */
+		/* FIXME: Refer to comments in the definition of
+		 * get_ksymbol under kernel/module.c */
 		sym_name = get_ksymbol(extra_module, hva_val(hva),
 				&size, &offset);
 		if (!sym_name)

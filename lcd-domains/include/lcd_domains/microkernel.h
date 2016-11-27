@@ -13,6 +13,7 @@
 #include <linux/types.h>
 #include <linux/spinlock.h>
 #include <linux/interval_tree.h>
+#include <linux/vmalloc.h>
 
 #include <asm/lcd_domains/types.h>
 #include <lcd_domains/types.h>
@@ -532,7 +533,7 @@ int __lcd_insert_memory_object(struct lcd *caller,
  * @flags: gfp flags
  * @order: alloc 2^order pages
  *
- * This uses Linux's alloc_pages_exact_node internally.
+ * This uses Linux's __alloc_pages_node internally.
  */
 int __lcd_alloc_pages_exact_node(struct lcd *caller, cptr_t slot, int nid,
 				unsigned int flags, unsigned int order);

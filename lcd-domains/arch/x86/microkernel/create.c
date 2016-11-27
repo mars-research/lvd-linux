@@ -36,7 +36,7 @@ struct lcd_arch_vmcs *lcd_arch_alloc_vmcs(int cpu)
 	struct lcd_arch_vmcs *vmcs;
 
 	node = cpu_to_node(cpu);
-	pages = alloc_pages_exact_node(node, GFP_KERNEL, 
+	pages = __alloc_pages_node(node, GFP_KERNEL, 
 				lcd_global_vmcs_config.order);
 	if (!pages)
 		return NULL;

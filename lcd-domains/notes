@@ -1,15 +1,15 @@
                  U arch_get_unmapped_area_sz
                  U autoremove_wake_function
                  U boot_cpu_data
-                 U call_rcu_sched
+X REDEF DONE     U call_rcu_sched
                  U capable
-                 U clear_inode
+X GLUE DONE      U clear_inode
                  U clear_nlink
                  U __copy_user_nocache
 X SUCK DONE      U crc16
                  U current_kernel_time
                  U d_instantiate
-X GLUE           U d_make_root
+X GLUE DONE      U d_make_root
                  U d_obtain_alias
                  U drop_nlink
                  U d_splice_alias
@@ -27,8 +27,8 @@ X GLUE           U d_make_root
 X REDEF  DONE    U get_random_bytes
 X REDEF  DONE    U get_seconds
                  U __get_user_4
-X GLUE           U iget_failed
-X GLUE           U iget_locked
+X GLUE DONE      U iget_failed
+X GLUE DONE      U iget_locked
                  U ihold
                  U inc_nlink
                  U init_special_inode
@@ -45,9 +45,9 @@ X LIBLCD DONE    U ioremap_cache_ro
 X LIBLCD DONE    U ioremap_hpage_cache
 X LIBLCD DONE    U ioremap_hpage_cache_ro
 X LIBLCD DONE    U iounmap
-X GLUE           U iput
+                 U iput
                  U is_bad_inode
-X GLUE           U kill_anon_super
+X GLUE DONE      U kill_anon_super
 X NO-OP DONE     U kthread_create_on_node
 X NO-OP DONE     U kthread_should_stop
 X NO-OP DONE     U kthread_stop
@@ -58,7 +58,7 @@ X SUCK  DONE     U match_token
 X SUCK  DONE     U memparse
                  U mnt_drop_write_file
                  U mnt_want_write_file
-X GLUE           U mount_nodev
+X GLUE DONE      U mount_nodev
                  U new_inode
                  U noop_fsync
                  U panic
@@ -69,7 +69,7 @@ X GLUE           U mount_nodev
                  U ___ratelimit
                  U _raw_spin_lock
                  U _raw_spin_unlock
-X NO-OP DONE     U __release_region   XXX: Non-isol will need to grant during mount
+X NO-OP DONE     U __release_region
 X NO-OP DONE     U __request_region
                  U __sb_end_write
                  U __sb_start_write
@@ -82,8 +82,8 @@ X NO-OP DONE     U __request_region
                  U set_nlink
                  U __supported_pte_mask
                  U touch_atime
-                 U truncate_inode_pages
-X GLUE           U unlock_new_inode
+X GLUE DONE      U truncate_inode_pages (shouldn't do much)
+X GLUE DONE      U unlock_new_inode
                  U vfs_follow_link
                  U vfs_readlink
                  U vm_insert_mixed
@@ -96,5 +96,33 @@ X NO-OP  DONE    U wake_up_process
 
 current fsuid, fsgid, ns --> elide DONE
 
-glue for super ops -> put_super
-glue for mount fn pointer
+glue for super ops
+     alloc_inode DONE
+     destroy_inode DONE
+     put_super DONE
+     evict_inode DONE
+        -- assume i links > 0, truncate list is empty
+
+glue for fs type DONE
+     -- populate fn pointers in register_filesystem DONE
+     -- kill fn pointers in unregister_filesystem DONE
+     mount DONE
+           -- need to volunteer fs phys mem DONE
+     kill_sb DONE
+           -- this will unvolunteer fs phys mem DONE
+           -- kill super_block trampolines after kill_sb rpc DONE
+
+glue for pmfs_fill_super DONE
+     -- this is where we'll populate super ops DONE
+
+Also todo: make sure containers are set up properly
+     -- modify super_block alloc/free DONE
+     -- modify dentry alloc/free DONE
+
+TODO: Need to marshal module crap over in register fs DONE
+
+Not going to have user level do mount call, because too complicated
+to interface user thread with the dispatch loop on non-isolated side.
+Just have non-isolated side call mount system call or something, same
+for umount. Maybe. May not work - maybe only real threads (non-kthreads) 
+are allowed to call mount, since kthreads may not have a root dir.

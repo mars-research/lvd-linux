@@ -1,0 +1,26 @@
+
+1 - A pointer points to a struct embedded inside another struct. It's difficult
+or impossible to wrap that other struct in a container, because it changes
+the layout of the struct it's inside. (It only makes sense to have one
+container per memory chunk.) However, it's then hard for glue to know
+whether the struct is embedded or not.
+
+2 - The callee might try to use "current", including mm related stuff. This
+assumes that the calling thread is the same as the original thread that
+started off the call sequence. This may not be true if we have other threads
+handling calls/replies. It may not be simple to switch "current", so it might
+require some code modification of callee.
+
+3 - The caller may pass a global variable as an argument to a function. But
+the global variable is defined on the callee side. Could add a "getter". But
+when does callee insert global variable into caller's cspace? Perhaps it checks
+if ref is non-null already (insert already done).
+
+4 - Tracking the percolation of shared, stateful objects is hard.
+
+5 - Handling error scenarios is hard. For example, consider LCD A and B. B
+does an rpc to A, and something happens inside A that causes an error. So
+A returns an error status to B. Perhaps B wants to do *additional* rpc's
+on A because of the error. A needs to be ready to handle those error-scenario
+rpc's, or else B will just sit there waiting.
+

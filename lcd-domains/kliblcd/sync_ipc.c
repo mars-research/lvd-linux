@@ -78,5 +78,6 @@ EXPORT_SYMBOL(_lcd_create_sync_endpoint);
 EXPORT_SYMBOL(lcd_create_sync_endpoint);
 EXPORT_SYMBOL(lcd_sync_send);
 EXPORT_SYMBOL(lcd_sync_recv);
+EXPORT_SYMBOL(lcd_sync_poll_recv);
 EXPORT_SYMBOL(lcd_sync_call);
 EXPORT_SYMBOL(lcd_sync_reply);

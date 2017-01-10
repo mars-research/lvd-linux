@@ -49,3 +49,7 @@ llvm_example/lcd isolated
 
 ioremap/boot nonisolated
 ioremap/lcd isolated
+
+nullnet/boot nonisolated
+nullnet/dummy_lcd isolated
+nullnet/net_klcd nonisolated

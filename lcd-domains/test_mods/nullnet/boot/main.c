@@ -56,39 +56,25 @@ static int boot_main(void)
 		goto fail4;
 	}
 
-	/* ---------- Grant caps ---------- */
-	/*
-	ret = cptr_alloc(lcd_to_boot_cptr_cache(net_ctx), 
-			&net_chnl_domain_cptr);
-	if (ret) {
-		LIBLCD_ERR("alloc cptr");
-		goto fail5;
-	}
-	ret = lcd_cap_grant(net_lcd, net_chnl, net_chnl_domain_cptr);
-	if (ret) {
-		LIBLCD_ERR("grant");
-		goto fail6;
-	} */
 	ret = cptr_alloc(lcd_to_boot_cptr_cache(dummy_ctx), 
 			&dummy_chnl_domain_cptr);
 	if (ret) {
 		LIBLCD_ERR("alloc cptr");
-		goto fail7;
+		goto fail5;
 	}
 	ret = lcd_cap_grant(dummy_lcd, net_chnl, dummy_chnl_domain_cptr);
 	if (ret) {
 		LIBLCD_ERR("grant");
-		goto fail8;
+		goto fail6;
 	}
 	
 	/* ---------- Set up boot info ---------- */
-
-//	lcd_to_boot_info(net_ctx)->cptrs[0] = net_chnl_domain_cptr;
+	// HACK: But WTF is this?
 	net_chnl_domain_cptr = __cptr(3);
 	ret = lcd_cap_grant(net_lcd, net_chnl, net_chnl_domain_cptr);
 	if (ret) {
 		LIBLCD_ERR("grant");
-		goto fail6;
+		goto fail7;
 	}
 
 	lcd_to_boot_info(dummy_ctx)->cptrs[0] = dummy_chnl_domain_cptr;
@@ -100,7 +86,7 @@ static int boot_main(void)
 	ret = lcd_run(net_lcd);
 	if (ret) {
 		LIBLCD_ERR("failed to start vfs lcd");
-		goto fail9;
+		goto fail8;
 	}
 	/* Wait a few moments so vfs lcd has a chance to enter its
 	 * dispatch loop. This is obviously a hack. You could use some
@@ -111,7 +97,7 @@ static int boot_main(void)
 	ret = lcd_run(dummy_lcd);
 	if (ret) {
 		LIBLCD_ERR("failed to start dummy lcd");
-		goto fail10;
+		goto fail9;
 	}
 	/*
 	 * Wait for 4 seconds
@@ -126,13 +112,13 @@ static int boot_main(void)
 
 	/* The destroy's will free up everything ... */
 out:
-fail10:
 fail9:
 fail8:
 fail7:
-fail6:
 	lcd_cap_delete(dummy_lcd);
 	lcd_destroy_create_ctx(dummy_ctx);
+fail6:
+fail5:
 fail4:
 	lcd_cap_delete(net_lcd);
 fail3:

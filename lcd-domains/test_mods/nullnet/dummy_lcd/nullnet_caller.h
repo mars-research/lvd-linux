@@ -3,7 +3,7 @@
 
 #include "../glue_helper.h"
 
-int glue_nullnet_init(struct cptr c, struct lcd_sync_channel_group *nullnet_group);
+int glue_nullnet_init(void);
 void glue_nullnet_exit(void);
 int ndo_init_callee(struct fipc_message *request, struct thc_channel *channel, struct cspace *cspace, struct cptr sync_ep);
 int ndo_uninit_callee(struct fipc_message *request, struct thc_channel *channel, struct cspace *cspace, struct cptr sync_ep);

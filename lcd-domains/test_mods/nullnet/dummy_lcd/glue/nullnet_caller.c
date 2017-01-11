@@ -4,24 +4,20 @@
 #include <liblcd/glue_cspace.h>
 #include "../../glue_helper.h"
 #include "../nullnet_caller.h"
-static struct cptr c;
 struct cptr sync_ep;
 static struct glue_cspace *c_cspace;
 struct thc_channel *net_async;
-static struct lcd_sync_channel_group *nullnet_group;
 
-int glue_nullnet_init(struct cptr c1, struct lcd_sync_channel_group *nullnet_group1)
+int glue_nullnet_init(void)
 {
 	int ret;
-	c = c1;
-	nullnet_group = nullnet_group1;
 	ret = glue_cap_init();
-	if (!ret) {
+	if (ret) {
 		LIBLCD_ERR("cap init");
 		goto fail1;
 	}
 	ret = glue_cap_create(&c_cspace);
-	if (!ret) {
+	if (ret) {
 		LIBLCD_ERR("cap create");
 		goto fail2;
 	}
@@ -40,13 +36,185 @@ void glue_nullnet_exit()
 
 }
 
+static int setup_async_channel(cptr_t *buf1_cptr_out, cptr_t *buf2_cptr_out,
+			struct thc_channel **chnl_out)
+{
+	int ret;
+	cptr_t buf1_cptr, buf2_cptr;
+	gva_t buf1_addr, buf2_addr;
+	struct fipc_ring_channel *fchnl;
+	struct thc_channel *chnl;
+	unsigned int pg_order = PMFS_ASYNC_RPC_BUFFER_ORDER - PAGE_SHIFT;
+	/*
+	 * Allocate buffers
+	 *
+	 * (We use the lower level alloc. If we used the heap, even though
+	 * we may alloc only 1 - 2 pages, we would end up sharing around
+	 * 4 MB chunks of memory, since the heap uses coarse microkernel
+	 * allocations.)
+	 */
+	ret = _lcd_alloc_pages(GFP_KERNEL, pg_order, &buf1_cptr);
+	if (ret) {
+		LIBLCD_ERR("buf1 alloc");
+		goto fail1;
+	}
+	ret = _lcd_alloc_pages(GFP_KERNEL, pg_order, &buf2_cptr);
+	if (ret) {
+		LIBLCD_ERR("buf2 alloc");
+		goto fail2;
+	}
+	/*
+	 * Map them somewhere
+	 */
+	ret = lcd_map_virt(buf1_cptr, pg_order, &buf1_addr);
+	if (ret) {
+		LIBLCD_ERR("error mapping buf1");
+		goto fail3;
+	}
+	ret = lcd_map_virt(buf2_cptr, pg_order, &buf2_addr);
+	if (ret) {
+		LIBLCD_ERR("error mapping buf2");
+		goto fail4;
+	}
+	/*
+	 * Prep buffers for rpc
+	 */
+	ret = fipc_prep_buffers(PMFS_ASYNC_RPC_BUFFER_ORDER,
+				(void *)gva_val(buf1_addr),
+				(void *)gva_val(buf2_addr));
+	if (ret) {
+		LIBLCD_ERR("prep buffers");
+		goto fail5;
+	}
+	/*
+	 * Alloc and init channel header
+	 */
+	fchnl = kmalloc(sizeof(*fchnl), GFP_KERNEL);
+	if (!fchnl) {
+		ret = -ENOMEM;
+		LIBLCD_ERR("chnl alloc");
+		goto fail6;
+	}
+	ret = fipc_ring_channel_init(fchnl, PMFS_ASYNC_RPC_BUFFER_ORDER,
+				(void *)gva_val(buf1_addr),
+				(void *)gva_val(buf2_addr));
+	if (ret) {
+		LIBLCD_ERR("ring chnl init");
+		goto fail7;
+	}
+	/*
+	 * Install async channel in async dispatch loop
+	 */
+	chnl = kzalloc(sizeof(*chnl), GFP_KERNEL);
+	if (!chnl) {
+		ret = -ENOMEM;
+		LIBLCD_ERR("alloc failed");
+		goto fail8;
+	}
+	ret = thc_channel_init(chnl, fchnl);
+	if (ret) {
+		LIBLCD_ERR("error init'ing async channel group item");
+		goto fail9;
+	}
+
+	*buf1_cptr_out = buf1_cptr;
+	*buf2_cptr_out = buf2_cptr;
+	*chnl_out = chnl;
+
+	return 0;
+
+fail9:
+	kfree(chnl);
+fail8:
+fail7:
+	kfree(fchnl);
+fail6:
+fail5:
+	lcd_unmap_virt(buf1_addr, pg_order);
+fail4:
+	lcd_unmap_virt(buf1_addr, pg_order);
+fail3:
+	lcd_cap_delete(buf2_cptr);
+fail2:
+	lcd_cap_delete(buf1_cptr);
+fail1:
+	return ret; 
+}
+
+static void destroy_async_channel(struct thc_channel *chnl)
+{
+	unsigned int pg_order = PMFS_ASYNC_RPC_BUFFER_ORDER - PAGE_SHIFT;
+	gva_t tx_gva, rx_gva;
+	cptr_t tx, rx;
+	int ret;
+	unsigned long unused1, unused2;
+	/*
+	 * Translate ring buffers to cptrs
+	 */
+	tx_gva = __gva((unsigned long)thc_channel_to_fipc(chnl)->tx.buffer);
+	rx_gva = __gva((unsigned long)thc_channel_to_fipc(chnl)->rx.buffer);
+	ret = lcd_virt_to_cptr(tx_gva, &tx, &unused1, &unused2);
+	if (ret) {
+		LIBLCD_ERR("failed to translate tx to cptr");
+		goto fail1;
+	}
+	ret = lcd_virt_to_cptr(rx_gva, &rx, &unused1, &unused2);
+	if (ret) {
+		LIBLCD_ERR("failed to translate rx to cptr");
+		goto fail2;
+	}
+	/*
+	 * Unmap and kill tx/rx
+	 */
+	lcd_unmap_virt(tx_gva, pg_order);
+	lcd_cap_delete(tx);
+	lcd_unmap_virt(rx_gva, pg_order);
+	lcd_cap_delete(rx);
+	/*
+	 * Free chnl header
+	 */
+	kfree(thc_channel_to_fipc(chnl));
+	/*
+	 * Free the async channel
+	 *
+	 * XXX: This is ok to do because there is no dispatch loop
+	 * polling on the channel when we free it.
+	 */
+	kfree(chnl);
+
+	return;
+
+fail2:
+fail1:
+	return;
+}
+
+cptr_t net_sync_endpoint;
+
 int __rtnl_link_register(struct rtnl_link_ops *ops)
 {
 	struct rtnl_link_ops_container *ops_container;
 	int err;
 	struct fipc_message *request;
 	struct fipc_message *response;
+	cptr_t tx, rx;
+	struct thc_channel *chnl;
 	int ret;
+
+	/*
+	 * Set up async and sync channels
+	 */
+	ret = lcd_create_sync_endpoint(&net_sync_endpoint);
+	if (ret) {
+		LIBLCD_ERR("lcd_create_sync_endpoint");
+		goto fail1;
+	}
+	ret = setup_async_channel(&tx, &rx, &chnl);
+	if (ret) {
+		LIBLCD_ERR("async chnl setup failed");
+		goto fail2;
+	}
+
 	ops_container = container_of(ops, struct rtnl_link_ops_container, rtnl_link_ops);
 	err = glue_cap_insert_rtnl_link_ops_type(c_cspace, ops_container, &ops_container->my_ref);
 	if (err) {
@@ -69,6 +237,11 @@ int __rtnl_link_register(struct rtnl_link_ops *ops)
 	ops_container->other_ref.cptr = fipc_get_reg2(response);
 	ret = fipc_get_reg2(response);
 	fipc_recv_msg_end(thc_channel_to_fipc(net_async), response);
+
+	return ret;
+fail2:
+	lcd_cap_delete(net_sync_endpoint);
+fail1:
 	return ret;
 
 }
@@ -336,6 +509,8 @@ void rtnl_link_unregister(struct rtnl_link_ops *ops)
 	}
 	glue_cap_remove(c_cspace, ops_container->my_ref);
 	fipc_recv_msg_end(thc_channel_to_fipc(net_async), response);
+
+	destroy_async_channel(net_async);
 	return;
 }
 

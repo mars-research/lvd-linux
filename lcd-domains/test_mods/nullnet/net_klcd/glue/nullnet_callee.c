@@ -7,27 +7,44 @@
 #include "../nullnet_callee.h"
 
 struct thc_channel *net_async;
-struct cspace *c_cspace;
-struct glue_cspace *gc_cspace;
+//struct cspace *c_cspace;
 struct cptr sync_ep;
 
 struct trampoline_hidden_args {
 	void *struct_container;
-	struct cspace *cspace;
+	struct glue_cspace *cspace;
 	struct lcd_trampoline_handle *t_handle;
 	struct thc_channel *async_chnl;
 	struct cptr sync_ep;
 };
 
-//static struct cptr c;
+static struct glue_cspace *c_cspace;
 
 int glue_nullnet_init(void)
 {
-return 0;
+	int ret;
+	ret = glue_cap_init();
+	if (ret) {
+		LIBLCD_ERR("cap init");
+		goto fail1;
+	}
+	ret = glue_cap_create(&c_cspace);
+	if (ret) {
+		LIBLCD_ERR("cap create");
+		goto fail2;
+	}
+	return 0;
+fail2:
+	glue_cap_exit();
+fail1:
+	return ret;
+
 }
 
-void glue_nullnet_exit(void)
+void glue_nullnet_exit()
 {
+	glue_cap_destroy(c_cspace);
+	glue_cap_exit();
 
 }
 
@@ -440,7 +457,7 @@ int register_netdevice_callee(struct fipc_message *request, struct thc_channel *
 		LIBLCD_ERR("kzalloc");
 		lcd_exit(-1);
 	}
-	err = glue_cap_insert_net_device_type(gc_cspace, dev_container, &dev_container->my_ref);
+	err = glue_cap_insert_net_device_type(c_cspace, dev_container, &dev_container->my_ref);
 	if (!err) {
 		LIBLCD_ERR("lcd insert");
 		lcd_exit(-1);
@@ -797,7 +814,7 @@ int __rtnl_link_register_callee(struct fipc_message *request, struct thc_channel
 		LIBLCD_ERR("kzalloc");
 		lcd_exit(-1);
 	}
-	err = glue_cap_insert_rtnl_link_ops_type(gc_cspace, ops_container, &ops_container->my_ref);
+	err = glue_cap_insert_rtnl_link_ops_type(c_cspace, ops_container, &ops_container->my_ref);
 	if (!err) {
 		LIBLCD_ERR("lcd insert");
 		lcd_exit(-1);
@@ -883,7 +900,7 @@ int rtnl_link_unregister_callee(struct fipc_message *request, struct thc_channel
 	struct trampoline_hidden_args *validate_hidden_args;
 	request_cookie = thc_get_request_cookie(request);
 	fipc_recv_msg_end(thc_channel_to_fipc(net_async), request);
-	err = glue_cap_lookup_rtnl_link_ops_type(gc_cspace, __cptr(fipc_get_reg2(request)), &ops_container);
+	err = glue_cap_lookup_rtnl_link_ops_type(c_cspace, __cptr(fipc_get_reg2(request)), &ops_container);
 	if (err) {
 		LIBLCD_ERR("lookup");
 		lcd_exit(-1);
@@ -895,7 +912,7 @@ int rtnl_link_unregister_callee(struct fipc_message *request, struct thc_channel
 	}
 //	ops->kind = fipc_get_reg1(request);
 	rtnl_link_unregister(( &ops_container->rtnl_link_ops ));
-	glue_cap_remove(gc_cspace, ops_container->my_ref);
+	glue_cap_remove(c_cspace, ops_container->my_ref);
 	setup_hidden_args = LCD_TRAMPOLINE_TO_HIDDEN_ARGS(ops_container->rtnl_link_ops.setup);
 	kfree(setup_hidden_args->t_handle);
 	kfree(setup_hidden_args);
@@ -979,7 +996,7 @@ int consume_skb_callee(struct fipc_message *request, struct thc_channel *channel
 	unsigned 	int request_cookie;
 	request_cookie = thc_get_request_cookie(request);
 	fipc_recv_msg_end(thc_channel_to_fipc(net_async), request);
-	err = glue_cap_lookup_sk_buff_type(gc_cspace, __cptr(fipc_get_reg1(request)), &skb_container);
+	err = glue_cap_lookup_sk_buff_type(c_cspace, __cptr(fipc_get_reg1(request)), &skb_container);
 	if (err) {
 		LIBLCD_ERR("lookup");
 		lcd_exit(-1);

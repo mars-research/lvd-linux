@@ -42,6 +42,7 @@ enum dispatch_t {
 	SETUP
 };
 
+#define PMFS_ASYNC_RPC_BUFFER_ORDER 12
 /* CONTAINERS 	---------- */
 struct net_device_container {
 	struct net_device net_device;

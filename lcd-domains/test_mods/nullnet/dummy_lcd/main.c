@@ -14,8 +14,8 @@
 
 cptr_t nullnet_register_channel;
 struct thc_channel *nullnet_async_chnl;
-struct glue_cspace *nullnet_cspace;
-cptr_t nullnet_sync_endpoint;
+//struct glue_cspace *nullnet_cspace;
+//cptr_t nullnet_sync_endpoint;
 int dummy_done;
 int dummy_init_module(void);
 void dummy_cleanup_module(void);

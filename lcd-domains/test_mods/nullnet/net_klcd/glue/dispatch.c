@@ -10,17 +10,17 @@
 
 #include <lcd_config/post_hook.h>
 
-int dispatch_sync_net_channel(void)
+#define trace(x) LIBLCD_MSG("net got " #x " msg")
+
+int dispatch_sync_loop(void)
 {
 	int fn_type = lcd_r0();
 
 	switch (fn_type) {
 
 	case __RTNL_LINK_REGISTER:
-//		return __rtnl_link_register_callee(message, channel, cspace,
-//						sync_endpoint);
-		break;
-
+		trace(RTNL_LINK_REGISTER);
+		return __rtnl_link_register_callee();
 	default:
 		LIBLCD_ERR("unexpected function label %d", fn_type);
 		return -EINVAL;
@@ -29,11 +29,10 @@ int dispatch_sync_net_channel(void)
 	return 0;
 }
 
-#define trace(x) LIBLIBLCD_MSG("net got " #x " msg")
 
-int dispatch_async_net_channel(struct thc_channel *channel, 
+int dispatch_async_loop(struct thc_channel *channel, 
 			struct fipc_message *message,
-			struct cspace *cspace,
+			struct glue_cspace *cspace,
 			cptr_t sync_endpoint)
 {
 	int ret;

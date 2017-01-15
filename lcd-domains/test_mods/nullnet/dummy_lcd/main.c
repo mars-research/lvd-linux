@@ -14,8 +14,8 @@
 
 cptr_t nullnet_register_channel;
 struct thc_channel *nullnet_async_chnl;
-//struct glue_cspace *nullnet_cspace;
-//cptr_t nullnet_sync_endpoint;
+struct glue_cspace *nullnet_cspace;
+cptr_t nullnet_sync_endpoint;
 int dummy_done;
 int dummy_init_module(void);
 void dummy_cleanup_module(void);
@@ -25,9 +25,8 @@ void dummy_cleanup_module(void);
 static void main_and_loop(void)
 {
 	int ret;
-	int stop = 0;
+	int stop = 1;
 	struct fipc_message *msg;
-	return;
 	DO_FINISH(
 
 		ASYNC(
@@ -63,9 +62,9 @@ static void main_and_loop(void)
 			 */
 			ASYNC(
 
-//				ret = dispatch_fs_channel(nullnet_async_chnl, msg,
-//							nullnet_cspace, 
-//							nullnet_sync_endpoint);
+				ret = dispatch_async_loop(nullnet_async_chnl, msg,
+							nullnet_cspace, 
+							nullnet_sync_endpoint);
 				if (ret) {
 					LIBLCD_ERR("async dispatch failed");
 					stop = 1;
@@ -83,6 +82,7 @@ static void main_and_loop(void)
 	 * to just run this without a loop (it's effectively polling since
 	 * only one awe will run in this do-finish).
 	 */
+	if (1) 
 	DO_FINISH(
 		ASYNC(
 			dummy_cleanup_module();
@@ -98,7 +98,7 @@ static void main_and_loop(void)
 	return;
 }
 
-static int dummy_lcd_init(void) 
+static int __noreturn dummy_lcd_init(void) 
 {
 	int r = 0;
 
@@ -110,10 +110,11 @@ static int dummy_lcd_init(void)
 	 * Get the nullnet channel cptr from boot info
 	 */
 	nullnet_register_channel = lcd_get_boot_info()->cptrs[0];
+	printk("nullnet reg channel %lu\n", nullnet_register_channel.cptr);
 	/*
 	 * Initialize nullnet glue
 	 */
-	//r = glue_nullnet_init();
+	r = glue_nullnet_init();
 	if (r) {
 		LIBLCD_ERR("nullnet init");
 		goto fail2;
@@ -125,11 +126,9 @@ static int dummy_lcd_init(void)
 
 	/* DONE -------------------------------------------------- */
 
-	//glue_nullnet_exit();
+	glue_nullnet_exit();
 
 	lcd_exit(0); /* doesn't return */
-	return 0;
-
 fail2:
 fail1:
 	lcd_exit(r);
@@ -150,10 +149,6 @@ static int __dummy_lcd_init(void)
 
 static void __exit dummy_lcd_exit(void)
 {
-	//glue_nullnet_exit();
-
-	lcd_exit(0);
-
 	return;
 }
 

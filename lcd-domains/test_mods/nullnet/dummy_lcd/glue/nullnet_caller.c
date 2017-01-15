@@ -45,6 +45,7 @@ static int setup_async_channel(cptr_t *buf1_cptr_out, cptr_t *buf2_cptr_out,
 	struct fipc_ring_channel *fchnl;
 	struct thc_channel *chnl;
 	unsigned int pg_order = PMFS_ASYNC_RPC_BUFFER_ORDER - PAGE_SHIFT;
+	LIBLCD_MSG("%s\n",__func__);
 	/*
 	 * Allocate buffers
 	 *
@@ -86,6 +87,7 @@ static int setup_async_channel(cptr_t *buf1_cptr_out, cptr_t *buf2_cptr_out,
 		LIBLCD_ERR("prep buffers");
 		goto fail5;
 	}
+	LIBLCD_MSG("==> Prep buffers");
 	/*
 	 * Alloc and init channel header
 	 */
@@ -101,6 +103,17 @@ static int setup_async_channel(cptr_t *buf1_cptr_out, cptr_t *buf2_cptr_out,
 	if (ret) {
 		LIBLCD_ERR("ring chnl init");
 		goto fail7;
+	}
+	{
+		size_t sz = sizeof(*chnl);
+		int idx = kmalloc_index(sz);
+		int i = 0;
+		for (i = 0; i < sizeof(kmalloc_caches)/sizeof(kmalloc_caches[0]); i++) {
+			printk("--> idx %d | cache addr %p\n", i, kmalloc_caches[i]);
+		}
+		LIBLCD_MSG("==> Prep buffers 2, size %zu | idx %d  | ptr %p",
+			sz, idx, kmalloc_caches[idx]);
+		
 	}
 	/*
 	 * Install async channel in async dispatch loop
@@ -189,14 +202,13 @@ fail1:
 	return;
 }
 
-cptr_t net_sync_endpoint;
+extern cptr_t nullnet_sync_endpoint;
+extern cptr_t nullnet_register_channel;
 
 int __rtnl_link_register(struct rtnl_link_ops *ops)
 {
 	struct rtnl_link_ops_container *ops_container;
 	int err;
-	struct fipc_message *request;
-	struct fipc_message *response;
 	cptr_t tx, rx;
 	struct thc_channel *chnl;
 	int ret;
@@ -204,7 +216,7 @@ int __rtnl_link_register(struct rtnl_link_ops *ops)
 	/*
 	 * Set up async and sync channels
 	 */
-	ret = lcd_create_sync_endpoint(&net_sync_endpoint);
+	ret = lcd_create_sync_endpoint(&nullnet_sync_endpoint);
 	if (ret) {
 		LIBLCD_ERR("lcd_create_sync_endpoint");
 		goto fail1;
@@ -216,31 +228,49 @@ int __rtnl_link_register(struct rtnl_link_ops *ops)
 	}
 
 	ops_container = container_of(ops, struct rtnl_link_ops_container, rtnl_link_ops);
+	LIBLCD_MSG("Retrieve container ops %p\n", ops_container);
 	err = glue_cap_insert_rtnl_link_ops_type(c_cspace, ops_container, &ops_container->my_ref);
 	if (err) {
 		LIBLCD_ERR("lcd insert");
-		lcd_exit(-1);
+		goto fail3;
 	}
-	ret = async_msg_blocking_send_start(net_async, &request);
-	if (ret) {
-		LIBLCD_ERR("failed to get a send slot");
-		lcd_exit(-1);
-	}
-	async_msg_set_fn_type(request, __RTNL_LINK_REGISTER);
-	fipc_set_reg2(request, ops_container->my_ref.cptr);
-//	fipc_set_reg1(request, ops->kind);
-	err = thc_ipc_call(net_async, request, &response);
-	if (err) {
-		LIBLCD_ERR("thc_ipc_call");
-		lcd_exit(-1);
-	}
-	ops_container->other_ref.cptr = fipc_get_reg2(response);
-	ret = fipc_get_reg2(response);
-	fipc_recv_msg_end(thc_channel_to_fipc(net_async), response);
+        lcd_set_r0(__RTNL_LINK_REGISTER);
+        lcd_set_r1(cptr_val(ops_container->my_ref));
+        lcd_set_cr0(nullnet_sync_endpoint);
+        lcd_set_cr1(rx);
+        lcd_set_cr2(tx);
 
+        ret = lcd_sync_call(nullnet_register_channel);
+
+        /*
+         * Flush cap registers
+         */
+        lcd_set_cr0(CAP_CPTR_NULL);
+        lcd_set_cr1(CAP_CPTR_NULL);
+        lcd_set_cr2(CAP_CPTR_NULL);
+        if (ret) {
+                LIBLCD_ERR("lcd_call");
+                goto fail4;
+        }
+
+        ret = lcd_r0();
+	printk("%s: Got %d\n", __func__, ret);
+        if (ret < 0) {
+                LIBLCD_ERR("remote register fs failed");
+                goto fail5;
+        }
+
+	ops_container->other_ref.cptr = lcd_r1();
+	net_async = chnl;
 	return ret;
+
+fail5:
+fail4:
+        glue_cap_remove(c_cspace, ops_container->my_ref);
+fail3:
+        destroy_async_channel(chnl);
 fail2:
-	lcd_cap_delete(net_sync_endpoint);
+	lcd_cap_delete(nullnet_sync_endpoint);
 fail1:
 	return ret;
 
@@ -497,7 +527,7 @@ void rtnl_link_unregister(struct rtnl_link_ops *ops)
 	ret = async_msg_blocking_send_start(net_async, &request);
 	if (ret) {
 		LIBLCD_ERR("failed to get a send slot");
-		lcd_exit(-1);
+		goto fail1;
 	}
 	async_msg_set_fn_type(request, RTNL_LINK_UNREGISTER);
 	fipc_set_reg2(request, ops_container->my_ref.cptr);
@@ -505,12 +535,15 @@ void rtnl_link_unregister(struct rtnl_link_ops *ops)
 	err = thc_ipc_call(net_async, request, &response);
 	if (err) {
 		LIBLCD_ERR("thc_ipc_call");
-		lcd_exit(-1);
+		goto fail2;
 	}
 	glue_cap_remove(c_cspace, ops_container->my_ref);
 	fipc_recv_msg_end(thc_channel_to_fipc(net_async), response);
 
+	lcd_cap_delete(nullnet_sync_endpoint);
 	destroy_async_channel(net_async);
+fail2:
+fail1:
 	return;
 }
 
@@ -582,7 +615,7 @@ void consume_skb(struct sk_buff *skb)
 	return;
 }
 
-int ndo_init_callee(struct fipc_message *request, struct thc_channel *channel, struct cspace *cspace, struct cptr sync_ep)
+int ndo_init_callee(struct fipc_message *request, struct thc_channel *channel, struct glue_cspace *cspace, struct cptr sync_ep)
 {
 	struct net_device *dev;
 	struct fipc_message *response;
@@ -622,7 +655,7 @@ int ndo_init_callee(struct fipc_message *request, struct thc_channel *channel, s
 
 }
 
-int ndo_uninit_callee(struct fipc_message *request, struct thc_channel *channel, struct cspace *cspace, struct cptr sync_ep)
+int ndo_uninit_callee(struct fipc_message *request, struct thc_channel *channel, struct glue_cspace *cspace, struct cptr sync_ep)
 {
 	//struct net_device *dev;
 	int ret;
@@ -640,7 +673,7 @@ int ndo_uninit_callee(struct fipc_message *request, struct thc_channel *channel,
 
 }
 
-int ndo_start_xmit_callee(struct fipc_message *request, struct thc_channel *channel, struct cspace *cspace, struct cptr sync_ep)
+int ndo_start_xmit_callee(struct fipc_message *request, struct thc_channel *channel, struct glue_cspace *cspace, struct cptr sync_ep)
 {
 //	struct sk_buff *skb;
 //	struct net_device *dev;
@@ -660,7 +693,7 @@ int ndo_start_xmit_callee(struct fipc_message *request, struct thc_channel *chan
 
 }
 
-int ndo_validate_addr_callee(struct fipc_message *request, struct thc_channel *channel, struct cspace *cspace, struct cptr sync_ep)
+int ndo_validate_addr_callee(struct fipc_message *request, struct thc_channel *channel, struct glue_cspace *cspace, struct cptr sync_ep)
 {
 	//struct net_device *dev;
 	struct fipc_message *response;
@@ -679,7 +712,7 @@ int ndo_validate_addr_callee(struct fipc_message *request, struct thc_channel *c
 
 }
 
-int ndo_set_rx_mode_callee(struct fipc_message *request, struct thc_channel *channel, struct cspace *cspace, struct cptr sync_ep)
+int ndo_set_rx_mode_callee(struct fipc_message *request, struct thc_channel *channel, struct glue_cspace *cspace, struct cptr sync_ep)
 {
 	int ret;
 	struct fipc_message *response;
@@ -696,7 +729,7 @@ int ndo_set_rx_mode_callee(struct fipc_message *request, struct thc_channel *cha
 
 }
 
-int ndo_set_mac_address_callee(struct fipc_message *request, struct thc_channel *channel, struct cspace *cspace, struct cptr sync_ep)
+int ndo_set_mac_address_callee(struct fipc_message *request, struct thc_channel *channel, struct glue_cspace *cspace, struct cptr sync_ep)
 {
 //	void *addr;
 	struct fipc_message *response;
@@ -739,7 +772,7 @@ int ndo_set_mac_address_callee(struct fipc_message *request, struct thc_channel 
 
 }
 
-int ndo_get_stats64_callee(struct fipc_message *request, struct thc_channel *channel, struct cspace *cspace, struct cptr sync_ep)
+int ndo_get_stats64_callee(struct fipc_message *request, struct thc_channel *channel, struct glue_cspace *cspace, struct cptr sync_ep)
 {
 	//struct rtnl_link_stats64 *storage;
 	struct fipc_message *response;
@@ -758,7 +791,7 @@ int ndo_get_stats64_callee(struct fipc_message *request, struct thc_channel *cha
 
 }
 
-int ndo_change_carrier_callee(struct fipc_message *request, struct thc_channel *channel, struct cspace *cspace, struct cptr sync_ep)
+int ndo_change_carrier_callee(struct fipc_message *request, struct thc_channel *channel, struct glue_cspace *cspace, struct cptr sync_ep)
 {
 //	struct net_device *dev;
 	//bool new_carrier;
@@ -778,7 +811,7 @@ int ndo_change_carrier_callee(struct fipc_message *request, struct thc_channel *
 
 }
 
-int setup_callee(struct fipc_message *request, struct thc_channel *channel, struct cspace *cspace, struct cptr sync_ep)
+int setup_callee(struct fipc_message *request, struct thc_channel *channel, struct glue_cspace *cspace, struct cptr sync_ep)
 {
 	//struct net_device *dev;
 	int ret;
@@ -796,7 +829,7 @@ int setup_callee(struct fipc_message *request, struct thc_channel *channel, stru
 	return ret;
 }
 
-int validate_callee(struct fipc_message *request, struct thc_channel *channel, struct cspace *cspace, struct cptr sync_ep)
+int validate_callee(struct fipc_message *request, struct thc_channel *channel, struct glue_cspace *cspace, struct cptr sync_ep)
 {
 	struct nlattr **tb;
 	struct nlattr **data;

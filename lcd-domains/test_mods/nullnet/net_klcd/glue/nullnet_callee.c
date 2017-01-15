@@ -6,8 +6,10 @@
 #include "../../glue_helper.h"
 #include "../nullnet_callee.h"
 
+#include <asm/cacheflush.h>
+
 struct thc_channel *net_async;
-//struct cspace *c_cspace;
+//struct glue_cspace *c_cspace;
 struct cptr sync_ep;
 
 struct trampoline_hidden_args {
@@ -46,6 +48,127 @@ void glue_nullnet_exit()
 	glue_cap_destroy(c_cspace);
 	glue_cap_exit();
 
+}
+
+static void destroy_async_fs_ring_channel(struct thc_channel *chnl)
+{
+	cptr_t tx, rx;
+	gva_t tx_gva, rx_gva;
+	unsigned long unused1, unused2;
+	int ret;
+	unsigned int pg_order = PMFS_ASYNC_RPC_BUFFER_ORDER - PAGE_SHIFT;
+	/*
+	 * Translate ring buffers to cptrs
+	 */
+	tx_gva = __gva((unsigned long)thc_channel_to_fipc(chnl)->tx.buffer);
+	rx_gva = __gva((unsigned long)thc_channel_to_fipc(chnl)->rx.buffer);
+	ret = lcd_virt_to_cptr(tx_gva, &tx, &unused1, &unused2);
+	if (ret) {
+		LIBLCD_ERR("failed to translate tx to cptr");
+		goto fail1;
+	}
+	ret = lcd_virt_to_cptr(rx_gva, &rx, &unused1, &unused2);
+	if (ret) {
+		LIBLCD_ERR("failed to translate rx to cptr");
+		goto fail2;
+	}
+	/*
+	 * Unmap and kill tx/rx
+	 */
+	lcd_unmap_virt(tx_gva, pg_order);
+	lcd_cap_delete(tx);
+	lcd_unmap_virt(rx_gva, pg_order);
+	lcd_cap_delete(rx);
+	/*
+	 * Free chnl header
+	 */
+	kfree(thc_channel_to_fipc(chnl));
+	/*
+	 * Free the thc channel
+	 *
+	 * XXX: We are assuming this is called *from the dispatch loop*
+	 * (i.e., as part of handling a callee function), so no one
+	 * else (no other awe) is going to try to use the channel
+	 * after we kill it. (For the PMFS LCD, this is not possible,
+	 * because the unregister happens from a *caller context*.)
+	 */
+	kfree(chnl);
+
+	return;
+
+fail2:
+fail1:
+	return;
+}
+
+static int setup_async_fs_ring_channel(cptr_t tx, cptr_t rx, 
+				struct thc_channel **chnl_out)
+{
+	gva_t tx_gva, rx_gva;
+	int ret;
+	struct fipc_ring_channel *fchnl;
+	struct thc_channel *chnl;
+	unsigned int pg_order = PMFS_ASYNC_RPC_BUFFER_ORDER - PAGE_SHIFT;
+	/*
+	 * Map tx and rx buffers (caller has already prep'd buffers)
+	 */
+	ret = lcd_map_virt(tx, pg_order, &tx_gva);
+	if (ret) {
+		LIBLCD_ERR("failed to map tx");
+		goto fail1;
+	}
+	ret = lcd_map_virt(rx, pg_order, &rx_gva);
+	if (ret) {
+		LIBLCD_ERR("failed to map rx");
+		goto fail2;
+	}
+	/*
+	 * Alloc and init channel header
+	 */
+	fchnl = kmalloc(sizeof(*fchnl), GFP_KERNEL);
+	if (!fchnl) {
+		ret = -ENOMEM;
+		LIBLCD_ERR("malloc failed");
+		goto fail3;
+	}
+	ret = fipc_ring_channel_init(fchnl,
+				PMFS_ASYNC_RPC_BUFFER_ORDER,
+				/* (note: gva == hva for non-isolated) */
+				(void *)gva_val(tx_gva),
+				(void *)gva_val(rx_gva));
+	if (ret) {
+		LIBLCD_ERR("channel init failed");
+		goto fail4;
+	}
+	/*
+	 * Add to async channel group
+	 */
+	chnl = kzalloc(sizeof(*chnl), GFP_KERNEL);
+	if (!chnl) {
+		ret = -ENOMEM;
+		LIBLCD_ERR("malloc failed");
+		goto fail5;
+	}
+	ret = thc_channel_init(chnl, fchnl);
+	if (ret) {
+		LIBLCD_ERR("async group item init failed");
+		goto fail6;
+	}
+
+	*chnl_out = chnl;
+	return 0;
+
+fail6:
+	kfree(chnl);
+fail5:
+fail4:
+	kfree(fchnl);
+fail3:
+	lcd_unmap_virt(rx_gva, pg_order);
+fail2:
+	lcd_unmap_virt(tx_gva, pg_order);
+fail1:
+	return ret;
 }
 
 int ndo_init(struct net_device *dev, struct trampoline_hidden_args *hidden_args)
@@ -431,7 +554,7 @@ void LCD_TRAMPOLINE_LINKAGE(setup_trampoline) setup_trampoline(struct net_device
 
 }
 
-int register_netdevice_callee(struct fipc_message *request, struct thc_channel *channel, struct cspace *cspace, struct cptr sync_ep)
+int register_netdevice_callee(struct fipc_message *request, struct thc_channel *channel, struct glue_cspace *cspace, struct cptr sync_ep)
 {
 	struct net_device_container *dev_container;
 	struct net_device_ops_container *netdev_ops_container;
@@ -620,7 +743,7 @@ int register_netdevice_callee(struct fipc_message *request, struct thc_channel *
 
 }
 
-int ether_setup_callee(struct fipc_message *request, struct thc_channel *channel, struct cspace *cspace, struct cptr sync_ep)
+int ether_setup_callee(struct fipc_message *request, struct thc_channel *channel, struct glue_cspace *cspace, struct cptr sync_ep)
 {
 	int ret;
 	struct net_device *dev;
@@ -659,7 +782,7 @@ int ether_setup_callee(struct fipc_message *request, struct thc_channel *channel
 
 }
 
-int eth_mac_addr_callee(struct fipc_message *request, struct thc_channel *channel, struct cspace *cspace, struct cptr sync_ep)
+int eth_mac_addr_callee(struct fipc_message *request, struct thc_channel *channel, struct glue_cspace *cspace, struct cptr sync_ep)
 {
 	//struct net_device *dev;
 	int ret;
@@ -724,7 +847,7 @@ int eth_mac_addr_callee(struct fipc_message *request, struct thc_channel *channe
 
 }
 
-int eth_validate_addr_callee(struct fipc_message *request, struct thc_channel *channel, struct cspace *cspace, struct cptr sync_ep)
+int eth_validate_addr_callee(struct fipc_message *request, struct thc_channel *channel, struct glue_cspace *cspace, struct cptr sync_ep)
 {
 	//struct net_device *dev;
 	int ret;
@@ -744,7 +867,7 @@ int eth_validate_addr_callee(struct fipc_message *request, struct thc_channel *c
 
 }
 
-int free_netdev_callee(struct fipc_message *request, struct thc_channel *channel, struct cspace *cspace, struct cptr sync_ep)
+int free_netdev_callee(struct fipc_message *request, struct thc_channel *channel, struct glue_cspace *cspace, struct cptr sync_ep)
 {
 //	struct net_device *dev;
 	int ret;
@@ -762,7 +885,7 @@ int free_netdev_callee(struct fipc_message *request, struct thc_channel *channel
 
 }
 
-int netif_carrier_off_callee(struct fipc_message *request, struct thc_channel *channel, struct cspace *cspace, struct cptr sync_ep)
+int netif_carrier_off_callee(struct fipc_message *request, struct thc_channel *channel, struct glue_cspace *cspace, struct cptr sync_ep)
 {
 //	struct net_device *dev;
 	int ret;
@@ -780,7 +903,7 @@ int netif_carrier_off_callee(struct fipc_message *request, struct thc_channel *c
 
 }
 
-int netif_carrier_on_callee(struct fipc_message *request, struct thc_channel *channel, struct cspace *cspace, struct cptr sync_ep)
+int netif_carrier_on_callee(struct fipc_message *request, struct thc_channel *channel, struct glue_cspace *cspace, struct cptr sync_ep)
 {
 	//struct net_device *dev;
 	int ret;
@@ -798,33 +921,49 @@ int netif_carrier_on_callee(struct fipc_message *request, struct thc_channel *ch
 
 }
 
-int __rtnl_link_register_callee(struct fipc_message *request, struct thc_channel *channel, struct cspace *cspace, struct cptr sync_ep)
+//int __rtnl_link_register_callee(struct fipc_message *request, struct thc_channel *channel, struct glue_cspace *cspace, struct cptr sync_ep)
+int __rtnl_link_register_callee(void)
 {
 	struct rtnl_link_ops_container *ops_container;
+	cptr_t tx, rx;
+	struct thc_channel *chnl;
+	cptr_t sync_endpoint;
 	int ret;
-	struct fipc_message *response;
-	unsigned 	int request_cookie;
 	struct trampoline_hidden_args *setup_hidden_args;
 	struct trampoline_hidden_args *validate_hidden_args;
 	int err;
-	request_cookie = thc_get_request_cookie(request);
-	fipc_recv_msg_end(thc_channel_to_fipc(net_async), request);
+	struct fs_info *fs_info;
 	ops_container = kzalloc(sizeof( struct rtnl_link_ops_container   ), GFP_KERNEL);
 	if (!ops_container) {
 		LIBLCD_ERR("kzalloc");
-		lcd_exit(-1);
+		goto fail7;
 	}
 	err = glue_cap_insert_rtnl_link_ops_type(c_cspace, ops_container, &ops_container->my_ref);
-	if (!err) {
+	if (err) {
 		LIBLCD_ERR("lcd insert");
-		lcd_exit(-1);
+		goto fail7;
 	}
-	ops_container->other_ref.cptr = fipc_get_reg2(response);
-	ops_container->rtnl_link_ops.kind = kzalloc(sizeof( char   ), GFP_KERNEL);
-	if (!ops_container->rtnl_link_ops.kind) {
-		LIBLCD_ERR("kzalloc");
-		lcd_exit(-1);
+	ops_container->other_ref.cptr = lcd_r1();
+	sync_endpoint = lcd_cr0();
+	tx = lcd_cr1(); rx = lcd_cr2();
+
+	/*
+	 * Set up async ring channel
+	 */
+	ret = setup_async_fs_ring_channel(tx, rx, &chnl);
+	if (ret) {
+		LIBLCD_ERR("error setting up ring channel");
+		goto fail6;
 	}
+	/*
+	 * Add to dispatch loop
+	 */
+	fs_info = add_fs(chnl, c_cspace, sync_endpoint);
+	if (!fs_info) {
+		LIBLCD_ERR("error adding to dispatch loop");
+		goto fail7;
+	}
+	ops_container->fs_info = fs_info;
 	setup_hidden_args = kzalloc(sizeof( *setup_hidden_args ), GFP_KERNEL);
 	if (!setup_hidden_args) {
 		LIBLCD_ERR("kzalloc hidden args");
@@ -838,7 +977,17 @@ int __rtnl_link_register_callee(struct fipc_message *request, struct thc_channel
 	setup_hidden_args->t_handle->hidden_args = setup_hidden_args;
 	setup_hidden_args->struct_container = ops_container;
 	setup_hidden_args->cspace = c_cspace;
+	setup_hidden_args->sync_ep = sync_endpoint;
+	setup_hidden_args->async_chnl = chnl;
 	ops_container->rtnl_link_ops.setup = LCD_HANDLE_TO_TRAMPOLINE(setup_hidden_args->t_handle);
+	ret = set_memory_x(((unsigned long)setup_hidden_args->t_handle) & PAGE_MASK,
+			ALIGN(LCD_TRAMPOLINE_SIZE(setup_trampoline),
+				PAGE_SIZE) >> PAGE_SHIFT);
+	if (ret) {
+		LIBLCD_ERR("set mem nx");
+		goto fail3;
+	}
+
 	validate_hidden_args = kzalloc(sizeof( *validate_hidden_args ), GFP_KERNEL);
 	if (!validate_hidden_args) {
 		LIBLCD_ERR("kzalloc hidden args");
@@ -852,21 +1001,44 @@ int __rtnl_link_register_callee(struct fipc_message *request, struct thc_channel
 	validate_hidden_args->t_handle->hidden_args = validate_hidden_args;
 	validate_hidden_args->struct_container = ops_container;
 	validate_hidden_args->cspace = c_cspace;
-	ops_container->rtnl_link_ops.validate = LCD_HANDLE_TO_TRAMPOLINE(validate_hidden_args->t_handle);
-	//ops->kind = fipc_get_reg1(request);
-	ret = __rtnl_link_register(( &ops_container->rtnl_link_ops ));
-	if (async_msg_blocking_send_start(net_async, &response)) {
-		LIBLCD_ERR("error getting response msg");
-		return -EIO;
+	validate_hidden_args->sync_ep = sync_endpoint;
+	validate_hidden_args->async_chnl = chnl;
+	ret = set_memory_x(((unsigned long)validate_hidden_args->t_handle) & PAGE_MASK,
+			ALIGN(LCD_TRAMPOLINE_SIZE(validate_trampoline),
+				PAGE_SIZE) >> PAGE_SHIFT);
+	if (ret) {
+		LIBLCD_ERR("set mem nx");
+		goto fail3;
 	}
-	fipc_set_reg1(response, ops_container->other_ref.cptr);
-	fipc_set_reg2(response, ret);
-	thc_ipc_reply(net_async, request_cookie, response);
-	return ret;
 
+	LIBLCD_MSG("Calling real function ");
+ops_container->rtnl_link_ops.validate = LCD_HANDLE_TO_TRAMPOLINE(validate_hidden_args->t_handle);
+	ops_container->rtnl_link_ops.kind = "dummy"; 
+	ret = __rtnl_link_register(( &ops_container->rtnl_link_ops ));
+	lcd_set_r1(ops_container->other_ref.cptr);
+	goto out;
+fail7:
+fail6:
+fail3:
+	kfree(chnl);
+	destroy_async_fs_ring_channel(chnl);
+	return ret;
+out:
+	/*
+	 * Flush capability registers
+	 */
+	lcd_set_cr0(CAP_CPTR_NULL);
+	lcd_set_cr1(CAP_CPTR_NULL);
+	lcd_set_cr2(CAP_CPTR_NULL);
+
+	lcd_set_r0(ret);
+
+	if (lcd_sync_reply())
+		LIBLCD_ERR("double fault?");
+	return ret;
 }
 
-int __rtnl_link_unregister_callee(struct fipc_message *request, struct thc_channel *channel, struct cspace *cspace, struct cptr sync_ep)
+int __rtnl_link_unregister_callee(struct fipc_message *request, struct thc_channel *channel, struct glue_cspace *cspace, struct cptr sync_ep)
 {
 	struct rtnl_link_ops *ops;
 	int ret;
@@ -889,7 +1061,7 @@ int __rtnl_link_unregister_callee(struct fipc_message *request, struct thc_chann
 	return ret;
 }
 
-int rtnl_link_unregister_callee(struct fipc_message *request, struct thc_channel *channel, struct cspace *cspace, struct cptr sync_ep)
+int rtnl_link_unregister_callee(struct fipc_message *request, struct thc_channel *channel, struct glue_cspace *cspace, struct cptr sync_ep)
 {
 	struct rtnl_link_ops_container *ops_container;
 	int ret;
@@ -899,18 +1071,13 @@ int rtnl_link_unregister_callee(struct fipc_message *request, struct thc_channel
 	struct trampoline_hidden_args *setup_hidden_args;
 	struct trampoline_hidden_args *validate_hidden_args;
 	request_cookie = thc_get_request_cookie(request);
-	fipc_recv_msg_end(thc_channel_to_fipc(net_async), request);
+	fipc_recv_msg_end(thc_channel_to_fipc(channel), request);
 	err = glue_cap_lookup_rtnl_link_ops_type(c_cspace, __cptr(fipc_get_reg2(request)), &ops_container);
 	if (err) {
 		LIBLCD_ERR("lookup");
 		lcd_exit(-1);
 	}
-	ops_container->rtnl_link_ops.kind = kzalloc(sizeof( char   ), GFP_KERNEL);
-	if (!ops_container->rtnl_link_ops.kind) {
-		LIBLCD_ERR("kzalloc");
-		lcd_exit(-1);
-	}
-//	ops->kind = fipc_get_reg1(request);
+	LIBLCD_MSG("Calling real function %s", __func__);
 	rtnl_link_unregister(( &ops_container->rtnl_link_ops ));
 	glue_cap_remove(c_cspace, ops_container->my_ref);
 	setup_hidden_args = LCD_TRAMPOLINE_TO_HIDDEN_ARGS(ops_container->rtnl_link_ops.setup);
@@ -920,16 +1087,16 @@ int rtnl_link_unregister_callee(struct fipc_message *request, struct thc_channel
 	kfree(validate_hidden_args->t_handle);
 	kfree(validate_hidden_args);
 	kfree(ops_container);
-	if (async_msg_blocking_send_start(net_async, &response)) {
+	if (async_msg_blocking_send_start(channel, &response)) {
 		LIBLCD_ERR("error getting response msg");
 		return -EIO;
 	}
-	thc_ipc_reply(net_async, request_cookie, response);
+	thc_ipc_reply(channel, request_cookie, response);
 	return ret;
 
 }
 
-int alloc_netdev_mqs_callee(struct fipc_message *request, struct thc_channel *channel, struct cspace *cspace, struct cptr sync_ep)
+int alloc_netdev_mqs_callee(struct fipc_message *request, struct thc_channel *channel, struct glue_cspace *cspace, struct cptr sync_ep)
 {
 	int sizeof_priv;
 	int ret;
@@ -987,7 +1154,7 @@ int alloc_netdev_mqs_callee(struct fipc_message *request, struct thc_channel *ch
 
 }
 
-int consume_skb_callee(struct fipc_message *request, struct thc_channel *channel, struct cspace *cspace, struct cptr sync_ep)
+int consume_skb_callee(struct fipc_message *request, struct thc_channel *channel, struct glue_cspace *cspace, struct cptr sync_ep)
 {
 	int ret;
 	int err;

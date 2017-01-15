@@ -18,7 +18,7 @@ static int boot_main(void)
 	int ret;
 	cptr_t net_chnl;
 	cptr_t net_chnl_domain_cptr, dummy_chnl_domain_cptr;
-	cptr_t net_lcd, dummy_lcd;
+	cptr_t net_klcd, dummy_lcd;
 	struct lcd_create_ctx *dummy_ctx;
 	/*
 	 * Enter lcd mode
@@ -41,7 +41,7 @@ static int boot_main(void)
 
 	ret = lcd_create_module_klcd(LCD_DIR("nullnet/net_klcd"),
 				"lcd_test_mod_nullnet_net_klcd",
-				&net_lcd);
+				&net_klcd);
 
 	if (ret) {
 		LIBLCD_ERR("failed to create net klcd");
@@ -71,7 +71,7 @@ static int boot_main(void)
 	/* ---------- Set up boot info ---------- */
 	// HACK: But WTF is this?
 	net_chnl_domain_cptr = __cptr(3);
-	ret = lcd_cap_grant(net_lcd, net_chnl, net_chnl_domain_cptr);
+	ret = lcd_cap_grant(net_klcd, net_chnl, net_chnl_domain_cptr);
 	if (ret) {
 		LIBLCD_ERR("grant");
 		goto fail7;
@@ -83,16 +83,12 @@ static int boot_main(void)
 	/* ---------- RUN! ---------- */
 
 	LIBLCD_MSG("starting network...");
-	ret = lcd_run(net_lcd);
+	ret = lcd_run(net_klcd);
 	if (ret) {
 		LIBLCD_ERR("failed to start vfs lcd");
 		goto fail8;
 	}
-	/* Wait a few moments so vfs lcd has a chance to enter its
-	 * dispatch loop. This is obviously a hack. You could use some
-	 * kind of protocol to wait for the vfs to signal it is ready. */
-	//msleep(2000);
-
+	
 	LIBLCD_MSG("starting dummy ethernet...");
 	ret = lcd_run(dummy_lcd);
 	if (ret) {
@@ -102,7 +98,7 @@ static int boot_main(void)
 	/*
 	 * Wait for 4 seconds
 	 */
-	msleep(4000);
+	msleep(10000);
 	/*
 	 * Tear everything down
 	 */
@@ -120,7 +116,8 @@ fail7:
 fail6:
 fail5:
 fail4:
-	lcd_cap_delete(net_lcd);
+	//lcd_cap_delete(net_klcd);
+	lcd_destroy_module_klcd(net_klcd, "lcd_test_mod_nullnet_net_klcd");
 fail3:
 fail2:
 	lcd_exit(0); /* will free endpoints */

@@ -1,18 +1,56 @@
 #include <lcd_config/pre_hook.h>
 
 #include <linux/module.h>
-/* COMPILER: This is always included. */
+#include <linux/kernel.h>
 #include <liblcd/liblcd.h>
-
-/* COMPILER: This is always included. */
 #include <liblcd/sync_ipc_poll.h>
+#include <linux/kthread.h>
+#include <linux/delay.h>
+#include <thc.h>
+
 
 #include "./nullnet_callee.h"
 
 /* COMPILER: This is always included after all includes. */
 #include <lcd_config/post_hook.h>
 /* LOOP ------------------------------------------------------------ */
-#if 0
+struct fs_info {
+	struct thc_channel *chnl;
+	struct glue_cspace *cspace;
+	cptr_t sync_endpoint;
+	struct list_head list;
+};
+static LIST_HEAD(fs_infos);
+
+struct fs_info * 
+add_fs(struct thc_channel *chnl, struct glue_cspace *cspace,
+	cptr_t sync_endpoint)
+{
+	struct fs_info *fs_info;
+	
+	fs_info = kmalloc(sizeof(*fs_info), GFP_KERNEL);
+	if (!fs_info)
+		goto fail1;
+	fs_info->chnl = chnl;
+	fs_info->cspace = cspace;
+	fs_info->sync_endpoint = sync_endpoint;
+	INIT_LIST_HEAD(&fs_info->list);
+	list_add(&fs_info->list, &fs_infos);
+
+	return fs_info;
+
+fail1:
+	return NULL;
+}
+
+void remove_fs(struct fs_info *fs)
+{
+	list_del_init(&fs->list);
+	kfree(fs);
+}
+
+
+
 static int async_loop(struct fs_info **fs_out, struct fipc_message **msg_out)
 {
 	struct fs_info *cursor, *next;
@@ -54,6 +92,7 @@ static int async_loop(struct fs_info **fs_out, struct fipc_message **msg_out)
 	return -EWOULDBLOCK;
 }
 
+/* LOOP -------------------------------------------------- */
 static int do_one_register(cptr_t register_chnl)
 {
 	int ret;
@@ -109,35 +148,93 @@ fail2:
 fail1:
 	return ret;
 }
-#endif
-/* LOOP -------------------------------------------------- */
+#define REGISTER_FREQ	50
 
-//static void loop(struct lcd_sync_channel_group *group)
 static void loop(cptr_t register_chnl)
 {
-	struct lcd_sync_channel_group_item *chnl = NULL;
-	int ret = 0 ;
-	int count = 0;
-	return;
-	for (;;) {
+	unsigned long tics = jiffies + REGISTER_FREQ;
+	struct fipc_message *msg;
+	struct fs_info *fs;
+	int stop = 0;
+	int ret;
 
-		count += 1;
+	DO_FINISH(
 
-//		ret = lcd_sync_channel_group_recv(group, chnl, &chnl);
-		if (ret) {
-			LIBLCD_ERR("lcd recv");
-			return;
+		while (!stop) {
+			//LIBLCD_MSG(" tics %lu\n", tics);
+			if (jiffies >= tics) {
+				/*
+				 * Listen for a register call
+				 */
+				ret = do_one_register(register_chnl);
+				if (ret) {
+					LIBLCD_ERR("register error");
+					break;
+				}
+				tics = jiffies + REGISTER_FREQ;
+				continue;
+			}
+			/*
+			if (pmfs_ready) {
+				pmfs_ready = 0;
+				ASYNC(
+					stop = do_pmfs_test();
+					);
+			}
+			 */
+			if (stop)
+				break;
+			ret = async_loop(&fs, &msg);
+			if (!ret) {
+				ASYNC(
+					ret = dispatch_async_loop(
+						fs->chnl, 
+						msg,
+						fs->cspace,
+						fs->sync_endpoint);
+					if (ret) {
+						LIBLCD_ERR("fs dispatch err");
+						/* (break won't work here) */
+						stop = 1;
+					}
+					);
+			} else if (ret != -EWOULDBLOCK) {
+				LIBLCD_ERR("async loop failed");
+				stop = 1;
+				break;
+			}
+
+			if (kthread_should_stop()) {
+					LIBLCD_MSG("kthread should stop");
+				stop = 1;
+				break;
+			}
+
+#ifndef CONFIG_PREEMPT
+			/*
+			 * Play nice with the rest of the system
+			 */
+			cond_resched();
+#endif
 		}
 
-		chnl->dispatch_fn(chnl);
+		LIBLCD_MSG("vfs exited loop");
 
-//		chnl = lcd_sync_channel_group_item_next(chnl);
-			
-		/* HACK: VFS exits after receiving two calls (one to
-		 * register_fs and one to unregister_fs). */
-		if (count >= 2)
-			return;
-	}
+		THCStopAllAwes();
+
+		);
+
+	/* 
+	 * NOTE: If the vfs klcd quits / is killed before 
+	 * unregister_filesystem runs, it could cause some proc fs
+	 * crap to crash (the struct file_system_type is still in
+	 * the registered fs list, but e.g. the const char *name just
+	 * went bye-bye when we unloaded the vfs's .ko.)
+	 */
+
+	LIBLCD_MSG("EXITED VFS DO_FINISH");
+
+
 }
 
 /* INIT / EXIT ---------------------------------------- */
@@ -163,11 +260,12 @@ static int net_klcd_init(void)
 		LIBLCD_ERR("alloc cptr");
 		goto fail2;
 	}
-
+	LIBLCD_MSG("==========> got cptr %lu\n", net_chnl.cptr);
 	/*
 	 * Init net glue
 	 */
 	ret = glue_nullnet_init();
+	LIBLCD_MSG("-===== > glue nullnet init called\n");
 	if (ret) {
 		LIBLCD_ERR("net init");
 		goto fail3;
@@ -195,7 +293,8 @@ fail1:
 
 static int __net_klcd_init(void)
 {
-	int ret = 0;
+	int ret;
+	printk("Net klcd\n");
 	LCD_MAIN({
 
 			ret = net_klcd_init();

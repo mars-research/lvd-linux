@@ -209,7 +209,7 @@ static struct rtnl_link_ops dummy_link_ops __read_mostly = {
 module_param(numdummies, int, 0);
 MODULE_PARM_DESC(numdummies, "Number of dummy pseudo devices");
 #endif
-
+#if 0
 #ifdef LCD_ISOLATE
 static int dummy_init_one(void)
 #else
@@ -233,30 +233,31 @@ err:
 	free_netdev(dev_dummy);
 	return err;
 }
-
+#endif
 #ifndef LCD_ISOLATE
 static int __init dummy_init_module(void)
 #else
 int dummy_init_module(void)
 #endif
 {
-	int i, err = 0;
+	int i;
+	int err = 0;
 
-	rtnl_lock();
+//	rtnl_lock();
 	err = __rtnl_link_register(&dummy_link_ops_container.rtnl_link_ops);
 	if (err < 0)
 		goto out;
 
 	for (i = 0; i < numdummies && !err; i++) {
-		err = dummy_init_one();
-		cond_resched();
+//		err = dummy_init_one();
+//		cond_resched();
 	}
-	if (err < 0)
+/*	if (err < 0)
 		__rtnl_link_unregister(&dummy_link_ops_container.rtnl_link_ops);
 
+*/
 out:
-	rtnl_unlock();
-
+//	rtnl_unlock();
 	return err;
 }
 

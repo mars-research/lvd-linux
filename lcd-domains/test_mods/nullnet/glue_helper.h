@@ -63,6 +63,7 @@ struct rtnl_link_ops_container {
 	struct rtnl_link_ops rtnl_link_ops;
 	cptr_t other_ref;
 	cptr_t my_ref;
+	void *fs_info;
 };
 struct rtnl_link_stats64_container {
 	struct rtnl_link_stats64 rtnl_link_stats64;

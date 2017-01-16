@@ -1,3 +1,5 @@
+#include <lcd_config/pre_hook.h>
+
 #include <libcap.h>
 #include <liblcd/liblcd.h>
 #include <liblcd/sync_ipc_poll.h>
@@ -8,8 +10,9 @@
 
 #include <asm/cacheflush.h>
 
+#include <lcd_config/post_hook.h>
+
 struct thc_channel *net_async;
-//struct glue_cspace *c_cspace;
 struct cptr sync_ep;
 
 struct trampoline_hidden_args {

@@ -1,9 +1,14 @@
+#include <lcd_config/pre_hook.h>
+
 #include <libcap.h>
 #include <liblcd/liblcd.h>
 #include <liblcd/sync_ipc_poll.h>
 #include <liblcd/glue_cspace.h>
 #include "../../glue_helper.h"
 #include "../nullnet_caller.h"
+
+#include <lcd_config/post_hook.h>
+
 struct cptr sync_ep;
 static struct glue_cspace *c_cspace;
 struct thc_channel *net_async;
@@ -104,16 +109,15 @@ static int setup_async_channel(cptr_t *buf1_cptr_out, cptr_t *buf2_cptr_out,
 		LIBLCD_ERR("ring chnl init");
 		goto fail7;
 	}
-	{
+	if (0) {
 		size_t sz = sizeof(*chnl);
 		int idx = kmalloc_index(sz);
 		int i = 0;
 		for (i = 0; i < sizeof(kmalloc_caches)/sizeof(kmalloc_caches[0]); i++) {
-			printk("--> idx %d | cache addr %p\n", i, kmalloc_caches[i]);
+			printk("--> idx %d | cache addr %p", i, kmalloc_caches[i]);
 		}
-		LIBLCD_MSG("==> Prep buffers 2, size %zu | idx %d  | ptr %p",
-			sz, idx, kmalloc_caches[idx]);
-		
+		LIBLCD_MSG("==> Prep buffers 2, size %zu | idx %d  | ptr %p | KMALOC_MIN %d, SHIFT_LOW %d",
+			sz, idx, kmalloc_caches[idx], KMALLOC_MIN_SIZE, KMALLOC_SHIFT_LOW);
 	}
 	/*
 	 * Install async channel in async dispatch loop

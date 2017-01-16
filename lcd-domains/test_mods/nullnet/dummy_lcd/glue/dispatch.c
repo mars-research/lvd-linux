@@ -1,6 +1,8 @@
 #include <lcd_config/pre_hook.h>
+
 #include <liblcd/liblcd.h>
 #include "../nullnet_caller.h"
+
 #include <lcd_config/post_hook.h>
 
 int dispatch_async_loop(struct thc_channel *channel, struct fipc_message *message, struct glue_cspace *cspace, struct cptr sync_ep)

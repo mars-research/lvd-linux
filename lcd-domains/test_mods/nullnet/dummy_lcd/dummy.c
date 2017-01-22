@@ -145,6 +145,8 @@ static const struct ethtool_ops dummy_ethtool_ops = {
 	.get_drvinfo            = dummy_get_drvinfo,
 };
 
+extern int dummy_done;
+
 static void dummy_setup(struct net_device *dev)
 {
 	printk("%s, called\n", __func__);
@@ -178,6 +180,7 @@ static void dummy_setup(struct net_device *dev)
 	dev->addr_assign_type = NET_ADDR_RANDOM;
 
 	//eth_hw_addr_random(dev);
+	dummy_done = 1;
 }
 
 static int dummy_validate(struct nlattr *tb[], struct nlattr *data[])
@@ -209,7 +212,7 @@ static struct rtnl_link_ops dummy_link_ops __read_mostly = {
 module_param(numdummies, int, 0);
 MODULE_PARM_DESC(numdummies, "Number of dummy pseudo devices");
 #endif
-#if 0
+
 #ifdef LCD_ISOLATE
 static int dummy_init_one(void)
 #else
@@ -219,21 +222,28 @@ static int __init dummy_init_one(void)
 	struct net_device *dev_dummy;
 	int err;
 
-	dev_dummy = alloc_netdev(0, "dummy%d", NET_NAME_UNKNOWN, dummy_setup);
+	/*
+	 * we need alloc_netdev to allocate more memory for us
+	 * due to alignment this might be larger that the size of net_device_container
+	 */
+	dev_dummy = alloc_netdev(0
+			, "dummy%d", NET_NAME_UNKNOWN, dummy_setup);
 	if (!dev_dummy)
 		return -ENOMEM;
 
 	dev_dummy->rtnl_link_ops = &dummy_link_ops_container.rtnl_link_ops;
-	err = register_netdevice(dev_dummy);
+/*	err = register_netdevice(&dev_dummy->net_device);
 	if (err < 0)
-		goto err;
+		goto err;*/
 	return 0;
 
-err:
-	free_netdev(dev_dummy);
+//err:
+//	free_netdev(&dev_dummy_container->net_device);
 	return err;
 }
-#endif
+
+extern int dummy_done;
+
 #ifndef LCD_ISOLATE
 static int __init dummy_init_module(void)
 #else
@@ -247,7 +257,8 @@ int dummy_init_module(void)
 	err = __rtnl_link_register(&dummy_link_ops_container.rtnl_link_ops);
 	if (err < 0)
 		goto out;
-
+//	else
+//		dummy_done = 1;
 	for (i = 0; i < numdummies && !err; i++) {
 //		err = dummy_init_one();
 //		cond_resched();

@@ -528,21 +528,31 @@ void setup(struct net_device *dev, struct trampoline_hidden_args *hidden_args)
 	int err;
 	struct fipc_message *request;
 	struct fipc_message *response;
-	ret = async_msg_blocking_send_start(net_async, &request);
+	struct setup_container *setup_container;
+	struct net_device_container *net_dev_container;
+
+	net_dev_container = container_of(dev, struct net_device_container, net_device);
+	ret = async_msg_blocking_send_start(hidden_args->async_chnl, &request);
 	if (ret) {
 		LIBLCD_ERR("failed to get a send slot");
-		lcd_exit(-1);
+		goto fail_async;
 	}
 	async_msg_set_fn_type(request, SETUP);
 	/*fipc_set_reg1(request, netdev_ops_container->my_ref.cptr);
-	fipc_set_reg3(request, rtnl_link_ops_container->my_ref.cptr);
-	fipc_set_reg2(request, dev->rtnl_link_ops->kind);*/
-	err = thc_ipc_call(net_async, request, &response);
+	fipc_set_reg3(request, rtnl_link_ops_container->my_ref.cptr);*/
+	setup_container = (struct setup_container*)hidden_args->struct_container;
+
+	LIBLCD_MSG("sending setup_container cptr: other_ref %lu", setup_container->other_ref.cptr);	
+	fipc_set_reg1(request, net_dev_container->other_ref.cptr);
+	fipc_set_reg2(request, setup_container->other_ref.cptr);
+	err = thc_ipc_call(hidden_args->async_chnl, request, &response);
 	if (err) {
 		LIBLCD_ERR("thc_ipc_call");
-		lcd_exit(-1);
+		goto fail_ipc;
 	}
-	fipc_recv_msg_end(thc_channel_to_fipc(net_async), response);
+	fipc_recv_msg_end(thc_channel_to_fipc(hidden_args->async_chnl), response);
+fail_async:
+fail_ipc:
 	return;
 }
 
@@ -967,7 +977,7 @@ int __rtnl_link_register_callee(void)
 		goto fail7;
 	}
 	ops_container->fs_info = fs_info;
-	setup_hidden_args = kzalloc(sizeof( *setup_hidden_args ), GFP_KERNEL);
+	/*setup_hidden_args = kzalloc(sizeof( *setup_hidden_args ), GFP_KERNEL);
 	if (!setup_hidden_args) {
 		LIBLCD_ERR("kzalloc hidden args");
 		lcd_exit(-1);
@@ -990,7 +1000,7 @@ int __rtnl_link_register_callee(void)
 		LIBLCD_ERR("set mem nx");
 		goto fail3;
 	}
-
+*/
 	validate_hidden_args = kzalloc(sizeof( *validate_hidden_args ), GFP_KERNEL);
 	if (!validate_hidden_args) {
 		LIBLCD_ERR("kzalloc hidden args");
@@ -1083,9 +1093,9 @@ int rtnl_link_unregister_callee(struct fipc_message *request, struct thc_channel
 	LIBLCD_MSG("Calling real function %s", __func__);
 	rtnl_link_unregister(( &ops_container->rtnl_link_ops ));
 	glue_cap_remove(c_cspace, ops_container->my_ref);
-	setup_hidden_args = LCD_TRAMPOLINE_TO_HIDDEN_ARGS(ops_container->rtnl_link_ops.setup);
+	/*setup_hidden_args = LCD_TRAMPOLINE_TO_HIDDEN_ARGS(ops_container->rtnl_link_ops.setup);
 	kfree(setup_hidden_args->t_handle);
-	kfree(setup_hidden_args);
+	kfree(setup_hidden_args);*/
 	validate_hidden_args = LCD_TRAMPOLINE_TO_HIDDEN_ARGS(ops_container->rtnl_link_ops.validate);
 	kfree(validate_hidden_args->t_handle);
 	kfree(validate_hidden_args);
@@ -1110,51 +1120,80 @@ int alloc_netdev_mqs_callee(struct fipc_message *request, struct thc_channel *ch
 	int rxqs;
 	struct fipc_message *response;
 	unsigned 	int request_cookie;
-	struct net_device *ret1;
-	struct net_device_ops_container *netdev_ops_container;
-	struct rtnl_link_ops_container *rtnl_link_ops_container;
+	struct net_device_container *dev_container;
+	struct net_device *net_device;
+	struct trampoline_hidden_args *setup_hidden_args;
+
 	request_cookie = thc_get_request_cookie(request);
-	fipc_recv_msg_end(thc_channel_to_fipc(net_async), request);
+	fipc_recv_msg_end(thc_channel_to_fipc(channel), request);
 	temp = kzalloc(sizeof( struct setup_container   ), GFP_KERNEL);
 	if (!temp) {
 		LIBLCD_ERR("kzalloc");
-		lcd_exit(-1);
+		goto fail_alloc;
 	}
-	name = kzalloc(sizeof( char   ), GFP_KERNEL);
-	if (!name) {
-		LIBLCD_ERR("kzalloc");
-		lcd_exit(-1);
-	}
+
 	sizeof_priv = fipc_get_reg1(request);
-	//name = fipc_get_reg2(request);
+	name = "dummy%d";
 	name_assign_type = fipc_get_reg3(request);
 	txqs = fipc_get_reg4(request);
 	rxqs = fipc_get_reg5(request);
-	ret1 = kzalloc(sizeof( ret ), GFP_KERNEL);
-	if (!ret1) {
-		LIBLCD_ERR("kzalloc");
-		lcd_exit(-1);
+
+	temp->other_ref = __cptr(fipc_get_reg2(request));
+
+	LIBLCD_MSG("received setup_container cptr: other_ref %lu", temp->other_ref.cptr);
+	ret = glue_cap_insert_setup_type(c_cspace, temp, &temp->my_ref);
+	if (ret) {
+		LIBLCD_ERR("insert");
+		goto fail_insert;
 	}
-	ret1->netdev_ops = kzalloc(sizeof( ret1->netdev_ops ), GFP_KERNEL);
-	if (!ret1->netdev_ops) {
-		LIBLCD_ERR("kzalloc");
-		lcd_exit(-1);
+
+
+	setup_hidden_args = kzalloc(sizeof( *setup_hidden_args ), GFP_KERNEL);
+	if (!setup_hidden_args) {
+		LIBLCD_ERR("kzalloc hidden args");
+		goto fail_alloc;
 	}
-	ret1->rtnl_link_ops = kzalloc(sizeof( ret1->rtnl_link_ops ), GFP_KERNEL);
-	if (!ret1->rtnl_link_ops) {
-		LIBLCD_ERR("kzalloc");
-		lcd_exit(-1);
+	setup_hidden_args->t_handle = LCD_DUP_TRAMPOLINE(setup_trampoline);
+	if (!setup_hidden_args->t_handle) {
+		LIBLCD_ERR("duplicate trampoline");
+		goto fail_alloc;
 	}
-	ret1 = alloc_netdev_mqs(sizeof_priv, name, name_assign_type, ( temp->setup ), txqs, rxqs);
-	if (async_msg_blocking_send_start(net_async, &response)) {
+	setup_hidden_args->t_handle->hidden_args = setup_hidden_args;
+	setup_hidden_args->struct_container = temp;
+	setup_hidden_args->cspace = c_cspace;
+	setup_hidden_args->sync_ep = sync_ep;
+	setup_hidden_args->async_chnl = channel;
+	temp->setup = LCD_HANDLE_TO_TRAMPOLINE(setup_hidden_args->t_handle);
+	ret = set_memory_x(((unsigned long)setup_hidden_args->t_handle) & PAGE_MASK,
+			ALIGN(LCD_TRAMPOLINE_SIZE(setup_trampoline),
+				PAGE_SIZE) >> PAGE_SHIFT);
+	if (ret) {
+		LIBLCD_ERR("set mem nx");
+		goto fail3;
+	}
+
+	net_device = alloc_netdev_mqs(sizeof_priv, name, name_assign_type, (temp->setup ), txqs, rxqs);
+
+	dev_container = container_of(net_device, struct net_device_container, net_device);
+	
+	ret = glue_cap_insert_net_device_type(c_cspace, dev_container , &dev_container->my_ref);
+
+	if (!ret) {
+		LIBLCD_ERR("lcd insert");
+		goto fail_insert;
+	}
+
+	if (async_msg_blocking_send_start(channel, &response)) {
 		LIBLCD_ERR("error getting response msg");
 		return -EIO;
 	}
-	fipc_set_reg1(response, netdev_ops_container->other_ref.cptr);
-	fipc_set_reg5(response, rtnl_link_ops_container->other_ref.cptr);
-	thc_ipc_reply(net_async, request_cookie, response);
+	fipc_set_reg5(response, dev_container->my_ref.cptr);
+	thc_ipc_reply(channel, request_cookie, response);
 	return ret;
-
+fail_insert:
+fail3:
+fail_alloc:
+	return ret;
 }
 
 int consume_skb_callee(struct fipc_message *request, struct thc_channel *channel, struct glue_cspace *cspace, struct cptr sync_ep)

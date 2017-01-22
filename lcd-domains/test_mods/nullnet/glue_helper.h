@@ -125,6 +125,11 @@ int glue_cap_insert_sk_buff_type(
 	struct sk_buff_container *sk_buff_container,
 	cptr_t *c_out);
 
+int glue_cap_insert_setup_type(
+	struct glue_cspace *cspace, 
+	struct setup_container *setup_container,
+	cptr_t *c_out);
+
 int glue_cap_lookup_net_device_type(
 	struct glue_cspace *cspace, 
 	cptr_t c,
@@ -156,6 +161,10 @@ int glue_cap_lookup_sk_buff_type(
 	cptr_t c,
 	struct sk_buff_container **sk_buff_container);
 
+int glue_cap_lookup_setup_type(
+	struct glue_cspace *cspace, 
+	cptr_t c,
+	struct setup_container **setup_container);
 
 /* ASYNC HELPERS -------------------------------------------------- */
 

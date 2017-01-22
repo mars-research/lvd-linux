@@ -11,7 +11,7 @@
 
 struct cptr sync_ep;
 static struct glue_cspace *c_cspace;
-struct thc_channel *net_async;
+extern struct thc_channel *net_async;
 
 int glue_nullnet_init(void)
 {
@@ -270,14 +270,13 @@ int __rtnl_link_register(struct rtnl_link_ops *ops)
 
 fail5:
 fail4:
-        glue_cap_remove(c_cspace, ops_container->my_ref);
+        //glue_cap_remove(c_cspace, ops_container->my_ref);
 fail3:
-        destroy_async_channel(chnl);
+        //destroy_async_channel(chnl);
 fail2:
 	lcd_cap_delete(nullnet_sync_endpoint);
 fail1:
 	return ret;
-
 }
 
 void __rtnl_link_unregister(struct rtnl_link_ops *ops)
@@ -551,39 +550,71 @@ fail1:
 	return;
 }
 
-struct net_device *alloc_netdev_mqs(int sizeof_priv, const char *name, unsigned char name_assign_type, void (*setup)(struct net_device*), unsigned int txqs, unsigned int rxqs)
+struct net_device *alloc_netdev_mqs(int sizeof_priv, const char *name, unsigned char name_assign_type, void (*setup)(struct net_device* dev), unsigned int txqs, unsigned int rxqs)
 {
-	struct setup_container *temp;
+	struct setup_container *setup_container;
 	int ret;
 	int err;
 	struct fipc_message *request;
 	struct fipc_message *response;
-	struct net_device *ret1;
-	temp = kzalloc(sizeof( struct setup_container   ), GFP_KERNEL);
-	if (!temp) {
+	struct net_device_container *ret1;
+	struct rtnl_link_ops *rtnl_ops;
+	struct rtnl_link_ops_container *rtnl_ops_cnt;
+
+	ret1 = kzalloc(sizeof( struct net_device_container   ), GFP_KERNEL);
+	if (!ret1) {
 		LIBLCD_ERR("kzalloc");
-		lcd_exit(-1);
+		goto fail_alloc;
 	}
+	setup_container = kzalloc(sizeof(*setup_container), GFP_KERNEL);
+	if (!setup_container) {
+		LIBLCD_ERR("kzalloc");
+		goto fail_alloc;
+	}
+
+	setup_container->setup = setup;
+
+	ret = glue_cap_insert_setup_type(c_cspace, setup_container, &setup_container->my_ref);
+
+	if (ret) {
+		LIBLCD_ERR("lcd insert");
+		goto fail_insert;
+	}
+
+	ret = glue_cap_insert_net_device_type(c_cspace, ret1, &ret1->my_ref);
+
+	if (ret) {
+		LIBLCD_ERR("lcd insert");
+		goto fail_insert;
+	}
+
 	ret = async_msg_blocking_send_start(net_async, &request);
 	if (ret) {
 		LIBLCD_ERR("failed to get a send slot");
-		lcd_exit(-1);
+		goto fail_async;
 	}
+
 	async_msg_set_fn_type(request, ALLOC_NETDEV_MQS);
 	fipc_set_reg1(request, sizeof_priv);
-//	fipc_set_reg2(request, name);
+	fipc_set_reg2(request, setup_container->other_ref.cptr);
 	fipc_set_reg3(request, name_assign_type);
 	fipc_set_reg4(request, txqs);
 	fipc_set_reg5(request, rxqs);
 	err = thc_ipc_call(net_async, request, &response);
 	if (err) {
 		LIBLCD_ERR("thc_ipc_call");
-		lcd_exit(-1);
+		goto fail_ipc;
 	}
-	ret = fipc_get_reg5(response);
-	fipc_recv_msg_end(thc_channel_to_fipc(net_async), response);
-	return ret1;
 
+	ret1->other_ref.cptr = fipc_get_reg5(response);
+
+	fipc_recv_msg_end(thc_channel_to_fipc(net_async), response);
+
+fail_ipc:
+fail_async:
+fail_alloc:
+fail_insert:
+	return &ret1->net_device;
 }
 
 void consume_skb(struct sk_buff *skb)
@@ -817,19 +848,36 @@ int ndo_change_carrier_callee(struct fipc_message *request, struct thc_channel *
 
 int setup_callee(struct fipc_message *request, struct thc_channel *channel, struct glue_cspace *cspace, struct cptr sync_ep)
 {
-	//struct net_device *dev;
 	int ret;
 	struct fipc_message *response;
 	unsigned 	int request_cookie;
-	request_cookie = thc_get_request_cookie(request);
-	fipc_recv_msg_end(thc_channel_to_fipc(net_async), request);
+	struct setup_container *setup_container;
+	struct net_device_container *net_dev_container;
 
-	//setup(dev);
-	if (async_msg_blocking_send_start(net_async, &response)) {
+	request_cookie = thc_get_request_cookie(request);
+	fipc_recv_msg_end(thc_channel_to_fipc(channel), request);
+
+	ret = glue_cap_lookup_setup_type(c_cspace, __cptr(fipc_get_reg2(request)), &setup_container);
+	if (ret) {
+		LIBLCD_ERR("lookup");
+		goto fail_lookup;
+	}
+
+	ret = glue_cap_lookup_net_device_type(c_cspace, __cptr(fipc_get_reg1(response)), &net_dev_container);
+	if (ret) {
+		LIBLCD_ERR("lookup");
+		goto fail_lookup;
+	}
+
+	setup_container->setup(&net_dev_container->net_device);
+
+	if (async_msg_blocking_send_start(channel, &response)) {
 		LIBLCD_ERR("error getting response msg");
 		return -EIO;
 	}
-	thc_ipc_reply(net_async, request_cookie, response);
+	thc_ipc_reply(channel, request_cookie, response);
+
+fail_lookup:
 	return ret;
 }
 

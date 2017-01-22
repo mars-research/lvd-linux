@@ -1,4 +1,4 @@
-#include <lcd_config/pre_hook.h>
+
 
 #include <linux/module.h>
 #include <linux/kernel.h>

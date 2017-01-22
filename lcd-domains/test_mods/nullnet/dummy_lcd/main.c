@@ -13,10 +13,10 @@
 #include <lcd_config/post_hook.h>
 
 cptr_t nullnet_register_channel;
-struct thc_channel *nullnet_async_chnl;
+struct thc_channel *net_async;
 struct glue_cspace *nullnet_cspace;
 cptr_t nullnet_sync_endpoint;
-int dummy_done;
+int dummy_done = 0;
 int dummy_init_module(void);
 void dummy_cleanup_module(void);
 
@@ -48,7 +48,7 @@ static void main_and_loop(void)
 			/*
 			 * Do one async receive
 			 */
-			ret = thc_ipc_poll_recv(nullnet_async_chnl, &msg);
+			ret = thc_ipc_poll_recv(net_async, &msg);
 			if (ret) {
 				if (ret == -EWOULDBLOCK) {
 					continue;
@@ -62,7 +62,7 @@ static void main_and_loop(void)
 			 */
 			ASYNC(
 
-				ret = dispatch_async_loop(nullnet_async_chnl, msg,
+				ret = dispatch_async_loop(net_async, msg,
 							nullnet_cspace, 
 							nullnet_sync_endpoint);
 				if (ret) {

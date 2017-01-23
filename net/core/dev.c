@@ -7562,6 +7562,16 @@ void netdev_freemem(struct net_device *dev)
 	kvfree(addr);
 }
 
+typedef struct cptr {
+	unsigned long cptr;
+} cptr_t;
+
+struct net_device_container {
+	struct net_device dev;
+	cptr_t other_ref;
+	cptr_t my_ref;
+};
+
 /**
  *	alloc_netdev_mqs - allocate network device
  *	@sizeof_priv:		size of private data to allocate space for
@@ -7581,6 +7591,7 @@ struct net_device *alloc_netdev_mqs(int sizeof_priv, const char *name,
 		unsigned int txqs, unsigned int rxqs)
 {
 	struct net_device *dev;
+	struct net_device_container *dev_c;
 	size_t alloc_size;
 	struct net_device *p;
 
@@ -7598,7 +7609,7 @@ struct net_device *alloc_netdev_mqs(int sizeof_priv, const char *name,
 	}
 #endif
 
-	alloc_size = sizeof(struct net_device);
+	alloc_size = sizeof(struct net_device_container);
 	if (sizeof_priv) {
 		/* ensure 32-byte alignment of private area */
 		alloc_size = ALIGN(alloc_size, NETDEV_ALIGN);
@@ -7613,7 +7624,8 @@ struct net_device *alloc_netdev_mqs(int sizeof_priv, const char *name,
 	if (!p)
 		return NULL;
 
-	dev = PTR_ALIGN(p, NETDEV_ALIGN);
+	dev_c = PTR_ALIGN(p, NETDEV_ALIGN);
+	dev = &dev_c->dev;
 	dev->padded = (char *)dev - (char *)p;
 
 	dev->pcpu_refcnt = alloc_percpu(int);
@@ -7683,6 +7695,119 @@ free_dev:
 }
 EXPORT_SYMBOL(alloc_netdev_mqs);
 
+struct net_device *alloc_netdev_mqs_lcd(int sizeof_priv, const char *name,
+		unsigned char name_assign_type,
+		void (*setup)(struct net_device *),
+		unsigned int txqs, unsigned int rxqs, u64 other_ref_cptr)
+{
+	struct net_device *dev;
+	struct net_device_container *dev_c;
+	size_t alloc_size;
+	struct net_device *p;
+
+	BUG_ON(strlen(name) >= sizeof(dev->name));
+
+	if (txqs < 1) {
+		pr_err("alloc_netdev: Unable to allocate device with zero queues\n");
+		return NULL;
+	}
+
+#ifdef CONFIG_SYSFS
+	if (rxqs < 1) {
+		pr_err("alloc_netdev: Unable to allocate device with zero RX queues\n");
+		return NULL;
+	}
+#endif
+
+	alloc_size = sizeof(struct net_device_container);
+	if (sizeof_priv) {
+		/* ensure 32-byte alignment of private area */
+		alloc_size = ALIGN(alloc_size, NETDEV_ALIGN);
+		alloc_size += sizeof_priv;
+	}
+	/* ensure 32-byte alignment of whole construct */
+	alloc_size += NETDEV_ALIGN - 1;
+
+	p = kzalloc(alloc_size, GFP_KERNEL | __GFP_NOWARN | __GFP_REPEAT);
+	if (!p)
+		p = vzalloc(alloc_size);
+	if (!p)
+		return NULL;
+
+	dev_c = PTR_ALIGN(p, NETDEV_ALIGN);
+
+	dev_c->other_ref.cptr = other_ref_cptr;
+	dev = &dev_c->dev;
+	dev->padded = (char *)dev - (char *)p;
+
+	dev->pcpu_refcnt = alloc_percpu(int);
+	if (!dev->pcpu_refcnt)
+		goto free_dev;
+
+	if (dev_addr_init(dev))
+		goto free_pcpu;
+
+	dev_mc_init(dev);
+	dev_uc_init(dev);
+
+	dev_net_set(dev, &init_net);
+
+	dev->gso_max_size = GSO_MAX_SIZE;
+	dev->gso_max_segs = GSO_MAX_SEGS;
+
+	INIT_LIST_HEAD(&dev->napi_list);
+	INIT_LIST_HEAD(&dev->unreg_list);
+	INIT_LIST_HEAD(&dev->close_list);
+	INIT_LIST_HEAD(&dev->link_watch_list);
+	INIT_LIST_HEAD(&dev->adj_list.upper);
+	INIT_LIST_HEAD(&dev->adj_list.lower);
+	INIT_LIST_HEAD(&dev->all_adj_list.upper);
+	INIT_LIST_HEAD(&dev->all_adj_list.lower);
+	INIT_LIST_HEAD(&dev->ptype_all);
+	INIT_LIST_HEAD(&dev->ptype_specific);
+	dev->priv_flags = IFF_XMIT_DST_RELEASE | IFF_XMIT_DST_RELEASE_PERM;
+	setup(dev);
+
+	if (!dev->tx_queue_len) {
+		dev->priv_flags |= IFF_NO_QUEUE;
+		dev->tx_queue_len = 1;
+	}
+
+	dev->num_tx_queues = txqs;
+	dev->real_num_tx_queues = txqs;
+	if (netif_alloc_netdev_queues(dev))
+		goto free_all;
+
+#ifdef CONFIG_SYSFS
+	dev->num_rx_queues = rxqs;
+	dev->real_num_rx_queues = rxqs;
+	if (netif_alloc_rx_queues(dev))
+		goto free_all;
+#endif
+
+	strcpy(dev->name, name);
+	dev->name_assign_type = name_assign_type;
+	dev->group = INIT_NETDEV_GROUP;
+	if (!dev->ethtool_ops)
+		dev->ethtool_ops = &default_ethtool_ops;
+
+	nf_hook_ingress_init(dev);
+
+	return dev;
+
+free_all:
+	free_netdev(dev);
+	return NULL;
+
+free_pcpu:
+	free_percpu(dev->pcpu_refcnt);
+free_dev:
+	netdev_freemem(dev);
+	return NULL;
+}
+EXPORT_SYMBOL(alloc_netdev_mqs_lcd);
+
+
 /**
  *	free_netdev - free network device
  *	@dev: device
@@ -7695,7 +7820,6 @@ EXPORT_SYMBOL(alloc_netdev_mqs);
 void free_netdev(struct net_device *dev)
 {
 	struct napi_struct *p, *n;
-
 	might_sleep();
 	netif_free_tx_queues(dev);
 #ifdef CONFIG_SYSFS

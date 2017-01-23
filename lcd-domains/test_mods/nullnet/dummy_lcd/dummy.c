@@ -168,18 +168,7 @@ static void dummy_setup(struct net_device *dev)
 	dev->hw_features |= dev->features;
 	dev->hw_enc_features |= dev->features;
 
-	dev->dev_addr[1] = 0xab;
-	dev->dev_addr[2] = 0xcd;
-	dev->dev_addr[3] = 0xef;
-	dev->dev_addr[4] = 0xef;
-	dev->dev_addr[5] = 0xef;
-
-	dev->dev_addr[0] &= 0xfe;	/* clear multicast bit */
-	dev->dev_addr[0] |= 0x02;	/* set local assignment bit (IEEE802) */
-
-	dev->addr_assign_type = NET_ADDR_RANDOM;
-
-	//eth_hw_addr_random(dev);
+//	eth_hw_addr_random(dev);
 	dummy_done = 1;
 }
 
@@ -260,8 +249,8 @@ int dummy_init_module(void)
 //	else
 //		dummy_done = 1;
 	for (i = 0; i < numdummies && !err; i++) {
-//		err = dummy_init_one();
-//		cond_resched();
+		err = dummy_init_one();
+		cond_resched();
 	}
 /*	if (err < 0)
 		__rtnl_link_unregister(&dummy_link_ops_container.rtnl_link_ops);

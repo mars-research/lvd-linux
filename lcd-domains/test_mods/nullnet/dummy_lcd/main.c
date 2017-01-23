@@ -25,7 +25,7 @@ void dummy_cleanup_module(void);
 static void main_and_loop(void)
 {
 	int ret;
-	int stop = 1;
+	int stop = 0;
 	struct fipc_message *msg;
 	DO_FINISH(
 

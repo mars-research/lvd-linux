@@ -358,21 +358,28 @@ void ether_setup(struct net_device *dev)
 	int err;
 	struct fipc_message *request;
 	struct fipc_message *response;
+	struct net_device_container *netdev_container;
+
 	ret = async_msg_blocking_send_start(net_async, &request);
 	if (ret) {
 		LIBLCD_ERR("failed to get a send slot");
-		lcd_exit(-1);
+		goto fail_async;
 	}
 	async_msg_set_fn_type(request, ETHER_SETUP);
-	//fipc_set_reg1(request, netdev_ops_container->my_ref.cptr);
+
+	netdev_container = container_of(dev, struct net_device_container, net_device);
+	fipc_set_reg1(request, netdev_container->other_ref.cptr);
+	LIBLCD_MSG("ndev other ref %lu\n", netdev_container->other_ref.cptr);
 	//fipc_set_reg3(request, rtnl_link_ops_container->my_ref.cptr);
 	//fipc_set_reg2(request, dev->rtnl_link_ops->kind);
 	err = thc_ipc_call(net_async, request, &response);
 	if (err) {
 		LIBLCD_ERR("thc_ipc_call");
-		lcd_exit(-1);
+		goto fail_ipc;
 	}
 	fipc_recv_msg_end(thc_channel_to_fipc(net_async), response);
+fail_ipc:
+fail_async:
 	return;
 }
 
@@ -596,17 +603,18 @@ struct net_device *alloc_netdev_mqs(int sizeof_priv, const char *name, unsigned 
 
 	async_msg_set_fn_type(request, ALLOC_NETDEV_MQS);
 	fipc_set_reg1(request, sizeof_priv);
-	fipc_set_reg2(request, setup_container->other_ref.cptr);
+	fipc_set_reg2(request, setup_container->my_ref.cptr);
 	fipc_set_reg3(request, name_assign_type);
 	fipc_set_reg4(request, txqs);
 	fipc_set_reg5(request, rxqs);
+	fipc_set_reg6(request, ret1->my_ref.cptr);
 	err = thc_ipc_call(net_async, request, &response);
 	if (err) {
 		LIBLCD_ERR("thc_ipc_call");
 		goto fail_ipc;
 	}
 
-	ret1->other_ref.cptr = fipc_get_reg5(response);
+	//ret1->other_ref.cptr = fipc_get_reg5(response);
 
 	fipc_recv_msg_end(thc_channel_to_fipc(net_async), response);
 
@@ -863,12 +871,13 @@ int setup_callee(struct fipc_message *request, struct thc_channel *channel, stru
 		goto fail_lookup;
 	}
 
-	ret = glue_cap_lookup_net_device_type(c_cspace, __cptr(fipc_get_reg1(response)), &net_dev_container);
+	ret = glue_cap_lookup_net_device_type(c_cspace, __cptr(fipc_get_reg1(request)), &net_dev_container);
 	if (ret) {
 		LIBLCD_ERR("lookup");
 		goto fail_lookup;
 	}
-
+	// save other ref cptr
+	net_dev_container->other_ref = __cptr(fipc_get_reg3(request));
 	setup_container->setup(&net_dev_container->net_device);
 
 	if (async_msg_blocking_send_start(channel, &response)) {

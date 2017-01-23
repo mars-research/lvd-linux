@@ -538,6 +538,13 @@ void setup(struct net_device *dev, struct trampoline_hidden_args *hidden_args)
 		goto fail_async;
 	}
 	async_msg_set_fn_type(request, SETUP);
+
+	ret = glue_cap_insert_net_device_type(c_cspace, net_dev_container, &net_dev_container->my_ref);
+	if (ret) {
+		LIBLCD_ERR("insert");
+		goto fail_insert;
+	}
+
 	/*fipc_set_reg1(request, netdev_ops_container->my_ref.cptr);
 	fipc_set_reg3(request, rtnl_link_ops_container->my_ref.cptr);*/
 	setup_container = (struct setup_container*)hidden_args->struct_container;
@@ -545,6 +552,8 @@ void setup(struct net_device *dev, struct trampoline_hidden_args *hidden_args)
 	LIBLCD_MSG("sending setup_container cptr: other_ref %lu", setup_container->other_ref.cptr);	
 	fipc_set_reg1(request, net_dev_container->other_ref.cptr);
 	fipc_set_reg2(request, setup_container->other_ref.cptr);
+	fipc_set_reg3(request, net_dev_container->my_ref.cptr);
+
 	err = thc_ipc_call(hidden_args->async_chnl, request, &response);
 	if (err) {
 		LIBLCD_ERR("thc_ipc_call");
@@ -552,6 +561,7 @@ void setup(struct net_device *dev, struct trampoline_hidden_args *hidden_args)
 	}
 	fipc_recv_msg_end(thc_channel_to_fipc(hidden_args->async_chnl), response);
 fail_async:
+fail_insert:
 fail_ipc:
 	return;
 }
@@ -759,40 +769,30 @@ int register_netdevice_callee(struct fipc_message *request, struct thc_channel *
 int ether_setup_callee(struct fipc_message *request, struct thc_channel *channel, struct glue_cspace *cspace, struct cptr sync_ep)
 {
 	int ret;
-	struct net_device *dev;
+	struct net_device_container *dev;
 	struct fipc_message *response;
 	unsigned 	int request_cookie;
 	request_cookie = thc_get_request_cookie(request);
-	fipc_recv_msg_end(thc_channel_to_fipc(net_async), request);
-	dev = kzalloc(sizeof( dev ), GFP_KERNEL);
-	if (!dev) {
-		LIBLCD_ERR("kzalloc");
-		lcd_exit(-1);
+	fipc_recv_msg_end(thc_channel_to_fipc(channel), request);
+
+
+	ret = glue_cap_lookup_net_device_type(c_cspace, __cptr(fipc_get_reg1(request)), &dev);
+
+	LIBLCD_MSG("ndev other ref %lu", dev->other_ref.cptr);
+	if (ret) {
+		LIBLCD_MSG("lookup failed");
+		goto fail_lookup;
 	}
-	dev->netdev_ops = kzalloc(sizeof( dev->netdev_ops ), GFP_KERNEL);
-	if (!dev->netdev_ops) {
-		LIBLCD_ERR("kzalloc");
-		lcd_exit(-1);
-	}
-	dev->rtnl_link_ops = kzalloc(sizeof( dev->rtnl_link_ops ), GFP_KERNEL);
-	if (!dev->rtnl_link_ops) {
-		LIBLCD_ERR("kzalloc");
-		lcd_exit(-1);
-	}
-/*	dev->rtnl_link_ops->kind = kzalloc(sizeof( char   ), GFP_KERNEL);
-	if (!dev->rtnl_link_ops->kind) {
-		LIBLCD_ERR("kzalloc");
-		lcd_exit(-1);
-	}
-	dev->rtnl_link_ops->kind = fipc_get_reg2(request);*/
-	ether_setup(dev);
-	if (async_msg_blocking_send_start(net_async, &response)) {
+
+	LIBLCD_MSG("Calling ether_setup");
+	ether_setup(&dev->net_device);
+	if (async_msg_blocking_send_start(channel, &response)) {
 		LIBLCD_ERR("error getting response msg");
 		return -EIO;
 	}
-	thc_ipc_reply(net_async, request_cookie, response);
+	thc_ipc_reply(channel, request_cookie, response);
+fail_lookup:
 	return ret;
-
 }
 
 int eth_mac_addr_callee(struct fipc_message *request, struct thc_channel *channel, struct glue_cspace *cspace, struct cptr sync_ep)
@@ -1105,6 +1105,7 @@ int rtnl_link_unregister_callee(struct fipc_message *request, struct thc_channel
 		return -EIO;
 	}
 	thc_ipc_reply(channel, request_cookie, response);
+
 	return ret;
 
 }
@@ -1138,7 +1139,7 @@ int alloc_netdev_mqs_callee(struct fipc_message *request, struct thc_channel *ch
 	txqs = fipc_get_reg4(request);
 	rxqs = fipc_get_reg5(request);
 
-	temp->other_ref = __cptr(fipc_get_reg2(request));
+	temp->other_ref.cptr = fipc_get_reg2(request);
 
 	LIBLCD_MSG("received setup_container cptr: other_ref %lu", temp->other_ref.cptr);
 	ret = glue_cap_insert_setup_type(c_cspace, temp, &temp->my_ref);
@@ -1172,22 +1173,22 @@ int alloc_netdev_mqs_callee(struct fipc_message *request, struct thc_channel *ch
 		goto fail3;
 	}
 
-	net_device = alloc_netdev_mqs(sizeof_priv, name, name_assign_type, (temp->setup ), txqs, rxqs);
+	net_device = alloc_netdev_mqs_lcd(sizeof_priv, name, name_assign_type, (temp->setup ), txqs, rxqs, fipc_get_reg6(request));
 
 	dev_container = container_of(net_device, struct net_device_container, net_device);
 	
-	ret = glue_cap_insert_net_device_type(c_cspace, dev_container , &dev_container->my_ref);
+	/*ret = glue_cap_insert_net_device_type(c_cspace, dev_container , &dev_container->my_ref);
 
 	if (!ret) {
 		LIBLCD_ERR("lcd insert");
 		goto fail_insert;
-	}
+	}*/
 
 	if (async_msg_blocking_send_start(channel, &response)) {
 		LIBLCD_ERR("error getting response msg");
 		return -EIO;
 	}
-	fipc_set_reg5(response, dev_container->my_ref.cptr);
+//	fipc_set_reg5(response, dev_container->my_ref.cptr);
 	thc_ipc_reply(channel, request_cookie, response);
 	return ret;
 fail_insert:

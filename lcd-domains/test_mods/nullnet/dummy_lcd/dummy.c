@@ -168,8 +168,12 @@ static void dummy_setup(struct net_device *dev)
 	dev->hw_features |= dev->features;
 	dev->hw_enc_features |= dev->features;
 
-//	eth_hw_addr_random(dev);
-	dummy_done = 1;
+	dev->dev_addr = kmalloc(MAX_ADDR_LEN, GFP_KERNEL);
+
+	if (!dev->dev_addr)
+		LIBLCD_ERR("kmalloc failed");
+
+	eth_hw_addr_random(dev);
 }
 
 static int dummy_validate(struct nlattr *tb[], struct nlattr *data[])
@@ -221,6 +225,7 @@ static int __init dummy_init_one(void)
 		return -ENOMEM;
 
 	dev_dummy->rtnl_link_ops = &dummy_link_ops_container.rtnl_link_ops;
+	printk("Dummy allocated\n");
 /*	err = register_netdevice(&dev_dummy->net_device);
 	if (err < 0)
 		goto err;*/
@@ -252,6 +257,8 @@ int dummy_init_module(void)
 		err = dummy_init_one();
 		cond_resched();
 	}
+
+	dummy_done = 1;
 /*	if (err < 0)
 		__rtnl_link_unregister(&dummy_link_ops_container.rtnl_link_ops);
 

@@ -177,27 +177,31 @@ fail1:
 int ndo_init(struct net_device *dev, struct trampoline_hidden_args *hidden_args)
 {
 	int ret;
-	int err;
 	struct fipc_message *request;
 	struct fipc_message *response;
-	ret = async_msg_blocking_send_start(net_async, &request);
+	struct net_device_container *net_dev_container;
+
+	net_dev_container = container_of(dev, struct net_device_container, net_device);
+
+	ret = async_msg_blocking_send_start(hidden_args->async_chnl, &request);
 	if (ret) {
 		LIBLCD_ERR("failed to get a send slot");
 		lcd_exit(-1);
 	}
-	async_msg_set_fn_type(request, NDO_INIT);
-/*	fipc_set_reg1(request, netdev_ops_container->my_ref.cptr);
-	fipc_set_reg3(request, rtnl_link_ops_container->my_ref.cptr);
-	fipc_set_reg2(request, dev->rtnl_link_ops->kind);*/
-	err = thc_ipc_call(net_async, request, &response);
-	if (err) {
-		LIBLCD_ERR("thc_ipc_call");
-		lcd_exit(-1);
-	}
-	ret = fipc_get_reg1(response);
-	fipc_recv_msg_end(thc_channel_to_fipc(net_async), response);
-	return ret;
 
+	async_msg_set_fn_type(request, NDO_INIT);
+	fipc_set_reg1(request, net_dev_container->other_ref.cptr);
+
+	ret = thc_ipc_call(hidden_args->async_chnl, request, &response);
+	if (ret) {
+		LIBLCD_ERR("thc_ipc_call");
+		goto fail_ipc;
+	}
+
+	ret = fipc_get_reg1(response);
+	fipc_recv_msg_end(thc_channel_to_fipc(hidden_args->async_chnl), response);
+fail_ipc:
+	return ret;
 }
 
 
@@ -418,25 +422,38 @@ struct rtnl_link_stats64 *ndo_get_stats64(struct net_device *dev, struct rtnl_li
 	int err;
 	struct fipc_message *request;
 	struct fipc_message *response;
-	struct rtnl_link_stats64 *ret1 = NULL;
-	ret = async_msg_blocking_send_start(net_async, &request);
+	struct net_device_container *net_dev_container;
+
+	if (!get_current()->ptstate) {
+		storage->tx_packets = storage->tx_bytes = 0x100;
+		return storage;	
+	}
+
+	net_dev_container = container_of(dev, struct net_device_container, net_device);
+
+	ret = async_msg_blocking_send_start(hidden_args->async_chnl, &request);
 	if (ret) {
 		LIBLCD_ERR("failed to get a send slot");
-		lcd_exit(-1);
+		goto fail_async;
 	}
+
 	async_msg_set_fn_type(request, NDO_GET_STATS64);
-	/*fipc_set_reg1(request, netdev_ops_container->my_ref.cptr);
-	fipc_set_reg3(request, rtnl_link_ops_container->my_ref.cptr);
-	fipc_set_reg2(request, dev->rtnl_link_ops->kind);*/
-	err = thc_ipc_call(net_async, request, &response);
+
+	fipc_set_reg1(request, net_dev_container->other_ref.cptr);
+
+	err = thc_ipc_call(hidden_args->async_chnl, request, &response);
 	if (err) {
 		LIBLCD_ERR("thc_ipc_call");
-		lcd_exit(-1);
+		goto fail_ipc;
 	}
-	//ret1 = fipc_get_reg5(response);
-	fipc_recv_msg_end(thc_channel_to_fipc(net_async), response);
-	return ret1;
+	storage->tx_packets = fipc_get_reg1(response);
+	storage->tx_bytes = fipc_get_reg2(response);
 
+	fipc_recv_msg_end(thc_channel_to_fipc(hidden_args->async_chnl), response);
+
+fail_ipc:
+fail_async:
+	return storage;
 }
 
 LCD_TRAMPOLINE_DATA(ndo_get_stats64_trampoline);
@@ -522,6 +539,240 @@ int LCD_TRAMPOLINE_LINKAGE(validate_trampoline) validate_trampoline(struct nlatt
 
 }
 
+void setup_device_ops_trampolines(struct net_device_ops_container *netdev_ops_container, struct trampoline_hidden_args *hargs)
+{
+	struct thc_channel *chnl = hargs->async_chnl;
+	cptr_t sync_ep = hargs->sync_ep;
+
+	struct trampoline_hidden_args *ndo_init_hidden_args;
+	struct trampoline_hidden_args *ndo_uninit_hidden_args;
+	struct trampoline_hidden_args *ndo_start_xmit_hidden_args;
+	struct trampoline_hidden_args *ndo_validate_addr_hidden_args;
+	struct trampoline_hidden_args *ndo_set_rx_mode_hidden_args;
+	struct trampoline_hidden_args *ndo_set_mac_address_hidden_args;
+	struct trampoline_hidden_args *ndo_get_stats64_hidden_args;
+	struct trampoline_hidden_args *ndo_change_carrier_hidden_args;
+	int ret;
+
+	ndo_init_hidden_args = kzalloc(sizeof( *ndo_init_hidden_args ), GFP_KERNEL);
+	if (!ndo_init_hidden_args) {
+		LIBLCD_ERR("kzalloc hidden args");
+		lcd_exit(-1);
+	}
+	ndo_init_hidden_args->t_handle = LCD_DUP_TRAMPOLINE(ndo_init_trampoline);
+	if (!ndo_init_hidden_args->t_handle) {
+		LIBLCD_ERR("duplicate trampoline");
+		lcd_exit(-1);
+	}
+	ndo_init_hidden_args->t_handle->hidden_args = ndo_init_hidden_args;
+	ndo_init_hidden_args->struct_container = netdev_ops_container;
+	ndo_init_hidden_args->cspace = c_cspace;	
+	netdev_ops_container->net_device_ops.ndo_init = LCD_HANDLE_TO_TRAMPOLINE(ndo_init_hidden_args->t_handle);
+
+	ndo_uninit_hidden_args = kzalloc(sizeof( *ndo_uninit_hidden_args ), GFP_KERNEL);
+	if (!ndo_uninit_hidden_args) {
+		LIBLCD_ERR("kzalloc hidden args");
+		lcd_exit(-1);
+	}
+	ndo_uninit_hidden_args->t_handle = LCD_DUP_TRAMPOLINE(ndo_uninit_trampoline);
+	if (!ndo_uninit_hidden_args->t_handle) {
+		LIBLCD_ERR("duplicate trampoline");
+		lcd_exit(-1);
+	}
+	ndo_uninit_hidden_args->t_handle->hidden_args = ndo_uninit_hidden_args;
+	ndo_uninit_hidden_args->struct_container = netdev_ops_container;
+	ndo_uninit_hidden_args->cspace = c_cspace;
+	netdev_ops_container->net_device_ops.ndo_uninit = LCD_HANDLE_TO_TRAMPOLINE(ndo_uninit_hidden_args->t_handle);
+	ndo_start_xmit_hidden_args = kzalloc(sizeof( *ndo_start_xmit_hidden_args ), GFP_KERNEL);
+	if (!ndo_start_xmit_hidden_args) {
+		LIBLCD_ERR("kzalloc hidden args");
+		lcd_exit(-1);
+	}
+	ndo_start_xmit_hidden_args->t_handle = LCD_DUP_TRAMPOLINE(ndo_start_xmit_trampoline);
+	if (!ndo_start_xmit_hidden_args->t_handle) {
+		LIBLCD_ERR("duplicate trampoline");
+		lcd_exit(-1);
+	}
+	ndo_start_xmit_hidden_args->t_handle->hidden_args = ndo_start_xmit_hidden_args;
+	ndo_start_xmit_hidden_args->struct_container = netdev_ops_container;
+	ndo_start_xmit_hidden_args->cspace = c_cspace;
+	netdev_ops_container->net_device_ops.ndo_start_xmit = LCD_HANDLE_TO_TRAMPOLINE(ndo_start_xmit_hidden_args->t_handle);
+	ndo_validate_addr_hidden_args = kzalloc(sizeof( *ndo_validate_addr_hidden_args ), GFP_KERNEL);
+	if (!ndo_validate_addr_hidden_args) {
+		LIBLCD_ERR("kzalloc hidden args");
+		lcd_exit(-1);
+	}
+	ndo_validate_addr_hidden_args->t_handle = LCD_DUP_TRAMPOLINE(ndo_validate_addr_trampoline);
+	if (!ndo_validate_addr_hidden_args->t_handle) {
+		LIBLCD_ERR("duplicate trampoline");
+		lcd_exit(-1);
+	}
+	ndo_validate_addr_hidden_args->t_handle->hidden_args = ndo_validate_addr_hidden_args;
+	ndo_validate_addr_hidden_args->struct_container = netdev_ops_container;
+	ndo_validate_addr_hidden_args->cspace = c_cspace;
+	netdev_ops_container->net_device_ops.ndo_validate_addr = LCD_HANDLE_TO_TRAMPOLINE(ndo_validate_addr_hidden_args->t_handle);
+	ndo_set_rx_mode_hidden_args = kzalloc(sizeof( *ndo_set_rx_mode_hidden_args ), GFP_KERNEL);
+	if (!ndo_set_rx_mode_hidden_args) {
+		LIBLCD_ERR("kzalloc hidden args");
+		lcd_exit(-1);
+	}
+	ndo_set_rx_mode_hidden_args->t_handle = LCD_DUP_TRAMPOLINE(ndo_set_rx_mode_trampoline);
+	if (!ndo_set_rx_mode_hidden_args->t_handle) {
+		LIBLCD_ERR("duplicate trampoline");
+		lcd_exit(-1);
+	}
+	ndo_set_rx_mode_hidden_args->t_handle->hidden_args = ndo_set_rx_mode_hidden_args;
+	ndo_set_rx_mode_hidden_args->struct_container = netdev_ops_container;
+	ndo_set_rx_mode_hidden_args->cspace = c_cspace;
+	netdev_ops_container->net_device_ops.ndo_set_rx_mode = LCD_HANDLE_TO_TRAMPOLINE(ndo_set_rx_mode_hidden_args->t_handle);
+	ndo_set_mac_address_hidden_args = kzalloc(sizeof( *ndo_set_mac_address_hidden_args ), GFP_KERNEL);
+	if (!ndo_set_mac_address_hidden_args) {
+		LIBLCD_ERR("kzalloc hidden args");
+		lcd_exit(-1);
+	}
+	ndo_set_mac_address_hidden_args->t_handle = LCD_DUP_TRAMPOLINE(ndo_set_mac_address_trampoline);
+	if (!ndo_set_mac_address_hidden_args->t_handle) {
+		LIBLCD_ERR("duplicate trampoline");
+		lcd_exit(-1);
+	}
+	ndo_set_mac_address_hidden_args->t_handle->hidden_args = ndo_set_mac_address_hidden_args;
+	ndo_set_mac_address_hidden_args->struct_container = netdev_ops_container;
+	ndo_set_mac_address_hidden_args->cspace = c_cspace;
+	netdev_ops_container->net_device_ops.ndo_set_mac_address = LCD_HANDLE_TO_TRAMPOLINE(ndo_set_mac_address_hidden_args->t_handle);
+	ndo_get_stats64_hidden_args = kzalloc(sizeof( *ndo_get_stats64_hidden_args ), GFP_KERNEL);
+	if (!ndo_get_stats64_hidden_args) {
+		LIBLCD_ERR("kzalloc hidden args");
+		lcd_exit(-1);
+	}
+	ndo_get_stats64_hidden_args->t_handle = LCD_DUP_TRAMPOLINE(ndo_get_stats64_trampoline);
+	if (!ndo_get_stats64_hidden_args->t_handle) {
+		LIBLCD_ERR("duplicate trampoline");
+		lcd_exit(-1);
+	}
+	ndo_get_stats64_hidden_args->t_handle->hidden_args = ndo_get_stats64_hidden_args;
+	ndo_get_stats64_hidden_args->struct_container = netdev_ops_container;
+	ndo_get_stats64_hidden_args->cspace = c_cspace;
+	netdev_ops_container->net_device_ops.ndo_get_stats64 = LCD_HANDLE_TO_TRAMPOLINE(ndo_get_stats64_hidden_args->t_handle);
+	ndo_change_carrier_hidden_args = kzalloc(sizeof( *ndo_change_carrier_hidden_args ), GFP_KERNEL);
+	if (!ndo_change_carrier_hidden_args) {
+		LIBLCD_ERR("kzalloc hidden args");
+		lcd_exit(-1);
+	}
+	ndo_change_carrier_hidden_args->t_handle = LCD_DUP_TRAMPOLINE(ndo_change_carrier_trampoline);
+	if (!ndo_change_carrier_hidden_args->t_handle) {
+		LIBLCD_ERR("duplicate trampoline");
+		lcd_exit(-1);
+	}
+	ndo_change_carrier_hidden_args->t_handle->hidden_args = ndo_change_carrier_hidden_args;
+	ndo_change_carrier_hidden_args->struct_container = netdev_ops_container;
+	ndo_change_carrier_hidden_args->cspace = c_cspace;
+	netdev_ops_container->net_device_ops.ndo_change_carrier = LCD_HANDLE_TO_TRAMPOLINE(ndo_change_carrier_hidden_args->t_handle);
+
+        ret = set_memory_x(((unsigned long)ndo_init_hidden_args->t_handle) & PAGE_MASK,
+                        ALIGN(LCD_TRAMPOLINE_SIZE(ndo_init_trampoline),
+                                PAGE_SIZE) >> PAGE_SHIFT);
+        if (ret) {
+                LIBLCD_ERR("set mem ndo_init");
+                goto fail1;
+        }
+
+        ret = set_memory_x(((unsigned long)ndo_uninit_hidden_args->t_handle) & PAGE_MASK,
+                        ALIGN(LCD_TRAMPOLINE_SIZE(ndo_uninit_trampoline),
+                                PAGE_SIZE) >> PAGE_SHIFT);
+        if (ret) {
+                LIBLCD_ERR("set mem ndo_uninit");
+                goto fail2;
+        }
+
+        ret = set_memory_x(((unsigned long)ndo_start_xmit_hidden_args->t_handle) & PAGE_MASK,
+                        ALIGN(LCD_TRAMPOLINE_SIZE(ndo_start_xmit_trampoline),
+                                PAGE_SIZE) >> PAGE_SHIFT);
+        if (ret) {
+                LIBLCD_ERR("set mem ndo_start_xmit");
+                goto fail3;
+        }
+
+        ret = set_memory_x(((unsigned long)ndo_validate_addr_hidden_args->t_handle) & PAGE_MASK,
+                        ALIGN(LCD_TRAMPOLINE_SIZE(ndo_validate_addr_trampoline),
+                                PAGE_SIZE) >> PAGE_SHIFT);
+        if (ret) {
+                LIBLCD_ERR("set mem ndo_validate_addr");
+                goto fail4;
+        }
+
+        ret = set_memory_x(((unsigned long)ndo_set_rx_mode_hidden_args->t_handle) & PAGE_MASK,
+                        ALIGN(LCD_TRAMPOLINE_SIZE(ndo_set_rx_mode_trampoline),
+                                PAGE_SIZE) >> PAGE_SHIFT);
+        if (ret) {
+                LIBLCD_ERR("set mem ndo_set_rx_mode");
+                goto fail5;
+        }
+
+        ret = set_memory_x(((unsigned long)ndo_set_mac_address_hidden_args->t_handle) & PAGE_MASK,
+                        ALIGN(LCD_TRAMPOLINE_SIZE(ndo_set_mac_address_trampoline),
+                                PAGE_SIZE) >> PAGE_SHIFT);
+        if (ret) {
+                LIBLCD_ERR("set mem ndo_set_mac_address");
+                goto fail6;
+        }
+
+        ret = set_memory_x(((unsigned long)ndo_get_stats64_hidden_args->t_handle) & PAGE_MASK,
+                        ALIGN(LCD_TRAMPOLINE_SIZE(ndo_get_stats64_trampoline),
+                                PAGE_SIZE) >> PAGE_SHIFT);
+        if (ret) {
+                LIBLCD_ERR("set mem ndo_get_stats64");
+                goto fail7;
+        }
+
+        ret = set_memory_x(((unsigned long)ndo_change_carrier_hidden_args->t_handle) & PAGE_MASK,
+                        ALIGN(LCD_TRAMPOLINE_SIZE(ndo_change_carrier_trampoline),
+                                PAGE_SIZE) >> PAGE_SHIFT);
+        if (ret) {
+                LIBLCD_ERR("set mem ndo_change_carrier");
+                goto fail8;
+        }
+        ndo_init_hidden_args->sync_ep = sync_ep;
+        ndo_init_hidden_args->async_chnl = chnl;
+        
+
+        ndo_uninit_hidden_args->sync_ep = sync_ep;
+        ndo_uninit_hidden_args->async_chnl = chnl;
+        
+
+        ndo_start_xmit_hidden_args->sync_ep = sync_ep;
+        ndo_start_xmit_hidden_args->async_chnl = chnl;
+        
+
+        ndo_validate_addr_hidden_args->sync_ep = sync_ep;
+        ndo_validate_addr_hidden_args->async_chnl = chnl;
+        
+
+        ndo_set_rx_mode_hidden_args->sync_ep = sync_ep;
+        ndo_set_rx_mode_hidden_args->async_chnl = chnl;
+        
+
+        ndo_set_mac_address_hidden_args->sync_ep = sync_ep;
+        ndo_set_mac_address_hidden_args->async_chnl = chnl;
+        
+
+        ndo_get_stats64_hidden_args->sync_ep = sync_ep;
+        ndo_get_stats64_hidden_args->async_chnl = chnl;
+        
+
+        ndo_change_carrier_hidden_args->sync_ep = sync_ep;
+        ndo_change_carrier_hidden_args->async_chnl = chnl;
+
+fail1:
+fail2:
+fail3:
+fail4:
+fail5:
+fail6:
+fail7:
+fail8:
+	return;
+}
+
 void setup(struct net_device *dev, struct trampoline_hidden_args *hidden_args)
 {
 	int ret;
@@ -530,6 +781,7 @@ void setup(struct net_device *dev, struct trampoline_hidden_args *hidden_args)
 	struct fipc_message *response;
 	struct setup_container *setup_container;
 	struct net_device_container *net_dev_container;
+	struct net_device_ops_container *netdev_ops_container;
 
 	net_dev_container = container_of(dev, struct net_device_container, net_device);
 	ret = async_msg_blocking_send_start(hidden_args->async_chnl, &request);
@@ -539,27 +791,54 @@ void setup(struct net_device *dev, struct trampoline_hidden_args *hidden_args)
 	}
 	async_msg_set_fn_type(request, SETUP);
 
+	netdev_ops_container = kzalloc(sizeof(*netdev_ops_container), GFP_KERNEL);
+	if (!netdev_ops_container) {
+		LIBLCD_ERR("kzalloc");
+		goto fail_alloc;
+	}
+
+	ret = glue_cap_insert_net_device_ops_type(c_cspace, netdev_ops_container, &netdev_ops_container->my_ref);
+	if (ret) {
+		LIBLCD_ERR("insert");
+		goto fail_insert;
+	}
+
 	ret = glue_cap_insert_net_device_type(c_cspace, net_dev_container, &net_dev_container->my_ref);
 	if (ret) {
 		LIBLCD_ERR("insert");
 		goto fail_insert;
 	}
 
-	/*fipc_set_reg1(request, netdev_ops_container->my_ref.cptr);
-	fipc_set_reg3(request, rtnl_link_ops_container->my_ref.cptr);*/
+	/*fipc_set_reg3(request, rtnl_link_ops_container->my_ref.cptr);*/
 	setup_container = (struct setup_container*)hidden_args->struct_container;
 
 	LIBLCD_MSG("sending setup_container cptr: other_ref %lu", setup_container->other_ref.cptr);	
 	fipc_set_reg1(request, net_dev_container->other_ref.cptr);
 	fipc_set_reg2(request, setup_container->other_ref.cptr);
 	fipc_set_reg3(request, net_dev_container->my_ref.cptr);
+	fipc_set_reg4(request, netdev_ops_container->my_ref.cptr);
 
 	err = thc_ipc_call(hidden_args->async_chnl, request, &response);
 	if (err) {
 		LIBLCD_ERR("thc_ipc_call");
 		goto fail_ipc;
 	}
+
+	net_dev_container->net_device.flags = fipc_get_reg1(response);
+	net_dev_container->net_device.priv_flags = fipc_get_reg2(response);
+	net_dev_container->net_device.features = fipc_get_reg3(response);
+	net_dev_container->net_device.hw_features = fipc_get_reg4(response);
+	net_dev_container->net_device.hw_enc_features = fipc_get_reg5(response);
+
+	netdev_ops_container->other_ref.cptr = fipc_get_reg6(response);
+
 	fipc_recv_msg_end(thc_channel_to_fipc(hidden_args->async_chnl), response);
+
+	net_dev_container->net_device.netdev_ops = &netdev_ops_container->net_device_ops;
+
+	setup_device_ops_trampolines(netdev_ops_container, hidden_args);
+
+fail_alloc:
 fail_async:
 fail_insert:
 fail_ipc:
@@ -580,190 +859,36 @@ void LCD_TRAMPOLINE_LINKAGE(setup_trampoline) setup_trampoline(struct net_device
 int register_netdevice_callee(struct fipc_message *request, struct thc_channel *channel, struct glue_cspace *cspace, struct cptr sync_ep)
 {
 	struct net_device_container *dev_container;
-	struct net_device_ops_container *netdev_ops_container;
-	struct rtnl_link_ops_container *rtnl_link_ops_container;
 	struct fipc_message *response;
-	int err;
 	unsigned 	int request_cookie;
-	struct trampoline_hidden_args *ndo_init_hidden_args;
-	struct trampoline_hidden_args *ndo_uninit_hidden_args;
-	struct trampoline_hidden_args *ndo_start_xmit_hidden_args;
-	struct trampoline_hidden_args *ndo_validate_addr_hidden_args;
-	struct trampoline_hidden_args *ndo_set_rx_mode_hidden_args;
-	struct trampoline_hidden_args *ndo_set_mac_address_hidden_args;
-	struct trampoline_hidden_args *ndo_get_stats64_hidden_args;
-	struct trampoline_hidden_args *ndo_change_carrier_hidden_args;
-	struct trampoline_hidden_args *setup_hidden_args;
-	struct trampoline_hidden_args *validate_hidden_args;
 	int ret;
 	request_cookie = thc_get_request_cookie(request);
-	fipc_recv_msg_end(thc_channel_to_fipc(net_async), request);
-	dev_container = kzalloc(sizeof( struct net_device_container   ), GFP_KERNEL);
-	if (!dev_container) {
-		LIBLCD_ERR("kzalloc");
-		lcd_exit(-1);
+	fipc_recv_msg_end(thc_channel_to_fipc(channel), request);
+
+	ret = glue_cap_lookup_net_device_type(c_cspace, __cptr(fipc_get_reg1(request)), &dev_container);
+
+	if (ret) {
+		LIBLCD_MSG("lookup failed");
+		goto fail_lookup;
 	}
-	err = glue_cap_insert_net_device_type(c_cspace, dev_container, &dev_container->my_ref);
-	if (!err) {
-		LIBLCD_ERR("lcd insert");
-		lcd_exit(-1);
-	}
-	dev_container->other_ref.cptr = fipc_get_reg4(response);
-	//dev_container->net_device.netdev_ops = &netdev_ops_container->net_device_ops;
-	//dev_container->net_device.rtnl_link_ops = &rtnl_link_ops_container->rtnl_link_ops;
-	ndo_init_hidden_args = kzalloc(sizeof( *ndo_init_hidden_args ), GFP_KERNEL);
-	if (!ndo_init_hidden_args) {
-		LIBLCD_ERR("kzalloc hidden args");
-		lcd_exit(-1);
-	}
-	ndo_init_hidden_args->t_handle = LCD_DUP_TRAMPOLINE(ndo_init_trampoline);
-	if (!ndo_init_hidden_args->t_handle) {
-		LIBLCD_ERR("duplicate trampoline");
-		lcd_exit(-1);
-	}
-	ndo_init_hidden_args->t_handle->hidden_args = ndo_init_hidden_args;
-	//ndo_init_hidden_args->struct_container = netdev_ops_container;
-	ndo_init_hidden_args->cspace = c_cspace;
-	//netdev_ops_container->net_device_ops.ndo_init = LCD_HANDLE_TO_TRAMPOLINE(ndo_init_hidden_args->t_handle);
-	ndo_uninit_hidden_args = kzalloc(sizeof( *ndo_uninit_hidden_args ), GFP_KERNEL);
-	if (!ndo_uninit_hidden_args) {
-		LIBLCD_ERR("kzalloc hidden args");
-		lcd_exit(-1);
-	}
-	ndo_uninit_hidden_args->t_handle = LCD_DUP_TRAMPOLINE(ndo_uninit_trampoline);
-	if (!ndo_uninit_hidden_args->t_handle) {
-		LIBLCD_ERR("duplicate trampoline");
-		lcd_exit(-1);
-	}
-	ndo_uninit_hidden_args->t_handle->hidden_args = ndo_uninit_hidden_args;
-	//ndo_uninit_hidden_args->struct_container = netdev_ops_container;
-	ndo_uninit_hidden_args->cspace = c_cspace;
-	//netdev_ops_container->net_device_ops.ndo_uninit = LCD_HANDLE_TO_TRAMPOLINE(ndo_uninit_hidden_args->t_handle);
-	ndo_start_xmit_hidden_args = kzalloc(sizeof( *ndo_start_xmit_hidden_args ), GFP_KERNEL);
-	if (!ndo_start_xmit_hidden_args) {
-		LIBLCD_ERR("kzalloc hidden args");
-		lcd_exit(-1);
-	}
-	ndo_start_xmit_hidden_args->t_handle = LCD_DUP_TRAMPOLINE(ndo_start_xmit_trampoline);
-	if (!ndo_start_xmit_hidden_args->t_handle) {
-		LIBLCD_ERR("duplicate trampoline");
-		lcd_exit(-1);
-	}
-	ndo_start_xmit_hidden_args->t_handle->hidden_args = ndo_start_xmit_hidden_args;
-	//ndo_start_xmit_hidden_args->struct_container = netdev_ops_container;
-	ndo_start_xmit_hidden_args->cspace = c_cspace;
-	//netdev_ops_container->net_device_ops.ndo_start_xmit = LCD_HANDLE_TO_TRAMPOLINE(ndo_start_xmit_hidden_args->t_handle);
-	ndo_validate_addr_hidden_args = kzalloc(sizeof( *ndo_validate_addr_hidden_args ), GFP_KERNEL);
-	if (!ndo_validate_addr_hidden_args) {
-		LIBLCD_ERR("kzalloc hidden args");
-		lcd_exit(-1);
-	}
-	ndo_validate_addr_hidden_args->t_handle = LCD_DUP_TRAMPOLINE(ndo_validate_addr_trampoline);
-	if (!ndo_validate_addr_hidden_args->t_handle) {
-		LIBLCD_ERR("duplicate trampoline");
-		lcd_exit(-1);
-	}
-	ndo_validate_addr_hidden_args->t_handle->hidden_args = ndo_validate_addr_hidden_args;
-	//ndo_validate_addr_hidden_args->struct_container = netdev_ops_container;
-	ndo_validate_addr_hidden_args->cspace = c_cspace;
-	//netdev_ops_container->net_device_ops.ndo_validate_addr = LCD_HANDLE_TO_TRAMPOLINE(ndo_validate_addr_hidden_args->t_handle);
-	ndo_set_rx_mode_hidden_args = kzalloc(sizeof( *ndo_set_rx_mode_hidden_args ), GFP_KERNEL);
-	if (!ndo_set_rx_mode_hidden_args) {
-		LIBLCD_ERR("kzalloc hidden args");
-		lcd_exit(-1);
-	}
-	ndo_set_rx_mode_hidden_args->t_handle = LCD_DUP_TRAMPOLINE(ndo_set_rx_mode_trampoline);
-	if (!ndo_set_rx_mode_hidden_args->t_handle) {
-		LIBLCD_ERR("duplicate trampoline");
-		lcd_exit(-1);
-	}
-	ndo_set_rx_mode_hidden_args->t_handle->hidden_args = ndo_set_rx_mode_hidden_args;
-	//ndo_set_rx_mode_hidden_args->struct_container = netdev_ops_container;
-	ndo_set_rx_mode_hidden_args->cspace = c_cspace;
-	//netdev_ops_container->net_device_ops.ndo_set_rx_mode = LCD_HANDLE_TO_TRAMPOLINE(ndo_set_rx_mode_hidden_args->t_handle);
-	ndo_set_mac_address_hidden_args = kzalloc(sizeof( *ndo_set_mac_address_hidden_args ), GFP_KERNEL);
-	if (!ndo_set_mac_address_hidden_args) {
-		LIBLCD_ERR("kzalloc hidden args");
-		lcd_exit(-1);
-	}
-	ndo_set_mac_address_hidden_args->t_handle = LCD_DUP_TRAMPOLINE(ndo_set_mac_address_trampoline);
-	if (!ndo_set_mac_address_hidden_args->t_handle) {
-		LIBLCD_ERR("duplicate trampoline");
-		lcd_exit(-1);
-	}
-	ndo_set_mac_address_hidden_args->t_handle->hidden_args = ndo_set_mac_address_hidden_args;
-	//ndo_set_mac_address_hidden_args->struct_container = netdev_ops_container;
-	ndo_set_mac_address_hidden_args->cspace = c_cspace;
-	//netdev_ops_container->net_device_ops.ndo_set_mac_address = LCD_HANDLE_TO_TRAMPOLINE(ndo_set_mac_address_hidden_args->t_handle);
-	ndo_get_stats64_hidden_args = kzalloc(sizeof( *ndo_get_stats64_hidden_args ), GFP_KERNEL);
-	if (!ndo_get_stats64_hidden_args) {
-		LIBLCD_ERR("kzalloc hidden args");
-		lcd_exit(-1);
-	}
-	ndo_get_stats64_hidden_args->t_handle = LCD_DUP_TRAMPOLINE(ndo_get_stats64_trampoline);
-	if (!ndo_get_stats64_hidden_args->t_handle) {
-		LIBLCD_ERR("duplicate trampoline");
-		lcd_exit(-1);
-	}
-	ndo_get_stats64_hidden_args->t_handle->hidden_args = ndo_get_stats64_hidden_args;
-	//ndo_get_stats64_hidden_args->struct_container = netdev_ops_container;
-	ndo_get_stats64_hidden_args->cspace = c_cspace;
-	//netdev_ops_container->net_device_ops.ndo_get_stats64 = LCD_HANDLE_TO_TRAMPOLINE(ndo_get_stats64_hidden_args->t_handle);
-	ndo_change_carrier_hidden_args = kzalloc(sizeof( *ndo_change_carrier_hidden_args ), GFP_KERNEL);
-	if (!ndo_change_carrier_hidden_args) {
-		LIBLCD_ERR("kzalloc hidden args");
-		lcd_exit(-1);
-	}
-	ndo_change_carrier_hidden_args->t_handle = LCD_DUP_TRAMPOLINE(ndo_change_carrier_trampoline);
-	if (!ndo_change_carrier_hidden_args->t_handle) {
-		LIBLCD_ERR("duplicate trampoline");
-		lcd_exit(-1);
-	}
-	ndo_change_carrier_hidden_args->t_handle->hidden_args = ndo_change_carrier_hidden_args;
-	//ndo_change_carrier_hidden_args->struct_container = netdev_ops_container;
-	ndo_change_carrier_hidden_args->cspace = c_cspace;
-	//netdev_ops_container->net_device_ops.ndo_change_carrier = LCD_HANDLE_TO_TRAMPOLINE(ndo_change_carrier_hidden_args->t_handle);
-	setup_hidden_args = kzalloc(sizeof( *setup_hidden_args ), GFP_KERNEL);
-	if (!setup_hidden_args) {
-		LIBLCD_ERR("kzalloc hidden args");
-		lcd_exit(-1);
-	}
-	setup_hidden_args->t_handle = LCD_DUP_TRAMPOLINE(setup_trampoline);
-	if (!setup_hidden_args->t_handle) {
-		LIBLCD_ERR("duplicate trampoline");
-		lcd_exit(-1);
-	}
-	setup_hidden_args->t_handle->hidden_args = setup_hidden_args;
-	//setup_hidden_args->struct_container = rtnl_link_ops_container;
-	setup_hidden_args->cspace = c_cspace;
-	//rtnl_link_ops_container->rtnl_link_ops.setup = LCD_HANDLE_TO_TRAMPOLINE(setup_hidden_args->t_handle);
-	validate_hidden_args = kzalloc(sizeof( *validate_hidden_args ), GFP_KERNEL);
-	if (!validate_hidden_args) {
-		LIBLCD_ERR("kzalloc hidden args");
-		lcd_exit(-1);
-	}
-	validate_hidden_args->t_handle = LCD_DUP_TRAMPOLINE(validate_trampoline);
-	if (!validate_hidden_args->t_handle) {
-		LIBLCD_ERR("duplicate trampoline");
-		lcd_exit(-1);
-	}
-	validate_hidden_args->t_handle->hidden_args = validate_hidden_args;
-	//validate_hidden_args->struct_container = rtnl_link_ops_container;
-	validate_hidden_args->cspace = c_cspace;
-	//rtnl_link_ops_container->rtnl_link_ops.validate = LCD_HANDLE_TO_TRAMPOLINE(validate_hidden_args->t_handle);
-	//dev->rtnl_link_ops->kind = fipc_get_reg2(request);
+
+	dev_container->net_device.dev_addr = kmalloc(MAX_ADDR_LEN, GFP_KERNEL);
+
+	rtnl_lock();
+	LIBLCD_MSG("Got lock ");
 	ret = register_netdevice(( &dev_container->net_device ));
-	if (async_msg_blocking_send_start(net_async, &response)) {
+	rtnl_unlock();
+	LIBLCD_MSG("unlocked ");
+
+	if (async_msg_blocking_send_start(channel, &response)) {
 		LIBLCD_ERR("error getting response msg");
 		return -EIO;
 	}
-	fipc_set_reg3(response, dev_container->other_ref.cptr);
-	fipc_set_reg1(response, netdev_ops_container->other_ref.cptr);
-	fipc_set_reg2(response, rtnl_link_ops_container->other_ref.cptr);
-	fipc_set_reg4(response, ret);
-	thc_ipc_reply(net_async, request_cookie, response);
-	return ret;
 
+	fipc_set_reg4(response, ret);
+	thc_ipc_reply(channel, request_cookie, response);
+fail_lookup:
+	return ret;
 }
 
 int ether_setup_callee(struct fipc_message *request, struct thc_channel *channel, struct glue_cspace *cspace, struct cptr sync_ep)
@@ -882,20 +1007,32 @@ int eth_validate_addr_callee(struct fipc_message *request, struct thc_channel *c
 
 int free_netdev_callee(struct fipc_message *request, struct thc_channel *channel, struct glue_cspace *cspace, struct cptr sync_ep)
 {
-//	struct net_device *dev;
 	int ret;
 	struct fipc_message *response;
 	unsigned 	int request_cookie;
+	struct net_device_container *dev_container;
+	struct net_device *dev;
+
 	request_cookie = thc_get_request_cookie(request);
-	fipc_recv_msg_end(thc_channel_to_fipc(net_async), request);
-	//free_netdev(dev);
-	if (async_msg_blocking_send_start(net_async, &response)) {
+	fipc_recv_msg_end(thc_channel_to_fipc(channel), request);
+
+	ret = glue_cap_lookup_net_device_type(c_cspace, __cptr(fipc_get_reg1(request)), &dev_container);
+
+	if (ret) {
+		LIBLCD_MSG("lookup failed");
+		goto fail_lookup;
+	}
+
+	dev = &dev_container->net_device;
+
+	free_netdev(dev);
+	if (async_msg_blocking_send_start(channel, &response)) {
 		LIBLCD_ERR("error getting response msg");
 		return -EIO;
 	}
-	thc_ipc_reply(net_async, request_cookie, response);
+	thc_ipc_reply(channel, request_cookie, response);
+fail_lookup:
 	return ret;
-
 }
 
 int netif_carrier_off_callee(struct fipc_message *request, struct thc_channel *channel, struct glue_cspace *cspace, struct cptr sync_ep)
@@ -942,7 +1079,6 @@ int __rtnl_link_register_callee(void)
 	struct thc_channel *chnl;
 	cptr_t sync_endpoint;
 	int ret;
-	struct trampoline_hidden_args *setup_hidden_args;
 	struct trampoline_hidden_args *validate_hidden_args;
 	int err;
 	struct fs_info *fs_info;
@@ -1028,7 +1164,7 @@ int __rtnl_link_register_callee(void)
 ops_container->rtnl_link_ops.validate = LCD_HANDLE_TO_TRAMPOLINE(validate_hidden_args->t_handle);
 	ops_container->rtnl_link_ops.kind = "dummy"; 
 	ret = __rtnl_link_register(( &ops_container->rtnl_link_ops ));
-	lcd_set_r1(ops_container->other_ref.cptr);
+	lcd_set_r1(ops_container->my_ref.cptr);
 	goto out;
 fail7:
 fail6:
@@ -1220,107 +1356,3 @@ int consume_skb_callee(struct fipc_message *request, struct thc_channel *channel
 	return ret;
 
 }
-
-
-
-
-void dispatch_loop()
-{
-	int ret = 0;
-	for (;;) {
-//		ret = lcd_recv(manufacturer_interface_cap);
-		if (ret) {
-			goto out;
-		}
-		switch (ret) {
-			case REGISTER_NETDEVICE:
-				LIBLCD_MSG("Calling function register_netdevice");
-				//ret = register_netdevice_callee();
-				break;
-			case ETHER_SETUP:
-				LIBLCD_MSG("Calling function ether_setup");
-				//ret = ether_setup_callee();
-				break;
-			case ETH_MAC_ADDR:
-				LIBLCD_MSG("Calling function eth_mac_addr");
-				//ret = eth_mac_addr_callee();
-				break;
-			case ETH_VALIDATE_ADDR:
-				LIBLCD_MSG("Calling function eth_validate_addr");
-				//ret = eth_validate_addr_callee();
-				break;
-			case FREE_NETDEV:
-				LIBLCD_MSG("Calling function free_netdev");
-				//ret = free_netdev_callee();
-				break;
-			case NETIF_CARRIER_OFF:
-				LIBLCD_MSG("Calling function netif_carrier_off");
-				//ret = netif_carrier_off_callee();
-				break;
-			case NETIF_CARRIER_ON:
-				LIBLCD_MSG("Calling function netif_carrier_on");
-				//ret = netif_carrier_on_callee();
-				break;
-			case __RTNL_LINK_REGISTER:
-				LIBLCD_MSG("Calling function __rtnl_link_register");
-				//ret = __rtnl_link_register_callee();
-				break;
-			case __RTNL_LINK_UNREGISTER:
-				LIBLCD_MSG("Calling function __rtnl_link_unregister");
-				//ret = __rtnl_link_unregister_callee();
-				break;
-			case RTNL_LINK_UNREGISTER:
-				LIBLCD_MSG("Calling function rtnl_link_unregister");
-				//ret = rtnl_link_unregister_callee();
-				break;
-			case ALLOC_NETDEV_MQS:
-				LIBLCD_MSG("Calling function alloc_netdev_mqs");
-				//ret = alloc_netdev_mqs_callee();
-				break;
-			case CONSUME_SKB:
-				LIBLCD_MSG("Calling function consume_skb");
-				//ret = consume_skb_callee();
-				break;
-			case NDO_INIT:
-				LIBLCD_MSG("Calling function ndo_init");
-				//ret = ndo_init_callee();
-				break;
-			case NDO_UNINIT:
-				LIBLCD_MSG("Calling function ndo_uninit");
-				//ret = ndo_uninit_callee();
-				break;
-			case NDO_START_XMIT:
-				LIBLCD_MSG("Calling function ndo_start_xmit");
-				//ret = ndo_start_xmit_callee();
-				break;
-			case NDO_VALIDATE_ADDR:
-				LIBLCD_MSG("Calling function ndo_validate_addr");
-				//ret = ndo_validate_addr_callee();
-				break;
-			case NDO_SET_RX_MODE:
-				LIBLCD_MSG("Calling function ndo_set_rx_mode");
-				//ret = ndo_set_rx_mode_callee();
-				break;
-			case NDO_SET_MAC_ADDRESS:
-				LIBLCD_MSG("Calling function ndo_set_mac_address");
-				//ret = ndo_set_mac_address_callee();
-				break;
-			case NDO_GET_STATS64:
-				LIBLCD_MSG("Calling function ndo_get_stats64");
-				//ret = ndo_get_stats64_callee();
-				break;
-			case NDO_CHANGE_CARRIER:
-				LIBLCD_MSG("Calling function ndo_change_carrier");
-				//ret = ndo_change_carrier_callee();
-				break;
-			default:
-				break;
-		}
-		if (ret) {
-			goto out;
-		}
-	}
-out:
-	return;
-}
-

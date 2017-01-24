@@ -209,6 +209,53 @@ fail1:
 extern cptr_t nullnet_sync_endpoint;
 extern cptr_t nullnet_register_channel;
 
+int create_async_channel(void)
+{
+	int ret;
+	cptr_t tx, rx;
+	struct thc_channel *chnl;
+	/*
+	 * Set up async and sync channels
+	 */
+	ret = lcd_create_sync_endpoint(&nullnet_sync_endpoint);
+	if (ret) {
+		LIBLCD_ERR("lcd_create_sync_endpoint");
+		goto fail1;
+	}
+	ret = setup_async_channel(&tx, &rx, &chnl);
+	if (ret) {
+		LIBLCD_ERR("async chnl setup failed");
+		goto fail2;
+	}
+        lcd_set_cr0(nullnet_sync_endpoint);
+        lcd_set_cr1(rx);
+        lcd_set_cr2(tx);
+
+        ret = lcd_sync_call(nullnet_register_channel);
+
+        /*
+         * Flush cap registers
+         */
+        lcd_set_cr0(CAP_CPTR_NULL);
+        lcd_set_cr1(CAP_CPTR_NULL);
+        lcd_set_cr2(CAP_CPTR_NULL);
+        if (ret) {
+                LIBLCD_ERR("lcd_call");
+                goto fail4;
+        }
+	net_async = chnl;
+	return ret;
+fail5:
+fail4:
+        //glue_cap_remove(c_cspace, ops_container->my_ref);
+fail3:
+        //destroy_async_channel(chnl);
+fail2:
+	lcd_cap_delete(nullnet_sync_endpoint);
+fail1:
+	return ret;
+}
+
 int __rtnl_link_register(struct rtnl_link_ops *ops)
 {
 	struct rtnl_link_ops_container *ops_container;
@@ -311,33 +358,18 @@ int register_netdevice(struct net_device *dev)
 	struct fipc_message *response;
 	int ret;
 	dev_container = container_of(dev, struct net_device_container, net_device);
+
 	netdev_ops_container = container_of(dev->netdev_ops, struct net_device_ops_container, net_device_ops);
-	err = glue_cap_insert_net_device_ops_type(c_cspace, netdev_ops_container, &netdev_ops_container->my_ref);
-	if (err) {
-		LIBLCD_ERR("lcd insert");
-		lcd_exit(-1);
-	}
+
 	rtnl_link_ops_container = container_of(dev->rtnl_link_ops, struct rtnl_link_ops_container, rtnl_link_ops);
-	err = glue_cap_insert_rtnl_link_ops_type(c_cspace, rtnl_link_ops_container, &rtnl_link_ops_container->my_ref);
-	if (err) {
-		LIBLCD_ERR("lcd insert");
-		lcd_exit(-1);
-	}
-	err = glue_cap_insert_net_device_type(c_cspace, dev_container, &dev_container->my_ref);
-	if (err) {
-		LIBLCD_ERR("lcd insert");
-		lcd_exit(-1);
-	}
+
 	ret = async_msg_blocking_send_start(net_async, &request);
 	if (ret) {
 		LIBLCD_ERR("failed to get a send slot");
 		lcd_exit(-1);
 	}
 	async_msg_set_fn_type(request, REGISTER_NETDEVICE);
-	fipc_set_reg4(request, dev_container->my_ref.cptr);
-	fipc_set_reg1(request, netdev_ops_container->my_ref.cptr);
-	fipc_set_reg3(request, rtnl_link_ops_container->my_ref.cptr);
-//	fipc_set_reg2(request, dev->rtnl_link_ops->kind);
+	fipc_set_reg1(request, dev_container->other_ref.cptr);
 	err = thc_ipc_call(net_async, request, &response);
 	if (err) {
 		LIBLCD_ERR("thc_ipc_call");
@@ -459,21 +491,28 @@ void free_netdev(struct net_device *dev)
 	int err;
 	struct fipc_message *request;
 	struct fipc_message *response;
+	struct net_device_container *dev_container;
+
 	ret = async_msg_blocking_send_start(net_async, &request);
 	if (ret) {
 		LIBLCD_ERR("failed to get a send slot");
-		lcd_exit(-1);
+		goto fail_async;
 	}
 	async_msg_set_fn_type(request, FREE_NETDEV);
-	//fipc_set_reg1(request, netdev_ops_container->my_ref.cptr);
-	//fipc_set_reg3(request, rtnl_link_ops_container->my_ref.cptr);
-	//fipc_set_reg2(request, dev->rtnl_link_ops->kind);
-	err = thc_ipc_call(net_async, request, &response);
-	if (err) {
+
+	dev_container = container_of(dev, struct net_device_container, net_device);
+
+	fipc_set_reg1(request, dev_container->other_ref.cptr);
+
+	ret = thc_ipc_call(net_async, request, &response);
+	if (ret) {
 		LIBLCD_ERR("thc_ipc_call");
-		lcd_exit(-1);
+		goto fail_ipc;
 	}
 	fipc_recv_msg_end(thc_channel_to_fipc(net_async), response);
+
+fail_async:
+fail_ipc:
 	return;
 }
 
@@ -566,7 +605,6 @@ struct net_device *alloc_netdev_mqs(int sizeof_priv, const char *name, unsigned 
 	struct fipc_message *response;
 	struct net_device_container *ret1;
 	struct rtnl_link_ops *rtnl_ops;
-	struct rtnl_link_ops_container *rtnl_ops_cnt;
 
 	ret1 = kzalloc(sizeof( struct net_device_container   ), GFP_KERNEL);
 	if (!ret1) {
@@ -660,42 +698,30 @@ void consume_skb(struct sk_buff *skb)
 
 int ndo_init_callee(struct fipc_message *request, struct thc_channel *channel, struct glue_cspace *cspace, struct cptr sync_ep)
 {
-	struct net_device *dev;
+	struct net_device_container *net_dev_container;
 	struct fipc_message *response;
 	unsigned 	int request_cookie;
 	int ret;
 	request_cookie = thc_get_request_cookie(request);
-	fipc_recv_msg_end(thc_channel_to_fipc(net_async), request);
-	dev = kzalloc(sizeof( *dev ), GFP_KERNEL);
-	if (!dev) {
-		LIBLCD_ERR("kzalloc");
-		lcd_exit(-1);
+
+	fipc_recv_msg_end(thc_channel_to_fipc(channel), request);
+
+	ret = glue_cap_lookup_net_device_type(c_cspace, __cptr(fipc_get_reg1(request)), &net_dev_container);
+	if (ret) {
+		LIBLCD_ERR("lookup");
+		goto fail_lookup;
 	}
-	dev->netdev_ops = kzalloc(sizeof( *dev->netdev_ops ), GFP_KERNEL);
-	if (!dev->netdev_ops) {
-		LIBLCD_ERR("kzalloc");
-		lcd_exit(-1);
-	}
-	dev->rtnl_link_ops = kzalloc(sizeof( *dev->rtnl_link_ops ), GFP_KERNEL);
-	if (!dev->rtnl_link_ops) {
-		LIBLCD_ERR("kzalloc");
-		lcd_exit(-1);
-	}
-/*	dev->rtnl_link_ops->kind = kzalloc(sizeof( char   ), GFP_KERNEL);
-	if (!dev->rtnl_link_ops->kind) {
-		LIBLCD_ERR("kzalloc");
-		lcd_exit(-1);
-	}
-	dev->rtnl_link_ops->kind = fipc_get_reg2(request);*/
-	//ret = ndo_init(dev);
-	if (async_msg_blocking_send_start(net_async, &response)) {
+
+	ret = net_dev_container->net_device.netdev_ops->ndo_init(&net_dev_container->net_device);
+
+	if (async_msg_blocking_send_start(channel, &response)) {
 		LIBLCD_ERR("error getting response msg");
 		return -EIO;
 	}
 	fipc_set_reg1(response, ret);
-	thc_ipc_reply(net_async, request_cookie, response);
+	thc_ipc_reply(channel, request_cookie, response);
+fail_lookup:
 	return ret;
-
 }
 
 int ndo_uninit_callee(struct fipc_message *request, struct thc_channel *channel, struct glue_cspace *cspace, struct cptr sync_ep)
@@ -817,21 +843,48 @@ int ndo_set_mac_address_callee(struct fipc_message *request, struct thc_channel 
 
 int ndo_get_stats64_callee(struct fipc_message *request, struct thc_channel *channel, struct glue_cspace *cspace, struct cptr sync_ep)
 {
-	//struct rtnl_link_stats64 *storage;
 	struct fipc_message *response;
 	unsigned 	int request_cookie;
-//	struct rtnl_link_stats64 *ret1;
+	struct rtnl_link_stats64_container *stats_container;
 	int ret;
+	struct net_device_container *net_dev_container;
+
 	request_cookie = thc_get_request_cookie(request);
-	fipc_recv_msg_end(thc_channel_to_fipc(net_async), request);
-	//ret = ndo_get_stats64(dev, storage);
-	if (async_msg_blocking_send_start(net_async, &response)) {
+	fipc_recv_msg_end(thc_channel_to_fipc(channel), request);
+
+	stats_container = kmalloc(sizeof(*stats_container), GFP_KERNEL);
+
+	if (!stats_container) {
+		LIBLCD_MSG("kmalloc failed");
+		goto fail_alloc;
+	}
+
+	ret = glue_cap_insert_rtnl_link_stats64_type(c_cspace, stats_container, &stats_container->my_ref);
+	if (ret) {
+		LIBLCD_ERR("lookup");
+		goto fail_lookup;
+	}
+
+	ret = glue_cap_lookup_net_device_type(c_cspace, __cptr(fipc_get_reg1(request)), &net_dev_container);
+	if (ret) {
+		LIBLCD_ERR("lookup");
+		goto fail_lookup;
+	}
+	LIBLCD_MSG("Calling ndo get stats64");
+	net_dev_container->net_device.netdev_ops->ndo_get_stats64(&net_dev_container->net_device, &stats_container->rtnl_link_stats64);
+
+	if (async_msg_blocking_send_start(channel, &response)) {
 		LIBLCD_ERR("error getting response msg");
 		return -EIO;
 	}
-	thc_ipc_reply(net_async, request_cookie, response);
-	return ret;
 
+	fipc_set_reg1(response, stats_container->rtnl_link_stats64.tx_packets);
+	fipc_set_reg2(response, stats_container->rtnl_link_stats64.tx_bytes);
+
+	thc_ipc_reply(channel, request_cookie, response);
+fail_lookup:
+fail_alloc:
+	return ret;
 }
 
 int ndo_change_carrier_callee(struct fipc_message *request, struct thc_channel *channel, struct glue_cspace *cspace, struct cptr sync_ep)
@@ -861,7 +914,9 @@ int setup_callee(struct fipc_message *request, struct thc_channel *channel, stru
 	unsigned 	int request_cookie;
 	struct setup_container *setup_container;
 	struct net_device_container *net_dev_container;
-
+	struct net_device_ops_container *netdev_ops_container;
+	const struct net_device_ops *netdev_ops;
+	cptr_t netdev_ops_ref;
 	request_cookie = thc_get_request_cookie(request);
 	fipc_recv_msg_end(thc_channel_to_fipc(channel), request);
 
@@ -876,17 +931,41 @@ int setup_callee(struct fipc_message *request, struct thc_channel *channel, stru
 		LIBLCD_ERR("lookup");
 		goto fail_lookup;
 	}
+
 	// save other ref cptr
 	net_dev_container->other_ref = __cptr(fipc_get_reg3(request));
+
+	netdev_ops_ref.cptr = fipc_get_reg4(request);
+
 	setup_container->setup(&net_dev_container->net_device);
 
+	netdev_ops = net_dev_container->net_device.netdev_ops;
+
+	netdev_ops_container = container_of(netdev_ops, struct net_device_ops_container, net_device_ops);
+
+	netdev_ops_container->other_ref.cptr = netdev_ops_ref.cptr;
+
+	ret = glue_cap_insert_net_device_ops_type(c_cspace, netdev_ops_container, &netdev_ops_container->my_ref);
+	if (ret) {
+		LIBLCD_ERR("lcd insert");
+		goto fail_insert;
+	}
+ 
 	if (async_msg_blocking_send_start(channel, &response)) {
 		LIBLCD_ERR("error getting response msg");
 		return -EIO;
 	}
-	thc_ipc_reply(channel, request_cookie, response);
 
+	fipc_set_reg1(response, net_dev_container->net_device.flags);
+	fipc_set_reg2(response, net_dev_container->net_device.priv_flags);
+	fipc_set_reg3(response, net_dev_container->net_device.features);
+	fipc_set_reg4(response, net_dev_container->net_device.hw_features);
+	fipc_set_reg5(response, net_dev_container->net_device.hw_enc_features);
+	fipc_set_reg6(response, netdev_ops_container->my_ref.cptr);
+
+	thc_ipc_reply(channel, request_cookie, response);
 fail_lookup:
+fail_insert:
 	return ret;
 }
 

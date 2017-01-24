@@ -98,7 +98,7 @@ static int boot_main(void)
 	/*
 	 * Wait for 4 seconds
 	 */
-	msleep(10000);
+	msleep(100000);
 	/*
 	 * Tear everything down
 	 */

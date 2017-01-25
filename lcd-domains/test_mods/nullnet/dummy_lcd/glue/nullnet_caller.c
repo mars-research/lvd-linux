@@ -241,14 +241,12 @@ int create_async_channel(void)
         lcd_set_cr2(CAP_CPTR_NULL);
         if (ret) {
                 LIBLCD_ERR("lcd_call");
-                goto fail4;
+                goto fail3;
         }
 	net_async = chnl;
 	return ret;
-fail5:
-fail4:
-        //glue_cap_remove(c_cspace, ops_container->my_ref);
 fail3:
+        //glue_cap_remove(c_cspace, ops_container->my_ref);
         //destroy_async_channel(chnl);
 fail2:
 	lcd_cap_delete(nullnet_sync_endpoint);
@@ -279,7 +277,7 @@ int __rtnl_link_register(struct rtnl_link_ops *ops)
 	}
 
 	ops_container = container_of(ops, struct rtnl_link_ops_container, rtnl_link_ops);
-	LIBLCD_MSG("Retrieve container ops %p\n", ops_container);
+	LIBLCD_MSG("Retrieve container ops %p", ops_container);
 	err = glue_cap_insert_rtnl_link_ops_type(c_cspace, ops_container, &ops_container->my_ref);
 	if (err) {
 		LIBLCD_ERR("lcd insert");
@@ -488,7 +486,6 @@ int eth_validate_addr(struct net_device *dev)
 void free_netdev(struct net_device *dev)
 {
 	int ret;
-	int err;
 	struct fipc_message *request;
 	struct fipc_message *response;
 	struct net_device_container *dev_container;
@@ -604,7 +601,6 @@ struct net_device *alloc_netdev_mqs(int sizeof_priv, const char *name, unsigned 
 	struct fipc_message *request;
 	struct fipc_message *response;
 	struct net_device_container *ret1;
-	struct rtnl_link_ops *rtnl_ops;
 
 	ret1 = kzalloc(sizeof( struct net_device_container   ), GFP_KERNEL);
 	if (!ret1) {
@@ -810,7 +806,7 @@ int ndo_set_mac_address_callee(struct fipc_message *request, struct thc_channel 
 	cptr_t addr_cptr;
 	gva_t addr_gva;
 	request_cookie = thc_get_request_cookie(request);
-	fipc_recv_msg_end(thc_channel_to_fipc(net_async), request);
+	fipc_recv_msg_end(thc_channel_to_fipc(channel), request);
 	sync_ret = lcd_cptr_alloc(&addr_cptr);
 	if (sync_ret) {
 		LIBLCD_ERR("failed to get cptr");
@@ -831,14 +827,14 @@ int ndo_set_mac_address_callee(struct fipc_message *request, struct thc_channel 
 		lcd_exit(-1);
 	}
 	//ret = ndo_set_mac_address(dev, addr);
-	if (async_msg_blocking_send_start(net_async, &response)) {
+	if (async_msg_blocking_send_start(channel, &response)) {
 		LIBLCD_ERR("error getting response msg");
 		return -EIO;
 	}
-	fipc_set_reg1(response, ret);
-	thc_ipc_reply(net_async, request_cookie, response);
-	return ret;
 
+	fipc_set_reg1(response, ret);
+	thc_ipc_reply(channel, request_cookie, response);
+	return ret;
 }
 
 int ndo_get_stats64_callee(struct fipc_message *request, struct thc_channel *channel, struct glue_cspace *cspace, struct cptr sync_ep)

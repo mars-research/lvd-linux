@@ -10,16 +10,20 @@
 #include <linux/delay.h>
 #include <linux/module.h>
 #include <linux/kernel.h>
+#include <linux/kmod.h>
+
+#include "../glue_helper.h"
 
 #include <lcd_config/post_hook.h>
+
+cptr_t net_klcd, dummy_lcd;
+struct lcd_create_ctx *dummy_ctx;
+cptr_t net_chnl;
+cptr_t net_chnl_domain_cptr, dummy_chnl_domain_cptr;
 
 static int boot_main(void)
 {
 	int ret;
-	cptr_t net_chnl;
-	cptr_t net_chnl_domain_cptr, dummy_chnl_domain_cptr;
-	cptr_t net_klcd, dummy_lcd;
-	struct lcd_create_ctx *dummy_ctx;
 	/*
 	 * Enter lcd mode
 	 */
@@ -98,16 +102,16 @@ static int boot_main(void)
 	/*
 	 * Wait for 4 seconds
 	 */
-	msleep(100000);
+	//msleep(100000);
 	/*
 	 * Tear everything down
 	 */
 	ret = 0;
-	goto out;
+	// return
+	goto fail1;
 
 
 	/* The destroy's will free up everything ... */
-out:
 fail9:
 fail8:
 fail7:
@@ -125,23 +129,49 @@ fail1:
 	return ret;
 }
 
+int boot_lcd_thread(void *data)
+{
+	static unsigned once = 0;
+	int ret;
+	while (!kthread_should_stop()) {
+		if (!once) {
+			LCD_MAIN({
+				ret = boot_main();
+			});
+		}
+		once = 1;
+		schedule();	
+	}
+	LIBLCD_MSG("Exiting thread");
+	lcd_cap_delete(dummy_lcd);
+	lcd_destroy_create_ctx(dummy_ctx);
+
+	msleep(10000);	
+	lcd_destroy_module_klcd(net_klcd, "lcd_test_mod_nullnet_net_klcd");
+	lcd_exit(0);
+	return 0;
+}
+
+struct task_struct *boot_task;
+
 static int boot_init(void)
 {
-	int ret;
-	
-	LCD_MAIN({
+	LIBLCD_MSG("%s: entering", __func__);
 
-			ret = boot_main();
+	boot_task = kthread_create(boot_lcd_thread, NULL, "boot_lcd_thread");
 
-		});
-
-	return ret;
+	if (!IS_ERR(boot_task))
+		wake_up_process(boot_task);
+	return 0;
 }
 
 static void boot_exit(void)
 {
 	/* nothing to do */
+	if (!IS_ERR(boot_task)) {
+		LIBLCD_MSG("%s: exiting", __func__);
+		kthread_stop(boot_task);
+	}
 }
-
 module_init(boot_init);
 module_exit(boot_exit);

@@ -73,7 +73,7 @@ static void main_and_loop(void)
 				);
 		}
 		
-		LIBLCD_MSG("PMFS EXITED DISPATCH LOOP");
+		LIBLCD_MSG("NULLNET EXITED DISPATCH LOOP");
 
 		);
 
@@ -88,7 +88,7 @@ static void main_and_loop(void)
 			dummy_cleanup_module();
 
 			
-				LIBLCD_MSG("SUCCESSFULLY UNREGISTERED PMFS!");
+				LIBLCD_MSG("SUCCESSFULLY UNREGISTERED NULLNET!");
 
 			);
 		);
@@ -138,6 +138,8 @@ static int __dummy_lcd_init(void)
 {
 	int ret;
 
+	LIBLCD_MSG("%s: entering", __func__);
+
 	LCD_MAIN({
 
 			ret = dummy_lcd_init();
@@ -149,6 +151,7 @@ static int __dummy_lcd_init(void)
 
 static void __exit dummy_lcd_exit(void)
 {
+	LIBLCD_MSG("%s: exiting", __func__);
 	return;
 }
 

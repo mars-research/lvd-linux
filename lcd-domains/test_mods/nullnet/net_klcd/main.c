@@ -232,7 +232,7 @@ static void loop(cptr_t register_chnl)
 	 * went bye-bye when we unloaded the vfs's .ko.)
 	 */
 
-	LIBLCD_MSG("EXITED VFS DO_FINISH");
+	LIBLCD_MSG("EXITED DUMMY DO_FINISH");
 
 
 }
@@ -294,7 +294,7 @@ fail1:
 static int __net_klcd_init(void)
 {
 	int ret;
-	printk("Net klcd\n");
+	LIBLCD_MSG("%s: entering", __func__);
 	LCD_MAIN({
 
 			ret = net_klcd_init();
@@ -309,6 +309,7 @@ static int __net_klcd_init(void)
  */
 static void __exit net_klcd_exit(void)
 {
+	LIBLCD_MSG("%s: exiting", __func__);
 	return;
 }
 

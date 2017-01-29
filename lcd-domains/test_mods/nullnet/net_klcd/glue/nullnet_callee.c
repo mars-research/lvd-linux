@@ -174,6 +174,47 @@ fail1:
 	return ret;
 }
 
+int ndo_init_user(struct net_device *dev, struct trampoline_hidden_args *hidden_args)
+{
+	int ret;
+	struct fipc_message *request;
+	struct fipc_message *response;
+	struct net_device_container *net_dev_container;
+
+	thc_init();
+
+	net_dev_container = container_of(dev, struct net_device_container, net_device);
+
+	ret = async_msg_blocking_send_start(hidden_args->async_chnl, &request);
+	if (ret) {
+		LIBLCD_ERR("failed to get a send slot");
+		goto fail_async;
+	}
+
+	async_msg_set_fn_type(request, NDO_INIT);
+	fipc_set_reg1(request, net_dev_container->other_ref.cptr);
+
+	DO_FINISH_(ndo_init, {
+		ASYNC_( {
+		ret = thc_ipc_call(hidden_args->async_chnl, request, &response);
+		}, ndo_init);
+	});
+
+	if (ret) {
+		LIBLCD_ERR("thc_ipc_call");
+		goto fail_ipc;
+	}
+
+	ret = fipc_get_reg1(response);
+	fipc_recv_msg_end(thc_channel_to_fipc(hidden_args->async_chnl), response);
+
+fail_ipc:
+fail_async:
+	lcd_exit(0);
+	return ret;
+}
+
+
 int ndo_init(struct net_device *dev, struct trampoline_hidden_args *hidden_args)
 {
 	int ret;
@@ -182,8 +223,11 @@ int ndo_init(struct net_device *dev, struct trampoline_hidden_args *hidden_args)
 	struct net_device_container *net_dev_container;
 
 	if (!get_current()->ptstate) {
-		LIBLCD_ERR("%s:Called from userland - can't process", __func__);
-		return 0;
+		LIBLCD_MSG("%s:Called from userland - can't process", __func__);
+		LCD_MAIN({
+			ret = ndo_init_user(dev, hidden_args);
+		});
+		return ret;
 	}
 
 	net_dev_container = container_of(dev, struct net_device_container, net_device);
@@ -222,6 +266,43 @@ int LCD_TRAMPOLINE_LINKAGE(ndo_init_trampoline) ndo_init_trampoline(struct net_d
 
 }
 
+void ndo_uninit_user(struct net_device *dev, struct trampoline_hidden_args *hidden_args)
+{
+	int ret;
+	struct fipc_message *request;
+	struct fipc_message *response;
+	struct net_device_container *net_dev_container;
+
+	thc_init();
+
+	net_dev_container = container_of(dev, struct net_device_container, net_device);
+
+	ret = async_msg_blocking_send_start(hidden_args->async_chnl, &request);
+	if (ret) {
+		LIBLCD_ERR("failed to get a send slot");
+		goto fail_async;
+	}
+	async_msg_set_fn_type(request, NDO_UNINIT);
+	fipc_set_reg1(request, net_dev_container->other_ref.cptr);
+
+	DO_FINISH_(ndo_uninit, {
+		ASYNC_( {
+		ret = thc_ipc_call(hidden_args->async_chnl, request, &response);
+		}, ndo_uninit);
+	});
+
+	if (ret) {
+		LIBLCD_ERR("thc_ipc_call");
+		goto fail_ipc;
+	}
+
+	fipc_recv_msg_end(thc_channel_to_fipc(hidden_args->async_chnl), response);
+fail_ipc:
+fail_async:
+	lcd_exit(0);
+	return;
+}
+
 void ndo_uninit(struct net_device *dev, struct trampoline_hidden_args *hidden_args)
 {
 	int ret;
@@ -230,7 +311,10 @@ void ndo_uninit(struct net_device *dev, struct trampoline_hidden_args *hidden_ar
 	struct net_device_container *net_dev_container;
 
 	if (!get_current()->ptstate) {
-		LIBLCD_ERR("%s:Called from userland - can't process", __func__);
+		LIBLCD_MSG("%s:Called from userland - can't process", __func__);
+		LCD_MAIN({
+			ndo_uninit_user(dev, hidden_args);
+		});
 		return;	
 	}
 
@@ -267,6 +351,45 @@ void LCD_TRAMPOLINE_LINKAGE(ndo_uninit_trampoline) ndo_uninit_trampoline(struct 
 
 }
 
+int ndo_start_xmit_user(struct sk_buff *skb, struct net_device *dev, struct trampoline_hidden_args *hidden_args)
+{
+	int ret;
+	struct fipc_message *request;
+	struct fipc_message *response;
+	struct net_device_container *net_dev_container;
+
+	thc_init();
+
+	net_dev_container = container_of(dev, struct net_device_container, net_device);
+
+	ret = async_msg_blocking_send_start(hidden_args->async_chnl, &request);
+	if (ret) {
+		LIBLCD_ERR("failed to get a send slot");
+		goto fail_async;
+	}
+
+	async_msg_set_fn_type(request, NDO_START_XMIT);
+
+	DO_FINISH_(ndo_start_xmit, {
+	  ASYNC_({
+	    ret = thc_ipc_call(hidden_args->async_chnl, request, &response);
+	  }, ndo_start_xmit);
+	});
+
+	if (ret) {
+		LIBLCD_ERR("thc_ipc_call");
+		goto fail_ipc;
+	}
+
+	ret = fipc_get_reg1(response);
+	fipc_recv_msg_end(thc_channel_to_fipc(hidden_args->async_chnl), response);
+
+fail_async:
+fail_ipc:
+	lcd_exit(0);
+	return ret;
+}
+
 int ndo_start_xmit(struct sk_buff *skb, struct net_device *dev, struct trampoline_hidden_args *hidden_args)
 {
 	int ret;
@@ -275,8 +398,11 @@ int ndo_start_xmit(struct sk_buff *skb, struct net_device *dev, struct trampolin
 	struct net_device_container *net_dev_container;
 
 	if (!get_current()->ptstate) {
-		LIBLCD_ERR("%s:Called from userland - can't process", __func__);
-		return 0;	
+		LIBLCD_MSG("%s:Called from userland - can't process", __func__);
+		LCD_MAIN( {
+			ret = ndo_start_xmit_user(skb, dev, hidden_args);
+		});
+		return ret;
 	}
 
 	net_dev_container = container_of(dev, struct net_device_container, net_device);
@@ -316,6 +442,47 @@ int LCD_TRAMPOLINE_LINKAGE(ndo_start_xmit_trampoline)
 
 }
 
+int ndo_validate_addr_user(struct net_device *dev, struct trampoline_hidden_args *hidden_args)
+{
+	int ret;
+	struct fipc_message *request;
+	struct fipc_message *response;
+	struct net_device_container *net_dev_container;
+
+	thc_init();
+
+	net_dev_container = container_of(dev, struct net_device_container, net_device);
+
+	ret = async_msg_blocking_send_start(hidden_args->async_chnl, &request);
+	if (ret) {
+		LIBLCD_ERR("failed to get a send slot");
+		goto fail_async;
+	}
+	async_msg_set_fn_type(request, NDO_VALIDATE_ADDR);
+
+	fipc_set_reg1(request, net_dev_container->other_ref.cptr);
+
+	LIBLCD_MSG("%s, cptr klcd %lu", __func__, net_dev_container->other_ref.cptr);
+
+	DO_FINISH_(ndo_validate_addr, {
+	  ASYNC_({
+	    ret = thc_ipc_call(hidden_args->async_chnl, request, &response);
+	  }, ndo_validate_addr);
+	});
+
+	if (ret) {
+		LIBLCD_ERR("thc_ipc_call");
+		goto fail_ipc;
+	}
+
+	ret = fipc_get_reg1(response);
+	fipc_recv_msg_end(thc_channel_to_fipc(hidden_args->async_chnl), response);
+fail_ipc:
+fail_async:
+	lcd_exit(0);
+	return ret;
+}
+
 int ndo_validate_addr(struct net_device *dev, struct trampoline_hidden_args *hidden_args)
 {
 	int ret;
@@ -324,8 +491,11 @@ int ndo_validate_addr(struct net_device *dev, struct trampoline_hidden_args *hid
 	struct net_device_container *net_dev_container;
 
 	if (!get_current()->ptstate) {
-		LIBLCD_ERR("%s:Called from userland - can't process", __func__);
-		return eth_validate_addr(dev);
+		LIBLCD_MSG("%s:Called from userland %p", __func__, dev);
+		LCD_MAIN({
+			ret = ndo_validate_addr_user(dev, hidden_args);
+		});
+		return ret;
 	}
 
 	net_dev_container = container_of(dev, struct net_device_container, net_device);
@@ -362,6 +532,44 @@ int LCD_TRAMPOLINE_LINKAGE(ndo_validate_addr_trampoline) ndo_validate_addr_tramp
 
 }
 
+void ndo_set_rx_mode_user(struct net_device *dev, struct trampoline_hidden_args *hidden_args)
+{
+	int ret;
+	struct fipc_message *request;
+	struct fipc_message *response;
+	struct net_device_container *net_dev_container;
+
+	thc_init();
+
+	net_dev_container = container_of(dev, struct net_device_container, net_device);
+
+	ret = async_msg_blocking_send_start(hidden_args->async_chnl, &request);
+	if (ret) {
+		LIBLCD_ERR("failed to get a send slot");
+		goto fail_async;
+	}
+	async_msg_set_fn_type(request, NDO_SET_RX_MODE);
+	fipc_set_reg1(request, net_dev_container->other_ref.cptr);
+
+	DO_FINISH_(ndo_set_rx_mode, {
+	  ASYNC_({
+	    ret = thc_ipc_call(hidden_args->async_chnl, request, &response);
+	  }, ndo_set_rx_mode);
+	});
+
+	if (ret) {
+		LIBLCD_ERR("thc_ipc_call");
+		goto fail_ipc;
+	}
+
+	fipc_recv_msg_end(thc_channel_to_fipc(hidden_args->async_chnl), response);
+
+fail_ipc:
+fail_async:
+	lcd_exit(0);
+	return;
+}
+
 void ndo_set_rx_mode(struct net_device *dev, struct trampoline_hidden_args *hidden_args)
 {
 	int ret;
@@ -370,7 +578,10 @@ void ndo_set_rx_mode(struct net_device *dev, struct trampoline_hidden_args *hidd
 	struct net_device_container *net_dev_container;
 
 	if (!get_current()->ptstate) {
-		LIBLCD_ERR("%s:Called from userland - can't process", __func__);
+		LIBLCD_MSG("%s:Called from userland - can't process", __func__);
+		LCD_MAIN({
+			ndo_set_rx_mode_user(dev, hidden_args);
+		});
 		return;
 	}
 
@@ -408,6 +619,62 @@ void LCD_TRAMPOLINE_LINKAGE(ndo_set_rx_mode_trampoline) ndo_set_rx_mode_trampoli
 
 }
 
+int ndo_set_mac_address_user(struct net_device *dev, void *addr, struct trampoline_hidden_args *hidden_args)
+{
+	int ret;
+	struct fipc_message *request;
+	struct fipc_message *response;
+	int sync_ret;
+	unsigned 	long addr_mem_sz;
+	unsigned 	long addr_offset;
+	cptr_t addr_cptr;
+	struct net_device_container *net_dev_container;
+
+	thc_init();
+
+	ret = async_msg_blocking_send_start(hidden_args->async_chnl, &request);
+	if (ret) {
+		LIBLCD_ERR("failed to get a send slot");
+		goto fail_async;
+	}
+	async_msg_set_fn_type(request, NDO_SET_MAC_ADDRESS);
+	fipc_set_reg1(request, net_dev_container->other_ref.cptr);
+
+	sync_ret = lcd_virt_to_cptr(__gva(( unsigned  long   )addr), &addr_cptr, &addr_mem_sz, &addr_offset);
+	if (sync_ret) {
+		LIBLCD_ERR("virt to cptr failed");
+		goto fail_virt;
+	}
+
+	DO_FINISH_(ndo_set_mac_address, {
+	  ASYNC_({
+	    ret = thc_ipc_call(hidden_args->async_chnl, request, &response);
+	  }, ndo_set_mac_address);
+	});
+
+	if (ret) {
+		LIBLCD_ERR("thc_ipc_call");
+		goto fail_ipc;
+	}
+	lcd_set_r0(addr_mem_sz);
+	lcd_set_r1(addr_offset);
+	lcd_set_cr0(addr_cptr);
+	sync_ret = lcd_sync_send(hidden_args->sync_ep);
+	lcd_set_cr0(CAP_CPTR_NULL);
+	if (sync_ret) {
+		LIBLCD_ERR("failed to send");
+		goto fail_sync;
+	}
+	ret = fipc_get_reg1(response);
+	fipc_recv_msg_end(thc_channel_to_fipc(hidden_args->async_chnl), response);
+fail_virt:
+fail_sync:
+fail_ipc:
+fail_async:
+	lcd_exit(0);
+	return ret;
+}
+
 int ndo_set_mac_address(struct net_device *dev, void *addr, struct trampoline_hidden_args *hidden_args)
 {
 	int ret;
@@ -420,7 +687,12 @@ int ndo_set_mac_address(struct net_device *dev, void *addr, struct trampoline_hi
 	struct net_device_container *net_dev_container;
 
 	if (!get_current()->ptstate) {
-		LIBLCD_ERR("%s:Called from userland - can't process", __func__);
+		LIBLCD_MSG("%s:Called from userland - can't process", __func__);
+		if (0) {
+		LCD_MAIN({
+			ret = ndo_set_mac_address_user(dev, addr, hidden_args); 
+		});
+		}
 		return eth_mac_addr(dev, addr);
 	}
 
@@ -474,6 +746,52 @@ int LCD_TRAMPOLINE_LINKAGE(ndo_set_mac_address_trampoline) ndo_set_mac_address_t
 
 }
 
+struct rtnl_link_stats64 *ndo_get_stats64_user(struct net_device *dev,
+		struct rtnl_link_stats64 *storage, 
+		struct trampoline_hidden_args *hidden_args)
+{
+	int ret;
+	struct fipc_message *request;
+	struct fipc_message *response;
+	struct net_device_container *net_dev_container;
+
+	thc_init();
+
+	net_dev_container = container_of(dev, struct net_device_container, net_device);
+
+	ret = async_msg_blocking_send_start(hidden_args->async_chnl, &request);
+	if (ret) {
+		LIBLCD_MSG("failed to get a send slot");
+		goto fail_async;
+	}
+
+	async_msg_set_fn_type(request, NDO_GET_STATS64);
+
+	fipc_set_reg1(request, net_dev_container->other_ref.cptr);
+
+	LIBLCD_MSG("%s, klcd netdev other ref %lu",__func__, net_dev_container->other_ref.cptr);
+
+	DO_FINISH_(ndo_get_stats64, {
+	  ASYNC_({
+	    ret = thc_ipc_call(hidden_args->async_chnl, request, &response);
+	  }, ndo_get_stats64);
+	});
+
+	if (ret) {
+		LIBLCD_ERR("thc_ipc_call");
+		goto fail_ipc;
+	}
+	storage->tx_packets = fipc_get_reg1(response);
+	storage->tx_bytes = fipc_get_reg2(response);
+
+	fipc_recv_msg_end(thc_channel_to_fipc(hidden_args->async_chnl), response);
+
+fail_ipc:
+fail_async:
+	lcd_exit(0);
+	return storage;
+}
+
 struct rtnl_link_stats64 *ndo_get_stats64(struct net_device *dev, struct rtnl_link_stats64 *storage, struct trampoline_hidden_args *hidden_args)
 {
 	int ret;
@@ -482,9 +800,11 @@ struct rtnl_link_stats64 *ndo_get_stats64(struct net_device *dev, struct rtnl_li
 	struct net_device_container *net_dev_container;
 
 	if (!get_current()->ptstate) {
-		storage->tx_packets = storage->tx_bytes = 0x100;
-		LIBLCD_ERR("%s:Called from userland - can't process", __func__);
-		return storage;	
+		LIBLCD_MSG("%s:Called from userland - %p", __func__, dev);
+		LCD_MAIN( {
+			ndo_get_stats64_user(dev, storage, hidden_args);
+		});
+		return storage;
 	}
 
 	net_dev_container = container_of(dev, struct net_device_container, net_device);
@@ -525,6 +845,45 @@ struct rtnl_link_stats64 LCD_TRAMPOLINE_LINKAGE(ndo_get_stats64_trampoline) *ndo
 
 }
 
+int ndo_change_carrier_user(struct net_device *dev, bool new_carrier, struct trampoline_hidden_args *hidden_args)
+{
+	int ret;
+	struct fipc_message *request;
+	struct fipc_message *response;
+	struct net_device_container *net_dev_container;
+
+	thc_init();
+
+	net_dev_container = container_of(dev, struct net_device_container, net_device);
+
+	ret = async_msg_blocking_send_start(hidden_args->async_chnl, &request);
+	if (ret) {
+		LIBLCD_ERR("failed to get a send slot");
+		goto fail_async;
+	}
+	async_msg_set_fn_type(request, NDO_CHANGE_CARRIER);
+	fipc_set_reg1(request, net_dev_container->other_ref.cptr);
+	fipc_set_reg2(request, new_carrier);
+
+	DO_FINISH_(ndo_change_carrier, {
+	  ASYNC_({
+		ret = thc_ipc_call(hidden_args->async_chnl, request, &response);
+	  }, ndo_change_carrier);
+	});
+
+	if (ret) {
+		LIBLCD_ERR("thc_ipc_call");
+		goto fail_ipc;
+	}
+	ret = fipc_get_reg1(response);
+	fipc_recv_msg_end(thc_channel_to_fipc(hidden_args->async_chnl), response);
+
+fail_async:
+fail_ipc:
+	lcd_exit(0);
+	return ret;
+}
+
 int ndo_change_carrier(struct net_device *dev, bool new_carrier, struct trampoline_hidden_args *hidden_args)
 {
 	int ret;
@@ -534,7 +893,10 @@ int ndo_change_carrier(struct net_device *dev, bool new_carrier, struct trampoli
 
 	if (!get_current()->ptstate) {
 		LIBLCD_ERR("%s:Called from userland - can't process", __func__);
-		return 0;	
+		LCD_MAIN( {
+			ret = ndo_change_carrier_user(dev, new_carrier, hidden_args);
+		});
+		return ret;
 	}
 
 	net_dev_container = container_of(dev, struct net_device_container, net_device);
@@ -878,7 +1240,8 @@ void setup(struct net_device *dev, struct trampoline_hidden_args *hidden_args)
 	/*fipc_set_reg3(request, rtnl_link_ops_container->my_ref.cptr);*/
 	setup_container = (struct setup_container*)hidden_args->struct_container;
 
-	LIBLCD_MSG("sending setup_container cptr: other_ref %lu", setup_container->other_ref.cptr);	
+	LIBLCD_MSG("%s sending setup_container cptr: other_ref %lu", __func__, setup_container->other_ref.cptr);
+	LIBLCD_MSG("%s sending netdev_cptr: %p my_ref %lu", __func__, dev, net_dev_container->my_ref.cptr);
 	fipc_set_reg1(request, net_dev_container->other_ref.cptr);
 	fipc_set_reg2(request, setup_container->other_ref.cptr);
 	fipc_set_reg3(request, net_dev_container->my_ref.cptr);
@@ -963,13 +1326,11 @@ int ether_setup_callee(struct fipc_message *request, struct thc_channel *channel
 	struct net_device_container *dev;
 	struct fipc_message *response;
 	unsigned 	int request_cookie;
+	cptr_t netdev_ref = __cptr(fipc_get_reg1(request));
 	request_cookie = thc_get_request_cookie(request);
 	fipc_recv_msg_end(thc_channel_to_fipc(channel), request);
 
-
-	ret = glue_cap_lookup_net_device_type(c_cspace, __cptr(fipc_get_reg1(request)), &dev);
-
-	LIBLCD_MSG("ndev other ref %lu", dev->other_ref.cptr);
+	ret = glue_cap_lookup_net_device_type(c_cspace, netdev_ref, &dev);
 	if (ret) {
 		LIBLCD_MSG("lookup failed");
 		goto fail_lookup;
@@ -1053,22 +1414,35 @@ int eth_mac_addr_callee(struct fipc_message *request, struct thc_channel *channe
 
 int eth_validate_addr_callee(struct fipc_message *request, struct thc_channel *channel, struct glue_cspace *cspace, struct cptr sync_ep)
 {
-	//struct net_device *dev;
 	int ret;
 	struct fipc_message *response;
 	unsigned 	int request_cookie;
+	struct net_device_container *net_dev_container;
+	cptr_t netdev_ref = __cptr(fipc_get_reg1(request));
+
 	request_cookie = thc_get_request_cookie(request);
-	fipc_recv_msg_end(thc_channel_to_fipc(net_async), request);
-	//dev->rtnl_link_ops->kind = fipc_get_reg2(request);
-	//ret = eth_validate_addr(dev);
-	if (async_msg_blocking_send_start(net_async, &response)) {
+
+	fipc_recv_msg_end(thc_channel_to_fipc(channel), request);
+
+	LIBLCD_MSG("cptr %lu", netdev_ref.cptr);
+
+	ret = glue_cap_lookup_net_device_type(c_cspace, netdev_ref, &net_dev_container);
+	if (ret) {
+		LIBLCD_MSG("lookup failed");
+		goto fail_lookup;
+	}
+
+	ret = eth_validate_addr(&net_dev_container->net_device);
+
+	if (async_msg_blocking_send_start(channel, &response)) {
 		LIBLCD_ERR("error getting response msg");
 		return -EIO;
 	}
 	fipc_set_reg1(response, ret);
-	thc_ipc_reply(net_async, request_cookie, response);
-	return ret;
+	thc_ipc_reply(channel, request_cookie, response);
 
+fail_lookup:
+	return ret;
 }
 
 int free_netdev_callee(struct fipc_message *request, struct thc_channel *channel, struct glue_cspace *cspace, struct cptr sync_ep)
@@ -1103,41 +1477,58 @@ fail_lookup:
 
 int netif_carrier_off_callee(struct fipc_message *request, struct thc_channel *channel, struct glue_cspace *cspace, struct cptr sync_ep)
 {
-//	struct net_device *dev;
 	int ret;
 	struct fipc_message *response;
 	unsigned 	int request_cookie;
+	struct net_device_container *net_dev_container;
+	cptr_t netdev_ref = __cptr(fipc_get_reg1(request));
+
 	request_cookie = thc_get_request_cookie(request);
-	fipc_recv_msg_end(thc_channel_to_fipc(net_async), request);
-	//netif_carrier_off(dev);
-	if (async_msg_blocking_send_start(net_async, &response)) {
+	fipc_recv_msg_end(thc_channel_to_fipc(channel), request);
+
+	ret = glue_cap_lookup_net_device_type(c_cspace, netdev_ref, &net_dev_container);
+	if (ret) {
+		LIBLCD_MSG("lookup failed");
+		goto fail_lookup;
+	}
+
+	netif_carrier_off(&net_dev_container->net_device);
+	if (async_msg_blocking_send_start(channel, &response)) {
 		LIBLCD_ERR("error getting response msg");
 		return -EIO;
 	}
-	thc_ipc_reply(net_async, request_cookie, response);
+	thc_ipc_reply(channel, request_cookie, response);
+fail_lookup:
 	return ret;
-
 }
 
 int netif_carrier_on_callee(struct fipc_message *request, struct thc_channel *channel, struct glue_cspace *cspace, struct cptr sync_ep)
 {
-	//struct net_device *dev;
 	int ret;
 	struct fipc_message *response;
-	unsigned 	int request_cookie;
+	unsigned int request_cookie;
+	struct net_device_container *net_dev_container;
+	cptr_t netdev_ref = __cptr(fipc_get_reg1(request));
+
 	request_cookie = thc_get_request_cookie(request);
-	fipc_recv_msg_end(thc_channel_to_fipc(net_async), request);
-	//netif_carrier_on(dev);
-	if (async_msg_blocking_send_start(net_async, &response)) {
+
+	fipc_recv_msg_end(thc_channel_to_fipc(channel), request);
+
+	ret = glue_cap_lookup_net_device_type(c_cspace, netdev_ref, &net_dev_container);
+	if (ret) {
+		LIBLCD_MSG("lookup failed");
+		goto fail_lookup;
+	}
+	netif_carrier_on(&net_dev_container->net_device);
+	if (async_msg_blocking_send_start(channel, &response)) {
 		LIBLCD_ERR("error getting response msg");
 		return -EIO;
 	}
-	thc_ipc_reply(net_async, request_cookie, response);
+	thc_ipc_reply(channel, request_cookie, response);
+fail_lookup:
 	return ret;
-
 }
 
-//int __rtnl_link_register_callee(struct fipc_message *request, struct thc_channel *channel, struct glue_cspace *cspace, struct cptr sync_ep)
 int __rtnl_link_register_callee(void)
 {
 	struct rtnl_link_ops_container *ops_container;
@@ -1399,6 +1790,7 @@ fail_alloc:
 	return ret;
 }
 
+//TODO:
 int consume_skb_callee(struct fipc_message *request, struct thc_channel *channel, struct glue_cspace *cspace, struct cptr sync_ep)
 {
 	int ret;

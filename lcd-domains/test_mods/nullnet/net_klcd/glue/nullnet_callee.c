@@ -399,10 +399,11 @@ int ndo_start_xmit(struct sk_buff *skb, struct net_device *dev, struct trampolin
 
 	if (!get_current()->ptstate) {
 		LIBLCD_MSG("%s:Called from userland - can't process", __func__);
-		LCD_MAIN( {
+/*		LCD_MAIN( {
 			ret = ndo_start_xmit_user(skb, dev, hidden_args);
-		});
-		return ret;
+		});*/
+		// return for now
+		return 0;
 	}
 
 	net_dev_container = container_of(dev, struct net_device_container, net_device);
@@ -769,7 +770,7 @@ struct rtnl_link_stats64 *ndo_get_stats64_user(struct net_device *dev,
 
 	fipc_set_reg1(request, net_dev_container->other_ref.cptr);
 
-	LIBLCD_MSG("%s, klcd netdev other ref %lu",__func__, net_dev_container->other_ref.cptr);
+	LIBLCD_MSG("%s, klcd netdev other ref %p | %lu",__func__, net_dev_container, net_dev_container->other_ref.cptr);
 
 	DO_FINISH_(ndo_get_stats64, {
 	  ASYNC_({

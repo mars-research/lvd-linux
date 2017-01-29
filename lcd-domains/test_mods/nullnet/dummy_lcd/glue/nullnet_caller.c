@@ -376,9 +376,6 @@ int register_netdevice(struct net_device *dev)
 		LIBLCD_ERR("thc_ipc_call");
 		lcd_exit(-1);
 	}
-	dev_container->other_ref.cptr = fipc_get_reg4(response);
-	netdev_ops_container->other_ref.cptr = fipc_get_reg1(response);
-	rtnl_link_ops_container->other_ref.cptr = fipc_get_reg3(response);
 	ret = fipc_get_reg4(response);
 	fipc_recv_msg_end(thc_channel_to_fipc(net_async), response);
 	return ret;
@@ -826,7 +823,7 @@ int ndo_validate_addr_callee(struct fipc_message *request, struct thc_channel *c
 	}
 
 	LIBLCD_MSG("%s, cptr lcd %lu", __func__, netdev_ref);
-	LIBLCD_MSG("%s, looked up cptr lcd %lu", __func__, net_dev_container->other_ref.cptr);
+	LIBLCD_MSG("%s, looked up cptr lcd %p |  %lu", __func__, net_dev_container, net_dev_container->other_ref.cptr);
 
 	request_cookie = thc_get_request_cookie(request);
 

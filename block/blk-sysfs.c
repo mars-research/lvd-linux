@@ -13,6 +13,7 @@
 
 #include "blk.h"
 #include "blk-mq.h"
+#include <linux/blk-lcd.h>
 
 struct queue_sysfs_entry {
 	struct attribute attr;
@@ -604,7 +605,11 @@ static void blk_free_queue_rcu(struct rcu_head *rcu_head)
 {
 	struct request_queue *q = container_of(rcu_head, struct request_queue,
 					       rcu_head);
-	kmem_cache_free(blk_requestq_cachep, q);
+
+	struct request_queue_container *rq_cnt = container_of(q, 
+					struct request_queue_container,
+						rq);
+	kmem_cache_free(blk_requestq_cachep, rq_cnt);
 }
 
 /**

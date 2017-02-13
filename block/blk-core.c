@@ -39,6 +39,7 @@
 
 #include "blk.h"
 #include "blk-mq.h"
+#include <linux/blk-lcd.h>
 
 EXPORT_TRACEPOINT_SYMBOL_GPL(block_bio_remap);
 EXPORT_TRACEPOINT_SYMBOL_GPL(block_rq_remap);
@@ -691,13 +692,17 @@ static void blk_rq_timed_out_timer(unsigned long data)
 
 struct request_queue *blk_alloc_queue_node(gfp_t gfp_mask, int node_id)
 {
+
+	struct request_queue_container *rq_cnt;
 	struct request_queue *q;
 	int err;
 
-	q = kmem_cache_alloc_node(blk_requestq_cachep,
+	rq_cnt = kmem_cache_alloc_node(blk_requestq_cachep,
 				gfp_mask | __GFP_ZERO, node_id);
-	if (!q)
+	if (!rq_cnt)
 		return NULL;
+
+	q = &rq_cnt->rq;
 
 	q->id = ida_simple_get(&blk_queue_ida, 0, 0, gfp_mask);
 	if (q->id < 0)
@@ -773,7 +778,8 @@ fail_split:
 fail_id:
 	ida_simple_remove(&blk_queue_ida, q->id);
 fail_q:
-	kmem_cache_free(blk_requestq_cachep, q);
+	//kmem_cache_free(blk_requestq_cachep, q);
+	kmem_cache_free(blk_requestq_cachep, rq_cnt);
 	return NULL;
 }
 EXPORT_SYMBOL(blk_alloc_queue_node);
@@ -3532,8 +3538,12 @@ int __init blk_dev_init(void)
 	request_cachep = kmem_cache_create("blkdev_requests",
 			sizeof(struct request), 0, SLAB_PANIC, NULL);
 
+	//blk_requestq_cachep = kmem_cache_create("request_queue",
+	//		sizeof(struct request_queue), 0, SLAB_PANIC, NULL);
+
+	/* AB - This is for LCD */	
 	blk_requestq_cachep = kmem_cache_create("request_queue",
-			sizeof(struct request_queue), 0, SLAB_PANIC, NULL);
+			sizeof(struct request_queue_container), 0, SLAB_PANIC, NULL);
 
 	return 0;
 }

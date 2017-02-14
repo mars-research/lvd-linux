@@ -62,4 +62,5 @@ int lcd_cptr_alloc(cptr_t *slot_out);
  */
 void lcd_cptr_free(cptr_t slot);
 
+struct cspace *get_current_cspace(struct task_struct *c);
 #endif /* LCD_DOMAINS_CAP_H */

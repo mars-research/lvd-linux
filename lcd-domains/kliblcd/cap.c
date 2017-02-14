@@ -29,9 +29,14 @@ void lcd_cptr_free(cptr_t slot)
 	cptr_free(current->cptr_cache, slot);
 }
 
+struct cspace *get_current_cspace(struct task_struct *c)
+{
+	return current->lcd->cspace;
+}
 /* EXPORTS -------------------------------------------------- */
 
 EXPORT_SYMBOL(lcd_cap_delete);
 EXPORT_SYMBOL(lcd_cap_revoke);
 EXPORT_SYMBOL(lcd_cptr_alloc);
 EXPORT_SYMBOL(lcd_cptr_free);
+EXPORT_SYMBOL(get_current_cspace);

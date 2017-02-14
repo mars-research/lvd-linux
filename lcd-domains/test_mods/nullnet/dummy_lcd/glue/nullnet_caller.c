@@ -332,13 +332,16 @@ void __rtnl_link_unregister(struct rtnl_link_ops *ops)
 	int err;
 	struct fipc_message *request;
 	struct fipc_message *response;
+	struct rtnl_link_ops_container *ops_container;
+
 	ret = async_msg_blocking_send_start(net_async, &request);
 	if (ret) {
 		LIBLCD_ERR("failed to get a send slot");
 		lcd_exit(-1);
 	}
+	ops_container = container_of(ops, struct rtnl_link_ops_container, rtnl_link_ops);
 	async_msg_set_fn_type(request, __RTNL_LINK_UNREGISTER);
-//	fipc_set_reg1(request, ops->kind);
+	fipc_set_reg1(request, ops_container->other_ref.cptr);
 	err = thc_ipc_call(net_async, request, &response);
 	if (err) {
 		LIBLCD_ERR("thc_ipc_call");
@@ -401,8 +404,6 @@ void ether_setup(struct net_device *dev)
 	netdev_container = container_of(dev, struct net_device_container, net_device);
 	fipc_set_reg1(request, netdev_container->other_ref.cptr);
 	LIBLCD_MSG("ndev other ref %lu\n", netdev_container->other_ref.cptr);
-	//fipc_set_reg3(request, rtnl_link_ops_container->my_ref.cptr);
-	//fipc_set_reg2(request, dev->rtnl_link_ops->kind);
 	err = thc_ipc_call(net_async, request, &response);
 	if (err) {
 		LIBLCD_ERR("thc_ipc_call");
@@ -414,6 +415,17 @@ fail_async:
 	return;
 }
 
+int sync_prep_data(void *data, unsigned long *sz, unsigned long *off, cptr_t *data_cptr)
+{
+    int ret;
+	ret = lcd_virt_to_cptr(__gva((unsigned long)data), data_cptr, sz, off);
+	if (ret) {
+		LIBLCD_ERR("virt to cptr failed");
+	}
+	return ret;
+}
+
+
 // TODO:
 int eth_mac_addr(struct net_device *dev, void *p)
 {
@@ -424,6 +436,8 @@ int eth_mac_addr(struct net_device *dev, void *p)
 	unsigned 	long p_offset;
 	cptr_t p_cptr;
 	int ret;
+	struct net_device_container *dev_container;
+	uint32_t request_cookie;
 
 	ret = async_msg_blocking_send_start(net_async, &request);
 
@@ -432,34 +446,48 @@ int eth_mac_addr(struct net_device *dev, void *p)
 		goto fail_async;
 	}
 
+	dev_container = container_of(dev, struct net_device_container, net_device);
+
+	fipc_set_reg1(request, dev_container->other_ref.cptr);
+
 	async_msg_set_fn_type(request, ETH_MAC_ADDR);
-	//fipc_set_reg1(request, netdev_ops_container->my_ref.cptr);
-	//fipc_set_reg3(request, rtnl_link_ops_container->my_ref.cptr);
-	//fipc_set_reg2(request, dev->rtnl_link_ops->kind);
-	sync_ret = lcd_virt_to_cptr(__gva(( unsigned  long   )p), &p_cptr, &p_mem_sz, &p_offset);
+
+	sync_ret = sync_prep_data(p, &p_mem_sz, &p_offset, &p_cptr);
 	if (sync_ret) {
 		LIBLCD_ERR("virt to cptr failed");
 		lcd_exit(-1);
 	}
-	ret = thc_ipc_call(net_async, request, &response);
+
+	ret = thc_ipc_send_request(net_async, request, &request_cookie);
 	if (ret) {
 		LIBLCD_ERR("thc_ipc_call");
 		goto fail_ipc;
 	}
+
 	lcd_set_r0(p_mem_sz);
 	lcd_set_r1(p_offset);
 	lcd_set_cr0(p_cptr);
-	sync_ret = lcd_sync_send(sync_ep);
+	sync_ret = lcd_sync_send(nullnet_sync_endpoint);
 	lcd_set_cr0(CAP_CPTR_NULL);
 	if (sync_ret) {
 		LIBLCD_ERR("failed to send");
 		goto fail_sync;
 	}
+
+	ret = thc_ipc_recv_response(net_async,
+				request_cookie,
+				&response);
+	if (ret) {
+		LIBLCD_ERR("async recv failed");
+		goto fail_ipc_recv;
+	}
+
 	ret = fipc_get_reg1(response);
 	fipc_recv_msg_end(thc_channel_to_fipc(net_async), response);
 
 fail_async:
 fail_sync:
+fail_ipc_recv:
 fail_ipc:
 	return ret;
 }
@@ -608,7 +636,7 @@ void rtnl_link_unregister(struct rtnl_link_ops *ops)
 		goto fail1;
 	}
 	async_msg_set_fn_type(request, RTNL_LINK_UNREGISTER);
-	fipc_set_reg2(request, ops_container->my_ref.cptr);
+	fipc_set_reg2(request, ops_container->other_ref.cptr);
 
 	err = thc_ipc_call(net_async, request, &response);
 	if (err) {
@@ -875,8 +903,8 @@ fail_lookup:
 // TODO:
 int ndo_set_mac_address_callee(struct fipc_message *request, struct thc_channel *channel, struct glue_cspace *cspace, struct cptr sync_ep)
 {
-//	void *addr;
 	struct fipc_message *response;
+	struct net_device_container *net_dev_container;
 	unsigned 	int request_cookie;
 	int ret;
 	int sync_ret;
@@ -885,27 +913,41 @@ int ndo_set_mac_address_callee(struct fipc_message *request, struct thc_channel 
 	cptr_t addr_cptr;
 	gva_t addr_gva;
 	request_cookie = thc_get_request_cookie(request);
+
+	ret = glue_cap_lookup_net_device_type(c_cspace, __cptr(fipc_get_reg1(request)), &net_dev_container);
+	if (ret) {
+		LIBLCD_ERR("lookup");
+		goto fail_lookup;
+	}
+
 	fipc_recv_msg_end(thc_channel_to_fipc(channel), request);
+
 	sync_ret = lcd_cptr_alloc(&addr_cptr);
 	if (sync_ret) {
 		LIBLCD_ERR("failed to get cptr");
-		lcd_exit(-1);
+		goto fail_sync;
 	}
+
 	lcd_set_cr0(addr_cptr);
 	sync_ret = lcd_sync_recv(sync_ep);
 	lcd_set_cr0(CAP_CPTR_NULL);
 	if (sync_ret) {
 		LIBLCD_ERR("failed to recv");
-		lcd_exit(-1);
+		goto fail_sync;
 	}
 	mem_order = lcd_r0();
 	addr_offset = lcd_r1();
+	LIBLCD_MSG("%s: cptr %lu | order %lu | offset %lu",
+		__func__, addr_cptr.cptr, mem_order, addr_offset);
+
 	sync_ret = lcd_map_virt(addr_cptr, mem_order, &addr_gva);
 	if (sync_ret) {
 		LIBLCD_ERR("failed to map void *addr");
-		lcd_exit(-1);
+		goto fail_sync;
 	}
-	//ret = ndo_set_mac_address(dev, addr);
+
+	ret = net_dev_container->net_device.netdev_ops->ndo_set_mac_address(&net_dev_container->net_device, (void*)(gva_val(addr_gva) + addr_offset));
+
 	if (async_msg_blocking_send_start(channel, &response)) {
 		LIBLCD_ERR("error getting response msg");
 		return -EIO;
@@ -913,7 +955,9 @@ int ndo_set_mac_address_callee(struct fipc_message *request, struct thc_channel 
 
 	fipc_set_reg1(response, ret);
 	thc_ipc_reply(channel, request_cookie, response);
-	return ret;
+fail_lookup:
+fail_sync:
+	return 0;
 }
 
 // DONE

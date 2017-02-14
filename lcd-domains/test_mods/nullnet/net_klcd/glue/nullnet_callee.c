@@ -341,7 +341,8 @@ fail_async:
 }
 
 LCD_TRAMPOLINE_DATA(ndo_uninit_trampoline);
-void LCD_TRAMPOLINE_LINKAGE(ndo_uninit_trampoline) ndo_uninit_trampoline(struct net_device *dev)
+void LCD_TRAMPOLINE_LINKAGE(ndo_uninit_trampoline)
+ndo_uninit_trampoline(struct net_device *dev)
 {
 	void ( *volatile ndo_uninit_fp )(struct net_device *, struct trampoline_hidden_args *);
 	struct trampoline_hidden_args *hidden_args;
@@ -398,11 +399,22 @@ int ndo_start_xmit(struct sk_buff *skb, struct net_device *dev, struct trampolin
 	struct net_device_container *net_dev_container;
 
 	if (!get_current()->ptstate) {
-		LIBLCD_MSG("%s:Called from userland - can't process", __func__);
+		LIBLCD_MSG("%s:Called from userspace", __func__);
+//		dump_stack();
 /*		LCD_MAIN( {
 			ret = ndo_start_xmit_user(skb, dev, hidden_args);
 		});*/
 		// return for now
+		LIBLCD_MSG("\nskb %p | skb->len %d | skb->datalen %d\n"
+			   "skb->end %p | skb->head %p | skb->data %p\n"
+			   "truesize %d",
+			skb, skb->len, skb->data_len,
+			skb_end_pointer(skb), skb->head, skb->data,
+			skb->truesize);
+		LIBLCD_MSG("\ncur->tskfrag 0x%X | frag off %d | frag sz %d\n"
+			   "nr_frags %d\n",
+				current->task_frag.page, current->task_frag.offset, current->task_frag.size,
+				skb_shinfo(skb)->nr_frags);
 		return 0;
 	}
 
@@ -620,6 +632,43 @@ void LCD_TRAMPOLINE_LINKAGE(ndo_set_rx_mode_trampoline) ndo_set_rx_mode_trampoli
 
 }
 
+int sync_setup_memory(void *data, size_t sz, unsigned long *order, cptr_t *data_cptr, unsigned long *data_offset)
+{
+        int ret;
+        struct page *p;
+        unsigned long data_len;
+        unsigned long mem_len;
+        /*
+         * Determine page that contains (start of) data
+         */
+        p = virt_to_head_page(data);
+        if (!p) {
+                LIBLCD_ERR("failed to translate to page");
+                ret = -EINVAL;
+                goto fail1;
+        }
+        data_len = sz;
+        mem_len = ALIGN(data + data_len - page_address(p), PAGE_SIZE);
+        *order = ilog2(roundup_pow_of_two(mem_len >> PAGE_SHIFT));
+        /*
+         * Volunteer memory
+         */
+        *data_offset = data - page_address(p);
+        ret = lcd_volunteer_pages(p, *order, data_cptr);
+        if (ret) {
+                LIBLCD_ERR("failed to volunteer memory");
+                goto fail2;
+        }
+        /*
+         * Done
+         */
+        return 0;
+fail2:
+fail1:
+        return ret;
+}
+extern struct cspace *klcd_cspace;
+
 int ndo_set_mac_address_user(struct net_device *dev, void *addr, struct trampoline_hidden_args *hidden_args)
 {
 	int ret;
@@ -629,9 +678,17 @@ int ndo_set_mac_address_user(struct net_device *dev, void *addr, struct trampoli
 	unsigned 	long addr_mem_sz;
 	unsigned 	long addr_offset;
 	cptr_t addr_cptr;
+	unsigned 	int request_cookie;
 	struct net_device_container *net_dev_container;
+	cptr_t sync_end;
+	struct cspace *curr_cspace;
+	net_dev_container = container_of(dev, struct net_device_container, net_device);
 
-	thc_init();
+	/* creates lcd and cspace */
+	lcd_enter();
+	curr_cspace = get_current_cspace(current);
+	lcd_cptr_alloc(&sync_end);
+	ret = cap_grant(klcd_cspace, hidden_args->sync_ep, curr_cspace, sync_end);
 
 	ret = async_msg_blocking_send_start(hidden_args->async_chnl, &request);
 	if (ret) {
@@ -641,33 +698,54 @@ int ndo_set_mac_address_user(struct net_device *dev, void *addr, struct trampoli
 	async_msg_set_fn_type(request, NDO_SET_MAC_ADDRESS);
 	fipc_set_reg1(request, net_dev_container->other_ref.cptr);
 
-	sync_ret = lcd_virt_to_cptr(__gva(( unsigned  long   )addr), &addr_cptr, &addr_mem_sz, &addr_offset);
-	if (sync_ret) {
+	ret = sync_setup_memory(addr, sizeof(struct sockaddr), &addr_mem_sz, &addr_cptr, &addr_offset);
+
+	if (ret) {
 		LIBLCD_ERR("virt to cptr failed");
 		goto fail_virt;
 	}
 
-	DO_FINISH_(ndo_set_mac_address, {
-	  ASYNC_({
-	    ret = thc_ipc_call(hidden_args->async_chnl, request, &response);
-	  }, ndo_set_mac_address);
-	});
+	ret = thc_ipc_send_request(hidden_args->async_chnl, request, &request_cookie);
 
 	if (ret) {
 		LIBLCD_ERR("thc_ipc_call");
 		goto fail_ipc;
 	}
+	lcd_set_cr0(addr_cptr);
 	lcd_set_r0(addr_mem_sz);
 	lcd_set_r1(addr_offset);
-	lcd_set_cr0(addr_cptr);
-	sync_ret = lcd_sync_send(hidden_args->sync_ep);
+
+	LIBLCD_MSG("%s: cptr %lu | order %lu | offset %lu",
+		__func__, addr_cptr.cptr, addr_mem_sz, addr_offset);
+
+	sync_ret = lcd_sync_send(sync_end);
 	lcd_set_cr0(CAP_CPTR_NULL);
 	if (sync_ret) {
 		LIBLCD_ERR("failed to send");
 		goto fail_sync;
 	}
+
+	lcd_cap_delete(sync_end);
+	DO_FINISH_(ndo_set_mac_address, {
+	  ASYNC_({
+	ret = thc_ipc_recv_response(hidden_args->async_chnl,
+				request_cookie,
+				&response);
+	 }, ndo_set_mac_address);
+	});
+
+	if (ret) {
+		LIBLCD_ERR("async recv failed");
+		goto fail_ipcresp;
+	}
+
 	ret = fipc_get_reg1(response);
+
+	LIBLCD_MSG("%s: returned %d", __func__, ret);
+
 	fipc_recv_msg_end(thc_channel_to_fipc(hidden_args->async_chnl), response);
+
+fail_ipcresp:
 fail_virt:
 fail_sync:
 fail_ipc:
@@ -689,12 +767,15 @@ int ndo_set_mac_address(struct net_device *dev, void *addr, struct trampoline_hi
 
 	if (!get_current()->ptstate) {
 		LIBLCD_MSG("%s:Called from userland - can't process", __func__);
-		if (0) {
+		for (ret = 0; ret < 14; ret++) {
+			printk("%02X:",((char*)addr)[ret]);
+		}
+		if (1) {
 		LCD_MAIN({
 			ret = ndo_set_mac_address_user(dev, addr, hidden_args); 
 		});
 		}
-		return eth_mac_addr(dev, addr);
+		return ret;//eth_mac_addr(dev, addr);
 	}
 
 	net_dev_container = container_of(dev, struct net_device_container, net_device);
@@ -1305,7 +1386,6 @@ int register_netdevice_callee(struct fipc_message *request, struct thc_channel *
 	dev_container->net_device.dev_addr = kmalloc(MAX_ADDR_LEN, GFP_KERNEL);
 
 	rtnl_lock();
-	LIBLCD_MSG("Got lock ");
 	ret = register_netdevice(( &dev_container->net_device ));
 	rtnl_unlock();
 	LIBLCD_MSG("unlocked ");
@@ -1348,69 +1428,83 @@ fail_lookup:
 	return ret;
 }
 
+int sync_recv_data(unsigned long *order, unsigned long *off, cptr_t *data_cptr, gva_t *data_gva, cptr_t sync_ep)
+{
+    int ret;
+	ret = lcd_cptr_alloc(data_cptr);
+	if (ret) {
+		LIBLCD_ERR("failed to get cptr");
+		goto fail1;
+	}
+
+	lcd_set_cr0(*data_cptr);
+
+	ret = lcd_sync_recv(sync_ep);
+
+	lcd_set_cr0(CAP_CPTR_NULL);
+
+	if (ret) {
+		LIBLCD_ERR("failed to recv");
+		goto fail2;
+	}
+
+	*order = lcd_r0();
+	*off = lcd_r1();
+
+	ret = lcd_map_virt(*data_cptr, *order, data_gva);
+	if (ret) {
+		LIBLCD_ERR("failed to map void *addr");
+		goto fail3;
+	}
+	return 0;
+
+fail3:
+    lcd_cap_delete(*data_cptr);
+fail2:
+    lcd_cptr_free(*data_cptr);
+fail1:
+	return ret;
+}
+
+
 int eth_mac_addr_callee(struct fipc_message *request, struct thc_channel *channel, struct glue_cspace *cspace, struct cptr sync_ep)
 {
-	//struct net_device *dev;
+	struct net_device_container *dev_container;
 	int ret;
-	//void *p;
 	struct fipc_message *response;
-	unsigned 	int request_cookie;
-	/*dev = kzalloc(*sizeof( dev ), GFP_KERNEL);
-	if (!dev) {
-		LIBLCD_ERR("kzalloc");
-		lcd_exit(-1);
-	}
-	dev->netdev_ops = kzalloc(*sizeof( dev->netdev_ops ), GFP_KERNEL);
-	if (!dev->netdev_ops) {
-		LIBLCD_ERR("kzalloc");
-		lcd_exit(-1);
-	}
-	dev->rtnl_link_ops = kzalloc(*sizeof( dev->rtnl_link_ops ), GFP_KERNEL);
-	if (!dev->rtnl_link_ops) {
-		LIBLCD_ERR("kzalloc");
-		lcd_exit(-1);
-	}
-	dev->rtnl_link_ops->kind = kzalloc(sizeof( char   ), GFP_KERNEL);
-	if (!dev->rtnl_link_ops->kind) {
-		LIBLCD_ERR("kzalloc");
-		lcd_exit(-1);
-	}*/
 	int sync_ret;
 	unsigned 	long mem_order;
 	unsigned 	long p_offset;
 	cptr_t p_cptr;
 	gva_t p_gva;
+unsigned 	int request_cookie;
 	request_cookie = thc_get_request_cookie(request);
-	fipc_recv_msg_end(thc_channel_to_fipc(net_async), request);
-	//dev->rtnl_link_ops->kind = fipc_get_reg2(request);
-	sync_ret = lcd_cptr_alloc(&p_cptr);
+	fipc_recv_msg_end(thc_channel_to_fipc(channel), request);
+
+	ret = glue_cap_lookup_net_device_type(c_cspace, __cptr(fipc_get_reg1(request)), &dev_container);
+
+	if (ret) {
+		LIBLCD_MSG("lookup failed");
+		goto fail_lookup;
+	}
+	sync_ret = sync_recv_data(&mem_order, &p_offset, &p_cptr, &p_gva, sync_ep);
 	if (sync_ret) {
-		LIBLCD_ERR("failed to get cptr");
+		LIBLCD_ERR("failed to recv data");
 		lcd_exit(-1);
 	}
-	lcd_set_cr0(p_cptr);
-	sync_ret = lcd_sync_recv(sync_ep);
-	lcd_set_cr0(CAP_CPTR_NULL);
-	if (sync_ret) {
-		LIBLCD_ERR("failed to recv");
-		lcd_exit(-1);
-	}
-	mem_order = lcd_r0();
-	p_offset = lcd_r1();
-	sync_ret = lcd_map_virt(p_cptr, mem_order, &p_gva);
-	if (sync_ret) {
-		LIBLCD_ERR("failed to map void *p");
-		lcd_exit(-1);
-	}
-	//ret = eth_mac_addr(dev, p);
-	if (async_msg_blocking_send_start(net_async, &response)) {
+
+	ret = eth_mac_addr(&dev_container->net_device, (void*)(gva_val(p_gva) + p_offset));
+
+	LIBLCD_MSG("eth_mac_addr returned %d", ret);
+
+	if (async_msg_blocking_send_start(channel, &response)) {
 		LIBLCD_ERR("error getting response msg");
 		return -EIO;
 	}
 	fipc_set_reg1(response, ret);
-	thc_ipc_reply(net_async, request_cookie, response);
+	thc_ipc_reply(channel, request_cookie, response);
+fail_lookup:
 	return ret;
-
 }
 
 int eth_validate_addr_callee(struct fipc_message *request, struct thc_channel *channel, struct glue_cspace *cspace, struct cptr sync_ep)
@@ -1530,6 +1624,8 @@ fail_lookup:
 	return ret;
 }
 
+extern struct rtnl_link_ops_container *main_ops_container;
+
 int __rtnl_link_register_callee(void)
 {
 	struct rtnl_link_ops_container *ops_container;
@@ -1545,6 +1641,7 @@ int __rtnl_link_register_callee(void)
 		LIBLCD_ERR("kzalloc");
 		goto fail7;
 	}
+	main_ops_container = ops_container;
 	err = glue_cap_insert_rtnl_link_ops_type(c_cspace, ops_container, &ops_container->my_ref);
 	if (err) {
 		LIBLCD_ERR("lcd insert");

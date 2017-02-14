@@ -22,6 +22,8 @@ struct fs_info {
 };
 static LIST_HEAD(fs_infos);
 
+struct rtnl_link_ops_container *main_ops_container;
+
 struct fs_info * 
 add_fs(struct thc_channel *chnl, struct glue_cspace *cspace,
 	cptr_t sync_endpoint)
@@ -218,7 +220,7 @@ static void loop(cptr_t register_chnl)
 #endif
 		}
 
-		LIBLCD_MSG("vfs exited loop");
+		LIBLCD_MSG("net layer exited loop");
 
 		THCStopAllAwes();
 
@@ -232,13 +234,18 @@ static void loop(cptr_t register_chnl)
 	 * went bye-bye when we unloaded the vfs's .ko.)
 	 */
 
+	if (main_ops_container) {
+		LIBLCD_MSG("Forcefully unregister %s", main_ops_container->rtnl_link_ops.kind);
+		rtnl_link_unregister(( &main_ops_container->rtnl_link_ops ));
+		kfree(main_ops_container);
+	}
 	LIBLCD_MSG("EXITED DUMMY DO_FINISH");
 
 
 }
 
 /* INIT / EXIT ---------------------------------------- */
-
+struct cspace *klcd_cspace;
 static int net_klcd_init(void) 
 {
 	int ret;
@@ -261,6 +268,12 @@ static int net_klcd_init(void)
 		goto fail2;
 	}
 	LIBLCD_MSG("==========> got cptr %lu\n", net_chnl.cptr);
+	/* save cspace for future use
+	 * when userspace functions call function pointers,
+	 * we need to get access to the sync_ep of this klcd
+	 * to transfer pointers and data thro sync IPC to the lcd
+	 */
+	klcd_cspace = get_current_cspace(current);
 	/*
 	 * Init net glue
 	 */

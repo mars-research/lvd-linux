@@ -426,7 +426,7 @@ int sync_prep_data(void *data, unsigned long *sz, unsigned long *off, cptr_t *da
 }
 
 
-// TODO:
+// DONE
 int eth_mac_addr(struct net_device *dev, void *p)
 {
 	struct fipc_message *request;
@@ -817,22 +817,82 @@ fail_lookup:
 // TODO:
 int ndo_start_xmit_callee(struct fipc_message *request, struct thc_channel *channel, struct glue_cspace *cspace, struct cptr sync_ep)
 {
-//	struct sk_buff *skb;
-//	struct net_device *dev;
+	struct sk_buff *skb;
+	struct net_device_container *net_dev_container;
 	struct fipc_message *response;
 	unsigned 	int request_cookie;
-	int ret;
+	int ret, sync_ret;
+	cptr_t skb_cptr, skbd_cptr;
+	unsigned long skb_ord, skb_off;
+	unsigned long skbd_ord, skbd_off;
+	gva_t skb_gva, skbd_gva;
+	unsigned int head_off;
 	request_cookie = thc_get_request_cookie(request);
+
+	ret = glue_cap_lookup_net_device_type(c_cspace, __cptr(fipc_get_reg1(request)), &net_dev_container);
+	if (ret) {
+		LIBLCD_ERR("lookup");
+		goto fail_lookup;
+	}
+
 	fipc_recv_msg_end(thc_channel_to_fipc(net_async), request);
-//	ret = ndo_start_xmit(skb, dev);
+	sync_ret = lcd_cptr_alloc(&skb_cptr);
+	if (sync_ret) {
+		LIBLCD_ERR("failed to get cptr");
+		goto fail_sync;
+	}
+	sync_ret = lcd_cptr_alloc(&skbd_cptr);
+	if (sync_ret) {
+		LIBLCD_ERR("failed to get cptr");
+		goto fail_sync;
+	}
+
+	lcd_set_cr0(skb_cptr);
+	lcd_set_cr1(skbd_cptr);
+	sync_ret = lcd_sync_recv(sync_ep);
+	lcd_set_cr0(CAP_CPTR_NULL);
+	lcd_set_cr1(CAP_CPTR_NULL);
+	if (sync_ret) {
+		LIBLCD_ERR("failed to recv");
+		goto fail_sync;
+	}
+	skb_ord = lcd_r0();
+	skb_off = lcd_r1();
+	skbd_ord = lcd_r2();
+	skbd_off = lcd_r3();
+	head_off = lcd_r4();
+
+	sync_ret = lcd_map_virt(skb_cptr, skb_ord, &skb_gva);
+	if (sync_ret) {
+		LIBLCD_ERR("failed to map void *addr");
+		goto fail_sync;
+	}
+
+	sync_ret = lcd_map_virt(skbd_cptr, skbd_ord, &skbd_gva);
+	if (sync_ret) {
+		LIBLCD_ERR("failed to map void *addr");
+		goto fail_sync;
+	}
+
+	skb = (void*)(gva_val(skb_gva) + skb_off);
+	skb->data = (void*)(gva_val(skbd_gva) + skbd_off);
+	skb->head = skb->data - head_off;
+
+	ret = net_dev_container->net_device.netdev_ops->ndo_start_xmit(skb, &net_dev_container->net_device);
+
+	LIBLCD_MSG("LCD:\n\nskb %p | skb->len %d | skb->datalen %d\n"
+			   "skb->end %p | skb->head %p | skb->data %p| skb->tail %p\n", skb, skb->len, skb->data_len, skb_end_pointer(skb), skb->head, skb->data, skb->tail);
+
 	if (async_msg_blocking_send_start(net_async, &response)) {
 		LIBLCD_ERR("error getting response msg");
 		return -EIO;
 	}
 	fipc_set_reg1(response, ret);
 	thc_ipc_reply(net_async, request_cookie, response);
+	return 0;
+fail_sync:
+fail_lookup:
 	return ret;
-
 }
 
 // DONE
@@ -900,7 +960,7 @@ fail_lookup:
 	return ret;
 }
 
-// TODO:
+// DONE
 int ndo_set_mac_address_callee(struct fipc_message *request, struct thc_channel *channel, struct glue_cspace *cspace, struct cptr sync_ep)
 {
 	struct fipc_message *response;

@@ -96,7 +96,27 @@ static netdev_tx_t dummy_xmit(struct sk_buff *skb, struct net_device *dev)
 	dstats->tx_bytes += skb->len;
 	u64_stats_update_end(&dstats->syncp);
 */
-	dev_kfree_skb(skb);
+//	dev_kfree_skb(skb);
+
+	unsigned char nr_frags = skb_shinfo(skb)->nr_frags;
+	int i;
+	LIBLCD_MSG("LCD:\n\nskb %p | skb->len %d | skb->datalen %d\n"
+			   "skb->end %p | skb->head %p | skb->data %p\n"
+			   "truesize %d | headlen %d | pagelen %d",
+			skb, skb->len, skb->data_len,
+			skb_end_pointer(skb), skb->head, skb->data,
+			skb->truesize, skb_headlen(skb), skb_pagelen(skb));
+	for (i = 0; i < nr_frags; i++) {
+		skb_frag_t *frag = &skb_shinfo(skb)->frags[i];
+		LIBLCD_MSG("page 0x%X | size %d", skb_frag_page(frag), skb_frag_size(frag));
+	}
+
+	if (0) {
+		print_hex_dump(KERN_DEBUG, "pkt_data_lcd",
+                         DUMP_PREFIX_NONE, 16, 1,
+                         skb->data, skb->len, false);
+	}
+
 	return NETDEV_TX_OK;
 }
 

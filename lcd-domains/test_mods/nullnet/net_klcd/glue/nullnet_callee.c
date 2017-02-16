@@ -416,9 +416,9 @@ int ndo_start_xmit_user(struct sk_buff *skb, struct net_device *dev, struct tram
 
 	net_dev_container = container_of(dev, struct net_device_container, net_device);
 
-	ret = sync_setup_memory(skb, skb->truesize, &skb_ord, &skb_cptr, &skb_off);
+	ret = sync_setup_memory(skb, sizeof(struct sk_buff), &skb_ord, &skb_cptr, &skb_off);
 
-	ret = sync_setup_memory(skb->data, skb_headlen(skb), &skbd_ord, &skbd_cptr, &skbd_off);
+	ret = sync_setup_memory(skb->head, skb_end_offset(skb) + sizeof(struct skb_shared_info), &skbd_ord, &skbd_cptr, &skbd_off);
 
 	ret = async_msg_blocking_send_start(hidden_args->async_chnl, &request);
 	if (ret) {
@@ -451,7 +451,7 @@ int ndo_start_xmit_user(struct sk_buff *skb, struct net_device *dev, struct tram
 			skb->data, skb->len, false);
 	}
 
-	LIBLCD_MSG("r4 tail_off 0x%X |  r5 end off 0x%X | r6 head off 0x%X", skb->tail - (unsigned long)skb->data, skb->end - (unsigned long)skb->data, skb->data - skb->head);
+	LIBLCD_MSG("r4 data_off 0x%X | %d", skb->data - skb->head);
 	ret = lcd_sync_send(sync_end);
 	lcd_set_cr0(CAP_CPTR_NULL);
 	lcd_set_cr1(CAP_CPTR_NULL);

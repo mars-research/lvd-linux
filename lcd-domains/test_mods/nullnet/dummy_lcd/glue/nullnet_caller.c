@@ -826,7 +826,7 @@ int ndo_start_xmit_callee(struct fipc_message *request, struct thc_channel *chan
 	unsigned long skb_ord, skb_off;
 	unsigned long skbd_ord, skbd_off;
 	gva_t skb_gva, skbd_gva;
-	unsigned int head_off;
+	unsigned int data_off;
 	request_cookie = thc_get_request_cookie(request);
 
 	ret = glue_cap_lookup_net_device_type(c_cspace, __cptr(fipc_get_reg1(request)), &net_dev_container);
@@ -860,7 +860,7 @@ int ndo_start_xmit_callee(struct fipc_message *request, struct thc_channel *chan
 	skb_off = lcd_r1();
 	skbd_ord = lcd_r2();
 	skbd_off = lcd_r3();
-	head_off = lcd_r4();
+	data_off = lcd_r4();
 
 	sync_ret = lcd_map_virt(skb_cptr, skb_ord, &skb_gva);
 	if (sync_ret) {
@@ -875,8 +875,8 @@ int ndo_start_xmit_callee(struct fipc_message *request, struct thc_channel *chan
 	}
 
 	skb = (void*)(gva_val(skb_gva) + skb_off);
-	skb->data = (void*)(gva_val(skbd_gva) + skbd_off);
-	skb->head = skb->data - head_off;
+	skb->head = (void*)(gva_val(skbd_gva) + skbd_off);
+	skb->data = skb->head + data_off;
 
 	ret = net_dev_container->net_device.netdev_ops->ndo_start_xmit(skb, &net_dev_container->net_device);
 

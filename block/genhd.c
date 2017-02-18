@@ -23,6 +23,7 @@
 #include <linux/badblocks.h>
 
 #include "blk.h"
+#include <linux/blk-lcd.h>
 
 static DEFINE_MUTEX(block_class_lock);
 struct kobject *block_depr;
@@ -1144,7 +1145,10 @@ static void disk_release(struct device *dev)
 	hd_free_part(&disk->part0);
 	if (disk->queue)
 		blk_put_queue(disk->queue);
-	kfree(disk);
+	//kfree(disk);
+	kfree((container_of(disk, 
+		struct gendisk_container,
+			gendisk)));
 }
 struct class block_class = {
 	.name		= "block",
@@ -1289,18 +1293,25 @@ EXPORT_SYMBOL(alloc_disk);
 
 struct gendisk *alloc_disk_node(int minors, int node_id)
 {
+	struct gendisk_container *disk_container;
 	struct gendisk *disk;
 
-	disk = kzalloc_node(sizeof(struct gendisk), GFP_KERNEL, node_id);
-	if (disk) {
+	//disk = kzalloc_node(sizeof(struct gendisk), GFP_KERNEL, node_id);
+	disk_container = kzalloc_node(sizeof(struct gendisk_container), GFP_KERNEL, node_id);
+	if (disk_container) {
+
+		disk = &disk_container->gendisk;
+
 		if (!init_part_stats(&disk->part0)) {
-			kfree(disk);
+			//kfree(disk);
+			kfree(disk_container);
 			return NULL;
 		}
 		disk->node_id = node_id;
 		if (disk_expand_part_tbl(disk, 0)) {
 			free_part_stats(&disk->part0);
-			kfree(disk);
+			//kfree(disk);
+			kfree(disk_container);
 			return NULL;
 		}
 		disk->part_tbl->part[0] = &disk->part0;
@@ -1317,7 +1328,8 @@ struct gendisk *alloc_disk_node(int minors, int node_id)
 		seqcount_init(&disk->part0.nr_sects_seq);
 		if (hd_ref_init(&disk->part0)) {
 			hd_free_part(&disk->part0);
-			kfree(disk);
+			//kfree(disk);
+			kfree(disk_container);
 			return NULL;
 		}
 

@@ -16,4 +16,11 @@ struct blk_mq_hw_ctx_container {
         cptr_t other_ref;
         cptr_t my_ref;
 };
+
+struct gendisk_container {
+        struct gendisk gendisk;                                                                          
+        cptr_t other_ref;
+        cptr_t my_ref;
+};
+
 #endif

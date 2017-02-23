@@ -54,6 +54,9 @@ int __kliblcd_module_host_load(char *mdir, char *module_name,
 	ret = request_lcd_module(mpath);
 	if (ret < 0) {
 		LIBLCD_ERR("load module failed for %s (ret = %d)", mpath, ret);
+               /* To facilitate debugging */
+               if (ret == -ENOENT)
+                       LIBLCD_ERR("Maybe /sbin/lcd-insmod is missing?");
 		goto fail1;
 	}
 	/*

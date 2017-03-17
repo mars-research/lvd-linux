@@ -85,7 +85,7 @@ fail1:
 	return ret;
 }
 
-int __lcd_create_no_vm(struct lcd **out)
+int __lcd_create_no_vm(struct lcd **out, char *name)
 {
 	struct lcd *lcd;
 	int ret;
@@ -100,7 +100,7 @@ int __lcd_create_no_vm(struct lcd **out)
 	/*
 	 * Create a kernel thread (won't run till we wake it up)
 	 */
-	lcd->kthread = kthread_create(__lcd_kthread_main, NULL, "lcd");
+	lcd->kthread = kthread_create(__lcd_kthread_main, NULL, name);
 	if (!lcd->kthread) {
 		LCD_ERR("failed to create kthread");
 		goto fail2;
@@ -131,7 +131,7 @@ int __lcd_create(struct lcd *caller, cptr_t slot)
 	/*
 	 * Basic init of lcd
 	 */
-	ret = __lcd_create_no_vm(&lcd);
+	ret = __lcd_create_no_vm(&lcd, "lcd");
 	if (ret) {
 		LCD_ERR("lcd create");
 		goto fail1;
@@ -174,7 +174,7 @@ int __lcd_create_klcd(struct lcd *caller, cptr_t slot)
 	/*
 	 * Basic init of lcd
 	 */
-	ret = __lcd_create_no_vm(&lcd);
+	ret = __lcd_create_no_vm(&lcd, "klcd");
 	if (ret) {
 		LCD_ERR("lcd create");
 		goto fail1;

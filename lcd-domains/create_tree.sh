@@ -52,7 +52,7 @@ klcd_kbuild() {
     # KLCD kbuild file
     echo -e "obj-m += lcd_test_mod_${MODULE}_${KLCD}.o\n\nlcd_test_mod_${MODULE}_${KLCD}-y\t\t+= main.o\n" > ${MODULE}/${KLCD}/Kbuild;
     echo -e "# glue code\nlcd_test_mod_${MODULE}_${KLCD}-y\t\t+= \$(addprefix glue/, ${MODULE}_callee.o \\" >> ${MODULE}/${KLCD}/Kbuild;
-    echo -e "\t\t\t\t\t\t${MODULE}_caller_dispatch.o )\n" >> ${MODULE}/${KLCD}/Kbuild;
+    echo -e "\t\t\t\t\t\t${MODULE}_callee_dispatch.o )\n" >> ${MODULE}/${KLCD}/Kbuild;
     echo -e "lcd_test_mod_${MODULE}_${KLCD}-y\t\t+= \$(addprefix ../, ${MODULE}_cap.o)\n" >> ${MODULE}/${KLCD}/Kbuild;
     echo -e "cppflags-y += \$(NONISOLATED_CFLAGS)\n" >> ${MODULE}/${KLCD}/Kbuild;
     echo -e "extra-y += glue/${MODULE}_callee.lds\n" >> ${MODULE}/${KLCD}/Kbuild;
@@ -66,7 +66,7 @@ lcd_kbuild() {
     echo -e "# Original code\nlcd_test_mod_${MODULE}_${LCD}-y\t\t+= " >> ${MODULE}/${LCD}/Kbuild;
     echo -e "\n\nlcd_test_mod_${MODULE}_${LCD}-y\t\t+= \$(LIBLCD)\n" >> ${MODULE}/${LCD}/Kbuild;
     echo -e "# glue code\nlcd_test_mod_${MODULE}_${LCD}-y\t\t+= \$(addprefix glue/, ${MODULE}_caller.o \\" >> ${MODULE}/${LCD}/Kbuild;
-    echo -e "\t\t\t\t\t\t${MODULE}_callee_dispatch.o )\n" >> ${MODULE}/${LCD}/Kbuild;
+    echo -e "\t\t\t\t\t\t${MODULE}_caller_dispatch.o )\n" >> ${MODULE}/${LCD}/Kbuild;
     echo -e "lcd_test_mod_${MODULE}_${LCD}-y\t\t+= \$(addprefix ../, ${MODULE}_cap.o)\n" >> ${MODULE}/${LCD}/Kbuild;
     echo -e "ccflags-y += \$(ISOLATED_CFLAGS)\n" >> ${MODULE}/${LCD}/Kbuild;
 }

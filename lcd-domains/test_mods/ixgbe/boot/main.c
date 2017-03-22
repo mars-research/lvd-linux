@@ -145,6 +145,9 @@ fail1:
 }
 
 #ifdef BOOT_THREAD
+static DECLARE_WAIT_QUEUE_HEAD(wq);
+static int shutdown = 0;
+
 int boot_lcd_thread(void *data)
 {
 	static unsigned once = 0;
@@ -156,7 +159,7 @@ int boot_lcd_thread(void *data)
 			});
 		}
 		once = 1;
-		schedule();
+		wait_event_interruptible(wq, shutdown != 0);
 	}
 	LIBLCD_MSG("Exiting thread");
 
@@ -188,6 +191,8 @@ static void boot_exit(void)
 	/* nothing to do */
 	if (!IS_ERR(boot_task)) {
 		LIBLCD_MSG("%s: exiting", __func__);
+		shutdown = 1;
+		wake_up_interruptible(&wq);
 		kthread_stop(boot_task);
 	}
 }

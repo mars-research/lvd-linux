@@ -4,6 +4,8 @@
 #include <linux/kthread.h>
 #include <linux/module.h>
 #include <linux/pci.h>
+#include <linux/netdevice.h>
+#include <linux/etherdevice.h>
 
 #include <libcap.h>
 #include <libfipc.h>
@@ -15,7 +17,9 @@
 enum dispatch_t {
 	__PCI_REGISTER_DRIVER,
 	PROBE,
+	REMOVE,
 	PCI_UNREGISTER_DRIVER,
+	ALLOC_ETHERDEV_MQS,
 };
 
 struct module_container {
@@ -23,6 +27,13 @@ struct module_container {
 	struct cptr other_ref;
 	struct cptr my_ref;
 };
+
+struct net_device_container {
+	struct net_device net_device;
+	struct cptr other_ref;
+	struct cptr my_ref;
+};
+
 struct pci_dev_container {
 	struct pci_dev pci_dev;
 	struct cptr other_ref;
@@ -74,6 +85,9 @@ int glue_cap_insert_pci_device_id_type(struct glue_cspace *cspace,
 int glue_cap_insert_pci_driver_type(struct glue_cspace *cspace,
 		struct pci_driver_container *pci_driver_container,
 		struct cptr *c_out);
+int glue_cap_insert_net_device_type(struct glue_cspace *cspace,
+		struct net_device_container *net_device_container,
+		struct cptr *c_out);
 int glue_cap_lookup_module_type(struct glue_cspace *cspace,
 		struct cptr c,
 		struct module_container **module_container);
@@ -86,6 +100,10 @@ int glue_cap_lookup_pci_device_id_type(struct glue_cspace *cspace,
 int glue_cap_lookup_pci_driver_type(struct glue_cspace *cspace,
 		struct cptr c,
 		struct pci_driver_container **pci_driver_container);
+int glue_cap_lookup_net_device_type(struct glue_cspace *cspace,
+		struct cptr c,
+		struct net_device_container **net_device_container);
+
 /* ASYNC HELPERS -------------------------------------------------- */
 
 static inline

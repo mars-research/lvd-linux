@@ -196,6 +196,22 @@ probe_trampoline(struct pci_dev *dev,
 		hidden_args);
 
 }
+
+LCD_TRAMPOLINE_DATA(remove_trampoline);
+void  LCD_TRAMPOLINE_LINKAGE(remove_trampoline)
+remove_trampoline(struct pci_dev *dev)
+{
+	void ( *volatile remove_fp )(struct pci_dev *,
+		struct trampoline_hidden_args *);
+	struct trampoline_hidden_args *hidden_args;
+	LCD_TRAMPOLINE_PROLOGUE(hidden_args,
+			remove_trampoline);
+	remove_fp = remove;
+	return remove_fp(dev,
+		hidden_args);
+
+}
+
 const char driver_name[] = "ixgbe_lcd";
 extern struct pci_driver_container *pci_container;
 
@@ -210,6 +226,7 @@ int __pci_register_driver_callee(struct fipc_message *_request,
 	struct fipc_message *_response;
 	unsigned 	int request_cookie;
 	struct trampoline_hidden_args *drv_probe_hidden_args;
+	struct trampoline_hidden_args *drv_remove_hidden_args;
 	int func_ret;
 	int ret;
 
@@ -269,6 +286,28 @@ int __pci_register_driver_callee(struct fipc_message *_request,
 	ret = set_memory_x(( ( unsigned  long   )drv_probe_hidden_args->t_handle ) & ( PAGE_MASK ),
 		( ALIGN(LCD_TRAMPOLINE_SIZE(probe_trampoline),
 		PAGE_SIZE) ) >> ( PAGE_SHIFT ));
+
+	drv_remove_hidden_args = kzalloc(sizeof( *drv_remove_hidden_args ),
+		GFP_KERNEL);
+	if (!drv_remove_hidden_args) {
+		LIBLCD_ERR("kzalloc hidden args");
+		goto fail_alloc2;
+	}
+	drv_remove_hidden_args->t_handle = LCD_DUP_TRAMPOLINE(remove_trampoline);
+	if (!drv_remove_hidden_args->t_handle) {
+		LIBLCD_ERR("duplicate trampoline");
+		goto fail_dup2;
+	}
+	drv_remove_hidden_args->t_handle->hidden_args = drv_remove_hidden_args;
+	drv_remove_hidden_args->struct_container = drv_container;
+	drv_remove_hidden_args->cspace = c_cspace;
+	drv_remove_hidden_args->sync_ep = sync_ep;
+	drv_remove_hidden_args->async_chnl = _channel;
+	drv_container->pci_driver.remove = LCD_HANDLE_TO_TRAMPOLINE(drv_remove_hidden_args->t_handle);
+	ret = set_memory_x(( ( unsigned  long   )drv_remove_hidden_args->t_handle ) & ( PAGE_MASK ),
+		( ALIGN(LCD_TRAMPOLINE_SIZE(remove_trampoline),
+		PAGE_SIZE) ) >> ( PAGE_SHIFT ));
+
 	drv_container->pci_driver.name = driver_name;
 	drv_container->pci_driver.id_table = ixgbe_pci_tbl;
 	name = "ixgbe_lcd";
@@ -290,9 +329,9 @@ int __pci_register_driver_callee(struct fipc_message *_request,
 		return -EIO;
 	}
 	fipc_set_reg1(_response,
-			drv_container->other_ref.cptr);
+			drv_container->my_ref.cptr);
 	fipc_set_reg2(_response,
-			owner_container->other_ref.cptr);
+			owner_container->my_ref.cptr);
 	fipc_set_reg3(_response,
 			func_ret);
 	thc_ipc_reply(_channel,
@@ -301,34 +340,78 @@ int __pci_register_driver_callee(struct fipc_message *_request,
 	return ret;
 fail_alloc:
 fail_alloc1:
+fail_alloc2:
 fail_dup1:
+fail_dup2:
 fail_insert:
 	return ret;
+}
+
+int alloc_etherdev_mqs_callee(struct fipc_message *_request,
+		struct thc_channel *_channel,
+		struct glue_cspace *cspace,
+		struct cptr sync_ep)
+{
+	int sizeof_priv;
+	unsigned 	int txqs;
+	unsigned 	int rxqs;
+	int ret;
+	struct fipc_message *_response;
+	unsigned 	int request_cookie;
+	struct net_device_container *func_ret_container;
+	struct net_device *func_ret;
+	cptr_t netdev_ref;
+	request_cookie = thc_get_request_cookie(_request);
+	fipc_recv_msg_end(thc_channel_to_fipc(_channel),
+			_request);
+	sizeof_priv = fipc_get_reg1(_request);
+	txqs = fipc_get_reg2(_request);
+	rxqs = fipc_get_reg3(_request);
+	netdev_ref.cptr = fipc_get_reg4(_request);
+
+	func_ret = alloc_etherdev_mqs(sizeof_priv,
+		txqs,
+		rxqs);
+	func_ret_container = container_of(func_ret,
+		struct net_device_container, net_device);
+	func_ret_container->other_ref = netdev_ref;
+	ret = glue_cap_insert_net_device_type(c_cspace,
+		func_ret_container,
+		&func_ret_container->my_ref);
+	if (ret) {
+		LIBLCD_ERR("lcd insert");
+		goto fail_insert;
+	}
+	if (async_msg_blocking_send_start(_channel,
+		&_response)) {
+		LIBLCD_ERR("error getting response msg");
+		return -EIO;
+	}
+	fipc_set_reg1(_response,
+			func_ret_container->other_ref.cptr);
+	thc_ipc_reply(_channel,
+			request_cookie,
+			_response);
+fail_insert:
+	return ret;
+
 }
 
 int probe_user(struct pci_dev *dev,
 		struct pci_device_id *id,
 		struct trampoline_hidden_args *hidden_args)
 {
-	struct pci_dev_container *dev_container;
 	struct fipc_message *_request;
 	struct fipc_message *_response;
 	int func_ret;
 	int ret;
-	dev_container = kzalloc(sizeof( struct pci_dev_container   ),
-		GFP_KERNEL);
-	if (!dev_container) {
-		LIBLCD_ERR("kzalloc");
-		goto fail_alloc;
-	}
-	ret = glue_cap_insert_pci_dev_type(hidden_args->cspace,
-		dev_container,
-		&dev_container->my_ref);
-	if (ret) {
-		LIBLCD_ERR("lcd insert");
-		goto fail_insert;
-	}
+
+	/* XXX: we need cptr tree too. This lcd context will be destroyed
+	 * rendering any volunteered resource void after this function is
+	 * returned. Not the right way to do it. Use lcd_enter instead.
+	 */
 	thc_init();
+
 	ret = async_msg_blocking_send_start(hidden_args->async_chnl,
 		&_request);
 	if (ret) {
@@ -337,8 +420,6 @@ int probe_user(struct pci_dev *dev,
 	}
 	async_msg_set_fn_type(_request,
 			PROBE);
-	fipc_set_reg1(_request,
-			dev_container->my_ref.cptr);
 	DO_FINISH_(probe_user,{
 		ASYNC_({
 			ret = thc_ipc_call(hidden_args->async_chnl,
@@ -358,8 +439,6 @@ int probe_user(struct pci_dev *dev,
 	lcd_exit(0);
 	return func_ret;
 fail_async:
-fail_insert:
-fail_alloc:
 fail_ipc:
 	return ret;
 }
@@ -469,5 +548,83 @@ int pci_unregister_driver_callee(struct fipc_message *_request,
 	return ret;
 fail_lookup:
 	return ret;
+}
+
+void remove_user(struct pci_dev *dev,
+		struct trampoline_hidden_args *hidden_args)
+{
+	int ret;
+	struct fipc_message *_request;
+	struct fipc_message *_response;
+	thc_init();
+
+	ret = async_msg_blocking_send_start(hidden_args->async_chnl,
+		&_request);
+	if (ret) {
+		LIBLCD_ERR("failed to get a send slot");
+		goto fail_async;
+	}
+	async_msg_set_fn_type(_request,
+			REMOVE);
+	DO_FINISH_(remove_user,{
+		ASYNC_({
+			ret = thc_ipc_call(hidden_args->async_chnl,
+		_request,
+		&_response);
+		}, remove_user
+		);
+	}
+	);
+	if (ret) {
+		LIBLCD_ERR("thc_ipc_call");
+		goto fail_ipc;
+	}
+	fipc_recv_msg_end(thc_channel_to_fipc(hidden_args->async_chnl),
+			_response);
+	lcd_exit(0);
+	return;
+fail_async:
+fail_ipc:
+	return;
+}
+
+void remove(struct pci_dev *dev,
+		struct trampoline_hidden_args *hidden_args)
+{
+	int ret;
+	struct fipc_message *_request;
+	struct fipc_message *_response;
+	if (!current->ptstate) {
+		LIBLCD_MSG("Calling from a non-LCD context! creating thc runtime!");
+		LCD_MAIN({
+			remove_user(dev,
+					hidden_args);
+		}
+		);
+		return;
+	}
+
+	ret = async_msg_blocking_send_start(hidden_args->async_chnl,
+		&_request);
+	if (ret) {
+		LIBLCD_ERR("failed to get a send slot");
+		goto fail_async;
+	}
+	async_msg_set_fn_type(_request,
+			REMOVE);
+
+	ret = thc_ipc_call(hidden_args->async_chnl,
+		_request,
+		&_response);
+	if (ret) {
+		LIBLCD_ERR("thc_ipc_call");
+		goto fail_ipc;
+	}
+	fipc_recv_msg_end(thc_channel_to_fipc(hidden_args->async_chnl),
+			_response);
+	return;
+fail_async:
+fail_ipc:
+	return;
 }
 

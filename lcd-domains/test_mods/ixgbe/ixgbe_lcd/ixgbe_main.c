@@ -22,11 +22,17 @@ static int ixgbe_probe(struct pci_dev *dev, const struct pci_device_id *id)
         return 0;
 }
 
+static void ixgbe_remove(struct pci_dev *dev)
+{
+        LIBLCD_MSG("remove called : ixgbe_lcd\n");
+}
+
 struct pci_driver_container ixgbe_driver_container = {
 	.pci_driver = {
 	        .name     = ixgbe_driver_name,
 	        .id_table = ixgbe_pci_tbl,
 	        .probe    = ixgbe_probe,
+		.remove   = ixgbe_remove,
 	}
 };
 
@@ -44,4 +50,6 @@ int ixgbe_init_module(void)
 }
 
 void ixgbe_exit_module(void)
-{}
+{
+	pci_unregister_driver(&ixgbe_driver_container.pci_driver);
+}

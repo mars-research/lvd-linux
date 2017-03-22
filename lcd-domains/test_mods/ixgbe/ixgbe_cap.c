@@ -18,6 +18,7 @@ struct type_ops_id {
 
 enum glue_type {
 	GLUE_TYPE_MODULE_CONTAINER,
+	GLUE_TYPE_NET_DEVICE_CONTAINER,
 	GLUE_TYPE_PCI_DEV_CONTAINER,
 	GLUE_TYPE_PCI_DEVICE_ID_CONTAINER,
 	GLUE_TYPE_PCI_DRIVER_CONTAINER,
@@ -34,6 +35,13 @@ static struct type_ops_id glue_libcap_type_ops[GLUE_NR_TYPES] = {
 	{
 		{
 			.name = "struct module",
+			.delete = dummy_func,
+			.revoke = dummy_func,
+		}
+	},
+	{
+		{
+			.name = "struct net_device",
 			.delete = dummy_func,
 			.revoke = dummy_func,
 		}
@@ -59,14 +67,6 @@ static struct type_ops_id glue_libcap_type_ops[GLUE_NR_TYPES] = {
 			.revoke = dummy_func,
 		}
 	},
-/*	{
-		{
-			.name = "struct module",
-			.delete = dummy_func,
-			.revoke = dummy_func,
-		}
-	},
-*/
 };
 
 int glue_cap_init(void)
@@ -232,4 +232,27 @@ int glue_cap_lookup_pci_driver_type(struct glue_cspace *cspace,
 		( void  ** )pci_driver_container);
 
 }
+
+int glue_cap_insert_net_device_type(struct glue_cspace *cspace,
+		struct net_device_container *net_device_container,
+		struct cptr *c_out)
+{
+	return glue_cspace_insert(cspace,
+		net_device_container,
+		glue_libcap_type_ops[ GLUE_TYPE_NET_DEVICE_CONTAINER ].libcap_type,
+		c_out);
+
+}
+
+int glue_cap_lookup_net_device_type(struct glue_cspace *cspace,
+		struct cptr c,
+		struct net_device_container **net_device_container)
+{
+	return glue_cspace_lookup(cspace,
+		c,
+		glue_libcap_type_ops[ GLUE_TYPE_NET_DEVICE_CONTAINER ].libcap_type,
+		( void  ** )net_device_container);
+
+}
+
 

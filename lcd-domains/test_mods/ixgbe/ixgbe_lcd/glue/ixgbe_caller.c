@@ -6,7 +6,7 @@
 #include <liblcd/glue_cspace.h>
 #include "../../ixgbe_common.h"
 #include "../ixgbe_caller.h"
-
+#include <asm/lcd_domains/liblcd.h>
 #include <lcd_config/post_hook.h>
 
 struct cptr sync_ep;
@@ -309,6 +309,62 @@ fail_ipc:
 	return ret;
 }
 
+struct net_device *alloc_etherdev_mqs(int sizeof_priv,
+		unsigned int txqs,
+		unsigned int rxqs)
+{
+	struct net_device_container *func_ret_container;
+	int ret;
+	struct fipc_message *_request;
+	struct fipc_message *_response;
+	struct net_device *func_ret;
+	func_ret_container = kzalloc(sizeof( struct net_device_container   ),
+		GFP_KERNEL);
+	if (!func_ret_container) {
+		LIBLCD_ERR("kzalloc");
+		goto fail_alloc;
+	}
+	ret = glue_cap_insert_net_device_type(c_cspace,
+		func_ret_container,
+		&func_ret_container->my_ref);
+	if (ret) {
+		LIBLCD_ERR("lcd insert");
+		goto fail_insert;
+	}
+	ret = async_msg_blocking_send_start(ixgbe_async,
+		&_request);
+	if (ret) {
+		LIBLCD_ERR("failed to get a send slot");
+		goto fail_async;
+	}
+	async_msg_set_fn_type(_request,
+			ALLOC_ETHERDEV_MQS);
+	fipc_set_reg1(_request,
+			sizeof_priv);
+	fipc_set_reg2(_request,
+			txqs);
+	fipc_set_reg3(_request,
+			rxqs);
+	fipc_set_reg4(_request,
+			func_ret_container->my_ref.cptr);
+	ret = thc_ipc_call(ixgbe_async,
+		_request,
+		&_response);
+	if (ret) {
+		LIBLCD_ERR("thc_ipc_call");
+		goto fail_ipc;
+	}
+	func_ret_container->other_ref.cptr = fipc_get_reg1(_response);
+	fipc_recv_msg_end(thc_channel_to_fipc(ixgbe_async),
+			_response);
+	return func_ret;
+fail_async:
+fail_insert:
+fail_alloc:
+fail_ipc:
+	return NULL;
+}
+
 /* FIXME: Handle this without extern */
 extern struct pci_driver_container ixgbe_driver_container;
 
@@ -317,32 +373,22 @@ int probe_callee(struct fipc_message *_request,
 		struct glue_cspace *cspace,
 		struct cptr sync_ep)
 {
-	struct pci_dev_container *dev_container;
 	struct fipc_message *_response;
 	unsigned 	int request_cookie;
 	int func_ret;
-	int ret;
+	int ret = 0;
 
+	LIBLCD_MSG("%s called", __func__);
 	request_cookie = thc_get_request_cookie(_request);
-	dev_container = kzalloc(sizeof( struct pci_dev_container   ),
-		GFP_KERNEL);
-	if (!dev_container) {
-		LIBLCD_ERR("kzalloc");
-		goto fail_alloc;
-	}
-	ret = glue_cap_insert_pci_dev_type(c_cspace,
-		dev_container,
-		&dev_container->my_ref);
-	if (ret) {
-		LIBLCD_ERR("lcd insert");
-		goto fail_insert;
-	}
-	dev_container->other_ref.cptr = fipc_get_reg1(_request);
+
 	fipc_recv_msg_end(thc_channel_to_fipc(_channel),
 			_request);
 
-	func_ret = ixgbe_driver_container.pci_driver.probe(( &dev_container->pci_dev ),
-		NULL);
+	/* XXX: Pass null for now. struct pci_dev is passed from the
+	 * kernel and needs analysis for wrapping it around a container
+	 */
+	func_ret = ixgbe_driver_container.pci_driver.probe(NULL, NULL);
+
 	if (async_msg_blocking_send_start(_channel,
 		&_response)) {
 		LIBLCD_ERR("error getting response msg");
@@ -353,9 +399,6 @@ int probe_callee(struct fipc_message *_request,
 	thc_ipc_reply(_channel,
 			request_cookie,
 			_response);
-	return ret;
-fail_alloc:
-fail_insert:
 	return ret;
 }
 
@@ -394,3 +437,30 @@ fail_ipc:
         destroy_async_channel(ixgbe_async);
 	return;
 }
+
+int remove_callee(struct fipc_message *_request,
+		struct thc_channel *_channel,
+		struct glue_cspace *cspace,
+		struct cptr sync_ep)
+{
+	int ret;
+	struct fipc_message *_response;
+	unsigned 	int request_cookie;
+	request_cookie = thc_get_request_cookie(_request);
+	fipc_recv_msg_end(thc_channel_to_fipc(_channel),
+			_request);
+
+	/* XXX: refer the comments under probe_callee */
+	ixgbe_driver_container.pci_driver.remove(NULL);
+
+	if (async_msg_blocking_send_start(_channel,
+		&_response)) {
+		LIBLCD_ERR("error getting response msg");
+		return -EIO;
+	}
+	thc_ipc_reply(_channel,
+			request_cookie,
+			_response);
+	return ret;
+}
+

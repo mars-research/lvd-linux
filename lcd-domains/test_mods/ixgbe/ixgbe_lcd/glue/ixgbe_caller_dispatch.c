@@ -20,6 +20,13 @@ int dispatch_async_loop(struct thc_channel *_channel,
 		cspace,
 		sync_ep);
 
+		case REMOVE:
+			trace(REMOVE);
+			return remove_callee(message,
+		_channel,
+		cspace,
+		sync_ep);
+
 		default:
 			LIBLCD_ERR("unexpected function label: %d",
 					fn_type);

@@ -2032,6 +2032,11 @@ static inline bool netdev_uses_dsa(struct net_device *dev)
 	return false;
 }
 
+struct _net_device_container {
+	struct net_device net_device;
+	u64 cptr1, cptr2;
+} __packed;
+
 /**
  *	netdev_priv - access network device private data
  *	@dev: network device
@@ -2040,7 +2045,7 @@ static inline bool netdev_uses_dsa(struct net_device *dev)
  */
 static inline void *netdev_priv(const struct net_device *dev)
 {
-	return (char *)dev + ALIGN(sizeof(struct net_device), NETDEV_ALIGN);
+	return (char *)dev + ALIGN(sizeof(struct _net_device_container), NETDEV_ALIGN);
 }
 
 /* Set the sysfs physical device reference for the network logical device

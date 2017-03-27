@@ -3,7 +3,12 @@ obj-m += lcd_test_mod_ixgbe_ixgbe_lcd.o
 lcd_test_mod_ixgbe_ixgbe_lcd-y		+= main.o
 
 # Original code
-lcd_test_mod_ixgbe_ixgbe_lcd-y		+= ixgbe_main.o
+lcd_test_mod_ixgbe_ixgbe_lcd-y		+= $(addprefix ixgbe/, ixgbe_main.o \
+						ixgbe_82599.o \
+						ixgbe_ethtool.o \
+						ixgbe_common.o \
+						ixgbe_phy.o \
+						ixgbe_lib.o )
 
 
 lcd_test_mod_ixgbe_ixgbe_lcd-y		+= $(LIBLCD)

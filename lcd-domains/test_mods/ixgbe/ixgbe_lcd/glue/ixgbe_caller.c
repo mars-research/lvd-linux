@@ -257,6 +257,7 @@ int __must_check __pci_register_driver(struct pci_driver *drv,
 	struct fipc_message *_request;
 	struct fipc_message *_response;
 	int func_ret;
+
 	drv_container = container_of(drv,
 		struct pci_driver_container,
 		pci_driver);
@@ -373,21 +374,73 @@ int probe_callee(struct fipc_message *_request,
 		struct glue_cspace *cspace,
 		struct cptr sync_ep)
 {
+	struct pci_dev_container *dev_container;
 	struct fipc_message *_response;
 	unsigned 	int request_cookie;
 	int func_ret;
 	int ret = 0;
-
+#ifdef PCI_REGIONS
+	cptr_t res0_cptr;
+	gpa_t gpa_addr;
+	unsigned int res0_len;
+	void *dev_resource_0;
+#endif
 	LIBLCD_MSG("%s called", __func__);
 	request_cookie = thc_get_request_cookie(_request);
 
 	fipc_recv_msg_end(thc_channel_to_fipc(_channel),
 			_request);
 
+	dev_container = kzalloc(sizeof( struct pci_dev_container   ),
+		GFP_KERNEL);
+	if (!dev_container) {
+		LIBLCD_ERR("kzalloc");
+		goto fail_alloc;
+	}
+	ret = glue_cap_insert_pci_dev_type(c_cspace,
+		dev_container,
+		&dev_container->my_ref);
+	if (ret) {
+		LIBLCD_ERR("lcd insert");
+		goto fail_insert;
+	}
+#ifdef PCI_REGIONS
+	ret = lcd_cptr_alloc(&res0_cptr);
+	if (ret) {
+		LIBLCD_ERR("failed to get cptr");
+		goto fail_cptr;
+	}
+
+	lcd_set_cr0(res0_cptr);
+	ret = lcd_sync_recv(ixgbe_sync_endpoint);
+	lcd_set_cr0(CAP_CPTR_NULL);
+	/* resource len */
+	res0_len = lcd_r0();
+	if (ret) {
+		LIBLCD_ERR("failed to recv sync");
+		goto fail_sync;
+	}
+
+	ret = lcd_ioremap_phys(res0_cptr, res0_len, &gpa_addr);
+	if (ret) {
+		LIBLCD_ERR("failed to ioremap phys");
+		goto fail_ioremap;
+	}
+
+	dev_resource_0 = lcd_ioremap(gpa_val(gpa_addr), res0_len);
+	if (!dev_resource_0) {
+		LIBLCD_ERR("failed to ioremap virt");
+		goto fail_ioremap2;
+	}
+	dev_container->pci_dev.resource[0].start = (resource_size_t) dev_resource_0;
+	dev_container->pci_dev.resource[0].end = (resource_size_t)((char*)dev_resource_0 + res0_len - 1);
+	LIBLCD_MSG("%s: status reg 0x%X\n", __func__, *(unsigned int *)((char*)dev_resource_0 + 0x8));
+#endif
+
 	/* XXX: Pass null for now. struct pci_dev is passed from the
 	 * kernel and needs analysis for wrapping it around a container
 	 */
-	func_ret = ixgbe_driver_container.pci_driver.probe(NULL, NULL);
+	func_ret = ixgbe_driver_container.pci_driver.probe(&dev_container->pci_dev, NULL);
 
 	if (async_msg_blocking_send_start(_channel,
 		&_response)) {
@@ -399,6 +452,14 @@ int probe_callee(struct fipc_message *_request,
 	thc_ipc_reply(_channel,
 			request_cookie,
 			_response);
+#ifdef PCI_REGIONS
+fail_ioremap:
+fail_ioremap2:
+fail_alloc:
+fail_sync:
+fail_insert:
+fail_cptr:
+#endif
 	return ret;
 }
 
@@ -443,7 +504,8 @@ int remove_callee(struct fipc_message *_request,
 		struct glue_cspace *cspace,
 		struct cptr sync_ep)
 {
-	int ret;
+	/* async loop should get 0 */
+	int ret = 0;
 	struct fipc_message *_response;
 	unsigned 	int request_cookie;
 	request_cookie = thc_get_request_cookie(_request);

@@ -14,6 +14,8 @@
 #include <liblcd/liblcd.h>
 #include <liblcd/sync_ipc_poll.h>
 
+#define PCI_REGIONS
+
 enum dispatch_t {
 	__PCI_REGISTER_DRIVER,
 	PROBE,

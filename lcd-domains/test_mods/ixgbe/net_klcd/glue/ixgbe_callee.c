@@ -323,6 +323,7 @@ int __pci_register_driver_callee(struct fipc_message *_request,
 	*/
 
 	func_ret = pci_register_driver(&drv_container->pci_driver);
+
 	if (async_msg_blocking_send_start(_channel,
 		&_response)) {
 		LIBLCD_ERR("retor getting response msg");
@@ -452,7 +453,13 @@ int probe(struct pci_dev *dev,
 	struct fipc_message *_request;
 	struct fipc_message *_response;
 	int func_ret;
+#ifdef PCI_REGIONS
+	uint32_t request_cookie;
+	cptr_t res0_cptr;
+	unsigned int res0_len;
+#endif
 	if (!current->ptstate) {
+		dump_stack();
 		LIBLCD_MSG("Calling from a non-LCD context! creating thc runtime!");
 		LCD_MAIN({
 			ret = probe_user(dev,
@@ -462,6 +469,8 @@ int probe(struct pci_dev *dev,
 		);
 		return ret;
 	}
+
+	dump_stack();
 	dev_container = kzalloc(sizeof( struct pci_dev_container   ),
 		GFP_KERNEL);
 	if (!dev_container) {
@@ -485,6 +494,48 @@ int probe(struct pci_dev *dev,
 			PROBE);
 	fipc_set_reg1(_request,
 			dev_container->my_ref.cptr);
+
+#ifdef PCI_REGIONS
+	ret = thc_ipc_send_request(hidden_args->async_chnl,
+			_request,
+			&request_cookie);
+	if (ret) {
+		LIBLCD_ERR("thc_ipc_call");
+		goto fail_ipc;
+	}
+	/*
+	 * ixgbe driver just needs res[0]
+	 */
+	res0_len = pci_resource_len(dev, 0);
+	ret = lcd_volunteer_dev_mem(__gpa(pci_resource_start(dev, 0)),
+			get_order(res0_len),
+			&res0_cptr);
+	if (ret) {
+		LIBLCD_ERR("volunteer devmem");
+		goto fail_vol;
+	}
+
+	lcd_set_cr0(res0_cptr);
+	lcd_set_r0(res0_len);
+
+	ret = lcd_sync_send(hidden_args->sync_ep);
+	lcd_set_cr0(CAP_CPTR_NULL);
+
+	if (ret) {
+		LIBLCD_ERR("sync send");
+		goto fail_sync;
+	}
+
+	ret = thc_ipc_recv_response(hidden_args->async_chnl,
+			request_cookie,
+			&_response);
+
+	if (ret) {
+		LIBLCD_ERR("failed to recv ipc");
+		goto fail_ipc_rx;
+	}
+
+#else
 	ret = thc_ipc_call(hidden_args->async_chnl,
 		_request,
 		&_response);
@@ -492,14 +543,18 @@ int probe(struct pci_dev *dev,
 		LIBLCD_ERR("thc_ipc_call");
 		goto fail_ipc;
 	}
+#endif
 	func_ret = fipc_get_reg1(_response);
 	fipc_recv_msg_end(thc_channel_to_fipc(hidden_args->async_chnl),
 			_response);
 	return func_ret;
 fail_async:
+fail_sync:
 fail_ipc:
+fail_vol:
 fail_insert:
 fail_alloc:
+fail_ipc_rx:
 	return ret;
 }
 

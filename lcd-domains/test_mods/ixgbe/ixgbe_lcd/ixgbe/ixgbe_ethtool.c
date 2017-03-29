@@ -1027,7 +1027,7 @@ static int ixgbe_set_ringparam(struct net_device *netdev,
 
 	/* allocate temporary buffer to store rings in */
 	i = max_t(int, adapter->num_tx_queues, adapter->num_rx_queues);
-	temp_ring = vmalloc(i * sizeof(struct ixgbe_ring));
+	temp_ring = kmalloc(i * sizeof(struct ixgbe_ring), GFP_KERNEL);
 
 	if (!temp_ring) {
 		err = -ENOMEM;
@@ -1098,7 +1098,7 @@ static int ixgbe_set_ringparam(struct net_device *netdev,
 
 err_setup:
 	ixgbe_up(adapter);
-	vfree(temp_ring);
+	kfree(temp_ring);
 clear_reset:
 	clear_bit(__IXGBE_RESETTING, &adapter->state);
 	return err;

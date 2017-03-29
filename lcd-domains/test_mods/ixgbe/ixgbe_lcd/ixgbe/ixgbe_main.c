@@ -70,6 +70,9 @@
 #include "ixgbe_model.h"
 
 #include "../ixgbe_caller.h"
+
+#include "ixgbe_stub.h"
+
 #include <lcd_config/post_hook.h>
 
 char ixgbe_driver_name[] = "ixgbe";
@@ -300,7 +303,7 @@ static void ixgbe_check_minimum_link(struct ixgbe_adapter *adapter,
 
 	if (pcie_get_minimum_link(pdev, &speed, &width) ||
 	    speed == PCI_SPEED_UNKNOWN || width == PCIE_LNK_WIDTH_UNKNOWN) {
-		e_dev_warn("Unable to determine PCI Express bandwidth.\n");
+		LIBLCD_WARN("Unable to determine PCI Express bandwidth.\n");
 		return;
 	}
 
@@ -318,13 +321,13 @@ static void ixgbe_check_minimum_link(struct ixgbe_adapter *adapter,
 		max_gts = 8 * width;
 		break;
 	default:
-		e_dev_warn("Unable to determine PCI Express bandwidth.\n");
+		LIBLCD_WARN("Unable to determine PCI Express bandwidth.\n");
 		return;
 	}
 
-	e_dev_info("PCI Express bandwidth of %dGT/s available\n",
+	LIBLCD_MSG("PCI Express bandwidth of %dGT/s available\n",
 		   max_gts);
-	e_dev_info("(Speed:%s, Width: x%d, Encoding Loss:%s)\n",
+	LIBLCD_MSG("(Speed:%s, Width: x%d, Encoding Loss:%s)\n",
 		   (speed == PCIE_SPEED_8_0GT ? "8.0GT/s" :
 		    speed == PCIE_SPEED_5_0GT ? "5.0GT/s" :
 		    speed == PCIE_SPEED_2_5GT ? "2.5GT/s" :
@@ -336,10 +339,10 @@ static void ixgbe_check_minimum_link(struct ixgbe_adapter *adapter,
 		    "Unknown"));
 
 	if (max_gts < expected_gts) {
-		e_dev_warn("This is not sufficient for optimal performance of this card.\n");
-		e_dev_warn("For optimal performance, at least %dGT/s of bandwidth is required.\n",
+		LIBLCD_WARN("This is not sufficient for optimal performance of this card.\n");
+		LIBLCD_WARN("For optimal performance, at least %dGT/s of bandwidth is required.\n",
 			expected_gts);
-		e_dev_warn("A slot with more lanes and/or higher speed is suggested.\n");
+		LIBLCD_WARN("A slot with more lanes and/or higher speed is suggested.\n");
 	}
 }
 
@@ -353,14 +356,17 @@ static void ixgbe_service_event_schedule(struct ixgbe_adapter *adapter)
 
 static void ixgbe_remove_adapter(struct ixgbe_hw *hw)
 {
+#ifndef LCD_ISOLATE
 	struct ixgbe_adapter *adapter = hw->back;
-
+#endif
 	if (!hw->hw_addr)
 		return;
 	hw->hw_addr = NULL;
-	e_dev_err("Adapter removed\n");
+	LIBLCD_ERR("Adapter removed\n");
+#ifndef LCD_ISOLATE
 	if (test_bit(__IXGBE_SERVICE_INITED, &adapter->state))
 		ixgbe_service_event_schedule(adapter);
+#endif
 }
 
 static void ixgbe_check_remove(struct ixgbe_hw *hw, u32 reg)
@@ -480,6 +486,7 @@ void ixgbe_write_pci_cfg_word(struct ixgbe_hw *hw, u32 reg, u16 value)
 	pci_write_config_word(adapter->pdev, reg, value);
 }
 
+#ifndef LCD_ISOLATE
 static void ixgbe_service_event_complete(struct ixgbe_adapter *adapter)
 {
 	BUG_ON(!test_bit(__IXGBE_SERVICE_SCHED, &adapter->state));
@@ -871,6 +878,7 @@ rx_ring_summary:
 		}
 	}
 }
+#endif /* LCD_ISOLATE */
 
 static void ixgbe_release_hw_control(struct ixgbe_adapter *adapter)
 {
@@ -1192,6 +1200,13 @@ static int ixgbe_tx_maxrate(struct net_device *netdev,
  * @tx_ring: tx ring to clean
  * @napi_budget: Used to determine if we are in netpoll
  **/
+#ifdef LCD_ISOLATE
+static bool ixgbe_clean_tx_irq(struct ixgbe_q_vector *q_vector,
+			       struct ixgbe_ring *tx_ring, int napi_budget)
+{
+	return true;
+}
+#else
 static bool ixgbe_clean_tx_irq(struct ixgbe_q_vector *q_vector,
 			       struct ixgbe_ring *tx_ring, int napi_budget)
 {
@@ -1341,6 +1356,7 @@ static bool ixgbe_clean_tx_irq(struct ixgbe_q_vector *q_vector,
 
 	return !!budget;
 }
+#endif /* LCD_ISOLATE */
 
 #ifdef CONFIG_IXGBE_DCA
 static void ixgbe_update_tx_dca(struct ixgbe_adapter *adapter,
@@ -1600,13 +1616,25 @@ static bool ixgbe_alloc_mapped_page(struct ixgbe_ring *rx_ring,
 {
 	struct page *page = bi->page;
 	dma_addr_t dma;
-
+#ifdef LCD_ISOLATE
+	gfp_t flags;
+#endif
 	/* since we are recycling buffers we should seldom need to alloc */
 	if (likely(page))
 		return true;
 
 	/* alloc new page for storage */
+#ifndef LCD_ISOLATE
 	page = dev_alloc_pages(ixgbe_rx_pg_order(rx_ring));
+#else
+	/* XXX: Refer dev_alloc_pages and __dev_alloc_pages for flags
+	 * LCD allocator most likely doesn't care about these flags,
+	 * especially GFP_ATOMIC.
+	 */
+	flags = GFP_ATOMIC | __GFP_NOWARN |  __GFP_COLD | __GFP_COMP | __GFP_MEMALLOC;
+	page = lcd_alloc_pages(flags, ixgbe_rx_pg_order(rx_ring));
+#endif
+
 	if (unlikely(!page)) {
 		rx_ring->rx_stats.alloc_rx_page_failed++;
 		return false;
@@ -1621,8 +1649,11 @@ static bool ixgbe_alloc_mapped_page(struct ixgbe_ring *rx_ring,
 	 * there isn't much point in holding memory we can't use
 	 */
 	if (dma_mapping_error(rx_ring->dev, dma)) {
+#ifndef LCD_ISOLATE
 		__free_pages(page, ixgbe_rx_pg_order(rx_ring));
-
+#else
+		lcd_free_pages(page, ixgbe_rx_pg_order(rx_ring));
+#endif
 		rx_ring->rx_stats.alloc_rx_page_failed++;
 		return false;
 	}
@@ -1765,11 +1796,13 @@ static void ixgbe_process_skb_fields(struct ixgbe_ring *rx_ring,
 static void ixgbe_rx_skb(struct ixgbe_q_vector *q_vector,
 			 struct sk_buff *skb)
 {
+#ifndef LCD_ISOLATE
 	skb_mark_napi_id(skb, &q_vector->napi);
 	if (ixgbe_qv_busy_polling(q_vector))
 		netif_receive_skb(skb);
 	else
 		napi_gro_receive(&q_vector->napi, skb);
+#endif
 }
 
 /**
@@ -2019,7 +2052,11 @@ static bool ixgbe_add_rx_frag(struct ixgbe_ring *rx_ring,
 			return true;
 
 		/* this page cannot be reused so discard it */
+#ifndef LCD_ISOLATE
 		__free_pages(page, ixgbe_rx_pg_order(rx_ring));
+#else
+		lcd_free_pages(page, ixgbe_rx_pg_order(rx_ring));
+#endif
 		return false;
 	}
 
@@ -3249,7 +3286,11 @@ void ixgbe_configure_tx_ring(struct ixgbe_adapter *adapter,
 	} else {
 		ring->atr_sample_rate = 0;
 	}
-
+	/* XXX: Used to select the hardware queue based on the current
+	 * cpu. Looks complicated to achieve inside LCDs. Disable it
+	 * for now
+	 */
+#ifndef LCD_ISOLATE
 	/* initialize XPS */
 	if (!test_and_set_bit(__IXGBE_TX_XPS_INIT_DONE, &ring->state)) {
 		struct ixgbe_q_vector *q_vector = ring->q_vector;
@@ -3259,7 +3300,7 @@ void ixgbe_configure_tx_ring(struct ixgbe_adapter *adapter,
 					    &q_vector->affinity_mask,
 					    ring->queue_index);
 	}
-
+#endif
 	clear_bit(__IXGBE_HANG_CHECK_ARMED, &ring->state);
 
 	/* enable queue */
@@ -4971,8 +5012,11 @@ static void ixgbe_clean_rx_ring(struct ixgbe_ring *rx_ring)
 
 		dma_unmap_page(dev, rx_buffer->dma,
 			       ixgbe_rx_pg_size(rx_ring), DMA_FROM_DEVICE);
+#ifndef LCD_ISOLATE
 		__free_pages(rx_buffer->page, ixgbe_rx_pg_order(rx_ring));
-
+#else
+		lcd_free_pages(rx_buffer->page, ixgbe_rx_pg_order(rx_ring));
+#endif
 		rx_buffer->page = NULL;
 	}
 
@@ -5406,11 +5450,11 @@ void ixgbe_reset(struct ixgbe_adapter *adapter)
 	case IXGBE_ERR_SFP_NOT_SUPPORTED:
 		break;
 	case IXGBE_ERR_MASTER_REQUESTS_PENDING:
-		e_dev_err("master disable timed out\n");
+		LIBLCD_ERR("master disable timed out\n");
 		break;
 	case IXGBE_ERR_EEPROM_VERSION:
 		/* We are running on a pre-production device, log a warning */
-		e_dev_warn("This device is a pre-production adapter/LOM. "
+		LIBLCD_WARN("This device is a pre-production adapter/LOM. "
 			   "Please be aware there may be issues associated with "
 			   "your hardware.  If you are experiencing problems "
 			   "please contact your Intel or hardware "
@@ -5418,7 +5462,7 @@ void ixgbe_reset(struct ixgbe_adapter *adapter)
 			   "hardware.\n");
 		break;
 	default:
-		e_dev_err("Hardware Error: %d\n", err);
+		LIBLCD_ERR("Hardware Error: %d\n", err);
 	}
 
 	clear_bit(__IXGBE_IN_SFP_INIT, &adapter->state);
@@ -5820,13 +5864,13 @@ static int ixgbe_sw_init(struct ixgbe_adapter *adapter)
 
 #ifdef CONFIG_PCI_IOV
 	if (max_vfs > 0)
-		e_dev_warn("Enabling SR-IOV VFs using the max_vfs module parameter is deprecated - please use the pci sysfs interface instead.\n");
+		LIBLCD_WARN("Enabling SR-IOV VFs using the max_vfs module parameter is deprecated - please use the pci sysfs interface instead.\n");
 
 	/* assign number of SR-IOV VFs */
 	if (hw->mac.type != ixgbe_mac_82598EB) {
 		if (max_vfs > IXGBE_MAX_VFS_DRV_LIMIT) {
 			adapter->num_vfs = 0;
-			e_dev_warn("max_vfs parameter out of range. Not assigning any SR-IOV VFs\n");
+			LIBLCD_WARN("max_vfs parameter out of range. Not assigning any SR-IOV VFs\n");
 		} else {
 			adapter->num_vfs = max_vfs;
 		}
@@ -5846,7 +5890,7 @@ static int ixgbe_sw_init(struct ixgbe_adapter *adapter)
 
 	/* initialize eeprom parameters */
 	if (ixgbe_init_eeprom_params_generic(hw)) {
-		e_dev_err("EEPROM initialization failed\n");
+		LIBLCD_ERR("EEPROM initialization failed\n");
 		return -EIO;
 	}
 
@@ -5875,9 +5919,9 @@ int ixgbe_setup_tx_resources(struct ixgbe_ring *tx_ring)
 	if (tx_ring->q_vector)
 		ring_node = tx_ring->q_vector->numa_node;
 
-	tx_ring->tx_buffer_info = vzalloc_node(size, ring_node);
+	tx_ring->tx_buffer_info = kzalloc_node(size, GFP_KERNEL, ring_node);
 	if (!tx_ring->tx_buffer_info)
-		tx_ring->tx_buffer_info = vzalloc(size);
+		tx_ring->tx_buffer_info = kzalloc(size, GFP_KERNEL);
 	if (!tx_ring->tx_buffer_info)
 		goto err;
 
@@ -5904,7 +5948,7 @@ int ixgbe_setup_tx_resources(struct ixgbe_ring *tx_ring)
 	return 0;
 
 err:
-	vfree(tx_ring->tx_buffer_info);
+	kfree(tx_ring->tx_buffer_info);
 	tx_ring->tx_buffer_info = NULL;
 	dev_err(dev, "Unable to allocate memory for the Tx descriptor ring\n");
 	return -ENOMEM;
@@ -5959,9 +6003,9 @@ int ixgbe_setup_rx_resources(struct ixgbe_ring *rx_ring)
 	if (rx_ring->q_vector)
 		ring_node = rx_ring->q_vector->numa_node;
 
-	rx_ring->rx_buffer_info = vzalloc_node(size, ring_node);
+	rx_ring->rx_buffer_info = kzalloc_node(size, GFP_KERNEL, ring_node);
 	if (!rx_ring->rx_buffer_info)
-		rx_ring->rx_buffer_info = vzalloc(size);
+		rx_ring->rx_buffer_info = kzalloc(size, GFP_KERNEL);
 	if (!rx_ring->rx_buffer_info)
 		goto err;
 
@@ -5988,7 +6032,7 @@ int ixgbe_setup_rx_resources(struct ixgbe_ring *rx_ring)
 
 	return 0;
 err:
-	vfree(rx_ring->rx_buffer_info);
+	kfree(rx_ring->rx_buffer_info);
 	rx_ring->rx_buffer_info = NULL;
 	dev_err(dev, "Unable to allocate memory for the Rx descriptor ring\n");
 	return -ENOMEM;
@@ -6039,7 +6083,7 @@ void ixgbe_free_tx_resources(struct ixgbe_ring *tx_ring)
 {
 	ixgbe_clean_tx_ring(tx_ring);
 
-	vfree(tx_ring->tx_buffer_info);
+	kfree(tx_ring->tx_buffer_info);
 	tx_ring->tx_buffer_info = NULL;
 
 	/* if not set, then don't free */
@@ -6077,7 +6121,7 @@ void ixgbe_free_rx_resources(struct ixgbe_ring *rx_ring)
 {
 	ixgbe_clean_rx_ring(rx_ring);
 
-	vfree(rx_ring->rx_buffer_info);
+	kfree(rx_ring->rx_buffer_info);
 	rx_ring->rx_buffer_info = NULL;
 
 	/* if not set, then don't free */
@@ -6294,7 +6338,7 @@ static int ixgbe_resume(struct pci_dev *pdev)
 
 	err = pci_enable_device_mem(pdev);
 	if (err) {
-		e_dev_err("Cannot enable PCI device from suspend\n");
+		LIBLCD_ERR("Cannot enable PCI device from suspend\n");
 		return err;
 	}
 	smp_mb__before_atomic();
@@ -6886,7 +6930,7 @@ static void ixgbe_watchdog_link_is_up(struct ixgbe_adapter *adapter)
 	netif_tx_wake_all_queues(adapter->netdev);
 
 	/* enable any upper devices */
-//	rtnl_lock();
+	rtnl_lock();
 	netdev_for_each_all_upper_dev_rcu(adapter->netdev, upper, iter) {
 		if (netif_is_macvlan(upper)) {
 			struct macvlan_dev *vlan = netdev_priv(upper);
@@ -6895,7 +6939,7 @@ static void ixgbe_watchdog_link_is_up(struct ixgbe_adapter *adapter)
 				netif_tx_wake_all_queues(upper);
 		}
 	}
-//	rtnl_unlock();
+	rtnl_unlock();
 
 	/* update the default user priority for VFs */
 	ixgbe_update_default_up(adapter);
@@ -7009,9 +7053,9 @@ static inline void ixgbe_issue_vf_flr(struct ixgbe_adapter *adapter,
 				      struct pci_dev *vfdev)
 {
 	if (!pci_wait_for_pending_transaction(vfdev))
-		e_dev_warn("Issuing VFLR with pending transactions\n");
+		LIBLCD_WARN("Issuing VFLR with pending transactions\n");
 
-	e_dev_err("Issuing VFLR for VF %s\n", pci_name(vfdev));
+	LIBLCD_ERR("Issuing VFLR for VF %s\n", pci_name(vfdev));
 	pcie_capability_set_word(vfdev, PCI_EXP_DEVCTL, PCI_EXP_DEVCTL_BCR_FLR);
 
 	msleep(100);
@@ -7085,6 +7129,7 @@ ixgbe_check_for_bad_vf(struct ixgbe_adapter __always_unused *adapter)
 #endif /* CONFIG_PCI_IOV */
 
 
+#ifndef LCD_ISOLATE
 /**
  * ixgbe_watchdog_subtask - check and bring link up
  * @adapter: pointer to the device adapter structure
@@ -7176,9 +7221,9 @@ sfp_out:
 
 	if ((err == IXGBE_ERR_SFP_NOT_SUPPORTED) &&
 	    (adapter->netdev->reg_state == NETREG_REGISTERED)) {
-		e_dev_err("failed to initialize because an unsupported "
+		LIBLCD_ERR("failed to initialize because an unsupported "
 			  "SFP+ module type was detected.\n");
-		e_dev_err("Reload the driver after installing a "
+		LIBLCD_ERR("Reload the driver after installing a "
 			  "supported module.\n");
 		unregister_netdev(adapter->netdev);
 	}
@@ -7327,6 +7372,7 @@ static void ixgbe_service_task(struct work_struct *work)
 
 	ixgbe_service_event_complete(adapter);
 }
+#endif
 
 static int ixgbe_tso(struct ixgbe_ring *tx_ring,
 		     struct ixgbe_tx_buffer *first,
@@ -8033,7 +8079,6 @@ static netdev_tx_t ixgbe_xmit_frame(struct sk_buff *skb,
 {
 	return __ixgbe_xmit_frame(skb, netdev, NULL);
 }
-
 /**
  * ixgbe_set_mac - Change the Ethernet Address of the NIC
  * @netdev: network interface device structure
@@ -8151,7 +8196,6 @@ static int ixgbe_del_sanmac_netdev(struct net_device *dev)
 	}
 	return err;
 }
-
 #ifdef CONFIG_NET_POLL_CONTROLLER
 /*
  * Polling 'interrupt' - used by things like netconsole to send skbs
@@ -9498,8 +9542,11 @@ static int ixgbe_probe(struct pci_dev *pdev, const struct pci_device_id *ent)
 	hw->back = adapter;
 	adapter->msg_enable = netif_msg_init(debug, DEFAULT_MSG_ENABLE);
 
+#ifndef LCD_ISOLATE
 	hw->hw_addr = ioremap(pci_resource_start(pdev, 0),
 			      pci_resource_len(pdev, 0));
+#endif
+	hw->hw_addr = 0x0;
 	adapter->io_addr = hw->hw_addr;
 	if (!hw->hw_addr) {
 		err = -EIO;
@@ -9582,11 +9629,11 @@ static int ixgbe_probe(struct pci_dev *pdev, const struct pci_device_id *ent)
 	if (err == IXGBE_ERR_SFP_NOT_PRESENT) {
 		err = 0;
 	} else if (err == IXGBE_ERR_SFP_NOT_SUPPORTED) {
-		e_dev_err("failed to load because an unsupported SFP+ or QSFP module type was detected.\n");
-		e_dev_err("Reload the driver after installing a supported module.\n");
+		LIBLCD_ERR("failed to load because an unsupported SFP+ or QSFP module type was detected.\n");
+		LIBLCD_ERR("Reload the driver after installing a supported module.\n");
 		goto err_sw_init;
 	} else if (err) {
-		e_dev_err("HW Init failed: %d\n", err);
+		LIBLCD_ERR("HW Init failed: %d\n", err);
 		goto err_sw_init;
 	}
 
@@ -9685,7 +9732,7 @@ skip_sriov:
 
 	/* make sure the EEPROM is good */
 	if (hw->eeprom.ops.validate_checksum(hw, NULL) < 0) {
-		e_dev_err("The EEPROM Checksum Is Not Valid\n");
+		LIBLCD_ERR("The EEPROM Checksum Is Not Valid\n");
 		err = -EIO;
 		goto err_sw_init;
 	}
@@ -9696,7 +9743,7 @@ skip_sriov:
 	memcpy(netdev->dev_addr, hw->mac.perm_addr, netdev->addr_len);
 
 	if (!is_valid_ether_addr(netdev->dev_addr)) {
-		e_dev_err("invalid MAC address\n");
+		LIBLCD_ERR("invalid MAC address\n");
 		err = -EIO;
 		goto err_sw_init;
 	}
@@ -9705,13 +9752,16 @@ skip_sriov:
 	ether_addr_copy(hw->mac.addr, hw->mac.perm_addr);
 	ixgbe_mac_set_default_filter(adapter);
 
+#ifndef LCD_ISOLATE
 	setup_timer(&adapter->service_timer, &ixgbe_service_timer,
 		    (unsigned long) adapter);
+#endif
 
 	if (ixgbe_removed(hw->hw_addr)) {
 		err = -EIO;
 		goto err_sw_init;
 	}
+#ifndef LCD_ISOLATE
 	INIT_WORK(&adapter->service_task, ixgbe_service_task);
 	set_bit(__IXGBE_SERVICE_INITED, &adapter->state);
 	clear_bit(__IXGBE_SERVICE_SCHED, &adapter->state);
@@ -9729,7 +9779,7 @@ skip_sriov:
 		adapter->wol = IXGBE_WUFC_MAG;
 
 	device_set_wakeup_enable(&adapter->pdev->dev, adapter->wol);
-
+#endif
 	/* save off EEPROM version number */
 	hw->eeprom.ops.read(hw, 0x2e, &adapter->eeprom_verh);
 	hw->eeprom.ops.read(hw, 0x2d, &adapter->eeprom_verl);
@@ -9762,20 +9812,20 @@ skip_sriov:
 	if (err)
 		strlcpy(part_str, "Unknown", sizeof(part_str));
 	if (ixgbe_is_sfp(hw) && hw->phy.sfp_type != ixgbe_sfp_type_not_present)
-		e_dev_info("MAC: %d, PHY: %d, SFP+: %d, PBA No: %s\n",
+		LIBLCD_MSG("MAC: %d, PHY: %d, SFP+: %d, PBA No: %s\n",
 			   hw->mac.type, hw->phy.type, hw->phy.sfp_type,
 			   part_str);
 	else
-		e_dev_info("MAC: %d, PHY: %d, PBA No: %s\n",
+		LIBLCD_MSG("MAC: %d, PHY: %d, PBA No: %s\n",
 			   hw->mac.type, hw->phy.type, part_str);
 
-	e_dev_info("%pM\n", netdev->dev_addr);
+	LIBLCD_MSG("%pM\n", netdev->dev_addr);
 
 	/* reset the hardware with the new settings */
 	err = hw->mac.ops.start_hw(hw);
 	if (err == IXGBE_ERR_EEPROM_VERSION) {
 		/* We are running on a pre-production device, log a warning */
-		e_dev_warn("This device is a pre-production adapter/LOM. "
+		LIBLCD_WARN("This device is a pre-production adapter/LOM. "
 			   "Please be aware there may be issues associated "
 			   "with your hardware.  If you are experiencing "
 			   "problems please contact your Intel or hardware "
@@ -9820,7 +9870,7 @@ skip_sriov:
 	/* add san mac addr to netdev */
 	ixgbe_add_sanmac_netdev(netdev);
 
-	e_dev_info("%s\n", ixgbe_default_device_descr);
+	LIBLCD_MSG("%s\n", ixgbe_default_device_descr);
 
 #ifdef CONFIG_IXGBE_HWMON
 	if (ixgbe_sysfs_init(adapter))
@@ -9923,7 +9973,7 @@ static void ixgbe_remove(struct pci_dev *pdev)
 	iounmap(adapter->io_addr);
 	pci_release_mem_regions(pdev);
 
-	e_dev_info("complete\n");
+	LIBLCD_MSG("complete\n");
 
 	for (i = 0; i < IXGBE_MAX_LINK_HANDLE; i++) {
 		if (adapter->jump_tables[i]) {
@@ -9996,8 +10046,8 @@ static pci_ers_result_t ixgbe_io_error_detected(struct pci_dev *pdev,
 		unsigned int device_id;
 
 		vf = (req_id & 0x7F) >> 1;
-		e_dev_err("VF %d has caused a PCIe error\n", vf);
-		e_dev_err("TLP: dw0: %8.8x\tdw1: %8.8x\tdw2: "
+		LIBLCD_ERR("VF %d has caused a PCIe error\n", vf);
+		LIBLCD_ERR("TLP: dw0: %8.8x\tdw1: %8.8x\tdw2: "
 				"%8.8x\tdw3: %8.8x\n",
 		dw0, dw1, dw2, dw3);
 		switch (adapter->hw.mac.type) {
@@ -10109,7 +10159,7 @@ static pci_ers_result_t ixgbe_io_slot_reset(struct pci_dev *pdev)
 
 	err = pci_cleanup_aer_uncorrect_error_status(pdev);
 	if (err) {
-		e_dev_err("pci_cleanup_aer_uncorrect_error_status "
+		LIBLCD_ERR("pci_cleanup_aer_uncorrect_error_status "
 			  "failed 0x%0x\n", err);
 		/* non-fatal, continue */
 	}

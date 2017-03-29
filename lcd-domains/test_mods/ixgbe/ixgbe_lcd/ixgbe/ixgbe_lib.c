@@ -704,6 +704,7 @@ static void ixgbe_set_num_queues(struct ixgbe_adapter *adapter)
 	ixgbe_set_rss_queues(adapter);
 }
 
+#ifndef LCD_ISOLATE
 /**
  * ixgbe_acquire_msix_vectors - acquire MSI-X vectors
  * @adapter: board private structure
@@ -759,7 +760,7 @@ static int ixgbe_acquire_msix_vectors(struct ixgbe_adapter *adapter)
 		/* A negative count of allocated vectors indicates an error in
 		 * acquiring within the specified range of MSI-X vectors
 		 */
-		e_dev_warn("Failed to allocate MSI-X interrupts. Err: %d\n",
+		LIBLCD_WARN("Failed to allocate MSI-X interrupts. Err: %d\n",
 			   vectors);
 
 		adapter->flags &= ~IXGBE_FLAG_MSIX_ENABLED;
@@ -782,6 +783,7 @@ static int ixgbe_acquire_msix_vectors(struct ixgbe_adapter *adapter)
 
 	return 0;
 }
+#endif
 
 static void ixgbe_add_ring(struct ixgbe_ring *ring,
 			   struct ixgbe_ring_container *head)
@@ -847,9 +849,11 @@ static int ixgbe_alloc_q_vector(struct ixgbe_adapter *adapter,
 	q_vector->cpu = -1;
 
 #endif
+#ifndef LCD_ISOLATE
 	/* initialize NAPI */
 	netif_napi_add(adapter->netdev, &q_vector->napi,
 		       ixgbe_poll, 64);
+#endif
 
 #ifdef CONFIG_NET_RX_BUSY_POLL
 	/* initialize busy poll */
@@ -973,6 +977,7 @@ static int ixgbe_alloc_q_vector(struct ixgbe_adapter *adapter,
  **/
 static void ixgbe_free_q_vector(struct ixgbe_adapter *adapter, int v_idx)
 {
+#ifndef LCD_ISOLATE
 	struct ixgbe_q_vector *q_vector = adapter->q_vector[v_idx];
 	struct ixgbe_ring *ring;
 
@@ -991,6 +996,7 @@ static void ixgbe_free_q_vector(struct ixgbe_adapter *adapter, int v_idx)
 	 * we must wait a grace period before freeing it.
 	 */
 	kfree_rcu(q_vector, rcu);
+#endif
 }
 
 /**
@@ -1098,12 +1104,13 @@ static void ixgbe_reset_interrupt_capability(struct ixgbe_adapter *adapter)
  **/
 static void ixgbe_set_interrupt_capability(struct ixgbe_adapter *adapter)
 {
+#ifndef LCD_ISOLATE
 	int err;
 
 	/* We will try to get MSI-X interrupts first */
 	if (!ixgbe_acquire_msix_vectors(adapter))
 		return;
-
+#endif
 	/* At this point, we do not have MSI-X capabilities. We need to
 	 * reconfigure or disable various features which require MSI-X
 	 * capability.
@@ -1111,7 +1118,7 @@ static void ixgbe_set_interrupt_capability(struct ixgbe_adapter *adapter)
 #ifdef CONFIG_IXGBE_DCB
 	/* Disable DCB unless we only have a single traffic class */
 	if (netdev_get_num_tc(adapter->netdev) > 1) {
-		e_dev_warn("Number of DCB TCs exceeds number of available queues. Disabling DCB support.\n");
+		LIBLCD_WARN("Number of DCB TCs exceeds number of available queues. Disabling DCB support.\n");
 		netdev_reset_tc(adapter->netdev);
 
 		if (adapter->hw.mac.type == ixgbe_mac_82598EB)
@@ -1127,11 +1134,11 @@ static void ixgbe_set_interrupt_capability(struct ixgbe_adapter *adapter)
 #endif
 #ifdef CONFIG_PCI_IOV
 	/* Disable SR-IOV support */
-	e_dev_warn("Disabling SR-IOV support\n");
+	LIBLCD_WARN("Disabling SR-IOV support\n");
 	ixgbe_disable_sriov(adapter);
 #endif
 	/* Disable RSS */
-	e_dev_warn("Disabling RSS support\n");
+	LIBLCD_WARN("Disabling RSS support\n");
 	adapter->ring_feature[RING_F_RSS].limit = 1;
 
 	/* recalculate number of queues now that many features have been
@@ -1140,12 +1147,14 @@ static void ixgbe_set_interrupt_capability(struct ixgbe_adapter *adapter)
 	ixgbe_set_num_queues(adapter);
 	adapter->num_q_vectors = 1;
 
+#ifndef LCD_ISOLATE
 	err = pci_enable_msi(adapter->pdev);
 	if (err)
-		e_dev_warn("Failed to allocate MSI interrupt, falling back to legacy. Error: %d\n",
+		LIBLCD_WARN("Failed to allocate MSI interrupt, falling back to legacy. Error: %d\n",
 			   err);
 	else
 		adapter->flags |= IXGBE_FLAG_MSI_ENABLED;
+#endif
 }
 
 /**
@@ -1170,13 +1179,13 @@ int ixgbe_init_interrupt_scheme(struct ixgbe_adapter *adapter)
 
 	err = ixgbe_alloc_q_vectors(adapter);
 	if (err) {
-		e_dev_err("Unable to allocate memory for queue vectors\n");
+		LIBLCD_ERR("Unable to allocate memory for queue vectors\n");
 		goto err_alloc_q_vectors;
 	}
 
 	ixgbe_cache_ring_register(adapter);
 
-	e_dev_info("Multiqueue %s: Rx Queue count = %u, Tx Queue count = %u\n",
+	LIBLCD_MSG("Multiqueue %s: Rx Queue count = %u, Tx Queue count = %u\n",
 		   (adapter->num_rx_queues > 1) ? "Enabled" : "Disabled",
 		   adapter->num_rx_queues, adapter->num_tx_queues);
 

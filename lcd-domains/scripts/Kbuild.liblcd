@@ -39,6 +39,8 @@ lib-y += $(addprefix liblcd/lib/, \
 	crc16.o \
 	parser.o \
 	cmdline.o \
+	dynamic_queue_limits.o \
+	checksum.o \
 	)
 
 lib-y += $(addprefix liblcd/mm/, \

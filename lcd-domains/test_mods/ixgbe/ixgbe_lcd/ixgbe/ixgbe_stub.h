@@ -1,13 +1,9 @@
 #ifndef IXGBE_STUB_H
 #define IXGBE_STUB_H
 
-void napi_disable(struct napi_struct *n) {
+void napi_disable(struct napi_struct *n) { }
 
-}
-
-void napi_complete_done(struct napi_struct *n, int work_done)
-{
-}
+void napi_complete_done(struct napi_struct *n, int work_done) { }
 
 void pci_disable_msix(struct pci_dev *dev) { }
 
@@ -21,56 +17,40 @@ int __must_check
 request_threaded_irq(unsigned int irq, irq_handler_t handler,
 		     irq_handler_t thread_fn,
 		     unsigned long flags, const char *name, void *dev)
-{
-	return 0;
-}
+{ return 0; }
 
 int call_netdevice_notifiers(unsigned long val, struct net_device *dev)
-{
-	return 0;
-}
-bool cancel_work_sync(struct work_struct *work)
-{
-	return true;
-}
-int rtnl_is_locked(void)
-{
-	return 0;
-}
+{ return 0; }
+
+bool cancel_work_sync(struct work_struct *work) { return true; }
+
+int rtnl_is_locked(void) { return 0; }
+
 void usleep_range(unsigned long min, unsigned long max)
 {
 }
 
-void synchronize_irq(unsigned int irq) {}
+void synchronize_irq(unsigned int irq) { }
 
 int mdio45_probe(struct mdio_if_info *mdio, int prtad) { return 0; }
 
-void napi_gro_flush(struct napi_struct *napi, bool flush_old) {}
-void free_irq(unsigned int a, void *p) {}
+void napi_gro_flush(struct napi_struct *napi, bool flush_old) { }
+
+void free_irq(unsigned int a, void *p) { }
 
 unsigned char *skb_put(struct sk_buff *skb, unsigned int len)
 {
 	return (char*) skb;
 }
 
-int skb_pad(struct sk_buff *skb, int pad)
-{
-	return 0;
-}
+int skb_pad(struct sk_buff *skb, int pad) { return 0; }
 
-int skb_copy_bits(const struct sk_buff *skb, int offset, void *to, int len)
-{
-	return 0;
-}
+int skb_copy_bits(const struct sk_buff *skb, int offset, void *to, int len) { return 0; }
 
-int skb_checksum_help(struct sk_buff *skb)
-{
-	return 0;
-}
+int skb_checksum_help(struct sk_buff *skb) { return 0; }
 
 void skb_tstamp_tx(struct sk_buff *orig_skb,
-		   struct skb_shared_hwtstamps *hwtstamps)
-{}
+		   struct skb_shared_hwtstamps *hwtstamps) { }
 
 int pskb_expand_head(struct sk_buff *skb, int nhead, int ntail, gfp_t gfp_mask) { return 0; }
 
@@ -132,6 +112,34 @@ struct dma_map_ops *dma_ops;
 bool arch_dma_alloc_attrs(struct device **dev, gfp_t *gfp) { return true; }
 
 struct pglist_data contig_page_data;
+
+void pci_restore_state(struct pci_dev *dev) { }
+
+void __napi_schedule_irqoff(struct napi_struct *n) { }
+
+int mdio_mii_ioctl(const struct mdio_if_info *mdio,
+			struct mii_ioctl_data *mii_data, int cmd)
+{ return 0; }
+
+int ndo_dflt_bridge_getlink(struct sk_buff *skb, u32 pid, u32 seq,
+				   struct net_device *dev, u16 mode,
+				   u32 flags, u32 mask, int nlflags,
+				   u32 filter_mask,
+				   int (*vlan_fill)(struct sk_buff *skb,
+						    struct net_device *dev,
+						    u32 filter_mask))
+{ return 0; }
+
+int ndo_dflt_fdb_add(struct ndmsg *ndm,
+			    struct nlattr *tb[],
+			    struct net_device *dev,
+			    const unsigned char *addr,
+			    u16 vid,
+			    u16 flags)
+{ return 0; }
+
+struct nlattr *nla_find(const struct nlattr *head, int len, int attrtype)
+{ return NULL; }
 
 /* TODO: Move this to a common header, say arch/x86/include/asm/udelay.h
  * As of now, lpj is passed by boot module to LCD. Devise a way to retrieve

@@ -278,7 +278,7 @@ static inline bool ixgbe_pcie_from_parent(struct ixgbe_hw *hw)
 		return false;
 	}
 }
-
+#ifndef LCD_ISOLATE
 static void ixgbe_check_minimum_link(struct ixgbe_adapter *adapter,
 				     int expected_gts)
 {
@@ -345,6 +345,7 @@ static void ixgbe_check_minimum_link(struct ixgbe_adapter *adapter,
 		LIBLCD_WARN("A slot with more lanes and/or higher speed is suggested.\n");
 	}
 }
+#endif /* LCD_ISOLATE */
 
 static void ixgbe_service_event_schedule(struct ixgbe_adapter *adapter)
 {
@@ -2524,6 +2525,7 @@ static void ixgbe_set_itr(struct ixgbe_q_vector *q_vector)
 	}
 }
 
+#ifndef LCD_ISOLATE
 /**
  * ixgbe_check_overtemp_subtask - check for over temperature
  * @adapter: pointer to adapter
@@ -2581,6 +2583,7 @@ static void ixgbe_check_overtemp_subtask(struct ixgbe_adapter *adapter)
 
 	adapter->interrupt_event = 0;
 }
+#endif /* LCD_ISOLATE */
 
 static void ixgbe_check_fan_failure(struct ixgbe_adapter *adapter, u32 eicr)
 {
@@ -3396,6 +3399,7 @@ static void ixgbe_configure_tx(struct ixgbe_adapter *adapter)
 		ixgbe_configure_tx_ring(adapter, adapter->tx_ring[i]);
 }
 
+#ifndef LCD_ISOLATE
 static void ixgbe_enable_rx_drop(struct ixgbe_adapter *adapter,
 				 struct ixgbe_ring *ring)
 {
@@ -3454,6 +3458,7 @@ static void ixgbe_set_rx_drop_en(struct ixgbe_adapter *adapter)
 			ixgbe_disable_rx_drop(adapter, adapter->rx_ring[i]);
 	}
 }
+#endif /* LCD_ISOLATE */
 
 #define IXGBE_SRRCTL_BSIZEHDRSIZE_SHIFT 2
 
@@ -6701,6 +6706,7 @@ void ixgbe_update_stats(struct ixgbe_adapter *adapter)
 	netdev->stats.rx_missed_errors = total_mpc;
 }
 
+#ifndef LCD_ISOLATE
 /**
  * ixgbe_fdir_reinit_subtask - worker thread to reinit FDIR filter table
  * @adapter: pointer to the device adapter structure
@@ -7047,6 +7053,7 @@ static void ixgbe_watchdog_flush_tx(struct ixgbe_adapter *adapter)
 		}
 	}
 }
+#endif /* LCD_ISOLATE */
 
 #ifdef CONFIG_PCI_IOV
 static inline void ixgbe_issue_vf_flr(struct ixgbe_adapter *adapter,
@@ -7118,6 +7125,7 @@ static void ixgbe_spoof_check(struct ixgbe_adapter *adapter)
 	e_warn(drv, "%u Spoofed packets detected\n", ssvpc);
 }
 #else
+#ifndef LCD_ISOLATE
 static void ixgbe_spoof_check(struct ixgbe_adapter __always_unused *adapter)
 {
 }
@@ -7127,6 +7135,7 @@ ixgbe_check_for_bad_vf(struct ixgbe_adapter __always_unused *adapter)
 {
 }
 #endif /* CONFIG_PCI_IOV */
+#endif /* LCD_ISOLATE */
 
 
 #ifndef LCD_ISOLATE
@@ -8152,6 +8161,7 @@ static int ixgbe_ioctl(struct net_device *netdev, struct ifreq *req, int cmd)
 	}
 }
 
+#ifndef LCD_ISOLATE
 /**
  * ixgbe_add_sanmac_netdev - Add the SAN MAC address to the corresponding
  * netdev->dev_addrs
@@ -8196,6 +8206,8 @@ static int ixgbe_del_sanmac_netdev(struct net_device *dev)
 	}
 	return err;
 }
+#endif /* LCD_ISOLATE */
+
 #ifdef CONFIG_NET_POLL_CONTROLLER
 /*
  * Polling 'interrupt' - used by things like netconsole to send skbs
@@ -9458,6 +9470,9 @@ bool ixgbe_wol_supported(struct ixgbe_adapter *adapter, u16 device_id,
  * The OS initialization, configuring of the adapter private structure,
  * and a hardware reset occur.
  **/
+
+struct ixgbe_adapter *g_adapter = NULL;
+
 static int ixgbe_probe(struct pci_dev *pdev, const struct pci_device_id *ent)
 {
 	struct net_device *netdev;
@@ -9468,7 +9483,10 @@ static int ixgbe_probe(struct pci_dev *pdev, const struct pci_device_id *ent)
 #else
 	const struct ixgbe_info *ii = ixgbe_info_tbl[board_82599];
 #endif
-	int err, pci_using_dac, expected_gts;
+	int err, pci_using_dac;
+#ifndef LCD_ISOLATE
+	int expected_gts;
+#endif
 #ifdef CONFIG_PCI_IOV
 	int i;
 #endif
@@ -9493,6 +9511,7 @@ static int ixgbe_probe(struct pci_dev *pdev, const struct pci_device_id *ent)
 	if (err)
 		return err;
 
+#ifdef LCD_IXGBE_DMA
 	if (!dma_set_mask_and_coherent(&pdev->dev, DMA_BIT_MASK(64))) {
 		pci_using_dac = 1;
 	} else {
@@ -9504,7 +9523,7 @@ static int ixgbe_probe(struct pci_dev *pdev, const struct pci_device_id *ent)
 		}
 		pci_using_dac = 0;
 	}
-
+#endif
 	err = pci_request_mem_regions(pdev, ixgbe_driver_name);
 	if (err) {
 		dev_err(&pdev->dev,
@@ -9536,6 +9555,8 @@ static int ixgbe_probe(struct pci_dev *pdev, const struct pci_device_id *ent)
 
 	adapter = netdev_priv(netdev);
 
+	g_adapter = adapter;
+
 	adapter->netdev = netdev;
 	adapter->pdev = pdev;
 	hw = &adapter->hw;
@@ -9545,8 +9566,10 @@ static int ixgbe_probe(struct pci_dev *pdev, const struct pci_device_id *ent)
 #ifndef LCD_ISOLATE
 	hw->hw_addr = ioremap(pci_resource_start(pdev, 0),
 			      pci_resource_len(pdev, 0));
+#else
+	/* already remapped by probe_callee in ixgbe_caller.c */
+	hw->hw_addr = (u8*) pci_resource_start(pdev, 0);
 #endif
-	hw->hw_addr = 0x0;
 	adapter->io_addr = hw->hw_addr;
 	if (!hw->hw_addr) {
 		err = -EIO;
@@ -9737,6 +9760,12 @@ skip_sriov:
 		goto err_sw_init;
 	}
 
+	/* TODO: Supposed to be filled by eth_setup() in the kernel.
+	 * propagate these to the netdev object of LCD to avoid
+	 * scratching your head on WTF is wrong where.
+	 */
+	netdev->addr_len = ETH_ALEN;
+
 	eth_platform_get_mac_address(&adapter->pdev->dev,
 				     adapter->hw.mac.perm_addr);
 
@@ -9795,6 +9824,7 @@ skip_sriov:
 	 * bandwidth due to being older generation PCIe parts. We clamp these
 	 * parts to ensure no warning is displayed if it can't be fixed.
 	 */
+#ifndef LCD_ISOLATE
 	switch (hw->mac.type) {
 	case ixgbe_mac_82598EB:
 		expected_gts = min(ixgbe_enumerate_functions(adapter) * 10, 16);
@@ -9807,6 +9837,7 @@ skip_sriov:
 	/* don't check link if we failed to enumerate functions */
 	if (expected_gts > 0)
 		ixgbe_check_minimum_link(adapter, expected_gts);
+#endif
 
 	err = ixgbe_read_pba_string_generic(hw, part_str, sizeof(part_str));
 	if (err)
@@ -9833,10 +9864,12 @@ skip_sriov:
 			   "hardware.\n");
 	}
 	strcpy(netdev->name, "eth%d");
+
+#ifndef LCD_ISOLATE
 	err = register_netdev(netdev);
 	if (err)
 		goto err_register;
-
+#endif
 	pci_set_drvdata(pdev, adapter);
 
 	/* power down the optics for 82599 SFP+ fiber */
@@ -9868,7 +9901,9 @@ skip_sriov:
 					   0xFF);
 
 	/* add san mac addr to netdev */
+#ifndef LCD_ISOLATE
 	ixgbe_add_sanmac_netdev(netdev);
+#endif
 
 	LIBLCD_MSG("%s\n", ixgbe_default_device_descr);
 
@@ -9887,8 +9922,9 @@ skip_sriov:
 			true);
 
 	return 0;
-
+#ifndef LCD_ISOLATE
 err_register:
+#endif
 	ixgbe_release_hw_control(adapter);
 	ixgbe_clear_interrupt_scheme(adapter);
 err_sw_init:
@@ -9905,7 +9941,9 @@ err_ioremap:
 err_alloc_etherdev:
 	pci_release_mem_regions(pdev);
 err_pci_reg:
+#ifndef LCD_ISOLATE
 err_dma:
+#endif
 	if (!adapter || disable_dev)
 		pci_disable_device(pdev);
 	return err;
@@ -9922,10 +9960,16 @@ err_dma:
  **/
 static void ixgbe_remove(struct pci_dev *pdev)
 {
+#ifndef LCD_ISOLATE
 	struct ixgbe_adapter *adapter = pci_get_drvdata(pdev);
+#else
+	struct ixgbe_adapter *adapter = g_adapter;
+#endif
 	struct net_device *netdev;
 	bool disable_dev;
 	int i;
+
+	LIBLCD_MSG("ixgbe_lcd: %s called", __func__);
 
 	/* if !adapter then we already cleaned up in probe */
 	if (!adapter)
@@ -9936,8 +9980,9 @@ static void ixgbe_remove(struct pci_dev *pdev)
 	ixgbe_dbg_adapter_exit(adapter);
 #endif
 	set_bit(__IXGBE_REMOVING, &adapter->state);
+#ifdef LCD_ISOLATE
 	cancel_work_sync(&adapter->service_task);
-
+#endif
 
 #ifdef CONFIG_IXGBE_DCA
 	if (adapter->flags & IXGBE_FLAG_DCA_ENABLED) {
@@ -9952,8 +9997,10 @@ static void ixgbe_remove(struct pci_dev *pdev)
 	ixgbe_sysfs_exit(adapter);
 #endif /* CONFIG_IXGBE_HWMON */
 
+#ifndef LCD_ISOLATE
 	/* remove the added san mac */
 	ixgbe_del_sanmac_netdev(netdev);
+#endif
 
 #ifdef CONFIG_PCI_IOV
 	ixgbe_disable_sriov(adapter);
@@ -9961,16 +10008,19 @@ static void ixgbe_remove(struct pci_dev *pdev)
 	if (netdev->reg_state == NETREG_REGISTERED)
 		unregister_netdev(netdev);
 
+#ifndef LCD_ISOLATE
 	ixgbe_clear_interrupt_scheme(adapter);
+#endif
 
 	ixgbe_release_hw_control(adapter);
 
 #ifdef CONFIG_DCB
 	kfree(adapter->ixgbe_ieee_pfc);
 	kfree(adapter->ixgbe_ieee_ets);
-
 #endif
+#ifndef LCD_ISOLATE
 	iounmap(adapter->io_addr);
+#endif
 	pci_release_mem_regions(pdev);
 
 	LIBLCD_MSG("complete\n");

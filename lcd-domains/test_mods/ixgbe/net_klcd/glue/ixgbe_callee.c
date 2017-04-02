@@ -1903,3 +1903,34 @@ int pci_wake_from_d3_callee(struct fipc_message *_request,
 			_response);
 	return ret;
 }
+
+int trigger_exit_to_lcd(struct thc_channel *_channel)
+{
+	struct fipc_message *_request;
+	int ret;
+	unsigned int request_cookie;
+
+	dump_stack();
+	ret = async_msg_blocking_send_start(_channel,
+		&_request);
+	if (ret) {
+		LIBLCD_ERR("failed to get a send slot");
+		goto fail_async;
+	}
+	async_msg_set_fn_type(_request,
+			TRIGGER_EXIT);
+
+	/* No need to wait for a response here */
+	ret = thc_ipc_send_request(_channel,
+			_request,
+			&request_cookie);
+
+	if (ret) {
+		LIBLCD_ERR("thc_ipc send");
+		goto fail_ipc;
+	}
+
+fail_async:
+fail_ipc:
+	return ret;
+}

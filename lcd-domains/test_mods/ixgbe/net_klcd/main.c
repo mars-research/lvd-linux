@@ -28,6 +28,9 @@ extern void destroy_async_net_ring_channel(struct thc_channel *chnl);
 extern struct glue_cspace *c_cspace;
 struct pci_driver_container *pci_container;
 
+static bool unload_lcd =0;
+module_param_named(unload, unload_lcd, bool, S_IWUSR);
+
 struct net_info *
 add_net(struct thc_channel *chnl, struct glue_cspace *cspace,
 	cptr_t sync_endpoint)
@@ -55,6 +58,15 @@ void remove_net(struct net_info *net)
 	kfree(net);
 }
 
+
+static int __get_net(struct net_info **net_out)
+{
+	struct net_info *first;
+	first = list_first_entry_or_null(&net_infos, struct net_info, list);
+	if (first)
+		*net_out = first;
+	return first ? 1 : 0;
+}
 
 
 static int async_loop(struct net_info **net_out, struct fipc_message **msg_out)
@@ -189,6 +201,8 @@ fail1:
 }
 #define REGISTER_FREQ	50
 
+extern int trigger_exit_to_lcd(struct thc_channel *_channel);
+
 static void loop(cptr_t register_chnl)
 {
 	unsigned long tics = jiffies + REGISTER_FREQ;
@@ -200,7 +214,6 @@ static void loop(cptr_t register_chnl)
 	DO_FINISH(
 
 		while (!stop) {
-			//LIBLCD_MSG(" tics %lu\n", tics);
 			if (jiffies >= tics) {
 				/*
 				 * Listen for a register call
@@ -213,16 +226,18 @@ static void loop(cptr_t register_chnl)
 				tics = jiffies + REGISTER_FREQ;
 				continue;
 			}
-			/*
-			if (ixgbe_ready) {
-				ixgbe_ready = 0;
-				ASYNC(
-					stop = do_ixgbe_test();
-					);
-			}
-			 */
 			if (stop)
 				break;
+
+			/*
+			 * will be updated by a write into sysfs
+			 * from userspace.
+			 */
+			if (unload_lcd) {
+				unload_lcd = 0;
+				if (__get_net(&net))
+					trigger_exit_to_lcd(net->chnl);
+			}
 			ret = async_loop(&net, &msg);
 			if (!ret) {
 				ASYNC(
@@ -263,10 +278,7 @@ static void loop(cptr_t register_chnl)
 
 		);
 
-	if (pci_container) {
-		pci_unregister_driver(&pci_container->pci_driver);
-	}
-	LIBLCD_MSG("EXITED IXGBE DO_FINISH");
+	LIBLCD_MSG("EXITED net_klcd DO_FINISH");
 }
 
 /* INIT / EXIT ---------------------------------------- */

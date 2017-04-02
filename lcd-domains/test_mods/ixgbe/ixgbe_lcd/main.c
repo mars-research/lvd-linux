@@ -86,18 +86,6 @@ static void main_and_loop(void)
 		LIBLCD_MSG("IXGBE EXITED DISPATCH LOOP");
 		);
 
-	/*
-	 * We don't expect any requests coming back to us, so it's safe
-	 * to just run this without a loop (it's effectively polling since
-	 * only one awe will run in this do-finish).
-	 */
-	DO_FINISH(
-		ASYNC(
-			ixgbe_exit_module();
-			LIBLCD_MSG("SUCCESSFULLY UNREGISTERED IXGBE driver!");
-			);
-		);
-
 	LIBLCD_MSG("EXITED IXGBE DO_FINISH");
 
 	return;

@@ -5,6 +5,8 @@
 
 #define trace(x) LIBLCD_MSG("net got " #x " msg")
 
+extern void ixgbe_exit_module(void);
+
 int dispatch_async_loop(struct thc_channel *_channel,
 		struct fipc_message *message,
 		struct glue_cspace *cspace,
@@ -27,6 +29,14 @@ int dispatch_async_loop(struct thc_channel *_channel,
 		cspace,
 		sync_ep);
 
+		case TRIGGER_EXIT:
+			trace(TRIGGER_EXIT);
+			ixgbe_exit_module();
+			/* XXX: return failure to exit the dispatch
+			 * loop. After exit, there is no reason to
+			 * be spinning on the loop
+			 */
+			return -1;
 		default:
 			LIBLCD_ERR("unexpected function label: %d",
 					fn_type);

@@ -21,6 +21,7 @@ int ixgbe_done = 0;
 int ixgbe_init_module(void);
 void ixgbe_exit_module(void);
 extern int create_async_channel(void);
+unsigned long loops_per_jiffy;
 
 /* LOOP ---------------------------------------- */
 
@@ -114,7 +115,10 @@ static int __noreturn ixgbe_lcd_init(void)
 	 * Get the ixgbe channel cptr from boot info
 	 */
 	ixgbe_register_channel = lcd_get_boot_info()->cptrs[0];
+	loops_per_jiffy = lcd_get_boot_info()->cptrs[1].cptr;
+
 	printk("ixgbe reg channel %lu\n", ixgbe_register_channel.cptr);
+	printk("ixgbe lpj %lu\n", loops_per_jiffy);
 	/*
 	 * Initialize ixgbe glue
 	 */

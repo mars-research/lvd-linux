@@ -92,7 +92,8 @@ static int boot_main(void)
 	}
 
 	lcd_to_boot_info(ixgbe_ctx)->cptrs[0] = ixgbe_chnl_domain_cptr;
-
+	/* for udelay calculatio we need lpj inside LCD */
+	lcd_to_boot_info(ixgbe_ctx)->cptrs[1].cptr = this_cpu_read(cpu_info.loops_per_jiffy);
 
 	/* ---------- RUN! ---------- */
 

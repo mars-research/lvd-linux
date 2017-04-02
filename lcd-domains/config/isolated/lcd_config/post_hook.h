@@ -222,9 +222,6 @@ static inline void force_up_write(void *x)
 #undef might_fault
 #define might_fault() do { } while(0)
 
-#undef msleep
-#define msleep(x) do { } while(0)
-
 /*
  * Copy to/from user
  */

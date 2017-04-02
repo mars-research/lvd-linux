@@ -297,8 +297,8 @@ int __must_check __pci_register_driver(struct pci_driver *drv,
 		LIBLCD_ERR("thc_ipc_call");
 		goto fail_ipc;
 	}
-	drv_container->other_ref.cptr = fipc_get_reg2(_response);
-	owner_container->other_ref.cptr = fipc_get_reg3(_response);
+	drv_container->other_ref.cptr = fipc_get_reg1(_response);
+	owner_container->other_ref.cptr = fipc_get_reg2(_response);
 	drv_container->pci_driver.driver.owner = &owner_container->module;
 	func_ret = fipc_get_reg3(_response);
 	fipc_recv_msg_end(thc_channel_to_fipc(ixgbe_async),
@@ -319,12 +319,25 @@ struct net_device *alloc_etherdev_mqs(int sizeof_priv,
 	struct fipc_message *_request;
 	struct fipc_message *_response;
 	struct net_device *func_ret;
-	func_ret_container = kzalloc(sizeof( struct net_device_container   ),
-		GFP_KERNEL);
-	if (!func_ret_container) {
+	unsigned int alloc_size = sizeof(struct net_device_container);
+	void *p;
+
+	if (sizeof_priv) {
+		/* ensure 32-byte alignment of private area */
+		alloc_size = ALIGN(alloc_size, NETDEV_ALIGN);
+		alloc_size += sizeof_priv;
+	}
+	/* ensure 32-byte alignment of whole construct */
+	alloc_size += NETDEV_ALIGN - 1;
+
+	p = kzalloc(alloc_size, GFP_KERNEL);
+	if (!p) {
 		LIBLCD_ERR("kzalloc");
 		goto fail_alloc;
 	}
+	func_ret_container = PTR_ALIGN(p, NETDEV_ALIGN);
+	func_ret = &func_ret_container->net_device;
+
 	ret = glue_cap_insert_net_device_type(c_cspace,
 		func_ret_container,
 		&func_ret_container->my_ref);
@@ -356,6 +369,12 @@ struct net_device *alloc_etherdev_mqs(int sizeof_priv,
 		goto fail_ipc;
 	}
 	func_ret_container->other_ref.cptr = fipc_get_reg1(_response);
+	func_ret->dev_addr = kzalloc(ETH_ALEN, GFP_KERNEL);
+
+	if (!func_ret->dev_addr) {
+		LIBLCD_ERR("dev_addr assignment failed");
+	}
+
 	fipc_recv_msg_end(thc_channel_to_fipc(ixgbe_async),
 			_response);
 	return func_ret;
@@ -385,6 +404,7 @@ int probe_callee(struct fipc_message *_request,
 	unsigned int res0_len;
 	void *dev_resource_0;
 #endif
+
 	LIBLCD_MSG("%s called", __func__);
 	request_cookie = thc_get_request_cookie(_request);
 
@@ -404,6 +424,9 @@ int probe_callee(struct fipc_message *_request,
 		LIBLCD_ERR("lcd insert");
 		goto fail_insert;
 	}
+	dev_container->pci_dev.dev.kobj.name = "ixgbe_lcd";
+	dev_container->pci_dev.vendor = 0x8086;
+	dev_container->pci_dev.device = 0x154D;
 #ifdef PCI_REGIONS
 	ret = lcd_cptr_alloc(&res0_cptr);
 	if (ret) {
@@ -493,6 +516,8 @@ void pci_unregister_driver(struct pci_driver *drv)
 			drv_container->my_ref);
 	fipc_recv_msg_end(thc_channel_to_fipc(ixgbe_async),
 			_response);
+
+	return;
 fail_async:
 fail_ipc:
         destroy_async_channel(ixgbe_async);
@@ -526,3 +551,1251 @@ int remove_callee(struct fipc_message *_request,
 	return ret;
 }
 
+int register_netdev(struct net_device *dev)
+{
+	struct net_device_container *dev_container;
+	int ret;
+	struct fipc_message *_request;
+	struct fipc_message *_response;
+	int func_ret;
+	dev_container = container_of(dev,
+		struct net_device_container,
+		net_device);
+	ret = async_msg_blocking_send_start(ixgbe_async,
+		&_request);
+	if (ret) {
+		LIBLCD_ERR("failed to get a send slot");
+		goto fail_async;
+	}
+	async_msg_set_fn_type(_request,
+			REGISTER_NETDEVICE);
+	fipc_set_reg0(_request,
+			dev_container->other_ref.cptr);
+	fipc_set_reg1(_request,
+			dev->flags);
+	fipc_set_reg2(_request,
+			dev->priv_flags);
+	fipc_set_reg3(_request,
+			dev->features);
+	fipc_set_reg4(_request,
+			dev->hw_features);
+	fipc_set_reg5(_request,
+			dev->hw_enc_features);
+	fipc_set_reg6(_request,
+			dev->mpls_features);
+	ret = thc_ipc_call(ixgbe_async,
+		_request,
+		&_response);
+	if (ret) {
+		LIBLCD_ERR("thc_ipc_call");
+		goto fail_ipc;
+	}
+	func_ret = fipc_get_reg1(_response);
+	fipc_recv_msg_end(thc_channel_to_fipc(ixgbe_async),
+			_response);
+	return func_ret;
+fail_async:
+fail_ipc:
+	return ret;
+}
+
+void ether_setup(struct net_device *dev)
+{
+	struct net_device_container *dev_container;
+	int ret;
+	struct fipc_message *_request;
+	struct fipc_message *_response;
+	dev_container = container_of(dev,
+		struct net_device_container,
+		net_device);
+	ret = async_msg_blocking_send_start(ixgbe_async,
+		&_request);
+	if (ret) {
+		LIBLCD_ERR("failed to get a send slot");
+		goto fail_async;
+	}
+	async_msg_set_fn_type(_request,
+			ETHER_SETUP);
+	fipc_set_reg1(_request,
+			dev_container->other_ref.cptr);
+	ret = thc_ipc_call(ixgbe_async,
+		_request,
+		&_response);
+	if (ret) {
+		LIBLCD_ERR("thc_ipc_call");
+		goto fail_ipc;
+	}
+	fipc_recv_msg_end(thc_channel_to_fipc(ixgbe_async),
+			_response);
+	return;
+fail_async:
+fail_ipc:
+	return;
+
+}
+
+int eth_mac_addr(struct net_device *dev,
+		void *p)
+{
+	struct net_device_container *dev_container;
+	int ret;
+	struct fipc_message *_request;
+	struct fipc_message *_response;
+	int sync_ret;
+	unsigned 	long p_mem_sz;
+	unsigned 	long p_offset;
+	cptr_t p_cptr;
+	unsigned 	int request_cookie;
+	int func_ret;
+	dev_container = container_of(dev,
+		struct net_device_container,
+		net_device);
+	ret = async_msg_blocking_send_start(ixgbe_async,
+		&_request);
+	if (ret) {
+		LIBLCD_ERR("failed to get a send slot");
+		goto fail_async;
+	}
+	async_msg_set_fn_type(_request,
+			ETH_MAC_ADDR);
+	fipc_set_reg1(_request,
+			dev_container->other_ref.cptr);
+	sync_ret = lcd_virt_to_cptr(__gva(( unsigned  long   )p),
+		&p_cptr,
+		&p_mem_sz,
+		&p_offset);
+	if (sync_ret) {
+		LIBLCD_ERR("virt to cptr failed");
+		lcd_exit(-1);
+	}
+	ret = thc_ipc_send_request(ixgbe_async,
+		_request,
+		&request_cookie);
+	if (ret) {
+		LIBLCD_ERR("thc_ipc_send_request");
+		goto fail_ipc;
+	}
+	lcd_set_r0(ilog2(( p_mem_sz ) >> ( PAGE_SHIFT )));
+	lcd_set_r1(p_offset);
+	lcd_set_cr0(p_cptr);
+	sync_ret = lcd_sync_send(sync_ep);
+	lcd_set_cr0(CAP_CPTR_NULL);
+	if (sync_ret) {
+		LIBLCD_ERR("failed to send");
+		lcd_exit(-1);
+	}
+	ret = thc_ipc_recv_response(ixgbe_async,
+		request_cookie,
+		&_response);
+	func_ret = fipc_get_reg1(_response);
+	fipc_recv_msg_end(thc_channel_to_fipc(ixgbe_async),
+			_response);
+	return func_ret;
+fail_async:
+fail_ipc:
+	return ret;
+}
+
+int eth_validate_addr(struct net_device *dev)
+{
+	struct net_device_container *dev_container;
+	int ret;
+	struct fipc_message *_request;
+	struct fipc_message *_response;
+	int func_ret;
+	dev_container = container_of(dev,
+		struct net_device_container,
+		net_device);
+	ret = async_msg_blocking_send_start(ixgbe_async,
+		&_request);
+	if (ret) {
+		LIBLCD_ERR("failed to get a send slot");
+		goto fail_async;
+	}
+	async_msg_set_fn_type(_request,
+			ETH_VALIDATE_ADDR);
+	fipc_set_reg1(_request,
+			dev_container->other_ref.cptr);
+	ret = thc_ipc_call(ixgbe_async,
+		_request,
+		&_response);
+	if (ret) {
+		LIBLCD_ERR("thc_ipc_call");
+		goto fail_ipc;
+	}
+	func_ret = fipc_get_reg1(_response);
+	fipc_recv_msg_end(thc_channel_to_fipc(ixgbe_async),
+			_response);
+	return func_ret;
+fail_async:
+fail_ipc:
+	return ret;
+}
+
+void free_netdev(struct net_device *dev)
+{
+	struct net_device_container *dev_container;
+	int ret;
+	struct fipc_message *_request;
+	struct fipc_message *_response;
+	dev_container = container_of(dev,
+		struct net_device_container,
+		net_device);
+	ret = async_msg_blocking_send_start(ixgbe_async,
+		&_request);
+	if (ret) {
+		LIBLCD_ERR("failed to get a send slot");
+		goto fail_async;
+	}
+	async_msg_set_fn_type(_request,
+			FREE_NETDEV);
+	fipc_set_reg1(_request,
+			dev_container->other_ref.cptr);
+	ret = thc_ipc_call(ixgbe_async,
+		_request,
+		&_response);
+	if (ret) {
+		LIBLCD_ERR("thc_ipc_call");
+		goto fail_ipc;
+	}
+	fipc_recv_msg_end(thc_channel_to_fipc(ixgbe_async),
+			_response);
+	return;
+fail_async:
+fail_ipc:
+	return;
+}
+
+void netif_carrier_off(struct net_device *dev)
+{
+	struct net_device_container *dev_container;
+	int ret;
+	struct fipc_message *_request;
+	struct fipc_message *_response;
+	dev_container = container_of(dev,
+		struct net_device_container,
+		net_device);
+	ret = async_msg_blocking_send_start(ixgbe_async,
+		&_request);
+	if (ret) {
+		LIBLCD_ERR("failed to get a send slot");
+		goto fail_async;
+	}
+	async_msg_set_fn_type(_request,
+			NETIF_CARRIER_OFF);
+	fipc_set_reg1(_request,
+			dev_container->other_ref.cptr);
+	ret = thc_ipc_call(ixgbe_async,
+		_request,
+		&_response);
+	if (ret) {
+		LIBLCD_ERR("thc_ipc_call");
+		goto fail_ipc;
+	}
+	fipc_recv_msg_end(thc_channel_to_fipc(ixgbe_async),
+			_response);
+	return;
+fail_async:
+fail_ipc:
+	return;
+
+}
+
+void netif_carrier_on(struct net_device *dev)
+{
+	struct net_device_container *dev_container;
+	int ret;
+	struct fipc_message *_request;
+	struct fipc_message *_response;
+	dev_container = container_of(dev,
+		struct net_device_container,
+		net_device);
+	ret = async_msg_blocking_send_start(ixgbe_async,
+		&_request);
+	if (ret) {
+		LIBLCD_ERR("failed to get a send slot");
+		goto fail_async;
+	}
+	async_msg_set_fn_type(_request,
+			NETIF_CARRIER_ON);
+	fipc_set_reg1(_request,
+			dev_container->other_ref.cptr);
+	ret = thc_ipc_call(ixgbe_async,
+		_request,
+		&_response);
+	if (ret) {
+		LIBLCD_ERR("thc_ipc_call");
+		goto fail_ipc;
+	}
+	fipc_recv_msg_end(thc_channel_to_fipc(ixgbe_async),
+			_response);
+	return;
+fail_async:
+fail_ipc:
+	return;
+
+}
+
+void netif_device_attach(struct net_device *dev)
+{
+	int ret;
+	struct fipc_message *_request;
+	struct fipc_message *_response;
+	ret = async_msg_blocking_send_start(ixgbe_async,
+		&_request);
+	if (ret) {
+		LIBLCD_ERR("failed to get a send slot");
+		goto fail_async;
+	}
+	async_msg_set_fn_type(_request,
+			NETIF_DEVICE_ATTACH);
+	ret = thc_ipc_call(ixgbe_async,
+		_request,
+		&_response);
+	if (ret) {
+		LIBLCD_ERR("thc_ipc_call");
+		goto fail_ipc;
+	}
+	fipc_recv_msg_end(thc_channel_to_fipc(ixgbe_async),
+			_response);
+	return;
+fail_async:
+fail_ipc:
+	return;
+
+}
+
+void netif_device_detach(struct net_device *dev)
+{
+	int ret;
+	struct fipc_message *_request;
+	struct fipc_message *_response;
+	ret = async_msg_blocking_send_start(ixgbe_async,
+		&_request);
+	if (ret) {
+		LIBLCD_ERR("failed to get a send slot");
+		goto fail_async;
+	}
+	async_msg_set_fn_type(_request,
+			NETIF_DEVICE_DETACH);
+	ret = thc_ipc_call(ixgbe_async,
+		_request,
+		&_response);
+	if (ret) {
+		LIBLCD_ERR("thc_ipc_call");
+		goto fail_ipc;
+	}
+	fipc_recv_msg_end(thc_channel_to_fipc(ixgbe_async),
+			_response);
+	return;
+fail_async:
+fail_ipc:
+	return;
+
+}
+
+int netif_set_real_num_rx_queues(struct net_device *dev,
+		unsigned int rxq)
+{
+	int ret;
+	struct fipc_message *_request;
+	struct fipc_message *_response;
+	int func_ret;
+	ret = async_msg_blocking_send_start(ixgbe_async,
+		&_request);
+	if (ret) {
+		LIBLCD_ERR("failed to get a send slot");
+		goto fail_async;
+	}
+	async_msg_set_fn_type(_request,
+			NETIF_SET_REAL_NUM_RX_QUEUES);
+	fipc_set_reg1(_request,
+			rxq);
+	ret = thc_ipc_call(ixgbe_async,
+		_request,
+		&_response);
+	if (ret) {
+		LIBLCD_ERR("thc_ipc_call");
+		goto fail_ipc;
+	}
+	func_ret = fipc_get_reg1(_response);
+	fipc_recv_msg_end(thc_channel_to_fipc(ixgbe_async),
+			_response);
+	return func_ret;
+fail_async:
+fail_ipc:
+	return ret;
+
+}
+
+int netif_set_real_num_tx_queues(struct net_device *dev,
+		unsigned int txq)
+{
+	int ret;
+	struct fipc_message *_request;
+	struct fipc_message *_response;
+	int func_ret;
+	ret = async_msg_blocking_send_start(ixgbe_async,
+		&_request);
+	if (ret) {
+		LIBLCD_ERR("failed to get a send slot");
+		goto fail_async;
+	}
+	async_msg_set_fn_type(_request,
+			NETIF_SET_REAL_NUM_TX_QUEUES);
+	fipc_set_reg1(_request,
+			txq);
+	ret = thc_ipc_call(ixgbe_async,
+		_request,
+		&_response);
+	if (ret) {
+		LIBLCD_ERR("thc_ipc_call");
+		goto fail_ipc;
+	}
+	func_ret = fipc_get_reg1(_response);
+	fipc_recv_msg_end(thc_channel_to_fipc(ixgbe_async),
+			_response);
+	return func_ret;
+fail_async:
+fail_ipc:
+	return ret;
+}
+
+void consume_skb(struct sk_buff *skb)
+{
+	int ret;
+	struct fipc_message *_request;
+	struct fipc_message *_response;
+	ret = async_msg_blocking_send_start(ixgbe_async,
+		&_request);
+	if (ret) {
+		LIBLCD_ERR("failed to get a send slot");
+		goto fail_async;
+	}
+	async_msg_set_fn_type(_request,
+			CONSUME_SKB);
+	ret = thc_ipc_call(ixgbe_async,
+		_request,
+		&_response);
+	if (ret) {
+		LIBLCD_ERR("thc_ipc_call");
+		goto fail_ipc;
+	}
+	fipc_recv_msg_end(thc_channel_to_fipc(ixgbe_async),
+			_response);
+	return;
+fail_async:
+fail_ipc:
+	return;
+
+}
+
+void unregister_netdev(struct net_device *dev)
+{
+	int ret;
+	struct fipc_message *_request;
+	struct fipc_message *_response;
+	struct net_device_container *dev_container;
+
+	ret = async_msg_blocking_send_start(ixgbe_async,
+		&_request);
+	if (ret) {
+		LIBLCD_ERR("failed to get a send slot");
+		goto fail_async;
+	}
+	dev_container = container_of(dev,
+		struct net_device_container,
+		net_device);
+
+	async_msg_set_fn_type(_request,
+			UNREGISTER_NETDEV);
+	fipc_set_reg0(_request,
+			dev_container->other_ref.cptr);
+	ret = thc_ipc_call(ixgbe_async,
+		_request,
+		&_response);
+	if (ret) {
+		LIBLCD_ERR("thc_ipc_call");
+		goto fail_ipc;
+	}
+	fipc_recv_msg_end(thc_channel_to_fipc(ixgbe_async),
+			_response);
+	return;
+fail_async:
+fail_ipc:
+	return;
+
+}
+
+int eth_platform_get_mac_address(struct device *dev,
+		u8 *mac_addr)
+{
+	int ret;
+	struct fipc_message *_request;
+	struct fipc_message *_response;
+	int func_ret;
+	int i;
+	union mac {
+		u8 mac_addr[ETH_ALEN];
+		unsigned long mac_addr_l;
+	} m = { {0} };
+
+	ret = async_msg_blocking_send_start(ixgbe_async,
+		&_request);
+	if (ret) {
+		LIBLCD_ERR("failed to get a send slot");
+		goto fail_async;
+	}
+	async_msg_set_fn_type(_request,
+			ETH_PLATFORM_GET_MAC_ADDRESS);
+
+	ret = thc_ipc_call(ixgbe_async,
+		_request,
+		&_response);
+	if (ret) {
+		LIBLCD_ERR("thc_ipc_call");
+		goto fail_ipc;
+	}
+	func_ret = fipc_get_reg1(_response);
+
+	if (!func_ret) {
+		m.mac_addr_l = fipc_get_reg2(_response);
+		memcpy(mac_addr, m.mac_addr, ETH_ALEN);
+		for (i = 0; i < ETH_ALEN; i++) {
+			printk("%02X:", m.mac_addr[i]);
+		}
+		LIBLCD_MSG("\n%s, got 0x%06lX", __func__, m.mac_addr_l);
+	}
+
+	fipc_recv_msg_end(thc_channel_to_fipc(ixgbe_async),
+			_response);
+	return func_ret;
+fail_async:
+fail_ipc:
+	return ret;
+}
+
+int dev_addr_del(struct net_device *dev,
+		const unsigned char *addr,
+		unsigned char addr_type)
+{
+	int ret;
+	struct fipc_message *_request;
+	struct fipc_message *_response;
+	int sync_ret;
+	unsigned 	long addr_mem_sz;
+	unsigned 	long addr_offset;
+	cptr_t addr_cptr;
+	unsigned 	int request_cookie;
+	int func_ret;
+	ret = async_msg_blocking_send_start(ixgbe_async,
+		&_request);
+	if (ret) {
+		LIBLCD_ERR("failed to get a send slot");
+		goto fail_async;
+	}
+	async_msg_set_fn_type(_request,
+			DEV_ADDR_DEL);
+	sync_ret = lcd_virt_to_cptr(__gva(( unsigned  long   )addr),
+		&addr_cptr,
+		&addr_mem_sz,
+		&addr_offset);
+	if (sync_ret) {
+		LIBLCD_ERR("virt to cptr failed");
+		lcd_exit(-1);
+	}
+	fipc_set_reg1(_request,
+			addr_type);
+	ret = thc_ipc_send_request(ixgbe_async,
+		_request,
+		&request_cookie);
+	if (ret) {
+		LIBLCD_ERR("thc_ipc_send_request");
+		goto fail_ipc;
+	}
+	lcd_set_r0(ilog2(( addr_mem_sz ) >> ( PAGE_SHIFT )));
+	lcd_set_r1(addr_offset);
+	lcd_set_cr0(addr_cptr);
+	sync_ret = lcd_sync_send(sync_ep);
+	lcd_set_cr0(CAP_CPTR_NULL);
+	if (sync_ret) {
+		LIBLCD_ERR("failed to send");
+		lcd_exit(-1);
+	}
+	ret = thc_ipc_recv_response(ixgbe_async,
+		request_cookie,
+		&_response);
+	func_ret = fipc_get_reg1(_response);
+	fipc_recv_msg_end(thc_channel_to_fipc(ixgbe_async),
+			_response);
+	return func_ret;
+fail_async:
+fail_ipc:
+	return ret;
+
+}
+
+int device_set_wakeup_enable(struct device *dev,
+		bool enable)
+{
+	int ret;
+	struct fipc_message *_request;
+	struct fipc_message *_response;
+	int func_ret;
+	ret = async_msg_blocking_send_start(ixgbe_async,
+		&_request);
+	if (ret) {
+		LIBLCD_ERR("failed to get a send slot");
+		goto fail_async;
+	}
+	async_msg_set_fn_type(_request,
+			DEVICE_SET_WAKEUP_ENABLE);
+	fipc_set_reg1(_request,
+			enable);
+	ret = thc_ipc_call(ixgbe_async,
+		_request,
+		&_response);
+	if (ret) {
+		LIBLCD_ERR("thc_ipc_call");
+		goto fail_ipc;
+	}
+	func_ret = fipc_get_reg1(_response);
+	fipc_recv_msg_end(thc_channel_to_fipc(ixgbe_async),
+			_response);
+	return func_ret;
+fail_async:
+fail_ipc:
+	return ret;
+}
+
+unsigned int eth_get_headlen(void *data,
+		unsigned int len)
+{
+	int ret;
+	struct fipc_message *_request;
+	struct fipc_message *_response;
+	int sync_ret;
+	unsigned 	long data_mem_sz;
+	unsigned 	long data_offset;
+	cptr_t data_cptr;
+	unsigned 	int request_cookie;
+	unsigned 	int func_ret;
+	ret = async_msg_blocking_send_start(ixgbe_async,
+		&_request);
+	if (ret) {
+		LIBLCD_ERR("failed to get a send slot");
+		goto fail_async;
+	}
+	async_msg_set_fn_type(_request,
+			ETH_GET_HEADLEN);
+	sync_ret = lcd_virt_to_cptr(__gva(( unsigned  long   )data),
+		&data_cptr,
+		&data_mem_sz,
+		&data_offset);
+	if (sync_ret) {
+		LIBLCD_ERR("virt to cptr failed");
+		lcd_exit(-1);
+	}
+	fipc_set_reg1(_request,
+			len);
+	ret = thc_ipc_send_request(ixgbe_async,
+		_request,
+		&request_cookie);
+	if (ret) {
+		LIBLCD_ERR("thc_ipc_send_request");
+		goto fail_ipc;
+	}
+	lcd_set_r0(ilog2(( data_mem_sz ) >> ( PAGE_SHIFT )));
+	lcd_set_r1(data_offset);
+	lcd_set_cr0(data_cptr);
+	sync_ret = lcd_sync_send(sync_ep);
+	lcd_set_cr0(CAP_CPTR_NULL);
+	if (sync_ret) {
+		LIBLCD_ERR("failed to send");
+		lcd_exit(-1);
+	}
+	ret = thc_ipc_recv_response(ixgbe_async,
+		request_cookie,
+		&_response);
+	func_ret = fipc_get_reg1(_response);
+	fipc_recv_msg_end(thc_channel_to_fipc(ixgbe_async),
+			_response);
+	return func_ret;
+fail_async:
+fail_ipc:
+	return ret;
+}
+
+void netif_tx_stop_all_queues(struct net_device *dev)
+{
+	int ret;
+	struct fipc_message *_request;
+	struct fipc_message *_response;
+	struct net_device_container *dev_container;
+	ret = async_msg_blocking_send_start(ixgbe_async,
+		&_request);
+	if (ret) {
+		LIBLCD_ERR("failed to get a send slot");
+		goto fail_async;
+	}
+
+	dev_container = container_of(dev,
+		struct net_device_container,
+		net_device);
+	async_msg_set_fn_type(_request,
+			NETIF_TX_STOP_ALL_QUEUES);
+
+	fipc_set_reg0(_request,
+			dev_container->other_ref.cptr);
+	ret = thc_ipc_call(ixgbe_async,
+		_request,
+		&_response);
+	if (ret) {
+		LIBLCD_ERR("thc_ipc_call");
+		goto fail_ipc;
+	}
+	fipc_recv_msg_end(thc_channel_to_fipc(ixgbe_async),
+			_response);
+	return;
+fail_async:
+fail_ipc:
+	return;
+}
+
+
+int pci_disable_pcie_error_reporting(struct pci_dev *dev)
+{
+	int ret;
+	struct fipc_message *_request;
+	struct fipc_message *_response;
+	int func_ret;
+	ret = async_msg_blocking_send_start(ixgbe_async,
+		&_request);
+	if (ret) {
+		LIBLCD_ERR("failed to get a send slot");
+		goto fail_async;
+	}
+	async_msg_set_fn_type(_request,
+			PCI_DISABLE_PCIE_ERROR_REPORTING);
+	ret = thc_ipc_call(ixgbe_async,
+		_request,
+		&_response);
+	if (ret) {
+		LIBLCD_ERR("thc_ipc_call");
+		goto fail_ipc;
+	}
+	func_ret = fipc_get_reg1(_response);
+	fipc_recv_msg_end(thc_channel_to_fipc(ixgbe_async),
+			_response);
+	return func_ret;
+fail_async:
+fail_ipc:
+	return ret;
+}
+
+int pci_bus_read_config_word(struct pci_bus *bus,
+		unsigned int devfn,
+		int where,
+		unsigned short *val)
+{
+	int ret;
+	struct fipc_message *_request;
+	struct fipc_message *_response;
+	int func_ret;
+	ret = async_msg_blocking_send_start(ixgbe_async,
+		&_request);
+	if (ret) {
+		LIBLCD_ERR("failed to get a send slot");
+		goto fail_async;
+	}
+	async_msg_set_fn_type(_request,
+			PCI_BUS_READ_CONFIG_WORD);
+	fipc_set_reg1(_request,
+			devfn);
+	fipc_set_reg2(_request,
+			where);
+	ret = thc_ipc_call(ixgbe_async,
+		_request,
+		&_response);
+	if (ret) {
+		LIBLCD_ERR("thc_ipc_call");
+		goto fail_ipc;
+	}
+	*val = fipc_get_reg1(_response);
+	func_ret = fipc_get_reg2(_response);
+	fipc_recv_msg_end(thc_channel_to_fipc(ixgbe_async),
+			_response);
+	return func_ret;
+fail_async:
+fail_ipc:
+	return ret;
+
+}
+
+int pci_bus_write_config_word(struct pci_bus *bus,
+		unsigned int devfn,
+		int where,
+		unsigned short val)
+{
+	struct pci_bus_container *bus_container;
+	int ret;
+	struct fipc_message *_request;
+	struct fipc_message *_response;
+	int func_ret;
+	bus_container = container_of(bus,
+		struct pci_bus_container,
+		pci_bus);
+	ret = async_msg_blocking_send_start(ixgbe_async,
+		&_request);
+	if (ret) {
+		LIBLCD_ERR("failed to get a send slot");
+		goto fail_async;
+	}
+	async_msg_set_fn_type(_request,
+			PCI_BUS_WRITE_CONFIG_WORD);
+	fipc_set_reg1(_request,
+			bus_container->other_ref.cptr);
+	fipc_set_reg3(_request,
+			devfn);
+	fipc_set_reg4(_request,
+			where);
+	fipc_set_reg5(_request,
+			val);
+	ret = thc_ipc_call(ixgbe_async,
+		_request,
+		&_response);
+	if (ret) {
+		LIBLCD_ERR("thc_ipc_call");
+		goto fail_ipc;
+	}
+	func_ret = fipc_get_reg1(_response);
+	fipc_recv_msg_end(thc_channel_to_fipc(ixgbe_async),
+			_response);
+	return func_ret;
+fail_async:
+fail_ipc:
+	return ret;
+
+}
+
+int pci_cleanup_aer_uncorrect_error_status(struct pci_dev *dev)
+{
+	int ret;
+	struct fipc_message *_request;
+	struct fipc_message *_response;
+	int func_ret;
+	ret = async_msg_blocking_send_start(ixgbe_async,
+		&_request);
+	if (ret) {
+		LIBLCD_ERR("failed to get a send slot");
+		goto fail_async;
+	}
+	async_msg_set_fn_type(_request,
+			PCI_CLEANUP_AER_UNCORRECT_ERROR_STATUS);
+	ret = thc_ipc_call(ixgbe_async,
+		_request,
+		&_response);
+	if (ret) {
+		LIBLCD_ERR("thc_ipc_call");
+		goto fail_ipc;
+	}
+	func_ret = fipc_get_reg1(_response);
+	fipc_recv_msg_end(thc_channel_to_fipc(ixgbe_async),
+			_response);
+	return func_ret;
+fail_async:
+fail_ipc:
+	return ret;
+
+}
+
+void pci_disable_device(struct pci_dev *dev)
+{
+	int ret;
+	struct fipc_message *_request;
+	struct fipc_message *_response;
+	ret = async_msg_blocking_send_start(ixgbe_async,
+		&_request);
+	if (ret) {
+		LIBLCD_ERR("failed to get a send slot");
+		goto fail_async;
+	}
+	async_msg_set_fn_type(_request,
+			PCI_DISABLE_DEVICE);
+	ret = thc_ipc_call(ixgbe_async,
+		_request,
+		&_response);
+	if (ret) {
+		LIBLCD_ERR("thc_ipc_call");
+		goto fail_ipc;
+	}
+	fipc_recv_msg_end(thc_channel_to_fipc(ixgbe_async),
+			_response);
+	return;
+fail_async:
+fail_ipc:
+	return;
+}
+
+int pci_enable_pcie_error_reporting(struct pci_dev *dev)
+{
+	int ret;
+	struct fipc_message *_request;
+	struct fipc_message *_response;
+	int func_ret;
+	ret = async_msg_blocking_send_start(ixgbe_async,
+		&_request);
+	if (ret) {
+		LIBLCD_ERR("failed to get a send slot");
+		goto fail_async;
+	}
+	async_msg_set_fn_type(_request,
+			PCI_ENABLE_PCIE_ERROR_REPORTING);
+	ret = thc_ipc_call(ixgbe_async,
+		_request,
+		&_response);
+	if (ret) {
+		LIBLCD_ERR("thc_ipc_call");
+		goto fail_ipc;
+	}
+	func_ret = fipc_get_reg1(_response);
+	fipc_recv_msg_end(thc_channel_to_fipc(ixgbe_async),
+			_response);
+	return func_ret;
+fail_async:
+fail_ipc:
+	return ret;
+
+}
+
+int pcie_capability_read_word(struct pci_dev *dev,
+		int pos,
+		unsigned short *val)
+{
+	int ret;
+	struct fipc_message *_request;
+	struct fipc_message *_response;
+	int func_ret;
+	ret = async_msg_blocking_send_start(ixgbe_async,
+		&_request);
+	if (ret) {
+		LIBLCD_ERR("failed to get a send slot");
+		goto fail_async;
+	}
+	async_msg_set_fn_type(_request,
+			PCIE_CAPABILITY_READ_WORD);
+	fipc_set_reg1(_request,
+			pos);
+	ret = thc_ipc_call(ixgbe_async,
+		_request,
+		&_response);
+	if (ret) {
+		LIBLCD_ERR("thc_ipc_call");
+		goto fail_ipc;
+	}
+	func_ret = fipc_get_reg1(_response);
+	fipc_recv_msg_end(thc_channel_to_fipc(ixgbe_async),
+			_response);
+	return func_ret;
+fail_async:
+fail_ipc:
+	return ret;
+
+}
+
+int pcie_get_minimum_link(struct pci_dev *dev,
+		enum pci_bus_speed *speed,
+		enum pcie_link_width *width)
+{
+	int ret;
+	struct fipc_message *_request;
+	struct fipc_message *_response;
+	int func_ret;
+	ret = async_msg_blocking_send_start(ixgbe_async,
+		&_request);
+	if (ret) {
+		LIBLCD_ERR("failed to get a send slot");
+		goto fail_async;
+	}
+	async_msg_set_fn_type(_request,
+			PCIE_GET_MINIMUM_LINK);
+	fipc_set_reg1(_request,
+			*speed);
+	fipc_set_reg2(_request,
+			*width);
+	ret = thc_ipc_call(ixgbe_async,
+		_request,
+		&_response);
+	if (ret) {
+		LIBLCD_ERR("thc_ipc_call");
+		goto fail_ipc;
+	}
+	func_ret = fipc_get_reg1(_response);
+	fipc_recv_msg_end(thc_channel_to_fipc(ixgbe_async),
+			_response);
+	return func_ret;
+fail_async:
+fail_ipc:
+	return ret;
+
+}
+
+int pci_enable_device_mem(struct pci_dev *dev)
+{
+	int ret;
+	struct fipc_message *_request;
+	struct fipc_message *_response;
+	int func_ret;
+	ret = async_msg_blocking_send_start(ixgbe_async,
+		&_request);
+	if (ret) {
+		LIBLCD_ERR("failed to get a send slot");
+		goto fail_async;
+	}
+	async_msg_set_fn_type(_request,
+			PCI_ENABLE_DEVICE_MEM);
+	ret = thc_ipc_call(ixgbe_async,
+		_request,
+		&_response);
+	if (ret) {
+		LIBLCD_ERR("thc_ipc_call");
+		goto fail_ipc;
+	}
+	func_ret = fipc_get_reg1(_response);
+	fipc_recv_msg_end(thc_channel_to_fipc(ixgbe_async),
+			_response);
+	return func_ret;
+fail_async:
+fail_ipc:
+	return ret;
+
+}
+
+int pci_request_selected_regions(struct pci_dev *dev,
+		int type,
+		const char *reg)
+{
+	int ret;
+	struct fipc_message *_request;
+	struct fipc_message *_response;
+	int func_ret;
+	ret = async_msg_blocking_send_start(ixgbe_async,
+		&_request);
+	if (ret) {
+		LIBLCD_ERR("failed to get a send slot");
+		goto fail_async;
+	}
+	async_msg_set_fn_type(_request,
+			PCI_REQUEST_SELECTED_REGIONS);
+	fipc_set_reg1(_request,
+			type);
+	ret = thc_ipc_call(ixgbe_async,
+		_request,
+		&_response);
+	if (ret) {
+		LIBLCD_ERR("thc_ipc_call");
+		goto fail_ipc;
+	}
+	func_ret = fipc_get_reg1(_response);
+	fipc_recv_msg_end(thc_channel_to_fipc(ixgbe_async),
+			_response);
+	return func_ret;
+fail_async:
+fail_ipc:
+	return ret;
+}
+
+int pci_request_selected_regions_exclusive(struct pci_dev *dev,
+		int type,
+		const char *reg)
+{
+	int ret;
+	struct fipc_message *_request;
+	struct fipc_message *_response;
+	int func_ret;
+	ret = async_msg_blocking_send_start(ixgbe_async,
+		&_request);
+	if (ret) {
+		LIBLCD_ERR("failed to get a send slot");
+		goto fail_async;
+	}
+	async_msg_set_fn_type(_request,
+			PCI_REQUEST_SELECTED_REGIONS_EXCLUSIVE);
+	fipc_set_reg1(_request,
+			type);
+	ret = thc_ipc_call(ixgbe_async,
+		_request,
+		&_response);
+	if (ret) {
+		LIBLCD_ERR("thc_ipc_call");
+		goto fail_ipc;
+	}
+	func_ret = fipc_get_reg1(_response);
+	fipc_recv_msg_end(thc_channel_to_fipc(ixgbe_async),
+			_response);
+	return func_ret;
+fail_async:
+fail_ipc:
+	return ret;
+
+}
+
+void pci_set_master(struct pci_dev *dev)
+{
+	int ret;
+	struct fipc_message *_request;
+	struct fipc_message *_response;
+	ret = async_msg_blocking_send_start(ixgbe_async,
+		&_request);
+	if (ret) {
+		LIBLCD_ERR("failed to get a send slot");
+		goto fail_async;
+	}
+	async_msg_set_fn_type(_request,
+			PCI_SET_MASTER);
+	ret = thc_ipc_call(ixgbe_async,
+		_request,
+		&_response);
+	if (ret) {
+		LIBLCD_ERR("thc_ipc_call");
+		goto fail_ipc;
+	}
+	fipc_recv_msg_end(thc_channel_to_fipc(ixgbe_async),
+			_response);
+	return;
+fail_async:
+fail_ipc:
+	return;
+
+}
+
+int pci_save_state(struct pci_dev *dev)
+{
+	int ret;
+	struct fipc_message *_request;
+	struct fipc_message *_response;
+	int func_ret;
+	ret = async_msg_blocking_send_start(ixgbe_async,
+		&_request);
+	if (ret) {
+		LIBLCD_ERR("failed to get a send slot");
+		goto fail_async;
+	}
+	async_msg_set_fn_type(_request,
+			PCI_SAVE_STATE);
+	ret = thc_ipc_call(ixgbe_async,
+		_request,
+		&_response);
+	if (ret) {
+		LIBLCD_ERR("thc_ipc_call");
+		goto fail_ipc;
+	}
+	func_ret = fipc_get_reg1(_response);
+	fipc_recv_msg_end(thc_channel_to_fipc(ixgbe_async),
+			_response);
+	return func_ret;
+fail_async:
+fail_ipc:
+	return ret;
+
+}
+
+void pci_release_selected_regions(struct pci_dev *dev,
+		int r)
+{
+	int ret;
+	struct fipc_message *_request;
+	struct fipc_message *_response;
+	ret = async_msg_blocking_send_start(ixgbe_async,
+		&_request);
+	if (ret) {
+		LIBLCD_ERR("failed to get a send slot");
+		goto fail_async;
+	}
+	async_msg_set_fn_type(_request,
+			PCI_RELEASE_SELECTED_REGIONS);
+	fipc_set_reg1(_request,
+			r);
+	ret = thc_ipc_call(ixgbe_async,
+		_request,
+		&_response);
+	if (ret) {
+		LIBLCD_ERR("thc_ipc_call");
+		goto fail_ipc;
+	}
+	fipc_recv_msg_end(thc_channel_to_fipc(ixgbe_async),
+			_response);
+	return;
+fail_async:
+fail_ipc:
+	return;
+
+}
+
+int pci_select_bars(struct pci_dev *dev,
+		unsigned long flags)
+{
+	int ret;
+	struct fipc_message *_request;
+	struct fipc_message *_response;
+	int func_ret;
+	ret = async_msg_blocking_send_start(ixgbe_async,
+		&_request);
+	if (ret) {
+		LIBLCD_ERR("failed to get a send slot");
+		goto fail_async;
+	}
+	async_msg_set_fn_type(_request,
+			PCI_SELECT_BARS);
+	fipc_set_reg1(_request,
+			flags);
+	ret = thc_ipc_call(ixgbe_async,
+		_request,
+		&_response);
+	if (ret) {
+		LIBLCD_ERR("thc_ipc_call");
+		goto fail_ipc;
+	}
+	func_ret = fipc_get_reg1(_response);
+	fipc_recv_msg_end(thc_channel_to_fipc(ixgbe_async),
+			_response);
+	return func_ret;
+fail_async:
+fail_ipc:
+	return func_ret;
+
+}
+
+int pci_wake_from_d3(struct pci_dev *dev,
+		bool enable)
+{
+	int ret;
+	struct fipc_message *_request;
+	struct fipc_message *_response;
+	int func_ret;
+	ret = async_msg_blocking_send_start(ixgbe_async,
+		&_request);
+	if (ret) {
+		LIBLCD_ERR("failed to get a send slot");
+		goto fail_async;
+	}
+	async_msg_set_fn_type(_request,
+			PCI_WAKE_FROM_D3);
+	fipc_set_reg1(_request,
+			enable);
+	ret = thc_ipc_call(ixgbe_async,
+		_request,
+		&_response);
+	if (ret) {
+		LIBLCD_ERR("thc_ipc_call");
+		goto fail_ipc;
+	}
+	func_ret = fipc_get_reg1(_response);
+	fipc_recv_msg_end(thc_channel_to_fipc(ixgbe_async),
+			_response);
+	return func_ret;
+fail_async:
+fail_ipc:
+	return func_ret;
+
+}

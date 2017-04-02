@@ -5,6 +5,8 @@
 #include <liblcd/sync_ipc_poll.h>
 #include <liblcd/glue_cspace.h>
 #include <liblcd/trampoline.h>
+#include <linux/aer.h>
+
 #include "../../ixgbe_common.h"
 #include "../ixgbe_callee.h"
 
@@ -29,6 +31,8 @@ static const struct pci_device_id ixgbe_pci_tbl[] = {
 	{PCI_VDEVICE(INTEL, IXGBE_DEV_ID_82599_SFP_SF2) },
 	{ 0 } /* sentinel */
 };
+
+struct pci_dev *g_pdev = NULL;
 
 int glue_ixgbe_init(void)
 {
@@ -389,7 +393,7 @@ int alloc_etherdev_mqs_callee(struct fipc_message *_request,
 		return -EIO;
 	}
 	fipc_set_reg1(_response,
-			func_ret_container->other_ref.cptr);
+			func_ret_container->my_ref.cptr);
 	thc_ipc_reply(_channel,
 			request_cookie,
 			_response);
@@ -458,6 +462,9 @@ int probe(struct pci_dev *dev,
 	cptr_t res0_cptr;
 	unsigned int res0_len;
 #endif
+	/* assign pdev to a global instance */
+	g_pdev = dev;
+
 	if (!current->ptstate) {
 		dump_stack();
 		LIBLCD_MSG("Calling from a non-LCD context! creating thc runtime!");
@@ -477,6 +484,7 @@ int probe(struct pci_dev *dev,
 		LIBLCD_ERR("kzalloc");
 		goto fail_alloc;
 	}
+
 	ret = glue_cap_insert_pci_dev_type(hidden_args->cspace,
 		dev_container,
 		&dev_container->my_ref);
@@ -570,6 +578,10 @@ int pci_unregister_driver_callee(struct fipc_message *_request,
 	struct trampoline_hidden_args *drv_probe_hidden_args;
 
 	request_cookie = thc_get_request_cookie(_request);
+
+	fipc_recv_msg_end(thc_channel_to_fipc(_channel),
+			_request);
+
 	ret = glue_cap_lookup_pci_driver_type(cspace,
 		__cptr(fipc_get_reg2(_request)),
 		&drv_container);
@@ -577,10 +589,12 @@ int pci_unregister_driver_callee(struct fipc_message *_request,
 		LIBLCD_ERR("lookup");
 		goto fail_lookup;
 	}
-	fipc_recv_msg_end(thc_channel_to_fipc(_channel),
-			_request);
+
+	LIBLCD_MSG("Calling pci_unregister_driver");
 
 	pci_unregister_driver(( &drv_container->pci_driver ));
+
+	LIBLCD_MSG("Called pci_unregister_driver");
 	glue_cap_remove(c_cspace,
 			drv_container->my_ref);
 
@@ -683,3 +697,1209 @@ fail_ipc:
 	return;
 }
 
+int register_netdev_callee(struct fipc_message *_request,
+		struct thc_channel *_channel,
+		struct glue_cspace *cspace,
+		struct cptr sync_ep)
+{
+	struct net_device_container *dev_container;
+	struct net_device *dev;
+	int ret;
+	struct fipc_message *_response;
+	unsigned 	int request_cookie;
+	int func_ret;
+	request_cookie = thc_get_request_cookie(_request);
+	ret = glue_cap_lookup_net_device_type(cspace,
+		__cptr(fipc_get_reg0(_request)),
+		&dev_container);
+	if (ret) {
+		LIBLCD_ERR("lookup");
+		goto fail_lookup;
+	}
+	fipc_recv_msg_end(thc_channel_to_fipc(_channel),
+			_request);
+	dev = &dev_container->net_device;
+	dev->flags = fipc_get_reg1(_request);
+	dev->priv_flags = fipc_get_reg2(_request);
+	dev->features = fipc_get_reg3(_request);
+	dev->hw_features = fipc_get_reg4(_request);
+	dev->hw_enc_features = fipc_get_reg5(_request);
+	dev->mpls_features = fipc_get_reg6(_request);
+	func_ret = register_netdev(( &dev_container->net_device ));
+	if (async_msg_blocking_send_start(_channel,
+		&_response)) {
+		LIBLCD_ERR("error getting response msg");
+		return -EIO;
+	}
+	fipc_set_reg1(_response,
+			func_ret);
+	thc_ipc_reply(_channel,
+			request_cookie,
+			_response);
+
+fail_lookup:
+	return ret;
+}
+
+int ether_setup_callee(struct fipc_message *_request,
+		struct thc_channel *_channel,
+		struct glue_cspace *cspace,
+		struct cptr sync_ep)
+{
+	struct net_device_container *dev_container;
+	int ret;
+	struct fipc_message *_response;
+	unsigned 	int request_cookie;
+	request_cookie = thc_get_request_cookie(_request);
+	ret = glue_cap_lookup_net_device_type(cspace,
+		__cptr(fipc_get_reg1(_request)),
+		&dev_container);
+	if (ret) {
+		LIBLCD_ERR("lookup");
+		goto fail_lookup;
+	}
+	fipc_recv_msg_end(thc_channel_to_fipc(_channel),
+			_request);
+	ether_setup(( &dev_container->net_device ));
+	if (async_msg_blocking_send_start(_channel,
+		&_response)) {
+		LIBLCD_ERR("error getting response msg");
+		return -EIO;
+	}
+	thc_ipc_reply(_channel,
+			request_cookie,
+			_response);
+fail_lookup:
+	return ret;
+
+}
+
+int eth_mac_addr_callee(struct fipc_message *_request,
+		struct thc_channel *_channel,
+		struct glue_cspace *cspace,
+		struct cptr sync_ep)
+{
+	struct net_device_container *dev_container;
+	int ret;
+	struct fipc_message *_response;
+	unsigned 	int request_cookie;
+	int func_ret;
+	int sync_ret;
+	unsigned 	long mem_order;
+	unsigned 	long p_offset;
+	cptr_t p_cptr;
+	gva_t p_gva;
+
+	request_cookie = thc_get_request_cookie(_request);
+	ret = glue_cap_lookup_net_device_type(cspace,
+		__cptr(fipc_get_reg1(_request)),
+		&dev_container);
+	if (ret) {
+		LIBLCD_ERR("lookup");
+		goto fail_lookup;
+	}
+	fipc_recv_msg_end(thc_channel_to_fipc(_channel),
+			_request);
+	sync_ret = lcd_cptr_alloc(&p_cptr);
+	if (sync_ret) {
+		LIBLCD_ERR("failed to get cptr");
+		lcd_exit(-1);
+	}
+	lcd_set_cr0(p_cptr);
+	sync_ret = lcd_sync_recv(sync_ep);
+	lcd_set_cr0(CAP_CPTR_NULL);
+	if (sync_ret) {
+		LIBLCD_ERR("failed to recv");
+		lcd_exit(-1);
+	}
+	mem_order = lcd_r0();
+	p_offset = lcd_r1();
+	sync_ret = lcd_map_virt(p_cptr,
+		mem_order,
+		&p_gva);
+	if (sync_ret) {
+		LIBLCD_ERR("failed to map void *p");
+		lcd_exit(-1);
+	}
+	func_ret = eth_mac_addr(( &dev_container->net_device ),
+		( void  * )( ( gva_val(p_gva) ) + ( p_offset ) ));
+	if (async_msg_blocking_send_start(_channel,
+		&_response)) {
+		LIBLCD_ERR("error getting response msg");
+		return -EIO;
+	}
+	fipc_set_reg1(_response,
+			func_ret);
+	thc_ipc_reply(_channel,
+			request_cookie,
+			_response);
+fail_lookup:
+	return ret;
+
+}
+
+int eth_validate_addr_callee(struct fipc_message *_request,
+		struct thc_channel *_channel,
+		struct glue_cspace *cspace,
+		struct cptr sync_ep)
+{
+	struct net_device_container *dev_container;
+	int ret;
+	struct fipc_message *_response;
+	unsigned 	int request_cookie;
+	int func_ret;
+	request_cookie = thc_get_request_cookie(_request);
+	ret = glue_cap_lookup_net_device_type(cspace,
+		__cptr(fipc_get_reg1(_request)),
+		&dev_container);
+	if (ret) {
+		LIBLCD_ERR("lookup");
+		goto fail_lookup;
+	}
+	fipc_recv_msg_end(thc_channel_to_fipc(_channel),
+			_request);
+	func_ret = eth_validate_addr(( &dev_container->net_device ));
+	if (async_msg_blocking_send_start(_channel,
+		&_response)) {
+		LIBLCD_ERR("error getting response msg");
+		return -EIO;
+	}
+	fipc_set_reg1(_response,
+			func_ret);
+	thc_ipc_reply(_channel,
+			request_cookie,
+			_response);
+fail_lookup:
+	return ret;
+
+}
+
+int free_netdev_callee(struct fipc_message *_request,
+		struct thc_channel *_channel,
+		struct glue_cspace *cspace,
+		struct cptr sync_ep)
+{
+	struct net_device_container *dev_container;
+	int ret;
+	struct fipc_message *_response;
+	unsigned 	int request_cookie;
+	request_cookie = thc_get_request_cookie(_request);
+	ret = glue_cap_lookup_net_device_type(cspace,
+		__cptr(fipc_get_reg1(_request)),
+		&dev_container);
+	if (ret) {
+		LIBLCD_ERR("lookup");
+		goto fail_lookup;
+	}
+	fipc_recv_msg_end(thc_channel_to_fipc(_channel),
+			_request);
+	free_netdev(( &dev_container->net_device ));
+	if (async_msg_blocking_send_start(_channel,
+		&_response)) {
+		LIBLCD_ERR("error getting response msg");
+		return -EIO;
+	}
+	thc_ipc_reply(_channel,
+			request_cookie,
+			_response);
+fail_lookup:
+	return ret;
+
+}
+
+int netif_carrier_off_callee(struct fipc_message *_request,
+		struct thc_channel *_channel,
+		struct glue_cspace *cspace,
+		struct cptr sync_ep)
+{
+	struct net_device_container *dev_container;
+	int ret = 0;
+	struct fipc_message *_response;
+	unsigned 	int request_cookie;
+	request_cookie = thc_get_request_cookie(_request);
+	ret = glue_cap_lookup_net_device_type(cspace,
+		__cptr(fipc_get_reg1(_request)),
+		&dev_container);
+	if (ret) {
+		LIBLCD_ERR("lookup");
+		goto fail_lookup;
+	}
+	fipc_recv_msg_end(thc_channel_to_fipc(_channel),
+			_request);
+	netif_carrier_off(( &dev_container->net_device ));
+	if (async_msg_blocking_send_start(_channel,
+		&_response)) {
+		LIBLCD_ERR("error getting response msg");
+		return -EIO;
+	}
+	thc_ipc_reply(_channel,
+			request_cookie,
+			_response);
+fail_lookup:
+	return ret;
+
+}
+
+int netif_carrier_on_callee(struct fipc_message *_request,
+		struct thc_channel *_channel,
+		struct glue_cspace *cspace,
+		struct cptr sync_ep)
+{
+	struct net_device_container *dev_container;
+	int ret;
+	struct fipc_message *_response;
+	unsigned 	int request_cookie;
+	request_cookie = thc_get_request_cookie(_request);
+	ret = glue_cap_lookup_net_device_type(cspace,
+		__cptr(fipc_get_reg1(_request)),
+		&dev_container);
+	if (ret) {
+		LIBLCD_ERR("lookup");
+		goto fail_lookup;
+	}
+	fipc_recv_msg_end(thc_channel_to_fipc(_channel),
+			_request);
+	netif_carrier_on(( &dev_container->net_device ));
+	if (async_msg_blocking_send_start(_channel,
+		&_response)) {
+		LIBLCD_ERR("error getting response msg");
+		return -EIO;
+	}
+	thc_ipc_reply(_channel,
+			request_cookie,
+			_response);
+fail_lookup:
+	return ret;
+
+}
+
+int netif_device_attach_callee(struct fipc_message *_request,
+		struct thc_channel *_channel,
+		struct glue_cspace *cspace,
+		struct cptr sync_ep)
+{
+	struct net_device *dev;
+	int ret;
+	struct fipc_message *_response;
+	unsigned 	int request_cookie;
+	request_cookie = thc_get_request_cookie(_request);
+	fipc_recv_msg_end(thc_channel_to_fipc(_channel),
+			_request);
+	dev = kzalloc(sizeof( *dev ),
+		GFP_KERNEL);
+	if (!dev) {
+		LIBLCD_ERR("kzalloc");
+		goto fail_alloc;
+	}
+	netif_device_attach(dev);
+	if (async_msg_blocking_send_start(_channel,
+		&_response)) {
+		LIBLCD_ERR("error getting response msg");
+		return -EIO;
+	}
+	thc_ipc_reply(_channel,
+			request_cookie,
+			_response);
+fail_alloc:
+	return ret;
+
+}
+
+int netif_device_detach_callee(struct fipc_message *_request,
+		struct thc_channel *_channel,
+		struct glue_cspace *cspace,
+		struct cptr sync_ep)
+{
+	struct net_device *dev;
+	int ret;
+	struct fipc_message *_response;
+	unsigned 	int request_cookie;
+	request_cookie = thc_get_request_cookie(_request);
+	fipc_recv_msg_end(thc_channel_to_fipc(_channel),
+			_request);
+	dev = kzalloc(sizeof( *dev ),
+		GFP_KERNEL);
+	if (!dev) {
+		LIBLCD_ERR("kzalloc");
+		goto fail_alloc;
+	}
+	netif_device_detach(dev);
+	if (async_msg_blocking_send_start(_channel,
+		&_response)) {
+		LIBLCD_ERR("error getting response msg");
+		return -EIO;
+	}
+	thc_ipc_reply(_channel,
+			request_cookie,
+			_response);
+fail_alloc:
+	return ret;
+
+}
+
+int netif_set_real_num_rx_queues_callee(struct fipc_message *_request,
+		struct thc_channel *_channel,
+		struct glue_cspace *cspace,
+		struct cptr sync_ep)
+{
+	struct net_device *dev;
+	unsigned 	int rxq;
+	int ret;
+	struct fipc_message *_response;
+	unsigned 	int request_cookie;
+	int func_ret;
+	request_cookie = thc_get_request_cookie(_request);
+	fipc_recv_msg_end(thc_channel_to_fipc(_channel),
+			_request);
+	dev = kzalloc(sizeof( *dev ),
+		GFP_KERNEL);
+	if (!dev) {
+		LIBLCD_ERR("kzalloc");
+		goto fail_alloc;
+	}
+	rxq = fipc_get_reg1(_request);
+	func_ret = netif_set_real_num_rx_queues(dev,
+		rxq);
+	if (async_msg_blocking_send_start(_channel,
+		&_response)) {
+		LIBLCD_ERR("error getting response msg");
+		return -EIO;
+	}
+	fipc_set_reg1(_response,
+			func_ret);
+	thc_ipc_reply(_channel,
+			request_cookie,
+			_response);
+fail_alloc:
+	return ret;
+
+}
+
+int netif_set_real_num_tx_queues_callee(struct fipc_message *_request,
+		struct thc_channel *_channel,
+		struct glue_cspace *cspace,
+		struct cptr sync_ep)
+{
+	struct net_device *dev;
+	unsigned 	int txq;
+	int ret;
+	struct fipc_message *_response;
+	unsigned 	int request_cookie;
+	int func_ret;
+	request_cookie = thc_get_request_cookie(_request);
+	fipc_recv_msg_end(thc_channel_to_fipc(_channel),
+			_request);
+	dev = kzalloc(sizeof( *dev ),
+		GFP_KERNEL);
+	if (!dev) {
+		LIBLCD_ERR("kzalloc");
+		goto fail_alloc;
+	}
+	txq = fipc_get_reg1(_request);
+	func_ret = netif_set_real_num_tx_queues(dev,
+		txq);
+	if (async_msg_blocking_send_start(_channel,
+		&_response)) {
+		LIBLCD_ERR("error getting response msg");
+		return -EIO;
+	}
+	fipc_set_reg1(_response,
+			func_ret);
+	thc_ipc_reply(_channel,
+			request_cookie,
+			_response);
+fail_alloc:
+	return ret;
+
+}
+
+int consume_skb_callee(struct fipc_message *_request,
+		struct thc_channel *_channel,
+		struct glue_cspace *cspace,
+		struct cptr sync_ep)
+{
+	struct sk_buff *skb;
+	int ret;
+	struct fipc_message *_response;
+	unsigned 	int request_cookie;
+	request_cookie = thc_get_request_cookie(_request);
+	fipc_recv_msg_end(thc_channel_to_fipc(_channel),
+			_request);
+	skb = kzalloc(sizeof( *skb ),
+		GFP_KERNEL);
+	if (!skb) {
+		LIBLCD_ERR("kzalloc");
+		goto fail_alloc;
+	}
+	consume_skb(skb);
+	if (async_msg_blocking_send_start(_channel,
+		&_response)) {
+		LIBLCD_ERR("error getting response msg");
+		return -EIO;
+	}
+	thc_ipc_reply(_channel,
+			request_cookie,
+			_response);
+fail_alloc:
+	return ret;
+
+}
+
+int unregister_netdev_callee(struct fipc_message *_request,
+		struct thc_channel *_channel,
+		struct glue_cspace *cspace,
+		struct cptr sync_ep)
+{
+	struct net_device_container *dev_container;
+	int ret;
+	struct fipc_message *_response;
+	unsigned 	int request_cookie;
+	request_cookie = thc_get_request_cookie(_request);
+	fipc_recv_msg_end(thc_channel_to_fipc(_channel),
+			_request);
+	ret = glue_cap_lookup_net_device_type(cspace,
+		__cptr(fipc_get_reg0(_request)),
+		&dev_container);
+	if (ret) {
+		LIBLCD_ERR("lookup");
+		goto fail_lookup;
+	}
+	unregister_netdev(&dev_container->net_device);
+	if (async_msg_blocking_send_start(_channel,
+		&_response)) {
+		LIBLCD_ERR("error getting response msg");
+		return -EIO;
+	}
+	thc_ipc_reply(_channel,
+			request_cookie,
+			_response);
+fail_lookup:
+	return ret;
+}
+
+int eth_platform_get_mac_address_callee(struct fipc_message *_request,
+		struct thc_channel *_channel,
+		struct glue_cspace *cspace,
+		struct cptr sync_ep)
+{
+	struct device *dev;
+	int ret = 0;
+	struct fipc_message *_response;
+	unsigned int request_cookie;
+	int func_ret;
+	union mac {
+		u8 mac_addr[ETH_ALEN];
+		unsigned long mac_addr_l;
+	} m = { {0} };
+	u8 mac_addr[ETH_ALEN];
+
+	request_cookie = thc_get_request_cookie(_request);
+	fipc_recv_msg_end(thc_channel_to_fipc(_channel),
+			_request);
+	dev = &g_pdev->dev;
+
+	func_ret = eth_platform_get_mac_address(dev, mac_addr);
+
+	LIBLCD_MSG("%s returned %d", __func__, func_ret);
+
+	if (async_msg_blocking_send_start(_channel,
+		&_response)) {
+		LIBLCD_ERR("error getting response msg");
+		return -EIO;
+	}
+
+	/* pass on mac addr only if the function gets a
+	 * valid address
+	 */
+	if (!func_ret) {
+		memcpy(m.mac_addr, mac_addr, ETH_ALEN);
+		fipc_set_reg2(_response,
+			m.mac_addr_l);
+	}
+
+	fipc_set_reg1(_response,
+			func_ret);
+
+	thc_ipc_reply(_channel,
+			request_cookie,
+			_response);
+	return ret;
+}
+
+int dev_addr_del_callee(struct fipc_message *_request,
+		struct thc_channel *_channel,
+		struct glue_cspace *cspace,
+		struct cptr sync_ep)
+{
+	struct net_device *dev;
+	unsigned 	char addr_type;
+	int ret;
+	struct fipc_message *_response;
+	unsigned 	int request_cookie;
+	int func_ret;
+	int sync_ret;
+	unsigned 	long mem_order;
+	unsigned 	long addr_offset;
+	cptr_t addr_cptr;
+	gva_t addr_gva;
+
+	request_cookie = thc_get_request_cookie(_request);
+	fipc_recv_msg_end(thc_channel_to_fipc(_channel),
+			_request);
+	dev = kzalloc(sizeof( *dev ),
+		GFP_KERNEL);
+	if (!dev) {
+		LIBLCD_ERR("kzalloc");
+		goto fail_alloc;
+	}
+
+	sync_ret = lcd_cptr_alloc(&addr_cptr);
+	if (sync_ret) {
+		LIBLCD_ERR("failed to get cptr");
+		lcd_exit(-1);
+	}
+	lcd_set_cr0(addr_cptr);
+	sync_ret = lcd_sync_recv(sync_ep);
+	lcd_set_cr0(CAP_CPTR_NULL);
+	if (sync_ret) {
+		LIBLCD_ERR("failed to recv");
+		lcd_exit(-1);
+	}
+	mem_order = lcd_r0();
+	addr_offset = lcd_r1();
+	sync_ret = lcd_map_virt(addr_cptr,
+		mem_order,
+		&addr_gva);
+	if (sync_ret) {
+		LIBLCD_ERR("failed to map void *addr");
+		lcd_exit(-1);
+	}
+	addr_type = fipc_get_reg1(_request);
+	func_ret = dev_addr_del(dev,
+		( void  * )( ( gva_val(addr_gva) ) + ( addr_offset ) ),
+		addr_type);
+	if (async_msg_blocking_send_start(_channel,
+		&_response)) {
+		LIBLCD_ERR("error getting response msg");
+		return -EIO;
+	}
+	fipc_set_reg1(_response,
+			func_ret);
+	thc_ipc_reply(_channel,
+			request_cookie,
+			_response);
+fail_alloc:
+	return ret;
+
+}
+
+int device_set_wakeup_enable_callee(struct fipc_message *_request,
+		struct thc_channel *_channel,
+		struct glue_cspace *cspace,
+		struct cptr sync_ep)
+{
+	struct device *dev;
+	bool enable;
+	int ret = 0;
+	struct fipc_message *_response;
+	unsigned 	int request_cookie;
+	int func_ret;
+	request_cookie = thc_get_request_cookie(_request);
+	fipc_recv_msg_end(thc_channel_to_fipc(_channel),
+			_request);
+	dev = &g_pdev->dev;
+	enable = fipc_get_reg1(_request);
+	func_ret = device_set_wakeup_enable(dev,
+		enable);
+	if (async_msg_blocking_send_start(_channel,
+		&_response)) {
+		LIBLCD_ERR("error getting response msg");
+		return -EIO;
+	}
+	fipc_set_reg1(_response,
+			func_ret);
+	thc_ipc_reply(_channel,
+			request_cookie,
+			_response);
+	return ret;
+}
+
+int eth_get_headlen_callee(struct fipc_message *_request,
+		struct thc_channel *_channel,
+		struct glue_cspace *cspace,
+		struct cptr sync_ep)
+{
+	int sync_ret;
+	unsigned 	long mem_order;
+	unsigned 	long data_offset;
+	cptr_t data_cptr;
+	gva_t data_gva;
+	unsigned 	int len;
+	int ret;
+	struct fipc_message *_response;
+	unsigned 	int request_cookie;
+	unsigned 	int func_ret;
+	request_cookie = thc_get_request_cookie(_request);
+	fipc_recv_msg_end(thc_channel_to_fipc(_channel),
+			_request);
+	sync_ret = lcd_cptr_alloc(&data_cptr);
+	if (sync_ret) {
+		LIBLCD_ERR("failed to get cptr");
+		lcd_exit(-1);
+	}
+	lcd_set_cr0(data_cptr);
+	sync_ret = lcd_sync_recv(sync_ep);
+	lcd_set_cr0(CAP_CPTR_NULL);
+	if (sync_ret) {
+		LIBLCD_ERR("failed to recv");
+		lcd_exit(-1);
+	}
+	mem_order = lcd_r0();
+	data_offset = lcd_r1();
+	sync_ret = lcd_map_virt(data_cptr,
+		mem_order,
+		&data_gva);
+	if (sync_ret) {
+		LIBLCD_ERR("failed to map void *data");
+		lcd_exit(-1);
+	}
+	len = fipc_get_reg1(_request);
+	func_ret = eth_get_headlen(( void  * )( ( gva_val(data_gva) ) + ( data_offset ) ),
+		len);
+	if (async_msg_blocking_send_start(_channel,
+		&_response)) {
+		LIBLCD_ERR("error getting response msg");
+		return -EIO;
+	}
+	fipc_set_reg1(_response,
+			func_ret);
+	thc_ipc_reply(_channel,
+			request_cookie,
+			_response);
+	return ret;
+
+}
+
+int netif_tx_stop_all_queues_callee(struct fipc_message *_request,
+		struct thc_channel *_channel,
+		struct glue_cspace *cspace,
+		struct cptr sync_ep)
+{
+	struct net_device_container *ndev_container;
+	struct net_device *dev;
+	int ret;
+	struct fipc_message *_response;
+	unsigned 	int request_cookie;
+	request_cookie = thc_get_request_cookie(_request);
+	fipc_recv_msg_end(thc_channel_to_fipc(_channel),
+			_request);
+
+	ret = glue_cap_lookup_net_device_type(cspace,
+		__cptr(fipc_get_reg0(_request)),
+		&ndev_container);
+	if (ret) {
+		LIBLCD_ERR("lookup");
+		goto fail_lookup;
+	}
+	dev = &ndev_container->net_device;
+	netif_tx_stop_all_queues(dev);
+	if (async_msg_blocking_send_start(_channel,
+		&_response)) {
+		LIBLCD_ERR("error getting response msg");
+		return -EIO;
+	}
+	thc_ipc_reply(_channel,
+			request_cookie,
+			_response);
+fail_lookup:
+	return ret;
+}
+
+
+int pci_disable_pcie_error_reporting_callee(struct fipc_message *_request,
+		struct thc_channel *_channel,
+		struct glue_cspace *cspace,
+		struct cptr sync_ep)
+{
+	struct pci_dev *dev;
+	int ret = 0;
+	struct fipc_message *_response;
+	unsigned 	int request_cookie;
+	int func_ret;
+	request_cookie = thc_get_request_cookie(_request);
+	fipc_recv_msg_end(thc_channel_to_fipc(_channel),
+			_request);
+	dev = g_pdev;
+	func_ret = pci_disable_pcie_error_reporting(dev);
+	if (async_msg_blocking_send_start(_channel,
+		&_response)) {
+		LIBLCD_ERR("error getting response msg");
+		return -EIO;
+	}
+	fipc_set_reg1(_response,
+			func_ret);
+	thc_ipc_reply(_channel,
+			request_cookie,
+			_response);
+	return ret;
+}
+
+int pci_bus_read_config_word_callee(struct fipc_message *_request,
+		struct thc_channel *_channel,
+		struct glue_cspace *cspace,
+		struct cptr sync_ep)
+{
+	struct pci_bus *bus = g_pdev->bus;
+	unsigned 	int devfn;
+	int where;
+	unsigned short val;
+	int ret = 0;
+	struct fipc_message *_response;
+	unsigned 	int request_cookie;
+	int func_ret;
+	request_cookie = thc_get_request_cookie(_request);
+	fipc_recv_msg_end(thc_channel_to_fipc(_channel),
+			_request);
+
+	devfn = fipc_get_reg1(_request);
+	where = fipc_get_reg2(_request);
+	func_ret = pci_bus_read_config_word(bus,
+		devfn,
+		where,
+		&val);
+	if (async_msg_blocking_send_start(_channel,
+		&_response)) {
+		LIBLCD_ERR("error getting response msg");
+		return -EIO;
+	}
+	fipc_set_reg1(_response,
+			val);
+	fipc_set_reg2(_response,
+			func_ret);
+	thc_ipc_reply(_channel,
+			request_cookie,
+			_response);
+	return ret;
+}
+
+int pci_bus_write_config_word_callee(struct fipc_message *_request,
+		struct thc_channel *_channel,
+		struct glue_cspace *cspace,
+		struct cptr sync_ep)
+{
+	struct pci_bus *bus;
+	unsigned 	int devfn;
+	int where;
+	unsigned 	short val;
+	int ret = 0;
+	struct fipc_message *_response;
+	unsigned 	int request_cookie;
+	int func_ret;
+	request_cookie = thc_get_request_cookie(_request);
+
+	fipc_recv_msg_end(thc_channel_to_fipc(_channel),
+			_request);
+	bus = g_pdev->bus;
+	devfn = fipc_get_reg3(_request);
+	where = fipc_get_reg4(_request);
+	val = fipc_get_reg5(_request);
+	func_ret = pci_bus_write_config_word(bus,
+		devfn,
+		where,
+		val);
+	if (async_msg_blocking_send_start(_channel,
+		&_response)) {
+		LIBLCD_ERR("error getting response msg");
+		return -EIO;
+	}
+	fipc_set_reg1(_response,
+			func_ret);
+	thc_ipc_reply(_channel,
+			request_cookie,
+			_response);
+	return ret;
+}
+
+int pci_cleanup_aer_uncorrect_error_status_callee(struct fipc_message *_request,
+		struct thc_channel *_channel,
+		struct glue_cspace *cspace,
+		struct cptr sync_ep)
+{
+	struct pci_dev *dev;
+	int ret = 0;
+	struct fipc_message *_response;
+	unsigned 	int request_cookie;
+	int func_ret;
+	request_cookie = thc_get_request_cookie(_request);
+	fipc_recv_msg_end(thc_channel_to_fipc(_channel),
+			_request);
+	dev = g_pdev;
+	func_ret = pci_cleanup_aer_uncorrect_error_status(dev);
+	if (async_msg_blocking_send_start(_channel,
+		&_response)) {
+		LIBLCD_ERR("error getting response msg");
+		return -EIO;
+	}
+	fipc_set_reg1(_response,
+			func_ret);
+	thc_ipc_reply(_channel,
+			request_cookie,
+			_response);
+	return ret;
+}
+
+int pci_disable_device_callee(struct fipc_message *_request,
+		struct thc_channel *_channel,
+		struct glue_cspace *cspace,
+		struct cptr sync_ep)
+{
+	struct pci_dev *dev;
+	int ret = 0;
+	struct fipc_message *_response;
+	unsigned 	int request_cookie;
+	request_cookie = thc_get_request_cookie(_request);
+	fipc_recv_msg_end(thc_channel_to_fipc(_channel),
+			_request);
+	dev = g_pdev;
+	pci_disable_device(dev);
+	if (async_msg_blocking_send_start(_channel,
+		&_response)) {
+		LIBLCD_ERR("error getting response msg");
+		return -EIO;
+	}
+	thc_ipc_reply(_channel,
+			request_cookie,
+			_response);
+	return ret;
+}
+
+int pci_enable_pcie_error_reporting_callee(struct fipc_message *_request,
+		struct thc_channel *_channel,
+		struct glue_cspace *cspace,
+		struct cptr sync_ep)
+{
+	struct pci_dev *dev = g_pdev;
+	int ret = 0;
+	struct fipc_message *_response;
+	unsigned 	int request_cookie;
+	int func_ret;
+	request_cookie = thc_get_request_cookie(_request);
+	fipc_recv_msg_end(thc_channel_to_fipc(_channel),
+			_request);
+	func_ret = pci_enable_pcie_error_reporting(dev);
+	if (async_msg_blocking_send_start(_channel,
+		&_response)) {
+		LIBLCD_ERR("error getting response msg");
+		return -EIO;
+	}
+	fipc_set_reg1(_response,
+			func_ret);
+	thc_ipc_reply(_channel,
+			request_cookie,
+			_response);
+	return ret;
+}
+
+int pcie_capability_read_word_callee(struct fipc_message *_request,
+		struct thc_channel *_channel,
+		struct glue_cspace *cspace,
+		struct cptr sync_ep)
+{
+	struct pci_dev *dev;
+	int pos;
+	unsigned short val;
+	int ret = 0;
+	struct fipc_message *_response;
+	unsigned 	int request_cookie;
+	int func_ret;
+	request_cookie = thc_get_request_cookie(_request);
+	fipc_recv_msg_end(thc_channel_to_fipc(_channel),
+			_request);
+	dev = g_pdev;
+	pos = fipc_get_reg1(_request);
+	val = fipc_get_reg2(_request);
+	func_ret = pcie_capability_read_word(dev,
+		pos,
+		&val);
+	if (async_msg_blocking_send_start(_channel,
+		&_response)) {
+		LIBLCD_ERR("error getting response msg");
+		return -EIO;
+	}
+	fipc_set_reg1(_response,
+			func_ret);
+	fipc_set_reg2(_response,
+			val);
+	thc_ipc_reply(_channel,
+			request_cookie,
+			_response);
+	return ret;
+}
+
+int pcie_get_minimum_link_callee(struct fipc_message *_request,
+		struct thc_channel *_channel,
+		struct glue_cspace *cspace,
+		struct cptr sync_ep)
+{
+	struct pci_dev *dev;
+	enum pci_bus_speed speed;
+	enum pcie_link_width width;
+	int ret = 0;
+	struct fipc_message *_response;
+	unsigned 	int request_cookie;
+	int func_ret;
+	request_cookie = thc_get_request_cookie(_request);
+	fipc_recv_msg_end(thc_channel_to_fipc(_channel),
+			_request);
+	dev = g_pdev;
+	speed = fipc_get_reg1(_request);
+	width = fipc_get_reg2(_request);
+
+	func_ret = pcie_get_minimum_link(dev,
+		&speed,
+		&width);
+	if (async_msg_blocking_send_start(_channel,
+		&_response)) {
+		LIBLCD_ERR("error getting response msg");
+		return -EIO;
+	}
+	fipc_set_reg1(_response,
+			func_ret);
+	thc_ipc_reply(_channel,
+			request_cookie,
+			_response);
+	return ret;
+}
+
+int pci_enable_device_mem_callee(struct fipc_message *_request,
+		struct thc_channel *_channel,
+		struct glue_cspace *cspace,
+		struct cptr sync_ep)
+{
+	struct pci_dev *dev = g_pdev;
+	int ret = 0;
+	struct fipc_message *_response;
+	unsigned 	int request_cookie;
+	int func_ret;
+	request_cookie = thc_get_request_cookie(_request);
+	fipc_recv_msg_end(thc_channel_to_fipc(_channel),
+			_request);
+
+	func_ret = pci_enable_device_mem(dev);
+	if (async_msg_blocking_send_start(_channel,
+		&_response)) {
+		LIBLCD_ERR("error getting response msg");
+		return -EIO;
+	}
+	fipc_set_reg1(_response,
+			func_ret);
+	thc_ipc_reply(_channel,
+			request_cookie,
+			_response);
+	return ret;
+}
+
+int pci_request_selected_regions_callee(struct fipc_message *_request,
+		struct thc_channel *_channel,
+		struct glue_cspace *cspace,
+		struct cptr sync_ep)
+{
+	int type;
+	int ret = 0;
+	struct fipc_message *_response;
+	unsigned int request_cookie;
+	int func_ret;
+	struct pci_dev *dev = g_pdev;
+
+	request_cookie = thc_get_request_cookie(_request);
+	fipc_recv_msg_end(thc_channel_to_fipc(_channel),
+			_request);
+	type = fipc_get_reg1(_request);
+	func_ret = pci_request_selected_regions(dev,
+		type,
+		driver_name);
+	if (async_msg_blocking_send_start(_channel,
+		&_response)) {
+		LIBLCD_ERR("error getting response msg");
+		return -EIO;
+	}
+	fipc_set_reg1(_response,
+			func_ret);
+	thc_ipc_reply(_channel,
+			request_cookie,
+			_response);
+	return ret;
+}
+
+int pci_request_selected_regions_exclusive_callee(struct fipc_message *_request,
+		struct thc_channel *_channel,
+		struct glue_cspace *cspace,
+		struct cptr sync_ep)
+{
+	struct pci_dev *dev;
+	int type;
+	int ret = 0;
+	struct fipc_message *_response;
+	unsigned 	int request_cookie;
+	int func_ret;
+	request_cookie = thc_get_request_cookie(_request);
+	fipc_recv_msg_end(thc_channel_to_fipc(_channel),
+			_request);
+	dev = g_pdev;
+	type = fipc_get_reg1(_request);
+	func_ret = pci_request_selected_regions_exclusive(dev,
+		type,
+		driver_name);
+	if (async_msg_blocking_send_start(_channel,
+		&_response)) {
+		LIBLCD_ERR("error getting response msg");
+		return -EIO;
+	}
+	fipc_set_reg1(_response,
+			func_ret);
+	thc_ipc_reply(_channel,
+			request_cookie,
+			_response);
+	return ret;
+}
+
+int pci_set_master_callee(struct fipc_message *_request,
+		struct thc_channel *_channel,
+		struct glue_cspace *cspace,
+		struct cptr sync_ep)
+{
+	struct pci_dev *dev = g_pdev;
+	int ret = 0;
+	struct fipc_message *_response;
+	unsigned 	int request_cookie;
+	request_cookie = thc_get_request_cookie(_request);
+	fipc_recv_msg_end(thc_channel_to_fipc(_channel),
+			_request);
+	pci_set_master(dev);
+	if (async_msg_blocking_send_start(_channel,
+		&_response)) {
+		LIBLCD_ERR("error getting response msg");
+		return -EIO;
+	}
+	thc_ipc_reply(_channel,
+			request_cookie,
+			_response);
+	return ret;
+}
+
+int pci_save_state_callee(struct fipc_message *_request,
+		struct thc_channel *_channel,
+		struct glue_cspace *cspace,
+		struct cptr sync_ep)
+{
+	struct pci_dev *dev = g_pdev;
+	int ret = 0;
+	struct fipc_message *_response;
+	unsigned 	int request_cookie;
+	int func_ret;
+	request_cookie = thc_get_request_cookie(_request);
+	fipc_recv_msg_end(thc_channel_to_fipc(_channel),
+			_request);
+	func_ret = pci_save_state(dev);
+	if (async_msg_blocking_send_start(_channel,
+		&_response)) {
+		LIBLCD_ERR("error getting response msg");
+		return -EIO;
+	}
+	fipc_set_reg1(_response,
+			func_ret);
+	thc_ipc_reply(_channel,
+			request_cookie,
+			_response);
+	return ret;
+}
+
+int pci_release_selected_regions_callee(struct fipc_message *_request,
+		struct thc_channel *_channel,
+		struct glue_cspace *cspace,
+		struct cptr sync_ep)
+{
+	struct pci_dev *dev;
+	int r;
+	int ret = 0;
+	struct fipc_message *_response;
+	unsigned 	int request_cookie;
+	request_cookie = thc_get_request_cookie(_request);
+	fipc_recv_msg_end(thc_channel_to_fipc(_channel),
+			_request);
+	dev = g_pdev;
+	r = fipc_get_reg1(_request);
+	pci_release_selected_regions(dev,
+			r);
+	if (async_msg_blocking_send_start(_channel,
+		&_response)) {
+		LIBLCD_ERR("error getting response msg");
+		return -EIO;
+	}
+	thc_ipc_reply(_channel,
+			request_cookie,
+			_response);
+	return ret;
+}
+
+int pci_select_bars_callee(struct fipc_message *_request,
+		struct thc_channel *_channel,
+		struct glue_cspace *cspace,
+		struct cptr sync_ep)
+{
+	struct pci_dev *dev;
+	unsigned 	long flags;
+	int ret = 0;
+	struct fipc_message *_response;
+	unsigned 	int request_cookie;
+	int func_ret;
+	request_cookie = thc_get_request_cookie(_request);
+	fipc_recv_msg_end(thc_channel_to_fipc(_channel),
+			_request);
+	dev = g_pdev;
+	flags = fipc_get_reg1(_request);
+	func_ret = pci_select_bars(dev,
+		flags);
+	if (async_msg_blocking_send_start(_channel,
+		&_response)) {
+		LIBLCD_ERR("error getting response msg");
+		return -EIO;
+	}
+	fipc_set_reg1(_response,
+			func_ret);
+	thc_ipc_reply(_channel,
+			request_cookie,
+			_response);
+	return ret;
+}
+
+int pci_wake_from_d3_callee(struct fipc_message *_request,
+		struct thc_channel *_channel,
+		struct glue_cspace *cspace,
+		struct cptr sync_ep)
+{
+	struct pci_dev *dev;
+	bool enable;
+	int ret = 0;
+	struct fipc_message *_response;
+	unsigned 	int request_cookie;
+	int func_ret;
+	request_cookie = thc_get_request_cookie(_request);
+	fipc_recv_msg_end(thc_channel_to_fipc(_channel),
+			_request);
+	dev = g_pdev;
+	enable = fipc_get_reg1(_request);
+	func_ret = pci_wake_from_d3(dev,
+		enable);
+	if (async_msg_blocking_send_start(_channel,
+		&_response)) {
+		LIBLCD_ERR("error getting response msg");
+		return -EIO;
+	}
+	fipc_set_reg1(_response,
+			func_ret);
+	thc_ipc_reply(_channel,
+			request_cookie,
+			_response);
+	return ret;
+}

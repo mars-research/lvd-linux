@@ -14,49 +14,50 @@
 #include <liblcd/liblcd.h>
 #include <liblcd/sync_ipc_poll.h>
 
-#define PCI_REGIONS
+#include "ixgbe_glue_helper.h"
 
+#define PCI_REGIONS
 enum dispatch_t {
 	__PCI_REGISTER_DRIVER,
-	PROBE,
-	REMOVE,
 	PCI_UNREGISTER_DRIVER,
 	ALLOC_ETHERDEV_MQS,
-};
-
-struct module_container {
-	struct module module;
-	struct cptr other_ref;
-	struct cptr my_ref;
-};
-
-struct net_device_container {
-	struct net_device net_device;
-	struct cptr other_ref;
-	struct cptr my_ref;
-};
-
-struct pci_dev_container {
-	struct pci_dev pci_dev;
-	struct cptr other_ref;
-	struct cptr my_ref;
-};
-struct pci_device_id_container {
-	struct pci_device_id pci_device_id;
-	struct cptr other_ref;
-	struct cptr my_ref;
-};
-struct pci_driver_container {
-	struct pci_driver pci_driver;
-	struct cptr other_ref;
-	struct cptr my_ref;
-};
-struct trampoline_hidden_args {
-	void *struct_container;
-	struct glue_cspace *cspace;
-	struct lcd_trampoline_handle *t_handle;
-	struct thc_channel *async_chnl;
-	struct cptr sync_ep;
+	REGISTER_NETDEVICE,
+	ETHER_SETUP,
+	ETH_MAC_ADDR,
+	ETH_VALIDATE_ADDR,
+	FREE_NETDEV,
+	NETIF_CARRIER_OFF,
+	NETIF_CARRIER_ON,
+	NETIF_DEVICE_ATTACH,
+	NETIF_DEVICE_DETACH,
+	NETIF_SET_REAL_NUM_RX_QUEUES,
+	NETIF_SET_REAL_NUM_TX_QUEUES,
+	CONSUME_SKB,
+	UNREGISTER_NETDEV,
+	ETH_PLATFORM_GET_MAC_ADDRESS,
+	DEV_ADDR_DEL,
+	DEVICE_SET_WAKEUP_ENABLE,
+	ETH_GET_HEADLEN,
+	NETIF_TX_STOP_ALL_QUEUES,
+	PCI_DISABLE_PCIE_ERROR_REPORTING,
+	PCI_BUS_READ_CONFIG_WORD,
+	PCI_BUS_WRITE_CONFIG_WORD,
+	PCI_CLEANUP_AER_UNCORRECT_ERROR_STATUS,
+	PCI_DISABLE_DEVICE,
+	PCI_ENABLE_PCIE_ERROR_REPORTING,
+	PCIE_CAPABILITY_READ_WORD,
+	PCIE_GET_MINIMUM_LINK,
+	PCI_ENABLE_DEVICE_MEM,
+	PCI_REQUEST_SELECTED_REGIONS,
+	PCI_REQUEST_SELECTED_REGIONS_EXCLUSIVE,
+	PCI_SET_MASTER,
+	PCI_SAVE_STATE,
+	PCI_RELEASE_SELECTED_REGIONS,
+	PCI_SELECT_BARS,
+	PCI_WAKE_FROM_D3,
+	PROBE,
+	REMOVE,
+	TRIGGER_EXIT,
 };
 
 #define ASYNC_RPC_BUFFER_ORDER 12
@@ -73,38 +74,6 @@ void glue_cap_exit(void);
 void glue_cap_remove(
 	struct glue_cspace *cspace,
 	cptr_t c);
-
-
-int glue_cap_insert_module_type(struct glue_cspace *cspace,
-		struct module_container *module_container,
-		struct cptr *c_out);
-int glue_cap_insert_pci_dev_type(struct glue_cspace *cspace,
-		struct pci_dev_container *pci_dev_container,
-		struct cptr *c_out);
-int glue_cap_insert_pci_device_id_type(struct glue_cspace *cspace,
-		struct pci_device_id_container *pci_device_id_container,
-		struct cptr *c_out);
-int glue_cap_insert_pci_driver_type(struct glue_cspace *cspace,
-		struct pci_driver_container *pci_driver_container,
-		struct cptr *c_out);
-int glue_cap_insert_net_device_type(struct glue_cspace *cspace,
-		struct net_device_container *net_device_container,
-		struct cptr *c_out);
-int glue_cap_lookup_module_type(struct glue_cspace *cspace,
-		struct cptr c,
-		struct module_container **module_container);
-int glue_cap_lookup_pci_dev_type(struct glue_cspace *cspace,
-		struct cptr c,
-		struct pci_dev_container **pci_dev_container);
-int glue_cap_lookup_pci_device_id_type(struct glue_cspace *cspace,
-		struct cptr c,
-		struct pci_device_id_container **pci_device_id_container);
-int glue_cap_lookup_pci_driver_type(struct glue_cspace *cspace,
-		struct cptr c,
-		struct pci_driver_container **pci_driver_container);
-int glue_cap_lookup_net_device_type(struct glue_cspace *cspace,
-		struct cptr c,
-		struct net_device_container **net_device_container);
 
 /* ASYNC HELPERS -------------------------------------------------- */
 

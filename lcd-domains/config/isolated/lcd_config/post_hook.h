@@ -306,3 +306,31 @@ static inline void force_up_write(void *x)
  * the %gs segment register. */
 #undef get_current
 #define get_current() (current_task)
+
+/* XXX: For IXGBE device layer
+ * Polluting this file is inappropriate. Ideally we should have a
+ * common {pre,post}_hook and a project specific one
+ */
+#undef dev_warn
+#define dev_warn(dev, fmt, ...) do { } while(0)
+
+#undef dev_err
+#define dev_err(dev, fmt, ...) do { } while(0)
+
+#undef dev_info
+#define dev_info(dev, fmt, ...) do { } while(0)
+
+/* net layer locks
+ */
+#define rtnl_lock()     do { } while(0)
+#define rtnl_unlock()   do { } while(0)
+#define rtnl_is_locked()        (0)
+
+#define netdev_warn(dev, msg...)        LIBLCD_WARN(msg)
+#define netdev_err(dev, msg...)         LIBLCD_ERR(msg)
+#define netdev_crit(dev, msg...)        LIBLCD_ERR(msg)
+#define netdev_info(dev, msg...)        LIBLCD_MSG(msg)
+
+#define  __dynamic_netdev_dbg(desc, dev, fmt...)        LIBLCD_MSG(fmt)
+
+#define system_state    1

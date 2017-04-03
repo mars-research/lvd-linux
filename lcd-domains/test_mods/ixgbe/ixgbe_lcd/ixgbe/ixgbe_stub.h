@@ -105,12 +105,6 @@ void kfree_skb(struct sk_buff *skb) { }
 
 unsigned long volatile __jiffy_data jiffies;
 
-int dma_supported(struct device *dev, u64 mask) { return 0; }
-
-struct dma_map_ops *dma_ops;
-
-bool arch_dma_alloc_attrs(struct device **dev, gfp_t *gfp) { return true; }
-
 struct pglist_data contig_page_data;
 
 void pci_restore_state(struct pci_dev *dev) { }

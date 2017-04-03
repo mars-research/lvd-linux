@@ -302,6 +302,12 @@ static inline void force_up_write(void *x)
 #undef __pa
 #define __pa(vaddr) gpa_val(lcd_gva2gpa(__gva((unsigned long)vaddr)))
 
+#undef free_page
+#define free_page(addr) __lcd_free_pages(addr, 0)
+
+#undef __get_free_page
+#define __get_free_page(gfp_mask) __lcd_get_free_pages(gfp_mask, 0)
+
 /* The "real" get_current tries to read a percpu variable that using
  * the %gs segment register. */
 #undef get_current

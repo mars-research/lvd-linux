@@ -163,8 +163,8 @@
 #undef spin_lock_irq
 #define spin_lock_irq(x) do { } while (0)
 
-#undef spin_lock_irqrestore
-#define spin_lock_irqrestore(x,flags) do { } while (0)
+#undef spin_unlock_irqrestore
+#define spin_unlock_irqrestore(x,flags) do { } while (0)
 
 #undef spin_unlock
 #define spin_unlock(x) do { } while(0)

@@ -70,13 +70,6 @@ long strnlen_user(const char __user *str, long count)
 	return 0L;
 }
 
-void __lockfunc _raw_spin_unlock_irqrestore(raw_spinlock_t *lock, 
-					unsigned long flags)
-{
-	lcd_printk("resolve.c: trying to call dummy _raw_spin_unlock_irqrestore!");
-	return;
-}
-
 /* MUTEXES ------------------------------------------------------------ */
 
 void __mutex_init(struct mutex *lock, const char *name, 

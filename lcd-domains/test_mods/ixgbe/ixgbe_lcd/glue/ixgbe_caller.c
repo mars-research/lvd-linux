@@ -387,6 +387,7 @@ fail_ipc:
 
 /* FIXME: Handle this without extern */
 extern struct pci_driver_container ixgbe_driver_container;
+u64 dma_mask = 0;
 
 int probe_callee(struct fipc_message *_request,
 		struct thc_channel *_channel,
@@ -398,6 +399,8 @@ int probe_callee(struct fipc_message *_request,
 	unsigned 	int request_cookie;
 	int func_ret;
 	int ret = 0;
+	cptr_t other_ref;
+
 #ifdef PCI_REGIONS
 	cptr_t res0_cptr;
 	gpa_t gpa_addr;
@@ -407,6 +410,8 @@ int probe_callee(struct fipc_message *_request,
 
 	LIBLCD_MSG("%s called", __func__);
 	request_cookie = thc_get_request_cookie(_request);
+	dma_mask = fipc_get_reg2(_request);
+	other_ref.cptr = fipc_get_reg1(_request);
 
 	fipc_recv_msg_end(thc_channel_to_fipc(_channel),
 			_request);
@@ -427,6 +432,8 @@ int probe_callee(struct fipc_message *_request,
 	dev_container->pci_dev.dev.kobj.name = "ixgbe_lcd";
 	dev_container->pci_dev.vendor = 0x8086;
 	dev_container->pci_dev.device = 0x154D;
+	dev_container->other_ref = other_ref;
+	dev_container->pci_dev.dev.dma_mask = &dma_mask;
 #ifdef PCI_REGIONS
 	ret = lcd_cptr_alloc(&res0_cptr);
 	if (ret) {
@@ -1567,8 +1574,7 @@ int pci_enable_device_mem(struct pci_dev *dev)
 	return func_ret;
 fail_async:
 fail_ipc:
-	return ret;
-
+	return func_ret;
 }
 
 int pci_request_selected_regions(struct pci_dev *dev,

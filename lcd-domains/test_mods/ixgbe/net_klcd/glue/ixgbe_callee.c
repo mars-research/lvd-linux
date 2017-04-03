@@ -502,6 +502,8 @@ int probe(struct pci_dev *dev,
 			PROBE);
 	fipc_set_reg1(_request,
 			dev_container->my_ref.cptr);
+	fipc_set_reg2(_request,
+			*dev->dev.dma_mask);
 
 #ifdef PCI_REGIONS
 	ret = thc_ipc_send_request(hidden_args->async_chnl,

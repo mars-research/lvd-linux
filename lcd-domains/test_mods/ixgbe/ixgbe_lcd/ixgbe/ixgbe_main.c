@@ -9511,7 +9511,6 @@ static int ixgbe_probe(struct pci_dev *pdev, const struct pci_device_id *ent)
 	if (err)
 		return err;
 
-#ifdef LCD_IXGBE_DMA
 	if (!dma_set_mask_and_coherent(&pdev->dev, DMA_BIT_MASK(64))) {
 		pci_using_dac = 1;
 	} else {
@@ -9523,7 +9522,7 @@ static int ixgbe_probe(struct pci_dev *pdev, const struct pci_device_id *ent)
 		}
 		pci_using_dac = 0;
 	}
-#endif
+
 	err = pci_request_mem_regions(pdev, ixgbe_driver_name);
 	if (err) {
 		dev_err(&pdev->dev,
@@ -9941,9 +9940,7 @@ err_ioremap:
 err_alloc_etherdev:
 	pci_release_mem_regions(pdev);
 err_pci_reg:
-#ifndef LCD_ISOLATE
 err_dma:
-#endif
 	if (!adapter || disable_dev)
 		pci_disable_device(pdev);
 	return err;

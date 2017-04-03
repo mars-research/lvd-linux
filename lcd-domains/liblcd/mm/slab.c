@@ -826,8 +826,9 @@ static void recheck_pfmemalloc_active(struct kmem_cache *cachep,
 {
 	struct kmem_cache_node *n = cachep->node[numa_mem_id()];
 	struct page *page;
+#ifndef LCD_ISOLATE
 	unsigned long flags;
-
+#endif
 	if (!pfmemalloc_active)
 		return;
 
@@ -1704,7 +1705,9 @@ slab_out_of_memory(struct kmem_cache *cachep, gfp_t gfpflags, int nodeid)
 	unsigned long flags;
 /* BEGIN LCD */
 #endif
+#ifndef LCD_ISOLATE
 	unsigned long flags = 0UL;
+#endif
 /* END LCD */
 	int node;
 

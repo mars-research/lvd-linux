@@ -26,10 +26,6 @@ bool cancel_work_sync(struct work_struct *work) { return true; }
 
 int rtnl_is_locked(void) { return 0; }
 
-void usleep_range(unsigned long min, unsigned long max)
-{
-}
-
 void synchronize_irq(unsigned int irq) { }
 
 int mdio45_probe(struct mdio_if_info *mdio, int prtad) { return 0; }
@@ -186,6 +182,11 @@ void msleep(unsigned int msecs)
 void __udelay(unsigned long usecs)
 {
 	__const_udelay(usecs * 0x000010c7); /* 2**32 / 1000000 (rounded up) */
+}
+
+void usleep_range(unsigned long min, unsigned long max)
+{
+	udelay((max + min) >> 1);
 }
 
 #endif /* IXGBE_STUB_H */

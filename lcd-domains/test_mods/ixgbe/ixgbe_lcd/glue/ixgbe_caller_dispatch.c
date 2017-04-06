@@ -15,6 +15,76 @@ int dispatch_async_loop(struct thc_channel *_channel,
 	int fn_type;
 	fn_type = async_msg_get_fn_type(message);
 	switch (fn_type) {
+		case NDO_OPEN:
+			trace(NDO_OPEN);
+			return ndo_open_callee(message,
+		_channel,
+		cspace,
+		sync_ep);
+
+		case NDO_STOP:
+			trace(NDO_STOP);
+			return ndo_stop_callee(message,
+		_channel,
+		cspace,
+		sync_ep);
+
+		case NDO_START_XMIT:
+			trace(NDO_START_XMIT);
+			return ndo_start_xmit_callee(message,
+		_channel,
+		cspace,
+		sync_ep);
+
+		case NDO_SET_RX_MODE:
+			trace(NDO_SET_RX_MODE);
+			return ndo_set_rx_mode_callee(message,
+		_channel,
+		cspace,
+		sync_ep);
+
+		case NDO_VALIDATE_ADDR:
+			trace(NDO_VALIDATE_ADDR);
+			return ndo_validate_addr_callee(message,
+		_channel,
+		cspace,
+		sync_ep);
+
+		case NDO_SET_MAC_ADDRESS:
+			trace(NDO_SET_MAC_ADDRESS);
+			return ndo_set_mac_address_callee(message,
+		_channel,
+		cspace,
+		sync_ep);
+
+		case NDO_CHANGE_MTU:
+			trace(NDO_CHANGE_MTU);
+			return ndo_change_mtu_callee(message,
+		_channel,
+		cspace,
+		sync_ep);
+
+		case NDO_TX_TIMEOUT:
+			trace(NDO_TX_TIMEOUT);
+			return ndo_tx_timeout_callee(message,
+		_channel,
+		cspace,
+		sync_ep);
+
+		case NDO_SET_TX_MAXRATE:
+			trace(NDO_SET_TX_MAXRATE);
+			return ndo_set_tx_maxrate_callee(message,
+		_channel,
+		cspace,
+		sync_ep);
+
+		case NDO_GET_STATS64:
+			trace(NDO_GET_STATS64);
+			return ndo_get_stats64_callee(message,
+		_channel,
+		cspace,
+		sync_ep);
+
 		case PROBE:
 			trace(PROBE);
 			return probe_callee(message,

@@ -1,4 +1,3 @@
-
 int glue_cap_insert_device_type(struct glue_cspace *cspace,
 		struct device_container *device_container,
 		struct cptr *c_out)
@@ -62,6 +61,28 @@ int glue_cap_lookup_net_device_type(struct glue_cspace *cspace,
 		c,
 		glue_libcap_type_ops[ GLUE_TYPE_NET_DEVICE_CONTAINER ].libcap_type,
 		( void  ** )net_device_container);
+
+}
+
+int glue_cap_insert_net_device_ops_type(struct glue_cspace *cspace,
+		struct net_device_ops_container *net_device_ops_container,
+		struct cptr *c_out)
+{
+	return glue_cspace_insert(cspace,
+		net_device_ops_container,
+		glue_libcap_type_ops[ GLUE_TYPE_NET_DEVICE_OPS_CONTAINER ].libcap_type,
+		c_out);
+
+}
+
+int glue_cap_lookup_net_device_ops_type(struct glue_cspace *cspace,
+		struct cptr c,
+		struct net_device_ops_container **net_device_ops_container)
+{
+	return glue_cspace_lookup(cspace,
+		c,
+		glue_libcap_type_ops[ GLUE_TYPE_NET_DEVICE_OPS_CONTAINER ].libcap_type,
+		( void  ** )net_device_ops_container);
 
 }
 
@@ -150,6 +171,28 @@ int glue_cap_lookup_pci_driver_type(struct glue_cspace *cspace,
 		c,
 		glue_libcap_type_ops[ GLUE_TYPE_PCI_DRIVER_CONTAINER ].libcap_type,
 		( void  ** )pci_driver_container);
+
+}
+
+int glue_cap_insert_rtnl_link_stats64_type(struct glue_cspace *cspace,
+		struct rtnl_link_stats64_container *rtnl_link_stats64_container,
+		struct cptr *c_out)
+{
+	return glue_cspace_insert(cspace,
+		rtnl_link_stats64_container,
+		glue_libcap_type_ops[ GLUE_TYPE_RTNL_LINK_STATS64_CONTAINER ].libcap_type,
+		c_out);
+
+}
+
+int glue_cap_lookup_rtnl_link_stats64_type(struct glue_cspace *cspace,
+		struct cptr c,
+		struct rtnl_link_stats64_container **rtnl_link_stats64_container)
+{
+	return glue_cspace_lookup(cspace,
+		c,
+		glue_libcap_type_ops[ GLUE_TYPE_RTNL_LINK_STATS64_CONTAINER ].libcap_type,
+		( void  ** )rtnl_link_stats64_container);
 
 }
 

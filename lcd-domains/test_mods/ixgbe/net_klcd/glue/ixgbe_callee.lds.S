@@ -2,6 +2,16 @@
 
 SECTIONS
 {
+	LCD_TRAMPOLINE_LINKER_SECTION(ndo_open_trampoline)
+	LCD_TRAMPOLINE_LINKER_SECTION(ndo_stop_trampoline)
+	LCD_TRAMPOLINE_LINKER_SECTION(ndo_start_xmit_trampoline)
+	LCD_TRAMPOLINE_LINKER_SECTION(ndo_set_rx_mode_trampoline)
+	LCD_TRAMPOLINE_LINKER_SECTION(ndo_validate_addr_trampoline)
+	LCD_TRAMPOLINE_LINKER_SECTION(ndo_set_mac_address_trampoline)
+	LCD_TRAMPOLINE_LINKER_SECTION(ndo_change_mtu_trampoline)
+	LCD_TRAMPOLINE_LINKER_SECTION(ndo_tx_timeout_trampoline)
+	LCD_TRAMPOLINE_LINKER_SECTION(ndo_set_tx_maxrate_trampoline)
+	LCD_TRAMPOLINE_LINKER_SECTION(ndo_get_stats64_trampoline)
 	LCD_TRAMPOLINE_LINKER_SECTION(probe_trampoline)
 	LCD_TRAMPOLINE_LINKER_SECTION(remove_trampoline)
 }

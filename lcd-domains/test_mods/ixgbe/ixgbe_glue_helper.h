@@ -16,6 +16,11 @@ struct net_device_container {
 	struct cptr other_ref;
 	struct cptr my_ref;
 };
+struct net_device_ops_container {
+	struct net_device_ops net_device_ops;
+	struct cptr other_ref;
+	struct cptr my_ref;
+};
 struct pci_bus_container {
 	struct pci_bus pci_bus;
 	struct cptr other_ref;
@@ -33,6 +38,11 @@ struct pci_device_id_container {
 };
 struct pci_driver_container {
 	struct pci_driver pci_driver;
+	struct cptr other_ref;
+	struct cptr my_ref;
+};
+struct rtnl_link_stats64_container {
+	struct rtnl_link_stats64 rtnl_link_stats64;
 	struct cptr other_ref;
 	struct cptr my_ref;
 };
@@ -57,6 +67,9 @@ int glue_cap_insert_module_type(struct glue_cspace *cspace,
 int glue_cap_insert_net_device_type(struct glue_cspace *cspace,
 		struct net_device_container *net_device_container,
 		struct cptr *c_out);
+int glue_cap_insert_net_device_ops_type(struct glue_cspace *cspace,
+		struct net_device_ops_container *net_device_ops_container,
+		struct cptr *c_out);
 int glue_cap_insert_pci_bus_type(struct glue_cspace *cspace,
 		struct pci_bus_container *pci_bus_container,
 		struct cptr *c_out);
@@ -68,6 +81,9 @@ int glue_cap_insert_pci_device_id_type(struct glue_cspace *cspace,
 		struct cptr *c_out);
 int glue_cap_insert_pci_driver_type(struct glue_cspace *cspace,
 		struct pci_driver_container *pci_driver_container,
+		struct cptr *c_out);
+int glue_cap_insert_rtnl_link_stats64_type(struct glue_cspace *cspace,
+		struct rtnl_link_stats64_container *rtnl_link_stats64_container,
 		struct cptr *c_out);
 int glue_cap_insert_sk_buff_type(struct glue_cspace *cspace,
 		struct sk_buff_container *sk_buff_container,
@@ -81,6 +97,9 @@ int glue_cap_lookup_module_type(struct glue_cspace *cspace,
 int glue_cap_lookup_net_device_type(struct glue_cspace *cspace,
 		struct cptr c,
 		struct net_device_container **net_device_container);
+int glue_cap_lookup_net_device_ops_type(struct glue_cspace *cspace,
+		struct cptr c,
+		struct net_device_ops_container **net_device_ops_container);
 int glue_cap_lookup_pci_bus_type(struct glue_cspace *cspace,
 		struct cptr c,
 		struct pci_bus_container **pci_bus_container);
@@ -93,6 +112,9 @@ int glue_cap_lookup_pci_device_id_type(struct glue_cspace *cspace,
 int glue_cap_lookup_pci_driver_type(struct glue_cspace *cspace,
 		struct cptr c,
 		struct pci_driver_container **pci_driver_container);
+int glue_cap_lookup_rtnl_link_stats64_type(struct glue_cspace *cspace,
+		struct cptr c,
+		struct rtnl_link_stats64_container **rtnl_link_stats64_container);
 int glue_cap_lookup_sk_buff_type(struct glue_cspace *cspace,
 		struct cptr c,
 		struct sk_buff_container **sk_buff_container);

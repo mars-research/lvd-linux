@@ -183,6 +183,51 @@ fail1:
 	return ret;
 }
 
+int sync_setup_memory(void *data, size_t sz, unsigned long *order, cptr_t *data_cptr, unsigned long *data_offset)
+{
+        int ret;
+        struct page *p;
+        unsigned long data_len;
+        unsigned long mem_len;
+        /*
+         * Determine page that contains (start of) data
+         */
+        p = virt_to_head_page(data);
+        if (!p) {
+                LIBLCD_ERR("failed to translate to page");
+                ret = -EINVAL;
+                goto fail1;
+        }
+        data_len = sz;
+        mem_len = ALIGN(data + data_len - page_address(p), PAGE_SIZE);
+        *order = ilog2(roundup_pow_of_two(mem_len >> PAGE_SHIFT));
+        /*
+         * Volunteer memory
+         */
+        *data_offset = data - page_address(p);
+        ret = lcd_volunteer_pages(p, *order, data_cptr);
+        if (ret) {
+                LIBLCD_ERR("failed to volunteer memory");
+                goto fail2;
+        }
+        /*
+         * Done
+         */
+        return 0;
+fail2:
+fail1:
+        return ret;
+}
+
+int grant_sync_ep(cptr_t *sync_end, cptr_t ha_sync_ep)
+{
+	int ret;
+	struct cspace *curr_cspace = get_current_cspace(current);
+	lcd_cptr_alloc(sync_end);
+	ret = cap_grant(klcd_cspace, ha_sync_ep, curr_cspace, *sync_end);
+	return ret;
+}
+
 LCD_TRAMPOLINE_DATA(probe_trampoline);
 int  LCD_TRAMPOLINE_LINKAGE(probe_trampoline)
 probe_trampoline(struct pci_dev *dev,
@@ -699,17 +744,1473 @@ fail_ipc:
 	return;
 }
 
+int ndo_open_user(struct net_device *dev,
+		struct trampoline_hidden_args *hidden_args)
+{
+	struct net_device_container *dev_container;
+	int ret;
+	struct fipc_message *_request;
+	struct fipc_message *_response;
+	int func_ret;
+	dev_container = container_of(dev,
+		struct net_device_container,
+		net_device);
+	thc_init();
+	ret = async_msg_blocking_send_start(hidden_args->async_chnl,
+		&_request);
+	if (ret) {
+		LIBLCD_ERR("failed to get a send slot");
+		goto fail_async;
+	}
+	async_msg_set_fn_type(_request,
+			NDO_OPEN);
+	fipc_set_reg1(_request,
+			dev_container->other_ref.cptr);
+	DO_FINISH({
+		ASYNC({
+			ret = thc_ipc_call(hidden_args->async_chnl,
+		_request,
+		&_response);
+		}
+		);
+	}
+	);
+	if (ret) {
+		LIBLCD_ERR("thc_ipc_call");
+		goto fail_ipc;
+	}
+	func_ret = fipc_get_reg1(_response);
+	fipc_recv_msg_end(thc_channel_to_fipc(hidden_args->async_chnl),
+			_response);
+	lcd_exit(0);
+	return func_ret;
+fail_async:
+fail_ipc:
+	return ret;
+}
+
+int ndo_open(struct net_device *dev,
+		struct trampoline_hidden_args *hidden_args)
+{
+	struct net_device_container *dev_container;
+	int ret;
+	struct fipc_message *_request;
+	struct fipc_message *_response;
+	int func_ret;
+	if (!current->ptstate) {
+		LIBLCD_MSG("Calling from a non-LCD context! creating thc runtime!");
+		LCD_MAIN({
+			ret = ndo_open_user(dev,
+		hidden_args);
+		}
+		);
+		return ret;
+	}
+	dev_container = container_of(dev,
+		struct net_device_container,
+		net_device);
+	ret = async_msg_blocking_send_start(hidden_args->async_chnl,
+		&_request);
+	if (ret) {
+		LIBLCD_ERR("failed to get a send slot");
+		goto fail_async;
+	}
+	async_msg_set_fn_type(_request,
+			NDO_OPEN);
+	fipc_set_reg1(_request,
+			dev_container->other_ref.cptr);
+	ret = thc_ipc_call(hidden_args->async_chnl,
+		_request,
+		&_response);
+	if (ret) {
+		LIBLCD_ERR("thc_ipc_call");
+		goto fail_ipc;
+	}
+	func_ret = fipc_get_reg1(_response);
+	fipc_recv_msg_end(thc_channel_to_fipc(hidden_args->async_chnl),
+			_response);
+	return func_ret;
+fail_async:
+fail_ipc:
+	return ret;
+
+}
+
+LCD_TRAMPOLINE_DATA(ndo_open_trampoline);
+int  LCD_TRAMPOLINE_LINKAGE(ndo_open_trampoline)
+ndo_open_trampoline(struct net_device *dev)
+{
+	int ( *volatile ndo_open_fp )(struct net_device *,
+		struct trampoline_hidden_args *);
+	struct trampoline_hidden_args *hidden_args;
+	LCD_TRAMPOLINE_PROLOGUE(hidden_args,
+			ndo_open_trampoline);
+	ndo_open_fp = ndo_open;
+	return ndo_open_fp(dev,
+		hidden_args);
+
+}
+
+int ndo_stop_user(struct net_device *dev,
+		struct trampoline_hidden_args *hidden_args)
+{
+	struct net_device_container *dev_container;
+	int ret;
+	struct fipc_message *_request;
+	struct fipc_message *_response;
+	int func_ret;
+	dev_container = container_of(dev,
+		struct net_device_container,
+		net_device);
+	thc_init();
+	ret = async_msg_blocking_send_start(hidden_args->async_chnl,
+		&_request);
+	if (ret) {
+		LIBLCD_ERR("failed to get a send slot");
+		goto fail_async;
+	}
+	async_msg_set_fn_type(_request,
+			NDO_STOP);
+	fipc_set_reg1(_request,
+			dev_container->other_ref.cptr);
+	DO_FINISH({
+		ASYNC_({
+			ret = thc_ipc_call(hidden_args->async_chnl,
+		_request,
+		&_response);
+		}, ndo_stop
+		);
+	}
+	);
+	if (ret) {
+		LIBLCD_ERR("thc_ipc_call");
+		goto fail_ipc;
+	}
+	func_ret = fipc_get_reg1(_response);
+	fipc_recv_msg_end(thc_channel_to_fipc(hidden_args->async_chnl),
+			_response);
+	lcd_exit(0);
+	return func_ret;
+fail_async:
+fail_ipc:
+	return ret;
+
+}
+
+int ndo_stop(struct net_device *dev,
+		struct trampoline_hidden_args *hidden_args)
+{
+	struct net_device_container *dev_container;
+	int ret;
+	struct fipc_message *_request;
+	struct fipc_message *_response;
+	int func_ret;
+	if (!current->ptstate) {
+		LIBLCD_MSG("Calling from a non-LCD context! creating thc runtime!");
+		LCD_MAIN({
+			ret = ndo_stop_user(dev,
+		hidden_args);
+		}
+		);
+		return ret;
+	}
+	dev_container = container_of(dev,
+		struct net_device_container,
+		net_device);
+	ret = async_msg_blocking_send_start(hidden_args->async_chnl,
+		&_request);
+	if (ret) {
+		LIBLCD_ERR("failed to get a send slot");
+		goto fail_async;
+	}
+	async_msg_set_fn_type(_request,
+			NDO_STOP);
+	fipc_set_reg1(_request,
+			dev_container->other_ref.cptr);
+	ret = thc_ipc_call(hidden_args->async_chnl,
+		_request,
+		&_response);
+	if (ret) {
+		LIBLCD_ERR("thc_ipc_call");
+		goto fail_ipc;
+	}
+	func_ret = fipc_get_reg1(_response);
+	fipc_recv_msg_end(thc_channel_to_fipc(hidden_args->async_chnl),
+			_response);
+	return func_ret;
+fail_async:
+fail_ipc:
+	return ret;
+
+}
+
+LCD_TRAMPOLINE_DATA(ndo_stop_trampoline);
+int  LCD_TRAMPOLINE_LINKAGE(ndo_stop_trampoline)
+ndo_stop_trampoline(struct net_device *dev)
+{
+	int ( *volatile ndo_stop_fp )(struct net_device *,
+		struct trampoline_hidden_args *);
+	struct trampoline_hidden_args *hidden_args;
+	LCD_TRAMPOLINE_PROLOGUE(hidden_args,
+			ndo_stop_trampoline);
+	ndo_stop_fp = ndo_stop;
+	return ndo_stop_fp(dev,
+		hidden_args);
+
+}
+
+int ndo_start_xmit_user(struct sk_buff *skb,
+		struct net_device *dev,
+		struct trampoline_hidden_args *hidden_args)
+{
+	struct net_device_container *dev_container;
+	int ret;
+	struct fipc_message *_request;
+	struct fipc_message *_response;
+	int func_ret;
+	unsigned int request_cookie;
+
+	cptr_t sync_end;
+	unsigned long skb_ord, skb_off;
+	unsigned long skbd_ord, skbd_off;
+	cptr_t skb_cptr, skbd_cptr;
+
+	dev_container = container_of(dev,
+		struct net_device_container,
+		net_device);
+
+	thc_init();
+	ret = grant_sync_ep(&sync_end, hidden_args->sync_ep);
+
+	ret = sync_setup_memory(skb, sizeof(struct sk_buff), &skb_ord, &skb_cptr, &skb_off);
+
+	ret = sync_setup_memory(skb->head, skb_end_offset(skb) + sizeof(struct skb_shared_info), &skbd_ord, &skbd_cptr, &skbd_off);
+
+	ret = async_msg_blocking_send_start(hidden_args->async_chnl,
+		&_request);
+	if (ret) {
+		LIBLCD_ERR("failed to get a send slot");
+		goto fail_async;
+	}
+	async_msg_set_fn_type(_request,
+			NDO_START_XMIT);
+
+	fipc_set_reg1(_request,
+			dev_container->other_ref.cptr);
+
+	ret = thc_ipc_send_request(hidden_args->async_chnl, _request, &request_cookie);
+
+	if (ret) {
+		LIBLCD_ERR("thc_ipc_call");
+		goto fail_ipc;
+	}
+
+	//sync half
+	lcd_set_cr0(skb_cptr);
+	lcd_set_cr1(skbd_cptr);
+	lcd_set_r0(skb_ord);
+	lcd_set_r1(skb_off);
+	lcd_set_r2(skbd_ord);
+	lcd_set_r3(skbd_off);
+	lcd_set_r4(skb->data - skb->head);
+
+	LIBLCD_MSG("r4 data_off 0x%X | %d", skb->data - skb->head);
+	ret = lcd_sync_send(sync_end);
+	lcd_set_cr0(CAP_CPTR_NULL);
+	lcd_set_cr1(CAP_CPTR_NULL);
+	if (ret) {
+		LIBLCD_ERR("failed to send");
+		goto fail_sync;
+	}
+
+	lcd_cap_delete(sync_end);
+
+	DO_FINISH({
+		ASYNC_({
+			ret = thc_ipc_recv_response(hidden_args->async_chnl, request_cookie, &_response);
+		}, ndo_xmit
+		);
+	}
+	);
+	if (ret) {
+		LIBLCD_ERR("thc_ipc_call");
+		goto fail_ipc;
+	}
+	func_ret = fipc_get_reg1(_response);
+	fipc_recv_msg_end(thc_channel_to_fipc(hidden_args->async_chnl),
+			_response);
+
+fail_sync:
+fail_async:
+fail_ipc:
+	lcd_exit(0);
+	return ret;
+
+}
+
+int ndo_start_xmit(struct sk_buff *skb,
+		struct net_device *dev,
+		struct trampoline_hidden_args *hidden_args)
+{
+	struct net_device_container *dev_container;
+	int ret;
+	struct fipc_message *_request;
+	struct fipc_message *_response;
+	int func_ret;
+	if (!current->ptstate) {
+		LIBLCD_MSG("Calling from a non-LCD context! creating thc runtime!");
+		LCD_MAIN({
+			ret = ndo_start_xmit_user(skb,
+		dev,
+		hidden_args);
+		}
+		);
+		return ret;
+	}
+	dev_container = container_of(dev,
+		struct net_device_container,
+		net_device);
+	ret = async_msg_blocking_send_start(hidden_args->async_chnl,
+		&_request);
+	if (ret) {
+		LIBLCD_ERR("failed to get a send slot");
+		goto fail_async;
+	}
+	async_msg_set_fn_type(_request,
+			NDO_START_XMIT);
+	fipc_set_reg1(_request,
+			dev_container->other_ref.cptr);
+	ret = thc_ipc_call(hidden_args->async_chnl,
+		_request,
+		&_response);
+	if (ret) {
+		LIBLCD_ERR("thc_ipc_call");
+		goto fail_ipc;
+	}
+	func_ret = fipc_get_reg1(_response);
+	fipc_recv_msg_end(thc_channel_to_fipc(hidden_args->async_chnl),
+			_response);
+	return func_ret;
+fail_async:
+fail_ipc:
+	return ret;
+
+}
+
+LCD_TRAMPOLINE_DATA(ndo_start_xmit_trampoline);
+int  LCD_TRAMPOLINE_LINKAGE(ndo_start_xmit_trampoline)
+ndo_start_xmit_trampoline(struct sk_buff *skb,
+		struct net_device *dev)
+{
+	int ( *volatile ndo_start_xmit_fp )(struct sk_buff *,
+		struct net_device *,
+		struct trampoline_hidden_args *);
+	struct trampoline_hidden_args *hidden_args;
+	LCD_TRAMPOLINE_PROLOGUE(hidden_args,
+			ndo_start_xmit_trampoline);
+	ndo_start_xmit_fp = ndo_start_xmit;
+	return ndo_start_xmit_fp(skb,
+		dev,
+		hidden_args);
+
+}
+
+void ndo_set_rx_mode_user(struct net_device *dev,
+		struct trampoline_hidden_args *hidden_args)
+{
+	struct net_device_container *dev_container;
+	int ret;
+	struct fipc_message *_request;
+	struct fipc_message *_response;
+	dev_container = container_of(dev,
+		struct net_device_container,
+		net_device);
+	thc_init();
+	ret = async_msg_blocking_send_start(hidden_args->async_chnl,
+		&_request);
+	if (ret) {
+		LIBLCD_ERR("failed to get a send slot");
+		goto fail_async;
+	}
+	async_msg_set_fn_type(_request,
+			NDO_SET_RX_MODE);
+	fipc_set_reg1(_request,
+			dev_container->other_ref.cptr);
+	DO_FINISH({
+		ASYNC_({
+			ret = thc_ipc_call(hidden_args->async_chnl,
+		_request,
+		&_response);
+		}, ndo_set_rx_mode
+		);
+	}
+	);
+	if (ret) {
+		LIBLCD_ERR("thc_ipc_call");
+		goto fail_ipc;
+	}
+	fipc_recv_msg_end(thc_channel_to_fipc(hidden_args->async_chnl),
+			_response);
+	lcd_exit(0);
+	return;
+fail_async:
+fail_ipc:
+	return;
+
+}
+
+void ndo_set_rx_mode(struct net_device *dev,
+		struct trampoline_hidden_args *hidden_args)
+{
+	struct net_device_container *dev_container;
+	int ret;
+	struct fipc_message *_request;
+	struct fipc_message *_response;
+	if (!current->ptstate) {
+		LIBLCD_MSG("Calling from a non-LCD context! creating thc runtime!");
+		LCD_MAIN({
+			ndo_set_rx_mode_user(dev,
+					hidden_args);
+		}
+		);
+		return;
+	}
+	dev_container = container_of(dev,
+		struct net_device_container,
+		net_device);
+	ret = async_msg_blocking_send_start(hidden_args->async_chnl,
+		&_request);
+	if (ret) {
+		LIBLCD_ERR("failed to get a send slot");
+		goto fail_async;
+	}
+	async_msg_set_fn_type(_request,
+			NDO_SET_RX_MODE);
+	fipc_set_reg1(_request,
+			dev_container->other_ref.cptr);
+	ret = thc_ipc_call(hidden_args->async_chnl,
+		_request,
+		&_response);
+	if (ret) {
+		LIBLCD_ERR("thc_ipc_call");
+		goto fail_ipc;
+	}
+	fipc_recv_msg_end(thc_channel_to_fipc(hidden_args->async_chnl),
+			_response);
+	return;
+fail_async:
+fail_ipc:
+	return;
+
+}
+
+LCD_TRAMPOLINE_DATA(ndo_set_rx_mode_trampoline);
+void  LCD_TRAMPOLINE_LINKAGE(ndo_set_rx_mode_trampoline)
+ndo_set_rx_mode_trampoline(struct net_device *dev)
+{
+	void ( *volatile ndo_set_rx_mode_fp )(struct net_device *,
+		struct trampoline_hidden_args *);
+	struct trampoline_hidden_args *hidden_args;
+	LCD_TRAMPOLINE_PROLOGUE(hidden_args,
+			ndo_set_rx_mode_trampoline);
+	ndo_set_rx_mode_fp = ndo_set_rx_mode;
+	return ndo_set_rx_mode_fp(dev,
+		hidden_args);
+
+}
+
+int ndo_validate_addr_user(struct net_device *dev,
+		struct trampoline_hidden_args *hidden_args)
+{
+	struct net_device_container *dev_container;
+	int ret;
+	struct fipc_message *_request;
+	struct fipc_message *_response;
+	int func_ret;
+	dev_container = container_of(dev,
+		struct net_device_container,
+		net_device);
+	thc_init();
+	ret = async_msg_blocking_send_start(hidden_args->async_chnl,
+		&_request);
+	if (ret) {
+		LIBLCD_ERR("failed to get a send slot");
+		goto fail_async;
+	}
+	async_msg_set_fn_type(_request,
+			NDO_VALIDATE_ADDR);
+	fipc_set_reg1(_request,
+			dev_container->other_ref.cptr);
+	DO_FINISH({
+		ASYNC_({
+			ret = thc_ipc_call(hidden_args->async_chnl,
+		_request,
+		&_response);
+		}, ndo_validate_addr
+		);
+	}
+	);
+	if (ret) {
+		LIBLCD_ERR("thc_ipc_call");
+		goto fail_ipc;
+	}
+	func_ret = fipc_get_reg1(_response);
+	fipc_recv_msg_end(thc_channel_to_fipc(hidden_args->async_chnl),
+			_response);
+	lcd_exit(0);
+	return func_ret;
+fail_async:
+fail_ipc:
+	return ret;
+}
+
+int ndo_validate_addr(struct net_device *dev,
+		struct trampoline_hidden_args *hidden_args)
+{
+	struct net_device_container *dev_container;
+	int ret;
+	struct fipc_message *_request;
+	struct fipc_message *_response;
+	int func_ret;
+	if (!current->ptstate) {
+		LIBLCD_MSG("Calling from a non-LCD context! creating thc runtime!");
+		LCD_MAIN({
+			ret = ndo_validate_addr_user(dev,
+		hidden_args);
+		}
+		);
+		return ret;
+	}
+	dev_container = container_of(dev,
+		struct net_device_container,
+		net_device);
+	ret = async_msg_blocking_send_start(hidden_args->async_chnl,
+		&_request);
+	if (ret) {
+		LIBLCD_ERR("failed to get a send slot");
+		goto fail_async;
+	}
+	async_msg_set_fn_type(_request,
+			NDO_VALIDATE_ADDR);
+	fipc_set_reg1(_request,
+			dev_container->other_ref.cptr);
+	ret = thc_ipc_call(hidden_args->async_chnl,
+		_request,
+		&_response);
+	if (ret) {
+		LIBLCD_ERR("thc_ipc_call");
+		goto fail_ipc;
+	}
+	func_ret = fipc_get_reg1(_response);
+	fipc_recv_msg_end(thc_channel_to_fipc(hidden_args->async_chnl),
+			_response);
+	return func_ret;
+fail_async:
+fail_ipc:
+	return ret;
+
+}
+
+LCD_TRAMPOLINE_DATA(ndo_validate_addr_trampoline);
+int  LCD_TRAMPOLINE_LINKAGE(ndo_validate_addr_trampoline)
+ndo_validate_addr_trampoline(struct net_device *dev)
+{
+	int ( *volatile ndo_validate_addr_fp )(struct net_device *,
+		struct trampoline_hidden_args *);
+	struct trampoline_hidden_args *hidden_args;
+	LCD_TRAMPOLINE_PROLOGUE(hidden_args,
+			ndo_validate_addr_trampoline);
+	ndo_validate_addr_fp = ndo_validate_addr;
+	return ndo_validate_addr_fp(dev,
+		hidden_args);
+
+}
+
+int ndo_set_mac_address_user(struct net_device *dev,
+		void *addr,
+		struct trampoline_hidden_args *hidden_args)
+{
+	struct net_device_container *dev_container;
+	int ret;
+	struct fipc_message *_request;
+	struct fipc_message *_response;
+	int sync_ret;
+	unsigned 	long addr_mem_sz;
+	unsigned 	long addr_offset;
+	cptr_t addr_cptr;
+	unsigned 	int request_cookie;
+	int func_ret;
+	dev_container = container_of(dev,
+		struct net_device_container,
+		net_device);
+	thc_init();
+	ret = async_msg_blocking_send_start(hidden_args->async_chnl,
+		&_request);
+	if (ret) {
+		LIBLCD_ERR("failed to get a send slot");
+		goto fail_async;
+	}
+	async_msg_set_fn_type(_request,
+			NDO_SET_MAC_ADDRESS);
+	fipc_set_reg1(_request,
+			dev_container->other_ref.cptr);
+	sync_ret = lcd_virt_to_cptr(__gva(( unsigned  long   )addr),
+		&addr_cptr,
+		&addr_mem_sz,
+		&addr_offset);
+	if (sync_ret) {
+		LIBLCD_ERR("virt to cptr failed");
+		lcd_exit(-1);
+	}
+	ret = thc_ipc_send_request(hidden_args->async_chnl,
+		_request,
+		&request_cookie);
+
+	if (ret) {
+		LIBLCD_ERR("thc_ipc_send_request");
+		goto fail_ipc;
+	}
+	lcd_set_r0(ilog2(( addr_mem_sz ) >> ( PAGE_SHIFT )));
+	lcd_set_r1(addr_offset);
+	lcd_set_cr0(addr_cptr);
+	sync_ret = lcd_sync_send(sync_ep);
+	lcd_set_cr0(CAP_CPTR_NULL);
+	if (sync_ret) {
+		LIBLCD_ERR("failed to send");
+		lcd_exit(-1);
+	}
+	DO_FINISH({
+		ASYNC_({
+		ret = thc_ipc_recv_response(hidden_args->async_chnl,
+		request_cookie,
+		&_response);
+		}, ndo_set_mac_addr
+		);
+	});
+	func_ret = fipc_get_reg1(_response);
+	fipc_recv_msg_end(thc_channel_to_fipc(hidden_args->async_chnl),
+			_response);
+	lcd_exit(0);
+	return func_ret;
+fail_async:
+fail_ipc:
+	return ret;
+
+}
+
+int ndo_set_mac_address(struct net_device *dev,
+		void *addr,
+		struct trampoline_hidden_args *hidden_args)
+{
+	struct net_device_container *dev_container;
+	int ret;
+	struct fipc_message *_request;
+	struct fipc_message *_response;
+	int sync_ret;
+	unsigned 	long addr_mem_sz;
+	unsigned 	long addr_offset;
+	cptr_t addr_cptr;
+	unsigned 	int request_cookie;
+	int func_ret;
+	if (!current->ptstate) {
+		LIBLCD_MSG("Calling from a non-LCD context! creating thc runtime!");
+		LCD_MAIN({
+			ret = ndo_set_mac_address_user(dev,
+		addr,
+		hidden_args);
+		}
+		);
+		return ret;
+	}
+	dev_container = container_of(dev,
+		struct net_device_container,
+		net_device);
+	ret = async_msg_blocking_send_start(hidden_args->async_chnl,
+		&_request);
+	if (ret) {
+		LIBLCD_ERR("failed to get a send slot");
+		goto fail_async;
+	}
+	async_msg_set_fn_type(_request,
+			NDO_SET_MAC_ADDRESS);
+	fipc_set_reg1(_request,
+			dev_container->other_ref.cptr);
+	sync_ret = lcd_virt_to_cptr(__gva(( unsigned  long   )addr),
+		&addr_cptr,
+		&addr_mem_sz,
+		&addr_offset);
+	if (sync_ret) {
+		LIBLCD_ERR("virt to cptr failed");
+		lcd_exit(-1);
+	}
+	ret = thc_ipc_send_request(hidden_args->async_chnl,
+		_request,
+		&request_cookie);
+	if (ret) {
+		LIBLCD_ERR("thc_ipc_send_request");
+		goto fail_ipc;
+	}
+	lcd_set_r0(ilog2(( addr_mem_sz ) >> ( PAGE_SHIFT )));
+	lcd_set_r1(addr_offset);
+	lcd_set_cr0(addr_cptr);
+	sync_ret = lcd_sync_send(sync_ep);
+	lcd_set_cr0(CAP_CPTR_NULL);
+	if (sync_ret) {
+		LIBLCD_ERR("failed to send");
+		lcd_exit(-1);
+	}
+	ret = thc_ipc_recv_response(hidden_args->async_chnl,
+		request_cookie,
+		&_response);
+	func_ret = fipc_get_reg1(_response);
+	fipc_recv_msg_end(thc_channel_to_fipc(hidden_args->async_chnl),
+			_response);
+	return func_ret;
+fail_async:
+fail_ipc:
+	return ret;
+
+}
+
+LCD_TRAMPOLINE_DATA(ndo_set_mac_address_trampoline);
+int  LCD_TRAMPOLINE_LINKAGE(ndo_set_mac_address_trampoline)
+ndo_set_mac_address_trampoline(struct net_device *dev,
+		void *addr)
+{
+	int ( *volatile ndo_set_mac_address_fp )(struct net_device *,
+		void *,
+		struct trampoline_hidden_args *);
+	struct trampoline_hidden_args *hidden_args;
+	LCD_TRAMPOLINE_PROLOGUE(hidden_args,
+			ndo_set_mac_address_trampoline);
+	ndo_set_mac_address_fp = ndo_set_mac_address;
+	return ndo_set_mac_address_fp(dev,
+		addr,
+		hidden_args);
+
+}
+
+int ndo_change_mtu_user(struct net_device *dev,
+		int new_mtu,
+		struct trampoline_hidden_args *hidden_args)
+{
+	struct net_device_container *dev_container;
+	int ret;
+	struct fipc_message *_request;
+	struct fipc_message *_response;
+	int func_ret;
+	dev_container = container_of(dev,
+		struct net_device_container,
+		net_device);
+	thc_init();
+	ret = async_msg_blocking_send_start(hidden_args->async_chnl,
+		&_request);
+	if (ret) {
+		LIBLCD_ERR("failed to get a send slot");
+		goto fail_async;
+	}
+	async_msg_set_fn_type(_request,
+			NDO_CHANGE_MTU);
+	fipc_set_reg1(_request,
+			dev_container->other_ref.cptr);
+	fipc_set_reg3(_request,
+			new_mtu);
+	DO_FINISH({
+		ASYNC_({
+			ret = thc_ipc_call(hidden_args->async_chnl,
+		_request,
+		&_response);
+		}, ndo_change_mtu
+		);
+	}
+	);
+	if (ret) {
+		LIBLCD_ERR("thc_ipc_call");
+		goto fail_ipc;
+	}
+	func_ret = fipc_get_reg1(_response);
+	fipc_recv_msg_end(thc_channel_to_fipc(hidden_args->async_chnl),
+			_response);
+	lcd_exit(0);
+	return func_ret;
+fail_async:
+fail_ipc:
+	return ret;
+
+}
+
+int ndo_change_mtu(struct net_device *dev,
+		int new_mtu,
+		struct trampoline_hidden_args *hidden_args)
+{
+	struct net_device_container *dev_container;
+	int ret;
+	struct fipc_message *_request;
+	struct fipc_message *_response;
+	int func_ret;
+	if (!current->ptstate) {
+		LIBLCD_MSG("Calling from a non-LCD context! creating thc runtime!");
+		LCD_MAIN({
+			ret = ndo_change_mtu_user(dev,
+		new_mtu,
+		hidden_args);
+		}
+		);
+		return ret;
+	}
+	dev_container = container_of(dev,
+		struct net_device_container,
+		net_device);
+	ret = async_msg_blocking_send_start(hidden_args->async_chnl,
+		&_request);
+	if (ret) {
+		LIBLCD_ERR("failed to get a send slot");
+		goto fail_async;
+	}
+	async_msg_set_fn_type(_request,
+			NDO_CHANGE_MTU);
+	fipc_set_reg1(_request,
+			dev_container->other_ref.cptr);
+	fipc_set_reg3(_request,
+			new_mtu);
+	ret = thc_ipc_call(hidden_args->async_chnl,
+		_request,
+		&_response);
+	if (ret) {
+		LIBLCD_ERR("thc_ipc_call");
+		goto fail_ipc;
+	}
+	func_ret = fipc_get_reg1(_response);
+	fipc_recv_msg_end(thc_channel_to_fipc(hidden_args->async_chnl),
+			_response);
+	return func_ret;
+fail_async:
+fail_ipc:
+	return ret;
+
+}
+
+LCD_TRAMPOLINE_DATA(ndo_change_mtu_trampoline);
+int  LCD_TRAMPOLINE_LINKAGE(ndo_change_mtu_trampoline)
+ndo_change_mtu_trampoline(struct net_device *dev,
+		int new_mtu)
+{
+	int ( *volatile ndo_change_mtu_fp )(struct net_device *,
+		int ,
+		struct trampoline_hidden_args *);
+	struct trampoline_hidden_args *hidden_args;
+	LCD_TRAMPOLINE_PROLOGUE(hidden_args,
+			ndo_change_mtu_trampoline);
+	ndo_change_mtu_fp = ndo_change_mtu;
+	return ndo_change_mtu_fp(dev,
+		new_mtu,
+		hidden_args);
+
+}
+
+void ndo_tx_timeout_user(struct net_device *dev,
+		struct trampoline_hidden_args *hidden_args)
+{
+	struct net_device_container *dev_container;
+	int ret;
+	struct fipc_message *_request;
+	struct fipc_message *_response;
+	dev_container = container_of(dev,
+		struct net_device_container,
+		net_device);
+	thc_init();
+	ret = async_msg_blocking_send_start(hidden_args->async_chnl,
+		&_request);
+	if (ret) {
+		LIBLCD_ERR("failed to get a send slot");
+		goto fail_async;
+	}
+	async_msg_set_fn_type(_request,
+			NDO_TX_TIMEOUT);
+	fipc_set_reg1(_request,
+			dev_container->other_ref.cptr);
+	DO_FINISH({
+		ASYNC_({
+			ret = thc_ipc_call(hidden_args->async_chnl,
+		_request,
+		&_response);
+		}, ndo_tx_timeout
+		);
+	}
+	);
+	if (ret) {
+		LIBLCD_ERR("thc_ipc_call");
+		goto fail_ipc;
+	}
+	fipc_recv_msg_end(thc_channel_to_fipc(hidden_args->async_chnl),
+			_response);
+	lcd_exit(0);
+
+fail_async:
+fail_ipc:
+	return;
+
+}
+
+void ndo_tx_timeout(struct net_device *dev,
+		struct trampoline_hidden_args *hidden_args)
+{
+	struct net_device_container *dev_container;
+	int ret;
+	struct fipc_message *_request;
+	struct fipc_message *_response;
+	if (!current->ptstate) {
+		LIBLCD_MSG("Calling from a non-LCD context! creating thc runtime!");
+		LCD_MAIN({
+			ndo_tx_timeout_user(dev,
+		hidden_args);
+		}
+		);
+		return;
+	}
+	dev_container = container_of(dev,
+		struct net_device_container,
+		net_device);
+	ret = async_msg_blocking_send_start(hidden_args->async_chnl,
+		&_request);
+	if (ret) {
+		LIBLCD_ERR("failed to get a send slot");
+		goto fail_async;
+	}
+	async_msg_set_fn_type(_request,
+			NDO_TX_TIMEOUT);
+	fipc_set_reg1(_request,
+			dev_container->other_ref.cptr);
+	ret = thc_ipc_call(hidden_args->async_chnl,
+		_request,
+		&_response);
+	if (ret) {
+		LIBLCD_ERR("thc_ipc_call");
+		goto fail_ipc;
+	}
+	fipc_recv_msg_end(thc_channel_to_fipc(hidden_args->async_chnl),
+			_response);
+fail_async:
+fail_ipc:
+	return;
+
+}
+
+LCD_TRAMPOLINE_DATA(ndo_tx_timeout_trampoline);
+void LCD_TRAMPOLINE_LINKAGE(ndo_tx_timeout_trampoline)
+ndo_tx_timeout_trampoline(struct net_device *dev)
+{
+	void ( *volatile ndo_tx_timeout_fp )(struct net_device *,
+		struct trampoline_hidden_args *);
+	struct trampoline_hidden_args *hidden_args;
+	LCD_TRAMPOLINE_PROLOGUE(hidden_args,
+			ndo_tx_timeout_trampoline);
+	ndo_tx_timeout_fp = ndo_tx_timeout;
+	ndo_tx_timeout_fp(dev,
+		hidden_args);
+	return;
+}
+
+int ndo_set_tx_maxrate_user(struct net_device *dev,
+		int queue_index,
+		unsigned int maxrate,
+		struct trampoline_hidden_args *hidden_args)
+{
+	struct net_device_container *dev_container;
+	int ret;
+	struct fipc_message *_request;
+	struct fipc_message *_response;
+	int func_ret;
+	dev_container = container_of(dev,
+		struct net_device_container,
+		net_device);
+	thc_init();
+	ret = async_msg_blocking_send_start(hidden_args->async_chnl,
+		&_request);
+	if (ret) {
+		LIBLCD_ERR("failed to get a send slot");
+		goto fail_async;
+	}
+	async_msg_set_fn_type(_request,
+			NDO_SET_TX_MAXRATE);
+	fipc_set_reg1(_request,
+			dev_container->other_ref.cptr);
+	fipc_set_reg3(_request,
+			queue_index);
+	fipc_set_reg4(_request,
+			maxrate);
+	DO_FINISH({
+		ASYNC_({
+			ret = thc_ipc_call(hidden_args->async_chnl,
+		_request,
+		&_response);
+		}, ndo_set_tx_maxrate
+		);
+	}
+	);
+	if (ret) {
+		LIBLCD_ERR("thc_ipc_call");
+		goto fail_ipc;
+	}
+	func_ret = fipc_get_reg1(_response);
+	fipc_recv_msg_end(thc_channel_to_fipc(hidden_args->async_chnl),
+			_response);
+	lcd_exit(0);
+	return func_ret;
+fail_async:
+fail_ipc:
+	return ret;
+
+}
+
+int ndo_set_tx_maxrate(struct net_device *dev,
+		int queue_index,
+		unsigned int maxrate,
+		struct trampoline_hidden_args *hidden_args)
+{
+	struct net_device_container *dev_container;
+	int ret;
+	struct fipc_message *_request;
+	struct fipc_message *_response;
+	int func_ret;
+	if (!current->ptstate) {
+		LIBLCD_MSG("Calling from a non-LCD context! creating thc runtime!");
+		LCD_MAIN({
+			ret = ndo_set_tx_maxrate_user(dev,
+		queue_index,
+		maxrate,
+		hidden_args);
+		}
+		);
+		return ret;
+	}
+	dev_container = container_of(dev,
+		struct net_device_container,
+		net_device);
+	ret = async_msg_blocking_send_start(hidden_args->async_chnl,
+		&_request);
+	if (ret) {
+		LIBLCD_ERR("failed to get a send slot");
+		goto fail_async;
+	}
+	async_msg_set_fn_type(_request,
+			NDO_SET_TX_MAXRATE);
+	fipc_set_reg1(_request,
+			dev_container->other_ref.cptr);
+	fipc_set_reg3(_request,
+			queue_index);
+	fipc_set_reg4(_request,
+			maxrate);
+	ret = thc_ipc_call(hidden_args->async_chnl,
+		_request,
+		&_response);
+	if (ret) {
+		LIBLCD_ERR("thc_ipc_call");
+		goto fail_ipc;
+	}
+	func_ret = fipc_get_reg1(_response);
+	fipc_recv_msg_end(thc_channel_to_fipc(hidden_args->async_chnl),
+			_response);
+	return func_ret;
+fail_async:
+fail_ipc:
+	return ret;
+
+}
+
+LCD_TRAMPOLINE_DATA(ndo_set_tx_maxrate_trampoline);
+int  LCD_TRAMPOLINE_LINKAGE(ndo_set_tx_maxrate_trampoline)
+ndo_set_tx_maxrate_trampoline(struct net_device *dev,
+		int queue_index,
+		unsigned int maxrate)
+{
+	int ( *volatile ndo_set_tx_maxrate_fp )(struct net_device *,
+		int ,
+		unsigned int ,
+		struct trampoline_hidden_args *);
+	struct trampoline_hidden_args *hidden_args;
+	LCD_TRAMPOLINE_PROLOGUE(hidden_args,
+			ndo_set_tx_maxrate_trampoline);
+	ndo_set_tx_maxrate_fp = ndo_set_tx_maxrate;
+	return ndo_set_tx_maxrate_fp(dev,
+		queue_index,
+		maxrate,
+		hidden_args);
+
+}
+
+struct rtnl_link_stats64 *ndo_get_stats64_user(struct net_device *dev,
+		struct rtnl_link_stats64 *stats,
+		struct trampoline_hidden_args *hidden_args)
+{
+	struct net_device_container *dev_container;
+	int ret;
+	struct fipc_message *_request;
+	struct fipc_message *_response;
+	dev_container = container_of(dev,
+		struct net_device_container,
+		net_device);
+	thc_init();
+	ret = async_msg_blocking_send_start(hidden_args->async_chnl,
+		&_request);
+	if (ret) {
+		LIBLCD_ERR("failed to get a send slot");
+		goto fail_async;
+	}
+	async_msg_set_fn_type(_request,
+			NDO_GET_STATS64);
+	fipc_set_reg1(_request,
+			dev_container->other_ref.cptr);
+	DO_FINISH({
+		ASYNC_({
+			ret = thc_ipc_call(hidden_args->async_chnl,
+		_request,
+		&_response);
+		}, ndo_get_stats
+		);
+	}
+	);
+	if (ret) {
+		LIBLCD_ERR("thc_ipc_call");
+		goto fail_ipc;
+	}
+	fipc_recv_msg_end(thc_channel_to_fipc(hidden_args->async_chnl),
+			_response);
+	lcd_exit(0);
+	return stats;
+fail_async:
+fail_ipc:
+	return stats;
+}
+
+struct rtnl_link_stats64 *ndo_get_stats64(struct net_device *dev,
+		struct rtnl_link_stats64 *stats,
+		struct trampoline_hidden_args *hidden_args)
+{
+	struct net_device_container *dev_container;
+	int ret;
+	struct fipc_message *_request;
+	struct fipc_message *_response;
+	struct rtnl_link_stats64 *func_ret = stats;
+	if (!current->ptstate) {
+		LIBLCD_MSG("Calling from a non-LCD context! creating thc runtime!");
+		LCD_MAIN({
+			func_ret = ndo_get_stats64_user(dev,
+		stats,
+		hidden_args);
+		}
+		);
+		return func_ret;
+	}
+	dev_container = container_of(dev,
+		struct net_device_container,
+		net_device);
+	ret = async_msg_blocking_send_start(hidden_args->async_chnl,
+		&_request);
+	if (ret) {
+		LIBLCD_ERR("failed to get a send slot");
+		goto fail_async;
+	}
+	async_msg_set_fn_type(_request,
+			NDO_GET_STATS64);
+	fipc_set_reg1(_request,
+			dev_container->other_ref.cptr);
+
+	LIBLCD_MSG("netdev lcd_ref %lu", dev_container->other_ref.cptr);
+
+	ret = thc_ipc_call(hidden_args->async_chnl,
+		_request,
+		&_response);
+	if (ret) {
+		LIBLCD_ERR("thc_ipc_call");
+		goto fail_ipc;
+	}
+	stats->rx_packets = fipc_get_reg1(_response);
+	stats->rx_bytes = fipc_get_reg2(_response);
+	stats->tx_packets = fipc_get_reg3(_response);
+	stats->tx_bytes = fipc_get_reg4(_response);
+
+	fipc_recv_msg_end(thc_channel_to_fipc(hidden_args->async_chnl),
+			_response);
+	return func_ret;
+fail_async:
+fail_ipc:
+	return func_ret;
+}
+
+LCD_TRAMPOLINE_DATA(ndo_get_stats64_trampoline);
+struct rtnl_link_stats64  LCD_TRAMPOLINE_LINKAGE(ndo_get_stats64_trampoline)
+*ndo_get_stats64_trampoline(struct net_device *dev,
+		struct rtnl_link_stats64 *stats)
+{
+	struct rtnl_link_stats64* ( *volatile ndo_get_stats64_fp )(struct net_device *,
+		struct rtnl_link_stats64 *,
+		struct trampoline_hidden_args *);
+	struct trampoline_hidden_args *hidden_args;
+	LCD_TRAMPOLINE_PROLOGUE(hidden_args,
+			ndo_get_stats64_trampoline);
+	ndo_get_stats64_fp = ndo_get_stats64;
+	return ndo_get_stats64_fp(dev,
+		stats,
+		hidden_args);
+
+}
+
+
+void setup_netdev_ops(struct net_device_container *dev_c,
+	struct net_device_ops_container *netdev_ops_container, struct thc_channel *_channel,
+	struct cptr sync_ep)
+{
+	struct trampoline_hidden_args *dev_netdev_ops_ndo_open_hidden_args;
+	struct trampoline_hidden_args *dev_netdev_ops_ndo_stop_hidden_args;
+	struct trampoline_hidden_args *dev_netdev_ops_ndo_start_xmit_hidden_args;
+	struct trampoline_hidden_args *dev_netdev_ops_ndo_set_rx_mode_hidden_args;
+	struct trampoline_hidden_args *dev_netdev_ops_ndo_validate_addr_hidden_args;
+	struct trampoline_hidden_args *dev_netdev_ops_ndo_set_mac_address_hidden_args;
+	struct trampoline_hidden_args *dev_netdev_ops_ndo_change_mtu_hidden_args;
+	struct trampoline_hidden_args *dev_netdev_ops_ndo_tx_timeout_hidden_args;
+	struct trampoline_hidden_args *dev_netdev_ops_ndo_set_tx_maxrate_hidden_args;
+	struct trampoline_hidden_args *dev_netdev_ops_ndo_get_stats64_hidden_args;
+	int ret;
+
+	dev_netdev_ops_ndo_open_hidden_args = kzalloc(sizeof( struct trampoline_hidden_args ),
+		GFP_KERNEL);
+	if (!dev_netdev_ops_ndo_open_hidden_args) {
+		LIBLCD_ERR("kzalloc hidden args");
+		goto fail_alloc1;
+	}
+	dev_netdev_ops_ndo_open_hidden_args->t_handle = LCD_DUP_TRAMPOLINE(ndo_open_trampoline);
+	if (!dev_netdev_ops_ndo_open_hidden_args->t_handle) {
+		LIBLCD_ERR("duplicate trampoline");
+		goto fail_dup1;
+	}
+	dev_netdev_ops_ndo_open_hidden_args->t_handle->hidden_args = dev_netdev_ops_ndo_open_hidden_args;
+	dev_netdev_ops_ndo_open_hidden_args->struct_container = netdev_ops_container;
+	dev_netdev_ops_ndo_open_hidden_args->cspace = c_cspace;
+	dev_netdev_ops_ndo_open_hidden_args->sync_ep = sync_ep;
+	dev_netdev_ops_ndo_open_hidden_args->async_chnl = _channel;
+	netdev_ops_container->net_device_ops.ndo_open = LCD_HANDLE_TO_TRAMPOLINE(dev_netdev_ops_ndo_open_hidden_args->t_handle);
+	ret = set_memory_x(( ( unsigned  long   )dev_netdev_ops_ndo_open_hidden_args->t_handle ) & ( PAGE_MASK ),
+		( ALIGN(LCD_TRAMPOLINE_SIZE(ndo_open_trampoline),
+		PAGE_SIZE) ) >> ( PAGE_SHIFT ));
+	dev_netdev_ops_ndo_stop_hidden_args = kzalloc(sizeof( struct trampoline_hidden_args ),
+		GFP_KERNEL);
+	if (!dev_netdev_ops_ndo_stop_hidden_args) {
+		LIBLCD_ERR("kzalloc hidden args");
+		goto fail_alloc2;
+	}
+	dev_netdev_ops_ndo_stop_hidden_args->t_handle = LCD_DUP_TRAMPOLINE(ndo_stop_trampoline);
+	if (!dev_netdev_ops_ndo_stop_hidden_args->t_handle) {
+		LIBLCD_ERR("duplicate trampoline");
+		goto fail_dup2;
+	}
+	dev_netdev_ops_ndo_stop_hidden_args->t_handle->hidden_args = dev_netdev_ops_ndo_stop_hidden_args;
+	dev_netdev_ops_ndo_stop_hidden_args->struct_container = netdev_ops_container;
+	dev_netdev_ops_ndo_stop_hidden_args->cspace = c_cspace;
+	dev_netdev_ops_ndo_stop_hidden_args->sync_ep = sync_ep;
+	dev_netdev_ops_ndo_stop_hidden_args->async_chnl = _channel;
+	netdev_ops_container->net_device_ops.ndo_stop = LCD_HANDLE_TO_TRAMPOLINE(dev_netdev_ops_ndo_stop_hidden_args->t_handle);
+	ret = set_memory_x(( ( unsigned  long   )dev_netdev_ops_ndo_stop_hidden_args->t_handle ) & ( PAGE_MASK ),
+		( ALIGN(LCD_TRAMPOLINE_SIZE(ndo_stop_trampoline),
+		PAGE_SIZE) ) >> ( PAGE_SHIFT ));
+	dev_netdev_ops_ndo_start_xmit_hidden_args = kzalloc(sizeof( struct trampoline_hidden_args ),
+		GFP_KERNEL);
+	if (!dev_netdev_ops_ndo_start_xmit_hidden_args) {
+		LIBLCD_ERR("kzalloc hidden args");
+		goto fail_alloc3;
+	}
+	dev_netdev_ops_ndo_start_xmit_hidden_args->t_handle = LCD_DUP_TRAMPOLINE(ndo_start_xmit_trampoline);
+	if (!dev_netdev_ops_ndo_start_xmit_hidden_args->t_handle) {
+		LIBLCD_ERR("duplicate trampoline");
+		goto fail_dup3;
+	}
+	dev_netdev_ops_ndo_start_xmit_hidden_args->t_handle->hidden_args = dev_netdev_ops_ndo_start_xmit_hidden_args;
+	dev_netdev_ops_ndo_start_xmit_hidden_args->struct_container = netdev_ops_container;
+	dev_netdev_ops_ndo_start_xmit_hidden_args->cspace = c_cspace;
+	dev_netdev_ops_ndo_start_xmit_hidden_args->sync_ep = sync_ep;
+	dev_netdev_ops_ndo_start_xmit_hidden_args->async_chnl = _channel;
+	netdev_ops_container->net_device_ops.ndo_start_xmit = LCD_HANDLE_TO_TRAMPOLINE(dev_netdev_ops_ndo_start_xmit_hidden_args->t_handle);
+	ret = set_memory_x(( ( unsigned  long   )dev_netdev_ops_ndo_start_xmit_hidden_args->t_handle ) & ( PAGE_MASK ),
+		( ALIGN(LCD_TRAMPOLINE_SIZE(ndo_start_xmit_trampoline),
+		PAGE_SIZE) ) >> ( PAGE_SHIFT ));
+
+	dev_netdev_ops_ndo_set_rx_mode_hidden_args = kzalloc(sizeof( struct trampoline_hidden_args ),
+		GFP_KERNEL);
+	if (!dev_netdev_ops_ndo_set_rx_mode_hidden_args) {
+		LIBLCD_ERR("kzalloc hidden args");
+		goto fail_alloc5;
+	}
+	dev_netdev_ops_ndo_set_rx_mode_hidden_args->t_handle = LCD_DUP_TRAMPOLINE(ndo_set_rx_mode_trampoline);
+	if (!dev_netdev_ops_ndo_set_rx_mode_hidden_args->t_handle) {
+		LIBLCD_ERR("duplicate trampoline");
+		goto fail_dup5;
+	}
+	dev_netdev_ops_ndo_set_rx_mode_hidden_args->t_handle->hidden_args = dev_netdev_ops_ndo_set_rx_mode_hidden_args;
+	dev_netdev_ops_ndo_set_rx_mode_hidden_args->struct_container = netdev_ops_container;
+	dev_netdev_ops_ndo_set_rx_mode_hidden_args->cspace = c_cspace;
+	dev_netdev_ops_ndo_set_rx_mode_hidden_args->sync_ep = sync_ep;
+	dev_netdev_ops_ndo_set_rx_mode_hidden_args->async_chnl = _channel;
+	netdev_ops_container->net_device_ops.ndo_set_rx_mode = LCD_HANDLE_TO_TRAMPOLINE(dev_netdev_ops_ndo_set_rx_mode_hidden_args->t_handle);
+	ret = set_memory_x(( ( unsigned  long   )dev_netdev_ops_ndo_set_rx_mode_hidden_args->t_handle ) & ( PAGE_MASK ),
+		( ALIGN(LCD_TRAMPOLINE_SIZE(ndo_set_rx_mode_trampoline),
+		PAGE_SIZE) ) >> ( PAGE_SHIFT ));
+	dev_netdev_ops_ndo_validate_addr_hidden_args = kzalloc(sizeof( struct trampoline_hidden_args ),
+		GFP_KERNEL);
+	if (!dev_netdev_ops_ndo_validate_addr_hidden_args) {
+		LIBLCD_ERR("kzalloc hidden args");
+		goto fail_alloc6;
+	}
+	dev_netdev_ops_ndo_validate_addr_hidden_args->t_handle = LCD_DUP_TRAMPOLINE(ndo_validate_addr_trampoline);
+	if (!dev_netdev_ops_ndo_validate_addr_hidden_args->t_handle) {
+		LIBLCD_ERR("duplicate trampoline");
+		goto fail_dup6;
+	}
+	dev_netdev_ops_ndo_validate_addr_hidden_args->t_handle->hidden_args = dev_netdev_ops_ndo_validate_addr_hidden_args;
+	dev_netdev_ops_ndo_validate_addr_hidden_args->struct_container = netdev_ops_container;
+	dev_netdev_ops_ndo_validate_addr_hidden_args->cspace = c_cspace;
+	dev_netdev_ops_ndo_validate_addr_hidden_args->sync_ep = sync_ep;
+	dev_netdev_ops_ndo_validate_addr_hidden_args->async_chnl = _channel;
+	netdev_ops_container->net_device_ops.ndo_validate_addr = LCD_HANDLE_TO_TRAMPOLINE(dev_netdev_ops_ndo_validate_addr_hidden_args->t_handle);
+	ret = set_memory_x(( ( unsigned  long   )dev_netdev_ops_ndo_validate_addr_hidden_args->t_handle ) & ( PAGE_MASK ),
+		( ALIGN(LCD_TRAMPOLINE_SIZE(ndo_validate_addr_trampoline),
+		PAGE_SIZE) ) >> ( PAGE_SHIFT ));
+	dev_netdev_ops_ndo_set_mac_address_hidden_args = kzalloc(sizeof( struct trampoline_hidden_args ),
+		GFP_KERNEL);
+	if (!dev_netdev_ops_ndo_set_mac_address_hidden_args) {
+		LIBLCD_ERR("kzalloc hidden args");
+		goto fail_alloc7;
+	}
+	dev_netdev_ops_ndo_set_mac_address_hidden_args->t_handle = LCD_DUP_TRAMPOLINE(ndo_set_mac_address_trampoline);
+	if (!dev_netdev_ops_ndo_set_mac_address_hidden_args->t_handle) {
+		LIBLCD_ERR("duplicate trampoline");
+		goto fail_dup7;
+	}
+	dev_netdev_ops_ndo_set_mac_address_hidden_args->t_handle->hidden_args = dev_netdev_ops_ndo_set_mac_address_hidden_args;
+	dev_netdev_ops_ndo_set_mac_address_hidden_args->struct_container = netdev_ops_container;
+	dev_netdev_ops_ndo_set_mac_address_hidden_args->cspace = c_cspace;
+	dev_netdev_ops_ndo_set_mac_address_hidden_args->sync_ep = sync_ep;
+	dev_netdev_ops_ndo_set_mac_address_hidden_args->async_chnl = _channel;
+	netdev_ops_container->net_device_ops.ndo_set_mac_address = LCD_HANDLE_TO_TRAMPOLINE(dev_netdev_ops_ndo_set_mac_address_hidden_args->t_handle);
+	ret = set_memory_x(( ( unsigned  long   )dev_netdev_ops_ndo_set_mac_address_hidden_args->t_handle ) & ( PAGE_MASK ),
+		( ALIGN(LCD_TRAMPOLINE_SIZE(ndo_set_mac_address_trampoline),
+		PAGE_SIZE) ) >> ( PAGE_SHIFT ));
+	dev_netdev_ops_ndo_change_mtu_hidden_args = kzalloc(sizeof( struct trampoline_hidden_args ),
+		GFP_KERNEL);
+	if (!dev_netdev_ops_ndo_change_mtu_hidden_args) {
+		LIBLCD_ERR("kzalloc hidden args");
+		goto fail_alloc8;
+	}
+	dev_netdev_ops_ndo_change_mtu_hidden_args->t_handle = LCD_DUP_TRAMPOLINE(ndo_change_mtu_trampoline);
+	if (!dev_netdev_ops_ndo_change_mtu_hidden_args->t_handle) {
+		LIBLCD_ERR("duplicate trampoline");
+		goto fail_dup8;
+	}
+	dev_netdev_ops_ndo_change_mtu_hidden_args->t_handle->hidden_args = dev_netdev_ops_ndo_change_mtu_hidden_args;
+	dev_netdev_ops_ndo_change_mtu_hidden_args->struct_container = netdev_ops_container;
+	dev_netdev_ops_ndo_change_mtu_hidden_args->cspace = c_cspace;
+	dev_netdev_ops_ndo_change_mtu_hidden_args->sync_ep = sync_ep;
+	dev_netdev_ops_ndo_change_mtu_hidden_args->async_chnl = _channel;
+	netdev_ops_container->net_device_ops.ndo_change_mtu = LCD_HANDLE_TO_TRAMPOLINE(dev_netdev_ops_ndo_change_mtu_hidden_args->t_handle);
+	ret = set_memory_x(( ( unsigned  long   )dev_netdev_ops_ndo_change_mtu_hidden_args->t_handle ) & ( PAGE_MASK ),
+		( ALIGN(LCD_TRAMPOLINE_SIZE(ndo_change_mtu_trampoline),
+		PAGE_SIZE) ) >> ( PAGE_SHIFT ));
+	dev_netdev_ops_ndo_tx_timeout_hidden_args = kzalloc(sizeof( struct trampoline_hidden_args),
+		GFP_KERNEL);
+	if (!dev_netdev_ops_ndo_tx_timeout_hidden_args) {
+		LIBLCD_ERR("kzalloc hidden args");
+		goto fail_alloc9;
+	}
+	dev_netdev_ops_ndo_tx_timeout_hidden_args->t_handle = LCD_DUP_TRAMPOLINE(ndo_tx_timeout_trampoline);
+	if (!dev_netdev_ops_ndo_tx_timeout_hidden_args->t_handle) {
+		LIBLCD_ERR("duplicate trampoline");
+		goto fail_dup9;
+	}
+	dev_netdev_ops_ndo_tx_timeout_hidden_args->t_handle->hidden_args = dev_netdev_ops_ndo_tx_timeout_hidden_args;
+	dev_netdev_ops_ndo_tx_timeout_hidden_args->struct_container = netdev_ops_container;
+	dev_netdev_ops_ndo_tx_timeout_hidden_args->cspace = c_cspace;
+	dev_netdev_ops_ndo_tx_timeout_hidden_args->sync_ep = sync_ep;
+	dev_netdev_ops_ndo_tx_timeout_hidden_args->async_chnl = _channel;
+	netdev_ops_container->net_device_ops.ndo_tx_timeout = LCD_HANDLE_TO_TRAMPOLINE(dev_netdev_ops_ndo_tx_timeout_hidden_args->t_handle);
+	ret = set_memory_x(( ( unsigned  long   )dev_netdev_ops_ndo_tx_timeout_hidden_args->t_handle ) & ( PAGE_MASK ),
+		( ALIGN(LCD_TRAMPOLINE_SIZE(ndo_tx_timeout_trampoline),
+		PAGE_SIZE) ) >> ( PAGE_SHIFT ));
+	dev_netdev_ops_ndo_set_tx_maxrate_hidden_args = kzalloc(sizeof( struct trampoline_hidden_args ),
+		GFP_KERNEL);
+	if (!dev_netdev_ops_ndo_set_tx_maxrate_hidden_args) {
+		LIBLCD_ERR("kzalloc hidden args");
+		goto fail_alloc10;
+	}
+	dev_netdev_ops_ndo_set_tx_maxrate_hidden_args->t_handle = LCD_DUP_TRAMPOLINE(ndo_set_tx_maxrate_trampoline);
+	if (!dev_netdev_ops_ndo_set_tx_maxrate_hidden_args->t_handle) {
+		LIBLCD_ERR("duplicate trampoline");
+		goto fail_dup10;
+	}
+	dev_netdev_ops_ndo_set_tx_maxrate_hidden_args->t_handle->hidden_args = dev_netdev_ops_ndo_set_tx_maxrate_hidden_args;
+	dev_netdev_ops_ndo_set_tx_maxrate_hidden_args->struct_container = netdev_ops_container;
+	dev_netdev_ops_ndo_set_tx_maxrate_hidden_args->cspace = c_cspace;
+	dev_netdev_ops_ndo_set_tx_maxrate_hidden_args->sync_ep = sync_ep;
+	dev_netdev_ops_ndo_set_tx_maxrate_hidden_args->async_chnl = _channel;
+	netdev_ops_container->net_device_ops.ndo_set_tx_maxrate = LCD_HANDLE_TO_TRAMPOLINE(dev_netdev_ops_ndo_set_tx_maxrate_hidden_args->t_handle);
+	ret = set_memory_x(( ( unsigned  long   )dev_netdev_ops_ndo_set_tx_maxrate_hidden_args->t_handle ) & ( PAGE_MASK ),
+		( ALIGN(LCD_TRAMPOLINE_SIZE(ndo_set_tx_maxrate_trampoline),
+		PAGE_SIZE) ) >> ( PAGE_SHIFT ));
+	dev_netdev_ops_ndo_get_stats64_hidden_args = kzalloc(sizeof( struct trampoline_hidden_args ),
+		GFP_KERNEL);
+	if (!dev_netdev_ops_ndo_get_stats64_hidden_args) {
+		LIBLCD_ERR("kzalloc hidden args");
+		goto fail_alloc11;
+	}
+	dev_netdev_ops_ndo_get_stats64_hidden_args->t_handle = LCD_DUP_TRAMPOLINE(ndo_get_stats64_trampoline);
+	if (!dev_netdev_ops_ndo_get_stats64_hidden_args->t_handle) {
+		LIBLCD_ERR("duplicate trampoline");
+		goto fail_dup11;
+	}
+	dev_netdev_ops_ndo_get_stats64_hidden_args->t_handle->hidden_args = dev_netdev_ops_ndo_get_stats64_hidden_args;
+	dev_netdev_ops_ndo_get_stats64_hidden_args->struct_container = netdev_ops_container;
+	dev_netdev_ops_ndo_get_stats64_hidden_args->cspace = c_cspace;
+	dev_netdev_ops_ndo_get_stats64_hidden_args->sync_ep = sync_ep;
+	dev_netdev_ops_ndo_get_stats64_hidden_args->async_chnl = _channel;
+	netdev_ops_container->net_device_ops.ndo_get_stats64 = LCD_HANDLE_TO_TRAMPOLINE(dev_netdev_ops_ndo_get_stats64_hidden_args->t_handle);
+	ret = set_memory_x(( ( unsigned  long   )dev_netdev_ops_ndo_get_stats64_hidden_args->t_handle ) & ( PAGE_MASK ),
+		( ALIGN(LCD_TRAMPOLINE_SIZE(ndo_get_stats64_trampoline),
+		PAGE_SIZE) ) >> ( PAGE_SHIFT ));
+fail_alloc1:
+fail_dup1:
+fail_alloc2:
+fail_dup2:
+fail_alloc3:
+fail_dup3:
+fail_alloc5:
+fail_dup5:
+fail_alloc6:
+fail_dup6:
+fail_alloc7:
+fail_dup7:
+fail_alloc8:
+fail_dup8:
+fail_alloc9:
+fail_dup9:
+fail_alloc10:
+fail_dup10:
+fail_alloc11:
+fail_dup11:
+	return;
+}
+
 int register_netdev_callee(struct fipc_message *_request,
 		struct thc_channel *_channel,
 		struct glue_cspace *cspace,
 		struct cptr sync_ep)
 {
 	struct net_device_container *dev_container;
+	struct net_device_ops_container *netdev_ops_container;
 	struct net_device *dev;
 	int ret;
 	struct fipc_message *_response;
 	unsigned 	int request_cookie;
 	int func_ret;
+	u8 mac_addr[] = {0xa0, 0x36, 0x9f, 0x08, 0x1c, 0x4a};
+
 	request_cookie = thc_get_request_cookie(_request);
 	ret = glue_cap_lookup_net_device_type(cspace,
 		__cptr(fipc_get_reg0(_request)),
@@ -718,6 +2219,20 @@ int register_netdev_callee(struct fipc_message *_request,
 		LIBLCD_ERR("lookup");
 		goto fail_lookup;
 	}
+	netdev_ops_container = kzalloc(sizeof( struct net_device_ops_container   ),
+		GFP_KERNEL);
+	if (!netdev_ops_container) {
+		LIBLCD_ERR("kzalloc");
+		goto fail_alloc;
+	}
+	ret = glue_cap_insert_net_device_ops_type(c_cspace,
+		netdev_ops_container,
+		&netdev_ops_container->my_ref);
+	if (ret) {
+		LIBLCD_ERR("lcd insert");
+		goto fail_insert;
+	}
+	dev_container->net_device.netdev_ops = &netdev_ops_container->net_device_ops;
 	fipc_recv_msg_end(thc_channel_to_fipc(_channel),
 			_request);
 	dev = &dev_container->net_device;
@@ -727,6 +2242,11 @@ int register_netdev_callee(struct fipc_message *_request,
 	dev->hw_features = fipc_get_reg4(_request);
 	dev->hw_enc_features = fipc_get_reg5(_request);
 	dev->mpls_features = fipc_get_reg6(_request);
+
+	memcpy(dev->dev_addr, mac_addr, ETH_ALEN);
+	/* setup netdev_ops */
+	setup_netdev_ops(dev_container, netdev_ops_container, _channel, sync_ep);
+
 	func_ret = register_netdev(( &dev_container->net_device ));
 	if (async_msg_blocking_send_start(_channel,
 		&_response)) {
@@ -735,11 +2255,15 @@ int register_netdev_callee(struct fipc_message *_request,
 	}
 	fipc_set_reg1(_response,
 			func_ret);
+	fipc_set_reg2(_response,
+			dev->reg_state);
 	thc_ipc_reply(_channel,
 			request_cookie,
 			_response);
 
 fail_lookup:
+fail_insert:
+fail_alloc:
 	return ret;
 }
 
@@ -980,20 +2504,21 @@ int netif_device_attach_callee(struct fipc_message *_request,
 		struct glue_cspace *cspace,
 		struct cptr sync_ep)
 {
-	struct net_device *dev;
+	struct net_device_container *dev_container;
 	int ret;
 	struct fipc_message *_response;
 	unsigned 	int request_cookie;
 	request_cookie = thc_get_request_cookie(_request);
+	ret = glue_cap_lookup_net_device_type(cspace,
+		__cptr(fipc_get_reg1(_request)),
+		&dev_container);
+	if (ret) {
+		LIBLCD_ERR("lookup");
+		goto fail_lookup;
+	}
 	fipc_recv_msg_end(thc_channel_to_fipc(_channel),
 			_request);
-	dev = kzalloc(sizeof( *dev ),
-		GFP_KERNEL);
-	if (!dev) {
-		LIBLCD_ERR("kzalloc");
-		goto fail_alloc;
-	}
-	netif_device_attach(dev);
+	netif_device_attach(( &dev_container->net_device ));
 	if (async_msg_blocking_send_start(_channel,
 		&_response)) {
 		LIBLCD_ERR("error getting response msg");
@@ -1002,9 +2527,9 @@ int netif_device_attach_callee(struct fipc_message *_request,
 	thc_ipc_reply(_channel,
 			request_cookie,
 			_response);
-fail_alloc:
 	return ret;
-
+fail_lookup:
+	return ret;
 }
 
 int netif_device_detach_callee(struct fipc_message *_request,
@@ -1012,20 +2537,21 @@ int netif_device_detach_callee(struct fipc_message *_request,
 		struct glue_cspace *cspace,
 		struct cptr sync_ep)
 {
-	struct net_device *dev;
+	struct net_device_container *dev_container;
 	int ret;
 	struct fipc_message *_response;
 	unsigned 	int request_cookie;
 	request_cookie = thc_get_request_cookie(_request);
+	ret = glue_cap_lookup_net_device_type(cspace,
+		__cptr(fipc_get_reg1(_request)),
+		&dev_container);
+	if (ret) {
+		LIBLCD_ERR("lookup");
+		goto fail_lookup;
+	}
 	fipc_recv_msg_end(thc_channel_to_fipc(_channel),
 			_request);
-	dev = kzalloc(sizeof( *dev ),
-		GFP_KERNEL);
-	if (!dev) {
-		LIBLCD_ERR("kzalloc");
-		goto fail_alloc;
-	}
-	netif_device_detach(dev);
+	netif_device_detach(( &dev_container->net_device ));
 	if (async_msg_blocking_send_start(_channel,
 		&_response)) {
 		LIBLCD_ERR("error getting response msg");
@@ -1034,9 +2560,9 @@ int netif_device_detach_callee(struct fipc_message *_request,
 	thc_ipc_reply(_channel,
 			request_cookie,
 			_response);
-fail_alloc:
 	return ret;
-
+fail_lookup:
+	return ret;
 }
 
 int netif_set_real_num_rx_queues_callee(struct fipc_message *_request,
@@ -1044,23 +2570,24 @@ int netif_set_real_num_rx_queues_callee(struct fipc_message *_request,
 		struct glue_cspace *cspace,
 		struct cptr sync_ep)
 {
-	struct net_device *dev;
+	struct net_device_container *dev_container;
 	unsigned 	int rxq;
 	int ret;
 	struct fipc_message *_response;
 	unsigned 	int request_cookie;
 	int func_ret;
 	request_cookie = thc_get_request_cookie(_request);
+	ret = glue_cap_lookup_net_device_type(cspace,
+		__cptr(fipc_get_reg1(_request)),
+		&dev_container);
+	if (ret) {
+		LIBLCD_ERR("lookup");
+		goto fail_lookup;
+	}
 	fipc_recv_msg_end(thc_channel_to_fipc(_channel),
 			_request);
-	dev = kzalloc(sizeof( *dev ),
-		GFP_KERNEL);
-	if (!dev) {
-		LIBLCD_ERR("kzalloc");
-		goto fail_alloc;
-	}
-	rxq = fipc_get_reg1(_request);
-	func_ret = netif_set_real_num_rx_queues(dev,
+	rxq = fipc_get_reg3(_request);
+	func_ret = netif_set_real_num_rx_queues(( &dev_container->net_device ),
 		rxq);
 	if (async_msg_blocking_send_start(_channel,
 		&_response)) {
@@ -1072,7 +2599,8 @@ int netif_set_real_num_rx_queues_callee(struct fipc_message *_request,
 	thc_ipc_reply(_channel,
 			request_cookie,
 			_response);
-fail_alloc:
+	return ret;
+fail_lookup:
 	return ret;
 
 }
@@ -1082,24 +2610,29 @@ int netif_set_real_num_tx_queues_callee(struct fipc_message *_request,
 		struct glue_cspace *cspace,
 		struct cptr sync_ep)
 {
-	struct net_device *dev;
+	struct net_device_container *dev_container;
 	unsigned 	int txq;
 	int ret;
 	struct fipc_message *_response;
 	unsigned 	int request_cookie;
 	int func_ret;
 	request_cookie = thc_get_request_cookie(_request);
+	ret = glue_cap_lookup_net_device_type(cspace,
+		__cptr(fipc_get_reg1(_request)),
+		&dev_container);
+	if (ret) {
+		LIBLCD_ERR("lookup");
+		goto fail_lookup;
+	}
 	fipc_recv_msg_end(thc_channel_to_fipc(_channel),
 			_request);
-	dev = kzalloc(sizeof( *dev ),
-		GFP_KERNEL);
-	if (!dev) {
-		LIBLCD_ERR("kzalloc");
-		goto fail_alloc;
-	}
-	txq = fipc_get_reg1(_request);
-	func_ret = netif_set_real_num_tx_queues(dev,
+	txq = fipc_get_reg3(_request);
+
+	LIBLCD_MSG("%s, txq %d | num_tx_queues %d", __func__, txq, dev_container->net_device.num_tx_queues);
+
+	func_ret = netif_set_real_num_tx_queues(( &dev_container->net_device ),
 		txq);
+	LIBLCD_MSG("netif_set_real_num_tx_queues returns %d", func_ret);
 	if (async_msg_blocking_send_start(_channel,
 		&_response)) {
 		LIBLCD_ERR("error getting response msg");
@@ -1110,7 +2643,8 @@ int netif_set_real_num_tx_queues_callee(struct fipc_message *_request,
 	thc_ipc_reply(_channel,
 			request_cookie,
 			_response);
-fail_alloc:
+	return ret;
+fail_lookup:
 	return ret;
 
 }
@@ -1228,12 +2762,13 @@ int eth_platform_get_mac_address_callee(struct fipc_message *_request,
 	return ret;
 }
 
-int dev_addr_del_callee(struct fipc_message *_request,
+int dev_addr_add_callee(struct fipc_message *_request,
 		struct thc_channel *_channel,
 		struct glue_cspace *cspace,
 		struct cptr sync_ep)
 {
 	struct net_device *dev;
+	struct net_device_container *dev_container;
 	unsigned 	char addr_type;
 	int ret;
 	struct fipc_message *_response;
@@ -1246,14 +2781,17 @@ int dev_addr_del_callee(struct fipc_message *_request,
 	gva_t addr_gva;
 
 	request_cookie = thc_get_request_cookie(_request);
+	ret = glue_cap_lookup_net_device_type(cspace,
+		__cptr(fipc_get_reg1(_request)),
+		&dev_container);
+	if (ret) {
+		LIBLCD_ERR("lookup");
+		goto fail_lookup;
+	}
+	dev = &dev_container->net_device;
+	addr_type = fipc_get_reg3(_request);
 	fipc_recv_msg_end(thc_channel_to_fipc(_channel),
 			_request);
-	dev = kzalloc(sizeof( *dev ),
-		GFP_KERNEL);
-	if (!dev) {
-		LIBLCD_ERR("kzalloc");
-		goto fail_alloc;
-	}
 
 	sync_ret = lcd_cptr_alloc(&addr_cptr);
 	if (sync_ret) {
@@ -1276,10 +2814,11 @@ int dev_addr_del_callee(struct fipc_message *_request,
 		LIBLCD_ERR("failed to map void *addr");
 		lcd_exit(-1);
 	}
-	addr_type = fipc_get_reg1(_request);
-	func_ret = dev_addr_del(dev,
+	rtnl_lock();
+	func_ret = dev_addr_add(dev,
 		( void  * )( ( gva_val(addr_gva) ) + ( addr_offset ) ),
 		addr_type);
+	rtnl_unlock();
 	if (async_msg_blocking_send_start(_channel,
 		&_response)) {
 		LIBLCD_ERR("error getting response msg");
@@ -1290,7 +2829,79 @@ int dev_addr_del_callee(struct fipc_message *_request,
 	thc_ipc_reply(_channel,
 			request_cookie,
 			_response);
-fail_alloc:
+fail_lookup:
+	return ret;
+
+}
+
+int dev_addr_del_callee(struct fipc_message *_request,
+		struct thc_channel *_channel,
+		struct glue_cspace *cspace,
+		struct cptr sync_ep)
+{
+	struct net_device *dev;
+	struct net_device_container *dev_container;
+	unsigned 	char addr_type;
+	int ret;
+	struct fipc_message *_response;
+	unsigned 	int request_cookie;
+	int func_ret;
+	int sync_ret;
+	unsigned 	long mem_order;
+	unsigned 	long addr_offset;
+	cptr_t addr_cptr;
+	gva_t addr_gva;
+
+	request_cookie = thc_get_request_cookie(_request);
+	ret = glue_cap_lookup_net_device_type(cspace,
+		__cptr(fipc_get_reg1(_request)),
+		&dev_container);
+	if (ret) {
+		LIBLCD_ERR("lookup");
+		goto fail_lookup;
+	}
+	dev = &dev_container->net_device;
+	addr_type = fipc_get_reg3(_request);
+	fipc_recv_msg_end(thc_channel_to_fipc(_channel),
+			_request);
+
+	sync_ret = lcd_cptr_alloc(&addr_cptr);
+	if (sync_ret) {
+		LIBLCD_ERR("failed to get cptr");
+		lcd_exit(-1);
+	}
+	lcd_set_cr0(addr_cptr);
+	sync_ret = lcd_sync_recv(sync_ep);
+	lcd_set_cr0(CAP_CPTR_NULL);
+	if (sync_ret) {
+		LIBLCD_ERR("failed to recv");
+		lcd_exit(-1);
+	}
+	mem_order = lcd_r0();
+	addr_offset = lcd_r1();
+	sync_ret = lcd_map_virt(addr_cptr,
+		mem_order,
+		&addr_gva);
+	if (sync_ret) {
+		LIBLCD_ERR("failed to map void *addr");
+		lcd_exit(-1);
+	}
+	rtnl_lock();
+	func_ret = dev_addr_del(dev,
+		( void  * )( ( gva_val(addr_gva) ) + ( addr_offset ) ),
+		addr_type);
+	rtnl_unlock();
+	if (async_msg_blocking_send_start(_channel,
+		&_response)) {
+		LIBLCD_ERR("error getting response msg");
+		return -EIO;
+	}
+	fipc_set_reg1(_response,
+			func_ret);
+	thc_ipc_reply(_channel,
+			request_cookie,
+			_response);
+fail_lookup:
 	return ret;
 
 }

@@ -48,7 +48,7 @@ int dispatch_async_loop(struct thc_channel *_channel,
 		cspace,
 		sync_ep);
 
-		case REGISTER_NETDEVICE:
+		case REGISTER_NETDEV:
 			trace(REGISTER_NETDEVICE);
 			return register_netdev_callee(message,
 		_channel,
@@ -142,6 +142,13 @@ int dispatch_async_loop(struct thc_channel *_channel,
 		case ETH_PLATFORM_GET_MAC_ADDRESS:
 			trace(ETH_PLATFORM_GET_MAC_ADDRESS);
 			return eth_platform_get_mac_address_callee(message,
+		_channel,
+		cspace,
+		sync_ep);
+
+		case DEV_ADDR_ADD:
+			trace(DEV_ADDR_ADD);
+			return dev_addr_add_callee(message,
 		_channel,
 		cspace,
 		sync_ep);

@@ -24,7 +24,11 @@ int call_netdevice_notifiers(unsigned long val, struct net_device *dev)
 
 bool cancel_work_sync(struct work_struct *work) { return true; }
 
-int rtnl_is_locked(void) { return 0; }
+/* ASSERT_RTNL macro checks if rtnl_lock is held by the caller
+ * during certain API calls. Inside LCDs we don't hold this lock,
+ * just make the assert macro happy by faking that we did.
+ */
+int rtnl_is_locked(void) { return 1; }
 
 void synchronize_irq(unsigned int irq) { }
 

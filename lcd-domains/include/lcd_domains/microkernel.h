@@ -269,7 +269,7 @@ int __lcd_create_no_vm_no_thread(struct lcd **out);
  * which we need a new kthread to run the LCD's code, but we don't want
  * the code to run inside an isolated VM.
  */
-int __lcd_create_no_vm(struct lcd **out);
+int __lcd_create_no_vm(struct lcd **out, const char *name);
 /**
  * __lcd_create -- Create an empty isolated LCD
  * @caller: the LCD doing the creating

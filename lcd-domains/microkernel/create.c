@@ -85,7 +85,7 @@ fail1:
 	return ret;
 }
 
-int __lcd_create_no_vm(struct lcd **out, char *name)
+int __lcd_create_no_vm(struct lcd **out, const char *name)
 {
 	struct lcd *lcd;
 	int ret;

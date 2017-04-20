@@ -61,6 +61,11 @@ lib-y += $(addprefix liblcd/arch/x86/dma/, \
 	pci-dma.o \
 	)
 
+lib-y += $(addprefix liblcd/net/, \
+	dev_addr_lists.o \
+	dev.o \
+	)
+
 lib-y += liblcd/resolve.o
 
 # code shared by kliblcd and isolated liblcd

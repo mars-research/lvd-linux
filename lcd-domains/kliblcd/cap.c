@@ -31,7 +31,7 @@ void lcd_cptr_free(cptr_t slot)
 
 struct cspace *get_current_cspace(struct task_struct *c)
 {
-	return current->lcd->cspace;
+	return current->lcd ? current->lcd->cspace : NULL;
 }
 /* EXPORTS -------------------------------------------------- */
 

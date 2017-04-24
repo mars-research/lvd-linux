@@ -2567,6 +2567,7 @@ int netif_carrier_off_callee(struct fipc_message *_request,
 		LIBLCD_ERR("error getting response msg");
 		return -EIO;
 	}
+	fipc_set_reg1(_response, dev_container->net_device.state);
 	thc_ipc_reply(_channel,
 			request_cookie,
 			_response);
@@ -2600,6 +2601,7 @@ int netif_carrier_on_callee(struct fipc_message *_request,
 		LIBLCD_ERR("error getting response msg");
 		return -EIO;
 	}
+	fipc_set_reg1(_response, dev_container->net_device.state);
 	thc_ipc_reply(_channel,
 			request_cookie,
 			_response);
@@ -2633,6 +2635,7 @@ int netif_device_attach_callee(struct fipc_message *_request,
 		LIBLCD_ERR("error getting response msg");
 		return -EIO;
 	}
+	fipc_set_reg1(_response, dev_container->net_device.state);
 	thc_ipc_reply(_channel,
 			request_cookie,
 			_response);
@@ -2666,6 +2669,7 @@ int netif_device_detach_callee(struct fipc_message *_request,
 		LIBLCD_ERR("error getting response msg");
 		return -EIO;
 	}
+	fipc_set_reg1(_response, dev_container->net_device.state);
 	thc_ipc_reply(_channel,
 			request_cookie,
 			_response);

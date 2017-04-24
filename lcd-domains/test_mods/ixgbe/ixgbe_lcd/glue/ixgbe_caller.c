@@ -934,6 +934,7 @@ void netif_carrier_off(struct net_device *dev)
 	}
 	fipc_recv_msg_end(thc_channel_to_fipc(ixgbe_async),
 			_response);
+	dev->state = fipc_get_reg1(_response);
 
 	return;
 fail_async:
@@ -968,6 +969,7 @@ void netif_carrier_on(struct net_device *dev)
 		LIBLCD_ERR("thc_ipc_call");
 		goto fail_ipc;
 	}
+	dev->state = fipc_get_reg1(_response);
 	fipc_recv_msg_end(thc_channel_to_fipc(ixgbe_async),
 			_response);
 	return;
@@ -1003,6 +1005,7 @@ void netif_device_attach(struct net_device *dev)
 		LIBLCD_ERR("thc_ipc_call");
 		goto fail_ipc;
 	}
+	dev->state = fipc_get_reg1(_response);
 	fipc_recv_msg_end(thc_channel_to_fipc(ixgbe_async),
 			_response);
 	return;
@@ -1037,6 +1040,7 @@ void netif_device_detach(struct net_device *dev)
 		LIBLCD_ERR("thc_ipc_call");
 		goto fail_ipc;
 	}
+	dev->state = fipc_get_reg1(_response);
 	fipc_recv_msg_end(thc_channel_to_fipc(ixgbe_async),
 			_response);
 	return;
@@ -1297,6 +1301,9 @@ int dev_addr_add(struct net_device *dev,
 	func_ret = fipc_get_reg1(_response);
 	fipc_recv_msg_end(thc_channel_to_fipc(ixgbe_async),
 			_response);
+
+	/* call local function */
+	liblcd_dev_addr_add(dev, addr, addr_type);
 	return func_ret;
 fail_async:
 fail_ipc:
@@ -1363,6 +1370,9 @@ int dev_addr_del(struct net_device *dev,
 	func_ret = fipc_get_reg1(_response);
 	fipc_recv_msg_end(thc_channel_to_fipc(ixgbe_async),
 			_response);
+
+	/* call local function */
+	liblcd_dev_addr_del(dev, addr, addr_type);
 	return func_ret;
 fail_async:
 fail_ipc:
@@ -2637,6 +2647,7 @@ int __hw_addr_sync_dev(
 	func_ret = fipc_get_reg1(_response);
 	fipc_recv_msg_end(thc_channel_to_fipc(ixgbe_async),
 			_response);
+	liblcd__hw_addr_sync_dev(list, dev1, sync, unsync);
 	return func_ret;
 fail_async:
 fail_ipc:
@@ -2677,6 +2688,7 @@ void __hw_addr_unsync_dev(
 	fipc_recv_msg_end(thc_channel_to_fipc(ixgbe_async),
 			_response);
 
+	liblcd__hw_addr_unsync_dev(list, dev1, unsync);
 	return;
 fail_async:
 fail_ipc:

@@ -58,6 +58,19 @@ struct trampoline_hidden_args {
 	struct thc_channel *async_chnl;
 	struct cptr sync_ep;
 };
+struct sync_container {
+	int ( *sync )(struct net_device *, const unsigned char*);
+	cptr_t my_ref;
+	cptr_t other_ref;
+};
+
+struct unsync_container {
+	int ( *unsync )(struct net_device *, const unsigned char*);
+	cptr_t my_ref;
+	cptr_t other_ref;
+};
+
+
 int glue_cap_insert_device_type(struct glue_cspace *cspace,
 		struct device_container *device_container,
 		struct cptr *c_out);

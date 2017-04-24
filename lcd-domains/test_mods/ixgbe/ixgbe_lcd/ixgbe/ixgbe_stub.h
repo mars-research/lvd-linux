@@ -1,119 +1,107 @@
 #ifndef IXGBE_STUB_H
 #define IXGBE_STUB_H
 
-void napi_disable(struct napi_struct *n) { }
+void napi_disable(struct napi_struct *n) { LIBLCD_MSG("================>$$$$$$ Dummy %s called", __func__); }
 
-void napi_complete_done(struct napi_struct *n, int work_done) { }
-
-void pci_disable_msix(struct pci_dev *dev) { }
+void napi_complete_done(struct napi_struct *n, int work_done) { LIBLCD_MSG("================>$$$$$$ Dummy %s called", __func__); }
 
 int pci_enable_msi_range(struct pci_dev *dev, int minvec,
 				       int maxvec)
-{ return -ENOSYS; }
+{ LIBLCD_MSG("================>$$$$$$ Dummy %s called", __func__); return -ENOSYS; }
 
-void pci_disable_msi(struct pci_dev *dev) { }
+void pci_disable_msi(struct pci_dev *dev) { LIBLCD_MSG("================>$$$$$$ Dummy %s called", __func__); }
 
 int __must_check
 request_threaded_irq(unsigned int irq, irq_handler_t handler,
 		     irq_handler_t thread_fn,
 		     unsigned long flags, const char *name, void *dev)
-{ return 0; }
+{ LIBLCD_MSG("================>$$$$$$ Dummy %s called", __func__); return 0; }
+
 
 int call_netdevice_notifiers(unsigned long val, struct net_device *dev)
-{ return 0; }
+{ LIBLCD_MSG("================>$$$$$$ Dummy %s called", __func__); return 0; }
 
-bool cancel_work_sync(struct work_struct *work) { return true; }
+bool cancel_work_sync(struct work_struct *work) { LIBLCD_MSG("================>$$$$$$ Dummy %s called", __func__); return true; }
 
 /* ASSERT_RTNL macro checks if rtnl_lock is held by the caller
  * during certain API calls. Inside LCDs we don't hold this lock,
  * just make the assert macro happy by faking that we did.
  */
-int rtnl_is_locked(void) { return 1; }
+int rtnl_is_locked(void) { LIBLCD_MSG("================>$$$$$$ Dummy %s called", __func__); return 1; }
 
-void synchronize_irq(unsigned int irq) { }
+void synchronize_irq(unsigned int irq) { LIBLCD_MSG("================>$$$$$$ Dummy %s called", __func__); }
 
-int mdio45_probe(struct mdio_if_info *mdio, int prtad) { return 0; }
+int mdio45_probe(struct mdio_if_info *mdio, int prtad) { dump_stack(); LIBLCD_MSG("================>$$$$$$ Dummy %s called", __func__); return 0; }
 
-void napi_gro_flush(struct napi_struct *napi, bool flush_old) { }
+void napi_gro_flush(struct napi_struct *napi, bool flush_old) { LIBLCD_MSG("================>$$$$$$ Dummy %s called", __func__); }
 
-void free_irq(unsigned int a, void *p) { }
+void free_irq(unsigned int a, void *p) { LIBLCD_MSG("================>$$$$$$ Dummy %s called", __func__); }
 
 unsigned char *skb_put(struct sk_buff *skb, unsigned int len)
 {
-	return (char*) skb;
+	LIBLCD_MSG("================>$$$$$$ Dummy %s called", __func__); return (char*) skb;
 }
 
-int skb_pad(struct sk_buff *skb, int pad) { return 0; }
+int skb_pad(struct sk_buff *skb, int pad) { LIBLCD_MSG("================>$$$$$$ Dummy %s called", __func__); return 0; }
 
-int skb_copy_bits(const struct sk_buff *skb, int offset, void *to, int len) { return 0; }
+int skb_copy_bits(const struct sk_buff *skb, int offset, void *to, int len) { LIBLCD_MSG("================>$$$$$$ Dummy %s called", __func__); return 0; }
 
-int skb_checksum_help(struct sk_buff *skb) { return 0; }
+int skb_checksum_help(struct sk_buff *skb) { LIBLCD_MSG("================>$$$$$$ Dummy %s called", __func__); return 0; }
 
 void skb_tstamp_tx(struct sk_buff *orig_skb,
-		   struct skb_shared_hwtstamps *hwtstamps) { }
+		   struct skb_shared_hwtstamps *hwtstamps) { LIBLCD_MSG("================>$$$$$$ Dummy %s called", __func__); }
 
-int pskb_expand_head(struct sk_buff *skb, int nhead, int ntail, gfp_t gfp_mask) { return 0; }
+int pskb_expand_head(struct sk_buff *skb, int nhead, int ntail, gfp_t gfp_mask) { LIBLCD_MSG("================>$$$$$$ Dummy %s called", __func__); return 0; }
 
-unsigned char *__pskb_pull_tail(struct sk_buff *skb, int delta) { return (char*)skb; }
+unsigned char *__pskb_pull_tail(struct sk_buff *skb, int delta) { LIBLCD_MSG("================>$$$$$$ Dummy %s called", __func__); return (char*)skb; }
 
 void skb_add_rx_frag(struct sk_buff *skb, int i, struct page *page, int off,
-		     int size, unsigned int truesize) { }
+		     int size, unsigned int truesize) { LIBLCD_MSG("================>$$$$$$ Dummy %s called", __func__); }
 
-void netdev_rss_key_fill(void *buffer, size_t len) { }
+void netdev_rss_key_fill(void *buffer, size_t len) { LIBLCD_MSG("================>$$$$$$ Dummy %s called", __func__); }
 
-int del_timer(struct timer_list * timer) { return 0; }
-int mod_timer(struct timer_list *timer, unsigned long expires) { return 0; }
+int del_timer(struct timer_list * timer) { LIBLCD_MSG("================>$$$$$$ Dummy %s called", __func__); return 0; }
+int mod_timer(struct timer_list *timer, unsigned long expires) { LIBLCD_MSG("================>$$$$$$ Dummy %s called", __func__); return 0; }
 
 struct net_device *netdev_all_upper_get_next_dev_rcu(struct net_device *dev,
-						     struct list_head **iter) { return NULL; }
+						     struct list_head **iter) { LIBLCD_MSG("================>$$$$$$ Dummy %s called", __func__); return NULL; }
 
 struct sk_buff *__napi_alloc_skb(struct napi_struct *napi,
-				 unsigned int length, gfp_t gfp_mask) { return NULL; }
+				 unsigned int length, gfp_t gfp_mask) { LIBLCD_MSG("================>$$$$$$ Dummy %s called", __func__); return NULL; }
 
-unsigned long msleep_interruptible(unsigned int msecs) { return 0ul; }
+unsigned long msleep_interruptible(unsigned int msecs) { LIBLCD_MSG("================>$$$$$$ Dummy %s called", __func__); return 0ul; }
 
 struct rtnl_link_stats64 *dev_get_stats(struct net_device *dev,
-					struct rtnl_link_stats64 *storage) { return storage; }
+					struct rtnl_link_stats64 *storage) { LIBLCD_MSG("================>$$$$$$ Dummy %s called", __func__); return storage; }
 
-void __dev_kfree_skb_any(struct sk_buff *skb, enum skb_free_reason reason) { };
+void __dev_kfree_skb_any(struct sk_buff *skb, enum skb_free_reason reason) { LIBLCD_MSG("================>$$$$$$ Dummy %s called", __func__); };
 
-u32 ethtool_op_get_link(struct net_device *dev) { return 0; }
-int ethtool_op_get_ts_info(struct net_device *dev, struct ethtool_ts_info *eti) { return 0; }
+u32 ethtool_op_get_link(struct net_device *dev) { LIBLCD_MSG("================>$$$$$$ Dummy %s called", __func__); return 0; }
+int ethtool_op_get_ts_info(struct net_device *dev, struct ethtool_ts_info *eti) { LIBLCD_MSG("================>$$$$$$ Dummy %s called", __func__); return 0; }
 
-__be16 eth_type_trans(struct sk_buff *skb, struct net_device *dev) { return 0; }
-
-
-int __hw_addr_sync_dev(struct netdev_hw_addr_list *list,
-		       struct net_device *dev,
-		       int (*sync)(struct net_device *, const unsigned char *),
-		       int (*unsync)(struct net_device *,
-				     const unsigned char *)) { return 0; }
-void __hw_addr_unsync_dev(struct netdev_hw_addr_list *list,
-			  struct net_device *dev,
-			  int (*unsync)(struct net_device *,
-					const unsigned char *)) { }
+__be16 eth_type_trans(struct sk_buff *skb, struct net_device *dev) { LIBLCD_MSG("================>$$$$$$ Dummy %s called", __func__); return 0; }
 
 struct sk_buff *__alloc_skb(unsigned int size, gfp_t priority, int flags,
-			    int node) { return NULL; }
+			    int node) { LIBLCD_MSG("================>$$$$$$ Dummy %s called", __func__); return NULL; }
 
 int ipv6_find_hdr(const struct sk_buff *skb, unsigned int *offset, int target,
-		  unsigned short *fragoff, int *fragflg) { return 0; }
+		  unsigned short *fragoff, int *fragflg) { LIBLCD_MSG("================>$$$$$$ Dummy %s called", __func__); return 0; }
 
-void __local_bh_enable_ip(unsigned long ip, unsigned int cnt) { } 
+void __local_bh_enable_ip(unsigned long ip, unsigned int cnt) { LIBLCD_MSG("================>$$$$$$ Dummy %s called", __func__); }
 
-void kfree_skb(struct sk_buff *skb) { }
+void kfree_skb(struct sk_buff *skb) { LIBLCD_MSG("================>$$$$$$ Dummy %s called", __func__); }
 
 unsigned long volatile __jiffy_data jiffies;
 
 struct pglist_data contig_page_data;
 
-void pci_restore_state(struct pci_dev *dev) { }
+void pci_restore_state(struct pci_dev *dev) { LIBLCD_MSG("================>$$$$$$ Dummy %s called", __func__); }
 
-void __napi_schedule_irqoff(struct napi_struct *n) { }
+void __napi_schedule_irqoff(struct napi_struct *n) { LIBLCD_MSG("================>$$$$$$ Dummy %s called", __func__); }
 
 int mdio_mii_ioctl(const struct mdio_if_info *mdio,
 			struct mii_ioctl_data *mii_data, int cmd)
-{ return 0; }
+{ LIBLCD_MSG("================>$$$$$$ Dummy %s called", __func__); return 0; }
 
 int ndo_dflt_bridge_getlink(struct sk_buff *skb, u32 pid, u32 seq,
 				   struct net_device *dev, u16 mode,
@@ -122,7 +110,7 @@ int ndo_dflt_bridge_getlink(struct sk_buff *skb, u32 pid, u32 seq,
 				   int (*vlan_fill)(struct sk_buff *skb,
 						    struct net_device *dev,
 						    u32 filter_mask))
-{ return 0; }
+{ LIBLCD_MSG("================>$$$$$$ Dummy %s called", __func__); return 0; }
 
 int ndo_dflt_fdb_add(struct ndmsg *ndm,
 			    struct nlattr *tb[],
@@ -130,10 +118,10 @@ int ndo_dflt_fdb_add(struct ndmsg *ndm,
 			    const unsigned char *addr,
 			    u16 vid,
 			    u16 flags)
-{ return 0; }
+{ LIBLCD_MSG("================>$$$$$$ Dummy %s called", __func__); return 0; }
 
 struct nlattr *nla_find(const struct nlattr *head, int len, int attrtype)
-{ return NULL; }
+{ LIBLCD_MSG("================>$$$$$$ Dummy %s called", __func__); return NULL; }
 
 /* TODO: Move this to a common header, say arch/x86/include/asm/udelay.h
  * As of now, lpj is passed by boot module to LCD. Devise a way to retrieve
@@ -192,5 +180,12 @@ void usleep_range(unsigned long min, unsigned long max)
 {
 	udelay((max + min) >> 1);
 }
+
+void netif_napi_add(struct net_device *dev, struct napi_struct *napi,
+		    int (*poll)(struct napi_struct *, int), int weight) { LIBLCD_MSG("================>$$$$$$ Dummy %s called", __func__); }
+
+void netif_napi_del(struct napi_struct *napi) { LIBLCD_MSG("================>$$$$$$ Dummy %s called", __func__); }
+
+bool napi_hash_del(struct napi_struct *napi) { LIBLCD_MSG("================>$$$$$$ Dummy %s called", __func__); return true; }
 
 #endif /* IXGBE_STUB_H */

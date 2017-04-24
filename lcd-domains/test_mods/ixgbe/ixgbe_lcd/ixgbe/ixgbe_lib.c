@@ -704,7 +704,6 @@ static void ixgbe_set_num_queues(struct ixgbe_adapter *adapter)
 	ixgbe_set_rss_queues(adapter);
 }
 
-#ifndef LCD_ISOLATE
 /**
  * ixgbe_acquire_msix_vectors - acquire MSI-X vectors
  * @adapter: board private structure
@@ -783,7 +782,6 @@ static int ixgbe_acquire_msix_vectors(struct ixgbe_adapter *adapter)
 
 	return 0;
 }
-#endif
 
 static void ixgbe_add_ring(struct ixgbe_ring *ring,
 			   struct ixgbe_ring_container *head)
@@ -849,11 +847,9 @@ static int ixgbe_alloc_q_vector(struct ixgbe_adapter *adapter,
 	q_vector->cpu = -1;
 
 #endif
-#ifndef LCD_ISOLATE
 	/* initialize NAPI */
 	netif_napi_add(adapter->netdev, &q_vector->napi,
 		       ixgbe_poll, 64);
-#endif
 
 #ifdef CONFIG_NET_RX_BUSY_POLL
 	/* initialize busy poll */
@@ -977,7 +973,6 @@ static int ixgbe_alloc_q_vector(struct ixgbe_adapter *adapter,
  **/
 static void ixgbe_free_q_vector(struct ixgbe_adapter *adapter, int v_idx)
 {
-#ifndef LCD_ISOLATE
 	struct ixgbe_q_vector *q_vector = adapter->q_vector[v_idx];
 	struct ixgbe_ring *ring;
 
@@ -995,8 +990,10 @@ static void ixgbe_free_q_vector(struct ixgbe_adapter *adapter, int v_idx)
 	 * ixgbe_get_stats64() might access the rings on this vector,
 	 * we must wait a grace period before freeing it.
 	 */
+#ifndef LCD_ISOLATE
 	kfree_rcu(q_vector, rcu);
-#endif
+	kfree(q_vector);
+#endif /* LCD_ISOLATE */
 }
 
 /**
@@ -1104,13 +1101,12 @@ static void ixgbe_reset_interrupt_capability(struct ixgbe_adapter *adapter)
  **/
 static void ixgbe_set_interrupt_capability(struct ixgbe_adapter *adapter)
 {
-#ifndef LCD_ISOLATE
 	int err;
 
 	/* We will try to get MSI-X interrupts first */
 	if (!ixgbe_acquire_msix_vectors(adapter))
 		return;
-#endif
+
 	/* At this point, we do not have MSI-X capabilities. We need to
 	 * reconfigure or disable various features which require MSI-X
 	 * capability.
@@ -1147,14 +1143,12 @@ static void ixgbe_set_interrupt_capability(struct ixgbe_adapter *adapter)
 	ixgbe_set_num_queues(adapter);
 	adapter->num_q_vectors = 1;
 
-#ifndef LCD_ISOLATE
 	err = pci_enable_msi(adapter->pdev);
 	if (err)
 		LIBLCD_WARN("Failed to allocate MSI interrupt, falling back to legacy. Error: %d\n",
 			   err);
 	else
 		adapter->flags |= IXGBE_FLAG_MSI_ENABLED;
-#endif
 }
 
 /**

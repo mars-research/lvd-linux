@@ -99,6 +99,20 @@ int dispatch_async_loop(struct thc_channel *_channel,
 		cspace,
 		sync_ep);
 
+		case SYNC:
+			trace(SYNC);
+			return sync_callee(message,
+		_channel,
+		cspace,
+		sync_ep);
+
+		case UNSYNC:
+			trace(UNSYNC);
+			return unsync_callee(message,
+		_channel,
+		cspace,
+		sync_ep);
+
 		case TRIGGER_EXIT:
 			trace(TRIGGER_EXIT);
 			ixgbe_exit_module();

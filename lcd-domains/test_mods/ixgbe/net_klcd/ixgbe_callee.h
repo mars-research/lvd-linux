@@ -93,6 +93,10 @@ int netif_tx_stop_all_queues_callee(struct fipc_message *_request,
 		struct thc_channel *_channel,
 		struct glue_cspace *cspace,
 		struct cptr sync_ep);
+int _netif_tx_wake_all_queues_callee(struct fipc_message *_request,
+		struct thc_channel *_channel,
+		struct glue_cspace *cspace,
+		struct cptr sync_ep);
 int pci_disable_device_callee(struct fipc_message *_request,
 		struct thc_channel *_channel,
 		struct glue_cspace *cspace,
@@ -114,6 +118,14 @@ int pci_cleanup_aer_uncorrect_error_status_callee(struct fipc_message *_request,
 		struct glue_cspace *cspace,
 		struct cptr sync_ep);
 int pci_disable_device_callee(struct fipc_message *_request,
+		struct thc_channel *_channel,
+		struct glue_cspace *cspace,
+		struct cptr sync_ep);
+int pci_disable_msix_callee(struct fipc_message *_request,
+		struct thc_channel *_channel,
+		struct glue_cspace *cspace,
+		struct cptr sync_ep);
+int pci_enable_msix_range_callee(struct fipc_message *_request,
 		struct thc_channel *_channel,
 		struct glue_cspace *cspace,
 		struct cptr sync_ep);
@@ -161,7 +173,14 @@ int pci_wake_from_d3_callee(struct fipc_message *_request,
 		struct thc_channel *_channel,
 		struct glue_cspace *cspace,
 		struct cptr sync_ep);
-
+int __hw_addr_sync_dev_callee(struct fipc_message *_request,
+		struct thc_channel *_channel,
+		struct glue_cspace *cspace,
+		struct cptr sync_ep);
+int __hw_addr_unsync_dev_callee(struct fipc_message *_request,
+		struct thc_channel *_channel,
+		struct glue_cspace *cspace,
+		struct cptr sync_ep);
 int dispatch_sync_loop(void);
 
 int dispatch_async_loop(struct thc_channel *_channel,

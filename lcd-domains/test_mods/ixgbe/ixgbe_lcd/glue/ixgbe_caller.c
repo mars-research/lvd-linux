@@ -7,6 +7,8 @@
 #include "../../ixgbe_common.h"
 #include "../ixgbe_caller.h"
 #include <asm/lcd_domains/liblcd.h>
+
+#include <liblcd/netdev_helper.h>
 #include <lcd_config/post_hook.h>
 
 struct cptr sync_ep;
@@ -15,6 +17,8 @@ extern struct glue_cspace *ixgbe_cspace;
 extern struct thc_channel *ixgbe_async;
 extern cptr_t ixgbe_sync_endpoint;
 extern cptr_t ixgbe_register_channel;
+
+static struct net_device *g_net_device;
 
 int glue_ixgbe_init(void)
 {
@@ -249,6 +253,104 @@ fail1:
 	return ret;
 }
 
+void pci_disable_msix(struct pci_dev *dev)
+{
+	int ret;
+	struct fipc_message *_request;
+	struct fipc_message *_response;
+	ret = async_msg_blocking_send_start(ixgbe_async,
+		&_request);
+	if (ret) {
+		LIBLCD_ERR("failed to get a send slot");
+		goto fail_async;
+	}
+	async_msg_set_fn_type(_request,
+			PCI_DISABLE_MSIX);
+	ret = thc_ipc_call(ixgbe_async,
+		_request,
+		&_response);
+	if (ret) {
+		LIBLCD_ERR("thc_ipc_call");
+		goto fail_ipc;
+	}
+	fipc_recv_msg_end(thc_channel_to_fipc(ixgbe_async),
+			_response);
+	return;
+fail_async:
+fail_ipc:
+	return;
+}
+
+int pci_enable_msix_range(struct pci_dev *dev, struct msix_entry *entries, int minvec, int maxvec)
+{
+	int ret;
+	struct fipc_message *_request;
+	struct fipc_message *_response;
+	int func_ret;
+	int sync_ret;
+	unsigned 	long p_mem_sz;
+	unsigned 	long p_offset;
+	cptr_t p_cptr;
+	unsigned 	int request_cookie;
+
+	ret = async_msg_blocking_send_start(ixgbe_async,
+		&_request);
+	if (ret) {
+		LIBLCD_ERR("failed to get a send slot");
+		goto fail_async;
+	}
+
+	async_msg_set_fn_type(_request,
+			PCI_ENABLE_MSIX_RANGE);
+
+	fipc_set_reg0(_request, minvec);
+	fipc_set_reg1(_request, maxvec);
+
+	sync_ret = lcd_virt_to_cptr(__gva(( unsigned  long )entries),
+		&p_cptr,
+		&p_mem_sz,
+		&p_offset);
+	if (sync_ret) {
+		LIBLCD_ERR("virt to cptr failed");
+		lcd_exit(-1);
+	}
+	ret = thc_ipc_send_request(ixgbe_async,
+		_request,
+		&request_cookie);
+	if (ret) {
+		LIBLCD_ERR("thc_ipc_send_request");
+		goto fail_ipc;
+	}
+	lcd_set_r0(ilog2(( p_mem_sz ) >> ( PAGE_SHIFT )));
+	lcd_set_r1(p_offset);
+	lcd_set_cr0(p_cptr);
+	sync_ret = lcd_sync_send(ixgbe_sync_endpoint);
+	lcd_set_cr0(CAP_CPTR_NULL);
+	if (sync_ret) {
+		LIBLCD_ERR("failed to send");
+		lcd_exit(-1);
+	}
+
+	ret = thc_ipc_recv_response(ixgbe_async,
+		request_cookie,
+		&_response);
+
+	if (ret) {
+		LIBLCD_ERR("thc_ipc_call");
+		goto fail_ipc;
+	}
+
+	func_ret = fipc_get_reg1(_response);
+	fipc_recv_msg_end(thc_channel_to_fipc(ixgbe_async),
+			_response);
+	return func_ret;
+fail_async:
+fail_ipc:
+	return ret;
+
+
+}
+
 int __must_check __pci_register_driver(struct pci_driver *drv,
 		struct module *owner,
 		const char* name)
@@ -321,6 +423,8 @@ struct net_device *alloc_etherdev_mqs(int sizeof_priv,
 	struct fipc_message *_request;
 	struct fipc_message *_response;
 	struct net_device *func_ret;
+	struct net_device *dev;
+
 	unsigned int alloc_size = sizeof(struct net_device_container);
 	void *p;
 
@@ -338,8 +442,10 @@ struct net_device *alloc_etherdev_mqs(int sizeof_priv,
 		goto fail_alloc;
 	}
 	func_ret_container = PTR_ALIGN(p, NETDEV_ALIGN);
-	func_ret = &func_ret_container->net_device;
+	dev = func_ret = &func_ret_container->net_device;
 
+	/* assign global instance */
+	g_net_device = func_ret;
 	ret = glue_cap_insert_net_device_type(c_cspace,
 		func_ret_container,
 		&func_ret_container->my_ref);
@@ -371,7 +477,30 @@ struct net_device *alloc_etherdev_mqs(int sizeof_priv,
 		goto fail_ipc;
 	}
 	func_ret_container->other_ref.cptr = fipc_get_reg1(_response);
-	func_ret->dev_addr = kzalloc(ETH_ALEN, GFP_KERNEL);
+
+	dev_addr_init(dev);
+
+	dev_mc_init(dev);
+	dev_uc_init(dev);
+
+	dev->gso_max_size = GSO_MAX_SIZE;
+	dev->gso_max_segs = GSO_MAX_SEGS;
+
+	INIT_LIST_HEAD(&dev->napi_list);
+	INIT_LIST_HEAD(&dev->unreg_list);
+	INIT_LIST_HEAD(&dev->close_list);
+	INIT_LIST_HEAD(&dev->link_watch_list);
+	INIT_LIST_HEAD(&dev->adj_list.upper);
+	INIT_LIST_HEAD(&dev->adj_list.lower);
+	INIT_LIST_HEAD(&dev->all_adj_list.upper);
+	INIT_LIST_HEAD(&dev->all_adj_list.lower);
+	INIT_LIST_HEAD(&dev->ptype_all);
+	INIT_LIST_HEAD(&dev->ptype_specific);
+	dev->priv_flags = IFF_XMIT_DST_RELEASE | IFF_XMIT_DST_RELEASE_PERM;
+	dev->num_tx_queues = txqs;
+	dev->real_num_tx_queues = txqs;
+
+	netif_alloc_netdev_queues(dev);
 
 	if (!func_ret->dev_addr) {
 		LIBLCD_ERR("dev_addr assignment failed");
@@ -541,6 +670,7 @@ int remove_callee(struct fipc_message *_request,
 	/* async loop should get 0 */
 	int ret = 0;
 	struct fipc_message *_response;
+	unsigned int __maybe_unused devfn;
 	unsigned 	int request_cookie;
 	request_cookie = thc_get_request_cookie(_request);
 	fipc_recv_msg_end(thc_channel_to_fipc(_channel),
@@ -804,6 +934,7 @@ void netif_carrier_off(struct net_device *dev)
 	}
 	fipc_recv_msg_end(thc_channel_to_fipc(ixgbe_async),
 			_response);
+
 	return;
 fail_async:
 fail_ipc:
@@ -976,6 +1107,7 @@ int netif_set_real_num_tx_queues(struct net_device *dev,
 			dev_container->other_ref.cptr);
 	fipc_set_reg3(_request,
 			txq);
+	LIBLCD_MSG("%s, setting real_num_tx_queues to %d", __func__, txq);
 	ret = thc_ipc_call(ixgbe_async,
 		_request,
 		&_response);
@@ -1365,6 +1497,41 @@ fail_ipc:
 	return;
 }
 
+void _netif_tx_wake_all_queues(struct net_device *dev)
+{
+	struct net_device_container *dev_queue_container;
+	int ret;
+	struct fipc_message *_request;
+	struct fipc_message *_response;
+	dev_queue_container = container_of(dev,
+		struct net_device_container,
+		net_device);
+	ret = async_msg_blocking_send_start(ixgbe_async,
+		&_request);
+	if (ret) {
+		LIBLCD_ERR("failed to get a send slot");
+		goto fail_async;
+	}
+	async_msg_set_fn_type(_request,
+			NETIF_TX_WAKE_ALL_QUEUES);
+	fipc_set_reg1(_request,
+			dev_queue_container->other_ref.cptr);
+	fipc_set_reg2(_request,
+			dev->num_tx_queues);
+	ret = thc_ipc_call(ixgbe_async,
+		_request,
+		&_response);
+	if (ret) {
+		LIBLCD_ERR("thc_ipc_call");
+		goto fail_ipc;
+	}
+	fipc_recv_msg_end(thc_channel_to_fipc(ixgbe_async),
+			_response);
+	return;
+fail_async:
+fail_ipc:
+	return;
+}
 
 int pci_disable_pcie_error_reporting(struct pci_dev *dev)
 {
@@ -1922,6 +2089,8 @@ int ndo_open_callee(struct fipc_message *_request,
 	fipc_recv_msg_end(thc_channel_to_fipc(_channel),
 			_request);
 	func_ret = dev_container->net_device.netdev_ops->ndo_open(( &dev_container->net_device ));
+
+	LIBLCD_MSG("%s, returns %d", __func__, func_ret);
 	if (async_msg_blocking_send_start(_channel,
 		&_response)) {
 		LIBLCD_ERR("error getting response msg");
@@ -2041,6 +2210,8 @@ int ndo_start_xmit_callee(struct fipc_message *_request,
 	skb->head = (void*)(gva_val(skbd_gva) + skbd_off);
 	skb->data = skb->head + data_off;
 
+	LIBLCD_MSG("data %x %x", skb->data[12], skb->data[13]);
+
 	func_ret = dev_container->net_device.netdev_ops->ndo_start_xmit(skb,
 		( &dev_container->net_device ));
 	if (async_msg_blocking_send_start(_channel,
@@ -2053,6 +2224,8 @@ int ndo_start_xmit_callee(struct fipc_message *_request,
 	thc_ipc_reply(_channel,
 			request_cookie,
 			_response);
+	LIBLCD_MSG("%s returns %d", __func__, func_ret);
+
 fail_lookup:
 fail_sync:
 	return ret;
@@ -2350,6 +2523,199 @@ int ndo_get_stats64_callee(struct fipc_message *_request,
 	thc_ipc_reply(_channel,
 			request_cookie,
 			_response);
+fail_lookup:
+	return ret;
+}
+
+struct sync_container *sync_container;
+struct unsync_container *unsync_container;
+
+int __hw_addr_sync_dev(
+		struct netdev_hw_addr_list *list,
+		struct net_device *dev1,
+		int ( *sync )(struct net_device *, const unsigned char*),
+		int ( *unsync )(struct net_device *, const unsigned char*))
+{
+	struct net_device_container *dev1_container;
+	int ret;
+	struct fipc_message *_request;
+	struct fipc_message *_response;
+	int func_ret;
+	dev1_container = container_of(dev1,
+		struct net_device_container,
+		net_device);
+	sync_container = kzalloc(sizeof( struct sync_container   ),
+		GFP_KERNEL);
+	if (!sync_container) {
+		LIBLCD_ERR("kzalloc");
+		goto fail_alloc;
+	}
+	sync_container->sync = sync;
+
+	unsync_container = kzalloc(sizeof( struct unsync_container   ),
+		GFP_KERNEL);
+	if (!unsync_container) {
+		LIBLCD_ERR("kzalloc");
+		goto fail_alloc;
+	}
+	unsync_container->unsync = unsync;
+	ret = async_msg_blocking_send_start(ixgbe_async,
+		&_request);
+	if (ret) {
+		LIBLCD_ERR("failed to get a send slot");
+		goto fail_async;
+	}
+	async_msg_set_fn_type(_request,
+			__HW_ADDR_SYNC_DEV);
+	fipc_set_reg1(_request,
+			dev1_container->other_ref.cptr);
+	fipc_set_reg2(_request, list == &dev1->mc ? MC_LIST : UC_LIST);
+
+	ret = thc_ipc_call(ixgbe_async,
+		_request,
+		&_response);
+	if (ret) {
+		LIBLCD_ERR("thc_ipc_call");
+		goto fail_ipc;
+	}
+	func_ret = fipc_get_reg1(_response);
+	fipc_recv_msg_end(thc_channel_to_fipc(ixgbe_async),
+			_response);
+	return func_ret;
+fail_async:
+fail_ipc:
+fail_alloc:
+	return ret;
+}
+
+void __hw_addr_unsync_dev(
+		struct netdev_hw_addr_list *list,
+		struct net_device *dev1,
+		int ( *unsync )(struct net_device *, const unsigned char*))
+{
+	struct net_device_container *dev1_container;
+	int ret;
+	struct fipc_message *_request;
+	struct fipc_message *_response;
+	dev1_container = container_of(dev1,
+		struct net_device_container,
+		net_device);
+	ret = async_msg_blocking_send_start(ixgbe_async,
+		&_request);
+	if (ret) {
+		LIBLCD_ERR("failed to get a send slot");
+		goto fail_async;
+	}
+	async_msg_set_fn_type(_request,
+			__HW_ADDR_UNSYNC_DEV);
+	fipc_set_reg1(_request,
+			dev1_container->other_ref.cptr);
+	fipc_set_reg2(_request, list == &dev1->mc ? MC_LIST : UC_LIST);
+	ret = thc_ipc_call(ixgbe_async,
+		_request,
+		&_response);
+	if (ret) {
+		LIBLCD_ERR("thc_ipc_call");
+		goto fail_ipc;
+	}
+	fipc_recv_msg_end(thc_channel_to_fipc(ixgbe_async),
+			_response);
+
+	return;
+fail_async:
+fail_ipc:
+	return;
+
+}
+
+int sync_callee(struct fipc_message *_request,
+		struct thc_channel *_channel,
+		struct glue_cspace *cspace,
+		struct cptr sync_ep)
+{
+	struct net_device_container *dev_container;
+	int ret;
+	struct fipc_message *_response;
+	unsigned 	int request_cookie;
+	int func_ret;
+	union __mac {
+		u8 mac_addr[ETH_ALEN];
+		unsigned long mac_addr_l;
+	} m = { {0} };
+
+	request_cookie = thc_get_request_cookie(_request);
+	ret = glue_cap_lookup_net_device_type(cspace,
+		__cptr(fipc_get_reg1(_request)),
+		&dev_container);
+	if (ret) {
+		LIBLCD_ERR("lookup");
+		goto fail_lookup;
+	}
+	fipc_recv_msg_end(thc_channel_to_fipc(_channel),
+			_request);
+
+	m.mac_addr_l = fipc_get_reg3(_request);
+
+	func_ret = sync_container->sync(( &dev_container->net_device ),
+		m.mac_addr);
+
+	if (async_msg_blocking_send_start(_channel,
+		&_response)) {
+		LIBLCD_ERR("error getting response msg");
+		return -EIO;
+	}
+	fipc_set_reg1(_response,
+			func_ret);
+	thc_ipc_reply(_channel,
+			request_cookie,
+			_response);
+	return ret;
+fail_lookup:
+	return ret;
+}
+
+int unsync_callee(struct fipc_message *_request,
+		struct thc_channel *_channel,
+		struct glue_cspace *cspace,
+		struct cptr sync_ep)
+{
+	struct net_device_container *dev_container;
+	int ret;
+	struct fipc_message *_response;
+	unsigned 	int request_cookie;
+	int func_ret;
+	union __mac {
+		u8 mac_addr[ETH_ALEN];
+		unsigned long mac_addr_l;
+	} m = { {0} };
+
+	request_cookie = thc_get_request_cookie(_request);
+	ret = glue_cap_lookup_net_device_type(cspace,
+		__cptr(fipc_get_reg1(_request)),
+		&dev_container);
+	if (ret) {
+		LIBLCD_ERR("lookup");
+		goto fail_lookup;
+	}
+	fipc_recv_msg_end(thc_channel_to_fipc(_channel),
+			_request);
+
+	m.mac_addr_l = fipc_get_reg3(_request);
+
+	func_ret = unsync_container->unsync(( &dev_container->net_device ),
+		m.mac_addr);
+	if (async_msg_blocking_send_start(_channel,
+		&_response)) {
+		LIBLCD_ERR("error getting response msg");
+		return -EIO;
+	}
+	fipc_set_reg1(_response,
+			func_ret);
+	thc_ipc_reply(_channel,
+			request_cookie,
+			_response);
+	return ret;
+
 fail_lookup:
 	return ret;
 }

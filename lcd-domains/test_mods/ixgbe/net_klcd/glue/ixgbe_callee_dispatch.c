@@ -181,6 +181,13 @@ int dispatch_async_loop(struct thc_channel *_channel,
 		cspace,
 		sync_ep);
 
+		case NETIF_TX_WAKE_ALL_QUEUES:
+			trace(NETIF_TX_WAKE_ALL_QUEUES);
+			return _netif_tx_wake_all_queues_callee(message,
+		_channel,
+		cspace,
+		sync_ep);
+
 
 		case PCI_DISABLE_PCIE_ERROR_REPORTING:
 			trace(PCI_DISABLE_PCIE_ERROR_REPORTING);
@@ -213,6 +220,20 @@ int dispatch_async_loop(struct thc_channel *_channel,
 		case PCI_DISABLE_DEVICE:
 			trace(PCI_DISABLE_DEVICE);
 			return pci_disable_device_callee(message,
+		_channel,
+		cspace,
+		sync_ep);
+
+		case PCI_DISABLE_MSIX:
+			trace(PCI_DISABLE_MSIX);
+			return pci_disable_msix_callee(message,
+		_channel,
+		cspace,
+		sync_ep);
+
+		case PCI_ENABLE_MSIX_RANGE:
+			trace(PCI_ENABLE_MSIX_RANGE);
+			return pci_enable_msix_range_callee(message,
 		_channel,
 		cspace,
 		sync_ep);
@@ -293,6 +314,22 @@ int dispatch_async_loop(struct thc_channel *_channel,
 		_channel,
 		cspace,
 		sync_ep);
+
+
+		case __HW_ADDR_SYNC_DEV:
+			trace(__HW_ADDR_SYNC_DEV);
+			return __hw_addr_sync_dev_callee(message,
+		_channel,
+		cspace,
+		sync_ep);
+
+		case __HW_ADDR_UNSYNC_DEV:
+			trace(__HW_ADDR_UNSYNC_DEV);
+			return __hw_addr_unsync_dev_callee(message,
+		_channel,
+		cspace,
+		sync_ep);
+
 
 		default:
 			LIBLCD_ERR("unexpected function label: %d",

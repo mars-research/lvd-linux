@@ -211,6 +211,10 @@ static struct workqueue_struct *ixgbe_wq;
 #endif
 
 static bool ixgbe_check_cfg_remove(struct ixgbe_hw *hw, struct pci_dev *pdev);
+static void ixgbe_service_task(struct work_struct *work);
+
+/* global instance of adapter struct */
+struct ixgbe_adapter *g_adapter = NULL;
 
 static int ixgbe_read_pci_cfg_word_parent(struct ixgbe_adapter *adapter,
 					  u32 reg, u16 *value)
@@ -352,7 +356,11 @@ static void ixgbe_service_event_schedule(struct ixgbe_adapter *adapter)
 	if (!test_bit(__IXGBE_DOWN, &adapter->state) &&
 	    !test_bit(__IXGBE_REMOVING, &adapter->state) &&
 	    !test_and_set_bit(__IXGBE_SERVICE_SCHED, &adapter->state))
+#ifndef LCD_ISOLATE
 		queue_work(ixgbe_wq, &adapter->service_task);
+#else
+		ixgbe_service_task(NULL);
+#endif
 }
 
 static void ixgbe_remove_adapter(struct ixgbe_hw *hw)
@@ -487,7 +495,6 @@ void ixgbe_write_pci_cfg_word(struct ixgbe_hw *hw, u32 reg, u16 value)
 	pci_write_config_word(adapter->pdev, reg, value);
 }
 
-#ifndef LCD_ISOLATE
 static void ixgbe_service_event_complete(struct ixgbe_adapter *adapter)
 {
 	BUG_ON(!test_bit(__IXGBE_SERVICE_SCHED, &adapter->state));
@@ -642,7 +649,7 @@ static void ixgbe_dump(struct ixgbe_adapter *adapter)
 	/* Print netdevice Info */
 	if (netdev) {
 		dev_info(&adapter->pdev->dev, "Net device Info\n");
-		pr_info("Device Name     state            "
+		LIBLCD_MSG("Device Name     state            "
 			"trans_start      last_rx\n");
 		pr_info("%-15s %016lX %016lX %016lX\n",
 			netdev->name,
@@ -879,7 +886,6 @@ rx_ring_summary:
 		}
 	}
 }
-#endif /* LCD_ISOLATE */
 
 static void ixgbe_release_hw_control(struct ixgbe_adapter *adapter)
 {
@@ -2525,7 +2531,6 @@ static void ixgbe_set_itr(struct ixgbe_q_vector *q_vector)
 	}
 }
 
-#ifndef LCD_ISOLATE
 /**
  * ixgbe_check_overtemp_subtask - check for over temperature
  * @adapter: pointer to adapter
@@ -2583,7 +2588,6 @@ static void ixgbe_check_overtemp_subtask(struct ixgbe_adapter *adapter)
 
 	adapter->interrupt_event = 0;
 }
-#endif /* LCD_ISOLATE */
 
 static void ixgbe_check_fan_failure(struct ixgbe_adapter *adapter, u32 eicr)
 {
@@ -2903,7 +2907,6 @@ static irqreturn_t ixgbe_msix_other(int irq, void *data)
 	/* re-enable the original interrupt state, no lsc, no queues */
 	if (!test_bit(__IXGBE_DOWN, &adapter->state))
 		ixgbe_irq_enable(adapter, false, false);
-
 	return IRQ_HANDLED;
 }
 
@@ -3399,7 +3402,6 @@ static void ixgbe_configure_tx(struct ixgbe_adapter *adapter)
 		ixgbe_configure_tx_ring(adapter, adapter->tx_ring[i]);
 }
 
-#ifndef LCD_ISOLATE
 static void ixgbe_enable_rx_drop(struct ixgbe_adapter *adapter,
 				 struct ixgbe_ring *ring)
 {
@@ -3458,7 +3460,6 @@ static void ixgbe_set_rx_drop_en(struct ixgbe_adapter *adapter)
 			ixgbe_disable_rx_drop(adapter, adapter->rx_ring[i]);
 	}
 }
-#endif /* LCD_ISOLATE */
 
 #define IXGBE_SRRCTL_BSIZEHDRSIZE_SHIFT 2
 
@@ -5409,7 +5410,9 @@ static void ixgbe_up_complete(struct ixgbe_adapter *adapter)
 
 void ixgbe_reinit_locked(struct ixgbe_adapter *adapter)
 {
+#ifndef LCD_ISOLATE
 	WARN_ON(in_interrupt());
+#endif
 	/* put off any impending NetWatchDogTimeout */
 	netif_trans_update(adapter->netdev);
 
@@ -5945,6 +5948,8 @@ int ixgbe_setup_tx_resources(struct ixgbe_ring *tx_ring)
 	if (tx_ring->q_vector)
 		ring_node = tx_ring->q_vector->numa_node;
 
+	LIBLCD_MSG("%s, allocating memory ring_count %d | size per ring %zu\n",
+			__func__, tx_ring->count, sizeof(struct ixgbe_tx_buffer) );
 	tx_ring->tx_buffer_info = kzalloc_node(size, GFP_KERNEL, ring_node);
 	if (!tx_ring->tx_buffer_info)
 		tx_ring->tx_buffer_info = kzalloc(size, GFP_KERNEL);
@@ -5966,6 +5971,7 @@ int ixgbe_setup_tx_resources(struct ixgbe_ring *tx_ring)
 	if (!tx_ring->desc)
 		tx_ring->desc = dma_alloc_coherent(dev, tx_ring->size,
 						   &tx_ring->dma, GFP_KERNEL);
+
 	if (!tx_ring->desc)
 		goto err;
 
@@ -6727,7 +6733,6 @@ void ixgbe_update_stats(struct ixgbe_adapter *adapter)
 	netdev->stats.rx_missed_errors = total_mpc;
 }
 
-#ifndef LCD_ISOLATE
 /**
  * ixgbe_fdir_reinit_subtask - worker thread to reinit FDIR filter table
  * @adapter: pointer to the device adapter structure
@@ -6853,7 +6858,6 @@ static void ixgbe_watchdog_update_link(struct ixgbe_adapter *adapter)
 		IXGBE_WRITE_REG(hw, IXGBE_EIMS, IXGBE_EIMC_LSC);
 		IXGBE_WRITE_FLUSH(hw);
 	}
-
 	adapter->link_up = link_up;
 	adapter->link_speed = link_speed;
 }
@@ -6874,7 +6878,7 @@ static void ixgbe_update_default_up(struct ixgbe_adapter *adapter)
 	adapter->default_up = (up > 1) ? (ffs(up) - 1) : 0;
 #endif
 }
-
+extern void _netif_tx_wake_all_queues(struct net_device *dev);
 /**
  * ixgbe_watchdog_link_is_up - update netif_carrier status and
  *                             print link up message
@@ -6954,7 +6958,7 @@ static void ixgbe_watchdog_link_is_up(struct ixgbe_adapter *adapter)
 	ixgbe_check_vf_rate_limit(adapter);
 #endif
 	/* enable transmits */
-	netif_tx_wake_all_queues(adapter->netdev);
+	_netif_tx_wake_all_queues(adapter->netdev);
 
 	/* enable any upper devices */
 	rtnl_lock();
@@ -6963,7 +6967,7 @@ static void ixgbe_watchdog_link_is_up(struct ixgbe_adapter *adapter)
 			struct macvlan_dev *vlan = netdev_priv(upper);
 
 			if (vlan->fwd_priv)
-				netif_tx_wake_all_queues(upper);
+				_netif_tx_wake_all_queues(upper);
 		}
 	}
 	rtnl_unlock();
@@ -7074,7 +7078,6 @@ static void ixgbe_watchdog_flush_tx(struct ixgbe_adapter *adapter)
 		}
 	}
 }
-#endif /* LCD_ISOLATE */
 
 #ifdef CONFIG_PCI_IOV
 static inline void ixgbe_issue_vf_flr(struct ixgbe_adapter *adapter,
@@ -7146,7 +7149,7 @@ static void ixgbe_spoof_check(struct ixgbe_adapter *adapter)
 	e_warn(drv, "%u Spoofed packets detected\n", ssvpc);
 }
 #else
-#ifndef LCD_ISOLATE
+#ifdef LCD_ISOLATE
 static void ixgbe_spoof_check(struct ixgbe_adapter __always_unused *adapter)
 {
 }
@@ -7155,11 +7158,9 @@ static void
 ixgbe_check_for_bad_vf(struct ixgbe_adapter __always_unused *adapter)
 {
 }
-#endif /* CONFIG_PCI_IOV */
 #endif /* LCD_ISOLATE */
+#endif /* CONFIG_PCI_IOV */
 
-
-#ifndef LCD_ISOLATE
 /**
  * ixgbe_watchdog_subtask - check and bring link up
  * @adapter: pointer to the device adapter structure
@@ -7366,9 +7367,14 @@ static void ixgbe_reset_subtask(struct ixgbe_adapter *adapter)
  **/
 static void ixgbe_service_task(struct work_struct *work)
 {
+#ifndef LCD_ISOLATE
 	struct ixgbe_adapter *adapter = container_of(work,
 						     struct ixgbe_adapter,
 						     service_task);
+#else
+	struct ixgbe_adapter *adapter = g_adapter;
+#endif
+
 	if (ixgbe_removed(adapter->hw.hw_addr)) {
 		if (!test_bit(__IXGBE_DOWN, &adapter->state)) {
 			rtnl_lock();
@@ -7402,7 +7408,6 @@ static void ixgbe_service_task(struct work_struct *work)
 
 	ixgbe_service_event_complete(adapter);
 }
-#endif
 
 static int ixgbe_tso(struct ixgbe_ring *tx_ring,
 		     struct ixgbe_tx_buffer *first,
@@ -7671,13 +7676,12 @@ static void ixgbe_tx_map(struct ixgbe_ring *tx_ring,
 	for (frag = &skb_shinfo(skb)->frags[0];; frag++) {
 		if (dma_mapping_error(tx_ring->dev, dma))
 			goto dma_error;
-
+		printk("frag %p", frag);
 		/* record length, and DMA address */
 		dma_unmap_len_set(tx_buffer, len, size);
 		dma_unmap_addr_set(tx_buffer, dma, dma);
 
 		tx_desc->read.buffer_addr = cpu_to_le64(dma);
-
 		while (unlikely(size > IXGBE_MAX_DATA_PER_TXD)) {
 			tx_desc->read.cmd_type_len =
 				cpu_to_le32(cmd_type ^ IXGBE_MAX_DATA_PER_TXD);
@@ -7692,7 +7696,6 @@ static void ixgbe_tx_map(struct ixgbe_ring *tx_ring,
 
 			dma += IXGBE_MAX_DATA_PER_TXD;
 			size -= IXGBE_MAX_DATA_PER_TXD;
-
 			tx_desc->read.buffer_addr = cpu_to_le64(dma);
 		}
 
@@ -9490,7 +9493,6 @@ bool ixgbe_wol_supported(struct ixgbe_adapter *adapter, u16 device_id,
  * and a hardware reset occur.
  **/
 
-struct ixgbe_adapter *g_adapter = NULL;
 
 static int ixgbe_probe(struct pci_dev *pdev, const struct pci_device_id *ent)
 {
@@ -9986,8 +9988,6 @@ static void ixgbe_remove(struct pci_dev *pdev)
 	bool disable_dev;
 	int i;
 
-	LIBLCD_MSG("ixgbe_lcd: %s called", __func__);
-
 	/* if !adapter then we already cleaned up in probe */
 	if (!adapter)
 		return;
@@ -10021,9 +10021,7 @@ static void ixgbe_remove(struct pci_dev *pdev)
 	if (netdev->reg_state == NETREG_REGISTERED)
 		unregister_netdev(netdev);
 
-#ifndef LCD_ISOLATE
 	ixgbe_clear_interrupt_scheme(adapter);
-#endif
 
 	ixgbe_release_hw_control(adapter);
 
@@ -10035,8 +10033,6 @@ static void ixgbe_remove(struct pci_dev *pdev)
 	iounmap(adapter->io_addr);
 #endif
 	pci_release_mem_regions(pdev);
-
-	LIBLCD_MSG("complete\n");
 
 	for (i = 0; i < IXGBE_MAX_LINK_HANDLE; i++) {
 		if (adapter->jump_tables[i]) {

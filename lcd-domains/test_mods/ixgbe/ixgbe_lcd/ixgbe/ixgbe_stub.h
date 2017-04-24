@@ -31,7 +31,6 @@ int rtnl_is_locked(void) { LIBLCD_MSG("================>$$$$$$ Dummy %s called",
 
 void synchronize_irq(unsigned int irq) { LIBLCD_MSG("================>$$$$$$ Dummy %s called", __func__); }
 
-int mdio45_probe(struct mdio_if_info *mdio, int prtad) { dump_stack(); LIBLCD_MSG("================>$$$$$$ Dummy %s called", __func__); return 0; }
 
 void napi_gro_flush(struct napi_struct *napi, bool flush_old) { LIBLCD_MSG("================>$$$$$$ Dummy %s called", __func__); }
 

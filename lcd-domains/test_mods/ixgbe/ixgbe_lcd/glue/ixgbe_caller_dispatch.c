@@ -113,6 +113,20 @@ int dispatch_async_loop(struct thc_channel *_channel,
 		cspace,
 		sync_ep);
 
+		case SERVICE_EVENT_SCHED:
+			trace(SERVICE_EVENT_SCHED);
+			return ixgbe_service_event_schedule_callee(message,
+		_channel,
+		cspace,
+		sync_ep);
+
+		case TRIGGER_DUMP:
+			trace(TRIGGER_DUMP);
+			return trigger_dump_callee(message,
+		_channel,
+		cspace,
+		sync_ep);
+
 		case TRIGGER_EXIT:
 			trace(TRIGGER_EXIT);
 			ixgbe_exit_module();

@@ -19,6 +19,7 @@ struct thc_channel *ixgbe_async;
 struct cptr sync_ep;
 extern struct cspace *klcd_cspace;
 
+struct timer_list service_timer;
 
 /* This is the only device we strive for */
 #define IXGBE_DEV_ID_82599_SFP_SF2       0x154D
@@ -584,6 +585,8 @@ fail_ipc:
 	return ret;
 }
 
+extern void ixgbe_service_timer(unsigned long data);
+
 int probe(struct pci_dev *dev,
 		struct pci_device_id *id,
 		struct trampoline_hidden_args *hidden_args)
@@ -696,6 +699,7 @@ int probe(struct pci_dev *dev,
 	fipc_recv_msg_end(thc_channel_to_fipc(hidden_args->async_chnl),
 			_response);
 
+	setup_timer(&service_timer, &ixgbe_service_timer, (unsigned long) NULL);
 	return func_ret;
 fail_async:
 fail_sync:
@@ -832,6 +836,7 @@ void remove(struct pci_dev *dev,
 	}
 	fipc_recv_msg_end(thc_channel_to_fipc(hidden_args->async_chnl),
 			_response);
+	del_timer_sync(&service_timer);
 	return;
 fail_async:
 fail_ipc:
@@ -875,6 +880,7 @@ int ndo_open_user(struct net_device *dev,
 	}
 	func_ret = fipc_get_reg1(_response);
 	printk("%s, returned %d\n", __func__, func_ret);
+	mod_timer(&service_timer, jiffies + msecs_to_jiffies(2000));
 	fipc_recv_msg_end(thc_channel_to_fipc(hidden_args->async_chnl),
 			_response);
 	lcd_exit(0);
@@ -3690,6 +3696,90 @@ int trigger_exit_to_lcd(struct thc_channel *_channel)
 
 fail_async:
 fail_ipc:
+	return ret;
+}
+
+int ixgbe_trigger_dump(struct thc_channel *_channel)
+{
+	struct fipc_message *_request;
+	unsigned int request_cookie;
+	int ret;
+	struct net_device_container *dev_container;
+	bool cleanup = false;
+
+	if (!PTS()) {
+		cleanup = true;
+		thc_init();
+	}
+
+	ret = async_msg_blocking_send_start(_channel,
+		&_request);
+	if (ret) {
+		LIBLCD_ERR("failed to get a send slot");
+		goto fail_async;
+	}
+	async_msg_set_fn_type(_request,
+			TRIGGER_DUMP);
+	dev_container = container_of(g_ndev,
+		struct net_device_container, net_device);
+	fipc_set_reg1(_request,
+			dev_container->other_ref.cptr);
+
+	/* No need to wait for a response here */
+	ret = thc_ipc_send_request(_channel,
+			_request,
+			&request_cookie);
+	if (ret) {
+		LIBLCD_ERR("thc_ipc send");
+		goto fail_ipc;
+	}
+
+fail_async:
+fail_ipc:
+	if (cleanup)
+		lcd_exit(0);
+	return ret;
+}
+
+int ixgbe_service_event_sched(struct thc_channel *_channel)
+{
+	struct fipc_message *_request;
+	unsigned int request_cookie;
+	int ret;
+	struct net_device_container *dev_container;
+	bool cleanup = false;
+
+	if (!PTS()) {
+		cleanup = true;
+		thc_init();
+	}
+
+	ret = async_msg_blocking_send_start(_channel,
+		&_request);
+	if (ret) {
+		LIBLCD_ERR("failed to get a send slot");
+		goto fail_async;
+	}
+	async_msg_set_fn_type(_request,
+			SERVICE_EVENT_SCHED);
+	dev_container = container_of(g_ndev,
+		struct net_device_container, net_device);
+	fipc_set_reg1(_request,
+			dev_container->other_ref.cptr);
+
+	/* No need to wait for a response here */
+	ret = thc_ipc_send_request(_channel,
+			_request,
+			&request_cookie);
+	if (ret) {
+		LIBLCD_ERR("thc_ipc send");
+		goto fail_ipc;
+	}
+
+fail_async:
+fail_ipc:
+	if (cleanup)
+		lcd_exit(0);
 	return ret;
 }
 

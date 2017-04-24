@@ -25,11 +25,19 @@ static LIST_HEAD(net_infos);
 extern int setup_async_net_ring_channel(cptr_t tx, cptr_t rx, 
 				struct thc_channel **chnl_out);
 extern void destroy_async_net_ring_channel(struct thc_channel *chnl);
+extern int ixgbe_trigger_dump(struct thc_channel *_channel);
+extern int ixgbe_service_event_sched(struct thc_channel *_channel);
+extern int trigger_exit_to_lcd(struct thc_channel *_channel);
+extern struct timer_list service_timer;
 extern struct glue_cspace *c_cspace;
-struct pci_driver_container *pci_container;
 
+/* mechanism for unloading LCD gracefully */
 static bool unload_lcd =0;
 module_param_named(unload, unload_lcd, bool, S_IWUSR);
+
+/* to dump ixgbe registers */
+static bool ixgbe_dump =0;
+module_param_named(dump_regs, ixgbe_dump, bool, S_IWUSR);
 
 struct net_info *
 add_net(struct thc_channel *chnl, struct glue_cspace *cspace,
@@ -58,7 +66,6 @@ void remove_net(struct net_info *net)
 	kfree(net);
 }
 
-
 static int __get_net(struct net_info **net_out)
 {
 	struct net_info *first;
@@ -67,7 +74,6 @@ static int __get_net(struct net_info **net_out)
 		*net_out = first;
 	return first ? 1 : 0;
 }
-
 
 static int async_loop(struct net_info **net_out, struct fipc_message **msg_out)
 {
@@ -109,6 +115,22 @@ static int async_loop(struct net_info **net_out, struct fipc_message **msg_out)
 	 */
 	return -EWOULDBLOCK;
 }
+
+void ixgbe_service_timer(unsigned long data)
+{
+	unsigned long next_event_offset;
+	struct net_info *net;
+
+	next_event_offset = msecs_to_jiffies(10000);
+
+	/* Reset the timer */
+	mod_timer(&service_timer, next_event_offset + jiffies);
+
+	if (__get_net(&net)) {
+		ixgbe_service_event_sched(net->chnl);
+	}
+}
+
 
 /* LOOP -------------------------------------------------- */
 static int do_one_register(cptr_t register_chnl)
@@ -201,7 +223,6 @@ fail1:
 }
 #define REGISTER_FREQ	50
 
-extern int trigger_exit_to_lcd(struct thc_channel *_channel);
 
 static void loop(cptr_t register_chnl)
 {
@@ -237,6 +258,11 @@ static void loop(cptr_t register_chnl)
 				unload_lcd = 0;
 				if (__get_net(&net))
 					trigger_exit_to_lcd(net->chnl);
+			}
+			if (ixgbe_dump) {
+				ixgbe_dump = 0;
+				if (__get_net(&net))
+					ixgbe_trigger_dump(net->chnl);
 			}
 			ret = async_loop(&net, &msg);
 			if (!ret) {

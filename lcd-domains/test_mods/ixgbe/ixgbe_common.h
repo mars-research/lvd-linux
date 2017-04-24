@@ -80,6 +80,8 @@ enum dispatch_t {
 	SYNC,
 	UNSYNC,
 	TRIGGER_EXIT,
+	SERVICE_EVENT_SCHED,
+	TRIGGER_DUMP,
 };
 
 typedef enum {

@@ -68,4 +68,15 @@ int unsync_callee(struct fipc_message *_request,
 		struct thc_channel *_channel,
 		struct glue_cspace *cspace,
 		struct cptr sync_ep);
+
+int ixgbe_service_event_schedule_callee(struct fipc_message *_request,
+		struct thc_channel *_channel,
+		struct glue_cspace *cspace,
+		struct cptr sync_ep);
+
+int trigger_dump_callee(struct fipc_message *_request,
+		struct thc_channel *_channel,
+		struct glue_cspace *cspace,
+		struct cptr sync_ep);
+
 #endif /* __IXGBE_CALLER_H__ */

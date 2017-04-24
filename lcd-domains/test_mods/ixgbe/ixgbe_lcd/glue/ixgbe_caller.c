@@ -2527,6 +2527,62 @@ fail_lookup:
 	return ret;
 }
 
+extern void __ixgbe_service_event_schedule(struct net_device *netdev);
+
+int ixgbe_service_event_schedule_callee(struct fipc_message *_request,
+		struct thc_channel *_channel,
+		struct glue_cspace *cspace,
+		struct cptr sync_ep)
+{
+	struct net_device_container *dev_container;
+	int ret = 0;
+	unsigned int request_cookie;
+	ret = glue_cap_lookup_net_device_type(c_cspace,
+		__cptr(fipc_get_reg1(_request)),
+		&dev_container);
+	if (ret) {
+		LIBLCD_ERR("lookup");
+		goto fail_lookup;
+	}
+
+	request_cookie = thc_get_request_cookie(_request);
+	fipc_recv_msg_end(thc_channel_to_fipc(_channel),
+			_request);
+	LIBLCD_MSG("service timer callback");
+	__ixgbe_service_event_schedule(&dev_container->net_device);
+
+fail_lookup:
+	return ret;
+}
+
+extern void __ixgbe_dump(struct net_device *);
+
+int trigger_dump_callee(struct fipc_message *_request,
+		struct thc_channel *_channel,
+		struct glue_cspace *cspace,
+		struct cptr sync_ep)
+{
+	struct net_device_container *dev_container;
+	int ret = 0;
+	unsigned int request_cookie;
+	ret = glue_cap_lookup_net_device_type(c_cspace,
+		__cptr(fipc_get_reg1(_request)),
+		&dev_container);
+	if (ret) {
+		LIBLCD_ERR("lookup");
+		goto fail_lookup;
+	}
+
+	request_cookie = thc_get_request_cookie(_request);
+	fipc_recv_msg_end(thc_channel_to_fipc(_channel),
+			_request);
+
+	__ixgbe_dump(&dev_container->net_device);
+
+fail_lookup:
+	return ret;
+}
+
 struct sync_container *sync_container;
 struct unsync_container *unsync_container;
 

@@ -363,6 +363,12 @@ static void ixgbe_service_event_schedule(struct ixgbe_adapter *adapter)
 #endif
 }
 
+void __ixgbe_service_event_schedule(struct net_device *netdev)
+{
+	struct ixgbe_adapter *adapter = netdev_priv(netdev);
+	ixgbe_service_event_schedule(adapter);
+}
+
 static void ixgbe_remove_adapter(struct ixgbe_hw *hw)
 {
 #ifndef LCD_ISOLATE
@@ -895,6 +901,11 @@ static void ixgbe_release_hw_control(struct ixgbe_adapter *adapter)
 	ctrl_ext = IXGBE_READ_REG(&adapter->hw, IXGBE_CTRL_EXT);
 	IXGBE_WRITE_REG(&adapter->hw, IXGBE_CTRL_EXT,
 			ctrl_ext & ~IXGBE_CTRL_EXT_DRV_LOAD);
+}
+
+void __ixgbe_dump(struct net_device *dev)
+{
+	ixgbe_dump(netdev_priv(dev));
 }
 
 static void ixgbe_get_hw_control(struct ixgbe_adapter *adapter)

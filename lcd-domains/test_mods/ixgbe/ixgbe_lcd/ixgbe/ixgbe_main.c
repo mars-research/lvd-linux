@@ -7680,8 +7680,17 @@ static void ixgbe_tx_map(struct ixgbe_ring *tx_ring,
 	}
 
 #endif
+#ifndef LCD_ISOLATE
 	dma = dma_map_single(tx_ring->dev, skb->data, size, DMA_TO_DEVICE);
-
+#else
+	/* Inside LCDs, we program the device registers and descriptors with
+	 * physical address of the buffers and the corresponding gpa:hpa pair
+	 * is programmed inside the iommu. Here a simple __pa macro is enough
+	 * to get us the physical page of this buffer.
+	 * TODO: Check if this is really sufficient for all cases
+	 */
+	dma = __pa(skb->data);
+#endif
 	tx_buffer = first;
 
 	for (frag = &skb_shinfo(skb)->frags[0];; frag++) {

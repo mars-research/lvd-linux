@@ -20,6 +20,11 @@ extern cptr_t ixgbe_register_channel;
 
 static struct net_device *g_net_device;
 
+#ifdef IOMMU_ASSIGN
+/* device for IOMMU assignment */
+struct pcidev_info dev_assign = { 0x0000, 0x04, 0x00, 0x1 };
+#endif
+
 int glue_ixgbe_init(void)
 {
 	int ret;
@@ -531,12 +536,26 @@ int probe_callee(struct fipc_message *_request,
 	int func_ret;
 	int ret = 0;
 	cptr_t other_ref;
+#ifdef IOMMU_ASSIGN
+	unsigned int devfn;
+#endif
 
 #ifdef PCI_REGIONS
 	cptr_t res0_cptr;
 	gpa_t gpa_addr;
 	unsigned int res0_len;
 	void *dev_resource_0;
+#endif
+
+#ifdef IOMMU_ASSIGN
+	devfn = PCI_DEVFN(dev_assign.slot, dev_assign.fn);
+
+	ret = lcd_syscall_assign_device(dev_assign.domain,
+				dev_assign.bus,
+				devfn);
+	if (ret)
+		LIBLCD_ERR("Could not assign pci device to LCD: ret %d",
+				ret);
 #endif
 
 	LIBLCD_MSG("%s called", __func__);
@@ -675,6 +694,17 @@ int remove_callee(struct fipc_message *_request,
 	request_cookie = thc_get_request_cookie(_request);
 	fipc_recv_msg_end(thc_channel_to_fipc(_channel),
 			_request);
+
+#ifdef IOMMU_ASSIGN
+	devfn = PCI_DEVFN(dev_assign.slot, dev_assign.fn);
+
+	ret = lcd_syscall_deassign_device(dev_assign.domain,
+				dev_assign.bus,
+				devfn);
+	if (ret)
+		LIBLCD_ERR("Could not deassign pci device to LCD: ret %d",
+				ret);
+#endif
 
 	/* XXX: refer the comments under probe_callee */
 	ixgbe_driver_container.pci_driver.remove(NULL);
@@ -2220,7 +2250,16 @@ int ndo_start_xmit_callee(struct fipc_message *_request,
 	skb->head = (void*)(gva_val(skbd_gva) + skbd_off);
 	skb->data = skb->head + data_off;
 
-	LIBLCD_MSG("data %x %x", skb->data[12], skb->data[13]);
+#ifdef IOMMU_ASSIGN
+	ret = lcd_syscall_iommu_map_page(lcd_gva2gpa(skbd_gva),
+				skbd_ord, true);
+	LIBLCD_MSG("%s, order %d | gva %p | gpa %p", __func__,
+			skbd_ord, gva_val(skbd_gva),
+			gpa_val(lcd_gva2gpa(skbd_gva)));
+	if (ret)
+		LIBLCD_ERR("Mapping failed for packet %p",
+				__pa(skb->data));
+#endif
 
 	func_ret = dev_container->net_device.netdev_ops->ndo_start_xmit(skb,
 		( &dev_container->net_device ));

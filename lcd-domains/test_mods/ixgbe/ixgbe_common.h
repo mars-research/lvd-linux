@@ -18,6 +18,7 @@
 #include "ixgbe_glue_helper.h"
 
 #define PCI_REGIONS
+#define IOMMU_ASSIGN
 
 enum dispatch_t {
 	__PCI_REGISTER_DRIVER,
@@ -98,6 +99,10 @@ typedef enum {
 	} while(0)
 
 #define ASYNC_RPC_BUFFER_ORDER 12
+
+struct pcidev_info {
+	unsigned int domain, bus, slot, fn;
+};
 
 /* CSPACES ------------------------------------------------------------ */
 int glue_cap_init(void);

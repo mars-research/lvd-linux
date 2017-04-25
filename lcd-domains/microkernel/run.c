@@ -7,7 +7,9 @@
 #include <linux/slab.h>
 #include <linux/sched.h>
 #include <linux/kthread.h>
+#include <linux/pci.h>
 #include <lcd_domains/microkernel.h>
+#include <lcd_domains/lcd_iommu.h>
 #include <asm/lcd_domains/run.h>
 #include <asm/lcd_domains/create.h>
 
@@ -302,6 +304,79 @@ static int handle_syscall_irq_enable(struct lcd *lcd)
 	return 0;
 }
 
+static int handle_syscall_iommu_map_page(struct lcd *lcd)
+{
+	int ret;
+	bool force;
+	gpa_t gpa;
+	unsigned int order;
+
+	gpa = __gpa(lcd_arch_get_syscall_arg0(lcd->lcd_arch));
+	order = lcd_arch_get_syscall_arg1(lcd->lcd_arch);
+	force = lcd_arch_get_syscall_arg2(lcd->lcd_arch);
+
+	ret = lcd_iommu_map_page(lcd, gpa, order, force);
+	return ret;
+}
+
+static int handle_syscall_iommu_unmap_page(struct lcd *lcd)
+{
+	int ret;
+	gpa_t gpa;
+
+	gpa = __gpa(lcd_arch_get_syscall_arg0(lcd->lcd_arch));
+
+	ret = lcd_iommu_unmap_page(lcd, gpa);
+	return ret;
+}
+
+static int handle_syscall_assign_device(struct lcd *lcd)
+{
+	int domain, bus, devfn;
+	struct pci_dev *dev;
+	int ret;
+
+	domain = lcd_arch_get_syscall_arg0(lcd->lcd_arch);
+	bus = lcd_arch_get_syscall_arg1(lcd->lcd_arch);
+	devfn = lcd_arch_get_syscall_arg2(lcd->lcd_arch);
+
+	dev = pci_get_domain_bus_and_slot(domain, bus, devfn);
+	if (dev) {
+		LCD_MSG("Device found %x:%x:%x. mapping into iommu domain",
+			bus, domain, devfn);
+		ret = lcd_iommu_map_domain(lcd, dev);
+		LCD_MSG("lcd iommu map returned %d", ret);
+	} else {
+		LCD_ERR("couldn't get device %x:%x:%x", bus, domain, devfn);
+		ret = -ENODEV;
+	}
+	return ret;
+}
+
+static int handle_syscall_deassign_device(struct lcd *lcd)
+{
+	int domain, bus, devfn;
+	struct pci_dev *dev;
+	int ret;
+
+	domain = lcd_arch_get_syscall_arg0(lcd->lcd_arch);
+	bus = lcd_arch_get_syscall_arg1(lcd->lcd_arch);
+	devfn = lcd_arch_get_syscall_arg2(lcd->lcd_arch);
+
+	dev = pci_get_domain_bus_and_slot(domain, bus, devfn);
+	if (dev) {
+		LCD_MSG("Device found %x:%x:%x. mapping into iommu domain",
+			bus, domain, devfn);
+		ret = lcd_iommu_unmap_domain(lcd, dev);
+		LCD_MSG("lcd iommu map returned %d", ret);
+	} else {
+		LCD_ERR("couldn't get device %x:%x:%x", bus, domain, devfn);
+		ret = -ENODEV;
+	}
+	return ret;
+}
+
+
 static int handle_syscall(struct lcd *lcd, int *lcd_ret)
 {
 	int syscall_id;
@@ -378,6 +453,18 @@ static int handle_syscall(struct lcd *lcd, int *lcd_ret)
 		break;
 	case LCD_SYSCALL_IRQ_ENABLE:
 		ret = handle_syscall_irq_enable(lcd);
+		break;
+	case LCD_SYSCALL_ASSIGN_DEVICE:
+		ret = handle_syscall_assign_device(lcd);
+		break;
+	case LCD_SYSCALL_DEASSIGN_DEVICE:
+		ret = handle_syscall_deassign_device(lcd);
+		break;
+	case LCD_SYSCALL_IOMMU_MAP_PAGE:
+		ret = handle_syscall_iommu_map_page(lcd);
+		break;
+	case LCD_SYSCALL_IOMMU_UNMAP_PAGE:
+		ret = handle_syscall_iommu_unmap_page(lcd);
 		break;
 	default:
 		LCD_ERR("unimplemented syscall %d", syscall_id);

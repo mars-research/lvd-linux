@@ -206,6 +206,26 @@ static inline int lcd_syscall_sync_reply(void)
 	return lcd_syscall_no_args(LCD_SYSCALL_SYNC_REPLY);
 }
 
+static inline int lcd_syscall_assign_device(int domain, int bus, int devfn)
+{
+	return lcd_syscall_three_args(LCD_SYSCALL_ASSIGN_DEVICE, domain, bus, devfn);
+}
+
+static inline int lcd_syscall_deassign_device(int domain, int bus, int devfn)
+{
+	return lcd_syscall_three_args(LCD_SYSCALL_DEASSIGN_DEVICE, domain, bus, devfn);
+}
+
+static inline int lcd_syscall_iommu_map_page(gpa_t gpa, unsigned int order, bool force)
+{
+	return lcd_syscall_three_args(LCD_SYSCALL_IOMMU_MAP_PAGE, gpa_val(gpa), order, force);
+}
+
+static inline int lcd_syscall_iommu_unmap_page(gpa_t gpa)
+{
+	return lcd_syscall_one_arg(LCD_SYSCALL_IOMMU_UNMAP_PAGE, gpa_val(gpa));
+}
+
 static inline int lcd_syscall_create_sync_ep(cptr_t slot)
 {
 	return lcd_syscall_one_arg(LCD_SYSCALL_CREATE_SYNC_EP, cptr_val(slot));

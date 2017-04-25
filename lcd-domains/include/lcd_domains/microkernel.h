@@ -177,6 +177,12 @@ struct lcd {
 	 * ==============
 	 */
 	int (*klcd_main)(void);
+
+	/* FIXME: If we need to assign more than one device to an LCD,
+	 * this won't work. We need sophisticated mechanisms to handle
+	 * that. For now, I hope this should be enough.
+	 */
+	struct iommu_domain *domain;
 };
 
 /* similar to task structs */

@@ -349,7 +349,7 @@ int lcd_arch_ept_unmap_range(struct lcd_arch *lcd, gpa_t ga_start,
 /**
  * Simple routine combinding ept walk and get.
  */
-int lcd_arch_ept_gpa_to_hpa(struct lcd_arch *lcd, gpa_t ga, hpa_t *ha_out);
+int lcd_arch_ept_gpa_to_hpa(struct lcd_arch *lcd, gpa_t ga, hpa_t *ha_out, bool);
 /**
  * Translate guest physical address to host virtual.
  */
@@ -358,7 +358,7 @@ static inline int lcd_arch_ept_gpa_to_hva(struct lcd_arch *lcd, gpa_t gpa,
 {
 	hpa_t hpa;
 	int ret;
-	ret = lcd_arch_ept_gpa_to_hpa(lcd, gpa, &hpa);
+	ret = lcd_arch_ept_gpa_to_hpa(lcd, gpa, &hpa, true);
 	if (ret)
 		return ret;
 	*hva_out = hpa2hva(hpa);

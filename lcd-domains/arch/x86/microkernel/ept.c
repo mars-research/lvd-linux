@@ -403,7 +403,7 @@ int lcd_arch_ept_unmap_range(struct lcd_arch *lcd, gpa_t ga_start,
 	return 0;
 }
 
-int lcd_arch_ept_gpa_to_hpa(struct lcd_arch *lcd, gpa_t ga, hpa_t *ha_out)
+int lcd_arch_ept_gpa_to_hpa(struct lcd_arch *lcd, gpa_t ga, hpa_t *ha_out, bool verbose)
 {
 	int ret;
 	lcd_arch_epte_t *ept_entry;
@@ -419,11 +419,11 @@ int lcd_arch_ept_gpa_to_hpa(struct lcd_arch *lcd, gpa_t ga, hpa_t *ha_out)
 	/*
 	 * Confirm the entry is present
 	 */
-	if (!vmx_epte_present(*ept_entry)) {
+	if (!vmx_epte_present(*ept_entry) && verbose) {
 		LCD_ERR("gpa %lx is not mapped\n",
 			gpa_val(ga));
 		return -EINVAL;
-	}	
+	}
 
 	/*
 	 * Get the base host physical address, and add the offset.

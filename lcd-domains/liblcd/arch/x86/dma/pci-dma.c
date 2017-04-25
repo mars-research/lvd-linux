@@ -17,6 +17,8 @@
 #include <asm/x86_init.h>
 #include <asm/iommu_table.h>
 
+#include <asm/lcd_domains/liblcd.h>
+
 #include <lcd_config/post_hook.h>
 
 static int forbid_dac __read_mostly;
@@ -112,10 +114,22 @@ again:
 	/* fallback */
 	if (!page)
 		page = lcd_alloc_pages_node(dev_to_node(dev), flag, get_order(size));
-	if (!page)
+	if (!page) {
+		LIBLCD_ERR("%s, failed to allocate dma buffer",
+			__func__);
 		return NULL;
+	}
 
+#ifndef LCD_ISOLATE
 	addr = page_to_phys(page);
+#else
+	addr = __pa(lcd_page_address(page));
+#endif
+
+	if (lcd_syscall_iommu_map_page(__gpa(addr), get_order(size), true))
+		LIBLCD_ERR("iommu map page for desc->dma failed");
+
+
 	if (addr + size > dma_mask) {
 		lcd_free_pages(page, get_order(size));
 
@@ -128,6 +142,8 @@ again:
 	}
 	memset(lcd_page_address(page), 0, size);
 	*dma_addr = addr;
+	LIBLCD_MSG("%s, page %p | dma_addr %lx | page_address %p",
+			__func__, page, *dma_addr, lcd_page_address(page));
 	return lcd_page_address(page);
 }
 

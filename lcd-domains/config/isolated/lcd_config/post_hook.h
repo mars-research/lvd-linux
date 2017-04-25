@@ -318,19 +318,18 @@ static inline void force_up_write(void *x)
  * common {pre,post}_hook and a project specific one
  */
 #undef dev_warn
-#define dev_warn(dev, fmt, ...) do { } while(0)
+#define dev_warn(dev, fmt, ...) LIBLCD_WARN(fmt)
 
 #undef dev_err
-#define dev_err(dev, fmt, ...) do { } while(0)
+#define dev_err(dev, fmt, ...) LIBLCD_ERR(fmt)
 
 #undef dev_info
-#define dev_info(dev, fmt, ...) do { } while(0)
+#define dev_info(dev, fmt, ...) LIBLCD_MSG(fmt)
 
 /* net layer locks
  */
 #define rtnl_lock()     do { } while(0)
 #define rtnl_unlock()   do { } while(0)
-#define rtnl_is_locked()        (0)
 
 #define netdev_warn(dev, msg...)        LIBLCD_WARN(msg)
 #define netdev_err(dev, msg...)         LIBLCD_ERR(msg)

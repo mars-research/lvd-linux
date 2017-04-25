@@ -59,6 +59,19 @@ void skb_add_rx_frag(struct sk_buff *skb, int i, struct page *page, int off,
 
 void netdev_rss_key_fill(void *buffer, size_t len) { LIBLCD_MSG("================>$$$$$$ Dummy %s called", __func__); }
 
+unsigned long dev_trans_start(struct net_device *dev)
+{
+	LIBLCD_MSG("================>$$$$$$ Dummy %s called", __func__);
+	return 0ul;
+}
+
+void init_timer_key(struct timer_list *timer, unsigned int flags,
+		    const char *name, struct lock_class_key *key)
+{
+	LIBLCD_MSG("================>$$$$$$ Dummy %s called", __func__);
+	return;
+}
+
 int del_timer(struct timer_list * timer) { LIBLCD_MSG("================>$$$$$$ Dummy %s called", __func__); return 0; }
 int mod_timer(struct timer_list *timer, unsigned long expires) { LIBLCD_MSG("================>$$$$$$ Dummy %s called", __func__); return 0; }
 

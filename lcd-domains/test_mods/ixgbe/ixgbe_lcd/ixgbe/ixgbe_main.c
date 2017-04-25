@@ -9824,10 +9824,8 @@ skip_sriov:
 	ether_addr_copy(hw->mac.addr, hw->mac.perm_addr);
 	ixgbe_mac_set_default_filter(adapter);
 
-#ifndef LCD_ISOLATE
 	setup_timer(&adapter->service_timer, &ixgbe_service_timer,
 		    (unsigned long) adapter);
-#endif
 
 	if (ixgbe_removed(hw->hw_addr)) {
 		err = -EIO;

@@ -221,9 +221,9 @@ static inline int lcd_syscall_iommu_map_page(gpa_t gpa, unsigned int order, bool
 	return lcd_syscall_three_args(LCD_SYSCALL_IOMMU_MAP_PAGE, gpa_val(gpa), order, force);
 }
 
-static inline int lcd_syscall_iommu_unmap_page(gpa_t gpa)
+static inline int lcd_syscall_iommu_unmap_page(gpa_t gpa, unsigned int order)
 {
-	return lcd_syscall_one_arg(LCD_SYSCALL_IOMMU_UNMAP_PAGE, gpa_val(gpa));
+	return lcd_syscall_two_args(LCD_SYSCALL_IOMMU_UNMAP_PAGE, gpa_val(gpa), order);
 }
 
 static inline int lcd_syscall_create_sync_ep(cptr_t slot)

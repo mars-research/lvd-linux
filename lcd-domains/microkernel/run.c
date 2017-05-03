@@ -323,10 +323,12 @@ static int handle_syscall_iommu_unmap_page(struct lcd *lcd)
 {
 	int ret;
 	gpa_t gpa;
+	int order;
 
 	gpa = __gpa(lcd_arch_get_syscall_arg0(lcd->lcd_arch));
+	order = lcd_arch_get_syscall_arg1(lcd->lcd_arch);
 
-	ret = lcd_iommu_unmap_page(lcd, gpa);
+	ret = lcd_iommu_unmap_page(lcd, gpa, order);
 	return ret;
 }
 

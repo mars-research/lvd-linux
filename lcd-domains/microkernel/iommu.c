@@ -94,30 +94,46 @@ int lcd_iommu_map_page(struct lcd *lcd, gpa_t gpa, unsigned int order,
 	return ret;
 }
 
-int lcd_iommu_unmap_page(struct lcd *lcd, gpa_t gpa)
+int lcd_iommu_unmap_page(struct lcd *lcd, gpa_t gpa, unsigned int order)
 {
 	hpa_t hpa;
 	int ret;
+	int i;
+	u64 gfn_start, gfn_end = 1 << order;
 
-	ret = lcd_arch_ept_gpa_to_hpa(lcd->lcd_arch, gpa, &hpa, true);
-
-	/* no mapping. Just return */
-	if (ret) {
-		LIBLCD_WARN("%s, spurious unmap to gpa:hpa %lx:%lx pair",
-			    __func__, gpa_val(gpa), hpa_val(hpa));
-		return 0;
-	}
+	gfn_start = gpa_to_gfn(gpa_val(gpa));
 
 	if (!lcd->domain)
 		return -EINVAL;
 
-	ret = iommu_iova_to_phys(lcd->domain, gpa_val(gpa));
+	for (i = 0; i < gfn_end; ++i) {
+		gpa_t ga = gfn_to_gpa(gfn_start + i);
 
-	if (ret) {
-		/* A valid mapping is present */
-		ret = iommu_unmap(lcd->domain, gpa_val(gpa), PAGE_SIZE);
-		/* bug if not a page */
-		BUG_ON(ret != PAGE_SIZE);
+		ret = lcd_arch_ept_gpa_to_hpa(lcd->lcd_arch, ga, &hpa, false);
+
+		/* no mapping. Just return */
+		/* TODO: it might be possible that the LCD has freed the memory
+		 * without freeing the iommu mapping. in that case, it is
+		 * messed up, but we can still go ahead and try to unmap it.
+		 * This is has to be handled in a more cleaner way.
+		 */
+		if (ret) {
+			LIBLCD_WARN("%s, spurious unmap to gpa:hpa %lx:%lx pair",
+				    __func__, gpa_val(ga), hpa_val(hpa));
+			continue;
+		}
+
+		ret = iommu_iova_to_phys(lcd->domain, gpa_val(ga));
+
+		printk("%s, unmapping gpa:hpa %lx:%lx pair\n", __func__,
+		       gpa_val(ga), hpa_val(hpa));
+
+		if (ret) {
+			/* A valid mapping is present */
+			ret = iommu_unmap(lcd->domain, gpa_val(ga), PAGE_SIZE);
+			/* bug if not a page */
+			BUG_ON(ret != PAGE_SIZE);
+		}
 	}
 	/* return success */
 	return 0;

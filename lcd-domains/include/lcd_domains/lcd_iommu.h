@@ -36,7 +36,7 @@ int lcd_iommu_map_memory(struct lcd *lcd);
  */
 int lcd_iommu_map_page(struct lcd *lcd, gpa_t gpa, unsigned int, bool force);
 
-int lcd_iommu_unmap_page(struct lcd *lcd, gpa_t gpa);
+int lcd_iommu_unmap_page(struct lcd *lcd, gpa_t gpa, unsigned int);
 
 /**
  * unmap the mappings from iommu. The logic is similar to mapping, except

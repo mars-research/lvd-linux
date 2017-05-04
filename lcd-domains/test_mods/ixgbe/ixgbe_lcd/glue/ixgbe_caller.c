@@ -8,6 +8,8 @@
 #include "../ixgbe_caller.h"
 #include <asm/lcd_domains/liblcd.h>
 
+#include <linux/hashtable.h>
+
 #include <liblcd/netdev_helper.h>
 #include <lcd_config/post_hook.h>
 
@@ -25,6 +27,10 @@ static struct net_device *g_net_device;
 struct pcidev_info dev_assign = { 0x0000, 0x04, 0x00, 0x1 };
 #endif
 
+/* XXX: How to determine this? */
+#define CPTR_HASH_BITS      5
+static DEFINE_HASHTABLE(cptr_table, CPTR_HASH_BITS);
+
 int glue_ixgbe_init(void)
 {
 	int ret;
@@ -39,6 +45,7 @@ int glue_ixgbe_init(void)
 		goto fail2;
 	}
 	ixgbe_cspace = c_cspace;
+	hash_init(cptr_table);
 	return 0;
 fail2:
 	glue_cap_exit();
@@ -52,6 +59,35 @@ void glue_ixgbe_exit(void)
 	glue_cap_destroy(c_cspace);
 	glue_cap_exit();
 
+}
+
+int glue_insert_skbuff(struct hlist_head *htable, struct sk_buff_container *skb_c)
+{
+        BUG_ON(!skb_c->skb);
+
+        skb_c->my_ref = __cptr((unsigned long)skb_c->skb);
+
+        hash_add(cptr_table, &skb_c->hentry, (unsigned long) skb_c->skb);
+        return 0;
+}
+
+int glue_lookup_skbuff(struct hlist_head *htable, struct cptr c, struct sk_buff_container **skb_cout)
+{
+        struct sk_buff_container *skb_c;
+
+        hash_for_each_possible(cptr_table, skb_c, hentry, (unsigned long) cptr_val(c)) {
+                printk("lookup skb %p\n", skb_c->skb);
+		if (skb_c->skb == (struct sk_buff*) c.cptr) {
+			printk("match %p <==> %lx", skb_c->skb, c.cptr);
+	                *skb_cout = skb_c;
+		}
+        }
+        return 0;
+}
+
+void glue_remove_skbuff(struct sk_buff_container *skb_c)
+{
+	hash_del(&skb_c->hentry);
 }
 
 static int setup_async_channel(cptr_t *buf1_cptr_out, cptr_t *buf2_cptr_out,

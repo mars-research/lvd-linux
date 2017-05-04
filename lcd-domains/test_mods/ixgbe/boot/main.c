@@ -166,7 +166,8 @@ int boot_lcd_thread(void *data)
 
 	lcd_destroy_module_klcd(net_klcd, "lcd_test_mod_ixgbe_net_klcd");
 
-	lcd_cap_delete(ixgbe_lcd);
+	if (current->lcd)
+		lcd_cap_delete(ixgbe_lcd);
 	lcd_destroy_create_ctx(ixgbe_ctx);
 
 	msleep(2000);

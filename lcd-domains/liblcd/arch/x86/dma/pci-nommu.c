@@ -34,7 +34,11 @@ static dma_addr_t nommu_map_page(struct device *dev, struct page *page,
 				 enum dma_data_direction dir,
 				 unsigned long attrs)
 {
+#ifndef LCD_ISOLATE
 	dma_addr_t bus = page_to_phys(page) + offset;
+#else
+	dma_addr_t bus = __pa(lcd_page_address(page)) + offset;
+#endif
 	WARN_ON(size == 0);
 	if (!check_addr("map_single", dev, bus, size))
 		return DMA_ERROR_CODE;

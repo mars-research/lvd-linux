@@ -83,6 +83,11 @@ struct unsync_container {
 	cptr_t other_ref;
 };
 
+struct poll_container {
+	int ( *poll )(struct napi_struct *, int);
+	cptr_t my_ref;
+	cptr_t other_ref;
+};
 
 int glue_cap_insert_device_type(struct glue_cspace *cspace,
 		struct device_container *device_container,

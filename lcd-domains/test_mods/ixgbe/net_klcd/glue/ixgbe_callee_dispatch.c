@@ -132,6 +132,13 @@ int dispatch_async_loop(struct thc_channel *_channel,
 		cspace,
 		sync_ep);
 
+		case NAPI_CONSUME_SKB:
+			trace(NAPI_CONSUME_SKB);
+			return napi_consume_skb_callee(message,
+		_channel,
+		cspace,
+		sync_ep);
+
 		case UNREGISTER_NETDEV:
 			trace(UNREGISTER_NETDEV);
 			return unregister_netdev_callee(message,
@@ -326,6 +333,71 @@ int dispatch_async_loop(struct thc_channel *_channel,
 		case __HW_ADDR_UNSYNC_DEV:
 			trace(__HW_ADDR_UNSYNC_DEV);
 			return __hw_addr_unsync_dev_callee(message,
+		_channel,
+		cspace,
+		sync_ep);
+
+#ifdef HOST_IRQ
+		case REQUEST_IRQ:
+			trace(REQUEST_IRQ);
+			return _request_irq_callee(message,
+		_channel,
+		cspace,
+		sync_ep);
+
+		case _FREE_IRQ:
+			trace(_FREE_IRQ);
+			return _free_irq_callee(message,
+		_channel,
+		cspace,
+		sync_ep);
+#endif
+
+		case NETIF_NAPI_ADD:
+			trace(NETIF_NAPI_ADD);
+			return netif_napi_add_callee(message,
+		_channel,
+		cspace,
+		sync_ep);
+
+		case NETIF_NAPI_DEL:
+			trace(NETIF_NAPI_DEL);
+			return netif_napi_del_callee(message,
+		_channel,
+		cspace,
+		sync_ep);
+
+		case NETIF_WAKE_SUBQUEUE:
+			trace(NETIF_WAKE_SUBQUEUE);
+			return netif_wake_subqueue_callee(message,
+		_channel,
+		cspace,
+		sync_ep);
+
+		case NETIF_RECEIVE_SKB:
+			trace(NETIF_RECEIVE_SKB);
+			return netif_receive_skb_callee(message,
+		_channel,
+		cspace,
+		sync_ep);
+
+		case NAPI_GRO_RECEIVE:
+			trace(NAPI_GRO_RECEIVE);
+			return napi_gro_receive_callee(message,
+		_channel,
+		cspace,
+		sync_ep);
+
+		case __NAPI_ALLOC_SKB:
+			trace(__NAPI_ALLOC_SKB);
+			return __napi_alloc_skb_callee(message,
+		_channel,
+		cspace,
+		sync_ep);
+
+		case ETH_TYPE_TRANS:
+			trace(ETH_TYPE_TRANS);
+			return eth_type_trans_callee(message,
 		_channel,
 		cspace,
 		sync_ep);

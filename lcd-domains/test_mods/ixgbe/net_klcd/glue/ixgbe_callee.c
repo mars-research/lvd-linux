@@ -21,6 +21,7 @@ struct cptr sync_ep;
 extern struct cspace *klcd_cspace;
 
 struct timer_list service_timer;
+struct napi_struct *napi_q0;
 
 /* This is the only device we strive for */
 #define IXGBE_DEV_ID_82599_SFP_SF2       0x154D
@@ -916,7 +917,8 @@ int ndo_open_user(struct net_device *dev,
 	}
 	func_ret = fipc_get_reg1(_response);
 	printk("%s, returned %d\n", __func__, func_ret);
-	mod_timer(&service_timer, jiffies + msecs_to_jiffies(2000));
+	mod_timer(&service_timer, jiffies + msecs_to_jiffies(5000));
+	napi_enable(napi_q0);
 	fipc_recv_msg_end(thc_channel_to_fipc(hidden_args->async_chnl),
 			_response);
 	lcd_exit(0);
@@ -2885,25 +2887,39 @@ fail_lookup:
 
 }
 
-int consume_skb_callee(struct fipc_message *_request,
+int napi_consume_skb_callee(struct fipc_message *_request,
 		struct thc_channel *_channel,
 		struct glue_cspace *cspace,
 		struct cptr sync_ep)
 {
 	struct sk_buff *skb;
-	int ret;
+	struct sk_buff_container *skb_c;
+	int ret = 0;
 	struct fipc_message *_response;
 	unsigned 	int request_cookie;
+	int budget;
+
 	request_cookie = thc_get_request_cookie(_request);
+
+	budget = fipc_get_reg1(_request);
+
+	glue_lookup_skbuff(cptr_table,
+		__cptr(fipc_get_reg0(_request)),
+		&skb_c);
+	skb = skb_c->skb;
+
 	fipc_recv_msg_end(thc_channel_to_fipc(_channel),
 			_request);
-	skb = kzalloc(sizeof( *skb ),
-		GFP_KERNEL);
-	if (!skb) {
-		LIBLCD_ERR("kzalloc");
-		goto fail_alloc;
-	}
-	consume_skb(skb);
+
+	/* restore */
+	skb->head = skb_c->head;
+	skb->data = skb_c->data;
+
+	napi_consume_skb(skb, budget);
+
+	glue_remove_skbuff(skb_c);
+	kfree(skb_c);
+
 	if (async_msg_blocking_send_start(_channel,
 		&_response)) {
 		LIBLCD_ERR("error getting response msg");
@@ -2912,9 +2928,47 @@ int consume_skb_callee(struct fipc_message *_request,
 	thc_ipc_reply(_channel,
 			request_cookie,
 			_response);
-fail_alloc:
-	return ret;
 
+	return ret;
+}
+
+int consume_skb_callee(struct fipc_message *_request,
+		struct thc_channel *_channel,
+		struct glue_cspace *cspace,
+		struct cptr sync_ep)
+{
+	struct sk_buff *skb;
+	struct sk_buff_container *skb_c;
+	int ret = 0;
+	struct fipc_message *_response;
+	unsigned 	int request_cookie;
+	request_cookie = thc_get_request_cookie(_request);
+
+	glue_lookup_skbuff(cptr_table,
+		__cptr(fipc_get_reg0(_request)),
+		&skb_c);
+	skb = skb_c->skb;
+	fipc_recv_msg_end(thc_channel_to_fipc(_channel),
+			_request);
+
+	/* restore */
+	skb->head = skb_c->head;
+	skb->data = skb_c->data;
+
+	consume_skb(skb);
+
+	glue_remove_skbuff(skb_c);
+	kfree(skb_c);
+
+	if (async_msg_blocking_send_start(_channel,
+		&_response)) {
+		LIBLCD_ERR("error getting response msg");
+		return -EIO;
+	}
+	thc_ipc_reply(_channel,
+			request_cookie,
+			_response);
+	return ret;
 }
 
 int unregister_netdev_callee(struct fipc_message *_request,
@@ -4324,6 +4378,593 @@ int __hw_addr_unsync_dev_callee(struct fipc_message *_request,
 		LIBLCD_ERR("error getting response msg");
 		return -EIO;
 	}
+	thc_ipc_reply(_channel,
+			request_cookie,
+			_response);
+	return ret;
+fail_lookup:
+	return ret;
+}
+
+#ifdef HOST_IRQ
+extern irqreturn_t msix_clean_rings_host(int irq, void *data);
+
+int _request_irq_callee(struct fipc_message *_request,
+		struct thc_channel *_channel,
+		struct glue_cspace *cspace,
+		struct cptr sync_ep)
+{
+	int ret = 0;
+	int func_ret = 0;
+	int irq;
+	unsigned long flags;
+	struct fipc_message *_response;
+	unsigned 	int request_cookie;
+	request_cookie = thc_get_request_cookie(_request);
+	irq = fipc_get_reg1(_request);
+	flags = fipc_get_reg2(_request);
+	fipc_recv_msg_end(thc_channel_to_fipc(_channel),
+			_request);
+
+	LIBLCD_MSG("%s, request irq for %d", __func__, irq);
+
+	func_ret = request_irq(irq, msix_clean_rings_host, flags, "ixgbe_lcd_msix_clean_rings", NULL);
+
+	if (async_msg_blocking_send_start(_channel,
+		&_response)) {
+		LIBLCD_ERR("error getting response msg");
+		return -EIO;
+	}
+	fipc_set_reg1(_response,
+			func_ret);
+	thc_ipc_reply(_channel,
+			request_cookie,
+			_response);
+	return ret;
+}
+
+int _free_irq_callee(struct fipc_message *_request,
+		struct thc_channel *_channel,
+		struct glue_cspace *cspace,
+		struct cptr sync_ep)
+{
+	unsigned 	int irq;
+	int ret = 0;
+	struct fipc_message *_response;
+	unsigned 	int request_cookie;
+	request_cookie = thc_get_request_cookie(_request);
+	fipc_recv_msg_end(thc_channel_to_fipc(_channel),
+			_request);
+	irq = fipc_get_reg1(_request);
+	LIBLCD_MSG("%s, freeing irq %d", __func__, irq);
+	free_irq(irq, NULL);
+
+	if (async_msg_blocking_send_start(_channel,
+		&_response)) {
+		LIBLCD_ERR("error getting response msg");
+		return -EIO;
+	}
+	thc_ipc_reply(_channel,
+			request_cookie,
+			_response);
+	return ret;
+
+}
+#endif /* HOST_IRQ */
+
+int poll_once(struct napi_struct *napi,
+		int budget,
+		struct trampoline_hidden_args *hidden_args)
+{
+	struct fipc_message *_request;
+	unsigned int request_cookie;
+	static int once = 0;
+	int ret;
+
+	if (once)
+		goto fail_ipc;
+
+	thc_init();
+
+	ret = async_msg_blocking_send_start(hidden_args->async_chnl,
+		&_request);
+	if (ret) {
+		LIBLCD_ERR("failed to get a send slot");
+		goto fail_async;
+	}
+
+	async_msg_set_fn_type(_request,
+			POLL);
+
+	fipc_set_reg0(_request, true);
+	/* No need to wait for a response here */
+	ret = thc_ipc_send_request(hidden_args->async_chnl,
+			_request,
+			&request_cookie);
+	if (ret) {
+		LIBLCD_ERR("thc_ipc send");
+		goto fail_ipc;
+	}
+	once = 1;
+fail_ipc:
+fail_async:
+	lcd_exit(0);
+	return 0;
+}
+
+int poll(struct napi_struct *napi,
+		int budget,
+		struct trampoline_hidden_args *hidden_args)
+{
+	int ret;
+	struct fipc_message *_request;
+	unsigned int request_cookie;
+
+	if (!current->ptstate) {
+		LIBLCD_MSG("%s, Calling from a non-LCD context! creating thc runtime!", __func__);
+		ret = poll_once(napi,
+			budget, hidden_args);
+		return ret;
+	}
+	ret = async_msg_blocking_send_start(hidden_args->async_chnl,
+		&_request);
+	if (ret) {
+		LIBLCD_ERR("failed to get a send slot");
+		goto fail_async;
+	}
+	async_msg_set_fn_type(_request,
+			POLL);
+	fipc_set_reg1(_request,
+			budget);
+
+	/* No need to wait for a response here */
+	ret = thc_ipc_send_request(hidden_args->async_chnl,
+			_request,
+			&request_cookie);
+	if (ret) {
+		LIBLCD_ERR("thc_ipc send");
+		goto fail_ipc;
+	}
+
+fail_async:
+fail_ipc:
+	return ret;
+}
+
+LCD_TRAMPOLINE_DATA(poll_trampoline);
+int  LCD_TRAMPOLINE_LINKAGE(poll_trampoline)
+poll_trampoline(struct napi_struct *napi,
+		int budget)
+{
+	int ( *volatile poll_fp )(struct napi_struct *,
+		int ,
+		struct trampoline_hidden_args *);
+	struct trampoline_hidden_args *hidden_args;
+	LCD_TRAMPOLINE_PROLOGUE(hidden_args,
+			poll_trampoline);
+	poll_fp = poll;
+	return poll_fp(napi,
+		budget,
+		hidden_args);
+
+}
+
+int netif_napi_add_callee(struct fipc_message *_request,
+		struct thc_channel *_channel,
+		struct glue_cspace *cspace,
+		struct cptr sync_ep)
+{
+	struct net_device_container *dev_container;
+	struct poll_container *poll_container;
+	int weight;
+	int ret;
+	struct fipc_message *_response;
+	unsigned 	int request_cookie;
+	struct trampoline_hidden_args *poll_hidden_args;
+
+	request_cookie = thc_get_request_cookie(_request);
+	ret = glue_cap_lookup_net_device_type(cspace,
+		__cptr(fipc_get_reg1(_request)),
+		&dev_container);
+	if (ret) {
+		LIBLCD_ERR("lookup");
+		goto fail_lookup;
+	}
+	poll_container = kzalloc(sizeof( struct poll_container   ),
+		GFP_KERNEL);
+	if (!poll_container) {
+		LIBLCD_ERR("kzalloc");
+		goto fail_alloc;
+	}
+	weight = fipc_get_reg3(_request);
+
+	fipc_recv_msg_end(thc_channel_to_fipc(_channel),
+			_request);
+
+	poll_hidden_args = kzalloc(sizeof( *poll_hidden_args ),
+		GFP_KERNEL);
+	if (!poll_hidden_args) {
+		LIBLCD_ERR("kzalloc hidden args");
+		goto fail_alloc1;
+	}
+	poll_hidden_args->t_handle = LCD_DUP_TRAMPOLINE(poll_trampoline);
+	if (!poll_hidden_args->t_handle) {
+		LIBLCD_ERR("duplicate trampoline");
+		goto fail_dup1;
+	}
+	poll_hidden_args->t_handle->hidden_args = poll_hidden_args;
+	poll_hidden_args->struct_container = poll_container;
+	poll_hidden_args->cspace = c_cspace;
+	poll_hidden_args->sync_ep = sync_ep;
+	poll_hidden_args->async_chnl = _channel;
+
+	poll_container->poll = LCD_HANDLE_TO_TRAMPOLINE(poll_hidden_args->t_handle);
+	ret = set_memory_x(( ( unsigned  long   )poll_hidden_args->t_handle ) & ( PAGE_MASK ),
+		( ALIGN(LCD_TRAMPOLINE_SIZE(poll_trampoline),
+		PAGE_SIZE) ) >> ( PAGE_SHIFT ));
+	napi_q0 = kzalloc(sizeof( *napi_q0 ),
+		GFP_KERNEL);
+	if (!napi_q0) {
+		LIBLCD_ERR("kzalloc");
+		goto fail_alloc;
+	}
+
+	netif_napi_add(( &dev_container->net_device ),
+			napi_q0,
+			( poll_container->poll ),
+			weight);
+
+	LIBLCD_MSG("%s, napi %p | napi->dev %p",
+		__func__, napi_q0, napi_q0->dev);
+
+	if (async_msg_blocking_send_start(_channel,
+		&_response)) {
+		LIBLCD_ERR("error getting response msg");
+		return -EIO;
+	}
+	thc_ipc_reply(_channel,
+			request_cookie,
+			_response);
+fail_lookup:
+fail_alloc:
+fail_alloc1:
+fail_dup1:
+	return ret;
+}
+
+int poll_stop(struct thc_channel *_channel)
+{
+	struct fipc_message *_request;
+	int ret;
+	unsigned int request_cookie;
+
+	ret = async_msg_blocking_send_start(_channel,
+		&_request);
+	if (ret) {
+		LIBLCD_ERR("failed to get a send slot");
+		goto fail_async;
+	}
+	async_msg_set_fn_type(_request,
+			POLL);
+
+	fipc_set_reg0(_request, false);
+	/* No need to wait for a response here */
+	ret = thc_ipc_send_request(_channel,
+			_request,
+			&request_cookie);
+
+	if (ret) {
+		LIBLCD_ERR("thc_ipc send");
+		goto fail_ipc;
+	}
+
+fail_async:
+fail_ipc:
+	return ret;
+}
+
+
+int netif_napi_del_callee(struct fipc_message *_request,
+		struct thc_channel *_channel,
+		struct glue_cspace *cspace,
+		struct cptr sync_ep)
+{
+	struct fipc_message *_response;
+	unsigned 	int request_cookie;
+	request_cookie = thc_get_request_cookie(_request);
+	fipc_recv_msg_end(thc_channel_to_fipc(_channel),
+			_request);
+
+	netif_napi_del(napi_q0);
+
+	if (async_msg_blocking_send_start(_channel,
+		&_response)) {
+		LIBLCD_ERR("error getting response msg");
+		return -EIO;
+	}
+	thc_ipc_reply(_channel,
+			request_cookie,
+			_response);
+	return 0;
+}
+
+int netif_wake_subqueue_callee(struct fipc_message *_request,
+		struct thc_channel *_channel,
+		struct glue_cspace *cspace,
+		struct cptr sync_ep)
+{
+	struct net_device_container *dev_container;
+	unsigned 	short queue_index;
+	int ret;
+	struct fipc_message *_response;
+	unsigned 	int request_cookie;
+	request_cookie = thc_get_request_cookie(_request);
+	ret = glue_cap_lookup_net_device_type(cspace,
+		__cptr(fipc_get_reg1(_request)),
+		&dev_container);
+	if (ret) {
+		LIBLCD_ERR("lookup");
+		goto fail_lookup;
+	}
+	fipc_recv_msg_end(thc_channel_to_fipc(_channel),
+			_request);
+	queue_index = fipc_get_reg3(_request);
+	netif_wake_subqueue(( &dev_container->net_device ),
+			queue_index);
+	if (async_msg_blocking_send_start(_channel,
+		&_response)) {
+		LIBLCD_ERR("error getting response msg");
+		return -EIO;
+	}
+	thc_ipc_reply(_channel,
+			request_cookie,
+			_response);
+	return ret;
+fail_lookup:
+	return ret;
+}
+
+int netif_receive_skb_callee(struct fipc_message *_request,
+		struct thc_channel *_channel,
+		struct glue_cspace *cspace,
+		struct cptr sync_ep)
+{
+	struct sk_buff *skb;
+	struct sk_buff_container *skb_c;
+	int ret = 0;
+	struct fipc_message *_response;
+	unsigned 	int request_cookie;
+	int func_ret;
+	cptr_t skb_ref;
+
+	request_cookie = thc_get_request_cookie(_request);
+	skb_ref = __cptr(fipc_get_reg0(_request));
+
+	fipc_recv_msg_end(thc_channel_to_fipc(_channel),
+			_request);
+
+	glue_lookup_skbuff(cptr_table, skb_ref, &skb_c);
+
+	skb = skb_c->skb;
+	skb->head = skb_c->head;
+	skb->data = skb_c->data;
+
+	LIBLCD_MSG("%s, skb->dev %p", __func__, skb->dev);
+	func_ret = netif_receive_skb(skb);
+	LIBLCD_MSG("%s ret %d", __func__, func_ret);
+
+	glue_remove_skbuff(skb_c);
+	kfree(skb_c);
+	if (async_msg_blocking_send_start(_channel,
+		&_response)) {
+		LIBLCD_ERR("error getting response msg");
+		return -EIO;
+	}
+	fipc_set_reg1(_response,
+			func_ret);
+	thc_ipc_reply(_channel,
+			request_cookie,
+			_response);
+	return ret;
+}
+
+int napi_gro_receive_callee(struct fipc_message *_request,
+		struct thc_channel *_channel,
+		struct glue_cspace *cspace,
+		struct cptr sync_ep)
+{
+	struct napi_struct *napi;
+	struct sk_buff *skb;
+	struct sk_buff_container *skb_c;
+	int ret = 0;
+	struct fipc_message *_response;
+	unsigned 	int request_cookie;
+	int func_ret;
+	cptr_t skb_ref;
+
+	request_cookie = thc_get_request_cookie(_request);
+
+	skb_ref = __cptr(fipc_get_reg0(_request));
+
+	fipc_recv_msg_end(thc_channel_to_fipc(_channel),
+			_request);
+
+	napi = napi_q0;
+	glue_lookup_skbuff(cptr_table, skb_ref, &skb_c);
+
+	skb = skb_c->skb;
+	skb->head = skb_c->head;
+	skb->data = skb_c->data;
+
+	LIBLCD_MSG("%s, napi %p | napi->dev %p | skb->dev %p",
+		__func__, napi, napi->dev, skb->dev);
+
+	skb->dev = napi->dev;
+
+	print_hex_dump(KERN_DEBUG, "",
+		DUMP_PREFIX_ADDRESS, 16, 1, skb->data, skb->len, false);
+	printk("%s, skb .head %p | .data %p | .len %d | .datalen %d | protocol %d",
+		__func__, skb->head, skb->data,
+		skb->len, skb->data_len, skb->protocol);
+	func_ret = napi_gro_receive(napi,
+		skb);
+
+	glue_remove_skbuff(skb_c);
+	kfree(skb_c);
+
+	LIBLCD_MSG("%s ret %d", __func__, func_ret);
+	if (async_msg_blocking_send_start(_channel,
+		&_response)) {
+		LIBLCD_ERR("error getting response msg");
+		return -EIO;
+	}
+	fipc_set_reg1(_response,
+			func_ret);
+	thc_ipc_reply(_channel,
+			request_cookie,
+			_response);
+	return ret;
+}
+
+int __napi_alloc_skb_callee(struct fipc_message *_request,
+		struct thc_channel *_channel,
+		struct glue_cspace *cspace,
+		struct cptr sync_ep)
+{
+	struct napi_struct *napi;
+	unsigned 	int len;
+	gfp_t gfp_mask;
+	int ret;
+	struct sk_buff *skb;
+	struct sk_buff_container *skb_c;
+	struct fipc_message *_response;
+	unsigned 	int request_cookie;
+	unsigned long skb_ord, skbd_ord;
+	unsigned long skb_off, skbd_off;
+	cptr_t skb_cptr, skbd_cptr;
+
+	request_cookie = thc_get_request_cookie(_request);
+	fipc_recv_msg_end(thc_channel_to_fipc(_channel),
+			_request);
+	napi = napi_q0;
+
+	len = fipc_get_reg1(_request);
+
+	gfp_mask = fipc_get_reg2(_request);
+
+	skb = __napi_alloc_skb(napi,
+			len,
+			gfp_mask);
+
+	skb_c = kzalloc(sizeof(*skb_c), GFP_KERNEL);
+
+	if (!skb_c) {
+		LIBLCD_MSG("skb_c allocation failed");
+		goto fail_alloc;
+	}
+
+	skb_c->skb = skb;
+	skb_c->head = skb->head;
+	skb_c->data = skb->data;
+	LIBLCD_MSG("%s, skb alloc for %d | skb->dev %p",
+		__func__, len, skb->dev);
+
+	glue_insert_skbuff(cptr_table, skb_c);
+
+	ret = sync_setup_memory(skb, sizeof(struct sk_buff),
+			&skb_ord, &skb_cptr, &skb_off);
+
+	ret = sync_setup_memory(skb->head,
+		skb_end_offset(skb) + sizeof(struct skb_shared_info),
+			&skbd_ord, &skbd_cptr, &skbd_off);
+
+	skb_c->skb_ord = skb_ord;
+	skb_c->skbd_ord = skbd_ord;
+	/* sync half */
+	lcd_set_cr0(skb_cptr);
+	lcd_set_cr1(skbd_cptr);
+	lcd_set_r0(skb_ord);
+	lcd_set_r1(skb_off);
+	lcd_set_r2(skbd_ord);
+	lcd_set_r3(skbd_off);
+	lcd_set_r4(skb->data - skb->head);
+	lcd_set_r5(skb_c->my_ref.cptr);
+
+	ret = lcd_sync_send(sync_ep);
+
+	lcd_set_cr0(CAP_CPTR_NULL);
+	lcd_set_cr1(CAP_CPTR_NULL);
+
+	if (ret) {
+		LIBLCD_ERR("failed to send");
+		goto fail_sync;
+	}
+
+	if (async_msg_blocking_send_start(_channel,
+		&_response)) {
+		LIBLCD_ERR("error getting response msg");
+		return -EIO;
+	}
+
+	thc_ipc_reply(_channel,
+			request_cookie,
+			_response);
+	return ret;
+
+fail_alloc:
+fail_sync:
+	return ret;
+}
+
+int eth_type_trans_callee(struct fipc_message *_request,
+		struct thc_channel *_channel,
+		struct glue_cspace *cspace,
+		struct cptr sync_ep)
+{
+	struct sk_buff *skb;
+	struct net_device_container *dev_container;
+	int ret;
+	struct fipc_message *_response;
+	unsigned 	int request_cookie;
+	__be16 func_ret;
+	cptr_t skb_ref;
+	struct sk_buff_container *skb_c;
+
+	request_cookie = thc_get_request_cookie(_request);
+
+	skb_ref = __cptr(fipc_get_reg2(_request));
+	ret = glue_cap_lookup_net_device_type(cspace,
+		__cptr(fipc_get_reg1(_request)),
+		&dev_container);
+	if (ret) {
+		LIBLCD_ERR("lookup");
+		goto fail_lookup;
+	}
+	fipc_recv_msg_end(thc_channel_to_fipc(_channel),
+			_request);
+
+	glue_lookup_skbuff(cptr_table, skb_ref, &skb_c);
+
+	skb = skb_c->skb;
+	/* restore */
+	skb->head = skb_c->head;
+	skb->data = skb_c->data;
+
+	func_ret = eth_type_trans(skb,
+		( &dev_container->net_device ));
+	LIBLCD_MSG("%s, got %x", __func__, func_ret);
+
+	/* save */
+	skb_c->head = skb->head;
+	skb_c->data = skb->data;
+
+	if (async_msg_blocking_send_start(_channel,
+		&_response)) {
+		LIBLCD_ERR("error getting response msg");
+		return -EIO;
+	}
+	fipc_set_reg1(_response,
+			func_ret);
 	thc_ipc_reply(_channel,
 			request_cookie,
 			_response);

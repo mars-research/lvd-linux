@@ -22,6 +22,8 @@ int ixgbe_init_module(void);
 void ixgbe_exit_module(void);
 extern int create_async_channel(void);
 unsigned long loops_per_jiffy;
+bool poll_start = false;
+extern int __ixgbe_poll(void);
 
 /* LOOP ---------------------------------------- */
 
@@ -30,6 +32,7 @@ static void main_and_loop(void)
 	int ret;
 	int stop = 0;
 	struct fipc_message *msg;
+	unsigned long long poll_count = 0ull;
 
 	DO_FINISH(
 		ASYNC(
@@ -82,6 +85,11 @@ static void main_and_loop(void)
 				}
 
 				);
+			/* FIXME: This is pretty naive. This is *NOT* how
+			 * we should do napi polling.
+			 */
+			if (poll_start && (++poll_count % 2))
+				ASYNC(__ixgbe_poll(););
 		}
 		LIBLCD_MSG("IXGBE EXITED DISPATCH LOOP");
 		);

@@ -78,9 +78,6 @@ int mod_timer(struct timer_list *timer, unsigned long expires) { LIBLCD_MSG("===
 struct net_device *netdev_all_upper_get_next_dev_rcu(struct net_device *dev,
 						     struct list_head **iter) { LIBLCD_MSG("================>$$$$$$ Dummy %s called", __func__); return NULL; }
 
-struct sk_buff *__napi_alloc_skb(struct napi_struct *napi,
-				 unsigned int length, gfp_t gfp_mask) { LIBLCD_MSG("================>$$$$$$ Dummy %s called", __func__); return NULL; }
-
 unsigned long msleep_interruptible(unsigned int msecs) { LIBLCD_MSG("================>$$$$$$ Dummy %s called", __func__); return 0ul; }
 
 struct rtnl_link_stats64 *dev_get_stats(struct net_device *dev,
@@ -90,8 +87,6 @@ void __dev_kfree_skb_any(struct sk_buff *skb, enum skb_free_reason reason) { LIB
 
 u32 ethtool_op_get_link(struct net_device *dev) { LIBLCD_MSG("================>$$$$$$ Dummy %s called", __func__); return 0; }
 int ethtool_op_get_ts_info(struct net_device *dev, struct ethtool_ts_info *eti) { LIBLCD_MSG("================>$$$$$$ Dummy %s called", __func__); return 0; }
-
-__be16 eth_type_trans(struct sk_buff *skb, struct net_device *dev) { LIBLCD_MSG("================>$$$$$$ Dummy %s called", __func__); return 0; }
 
 struct sk_buff *__alloc_skb(unsigned int size, gfp_t priority, int flags,
 			    int node) { LIBLCD_MSG("================>$$$$$$ Dummy %s called", __func__); return NULL; }
@@ -192,11 +187,6 @@ void usleep_range(unsigned long min, unsigned long max)
 {
 	udelay((max + min) >> 1);
 }
-
-void netif_napi_add(struct net_device *dev, struct napi_struct *napi,
-		    int (*poll)(struct napi_struct *, int), int weight) { LIBLCD_MSG("================>$$$$$$ Dummy %s called", __func__); }
-
-void netif_napi_del(struct napi_struct *napi) { LIBLCD_MSG("================>$$$$$$ Dummy %s called", __func__); }
 
 bool napi_hash_del(struct napi_struct *napi) { LIBLCD_MSG("================>$$$$$$ Dummy %s called", __func__); return true; }
 

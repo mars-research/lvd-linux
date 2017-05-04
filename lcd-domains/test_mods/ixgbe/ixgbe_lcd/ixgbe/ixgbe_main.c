@@ -216,6 +216,10 @@ static void ixgbe_service_task(struct work_struct *work);
 /* global instance of adapter struct */
 struct ixgbe_adapter *g_adapter = NULL;
 
+extern int _request_irq(unsigned int irq, irq_handler_t handler, unsigned long flags,
+	    const char *name, void *dev);
+extern void _free_irq(unsigned int irq, void *dev_id);
+
 static int ixgbe_read_pci_cfg_word_parent(struct ixgbe_adapter *adapter,
 					  u32 reg, u16 *value)
 {
@@ -1218,13 +1222,6 @@ static int ixgbe_tx_maxrate(struct net_device *netdev,
  * @tx_ring: tx ring to clean
  * @napi_budget: Used to determine if we are in netpoll
  **/
-#ifdef LCD_ISOLATE
-static bool ixgbe_clean_tx_irq(struct ixgbe_q_vector *q_vector,
-			       struct ixgbe_ring *tx_ring, int napi_budget)
-{
-	return true;
-}
-#else
 static bool ixgbe_clean_tx_irq(struct ixgbe_q_vector *q_vector,
 			       struct ixgbe_ring *tx_ring, int napi_budget)
 {
@@ -1374,7 +1371,6 @@ static bool ixgbe_clean_tx_irq(struct ixgbe_q_vector *q_vector,
 
 	return !!budget;
 }
-#endif /* LCD_ISOLATE */
 
 #ifdef CONFIG_IXGBE_DCA
 static void ixgbe_update_tx_dca(struct ixgbe_adapter *adapter,
@@ -1814,13 +1810,11 @@ static void ixgbe_process_skb_fields(struct ixgbe_ring *rx_ring,
 static void ixgbe_rx_skb(struct ixgbe_q_vector *q_vector,
 			 struct sk_buff *skb)
 {
-#ifndef LCD_ISOLATE
 	skb_mark_napi_id(skb, &q_vector->napi);
 	if (ixgbe_qv_busy_polling(q_vector))
 		netif_receive_skb(skb);
 	else
 		napi_gro_receive(&q_vector->napi, skb);
-#endif
 }
 
 /**
@@ -2984,6 +2978,9 @@ int ixgbe_poll(struct napi_struct *napi, int budget)
 	if (!clean_complete)
 		return budget;
 
+	/* always poll */
+	return budget;
+
 	/* all work done, exit the polling mode */
 	napi_complete_done(napi, work_done);
 	if (adapter->rx_itr_setting & 1)
@@ -2992,6 +2989,14 @@ int ixgbe_poll(struct napi_struct *napi, int budget)
 		ixgbe_irq_enable_queues(adapter, BIT_ULL(q_vector->v_idx));
 
 	return min(work_done, budget - 1);
+}
+
+int __ixgbe_poll(void)
+{
+	if (g_adapter)
+		return ixgbe_poll(&g_adapter->q_vector[0]->napi, 64);
+	else
+		return 0;
 }
 
 /**
@@ -3025,7 +3030,7 @@ static int ixgbe_request_msix_irqs(struct ixgbe_adapter *adapter)
 			/* skip this unused q_vector */
 			continue;
 		}
-		err = request_irq(entry->vector, &ixgbe_msix_clean_rings, 0,
+		err = _request_irq(entry->vector, &ixgbe_msix_clean_rings, 0,
 				  q_vector->name, q_vector);
 		if (err) {
 			e_err(probe, "request_irq failed for MSIX interrupt "
@@ -3187,7 +3192,7 @@ static void ixgbe_free_irq(struct ixgbe_adapter *adapter)
 		/* clear the affinity_mask in the IRQ descriptor */
 		irq_set_affinity_hint(entry->vector, NULL);
 
-		free_irq(entry->vector, q_vector);
+		_free_irq(entry->vector, q_vector);
 	}
 
 	free_irq(adapter->msix_entries[vector].vector, adapter);

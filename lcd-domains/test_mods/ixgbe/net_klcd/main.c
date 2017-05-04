@@ -116,6 +116,20 @@ static int async_loop(struct net_info **net_out, struct fipc_message **msg_out)
 	return -EWOULDBLOCK;
 }
 
+#ifdef HOST_IRQ
+extern struct napi_struct *napi_q0;
+
+irqreturn_t msix_clean_rings_host(int irq, void *data)
+{
+	struct net_info *net;
+	printk("%s,.\n", __func__);
+	if (__get_net(&net)) {
+		napi_schedule_irqoff(napi_q0);
+	}
+	return IRQ_HANDLED;
+}
+#endif
+
 void ixgbe_service_timer(unsigned long data)
 {
 	unsigned long next_event_offset;

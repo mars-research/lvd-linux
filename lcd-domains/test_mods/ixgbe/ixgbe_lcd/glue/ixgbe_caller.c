@@ -1194,6 +1194,94 @@ fail_ipc:
 	return ret;
 }
 
+void napi_consume_skb(struct sk_buff *skb, int budget)
+{
+	int ret;
+	struct fipc_message *_request;
+	struct fipc_message *_response;
+	unsigned long skb_sz, skb_off, skbh_sz, skbh_off;
+	cptr_t skb_cptr, skbh_cptr;
+	struct sk_buff_container *skb_c;
+
+	ret = async_msg_blocking_send_start(ixgbe_async,
+		&_request);
+
+	glue_lookup_skbuff(cptr_table,
+		__cptr((unsigned long)skb), &skb_c);
+
+	if (ret) {
+		LIBLCD_ERR("failed to get a send slot");
+		goto fail_async;
+	}
+	async_msg_set_fn_type(_request,
+			NAPI_CONSUME_SKB);
+
+	fipc_set_reg0(_request, skb_c->other_ref.cptr);
+	fipc_set_reg1(_request, budget);
+
+	ret = lcd_virt_to_cptr(__gva((unsigned long)skb),
+		&skb_cptr,
+		&skb_sz,
+		&skb_off);
+	if (ret) {
+		LIBLCD_ERR("lcd_virt_to_cptr");
+		goto fail_virt;
+	}
+
+	ret = lcd_virt_to_cptr(__gva((unsigned long)skb->head),
+		&skbh_cptr,
+		&skbh_sz,
+		&skbh_off);
+	if (ret) {
+		LIBLCD_ERR("lcd_virt_to_cptr");
+		goto fail_virt;
+	}
+
+#ifdef IOMMU_ASSIGN
+	LIBLCD_MSG("unmap skb->head address %p | pa %p | gpa %p | "
+		   "size %d | ord %d",
+			skb->head,
+			__pa(skb->head - skbh_off),
+			gpa_val(lcd_gva2gpa(__gva(
+				(unsigned long)(void*)skb->head - skbh_off))),
+			skbh_sz, get_order(skbh_sz));
+	ret = lcd_syscall_iommu_unmap_page(lcd_gva2gpa(__gva(
+		(unsigned long)((void*)skb->head - skbh_off))),
+		skb_c->skbd_ord);
+	if (ret)
+		LIBLCD_ERR("unMapping failed for packet %p",
+				__pa(skb->data));
+#endif
+
+	lcd_unmap_virt(__gva((unsigned long)skb->head),
+			get_order(skbh_sz));
+	lcd_unmap_virt(__gva((unsigned long)skb),
+			get_order(skb_sz));
+
+	lcd_cap_revoke(skb_cptr);
+	lcd_cap_revoke(skbh_cptr);
+	lcd_cap_delete(skb_cptr);
+	lcd_cap_delete(skbh_cptr);
+
+	glue_remove_skbuff(skb_c);
+	kfree(skb_c);
+	ret = thc_ipc_call(ixgbe_async,
+		_request,
+		&_response);
+	if (ret) {
+		LIBLCD_ERR("thc_ipc_call");
+		goto fail_ipc;
+	}
+	fipc_recv_msg_end(thc_channel_to_fipc(ixgbe_async),
+			_response);
+	return;
+fail_async:
+fail_ipc:
+fail_virt:
+	return;
+
+}
+
 void consume_skb(struct sk_buff *skb)
 {
 	int ret;
@@ -1265,6 +1353,7 @@ void consume_skb(struct sk_buff *skb)
 	return;
 fail_async:
 fail_ipc:
+fail_virt:
 	return;
 
 }
@@ -1302,7 +1391,6 @@ void unregister_netdev(struct net_device *dev)
 	return;
 fail_async:
 fail_ipc:
-fail_virt:
 	return;
 
 }
@@ -2925,3 +3013,493 @@ fail_lookup:
 	return ret;
 }
 
+#ifdef HOST_IRQ
+irq_handler_t msix_other_irqh;
+
+int _request_irq(unsigned int irq, irq_handler_t handler, unsigned long flags, const char *name, void *dev)
+{
+	int ret;
+	struct fipc_message *_request;
+	struct fipc_message *_response;
+	int func_ret;
+	ret = async_msg_blocking_send_start(ixgbe_async,
+		&_request);
+	if (ret) {
+		LIBLCD_ERR("failed to get a send slot");
+		goto fail_async;
+	}
+	async_msg_set_fn_type(_request,
+			REQUEST_IRQ);
+	fipc_set_reg1(_request, irq);
+	fipc_set_reg2(_request, flags);
+	msix_other_irqh = handler;
+	ret = thc_ipc_call(ixgbe_async,
+		_request,
+		&_response);
+	if (ret) {
+		LIBLCD_ERR("thc_ipc_call");
+		goto fail_ipc;
+	}
+	func_ret = fipc_get_reg1(_response);
+	fipc_recv_msg_end(thc_channel_to_fipc(ixgbe_async),
+			_response);
+	return func_ret;
+fail_async:
+fail_ipc:
+	return ret;
+}
+
+extern int __ixgbe_poll(void);
+
+void _free_irq(unsigned int irq,
+		int dev_id)
+{
+	int ret;
+	struct fipc_message *_request;
+	struct fipc_message *_response;
+	ret = async_msg_blocking_send_start(ixgbe_async,
+		&_request);
+	if (ret) {
+		LIBLCD_ERR("failed to get a send slot");
+		goto fail_async;
+	}
+	async_msg_set_fn_type(_request,
+			_FREE_IRQ);
+	fipc_set_reg1(_request,
+			irq);
+
+	ret = thc_ipc_call(ixgbe_async,
+		_request,
+		&_response);
+	if (ret) {
+		LIBLCD_ERR("thc_ipc_call");
+		goto fail_ipc;
+	}
+	fipc_recv_msg_end(thc_channel_to_fipc(ixgbe_async),
+			_response);
+	return;
+fail_async:
+fail_ipc:
+	return;
+}
+#endif /* HOST_IRQ */
+
+void netif_napi_add(struct net_device *dev,
+		struct napi_struct *napi,
+		int ( *poll )(struct napi_struct*, int),
+		int weight)
+{
+	struct net_device_container *dev_container;
+	struct poll_container *poll_container;
+	int ret;
+	struct fipc_message *_request;
+	struct fipc_message *_response;
+	dev_container = container_of(dev,
+		struct net_device_container,
+		net_device);
+	poll_container = kzalloc(sizeof( struct poll_container   ),
+		GFP_KERNEL);
+	if (!poll_container) {
+		LIBLCD_ERR("kzalloc");
+		goto fail_alloc;
+	}
+	poll_container->poll = poll;
+	ret = async_msg_blocking_send_start(ixgbe_async,
+		&_request);
+	if (ret) {
+		LIBLCD_ERR("failed to get a send slot");
+		goto fail_async;
+	}
+	async_msg_set_fn_type(_request,
+			NETIF_NAPI_ADD);
+	fipc_set_reg1(_request,
+			dev_container->other_ref.cptr);
+	fipc_set_reg3(_request,
+			weight);
+	ret = thc_ipc_call(ixgbe_async,
+		_request,
+		&_response);
+	if (ret) {
+		LIBLCD_ERR("thc_ipc_call");
+		goto fail_ipc;
+	}
+	fipc_recv_msg_end(thc_channel_to_fipc(ixgbe_async),
+			_response);
+	return;
+fail_async:
+fail_ipc:
+fail_alloc:
+	return;
+}
+
+extern bool poll_start;
+
+int poll_callee(struct fipc_message *_request,
+		struct thc_channel *_channel,
+		struct glue_cspace *cspace,
+		struct cptr sync_ep)
+{
+	unsigned 	int request_cookie;
+	bool poll;
+
+	request_cookie = thc_get_request_cookie(_request);
+
+	poll = fipc_get_reg0(_request);
+	fipc_recv_msg_end(thc_channel_to_fipc(_channel),
+			_request);
+
+	poll_start = poll;
+	LIBLCD_MSG("%s, setting poll_start to %d",
+		__func__, poll_start);
+
+	return 0;
+}
+
+void netif_napi_del(struct napi_struct *napi)
+{
+	int ret;
+	struct fipc_message *_request;
+	struct fipc_message *_response;
+	ret = async_msg_blocking_send_start(ixgbe_async,
+		&_request);
+	if (ret) {
+		LIBLCD_ERR("failed to get a send slot");
+		goto fail_async;
+	}
+	async_msg_set_fn_type(_request,
+			NETIF_NAPI_DEL);
+	ret = thc_ipc_call(ixgbe_async,
+		_request,
+		&_response);
+	if (ret) {
+		LIBLCD_ERR("thc_ipc_call");
+		goto fail_ipc;
+	}
+	fipc_recv_msg_end(thc_channel_to_fipc(ixgbe_async),
+			_response);
+	return;
+fail_async:
+fail_ipc:
+	return;
+}
+
+void netif_wake_subqueue(struct net_device *dev,
+		unsigned short queue_index)
+{
+	struct net_device_container *dev_container;
+	int ret;
+	struct fipc_message *_request;
+	struct fipc_message *_response;
+	dev_container = container_of(dev,
+		struct net_device_container,
+		net_device);
+	ret = async_msg_blocking_send_start(ixgbe_async,
+		&_request);
+	if (ret) {
+		LIBLCD_ERR("failed to get a send slot");
+		goto fail_async;
+	}
+	async_msg_set_fn_type(_request,
+			NETIF_WAKE_SUBQUEUE);
+	fipc_set_reg1(_request,
+			dev_container->other_ref.cptr);
+	fipc_set_reg3(_request,
+			queue_index);
+	ret = thc_ipc_call(ixgbe_async,
+		_request,
+		&_response);
+	if (ret) {
+		LIBLCD_ERR("thc_ipc_call");
+		goto fail_ipc;
+	}
+	fipc_recv_msg_end(thc_channel_to_fipc(ixgbe_async),
+			_response);
+	return;
+fail_async:
+fail_ipc:
+	return;
+}
+
+int netif_receive_skb(struct sk_buff *skb)
+{
+	int ret;
+	struct fipc_message *_request;
+	struct fipc_message *_response;
+	int func_ret;
+	struct sk_buff_container *skb_c;
+	ret = async_msg_blocking_send_start(ixgbe_async,
+		&_request);
+	if (ret) {
+		LIBLCD_ERR("failed to get a send slot");
+		goto fail_async;
+	}
+
+	glue_lookup_skbuff(cptr_table,
+		__cptr((unsigned long)skb), &skb_c);
+
+	async_msg_set_fn_type(_request,
+			NETIF_RECEIVE_SKB);
+
+	fipc_set_reg0(_request, skb_c->other_ref.cptr);
+
+	glue_remove_skbuff(skb_c);
+	kfree(skb_c);
+
+	ret = thc_ipc_call(ixgbe_async,
+		_request,
+		&_response);
+	if (ret) {
+		LIBLCD_ERR("thc_ipc_call");
+		goto fail_ipc;
+	}
+	func_ret = fipc_get_reg1(_response);
+	fipc_recv_msg_end(thc_channel_to_fipc(ixgbe_async),
+			_response);
+	return func_ret;
+fail_async:
+fail_ipc:
+	return ret;
+}
+
+gro_result_t napi_gro_receive(struct napi_struct *napi,
+		struct sk_buff *skb)
+{
+	int ret;
+	struct fipc_message *_request;
+	struct fipc_message *_response;
+	int func_ret;
+	struct sk_buff_container *skb_c;
+	unsigned long skb_sz, skb_off, skbh_sz, skbh_off;
+	cptr_t skb_cptr, skbh_cptr;
+
+	ret = async_msg_blocking_send_start(ixgbe_async,
+		&_request);
+	if (ret) {
+		LIBLCD_ERR("failed to get a send slot");
+		goto fail_async;
+	}
+
+	glue_lookup_skbuff(cptr_table,
+		__cptr((unsigned long)skb), &skb_c);
+
+	LIBLCD_MSG("%s, skb .head %p | .data %p | .len %d | .datalen %d",
+		__func__, skb->head, skb->data, skb->len, skb->data_len);
+
+	async_msg_set_fn_type(_request,
+			NAPI_GRO_RECEIVE);
+
+	fipc_set_reg0(_request, skb_c->other_ref.cptr);
+
+	ret = lcd_virt_to_cptr(__gva((unsigned long)skb),
+		&skb_cptr,
+		&skb_sz,
+		&skb_off);
+	if (ret) {
+		LIBLCD_ERR("lcd_virt_to_cptr");
+		goto fail_virt;
+	}
+
+	ret = lcd_virt_to_cptr(__gva((unsigned long)skb->head),
+		&skbh_cptr,
+		&skbh_sz,
+		&skbh_off);
+	if (ret) {
+		LIBLCD_ERR("lcd_virt_to_cptr");
+		goto fail_virt;
+	}
+
+	lcd_unmap_virt(__gva((unsigned long)skb->head),
+			get_order(skbh_sz));
+	lcd_unmap_virt(__gva((unsigned long)skb),
+			get_order(skb_sz));
+
+	lcd_cap_revoke(skb_cptr);
+	lcd_cap_revoke(skbh_cptr);
+	lcd_cap_delete(skb_cptr);
+	lcd_cap_delete(skbh_cptr);
+
+
+	glue_remove_skbuff(skb_c);
+	kfree(skb_c);
+
+	ret = thc_ipc_call(ixgbe_async,
+		_request,
+		&_response);
+	if (ret) {
+		LIBLCD_ERR("thc_ipc_call");
+		goto fail_ipc;
+	}
+	func_ret = fipc_get_reg1(_response);
+	fipc_recv_msg_end(thc_channel_to_fipc(ixgbe_async),
+			_response);
+	return func_ret;
+fail_async:
+fail_ipc:
+fail_virt:
+	return ret;
+}
+
+struct sk_buff *__napi_alloc_skb(struct napi_struct *napi,
+		unsigned int len,
+		gfp_t gfp_mask)
+{
+	int ret;
+	struct fipc_message *_request;
+	struct fipc_message *_response;
+	cptr_t skb_cptr, skbd_cptr;
+	unsigned int skb_ord, skbd_ord;
+	unsigned int skb_off, skbd_off, data_off;
+	unsigned int request_cookie;
+	cptr_t skb_ref;
+	gva_t skb_gva, skbd_gva;
+	struct sk_buff *skb;
+	struct sk_buff_container *skb_c;
+
+	ret = async_msg_blocking_send_start(ixgbe_async,
+		&_request);
+	if (ret) {
+		LIBLCD_ERR("failed to get a send slot");
+		goto fail_async;
+	}
+	async_msg_set_fn_type(_request,
+			__NAPI_ALLOC_SKB);
+	fipc_set_reg1(_request,
+			len);
+	fipc_set_reg2(_request,
+			gfp_mask);
+
+	ret = thc_ipc_send_request(ixgbe_async,
+			_request,
+			&request_cookie);
+
+	if (ret) {
+		LIBLCD_ERR("thc_ipc_call");
+		goto fail_ipc;
+	}
+
+	/* sync half */
+	ret = lcd_cptr_alloc(&skb_cptr);
+
+	if (ret) {
+		LIBLCD_ERR("failed to get cptr");
+		goto fail_sync;
+	}
+	ret = lcd_cptr_alloc(&skbd_cptr);
+	if (ret) {
+		LIBLCD_ERR("failed to get cptr");
+		goto fail_sync;
+	}
+
+	lcd_set_cr0(skb_cptr);
+	lcd_set_cr1(skbd_cptr);
+	ret = lcd_sync_recv(ixgbe_sync_endpoint);
+	lcd_set_cr0(CAP_CPTR_NULL);
+	lcd_set_cr1(CAP_CPTR_NULL);
+	if (ret) {
+		LIBLCD_ERR("failed to recv");
+		goto fail_sync;
+	}
+	skb_ord = lcd_r0();
+	skb_off = lcd_r1();
+	skbd_ord = lcd_r2();
+	skbd_off = lcd_r3();
+	data_off = lcd_r4();
+	skb_ref.cptr = lcd_r5();
+
+	ret = lcd_map_virt(skb_cptr, skb_ord, &skb_gva);
+	if (ret) {
+		LIBLCD_ERR("failed to map void *addr");
+		goto fail_sync;
+	}
+
+	ret = lcd_map_virt(skbd_cptr, skbd_ord, &skbd_gva);
+	if (ret) {
+		LIBLCD_ERR("failed to map void *addr");
+		goto fail_sync;
+	}
+
+	skb = (void*)(gva_val(skb_gva) + skb_off);
+	skb->head = (void*)(gva_val(skbd_gva) + skbd_off);
+	skb->data = skb->head + data_off;
+	skb_c = kzalloc(sizeof(*skb_c), GFP_KERNEL);
+
+	if (!skb_c)
+		LIBLCD_MSG("no memory");
+	skb_c->skb = skb;
+	skb_c->skbd_ord = skbd_ord;
+	glue_insert_skbuff(cptr_table, skb_c);
+
+	skb_c->other_ref = skb_ref;
+
+	ret = thc_ipc_recv_response(ixgbe_async,
+		request_cookie,
+		&_response);
+
+	if (ret) {
+		LIBLCD_ERR("thc_ipc_call");
+		goto fail_ipc;
+	}
+
+	fipc_recv_msg_end(thc_channel_to_fipc(ixgbe_async),
+			_response);
+	return skb;
+fail_async:
+fail_sync:
+fail_ipc:
+	return NULL;
+}
+
+__be16 eth_type_trans(struct sk_buff *skb,
+		struct net_device *dev)
+{
+	struct net_device_container *dev_container;
+	int ret;
+	struct fipc_message *_request;
+	struct fipc_message *_response;
+	__be16 func_ret;
+	struct sk_buff_container *skb_c;
+
+	glue_lookup_skbuff(cptr_table,
+		__cptr((unsigned long)skb), &skb_c);
+	dev_container = container_of(dev,
+		struct net_device_container,
+		net_device);
+	ret = async_msg_blocking_send_start(ixgbe_async,
+		&_request);
+	if (ret) {
+		LIBLCD_ERR("failed to get a send slot");
+		goto fail_async;
+	}
+	async_msg_set_fn_type(_request,
+			ETH_TYPE_TRANS);
+
+	/* save pointers */
+	skb_c->head = skb->head;
+	skb_c->data = skb->data;
+
+	fipc_set_reg1(_request,
+			dev_container->other_ref.cptr);
+
+	fipc_set_reg2(_request, skb_c->other_ref.cptr);
+
+	ret = thc_ipc_call(ixgbe_async,
+		_request,
+		&_response);
+	if (ret) {
+		LIBLCD_ERR("thc_ipc_call");
+		goto fail_ipc;
+	}
+	func_ret = fipc_get_reg1(_response);
+	LIBLCD_MSG("%s, got %x", __func__, func_ret);
+
+	/* restore pointers */
+	skb->head = skb_c->head;
+	skb->data = skb_c->data;
+
+	fipc_recv_msg_end(thc_channel_to_fipc(ixgbe_async),
+			_response);
+	return func_ret;
+fail_async:
+fail_ipc:
+	return ret;
+}

@@ -6,6 +6,7 @@
 #define trace(x) LIBLCD_MSG("net got " #x " msg")
 
 extern void ixgbe_exit_module(void);
+extern bool poll_start;
 
 int dispatch_async_loop(struct thc_channel *_channel,
 		struct fipc_message *message,
@@ -127,8 +128,16 @@ int dispatch_async_loop(struct thc_channel *_channel,
 		cspace,
 		sync_ep);
 
+		case POLL:
+			trace(POLL);
+			return poll_callee(message,
+		_channel,
+		cspace,
+		sync_ep);
+
 		case TRIGGER_EXIT:
 			trace(TRIGGER_EXIT);
+			poll_start = false;
 			ixgbe_exit_module();
 			/* XXX: return failure to exit the dispatch
 			 * loop. After exit, there is no reason to

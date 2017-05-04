@@ -135,7 +135,7 @@ void ixgbe_service_timer(unsigned long data)
 	unsigned long next_event_offset;
 	struct net_info *net;
 
-	next_event_offset = msecs_to_jiffies(10000);
+	next_event_offset = HZ * 2;
 
 	/* Reset the timer */
 	mod_timer(&service_timer, next_event_offset + jiffies);

@@ -89,6 +89,7 @@
 #undef CONFIG_PTP_1588_CLOCK
 #undef CONFIG_DEBUGFS
 #undef CONFIG_PM
+#undef CONFIG_BQL
 
 /*
  * Set include guards to force using our includes.

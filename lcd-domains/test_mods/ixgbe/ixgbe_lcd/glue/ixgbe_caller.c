@@ -1199,14 +1199,60 @@ void consume_skb(struct sk_buff *skb)
 	int ret;
 	struct fipc_message *_request;
 	struct fipc_message *_response;
+	unsigned long skb_sz, skb_off, skbh_sz, skbh_off;
+	cptr_t skb_cptr, skbh_cptr;
+	struct sk_buff_container *skb_c;
+
 	ret = async_msg_blocking_send_start(ixgbe_async,
 		&_request);
+
+	glue_lookup_skbuff(cptr_table,
+		__cptr((unsigned long)skb), &skb_c);
+
 	if (ret) {
 		LIBLCD_ERR("failed to get a send slot");
 		goto fail_async;
 	}
 	async_msg_set_fn_type(_request,
 			CONSUME_SKB);
+
+	fipc_set_reg0(_request, skb_c->other_ref.cptr);
+
+	ret = lcd_virt_to_cptr(__gva((unsigned long)skb),
+		&skb_cptr,
+		&skb_sz,
+		&skb_off);
+	if (ret) {
+		LIBLCD_ERR("lcd_virt_to_cptr");
+		goto fail_virt;
+	}
+
+	ret = lcd_virt_to_cptr(__gva((unsigned long)skb->head),
+		&skbh_cptr,
+		&skbh_sz,
+		&skbh_off);
+	if (ret) {
+		LIBLCD_ERR("lcd_virt_to_cptr");
+		goto fail_virt;
+	}
+
+#ifdef IOMMU_ASSIGN
+	ret = lcd_syscall_iommu_unmap_page(lcd_gva2gpa(__gva((unsigned long) skb->head)),
+				get_order(skbh_sz));
+	if (ret)
+		LIBLCD_ERR("unMapping failed for packet %p",
+				__pa(skb->data));
+#endif
+
+	lcd_unmap_virt(__gva((unsigned long)skb->head), get_order(skb_sz));
+	lcd_unmap_virt(__gva((unsigned long)skb), get_order(skbh_sz));
+
+	lcd_cap_delete(skb_cptr);
+	lcd_cap_delete(skbh_cptr);
+
+	glue_remove_skbuff(skb_c);
+	kfree(skb_c);
+
 	ret = thc_ipc_call(ixgbe_async,
 		_request,
 		&_response);
@@ -1256,6 +1302,7 @@ void unregister_netdev(struct net_device *dev)
 	return;
 fail_async:
 fail_ipc:
+fail_virt:
 	return;
 
 }
@@ -2223,6 +2270,7 @@ int ndo_start_xmit_callee(struct fipc_message *_request,
 		struct cptr sync_ep)
 {
 	struct sk_buff *skb;
+	struct sk_buff_container *skb_c;
 	struct net_device_container *dev_container;
 	int ret;
 	struct fipc_message *_response;
@@ -2233,6 +2281,7 @@ int ndo_start_xmit_callee(struct fipc_message *_request,
 	unsigned long skbd_ord, skbd_off;
 	gva_t skb_gva, skbd_gva;
 	unsigned int data_off;
+	cptr_t skb_ref;
 
 	request_cookie = thc_get_request_cookie(_request);
 	ret = glue_cap_lookup_net_device_type(cspace,
@@ -2242,9 +2291,14 @@ int ndo_start_xmit_callee(struct fipc_message *_request,
 		LIBLCD_ERR("lookup");
 		goto fail_lookup;
 	}
+
+	skb_ref = __cptr(fipc_get_reg2(_request));
+
 	fipc_recv_msg_end(thc_channel_to_fipc(_channel),
 			_request);
+
 	ret = lcd_cptr_alloc(&skb_cptr);
+
 	if (ret) {
 		LIBLCD_ERR("failed to get cptr");
 		goto fail_sync;
@@ -2285,6 +2339,15 @@ int ndo_start_xmit_callee(struct fipc_message *_request,
 	skb = (void*)(gva_val(skb_gva) + skb_off);
 	skb->head = (void*)(gva_val(skbd_gva) + skbd_off);
 	skb->data = skb->head + data_off;
+	skb_c = kzalloc(sizeof(*skb_c), GFP_KERNEL);
+
+	if (!skb_c)
+		LIBLCD_MSG("no memory");
+	skb_c->skb = skb;
+	skb_c->skbd_ord = skbd_ord;
+	glue_insert_skbuff(cptr_table, skb_c);
+
+	skb_c->other_ref = skb_ref;
 
 #ifdef IOMMU_ASSIGN
 	ret = lcd_syscall_iommu_map_page(lcd_gva2gpa(skbd_gva),
@@ -2840,10 +2903,9 @@ int unsync_callee(struct fipc_message *_request,
 		LIBLCD_ERR("lookup");
 		goto fail_lookup;
 	}
+	m.mac_addr_l = fipc_get_reg3(_request);
 	fipc_recv_msg_end(thc_channel_to_fipc(_channel),
 			_request);
-
-	m.mac_addr_l = fipc_get_reg3(_request);
 
 	func_ret = unsync_container->unsync(( &dev_container->net_device ),
 		m.mac_addr);

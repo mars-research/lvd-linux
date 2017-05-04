@@ -1106,8 +1106,8 @@ int ndo_start_xmit_user(struct sk_buff *skb,
 	struct fipc_message *_response;
 	int func_ret;
 	unsigned int request_cookie;
-
 	cptr_t sync_end;
+	struct sk_buff_container *skb_c;
 	unsigned long skb_ord, skb_off;
 	unsigned long skbd_ord, skbd_off;
 	cptr_t skb_cptr, skbd_cptr;
@@ -1116,14 +1116,32 @@ int ndo_start_xmit_user(struct sk_buff *skb,
 		struct net_device_container,
 		net_device);
 
+	skb_c = kzalloc(sizeof(*skb_c), GFP_KERNEL);
+
+	if (!skb_c)
+		LIBLCD_MSG("no memory");
+	skb_c->skb = skb;
+	glue_insert_skbuff(cptr_table, skb_c);
+
+	/* save original head, data */
+	skb_c->head = skb->head;
+	skb_c->data = skb->data;
+	skb_c->skb_ord = skb_ord;
+
 	/* enter LCD mode to have cspace tree */
 	lcd_enter();
 
 	ret = grant_sync_ep(&sync_end, hidden_args->sync_ep);
 
-	ret = sync_setup_memory(skb, sizeof(struct sk_buff), &skb_ord, &skb_cptr, &skb_off);
+	ret = sync_setup_memory(skb, sizeof(struct sk_buff),
+			&skb_ord, &skb_cptr, &skb_off);
 
-	ret = sync_setup_memory(skb->head, skb_end_offset(skb) + sizeof(struct skb_shared_info), &skbd_ord, &skbd_cptr, &skbd_off);
+	ret = sync_setup_memory(skb->head,
+		skb_end_offset(skb) + sizeof(struct skb_shared_info),
+		&skbd_ord, &skbd_cptr, &skbd_off);
+
+	skb_c->skb_cptr = skb_cptr;
+	skb_c->skbh_cptr = skbd_cptr;
 
 	ret = async_msg_blocking_send_start(hidden_args->async_chnl,
 		&_request);
@@ -1137,7 +1155,11 @@ int ndo_start_xmit_user(struct sk_buff *skb,
 	fipc_set_reg1(_request,
 			dev_container->other_ref.cptr);
 
-	ret = thc_ipc_send_request(hidden_args->async_chnl, _request, &request_cookie);
+	fipc_set_reg2(_request,
+			skb_c->my_ref.cptr);
+
+	ret = thc_ipc_send_request(hidden_args->async_chnl,
+		_request, &request_cookie);
 
 	if (ret) {
 		LIBLCD_ERR("thc_ipc_call");
@@ -1153,8 +1175,8 @@ int ndo_start_xmit_user(struct sk_buff *skb,
 	lcd_set_r3(skbd_off);
 	lcd_set_r4(skb->data - skb->head);
 
-	LIBLCD_MSG("skb->data %p | nr_frags %d",
-		__pa(skb->data),
+	LIBLCD_MSG("skb %p | skb->data %p | nr_frags %d",
+		skb, skb->data,
 		skb_shinfo(skb)->nr_frags);
 
 	ret = lcd_sync_send(sync_end);
@@ -1187,7 +1209,6 @@ fail_async:
 fail_ipc:
 	lcd_exit(0);
 	return func_ret;
-
 }
 
 int ndo_start_xmit(struct sk_buff *skb,
@@ -1198,7 +1219,13 @@ int ndo_start_xmit(struct sk_buff *skb,
 	int ret;
 	struct fipc_message *_request;
 	struct fipc_message *_response;
+	unsigned int request_cookie;
 	int func_ret;
+	struct sk_buff_container *skb_c;
+	unsigned long skb_ord, skb_off;
+	unsigned long skbd_ord, skbd_off;
+	cptr_t skb_cptr, skbd_cptr;
+
 	if (!current->ptstate) {
 		LIBLCD_MSG("Calling %s from a non-LCD context! creating thc runtime!",
 			__func__);
@@ -1214,6 +1241,33 @@ int ndo_start_xmit(struct sk_buff *skb,
 	dev_container = container_of(dev,
 		struct net_device_container,
 		net_device);
+
+	skb_c = kzalloc(sizeof(*skb_c), GFP_KERNEL);
+
+	if (!skb_c) {
+		LIBLCD_MSG("no memory");
+		goto fail_alloc;
+	}
+
+	skb_c->skb = skb;
+	glue_insert_skbuff(cptr_table, skb_c);
+
+	/* save original head, data */
+	skb_c->head = skb->head;
+	skb_c->data = skb->data;
+	skb_c->skb_ord = skb_ord;
+
+	ret = sync_setup_memory(skb, sizeof(struct sk_buff),
+			&skb_ord, &skb_cptr, &skb_off);
+
+	ret = sync_setup_memory(skb->head,
+		skb_end_offset(skb) + sizeof(struct skb_shared_info),
+			&skbd_ord, &skbd_cptr, &skbd_off);
+
+	skb_c->skb_cptr = skb_cptr;
+	skb_c->skbh_cptr = skbd_cptr;
+
+
 	ret = async_msg_blocking_send_start(hidden_args->async_chnl,
 		&_request);
 	if (ret) {
@@ -1224,9 +1278,40 @@ int ndo_start_xmit(struct sk_buff *skb,
 			NDO_START_XMIT);
 	fipc_set_reg1(_request,
 			dev_container->other_ref.cptr);
-	ret = thc_ipc_call(hidden_args->async_chnl,
-		_request,
-		&_response);
+	fipc_set_reg2(_request,
+			skb_c->my_ref.cptr);
+
+	ret = thc_ipc_send_request(hidden_args->async_chnl,
+			_request, &request_cookie);
+
+	if (ret) {
+		LIBLCD_ERR("thc_ipc_call");
+		goto fail_ipc;
+	}
+
+	//sync half
+	lcd_set_cr0(skb_cptr);
+	lcd_set_cr1(skbd_cptr);
+	lcd_set_r0(skb_ord);
+	lcd_set_r1(skb_off);
+	lcd_set_r2(skbd_ord);
+	lcd_set_r3(skbd_off);
+	lcd_set_r4(skb->data - skb->head);
+
+	LIBLCD_MSG("skb %p | skb->data %p | nr_frags %d",
+		skb, skb->data,
+		skb_shinfo(skb)->nr_frags);
+
+	ret = lcd_sync_send(hidden_args->sync_ep);
+	lcd_set_cr0(CAP_CPTR_NULL);
+	lcd_set_cr1(CAP_CPTR_NULL);
+	if (ret) {
+		LIBLCD_ERR("failed to send");
+		goto fail_sync;
+	}
+
+	ret = thc_ipc_recv_response(hidden_args->async_chnl, request_cookie, &_response);
+
 	if (ret) {
 		LIBLCD_ERR("thc_ipc_call");
 		goto fail_ipc;
@@ -1235,7 +1320,9 @@ int ndo_start_xmit(struct sk_buff *skb,
 	fipc_recv_msg_end(thc_channel_to_fipc(hidden_args->async_chnl),
 			_response);
 	return func_ret;
+fail_alloc:
 fail_async:
+fail_sync:
 fail_ipc:
 	return ret;
 

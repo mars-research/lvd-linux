@@ -46,11 +46,24 @@ struct rtnl_link_stats64_container {
 	struct cptr other_ref;
 	struct cptr my_ref;
 };
+
 struct sk_buff_container {
-	struct sk_buff sk_buff;
+	/* just store the pointer */
+	struct sk_buff *skb;
+	/* store the order when volunteered. comes handy during unmap */
+	unsigned int skb_ord, skbd_ord;
+	cptr_t skb_cptr, skbh_cptr;
+	/*
+	 * as head, data pointer is different in LCD and KLCD, store it
+	 * while crossing the boundary
+	 */
+	unsigned char *head, *data;
+	/* for hashtable insertion */
+	struct hlist_node hentry;
 	struct cptr other_ref;
 	struct cptr my_ref;
 };
+
 struct trampoline_hidden_args {
 	void *struct_container;
 	struct glue_cspace *cspace;

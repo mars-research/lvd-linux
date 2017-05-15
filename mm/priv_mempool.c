@@ -1,0 +1,365 @@
+#include <linux/module.h>
+#include <linux/kernel.h>
+#include <linux/priv_mempool.h>
+#include <linux/kthread.h>
+#include <linux/slab.h>
+#include <linux/delay.h>
+#include <linux/mm.h>
+#include <linux/percpu.h>
+
+#undef pr_fmt
+#define pr_fmt(fmt)	"%s:%d : " fmt, __func__, smp_processor_id()
+
+static priv_pool_t pool_array[POOL_MAX];
+
+static priv_pool_t *get_pool(pool_type_t type)
+{
+
+	if (type < 0 || type > POOL_MAX) {
+		printk("%s, unknown type requested %d\n", __func__, type);
+		return NULL;
+	}
+	return &pool_array[type];
+}
+
+#define CACHE_SIZE	0x20
+
+void construct_global_pool(priv_pool_t *p)
+{
+	unsigned int list_sz = p->num_objs_percpu;
+	unsigned int obj_size = p->obj_size;
+	unsigned int gpool_objs = list_sz * p->num_cpus;
+
+	char *gpool = p->gpool;
+	int i, b;
+	char *bpool = gpool;
+	unsigned int bundles;
+	struct object *objs;
+	struct bundle *prev_bund = NULL, *bund = NULL;
+
+	/* Let's have each bundle of size = CACHE_SIZE
+	 * That would give us the number of bundles
+	 */
+	bundles = gpool_objs / CACHE_SIZE;
+
+	printk("%s, bundles %u | list_sz %u\n",
+		__func__, bundles, list_sz);
+
+	for (b = 0; b < bundles; b++) {
+		printk("bundle ===> %d\n", b);
+		for (i = 0; i < CACHE_SIZE; i++) {
+			objs = (struct object*)((char*)bpool + (i * obj_size));
+			objs->next = (struct object*)((char*)bpool + (i + 1) * obj_size);
+			printk("\tobj %p | obj->next %p\n", objs, objs->next);
+		}
+		/* break the last object's chain */
+		objs->next = NULL;
+		/* point to our first object in the list */
+		objs = (struct object *) bpool;
+		/* our new bundle is the first element of the list */
+		bund = (struct bundle *)objs;
+
+		/* assign the list we created to this bundle */
+		bund->list = (struct object *)objs->next;
+
+		printk("prev_bund %p | bund %p\n",
+			prev_bund, bund);
+		/* if prev_bundle is constructed, chain it */
+		if (prev_bund)
+			prev_bund->next = bund;
+		/* save prev bundle */
+		prev_bund = bund;
+		/* bpool should point to the next chunk */
+		bpool += (CACHE_SIZE * obj_size);
+	}
+
+	/* the newly created bundle is the last in the chain */
+	if (bund)
+		bund->next = NULL;
+
+	/* our top bundle is at bpool */
+	p->stack.head = (struct bundle *)gpool;
+	printk("stak head %p | head->list %p | head->next %p\n",
+		p->stack.head, p->stack.head->list, p->stack.head->next);
+}
+
+void priv_pool_destroy(priv_pool_t *p)
+{
+	if (!p)
+		return;
+
+	if (p->pool)
+		free_pages((unsigned long)p->pool, p->pool_order);
+
+	if (p->buf)
+		free_percpu(p->buf);
+
+	if (p->bufend)
+		free_percpu(p->bufend);
+
+	if (p->head)
+		free_percpu(p->head);
+
+	if (p->marker)
+		free_percpu(p->marker);
+
+	if (p->cached)
+		free_percpu(p->cached);
+}
+EXPORT_SYMBOL(priv_pool_destroy);
+
+priv_pool_t *priv_pool_init(pool_type_t type, unsigned int num_objs,
+            unsigned int obj_size)
+{
+	priv_pool_t *p;
+	unsigned int num_pages, num_objs_percpu;
+	char *pool, *pcpu_pool, *global_pool;
+	unsigned int total_pages, num_cpus;
+	int cpu;
+
+	if (!num_objs || !obj_size) {
+		printk("%s, invalid objsize (%u) or numobjs (%u) requested\n",
+		            __func__, obj_size, num_objs);
+		return NULL;
+	}
+
+	p = get_pool(type);
+
+	if (!p)
+		return NULL;
+
+	memset(p, 0, sizeof(priv_pool_t));
+
+	p->buf = alloc_percpu(char *);
+	p->bufend = alloc_percpu(char *);
+	p->head = alloc_percpu(struct object *);
+	p->marker = alloc_percpu(struct object *);
+	p->cached = alloc_percpu(int);
+
+	/* align obj_size to 32 bit boundary */
+	p->obj_size = obj_size = ALIGN(obj_size, 32);
+
+	/* calculate num objs per cpu */
+	p->num_objs_percpu = num_objs_percpu =
+	        PAGE_ALIGN(num_objs * obj_size) / obj_size;
+
+	/* calculate num_pages per cpu */
+	num_pages = PAGE_ALIGN(num_objs * obj_size) / PAGE_SIZE;
+
+	p->num_cpus = num_cpus = num_possible_cpus();
+	/* allocate twice the amount of requested pages
+	 * one set is for the percpu buf, the remaining pages
+	 * would be given to the global buffer
+	 */
+	p->total_pages = total_pages = num_pages * num_cpus * 2;
+
+	printk("num objs %d | num_cpus %d | num_pages %d | num_objs_percpu %d "
+		"| total_pages %d | page order %d\npcpu_pool %p | global_pool %p\n",
+		num_objs, num_possible_cpus(), num_pages, num_objs_percpu,
+		total_pages, get_order(total_pages * PAGE_SIZE), pcpu_pool,
+		global_pool);
+
+	p->pool_order = min_t(int, MAX_ORDER,
+	                        get_order(total_pages * PAGE_SIZE));
+
+	/* alloc total_size pages */
+	pool = p->pool = (char*) __get_free_pages(GFP_KERNEL | __GFP_ZERO,
+	                            p->pool_order);
+
+	if (!pool) {
+		printk("No memory %p\n", pool);
+		return NULL;
+	} else {
+		printk("Memory %p | size %lu\n", pool, total_pages * PAGE_SIZE);
+	}
+	/* split the total pages between pcpu pool and the global pool */
+	pcpu_pool = pool;
+	p->gpool = global_pool =
+	                pool + (num_possible_cpus() * num_pages * PAGE_SIZE);
+
+	/* update percpu vars */
+	for_each_possible_cpu(cpu) {
+		*per_cpu_ptr(p->marker, cpu) =
+		        *per_cpu_ptr(p->head, cpu) = (struct object*) NULL;
+		*per_cpu_ptr(p->buf, cpu) =
+		        pcpu_pool + (cpu * num_pages * PAGE_SIZE);
+		*per_cpu_ptr(p->bufend, cpu) =
+		        pcpu_pool + ((cpu + 1) * num_pages * PAGE_SIZE) - 1;
+		*per_cpu_ptr(p->cached, cpu) = p->num_objs_percpu;
+
+		printk("cpu %d | buf %p | bufend %p\n",
+				cpu, *per_cpu_ptr(p->buf, cpu),
+				*per_cpu_ptr(p->bufend, cpu));
+	}
+
+	construct_global_pool(p);
+	mutex_init(&p->pool_lock);
+	return p;
+}
+EXPORT_SYMBOL(priv_pool_init);
+
+void *priv_alloc(pool_type_t type)
+{
+	void *m = NULL;
+	char *pbuf;
+	char *pbufend;
+	struct object *head;
+	priv_pool_t *p = get_pool(type);
+
+	if (!p)
+		return NULL;
+
+	/* disable preempt until we manipulate all percpu pointers */
+	preempt_disable();
+
+	head = (struct object*) *this_cpu_ptr(p->head);
+
+	/* if head is not null */
+	if (head) {
+		pr_debug("from head %p | nhead %p\n", head, head->next);
+		m = head;
+		*this_cpu_ptr(p->head) = head->next;
+		this_cpu_dec(*p->cached);
+		goto out;
+	} else {
+		pr_debug("reset cached\n");
+		this_cpu_write(*(p->cached), 0);
+	}
+
+	pbuf = (char*)*this_cpu_ptr(p->buf);
+	pbufend = (char*)*this_cpu_ptr(p->bufend);
+
+	if (pbuf + p->obj_size <= pbufend) {
+		m = (void *)pbuf;
+
+		this_cpu_add(*(unsigned long*)(p->buf), p->obj_size);
+
+		pr_debug("from pbuf old: %p, new: %p | e: %p\n",
+				pbuf,
+				*this_cpu_ptr(p->buf),
+				*this_cpu_ptr(p->bufend));
+
+		/* got a chunk */
+		goto out;
+	}
+
+	/* no cached or private pool chunk. Try our luck in the
+	* global pool. First, check if global pool has any chunk
+	* remaining
+	*/
+	if (!p->stack.head) {
+		pr_err("Out of memory! This must be crazy\n");
+		goto out;
+	}
+	{
+		struct atom snapshot, new;
+
+		/* lock global pool */
+		mutex_lock(&p->pool_lock);
+
+		snapshot = p->stack;
+
+		new.head = snapshot.head->next;
+		new.version = snapshot.version + 1;
+
+		p->stack.head = new.head;
+		p->stack.version = new.version;
+
+		*this_cpu_ptr(p->head) = snapshot.head->list;
+		this_cpu_write(*(p->cached), CACHE_SIZE);
+
+		/* unlock global pool */
+		mutex_unlock(&p->pool_lock);
+
+		m = (struct object*) snapshot.head;
+
+		pr_debug("from gpool ohead: %p/%ld, nhead: %p/%ld\n",
+				snapshot.head, snapshot.version,
+				new.head, new.version);
+		WARN_ON(!new.head);
+		goto out;
+	}
+
+
+out:
+	/* enable preemption */
+	preempt_enable();
+	return m;
+}
+
+EXPORT_SYMBOL(priv_alloc);
+
+void priv_free(void *addr, pool_type_t type)
+{
+	struct object *p, *head;
+	priv_pool_t *pool;
+	if (!addr)
+		return;
+
+	pool = get_pool(type);
+
+	if (!pool)
+		return;
+
+	p = (struct object*) addr;
+
+	/* disable preempt until we manipulate all percpu pointers */
+	preempt_disable();
+
+	head = (struct object*)*this_cpu_ptr(pool->head);
+	p->next = (struct object*)head;
+	*this_cpu_ptr(pool->head) = p;
+
+	pr_debug("chaining %p to head %p\n", p, head);
+
+	if (this_cpu_inc_return(*pool->cached) == CACHE_SIZE) {
+		*this_cpu_ptr(pool->marker) = *this_cpu_ptr(pool->head);
+		pr_debug("set marker @ %p\n", *this_cpu_ptr(pool->marker));
+	} else if (*this_cpu_ptr(pool->cached) == (CACHE_SIZE << 1)) {
+		struct bundle *donation = (struct bundle *)*this_cpu_ptr(pool->head);
+		struct atom snapshot, new;
+
+		/* lock global pool */
+		mutex_lock(&pool->pool_lock);
+
+		new.head = donation;
+		donation->list = ((struct object*)*this_cpu_ptr(pool->head))->next;
+		*this_cpu_ptr(pool->head) = (*this_cpu_ptr(pool->marker))->next;
+		(*this_cpu_ptr(pool->marker))->next = NULL;
+		*this_cpu_ptr(pool->cached) = CACHE_SIZE - 1;
+
+		snapshot = pool->stack;
+
+		donation->next = snapshot.head;
+		new.version = snapshot.version + 1;
+
+		pool->stack.head = new.head;
+		pool->stack.version = new.version;
+
+		/* unlock global pool */
+		mutex_unlock(&pool->pool_lock);
+		WARN_ON(!new.head);
+		pr_debug("update gpchain %p to %p | ohead: %p/%ld, nhead: %p/%ld\n",
+				donation, snapshot.head,
+				snapshot.head, snapshot.version,
+				new.head, new.version);
+	}
+
+	/* enable preemption */
+	preempt_enable();
+}
+EXPORT_SYMBOL(priv_free);
+
+int priv_init(void)
+{
+	return 0;
+}
+module_init(priv_init);
+
+void priv_exit(void)
+{
+	return;
+}
+module_exit(priv_exit);
+
+MODULE_LICENSE("GPL");

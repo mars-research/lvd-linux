@@ -13,6 +13,8 @@ struct cptr sync_ep;
 static struct glue_cspace *c_cspace;
 extern struct thc_channel *net_async;
 
+struct rtnl_link_ops *g_rtnl_link_ops;
+
 int glue_nullnet_init(void)
 {
 	int ret;
@@ -38,7 +40,6 @@ void glue_nullnet_exit()
 {
 	glue_cap_destroy(c_cspace);
 	glue_cap_exit();
-
 }
 
 static int setup_async_channel(cptr_t *buf1_cptr_out, cptr_t *buf2_cptr_out,
@@ -289,6 +290,8 @@ int __rtnl_link_register(struct rtnl_link_ops *ops)
         lcd_set_cr0(nullnet_sync_endpoint);
         lcd_set_cr1(rx);
         lcd_set_cr2(tx);
+
+	g_rtnl_link_ops = ops;
 
         ret = lcd_sync_call(nullnet_register_channel);
 
@@ -643,11 +646,14 @@ void rtnl_link_unregister(struct rtnl_link_ops *ops)
 		LIBLCD_ERR("thc_ipc_call");
 		goto fail2;
 	}
+
 	glue_cap_remove(c_cspace, ops_container->my_ref);
+
 	fipc_recv_msg_end(thc_channel_to_fipc(net_async), response);
 
-	lcd_cap_delete(nullnet_sync_endpoint);
-	destroy_async_channel(net_async);
+	//lcd_cap_delete(nullnet_sync_endpoint);
+	if (0)
+		destroy_async_channel(net_async);
 fail2:
 fail1:
 	return;
@@ -802,6 +808,7 @@ int ndo_uninit_callee(struct fipc_message *request, struct thc_channel *channel,
 		LIBLCD_ERR("lookup");
 		goto fail_lookup;
 	}
+	printk("%s called, triggering rpc\n", __func__);
 
 	net_dev_container->net_device.netdev_ops->ndo_uninit(&net_dev_container->net_device);
 
@@ -1108,11 +1115,9 @@ int setup_callee(struct fipc_message *request, struct thc_channel *channel, stru
 	int ret;
 	struct fipc_message *response;
 	unsigned 	int request_cookie;
-	struct setup_container *setup_container;
 	struct net_device_container *net_dev_container;
 	struct net_device_ops_container *netdev_ops_container;
 	const struct net_device_ops *netdev_ops;
-	cptr_t setup_ref = __cptr(fipc_get_reg2(request));
 	cptr_t netdev_ref = __cptr(fipc_get_reg1(request));
 	cptr_t netdev_ops_ref = __cptr(fipc_get_reg4(request));
 	cptr_t netdev_other_ref = __cptr(fipc_get_reg3(request));
@@ -1121,12 +1126,6 @@ int setup_callee(struct fipc_message *request, struct thc_channel *channel, stru
 	request_cookie = thc_get_request_cookie(request);
 
 	fipc_recv_msg_end(thc_channel_to_fipc(channel), request);
-
-	ret = glue_cap_lookup_setup_type(c_cspace, setup_ref, &setup_container);
-	if (ret) {
-		LIBLCD_ERR("lookup");
-		goto fail_lookup;
-	}
 
 	ret = glue_cap_lookup_net_device_type(c_cspace, netdev_ref, &net_dev_container);
 	if (ret) {
@@ -1138,7 +1137,7 @@ int setup_callee(struct fipc_message *request, struct thc_channel *channel, stru
 	net_dev_container->other_ref = netdev_other_ref;
 	LIBLCD_MSG("%s, lcd other ref %p | %lu", __func__, net_dev_container, net_dev_container->other_ref.cptr);
 
-	setup_container->setup(&net_dev_container->net_device);
+	g_rtnl_link_ops->setup(&net_dev_container->net_device);
 
 	netdev_ops = net_dev_container->net_device.netdev_ops;
 

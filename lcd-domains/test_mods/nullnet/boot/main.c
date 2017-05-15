@@ -145,7 +145,10 @@ int boot_lcd_thread(void *data)
 		once = 1;
 		wait_event_interruptible(wq, shutdown != 0);
 	}
+	msleep(2000);
 	LIBLCD_MSG("Exiting thread");
+	lcd_destroy_module_klcd(net_klcd,
+			"lcd_test_mod_nullnet_net_klcd");
 	if (current->lcd)
 		lcd_cap_delete(dummy_lcd);
 	if (dummy_ctx)

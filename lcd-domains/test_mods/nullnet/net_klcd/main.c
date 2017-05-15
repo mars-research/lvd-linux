@@ -1,4 +1,4 @@
-
+#include <lcd_config/pre_hook.h>
 
 #include <linux/module.h>
 #include <linux/kernel.h>
@@ -13,22 +13,27 @@
 
 /* COMPILER: This is always included after all includes. */
 #include <lcd_config/post_hook.h>
+
+/* mechanism for unloading LCD gracefully */
+static bool unload_lcd =0;
+module_param_named(unload, unload_lcd, bool, S_IWUSR);
+
 /* LOOP ------------------------------------------------------------ */
-struct fs_info {
+struct net_info {
 	struct thc_channel *chnl;
 	struct glue_cspace *cspace;
 	cptr_t sync_endpoint;
 	struct list_head list;
 };
-static LIST_HEAD(fs_infos);
+static LIST_HEAD(net_infos);
 
-struct rtnl_link_ops_container *main_ops_container;
+extern int trigger_exit_to_lcd(struct thc_channel *_channel);
 
-struct fs_info * 
+struct net_info *
 add_fs(struct thc_channel *chnl, struct glue_cspace *cspace,
 	cptr_t sync_endpoint)
 {
-	struct fs_info *fs_info;
+	struct net_info *fs_info;
 	
 	fs_info = kmalloc(sizeof(*fs_info), GFP_KERNEL);
 	if (!fs_info)
@@ -37,7 +42,7 @@ add_fs(struct thc_channel *chnl, struct glue_cspace *cspace,
 	fs_info->cspace = cspace;
 	fs_info->sync_endpoint = sync_endpoint;
 	INIT_LIST_HEAD(&fs_info->list);
-	list_add(&fs_info->list, &fs_infos);
+	list_add(&fs_info->list, &net_infos);
 
 	return fs_info;
 
@@ -45,20 +50,27 @@ fail1:
 	return NULL;
 }
 
-void remove_fs(struct fs_info *fs)
+void remove_fs(struct net_info *fs)
 {
 	list_del_init(&fs->list);
 	kfree(fs);
 }
 
-
-
-static int async_loop(struct fs_info **fs_out, struct fipc_message **msg_out)
+static int __get_net(struct net_info **net_out)
 {
-	struct fs_info *cursor, *next;
+	struct net_info *first;
+	first = list_first_entry_or_null(&net_infos, struct net_info, list);
+	if (first)
+		*net_out = first;
+	return first ? 1 : 0;
+}
+
+static int async_loop(struct net_info **fs_out, struct fipc_message **msg_out)
+{
+	struct net_info *cursor, *next;
 	int ret;
 
-	list_for_each_entry_safe(cursor, next, &fs_infos, list) {
+	list_for_each_entry_safe(cursor, next, &net_infos, list) {
 
 		ret = thc_ipc_poll_recv(cursor->chnl, msg_out);
 		if (ret == -EPIPE) {
@@ -156,7 +168,7 @@ static void loop(cptr_t register_chnl)
 {
 	unsigned long tics = jiffies + REGISTER_FREQ;
 	struct fipc_message *msg;
-	struct fs_info *fs;
+	struct net_info *net;
 	int stop = 0;
 	int ret;
 
@@ -176,26 +188,28 @@ static void loop(cptr_t register_chnl)
 				tics = jiffies + REGISTER_FREQ;
 				continue;
 			}
-			/*
-			if (pmfs_ready) {
-				pmfs_ready = 0;
-				ASYNC(
-					stop = do_pmfs_test();
-					);
-			}
-			 */
 			if (stop)
 				break;
-			ret = async_loop(&fs, &msg);
+			/*
+			 * will be updated by a write into sysfs
+			 * from userspace.
+			 */
+			if (unload_lcd) {
+				unload_lcd = 0;
+				if (__get_net(&net))
+					trigger_exit_to_lcd(net->chnl);
+			}
+
+			ret = async_loop(&net, &msg);
 			if (!ret) {
 				ASYNC(
 					ret = dispatch_async_loop(
-						fs->chnl, 
+						net->chnl,
 						msg,
-						fs->cspace,
-						fs->sync_endpoint);
+						net->cspace,
+						net->sync_endpoint);
 					if (ret) {
-						LIBLCD_ERR("fs dispatch err");
+						LIBLCD_ERR("net dispatch err");
 						/* (break won't work here) */
 						stop = 1;
 					}
@@ -226,22 +240,7 @@ static void loop(cptr_t register_chnl)
 
 		);
 
-	/* 
-	 * NOTE: If the vfs klcd quits / is killed before 
-	 * unregister_filesystem runs, it could cause some proc fs
-	 * crap to crash (the struct file_system_type is still in
-	 * the registered fs list, but e.g. the const char *name just
-	 * went bye-bye when we unloaded the vfs's .ko.)
-	 */
-
-	if (main_ops_container) {
-		LIBLCD_MSG("Forcefully unregister %s", main_ops_container->rtnl_link_ops.kind);
-		rtnl_link_unregister(( &main_ops_container->rtnl_link_ops ));
-		kfree(main_ops_container);
-	}
 	LIBLCD_MSG("EXITED DUMMY DO_FINISH");
-
-
 }
 
 /* INIT / EXIT ---------------------------------------- */

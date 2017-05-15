@@ -5,53 +5,71 @@
 
 #include <lcd_config/post_hook.h>
 
-int dispatch_async_loop(struct thc_channel *channel, struct fipc_message *message, struct glue_cspace *cspace, struct cptr sync_ep)
+#define trace(x) LIBLCD_MSG("net got " #x " msg")
+
+extern void dummy_cleanup_module(void);
+
+int dispatch_async_loop(struct thc_channel *channel,
+			struct fipc_message *message,
+			struct glue_cspace *cspace,
+			struct cptr sync_ep)
 {
 	int fn_type;
 	fn_type = async_msg_get_fn_type(message);
+
 	switch (fn_type) {
 		case NDO_INIT:
-			LIBLCD_MSG("Calling function ndo_init");
-			return ndo_init_callee(message, channel, cspace, sync_ep);
-			break;
+			trace(NDO_INIT);
+			return ndo_init_callee(message, channel,
+					cspace, sync_ep);
 		case NDO_UNINIT:
-			LIBLCD_MSG("Calling function ndo_uninit");
-			return ndo_uninit_callee(message, channel, cspace, sync_ep);
-			break;
+			trace(NDO_UNINIT);
+			ndo_uninit_callee(message, channel,
+					cspace, sync_ep);
+			/* wait until uninit is called */
+			return -1;
 		case NDO_START_XMIT:
-			LIBLCD_MSG("Calling function ndo_start_xmit");
-			return ndo_start_xmit_callee(message, channel, cspace, sync_ep);
-			break;
+			trace(NDO_START_XMIT);
+			return ndo_start_xmit_callee(message,
+					channel, cspace, sync_ep);
 		case NDO_VALIDATE_ADDR:
-			LIBLCD_MSG("Calling function ndo_validate_addr");
-			return ndo_validate_addr_callee(message, channel, cspace, sync_ep);
-			break;
+			trace(NDO_VALIDATE_ADDR);
+			return ndo_validate_addr_callee(message,
+					channel, cspace, sync_ep);
 		case NDO_GET_STATS64:
-			LIBLCD_MSG("Calling function ndo_get_stats64");
-			return ndo_get_stats64_callee(message, channel, cspace, sync_ep);
-			break;
+			trace(NDO_GET_STATS64);
+			return ndo_get_stats64_callee(message,
+					channel, cspace, sync_ep);
 		case NDO_SET_RX_MODE:
-			LIBLCD_MSG("Calling function ndo_set_rx_mode");
-			return ndo_set_rx_mode_callee(message, channel, cspace, sync_ep);
-			break;
+			trace(NDO_SET_RX_MODE);
+			return ndo_set_rx_mode_callee(message,
+					channel, cspace, sync_ep);
 		case NDO_SET_MAC_ADDRESS:
-			LIBLCD_MSG("Calling function ndo_set_mac_address");
-			return ndo_set_mac_address_callee(message, channel, cspace, sync_ep);
-			break;
+			trace(NDO_SET_MAC_ADDRESS);
+			return ndo_set_mac_address_callee(message,
+					channel, cspace, sync_ep);
 		case NDO_CHANGE_CARRIER:
-			LIBLCD_MSG("Calling function ndo_change_carrier");
-			return ndo_change_carrier_callee(message, channel, cspace, sync_ep);
-			break;
+			trace(NDO_CHANGE_CARRIER);
+			return ndo_change_carrier_callee(message,
+					channel, cspace, sync_ep);
 		case SETUP:
-			LIBLCD_MSG("Calling function setup");
-			return setup_callee(message, channel, cspace, sync_ep);
-			break;
+			trace(SETUP);
+			return setup_callee(message, channel,
+					cspace, sync_ep);
 		case VALIDATE:
-			LIBLCD_MSG("Calling function validate");
-			return validate_callee(message, channel, cspace, sync_ep);
-			break;
+			trace(VALIDATE);
+			return validate_callee(message, channel,
+					cspace, sync_ep);
+
+		case TRIGGER_EXIT:
+			trace(TRIGGER_EXIT);
+			/* call nullnet exit */
+			dummy_cleanup_module();
+			return 0;
+		default:
+			LIBLCD_ERR("unexpected function label: %d",
+					fn_type);
+			return -EINVAL;
 	}
 	return 0;
-
 }
-

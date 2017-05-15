@@ -77,22 +77,6 @@ static void main_and_loop(void)
 
 		);
 
-	/*
-	 * We don't expect any requests coming back to us, so it's safe
-	 * to just run this without a loop (it's effectively polling since
-	 * only one awe will run in this do-finish).
-	 */
-	if (1) 
-	DO_FINISH(
-		ASYNC(
-			dummy_cleanup_module();
-
-			
-				LIBLCD_MSG("SUCCESSFULLY UNREGISTERED NULLNET!");
-
-			);
-		);
-
 	LIBLCD_MSG("EXITED PMFS DO_FINISH");
 
 	return;

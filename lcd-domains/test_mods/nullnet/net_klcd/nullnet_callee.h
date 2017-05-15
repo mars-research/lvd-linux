@@ -13,7 +13,7 @@ void glue_nullnet_exit(void);
 
 int dispatch_sync_loop (void);
 
-struct fs_info * 
+struct net_info *
 add_fs(struct thc_channel *chnl, struct glue_cspace *cspace,
 	cptr_t sync_endpoint);
 

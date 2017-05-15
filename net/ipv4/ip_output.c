@@ -984,15 +984,25 @@ alloc_new_skb:
 				alloclen += rt->dst.trailer_len;
 
 			if (transhdrlen) {
-				skb = sock_alloc_send_skb(sk,
-						alloclen + hh_len + 15,
+				unsigned long size = alloclen + hh_len + 15;
+
+				if (rt->dst.dev->features & NETIF_F_PRIV_DATA_POOL)
+					size |= SKB_DATA_PRIV_POOL;
+
+				skb = sock_alloc_send_skb(sk, size,
 						(flags & MSG_DONTWAIT), &err);
 			} else {
+				unsigned long size = alloclen + hh_len + 15;
+
+				if (rt->dst.dev->features & NETIF_F_PRIV_DATA_POOL)
+					size |= SKB_DATA_PRIV_POOL;
+
 				skb = NULL;
+
 				if (atomic_read(&sk->sk_wmem_alloc) <=
 				    2 * sk->sk_sndbuf)
 					skb = sock_wmalloc(sk,
-							   alloclen + hh_len + 15, 1,
+							   size, 1,
 							   sk->sk_allocation);
 				if (unlikely(!skb))
 					err = -ENOBUFS;

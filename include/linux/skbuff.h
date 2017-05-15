@@ -222,6 +222,9 @@
 /* Maximum value in skb->csum_level */
 #define SKB_MAX_CSUM_LEVEL	3
 
+/* for skb->data allocation */
+#define SKB_DATA_PRIV_POOL	(1 << 31)
+
 #define SKB_DATA_ALIGN(X)	ALIGN(X, SMP_CACHE_BYTES)
 #define SKB_WITH_OVERHEAD(X)	\
 	((X) - SKB_DATA_ALIGN(sizeof(struct skb_shared_info)))
@@ -682,7 +685,8 @@ struct sk_buff {
 				fclone:2,
 				peeked:1,
 				head_frag:1,
-				xmit_more:1;
+				xmit_more:1,
+				private:1;
 	/* one bit hole */
 	kmemcheck_bitfield_end(flags1);
 

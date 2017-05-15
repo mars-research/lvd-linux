@@ -78,6 +78,8 @@
 #include <linux/capability.h>
 #include <linux/user_namespace.h>
 
+#include <linux/priv_mempool.h>
+
 struct kmem_cache *skbuff_head_cache __read_mostly;
 static struct kmem_cache *skbuff_fclone_cache __read_mostly;
 int sysctl_max_skb_frags __read_mostly = MAX_SKB_FRAGS;
@@ -208,6 +210,7 @@ struct sk_buff *__alloc_skb(unsigned int size, gfp_t gfp_mask,
 	struct sk_buff *skb;
 	u8 *data;
 	bool pfmemalloc;
+	bool privpool = false;
 
 	cache = (flags & SKB_ALLOC_FCLONE)
 		? skbuff_fclone_cache : skbuff_head_cache;
@@ -221,22 +224,40 @@ struct sk_buff *__alloc_skb(unsigned int size, gfp_t gfp_mask,
 		goto out;
 	prefetchw(skb);
 
+	if (size & SKB_DATA_PRIV_POOL) {
+		privpool = true;
+		size &= ~SKB_DATA_PRIV_POOL;
+	}
 	/* We do our best to align skb_shared_info on a separate cache
 	 * line. It usually works because kmalloc(X > SMP_CACHE_BYTES) gives
 	 * aligned memory blocks, unless SLUB/SLAB debug is enabled.
 	 * Both skb->head and skb_shared_info are cache line aligned.
 	 */
-	size = SKB_DATA_ALIGN(size);
-	size += SKB_DATA_ALIGN(sizeof(struct skb_shared_info));
-	data = kmalloc_reserve(size, gfp_mask, node, &pfmemalloc);
+	if (unlikely(privpool)) {
+		/* private pool */
+		data = priv_alloc(SKB_DATA_POOL);
+		size = SKB_DATA_SIZE;
+	} else {
+		size = SKB_DATA_ALIGN(size);
+		size += SKB_DATA_ALIGN(sizeof(struct skb_shared_info));
+
+		data = kmalloc_reserve(size, gfp_mask, node, &pfmemalloc);
+	}
+
 	if (!data)
 		goto nodata;
+
 	/* kmalloc(size) might give us more room than requested.
 	 * Put skb_shared_info exactly at the end of allocated zone,
 	 * to allow max possible filling before reallocation.
 	 */
-	size = SKB_WITH_OVERHEAD(ksize(data));
-	prefetchw(data + size);
+	if (!privpool) {
+		size = SKB_WITH_OVERHEAD(ksize(data));
+		prefetchw(data + size);
+	} else {
+		size = SKB_WITH_OVERHEAD(SKB_DATA_SIZE);
+		prefetchw(data);
+	}
 
 	/*
 	 * Only clear those fields we need to clear, not those that we will
@@ -254,6 +275,9 @@ struct sk_buff *__alloc_skb(unsigned int size, gfp_t gfp_mask,
 	skb->end = skb->tail + size;
 	skb->mac_header = (typeof(skb->mac_header))~0U;
 	skb->transport_header = (typeof(skb->transport_header))~0U;
+
+	if (privpool)
+		skb->private = true;
 
 	/* make sure we initialize shinfo sequentially */
 	shinfo = skb_shinfo(skb);
@@ -576,8 +600,12 @@ static void skb_free_head(struct sk_buff *skb)
 
 	if (skb->head_frag)
 		skb_free_frag(head);
-	else
-		kfree(head);
+	else {
+		if (skb->private)
+			priv_free(head, SKB_DATA_POOL);
+		else
+			kfree(head);
+	}
 }
 
 static void skb_release_data(struct sk_buff *skb)
@@ -910,6 +938,7 @@ static struct sk_buff *__skb_clone(struct sk_buff *n, struct sk_buff *skb)
 	C(head_frag);
 	C(data);
 	C(truesize);
+	C(private);
 	atomic_set(&n->users, 1);
 
 	atomic_inc(&(skb_shinfo(skb)->dataref));

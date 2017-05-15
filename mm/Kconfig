@@ -711,3 +711,9 @@ config ARCH_USES_HIGH_VMA_FLAGS
 	bool
 config ARCH_HAS_PKEYS
 	bool
+
+config PRIV_DATA_POOL
+	bool "Private data pool to use with LCDs"
+
+	help
+	  For use with LCDs.

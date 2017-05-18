@@ -21,6 +21,9 @@ struct region {
 	}
 };
 
+struct lcd *iommu_lcd;
+EXPORT_SYMBOL(iommu_lcd);
+
 /* XXX: We are indeed walking the ept *without* a lock!
  * HINT: A mutex is initialized during ept init and never used.
  * What are the consequences?
@@ -79,9 +82,10 @@ int lcd_iommu_map_page(struct lcd *lcd, gpa_t gpa, unsigned int order,
 			BUG_ON(ret != PAGE_SIZE);
 		}
 
+		if (0) {
 		printk("%s, mapping gpa:hpa %lx:%lx pair\n", __func__,
 		       gpa_val(ga), hpa_val(hpa));
-
+		}
 		/* map */
 		ret = iommu_map(lcd->domain, gpa_val(ga), hpa_val(hpa),
 				PAGE_SIZE, IOMMU_READ | IOMMU_WRITE);
@@ -124,7 +128,7 @@ int lcd_iommu_unmap_page(struct lcd *lcd, gpa_t gpa, unsigned int order)
 		}
 
 		ret = iommu_iova_to_phys(lcd->domain, gpa_val(ga));
-
+		if (0)
 		printk("%s, unmapping gpa:hpa %lx:%lx pair\n", __func__,
 		       gpa_val(ga), hpa_val(hpa));
 
@@ -133,6 +137,7 @@ int lcd_iommu_unmap_page(struct lcd *lcd, gpa_t gpa, unsigned int order)
 			ret = iommu_unmap(lcd->domain, gpa_val(ga), PAGE_SIZE);
 			/* bug if not a page */
 			BUG_ON(ret != PAGE_SIZE);
+
 		}
 	}
 	/* return success */
@@ -257,6 +262,8 @@ int lcd_iommu_map_domain(struct lcd *lcd, struct pci_dev *pdev)
 		goto fail_attach;
 	}
 
+	/* XXX: Grrr. this is ugly. devise a clean way to do this */
+	iommu_lcd = lcd;
 	return ret;
 
 fail_attach:

@@ -89,7 +89,7 @@ int dispatch_async_loop(struct thc_channel *channel,
 						sync_endpoint);
 		break;
 	case CONSUME_SKB:
-		LIBLCD_MSG("Calling function consume_skb");
+		//LIBLCD_MSG("Calling function consume_skb");
 		ret = consume_skb_callee(message, channel, cspace,
 						sync_endpoint);
 		break;

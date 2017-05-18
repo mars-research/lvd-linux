@@ -9,6 +9,8 @@
 #include <uapi/linux/netlink.h>
 #include <linux/skbuff.h>
 
+#include <linux/priv_mempool.h>
+
 #include <libcap.h>
 #include <libfipc.h>
 #include <thc_ipc.h>
@@ -42,6 +44,38 @@ enum dispatch_t {
 	SETUP,
 	TRIGGER_EXIT,
 };
+
+typedef enum {
+	VOLUNTEER_XMIT = 1,
+	SHARED_DATA_XMIT = 2,
+} xmit_type_t;
+
+
+struct skbuff_members {
+	unsigned int        len, data_len;
+	__u16               queue_mapping;
+	__u8                xmit_more:1,
+			ip_summed:2;
+	__u16		network_header;
+	__u16			transport_header;
+	union {
+		__wsum		csum;
+		struct {
+			__u16	csum_start;
+			__u16	csum_offset;
+		};
+	};
+	sk_buff_data_t      tail;
+	sk_buff_data_t      end;
+	unsigned int 	head_data_off;
+	unsigned int        truesize;
+} __attribute__((aligned));
+
+#define SKB_LCD_MEMBERS(SKB)	((struct skbuff_members*)((char*)skb_end_pointer(SKB) - (char*)SKB_LCD_MEMBERS_SZ))
+
+#define C(x)	skb_lcd->x = skb->x
+#define P(x)	skb->x = skb_lcd->x
+
 
 #define PMFS_ASYNC_RPC_BUFFER_ORDER 12
 /* CONTAINERS 	---------- */
@@ -77,9 +111,21 @@ struct setup_container {
 	cptr_t my_ref;
 };
 struct sk_buff_container {
-	struct sk_buff sk_buff;
-	cptr_t other_ref;
-	cptr_t my_ref;
+	/* just store the pointer */
+	struct sk_buff *skb;
+	/* store the order when volunteered. comes handy during unmap */
+	unsigned int skb_ord, skbd_ord;
+	cptr_t skb_cptr, skbh_cptr;
+	/*
+	 * as head, data pointer is different in LCD and KLCD, store it
+	 * while crossing the boundary
+	 */
+	unsigned char *head, *data;
+	/* for hashtable insertion */
+	struct hlist_node hentry;
+	struct cptr other_ref;
+	struct cptr my_ref;
+	struct task_struct *tsk;
 };
 
 

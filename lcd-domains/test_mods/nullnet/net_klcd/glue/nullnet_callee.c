@@ -8,14 +8,10 @@
 #include "../../glue_helper.h"
 #include "../nullnet_callee.h"
 
+#include <linux/hashtable.h>
 #include <asm/cacheflush.h>
 
 #include <lcd_config/post_hook.h>
-
-struct thc_channel *net_async;
-struct cptr sync_ep;
-extern struct cspace *klcd_cspace;
-struct rtnl_link_ops_container *g_ops_container;
 
 struct trampoline_hidden_args {
 	void *struct_container;
@@ -25,7 +21,39 @@ struct trampoline_hidden_args {
 	struct cptr sync_ep;
 };
 
+/* XXX: How to determine this? */
+#define CPTR_HASH_BITS      5
+static DEFINE_HASHTABLE(cptr_table, CPTR_HASH_BITS);
+
 static struct glue_cspace *c_cspace;
+struct thc_channel *net_async;
+struct cptr sync_ep;
+extern struct cspace *klcd_cspace;
+struct rtnl_link_ops_container *g_ops_container;
+DEFINE_MUTEX(hash_lock);
+static unsigned long pool_pfn_start, pool_pfn_end;
+priv_pool_t *pool;
+
+void skb_data_pool_init(void)
+{
+	pool = priv_pool_init(SKB_DATA_POOL, 10, SKB_DATA_SIZE);
+}
+
+void skb_data_pool_free(void)
+{
+	priv_pool_destroy(pool);
+}
+
+xmit_type_t check_skb_range(struct sk_buff *skb)
+{
+	unsigned long pfn;
+	pfn = ((unsigned long)skb->data) >> PAGE_SHIFT;
+	if (pfn >= pool_pfn_start && pfn <= pool_pfn_end) {
+		WARN_ON(!skb->private);
+		return SHARED_DATA_XMIT;
+	} else
+		return VOLUNTEER_XMIT;
+}
 
 int glue_nullnet_init(void)
 {
@@ -40,6 +68,12 @@ int glue_nullnet_init(void)
 		LIBLCD_ERR("cap create");
 		goto fail2;
 	}
+
+	hash_init(cptr_table);
+
+	/* initialize our private pool */
+	skb_data_pool_init();
+
 	return 0;
 fail2:
 	glue_cap_exit();
@@ -54,6 +88,44 @@ void glue_nullnet_exit()
 	glue_cap_exit();
 
 }
+
+int glue_insert_skbuff(struct hlist_head *htable,
+			struct sk_buff_container *skb_c)
+{
+	BUG_ON(!skb_c->skb);
+
+	skb_c->my_ref = __cptr((unsigned long)skb_c->skb);
+
+	mutex_lock_interruptible(&hash_lock);
+	hash_add_rcu(cptr_table, &skb_c->hentry,
+			(unsigned long) skb_c->skb);
+	mutex_unlock(&hash_lock);
+	return 0;
+}
+
+int glue_lookup_skbuff(struct hlist_head *htable, struct cptr c, struct sk_buff_container **skb_cout)
+{
+        struct sk_buff_container *skb_c;
+
+        hash_for_each_possible_rcu(cptr_table, skb_c, hentry, (unsigned long) cptr_val(c)) {
+		if (!skb_c) {
+			WARN_ON(!skb_c);
+			continue;
+		}
+		if (skb_c->skb == (struct sk_buff*) c.cptr) {
+	                *skb_cout = skb_c;
+		}
+        }
+        return 0;
+}
+
+void glue_remove_skbuff(struct sk_buff_container *skb_c)
+{
+	mutex_lock_interruptible(&hash_lock);
+	hash_del_rcu(&skb_c->hentry);
+	mutex_unlock(&hash_lock);
+}
+
 
 int grant_sync_ep(cptr_t *sync_end, cptr_t ha_sync_ep)
 {
@@ -399,73 +471,147 @@ ndo_uninit_trampoline(struct net_device *dev)
 
 }
 
-int ndo_start_xmit_user(struct sk_buff *skb, struct net_device *dev, struct trampoline_hidden_args *hidden_args)
+int ndo_start_xmit_user(struct sk_buff *skb, struct net_device *dev, struct trampoline_hidden_args *hidden_args, xmit_type_t xmit_type)
 {
 	int ret;
-	struct fipc_message *request;
-	struct fipc_message *response;
+	struct fipc_message *_request;
+	struct fipc_message *_response;
 	struct net_device_container *net_dev_container;
 	unsigned int request_cookie;
 	cptr_t sync_end;
 	unsigned long skb_ord, skb_off;
 	unsigned long skbd_ord, skbd_off;
+	struct sk_buff_container *skb_c;
+	struct skbuff_members *skb_lcd;
 	cptr_t skb_cptr, skbd_cptr;
 
-	// enter lcd mode
+	net_dev_container = container_of(dev,
+			struct net_device_container, net_device);
+
+	skb_c = kzalloc(sizeof(*skb_c), GFP_KERNEL);
+
+	if (!skb_c)
+		LIBLCD_MSG("no memory");
+	skb_c->skb = skb;
+	glue_insert_skbuff(cptr_table, skb_c);
+
+	/* save original head, data */
+	skb_c->head = skb->head;
+	skb_c->data = skb->data;
+	skb_c->skb_ord = skb_ord;
+
+	/* enter LCD mode to have cspace tree */
 	lcd_enter();
-	ret = grant_sync_ep(&sync_end, hidden_args->sync_ep);
 
-	net_dev_container = container_of(dev, struct net_device_container, net_device);
-
-	ret = sync_setup_memory(skb, sizeof(struct sk_buff), &skb_ord, &skb_cptr, &skb_off);
-
-	ret = sync_setup_memory(skb->head, skb_end_offset(skb) + sizeof(struct skb_shared_info), &skbd_ord, &skbd_cptr, &skbd_off);
-
-	ret = async_msg_blocking_send_start(hidden_args->async_chnl, &request);
+	ret = async_msg_blocking_send_start(hidden_args->async_chnl,
+		&_request);
 	if (ret) {
 		LIBLCD_ERR("failed to get a send slot");
 		goto fail_async;
 	}
 
-	async_msg_set_fn_type(request, NDO_START_XMIT);
-	fipc_set_reg1(request, net_dev_container->other_ref.cptr);
+	async_msg_set_fn_type(_request,
+			NDO_START_XMIT);
 
-	ret = thc_ipc_send_request(hidden_args->async_chnl, request, &request_cookie);
+	fipc_set_reg0(_request, xmit_type);
 
-	if (ret) {
-		LIBLCD_ERR("thc_ipc_call");
-		goto fail_ipc;
+	fipc_set_reg1(_request,
+			net_dev_container->other_ref.cptr);
+
+	fipc_set_reg2(_request,
+			skb_c->my_ref.cptr);
+
+	switch (xmit_type) {
+	case VOLUNTEER_XMIT:
+
+		ret = thc_ipc_send_request(hidden_args->async_chnl,
+			_request, &request_cookie);
+
+		if (ret) {
+			LIBLCD_ERR("thc_ipc_call");
+			goto fail_ipc;
+		}
+
+		ret = grant_sync_ep(&sync_end, hidden_args->sync_ep);
+
+		ret = sync_setup_memory(skb, sizeof(struct sk_buff),
+				&skb_ord, &skb_cptr, &skb_off);
+
+		ret = sync_setup_memory(skb->head,
+			skb_end_offset(skb)
+			+ sizeof(struct skb_shared_info),
+			&skbd_ord, &skbd_cptr, &skbd_off);
+
+		skb_c->skb_cptr = skb_cptr;
+		skb_c->skbh_cptr = skbd_cptr;
+
+		//sync half
+		lcd_set_cr0(skb_cptr);
+		lcd_set_cr1(skbd_cptr);
+		lcd_set_r0(skb_ord);
+		lcd_set_r1(skb_off);
+		lcd_set_r2(skbd_ord);
+		lcd_set_r3(skbd_off);
+		lcd_set_r4(skb->data - skb->head);
+
+		ret = lcd_sync_send(sync_end);
+		lcd_set_cr0(CAP_CPTR_NULL);
+		lcd_set_cr1(CAP_CPTR_NULL);
+		if (ret) {
+			LIBLCD_ERR("failed to send");
+			goto fail_sync;
+		}
+
+		lcd_cap_delete(sync_end);
+
+		break;
+
+	case SHARED_DATA_XMIT:
+		fipc_set_reg3(_request,
+				(unsigned long)
+				((void*)skb->head - pool->pool));
+
+		fipc_set_reg4(_request, skb->end);
+
+		fipc_set_reg5(_request, skb->protocol);
+
+		skb_lcd = SKB_LCD_MEMBERS(skb);
+
+		C(len);
+		C(data_len);
+		C(queue_mapping);
+		C(xmit_more);
+		C(tail);
+		C(truesize);
+		C(ip_summed);
+		C(csum_start);
+		C(network_header);
+		C(csum_offset);
+		C(transport_header);
+
+		skb_lcd->head_data_off = skb->data - skb->head;
+
+
+		ret = thc_ipc_send_request(hidden_args->async_chnl,
+			_request, &request_cookie);
+
+		if (ret) {
+			LIBLCD_ERR("thc_ipc_call");
+			goto fail_ipc;
+		}
+		break;
+
+	default:
+		LIBLCD_ERR("%s, Unknown xmit_type requested",
+			__func__);
+		break;
 	}
 
-	//sync half
-	lcd_set_cr0(skb_cptr);
-	lcd_set_cr1(skbd_cptr);
-	lcd_set_r0(skb_ord);
-	lcd_set_r1(skb_off);
-	lcd_set_r2(skbd_ord);
-	lcd_set_r3(skbd_off);
-	lcd_set_r4(skb->data - skb->head);
-
-	if (0) {
-		print_hex_dump(KERN_DEBUG, "pkt_data_klcd",
-			DUMP_PREFIX_NONE, 16, 1,
-			skb->data, skb->len, false);
-	}
-
-	LIBLCD_MSG("r4 data_off 0x%X | %d", skb->data - skb->head);
-	ret = lcd_sync_send(sync_end);
-	lcd_set_cr0(CAP_CPTR_NULL);
-	lcd_set_cr1(CAP_CPTR_NULL);
-	if (ret) {
-		LIBLCD_ERR("failed to send");
-		goto fail_sync;
-	}
-
-	lcd_cap_delete(sync_end);
 
 	DO_FINISH_(ndo_start_xmit, {
 	  ASYNC_({
-	    ret = thc_ipc_recv_response(hidden_args->async_chnl, request_cookie, &response);
+	    ret = thc_ipc_recv_response(hidden_args->async_chnl,
+			request_cookie, &_response);
 	  }, ndo_start_xmit);
 	});
 
@@ -474,8 +620,8 @@ int ndo_start_xmit_user(struct sk_buff *skb, struct net_device *dev, struct tram
 		goto fail_ipc;
 	}
 
-	ret = fipc_get_reg1(response);
-	fipc_recv_msg_end(thc_channel_to_fipc(hidden_args->async_chnl), response);
+	ret = fipc_get_reg1(_response);
+	fipc_recv_msg_end(thc_channel_to_fipc(hidden_args->async_chnl), _response);
 
 fail_async:
 fail_sync:
@@ -487,54 +633,150 @@ fail_ipc:
 int ndo_start_xmit(struct sk_buff *skb, struct net_device *dev, struct trampoline_hidden_args *hidden_args)
 {
 	int ret;
-	struct fipc_message *request;
-	struct fipc_message *response;
+	struct fipc_message *_request;
+	struct fipc_message *_response;
 	struct net_device_container *net_dev_container;
+	xmit_type_t xmit_type;
+	struct skbuff_members *skb_lcd;
+	struct sk_buff_container *skb_c;
+	unsigned long skb_ord, skb_off;
+	unsigned long skbd_ord, skbd_off;
+	unsigned int request_cookie;
+	cptr_t skb_cptr, skbd_cptr;
+
+	xmit_type = check_skb_range(skb);
 
 	if (!get_current()->ptstate) {
-		LIBLCD_MSG("\nskb %p | skb->len %d | skb->datalen %d\n"
-			   "skb->end %p | skb->end_off %u | skb->head %p | skb->data %p\n"
-			   "truesize %d | skb->tail %p",
-			skb, skb->len, skb->data_len,
-			skb_end_pointer(skb), skb_end_offset(skb), skb->head, skb->data,
-			skb->truesize, skb->tail);
-		LIBLCD_MSG("headlen %d | pagelen %d",
-			skb_headlen(skb), skb_pagelen(skb));
-		{
-			unsigned char nr_frags = skb_shinfo(skb)->nr_frags;
-			int i;
-			for (i = 0; i < nr_frags; i++) {
-				skb_frag_t *frag = &skb_shinfo(skb)->frags[i];
-				LIBLCD_MSG("page 0x%X | size %d", skb_frag_page(frag), skb_frag_size(frag));
-			}
-		}
 		LCD_MAIN( {
-			ret = ndo_start_xmit_user(skb, dev, hidden_args);
+			ret = ndo_start_xmit_user(skb, dev, hidden_args, xmit_type);
 		});
 
-		return 0;
+		return ret;
 	}
 
-	net_dev_container = container_of(dev, struct net_device_container, net_device);
+	net_dev_container = container_of(dev,
+			struct net_device_container, net_device);
 
-	ret = async_msg_blocking_send_start(hidden_args->async_chnl, &request);
+	skb_c = kzalloc(sizeof(*skb_c), GFP_KERNEL);
+
+	if (!skb_c) {
+		LIBLCD_MSG("no memory");
+		goto fail_alloc;
+	}
+
+	skb_c->skb = skb;
+	glue_insert_skbuff(cptr_table, skb_c);
+
+	ret = async_msg_blocking_send_start(
+			hidden_args->async_chnl, &_request);
 	if (ret) {
 		LIBLCD_ERR("failed to get a send slot");
 		goto fail_async;
 	}
 
-	async_msg_set_fn_type(request, NDO_START_XMIT);
+	async_msg_set_fn_type(_request, NDO_START_XMIT);
 
-	ret = thc_ipc_call(hidden_args->async_chnl, request, &response);
+	fipc_set_reg0(_request, xmit_type);
+	fipc_set_reg1(_request,
+			net_dev_container->other_ref.cptr);
+	fipc_set_reg2(_request,
+			skb_c->my_ref.cptr);
+
+	switch (xmit_type) {
+	case VOLUNTEER_XMIT:
+
+		ret = thc_ipc_send_request(hidden_args->async_chnl,
+				_request, &request_cookie);
+
+		if (ret) {
+			LIBLCD_ERR("thc_ipc_call");
+			goto fail_ipc;
+		}
+
+		ret = sync_setup_memory(skb, sizeof(struct sk_buff),
+				&skb_ord, &skb_cptr, &skb_off);
+
+		ret = sync_setup_memory(skb->head,
+			skb_end_offset(skb)
+			+ sizeof(struct skb_shared_info),
+				&skbd_ord, &skbd_cptr, &skbd_off);
+
+		skb_c->skb_cptr = skb_cptr;
+		skb_c->skbh_cptr = skbd_cptr;
+
+		/* sync half */
+		lcd_set_cr0(skb_cptr);
+		lcd_set_cr1(skbd_cptr);
+		lcd_set_r0(skb_ord);
+		lcd_set_r1(skb_off);
+		lcd_set_r2(skbd_ord);
+		lcd_set_r3(skbd_off);
+		lcd_set_r4(skb->data - skb->head);
+
+		ret = lcd_sync_send(hidden_args->sync_ep);
+
+		lcd_set_cr0(CAP_CPTR_NULL);
+		lcd_set_cr1(CAP_CPTR_NULL);
+
+		if (ret) {
+			LIBLCD_ERR("failed to send");
+			goto fail_sync;
+		}
+
+		ret = thc_ipc_recv_response(
+				hidden_args->async_chnl,
+				request_cookie,
+				&_response);
+
+		break;
+
+	case SHARED_DATA_XMIT:
+		fipc_set_reg3(_request,
+				(unsigned long)
+				((void*)skb->head - pool->pool));
+
+		fipc_set_reg4(_request, skb->end);
+		fipc_set_reg5(_request, skb->protocol);
+
+		skb_lcd = SKB_LCD_MEMBERS(skb);
+
+		C(len);
+		C(data_len);
+		C(queue_mapping);
+		C(xmit_more);
+		C(tail);
+		C(truesize);
+		C(ip_summed);
+		C(csum_start);
+		C(network_header);
+		C(csum_offset);
+		C(transport_header);
+
+		skb_lcd->head_data_off = skb->data - skb->head;
+
+		ret = thc_ipc_call(hidden_args->async_chnl,
+				_request,
+				&_response);
+		break;
+
+	default:
+		LIBLCD_ERR("%s, Unknown xmit_type requested",
+			__func__);
+		break;
+	}
+
 	if (ret) {
 		LIBLCD_ERR("thc_ipc_call");
 		goto fail_ipc;
 	}
 
-	ret = fipc_get_reg1(response);
-	fipc_recv_msg_end(thc_channel_to_fipc(hidden_args->async_chnl), response);
+	ret = fipc_get_reg1(_response);
+	fipc_recv_msg_end(thc_channel_to_fipc(
+			hidden_args->async_chnl), _response);
 
 fail_async:
+fail_alloc:
+fail_sync:
 fail_ipc:
 	return ret;
 
@@ -890,7 +1132,7 @@ int LCD_TRAMPOLINE_LINKAGE(ndo_set_mac_address_trampoline) ndo_set_mac_address_t
 }
 
 struct rtnl_link_stats64 *ndo_get_stats64_user(struct net_device *dev,
-		struct rtnl_link_stats64 *storage, 
+		struct rtnl_link_stats64 *stats,
 		struct trampoline_hidden_args *hidden_args)
 {
 	int ret;
@@ -924,19 +1166,19 @@ struct rtnl_link_stats64 *ndo_get_stats64_user(struct net_device *dev,
 		LIBLCD_ERR("thc_ipc_call");
 		goto fail_ipc;
 	}
-	storage->tx_packets = fipc_get_reg1(response);
-	storage->tx_bytes = fipc_get_reg2(response);
+	stats->tx_packets += fipc_get_reg1(response);
+	stats->tx_bytes += fipc_get_reg2(response);
 
 	fipc_recv_msg_end(thc_channel_to_fipc(hidden_args->async_chnl), response);
 
 fail_ipc:
 fail_async:
 	lcd_exit(0);
-	return storage;
+	return stats;
 }
 
 //DONE
-struct rtnl_link_stats64 *ndo_get_stats64(struct net_device *dev, struct rtnl_link_stats64 *storage, struct trampoline_hidden_args *hidden_args)
+struct rtnl_link_stats64 *ndo_get_stats64(struct net_device *dev, struct rtnl_link_stats64 *stats, struct trampoline_hidden_args *hidden_args)
 {
 	int ret;
 	struct fipc_message *request;
@@ -946,9 +1188,9 @@ struct rtnl_link_stats64 *ndo_get_stats64(struct net_device *dev, struct rtnl_li
 	if (!get_current()->ptstate) {
 		LIBLCD_MSG("%s:Called from userland - %p", __func__, dev);
 		LCD_MAIN( {
-			ndo_get_stats64_user(dev, storage, hidden_args);
+			ndo_get_stats64_user(dev, stats, hidden_args);
 		});
-		return storage;
+		return stats;
 	}
 
 	net_dev_container = container_of(dev, struct net_device_container, net_device);
@@ -968,24 +1210,24 @@ struct rtnl_link_stats64 *ndo_get_stats64(struct net_device *dev, struct rtnl_li
 		LIBLCD_ERR("thc_ipc_call");
 		goto fail_ipc;
 	}
-	storage->tx_packets = fipc_get_reg1(response);
-	storage->tx_bytes = fipc_get_reg2(response);
+	stats->tx_packets = fipc_get_reg1(response);
+	stats->tx_bytes = fipc_get_reg2(response);
 
 	fipc_recv_msg_end(thc_channel_to_fipc(hidden_args->async_chnl), response);
 
 fail_ipc:
 fail_async:
-	return storage;
+	return stats;
 }
 
 LCD_TRAMPOLINE_DATA(ndo_get_stats64_trampoline);
-struct rtnl_link_stats64 LCD_TRAMPOLINE_LINKAGE(ndo_get_stats64_trampoline) *ndo_get_stats64_trampoline(struct net_device *dev, struct rtnl_link_stats64 *storage)
+struct rtnl_link_stats64 LCD_TRAMPOLINE_LINKAGE(ndo_get_stats64_trampoline) *ndo_get_stats64_trampoline(struct net_device *dev, struct rtnl_link_stats64 *stats)
 {
 	struct rtnl_link_stats64* ( *volatile ndo_get_stats64_fp )(struct net_device *, struct rtnl_link_stats64 *, struct trampoline_hidden_args *);
 	struct trampoline_hidden_args *hidden_args;
 	LCD_TRAMPOLINE_PROLOGUE(hidden_args, ndo_get_stats64_trampoline);
 	ndo_get_stats64_fp = ndo_get_stats64;
-	return ndo_get_stats64_fp(dev, storage, hidden_args);
+	return ndo_get_stats64_fp(dev, stats, hidden_args);
 
 }
 
@@ -1353,20 +1595,30 @@ fail8:
 void setup(struct net_device *dev, struct trampoline_hidden_args *hidden_args)
 {
 	int ret;
-	int err;
-	struct fipc_message *request;
-	struct fipc_message *response;
+	struct fipc_message *_request;
+	struct fipc_message *_response;
 	struct setup_container *setup_container;
 	struct net_device_container *net_dev_container;
 	struct net_device_ops_container *netdev_ops_container;
+	struct page *p;
+	unsigned int pool_ord;
+	cptr_t pool_cptr;
+	uint32_t request_cookie;
 
-	net_dev_container = container_of(dev, struct net_device_container, net_device);
-	ret = async_msg_blocking_send_start(hidden_args->async_chnl, &request);
+	net_dev_container = container_of(dev,
+			struct net_device_container,
+			net_device);
+
+	ret = async_msg_blocking_send_start(
+			hidden_args->async_chnl,
+			&_request);
+
 	if (ret) {
 		LIBLCD_ERR("failed to get a send slot");
 		goto fail_async;
 	}
-	async_msg_set_fn_type(request, SETUP);
+
+	async_msg_set_fn_type(_request, SETUP);
 
 	netdev_ops_container = kzalloc(sizeof(*netdev_ops_container), GFP_KERNEL);
 	if (!netdev_ops_container) {
@@ -1391,26 +1643,68 @@ void setup(struct net_device *dev, struct trampoline_hidden_args *hidden_args)
 
 	LIBLCD_MSG("%s sending setup_container cptr: other_ref %lu", __func__, setup_container->other_ref.cptr);
 	LIBLCD_MSG("%s sending netdev_cptr: %p my_ref %lu", __func__, dev, net_dev_container->my_ref.cptr);
-	fipc_set_reg1(request, net_dev_container->other_ref.cptr);
-	fipc_set_reg2(request, setup_container->other_ref.cptr);
-	fipc_set_reg3(request, net_dev_container->my_ref.cptr);
-	fipc_set_reg4(request, netdev_ops_container->my_ref.cptr);
+	fipc_set_reg1(_request, net_dev_container->other_ref.cptr);
+	fipc_set_reg2(_request, setup_container->other_ref.cptr);
+	fipc_set_reg3(_request, net_dev_container->my_ref.cptr);
+	fipc_set_reg4(_request, netdev_ops_container->my_ref.cptr);
 
-	err = thc_ipc_call(hidden_args->async_chnl, request, &response);
-	if (err) {
+	ret = thc_ipc_send_request(hidden_args->async_chnl,
+			_request,
+			&request_cookie);
+	if (ret) {
 		LIBLCD_ERR("thc_ipc_call");
 		goto fail_ipc;
 	}
 
-	net_dev_container->net_device.flags = fipc_get_reg1(response);
-	net_dev_container->net_device.priv_flags = fipc_get_reg2(response);
-	net_dev_container->net_device.features = fipc_get_reg3(response);
-	net_dev_container->net_device.hw_features = fipc_get_reg4(response);
-	net_dev_container->net_device.hw_enc_features = fipc_get_reg5(response);
+	p = virt_to_head_page(pool->pool);
 
-	netdev_ops_container->other_ref.cptr = fipc_get_reg6(response);
+        pool_ord = ilog2(roundup_pow_of_two((
+				pool->total_pages * PAGE_SIZE)
+				>> PAGE_SHIFT));
 
-	fipc_recv_msg_end(thc_channel_to_fipc(hidden_args->async_chnl), response);
+        ret = lcd_volunteer_pages(p, pool_ord, &pool_cptr);
+
+	if (ret) {
+		LIBLCD_ERR("volunteer shared region");
+		goto fail_vol;
+	}
+
+	pool_pfn_start = (unsigned long)pool->pool >> PAGE_SHIFT;
+	pool_pfn_end = pool_pfn_start + pool->total_pages;
+
+	printk("%s, pool pfn start %lu | end %lu\n", __func__,
+			pool_pfn_start, pool_pfn_end);
+
+	lcd_set_cr0(pool_cptr);
+	lcd_set_r0(pool_ord);
+
+	printk("%s, calling sync send", __func__);
+	ret = lcd_sync_send(hidden_args->sync_ep);
+	lcd_set_cr0(CAP_CPTR_NULL);
+
+	if (ret) {
+		LIBLCD_ERR("sync send");
+		goto fail_sync;
+	}
+
+	ret = thc_ipc_recv_response(hidden_args->async_chnl,
+			request_cookie,
+			&_response);
+
+	if (ret) {
+		LIBLCD_ERR("failed to recv ipc");
+		goto fail_ipc_rx;
+	}
+
+	net_dev_container->net_device.flags = fipc_get_reg1(_response);
+	net_dev_container->net_device.priv_flags = fipc_get_reg2(_response);
+	net_dev_container->net_device.features = fipc_get_reg3(_response);
+	net_dev_container->net_device.hw_features = fipc_get_reg4(_response);
+	net_dev_container->net_device.hw_enc_features = fipc_get_reg5(_response);
+
+	netdev_ops_container->other_ref.cptr = fipc_get_reg6(_response);
+
+	fipc_recv_msg_end(thc_channel_to_fipc(hidden_args->async_chnl), _response);
 
 	net_dev_container->net_device.netdev_ops = &netdev_ops_container->net_device_ops;
 
@@ -1419,8 +1713,11 @@ void setup(struct net_device *dev, struct trampoline_hidden_args *hidden_args)
 		= &g_ops_container->rtnl_link_ops;
 fail_alloc:
 fail_async:
+fail_sync:
+fail_vol:
 fail_insert:
 fail_ipc:
+fail_ipc_rx:
 	return;
 }
 
@@ -1984,26 +2281,65 @@ fail_alloc:
 //TODO:
 int consume_skb_callee(struct fipc_message *request, struct thc_channel *channel, struct glue_cspace *cspace, struct cptr sync_ep)
 {
-	int ret;
-	int err;
-	struct sk_buff_container *skb_container;
+	int ret = 0;
+	struct sk_buff_container *skb_c;
+	struct sk_buff *skb;
 	struct fipc_message *response;
 	unsigned 	int request_cookie;
-	request_cookie = thc_get_request_cookie(request);
-	fipc_recv_msg_end(thc_channel_to_fipc(net_async), request);
-	err = glue_cap_lookup_sk_buff_type(c_cspace, __cptr(fipc_get_reg1(request)), &skb_container);
-	if (err) {
-		LIBLCD_ERR("lookup");
-		lcd_exit(-1);
-	}
-	consume_skb(( &skb_container->sk_buff ));
-	if (async_msg_blocking_send_start(net_async, &response)) {
-		LIBLCD_ERR("error getting response msg");
-		return -EIO;
-	}
-	thc_ipc_reply(net_async, request_cookie, response);
-	return ret;
+	cptr_t skb_cptr, skbh_cptr;
+	bool revoke = false;
 
+	request_cookie = thc_get_request_cookie(request);
+
+	glue_lookup_skbuff(cptr_table,
+			__cptr(fipc_get_reg0(request)),
+			&skb_c);
+
+	fipc_recv_msg_end(thc_channel_to_fipc(channel),
+			request);
+
+	if (!skb_c) {
+		printk("%s, skb_c null\n", __func__);
+		goto skip;
+	} else {
+		skb = skb_c->skb;
+	}
+
+	WARN_ON(!skb);
+
+	if (!skb)
+		goto skip;
+
+	if (!skb->private) {
+		/* restore */
+		skb->head = skb_c->head;
+		skb->data = skb_c->data;
+
+		skb_cptr = skb_c->skb_cptr;
+		skbh_cptr = skb_c->skbh_cptr;
+		revoke = true;
+	}
+
+	consume_skb(skb_c->skb);
+
+	if (skb_c->tsk == current && revoke) {
+		lcd_cap_revoke(skb_cptr);
+		lcd_cap_revoke(skbh_cptr);
+		lcd_unvolunteer_pages(skb_cptr);
+		lcd_unvolunteer_pages(skbh_cptr);
+	}
+
+	glue_remove_skbuff(skb_c);
+	kfree(skb_c);
+
+skip:
+	if (async_msg_blocking_send_start(channel, &response)) {
+		LIBLCD_ERR("error getting response msg");
+		goto fail_async;
+	}
+	thc_ipc_reply(channel, request_cookie, response);
+fail_async:
+	return ret;
 }
 
 int trigger_exit_to_lcd(struct thc_channel *_channel)

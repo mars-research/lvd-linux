@@ -63,12 +63,15 @@ struct pcpu_dstats {
 	struct u64_stats_sync	syncp;
 };
 
+struct pcpu_dstats g_dstats;
+
 static struct rtnl_link_stats64 *dummy_get_stats64(struct net_device *dev,
 						   struct rtnl_link_stats64 *stats)
 {
-	//int i;
+#ifndef LCD_ISOLATE
+	int i;
 
-/*	for_each_possible_cpu(i) {
+	for_each_possible_cpu(i) {
 		const struct pcpu_dstats *dstats;
 		u64 tbytes, tpackets;
 		unsigned int start;
@@ -81,57 +84,46 @@ static struct rtnl_link_stats64 *dummy_get_stats64(struct net_device *dev,
 		} while (u64_stats_fetch_retry_irq(&dstats->syncp, start));
 		stats->tx_bytes += tbytes;
 		stats->tx_packets += tpackets;
-	}*/
-	stats->tx_bytes = 100;
-	stats->tx_packets = 0x5A5A;
+	}
+#else
+	stats->tx_bytes = g_dstats.tx_bytes;
+	stats->tx_packets = g_dstats.tx_packets;
+#endif
 	return stats;
 }
 
 static netdev_tx_t dummy_xmit(struct sk_buff *skb, struct net_device *dev)
 {
-/*	struct pcpu_dstats *dstats = this_cpu_ptr(dev->dstats);
+#ifndef LCD_ISOLATE
+	struct pcpu_dstats *dstats = this_cpu_ptr(dev->dstats);
 
 	u64_stats_update_begin(&dstats->syncp);
 	dstats->tx_packets++;
 	dstats->tx_bytes += skb->len;
 	u64_stats_update_end(&dstats->syncp);
-*/
-//	dev_kfree_skb(skb);
-
-	unsigned char nr_frags = skb_shinfo(skb)->nr_frags;
-	int i;
-	LIBLCD_MSG("LCD:\n\nskb %p | skb->len %d | skb->datalen %d\n"
-			   "skb->end %p | skb->head %p | skb->data %p\n"
-			   "truesize %d | headlen %d | pagelen %d",
-			skb, skb->len, skb->data_len,
-			skb_end_pointer(skb), skb->head, skb->data,
-			skb->truesize, skb_headlen(skb), skb_pagelen(skb));
-	for (i = 0; i < nr_frags; i++) {
-		skb_frag_t *frag = &skb_shinfo(skb)->frags[i];
-		LIBLCD_MSG("page 0x%X | size %d", skb_frag_page(frag), skb_frag_size(frag));
-	}
-
-	if (0) {
-		print_hex_dump(KERN_DEBUG, "pkt_data_lcd",
-                         DUMP_PREFIX_NONE, 16, 1,
-                         skb->data, skb->len, false);
-	}
-
+#else
+	g_dstats.tx_packets++;
+	g_dstats.tx_bytes += skb->len;
+#endif
+	dev_kfree_skb(skb);
 	return NETDEV_TX_OK;
 }
 
 static int dummy_dev_init(struct net_device *dev)
 {
-/*	dev->dstats = netdev_alloc_pcpu_stats(struct pcpu_dstats);
+#ifndef LCD_ISOLATE
+	dev->dstats = netdev_alloc_pcpu_stats(struct pcpu_dstats);
 	if (!dev->dstats)
 		return -ENOMEM;
-*/
+#endif
 	return 0;
 }
 
 static void dummy_dev_uninit(struct net_device *dev)
 {
-//	free_percpu(dev->dstats);
+#ifndef LCD_ISOLATE
+	free_percpu(dev->dstats);
+#endif
 }
 
 static int dummy_change_carrier(struct net_device *dev, bool new_carrier)
@@ -197,7 +189,7 @@ static void dummy_setup(struct net_device *dev)
 	dev->priv_flags |= IFF_LIVE_ADDR_CHANGE | IFF_NO_QUEUE;
 	dev->features	|= NETIF_F_SG | NETIF_F_FRAGLIST;
 	dev->features	|= NETIF_F_ALL_TSO | NETIF_F_UFO;
-	dev->features	|= NETIF_F_HW_CSUM | NETIF_F_HIGHDMA | NETIF_F_LLTX;
+	dev->features	|= NETIF_F_HW_CSUM | NETIF_F_HIGHDMA | NETIF_F_LLTX | NETIF_F_PRIV_DATA_POOL;
 	dev->features	|= NETIF_F_GSO_ENCAP_ALL;
 	dev->hw_features |= dev->features;
 	dev->hw_enc_features |= dev->features;
@@ -282,22 +274,21 @@ int dummy_init_module(void)
 	int i;
 	int err = 0;
 
-//	rtnl_lock();
+	rtnl_lock();
 	err = __rtnl_link_register(&dummy_link_ops_container.rtnl_link_ops);
 	if (err < 0)
 		goto out;
 
 	for (i = 0; i < numdummies && !err; i++) {
 		err = dummy_init_one();
-//		cond_resched();
+		cond_resched();
 	}
 
 	if (err < 0)
 		__rtnl_link_unregister(&dummy_link_ops_container.rtnl_link_ops);
 
 out:
-//	rtnl_unlock();
-//	dummy_done = 1;
+	rtnl_unlock();
 	return err;
 }
 

@@ -309,3 +309,6 @@ static inline void force_up_write(void *x)
  * the %gs segment register. */
 #undef get_current
 #define get_current() (current_task)
+
+#define rtnl_lock()	do { } while(0)
+#define rtnl_unlock()	do { } while(0)

@@ -916,7 +916,6 @@ int ndo_open_user(struct net_device *dev,
 		goto fail_ipc;
 	}
 	func_ret = fipc_get_reg1(_response);
-	printk("%s, returned %d\n", __func__, func_ret);
 	mod_timer(&service_timer, jiffies + msecs_to_jiffies(5000));
 	napi_enable(napi_q0);
 	fipc_recv_msg_end(thc_channel_to_fipc(hidden_args->async_chnl),
@@ -1252,6 +1251,7 @@ int ndo_start_xmit(struct sk_buff *skb,
 	}
 
 	skb_c->skb = skb;
+	skb_c->tsk = current;
 	glue_insert_skbuff(cptr_table, skb_c);
 
 	/* save original head, data */
@@ -3227,62 +3227,6 @@ int device_set_wakeup_enable_callee(struct fipc_message *_request,
 	return ret;
 }
 
-int eth_get_headlen_callee(struct fipc_message *_request,
-		struct thc_channel *_channel,
-		struct glue_cspace *cspace,
-		struct cptr sync_ep)
-{
-	int sync_ret;
-	unsigned 	long mem_order;
-	unsigned 	long data_offset;
-	cptr_t data_cptr;
-	gva_t data_gva;
-	unsigned 	int len;
-	int ret;
-	struct fipc_message *_response;
-	unsigned 	int request_cookie;
-	unsigned 	int func_ret;
-	request_cookie = thc_get_request_cookie(_request);
-	fipc_recv_msg_end(thc_channel_to_fipc(_channel),
-			_request);
-	sync_ret = lcd_cptr_alloc(&data_cptr);
-	if (sync_ret) {
-		LIBLCD_ERR("failed to get cptr");
-		lcd_exit(-1);
-	}
-	lcd_set_cr0(data_cptr);
-	sync_ret = lcd_sync_recv(sync_ep);
-	lcd_set_cr0(CAP_CPTR_NULL);
-	if (sync_ret) {
-		LIBLCD_ERR("failed to recv");
-		lcd_exit(-1);
-	}
-	mem_order = lcd_r0();
-	data_offset = lcd_r1();
-	sync_ret = lcd_map_virt(data_cptr,
-		mem_order,
-		&data_gva);
-	if (sync_ret) {
-		LIBLCD_ERR("failed to map void *data");
-		lcd_exit(-1);
-	}
-	len = fipc_get_reg1(_request);
-	func_ret = eth_get_headlen(( void  * )( ( gva_val(data_gva) ) + ( data_offset ) ),
-		len);
-	if (async_msg_blocking_send_start(_channel,
-		&_response)) {
-		LIBLCD_ERR("error getting response msg");
-		return -EIO;
-	}
-	fipc_set_reg1(_response,
-			func_ret);
-	thc_ipc_reply(_channel,
-			request_cookie,
-			_response);
-	return ret;
-
-}
-
 int netif_tx_stop_all_queues_callee(struct fipc_message *_request,
 		struct thc_channel *_channel,
 		struct glue_cspace *cspace,
@@ -3855,7 +3799,6 @@ int trigger_exit_to_lcd(struct thc_channel *_channel)
 	int ret;
 	unsigned int request_cookie;
 
-	dump_stack();
 	ret = async_msg_blocking_send_start(_channel,
 		&_request);
 	if (ret) {
@@ -4768,6 +4711,8 @@ int netif_receive_skb_callee(struct fipc_message *_request,
 	return ret;
 }
 
+extern struct lcd *iommu_lcd;
+
 int napi_gro_receive_callee(struct fipc_message *_request,
 		struct thc_channel *_channel,
 		struct glue_cspace *cspace,
@@ -4862,12 +4807,10 @@ int __napi_alloc_skb_callee(struct fipc_message *_request,
 		LIBLCD_MSG("skb_c allocation failed");
 		goto fail_alloc;
 	}
-
+	skb_c->tsk = current;
 	skb_c->skb = skb;
 	skb_c->head = skb->head;
 	skb_c->data = skb->data;
-	LIBLCD_MSG("%s, skb alloc for %d | skb->dev %p",
-		__func__, len, skb->dev);
 
 	glue_insert_skbuff(cptr_table, skb_c);
 
@@ -4880,6 +4823,9 @@ int __napi_alloc_skb_callee(struct fipc_message *_request,
 
 	skb_c->skb_ord = skb_ord;
 	skb_c->skbd_ord = skbd_ord;
+	skb_c->skb_cptr = skb_cptr;
+	skb_c->skbh_cptr = skbd_cptr;
+
 	/* sync half */
 	lcd_set_cr0(skb_cptr);
 	lcd_set_cr1(skbd_cptr);
@@ -4952,7 +4898,6 @@ int eth_type_trans_callee(struct fipc_message *_request,
 
 	func_ret = eth_type_trans(skb,
 		( &dev_container->net_device ));
-	LIBLCD_MSG("%s, got %x", __func__, func_ret);
 
 	/* save */
 	skb_c->head = skb->head;
@@ -4970,5 +4915,134 @@ int eth_type_trans_callee(struct fipc_message *_request,
 			_response);
 	return ret;
 fail_lookup:
+	return ret;
+}
+
+int skb_add_rx_frag_callee(struct fipc_message *_request,
+		struct thc_channel *_channel,
+		struct glue_cspace *cspace,
+		struct cptr sync_ep,
+		cptr_t lcd_cptr)
+{
+	struct sk_buff *skb;
+	int i;
+	unsigned 	long page;
+	int off;
+	int size;
+	unsigned 	int truesize;
+	int ret;
+	struct fipc_message *_response;
+	unsigned 	int request_cookie;
+	cptr_t skb_ref;
+	struct sk_buff_container *skb_c;
+	struct lcd *lcd_struct;
+	hva_t hva_out;
+
+	request_cookie = thc_get_request_cookie(_request);
+
+	skb_ref = __cptr(fipc_get_reg0(_request));
+	i = fipc_get_reg1(_request);
+	page = fipc_get_reg2(_request);
+	off = fipc_get_reg3(_request);
+	size = fipc_get_reg4(_request);
+	truesize = fipc_get_reg5(_request);
+
+	fipc_recv_msg_end(thc_channel_to_fipc(_channel),
+			_request);
+
+	glue_lookup_skbuff(cptr_table, skb_ref, &skb_c);
+
+	skb = skb_c->skb;
+
+	lcd_struct = iommu_lcd;
+
+	ret = lcd_arch_ept_gpa_to_hva(lcd_struct->lcd_arch, __gpa(page), &hva_out);
+	if (ret) {
+		LIBLCD_WARN("Couldn't get gpa:hpa mapping");
+		goto reply;
+	}
+
+	printk("got gpa:hpa %lx:%lx from ept\n", page,
+		hva_val(hva_out));
+
+	/* restore */
+	skb->head = skb_c->head;
+	skb->data = skb_c->data;
+	LIBLCD_MSG("%s ,calling real function", __func__);
+	skb_add_rx_frag(skb,
+			i,
+			virt_to_page(hva_val(hva_out)),
+			off,
+			size,
+			truesize);
+
+	/* XXX: Is it ok to mess up with page ref?
+	 * In the native driver, they do it. But with all our
+	 * hpa:gpa stuff, I am skeptical if this is correct.
+	 * If there are any page related bugs, this can be the
+	 * reason.
+	 */
+	page_ref_inc(virt_to_page(hva_val(hva_out)));
+
+	/* save */
+	skb_c->head = skb->head;
+	skb_c->data = skb->data;
+
+reply:
+	if (async_msg_blocking_send_start(_channel,
+		&_response)) {
+		LIBLCD_ERR("error getting response msg");
+		return -EIO;
+	}
+	thc_ipc_reply(_channel,
+			request_cookie,
+			_response);
+	return ret;
+}
+
+int eth_get_headlen_callee(struct fipc_message *_request,
+		struct thc_channel *_channel,
+		struct glue_cspace *cspace,
+		struct cptr sync_ep)
+{
+	unsigned 	long data;
+	unsigned 	int len;
+	int ret = 0;
+	struct fipc_message *_response;
+	unsigned 	int request_cookie;
+	unsigned 	int func_ret;
+	struct lcd *lcd_struct;
+	hva_t hva_out;
+
+	request_cookie = thc_get_request_cookie(_request);
+	fipc_recv_msg_end(thc_channel_to_fipc(_channel),
+			_request);
+	data = fipc_get_reg1(_request);
+	len = fipc_get_reg2(_request);
+
+	lcd_struct = iommu_lcd;
+
+	printk("req gpa %lx from ept\n", data);
+
+	ret = lcd_arch_ept_gpa_to_hva(lcd_struct->lcd_arch, __gpa(data), &hva_out);
+	if (ret) {
+		LIBLCD_WARN("Couldn't get gpa:hpa mapping");
+		goto reply;
+	}
+
+	func_ret = eth_get_headlen((void *)hva_val(hva_out),
+		len);
+reply:
+	ret = 0;
+	if (async_msg_blocking_send_start(_channel,
+		&_response)) {
+		LIBLCD_ERR("error getting response msg");
+		return -EIO;
+	}
+	fipc_set_reg1(_response,
+			func_ret);
+	thc_ipc_reply(_channel,
+			request_cookie,
+			_response);
 	return ret;
 }

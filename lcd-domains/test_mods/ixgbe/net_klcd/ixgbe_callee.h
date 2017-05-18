@@ -227,7 +227,10 @@ int eth_type_trans_callee(struct fipc_message *_request,
 		struct thc_channel *_channel,
 		struct glue_cspace *cspace,
 		struct cptr sync_ep);
-
+int skb_add_rx_frag_callee(struct fipc_message *_request,
+		struct thc_channel *_channel,
+		struct glue_cspace *cspace,
+		struct cptr sync_ep);
 int dispatch_sync_loop(void);
 
 int dispatch_async_loop(struct thc_channel *_channel,

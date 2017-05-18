@@ -62,6 +62,7 @@ struct sk_buff_container {
 	struct hlist_node hentry;
 	struct cptr other_ref;
 	struct cptr my_ref;
+	struct task_struct *tsk;
 };
 
 struct trampoline_hidden_args {

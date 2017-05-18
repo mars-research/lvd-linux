@@ -43,7 +43,6 @@ enum dispatch_t {
 	DEV_ADDR_ADD,
 	DEV_ADDR_DEL,
 	DEVICE_SET_WAKEUP_ENABLE,
-	ETH_GET_HEADLEN,
 	NETIF_TX_STOP_ALL_QUEUES,
 	NETIF_TX_WAKE_ALL_QUEUES,
 	NETIF_NAPI_ADD,
@@ -53,6 +52,8 @@ enum dispatch_t {
 	NAPI_GRO_RECEIVE,
 	__NAPI_ALLOC_SKB,
 	ETH_TYPE_TRANS,
+	SKB_ADD_RX_FRAG,
+	ETH_GET_HEADLEN,
 	PCI_DISABLE_PCIE_ERROR_REPORTING,
 	PCI_BUS_READ_CONFIG_WORD,
 	PCI_BUS_WRITE_CONFIG_WORD,
@@ -168,6 +169,4 @@ async_msg_blocking_send_start(struct thc_channel *chnl,
 			return -EIO;
 	}
 }
-
-
 #endif /* __IXGBE_COMMON_H__ */

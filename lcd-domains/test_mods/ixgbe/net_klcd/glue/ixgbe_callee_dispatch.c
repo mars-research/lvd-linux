@@ -126,14 +126,12 @@ int dispatch_async_loop(struct thc_channel *_channel,
 		sync_ep);
 
 		case CONSUME_SKB:
-			trace(CONSUME_SKB);
 			return consume_skb_callee(message,
 		_channel,
 		cspace,
 		sync_ep);
 
 		case NAPI_CONSUME_SKB:
-			trace(NAPI_CONSUME_SKB);
 			return napi_consume_skb_callee(message,
 		_channel,
 		cspace,
@@ -375,33 +373,35 @@ int dispatch_async_loop(struct thc_channel *_channel,
 		sync_ep);
 
 		case NETIF_RECEIVE_SKB:
-			trace(NETIF_RECEIVE_SKB);
 			return netif_receive_skb_callee(message,
 		_channel,
 		cspace,
 		sync_ep);
 
 		case NAPI_GRO_RECEIVE:
-			trace(NAPI_GRO_RECEIVE);
 			return napi_gro_receive_callee(message,
 		_channel,
 		cspace,
 		sync_ep);
 
 		case __NAPI_ALLOC_SKB:
-			trace(__NAPI_ALLOC_SKB);
 			return __napi_alloc_skb_callee(message,
 		_channel,
 		cspace,
 		sync_ep);
 
 		case ETH_TYPE_TRANS:
-			trace(ETH_TYPE_TRANS);
 			return eth_type_trans_callee(message,
 		_channel,
 		cspace,
 		sync_ep);
 
+		case SKB_ADD_RX_FRAG:
+			trace(SKB_ADD_RX_FRAG);
+			return skb_add_rx_frag_callee(message,
+		_channel,
+		cspace,
+		sync_ep);
 
 		default:
 			LIBLCD_ERR("unexpected function label: %d",
@@ -412,4 +412,3 @@ int dispatch_async_loop(struct thc_channel *_channel,
 	return 0;
 
 }
-

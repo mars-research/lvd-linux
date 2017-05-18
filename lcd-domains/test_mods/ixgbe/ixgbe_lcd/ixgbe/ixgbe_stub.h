@@ -54,9 +54,6 @@ int pskb_expand_head(struct sk_buff *skb, int nhead, int ntail, gfp_t gfp_mask) 
 
 unsigned char *__pskb_pull_tail(struct sk_buff *skb, int delta) { LIBLCD_MSG("================>$$$$$$ Dummy %s called", __func__); return (char*)skb; }
 
-void skb_add_rx_frag(struct sk_buff *skb, int i, struct page *page, int off,
-		     int size, unsigned int truesize) { LIBLCD_MSG("================>$$$$$$ Dummy %s called", __func__); }
-
 void netdev_rss_key_fill(void *buffer, size_t len) { LIBLCD_MSG("================>$$$$$$ Dummy %s called", __func__); }
 
 unsigned long dev_trans_start(struct net_device *dev)

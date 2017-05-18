@@ -31,7 +31,6 @@ int dispatch_async_loop(struct thc_channel *_channel,
 		sync_ep);
 
 		case NDO_START_XMIT:
-			trace(NDO_START_XMIT);
 			return ndo_start_xmit_callee(message,
 		_channel,
 		cspace,
@@ -115,7 +114,6 @@ int dispatch_async_loop(struct thc_channel *_channel,
 		sync_ep);
 
 		case SERVICE_EVENT_SCHED:
-			trace(SERVICE_EVENT_SCHED);
 			return ixgbe_service_event_schedule_callee(message,
 		_channel,
 		cspace,

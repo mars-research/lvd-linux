@@ -122,7 +122,6 @@ extern struct napi_struct *napi_q0;
 irqreturn_t msix_clean_rings_host(int irq, void *data)
 {
 	struct net_info *net;
-	printk("%s,.\n", __func__);
 	if (__get_net(&net)) {
 		napi_schedule_irqoff(napi_q0);
 	}
@@ -237,7 +236,6 @@ fail1:
 }
 #define REGISTER_FREQ	50
 
-
 static void loop(cptr_t register_chnl)
 {
 	unsigned long tics = jiffies + REGISTER_FREQ;
@@ -245,11 +243,12 @@ static void loop(cptr_t register_chnl)
 	struct net_info *net;
 	int stop = 0;
 	int ret;
+	bool reg_done = false;
 
 	DO_FINISH(
 
 		while (!stop) {
-			if (jiffies >= tics) {
+			if (jiffies >= tics && !reg_done) {
 				/*
 				 * Listen for a register call
 				 */
@@ -257,6 +256,8 @@ static void loop(cptr_t register_chnl)
 				if (ret) {
 					LIBLCD_ERR("register error");
 					break;
+				} else {
+					reg_done = true;
 				}
 				tics = jiffies + REGISTER_FREQ;
 				continue;
@@ -323,6 +324,8 @@ static void loop(cptr_t register_chnl)
 
 /* INIT / EXIT ---------------------------------------- */
 struct cspace *klcd_cspace;
+struct task_struct *task_klcd;
+
 static int net_klcd_init(void)
 {
 	int ret;
@@ -345,12 +348,14 @@ static int net_klcd_init(void)
 		goto fail2;
 	}
 	LIBLCD_MSG("==========> got cptr %lu\n", net_chnl.cptr);
+
 	/* save cspace for future use
 	 * when userspace functions call function pointers,
 	 * we need to get access to the sync_ep of this klcd
 	 * to transfer pointers and data thro sync IPC to the lcd
 	 */
 	klcd_cspace = get_current_cspace(current);
+	task_klcd = current;
 	/*
 	 * Init net glue
 	 */

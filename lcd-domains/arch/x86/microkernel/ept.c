@@ -434,7 +434,7 @@ int lcd_arch_ept_gpa_to_hpa(struct lcd_arch *lcd, gpa_t ga, hpa_t *ha_out, bool 
 
 	return 0;
 }
-
+EXPORT_SYMBOL(lcd_arch_ept_gpa_to_hpa);
 /**
  * Recursively frees all present entries in dir at level, and
  * the page containing the dir. The recursion depth is limited to 3 - 4 stack

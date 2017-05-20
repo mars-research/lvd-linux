@@ -14,12 +14,14 @@
 #include <liblcd/glue_cspace.h>
 #include <liblcd/liblcd.h>
 #include <liblcd/sync_ipc_poll.h>
+#include <linux/priv_mempool.h>
 
 #include "ixgbe_glue_helper.h"
 
 #define PCI_REGIONS
 #define IOMMU_ASSIGN
 #define HOST_IRQ
+#define NAPI_CONSUME_SEND_ONLY
 
 enum dispatch_t {
 	__PCI_REGISTER_DRIVER,
@@ -103,6 +105,16 @@ typedef enum {
 	UC_LIST = 2,
 } addr_list;
 
+typedef enum {
+	VOLUNTEER_XMIT = 1,
+	SHARED_DATA_XMIT = 2,
+} xmit_type_t;
+
+typedef enum {
+	IXGBE_POLL_RUNNING,
+	IXGBE_POLL_STOPPED,
+} ixgbe_poll_state_t;
+
 #define MAC_ADDR_DUMP(addr)	\
 	do { \
 	int _i; \
@@ -116,6 +128,31 @@ typedef enum {
 struct pcidev_info {
 	unsigned int domain, bus, slot, fn;
 };
+
+struct skbuff_members {
+	unsigned int        len, data_len;
+	__u16               queue_mapping;
+	__u8                xmit_more:1,
+			ip_summed:2;
+	__u16		network_header;
+	__u16			transport_header;
+	union {
+		__wsum		csum;
+		struct {
+			__u16	csum_start;
+			__u16	csum_offset;
+		};
+	};
+	sk_buff_data_t      tail;
+	sk_buff_data_t      end;
+	unsigned int 	head_data_off;
+	unsigned int        truesize;
+} __attribute__((aligned));
+
+#define SKB_LCD_MEMBERS(SKB)	((struct skbuff_members*)((char*)skb_end_pointer(SKB) - (char*)SKB_LCD_MEMBERS_SZ))
+
+#define C(x)	skb_lcd->x = skb->x
+#define P(x)	skb->x = skb_lcd->x
 
 /* CSPACES ------------------------------------------------------------ */
 int glue_cap_init(void);

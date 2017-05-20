@@ -63,24 +63,25 @@ void glue_ixgbe_exit(void)
 
 int glue_insert_skbuff(struct hlist_head *htable, struct sk_buff_container *skb_c)
 {
-        BUG_ON(!skb_c->skb);
+	BUG_ON(!skb_c->skb);
 
-        skb_c->my_ref = __cptr((unsigned long)skb_c->skb);
+	skb_c->my_ref = __cptr((unsigned long)skb_c->skb);
 
-        hash_add(cptr_table, &skb_c->hentry, (unsigned long) skb_c->skb);
-        return 0;
+	hash_add(cptr_table, &skb_c->hentry,
+			(unsigned long) skb_c->skb);
+	return 0;
 }
 
 int glue_lookup_skbuff(struct hlist_head *htable, struct cptr c, struct sk_buff_container **skb_cout)
 {
-        struct sk_buff_container *skb_c;
+	struct sk_buff_container *skb_c;
 
-        hash_for_each_possible(cptr_table, skb_c, hentry, (unsigned long) cptr_val(c)) {
-		if (skb_c->skb == (struct sk_buff*) c.cptr) {
-	                *skb_cout = skb_c;
-		}
-        }
-        return 0;
+	hash_for_each_possible(cptr_table, skb_c,
+			hentry, (unsigned long) cptr_val(c)) {
+		if (skb_c->skb == (struct sk_buff*) c.cptr)
+			*skb_cout = skb_c;
+	}
+	return 0;
 }
 
 void glue_remove_skbuff(struct sk_buff_container *skb_c)
@@ -560,6 +561,7 @@ fail_ipc:
 /* FIXME: Handle this without extern */
 extern struct pci_driver_container ixgbe_driver_container;
 u64 dma_mask = 0;
+void *data_pool;
 
 int probe_callee(struct fipc_message *_request,
 		struct thc_channel *_channel,
@@ -581,18 +583,11 @@ int probe_callee(struct fipc_message *_request,
 	gpa_t gpa_addr;
 	unsigned int res0_len;
 	void *dev_resource_0;
+	cptr_t pool_cptr;
+	gva_t pool_addr;
+	unsigned int pool_ord;
 #endif
 
-#ifdef IOMMU_ASSIGN
-	devfn = PCI_DEVFN(dev_assign.slot, dev_assign.fn);
-
-	ret = lcd_syscall_assign_device(dev_assign.domain,
-				dev_assign.bus,
-				devfn);
-	if (ret)
-		LIBLCD_ERR("Could not assign pci device to LCD: ret %d",
-				ret);
-#endif
 
 	LIBLCD_MSG("%s called", __func__);
 	request_cookie = thc_get_request_cookie(_request);
@@ -627,15 +622,25 @@ int probe_callee(struct fipc_message *_request,
 		goto fail_cptr;
 	}
 
+	ret = lcd_cptr_alloc(&pool_cptr);
+	if (ret) {
+		LIBLCD_ERR("failed to get cptr");
+		goto fail_cptr;
+	}
+
 	lcd_set_cr0(res0_cptr);
+	lcd_set_cr1(pool_cptr);
 	ret = lcd_sync_recv(ixgbe_sync_endpoint);
 	lcd_set_cr0(CAP_CPTR_NULL);
+	lcd_set_cr1(CAP_CPTR_NULL);
+
 	/* resource len */
 	res0_len = lcd_r0();
 	if (ret) {
 		LIBLCD_ERR("failed to recv sync");
 		goto fail_sync;
 	}
+	pool_ord = lcd_r1();
 
 	ret = lcd_ioremap_phys(res0_cptr, res0_len, &gpa_addr);
 	if (ret) {
@@ -651,6 +656,32 @@ int probe_callee(struct fipc_message *_request,
 	dev_container->pci_dev.resource[0].start = (resource_size_t) dev_resource_0;
 	dev_container->pci_dev.resource[0].end = (resource_size_t)((char*)dev_resource_0 + res0_len - 1);
 	LIBLCD_MSG("%s: status reg 0x%X\n", __func__, *(unsigned int *)((char*)dev_resource_0 + 0x8));
+
+	ret = lcd_map_virt(pool_cptr, pool_ord, &pool_addr);
+	if (ret) {
+		LIBLCD_ERR("failed to map pool");
+		goto fail_pool;
+	}
+
+	LIBLCD_MSG("%s, mapping private pool %p | ord %d", __func__,
+			gva_val(pool_addr), pool_ord);
+
+	data_pool = (void*)gva_val(pool_addr);
+#endif
+
+#ifdef IOMMU_ASSIGN
+	devfn = PCI_DEVFN(dev_assign.slot, dev_assign.fn);
+
+	/* assign the device after we map the memory so that
+	 * all the rammapped pages are automatically keyed
+	 * into the iommu hardware
+	 */
+	ret = lcd_syscall_assign_device(dev_assign.domain,
+				dev_assign.bus,
+				devfn);
+	if (ret)
+		LIBLCD_ERR("Could not assign pci device to LCD: ret %d",
+				ret);
 #endif
 
 	/* XXX: Pass null for now. struct pci_dev is passed from the
@@ -675,6 +706,7 @@ fail_alloc:
 fail_sync:
 fail_insert:
 fail_cptr:
+fail_pool:
 #endif
 	return ret;
 }
@@ -1198,10 +1230,14 @@ void napi_consume_skb(struct sk_buff *skb, int budget)
 {
 	int ret;
 	struct fipc_message *_request;
-	struct fipc_message *_response;
 	unsigned long skb_sz, skb_off, skbh_sz, skbh_off;
 	cptr_t skb_cptr, skbh_cptr;
 	struct sk_buff_container *skb_c;
+#ifdef NAPI_CONSUME_SEND_ONLY
+	uint32_t request_cookie;
+#else
+	struct fipc_message *_response;
+#endif
 
 	ret = async_msg_blocking_send_start(ixgbe_async,
 		&_request);
@@ -1219,67 +1255,75 @@ void napi_consume_skb(struct sk_buff *skb, int budget)
 	fipc_set_reg0(_request, skb_c->other_ref.cptr);
 	fipc_set_reg1(_request, budget);
 
-	ret = lcd_virt_to_cptr(__gva((unsigned long)skb),
-		&skb_cptr,
-		&skb_sz,
-		&skb_off);
-	if (ret) {
-		LIBLCD_ERR("lcd_virt_to_cptr");
-		goto fail_virt;
-	}
+	if (!skb->private) {
+		ret = lcd_virt_to_cptr(__gva((unsigned long)skb),
+			&skb_cptr,
+			&skb_sz,
+			&skb_off);
+		if (ret) {
+			LIBLCD_ERR("lcd_virt_to_cptr");
+			goto fail_virt;
+		}
 
-	ret = lcd_virt_to_cptr(__gva((unsigned long)skb->head),
-		&skbh_cptr,
-		&skbh_sz,
-		&skbh_off);
-	if (ret) {
-		LIBLCD_ERR("lcd_virt_to_cptr");
-		goto fail_virt;
-	}
+		ret = lcd_virt_to_cptr(__gva((unsigned long)skb->head),
+			&skbh_cptr,
+			&skbh_sz,
+			&skbh_off);
+		if (ret) {
+			LIBLCD_ERR("lcd_virt_to_cptr");
+			goto fail_virt;
+		}
 
 #ifdef IOMMU_ASSIGN
-	LIBLCD_MSG("unmap skb->head address %p | pa %p | gpa %p | "
-		   "size %d | ord %d",
-			skb->head,
-			__pa(skb->head - skbh_off),
-			gpa_val(lcd_gva2gpa(__gva(
-				(unsigned long)(void*)skb->head - skbh_off))),
-			skbh_sz, get_order(skbh_sz));
-	ret = lcd_syscall_iommu_unmap_page(lcd_gva2gpa(__gva(
-		(unsigned long)((void*)skb->head - skbh_off))),
-		skb_c->skbd_ord);
-	if (ret)
-		LIBLCD_ERR("unMapping failed for packet %p",
-				__pa(skb->data));
+		LIBLCD_MSG("%s, unmap iommu page", __func__);
+		ret = lcd_syscall_iommu_unmap_page(lcd_gva2gpa(__gva(
+			(unsigned long)((void*)skb->head - skbh_off))),
+			skb_c->skbd_ord);
+		if (ret)
+			LIBLCD_ERR("unMapping failed for packet %p",
+					__pa(skb->data));
 #endif
 
-	lcd_unmap_virt(__gva((unsigned long)skb->head),
-			get_order(skbh_sz));
-	lcd_unmap_virt(__gva((unsigned long)skb),
-			get_order(skb_sz));
+		lcd_unmap_virt(__gva((unsigned long)skb->head),
+				get_order(skbh_sz));
+		lcd_unmap_virt(__gva((unsigned long)skb),
+				get_order(skb_sz));
 
-	lcd_cap_revoke(skb_cptr);
-	lcd_cap_revoke(skbh_cptr);
-	lcd_cap_delete(skb_cptr);
-	lcd_cap_delete(skbh_cptr);
+		lcd_cap_delete(skb_c->skb_cptr);
+		lcd_cap_delete(skb_c->skbh_cptr);
+	} else {
+		/* free skb memory that was allocate by us */
+		kfree(skb);
+	}
 
-	glue_remove_skbuff(skb_c);
-	kfree(skb_c);
+#ifdef NAPI_CONSUME_SEND_ONLY
+	ret = thc_ipc_send_request(ixgbe_async,
+		_request,
+		&request_cookie);
+#else
 	ret = thc_ipc_call(ixgbe_async,
 		_request,
 		&_response);
+#endif
+	printk("napi_consume_skb returns to lcd\n");
+	glue_remove_skbuff(skb_c);
+	kfree(skb_c);
+
 	if (ret) {
 		LIBLCD_ERR("thc_ipc_call");
 		goto fail_ipc;
 	}
+#ifdef NAPI_CONSUME_SEND_ONLY
+	thc_kill_request_cookie(request_cookie);
+#else
 	fipc_recv_msg_end(thc_channel_to_fipc(ixgbe_async),
 			_response);
+#endif
 	return;
 fail_async:
 fail_ipc:
 fail_virt:
 	return;
-
 }
 
 void consume_skb(struct sk_buff *skb)
@@ -1306,37 +1350,42 @@ void consume_skb(struct sk_buff *skb)
 
 	fipc_set_reg0(_request, skb_c->other_ref.cptr);
 
-	ret = lcd_virt_to_cptr(__gva((unsigned long)skb),
-		&skb_cptr,
-		&skb_sz,
-		&skb_off);
-	if (ret) {
-		LIBLCD_ERR("lcd_virt_to_cptr");
-		goto fail_virt;
-	}
+	if (!skb->private) {
+		ret = lcd_virt_to_cptr(__gva((unsigned long)skb),
+			&skb_cptr,
+			&skb_sz,
+			&skb_off);
+		if (ret) {
+			LIBLCD_ERR("lcd_virt_to_cptr");
+			goto fail_virt;
+		}
 
-	ret = lcd_virt_to_cptr(__gva((unsigned long)skb->head),
-		&skbh_cptr,
-		&skbh_sz,
-		&skbh_off);
-	if (ret) {
-		LIBLCD_ERR("lcd_virt_to_cptr");
-		goto fail_virt;
-	}
+		ret = lcd_virt_to_cptr(__gva((unsigned long)skb->head),
+			&skbh_cptr,
+			&skbh_sz,
+			&skbh_off);
+		if (ret) {
+			LIBLCD_ERR("lcd_virt_to_cptr");
+			goto fail_virt;
+		}
 
 #ifdef IOMMU_ASSIGN
-	ret = lcd_syscall_iommu_unmap_page(lcd_gva2gpa(__gva((unsigned long) skb->head)),
-				get_order(skbh_sz));
-	if (ret)
-		LIBLCD_ERR("unMapping failed for packet %p",
-				__pa(skb->data));
+		LIBLCD_MSG("%s, unmap iommu page", __func__);
+		ret = lcd_syscall_iommu_unmap_page(lcd_gva2gpa(__gva((unsigned long) skb->head)),
+					get_order(skbh_sz));
+		if (ret)
+			LIBLCD_ERR("unMapping failed for packet %p",
+					__pa(skb->data));
 #endif
 
-	lcd_unmap_virt(__gva((unsigned long)skb->head), get_order(skb_sz));
-	lcd_unmap_virt(__gva((unsigned long)skb), get_order(skbh_sz));
+		lcd_unmap_virt(__gva((unsigned long)skb->head), get_order(skb_sz));
+		lcd_unmap_virt(__gva((unsigned long)skb), get_order(skbh_sz));
 
-	lcd_cap_delete(skb_cptr);
-	lcd_cap_delete(skbh_cptr);
+		lcd_cap_delete(skb_c->skb_cptr);
+		lcd_cap_delete(skb_c->skbh_cptr);
+	} else {
+		kfree(skb);
+	}
 
 	glue_remove_skbuff(skb_c);
 	kfree(skb_c);
@@ -2312,8 +2361,15 @@ int ndo_start_xmit_callee(struct fipc_message *_request,
 	gva_t skb_gva, skbd_gva;
 	unsigned int data_off;
 	cptr_t skb_ref;
+	xmit_type_t xmit_type;
+	unsigned long skbh_offset, skb_end;
+	struct skbuff_members *skb_lcd;
+	__be16 proto;
 
 	request_cookie = thc_get_request_cookie(_request);
+
+	xmit_type = fipc_get_reg0(_request);
+
 	ret = glue_cap_lookup_net_device_type(cspace,
 		__cptr(fipc_get_reg1(_request)),
 		&dev_container);
@@ -2324,74 +2380,132 @@ int ndo_start_xmit_callee(struct fipc_message *_request,
 
 	skb_ref = __cptr(fipc_get_reg2(_request));
 
+	skbh_offset = fipc_get_reg3(_request);
+
+	skb_end = fipc_get_reg4(_request);
+	proto = fipc_get_reg5(_request);
+
 	fipc_recv_msg_end(thc_channel_to_fipc(_channel),
 			_request);
 
-	ret = lcd_cptr_alloc(&skb_cptr);
+	switch (xmit_type) {
+	case VOLUNTEER_XMIT:
+		ret = lcd_cptr_alloc(&skb_cptr);
 
-	if (ret) {
-		LIBLCD_ERR("failed to get cptr");
-		goto fail_sync;
-	}
-	ret = lcd_cptr_alloc(&skbd_cptr);
-	if (ret) {
-		LIBLCD_ERR("failed to get cptr");
-		goto fail_sync;
+		if (ret) {
+			LIBLCD_ERR("failed to get cptr");
+			goto fail_sync;
+		}
+		ret = lcd_cptr_alloc(&skbd_cptr);
+		if (ret) {
+			LIBLCD_ERR("failed to get cptr");
+			goto fail_sync;
+		}
+
+		lcd_set_cr0(skb_cptr);
+		lcd_set_cr1(skbd_cptr);
+		ret = lcd_sync_recv(sync_ep);
+		lcd_set_cr0(CAP_CPTR_NULL);
+		lcd_set_cr1(CAP_CPTR_NULL);
+		if (ret) {
+			LIBLCD_ERR("failed to recv");
+			goto fail_sync;
+		}
+		skb_ord = lcd_r0();
+		skb_off = lcd_r1();
+		skbd_ord = lcd_r2();
+		skbd_off = lcd_r3();
+		data_off = lcd_r4();
+
+		ret = lcd_map_virt(skb_cptr, skb_ord, &skb_gva);
+		if (ret) {
+			LIBLCD_ERR("failed to map void *addr");
+			goto fail_sync;
+		}
+
+		ret = lcd_map_virt(skbd_cptr, skbd_ord, &skbd_gva);
+		if (ret) {
+			LIBLCD_ERR("failed to map void *addr");
+			goto fail_sync;
+		}
+
+		skb = (void*)(gva_val(skb_gva) + skb_off);
+		skb->head = (void*)(gva_val(skbd_gva) + skbd_off);
+		skb->data = skb->head + data_off;
+		break;
+
+	case SHARED_DATA_XMIT:
+		skb = kzalloc(sizeof(struct sk_buff), GFP_KERNEL);
+
+		if (!skb) {
+			LIBLCD_MSG("out of mmeory");
+			goto fail_alloc;
+		}
+
+		skb->head = (char*)data_pool + skbh_offset;
+		skb->end = skb_end;
+
+		skb_lcd = SKB_LCD_MEMBERS(skb);
+		skb->private = true;
+
+		P(len);
+		P(data_len);
+		P(queue_mapping);
+		P(xmit_more);
+		P(tail);
+		P(truesize);
+		P(ip_summed);
+		P(csum_start);
+		P(network_header);
+		P(csum_offset);
+		P(transport_header);
+
+		if (0)
+		LIBLCD_MSG("lcd-> l: %d | dlen %d | qm %d"
+			   " | xm %d | t %lu |ts %u",
+			skb->len, skb->data_len, skb->queue_mapping,
+			skb->xmit_more, skb->tail, skb->truesize);
+
+		skb->data = skb->head + skb_lcd->head_data_off;
+
+		break;
+
+	default:
+		LIBLCD_ERR("%s, unknown xmit type", __func__);
+		break;
 	}
 
-	lcd_set_cr0(skb_cptr);
-	lcd_set_cr1(skbd_cptr);
-	ret = lcd_sync_recv(sync_ep);
-	lcd_set_cr0(CAP_CPTR_NULL);
-	lcd_set_cr1(CAP_CPTR_NULL);
-	if (ret) {
-		LIBLCD_ERR("failed to recv");
-		goto fail_sync;
-	}
-	skb_ord = lcd_r0();
-	skb_off = lcd_r1();
-	skbd_ord = lcd_r2();
-	skbd_off = lcd_r3();
-	data_off = lcd_r4();
-
-	ret = lcd_map_virt(skb_cptr, skb_ord, &skb_gva);
-	if (ret) {
-		LIBLCD_ERR("failed to map void *addr");
-		goto fail_sync;
-	}
-
-	ret = lcd_map_virt(skbd_cptr, skbd_ord, &skbd_gva);
-	if (ret) {
-		LIBLCD_ERR("failed to map void *addr");
-		goto fail_sync;
-	}
-
-	skb = (void*)(gva_val(skb_gva) + skb_off);
-	skb->head = (void*)(gva_val(skbd_gva) + skbd_off);
-	skb->data = skb->head + data_off;
 	skb_c = kzalloc(sizeof(*skb_c), GFP_KERNEL);
 
 	if (!skb_c)
 		LIBLCD_MSG("no memory");
+
 	skb_c->skb = skb;
-	skb_c->skbd_ord = skbd_ord;
 	glue_insert_skbuff(cptr_table, skb_c);
 
 	skb_c->other_ref = skb_ref;
 
-#ifdef IOMMU_ASSIGN
-	ret = lcd_syscall_iommu_map_page(lcd_gva2gpa(skbd_gva),
-				skbd_ord, true);
-	LIBLCD_MSG("%s, order %d | gva %p | gpa %p", __func__,
-			skbd_ord, gva_val(skbd_gva),
-			gpa_val(lcd_gva2gpa(skbd_gva)));
-	if (ret)
-		LIBLCD_ERR("Mapping failed for packet %p",
-				__pa(skb->data));
-#endif
+	if (xmit_type == VOLUNTEER_XMIT) {
+		skb_c->skbd_ord = skbd_ord;
+		skb_c->skb_cptr = skb_cptr;
+		skb_c->skbh_cptr = skbd_cptr;
 
-	func_ret = dev_container->net_device.netdev_ops->ndo_start_xmit(skb,
-		( &dev_container->net_device ));
+#ifdef IOMMU_ASSIGN
+		LIBLCD_MSG("%s, MAP iommu page", __func__);
+		ret = lcd_syscall_iommu_map_page(
+				lcd_gva2gpa(skbd_gva),
+				skbd_ord, true);
+
+		if (ret)
+			LIBLCD_ERR("Mapping failed for packet %p",
+					__pa(skb->data));
+#endif
+	} /* if */
+
+	func_ret = dev_container->net_device.
+			netdev_ops->ndo_start_xmit(
+			skb, &dev_container->net_device);
+
 	if (async_msg_blocking_send_start(_channel,
 		&_response)) {
 		LIBLCD_ERR("error getting response msg");
@@ -2402,8 +2516,7 @@ int ndo_start_xmit_callee(struct fipc_message *_request,
 	thc_ipc_reply(_channel,
 			request_cookie,
 			_response);
-	LIBLCD_MSG("%s returns %d", __func__, func_ret);
-
+fail_alloc:
 fail_lookup:
 fail_sync:
 	return ret;
@@ -2969,6 +3082,9 @@ int _request_irq(unsigned int irq, irq_handler_t handler, unsigned long flags, c
 		LIBLCD_ERR("failed to get a send slot");
 		goto fail_async;
 	}
+
+	printk("%s, irq # %d", __func__, irq);
+
 	async_msg_set_fn_type(_request,
 			REQUEST_IRQ);
 	fipc_set_reg1(_request, irq);
@@ -3212,6 +3328,7 @@ gro_result_t napi_gro_receive(struct napi_struct *napi,
 	struct sk_buff_container *skb_c;
 	unsigned long skb_sz, skb_off, skbh_sz, skbh_off;
 	cptr_t skb_cptr, skbh_cptr;
+	struct skb_shared_info *shinfo;
 
 	ret = async_msg_blocking_send_start(ixgbe_async,
 		&_request);
@@ -3223,13 +3340,22 @@ gro_result_t napi_gro_receive(struct napi_struct *napi,
 	glue_lookup_skbuff(cptr_table,
 		__cptr((unsigned long)skb), &skb_c);
 
-	LIBLCD_MSG("%s, skb .head %p | .data %p | .len %d | .datalen %d",
-		__func__, skb->head, skb->data, skb->len, skb->data_len);
+	shinfo = skb_shinfo(skb);
 
 	async_msg_set_fn_type(_request,
 			NAPI_GRO_RECEIVE);
 
 	fipc_set_reg0(_request, skb_c->other_ref.cptr);
+
+	if (shinfo->nr_frags) {
+		skb_frag_t *frag = &shinfo->frags[0];
+
+		printk("frag found, mapping");
+		fipc_set_reg1(_request,	gpa_val(lcd_gva2gpa(
+			__gva(
+			(unsigned long)lcd_page_address(
+				skb_frag_page(frag))))));
+	}
 
 	ret = lcd_virt_to_cptr(__gva((unsigned long)skb),
 		&skb_cptr,
@@ -3254,10 +3380,8 @@ gro_result_t napi_gro_receive(struct napi_struct *napi,
 	lcd_unmap_virt(__gva((unsigned long)skb),
 			get_order(skb_sz));
 
-	lcd_cap_revoke(skb_cptr);
-	lcd_cap_revoke(skbh_cptr);
-	lcd_cap_delete(skb_cptr);
-	lcd_cap_delete(skbh_cptr);
+	lcd_cap_delete(skb_c->skb_cptr);
+	lcd_cap_delete(skb_c->skbh_cptr);
 
 
 	glue_remove_skbuff(skb_c);

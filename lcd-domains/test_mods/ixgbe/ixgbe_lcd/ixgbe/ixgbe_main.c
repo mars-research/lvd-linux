@@ -1631,6 +1631,7 @@ static bool ixgbe_alloc_mapped_page(struct ixgbe_ring *rx_ring,
 	struct page *page = bi->page;
 	dma_addr_t dma;
 #ifdef LCD_ISOLATE
+	static unsigned int pg_count = 0;
 	gfp_t flags;
 #endif
 	/* since we are recycling buffers we should seldom need to alloc */
@@ -1647,6 +1648,11 @@ static bool ixgbe_alloc_mapped_page(struct ixgbe_ring *rx_ring,
 	 */
 	flags = GFP_ATOMIC | __GFP_NOWARN |  __GFP_COLD | __GFP_COMP | __GFP_MEMALLOC;
 	page = lcd_alloc_pages(flags, ixgbe_rx_pg_order(rx_ring));
+	if (page) {
+		unsigned ord = ixgbe_rx_pg_order(rx_ring);
+		pg_count += ord ? (1 << ord) : 1;
+		LIBLCD_MSG("total rx pages %u", pg_count);
+	}
 #endif
 
 	if (unlikely(!page)) {
@@ -1893,7 +1899,13 @@ static void ixgbe_pull_tail(struct ixgbe_ring *rx_ring,
 	 * working with pages allocated out of the lomem pool per
 	 * alloc_page(GFP_ATOMIC)
 	 */
+#ifndef LCD_ISOLATE
 	va = skb_frag_address(frag);
+#else
+	printk("frag %p | frag_page_addr %p | offset %x", frag->page.p,
+		lcd_page_address(frag->page.p),  frag->page_offset);
+	va = lcd_page_address(skb_frag_page(frag)) + frag->page_offset;
+#endif /* LCD_ISOLATE */
 
 	/*
 	 * we need the header to contain the greater of either ETH_HLEN or
@@ -1921,18 +1933,31 @@ static void ixgbe_pull_tail(struct ixgbe_ring *rx_ring,
  * unmapped until we have reached the end of packet descriptor for a buffer
  * chain.
  */
+static inline void _dma_unmap_page(struct device *dev, dma_addr_t addr,
+				  size_t size, enum dma_data_direction dir) {
+	return;
+}
+
+static inline void _dma_sync_single_range_for_cpu(struct device *dev,
+						 dma_addr_t addr,
+						 unsigned long offset,
+						 size_t size,
+						 enum dma_data_direction dir)
+{ }
+
 static void ixgbe_dma_sync_frag(struct ixgbe_ring *rx_ring,
 				struct sk_buff *skb)
 {
 	/* if the page was released unmap it, else just sync our portion */
 	if (unlikely(IXGBE_CB(skb)->page_released)) {
-		dma_unmap_page(rx_ring->dev, IXGBE_CB(skb)->dma,
+		_dma_unmap_page(rx_ring->dev, IXGBE_CB(skb)->dma,
 			       ixgbe_rx_pg_size(rx_ring), DMA_FROM_DEVICE);
 		IXGBE_CB(skb)->page_released = false;
+
 	} else {
 		struct skb_frag_struct *frag = &skb_shinfo(skb)->frags[0];
 
-		dma_sync_single_range_for_cpu(rx_ring->dev,
+		_dma_sync_single_range_for_cpu(rx_ring->dev,
 					      IXGBE_CB(skb)->dma,
 					      frag->page_offset,
 					      ixgbe_rx_bufsz(rx_ring),
@@ -2021,6 +2046,7 @@ static void ixgbe_reuse_rx_page(struct ixgbe_ring *rx_ring,
 
 static inline bool ixgbe_page_is_reserved(struct page *page)
 {
+	return false;
 	return (page_to_nid(page) != numa_mem_id()) || page_is_pfmemalloc(page);
 }
 
@@ -2156,7 +2182,7 @@ static struct sk_buff *ixgbe_fetch_rx_buffer(struct ixgbe_ring *rx_ring,
 
 dma_sync:
 		/* we are reusing so sync this buffer for CPU use */
-		dma_sync_single_range_for_cpu(rx_ring->dev,
+		_dma_sync_single_range_for_cpu(rx_ring->dev,
 					      rx_buffer->dma,
 					      rx_buffer->page_offset,
 					      ixgbe_rx_bufsz(rx_ring),
@@ -2991,12 +3017,18 @@ int ixgbe_poll(struct napi_struct *napi, int budget)
 	return min(work_done, budget - 1);
 }
 
+extern unsigned long poll_state;
+
 int __ixgbe_poll(void)
 {
-	if (g_adapter)
-		return ixgbe_poll(&g_adapter->q_vector[0]->napi, 64);
-	else
-		return 0;
+	int ret = 0;
+	if (g_adapter) {
+		if (!test_and_set_bit(IXGBE_POLL_RUNNING, &poll_state)) {
+			ret = ixgbe_poll(&g_adapter->q_vector[0]->napi, 64);
+			clear_bit(IXGBE_POLL_RUNNING, &poll_state);
+		}
+	}
+	return ret;
 }
 
 /**
@@ -3030,6 +3062,7 @@ static int ixgbe_request_msix_irqs(struct ixgbe_adapter *adapter)
 			/* skip this unused q_vector */
 			continue;
 		}
+		printk("%s, i %d | vec %d", __func__, vector, entry->vector);
 		err = _request_irq(entry->vector, &ixgbe_msix_clean_rings, 0,
 				  q_vector->name, q_vector);
 		if (err) {
@@ -6051,6 +6084,9 @@ int ixgbe_setup_rx_resources(struct ixgbe_ring *rx_ring)
 	if (rx_ring->q_vector)
 		ring_node = rx_ring->q_vector->numa_node;
 
+	LIBLCD_MSG("%s, allocating rx memory ring_count %d | size per ring %zu\n",
+			__func__, rx_ring->count, sizeof(struct ixgbe_rx_buffer));
+
 	rx_ring->rx_buffer_info = kzalloc_node(size, GFP_KERNEL, ring_node);
 	if (!rx_ring->rx_buffer_info)
 		rx_ring->rx_buffer_info = kzalloc(size, GFP_KERNEL);
@@ -7701,7 +7737,6 @@ static void ixgbe_tx_map(struct ixgbe_ring *tx_ring,
 	for (frag = &skb_shinfo(skb)->frags[0];; frag++) {
 		if (dma_mapping_error(tx_ring->dev, dma))
 			goto dma_error;
-		printk("frag %p", frag);
 		/* record length, and DMA address */
 		dma_unmap_len_set(tx_buffer, len, size);
 		dma_unmap_addr_set(tx_buffer, dma, dma);
@@ -8282,7 +8317,9 @@ static struct rtnl_link_stats64 *ixgbe_get_stats64(struct net_device *netdev,
 	struct ixgbe_adapter *adapter = netdev_priv(netdev);
 	int i;
 
+#ifndef LCD_ISOLATE
 	rcu_read_lock();
+#endif
 	for (i = 0; i < adapter->num_rx_queues; i++) {
 		struct ixgbe_ring *ring = ACCESS_ONCE(adapter->rx_ring[i]);
 		u64 bytes, packets;
@@ -8314,7 +8351,9 @@ static struct rtnl_link_stats64 *ixgbe_get_stats64(struct net_device *netdev,
 			stats->tx_bytes   += bytes;
 		}
 	}
+#ifndef LCD_ISOLATE
 	rcu_read_unlock();
+#endif
 	/* following stats updated by ixgbe_watchdog_task() */
 	stats->multicast	= netdev->stats.multicast;
 	stats->rx_errors	= netdev->stats.rx_errors;
@@ -9722,7 +9761,8 @@ skip_sriov:
 			   NETIF_F_TSO6 |
 			   NETIF_F_RXHASH |
 			   NETIF_F_RXCSUM |
-			   NETIF_F_HW_CSUM;
+			   NETIF_F_HW_CSUM |
+			   NETIF_F_PRIV_DATA_POOL;
 
 #define IXGBE_GSO_PARTIAL_FEATURES (NETIF_F_GSO_GRE | \
 				    NETIF_F_GSO_GRE_CSUM | \

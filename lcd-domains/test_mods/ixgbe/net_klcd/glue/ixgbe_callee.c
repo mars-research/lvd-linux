@@ -296,7 +296,10 @@ int grant_sync_ep(cptr_t *sync_end, cptr_t ha_sync_ep)
 	int ret;
 	struct cspace *curr_cspace = get_current_cspace(current);
 	lcd_cptr_alloc(sync_end);
-	ret = cap_grant(klcd_cspace, ha_sync_ep, curr_cspace, *sync_end);
+	ret = cap_grant(klcd_cspace, ha_sync_ep,
+			curr_cspace, *sync_end);
+	PTS()->syncep_present = true;
+	PTS()->sync_ep = sync_end->cptr;
 	return ret;
 }
 
@@ -1153,6 +1156,7 @@ ndo_stop_trampoline(struct net_device *dev)
 
 }
 
+#if 0
 int ndo_start_xmit_user(struct sk_buff *skb,
 		struct net_device *dev,
 		struct trampoline_hidden_args *hidden_args,
@@ -1318,7 +1322,7 @@ fail_ipc:
 	lcd_exit(0);
 	return func_ret;
 }
-
+#endif
 int ndo_start_xmit(struct sk_buff *skb,
 		struct net_device *dev,
 		struct trampoline_hidden_args *hidden_args)
@@ -1335,17 +1339,24 @@ int ndo_start_xmit(struct sk_buff *skb,
 	cptr_t skb_cptr, skbd_cptr;
 	xmit_type_t xmit_type;
 	struct skbuff_members *skb_lcd;
+	cptr_t sync_end;
 
 	xmit_type = check_skb_range(skb);
 
-	if (!current->ptstate) {
-		LCD_MAIN({
-			ret = ndo_start_xmit_user(skb,
-		dev,
-		hidden_args, xmit_type);
-		}
-		);
-		return ret;
+	if (!PTS()) {
+		/* step 1. create lcd env */
+		lcd_enter();
+
+		/* set nonlcd ctx for future use */
+		PTS()->nonlcd_ctx = true;
+
+		/* step 2. grant sync_ep if needed */
+		/* FIXME: always grant sync_ep? */
+		if (grant_sync_ep(&sync_end, hidden_args->sync_ep))
+			printk("%s, grant_syncep failed %d\n",
+					__func__, ret);
+	} else if (PTS()->nonlcd_ctx && PTS()->syncep_present) {
+		sync_end.cptr = PTS()->sync_ep;
 	}
 
 	dev_container = container_of(dev,
@@ -1388,6 +1399,10 @@ int ndo_start_xmit(struct sk_buff *skb,
 
 	switch (xmit_type) {
 	case VOLUNTEER_XMIT:
+		printk("%s, comm %s | pid %d | skblen %d "
+			"| skb->proto %02X\n", __func__,
+			current->comm, current->pid, skb->len,
+			ntohs(skb->protocol));
 
 		ret = thc_ipc_send_request(hidden_args->async_chnl,
 				_request, &request_cookie);
@@ -1417,7 +1432,11 @@ int ndo_start_xmit(struct sk_buff *skb,
 		lcd_set_r3(skbd_off);
 		lcd_set_r4(skb->data - skb->head);
 
-		ret = lcd_sync_send(hidden_args->sync_ep);
+		/* handle nonlcd case with a granted sync ep */
+		if (PTS()->nonlcd_ctx)
+			ret = lcd_sync_send(sync_end);
+		else
+			ret = lcd_sync_send(hidden_args->sync_ep);
 
 		lcd_set_cr0(CAP_CPTR_NULL);
 		lcd_set_cr1(CAP_CPTR_NULL);
@@ -1427,15 +1446,9 @@ int ndo_start_xmit(struct sk_buff *skb,
 			goto fail_sync;
 		}
 
-		ret = thc_ipc_recv_response(
-				hidden_args->async_chnl,
-				request_cookie,
-				&_response);
-
 		break;
 
 	case SHARED_DATA_XMIT:
-		printk("#\n");
 		fipc_set_reg3(_request,
 				(unsigned long)
 				((void*)skb->head - pool->pool));
@@ -1459,19 +1472,41 @@ int ndo_start_xmit(struct sk_buff *skb,
 
 		skb_lcd->head_data_off = skb->data - skb->head;
 
-		ret = thc_ipc_call(hidden_args->async_chnl,
-				_request,
-				&_response);
-		break;
+		ret = thc_ipc_send_request(hidden_args->async_chnl,
+			_request, &request_cookie);
 
+		if (ret) {
+			LIBLCD_ERR("thc_ipc_call");
+			goto fail_ipc;
+		}
+
+		break;
 	default:
 		LIBLCD_ERR("%s, Unknown xmit_type requested",
 			__func__);
 		break;
 	}
 
+	/* guard nonlcd case with all macros */
+	if (PTS()->nonlcd_ctx) {
+		LCD_MAIN({
+		DO_FINISH({
+		ASYNC_({
+			ret = thc_ipc_recv_response(
+				hidden_args->async_chnl,
+				request_cookie,
+				&_response);
+		}, ndo_xmit
+		);});});
+	} else {
+		ret = thc_ipc_recv_response(
+				hidden_args->async_chnl,
+				request_cookie,
+				&_response);
+	}
+
 	if (ret) {
-		LIBLCD_ERR("thc_ipc_call");
+		LIBLCD_ERR("thc_ipc_recv_response");
 		goto fail_ipc;
 	}
 
@@ -1486,7 +1521,6 @@ fail_async:
 fail_sync:
 fail_ipc:
 	return ret;
-
 }
 
 LCD_TRAMPOLINE_DATA(ndo_start_xmit_trampoline);

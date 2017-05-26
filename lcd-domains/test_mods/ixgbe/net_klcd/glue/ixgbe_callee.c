@@ -2266,12 +2266,17 @@ struct rtnl_link_stats64 *ndo_get_stats64_user(struct net_device *dev,
 		LIBLCD_ERR("thc_ipc_call");
 		goto fail_ipc;
 	}
-	fipc_recv_msg_end(thc_channel_to_fipc(hidden_args->async_chnl),
+	stats->rx_packets += fipc_get_reg1(_response);
+	stats->rx_bytes += fipc_get_reg2(_response);
+	stats->tx_packets += fipc_get_reg3(_response);
+	stats->tx_bytes += fipc_get_reg4(_response);
+
+	fipc_recv_msg_end(thc_channel_to_fipc(
+			hidden_args->async_chnl),
 			_response);
-	lcd_exit(0);
-	return stats;
 fail_async:
 fail_ipc:
+	lcd_exit(0);
 	return stats;
 }
 
@@ -3085,7 +3090,7 @@ int napi_consume_skb_callee(struct fipc_message *_request,
 	}
 
 	napi_consume_skb(skb, budget);
-	printk("napi_consume_skb returns\n");
+
 	if (skb_c->tsk == current && revoke) {
 		lcd_cap_revoke(skb_cptr);
 		lcd_cap_revoke(skbh_cptr);

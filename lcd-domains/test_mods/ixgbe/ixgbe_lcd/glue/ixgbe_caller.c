@@ -1275,12 +1275,12 @@ void napi_consume_skb(struct sk_buff *skb, int budget)
 		}
 
 #ifdef IOMMU_ASSIGN
-		LIBLCD_MSG("%s, unmap iommu page", __func__);
+		LIBLCD_MSG("%s, iommu unmap page", __func__);
 		ret = lcd_syscall_iommu_unmap_page(lcd_gva2gpa(__gva(
 			(unsigned long)((void*)skb->head - skbh_off))),
 			skb_c->skbd_ord);
 		if (ret)
-			LIBLCD_ERR("unMapping failed for packet %p",
+			LIBLCD_ERR("unmap iommu failed for addr %p",
 					__pa(skb->data));
 #endif
 
@@ -1305,7 +1305,6 @@ void napi_consume_skb(struct sk_buff *skb, int budget)
 		_request,
 		&_response);
 #endif
-	printk("napi_consume_skb returns to lcd\n");
 	glue_remove_skbuff(skb_c);
 	kfree(skb_c);
 
@@ -1370,7 +1369,7 @@ void consume_skb(struct sk_buff *skb)
 		}
 
 #ifdef IOMMU_ASSIGN
-		LIBLCD_MSG("%s, unmap iommu page", __func__);
+		LIBLCD_MSG("%s, iommu unmap page", __func__);
 		ret = lcd_syscall_iommu_unmap_page(lcd_gva2gpa(__gva((unsigned long) skb->head)),
 					get_order(skbh_sz));
 		if (ret)
@@ -2491,7 +2490,7 @@ int ndo_start_xmit_callee(struct fipc_message *_request,
 		skb_c->skbh_cptr = skbd_cptr;
 
 #ifdef IOMMU_ASSIGN
-		LIBLCD_MSG("%s, MAP iommu page", __func__);
+		LIBLCD_MSG("%s, iommu map page", __func__);
 		ret = lcd_syscall_iommu_map_page(
 				lcd_gva2gpa(skbd_gva),
 				skbd_ord, true);

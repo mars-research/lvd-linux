@@ -17,6 +17,7 @@ struct thc_channel *ixgbe_async;
 struct glue_cspace *ixgbe_cspace;
 cptr_t ixgbe_sync_endpoint;
 int ixgbe_done = 0;
+struct thc_channel_group ch_grp;
 
 int ixgbe_init_module(void);
 void ixgbe_exit_module(void);
@@ -59,10 +60,12 @@ static void main_and_loop(void)
 		 * will not yield until it tries to use the async
 		 * channel). */
 		while (!stop && !ixgbe_done) {
+			struct thc_channel_group_item* curr_item;
 			/*
 			 * Do one async receive
 			 */
-			ret = thc_ipc_poll_recv(ixgbe_async, &msg);
+			ret = thc_poll_recv_group(&ch_grp,
+						&curr_item, &msg);
 			if (ret) {
 				if (ret == -EWOULDBLOCK) {
 					continue;
@@ -76,7 +79,7 @@ static void main_and_loop(void)
 			 */
 			ASYNC(
 
-				ret = dispatch_async_loop(ixgbe_async, msg,
+				ret = dispatch_async_loop(curr_item->channel, msg,
 							ixgbe_cspace,
 							ixgbe_sync_endpoint);
 				if (ret) {
@@ -124,6 +127,7 @@ static int __noreturn ixgbe_lcd_init(void)
 		goto fail2;
 	}
 
+	thc_channel_group_init(&ch_grp);
 	/* RUN CODE / LOOP ---------------------------------------- */
 
 	main_and_loop();

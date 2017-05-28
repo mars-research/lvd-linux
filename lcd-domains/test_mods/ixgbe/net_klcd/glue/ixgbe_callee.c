@@ -23,7 +23,7 @@ struct glue_cspace *c_cspace = NULL;
 struct thc_channel *ixgbe_async;
 struct cptr sync_ep;
 extern struct cspace *klcd_cspace;
-
+extern struct thc_channel *xmit_chnl;
 struct timer_list service_timer;
 struct napi_struct *napi_q0;
 
@@ -1359,6 +1359,14 @@ int ndo_start_xmit(struct sk_buff *skb,
 		sync_end.cptr = PTS()->sync_ep;
 	}
 
+	if (xmit_type == VOLUNTEER_XMIT) {
+		printk("%s, comm %s | pid %d | skblen %d "
+			"| skb->proto %02X\n", __func__,
+			current->comm, current->pid, skb->len,
+			ntohs(skb->protocol));
+		return NETDEV_TX_OK;
+	}
+
 	dev_container = container_of(dev,
 		struct net_device_container,
 		net_device);
@@ -1399,11 +1407,6 @@ int ndo_start_xmit(struct sk_buff *skb,
 
 	switch (xmit_type) {
 	case VOLUNTEER_XMIT:
-		printk("%s, comm %s | pid %d | skblen %d "
-			"| skb->proto %02X\n", __func__,
-			current->comm, current->pid, skb->len,
-			ntohs(skb->protocol));
-
 		ret = thc_ipc_send_request(hidden_args->async_chnl,
 				_request, &request_cookie);
 
@@ -2459,7 +2462,7 @@ void setup_netdev_ops(struct net_device_container *dev_c,
 	dev_netdev_ops_ndo_start_xmit_hidden_args->struct_container = netdev_ops_container;
 	dev_netdev_ops_ndo_start_xmit_hidden_args->cspace = c_cspace;
 	dev_netdev_ops_ndo_start_xmit_hidden_args->sync_ep = sync_ep;
-	dev_netdev_ops_ndo_start_xmit_hidden_args->async_chnl = _channel;
+	dev_netdev_ops_ndo_start_xmit_hidden_args->async_chnl = xmit_chnl;
 	netdev_ops_container->net_device_ops.ndo_start_xmit = LCD_HANDLE_TO_TRAMPOLINE(dev_netdev_ops_ndo_start_xmit_hidden_args->t_handle);
 	ret = set_memory_x(( ( unsigned  long   )dev_netdev_ops_ndo_start_xmit_hidden_args->t_handle ) & ( PAGE_MASK ),
 		( ALIGN(LCD_TRAMPOLINE_SIZE(ndo_start_xmit_trampoline),

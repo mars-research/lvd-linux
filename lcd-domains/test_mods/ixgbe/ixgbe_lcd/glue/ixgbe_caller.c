@@ -19,6 +19,7 @@ extern struct glue_cspace *ixgbe_cspace;
 extern struct thc_channel *ixgbe_async;
 extern cptr_t ixgbe_sync_endpoint;
 extern cptr_t ixgbe_register_channel;
+extern struct thc_channel_group ch_grp;
 
 static struct net_device *g_net_device;
 
@@ -249,7 +250,12 @@ int create_async_channel(void)
 {
 	int ret;
 	cptr_t tx, rx;
+	cptr_t tx_xmit, rx_xmit;
 	struct thc_channel *chnl;
+	struct thc_channel *xmit_chnl;
+	struct thc_channel_group_item *ch_item;
+	struct thc_channel_group_item *xmit_ch_item;
+
 	/*
 	 * Set up async and sync channels
 	 */
@@ -263,9 +269,30 @@ int create_async_channel(void)
 		LIBLCD_ERR("async chnl setup failed");
 		goto fail2;
 	}
-        lcd_set_cr0(ixgbe_sync_endpoint);
+
+	ch_item = kzalloc(sizeof(*ch_item), GFP_KERNEL);
+
+	thc_channel_group_item_init(ch_item, chnl, NULL);
+
+	thc_channel_group_item_add(&ch_grp, ch_item);
+
+	ret = setup_async_channel(&tx_xmit, &rx_xmit, &xmit_chnl);
+	if (ret) {
+		LIBLCD_ERR("async xmit chnl setup failed");
+		goto fail2;
+	}
+
+	xmit_ch_item = kzalloc(sizeof(*xmit_ch_item), GFP_KERNEL);
+
+	thc_channel_group_item_init(xmit_ch_item, xmit_chnl, NULL);
+
+	thc_channel_group_item_add(&ch_grp, xmit_ch_item);
+
+	lcd_set_cr0(ixgbe_sync_endpoint);
         lcd_set_cr1(rx);
         lcd_set_cr2(tx);
+        lcd_set_cr3(rx_xmit);
+        lcd_set_cr4(tx_xmit);
 
 	LIBLCD_MSG("sync call %s", __func__);
 	ret = lcd_sync_call(ixgbe_register_channel);
@@ -278,6 +305,9 @@ int create_async_channel(void)
         lcd_set_cr0(CAP_CPTR_NULL);
         lcd_set_cr1(CAP_CPTR_NULL);
         lcd_set_cr2(CAP_CPTR_NULL);
+        lcd_set_cr3(CAP_CPTR_NULL);
+        lcd_set_cr4(CAP_CPTR_NULL);
+
         if (ret) {
                 LIBLCD_ERR("lcd_call");
                 goto fail3;

@@ -21,6 +21,7 @@ struct net_info {
 	struct list_head list;
 };
 static LIST_HEAD(net_infos);
+struct thc_channel *xmit_chnl;
 
 extern int setup_async_net_ring_channel(cptr_t tx, cptr_t rx, 
 				struct thc_channel **chnl_out);
@@ -150,6 +151,7 @@ static int do_one_register(cptr_t register_chnl)
 {
 	int ret;
 	cptr_t sync_endpoint, tx, rx;
+	cptr_t tx_xmit, rx_xmit;
 	struct thc_channel *chnl;
 	struct net_info *net_info;
 
@@ -171,12 +173,25 @@ static int do_one_register(cptr_t register_chnl)
 		LIBLCD_ERR("cptr alloc failed");
 		goto fail3;
 	}
+	ret = lcd_cptr_alloc(&tx_xmit);
+	if (ret) {
+		LIBLCD_ERR("cptr alloc failed");
+		goto fail2;
+	}
+	ret = lcd_cptr_alloc(&rx_xmit);
+	if (ret) {
+		LIBLCD_ERR("cptr alloc failed");
+		goto fail3;
+	}
+
 	/*
 	 * Set up regs and poll
 	 */
 	lcd_set_cr0(sync_endpoint);
 	lcd_set_cr1(tx);
 	lcd_set_cr2(rx);
+	lcd_set_cr3(tx_xmit);
+	lcd_set_cr4(rx_xmit);
 	ret = lcd_sync_poll_recv(register_chnl);
 	if (ret) {
 		if (ret == -EWOULDBLOCK)
@@ -200,6 +215,18 @@ static int do_one_register(cptr_t register_chnl)
 		LIBLCD_ERR("error setting up ring channel");
 		goto fail6;
 	}
+
+	LIBLCD_MSG("settingup xmit channel");
+	/*
+	 * Set up async ring channel
+	 */
+	ret = setup_async_net_ring_channel(tx_xmit, rx_xmit,
+					&xmit_chnl);
+	if (ret) {
+		LIBLCD_ERR("error setting up ring channel");
+		goto fail6;
+	}
+
 	/*
 	 * Add to dispatch loop
 	 */
@@ -211,10 +238,19 @@ static int do_one_register(cptr_t register_chnl)
 		goto fail7;
 	}
 
+	net_info = add_net(xmit_chnl, c_cspace, sync_endpoint);
+	if (!net_info) {
+		LIBLCD_ERR("error adding to dispatch loop");
+		goto fail7;
+	}
+
 	LIBLCD_MSG("Returning from %s", __func__);
 	lcd_set_cr0(CAP_CPTR_NULL);
 	lcd_set_cr1(CAP_CPTR_NULL);
 	lcd_set_cr2(CAP_CPTR_NULL);
+	lcd_set_cr3(CAP_CPTR_NULL);
+	lcd_set_cr4(CAP_CPTR_NULL);
+
 	if (lcd_sync_reply())
 		LIBLCD_ERR("Error reply");
 	return 0;
@@ -226,11 +262,15 @@ free_cptrs:
 	lcd_set_cr0(CAP_CPTR_NULL);
 	lcd_set_cr1(CAP_CPTR_NULL);
 	lcd_set_cr2(CAP_CPTR_NULL);
+	lcd_set_cr3(CAP_CPTR_NULL);
+	lcd_set_cr4(CAP_CPTR_NULL);
 	lcd_cptr_free(sync_endpoint);
 fail3:
 	lcd_cptr_free(tx);
+	lcd_cptr_free(tx_xmit);
 fail2:
 	lcd_cptr_free(rx);
+	lcd_cptr_free(rx_xmit);
 fail1:
 	return ret;
 }

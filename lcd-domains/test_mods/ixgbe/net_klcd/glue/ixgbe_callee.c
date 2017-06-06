@@ -45,7 +45,7 @@ static DEFINE_HASHTABLE(cptr_table, CPTR_HASH_BITS);
 
 struct pci_dev *g_pdev = NULL;
 struct net_device *g_ndev = NULL;
-DEFINE_MUTEX(hash_lock);
+DEFINE_SPINLOCK(hspin_lock);
 static unsigned long pool_pfn_start, pool_pfn_end;
 priv_pool_t *pool;
 
@@ -108,10 +108,10 @@ int glue_insert_skbuff(struct hlist_head *htable, struct sk_buff_container *skb_
 
 	skb_c->my_ref = __cptr((unsigned long)skb_c->skb);
 
-	mutex_lock_interruptible(&hash_lock);
-	hash_add_rcu(cptr_table, &skb_c->hentry,
+	spin_lock(&hspin_lock);
+	hash_add(cptr_table, &skb_c->hentry,
 			(unsigned long) skb_c->skb);
-	mutex_unlock(&hash_lock);
+	spin_unlock(&hspin_lock);
 	return 0;
 }
 
@@ -119,19 +119,21 @@ int glue_lookup_skbuff(struct hlist_head *htable, struct cptr c, struct sk_buff_
 {
 	struct sk_buff_container *skb_c;
 
-	hash_for_each_possible_rcu(cptr_table, skb_c,
+	spin_lock(&hspin_lock);
+	hash_for_each_possible(cptr_table, skb_c,
 			hentry, (unsigned long) cptr_val(c)) {
 		if (skb_c->skb == (struct sk_buff*) c.cptr)
 			*skb_cout = skb_c;
 	}
+	spin_unlock(&hspin_lock);
 	return 0;
 }
 
 void glue_remove_skbuff(struct sk_buff_container *skb_c)
 {
-	mutex_lock_interruptible(&hash_lock);
-	hash_del_rcu(&skb_c->hentry);
-	mutex_unlock(&hash_lock);
+	spin_lock(&hspin_lock);
+	hash_del(&skb_c->hentry);
+	spin_unlock(&hspin_lock);
 }
 
 void destroy_async_net_ring_channel(struct thc_channel *chnl)

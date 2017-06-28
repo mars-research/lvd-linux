@@ -42,8 +42,8 @@ void construct_global_pool(priv_pool_t *p)
 	 */
 	bundles = gpool_objs / CACHE_SIZE;
 
-	printk("%s, bundles %u | list_sz %u\n",
-		__func__, bundles, list_sz);
+	printk("%s, gpool_objs %d | list_sz %u | bundles %u\n",
+		__func__, gpool_objs, list_sz, bundles);
 
 	for (b = 0; b < bundles; b++) {
 		printk("bundle ===> %d\n", b);
@@ -146,16 +146,16 @@ priv_pool_t *priv_pool_init(pool_type_t type, unsigned int num_objs,
 	/* calculate num_pages per cpu */
 	num_pages = PAGE_ALIGN(num_objs * obj_size) / PAGE_SIZE;
 
-	p->num_cpus = num_cpus = num_possible_cpus();
+	p->num_cpus = num_cpus = num_online_cpus();
 	/* allocate twice the amount of requested pages
 	 * one set is for the percpu buf, the remaining pages
 	 * would be given to the global buffer
 	 */
-	p->total_pages = total_pages = num_pages * num_cpus * 2;
+	p->total_pages = total_pages = num_pages * (num_cpus + num_possible_cpus());
 
 	printk("num objs %d | num_cpus %d | num_pages %d | num_objs_percpu %d "
 		"| total_pages %d | page order %d\npcpu_pool %p | global_pool %p\n",
-		num_objs, num_possible_cpus(), num_pages, num_objs_percpu,
+		num_objs, num_online_cpus(), num_pages, num_objs_percpu,
 		total_pages, get_order(total_pages * PAGE_SIZE), pcpu_pool,
 		global_pool);
 
@@ -175,10 +175,10 @@ priv_pool_t *priv_pool_init(pool_type_t type, unsigned int num_objs,
 	/* split the total pages between pcpu pool and the global pool */
 	pcpu_pool = pool;
 	p->gpool = global_pool =
-	                pool + (num_possible_cpus() * num_pages * PAGE_SIZE);
+	                pool + (num_cpus * num_pages * PAGE_SIZE);
 
 	/* update percpu vars */
-	for_each_possible_cpu(cpu) {
+	for_each_online_cpu(cpu) {
 		*per_cpu_ptr(p->marker, cpu) =
 		        *per_cpu_ptr(p->head, cpu) = (struct object*) NULL;
 		*per_cpu_ptr(p->buf, cpu) =
@@ -193,7 +193,7 @@ priv_pool_t *priv_pool_init(pool_type_t type, unsigned int num_objs,
 	}
 
 	construct_global_pool(p);
-	mutex_init(&p->pool_lock);
+	spin_lock_init(&p->pool_spin_lock);
 	return p;
 }
 EXPORT_SYMBOL(priv_pool_init);
@@ -255,7 +255,7 @@ void *priv_alloc(pool_type_t type)
 		struct atom snapshot, new;
 
 		/* lock global pool */
-		mutex_lock(&p->pool_lock);
+		spin_lock(&p->pool_spin_lock);
 
 		snapshot = p->stack;
 
@@ -269,7 +269,7 @@ void *priv_alloc(pool_type_t type)
 		this_cpu_write(*(p->cached), CACHE_SIZE);
 
 		/* unlock global pool */
-		mutex_unlock(&p->pool_lock);
+		spin_unlock(&p->pool_spin_lock);
 
 		m = (struct object*) snapshot.head;
 
@@ -320,7 +320,7 @@ void priv_free(void *addr, pool_type_t type)
 		struct atom snapshot, new;
 
 		/* lock global pool */
-		mutex_lock(&pool->pool_lock);
+		spin_lock(&pool->pool_spin_lock);
 
 		new.head = donation;
 		donation->list = ((struct object*)*this_cpu_ptr(pool->head))->next;
@@ -337,7 +337,7 @@ void priv_free(void *addr, pool_type_t type)
 		pool->stack.version = new.version;
 
 		/* unlock global pool */
-		mutex_unlock(&pool->pool_lock);
+		spin_unlock(&pool->pool_spin_lock);
 		WARN_ON(!new.head);
 		pr_debug("update gpchain %p to %p | ohead: %p/%ld, nhead: %p/%ld\n",
 				donation, snapshot.head,

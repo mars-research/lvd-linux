@@ -8,12 +8,17 @@
 #define DATA_ALIGNED_SZ   	(SKB_DATA_ALIGN(MTU + HEADERS + SKB_LCD_MEMBERS_SZ))
 #define SKB_DATA_SIZE           (DATA_ALIGNED_SZ + SKB_DATA_ALIGN(SKB_SHARED_INFO))
 
+#define SKB_CONTAINER_SIZE	128
+
 typedef enum {
 	/* for skb->data */
 	SKB_DATA_POOL = 0,
 
 	/* for skb->page_frag */
 	SKB_FRAG_POOL,
+
+	/* for skb_container */
+	SKB_CONTAINER_POOL,
 
 	POOL_MAX,
 } pool_type_t;
@@ -46,7 +51,7 @@ typedef struct {
 	void *gpool;
 	struct atom stack;
 	unsigned int pool_order;
-    struct mutex pool_lock;
+	spinlock_t pool_spin_lock;
 } priv_pool_t;
 
 

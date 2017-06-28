@@ -215,6 +215,7 @@ static void ixgbe_service_task(struct work_struct *work);
 
 /* global instance of adapter struct */
 struct ixgbe_adapter *g_adapter = NULL;
+struct net_device *g_netdev = NULL;
 
 extern int _request_irq(unsigned int irq, irq_handler_t handler, unsigned long flags,
 	    const char *name, void *dev);
@@ -1648,11 +1649,10 @@ static bool ixgbe_alloc_mapped_page(struct ixgbe_ring *rx_ring,
 	 */
 	flags = GFP_ATOMIC | __GFP_NOWARN |  __GFP_COLD | __GFP_COMP | __GFP_MEMALLOC;
 	page = lcd_alloc_pages(flags, ixgbe_rx_pg_order(rx_ring));
-	if (page) {
-		unsigned ord = ixgbe_rx_pg_order(rx_ring);
-		pg_count += ord ? (1 << ord) : 1;
-		LIBLCD_MSG("total rx pages %u", pg_count);
-	}
+	/* increment ref count for an allocated page. This is not being
+	 * done by the liblcd helper functions.
+	 */
+	page_ref_inc(page);
 #endif
 
 	if (unlikely(!page)) {
@@ -1681,6 +1681,12 @@ static bool ixgbe_alloc_mapped_page(struct ixgbe_ring *rx_ring,
 	bi->dma = dma;
 	bi->page = page;
 	bi->page_offset = 0;
+
+	if (page) {
+		unsigned ord = ixgbe_rx_pg_order(rx_ring);
+		pg_count += ord ? (1 << ord) : 1;
+		LIBLCD_MSG("total rx pages %u", pg_count);
+	}
 
 	return true;
 }
@@ -1902,8 +1908,6 @@ static void ixgbe_pull_tail(struct ixgbe_ring *rx_ring,
 #ifndef LCD_ISOLATE
 	va = skb_frag_address(frag);
 #else
-	printk("frag %p | frag_page_addr %p | offset %x", frag->page.p,
-		lcd_page_address(frag->page.p),  frag->page_offset);
 	va = lcd_page_address(skb_frag_page(frag)) + frag->page_offset;
 #endif /* LCD_ISOLATE */
 
@@ -2107,7 +2111,7 @@ static bool ixgbe_add_rx_frag(struct ixgbe_ring *rx_ring,
 
 #if (PAGE_SIZE < 8192)
 	/* if we are only owner of page we can reuse it */
-	if (unlikely(page_count(page) != 1))
+	if (unlikely(page_ref_count(page) != 1))
 		return false;
 
 	/* flip page offset to other buffer */
@@ -2968,7 +2972,7 @@ int ixgbe_poll(struct napi_struct *napi, int budget)
 	struct ixgbe_ring *ring;
 	int per_ring_budget, work_done = 0;
 	bool clean_complete = true;
-
+	static int once = 0;
 #ifdef CONFIG_IXGBE_DCA
 	if (adapter->flags & IXGBE_FLAG_DCA_ENABLED)
 		ixgbe_update_dca(q_vector);
@@ -2990,6 +2994,11 @@ int ixgbe_poll(struct napi_struct *napi, int budget)
 	else
 		per_ring_budget = budget;
 
+	if (!once) {
+		LIBLCD_MSG("%s, budget %d | perring %d | qvec rx %d", __func__,
+			budget, per_ring_budget, q_vector->rx.count);
+		once++;
+	}
 	ixgbe_for_each_ring(ring, q_vector->rx) {
 		int cleaned = ixgbe_clean_rx_irq(q_vector, ring,
 						 per_ring_budget);
@@ -3872,6 +3881,8 @@ void ixgbe_configure_rx_ring(struct ixgbe_adapter *adapter,
 	IXGBE_WRITE_REG(hw, IXGBE_RXDCTL(reg_idx), rxdctl);
 
 	ixgbe_rx_desc_queue_enable(adapter, ring);
+	printk("%s, calling rx_alloc %d | nextto use %u", __func__,
+			ixgbe_desc_unused(ring), ring->next_to_use);
 	ixgbe_alloc_rx_buffers(ring, ixgbe_desc_unused(ring));
 }
 
@@ -8167,7 +8178,7 @@ static netdev_tx_t __ixgbe_xmit_frame(struct sk_buff *skb,
 	return ixgbe_xmit_frame_ring(skb, adapter, tx_ring);
 }
 
-static netdev_tx_t ixgbe_xmit_frame(struct sk_buff *skb,
+netdev_tx_t ixgbe_xmit_frame(struct sk_buff *skb,
 				    struct net_device *netdev)
 {
 	return __ixgbe_xmit_frame(skb, netdev, NULL);
@@ -9957,6 +9968,7 @@ skip_sriov:
 	if (err)
 		goto err_register;
 
+	g_netdev = netdev;
 	pci_set_drvdata(pdev, adapter);
 
 	/* power down the optics for 82599 SFP+ fiber */

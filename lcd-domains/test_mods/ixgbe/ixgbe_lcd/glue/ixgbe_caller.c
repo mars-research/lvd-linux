@@ -11,6 +11,8 @@
 #include <linux/hashtable.h>
 
 #include <liblcd/netdev_helper.h>
+
+#include "../../rdtsc_helper.h"
 #include <lcd_config/post_hook.h>
 
 struct cptr sync_ep;
@@ -27,6 +29,10 @@ static struct net_device *g_net_device;
 /* device for IOMMU assignment */
 struct pcidev_info dev_assign = { 0x0000, 0x04, 0x00, 0x1 };
 #endif
+
+struct kmem_cache *skb_c_cache;
+struct kmem_cache *skb_c_cache1;
+struct kmem_cache *skbuff_cache;
 
 /* XXX: How to determine this? */
 #define CPTR_HASH_BITS      5
@@ -47,7 +53,32 @@ int glue_ixgbe_init(void)
 	}
 	ixgbe_cspace = c_cspace;
 	hash_init(cptr_table);
+
+	/* merge two datastructures into one for allocation */
+	skb_c_cache = kmem_cache_create("skb_c_cache",
+				sizeof(struct sk_buff_container)
+				+ sizeof(struct sk_buff),
+				0,
+				SLAB_HWCACHE_ALIGN|SLAB_PANIC,
+				NULL);
+	if (!skb_c_cache) {
+		LIBLCD_ERR("skb_container cache not created");
+		goto fail2;
+	}
+
+	/* container only slab for rx */
+	skb_c_cache1 = kmem_cache_create("skb_c_cache1",
+				sizeof(struct sk_buff_container),
+				0,
+				SLAB_HWCACHE_ALIGN|SLAB_PANIC,
+				NULL);
+	if (!skb_c_cache1) {
+		LIBLCD_ERR("skb_container cache not created");
+		goto fail2;
+	}
+
 	return 0;
+
 fail2:
 	glue_cap_exit();
 fail1:
@@ -59,7 +90,11 @@ void glue_ixgbe_exit(void)
 {
 	glue_cap_destroy(c_cspace);
 	glue_cap_exit();
+	if (skb_c_cache)
+		kmem_cache_destroy(skb_c_cache);
 
+	if (skb_c_cache1)
+		kmem_cache_destroy(skb_c_cache1);
 }
 
 int glue_insert_skbuff(struct hlist_head *htable, struct sk_buff_container *skb_c)
@@ -1344,9 +1379,6 @@ void napi_consume_skb(struct sk_buff *skb, int budget)
 
 		lcd_cap_delete(skb_c->skb_cptr);
 		lcd_cap_delete(skb_c->skbh_cptr);
-	} else {
-		/* free skb memory that was allocate by us */
-		kfree(skb);
 	}
 
 #ifdef NAPI_CONSUME_SEND_ONLY
@@ -1359,7 +1391,7 @@ void napi_consume_skb(struct sk_buff *skb, int budget)
 		&_response);
 #endif
 	glue_remove_skbuff(skb_c);
-	kfree(skb_c);
+	kmem_cache_free(skb_c_cache, skb_c);
 
 	if (ret) {
 		LIBLCD_ERR("thc_ipc_call");
@@ -2395,6 +2427,10 @@ fail_lookup:
 
 }
 
+extern netdev_tx_t ixgbe_xmit_frame(struct sk_buff *skb,
+				struct net_device *dev);
+extern struct net_device *g_netdev;
+
 int ndo_start_xmit_callee(struct fipc_message *_request,
 		struct thc_channel *_channel,
 		struct glue_cspace *cspace,
@@ -2402,7 +2438,6 @@ int ndo_start_xmit_callee(struct fipc_message *_request,
 {
 	struct sk_buff *skb;
 	struct sk_buff_container *skb_c;
-	struct net_device_container *dev_container;
 	int ret;
 	struct fipc_message *_response;
 	unsigned 	int request_cookie;
@@ -2417,18 +2452,9 @@ int ndo_start_xmit_callee(struct fipc_message *_request,
 	unsigned long skbh_offset, skb_end;
 	struct skbuff_members *skb_lcd;
 	__be16 proto;
-
+	void *mem;
 	request_cookie = thc_get_request_cookie(_request);
-
 	xmit_type = fipc_get_reg0(_request);
-
-	ret = glue_cap_lookup_net_device_type(cspace,
-		__cptr(fipc_get_reg1(_request)),
-		&dev_container);
-	if (ret) {
-		LIBLCD_ERR("lookup");
-		goto fail_lookup;
-	}
 
 	skb_ref = __cptr(fipc_get_reg2(_request));
 
@@ -2487,7 +2513,10 @@ int ndo_start_xmit_callee(struct fipc_message *_request,
 		break;
 
 	case SHARED_DATA_XMIT:
-		skb = kzalloc(sizeof(struct sk_buff), GFP_KERNEL);
+		skb_c = mem = kmem_cache_alloc(skb_c_cache,
+					GFP_KERNEL);
+		skb = (struct sk_buff*)((char*)mem +
+				sizeof(struct sk_buff_container));
 
 		if (!skb) {
 			LIBLCD_MSG("out of mmeory");
@@ -2527,14 +2556,8 @@ int ndo_start_xmit_callee(struct fipc_message *_request,
 		break;
 	}
 
-	skb_c = kzalloc(sizeof(*skb_c), GFP_KERNEL);
-
-	if (!skb_c)
-		LIBLCD_MSG("no memory");
-
 	skb_c->skb = skb;
 	glue_insert_skbuff(cptr_table, skb_c);
-
 	skb_c->other_ref = skb_ref;
 
 	if (xmit_type == VOLUNTEER_XMIT) {
@@ -2554,9 +2577,7 @@ int ndo_start_xmit_callee(struct fipc_message *_request,
 #endif
 	} /* if */
 
-	func_ret = dev_container->net_device.
-			netdev_ops->ndo_start_xmit(
-			skb, &dev_container->net_device);
+	func_ret = ixgbe_xmit_frame(skb, g_netdev);
 
 	if (async_msg_blocking_send_start(_channel,
 		&_response)) {
@@ -2569,7 +2590,6 @@ int ndo_start_xmit_callee(struct fipc_message *_request,
 			request_cookie,
 			_response);
 fail_alloc:
-fail_lookup:
 fail_sync:
 	return ret;
 
@@ -3381,6 +3401,7 @@ gro_result_t napi_gro_receive(struct napi_struct *napi,
 	unsigned long skb_sz, skb_off, skbh_sz, skbh_off;
 	cptr_t skb_cptr, skbh_cptr;
 	struct skb_shared_info *shinfo;
+	struct page *p = NULL;
 
 	ret = async_msg_blocking_send_start(ixgbe_async,
 		&_request);
@@ -3402,11 +3423,11 @@ gro_result_t napi_gro_receive(struct napi_struct *napi,
 	if (shinfo->nr_frags) {
 		skb_frag_t *frag = &shinfo->frags[0];
 
-		printk("frag found, mapping");
 		fipc_set_reg1(_request,	gpa_val(lcd_gva2gpa(
 			__gva(
 			(unsigned long)lcd_page_address(
 				skb_frag_page(frag))))));
+		p = skb_frag_page(frag);
 	}
 
 	ret = lcd_virt_to_cptr(__gva((unsigned long)skb),
@@ -3437,7 +3458,7 @@ gro_result_t napi_gro_receive(struct napi_struct *napi,
 
 
 	glue_remove_skbuff(skb_c);
-	kfree(skb_c);
+	kmem_cache_free(skb_c_cache1, skb_c);
 
 	ret = thc_ipc_call(ixgbe_async,
 		_request,
@@ -3449,6 +3470,14 @@ gro_result_t napi_gro_receive(struct napi_struct *napi,
 	func_ret = fipc_get_reg1(_response);
 	fipc_recv_msg_end(thc_channel_to_fipc(ixgbe_async),
 			_response);
+
+	/* simulate the effect of put_page called by kfree_skb
+	 * a page_ref_inc is done by the driver to make sure that
+	 * this page is not freed and reused again
+	 */
+	if (p)
+		page_ref_dec(p);
+
 	return func_ret;
 fail_async:
 fail_ipc:
@@ -3538,7 +3567,7 @@ struct sk_buff *__napi_alloc_skb(struct napi_struct *napi,
 	skb = (void*)(gva_val(skb_gva) + skb_off);
 	skb->head = (void*)(gva_val(skbd_gva) + skbd_off);
 	skb->data = skb->head + data_off;
-	skb_c = kzalloc(sizeof(*skb_c), GFP_KERNEL);
+	skb_c = kmem_cache_alloc(skb_c_cache1, GFP_KERNEL);
 
 	if (!skb_c)
 		LIBLCD_MSG("no memory");
@@ -3614,116 +3643,6 @@ __be16 eth_type_trans(struct sk_buff *skb,
 	skb->head = skb_c->head;
 	skb->data = skb_c->data;
 
-	fipc_recv_msg_end(thc_channel_to_fipc(ixgbe_async),
-			_response);
-	return func_ret;
-fail_async:
-fail_ipc:
-	return ret;
-}
-
-void skb_add_rx_frag(struct sk_buff *skb,
-		int i,
-		struct page *page,
-		int off,
-		int size,
-		unsigned int truesize)
-{
-	int ret;
-	struct fipc_message *_request;
-	struct fipc_message *_response;
-	struct sk_buff_container *skb_c;
-	skb_frag_t *frag = &skb_shinfo(skb)->frags[i];
-
-	glue_lookup_skbuff(cptr_table,
-		__cptr((unsigned long)skb), &skb_c);
-
-	ret = async_msg_blocking_send_start(ixgbe_async,
-		&_request);
-	if (ret) {
-		LIBLCD_ERR("failed to get a send slot");
-		goto fail_async;
-	}
-
-	async_msg_set_fn_type(_request,
-			SKB_ADD_RX_FRAG);
-
-	fipc_set_reg0(_request,
-			skb_c->other_ref.cptr);
-	fipc_set_reg1(_request,
-			i);
-	fipc_set_reg2(_request,
-		gpa_val(lcd_gva2gpa(
-			__gva(
-			(unsigned long)lcd_page_address(page)))));
-
-	fipc_set_reg3(_request,
-			off);
-	fipc_set_reg4(_request,
-			size);
-	fipc_set_reg5(_request,
-			truesize);
-
-	/* save pointers */
-	skb_c->head = skb->head;
-	skb_c->data = skb->data;
-
-	printk("calling rpc rx_flag");
-
-	ret = thc_ipc_call(ixgbe_async,
-		_request,
-		&_response);
-	if (ret) {
-		LIBLCD_ERR("thc_ipc_call");
-		goto fail_ipc;
-	}
-	fipc_recv_msg_end(thc_channel_to_fipc(ixgbe_async),
-			_response);
-
-	/* restore pointers */
-	skb->head = skb_c->head;
-	skb->data = skb_c->data;
-
-	/* set LCD page's address */
-	frag->page.p = page;
-
-	printk("call returns rx_frag");
-
-	return;
-fail_async:
-fail_ipc:
-	return;
-}
-
-unsigned int eth_get_headlen(void *data,
-		unsigned int len)
-{
-	int ret;
-	struct fipc_message *_request;
-	struct fipc_message *_response;
-	unsigned 	int func_ret;
-	ret = async_msg_blocking_send_start(ixgbe_async,
-		&_request);
-	if (ret) {
-		LIBLCD_ERR("failed to get a send slot");
-		goto fail_async;
-	}
-	async_msg_set_fn_type(_request,
-			ETH_GET_HEADLEN);
-	fipc_set_reg1(_request,
-		gpa_val(lcd_gva2gpa(__gva((unsigned long)data))));
-
-	fipc_set_reg2(_request,
-			len);
-
-	ret = thc_ipc_call(ixgbe_async,
-		_request,
-		&_response);
-	if (ret) {
-		LIBLCD_ERR("thc_ipc_call");
-		goto fail_ipc;
-	}
-	func_ret = fipc_get_reg1(_response);
 	fipc_recv_msg_end(thc_channel_to_fipc(ixgbe_async),
 			_response);
 	return func_ret;

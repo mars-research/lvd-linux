@@ -64,6 +64,8 @@ lib-y += $(addprefix liblcd/arch/x86/dma/, \
 lib-y += $(addprefix liblcd/net/, \
 	dev_addr_lists.o \
 	dev.o \
+	skbuff.o \
+	flow_dissector.o \
 	)
 
 lib-y += liblcd/resolve.o

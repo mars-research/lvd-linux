@@ -38,6 +38,8 @@ struct kmem_cache *skbuff_cache;
 #define CPTR_HASH_BITS      5
 static DEFINE_HASHTABLE(cptr_table, CPTR_HASH_BITS);
 
+extern int init_default_flow_dissectors(void);
+
 int glue_ixgbe_init(void)
 {
 	int ret;
@@ -53,6 +55,9 @@ int glue_ixgbe_init(void)
 	}
 	ixgbe_cspace = c_cspace;
 	hash_init(cptr_table);
+
+        LIBLCD_MSG("dissector init ret %d",
+                init_default_flow_dissectors());
 
 	/* merge two datastructures into one for allocation */
 	skb_c_cache = kmem_cache_create("skb_c_cache",

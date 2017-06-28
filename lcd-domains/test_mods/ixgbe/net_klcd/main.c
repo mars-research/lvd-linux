@@ -22,6 +22,8 @@ struct net_info {
 };
 static LIST_HEAD(net_infos);
 struct thc_channel *xmit_chnl;
+struct thc_channel *xmit_irq_chnl;
+struct thc_channel *klcd_chnl;
 
 extern int setup_async_net_ring_channel(cptr_t tx, cptr_t rx, 
 				struct thc_channel **chnl_out);
@@ -152,6 +154,7 @@ static int do_one_register(cptr_t register_chnl)
 	int ret;
 	cptr_t sync_endpoint, tx, rx;
 	cptr_t tx_xmit, rx_xmit;
+	cptr_t txirq_xmit, rxirq_xmit;
 	struct thc_channel *chnl;
 	struct net_info *net_info;
 
@@ -184,6 +187,17 @@ static int do_one_register(cptr_t register_chnl)
 		goto fail3;
 	}
 
+	ret = lcd_cptr_alloc(&txirq_xmit);
+	if (ret) {
+		LIBLCD_ERR("cptr alloc failed");
+		goto fail2;
+	}
+	ret = lcd_cptr_alloc(&rxirq_xmit);
+	if (ret) {
+		LIBLCD_ERR("cptr alloc failed");
+		goto fail3;
+	}
+
 	/*
 	 * Set up regs and poll
 	 */
@@ -192,6 +206,9 @@ static int do_one_register(cptr_t register_chnl)
 	lcd_set_cr2(rx);
 	lcd_set_cr3(tx_xmit);
 	lcd_set_cr4(rx_xmit);
+	lcd_set_cr5(txirq_xmit);
+	lcd_set_cr6(rxirq_xmit);
+
 	ret = lcd_sync_poll_recv(register_chnl);
 	if (ret) {
 		if (ret == -EWOULDBLOCK)
@@ -216,12 +233,24 @@ static int do_one_register(cptr_t register_chnl)
 		goto fail6;
 	}
 
+	klcd_chnl = chnl;
+
 	LIBLCD_MSG("settingup xmit channel");
 	/*
 	 * Set up async ring channel
 	 */
 	ret = setup_async_net_ring_channel(tx_xmit, rx_xmit,
 					&xmit_chnl);
+	if (ret) {
+		LIBLCD_ERR("error setting up ring channel");
+		goto fail6;
+	}
+
+	/*
+	 * Set up async ring channel
+	 */
+	ret = setup_async_net_ring_channel(txirq_xmit, rxirq_xmit,
+					&xmit_irq_chnl);
 	if (ret) {
 		LIBLCD_ERR("error setting up ring channel");
 		goto fail6;
@@ -238,18 +267,14 @@ static int do_one_register(cptr_t register_chnl)
 		goto fail7;
 	}
 
-	net_info = add_net(xmit_chnl, c_cspace, sync_endpoint);
-	if (!net_info) {
-		LIBLCD_ERR("error adding to dispatch loop");
-		goto fail7;
-	}
-
 	LIBLCD_MSG("Returning from %s", __func__);
 	lcd_set_cr0(CAP_CPTR_NULL);
 	lcd_set_cr1(CAP_CPTR_NULL);
 	lcd_set_cr2(CAP_CPTR_NULL);
 	lcd_set_cr3(CAP_CPTR_NULL);
 	lcd_set_cr4(CAP_CPTR_NULL);
+	lcd_set_cr5(CAP_CPTR_NULL);
+	lcd_set_cr6(CAP_CPTR_NULL);
 
 	if (lcd_sync_reply())
 		LIBLCD_ERR("Error reply");
@@ -264,13 +289,16 @@ free_cptrs:
 	lcd_set_cr2(CAP_CPTR_NULL);
 	lcd_set_cr3(CAP_CPTR_NULL);
 	lcd_set_cr4(CAP_CPTR_NULL);
+	lcd_set_cr5(CAP_CPTR_NULL);
+	lcd_set_cr6(CAP_CPTR_NULL);
 	lcd_cptr_free(sync_endpoint);
 fail3:
 	lcd_cptr_free(tx);
 	lcd_cptr_free(tx_xmit);
+	lcd_cptr_free(txirq_xmit);
 fail2:
 	lcd_cptr_free(rx);
-	lcd_cptr_free(rx_xmit);
+	lcd_cptr_free(rxirq_xmit);
 fail1:
 	return ret;
 }

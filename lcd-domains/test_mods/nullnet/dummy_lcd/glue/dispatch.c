@@ -29,6 +29,7 @@ int dispatch_async_loop(struct thc_channel *channel,
 			/* wait until uninit is called */
 			return -1;
 		case NDO_START_XMIT:
+//			trace(NDO_START_XMIT);
 			return ndo_start_xmit_callee(message,
 					channel, cspace, sync_ep);
 		case NDO_VALIDATE_ADDR:
@@ -58,6 +59,10 @@ int dispatch_async_loop(struct thc_channel *channel,
 		case VALIDATE:
 			trace(VALIDATE);
 			return validate_callee(message, channel,
+					cspace, sync_ep);
+		case PREP_CHANNEL:
+			trace(PREP_CHANNEL);
+			return prep_channel_callee(message, channel,
 					cspace, sync_ep);
 
 		case TRIGGER_EXIT:

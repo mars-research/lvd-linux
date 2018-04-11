@@ -10,6 +10,7 @@
 #include <liblcd/sync_ipc_poll.h>
 #include "./nullnet_caller.h"
 
+#include "../rdtsc_helper.h"
 #include <lcd_config/post_hook.h>
 
 cptr_t nullnet_register_channel;
@@ -19,7 +20,11 @@ cptr_t nullnet_sync_endpoint;
 int dummy_done = 0;
 int dummy_init_module(void);
 void dummy_cleanup_module(void);
+struct thc_channel_group ch_grp;
 
+bool tdiff_valid = false;
+u64 tdiff_disp = 0ull;
+TS_DECL(disp_loop);
 /* LOOP ---------------------------------------- */
 
 static void main_and_loop(void)
@@ -45,12 +50,18 @@ static void main_and_loop(void)
 		 * will not yield until it tries to use the async
 		 * channel). */
 		while (!stop && !dummy_done) {
+			struct thc_channel_group_item* curr_item;
+
+
 			/*
 			 * Do one async receive
 			 */
-			ret = thc_ipc_poll_recv(net_async, &msg);
+//			ret = thc_ipc_poll_recv(net_async, &msg);
+//			TS_START_LCD(disp_loop);
+			ret = thc_poll_recv_group(&ch_grp, &curr_item, &msg);
 			if (ret) {
 				if (ret == -EWOULDBLOCK) {
+					cpu_relax();
 					continue;
 				} else {
 					LIBLCD_ERR("async recv failed");
@@ -60,11 +71,21 @@ static void main_and_loop(void)
 			/*
 			 * Got a message. Dispatch.
 			 */
+/*			if (async_msg_get_fn_type(msg) ==
+					NDO_START_XMIT) {
+				//TS_STOP_LCD(disp_loop);
+				//tdiff_disp = TS_DIFF(disp_loop);
+				//tdiff_valid = true;
+			} else {
+				printk("Some other message");
+			}
+*/
 			ASYNC(
 
-				ret = dispatch_async_loop(net_async, msg,
-							nullnet_cspace, 
-							nullnet_sync_endpoint);
+			ret = dispatch_async_loop(curr_item->channel,
+					msg,
+					nullnet_cspace, 
+					nullnet_sync_endpoint);
 				if (ret) {
 					LIBLCD_ERR("async dispatch failed");
 					stop = 1;
@@ -104,6 +125,7 @@ static int __noreturn dummy_lcd_init(void)
 		goto fail2;
 	}
 
+	thc_channel_group_init(&ch_grp);
 	/* RUN CODE / LOOP ---------------------------------------- */
 
 	main_and_loop();

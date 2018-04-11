@@ -92,7 +92,7 @@ static struct rtnl_link_stats64 *dummy_get_stats64(struct net_device *dev,
 	return stats;
 }
 
-static netdev_tx_t dummy_xmit(struct sk_buff *skb, struct net_device *dev)
+netdev_tx_t dummy_xmit(struct sk_buff *skb, struct net_device *dev)
 {
 #ifndef LCD_ISOLATE
 	struct pcpu_dstats *dstats = this_cpu_ptr(dev->dstats);
@@ -105,6 +105,7 @@ static netdev_tx_t dummy_xmit(struct sk_buff *skb, struct net_device *dev)
 	g_dstats.tx_packets++;
 	g_dstats.tx_bytes += skb->len;
 #endif
+//	printk("%s, hit", __func__);
 	dev_kfree_skb(skb);
 	return NETDEV_TX_OK;
 }

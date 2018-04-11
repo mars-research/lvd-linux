@@ -43,6 +43,7 @@ enum dispatch_t {
 	VALIDATE,
 	SETUP,
 	TRIGGER_EXIT,
+	PREP_CHANNEL,
 };
 
 typedef enum {
@@ -76,8 +77,9 @@ struct skbuff_members {
 #define C(x)	skb_lcd->x = skb->x
 #define P(x)	skb->x = skb_lcd->x
 
-
-#define PMFS_ASYNC_RPC_BUFFER_ORDER 12
+#define CONSUME_SKB_SEND_ONLY
+#define NO_AWE
+#define PMFS_ASYNC_RPC_BUFFER_ORDER 20
 /* CONTAINERS 	---------- */
 struct net_device_container {
 	struct net_device net_device;
@@ -248,6 +250,23 @@ async_msg_blocking_send_start(struct thc_channel *chnl,
 		if (!ret || ret != -EWOULDBLOCK)
 			return ret;
 		cpu_relax();
+		if (kthread_should_stop())
+			return -EIO;
+	}
+}
+
+static inline
+int
+async_msg_blocking_send_start_inc(struct thc_channel *chnl, 
+			struct fipc_message **out, u64 __maybe_unused *counter)
+{
+	int ret;
+	for (;;) {
+		(*counter)++;
+		/* Poll until we get a free slot or error */
+		ret = fipc_send_msg_start(thc_channel_to_fipc(chnl), out);
+		if (!ret || ret != -EWOULDBLOCK)
+			return ret;
 		if (kthread_should_stop())
 			return -EIO;
 	}

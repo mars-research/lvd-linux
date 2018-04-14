@@ -338,7 +338,7 @@ int create_one_async_channel(struct thc_channel **chnl, cptr_t *tx, cptr_t *rx)
 
 	xmit_ch_item = kzalloc(sizeof(*xmit_ch_item), GFP_KERNEL);
 
-	thc_channel_group_item_init(xmit_ch_item, *chnl, NULL, false);
+	thc_channel_group_item_init(xmit_ch_item, *chnl, NULL);
 
 	thc_channel_group_item_add(&ch_grp, xmit_ch_item);
 
@@ -376,7 +376,7 @@ int __rtnl_link_register(struct rtnl_link_ops *ops)
 
 	ch_item = kzalloc(sizeof(*ch_item), GFP_KERNEL);
 
-	thc_channel_group_item_init(ch_item, chnl, NULL, true);
+	thc_channel_group_item_init(ch_item, chnl, NULL);
 
 	thc_channel_group_item_add(&ch_grp, ch_item);
 
@@ -389,7 +389,7 @@ int __rtnl_link_register(struct rtnl_link_ops *ops)
 	xmit_ch_item = kzalloc(sizeof(*xmit_ch_item), GFP_KERNEL);
 
 	thc_channel_group_item_init(xmit_ch_item,
-				xmit_chnl, NULL, false);
+				xmit_chnl, NULL);
 
 	thc_channel_group_item_add(&ch_grp, xmit_ch_item);
 

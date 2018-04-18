@@ -2922,7 +2922,7 @@ static int xmit_one(struct sk_buff *skb, struct net_device *dev,
 	return rc;
 }
 
-struct sk_buff *dev_hard_start_xmit(struct sk_buff *first, struct net_device *dev,
+struct sk_buff *__dev_hard_start_xmit(struct sk_buff *first, struct net_device *dev,
 				    struct netdev_queue *txq, int *ret)
 {
 	struct sk_buff *skb = first;
@@ -2944,10 +2944,44 @@ struct sk_buff *dev_hard_start_xmit(struct sk_buff *first, struct net_device *de
 			break;
 		}
 	}
-
 out:
 	*ret = rc;
 	return skb;
+
+}
+
+/* send it by calling xmit once. In the KLCD driver, let's do do finish */
+struct noinline sk_buff *__dev_hard_start_xmit_async(struct sk_buff *skb, struct net_device *dev,
+				    struct netdev_queue *txq, int *ret)
+{
+	int rc = NETDEV_TX_OK;
+
+	skb->chain_skb = true;
+
+	rc = xmit_one(skb, dev, txq, skb->next != NULL);
+	if (unlikely(!dev_xmit_complete(rc))) {
+		goto out;
+	}
+
+	if (netif_xmit_stopped(txq) && skb) {
+		rc = NETDEV_TX_BUSY;
+		goto out;
+	}
+out:
+	*ret = rc;
+	return skb;
+
+}
+
+
+struct noinline sk_buff *dev_hard_start_xmit(struct sk_buff *first, struct net_device *dev,
+				    struct netdev_queue *txq, int *ret)
+{
+	if (dev->features & NETIF_F_CHAIN_SKB)
+		if (first->next)
+			return __dev_hard_start_xmit_async(first, dev, txq, ret);
+
+	return __dev_hard_start_xmit(first, dev, txq, ret);
 }
 
 static struct sk_buff *validate_xmit_vlan(struct sk_buff *skb,

@@ -75,6 +75,7 @@ enum {
 
 	NETIF_F_HW_TC_BIT,		/* Offload TC infrastructure */
 	NETIF_F_PRIV_DATA_POOL_BIT,	/* private pool for skb->data */
+	NETIF_F_CHAIN_SKB_BIT,
 	/*
 	 * Add your fresh new feature above and remember to update
 	 * netdev_features_strings[] in net/core/ethtool.c and maybe
@@ -137,6 +138,7 @@ enum {
 #define NETIF_F_BUSY_POLL	__NETIF_F(BUSY_POLL)
 #define NETIF_F_HW_TC		__NETIF_F(HW_TC)
 #define NETIF_F_PRIV_DATA_POOL	__NETIF_F(PRIV_DATA_POOL)
+#define NETIF_F_CHAIN_SKB	__NETIF_F(CHAIN_SKB)
 
 #define for_each_netdev_feature(mask_addr, bit)	\
 	for_each_set_bit(bit, (unsigned long *)mask_addr, NETDEV_FEATURE_COUNT)

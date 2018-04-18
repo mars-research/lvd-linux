@@ -529,6 +529,8 @@ int ip_do_fragment(struct net *net, struct sock *sk, struct sk_buff *skb,
 	__be16 not_last_frag;
 	struct rtable *rt = skb_rtable(skb);
 	int err = 0;
+	bool first = true, chain = false;
+	struct sk_buff *head_skb, *oskb;
 
 	dev = rt->dst.dev;
 
@@ -565,6 +567,7 @@ int ip_do_fragment(struct net *net, struct sock *sk, struct sk_buff *skb,
 	if (skb_has_frag_list(skb)) {
 		struct sk_buff *frag, *frag2;
 		int first_len = skb_pagelen(skb);
+		int loop = 0;
 
 		if (first_len - hlen > mtu ||
 		    ((first_len - hlen) & 7) ||
@@ -603,6 +606,11 @@ int ip_do_fragment(struct net *net, struct sock *sk, struct sk_buff *skb,
 		iph->frag_off = htons(IP_MF);
 		ip_send_check(iph);
 
+		if (dev->features & NETIF_F_CHAIN_SKB) {
+			chain = first = true;
+			head_skb = oskb = skb;
+		}
+
 		for (;;) {
 			/* Prepare header of the next frame,
 			 * before previous one went down. */
@@ -625,17 +633,59 @@ int ip_do_fragment(struct net *net, struct sock *sk, struct sk_buff *skb,
 				ip_send_check(iph);
 			}
 
-			err = output(net, sk, skb);
 
-			if (!err)
-				IP_INC_STATS(net, IPSTATS_MIB_FRAGCREATES);
-			if (err || !frag)
-				break;
+			pr_debug("%s:%u, calling ip_output %d | skb %p | skb->len %d | skb->next %p | frag %p | frag->len %d | frag->next %p \n", __func__,
+							__LINE__, ++loop, skb, skb ? skb->len : 0, skb ? skb->next : 0,
+							frag, frag ? frag->len : 0, frag ? frag->next : 0);
+			if (!chain) {
+				err = output(net, sk, skb);
 
-			skb = frag;
-			frag = skb->next;
-			skb->next = NULL;
+				if (!err)
+					IP_INC_STATS(net, IPSTATS_MIB_FRAGCREATES);
+				if (err || !frag)
+					break;
+
+				skb = frag;
+				frag = skb->next;
+				skb->next = NULL;
+
+			} else {
+				if (!frag)
+					break;
+				skb = frag;
+				frag = skb->next;
+				skb->next = NULL;
+
+				if (first) {
+					head_skb->next = skb;
+					oskb = skb;
+					first = false;
+				} else {
+					oskb->next = skb;
+					oskb = skb;
+				}
+			}
 		}
+		/* set the final skb to null */
+		if (chain) {
+			//skb->next = NULL;
+
+			pr_debug("%s, sending the chained skb\n", __func__);
+
+			/* send the head of this skb chain */
+			err = output(net, sk, head_skb);
+
+			if (err)
+				goto err_fast;
+
+			oskb = head_skb;
+			/* for all the packets, inc the stats */
+			while (oskb) {
+				IP_INC_STATS(net, IPSTATS_MIB_FRAGCREATES);
+				oskb = oskb->next;
+			}
+
+		} // if
 
 		if (err == 0) {
 			IP_INC_STATS(net, IPSTATS_MIB_FRAGOKS);
@@ -647,6 +697,7 @@ int ip_do_fragment(struct net *net, struct sock *sk, struct sk_buff *skb,
 			kfree_skb(frag);
 			frag = skb;
 		}
+err_fast:
 		IP_INC_STATS(net, IPSTATS_MIB_FRAGFAILS);
 		return err;
 

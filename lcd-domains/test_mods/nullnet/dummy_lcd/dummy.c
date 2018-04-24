@@ -105,8 +105,11 @@ netdev_tx_t dummy_xmit(struct sk_buff *skb, struct net_device *dev)
 	g_dstats.tx_packets++;
 	g_dstats.tx_bytes += skb->len;
 #endif
-//	printk("%s, hit", __func__);
+
+#ifndef NO_HASHING
 	dev_kfree_skb(skb);
+#endif
+	//printk("%s, got packet\n", __func__);
 	return NETDEV_TX_OK;
 }
 
@@ -191,7 +194,7 @@ static void dummy_setup(struct net_device *dev)
 	dev->features	|= NETIF_F_SG | NETIF_F_FRAGLIST;
 	dev->features	|= NETIF_F_ALL_TSO | NETIF_F_UFO;
 	dev->features	|= NETIF_F_HW_CSUM | NETIF_F_HIGHDMA | NETIF_F_LLTX | NETIF_F_PRIV_DATA_POOL;
-	dev->features	|= NETIF_F_GSO_ENCAP_ALL;
+	dev->features	|= NETIF_F_GSO_ENCAP_ALL | NETIF_F_CHAIN_SKB;
 	dev->hw_features |= dev->features;
 	dev->hw_enc_features |= dev->features;
 

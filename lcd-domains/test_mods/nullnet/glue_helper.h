@@ -19,31 +19,32 @@
 #include <liblcd/sync_ipc_poll.h>
 
 enum dispatch_t {
-	REGISTER_NETDEVICE,
-	UNREGISTER_NETDEVICE,
-	ETHER_SETUP,
-	ETH_MAC_ADDR,
-	ETH_VALIDATE_ADDR,
-	FREE_NETDEV,
-	NETIF_CARRIER_OFF,
+	REGISTER_NETDEVICE = 0,
+	UNREGISTER_NETDEVICE = 1,
+	ETHER_SETUP = 2,
+	ETH_MAC_ADDR =3,
+	ETH_VALIDATE_ADDR = 4,
+	FREE_NETDEV= 5,
+	NETIF_CARRIER_OFF=6,
 	NETIF_CARRIER_ON,
-	__RTNL_LINK_REGISTER,
+	__RTNL_LINK_REGISTER = 8,
 	__RTNL_LINK_UNREGISTER,
 	RTNL_LINK_UNREGISTER,
 	ALLOC_NETDEV_MQS,
-	CONSUME_SKB,
+	CONSUME_SKB = 12,
 	NDO_INIT,
 	NDO_UNINIT,
 	NDO_START_XMIT,
-	NDO_VALIDATE_ADDR,
+	NDO_VALIDATE_ADDR = 16,
 	NDO_SET_RX_MODE,
 	NDO_SET_MAC_ADDRESS,
 	NDO_GET_STATS64,
-	NDO_CHANGE_CARRIER,
-	VALIDATE,
-	SETUP,
-	TRIGGER_EXIT,
-	PREP_CHANNEL,
+	NDO_CHANGE_CARRIER = 20,
+	VALIDATE = 21,
+	SETUP = 22,
+	TRIGGER_EXIT =23,
+	TRIGGER_CLEAN,
+	PREP_CHANNEL=25,
 };
 
 typedef enum {
@@ -79,7 +80,16 @@ struct skbuff_members {
 
 #define CONSUME_SKB_SEND_ONLY
 #define NO_AWE
-#define PMFS_ASYNC_RPC_BUFFER_ORDER 20
+#define NO_HASHING
+//#define NO_MARSHAL
+
+//#define DOUBLE_HASHING
+//#define ONE_SLOT
+
+//#define CACHE_ALIGNED __attribute__((aligned(64)))
+
+#define PMFS_ASYNC_RPC_BUFFER_ORDER 12
+// LCD_DEBUG
 /* CONTAINERS 	---------- */
 struct net_device_container {
 	struct net_device net_device;
@@ -90,7 +100,8 @@ struct net_device_ops_container {
 	struct net_device_ops net_device_ops;
 	cptr_t other_ref;
 	cptr_t my_ref;
-};
+} CACHE_ALIGNED;
+
 struct nlattr_container {
 	struct nlattr nlattr;
 	cptr_t other_ref;
@@ -128,7 +139,7 @@ struct sk_buff_container {
 	struct cptr other_ref;
 	struct cptr my_ref;
 	struct task_struct *tsk;
-};
+} CACHE_ALIGNED;
 
 
 /* CSPACES ------------------------------------------------------------ */
@@ -257,6 +268,23 @@ async_msg_blocking_send_start(struct thc_channel *chnl,
 
 static inline
 int
+async_msg_blocking_send_start_0(struct thc_channel *chnl, 
+			struct fipc_message **out)
+{
+	int ret;
+	for (;;) {
+		/* Poll until we get a free slot or error */
+		ret = fipc_send_msg_start_0(thc_channel_to_fipc(chnl), out);
+		if (!ret || ret != -EWOULDBLOCK)
+			return ret;
+		cpu_relax();
+		if (kthread_should_stop())
+			return -EIO;
+	}
+}
+
+static inline
+int
 async_msg_blocking_send_start_inc(struct thc_channel *chnl, 
 			struct fipc_message **out, u64 __maybe_unused *counter)
 {
@@ -271,5 +299,53 @@ async_msg_blocking_send_start_inc(struct thc_channel *chnl,
 			return -EIO;
 	}
 }
+extern void *_thc_allocstack(void);
+extern int  _thc_schedulecont(struct awe_t *awe) __attribute__((returns_twice));
+#if 0
+inline
+int thc_ipc_recv_response_new(struct thc_channel* channel,
+			struct fipc_message** out, uint64_t id )
+{
+	int ret;
+	int received_cookie;
+retry:
+	while ( 1 )
+	{
+		// Poll until we get a message or error
+		*out = get_current_rx_slot( channel);
+
+		if ( ! check_rx_slot_msg_waiting( *out ) )
+		{
+			// No messages to receive, yield to next async
+			//printf("No messages to recv, yield and save into id:%llu\n", id);
+			THCYieldAndSave(id);
+			continue; 
+		}
+
+		break;
+	}
+
+	received_cookie = thc_get_msg_id(*out);
+	if (received_cookie == id) {
+		//printf("Message is ours id:%llu\n", (*out)->regs[0]);
+		inc_rx_slot( channel ); 
+		return 0;
+	}
+	
+	//printf("Message is not ours yielding to id:%llu\n", (*out)->regs[0]);
+	ret = THCYieldToIdAndSave(received_cookie, id);
+	 
+	//ret = THCYieldToId((*out)->regs[0]);
+	if (ret) {
+		printk("ALERT: wrong id\n");
+		return ret;
+	}
+
+	// We came back here but maybe we're the last AWE and 
+        // we're re-started by do finish
+	goto retry; 
+	return 0;
+}
+#endif /* #if 0 */
 
 #endif /* _GLUE_HELPER_H_ */

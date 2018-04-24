@@ -90,8 +90,13 @@ int dispatch_async_loop(struct thc_channel *channel,
 		break;
 	case CONSUME_SKB:
 		//LIBLCD_MSG("Calling function consume_skb");
+		//trace(CONSUME_SKB);
+#ifndef NO_HASHING
 		ret = consume_skb_callee(message, channel, cspace,
 						sync_endpoint);
+#else
+		ret = 0;
+#endif
 		break;
 
 	default:

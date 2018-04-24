@@ -56,10 +56,8 @@ static void main_and_loop(void)
 			/*
 			 * Do one async receive
 			 */
-//			ret = thc_ipc_poll_recv(net_async, &msg);
-//			TS_START_LCD(disp_loop);
-			ret = thc_poll_recv_group(&ch_grp, &curr_item, &msg);
-			if (ret) {
+			ret = thc_poll_recv_group_2(&ch_grp, &curr_item, &msg);
+			if (likely(ret)) {
 				if (ret == -EWOULDBLOCK) {
 					cpu_relax();
 					continue;
@@ -68,30 +66,31 @@ static void main_and_loop(void)
 					stop = 1; /* stop */
 				}
 			}
-			/*
-			 * Got a message. Dispatch.
-			 */
-/*			if (async_msg_get_fn_type(msg) ==
-					NDO_START_XMIT) {
-				//TS_STOP_LCD(disp_loop);
-				//tdiff_disp = TS_DIFF(disp_loop);
-				//tdiff_valid = true;
+
+			if (async_msg_get_fn_type(msg) == NDO_START_XMIT) {
+				ret = ndo_start_xmit_noawe(msg,
+					curr_item->channel,
+					nullnet_cspace,
+					nullnet_sync_endpoint); 
+				if (likely(ret)) {
+					LIBLCD_ERR("async dispatch failed");
+					stop = 1;
+				}
+
 			} else {
-				printk("Some other message");
-			}
-*/
 			ASYNC(
 
 			ret = dispatch_async_loop(curr_item->channel,
 					msg,
 					nullnet_cspace, 
 					nullnet_sync_endpoint);
+	
 				if (ret) {
 					LIBLCD_ERR("async dispatch failed");
 					stop = 1;
 				}
-
-				);
+			);
+			}
 		}
 		
 		LIBLCD_MSG("NULLNET EXITED DISPATCH LOOP");

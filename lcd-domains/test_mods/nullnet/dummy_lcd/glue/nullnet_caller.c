@@ -24,16 +24,21 @@ struct kmem_cache *skbuff_cache;
 
 extern bool tdiff_valid;
 extern u64 tdiff_disp;
-#define LCD_MEASUREMENT
+//#define LCD_MEASUREMENT
 #define LCD_SKB_CONTAINER
 #define NOLOOKUP
+#define STATIC_SKB
+
 /* XXX: How to determine this? */
 #define CPTR_HASH_BITS      5
+
+
 static DEFINE_HASHTABLE(cptr_table, CPTR_HASH_BITS);
 
 struct lcd_sk_buff_container {
 	struct cptr my_ref, other_ref;
 	struct sk_buff skbuff;
+	uint64_t tid;
 };
 
 int glue_nullnet_init(void)
@@ -110,6 +115,118 @@ void glue_remove_skbuff(struct sk_buff_container *skb_c)
 	hash_del(&skb_c->hentry);
 }
 
+#ifdef ONE_SLOT
+static int setup_async_channel_0(cptr_t *buf1_cptr_out, cptr_t *buf2_cptr_out,
+			struct thc_channel **chnl_out)
+{
+	int ret;
+	cptr_t buf1_cptr, buf2_cptr;
+	gva_t buf1_addr, buf2_addr;
+	struct fipc_ring_channel *fchnl;
+	struct thc_channel *chnl;
+
+	// we need only one page
+	unsigned int pg_order = 0;
+
+	LIBLCD_MSG("%s\n",__func__);
+	/*
+	 * Allocate buffers
+	 *
+	 * (We use the lower level alloc. If we used the heap, even though
+	 * we may alloc only 1 - 2 pages, we would end up sharing around
+	 * 4 MB chunks of memory, since the heap uses coarse microkernel
+	 * allocations.)
+	 */
+	ret = _lcd_alloc_pages(GFP_KERNEL, pg_order, &buf1_cptr);
+	if (ret) {
+		LIBLCD_ERR("buf1 alloc");
+		goto fail1;
+	}
+	ret = _lcd_alloc_pages(GFP_KERNEL, pg_order, &buf2_cptr);
+	if (ret) {
+		LIBLCD_ERR("buf2 alloc");
+		goto fail2;
+	}
+	/*
+	 * Map them somewhere
+	 */
+	ret = lcd_map_virt(buf1_cptr, pg_order, &buf1_addr);
+	if (ret) {
+		LIBLCD_ERR("error mapping buf1");
+		goto fail3;
+	}
+	ret = lcd_map_virt(buf2_cptr, pg_order, &buf2_addr);
+	if (ret) {
+		LIBLCD_ERR("error mapping buf2");
+		goto fail4;
+	}
+	/*
+	 * Prep buffers for rpc
+	 */
+	ret = fipc_prep_buffers_0(sizeof(struct fipc_message),
+				(void *)gva_val(buf1_addr),
+				(void *)gva_val(buf2_addr));
+	if (ret) {
+		LIBLCD_ERR("prep buffers");
+		goto fail5;
+	}
+	LIBLCD_MSG("==> Prep buffers");
+	/*
+	 * Alloc and init channel header
+	 */
+	fchnl = kmalloc(sizeof(*fchnl), GFP_KERNEL);
+	if (!fchnl) {
+		ret = -ENOMEM;
+		LIBLCD_ERR("chnl alloc");
+		goto fail6;
+	}
+	ret = fipc_ring_channel_init_0(fchnl, sizeof(struct fipc_message),
+				(void *)gva_val(buf1_addr),
+				(void *)gva_val(buf2_addr));
+	if (ret) {
+		LIBLCD_ERR("ring chnl init");
+		goto fail7;
+	}
+
+	/*
+	 * Install async channel in async dispatch loop
+	 */
+	chnl = kzalloc(sizeof(*chnl), GFP_KERNEL);
+	if (!chnl) {
+		ret = -ENOMEM;
+		LIBLCD_ERR("alloc failed");
+		goto fail8;
+	}
+	ret = thc_channel_init_0(chnl, fchnl);
+	if (ret) {
+		LIBLCD_ERR("error init'ing async channel group item");
+		goto fail9;
+	}
+
+	*buf1_cptr_out = buf1_cptr;
+	*buf2_cptr_out = buf2_cptr;
+	*chnl_out = chnl;
+
+	return 0;
+
+fail9:
+	kfree(chnl);
+fail8:
+fail7:
+	kfree(fchnl);
+fail6:
+fail5:
+	lcd_unmap_virt(buf1_addr, pg_order);
+fail4:
+	lcd_unmap_virt(buf1_addr, pg_order);
+fail3:
+	lcd_cap_delete(buf2_cptr);
+fail2:
+	lcd_cap_delete(buf1_cptr);
+fail1:
+	return ret; 
+}
+#endif
 
 static int setup_async_channel(cptr_t *buf1_cptr_out, cptr_t *buf2_cptr_out,
 			struct thc_channel **chnl_out)
@@ -324,13 +441,18 @@ fail1:
 	return ret;
 }
 
+struct thc_channel_group_item *ptrs[32];
+
 int create_one_async_channel(struct thc_channel **chnl, cptr_t *tx, cptr_t *rx)
 {
 	int ret;
+	static int idx = 0;
 	struct thc_channel_group_item *xmit_ch_item;
-
+#ifdef ONE_SLOT
+	ret = setup_async_channel_0(tx, rx, chnl);
+#else
 	ret = setup_async_channel(tx, rx, chnl);
-
+#endif
 	if (ret) {
 		LIBLCD_ERR("async xmit chnl setup failed");
 		return -1;
@@ -340,7 +462,11 @@ int create_one_async_channel(struct thc_channel **chnl, cptr_t *tx, cptr_t *rx)
 
 	thc_channel_group_item_init(xmit_ch_item, *chnl, NULL);
 
+	xmit_ch_item->xmit_channel = true;
+
 	thc_channel_group_item_add(&ch_grp, xmit_ch_item);
+
+	ptrs[idx++%32] = xmit_ch_item;
 
 	return 0;
 }
@@ -836,6 +962,7 @@ struct net_device *alloc_netdev_mqs(int sizeof_priv, const char *name, unsigned 
 	fipc_set_reg4(request, txqs);
 	fipc_set_reg5(request, rxqs);
 	fipc_set_reg6(request, ret1->my_ref.cptr);
+	printk("%s, netdevice lcd cptr : %lu", __func__, ret1->my_ref.cptr);
 	err = thc_ipc_call(net_async, request, &response);
 	if (err) {
 		LIBLCD_ERR("thc_ipc_call");
@@ -855,6 +982,7 @@ fail_insert:
 
 TS_DECL(ipc_send);
 TS_DECL(hlookup);
+
 void consume_skb(struct sk_buff *skb)
 {
 #ifdef LCD_SKB_CONTAINER
@@ -885,6 +1013,10 @@ void consume_skb(struct sk_buff *skb)
 	async_msg_set_fn_type(request, CONSUME_SKB);
 	fipc_set_reg0(request, skb_c->other_ref.cptr);
 
+//	printk("%s: sending pid %llu", __func__,skb_c->tid);
+#ifdef DOUBLE_HASHING
+	fipc_set_reg1(request, skb_c->tid);
+#endif
 	if (!skb->private) {
 		ret = lcd_virt_to_cptr(__gva((unsigned long)skb),
 			&skb_cptr,
@@ -931,7 +1063,10 @@ void consume_skb(struct sk_buff *skb)
 #ifndef LCD_SKB_CONTAINER
 	glue_remove_skbuff(skb_c);
 #endif
+
+#ifndef STATIC_SKB
 	kmem_cache_free(skb_c_cache, skb_c);
+#endif
 
 #ifndef CONSUME_SKB_SEND_ONLY
 	fipc_recv_msg_end(thc_channel_to_fipc(net_async), response);
@@ -1061,15 +1196,157 @@ int prep_channel_callee(struct fipc_message *_request,
 	return ret;
 }
 
+int dummy_return_callee(struct fipc_message *_request, struct thc_channel *channel, struct glue_cspace *cspace, struct cptr sync_ep)
+{
+	struct fipc_message *response;
+#if 0
+	xmit_type_t xmit_type;
+	unsigned long skbh_offset, skb_end;
+	__be16 proto;
+	u32 len;
+	cptr_t skb_ref;
+
+	xmit_type = fipc_get_reg0(_request);
+
+	skb_ref = __cptr(fipc_get_reg2(_request));
+
+	skbh_offset = fipc_get_reg3(_request);
+
+	skb_end = fipc_get_reg4(_request);
+	proto = fipc_get_reg5(_request);
+	len = fipc_get_reg6(_request);
+#endif
+	fipc_recv_msg_end(thc_channel_to_fipc(channel), _request);
+
+	if (likely(async_msg_blocking_send_start(channel, &response))) {
+		LIBLCD_ERR("error getting response msg");
+		return -EIO;
+	}
+//	fipc_set_reg1(response, skb_end|skbh_offset| proto | len | cptr_val(skb_ref));
+	fipc_send_msg_end(thc_channel_to_fipc(channel), response);
+
+	return 0;
+}
+
+int ndo_start_xmit_noawe(struct fipc_message *_request, struct thc_channel *channel, struct glue_cspace *cspace, struct cptr sync_ep)
+{
+#if defined(NO_HASHING) && defined(STATIC_SKB)
+	struct sk_buff static_skb;
+	struct sk_buff *skb = &static_skb;
+#else
+	struct sk_buff *skb;
+#endif
+
+#ifndef NO_HASHING
+	struct lcd_sk_buff_container static_skb_c;
+	struct lcd_sk_buff_container *skb_c = &static_skb_c;
+	uint64_t pid;
+#endif /* NO_HASHING */
+
+	struct fipc_message *response;
+#ifndef NO_AWE
+	unsigned 	int request_cookie;
+#endif
+	int ret;
+#ifdef COPY
+	struct skbuff_members *skb_lcd;
+#endif
+
+#ifndef NO_MARSHAL
+	xmit_type_t xmit_type;
+	unsigned long skbh_offset, skb_end;
+	__be16 proto;
+	u32 len;
+	cptr_t skb_ref;
+
+	xmit_type = fipc_get_reg0(_request);
+
+	skb_ref = __cptr(fipc_get_reg2(_request));
+
+	skbh_offset = fipc_get_reg3(_request);
+
+	skb_end = fipc_get_reg4(_request);
+	proto = fipc_get_reg5(_request);
+	len = fipc_get_reg6(_request);
+#endif
+	fipc_recv_msg_end(thc_channel_to_fipc(channel),
+				_request);
+
+#ifndef NO_HASHING		
+	skb = &skb_c->skbuff;
+	skb_c->tid = pid;
+#endif /* NO_HASHING */
+
+#ifndef NO_MARSHAL
+	skb->head = (char*)data_pool + skbh_offset;
+	skb->end = skb_end;
+	skb->len = len;
+	skb->private = true;
+#endif
+
+#ifdef COPY
+	skb_lcd = SKB_LCD_MEMBERS(skb);
+
+	P(len);
+	P(data_len);
+	P(queue_mapping);
+	P(xmit_more);
+	P(tail);
+	P(truesize);
+	P(ip_summed);
+	P(csum_start);
+	P(network_header);
+	P(csum_offset);
+	P(transport_header);
+
+	if (0)
+	LIBLCD_MSG("lcd-> l: %d | dlen %d | qm %d"
+		   " | xm %d | t %lu |ts %u",
+		skb->len, skb->data_len, skb->queue_mapping,
+		skb->xmit_more, skb->tail, skb->truesize);
+
+	skb->data = skb->head + skb_lcd->head_data_off;
+#endif
+
+	
+#ifndef NO_HASHING
+	skb_c->other_ref = skb_ref;
+#endif
+
+	ret = dummy_xmit(skb, NULL);
+
+	if (async_msg_blocking_send_start(channel, &response)) {
+		LIBLCD_ERR("error getting response msg");
+		return -EIO;
+	}
+
+	fipc_set_reg1(response, ret);
+	thc_set_msg_type(response, msg_type_response);
+	fipc_send_msg_end(thc_channel_to_fipc(channel), response);
+	//printk("%s, response sent\n", __func__);
+	return ret;
+}
 
 int ndo_start_xmit_callee(struct fipc_message *_request, struct thc_channel *channel, struct glue_cspace *cspace, struct cptr sync_ep)
 {
+#if defined(STATIC_SKB) && defined(NO_HASHING)
+	struct sk_buff static_skb;
+#endif
 	struct sk_buff *skb;
+#ifndef NO_HASHING
 #ifdef LCD_SKB_CONTAINER
+#ifdef STATIC_SKB
+	struct lcd_sk_buff_container static_skb_c;
+	struct lcd_sk_buff_container *skb_c = &static_skb_c;
+#else /* STATIC_SKB */
 	struct lcd_sk_buff_container *skb_c;
+#endif /* STATIC_SKB */
 #else
 	struct sk_buff_container *skb_c;
 #endif
+	uint64_t pid;
+#endif /* NO_HASHING */
+
 #ifndef NOLOOKUP
 	struct net_device_container *net_dev_container;
 #endif
@@ -1089,6 +1366,9 @@ int ndo_start_xmit_callee(struct fipc_message *_request, struct thc_channel *cha
 #endif
 	__be16 proto;
 	u32 len;
+#ifdef DOUBLE_HASHING
+	uint64_t len_pid;
+#endif
 	cptr_t skb_ref;
 	unsigned int data_off;
 #ifdef LCD_MEASUREMENT
@@ -1128,7 +1408,14 @@ int ndo_start_xmit_callee(struct fipc_message *_request, struct thc_channel *cha
 
 	skb_end = fipc_get_reg4(_request);
 	proto = fipc_get_reg5(_request);
+#ifdef DOUBLE_HASHING
+	len_pid = fipc_get_reg6(_request);
+	pid = len_pid >> 32;
+	len = len_pid & 0xFFFFFFFF;
+	//printk("Got pid %llu", pid);
+#else
 	len = fipc_get_reg6(_request);
+#endif
 
 	fipc_recv_msg_end(thc_channel_to_fipc(channel),
 				_request);
@@ -1184,17 +1471,17 @@ int ndo_start_xmit_callee(struct fipc_message *_request, struct thc_channel *cha
 #ifdef LCD_MEASUREMENT
 //		TS_START_LCD(con_skb);
 #endif
+#ifndef NO_HASHING
+#ifndef STATIC_SKB
 		skb_c = kmem_cache_alloc(skb_c_cache, GFP_KERNEL);
 
 		if (!skb_c)
 			LIBLCD_MSG("no memory");
-
-#ifdef LCD_MEASUREMENT
-//		TS_STOP_LCD(con_skb);
-#endif
+#endif /* STATIC_SKB */
 		
 #ifdef LCD_SKB_CONTAINER
 		skb = &skb_c->skbuff;
+		skb_c->tid = pid;
 #else
 		skb = kmem_cache_alloc(skbuff_cache, GFP_KERNEL);
 
@@ -1206,8 +1493,22 @@ int ndo_start_xmit_callee(struct fipc_message *_request, struct thc_channel *cha
 		skb_c->skb = skb;
 
 		glue_insert_skbuff(cptr_table, skb_c);
-#endif
+#endif /* LCD_SKB_CONTAINER */
 
+#else /*  NO_HASHING */
+
+#ifdef STATIC_SKB
+		skb = &static_skb;
+#else
+		skb = kmem_cache_alloc(skbuff_cache, GFP_KERNEL);
+
+		if (!skb) {
+			LIBLCD_MSG("out of mmeory");
+			goto fail_alloc;
+		}
+#endif /* STATIC_SKB */
+
+#endif /* NO_HASHING */
 
 		skb->head = (char*)data_pool + skbh_offset;
 		skb->end = skb_end;
@@ -1243,18 +1544,20 @@ int ndo_start_xmit_callee(struct fipc_message *_request, struct thc_channel *cha
 		break;
 	}
 	
+#ifndef NO_HASHING
 	skb_c->other_ref = skb_ref;
+#endif
 
 	if (xmit_type == VOLUNTEER_XMIT) {
 #ifndef LCD_SKB_CONTAINER
-		skb_c->skbd_ord = skbd_ord;
-		skb_c->skb_cptr = skb_cptr;
-		skb_c->skbh_cptr = skbd_cptr;
+//		skb_c->skbd_ord = skbd_ord;
+//		skb_c->skb_cptr = skb_cptr;
+//		skb_c->skbh_cptr = skbd_cptr;
 #endif
 	}
 
 #ifdef NOLOOKUP
-
+	//printk("%s, dummy_xmit", __func__);
 	dummy_xmit(skb, NULL);
 
 #else
@@ -1263,19 +1566,30 @@ int ndo_start_xmit_callee(struct fipc_message *_request, struct thc_channel *cha
 			&net_dev_container->net_device);
 #endif
 
-	TS_START_LCD(con_skb);
+	//TS_START_LCD(con_skb);
+#ifdef ONE_SLOT
+	if (async_msg_blocking_send_start_0(channel, &response)) {
+		LIBLCD_ERR("error getting response msg");
+		return -EIO;
+	}
+#else
 	if (async_msg_blocking_send_start(channel, &response)) {
 		LIBLCD_ERR("error getting response msg");
 		return -EIO;
 	}
+#endif
 
-	TS_STOP_LCD(con_skb);
+#if defined(NO_HASHING) && !defined(STATIC_SKB)
+	kmem_cache_free(skbuff_cache, skb);
+#endif
 	fipc_set_reg1(response, ret);
-	//if (tdiff_valid)
+//	TS_STOP_LCD(disp_loop);
+//	if (tdiff_valid)
 //		fipc_set_reg2(response, tdiff_disp);
 #ifdef LCD_MEASUREMENT
-	fipc_set_reg2(response, TS_DIFF(con_skb));
-//	fipc_set_reg2(response, tdiff);
+	//fipc_set_reg2(response, TS_DIFF(con_skb));
+//	fipc_set_reg2(response, TS_DIFF(disp_loop));
+	//fipc_set_reg2(response, tdiff);
 //	fipc_set_reg3(response, TS_DIFF(ipc_send));
 //	fipc_set_reg4(response, TS_DIFF(hlookup));
 #endif
@@ -1625,4 +1939,21 @@ int validate_callee(struct fipc_message *request, struct thc_channel *channel, s
 	fipc_set_reg1(response, ret);
 	thc_ipc_reply(channel, request_cookie, response);
 	return ret;
+}
+
+int cleanup_channel_group(struct fipc_message *request, struct thc_channel *channel)
+{
+	int i;
+	fipc_recv_msg_end(thc_channel_to_fipc(channel), request);
+
+	for (i = 0; i < 32; i++) {
+		if (ptrs[i]) {
+			thc_channel_group_item_remove(&ch_grp, ptrs[i]);
+			destroy_async_channel(ptrs[i]->channel);
+			kfree(ptrs[i]);
+			ptrs[i] = NULL;
+		} //if
+	} //for
+
+	return 0;
 }

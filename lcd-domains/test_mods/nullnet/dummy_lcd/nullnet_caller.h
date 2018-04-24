@@ -21,4 +21,14 @@ int prep_channel_callee(struct fipc_message *_request,
 		struct glue_cspace *cspace,
 		struct cptr sync_ep);
 
+int ndo_start_xmit_noawe(struct fipc_message *_request,
+		struct thc_channel *_channel,
+		struct glue_cspace *cspace,
+		struct cptr sync_ep);
+
+int dummy_return_callee(struct fipc_message *_request,
+		struct thc_channel *_channel,
+		struct glue_cspace *cspace,
+		struct cptr sync_ep);
+
 #endif /* __NULLNET_CALLER_H__ */

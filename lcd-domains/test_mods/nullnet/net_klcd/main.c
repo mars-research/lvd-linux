@@ -18,8 +18,10 @@
 //#define PERF_EVENTS
 #define NUM_PACKETS	10000000
 /* mechanism for unloading LCD gracefully */
-static bool unload_lcd =0;
+static bool unload_lcd = false;
+static bool clean_up = false;
 module_param_named(unload, unload_lcd, bool, S_IWUSR);
+module_param_named(clean, clean_up, bool, S_IWUSR);
 
 bool tdiff_valid = false;
 u64 tdiff_disp = 0ull;
@@ -33,7 +35,7 @@ struct net_info {
 };
 static LIST_HEAD(net_infos);
 
-extern int trigger_exit_to_lcd(struct thc_channel *_channel);
+extern int trigger_exit_to_lcd(struct thc_channel *_channel, enum dispatch_t);
 
 struct net_info *
 add_net(struct thc_channel *chnl, struct glue_cspace *cspace,
@@ -230,10 +232,18 @@ static void loop(cptr_t register_chnl)
 			 * will be updated by a write into sysfs
 			 * from userspace.
 			 */
-			if (unload_lcd) {
-				unload_lcd = 0;
-				if (__get_net(&net))
-					trigger_exit_to_lcd(net->chnl);
+			if (unload_lcd || clean_up) {
+				if (__get_net(&net)) {
+					if (unload_lcd) {
+						trigger_exit_to_lcd(net->chnl, TRIGGER_EXIT);
+						unload_lcd ^= unload_lcd;
+					}
+					if (clean_up) {
+						LIBLCD_MSG("cleanup triggered"); 
+						trigger_exit_to_lcd(net->chnl, TRIGGER_CLEAN);
+						clean_up ^= clean_up;
+					}
+				}
 			}
 	//		_TS_START(disp_loop);
 #ifdef PERF_EVENTS
@@ -315,8 +325,6 @@ static void loop(cptr_t register_chnl)
 		}
 
 		LIBLCD_MSG("net layer exited loop");
-
-		THCStopAllAwes();
 
 		);
 

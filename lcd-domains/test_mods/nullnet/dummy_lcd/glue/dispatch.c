@@ -8,6 +8,7 @@
 #define trace(x) LIBLCD_MSG("net got " #x " msg")
 
 extern void dummy_cleanup_module(void);
+int cleanup_channel_group(struct fipc_message *, struct thc_channel *);
 
 int dispatch_async_loop(struct thc_channel *channel,
 			struct fipc_message *message,
@@ -30,7 +31,7 @@ int dispatch_async_loop(struct thc_channel *channel,
 			return -1;
 		case NDO_START_XMIT:
 //			trace(NDO_START_XMIT);
-			return ndo_start_xmit_callee(message,
+			return dummy_return_callee(message,
 					channel, cspace, sync_ep);
 		case NDO_VALIDATE_ADDR:
 			trace(NDO_VALIDATE_ADDR);
@@ -70,6 +71,9 @@ int dispatch_async_loop(struct thc_channel *channel,
 			/* call nullnet exit */
 			dummy_cleanup_module();
 			return 0;
+		case TRIGGER_CLEAN:
+			trace(TRIGGER_CLEAN);
+			return cleanup_channel_group(message, channel);
 		default:
 			LIBLCD_ERR("unexpected function label: %d",
 					fn_type);

@@ -146,12 +146,12 @@ priv_pool_t *priv_pool_init(pool_type_t type, unsigned int num_objs,
 	/* calculate num_pages per cpu */
 	num_pages = PAGE_ALIGN(num_objs * obj_size) / PAGE_SIZE;
 
-	p->num_cpus = num_cpus = num_online_cpus();
+	p->num_cpus = num_cpus = num_online_cpus() * 2;
 	/* allocate twice the amount of requested pages
 	 * one set is for the percpu buf, the remaining pages
 	 * would be given to the global buffer
 	 */
-	p->total_pages = total_pages = num_pages * (num_cpus + num_possible_cpus());
+	p->total_pages = total_pages = num_pages * (num_cpus + num_possible_cpus() * 2);
 
 	printk("num objs %d | num_cpus %d | num_pages %d | num_objs_percpu %d "
 		"| total_pages %d | page order %d\npcpu_pool %p | global_pool %p\n",
@@ -252,16 +252,24 @@ void *priv_alloc(pool_type_t type)
 		goto out;
 	}
 	{
+#ifndef SPINLOCK
+		for(;;) {
+#endif
 		struct atom snapshot, new;
 
+#ifdef SPINLOCK
 		/* lock global pool */
 		spin_lock(&p->pool_spin_lock);
-
+#endif
+		// this is old
 		snapshot = p->stack;
 
+		// prepare new
 		new.head = snapshot.head->next;
 		new.version = snapshot.version + 1;
 
+#ifdef SPINLOCK
+		// if cmpxchg is used, this is done automatically
 		p->stack.head = new.head;
 		p->stack.version = new.version;
 
@@ -269,17 +277,24 @@ void *priv_alloc(pool_type_t type)
 		this_cpu_write(*(p->cached), CACHE_SIZE);
 
 		/* unlock global pool */
-		spin_unlock(&p->pool_spin_lock);
+		spin_unlock(&p->pool_spin_lock)
+#else
+		if (cmpxchg_double(&p->stack.head, &p->stack.version, snapshot.head, snapshot.version,
+					new.head, new.version)) {
+			*this_cpu_ptr(p->head) = snapshot.head->list;
+			this_cpu_write(*(p->cached), CACHE_SIZE);
+			m = (struct object*) snapshot.head;
 
-		m = (struct object*) snapshot.head;
-
-		pr_debug("from gpool ohead: %p/%ld, nhead: %p/%ld\n",
+			pr_debug("from gpool ohead: %p/%ld, nhead: %p/%ld\n",
 				snapshot.head, snapshot.version,
 				new.head, new.version);
-		WARN_ON(!new.head);
-		goto out;
-	}
+			WARN_ON_ONCE(!new.head);
+			goto out;
+		} // if
 
+		} // for
+#endif
+	}
 
 out:
 	/* enable preemption */
@@ -319,8 +334,10 @@ void priv_free(void *addr, pool_type_t type)
 		struct bundle *donation = (struct bundle *)*this_cpu_ptr(pool->head);
 		struct atom snapshot, new;
 
+#ifdef SPINLOCK
 		/* lock global pool */
 		spin_lock(&pool->pool_spin_lock);
+#endif
 
 		new.head = donation;
 		donation->list = ((struct object*)*this_cpu_ptr(pool->head))->next;
@@ -328,17 +345,25 @@ void priv_free(void *addr, pool_type_t type)
 		(*this_cpu_ptr(pool->marker))->next = NULL;
 		*this_cpu_ptr(pool->cached) = CACHE_SIZE - 1;
 
+#ifndef SPINLOCK
+		do {
+#endif
 		snapshot = pool->stack;
 
 		donation->next = snapshot.head;
 		new.version = snapshot.version + 1;
 
+#ifdef SPINLOCK
 		pool->stack.head = new.head;
 		pool->stack.version = new.version;
 
 		/* unlock global pool */
 		spin_unlock(&pool->pool_spin_lock);
-		WARN_ON(!new.head);
+#else
+		} while (!cmpxchg_double(&pool->stack.head, &pool->stack.version, snapshot.head, snapshot.version,
+					new.head, new.version));
+#endif
+		WARN_ON_ONCE(!new.head);
 		pr_debug("update gpchain %p to %p | ohead: %p/%ld, nhead: %p/%ld\n",
 				donation, snapshot.head,
 				snapshot.head, snapshot.version,

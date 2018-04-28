@@ -1361,7 +1361,7 @@ int ndo_start_xmit_async_landing(struct sk_buff *first, struct net_device *dev, 
 	}
 
 	if (!skb->chain_skb) {
-		return ndo_start_xmit_bare_async(skb, dev, hidden_args);
+		return ndo_start_xmit_dummy(skb, dev, hidden_args);
 	} else {
 		/* chain skb */
 	    if (!current->ptstate) {
@@ -1869,6 +1869,7 @@ int ndo_start_xmit_bare2(struct sk_buff *skb, struct net_device *dev, struct tra
 
 	thc_set_msg_type(_request, msg_type_request);
 
+	/* chain skb or not */
 	fipc_set_reg0(_request, false);
 
 	fipc_set_reg1(_request,
@@ -1903,11 +1904,13 @@ free:
 	return NETDEV_TX_OK;
 }
 
+/* This function does exactly what the native xmit does
+ * this serves as our base. If we use this function for isolated xmit,
+ * we should ideally get the same bandwidth as the native dummy driver
+ */
 int ndo_start_xmit_dummy(struct sk_buff *skb, struct net_device *dev, struct trampoline_hidden_args *hidden_args)
 {
-#ifdef NO_HASHING
 	dev_kfree_skb(skb);
-#endif
 	return NETDEV_TX_OK;
 }
 
@@ -2706,15 +2709,11 @@ int ndo_validate_addr_user(struct net_device *dev, struct trampoline_hidden_args
 
 	LIBLCD_MSG("%s, cptr klcd %lu", __func__, net_dev_container->other_ref.cptr);
 
-	  printk("%s, before async \n", __func__);
 	DO_FINISH_(ndo_validate_addr, {
 	  ASYNC_({
 	    ret = thc_ipc_call(hidden_args->async_chnl, request, &response);
-	  printk("%s, after async \n", __func__);
 	  }, ndo_validate_addr);
-	  printk("%s, after async3 \n", __func__);
 	});
-	  printk("%s, after dofin \n", __func__);
 
 	if (ret) {
 		LIBLCD_ERR("thc_ipc_call");

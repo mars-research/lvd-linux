@@ -75,6 +75,9 @@ int lcd_enter(void);
 #ifdef LCD_ISOLATE
 #define LCD_MAIN(_CODE)	do { _CODE } while(0)
 #else
+#define LCD_MAIN(_CODE)	do { _CODE } while(0)
+#endif
+#if 0
 #define LCD_MAIN(_CODE)	do {						\
 									\
 		/* NULL out return address on stack so that libasync */ \

@@ -53,3 +53,7 @@ ioremap/lcd isolated
 ixgbe/boot nonisolated
 ixgbe/ixgbe_lcd isolated
 ixgbe/net_klcd nonisolated
+
+nullnet/boot nonisolated
+nullnet/dummy_lcd isolated
+nullnet/net_klcd nonisolated

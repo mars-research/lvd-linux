@@ -339,3 +339,4 @@ static inline void force_up_write(void *x)
 #define  __dynamic_netdev_dbg(desc, dev, fmt...)        LIBLCD_MSG(fmt)
 
 #define system_state    1
+

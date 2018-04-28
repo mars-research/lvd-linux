@@ -79,7 +79,7 @@ struct skbuff_members {
 #define P(x)	skb->x = skb_lcd->x
 
 #define CONSUME_SKB_SEND_ONLY
-#define NO_AWE
+//#define NO_AWE
 #define NO_HASHING
 //#define NO_MARSHAL
 

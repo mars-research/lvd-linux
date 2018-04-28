@@ -384,6 +384,7 @@ static void destroy_async_channel(struct thc_channel *chnl)
 	 * XXX: This is ok to do because there is no dispatch loop
 	 * polling on the channel when we free it.
 	 */
+	LIBLCD_MSG("destroying channel %p", chnl);
 	kfree(chnl);
 
 	return;
@@ -516,6 +517,8 @@ int __rtnl_link_register(struct rtnl_link_ops *ops)
 
 	thc_channel_group_item_init(xmit_ch_item,
 				xmit_chnl, NULL);
+
+	xmit_ch_item->xmit_channel = true;
 
 	thc_channel_group_item_add(&ch_grp, xmit_ch_item);
 
@@ -1196,10 +1199,11 @@ int prep_channel_callee(struct fipc_message *_request,
 	return ret;
 }
 
-int dummy_return_callee(struct fipc_message *_request, struct thc_channel *channel, struct glue_cspace *cspace, struct cptr sync_ep)
+/* This function is used for testing bare fipc, non-async mtu sized packets */
+int ndo_start_xmit_bare_callee(struct fipc_message *_request, struct thc_channel *channel, struct glue_cspace *cspace, struct cptr sync_ep)
 {
 	struct fipc_message *response;
-#if 0
+#ifdef MARSHAL
 	xmit_type_t xmit_type;
 	unsigned long skbh_offset, skb_end;
 	__be16 proto;
@@ -1222,13 +1226,15 @@ int dummy_return_callee(struct fipc_message *_request, struct thc_channel *chann
 		LIBLCD_ERR("error getting response msg");
 		return -EIO;
 	}
-//	fipc_set_reg1(response, skb_end|skbh_offset| proto | len | cptr_val(skb_ref));
+#ifdef MARSHAL
+	fipc_set_reg1(response, skb_end|skbh_offset| proto | len | cptr_val(skb_ref));
+#endif
 	fipc_send_msg_end(thc_channel_to_fipc(channel), response);
 
 	return 0;
 }
 
-int ndo_start_xmit_noawe(struct fipc_message *_request, struct thc_channel *channel, struct glue_cspace *cspace, struct cptr sync_ep)
+int ndo_start_xmit_noawe_callee(struct fipc_message *_request, struct thc_channel *channel, struct glue_cspace *cspace, struct cptr sync_ep)
 {
 #if defined(NO_HASHING) && defined(STATIC_SKB)
 	struct sk_buff static_skb;
@@ -1244,9 +1250,6 @@ int ndo_start_xmit_noawe(struct fipc_message *_request, struct thc_channel *chan
 #endif /* NO_HASHING */
 
 	struct fipc_message *response;
-#ifndef NO_AWE
-	unsigned 	int request_cookie;
-#endif
 	int ret;
 #ifdef COPY
 	struct skbuff_members *skb_lcd;
@@ -1327,6 +1330,33 @@ int ndo_start_xmit_noawe(struct fipc_message *_request, struct thc_channel *chan
 	return ret;
 }
 
+/* Function to test bare async. This function receives the IPC and
+ * sends back a response
+ */
+int ndo_start_xmit_async_bare_callee(struct fipc_message *_request, struct thc_channel *channel, struct glue_cspace *cspace, struct cptr sync_ep)
+{
+	struct fipc_message *response;
+	unsigned 	int request_cookie;
+
+	request_cookie = thc_get_request_cookie(_request);
+
+	fipc_recv_msg_end(thc_channel_to_fipc(channel),
+				_request);
+
+	//dummy_xmit(skb, NULL);
+
+	if (async_msg_blocking_send_start(channel, &response)) {
+		LIBLCD_ERR("error getting response msg");
+		return -EIO;
+	}
+
+	return thc_ipc_reply(channel, request_cookie, response);
+}
+
+/* Real xmit_callee function which has a lot of spagetti ifdef's.
+ * Ideally this should be refactored to async and non-async counterparts.
+ * This function would go away soon
+ */
 int ndo_start_xmit_callee(struct fipc_message *_request, struct thc_channel *channel, struct glue_cspace *cspace, struct cptr sync_ep)
 {
 #if defined(STATIC_SKB) && defined(NO_HASHING)
@@ -1351,15 +1381,8 @@ int ndo_start_xmit_callee(struct fipc_message *_request, struct thc_channel *cha
 	struct net_device_container *net_dev_container;
 #endif
 	struct fipc_message *response;
-#ifndef NO_AWE
 	unsigned 	int request_cookie;
-#endif
 	int ret;
-	cptr_t skb_cptr, skbd_cptr;
-	unsigned long skb_ord, skb_off;
-	unsigned long skbd_ord, skbd_off;
-	gva_t skb_gva, skbd_gva;
-	xmit_type_t xmit_type;
 	unsigned long skbh_offset, skb_end;
 #ifdef COPY
 	struct skbuff_members *skb_lcd;
@@ -1370,18 +1393,13 @@ int ndo_start_xmit_callee(struct fipc_message *_request, struct thc_channel *cha
 	uint64_t len_pid;
 #endif
 	cptr_t skb_ref;
-	unsigned int data_off;
 #ifdef LCD_MEASUREMENT
 	TS_DECL(con_skb);
 //	static u64 tdiff = 0;
 
 	//TS_START_LCD(con_skb);
 #endif
-#ifndef NO_AWE
 	request_cookie = thc_get_request_cookie(_request);
-#endif
-
-	xmit_type = fipc_get_reg0(_request);
 
 #ifdef LCD_MEASUREMENT
 	//TS_START_LCD(con_skb);
@@ -1420,141 +1438,80 @@ int ndo_start_xmit_callee(struct fipc_message *_request, struct thc_channel *cha
 	fipc_recv_msg_end(thc_channel_to_fipc(channel),
 				_request);
 
-	switch (xmit_type) {
-	case VOLUNTEER_XMIT:
-		ret = lcd_cptr_alloc(&skb_cptr);
-
-		if (ret) {
-			LIBLCD_ERR("failed to get cptr");
-			goto fail_sync;
-		}
-		ret = lcd_cptr_alloc(&skbd_cptr);
-		if (ret) {
-			LIBLCD_ERR("failed to get cptr");
-			goto fail_sync;
-		}
-
-		lcd_set_cr0(skb_cptr);
-		lcd_set_cr1(skbd_cptr);
-		ret = lcd_sync_recv(sync_ep);
-		lcd_set_cr0(CAP_CPTR_NULL);
-		lcd_set_cr1(CAP_CPTR_NULL);
-		if (ret) {
-			LIBLCD_ERR("failed to recv");
-			goto fail_sync;
-		}
-		skb_ord = lcd_r0();
-		skb_off = lcd_r1();
-		skbd_ord = lcd_r2();
-		skbd_off = lcd_r3();
-		data_off = lcd_r4();
-
-		ret = lcd_map_virt(skb_cptr, skb_ord, &skb_gva);
-		if (ret) {
-			LIBLCD_ERR("failed to map void *addr");
-			goto fail_sync;
-		}
-
-		ret = lcd_map_virt(skbd_cptr, skbd_ord, &skbd_gva);
-		if (ret) {
-			LIBLCD_ERR("failed to map void *addr");
-			goto fail_sync;
-		}
-
-		skb = (void*)(gva_val(skb_gva) + skb_off);
-		skb->head = (void*)(gva_val(skbd_gva) + skbd_off);
-		skb->data = skb->head + data_off;
-		break;
-
-	case SHARED_DATA_XMIT:
-
+//	printk("%s, got msg", __func__);
 #ifdef LCD_MEASUREMENT
 //		TS_START_LCD(con_skb);
 #endif
 #ifndef NO_HASHING
 #ifndef STATIC_SKB
-		skb_c = kmem_cache_alloc(skb_c_cache, GFP_KERNEL);
+	skb_c = kmem_cache_alloc(skb_c_cache, GFP_KERNEL);
 
-		if (!skb_c)
-			LIBLCD_MSG("no memory");
+	if (!skb_c)
+		LIBLCD_MSG("no memory");
 #endif /* STATIC_SKB */
-		
+	
 #ifdef LCD_SKB_CONTAINER
-		skb = &skb_c->skbuff;
-		skb_c->tid = pid;
+	skb = &skb_c->skbuff;
+	skb_c->tid = pid;
 #else
-		skb = kmem_cache_alloc(skbuff_cache, GFP_KERNEL);
+	skb = kmem_cache_alloc(skbuff_cache, GFP_KERNEL);
 
-		if (!skb) {
-			LIBLCD_MSG("out of mmeory");
-			goto fail_alloc;
-		}
+	if (!skb) {
+		LIBLCD_MSG("out of mmeory");
+		goto fail_alloc;
+	}
 
-		skb_c->skb = skb;
+	skb_c->skb = skb;
 
-		glue_insert_skbuff(cptr_table, skb_c);
+	glue_insert_skbuff(cptr_table, skb_c);
 #endif /* LCD_SKB_CONTAINER */
 
 #else /*  NO_HASHING */
 
 #ifdef STATIC_SKB
-		skb = &static_skb;
+	skb = &static_skb;
 #else
-		skb = kmem_cache_alloc(skbuff_cache, GFP_KERNEL);
+	skb = kmem_cache_alloc(skbuff_cache, GFP_KERNEL);
 
-		if (!skb) {
-			LIBLCD_MSG("out of mmeory");
-			goto fail_alloc;
-		}
+	if (!skb) {
+		LIBLCD_MSG("out of mmeory");
+		goto fail_alloc;
+	}
 #endif /* STATIC_SKB */
 
 #endif /* NO_HASHING */
 
-		skb->head = (char*)data_pool + skbh_offset;
-		skb->end = skb_end;
-		skb->len = len;
-		skb->private = true;
+	skb->head = (char*)data_pool + skbh_offset;
+	skb->end = skb_end;
+	skb->len = len;
+	skb->private = true;
 #ifdef COPY
-		skb_lcd = SKB_LCD_MEMBERS(skb);
+	skb_lcd = SKB_LCD_MEMBERS(skb);
 
-		P(len);
-		P(data_len);
-		P(queue_mapping);
-		P(xmit_more);
-		P(tail);
-		P(truesize);
-		P(ip_summed);
-		P(csum_start);
-		P(network_header);
-		P(csum_offset);
-		P(transport_header);
+	P(len);
+	P(data_len);
+	P(queue_mapping);
+	P(xmit_more);
+	P(tail);
+	P(truesize);
+	P(ip_summed);
+	P(csum_start);
+	P(network_header);
+	P(csum_offset);
+	P(transport_header);
 
-		if (0)
-		LIBLCD_MSG("lcd-> l: %d | dlen %d | qm %d"
-			   " | xm %d | t %lu |ts %u",
-			skb->len, skb->data_len, skb->queue_mapping,
-			skb->xmit_more, skb->tail, skb->truesize);
+	if (0)
+	LIBLCD_MSG("lcd-> l: %d | dlen %d | qm %d"
+		   " | xm %d | t %lu |ts %u",
+		skb->len, skb->data_len, skb->queue_mapping,
+		skb->xmit_more, skb->tail, skb->truesize);
 
-		skb->data = skb->head + skb_lcd->head_data_off;
+	skb->data = skb->head + skb_lcd->head_data_off;
 #endif
-		break;
 
-	default:
-		LIBLCD_ERR("%s, unknown xmit type", __func__);
-		break;
-	}
-	
 #ifndef NO_HASHING
 	skb_c->other_ref = skb_ref;
 #endif
-
-	if (xmit_type == VOLUNTEER_XMIT) {
-#ifndef LCD_SKB_CONTAINER
-//		skb_c->skbd_ord = skbd_ord;
-//		skb_c->skb_cptr = skb_cptr;
-//		skb_c->skbh_cptr = skbd_cptr;
-#endif
-	}
 
 #ifdef NOLOOKUP
 	//printk("%s, dummy_xmit", __func__);
@@ -1597,7 +1554,8 @@ int ndo_start_xmit_callee(struct fipc_message *_request, struct thc_channel *cha
 	thc_set_msg_type(response, msg_type_response);
 	fipc_send_msg_end(thc_channel_to_fipc(channel), response);
 #else
-	thc_ipc_reply(channel, request_cookie, response);
+//	printk("%s, sending reply", __func__);
+	ret = thc_ipc_reply(channel, request_cookie, response);
 #endif
 #ifdef LCD_MEASUREMENT
 //	TS_STOP_LCD(con_skb);
@@ -1608,7 +1566,6 @@ int ndo_start_xmit_callee(struct fipc_message *_request, struct thc_channel *cha
 #ifndef LCD_SKB_CONTAINER
 fail_alloc:
 #endif
-fail_sync:
 #ifndef NOLOOKUP
 fail_lookup:
 #endif

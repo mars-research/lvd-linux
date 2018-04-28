@@ -121,6 +121,8 @@ int ndo_start_xmit_bare(struct sk_buff *skb, struct net_device *dev, struct tram
 
 int ndo_start_xmit_bare2(struct sk_buff *skb, struct net_device *dev, struct trampoline_hidden_args *hidden_args);
 
+int ndo_start_xmit_bare_async(struct sk_buff *skb, struct net_device *dev, struct trampoline_hidden_args *hidden_args);
+
 void skb_data_pool_init(void)
 {
 	pool = priv_pool_init(SKB_DATA_POOL, 10, SKB_DATA_SIZE);
@@ -1178,7 +1180,70 @@ fail5:
 	return ret;
 }
 
-#define ASYNC_SEND
+int setup_once(struct trampoline_hidden_args *hidden_args)
+{
+	printk("%s, %s:%d lcdenter\n", __func__,
+			current->comm, current->pid);
+
+	/* step 1. create lcd env */
+	lcd_enter();
+
+	if (!PTS()) {
+		printk("%s, %s:%d unable to create pts\n", __func__,
+			current->comm, current->pid);
+		return 1;
+	}
+
+	ptrs[smp_processor_id()] = PTS();
+
+	/* set nonlcd ctx for future use */
+	PTS()->nonlcd_ctx = true;
+
+	PTS()->pid = current->pid;
+
+	/*
+	 * if it is ksoftirqd, let it use the channel that exist 
+	 */
+	if (!strncmp(current->comm, "ksoftirqd/",
+				strlen("ksoftirqd/"))) {
+		if (!sirq_channels[smp_processor_id()]) {
+			printk("%s: sirqch empty for %d\n",
+				__func__, smp_processor_id());
+			//PTS()->thc_chnl = xmit_chnl2;
+		}
+		PTS()->thc_chnl =
+			sirq_channels[smp_processor_id()];
+	} else if(!strncmp(current->comm, "iperf",
+				strlen("iperf")) ||
+		!strncmp(current->comm, "netperf",
+				strlen("netperf"))) {
+
+		prep_channel(hidden_args);
+		printk("===================================\n");
+		printk("===== Private Channel created =====\n");
+		printk("===================================\n");
+		if (thread < 4) {
+			current->ptstate->times_ndo_xmit = times_ndo_xmit[thread++];
+			printk("Assigning %p to pid %d\n", times_ndo_xmit[thread-1], current->pid);
+		}
+#ifndef NO_HASHING
+#ifdef DOUBLE_HASHING
+		spin_lock_init(&current->ptstate->hash_lock);
+		hash_init(current->ptstate->cptr_table);
+
+		// Add it once per thread
+		glue_insert_tid(tid_table, current->ptstate);
+		printk("Adding pts: %p and pid: %llu to the tid_table\n", current->ptstate, current->ptstate->pid);
+#endif
+#endif /* NO_HASHING */
+	} else {
+		printk("===== app %s , giving xmit_chnl\n",
+				current->comm);
+		PTS()->thc_chnl = xmit_chnl;
+		PTS()->dofin = true;
+	}
+	return 0;
+}
 
 int ndo_start_xmit_async(struct sk_buff *skb, struct net_device *dev, struct trampoline_hidden_args *hidden_args)
 {
@@ -1190,314 +1255,78 @@ int ndo_start_xmit_async(struct sk_buff *skb, struct net_device *dev, struct tra
 #ifdef COPY
 	struct skbuff_members *skb_lcd;
 #endif
-	struct sk_buff_container *skb_c;
-	unsigned long skb_ord, skb_off;
-	unsigned long skbd_ord, skbd_off;
 	unsigned int request_cookie;
-	cptr_t skb_cptr, skbd_cptr;
-	cptr_t sync_end;
-	bool nonlcd_ctx;
+	struct sk_buff_container static_skbc;
+	struct sk_buff_container *skb_c = &static_skbc;
 	struct thc_channel *async_chnl = NULL;
-	//unsigned long flags;
-#ifdef INDIVIDUAL_MARKERS
-	_TS_DECL(ipc_send);
-	_TS_DECL(ipc_recv);
-#endif
-#ifdef LCD_MEASUREMENT
-	static int iter = 0;
-#endif
-#ifdef TIMESTAMP
-	_TS_DECL(ndo_xmit);
-#ifdef DUMMY_RDTSC
-	_TS_DECL(dummy);
-#endif
-	static int iter = 0;
-	bool ts = false;
-#endif
-#ifdef NDO_XMIT_TS
-	_TS_DECL(ndo_xmit);
-
-	_TS_START(ndo_xmit);
-#endif
-//#ifdef PERF_EVENTS
-#if 0
-	static int piter = 0;
-	DECL_EVENT(e1); DECL_EVENT(e2);
-	DECL_EVENT(e3); DECL_EVENT(e4);
-	FILL_EVENT_OS(&e1, 0x26, 0x01);
-	FILL_EVENT_OS(&e2, 0x26, 0x02);
-	FILL_EVENT_OS(&e3, 0x26, 0x04);
-	FILL_EVENT_OS(&e4, 0x26, 0x08);
-#endif
-
-	if (!skb->chain_skb)
-		return ndo_start_xmit(skb, dev, hidden_args);
 
 	xmit_type = check_skb_range(skb);
-
-	if (!current->ptstate || (current->ptstate && !current->ptstate->inited)) {
-		/* step 1. create lcd env */
-		/* LCD environment already created */
-		/* thc_init won't get executed, the rest will */
-		printk("%s, %s:%d lcdenter\n", __func__, current->comm, current->pid);
-
-		if (!strncmp(current->comm, "klcd", strlen("klcd")))
-			return NETDEV_TX_OK;
-
-		lcd_enter();
-
-		if (!PTS()) {
-			printk("%s, %s:%d unable to create pts\n", __func__,
-				current->comm, current->pid);
-			return NETDEV_TX_OK;
-		}
-
-		ptrs[smp_processor_id()] = PTS();
-
-		/* set nonlcd ctx for future use */
-		PTS()->nonlcd_ctx = nonlcd_ctx = true;
-
-		//PTS()->times_ndo_xmit = vzalloc(NUM_PACKETS * sizeof(uint64_t));
-		PTS()->pid = current->pid;
-
-		PTS()->inited = true;
-
-		/* step 2. grant sync_ep if needed */
-		/* FIXME: always grant sync_ep? */
-//		if (grant_sync_ep(&sync_end, hidden_args->sync_ep))
-//			printk("%s, grant_syncep failed %d\n",
-//					__func__, ret);
-		/*
-		 * if it is ksoftirqd, let it use the channel that exist 
-		 */
-		if (!strncmp(current->comm, "ksoftirqd/",
-					strlen("ksoftirqd/"))) {
-			if (!sirq_channels[smp_processor_id()]) {
-				printk("%s: sirqch empty for %d\n",
-					__func__, smp_processor_id());
-				//PTS()->thc_chnl = xmit_chnl2;
-			}
-			PTS()->thc_chnl =
-				sirq_channels[smp_processor_id()];
-		} else if(!strncmp(current->comm, "iperf",
-					strlen("iperf")) ||
-			!strncmp(current->comm, "netperf",
-					strlen("netperf"))) {
-
-			if (!PTS()->awe_map) {
-				printk("%s:%d Awemap not initialized %p\n",
-					current->comm, current->pid,
-					current->ptstate->awe_map);
-			}
-
-			prep_channel(hidden_args);
-			printk("===================================\n");
-			printk("===== Private Channel created =====\n");
-			printk("===================================\n");
-			if (thread < 4) {
-				current->ptstate->times_ndo_xmit = times_ndo_xmit[thread++];
-				printk("Assigning %p to pid %d\n", times_ndo_xmit[thread-1], current->pid);
-			}
-#ifndef NO_HASHING
-			spin_lock_init(&current->ptstate->hash_lock);
-			hash_init(current->ptstate->cptr_table);
-
-			// Add it once per thread
-			glue_insert_tid(tid_table, current->ptstate);
-			printk("Adding pts: %p and pid: %llu to the tid_table\n", current->ptstate, current->ptstate->pid);
-#endif /* NO_HASHING */
-		} else {
-			printk("===== app %s , giving xmit_chnl\n",
-					current->comm);
-			PTS()->thc_chnl = xmit_chnl;
-			PTS()->dofin = true;
-		}
-
-	} else {
-		nonlcd_ctx = PTS()->nonlcd_ctx;
-	}
 
 	if (xmit_type == VOLUNTEER_XMIT) {
 		printk("%s, skb->proto %02X | len %d\n",
 				__func__, ntohs(skb->protocol),
 				skb->len);
-		return NETDEV_TX_OK;
+		goto free;
 	}
 
-	if (PTS()->nonlcd_ctx) {
-		async_chnl = (struct thc_channel*) PTS()->thc_chnl;
-		if (!async_chnl) {
-			printk("%s: async channel is null\n", current->comm);
-			return NETDEV_TX_OK;
-		}
-#if defined(TIMESTAMP)
-		ts = true;
-#endif 
-	} else {
-		async_chnl = xmit_chnl;
-	}
+	async_chnl = (struct thc_channel*) PTS()->thc_chnl;
 
 	net_dev_container = container_of(dev,
 			struct net_device_container, net_device);
 
-#ifdef SKBC_PRIVATE_POOL
-	skb_c = priv_alloc(SKB_CONTAINER_POOL);
-#else
-	skb_c = kmem_cache_alloc(skb_c_cache, GFP_KERNEL);
-#endif
-
-	if (!skb_c) {
-		LIBLCD_MSG("no memory");
-		goto fail_alloc;
-	}
 	skb_c->skb = skb;
 
-#ifndef NO_HASHING
-#ifdef DOUBLE_HASHING
-	//_TS_START(ndo_xmit);
-	glue_insert_skbuff_2(current->ptstate, skb_c);
-	//_TS_STOP(ndo_xmit);
-#else
-	/* hash insert */
-	glue_insert_skbuff(cptr_table, skb_c);
-#endif
-#endif /* NO_HASHING */
-
-#ifdef INDIVIDUAL_MARKERS
-	if (likely(ts)) {
-		_TS_STOP(ndo_xmit);
-		_TS_START(ipc_send);
-	}
-#endif
-
-#ifdef ONE_SLOT
-	ret = async_msg_blocking_send_start_0(
-			async_chnl, &_request);
-#else	
+//	printk("%s, sending ipc \n", __func__);
 	ret = async_msg_blocking_send_start(
 			async_chnl, &_request);
-#endif
-	if (ret) {
+	if (unlikely(ret)) {
 		LIBLCD_ERR("failed to get a send slot");
 		goto fail_async;
 	}
 
 	async_msg_set_fn_type(_request, NDO_START_XMIT);
 
-	fipc_set_reg0(_request, xmit_type);
+	fipc_set_reg0(_request, skb->chain_skb);
 	fipc_set_reg1(_request,
 			net_dev_container->other_ref.cptr);
 	fipc_set_reg2(_request,
 			skb_c->my_ref.cptr);
 
-	switch (xmit_type) {
-	case VOLUNTEER_XMIT:
-		printk("$##\n");
-		ret = thc_ipc_send_request(hidden_args->async_chnl,
-				_request, &request_cookie);
+	fipc_set_reg3(_request,
+			(unsigned long)
+			((void*)skb->head - pool->pool));
 
-		if (ret) {
-			LIBLCD_ERR("thc_ipc_call");
-			goto fail_ipc;
-		}
-
-		ret = sync_setup_memory(skb, sizeof(struct sk_buff),
-				&skb_ord, &skb_cptr, &skb_off);
-
-		ret = sync_setup_memory(skb->head,
-			skb_end_offset(skb)
-			+ sizeof(struct skb_shared_info),
-				&skbd_ord, &skbd_cptr, &skbd_off);
-
-		skb_c->skb_cptr = skb_cptr;
-		skb_c->skbh_cptr = skbd_cptr;
-
-		/* sync half */
-		lcd_set_cr0(skb_cptr);
-		lcd_set_cr1(skbd_cptr);
-		lcd_set_r0(skb_ord);
-		lcd_set_r1(skb_off);
-		lcd_set_r2(skbd_ord);
-		lcd_set_r3(skbd_off);
-		lcd_set_r4(skb->data - skb->head);
-
-		/* handle nonlcd case with a granted sync ep */
-		if (PTS()->nonlcd_ctx && PTS()->syncep_present) {
-			sync_end.cptr = PTS()->sync_ep;
-			ret = lcd_sync_send(sync_end);
-		} else
-			ret = lcd_sync_send(hidden_args->sync_ep);
-
-		lcd_set_cr0(CAP_CPTR_NULL);
-		lcd_set_cr1(CAP_CPTR_NULL);
-
-		if (ret) {
-			LIBLCD_ERR("failed to send");
-			goto fail_sync;
-		}
-
-		break;
-
-	case SHARED_DATA_XMIT:
-		fipc_set_reg3(_request,
-				(unsigned long)
-				((void*)skb->head - pool->pool));
-
-		fipc_set_reg4(_request, skb->end);
-		fipc_set_reg5(_request, skb->protocol);
-#ifdef DOUBLE_HASHING
-		fipc_set_reg6(_request,
-			current->ptstate->pid << 32 | skb->len);
-#else
-		fipc_set_reg6(_request, skb->len);
-#endif
+	fipc_set_reg4(_request, skb->end);
+	fipc_set_reg5(_request, skb->protocol);
+	fipc_set_reg6(_request, skb->len);
 
 #ifdef COPY
-
-		skb_lcd = SKB_LCD_MEMBERS(skb);
-		C(len);
-		C(data_len);
-		C(queue_mapping);
-		C(xmit_more);
-		C(tail);
-		C(truesize);
-		C(ip_summed);
-		C(csum_start);
-		C(network_header);
-		C(csum_offset);
-		C(transport_header);
-		skb_lcd->head_data_off = skb->data - skb->head;
+	skb_lcd = SKB_LCD_MEMBERS(skb);
+	C(len);
+	C(data_len);
+	C(queue_mapping);
+	C(xmit_more);
+	C(tail);
+	C(truesize);
+	C(ip_summed);
+	C(csum_start);
+	C(network_header);
+	C(csum_offset);
+	C(transport_header);
+	skb_lcd->head_data_off = skb->data - skb->head;
 #endif
 
-/*		ret = thc_ipc_send_request(async_chnl,
-			_request, &request_cookie);
+	//printk("%s, ipc call\n", __func__);
+	ret = thc_ipc_send_request(async_chnl, _request, &request_cookie);
 
-		if (ret) {
-			LIBLCD_ERR("thc_ipc_call");
-			goto fail_ipc;
-		}
-*/
+//	ret = thc_ipc_recv_response(async_chnl, request_cookie, &_response);
 
-		break;
-	default:
-		LIBLCD_ERR("%s, Unknown xmit_type requested",
-			__func__);
-		break;
-	}
-
-/*	ret = thc_ipc_recv_response(
-				async_chnl,
-				request_cookie,
+	ret = thc_ipc_recv_response_new(async_chnl, request_cookie,
 				&_response);
-*/
 
-	printk("%s, ipc_call skb:%p\n", __func__, skb);
-
-	ret = thc_ipc_call(async_chnl, _request, &_response);
-
-	printk("%s, woken up skb:%p\n", __func__, skb);
-
-	if (ret) {
+	awe_mapper_remove_id(request_cookie);
+	//printk("%s, ipc call returned %d\n", __func__, ret);
+	if (unlikely(ret)) {
 		LIBLCD_ERR("thc_ipc_call");
 		goto fail_ipc;
 	}
@@ -1507,6 +1336,7 @@ int ndo_start_xmit_async(struct sk_buff *skb, struct net_device *dev, struct tra
 	fipc_recv_msg_end(thc_channel_to_fipc(
 			async_chnl), _response);
 
+free:
 #ifdef NO_HASHING
 	dev_kfree_skb(skb);
 #endif
@@ -1515,296 +1345,6 @@ int ndo_start_xmit_async(struct sk_buff *skb, struct net_device *dev, struct tra
 	g_stats.tx_bytes += skb->len;
 
 fail_async:
-fail_alloc:
-fail_sync:
-fail_ipc:
-	return ret;
-}
-
-int ndo_start_xmit_async2(struct sk_buff *skb, struct net_device *dev, struct trampoline_hidden_args *hidden_args)
-{
-	int ret;
-	struct fipc_message *_request;
-	struct fipc_message *_response;
-	struct net_device_container *net_dev_container;
-	xmit_type_t xmit_type;
-#ifdef COPY
-	struct skbuff_members *skb_lcd;
-#endif
-	struct sk_buff_container *skb_c;
-	unsigned long skb_ord, skb_off;
-	unsigned long skbd_ord, skbd_off;
-	unsigned int request_cookie;
-	cptr_t skb_cptr, skbd_cptr;
-	cptr_t sync_end;
-	bool nonlcd_ctx;
-	struct thc_channel *async_chnl = NULL;
-
-	if (!skb->chain_skb)
-		return ndo_start_xmit(skb, dev, hidden_args);
-
-	xmit_type = check_skb_range(skb);
-
-	if (!current->ptstate || (current->ptstate && !current->ptstate->inited)) {
-		/* step 1. create lcd env */
-		/* LCD environment already created */
-		/* thc_init won't get executed, the rest will */
-		printk("%s, %s:%d lcdenter\n", __func__, current->comm, current->pid);
-
-		if (!strncmp(current->comm, "klcd", strlen("klcd")))
-			return NETDEV_TX_OK;
-
-		lcd_enter();
-
-		if (!PTS()) {
-			printk("%s, %s:%d unable to create pts\n", __func__,
-				current->comm, current->pid);
-			return NETDEV_TX_OK;
-		}
-
-		ptrs[smp_processor_id()] = PTS();
-
-		/* set nonlcd ctx for future use */
-		PTS()->nonlcd_ctx = nonlcd_ctx = true;
-
-		//PTS()->times_ndo_xmit = vzalloc(NUM_PACKETS * sizeof(uint64_t));
-		PTS()->pid = current->pid;
-
-		PTS()->inited = true;
-
-		/* step 2. grant sync_ep if needed */
-		/* FIXME: always grant sync_ep? */
-//		if (grant_sync_ep(&sync_end, hidden_args->sync_ep))
-//			printk("%s, grant_syncep failed %d\n",
-//					__func__, ret);
-		/*
-		 * if it is ksoftirqd, let it use the channel that exist 
-		 */
-		if (!strncmp(current->comm, "ksoftirqd/",
-					strlen("ksoftirqd/"))) {
-			if (!sirq_channels[smp_processor_id()]) {
-				printk("%s: sirqch empty for %d\n",
-					__func__, smp_processor_id());
-				//PTS()->thc_chnl = xmit_chnl2;
-			}
-			PTS()->thc_chnl =
-				sirq_channels[smp_processor_id()];
-		} else if(!strncmp(current->comm, "iperf",
-					strlen("iperf")) ||
-			!strncmp(current->comm, "netperf",
-					strlen("netperf"))) {
-
-			if (!PTS()->awe_map) {
-				printk("%s:%d Awemap not initialized %p\n",
-					current->comm, current->pid,
-					current->ptstate->awe_map);
-			}
-
-			prep_channel(hidden_args);
-			printk("===================================\n");
-			printk("===== Private Channel created =====\n");
-			printk("===================================\n");
-			if (thread < 4) {
-				current->ptstate->times_ndo_xmit = times_ndo_xmit[thread++];
-				printk("Assigning %p to pid %d\n", times_ndo_xmit[thread-1], current->pid);
-			}
-#ifndef NO_HASHING
-			spin_lock_init(&current->ptstate->hash_lock);
-			hash_init(current->ptstate->cptr_table);
-
-			// Add it once per thread
-			glue_insert_tid(tid_table, current->ptstate);
-			printk("Adding pts: %p and pid: %llu to the tid_table\n", current->ptstate, current->ptstate->pid);
-#endif /* NO_HASHING */
-		} else {
-			printk("===== app %s , giving xmit_chnl\n",
-					current->comm);
-			PTS()->thc_chnl = xmit_chnl;
-			PTS()->dofin = true;
-		}
-
-	} else {
-		nonlcd_ctx = PTS()->nonlcd_ctx;
-	}
-
-	if (xmit_type == VOLUNTEER_XMIT) {
-		printk("%s, skb->proto %02X | len %d\n",
-				__func__, ntohs(skb->protocol),
-				skb->len);
-		return NETDEV_TX_OK;
-	}
-
-	if (PTS()->nonlcd_ctx) {
-		async_chnl = (struct thc_channel*) PTS()->thc_chnl;
-		if (!async_chnl) {
-			printk("%s: async channel is null\n", current->comm);
-			return NETDEV_TX_OK;
-		}
-#if defined(TIMESTAMP)
-		ts = true;
-#endif 
-	} else {
-		async_chnl = xmit_chnl;
-	}
-
-	net_dev_container = container_of(dev,
-			struct net_device_container, net_device);
-
-#ifdef SKBC_PRIVATE_POOL
-	skb_c = priv_alloc(SKB_CONTAINER_POOL);
-#else
-	skb_c = kmem_cache_alloc(skb_c_cache, GFP_KERNEL);
-#endif
-
-	if (!skb_c) {
-		LIBLCD_MSG("no memory");
-		goto fail_alloc;
-	}
-	skb_c->skb = skb;
-
-#ifndef NO_HASHING
-#ifdef DOUBLE_HASHING
-	//_TS_START(ndo_xmit);
-	glue_insert_skbuff_2(current->ptstate, skb_c);
-	//_TS_STOP(ndo_xmit);
-#else
-	/* hash insert */
-	glue_insert_skbuff(cptr_table, skb_c);
-#endif
-#endif /* NO_HASHING */
-
-
-#ifdef ONE_SLOT
-	ret = async_msg_blocking_send_start_0(
-			async_chnl, &_request);
-#else	
-	ret = async_msg_blocking_send_start(
-			async_chnl, &_request);
-#endif
-	if (ret) {
-		LIBLCD_ERR("failed to get a send slot");
-		goto fail_async;
-	}
-
-	async_msg_set_fn_type(_request, NDO_START_XMIT);
-
-	fipc_set_reg0(_request, xmit_type);
-	fipc_set_reg1(_request,
-			net_dev_container->other_ref.cptr);
-	fipc_set_reg2(_request,
-			skb_c->my_ref.cptr);
-
-	switch (xmit_type) {
-	case VOLUNTEER_XMIT:
-		printk("$##\n");
-		ret = thc_ipc_send_request(hidden_args->async_chnl,
-				_request, &request_cookie);
-
-		if (ret) {
-			LIBLCD_ERR("thc_ipc_call");
-			goto fail_ipc;
-		}
-
-		ret = sync_setup_memory(skb, sizeof(struct sk_buff),
-				&skb_ord, &skb_cptr, &skb_off);
-
-		ret = sync_setup_memory(skb->head,
-			skb_end_offset(skb)
-			+ sizeof(struct skb_shared_info),
-				&skbd_ord, &skbd_cptr, &skbd_off);
-
-		skb_c->skb_cptr = skb_cptr;
-		skb_c->skbh_cptr = skbd_cptr;
-
-		/* sync half */
-		lcd_set_cr0(skb_cptr);
-		lcd_set_cr1(skbd_cptr);
-		lcd_set_r0(skb_ord);
-		lcd_set_r1(skb_off);
-		lcd_set_r2(skbd_ord);
-		lcd_set_r3(skbd_off);
-		lcd_set_r4(skb->data - skb->head);
-
-		/* handle nonlcd case with a granted sync ep */
-		if (PTS()->nonlcd_ctx && PTS()->syncep_present) {
-			sync_end.cptr = PTS()->sync_ep;
-			ret = lcd_sync_send(sync_end);
-		} else
-			ret = lcd_sync_send(hidden_args->sync_ep);
-
-		lcd_set_cr0(CAP_CPTR_NULL);
-		lcd_set_cr1(CAP_CPTR_NULL);
-
-		if (ret) {
-			LIBLCD_ERR("failed to send");
-			goto fail_sync;
-		}
-
-		break;
-
-	case SHARED_DATA_XMIT:
-		fipc_set_reg3(_request,
-				(unsigned long)
-				((void*)skb->head - pool->pool));
-
-		fipc_set_reg4(_request, skb->end);
-		fipc_set_reg5(_request, skb->protocol);
-#ifdef DOUBLE_HASHING
-		fipc_set_reg6(_request,
-			current->ptstate->pid << 32 | skb->len);
-#else
-		fipc_set_reg6(_request, skb->len);
-#endif
-
-#ifdef COPY
-
-		skb_lcd = SKB_LCD_MEMBERS(skb);
-		C(len);
-		C(data_len);
-		C(queue_mapping);
-		C(xmit_more);
-		C(tail);
-		C(truesize);
-		C(ip_summed);
-		C(csum_start);
-		C(network_header);
-		C(csum_offset);
-		C(transport_header);
-		skb_lcd->head_data_off = skb->data - skb->head;
-#endif
-		break;
-	default:
-		LIBLCD_ERR("%s, Unknown xmit_type requested",
-			__func__);
-		break;
-	}
-
-//	printk("%s, ipc_call skb:%p\n", __func__, skb);
-
-	ret = thc_ipc_call(async_chnl, _request, &_response);
-
-//	printk("%s, woken up skb:%p\n", __func__, skb);
-
-	if (ret) {
-		LIBLCD_ERR("thc_ipc_call");
-		goto fail_ipc;
-	}
-
-	ret = fipc_get_reg1(_response);
-
-	fipc_recv_msg_end(thc_channel_to_fipc(
-			async_chnl), _response);
-
-#ifdef NO_HASHING
-	dev_kfree_skb(skb);
-#endif
-
-	g_stats.tx_packets += 1;
-	g_stats.tx_bytes += skb->len;
-
-fail_async:
-fail_alloc:
-fail_sync:
 fail_ipc:
 	return ret;
 }
@@ -1821,7 +1361,7 @@ int ndo_start_xmit_async_landing(struct sk_buff *first, struct net_device *dev, 
 	}
 
 	if (!skb->chain_skb) {
-		return ndo_start_xmit_bare2(skb, dev, hidden_args);
+		return ndo_start_xmit_bare_async(skb, dev, hidden_args);
 	} else {
 		/* chain skb */
 	    if (!current->ptstate) {
@@ -1898,13 +1438,13 @@ int ndo_start_xmit_async_landing(struct sk_buff *first, struct net_device *dev, 
 			while (skb) {
 				struct sk_buff *next = skb->next;
 			
-			//	printk("%s, before async next: %p\n", __func__,
-//								next);
+				//printk("%s, before async next: %p\n", __func__,
+				//				next);
 				skb->next = NULL;
 				ASYNC_( {
-			//		printk("%s, sending skb %p\n", __func__, skb);
+				//	printk("%s, sending skb %p\n", __func__, skb);
 					skb->chain_skb = true;
-					rc = ndo_start_xmit_async2(skb, dev, hidden_args);
+					rc = ndo_start_xmit_async(skb, dev, hidden_args);
 					if (unlikely(!dev_xmit_complete(rc))) {
 						skb->next = next;
 						printk("%s, xmit failed\n", __func__);
@@ -1914,8 +1454,8 @@ int ndo_start_xmit_async_landing(struct sk_buff *first, struct net_device *dev, 
 					
 				}, before_xmit); // ASYNC
 
-			//	printk("%s, after async next: %p\n", __func__,
-//								next);
+				//printk("%s, after async next: %p\n", __func__,
+				//				next);
 				skb = next;
 /*				if (netif_xmit_stopped(txq) && skb) {
 					rc = NETDEV_TX_BUSY;
@@ -1946,75 +1486,216 @@ int ndo_start_xmit_async_landing(struct sk_buff *first, struct net_device *dev, 
 #endif
 //	printk("%s, dofin complete\n", __func__);
 	return rc;
-
-}
-
-int setup_once(struct trampoline_hidden_args *hidden_args)
-{
-	printk("%s, %s:%d lcdenter\n", __func__,
-			current->comm, current->pid);
-
-	/* step 1. create lcd env */
-	lcd_enter();
-
-	if (!PTS()) {
-		printk("%s, %s:%d unable to create pts\n", __func__,
-			current->comm, current->pid);
-		return 1;
-	}
-
-	ptrs[smp_processor_id()] = PTS();
-
-	/* set nonlcd ctx for future use */
-	PTS()->nonlcd_ctx = true;
-
-	PTS()->pid = current->pid;
-
-	/*
-	 * if it is ksoftirqd, let it use the channel that exist 
-	 */
-	if (!strncmp(current->comm, "ksoftirqd/",
-				strlen("ksoftirqd/"))) {
-		if (!sirq_channels[smp_processor_id()]) {
-			printk("%s: sirqch empty for %d\n",
-				__func__, smp_processor_id());
-			//PTS()->thc_chnl = xmit_chnl2;
-		}
-		PTS()->thc_chnl =
-			sirq_channels[smp_processor_id()];
-	} else if(!strncmp(current->comm, "iperf",
-				strlen("iperf")) ||
-		!strncmp(current->comm, "netperf",
-				strlen("netperf"))) {
-
-		prep_channel(hidden_args);
-		printk("===================================\n");
-		printk("===== Private Channel created =====\n");
-		printk("===================================\n");
-		if (thread < 4) {
-			current->ptstate->times_ndo_xmit = times_ndo_xmit[thread++];
-			printk("Assigning %p to pid %d\n", times_ndo_xmit[thread-1], current->pid);
-		}
-#ifndef NO_HASHING
-#ifdef DOUBLE_HASHING
-		spin_lock_init(&current->ptstate->hash_lock);
-		hash_init(current->ptstate->cptr_table);
-
-		// Add it once per thread
-		glue_insert_tid(tid_table, current->ptstate);
-		printk("Adding pts: %p and pid: %llu to the tid_table\n", current->ptstate, current->ptstate->pid);
-#endif
-#endif /* NO_HASHING */
-	} else {
-		printk("===== app %s , giving xmit_chnl\n",
-				current->comm);
-		PTS()->thc_chnl = xmit_chnl;
-		PTS()->dofin = true;
-	}
-	return 0;
 }
 
 #define NUM_TRANSACTIONS	1000000
+
+int ndo_start_xmit_async2(struct sk_buff *skb, struct net_device *dev, struct trampoline_hidden_args *hidden_args)
+{
+	int ret;
+	struct fipc_message *_request;
+	struct fipc_message *_response;
+	struct thc_channel *async_chnl;
+#ifdef COPY
+	struct skbuff_members *skb_lcd;
+#endif
+	unsigned int request_cookie;
+#ifdef MARSHAL
+	struct net_device_container *net_dev_container;
+	struct sk_buff_container static_skbc;
+	struct sk_buff_container *skb_c = &static_skbc;
+	struct thc_channel *async_chnl = NULL;
+
+	xmit_type = check_skb_range(skb);
+
+	if (xmit_type == VOLUNTEER_XMIT) {
+		printk("%s, skb->proto %02X | len %d\n",
+				__func__, ntohs(skb->protocol),
+				skb->len);
+		goto free;
+	}
+#endif
+	async_chnl = (struct thc_channel*) PTS()->thc_chnl;
+
+#ifdef MARSHAL
+	net_dev_container = container_of(dev,
+			struct net_device_container, net_device);
+#endif
+//	printk("%s, sending ipc \n", __func__);
+	ret = async_msg_blocking_send_start(
+			async_chnl, &_request);
+	if (unlikely(ret)) {
+		LIBLCD_ERR("failed to get a send slot");
+		goto fail_async;
+	}
+
+	async_msg_set_fn_type(_request, NDO_START_XMIT);
+#ifndef NO_ASYNC
+	fipc_set_reg0(_request, 1);
+#endif
+#ifdef MARSHAL
+	fipc_set_reg1(_request,
+			net_dev_container->other_ref.cptr);
+	fipc_set_reg2(_request, 0x0);
+
+	fipc_set_reg3(_request,
+			(unsigned long)
+			((void*)skb->head - pool->pool));
+
+	fipc_set_reg4(_request, skb->end);
+	fipc_set_reg5(_request, skb->protocol);
+	fipc_set_reg6(_request, skb->len);
+#endif
+#ifdef COPY
+	skb_lcd = SKB_LCD_MEMBERS(skb);
+	C(len);
+	C(data_len);
+	C(queue_mapping);
+	C(xmit_more);
+	C(tail);
+	C(truesize);
+	C(ip_summed);
+	C(csum_start);
+	C(network_header);
+	C(csum_offset);
+	C(transport_header);
+	skb_lcd->head_data_off = skb->data - skb->head;
+#endif
+
+#ifndef NO_ASYNC
+	ret = thc_ipc_send_request(async_chnl, _request, &request_cookie);
+
+	#ifdef OLD_RESPONSE
+	  ret = thc_ipc_recv_response(async_chnl, request_cookie,
+						&_response);
+	#else
+	  ret = thc_ipc_recv_response_new(async_chnl, request_cookie,
+				&_response);
+
+	awe_mapper_remove_id(request_cookie);
+#endif /* OLD_RESPONSE */
+
+#else /* NO_ASYNC */
+	thc_set_msg_type(_request, msg_type_request);
+	fipc_send_msg_end(thc_channel_to_fipc(
+			async_chnl), _request);
+
+	/* guard nonlcd case with all macros */
+	fipc_test_blocking_recv_start(
+			async_chnl,
+			&_response);
+
+	fipc_recv_msg_end(thc_channel_to_fipc(
+			async_chnl), _response);
+
+#endif
+	//printk("%s, ipc call returned %d\n", __func__, ret);
+	if (unlikely(ret)) {
+		LIBLCD_ERR("thc_ipc_call");
+		goto fail_ipc;
+	}
+#ifdef MARSHAL
+	ret = fipc_get_reg1(_response);
+#endif
+	fipc_recv_msg_end(thc_channel_to_fipc(
+			async_chnl), _response);
+
+fail_async:
+fail_ipc:
+	return ret;
+}
+
+int NUM_INNER_ASYNCS = 2;
+
+//#define TS
+int ndo_start_xmit_bare_async(struct sk_buff *skb, struct net_device *dev, struct trampoline_hidden_args *hidden_args)
+{
+	xmit_type_t xmit_type;
+	_TS_DECL(xmit);
+	u32 i;
+
+	xmit_type = check_skb_range(skb);
+
+	if (xmit_type == VOLUNTEER_XMIT) {
+		printk("%s, skb->proto %02X | len %d\n",
+				__func__, ntohs(skb->protocol),
+				skb->len);
+		goto free;
+	}
+
+	if (unlikely(!current->ptstate)) {
+		if (setup_once(hidden_args))
+			goto free;
+	}
+
+	_TS_START(xmit);
+	for (i = 0; i < NUM_TRANSACTIONS; i++) {
+		int j;
+		DO_FINISH({
+			for (j = 0; j < NUM_INNER_ASYNCS; j++) {
+			ASYNC({
+				ndo_start_xmit_async2(skb, dev, hidden_args);
+			}); //async
+		}
+		}); // dofinish
+	}
+	_TS_STOP(xmit);
+
+	printk("%s, %d ch3 transactions took %llu\n", __func__,
+			NUM_TRANSACTIONS, _TS_DIFF(xmit)/NUM_TRANSACTIONS);
+
+	if (0)
+	{
+	unsigned long num = 0, j;
+	unsigned int ids[NUM_INNER_ASYNCS];
+	_TS_START(xmit);
+	for (i = 0; i < NUM_TRANSACTIONS; i++) {
+	     DO_FINISH({
+             for (j = 0; j < NUM_INNER_ASYNCS/2; j++) {
+                 ASYNC({
+                     awe_mapper_create_id(&ids[j]);
+                     assert(ids[j]);
+                     THCYieldAndSave(ids[j]);
+                     awe_mapper_remove_id(ids[j]);
+                     num++;
+                 });
+             }
+             for (j = 0; j < NUM_INNER_ASYNCS/2; j++) {
+                 ASYNC({
+                     THCYieldToId(ids[j]);
+                 });
+             };
+         });
+	}
+	_TS_STOP(xmit);
+
+	printk("%s, %d ch3 1 yield and 1 yields back (via awe mapper) transactions took %llu\n", __func__,
+			NUM_TRANSACTIONS, _TS_DIFF(xmit)/NUM_TRANSACTIONS);
+	}
+#ifdef CH2
+	PTS()->thc_chnl = xmit_chnl;
+	_TS_START(xmit);
+	for (i = 0; i < NUM_TRANSACTIONS; i++) {
+		int j;
+		DO_FINISH({
+		for (j = 0; j < num_inner_asyncs; j++) {
+			ASYNC({
+				ndo_start_xmit_async2(skb, dev, hidden_args);
+			}); //async
+		}
+		}); // dofinish
+	}
+	_TS_STOP(xmit);
+
+	printk("%s, %d ch2 transactions took %llu\n", __func__,
+			NUM_TRANSACTIONS, _TS_DIFF(xmit)/NUM_TRANSACTIONS);
+#endif
+free:
+#ifdef NO_HASHING
+	dev_kfree_skb(skb);
+#endif
+	return NETDEV_TX_OK;
+}
 
 //#define TS
 int ndo_start_xmit_bare(struct sk_buff *skb, struct net_device *dev, struct trampoline_hidden_args *hidden_args)
@@ -2022,6 +1703,7 @@ int ndo_start_xmit_bare(struct sk_buff *skb, struct net_device *dev, struct tram
 	struct fipc_message *_request;
 	struct fipc_message *_response;
 	xmit_type_t xmit_type;
+	struct thc_channel *async_chnl;
 #ifdef TS
 	u32 i;
 	static bool prog = false;
@@ -2035,8 +1717,6 @@ int ndo_start_xmit_bare(struct sk_buff *skb, struct net_device *dev, struct tram
 		prog = true;
 	}
 #endif
-
-//#define MARSHAL
 
 #ifdef MARSHAL
 	struct net_device_container *net_dev_container;
@@ -2061,9 +1741,9 @@ int ndo_start_xmit_bare(struct sk_buff *skb, struct net_device *dev, struct tram
 	if (unlikely(!current->ptstate)) {
 		if (setup_once(hidden_args))
 			goto free;
-		hidden_args->async_chnl = PTS()->thc_chnl;
+		async_chnl = PTS()->thc_chnl;
 	} else {
-		hidden_args->async_chnl = PTS()->thc_chnl;
+		async_chnl = PTS()->thc_chnl;
 	}
 
 #ifdef TS
@@ -2077,7 +1757,7 @@ int ndo_start_xmit_bare(struct sk_buff *skb, struct net_device *dev, struct tram
 	//for (i = 0; i < NUM_TRANSACTIONS; i++) {
 
 	async_msg_blocking_send_start(
-			hidden_args->async_chnl, &_request);
+			async_chnl, &_request);
 
 	async_msg_set_fn_type(_request, NDO_START_XMIT);
 
@@ -2098,15 +1778,15 @@ int ndo_start_xmit_bare(struct sk_buff *skb, struct net_device *dev, struct tram
 #endif
 	thc_set_msg_type(_request, msg_type_request);
 	fipc_send_msg_end(thc_channel_to_fipc(
-			hidden_args->async_chnl), _request);
+			async_chnl), _request);
 
 	/* guard nonlcd case with all macros */
 	fipc_test_blocking_recv_start(
-			hidden_args->async_chnl,
+			async_chnl,
 			&_response);
 
 	fipc_recv_msg_end(thc_channel_to_fipc(
-			hidden_args->async_chnl), _response);
+			async_chnl), _response);
 
 	//}
 #ifdef TS
@@ -2189,7 +1869,8 @@ int ndo_start_xmit_bare2(struct sk_buff *skb, struct net_device *dev, struct tra
 
 	thc_set_msg_type(_request, msg_type_request);
 
-	fipc_set_reg0(_request, xmit_type);
+	fipc_set_reg0(_request, false);
+
 	fipc_set_reg1(_request,
 			net_dev_container->other_ref.cptr);
 	fipc_set_reg2(_request,
@@ -4340,12 +4021,12 @@ int __rtnl_link_register_callee(void)
 	/*
 	 * Add to dispatch loop
 	 */
-	net_info = add_net(xmit_chnl, c_cspace, sync_endpoint);
+/*	net_info = add_net(xmit_chnl, c_cspace, sync_endpoint);
 	if (!net_info) {
 		LIBLCD_ERR("error adding to dispatch loop");
 		goto fail7;
 	}
-
+*/
 	setup_hidden_args = kzalloc(sizeof(*setup_hidden_args),
 				GFP_KERNEL);
 

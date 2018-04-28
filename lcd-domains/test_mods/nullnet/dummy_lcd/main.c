@@ -56,6 +56,7 @@ static void main_and_loop(void)
 			/*
 			 * Do one async receive
 			 */
+			//ret = thc_poll_recv_group(&ch_grp, &curr_item, &msg);
 			ret = thc_poll_recv_group_2(&ch_grp, &curr_item, &msg);
 			if (likely(ret)) {
 				if (ret == -EWOULDBLOCK) {
@@ -68,10 +69,18 @@ static void main_and_loop(void)
 			}
 
 			if (async_msg_get_fn_type(msg) == NDO_START_XMIT) {
-				ret = ndo_start_xmit_noawe(msg,
+				if (fipc_get_reg0(msg)) {
+//				printk("%s, chain skb", __func__);
+				ret = ndo_start_xmit_async_bare_callee(msg,
 					curr_item->channel,
 					nullnet_cspace,
-					nullnet_sync_endpoint); 
+					nullnet_sync_endpoint);
+				} else {
+				ret = ndo_start_xmit_noawe_callee(msg,
+					curr_item->channel,
+					nullnet_cspace,
+					nullnet_sync_endpoint);
+				}
 				if (likely(ret)) {
 					LIBLCD_ERR("async dispatch failed");
 					stop = 1;

@@ -39,6 +39,8 @@ struct lcd_sk_buff_container {
 	struct cptr my_ref, other_ref;
 	struct sk_buff skbuff;
 	uint64_t tid;
+	void *chnl;
+	unsigned int cookie;
 };
 
 int glue_nullnet_init(void)
@@ -986,6 +988,36 @@ fail_insert:
 TS_DECL(ipc_send);
 TS_DECL(hlookup);
 
+#ifdef CONSUME_SKB_NO_HASHING
+void consume_skb(struct sk_buff *skb)
+{
+	int ret;
+	struct fipc_message *request;
+	struct lcd_sk_buff_container *skb_c;
+	struct thc_channel *channel;
+
+	skb_c = container_of(skb,
+			struct lcd_sk_buff_container, skbuff);
+
+	channel = (struct thc_channel*) skb_c->chnl;
+
+	ret = async_msg_blocking_send_start(channel, &request);
+	if (ret) {
+		LIBLCD_ERR("failed to get a send slot");
+		goto fail_async;
+	}
+	async_msg_set_fn_type(request, CONSUME_SKB);
+
+	thc_set_msg_type(request, msg_type_request);
+	thc_set_msg_id(request, skb_c->cookie);
+	fipc_send_msg_end (thc_channel_to_fipc(channel), request);
+
+fail_async:
+	return;
+}
+
+#else
+
 void consume_skb(struct sk_buff *skb)
 {
 #ifdef LCD_SKB_CONTAINER
@@ -1079,6 +1111,8 @@ fail_async:
 fail_virt:
 	return;
 }
+
+#endif /* CONSUME_SKB_NO_HASHING */
 
 // DONE
 int ndo_init_callee(struct fipc_message *request, struct thc_channel *channel, struct glue_cspace *cspace, struct cptr sync_ep)
@@ -1234,6 +1268,80 @@ int ndo_start_xmit_bare_callee(struct fipc_message *_request, struct thc_channel
 	return 0;
 }
 
+#ifdef CONSUME_SKB_NO_HASHING
+int ndo_start_xmit_noawe_callee(struct fipc_message *_request, struct thc_channel *channel, struct glue_cspace *cspace, struct cptr sync_ep)
+{
+	struct lcd_sk_buff_container static_skb_c;
+	struct lcd_sk_buff_container *skb_c = &static_skb_c;
+	struct sk_buff *skb = &skb_c->skbuff;
+	struct fipc_message *response;
+	int ret;
+#ifdef COPY
+	struct skbuff_members *skb_lcd;
+#endif
+
+#ifndef NO_MARSHAL
+	xmit_type_t xmit_type;
+	unsigned long skbh_offset, skb_end;
+	__be16 proto;
+	u32 len;
+	cptr_t skb_ref;
+
+	xmit_type = fipc_get_reg0(_request);
+
+	skb_ref = __cptr(fipc_get_reg2(_request));
+
+	skbh_offset = fipc_get_reg3(_request);
+
+	skb_end = fipc_get_reg4(_request);
+	proto = fipc_get_reg5(_request);
+	len = fipc_get_reg6(_request);
+#endif
+	fipc_recv_msg_end(thc_channel_to_fipc(channel),
+				_request);
+
+#ifndef NO_MARSHAL
+	skb->head = (char*)data_pool + skbh_offset;
+	skb->end = skb_end;
+	skb->len = len;
+	skb->private = true;
+#endif
+
+#ifdef COPY
+	skb_lcd = SKB_LCD_MEMBERS(skb);
+
+	P(len);
+	P(data_len);
+	P(queue_mapping);
+	P(xmit_more);
+	P(tail);
+	P(truesize);
+	P(ip_summed);
+	P(csum_start);
+	P(network_header);
+	P(csum_offset);
+	P(transport_header);
+
+	skb->data = skb->head + skb_lcd->head_data_off;
+#endif
+
+	skb_c->chnl = channel;
+
+	ret = dummy_xmit(skb, NULL);
+
+	if (async_msg_blocking_send_start(channel, &response)) {
+		LIBLCD_ERR("error getting response msg");
+		return -EIO;
+	}
+
+	fipc_set_reg1(response, ret);
+	thc_set_msg_type(response, msg_type_response);
+	fipc_send_msg_end(thc_channel_to_fipc(channel), response);
+	return ret;
+}
+
+#else
+
 int ndo_start_xmit_noawe_callee(struct fipc_message *_request, struct thc_channel *channel, struct glue_cspace *cspace, struct cptr sync_ep)
 {
 #if defined(NO_HASHING) && defined(STATIC_SKB)
@@ -1329,6 +1437,7 @@ int ndo_start_xmit_noawe_callee(struct fipc_message *_request, struct thc_channe
 	//printk("%s, response sent\n", __func__);
 	return ret;
 }
+#endif /* CONSUME_SKB_NO_HASHING */
 
 /* Function to test bare async. This function receives the IPC and
  * sends back a response
@@ -1337,13 +1446,19 @@ int ndo_start_xmit_async_bare_callee(struct fipc_message *_request, struct thc_c
 {
 	struct fipc_message *response;
 	unsigned 	int request_cookie;
+	struct lcd_sk_buff_container static_skb_c;
+	struct lcd_sk_buff_container *skb_c = &static_skb_c;
+	struct sk_buff *skb = &skb_c->skbuff;
 
 	request_cookie = thc_get_request_cookie(_request);
 
 	fipc_recv_msg_end(thc_channel_to_fipc(channel),
 				_request);
 
-	//dummy_xmit(skb, NULL);
+	skb_c->chnl = channel;
+	skb_c->cookie = request_cookie;
+
+	dummy_xmit(skb, NULL);
 
 	if (async_msg_blocking_send_start(channel, &response)) {
 		LIBLCD_ERR("error getting response msg");
@@ -1374,7 +1489,7 @@ int ndo_start_xmit_callee(struct fipc_message *_request, struct thc_channel *cha
 #else
 	struct sk_buff_container *skb_c;
 #endif
-	uint64_t pid;
+	uint64_t pid = 0;
 #endif /* NO_HASHING */
 
 #ifndef NOLOOKUP
@@ -1450,7 +1565,7 @@ int ndo_start_xmit_callee(struct fipc_message *_request, struct thc_channel *cha
 		LIBLCD_MSG("no memory");
 #endif /* STATIC_SKB */
 	
-#ifdef LCD_SKB_CONTAINER
+#if defined(LCD_SKB_CONTAINER)
 	skb = &skb_c->skbuff;
 	skb_c->tid = pid;
 #else

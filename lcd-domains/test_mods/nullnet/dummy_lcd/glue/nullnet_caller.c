@@ -1449,11 +1449,54 @@ int ndo_start_xmit_async_bare_callee(struct fipc_message *_request, struct thc_c
 	struct lcd_sk_buff_container static_skb_c;
 	struct lcd_sk_buff_container *skb_c = &static_skb_c;
 	struct sk_buff *skb = &skb_c->skbuff;
+#ifdef COPY
+	struct skbuff_members *skb_lcd;
+#endif
+
+#ifndef NO_MARSHAL
+	unsigned long skbh_offset, skb_end;
+	__be16 proto;
+	u32 len;
+	cptr_t skb_ref;
+
+	skb_ref = __cptr(fipc_get_reg2(_request));
+
+	skbh_offset = fipc_get_reg3(_request);
+
+	skb_end = fipc_get_reg4(_request);
+	proto = fipc_get_reg5(_request);
+	len = fipc_get_reg6(_request);
+#endif
 
 	request_cookie = thc_get_request_cookie(_request);
 
 	fipc_recv_msg_end(thc_channel_to_fipc(channel),
 				_request);
+
+#ifndef NO_MARSHAL
+	skb->head = (char*)data_pool + skbh_offset;
+	skb->end = skb_end;
+	skb->len = len;
+	skb->private = true;
+#endif
+
+#ifdef COPY
+	skb_lcd = SKB_LCD_MEMBERS(skb);
+
+	P(len);
+	P(data_len);
+	P(queue_mapping);
+	P(xmit_more);
+	P(tail);
+	P(truesize);
+	P(ip_summed);
+	P(csum_start);
+	P(network_header);
+	P(csum_offset);
+	P(transport_header);
+
+	skb->data = skb->head + skb_lcd->head_data_off;
+#endif
 
 	skb_c->chnl = channel;
 	skb_c->cookie = request_cookie;

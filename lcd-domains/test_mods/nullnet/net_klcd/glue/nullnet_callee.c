@@ -1381,7 +1381,7 @@ int ndo_start_xmit_async_landing(struct sk_buff *first, struct net_device *dev, 
 	}
 
 	if (!skb->chain_skb) {
-		return ndo_start_xmit_bare_async(skb, dev, hidden_args);
+		return ndo_start_xmit_bare2(skb, dev, hidden_args);
 	} else {
 		/* chain skb */
 	    if (!current->ptstate) {
@@ -1856,13 +1856,7 @@ free:
 #endif
 	return NETDEV_TX_OK;
 }
-#if 0
-int dispatch_request(struct thc_channel *channel, struct fipc_message *req)
-{
 
-
-}
-#endif
 int ndo_start_xmit_bare2(struct sk_buff *skb, struct net_device *dev, struct trampoline_hidden_args *hidden_args)
 {
 	struct fipc_message *_request;
@@ -4338,7 +4332,7 @@ int consume_skb_callee(struct fipc_message *request, struct thc_channel *channel
 			request);
 
 //	printk("%s, freeing %p\n", __func__, skb);
-//	consume_skb(skb);
+	consume_skb(skb);
 
 	return ret;
 }

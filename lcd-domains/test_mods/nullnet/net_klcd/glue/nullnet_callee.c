@@ -15,6 +15,8 @@
 #include "../../perf_counter_helper.h"
 #include <linux/vmalloc.h>
 
+#include "../../ipc_helper.h"
+
 #include <lcd_config/post_hook.h>
 
 #define NUM_PACKETS	(1000000)
@@ -1245,6 +1247,14 @@ int setup_once(struct trampoline_hidden_args *hidden_args)
 	return 0;
 }
 
+int sender_dispatch(struct thc_channel *chnl, struct fipc_message *out, void *arg)
+{
+	/* we receive the skb pointer via arg, pass it to consume skb via reg 0 */
+	fipc_set_reg0(out, (uint64_t) arg);
+//	printk("%s, called\n", __func__);
+	return dispatch_async_loop(chnl, out, c_cspace, sync_ep); 
+}
+
 int ndo_start_xmit_async(struct sk_buff *skb, struct net_device *dev, struct trampoline_hidden_args *hidden_args)
 {
 	int ret;
@@ -1321,10 +1331,20 @@ int ndo_start_xmit_async(struct sk_buff *skb, struct net_device *dev, struct tra
 
 //	ret = thc_ipc_recv_response(async_chnl, request_cookie, &_response);
 
-	ret = thc_ipc_recv_response_new(async_chnl, request_cookie,
+#ifdef SENDER_DISPATCH_LOOP
+
+//	printk("%s, server dispatch %p\n", __func__, skb);
+	ret = thc_ipc_recv_req_resp(async_chnl, &_response, request_cookie, sender_dispatch, (void*)skb);
+
+	fipc_recv_msg_end(thc_channel_to_fipc(async_chnl), _response);
+
+//	printk("%s, got response\n", __func__);
+#else
+	ret = thc_ipc_recv_response_inline(async_chnl, request_cookie,
 				&_response);
 
 	awe_mapper_remove_id(request_cookie);
+#endif
 	//printk("%s, ipc call returned %d\n", __func__, ret);
 	if (unlikely(ret)) {
 		LIBLCD_ERR("thc_ipc_call");
@@ -1361,7 +1381,7 @@ int ndo_start_xmit_async_landing(struct sk_buff *first, struct net_device *dev, 
 	}
 
 	if (!skb->chain_skb) {
-		return ndo_start_xmit_dummy(skb, dev, hidden_args);
+		return ndo_start_xmit_bare2(skb, dev, hidden_args);
 	} else {
 		/* chain skb */
 	    if (!current->ptstate) {
@@ -1568,12 +1588,16 @@ int ndo_start_xmit_async2(struct sk_buff *skb, struct net_device *dev, struct tr
 	#ifdef OLD_RESPONSE
 	  ret = thc_ipc_recv_response(async_chnl, request_cookie,
 						&_response);
+	#elif defined(SENDER_DISPATCH_LOOP)
+	ret = thc_ipc_recv_req_resp(async_chnl, &_response, request_cookie, sender_dispatch, (void*)skb);
+
+	  fipc_recv_msg_end(thc_channel_to_fipc(async_chnl), _response);
 	#else
-	  ret = thc_ipc_recv_response_new(async_chnl, request_cookie,
+	  ret = thc_ipc_recv_response_inline(async_chnl, request_cookie,
 				&_response);
 
 	awe_mapper_remove_id(request_cookie);
-#endif /* OLD_RESPONSE */
+	#endif /* OLD_RESPONSE */
 
 #else /* NO_ASYNC */
 	thc_set_msg_type(_request, msg_type_request);
@@ -1605,7 +1629,7 @@ fail_ipc:
 	return ret;
 }
 
-int NUM_INNER_ASYNCS = 2;
+int NUM_INNER_ASYNCS = 1;
 
 //#define TS
 int ndo_start_xmit_bare_async(struct sk_buff *skb, struct net_device *dev, struct trampoline_hidden_args *hidden_args)
@@ -1691,8 +1715,11 @@ int ndo_start_xmit_bare_async(struct sk_buff *skb, struct net_device *dev, struc
 			NUM_TRANSACTIONS, _TS_DIFF(xmit)/NUM_TRANSACTIONS);
 #endif
 free:
-#ifdef NO_HASHING
+#ifdef CONSUME_SKB_NO_HASHING
 	dev_kfree_skb(skb);
+#endif
+#ifdef NO_HASHING
+//	dev_kfree_skb(skb);
 #endif
 	return NETDEV_TX_OK;
 }
@@ -1833,6 +1860,7 @@ free:
 int ndo_start_xmit_bare2(struct sk_buff *skb, struct net_device *dev, struct trampoline_hidden_args *hidden_args)
 {
 	struct fipc_message *_request;
+	struct fipc_message *_request1;
 	struct fipc_message *_response;
 	xmit_type_t xmit_type;
 	struct thc_channel *async_chnl;
@@ -1887,6 +1915,24 @@ int ndo_start_xmit_bare2(struct sk_buff *skb, struct net_device *dev, struct tra
 
 	fipc_send_msg_end(thc_channel_to_fipc(
 			async_chnl), _request);
+
+	/* to receive consume_skb */
+	fipc_test_blocking_recv_start(
+			async_chnl,
+			&_request1);
+
+	/* TODO: replace this with a valid identifier mechanism
+	 * e.g., bitmap, create a bitmap and store this skb pointer and send the bitnumber
+	 * across the domain. during the consume_skb call, the same number is sent back and
+	 * looked up here by the consume skb function to get the corresponding skb pointer.
+	 * but this below mechanism is no way inferior to bitmap, except that the bitmap
+	 * mechanism is more generalizable.
+	 */
+	fipc_set_reg0(_request1, (uint64_t) skb);
+
+	/* call consume_skb */
+	dispatch_async_loop(async_chnl, _request1, hidden_args->cspace,
+				hidden_args->sync_ep);
 
 	/* guard nonlcd case with all macros */
 	fipc_test_blocking_recv_start(
@@ -4274,6 +4320,25 @@ fail_alloc:
 	return ret;
 }
 
+#ifdef CONSUME_SKB_NO_HASHING
+int consume_skb_callee(struct fipc_message *request, struct thc_channel *channel, struct glue_cspace *cspace, struct cptr sync_ep)
+{
+	int ret = 0;
+	struct sk_buff *skb;
+
+	skb = (struct sk_buff *) fipc_get_reg0(request);
+
+	fipc_recv_msg_end(thc_channel_to_fipc(channel),
+			request);
+
+//	printk("%s, freeing %p\n", __func__, skb);
+	consume_skb(skb);
+
+	return ret;
+}
+
+#else
+
 //TODO:
 int consume_skb_callee(struct fipc_message *request, struct thc_channel *channel, struct glue_cspace *cspace, struct cptr sync_ep)
 {
@@ -4375,6 +4440,7 @@ fail_async:
 #endif
 	return ret;
 }
+#endif /* CONSUME_SKB_NO_HASHING */
 
 int trigger_exit_to_lcd(struct thc_channel *_channel, enum dispatch_t disp)
 {

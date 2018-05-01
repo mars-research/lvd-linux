@@ -46,8 +46,8 @@
 #include "ixgbe_common.h"
 #include "ixgbe_dcb.h"
 #if defined(CONFIG_FCOE) || defined(CONFIG_FCOE_MODULE)
-#define IXGBE_FCOE
-#include "ixgbe_fcoe.h"
+//#define IXGBE_FCOE
+//#include "ixgbe_fcoe.h"
 #endif /* CONFIG_FCOE or CONFIG_FCOE_MODULE */
 #ifdef CONFIG_IXGBE_DCA
 #include <linux/dca.h>

@@ -17,6 +17,15 @@ struct net_info *
 add_net(struct thc_channel *chnl, struct glue_cspace *cspace,
 	cptr_t sync_endpoint);
 
+struct trampoline_hidden_args {
+	void *struct_container;
+	struct glue_cspace *cspace;
+	struct lcd_trampoline_handle *t_handle;
+	struct thc_channel *async_chnl;
+	struct cptr sync_ep;
+};
+
+
 int dispatch_async_loop(struct thc_channel *chnl,
 			struct fipc_message *msg,
 			struct glue_cspace *cspace,

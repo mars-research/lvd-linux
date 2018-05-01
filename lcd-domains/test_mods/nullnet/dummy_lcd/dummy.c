@@ -106,10 +106,9 @@ netdev_tx_t dummy_xmit(struct sk_buff *skb, struct net_device *dev)
 	g_dstats.tx_bytes += skb->len;
 #endif
 
-#ifndef NO_HASHING
+#ifdef SENDER_DISPATCH_LOOP
 	dev_kfree_skb(skb);
 #endif
-	//printk("%s, got packet\n", __func__);
 	return NETDEV_TX_OK;
 }
 

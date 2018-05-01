@@ -21,13 +21,15 @@
 #include <lcd_config/post_hook.h>
 
 //#define TIMESTAMP
-//#define LCD_MEASUREMENT
+#define LCD_MEASUREMENT
+//#define FREE_TIMESTAMP
 
 struct glue_cspace *c_cspace = NULL;
 struct thc_channel *ixgbe_async;
 struct cptr sync_ep;
 extern struct cspace *klcd_cspace;
 extern struct thc_channel *xmit_chnl;
+extern struct thc_channel *xmit_chnl2;
 extern struct thc_channel *xmit_irq_chnl;
 struct timer_list service_timer;
 struct napi_struct *napi_q0;
@@ -37,6 +39,8 @@ struct napi_struct *napi_q0;
 
 uint64_t *times_ndo_xmit = NULL;
 uint64_t *times_lcd = NULL;
+uint64_t *times_free = NULL;
+
 static struct rtnl_link_stats64 g_stats;
 
 /* This is the only device we strive for */
@@ -110,6 +114,8 @@ int glue_ixgbe_init(void)
 
 	times_lcd = vzalloc(NUM_PACKETS * sizeof(uint64_t));
 
+	times_free = vzalloc(NUM_PACKETS * sizeof(uint64_t));
+
 	skb_c_cache = kmem_cache_create("skb_c_cache",
 				sizeof(struct sk_buff_container),
 				0,
@@ -140,6 +146,9 @@ void glue_ixgbe_exit(void)
 
 	if (times_lcd)
 		vfree(times_lcd);
+
+	if (times_free)
+		vfree(times_free);
 }
 
 int glue_insert_skbuff(struct hlist_head *htable, struct sk_buff_container *skb_c)
@@ -1383,8 +1392,15 @@ int ndo_start_xmit_nonlcd(struct sk_buff *skb,
 	struct skbuff_members *skb_lcd;
 #ifdef TIMESTAMP
 	TS_DECL(mndo_xmit);
+#endif
+
+#if defined(TIMESTAMP) || defined(LCD_MEASUREMENT)
 	static int iter = 0;
 #endif
+#ifdef TIMESTAMP
+	TS_START(mndo_xmit);
+#endif
+
 	dev_container = container_of(dev,
 		struct net_device_container,
 		net_device);
@@ -1411,9 +1427,6 @@ int ndo_start_xmit_nonlcd(struct sk_buff *skb,
 	/* pad to 17 bytes, don't care the ret val */
 	skb_put_padto(skb, 17);
 
-#ifdef TIMESTAMP
-	TS_START(mndo_xmit);
-#endif
 	ret = async_msg_blocking_send_start(async_chnl,	&_request);
 
 	if (ret) {
@@ -1537,6 +1550,138 @@ extern struct thc_channel *klcd_chnl;
 
 bool post_recv = false;
 
+struct thc_channel *sirq_channels[64];
+
+int prep_channel(struct trampoline_hidden_args *hidden_args)
+{
+	cptr_t tx, rx;
+	cptr_t tx_softirq, rx_softirq;
+	cptr_t sync_end;
+	struct thc_channel *chnl;
+	struct thc_channel *chnl_softirq;
+	struct fipc_message *_request;
+	struct fipc_message *_response;
+	unsigned int request_cookie;
+	int ret;
+
+	ret = lcd_cptr_alloc(&tx);
+	if (ret) {
+		LIBLCD_ERR("cptr alloc failed");
+		goto fail_cptr;
+	}
+	ret = lcd_cptr_alloc(&rx);
+	if (ret) {
+		LIBLCD_ERR("cptr alloc failed");
+		goto fail_cptr;
+	}
+
+	ret = lcd_cptr_alloc(&tx_softirq);
+	if (ret) {
+		LIBLCD_ERR("cptr alloc failed");
+		goto fail_cptr;
+	}
+	ret = lcd_cptr_alloc(&rx_softirq);
+	if (ret) {
+		LIBLCD_ERR("cptr alloc failed");
+		goto fail_cptr;
+	}
+
+	/* grant sync_ep */
+	if (grant_sync_ep(&sync_end, hidden_args->sync_ep)) {
+		LIBLCD_ERR("%s, grant_syncep failed %d\n",
+				__func__, ret);
+		goto fail_ep;
+	}
+
+	ret = async_msg_blocking_send_start(hidden_args->async_chnl,
+		&_request);
+	if (ret) {
+		LIBLCD_ERR("failed to get a send slot");
+		goto fail_async;
+	}
+
+	async_msg_set_fn_type(_request,
+			PREP_CHANNEL);
+
+	/* No need to wait for a response here */
+	ret = thc_ipc_send_request(hidden_args->async_chnl,
+			_request,
+			&request_cookie);
+	if (ret) {
+		LIBLCD_ERR("thc_ipc send");
+		goto fail_ipc;
+	}
+
+	lcd_set_cr0(rx);
+	lcd_set_cr1(tx);
+	lcd_set_cr2(rx_softirq);
+	lcd_set_cr3(tx_softirq);
+
+	ret = lcd_sync_recv(sync_end);
+	if (ret) {
+		if (ret == -EWOULDBLOCK)
+			ret = 0;
+		goto fail_ep;
+	}
+	/*
+	 * Set up async ring channel
+	 */
+	ret = setup_async_net_ring_channel(tx, rx, &chnl);
+	if (ret) {
+		LIBLCD_ERR("error setting up ring channel");
+		goto fail_ep;
+	}
+
+	printk("[%d]%s[pid=%d] Creating a pair for softirq\n", smp_processor_id(), current->comm, current->pid);
+	/*
+	 * Set up async ring channel for softirq
+	 */
+	ret = setup_async_net_ring_channel(tx_softirq, rx_softirq,
+				&chnl_softirq);
+	if (ret) {
+		LIBLCD_ERR("error setting up ring channel");
+		goto fail_ep2;
+	}
+
+	lcd_set_cr0(CAP_CPTR_NULL);
+	lcd_set_cr1(CAP_CPTR_NULL);
+	lcd_set_cr2(CAP_CPTR_NULL);
+	lcd_set_cr3(CAP_CPTR_NULL);
+
+
+	PTS()->thc_chnl = chnl;
+	sirq_channels[smp_processor_id()] = chnl_softirq;
+
+fail_ep2:
+	/* technically, we do not need to receive the response */
+	ret = thc_ipc_recv_response(
+			hidden_args->async_chnl,
+			request_cookie,
+			&_response);
+
+	printk("%s, ipc recv resp %d | pts %p | reqc 0x%x\n",
+				__func__, ret, PTS(),
+				request_cookie);
+
+	if (ret) {
+		LIBLCD_ERR("thc_ipc_recv_response");
+		goto fail_ipc;
+	}
+
+	fipc_recv_msg_end(thc_channel_to_fipc(
+			hidden_args->async_chnl),_response);
+
+	return 0;
+fail_async:
+fail_ep:
+	lcd_cptr_free(rx);
+	lcd_cptr_free(tx);
+fail_ipc:
+fail_cptr:
+	return -1;
+}
+
+
 int ndo_start_xmit(struct sk_buff *skb,
 		struct net_device *dev,
 		struct trampoline_hidden_args *hidden_args)
@@ -1564,24 +1709,54 @@ int ndo_start_xmit(struct sk_buff *skb,
 		/* set nonlcd ctx for future use */
 		PTS()->nonlcd_ctx = true;
 
+		/*
+		 * if it is ksoftirqd, let it use the channel that exist 
+		 */
 		if (!strncmp(current->comm, "ksoftirqd/",
-					strlen("ksoftirqd/")))
-			PTS()->thc_chnl = xmit_irq_chnl;
-		else if(!strncmp(current->comm, "iperf",
-					strlen("iperf")))
-			PTS()->thc_chnl = xmit_chnl;
-		else {
+					strlen("ksoftirqd/"))) {
+			//PTS()->thc_chnl = xmit_irq_chnl;
+			//printk("softirq\n");
+		/* step 2. grant sync_ep if needed */
+		/* FIXME: always grant sync_ep? */
+		//if (grant_sync_ep(&sync_end, hidden_args->sync_ep))
+		//	printk("%s, grant_syncep failed %d\n",
+		//			__func__, ret);
+			if (!sirq_channels[smp_processor_id()]) {
+				printk("%s: sirqch empty for %d\n",
+					__func__, smp_processor_id());
+				PTS()->thc_chnl = xmit_irq_chnl;
+			}
+			PTS()->thc_chnl =
+				sirq_channels[smp_processor_id()];
+		} else if(!strncmp(current->comm, "iperf",
+					strlen("iperf")) ||
+			!strncmp(current->comm, "netperf",
+					strlen("netperf"))) {
+
+			prep_channel(hidden_args);
+			printk("===================================\n");
+			printk("===== Private Channel created =====\n");
+			printk("===================================\n");
+
+/*			if (!entry)
+				PTS()->thc_chnl = xmit_chnl;
+			else
+				PTS()->thc_chnl = xmit_chnl2;
+			++entry;
+*/
+		} else {
 			printk("===== app %s , giving xmit_chnl\n",
 					current->comm);
-			PTS()->thc_chnl = xmit_chnl;
+			PTS()->thc_chnl = xmit_irq_chnl;
 			PTS()->dofin = true;
-		}
-
 		/* step 2. grant sync_ep if needed */
 		/* FIXME: always grant sync_ep? */
 		if (grant_sync_ep(&sync_end, hidden_args->sync_ep))
 			printk("%s, grant_syncep failed %d\n",
 					__func__, ret);
+
+		}
+
 	} else if (PTS()->nonlcd_ctx && PTS()->syncep_present) {
 		sync_end.cptr = PTS()->sync_ep;
 	}
@@ -1596,14 +1771,20 @@ int ndo_start_xmit(struct sk_buff *skb,
 		return NETDEV_TX_OK;
 	}
 
+	//printk("%s, nr_frags %d\n", __func__, skb_shinfo(skb)->nr_frags);
 	if (PTS()->nonlcd_ctx) {
 		async_chnl = (struct thc_channel*) PTS()->thc_chnl;
+		if (!async_chnl) {
+			printk("%s: async_chnl is null\n", current->comm);
+			goto quit;
+		}
 		if (unlikely(PTS()->dofin))
 			func_ret = ndo_start_xmit_dofin(skb, dev,
 					async_chnl, xmit_type);
 		else
 			func_ret = ndo_start_xmit_nonlcd(skb, dev,
 				async_chnl, xmit_type);
+quit:
 		return func_ret;
 	} else {
 		async_chnl = klcd_chnl;
@@ -1723,6 +1904,10 @@ int ndo_start_xmit(struct sk_buff *skb,
 		ret = thc_ipc_send_request(async_chnl,
 			_request, &request_cookie);
 
+		printk("%s, ipc send ret %d | pts %p | reqc 0x%x\n",
+				__func__, ret,
+				PTS(), request_cookie);
+
 		if (ret) {
 			LIBLCD_ERR("thc_ipc_call");
 			goto fail_ipc;
@@ -1734,11 +1919,15 @@ int ndo_start_xmit(struct sk_buff *skb,
 			__func__);
 		break;
 	}
+
 	ret = thc_ipc_recv_response(
 			async_chnl,
 			request_cookie,
 			&_response);
 
+	printk("%s, ipc recv resp %d | pts %p | reqc 0x%x\n",
+				__func__, ret, PTS(),
+				request_cookie);
 
 	if (ret) {
 		LIBLCD_ERR("thc_ipc_recv_response");
@@ -2564,8 +2753,14 @@ struct rtnl_link_stats64 *ndo_get_stats64(struct net_device *dev,
 						NUM_PACKETS);
 #endif
 #ifdef LCD_MEASUREMENT
+	printk("---------- LCD ---------------\n");
 	if (times_lcd)
 		fipc_test_stat_print_info(times_lcd,
+						NUM_PACKETS);
+#endif
+#ifdef FREE_TIMESTAMP
+	if (times_free)
+		fipc_test_stat_print_info(times_free,
 						NUM_PACKETS);
 #endif
 
@@ -3349,6 +3544,11 @@ int napi_consume_skb_callee(struct fipc_message *_request,
 	int budget;
 	bool revoke = false;
 
+#ifdef FREE_TIMESTAMP
+	static int iter = 0;
+	TS_DECL(free);
+
+#endif
 	request_cookie = thc_get_request_cookie(_request);
 
 	budget = fipc_get_reg1(_request);
@@ -3371,7 +3571,16 @@ int napi_consume_skb_callee(struct fipc_message *_request,
 		revoke = true;
 	}
 
+#ifdef FREE_TIMESTAMP
+	TS_START(free);
+#endif
 	napi_consume_skb(skb, budget);
+
+#ifdef FREE_TIMESTAMP
+	TS_STOP(free);
+	times_free[iter] = TS_DIFF(free);
+	iter = (iter + 1) % NUM_PACKETS;
+#endif
 
 	if (skb_c->tsk == current && revoke) {
 		lcd_cap_revoke(skb_cptr);
@@ -4914,6 +5123,8 @@ int poll(struct napi_struct *napi,
 	struct fipc_message *_request;
 	unsigned int request_cookie;
 
+	printk("%s, poll - budget %d\n", __func__, budget);
+
 	if (!current->ptstate) {
 		LIBLCD_MSG("%s, Calling from a non-LCD context! creating thc runtime!", __func__);
 		ret = poll_once(napi,
@@ -4928,7 +5139,7 @@ int poll(struct napi_struct *napi,
 	}
 	async_msg_set_fn_type(_request,
 			POLL);
-	fipc_set_reg1(_request,
+	fipc_set_reg0(_request,
 			budget);
 
 	/* No need to wait for a response here */
@@ -5184,6 +5395,7 @@ int netif_receive_skb_callee(struct fipc_message *_request,
 
 extern struct lcd *iommu_lcd;
 
+#ifndef LOCAL_SKB
 int napi_gro_receive_callee(struct fipc_message *_request,
 		struct thc_channel *_channel,
 		struct glue_cspace *cspace,
@@ -5256,6 +5468,9 @@ skip:
 
 	post_recv = true;
 
+	//skb_pull_inline(skb, ETH_HLEN);
+	skb->data += ETH_HLEN;
+
 	func_ret = napi_gro_receive(napi, skb);
 
 	if (p)
@@ -5283,6 +5498,182 @@ skip:
 			_response);
 	return ret;
 }
+
+#else
+
+void ixgbe_pull_tail(struct sk_buff *skb)
+{
+	struct skb_frag_struct *frag = &skb_shinfo(skb)->frags[0];
+	unsigned char *va;
+	unsigned int pull_len;
+
+	/*
+	 * it is valid to use page_address instead of kmap since we are
+	 * working with pages allocated out of the lomem pool per
+	 * alloc_page(GFP_ATOMIC)
+	 */
+	va = skb_frag_address(frag);
+
+	/*
+	 * we need the header to contain the greater of either ETH_HLEN or
+	 * 60 bytes if the skb->len is less than 60 for skb_pad.
+	 */
+
+#define IXGBE_RX_HDR_SIZE	256
+
+	pull_len = eth_get_headlen(va, IXGBE_RX_HDR_SIZE);
+
+	/* align pull length to size of long to optimize memcpy performance */
+	skb_copy_to_linear_data(skb, va, ALIGN(pull_len, sizeof(long)));
+
+	//printk("%s, pull len %d\n", __func__, pull_len);
+	/* update all of the pointers */
+	skb_frag_size_sub(frag, pull_len);
+	frag->page_offset += pull_len;
+	skb->data_len -= pull_len;
+	skb->tail += pull_len;
+}
+
+int napi_gro_receive_callee(struct fipc_message *_request,
+		struct thc_channel *_channel,
+		struct glue_cspace *cspace,
+		struct cptr sync_ep)
+{
+	struct napi_struct *napi;
+	struct sk_buff *skb;
+	int ret = 0;
+#ifndef NAPI_RX_SEND_ONLY
+	struct fipc_message *_response;
+	unsigned int request_cookie;
+#endif
+	int func_ret;
+	unsigned long page = 0ul;
+	struct lcd *lcd_struct;
+	hva_t hva_out;
+	struct skb_shared_info *shinfo;
+	struct page *p = NULL;
+	unsigned int old_pcount;
+	__be16 prot;
+	u64 off_sz,
+		truesize,
+		csum_ipsum,
+		hash_l4sw,
+		nr_frags_tail;
+	unsigned int pull_len;
+	unsigned char nr_frags;
+
+	u32 frag_off = 0, frag_size = 0;
+#ifndef NAPI_RX_SEND_ONLY
+	request_cookie = thc_get_request_cookie(_request);
+#endif
+	nr_frags_tail = fipc_get_reg0(_request);
+
+	nr_frags = nr_frags_tail & 0xff;
+	/* this is the amount of data copied to the skb->data
+	 * by copy_to_linear_data. We have to do it again with
+	 * the skb allocated here
+	 */
+	pull_len = nr_frags_tail >> 8;
+
+	if (nr_frags) {
+		page = fipc_get_reg1(_request);
+		off_sz = fipc_get_reg3(_request);
+		frag_size = off_sz >> 32;
+		frag_off = off_sz;
+		/* reverse the effects of pull_tail done at LCD end */
+		frag_size += pull_len;
+		frag_off -= pull_len;
+	}
+
+	prot = fipc_get_reg2(_request);
+	truesize = fipc_get_reg5(_request);
+	hash_l4sw = fipc_get_reg4(_request);
+	csum_ipsum = fipc_get_reg6(_request);
+
+	fipc_recv_msg_end(thc_channel_to_fipc(_channel),
+			_request);
+
+	WARN_ON(nr_frags > 1);
+	napi = napi_q0;
+
+#define IXGBE_HDR_SIZE	256
+
+	skb = napi_alloc_skb(napi, IXGBE_HDR_SIZE);
+
+	skb->dev = napi->dev;
+
+	shinfo = skb_shinfo(skb);
+
+	if (nr_frags) {
+		skb_frag_t *frag;
+
+		lcd_struct = iommu_lcd;
+
+		ret = lcd_arch_ept_gpa_to_hva(lcd_struct->lcd_arch,
+			__gpa(page), &hva_out);
+		if (ret) {
+			LIBLCD_WARN("getting gpa:hpa mapping %p:%llx",
+				(void*)page, hva_val(hva_out));
+			ret = 0;
+			goto skip;
+		}
+
+		p = virt_to_page(hva_val(hva_out));
+
+		/* add frag */
+		skb_add_rx_frag(skb, shinfo->nr_frags, p, frag_off,
+					frag_size,
+					truesize); 
+
+		frag = &shinfo->frags[0];
+
+		old_pcount = page_count(skb_frag_page(frag));
+
+		set_page_count(skb_frag_page(frag), 2);
+	}
+
+	if (skb_is_nonlinear(skb))
+		ixgbe_pull_tail(skb);
+
+	skb->protocol = prot;
+
+	eth_skb_pad(skb);
+
+	skb->queue_mapping = csum_ipsum & 0xffff;
+	skb->csum_level = (csum_ipsum >> 16)& 0x3;
+	skb->ip_summed = (csum_ipsum >> 18) & 0x3;
+	skb->queue_mapping = (csum_ipsum >> 2) & 0x3;
+
+	skb->napi_id = napi->napi_id;
+	skb->hash = hash_l4sw;
+	skb->l4_hash = (hash_l4sw >> 32) & 0x1;
+	skb->sw_hash = (hash_l4sw >> 33) & 0x1;
+
+	skb_pull_inline(skb, ETH_HLEN);
+
+	func_ret = napi_gro_receive(napi, skb);
+
+	//printk("%s, %d\n", __func__, func_ret);
+
+	if (p)
+		set_page_count(p, old_pcount);
+skip:
+#ifndef NAPI_RX_SEND_ONLY
+	if (async_msg_blocking_send_start(_channel,
+		&_response)) {
+		LIBLCD_ERR("error getting response msg");
+		return -EIO;
+	}
+
+	fipc_set_reg1(_response,
+			func_ret);
+	thc_ipc_reply(_channel,
+			request_cookie,
+			_response);
+#endif
+	return ret;
+}
+#endif
 
 int __napi_alloc_skb_callee(struct fipc_message *_request,
 		struct thc_channel *_channel,
@@ -5412,6 +5803,7 @@ int eth_type_trans_callee(struct fipc_message *_request,
 	func_ret = eth_type_trans(skb,
 		( &dev_container->net_device ));
 
+	printk("%s, ret 0x%X\n", __func__, ntohs(func_ret));
 	/* save */
 	skb_c->head = skb->head;
 	skb_c->data = skb->data;

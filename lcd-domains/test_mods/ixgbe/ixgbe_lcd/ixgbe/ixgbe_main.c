@@ -1917,6 +1917,8 @@ static void ixgbe_pull_tail(struct ixgbe_ring *rx_ring,
 	 */
 	pull_len = eth_get_headlen(va, IXGBE_RX_HDR_SIZE);
 
+	//printk("%s, copy %d bytes to skb->data", __func__,
+	//			ALIGN(pull_len, sizeof(long)));
 	/* align pull length to size of long to optimize memcpy performance */
 	skb_copy_to_linear_data(skb, va, ALIGN(pull_len, sizeof(long)));
 
@@ -2013,6 +2015,12 @@ static bool ixgbe_cleanup_headers(struct ixgbe_ring *rx_ring,
 
 #endif
 	/* if eth_skb_pad returns an error the skb was freed */
+	if (skb->len <  ETH_ZLEN) {
+		LIBLCD_ERR("skb len %d | data_len %d | nrfrags %d, I'll drop this!",
+				skb->len, skb->data_len,
+				skb_shinfo(skb)->nr_frags);
+		return true;
+	}
 	if (eth_skb_pad(skb))
 		return true;
 
@@ -2084,6 +2092,9 @@ static bool ixgbe_add_rx_frag(struct ixgbe_ring *rx_ring,
 				   ixgbe_rx_bufsz(rx_ring);
 #endif
 
+//	printk("%s, rx packet size %d", __func__, size);
+
+#if 0
 	if ((size <= IXGBE_RX_HDR_SIZE) && !skb_is_nonlinear(skb)) {
 		unsigned char *va = page_address(page) + rx_buffer->page_offset;
 
@@ -2101,7 +2112,7 @@ static bool ixgbe_add_rx_frag(struct ixgbe_ring *rx_ring,
 #endif
 		return false;
 	}
-
+#endif
 	skb_add_rx_frag(skb, skb_shinfo(skb)->nr_frags, page,
 			rx_buffer->page_offset, size, truesize);
 
@@ -2181,6 +2192,7 @@ static struct sk_buff *ixgbe_fetch_rx_buffer(struct ixgbe_ring *rx_ring,
 
 		IXGBE_CB(skb)->dma = rx_buffer->dma;
 	} else {
+		printk("%s, Reusing skb?", __func__);
 		if (ixgbe_test_staterr(rx_desc, IXGBE_RXD_STAT_EOP))
 			ixgbe_dma_sync_frag(rx_ring, skb);
 
@@ -2309,6 +2321,7 @@ static int ixgbe_clean_rx_irq(struct ixgbe_q_vector *q_vector,
 		}
 
 #endif /* IXGBE_FCOE */
+		//printk("%s, processing", __func__);
 		ixgbe_rx_skb(q_vector, skb);
 
 		/* update budget accounting */

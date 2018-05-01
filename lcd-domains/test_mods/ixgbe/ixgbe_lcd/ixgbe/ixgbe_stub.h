@@ -38,7 +38,7 @@ void free_irq(unsigned int a, void *p) { LIBLCD_MSG("================>$$$$$$ Dum
 
 unsigned char *skb_put(struct sk_buff *skb, unsigned int len)
 {
-	LIBLCD_MSG("================>$$$$$$ Dummy %s called", __func__); return (char*) skb;
+	LIBLCD_MSG("=====> Dummy %s called skb->len %d | pad %d", __func__, skb->len, len); return (char*) skb;
 }
 
 int skb_pad(struct sk_buff *skb, int pad) { LIBLCD_MSG("================>$$$$$$ Dummy %s called", __func__); return 0; }

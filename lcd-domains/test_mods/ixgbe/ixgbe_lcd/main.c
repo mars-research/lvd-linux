@@ -68,6 +68,9 @@ static void main_and_loop(void)
 						&curr_item, &msg);
 			if (ret) {
 				if (ret == -EWOULDBLOCK) {
+				if (poll_start)
+					ASYNC(__ixgbe_poll(););
+
 					continue;
 				} else {
 					LIBLCD_ERR("async recv failed");

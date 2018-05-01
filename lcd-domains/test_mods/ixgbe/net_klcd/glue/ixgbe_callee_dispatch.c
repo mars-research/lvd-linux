@@ -385,6 +385,7 @@ int dispatch_async_loop(struct thc_channel *_channel,
 		sync_ep);
 
 		case __NAPI_ALLOC_SKB:
+			trace(NAPI_ALLOC_SKB);
 			return __napi_alloc_skb_callee(message,
 		_channel,
 		cspace,

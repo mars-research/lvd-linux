@@ -22,12 +22,15 @@
 #define IOMMU_ASSIGN
 #define HOST_IRQ
 #define NAPI_CONSUME_SEND_ONLY
+#define LOCAL_SKB
+#define NAPI_RX_SEND_ONLY
 
 enum dispatch_t {
 	__PCI_REGISTER_DRIVER,
 	PCI_UNREGISTER_DRIVER,
 	ALLOC_ETHERDEV_MQS,
 	REGISTER_NETDEV,
+	PREP_CHANNEL,
 	ETHER_SETUP,
 	ETH_MAC_ADDR,
 	ETH_VALIDATE_ADDR,
@@ -106,8 +109,8 @@ typedef enum {
 } addr_list;
 
 typedef enum {
-	VOLUNTEER_XMIT = 1,
-	SHARED_DATA_XMIT = 2,
+	VOLUNTEER_XMIT = 0x1,
+	SHARED_DATA_XMIT = 0x2,
 } xmit_type_t;
 
 typedef enum {

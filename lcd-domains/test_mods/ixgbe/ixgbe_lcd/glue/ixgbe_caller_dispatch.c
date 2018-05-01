@@ -142,6 +142,11 @@ int dispatch_async_loop(struct thc_channel *_channel,
 			 * be spinning on the loop
 			 */
 			return -1;
+
+		case PREP_CHANNEL:
+			trace(PREP_CHANNEL);
+			return prep_channel_callee(message, _channel, cspace, sync_ep);
+
 		default:
 			LIBLCD_ERR("unexpected function label: %d",
 					fn_type);

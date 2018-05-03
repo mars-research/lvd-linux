@@ -5852,13 +5852,21 @@ static int ixgbe_sw_init(struct ixgbe_adapter *adapter)
 	hw->subsystem_vendor_id = pdev->subsystem_vendor;
 	hw->subsystem_device_id = pdev->subsystem_device;
 
+#define NUM_HW_QUEUES		4
+	/* XXX: This decides the number of hardware queues
+	 * It checks the number of online cpus and sets the number of
+	 * queues to the number of cpus. Fake it now to enable
+	 * multiqueue support and see if something comes up
+	 */
 	/* Set common capability flags and settings */
-	rss = min_t(int, ixgbe_max_rss_indices(adapter), num_online_cpus());
+	//rss = min_t(int, ixgbe_max_rss_indices(adapter), num_online_cpus());
+	rss = min_t(int, ixgbe_max_rss_indices(adapter), NUM_HW_QUEUES);
 	adapter->ring_feature[RING_F_RSS].limit = rss;
 	adapter->flags2 |= IXGBE_FLAG2_RSC_CAPABLE;
 	adapter->max_q_vectors = MAX_Q_VECTORS_82599;
 	adapter->atr_sample_rate = 20;
-	fdir = min_t(int, IXGBE_MAX_FDIR_INDICES, num_online_cpus());
+	//fdir = min_t(int, IXGBE_MAX_FDIR_INDICES, num_online_cpus());
+	fdir = min_t(int, IXGBE_MAX_FDIR_INDICES, NUM_HW_QUEUES);
 	adapter->ring_feature[RING_F_FDIR].limit = fdir;
 	adapter->fdir_pballoc = IXGBE_FDIR_PBALLOC_64K;
 #ifdef CONFIG_IXGBE_DCA
@@ -8166,6 +8174,7 @@ xmit_fcoe:
 	return NETDEV_TX_OK;
 
 out_drop:
+	printk("%s, dropping packet %p", __func__, first->skb);
 	dev_kfree_skb_any(first->skb);
 	first->skb = NULL;
 

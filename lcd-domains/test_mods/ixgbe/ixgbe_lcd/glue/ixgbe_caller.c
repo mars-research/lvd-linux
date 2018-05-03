@@ -15,7 +15,7 @@
 #include "../../rdtsc_helper.h"
 #include <lcd_config/post_hook.h>
 
-#define LCD_MEASUREMENT
+//#define LCD_MEASUREMENT
 
 struct cptr sync_ep;
 static struct glue_cspace *c_cspace;
@@ -307,9 +307,12 @@ fail1:
 	return;
 }
 
+struct thc_channel_group_item *ptrs[32];
+
 int create_one_async_channel(struct thc_channel **chnl, cptr_t *tx, cptr_t *rx)
 {
 	int ret;
+	static int idx = 0;
 	struct thc_channel_group_item *xmit_ch_item;
 
 	ret = setup_async_channel(tx, rx, chnl);
@@ -323,7 +326,11 @@ int create_one_async_channel(struct thc_channel **chnl, cptr_t *tx, cptr_t *rx)
 
 	thc_channel_group_item_init(xmit_ch_item, *chnl, NULL);
 
+	xmit_ch_item->xmit_channel = true;
+
 	thc_channel_group_item_add(&ch_grp, xmit_ch_item);
+
+	ptrs[idx++%32] = xmit_ch_item;
 
 	return 0;
 }
@@ -1500,18 +1507,23 @@ void napi_consume_skb(struct sk_buff *skb, int budget)
 {
 	int ret;
 	struct fipc_message *_request;
-	unsigned long skb_sz, skb_off, skbh_sz, skbh_off;
-	cptr_t skb_cptr, skbh_cptr;
 	struct sk_buff_container *skb_c;
 #ifndef NAPI_CONSUME_SEND_ONLY
 	struct fipc_message *_response;
 #endif
-
-	ret = async_msg_blocking_send_start(ixgbe_async,
-		&_request);
+	struct thc_channel *channel;
 
 	glue_lookup_skbuff(cptr_table,
 		__cptr((unsigned long)skb), &skb_c);
+
+#ifdef SENDER_DISPATCH_LOOP
+	channel = skb_c->channel;
+#else
+	channel = ixgbe_async;
+#endif
+
+	ret = async_msg_blocking_send_start(channel,
+		&_request);
 
 	if (ret) {
 		LIBLCD_ERR("failed to get a send slot");
@@ -1523,50 +1535,12 @@ void napi_consume_skb(struct sk_buff *skb, int budget)
 	fipc_set_reg0(_request, skb_c->other_ref.cptr);
 	fipc_set_reg1(_request, budget);
 
-	if (!skb->private) {
-		ret = lcd_virt_to_cptr(__gva((unsigned long)skb),
-			&skb_cptr,
-			&skb_sz,
-			&skb_off);
-		if (ret) {
-			LIBLCD_ERR("lcd_virt_to_cptr");
-			goto fail_virt;
-		}
-
-		ret = lcd_virt_to_cptr(__gva((unsigned long)skb->head),
-			&skbh_cptr,
-			&skbh_sz,
-			&skbh_off);
-		if (ret) {
-			LIBLCD_ERR("lcd_virt_to_cptr");
-			goto fail_virt;
-		}
-
-#ifdef IOMMU_ASSIGN
-		LIBLCD_MSG("%s, iommu unmap page", __func__);
-		ret = lcd_syscall_iommu_unmap_page(lcd_gva2gpa(__gva(
-			(unsigned long)((void*)skb->head - skbh_off))),
-			skb_c->skbd_ord);
-		if (ret)
-			LIBLCD_ERR("unmap iommu failed for addr %p",
-					__pa(skb->data));
-#endif
-
-		lcd_unmap_virt(__gva((unsigned long)skb->head),
-				get_order(skbh_sz));
-		lcd_unmap_virt(__gva((unsigned long)skb),
-				get_order(skb_sz));
-
-		lcd_cap_delete(skb_c->skb_cptr);
-		lcd_cap_delete(skb_c->skbh_cptr);
-	}
-
 #ifdef NAPI_CONSUME_SEND_ONLY
 	thc_set_msg_type(_request, msg_type_request);
-	fipc_send_msg_end(thc_channel_to_fipc(ixgbe_async),
+	fipc_send_msg_end(thc_channel_to_fipc(channel),
 					_request);
 #else
-	ret = thc_ipc_call(ixgbe_async,
+	ret = thc_ipc_call(channel,
 		_request,
 		&_response);
 
@@ -1575,7 +1549,7 @@ void napi_consume_skb(struct sk_buff *skb, int budget)
 		goto fail_ipc;
 	}
 
-	fipc_recv_msg_end(thc_channel_to_fipc(ixgbe_async),
+	fipc_recv_msg_end(thc_channel_to_fipc(channel),
 			_response);
 #endif
 
@@ -1586,7 +1560,6 @@ fail_async:
 #ifndef NAPI_CONSUME_SEND_ONLY
 fail_ipc:
 #endif
-fail_virt:
 	return;
 }
 
@@ -2617,9 +2590,11 @@ int prep_channel_callee(struct fipc_message *_request,
 		struct cptr sync_ep)
 {
 	cptr_t tx, rx;
+#ifdef SOFTIRQ_CHANNELS
 	cptr_t tx_sirq, rx_sirq;
-	struct thc_channel *xmit;
 	struct thc_channel *xmit_sirq;
+#endif
+	struct thc_channel *xmit;
 	unsigned 	int request_cookie;
 	int ret;
 	struct fipc_message *_response;
@@ -2632,23 +2607,28 @@ int prep_channel_callee(struct fipc_message *_request,
 	if (create_one_async_channel(&xmit, &tx, &rx))
 		LIBLCD_ERR("async channel creation failed\n");
 
+	lcd_set_cr0(tx);
+	lcd_set_cr1(rx);
+
+#ifdef SOFTIRQ_CHANNELS
 	printk("Creating one for softirq\n");
 
 	if (create_one_async_channel(&xmit_sirq, &tx_sirq, &rx_sirq))
 		LIBLCD_ERR("async channel creation failed\n");
-
-	lcd_set_cr0(tx);
-	lcd_set_cr1(rx);
 	lcd_set_cr2(tx_sirq);
 	lcd_set_cr3(rx_sirq);
+#endif
 
 	LIBLCD_MSG("%s: Preparing sync send", __func__);
 	ret = lcd_sync_send(ixgbe_sync_endpoint);
 
 	lcd_set_cr0(CAP_CPTR_NULL);
 	lcd_set_cr1(CAP_CPTR_NULL);
+
+#ifdef SOFTIRQ_CHANNELS
 	lcd_set_cr2(CAP_CPTR_NULL);
 	lcd_set_cr3(CAP_CPTR_NULL);
+#endif
 
 	if (ret) {
 		LIBLCD_ERR("failed to send");
@@ -2665,6 +2645,138 @@ int prep_channel_callee(struct fipc_message *_request,
 	return ret;
 }
 
+/* This function is used for testing bare fipc, non-async mtu sized packets */
+int ndo_start_xmit_bare_callee(struct fipc_message *_request, struct thc_channel *channel, struct glue_cspace *cspace, struct cptr sync_ep)
+{
+	struct fipc_message *response;
+	fipc_recv_msg_end(thc_channel_to_fipc(channel), _request);
+
+	if (likely(async_msg_blocking_send_start(channel, &response))) {
+		LIBLCD_ERR("error getting response msg");
+		return -EIO;
+	}
+	fipc_send_msg_end(thc_channel_to_fipc(channel), response);
+
+	return 0;
+}
+
+int ndo_start_xmit_clean_callee(struct fipc_message *_request,
+		struct thc_channel *_channel,
+		struct glue_cspace *cspace,
+		struct cptr sync_ep)
+{
+	struct sk_buff *skb;
+	struct sk_buff_container *skb_c;
+	int ret = 0;
+	struct fipc_message *_response;
+	unsigned 	int request_cookie;
+	int func_ret;
+	cptr_t skb_ref;
+	xmit_type_t xmit_type;
+	unsigned long skbh_offset, skb_end;
+	struct skbuff_members *skb_lcd;
+	__be16 proto;
+	void *mem;
+#ifdef LCD_MEASUREMENT
+	TS_DECL(xmit);
+#endif
+	request_cookie = thc_get_request_cookie(_request);
+	xmit_type = fipc_get_reg0(_request);
+
+	skb_ref = __cptr(fipc_get_reg2(_request));
+
+	skbh_offset = fipc_get_reg3(_request);
+
+	skb_end = fipc_get_reg4(_request);
+	proto = fipc_get_reg5(_request);
+
+	fipc_recv_msg_end(thc_channel_to_fipc(_channel),
+			_request);
+
+	if (_channel == ixgbe_async)
+		printk("%s, Got msg - reqc 0x%x | xmitty %d",
+				__func__, request_cookie,
+				xmit_type);
+
+	skb_c = mem = kmem_cache_alloc(skb_c_cache,
+				GFP_KERNEL);
+	skb = (struct sk_buff*)((char*)mem +
+			sizeof(struct sk_buff_container));
+
+	if (!skb) {
+		LIBLCD_MSG("out of mmeory");
+		goto fail_alloc;
+	}
+
+	skb->head = (char*)data_pool + skbh_offset;
+	skb->end = skb_end;
+
+	skb_lcd = SKB_LCD_MEMBERS(skb);
+	skb->private = true;
+	skb->protocol = proto;
+
+	P(len);
+	P(data_len);
+	P(queue_mapping);
+	P(xmit_more);
+	P(tail);
+	P(truesize);
+	P(ip_summed);
+	P(csum_start);
+	P(network_header);
+	P(csum_offset);
+	P(transport_header);
+
+	if (0)
+	LIBLCD_MSG("lcd-> l: %d | dlen %d | qm %d"
+		   " | xm %d | t %lu |ts %u",
+		skb->len, skb->data_len, skb->queue_mapping,
+		skb->xmit_more, skb->tail, skb->truesize);
+
+	skb->data = skb->head + skb_lcd->head_data_off;
+
+	skb_c->skb = skb;
+	glue_insert_skbuff(cptr_table, skb_c);
+	skb_c->other_ref = skb_ref;
+
+	skb_c->channel = _channel;
+
+#ifdef LCD_MEASUREMENT
+	TS_START_LCD(xmit);
+#endif
+	func_ret = ixgbe_xmit_frame(skb, g_netdev);
+
+	if (func_ret)
+		LIBLCD_MSG("ixgbe xmit failed %p", skb);
+
+#ifdef LCD_MEASUREMENT
+	TS_STOP_LCD(xmit);
+#endif
+	if (async_msg_blocking_send_start(_channel,
+		&_response)) {
+		LIBLCD_ERR("error getting response msg");
+		return -EIO;
+	}
+	fipc_set_reg1(_response,
+			func_ret);
+#ifdef LCD_MEASUREMENT
+	fipc_set_reg2(_response,
+			TS_DIFF(xmit));
+#endif
+	thc_ipc_reply(_channel,
+			request_cookie,
+			_response);
+
+//	printk("%s, posting response for reqc 0x%x", __func__,
+//				request_cookie);
+
+	if (_channel == ixgbe_async)
+		printk("%s, Sending reply for reqc 0x%x", __func__,
+				request_cookie);
+fail_alloc:
+	return ret;
+
+}
 
 int ndo_start_xmit_callee(struct fipc_message *_request,
 		struct thc_channel *_channel,
@@ -4044,3 +4156,20 @@ fail_ipc:
 	return ret;
 }
 #endif
+
+int cleanup_channel_group(struct fipc_message *request, struct thc_channel *channel)
+{
+	int i;
+	fipc_recv_msg_end(thc_channel_to_fipc(channel), request);
+
+	for (i = 0; i < 32; i++) {
+		if (ptrs[i]) {
+			thc_channel_group_item_remove(&ch_grp, ptrs[i]);
+			destroy_async_channel(ptrs[i]->channel);
+			kfree(ptrs[i]);
+			ptrs[i] = NULL;
+		} //if
+	} //for
+
+	return 0;
+}

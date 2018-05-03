@@ -24,6 +24,7 @@
 #define NAPI_CONSUME_SEND_ONLY
 #define LOCAL_SKB
 #define NAPI_RX_SEND_ONLY
+#define SENDER_DISPATCH_LOOP
 
 enum dispatch_t {
 	__PCI_REGISTER_DRIVER,
@@ -101,6 +102,7 @@ enum dispatch_t {
 	TRIGGER_EXIT,
 	SERVICE_EVENT_SCHED,
 	TRIGGER_DUMP,
+	TRIGGER_CLEAN,
 };
 
 typedef enum {
@@ -126,7 +128,7 @@ typedef enum {
 	printk("%02x\n", addr[_i]); \
 	} while(0)
 
-#define ASYNC_RPC_BUFFER_ORDER 12
+#define ASYNC_RPC_BUFFER_ORDER 15
 
 struct pcidev_info {
 	unsigned int domain, bus, slot, fn;
@@ -215,6 +217,8 @@ async_msg_blocking_recv_start(struct thc_channel *chnl,
 			struct fipc_message** out)
 {
 	int ret;
+	static int count = 0;
+
 	for (;;) {
 		/* Poll until we get a message or error */
 		ret = fipc_recv_msg_start(thc_channel_to_fipc(chnl),
@@ -222,6 +226,8 @@ async_msg_blocking_recv_start(struct thc_channel *chnl,
 		if ( !ret || ret != -EWOULDBLOCK )
 			return ret;
 		cpu_relax();
+		if (count++ % 512 == 0)
+			cond_resched();
 	}
 }
 #endif /* __IXGBE_COMMON_H__ */

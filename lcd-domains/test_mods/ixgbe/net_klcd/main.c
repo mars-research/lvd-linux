@@ -31,17 +31,19 @@ extern int setup_async_net_ring_channel(cptr_t tx, cptr_t rx,
 extern void destroy_async_net_ring_channel(struct thc_channel *chnl);
 extern int ixgbe_trigger_dump(struct thc_channel *_channel);
 extern int ixgbe_service_event_sched(struct thc_channel *_channel);
-extern int trigger_exit_to_lcd(struct thc_channel *_channel);
+extern int trigger_exit_to_lcd(struct thc_channel *_channel, enum dispatch_t);
 extern struct timer_list service_timer;
 extern struct glue_cspace *c_cspace;
 
 /* mechanism for unloading LCD gracefully */
 static bool unload_lcd =0;
+static bool clean_up = false;
 module_param_named(unload, unload_lcd, bool, S_IWUSR);
 
 /* to dump ixgbe registers */
 static bool ixgbe_dump =0;
 module_param_named(dump_regs, ixgbe_dump, bool, S_IWUSR);
+module_param_named(clean, clean_up, bool, S_IWUSR);
 
 struct net_info *
 add_net(struct thc_channel *chnl, struct glue_cspace *cspace,
@@ -286,78 +288,86 @@ static void loop(cptr_t register_chnl)
 	bool reg_done = false;
 
 	DO_FINISH(
-
-		while (!stop) {
-			if (jiffies >= tics && !reg_done) {
-				/*
-				 * Listen for a register call
-				 */
-				ret = do_one_register(register_chnl);
-				if (ret) {
-					LIBLCD_ERR("register error");
-					break;
-				} else {
-					reg_done = true;
-				}
-				tics = jiffies + REGISTER_FREQ;
-				continue;
-			}
-			if (stop)
-				break;
-
+	while (!stop) {
+		if (jiffies >= tics && !reg_done) {
 			/*
-			 * will be updated by a write into sysfs
-			 * from userspace.
+			 * Listen for a register call
 			 */
-			if (unload_lcd) {
-				unload_lcd = 0;
-				if (__get_net(&net))
-					trigger_exit_to_lcd(net->chnl);
-			}
-			if (ixgbe_dump) {
-				ixgbe_dump = 0;
-				if (__get_net(&net))
-					ixgbe_trigger_dump(net->chnl);
-			}
-			ret = async_loop(&net, &msg);
-			if (!ret) {
-				ASYNC(
-					ret = dispatch_async_loop(
-						net->chnl,
-						msg,
-						net->cspace,
-						net->sync_endpoint);
-					if (ret) {
-						LIBLCD_ERR("net dispatch err");
-						/* (break won't work here) */
-						stop = 1;
-					}
-					);
-			} else if (ret != -EWOULDBLOCK) {
-				LIBLCD_ERR("async loop failed");
-				stop = 1;
+			ret = do_one_register(register_chnl);
+			if (ret) {
+				LIBLCD_ERR("register error");
 				break;
+			} else {
+				reg_done = true;
 			}
+			tics = jiffies + REGISTER_FREQ;
+			continue;
+		}
+		if (stop)
+			break;
 
-			if (kthread_should_stop()) {
-				LIBLCD_MSG("kthread should stop");
-				stop = 1;
-				break;
+		/*
+		 * will be updated by a write into sysfs
+		 * from userspace.
+		 */
+		if (unload_lcd || clean_up) {
+			if (__get_net(&net)) {
+				if (unload_lcd) {
+					trigger_exit_to_lcd(net->chnl, TRIGGER_EXIT);
+					unload_lcd ^= unload_lcd;
+				}
+				if (clean_up) {
+					LIBLCD_MSG("cleanup triggered"); 
+					trigger_exit_to_lcd(net->chnl, TRIGGER_CLEAN);
+					clean_up ^= clean_up;
+				}
 			}
+		}
+
+		if (ixgbe_dump) {
+			ixgbe_dump = 0;
+			if (__get_net(&net))
+				ixgbe_trigger_dump(net->chnl);
+		}
+		ret = async_loop(&net, &msg);
+		if (!ret) {
+			ASYNC(
+				ret = dispatch_async_loop(
+					net->chnl,
+					msg,
+					net->cspace,
+					net->sync_endpoint);
+				if (ret) {
+					LIBLCD_ERR("net dispatch err");
+					/* (break won't work here) */
+					stop = 1;
+				}
+				);
+		} else if (ret != -EWOULDBLOCK) {
+			LIBLCD_ERR("async loop failed");
+			stop = 1;
+			break;
+		}
+
+		if (kthread_should_stop()) {
+			LIBLCD_MSG("kthread should stop");
+			stop = 1;
+			break;
+		}
 
 #ifndef CONFIG_PREEMPT
-			/*
-			 * Play nice with the rest of the system
-			 */
-			cond_resched();
+		/*
+		 * Play nice with the rest of the system
+		 */
+		cond_resched();
 #endif
-		}
+	}
 
 		LIBLCD_MSG("net layer exited loop");
 
 		//THCStopAllAwes();
 
-		);
+	);
 
 	LIBLCD_MSG("EXITED net_klcd DO_FINISH");
 }

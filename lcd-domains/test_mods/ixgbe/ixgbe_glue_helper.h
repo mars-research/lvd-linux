@@ -63,6 +63,7 @@ struct sk_buff_container {
 	struct cptr other_ref;
 	struct cptr my_ref;
 	struct task_struct *tsk;
+	void *channel;
 };
 
 struct trampoline_hidden_args {

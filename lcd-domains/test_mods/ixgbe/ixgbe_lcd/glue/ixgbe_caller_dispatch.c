@@ -6,6 +6,7 @@
 #define trace(x) LIBLCD_MSG("net got " #x " msg")
 
 extern void ixgbe_exit_module(void);
+int cleanup_channel_group(struct fipc_message *, struct thc_channel *);
 extern bool poll_start;
 
 int dispatch_async_loop(struct thc_channel *_channel,
@@ -142,6 +143,10 @@ int dispatch_async_loop(struct thc_channel *_channel,
 			 * be spinning on the loop
 			 */
 			return -1;
+
+		case TRIGGER_CLEAN:
+			trace(TRIGGER_CLEAN);
+			return cleanup_channel_group(message, _channel);
 
 		case PREP_CHANNEL:
 			trace(PREP_CHANNEL);

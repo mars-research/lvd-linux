@@ -77,6 +77,19 @@ static void main_and_loop(void)
 					stop = 1; /* stop */
 				}
 			}
+
+			if (async_msg_get_fn_type(msg) == NDO_START_XMIT) {
+				ret = ndo_start_xmit_clean_callee(msg,
+					curr_item->channel,
+					ixgbe_cspace,
+					ixgbe_sync_endpoint);
+
+				if (unlikely(ret)) {
+					LIBLCD_ERR("async dispatch failed");
+					stop = 1;
+				}
+
+			} else {
 			/*
 			 * Got a message. Dispatch.
 			 */
@@ -91,6 +104,7 @@ static void main_and_loop(void)
 				}
 
 				);
+			}
 			/* FIXME: This is pretty naive. This is *NOT* how
 			 * we should do napi polling.
 			 */

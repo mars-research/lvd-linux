@@ -510,9 +510,10 @@ static bool ixgbe_set_sriov_queues(struct ixgbe_adapter *adapter)
 	bool pools = (find_first_zero_bit(&adapter->fwd_bitmask, 32) > 1);
 
 	/* only proceed if SR-IOV is enabled */
-	if (!(adapter->flags & IXGBE_FLAG_SRIOV_ENABLED))
+	if (!(adapter->flags & IXGBE_FLAG_SRIOV_ENABLED)) {
+		printk("%s, SRIOV not enabled, won't allocate more queues", __func__);
 		return false;
-
+	}
 	/* Add starting offset to total pool count */
 	vmdq_i += adapter->ring_feature[RING_F_VMDQ].offset;
 
@@ -665,6 +666,10 @@ static bool ixgbe_set_rss_queues(struct ixgbe_adapter *adapter)
 	}
 
 #endif /* IXGBE_FCOE */
+
+	printk("%s:%d, adapter tx=%d rx=%d", __func__, __LINE__,
+			adapter->num_tx_queues, adapter->num_rx_queues);
+
 	adapter->num_rx_queues = rss_i;
 	adapter->num_tx_queues = rss_i;
 
@@ -690,6 +695,8 @@ static void ixgbe_set_num_queues(struct ixgbe_adapter *adapter)
 	adapter->num_rx_pools = adapter->num_rx_queues;
 	adapter->num_rx_queues_per_pool = 1;
 
+	printk("%s:%d, adapter tx=%d rx=%d", __func__, __LINE__,
+			adapter->num_tx_queues, adapter->num_rx_queues);
 #ifdef CONFIG_IXGBE_DCB
 	if (ixgbe_set_dcb_sriov_queues(adapter))
 		return;
@@ -701,6 +708,8 @@ static void ixgbe_set_num_queues(struct ixgbe_adapter *adapter)
 	if (ixgbe_set_sriov_queues(adapter))
 		return;
 
+	printk("%s:%d, after calling sriov queues adapter tx=%d rx=%d", __func__, __LINE__,
+			adapter->num_tx_queues, adapter->num_rx_queues);
 	ixgbe_set_rss_queues(adapter);
 }
 

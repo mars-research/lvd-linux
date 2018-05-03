@@ -17,13 +17,20 @@
 #include <lcd_domains/microkernel.h>
 
 #include <linux/priv_mempool.h>
-
+#include <linux/sort.h>
 #include <lcd_config/post_hook.h>
 
 //#define TIMESTAMP
-#define LCD_MEASUREMENT
+//#define LCD_MEASUREMENT
 //#define FREE_TIMESTAMP
+//#define SKBC_PRIVATE_POOL
+#define STATS
 
+#define NUM_CORES	32
+#define NUM_THREADS	NUM_CORES
+
+struct ptstate_t *ptrs[NUM_THREADS] = {0};
+u32 thread = 0;
 struct glue_cspace *c_cspace = NULL;
 struct thc_channel *ixgbe_async;
 struct cptr sync_ep;
@@ -41,6 +48,7 @@ uint64_t *times_ndo_xmit = NULL;
 uint64_t *times_lcd = NULL;
 uint64_t *times_free = NULL;
 
+static u64 global_tx_count, global_free_count;
 static struct rtnl_link_stats64 g_stats;
 
 /* This is the only device we strive for */
@@ -66,19 +74,97 @@ struct kmem_cache *skb_c_cache = NULL;
 DEFINE_SPINLOCK(hspin_lock);
 static unsigned long pool_pfn_start, pool_pfn_end;
 priv_pool_t *pool;
+void *pool_base = NULL;
+size_t pool_size = 0;
+#ifdef SKBC_PRIVATE_POOL
 priv_pool_t *skbc_pool;
+#endif
+
+#define MAX_POOLS	20
+
+char *base_pools[MAX_POOLS];
+int pool_order = 10;
+int start_idx[MAX_POOLS/2] = {-1}, end_idx[MAX_POOLS/2] = {-1};
+unsigned int best_diff = 0;
+int best_idx = -1;
+int pool_idx = 0;
+struct {
+	int start_idx;
+	int end_idx;
+	size_t size;
+	bool valid;
+} pools[MAX_POOLS] = { {0} };
+
+int compare_addr(const void *a, const void *b)
+{
+	return *(unsigned int *)a - *(unsigned int *)b;
+}
+
+int pool_pick(void)
+{
+	int i;
+	for (i = 0; i < MAX_POOLS; i++) {
+		base_pools[i] = (char*) __get_free_pages(GFP_KERNEL | __GFP_ZERO,
+	                            pool_order);
+	}
+
+	sort(base_pools, MAX_POOLS, sizeof(char*), compare_addr, NULL);
+
+	printk("%s, sorted order:\n", __func__);
+	for (i = 0; i < MAX_POOLS; i++) {
+		printk("%s, got pool %p\n", __func__, base_pools[i]);
+	}
+
+	pools[pool_idx].start_idx = 0;
+	pools[pool_idx].end_idx = MAX_POOLS - 1;
+	pools[pool_idx].valid = true;
+	for (i = 0; i < MAX_POOLS - 1; i++) {
+		printk("%s, comparing pool[%d]=%llx and pool[%d]=%llx\n", __func__,
+					i+1, (uint64_t)base_pools[i+1], i, (uint64_t) base_pools[i]);
+		if (((uint64_t) base_pools[i+1] - (uint64_t) base_pools[i]) != ((1 << pool_order) * PAGE_SIZE)) {
+			printk("%s, found discontinuity @ i %d\n", __func__, i);
+			pools[pool_idx].valid = true;
+			pools[pool_idx++].end_idx = i;
+			pools[pool_idx].start_idx = i + 1;
+		}
+	}
+
+	for (i = 0; i < MAX_POOLS; i++) {
+		printk("%s, pool %d: start idx = %d | end idx = %d\n",
+				__func__, i, pools[i].start_idx, pools[i].end_idx);
+		if (!pools[i].valid)
+			continue;
+		if ((pools[i].end_idx - pools[i].start_idx + 1) > best_diff) {
+			best_idx = i;
+			best_diff = pools[i].end_idx - pools[i].start_idx + 1;
+		}
+	}
+	printk("%s, best diff %u | best idx %d | start = %d | end = %d\n",
+			__func__, best_diff, best_idx, pools[best_idx].start_idx, pools[best_idx].end_idx);
+       	return best_idx;
+}
 
 void skb_data_pool_init(void)
 {
-	pool = priv_pool_init(SKB_DATA_POOL, 10, SKB_DATA_SIZE);
-	skbc_pool = priv_pool_init(SKB_CONTAINER_POOL, 10,
+	printk("%s, init pool for skbdata | size %zu | %lx\n", __func__,
+			SKB_DATA_SIZE, SKB_DATA_SIZE);
+	// XXX: round it to 2KiB
+	//pool = priv_pool_init(SKB_DATA_POOL, 0x20, 2048);
+	pool_base = base_pools[pool_pick()];
+	pool_size = best_diff * ((1 << pool_order) * PAGE_SIZE);
+	pool = priv_pool_init(SKB_DATA_POOL, (void*) pool_base, pool_size, 2048);
+#ifdef SKBC_PRIVATE_POOL
+	skbc_pool = priv_pool_init(SKB_CONTAINER_POOL, 0x20,
 				SKB_CONTAINER_SIZE * 2);
+#endif
 }
 
 void skb_data_pool_free(void)
 {
 	priv_pool_destroy(pool);
+#ifdef SKBC_PRIVATE_POOL
 	priv_pool_destroy(skbc_pool);
+#endif
 }
 
 xmit_type_t check_skb_range(struct sk_buff *skb)
@@ -463,7 +549,8 @@ int pci_enable_msix_range_callee(struct fipc_message *_request,
 
 	entries = (struct msix_entry*)(void*)(gva_val(p_gva) + p_offset);
 
-	LIBLCD_MSG("%s, dev->msix_enabled %d", __func__, dev->msix_enabled);
+	LIBLCD_MSG("%s, dev->msix_enabled %d | minvec %d | maxvec %d",
+			__func__, dev->msix_enabled, minvec, maxvec);
 
 	func_ret = pci_enable_msix_range(dev, entries, minvec, maxvec);
 
@@ -797,7 +884,9 @@ int probe(struct pci_dev *dev,
 
         p = virt_to_head_page(pool->pool);
 
-        pool_ord = ilog2(roundup_pow_of_two((pool->total_pages * PAGE_SIZE) >> PAGE_SHIFT));
+        //pool_ord = ilog2(roundup_pow_of_two((pool->total_pages * PAGE_SIZE) >> PAGE_SHIFT));
+        
+	pool_ord = ilog2(roundup_pow_of_two((1 << pool_order) * best_diff));
         ret = lcd_volunteer_pages(p, pool_ord, &pool_cptr);
 
 	if (ret) {
@@ -806,7 +895,8 @@ int probe(struct pci_dev *dev,
 	}
 
 	pool_pfn_start = (unsigned long)pool->pool >> PAGE_SHIFT;
-	pool_pfn_end = pool_pfn_start + pool->total_pages;
+	//pool_pfn_end = pool_pfn_start + pool->total_pages;
+	pool_pfn_end = pool_pfn_start + ((1 << pool_order) * best_diff);
 
 	lcd_set_cr0(res0_cptr);
 	lcd_set_cr1(pool_cptr);
@@ -1371,8 +1461,6 @@ fail_ipc:
 	return func_ret;
 }
 
-//#define SKBC_PRIVATE_POOL
-
 int ndo_start_xmit_nonlcd(struct sk_buff *skb,
 		struct net_device *dev,
 		struct thc_channel *async_chnl,
@@ -1390,6 +1478,7 @@ int ndo_start_xmit_nonlcd(struct sk_buff *skb,
 	unsigned long skbd_ord, skbd_off;
 	cptr_t skb_cptr, skbd_cptr;
 	struct skbuff_members *skb_lcd;
+	bool got_resp = false;
 #ifdef TIMESTAMP
 	TS_DECL(mndo_xmit);
 #endif
@@ -1524,15 +1613,32 @@ int ndo_start_xmit_nonlcd(struct sk_buff *skb,
 		break;
 	}
 
+again:
 	async_msg_blocking_recv_start(async_chnl, &_response);
 
-	func_ret = fipc_get_reg1(_response);
+	if (thc_get_msg_type(_response) == msg_type_request) {
+		/* TODO: handle request */
+		if (async_msg_get_fn_type(_response) == NAPI_CONSUME_SKB) {
+			//printk("%s, calling napi_consume_skb\n", __func__);
+			dispatch_async_loop(async_chnl, _response,
+				c_cspace, sync_end);
+		} else {
+			printk("%s got unknown msg type! %d\n", __func__,
+				async_msg_get_fn_type(_response));
+		}
+		if (!got_resp)
+			goto again;
+	} else if (thc_get_msg_type(_response) == msg_type_response) {
+		got_resp = true;
+		//printk("%s, got response \n", __func__);
+		func_ret = fipc_get_reg1(_response);
 #ifdef LCD_MEASUREMENT
-	times_lcd[iter] = fipc_get_reg2(_response);
-	iter = (iter + 1) % NUM_PACKETS;
+		times_lcd[iter] = fipc_get_reg2(_response);
+		iter = (iter + 1) % NUM_PACKETS;
 #endif
-	fipc_recv_msg_end(thc_channel_to_fipc(async_chnl),
+		fipc_recv_msg_end(thc_channel_to_fipc(async_chnl),
 			_response);
+	}
 
 #ifdef TIMESTAMP
 	TS_STOP(mndo_xmit);
@@ -1543,6 +1649,8 @@ fail_alloc:
 fail_sync:
 fail_async:
 fail_ipc:
+	if (func_ret != NETDEV_TX_OK)
+		printk("%s, got %d\n", __func__, func_ret);
 	return func_ret;
 }
 
@@ -1555,10 +1663,12 @@ struct thc_channel *sirq_channels[64];
 int prep_channel(struct trampoline_hidden_args *hidden_args)
 {
 	cptr_t tx, rx;
+#ifdef SOFTIRQ_CHANNELS
 	cptr_t tx_softirq, rx_softirq;
+	struct thc_channel *chnl_softirq;
+#endif
 	cptr_t sync_end;
 	struct thc_channel *chnl;
-	struct thc_channel *chnl_softirq;
 	struct fipc_message *_request;
 	struct fipc_message *_response;
 	unsigned int request_cookie;
@@ -1575,6 +1685,7 @@ int prep_channel(struct trampoline_hidden_args *hidden_args)
 		goto fail_cptr;
 	}
 
+#ifdef SOFTIRQ_CHANNELS
 	ret = lcd_cptr_alloc(&tx_softirq);
 	if (ret) {
 		LIBLCD_ERR("cptr alloc failed");
@@ -1585,7 +1696,7 @@ int prep_channel(struct trampoline_hidden_args *hidden_args)
 		LIBLCD_ERR("cptr alloc failed");
 		goto fail_cptr;
 	}
-
+#endif
 	/* grant sync_ep */
 	if (grant_sync_ep(&sync_end, hidden_args->sync_ep)) {
 		LIBLCD_ERR("%s, grant_syncep failed %d\n",
@@ -1614,8 +1725,13 @@ int prep_channel(struct trampoline_hidden_args *hidden_args)
 
 	lcd_set_cr0(rx);
 	lcd_set_cr1(tx);
+
+#ifdef SOFTIRQ_CHANNELS
 	lcd_set_cr2(rx_softirq);
 	lcd_set_cr3(tx_softirq);
+#endif
+	printk("[%d]%s[pid=%d] Creating a private channel pair\n",
+			smp_processor_id(), current->comm, current->pid);
 
 	ret = lcd_sync_recv(sync_end);
 	if (ret) {
@@ -1623,6 +1739,9 @@ int prep_channel(struct trampoline_hidden_args *hidden_args)
 			ret = 0;
 		goto fail_ep;
 	}
+	
+	printk("[%d]%s[pid=%d] Received capabilities via sync_recv\n",
+			smp_processor_id(), current->comm, current->pid);
 	/*
 	 * Set up async ring channel
 	 */
@@ -1632,6 +1751,7 @@ int prep_channel(struct trampoline_hidden_args *hidden_args)
 		goto fail_ep;
 	}
 
+#ifdef SOFTIRQ_CHANNELS
 	printk("[%d]%s[pid=%d] Creating a pair for softirq\n", smp_processor_id(), current->comm, current->pid);
 	/*
 	 * Set up async ring channel for softirq
@@ -1642,17 +1762,19 @@ int prep_channel(struct trampoline_hidden_args *hidden_args)
 		LIBLCD_ERR("error setting up ring channel");
 		goto fail_ep2;
 	}
-
+#endif
 	lcd_set_cr0(CAP_CPTR_NULL);
 	lcd_set_cr1(CAP_CPTR_NULL);
+
+#ifdef SOFTIRQ_CHANNELS
 	lcd_set_cr2(CAP_CPTR_NULL);
 	lcd_set_cr3(CAP_CPTR_NULL);
-
-
-	PTS()->thc_chnl = chnl;
 	sirq_channels[smp_processor_id()] = chnl_softirq;
-
 fail_ep2:
+#else
+	PTS()->thc_chnl = chnl;
+	sirq_channels[smp_processor_id()] = chnl;
+#endif
 	/* technically, we do not need to receive the response */
 	ret = thc_ipc_recv_response(
 			hidden_args->async_chnl,
@@ -1681,6 +1803,7 @@ fail_cptr:
 	return -1;
 }
 
+DEFINE_SPINLOCK(prep_lock);
 
 int ndo_start_xmit(struct sk_buff *skb,
 		struct net_device *dev,
@@ -1706,6 +1829,8 @@ int ndo_start_xmit(struct sk_buff *skb,
 		/* step 1. create lcd env */
 		lcd_enter();
 
+		ptrs[smp_processor_id()] = PTS();
+
 		/* set nonlcd ctx for future use */
 		PTS()->nonlcd_ctx = true;
 
@@ -1726,14 +1851,26 @@ int ndo_start_xmit(struct sk_buff *skb,
 					__func__, smp_processor_id());
 				PTS()->thc_chnl = xmit_irq_chnl;
 			}
+
 			PTS()->thc_chnl =
 				sirq_channels[smp_processor_id()];
+
+			printk("[%d]%s[pid=%d] pts %p softirq channel %p\n",
+				smp_processor_id(), current->comm,
+				current->pid, PTS(),
+				sirq_channels[smp_processor_id()]);
+
 		} else if(!strncmp(current->comm, "iperf",
 					strlen("iperf")) ||
 			!strncmp(current->comm, "netperf",
 					strlen("netperf"))) {
-
+		
+			printk("[%d]%s[pid=%d] calling prep_channel\n",
+				smp_processor_id(), current->comm,
+				current->pid);
+			spin_lock(&prep_lock);
 			prep_channel(hidden_args);
+			spin_unlock(&prep_lock);
 			printk("===================================\n");
 			printk("===== Private Channel created =====\n");
 			printk("===================================\n");
@@ -1771,11 +1908,17 @@ int ndo_start_xmit(struct sk_buff *skb,
 		return NETDEV_TX_OK;
 	}
 
+	global_tx_count++;
 	//printk("%s, nr_frags %d\n", __func__, skb_shinfo(skb)->nr_frags);
 	if (PTS()->nonlcd_ctx) {
 		async_chnl = (struct thc_channel*) PTS()->thc_chnl;
 		if (!async_chnl) {
-			printk("%s: async_chnl is null\n", current->comm);
+			printk("[%d]%s[pid=%d] pts %p, pts->chnl %p,"
+				"softirq channel %p\n",
+				smp_processor_id(), current->comm,
+				current->pid, PTS(),
+				PTS()->thc_chnl,
+				sirq_channels[smp_processor_id()]);
 			goto quit;
 		}
 		if (unlikely(PTS()->dofin))
@@ -2752,6 +2895,12 @@ struct rtnl_link_stats64 *ndo_get_stats64(struct net_device *dev,
 		fipc_test_stat_print_info(times_ndo_xmit,
 						NUM_PACKETS);
 #endif
+#ifdef STATS
+	printk("---------- counter  ---------------\n");
+	printk("%s, global tx = %llu | global free = %llu\n",
+			__func__, global_tx_count, global_free_count);
+	printk("-----------------------------------\n");
+#endif
 #ifdef LCD_MEASUREMENT
 	printk("---------- LCD ---------------\n");
 	if (times_lcd)
@@ -3574,6 +3723,12 @@ int napi_consume_skb_callee(struct fipc_message *_request,
 #ifdef FREE_TIMESTAMP
 	TS_START(free);
 #endif
+
+	if (check_skb_range(skb) == VOLUNTEER_XMIT)
+		printk("%s, skb possibly corrupted %p\n", __func__, skb);
+	
+	global_free_count++;
+
 	napi_consume_skb(skb, budget);
 
 #ifdef FREE_TIMESTAMP
@@ -4473,10 +4628,10 @@ int pci_wake_from_d3_callee(struct fipc_message *_request,
 	return ret;
 }
 
-int trigger_exit_to_lcd(struct thc_channel *_channel)
+int trigger_exit_to_lcd(struct thc_channel *_channel, enum dispatch_t disp)
 {
 	struct fipc_message *_request;
-	int ret;
+	int ret, i;
 	unsigned int request_cookie;
 
 	ret = async_msg_blocking_send_start(_channel,
@@ -4486,17 +4641,31 @@ int trigger_exit_to_lcd(struct thc_channel *_channel)
 		goto fail_async;
 	}
 	async_msg_set_fn_type(_request,
-			TRIGGER_EXIT);
+			disp);
 
 	/* No need to wait for a response here */
 	ret = thc_ipc_send_request(_channel,
 			_request,
 			&request_cookie);
 
+	if (disp == TRIGGER_CLEAN) {
+	thread = 0;
+	for (i = 0; i < NUM_CORES; i++) {
+		if (ptrs[i]) {
+			if (ptrs[i]->exited) {
+				kfree(ptrs[i]);
+				ptrs[i] = NULL;
+				continue;
+			}
+		}
+	}
+	}
+
 	if (ret) {
 		LIBLCD_ERR("thc_ipc send");
 		goto fail_ipc;
 	}
+	awe_mapper_remove_id(request_cookie);
 
 fail_async:
 fail_ipc:

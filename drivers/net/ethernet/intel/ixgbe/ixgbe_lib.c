@@ -29,8 +29,6 @@
 #include "ixgbe.h"
 #include "ixgbe_sriov.h"
 
-#undef CONFIG_PCI_IOV
-
 #ifdef CONFIG_IXGBE_DCB
 /**
  * ixgbe_cache_ring_dcb_sriov - Descriptor ring to register mapping for SR-IOV
@@ -506,8 +504,6 @@ static bool ixgbe_set_sriov_queues(struct ixgbe_adapter *adapter)
 #endif
 	bool pools = (find_first_zero_bit(&adapter->fwd_bitmask, 32) > 1);
 
-	printk("%s, adapter flags 0x%x\n", __func__, adapter->flags);
-
 	/* only proceed if SR-IOV is enabled */
 	if (!(adapter->flags & IXGBE_FLAG_SRIOV_ENABLED))
 		return false;
@@ -552,7 +548,6 @@ static bool ixgbe_set_sriov_queues(struct ixgbe_adapter *adapter)
 	adapter->num_rx_queues = vmdq_i * rss_i;
 	adapter->num_tx_queues = vmdq_i * rss_i;
 
-	printk("%s, adapter numqs %d\n", __func__, adapter->num_tx_queues);
 	/* disable ATR as it is not supported when VMDq is enabled */
 	adapter->flags &= ~IXGBE_FLAG_FDIR_HASH_CAPABLE;
 
@@ -621,7 +616,6 @@ static bool ixgbe_set_rss_queues(struct ixgbe_adapter *adapter)
 	/* disable ATR by default, it will be configured below */
 	adapter->flags &= ~IXGBE_FLAG_FDIR_HASH_CAPABLE;
 
-	printk("%s, rss_i %d\n", __func__, rss_i);
 	/*
 	 * Use Flow Director in addition to RSS to ensure the best
 	 * distribution of flows across cores, even when an FDIR flow
@@ -669,7 +663,6 @@ static bool ixgbe_set_rss_queues(struct ixgbe_adapter *adapter)
 	adapter->num_rx_queues = rss_i;
 	adapter->num_tx_queues = rss_i;
 
-	printk("%s, numqs %d\n", __func__, adapter->num_tx_queues);
 	return true;
 }
 
@@ -1129,9 +1122,8 @@ static void ixgbe_set_interrupt_capability(struct ixgbe_adapter *adapter)
 
 	/* Disable SR-IOV support */
 	e_dev_warn("Disabling SR-IOV support\n");
-#ifdef CONFIG_PCI_IOV
 	ixgbe_disable_sriov(adapter);
-#endif
+
 	/* Disable RSS */
 	e_dev_warn("Disabling RSS support\n");
 	adapter->ring_feature[RING_F_RSS].limit = 1;

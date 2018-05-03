@@ -60,13 +60,6 @@
 #include "ixgbe_dcb_82599.h"
 #include "ixgbe_sriov.h"
 #include "ixgbe_model.h"
-#include "rdtsc_helper.h"
-
-#undef CONFIG_PCI_IOV
-
-#define NUM_PACKETS	600000
-uint64_t *times_ndo_xmit = NULL;
-static int iter = 0;
 
 char ixgbe_driver_name[] = "ixgbe";
 static const char ixgbe_driver_string[] =
@@ -1116,20 +1109,6 @@ static void ixgbe_tx_timeout_reset(struct ixgbe_adapter *adapter)
 	}
 }
 
-int ixgbe_link_mbps(struct ixgbe_adapter *adapter)
-{
-	switch (adapter->link_speed) {
-	case IXGBE_LINK_SPEED_100_FULL:
-		return 100;
-	case IXGBE_LINK_SPEED_1GB_FULL:
-		return 1000;
-	case IXGBE_LINK_SPEED_10GB_FULL:
-		return 10000;
-	default:
-		return 0;
-	}
-}
-
 /**
  * ixgbe_tx_maxrate - callback to set the maximum per-queue bitrate
  **/
@@ -1175,7 +1154,6 @@ static bool ixgbe_clean_tx_irq(struct ixgbe_q_vector *q_vector,
 	unsigned int total_bytes = 0, total_packets = 0;
 	unsigned int budget = q_vector->tx.work_limit;
 	unsigned int i = tx_ring->next_to_clean;
-//	TS_DECL(ndo_xmit);
 
 	if (test_bit(__IXGBE_DOWN, &adapter->state))
 		return true;
@@ -1205,17 +1183,9 @@ static bool ixgbe_clean_tx_irq(struct ixgbe_q_vector *q_vector,
 		total_bytes += tx_buffer->bytecount;
 		total_packets += tx_buffer->gso_segs;
 
-//		TS_START(ndo_xmit);
 		/* free the skb */
 		napi_consume_skb(tx_buffer->skb, napi_budget);
 
-//		TS_STOP(ndo_xmit);
-
-/*		if (times_ndo_xmit) {
-			times_ndo_xmit[iter] = TS_DIFF(ndo_xmit);
-			iter = (iter + 1) % NUM_PACKETS;
-		}
-*/
 		/* unmap skb header data */
 		dma_unmap_single(tx_ring->dev,
 				 dma_unmap_addr(tx_buffer, dma),
@@ -1583,7 +1553,6 @@ static bool ixgbe_alloc_mapped_page(struct ixgbe_ring *rx_ring,
 {
 	struct page *page = bi->page;
 	dma_addr_t dma;
-	static unsigned pg_count = 0;
 
 	/* since we are recycling buffers we should seldom need to alloc */
 	if (likely(page))
@@ -1595,8 +1564,6 @@ static bool ixgbe_alloc_mapped_page(struct ixgbe_ring *rx_ring,
 		rx_ring->rx_stats.alloc_rx_page_failed++;
 		return false;
 	}
-
-//	printk("%s, alloc %d pages\n", __func__, ++pg_count);
 
 	/* map page for use */
 	dma = dma_map_page(rx_ring->dev, page, 0,
@@ -2791,10 +2758,9 @@ static irqreturn_t ixgbe_msix_other(int irq, void *data)
 
 	if (eicr & IXGBE_EICR_LSC)
 		ixgbe_check_lsc(adapter);
-#ifdef CONFIG_PCI_IOV
+
 	if (eicr & IXGBE_EICR_MAILBOX)
 		ixgbe_msg_task(adapter);
-#endif
 
 	switch (hw->mac.type) {
 	case ixgbe_mac_82599EB:
@@ -3779,7 +3745,7 @@ static void ixgbe_setup_psrtype(struct ixgbe_adapter *adapter)
 	for_each_set_bit(pool, &adapter->fwd_bitmask, 32)
 		IXGBE_WRITE_REG(hw, IXGBE_PSRTYPE(VMDQ_P(pool)), psrtype);
 }
-#ifdef CONFIG_PCI_IOV
+
 static void ixgbe_configure_virtualization(struct ixgbe_adapter *adapter)
 {
 	struct ixgbe_hw *hw = &adapter->hw;
@@ -3842,7 +3808,6 @@ static void ixgbe_configure_virtualization(struct ixgbe_adapter *adapter)
 					  adapter->vfinfo[i].rss_query_enabled);
 	}
 }
-#endif
 
 static void ixgbe_set_rx_buffer_len(struct ixgbe_adapter *adapter)
 {
@@ -5086,9 +5051,8 @@ static void ixgbe_configure(struct ixgbe_adapter *adapter)
 	 * We must restore virtualization before VLANs or else
 	 * the VLVF registers will not be populated
 	 */
-#ifdef CONFIG_PCI_IOV
 	ixgbe_configure_virtualization(adapter);
-#endif
+
 	ixgbe_set_rx_mode(adapter->netdev);
 	ixgbe_restore_vlan(adapter);
 
@@ -5541,7 +5505,7 @@ void ixgbe_down(struct ixgbe_adapter *adapter)
 	adapter->flags &= ~IXGBE_FLAG_NEED_LINK_UPDATE;
 
 	del_timer_sync(&adapter->service_timer);
-#ifdef CONFIG_PCI_IOV
+
 	if (adapter->num_vfs) {
 		/* Clear EITR Select mapping */
 		IXGBE_WRITE_REG(&adapter->hw, IXGBE_EITRSEL, 0);
@@ -5556,7 +5520,7 @@ void ixgbe_down(struct ixgbe_adapter *adapter)
 		/* Disable all VFTE/VFRE TX/RX */
 		ixgbe_disable_tx_rx(adapter);
 	}
-#endif
+
 	/* disable transmits in the hardware now that interrupts are off */
 	for (i = 0; i < adapter->num_tx_queues; i++) {
 		u8 reg_idx = adapter->tx_ring[i]->reg_idx;
@@ -5678,8 +5642,7 @@ static int ixgbe_sw_init(struct ixgbe_adapter *adapter)
 	hw->subsystem_device_id = pdev->subsystem_device;
 
 	/* Set common capability flags and settings */
-	//rss = min_t(int, ixgbe_max_rss_indices(adapter), num_online_cpus());
-	rss = min_t(int, ixgbe_max_rss_indices(adapter), 1ul);
+	rss = min_t(int, ixgbe_max_rss_indices(adapter), num_online_cpus());
 	adapter->ring_feature[RING_F_RSS].limit = rss;
 	adapter->flags2 |= IXGBE_FLAG2_RSC_CAPABLE;
 	adapter->max_q_vectors = MAX_Q_VECTORS_82599;
@@ -6844,9 +6807,8 @@ static void ixgbe_watchdog_link_is_up(struct ixgbe_adapter *adapter)
 	       (flow_tx ? "TX" : "None"))));
 
 	netif_carrier_on(netdev);
-#ifdef CONFIG_PCI_IOV
 	ixgbe_check_vf_rate_limit(adapter);
-#endif
+
 	/* enable transmits */
 	netif_tx_wake_all_queues(adapter->netdev);
 
@@ -6864,10 +6826,9 @@ static void ixgbe_watchdog_link_is_up(struct ixgbe_adapter *adapter)
 
 	/* update the default user priority for VFs */
 	ixgbe_update_default_up(adapter);
-#ifdef CONFIG_PCI_IOV
+
 	/* ping all the active vfs to let them know link has changed */
 	ixgbe_ping_all_vfs(adapter);
-#endif
 }
 
 /**
@@ -6897,10 +6858,8 @@ static void ixgbe_watchdog_link_is_down(struct ixgbe_adapter *adapter)
 	e_info(drv, "NIC Link is Down\n");
 	netif_carrier_off(netdev);
 
-#ifdef CONFIG_PCI_IOV
 	/* ping all the active vfs to let them know link has changed */
 	ixgbe_ping_all_vfs(adapter);
-#endif
 }
 
 static bool ixgbe_ring_tx_pending(struct ixgbe_adapter *adapter)
@@ -7530,9 +7489,6 @@ static void ixgbe_tx_map(struct ixgbe_ring *tx_ring,
 	u32 tx_flags = first->tx_flags;
 	u32 cmd_type = ixgbe_tx_cmd_type(skb, tx_flags);
 	u16 i = tx_ring->next_to_use;
-//	TS_DECL(ndo_xmit);
-//	u64 start, end;
-//	bool ts = false;
 
 	tx_desc = IXGBE_TX_DESC(tx_ring, i);
 
@@ -7552,25 +7508,7 @@ static void ixgbe_tx_map(struct ixgbe_ring *tx_ring,
 	}
 
 #endif
-#if 0
-	if (!strcmp(current->comm, "iperf"))
-		ts = true;
-	if (ts) TS_START(ndo_xmit);
-	//	start = ktime_get_ns();
-#endif
 	dma = dma_map_single(tx_ring->dev, skb->data, size, DMA_TO_DEVICE);
-#if 0
-	if (ts) TS_STOP(ndo_xmit);
-	//	end = ktime_get_ns();
-
-	//if (ts) 
-	//	printk("dma addr %lx\n", dma);
-
-	if (ts && times_ndo_xmit) {
-		times_ndo_xmit[iter] = TS_DIFF(ndo_xmit);
-		iter = (iter + 1) % NUM_PACKETS;
-	}
-#endif
 
 	tx_buffer = first;
 
@@ -8012,22 +7950,7 @@ static netdev_tx_t __ixgbe_xmit_frame(struct sk_buff *skb,
 static netdev_tx_t ixgbe_xmit_frame(struct sk_buff *skb,
 				    struct net_device *netdev)
 {
-#if 0
-	TS_DECL(ndo_xmit);
-	TS_START(ndo_xmit);
-#endif
-//	if (!strncmp(current->comm, "ksoftirqd/", strlen("ksoftirqd/")))
-//		printk("softirq\n");
-
-	netdev_tx_t ret;
-	ret = __ixgbe_xmit_frame(skb, netdev, NULL);
-#if 0
-	TS_STOP(ndo_xmit);
-	if (times_ndo_xmit)
-		times_ndo_xmit[iter] = TS_DIFF(ndo_xmit);
-	iter = (iter + 1) % NUM_PACKETS;
-#endif
-	return ret;
+	return __ixgbe_xmit_frame(skb, netdev, NULL);
 }
 
 /**
@@ -8161,19 +8084,11 @@ static void ixgbe_netpoll(struct net_device *netdev)
 }
 
 #endif
-
 static struct rtnl_link_stats64 *ixgbe_get_stats64(struct net_device *netdev,
 						   struct rtnl_link_stats64 *stats)
 {
 	struct ixgbe_adapter *adapter = netdev_priv(netdev);
 	int i;
-
-	if (iter && times_ndo_xmit) {
-		fipc_test_stat_print_info(times_ndo_xmit,
-						iter);
-		memset(times_ndo_xmit, 0, NUM_PACKETS * sizeof(u64));
-		iter = 0;
-	}
 
 	rcu_read_lock();
 	for (i = 0; i < adapter->num_rx_queues; i++) {
@@ -9246,7 +9161,6 @@ static const struct net_device_ops ixgbe_netdev_ops = {
 	.ndo_vlan_rx_add_vid	= ixgbe_vlan_rx_add_vid,
 	.ndo_vlan_rx_kill_vid	= ixgbe_vlan_rx_kill_vid,
 	.ndo_do_ioctl		= ixgbe_ioctl,
-#ifdef CONFIG_PCI_IOV
 	.ndo_set_vf_mac		= ixgbe_ndo_set_vf_mac,
 	.ndo_set_vf_vlan	= ixgbe_ndo_set_vf_vlan,
 	.ndo_set_vf_rate	= ixgbe_ndo_set_vf_bw,
@@ -9254,7 +9168,6 @@ static const struct net_device_ops ixgbe_netdev_ops = {
 	.ndo_set_vf_rss_query_en = ixgbe_ndo_set_vf_rss_query_en,
 	.ndo_set_vf_trust	= ixgbe_ndo_set_vf_trust,
 	.ndo_get_vf_config	= ixgbe_ndo_get_vf_config,
-#endif
 	.ndo_get_stats64	= ixgbe_get_stats64,
 	.ndo_setup_tc		= __ixgbe_setup_tc,
 #ifdef CONFIG_NET_POLL_CONTROLLER
@@ -9422,8 +9335,6 @@ static int ixgbe_probe(struct pci_dev *pdev, const struct pci_device_id *ent)
 	u16 device_caps;
 #endif
 	u32 eec;
-
-	times_ndo_xmit = vzalloc(NUM_PACKETS * sizeof(uint64_t));
 
 	/* Catch broken hardware that put the wrong VF device ID in
 	 * the PCIe SR-IOV capability.
@@ -9791,13 +9702,12 @@ skip_sriov:
 		ixgbe_setup_dca(adapter);
 	}
 #endif
-#ifdef CONFIG_PCI_IOV
 	if (adapter->flags & IXGBE_FLAG_SRIOV_ENABLED) {
 		e_info(probe, "IOV is enabled with %d VFs\n", adapter->num_vfs);
 		for (i = 0; i < adapter->num_vfs; i++)
 			ixgbe_vf_configuration(pdev, (i | 0x10000000));
 	}
-#endif
+
 	/* firmware requires driver version to be 0xFFFFFFFF
 	 * since os does not support feature
 	 */
@@ -9829,9 +9739,7 @@ err_register:
 	ixgbe_release_hw_control(adapter);
 	ixgbe_clear_interrupt_scheme(adapter);
 err_sw_init:
-#ifdef CONFIG_PCI_IOV
 	ixgbe_disable_sriov(adapter);
-#endif
 	adapter->flags2 &= ~IXGBE_FLAG2_SEARCH_FOR_SFP;
 	iounmap(adapter->io_addr);
 	kfree(adapter->jump_tables[0]);
@@ -9863,11 +9771,6 @@ static void ixgbe_remove(struct pci_dev *pdev)
 	struct net_device *netdev;
 	bool disable_dev;
 	int i;
-
-	if (times_ndo_xmit) {
-		vfree(times_ndo_xmit);
-		times_ndo_xmit = NULL;
-	}
 
 	/* if !adapter then we already cleaned up in probe */
 	if (!adapter)
@@ -10150,9 +10053,7 @@ static struct pci_driver ixgbe_driver = {
 	.resume   = ixgbe_resume,
 #endif
 	.shutdown = ixgbe_shutdown,
-#ifdef CONFIG_PCI_IOV
 	.sriov_configure = ixgbe_pci_sriov_configure,
-#endif
 	.err_handler = &ixgbe_err_handler
 };
 

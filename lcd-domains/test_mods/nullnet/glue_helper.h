@@ -80,7 +80,7 @@ struct skbuff_members {
 
 #define CONSUME_SKB_SEND_ONLY
 #define CONSUME_SKB_NO_HASHING
-#define SENDER_DISPATCH_LOOP
+//#define SENDER_DISPATCH_LOOP
 
 //#define NO_AWE
 //#define NO_HASHING
@@ -90,6 +90,8 @@ struct skbuff_members {
 //#define ONE_SLOT
 
 //#define CACHE_ALIGNED __attribute__((aligned(64)))
+
+#define fipc_test_pause()    asm volatile ( "pause\n": : :"memory" );
 
 #define PMFS_ASYNC_RPC_BUFFER_ORDER 12
 // LCD_DEBUG
@@ -350,5 +352,55 @@ retry:
 	return 0;
 }
 #endif /* #if 0 */
+
+static inline
+int fipc_test_blocking_recv_start ( struct thc_channel *chnl, struct fipc_message** out)
+{
+	int ret;
+
+	while ( 1 )
+	{
+#ifdef ONE_SLOT
+		// Poll until we get a message or error
+		ret = fipc_recv_msg_start_0( thc_channel_to_fipc(chnl),
+						out );
+#else
+		// Poll until we get a message or error
+		ret = fipc_recv_msg_start( thc_channel_to_fipc(chnl),
+						out );
+#endif
+		if ( !ret || ret != -EWOULDBLOCK )
+		{
+			return ret;
+		}	
+		fipc_test_pause();
+	}
+	return 0;
+}
+
+/**
+ * This function will block until a message slot is available and stored in out.
+ */
+static inline
+int fipc_test_blocking_send_start ( struct thc_channel * chnl, struct fipc_message** out )
+{
+	int ret;
+
+	while ( 1 )
+	{
+		// Poll until we get a free slot or error
+		ret = fipc_send_msg_start( thc_channel_to_fipc(chnl), out );
+
+		if ( !ret || ret != -EWOULDBLOCK )
+		{
+			return ret;
+		}
+
+		fipc_test_pause();
+	}
+
+	return 0;
+}
+
 
 #endif /* _GLUE_HELPER_H_ */

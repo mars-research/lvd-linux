@@ -40,24 +40,32 @@ struct atom {
 typedef struct {
 	struct object __percpu **head;
 	struct object __percpu **marker;
+#ifdef PBUF
 	char __percpu **buf;
 	char __percpu **bufend;
+#endif
 	int __percpu *cached;
 	unsigned int obj_size;
 	unsigned int total_pages;
 	unsigned int num_objs_percpu;
+	unsigned int total_objs;
 	unsigned int num_cpus;
 	void *pool;
 	void *gpool;
 	struct atom stack;
 	unsigned int pool_order;
 	spinlock_t pool_spin_lock;
+	bool dump_once;
 } priv_pool_t;
 
 
 void *priv_alloc(pool_type_t type);
 void priv_free(void *p, pool_type_t type);
-priv_pool_t *priv_pool_init(pool_type_t type, unsigned int num_objs, unsigned int obj_size);
+//priv_pool_t *priv_pool_init(pool_type_t type, unsigned int num_objs, unsigned int obj_size);
+
+priv_pool_t *priv_pool_init(pool_type_t type, void *pool_base,
+			size_t pool_size,
+			unsigned int obj_size);
 void priv_pool_destroy(priv_pool_t *p);
 
 #endif /* PRIV_MEMPOOL_H */

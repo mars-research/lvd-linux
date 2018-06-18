@@ -16,6 +16,7 @@
 #include <linux/vmalloc.h>
 
 #include "../../ipc_helper.h"
+#include <linux/sort.h>
 
 #include <lcd_config/post_hook.h>
 
@@ -88,6 +89,8 @@ struct rtnl_link_stats64 g_stats;
 struct thc_channel *xmit_chnl;
 priv_pool_t *pool;
 priv_pool_t *skbc_pool;
+void *pool_base = NULL;
+size_t pool_size = 0;
 
 
 #ifdef TIMESTAMP
@@ -109,9 +112,78 @@ struct kmem_cache *skb_c_cache = NULL;
 
 int ndo_start_xmit_async_landing(struct sk_buff *first, struct net_device *dev, struct trampoline_hidden_args *hidden_args);
 
+#define MAX_POOLS	20
+
+char *base_pools[MAX_POOLS];
+int pool_order = 10;
+int start_idx[MAX_POOLS/2] = {-1}, end_idx[MAX_POOLS/2] = {-1};
+unsigned int best_diff = 0;
+int best_idx = -1;
+int pool_idx = 0;
+struct {
+	int start_idx;
+	int end_idx;
+	size_t size;
+	bool valid;
+} pools[MAX_POOLS] = { {0} };
+
+int compare_addr(const void *a, const void *b)
+{
+	return *(unsigned int *)a - *(unsigned int *)b;
+}
+
+int pool_pick(void)
+{
+	int i;
+	for (i = 0; i < MAX_POOLS; i++) {
+		base_pools[i] = (char*) __get_free_pages(GFP_KERNEL | __GFP_ZERO,
+	                            pool_order);
+	}
+
+	sort(base_pools, MAX_POOLS, sizeof(char*), compare_addr, NULL);
+
+	printk("%s, sorted order:\n", __func__);
+	for (i = 0; i < MAX_POOLS; i++) {
+		printk("%s, got pool %p\n", __func__, base_pools[i]);
+	}
+
+	pools[pool_idx].start_idx = 0;
+	pools[pool_idx].end_idx = MAX_POOLS - 1;
+	pools[pool_idx].valid = true;
+	for (i = 0; i < MAX_POOLS - 1; i++) {
+		printk("%s, comparing pool[%d]=%llx and pool[%d]=%llx\n", __func__,
+					i+1, (uint64_t)base_pools[i+1], i, (uint64_t) base_pools[i]);
+		if (((uint64_t) base_pools[i+1] - (uint64_t) base_pools[i]) != ((1 << pool_order) * PAGE_SIZE)) {
+			printk("%s, found discontinuity @ i %d\n", __func__, i);
+			pools[pool_idx].valid = true;
+			pools[pool_idx++].end_idx = i;
+			pools[pool_idx].start_idx = i + 1;
+		}
+	}
+
+	for (i = 0; i < MAX_POOLS; i++) {
+		printk("%s, pool %d: start idx = %d | end idx = %d\n",
+				__func__, i, pools[i].start_idx, pools[i].end_idx);
+		if (!pools[i].valid)
+			continue;
+		if ((pools[i].end_idx - pools[i].start_idx + 1) > best_diff) {
+			best_idx = i;
+			best_diff = pools[i].end_idx - pools[i].start_idx + 1;
+		}
+	}
+	printk("%s, best diff %u | best idx %d | start = %d | end = %d\n",
+			__func__, best_diff, best_idx, pools[best_idx].start_idx, pools[best_idx].end_idx);
+       	return best_idx;
+}
+
+
 void skb_data_pool_init(void)
 {
-	pool = priv_pool_init(SKB_DATA_POOL, 10, SKB_DATA_SIZE);
+	//pool = priv_pool_init(SKB_DATA_POOL, 10, SKB_DATA_SIZE);
+	pool_base = base_pools[pool_pick()];
+	pool_size = best_diff * ((1 << pool_order) * PAGE_SIZE);
+	pool = priv_pool_init(SKB_DATA_POOL, (void*) pool_base, pool_size, 2048);
+
 #ifdef SKBC_PRIVATE_POOL
 	skbc_pool = priv_pool_init(SKB_CONTAINER_POOL, 10,
 				SKB_CONTAINER_SIZE * 2);

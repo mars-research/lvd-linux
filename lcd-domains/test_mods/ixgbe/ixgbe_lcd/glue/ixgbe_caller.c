@@ -29,7 +29,7 @@ static struct net_device *g_net_device;
 
 #ifdef IOMMU_ASSIGN
 /* device for IOMMU assignment */
-struct pcidev_info dev_assign = { 0x0000, 0x04, 0x00, 0x1 };
+struct pcidev_info dev_assign = { 0x0000, 0x42, 0x00, 0x1 };
 #endif
 
 struct kmem_cache *skb_c_cache;
@@ -281,6 +281,7 @@ static void destroy_async_channel(struct thc_channel *chnl)
 		LIBLCD_ERR("failed to translate rx to cptr");
 		goto fail2;
 	}
+	printk("%s, destroying channel %p", __func__, chnl); 
 	/*
 	 * Unmap and kill tx/rx
 	 */
@@ -307,7 +308,7 @@ fail1:
 	return;
 }
 
-struct thc_channel_group_item *ptrs[32];
+struct thc_channel_group_item *ptrs[32] = {0};
 
 int create_one_async_channel(struct thc_channel **chnl, cptr_t *tx, cptr_t *rx)
 {
@@ -330,6 +331,7 @@ int create_one_async_channel(struct thc_channel **chnl, cptr_t *tx, cptr_t *rx)
 
 	thc_channel_group_item_add(&ch_grp, xmit_ch_item);
 
+	printk("%s, assingning ptrs[%d] to %p", __func__, idx % 32, xmit_ch_item);
 	ptrs[idx++%32] = xmit_ch_item;
 
 	return 0;
@@ -340,17 +342,16 @@ int create_async_channel(void)
 	int ret;
 	cptr_t tx, rx;
 	cptr_t tx_xmit, rx_xmit;
-	cptr_t tx_xmit2, rx_xmit2;
-	cptr_t txirq_xmit, rxirq_xmit;
+
 	struct thc_channel *chnl;
 	struct thc_channel *xmit_chnl;
+
+#ifdef EXTRA_CHANNELS
+	cptr_t tx_xmit2, rx_xmit2;
+	cptr_t txirq_xmit, rxirq_xmit;
 	struct thc_channel *xmit_chnl2;
 	struct thc_channel *xmit_irq_chnl;
-/*	struct thc_channel_group_item *ch_item;
-	struct thc_channel_group_item *xmit_ch_item;
-	struct thc_channel_group_item *xmit_ch_item2;
-	struct thc_channel_group_item *xmit_chirq_item;
-*/
+#endif
 	/*
 	 * Set up async and sync channels
 	 */
@@ -370,6 +371,9 @@ int create_async_channel(void)
 		goto fail_ch;
 	}
 
+	ptrs[0] = ptrs[1] = NULL;
+
+#ifdef EXTRA_CHANNELS
 	if (create_one_async_channel(&xmit_chnl2, &tx_xmit2, &rx_xmit2)) {
 		LIBLCD_ERR("async channel creation failed");
 		goto fail_ch;
@@ -379,70 +383,19 @@ int create_async_channel(void)
 		LIBLCD_ERR("async channel creation failed");
 		goto fail_ch;
 	}
-
-#if 0
-	ret = setup_async_channel(&tx, &rx, &chnl);
-	if (ret) {
-		LIBLCD_ERR("async chnl setup failed");
-		goto fail2;
-	}
-
-	ch_item = kzalloc(sizeof(*ch_item), GFP_KERNEL);
-
-	thc_channel_group_item_init(ch_item, chnl, NULL);
-
-	thc_channel_group_item_add(&ch_grp, ch_item);
-
-	ret = setup_async_channel(&tx_xmit, &rx_xmit, &xmit_chnl);
-	if (ret) {
-		LIBLCD_ERR("async xmit chnl setup failed");
-		goto fail2;
-	}
-
-	xmit_ch_item = kzalloc(sizeof(*xmit_ch_item), GFP_KERNEL);
-
-	thc_channel_group_item_init(xmit_ch_item, xmit_chnl, NULL);
-
-	thc_channel_group_item_add(&ch_grp, xmit_ch_item);
-
-	ret = setup_async_channel(&tx_xmit2, &rx_xmit2, &xmit_chnl2);
-	if (ret) {
-		LIBLCD_ERR("async xmit chnl setup failed");
-		goto fail2;
-	}
-
-	xmit_ch_item2 = kzalloc(sizeof(*xmit_ch_item2), GFP_KERNEL);
-
-	thc_channel_group_item_init(xmit_ch_item2, xmit_chnl2, NULL);
-
-	thc_channel_group_item_add(&ch_grp, xmit_ch_item2);
-
-	ret = setup_async_channel(&txirq_xmit, &rxirq_xmit,
-					&xmit_irq_chnl);
-	if (ret) {
-		LIBLCD_ERR("async xmit chnl setup failed");
-		goto fail2;
-	}
-
-	xmit_chirq_item = kzalloc(sizeof(*xmit_chirq_item),
-						GFP_KERNEL);
-
-	thc_channel_group_item_init(xmit_chirq_item, xmit_irq_chnl,
-						NULL);
-
-	thc_channel_group_item_add(&ch_grp, xmit_chirq_item);
-
 #endif
+
 	lcd_set_cr0(ixgbe_sync_endpoint);
         lcd_set_cr1(rx);
         lcd_set_cr2(tx);
         lcd_set_cr3(rx_xmit);
         lcd_set_cr4(tx_xmit);
+#ifdef EXTRA_CHANNELS
         lcd_set_cr5(rxirq_xmit);
         lcd_set_cr6(txirq_xmit);
         lcd_set_cr7(rx_xmit2);
-//        lcd_set_cr8(tx_xmit2);
-
+	lcd_set_cr8(tx_xmit2);
+#endif
 	LIBLCD_MSG("sync call %s", __func__);
 	ret = lcd_sync_call(ixgbe_register_channel);
 
@@ -456,9 +409,11 @@ int create_async_channel(void)
         lcd_set_cr2(CAP_CPTR_NULL);
         lcd_set_cr3(CAP_CPTR_NULL);
         lcd_set_cr4(CAP_CPTR_NULL);
+
+#ifdef EXTRA_CHANNELS
         lcd_set_cr5(CAP_CPTR_NULL);
         lcd_set_cr6(CAP_CPTR_NULL);
-
+#endif
         if (ret) {
                 LIBLCD_ERR("lcd_call");
                 goto fail3;
@@ -2677,6 +2632,7 @@ int ndo_start_xmit_clean_callee(struct fipc_message *_request,
 	struct skbuff_members *skb_lcd;
 	__be16 proto;
 	void *mem;
+	unsigned int seq, ack;
 #ifdef LCD_MEASUREMENT
 	TS_DECL(xmit);
 #endif
@@ -2693,10 +2649,10 @@ int ndo_start_xmit_clean_callee(struct fipc_message *_request,
 	fipc_recv_msg_end(thc_channel_to_fipc(_channel),
 			_request);
 
-	if (_channel == ixgbe_async)
-		printk("%s, Got msg - reqc 0x%x | xmitty %d",
-				__func__, request_cookie,
-				xmit_type);
+	//if (_channel == ixgbe_async)
+	//	printk("%s, Got msg - reqc 0x%x | xmitty %d",
+	//			__func__, request_cookie,
+	//			xmit_type);
 
 	skb_c = mem = kmem_cache_alloc(skb_c_cache,
 				GFP_KERNEL);
@@ -2744,6 +2700,27 @@ int ndo_start_xmit_clean_callee(struct fipc_message *_request,
 #ifdef LCD_MEASUREMENT
 	TS_START_LCD(xmit);
 #endif
+
+	/* if TCP */
+	/* 38-41 - Seq no
+	 * 42-45 - Ack no
+	 */
+	if (skb->data[23] == 0x6) {
+		unsigned char flags = (skb->data[46] & 0x0F) | skb->data[47];
+		seq = (skb->data[38] << 24) | (skb->data[39] << 16) | (skb->data[40] << 8) | skb->data[41];
+		ack = (skb->data[42] << 24) | (skb->data[43] << 16) | (skb->data[44] << 8) | skb->data[45];
+
+		printk("got pkt | cookie %d | proto %x | IP proto %x | TCP.seq %u | TCP.ack %u | TCP Flags [%s%s%s%s%s]\n",
+				request_cookie, htons(skb->protocol),
+				skb->data[23], seq, ack,
+				(flags & 0x1) ? " FIN " : "",
+				(flags & 0x2) ? " SYN " : "",
+				(flags & 0x4) ? " RST " : "",
+				(flags & 0x8) ? " PSH " : "",
+				(flags & 0x10) ? " ACK " : "");
+
+	}
+
 	func_ret = ixgbe_xmit_frame(skb, g_netdev);
 
 	if (func_ret)
@@ -2767,12 +2744,12 @@ int ndo_start_xmit_clean_callee(struct fipc_message *_request,
 			request_cookie,
 			_response);
 
-//	printk("%s, posting response for reqc 0x%x", __func__,
-//				request_cookie);
+//	printk("%s, posting response for pkt | cookie %d | seq %u | ack %u", __func__,
+//				request_cookie, seq, ack);
 
-	if (_channel == ixgbe_async)
-		printk("%s, Sending reply for reqc 0x%x", __func__,
-				request_cookie);
+//	if (_channel == ixgbe_async)
+//		printk("%s, Sending reply for reqc 0x%x", __func__,
+//				request_cookie);
 fail_alloc:
 	return ret;
 
@@ -2816,10 +2793,10 @@ int ndo_start_xmit_callee(struct fipc_message *_request,
 	fipc_recv_msg_end(thc_channel_to_fipc(_channel),
 			_request);
 
-	if (_channel == ixgbe_async)
-		printk("%s, Got msg - reqc 0x%x | xmitty %d",
-				__func__, request_cookie,
-				xmit_type);
+//	if (_channel == ixgbe_async)
+//		printk("%s, Got msg - reqc 0x%x | xmitty %d",
+//				__func__, request_cookie,
+//				xmit_type);
 
 	switch (xmit_type) {
 	case VOLUNTEER_XMIT:
@@ -2957,9 +2934,9 @@ int ndo_start_xmit_callee(struct fipc_message *_request,
 	thc_ipc_reply(_channel,
 			request_cookie,
 			_response);
-	if (_channel == ixgbe_async)
-		printk("%s, Sending reply for reqc 0x%x", __func__,
-				request_cookie);
+//	if (_channel == ixgbe_async)
+//		printk("%s, Sending reply for reqc 0x%x", __func__,
+//				request_cookie);
 fail_alloc:
 fail_sync:
 	return ret;

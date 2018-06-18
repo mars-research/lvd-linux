@@ -1479,6 +1479,7 @@ int ndo_start_xmit_nonlcd(struct sk_buff *skb,
 	cptr_t skb_cptr, skbd_cptr;
 	struct skbuff_members *skb_lcd;
 	bool got_resp = false;
+	u64 tcp_count = global_tx_count;
 #ifdef TIMESTAMP
 	TS_DECL(mndo_xmit);
 #endif
@@ -1613,6 +1614,10 @@ int ndo_start_xmit_nonlcd(struct sk_buff *skb,
 		break;
 	}
 
+	if (skb->data[23] == 0x6) {
+		printk("%s, ipc_send | pts %p | reqc 0x%x | seq %llu\n",
+			__func__, PTS(), request_cookie, tcp_count);
+	}
 again:
 	async_msg_blocking_recv_start(async_chnl, &_response);
 
@@ -1640,6 +1645,12 @@ again:
 			_response);
 	}
 
+	if (skb->data[23] == 0x6) {
+		printk("%s, ipc_recv | pts %p | reqc 0x%x | seq %llu\n",
+			__func__, PTS(), request_cookie, tcp_count);
+	}
+
+	//printk("%s, queue_mapping %d\n", __func__, skb->queue_mapping);
 #ifdef TIMESTAMP
 	TS_STOP(mndo_xmit);
 	times_ndo_xmit[iter] = TS_DIFF(mndo_xmit);
@@ -1823,6 +1834,7 @@ int ndo_start_xmit(struct sk_buff *skb,
 	struct skbuff_members *skb_lcd;
 	cptr_t sync_end;
 	struct thc_channel *async_chnl = NULL;
+	u64 tcp_count = 0;
 	xmit_type = check_skb_range(skb);
 
 	if (!PTS()) {
@@ -1862,8 +1874,8 @@ int ndo_start_xmit(struct sk_buff *skb,
 
 		} else if(!strncmp(current->comm, "iperf",
 					strlen("iperf")) ||
-			!strncmp(current->comm, "netperf",
-					strlen("netperf"))) {
+			!strncmp(current->comm, "lt-iperf3",
+					strlen("lt-iperf3"))) {
 		
 			printk("[%d]%s[pid=%d] calling prep_channel\n",
 				smp_processor_id(), current->comm,
@@ -1907,6 +1919,29 @@ int ndo_start_xmit(struct sk_buff *skb,
 			dump_stack();
 		return NETDEV_TX_OK;
 	}
+
+
+	/* if TCP */
+	/* 38-41 - Seq no
+	 * 42-45 - Ack no
+	 */
+	if (skb->data[23] == 0x6) {
+		unsigned int seq = (skb->data[38] << 24) | (skb->data[39] << 16) | (skb->data[40] << 8) | skb->data[41];
+		unsigned int ack = (skb->data[42] << 24) | (skb->data[43] << 16) | (skb->data[44] << 8) | skb->data[45];
+
+		unsigned char flags = (skb->data[46] & 0x0F) | skb->data[47];
+		printk("%s, xmit via cpu=%d:%10s[%d] | pts %p | proto %x | IP proto %x | TCP.seq %u | TCP.ack %u | TCP Flags [%s%s%s%s%s]\n",
+				__func__, smp_processor_id(), current->comm, current->pid,
+				PTS(), htons(skb->protocol), skb->data[23], seq, ack,
+				(flags & 0x1) ? " FIN " : "",
+				(flags & 0x2) ? " SYN " : "",
+				(flags & 0x4) ? " RST " : "",
+				(flags & 0x8) ? " PSH " : "",
+				(flags & 0x10) ? " ACK " : "");
+
+		tcp_count = global_tx_count;
+	}
+
 
 	global_tx_count++;
 	//printk("%s, nr_frags %d\n", __func__, skb_shinfo(skb)->nr_frags);
@@ -2047,9 +2082,9 @@ quit:
 		ret = thc_ipc_send_request(async_chnl,
 			_request, &request_cookie);
 
-		printk("%s, ipc send ret %d | pts %p | reqc 0x%x\n",
-				__func__, ret,
-				PTS(), request_cookie);
+		if (skb->data[23] == 0x6)
+		printk("%s, ipc_send | pts %p | reqc 0x%x | seq %llu\n",
+				__func__, PTS(), request_cookie, tcp_count);
 
 		if (ret) {
 			LIBLCD_ERR("thc_ipc_call");
@@ -2068,9 +2103,15 @@ quit:
 			request_cookie,
 			&_response);
 
-	printk("%s, ipc recv resp %d | pts %p | reqc 0x%x\n",
-				__func__, ret, PTS(),
-				request_cookie);
+	//printk("%s, queue_mapping %d\n", __func__, skb->queue_mapping);
+
+	if (skb->data[23] == 0x6)
+	printk("%s, ipc_recv | pts %p | reqc 0x%x | seq %llu\n",
+			__func__, PTS(), request_cookie, tcp_count);
+	
+	//printk("%s, xmit via KLCD | pts %p | cookie %d | proto %x | IP proto %x | TCP flags %x\n",
+	//			__func__, PTS(), request_cookie, htons(skb->protocol),
+	//			skb->data[23], (skb->data[46] & 0x0F) | skb->data[47]);
 
 	if (ret) {
 		LIBLCD_ERR("thc_ipc_recv_response");
@@ -3233,7 +3274,8 @@ int register_netdev_callee(struct fipc_message *_request,
 	unsigned 	int request_cookie;
 	int func_ret;
 	//a0:36:9f:08:1c:3e
-	u8 mac_addr[] = {0xa0, 0x36, 0x9f, 0x08, 0x1c, 0x3e};
+	//eth7 a0:36:9f:08:1c:4a
+	u8 mac_addr[] = {0xa0, 0x36, 0x9f, 0x08, 0x1c, 0x4a};
 
 	request_cookie = thc_get_request_cookie(_request);
 	ret = glue_cap_lookup_net_device_type(cspace,
@@ -5669,7 +5711,6 @@ skip:
 }
 
 #else
-
 void ixgbe_pull_tail(struct sk_buff *skb)
 {
 	struct skb_frag_struct *frag = &skb_shinfo(skb)->frags[0];
@@ -5730,6 +5771,8 @@ int napi_gro_receive_callee(struct fipc_message *_request,
 		nr_frags_tail;
 	unsigned int pull_len;
 	unsigned char nr_frags;
+	unsigned char buffer[300] = {0};
+	bool tcp = false;
 
 	u32 frag_off = 0, frag_size = 0;
 #ifndef NAPI_RX_SEND_ONLY
@@ -5820,9 +5863,32 @@ int napi_gro_receive_callee(struct fipc_message *_request,
 
 	skb_pull_inline(skb, ETH_HLEN);
 
+	/* if TCP */
+	if (skb->data[9] == 0x6) {
+		unsigned char flags = (skb->data[32] & 0x0F) | skb->data[33];
+		unsigned int seq = (skb->data[24] << 24) | (skb->data[25] << 16) | (skb->data[26] << 8) | skb->data[27];
+		unsigned int ack = (skb->data[28] << 24) | (skb->data[29] << 16) | (skb->data[30] << 8) | skb->data[31];
+
+		sprintf(buffer, "%s, recv cpu=%d:%10s[%d] | pts %p | proto %x | IP proto %x | TCP.seq %u | TCP.ack %u | TCP Flags [%s%s%s%s%s] ",
+				__func__, smp_processor_id(), current->comm, current->pid,
+				PTS(), htons(skb->protocol), skb->data[9], seq, ack,
+					(flags & 0x1) ? " FIN " : "",
+					(flags & 0x2) ? " SYN " : "",
+					(flags & 0x4) ? " RST " : "",
+					(flags & 0x8) ? " PSH " : "",
+					(flags & 0x10) ? " ACK " : "");
+		tcp = true;
+	} else {
+		sprintf(buffer, "%s, recv cpu=%d:%10s[%d] | pts %p | proto %x | IP proto %x",
+				__func__, smp_processor_id(), current->comm, current->pid,
+				PTS(), htons(skb->protocol), skb->data[9]);
+	}
+
+	//printk("%s context {\n", buffer);
+
 	func_ret = napi_gro_receive(napi, skb);
 
-	//printk("%s, %d\n", __func__, func_ret);
+	//printk("} ==> ret_val = %d\n", func_ret);
 
 	if (p)
 		set_page_count(p, old_pcount);

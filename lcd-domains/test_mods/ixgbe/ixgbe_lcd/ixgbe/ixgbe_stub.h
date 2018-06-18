@@ -43,7 +43,7 @@ unsigned char *skb_put(struct sk_buff *skb, unsigned int len)
 
 int skb_pad(struct sk_buff *skb, int pad) { LIBLCD_MSG("================>$$$$$$ Dummy %s called", __func__); return 0; }
 
-int skb_copy_bits(const struct sk_buff *skb, int offset, void *to, int len) { LIBLCD_MSG("================>$$$$$$ Dummy %s called", __func__); return 0; }
+int skb_copy_bits(const struct sk_buff *skb, int offset, void *to, int len) { LIBLCD_MSG("================>$$$$$$ Dummy %s called", __func__); dump_stack(); return 0; }
 
 int skb_checksum_help(struct sk_buff *skb) { LIBLCD_MSG("================>$$$$$$ Dummy %s called", __func__); return 0; }
 

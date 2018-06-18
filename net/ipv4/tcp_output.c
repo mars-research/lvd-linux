@@ -2895,7 +2895,13 @@ coalesce:
 			return;
 		}
 	} else {
-		skb = alloc_skb_fclone(MAX_TCP_HEADER, sk->sk_allocation);
+		u32 size = MAX_TCP_HEADER;
+
+		if (sk->sk_dst_cache && sk->sk_dst_cache->dev &&
+			(sk->sk_dst_cache->dev->features & NETIF_F_PRIV_DATA_POOL))
+	                size |= SKB_DATA_PRIV_POOL;
+
+		skb = alloc_skb_fclone(size, sk->sk_allocation);
 		if (unlikely(!skb)) {
 			if (tskb)
 				goto coalesce;
@@ -3394,6 +3400,7 @@ void tcp_send_delayed_ack(struct sock *sk)
 void tcp_send_ack(struct sock *sk)
 {
 	struct sk_buff *buff;
+	unsigned size;
 
 	/* If we have been reset, we may not send again. */
 	if (sk->sk_state == TCP_CLOSE)
@@ -3405,7 +3412,13 @@ void tcp_send_ack(struct sock *sk)
 	 * tcp_transmit_skb() will set the ownership to this
 	 * sock.
 	 */
-	buff = alloc_skb(MAX_TCP_HEADER,
+	size = MAX_TCP_HEADER;
+	if (sk->sk_dst_cache && sk->sk_dst_cache->dev &&
+                       (sk->sk_dst_cache->dev->features &
+	                       NETIF_F_PRIV_DATA_POOL))
+		size |= SKB_DATA_PRIV_POOL;
+
+	buff = alloc_skb(size,
 			 sk_gfp_mask(sk, GFP_ATOMIC | __GFP_NOWARN));
 	if (unlikely(!buff)) {
 		inet_csk_schedule_ack(sk);

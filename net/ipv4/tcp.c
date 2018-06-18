@@ -806,6 +806,7 @@ struct sk_buff *sk_stream_alloc_skb(struct sock *sk, int size, gfp_t gfp,
 				    bool force_schedule)
 {
 	struct sk_buff *skb;
+	unsigned alloc_sz;
 
 	/* The TCP header must be at least 32-bit aligned.  */
 	size = ALIGN(size, 4);
@@ -813,7 +814,15 @@ struct sk_buff *sk_stream_alloc_skb(struct sock *sk, int size, gfp_t gfp,
 	if (unlikely(tcp_under_memory_pressure(sk)))
 		sk_mem_reclaim_partial(sk);
 
-	skb = alloc_skb_fclone(size + sk->sk_prot->max_header, gfp);
+	if (sk->sk_dst_cache && sk->sk_dst_cache->dev &&
+			(sk->sk_dst_cache->dev->features &
+			NETIF_F_PRIV_DATA_POOL))
+		alloc_sz = (size + sk->sk_prot->max_header)
+				| SKB_DATA_PRIV_POOL;
+	else
+		alloc_sz = size + sk->sk_prot->max_header;
+
+	skb = alloc_skb_fclone(alloc_sz, gfp);
 	if (likely(skb)) {
 		bool mem_scheduled;
 

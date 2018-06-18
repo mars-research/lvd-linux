@@ -72,7 +72,7 @@
 #include "../ixgbe_caller.h"
 
 #include "ixgbe_stub.h"
-
+#include <asm/lcd_domains/liblcd.h>
 #include <lcd_config/post_hook.h>
 
 char ixgbe_driver_name[] = "ixgbe";
@@ -1631,6 +1631,7 @@ static bool ixgbe_alloc_mapped_page(struct ixgbe_ring *rx_ring,
 {
 	struct page *page = bi->page;
 	dma_addr_t dma;
+	int ret;
 #ifdef LCD_ISOLATE
 	static unsigned int pg_count = 0;
 	gfp_t flags;
@@ -1664,6 +1665,13 @@ static bool ixgbe_alloc_mapped_page(struct ixgbe_ring *rx_ring,
 	dma = dma_map_page(rx_ring->dev, page, 0,
 			   ixgbe_rx_pg_size(rx_ring), DMA_FROM_DEVICE);
 
+	ret = lcd_syscall_iommu_map_page(
+			lcd_gva2gpa(__gva((unsigned long)lcd_page_address(page))),
+			0, true);
+
+	if (ret)
+		LIBLCD_ERR("Mapping failed for packet");
+
 	/*
 	 * if mapping failed free memory back to system since
 	 * there isn't much point in holding memory we can't use
@@ -1685,7 +1693,8 @@ static bool ixgbe_alloc_mapped_page(struct ixgbe_ring *rx_ring,
 	if (page) {
 		unsigned ord = ixgbe_rx_pg_order(rx_ring);
 		pg_count += ord ? (1 << ord) : 1;
-		LIBLCD_MSG("total rx pages %u", pg_count);
+		if (pg_count % 10 == 0)
+			LIBLCD_MSG("total rx pages %u", pg_count);
 	}
 
 	return true;
@@ -5852,7 +5861,7 @@ static int ixgbe_sw_init(struct ixgbe_adapter *adapter)
 	hw->subsystem_vendor_id = pdev->subsystem_vendor;
 	hw->subsystem_device_id = pdev->subsystem_device;
 
-#define NUM_HW_QUEUES		4
+#define NUM_HW_QUEUES		6
 	/* XXX: This decides the number of hardware queues
 	 * It checks the number of online cpus and sets the number of
 	 * queues to the number of cpus. Fake it now to enable

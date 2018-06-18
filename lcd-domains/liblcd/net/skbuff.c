@@ -55,8 +55,10 @@ EXPORT_SYMBOL(eth_get_headlen);
  */
 __be16 eth_type_trans(struct sk_buff *skb, struct net_device *dev)
 {
+#ifdef IPX_PACKETS
 	unsigned short _service_access_point;
 	const unsigned short *sap;
+#endif
 	const struct ethhdr *eth;
 	static int rate = 0;
 
@@ -96,6 +98,10 @@ __be16 eth_type_trans(struct sk_buff *skb, struct net_device *dev)
 	if (likely(eth_proto_is_802_3(eth->h_proto)))
 		return eth->h_proto;
 
+/* XXX: This is not required for normal mode. Let's remove this to avoid
+  copying skb_copy_bits function into the liblcd.
+ */
+#ifdef IPX_PACKETS
 	/*
 	 *      This is a magic hack to spot IPX packets. Older Novell breaks
 	 *      the protocol design and runs IPX over 802.3 without an 802.2 LLC
@@ -105,7 +111,7 @@ __be16 eth_type_trans(struct sk_buff *skb, struct net_device *dev)
 	sap = skb_header_pointer(skb, 0, sizeof(*sap), &_service_access_point);
 	if (sap && *sap == 0xFFFF)
 		return htons(ETH_P_802_3);
-
+#endif
 	/*
 	 *      Real 802.2 LLC
 	 */

@@ -57,3 +57,7 @@ ixgbe/net_klcd nonisolated
 nullnet/boot nonisolated
 nullnet/dummy_lcd isolated
 nullnet/net_klcd nonisolated
+
+vmfunc/boot nonisolated
+vmfunc/caller_lcd isolated
+vmfunc/callee_lcd isolated

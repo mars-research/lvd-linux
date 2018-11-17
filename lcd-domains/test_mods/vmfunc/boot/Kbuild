@@ -1,0 +1,6 @@
+
+obj-m += lcd_test_mod_vmfunc_boot.o
+
+lcd_test_mod_vmfunc_boot-y             += main.o
+
+ccflags-y += $(NONISOLATED_CFLAGS)

@@ -27,3 +27,4 @@ obj-m += llvm_example/
 obj-m += ioremap/
 obj-m += ixgbe/
 obj-m += nullnet/
+obj-m += vmfunc/

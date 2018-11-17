@@ -1,0 +1,8 @@
+
+obj-m  += lcd_test_mod_vmfunc_caller_lcd.o
+
+lcd_test_mod_vmfunc_caller_lcd-y              += main.o
+
+lcd_test_mod_vmfunc_caller_lcd-y += $(LIBLCD)
+
+ccflags-y += $(ISOLATED_CFLAGS)

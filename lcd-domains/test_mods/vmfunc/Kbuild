@@ -1,0 +1,4 @@
+
+obj-$(LCD_CONFIG_BUILD_VMFUNC_BOOT) += boot/
+obj-$(LCD_CONFIG_BUILD_VMFUNC_CALLER_LCD) += caller_lcd/
+obj-$(LCD_CONFIG_BUILD_VMFUNC_CALLEE_LCD) += callee_lcd/

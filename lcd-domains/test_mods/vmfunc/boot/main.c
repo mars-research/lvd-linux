@@ -2,18 +2,26 @@
  * boot.c - non-isolated boot module
  */
 
+#include <lcd_config/pre_hook.h>
+
 #include <linux/delay.h>
 #include <linux/module.h>
 #include <linux/kernel.h>
 #include <liblcd/liblcd.h>
+#include <linux/delay.h>
+#include <linux/kthread.h>
+
+#include <lcd_config/post_hook.h>
+
+cptr_t endpoint;
+cptr_t lcd1, lcd2;
+cptr_t dest1, dest2;
+struct lcd_create_ctx *ctx1, *ctx2;
 
 static int boot_main(void)
 {
 	int ret;
-	cptr_t endpoint;
-	cptr_t lcd1, lcd2;
-	cptr_t dest1, dest2;
-	struct lcd_create_ctx *ctx1, *ctx2;
+
 	/*
 	 * Enter LCD mode
 	 */
@@ -93,20 +101,13 @@ static int boot_main(void)
 		LIBLCD_ERR("failed to start lcd2");
 		goto fail10;
 	}
-	/*
-	 * Hang out for a few seconds
-	 */
-	msleep(3000);
-	/*
-	 * Tear everything down
-	 */
+
 	ret = 0;
-	goto out;
+	goto fail1;
 
 	/*
 	 * Everything torn down / freed during destroy / exit.
 	 */
-out:
 fail10:
 fail9:
 fail8:
@@ -125,22 +126,59 @@ fail1:
 	return ret;
 }
 
+static DECLARE_WAIT_QUEUE_HEAD(wq);
+static int shutdown = 0;
+
+int boot_lcd_thread(void *data)
+{
+	static unsigned once = 0;
+	int ret;
+	while (!kthread_should_stop()) {
+		if (!once) {
+			LCD_MAIN({
+				ret = boot_main();
+			});
+		}
+		once = 1;
+		wait_event_interruptible(wq, shutdown != 0);
+	}
+	msleep(2000);
+	LIBLCD_MSG("Exiting thread");
+
+	if (current->lcd) {
+		lcd_cap_delete(lcd2);
+		lcd_cap_delete(lcd1);
+	}
+
+	if (ctx2)
+		lcd_destroy_create_ctx(ctx2); /* tears down LCD 2 */
+
+	if (ctx1)
+		lcd_destroy_create_ctx(ctx1); /* tears down LCD 1 */
+
+	lcd_exit(0);
+	return 0;
+}
+struct task_struct *boot_task;
+
 static int boot_init(void)
 {
-	int ret;
 
-	LCD_MAIN({
+	boot_task = kthread_create(boot_lcd_thread, NULL, "boot_lcd_thread");
 
-			ret = boot_main();
-
-		});
-
-	return ret;
+	if (!IS_ERR(boot_task))
+		wake_up_process(boot_task);
+	return 0;
 }
 
 static void boot_exit(void)
 {
-	/* nothing to do */
+	if (!IS_ERR(boot_task)) {
+		LIBLCD_MSG("%s: exiting", __func__);
+		shutdown = 1;
+		wake_up_interruptible(&wq);
+		kthread_stop(boot_task);
+	}
 }
 
 module_init(boot_init);

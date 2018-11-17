@@ -15,8 +15,11 @@
 #include <thc_ipc.h>
 #include <thc.h>
 #include <awe_mapper.h>
+#include <linux/module.h>
 
 #include <lcd_config/post_hook.h>
+
+struct thc_channel *tchnl;
 
 static inline int send_and_get_response(
 	struct fipc_ring_channel *chan,
@@ -38,7 +41,7 @@ static inline int send_and_get_response(
 	/*
 	 * Try to get the response
 	 */
-	ret = thc_ipc_recv(chan, msg_id, &resp);
+	ret = thc_ipc_recv_response(tchnl, msg_id, &resp);
 	if (ret) {
 		pr_err("failed to get a response, ret = %d\n", ret);
 		goto fail2;
@@ -115,10 +118,10 @@ async_add_nums(struct fipc_ring_channel *chan, unsigned long trans,
 		pr_err("Error getting send message, ret = %d\n", ret);
 		goto fail;
 	}
-	msg_id = awe_mapper_create_id();
+	awe_mapper_create_id(&msg_id);
 
-	THC_MSG_TYPE(request) = msg_type_request;
-	THC_MSG_ID(request)   = msg_id;
+	thc_set_msg_type(request, msg_type_request);
+	thc_set_msg_id(request, msg_id);
 	set_fn_type(request, ADD_NUMS);
 	fipc_set_reg0(request, trans);
 	fipc_set_reg1(request, res1);
@@ -292,6 +295,18 @@ static int __noreturn caller_main(void)
 				tx, rx);
 	if (ret)
 		goto out;
+
+	tchnl = kzalloc(sizeof(*tchnl), GFP_KERNEL);
+	if (!tchnl) {
+		ret = -ENOMEM;
+		LIBLCD_ERR("alloc failed");
+	}
+
+	ret = thc_channel_init(tchnl, chnl);
+	if (ret) {
+		LIBLCD_ERR("error init'ing async channel group item");
+	}
+
 	/*
 	 * Do ipc
 	 */

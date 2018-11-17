@@ -15,6 +15,7 @@
 #include <thc_ipc.h>
 #include <thc.h>
 #include <awe_mapper.h>
+#include <linux/module.h>
 
 #include <lcd_config/post_hook.h>
 
@@ -92,8 +93,8 @@ static inline int send_response(struct fipc_ring_channel *chnl,
 		return ret;
 	}
     
-	THC_MSG_TYPE(response) = msg_type_response;
-	THC_MSG_ID(response)   = THC_MSG_ID(recvd_msg);
+	thc_set_msg_type(response, msg_type_response);
+	thc_set_msg_id(response, thc_get_msg_id(recvd_msg));
 	set_fn_type(response, type);
 	response->regs[0] = val;
 
@@ -313,7 +314,7 @@ out:
 
 static int async_rpc_callee_init(void)
 {
-	int ret;
+	int ret = 0;
 
 	LCD_MAIN({
 

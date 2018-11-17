@@ -11,8 +11,8 @@ async/boot nonisolated
 async/lcd isolated
 
 async_rpc/boot nonisolated
-async_rpc/caller isolated
-async_rpc/callee isolated
+async_rpc/caller_lcd isolated
+async_rpc/callee_lcd isolated
 
 bug/boot nonisolated
 bug/lcd isolated   

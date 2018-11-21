@@ -33,7 +33,7 @@ int lcd_iommu_map_page(struct lcd *lcd, gpa_t gpa, unsigned int order,
 		       bool force)
 {
 	hpa_t hpa;
-	int ret;
+	int ret = 0;
 	int i;
 	phys_addr_t phys;
 	u64 gfn_start, gfn_end = 1 << order;

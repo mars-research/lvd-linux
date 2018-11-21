@@ -2141,7 +2141,7 @@ ndo_start_xmit_trampoline(struct sk_buff *skb,
 	struct trampoline_hidden_args *hidden_args;
 	LCD_TRAMPOLINE_PROLOGUE(hidden_args,
 			ndo_start_xmit_trampoline);
-	ndo_start_xmit_fp = ndo_start_xmit;
+	ndo_start_xmit_fp = ndo_start_xmit_async_landing;
 	return ndo_start_xmit_fp(skb,
 		dev,
 		hidden_args);

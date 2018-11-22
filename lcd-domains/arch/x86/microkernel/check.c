@@ -362,10 +362,11 @@ static int vmx_check_exec_ctrls(struct lcd_arch *t)
 	 */
 	if (vmx_has_sec_exec(t) &&
 		vmx_sec_exec_has(t, SECONDARY_EXEC_ENABLE_VMFUNCTIONS)) {
-		LCD_ERR("vmfunction checking not implemented");
-		return -1;
+		if (!t->eptp_list_pg) {
+			LCD_ERR("eptp list page is null (vmfunc won't work)\n");
+			return -1;
+		}
 	}
-
 	/*
 	 * vmcs shadowing
 	 */

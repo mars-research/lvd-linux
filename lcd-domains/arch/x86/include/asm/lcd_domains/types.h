@@ -136,6 +136,7 @@ struct lcd_arch {
 	u32 error_code;
 	u32 vec_no;
 
+	struct page *eptp_list_pg;
 	/*
 	 * Stuff we need to save explicitly
 	 */

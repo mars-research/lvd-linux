@@ -295,6 +295,7 @@ static int setup_vmcs_config(struct lcd_vmcs_config *vmcs_conf)
 	 * -- Enable EPT
 	 * -- Enable RDTSCP
 	 * -- Enable VPID
+	 * -- Enable VMFUNC
 	 * -- WBINVD Exit
 	 *
 	 * Note: Unrestricted guest and INVPCID not available on
@@ -303,7 +304,9 @@ static int setup_vmcs_config(struct lcd_vmcs_config *vmcs_conf)
 	secondary_proc_based_exec_controls = SECONDARY_EXEC_ENABLE_EPT |
 		SECONDARY_EXEC_RDTSCP |
 		SECONDARY_EXEC_ENABLE_VPID |
-		SECONDARY_EXEC_WBINVD_EXITING;
+		SECONDARY_EXEC_WBINVD_EXITING |
+		SECONDARY_EXEC_ENABLE_VMFUNCTIONS;
+
 	if (adjust_vmx_controls(&secondary_proc_based_exec_controls,
 					SECONDARY_EXEC_RESERVED_MASK,
 					MSR_IA32_VMX_PROCBASED_CTLS2) < 0) {

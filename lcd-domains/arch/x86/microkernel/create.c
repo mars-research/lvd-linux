@@ -612,6 +612,67 @@ static void vmx_setup_vmcs_guest_regs(struct lcd_arch *lcd_arch)
 	vmcs_write64(GUEST_IA32_DEBUGCTL, 0);
 }
 
+static inline bool cpu_has_vmx_vm_functions(void)
+{
+	return lcd_global_vmcs_config.secondary_proc_based_exec_controls &
+		SECONDARY_EXEC_ENABLE_VMFUNCTIONS;
+}
+
+/* check if the cpu supports writing EPTP switching */
+static inline bool cpu_has_vmx_eptp_switching(void)
+{
+	u64 vmx_msr;
+
+	rdmsrl(MSR_IA32_VMX_VMFUNC, vmx_msr);
+	/* This MSR has same format as VM-function controls */
+	return vmx_msr & VM_FUNCTION_EPTP_SWITCHING;
+}
+
+static int vmx_enable_ept_switching(struct lcd_arch *lcd_arch)
+{
+	struct page *eptp_list_pg;
+	u64 vm_function_control;
+	u32 i = 0;
+	u64 *eptp_list;
+
+	eptp_list_pg = alloc_page(GFP_KERNEL | __GFP_ZERO);
+	if (!eptp_list_pg)
+		return -ENOMEM;
+
+	lcd_arch->eptp_list_pg = eptp_list_pg;
+	eptp_list = phys_to_virt(page_to_phys(eptp_list_pg));
+
+	for (i = 0; i < 512; i++)
+		eptp_list[i] = lcd_arch->ept.vmcs_ptr;
+
+	vmcs_write64(EPTP_LIST_ADDRESS, page_to_phys(lcd_arch->eptp_list_pg));
+
+	vm_function_control = vmcs_read64(VM_FUNCTION_CTRL);
+	vm_function_control |= VM_FUNCTION_EPTP_SWITCHING;
+	vmcs_write64(VM_FUNCTION_CTRL, vm_function_control);
+
+	return 0;
+}
+
+static void vmx_disable_ept_switching(struct lcd_arch *lcd_arch)
+{
+	u64 vm_function_control;
+
+	if (!lcd_arch->eptp_list_pg) {
+		printk("%s, eptp_list_pg is NULL\n", __func__);
+		return;
+	}
+	__free_page(lcd_arch->eptp_list_pg);
+	lcd_arch->eptp_list_pg = NULL;
+
+	vmcs_write64(EPTP_LIST_ADDRESS, 0);
+
+	vm_function_control = vmcs_read64(VM_FUNCTION_CTRL);
+	vm_function_control &= ~VM_FUNCTION_EPTP_SWITCHING;
+	vmcs_write64(VM_FUNCTION_CTRL, vm_function_control);
+}
+
+
 /**
  * Sets up VMCS settings--execution control, control register
  * access, exception handling.
@@ -914,6 +975,7 @@ int lcd_arch_create(struct lcd_arch **out)
 	 */
 	vmx_get_cpu(lcd_arch);
 	vmx_setup_vmcs(lcd_arch);
+	vmx_enable_ept_switching(lcd_arch);
 	vmx_put_cpu(lcd_arch);
 
 	*out = lcd_arch;
@@ -950,6 +1012,7 @@ void lcd_arch_destroy(struct lcd_arch *lcd_arch)
 	 */
 	lcd_arch_ept_invvpid(lcd_arch->vpid);
 	lcd_arch_ept_invept(lcd_arch->ept.vmcs_ptr);
+	vmx_disable_ept_switching(lcd_arch);
 	/*
 	 * VM clear on this cpu
 	 */

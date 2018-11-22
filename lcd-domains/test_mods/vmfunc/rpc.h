@@ -21,7 +21,7 @@ enum fn_type {
 };
 
 /* must be divisible by 6... because I call 6 functions in the callee.c */
-#define TRANSACTIONS 60
+#define TRANSACTIONS 1000000
 
 /* Each buffer is 2^ASYNC_RPC_BUFFER_ORDER bytes. Must be >= PAGE_SHIFT. */
 #define ASYNC_RPC_EXAMPLE_BUFFER_ORDER 12

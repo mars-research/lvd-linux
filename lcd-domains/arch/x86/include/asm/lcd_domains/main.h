@@ -199,6 +199,7 @@ struct lcd_arch {
 	u32 exit_intr_info;
 	u32 error_code;
 	u32 vec_no;
+	u32 exit_instr_len;
 
 	/*
 	 * Stuff we need to save explicitly
@@ -281,6 +282,7 @@ enum lcd_arch_status {
 	LCD_ARCH_STATUS_EPT_FAULT  = 2,
 	LCD_ARCH_STATUS_CR3_ACCESS = 3,
 	LCD_ARCH_STATUS_SYSCALL    = 4,
+	LCD_ARCH_STATUS_VMFUNC_EXIT    = 5,
 };
 
 /**

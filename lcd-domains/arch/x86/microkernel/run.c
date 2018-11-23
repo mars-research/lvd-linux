@@ -187,6 +187,15 @@ static int vmx_handle_control_reg(struct lcd_arch *lcd_arch)
 	}
 }
 
+static int vmx_handle_vmfunc(struct lcd_arch *lcd_arch)
+{
+	u32 inst_len = lcd_arch->exit_instr_len;
+	LCD_ERR("VMFUNC exit (ecx >= 512)? inst len %u\n"
+			"No additional exit information is provided", inst_len);
+	return LCD_ARCH_STATUS_VMFUNC_EXIT;
+
+}
+
 static int vmx_handle_ext_intr(struct lcd_arch *lcd_arch)
 {
 	/*
@@ -353,6 +362,9 @@ static int vmx_handle_other_exits(struct lcd_arch *lcd_arch)
 		break;
 	case EXIT_REASON_CR_ACCESS:
 		ret = vmx_handle_control_reg(lcd_arch);
+		break;
+	case EXIT_REASON_VMFUNC:
+		ret = vmx_handle_vmfunc(lcd_arch);
 		break;
 	default:
 		LCD_ERR("unhandled exit reason: %x\n",
@@ -547,6 +559,7 @@ static void __noclone vmx_enter(struct lcd_arch *lcd_arch)
 	}
 
 	lcd_arch->exit_reason = vmcs_read32(VM_EXIT_REASON);
+	lcd_arch->exit_instr_len = vmcs_read32(VM_EXIT_INSTRUCTION_LEN);
 	lcd_arch->exit_qualification = vmcs_readl(EXIT_QUALIFICATION);
 	lcd_arch->idt_vectoring_info = vmcs_read32(IDT_VECTORING_INFO_FIELD);
 	lcd_arch->error_code = vmcs_read32(IDT_VECTORING_ERROR_CODE);

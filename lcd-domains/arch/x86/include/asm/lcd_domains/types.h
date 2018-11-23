@@ -135,6 +135,7 @@ struct lcd_arch {
 	u32 exit_intr_info;
 	u32 error_code;
 	u32 vec_no;
+	u32 exit_instr_len;
 
 	struct page *eptp_list_pg;
 	/*

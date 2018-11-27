@@ -1597,7 +1597,7 @@ int validate_callee(struct fipc_message *request, struct thc_channel *channel, s
 	struct nlattr **data;
 	struct fipc_message *response;
 	unsigned 	int request_cookie;
-	int ret;
+	int ret = 0;
 	request_cookie = thc_get_request_cookie(request);
 	fipc_recv_msg_end(thc_channel_to_fipc(channel), request);
 	tb = kzalloc(sizeof( void  * ), GFP_KERNEL);

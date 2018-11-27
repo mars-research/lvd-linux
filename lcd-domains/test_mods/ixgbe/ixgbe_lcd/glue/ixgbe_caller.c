@@ -1462,7 +1462,7 @@ void napi_consume_skb(struct sk_buff *skb, int budget)
 {
 	int ret;
 	struct fipc_message *_request;
-	struct sk_buff_container *skb_c;
+	struct sk_buff_container *skb_c = NULL;
 #ifndef NAPI_CONSUME_SEND_ONLY
 	struct fipc_message *_response;
 #endif
@@ -1525,7 +1525,7 @@ void consume_skb(struct sk_buff *skb)
 	struct fipc_message *_response;
 	unsigned long skb_sz, skb_off, skbh_sz, skbh_off;
 	cptr_t skb_cptr, skbh_cptr;
-	struct sk_buff_container *skb_c;
+	struct sk_buff_container *skb_c = NULL;
 
 	ret = async_msg_blocking_send_start(ixgbe_async,
 		&_request);
@@ -2209,7 +2209,7 @@ int pci_enable_device_mem(struct pci_dev *dev)
 	int ret;
 	struct fipc_message *_request;
 	struct fipc_message *_response;
-	int func_ret;
+	int func_ret = 0;
 	ret = async_msg_blocking_send_start(ixgbe_async,
 		&_request);
 	if (ret) {
@@ -2401,7 +2401,7 @@ int pci_select_bars(struct pci_dev *dev,
 	int ret;
 	struct fipc_message *_request;
 	struct fipc_message *_response;
-	int func_ret;
+	int func_ret = 0;
 	ret = async_msg_blocking_send_start(ixgbe_async,
 		&_request);
 	if (ret) {
@@ -2435,7 +2435,7 @@ int pci_wake_from_d3(struct pci_dev *dev,
 	int ret;
 	struct fipc_message *_request;
 	struct fipc_message *_response;
-	int func_ret;
+	int func_ret = 0;
 	ret = async_msg_blocking_send_start(ixgbe_async,
 		&_request);
 	if (ret) {
@@ -2471,7 +2471,7 @@ int ndo_open_callee(struct fipc_message *_request,
 	int ret;
 	struct fipc_message *_response;
 	unsigned 	int request_cookie;
-	int func_ret;
+	int func_ret = 0;
 	request_cookie = thc_get_request_cookie(_request);
 	ret = glue_cap_lookup_net_device_type(cspace,
 		__cptr(fipc_get_reg1(_request)),
@@ -2760,9 +2760,9 @@ int ndo_start_xmit_callee(struct fipc_message *_request,
 		struct glue_cspace *cspace,
 		struct cptr sync_ep)
 {
-	struct sk_buff *skb;
-	struct sk_buff_container *skb_c;
-	int ret;
+	struct sk_buff *skb = NULL;
+	struct sk_buff_container *skb_c = NULL;
+	int ret = 0;
 	struct fipc_message *_response;
 	unsigned 	int request_cookie;
 	int func_ret;
@@ -3303,7 +3303,7 @@ int __hw_addr_sync_dev(
 		int ( *unsync )(struct net_device *, const unsigned char*))
 {
 	struct net_device_container *dev1_container;
-	int ret;
+	int ret = 0;
 	struct fipc_message *_request;
 	struct fipc_message *_response;
 	int func_ret;
@@ -3703,7 +3703,7 @@ int netif_receive_skb(struct sk_buff *skb)
 	struct fipc_message *_request;
 	struct fipc_message *_response;
 	int func_ret;
-	struct sk_buff_container *skb_c;
+	struct sk_buff_container *skb_c = NULL;
 	ret = async_msg_blocking_send_start(ixgbe_async,
 		&_request);
 	if (ret) {
@@ -3956,7 +3956,7 @@ gro_result_t napi_gro_receive(struct napi_struct *napi,
 #ifndef NAPI_RX_SEND_ONLY
 	struct fipc_message *_response;
 #endif
-	int func_ret;
+	int func_ret = 0;
 	struct skb_shared_info *shinfo;
 	struct page *p = NULL;
 	u64 hash;

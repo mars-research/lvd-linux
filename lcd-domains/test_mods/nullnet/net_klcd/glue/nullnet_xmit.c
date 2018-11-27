@@ -116,7 +116,7 @@ int sender_dispatch(struct thc_channel *chnl, struct fipc_message *out, void *ar
 
 int __ndo_start_xmit_inner_async(struct sk_buff *skb, struct net_device *dev, struct trampoline_hidden_args *hidden_args)
 {
-	int ret;
+	int ret = 0;
 	struct fipc_message *_request;
 	struct fipc_message *_response;
 #ifdef COPY
@@ -346,7 +346,7 @@ int ndo_start_xmit_noasync(struct sk_buff *skb, struct net_device *dev, struct t
 	xmit_type_t xmit_type;
 	struct thc_channel *async_chnl;
 	struct net_device_container *net_dev_container;
-	struct sk_buff_container static_skbc;
+	struct sk_buff_container static_skbc = {0};
 	struct sk_buff_container *skb_c = &static_skbc;
 	int ret;
 
@@ -442,7 +442,7 @@ free:
  */
 int ndo_start_xmit_async(struct sk_buff *skb, struct net_device *dev, struct trampoline_hidden_args *hidden_args)
 {
-	int ret;
+	int ret = 0;
 	struct fipc_message *_request;
 	struct fipc_message *_response;
 	struct net_device_container *net_dev_container;
@@ -451,7 +451,7 @@ int ndo_start_xmit_async(struct sk_buff *skb, struct net_device *dev, struct tra
 	struct skbuff_members *skb_lcd;
 #endif
 	unsigned int request_cookie;
-	struct sk_buff_container static_skbc;
+	struct sk_buff_container static_skbc = {0};
 	struct sk_buff_container *skb_c = &static_skbc;
 	struct thc_channel *async_chnl = NULL;
 

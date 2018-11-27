@@ -7772,7 +7772,7 @@ struct net_device *alloc_netdev_mqs_lcd(int sizeof_priv, const char *name,
 	if (!p)
 		return NULL;
 
-	dev_c = PTR_ALIGN(p, NETDEV_ALIGN);
+	dev_c = (struct net_device_container*) PTR_ALIGN(p, NETDEV_ALIGN);
 
 	dev_c->other_ref.cptr = other_ref_cptr;
 	dev = &dev_c->dev;

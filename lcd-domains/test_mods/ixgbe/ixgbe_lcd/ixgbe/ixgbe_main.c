@@ -3073,7 +3073,7 @@ static int ixgbe_request_msix_irqs(struct ixgbe_adapter *adapter)
 {
 	struct net_device *netdev = adapter->netdev;
 	int vector, err;
-	int ri = 0, ti = 0;
+	unsigned char ri = 0, ti = 0;
 
 	for (vector = 0; vector < adapter->num_q_vectors; vector++) {
 		struct ixgbe_q_vector *q_vector = adapter->q_vector[vector];
@@ -3081,7 +3081,7 @@ static int ixgbe_request_msix_irqs(struct ixgbe_adapter *adapter)
 
 		if (q_vector->tx.ring && q_vector->rx.ring) {
 			snprintf(q_vector->name, sizeof(q_vector->name) - 1,
-				 "%s-%s-%d", netdev->name, "TxRx", ri++);
+				 "%s-%s-%d", netdev->name, "TxRx", ri++ & 0xf);
 			ti++;
 		} else if (q_vector->rx.ring) {
 			snprintf(q_vector->name, sizeof(q_vector->name) - 1,

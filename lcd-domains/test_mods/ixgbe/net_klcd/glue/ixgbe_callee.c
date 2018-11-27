@@ -95,6 +95,8 @@ struct {
 	bool valid;
 } pools[MAX_POOLS] = { {0} };
 
+int ndo_start_xmit_async_landing(struct sk_buff *first, struct net_device *dev, struct trampoline_hidden_args *hidden_args);
+
 int compare_addr(const void *a, const void *b)
 {
 	return *(unsigned int *)a - *(unsigned int *)b;
@@ -583,8 +585,8 @@ int __pci_register_driver_callee(struct fipc_message *_request,
 	unsigned 	int request_cookie;
 	struct trampoline_hidden_args *drv_probe_hidden_args;
 	struct trampoline_hidden_args *drv_remove_hidden_args;
-	int func_ret;
-	int ret;
+	int func_ret = 0;
+	int ret = 0;
 
 	request_cookie = thc_get_request_cookie(_request);
 	drv_container = kzalloc(sizeof( struct pci_driver_container   ),
@@ -805,7 +807,7 @@ int probe(struct pci_dev *dev,
 		struct trampoline_hidden_args *hidden_args)
 {
 	struct pci_dev_container *dev_container;
-	int ret;
+	int ret = 0;
 	struct fipc_message *_request;
 	struct fipc_message *_response;
 	int func_ret;
@@ -1470,7 +1472,7 @@ int ndo_start_xmit_nonlcd(struct sk_buff *skb,
 	int ret;
 	struct fipc_message *_request;
 	struct fipc_message *_response;
-	int func_ret;
+	int func_ret = 0;
 	unsigned int request_cookie;
 	cptr_t sync_end;
 	struct sk_buff_container *skb_c;
@@ -1821,13 +1823,13 @@ int ndo_start_xmit(struct sk_buff *skb,
 		struct trampoline_hidden_args *hidden_args)
 {
 	struct net_device_container *dev_container;
-	int ret;
+	int ret = 0;
 	struct fipc_message *_request;
 	struct fipc_message *_response;
 	unsigned int request_cookie;
-	int func_ret;
+	int func_ret = 0;
 	struct sk_buff_container *skb_c;
-	unsigned long skb_ord, skb_off;
+	unsigned long skb_ord = 0, skb_off;
 	unsigned long skbd_ord, skbd_off;
 	cptr_t skb_cptr, skbd_cptr;
 	xmit_type_t xmit_type;
@@ -5759,7 +5761,7 @@ int napi_gro_receive_callee(struct fipc_message *_request,
 	int func_ret;
 	unsigned long page = 0ul;
 	struct lcd *lcd_struct;
-	hva_t hva_out;
+	hva_t hva_out = {0};
 	struct skb_shared_info *shinfo;
 	struct page *p = NULL;
 	unsigned int old_pcount;
@@ -5918,7 +5920,7 @@ int __napi_alloc_skb_callee(struct fipc_message *_request,
 	struct napi_struct *napi;
 	unsigned 	int len;
 	gfp_t gfp_mask;
-	int ret;
+	int ret = 0;
 	struct sk_buff *skb;
 	struct sk_buff_container *skb_c;
 	struct fipc_message *_response;
@@ -6150,7 +6152,7 @@ int eth_get_headlen_callee(struct fipc_message *_request,
 	int ret = 0;
 	struct fipc_message *_response;
 	unsigned 	int request_cookie;
-	unsigned 	int func_ret;
+	unsigned 	int func_ret = 0;
 	struct lcd *lcd_struct;
 	hva_t hva_out;
 

@@ -17,6 +17,7 @@
 
 #include "../../ipc_helper.h"
 #include <linux/sort.h>
+#include <linux/priv_mempool.h>
 
 #include <lcd_config/post_hook.h>
 
@@ -2119,7 +2120,7 @@ int __rtnl_link_register_callee(void)
 	cptr_t tx_xmit, rx_xmit;
 	struct thc_channel *chnl;
 	cptr_t sync_endpoint;
-	int ret;
+	int ret = 0;
 	struct trampoline_hidden_args *validate_hidden_args;
 	struct trampoline_hidden_args *setup_hidden_args;
 	int err;
@@ -2431,7 +2432,7 @@ fail_cptr:
 int alloc_netdev_mqs_callee(struct fipc_message *request, struct thc_channel *channel, struct glue_cspace *cspace, struct cptr sync_ep)
 {
 	int sizeof_priv;
-	int ret;
+	int ret = 0;
 	char *name;
 	char name_assign_type;
 	struct setup_container *temp;

@@ -16,8 +16,6 @@
 
 #include <lcd_config/post_hook.h>
 
-extern void* __vmfunc_load_addr;
-
 /*
  * We use "noinline" because we want the function call to actually
  * happen.
@@ -51,7 +49,7 @@ int callee(struct fipc_ring_channel *chan)
 	     transaction_id++) {
 		vmfunc(0, 0);
 		if (!transaction_id)
-			printk("%s, vmfunc(%p) | vmfunc_load_addr %p\n", __func__, vmfunc, __vmfunc_load_addr);
+			printk("%s, vmfunc(%p) | vmfunc_load_addr %p\n", __func__, vmfunc, vmfunc_load_addr);
 		null_invocation();
 		add_constant(transaction_id);
 		add_nums(transaction_id, 50);

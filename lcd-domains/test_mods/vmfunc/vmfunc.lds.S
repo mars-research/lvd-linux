@@ -8,6 +8,7 @@ SECTIONS {
 		/* align to a page boundary */
 		. = ALIGN(0x1000);
 	}
+	__vmfunc_page_size = SIZEOF(.vmfunc.text);
 }
 /* XXX: ld fails to respect the alignment if I insert it AFTER .text */
 INSERT BEFORE .text;

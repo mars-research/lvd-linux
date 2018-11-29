@@ -61,3 +61,7 @@ nullnet/net_klcd nonisolated
 vmfunc/boot nonisolated
 vmfunc/caller_lcd isolated
 vmfunc/callee_lcd isolated
+
+vmfunc_klcd/boot nonisolated
+vmfunc_klcd/caller_klcd isolated
+vmfunc_klcd/callee_lcd isolated

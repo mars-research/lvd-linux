@@ -1,0 +1,10 @@
+
+obj-m  += lcd_test_mod_vmfunc_klcd_caller_klcd.o
+
+lcd_test_mod_vmfunc_klcd_caller_klcd-y              += main.o
+
+ccflags-y += $(NONISOLATED_CFLAGS)
+
+extra-y += ../vmfunc.lds
+
+ldflags-y += -T $(LCD_TEST_MODULES_BUILD_DIR)/vmfunc_klcd/vmfunc.lds

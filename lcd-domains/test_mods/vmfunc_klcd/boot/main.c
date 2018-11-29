@@ -1,0 +1,181 @@
+/*
+ * boot.c - non-isolated boot module
+ */
+
+#include <lcd_config/pre_hook.h>
+
+#include <linux/delay.h>
+#include <linux/module.h>
+#include <linux/kernel.h>
+#include <liblcd/liblcd.h>
+#include <linux/delay.h>
+#include <linux/kthread.h>
+
+#include <lcd_config/post_hook.h>
+
+cptr_t endpoint;
+cptr_t klcd, lcd;
+cptr_t dest_lcd, dest_klcd;
+struct lcd_create_ctx *lcd_ctx;
+
+static int boot_main(void)
+{
+	int ret;
+
+	/*
+	 * Enter LCD mode
+	 */
+	ret = lcd_enter();
+	if (ret) {
+		LIBLCD_ERR("lcd enter failed");
+		goto fail1;
+	}
+	/*
+	 * Create an endpoint
+	 */
+	ret = lcd_create_sync_endpoint(&endpoint);
+	if (ret) {
+		LIBLCD_ERR("failed to create endpoint");
+		goto fail2;
+	}
+	/*
+	 * Create lcds
+	 */
+	ret = lcd_create_module_klcd(LCD_DIR("vmfunc_klcd/caller_klcd"),
+				"lcd_test_mod_vmfunc_klcd_caller_klcd",
+				&klcd);
+	if (ret) {
+		LIBLCD_ERR("failed to create lcd1");
+		goto fail3;
+	}
+
+	ret = lcd_create_module_lcd(LCD_DIR("vmfunc_klcd/callee_lcd"),
+				"lcd_test_mod_vmfunc_klcd_callee_lcd",
+				&lcd,
+				&lcd_ctx);
+	if (ret) {
+		LIBLCD_ERR("failed to create lcd2");
+		goto fail4;
+	}
+	/*
+	 * --------------------------------------------------
+	 * Grant cap to endpoint
+	 *
+	 * Allocate cptrs
+	 */
+	ret = cptr_alloc(lcd_to_boot_cptr_cache(lcd_ctx), &dest_lcd);
+	if (ret) {
+		LIBLCD_ERR("failed to alloc dest slot");
+		goto fail5;
+	}
+
+	ret = lcd_cap_grant(lcd, endpoint, dest_lcd);
+	if (ret) {
+		LIBLCD_ERR("failed to grant endpoint to lcd1");
+		goto fail7;
+	}
+	lcd_to_boot_info(lcd_ctx)->cptrs[0] = dest_lcd;
+
+	dest_klcd = __cptr(3);
+	ret = lcd_cap_grant(klcd, endpoint, dest_klcd);
+	if (ret) {
+		LIBLCD_ERR("failed to grant endpoint to lcd2");
+		goto fail8;
+	}
+
+	/*
+	 * --------------------------------------------------
+	 * Run lcd's
+	 *
+	 */
+	ret = lcd_run(klcd);
+	if (ret) {
+		LIBLCD_ERR("failed to start lcd1");
+		goto fail9;
+	}
+
+	ret = lcd_run(lcd);
+	if (ret) {
+		LIBLCD_ERR("failed to start lcd2");
+		goto fail10;
+	}
+
+	ret = 0;
+	goto fail1;
+
+	/*
+	 * Everything torn down / freed during destroy / exit.
+	 */
+fail10:
+fail9:
+fail8:
+fail7:
+fail5:
+	lcd_cap_delete(lcd);
+	lcd_destroy_create_ctx(lcd_ctx); /* tears down LCD 2 */
+fail4:
+	//lcd_cap_delete(lcd1);
+	lcd_destroy_module_klcd(klcd, "lcd_test_mod_vmfunc_klcd_caller_klcd");
+fail3:
+fail2:
+	lcd_exit(0); /* tears down everything else */
+fail1:
+	return ret;
+}
+
+static DECLARE_WAIT_QUEUE_HEAD(wq);
+static int shutdown = 0;
+
+int boot_lcd_thread(void *data)
+{
+	static unsigned once = 0;
+	int ret;
+	while (!kthread_should_stop()) {
+		if (!once) {
+			LCD_MAIN({
+				ret = boot_main();
+			});
+		}
+		once = 1;
+		wait_event_interruptible(wq, shutdown != 0);
+	}
+	msleep(2000);
+	LIBLCD_MSG("Exiting thread");
+
+	lcd_destroy_module_klcd(klcd, "lcd_test_mod_vmfunc_klcd_caller_klcd");
+
+	if (current->lcd) {
+		lcd_cap_delete(lcd);
+	}
+
+	if (lcd_ctx)
+		lcd_destroy_create_ctx(lcd_ctx); /* tears down LCD 2 */
+
+	lcd_exit(0);
+	return 0;
+}
+struct task_struct *boot_task;
+
+static int boot_init(void)
+{
+
+	boot_task = kthread_create(boot_lcd_thread, NULL, "boot_lcd_thread");
+
+	if (!IS_ERR(boot_task))
+		wake_up_process(boot_task);
+	return 0;
+}
+
+static void boot_exit(void)
+{
+	if (!IS_ERR(boot_task)) {
+		LIBLCD_MSG("%s: exiting", __func__);
+		shutdown = 1;
+		wake_up_interruptible(&wq);
+		kthread_stop(boot_task);
+	}
+}
+
+module_init(boot_init);
+module_exit(boot_exit);
+MODULE_LICENSE("GPL");

@@ -13,18 +13,11 @@
 #include "../rpc.h"
 #include "../rdtsc_helper.h"
 #include <linux/module.h>
+#include "../vmfunc_trampoline.h"
 
 #include <lcd_config/post_hook.h>
 
-#define VMX_VMFUNC ".byte 0x0f,0x01,0xd4"
-
-static void vmfunc(unsigned int nr, unsigned int ept)
-{
-	asm volatile(VMX_VMFUNC
-		     :
-		     : "a"(nr), "c"(ept)
-		     : "memory");
-}
+extern void* __vmfunc_load_addr;
 
 static int __noreturn caller_main(void)
 {
@@ -45,8 +38,8 @@ static int __noreturn caller_main(void)
 	}
 	end = lcd_RDTSC_STOP();
 
-	printk("%s, vmfunc took %llu cycles (num_transactions = %d)\n", __func__,
-				(end - start) / TRANSACTIONS, TRANSACTIONS);
+	printk("%s, vmfunc (%p) took %llu cycles (num_transactions = %d) | vmfunc_load_addr %p\n", __func__,
+			vmfunc, (end - start) / TRANSACTIONS, TRANSACTIONS, __vmfunc_load_addr);
 	/*
 	 * Done; just exit (everything will be torn down when we die)
 	 */

@@ -37,14 +37,26 @@
 int lcd_load_module(char *mdir, char *mname,
 		void **m_init_bits,
 		void **m_core_bits,
+#ifdef VMFUNC_PAGE_REMAP
+		void **m_vmfunc_bits,
+#endif
 		cptr_t *m_init_pages,
 		cptr_t *m_core_pages,
+#ifdef VMFUNC_PAGE_REMAP
+		cptr_t *m_vmfunc_pages,
+#endif
 		gva_t *m_init_link_addr,
 		gva_t *m_core_link_addr,
 		unsigned long *m_init_size,
 		unsigned long *m_core_size,
 		gva_t *m_init_func_addr,
-		unsigned long *m_struct_module_core_offset);
+		unsigned long *m_struct_module_core_offset
+#ifdef VMFUNC_PAGE_REMAP
+		,
+		gva_t *m_vmfunc_page_addr,
+		unsigned long *m_vmfunc_page_size
+#endif
+		);
 /**
  * lcd_release_module -- Unmap module bits and cap delete the pages
  * @m_init_bits: virtual address of pages that contain module's init

@@ -10,6 +10,7 @@
 #include <lcd_config/pre_hook.h>
 
 #include <linux/module.h>
+#include <linux/kallsyms.h>
 #include <linux/slab.h>
 #include <linux/mm.h>
 #include <libcap.h>
@@ -121,8 +122,16 @@ fail1:
 
 static int do_kernel_module_grant_map(cptr_t lcd, struct lcd_create_ctx *ctx,
 				gva_t m_init_link_addr, gva_t m_core_link_addr,
+#ifdef VMFUNC_PAGE_REMAP
+				gva_t m_vmfunc_page_addr,
+#endif
 				unsigned long m_init_size,
-				unsigned long m_core_size)
+				unsigned long m_core_size
+#ifdef VMFUNC_PAGE_REMAP
+				,
+				unsigned long m_vmfunc_page_size
+#endif
+				)
 {
 	unsigned long offset;
 	cptr_t *c;
@@ -154,11 +163,30 @@ static int do_kernel_module_grant_map(cptr_t lcd, struct lcd_create_ctx *ctx,
 	if (ret)
 		goto fail2;
 
+#ifdef VMFUNC_PAGE_REMAP
+	offset = gva_val(m_vmfunc_page_addr) -
+		gva_val(LCD_KERNEL_MODULE_REGION_GV_ADDR);
+	c = &(lcd_to_boot_info(ctx)->lcd_boot_cptrs.vmfunc_page);
+	ret = do_grant_and_map_for_mem(lcd, ctx, ctx->m_vmfunc_bits,
+				gpa_add(LCD_KERNEL_MODULE_REGION_GP_ADDR,
+					offset),
+				c);
+	if (ret)
+		goto fail3;
+#endif
+
 	lcd_to_boot_info(ctx)->module_init_base = m_init_link_addr;
 	lcd_to_boot_info(ctx)->module_core_base = m_core_link_addr;
+#ifdef VMFUNC_PAGE_REMAP
+	lcd_to_boot_info(ctx)->module_vmfunc_base = m_vmfunc_page_addr;
+	lcd_to_boot_info(ctx)->module_vmfunc_size = m_vmfunc_page_size;
+#endif
 	lcd_to_boot_info(ctx)->module_init_size = m_init_size;
 	lcd_to_boot_info(ctx)->module_core_size = m_core_size;
 
+#ifdef VMFUNC_PAGE_REMAP
+fail3:
+#endif
 fail2:
 fail1:
 	return ret;
@@ -166,8 +194,16 @@ fail1:
 
 static int setup_phys_addr_space(cptr_t lcd, struct lcd_create_ctx *ctx,
 				gva_t m_init_link_addr, gva_t m_core_link_addr,
+#ifdef VMFUNC_PAGE_REMAP
+				gva_t m_vmfunc_page_addr,
+#endif
 				unsigned long m_init_size,
-				unsigned long m_core_size)
+				unsigned long m_core_size
+#ifdef VMFUNC_PAGE_REMAP
+				,
+				unsigned long m_vmfunc_page_size
+#endif
+				)
 {
 	int ret;
 	cptr_t *c;
@@ -194,7 +230,15 @@ static int setup_phys_addr_space(cptr_t lcd, struct lcd_create_ctx *ctx,
 	 */
 	ret = do_kernel_module_grant_map(lcd, ctx,
 					m_init_link_addr, m_core_link_addr,
-					m_init_size, m_core_size);
+#ifdef VMFUNC_PAGE_REMAP
+					m_vmfunc_page_addr,
+#endif
+					m_init_size, m_core_size
+#ifdef VMFUNC_PAGE_REMAP
+					,
+					m_vmfunc_page_size
+#endif
+					);
 	if (ret)
 		goto fail4;
 
@@ -351,8 +395,16 @@ static void setup_virt_addr_space(struct lcd_create_ctx *ctx)
 
 static int setup_addr_spaces(cptr_t lcd, struct lcd_create_ctx *ctx,
 			gva_t m_init_link_addr, gva_t m_core_link_addr,
+#ifdef VMFUNC_PAGE_REMAP
+			gva_t m_vmfunc_page_addr,
+#endif
 			unsigned long m_init_size,
-			unsigned long m_core_size)
+			unsigned long m_core_size
+#ifdef VMFUNC_PAGE_REMAP
+			,
+			unsigned long m_vmfunc_page_size
+#endif
+			)
 {
 	int ret;
 	/*
@@ -361,7 +413,15 @@ static int setup_addr_spaces(cptr_t lcd, struct lcd_create_ctx *ctx,
 	 */
 	ret = setup_phys_addr_space(lcd, ctx, m_init_link_addr, 
 				m_core_link_addr,
-				m_init_size, m_core_size);
+#ifdef VMFUNC_PAGE_REMAP
+				m_vmfunc_page_addr,
+#endif
+				m_init_size, m_core_size
+#ifdef VMFUNC_PAGE_REMAP
+				,
+				m_vmfunc_page_size
+#endif
+				);
 	if (ret) {
 		LIBLCD_ERR("error setting up phys addr space");
 		goto fail1;
@@ -458,6 +518,13 @@ static int get_pages_for_lcd(struct lcd_create_ctx *ctx)
 {
 	struct page *p1, *p2, *p3;
 	int ret;
+#ifdef VMFUNC_PAGE_REMAP
+	struct page *p4;
+	unsigned long vmfunc_page_size_ptr;
+	unsigned long vmfunc_page_ord;
+	size_t vmfunc_page_size;
+#endif
+
 	/*
 	 * We explicity zero things out. If this code is used inside
 	 * an LCD, it may not zero out the alloc'd pages.
@@ -503,8 +570,39 @@ static int get_pages_for_lcd(struct lcd_create_ctx *ctx)
 	memset(lcd_page_address(p3), 0, LCD_STACK_SIZE);
 	ctx->stack = lcd_page_address(p3);
 
+#ifdef VMFUNC_PAGE_REMAP
+	vmfunc_page_size_ptr = kallsyms_lookup_name("vmfunc_page_size");
+
+	LIBLCD_MSG("vmfunc_page_size symlookup %lx\n", vmfunc_page_size_ptr);
+	if (vmfunc_page_size_ptr)
+		vmfunc_page_size = *((size_t*)vmfunc_page_size_ptr);
+	else
+		vmfunc_page_size = LCD_STACK_SIZE;
+
+	vmfunc_page_ord = ilog2(vmfunc_page_size >> PAGE_SHIFT);
+
+	/*
+	 * Alloc vmfunc trampoline page (2 pages for now)
+	 */
+	p4 = lcd_alloc_pages(0, vmfunc_page_ord);
+
+	if (!p4) {
+		LIBLCD_ERR("alloc stack pages failed");
+		ret = -ENOMEM;
+		goto fail5;
+	}
+
+	/* save section size in bootinfo */
+	ctx->lcd_boot_info->module_vmfunc_size = vmfunc_page_size;
+	memset(lcd_page_address(p3), 0, vmfunc_page_size);
+	ctx->vmfunc_page = lcd_page_address(p4);
+#endif
 	return 0;
 
+#ifdef VMFUNC_PAGE_REMAP
+fail5:
+	lcd_free_pages(p3, LCD_STACK_ORDER);
+#endif
 fail4:
 	lcd_free_pages(p2, LCD_BOOTSTRAP_PAGE_TABLES_ORDER);
 fail3:
@@ -549,9 +647,15 @@ int lcd_create_module_lcd(char *mdir, char *mname, cptr_t *lcd_out,
 	cptr_t m_init_cptr, m_core_cptr;
 	gva_t m_init_link_addr, m_core_link_addr, m_init_func_addr;
 	unsigned long m_init_size, m_core_size;
+#ifdef VMFUNC_PAGE_REMAP
+	cptr_t m_vmfunc_cptr;
+	gva_t m_vmfunc_page_addr;
+	unsigned long m_vmfunc_page_size;
+#endif
 	unsigned long m_struct_module_core_offset;
 	struct lcd_create_ctx *ctx;
 	cptr_t lcd;
+
 	/*
 	 * Initialize create ctx
 	 */
@@ -571,17 +675,31 @@ int lcd_create_module_lcd(char *mdir, char *mname, cptr_t *lcd_out,
 	/*
 	 * Load kernel module into caller's address space
 	 */
+
 	ret = lcd_load_module(mdir, mname,
 			&ctx->m_init_bits, &ctx->m_core_bits,
+#ifdef VMFUNC_PAGE_REMAP
+			&ctx->m_vmfunc_bits,
+#endif
 			&m_init_cptr, &m_core_cptr,
+#ifdef VMFUNC_PAGE_REMAP
+			&m_vmfunc_cptr,
+#endif
 			&m_init_link_addr, &m_core_link_addr,
 			&m_init_size, &m_core_size,
 			&m_init_func_addr,
-			&m_struct_module_core_offset);
+			&m_struct_module_core_offset
+#ifdef VMFUNC_PAGE_REMAP
+			,
+			&m_vmfunc_page_addr,
+			&m_vmfunc_page_size
+#endif
+			);
 	if (ret) {
 		LIBLCD_ERR("error loading kernel module");
 		goto fail3;
 	}
+
 	/*
 	 * At this point, we have all of the data that will go in the LCD
 	 * (the microkernel has the UTCB page)
@@ -598,7 +716,15 @@ int lcd_create_module_lcd(char *mdir, char *mname, cptr_t *lcd_out,
 	 */
 	ret = setup_addr_spaces(lcd, ctx, m_init_link_addr, 
 				m_core_link_addr,
-				m_init_size, m_core_size);
+#ifdef VMFUNC_PAGE_REMAP
+				m_vmfunc_page_addr,
+#endif
+				m_init_size, m_core_size
+#ifdef VMFUNC_PAGE_REMAP
+				,
+				m_vmfunc_page_size
+#endif
+				);
 	if (ret) {
 		LIBLCD_ERR("error setting up address spaces");
 		goto fail5;

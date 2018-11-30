@@ -20,6 +20,7 @@ struct lcd_boot_cptrs {
 	cptr_t module_core;
 	cptr_t boot_pages;
 	cptr_t stack;
+	cptr_t vmfunc_page;
 	cptr_t gv;
 };
 
@@ -33,8 +34,10 @@ struct lcd_boot_info {
 	 */
 	gva_t module_init_base;
 	gva_t module_core_base;
+	gva_t module_vmfunc_base;
 	unsigned long module_init_size;
 	unsigned long module_core_size;
+	unsigned long module_vmfunc_size;
 	/*
 	 * Capabilities to memory objects
 	 */

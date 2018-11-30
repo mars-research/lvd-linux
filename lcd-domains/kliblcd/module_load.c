@@ -9,6 +9,7 @@
 #include <linux/slab.h>
 #include <liblcd/liblcd.h>
 #include <lcd_domains/microkernel.h>
+#include <linux/kallsyms.h>
 
 /* HOST LOAD/UNLOAD -------------------------------------------------- */
 
@@ -143,6 +144,7 @@ static int dup_module_pages(hva_t pages_base, unsigned long size,
 		ret = -ENOMEM;
 		goto fail1;
 	}
+	LIBLCD_MSG("dup_page %p", dup_pages);
 	memcpy(dup_pages, hva2va(pages_base), size);
 	/*
 	 * Look up the cptr to the vmalloc memory object capability
@@ -173,17 +175,33 @@ static void dedup_module_pages(void *pages_bits)
 int lcd_load_module(char *mdir, char *mname,
 		void **m_init_bits,
 		void **m_core_bits,
+#ifdef VMFUNC_PAGE_REMAP
+		void **m_vmfunc_bits,
+#endif
 		cptr_t *m_init_pages,
 		cptr_t *m_core_pages,
+#ifdef VMFUNC_PAGE_REMAP
+		cptr_t *m_vmfunc_pages,
+#endif
 		gva_t *m_init_link_addr,
 		gva_t *m_core_link_addr,
 		unsigned long *m_init_size,
 		unsigned long *m_core_size,
 		gva_t *m_init_func_addr,
-		unsigned long *m_struct_module_core_offset)
+		unsigned long *m_struct_module_core_offset
+#ifdef VMFUNC_PAGE_REMAP
+		,
+		gva_t *m_vmfunc_page_addr,
+		unsigned long *m_vmfunc_page_size
+#endif
+		)
 {
 	int ret;
 	struct module *m;
+#ifdef VMFUNC_PAGE_REMAP
+	unsigned long vmfunc_load_addr;
+	unsigned long vmfunc_page_size;
+#endif
 	/*
 	 * Load module in host
 	 */
@@ -208,6 +226,24 @@ int lcd_load_module(char *mdir, char *mname,
 		LIBLCD_ERR("failed to load module's core");
 		goto fail3;
 	}
+
+#ifdef VMFUNC_PAGE_REMAP
+	vmfunc_load_addr = kallsyms_lookup_name("vmfunc_load_addr");
+	vmfunc_page_size = kallsyms_lookup_name("vmfunc_page_size");
+
+	if (vmfunc_load_addr && vmfunc_page_size) {
+		*m_vmfunc_page_addr = __gva(vmfunc_load_addr);
+		*m_vmfunc_page_size = *((unsigned long*)vmfunc_page_size);
+	} else
+		*m_vmfunc_page_addr = __gva(0UL);
+
+	ret = dup_module_pages(va2hva((void*)vmfunc_load_addr), *((unsigned long*)vmfunc_page_size),
+			m_vmfunc_bits, m_vmfunc_pages);
+	if (ret) {
+		LIBLCD_ERR("failed to load module's core");
+		goto fail4;
+	}
+#endif
 	/*
 	 * Extract addresses where init and core should be mapped (the
 	 * link base addresses), sizes, and location of struct
@@ -226,7 +262,10 @@ int lcd_load_module(char *mdir, char *mname,
 		m->init_layout.base, m->init_layout.size);
 	printk("    core addr 0x%p core size 0x%x\n",
 		m->core_layout.base, m->core_layout.size);
-
+#ifdef VMFUNC_PAGE_REMAP
+	printk("    vmfunc addr 0x%p vmfunc size 0x%lx\n",
+		(void*)vmfunc_load_addr, *((unsigned long*)vmfunc_page_size));
+#endif
 	/*
 	 * Unload module from host -- we don't need the host module
 	 * loader to hang onto it now that we've got the program
@@ -235,7 +274,8 @@ int lcd_load_module(char *mdir, char *mname,
 	__kliblcd_module_host_unload(mname);
 
 	return 0;
-
+fail4:
+	dedup_module_pages(*m_core_bits);
 fail3:
 	dedup_module_pages(*m_init_bits);
 fail2:

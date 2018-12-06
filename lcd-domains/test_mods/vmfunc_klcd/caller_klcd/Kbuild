@@ -2,6 +2,7 @@
 obj-m  += lcd_test_mod_vmfunc_klcd_caller_klcd.o
 
 lcd_test_mod_vmfunc_klcd_caller_klcd-y              += main.o
+lcd_test_mod_vmfunc_klcd_caller_klcd-y              += $(addprefix ../, vmfunc.o vmfunc_wrapper.o)
 
 ccflags-y += $(NONISOLATED_CFLAGS)
 

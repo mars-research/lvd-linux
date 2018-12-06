@@ -17,6 +17,7 @@
 
 #include <lcd_config/post_hook.h>
 
+extern int vmfunc_wrapper(struct fipc_message *req);
 unsigned long long stack;
 unsigned long long eip;
 
@@ -34,15 +35,19 @@ static int caller_main(void)
 
 	start = lcd_RDTSC_START();
 	while (transaction_id < TRANSACTIONS) {
-		transaction_id++;
 #ifdef HOST_LINUX_IN_VM
-		vmfunc(0, 0);
+		if (transaction_id == 0)
+			vmfunc_wrapper(NULL);
 #endif
+		transaction_id++;
 	}
 	end = lcd_RDTSC_STOP();
 
 	printk("%s, vmfunc (%p) took %llu cycles (num_transactions = %d) | vmfunc_load_addr %p | size %zx\n", __func__,
 			vmfunc, (end - start) / TRANSACTIONS, TRANSACTIONS, vmfunc_load_addr, vmfunc_page_size);
+
+	print_hex_dump(KERN_DEBUG, "vmfuncwrapper: ", DUMP_PREFIX_ADDRESS,
+		       32, 1, vmfunc_wrapper, 0x100, false);
 	/*
 	 * Done; just exit (everything will be torn down when we die)
 	 */

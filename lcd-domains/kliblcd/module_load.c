@@ -200,7 +200,18 @@ int lcd_load_module(char *mdir, char *mname,
 	struct module *m;
 #ifdef VMFUNC_PAGE_REMAP
 	unsigned long vmfunc_load_addr;
+	unsigned long vmfunc_load_addr_lcd;
 	unsigned long vmfunc_page_size;
+#endif
+
+#ifdef VMFUNC_PAGE_REMAP
+	/*
+	 * Do these lookups before loading the LCD module. Otherwise, kallsyms
+	 * is going to return this modules vmfunc_load_addr, whereas we want
+	 * KLCD's vmfunc_load_addr
+	 */
+	vmfunc_load_addr = kallsyms_lookup_name("vmfunc_load_addr");
+	vmfunc_page_size = kallsyms_lookup_name("vmfunc_page_size");
 #endif
 	/*
 	 * Load module in host
@@ -228,16 +239,14 @@ int lcd_load_module(char *mdir, char *mname,
 	}
 
 #ifdef VMFUNC_PAGE_REMAP
-	vmfunc_load_addr = kallsyms_lookup_name("vmfunc_load_addr");
-	vmfunc_page_size = kallsyms_lookup_name("vmfunc_page_size");
-
+	vmfunc_load_addr_lcd = kallsyms_lookup_name("vmfunc_load_addr");
 	if (vmfunc_load_addr && vmfunc_page_size) {
-		*m_vmfunc_page_addr = __gva(vmfunc_load_addr);
+		*m_vmfunc_page_addr = __gva(*((unsigned long *)vmfunc_load_addr));
 		*m_vmfunc_page_size = *((unsigned long*)vmfunc_page_size);
 	} else
 		*m_vmfunc_page_addr = __gva(0UL);
 
-	ret = dup_module_pages(va2hva((void*)vmfunc_load_addr), *((unsigned long*)vmfunc_page_size),
+	ret = dup_module_pages(va2hva((void*)(*(unsigned long*)vmfunc_load_addr_lcd)), *((unsigned long*)vmfunc_page_size),
 			m_vmfunc_bits, m_vmfunc_pages);
 	if (ret) {
 		LIBLCD_ERR("failed to load module's core");
@@ -263,19 +272,27 @@ int lcd_load_module(char *mdir, char *mname,
 	printk("    core addr 0x%p core size 0x%x\n",
 		m->core_layout.base, m->core_layout.size);
 #ifdef VMFUNC_PAGE_REMAP
-	printk("    vmfunc addr 0x%p vmfunc size 0x%lx\n",
-		(void*)vmfunc_load_addr, *((unsigned long*)vmfunc_page_size));
+	printk("    vmfunc addr 0x%lx vmfunc size 0x%lx\n",
+		gva_val(*m_vmfunc_page_addr), *m_vmfunc_page_size);
 #endif
+
 	/*
 	 * Unload module from host -- we don't need the host module
 	 * loader to hang onto it now that we've got the program
 	 * bits.
 	 */
+#ifndef VMFUNC_PAGE_REMAP
+	/* Do not unload the module from host, yet. we need to patch a few
+	 * relocs before finalizing the module. Do it once we setup the address
+	 * spaces.
+	 */
 	__kliblcd_module_host_unload(mname);
-
+#endif
 	return 0;
+#ifdef VMFUNC_PAGE_REMAP
 fail4:
 	dedup_module_pages(*m_core_bits);
+#endif
 fail3:
 	dedup_module_pages(*m_init_bits);
 fail2:

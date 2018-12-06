@@ -296,23 +296,6 @@ int unregister_module_notifier(struct notifier_block *nb)
 }
 EXPORT_SYMBOL(unregister_module_notifier);
 
-struct load_info {
-	Elf_Ehdr *hdr;
-	unsigned long len;
-	Elf_Shdr *sechdrs;
-	char *secstrings, *strtab;
-	unsigned long symoffs, stroffs;
-	struct _ddebug *debug;
-	unsigned int num_debug;
-	bool sig_ok;
-#ifdef CONFIG_KALLSYMS
-	unsigned long mod_kallsyms_init_off;
-#endif
-	struct {
-		unsigned int sym, str, mod, vers, info, pcpu;
-	} index;
-};
-
 /* We require a truly strong try_module_get(): 0 means failure due to
    ongoing or failed initialization etc. */
 static inline int strong_try_module_get(struct module *mod)
@@ -2054,6 +2037,18 @@ static int copy_module_elf(struct module *mod, struct load_info *info)
 	mod->klp_info->sechdrs[symndx].sh_addr = \
 		(unsigned long) mod->core_kallsyms.symtab;
 
+	/* For VMFUNC lcds, we need the entire file to patch relocations.  Take
+	 * a copy of load_info pointer as it is freed by kernel once the module
+	 * gets loaded.
+	 */
+	mod->klp_info->info.hdr = __vmalloc(info->len,
+			GFP_KERNEL | __GFP_HIGHMEM | __GFP_NOWARN, PAGE_KERNEL);
+
+	/* Suck in entire file: we'll want most of it. */
+	memcpy(mod->klp_info->info.hdr, info->hdr, info->len);
+
+	mod->klp_info->info.strtab = (char *)info->hdr
+				+ info->sechdrs[info->index.str].sh_offset;
 	return 0;
 
 free_sechdrs:
@@ -2068,6 +2063,8 @@ static void free_module_elf(struct module *mod)
 	kfree(mod->klp_info->sechdrs);
 	kfree(mod->klp_info->secstrings);
 	kfree(mod->klp_info);
+	/* free the extra copy */
+	vfree(mod->klp_info->info.hdr);
 }
 #else /* !CONFIG_LIVEPATCH */
 static int copy_module_elf(struct module *mod, struct load_info *info)

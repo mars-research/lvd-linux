@@ -18,17 +18,24 @@
 
 extern int vmfunc_wrapper(struct fipc_message *req);
 
+unsigned long noinline
+null_invocation(void)
+{
+       return 9;
+}
+
 int callee(struct fipc_ring_channel *chan)
 {
 	int ret = 0;
 	unsigned long transaction_id = 0;
 	u64 start, end;
+	struct fipc_message msg;
 
 	start = lcd_RDTSC_START();
 	for (transaction_id = 0; 
 	     transaction_id < TRANSACTIONS; 
 	     transaction_id++) {
-		vmfunc_wrapper(NULL);
+		vmfunc_wrapper(&msg);
 	}
 
 	end = lcd_RDTSC_STOP();

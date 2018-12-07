@@ -2,14 +2,27 @@
 #define VMFUNC_TRAMPOLINE_H
 
 #include <linux/types.h>
-
+#include <libfipc.h>
 #define VMFUNC_LINKAGE	  __attribute__((section(".vmfunc.text")))
+
+struct vmfunc_msg;
 
 void noinline
 VMFUNC_LINKAGE
-vmfunc(unsigned int nr, unsigned int ept);
+//vmfunc(unsigned int nr, unsigned int ept, struct fipc_message *reg);
+//vmfunc(struct vmfunc_msg *msg);
+vmfunc_call(struct vmfunc_msg *vmsg);
+
+void noinline
+VMFUNC_LINKAGE
+vmfunc_return(struct vmfunc_msg *vmsg);
 
 extern size_t vmfunc_page_size;
 extern unsigned long* vmfunc_load_addr;
 
+struct vmfunc_msg {
+	unsigned int nr;
+	unsigned int ept;
+	struct fipc_message *msg;
+};
 #endif /* VMFUNC_TRAMPOLINE_H */

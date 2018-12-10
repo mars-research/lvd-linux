@@ -9,13 +9,7 @@ struct vmfunc_msg;
 
 void noinline
 VMFUNC_LINKAGE
-//vmfunc(unsigned int nr, unsigned int ept, struct fipc_message *reg);
-//vmfunc(struct vmfunc_msg *msg);
-vmfunc_call(struct vmfunc_msg *vmsg);
-
-void noinline
-VMFUNC_LINKAGE
-vmfunc_return(struct vmfunc_msg *vmsg);
+vmfunc_call(unsigned int nr, unsigned int ept, struct fipc_message *reg);
 
 extern size_t vmfunc_page_size;
 extern unsigned long* vmfunc_load_addr;

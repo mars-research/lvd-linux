@@ -1,4 +1,7 @@
 
+ccflags-y += $(ISOLATED_CFLAGS)
+ccflags-y += -DOTHER_DOMAIN=0
+
 obj-m  += lcd_test_mod_vmfunc_klcd_callee_lcd.o
 
 lcd_test_mod_vmfunc_klcd_callee_lcd-y              += main.o
@@ -6,7 +9,6 @@ lcd_test_mod_vmfunc_klcd_callee_lcd-y              += $(addprefix ../, vmfunc.o 
 
 lcd_test_mod_vmfunc_klcd_callee_lcd-y += $(LIBLCD)
 
-ccflags-y += $(ISOLATED_CFLAGS)
 
 extra-y += ../vmfunc.lds
 

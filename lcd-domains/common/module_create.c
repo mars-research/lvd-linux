@@ -147,8 +147,12 @@ static int do_kernel_module_grant_map(cptr_t lcd, struct lcd_create_ctx *ctx,
 		gva_val(LCD_KERNEL_MODULE_REGION_GV_ADDR);
 	c = &(lcd_to_boot_info(ctx)->lcd_boot_cptrs.module_init);
 	ret = do_grant_and_map_for_mem(lcd, ctx, ctx->m_init_bits,
+#ifdef LCDS_NO_PAGE_TABLES
+				__gpa(ctx->m_init_bits),
+#else
 				gpa_add(LCD_KERNEL_MODULE_REGION_GP_ADDR,
 					offset),
+#endif
 				c);
 	if (ret)
 		goto fail1;
@@ -157,8 +161,12 @@ static int do_kernel_module_grant_map(cptr_t lcd, struct lcd_create_ctx *ctx,
 		gva_val(LCD_KERNEL_MODULE_REGION_GV_ADDR);
 	c = &(lcd_to_boot_info(ctx)->lcd_boot_cptrs.module_core);
 	ret = do_grant_and_map_for_mem(lcd, ctx, ctx->m_core_bits,
+#ifdef LCDS_NO_PAGE_TABLES
+				__gpa(ctx->m_core_bits),
+#else
 				gpa_add(LCD_KERNEL_MODULE_REGION_GP_ADDR,
 					offset),
+#endif
 				c);
 	if (ret)
 		goto fail2;
@@ -168,8 +176,20 @@ static int do_kernel_module_grant_map(cptr_t lcd, struct lcd_create_ctx *ctx,
 		gva_val(LCD_KERNEL_MODULE_REGION_GV_ADDR);
 	c = &(lcd_to_boot_info(ctx)->lcd_boot_cptrs.vmfunc_page);
 	ret = do_grant_and_map_for_mem(lcd, ctx, ctx->m_vmfunc_bits,
+#ifdef LCDS_NO_PAGE_TABLES
+	/* for vmfunc page, we take a fresh copy of the page, make relocations
+	 * of other sections point to this new page.  to map this page onto
+	 * LCDs ept at the same virtual address as KLCDs vmfunc page, we need
+	 * to create a different gpa-hpa mapping for this page. Let's pass the
+	 * GPA of KLCDs vmfunc page and HPA of our newly copied page.  This
+	 * way, a mapping would be created for this gpa and the corressponding
+	 * hpa would be the hpa of our newly copied page
+	 */
+				__gpa(virt_to_phys(m_vmfunc_page_addr)),
+#else
 				gpa_add(LCD_KERNEL_MODULE_REGION_GP_ADDR,
 					offset),
+#endif
 				c);
 	if (ret)
 		goto fail3;
@@ -212,17 +232,40 @@ static int setup_phys_addr_space(cptr_t lcd, struct lcd_create_ctx *ctx,
 	 */
 	c = &(lcd_to_boot_info(ctx)->lcd_boot_cptrs.boot_pages);
 	ret = do_grant_and_map_for_mem(lcd, ctx, ctx->lcd_boot_info,
-				LCD_BOOTSTRAP_PAGES_GP_ADDR, c);
+#ifdef LCDS_NO_PAGE_TABLES
+	/* XXX: we have linear virtual address of this page in lcd_boot info.
+	 * there is no additional virt-to-phys mapping inside LCDs as it is
+	 * mapped in host address space. The LCD will have this at the same
+	 * virtual address.  However, we need an EPT entry for this object on
+	 * LCD's EPT. To achieve that we need to go through physical addresses
+	 * of these pages (which should be a direct mapping as we deprivilege
+	 * the whole host linux into a VT-x domain), then add entries for those
+	 * pages in LCDs EPT.
+	 */
+				__gpa(virt_to_phys(ctx->lcd_boot_info)),
+#else
+				LCD_BOOTSTRAP_PAGES_GP_ADDR,
+#endif
+				c);
 	if (ret)
 		goto fail1;
+#ifndef LCDS_NO_PAGE_TABLES
+	/* in vmfunc LCDS, there are no additional guest page tables for LCDs */
 	c = &(lcd_to_boot_info(ctx)->lcd_boot_cptrs.gv);
 	ret = do_grant_and_map_for_mem(lcd, ctx, ctx->gv_pg_tables,
 				LCD_BOOTSTRAP_PAGE_TABLES_GP_ADDR, c);
 	if (ret)
 		goto fail2;
+#endif
+
 	c = &(lcd_to_boot_info(ctx)->lcd_boot_cptrs.stack);
 	ret = do_grant_and_map_for_mem(lcd, ctx, ctx->stack,
-				LCD_STACK_GP_ADDR, c);
+#ifdef LCDS_NO_PAGE_TABLES
+				__gpa(virt_to_phys(ctx->stack)),
+#else
+				LCD_STACK_GP_ADDR,
+#endif
+				c);
 	if (ret)
 		goto fail3;
 	/*
@@ -429,8 +472,10 @@ static int setup_addr_spaces(cptr_t lcd, struct lcd_create_ctx *ctx,
 	/*
 	 * Set up virtual address space
 	 */
+#ifndef LCDS_NO_PAGE_TABLES
+	/* VMFUNC lcds does not need another virtual address space */
 	setup_virt_addr_space(ctx);
-
+#endif
 	return 0;
 
 fail1: /* just return non-zero ret; caller will free mem */
@@ -518,12 +563,6 @@ static int get_pages_for_lcd(struct lcd_create_ctx *ctx)
 {
 	struct page *p1, *p2, *p3;
 	int ret;
-#ifdef VMFUNC_PAGE_REMAP
-	struct page *p4;
-	unsigned long vmfunc_page_size_ptr;
-	unsigned long vmfunc_page_ord;
-	size_t vmfunc_page_size;
-#endif
 
 	/*
 	 * We explicity zero things out. If this code is used inside
@@ -539,6 +578,7 @@ static int get_pages_for_lcd(struct lcd_create_ctx *ctx)
 	}
 	memset(lcd_page_address(p1), 0, LCD_BOOTSTRAP_PAGES_SIZE);
 	ctx->lcd_boot_info = lcd_page_address(p1);
+
 	/*
 	 * Initialize boot cptr cache
 	 */
@@ -570,39 +610,8 @@ static int get_pages_for_lcd(struct lcd_create_ctx *ctx)
 	memset(lcd_page_address(p3), 0, LCD_STACK_SIZE);
 	ctx->stack = lcd_page_address(p3);
 
-#ifdef VMFUNC_PAGE_REMAP
-	vmfunc_page_size_ptr = kallsyms_lookup_name("vmfunc_page_size");
-
-	LIBLCD_MSG("vmfunc_page_size symlookup %lx\n", vmfunc_page_size_ptr);
-	if (vmfunc_page_size_ptr)
-		vmfunc_page_size = *((size_t*)vmfunc_page_size_ptr);
-	else
-		vmfunc_page_size = LCD_STACK_SIZE;
-
-	vmfunc_page_ord = ilog2(vmfunc_page_size >> PAGE_SHIFT);
-
-	/*
-	 * Alloc vmfunc trampoline page (2 pages for now)
-	 */
-	p4 = lcd_alloc_pages(0, vmfunc_page_ord);
-
-	if (!p4) {
-		LIBLCD_ERR("alloc stack pages failed");
-		ret = -ENOMEM;
-		goto fail5;
-	}
-
-	/* save section size in bootinfo */
-	ctx->lcd_boot_info->module_vmfunc_size = vmfunc_page_size;
-	memset(lcd_page_address(p3), 0, vmfunc_page_size);
-	ctx->vmfunc_page = lcd_page_address(p4);
-#endif
 	return 0;
 
-#ifdef VMFUNC_PAGE_REMAP
-fail5:
-	lcd_free_pages(p3, LCD_STACK_ORDER);
-#endif
 fail4:
 	lcd_free_pages(p2, LCD_BOOTSTRAP_PAGE_TABLES_ORDER);
 fail3:

@@ -127,6 +127,10 @@ fail:
 }
 
 /* HIGHER-LEVEL LOAD/UNLOAD ---------------------------------------- */
+static int create_metadata(hva_t pages_base, unsigned long size)
+{
+	return lcd_create_mo_metadata(pages_base, size);
+}
 
 static int dup_module_pages(hva_t pages_base, unsigned long size,
 			void **dup_pages_bits,
@@ -219,6 +223,8 @@ int lcd_load_module(char *mdir, char *mname,
 	ret = __kliblcd_module_host_load(mdir, mname, &m);
 	if (ret)
 		goto fail1;
+
+#ifndef LCDS_NO_PAGE_TABLES
 	/*
 	 * Dup init and core pages so that LCD will use a copy
 	 * separate from the host (this will protect things
@@ -237,6 +243,17 @@ int lcd_load_module(char *mdir, char *mname,
 		LIBLCD_ERR("failed to load module's core");
 		goto fail3;
 	}
+#else
+	/* for LCDs with no page tables, there is no need to take a copy.
+	 * Let the module get loaded onto host normally and we map those
+	 * pages in our new EPT
+	 */
+	create_metadata(m->init_layout.base, m->init_layout.size);
+	create_metadata(m->core_layout.base, m->core_layout.size);
+
+	*m_init_bits = va2hva(m->init_layout.base);
+	*m_core_bits = va2hva(m->core_layout.base);
+#endif
 
 #ifdef VMFUNC_PAGE_REMAP
 	vmfunc_load_addr_lcd = kallsyms_lookup_name("vmfunc_load_addr");
@@ -246,6 +263,7 @@ int lcd_load_module(char *mdir, char *mname,
 	} else
 		*m_vmfunc_page_addr = __gva(0UL);
 
+	/* Only for vmfunc page, we make an additional copy */
 	ret = dup_module_pages(va2hva((void*)(*(unsigned long*)vmfunc_load_addr_lcd)), *((unsigned long*)vmfunc_page_size),
 			m_vmfunc_bits, m_vmfunc_pages);
 	if (ret) {
@@ -289,12 +307,14 @@ int lcd_load_module(char *mdir, char *mname,
 	__kliblcd_module_host_unload(mname);
 #endif
 	return 0;
+#ifndef LCDS_NO_PAGE_TABLES
 #ifdef VMFUNC_PAGE_REMAP
 fail4:
 	dedup_module_pages(*m_core_bits);
 #endif
 fail3:
 	dedup_module_pages(*m_init_bits);
+#endif /* LCDS_NO_PAGE_TABLES */
 fail2:
 	__kliblcd_module_host_unload(mname);
 fail1:
@@ -306,8 +326,10 @@ void lcd_release_module(void *m_init_bits, void *m_core_bits)
 	/*
 	 * Delete duplicates
 	 */
+#ifndef LCDS_NO_PAGE_TABLES
 	dedup_module_pages(m_init_bits);
 	dedup_module_pages(m_core_bits);
+#endif
 }
 
 /* EXPORTS -------------------------------------------------- */

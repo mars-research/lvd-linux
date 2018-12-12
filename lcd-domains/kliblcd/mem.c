@@ -498,6 +498,49 @@ void lcd_free_pages(struct page *base, unsigned int order)
 	lcd_cap_delete(page_cptr);
 }
 
+int lcd_create_mo_metadata(hva_t pages_base, unsigned long size)
+{
+
+	unsigned long nr_pages;
+	int ret;
+	cptr_t slot;
+	void *vptr = hva2va(pages_base);
+	struct lcd_memory_object *unused;
+	struct lcd *lcd = current->lcd;
+
+	/*
+	 * Convert to number of pages, rounding up
+	 */
+	nr_pages = ALIGN(size, PAGE_SIZE) >> PAGE_SHIFT;
+
+	/*
+	 * Allocate a slot in caller's cspace
+	 */
+	ret = lcd_cptr_alloc(&slot);
+	if (ret) {
+		LIBLCD_ERR("cptr alloc failed");
+		goto fail1;
+	}
+
+	/*
+	 * Insert into caller's cspace
+	 */
+	ret = __lcd_insert_memory_object(lcd, slot, vptr, nr_pages,
+					LCD_MICROKERNEL_TYPE_ID_VMALLOC_MEM,
+					&unused);
+	if (ret) {
+		LCD_ERR("failed to insert vmalloc mem capability into caller's cspace");
+		goto fail2;
+	}
+
+	return 0;
+
+fail2:
+	lcd_cptr_free(slot);
+fail1:
+	return ret;
+}
+
 void* lcd_vmalloc(unsigned long sz)
 {
 	struct lcd *lcd = current->lcd;
@@ -995,6 +1038,7 @@ gva_t lcd_gpa2gva(gpa_t gpa)
 
 /* EXPORTS -------------------------------------------------- */
 
+EXPORT_SYMBOL(lcd_create_mo_metadata);
 EXPORT_SYMBOL(lcd_alloc_init_resource_tree);
 EXPORT_SYMBOL(lcd_destroy_free_resource_tree);
 EXPORT_SYMBOL(_lcd_alloc_pages_exact_node);

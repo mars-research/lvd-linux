@@ -8,6 +8,7 @@
 #include <liblcd/liblcd.h>
 #include <lcd_domains/microkernel.h>
 
+#ifndef CONFIG_LVD
 struct lcd_utcb *lcd_get_utcb(void)
 {
 	return current->lcd->utcb;
@@ -81,3 +82,4 @@ EXPORT_SYMBOL(lcd_sync_recv);
 EXPORT_SYMBOL(lcd_sync_poll_recv);
 EXPORT_SYMBOL(lcd_sync_call);
 EXPORT_SYMBOL(lcd_sync_reply);
+#endif /* CONFIG_LVD */

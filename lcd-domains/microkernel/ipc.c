@@ -10,6 +10,7 @@
 #include <lcd_domains/types.h>
 #include <lcd_domains/microkernel.h>
 
+#ifndef CONFIG_LVD
 /* CREATE -------------------------------------------------- */
 
 int __lcd_create_sync_endpoint__(struct lcd_sync_endpoint **ep_out)
@@ -669,6 +670,7 @@ fail2:
 fail1:
 	return ret;
 }
+#endif /* CONFIG_LVD */
 
 /* INIT/EXIT -------------------------------------------------- */
 

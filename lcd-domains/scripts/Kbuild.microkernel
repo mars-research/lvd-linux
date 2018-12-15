@@ -25,6 +25,7 @@ lcd_domains-y += $(addprefix microkernel/, \
 	      mem_itree.o \
 	      run.o \
 	      ksym.o \
+	      vmfunc_ipc.o \
               )
 
 # Arch dependent code
@@ -57,7 +58,7 @@ lcd_domains-y += $(addprefix common/, \
 	      resource_tree.o \
 	      module_create.o \
               sync_ipc_poll.o \
-		vmfunc_syscalls.o \
+              vmfunc_calls.o \
 	      )
 
 # libcap (microkernel and kliblcd share libcap. We get away with this

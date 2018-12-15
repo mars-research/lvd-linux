@@ -37,6 +37,7 @@ struct lcd_mem_region {
 
 #define LCD_NR_MEM_REGIONS 6
 
+#ifndef CONFIG_LVD
 static struct lcd_mem_region lcd_mem_regions[LCD_NR_MEM_REGIONS] = {
 	{
 		"miscellaneous",
@@ -75,6 +76,7 @@ static struct lcd_mem_region lcd_mem_regions[LCD_NR_MEM_REGIONS] = {
 		.flags =  LCD_WRITEBACK_FLAGS,
 	},
 };
+#endif
 
 /* PHYSICAL ADDRESS SPACE -------------------------------------------------- */
 
@@ -147,8 +149,8 @@ static int do_kernel_module_grant_map(cptr_t lcd, struct lcd_create_ctx *ctx,
 		gva_val(LCD_KERNEL_MODULE_REGION_GV_ADDR);
 	c = &(lcd_to_boot_info(ctx)->lcd_boot_cptrs.module_init);
 	ret = do_grant_and_map_for_mem(lcd, ctx, ctx->m_init_bits,
-#ifdef LCDS_NO_PAGE_TABLES
-				__gpa(ctx->m_init_bits),
+#ifdef CONFIG_LVD
+				__gpa((unsigned long)ctx->m_init_bits),
 #else
 				gpa_add(LCD_KERNEL_MODULE_REGION_GP_ADDR,
 					offset),
@@ -161,8 +163,8 @@ static int do_kernel_module_grant_map(cptr_t lcd, struct lcd_create_ctx *ctx,
 		gva_val(LCD_KERNEL_MODULE_REGION_GV_ADDR);
 	c = &(lcd_to_boot_info(ctx)->lcd_boot_cptrs.module_core);
 	ret = do_grant_and_map_for_mem(lcd, ctx, ctx->m_core_bits,
-#ifdef LCDS_NO_PAGE_TABLES
-				__gpa(ctx->m_core_bits),
+#ifdef CONFIG_LVD
+				__gpa((unsigned long)ctx->m_core_bits),
 #else
 				gpa_add(LCD_KERNEL_MODULE_REGION_GP_ADDR,
 					offset),
@@ -176,7 +178,7 @@ static int do_kernel_module_grant_map(cptr_t lcd, struct lcd_create_ctx *ctx,
 		gva_val(LCD_KERNEL_MODULE_REGION_GV_ADDR);
 	c = &(lcd_to_boot_info(ctx)->lcd_boot_cptrs.vmfunc_page);
 	ret = do_grant_and_map_for_mem(lcd, ctx, ctx->m_vmfunc_bits,
-#ifdef LCDS_NO_PAGE_TABLES
+#ifdef CONFIG_LVD
 	/* for vmfunc page, we take a fresh copy of the page, make relocations
 	 * of other sections point to this new page.  to map this page onto
 	 * LCDs ept at the same virtual address as KLCDs vmfunc page, we need
@@ -185,7 +187,7 @@ static int do_kernel_module_grant_map(cptr_t lcd, struct lcd_create_ctx *ctx,
 	 * way, a mapping would be created for this gpa and the corressponding
 	 * hpa would be the hpa of our newly copied page
 	 */
-				__gpa(virt_to_phys(m_vmfunc_page_addr)),
+				__gpa(virt_to_phys((void*)gva_val(m_vmfunc_page_addr))),
 #else
 				gpa_add(LCD_KERNEL_MODULE_REGION_GP_ADDR,
 					offset),
@@ -232,7 +234,7 @@ static int setup_phys_addr_space(cptr_t lcd, struct lcd_create_ctx *ctx,
 	 */
 	c = &(lcd_to_boot_info(ctx)->lcd_boot_cptrs.boot_pages);
 	ret = do_grant_and_map_for_mem(lcd, ctx, ctx->lcd_boot_info,
-#ifdef LCDS_NO_PAGE_TABLES
+#ifdef CONFIG_LVD
 	/* XXX: we have linear virtual address of this page in lcd_boot info.
 	 * there is no additional virt-to-phys mapping inside LCDs as it is
 	 * mapped in host address space. The LCD will have this at the same
@@ -249,7 +251,7 @@ static int setup_phys_addr_space(cptr_t lcd, struct lcd_create_ctx *ctx,
 				c);
 	if (ret)
 		goto fail1;
-#ifndef LCDS_NO_PAGE_TABLES
+#ifndef CONFIG_LVD
 	/* in vmfunc LCDS, there are no additional guest page tables for LCDs */
 	c = &(lcd_to_boot_info(ctx)->lcd_boot_cptrs.gv);
 	ret = do_grant_and_map_for_mem(lcd, ctx, ctx->gv_pg_tables,
@@ -260,7 +262,7 @@ static int setup_phys_addr_space(cptr_t lcd, struct lcd_create_ctx *ctx,
 
 	c = &(lcd_to_boot_info(ctx)->lcd_boot_cptrs.stack);
 	ret = do_grant_and_map_for_mem(lcd, ctx, ctx->stack,
-#ifdef LCDS_NO_PAGE_TABLES
+#ifdef CONFIG_LVD
 				__gpa(virt_to_phys(ctx->stack)),
 #else
 				LCD_STACK_GP_ADDR,
@@ -289,7 +291,9 @@ static int setup_phys_addr_space(cptr_t lcd, struct lcd_create_ctx *ctx,
 
 fail4:  /* Just return; caller should kill new LCD and free up resources. */
 fail3:
+#ifndef CONFIG_LVD
 fail2:
+#endif
 fail1:
 	return ret;
 }
@@ -318,6 +322,7 @@ void lcd_dump_virt_addr_space(struct lcd_create_ctx *ctx)
 	}
 }
 
+#ifndef CONFIG_LVD
 static void setup_lcd_pmd(struct lcd_mem_region *reg, pmd_t *pmd,
 			unsigned int gigabyte_idx)
 {
@@ -435,6 +440,7 @@ static void setup_virt_addr_space(struct lcd_create_ctx *ctx)
 	 */
 	setup_lcd_pmds(cursor);
 }
+#endif
 
 static int setup_addr_spaces(cptr_t lcd, struct lcd_create_ctx *ctx,
 			gva_t m_init_link_addr, gva_t m_core_link_addr,
@@ -472,7 +478,7 @@ static int setup_addr_spaces(cptr_t lcd, struct lcd_create_ctx *ctx,
 	/*
 	 * Set up virtual address space
 	 */
-#ifndef LCDS_NO_PAGE_TABLES
+#ifndef CONFIG_LVD
 	/* VMFUNC lcds does not need another virtual address space */
 	setup_virt_addr_space(ctx);
 #endif

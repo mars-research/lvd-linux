@@ -171,10 +171,12 @@ fail1:
 	return ret;
 }
 
+#ifndef CONFIG_LVD
 static void dedup_module_pages(void *pages_bits)
 {
 	lcd_vfree(pages_bits);
 }
+#endif
 
 int lcd_load_module(char *mdir, char *mname,
 		void **m_init_bits,
@@ -224,7 +226,7 @@ int lcd_load_module(char *mdir, char *mname,
 	if (ret)
 		goto fail1;
 
-#ifndef LCDS_NO_PAGE_TABLES
+#ifndef CONFIG_LVD
 	/*
 	 * Dup init and core pages so that LCD will use a copy
 	 * separate from the host (this will protect things
@@ -248,11 +250,11 @@ int lcd_load_module(char *mdir, char *mname,
 	 * Let the module get loaded onto host normally and we map those
 	 * pages in our new EPT
 	 */
-	create_metadata(m->init_layout.base, m->init_layout.size);
-	create_metadata(m->core_layout.base, m->core_layout.size);
+	create_metadata(va2hva(m->init_layout.base), m->init_layout.size);
+	create_metadata(va2hva(m->core_layout.base), m->core_layout.size);
 
-	*m_init_bits = va2hva(m->init_layout.base);
-	*m_core_bits = va2hva(m->core_layout.base);
+	*m_init_bits = m->init_layout.base;
+	*m_core_bits = m->core_layout.base;
 #endif
 
 #ifdef VMFUNC_PAGE_REMAP
@@ -307,16 +309,16 @@ int lcd_load_module(char *mdir, char *mname,
 	__kliblcd_module_host_unload(mname);
 #endif
 	return 0;
-#ifndef LCDS_NO_PAGE_TABLES
 #ifdef VMFUNC_PAGE_REMAP
 fail4:
-	dedup_module_pages(*m_core_bits);
 #endif
+#ifndef CONFIG_LVD
+	dedup_module_pages(*m_core_bits);
 fail3:
 	dedup_module_pages(*m_init_bits);
-#endif /* LCDS_NO_PAGE_TABLES */
 fail2:
 	__kliblcd_module_host_unload(mname);
+#endif /* CONFIG_LVD */
 fail1:
 	return ret;
 }
@@ -326,7 +328,7 @@ void lcd_release_module(void *m_init_bits, void *m_core_bits)
 	/*
 	 * Delete duplicates
 	 */
-#ifndef LCDS_NO_PAGE_TABLES
+#ifndef CONFIG_LVD
 	dedup_module_pages(m_init_bits);
 	dedup_module_pages(m_core_bits);
 #endif

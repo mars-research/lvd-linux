@@ -20,6 +20,6 @@ vmfunc_wrapper(struct fipc_message *request)
 			       16, 1, vmfunc_call, 0x100, false);
 		once = 1;
 	}
-	vmfunc_call(0, OTHER_DOMAIN, request);
+	vmfunc_call(OTHER_DOMAIN, request);
 	return 0;
 }

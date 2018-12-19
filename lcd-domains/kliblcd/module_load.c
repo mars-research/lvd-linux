@@ -127,11 +127,12 @@ fail:
 }
 
 /* HIGHER-LEVEL LOAD/UNLOAD ---------------------------------------- */
+#ifdef CONFIG_LVD
 static int create_metadata(hva_t pages_base, unsigned long size)
 {
 	return lcd_create_mo_metadata(pages_base, size);
 }
-
+#endif
 static int dup_module_pages(hva_t pages_base, unsigned long size,
 			void **dup_pages_bits,
 			cptr_t *dup_pages_cap_out)

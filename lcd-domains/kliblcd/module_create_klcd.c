@@ -10,11 +10,24 @@
 #include <lcd_domains/microkernel.h>
 #include <lcd_domains/kliblcd.h>
 
+
+struct module *lcd_create_module_klcd_no_thread(char *mdir, char *mname, cptr_t *klcd_out)
+{
+	struct module *m = NULL;
+	if (!lcd_create_module_klcd(mdir, mname, klcd_out)) {
+		mutex_lock(&module_mutex);
+		m = find_module(mname);
+		mutex_unlock(&module_mutex);
+	}
+	return m;
+}
+
 int lcd_create_module_klcd(char *mdir, char *mname, cptr_t *klcd_out)
 {
 	cptr_t klcd;
 	int ret;
 	struct module *m;
+
 	/*
 	 * Load kernel module in host
 	 */
@@ -46,7 +59,6 @@ int lcd_create_module_klcd(char *mdir, char *mname, cptr_t *klcd_out)
 		LCD_ERR("failed to config klcd");
 		goto fail3;
 	}
-
 
 	*klcd_out = klcd;
 	

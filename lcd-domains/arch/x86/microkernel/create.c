@@ -24,8 +24,8 @@ struct lcd_vmcs_config lcd_global_vmcs_config;
 unsigned long *lcd_global_msr_bitmap;
 struct lcd_vpids lcd_vpids;
 
+#ifndef CONFIG_LVD
 /* VMCS ALLOC/FREE ---------------------------------------- */
-
 void lcd_arch_free_vmcs(struct lcd_arch_vmcs *vmcs)
 {
 	free_pages((unsigned long)vmcs, lcd_global_vmcs_config.order);
@@ -926,11 +926,16 @@ static void vmx_free_vpid(struct lcd_arch *lcd_arch)
 		__clear_bit(lcd_arch->vpid, lcd_vpids.bitmap);
 	spin_unlock(&lcd_vpids.lock);
 }
+#endif /* CONFIG_LVD */
 
 int lcd_arch_create(struct lcd_arch **out)
 {
 	struct lcd_arch *lcd_arch;
 	int ret;
+#ifdef CONFIG_LVD
+	int cpu;
+#endif
+
 	/*
 	 * Alloc lcd_arch
 	 */
@@ -940,6 +945,15 @@ int lcd_arch_create(struct lcd_arch **out)
 		ret = -ENOMEM;
 		goto fail_alloc;
 	}
+
+#ifdef CONFIG_LVD
+	lcd_arch->eptp_lcd = kmalloc(GFP_KERNEL, sizeof(u64) * num_online_cpus());
+
+	/* create ept for this LCD on all cpus */
+	for_each_online_cpu(cpu) {
+		lcd_arch->eptp_lcd[cpu] = lcd_arch_ept_init_one();
+	}
+#else
 	/*
 	 * Set up ept
 	 */
@@ -948,6 +962,9 @@ int lcd_arch_create(struct lcd_arch **out)
 		LCD_ERR("setting up etp");
 		goto fail_ept;
 	}
+#endif
+
+#ifndef CONFIG_LVD
 	/*
 	 * Alloc vmcs
 	 */
@@ -977,15 +994,18 @@ int lcd_arch_create(struct lcd_arch **out)
 	vmx_setup_vmcs(lcd_arch);
 	vmx_enable_ept_switching(lcd_arch);
 	vmx_put_cpu(lcd_arch);
-
+#endif /* CONFIG_LVD */
+	/* TODO: configure ept switching */
 	*out = lcd_arch;
 	
 	return 0;
 
+#ifndef CONFIG_LVD
 fail_vpid:
 	lcd_arch_free_vmcs(lcd_arch->vmcs);
 fail_vmcs:
 	lcd_arch_ept_free(lcd_arch);
+#endif
 fail_ept:
 	kmem_cache_free(lcd_arch_cache, lcd_arch);
 fail_alloc:
@@ -1012,7 +1032,9 @@ void lcd_arch_destroy(struct lcd_arch *lcd_arch)
 	 */
 	lcd_arch_ept_invvpid(lcd_arch->vpid);
 	lcd_arch_ept_invept(lcd_arch->ept.vmcs_ptr);
+#ifndef CONFIG_LVD
 	vmx_disable_ept_switching(lcd_arch);
+#endif
 	/*
 	 * VM clear on this cpu
 	 */
@@ -1025,8 +1047,10 @@ void lcd_arch_destroy(struct lcd_arch *lcd_arch)
 	/*
 	 * Free remaining junk
 	 */
+#ifndef CONFIG_LVD
 	vmx_free_vpid(lcd_arch);
 	lcd_arch_free_vmcs(lcd_arch->vmcs);
+#endif
 	lcd_arch_ept_free(lcd_arch);
 	kmem_cache_free(lcd_arch_cache, lcd_arch);
 }

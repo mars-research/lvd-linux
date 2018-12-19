@@ -97,6 +97,8 @@ int __lcd_create_no_vm(struct lcd **out, const char *name)
 		LCD_ERR("basic lcd create failed");
 		goto fail1;
 	}
+
+#ifndef CONFIG_LVD
 	/*
 	 * Create a kernel thread (won't run till we wake it up)
 	 */
@@ -113,13 +115,16 @@ int __lcd_create_no_vm(struct lcd **out, const char *name)
 	 * Store back reference to lcd
 	 */
 	lcd->kthread->lcd = lcd;
+#endif
 
 	*out = lcd;
 
 	return 0;
 
+#ifndef CONFIG_LVD
 fail2:
 	__lcd_destroy_no_vm_no_thread(lcd);
+#endif
 fail1:
 	return ret;
 }
@@ -567,7 +572,9 @@ void __lcd_destroy_no_vm(struct lcd *lcd)
 	 *     for which the lcd has the last capability (like pages).
 	 */
 	mark_lcd_as_dead(lcd);
+#ifndef CONFIG_LVD
 	destroy_kthread(lcd);
+#endif
 	destroy_cspace_and_utcb(lcd);
 	kfree(lcd);
 }

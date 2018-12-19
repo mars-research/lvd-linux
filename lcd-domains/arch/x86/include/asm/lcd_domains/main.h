@@ -189,6 +189,8 @@ struct lcd_arch {
 		bool access_dirty_enabled;
 	} ept;
 
+	/* eptp_lcd for all online cpus */
+	u64 *eptp_lcd;
 	/*
 	 * Exit info
 	 */

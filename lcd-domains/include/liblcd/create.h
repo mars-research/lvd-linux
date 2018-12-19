@@ -256,6 +256,7 @@ void lcd_destroy_create_ctx(struct lcd_create_ctx *ctx);
  */
 int lcd_create_module_klcd(char *mdir, char *mname, cptr_t *klcd);
 
+struct module *lcd_create_module_klcd_no_thread(char *mdir, char *mname, cptr_t *klcd_out);
 /**
  * lcd_destroy_module_klcd -- Destroys non-isolated LCD / thread 
  * @klcd: cptr to klcd capability in caller's cspace

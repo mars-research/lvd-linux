@@ -24,6 +24,7 @@
 #include <lcd_domains/types.h>
 #include <asm/lcd_domains/types.h>
 #include <asm/lcd_domains/ept.h>
+#include <asm/lcd_domains/ept_lcd.h>
 #include <asm/lcd_domains/create.h>
 #include <asm/lcd_domains/init.h>
 #include <asm/lcd_domains/run.h>

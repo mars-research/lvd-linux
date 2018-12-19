@@ -33,6 +33,7 @@ lcd_domains-y += $(addprefix arch/$(ARCH)/microkernel/, \
               init.o \
               create.o \
               ept.o \
+              ept_lcd.o \
               run.o \
               check.o \
               dump_stack.o \

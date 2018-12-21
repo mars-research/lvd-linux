@@ -8,6 +8,7 @@
 #include <linux/mm.h>
 #include <lcd_domains/microkernel.h>
 #include <asm/lcd_domains/ept.h>
+#include <asm/lcd_domains/ept_lcd.h>
 
 /* MEMORY OBJECT HELPERS -------------------------------------------------- */
 
@@ -164,6 +165,41 @@ fail1:
 }
 
 /* ALLOC -------------------------------------------------- */
+#ifdef CONFIG_LVD
+struct page* __lvd_alloc_pages_exact_node(struct lcd *caller, cptr_t slot, int nid,
+				unsigned int flags, unsigned int order)
+{
+	int ret;
+	struct page *p;
+	struct lcd_memory_object *unused;
+	/*
+	 * Allocate zero'd pages on node
+	 */
+	p = __alloc_pages_node(nid, flags | __GFP_ZERO, order);
+	if (!p) {
+		LCD_ERR("alloc failed");
+		ret = -ENOMEM;
+		goto fail1;
+	}
+	/*
+	 * Insert into caller's cspace
+	 */
+	ret = __lcd_insert_memory_object(caller, slot, p, (1UL << order),
+					LCD_MICROKERNEL_TYPE_ID_PAGE,
+					&unused);
+	if (ret) {
+		LCD_ERR("failed to insert page capability into caller's cspace");
+		goto fail2;
+	}
+
+	return p;
+
+fail2:
+	__free_pages(p, order);
+fail1:
+	return NULL;
+}
+#endif
 
 int __lcd_alloc_pages_exact_node(struct lcd *caller, cptr_t slot, int nid,
 				unsigned int flags, unsigned int order)
@@ -197,6 +233,40 @@ fail2:
 	__free_pages(p, order);
 fail1:
 	return ret;
+}
+
+struct page* __lvd_alloc_pages(struct lcd *caller, cptr_t slot,
+		unsigned int flags, unsigned int order)
+{
+	int ret;
+	struct page *p;
+	struct lcd_memory_object *unused;
+	/*
+	 * Allocate zero'd pages
+	 */
+	p = alloc_pages(flags | __GFP_ZERO, order);
+	if (!p) {
+		LCD_ERR("alloc failed");
+		ret = -ENOMEM;
+		goto fail1;
+	}
+	/*
+	 * Insert into caller's cspace
+	 */
+	ret = __lcd_insert_memory_object(caller, slot, p, (1UL << order),
+					LCD_MICROKERNEL_TYPE_ID_PAGE,
+					&unused);
+	if (ret) {
+		LCD_ERR("failed to insert page capability into caller's cspace");
+		goto fail2;
+	}
+
+	return p;
+
+fail2:
+	__free_pages(p, order);
+fail1:
+	return NULL;
 }
 
 int __lcd_alloc_pages(struct lcd *caller, cptr_t slot,
@@ -234,6 +304,39 @@ fail1:
 }
 
 /* VMALLOC -------------------------------------------------- */
+
+void* __lvd_vmalloc(struct lcd *caller, cptr_t slot, unsigned long nr_pages)
+{
+	int ret;
+	void *vptr;
+	struct lcd_memory_object *unused;
+	/*
+	 * Allocate zero'd out vmalloc pages
+	 */
+	vptr = vzalloc(nr_pages << PAGE_SHIFT);
+	if (!vptr) {
+		LCD_ERR("vzalloc failed");
+		ret = -ENOMEM;
+		goto fail1;
+	}
+	/*
+	 * Insert into caller's cspace
+	 */
+	ret = __lcd_insert_memory_object(caller, slot, vptr, nr_pages,
+					LCD_MICROKERNEL_TYPE_ID_VMALLOC_MEM,
+					&unused);
+	if (ret) {
+		LCD_ERR("failed to insert vmalloc mem capability into caller's cspace");
+		goto fail2;
+	}
+
+	return vptr;
+
+fail2:
+	vfree(vptr);
+fail1:
+	return NULL;
+}
 
 int __lcd_vmalloc(struct lcd *caller, cptr_t slot, unsigned long nr_pages)
 {
@@ -375,6 +478,7 @@ static int isolated_map_vmalloc_mem(struct lcd *lcd,
 	 * The base host virtual address is stored in the object
 	 */
 	vmalloc_base = __hva((unsigned long)vmalloc_mo->object);
+	LCD_ERR("mapping for vmalloc_base %lx | nr_pages %lu", vmalloc_base, vmalloc_mo->nr_pages);
 	/*
 	 * Map each page, one at a time
 	 */
@@ -388,9 +492,17 @@ static int isolated_map_vmalloc_mem(struct lcd *lcd,
 		/*
 		 * Map it in the LCD's guest physical
 		 */
+#ifdef CONFIG_LVD
+		ret = lcd_arch_ept_map_all_cpus(lcd->lcd_arch,
+				__gpa(__pa(page_address(p))),
+				va2hpa(page_address(p)),
+				true, /* create */
+				false); /* no overwrite */
+#else
 		ret = lcd_arch_ept_map(lcd->lcd_arch, gpa,
 				va2hpa(page_address(p)),
 				1, 0);
+#endif
 		if (ret) {
 			LCD_ERR("error mapping vmalloc page in LCD");
 			goto fail1;
@@ -443,8 +555,16 @@ static int isolated_map_contiguous_mem(struct lcd *lcd,
 	 * with it because we allow the LCD to use the PAT to control
 	 * caching, and we always map memory as WB in guest physical.
 	 */
+#ifdef CONFIG_LVD
+	/* in LVD's everything is one-to-one mapping */
+	ret = lcd_arch_ept_map_range_all_cpus(lcd->lcd_arch,
+					__gpa(hpa_val(hpa_base)),
+					hpa_base,
+					mo->nr_pages);
+#else
 	ret = lcd_arch_ept_map_range(lcd->lcd_arch, base, hpa_base,
 				mo->nr_pages);
+#endif
 	if (ret) {
 		LCD_ERR("map");
 		goto fail2;
@@ -528,8 +648,34 @@ int __lcd_do_map_memory_object(struct lcd *lcd,
 	 * here, in both cases we indicate the memory object as mapped.)
 	 */
 	meta->is_mapped = 1;
-	meta->where_mapped = base;
 
+#ifdef CONFIG_LVD
+	/* LCDs will have a predefined gpa base and the mo will have that
+	 * value.  Whereas, for LVDs we need to map it to the same gpa as the
+	 * host kernel.
+	 */
+	switch(lcd->type) {
+	case LCD_TYPE_ISOLATED:
+		if (__lcd_memory_object_is_contiguous(mo)) {
+			hpa_t hpa_base;
+			ret = contiguous_memory_object_hpa(mo, &hpa_base);
+			meta->where_mapped = __gpa(hpa_val(hpa_base));
+		} else {
+			void *addr = page_address(vmalloc_to_page(mo->object));
+			meta->where_mapped = __gpa(__pa(addr)); 
+		}
+		break;
+
+	case LCD_TYPE_NONISOLATED:
+	case LCD_TYPE_TOP:
+	default:
+		meta->where_mapped = base;
+		break;
+	}
+
+#else
+	meta->where_mapped = base;
+#endif
 	ret = 0;
 	goto out;
 
@@ -580,9 +726,15 @@ static void isolated_unmap_vmalloc_mem(struct lcd *lcd,
 	 * Unmapping is easier, because we mapped the vmalloc memory
 	 * in one contiguous chunk.
 	 */
+#ifdef CONFIG_LVD
+	ret = lcd_arch_ept_unmap_range_all_cpus(lcd->lcd_arch,
+				meta->where_mapped,
+				vmalloc_mo->nr_pages);
+#else
 	ret = lcd_arch_ept_unmap_range(lcd->lcd_arch,
 				meta->where_mapped,
 				vmalloc_mo->nr_pages);
+#endif
 	if (ret)
 		LCD_DEBUG(LCD_DEBUG_ERR, 
 			"some error unmapping");
@@ -596,8 +748,13 @@ static void isolated_unmap_contiguous_mem(struct lcd *lcd,
 	/*
 	 * Unmap memory object
 	 */
+#ifdef CONFIG_LVD
+	ret = lcd_arch_ept_unmap_range_all_cpus(lcd->lcd_arch, meta->where_mapped, 
+				mo->nr_pages);
+#else
 	ret = lcd_arch_ept_unmap_range(lcd->lcd_arch, meta->where_mapped, 
 				mo->nr_pages);
+#endif
 	if (ret)
 		LCD_DEBUG(LCD_DEBUG_ERR, 
 			"some error unmapping");

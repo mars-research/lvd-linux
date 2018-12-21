@@ -1005,9 +1005,9 @@ fail_vpid:
 	lcd_arch_free_vmcs(lcd_arch->vmcs);
 fail_vmcs:
 	lcd_arch_ept_free(lcd_arch);
-#endif
 fail_ept:
 	kmem_cache_free(lcd_arch_cache, lcd_arch);
+#endif
 fail_alloc:
 	return ret;
 }

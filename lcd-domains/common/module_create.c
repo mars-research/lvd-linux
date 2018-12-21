@@ -150,7 +150,7 @@ static int do_kernel_module_grant_map(cptr_t lcd, struct lcd_create_ctx *ctx,
 	c = &(lcd_to_boot_info(ctx)->lcd_boot_cptrs.module_init);
 	ret = do_grant_and_map_for_mem(lcd, ctx, ctx->m_init_bits,
 #ifdef CONFIG_LVD
-				__gpa((unsigned long)ctx->m_init_bits),
+				__gpa(__pa(ctx->m_init_bits)),
 #else
 				gpa_add(LCD_KERNEL_MODULE_REGION_GP_ADDR,
 					offset),
@@ -164,7 +164,7 @@ static int do_kernel_module_grant_map(cptr_t lcd, struct lcd_create_ctx *ctx,
 	c = &(lcd_to_boot_info(ctx)->lcd_boot_cptrs.module_core);
 	ret = do_grant_and_map_for_mem(lcd, ctx, ctx->m_core_bits,
 #ifdef CONFIG_LVD
-				__gpa((unsigned long)ctx->m_core_bits),
+				__gpa(__pa(ctx->m_core_bits)),
 #else
 				gpa_add(LCD_KERNEL_MODULE_REGION_GP_ADDR,
 					offset),
@@ -187,7 +187,7 @@ static int do_kernel_module_grant_map(cptr_t lcd, struct lcd_create_ctx *ctx,
 	 * way, a mapping would be created for this gpa and the corressponding
 	 * hpa would be the hpa of our newly copied page
 	 */
-				__gpa(virt_to_phys((void*)gva_val(m_vmfunc_page_addr))),
+				__gpa(__pa((void*)gva_val(m_vmfunc_page_addr))),
 #else
 				gpa_add(LCD_KERNEL_MODULE_REGION_GP_ADDR,
 					offset),

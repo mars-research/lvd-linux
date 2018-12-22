@@ -168,7 +168,10 @@ static int handle_syscall_vmalloc(struct fipc_message *msg)
 	/*
 	 * Do vmalloc
 	 */
-	return __lcd_vmalloc(lcd, slot, nr_pages);
+
+	msg->regs[0] = __lcd_vmalloc(lcd, slot, nr_pages);
+
+	return 0;
 }
 
 static int handle_syscall_pages_alloc(struct fipc_message *msg)
@@ -186,7 +189,8 @@ static int handle_syscall_pages_alloc(struct fipc_message *msg)
 	/*
 	 * Do page alloc
 	 */
-	return __lcd_alloc_pages(lcd, slot, flags, order);
+	msg->regs[0] = __lvd_alloc_pages(lcd, slot, flags, order);
+	return 0;
 }
 
 static int handle_syscall_pages_alloc_exact_node(struct fipc_message *msg)
@@ -206,7 +210,8 @@ static int handle_syscall_pages_alloc_exact_node(struct fipc_message *msg)
 	/*
 	 * Do page alloc
 	 */
-	return __lcd_alloc_pages_exact_node(lcd, slot, nid, flags, order);
+	msg->regs[0] = __lvd_alloc_pages_exact_node(lcd, slot, nid, flags, order);
+	return 0;
 }
 
 static int handle_syscall_sync_reply(struct fipc_message *msg)

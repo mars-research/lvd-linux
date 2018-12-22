@@ -49,7 +49,11 @@ lcd_enter(void)
 	/*
 	 * Initialize heap and kmalloc
 	 */
+#ifdef CONFIG_LVD
+	ret = __liblvd_heap_init();
+#else
 	ret = __liblcd_heap_init();
+#endif
 	if (ret) {
 		LIBLCD_ERR("failed to initialize heap and/or kmalloc");
 		goto fail;
@@ -58,7 +62,11 @@ lcd_enter(void)
 	/*
 	 * Initialize RAM map
 	 */
+#ifdef CONFIG_LVD
+	ret = __liblvd_ram_map_init();
+#else
 	ret = __liblcd_ram_map_init();
+#endif
 	if (ret) {
 		LIBLCD_ERR("failed to initialize RAM map");
 		goto fail;

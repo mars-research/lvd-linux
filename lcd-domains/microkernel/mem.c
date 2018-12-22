@@ -235,6 +235,8 @@ fail1:
 	return ret;
 }
 
+#ifdef CONFIG_LVD
+/* return virtual address */
 struct page* __lvd_alloc_pages(struct lcd *caller, cptr_t slot,
 		unsigned int flags, unsigned int order)
 {
@@ -266,8 +268,9 @@ struct page* __lvd_alloc_pages(struct lcd *caller, cptr_t slot,
 fail2:
 	__free_pages(p, order);
 fail1:
-	return NULL;
+	return p;
 }
+#endif
 
 int __lcd_alloc_pages(struct lcd *caller, cptr_t slot,
 		unsigned int flags, unsigned int order)
@@ -304,7 +307,7 @@ fail1:
 }
 
 /* VMALLOC -------------------------------------------------- */
-
+#ifdef CONFIG_LVD
 void* __lvd_vmalloc(struct lcd *caller, cptr_t slot, unsigned long nr_pages)
 {
 	int ret;
@@ -337,6 +340,7 @@ fail2:
 fail1:
 	return NULL;
 }
+#endif
 
 int __lcd_vmalloc(struct lcd *caller, cptr_t slot, unsigned long nr_pages)
 {

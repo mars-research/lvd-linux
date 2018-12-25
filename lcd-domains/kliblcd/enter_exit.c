@@ -64,6 +64,8 @@ int lcd_enter(void)
 		LCD_ERR("cptr cache alloc2");
 		goto fail5;
 	}
+
+#ifndef CONFIG_LVD
 	/*
 	 * Create our call endpoint (for receiving rpc replies)
 	 */
@@ -72,6 +74,7 @@ int lcd_enter(void)
                 LCD_ERR("creating call endpoint");
                 goto fail6;
         }
+#endif
 	/*
 	 * Set up resource trees
 	 */
@@ -96,7 +99,9 @@ int lcd_enter(void)
 
 fail8:
 fail7:
+#ifndef CONFIG_LVD
 fail6:
+#endif
 fail5:
 fail4:
 fail3:

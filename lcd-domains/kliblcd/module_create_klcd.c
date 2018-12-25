@@ -14,11 +14,29 @@
 struct module *lcd_create_module_klcd_no_thread(char *mdir, char *mname, cptr_t *klcd_out)
 {
 	struct module *m = NULL;
+	struct lcd *lcd_struct;
+	struct cnode *cnode;
+	int ret;
+
 	if (!lcd_create_module_klcd(mdir, mname, klcd_out)) {
 		mutex_lock(&module_mutex);
 		m = find_module(mname);
 		mutex_unlock(&module_mutex);
 	}
+
+	ret = __lcd_get(current->lcd, *klcd_out, &cnode, &lcd_struct);
+	if (ret)
+		goto fail1;
+
+	switch (lcd_struct->type) {
+	case LCD_TYPE_NONISOLATED:
+	case LCD_TYPE_ISOLATED:
+	case LCD_TYPE_TOP:
+		lcd_struct->m = m;
+	}
+
+	__lcd_put(current->lcd, cnode, lcd_struct);
+fail1:
 	return m;
 }
 
@@ -87,3 +105,4 @@ void lcd_destroy_module_klcd(cptr_t klcd, char *mname)
 
 EXPORT_SYMBOL(lcd_create_module_klcd);
 EXPORT_SYMBOL(lcd_destroy_module_klcd);
+EXPORT_SYMBOL(lcd_create_module_klcd_no_thread);

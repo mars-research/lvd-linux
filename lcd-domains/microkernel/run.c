@@ -649,7 +649,13 @@ int __lcd_run(struct lcd *caller, cptr_t lcd)
 	 * This will run the kthread for the first time
 	 */
 	set_lcd_status(lcd_struct, LCD_STATUS_RUNNING);
+#ifdef CONFIG_LVD
+	if (lcd_struct->type == LCD_TYPE_NONISOLATED)
+		if (lcd_struct->m)
+			lcd_struct->m->init();
+#else
 	wake_up_process(lcd_struct->kthread);
+#endif
 	/*
 	 * Unlock
 	 */

@@ -47,8 +47,9 @@
 typedef enum {
 	VMFUNC_SYNC_IPC = 0x1,
 	VMFUNC_LCD_SYSCALL = 0x2,
+	VMFUNC_RPC_CALL = 0x3,
 } vmfunc_id;
 
 int noinline vmfunc_wrapper(struct fipc_message *msg);
-int vmfunc_call(int domain, struct fipc_message *msg);
+void vmfunc_call(unsigned int ept, struct fipc_message *msg);
 #endif /* LIB_VMFUNC_H */

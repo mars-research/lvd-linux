@@ -86,6 +86,6 @@ lcd_domains-y += $(libasync_objs)
 # Extra includes
 ccflags-y += $(MICROKERNEL_CFLAGS)
 
-extra-y += ./microkernel/lcd_domains.lds
+extra-y += ./common/vmfunc.lds
 
-ldflags-y += -T $(MICROKERNEL_BUILD_DIR)/microkernel/lcd_domains.lds
+ldflags-y += -T $(MICROKERNEL_BUILD_DIR)/common/vmfunc.lds

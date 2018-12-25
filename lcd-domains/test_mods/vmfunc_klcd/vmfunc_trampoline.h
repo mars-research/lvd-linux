@@ -1,22 +1,17 @@
+#pragma once
+
 #ifndef VMFUNC_TRAMPOLINE_H
 #define VMFUNC_TRAMPOLINE_H
 
 #include <linux/types.h>
 #include <libfipc.h>
-#define VMFUNC_LINKAGE	  __attribute__((section(".vmfunc.text")))
 
-struct vmfunc_msg;
+/* Linker variables */
+extern int __vmfunc_page_size;
+extern int __vmfunc_load_addr;
 
-//void noinline
-//VMFUNC_LINKAGE
-//vmfunc_call(unsigned int ept, struct fipc_message *reg);
+/* extract data from linker variables */
+size_t vmfunc_page_size = (size_t)&__vmfunc_page_size;
+unsigned long* vmfunc_load_addr = (unsigned long*) &__vmfunc_load_addr;
 
-extern size_t vmfunc_page_size;
-extern unsigned long* vmfunc_load_addr;
-
-struct vmfunc_msg {
-	unsigned int nr;
-	unsigned int ept;
-	struct fipc_message *msg;
-};
 #endif /* VMFUNC_TRAMPOLINE_H */

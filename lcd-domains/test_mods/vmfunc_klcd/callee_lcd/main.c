@@ -19,15 +19,6 @@
 extern int vmfunc_wrapper(struct fipc_message *req);
 extern int vmfunc_call(struct fipc_message *msg);
 
-unsigned long noinline
-null_invocation(void)
-{
-	struct fipc_message msg;
-	msg.syscall_nr = 0;
-	vmfunc_call(&msg);
-	return 9;
-}
-
 int callee(struct fipc_ring_channel *chan)
 {
 	int ret = 0;

@@ -4,12 +4,11 @@ ccflags-y += -DOTHER_DOMAIN=0
 
 obj-m  += lcd_test_mod_vmfunc_klcd_callee_lcd.o
 
-lcd_test_mod_vmfunc_klcd_callee_lcd-y              += main.o
-lcd_test_mod_vmfunc_klcd_callee_lcd-y              += $(addprefix ../, vmfunc.o)
+lcd_test_mod_vmfunc_klcd_callee_lcd-y              += main.o dispatch.o
 
 lcd_test_mod_vmfunc_klcd_callee_lcd-y += $(LIBLCD)
 
 
-extra-y += ../vmfunc.lds
+extra-y += ../../../liblcd_build/common/vmfunc.lds
 
-ldflags-y += -T $(LCD_TEST_MODULES_BUILD_DIR)/vmfunc_klcd/vmfunc.lds
+ldflags-y += -T $(LIBLCD_BUILD_DIR)/common/vmfunc.lds

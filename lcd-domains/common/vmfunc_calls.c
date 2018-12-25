@@ -2,57 +2,90 @@
 
 #include <linux/compiler.h>
 #include <linux/mm.h>
-#include <linux/vmalloc.h>
+#include <linux/slab.h>
 #include <asm/lcd_domains/libvmfunc.h>
 #include <lcd_domains/microkernel.h>
+#include <liblcd/liblcd.h>
 
 #include <lcd_config/post_hook.h>
-
-#define VMFUNC_CALL_SECTION		".vmfunc.call"
-#define __vmfunc	__attribute__((section(VMFUNC_CALL_SECTION)))
-
-#define VMFUNC_WRAPPER_SECTION		".vmfuncwrapper.text"
-#define __vmfunc_wrapper __attribute__((section(VMFUNC_WRAPPER_SECTION)))
-
-int handle_vmfunc_syscall(struct fipc_message *msg);
-int handle_vmfunc_syncipc(struct fipc_message *msg);
-
-static int func = 0;
-static int host_ept = 0;
-static int lcds_ept = 1;
-
-void *_stack;
-
 
 /* include/linux/stringify.h */
 #define __stringify_1(x...)	#x
 #define __stringify(x...)	__stringify_1(x)
 
-int vmfunc_call_init(void)
+#define VMFUNC_TEXT_SECTION		".vmfunc.text"
+#define __vmfunc	__attribute__((section(VMFUNC_TEXT_SECTION)))
+
+#define VMFUNC_WRAPPER_SECTION		".vmfuncwrapper.text"
+#define __vmfunc_wrapper __attribute__((section(VMFUNC_WRAPPER_SECTION)))
+
+#define __weak __attribute__((weak))
+
+int handle_vmfunc_syscall(struct fipc_message *msg);
+int handle_vmfunc_syncipc(struct fipc_message *msg);
+
+/* this is the only function Intel VT-x support */
+static int func = 0;
+
+/* percpu stack pages and stack pointers */
+static void **stack_pages;
+static void **stack_ptrs;
+
+/* percpu response buffers */
+struct fipc_message **responses;
+
+/* exported by the microkernel. We trust that it's sane */
+extern void *cpuid_page;
+
+extern int __vmfunc_page_size;
+extern int __vmfunc_load_addr;
+
+int
+__vmfunc
+vmfunc_init(void)
 {
-	/* do this only for klcd case as syscalls are originated only from
-	 * LCDs.  When LCDs call vmfunc_syscall, the code will save the
-	 * existing stack pointer to syscall_stack variable and restore it on
-	 * the way back. On the host kernel, we need a stack to operate on.
-	 * Let's allocate a page for it.
+	int i, j;
+	/* TODO: this num_online_cpus macro accesses __cpu_online_mask
+	 * Make sure we map this page on LCDs EPT
 	 */
-#ifndef LCD_ISOLATE
-	/* allocate a single page for stack */
-	_stack = vmalloc(2 * PAGE_SIZE);
-	if (!_stack) {
-		LCD_ERR("failed to alloc mem for syscall stack");
-		return -ENOMEM;
+	stack_pages = kmalloc(sizeof(void*) * num_online_cpus(), GFP_KERNEL);
+	for (i = 0; i < num_online_cpus(); i++) {
+		stack_pages[i] = kmalloc(PAGE_SIZE * 2, GFP_KERNEL);
+		/* store stack pointers */
+		stack_ptrs[i] = stack_pages[i];
+		if (!stack_pages[i])
+			goto clean;
 	}
-#endif
+
+	responses = kmalloc(sizeof(struct fipc_message*) * num_online_cpus(), GFP_KERNEL);
+	for (j = 0; j < num_online_cpus(); j++) {
+		responses[j] = kmalloc(sizeof(struct fipc_message), GFP_KERNEL);
+		if (!responses[j])
+			goto clean2;
+	}
+
 	return 0;
+
+clean2:
+	for (; j >=0; j--)
+		kfree(responses[j]);
+clean:
+	for (; i >=0; i--)
+		kfree(stack_pages[i]);
+
+	return -ENOMEM;
 }
 
-void vmfunc_call_exit(void)
+void
+vmfunc_exit(void)
 {
-#ifndef LCD_ISOLATE
-	if (_stack)
-		vfree(_stack);
-#endif
+	int i = 0;
+
+	for (; i < num_online_cpus(); i++)
+		kfree(stack_pages[i]);
+
+	for (; i < num_online_cpus(); i++)
+		kfree(responses[i]);
 }
 
 int handle_vmfunc_syncipc(struct fipc_message *msg)
@@ -60,12 +93,18 @@ int handle_vmfunc_syncipc(struct fipc_message *msg)
 	return 0;
 }
 
-//extern int noinline
-//__vmfunc_dispatch(struct fipc_message *msg);
 
-// Every module (KLCD, LCD should define their own handle_rpc_calls() to handle
-// RPC calls for that domain
-extern int handle_rpc_calls(struct fipc_message *);
+/* Every module (KLCD, LCD should define their own handle_rpc_calls() to handle
+ * RPC calls for that domain
+ */
+int
+__weak
+handle_rpc_calls(struct fipc_message *msg) {
+	printk("weak alias for %s! If you want to handle RPCs"
+		" please override the function in your module\n", __func__);
+	return 0;
+};
+EXPORT_SYMBOL(handle_rpc_calls);
 
 int noinline
 __vmfunc_dispatch(struct fipc_message *msg)
@@ -82,9 +121,13 @@ __vmfunc_dispatch(struct fipc_message *msg)
 		ret = handle_vmfunc_syscall(msg);
 		break;
 #endif
-	default:
+	case VMFUNC_RPC_CALL:
 		ret = handle_rpc_calls(msg);
 		break;
+
+	default:
+		printk("%s, no handler for unknown call type %d\n",
+				__func__, msg->vmfunc_id);
 	}
 
 	return ret;
@@ -101,25 +144,36 @@ vmfunc_dispatch(unsigned long reg0, //rdi
 		unsigned long reg3, //r8
 		unsigned long reg4, //r9
 		unsigned long reg5, //r10
-		unsigned long reg6); //r11
+		unsigned long reg6, //r11
+		unsigned long reg7); //r12
 __asm__ (
-	"	.section " VMFUNC_CALL_SECTION ", \"ax\"	\n\t"
+	"	.section " VMFUNC_TEXT_SECTION ", \"ax\"	\n\t"
 	"	.align 16	\n\t"
 	"	.type vmfunc_dispatch,  @function \n\t"
 	"vmfunc_dispatch:		\n\t"
-	/* construct fipc_message */
-	"  sub $64, %rsp		\n\t"
-	"  mov %rdi, 0(%rsp)	\n\t"
-	"  mov %rsi, 8(%rsp)	\n\t"
-	"  mov %rdx, 16(%rsp)	\n\t"
-	"  mov %r8, 24(%rsp)	\n\t"
-	"  mov %r9, 32(%rsp)	\n\t"
-	"  mov %r10, 40(%rsp)	\n\t"
-	"  mov %r11, 48(%rsp)	\n\t"
-	"  mov %r12, 56(%rsp)	\n\t"
+	/* construct request fipc_message */
+	"  push %rdi	\n\t"
+	"  push %rsi	\n\t"
+	"  push %rdx	\n\t"
+	"  push %r8	\n\t"
+	"  push %r9	\n\t"
+	"  push %r10	\n\t"
+	"  push %r11	\n\t"
+	"  push %r12	\n\t"
+	/* make a pointer to this fipc_message struct and place it
+	 * as first argument */
 	"  mov %rsp, %rdi		\n\t"
 	"  call __vmfunc_dispatch	\n\t"
-	"  add $64, %rsp		\n\t"
+	/* populate registers for response fipc_message */
+	"  pop %r12	\n\t"
+	"  pop %r11	\n\t"
+	"  pop %r10	\n\t"
+	"  pop %r9	\n\t"
+	"  pop %r8	\n\t"
+	"  pop %rdx	\n\t"
+	"  pop %rsi	\n\t"
+	"  pop %rdi	\n\t"
+	/* stack pointer is restored */
 	"  ret			\n\t"
 	);
 
@@ -127,57 +181,123 @@ __asm__ (
 /* functions with vmfunc instructions should be on the same page on both
  * host Linux and LCDs. Place it in a separate section
  */
-int
+void
 __vmfunc
-vmfunc_call(int domain, struct fipc_message *msg)
+vmfunc_call(unsigned int ept, //rdi
+		struct fipc_message *msg) //rsi
 {
-	long ret = 0;
 	asm volatile(
+		/* function prologue pushes callee-saved registers onto the
+		 * stack as we have those registers clobbered */
+#ifdef LOCAL_RESPONSE_BUFFER
+		/* push msg pointer onto the stack. this is needed for
+		 * constructing response buffer when the call returns */
+		"push " _REG_RSI " \n\t"
+#endif
+		/* populate eax,ecx for vmfunc */
 		"mov %[func], " _REG_EAX " \n\t"
-		"mov %[hept], "	_REG_ECX " \n\t"
+		"mov %[ept], " _REG_ECX " \n\t"
 		/* populate registers as per calling convention */
-		"mov %[id]," REG0 " \n\t"
-		"mov %[reg0]," REG1 " \n\t"
-		"mov %[reg1]," REG2 " \n\t"
-		"mov %[reg2]," REG3 " \n\t"
-		"mov %[reg3]," REG4 " \n\t"
-		"mov %[reg4]," REG5 " \n\t"
-		"mov %[reg5]," REG6 " \n\t"
-		"mov %[reg6]," REG7 " \n\t"
-
+		"mov %[reg0]," REG0 " \n\t"
+		"mov %[reg1]," REG1 " \n\t"
+		"mov %[reg2]," REG2 " \n\t"
+		"mov %[reg3]," REG3 " \n\t"
+		"mov %[reg4]," REG4 " \n\t"
+		"mov %[reg5]," REG5 " \n\t"
+		"mov %[reg6]," REG6 " \n\t"
+		"mov %[reg7]," REG7 " \n\t"
+		/* get cpuid page buffer */
+		"mov %[cpuid], " _REG_RBX " \n\t"
+		/* get cpu number from cpuid page */
+		"mov (" _REG_RBX "), " _REG_RBX " \n\t"
+		/* get base address of stack pointer array */
+		"mov %[stack_ptrs], " _REG_R13 " \n\t"
 		/* save RSP */
-		"mov " _REG_RSP ", %[g_stack] \n\t"
+		"mov " _REG_RSP ", (" _REG_R13 ", " _REG_RBX ",8) \n\t"
+		/* zero callee saved registers */
+		"xor " _REG_RBX "," _REG_RBX " \n\t"
+		"xor " _REG_R13 "," _REG_R13 " \n\t"
+		"xor " _REG_R14 "," _REG_R14 " \n\t"
+		"xor " _REG_R15 "," _REG_R15 " \n\t"
+		/* call vmfunc */
 		"vmfunc \n\t"
+		/* get cpuid page buffer */
+		"mov %[cpuid], " _REG_RBX " \n\t"
+		/* get cpu number from cpuid page */
+		"mov (" _REG_RBX "), " _REG_RBX " \n\t"
+		/* get base address of stack pointer array */
+		"mov %[stack_ptrs], " _REG_R13 " \n\t"
 		/* restore RSP */
-		"mov %[g_stack], " _REG_RSP " \n\t"
+		"mov (" _REG_R13 ", " _REG_RBX ",8), " _REG_RSP " \n\t"
+
 		"call vmfunc_dispatch \n\t"
-		/* return value is in rax */
-		"mov " _REG_RAX "," REG0  " \n\t"
-		"mov $0, " _REG_EAX " \n\t"
-		"mov %[lept], " _REG_ECX " \n\t"
-		/* we are back after invoking the syscall, no need to save stack */
-		"vmfunc \n\t"
+		/* when the call returns RSP should be the same as above */
+		/* response message is on REG0..REG6 registers */
+		/* if so, do we need to save again? */
+		/* save RSP */
+		/* get cpuid page buffer */
+		"mov %[cpuid], " _REG_RBX " \n\t"
+		/* get cpu number from cpuid page */
+		"mov (" _REG_RBX "), " _REG_RBX " \n\t"
+		/* get base address of stack pointer array */
+		"mov %[stack_ptrs], " _REG_R13 " \n\t"
+		/* save RSP */
+		"mov " _REG_RSP ", (" _REG_R13 ", " _REG_RBX ",8) \n\t"
+		/* we do not need any registers to be saved as we are
+		 * returning to caller
+		 */
+		"mov 0, " _REG_EAX " \n\t"
+		/* OTHER_DOMAIN is set via cflags */
+		"mov " __stringify(OTHER_DOMAIN) ", " _REG_ECX " \n\t"
+		"vmfunc			\n\t"
+		/* get cpuid page buffer */
+		"mov %[cpuid], " _REG_RBX " \n\t"
+		/* get cpu number from cpuid page */
+		"mov (" _REG_RBX "), " _REG_RBX " \n\t"
+		/* get base address of stack pointer array */
+		"mov %[stack_ptrs], " _REG_R13 " \n\t"
 		/* restore RSP */
-		"mov %[g_stack], " _REG_RSP " \n\t"
+		"mov (" _REG_R13 ", " _REG_RBX ",8), " _REG_RSP " \n\t"
+#ifdef LOCAL_RESPONSE_BUFFER
+		/* stack pointer is restored, let's get our msg buffer */
+		"pop " _REG_R13 " \n\t"
+#else
+		/* get base address of responses buffer */
+		"mov %[resps], " _REG_R13 " \n\t"
+		/* get responses[cpu] */
+		"mov (" _REG_R13 ", " _REG_RBX ",8), " _REG_R13 " \n\t"
+#endif
+		/* construct response fipc_message from registers */
+		"mov " REG0 ", 0(" _REG_R13 ") \n\t"
+		"mov " REG1 ", 8(" _REG_R13 ") \n\t"
+		"mov " REG2 ", 16(" _REG_R13 ") \n\t"
+		"mov " REG3 ", 24(" _REG_R13 ") \n\t"
+		"mov " REG4 ", 32(" _REG_R13 ") \n\t"
+		"mov " REG5 ", 40(" _REG_R13 ") \n\t"
+		"mov " REG6 ", 48(" _REG_R13 ") \n\t"
+		"mov " REG7 ", 56(" _REG_R13 ") \n\t"
+		/* after restoring the callee-saved registers are popped off
+		 * the current stack and the calle returns
+		 */
 		: : [func]"i"(func),
-		[hept]"i"(host_ept),
-		[lept]"i"(lcds_ept),
-		[g_stack]"m"(_stack),
-		[id]"m"(msg->id),
-		[reg0]"m"(msg->regs[0]),
-		[reg1]"m"(msg->regs[1]),
-		[reg2]"m"(msg->regs[2]),
-		[reg3]"m"(msg->regs[3]),
-		[reg4]"m"(msg->regs[4]),
-		[reg5]"m"(msg->regs[5]),
-		[reg6]"m"(msg->regs[6])
+		[ept]"r"(ept),
+		[reg0]"m"(msg->id),
+		[reg1]"m"(msg->regs[0]),
+		[reg2]"m"(msg->regs[1]),
+		[reg3]"m"(msg->regs[2]),
+		[reg4]"m"(msg->regs[3]),
+		[reg5]"m"(msg->regs[4]),
+		[reg6]"m"(msg->regs[5]),
+		[reg7]"m"(msg->regs[6]),
+		[stack_ptrs]"m"(stack_ptrs),
+		[cpuid]"m"(cpuid_page),
+		[resps]"m"(responses)
 		:
 		/* add this to clobbered list and let the compiler generate push and pop
 		 * sequences in prologue and epilogue automatically
 		 */
 		"rbx", "r12", "r13", "r14",
 		"r15", "memory", "cc");
-	return ret;
 }
 EXPORT_SYMBOL(vmfunc_call);
 
@@ -197,3 +317,5 @@ vmfunc_wrapper(struct fipc_message *request)
 	return 0;
 }
 EXPORT_SYMBOL(vmfunc_wrapper);
+EXPORT_SYMBOL(__vmfunc_load_addr);
+EXPORT_SYMBOL(__vmfunc_page_size);

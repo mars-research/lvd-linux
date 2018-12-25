@@ -9,6 +9,14 @@
 
 #define VMFUNC_LINKAGE	  __attribute__((section(".vmfunc.text")))
 
+/* Linker variables */
+extern int __vmfunc_page_size;
+extern int __vmfunc_load_addr;
+
+/* extract data from linker variables */
+size_t vmfunc_page_size = (size_t)&__vmfunc_page_size;
+unsigned long* vmfunc_load_addr = (unsigned long*) &__vmfunc_load_addr;
+
 static void noinline
 VMFUNC_LINKAGE
 vmfunc(unsigned int nr, unsigned int ept)
@@ -19,18 +27,4 @@ vmfunc(unsigned int nr, unsigned int ept)
 		     : "memory");
 }
 
-extern char __vmfunc_page_size;
-extern char __vmfunc_load_addr;
-
-size_t vmfunc_page_size = (size_t)&__vmfunc_page_size;
-unsigned char* vmfunc_load_addr = (unsigned char*) &__vmfunc_load_addr;
-#if 0
-static void *
-__attribute__((unused))
-VMFUNC_LINKAGE
-get_stack(void)
-{
-	return NULL;
-}
-#endif
 #endif /* VMFUNC_TRAMPOLINE_H */

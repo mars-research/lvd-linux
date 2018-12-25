@@ -7,6 +7,6 @@ lcd_test_mod_vmfunc_callee_lcd-y += $(LIBLCD)
 
 ccflags-y += $(ISOLATED_CFLAGS)
 
-extra-y += ../vmfunc.lds
+extra-y += ../../../liblcd_build/common/vmfunc.lds
 
-ldflags-y += -T $(LCD_TEST_MODULES_BUILD_DIR)/vmfunc/vmfunc.lds
+ldflags-y += -T $(LIBLCD_BUILD_DIR)/common/vmfunc.lds

@@ -11,11 +11,22 @@
 #define VMFUNC_CALL_SECTION		".vmfunc.call"
 #define __vmfunc	__attribute__((section(VMFUNC_CALL_SECTION)))
 
+#define VMFUNC_WRAPPER_SECTION		".vmfuncwrapper.text"
+#define __vmfunc_wrapper __attribute__((section(VMFUNC_WRAPPER_SECTION)))
+
+int handle_vmfunc_syscall(struct fipc_message *msg);
+int handle_vmfunc_syncipc(struct fipc_message *msg);
+
 static int func = 0;
 static int host_ept = 0;
 static int lcds_ept = 1;
 
 void *_stack;
+
+
+/* include/linux/stringify.h */
+#define __stringify_1(x...)	#x
+#define __stringify(x...)	__stringify_1(x)
 
 int vmfunc_call_init(void)
 {
@@ -44,8 +55,19 @@ void vmfunc_call_exit(void)
 #endif
 }
 
+int handle_vmfunc_syncipc(struct fipc_message *msg)
+{
+	return 0;
+}
+
+//extern int noinline
+//__vmfunc_dispatch(struct fipc_message *msg);
+
+// Every module (KLCD, LCD should define their own handle_rpc_calls() to handle
+// RPC calls for that domain
+extern int handle_rpc_calls(struct fipc_message *);
+
 int noinline
-__vmfunc
 __vmfunc_dispatch(struct fipc_message *msg)
 {
 	int ret = 0;
@@ -55,17 +77,18 @@ __vmfunc_dispatch(struct fipc_message *msg)
 		handle_vmfunc_syncipc(msg);
 		break;
 
+#ifndef LCD_ISOLATE
 	case VMFUNC_LCD_SYSCALL:
 		ret = handle_vmfunc_syscall(msg);
 		break;
+#endif
 	default:
+		ret = handle_rpc_calls(msg);
 		break;
 	}
 
 	return ret;
 }
-
-
 
 /* this function is called from vmfunc layer with arguments on the registers
  * (per system V abi)
@@ -106,7 +129,7 @@ __asm__ (
  */
 int
 __vmfunc
-vmfunc_call(struct fipc_message *msg)
+vmfunc_call(int domain, struct fipc_message *msg)
 {
 	long ret = 0;
 	asm volatile(
@@ -156,3 +179,21 @@ vmfunc_call(struct fipc_message *msg)
 		"r15", "memory", "cc");
 	return ret;
 }
+EXPORT_SYMBOL(vmfunc_call);
+
+int noinline
+__vmfunc_wrapper
+vmfunc_wrapper(struct fipc_message *request)
+{
+	static int once = 0;
+
+	if (!once) {
+		printk("%s, vmfunc (%p)\n", __func__, vmfunc_call);
+		print_hex_dump(KERN_DEBUG, "vmfunc: ", DUMP_PREFIX_ADDRESS,
+			       16, 1, vmfunc_call, 0x100, false);
+		once = 1;
+	}
+	vmfunc_call(OTHER_DOMAIN, request);
+	return 0;
+}
+EXPORT_SYMBOL(vmfunc_wrapper);

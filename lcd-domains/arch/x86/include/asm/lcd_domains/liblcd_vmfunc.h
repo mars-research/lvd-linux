@@ -10,7 +10,8 @@
 
 #include <libcap.h>
 #include <lcd_domains/types.h>
-#include <liblcd/libvmfunc.h>
+#include <libfipc.h>
+#include <asm/lcd_domains/libvmfunc.h>
 
 /* LOW LEVEL SYSCALLS -------------------------------------------------- */
 
@@ -24,6 +25,7 @@
 	} while(0)
 
 /* Bit of redundancy. But trying not to get macro crazy. */
+extern int vmfunc_wrapper(struct fipc_message *msg);
 
 static inline void lvd_syscall_no_args(struct fipc_message *m, int id)
 {
@@ -90,213 +92,217 @@ static inline void lvd_syscall_five_args(struct fipc_message *m, int id,
 	fipc_set_reg4(m, arg4);
 }
 
-static inline void lvd_syscall_cap_delete(cptr_t cptr)
+static inline void lvd_syscall_cap_delete(struct fipc_message *msg, cptr_t cptr)
 {
-	struct fipc_message msg;
-	lvd_syscall_one_arg(&msg, LCD_SYSCALL_CAP_DELETE, cptr_val(cptr));
-	vmfunc_wrapper(&msg);
+	lvd_syscall_one_arg(msg, LCD_SYSCALL_CAP_DELETE, cptr_val(cptr));
+	vmfunc_wrapper(msg);
 }
 
-static inline int lvd_syscall_cap_revoke(cptr_t cptr)
+static inline int lvd_syscall_cap_revoke(struct fipc_message *msg, cptr_t cptr)
 {
-	struct fipc_message msg;
-	lvd_syscall_one_arg(&msg, LCD_SYSCALL_CAP_REVOKE, cptr_val(cptr));
-	vmfunc_wrapper(&msg);
+	lvd_syscall_one_arg(msg, LCD_SYSCALL_CAP_REVOKE, cptr_val(cptr));
+	vmfunc_wrapper(msg);
+	return 0;
 }
 
-static inline int lvd_syscall_cap_grant(cptr_t lcd, cptr_t src, cptr_t dest)
+static inline int lvd_syscall_cap_grant(struct fipc_message *msg, cptr_t lcd, cptr_t src, cptr_t dest)
 {
-	struct fipc_message msg;
-	lvd_syscall_three_args(&msg, LCD_SYSCALL_CAP_GRANT, 
+	lvd_syscall_three_args(msg, LCD_SYSCALL_CAP_GRANT, 
 				cptr_val(lcd), cptr_val(src), cptr_val(dest));
-	vmfunc_wrapper(&msg);
+	vmfunc_wrapper(msg);
+	return 0;
 }
 
-static inline int lvd_syscall_putchar(unsigned char c)
+static inline int lvd_syscall_putchar(struct fipc_message *msg, unsigned char c)
 {
-	struct fipc_message msg;
-	lvd_syscall_one_arg(&msg, LCD_SYSCALL_PUTCHAR, c);
-	vmfunc_wrapper(&msg);
+	lvd_syscall_one_arg(msg, LCD_SYSCALL_PUTCHAR, c);
+	vmfunc_wrapper(msg);
+	return 0;
 }
 
-static inline int lvd_syscall_create(cptr_t lcd_slot)
+static inline int lvd_syscall_create(struct fipc_message *msg, cptr_t lcd_slot)
 {
-	struct fipc_message msg;
-	lvd_syscall_one_arg(&msg, LCD_SYSCALL_CREATE, cptr_val(lcd_slot));
+	lvd_syscall_one_arg(msg, LCD_SYSCALL_CREATE, cptr_val(lcd_slot));
+	vmfunc_wrapper(msg);
+	return 0;
 }
 
-static inline int lvd_syscall_config_registers(cptr_t lcd, gva_t pc,
+static inline int lvd_syscall_config_registers(struct fipc_message *msg, cptr_t lcd, gva_t pc,
 					gva_t sp, gpa_t gva_root,
 					gpa_t utcb_page)
 {
-	struct fipc_message msg;
-	lvd_syscall_five_args(&msg, LCD_SYSCALL_CONFIG_REGISTERS, 
+	lvd_syscall_five_args(msg, LCD_SYSCALL_CONFIG_REGISTERS, 
 				cptr_val(lcd), gva_val(pc), gva_val(sp),
 				gpa_val(gva_root), gpa_val(utcb_page));
-	vmfunc_wrapper(&msg);
+	vmfunc_wrapper(msg);
+	return 0;
 }
 
-static inline int lvd_syscall_memory_grant_and_map(cptr_t lcd,
+static inline int lvd_syscall_memory_grant_and_map(struct fipc_message *msg, cptr_t lcd,
 						cptr_t mo_cptr,
 						cptr_t dest_slot,
 						gpa_t base)
 {
-	struct fipc_message msg;
-	lvd_syscall_four_args(&msg, LCD_SYSCALL_MEMORY_GRANT_AND_MAP, 
+	lvd_syscall_four_args(msg, LCD_SYSCALL_MEMORY_GRANT_AND_MAP, 
 				cptr_val(lcd), cptr_val(mo_cptr), 
 				cptr_val(dest_slot), gpa_val(base));
-	vmfunc_wrapper(&msg);
+	vmfunc_wrapper(msg);
+	return 0;
 }
 
-static inline int lvd_syscall_run(cptr_t lcd)
+static inline int lvd_syscall_run(struct fipc_message *msg, cptr_t lcd)
 {
-	struct fipc_message msg;
-	lvd_syscall_one_arg(&msg, LCD_SYSCALL_RUN, cptr_val(lcd));
-	vmfunc_wrapper(&msg);
+	lvd_syscall_one_arg(msg, LCD_SYSCALL_RUN, cptr_val(lcd));
+	vmfunc_wrapper(msg);
+	return 0;
 }
 
-static inline void __noreturn lvd_syscall_exit(int retval)
+static inline void __noreturn lvd_syscall_exit(struct fipc_message *msg, int retval)
 {
-	struct fipc_message msg;
 	for(;;)
-		lvd_syscall_one_arg(&msg, LCD_SYSCALL_EXIT, retval);
-	vmfunc_wrapper(&msg);
+		lvd_syscall_one_arg(msg, LCD_SYSCALL_EXIT, retval);
+	vmfunc_wrapper(msg);
 }
 
-static inline int lvd_syscall_sync_send(cptr_t endpoint)
+static inline int lvd_syscall_sync_send(struct fipc_message *msg, cptr_t endpoint)
 {
-	struct fipc_message msg;
-	lvd_syscall_one_arg(&msg, LCD_SYSCALL_SYNC_SEND, cptr_val(endpoint));
-	vmfunc_wrapper(&msg);
+	lvd_syscall_one_arg(msg, LCD_SYSCALL_SYNC_SEND, cptr_val(endpoint));
+	vmfunc_wrapper(msg);
+	return 0;
 }
 
-static inline int lvd_syscall_sync_recv(cptr_t endpoint)
+static inline int lvd_syscall_sync_recv(struct fipc_message *msg, cptr_t endpoint)
 {
-	struct fipc_message msg;
-	lvd_syscall_one_arg(&msg, LCD_SYSCALL_SYNC_RECV, cptr_val(endpoint));
-	vmfunc_wrapper(&msg);
+	lvd_syscall_one_arg(msg, LCD_SYSCALL_SYNC_RECV, cptr_val(endpoint));
+	vmfunc_wrapper(msg);
+	return 0;
 }
 
-static inline int lvd_syscall_sync_poll_recv(cptr_t endpoint)
+static inline int lvd_syscall_sync_poll_recv(struct fipc_message *msg, cptr_t endpoint)
 {
-	struct fipc_message msg;
-	lvd_syscall_one_arg(&msg, LCD_SYSCALL_SYNC_POLL_RECV, 
+	lvd_syscall_one_arg(msg, LCD_SYSCALL_SYNC_POLL_RECV, 
 				cptr_val(endpoint));
-	vmfunc_wrapper(&msg);
+	vmfunc_wrapper(msg);
+	return 0;
 }
 
-static inline int lvd_syscall_sync_call(cptr_t endpoint)
+static inline int lvd_syscall_sync_call(struct fipc_message *msg, cptr_t endpoint)
 {
-	struct fipc_message msg;
-	lvd_syscall_one_arg(&msg, LCD_SYSCALL_SYNC_CALL, cptr_val(endpoint));
-	vmfunc_wrapper(&msg);
+	lvd_syscall_one_arg(msg, LCD_SYSCALL_SYNC_CALL, cptr_val(endpoint));
+	vmfunc_wrapper(msg);
+	return 0;
 }
 
-static inline int lvd_syscall_sync_reply(void)
+static inline int lvd_syscall_sync_reply(struct fipc_message *msg)
 {
-	struct fipc_message msg;
-	lvd_syscall_no_args(&msg, LCD_SYSCALL_SYNC_REPLY);
-	vmfunc_wrapper(&msg);
+	lvd_syscall_no_args(msg, LCD_SYSCALL_SYNC_REPLY);
+	vmfunc_wrapper(msg);
+	return 0;
 }
 
-static inline int lvd_syscall_assign_device(int domain, int bus, int devfn)
+static inline int lvd_syscall_assign_device(struct fipc_message *msg, int domain, int bus, int devfn)
 {
-	struct fipc_message msg;
-	lvd_syscall_three_args(&msg, LCD_SYSCALL_ASSIGN_DEVICE, domain, bus, devfn);
-	vmfunc_wrapper(&msg);
+	lvd_syscall_three_args(msg, LCD_SYSCALL_ASSIGN_DEVICE, domain, bus, devfn);
+	vmfunc_wrapper(msg);
+	return 0;
 }
 
-static inline int lvd_syscall_deassign_device(int domain, int bus, int devfn)
+static inline int lvd_syscall_deassign_device(struct fipc_message *msg, int domain, int bus, int devfn)
 {
-	struct fipc_message msg;
-	lvd_syscall_three_args(&msg, LCD_SYSCALL_DEASSIGN_DEVICE, domain, bus, devfn);
-	vmfunc_wrapper(&msg);
+	lvd_syscall_three_args(msg, LCD_SYSCALL_DEASSIGN_DEVICE, domain, bus, devfn);
+	vmfunc_wrapper(msg);
+	return 0;
 }
 
-static inline int lvd_syscall_iommu_map_page(gpa_t gpa, unsigned int order, bool force)
+static inline int lvd_syscall_iommu_map_page(struct fipc_message *msg, gpa_t gpa, unsigned int order, bool force)
 {
-	struct fipc_message msg;
-	lvd_syscall_three_args(&msg, LCD_SYSCALL_IOMMU_MAP_PAGE, gpa_val(gpa), order, force);
-	vmfunc_wrapper(&msg);
+	lvd_syscall_three_args(msg, LCD_SYSCALL_IOMMU_MAP_PAGE, gpa_val(gpa), order, force);
+	vmfunc_wrapper(msg);
+	return 0;
 }
 
-static inline int lvd_syscall_iommu_unmap_page(gpa_t gpa, unsigned int order)
+static inline int lvd_syscall_iommu_unmap_page(struct fipc_message *msg, gpa_t gpa, unsigned int order)
 {
-	struct fipc_message msg;
-	lvd_syscall_two_args(&msg, LCD_SYSCALL_IOMMU_UNMAP_PAGE, gpa_val(gpa), order);
-	vmfunc_wrapper(&msg);
+	lvd_syscall_two_args(msg, LCD_SYSCALL_IOMMU_UNMAP_PAGE, gpa_val(gpa), order);
+	vmfunc_wrapper(msg);
+	return 0;
 }
 
-static inline int lvd_syscall_create_sync_ep(cptr_t slot)
+static inline int lvd_syscall_create_sync_ep(struct fipc_message *msg, cptr_t slot)
 {
-	struct fipc_message msg;
-	lvd_syscall_one_arg(&msg, LCD_SYSCALL_CREATE_SYNC_EP, cptr_val(slot));
-	vmfunc_wrapper(&msg);
+	lvd_syscall_one_arg(msg, LCD_SYSCALL_CREATE_SYNC_EP, cptr_val(slot));
+	vmfunc_wrapper(msg);
+	return 0;
 }
 
-static inline int lvd_syscall_alloc_pages_exact_node(cptr_t slot, int nid,
+static inline int lvd_syscall_alloc_pages_exact_node(struct fipc_message *msg, cptr_t slot, int nid,
 						unsigned int flags,
 						unsigned int order)
 {
-	struct fipc_message msg;
-	lvd_syscall_four_args(&msg, LCD_SYSCALL_ALLOC_PAGES_EXACT_NODE, 
+	lvd_syscall_four_args(msg, LCD_SYSCALL_ALLOC_PAGES_EXACT_NODE, 
 				cptr_val(slot), nid, flags, order);
-	vmfunc_wrapper(&msg);
+	vmfunc_wrapper(msg);
+	return 0;
 }
 
-static inline int lvd_syscall_alloc_pages(cptr_t slot,
+static inline int lvd_syscall_alloc_pages(struct fipc_message *msg, cptr_t slot,
 					unsigned int flags,
 					unsigned int order)
 {
-	struct fipc_message msg;
-	lvd_syscall_three_args(&msg, LCD_SYSCALL_ALLOC_PAGES, 
+	lvd_syscall_three_args(msg, LCD_SYSCALL_ALLOC_PAGES, 
 				cptr_val(slot), flags, order);
-	vmfunc_wrapper(&msg);
+	vmfunc_wrapper(msg);
+	return 0;
 }
 
-static inline int lvd_syscall_vmalloc(cptr_t slot,
+static inline int lvd_syscall_free_pages(struct fipc_message *msg, struct page *base,
+					unsigned int order)
+{
+	lvd_syscall_two_args(msg, LCD_SYSCALL_FREE_PAGES, (unsigned long)base, order);
+	vmfunc_wrapper(msg);
+	return 0;
+}
+
+static inline int lvd_syscall_vmalloc(struct fipc_message *msg, cptr_t slot,
 				unsigned long nr_pages)
 {
-	struct fipc_message msg;
-	lvd_syscall_two_args(&msg, LCD_SYSCALL_VMALLOC, 
+	lvd_syscall_two_args(msg, LCD_SYSCALL_VMALLOC, 
 				cptr_val(slot), nr_pages);
-	vmfunc_wrapper(&msg);
+	vmfunc_wrapper(msg);
+	return 0;
 }
 
-static inline int lvd_syscall_mmap(cptr_t mo_cptr, gpa_t base)
+static inline int lvd_syscall_mmap(struct fipc_message *msg, cptr_t mo_cptr, gpa_t base)
 {
-	struct fipc_message msg;
-	lvd_syscall_two_args(&msg, LCD_SYSCALL_MMAP, 
+	lvd_syscall_two_args(msg, LCD_SYSCALL_MMAP, 
 				cptr_val(mo_cptr), gpa_val(base));
-	vmfunc_wrapper(&msg);
+	vmfunc_wrapper(msg);
+	return 0;
 }
 
-static inline int lvd_syscall_munmap(cptr_t mo_cptr)
+static inline int lvd_syscall_munmap(struct fipc_message *msg, cptr_t mo_cptr)
 {
-	struct fipc_message msg;
-	lvd_syscall_one_arg(&msg, LCD_SYSCALL_MUNMAP, cptr_val(mo_cptr));
-	vmfunc_wrapper(&msg);
+	lvd_syscall_one_arg(msg, LCD_SYSCALL_MUNMAP, cptr_val(mo_cptr));
+	vmfunc_wrapper(msg);
+	return 0;
 }
 
-static inline void lvd_syscall_dump_stack(void)
+static inline void lvd_syscall_dump_stack(struct fipc_message *msg)
 {
-	struct fipc_message msg;
-	lvd_syscall_no_args(&msg, LCD_SYSCALL_DUMP_STACK);
-	vmfunc_wrapper(&msg);
+	lvd_syscall_no_args(msg, LCD_SYSCALL_DUMP_STACK);
+	vmfunc_wrapper(msg);
 }
 
-static inline void lvd_syscall_irq_disable(void)
+static inline void lvd_syscall_irq_disable(struct fipc_message *msg)
 {
-	struct fipc_message msg;
-	lvd_syscall_no_args(&msg, LCD_SYSCALL_IRQ_DISABLE);
-	vmfunc_wrapper(&msg);
+	lvd_syscall_no_args(msg, LCD_SYSCALL_IRQ_DISABLE);
+	vmfunc_wrapper(msg);
 }
 
-static inline void lvd_syscall_irq_enable(void)
+static inline void lvd_syscall_irq_enable(struct fipc_message *msg)
 {
-	struct fipc_message msg;
-	lvd_syscall_no_args(&msg, LCD_SYSCALL_IRQ_ENABLE);
-	vmfunc_wrapper(&msg);
+	lvd_syscall_no_args(msg, LCD_SYSCALL_IRQ_ENABLE);
+	vmfunc_wrapper(msg);
 }
 
 #endif /* ASM_LCD_DOMAINS_LIBLCD_VMFUNC_H */

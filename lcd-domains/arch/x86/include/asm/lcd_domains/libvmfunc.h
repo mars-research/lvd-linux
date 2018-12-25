@@ -13,7 +13,6 @@
 #define _REG_EAX		"%%eax"
 #define _REG_ECX		"%%ecx"
 
-
 /* other 64-bit regs */
 #define _REG_RAX		"%%rax"
 #define _REG_RBX		"%%rbx"
@@ -50,7 +49,6 @@ typedef enum {
 	VMFUNC_LCD_SYSCALL = 0x2,
 } vmfunc_id;
 
-int handle_vmfunc_syscall(struct fipc_message *msg);
-int handle_vmfunc_syncipc(struct fipc_message *msg);
-
+int noinline vmfunc_wrapper(struct fipc_message *msg);
+int vmfunc_call(int domain, struct fipc_message *msg);
 #endif /* LIB_VMFUNC_H */

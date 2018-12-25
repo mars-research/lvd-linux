@@ -8,13 +8,9 @@
 #include <lcd_domains/lcd_iommu.h>
 #include <asm/lcd_domains/run.h>
 #include <asm/lcd_domains/create.h>
+#include <asm/lcd_domains/libvmfunc.h>
 
 struct lcd *lcd = NULL;
-
-int handle_vmfunc_syncipc(struct fipc_message *msg)
-{
-	return 0;
-}
 
 /* SYSCALL HANDLERS -------------------------------------------------- */
 
@@ -169,7 +165,7 @@ static int handle_syscall_vmalloc(struct fipc_message *msg)
 	 * Do vmalloc
 	 */
 
-	msg->regs[0] = __lcd_vmalloc(lcd, slot, nr_pages);
+	msg->regs[0] = (unsigned long)__lcd_vmalloc(lcd, slot, nr_pages);
 
 	return 0;
 }
@@ -189,7 +185,7 @@ static int handle_syscall_pages_alloc(struct fipc_message *msg)
 	/*
 	 * Do page alloc
 	 */
-	msg->regs[0] = __lvd_alloc_pages(lcd, slot, flags, order);
+	msg->regs[0] = (unsigned long)__lvd_alloc_pages(lcd, slot, flags, order);
 	return 0;
 }
 
@@ -210,7 +206,7 @@ static int handle_syscall_pages_alloc_exact_node(struct fipc_message *msg)
 	/*
 	 * Do page alloc
 	 */
-	msg->regs[0] = __lvd_alloc_pages_exact_node(lcd, slot, nid, flags, order);
+	msg->regs[0] = (unsigned long)__lvd_alloc_pages_exact_node(lcd, slot, nid, flags, order);
 	return 0;
 }
 
@@ -484,4 +480,3 @@ int handle_vmfunc_syscall(struct fipc_message *msg)
 	 */
 	return ret;
 }
-

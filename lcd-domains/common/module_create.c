@@ -244,7 +244,7 @@ static int setup_phys_addr_space(cptr_t lcd, struct lcd_create_ctx *ctx,
 	 * the whole host linux into a VT-x domain), then add entries for those
 	 * pages in LCDs EPT.
 	 */
-				__gpa(virt_to_phys(ctx->lcd_boot_info)),
+				__gpa(__pa(ctx->lcd_boot_info)),
 #else
 				LCD_BOOTSTRAP_PAGES_GP_ADDR,
 #endif
@@ -263,7 +263,7 @@ static int setup_phys_addr_space(cptr_t lcd, struct lcd_create_ctx *ctx,
 	c = &(lcd_to_boot_info(ctx)->lcd_boot_cptrs.stack);
 	ret = do_grant_and_map_for_mem(lcd, ctx, ctx->stack,
 #ifdef CONFIG_LVD
-				__gpa(virt_to_phys(ctx->stack)),
+				__gpa(__pa(ctx->stack)),
 #else
 				LCD_STACK_GP_ADDR,
 #endif

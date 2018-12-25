@@ -12,7 +12,12 @@
 #include <liblcd/mem.h>
 #include <liblcd/allocator.h>
 #include <asm/lcd_domains/liblcd.h>
+#ifdef CONFIG_LVD
+#include <asm/lcd_domains/liblcd_vmfunc.h>
+#endif
 #include <lcd_domains/liblcd.h>
+
+#include <libfipc.h>
 
 #include <lcd_config/post_hook.h>
 
@@ -43,7 +48,7 @@ struct page *_lvd_alloc_pages_exact_node(int nid, unsigned int flags, unsigned i
 		goto fail2;
 	}
 
-	addr = (struct page*) msg.regs[0];
+	p = (struct page*) msg.regs[0];
 
 	*slot_out = slot;
 
@@ -52,7 +57,7 @@ struct page *_lvd_alloc_pages_exact_node(int nid, unsigned int flags, unsigned i
 fail2:
 	lcd_cptr_free(slot);
 fail1:
-	return p;
+	return NULL;
 }
 
 struct page* _lvd_alloc_pages(unsigned int flags, unsigned int order,
@@ -89,7 +94,7 @@ struct page* _lvd_alloc_pages(unsigned int flags, unsigned int order,
 fail2:
 	lcd_cptr_free(slot);
 fail1:
-	return p;
+	return NULL;
 }
 
 
@@ -126,7 +131,7 @@ void* _lvd_vmalloc(unsigned long nr_pages, cptr_t *slot_out)
 fail2:
 	lcd_cptr_free(slot);
 fail1:
-	return addr;
+	return NULL;
 }
 
 
@@ -159,7 +164,7 @@ struct page *lvd_alloc_pages(unsigned int flags, unsigned int order)
 void lvd_free_pages(struct page *base, unsigned int order)
 {
 	struct fipc_message msg;
-	return lvd_syscall_free_pages(&msg, base, order);
+	lvd_syscall_free_pages(&msg, base, order);
 }
 
 void* lvd_vmalloc(unsigned long sz)
@@ -232,18 +237,6 @@ void lcd_unvolunteer_vmalloc_mem(cptr_t vmalloc_mem)
 }
 #endif
 
-/* ADDRESS TRANSLATION -------------------------------------------------- */
-
-gpa_t lcd_gva2gpa(gva_t gva)
-{
-	return isolated_lcd_gva2gpa(gva);
-}
-
-gva_t lcd_gpa2gva(gpa_t gpa)
-{
-	return isolated_lcd_gpa2gva(gpa);
-}
-
 void cpucache_init(void);
 
 static void __ref kmalloc_init(void)
@@ -255,7 +248,6 @@ static void __ref kmalloc_init(void)
 
 int __liblvd_heap_init(void)
 {
-	int ret;
 	/*
 	 * Initialize kmalloc
 	 */
@@ -267,15 +259,12 @@ int __liblvd_heap_init(void)
 	__liblcd_mem_itree_booted();
 
 	return 0;
-
-fail1:
-	return ret;
 }
 
-void *__lcd_get_free_pages(gfp_t mask, unsigned int order)
+void *__lvd_get_free_pages(gfp_t mask, unsigned int order)
 {
-	struct page *p = lcd_alloc_pages(mask, order);
-	return p ? lcd_page_address(p) : NULL;
+	struct page *p = lvd_alloc_pages(mask, order);
+	return p ? lvd_page_address(p) : NULL;
 }
 
 void __lvd_free_pages(unsigned long addr, unsigned int order)

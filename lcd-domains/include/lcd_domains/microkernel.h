@@ -544,11 +544,21 @@ int __lcd_insert_memory_object(struct lcd *caller,
 int __lcd_alloc_pages_exact_node(struct lcd *caller, cptr_t slot, int nid,
 				unsigned int flags, unsigned int order);
 
+#ifdef CONFIG_LVD
+struct page* __lvd_alloc_pages_exact_node(struct lcd *caller, cptr_t slot, int nid,
+				unsigned int flags, unsigned int order);
+#endif
+
 /**
  * __lcd_alloc_pages -- Similar to __lcd_alloc_pages_exact_node
  */
 int __lcd_alloc_pages(struct lcd *caller, cptr_t slot,
 		unsigned int flags, unsigned int order);
+
+#ifdef CONFIG_LVD
+struct page* __lvd_alloc_pages(struct lcd *caller, cptr_t slot,
+		unsigned int flags, unsigned int order);
+#endif
 /**
  * __lcd_vmalloc -- Allocate host vmalloc memory for caller
  *
@@ -559,6 +569,10 @@ int __lcd_alloc_pages(struct lcd *caller, cptr_t slot,
  * sizes as argument.
  */
 int __lcd_vmalloc(struct lcd *caller, cptr_t slot, unsigned long nr_pages);
+
+#ifdef CONFIG_LVD
+void * __lvd_vmalloc(struct lcd *caller, cptr_t slot, unsigned long nr_pages);
+#endif
 /**
  * __lcd_get_memory_object -- Look up memory object in LCD's cspace
  * @caller: LCD whose cspace we should look in

@@ -79,6 +79,9 @@ void __liblcd_mem_itree_dump(void);
  */
 int __liblcd_heap_init(void);
 
+#ifdef CONFIG_LVD
+int __liblvd_heap_init(void);
+#endif
 /* 
  * RAM MAPPING --------------------------------------------------
  *
@@ -121,6 +124,9 @@ int __liblcd_heap_init(void);
  * This initializes the RAM map region allocator.
  */
 int __liblcd_ram_map_init(void);
+#ifdef CONFIG_LVD
+int __liblvd_ram_map_init(void);
+#endif
 
 /**
  * __liblcd__ioremap_init -- Initialize the ioremap region allocator

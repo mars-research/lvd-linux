@@ -14,12 +14,20 @@
 #include "../rdtsc_helper.h"
 #include <linux/module.h>
 #include "../vmfunc_trampoline.h"
+#include <asm/lcd_domains/libvmfunc.h>
 
 #include <lcd_config/post_hook.h>
 
 extern int vmfunc_wrapper(struct fipc_message *req);
 unsigned long long stack;
 unsigned long long eip;
+
+unsigned long noinline
+null_invocation(void)
+{
+       return 10;
+}
+
 
 static int caller_main(void)
 {

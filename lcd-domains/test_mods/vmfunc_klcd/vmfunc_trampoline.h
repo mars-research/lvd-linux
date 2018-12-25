@@ -7,9 +7,9 @@
 
 struct vmfunc_msg;
 
-void noinline
-VMFUNC_LINKAGE
-vmfunc_call(unsigned int ept, struct fipc_message *reg);
+//void noinline
+//VMFUNC_LINKAGE
+//vmfunc_call(unsigned int ept, struct fipc_message *reg);
 
 extern size_t vmfunc_page_size;
 extern unsigned long* vmfunc_load_addr;

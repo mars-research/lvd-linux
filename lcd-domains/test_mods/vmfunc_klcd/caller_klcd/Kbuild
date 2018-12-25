@@ -5,7 +5,7 @@ ccflags-y += -DOTHER_DOMAIN=1
 obj-m  += lcd_test_mod_vmfunc_klcd_caller_klcd.o
 
 lcd_test_mod_vmfunc_klcd_caller_klcd-y              += main.o
-lcd_test_mod_vmfunc_klcd_caller_klcd-y              += $(addprefix ../, vmfunc.o vmfunc_wrapper.o)
+lcd_test_mod_vmfunc_klcd_caller_klcd-y              += $(addprefix ../, vmfunc.o)
 
 
 extra-y += ../vmfunc.lds

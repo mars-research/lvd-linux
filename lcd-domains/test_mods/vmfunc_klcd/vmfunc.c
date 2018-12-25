@@ -31,7 +31,7 @@ static void **stack_ptrs;
 struct fipc_message **responses;
 
 /* this is the only function Intel VT-x support */
-static int func = 0;
+//static int func = 0;
 extern int noinline null_invocation(void);
 
 int
@@ -143,7 +143,7 @@ __dispatch_loop(struct fipc_message *msg)
 }
 
 extern int cpu_number;
-
+#if 0
 void
 __vmfunc_page
 vmfunc_call(unsigned int ept, //rdi
@@ -262,3 +262,4 @@ vmfunc_call(unsigned int ept, //rdi
 		"rbx", "r12", "r13", "r14",
 		"r15", "memory", "cc");
 }
+#endif

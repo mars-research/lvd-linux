@@ -12,7 +12,6 @@
 
 #include <lcd_config/post_hook.h>
 
-#ifndef CONFIG_LVD
 struct lcd_utcb *
 LIBLCD_FUNC_ATTR
 lcd_get_utcb(void)
@@ -91,4 +90,3 @@ lcd_sync_reply(void)
 {
 	return lcd_syscall_sync_reply();
 }
-#endif /* CONFIG_LVD */

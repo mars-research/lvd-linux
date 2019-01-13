@@ -1,12 +1,29 @@
 #ifndef _TOOLS_LINUX_COMPILER_H_
 #define _TOOLS_LINUX_COMPILER_H_
 
+#ifdef __GNUC__
+#include <linux/compiler-gcc.h>
+#endif
+
+#ifndef __compiletime_error
+# define __compiletime_error(message)
+#endif
+
 /* Optimization barrier */
 /* The "volatile" is due to gcc bugs */
 #define barrier() __asm__ __volatile__("": : :"memory")
 
 #ifndef __always_inline
 # define __always_inline	inline __attribute__((always_inline))
+#endif
+
+#ifndef noinline
+#define noinline
+#endif
+
+/* Are two types/vars the same type (ignoring qualifiers)? */
+#ifndef __same_type
+# define __same_type(a, b) __builtin_types_compatible_p(typeof(a), typeof(b))
 #endif
 
 #ifdef __ANDROID__

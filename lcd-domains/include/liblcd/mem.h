@@ -183,6 +183,9 @@ void _lcd_munmap(cptr_t mo, gpa_t base);
  */
 struct page *lcd_alloc_pages_exact_node(int nid, unsigned int flags, 
 					unsigned int order);
+
+struct page *lcd_alloc_pages_node(int nid, unsigned int flags,
+					unsigned int order);
 /**
  * lcd_alloc_pages -- Get free pages from the heap
  * @flags: GFP flags to control allocation
@@ -191,6 +194,11 @@ struct page *lcd_alloc_pages_exact_node(int nid, unsigned int flags,
  * Similar to lcd_alloc_pages_exact_node.
  */
 struct page *lcd_alloc_pages(unsigned int flags, unsigned int order);
+
+void *__lcd_get_free_pages(gfp_t mask, unsigned int order);
+
+void __lcd_free_pages(unsigned long addr, unsigned int order);
+
 /**
  * lcd_free_pages -- Free pages allocated via lcd_alloc_pages
  * @base: pointer to first struct page in the chunk

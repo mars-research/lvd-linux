@@ -1,0 +1,3 @@
+#! /bin/bash -e
+
+sudo rmmod build/test_mods/$@/boot/lcd_test_mod_$@_boot.ko

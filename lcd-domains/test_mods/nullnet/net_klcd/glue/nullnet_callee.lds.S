@@ -1,0 +1,17 @@
+#include <liblcd/trampoline_link.h>
+
+SECTIONS
+{
+	LCD_TRAMPOLINE_LINKER_SECTION(ndo_init_trampoline)
+	LCD_TRAMPOLINE_LINKER_SECTION(ndo_uninit_trampoline)
+	LCD_TRAMPOLINE_LINKER_SECTION(ndo_start_xmit_trampoline)
+	LCD_TRAMPOLINE_LINKER_SECTION(ndo_validate_addr_trampoline)
+	LCD_TRAMPOLINE_LINKER_SECTION(ndo_set_rx_mode_trampoline)
+	LCD_TRAMPOLINE_LINKER_SECTION(ndo_set_mac_address_trampoline)
+	LCD_TRAMPOLINE_LINKER_SECTION(ndo_get_stats64_trampoline)
+	LCD_TRAMPOLINE_LINKER_SECTION(ndo_change_carrier_trampoline)
+	LCD_TRAMPOLINE_LINKER_SECTION(setup_trampoline)
+	LCD_TRAMPOLINE_LINKER_SECTION(validate_trampoline)
+	LCD_TRAMPOLINE_LINKER_SECTION(setup_trampoline)
+}
+INSERT AFTER .text;

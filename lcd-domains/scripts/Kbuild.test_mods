@@ -25,3 +25,5 @@ obj-m += bug/
 obj-m += async_rpc/
 obj-m += llvm_example/
 obj-m += ioremap/
+obj-m += ixgbe/
+obj-m += nullnet/

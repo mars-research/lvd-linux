@@ -1,0 +1,6 @@
+obj-$(LCD_CONFIG_BUILD_NULLNET_BOOT)	+= boot/
+
+obj-$(LCD_CONFIG_BUILD_NULLNET_DUMMY_LCD) += dummy_lcd/
+
+obj-$(LCD_CONFIG_BUILD_NULLNET_NET_KLCD) += net_klcd/
+

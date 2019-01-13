@@ -163,8 +163,8 @@
 #undef spin_lock_irq
 #define spin_lock_irq(x) do { } while (0)
 
-#undef spin_lock_irqrestore
-#define spin_lock_irqrestore(x,flags) do { } while (0)
+#undef spin_unlock_irqrestore
+#define spin_unlock_irqrestore(x,flags) do { } while (0)
 
 #undef spin_unlock
 #define spin_unlock(x) do { } while(0)
@@ -221,9 +221,6 @@ static inline void force_up_write(void *x)
 
 #undef might_fault
 #define might_fault() do { } while(0)
-
-#undef msleep
-#define msleep(x) do { } while(0)
 
 /*
  * Copy to/from user
@@ -305,7 +302,41 @@ static inline void force_up_write(void *x)
 #undef __pa
 #define __pa(vaddr) gpa_val(lcd_gva2gpa(__gva((unsigned long)vaddr)))
 
+#undef free_page
+#define free_page(addr) __lcd_free_pages(addr, 0)
+
+#undef __get_free_page
+#define __get_free_page(gfp_mask) __lcd_get_free_pages(gfp_mask, 0)
+
 /* The "real" get_current tries to read a percpu variable that using
  * the %gs segment register. */
 #undef get_current
 #define get_current() (current_task)
+
+/* XXX: For IXGBE device layer
+ * Polluting this file is inappropriate. Ideally we should have a
+ * common {pre,post}_hook and a project specific one
+ */
+#undef dev_warn
+#define dev_warn(dev, fmt, ...) LIBLCD_WARN(fmt)
+
+#undef dev_err
+#define dev_err(dev, fmt, ...) LIBLCD_ERR(fmt)
+
+#undef dev_info
+#define dev_info(dev, fmt, ...) LIBLCD_MSG(fmt)
+
+/* net layer locks
+ */
+#define rtnl_lock()     do { } while(0)
+#define rtnl_unlock()   do { } while(0)
+
+#define netdev_warn(dev, msg...)        LIBLCD_WARN(msg)
+#define netdev_err(dev, msg...)         LIBLCD_ERR(msg)
+#define netdev_crit(dev, msg...)        LIBLCD_ERR(msg)
+#define netdev_info(dev, msg...)        LIBLCD_MSG(msg)
+
+#define  __dynamic_netdev_dbg(desc, dev, fmt...)        LIBLCD_MSG(fmt)
+
+#define system_state    1
+

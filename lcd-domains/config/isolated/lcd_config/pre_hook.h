@@ -76,6 +76,21 @@
 
 #undef CONFIG_NODES_SHIFT /* force max numnodes to 1 */
 
+/* ixgbe related undefs
+ * XXX: Where does this belong to? Should we really pollute
+ * pre_hook with all test_mod related stuff?
+ */
+#undef CONFIG_PCI_IOV
+#undef CONFIG_IXGBE_DCB
+#undef CONFIG_IXGBE_HWMON
+#undef CONFIG_FCOE
+#undef CONFIG_FCOE_MODULE
+#undef CONFIG_IXGBE_DCA
+#undef CONFIG_PTP_1588_CLOCK
+#undef CONFIG_DEBUGFS
+#undef CONFIG_PM
+#undef CONFIG_BQL
+
 /*
  * Set include guards to force using our includes.
  */

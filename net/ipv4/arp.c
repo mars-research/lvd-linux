@@ -533,7 +533,12 @@ struct sk_buff *arp_create(int type, int ptype, __be32 dest_ip,
 	 *	Allocate a buffer
 	 */
 
-	skb = alloc_skb(arp_hdr_len(dev) + hlen + tlen, GFP_ATOMIC);
+	int skb_sz = arp_hdr_len(dev) + hlen + tlen;
+
+	if (dev->features & NETIF_F_PRIV_DATA_POOL)
+		skb_sz |= SKB_DATA_PRIV_POOL;
+
+	skb = alloc_skb(skb_sz, GFP_ATOMIC);
 	if (!skb)
 		return NULL;
 

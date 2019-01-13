@@ -331,6 +331,15 @@ static inline struct lcd_page_block *heap_struct_page_to_page_block(
 
 /* PAGE ALLOC INTERFACE ---------------------------------------- */
 
+struct page *lcd_alloc_pages_node(int nid, unsigned int flags,
+					unsigned int order)
+{
+	/*
+	 * For now, we ignore the node id (not numa aware).
+	 */
+	return lcd_alloc_pages(flags, order);
+}
+
 struct page *lcd_alloc_pages_exact_node(int nid, unsigned int flags, 
 					unsigned int order)
 {
@@ -550,4 +559,16 @@ fail2:
 	heap_allocator = NULL;
 fail1:
 	return ret;
+}
+
+void *__lcd_get_free_pages(gfp_t mask, unsigned int order)
+{
+	struct page *p = lcd_alloc_pages(mask, order);
+	return p ? lcd_page_address(p) : NULL;
+}
+
+void __lcd_free_pages(unsigned long addr, unsigned int order)
+{
+	if (addr)
+		lcd_free_pages(heap_addr_to_struct_page(__gva(addr)), order);
 }

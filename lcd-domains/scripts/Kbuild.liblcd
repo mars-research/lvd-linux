@@ -39,6 +39,9 @@ lib-y += $(addprefix liblcd/lib/, \
 	crc16.o \
 	parser.o \
 	cmdline.o \
+	dynamic_queue_limits.o \
+	checksum.o \
+	scatterlist.o \
 	)
 
 lib-y += $(addprefix liblcd/mm/, \
@@ -52,6 +55,18 @@ lib-y += $(addprefix liblcd/arch/x86/lib/, \
       memcpy_64.o \
       memmove_64.o \
       )
+
+lib-y += $(addprefix liblcd/arch/x86/dma/, \
+	pci-nommu.o \
+	pci-dma.o \
+	)
+
+lib-y += $(addprefix liblcd/net/, \
+	dev_addr_lists.o \
+	dev.o \
+	skbuff.o \
+	flow_dissector.o \
+	)
 
 lib-y += liblcd/resolve.o
 

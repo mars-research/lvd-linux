@@ -11,8 +11,8 @@ async/boot nonisolated
 async/lcd isolated
 
 async_rpc/boot nonisolated
-async_rpc/caller isolated
-async_rpc/callee isolated
+async_rpc/caller_lcd isolated
+async_rpc/callee_lcd isolated
 
 bug/boot nonisolated
 bug/lcd isolated   
@@ -49,3 +49,11 @@ llvm_example/lcd isolated
 
 ioremap/boot nonisolated
 ioremap/lcd isolated
+
+ixgbe/boot nonisolated
+ixgbe/ixgbe_lcd isolated
+ixgbe/net_klcd nonisolated
+
+nullnet/boot nonisolated
+nullnet/dummy_lcd isolated
+nullnet/net_klcd nonisolated

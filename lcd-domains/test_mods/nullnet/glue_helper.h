@@ -80,7 +80,7 @@ struct skbuff_members {
 
 #define CONSUME_SKB_SEND_ONLY
 #define CONSUME_SKB_NO_HASHING
-//#define SENDER_DISPATCH_LOOP
+#define SENDER_DISPATCH_LOOP
 
 //#define NO_AWE
 //#define NO_HASHING

@@ -76,7 +76,9 @@ int setup_once(struct trampoline_hidden_args *hidden_args)
 	} else if(!strncmp(current->comm, "iperf",
 				strlen("iperf")) ||
 		!strncmp(current->comm, "netperf",
-				strlen("netperf"))) {
+				strlen("netperf")) ||
+		!strncmp(current->comm, "lt-iperf3",
+				strlen("lt-iperf3"))) {
 
 		prep_channel(hidden_args);
 		printk("===================================\n");
@@ -433,6 +435,8 @@ free:
 #ifndef SENDER_DISPATCH_LOOP
 	dev_kfree_skb(skb);
 #endif
+	g_stats.tx_packets += 1;
+	g_stats.tx_bytes += skb->len;
 	return NETDEV_TX_OK;
 }
 

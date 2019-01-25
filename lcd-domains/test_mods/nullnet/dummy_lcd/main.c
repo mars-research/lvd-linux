@@ -26,11 +26,17 @@ bool tdiff_valid = false;
 u64 tdiff_disp = 0ull;
 TS_DECL(disp_loop);
 /* LOOP ---------------------------------------- */
+#define REPORT_LCD_LOAD
 
 static void main_and_loop(void)
 {
 	int ret;
 	int stop = 0;
+#ifdef REPORT_LCD_LOAD
+	unsigned long long start_disp, end_disp;
+	unsigned long long start_g, end_g, diff_g;
+	unsigned long long disp_loop_cycles = 0, percent = 0;
+#endif
 	struct fipc_message *msg;
 	DO_FINISH(
 
@@ -52,7 +58,36 @@ static void main_and_loop(void)
 		while (!stop && !dummy_done) {
 			struct thc_channel_group_item* curr_item;
 
+#ifdef REPORT_LCD_LOAD
+			if (!start_g)
+				start_g = lcd_RDTSC_START();
 
+			end_g = lcd_RDTSC_STOP();
+
+			diff_g = end_g - start_g;
+			/* if it's greater than or equal to 5 seconds */
+			if (diff_g >= 10999820000ULL) {
+#ifdef CALC_PERCENTAGE
+				if (disp_loop_cycles) {
+					unsigned long long _diff_g = diff_g;
+					do_div(_diff_g, disp_loop_cycles);
+					percent = 100;
+					printk("dividend %llu | divisor %llu", percent, _diff_g);
+					do_div(percent, _diff_g);
+				} else {
+					percent = 0;
+				}
+#endif
+				if (disp_loop_cycles)
+					LIBLCD_MSG("total_time: %llu | disp_loop %llu | percent %llu",
+						diff_g, disp_loop_cycles, percent);
+				start_g = lcd_RDTSC_START();
+				// reset disp_loop_cycles
+				disp_loop_cycles = 0;
+			}
+
+			start_disp = lcd_RDTSC_START();
+#endif
 			/*
 			 * Do one async receive
 			 */
@@ -67,6 +102,7 @@ static void main_and_loop(void)
 					stop = 1; /* stop */
 				}
 			}
+
 
 			if (async_msg_get_fn_type(msg) == NDO_START_XMIT) {
 				if (fipc_get_reg0(msg)) {
@@ -100,6 +136,10 @@ static void main_and_loop(void)
 				}
 			);
 			}
+#ifdef REPORT_LCD_LOAD
+			end_disp = lcd_RDTSC_STOP();
+			disp_loop_cycles += (end_disp - start_disp);
+#endif
 		}
 		
 		LIBLCD_MSG("NULLNET EXITED DISPATCH LOOP");

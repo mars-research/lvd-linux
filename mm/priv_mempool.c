@@ -60,6 +60,9 @@ void construct_global_pool(priv_pool_t *p)
 		//printk("bundle ===> %d\n", b);
 		for (i = 0; i < CACHE_SIZE; i++) {
 			objs = (struct object*)((char*)bpool + (i * obj_size));
+			/* the last object's next is just null */
+			if (i == CACHE_SIZE - 1)
+				break;
 			objs->next = (struct object*)((char*)bpool + (i + 1) * obj_size);
 	//		printk("\tobj %p | obj->next %p\n", objs, objs->next);
 		}

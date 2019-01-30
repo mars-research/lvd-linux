@@ -145,7 +145,7 @@ int __ndo_start_xmit_inner_async(struct sk_buff *skb, struct net_device *dev, st
 	net_dev_container = container_of(dev,
 			struct net_device_container, net_device);
 
-	ret = async_msg_blocking_send_start(
+	ret = fipc_test_blocking_send_start(
 			async_chnl, &_request);
 
 	if (unlikely(ret)) {
@@ -286,7 +286,7 @@ int __ndo_start_xmit_bare_fipc_nomarshal(struct sk_buff *skb, struct net_device 
 	_TS_START(xmit);
 	for (i = 0; i < NUM_TRANSACTIONS; i++) {
 #endif
-		async_msg_blocking_send_start(
+		fipc_test_blocking_send_start(
 				async_chnl, &_request);
 
 		async_msg_set_fn_type(_request, NDO_START_XMIT);
@@ -376,7 +376,7 @@ int ndo_start_xmit_noasync(struct sk_buff *skb, struct net_device *dev, struct t
 	async_chnl = PTS()->thc_chnl;
 
 
-	async_msg_blocking_send_start(
+	fipc_test_blocking_send_start(
 			async_chnl, &_request);
 
 	async_msg_set_fn_type(_request, NDO_START_XMIT);
@@ -475,7 +475,7 @@ int ndo_start_xmit_async(struct sk_buff *skb, struct net_device *dev, struct tra
 
 	skb_c->skb = skb;
 
-	ret = async_msg_blocking_send_start(
+	ret = fipc_test_blocking_send_start(
 			async_chnl, &_request);
 	if (unlikely(ret)) {
 		LIBLCD_ERR("failed to get a send slot");

@@ -630,7 +630,7 @@ int ndo_init_user(struct net_device *dev, struct trampoline_hidden_args *hidden_
 
 	net_dev_container = container_of(dev, struct net_device_container, net_device);
 
-	ret = async_msg_blocking_send_start(hidden_args->async_chnl, &request);
+	ret = fipc_test_blocking_send_start(hidden_args->async_chnl, &request);
 	if (ret) {
 		LIBLCD_ERR("failed to get a send slot");
 		goto fail_async;
@@ -722,7 +722,7 @@ void ndo_uninit_user(struct net_device *dev, struct trampoline_hidden_args *hidd
 
 	net_dev_container = container_of(dev, struct net_device_container, net_device);
 
-	ret = async_msg_blocking_send_start(hidden_args->async_chnl, &request);
+	ret = fipc_test_blocking_send_start(hidden_args->async_chnl, &request);
 	if (ret) {
 		LIBLCD_ERR("failed to get a send slot");
 		goto fail_async;
@@ -848,7 +848,7 @@ int ndo_validate_addr_user(struct net_device *dev, struct trampoline_hidden_args
 
 	net_dev_container = container_of(dev, struct net_device_container, net_device);
 
-	ret = async_msg_blocking_send_start(hidden_args->async_chnl, &request);
+	ret = fipc_test_blocking_send_start(hidden_args->async_chnl, &request);
 	if (ret) {
 		LIBLCD_ERR("failed to get a send slot");
 		goto fail_async;
@@ -939,7 +939,7 @@ void ndo_set_rx_mode_user(struct net_device *dev, struct trampoline_hidden_args 
 
 	net_dev_container = container_of(dev, struct net_device_container, net_device);
 
-	ret = async_msg_blocking_send_start(hidden_args->async_chnl, &request);
+	ret = fipc_test_blocking_send_start(hidden_args->async_chnl, &request);
 	if (ret) {
 		LIBLCD_ERR("failed to get a send slot");
 		goto fail_async;
@@ -1043,7 +1043,7 @@ int ndo_set_mac_address_user(struct net_device *dev, void *addr, struct trampoli
 	lcd_enter();
 	ret = grant_sync_ep(&sync_end, hidden_args->sync_ep);
 
-	ret = async_msg_blocking_send_start(hidden_args->async_chnl, &request);
+	ret = fipc_test_blocking_send_start(hidden_args->async_chnl, &request);
 	if (ret) {
 		LIBLCD_ERR("failed to get a send slot");
 		goto fail_async;
@@ -1195,7 +1195,7 @@ struct rtnl_link_stats64 *ndo_get_stats64_user(struct net_device *dev,
 
 	net_dev_container = container_of(dev, struct net_device_container, net_device);
 
-	ret = async_msg_blocking_send_start(hidden_args->async_chnl, &request);
+	ret = fipc_test_blocking_send_start(hidden_args->async_chnl, &request);
 	if (ret) {
 		LIBLCD_MSG("failed to get a send slot");
 		goto fail_async;
@@ -1355,7 +1355,7 @@ int ndo_change_carrier_user(struct net_device *dev, bool new_carrier, struct tra
 
 	net_dev_container = container_of(dev, struct net_device_container, net_device);
 
-	ret = async_msg_blocking_send_start(hidden_args->async_chnl, &request);
+	ret = fipc_test_blocking_send_start(hidden_args->async_chnl, &request);
 	if (ret) {
 		LIBLCD_ERR("failed to get a send slot");
 		goto fail_async;

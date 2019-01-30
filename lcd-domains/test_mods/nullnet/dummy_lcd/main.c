@@ -38,6 +38,7 @@ static void main_and_loop(void)
 	unsigned long long disp_loop_cycles = 0, percent = 0;
 #endif
 	struct fipc_message *msg;
+
 	DO_FINISH(
 
 		ASYNC(
@@ -86,67 +87,74 @@ static void main_and_loop(void)
 				disp_loop_cycles = 0;
 			}
 
-			start_disp = lcd_RDTSC_START();
 #endif
 			/*
-			 * Do one async receive
+			 * Do RR async receive
 			 */
-			//ret = thc_poll_recv_group(&ch_grp, &curr_item, &msg);
-			ret = thc_poll_recv_group_2(&ch_grp, &curr_item, &msg);
-			if (likely(ret)) {
-				if (ret == -EWOULDBLOCK) {
-					cpu_relax();
-					continue;
+			list_for_each_entry(curr_item, &(ch_grp.head), list) {
+				if (curr_item->xmit_channel) {
+					ret = fipc_nonblocking_recv_start_if(
+						thc_channel_to_fipc(
+						thc_channel_group_item_channel(curr_item)),
+						&msg);
 				} else {
-					LIBLCD_ERR("async recv failed");
-					stop = 1; /* stop */
-				}
-			}
-
-
-			if (async_msg_get_fn_type(msg) == NDO_START_XMIT) {
-				if (fipc_get_reg0(msg)) {
-//				printk("%s, chain skb", __func__);
-				ret = ndo_start_xmit_async_bare_callee(msg,
-					curr_item->channel,
-					nullnet_cspace,
-					nullnet_sync_endpoint);
-				} else {
-				ret = ndo_start_xmit_noawe_callee(msg,
-					curr_item->channel,
-					nullnet_cspace,
-					nullnet_sync_endpoint);
-				}
-				if (likely(ret)) {
-					LIBLCD_ERR("async dispatch failed");
-					stop = 1;
+					ret = thc_ipc_poll_recv(thc_channel_group_item_channel(curr_item),
+						&msg);
 				}
 
-			} else {
-			ASYNC(
+				if( !ret )
+				{
+					start_disp = lcd_RDTSC_START();
+					/* message for us */
+					if (async_msg_get_fn_type(msg) == NDO_START_XMIT) {
+						if (fipc_get_reg0(msg)) {
+						ret = ndo_start_xmit_async_bare_callee(msg,
+							curr_item->channel,
+							nullnet_cspace,
+							nullnet_sync_endpoint);
+						} else {
+						ret = ndo_start_xmit_noawe_callee(msg,
+							curr_item->channel,
+							nullnet_cspace,
+							nullnet_sync_endpoint);
+						}
+						if (likely(ret)) {
+							LIBLCD_ERR("async dispatch failed");
+							stop = 1;
+						}
 
-			ret = dispatch_async_loop(curr_item->channel,
-					msg,
-					nullnet_cspace, 
-					nullnet_sync_endpoint);
-	
-				if (ret) {
-					LIBLCD_ERR("async dispatch failed");
-					stop = 1;
-				}
-			);
-			}
+					} else {
+					ASYNC(
+
+					ret = dispatch_async_loop(curr_item->channel,
+							msg,
+							nullnet_cspace,
+							nullnet_sync_endpoint);
+
+						if (ret) {
+							LIBLCD_ERR("async dispatch failed");
+							stop = 1;
+						}
+					);
+					}
 #ifdef REPORT_LCD_LOAD
-			end_disp = lcd_RDTSC_STOP();
-			disp_loop_cycles += (end_disp - start_disp);
+					end_disp = lcd_RDTSC_STOP();
+					disp_loop_cycles += (end_disp - start_disp);
 #endif
+				}
+			}
+
+			if (ret == -EWOULDBLOCK) {
+				cpu_relax();
+				continue;
+			}
 		}
 		
 		LIBLCD_MSG("NULLNET EXITED DISPATCH LOOP");
 
 		);
 
-	LIBLCD_MSG("EXITED PMFS DO_FINISH");
+	LIBLCD_MSG("EXITED NULLNET DO_FINISH");
 
 	return;
 }
@@ -212,4 +220,3 @@ static void __exit dummy_lcd_exit(void)
 module_init(__dummy_lcd_init);
 module_exit(dummy_lcd_exit);
 MODULE_LICENSE("GPL");
-

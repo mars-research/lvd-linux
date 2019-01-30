@@ -82,7 +82,7 @@ int setup_once(struct trampoline_hidden_args *hidden_args)
 
 		prep_channel(hidden_args);
 		printk("===================================\n");
-		printk("===== Private Channel created =====\n");
+		printk("===== Private Channel created (pid %d) =====\n", current->pid);
 		printk("===================================\n");
 		if (thread < 4) {
 			current->ptstate->times_ndo_xmit = times_ndo_xmit[thread++];

@@ -132,8 +132,11 @@ int pool_pick(void)
 			pools[pool_idx].start_idx = i + 1;
 		}
 	}
+	/* if there is no discontinuity, then we will have a huge chunk until the end */
+	pools[pool_idx].valid = true;
+	pools[pool_idx].end_idx = MAX_POOLS - 1;
 
-	for (i = 0; i < MAX_POOLS; i++) {
+	for (i = 0; i < pool_idx; i++) {
 		printk("%s, pool %d: start idx = %d | end idx = %d\n",
 				__func__, i, pools[i].start_idx, pools[i].end_idx);
 		if (!pools[i].valid)
@@ -154,7 +157,7 @@ void skb_data_pool_init(void)
 			SKB_DATA_SIZE, SKB_DATA_SIZE);
 	// XXX: round it to 2KiB
 	//pool = priv_pool_init(SKB_DATA_POOL, 0x20, 2048);
-	pool_base = base_pools[pool_pick()];
+	pool_base = base_pools[pools[pool_pick()].start_idx];
 	pool_size = best_diff * ((1 << pool_order) * PAGE_SIZE);
 	pool = priv_pool_init(SKB_DATA_POOL, (void*) pool_base, pool_size, 2048);
 #ifdef SKBC_PRIVATE_POOL

@@ -162,7 +162,11 @@ int pool_pick(void)
 		}
 	}
 
-	for (i = 0; i < MAX_POOLS; i++) {
+	/* if there is no discontinuity, then we will have a huge chunk until the end */
+	pools[pool_idx].valid = true;
+	pools[pool_idx].end_idx = MAX_POOLS - 1;
+
+	for (i = 0; i < pool_idx; i++) {
 		printk("%s, pool %d: start idx = %d | end idx = %d\n",
 				__func__, i, pools[i].start_idx, pools[i].end_idx);
 		if (!pools[i].valid)
@@ -181,7 +185,7 @@ int pool_pick(void)
 void skb_data_pool_init(void)
 {
 	//pool = priv_pool_init(SKB_DATA_POOL, 10, SKB_DATA_SIZE);
-	pool_base = base_pools[pool_pick()];
+	pool_base = base_pools[pools[pool_pick()].start_idx];
 	pool_size = best_diff * ((1 << pool_order) * PAGE_SIZE);
 	pool = priv_pool_init(SKB_DATA_POOL, (void*) pool_base, pool_size, 2048);
 
@@ -858,6 +862,7 @@ int ndo_validate_addr_user(struct net_device *dev, struct trampoline_hidden_args
 	fipc_set_reg1(request, net_dev_container->other_ref.cptr);
 
 	LIBLCD_MSG("%s, cptr klcd %lu", __func__, net_dev_container->other_ref.cptr);
+	printk("%s, awe_map %p\n", __func__, PTS()->awe_map);
 
 	DO_FINISH_(ndo_validate_addr, {
 	  ASYNC_({
@@ -886,7 +891,7 @@ int ndo_validate_addr(struct net_device *dev, struct trampoline_hidden_args *hid
 	struct net_device_container *net_dev_container;
 
 	if (!get_current()->ptstate) {
-		LIBLCD_MSG("%s:Called from userland %p", __func__, dev);
+		LIBLCD_MSG("%s:Called from userland[%s:%d] %p", __func__, current->comm, current->pid, dev);
 		LCD_MAIN({
 			ret = ndo_validate_addr_user(dev, hidden_args);
 		});
@@ -1864,7 +1869,7 @@ int register_netdevice_callee(struct fipc_message *request, struct thc_channel *
 	}
 
 	dev_container->net_device.dev_addr = kmalloc(MAX_ADDR_LEN, GFP_KERNEL);
-
+	printk("%s, awe_map %p\n", __func__, PTS()->awe_map);
 	rtnl_lock();
 	ret = register_netdevice(( &dev_container->net_device ));
 	rtnl_unlock();

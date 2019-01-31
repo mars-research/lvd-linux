@@ -49,7 +49,7 @@ uint64_t *times_lcd = NULL;
 uint64_t *times_free = NULL;
 
 static u64 global_tx_count, global_free_count;
-static struct rtnl_link_stats64 g_stats;
+struct rtnl_link_stats64 g_stats;
 
 /* This is the only device we strive for */
 #define IXGBE_DEV_ID_82599_SFP_SF2       0x154D
@@ -774,7 +774,7 @@ int probe_user(struct pci_dev *dev,
 	 */
 	thc_init();
 
-	ret = async_msg_blocking_send_start(hidden_args->async_chnl,
+	ret = fipc_test_blocking_send_start(hidden_args->async_chnl,
 		&_request);
 	if (ret) {
 		LIBLCD_ERR("failed to get a send slot");
@@ -824,24 +824,27 @@ int probe(struct pci_dev *dev,
 	unsigned int pool_ord;
 	cptr_t pool_cptr;
 #endif
+	struct thc_channel *async_chnl = hidden_args->async_chnl;
+	cptr_t sync_end;
+	bool nonlcd = false;
+
 	/* assign pdev to a global instance */
 	g_pdev = dev;
 
 	LIBLCD_MSG("%s, irq # %d | msix_enabled %d", __func__, dev->irq, dev->msix_enabled);
 
 	if (!current->ptstate) {
-		dump_stack();
-		LIBLCD_MSG("Calling from a non-LCD context! creating thc runtime!");
-		LCD_MAIN({
-			ret = probe_user(dev,
-		id,
-		hidden_args);
-		}
-		);
-		return ret;
+		LIBLCD_MSG("%s, Calling from non-LCD (%s) context! creating thc runtime", __func__, current->comm);
+
+		lcd_enter();
+		nonlcd = true;
+		grant_sync_ep(&sync_end, hidden_args->sync_ep);
+		goto normal_probe;
+	} else {
+		sync_end = hidden_args->sync_ep;
 	}
 
-	dump_stack();
+normal_probe:
 	dev_container = kzalloc(sizeof( struct pci_dev_container   ),
 		GFP_KERNEL);
 	if (!dev_container) {
@@ -849,6 +852,7 @@ int probe(struct pci_dev *dev,
 		goto fail_alloc;
 	}
 
+	/* pci_dev is used later. So let's insert it into KLCD's cspace */
 	ret = glue_cap_insert_pci_dev_type(hidden_args->cspace,
 		dev_container,
 		&dev_container->my_ref);
@@ -856,8 +860,14 @@ int probe(struct pci_dev *dev,
 		LIBLCD_ERR("lcd insert");
 		goto fail_insert;
 	}
-	ret = async_msg_blocking_send_start(hidden_args->async_chnl,
-		&_request);
+
+	if (nonlcd)
+		ret = fipc_test_blocking_send_start(async_chnl,
+				&_request);
+	else
+		ret = async_msg_blocking_send_start(async_chnl,
+				&_request);
+
 	if (ret) {
 		LIBLCD_ERR("failed to get a send slot");
 		goto fail_async;
@@ -870,13 +880,14 @@ int probe(struct pci_dev *dev,
 			*dev->dev.dma_mask);
 
 #ifdef PCI_REGIONS
-	ret = thc_ipc_send_request(hidden_args->async_chnl,
+	ret = thc_ipc_send_request(async_chnl,
 			_request,
 			&request_cookie);
 	if (ret) {
 		LIBLCD_ERR("thc_ipc_call");
 		goto fail_ipc;
 	}
+	printk("%s, send request done\n", __func__);
 	/*
 	 * ixgbe driver just needs res[0]
 	 */
@@ -891,8 +902,6 @@ int probe(struct pci_dev *dev,
 
         p = virt_to_head_page(pool->pool);
 
-        //pool_ord = ilog2(roundup_pow_of_two((pool->total_pages * PAGE_SIZE) >> PAGE_SHIFT));
-        
 	pool_ord = ilog2(roundup_pow_of_two((1 << pool_order) * best_diff));
         ret = lcd_volunteer_pages(p, pool_ord, &pool_cptr);
 
@@ -910,7 +919,9 @@ int probe(struct pci_dev *dev,
 	lcd_set_r0(res0_len);
 	lcd_set_r1(pool_ord);
 
-	ret = lcd_sync_send(hidden_args->sync_ep);
+	printk("%s, trying sync send\n", __func__);
+
+	ret = lcd_sync_send(sync_end);
 	lcd_set_cr0(CAP_CPTR_NULL);
 
 	if (ret) {
@@ -918,7 +929,9 @@ int probe(struct pci_dev *dev,
 		goto fail_sync;
 	}
 
-	ret = thc_ipc_recv_response(hidden_args->async_chnl,
+	printk("%s, sync send done. waiting for resp\n", __func__);
+
+	ret = thc_ipc_recv_response(async_chnl,
 			request_cookie,
 			&_response);
 
@@ -926,9 +939,8 @@ int probe(struct pci_dev *dev,
 		LIBLCD_ERR("failed to recv ipc");
 		goto fail_ipc_rx;
 	}
-
 #else
-	ret = thc_ipc_call(hidden_args->async_chnl,
+	ret = thc_ipc_call(async_chnl,
 		_request,
 		&_response);
 	if (ret) {
@@ -937,11 +949,15 @@ int probe(struct pci_dev *dev,
 	}
 #endif
 	func_ret = fipc_get_reg1(_response);
-	fipc_recv_msg_end(thc_channel_to_fipc(hidden_args->async_chnl),
+	fipc_recv_msg_end(thc_channel_to_fipc(async_chnl),
 			_response);
 
 	setup_timer(&service_timer, &ixgbe_service_timer, (unsigned long) NULL);
+
+	if (nonlcd)
+		lcd_exit(0);
 	return func_ret;
+
 fail_async:
 fail_sync:
 fail_ipc:
@@ -1016,7 +1032,7 @@ void remove_user(struct pci_dev *dev,
 	struct fipc_message *_response;
 	thc_init();
 
-	ret = async_msg_blocking_send_start(hidden_args->async_chnl,
+	ret = fipc_test_blocking_send_start(hidden_args->async_chnl,
 		&_request);
 	if (ret) {
 		LIBLCD_ERR("failed to get a send slot");
@@ -1053,7 +1069,7 @@ void remove(struct pci_dev *dev,
 	struct fipc_message *_request;
 	struct fipc_message *_response;
 	if (!current->ptstate) {
-		LIBLCD_MSG("Calling from a non-LCD context! creating thc runtime!");
+		LIBLCD_MSG("%s, Calling from non-LCD (%s) context! creating thc runtime", __func__, current->comm);
 		LCD_MAIN({
 			remove_user(dev,
 					hidden_args);
@@ -1099,7 +1115,7 @@ int ndo_open_user(struct net_device *dev,
 		struct net_device_container,
 		net_device);
 	thc_init();
-	ret = async_msg_blocking_send_start(hidden_args->async_chnl,
+	ret = fipc_test_blocking_send_start(hidden_args->async_chnl,
 		&_request);
 	if (ret) {
 		LIBLCD_ERR("failed to get a send slot");
@@ -1143,7 +1159,7 @@ int ndo_open(struct net_device *dev,
 	struct fipc_message *_response;
 	int func_ret;
 	if (!current->ptstate) {
-		LIBLCD_MSG("Calling from a non-LCD context! creating thc runtime!");
+		LIBLCD_MSG("%s, Calling from non-LCD (%s) context! creating thc runtime", __func__, current->comm);
 		LCD_MAIN({
 			ret = ndo_open_user(dev,
 		hidden_args);
@@ -1208,7 +1224,7 @@ int ndo_stop_user(struct net_device *dev,
 		struct net_device_container,
 		net_device);
 	thc_init();
-	ret = async_msg_blocking_send_start(hidden_args->async_chnl,
+	ret = fipc_test_blocking_send_start(hidden_args->async_chnl,
 		&_request);
 	if (ret) {
 		LIBLCD_ERR("failed to get a send slot");
@@ -1251,7 +1267,7 @@ int ndo_stop(struct net_device *dev,
 	struct fipc_message *_response;
 	int func_ret;
 	if (!current->ptstate) {
-		LIBLCD_MSG("Calling from a non-LCD context! creating thc runtime!");
+		LIBLCD_MSG("%s, Calling from non-LCD (%s) context! creating thc runtime", __func__, current->comm);
 		LCD_MAIN({
 			ret = ndo_stop_user(dev,
 		hidden_args);
@@ -1821,6 +1837,7 @@ fail_cptr:
 	return -1;
 }
 
+#if 1
 DEFINE_SPINLOCK(prep_lock);
 
 int ndo_start_xmit(struct sk_buff *skb,
@@ -1882,7 +1899,8 @@ int ndo_start_xmit(struct sk_buff *skb,
 		} else if(!strncmp(current->comm, "iperf",
 					strlen("iperf")) ||
 			!strncmp(current->comm, "lt-iperf3",
-					strlen("lt-iperf3"))) {
+					strlen("lt-iperf3")) ||
+			!strncmp(current->comm, "memcached", strlen("memcached"))) {
 		
 			printk("[%d]%s[pid=%d] calling prep_channel\n",
 				smp_processor_id(), current->comm,
@@ -2001,7 +2019,7 @@ quit:
 	/* pad to 17 bytes, don't care the ret val */
 	skb_put_padto(skb, 17);
 
-	ret = async_msg_blocking_send_start(async_chnl,
+	ret = fipc_test_blocking_send_start(async_chnl,
 		&_request);
 	if (ret) {
 		LIBLCD_ERR("failed to get a send slot");
@@ -2136,6 +2154,7 @@ fail_sync:
 fail_ipc:
 	return ret;
 }
+#endif
 
 LCD_TRAMPOLINE_DATA(ndo_start_xmit_trampoline);
 int  LCD_TRAMPOLINE_LINKAGE(ndo_start_xmit_trampoline)
@@ -2148,7 +2167,7 @@ ndo_start_xmit_trampoline(struct sk_buff *skb,
 	struct trampoline_hidden_args *hidden_args;
 	LCD_TRAMPOLINE_PROLOGUE(hidden_args,
 			ndo_start_xmit_trampoline);
-	ndo_start_xmit_fp = ndo_start_xmit_async_landing;
+	ndo_start_xmit_fp = ndo_start_xmit;
 	return ndo_start_xmit_fp(skb,
 		dev,
 		hidden_args);
@@ -2166,7 +2185,7 @@ void ndo_set_rx_mode_user(struct net_device *dev,
 		struct net_device_container,
 		net_device);
 	thc_init();
-	ret = async_msg_blocking_send_start(hidden_args->async_chnl,
+	ret = fipc_test_blocking_send_start(hidden_args->async_chnl,
 		&_request);
 	if (ret) {
 		LIBLCD_ERR("failed to get a send slot");
@@ -2207,7 +2226,7 @@ void ndo_set_rx_mode(struct net_device *dev,
 	struct fipc_message *_request;
 	struct fipc_message *_response;
 	if (!current->ptstate) {
-		LIBLCD_MSG("Calling from a non-LCD context! creating thc runtime!");
+		LIBLCD_MSG("%s, Calling from non-LCD (%s) context! creating thc runtime", __func__, current->comm);
 		LCD_MAIN({
 			ndo_set_rx_mode_user(dev,
 					hidden_args);
@@ -2271,7 +2290,7 @@ int ndo_validate_addr_user(struct net_device *dev,
 		struct net_device_container,
 		net_device);
 	thc_init();
-	ret = async_msg_blocking_send_start(hidden_args->async_chnl,
+	ret = fipc_test_blocking_send_start(hidden_args->async_chnl,
 		&_request);
 	if (ret) {
 		LIBLCD_ERR("failed to get a send slot");
@@ -2313,7 +2332,7 @@ int ndo_validate_addr(struct net_device *dev,
 	struct fipc_message *_response;
 	int func_ret;
 	if (!current->ptstate) {
-		LIBLCD_MSG("Calling from a non-LCD context! creating thc runtime!");
+		LIBLCD_MSG("%s, Calling from non-LCD (%s) context! creating thc runtime", __func__, current->comm);
 		LCD_MAIN({
 			ret = ndo_validate_addr_user(dev,
 		hidden_args);
@@ -2384,7 +2403,7 @@ int ndo_set_mac_address_user(struct net_device *dev,
 		struct net_device_container,
 		net_device);
 	thc_init();
-	ret = async_msg_blocking_send_start(hidden_args->async_chnl,
+	ret = fipc_test_blocking_send_start(hidden_args->async_chnl,
 		&_request);
 	if (ret) {
 		LIBLCD_ERR("failed to get a send slot");
@@ -2453,7 +2472,7 @@ int ndo_set_mac_address(struct net_device *dev,
 	unsigned 	int request_cookie;
 	int func_ret;
 	if (!current->ptstate) {
-		LIBLCD_MSG("Calling from a non-LCD context! creating thc runtime!");
+		LIBLCD_MSG("%s, Calling from non-LCD (%s) context! creating thc runtime", __func__, current->comm);
 		LCD_MAIN({
 			ret = ndo_set_mac_address_user(dev,
 		addr,
@@ -2543,7 +2562,7 @@ int ndo_change_mtu_user(struct net_device *dev,
 		struct net_device_container,
 		net_device);
 	thc_init();
-	ret = async_msg_blocking_send_start(hidden_args->async_chnl,
+	ret = fipc_test_blocking_send_start(hidden_args->async_chnl,
 		&_request);
 	if (ret) {
 		LIBLCD_ERR("failed to get a send slot");
@@ -2589,7 +2608,7 @@ int ndo_change_mtu(struct net_device *dev,
 	struct fipc_message *_response;
 	int func_ret;
 	if (!current->ptstate) {
-		LIBLCD_MSG("Calling from a non-LCD context! creating thc runtime!");
+		LIBLCD_MSG("%s, Calling from non-LCD (%s) context! creating thc runtime", __func__, current->comm);
 		LCD_MAIN({
 			ret = ndo_change_mtu_user(dev,
 		new_mtu,
@@ -2659,7 +2678,7 @@ void ndo_tx_timeout_user(struct net_device *dev,
 		struct net_device_container,
 		net_device);
 	thc_init();
-	ret = async_msg_blocking_send_start(hidden_args->async_chnl,
+	ret = fipc_test_blocking_send_start(hidden_args->async_chnl,
 		&_request);
 	if (ret) {
 		LIBLCD_ERR("failed to get a send slot");
@@ -2700,7 +2719,7 @@ void ndo_tx_timeout(struct net_device *dev,
 	struct fipc_message *_request;
 	struct fipc_message *_response;
 	if (!current->ptstate) {
-		LIBLCD_MSG("Calling from a non-LCD context! creating thc runtime!");
+		LIBLCD_MSG("%s, Calling from non-LCD (%s) context! creating thc runtime", __func__, current->comm);
 		LCD_MAIN({
 			ndo_tx_timeout_user(dev,
 		hidden_args);
@@ -2765,7 +2784,7 @@ int ndo_set_tx_maxrate_user(struct net_device *dev,
 		struct net_device_container,
 		net_device);
 	thc_init();
-	ret = async_msg_blocking_send_start(hidden_args->async_chnl,
+	ret = fipc_test_blocking_send_start(hidden_args->async_chnl,
 		&_request);
 	if (ret) {
 		LIBLCD_ERR("failed to get a send slot");
@@ -2814,7 +2833,7 @@ int ndo_set_tx_maxrate(struct net_device *dev,
 	struct fipc_message *_response;
 	int func_ret;
 	if (!current->ptstate) {
-		LIBLCD_MSG("Calling from a non-LCD context! creating thc runtime!");
+		LIBLCD_MSG("%s, Calling from non-LCD (%s) context! creating thc runtime", __func__, current->comm);
 		LCD_MAIN({
 			ret = ndo_set_tx_maxrate_user(dev,
 		queue_index,
@@ -2891,7 +2910,7 @@ struct rtnl_link_stats64 *ndo_get_stats64_user(struct net_device *dev,
 		struct net_device_container,
 		net_device);
 	thc_init();
-	ret = async_msg_blocking_send_start(hidden_args->async_chnl,
+	ret = fipc_test_blocking_send_start(hidden_args->async_chnl,
 		&_request);
 	if (ret) {
 		LIBLCD_ERR("failed to get a send slot");
@@ -2964,7 +2983,7 @@ struct rtnl_link_stats64 *ndo_get_stats64(struct net_device *dev,
 	if (!current->ptstate) {
 		func_ret = &g_stats;
 		return func_ret;
-		LIBLCD_MSG("Calling from a non-LCD context! creating thc runtime!");
+		LIBLCD_MSG("%s, Calling from non-LCD (%s) context! creating thc runtime", __func__, current->comm);
 		LCD_MAIN({
 			func_ret = ndo_get_stats64_user(dev,
 		stats,
@@ -3280,9 +3299,8 @@ int register_netdev_callee(struct fipc_message *_request,
 	struct fipc_message *_response;
 	unsigned 	int request_cookie;
 	int func_ret;
-	//a0:36:9f:08:1c:3e
-	//eth7 a0:36:9f:08:1c:4a
-	u8 mac_addr[] = {0xa0, 0x36, 0x9f, 0x08, 0x1c, 0x4a};
+	//node-0 90:e2:ba:b3:75:a1
+	u8 mac_addr[] = {0x90, 0xe2, 0xba, 0xb3, 0x75, 0xa1};
 
 	request_cookie = thc_get_request_cookie(_request);
 	ret = glue_cap_lookup_net_device_type(cspace,
@@ -4824,7 +4842,7 @@ int sync_user(struct net_device *dev,
 		struct net_device_container,
 		net_device);
 	thc_init();
-	ret = async_msg_blocking_send_start(hidden_args->async_chnl,
+	ret = fipc_test_blocking_send_start(hidden_args->async_chnl,
 		&_request);
 	if (ret) {
 		LIBLCD_ERR("failed to get a send slot");
@@ -4879,7 +4897,7 @@ int sync(struct net_device *dev,
 	} m = { {0} };
 
 	if (!current->ptstate) {
-		LIBLCD_MSG("Calling from a non-LCD context! creating thc runtime!");
+		LIBLCD_MSG("%s, Calling from non-LCD (%s) context! creating thc runtime", __func__, current->comm);
 		LCD_MAIN({
 			ret = sync_user(dev,
 		mac,
@@ -4958,7 +4976,7 @@ int unsync_user(struct net_device *dev,
 		struct net_device_container,
 		net_device);
 	thc_init();
-	ret = async_msg_blocking_send_start(hidden_args->async_chnl,
+	ret = fipc_test_blocking_send_start(hidden_args->async_chnl,
 		&_request);
 	if (ret) {
 		LIBLCD_ERR("failed to get a send slot");
@@ -5014,7 +5032,7 @@ int unsync(struct net_device *dev,
 	} m = { {0} };
 
 	if (!current->ptstate) {
-		LIBLCD_MSG("Calling from a non-LCD context! creating thc runtime!");
+		LIBLCD_MSG("%s, Calling from non-LCD (%s) context! creating thc runtime", __func__, current->comm);
 		LCD_MAIN({
 			ret = unsync_user(dev,
 		mac,

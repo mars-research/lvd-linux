@@ -211,6 +211,22 @@ async_msg_blocking_send_start(struct thc_channel *chnl,
 			return -EIO;
 	}
 }
+
+static inline
+int
+fipc_test_blocking_send_start(struct thc_channel *chnl,
+			struct fipc_message **out)
+{
+	int ret;
+	for (;;) {
+		/* Poll until we get a free slot or error */
+		ret = fipc_send_msg_start(thc_channel_to_fipc(chnl), out);
+		if (!ret || ret != -EWOULDBLOCK)
+			return ret;
+		cpu_relax();
+	}
+}
+
 static inline
 int
 async_msg_blocking_recv_start(struct thc_channel *chnl,

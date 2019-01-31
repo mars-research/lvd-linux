@@ -53,13 +53,15 @@ static struct rtnl_link_stats64 g_stats;
 
 /* This is the only device we strive for */
 #define IXGBE_DEV_ID_82599_SFP_SF2       0x154D
+#define IXGBE_DEV_ID_82599_SFP           0x10FB
 
 /* XXX: There's no way to pass arrays across domains for now.
  * May not be in the future too! But agree that this is ugly
  * and move forward. - vik
  */
 static const struct pci_device_id ixgbe_pci_tbl[] = {
-	{PCI_VDEVICE(INTEL, IXGBE_DEV_ID_82599_SFP_SF2) },
+	/* {PCI_VDEVICE(INTEL, IXGBE_DEV_ID_82599_SFP_SF2) }, */
+	{PCI_VDEVICE(INTEL, IXGBE_DEV_ID_82599_SFP) },
 	{ 0 } /* sentinel */
 };
 

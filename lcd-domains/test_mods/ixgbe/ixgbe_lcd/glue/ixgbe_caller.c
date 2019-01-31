@@ -29,7 +29,7 @@ static struct net_device *g_net_device;
 
 #ifdef IOMMU_ASSIGN
 /* device for IOMMU assignment */
-struct pcidev_info dev_assign = { 0x0000, 0x42, 0x00, 0x1 };
+struct pcidev_info dev_assign = { 0x0000, 0x06, 0x00, 0x1 };
 #endif
 
 struct kmem_cache *skb_c_cache;
@@ -842,7 +842,7 @@ int probe_callee(struct fipc_message *_request,
 	}
 	dev_container->pci_dev.dev.kobj.name = "ixgbe_lcd";
 	dev_container->pci_dev.vendor = 0x8086;
-	dev_container->pci_dev.device = 0x154D;
+	dev_container->pci_dev.device = 0x10fd;
 	dev_container->other_ref = other_ref;
 	dev_container->pci_dev.dev.dma_mask = &dma_mask;
 #ifdef PCI_REGIONS

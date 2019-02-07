@@ -6,6 +6,8 @@ lcd_test_mod_ixgbe_net_klcd-y		+= main.o
 lcd_test_mod_ixgbe_net_klcd-y		+= $(addprefix glue/, ixgbe_callee.o \
 						ixgbe_callee_dispatch.o )
 
+						#ixgbe_xmit.o \
+
 lcd_test_mod_ixgbe_net_klcd-y		+= $(addprefix ../, ixgbe_cap.o)
 
 cppflags-y += $(NONISOLATED_CFLAGS)

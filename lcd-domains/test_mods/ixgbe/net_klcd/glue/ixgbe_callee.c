@@ -107,11 +107,14 @@ int compare_addr(const void *a, const void *b)
 int pool_pick(void)
 {
 	int i;
+
+	/* allocate series of pages */
 	for (i = 0; i < MAX_POOLS; i++) {
 		base_pools[i] = (char*) __get_free_pages(GFP_KERNEL | __GFP_ZERO,
 	                            pool_order);
 	}
 
+	/* sort all of base addresses */
 	sort(base_pools, MAX_POOLS, sizeof(char*), compare_addr, NULL);
 
 	printk("%s, sorted order:\n", __func__);
@@ -122,6 +125,7 @@ int pool_pick(void)
 	pools[pool_idx].start_idx = 0;
 	pools[pool_idx].end_idx = MAX_POOLS - 1;
 	pools[pool_idx].valid = true;
+
 	for (i = 0; i < MAX_POOLS - 1; i++) {
 		printk("%s, comparing pool[%d]=%llx and pool[%d]=%llx\n", __func__,
 					i+1, (uint64_t)base_pools[i+1], i, (uint64_t) base_pools[i]);
@@ -136,7 +140,7 @@ int pool_pick(void)
 	pools[pool_idx].valid = true;
 	pools[pool_idx].end_idx = MAX_POOLS - 1;
 
-	for (i = 0; i < pool_idx; i++) {
+	for (i = 0; i < pool_idx + 1; i++) {
 		printk("%s, pool %d: start idx = %d | end idx = %d\n",
 				__func__, i, pools[i].start_idx, pools[i].end_idx);
 		if (!pools[i].valid)
@@ -911,7 +915,6 @@ normal_probe:
 	}
 
 	pool_pfn_start = (unsigned long)pool->pool >> PAGE_SHIFT;
-	//pool_pfn_end = pool_pfn_start + pool->total_pages;
 	pool_pfn_end = pool_pfn_start + ((1 << pool_order) * best_diff);
 
 	lcd_set_cr0(res0_cptr);
@@ -931,9 +934,18 @@ normal_probe:
 
 	printk("%s, sync send done. waiting for resp\n", __func__);
 
-	ret = thc_ipc_recv_response(async_chnl,
-			request_cookie,
-			&_response);
+	if (nonlcd) {
+		DO_FINISH_(_probe_user,{
+			ASYNC_({
+				ret = thc_ipc_recv_response(async_chnl,
+						request_cookie, &_response);
+			}, _probe_user);
+		});
+	} else {
+		ret = thc_ipc_recv_response(async_chnl,
+				request_cookie,
+				&_response);
+	}
 
 	if (ret) {
 		LIBLCD_ERR("failed to recv ipc");
@@ -1360,7 +1372,7 @@ int ndo_start_xmit_dofin(struct sk_buff *skb,
 	/* pad to 17 bytes, don't care the ret val */
 	skb_put_padto(skb, 17);
 
-	ret = async_msg_blocking_send_start(async_chnl,	&_request);
+	ret = fipc_test_blocking_send_start(async_chnl,	&_request);
 
 	if (ret) {
 		LIBLCD_ERR("failed to get a send slot");
@@ -1501,7 +1513,9 @@ int ndo_start_xmit_nonlcd(struct sk_buff *skb,
 	unsigned long skbd_ord, skbd_off;
 	cptr_t skb_cptr, skbd_cptr;
 	struct skbuff_members *skb_lcd;
+#ifdef SENDER_DISPATCH_LOOP
 	bool got_resp = false;
+#endif
 	u64 tcp_count = global_tx_count;
 #ifdef TIMESTAMP
 	TS_DECL(mndo_xmit);
@@ -1540,7 +1554,7 @@ int ndo_start_xmit_nonlcd(struct sk_buff *skb,
 	/* pad to 17 bytes, don't care the ret val */
 	skb_put_padto(skb, 17);
 
-	ret = async_msg_blocking_send_start(async_chnl,	&_request);
+	ret = fipc_test_blocking_send_start(async_chnl,	&_request);
 
 	if (ret) {
 		LIBLCD_ERR("failed to get a send slot");
@@ -1641,6 +1655,7 @@ int ndo_start_xmit_nonlcd(struct sk_buff *skb,
 		printk("%s, ipc_send | pts %p | reqc 0x%x | seq %llu\n",
 			__func__, PTS(), request_cookie, tcp_count);
 	}
+#ifdef SENDER_DISPATCH_LOOP
 again:
 	async_msg_blocking_recv_start(async_chnl, &_response);
 
@@ -1667,7 +1682,18 @@ again:
 		fipc_recv_msg_end(thc_channel_to_fipc(async_chnl),
 			_response);
 	}
+#else /* SENDER_DISPATCH_LOOP */
+	async_msg_blocking_recv_start(async_chnl, &_response);
 
+	func_ret = fipc_get_reg1(_response);
+#ifdef LCD_MEASUREMENT
+	times_lcd[iter] = fipc_get_reg2(_response);
+	iter = (iter + 1) % NUM_PACKETS;
+#endif
+	fipc_recv_msg_end(thc_channel_to_fipc(async_chnl),
+		_response);
+
+#endif /* SENDER_DISPATCH_LOOP */
 	if (skb->data[23] == 0x6) {
 		printk("%s, ipc_recv | pts %p | reqc 0x%x | seq %llu\n",
 			__func__, PTS(), request_cookie, tcp_count);
@@ -1738,7 +1764,7 @@ int prep_channel(struct trampoline_hidden_args *hidden_args)
 		goto fail_ep;
 	}
 
-	ret = async_msg_blocking_send_start(hidden_args->async_chnl,
+	ret = fipc_test_blocking_send_start(hidden_args->async_chnl,
 		&_request);
 	if (ret) {
 		LIBLCD_ERR("failed to get a send slot");
@@ -1909,7 +1935,8 @@ int ndo_start_xmit(struct sk_buff *skb,
 			prep_channel(hidden_args);
 			spin_unlock(&prep_lock);
 			printk("===================================\n");
-			printk("===== Private Channel created =====\n");
+			printk("===== Private Channel created on cpu %d for (pid %d)[%s] =====\n",
+						smp_processor_id(), current->pid, current->comm);
 			printk("===================================\n");
 
 /*			if (!entry)
@@ -4752,7 +4779,7 @@ int ixgbe_trigger_dump(struct thc_channel *_channel)
 		thc_init();
 	}
 
-	ret = async_msg_blocking_send_start(_channel,
+	ret = fipc_test_blocking_send_start(_channel,
 		&_request);
 	if (ret) {
 		LIBLCD_ERR("failed to get a send slot");
@@ -4794,7 +4821,7 @@ int ixgbe_service_event_sched(struct thc_channel *_channel)
 		thc_init();
 	}
 
-	ret = async_msg_blocking_send_start(_channel,
+	ret = fipc_test_blocking_send_start(_channel,
 		&_request);
 	if (ret) {
 		LIBLCD_ERR("failed to get a send slot");
@@ -5321,11 +5348,11 @@ int poll_once(struct napi_struct *napi,
 	int ret;
 
 	if (once)
-		goto fail_ipc;
+		goto exit;
 
 	thc_init();
 
-	ret = async_msg_blocking_send_start(hidden_args->async_chnl,
+	ret = fipc_test_blocking_send_start(hidden_args->async_chnl,
 		&_request);
 	if (ret) {
 		LIBLCD_ERR("failed to get a send slot");
@@ -5344,10 +5371,14 @@ int poll_once(struct napi_struct *napi,
 		LIBLCD_ERR("thc_ipc send");
 		goto fail_ipc;
 	}
-	once = 1;
 fail_ipc:
 fail_async:
-	lcd_exit(0);
+	if (!once) {
+		once = 1;
+		printk("%s trying to call lcd_exit with lcd %p\n", __func__, current->lcd);
+		thc_done();
+	}
+exit:
 	return 0;
 }
 
@@ -6023,192 +6054,5 @@ int __napi_alloc_skb_callee(struct fipc_message *_request,
 
 fail_alloc:
 fail_sync:
-	return ret;
-}
-
-int eth_type_trans_callee(struct fipc_message *_request,
-		struct thc_channel *_channel,
-		struct glue_cspace *cspace,
-		struct cptr sync_ep)
-{
-	struct sk_buff *skb;
-	struct net_device_container *dev_container;
-	int ret;
-	struct fipc_message *_response;
-	unsigned 	int request_cookie;
-	__be16 func_ret;
-	cptr_t skb_ref;
-	struct sk_buff_container *skb_c;
-
-	request_cookie = thc_get_request_cookie(_request);
-
-	skb_ref = __cptr(fipc_get_reg2(_request));
-	ret = glue_cap_lookup_net_device_type(cspace,
-		__cptr(fipc_get_reg1(_request)),
-		&dev_container);
-	if (ret) {
-		LIBLCD_ERR("lookup");
-		goto fail_lookup;
-	}
-	fipc_recv_msg_end(thc_channel_to_fipc(_channel),
-			_request);
-
-	glue_lookup_skbuff(cptr_table, skb_ref, &skb_c);
-
-	skb = skb_c->skb;
-	/* restore */
-	skb->head = skb_c->head;
-	skb->data = skb_c->data;
-
-	func_ret = eth_type_trans(skb,
-		( &dev_container->net_device ));
-
-	printk("%s, ret 0x%X\n", __func__, ntohs(func_ret));
-	/* save */
-	skb_c->head = skb->head;
-	skb_c->data = skb->data;
-
-	if (async_msg_blocking_send_start(_channel,
-		&_response)) {
-		LIBLCD_ERR("error getting response msg");
-		return -EIO;
-	}
-	fipc_set_reg1(_response,
-			func_ret);
-	thc_ipc_reply(_channel,
-			request_cookie,
-			_response);
-	return ret;
-fail_lookup:
-	return ret;
-}
-
-int skb_add_rx_frag_callee(struct fipc_message *_request,
-		struct thc_channel *_channel,
-		struct glue_cspace *cspace,
-		struct cptr sync_ep)
-{
-	struct sk_buff *skb;
-	int i;
-	unsigned 	long page;
-	int off;
-	int size;
-	unsigned 	int truesize;
-	int ret;
-	struct fipc_message *_response;
-	unsigned 	int request_cookie;
-	cptr_t skb_ref;
-	struct sk_buff_container *skb_c;
-	struct lcd *lcd_struct;
-	hva_t hva_out;
-
-	request_cookie = thc_get_request_cookie(_request);
-
-	skb_ref = __cptr(fipc_get_reg0(_request));
-	i = fipc_get_reg1(_request);
-	page = fipc_get_reg2(_request);
-	off = fipc_get_reg3(_request);
-	size = fipc_get_reg4(_request);
-	truesize = fipc_get_reg5(_request);
-
-	fipc_recv_msg_end(thc_channel_to_fipc(_channel),
-			_request);
-
-	glue_lookup_skbuff(cptr_table, skb_ref, &skb_c);
-
-	skb = skb_c->skb;
-
-	lcd_struct = iommu_lcd;
-
-	ret = lcd_arch_ept_gpa_to_hva(lcd_struct->lcd_arch,
-				__gpa(page), &hva_out);
-	if (ret) {
-		LIBLCD_WARN("Couldn't get gpa:hpa mapping for"
-			    " gpa %lx", page);
-		goto reply;
-	}
-
-	printk("got gpa:hpa %lx:%lx from ept\n", page,
-		hva_val(hva_out));
-
-	/* restore */
-	skb->head = skb_c->head;
-	skb->data = skb_c->data;
-	skb_add_rx_frag(skb,
-			i,
-			virt_to_page(hva_val(hva_out)),
-			off,
-			size,
-			truesize);
-
-	/* XXX: Is it ok to mess up with page ref?
-	 * In the native driver, they do it. But with all our
-	 * hpa:gpa stuff, I am skeptical if this is correct.
-	 * If there are any page related bugs, this can be the
-	 * reason.
-	 */
-	//page_ref_inc(virt_to_page(hva_val(hva_out)));
-
-	/* save */
-	skb_c->head = skb->head;
-	skb_c->data = skb->data;
-
-reply:
-	if (async_msg_blocking_send_start(_channel,
-		&_response)) {
-		LIBLCD_ERR("error getting response msg");
-		return -EIO;
-	}
-	thc_ipc_reply(_channel,
-			request_cookie,
-			_response);
-	return ret;
-}
-
-int eth_get_headlen_callee(struct fipc_message *_request,
-		struct thc_channel *_channel,
-		struct glue_cspace *cspace,
-		struct cptr sync_ep)
-{
-	unsigned 	long data;
-	unsigned 	int len;
-	int ret = 0;
-	struct fipc_message *_response;
-	unsigned 	int request_cookie;
-	unsigned 	int func_ret = 0;
-	struct lcd *lcd_struct;
-	hva_t hva_out;
-
-	request_cookie = thc_get_request_cookie(_request);
-	fipc_recv_msg_end(thc_channel_to_fipc(_channel),
-			_request);
-	data = fipc_get_reg1(_request);
-	len = fipc_get_reg2(_request);
-
-	lcd_struct = iommu_lcd;
-
-
-	ret = lcd_arch_ept_gpa_to_hva(lcd_struct->lcd_arch,
-				__gpa(data), &hva_out);
-	if (ret) {
-		LIBLCD_WARN("Couldn't get gpa:hpa mapping for"
-			    " gpa %lx", data);
-		goto reply;
-	}
-
-	func_ret = eth_get_headlen((void *)hva_val(hva_out),
-		len);
-reply:
-	ret = 0;
-	if (async_msg_blocking_send_start(_channel,
-		&_response)) {
-		LIBLCD_ERR("error getting response msg");
-		return -EIO;
-	}
-	fipc_set_reg1(_response,
-			func_ret);
-	thc_ipc_reply(_channel,
-			request_cookie,
-			_response);
 	return ret;
 }

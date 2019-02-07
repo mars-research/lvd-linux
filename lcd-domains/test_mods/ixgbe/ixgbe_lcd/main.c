@@ -26,7 +26,7 @@ unsigned long loops_per_jiffy;
 bool poll_start = false;
 extern int __ixgbe_poll(void);
 unsigned long poll_state = 0ul;
-
+#define LCD_ROUNDROBIN
 /* LOOP ---------------------------------------- */
 
 static void main_and_loop(void)
@@ -61,6 +61,61 @@ static void main_and_loop(void)
 		 * channel). */
 		while (!stop && !ixgbe_done) {
 			struct thc_channel_group_item* curr_item;
+#ifdef LCD_ROUNDROBIN
+			/*
+			 * Do RR async receive
+			 */
+			list_for_each_entry(curr_item, &(ch_grp.head), list) {
+				ret = thc_ipc_poll_recv(thc_channel_group_item_channel(curr_item),
+					&msg);
+
+				// if we have a message for this channel
+				if (!ret) {
+					if (async_msg_get_fn_type(msg) == NDO_START_XMIT) {
+						ret = ndo_start_xmit_clean_callee(msg,
+							curr_item->channel,
+							ixgbe_cspace,
+							ixgbe_sync_endpoint);
+
+						if (unlikely(ret)) {
+							LIBLCD_ERR("async dispatch failed");
+							stop = 1;
+						}
+
+						// XXX: is this polling freq good enough for full-duplex communication?
+						{
+							if (poll_start)
+								ASYNC(__ixgbe_poll(););
+							cpu_relax();
+							continue;
+						}
+					} else {
+					/*
+					 * Got a message. Dispatch.
+					 */
+					ASYNC(
+
+						ret = dispatch_async_loop(curr_item->channel, msg,
+									ixgbe_cspace,
+									ixgbe_sync_endpoint);
+						if (ret) {
+							LIBLCD_ERR("async dispatch failed");
+							stop = 1;
+						}
+
+						);
+					} // if (disp_loop)
+				} // if (!ret)
+			} // list
+
+			// XXX: is this polling freq good enough for full-duplex communication?
+			{
+				if (poll_start)
+					ASYNC(__ixgbe_poll(););
+				cpu_relax();
+				continue;
+			}
+#else
 			/*
 			 * Do one async receive
 			 */
@@ -110,6 +165,7 @@ static void main_and_loop(void)
 			 */
 			if (poll_start)
 				ASYNC(__ixgbe_poll(););
+#endif
 		}
 		LIBLCD_MSG("IXGBE EXITED DISPATCH LOOP");
 		);

@@ -9,15 +9,15 @@
 #include <asm/cacheflush.h>
 #include <linux/vmalloc.h>
 
-#include "../../glue_helper.h"
-#include "../nullnet_callee.h"
+#include "../../ixgbe_glue_helper.h"
+#include "../ixgbe_callee.h"
 #include "../../rdtsc_helper.h"
 #include "../../perf_counter_helper.h"
 #include "../../ipc_helper.h"
 
 #include <lcd_config/post_hook.h>
 
-struct thc_channel *sirq_channels[4];
+extern struct thc_channel *sirq_channels[64];
 
 #define NUM_TRANSACTIONS	1000000
 #define NUM_INNER_ASYNCS	2
@@ -34,7 +34,10 @@ extern u32 thread;
 extern struct ptstate_t *ptrs[NUM_THREADS];
 extern struct rtnl_link_stats64 g_stats;
 extern struct thc_channel *xmit_chnl;
+extern struct thc_channel *xmit_irq_chnl;
 extern priv_pool_t *pool;
+
+DEFINE_SPINLOCK(prep_lock);
 
 /*
  * setup a new channel for the first time when an application thread
@@ -69,7 +72,7 @@ int setup_once(struct trampoline_hidden_args *hidden_args)
 		if (!sirq_channels[smp_processor_id()]) {
 			printk("%s: sirqch empty for %d\n",
 				__func__, smp_processor_id());
-			PTS()->thc_chnl = xmit_irq_channel;
+			PTS()->thc_chnl = xmit_irq_chnl;
 		}
 		PTS()->thc_chnl =
 			sirq_channels[smp_processor_id()];
@@ -81,13 +84,16 @@ int setup_once(struct trampoline_hidden_args *hidden_args)
 	} else if(!strncmp(current->comm, "iperf",
 				strlen("iperf")) ||
 		!strncmp(current->comm, "netperf",
-				strlen("netperf"))) {
+				strlen("netperf")) ||
+		!strncmp(current->comm, "lt-iperf3",
+					strlen("lt-iperf3"))) {
 
 		printk("[%d]%s[pid=%d] calling prep_channel\n",
 				smp_processor_id(), current->comm,
 				current->pid);
 		spin_lock(&prep_lock);
 		prep_channel(hidden_args);
+		spin_unlock(&prep_lock);
 		printk("===================================\n");
 		printk("===== Private Channel created =====\n");
 		printk("===================================\n");
@@ -112,7 +118,7 @@ int sender_dispatch(struct thc_channel *chnl, struct fipc_message *out, void *ar
 
 int __ndo_start_xmit_inner_async(struct sk_buff *skb, struct net_device *dev, struct trampoline_hidden_args *hidden_args)
 {
-	int ret;
+	int ret = 0;
 	struct fipc_message *_request;
 	struct fipc_message *_response;
 #ifdef COPY
@@ -342,7 +348,7 @@ int ndo_start_xmit_noasync(struct sk_buff *skb, struct net_device *dev, struct t
 	xmit_type_t xmit_type;
 	struct thc_channel *async_chnl;
 	struct net_device_container *net_dev_container;
-	struct sk_buff_container static_skbc;
+	struct sk_buff_container static_skbc = {0};
 	struct sk_buff_container *skb_c = &static_skbc;
 	int ret;
 
@@ -438,7 +444,7 @@ free:
  */
 int ndo_start_xmit_async(struct sk_buff *skb, struct net_device *dev, struct trampoline_hidden_args *hidden_args)
 {
-	int ret;
+	int ret = 0;
 	struct fipc_message *_request;
 	struct fipc_message *_response;
 	struct net_device_container *net_dev_container;
@@ -447,7 +453,7 @@ int ndo_start_xmit_async(struct sk_buff *skb, struct net_device *dev, struct tra
 	struct skbuff_members *skb_lcd;
 #endif
 	unsigned int request_cookie;
-	struct sk_buff_container static_skbc;
+	struct sk_buff_container static_skbc = {0};
 	struct sk_buff_container *skb_c = &static_skbc;
 	struct thc_channel *async_chnl = NULL;
 

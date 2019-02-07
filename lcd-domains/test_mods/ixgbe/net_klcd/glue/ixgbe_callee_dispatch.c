@@ -171,14 +171,14 @@ int dispatch_async_loop(struct thc_channel *_channel,
 		_channel,
 		cspace,
 		sync_ep);
-
+#if 0
 		case ETH_GET_HEADLEN:
 			trace(ETH_GET_HEADLEN);
 			return eth_get_headlen_callee(message,
 		_channel,
 		cspace,
 		sync_ep);
-
+#endif
 		case NETIF_TX_STOP_ALL_QUEUES:
 			trace(NETIF_TX_STOP_ALL_QUEUES);
 			return netif_tx_stop_all_queues_callee(message,
@@ -390,7 +390,7 @@ int dispatch_async_loop(struct thc_channel *_channel,
 		_channel,
 		cspace,
 		sync_ep);
-
+#if 0
 		case ETH_TYPE_TRANS:
 			return eth_type_trans_callee(message,
 		_channel,
@@ -403,7 +403,7 @@ int dispatch_async_loop(struct thc_channel *_channel,
 		_channel,
 		cspace,
 		sync_ep);
-
+#endif
 		default:
 			LIBLCD_ERR("unexpected function label: %d",
 					fn_type);

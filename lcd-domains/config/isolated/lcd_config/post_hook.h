@@ -142,14 +142,16 @@
  * All locking etc. is elided.
  */
 
-#undef DEFINE_MUTEX
-#define DEFINE_MUTEX(x) struct mutex x
-
 #undef get_online_cpus
 #define get_online_cpus() do { } while(0)
 
 #undef put_online_cpus
 #define put_online_cpus() do { } while(0)
+
+#ifndef CONFIG_SMP		/* CONFIG_SMP */
+
+#undef DEFINE_MUTEX
+#define DEFINE_MUTEX(x) struct mutex x
 
 #undef spin_lock_init
 #define spin_lock_init(x) do { } while(0)
@@ -172,26 +174,28 @@
 #undef spin_unlock_irq
 #define spin_unlock_irq(x) do { } while(0)
 
-#undef rcu_barrier
-#define rcu_barrier() do { smp_mb(); } while(0)
-
-#undef call_rcu
-#define call_rcu(arg, func) do { func(arg); } while(0)
-
 #undef local_irq_enable
 #define local_irq_enable() do { } while(0)
 
 #undef local_irq_disable
 #define local_irq_disable() do { } while(0)
 
-#undef might_sleep_if
-#define might_sleep_if(x) do { } while (0)
-
 #undef _raw_spin_lock
 #define _raw_spin_lock(x) do { } while (0)
 
 #undef _raw_spin_unlock
 #define _raw_spin_unlock(x) do { } while (0)
+
+#endif /* CONFIG_SMP */
+
+#undef rcu_barrier
+#define rcu_barrier() do { smp_mb(); } while(0)
+
+#undef call_rcu
+#define call_rcu(arg, func) do { func(arg); } while(0)
+
+#undef might_sleep_if
+#define might_sleep_if(x) do { } while (0)
 
 static inline void force_down_read(void *x)
 {

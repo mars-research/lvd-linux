@@ -397,7 +397,7 @@ fail1:
 }
 
 extern cptr_t nullnet_sync_endpoint;
-extern cptr_t nullnet_register_channel;
+extern cptr_t nullnet_register_channels[2];
 
 int create_async_channel(void)
 {
@@ -421,7 +421,7 @@ int create_async_channel(void)
         lcd_set_cr1(rx);
         lcd_set_cr2(tx);
 
-        ret = lcd_sync_call(nullnet_register_channel);
+        ret = lcd_sync_call(nullnet_register_channels[lcd_id]);
 
         /*
          * Flush cap registers
@@ -548,7 +548,7 @@ int __rtnl_link_register(struct rtnl_link_ops *ops)
 	printk("%s, tx_xmit %lx | rx_xmit %lx", __func__,
 				cptr_val(tx_xmit),
 				cptr_val(rx_xmit));
-        ret = lcd_sync_call(nullnet_register_channel);
+        ret = lcd_sync_call(nullnet_register_channels[lcd_id]);
 
         /*
          * Flush cap registers

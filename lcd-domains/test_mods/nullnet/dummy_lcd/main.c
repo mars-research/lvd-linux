@@ -40,11 +40,12 @@ static void main_and_loop(void)
 #endif
 	struct fipc_message *msg;
 
-	while (!stop && !dummy_done) {
-		cpu_relax();
+	if (lcd_id) {
+		while (!stop && !dummy_done) {
+			cpu_relax();
+		}
+		goto done;
 	}
-
-	goto done;
 
 	DO_FINISH(
 
@@ -169,9 +170,7 @@ done:
 static int __noreturn dummy_lcd_init(void) 
 {
 	int r = 0;
-	int lcd_id;
 
-	lcd_id = lcd_get_boot_info()->lcd_id;
 	printk("LCD %d entering...\n", lcd_id);
 	r = lcd_enter();
 	if (r)

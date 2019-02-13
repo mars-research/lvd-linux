@@ -18,12 +18,17 @@
 
 cptr_t net_klcd, dummy_lcd;
 struct lcd_create_ctx *dummy_ctx;
+struct lcd_create_ctx **dummy_ctxs;
+cptr_t *dummy_lcds;
 cptr_t net_chnl;
 cptr_t net_chnl_domain_cptr, dummy_chnl_domain_cptr;
+int num_lcds = 2;
+cptr_t *dummy_chnl_domain_cptrs;
 
 static int boot_main(void)
 {
 	int ret;
+	int i;
 	/*
 	 * Enter lcd mode
 	 */
@@ -51,41 +56,85 @@ static int boot_main(void)
 		LIBLCD_ERR("failed to create net klcd");
 		goto fail3;
 	}
-	ret = lcd_create_module_lcd(LCD_DIR("nullnet/dummy_lcd"),
+
+	dummy_ctxs = kzalloc(sizeof(struct lcd_create_ctx*) * num_lcds, GFP_KERNEL);
+
+	if (!dummy_ctxs) {
+		LIBLCD_ERR("failed to alloc memory for dummy_ctxs");
+		goto fail4;
+	}
+	printk("%s, dummy_ctxs %p\n", __func__, dummy_ctxs);
+
+	dummy_lcds = kzalloc(sizeof(cptr_t*) * num_lcds, GFP_KERNEL);
+
+	if (!dummy_lcds) {
+		LIBLCD_ERR("failed to alloc memory for dummy_lcds");
+		goto fail4;
+	}
+
+	printk("%s, dummy_lcds %p\n", __func__, dummy_lcds);
+
+	dummy_chnl_domain_cptrs = kzalloc(sizeof(cptr_t*) * num_lcds, GFP_KERNEL);
+
+	if (!dummy_chnl_domain_cptrs) {
+		LIBLCD_ERR("failed to alloc memory for dummy_chnl_domain_cptrs");
+		goto fail4;
+	}
+
+	ret = lcd_create_module_lcds(LCD_DIR("nullnet/dummy_lcd"),
 				"lcd_test_mod_nullnet_dummy_lcd",
-				&dummy_lcd,
-				&dummy_ctx);
+				dummy_lcds,
+				dummy_ctxs, num_lcds);
 	if (ret) {
 		LIBLCD_ERR("failed to create dummy lcd");
 		goto fail4;
 	}
 
-	ret = cptr_alloc(lcd_to_boot_cptr_cache(dummy_ctx), 
-			&dummy_chnl_domain_cptr);
-	if (ret) {
-		LIBLCD_ERR("alloc cptr");
-		goto fail5;
+	LIBLCD_MSG("Created parent and child LCDS");
+
+	for (i = 0; i < num_lcds; i++) {
+		LIBLCD_MSG("LCD %d, cptr %lu | ctx %p\n", i,
+				dummy_lcds[i].cptr,
+				dummy_ctxs[i]);
 	}
-	ret = lcd_cap_grant(dummy_lcd, net_chnl, dummy_chnl_domain_cptr);
-	if (ret) {
-		LIBLCD_ERR("grant");
-		goto fail6;
+
+	for (i = 0; i < num_lcds; i++) {
+
+		LIBLCD_MSG("granting domain_chnl_ptr to LCD %d\n", i);
+		ret = cptr_alloc(lcd_to_boot_cptr_cache(dummy_ctxs[i]),
+				&dummy_chnl_domain_cptrs[i]);
+		printk("%s, cptr alloc returned %lu\n", __func__,
+				dummy_chnl_domain_cptrs[i].cptr);
+		if (ret) {
+			LIBLCD_ERR("alloc cptr");
+			goto fail5;
+		}
+		printk("%s, granting %lu to LCD %lu\n", __func__,
+				net_chnl.cptr, dummy_lcds[i].cptr);
+		ret = lcd_cap_grant(dummy_lcds[i], net_chnl, dummy_chnl_domain_cptrs[i]);
+		printk("%s, grant returned %d\n", __func__, ret);
+
+		if (ret) {
+			LIBLCD_ERR("grant");
+			goto fail6;
+		}
+		lcd_to_boot_info(dummy_ctxs[i])->cptrs[0] = dummy_chnl_domain_cptrs[i];
+		printk("%s, done with LCD %d\n", __func__, i);
 	}
 	
 	/* ---------- Set up boot info ---------- */
 	// HACK: But WTF is this?
 	net_chnl_domain_cptr = __cptr(3);
+	printk("%s, granting %lu to KLCD %lu\n", __func__,
+				net_chnl.cptr, net_klcd.cptr);
 	ret = lcd_cap_grant(net_klcd, net_chnl, net_chnl_domain_cptr);
 	if (ret) {
 		LIBLCD_ERR("grant");
 		goto fail7;
 	}
 
-	lcd_to_boot_info(dummy_ctx)->cptrs[0] = dummy_chnl_domain_cptr;
-
-
 	/* ---------- RUN! ---------- */
-
+	printk("%s starting network\n", __func__);
 	LIBLCD_MSG("starting network...");
 	ret = lcd_run(net_klcd);
 	if (ret) {
@@ -93,11 +142,14 @@ static int boot_main(void)
 		goto fail8;
 	}
 	
-	LIBLCD_MSG("starting dummy ethernet...");
-	ret = lcd_run(dummy_lcd);
-	if (ret) {
-		LIBLCD_ERR("failed to start dummy lcd");
-		goto fail9;
+	LIBLCD_MSG("starting dummy ethernet...\n");
+	for (i = 0; i < num_lcds; i++) {
+		LIBLCD_MSG("Starting LCD %d ", i);
+		ret = lcd_run(dummy_lcds[i]);
+		if (ret) {
+			LIBLCD_ERR("failed to start dummy lcd");
+			goto fail9;
+		}
 	}
 	/*
 	 * Wait for 4 seconds
@@ -115,8 +167,8 @@ static int boot_main(void)
 fail9:
 fail8:
 fail7:
-	lcd_cap_delete(dummy_lcd);
-	lcd_destroy_create_ctx(dummy_ctx);
+	lcd_cap_delete(dummy_lcds[0]);
+	lcd_destroy_create_ctx(dummy_ctxs[0]);
 fail6:
 fail5:
 fail4:
@@ -136,6 +188,7 @@ int boot_lcd_thread(void *data)
 {
 	static unsigned once = 0;
 	int ret;
+	int i;
 	while (!kthread_should_stop()) {
 		if (!once) {
 			LCD_MAIN({
@@ -149,10 +202,16 @@ int boot_lcd_thread(void *data)
 	LIBLCD_MSG("Exiting thread");
 	lcd_destroy_module_klcd(net_klcd,
 			"lcd_test_mod_nullnet_net_klcd");
-	if (current->lcd)
-		lcd_cap_delete(dummy_lcd);
-	if (dummy_ctx)
-		lcd_destroy_create_ctx(dummy_ctx);
+	if (current->lcd) {
+		for (i = 0; i < num_lcds; i++) {
+			lcd_cap_delete(dummy_lcds[i]);
+		}
+	}
+	if (dummy_ctxs) {
+		for (i = 0; i < num_lcds; i++) {
+			lcd_destroy_create_ctx(dummy_ctxs[i]);
+		}
+	}
 
 	lcd_exit(0);
 	return 0;

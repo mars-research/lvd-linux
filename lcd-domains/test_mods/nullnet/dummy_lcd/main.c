@@ -14,6 +14,7 @@
 #include <lcd_config/post_hook.h>
 
 cptr_t nullnet_register_channel;
+cptr_t nullnet_register_channels[2];
 struct thc_channel *net_async;
 struct glue_cspace *nullnet_cspace;
 cptr_t nullnet_sync_endpoint;
@@ -38,6 +39,12 @@ static void main_and_loop(void)
 	unsigned long long disp_loop_cycles = 0, percent = 0;
 #endif
 	struct fipc_message *msg;
+
+	while (!stop && !dummy_done) {
+		cpu_relax();
+	}
+
+	goto done;
 
 	DO_FINISH(
 
@@ -153,7 +160,7 @@ static void main_and_loop(void)
 		LIBLCD_MSG("NULLNET EXITED DISPATCH LOOP");
 
 		);
-
+done:
 	LIBLCD_MSG("EXITED NULLNET DO_FINISH");
 
 	return;
@@ -162,29 +169,35 @@ static void main_and_loop(void)
 static int __noreturn dummy_lcd_init(void) 
 {
 	int r = 0;
+	int lcd_id;
 
-	printk("LCD enter \n");
+	lcd_id = lcd_get_boot_info()->lcd_id;
+	printk("LCD %d entering...\n", lcd_id);
 	r = lcd_enter();
 	if (r)
 		goto fail1;
 	/*
 	 * Get the nullnet channel cptr from boot info
 	 */
-	nullnet_register_channel = lcd_get_boot_info()->cptrs[0];
-	printk("nullnet reg channel %lu\n", nullnet_register_channel.cptr);
+	nullnet_register_channels[lcd_id] = lcd_get_boot_info()->cptrs[0];
+	printk("[%d] nullnet reg channel %lu\n",
+			lcd_id,	nullnet_register_channels[lcd_id].cptr);
 	/*
 	 * Initialize nullnet glue
 	 */
-	r = glue_nullnet_init();
-	if (r) {
-		LIBLCD_ERR("nullnet init");
-		goto fail2;
+	if (lcd_id == 0) { 
+		r = glue_nullnet_init();
+		if (r) {
+			LIBLCD_ERR("nullnet init");
+			goto fail2;
+		}
+		thc_channel_group_init(&ch_grp);
 	}
 
-	thc_channel_group_init(&ch_grp);
 	/* RUN CODE / LOOP ---------------------------------------- */
 
-	main_and_loop();
+	if (1)
+		main_and_loop();
 
 	/* DONE -------------------------------------------------- */
 

@@ -67,6 +67,10 @@ int __lcd_create_no_vm_no_thread(struct lcd **out)
 	 */
 	INIT_LIST_HEAD(&lcd->endpoint_queue);
 	/*
+	 * Initialize child lcds queue list element
+	 */
+	INIT_LIST_HEAD(&lcd->child_lcds);
+	/*
 	 * Initialize console cursor
 	 */
 	lcd->console_cursor = 0;
@@ -85,18 +89,101 @@ fail1:
 	return ret;
 }
 
-int __lcd_create_no_vm(struct lcd **out, const char *name)
+int __lcd_create_child_no_vm_no_thread(struct lcd **out)
+{
+	struct lcd *lcd;
+	int ret;
+	/*
+	 * Alloc lcd data structure
+	 *
+	 * (Because we're doing a zalloc, this will set the type, status,
+	 * and so on to "defaults".)
+	 */
+	lcd = kzalloc(sizeof(*lcd), GFP_KERNEL);
+	if (!lcd) {
+		LCD_ERR("error alloc'ing lcd");
+		ret = -ENOMEM;
+		goto fail1;
+	}
+
+	/*
+	 * Alloc and init LCD's cspace. Use the microkernel's
+	 * type system.
+	 */
+	lcd->cspace = cap_alloc_cspace();
+	if (!lcd->cspace) {
+		LCD_ERR("cspace alloc failed");
+		ret = -ENOMEM;
+		goto fail2;
+	}
+	ret = cap_init_cspace_with_type_system(lcd->cspace,
+					lcd_libcap_type_system);
+	if (ret) {
+		LCD_ERR("cspace init failed");
+		goto fail3;
+	}
+	/*
+	 * Store backref (this is used during delete and revoke callbacks,
+	 * for example, to resolve cspace -> owning lcd)
+	 */
+	cap_cspace_setowner(lcd->cspace, lcd);
+
+	/*
+	 * Set up synchronous ipc utcb
+	 */
+	lcd->utcb = hva2va(__hva(get_zeroed_page(GFP_KERNEL)));
+	if (!lcd->utcb) {
+		LCD_ERR("utcb alloc");
+		goto fail2;
+	}
+	/*
+	 * Init mutex
+	 */
+	mutex_init(&lcd->lock);
+	/*
+	 * Initialize send/recv queue list element
+	 */
+	INIT_LIST_HEAD(&lcd->endpoint_queue);
+	INIT_LIST_HEAD(&lcd->lcd_item);
+
+	lcd->is_child = true;
+	/*
+	 * Initialize console cursor
+	 */
+	lcd->console_cursor = 0;
+
+	*out = lcd;
+
+	return 0;
+fail3:
+fail2:
+	kfree(lcd);
+fail1:
+	return ret;
+}
+
+int __lcd_create_no_vm(struct lcd **out, const char *name, bool is_child)
 {
 	struct lcd *lcd;
 	int ret;
 	/*
 	 * More basic init
 	 */
-	ret = __lcd_create_no_vm_no_thread(&lcd);
-	if (ret) {
-		LCD_ERR("basic lcd create failed");
-		goto fail1;
+	if (is_child) {
+		ret = __lcd_create_child_no_vm_no_thread(&lcd);
+		printk("%s, creating child LCD: %p\n", __func__, lcd);
+		if (ret) {
+			LCD_ERR("basic lcd create failed");
+			goto fail2;
+		}
+	} else {
+		ret = __lcd_create_no_vm_no_thread(&lcd);
+		if (ret) {
+			LCD_ERR("basic lcd create failed");
+			goto fail1;
+		}
 	}
+
 	/*
 	 * Create a kernel thread (won't run till we wake it up)
 	 */
@@ -124,14 +211,14 @@ fail1:
 	return ret;
 }
 
-int __lcd_create(struct lcd *caller, cptr_t slot)
+int __lcd_create(struct lcd *caller, cptr_t slot, bool is_child)
 {
 	struct lcd *lcd;
 	int ret;
 	/*
 	 * Basic init of lcd
 	 */
-	ret = __lcd_create_no_vm(&lcd, "lcd");
+	ret = __lcd_create_no_vm(&lcd, "lcd", is_child);
 	if (ret) {
 		LCD_ERR("lcd create");
 		goto fail1;
@@ -139,11 +226,12 @@ int __lcd_create(struct lcd *caller, cptr_t slot)
 	/*
 	 * Alloc vm / arch-dependent part
 	 */
-	ret = lcd_arch_create(&lcd->lcd_arch);
+	ret = lcd_arch_create(&lcd->lcd_arch, is_child);
 	if(ret) {
 		LCD_ERR("error creating lcd_arch");
 		goto fail2;
 	}
+
 	/*
 	 * Put in caller's cspace
 	 */
@@ -174,7 +262,7 @@ int __lcd_create_klcd(struct lcd *caller, cptr_t slot)
 	/*
 	 * Basic init of lcd
 	 */
-	ret = __lcd_create_no_vm(&lcd, "klcd");
+	ret = __lcd_create_no_vm(&lcd, "klcd", 0);
 	if (ret) {
 		LCD_ERR("lcd create");
 		goto fail1;
@@ -544,6 +632,11 @@ static void destroy_kthread(struct lcd *lcd)
 
 void __lcd_destroy_no_vm_no_thread(struct lcd *lcd)
 {
+	struct lcd *child_lcd;
+	list_for_each_entry(child_lcd, &lcd->child_lcds, lcd_item) {
+		__lcd_destroy_no_vm_no_thread(child_lcd);
+	}
+
 	mark_lcd_as_dead(lcd);
 	destroy_cspace_and_utcb(lcd);
 	kfree(lcd);

@@ -59,7 +59,7 @@ static int boot_main(void)
 	ret = lcd_create_module_lcd(LCD_DIR("ixgbe/ixgbe_lcd"),
 				"lcd_test_mod_ixgbe_ixgbe_lcd",
 				&ixgbe_lcd,
-				&ixgbe_ctx);
+				&ixgbe_ctx, 0);
 	if (ret) {
 		LIBLCD_ERR("failed to create ixgbe lcd");
 		goto fail4;

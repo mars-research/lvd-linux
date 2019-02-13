@@ -36,7 +36,7 @@ static int boot_main(void)
 	ret = lcd_create_module_lcd(LCD_DIR("ipc2/lcd1"),
 				"lcd_test_mod_ipc2_lcd1",
 				&lcd1, 
-				&ctx1);
+				&ctx1, 0);
 	if (ret) {
 		LIBLCD_ERR("failed to create lcd1");
 		goto fail3;
@@ -44,7 +44,7 @@ static int boot_main(void)
 	ret = lcd_create_module_lcd(LCD_DIR("ipc2/lcd2"),
 				"lcd_test_mod_ipc2_lcd2",
 				&lcd2, 
-				&ctx2);
+				&ctx2, 0);
 	if (ret) {
 		LIBLCD_ERR("failed to create lcd2");
 		goto fail4;

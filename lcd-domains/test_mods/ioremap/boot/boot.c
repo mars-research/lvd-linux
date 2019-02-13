@@ -57,7 +57,7 @@ static int boot_main(void)
 	ret = lcd_create_module_lcd(LCD_DIR("ioremap/lcd"),
 				"lcd_test_mod_ioremap_lcd",
 				&lcd, 
-				&ctx);
+				&ctx, 0);
 	if (ret) {
 		LIBLCD_ERR("failed to create lcd");
 		goto fail3;

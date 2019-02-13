@@ -35,6 +35,7 @@ struct lcd_boot_info {
 	gva_t module_core_base;
 	unsigned long module_init_size;
 	unsigned long module_core_size;
+	int lcd_id;
 	/*
 	 * Capabilities to memory objects
 	 */

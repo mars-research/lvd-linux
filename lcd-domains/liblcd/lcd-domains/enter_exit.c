@@ -17,12 +17,23 @@
 #include <lcd_config/post_hook.h>
 
 static int thc_initialized;
+atomic_t lcd_initialized;
 
 int 
 LIBLCD_FUNC_ATTR
 lcd_enter(void)
 {
 	int ret;
+
+	if (atomic_read(&lcd_initialized) == 0) {
+		atomic_set(&lcd_initialized, 1);
+	} else {
+		lcd_printk("===============");
+		lcd_printk("  Child LCD BOOTED   ");
+		lcd_printk("===============");
+		return 0;
+	}
+
 	/*
 	 * Aside from the call endpoint, order is important ...
 	 *

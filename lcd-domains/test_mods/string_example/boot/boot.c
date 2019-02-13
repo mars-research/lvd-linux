@@ -192,7 +192,7 @@ static int boot_main(void)
 	ret = lcd_create_module_lcd(LCD_DIR("string_example/lcd"),
 				"lcd_test_mod_string_example_lcd",
 				&lcd, 
-				&ctx);
+				&ctx, 0);
 	if (ret) {
 		LIBLCD_ERR("failed to create lcd");
 		goto fail3;

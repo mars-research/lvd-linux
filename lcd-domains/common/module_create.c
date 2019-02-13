@@ -14,6 +14,7 @@
 #include <linux/mm.h>
 #include <libcap.h>
 #include <liblcd/liblcd.h>
+#include <lcd_domains/microkernel.h>
 
 #include <lcd_config/post_hook.h>
 
@@ -454,7 +455,7 @@ static int do_cptr_cache_init(struct cptr_cache *cache)
 	return 0;
 }
 
-static int get_pages_for_lcd(struct lcd_create_ctx *ctx)
+static int get_pages_for_lcd(struct lcd_create_ctx *ctx, bool is_child)
 {
 	struct page *p1, *p2, *p3;
 	int ret;
@@ -543,15 +544,17 @@ static int set_struct_module(cptr_t lcd, void *m_core_bits,
 #endif
 
 int lcd_create_module_lcd(char *mdir, char *mname, cptr_t *lcd_out,
-			struct lcd_create_ctx **ctx_out)
+			struct lcd_create_ctx **ctx_out, bool is_child)
 {
 	int ret;
 	cptr_t m_init_cptr, m_core_cptr;
-	gva_t m_init_link_addr, m_core_link_addr, m_init_func_addr;
-	unsigned long m_init_size, m_core_size;
+	static gva_t m_init_link_addr, m_core_link_addr, m_init_func_addr;
+	static unsigned long m_init_size, m_core_size;
 	unsigned long m_struct_module_core_offset;
 	struct lcd_create_ctx *ctx;
+	static struct lcd_create_ctx *parent_ctx;
 	cptr_t lcd;
+
 	/*
 	 * Initialize create ctx
 	 */
@@ -563,11 +566,22 @@ int lcd_create_module_lcd(char *mdir, char *mname, cptr_t *lcd_out,
 	/*
 	 * Alloc boot pages, stack pages, etc. for LCD
 	 */
-	ret = get_pages_for_lcd(ctx);
+	ret = get_pages_for_lcd(ctx, is_child);
 	if (ret) {
 		LIBLCD_ERR("error alloc'ing boot, stack pages for LCD");
 		goto fail2;
 	}
+	/*
+	 * if we are creating a child LCD, skip loading the module as it is
+	 * already loaded in parent LCD. In child LCD, we just map the same set
+	 * of pages to the EPT.
+	 */
+	if (is_child) {
+		ctx->m_init_bits = parent_ctx->m_init_bits;
+		ctx->m_core_bits = parent_ctx->m_core_bits;
+		goto create_lcd;
+	}
+
 	/*
 	 * Load kernel module into caller's address space
 	 */
@@ -588,7 +602,8 @@ int lcd_create_module_lcd(char *mdir, char *mname, cptr_t *lcd_out,
 	 *
 	 * Initialize empty LCD
 	 */
-	ret = lcd_create(&lcd);
+create_lcd:
+	ret = lcd_create(&lcd, is_child);
 	if (ret) {
 		LIBLCD_ERR("error creating empty LCD");
 		goto fail4;
@@ -632,8 +647,17 @@ int lcd_create_module_lcd(char *mdir, char *mname, cptr_t *lcd_out,
 	/*
 	 * Return context and lcd
 	 */
+	LIBLCD_MSG("%s, %s LCD, ctx %p, lcd %lu", __func__, is_child ? "child" : "parent",
+				ctx, lcd.cptr);
 	*ctx_out = ctx;
 	*lcd_out = lcd;
+
+	/*
+	 * Save parent ctx for the future
+	 */
+	if (!is_child) {
+		parent_ctx = ctx;
+	}
 
 	return 0;
 
@@ -652,6 +676,69 @@ fail1:
 	return ret;
 }
 
+int lcd_create_module_lcds(char *mdir, char *mname, cptr_t *lcd_out,
+			struct lcd_create_ctx **ctx_out, int num_child)
+{
+	int ret;
+	struct lcd *lcd_struct;
+	struct lcd *parent_lcd;
+	struct cnode *lcd_cnode;
+	struct cnode *parent_cnode;
+	int i;
+
+	/*
+	 * create parent LCD
+	 */
+	for (i = 0; i < num_child; i++) {
+		LIBLCD_MSG("Creating LCD modules %d", i);
+		ret = lcd_create_module_lcd(mdir, mname, &lcd_out[i],
+				&ctx_out[i], i == 0 ? false /* parent
+							       LCD */ :
+				true /* child LCD */);
+		if (ret) {
+			LIBLCD_ERR("error creating empty LCD");
+			goto fail2;
+		}
+	}
+
+	if (num_child) {
+		LIBLCD_MSG("getting parent LCD");
+		ret = __lcd_get(current->lcd, lcd_out[0], &parent_cnode, &parent_lcd);
+
+		if (ret)
+			goto fail1;
+
+		for (i = 1; i < num_child; i++) {
+			LIBLCD_MSG("getting child LCD %d to make link", i);
+			lcd_to_boot_info(ctx_out[i])->lcd_id = i;
+			ret = __lcd_get(current->lcd, lcd_out[i], &lcd_cnode, &lcd_struct);
+			if (ret)
+				goto fail3;
+
+			LIBLCD_MSG("adding child LCD %p to parent_lcd", lcd_struct);
+			list_add_tail(&parent_lcd->child_lcds, &lcd_struct->lcd_item);
+			lcd_struct->parent_lcd = parent_lcd;
+
+			/*
+			 * put child LCD
+			 */
+			__lcd_put(current->lcd, lcd_cnode, lcd_struct);
+		}
+
+		/*
+		 * put parent LCD
+		 */
+fail3:
+		__lcd_put(current->lcd, parent_cnode, parent_lcd);
+
+	}
+	LIBLCD_MSG("%s creation done", __func__);
+	return 0;
+fail2:
+fail1:
+	return ret;
+}
+
 void lcd_destroy_create_ctx(struct lcd_create_ctx *ctx)
 {
 	destroy_create_ctx(ctx);
@@ -660,4 +747,5 @@ void lcd_destroy_create_ctx(struct lcd_create_ctx *ctx)
 /* EXPORTS -------------------------------------------------- */
 
 EXPORT_SYMBOL(lcd_create_module_lcd);
+EXPORT_SYMBOL(lcd_create_module_lcds);
 EXPORT_SYMBOL(lcd_destroy_create_ctx);

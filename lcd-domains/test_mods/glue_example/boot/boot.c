@@ -42,7 +42,7 @@ static int boot_main(void)
 	ret = lcd_create_module_lcd(LCD_DIR("glue_example/vfs"),
 				"lcd_test_mod_glue_example_vfs",
 				&vfs_lcd,
-				&vfs_ctx);
+				&vfs_ctx, 0);
 	if (ret) {
 		LIBLCD_ERR("failed to create vfs lcd");
 		goto fail3;
@@ -50,7 +50,7 @@ static int boot_main(void)
 	ret = lcd_create_module_lcd(LCD_DIR("glue_example/minix"),
 				"lcd_test_mod_glue_example_minix",
 				&minix_lcd,
-				&minix_ctx);
+				&minix_ctx, 0);
 	if (ret) {
 		LIBLCD_ERR("failed to create minix lcd");
 		goto fail4;

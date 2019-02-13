@@ -866,7 +866,7 @@ static void vmx_free_vpid(struct lcd_arch *lcd_arch)
 	spin_unlock(&lcd_vpids.lock);
 }
 
-int lcd_arch_create(struct lcd_arch **out)
+int lcd_arch_create(struct lcd_arch **out, bool is_child)
 {
 	struct lcd_arch *lcd_arch;
 	int ret;
@@ -879,9 +879,13 @@ int lcd_arch_create(struct lcd_arch **out)
 		ret = -ENOMEM;
 		goto fail_alloc;
 	}
+
 	/*
 	 * Set up ept
 	 */
+	if (is_child)
+		printk("%s, initializing EPT for child \n", __func__);
+
 	ret = lcd_arch_ept_init(lcd_arch);
 	if (ret) {
 		LCD_ERR("setting up etp");

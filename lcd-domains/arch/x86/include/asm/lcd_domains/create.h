@@ -16,7 +16,7 @@
 /**
  * Creates the arch-dependent part of an LCD (e.g., the ept).
  */
-int lcd_arch_create(struct lcd_arch **out);
+int lcd_arch_create(struct lcd_arch **out, bool is_child);
 /**
  * Tears down arch-dep part of LCD.
  *

@@ -13,7 +13,7 @@
 
 #include <lcd_config/post_hook.h>
 
-int lcd_create(cptr_t *lcd)
+int lcd_create(cptr_t *lcd, bool is_child)
 {
 	cptr_t slot;
 	int ret;

@@ -411,8 +411,18 @@ static void destroy_create_ctx(struct lcd_create_ctx *ctx)
 	 * capabilities to them. If these are the last caps,
 	 * pages will be freed by microkernel.
 	 */
-	if (ctx->m_init_bits)
-		lcd_release_module(ctx->m_init_bits, ctx->m_core_bits);
+	/*
+	 * Release the module only if parent LCD calls destroy, as the same set
+	 * of code/data pages is mapped in all child LCDs address space as
+	 * well.
+	 */
+	if (ctx->lcd_boot_info->lcd_id == 0) {
+		if (ctx->m_init_bits) {
+			LIBLCD_MSG("Freeing lcd module for lcd_id %d",
+					ctx->lcd_boot_info->lcd_id);
+			lcd_release_module(ctx->m_init_bits, ctx->m_core_bits);
+		}
+	}
 	if (ctx->stack)
 		lcd_free_pages(lcd_virt_to_head_page(ctx->stack),
 			LCD_STACK_ORDER);

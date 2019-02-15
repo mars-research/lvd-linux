@@ -543,11 +543,17 @@ static void fix_struct_module_addrs(struct module *mod, void *m_core_bits)
 }
 
 static int set_struct_module(cptr_t lcd, void *m_core_bits,
-			unsigned long m_struct_module_core_offset)
+			unsigned long m_struct_module_core_offset,
+			bool is_child)
 {
 	struct module *mod = m_core_bits + m_struct_module_core_offset;
 
-	fix_struct_module_addrs(mod, m_core_bits);
+	if (!is_child) {
+		/*
+		 * fix the module symbol table only once
+		 */
+		fix_struct_module_addrs(mod, m_core_bits);
+	}
 
 	return lcd_set_struct_module_hva(lcd, mod);
 }
@@ -560,7 +566,7 @@ int lcd_create_module_lcd(char *mdir, char *mname, cptr_t *lcd_out,
 	cptr_t m_init_cptr, m_core_cptr;
 	static gva_t m_init_link_addr, m_core_link_addr, m_init_func_addr;
 	static unsigned long m_init_size, m_core_size;
-	unsigned long m_struct_module_core_offset;
+	static unsigned long m_struct_module_core_offset;
 	struct lcd_create_ctx *ctx;
 	static struct lcd_create_ctx *parent_ctx;
 	cptr_t lcd;
@@ -648,7 +654,7 @@ create_lcd:
 	 * the struct module copy is located so we can do stack traces.
 	 */
 	ret = set_struct_module(lcd, ctx->m_core_bits, 
-				m_struct_module_core_offset);
+				m_struct_module_core_offset, is_child);
 	if (ret) {
 		LIBLCD_ERR("error setting struct module hva");
 		goto fail7;

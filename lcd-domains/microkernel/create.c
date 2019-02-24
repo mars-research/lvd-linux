@@ -74,6 +74,10 @@ int __lcd_create_no_vm_no_thread(struct lcd **out)
 	 * Initialize console cursor
 	 */
 	lcd->console_cursor = 0;
+	/*
+	 * Create a self link.
+	 */
+	lcd->parent_lcd = lcd;
 
 	*out = lcd;
 
@@ -144,7 +148,10 @@ int __lcd_create_child_no_vm_no_thread(struct lcd **out)
 	 * Initialize send/recv queue list element
 	 */
 	INIT_LIST_HEAD(&lcd->endpoint_queue);
+
 	INIT_LIST_HEAD(&lcd->lcd_item);
+
+	INIT_LIST_HEAD(&lcd->child_lcds);
 
 	lcd->is_child = true;
 	/*

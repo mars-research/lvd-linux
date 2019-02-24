@@ -180,6 +180,7 @@
 #define LCD_MISC_REGION_OFFSET (1UL << 30)
 #define LCD_UTCB_OFFSET LCD_MISC_REGION_OFFSET
 #define LCD_BOOTSTRAP_PAGES_OFFSET (LCD_UTCB_OFFSET + LCD_UTCB_SIZE)
+
 #define LCD_BOOTSTRAP_PAGE_TABLES_OFFSET \
 	(LCD_BOOTSTRAP_PAGES_OFFSET + LCD_BOOTSTRAP_PAGES_SIZE)
 
@@ -187,8 +188,88 @@
 
 #define LCD_STACK_REGION_OFFSET \
 	(LCD_MISC_REGION_OFFSET + LCD_MISC_REGION_SIZE + (1UL << 30))
+
 #define LCD_STACK_OFFSET \
 	(LCD_STACK_REGION_OFFSET + LCD_STACK_REGION_SIZE - LCD_STACK_SIZE)
+
+#ifdef CONFIG_LCD_SINGLE_EPT
+/*
+ * When we have multiple LCDs and decide to have a single EPT for all of them,
+ * we need to have private UTCB, bootstrap pages and stack pages.  For
+ * allocating those pages, we need the ID of the LCD to move offsets
+ * accordingly. So, we partition the UTCB, BOOTSTRAP_PAGES and STACK regions to
+ * support multiple LCDs.
+ */
+/*
+ *  +---------------------------+ 0x0000 0001 0000 0000 (4 GB)
+ *  |     Stack for LCD 0       |
+ *  +---------------------------+ (4 GB - STACK_SZ (8 KB) - (0 * STACK_SZ)
+ *  |     Stack for LCD 1       |
+ *  +---------------------------+ (4 GB - STACK_SZ (8 KB) - (1 * STACK_SZ)
+ *  |     Stack for LCD 2       |
+ *  +---------------------------+ (4 GB - STACK_SZ (8 KB) - (2 * STACK_SZ)
+ *  |           .               |
+ *  |           .               |
+ *  +---------------------------+ (4 GB - STACK_SZ (8 KB) - ((N-2) * STACK_SZ)
+ *  |     Stack for LCD N       |
+ *  +---------------------------+ (4 GB - STACK_SZ (8 KB) - ((N-1) * STACK_SZ)
+ *  |       Stack Region        |
+ *  +---------------------------+ 0x0000 0000 c000 0000 (3 GB)
+ *  |       HOLE / Unmapped     |
+ *  |          (1 GB)           |
+ *  +---------------------------+ 0x0000 0000 8000 0000 (2 GB)
+ *  |    Bootstrap Pagetable    |
+ *  |       Pages (512 MB)      |
+ *  +---------------------------+ (1 GB + 512 MB)
+ *  |      Bootstrap Pages      |
+ *  |         (256MB)           |
+ *  +---------------------------+ (1 GB + 256 MB)
+ *  |         UTCB Pages        |
+ *  |           (256MB)         |
+ *  +---------------------------+ 0x0000 0000 4000 0000 (1 GB)
+ */
+/* Region Sizes */
+#define LCD_UTCB_REGION_SIZE (1UL << 28) /* .................. 256 MBs */
+#define LCD_BOOTSTRAP_PAGES_REGION_SIZE (1UL << 28) /* ........... 256 MBs */
+
+/* Region offsets */
+#define LCD_BOOTSTRAP_PAGES_REGION_OFFSET \
+	 (LCD_UTCB_OFFSET + LCD_UTCB_REGION_SIZE)
+
+#define LCD_BOOTSTRAP_PAGE_TABLES_REGION_OFFSET \
+	(LCD_BOOTSTRAP_PAGES_REGION_OFFSET + LCD_BOOTSTRAP_PAGES_REGION_SIZE)
+
+/* Offsets for LCDs within a region */
+#define LCD_UTCB_OFFSET_CHILD(id) \
+	 (LCD_MISC_REGION_OFFSET + (id * LCD_UTCB_SIZE))
+
+#define LCD_BOOTSTRAP_PAGES_OFFSET_CHILD(id) (LCD_UTCB_OFFSET \
+		+ LCD_UTCB_REGION_SIZE + ((id) * LCD_BOOTSTRAP_PAGES_SIZE))
+
+#define LCD_STACK_OFFSET_CHILD(id)	\
+	(LCD_STACK_REGION_OFFSET + LCD_STACK_REGION_SIZE \
+	 - LCD_STACK_SIZE - ((id) * LCD_STACK_SIZE))
+
+/* GVA/GPA addresses */
+/* UTCB pages */
+#define LCD_UTCB_GP_ADDR_CHILD(id) (__gpa(LCD_PHYS_BASE \
+			+ LCD_UTCB_OFFSET + (id * LCD_UTCB_SIZE)))
+#define LCD_UTCB_GV_ADDR_CHILD(id) (__gva(LCD_VIRT_BASE \
+			+ LCD_UTCB_OFFSET + (id * LCD_UTCB_SIZE)))
+
+/* Bootstrap pages */
+#define LCD_BOOTSTRAP_PAGES_GP_ADDR_CHILD(id) \
+	(__gpa(LCD_PHYS_BASE + LCD_BOOTSTRAP_PAGES_OFFSET_CHILD(id)))
+#define LCD_BOOTSTRAP_PAGES_GV_ADDR_LCD(id) \
+	(__gva(LCD_VIRT_BASE + LCD_BOOTSTRAP_PAGES_OFFSET_CHILD(id)))
+
+/* Stack pages */
+#define LCD_STACK_GP_ADDR_CHILD(id) (__gpa(LCD_PHYS_BASE \
+			+ LCD_STACK_OFFSET_CHILD(id)))
+#define LCD_STACK_GV_ADDR_CHILD(id) (__gva(LCD_VIRT_BASE \
+			+ LCD_STACK_OFFSET_CHILD(id)))
+
+#endif		/* CONFIG_LCD_SINGLE_EPT */
 
 /* HOLE */
 

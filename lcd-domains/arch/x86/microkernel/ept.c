@@ -11,6 +11,12 @@
 #include <asm/lcd_domains/types.h>
 #include <asm/lcd_domains/microkernel.h>
 
+#ifdef CONFIG_LCD_SINGLE_EPT
+u64 g_vmcs_ptr;
+lcd_arch_epte_t *g_ept_root;
+struct mutex g_ept_lock;
+#endif
+
 /* INVEPT / INVVPID --------------------------------------------------*/
 
 static inline bool cpu_has_vmx_invvpid_single(void)
@@ -487,6 +493,15 @@ void lcd_arch_ept_free(struct lcd_arch *lcd)
 	vmx_free_ept_dir_level(dir, 0);
 }
 
+#ifdef CONFIG_LCD_SINGLE_EPT
+int lcd_arch_ept_child_init(struct lcd_arch *lcd_arch)
+{
+	lcd_arch->ept.root = g_ept_root;
+	lcd_arch->ept.vmcs_ptr = g_vmcs_ptr;
+	return 0;
+}
+#endif
+
 int lcd_arch_ept_init(struct lcd_arch *lcd_arch)
 {
 	hva_t page;
@@ -524,7 +539,11 @@ int lcd_arch_ept_init(struct lcd_arch *lcd_arch)
 	 * Init the mutex
 	 */
 	mutex_init(&lcd_arch->ept.lock);
-
+#ifdef CONFIG_LCD_SINGLE_EPT
+	g_ept_root = lcd_arch->ept.root;
+	g_vmcs_ptr = eptp;
+	mutex_init(&g_ept_lock);
+#endif
 	return 0;
 }
 

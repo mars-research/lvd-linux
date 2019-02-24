@@ -110,6 +110,9 @@ void lcd_arch_ept_invept(u64 eptp);
  * VMCS pointer, and the spinlock.
  */
 int lcd_arch_ept_init(struct lcd_arch *lcd_arch);
+#ifdef CONFIG_LCD_SINGLE_EPT
+int lcd_arch_ept_child_init(struct lcd_arch *lcd_arch);
+#endif
 /**
  * Free an LCD's EPT tables.
  *

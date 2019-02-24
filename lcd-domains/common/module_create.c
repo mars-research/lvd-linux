@@ -165,10 +165,10 @@ fail1:
 	return ret;
 }
 
-static int setup_phys_addr_space(cptr_t lcd, struct lcd_create_ctx *ctx,
-				gva_t m_init_link_addr, gva_t m_core_link_addr,
-				unsigned long m_init_size,
-				unsigned long m_core_size)
+#ifdef CONFIG_LCD_SINGLE_EPT
+static int setup_phys_addr_space_child_lcd(cptr_t lcd,
+		struct lcd_create_ctx *ctx,
+		unsigned int lcd_id)
 {
 	int ret;
 	cptr_t *c;
@@ -177,17 +177,54 @@ static int setup_phys_addr_space(cptr_t lcd, struct lcd_create_ctx *ctx,
 	 */
 	c = &(lcd_to_boot_info(ctx)->lcd_boot_cptrs.boot_pages);
 	ret = do_grant_and_map_for_mem(lcd, ctx, ctx->lcd_boot_info,
-				LCD_BOOTSTRAP_PAGES_GP_ADDR, c);
+				LCD_BOOTSTRAP_PAGES_GP_ADDR_CHILD(lcd_id),
+				c);
 	if (ret)
 		goto fail1;
+
+	c = &(lcd_to_boot_info(ctx)->lcd_boot_cptrs.stack);
+	ret = do_grant_and_map_for_mem(lcd, ctx, ctx->stack,
+				LCD_STACK_GP_ADDR_CHILD(lcd_id),
+				c);
+	if (ret)
+		goto fail2;
+
+	return 0;
+
+fail2:  /* Just return; caller should kill new LCD and free up resources. */
+fail1:
+	return ret;
+}
+#endif
+
+static int setup_phys_addr_space(cptr_t lcd, struct lcd_create_ctx *ctx,
+				gva_t m_init_link_addr, gva_t m_core_link_addr,
+				unsigned long m_init_size,
+				unsigned long m_core_size,
+				unsigned int lcd_id)
+{
+	int ret;
+	cptr_t *c;
+
+	/*
+	 * Map and grant bootstrap pages, page tables, and stack
+	 */
+	c = &(lcd_to_boot_info(ctx)->lcd_boot_cptrs.boot_pages);
+	ret = do_grant_and_map_for_mem(lcd, ctx, ctx->lcd_boot_info,
+				LCD_BOOTSTRAP_PAGES_GP_ADDR_CHILD(lcd_id),
+				c);
+	if (ret)
+		goto fail1;
+
 	c = &(lcd_to_boot_info(ctx)->lcd_boot_cptrs.gv);
 	ret = do_grant_and_map_for_mem(lcd, ctx, ctx->gv_pg_tables,
 				LCD_BOOTSTRAP_PAGE_TABLES_GP_ADDR, c);
 	if (ret)
 		goto fail2;
+
 	c = &(lcd_to_boot_info(ctx)->lcd_boot_cptrs.stack);
 	ret = do_grant_and_map_for_mem(lcd, ctx, ctx->stack,
-				LCD_STACK_GP_ADDR, c);
+				LCD_STACK_GP_ADDR_CHILD(lcd_id), c);
 	if (ret)
 		goto fail3;
 	/*
@@ -353,7 +390,8 @@ static void setup_virt_addr_space(struct lcd_create_ctx *ctx)
 static int setup_addr_spaces(cptr_t lcd, struct lcd_create_ctx *ctx,
 			gva_t m_init_link_addr, gva_t m_core_link_addr,
 			unsigned long m_init_size,
-			unsigned long m_core_size)
+			unsigned long m_core_size,
+			unsigned int lcd_id)
 {
 	int ret;
 	/*
@@ -362,7 +400,8 @@ static int setup_addr_spaces(cptr_t lcd, struct lcd_create_ctx *ctx,
 	 */
 	ret = setup_phys_addr_space(lcd, ctx, m_init_link_addr, 
 				m_core_link_addr,
-				m_init_size, m_core_size);
+				m_init_size, m_core_size,
+				lcd_id);
 	if (ret) {
 		LIBLCD_ERR("error setting up phys addr space");
 		goto fail1;
@@ -491,6 +530,10 @@ static int get_pages_for_lcd(struct lcd_create_ctx *ctx, bool is_child)
 		LIBLCD_ERR("failed to init cptr cache");
 		goto fail2;
 	}
+#ifdef CONFIG_LCD_SINGLE_EPT
+	if (is_child)
+		goto alloc_stack;
+#endif
 	/*
 	 * Alloc boot page tables
 	 */
@@ -502,6 +545,9 @@ static int get_pages_for_lcd(struct lcd_create_ctx *ctx, bool is_child)
 	}
 	memset(lcd_page_address(p2), 0, LCD_BOOTSTRAP_PAGE_TABLES_SIZE);
 	ctx->gv_pg_tables = lcd_page_address(p2);
+#ifdef CONFIG_LCD_SINGLE_EPT
+alloc_stack:
+#endif
 	/*
 	 * Alloc stack
 	 */
@@ -517,7 +563,9 @@ static int get_pages_for_lcd(struct lcd_create_ctx *ctx, bool is_child)
 	return 0;
 
 fail4:
+#ifndef CONFIG_LCD_SINGLE_EPT
 	lcd_free_pages(p2, LCD_BOOTSTRAP_PAGE_TABLES_ORDER);
+#endif
 fail3:
 	cptr_cache_destroy(lcd_to_boot_cptr_cache(ctx));
 fail2:
@@ -558,6 +606,8 @@ static int set_struct_module(cptr_t lcd, void *m_core_bits,
 	return lcd_set_struct_module_hva(lcd, mod);
 }
 #endif
+
+static unsigned int current_lcd = 0;
 
 int lcd_create_module_lcd(char *mdir, char *mname, cptr_t *lcd_out,
 			struct lcd_create_ctx **ctx_out, bool is_child)
@@ -627,9 +677,14 @@ create_lcd:
 	/*
 	 * Set up address spaces
 	 */
-	ret = setup_addr_spaces(lcd, ctx, m_init_link_addr, 
-				m_core_link_addr,
-				m_init_size, m_core_size);
+	if (is_child) {
+		ret = setup_phys_addr_space_child_lcd(lcd, ctx, current_lcd);
+	} else {
+		ret = setup_addr_spaces(lcd, ctx, m_init_link_addr,
+				m_core_link_addr, m_init_size, m_core_size,
+				current_lcd);
+	}
+
 	if (ret) {
 		LIBLCD_ERR("error setting up address spaces");
 		goto fail5;
@@ -640,10 +695,10 @@ create_lcd:
 	ret = lcd_config_registers(lcd, m_init_func_addr,
 				/* implicity put a null return address and
 				 * frame address */
-				gva_add(LCD_STACK_GV_ADDR,
+				gva_add(LCD_STACK_GV_ADDR_CHILD(current_lcd),
 					LCD_STACK_SIZE - sizeof(void *)),
 				LCD_BOOTSTRAP_PAGE_TABLES_GP_ADDR,
-				LCD_UTCB_GP_ADDR);
+				LCD_UTCB_GP_ADDR_CHILD(current_lcd));
 	if (ret) {
 		LIBLCD_ERR("error configuring LCDs registers");
 		goto fail6;
@@ -675,6 +730,13 @@ create_lcd:
 		parent_ctx = ctx;
 	}
 
+#ifdef CONFIG_LCD_SINGLE_EPT
+	/*
+	 * Increment LCD counter that we would pass for making stack
+	 * spaces for child LCDs
+	 */
+	++current_lcd;
+#endif
 	return 0;
 
 #ifndef LCD_ISOLATE

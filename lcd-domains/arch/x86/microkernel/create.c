@@ -883,13 +883,15 @@ int lcd_arch_create(struct lcd_arch **out, bool is_child)
 	/*
 	 * Set up ept
 	 */
-	if (is_child)
+	if (is_child) {
 		printk("%s, initializing EPT for child \n", __func__);
-
-	ret = lcd_arch_ept_init(lcd_arch);
-	if (ret) {
-		LCD_ERR("setting up etp");
-		goto fail_ept;
+		ret = lcd_arch_ept_child_init(lcd_arch);
+	} else {
+		ret = lcd_arch_ept_init(lcd_arch);
+		if (ret) {
+			LCD_ERR("setting up etp");
+			goto fail_ept;
+		}
 	}
 	/*
 	 * Alloc vmcs

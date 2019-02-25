@@ -220,11 +220,22 @@ static int add_boot_memory(void)
 	n->cptr = lcd_get_boot_info()->lcd_boot_cptrs.stack;
 	lcd_resource_tree_insert(&itree, n);
 	/*
-	 * Add boot guest virtual page tables
+	 * Add stack canary pages
 	 */
 	n = alloc_itree_node();
 	if (!n)
 		goto fail5;
+	n->start = gpa_val(LCD_ARCH_GS_BASE);
+	n->last = gpa_val(LCD_ARCH_GS_BASE) +
+		LCD_STACK_PROT_SIZE - 1;
+	n->cptr = lcd_get_boot_info()->lcd_boot_cptrs.stack_prot;
+	lcd_resource_tree_insert(&itree, n);
+	/*
+	 * Add boot guest virtual page tables
+	 */
+	n = alloc_itree_node();
+	if (!n)
+		goto fail6;
 	n->start = gpa_val(LCD_BOOTSTRAP_PAGE_TABLES_GP_ADDR);
 	n->last = gpa_val(LCD_BOOTSTRAP_PAGE_TABLES_GP_ADDR) + 
 		LCD_BOOTSTRAP_PAGE_TABLES_SIZE - 1;
@@ -233,6 +244,7 @@ static int add_boot_memory(void)
 
 	return 0;
 
+fail6:
 fail5:
 fail4:
 fail3:

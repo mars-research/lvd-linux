@@ -46,6 +46,9 @@ int lcd_arch_set_sp(struct lcd_arch *lcd_arch, gva_t a);
  * guest physical address a.
  */
 int lcd_arch_set_gva_root(struct lcd_arch *lcd_arch, gpa_t a);
+
+int lcd_arch_set_gs_base(struct lcd_arch *lcd_arch, gva_t a);
+
 /**
  * Allocate memory for the VMCS for an LCD.
  */

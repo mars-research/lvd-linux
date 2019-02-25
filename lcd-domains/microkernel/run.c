@@ -87,7 +87,7 @@ static int handle_syscall_cap_delete(struct lcd *lcd)
 static int handle_syscall_config_registers(struct lcd *lcd)
 {
 	cptr_t dest_lcd;
-	gva_t pc, sp;
+	gva_t pc, sp, gs_base;
 	gpa_t gva_root, utcb_page;
 	/*
 	 * Args
@@ -97,11 +97,12 @@ static int handle_syscall_config_registers(struct lcd *lcd)
 	sp = __gva(lcd_arch_get_syscall_arg2(lcd->lcd_arch));
 	gva_root = __gpa(lcd_arch_get_syscall_arg3(lcd->lcd_arch));
 	utcb_page = __gpa(lcd_arch_get_syscall_arg4(lcd->lcd_arch));
+	gs_base = __gva(lcd_arch_get_syscall_arg5(lcd->lcd_arch));
 	/*
 	 * Do config
 	 */
 	return __lcd_config(lcd, dest_lcd, pc, sp, gva_root,
-			utcb_page);
+			utcb_page, gs_base);
 }
 
 static int handle_syscall_memory_grant_and_map(struct lcd *lcd)

@@ -124,6 +124,32 @@ static inline int lcd_syscall_five_args(int id,
 	return (int)ret;
 }
 
+static inline int lcd_syscall_six_args(int id,
+					unsigned long arg0,
+					unsigned long arg1,
+					unsigned long arg2,
+					unsigned long arg3,
+					unsigned long arg4,
+					unsigned long arg5)
+{
+	long ret;
+	asm volatile(
+		"movq %7, %%r13 \n\t"
+		"movq %6, %%r12 \n\t"
+		"movq %5, %%r11 \n\t"
+		"movq %4, %%r10 \n\t"
+		"movq %3, %%r9 \n\t"
+		"movq %2, %%r8 \n\t"
+		"movq %1, %%rax \n\t"
+		"vmcall \n\t"
+		"movq %%rax, %0 \n\t"
+		: "=g" (ret)
+		: "g" (id), "g" (arg0), "g" (arg1), "g" (arg2), "g" (arg3),
+		"g" (arg4), "g" (arg5)
+		: "rax", "r8", "r9", "r10", "r11", "r12", "r13");
+	return (int)ret;
+}
+
 static inline void lcd_syscall_cap_delete(cptr_t cptr)
 {
 	lcd_syscall_one_arg(LCD_SYSCALL_CAP_DELETE, cptr_val(cptr));
@@ -152,11 +178,11 @@ static inline int lcd_syscall_create(cptr_t lcd_slot)
 
 static inline int lcd_syscall_config_registers(cptr_t lcd, gva_t pc,
 					gva_t sp, gpa_t gva_root,
-					gpa_t utcb_page)
+					gpa_t utcb_page, gva_t gs_base)
 {
-	return lcd_syscall_five_args(LCD_SYSCALL_CONFIG_REGISTERS, 
+	return lcd_syscall_six_args(LCD_SYSCALL_CONFIG_REGISTERS,
 				cptr_val(lcd), gva_val(pc), gva_val(sp),
-				gpa_val(gva_root), gpa_val(utcb_page));
+				gpa_val(gva_root), gpa_val(utcb_page), gva_val(gs_base));
 }
 
 static inline int lcd_syscall_memory_grant_and_map(cptr_t lcd,

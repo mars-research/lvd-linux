@@ -165,6 +165,7 @@
 #define LCD_BOOTSTRAP_PAGES_SIZE (1 * PAGE_SIZE) /* .......... 4  KBs */
 #define LCD_BOOTSTRAP_PAGE_TABLES_SIZE (16 * PAGE_SIZE) /* ... 64 KBs */
 #define LCD_STACK_SIZE (2 * PAGE_SIZE) /* .................... 8  KBs */
+#define LCD_STACK_PROT_SIZE PAGE_SIZE /* ..................... 4  KBs */
 
 /* Orders (for convenience) */
 
@@ -174,6 +175,8 @@
 	(ilog2(LCD_BOOTSTRAP_PAGE_TABLES_SIZE >> PAGE_SHIFT))
 #define LCD_STACK_ORDER \
 	(ilog2(LCD_STACK_SIZE >> PAGE_SHIFT))
+#define LCD_STACK_PROT_ORDER \
+	(ilog2(LCD_STACK_PROT_SIZE >> PAGE_SHIFT))
 
 /* Offsets. */
 
@@ -183,6 +186,8 @@
 
 #define LCD_BOOTSTRAP_PAGE_TABLES_OFFSET \
 	(LCD_BOOTSTRAP_PAGES_OFFSET + LCD_BOOTSTRAP_PAGES_SIZE)
+#define LCD_STACK_PROT_PAGE_OFFSET \
+	(LCD_BOOTSTRAP_PAGE_TABLES_OFFSET+ LCD_BOOTSTRAP_PAGE_TABLES_SIZE)
 
 /* HOLE */
 
@@ -333,7 +338,8 @@
 
 #define LCD_ARCH_FS_BASE     __gpa(0UL)
 #define LCD_ARCH_FS_LIMIT    0xFFFFFFFF
-#define LCD_ARCH_GS_BASE     __gpa(0UL)
+#define LCD_ARCH_GS_BASE     __gpa(LCD_PHYS_BASE + LCD_STACK_PROT_PAGE_OFFSET)
+#define LCD_ARCH_GS_GV_BASE  __gva(LCD_VIRT_BASE + LCD_STACK_PROT_PAGE_OFFSET)
 #define LCD_ARCH_GS_LIMIT    0xFFFFFFFF
 #define LCD_ARCH_GDTR_BASE   __gpa(0UL)
 #define LCD_ARCH_GDTR_LIMIT  0x0 /* no gdt */

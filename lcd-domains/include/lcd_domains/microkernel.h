@@ -331,7 +331,7 @@ void __lcd_put(struct lcd *caller, struct cnode *cnode, struct lcd *lcd);
  * @utcb_page: where to map the UTCB in the LCD's address space
  */
 int __lcd_config(struct lcd *caller, cptr_t lcd, gva_t pc, gva_t sp, 
-		gpa_t gva_root, gpa_t utcb_page);
+		gpa_t gva_root, gpa_t utcb_page, gva_t gs_base);
 
 /**
  * __lcd_memory_grant_and_map -- Grant LCD memory object capability and

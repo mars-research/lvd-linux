@@ -73,7 +73,7 @@ int lcd_create_klcd(cptr_t *klcd);
  * For now, we assume lcd will boot with a guest virtual address space.
  */
 int lcd_config_registers(cptr_t lcd, gva_t pc, gva_t sp, gpa_t gva_root,
-				 gpa_t utcb_page);
+				 gpa_t utcb_page, gva_t gs_base);
 
 /**
  * lcd_memory_grant_and_map -- Grant LCD access to memory object, and map it 
@@ -148,6 +148,7 @@ struct lcd_create_ctx {
 	void *stack;
 	void *m_init_bits;
 	void *m_core_bits;
+	void *stack_prot;
 };
 
 /**

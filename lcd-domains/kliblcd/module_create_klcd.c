@@ -41,7 +41,8 @@ int lcd_create_module_klcd(char *mdir, char *mname, cptr_t *klcd_out)
 				__gva(hva_val(va2hva(m->init))), 
 				__gva(0),
 				__gpa(0),
-				__gpa(0));
+				__gpa(0),
+				__gva(0));
 	if (ret) {
 		LCD_ERR("failed to config klcd");
 		goto fail3;

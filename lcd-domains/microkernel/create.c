@@ -374,7 +374,7 @@ void __lcd_put(struct lcd *caller, struct cnode *cnode, struct lcd *lcd)
 
 static int config_lcd(struct lcd *caller, struct lcd *lcd_struct, 
 		gva_t pc, gva_t sp, 
-		gpa_t gva_root, gpa_t utcb_page)
+		gpa_t gva_root, gpa_t utcb_page, gva_t gs_base)
 {
 	int ret;
 	hva_t utcb_page_addr;
@@ -392,6 +392,7 @@ static int config_lcd(struct lcd *caller, struct lcd *lcd_struct,
 	lcd_arch_set_pc(lcd_struct->lcd_arch, pc);
 	lcd_arch_set_sp(lcd_struct->lcd_arch, sp);
 	lcd_arch_set_gva_root(lcd_struct->lcd_arch, gva_root);
+	lcd_arch_set_gs_base(lcd_struct->lcd_arch, gs_base);
 	/*
 	 * Map utcb page in guest physical
 	 */
@@ -423,7 +424,7 @@ fail1:
 
 static int config_klcd(struct lcd *caller, struct lcd *lcd_struct, 
 		gva_t pc, gva_t sp, 
-		gpa_t gva_root, gpa_t utcb_page)
+		gpa_t gva_root, gpa_t utcb_page, gva_t gs_base)
 {
 	/*
 	 * For now, we ignore everything except the program counter.
@@ -439,7 +440,7 @@ static int config_klcd(struct lcd *caller, struct lcd *lcd_struct,
 }
 
 int __lcd_config(struct lcd *caller, cptr_t lcd, gva_t pc, gva_t sp, 
-		gpa_t gva_root, gpa_t utcb_page)
+		gpa_t gva_root, gpa_t utcb_page, gva_t gs_base)
 {
 	struct lcd *lcd_struct;
 	struct cnode *cnode;
@@ -457,11 +458,11 @@ int __lcd_config(struct lcd *caller, cptr_t lcd, gva_t pc, gva_t sp,
 
 	case LCD_TYPE_ISOLATED:
 		ret = config_lcd(caller, lcd_struct, pc, sp, gva_root, 
-				utcb_page);
+				utcb_page, gs_base);
 		break;
 	case LCD_TYPE_NONISOLATED:
 		ret = config_klcd(caller, lcd_struct, pc, sp, gva_root, 
-				utcb_page);
+				utcb_page, gs_base);
 		break;
 	default:
 		/* shouldn't happen */

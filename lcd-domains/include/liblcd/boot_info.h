@@ -21,6 +21,7 @@ struct lcd_boot_cptrs {
 	cptr_t boot_pages;
 	cptr_t stack;
 	cptr_t gv;
+	cptr_t stack_prot;
 };
 
 struct lcd_boot_info {

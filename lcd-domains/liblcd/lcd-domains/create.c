@@ -50,9 +50,9 @@ int lcd_create_klcd(cptr_t *klcd)
 }
 
 int lcd_config_registers(cptr_t lcd, gva_t pc, gva_t sp, gpa_t gva_root,
-				 gpa_t utcb_page)
+				 gpa_t utcb_page, gva_t gs_base)
 {
-	return lcd_syscall_config_registers(lcd, pc, sp, gva_root, utcb_page);
+	return lcd_syscall_config_registers(lcd, pc, sp, gva_root, utcb_page, gs_base);
 }
 
 int lcd_memory_grant_and_map(cptr_t lcd, cptr_t mo, cptr_t dest_slot,

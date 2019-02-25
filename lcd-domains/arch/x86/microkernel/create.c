@@ -1067,3 +1067,12 @@ void lcd_arch_irq_enable(struct lcd_arch *lcd_arch)
 		PIN_BASED_EXT_INTR_MASK);
 	vmx_put_cpu(lcd_arch);
 }
+
+int lcd_arch_set_gs_base(struct lcd_arch *lcd_arch, gva_t a)
+{
+	lcd_arch->regs.gs = gva_val(a);
+	vmx_get_cpu(lcd_arch);
+	vmcs_writel(GUEST_GS_BASE, gva_val(a));
+	vmx_put_cpu(lcd_arch);
+	return 0;
+}

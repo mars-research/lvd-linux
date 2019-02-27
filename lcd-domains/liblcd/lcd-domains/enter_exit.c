@@ -19,6 +19,8 @@
 static int thc_initialized;
 atomic_t lcd_initialized;
 
+static int lcds_entered = 0;
+
 int 
 LIBLCD_FUNC_ATTR
 lcd_enter(void)
@@ -31,6 +33,14 @@ lcd_enter(void)
 		lcd_printk("===============");
 		lcd_printk("  Child LCD BOOTED   ");
 		lcd_printk("===============");
+
+		ret = _lcd_create_sync_endpoint(LCD_CPTR_CALL_ENDPOINT);
+		if (ret) {
+			LIBLCD_ERR("creating call endpoint");
+			goto fail;
+		}
+		LIBLCD_MSG("call endpoint created and installed for child LCD");
+
 		return 0;
 	}
 
@@ -51,7 +61,7 @@ lcd_enter(void)
 	/*
 	 * Set up internal memory interval tree / resource tree
 	 */
-	ret = __liblcd_mem_itree_init();
+	ret = __liblcd_mem_itree_init(lcds_entered);
 	if (ret) {
 		LIBLCD_ERR("failed to init memory interval tree");
 		goto fail;
@@ -118,6 +128,8 @@ lcd_enter(void)
 	lcd_printk("===============");
 	lcd_printk("  LCD BOOTED   ");
 	lcd_printk("===============");
+
+	++lcds_entered;
 
 	return 0;
 

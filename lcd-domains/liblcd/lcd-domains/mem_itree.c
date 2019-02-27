@@ -174,7 +174,7 @@ void __liblcd_mem_itree_booted(void)
 	node_cache = KMEM_CACHE(lcd_resource_node, 0);
 }
 
-static int add_boot_memory(void)
+static int add_boot_memory(int lcd_id)
 {
 	struct lcd_resource_node *n;
 	/*
@@ -186,6 +186,8 @@ static int add_boot_memory(void)
 	n->start = gpa_val(lcd_gva2gpa(lcd_get_boot_info()->module_init_base));
 	n->last = n->start + lcd_get_boot_info()->module_init_size - 1;
 	n->cptr = lcd_get_boot_info()->lcd_boot_cptrs.module_init;
+	LIBLCD_MSG("%s, module_init start 0x%X | last 0x%X | cptr %llu", __func__,
+			n->start, n->last, cptr_val(n->cptr));
 	lcd_resource_tree_insert(&itree, n);
 	/*
 	 * Add module core
@@ -196,6 +198,8 @@ static int add_boot_memory(void)
 	n->start = gpa_val(lcd_gva2gpa(lcd_get_boot_info()->module_core_base));
 	n->last = n->start + lcd_get_boot_info()->module_core_size - 1;
 	n->cptr = lcd_get_boot_info()->lcd_boot_cptrs.module_core;
+	LIBLCD_MSG("%s, module_core start 0x%X | last 0x%X | cptr %lu", __func__,
+			n->start, n->last, cptr_val(n->cptr));
 	lcd_resource_tree_insert(&itree, n);
 	/*
 	 * Add bootstrap pages
@@ -203,10 +207,12 @@ static int add_boot_memory(void)
 	n = alloc_itree_node();
 	if (!n)
 		goto fail3;
-	n->start = gpa_val(LCD_BOOTSTRAP_PAGES_GP_ADDR);
-	n->last = gpa_val(LCD_BOOTSTRAP_PAGES_GP_ADDR) + 
+	n->start = gpa_val(LCD_BOOTSTRAP_PAGES_GP_ADDR_CHILD(lcd_id));
+	n->last = gpa_val(LCD_BOOTSTRAP_PAGES_GP_ADDR_CHILD(lcd_id)) +
 		LCD_BOOTSTRAP_PAGES_SIZE - 1;
 	n->cptr = lcd_get_boot_info()->lcd_boot_cptrs.boot_pages;
+	LIBLCD_MSG("%s, bootstrap pages start 0x%X | last 0x%X | cptr %llu", __func__,
+			n->start, n->last, cptr_val(n->cptr));
 	lcd_resource_tree_insert(&itree, n);
 	/*
 	 * Add stack pages
@@ -214,21 +220,23 @@ static int add_boot_memory(void)
 	n = alloc_itree_node();
 	if (!n)
 		goto fail4;
-	n->start = gpa_val(LCD_STACK_GP_ADDR);
-	n->last = gpa_val(LCD_STACK_GP_ADDR) + 
+	n->start = gpa_val(LCD_STACK_GP_ADDR_CHILD(lcd_id));
+	n->last = gpa_val(LCD_STACK_GP_ADDR_CHILD(lcd_id)) +
 		LCD_STACK_SIZE - 1;
 	n->cptr = lcd_get_boot_info()->lcd_boot_cptrs.stack;
+	LIBLCD_MSG("%s, stack pages start 0x%X | last 0x%X | cptr %llu", __func__,
+			n->start, n->last, cptr_val(n->cptr));
 	lcd_resource_tree_insert(&itree, n);
 	/*
-	 * Add stack canary pages
+	 * Add global segment page
 	 */
 	n = alloc_itree_node();
 	if (!n)
 		goto fail5;
-	n->start = gpa_val(LCD_ARCH_GS_BASE);
-	n->last = gpa_val(LCD_ARCH_GS_BASE) +
-		LCD_STACK_PROT_SIZE - 1;
-	n->cptr = lcd_get_boot_info()->lcd_boot_cptrs.stack_prot;
+	n->start = gpa_val(LCD_ARCH_GS_BASE_CHILD(lcd_id));
+	n->last = gpa_val(LCD_ARCH_GS_BASE_CHILD(lcd_id)) +
+		LCD_GLOBAL_SEGMENT_SIZE - 1;
+	n->cptr = lcd_get_boot_info()->lcd_boot_cptrs.gs_page;
 	lcd_resource_tree_insert(&itree, n);
 	/*
 	 * Add boot guest virtual page tables
@@ -240,6 +248,8 @@ static int add_boot_memory(void)
 	n->last = gpa_val(LCD_BOOTSTRAP_PAGE_TABLES_GP_ADDR) + 
 		LCD_BOOTSTRAP_PAGE_TABLES_SIZE - 1;
 	n->cptr = lcd_get_boot_info()->lcd_boot_cptrs.gv;
+	LIBLCD_MSG("%s, bootstrap PT pages start 0x%X | last 0x%X | cptr %llu", __func__,
+			n->start, n->last, cptr_val(n->cptr));
 	lcd_resource_tree_insert(&itree, n);
 
 	return 0;
@@ -253,7 +263,7 @@ fail1:
 	return -ENOMEM; /* we don't bother "freeing" nodes */
 }
 
-int __liblcd_mem_itree_init(void)
+int __liblcd_mem_itree_init(int lcd_id)
 {
 	int ret;
 	/*
@@ -267,7 +277,7 @@ int __liblcd_mem_itree_init(void)
 	/*
 	 * Add existing memory (at boot) to resource tree
 	 */
-	ret = add_boot_memory();
+	ret = add_boot_memory(lcd_id);
 	if (ret) {
 		LIBLCD_ERR("failed to add resource nodes for boot mem");
 		goto fail2;

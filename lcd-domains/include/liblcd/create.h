@@ -148,7 +148,7 @@ struct lcd_create_ctx {
 	void *stack;
 	void *m_init_bits;
 	void *m_core_bits;
-	void *stack_prot;
+	void *gs_page;
 };
 
 /**

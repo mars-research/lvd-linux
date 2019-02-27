@@ -16,7 +16,7 @@ struct lcd_utcb *
 LIBLCD_FUNC_ATTR
 lcd_get_utcb(void)
 {
-	return (struct lcd_utcb *)gva_val(LCD_UTCB_GV_ADDR);
+	return (struct lcd_utcb *)gva_val(LCD_UTCB_GV_ADDR_CHILD(current_lcd_id));
 }
 
 int 

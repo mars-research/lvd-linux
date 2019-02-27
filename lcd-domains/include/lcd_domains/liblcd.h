@@ -28,7 +28,7 @@
  *
  * This should be called before the page allocator inits.
  */
-int __liblcd_mem_itree_init(void);
+int __liblcd_mem_itree_init(int lcd_id);
 /**
  * __liblcd_mem_itree_booted -- Call this when kmalloc is initialized
  *

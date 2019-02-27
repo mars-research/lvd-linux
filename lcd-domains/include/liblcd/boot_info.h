@@ -21,7 +21,7 @@ struct lcd_boot_cptrs {
 	cptr_t boot_pages;
 	cptr_t stack;
 	cptr_t gv;
-	cptr_t stack_prot;
+	cptr_t gs_page;
 };
 
 struct lcd_boot_info {
@@ -46,6 +46,8 @@ struct lcd_boot_info {
 	 */
 	cptr_t cptrs[LCD_NUM_BOOT_CPTRS];
 };
+
+#define current_lcd_id		(lcd_get_boot_info()->lcd_id)
 
 /**
  * lcd_get_boot_info -- Return the bootstrap info

@@ -9,6 +9,7 @@
 
 extern void dummy_cleanup_module(void);
 int cleanup_channel_group(struct fipc_message *, struct thc_channel *);
+extern int dummy_done;
 
 int dispatch_async_loop(struct thc_channel *channel,
 			struct fipc_message *message,
@@ -28,6 +29,7 @@ int dispatch_async_loop(struct thc_channel *channel,
 			ndo_uninit_callee(message, channel,
 					cspace, sync_ep);
 			/* wait until uninit is called */
+			dummy_done = 1;
 			return -1;
 		case NDO_START_XMIT:
 //			trace(NDO_START_XMIT);

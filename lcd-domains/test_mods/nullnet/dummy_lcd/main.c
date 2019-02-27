@@ -15,9 +15,9 @@
 
 cptr_t nullnet_register_channel;
 cptr_t nullnet_register_channels[2];
-struct thc_channel *net_async;
+struct thc_channel *net_asyncs[2];
 struct glue_cspace *nullnet_cspace;
-cptr_t nullnet_sync_endpoint;
+cptr_t nullnet_sync_endpoints[2];
 int dummy_done = 0;
 int dummy_init_module(void);
 void dummy_cleanup_module(void);
@@ -28,6 +28,8 @@ u64 tdiff_disp = 0ull;
 TS_DECL(disp_loop);
 /* LOOP ---------------------------------------- */
 #define REPORT_LCD_LOAD
+
+void create_async_channel(void);
 
 static void main_and_loop(void)
 {
@@ -40,7 +42,8 @@ static void main_and_loop(void)
 #endif
 	struct fipc_message *msg;
 
-	if (lcd_id) {
+	if (current_lcd_id) {
+		create_async_channel();
 		while (!stop && !dummy_done) {
 			cpu_relax();
 		}
@@ -119,12 +122,12 @@ static void main_and_loop(void)
 						ret = ndo_start_xmit_async_bare_callee(msg,
 							curr_item->channel,
 							nullnet_cspace,
-							nullnet_sync_endpoint);
+							nullnet_sync_endpoints[current_lcd_id]);
 						} else {
 						ret = ndo_start_xmit_noawe_callee(msg,
 							curr_item->channel,
 							nullnet_cspace,
-							nullnet_sync_endpoint);
+							nullnet_sync_endpoints[current_lcd_id]);
 						}
 						if (likely(ret)) {
 							LIBLCD_ERR("async dispatch failed");
@@ -137,7 +140,7 @@ static void main_and_loop(void)
 					ret = dispatch_async_loop(curr_item->channel,
 							msg,
 							nullnet_cspace,
-							nullnet_sync_endpoint);
+							nullnet_sync_endpoints[current_lcd_id]);
 
 						if (ret) {
 							LIBLCD_ERR("async dispatch failed");
@@ -171,20 +174,20 @@ static int __noreturn dummy_lcd_init(void)
 {
 	int r = 0;
 
-	printk("LCD %d entering...\n", lcd_id);
+	printk("LCD %d entering...\n", current_lcd_id);
 	r = lcd_enter();
 	if (r)
 		goto fail1;
 	/*
 	 * Get the nullnet channel cptr from boot info
 	 */
-	nullnet_register_channels[lcd_id] = lcd_get_boot_info()->cptrs[0];
+	nullnet_register_channels[current_lcd_id] = lcd_get_boot_info()->cptrs[0];
 	printk("[%d] nullnet reg channel %lu\n",
-			lcd_id,	nullnet_register_channels[lcd_id].cptr);
+			current_lcd_id,	nullnet_register_channels[current_lcd_id].cptr);
 	/*
 	 * Initialize nullnet glue
 	 */
-	if (lcd_id == 0) { 
+	if (current_lcd_id == 0) {
 		r = glue_nullnet_init();
 		if (r) {
 			LIBLCD_ERR("nullnet init");

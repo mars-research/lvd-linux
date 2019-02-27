@@ -37,6 +37,8 @@ static LIST_HEAD(net_infos);
 
 extern int trigger_exit_to_lcd(struct thc_channel *_channel, enum dispatch_t);
 
+int register_child(void);
+
 struct net_info *
 add_net(struct thc_channel *chnl, struct glue_cspace *cspace,
 	cptr_t sync_endpoint)
@@ -158,18 +160,28 @@ static int do_one_register(cptr_t register_chnl)
 	lcd_set_cr2(rx);
 	lcd_set_cr3(tx_xmit);
 	lcd_set_cr4(rx_xmit);
+
 	ret = lcd_sync_poll_recv(register_chnl);
 	if (ret) {
 		if (ret == -EWOULDBLOCK)
 			ret = 0;
 		goto free_cptrs;
 	}
-	/*
-	 * Dispatch to register handler
-	 */
-	ret = dispatch_sync_loop();
-	if (ret)
-		return ret; /* dispatch fn is responsible for cptr cleanup */
+
+	if (lcd_r0()) {
+		/*
+		 * Dispatch to register handler
+		 */
+		ret = dispatch_sync_loop();
+
+	} else {
+		ret = register_child();
+	}
+
+	if (ret) {
+		/* dispatch fn is responsible for cptr cleanup */
+		return ret;
+	}
 
 	return 0;
 
@@ -189,6 +201,7 @@ fail2:
 fail1:
 	return ret;
 }
+
 #define REGISTER_FREQ	50
 extern uint64_t *perf1, *perf2, *perf3, *perf4;
 static void loop(cptr_t register_chnl)
@@ -261,7 +274,6 @@ static void loop(cptr_t register_chnl)
 	PROG_EVENT(&e3, EVENT_SEL2);
 	PROG_EVENT(&e4, EVENT_SEL3);
 #endif
-
 			ret = async_loop(&net, &msg);
 			if (!ret) {
 			/*if (async_msg_get_fn_type(msg) ==

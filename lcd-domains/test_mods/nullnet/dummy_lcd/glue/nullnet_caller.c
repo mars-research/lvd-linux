@@ -13,7 +13,7 @@
 
 struct cptr sync_ep;
 static struct glue_cspace *c_cspace;
-extern struct thc_channel *net_async;
+extern struct thc_channel *net_asyncs[2];
 extern struct thc_channel_group ch_grp;
 
 struct rtnl_link_ops *g_rtnl_link_ops;
@@ -396,7 +396,7 @@ fail1:
 	return;
 }
 
-extern cptr_t nullnet_sync_endpoint;
+extern cptr_t nullnet_sync_endpoints[2];
 extern cptr_t nullnet_register_channels[2];
 
 int create_async_channel(void)
@@ -407,7 +407,7 @@ int create_async_channel(void)
 	/*
 	 * Set up async and sync channels
 	 */
-	ret = lcd_create_sync_endpoint(&nullnet_sync_endpoint);
+	ret = lcd_create_sync_endpoint(&nullnet_sync_endpoints[current_lcd_id]);
 	if (ret) {
 		LIBLCD_ERR("lcd_create_sync_endpoint");
 		goto fail1;
@@ -417,11 +417,17 @@ int create_async_channel(void)
 		LIBLCD_ERR("async chnl setup failed");
 		goto fail2;
 	}
-        lcd_set_cr0(nullnet_sync_endpoint);
+        lcd_set_cr0(nullnet_sync_endpoints[current_lcd_id]);
         lcd_set_cr1(rx);
         lcd_set_cr2(tx);
+        lcd_set_cr3(CAP_CPTR_NULL);
+        lcd_set_cr4(CAP_CPTR_NULL);
+	// for function ID, we pass 0 as we are not calling a function
+	lcd_set_r0(0x0);
+	// conveys the LCD id the call is coming from
+	lcd_set_r1(current_lcd_id);
 
-        ret = lcd_sync_call(nullnet_register_channels[lcd_id]);
+        ret = lcd_sync_call(nullnet_register_channels[current_lcd_id]);
 
         /*
          * Flush cap registers
@@ -429,17 +435,20 @@ int create_async_channel(void)
         lcd_set_cr0(CAP_CPTR_NULL);
         lcd_set_cr1(CAP_CPTR_NULL);
         lcd_set_cr2(CAP_CPTR_NULL);
+        lcd_set_cr3(CAP_CPTR_NULL);
+        lcd_set_cr4(CAP_CPTR_NULL);
+
         if (ret) {
                 LIBLCD_ERR("lcd_call");
                 goto fail3;
         }
-	net_async = chnl;
+	net_asyncs[current_lcd_id] = chnl;
 	return ret;
 fail3:
         //glue_cap_remove(c_cspace, ops_container->my_ref);
         //destroy_async_channel(chnl);
 fail2:
-	lcd_cap_delete(nullnet_sync_endpoint);
+	lcd_cap_delete(nullnet_sync_endpoints[current_lcd_id]);
 fail1:
 	return ret;
 }
@@ -492,7 +501,7 @@ int __rtnl_link_register(struct rtnl_link_ops *ops)
 	/*
 	 * Set up async and sync channels
 	 */
-	ret = lcd_create_sync_endpoint(&nullnet_sync_endpoint);
+	ret = lcd_create_sync_endpoint(&nullnet_sync_endpoints[current_lcd_id]);
 	if (ret) {
 		LIBLCD_ERR("lcd_create_sync_endpoint");
 		goto fail1;
@@ -537,7 +546,8 @@ int __rtnl_link_register(struct rtnl_link_ops *ops)
 
 	lcd_set_r0(__RTNL_LINK_REGISTER);
         lcd_set_r1(cptr_val(ops_container->my_ref));
-        lcd_set_cr0(nullnet_sync_endpoint);
+	lcd_set_r2(current_lcd_id);
+        lcd_set_cr0(nullnet_sync_endpoints[current_lcd_id]);
         lcd_set_cr1(rx);
         lcd_set_cr2(tx);
         lcd_set_cr3(rx_xmit);
@@ -548,7 +558,7 @@ int __rtnl_link_register(struct rtnl_link_ops *ops)
 	printk("%s, tx_xmit %lx | rx_xmit %lx", __func__,
 				cptr_val(tx_xmit),
 				cptr_val(rx_xmit));
-        ret = lcd_sync_call(nullnet_register_channels[lcd_id]);
+        ret = lcd_sync_call(nullnet_register_channels[current_lcd_id]);
 
         /*
          * Flush cap registers
@@ -572,7 +582,7 @@ int __rtnl_link_register(struct rtnl_link_ops *ops)
         }
 
 	ops_container->other_ref.cptr = lcd_r1();
-	net_async = chnl;
+	net_asyncs[current_lcd_id] = chnl;
 	return ret;
 
 fail5:
@@ -581,7 +591,7 @@ fail4:
 fail3:
         //destroy_async_channel(chnl);
 fail2:
-	lcd_cap_delete(nullnet_sync_endpoint);
+	lcd_cap_delete(nullnet_sync_endpoints[current_lcd_id]);
 fail1:
 	return ret;
 }
@@ -595,7 +605,7 @@ void __rtnl_link_unregister(struct rtnl_link_ops *ops)
 	struct fipc_message *response;
 	struct rtnl_link_ops_container *ops_container;
 
-	ret = async_msg_blocking_send_start(net_async, &request);
+	ret = async_msg_blocking_send_start(net_asyncs[current_lcd_id], &request);
 	if (ret) {
 		LIBLCD_ERR("failed to get a send slot");
 		lcd_exit(-1);
@@ -603,12 +613,12 @@ void __rtnl_link_unregister(struct rtnl_link_ops *ops)
 	ops_container = container_of(ops, struct rtnl_link_ops_container, rtnl_link_ops);
 	async_msg_set_fn_type(request, __RTNL_LINK_UNREGISTER);
 	fipc_set_reg1(request, ops_container->other_ref.cptr);
-	err = thc_ipc_call(net_async, request, &response);
+	err = thc_ipc_call(net_asyncs[current_lcd_id], request, &response);
 	if (err) {
 		LIBLCD_ERR("thc_ipc_call");
 		lcd_exit(-1);
 	}
-	fipc_recv_msg_end(thc_channel_to_fipc(net_async), response);
+	fipc_recv_msg_end(thc_channel_to_fipc(net_asyncs[current_lcd_id]), response);
 	return;
 }
 
@@ -628,20 +638,20 @@ int register_netdevice(struct net_device *dev)
 
 	rtnl_link_ops_container = container_of(dev->rtnl_link_ops, struct rtnl_link_ops_container, rtnl_link_ops);
 
-	ret = async_msg_blocking_send_start(net_async, &request);
+	ret = async_msg_blocking_send_start(net_asyncs[current_lcd_id], &request);
 	if (ret) {
 		LIBLCD_ERR("failed to get a send slot");
 		lcd_exit(-1);
 	}
 	async_msg_set_fn_type(request, REGISTER_NETDEVICE);
 	fipc_set_reg1(request, dev_container->other_ref.cptr);
-	err = thc_ipc_call(net_async, request, &response);
+	err = thc_ipc_call(net_asyncs[current_lcd_id], request, &response);
 	if (err) {
 		LIBLCD_ERR("thc_ipc_call");
 		lcd_exit(-1);
 	}
 	ret = fipc_get_reg4(response);
-	fipc_recv_msg_end(thc_channel_to_fipc(net_async), response);
+	fipc_recv_msg_end(thc_channel_to_fipc(net_asyncs[current_lcd_id]), response);
 	return ret;
 
 }
@@ -655,7 +665,7 @@ void ether_setup(struct net_device *dev)
 	struct fipc_message *response;
 	struct net_device_container *netdev_container;
 
-	ret = async_msg_blocking_send_start(net_async, &request);
+	ret = async_msg_blocking_send_start(net_asyncs[current_lcd_id], &request);
 	if (ret) {
 		LIBLCD_ERR("failed to get a send slot");
 		goto fail_async;
@@ -665,12 +675,12 @@ void ether_setup(struct net_device *dev)
 	netdev_container = container_of(dev, struct net_device_container, net_device);
 	fipc_set_reg1(request, netdev_container->other_ref.cptr);
 	LIBLCD_MSG("ndev other ref %lu\n", netdev_container->other_ref.cptr);
-	err = thc_ipc_call(net_async, request, &response);
+	err = thc_ipc_call(net_asyncs[current_lcd_id], request, &response);
 	if (err) {
 		LIBLCD_ERR("thc_ipc_call");
 		goto fail_ipc;
 	}
-	fipc_recv_msg_end(thc_channel_to_fipc(net_async), response);
+	fipc_recv_msg_end(thc_channel_to_fipc(net_asyncs[current_lcd_id]), response);
 fail_ipc:
 fail_async:
 	return;
@@ -700,7 +710,7 @@ int eth_mac_addr(struct net_device *dev, void *p)
 	struct net_device_container *dev_container;
 	uint32_t request_cookie;
 
-	ret = async_msg_blocking_send_start(net_async, &request);
+	ret = async_msg_blocking_send_start(net_asyncs[current_lcd_id], &request);
 
 	if (ret) {
 		LIBLCD_ERR("failed to get a send slot");
@@ -719,7 +729,7 @@ int eth_mac_addr(struct net_device *dev, void *p)
 		lcd_exit(-1);
 	}
 
-	ret = thc_ipc_send_request(net_async, request, &request_cookie);
+	ret = thc_ipc_send_request(net_asyncs[current_lcd_id], request, &request_cookie);
 	if (ret) {
 		LIBLCD_ERR("thc_ipc_call");
 		goto fail_ipc;
@@ -728,14 +738,14 @@ int eth_mac_addr(struct net_device *dev, void *p)
 	lcd_set_r0(p_mem_sz);
 	lcd_set_r1(p_offset);
 	lcd_set_cr0(p_cptr);
-	sync_ret = lcd_sync_send(nullnet_sync_endpoint);
+	sync_ret = lcd_sync_send(nullnet_sync_endpoints[current_lcd_id]);
 	lcd_set_cr0(CAP_CPTR_NULL);
 	if (sync_ret) {
 		LIBLCD_ERR("failed to send");
 		goto fail_sync;
 	}
 
-	ret = thc_ipc_recv_response(net_async,
+	ret = thc_ipc_recv_response(net_asyncs[current_lcd_id],
 				request_cookie,
 				&response);
 	if (ret) {
@@ -744,7 +754,7 @@ int eth_mac_addr(struct net_device *dev, void *p)
 	}
 
 	ret = fipc_get_reg1(response);
-	fipc_recv_msg_end(thc_channel_to_fipc(net_async), response);
+	fipc_recv_msg_end(thc_channel_to_fipc(net_asyncs[current_lcd_id]), response);
 
 fail_async:
 fail_sync:
@@ -761,7 +771,7 @@ int eth_validate_addr(struct net_device *dev)
 	struct fipc_message *response;
 	struct net_device_container *dev_container;
 
-	ret = async_msg_blocking_send_start(net_async, &request);
+	ret = async_msg_blocking_send_start(net_asyncs[current_lcd_id], &request);
 	if (ret) {
 		LIBLCD_ERR("failed to get a send slot");
 		goto fail_async;
@@ -775,7 +785,7 @@ int eth_validate_addr(struct net_device *dev)
 
 	LIBLCD_MSG("%s, cptr lcd %lu", __func__, dev_container->other_ref.cptr);
 
-	ret = thc_ipc_call(net_async, request, &response);
+	ret = thc_ipc_call(net_asyncs[current_lcd_id], request, &response);
 
 	if (ret) {
 		LIBLCD_ERR("thc_ipc_call");
@@ -783,7 +793,7 @@ int eth_validate_addr(struct net_device *dev)
 	}
 
 	ret = fipc_get_reg1(response);
-	fipc_recv_msg_end(thc_channel_to_fipc(net_async), response);
+	fipc_recv_msg_end(thc_channel_to_fipc(net_asyncs[current_lcd_id]), response);
 
 fail_async:
 fail_ipc:
@@ -798,7 +808,7 @@ void free_netdev(struct net_device *dev)
 	struct fipc_message *response;
 	struct net_device_container *dev_container;
 
-	ret = async_msg_blocking_send_start(net_async, &request);
+	ret = async_msg_blocking_send_start(net_asyncs[current_lcd_id], &request);
 	if (ret) {
 		LIBLCD_ERR("failed to get a send slot");
 		goto fail_async;
@@ -809,12 +819,12 @@ void free_netdev(struct net_device *dev)
 
 	fipc_set_reg1(request, dev_container->other_ref.cptr);
 
-	ret = thc_ipc_call(net_async, request, &response);
+	ret = thc_ipc_call(net_asyncs[current_lcd_id], request, &response);
 	if (ret) {
 		LIBLCD_ERR("thc_ipc_call");
 		goto fail_ipc;
 	}
-	fipc_recv_msg_end(thc_channel_to_fipc(net_async), response);
+	fipc_recv_msg_end(thc_channel_to_fipc(net_asyncs[current_lcd_id]), response);
 
 fail_async:
 fail_ipc:
@@ -831,7 +841,7 @@ void netif_carrier_off(struct net_device *dev)
 
 	dev_container = container_of(dev, struct net_device_container, net_device);
 
-	ret = async_msg_blocking_send_start(net_async, &request);
+	ret = async_msg_blocking_send_start(net_asyncs[current_lcd_id], &request);
 	if (ret) {
 		LIBLCD_ERR("failed to get a send slot");
 		goto fail_async;
@@ -840,12 +850,12 @@ void netif_carrier_off(struct net_device *dev)
 	async_msg_set_fn_type(request, NETIF_CARRIER_OFF);
 	fipc_set_reg1(request, dev_container->other_ref.cptr);
 	
-	ret = thc_ipc_call(net_async, request, &response);
+	ret = thc_ipc_call(net_asyncs[current_lcd_id], request, &response);
 	if (ret) {
 		LIBLCD_ERR("thc_ipc_call");
 		goto fail_ipc;
 	}
-	fipc_recv_msg_end(thc_channel_to_fipc(net_async), response);
+	fipc_recv_msg_end(thc_channel_to_fipc(net_asyncs[current_lcd_id]), response);
 fail_async:
 fail_ipc:
 	return;
@@ -861,7 +871,7 @@ void netif_carrier_on(struct net_device *dev)
 
 	dev_container = container_of(dev, struct net_device_container, net_device);
 
-	ret = async_msg_blocking_send_start(net_async, &request);
+	ret = async_msg_blocking_send_start(net_asyncs[current_lcd_id], &request);
 	if (ret) {
 		LIBLCD_ERR("failed to get a send slot");
 		goto fail_async;
@@ -870,12 +880,12 @@ void netif_carrier_on(struct net_device *dev)
 
 	fipc_set_reg1(request, dev_container->other_ref.cptr);
 
-	ret = thc_ipc_call(net_async, request, &response);
+	ret = thc_ipc_call(net_asyncs[current_lcd_id], request, &response);
 	if (ret) {
 		LIBLCD_ERR("thc_ipc_call");
 		goto fail_ipc;
 	}
-	fipc_recv_msg_end(thc_channel_to_fipc(net_async), response);
+	fipc_recv_msg_end(thc_channel_to_fipc(net_asyncs[current_lcd_id]), response);
 
 fail_async:
 fail_ipc:
@@ -891,7 +901,7 @@ void rtnl_link_unregister(struct rtnl_link_ops *ops)
 	struct fipc_message *request;
 	struct fipc_message *response;
 	ops_container = container_of(ops, struct rtnl_link_ops_container, rtnl_link_ops);
-	ret = async_msg_blocking_send_start(net_async, &request);
+	ret = async_msg_blocking_send_start(net_asyncs[current_lcd_id], &request);
 	if (ret) {
 		LIBLCD_ERR("failed to get a send slot");
 		goto fail1;
@@ -899,7 +909,7 @@ void rtnl_link_unregister(struct rtnl_link_ops *ops)
 	async_msg_set_fn_type(request, RTNL_LINK_UNREGISTER);
 	fipc_set_reg2(request, ops_container->other_ref.cptr);
 
-	err = thc_ipc_call(net_async, request, &response);
+	err = thc_ipc_call(net_asyncs[current_lcd_id], request, &response);
 	if (err) {
 		LIBLCD_ERR("thc_ipc_call");
 		goto fail2;
@@ -907,11 +917,11 @@ void rtnl_link_unregister(struct rtnl_link_ops *ops)
 
 	glue_cap_remove(c_cspace, ops_container->my_ref);
 
-	fipc_recv_msg_end(thc_channel_to_fipc(net_async), response);
+	fipc_recv_msg_end(thc_channel_to_fipc(net_asyncs[current_lcd_id]), response);
 
-	//lcd_cap_delete(nullnet_sync_endpoint);
+	//lcd_cap_delete(nullnet_sync_endpoints[current_lcd_id]);
 	if (0)
-		destroy_async_channel(net_async);
+		destroy_async_channel(net_asyncs[current_lcd_id]);
 fail2:
 fail1:
 	return;
@@ -954,7 +964,7 @@ struct net_device *alloc_netdev_mqs(int sizeof_priv, const char *name, unsigned 
 		goto fail_insert;
 	}
 
-	ret = async_msg_blocking_send_start(net_async, &request);
+	ret = async_msg_blocking_send_start(net_asyncs[current_lcd_id], &request);
 	if (ret) {
 		LIBLCD_ERR("failed to get a send slot");
 		goto fail_async;
@@ -968,7 +978,7 @@ struct net_device *alloc_netdev_mqs(int sizeof_priv, const char *name, unsigned 
 	fipc_set_reg5(request, rxqs);
 	fipc_set_reg6(request, ret1->my_ref.cptr);
 	printk("%s, netdevice lcd cptr : %lu", __func__, ret1->my_ref.cptr);
-	err = thc_ipc_call(net_async, request, &response);
+	err = thc_ipc_call(net_asyncs[current_lcd_id], request, &response);
 	if (err) {
 		LIBLCD_ERR("thc_ipc_call");
 		goto fail_ipc;
@@ -976,7 +986,7 @@ struct net_device *alloc_netdev_mqs(int sizeof_priv, const char *name, unsigned 
 
 	//ret1->other_ref.cptr = fipc_get_reg5(response);
 
-	fipc_recv_msg_end(thc_channel_to_fipc(net_async), response);
+	fipc_recv_msg_end(thc_channel_to_fipc(net_asyncs[current_lcd_id]), response);
 
 fail_ipc:
 fail_async:
@@ -1001,7 +1011,7 @@ void consume_skb(struct sk_buff *skb)
 #ifdef SENDER_DISPATCH_LOOP
 	channel = (struct thc_channel*) skb_c->chnl;
 #else
-	channel = net_async;
+	channel = net_asyncs[current_lcd_id];
 #endif
 	ret = async_msg_blocking_send_start(channel, &request);
 
@@ -1115,7 +1125,7 @@ int prep_channel_callee(struct fipc_message *_request,
 	lcd_set_cr1(rx);
 
 	LIBLCD_MSG("%s: Preparing sync send", __func__);
-	ret = lcd_sync_send(nullnet_sync_endpoint);
+	ret = lcd_sync_send(nullnet_sync_endpoints[current_lcd_id]);
 
 	lcd_set_cr0(CAP_CPTR_NULL);
 	lcd_set_cr1(CAP_CPTR_NULL);

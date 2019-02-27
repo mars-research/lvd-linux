@@ -2111,11 +2111,69 @@ int netif_carrier_on_callee(struct fipc_message *request, struct thc_channel *ch
 		LIBLCD_ERR("error getting response msg");
 		return -EIO;
 	}
-	thc_ipc_reply(channel, request_cookie, response);
+;
+thc_ipc_reply(channel, request_cookie, response);
 fail_lookup:
 	return ret;
 }
 
+int register_child(void)
+{
+	cptr_t tx, rx;
+	cptr_t tx_xmit, rx_xmit;
+	struct thc_channel *chnl;
+	cptr_t sync_endpoint;
+	int ret;
+	struct net_info *net_info;
+
+	sync_endpoint = lcd_cr0();
+	tx = lcd_cr1(); rx = lcd_cr2();
+	tx_xmit = lcd_cr3(); rx_xmit = lcd_cr4();
+
+	LIBLCD_MSG("%s child %d registration received, setting up thc_chl",
+			__func__, lcd_r1());
+	/*
+	 * Set up async ring channel
+	 */
+	ret = setup_async_net_ring_channel(tx, rx, &chnl);
+	if (ret) {
+		LIBLCD_ERR("error setting up ring channel");
+		goto fail1;
+	}
+	/*
+	 * Add to dispatch loop
+	 */
+	net_info = add_net(chnl, c_cspace, sync_endpoint);
+	if (!net_info) {
+		LIBLCD_ERR("error adding to dispatch loop");
+		goto fail2;
+	}
+	LIBLCD_MSG("%s, child %d registration complete\n",
+			__func__, lcd_r1());
+	goto out;
+
+fail2:
+	kfree(chnl);
+	destroy_async_fs_ring_channel(chnl);
+fail1:
+	return ret;
+out:
+	/*
+	 * Flush capability registers
+	 */
+	lcd_set_cr0(CAP_CPTR_NULL);
+	lcd_set_cr1(CAP_CPTR_NULL);
+	lcd_set_cr2(CAP_CPTR_NULL);
+	lcd_set_cr3(CAP_CPTR_NULL);
+	lcd_set_cr4(CAP_CPTR_NULL);
+
+	lcd_set_r0(ret);
+
+	if (lcd_sync_reply())
+		LIBLCD_ERR("double fault?");
+
+	return 0;
+}
 
 //DONE
 int __rtnl_link_register_callee(void)

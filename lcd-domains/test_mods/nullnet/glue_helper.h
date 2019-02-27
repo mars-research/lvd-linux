@@ -92,7 +92,7 @@ struct skbuff_members {
 //#define CACHE_ALIGNED __attribute__((aligned(64)))
 
 #define fipc_test_pause()    asm volatile ( "pause\n": : :"memory" );
-#define lcd_id		(lcd_get_boot_info()->lcd_id)
+//#define current_lcd_id		(lcd_get_boot_info()->lcd_id)
 
 #define PMFS_ASYNC_RPC_BUFFER_ORDER 12
 // LCD_DEBUG

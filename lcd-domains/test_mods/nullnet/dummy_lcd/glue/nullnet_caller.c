@@ -14,7 +14,7 @@
 struct cptr sync_ep;
 static struct glue_cspace *c_cspace;
 extern struct thc_channel *net_asyncs[2];
-extern struct thc_channel_group ch_grp;
+extern struct thc_channel_group ch_grp[2];
 
 struct rtnl_link_ops *g_rtnl_link_ops;
 void *data_pool;
@@ -404,6 +404,7 @@ int create_async_channel(void)
 	int ret;
 	cptr_t tx, rx;
 	struct thc_channel *chnl;
+	struct thc_channel_group_item *xmit_ch_item;
 	/*
 	 * Set up async and sync channels
 	 */
@@ -443,6 +444,15 @@ int create_async_channel(void)
                 goto fail3;
         }
 	net_asyncs[current_lcd_id] = chnl;
+
+	xmit_ch_item = kzalloc(sizeof(*xmit_ch_item), GFP_KERNEL);
+
+	thc_channel_group_item_init(xmit_ch_item, chnl, NULL);
+
+	xmit_ch_item->xmit_channel = true;
+
+	thc_channel_group_item_add(&ch_grp[current_lcd_id], xmit_ch_item);
+
 	return ret;
 fail3:
         //glue_cap_remove(c_cspace, ops_container->my_ref);
@@ -476,14 +486,12 @@ int create_one_async_channel(struct thc_channel **chnl, cptr_t *tx, cptr_t *rx)
 
 	xmit_ch_item->xmit_channel = true;
 
-	thc_channel_group_item_add(&ch_grp, xmit_ch_item);
+	thc_channel_group_item_add(&ch_grp[current_lcd_id], xmit_ch_item);
 
 	ptrs[idx++%32] = xmit_ch_item;
 
 	return 0;
 }
-
-extern struct thc_channel_group ch_grp;
 
 //DONE
 int __rtnl_link_register(struct rtnl_link_ops *ops)
@@ -516,7 +524,7 @@ int __rtnl_link_register(struct rtnl_link_ops *ops)
 
 	thc_channel_group_item_init(ch_item, chnl, NULL);
 
-	thc_channel_group_item_add(&ch_grp, ch_item);
+	thc_channel_group_item_add(&ch_grp[current_lcd_id], ch_item);
 
 	ret = setup_async_channel(&tx_xmit, &rx_xmit, &xmit_chnl);
 	if (ret) {
@@ -531,7 +539,7 @@ int __rtnl_link_register(struct rtnl_link_ops *ops)
 
 	xmit_ch_item->xmit_channel = true;
 
-	thc_channel_group_item_add(&ch_grp, xmit_ch_item);
+	thc_channel_group_item_add(&ch_grp[current_lcd_id], xmit_ch_item);
 
 	ops_container = container_of(ops,
 			struct rtnl_link_ops_container,
@@ -1647,7 +1655,7 @@ int cleanup_channel_group(struct fipc_message *request, struct thc_channel *chan
 
 	for (i = 0; i < 32; i++) {
 		if (ptrs[i]) {
-			thc_channel_group_item_remove(&ch_grp, ptrs[i]);
+			thc_channel_group_item_remove(&ch_grp[current_lcd_id], ptrs[i]);
 			destroy_async_channel(ptrs[i]->channel);
 			kfree(ptrs[i]);
 			ptrs[i] = NULL;

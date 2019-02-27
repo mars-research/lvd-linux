@@ -21,7 +21,7 @@ cptr_t nullnet_sync_endpoints[2];
 int dummy_done = 0;
 int dummy_init_module(void);
 void dummy_cleanup_module(void);
-struct thc_channel_group ch_grp;
+struct thc_channel_group ch_grp[2];
 
 bool tdiff_valid = false;
 u64 tdiff_disp = 0ull;
@@ -41,27 +41,25 @@ static void main_and_loop(void)
 	unsigned long long disp_loop_cycles = 0, percent = 0;
 #endif
 	struct fipc_message *msg;
-
-	if (current_lcd_id) {
-		create_async_channel();
-		while (!stop && !dummy_done) {
-			cpu_relax();
-		}
-		goto done;
-	}
+	int _local_lcd_id = current_lcd_id;
 
 	DO_FINISH(
 
-		ASYNC(
-			ret = dummy_init_module();
-			if (ret) {
-				LIBLCD_ERR("dummy register failed");
-				stop = 1;
-			} else {
-				LIBLCD_MSG("SUCCESSFULLY REGISTERED DUMMY!");
-			}
+		/* parent LCD initializes the module */
+		if (current_lcd_id == 0) {
+			ASYNC(
+				ret = dummy_init_module();
+				if (ret) {
+					LIBLCD_ERR("dummy register failed");
+					stop = 1;
+				} else {
+					LIBLCD_MSG("SUCCESSFULLY REGISTERED DUMMY!");
+				}
 
-			);
+				);
+		} else {
+			create_async_channel();
+		}
 
 		/* By the time we hit this loop, the async channel
 		 * will be set up (the awe running init_dummy_fs above
@@ -102,7 +100,7 @@ static void main_and_loop(void)
 			/*
 			 * Do RR async receive
 			 */
-			list_for_each_entry(curr_item, &(ch_grp.head), list) {
+			list_for_each_entry(curr_item, &(ch_grp[_local_lcd_id].head), list) {
 				if (curr_item->xmit_channel) {
 					ret = fipc_nonblocking_recv_start_if(
 						thc_channel_to_fipc(
@@ -164,7 +162,7 @@ static void main_and_loop(void)
 		LIBLCD_MSG("NULLNET EXITED DISPATCH LOOP");
 
 		);
-done:
+
 	LIBLCD_MSG("EXITED NULLNET DO_FINISH");
 
 	return;
@@ -193,8 +191,9 @@ static int __noreturn dummy_lcd_init(void)
 			LIBLCD_ERR("nullnet init");
 			goto fail2;
 		}
-		thc_channel_group_init(&ch_grp);
 	}
+
+	thc_channel_group_init(&ch_grp[current_lcd_id]);
 
 	/* RUN CODE / LOOP ---------------------------------------- */
 
@@ -202,8 +201,8 @@ static int __noreturn dummy_lcd_init(void)
 		main_and_loop();
 
 	/* DONE -------------------------------------------------- */
-
-	glue_nullnet_exit();
+	if (current_lcd_id == 0)
+		glue_nullnet_exit();
 
 	lcd_exit(0); /* doesn't return */
 fail2:

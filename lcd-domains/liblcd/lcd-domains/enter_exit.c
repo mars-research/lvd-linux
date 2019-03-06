@@ -22,6 +22,35 @@ atomic_t lcd_initialized;
 
 static int lcds_entered = 0;
 
+int child_lcd_enter(void)
+{
+	int ret;
+
+	ret = _lcd_create_sync_endpoint(LCD_CPTR_CALL_ENDPOINT);
+	if (ret) {
+		LIBLCD_ERR("creating call endpoint");
+		goto fail1;
+	}
+	LIBLCD_MSG("call endpoint created and installed for child LCD");
+
+	lcd_get_boot_info()->lcd_current_task = (struct task_struct*)kmalloc(sizeof(struct task_struct), GFP_KERNEL);
+
+	if (!lcd_get_boot_info()->lcd_current_task) {
+		LIBLCD_ERR("allocating current_task failed");
+		goto fail1;
+	}
+
+	thc_init();
+
+	lcd_printk("===============");
+	lcd_printk("  Child LCD BOOTED   ");
+	lcd_printk("===============");
+
+fail1:
+	return 0;
+}
+
+
 int 
 LIBLCD_FUNC_ATTR
 lcd_enter(void)
@@ -31,18 +60,7 @@ lcd_enter(void)
 	if (atomic_read(&lcd_initialized) == 0) {
 		atomic_set(&lcd_initialized, 1);
 	} else {
-		lcd_printk("===============");
-		lcd_printk("  Child LCD BOOTED   ");
-		lcd_printk("===============");
-
-		ret = _lcd_create_sync_endpoint(LCD_CPTR_CALL_ENDPOINT);
-		if (ret) {
-			LIBLCD_ERR("creating call endpoint");
-			goto fail;
-		}
-		LIBLCD_MSG("call endpoint created and installed for child LCD");
-
-		return 0;
+		return child_lcd_enter();
 	}
 
 	/*

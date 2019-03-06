@@ -1,3 +1,5 @@
+subdir-ccflags-y += -DNUM_LCDS="1"
+
 obj-$(LCD_CONFIG_BUILD_IXGBE_BOOT)	+= boot/
 
 obj-$(LCD_CONFIG_BUILD_IXGBE_IXGBE_LCD) += ixgbe_lcd/

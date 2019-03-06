@@ -73,8 +73,8 @@ struct rtnl_link_stats64 pkt_stats;
 struct glue_cspace *c_cspace;
 struct thc_channel *net_async;
 struct cptr sync_ep;
-cptr_t new_sync_eps[2];
-struct thc_channel *lcd_channels[2];
+cptr_t new_sync_eps[NUM_LCDS];
+struct thc_channel *lcd_channels[NUM_LCDS];
 extern struct cspace *klcd_cspace;
 struct rtnl_link_ops_container *g_ops_container;
 DEFINE_MUTEX(hash_lock);
@@ -2117,8 +2117,8 @@ int netif_carrier_on_callee(struct fipc_message *request, struct thc_channel *ch
 		LIBLCD_ERR("error getting response msg");
 		return -EIO;
 	}
-;
-thc_ipc_reply(channel, request_cookie, response);
+
+	thc_ipc_reply(channel, request_cookie, response);
 fail_lookup:
 	return ret;
 }
@@ -2159,8 +2159,9 @@ int register_child(void)
 			__func__, lcd_r1());
 
 	lcd_channels[lcd_r1()] = chnl;
-	g_ndo_start_xmit_hidden_args->lcds[1].lcd_async_chnl = lcd_channels[1];
-	g_ndo_start_xmit_hidden_args->lcds[1].lcd_sync_ep = new_sync_eps[1];
+
+	g_ndo_start_xmit_hidden_args->lcds[lcd_r1()].lcd_async_chnl = lcd_channels[lcd_r1()];
+	g_ndo_start_xmit_hidden_args->lcds[lcd_r1()].lcd_sync_ep = new_sync_eps[lcd_r1()];
 
 	goto out;
 
@@ -2428,8 +2429,8 @@ int prep_channel(struct trampoline_hidden_args *hidden_args, int queue)
 	}
 
 	if (queue) {
-		from_sync_end = hidden_args->lcds[1].lcd_sync_ep;
-		async_chnl = hidden_args->lcds[1].lcd_async_chnl;
+		from_sync_end = hidden_args->lcds[queue].lcd_sync_ep;
+		async_chnl = hidden_args->lcds[queue].lcd_async_chnl;
 	} else {
 		from_sync_end = hidden_args->sync_ep;
 		async_chnl = hidden_args->async_chnl;

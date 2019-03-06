@@ -26,7 +26,7 @@ struct trampoline_hidden_args {
 	struct {
 		struct thc_channel *lcd_async_chnl;
 		struct cptr lcd_sync_ep;
-	} lcds[2];
+	} lcds[NUM_LCDS];
 };
 
 

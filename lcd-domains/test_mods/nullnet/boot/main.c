@@ -22,7 +22,7 @@ struct lcd_create_ctx **dummy_ctxs;
 cptr_t *dummy_lcds;
 cptr_t net_chnl;
 cptr_t net_chnl_domain_cptr, dummy_chnl_domain_cptr;
-int num_lcds = 2;
+int num_lcds = NUM_LCDS;
 cptr_t *dummy_chnl_domain_cptrs;
 
 static int boot_main(void)

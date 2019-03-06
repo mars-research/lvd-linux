@@ -1,3 +1,5 @@
+subdir-ccflags-y += -DNUM_LCDS="2"
+
 obj-$(LCD_CONFIG_BUILD_NULLNET_BOOT)	+= boot/
 
 obj-$(LCD_CONFIG_BUILD_NULLNET_DUMMY_LCD) += dummy_lcd/

@@ -20,7 +20,7 @@
 
 /* for multiple child LCDs */
 
-int num_lcds = 1; /* including the parent LCDs */
+int num_lcds = NUM_LCDS; /* including the parent LCDs */
 int i;
 struct lcd_create_ctx **ixgbe_ctxs;
 cptr_t *ixgbe_lcds;

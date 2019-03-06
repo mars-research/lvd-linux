@@ -13,8 +13,10 @@
 
 struct cptr sync_ep;
 static struct glue_cspace *c_cspace;
-extern struct thc_channel *net_asyncs[2];
-extern struct thc_channel_group ch_grp[2];
+extern struct thc_channel *net_asyncs[NUM_LCDS];
+extern struct thc_channel_group ch_grp[NUM_LCDS];
+extern cptr_t nullnet_sync_endpoints[NUM_LCDS];
+extern cptr_t nullnet_register_channels[NUM_LCDS];
 
 struct rtnl_link_ops *g_rtnl_link_ops;
 void *data_pool;
@@ -395,9 +397,6 @@ fail2:
 fail1:
 	return;
 }
-
-extern cptr_t nullnet_sync_endpoints[2];
-extern cptr_t nullnet_register_channels[2];
 
 int create_async_channel(void)
 {

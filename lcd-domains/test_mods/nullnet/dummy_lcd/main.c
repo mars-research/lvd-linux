@@ -14,14 +14,14 @@
 #include <lcd_config/post_hook.h>
 
 cptr_t nullnet_register_channel;
-cptr_t nullnet_register_channels[2];
-struct thc_channel *net_asyncs[2];
+cptr_t nullnet_register_channels[NUM_LCDS];
+struct thc_channel *net_asyncs[NUM_LCDS];
 struct glue_cspace *nullnet_cspace;
-cptr_t nullnet_sync_endpoints[2];
+cptr_t nullnet_sync_endpoints[NUM_LCDS];
 int dummy_done = 0;
 int dummy_init_module(void);
 void dummy_cleanup_module(void);
-struct thc_channel_group ch_grp[2];
+struct thc_channel_group ch_grp[NUM_LCDS];
 
 bool tdiff_valid = false;
 u64 tdiff_disp = 0ull;

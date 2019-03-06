@@ -135,6 +135,8 @@
 
 #include	"slab.h"
 
+#include <liblcd/spinlock.h>
+
 /* BEGIN LCD */
 #include <lcd_config/post_hook.h>
 /* END LCD */
@@ -190,7 +192,7 @@ struct array_cache {
 	unsigned int limit;
 	unsigned int batchcount;
 	unsigned int touched;
-	spinlock_t lock;
+	lcd_spinlock_t lock;
 	void *entry[];	/*
 			 * Must have this definition in here for the proper
 			 * alignment of array_cache. Also simplifies accessing
@@ -826,9 +828,8 @@ static void recheck_pfmemalloc_active(struct kmem_cache *cachep,
 {
 	struct kmem_cache_node *n = cachep->node[numa_mem_id()];
 	struct page *page;
-#ifndef LCD_ISOLATE
-	unsigned long flags;
-#endif
+	__maybe_unused unsigned long flags;
+
 	if (!pfmemalloc_active)
 		return;
 
@@ -1705,9 +1706,7 @@ slab_out_of_memory(struct kmem_cache *cachep, gfp_t gfpflags, int nodeid)
 	unsigned long flags;
 /* BEGIN LCD */
 #endif
-#ifndef LCD_ISOLATE
-	unsigned long flags = 0UL;
-#endif
+	__maybe_unused unsigned long flags = 0UL;
 /* END LCD */
 	int node;
 
@@ -3391,7 +3390,7 @@ __do_cache_alloc(struct kmem_cache *cachep, gfp_t flags)
 static __always_inline void *
 slab_alloc(struct kmem_cache *cachep, gfp_t flags, unsigned long caller)
 {
-	unsigned long save_flags;
+	__maybe_unused unsigned long save_flags;
 	void *objp;
 
 	flags &= gfp_allowed_mask;
@@ -3723,7 +3722,7 @@ EXPORT_SYMBOL(__kmalloc);
  */
 void kmem_cache_free(struct kmem_cache *cachep, void *objp)
 {
-	unsigned long flags;
+	__maybe_unused unsigned long flags;
 	cachep = cache_from_obj(cachep, objp);
 	if (!cachep)
 		return;
@@ -3751,7 +3750,7 @@ EXPORT_SYMBOL(kmem_cache_free);
 void kfree(const void *objp)
 {
 	struct kmem_cache *c;
-	unsigned long flags;
+	__maybe_unused unsigned long flags;
 
 	trace_kfree(_RET_IP_, objp);
 

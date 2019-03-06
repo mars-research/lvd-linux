@@ -45,6 +45,8 @@
 #include "ixgbe_type.h"
 #include "ixgbe_common.h"
 
+#include <liblcd/spinlock.h>
+
 #if defined(CONFIG_IXGBE_DCB)
 #include "ixgbe_dcb.h"
 #endif
@@ -742,7 +744,7 @@ struct ixgbe_adapter {
 	int fdir_filter_count;
 	u32 fdir_pballoc;
 	u32 atr_sample_rate;
-	spinlock_t fdir_perfect_lock;
+	lcd_spinlock_t fdir_perfect_lock;
 
 #ifdef IXGBE_FCOE
 	struct ixgbe_fcoe fcoe;

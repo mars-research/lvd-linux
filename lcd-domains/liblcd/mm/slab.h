@@ -1,6 +1,8 @@
 #ifndef LIBLCD_MM_SLAB_H
 #define LIBLCD_MM_SLAB_H
 
+#include <liblcd/spinlock.h>
+
 /*
  * Internal slab definitions
  */
@@ -248,7 +250,7 @@ static inline struct kmem_cache *cache_from_obj(struct kmem_cache *s, void *x)
  * The slab lists for all objects.
  */
 struct kmem_cache_node {
-	spinlock_t list_lock;
+	lcd_spinlock_t list_lock;
 
 #ifdef CONFIG_SLAB
 	struct list_head slabs_partial;	/* partial list first, better asm code */

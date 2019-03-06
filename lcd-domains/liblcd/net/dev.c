@@ -9,9 +9,9 @@
 static void netdev_init_one_queue(struct net_device *dev,
 				  struct netdev_queue *queue, void *_unused)
 {
+#ifndef LCD_ISOLATE
 	/* Initialize queue lock */
 	spin_lock_init(&queue->_xmit_lock);
-#ifndef LCD_ISOLATE
 	netdev_set_xmit_lockdep_class(&queue->_xmit_lock, dev->type);
 #endif
 	queue->xmit_lock_owner = -1;
@@ -44,8 +44,9 @@ int netif_alloc_netdev_queues(struct net_device *dev)
 	dev->_tx = tx;
 
 	netdev_for_each_tx_queue(dev, netdev_init_one_queue, NULL);
+#ifndef LCD_ISOLATE
 	spin_lock_init(&dev->tx_global_lock);
-
+#endif
 	return 0;
 }
 EXPORT_SYMBOL(netif_alloc_netdev_queues);

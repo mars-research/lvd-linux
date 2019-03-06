@@ -148,7 +148,50 @@
 #undef put_online_cpus
 #define put_online_cpus() do { } while(0)
 
-#ifndef CONFIG_SMP		/* CONFIG_SMP */
+#undef DEFINE_MUTEX
+#define DEFINE_MUTEX(x) struct mutex x
+
+#undef local_irq_enable
+#define local_irq_enable() do { } while(0)
+
+#undef local_irq_disable
+#define local_irq_disable() do { } while(0)
+
+#undef local_irq_save
+#define local_irq_save(x) do { } while(0)
+
+#undef local_irq_restore
+#define local_irq_restore(x) do { } while(0)
+
+#ifdef CONFIG_SMP
+#undef spin_lock_init
+#define spin_lock_init(x)	lcd_spin_lock_init(x)
+
+#undef spin_lock
+#define spin_lock(x)		lcd_spin_lock(x)
+
+#undef spin_unlock
+#define spin_unlock(x)		lcd_spin_unlock(x)
+
+#undef spin_lock_irqsave
+#define spin_lock_irqsave(x,flags)	spin_lock(x)
+
+#undef spin_lock_irq
+#define spin_lock_irq(x)	spin_lock(x)
+
+#undef spin_unlock_irq
+#define spin_unlock_irq(x)	spin_unlock(x)
+
+#undef spin_unlock_irqrestore
+#define spin_unlock_irqrestore(x,flags)		spin_unlock(x)
+
+#undef _raw_spin_lock
+#define _raw_spin_lock(x)	spin_lock(x)
+
+#undef _raw_spin_unlock
+#define _raw_spin_unlock(x)	spin_unlock(x)
+
+#else /* CONFIG_SMP */
 
 #undef DEFINE_MUTEX
 #define DEFINE_MUTEX(x) struct mutex x
@@ -173,12 +216,6 @@
 
 #undef spin_unlock_irq
 #define spin_unlock_irq(x) do { } while(0)
-
-#undef local_irq_enable
-#define local_irq_enable() do { } while(0)
-
-#undef local_irq_disable
-#define local_irq_disable() do { } while(0)
 
 #undef _raw_spin_lock
 #define _raw_spin_lock(x) do { } while (0)

@@ -636,12 +636,11 @@ static int set_struct_module(cptr_t lcd, void *m_core_bits,
 }
 #endif
 
-static unsigned int current_lcd = 0;
-
 int lcd_create_module_lcd(char *mdir, char *mname, cptr_t *lcd_out,
-			struct lcd_create_ctx **ctx_out, bool is_child)
+			struct lcd_create_ctx **ctx_out, int lcd_id)
 {
 	int ret;
+	bool is_child = (lcd_id > 0);
 	cptr_t m_init_cptr, m_core_cptr;
 	static gva_t m_init_link_addr, m_core_link_addr, m_init_func_addr;
 	static unsigned long m_init_size, m_core_size;
@@ -707,11 +706,11 @@ create_lcd:
 	 * Set up address spaces
 	 */
 	if (is_child) {
-		ret = setup_phys_addr_space_child_lcd(lcd, ctx, current_lcd);
+		ret = setup_phys_addr_space_child_lcd(lcd, ctx, lcd_id);
 	} else {
 		ret = setup_addr_spaces(lcd, ctx, m_init_link_addr,
 				m_core_link_addr, m_init_size, m_core_size,
-				current_lcd);
+				lcd_id);
 	}
 
 	if (ret) {
@@ -721,15 +720,15 @@ create_lcd:
 	/*
 	 * Configure initial control registers, etc. for LCD
 	 */
-	*((unsigned long *)ctx->gs_page) = gva_val(LCD_BOOTSTRAP_PAGES_GV_ADDR_CHILD(current_lcd));
+	*((unsigned long *)ctx->gs_page) = gva_val(LCD_BOOTSTRAP_PAGES_GV_ADDR_CHILD(lcd_id));
 	ret = lcd_config_registers(lcd, m_init_func_addr,
 				/* implicity put a null return address and
 				 * frame address */
-				gva_add(LCD_STACK_GV_ADDR_CHILD(current_lcd),
+				gva_add(LCD_STACK_GV_ADDR_CHILD(lcd_id),
 					LCD_STACK_SIZE - sizeof(void *)),
 				LCD_BOOTSTRAP_PAGE_TABLES_GP_ADDR,
-				LCD_UTCB_GP_ADDR_CHILD(current_lcd),
-				LCD_ARCH_GS_GV_BASE_CHILD(current_lcd));
+				LCD_UTCB_GP_ADDR_CHILD(lcd_id),
+				LCD_ARCH_GS_GV_BASE_CHILD(lcd_id));
 
 	if (ret) {
 		LIBLCD_ERR("error configuring LCDs registers");
@@ -763,11 +762,7 @@ create_lcd:
 	}
 
 #ifdef CONFIG_LCD_SINGLE_EPT
-	/*
-	 * Increment LCD counter that we would pass for making stack
-	 * spaces for child LCDs
-	 */
-	++current_lcd;
+	lcd_to_boot_info(ctx)->lcd_id = lcd_id;
 #endif
 	return 0;
 
@@ -802,9 +797,7 @@ int lcd_create_module_lcds(char *mdir, char *mname, cptr_t *lcd_out,
 	for (i = 0; i < num_child; i++) {
 		LIBLCD_MSG("Creating LCD modules %d", i);
 		ret = lcd_create_module_lcd(mdir, mname, &lcd_out[i],
-				&ctx_out[i], i == 0 ? false /* parent
-							       LCD */ :
-				true /* child LCD */);
+				&ctx_out[i], i);
 		if (ret) {
 			LIBLCD_ERR("error creating empty LCD");
 			goto fail2;

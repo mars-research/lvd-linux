@@ -178,7 +178,7 @@ struct lcd_create_ctx {
  * to any other lcd, etc., this will stop and destroy the lcd.
  */
 int lcd_create_module_lcd(char *mdir, char *mname, cptr_t *lcd,
-			struct lcd_create_ctx **ctx, bool is_child);
+			struct lcd_create_ctx **ctx, int child_id);
 
 int lcd_create_module_lcds(char *mdir, char *mname, cptr_t *lcd,
 			struct lcd_create_ctx **ctx, int num_child);

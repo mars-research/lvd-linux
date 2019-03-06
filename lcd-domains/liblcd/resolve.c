@@ -217,3 +217,14 @@ void dump_stack(void)
 {
 	lcd_dump_stack();
 }
+#ifdef CONFIG_SMP
+int irq_set_affinity_hint(unsigned int irq, const struct cpumask *m)
+{
+	return -EINVAL;
+}
+
+int del_timer_sync(struct timer_list *timer)
+{
+	return 0;
+}
+#endif

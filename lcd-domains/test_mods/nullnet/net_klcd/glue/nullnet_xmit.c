@@ -24,7 +24,7 @@ struct thc_channel *sirq_channels[4];
 #define NUM_CORES	32
 #define NUM_THREADS	NUM_CORES
 
-int prep_channel(struct trampoline_hidden_args *hidden_args);
+int prep_channel(struct trampoline_hidden_args *hidden_args, int queue);
 extern inline xmit_type_t check_skb_range(struct sk_buff *skb);
 extern struct glue_cspace *c_cspace;
 extern struct cptr sync_ep;
@@ -40,10 +40,10 @@ extern priv_pool_t *pool;
  * setup a new channel for the first time when an application thread
  * wishes to send a packet through this interface
  */
-int setup_once(struct trampoline_hidden_args *hidden_args)
+int setup_once(struct trampoline_hidden_args *hidden_args, int queue)
 {
-	printk("%s, %s:%d lcdenter\n", __func__,
-			current->comm, current->pid);
+	printk("%s, %s:%d lcdenter | skbqueue %d\n", __func__,
+			current->comm, current->pid, queue);
 
 	/* step 1. create lcd env */
 	lcd_enter();
@@ -80,7 +80,7 @@ int setup_once(struct trampoline_hidden_args *hidden_args)
 		!strncmp(current->comm, "lt-iperf3",
 				strlen("lt-iperf3"))) {
 
-		prep_channel(hidden_args);
+		prep_channel(hidden_args, queue);
 		printk("===================================\n");
 		printk("===== Private Channel created (pid %d) =====\n", current->pid);
 		printk("===================================\n");
@@ -225,7 +225,7 @@ int __ndo_start_xmit_bare_async(struct sk_buff *skb, struct net_device *dev, str
 	}
 
 	if (unlikely(!current->ptstate)) {
-		if (setup_once(hidden_args))
+		if (setup_once(hidden_args, 0))
 			goto free;
 	}
 
@@ -276,7 +276,7 @@ int __ndo_start_xmit_bare_fipc_nomarshal(struct sk_buff *skb, struct net_device 
 	}
 
 	if (unlikely(!current->ptstate)) {
-		if (setup_once(hidden_args))
+		if (setup_once(hidden_args, 0))
 			goto free;
 	}
 
@@ -368,7 +368,7 @@ int ndo_start_xmit_noasync(struct sk_buff *skb, struct net_device *dev, struct t
 
 	/* setup once for this thread */
 	if (unlikely(!current->ptstate)) {
-		if (setup_once(hidden_args))
+		if (setup_once(hidden_args, skb->queue_mapping))
 			goto free;
 	}
 
@@ -557,6 +557,9 @@ int ndo_start_xmit_async_landing(struct sk_buff *first, struct net_device *dev, 
 {
 	struct sk_buff *skb = first;
 	int rc = NETDEV_TX_OK;
+	static int count = 0;
+
+	skb->queue_mapping = (count++) & 0x1;
 
 	if (!skb->next)
 		skb->chain_skb = false;
@@ -566,7 +569,7 @@ int ndo_start_xmit_async_landing(struct sk_buff *first, struct net_device *dev, 
 
 	/* chain skb */
 	if (unlikely(!current->ptstate)) {
-		if (setup_once(hidden_args))
+		if (setup_once(hidden_args, 0))
 			goto free;
 	}
 

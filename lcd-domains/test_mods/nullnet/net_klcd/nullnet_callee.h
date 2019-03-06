@@ -23,6 +23,10 @@ struct trampoline_hidden_args {
 	struct lcd_trampoline_handle *t_handle;
 	struct thc_channel *async_chnl;
 	struct cptr sync_ep;
+	struct {
+		struct thc_channel *lcd_async_chnl;
+		struct cptr lcd_sync_ep;
+	} lcds[2];
 };
 
 

@@ -73,12 +73,15 @@ struct rtnl_link_stats64 pkt_stats;
 struct glue_cspace *c_cspace;
 struct thc_channel *net_async;
 struct cptr sync_ep;
+cptr_t new_sync_eps[2];
+struct thc_channel *lcd_channels[2];
 extern struct cspace *klcd_cspace;
 struct rtnl_link_ops_container *g_ops_container;
 DEFINE_MUTEX(hash_lock);
 DEFINE_SPINLOCK(hash_slock);
 
 static unsigned long pool_pfn_start, pool_pfn_end;
+struct trampoline_hidden_args *g_ndo_start_xmit_hidden_args;
 
 #define NUM_CORES	32
 #define NUM_THREADS	NUM_CORES
@@ -1518,7 +1521,7 @@ void setup_device_ops_trampolines(struct net_device_ops_container *netdev_ops_co
 	ndo_uninit_hidden_args->struct_container = netdev_ops_container;
 	ndo_uninit_hidden_args->cspace = c_cspace;
 	netdev_ops_container->net_device_ops.ndo_uninit = LCD_HANDLE_TO_TRAMPOLINE(ndo_uninit_hidden_args->t_handle);
-	ndo_start_xmit_hidden_args = kzalloc(sizeof( *ndo_start_xmit_hidden_args ), GFP_KERNEL);
+	g_ndo_start_xmit_hidden_args = ndo_start_xmit_hidden_args = kzalloc(sizeof( *ndo_start_xmit_hidden_args ), GFP_KERNEL);
 	if (!ndo_start_xmit_hidden_args) {
 		LIBLCD_ERR("kzalloc hidden args");
 		lcd_exit(-1);
@@ -1531,6 +1534,9 @@ void setup_device_ops_trampolines(struct net_device_ops_container *netdev_ops_co
 	ndo_start_xmit_hidden_args->t_handle->hidden_args = ndo_start_xmit_hidden_args;
 	ndo_start_xmit_hidden_args->struct_container = netdev_ops_container;
 	ndo_start_xmit_hidden_args->cspace = c_cspace;
+	ndo_start_xmit_hidden_args->lcds[1].lcd_async_chnl = lcd_channels[1];
+	ndo_start_xmit_hidden_args->lcds[1].lcd_sync_ep = new_sync_eps[1];
+
 	netdev_ops_container->net_device_ops.ndo_start_xmit = LCD_HANDLE_TO_TRAMPOLINE(ndo_start_xmit_hidden_args->t_handle);
 	ndo_validate_addr_hidden_args = kzalloc(sizeof( *ndo_validate_addr_hidden_args ), GFP_KERNEL);
 	if (!ndo_validate_addr_hidden_args) {
@@ -2130,6 +2136,7 @@ int register_child(void)
 	tx = lcd_cr1(); rx = lcd_cr2();
 	tx_xmit = lcd_cr3(); rx_xmit = lcd_cr4();
 
+	new_sync_eps[lcd_r1()] = sync_endpoint;
 	LIBLCD_MSG("%s child %d registration received, setting up thc_chl",
 			__func__, lcd_r1());
 	/*
@@ -2150,6 +2157,11 @@ int register_child(void)
 	}
 	LIBLCD_MSG("%s, child %d registration complete\n",
 			__func__, lcd_r1());
+
+	lcd_channels[lcd_r1()] = chnl;
+	g_ndo_start_xmit_hidden_args->lcds[1].lcd_async_chnl = lcd_channels[1];
+	g_ndo_start_xmit_hidden_args->lcds[1].lcd_sync_ep = new_sync_eps[1];
+
 	goto out;
 
 fail2:
@@ -2222,6 +2234,8 @@ int __rtnl_link_register_callee(void)
 	}
 
 	LIBLCD_MSG("%s, setting up xmit_channel", __func__);
+
+	lcd_channels[lcd_r2()] = chnl;
 	/*
 	 * Set up async xmit_ring channel
 	 */
@@ -2390,11 +2404,13 @@ fail_lookup:
 }
 
 /* prepare a new private channel for the thread that is calling this function */
-int prep_channel(struct trampoline_hidden_args *hidden_args)
+int prep_channel(struct trampoline_hidden_args *hidden_args, int queue)
 {
 	cptr_t tx, rx;
 	cptr_t sync_end;
+	cptr_t from_sync_end;
 	struct thc_channel *chnl;
+	struct thc_channel *async_chnl;
 	struct fipc_message *_request;
 	struct fipc_message *_response;
 	unsigned int request_cookie;
@@ -2411,14 +2427,22 @@ int prep_channel(struct trampoline_hidden_args *hidden_args)
 		goto fail_cptr;
 	}
 
+	if (queue) {
+		from_sync_end = hidden_args->lcds[1].lcd_sync_ep;
+		async_chnl = hidden_args->lcds[1].lcd_async_chnl;
+	} else {
+		from_sync_end = hidden_args->sync_ep;
+		async_chnl = hidden_args->async_chnl;
+	}
+
 	/* grant sync_ep */
-	if (grant_sync_ep(&sync_end, hidden_args->sync_ep)) {
+	if ((ret = grant_sync_ep(&sync_end, from_sync_end))) {
 		LIBLCD_ERR("%s, grant_syncep failed %d\n",
 				__func__, ret);
 		goto fail_ep;
 	}
 
-	ret = async_msg_blocking_send_start(hidden_args->async_chnl,
+	ret = async_msg_blocking_send_start(async_chnl,
 		&_request);
 	if (ret) {
 		LIBLCD_ERR("failed to get a send slot");
@@ -2429,7 +2453,7 @@ int prep_channel(struct trampoline_hidden_args *hidden_args)
 			PREP_CHANNEL);
 
 	/* No need to wait for a response here */
-	ret = thc_ipc_send_request(hidden_args->async_chnl,
+	ret = thc_ipc_send_request(async_chnl,
 			_request,
 			&request_cookie);
 
@@ -2464,7 +2488,7 @@ int prep_channel(struct trampoline_hidden_args *hidden_args)
 	/* technically, we do not need to receive the response */
 	DO_FINISH_(prep_channel, {
 	  ASYNC_({
-	    ret = thc_ipc_recv_response(hidden_args->async_chnl,
+	    ret = thc_ipc_recv_response(async_chnl,
 			request_cookie, &_response);
 	  }, prep_channel);
 	});
@@ -2478,8 +2502,7 @@ int prep_channel(struct trampoline_hidden_args *hidden_args)
 		goto fail_ipc;
 	}
 
-	fipc_recv_msg_end(thc_channel_to_fipc(
-			hidden_args->async_chnl),_response);
+	fipc_recv_msg_end(thc_channel_to_fipc( async_chnl), _response);
 
 	return 0;
 fail_async:

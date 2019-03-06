@@ -206,12 +206,15 @@ int boot_lcd_thread(void *data)
 		for (i = 0; i < num_lcds; i++) {
 			lcd_cap_delete(dummy_lcds[i]);
 		}
+		kfree(dummy_lcds);
 	}
 	if (dummy_ctxs) {
 		for (i = 0; i < num_lcds; i++) {
 			lcd_destroy_create_ctx(dummy_ctxs[i]);
 		}
+		kfree(dummy_ctxs);
 	}
+	kfree(dummy_chnl_domain_cptrs);
 
 	lcd_exit(0);
 	return 0;

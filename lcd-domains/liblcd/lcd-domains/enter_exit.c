@@ -13,6 +13,7 @@
 #include <libfipc.h>
 #include <lcd_domains/liblcd.h>
 #include <asm/lcd_domains/liblcd.h>
+#include <linux/slab.h>
 
 #include <lcd_config/post_hook.h>
 
@@ -96,6 +97,11 @@ lcd_enter(void)
         }
         LIBLCD_MSG("ioremap map initialized");
 
+	lcd_get_boot_info()->lcd_current_task = (struct task_struct*)kmalloc(sizeof(struct task_struct), GFP_KERNEL);
+
+	if (!lcd_get_boot_info()->lcd_current_task) {
+		LIBLCD_ERR("allocating current_task failed");
+	}
 	/*
 	 * Initialize libcap
 	 */

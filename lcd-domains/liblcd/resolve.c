@@ -20,7 +20,10 @@ struct task_struct fake_task = {
 	.pid = 12345678,
 	.cred = &fake_cred,
 };
+
+#ifndef CONFIG_LCD_SINGLE_EPT
 struct task_struct *current_task = &fake_task;
+#endif
 /*
  * Make sure these cause trouble. This kernel_stack value is non-canonical,
  * so will hopefully cause a GP exception. This phys_base sets bits past
@@ -71,7 +74,6 @@ long strnlen_user(const char __user *str, long count)
 }
 
 /* MUTEXES ------------------------------------------------------------ */
-
 void __mutex_init(struct mutex *lock, const char *name, 
 		struct lock_class_key *key)
 {

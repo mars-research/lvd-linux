@@ -106,3 +106,12 @@
 #ifndef _LINUX_SLAB_DEF_H
 #define _LINUX_SLAB_DEF_H
 #endif
+
+#ifndef _ASM_X86_CURRENT_H
+#define _ASM_X86_CURRENT_H
+#endif
+
+extern struct task_struct *current_task;
+
+#define get_current()	(current_task)
+#define current		get_current()

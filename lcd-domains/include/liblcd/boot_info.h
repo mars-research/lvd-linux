@@ -37,6 +37,7 @@ struct lcd_boot_info {
 	unsigned long module_init_size;
 	unsigned long module_core_size;
 	int lcd_id;
+	struct task_struct *lcd_current_task;
 	/*
 	 * Capabilities to memory objects
 	 */
@@ -48,7 +49,7 @@ struct lcd_boot_info {
 };
 
 #define current_lcd_id		(lcd_get_boot_info()->lcd_id)
-
+#define current_task		(lcd_get_boot_info()->lcd_current_task)
 /**
  * lcd_get_boot_info -- Return the bootstrap info
  *

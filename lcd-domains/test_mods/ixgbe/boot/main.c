@@ -17,6 +17,15 @@
 
 #include <lcd_config/post_hook.h>
 
+
+/* for multiple child LCDs */
+
+int num_lcds = 1; /* including the parent LCDs */
+int i;
+struct lcd_create_ctx **ixgbe_ctxs;
+cptr_t *ixgbe_lcds;
+cptr_t *ixgbe_chnl_domain_cptrs;
+
 cptr_t net_klcd, ixgbe_lcd;
 struct lcd_create_ctx *ixgbe_ctx;
 cptr_t net_chnl;
@@ -55,26 +64,59 @@ static int boot_main(void)
 		goto fail3;
 	}
 
+	ixgbe_ctxs = kzalloc(sizeof(struct lcd_create_ctx*) * num_lcds, GFP_KERNEL);
+
+	if (!ixgbe_ctxs) {
+		LIBLCD_ERR("failed to alloc memory for ixgbe_ctxs");
+		goto fail4;
+	}
+	printk("%s, ixgbe_ctxs %p\n", __func__, ixgbe_ctxs);
+
+	ixgbe_lcds = kzalloc(sizeof(cptr_t*) * num_lcds, GFP_KERNEL);
+
+	if (!ixgbe_lcds) {
+		LIBLCD_ERR("failed to alloc memory for ixgbe_lcds");
+		goto fail4;
+	}
+
+	printk("%s, ixgbe_lcds %p\n", __func__, ixgbe_lcds);
+
+	ixgbe_chnl_domain_cptrs = kzalloc(sizeof(cptr_t*) * num_lcds, GFP_KERNEL);
+
+	if (!ixgbe_chnl_domain_cptrs) {
+		LIBLCD_ERR("failed to alloc memory for ixgbe_chnl_domain_cptrs");
+		goto fail4;
+	}
+
 	/* ---------- Create LCD ---------- */
 	ret = lcd_create_module_lcd(LCD_DIR("ixgbe/ixgbe_lcd"),
 				"lcd_test_mod_ixgbe_ixgbe_lcd",
-				&ixgbe_lcd,
-				&ixgbe_ctx, 0);
+				ixgbe_lcds,
+				ixgbe_ctxs, num_lcds);
 	if (ret) {
 		LIBLCD_ERR("failed to create ixgbe lcd");
 		goto fail4;
 	}
 
-	ret = cptr_alloc(lcd_to_boot_cptr_cache(ixgbe_ctx),
-			&ixgbe_chnl_domain_cptr);
-	if (ret) {
-		LIBLCD_ERR("alloc cptr");
-		goto fail5;
-	}
-	ret = lcd_cap_grant(ixgbe_lcd, net_chnl, ixgbe_chnl_domain_cptr);
-	if (ret) {
-		LIBLCD_ERR("grant");
-		goto fail6;
+	for (i = 0; i < num_lcds; i++) {
+
+		LIBLCD_MSG("granting domain_chnl_ptr to LCD %d\n", i);
+
+		ret = cptr_alloc(lcd_to_boot_cptr_cache(ixgbe_ctxs[i]),
+				&ixgbe_chnl_domain_cptrs[i]);
+		if (ret) {
+			LIBLCD_ERR("alloc cptr");
+			goto fail5;
+		}
+
+		ret = lcd_cap_grant(ixgbe_lcds[i], net_chnl, ixgbe_chnl_domain_cptrs[i]);
+		if (ret) {
+			LIBLCD_ERR("grant");
+			goto fail6;
+		}
+		lcd_to_boot_info(ixgbe_ctxs[i])->cptrs[0] = ixgbe_chnl_domain_cptrs[i];
+		/* for udelay calculatio we need lpj inside LCD */
+		lcd_to_boot_info(ixgbe_ctxs[i])->cptrs[1].cptr = this_cpu_read(cpu_info.loops_per_jiffy);
 	}
 
 	/* ---------- Set up boot info ---------- */
@@ -91,10 +133,6 @@ static int boot_main(void)
 		goto fail7;
 	}
 
-	lcd_to_boot_info(ixgbe_ctx)->cptrs[0] = ixgbe_chnl_domain_cptr;
-	/* for udelay calculatio we need lpj inside LCD */
-	lcd_to_boot_info(ixgbe_ctx)->cptrs[1].cptr = this_cpu_read(cpu_info.loops_per_jiffy);
-
 	/* ---------- RUN! ---------- */
 
 	LIBLCD_MSG("starting network...");
@@ -105,12 +143,15 @@ static int boot_main(void)
 	}
 
 	LIBLCD_MSG("starting ixgbe ethernet...");
-	ret = lcd_run(ixgbe_lcd);
-	if (ret) {
-		LIBLCD_ERR("failed to start ixgbe lcd");
-		goto fail9;
-	}
 
+	for (i = 0; i < num_lcds; i++) {
+		LIBLCD_MSG("Starting LCD %d ", i);
+		ret = lcd_run(ixgbe_lcds[i]);
+		if (ret) {
+			LIBLCD_ERR("failed to start ixgbe lcd");
+			goto fail9;
+		}
+	}
 #ifdef BOOT_THREAD
 	// return
 	goto fail1;
@@ -131,8 +172,8 @@ out:
 fail9:
 fail8:
 fail7:
-	lcd_cap_delete(ixgbe_lcd);
-	lcd_destroy_create_ctx(ixgbe_ctx);
+	lcd_cap_delete(ixgbe_lcds[0]);
+	lcd_destroy_create_ctx(ixgbe_ctxs[0]);
 fail6:
 fail5:
 fail4:
@@ -164,13 +205,26 @@ int boot_lcd_thread(void *data)
 	}
 	LIBLCD_MSG("Exiting thread");
 
+	msleep(2000);
+
 	lcd_destroy_module_klcd(net_klcd, "lcd_test_mod_ixgbe_net_klcd");
 
-	if (current->lcd)
-		lcd_cap_delete(ixgbe_lcd);
-	lcd_destroy_create_ctx(ixgbe_ctx);
+	if (current->lcd) {
+		for (i = 0; i < num_lcds; i++) {
+			lcd_cap_delete(ixgbe_lcds[i]);
+		}
+		kfree(ixgbe_lcds);
+	}
 
-	msleep(2000);
+	if (ixgbe_ctxs) {
+		for (i = 0; i < num_lcds; i++) {
+			lcd_destroy_create_ctx(ixgbe_ctxs[i]);
+		}
+		kfree(ixgbe_ctxs);
+	}
+	kfree(ixgbe_chnl_domain_cptrs);
+
+
 	lcd_exit(0);
 	return 0;
 }

@@ -255,7 +255,7 @@ int __lcd_create(struct lcd *caller, cptr_t slot, bool is_child)
 	return 0;
 
 fail3:
-	lcd_arch_destroy(lcd->lcd_arch);
+	lcd_arch_destroy(lcd->lcd_arch, lcd->is_child);
 fail2:
 	__lcd_destroy_no_vm(lcd);
 fail1:
@@ -697,7 +697,7 @@ void __lcd_destroy(struct lcd *lcd)
 	mark_lcd_as_dead(lcd);
 	destroy_kthread(lcd);
 	destroy_cspace_and_utcb(lcd);
-	lcd_arch_destroy(lcd->lcd_arch);
+	lcd_arch_destroy(lcd->lcd_arch, lcd->is_child);
 	lcd->lcd_arch = NULL;
 	kfree(lcd);
 }

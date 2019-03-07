@@ -936,7 +936,7 @@ fail_alloc:
 	return ret;
 }
 
-void lcd_arch_destroy(struct lcd_arch *lcd_arch)
+void lcd_arch_destroy(struct lcd_arch *lcd_arch, bool is_child)
 {
 	/*
 	 * Premption Disabled
@@ -970,7 +970,8 @@ void lcd_arch_destroy(struct lcd_arch *lcd_arch)
 	 */
 	vmx_free_vpid(lcd_arch);
 	lcd_arch_free_vmcs(lcd_arch->vmcs);
-	lcd_arch_ept_free(lcd_arch);
+	if (!is_child)
+		lcd_arch_ept_free(lcd_arch);
 	kmem_cache_free(lcd_arch_cache, lcd_arch);
 }
 

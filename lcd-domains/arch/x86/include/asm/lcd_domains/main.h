@@ -252,7 +252,7 @@ int lcd_arch_create(struct lcd_arch **out);
  * IMPORTANT: When the ept is torn down, any host memory that is still mapped
  * will be freed. This is for convenience. But beware.
  */
-void lcd_arch_destroy(struct lcd_arch *lcd_arch);
+void lcd_arch_destroy(struct lcd_arch *lcd_arch, bool is_child);
 /**
  * Does logical consistency checks (e.g., runs through checks
  * listed in Intel SDM V3 26.1, 26.2, and 26.3).

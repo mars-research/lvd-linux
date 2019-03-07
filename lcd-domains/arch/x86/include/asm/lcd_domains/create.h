@@ -23,7 +23,7 @@ int lcd_arch_create(struct lcd_arch **out, bool is_child);
  * IMPORTANT: When the ept is torn down, any host memory that is still mapped
  * will *not* be freed. Beware.
  */
-void lcd_arch_destroy(struct lcd_arch *lcd_arch);
+void lcd_arch_destroy(struct lcd_arch *lcd_arch, bool is_child);
 /**
  * Set the lcd's program counter to the guest virtual address
  * a.

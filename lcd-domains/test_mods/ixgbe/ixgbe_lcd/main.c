@@ -12,12 +12,13 @@
 
 #include <lcd_config/post_hook.h>
 
-cptr_t ixgbe_register_channel;
-struct thc_channel *ixgbe_async;
 struct glue_cspace *ixgbe_cspace;
-cptr_t ixgbe_sync_endpoint;
 int ixgbe_done = 0;
-struct thc_channel_group ch_grp;
+
+cptr_t ixgbe_register_channels[NUM_LCDS];
+struct thc_channel_group ch_grps[NUM_LCDS];
+struct thc_channel *ixgbe_asyncs[NUM_LCDS];
+cptr_t ixgbe_sync_endpoints[NUM_LCDS];
 
 int ixgbe_init_module(void);
 void ixgbe_exit_module(void);
@@ -66,7 +67,7 @@ static void main_and_loop(void)
 			/*
 			 * Do RR async receive
 			 */
-			list_for_each_entry(curr_item, &(ch_grp.head), list) {
+			list_for_each_entry(curr_item, &(ch_grps[current_lcd_id].head), list) {
 				ret = thc_ipc_poll_recv(thc_channel_group_item_channel(curr_item),
 					&msg);
 
@@ -76,7 +77,7 @@ static void main_and_loop(void)
 						ret = ndo_start_xmit_clean_callee(msg,
 							curr_item->channel,
 							ixgbe_cspace,
-							ixgbe_sync_endpoint);
+							ixgbe_sync_endpoints[current_lcd_id]);
 
 						if (unlikely(ret)) {
 							LIBLCD_ERR("async dispatch failed");
@@ -98,7 +99,7 @@ static void main_and_loop(void)
 
 						ret = dispatch_async_loop(curr_item->channel, msg,
 									ixgbe_cspace,
-									ixgbe_sync_endpoint);
+									ixgbe_sync_endpoints[current_lcd_id]);
 						if (ret) {
 							LIBLCD_ERR("async dispatch failed");
 							stop = 1;
@@ -180,35 +181,39 @@ static int __noreturn ixgbe_lcd_init(void)
 {
 	int r = 0;
 
-	printk("IXGBE LCD enter \n");
+	printk("IXGBE LCD %d entering \n", current_lcd_id);
+
 	r = lcd_enter();
 	if (r)
 		goto fail1;
 	/*
 	 * Get the ixgbe channel cptr from boot info
 	 */
-	ixgbe_register_channel = lcd_get_boot_info()->cptrs[0];
+	ixgbe_register_channels[current_lcd_id] = lcd_get_boot_info()->cptrs[0];
 	loops_per_jiffy = lcd_get_boot_info()->cptrs[1].cptr;
 
-	printk("ixgbe reg channel %lu\n", ixgbe_register_channel.cptr);
+	printk("[%d] ixgbe reg channel %lu\n", current_lcd_id, ixgbe_register_channels[current_lcd_id].cptr);
 	printk("ixgbe lpj %lu\n", loops_per_jiffy);
 	/*
 	 * Initialize ixgbe glue
 	 */
-	r = glue_ixgbe_init();
-	if (r) {
-		LIBLCD_ERR("ixgbe init");
-		goto fail2;
+	if (current_lcd_id == 0) {
+		r = glue_ixgbe_init();
+		if (r) {
+			LIBLCD_ERR("ixgbe init");
+			goto fail2;
+		}
 	}
 
-	thc_channel_group_init(&ch_grp);
+	thc_channel_group_init(&ch_grps[current_lcd_id]);
 	/* RUN CODE / LOOP ---------------------------------------- */
 
 	main_and_loop();
 
 	/* DONE -------------------------------------------------- */
 
-	glue_ixgbe_exit();
+	if (current_lcd_id == 0)
+		glue_ixgbe_exit();
 
 	lcd_exit(0); /* doesn't return */
 fail2:

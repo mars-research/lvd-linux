@@ -337,7 +337,7 @@ int create_one_async_channel(struct thc_channel **chnl, cptr_t *tx, cptr_t *rx)
 	return 0;
 }
 
-int create_async_channel(void)
+int create_async_channel(int lcd_id)
 {
 	int ret;
 	cptr_t tx, rx;
@@ -366,11 +366,12 @@ int create_async_channel(void)
 		goto fail_ch;
 	}
 
-	if (create_one_async_channel(&xmit_chnl, &tx_xmit, &rx_xmit)) {
-		LIBLCD_ERR("async channel creation failed");
-		goto fail_ch;
+	if (lcd_id == 0) {
+		if (create_one_async_channel(&xmit_chnl, &tx_xmit, &rx_xmit)) {
+			LIBLCD_ERR("async channel creation failed");
+			goto fail_ch;
+		}
 	}
-
 	ptrs[0] = ptrs[1] = NULL;
 
 #ifdef EXTRA_CHANNELS
@@ -390,6 +391,8 @@ int create_async_channel(void)
         lcd_set_cr2(tx);
         lcd_set_cr3(rx_xmit);
         lcd_set_cr4(tx_xmit);
+	/* Pass lcd_id */
+	lcd_set_r1(current_lcd_id);
 #ifdef EXTRA_CHANNELS
         lcd_set_cr5(rxirq_xmit);
         lcd_set_cr6(txirq_xmit);

@@ -21,7 +21,7 @@ struct thc_channel_group ch_grp;
 
 int ixgbe_init_module(void);
 void ixgbe_exit_module(void);
-extern int create_async_channel(void);
+extern int create_async_channel(int lcd_id);
 unsigned long loops_per_jiffy;
 bool poll_start = false;
 extern int __ixgbe_poll(void);
@@ -37,7 +37,7 @@ static void main_and_loop(void)
 
 	DO_FINISH(
 		ASYNC(
-			ret = create_async_channel();
+			ret = create_async_channel(current_lcd_id);
 			if (ret) {
 				LIBLCD_ERR("async channel creation failed");
 				stop = 1;
@@ -45,12 +45,13 @@ static void main_and_loop(void)
 				LIBLCD_MSG("ASYNC channel established!");
 			}
 
-			ret = ixgbe_init_module();
-			if (ret) {
-				LIBLCD_ERR("ixgbe register failed");
-				stop = 1;
-			} else {
-				LIBLCD_MSG("SUCCESSFULLY REGISTERED DUMMY!");
+			if (current_lcd_id == 0) {
+				ret = ixgbe_init_module();
+				if (ret) {
+					LIBLCD_ERR("ixgbe register failed");
+					stop = 1;
+				} else
+					LIBLCD_MSG("SUCCESSFULLY REGISTERED DUMMY!");
 			}
 
 			);

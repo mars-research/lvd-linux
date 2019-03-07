@@ -161,6 +161,8 @@ static int do_one_register(cptr_t register_chnl)
 	struct thc_channel *chnl;
 	struct net_info *net_info;
 
+	int lcd_id;
+
 	/*
 	 * Set up cptrs
 	 */
@@ -213,7 +215,11 @@ static int do_one_register(cptr_t register_chnl)
 	if (ret)
 		return ret; /* dispatch fn is responsible for cptr cleanup */
 #endif
-	LIBLCD_MSG("settingup net_ring channel");
+
+	lcd_id = lcd_r1();
+
+	LIBLCD_MSG("settingup net_ring channel for LCD %d", lcd_id);
+
 	/*
 	 * Set up async ring channel
 	 */
@@ -225,15 +231,18 @@ static int do_one_register(cptr_t register_chnl)
 
 	klcd_chnl = chnl;
 
-	LIBLCD_MSG("settingup xmit channel");
-	/*
-	 * Set up async ring channel
-	 */
-	ret = setup_async_net_ring_channel(tx_xmit, rx_xmit,
-					&xmit_chnl);
-	if (ret) {
-		LIBLCD_ERR("error setting up ring channel");
-		goto fail6;
+	/* Only parent LCD creates extra channels */
+	if (lcd_id == 0) {
+		LIBLCD_MSG("settingup xmit channel for LCD %d", lcd_id);
+		/*
+		 * Set up async ring channel
+		 */
+		ret = setup_async_net_ring_channel(tx_xmit, rx_xmit,
+						&xmit_chnl);
+		if (ret) {
+			LIBLCD_ERR("error setting up ring channel");
+			goto fail6;
+		}
 	}
 
 	/*
@@ -285,11 +294,10 @@ static void loop(cptr_t register_chnl)
 	struct net_info *net;
 	int stop = 0;
 	int ret;
-	bool reg_done = false;
 
 	DO_FINISH(
 	while (!stop) {
-		if (jiffies >= tics && !reg_done) {
+		if (jiffies >= tics) {
 			/*
 			 * Listen for a register call
 			 */
@@ -297,9 +305,8 @@ static void loop(cptr_t register_chnl)
 			if (ret) {
 				LIBLCD_ERR("register error");
 				break;
-			} else {
-				reg_done = true;
 			}
+
 			tics = jiffies + REGISTER_FREQ;
 			continue;
 		}

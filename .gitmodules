@@ -1,6 +1,8 @@
 [submodule "lcd-domains/libcap"]
 	path = lcd-domains/libcap
 	url = git@gitlab.flux.utah.edu:xcap/libcap.git
+	branch = lcd
 [submodule "lcd-domains/libasync"]
 	path = lcd-domains/libasync
 	url = git@gitlab.flux.utah.edu:xcap/xcap-async-module.git
+	branch = one_slot

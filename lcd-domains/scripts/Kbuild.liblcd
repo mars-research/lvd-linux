@@ -84,3 +84,7 @@ lib-y += $(addprefix common/, \
 
 # Extra includes
 ccflags-y += $(LIBLCD_CFLAGS)
+
+extra-y += ./common/vmfunc.lds
+
+ldflags-y += -T $(LIBLCD_BUILD_DIR)/common/vmfunc.lds

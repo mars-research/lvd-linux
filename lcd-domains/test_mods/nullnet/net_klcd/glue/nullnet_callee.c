@@ -2503,7 +2503,7 @@ int prep_channel(struct trampoline_hidden_args *hidden_args, int queue)
 		goto fail_ipc;
 	}
 
-	fipc_recv_msg_end(thc_channel_to_fipc( async_chnl), _response);
+	fipc_recv_msg_end(thc_channel_to_fipc(async_chnl), _response);
 
 	return 0;
 fail_async:

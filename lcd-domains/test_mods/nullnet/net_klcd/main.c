@@ -211,7 +211,9 @@ static void loop(cptr_t register_chnl)
 	struct net_info *net;
 	int stop = 0;
 	int ret;
+#ifndef CONFIG_PREEMPT
 	u64 count = 0;
+#endif
 
 #ifdef PERF_EVENTS
 	static int piter = 0;

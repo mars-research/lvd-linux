@@ -15,6 +15,7 @@
 
 #include <lcd_config/post_hook.h>
 
+#ifndef CONFIG_LVD
 int lcd_sync_channel_group_item_init(struct lcd_sync_channel_group_item *c, 
 				cptr_t chnl, int expected_cptrs,
 				int (*dispatch_fn)(
@@ -173,3 +174,4 @@ EXPORT_SYMBOL(lcd_sync_channel_group_add);
 EXPORT_SYMBOL(lcd_sync_channel_group_remove);
 EXPORT_SYMBOL(lcd_sync_channel_group_poll);
 EXPORT_SYMBOL(lcd_sync_channel_group_recv);
+#endif

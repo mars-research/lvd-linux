@@ -94,14 +94,23 @@ static int __init lcd_init(void)
 {
 	int ret;
 
+#ifdef CONFIG_LVD
 	/*
 	 * Initialize each of the subsystems
 	 */
+	ret = lcd_arch_vmfunc_init();
+	if (ret) {
+		LCD_ERR("failed to init VMFUNC");
+		goto fail0;
+	}
+#endif
+
 	ret = lcd_arch_init();
 	if (ret) {
 		LCD_ERR("failed to init arch-dependent code");
 		goto fail0;
 	}
+
 	ret = cap_init();
 	if (ret) {
 		LCD_ERR("failed to init capability subsystem");

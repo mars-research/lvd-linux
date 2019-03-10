@@ -14,12 +14,17 @@
 #include <lcd_domains/types.h>
 #include <asm/lcd_domains/microkernel.h>
 #include <lcd_domains/microkernel.h>
+#include <asm/lcd_domains/vmfunc.h>
 
 
 struct lcd_vmx_capability lcd_vmx_capability;
 static atomic_t vmx_enable_failed;
 static DEFINE_PER_CPU(int, vmx_enabled);
 static DEFINE_PER_CPU(struct lcd_arch_vmcs *, vmxon_area);
+#if defined(CONFIG_LVD)
+DEFINE_PER_CPU(struct page *, vmfunc_epts_page);
+#endif
+
 
 /* DEBUGGING --------------------------------------------------*/
 
@@ -527,6 +532,30 @@ static void vmx_free_vmxon_areas(void)
 		}
 	}
 }
+
+#ifdef CONFIG_LVD
+static int vmx_alloc_vmfunc_ept_switching_page(void)
+{
+	int cpu;
+
+	for_each_possible_cpu(cpu) {
+		
+		per_cpu(vmfunc_epts_page, cpu) = alloc_page(GFP_KERNEL | __GFP_ZERO);
+		if (!__this_cpu_read(vmfunc_epts_page))
+			return -ENOMEM;
+
+	}
+
+	/* Install LCDs EPT on each CPU */
+	on_each_cpu(on_cpu_install_vmfunc_ept_page, NULL, 1);
+	return 0;
+}
+
+int lcd_arch_vmfunc_init(void) {
+	vmx_alloc_vmfunc_ept_switching_page();
+	return 0; 
+}
+#endif
 
 int lcd_arch_init(void)
 {

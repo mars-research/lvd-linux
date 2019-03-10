@@ -947,12 +947,23 @@ int lcd_arch_create(struct lcd_arch **out)
 	}
 
 #ifdef CONFIG_LVD
+	lcd_arch->ept_id = 1; 
+
 	lcd_arch->eptp_lcd = kmalloc(GFP_KERNEL, sizeof(u64) * num_online_cpus());
 
 	/* create ept for this LCD on all cpus */
 	for_each_online_cpu(cpu) {
+		/* Get the EPT VMFUNC switching page for this CPU */
+		struct page *eptp = __this_cpu_read(vmfunc_epts_page); 
+		u64 *eptp_list = phys_to_virt(page_to_phys(eptp)); 
+
+		/* Allocate LCDs EPT */
 		lcd_arch->eptp_lcd[cpu] = lcd_arch_ept_init_one();
+
+		/* Add EPT to the VMFUNC switching page */
+		eptp_list[lcd_arch->ept_id] = lcd_arch->eptp_lcd[cpu];
 	}
+
 #else
 	/*
 	 * Set up ept

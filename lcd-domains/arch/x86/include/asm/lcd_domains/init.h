@@ -13,6 +13,9 @@
  * features, turns on VMX on *all* cpu's).
  */
 int lcd_arch_init(void);
+
+int lcd_arch_vmfunc_init(void);
+
 /**
  * Turns off VMX on *all* cpu's and tears down arch-dependent code.
  * 

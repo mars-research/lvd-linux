@@ -161,6 +161,8 @@ struct lcd_arch_tss {
 #define LCD_ARCH_IDTR_BASE   __gpa(0UL)
 #define LCD_ARCH_IDTR_LIMIT  0x0 /* no idt right now */
 
+#if 0
+
 struct lcd_arch {
 	/*
 	 * CPU we're running on / vmloaded on
@@ -233,11 +235,19 @@ struct lcd_arch {
 	struct module *kernel_module;
 };
 
+#endif
+
+#if 0
 /**
  * Initializes the arch-dependent code for LCD (detects required
  * features, turns on VMX on *all* cpu's).
  */
 int lcd_arch_init(void);
+
+int lcd_arch_vmfunc_init(void);
+
+#endif
+
 /**
  * Turns off VMX on *all* cpu's and tears down arch-dependent code.
  * 

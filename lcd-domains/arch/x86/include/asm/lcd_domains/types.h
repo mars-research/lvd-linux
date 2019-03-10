@@ -13,6 +13,11 @@
 #include <linux/module.h>
 #include <lcd_domains/types.h>
 
+#if defined(CONFIG_LVD)
+extern DEFINE_PER_CPU(struct page *, vmfunc_epts_page);
+#endif
+
+
 struct lcd_arch_vmcs {
 	u32 revision_id;
 	u32 abort;
@@ -127,6 +132,8 @@ struct lcd_arch {
 
 	/* eptp_lcd for all online cpus */
 	u64 *eptp_lcd;
+	/* id of this specific EPT that we use in VMFUNC */
+	unsigned int ept_id; 
 
 	/*
 	 * Exit info
@@ -140,8 +147,7 @@ struct lcd_arch {
 	u32 vec_no;
 	u32 exit_instr_len;
 
-	struct page *eptp_list_pg;
-	/*
+		/*
 	 * Stuff we need to save explicitly
 	 */
 	u64 host_rsp;

@@ -3530,8 +3530,6 @@ fail_ipc:
 	return ret;
 }
 
-extern int __ixgbe_poll(void);
-
 void _free_irq(unsigned int irq,
 		int dev_id)
 {

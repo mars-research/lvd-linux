@@ -41,6 +41,8 @@ extern struct thc_channel *xmit_irq_chnl;
 struct timer_list service_timer;
 struct napi_struct *napi_q0;
 
+struct lcd_channels lcds[NUM_LCDS];
+
 #define NUM_PACKETS	(170000)
 #define VMALLOC_SZ	(NUM_PACKETS * sizeof(uint64_t))
 
@@ -446,8 +448,8 @@ int grant_sync_ep(cptr_t *sync_end, cptr_t ha_sync_ep)
 	lcd_cptr_alloc(sync_end);
 	ret = cap_grant(klcd_cspace, ha_sync_ep,
 			curr_cspace, *sync_end);
-	PTS()->syncep_present = true;
-	PTS()->sync_ep = sync_end->cptr;
+	current->ptstate->syncep_present = true;
+	current->ptstate->sync_ep = sync_end->cptr;
 	return ret;
 }
 
@@ -1653,7 +1655,7 @@ int ndo_start_xmit_nonlcd(struct sk_buff *skb,
 
 	if (skb->data[23] == 0x6) {
 		printk("%s, ipc_send | pts %p | reqc 0x%x | seq %llu\n",
-			__func__, PTS(), request_cookie, tcp_count);
+			__func__, current->ptstate, request_cookie, tcp_count);
 	}
 #ifdef SENDER_DISPATCH_LOOP
 again:
@@ -1696,7 +1698,7 @@ again:
 #endif /* SENDER_DISPATCH_LOOP */
 	if (skb->data[23] == 0x6) {
 		printk("%s, ipc_recv | pts %p | reqc 0x%x | seq %llu\n",
-			__func__, PTS(), request_cookie, tcp_count);
+			__func__, current->ptstate, request_cookie, tcp_count);
 	}
 
 	//printk("%s, queue_mapping %d\n", __func__, skb->queue_mapping);
@@ -1720,7 +1722,7 @@ bool post_recv = false;
 
 struct thc_channel *sirq_channels[64];
 
-int prep_channel(struct trampoline_hidden_args *hidden_args)
+int prep_channel(struct trampoline_hidden_args *hidden_args, int queue)
 {
 	cptr_t tx, rx;
 #ifdef SOFTIRQ_CHANNELS
@@ -1728,7 +1730,9 @@ int prep_channel(struct trampoline_hidden_args *hidden_args)
 	struct thc_channel *chnl_softirq;
 #endif
 	cptr_t sync_end;
+	cptr_t from_sync_end;
 	struct thc_channel *chnl;
+	struct thc_channel *async_chnl;
 	struct fipc_message *_request;
 	struct fipc_message *_response;
 	unsigned int request_cookie;
@@ -1757,14 +1761,22 @@ int prep_channel(struct trampoline_hidden_args *hidden_args)
 		goto fail_cptr;
 	}
 #endif
+	if (queue) {
+		from_sync_end = lcds[queue].lcd_sync_end;
+		async_chnl = lcds[queue].lcd_async_chnl;
+	} else {
+		from_sync_end = hidden_args->sync_ep;
+		async_chnl = hidden_args->async_chnl;
+	}
+
 	/* grant sync_ep */
-	if (grant_sync_ep(&sync_end, hidden_args->sync_ep)) {
+	if ((ret = grant_sync_ep(&sync_end, from_sync_end))) {
 		LIBLCD_ERR("%s, grant_syncep failed %d\n",
 				__func__, ret);
 		goto fail_ep;
 	}
 
-	ret = fipc_test_blocking_send_start(hidden_args->async_chnl,
+	ret = fipc_test_blocking_send_start(async_chnl,
 		&_request);
 	if (ret) {
 		LIBLCD_ERR("failed to get a send slot");
@@ -1775,7 +1787,7 @@ int prep_channel(struct trampoline_hidden_args *hidden_args)
 			PREP_CHANNEL);
 
 	/* No need to wait for a response here */
-	ret = thc_ipc_send_request(hidden_args->async_chnl,
+	ret = thc_ipc_send_request(async_chnl,
 			_request,
 			&request_cookie);
 	if (ret) {
@@ -1832,17 +1844,17 @@ int prep_channel(struct trampoline_hidden_args *hidden_args)
 	sirq_channels[smp_processor_id()] = chnl_softirq;
 fail_ep2:
 #else
-	PTS()->thc_chnl = chnl;
+	current->ptstate->thc_chnl = chnl;
 	sirq_channels[smp_processor_id()] = chnl;
 #endif
 	/* technically, we do not need to receive the response */
 	ret = thc_ipc_recv_response(
-			hidden_args->async_chnl,
+			async_chnl,
 			request_cookie,
 			&_response);
 
 	printk("%s, ipc recv resp %d | pts %p | reqc 0x%x\n",
-				__func__, ret, PTS(),
+				__func__, ret, current->ptstate,
 				request_cookie);
 
 	if (ret) {
@@ -1851,7 +1863,7 @@ fail_ep2:
 	}
 
 	fipc_recv_msg_end(thc_channel_to_fipc(
-			hidden_args->async_chnl),_response);
+			async_chnl),_response);
 
 	return 0;
 fail_async:
@@ -1887,21 +1899,35 @@ int ndo_start_xmit(struct sk_buff *skb,
 	u64 tcp_count = 0;
 	xmit_type = check_skb_range(skb);
 
-	if (!PTS()) {
+	/* do not entertain packets from swapper */
+	if (!strncmp(current->comm, "swapper", strlen("swapper"))
+		|| !strncmp(current->comm, "kworker/", strlen("kworker/")))
+		return NETDEV_TX_OK;
+
+	if (!strncmp(current->comm, "lcd", strlen("lcd"))) {
+		printk("%s Packet send likely from softirq context via %s! disallow\n",
+				__func__, current->comm);
+		return NETDEV_TX_OK;
+	}
+
+	if (unlikely(!current->ptstate)) {
+		printk("%s: Calling lcd_enter for pid:%d, comm %s\n", __func__,
+				current->pid, current->comm);
+
 		/* step 1. create lcd env */
 		lcd_enter();
 
-		ptrs[smp_processor_id()] = PTS();
+		ptrs[smp_processor_id()] = current->ptstate;
 
 		/* set nonlcd ctx for future use */
-		PTS()->nonlcd_ctx = true;
+		current->ptstate->nonlcd_ctx = true;
 
 		/*
 		 * if it is ksoftirqd, let it use the channel that exist 
 		 */
 		if (!strncmp(current->comm, "ksoftirqd/",
 					strlen("ksoftirqd/"))) {
-			//PTS()->thc_chnl = xmit_irq_chnl;
+			//current->ptstate->thc_chnl = xmit_irq_chnl;
 			//printk("softirq\n");
 		/* step 2. grant sync_ep if needed */
 		/* FIXME: always grant sync_ep? */
@@ -1911,15 +1937,15 @@ int ndo_start_xmit(struct sk_buff *skb,
 			if (!sirq_channels[smp_processor_id()]) {
 				printk("%s: sirqch empty for %d\n",
 					__func__, smp_processor_id());
-				PTS()->thc_chnl = xmit_irq_chnl;
+				current->ptstate->thc_chnl = xmit_irq_chnl;
 			}
 
-			PTS()->thc_chnl =
+			current->ptstate->thc_chnl =
 				sirq_channels[smp_processor_id()];
 
 			printk("[%d]%s[pid=%d] pts %p softirq channel %p\n",
 				smp_processor_id(), current->comm,
-				current->pid, PTS(),
+				current->pid, current->ptstate,
 				sirq_channels[smp_processor_id()]);
 
 		} else if(!strncmp(current->comm, "iperf",
@@ -1932,7 +1958,7 @@ int ndo_start_xmit(struct sk_buff *skb,
 				smp_processor_id(), current->comm,
 				current->pid);
 			spin_lock(&prep_lock);
-			prep_channel(hidden_args);
+			prep_channel(hidden_args, skb->queue_mapping);
 			spin_unlock(&prep_lock);
 			printk("===================================\n");
 			printk("===== Private Channel created on cpu %d for (pid %d)[%s] =====\n",
@@ -1940,16 +1966,16 @@ int ndo_start_xmit(struct sk_buff *skb,
 			printk("===================================\n");
 
 /*			if (!entry)
-				PTS()->thc_chnl = xmit_chnl;
+				current->ptstate->thc_chnl = xmit_chnl;
 			else
-				PTS()->thc_chnl = xmit_chnl2;
+				current->ptstate->thc_chnl = xmit_chnl2;
 			++entry;
 */
 		} else {
 			printk("===== app %s , giving xmit_chnl\n",
 					current->comm);
-			PTS()->thc_chnl = xmit_irq_chnl;
-			PTS()->dofin = true;
+			current->ptstate->thc_chnl = xmit_irq_chnl;
+			current->ptstate->dofin = true;
 		/* step 2. grant sync_ep if needed */
 		/* FIXME: always grant sync_ep? */
 		if (grant_sync_ep(&sync_end, hidden_args->sync_ep))
@@ -1958,8 +1984,8 @@ int ndo_start_xmit(struct sk_buff *skb,
 
 		}
 
-	} else if (PTS()->nonlcd_ctx && PTS()->syncep_present) {
-		sync_end.cptr = PTS()->sync_ep;
+	} else if (current->ptstate->nonlcd_ctx && current->ptstate->syncep_present) {
+		sync_end.cptr = current->ptstate->sync_ep;
 	}
 
 	if (xmit_type == VOLUNTEER_XMIT) {
@@ -1984,7 +2010,7 @@ int ndo_start_xmit(struct sk_buff *skb,
 		unsigned char flags = (skb->data[46] & 0x0F) | skb->data[47];
 		printk("%s, xmit via cpu=%d:%10s[%d] | pts %p | proto %x | IP proto %x | TCP.seq %u | TCP.ack %u | TCP Flags [%s%s%s%s%s]\n",
 				__func__, smp_processor_id(), current->comm, current->pid,
-				PTS(), htons(skb->protocol), skb->data[23], seq, ack,
+				current->ptstate, htons(skb->protocol), skb->data[23], seq, ack,
 				(flags & 0x1) ? " FIN " : "",
 				(flags & 0x2) ? " SYN " : "",
 				(flags & 0x4) ? " RST " : "",
@@ -1997,18 +2023,18 @@ int ndo_start_xmit(struct sk_buff *skb,
 
 	global_tx_count++;
 	//printk("%s, nr_frags %d\n", __func__, skb_shinfo(skb)->nr_frags);
-	if (PTS()->nonlcd_ctx) {
-		async_chnl = (struct thc_channel*) PTS()->thc_chnl;
+	if (current->ptstate->nonlcd_ctx) {
+		async_chnl = (struct thc_channel*) current->ptstate->thc_chnl;
 		if (!async_chnl) {
 			printk("[%d]%s[pid=%d] pts %p, pts->chnl %p,"
 				"softirq channel %p\n",
 				smp_processor_id(), current->comm,
-				current->pid, PTS(),
-				PTS()->thc_chnl,
+				current->pid, current->ptstate,
+				current->ptstate->thc_chnl,
 				sirq_channels[smp_processor_id()]);
 			goto quit;
 		}
-		if (unlikely(PTS()->dofin))
+		if (unlikely(current->ptstate->dofin))
 			func_ret = ndo_start_xmit_dofin(skb, dev,
 					async_chnl, xmit_type);
 		else
@@ -2092,7 +2118,7 @@ quit:
 		lcd_set_r4(skb->data - skb->head);
 
 		/* handle nonlcd case with a granted sync ep */
-		if (PTS()->nonlcd_ctx)
+		if (current->ptstate->nonlcd_ctx)
 			ret = lcd_sync_send(sync_end);
 		else
 			ret = lcd_sync_send(hidden_args->sync_ep);
@@ -2136,7 +2162,7 @@ quit:
 
 		if (skb->data[23] == 0x6)
 		printk("%s, ipc_send | pts %p | reqc 0x%x | seq %llu\n",
-				__func__, PTS(), request_cookie, tcp_count);
+				__func__, current->ptstate, request_cookie, tcp_count);
 
 		if (ret) {
 			LIBLCD_ERR("thc_ipc_call");
@@ -2159,10 +2185,10 @@ quit:
 
 	if (skb->data[23] == 0x6)
 	printk("%s, ipc_recv | pts %p | reqc 0x%x | seq %llu\n",
-			__func__, PTS(), request_cookie, tcp_count);
+			__func__, current->ptstate, request_cookie, tcp_count);
 	
 	//printk("%s, xmit via KLCD | pts %p | cookie %d | proto %x | IP proto %x | TCP flags %x\n",
-	//			__func__, PTS(), request_cookie, htons(skb->protocol),
+	//			__func__, current->ptstate, request_cookie, htons(skb->protocol),
 	//			skb->data[23], (skb->data[46] & 0x0F) | skb->data[47]);
 
 	if (ret) {
@@ -4774,7 +4800,7 @@ int ixgbe_trigger_dump(struct thc_channel *_channel)
 	struct net_device_container *dev_container;
 	bool cleanup = false;
 
-	if (!PTS()) {
+	if (!current->ptstate) {
 		cleanup = true;
 		thc_init();
 	}
@@ -4816,7 +4842,7 @@ int ixgbe_service_event_sched(struct thc_channel *_channel)
 	struct net_device_container *dev_container;
 	bool cleanup = false;
 
-	if (!PTS()) {
+	if (!current->ptstate) {
 		cleanup = true;
 		thc_init();
 	}
@@ -5393,7 +5419,8 @@ int poll(struct napi_struct *napi,
 	printk("%s, poll - budget %d\n", __func__, budget);
 
 	if (!current->ptstate) {
-		LIBLCD_MSG("%s, Calling from a non-LCD context! creating thc runtime!", __func__);
+		LIBLCD_MSG("%s, Calling from a non-LCD (%s) context! creating thc runtime!",
+				__func__, current->comm);
 		ret = poll_once(napi,
 			budget, hidden_args);
 		return ret;
@@ -5927,7 +5954,7 @@ int napi_gro_receive_callee(struct fipc_message *_request,
 
 		sprintf(buffer, "%s, recv cpu=%d:%10s[%d] | pts %p | proto %x | IP proto %x | TCP.seq %u | TCP.ack %u | TCP Flags [%s%s%s%s%s] ",
 				__func__, smp_processor_id(), current->comm, current->pid,
-				PTS(), htons(skb->protocol), skb->data[9], seq, ack,
+				current->ptstate, htons(skb->protocol), skb->data[9], seq, ack,
 					(flags & 0x1) ? " FIN " : "",
 					(flags & 0x2) ? " SYN " : "",
 					(flags & 0x4) ? " RST " : "",
@@ -5937,7 +5964,7 @@ int napi_gro_receive_callee(struct fipc_message *_request,
 	} else {
 		sprintf(buffer, "%s, recv cpu=%d:%10s[%d] | pts %p | proto %x | IP proto %x",
 				__func__, smp_processor_id(), current->comm, current->pid,
-				PTS(), htons(skb->protocol), skb->data[9]);
+				current->ptstate, htons(skb->protocol), skb->data[9]);
 	}
 
 	//printk("%s context {\n", buffer);

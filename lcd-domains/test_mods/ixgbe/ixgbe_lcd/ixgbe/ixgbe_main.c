@@ -3000,6 +3000,11 @@ int ixgbe_poll(struct napi_struct *napi, int budget)
 		ixgbe_update_dca(q_vector);
 #endif
 
+	if (!once) {
+		ixgbe_for_each_ring(ring, q_vector->tx) {
+			printk("%s, ring %p", __func__, ring);
+		}
+	}
 	ixgbe_for_each_ring(ring, q_vector->tx) {
 		if (!ixgbe_clean_tx_irq(q_vector, ring, budget))
 			clean_complete = false;
@@ -3048,15 +3053,16 @@ int ixgbe_poll(struct napi_struct *napi, int budget)
 	return min(work_done, budget - 1);
 }
 
-extern unsigned long poll_state;
+unsigned long poll_state[NUM_LCDS];
 
-int __ixgbe_poll(void)
+int __ixgbe_poll(int lcd_id)
 {
 	int ret = 0;
+
 	if (g_adapter) {
-		if (!test_and_set_bit(IXGBE_POLL_RUNNING, &poll_state)) {
-			ret = ixgbe_poll(&g_adapter->q_vector[0]->napi, 64);
-			clear_bit(IXGBE_POLL_RUNNING, &poll_state);
+		if (!test_and_set_bit(IXGBE_POLL_RUNNING, &poll_state[lcd_id])) {
+			ret = ixgbe_poll(&g_adapter->q_vector[lcd_id]->napi, 64);
+			clear_bit(IXGBE_POLL_RUNNING, &poll_state[lcd_id]);
 		}
 	}
 	return ret;
@@ -5861,7 +5867,7 @@ static int ixgbe_sw_init(struct ixgbe_adapter *adapter)
 	hw->subsystem_vendor_id = pdev->subsystem_vendor;
 	hw->subsystem_device_id = pdev->subsystem_device;
 
-#define NUM_HW_QUEUES		6
+#define NUM_HW_QUEUES		2
 	/* XXX: This decides the number of hardware queues
 	 * It checks the number of online cpus and sets the number of
 	 * queues to the number of cpus. Fake it now to enable

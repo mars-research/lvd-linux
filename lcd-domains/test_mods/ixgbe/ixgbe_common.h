@@ -24,7 +24,7 @@
 #define NAPI_CONSUME_SEND_ONLY
 #define LOCAL_SKB
 #define NAPI_RX_SEND_ONLY
-#define SENDER_DISPATCH_LOOP
+//#define SENDER_DISPATCH_LOOP
 
 enum dispatch_t {
 	__PCI_REGISTER_DRIVER,

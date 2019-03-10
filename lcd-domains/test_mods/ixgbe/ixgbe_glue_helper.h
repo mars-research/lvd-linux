@@ -73,6 +73,12 @@ struct trampoline_hidden_args {
 	struct thc_channel *async_chnl;
 	struct cptr sync_ep;
 };
+
+struct lcd_channels {
+	struct thc_channel *lcd_async_chnl;
+	cptr_t lcd_sync_end;
+};
+
 struct sync_container {
 	int ( *sync )(struct net_device *, const unsigned char*);
 	cptr_t my_ref;

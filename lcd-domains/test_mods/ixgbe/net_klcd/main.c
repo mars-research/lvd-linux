@@ -25,6 +25,8 @@ struct thc_channel *xmit_chnl;
 struct thc_channel *xmit_chnl2;
 struct thc_channel *xmit_irq_chnl;
 struct thc_channel *klcd_chnl;
+extern struct trampoline_hidden_args *g_ndo_start_xmit_hidden_args;
+extern struct lcd_channels lcds[NUM_LCDS];
 
 extern int setup_async_net_ring_channel(cptr_t tx, cptr_t rx, 
 				struct thc_channel **chnl_out);
@@ -231,6 +233,10 @@ static int do_one_register(cptr_t register_chnl)
 
 	klcd_chnl = chnl;
 
+	/* Populate LCD channel information */
+	lcds[lcd_id].lcd_async_chnl = chnl;
+	lcds[lcd_id].lcd_sync_end = sync_endpoint;
+
 	/* Only parent LCD creates extra channels */
 	if (lcd_id == 0) {
 		LIBLCD_MSG("settingup xmit channel for LCD %d", lcd_id);
@@ -282,6 +288,7 @@ fail3:
 	lcd_cptr_free(tx_xmit);
 fail2:
 	lcd_cptr_free(rx);
+	lcd_cptr_free(rx_xmit);
 fail1:
 	return ret;
 }

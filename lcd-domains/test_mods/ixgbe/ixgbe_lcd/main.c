@@ -25,8 +25,7 @@ void ixgbe_exit_module(void);
 extern int create_async_channel(int lcd_id);
 unsigned long loops_per_jiffy;
 bool poll_start = false;
-extern int __ixgbe_poll(void);
-unsigned long poll_state = 0ul;
+extern int __ixgbe_poll(int lcd_id);
 #define LCD_ROUNDROBIN
 /* LOOP ---------------------------------------- */
 
@@ -87,7 +86,7 @@ static void main_and_loop(void)
 						// XXX: is this polling freq good enough for full-duplex communication?
 						{
 							if (poll_start)
-								ASYNC(__ixgbe_poll(););
+								ASYNC(__ixgbe_poll(current_lcd_id););
 							cpu_relax();
 							continue;
 						}
@@ -113,7 +112,7 @@ static void main_and_loop(void)
 			// XXX: is this polling freq good enough for full-duplex communication?
 			{
 				if (poll_start)
-					ASYNC(__ixgbe_poll(););
+					ASYNC(__ixgbe_poll(current_lcd_id););
 				cpu_relax();
 				continue;
 			}
@@ -126,7 +125,7 @@ static void main_and_loop(void)
 			if (ret) {
 				if (ret == -EWOULDBLOCK) {
 				if (poll_start)
-					ASYNC(__ixgbe_poll(););
+					ASYNC(__ixgbe_poll(current_lcd_id););
 
 					continue;
 				} else {
@@ -166,7 +165,7 @@ static void main_and_loop(void)
 			 * we should do napi polling.
 			 */
 			if (poll_start)
-				ASYNC(__ixgbe_poll(););
+				ASYNC(__ixgbe_poll(current_lcd_id););
 #endif
 		}
 		LIBLCD_MSG("IXGBE EXITED DISPATCH LOOP");

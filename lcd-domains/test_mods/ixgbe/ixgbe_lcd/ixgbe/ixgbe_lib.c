@@ -667,12 +667,11 @@ static bool ixgbe_set_rss_queues(struct ixgbe_adapter *adapter)
 
 #endif /* IXGBE_FCOE */
 
-	printk("%s:%d, adapter tx=%d rx=%d", __func__, __LINE__,
-			adapter->num_tx_queues, adapter->num_rx_queues);
-
 	adapter->num_rx_queues = rss_i;
 	adapter->num_tx_queues = rss_i;
 
+	printk("%s:%d, adapter tx=%d rx=%d", __func__, __LINE__,
+			adapter->num_tx_queues, adapter->num_rx_queues);
 	return true;
 }
 
@@ -734,7 +733,8 @@ static int ixgbe_acquire_msix_vectors(struct ixgbe_adapter *adapter)
 	 * be somewhat conservative and only ask for (roughly) the same number
 	 * of vectors as there are CPUs.
 	 */
-	vectors = min_t(int, vectors, num_online_cpus());
+#define NUM_ONLINE_CPUS		2
+	vectors = min_t(int, vectors, NUM_ONLINE_CPUS);
 
 	/* Some vectors are necessary for non-queue interrupts */
 	vectors += NON_Q_VECTORS;
@@ -899,6 +899,8 @@ static int ixgbe_alloc_q_vector(struct ixgbe_adapter *adapter,
 		/* configure backlink on ring */
 		ring->q_vector = q_vector;
 
+		printk("%s, txr_count %d, add ring %p to qvector %p\n",
+				__func__, txr_count, ring, q_vector);
 		/* update q_vector Tx values */
 		ixgbe_add_ring(ring, &q_vector->tx);
 
@@ -929,6 +931,9 @@ static int ixgbe_alloc_q_vector(struct ixgbe_adapter *adapter,
 		/* configure backlink on ring */
 		ring->q_vector = q_vector;
 
+
+		printk("%s, rxr_count %d, add ring %p to qvector %p\n",
+				__func__, rxr_count, ring, q_vector);
 		/* update q_vector Rx values */
 		ixgbe_add_ring(ring, &q_vector->rx);
 
@@ -1026,6 +1031,9 @@ static int ixgbe_alloc_q_vectors(struct ixgbe_adapter *adapter)
 
 	if (q_vectors >= (rxr_remaining + txr_remaining)) {
 		for (; rxr_remaining; v_idx++) {
+			printk("%s:%d Loop1 calling alloc_q_vector with vcount %d, vidx = %d, "
+					"txr_count %d, txr_idx %d, rxr_count %d, rxr_idx %d",
+					 __func__, __LINE__, q_vectors, v_idx, 0, 0, 1, rxr_idx);
 			err = ixgbe_alloc_q_vector(adapter, q_vectors, v_idx,
 						   0, 0, 1, rxr_idx);
 
@@ -1041,6 +1049,11 @@ static int ixgbe_alloc_q_vectors(struct ixgbe_adapter *adapter)
 	for (; v_idx < q_vectors; v_idx++) {
 		int rqpv = DIV_ROUND_UP(rxr_remaining, q_vectors - v_idx);
 		int tqpv = DIV_ROUND_UP(txr_remaining, q_vectors - v_idx);
+
+		printk("%s:%d Loop2 calling alloc_q_vector with vcount %d, vidx = %d, "
+				"txr_count %d, txr_idx %d, rxr_count %d, rxr_idx %d",
+				 __func__, __LINE__, q_vectors, v_idx, tqpv, txr_idx, rqpv, rxr_idx);
+
 		err = ixgbe_alloc_q_vector(adapter, q_vectors, v_idx,
 					   tqpv, txr_idx,
 					   rqpv, rxr_idx);

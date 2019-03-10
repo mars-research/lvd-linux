@@ -89,7 +89,7 @@ static int boot_main(void)
 	}
 
 	/* ---------- Create LCD ---------- */
-	ret = lcd_create_module_lcd(LCD_DIR("ixgbe/ixgbe_lcd"),
+	ret = lcd_create_module_lcds(LCD_DIR("ixgbe/ixgbe_lcd"),
 				"lcd_test_mod_ixgbe_ixgbe_lcd",
 				ixgbe_lcds,
 				ixgbe_ctxs, num_lcds);

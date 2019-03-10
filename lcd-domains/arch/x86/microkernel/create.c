@@ -1025,6 +1025,9 @@ fail_alloc:
 
 void lcd_arch_destroy(struct lcd_arch *lcd_arch)
 {
+#ifdef CONFIG_LVD
+	kfree(lcd_arch->eptp_lcd);
+#else
 	/*
 	 * Premption Disabled
 	 *
@@ -1043,9 +1046,7 @@ void lcd_arch_destroy(struct lcd_arch *lcd_arch)
 	 */
 	lcd_arch_ept_invvpid(lcd_arch->vpid);
 	lcd_arch_ept_invept(lcd_arch->ept.vmcs_ptr);
-#ifndef CONFIG_LVD
 	vmx_disable_ept_switching(lcd_arch);
-#endif
 	/*
 	 * VM clear on this cpu
 	 */
@@ -1058,12 +1059,11 @@ void lcd_arch_destroy(struct lcd_arch *lcd_arch)
 	/*
 	 * Free remaining junk
 	 */
-#ifndef CONFIG_LVD
 	vmx_free_vpid(lcd_arch);
 	lcd_arch_free_vmcs(lcd_arch->vmcs);
-#endif
 	lcd_arch_ept_free(lcd_arch);
 	kmem_cache_free(lcd_arch_cache, lcd_arch);
+#endif
 }
 
 #if 0
@@ -1096,7 +1096,7 @@ static void vmx_pack_desc(struct desc_struct *desc, u64 base, u64 limit,
 #endif
 
 /* RUNTIME CONFIGURATION -------------------------------------------------- */
-
+#ifndef CONFIG_LVD
 int lcd_arch_set_pc(struct lcd_arch *lcd_arch, gva_t a)
 {
 	lcd_arch->regs.rip = gva_val(a);
@@ -1159,3 +1159,4 @@ void lcd_arch_irq_enable(struct lcd_arch *lcd_arch)
 		PIN_BASED_EXT_INTR_MASK);
 	vmx_put_cpu(lcd_arch);
 }
+#endif

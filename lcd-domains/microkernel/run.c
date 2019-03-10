@@ -14,7 +14,7 @@
 #include <asm/lcd_domains/create.h>
 
 /* SYSCALL HANDLERS -------------------------------------------------- */
-
+#ifndef CONFIG_LVD
 static int handle_syscall_create_sync_ep(struct lcd *lcd)
 {
 	cptr_t slot;
@@ -278,8 +278,9 @@ static int handle_syscall_putchar(struct lcd *lcd)
 
 static int handle_syscall_dump_stack(struct lcd *lcd)
 {
+#ifndef CONFIG_LVD
 	lcd_arch_dump_lcd(lcd->lcd_arch);
-
+#endif
 	return 0;
 }
 
@@ -484,9 +485,11 @@ static int handle_syscall(struct lcd *lcd, int *lcd_ret)
 int icount = 0;
 static int run_once(struct lcd *lcd, int *lcd_ret)
 {
-	int ret;
+	int ret = 0;
 
+#ifndef CONFIG_LVD
 	ret = lcd_arch_run(lcd->lcd_arch);
+#endif
 	if (ret < 0) {
 		LCD_ERR("running lcd %p", lcd);
 		goto out;
@@ -572,7 +575,9 @@ static int main_for_lcd(struct lcd *lcd)
 	for (;;) {
 		ret = run_once(lcd, &lcd_ret);
 		if (ret < 0 || should_stop(lcd)) {
+#ifndef CONFIG_LVD
 			lcd_arch_dump_lcd(lcd->lcd_arch);
+#endif
 			return ret;
 		} else if (ret == 1) {
 			LCD_MSG("icount is %d", icount);
@@ -593,6 +598,7 @@ static int main_for_lcd(struct lcd *lcd)
 	
 	/* unreachable */
 }
+#endif
 
 static int main_for_klcd(struct lcd *lcd)
 {
@@ -611,8 +617,10 @@ int __lcd_kthread_main(void *data) /* data is NULL */
 	 * reference to itself, we should tear it down.
 	 */
 	switch (current_lcd->type) {
+#ifndef CONFIG_LVD
 	case LCD_TYPE_ISOLATED:
 		return main_for_lcd(current_lcd);
+#endif
 	case LCD_TYPE_NONISOLATED:
 		return main_for_klcd(current_lcd);
 	default:

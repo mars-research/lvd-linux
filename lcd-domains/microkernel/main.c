@@ -103,14 +103,13 @@ static int __init lcd_init(void)
 		LCD_ERR("failed to init VMFUNC");
 		goto fail0;
 	}
-#endif
-
+#else
 	ret = lcd_arch_init();
 	if (ret) {
 		LCD_ERR("failed to init arch-dependent code");
 		goto fail0;
 	}
-
+#endif
 	ret = cap_init();
 	if (ret) {
 		LCD_ERR("failed to init capability subsystem");
@@ -185,7 +184,9 @@ fail3:
 fail2:
 	cap_fini();
 fail1:
+#ifndef CONFIG_LVD
 	lcd_arch_exit();
+#endif
 fail0:
 	return ret;
 }
@@ -202,8 +203,9 @@ static void __exit lcd_exit(void)
 	__lcd_ipc_exit();
 	__lcd_exit_cap_types();
 	cap_fini();
+#ifndef CONFIG_LVD
 	lcd_arch_exit();
-
+#endif
 	LCD_MSG("lcd microkernel exited");
 }
 

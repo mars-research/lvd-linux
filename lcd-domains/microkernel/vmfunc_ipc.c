@@ -14,19 +14,6 @@ struct lcd *lcd = NULL;
 
 /* SYSCALL HANDLERS -------------------------------------------------- */
 
-static int handle_syscall_create_sync_ep(struct fipc_message *msg)
-{
-	cptr_t slot;
-	/*
-	 * Get slot where to store new sync endpoint
-	 */
-	slot = __cptr(msg->regs[0]);
-	/*
-	 * Create sync ipc endpoint
-	 */
-	return __lcd_create_sync_endpoint(lcd, slot);
-}
-
 static int handle_syscall_create(struct fipc_message *msg)
 {
 	cptr_t lcd_slot;
@@ -210,66 +197,6 @@ static int handle_syscall_pages_alloc_exact_node(struct fipc_message *msg)
 	return 0;
 }
 
-static int handle_syscall_sync_reply(struct fipc_message *msg)
-{
-	/*
-	 * No endpoint arg; just do reply
-	 */
-	return __lcd_reply(lcd);
-}
-
-static int handle_syscall_sync_call(struct fipc_message *msg)
-{
-	cptr_t endpoint;
-	/*
-	 * Get endpoint
-	 */
-	endpoint = __cptr(msg->regs[0]);
-	/*
-	 * Do synchronous ipc call
-	 */
-	return __lcd_call(lcd, endpoint);
-}
-
-static int handle_syscall_sync_recv(struct fipc_message *msg)
-{
-	cptr_t endpoint;
-	/*
-	 * Get endpoint
-	 */
-	endpoint = __cptr(msg->regs[0]);
-	/*
-	 * Do synchronous ipc recv
-	 */
-	return __lcd_recv(lcd, endpoint);
-}
-
-static int handle_syscall_sync_send(struct fipc_message *msg)
-{
-	cptr_t endpoint;
-	/*
-	 * Get endpoint
-	 */
-	endpoint = __cptr(msg->regs[0]);
-	/*
-	 * Do synchronous ipc send
-	 */
-	return __lcd_send(lcd, endpoint);
-}
-
-static int handle_syscall_run(struct fipc_message *msg)
-{
-	cptr_t dest_lcd;
-	/*
-	 * Args
-	 */
-	dest_lcd = __cptr(msg->regs[0]);
-	/*
-	 * Run it
-	 */
-	return __lcd_run(lcd, dest_lcd);
-}
-
 static int handle_syscall_putchar(struct fipc_message *msg)
 {
 	char c;
@@ -280,13 +207,6 @@ static int handle_syscall_putchar(struct fipc_message *msg)
 	return __lcd_put_char(lcd, c);
 }
 
-static int handle_syscall_dump_stack(struct fipc_message *msg)
-{
-	lcd_arch_dump_lcd(lcd->lcd_arch);
-
-	return 0;
-}
-
 static int handle_syscall_exit(struct fipc_message *msg, int *lcd_ret)
 {
 	/*
@@ -294,18 +214,6 @@ static int handle_syscall_exit(struct fipc_message *msg, int *lcd_ret)
 	 */
 	*lcd_ret = (int)msg->regs[0];
 	return 1; /* signal LCD has exited */
-}
-
-static int handle_syscall_irq_disable(struct fipc_message *msg)
-{
-	lcd_arch_irq_disable(lcd->lcd_arch);
-	return 0;
-}
-
-static int handle_syscall_irq_enable(struct fipc_message *msg)
-{
-	lcd_arch_irq_enable(lcd->lcd_arch);
-	return 0;
 }
 
 static int handle_syscall_iommu_map_page(struct fipc_message *msg)
@@ -414,26 +322,8 @@ int handle_vmfunc_syscall(struct fipc_message *msg)
 	case LCD_SYSCALL_MEMORY_GRANT_AND_MAP:
 		ret = handle_syscall_memory_grant_and_map(msg);
 		break;
-	case LCD_SYSCALL_RUN:
-		ret = handle_syscall_run(msg);
-		break;
 	case LCD_SYSCALL_EXIT:
 		ret = handle_syscall_exit(msg, &lcd_ret);
-		break;
-	case LCD_SYSCALL_SYNC_SEND:
-		ret = handle_syscall_sync_send(msg);
-		break;
-	case LCD_SYSCALL_SYNC_RECV:
-		ret = handle_syscall_sync_recv(msg);
-		break;
-	case LCD_SYSCALL_SYNC_CALL:
-		ret = handle_syscall_sync_call(msg);
-		break;
-	case LCD_SYSCALL_SYNC_REPLY:
-		ret = handle_syscall_sync_reply(msg);
-		break;
-	case LCD_SYSCALL_CREATE_SYNC_EP:
-		ret = handle_syscall_create_sync_ep(msg);
 		break;
 	case LCD_SYSCALL_ALLOC_PAGES_EXACT_NODE:
 		ret = handle_syscall_pages_alloc_exact_node(msg);
@@ -451,13 +341,15 @@ int handle_vmfunc_syscall(struct fipc_message *msg)
 		ret = handle_syscall_munmap(msg);
 		break;
 	case LCD_SYSCALL_DUMP_STACK:
-		ret = handle_syscall_dump_stack(msg);
-		break;
 	case LCD_SYSCALL_IRQ_DISABLE:
-		ret = handle_syscall_irq_disable(msg);
-		break;
 	case LCD_SYSCALL_IRQ_ENABLE:
-		ret = handle_syscall_irq_enable(msg);
+	case LCD_SYSCALL_RUN:
+	case LCD_SYSCALL_SYNC_SEND:
+	case LCD_SYSCALL_SYNC_RECV:
+	case LCD_SYSCALL_SYNC_CALL:
+	case LCD_SYSCALL_SYNC_REPLY:
+	case LCD_SYSCALL_CREATE_SYNC_EP:
+		ret = 0;
 		break;
 	case LCD_SYSCALL_ASSIGN_DEVICE:
 		ret = handle_syscall_assign_device(msg);

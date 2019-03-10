@@ -16,7 +16,7 @@
 /* This controls how many stack addresses we print out */
 #define debug_stack_lines 20 /* 20 lines max */
 #define stack_words_per_line 3 /* 3 addresses per line */
-
+#ifndef CONFIG_LVD
 static inline gva_t stack_bottom(gva_t sp)
 {
 	/*
@@ -355,3 +355,4 @@ void lcd_arch_dump_lcd(struct lcd_arch *lcd)
 	__lcd_arch_dump_lcd(lcd);
 	vmx_put_cpu(lcd);
 }
+#endif

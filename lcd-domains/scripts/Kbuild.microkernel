@@ -27,6 +27,7 @@ lcd_domains-y += $(addprefix microkernel/, \
 	      ksym.o \
 	      vmfunc_ipc.o \
               vmfunc_stack.o \
+              vmfunc.o \
               )
 
 # Arch dependent code
@@ -39,6 +40,7 @@ lcd_domains-y += $(addprefix arch/$(ARCH)/microkernel/, \
               check.o \
               dump_stack.o \
               )
+
 
 # kliblcd (built into microkernel .ko)
 lcd_domains-y += $(addprefix kliblcd/, \

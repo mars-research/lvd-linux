@@ -12,6 +12,7 @@
 
 DEFINE_PER_CPU(struct lcd_arch *, local_lcd_arch);
 
+#ifndef CONFIG_LVD
 static inline int vmx_exit_intr(struct lcd_arch *lcd_arch)
 {
 	return (lcd_arch->exit_reason == EXIT_REASON_EXTERNAL_INTERRUPT) ||
@@ -632,4 +633,4 @@ out:
 
 	return ret;
 }
-
+#endif

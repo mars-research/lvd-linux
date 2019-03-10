@@ -18,7 +18,7 @@
 #include <lcd_domains/microkernel.h>
 #include <asm/lcd_domains/microkernel.h>
 
-
+#ifndef CONFIG_LVD
 static inline u16 vmx_get16(struct lcd_arch *t, u64 field)
 {
 	u16 out;
@@ -1531,3 +1531,4 @@ int lcd_arch_check(struct lcd_arch *t)
 
 	return 0;
 }
+#endif

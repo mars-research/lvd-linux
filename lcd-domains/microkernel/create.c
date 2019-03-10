@@ -286,7 +286,8 @@ static int config_lcd(struct lcd *caller, struct lcd *lcd_struct,
 		gva_t pc, gva_t sp, 
 		gpa_t gva_root, gpa_t utcb_page)
 {
-	int ret;
+	int ret = 0;
+#ifndef CONFIG_LVD
 	hva_t utcb_page_addr;
 	/*
 	 * If lcd is not an embryo, fail
@@ -328,6 +329,7 @@ fail3:
 	lcd_arch_ept_unmap(lcd_struct->lcd_arch, utcb_page);
 fail2:
 fail1:
+#endif
 	return ret;
 }
 

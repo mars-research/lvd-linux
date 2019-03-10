@@ -16,16 +16,16 @@
 #include <lcd_domains/microkernel.h>
 #include <asm/lcd_domains/vmfunc.h>
 
-
+#if defined(CONFIG_LVD)
+DEFINE_PER_CPU(struct page *, vmfunc_epts_page);
 struct lcd_vmx_capability lcd_vmx_capability;
+#else
 static atomic_t vmx_enable_failed;
 static DEFINE_PER_CPU(int, vmx_enabled);
 static DEFINE_PER_CPU(struct lcd_arch_vmcs *, vmxon_area);
-#if defined(CONFIG_LVD)
-DEFINE_PER_CPU(struct page *, vmfunc_epts_page);
 #endif
 
-
+#ifndef CONFIG_LVD
 /* DEBUGGING --------------------------------------------------*/
 
 /**
@@ -532,6 +532,7 @@ static void vmx_free_vmxon_areas(void)
 		}
 	}
 }
+#endif
 
 #ifdef CONFIG_LVD
 static int vmx_alloc_vmfunc_ept_switching_page(void)
@@ -555,7 +556,7 @@ int lcd_arch_vmfunc_init(void) {
 	vmx_alloc_vmfunc_ept_switching_page();
 	return 0; 
 }
-#endif
+#else
 
 int lcd_arch_init(void)
 {
@@ -664,3 +665,4 @@ void lcd_arch_exit(void)
 	free_page((unsigned long)lcd_global_msr_bitmap);
 	kmem_cache_destroy(lcd_arch_cache);
 }
+#endif

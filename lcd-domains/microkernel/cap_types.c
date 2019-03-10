@@ -256,7 +256,9 @@ static int sync_endpoint_delete(struct cspace *cspace, struct cnode *cnode,
 	 * No one has a capability to the endpoint, so no one should
 	 * be in the queues; destroy endpoint
 	 */
+#ifndef CONFIG_LVD
 	__lcd_destroy_sync_endpoint__(object);
+#endif
 
 	return 0;
 }

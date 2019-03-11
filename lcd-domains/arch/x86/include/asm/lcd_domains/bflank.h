@@ -24,13 +24,14 @@
 static inline unsigned int bfcall_install_vmfunc_ept_page(u64 eptp)
 {
 	unsigned int eax, ebx, ecx, edx; 
-	
+
 	eax = LCD_BFCALL_ADD_EPT;
 	ebx = (unsigned int)eptp;
 	ecx = (unsigned int)(eptp >> 32); 
 	edx = 0; 
 
-	LCD_MSG("seting ept page 0x%llx\n", eptp);
+	LCD_MSG("seting ept page 0x%llx, ebx:0x%lx, ecx:0x%lx\n",
+		eptp, ebx, ecx);
 
 	/* ecx is often an input as well as an output. */
 	asm volatile("cpuid"
@@ -38,7 +39,7 @@ static inline unsigned int bfcall_install_vmfunc_ept_page(u64 eptp)
 	      "=b" (ebx),
 	      "=c" (ecx),
 	      "=d" (edx)
-	    : "0" (eax), "2" (ecx)
+	    : "0" (eax), "1" (ebx), "2" (ecx), "3" (edx)
 	    : "memory");
 
 	LCD_MSG("set ept, ret:%llx\n", eax);

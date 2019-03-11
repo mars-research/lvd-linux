@@ -539,10 +539,13 @@ static int vmx_alloc_vmfunc_ept_switching_page(void)
 {
 	int cpu;
 
+	LCD_MSG("Initializing VMFUNC EPT list page\n"); 
+
 	for_each_possible_cpu(cpu) {
-		
-		per_cpu(vmfunc_epts_page, cpu) = alloc_page(GFP_KERNEL | __GFP_ZERO);
-		if (!__this_cpu_read(vmfunc_epts_page))
+		struct page *ept_page;  	
+		ept_page = alloc_page(GFP_KERNEL | __GFP_ZERO);
+		per_cpu(vmfunc_epts_page, cpu) = ept_page;  
+		if (!ept_page)
 			return -ENOMEM;
 
 	}

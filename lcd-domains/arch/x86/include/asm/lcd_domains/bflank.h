@@ -46,10 +46,14 @@ static inline unsigned int bfcall_install_vmfunc_ept_page(struct page *eptp_list
 	    : "0" (eax), "1" (ebx), "2" (ecx), "3" (edx)
 	    : "memory");
 
-	LCD_MSG("set ept, ret:%llx\n", eax);
+	LCD_MSG("set ept, eax:0x%lx, ebx:0x%lx, ecx:0x%lx\n", 
+			eax, ebx, ecx);
 
 	/* Bareflank returns the physical address of the kernel EPT */
 	kernel_ept_phys = (((u64)ecx) << 32) | ebx; 
+
+	LCD_MSG("set ept[0]:0x%llx\n", kernel_ept_phys);
+
 	eptp_list = phys_to_virt(page_to_phys(eptp_list_page)); 
 	eptp_list[0] = kernel_ept_phys; 
 

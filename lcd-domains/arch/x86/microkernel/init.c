@@ -17,7 +17,7 @@
 #include <asm/lcd_domains/vmfunc.h>
 
 #if defined(CONFIG_LVD)
-DEFINE_PER_CPU(struct page *, vmfunc_epts_page);
+DEFINE_PER_CPU(struct page *, vmfunc_eptp_list_page);
 struct lcd_vmx_capability lcd_vmx_capability;
 #else
 static atomic_t vmx_enable_failed;
@@ -542,10 +542,11 @@ static int vmx_alloc_vmfunc_ept_switching_page(void)
 	LCD_MSG("Initializing VMFUNC EPT list page\n"); 
 
 	for_each_possible_cpu(cpu) {
-		struct page *ept_page;  	
-		ept_page = alloc_page(GFP_KERNEL | __GFP_ZERO);
-		per_cpu(vmfunc_epts_page, cpu) = ept_page;  
-		if (!ept_page)
+		struct page *eptp_list_page;  	
+		eptp_list_page = alloc_page(GFP_KERNEL | __GFP_ZERO);
+		
+		per_cpu(vmfunc_eptp_list_page, cpu) = eptp_list_page;  
+		if (!eptp_list_page)
 			return -ENOMEM;
 
 	}

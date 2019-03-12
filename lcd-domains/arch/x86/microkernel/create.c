@@ -954,8 +954,8 @@ int lcd_arch_create(struct lcd_arch **out)
 	/* create ept for this LCD on all cpus */
 	for_each_online_cpu(cpu) {
 		/* Get the EPT VMFUNC switching page for this CPU */
-		struct page *eptp = __this_cpu_read(vmfunc_epts_page); 
-		u64 *eptp_list = phys_to_virt(page_to_phys(eptp)); 
+		struct page *eptp_list_page = __this_cpu_read(vmfunc_eptp_list_page); 
+		u64 *eptp_list = phys_to_virt(page_to_phys(eptp_list_page)); 
 
 		/* Allocate LCDs EPT */
 		lcd_arch->eptp_lcd[cpu] = lcd_arch_ept_init_one();

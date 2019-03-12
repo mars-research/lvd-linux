@@ -14,7 +14,7 @@
 #include <lcd_domains/types.h>
 
 #if defined(CONFIG_LVD)
-extern DEFINE_PER_CPU(struct page *, vmfunc_epts_page);
+extern DEFINE_PER_CPU(struct page *, vmfunc_eptp_list_page);
 #endif
 
 

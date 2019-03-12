@@ -11,6 +11,7 @@
 
 #include <asm/vmx.h>
 #include <linux/kernel.h>
+#include <linux/mm.h>
 
 #include <lcd_domains/types.h>
 #include <asm/lcd_domains/types.h>
@@ -21,17 +22,20 @@
 /**
  * Add the page that contains EPT ids for VMFUNC calls
  */
-static inline unsigned int bfcall_install_vmfunc_ept_page(u64 eptp)
+static inline unsigned int bfcall_install_vmfunc_ept_page(struct page *eptp_list_page)
 {
 	unsigned int eax, ebx, ecx, edx; 
+	u64 kernel_ept_phys; 
+	u64 *eptp_list; 
+
 
 	eax = LCD_BFCALL_ADD_EPT;
-	ebx = (unsigned int)eptp;
-	ecx = (unsigned int)(eptp >> 32); 
+	ebx = (unsigned int)page_to_phys(eptp_list_page);
+	ecx = (unsigned int)(page_to_phys(eptp_list_page) >> 32); 
 	edx = 0; 
 
 	LCD_MSG("seting ept page 0x%llx, ebx:0x%lx, ecx:0x%lx\n",
-		eptp, ebx, ecx);
+		page_to_phys(eptp_list_page), ebx, ecx);
 
 	/* ecx is often an input as well as an output. */
 	asm volatile("cpuid"
@@ -43,6 +47,11 @@ static inline unsigned int bfcall_install_vmfunc_ept_page(u64 eptp)
 	    : "memory");
 
 	LCD_MSG("set ept, ret:%llx\n", eax);
+
+	/* Bareflank returns the physical address of the kernel EPT */
+	kernel_ept_phys = (((u64)ecx) << 32) | ebx; 
+	eptp_list = phys_to_virt(page_to_phys(eptp_list_page)); 
+	eptp_list[0] = kernel_ept_phys; 
 
 	return eax; 
 }

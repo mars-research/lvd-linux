@@ -19,7 +19,7 @@
 extern int vmfunc_wrapper(struct fipc_message *req);
 extern int vmfunc_call(struct fipc_message *msg);
 
-int callee(struct fipc_ring_channel *chan)
+int callee(struct fipc_message *msg2)
 {
 	int ret = 0;
 	unsigned long transaction_id = 0;
@@ -35,10 +35,10 @@ int callee(struct fipc_ring_channel *chan)
 
 	end = lcd_RDTSC_STOP();
 
-	printk("%s, vmfunc took %llu cycles (num_transactions = %d)\n",
-			__func__,
-			(end - start) / TRANSACTIONS,
-			TRANSACTIONS);
+//	printk("%s, vmfunc took %llu cycles (num_transactions = %d)\n",
+//			__func__,
+//			(end - start) / TRANSACTIONS,
+//			TRANSACTIONS);
 	return ret;
 }
 

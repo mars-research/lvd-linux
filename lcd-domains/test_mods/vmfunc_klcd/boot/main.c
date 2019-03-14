@@ -13,7 +13,6 @@
 
 #include <lcd_config/post_hook.h>
 
-cptr_t endpoint;
 cptr_t klcd, lcd;
 cptr_t dest_lcd, dest_klcd;
 struct lcd_create_ctx *lcd_ctx;
@@ -21,6 +20,7 @@ struct lcd_create_ctx *lcd_ctx;
 static int boot_main(void)
 {
 	int ret;
+	struct module *m = NULL;
 
 	/*
 	 * Enter LCD mode
@@ -30,21 +30,14 @@ static int boot_main(void)
 		LIBLCD_ERR("lcd enter failed");
 		goto fail1;
 	}
-	/*
-	 * Create an endpoint
-	 */
-	ret = lcd_create_sync_endpoint(&endpoint);
-	if (ret) {
-		LIBLCD_ERR("failed to create endpoint");
-		goto fail2;
-	}
+
 	/*
 	 * Create lcds
 	 */
-	ret = lcd_create_module_klcd(LCD_DIR("vmfunc_klcd/caller_klcd"),
+	m = lcd_create_module_klcd_no_thread(LCD_DIR("vmfunc_klcd/caller_klcd"),
 				"lcd_test_mod_vmfunc_klcd_caller_klcd",
 				&klcd);
-	if (ret) {
+	if (!m) {
 		LIBLCD_ERR("failed to create lcd1");
 		goto fail3;
 	}
@@ -69,31 +62,19 @@ static int boot_main(void)
 		goto fail5;
 	}
 
-	ret = lcd_cap_grant(lcd, endpoint, dest_lcd);
-	if (ret) {
-		LIBLCD_ERR("failed to grant endpoint to lcd1");
-		goto fail7;
-	}
-	lcd_to_boot_info(lcd_ctx)->cptrs[0] = dest_lcd;
-
-	dest_klcd = __cptr(3);
-	ret = lcd_cap_grant(klcd, endpoint, dest_klcd);
-	if (ret) {
-		LIBLCD_ERR("failed to grant endpoint to lcd2");
-		goto fail8;
-	}
-
 	/*
 	 * --------------------------------------------------
 	 * Run lcd's
 	 *
 	 */
+	LIBLCD_MSG("Starting KLCD...");
 	ret = lcd_run(klcd);
 	if (ret) {
 		LIBLCD_ERR("failed to start lcd1");
 		goto fail9;
 	}
 
+	LIBLCD_MSG("Starting LCD...");
 	ret = lcd_run(lcd);
 	if (ret) {
 		LIBLCD_ERR("failed to start lcd2");
@@ -101,6 +82,7 @@ static int boot_main(void)
 	}
 
 	ret = 0;
+	LIBLCD_MSG("Done booting vmfunc_klcd");
 	goto fail1;
 
 	/*
@@ -108,16 +90,12 @@ static int boot_main(void)
 	 */
 fail10:
 fail9:
-fail8:
-fail7:
 fail5:
 	lcd_cap_delete(lcd);
 	lcd_destroy_create_ctx(lcd_ctx); /* tears down LCD 2 */
 fail4:
-	//lcd_cap_delete(lcd1);
 	lcd_destroy_module_klcd(klcd, "lcd_test_mod_vmfunc_klcd_caller_klcd");
 fail3:
-fail2:
 	lcd_exit(0); /* tears down everything else */
 fail1:
 	return ret;
@@ -129,7 +107,7 @@ static int shutdown = 0;
 int boot_lcd_thread(void *data)
 {
 	static unsigned once = 0;
-	int ret;
+	int ret = 0;
 	while (!kthread_should_stop()) {
 		if (!once) {
 			LCD_MAIN({
@@ -141,17 +119,19 @@ int boot_lcd_thread(void *data)
 	}
 	msleep(2000);
 	LIBLCD_MSG("Exiting thread");
+	/* tear down everything only if the load was successful */
+	if (!ret) {
+		lcd_destroy_module_klcd(klcd, "lcd_test_mod_vmfunc_klcd_caller_klcd");
 
-	lcd_destroy_module_klcd(klcd, "lcd_test_mod_vmfunc_klcd_caller_klcd");
+		if (current->lcd) {
+			lcd_cap_delete(lcd);
+		}
 
-	if (current->lcd) {
-		lcd_cap_delete(lcd);
+		if (lcd_ctx)
+			lcd_destroy_create_ctx(lcd_ctx); /* tears down LCD 2 */
+
+		lcd_exit(0);
 	}
-
-	if (lcd_ctx)
-		lcd_destroy_create_ctx(lcd_ctx); /* tears down LCD 2 */
-
-	lcd_exit(0);
 	return 0;
 }
 struct task_struct *boot_task;

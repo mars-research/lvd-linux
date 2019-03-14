@@ -30,19 +30,20 @@ static int caller_main(void)
 	int ret;
 	unsigned int transaction_id = 0;
 	u64 start, end;
+	struct fipc_message dummy;
+	fipc_set_reg1(&dummy, 0xabcd);
 	/*
 	 * Boot
 	 */
+	printk("%s entered\n", __func__);
 	ret = lcd_enter();
 	if (ret)
 		goto out;
 
 	start = lcd_RDTSC_START();
 	while (transaction_id < TRANSACTIONS) {
-#ifdef HOST_LINUX_IN_VM
 		if (transaction_id == 0)
-			vmfunc_wrapper(NULL);
-#endif
+			vmfunc_wrapper(&dummy);
 		transaction_id++;
 	}
 	end = lcd_RDTSC_STOP();

@@ -526,10 +526,14 @@ fail1:
 		 * Get the corresponding host page 
 		 */
 		p = vmalloc_to_page(hva2va(hva));
+#ifdef CONFIG_LVD
+		err_ret = lcd_arch_ept_unmap_all_cpus(lcd->lcd_arch, gpa);
+#else
 		/*
 		 * Unmap it from the LCD's guest physical
 		 */
 		err_ret = lcd_arch_ept_unmap(lcd->lcd_arch, gpa);
+#endif
 		if (err_ret)
 			LCD_ERR("double fault: error unmapping vmalloc page in LCD");
 	}

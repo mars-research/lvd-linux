@@ -949,7 +949,13 @@ int lcd_arch_create(struct lcd_arch **out)
 #ifdef CONFIG_LVD
 	lcd_arch->ept_id = 1; 
 
-	lcd_arch->eptp_lcd = kmalloc(GFP_KERNEL, sizeof(u64) * num_online_cpus());
+	lcd_arch->eptp_lcd = kmalloc(sizeof(u64) * num_online_cpus(), GFP_KERNEL);
+
+	if (!lcd_arch->eptp_lcd) {
+		LCD_ERR("Out of memory");
+		ret = -ENOMEM;
+		goto fail_alloc;
+	}
 
 	/* create ept for this LCD on all cpus */
 	for_each_online_cpu(cpu) {
@@ -1062,8 +1068,8 @@ void lcd_arch_destroy(struct lcd_arch *lcd_arch)
 	vmx_free_vpid(lcd_arch);
 	lcd_arch_free_vmcs(lcd_arch->vmcs);
 	lcd_arch_ept_free(lcd_arch);
-	kmem_cache_free(lcd_arch_cache, lcd_arch);
 #endif
+	kmem_cache_free(lcd_arch_cache, lcd_arch);
 }
 
 #if 0

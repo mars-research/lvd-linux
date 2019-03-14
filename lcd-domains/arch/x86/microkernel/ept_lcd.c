@@ -249,8 +249,9 @@ int lcd_arch_ept_walk_cpu(lcd_arch_epte_t *dir, gpa_t a, int create,
 int lcd_arch_ept_map_all_cpus(struct lcd_arch *lcd, gpa_t ga, hpa_t ha,
 				int create, int overwrite)
 {
-	int ret;
+	int ret = 0;
 	int cpu;
+
 	/*
 	 * Walk ept
 	 */
@@ -266,10 +267,9 @@ int lcd_arch_ept_map_all_cpus(struct lcd_arch *lcd, gpa_t ga, hpa_t ha,
 		 * Check if guest physical address already mapped
 		 */
 		if (!overwrite && vmx_epte_present(*ept_entry)) {
-			LCD_ERR("would overwrite hpa %lx with hpa %lx\n",
-				hpa_val(lcd_arch_ept_hpa(ept_entry)),
-				hpa_val(ha));
-			LCD_ERR("mapping call for gpa %lx | hpa %lx\n", ga, ha);
+			LCD_ERR("cpu:%d would overwrite hpa %lx with hpa %lx, gpa: %lx, hpa: %lx",
+				cpu, hpa_val(lcd_arch_ept_hpa(ept_entry)),
+				hpa_val(ha), ga, ha);
 			ret |= -EINVAL;
 			continue;
 		}
@@ -280,7 +280,7 @@ int lcd_arch_ept_map_all_cpus(struct lcd_arch *lcd, gpa_t ga, hpa_t ha,
 		lcd_arch_ept_set(ept_entry, ha);
 	}
 
-	return 0;
+	return ret;
 }
 
 int lcd_arch_ept_map_range_all_cpus(struct lcd_arch *lcd, gpa_t ga_start,

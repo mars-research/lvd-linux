@@ -497,7 +497,15 @@ void lcd_free_pages(struct page *base, unsigned int order)
 	 */
 	lcd_cap_delete(page_cptr);
 }
-
+/*
+ * For LVDs, we will not duplicate module pages as there is no separate page
+ * table for LVD modules. We only have a separate EPT. So, the module pages has
+ * to be inserted into the relevant resource trees because the memory mapping
+ * functions would look into these resource trees to map a page onto LVD EPTs.
+ * This function calls the same set of functions invoked by lcd_vmalloc, except
+ * allocating and mapping memory. The memory is already allocated to us by the
+ * kernel.
+ */
 int lcd_create_mo_metadata(hva_t pages_base, unsigned long size)
 {
 
@@ -505,7 +513,7 @@ int lcd_create_mo_metadata(hva_t pages_base, unsigned long size)
 	int ret;
 	cptr_t slot;
 	void *vptr = hva2va(pages_base);
-	struct lcd_memory_object *unused;
+	struct lcd_memory_object *mo;
 	struct lcd *lcd = current->lcd;
 
 	/*
@@ -527,14 +535,28 @@ int lcd_create_mo_metadata(hva_t pages_base, unsigned long size)
 	 */
 	ret = __lcd_insert_memory_object(lcd, slot, vptr, nr_pages,
 					LCD_MICROKERNEL_TYPE_ID_VMALLOC_MEM,
-					&unused);
+					&mo);
 	if (ret) {
 		LCD_ERR("failed to insert vmalloc mem capability into caller's cspace");
 		goto fail2;
 	}
-
+	/*
+	 * Insert into proper resource tree, depending on its type
+	 *
+	 * XXX: If the same memory object gets inserted more than
+	 * once, we can end up with duplicates in the trees. This occurs
+	 * when non-isolated code has multiple capabilities to the
+	 * same memory object. This is OK for now (address -> cptr
+	 * translation just needs some cptr, size, offset, etc.).
+	 */
+	ret = mo_insert_in_trees(current, mo, slot);
+	if (ret) {
+		LIBLCD_ERR("insert into resource tree failed");
+		goto fail3;
+	}
 	return 0;
 
+fail3:
 fail2:
 	lcd_cptr_free(slot);
 fail1:

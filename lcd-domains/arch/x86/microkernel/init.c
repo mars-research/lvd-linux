@@ -556,9 +556,22 @@ static int vmx_alloc_vmfunc_ept_switching_page(void)
 	return 0;
 }
 
-int lcd_arch_vmfunc_init(void) {
+int lcd_arch_vmfunc_init(void)
+{
+	int ret = 0;
+
 	vmx_alloc_vmfunc_ept_switching_page();
-	return 0; 
+	/*
+	 * Init lcd_arch_thread cache (using instead of kmalloc since
+	 * these structs need to be aligned properly)
+	 */
+	lcd_arch_cache = KMEM_CACHE(lcd_arch, 0);
+	if (!lcd_arch_cache) {
+		LCD_ERR("failed to set up kmem cache\n");
+		ret = -ENOMEM;
+	}
+
+	return ret;
 }
 #else
 

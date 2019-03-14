@@ -573,6 +573,12 @@ int lcd_arch_vmfunc_init(void)
 
 	return ret;
 }
+
+void lcd_arch_vmfunc_exit(void)
+{
+	kmem_cache_destroy(lcd_arch_cache);
+}
+
 #else
 
 int lcd_arch_init(void)

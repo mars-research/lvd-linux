@@ -18,6 +18,7 @@
 #include <lcd_domains/microkernel.h>
 
 #define LCD_BFCALL_ADD_EPT 0x4BF00031
+#define LCD_BFCALL_DUMP_STACK 0x4BF00032
 
 /**
  * Add the page that contains EPT ids for VMFUNC calls
@@ -59,5 +60,26 @@ static inline unsigned int bfcall_install_vmfunc_ept_page(struct page *eptp_list
 
 	return eax; 
 }
+
+static inline unsigned int bfcall_dump_stack(void)
+{
+	unsigned int eax, ebx = 0, ecx = 0, edx = 0; 
+
+	eax = LCD_BFCALL_DUMP_STACK; 
+	
+	LCD_MSG("Trigger dump stack\n");
+
+	/* ecx is often an input as well as an output. */
+	asm volatile("cpuid"
+	    : "=a" (eax),
+	      "=b" (ebx),
+	      "=c" (ecx),
+	      "=d" (edx)
+	    : "0" (eax), "1" (ebx), "2" (ecx), "3" (edx)
+	    : "memory");
+
+	return eax; 
+}
+
 
 #endif /* ASM_X86_LCD_DOMAINS_BFLANK_H */

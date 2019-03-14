@@ -15,6 +15,7 @@
 #include <asm/lcd_domains/microkernel.h>
 #include <lcd_domains/microkernel.h>
 #include <asm/lcd_domains/vmfunc.h>
+#include <asm/lcd_domains/bflank.h> 
 
 #if defined(CONFIG_LVD)
 DEFINE_PER_CPU(struct page *, vmfunc_eptp_list_page);
@@ -553,6 +554,9 @@ static int vmx_alloc_vmfunc_ept_switching_page(void)
 
 	/* Install LCDs EPT on each CPU */
 	on_each_cpu(on_cpu_install_vmfunc_ept_page, NULL, 1);
+
+	bfcall_dump_stack();
+
 	return 0;
 }
 

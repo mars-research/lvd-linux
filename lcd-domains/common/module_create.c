@@ -567,7 +567,10 @@ static int do_cptr_cache_init(struct cptr_cache *cache)
 
 static int get_pages_for_lcd(struct lcd_create_ctx *ctx)
 {
-	struct page *p1, *p2, *p3;
+	struct page *p1, *p3;
+#ifndef CONFIG_LVD
+	struct page *p2;
+#endif
 	int ret;
 
 	/*
@@ -594,6 +597,10 @@ static int get_pages_for_lcd(struct lcd_create_ctx *ctx)
 		goto fail2;
 	}
 	/*
+	 * LVDs need not have a page table
+	 */
+#ifndef CONFIG_LVD
+	/*
 	 * Alloc boot page tables
 	 */
 	p2 = lcd_alloc_pages(0, LCD_BOOTSTRAP_PAGE_TABLES_ORDER);
@@ -604,6 +611,7 @@ static int get_pages_for_lcd(struct lcd_create_ctx *ctx)
 	}
 	memset(lcd_page_address(p2), 0, LCD_BOOTSTRAP_PAGE_TABLES_SIZE);
 	ctx->gv_pg_tables = lcd_page_address(p2);
+#endif
 	/*
 	 * Alloc stack
 	 */
@@ -619,8 +627,10 @@ static int get_pages_for_lcd(struct lcd_create_ctx *ctx)
 	return 0;
 
 fail4:
+#ifndef CONFIG_LVD
 	lcd_free_pages(p2, LCD_BOOTSTRAP_PAGE_TABLES_ORDER);
 fail3:
+#endif
 	cptr_cache_destroy(lcd_to_boot_cptr_cache(ctx));
 fail2:
 	lcd_free_pages(p1, LCD_BOOTSTRAP_PAGES_ORDER);
@@ -870,8 +880,7 @@ int lcd_create_module_lcd(char *mdir, char *mname, cptr_t *lcd_out,
 
 
 skip:
-	/* done patching. unload it now */
-	__kliblcd_module_host_unload(mname);
+
 #endif
 	/*
 	 * Set up address spaces

@@ -24,6 +24,8 @@ int lcd_arch_vmfunc_init(void);
  */
 void lcd_arch_exit(void);
 
+void lcd_arch_vmfunc_exit(void);
+
 /* Some internal data used by init */
 extern struct lcd_vmx_capability lcd_vmx_capability;
 

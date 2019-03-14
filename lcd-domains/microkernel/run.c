@@ -617,8 +617,10 @@ int __lcd_kthread_main(void *data) /* data is NULL */
 	 * reference to itself, we should tear it down.
 	 */
 	switch (current_lcd->type) {
-#ifndef CONFIG_LVD
 	case LCD_TYPE_ISOLATED:
+#ifdef CONFIG_LVD
+		return 0;
+#else
 		return main_for_lcd(current_lcd);
 #endif
 	case LCD_TYPE_NONISOLATED:

@@ -20,6 +20,7 @@
 #include <lcd_domains/types.h>
 #include <uapi/lcd_domains.h>
 #include <lcd_domains/microkernel.h>
+#include <asm/lcd_domains/vmfunc.h>
 #include <asm/lcd_domains/init.h>
 #include <libcap.h>
 #include <libfipc.h>
@@ -103,6 +104,12 @@ static int __init lcd_init(void)
 		LCD_ERR("failed to init VMFUNC");
 		goto fail0;
 	}
+
+	ret = create_cpuid_pages();
+	if (ret) {
+		LCD_ERR("failed to create cpuid pages");
+		goto fail0a;
+	}
 #else
 	ret = lcd_arch_init();
 	if (ret) {
@@ -184,9 +191,14 @@ fail3:
 fail2:
 	cap_fini();
 fail1:
-#ifndef CONFIG_LVD
+	destroy_cpuid_pages();
+fail0a:
+#ifdef CONFIG_LVD
+	lcd_arch_vmfunc_exit();
+#else
 	lcd_arch_exit();
 #endif
+
 fail0:
 	return ret;
 }
@@ -203,7 +215,10 @@ static void __exit lcd_exit(void)
 	__lcd_ipc_exit();
 	__lcd_exit_cap_types();
 	cap_fini();
-#ifndef CONFIG_LVD
+#ifdef CONFIG_LVD
+	lcd_arch_vmfunc_exit();
+	destroy_cpuid_pages();
+#else
 	lcd_arch_exit();
 #endif
 	LCD_MSG("lcd microkernel exited");

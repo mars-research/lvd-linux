@@ -302,10 +302,9 @@ int lcd_load_module(char *mdir, char *mname,
 	 * loader to hang onto it now that we've got the program
 	 * bits.
 	 */
-#ifndef VMFUNC_PAGE_REMAP
-	/* Do not unload the module from host, yet. we need to patch a few
-	 * relocs before finalizing the module. Do it once we setup the address
-	 * spaces.
+#ifndef CONFIG_LVD
+	/* Do not unload the module from host. We will map these pages onto
+	 * LVDs EPT.
 	 */
 	__kliblcd_module_host_unload(mname);
 #endif

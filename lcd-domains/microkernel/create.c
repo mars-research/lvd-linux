@@ -531,6 +531,7 @@ static void destroy_cspace_and_utcb(struct lcd *lcd)
 	lcd->utcb = NULL;
 }
 
+#ifndef CONFIG_LVD
 static void destroy_kthread(struct lcd *lcd)
 {
 	int ret;
@@ -548,6 +549,7 @@ static void destroy_kthread(struct lcd *lcd)
 	put_task_struct(lcd->kthread);
 	lcd->kthread = NULL;
 }
+#endif
 
 void __lcd_destroy_no_vm_no_thread(struct lcd *lcd)
 {
@@ -603,7 +605,9 @@ void __lcd_destroy(struct lcd *lcd)
 	 *     ept, which requires the lcd arch.)
 	 */
 	mark_lcd_as_dead(lcd);
+#ifndef CONFIG_LVD
 	destroy_kthread(lcd);
+#endif
 	destroy_cspace_and_utcb(lcd);
 	lcd_arch_destroy(lcd->lcd_arch);
 	lcd->lcd_arch = NULL;

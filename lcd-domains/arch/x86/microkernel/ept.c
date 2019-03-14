@@ -221,7 +221,7 @@ static void vmx_epte_set(lcd_arch_epte_t *epte, hpa_t a, int level)
 		*epte &= ~VMX_EPT_IPAT_BIT;
 	}
 }
-
+#ifndef CONFIG_LVD
 int lcd_arch_ept_walk(struct lcd_arch *lcd, gpa_t a, int create,
 		lcd_arch_epte_t **epte_out)
 {
@@ -266,6 +266,7 @@ int lcd_arch_ept_walk(struct lcd_arch *lcd, gpa_t a, int create,
 	*epte_out = &dir[vmx_ept_idx(a, 3)];
 	return 0;
 }
+#endif
 
 void lcd_arch_ept_set(lcd_arch_epte_t *epte, hpa_t a)
 {
@@ -283,6 +284,7 @@ hpa_t lcd_arch_ept_hpa(lcd_arch_epte_t *epte)
 	return vmx_epte_hpa(*epte);
 }
 
+#ifndef CONFIG_LVD
 int lcd_arch_ept_map(struct lcd_arch *lcd, gpa_t ga, hpa_t ha,
 				int create, int overwrite)
 {
@@ -570,3 +572,4 @@ void lcd_arch_ept_dump(struct lcd_arch *lcd)
 {
 	debug_ept_lvl(lcd->ept.root, 0, 0);
 }
+#endif

@@ -565,6 +565,9 @@ static int do_cptr_cache_init(struct cptr_cache *cache)
 	return 0;
 }
 
+void *lcd_stack;
+EXPORT_SYMBOL(lcd_stack);
+
 static int get_pages_for_lcd(struct lcd_create_ctx *ctx)
 {
 	struct page *p1, *p3;
@@ -622,7 +625,7 @@ static int get_pages_for_lcd(struct lcd_create_ctx *ctx)
 		goto fail4;
 	}
 	memset(lcd_page_address(p3), 0, LCD_STACK_SIZE);
-	ctx->stack = lcd_page_address(p3);
+	lcd_stack = ctx->stack = lcd_page_address(p3);
 
 	return 0;
 

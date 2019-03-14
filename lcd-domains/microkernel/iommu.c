@@ -1,4 +1,5 @@
 #include <lcd_domains/lcd_iommu.h>
+#include <asm/lcd_domains/ept_lcd.h>
 
 /* Map the whole of heap and rammap regions for now.
  * Once the allocation logic is figured out, one can even introduce
@@ -46,8 +47,11 @@ int lcd_iommu_map_page(struct lcd *lcd, gpa_t gpa, unsigned int order,
 
 	for (i = 0; i < gfn_end; ++i) {
 		gpa_t ga = gfn_to_gpa(gfn_start + i);
+#ifdef CONFIG_LVD
+		ret = lcd_arch_ept_gpa_to_hpa_cpu(lcd->lcd_arch, ga, &hpa, false, smp_processor_id());
+#else
 		ret = lcd_arch_ept_gpa_to_hpa(lcd->lcd_arch, ga, &hpa, false);
-
+#endif
 		/* no mapping, continue */
 		if (ret) {
 			/* reset ret as this might be the last
@@ -112,8 +116,11 @@ int lcd_iommu_unmap_page(struct lcd *lcd, gpa_t gpa, unsigned int order)
 
 	for (i = 0; i < gfn_end; ++i) {
 		gpa_t ga = gfn_to_gpa(gfn_start + i);
-
+#ifdef CONFIG_LVD
+		ret = lcd_arch_ept_gpa_to_hpa_cpu(lcd->lcd_arch, ga, &hpa, false, smp_processor_id());
+#else
 		ret = lcd_arch_ept_gpa_to_hpa(lcd->lcd_arch, ga, &hpa, false);
+#endif
 
 		/* no mapping. Just return */
 		/* TODO: it might be possible that the LCD has freed the memory
@@ -156,10 +163,13 @@ int lcd_iommu_map_memory(struct lcd *lcd)
 		for (; p < gfn_end; ++p) {
 			gpa_t ga = gfn_to_gpa(p);
 			hpa_t hpa;
-
+#ifdef CONFIG_LVD
+			ret = lcd_arch_ept_gpa_to_hpa_cpu(lcd->lcd_arch, ga, &hpa, false, smp_processor_id());
+#else
 			ret =
 			    lcd_arch_ept_gpa_to_hpa(lcd->lcd_arch, ga, &hpa,
 						    false);
+#endif
 
 			/* no entry. Just continue */
 			if (ret)

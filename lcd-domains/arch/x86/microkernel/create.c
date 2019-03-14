@@ -928,6 +928,11 @@ static void vmx_free_vpid(struct lcd_arch *lcd_arch)
 }
 #endif /* CONFIG_LVD */
 
+static inline bool cpu_has_vmx_ept_ad_bits(void)
+{
+	return lcd_vmx_capability.ept & VMX_EPT_AD_BIT;
+}
+
 int lcd_arch_create(struct lcd_arch **out)
 {
 	struct lcd_arch *lcd_arch;
@@ -962,12 +967,23 @@ int lcd_arch_create(struct lcd_arch **out)
 		/* Get the EPT VMFUNC switching page for this CPU */
 		struct page *eptp_list_page = __this_cpu_read(vmfunc_eptp_list_page); 
 		u64 *eptp_list = phys_to_virt(page_to_phys(eptp_list_page)); 
+		u64 eptp;
+		u64 *root;
 
 		/* Allocate LCDs EPT */
 		lcd_arch->eptp_lcd[cpu] = lcd_arch_ept_init_one();
+		root = (u64*) lcd_arch->eptp_lcd[cpu];
+
+		eptp = VMX_EPT_DEFAULT_MT |
+			(LCD_ARCH_EPT_WALK_LENGTH - 1) << LCD_ARCH_EPTP_WALK_SHIFT;
+		if (cpu_has_vmx_ept_ad_bits()) {
+			//lcd_arch->ept.access_dirty_enabled = true;
+			eptp |= VMX_EPT_AD_ENABLE_BIT;
+		}
+		eptp |= hpa_val(va2hpa(root)) & PAGE_MASK;
 
 		/* Add EPT to the VMFUNC switching page */
-		eptp_list[lcd_arch->ept_id] = lcd_arch->eptp_lcd[cpu];
+		eptp_list[lcd_arch->ept_id] = eptp;
 	}
 
 #else

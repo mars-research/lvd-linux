@@ -112,6 +112,7 @@ struct lcd_arch {
 	 * if we have already launched; intel makes us track this)
 	 */
 	int launched;
+#ifndef CONFIG_LVD
 	/*
 	 * VPID of the vm, used by the tlb for vpid-specific invalidations
 	 */
@@ -129,9 +130,17 @@ struct lcd_arch {
 		u64 vmcs_ptr; /* to be loaded in vmcs EPT_POINTER field */
 		bool access_dirty_enabled;
 	} ept;
-
+#endif
 	/* eptp_lcd for all online cpus */
+	struct {
+		struct mutex lock;
+		lcd_arch_epte_t *root;
+		u64 vmcs_ptr; /* to be loaded in vmcs EPT_POINTER field */
+		bool access_dirty_enabled;
+	} eptp_lcds;
+
 	u64 *eptp_lcd;
+
 	/* id of this specific EPT that we use in VMFUNC */
 	unsigned int ept_id; 
 

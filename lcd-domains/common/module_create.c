@@ -37,7 +37,6 @@ struct lcd_mem_region {
 
 #define LCD_NR_MEM_REGIONS 6
 
-#ifndef CONFIG_LVD
 static struct lcd_mem_region lcd_mem_regions[LCD_NR_MEM_REGIONS] = {
 	{
 		"miscellaneous",
@@ -76,7 +75,6 @@ static struct lcd_mem_region lcd_mem_regions[LCD_NR_MEM_REGIONS] = {
 		.flags =  LCD_WRITEBACK_FLAGS,
 	},
 };
-#endif
 
 /* PHYSICAL ADDRESS SPACE -------------------------------------------------- */
 
@@ -149,12 +147,8 @@ static int do_kernel_module_grant_map(cptr_t lcd, struct lcd_create_ctx *ctx,
 		gva_val(LCD_KERNEL_MODULE_REGION_GV_ADDR);
 	c = &(lcd_to_boot_info(ctx)->lcd_boot_cptrs.module_init);
 	ret = do_grant_and_map_for_mem(lcd, ctx, ctx->m_init_bits,
-#ifdef CONFIG_LVD
-				__gpa(__pa(ctx->m_init_bits)),
-#else
 				gpa_add(LCD_KERNEL_MODULE_REGION_GP_ADDR,
 					offset),
-#endif
 				c);
 	if (ret)
 		goto fail1;
@@ -163,12 +157,8 @@ static int do_kernel_module_grant_map(cptr_t lcd, struct lcd_create_ctx *ctx,
 		gva_val(LCD_KERNEL_MODULE_REGION_GV_ADDR);
 	c = &(lcd_to_boot_info(ctx)->lcd_boot_cptrs.module_core);
 	ret = do_grant_and_map_for_mem(lcd, ctx, ctx->m_core_bits,
-#ifdef CONFIG_LVD
-				__gpa(__pa(ctx->m_core_bits)),
-#else
 				gpa_add(LCD_KERNEL_MODULE_REGION_GP_ADDR,
 					offset),
-#endif
 				c);
 	if (ret)
 		goto fail2;
@@ -178,20 +168,8 @@ static int do_kernel_module_grant_map(cptr_t lcd, struct lcd_create_ctx *ctx,
 		gva_val(LCD_KERNEL_MODULE_REGION_GV_ADDR);
 	c = &(lcd_to_boot_info(ctx)->lcd_boot_cptrs.vmfunc_page);
 	ret = do_grant_and_map_for_mem(lcd, ctx, ctx->m_vmfunc_bits,
-#ifdef CONFIG_LVD
-	/* for vmfunc page, we take a fresh copy of the page, make relocations
-	 * of other sections point to this new page.  to map this page onto
-	 * LCDs ept at the same virtual address as KLCDs vmfunc page, we need
-	 * to create a different gpa-hpa mapping for this page. Let's pass the
-	 * GPA of KLCDs vmfunc page and HPA of our newly copied page.  This
-	 * way, a mapping would be created for this gpa and the corressponding
-	 * hpa would be the hpa of our newly copied page
-	 */
-				__gpa(__pa((void*)gva_val(m_vmfunc_page_addr))),
-#else
 				gpa_add(LCD_KERNEL_MODULE_REGION_GP_ADDR,
 					offset),
-#endif
 				c);
 	if (ret)
 		goto fail3;
@@ -234,39 +212,21 @@ static int setup_phys_addr_space(cptr_t lcd, struct lcd_create_ctx *ctx,
 	 */
 	c = &(lcd_to_boot_info(ctx)->lcd_boot_cptrs.boot_pages);
 	ret = do_grant_and_map_for_mem(lcd, ctx, ctx->lcd_boot_info,
-#ifdef CONFIG_LVD
-	/* XXX: we have linear virtual address of this page in lcd_boot info.
-	 * there is no additional virt-to-phys mapping inside LCDs as it is
-	 * mapped in host address space. The LCD will have this at the same
-	 * virtual address.  However, we need an EPT entry for this object on
-	 * LCD's EPT. To achieve that we need to go through physical addresses
-	 * of these pages (which should be a direct mapping as we deprivilege
-	 * the whole host linux into a VT-x domain), then add entries for those
-	 * pages in LCDs EPT.
-	 */
-				__gpa(__pa(ctx->lcd_boot_info)),
-#else
 				LCD_BOOTSTRAP_PAGES_GP_ADDR,
-#endif
 				c);
 	if (ret)
 		goto fail1;
-#ifndef CONFIG_LVD
+
 	/* in vmfunc LCDS, there are no additional guest page tables for LCDs */
 	c = &(lcd_to_boot_info(ctx)->lcd_boot_cptrs.gv);
 	ret = do_grant_and_map_for_mem(lcd, ctx, ctx->gv_pg_tables,
 				LCD_BOOTSTRAP_PAGE_TABLES_GP_ADDR, c);
 	if (ret)
 		goto fail2;
-#endif
 
 	c = &(lcd_to_boot_info(ctx)->lcd_boot_cptrs.stack);
 	ret = do_grant_and_map_for_mem(lcd, ctx, ctx->stack,
-#ifdef CONFIG_LVD
-				__gpa(__pa(ctx->stack)),
-#else
 				LCD_STACK_GP_ADDR,
-#endif
 				c);
 	if (ret)
 		goto fail3;
@@ -291,9 +251,7 @@ static int setup_phys_addr_space(cptr_t lcd, struct lcd_create_ctx *ctx,
 
 fail4:  /* Just return; caller should kill new LCD and free up resources. */
 fail3:
-#ifndef CONFIG_LVD
 fail2:
-#endif
 fail1:
 	return ret;
 }
@@ -322,7 +280,6 @@ void lcd_dump_virt_addr_space(struct lcd_create_ctx *ctx)
 	}
 }
 
-#ifndef CONFIG_LVD
 static void setup_lcd_pmd(struct lcd_mem_region *reg, pmd_t *pmd,
 			unsigned int gigabyte_idx)
 {
@@ -440,7 +397,6 @@ static void setup_virt_addr_space(struct lcd_create_ctx *ctx)
 	 */
 	setup_lcd_pmds(cursor);
 }
-#endif
 
 static int setup_addr_spaces(cptr_t lcd, struct lcd_create_ctx *ctx,
 			gva_t m_init_link_addr, gva_t m_core_link_addr,
@@ -478,10 +434,8 @@ static int setup_addr_spaces(cptr_t lcd, struct lcd_create_ctx *ctx,
 	/*
 	 * Set up virtual address space
 	 */
-#ifndef CONFIG_LVD
 	/* VMFUNC lcds does not need another virtual address space */
 	setup_virt_addr_space(ctx);
-#endif
 	return 0;
 
 fail1: /* just return non-zero ret; caller will free mem */
@@ -522,7 +476,7 @@ static void destroy_create_ctx(struct lcd_create_ctx *ctx)
 	 * pages will be freed by microkernel.
 	 */
 	if (ctx->m_init_bits)
-		lcd_release_module(ctx->m_init_bits, ctx->m_core_bits);
+		lcd_release_module(ctx->m_init_bits, ctx->m_core_bits, ctx->m_vmfunc_bits);
 	if (ctx->stack)
 		lcd_free_pages(lcd_virt_to_head_page(ctx->stack),
 			LCD_STACK_ORDER);
@@ -570,10 +524,8 @@ EXPORT_SYMBOL(lcd_stack);
 
 static int get_pages_for_lcd(struct lcd_create_ctx *ctx)
 {
-	struct page *p1, *p3;
-#ifndef CONFIG_LVD
-	struct page *p2;
-#endif
+	struct page *p1, *p2, *p3;
+
 	int ret;
 
 	/*
@@ -600,10 +552,6 @@ static int get_pages_for_lcd(struct lcd_create_ctx *ctx)
 		goto fail2;
 	}
 	/*
-	 * LVDs need not have a page table
-	 */
-#ifndef CONFIG_LVD
-	/*
 	 * Alloc boot page tables
 	 */
 	p2 = lcd_alloc_pages(0, LCD_BOOTSTRAP_PAGE_TABLES_ORDER);
@@ -614,7 +562,6 @@ static int get_pages_for_lcd(struct lcd_create_ctx *ctx)
 	}
 	memset(lcd_page_address(p2), 0, LCD_BOOTSTRAP_PAGE_TABLES_SIZE);
 	ctx->gv_pg_tables = lcd_page_address(p2);
-#endif
 	/*
 	 * Alloc stack
 	 */
@@ -630,10 +577,8 @@ static int get_pages_for_lcd(struct lcd_create_ctx *ctx)
 	return 0;
 
 fail4:
-#ifndef CONFIG_LVD
 	lcd_free_pages(p2, LCD_BOOTSTRAP_PAGE_TABLES_ORDER);
 fail3:
-#endif
 	cptr_cache_destroy(lcd_to_boot_cptr_cache(ctx));
 fail2:
 	lcd_free_pages(p1, LCD_BOOTSTRAP_PAGES_ORDER);
@@ -944,7 +889,7 @@ fail6:
 fail5:
 	lcd_cap_delete(lcd);
 fail4:
-	lcd_release_module(ctx->m_init_bits, ctx->m_core_bits);
+	lcd_release_module(ctx->m_init_bits, ctx->m_core_bits, ctx->m_vmfunc_bits);
 fail3:
 fail2:
 	destroy_create_ctx(ctx);

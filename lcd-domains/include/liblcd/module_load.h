@@ -68,4 +68,4 @@ int lcd_load_module(char *mdir, char *mname,
  * the host. (Hence the name "release" - the module won't necessarily
  * be completely freed.)
  */
-void lcd_release_module(void *m_init_bits, void *m_core_bits);
+void lcd_release_module(void *m_init_bits, void *m_core_bits, void *m_vmfunc_bits);

@@ -127,12 +127,6 @@ fail:
 }
 
 /* HIGHER-LEVEL LOAD/UNLOAD ---------------------------------------- */
-#ifdef CONFIG_LVD
-static int create_metadata(hva_t pages_base, unsigned long size)
-{
-	return lcd_create_mo_metadata(pages_base, size);
-}
-#endif
 static int dup_module_pages(hva_t pages_base, unsigned long size,
 			void **dup_pages_bits,
 			cptr_t *dup_pages_cap_out)
@@ -172,12 +166,10 @@ fail1:
 	return ret;
 }
 
-#ifndef CONFIG_LVD
 static void dedup_module_pages(void *pages_bits)
 {
 	lcd_vfree(pages_bits);
 }
-#endif
 
 int lcd_load_module(char *mdir, char *mname,
 		void **m_init_bits,
@@ -227,7 +219,6 @@ int lcd_load_module(char *mdir, char *mname,
 	if (ret)
 		goto fail1;
 
-#ifndef CONFIG_LVD
 	/*
 	 * Dup init and core pages so that LCD will use a copy
 	 * separate from the host (this will protect things
@@ -246,17 +237,6 @@ int lcd_load_module(char *mdir, char *mname,
 		LIBLCD_ERR("failed to load module's core");
 		goto fail3;
 	}
-#else
-	/* for LCDs with no page tables, there is no need to take a copy.
-	 * Let the module get loaded onto host normally and we map those
-	 * pages in our new EPT
-	 */
-	create_metadata(va2hva(m->init_layout.base), m->init_layout.size);
-	create_metadata(va2hva(m->core_layout.base), m->core_layout.size);
-
-	*m_init_bits = m->init_layout.base;
-	*m_core_bits = m->core_layout.base;
-#endif
 
 #ifdef VMFUNC_PAGE_REMAP
 	vmfunc_load_addr_lcd = kallsyms_lookup_name("vmfunc_load_addr");
@@ -312,26 +292,23 @@ int lcd_load_module(char *mdir, char *mname,
 #ifdef VMFUNC_PAGE_REMAP
 fail4:
 #endif
-#ifndef CONFIG_LVD
 	dedup_module_pages(*m_core_bits);
 fail3:
 	dedup_module_pages(*m_init_bits);
 fail2:
 	__kliblcd_module_host_unload(mname);
-#endif /* CONFIG_LVD */
 fail1:
 	return ret;
 }
 
-void lcd_release_module(void *m_init_bits, void *m_core_bits)
+void lcd_release_module(void *m_init_bits, void *m_core_bits, void *m_vmfunc_bits)
 {
 	/*
 	 * Delete duplicates
 	 */
-#ifndef CONFIG_LVD
 	dedup_module_pages(m_init_bits);
 	dedup_module_pages(m_core_bits);
-#endif
+	dedup_module_pages(m_vmfunc_bits);
 }
 
 /* EXPORTS -------------------------------------------------- */

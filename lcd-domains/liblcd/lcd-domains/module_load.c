@@ -28,7 +28,7 @@ int lcd_load_module(char *mdir, char *mname,
 	return -ENOSYS; /* not implemented */
 }
 
-void lcd_release_module(void *m_init_bits, void *m_core_bits)
+void lcd_release_module(void *m_init_bits, void *m_core_bits, void *m_vmfunc_bits)
 {
 	return; /* not implemented */
 }

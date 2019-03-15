@@ -525,8 +525,9 @@ EXPORT_SYMBOL(lcd_stack);
 static int get_pages_for_lcd(struct lcd_create_ctx *ctx)
 {
 	struct page *p1, *p2, *p3;
-
+	int c;
 	int ret;
+	void **stack_pages;
 
 	/*
 	 * We explicity zero things out. If this code is used inside
@@ -562,20 +563,42 @@ static int get_pages_for_lcd(struct lcd_create_ctx *ctx)
 	}
 	memset(lcd_page_address(p2), 0, LCD_BOOTSTRAP_PAGE_TABLES_SIZE);
 	ctx->gv_pg_tables = lcd_page_address(p2);
-	/*
-	 * Alloc stack
-	 */
-	p3 = lcd_alloc_pages(0, LCD_STACK_ORDER);
-	if (!p3) {
-		LIBLCD_ERR("alloc stack pages failed");
+
+	ctx->stack = kzalloc(sizeof(void*) * num_online_cpus(), GFP_KERNEL);
+
+	stack_pages = kzalloc(sizeof(void*) * num_online_cpus(), GFP_KERNEL);
+
+	if (!ctx->stack || !stack_pages) {
+		LIBLCD_ERR("alloc boot page tables failed");
 		ret = -ENOMEM;
 		goto fail4;
 	}
-	memset(lcd_page_address(p3), 0, LCD_STACK_SIZE);
-	lcd_stack = ctx->stack = lcd_page_address(p3);
+
+	for_each_online_cpu(c) {
+		/*
+		 * Alloc stack
+		 */
+		p3 = lcd_alloc_pages(0, LCD_STACK_ORDER);
+		if (!p3) {
+			LIBLCD_ERR("alloc stack pages failed");
+			ret = -ENOMEM;
+			goto fail5;
+		}
+		memset(lcd_page_address(p3), 0, LCD_STACK_SIZE);
+		ctx->stack[c] = lcd_page_address(p3);
+		stack_pages[c] = p3;
+	}
+
+	kfree(stack_pages);
 
 	return 0;
 
+fail5:
+	for ( ; c >= 0; c--) {
+		lcd_free_pages(stack_pages[c], LCD_BOOTSTRAP_PAGE_TABLES_ORDER);
+	}
+
+	kzfree(stack_pages);
 fail4:
 	lcd_free_pages(p2, LCD_BOOTSTRAP_PAGE_TABLES_ORDER);
 fail3:

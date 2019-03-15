@@ -145,7 +145,7 @@ struct lcd_create_ctx {
 	 */
 	struct lcd_boot_info *lcd_boot_info;
 	void *gv_pg_tables;
-	void *stack;
+	void **stack;
 	void *vmfunc_page;
 	unsigned long global_vmfunc_page;
 	void *m_init_bits;

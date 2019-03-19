@@ -482,7 +482,7 @@ static int isolated_map_vmalloc_mem(struct lcd *lcd,
 	 * The base host virtual address is stored in the object
 	 */
 	vmalloc_base = __hva((unsigned long)vmalloc_mo->object);
-	LCD_ERR("mapping for vmalloc_base %lx | nr_pages %lu", vmalloc_base, vmalloc_mo->nr_pages);
+	LCD_MSG("mapping for vmalloc_base %lx | nr_pages %lu", vmalloc_base, vmalloc_mo->nr_pages);
 	/*
 	 * Map each page, one at a time
 	 */
@@ -498,7 +498,7 @@ static int isolated_map_vmalloc_mem(struct lcd *lcd,
 		 */
 #ifdef CONFIG_LVD
 		ret = lcd_arch_ept_map_all_cpus(lcd->lcd_arch,
-				__gpa(__pa(page_address(p))),
+				gpa,
 				va2hpa(page_address(p)),
 				true, /* create */
 				false); /* no overwrite */
@@ -566,7 +566,7 @@ static int isolated_map_contiguous_mem(struct lcd *lcd,
 #ifdef CONFIG_LVD
 	/* in LVD's everything is one-to-one mapping */
 	ret = lcd_arch_ept_map_range_all_cpus(lcd->lcd_arch,
-					__gpa(hpa_val(hpa_base)),
+					base,
 					hpa_base,
 					mo->nr_pages);
 #else
@@ -657,7 +657,7 @@ int __lcd_do_map_memory_object(struct lcd *lcd,
 	 */
 	meta->is_mapped = 1;
 
-#ifdef CONFIG_LVD
+#if 0
 	/* LCDs will have a predefined gpa base and the mo will have that
 	 * value.  Whereas, for LVDs we need to map it to the same gpa as the
 	 * host kernel.

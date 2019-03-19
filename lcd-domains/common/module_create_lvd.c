@@ -889,6 +889,9 @@ int lvd_create_module_lvd(char *mdir, char *mname, cptr_t *lcd_out,
 
 	print_hex_dump(KERN_DEBUG, "vmfuncwrapper: ", DUMP_PREFIX_ADDRESS,
 		32, 1, (void*)((char*)ctx->m_core_bits + 0x1000), 0x100, false);
+
+	/* unload the module. we don't need it anymore */
+	__kliblcd_module_host_unload(mname);
 skip:
 
 	/*

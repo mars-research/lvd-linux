@@ -674,6 +674,8 @@ static void destroy_kthread(struct lcd *lcd)
 	 * XXX: it would be nice to pass the return value to someone; for
 	 * now, we just print it out if it's non-zero, and then drop it
 	 */
+	if (!lcd->kthread)
+		return;
 	ret = kthread_stop(lcd->kthread);
 	if (ret)
 		LCD_ERR("got non-zero exit status %d from lcd %p",

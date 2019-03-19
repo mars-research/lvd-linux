@@ -246,6 +246,39 @@ int lcd_arch_ept_walk_cpu(lcd_arch_epte_t *dir, gpa_t a, int create,
 	return 0;
 }
 
+int lcd_arch_ept_map_this_cpu(struct lcd_arch *lcd, gpa_t ga, hpa_t ha,
+				int create, int overwrite)
+{
+	int ret = 0;
+	int cpu = smp_processor_id();
+
+	/*
+	 * Walk ept
+	 */
+	lcd_arch_epte_t *ept_entry;
+	lcd_arch_epte_t *dir = (lcd_arch_epte_t *)lcd->eptp_lcd[cpu];
+	ret = lcd_arch_ept_walk_cpu(dir, ga, create, &ept_entry);
+
+	if (ret)
+		return ret;
+	/*
+	 * Check if guest physical address already mapped
+	 */
+	if (!overwrite && vmx_epte_present(*ept_entry)) {
+		LCD_ERR("cpu:%d would overwrite hpa %lx with hpa %lx, gpa: %lx, hpa: %lx",
+			cpu, hpa_val(lcd_arch_ept_hpa(ept_entry)),
+			hpa_val(ha), ga, ha);
+		ret = -EINVAL;
+	}
+
+	/*
+	 * Map the guest physical addr to the host physical addr.
+	 */
+	lcd_arch_ept_set(ept_entry, ha);
+
+	return ret;
+}
+
 int lcd_arch_ept_map_all_cpus(struct lcd_arch *lcd, gpa_t ga, hpa_t ha,
 				int create, int overwrite)
 {
@@ -526,4 +559,10 @@ void lcd_arch_ept_dump_all_cpus(struct lcd_arch *lcd)
 	for_each_online_cpu(cpu) {
 		debug_ept_lvl((lcd_arch_epte_t*)lcd->eptp_lcd[cpu], 0, 0);
 	}
+}
+
+void lcd_arch_ept_dump_this_cpu(struct lcd_arch *lcd)
+{
+	int cpu = smp_processor_id();
+	debug_ept_lvl((lcd_arch_epte_t*)lcd->eptp_lcd[cpu], 0, 0);
 }

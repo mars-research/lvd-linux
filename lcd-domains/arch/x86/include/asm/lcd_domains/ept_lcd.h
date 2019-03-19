@@ -29,6 +29,10 @@ int lcd_arch_ept_walk_cpu(lcd_arch_epte_t *dir, gpa_t a, int create,
  */
 int lcd_arch_ept_map_all_cpus(struct lcd_arch *lcd, gpa_t ga, hpa_t ha,
 		int create, int overwrite);
+
+int lcd_arch_ept_map_this_cpu(struct lcd_arch *lcd, gpa_t ga, hpa_t ha,
+		int create, int overwrite);
+
 /**
  * Maps
  *
@@ -80,5 +84,7 @@ void lcd_arch_ept_free_all_cpus(struct lcd_arch *lcd);
  * Dump EPTs to console.
  */
 void lcd_arch_ept_dump_all_cpus(struct lcd_arch *lcd);
+
+void lcd_arch_ept_dump_this_cpu(struct lcd_arch *lcd);
 
 #endif /* ASM_X86_LCD_DOMAINS_EPT_LCD_H */

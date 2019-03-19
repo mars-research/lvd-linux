@@ -6,12 +6,9 @@
 #include <asm/lcd_domains/libvmfunc.h>
 #include <lcd_domains/microkernel.h>
 #include <liblcd/liblcd.h>
+#include <linux/stringify.h>
 
 #include <lcd_config/post_hook.h>
-
-/* include/linux/stringify.h */
-#define __stringify_1(x...)	#x
-#define __stringify(x...)	__stringify_1(x)
 
 #define VMFUNC_TEXT_SECTION		".vmfunc.text"
 #define __vmfunc	__attribute__((section(VMFUNC_TEXT_SECTION)))
@@ -23,7 +20,7 @@ int handle_vmfunc_syscall(struct fipc_message *msg);
 int handle_vmfunc_syncipc(struct fipc_message *msg);
 
 /* this is the only function Intel VT-x support */
-static int func = 0;
+#define VM_FUNCTION	0
 
 /* percpu stack pages and stack pointers */
 static void **stack_pages;
@@ -193,7 +190,6 @@ vmfunc_test(struct fipc_message *msg)
 /* functions with vmfunc instructions should be on the same page on both
  * host Linux and LCDs. Place it in a separate section
  */
-#define LOCAL_RESPONSE_BUFFER
 void
 __vmfunc
 vmfunc_call(unsigned int ept, //rdi
@@ -202,25 +198,18 @@ vmfunc_call(unsigned int ept, //rdi
 	asm volatile(
 		/* function prologue pushes callee-saved registers onto the
 		 * stack as we have those registers clobbered */
-#ifdef LOCAL_RESPONSE_BUFFER
+
 		/* push msg pointer onto the stack. this is needed for
 		 * constructing response buffer when the call returns */
 		"push " _REG_RSI " \n\t"
 		"push " _REG_RDI " \n\t"
-#endif
-		/* populate registers as per calling convention */
-#if 0
-		"mov %[reg0]," REG0 " \n\t"
-		"mov %[reg1]," REG1 " \n\t"
-		"mov %[reg2]," REG2 " \n\t"
-		"mov %[reg3]," REG3 " \n\t"
-		"mov %[reg4]," REG4 " \n\t"
-		"mov %[reg5]," REG5 " \n\t"
-		"mov %[reg6]," REG6 " \n\t"
-		"mov %[reg7]," REG7 " \n\t"
-#endif
+		/*
+		 * mov rsi to rax as rsi carries the function arguments to the
+		 * next call
+		 */
 		"mov " _REG_RSI "," _REG_RAX " \n\t"
 
+		/* populate registers as per calling convention */
 		"mov (" _REG_RAX ") ," REG0 " \n\t"
 		"mov 8(" _REG_RAX ") ," REG1 " \n\t"
 		"mov 16(" _REG_RAX ") ," REG2 " \n\t"
@@ -233,78 +222,45 @@ vmfunc_call(unsigned int ept, //rdi
 		/* get cpuid page buffer */
 		"mov %[cpuid], " _REG_RBX " \n\t"
 		/* get cpu number from cpuid page */
-		"mov (" _REG_RBX "), " _REG_RCX " \n\t"
+		"mov (" _REG_RBX "), " _REG_RAX " \n\t"
 		/* get base address of stack pointer array */
 		"mov %[stack_ptrs], " _REG_R13 " \n\t"
-		/* save RSP */
-		//"mov " _REG_RSP ", (" _REG_R13 ", " _REG_RBX ",8) \n\t"
-		//"pop " _REG_RCX " \n\t"
-		/* push it to the cpuid page */
+		/* save rsp to the cpuid page at offset 8*/
 		"mov " _REG_RSP ", 8(" _REG_RBX ") \n\t" 
+		/* pop back the ept value we pushed earlier */
+		"pop " _REG_RCX " \n\t"
 		/* populate stack for vmfunc domain */
-		"mov (" _REG_R13 ", " _REG_RCX ", 8), " _REG_RSP " \n\t"
+		/* FIXME: This should be from TLS of current */
+		"mov (" _REG_R13 ", " _REG_RAX ", 8), " _REG_RSP " \n\t"
+		/* populate eax for vmfunc */
+		"mov %[func], " _REG_EAX " \n\t"
+
 		/* zero callee saved registers */
 		"xor " _REG_RBX "," _REG_RBX " \n\t"
 		"xor " _REG_R13 "," _REG_R13 " \n\t"
 		"xor " _REG_R14 "," _REG_R14 " \n\t"
 		"xor " _REG_R15 "," _REG_R15 " \n\t"
-
-		/* populate eax,ecx for vmfunc */
-		"mov %[func], " _REG_EAX " \n\t"
-		"mov $0, " _REG_ECX " \n\t"
+		"xor " _REG_RBP "," _REG_RBP " \n\t"
 
 		/* call vmfunc */
 		"vmfunc \n\t"
-#if 0
-		/* get cpuid page buffer */
-		"mov %[cpuid], " _REG_RBX " \n\t"
-		/* get cpu number from cpuid page */
-		"mov (" _REG_RBX "), " _REG_RBX " \n\t"
-		/* get base address of stack pointer array */
-		"mov %[stack_ptrs], " _REG_R13 " \n\t"
-		/* restore RSP */
-		"mov (" _REG_R13 ", " _REG_RBX ",8), " _REG_RSP " \n\t"
-#endif
-		//"call vmfunc_dispatch \n\t"
-		/* when the call returns RSP should be the same as above */
-		/* response message is on REG0..REG6 registers */
-		/* if so, do we need to save again? */
-		/* save RSP */
-		/* get cpuid page buffer */
-#if 0
-		"mov %[cpuid], " _REG_RBX " \n\t"
-		/* get cpu number from cpuid page */
-		"mov (" _REG_RBX "), " _REG_RBX " \n\t"
-		/* get base address of stack pointer array */
-		"mov %[stack_ptrs], " _REG_R13 " \n\t"
-		/* save RSP */
-		"mov " _REG_RSP ", (" _REG_R13 ", " _REG_RBX ",8) \n\t"
-		/* we do not need any registers to be saved as we are
-		 * returning to caller
-		 */
-#endif
-		//"mov $0, " _REG_EAX " \n\t"
+		/* stack is populated. we are good to go */
+		"call vmfunc_dispatch \n\t"
+		/* This is the return path */
+		"mov $0, " _REG_EAX " \n\t"
 		/* OTHER_DOMAIN is set via cflags */
-		//"mov $" __stringify(OTHER_DOMAIN) ", " _REG_ECX " \n\t"
+		"mov $" __stringify(OTHER_DOMAIN) ", " _REG_ECX " \n\t"
+
+		/* do a vmfunc back */
 		"vmfunc			\n\t"
 		/* get cpuid page buffer */
 		"mov %[cpuid], " _REG_RBX " \n\t"
 		/* get cpu number from cpuid page */
 		"mov (" _REG_RBX "), " _REG_RCX " \n\t"
-		/* get base address of stack pointer array */
-//		"mov %[stack_ptrs], " _REG_R13 " \n\t"
-		/* restore RSP */
-//		"mov (" _REG_R13 ", " _REG_RBX ",8), " _REG_RSP " \n\t"
+		/* restore KLCD's RSP */
 		"mov 8(" _REG_RBX "), " _REG_RSP " \n\t"
-#ifdef LOCAL_RESPONSE_BUFFER
 		/* stack pointer is restored, let's get our msg buffer */
 		"pop " _REG_R13 " \n\t"
-#else
-		/* get base address of responses buffer */
-		"mov %[resps], " _REG_R13 " \n\t"
-		/* get responses[cpu] */
-		"mov (" _REG_R13 ", " _REG_RBX ",8), " _REG_R13 " \n\t"
-#endif
 		/* construct response fipc_message from registers */
 		"mov " REG0 ", 0(" _REG_R13 ") \n\t"
 		"mov " REG1 ", 8(" _REG_R13 ") \n\t"
@@ -317,19 +273,9 @@ vmfunc_call(unsigned int ept, //rdi
 		/* after restoring the callee-saved registers are popped off
 		 * the current stack and the callee returns
 		 */
-		: : [func]"i"(func),
+		: : [func]"i"(VM_FUNCTION),
 		[ept]"r"(ept),
 		[msg]"m"(msg),
-#if 0
-		[reg0]"r"(msg->id),
-		[reg1]"r"(msg->regs[0]),
-		[reg2]"r"(msg->regs[1]),
-		[reg3]"r"(msg->regs[2]),
-		[reg4]"r"(msg->regs[3]),
-		[reg5]"r"(msg->regs[4]),
-		[reg6]"r"(msg->regs[5]),
-		[reg7]"r"(msg->regs[6]),
-#endif
 		[stack_ptrs]"m"(stack_ptrs),
 		[cpuid]"m"(cpuid_page),
 		[resps]"m"(responses)

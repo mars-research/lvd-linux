@@ -29,6 +29,7 @@
 #define _REG_R14		"%%r14"
 #define _REG_R15		"%%r15"
 #define _REG_RSP		"%%rsp"
+#define _REG_RBP		"%%rbp"
 
 #define REG0	_REG_RDI
 #define REG1	_REG_RSI

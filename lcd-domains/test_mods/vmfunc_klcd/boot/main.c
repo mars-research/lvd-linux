@@ -34,7 +34,7 @@ static int boot_main(void)
 	/*
 	 * Create lcds
 	 */
-	m = lcd_create_module_klcd_no_thread(LCD_DIR("vmfunc_klcd/caller_klcd"),
+	m = lvd_create_module_klcd_no_thread(LCD_DIR("vmfunc_klcd/caller_klcd"),
 				"lcd_test_mod_vmfunc_klcd_caller_klcd",
 				&klcd);
 	if (!m) {
@@ -42,10 +42,10 @@ static int boot_main(void)
 		goto fail3;
 	}
 
-	ret = lcd_create_module_lcd(LCD_DIR("vmfunc_klcd/callee_lcd"),
+	ret = lvd_create_module_lvd(LCD_DIR("vmfunc_klcd/callee_lcd"),
 				"lcd_test_mod_vmfunc_klcd_callee_lcd",
 				&lcd,
-				&lcd_ctx);
+				&lcd_ctx, 1);
 	if (ret) {
 		LIBLCD_ERR("failed to create lcd2");
 		goto fail4;
@@ -68,6 +68,7 @@ static int boot_main(void)
 	 *
 	 */
 	LIBLCD_MSG("Starting KLCD...");
+
 	ret = lcd_run(klcd);
 	if (ret) {
 		LIBLCD_ERR("failed to start lcd1");

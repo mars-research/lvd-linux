@@ -28,6 +28,7 @@ lcd_domains-y += $(addprefix microkernel/, \
 	      vmfunc_ipc.o \
               vmfunc_stack.o \
               vmfunc.o \
+              vmfunc_switch.o \
               )
 
 # Arch dependent code

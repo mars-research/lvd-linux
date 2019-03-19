@@ -52,4 +52,5 @@ typedef enum {
 
 int noinline vmfunc_wrapper(struct fipc_message *msg);
 void vmfunc_call(unsigned int ept, struct fipc_message *msg);
+int vmfunc_klcd_wrapper(struct fipc_message *msg, unsigned int ept);
 #endif /* LIB_VMFUNC_H */

@@ -36,7 +36,7 @@ static int boot_main(void)
 
 	/* ---------- Create LCDs ---------- */
 
-	m = lcd_create_module_klcd_no_thread(LCD_DIR("nullnet_vmfunc/net_klcd"),
+	m = lvd_create_module_klcd_no_thread(LCD_DIR("nullnet_vmfunc/net_klcd"),
 				"lcd_test_mod_nullnet_vmunc_net_klcd",
 				&net_klcd);
 
@@ -44,10 +44,10 @@ static int boot_main(void)
 		LIBLCD_ERR("failed to create net klcd");
 		goto fail3;
 	}
-	ret = lcd_create_module_lcd(LCD_DIR("nullnet_vmfunc/dummy_lcd"),
+	ret = lvd_create_module_lvd(LCD_DIR("nullnet_vmfunc/dummy_lcd"),
 				"lcd_test_mod_nullnet_vmfunc_dummy_lcd",
 				&dummy_lcd,
-				&dummy_ctx);
+				&dummy_ctx, 1);
 	if (ret) {
 		LIBLCD_ERR("failed to create dummy lcd");
 		goto fail4;
@@ -94,7 +94,7 @@ static int shutdown = 0;
 int boot_lcd_thread(void *data)
 {
 	static unsigned once = 0;
-	int ret;
+	int ret = 0;
 	while (!kthread_should_stop()) {
 		if (!once) {
 			LCD_MAIN({
@@ -106,14 +106,16 @@ int boot_lcd_thread(void *data)
 	}
 	msleep(2000);
 	LIBLCD_MSG("Exiting thread");
-	lcd_destroy_module_klcd(net_klcd,
-			"lcd_test_mod_nullnet_vmfunc_net_klcd");
-	if (current->lcd)
-		lcd_cap_delete(dummy_lcd);
-	if (dummy_ctx)
-		lcd_destroy_create_ctx(dummy_ctx);
+	if (!ret) {
+		lcd_destroy_module_klcd(net_klcd,
+				"lcd_test_mod_nullnet_vmfunc_net_klcd");
+		if (current->lcd)
+			lcd_cap_delete(dummy_lcd);
+		if (dummy_ctx)
+			lcd_destroy_create_ctx(dummy_ctx);
 
-	lcd_exit(0);
+		lcd_exit(0);
+	}
 	return 0;
 }
 

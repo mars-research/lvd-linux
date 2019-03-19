@@ -21,7 +21,6 @@ struct cspace *klcd_cspace;
 static int net_klcd_init(void) 
 {
 	int ret;
-	cptr_t net_chnl;
 	/*
 	 * Set up cptr cache, etc.
 	 */
@@ -31,15 +30,6 @@ static int net_klcd_init(void)
 		goto fail1;
 	}
 
-	/*
-	 * XXX: Hack: boot provided us with one cptr for the net chnl
-	 */
-	ret = lcd_cptr_alloc(&net_chnl);
-	if (ret) {
-		LIBLCD_ERR("alloc cptr");
-		goto fail2;
-	}
-	LIBLCD_MSG("==========> got cptr %lu\n", net_chnl.cptr);
 	/* save cspace for future use
 	 * when userspace functions call function pointers,
 	 * we need to get access to the sync_ep of this klcd
@@ -51,14 +41,14 @@ static int net_klcd_init(void)
 	 */
 	ret = glue_nullnet_init();
 	LIBLCD_MSG("-===== > glue nullnet init called\n");
+
 	if (ret) {
 		LIBLCD_ERR("net init");
-		goto fail3;
+		goto fail2;
 	}
 
 	return 0;
 
-fail3:
 fail2:
 	lcd_exit(ret);
 fail1:

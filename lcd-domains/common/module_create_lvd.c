@@ -28,6 +28,19 @@
 #define LCD_UNCACHEABLE_FLAGS (_PAGE_PRESENT | _PAGE_RW | _PAGE_PWT)
 #define LCD_WRITEBACK_FLAGS (_PAGE_PRESENT | _PAGE_RW)
 
+#define CHECK_NULL(offset, addr)	({		\
+		int __isnull = 0;			\
+		do { 					\
+			if ((offset) == (unsigned long)(addr)) {	\
+				printk("%s:%d Pointer likely null (%lx) for %s\n", __func__, __LINE__, (unsigned long)(addr), #addr); \
+				__isnull = 1; 		\
+			}				\
+		} while(0);				\
+		__isnull;				\
+		})
+
+int vmfunc_load_debug = 0;
+
 struct lcd_mem_region {
 	const char *name;
 	unsigned long offset;
@@ -122,8 +135,10 @@ fail1:
 
 static int do_kernel_module_grant_map(cptr_t lcd, struct lcd_create_ctx *ctx,
 				gva_t m_init_link_addr, gva_t m_core_link_addr,
+				gva_t m_vmfunc_page_addr,
 				unsigned long m_init_size,
-				unsigned long m_core_size
+				unsigned long m_core_size,
+				unsigned long m_vmfunc_page_size
 				)
 {
 	unsigned long offset;
@@ -133,12 +148,13 @@ static int do_kernel_module_grant_map(cptr_t lcd, struct lcd_create_ctx *ctx,
 	 * Map module init and core at correct offsets
 	 *
 	 * XXX: Assumes init and core link addresses come from
-	 * the host's module mem area. 
-	 * (LCD_KERNEL_MODULE_REGION_GV_ADDR = 
+	 * the host's module mem area.
+	 * (LCD_KERNEL_MODULE_REGION_GV_ADDR =
 	 */
-	offset = gva_val(m_init_link_addr) - 
+	offset = gva_val(m_init_link_addr) -
 		gva_val(LCD_KERNEL_MODULE_REGION_GV_ADDR);
 	c = &(lcd_to_boot_info(ctx)->lcd_boot_cptrs.module_init);
+	LIBLCD_MSG("grant mem for init pages ctx %p | init_bits %lx | offset %lx, pa: %p", ctx, ctx->m_init_bits, offset, __pa(ctx->m_init_bits));
 	ret = do_grant_and_map_for_mem(lcd, ctx, ctx->m_init_bits,
 				gpa_add(LCD_KERNEL_MODULE_REGION_GP_ADDR,
 					offset),
@@ -149,6 +165,7 @@ static int do_kernel_module_grant_map(cptr_t lcd, struct lcd_create_ctx *ctx,
 	offset = gva_val(m_core_link_addr) -
 		gva_val(LCD_KERNEL_MODULE_REGION_GV_ADDR);
 	c = &(lcd_to_boot_info(ctx)->lcd_boot_cptrs.module_core);
+	LIBLCD_MSG("grant mem for core pages ctx %p | core_bits %lx | offset %lx", ctx, ctx->m_core_bits, offset);
 	ret = do_grant_and_map_for_mem(lcd, ctx, ctx->m_core_bits,
 				gpa_add(LCD_KERNEL_MODULE_REGION_GP_ADDR,
 					offset),
@@ -156,11 +173,25 @@ static int do_kernel_module_grant_map(cptr_t lcd, struct lcd_create_ctx *ctx,
 	if (ret)
 		goto fail2;
 
+	offset = gva_val(m_vmfunc_page_addr) -
+		gva_val(LCD_KERNEL_MODULE_REGION_GV_ADDR);
+	c = &(lcd_to_boot_info(ctx)->lcd_boot_cptrs.vmfunc_page);
+	LIBLCD_MSG("grant mem for vmfunc pages ctx %p | vmfunc_bits %lx | offset %lx", ctx, ctx->m_vmfunc_bits, offset);
+	ret = do_grant_and_map_for_mem(lcd, ctx, ctx->m_vmfunc_bits,
+				gpa_add(LCD_KERNEL_MODULE_REGION_GP_ADDR,
+					offset),
+				c);
+	if (ret)
+		goto fail3;
+
 	lcd_to_boot_info(ctx)->module_init_base = m_init_link_addr;
 	lcd_to_boot_info(ctx)->module_core_base = m_core_link_addr;
+	lcd_to_boot_info(ctx)->module_vmfunc_base = m_vmfunc_page_addr;
+	lcd_to_boot_info(ctx)->module_vmfunc_size = m_vmfunc_page_size;
 	lcd_to_boot_info(ctx)->module_init_size = m_init_size;
 	lcd_to_boot_info(ctx)->module_core_size = m_core_size;
 
+fail3:
 fail2:
 fail1:
 	return ret;
@@ -168,8 +199,10 @@ fail1:
 
 static int setup_phys_addr_space(cptr_t lcd, struct lcd_create_ctx *ctx,
 				gva_t m_init_link_addr, gva_t m_core_link_addr,
+				gva_t m_vmfunc_page_addr,
 				unsigned long m_init_size,
-				unsigned long m_core_size
+				unsigned long m_core_size,
+				unsigned long m_vmfunc_page_size
 				)
 {
 	int ret;
@@ -202,7 +235,9 @@ static int setup_phys_addr_space(cptr_t lcd, struct lcd_create_ctx *ctx,
 	 */
 	ret = do_kernel_module_grant_map(lcd, ctx,
 					m_init_link_addr, m_core_link_addr,
-					m_init_size, m_core_size
+					m_vmfunc_page_addr,
+					m_init_size, m_core_size,
+					m_vmfunc_page_size
 					);
 	if (ret)
 		goto fail4;
@@ -218,28 +253,6 @@ fail1:
 
 /* VIRTUAL ADDRESS SPACE ------------------------------ */
 
-static void dump_pg_table(unsigned long *pgtable)
-{
-	unsigned int i;
-	for (i = 0; i < 512; i++)
-		printk("     %03u: 0x%016lx\n", i, pgtable[i]);
-}
-
-void lcd_dump_virt_addr_space(struct lcd_create_ctx *ctx)
-{
-	unsigned int i;
-	LIBLCD_MSG("  DUMP LCD GUEST VIRTUAL PAGE TABLES:");
-	
-	for (i = 0; i < LCD_BOOTSTRAP_PAGE_TABLES_SIZE >> PAGE_SHIFT; i++) {
-		/*
-		 * XXX: Assumes 512 entries per table, 8 bytes/entry
-		 */
-		printk("\n     page table %d\n     -------------------\n",
-			i);
-		dump_pg_table(ctx->gv_pg_tables + i * 512 * 8);
-	}
-}
-
 static void setup_lcd_pmd(struct lcd_mem_region *reg, pmd_t *pmd,
 			unsigned int gigabyte_idx)
 {
@@ -250,7 +263,7 @@ static void setup_lcd_pmd(struct lcd_mem_region *reg, pmd_t *pmd,
 		/*
 		 * Guest physical address we put in the table entry is:
 		 *
-		 *    base + 
+		 *    base +
 		 *    offset to the 1GB region for this pmd +
 		 *    offset for this table entry (some multiple of 2MBs)
 		 */
@@ -358,10 +371,12 @@ static void setup_virt_addr_space(struct lcd_create_ctx *ctx)
 	setup_lcd_pmds(cursor);
 }
 
-static int setup_addr_spaces(cptr_t lcd, struct lcd_create_ctx *ctx,
+static int setup_addr_spaces_lvd(cptr_t lcd, struct lcd_create_ctx *ctx,
 			gva_t m_init_link_addr, gva_t m_core_link_addr,
+			gva_t m_vmfunc_page_addr,
 			unsigned long m_init_size,
-			unsigned long m_core_size
+			unsigned long m_core_size,
+			unsigned long m_vmfunc_page_size
 			)
 {
 	int ret;
@@ -369,9 +384,11 @@ static int setup_addr_spaces(cptr_t lcd, struct lcd_create_ctx *ctx,
 	 * Set up physical address space (except UTCB - that's done
 	 * via lcd_config)
 	 */
-	ret = setup_phys_addr_space(lcd, ctx, m_init_link_addr, 
+	ret = setup_phys_addr_space(lcd, ctx, m_init_link_addr,
 				m_core_link_addr,
-				m_init_size, m_core_size
+				m_vmfunc_page_addr,
+				m_init_size, m_core_size,
+				m_vmfunc_page_size
 				);
 	if (ret) {
 		LIBLCD_ERR("error setting up phys addr space");
@@ -380,7 +397,6 @@ static int setup_addr_spaces(cptr_t lcd, struct lcd_create_ctx *ctx,
 	/*
 	 * Set up virtual address space
 	 */
-
 	setup_virt_addr_space(ctx);
 	return 0;
 
@@ -422,7 +438,7 @@ static void destroy_create_ctx(struct lcd_create_ctx *ctx)
 	 * pages will be freed by microkernel.
 	 */
 	if (ctx->m_init_bits)
-		lcd_release_module(ctx->m_init_bits, ctx->m_core_bits);
+		lvd_release_module(ctx->m_init_bits, ctx->m_core_bits, ctx->m_vmfunc_bits);
 	if (ctx->stack)
 		lcd_free_pages(lcd_virt_to_head_page(ctx->stack),
 			LCD_STACK_ORDER);
@@ -465,10 +481,17 @@ static int do_cptr_cache_init(struct cptr_cache *cache)
 	return 0;
 }
 
-static int get_pages_for_lcd(struct lcd_create_ctx *ctx)
+void *lcd_stack;
+EXPORT_SYMBOL(lcd_stack);
+
+static int get_pages_for_lvd(struct lcd_create_ctx *ctx)
 {
 	struct page *p1, *p2, *p3;
 	int ret;
+#ifdef LVD_PERCPU_STACK
+	int c;
+	void **stack_pages;
+#endif
 
 	/*
 	 * We explicity zero things out. If this code is used inside
@@ -513,9 +536,46 @@ static int get_pages_for_lcd(struct lcd_create_ctx *ctx)
 	}
 	memset(lcd_page_address(p3), 0, LCD_STACK_SIZE);
 	ctx->stack = lcd_page_address(p3);
+	lcd_stack = (void*) gva_val(LCD_STACK_GV_ADDR);
 
+#ifdef LVD_PERCPU_STACK
+	ctx->stack = kzalloc(sizeof(void*) * num_online_cpus(), GFP_KERNEL);
+
+	stack_pages = kzalloc(sizeof(void*) * num_online_cpus(), GFP_KERNEL);
+
+	if (!ctx->stack || !stack_pages) {
+		LIBLCD_ERR("alloc boot page tables failed");
+		ret = -ENOMEM;
+		goto fail4;
+	}
+
+	for_each_online_cpu(c) {
+		/*
+		 * Alloc stack
+		 */
+		p3 = lcd_alloc_pages(0, LCD_STACK_ORDER);
+		if (!p3) {
+			LIBLCD_ERR("alloc stack pages failed");
+			ret = -ENOMEM;
+			goto fail5;
+		}
+		memset(lcd_page_address(p3), 0, LCD_STACK_SIZE);
+		ctx->stack[c] = lcd_page_address(p3);
+		stack_pages[c] = p3;
+	}
+
+	kfree(stack_pages);
+#endif
 	return 0;
 
+#ifdef LVD_PERCPU_STACK
+fail5:
+	for ( ; c >= 0; c--) {
+		lcd_free_pages(stack_pages[c], LCD_BOOTSTRAP_PAGE_TABLES_ORDER);
+	}
+
+	kzfree(stack_pages);
+#endif
 fail4:
 	lcd_free_pages(p2, LCD_BOOTSTRAP_PAGE_TABLES_ORDER);
 fail3:
@@ -553,13 +613,22 @@ static int set_struct_module(cptr_t lcd, void *m_core_bits,
 }
 #endif
 
-int lcd_create_module_lcd(char *mdir, char *mname, cptr_t *lcd_out,
-			struct lcd_create_ctx **ctx_out)
+extern void __kliblcd_module_host_unload(char *module_name);
+
+int lvd_create_module_lvd(char *mdir, char *mname, cptr_t *lcd_out,
+			struct lcd_create_ctx **ctx_out, int lvd_id)
 {
 	int ret;
 	cptr_t m_init_cptr, m_core_cptr;
 	gva_t m_init_link_addr, m_core_link_addr, m_init_func_addr;
 	unsigned long m_init_size, m_core_size;
+	cptr_t m_vmfunc_cptr;
+	gva_t m_vmfunc_page_addr;
+	unsigned long m_vmfunc_page_size;
+	struct module *mod;
+	struct klp_modinfo *klp_info;
+	struct load_info *info;
+	int sec;
 	unsigned long m_struct_module_core_offset;
 	struct lcd_create_ctx *ctx;
 	cptr_t lcd;
@@ -575,7 +644,7 @@ int lcd_create_module_lcd(char *mdir, char *mname, cptr_t *lcd_out,
 	/*
 	 * Alloc boot pages, stack pages, etc. for LCD
 	 */
-	ret = get_pages_for_lcd(ctx);
+	ret = get_pages_for_lvd(ctx);
 	if (ret) {
 		LIBLCD_ERR("error alloc'ing boot, stack pages for LCD");
 		goto fail2;
@@ -584,13 +653,17 @@ int lcd_create_module_lcd(char *mdir, char *mname, cptr_t *lcd_out,
 	 * Load kernel module into caller's address space
 	 */
 
-	ret = lcd_load_module(mdir, mname,
+	ret = lvd_load_module(mdir, mname,
 			&ctx->m_init_bits, &ctx->m_core_bits,
+			&ctx->m_vmfunc_bits,
 			&m_init_cptr, &m_core_cptr,
+			&m_vmfunc_cptr,
 			&m_init_link_addr, &m_core_link_addr,
 			&m_init_size, &m_core_size,
 			&m_init_func_addr,
-			&m_struct_module_core_offset
+			&m_struct_module_core_offset,
+			&m_vmfunc_page_addr,
+			&m_vmfunc_page_size
 			);
 	if (ret) {
 		LIBLCD_ERR("error loading kernel module");
@@ -603,18 +676,229 @@ int lcd_create_module_lcd(char *mdir, char *mname, cptr_t *lcd_out,
 	 *
 	 * Initialize empty LCD
 	 */
-	ret = lcd_create(&lcd);
+	ret = lvd_create(&lcd, lvd_id);
 	if (ret) {
 		LIBLCD_ERR("error creating empty LCD");
 		goto fail4;
 	}
 
 	/*
+	 * vmfuncwrapper.text hosts vmfunc wrapper. SHT_RELA of this text
+	 * section has to be patched because we have moved the vmfunc page to
+	 * align it with the host's vmfunc page address.
+	 *
+	 */
+	mutex_lock(&module_mutex);
+	mod = find_module(mname);
+	mutex_unlock(&module_mutex);
+
+	if (!mod)
+		goto skip;
+
+	/* get klp_info pointer */
+	klp_info = mod->klp_info;
+	info = &klp_info->info;
+
+	if (vmfunc_load_debug) {
+		unsigned int strtab_shsize = 0;
+		int is_null = 0;
+		int i;
+
+		printk("%s, sechdrs %p | index.sym %x | info %p | info->hdr %p | klp_info->hdr.e_shnum %x\n", __func__,
+				info->sechdrs, info->index.sym, info, info->hdr, mod->klp_info->hdr.e_shnum); 
+
+		is_null |= CHECK_NULL(offsetof(struct load_info, hdr), info->hdr);
+		if (!is_null)
+			is_null |= CHECK_NULL(offsetof(struct elf64_hdr, e_shnum), info->hdr->e_shnum);
+
+		is_null |= CHECK_NULL(offsetof(struct load_info, sechdrs), info->sechdrs);
+		is_null |= CHECK_NULL(offsetof(struct load_info, secstrings), info->secstrings);
+
+		if (is_null) {
+			printk("%s, one or more pointers are null\n", __func__);
+			goto skip;
+		}
+
+		/* search through the headers to find symtab section */
+		for (i = 1; i < klp_info->hdr.e_shnum; i++) {
+			if (klp_info->sechdrs[i].sh_type == SHT_SYMTAB) {
+				unsigned int strtab_idx = klp_info->sechdrs[i].sh_link;
+				info->strtab = (char *)info->hdr
+					+ klp_info->sechdrs[strtab_idx].sh_offset;
+				strtab_shsize = klp_info->sechdrs[strtab_idx].sh_size;
+				break;
+			}
+		}
+
+		printk("%s, hdr: %p | string table: %p | sh_size %x\n",
+				__func__, info->hdr, info->strtab,
+				strtab_shsize);
+
+		print_hex_dump(KERN_DEBUG, "strtab: ", DUMP_PREFIX_ADDRESS, 32,
+				1, info->strtab, strtab_shsize, true);
+
+		printk("%s, hdr: %p | symtab: %llx | sh_size %llx\n", __func__,
+				info->hdr,
+				klp_info->sechdrs[klp_info->symndx].sh_addr,
+				klp_info->sechdrs[klp_info->symndx].sh_size);
+
+		print_hex_dump(KERN_DEBUG, "symtab: ", DUMP_PREFIX_ADDRESS, 32,
+				1,
+				(void*)klp_info->sechdrs[klp_info->symndx].sh_addr,
+				klp_info->sechdrs[klp_info->symndx].sh_size,
+				false);
+
+		printk("%s, hdr: %p | symtab: %p | sh_size %lx\n", __func__,
+				info->hdr, mod->core_kallsyms.symtab,
+				mod->core_kallsyms.num_symtab *
+				sizeof(Elf_Sym));
+
+		print_hex_dump(KERN_DEBUG, "symtab: ", DUMP_PREFIX_ADDRESS, 32,
+				1, (void*)mod->core_kallsyms.symtab,
+				mod->core_kallsyms.num_symtab *
+				sizeof(Elf_Sym), false);
+
+	}
+
+	for (sec = 1; sec < klp_info->hdr.e_shnum; sec++) {
+		Elf64_Shdr *shdr = &klp_info->sechdrs[sec];
+		const char *sh_name = klp_info->secstrings + shdr->sh_name;
+
+		if ((shdr->sh_type == SHT_RELA) && !strcmp(".rela.vmfuncwrapper.text", sh_name)) {
+			Elf64_Shdr *sechdrs = klp_info->sechdrs;
+			unsigned int sh_size = shdr->sh_size;
+			unsigned int sh_offset = shdr->sh_offset;
+			unsigned int symindex = klp_info->symndx;
+			const char *strtab = mod->core_kallsyms.strtab;
+			unsigned long long loc_offset;
+			Elf64_Rela *rel;
+			Elf64_Sym *sym;
+			void *loc;
+			void *loc_load;
+			u64 val;
+			int i;
+
+			printk("%s, shdr: %p | sh_name: %s | sh_size %u | sh_offset %x | b4 sh_addr %llx | ",
+						__func__, shdr, sh_name, sh_size, sh_offset, shdr->sh_addr);
+
+			shdr->sh_addr = (size_t)info->hdr + sh_offset;
+
+			rel = (void *) shdr->sh_addr;
+
+			printk(" AF sh_addr %llx | entrysz: %zu\n", shdr->sh_addr, sizeof(*rel));
+
+			if (!rel)
+				goto skip;
+
+			print_hex_dump(KERN_DEBUG, "relavmwrap: ", DUMP_PREFIX_ADDRESS,
+				24, 1, (void*)rel, sh_size, false);
+
+			/* taken from apply_relocation_add function defined at arch/x86/kernel/module.c */
+
+			for (i = 0; i < sh_size / sizeof(*rel); i++) {
+				/* This is where to make the change */
+				loc_load = loc = (void *)sechdrs[shdr->sh_info].sh_addr
+					+ rel[i].r_offset;
+
+				/* loc_load is made RO by kernel after loading.
+				 * So directly patch the addresses in our
+				 * duplicated pages that would be loaded into
+				 * the LCDs.
+				 */
+				/* extract offset */
+				loc_offset = (unsigned long) loc - gva_val(m_core_link_addr);
+
+				printk("%s, loc %p | loc_offset %Lx | ctx->m_core_bits %p\n",
+						__func__, loc, loc_offset, ctx->m_core_bits);
+
+				/* our duplicate page's virtual address is here in m_core_bits */
+				loc = (char*)ctx->m_core_bits + loc_offset;
+
+				/* This is the symbol it is referring to. Note that all
+				 * undefined symbols have been resolved.
+				 */
+				sym = (Elf64_Sym *)sechdrs[symindex].sh_addr
+					+ ELF64_R_SYM(rel[i].r_info);
+
+				if (!strcmp(strtab + sym->st_name, "vmfunc")) {
+					/* patch vmfunc address */
+					sym->st_value = gva_val(m_vmfunc_page_addr);
+				} else {
+					/* do nothing for other reloc entries they are patched already */
+					continue;
+				}
+
+				val = sym->st_value + rel[i].r_addend;
+
+				printk("idx: %d | type %d | st_value %Lx | st_name %s | r_addend %Lx | loc %Lx | curval %x | val %Lx\n",
+						i, (int)ELF64_R_TYPE(rel[i].r_info),
+						sym->st_value,
+						strtab + sym->st_name,
+						rel[i].r_addend,
+						(u64)loc,
+						*(u32*)loc,
+						val);
+
+				switch (ELF64_R_TYPE(rel[i].r_info)) {
+				case R_X86_64_NONE:
+					break;
+				case R_X86_64_64:
+					printk("\t64:old value %Lx\n", *(u64 *)loc);
+					*(u64 *)loc = val;
+					printk("\t64:patched value %Lx\n", *(u64 *)loc);
+					break;
+				case R_X86_64_32:
+					printk("\t32:old value %x\n", *(u32 *)loc);
+					*(u32 *)loc = val;
+					printk("\t32:patched value %x\n", *(u32 *)loc);
+					if (val != *(u32 *)loc) {
+						pr_err("overflow in relocation type %d val %Lx\n",
+						       (int)ELF64_R_TYPE(rel[i].r_info), val);
+						return -ENOEXEC;
+					}
+					break;
+				case R_X86_64_32S:
+					printk("\t32:old value %x\n", *(s32 *)loc);
+					*(s32 *)loc = val;
+					printk("\t32S:patched value %x\n", *(s32 *)loc);
+					if ((s64)val != *(s32 *)loc) {
+						pr_err("overflow in relocation type %d val %Lx\n",
+						       (int)ELF64_R_TYPE(rel[i].r_info), val);
+						return -ENOEXEC;
+					}
+					break;
+				case R_X86_64_PC32:
+					printk("\tPC32: old value %x\n", *(u32 *)loc);
+					val -= (u64)loc_load;
+					*(u32 *)loc = val;
+					printk("\tPC32: patched value %x\n", *(u32 *)loc);
+#if 0
+					if ((s64)val != *(s32 *)loc)
+						goto overflow;
+#endif
+					break;
+				default:
+					pr_err("%s: Unknown rela relocation: %llu\n",
+					       mod->name, ELF64_R_TYPE(rel[i].r_info));
+					return -ENOEXEC;
+				}
+			}
+
+		}
+	}
+
+	print_hex_dump(KERN_DEBUG, "vmfuncwrapper: ", DUMP_PREFIX_ADDRESS,
+		32, 1, (void*)((char*)ctx->m_core_bits + 0x1000), 0x100, false);
+skip:
+
+	/*
 	 * Set up address spaces
 	 */
-	ret = setup_addr_spaces(lcd, ctx, m_init_link_addr, 
+	ret = setup_addr_spaces_lvd(lcd, ctx, m_init_link_addr,
 				m_core_link_addr,
-				m_init_size, m_core_size
+				m_vmfunc_page_addr,
+				m_init_size, m_core_size,
+				m_vmfunc_page_size
 				);
 	if (ret) {
 		LIBLCD_ERR("error setting up address spaces");
@@ -639,7 +923,7 @@ int lcd_create_module_lcd(char *mdir, char *mname, cptr_t *lcd_out,
 	 * For non-isolated code running this, we also remember where
 	 * the struct module copy is located so we can do stack traces.
 	 */
-	ret = set_struct_module(lcd, ctx->m_core_bits, 
+	ret = set_struct_module(lcd, ctx->m_core_bits,
 				m_struct_module_core_offset);
 	if (ret) {
 		LIBLCD_ERR("error setting struct module hva");
@@ -652,6 +936,8 @@ int lcd_create_module_lcd(char *mdir, char *mname, cptr_t *lcd_out,
 	*ctx_out = ctx;
 	*lcd_out = lcd;
 
+	lcd_save_cr3(lcd, ctx->gv_pg_tables);
+
 	return 0;
 
 #ifndef LCD_ISOLATE
@@ -661,7 +947,7 @@ fail6:
 fail5:
 	lcd_cap_delete(lcd);
 fail4:
-	lcd_release_module(ctx->m_init_bits, ctx->m_core_bits);
+	lvd_release_module(ctx->m_init_bits, ctx->m_core_bits, ctx->m_vmfunc_bits);
 fail3:
 fail2:
 	destroy_create_ctx(ctx);
@@ -669,12 +955,12 @@ fail1:
 	return ret;
 }
 
-void lcd_destroy_create_ctx(struct lcd_create_ctx *ctx)
+void lvd_destroy_create_ctx(struct lcd_create_ctx *ctx)
 {
 	destroy_create_ctx(ctx);
 }
 
 /* EXPORTS -------------------------------------------------- */
 
-EXPORT_SYMBOL(lcd_create_module_lcd);
-EXPORT_SYMBOL(lcd_destroy_create_ctx);
+EXPORT_SYMBOL(lvd_create_module_lvd);
+EXPORT_SYMBOL(lvd_destroy_create_ctx);

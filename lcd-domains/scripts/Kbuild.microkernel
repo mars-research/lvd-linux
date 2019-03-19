@@ -61,6 +61,7 @@ lcd_domains-y += $(addprefix kliblcd/, \
 lcd_domains-y += $(addprefix common/, \
 	      resource_tree.o \
 	      module_create.o \
+	      module_create_lvd.o \
               sync_ipc_poll.o \
               vmfunc_calls.o \
 	      )

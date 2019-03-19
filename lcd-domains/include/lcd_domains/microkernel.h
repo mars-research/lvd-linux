@@ -285,6 +285,8 @@ int __lcd_create_no_vm(struct lcd **out, const char *name);
  *        be stored
  */
 int __lcd_create(struct lcd *caller, cptr_t slot);
+
+int __lvd_create(struct lcd *caller, cptr_t slot, int lcd_id);
 /**
  * __lcd_create_klcd -- Create an empty non-isolated LCD (kLCD)
  * @caller: the LCD doing the creating
@@ -292,6 +294,9 @@ int __lcd_create(struct lcd *caller, cptr_t slot);
  *        be stored
  */
 int __lcd_create_klcd(struct lcd *caller, cptr_t slot);
+
+int __lvd_create_klcd(struct lcd *caller, cptr_t slot);
+
 /**
  * __lcd_get -- Look up an LCD in caller's cspace
  * @caller: the LCD in whose cspace we look for capability
@@ -321,6 +326,8 @@ void __lcd_put(struct lcd *caller, struct cnode *cnode, struct lcd *lcd);
  */
 int __lcd_config(struct lcd *caller, cptr_t lcd, gva_t pc, gva_t sp, 
 		gpa_t gva_root, gpa_t utcb_page);
+
+int __lcd_save_cr3(struct lcd *caller, cptr_t lcd, hpa_t hpa_lcd_cr3);
 
 /**
  * __lcd_memory_grant_and_map -- Grant LCD memory object capability and
@@ -368,6 +375,8 @@ void __lcd_destroy_no_vm_no_thread(struct lcd *lcd);
  * @lcd pointer is no longer valid after this call.
  */
 void __lcd_destroy_no_vm(struct lcd *lcd);
+
+void __lvd_destroy_no_vm(struct lcd *lcd);
 
 /**
  * __lcd_destroy -- Destroy an isolated LCD

@@ -39,6 +39,7 @@
  * mapped it - except the dedicated page for the LCD's UTCB - see sync_ipc.h).
  */
 int lcd_create(cptr_t *lcd);
+int lvd_create(cptr_t *lcd, int lcd_id);
 
 /**
  * lcd_create_klcd -- Create an LCD that runs in the non-isolated host
@@ -56,6 +57,7 @@ int lcd_create(cptr_t *lcd);
  * function returns an error.
  */
 int lcd_create_klcd(cptr_t *klcd);
+int lvd_create_klcd(cptr_t *klcd);
 
 /**
  * lcd_config_registers -- Set some of the LCD's registers with initial values
@@ -74,6 +76,9 @@ int lcd_create_klcd(cptr_t *klcd);
  */
 int lcd_config_registers(cptr_t lcd, gva_t pc, gva_t sp, gpa_t gva_root,
 				 gpa_t utcb_page);
+
+
+int lcd_save_cr3(cptr_t lcd, void *ptables_lcd);
 
 /**
  * lcd_memory_grant_and_map -- Grant LCD access to memory object, and map it 
@@ -145,7 +150,7 @@ struct lcd_create_ctx {
 	 */
 	struct lcd_boot_info *lcd_boot_info;
 	void *gv_pg_tables;
-	void **stack;
+	void *stack;
 	void *vmfunc_page;
 	unsigned long global_vmfunc_page;
 	void *m_init_bits;
@@ -181,6 +186,9 @@ struct lcd_create_ctx {
  */
 int lcd_create_module_lcd(char *mdir, char *mname, cptr_t *lcd,
 			struct lcd_create_ctx **ctx);
+
+int lvd_create_module_lvd(char *mdir, char *mname, cptr_t *lcd,
+			struct lcd_create_ctx **ctx, int lcd_id);
 
 /**
  * lcd_to_boot_info -- Extract lcd_boot_info from create context
@@ -255,8 +263,9 @@ void lcd_destroy_create_ctx(struct lcd_create_ctx *ctx);
  * capability, the module would remain loaded in the host.
  */
 int lcd_create_module_klcd(char *mdir, char *mname, cptr_t *klcd);
+int lvd_create_module_klcd(char *mdir, char *mname, cptr_t *klcd);
 
-struct module *lcd_create_module_klcd_no_thread(char *mdir, char *mname, cptr_t *klcd_out);
+struct module *lvd_create_module_klcd_no_thread(char *mdir, char *mname, cptr_t *klcd_out);
 /**
  * lcd_destroy_module_klcd -- Destroys non-isolated LCD / thread 
  * @klcd: cptr to klcd capability in caller's cspace

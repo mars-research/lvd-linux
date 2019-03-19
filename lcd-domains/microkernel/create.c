@@ -12,6 +12,9 @@
 #include <asm/lcd_domains/check.h>
 
 /* CREATE -------------------------------------------------- */
+#define NUM_LCDS		5
+struct lcd *lcd_list[NUM_LCDS];
+EXPORT_SYMBOL(lcd_list);
 
 int __lcd_create_no_vm_no_thread(struct lcd **out)
 {
@@ -129,6 +132,27 @@ fail1:
 	return ret;
 }
 
+int __lvd_create_no_vm(struct lcd **out, const char *name)
+{
+	struct lcd *lcd;
+	int ret;
+	/*
+	 * More basic init
+	 */
+	ret = __lcd_create_no_vm_no_thread(&lcd);
+	if (ret) {
+		LCD_ERR("basic lcd create failed");
+		goto fail1;
+	}
+
+	*out = lcd;
+
+	return 0;
+
+fail1:
+	return ret;
+}
+
 int __lcd_create(struct lcd *caller, cptr_t slot)
 {
 	struct lcd *lcd;
@@ -152,7 +176,7 @@ int __lcd_create(struct lcd *caller, cptr_t slot)
 	/*
 	 * Put in caller's cspace
 	 */
-	ret = cap_insert(caller->cspace, slot, 
+	ret = cap_insert(caller->cspace, slot,
 			lcd,
 			__lcd_get_libcap_type(LCD_MICROKERNEL_TYPE_ID_LCD));
 	if (ret) {
@@ -168,6 +192,50 @@ fail3:
 	lcd_arch_destroy(lcd->lcd_arch);
 fail2:
 	__lcd_destroy_no_vm(lcd);
+fail1:
+	return ret;
+}
+
+int __lvd_create(struct lcd *caller, cptr_t slot, int lcd_id)
+{
+	struct lcd *lcd;
+	int ret;
+	/*
+	 * Basic init of lcd
+	 */
+	ret = __lvd_create_no_vm(&lcd, "lvd");
+	if (ret) {
+		LCD_ERR("lcd create");
+		goto fail1;
+	}
+	/*
+	 * Alloc vm / arch-dependent part
+	 */
+	ret = lcd_arch_create(&lcd->lcd_arch);
+	if(ret) {
+		LCD_ERR("error creating lcd_arch");
+		goto fail2;
+	}
+	/*
+	 * Put in caller's cspace
+	 */
+	ret = cap_insert(caller->cspace, slot,
+			lcd,
+			__lcd_get_libcap_type(LCD_MICROKERNEL_TYPE_ID_LCD));
+	if (ret) {
+		LCD_ERR("cap insert failed");
+		goto fail3;
+	}
+	lcd_list[lcd_id] = lcd;
+	/*
+	 * Done
+	 */
+	return 0;
+
+fail3:
+	lcd_arch_destroy(lcd->lcd_arch);
+fail2:
+	__lvd_destroy_no_vm(lcd);
 fail1:
 	return ret;
 }
@@ -198,6 +266,7 @@ int __lcd_create_klcd(struct lcd *caller, cptr_t slot)
 		LCD_ERR("insert");
 		goto fail2;
 	}
+
 	/*
 	 * Done
 	 */
@@ -205,6 +274,46 @@ int __lcd_create_klcd(struct lcd *caller, cptr_t slot)
 
 fail2:
 	__lcd_destroy_no_vm(lcd);
+fail1:
+	return ret;
+}
+
+int __lvd_create_klcd(struct lcd *caller, cptr_t slot)
+{
+	struct lcd *lcd;
+	int ret;
+	/*
+	 * Basic init of lcd
+	 */
+	ret = __lvd_create_no_vm(&lcd, "klcd");
+	if (ret) {
+		LCD_ERR("lcd create");
+		goto fail1;
+	}
+	/*
+	 * Set type as non-isolated
+	 */
+	lcd->type = LCD_TYPE_NONISOLATED;
+	/*
+	 * Put in caller's cspace
+	 */
+	ret = cap_insert(caller->cspace, slot, 
+			lcd,
+			__lcd_get_libcap_type(LCD_MICROKERNEL_TYPE_ID_KLCD));
+	if (ret) {
+		LCD_ERR("insert");
+		goto fail2;
+	}
+
+	/* Add KLCD to list 0 */
+	lcd_list[0] = lcd;
+	/*
+	 * Done
+	 */
+	return 0;
+
+fail2:
+	__lvd_destroy_no_vm(lcd);
 fail1:
 	return ret;
 }
@@ -403,6 +512,33 @@ fail1:
 	return ret;
 }
 
+int __lcd_save_cr3(struct lcd *caller, cptr_t lcd, hpa_t hpa_lcd_cr3)
+{
+	struct lcd *lcd_struct;
+	struct cnode *lcd_cnode;
+	int ret;
+	/*
+	 * Look up and lock lcd
+	 */
+	ret = __lcd_get(caller, lcd, &lcd_cnode, &lcd_struct);
+	if (ret)
+		goto fail1;
+
+	LCD_MSG("setting hpa_cr3 to %lx", hpa_val(hpa_lcd_cr3));
+
+	lcd_struct->lcd_arch->hpa_cr3 = hpa_lcd_cr3;
+
+	/*
+	 * Put lcd
+	 */
+	__lcd_put(caller, lcd_cnode, lcd_struct);
+
+	return 0;
+
+fail1:
+	return ret;
+}
+
 /* CSPACE AND ADDRESS SPACE CONFIG ------------------------------ */
 
 int __lcd_memory_grant_and_map(struct lcd *caller, cptr_t lcd, 
@@ -531,7 +667,6 @@ static void destroy_cspace_and_utcb(struct lcd *lcd)
 	lcd->utcb = NULL;
 }
 
-#ifndef CONFIG_LVD
 static void destroy_kthread(struct lcd *lcd)
 {
 	int ret;
@@ -549,7 +684,6 @@ static void destroy_kthread(struct lcd *lcd)
 	put_task_struct(lcd->kthread);
 	lcd->kthread = NULL;
 }
-#endif
 
 void __lcd_destroy_no_vm_no_thread(struct lcd *lcd)
 {
@@ -559,6 +693,29 @@ void __lcd_destroy_no_vm_no_thread(struct lcd *lcd)
 }
 
 void __lcd_destroy_no_vm(struct lcd *lcd)
+{
+	/*
+	 * ORDER IS IMPORTANT:
+	 *
+	 * (0) Mark the LCD as dead. This prevents e.g. synchronous endpoints
+	 *     from trying to wake up the kthread.
+	 *
+	 *     (Alternative: Just start tearing down the cspace and let
+	 *     ipc's just fail in the lcd. After that, stop the lcd, since
+	 *     it can't be in any endpoint queues.)
+	 *
+	 * (1) Stop the kthread. This will tell the kthread to exit.
+	 *
+	 * (2) Tear down the lcd's cspace. This will free any objects
+	 *     for which the lcd has the last capability (like pages).
+	 */
+	mark_lcd_as_dead(lcd);
+	destroy_kthread(lcd);
+	destroy_cspace_and_utcb(lcd);
+	kfree(lcd);
+}
+
+void __lvd_destroy_no_vm(struct lcd *lcd)
 {
 	/*
 	 * ORDER IS IMPORTANT:
@@ -576,9 +733,6 @@ void __lcd_destroy_no_vm(struct lcd *lcd)
 	 *     for which the lcd has the last capability (like pages).
 	 */
 	mark_lcd_as_dead(lcd);
-#ifndef CONFIG_LVD
-	destroy_kthread(lcd);
-#endif
 	destroy_cspace_and_utcb(lcd);
 	kfree(lcd);
 }

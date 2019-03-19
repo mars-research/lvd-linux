@@ -8,6 +8,37 @@
 #include <liblcd/liblcd.h>
 #include <lcd_domains/microkernel.h>
 
+int lvd_create(cptr_t *lcd, int lvd_id)
+{
+	cptr_t slot;
+	int ret;
+	/*
+	 * Alloc slot for new object
+	 */
+	ret = lcd_cptr_alloc(&slot);
+	if (ret) {
+		LIBLCD_ERR("cptr alloc failed");
+		goto fail1;
+	}
+	/*
+	 * Make LCD
+	 */
+	ret = __lvd_create(current->lcd, slot, lvd_id);
+	if (ret) {
+		LIBLCD_ERR("lcd create failed");
+		goto fail2;
+	}
+
+	*lcd = slot;
+
+	return 0;
+
+fail2:
+	lcd_cptr_free(slot);
+fail1:
+	return ret;
+}
+
 int lcd_create(cptr_t *lcd)
 {
 	cptr_t slot;
@@ -70,10 +101,47 @@ fail1:
 	return ret;
 }
 
+int lvd_create_klcd(cptr_t *klcd)
+{
+	cptr_t slot;
+	int ret;
+	/*
+	 * Alloc slot for new object
+	 */
+	ret = lcd_cptr_alloc(&slot);
+	if (ret) {
+		LIBLCD_ERR("cptr alloc failed");
+		goto fail1;
+	}
+	/*
+	 * Make kLCD
+	 */
+	ret = __lvd_create_klcd(current->lcd, slot);
+	if (ret) {
+		LIBLCD_ERR("klcd create failed");
+		goto fail2;
+	}
+
+	*klcd = slot;
+
+	return 0;
+
+fail2:
+	lcd_cptr_free(slot);
+fail1:
+	return ret;
+}
+
 int lcd_config_registers(cptr_t lcd, gva_t pc, gva_t sp, gpa_t gva_root,
 			gpa_t utcb_page)
 {
 	return __lcd_config(current->lcd, lcd, pc, sp, gva_root, utcb_page);
+}
+
+int lcd_save_cr3(cptr_t lcd, void *lcd_ptables)
+{
+
+	return __lcd_save_cr3(current->lcd, lcd, __hpa(__pa(lcd_ptables)));
 }
 
 int lcd_memory_grant_and_map(cptr_t lcd, cptr_t mo, cptr_t dest_slot,
@@ -100,8 +168,10 @@ int lcd_run(cptr_t lcd)
 
 /* EXPORTS -------------------------------------------------- */
 
+EXPORT_SYMBOL(lvd_create);
 EXPORT_SYMBOL(lcd_create);
 EXPORT_SYMBOL(lcd_create_klcd);
+EXPORT_SYMBOL(lvd_create_klcd);
 EXPORT_SYMBOL(lcd_config_registers);
 EXPORT_SYMBOL(lcd_memory_grant_and_map);
 EXPORT_SYMBOL(lcd_cap_grant);

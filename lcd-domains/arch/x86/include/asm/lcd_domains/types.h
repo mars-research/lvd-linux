@@ -141,6 +141,8 @@ struct lcd_arch {
 
 	u64 *eptp_lcd;
 
+	hpa_t hpa_cr3;
+
 	/* id of this specific EPT that we use in VMFUNC */
 	unsigned int ept_id; 
 

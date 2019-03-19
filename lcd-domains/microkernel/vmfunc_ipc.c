@@ -17,14 +17,16 @@ struct lcd *lcd = NULL;
 static int handle_syscall_create(struct fipc_message *msg)
 {
 	cptr_t lcd_slot;
+	int lcd_id;
 	/*
 	 * Args
 	 */
 	lcd_slot = __cptr(msg->regs[0]);
+	lcd_id = msg->regs[1];
 	/*
 	 * Do create
 	 */
-	return __lcd_create(lcd, lcd_slot);
+	return __lvd_create(lcd, lcd_slot, lcd_id);
 }
 
 static int handle_syscall_cap_grant(struct fipc_message *msg)

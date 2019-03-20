@@ -616,6 +616,127 @@ static int set_struct_module(cptr_t lcd, void *m_core_bits,
 
 extern void __kliblcd_module_host_unload(char *module_name);
 
+/* taken from apply_relocation_add function defined at arch/x86/kernel/module.c */
+static int __apply_relocate_add(Elf64_Shdr *sechdrs,
+		   const char *strtab,
+		   unsigned int symindex,
+		   unsigned int relsec,
+		   struct load_info *info,
+		   const char *target_symbol,
+		   gva_t target_new_addr,
+		   gva_t m_core_link_addr,
+		   struct lcd_create_ctx *ctx)
+{
+	unsigned int i;
+	Elf64_Rela *rel;
+	Elf64_Sym *sym;
+	void *loc;
+	void *loc_load;
+	u64 val;
+	unsigned long long loc_offset;
+
+	/*
+	 * Why do we populate from info->hdr instead of section headers?
+	 * info->hdr is the place where the ELF header has been copied to.
+	 * sechdrs has only partial information
+	 */
+	sechdrs[relsec].sh_addr = (size_t) info->hdr + sechdrs[relsec].sh_offset;
+
+	rel = (Elf64_Rela *) sechdrs[relsec].sh_addr;
+
+	printk(" AF sh_addr %llx | entrysz: %zu\n", sechdrs[relsec].sh_addr, sizeof(*rel));
+
+	for (i = 0; i < sechdrs[relsec].sh_size / sizeof(*rel); i++) {
+		/* This is where to make the change */
+		loc_load = loc = (void *)sechdrs[sechdrs[relsec].sh_info].sh_addr
+			+ rel[i].r_offset;
+
+		/* loc_load is made RO by kernel after loading.
+		 * So directly patch the addresses in our
+		 * duplicated pages that would be loaded into
+		 * the LCDs.
+		 */
+		/* extract offset */
+		loc_offset = (unsigned long) loc - gva_val(m_core_link_addr);
+
+		printk("%s, loc %p | loc_offset %Lx | ctx->m_core_bits %p\n",
+				__func__, loc, loc_offset, ctx->m_core_bits);
+
+		/* our duplicate page's virtual address is here in m_core_bits */
+		loc = (char*)ctx->m_core_bits + loc_offset;
+
+		/* This is the symbol it is referring to. Note that all
+		 * undefined symbols have been resolved.
+		 */
+		sym = (Elf64_Sym *)sechdrs[symindex].sh_addr
+			+ ELF64_R_SYM(rel[i].r_info);
+
+		if (!strcmp(strtab + sym->st_name, target_symbol)) {
+			/* patch target address */
+			sym->st_value = gva_val(target_new_addr);
+		} else {
+			/* do nothing for other reloc entries they are patched already */
+			continue;
+		}
+
+		val = sym->st_value + rel[i].r_addend;
+
+		printk("idx: %d | type %d | st_value %Lx | st_name %s | r_addend %Lx | loc %Lx | curval %x | val %Lx\n",
+				i, (int)ELF64_R_TYPE(rel[i].r_info),
+				sym->st_value,
+				strtab + sym->st_name,
+				rel[i].r_addend,
+				(u64)loc,
+				*(u32*)loc,
+				val);
+
+		switch (ELF64_R_TYPE(rel[i].r_info)) {
+		case R_X86_64_NONE:
+			break;
+		case R_X86_64_64:
+			printk("\t64:old value %Lx\n", *(u64 *)loc);
+			*(u64 *)loc = val;
+			printk("\t64:patched value %Lx\n", *(u64 *)loc);
+			break;
+		case R_X86_64_32:
+			printk("\t32:old value %x\n", *(u32 *)loc);
+			*(u32 *)loc = val;
+			printk("\t32:patched value %x\n", *(u32 *)loc);
+			if (val != *(u32 *)loc) {
+				pr_err("overflow in relocation type %d val %Lx\n",
+				       (int)ELF64_R_TYPE(rel[i].r_info), val);
+				return -ENOEXEC;
+			}
+			break;
+		case R_X86_64_32S:
+			printk("\t32:old value %x\n", *(s32 *)loc);
+			*(s32 *)loc = val;
+			printk("\t32S:patched value %x\n", *(s32 *)loc);
+			if ((s64)val != *(s32 *)loc) {
+				pr_err("overflow in relocation type %d val %Lx\n",
+				       (int)ELF64_R_TYPE(rel[i].r_info), val);
+				return -ENOEXEC;
+			}
+			break;
+		case R_X86_64_PC32:
+			printk("\tPC32: old value %x\n", *(u32 *)loc);
+			val -= (u64)loc_load;
+			*(u32 *)loc = val;
+			printk("\tPC32: patched value %x\n", *(u32 *)loc);
+#if 0
+			if ((s64)val != *(s32 *)loc)
+				goto overflow;
+#endif
+			break;
+		default:
+			pr_err("Unknown rela relocation: %llu\n",
+					ELF64_R_TYPE(rel[i].r_info));
+			return -ENOEXEC;
+		}
+	}
+	return 0;
+}
+
 int lvd_create_module_lvd(char *mdir, char *mname, cptr_t *lcd_out,
 			struct lcd_create_ctx **ctx_out, int lvd_id)
 {
@@ -629,7 +750,7 @@ int lvd_create_module_lvd(char *mdir, char *mname, cptr_t *lcd_out,
 	struct module *mod;
 	struct klp_modinfo *klp_info;
 	struct load_info *info;
-	int sec;
+	int relsec;
 	unsigned long m_struct_module_core_offset;
 	struct lcd_create_ctx *ctx;
 	cptr_t lcd;
@@ -761,130 +882,27 @@ int lvd_create_module_lvd(char *mdir, char *mname, cptr_t *lcd_out,
 
 	}
 
-	for (sec = 1; sec < klp_info->hdr.e_shnum; sec++) {
-		Elf64_Shdr *shdr = &klp_info->sechdrs[sec];
+	for (relsec = 1; relsec < klp_info->hdr.e_shnum; relsec++) {
+		Elf64_Shdr *shdr = &klp_info->sechdrs[relsec];
 		const char *sh_name = klp_info->secstrings + shdr->sh_name;
 
-		if ((shdr->sh_type == SHT_RELA) && !strcmp(".rela.vmfuncwrapper.text", sh_name)) {
+		if (shdr->sh_type == SHT_RELA) {
 			Elf64_Shdr *sechdrs = klp_info->sechdrs;
 			unsigned int sh_size = shdr->sh_size;
 			unsigned int sh_offset = shdr->sh_offset;
 			unsigned int symindex = klp_info->symndx;
 			const char *strtab = mod->core_kallsyms.strtab;
-			unsigned long long loc_offset;
-			Elf64_Rela *rel;
-			Elf64_Sym *sym;
-			void *loc;
-			void *loc_load;
-			u64 val;
-			int i;
 
-			printk("%s, shdr: %p | sh_name: %s | sh_size %u | sh_offset %x | b4 sh_addr %llx | ",
-						__func__, shdr, sh_name, sh_size, sh_offset, shdr->sh_addr);
-
-			shdr->sh_addr = (size_t)info->hdr + sh_offset;
-
-			rel = (void *) shdr->sh_addr;
-
-			printk(" AF sh_addr %llx | entrysz: %zu\n", shdr->sh_addr, sizeof(*rel));
-
-			if (!rel)
-				goto skip;
-
-			print_hex_dump(KERN_DEBUG, "relavmwrap: ", DUMP_PREFIX_ADDRESS,
-				24, 1, (void*)rel, sh_size, false);
-
-			/* taken from apply_relocation_add function defined at arch/x86/kernel/module.c */
-
-			for (i = 0; i < sh_size / sizeof(*rel); i++) {
-				/* This is where to make the change */
-				loc_load = loc = (void *)sechdrs[shdr->sh_info].sh_addr
-					+ rel[i].r_offset;
-
-				/* loc_load is made RO by kernel after loading.
-				 * So directly patch the addresses in our
-				 * duplicated pages that would be loaded into
-				 * the LCDs.
-				 */
-				/* extract offset */
-				loc_offset = (unsigned long) loc - gva_val(m_core_link_addr);
-
-				printk("%s, loc %p | loc_offset %Lx | ctx->m_core_bits %p\n",
-						__func__, loc, loc_offset, ctx->m_core_bits);
-
-				/* our duplicate page's virtual address is here in m_core_bits */
-				loc = (char*)ctx->m_core_bits + loc_offset;
-
-				/* This is the symbol it is referring to. Note that all
-				 * undefined symbols have been resolved.
-				 */
-				sym = (Elf64_Sym *)sechdrs[symindex].sh_addr
-					+ ELF64_R_SYM(rel[i].r_info);
-
-				if (!strcmp(strtab + sym->st_name, "vmfunc")) {
-					/* patch vmfunc address */
-					sym->st_value = gva_val(m_vmfunc_page_addr);
-				} else {
-					/* do nothing for other reloc entries they are patched already */
-					continue;
-				}
-
-				val = sym->st_value + rel[i].r_addend;
-
-				printk("idx: %d | type %d | st_value %Lx | st_name %s | r_addend %Lx | loc %Lx | curval %x | val %Lx\n",
-						i, (int)ELF64_R_TYPE(rel[i].r_info),
-						sym->st_value,
-						strtab + sym->st_name,
-						rel[i].r_addend,
-						(u64)loc,
-						*(u32*)loc,
-						val);
-
-				switch (ELF64_R_TYPE(rel[i].r_info)) {
-				case R_X86_64_NONE:
-					break;
-				case R_X86_64_64:
-					printk("\t64:old value %Lx\n", *(u64 *)loc);
-					*(u64 *)loc = val;
-					printk("\t64:patched value %Lx\n", *(u64 *)loc);
-					break;
-				case R_X86_64_32:
-					printk("\t32:old value %x\n", *(u32 *)loc);
-					*(u32 *)loc = val;
-					printk("\t32:patched value %x\n", *(u32 *)loc);
-					if (val != *(u32 *)loc) {
-						pr_err("overflow in relocation type %d val %Lx\n",
-						       (int)ELF64_R_TYPE(rel[i].r_info), val);
-						return -ENOEXEC;
-					}
-					break;
-				case R_X86_64_32S:
-					printk("\t32:old value %x\n", *(s32 *)loc);
-					*(s32 *)loc = val;
-					printk("\t32S:patched value %x\n", *(s32 *)loc);
-					if ((s64)val != *(s32 *)loc) {
-						pr_err("overflow in relocation type %d val %Lx\n",
-						       (int)ELF64_R_TYPE(rel[i].r_info), val);
-						return -ENOEXEC;
-					}
-					break;
-				case R_X86_64_PC32:
-					printk("\tPC32: old value %x\n", *(u32 *)loc);
-					val -= (u64)loc_load;
-					*(u32 *)loc = val;
-					printk("\tPC32: patched value %x\n", *(u32 *)loc);
-#if 0
-					if ((s64)val != *(s32 *)loc)
-						goto overflow;
-#endif
-					break;
-				default:
-					pr_err("%s: Unknown rela relocation: %llu\n",
-					       mod->name, ELF64_R_TYPE(rel[i].r_info));
-					return -ENOEXEC;
-				}
+			if (!strcmp(".rela.vmfuncwrapper.text", sh_name)) {
+				printk("%s, shdr: %p | sh_name: %s | sh_size %u | sh_offset %x | b4 sh_addr %llx | ",
+							__func__, shdr, sh_name, sh_size, sh_offset, shdr->sh_addr);
+				__apply_relocate_add(sechdrs, strtab, symindex,
+						relsec, info, "vmfunc",
+						m_vmfunc_page_addr,
+						m_core_link_addr, ctx);
+				print_hex_dump(KERN_DEBUG, "relavmwrap: ", DUMP_PREFIX_ADDRESS,
+					24, 1, (void*)shdr->sh_addr, shdr->sh_size, false);
 			}
-
 		}
 	}
 

@@ -34,7 +34,11 @@ static int caller_main(void)
 	u64 start, end;
 #endif
 	struct fipc_message dummy = {0};
-	dummy.vmfunc_id = VMFUNC_RPC_CALL;
+	/*
+	 * only 3 types of calls are handled by the dispatch loop.  Set this to
+	 * 0x4 to cause a vmfunc switch to goto the default case and return.
+	 */
+	dummy.vmfunc_id = 0x4;
 	dummy.rpc_id = NULL_INVOCATION;	
 	fipc_set_reg1(&dummy, 0xabcd);
 	/*

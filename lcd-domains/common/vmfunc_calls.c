@@ -132,6 +132,7 @@ vmfunc_call_empty_switch(unsigned int ept, //rdi
 }
 
 int noinline
+__vmfunc
 __vmfunc_dispatch(struct fipc_message *msg)
 {
 	int ret = 0;
@@ -147,12 +148,15 @@ __vmfunc_dispatch(struct fipc_message *msg)
 		break;
 #endif
 	case VMFUNC_RPC_CALL:
-		//ret = handle_rpc_calls(msg);
+		ret = handle_rpc_calls(msg);
 		break;
-
 	default:
-		//printk("%s, no handler for unknown call type %d\n",
-		//		__func__, msg->vmfunc_id);
+#if 0
+		printk("%s, no handler for unknown call type %d\n",
+				__func__, msg->vmfunc_id);
+
+#endif
+		fipc_set_reg1(msg, 0xdad);
 		break;
 	}
 
@@ -242,10 +246,10 @@ vmfunc_call(unsigned int ept, //rdi
 		"mov (" _REG_RBX "), " _REG_RAX " \n\t"
 		/* get base address of stack pointer array */
 		"mov %[stack_ptrs], " _REG_R13 " \n\t"
-		/* save rsp to the cpuid page at offset 8*/
-		"mov " _REG_RSP ", 8(" _REG_RBX ") \n\t" 
 		/* pop back the ept value we pushed earlier */
 		"pop " _REG_RCX " \n\t"
+		/* save rsp to the cpuid page at offset 8*/
+		"mov " _REG_RSP ", 8(" _REG_RBX ") \n\t"
 		/* populate stack for vmfunc domain */
 		/* FIXME: This should be from TLS of current */
 		"mov (" _REG_R13 ", " _REG_RAX ", 8), " _REG_RSP " \n\t"
@@ -312,9 +316,10 @@ vmfunc_wrapper(struct fipc_message *request)
 	static int once = 0;
 
 	if (!once) {
-		printk("%s, vmfunc (%p)\n", __func__, vmfunc_call);
-		//print_hex_dump(KERN_DEBUG, "vmfunc: ", DUMP_PREFIX_ADDRESS,
-		//	       16, 1, vmfunc_call, 0x100, false);
+		printk("%s, vmfunc (%p), request: %p\n", __func__, vmfunc_call, request);
+		if (0)
+			print_hex_dump(KERN_DEBUG, "vmfunc: ", DUMP_PREFIX_ADDRESS,
+			       16, 1, vmfunc_call, 0x100, false);
 		once = 1;
 	}
 	vmfunc_call(OTHER_DOMAIN, request);

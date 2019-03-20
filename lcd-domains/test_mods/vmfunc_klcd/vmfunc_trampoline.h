@@ -1,5 +1,3 @@
-#pragma once
-
 #ifndef VMFUNC_TRAMPOLINE_H
 #define VMFUNC_TRAMPOLINE_H
 

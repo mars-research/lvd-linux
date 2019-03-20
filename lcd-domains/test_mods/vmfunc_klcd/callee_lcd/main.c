@@ -12,6 +12,7 @@
 #include <liblcd/liblcd.h>
 #include "../rpc.h"
 #include "../rdtsc_helper.h"
+#include "../vmfunc_trampoline.h"
 #include <linux/module.h>
 
 #include <lcd_config/post_hook.h>

@@ -536,7 +536,8 @@ static int get_pages_for_lvd(struct lcd_create_ctx *ctx)
 	}
 	memset(lcd_page_address(p3), 0, LCD_STACK_SIZE);
 	ctx->stack = lcd_page_address(p3);
-	lcd_stack = (void*) gva_val(LCD_STACK_GV_ADDR);
+	lcd_stack = (void*) gva_val(gva_add(LCD_STACK_GV_ADDR, LCD_STACK_SIZE - sizeof(void *)));
+
 
 #ifdef LVD_PERCPU_STACK
 	ctx->stack = kzalloc(sizeof(void*) * num_online_cpus(), GFP_KERNEL);

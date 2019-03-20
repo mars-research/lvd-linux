@@ -16,12 +16,17 @@ int do_check(int ept)
 	int ret;
 	gpa_t gpa_vmfunc_lcd;
 	hpa_t hpa_vmfunc;
+	gpa_t gpa_lcd_stack;
+	hpa_t hpa_lcd_stack;
+
 	vmfunc_load_addr = kallsyms_lookup_name("__vmfunc_load_addr");
 	gpa_vmfunc_lcd = isolated_lcd_gva2gpa(__gva(vmfunc_load_addr));
+	gpa_lcd_stack = gpa_add(LCD_STACK_GP_ADDR, LCD_STACK_SIZE - sizeof(void*));
+
 	ret = lcd_arch_ept_gpa_to_hpa_cpu(lcd_list[ept]->lcd_arch,
 			gpa_vmfunc_lcd, &hpa_vmfunc, 1, smp_processor_id());
 	if (ret) {
-		printk("%s, Unable to find GPA to HPA mapping for gva:%lx, gpa:%lx, ret = %d\n",
+		printk("%s, Unable to find GPA to HPA mapping for vmfunc page! gva:%lx, gpa:%lx, ret = %d\n",
 				__func__, vmfunc_load_addr, gpa_val(gpa_vmfunc_lcd), ret);
 		return ret;
 	}
@@ -31,6 +36,18 @@ int do_check(int ept)
 
 	print_hex_dump(KERN_DEBUG, "vmfunc_lcd: ", DUMP_PREFIX_ADDRESS,
 			       16, 1, __va(hpa_val(hpa_vmfunc)), 0x100, false);
+
+	ret = lcd_arch_ept_gpa_to_hpa_cpu(lcd_list[ept]->lcd_arch,
+			gpa_lcd_stack, &hpa_lcd_stack, 1, smp_processor_id());
+	if (ret) {
+		printk("%s, Unable to find GPA to HPA mapping for stack! gva:%lx, gpa:%lx, ret = %d\n",
+				__func__, gva_val(isolated_lcd_gpa2gva(gpa_lcd_stack)), gpa_val(gpa_lcd_stack), ret);
+		return ret;
+	}
+
+	printk("%s, Mapping found on LCDs EPT for stack GVA: %lx, GPA: %lx , HPA: %lx\n",
+			__func__, gva_val(isolated_lcd_gpa2gva(gpa_lcd_stack)), gpa_val(gpa_lcd_stack),
+			hpa_val(hpa_lcd_stack));
 
 	return ret;
 }

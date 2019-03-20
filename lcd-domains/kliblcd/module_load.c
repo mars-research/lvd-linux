@@ -279,6 +279,7 @@ int lvd_load_module(char *mdir, char *mname,
 	unsigned long vmfunc_load_addr;
 	unsigned long vmfunc_load_addr_lcd;
 	unsigned long vmfunc_page_size;
+	char mod_sym[100] = {0};
 
 	/*
 	 * Do these lookups before loading the LCD module. Otherwise, kallsyms
@@ -313,16 +314,26 @@ int lvd_load_module(char *mdir, char *mname,
 		goto fail3;
 	}
 
-	vmfunc_load_addr_lcd = kallsyms_lookup_name("vmfunc_load_addr");
+	sprintf(mod_sym, "%s:%s", mname, "vmfunc_load_addr");
+	vmfunc_load_addr_lcd = kallsyms_lookup_name(mod_sym);
 	if (vmfunc_load_addr && vmfunc_page_size) {
 		*m_vmfunc_page_addr = __gva(*((unsigned long *)vmfunc_load_addr));
 		*m_vmfunc_page_size = *((unsigned long*)vmfunc_page_size);
 	} else
 		*m_vmfunc_page_addr = __gva(0UL);
 
-	print_hex_dump(KERN_DEBUG, "vmfunc.load: ", DUMP_PREFIX_ADDRESS, 32, 1,
+	if (vmfunc_load_addr_lcd) {
+		printk("%s, vmfunc_load_addr: %lx, vmfunc_load_add_lcd: %lx\n",
+			__func__, *((unsigned long*)vmfunc_load_addr),
+			*((unsigned long*)vmfunc_load_addr_lcd));
+
+		print_hex_dump(KERN_DEBUG, "vmfunc.load: ", DUMP_PREFIX_ADDRESS, 32, 1,
 			(void*)(*(unsigned long*)vmfunc_load_addr), 0x100,
 			false);
+	} else {
+		ret = -EINVAL;
+		goto fail2;
+	}
 
 	/* we make an additional copy for vmfunc page */
 	ret = dup_module_pages(va2hva((void*)(*(unsigned long*)vmfunc_load_addr_lcd)), *((unsigned long*)vmfunc_page_size),

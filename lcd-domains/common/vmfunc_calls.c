@@ -108,6 +108,29 @@ handle_rpc_calls(struct fipc_message *msg) {
 };
 EXPORT_SYMBOL(handle_rpc_calls);
 
+/*
+ * test1: Switch to domain 1 and back
+ * Required: CR3 remapping
+ * Result: Passed
+ */
+void noinline
+__vmfunc
+vmfunc_call_empty_switch(unsigned int ept, //rdi
+			struct fipc_message *msg) // rsi
+{
+	asm volatile(
+		/* populate eax, ecx */
+		"mov $0, %eax \n\t"
+		"mov $1, %ecx \n\t"
+		/* switch to domain 1 */
+		"vmfunc 	\n\t"
+		/* zero ecx */
+		"xor %ecx, %ecx \n\t"
+		/* switch back to domain 0 */
+		"vmfunc 	\n\t"
+		);
+}
+
 int noinline
 __vmfunc_dispatch(struct fipc_message *msg)
 {
@@ -180,13 +203,7 @@ __asm__ (
 	"  ret			\n\t"
 	);
 
-void
-vmfunc_test(struct fipc_message *msg)
-{
-	unsigned long cpuid = *((unsigned long *)cpuid_page);
-	void *my_stack = stack_ptrs[cpuid];
-	*((unsigned long*)my_stack) = (unsigned long) msg;
-}
+
 /* functions with vmfunc instructions should be on the same page on both
  * host Linux and LCDs. Place it in a separate section
  */

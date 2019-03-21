@@ -1933,6 +1933,12 @@ struct task_struct {
 	struct lcd_resource_tree *lcd_resource_trees[2];
 	struct ptstate_t *ptstate;
 
+	/* used to check if a cr3 remapping has been done already */
+	unsigned long cr3_remapping;
+
+	/* to save lcd_stack when moving in/out of vmfunc domain */
+	void *lcd_stack;
+
 /* CPU-specific state of this task */
 	struct thread_struct thread;
 /*

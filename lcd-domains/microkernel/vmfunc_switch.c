@@ -67,7 +67,7 @@ static int vmfunc_prepare_switch(int ept)
 
 	lcd = lcd_list[ept];
 
-	if (lcd) {
+	if (lcd && !current->cr3_remapping) {
 		hpa_lcd_cr3 = lcd->lcd_arch->hpa_cr3;
 
 		LCD_MSG("Add mapping gpa: %lx, hpa: %lx", gpa_val(gpa_cr3),
@@ -78,6 +78,7 @@ static int vmfunc_prepare_switch(int ept)
 			1, /* create, if not present */
 			0 /* don't overwrite, if present */);
 
+		current->cr3_remapping = 1;
 		/* lcd_arch_ept_dump_this_cpu(lcd_list[ept]->lcd_arch); */
 	}
 

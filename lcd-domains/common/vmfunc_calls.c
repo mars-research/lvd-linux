@@ -13,6 +13,9 @@
 #define VMFUNC_TEXT_SECTION		".vmfunc.text"
 #define __vmfunc	__attribute__((section(VMFUNC_TEXT_SECTION)))
 
+#define VMFUNC_SBOARD_SECTION		".vmfunc.springboard.text"
+#define __vmfunc_springboard	__attribute__((section(VMFUNC_SBOARD_SECTION)))
+
 #define VMFUNC_WRAPPER_SECTION		".vmfuncwrapper.text"
 #define __vmfunc_wrapper __attribute__((section(VMFUNC_WRAPPER_SECTION)))
 
@@ -34,6 +37,9 @@ extern void *cpuid_page;
 
 extern int __vmfunc_page_size;
 extern int __vmfunc_load_addr;
+
+extern int __vmfunc_sboard_page_size;
+extern int __vmfunc_sboard_load_addr;
 
 int
 vmfunc_init(void *stack_page)
@@ -242,15 +248,21 @@ vmfunc_call(unsigned int ept, //rdi
 		"mov %[cpuid], " _REG_RBX " \n\t"
 		/* get cpu number from cpuid page */
 		"mov (" _REG_RBX "), " _REG_RAX " \n\t"
-		/* get base address of stack pointer array */
-		"mov %[stack_ptrs], " _REG_R13 " \n\t"
 		/* pop back the ept value we pushed earlier */
 		"pop " _REG_RCX " \n\t"
 		/* save rsp to the cpuid page at offset 8*/
 		"mov " _REG_RSP ", 8(" _REG_RBX ") \n\t"
+#ifdef LCD_TLS_STACK
+		"mov %[cur], " _REG_R13 " \n\t"
+		"mov %[tls_stack_off], " _REG_R14 " \n\t"
+		"mov (" _REG_R14 ", " _REG_R13 "), " _REG_RSP " \n\t"
+#else
+		/* get base address of stack pointer array */
+		"mov %[stack_ptrs], " _REG_R13 " \n\t"
 		/* populate stack for vmfunc domain */
 		/* FIXME: This should be from TLS of current */
 		"mov (" _REG_R13 ", " _REG_RAX ", 8), " _REG_RSP " \n\t"
+#endif
 		/* populate eax for vmfunc */
 		"mov %[func], " _REG_EAX " \n\t"
 
@@ -296,8 +308,156 @@ vmfunc_call(unsigned int ept, //rdi
 		[ept]"r"(ept),
 		[msg]"m"(msg),
 		[stack_ptrs]"m"(stack_ptrs),
-		[cpuid]"m"(cpuid_page),
-		[resps]"m"(responses)
+		[cpuid]"m"(cpuid_page)
+#ifdef LCD_TLS_STACK
+		/*
+		 * XXX: This offsetof would give us different values for KLCD
+		 * and LCD as some members are commented out inside LCD, based
+		 * on the configs undefined by {pre,post}_hook.h. We don't need
+		 * to worry about this difference in offset as this code would
+		 * only be used by KLCD to call into the isolated domain.
+		 */
+		,[tls_stack_off]"i"(offsetof(struct task_struct, lcd_stack)),
+		[cur]"r"(current)
+#endif
+		:
+		/* add this to clobbered list and let the compiler generate push and pop
+		 * sequences in prologue and epilogue automatically
+		 */
+		"rbx", "r12", "r14", "rax", "rcx", "rdx", "rsi", "rdi", "r9", "r10", "r11",
+		"r15", "memory", "cc");
+}
+EXPORT_SYMBOL(vmfunc_call);
+
+/*
+ * functions with vmfunc instructions should be on the same page on both
+ * host Linux and LCDs. Place it in a separate section to achieve this.
+ * This is a call from an untrusted domain to the kernel, which is trusted.
+ */
+void
+__vmfunc_springboard
+vmfunc_springboard(struct fipc_message *msg /* rdi */)
+{
+	asm volatile(
+		/*
+		 * function prologue pushes callee-saved registers onto the
+		 * stack as we have those registers clobbered
+		 */
+
+		/*
+		 * push msg pointer onto the stack. this is needed for
+		 * constructing response buffer when the call returns.
+		 * push: happens on LCD stack
+		 */
+		"push " _REG_RDI " \n\t"
+		/*
+		 * mov rdi to rax as rsi carries the function arguments to the
+		 * next call
+		 */
+		"mov " _REG_RDI "," _REG_RAX " \n\t"
+
+		/* populate registers as per calling convention */
+		"mov (" _REG_RAX ") ," REG0 " \n\t"
+		"mov 8(" _REG_RAX ") ," REG1 " \n\t"
+		"mov 16(" _REG_RAX ") ," REG2 " \n\t"
+		"mov 24(" _REG_RAX ") ," REG3 " \n\t"
+		"mov 32(" _REG_RAX ") ," REG4 " \n\t"
+		"mov 40(" _REG_RAX ") ," REG5 " \n\t"
+		"mov 48(" _REG_RAX ") ," REG6 " \n\t"
+		"mov 56(" _REG_RAX ") ," REG7 " \n\t"
+
+		/*
+		 * populate eax, ecx for vmfunc
+		 * This code always jumps to the trusted domain (ecx=0)
+		 */
+		"mov %[func], " _REG_EAX " \n\t"
+		"mov $0, " _REG_ECX " \n\t"
+
+		/* call vmfunc */
+		"vmfunc \n\t"
+
+		/* TODO: save LCD stack in current */
+#ifdef LCD_TLS_STACK
+		"mov %[cur], " _REG_R13 " \n\t"
+		"mov %[tls_stack_off], " _REG_R14 " \n\t"
+		/* save lcd_rsp to current->lcd_stack */
+		"mov " _REG_RSP ", (" _REG_R14 ", " _REG_R13 ") \n\t"
+#endif
+
+		/* install kernel stack */
+		/* get cpuid page buffer */
+		"mov %[cpuid], " _REG_RBX " \n\t"
+		/* get cpu number from cpuid page */
+		"mov (" _REG_RBX "), " _REG_RCX " \n\t"
+		/* restore KLCD's RSP */
+		"mov 8(" _REG_RBX "), " _REG_RSP " \n\t"
+
+		/* STACK SWITCHED esp=klcd_esp! */
+
+		/* stack is populated. we are good to go */
+		"call vmfunc_dispatch \n\t"
+
+		/* we are ready to jump back to the caller */
+		/* save kernel stack */
+		/* get cpuid page buffer */
+		"mov %[cpuid], " _REG_RBX " \n\t"
+		/* get cpu number from cpuid page */
+		"mov (" _REG_RBX "), " _REG_RAX " \n\t"
+		/* get base address of stack pointer array */
+		"mov %[stack_ptrs], " _REG_R13 " \n\t"
+		/* save rsp to the cpuid page at offset 8*/
+		"mov " _REG_RSP ", 8(" _REG_RBX ") \n\t"
+
+		/* restore stack for vmfunc domain */
+#ifdef LCD_TLS_STACK
+		"mov %[cur], " _REG_R13 " \n\t"
+		"mov %[tls_stack_off], " _REG_R14 " \n\t"
+		/* restore lcd_rsp from current->lcd_stack */
+		"mov (" _REG_R14 ", " _REG_R13 "), " _REG_RSP " \n\t"
+#else
+		/* FIXME: This should be from TLS of current */
+		"mov (" _REG_R13 ", " _REG_RAX ", 8), " _REG_RSP " \n\t"
+#endif
+		/* LCD STACK RESTORED! */
+
+		/* zero callee saved registers */
+		"xor " _REG_RBX "," _REG_RBX " \n\t"
+		"xor " _REG_R13 "," _REG_R13 " \n\t"
+		"xor " _REG_R14 "," _REG_R14 " \n\t"
+		"xor " _REG_R15 "," _REG_R15 " \n\t"
+		"xor " _REG_RBP "," _REG_RBP " \n\t"
+
+		/* This is the return path */
+		"mov $0, " _REG_EAX " \n\t"
+
+		/* OTHER_DOMAIN is set via cflags */
+		"mov $" __stringify(OTHER_DOMAIN) ", " _REG_ECX " \n\t"
+
+		/* do a vmfunc back */
+		"vmfunc			\n\t"
+
+		/* stack pointer is restored, let's get our msg buffer */
+		"pop " _REG_R13 " \n\t"
+		/* construct response fipc_message from registers */
+		"mov " REG0 ", 0(" _REG_R13 ") \n\t"
+		"mov " REG1 ", 8(" _REG_R13 ") \n\t"
+		"mov " REG2 ", 16(" _REG_R13 ") \n\t"
+		"mov " REG3 ", 24(" _REG_R13 ") \n\t"
+		"mov " REG4 ", 32(" _REG_R13 ") \n\t"
+		"mov " REG5 ", 40(" _REG_R13 ") \n\t"
+		"mov " REG6 ", 48(" _REG_R13 ") \n\t"
+		"mov " REG7 ", 56(" _REG_R13 ") \n\t"
+		/* after restoring the callee-saved registers are popped off
+		 * the current stack and the callee returns
+		 */
+		: : [func]"i"(VM_FUNCTION),
+		[msg]"m"(msg),
+		[stack_ptrs]"m"(stack_ptrs),
+		[cpuid]"m"(cpuid_page)
+#ifdef LCD_TLS_STACK
+		,[tls_stack_off]"i"(offsetof(struct task_struct, lcd_stack)),
+		[cur]"r"(current)
+#endif
 		:
 		/* add this to clobbered list and let the compiler generate push and pop
 		 * sequences in prologue and epilogue automatically
@@ -305,7 +465,7 @@ vmfunc_call(unsigned int ept, //rdi
 		"rbx", "r12", "r13", "r14",
 		"r15", "memory", "cc");
 }
-EXPORT_SYMBOL(vmfunc_call);
+EXPORT_SYMBOL(vmfunc_springboard);
 
 int noinline
 __vmfunc_wrapper
@@ -350,3 +510,6 @@ EXPORT_SYMBOL(vmfunc_wrapper);
 EXPORT_SYMBOL(vmfunc_test_wrapper);
 EXPORT_SYMBOL(__vmfunc_load_addr);
 EXPORT_SYMBOL(__vmfunc_page_size);
+
+EXPORT_SYMBOL(__vmfunc_sboard_load_addr);
+EXPORT_SYMBOL(__vmfunc_sboard_page_size);

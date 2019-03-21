@@ -51,9 +51,11 @@ int lvd_load_module(char *mdir, char *mname,
 		void **m_init_bits,
 		void **m_core_bits,
 		void **m_vmfunc_bits,
+		void **m_vmfunc_sboard_bits,
 		cptr_t *m_init_pages,
 		cptr_t *m_core_pages,
 		cptr_t *m_vmfunc_pages,
+		cptr_t *m_vmfunc_sboard_pages,
 		gva_t *m_init_link_addr,
 		gva_t *m_core_link_addr,
 		unsigned long *m_init_size,
@@ -61,7 +63,9 @@ int lvd_load_module(char *mdir, char *mname,
 		gva_t *m_init_func_addr,
 		unsigned long *m_struct_module_core_offset,
 		gva_t *m_vmfunc_page_addr,
-		unsigned long *m_vmfunc_page_size
+		unsigned long *m_vmfunc_page_size,
+		gva_t *m_vmfunc_sboard_page_addr,
+		unsigned long *m_vmfunc_sboard_page_size
 		);
 
 /**
@@ -77,4 +81,4 @@ int lvd_load_module(char *mdir, char *mname,
  */
 void lcd_release_module(void *m_init_bits, void *m_core_bits);
 
-void lvd_release_module(void *m_init_bits, void *m_core_bits, void *m_vmfunc_bits);
+void lvd_release_module(void *m_init_bits, void *m_core_bits, void *m_vmfunc_bits, void *m_vmfunc_sboard_bits);

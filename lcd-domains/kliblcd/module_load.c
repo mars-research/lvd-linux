@@ -261,9 +261,11 @@ int lvd_load_module(char *mdir, char *mname,
 		void **m_init_bits,
 		void **m_core_bits,
 		void **m_vmfunc_bits,
+		void **m_vmfunc_sboard_bits,
 		cptr_t *m_init_pages,
 		cptr_t *m_core_pages,
 		cptr_t *m_vmfunc_pages,
+		cptr_t *m_vmfunc_sboard_pages,
 		gva_t *m_init_link_addr,
 		gva_t *m_core_link_addr,
 		unsigned long *m_init_size,
@@ -271,7 +273,9 @@ int lvd_load_module(char *mdir, char *mname,
 		gva_t *m_init_func_addr,
 		unsigned long *m_struct_module_core_offset,
 		gva_t *m_vmfunc_page_addr,
-		unsigned long *m_vmfunc_page_size
+		unsigned long *m_vmfunc_page_size,
+		gva_t *m_vmfunc_sboard_page_addr,
+		unsigned long *m_vmfunc_sboard_page_size
 		)
 {
 	int ret;
@@ -279,6 +283,11 @@ int lvd_load_module(char *mdir, char *mname,
 	unsigned long vmfunc_load_addr;
 	unsigned long vmfunc_load_addr_lcd;
 	unsigned long vmfunc_page_size;
+
+	unsigned long vmfunc_sboard_load_addr;
+	unsigned long vmfunc_sboard_load_addr_lcd;
+	unsigned long vmfunc_sboard_page_size;
+
 	char mod_sym[100] = {0};
 
 	/*
@@ -288,6 +297,9 @@ int lvd_load_module(char *mdir, char *mname,
 	 */
 	vmfunc_load_addr = kallsyms_lookup_name("vmfunc_load_addr");
 	vmfunc_page_size = kallsyms_lookup_name("vmfunc_page_size");
+
+	vmfunc_sboard_load_addr = kallsyms_lookup_name("vmfunc_sboard_load_addr");
+	vmfunc_sboard_page_size = kallsyms_lookup_name("vmfunc_sboard_page_size");
 	/*
 	 * Load module in host
 	 */
@@ -316,11 +328,13 @@ int lvd_load_module(char *mdir, char *mname,
 
 	sprintf(mod_sym, "%s:%s", mname, "vmfunc_load_addr");
 	vmfunc_load_addr_lcd = kallsyms_lookup_name(mod_sym);
+
 	if (vmfunc_load_addr && vmfunc_page_size) {
 		*m_vmfunc_page_addr = __gva(*((unsigned long *)vmfunc_load_addr));
 		*m_vmfunc_page_size = *((unsigned long*)vmfunc_page_size);
-	} else
+	} else {
 		*m_vmfunc_page_addr = __gva(0UL);
+	}
 
 	if (vmfunc_load_addr_lcd) {
 		printk("%s, vmfunc_load_addr: %lx, vmfunc_load_add_lcd: %lx\n",
@@ -335,13 +349,47 @@ int lvd_load_module(char *mdir, char *mname,
 		goto fail2;
 	}
 
+	sprintf(mod_sym, "%s:%s", mname, "vmfunc_sboard_load_addr");
+	vmfunc_sboard_load_addr_lcd = kallsyms_lookup_name(mod_sym);
+
+	if (vmfunc_sboard_load_addr && vmfunc_sboard_page_size) {
+		*m_vmfunc_sboard_page_addr = __gva(*((unsigned long *)vmfunc_sboard_load_addr));
+		*m_vmfunc_sboard_page_size = *((unsigned long*)vmfunc_sboard_page_size);
+	} else {
+		*m_vmfunc_sboard_page_addr = __gva(0UL);
+	}
+
+	if (vmfunc_sboard_load_addr_lcd) {
+		printk("%s, vmfunc_sboard_load_addr: %lx, vmfunc_sboard_load_add_lcd: %lx\n",
+			__func__, *((unsigned long*)vmfunc_sboard_load_addr),
+			*((unsigned long*)vmfunc_sboard_load_addr_lcd));
+
+		print_hex_dump(KERN_DEBUG, "vmfunc.sboard.load: ", DUMP_PREFIX_ADDRESS, 32, 1,
+			(void*)(*(unsigned long*)vmfunc_sboard_load_addr_lcd), 0x40,
+			false);
+	} else {
+		ret = -EINVAL;
+		goto fail2;
+	}
+
 	/* we make an additional copy for vmfunc page */
-	ret = dup_module_pages(va2hva((void*)(*(unsigned long*)vmfunc_load_addr_lcd)), *((unsigned long*)vmfunc_page_size),
+	//ret = dup_module_pages(va2hva((void*)(*(unsigned long*)vmfunc_load_addr_lcd)), *((unsigned long*)vmfunc_page_size),
+	/* XXX: let's copy the kernel page to see if everything works */
+	ret = dup_module_pages(va2hva((void*)(*(unsigned long*)vmfunc_load_addr)), *((unsigned long*)vmfunc_page_size),
 			m_vmfunc_bits, m_vmfunc_pages);
 	if (ret) {
 		LIBLCD_ERR("failed to load module's core");
 		goto fail4;
 	}
+
+	/* we make an additional copy for vmfunc_sboard page */
+	ret = dup_module_pages(va2hva((void*)(*(unsigned long*)vmfunc_sboard_load_addr_lcd)), *((unsigned long*)vmfunc_sboard_page_size),
+			m_vmfunc_sboard_bits, m_vmfunc_sboard_pages);
+	if (ret) {
+		LIBLCD_ERR("failed to load module's core");
+		goto fail4;
+	}
+
 	/*
 	 * Extract addresses where init and core should be mapped (the
 	 * link base addresses), sizes, and location of struct
@@ -362,6 +410,8 @@ int lvd_load_module(char *mdir, char *mname,
 		m->core_layout.base, m->core_layout.size);
 	printk("    vmfunc addr 0x%lx vmfunc size 0x%lx\n",
 		gva_val(*m_vmfunc_page_addr), *m_vmfunc_page_size);
+	printk("    vmfunc.sboard addr 0x%lx vmfunc size 0x%lx\n",
+		gva_val(*m_vmfunc_sboard_page_addr), *m_vmfunc_sboard_page_size);
 
 	/*
 	 * Unload module from host -- we don't need the host module
@@ -385,7 +435,7 @@ fail1:
 	return ret;
 }
 
-void lvd_release_module(void *m_init_bits, void *m_core_bits, void *m_vmfunc_bits)
+void lvd_release_module(void *m_init_bits, void *m_core_bits, void *m_vmfunc_bits, void *m_vmfunc_sboard_bits)
 {
 	/*
 	 * Delete duplicates
@@ -393,6 +443,7 @@ void lvd_release_module(void *m_init_bits, void *m_core_bits, void *m_vmfunc_bit
 	dedup_module_pages(m_init_bits);
 	dedup_module_pages(m_core_bits);
 	dedup_module_pages(m_vmfunc_bits);
+	dedup_module_pages(m_vmfunc_sboard_bits);
 }
 
 /* EXPORTS -------------------------------------------------- */

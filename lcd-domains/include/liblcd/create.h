@@ -156,6 +156,7 @@ struct lcd_create_ctx {
 	void *m_init_bits;
 	void *m_core_bits;
 	void *m_vmfunc_bits;
+	void *m_vmfunc_sboard_bits;
 };
 
 /**

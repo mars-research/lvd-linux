@@ -438,7 +438,7 @@ static void destroy_create_ctx(struct lcd_create_ctx *ctx)
 	 * pages will be freed by microkernel.
 	 */
 	if (ctx->m_init_bits)
-		lvd_release_module(ctx->m_init_bits, ctx->m_core_bits, ctx->m_vmfunc_bits);
+		lvd_release_module(ctx->m_init_bits, ctx->m_core_bits, ctx->m_vmfunc_bits, ctx->m_vmfunc_sboard_bits);
 	if (ctx->stack)
 		lcd_free_pages(lcd_virt_to_head_page(ctx->stack),
 			LCD_STACK_ORDER);
@@ -869,8 +869,11 @@ int lvd_create_module_lvd(char *mdir, char *mname, cptr_t *lcd_out,
 	gva_t m_init_link_addr, m_core_link_addr, m_init_func_addr;
 	unsigned long m_init_size, m_core_size;
 	cptr_t m_vmfunc_cptr;
+	cptr_t m_vmfunc_sboard_cptr;
 	gva_t m_vmfunc_page_addr;
+	gva_t m_vmfunc_sboard_page_addr;
 	unsigned long m_vmfunc_page_size;
+	unsigned long m_vmfunc_sboard_page_size;
 	struct module *mod;
 	struct klp_modinfo *klp_info;
 	struct load_info *info;
@@ -902,14 +905,18 @@ int lvd_create_module_lvd(char *mdir, char *mname, cptr_t *lcd_out,
 	ret = lvd_load_module(mdir, mname,
 			&ctx->m_init_bits, &ctx->m_core_bits,
 			&ctx->m_vmfunc_bits,
+			&ctx->m_vmfunc_sboard_bits,
 			&m_init_cptr, &m_core_cptr,
 			&m_vmfunc_cptr,
+			&m_vmfunc_sboard_cptr,
 			&m_init_link_addr, &m_core_link_addr,
 			&m_init_size, &m_core_size,
 			&m_init_func_addr,
 			&m_struct_module_core_offset,
 			&m_vmfunc_page_addr,
-			&m_vmfunc_page_size
+			&m_vmfunc_page_size,
+			&m_vmfunc_sboard_page_addr,
+			&m_vmfunc_sboard_page_size
 			);
 	if (ret) {
 		LIBLCD_ERR("error loading kernel module");
@@ -1022,12 +1029,12 @@ int lvd_create_module_lvd(char *mdir, char *mname, cptr_t *lcd_out,
 						sh_name, sh_size, sh_offset, shdr->sh_addr);
 
 				__apply_relocate_add(sechdrs, strtab, symindex,
-						relsec, info, "vmfunc_call_empty_switch",
+						relsec, info, "vmfunc_springboard",
 						/*
 						 * FIXME: This should be the location of the above function on
 						 * the newly loaded page. Fill the offset below.
 						 */
-						gva_add(m_vmfunc_page_addr, 0),
+						gva_add(m_vmfunc_sboard_page_addr, 0),
 						m_core_link_addr, ctx);
 			} else if (!strcmp(".rela.vmfunc.text", sh_name)) {
 				printk("%s, shdr: %p | sh_name: %s | sh_size %u	| sh_offset %x | b4 sh_addr %llx | ", __func__, shdr,
@@ -1106,7 +1113,7 @@ fail6:
 fail5:
 	lcd_cap_delete(lcd);
 fail4:
-	lvd_release_module(ctx->m_init_bits, ctx->m_core_bits, ctx->m_vmfunc_bits);
+	lvd_release_module(ctx->m_init_bits, ctx->m_core_bits, ctx->m_vmfunc_bits, ctx->m_vmfunc_sboard_bits);
 fail3:
 fail2:
 	destroy_create_ctx(ctx);

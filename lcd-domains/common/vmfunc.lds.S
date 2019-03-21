@@ -11,6 +11,16 @@ SECTIONS {
 	__vmfunc_page_size = SIZEOF(.vmfunc.text);
 
 	/* start at a page-aligned address */
+	.vmfunc.springboard.text ALIGN(0x1000): {
+		/* I don't know what address this gives */
+		__vmfunc_sboard_load_addr = .;
+		KEEP(*(.vmfunc.springboard.text))
+		/* align to a page boundary */
+		. = ALIGN(0x1000);
+	}
+	__vmfunc_sboard_page_size = SIZEOF(.vmfunc.springboard.text);
+
+	/* start at a page-aligned address */
 	.vmfuncwrapper.text ALIGN(0x1000): {
 		/* I don't know what address this gives */
 		__vmfuncwrapper_load_addr = .;

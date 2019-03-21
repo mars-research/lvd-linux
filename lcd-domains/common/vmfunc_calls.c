@@ -502,6 +502,11 @@ vmfunc_test_wrapper(struct fipc_message *request, vmfunc_test_t test)
 		request->vmfunc_id = VMFUNC_RPC_CALL;
 		vmfunc_call(OTHER_DOMAIN, request);
 		break;
+	case VMFUNC_TEST_RPC_CALLBACK:
+		request->vmfunc_id = VMFUNC_RPC_CALL;
+		vmfunc_call(OTHER_DOMAIN, request);
+		break;
+
 	}
 	return 0;
 }

@@ -13,6 +13,8 @@
 enum fn_type {
 	NULL_INVOCATION, 
 	CALLEE,
+	FOO,
+	BAR,
 };
 int callee(struct fipc_message *);
 #define TRANSACTIONS 1000000

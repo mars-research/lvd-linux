@@ -41,6 +41,13 @@ void run_vmfunc_tests(void)
 	msg.rpc_id = NULL_INVOCATION;
 	vmfunc_klcd_test_wrapper(&msg, OTHER_DOMAIN, VMFUNC_TEST_RPC_CALL);
 	printk("VMFUNC_TEST_RPC_CALL: Value from other domain %lx\n", fipc_get_reg1(&msg));
+
+#if 0
+	/* test4: RPC call and get a call back */
+	msg.rpc_id = FOO;
+	vmfunc_klcd_test_wrapper(&msg, OTHER_DOMAIN, VMFUNC_TEST_RPC_CALL);
+	printk("VMFUNC_TEST_RPC_CALLBACK: Value from other domain %lx\n", fipc_get_reg1(&msg));
+#endif
 }
 
 static int caller_main(void)
@@ -50,14 +57,14 @@ static int caller_main(void)
 	unsigned int transaction_id = 0;
 	u64 start, end;
 #endif
-	struct fipc_message dummy = {0};
+//	struct fipc_message dummy = {0};
 	/*
 	 * only 3 types of calls are handled by the dispatch loop.  Set this to
 	 * 0x4 to cause a vmfunc switch to goto the default case and return.
 	 */
-	dummy.vmfunc_id = 0x4;
-	dummy.rpc_id = NULL_INVOCATION;	
-	fipc_set_reg1(&dummy, 0xabcd);
+//	dummy.vmfunc_id = VMFUNC_RPC_CALL;
+//	dummy.rpc_id = NULL_INVOCATION;
+//	fipc_set_reg1(&dummy, 0xabcd);
 	/*
 	 * Boot
 	 */
@@ -73,14 +80,14 @@ static int caller_main(void)
 	while (transaction_id < TRANSACTIONS) {
 		if (transaction_id == 0)
 #endif
-	vmfunc_klcd_wrapper(&dummy, OTHER_DOMAIN);
+//	vmfunc_klcd_wrapper(&dummy, OTHER_DOMAIN);
 
 #if 0
 		transaction_id++;
 	}
 	end = lcd_RDTSC_STOP();
 #endif
-	printk("Value from other domain %lx\n", fipc_get_reg1(&dummy));
+//	printk("Value from other domain %lx\n", fipc_get_reg1(&dummy));
 
 #if 0
 	printk("%s, vmfunc (%p) took %llu cycles (num_transactions = %d) | vmfunc_load_addr %p | size %zx\n", __func__,

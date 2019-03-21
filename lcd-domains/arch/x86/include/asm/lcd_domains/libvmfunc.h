@@ -55,6 +55,7 @@ typedef enum {
 	VMFUNC_TEST_EMPTY_SWITCH = 0x1,
 	VMFUNC_TEST_DUMMY_CALL = 0x2,
 	VMFUNC_TEST_RPC_CALL = 0x3,
+	VMFUNC_TEST_RPC_CALLBACK = 0x4,
 } vmfunc_test_t;
 
 int noinline vmfunc_wrapper(struct fipc_message *msg);

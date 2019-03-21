@@ -51,7 +51,15 @@ typedef enum {
 	VMFUNC_RPC_CALL = 0x3,
 } vmfunc_id;
 
+typedef enum {
+	VMFUNC_TEST_EMPTY_SWITCH = 0x1,
+	VMFUNC_TEST_DUMMY_CALL = 0x2,
+	VMFUNC_TEST_RPC_CALL = 0x3,
+} vmfunc_test_t;
+
 int noinline vmfunc_wrapper(struct fipc_message *msg);
+int noinline vmfunc_test_wrapper(struct fipc_message *msg, vmfunc_test_t type);
 void vmfunc_call(unsigned int ept, struct fipc_message *msg);
 int vmfunc_klcd_wrapper(struct fipc_message *msg, unsigned int ept);
+int vmfunc_klcd_test_wrapper(struct fipc_message *msg, unsigned int ept, vmfunc_test_t type);
 #endif /* LIB_VMFUNC_H */

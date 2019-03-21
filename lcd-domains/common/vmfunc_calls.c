@@ -325,6 +325,30 @@ vmfunc_wrapper(struct fipc_message *request)
 	vmfunc_call(OTHER_DOMAIN, request);
 	return 0;
 }
+
+int noinline
+__vmfunc_wrapper
+vmfunc_test_wrapper(struct fipc_message *request, vmfunc_test_t test)
+{
+
+	switch (test) {
+	case VMFUNC_TEST_EMPTY_SWITCH:
+		vmfunc_call_empty_switch(OTHER_DOMAIN, request);
+		break;
+	case VMFUNC_TEST_DUMMY_CALL:
+		/* only upto vmfunc_id 0x3 is handled */
+		request->vmfunc_id = 0x4;
+		vmfunc_call(OTHER_DOMAIN, request);
+		break;
+	case VMFUNC_TEST_RPC_CALL:
+		request->vmfunc_id = VMFUNC_RPC_CALL;
+		vmfunc_call(OTHER_DOMAIN, request);
+		break;
+	}
+	return 0;
+}
+
 EXPORT_SYMBOL(vmfunc_wrapper);
+EXPORT_SYMBOL(vmfunc_test_wrapper);
 EXPORT_SYMBOL(__vmfunc_load_addr);
 EXPORT_SYMBOL(__vmfunc_page_size);

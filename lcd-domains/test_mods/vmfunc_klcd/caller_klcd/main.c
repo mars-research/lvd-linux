@@ -26,6 +26,23 @@ extern void *lcd_stack;
 extern unsigned long *vmfunc_load_addr;
 extern size_t vmfunc_page_size;
 
+void run_vmfunc_tests(void)
+{
+	struct fipc_message msg = {0};
+
+	/* test1: empty switch */
+	vmfunc_klcd_test_wrapper(&msg, OTHER_DOMAIN, VMFUNC_TEST_EMPTY_SWITCH);
+
+	/* test2: dummy unhandled call type */
+	vmfunc_klcd_test_wrapper(&msg, OTHER_DOMAIN, VMFUNC_TEST_DUMMY_CALL);
+	printk("VMFUNC_TEST_EMPTY_SWITCH: Value from other domain %lx\n", fipc_get_reg1(&msg));
+
+	/* test3: RPC call, null_invocation */
+	msg.rpc_id = NULL_INVOCATION;
+	vmfunc_klcd_test_wrapper(&msg, OTHER_DOMAIN, VMFUNC_TEST_RPC_CALL);
+	printk("VMFUNC_TEST_RPC_CALL: Value from other domain %lx\n", fipc_get_reg1(&msg));
+}
+
 static int caller_main(void)
 {
 	int ret = 0;
@@ -47,6 +64,7 @@ static int caller_main(void)
 	printk("%s entered,  lcd_stack %p\n", __func__, lcd_stack);
 	vmfunc_init(lcd_stack);
 	
+	run_vmfunc_tests();
 #if 0
 	ret = lcd_enter();
 	if (ret)

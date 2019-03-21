@@ -102,4 +102,25 @@ exit:
 	return ret;
 }
 
-EXPORT_SYMBOL(vmfunc_klcd_wrapper);
+int vmfunc_klcd_test_wrapper(struct fipc_message *msg, unsigned int ept, vmfunc_test_t test)
+{
+	int ret;
+	if (ept > 511) {
+		ret = -EINVAL;
+		goto exit;
+	}
+	/* FIXME: This should be done only once per process.
+	 * create a TLS variable to mark if cr3 switch is already active.
+	 */
+	vmfunc_prepare_switch(ept);
+	ret = do_check(ept);
+	if (ret)
+		goto exit;
+	local_irq_disable();
+	ret = vmfunc_test_wrapper(msg, test);
+	local_irq_enable();
+exit:
+	return ret;
+}
+
+EXPORT_SYMBOL(vmfunc_klcd_test_wrapper);

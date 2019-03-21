@@ -328,7 +328,7 @@ int lvd_load_module(char *mdir, char *mname,
 			*((unsigned long*)vmfunc_load_addr_lcd));
 
 		print_hex_dump(KERN_DEBUG, "vmfunc.load: ", DUMP_PREFIX_ADDRESS, 32, 1,
-			(void*)(*(unsigned long*)vmfunc_load_addr), 0x100,
+			(void*)(*(unsigned long*)vmfunc_load_addr_lcd), 0x40,
 			false);
 	} else {
 		ret = -EINVAL;

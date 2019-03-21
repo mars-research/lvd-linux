@@ -36,7 +36,6 @@ extern int __vmfunc_page_size;
 extern int __vmfunc_load_addr;
 
 int
-__vmfunc
 vmfunc_init(void *stack_page)
 {
 	/* TODO: this num_online_cpus macro accesses __cpu_online_mask
@@ -132,7 +131,6 @@ vmfunc_call_empty_switch(unsigned int ept, //rdi
 }
 
 int noinline
-__vmfunc
 __vmfunc_dispatch(struct fipc_message *msg)
 {
 	int ret = 0;

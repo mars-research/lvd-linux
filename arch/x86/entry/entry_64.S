@@ -457,7 +457,24 @@ END(irq_entries_start)
 
 	CALL_enter_from_user_mode
 
+	/* 
+	 * We've entered on IST stack, from the user, now switch to normal 
+	 * kernel stack of the process 
+	 */ 
+	movq	%rsp, %rdi			/* pt_regs pointer */
+	call	sync_regs
+	movq	%rax, %rsp			/* switch stack */
+
+	jmp 2f
 1:
+	/* We've entered on the IST stack, from the kernel, switch to 
+           the stack that the kernel was using right before the interrupt */
+	movq	%rsp, %rdi			/* pt_regs pointer */
+	movq	RSP(%rsp), %rsi			/* sack to switch to */
+	call	sync_stacks
+	movq	%rax, %rsp			/* switch stack */
+
+2:
 	/*
 	 * Save previous stack pointer, optionally switch to interrupt stack.
 	 * irq_count is used to check if a CPU is already on an interrupt stack

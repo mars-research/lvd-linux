@@ -393,7 +393,7 @@ static inline void alloc_system_vector(int vector)
 #define alloc_intr_gate(n, addr)				\
 	do {							\
 		alloc_system_vector(n);				\
-		set_intr_gate(n, addr);				\
+		set_intr_gate_ist(n, addr, IRQ_LVD_STACK);	\
 	} while (0)
 
 /*

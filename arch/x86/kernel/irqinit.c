@@ -116,7 +116,7 @@ static void __init smp_intr_init(void)
 			call_function_single_interrupt);
 
 	/* Low priority IPI to cleanup after moving an irq */
-	set_intr_gate(IRQ_MOVE_CLEANUP_VECTOR, irq_move_cleanup_interrupt);
+	set_intr_gate_ist(IRQ_MOVE_CLEANUP_VECTOR, irq_move_cleanup_interrupt, IRQ_LVD_STACK);
 	set_bit(IRQ_MOVE_CLEANUP_VECTOR, used_vectors);
 
 	/* IPI used for rebooting/stopping */
@@ -184,12 +184,12 @@ void __init native_init_IRQ(void)
 #endif
 	for_each_clear_bit_from(i, used_vectors, first_system_vector) {
 		/* IA32_SYSCALL_VECTOR could be used in trap_init already. */
-		set_intr_gate(i, irq_entries_start +
-				8 * (i - FIRST_EXTERNAL_VECTOR));
+		set_intr_gate_ist(i, irq_entries_start +
+				8 * (i - FIRST_EXTERNAL_VECTOR), IRQ_LVD_STACK);
 	}
 #ifdef CONFIG_X86_LOCAL_APIC
 	for_each_clear_bit_from(i, used_vectors, NR_VECTORS)
-		set_intr_gate(i, spurious_interrupt);
+		set_intr_gate_ist(i, spurious_interrupt, IRQ_LVD_STACK);
 #endif
 
 	if (!acpi_ioapic && !of_ioapic && nr_legacy_irqs())

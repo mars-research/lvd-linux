@@ -527,6 +527,23 @@ asmlinkage __visible notrace struct pt_regs *sync_regs(struct pt_regs *eregs)
 }
 NOKPROBE_SYMBOL(sync_regs);
 
+asmlinkage __visible notrace struct pt_regs *sync_stacks(struct pt_regs *eregs, void *new_stack)
+{
+	struct pt_regs *regs = ((struct pt_regs *)new_stack - 1);
+	unsigned vector = ~eregs->orig_ax;
+
+//	if(vector != 48) {
+//		printk(KERN_ERR "IST stack:%p, kernel stack:%p\n", eregs, new_stack);
+//		printk(KERN_ERR "ss:0x%lx, sp:0x%lx, flags:0x%lx, cs:0x%lx, ip:0x%lx, vector:%d\n", 
+//			eregs->ss, eregs->sp, eregs->flags, eregs->cs, eregs->ip, vector);
+//		printk(KERN_ERR "irq_count:%d, irq_stack_ptr:%p\n", this_cpu_read(irq_count), this_cpu_read(irq_stack_ptr)); 
+//	}
+	*regs = *eregs;
+	return regs;
+}
+NOKPROBE_SYMBOL(sync_stacks);
+
+
 struct bad_iret_stack {
 	void *error_entry_ret;
 	struct pt_regs regs;

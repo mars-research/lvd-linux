@@ -39,6 +39,7 @@ static int boot_main(void)
 				&klcd);
 	if (!m) {
 		LIBLCD_ERR("failed to create lcd1");
+		ret = -1;
 		goto fail3;
 	}
 

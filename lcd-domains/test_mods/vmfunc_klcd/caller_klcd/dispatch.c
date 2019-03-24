@@ -24,6 +24,7 @@ bar(struct fipc_message *msg)
 			fipc_get_reg3(msg),
 			fipc_get_reg4(msg),
 			fipc_get_reg5(msg));
+	fipc_set_reg1(msg, 0x100);
 	return 0x12;
 }
 

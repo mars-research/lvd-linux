@@ -18,7 +18,9 @@
 #include <lcd_config/post_hook.h>
 
 extern int vmfunc_wrapper(struct fipc_message *req);
-extern int vmfunc_call(struct fipc_message *msg);
+
+EXPORT_SYMBOL(vmfunc_sboard_load_addr);
+EXPORT_SYMBOL(vmfunc_trampoline_load_addr);
 
 int callee(struct fipc_message *msg2)
 {

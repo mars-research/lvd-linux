@@ -12,7 +12,6 @@
 #include <liblcd/liblcd.h>
 #include "../rpc.h"
 #include "../rdtsc_helper.h"
-#include "../vmfunc_trampoline.h"
 #include <linux/module.h>
 #include <asm/lcd_domains/libvmfunc.h>
 
@@ -23,8 +22,6 @@ extern int vmfunc_init(void*);
 unsigned long long stack;
 unsigned long long eip;
 extern void *lcd_stack;
-extern unsigned long *vmfunc_load_addr;
-extern size_t vmfunc_page_size;
 
 void run_vmfunc_tests(void)
 {
@@ -32,22 +29,37 @@ void run_vmfunc_tests(void)
 
 	/* test1: empty switch */
 	vmfunc_klcd_test_wrapper(&msg, OTHER_DOMAIN, VMFUNC_TEST_EMPTY_SWITCH);
-
+	printk("%s: VMFUNC_TEST_EMPTY_SWITCH: Passed\n", __func__);
 	/* test2: dummy unhandled call type */
 	vmfunc_klcd_test_wrapper(&msg, OTHER_DOMAIN, VMFUNC_TEST_DUMMY_CALL);
-	printk("VMFUNC_TEST_EMPTY_SWITCH: Value from other domain %lx\n", fipc_get_reg1(&msg));
+
+	printk("%s: VMFUNC_TEST_EMPTY_SWITCH: Passed\n\tValue from other domain r1: %lx, r2:%lx, r3:%lx\n",
+			__func__,
+			fipc_get_reg1(&msg),
+			fipc_get_reg2(&msg),
+			fipc_get_reg3(&msg)
+			);
 
 	/* test3: RPC call, null_invocation */
 	msg.rpc_id = NULL_INVOCATION;
 	vmfunc_klcd_test_wrapper(&msg, OTHER_DOMAIN, VMFUNC_TEST_RPC_CALL);
-	printk("VMFUNC_TEST_RPC_CALL: Value from other domain %lx\n", fipc_get_reg1(&msg));
+	printk("%s: VMFUNC_TEST_RPC_CALL: Passed!\n\tValue from other domain %lx\n",
+				__func__, fipc_get_reg1(&msg));
 
-#if 0
 	/* test4: RPC call and get a call back */
+	memset(&msg, 0x0, sizeof(msg));
 	msg.rpc_id = FOO;
 	vmfunc_klcd_test_wrapper(&msg, OTHER_DOMAIN, VMFUNC_TEST_RPC_CALL);
-	printk("VMFUNC_TEST_RPC_CALLBACK: Value from other domain %lx\n", fipc_get_reg1(&msg));
-#endif
+	printk("%s: VMFUNC_TEST_RPC_CALLBACK: Value from other domain "
+			"r1: %lx, r2: %lx, r3: %lx, r4: %lx, r5: %lx, r6: %lx\n",
+			__func__,
+			fipc_get_reg1(&msg),
+			fipc_get_reg2(&msg),
+			fipc_get_reg3(&msg),
+			fipc_get_reg4(&msg),
+			fipc_get_reg5(&msg),
+			fipc_get_reg6(&msg)
+			);
 }
 
 static int caller_main(void)

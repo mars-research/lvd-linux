@@ -18,7 +18,8 @@ null_invocation(struct fipc_message *msg)
 unsigned long noinline
 foo(struct fipc_message *msg)
 {
-	struct fipc_message kmsg;
+	struct fipc_message kmsg = {0};
+	int ret = 0;
 	kmsg.vmfunc_id = VMFUNC_RPC_CALL;
 	kmsg.rpc_id = BAR;
 
@@ -30,6 +31,13 @@ foo(struct fipc_message *msg)
 	fipc_set_reg6(&kmsg, 0xff);
 
 	vmfunc_wrapper(&kmsg);
+
+	ret = fipc_get_reg1(&kmsg);
+	fipc_set_reg2(&kmsg, 0xbb + ret);
+	fipc_set_reg3(&kmsg, 0xcc + ret);
+	fipc_set_reg4(&kmsg, 0xdd + ret);
+	fipc_set_reg5(&kmsg, 0xee + ret);
+	fipc_set_reg6(&kmsg, 0xff + ret);
 
 	return 0;
 }

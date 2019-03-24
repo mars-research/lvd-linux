@@ -1,6 +1,7 @@
 
 ccflags-y += $(ISOLATED_CFLAGS)
 ccflags-y += -DOTHER_DOMAIN=0
+asflags-y += $(ISOLATED_ASFLAGS)
 
 obj-m  += lcd_test_mod_vmfunc_klcd_callee_lcd.o
 

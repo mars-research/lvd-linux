@@ -1,14 +1,14 @@
 
 SECTIONS {
 	/* start at a page-aligned address */
-	.vmfunc.text ALIGN(0x1000): {
+	.vmfunc.trampoline.text ALIGN(0x1000): {
 		/* I don't know what address this gives */
-		__vmfunc_load_addr = .;
-		KEEP(*(.vmfunc.text))
+		__vmfunc_trampoline_load_addr = .;
+		KEEP(*(.vmfunc.trampoline.text))
 		/* align to a page boundary */
 		. = ALIGN(0x1000);
 	}
-	__vmfunc_page_size = SIZEOF(.vmfunc.text);
+	__vmfunc_trampoline_page_size = SIZEOF(.vmfunc.trampoline.text);
 
 	/* start at a page-aligned address */
 	.vmfunc.springboard.text ALIGN(0x1000): {

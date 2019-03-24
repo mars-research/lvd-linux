@@ -155,8 +155,8 @@ struct lcd_create_ctx {
 	unsigned long global_vmfunc_page;
 	void *m_init_bits;
 	void *m_core_bits;
-	void *m_vmfunc_bits;
-	void *m_vmfunc_sboard_bits;
+	void *m_vmfunc_tr_bits;
+	void *m_vmfunc_sb_bits;
 };
 
 /**

@@ -135,10 +135,12 @@ fail1:
 
 static int do_kernel_module_grant_map(cptr_t lcd, struct lcd_create_ctx *ctx,
 				gva_t m_init_link_addr, gva_t m_core_link_addr,
-				gva_t m_vmfunc_page_addr,
+				gva_t m_vmfunc_tr_page_addr,
+				gva_t m_vmfunc_sb_page_addr,
 				unsigned long m_init_size,
 				unsigned long m_core_size,
-				unsigned long m_vmfunc_page_size
+				unsigned long m_vmfunc_tr_page_size,
+				unsigned long m_vmfunc_sb_page_size
 				)
 {
 	unsigned long offset;
@@ -173,24 +175,38 @@ static int do_kernel_module_grant_map(cptr_t lcd, struct lcd_create_ctx *ctx,
 	if (ret)
 		goto fail2;
 
-	offset = gva_val(m_vmfunc_page_addr) -
+	offset = gva_val(m_vmfunc_tr_page_addr) -
 		gva_val(LCD_KERNEL_MODULE_REGION_GV_ADDR);
-	c = &(lcd_to_boot_info(ctx)->lcd_boot_cptrs.vmfunc_page);
-	LIBLCD_MSG("grant mem for vmfunc pages ctx %p | vmfunc_bits %lx | offset %lx", ctx, ctx->m_vmfunc_bits, offset);
-	ret = do_grant_and_map_for_mem(lcd, ctx, ctx->m_vmfunc_bits,
+	c = &(lcd_to_boot_info(ctx)->lcd_boot_cptrs.vmfunc_tr_page);
+	LIBLCD_MSG("grant mem for vmfunc_tr pages ctx %p | vmfunc_tr_bits %lx | offset %lx", ctx, ctx->m_vmfunc_tr_bits, offset);
+	ret = do_grant_and_map_for_mem(lcd, ctx, ctx->m_vmfunc_tr_bits,
 				gpa_add(LCD_KERNEL_MODULE_REGION_GP_ADDR,
 					offset),
 				c);
 	if (ret)
 		goto fail3;
 
+	offset = gva_val(m_vmfunc_sb_page_addr) -
+		gva_val(LCD_KERNEL_MODULE_REGION_GV_ADDR);
+	c = &(lcd_to_boot_info(ctx)->lcd_boot_cptrs.vmfunc_sb_page);
+	LIBLCD_MSG("grant mem for vmfunc_sb pages ctx %p | vmfunc_sb_bits %lx | offset %lx", ctx, ctx->m_vmfunc_sb_bits, offset);
+	ret = do_grant_and_map_for_mem(lcd, ctx, ctx->m_vmfunc_sb_bits,
+				gpa_add(LCD_KERNEL_MODULE_REGION_GP_ADDR,
+					offset),
+				c);
+	if (ret)
+		goto fail4;
+
 	lcd_to_boot_info(ctx)->module_init_base = m_init_link_addr;
 	lcd_to_boot_info(ctx)->module_core_base = m_core_link_addr;
-	lcd_to_boot_info(ctx)->module_vmfunc_base = m_vmfunc_page_addr;
-	lcd_to_boot_info(ctx)->module_vmfunc_size = m_vmfunc_page_size;
+	lcd_to_boot_info(ctx)->module_vmfunc_tr_base = m_vmfunc_tr_page_addr;
+	lcd_to_boot_info(ctx)->module_vmfunc_tr_size = m_vmfunc_tr_page_size;
+	lcd_to_boot_info(ctx)->module_vmfunc_sb_base = m_vmfunc_sb_page_addr;
+	lcd_to_boot_info(ctx)->module_vmfunc_sb_size = m_vmfunc_sb_page_size;
 	lcd_to_boot_info(ctx)->module_init_size = m_init_size;
 	lcd_to_boot_info(ctx)->module_core_size = m_core_size;
 
+fail4:
 fail3:
 fail2:
 fail1:
@@ -199,10 +215,12 @@ fail1:
 
 static int setup_phys_addr_space(cptr_t lcd, struct lcd_create_ctx *ctx,
 				gva_t m_init_link_addr, gva_t m_core_link_addr,
-				gva_t m_vmfunc_page_addr,
+				gva_t m_vmfunc_tr_page_addr,
+				gva_t m_vmfunc_sb_page_addr,
 				unsigned long m_init_size,
 				unsigned long m_core_size,
-				unsigned long m_vmfunc_page_size
+				unsigned long m_vmfunc_tr_page_size,
+				unsigned long m_vmfunc_sb_page_size
 				)
 {
 	int ret;
@@ -235,9 +253,11 @@ static int setup_phys_addr_space(cptr_t lcd, struct lcd_create_ctx *ctx,
 	 */
 	ret = do_kernel_module_grant_map(lcd, ctx,
 					m_init_link_addr, m_core_link_addr,
-					m_vmfunc_page_addr,
+					m_vmfunc_tr_page_addr,
+					m_vmfunc_sb_page_addr,
 					m_init_size, m_core_size,
-					m_vmfunc_page_size
+					m_vmfunc_tr_page_size,
+					m_vmfunc_sb_page_size
 					);
 	if (ret)
 		goto fail4;
@@ -373,10 +393,12 @@ static void setup_virt_addr_space(struct lcd_create_ctx *ctx)
 
 static int setup_addr_spaces_lvd(cptr_t lcd, struct lcd_create_ctx *ctx,
 			gva_t m_init_link_addr, gva_t m_core_link_addr,
-			gva_t m_vmfunc_page_addr,
+			gva_t m_vmfunc_tr_page_addr,
+			gva_t m_vmfunc_sb_page_addr,
 			unsigned long m_init_size,
 			unsigned long m_core_size,
-			unsigned long m_vmfunc_page_size
+			unsigned long m_vmfunc_tr_page_size,
+			unsigned long m_vmfunc_sb_page_size
 			)
 {
 	int ret;
@@ -386,9 +408,11 @@ static int setup_addr_spaces_lvd(cptr_t lcd, struct lcd_create_ctx *ctx,
 	 */
 	ret = setup_phys_addr_space(lcd, ctx, m_init_link_addr,
 				m_core_link_addr,
-				m_vmfunc_page_addr,
+				m_vmfunc_tr_page_addr,
+				m_vmfunc_sb_page_addr,
 				m_init_size, m_core_size,
-				m_vmfunc_page_size
+				m_vmfunc_tr_page_size,
+				m_vmfunc_sb_page_size
 				);
 	if (ret) {
 		LIBLCD_ERR("error setting up phys addr space");
@@ -438,7 +462,7 @@ static void destroy_create_ctx(struct lcd_create_ctx *ctx)
 	 * pages will be freed by microkernel.
 	 */
 	if (ctx->m_init_bits)
-		lvd_release_module(ctx->m_init_bits, ctx->m_core_bits, ctx->m_vmfunc_bits, ctx->m_vmfunc_sboard_bits);
+		lvd_release_module(ctx->m_init_bits, ctx->m_core_bits, ctx->m_vmfunc_tr_bits, ctx->m_vmfunc_sb_bits);
 	if (ctx->stack)
 		lcd_free_pages(lcd_virt_to_head_page(ctx->stack),
 			LCD_STACK_ORDER);
@@ -646,6 +670,10 @@ static int __apply_relocate_add(Elf64_Shdr *sechdrs,
 
 	printk(" AF sh_addr %llx | entrysz: %zu\n", sechdrs[relsec].sh_addr, sizeof(*rel));
 
+	print_hex_dump(KERN_DEBUG, "relavmwrap: ", DUMP_PREFIX_ADDRESS, 24, 1,
+			(void*)rel, sechdrs[relsec].sh_size, false);
+
+
 	for (i = 0; i < sechdrs[relsec].sh_size / sizeof(*rel); i++) {
 		/* This is where to make the change */
 		loc_load = loc = (void *)sechdrs[sechdrs[relsec].sh_info].sh_addr
@@ -769,14 +797,14 @@ static int __reapply_relocate_add(Elf64_Shdr *sechdrs,
 			(void*)rel, sechdrs[relsec].sh_size, false);
 
 	/*
-	 * XXX: .vmfunc.text would completely be moved to match with the
+	 * XXX: .vmfunc.trampoline.text would completely be moved to match with the
 	 * kernel.  Update the sectionhdrs sh_addr to reflect the new load
 	 * address. All other offsets are hopefully relative.
 	 */
 	sechdrs[sechdrs[relsec].sh_info].sh_addr = gva_val(m_vmfunc_page_addr);
 
 	for (i = 0; i < sechdrs[relsec].sh_size / sizeof(*rel); i++) {
-		/* This points to the gva of new vmfunc page */
+		/* This points to the gva of new vmfunc.trampoline page */
 		loc_load = loc = (void *)sechdrs[sechdrs[relsec].sh_info].sh_addr
 			+ rel[i].r_offset;
 
@@ -788,11 +816,11 @@ static int __reapply_relocate_add(Elf64_Shdr *sechdrs,
 		/* extract offset */
 		loc_offset = (unsigned long) loc - gva_val(m_vmfunc_page_addr);
 
-		printk("%s, loc %p | loc_offset %Lx | ctx->m_vmfunc_bits %p\n",
-				__func__, loc, loc_offset, ctx->m_vmfunc_bits);
+		printk("%s, loc %p | loc_offset %Lx | ctx->m_vmfunc_tr_bits %p\n",
+				__func__, loc, loc_offset, ctx->m_vmfunc_tr_bits);
 
 		/* our duplicate page's virtual address is here in m_core_bits */
-		loc = (char*)ctx->m_vmfunc_bits + loc_offset;
+		loc = (char*)ctx->m_vmfunc_tr_bits + loc_offset;
 
 		/* This is the symbol it is referring to. Note that all
 		 * undefined symbols have been resolved.
@@ -801,6 +829,10 @@ static int __reapply_relocate_add(Elf64_Shdr *sechdrs,
 			+ ELF64_R_SYM(rel[i].r_info);
 
 		val = sym->st_value + rel[i].r_addend;
+
+		if (strcmp(strtab + sym->st_name, "vmfunc_dispatch")) {
+			continue;
+		}
 
 		printk("idx: %d | type %d | st_value %Lx | st_name %s | r_addend %Lx | loc %Lx | curval %x | val %Lx\n",
 				i, (int)ELF64_R_TYPE(rel[i].r_info),
@@ -868,12 +900,12 @@ int lvd_create_module_lvd(char *mdir, char *mname, cptr_t *lcd_out,
 	cptr_t m_init_cptr, m_core_cptr;
 	gva_t m_init_link_addr, m_core_link_addr, m_init_func_addr;
 	unsigned long m_init_size, m_core_size;
-	cptr_t m_vmfunc_cptr;
-	cptr_t m_vmfunc_sboard_cptr;
-	gva_t m_vmfunc_page_addr;
-	gva_t m_vmfunc_sboard_page_addr;
-	unsigned long m_vmfunc_page_size;
-	unsigned long m_vmfunc_sboard_page_size;
+	cptr_t m_vmfunc_tr_cptr;
+	cptr_t m_vmfunc_sb_cptr;
+	gva_t m_vmfunc_tr_page_addr;
+	gva_t m_vmfunc_sb_page_addr;
+	unsigned long m_vmfunc_tr_page_size;
+	unsigned long m_vmfunc_sb_page_size;
 	struct module *mod;
 	struct klp_modinfo *klp_info;
 	struct load_info *info;
@@ -904,19 +936,19 @@ int lvd_create_module_lvd(char *mdir, char *mname, cptr_t *lcd_out,
 
 	ret = lvd_load_module(mdir, mname,
 			&ctx->m_init_bits, &ctx->m_core_bits,
-			&ctx->m_vmfunc_bits,
-			&ctx->m_vmfunc_sboard_bits,
+			&ctx->m_vmfunc_tr_bits,
+			&ctx->m_vmfunc_sb_bits,
 			&m_init_cptr, &m_core_cptr,
-			&m_vmfunc_cptr,
-			&m_vmfunc_sboard_cptr,
+			&m_vmfunc_tr_cptr,
+			&m_vmfunc_sb_cptr,
 			&m_init_link_addr, &m_core_link_addr,
 			&m_init_size, &m_core_size,
 			&m_init_func_addr,
 			&m_struct_module_core_offset,
-			&m_vmfunc_page_addr,
-			&m_vmfunc_page_size,
-			&m_vmfunc_sboard_page_addr,
-			&m_vmfunc_sboard_page_size
+			&m_vmfunc_tr_page_addr,
+			&m_vmfunc_tr_page_size,
+			&m_vmfunc_sb_page_addr,
+			&m_vmfunc_sb_page_size
 			);
 	if (ret) {
 		LIBLCD_ERR("error loading kernel module");
@@ -952,6 +984,7 @@ int lvd_create_module_lvd(char *mdir, char *mname, cptr_t *lcd_out,
 	klp_info = mod->klp_info;
 	info = &klp_info->info;
 
+	/* find offset of the function that will be called from vmfunc_wrapper */
 	if (vmfunc_load_debug) {
 		unsigned int strtab_shsize = 0;
 		int is_null = 0;
@@ -1024,29 +1057,28 @@ int lvd_create_module_lvd(char *mdir, char *mname, cptr_t *lcd_out,
 			unsigned int symindex = klp_info->symndx;
 			const char *strtab = mod->core_kallsyms.strtab;
 
-			if (!strcmp(".rela.vmfuncwrapper.text", sh_name)) {
-				printk("%s, shdr: %p | sh_name: %s | sh_size %u	| sh_offset %x | b4 sh_addr %llx | ", __func__, shdr,
-						sh_name, sh_size, sh_offset, shdr->sh_addr);
-
-				__apply_relocate_add(sechdrs, strtab, symindex,
-						relsec, info, "vmfunc_springboard",
-						/*
-						 * FIXME: This should be the location of the above function on
-						 * the newly loaded page. Fill the offset below.
-						 */
-						gva_add(m_vmfunc_sboard_page_addr, 0),
-						m_core_link_addr, ctx);
-			} else if (!strcmp(".rela.vmfunc.text", sh_name)) {
+			if (!strcmp(".rela.vmfunc.trampoline.text", sh_name)) {
 				printk("%s, shdr: %p | sh_name: %s | sh_size %u	| sh_offset %x | b4 sh_addr %llx | ", __func__, shdr,
 						sh_name, sh_size, sh_offset, shdr->sh_addr);
 
 				__reapply_relocate_add(sechdrs, strtab, symindex,
-						relsec, info, m_vmfunc_page_addr, ctx);
+						relsec, info,
+						gva_add(m_vmfunc_tr_page_addr, 0),
+						ctx);
 
-				print_hex_dump(KERN_DEBUG, "patched.vmfunc.text: ", DUMP_PREFIX_ADDRESS, 24, 1,
-						(void*)ctx->m_vmfunc_bits, sechdrs[relsec].sh_size, false);
+			} else if (!strcmp(".rela.vmfuncwrapper.text", sh_name)) {
+				printk("%s, shdr: %p | sh_name: %s | sh_size %u	| sh_offset %x | b4 sh_addr %llx | ", __func__, shdr,
+						sh_name, sh_size, sh_offset, shdr->sh_addr);
+
+				__apply_relocate_add(sechdrs, strtab, symindex,
+						relsec, info, "vmfunc_springboard_entry",
+						/*
+						 * FIXME: This should be the location of the above function on
+						 * the newly loaded page. Fill the offset below.
+						 */
+						gva_add(m_vmfunc_sb_page_addr, 0),
+						m_core_link_addr, ctx);
 			}
-
 		}
 	}
 
@@ -1062,9 +1094,11 @@ skip:
 	 */
 	ret = setup_addr_spaces_lvd(lcd, ctx, m_init_link_addr,
 				m_core_link_addr,
-				m_vmfunc_page_addr,
+				m_vmfunc_tr_page_addr,
+				m_vmfunc_sb_page_addr,
 				m_init_size, m_core_size,
-				m_vmfunc_page_size
+				m_vmfunc_tr_page_size,
+				m_vmfunc_sb_page_size
 				);
 	if (ret) {
 		LIBLCD_ERR("error setting up address spaces");
@@ -1113,7 +1147,7 @@ fail6:
 fail5:
 	lcd_cap_delete(lcd);
 fail4:
-	lvd_release_module(ctx->m_init_bits, ctx->m_core_bits, ctx->m_vmfunc_bits, ctx->m_vmfunc_sboard_bits);
+	lvd_release_module(ctx->m_init_bits, ctx->m_core_bits, ctx->m_vmfunc_tr_bits, ctx->m_vmfunc_sb_bits);
 fail3:
 fail2:
 	destroy_create_ctx(ctx);

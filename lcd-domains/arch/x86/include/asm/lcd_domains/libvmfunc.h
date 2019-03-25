@@ -139,5 +139,6 @@ int vmfunc_klcd_test_wrapper(struct fipc_message *msg, unsigned int ept, vmfunc_
 extern int __vmfunc_trampoline_page_size[], __vmfunc_trampoline_load_addr[];
 extern int __vmfunc_sboard_page_size[], __vmfunc_sboard_load_addr[];
 
+typedef int (*rpc_handler_t)(struct fipc_message *);
 #endif /* !__ASSEMBLY__ */
 #endif /* LIB_VMFUNC_H */

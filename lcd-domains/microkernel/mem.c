@@ -165,42 +165,6 @@ fail1:
 }
 
 /* ALLOC -------------------------------------------------- */
-#ifdef CONFIG_LVD
-struct page* __lvd_alloc_pages_exact_node(struct lcd *caller, cptr_t slot, int nid,
-				unsigned int flags, unsigned int order)
-{
-	int ret;
-	struct page *p;
-	struct lcd_memory_object *unused;
-	/*
-	 * Allocate zero'd pages on node
-	 */
-	p = __alloc_pages_node(nid, flags | __GFP_ZERO, order);
-	if (!p) {
-		LCD_ERR("alloc failed");
-		ret = -ENOMEM;
-		goto fail1;
-	}
-	/*
-	 * Insert into caller's cspace
-	 */
-	ret = __lcd_insert_memory_object(caller, slot, p, (1UL << order),
-					LCD_MICROKERNEL_TYPE_ID_PAGE,
-					&unused);
-	if (ret) {
-		LCD_ERR("failed to insert page capability into caller's cspace");
-		goto fail2;
-	}
-
-	return p;
-
-fail2:
-	__free_pages(p, order);
-fail1:
-	return NULL;
-}
-#endif
-
 int __lcd_alloc_pages_exact_node(struct lcd *caller, cptr_t slot, int nid,
 				unsigned int flags, unsigned int order)
 {
@@ -234,43 +198,6 @@ fail2:
 fail1:
 	return ret;
 }
-
-#ifdef CONFIG_LVD
-/* return virtual address */
-struct page* __lvd_alloc_pages(struct lcd *caller, cptr_t slot,
-		unsigned int flags, unsigned int order)
-{
-	int ret;
-	struct page *p;
-	struct lcd_memory_object *unused;
-	/*
-	 * Allocate zero'd pages
-	 */
-	p = alloc_pages(flags | __GFP_ZERO, order);
-	if (!p) {
-		LCD_ERR("alloc failed");
-		ret = -ENOMEM;
-		goto fail1;
-	}
-	/*
-	 * Insert into caller's cspace
-	 */
-	ret = __lcd_insert_memory_object(caller, slot, p, (1UL << order),
-					LCD_MICROKERNEL_TYPE_ID_PAGE,
-					&unused);
-	if (ret) {
-		LCD_ERR("failed to insert page capability into caller's cspace");
-		goto fail2;
-	}
-
-	return p;
-
-fail2:
-	__free_pages(p, order);
-fail1:
-	return p;
-}
-#endif
 
 int __lcd_alloc_pages(struct lcd *caller, cptr_t slot,
 		unsigned int flags, unsigned int order)
@@ -307,41 +234,6 @@ fail1:
 }
 
 /* VMALLOC -------------------------------------------------- */
-#ifdef CONFIG_LVD
-void* __lvd_vmalloc(struct lcd *caller, cptr_t slot, unsigned long nr_pages)
-{
-	int ret;
-	void *vptr;
-	struct lcd_memory_object *unused;
-	/*
-	 * Allocate zero'd out vmalloc pages
-	 */
-	vptr = vzalloc(nr_pages << PAGE_SHIFT);
-	if (!vptr) {
-		LCD_ERR("vzalloc failed");
-		ret = -ENOMEM;
-		goto fail1;
-	}
-	/*
-	 * Insert into caller's cspace
-	 */
-	ret = __lcd_insert_memory_object(caller, slot, vptr, nr_pages,
-					LCD_MICROKERNEL_TYPE_ID_VMALLOC_MEM,
-					&unused);
-	if (ret) {
-		LCD_ERR("failed to insert vmalloc mem capability into caller's cspace");
-		goto fail2;
-	}
-
-	return vptr;
-
-fail2:
-	vfree(vptr);
-fail1:
-	return NULL;
-}
-#endif
-
 int __lcd_vmalloc(struct lcd *caller, cptr_t slot, unsigned long nr_pages)
 {
 	int ret;

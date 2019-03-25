@@ -18,10 +18,12 @@
 #include <lcd_config/post_hook.h>
 
 extern int vmfunc_wrapper(struct fipc_message *req);
-extern int vmfunc_init(void*);
+extern int vmfunc_init(void*, rpc_handler_t);
 unsigned long long stack;
 unsigned long long eip;
 extern void *lcd_stack;
+
+int handle_rpc_calls_klcd(struct fipc_message *msg);
 
 void run_vmfunc_tests(void)
 {
@@ -60,6 +62,13 @@ void run_vmfunc_tests(void)
 			fipc_get_reg5(&msg),
 			fipc_get_reg6(&msg)
 			);
+
+	memset(&msg, 0x0, sizeof(msg));
+	msg.rpc_id = MODULE_INIT;
+	vmfunc_klcd_test_wrapper(&msg, OTHER_DOMAIN, VMFUNC_TEST_RPC_CALL);
+	printk("%s: VMFUNC_TEST_RPC_CALL: MODULE_INIT Passed!\n",
+				__func__);
+
 }
 
 static int caller_main(void)
@@ -81,8 +90,7 @@ static int caller_main(void)
 	 * Boot
 	 */
 	printk("%s entered,  lcd_stack %p\n", __func__, lcd_stack);
-	vmfunc_init(lcd_stack);
-	
+	vmfunc_init(lcd_stack, handle_rpc_calls_klcd);
 	run_vmfunc_tests();
 #if 0
 	ret = lcd_enter();

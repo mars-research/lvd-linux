@@ -1826,11 +1826,7 @@ static void kmem_freepages(struct kmem_cache *cachep, struct page *page)
 	memcg_release_pages(cachep, cachep->gfporder);
 	if (current->reclaim_state)
 		current->reclaim_state->reclaimed_slab += nr_freed;
-#ifdef CONFIG_LVD
-	free_memcg_kmem_pages(page, cachep->gfporder);
-#else
 	free_memcg_kmem_pages((unsigned long)page_address(page), cachep->gfporder);
-#endif
 }
 
 static void kmem_rcu_free(struct rcu_head *head)

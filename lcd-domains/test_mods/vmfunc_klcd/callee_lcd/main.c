@@ -27,7 +27,7 @@ int callee(struct fipc_message *msg2)
 	int ret = 0;
 	unsigned long transaction_id = 0;
 	u64 start, end;
-	struct fipc_message msg;
+	struct fipc_message msg = {0};
 
 	start = lcd_RDTSC_START();
 	for (transaction_id = 0; 
@@ -45,13 +45,14 @@ int callee(struct fipc_message *msg2)
 	return ret;
 }
 
-static int __noreturn callee_main(void)
+int callee_main(void)
 {
 	int ret;
 	/*
 	 * Boot LCD
 	 */
 	ret = lcd_enter();
+#if 0
 	if (ret)
 		goto out;
 
@@ -67,6 +68,8 @@ static int __noreturn callee_main(void)
 
 out:
 	lcd_exit(ret);
+#endif
+	return ret;
 }
 
 static int vmfunc_callee_init(void)

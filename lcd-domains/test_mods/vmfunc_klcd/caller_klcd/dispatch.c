@@ -28,7 +28,7 @@ bar(struct fipc_message *msg)
 	return 0x12;
 }
 
-int handle_rpc_calls(struct fipc_message *msg)
+int handle_rpc_calls_klcd(struct fipc_message *msg)
 {
 	switch(msg->rpc_id) {
 	case NULL_INVOCATION:

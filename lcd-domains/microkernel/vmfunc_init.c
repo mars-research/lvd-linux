@@ -1,6 +1,6 @@
 #include <linux/kernel.h>
 #include <linux/slab.h>
-
+#include <asm/lcd_domains/libvmfunc.h>
 /* percpu stack pages and stack pointers */
 static void **stack_pages;
 static void **stack_ptrs;
@@ -11,8 +11,10 @@ struct fipc_message **responses;
 /* exported by the microkernel. We trust that it's sane */
 extern void *cpuid_page;
 
+rpc_handler_t klcd_handler;
+
 int
-vmfunc_init(void *stack_page)
+vmfunc_init(void *stack_page, rpc_handler_t rpc_handler)
 {
 	/* TODO: this num_online_cpus macro accesses __cpu_online_mask
 	 * Make sure we map this page on LCDs EPT
@@ -22,6 +24,7 @@ vmfunc_init(void *stack_page)
 	stack_pages[0] = stack_page;
 	stack_ptrs[0] = stack_pages[0];
 	current->lcd_stack = stack_page;
+	klcd_handler = rpc_handler;
 #if 0
 	int i, j;
 	for (i = 0; i < num_online_cpus(); i++) {

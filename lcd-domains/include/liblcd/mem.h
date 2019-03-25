@@ -42,10 +42,6 @@
 int _lcd_alloc_pages_exact_node(int nid, unsigned int flags, unsigned int order,
 				cptr_t *slot_out);
 
-#ifdef CONFIG_LVD
-struct page* _lvd_alloc_pages_exact_node(int nid, unsigned int flags, unsigned int order,
-				cptr_t *slot_out);
-#endif
 /**
  * _lcd_alloc_pages -- Allocate pages, low-level call into microkernel
  * @flags: GFP flags to control allocation
@@ -64,10 +60,6 @@ struct page* _lvd_alloc_pages_exact_node(int nid, unsigned int flags, unsigned i
 int _lcd_alloc_pages(unsigned int flags, unsigned int order,
 		cptr_t *slot_out);
 
-#ifdef CONFIG_LVD
-struct page* _lvd_alloc_pages(unsigned int flags, unsigned int order,
-		cptr_t *slot_out);
-#endif
 /**
  * _lcd_vmalloc -- Low-level vmalloc out into microkernel
  * @nr_pages: allocate nr_pages pages (nr_pages * PAGE_SIZE bytes)
@@ -77,10 +69,6 @@ struct page* _lvd_alloc_pages(unsigned int flags, unsigned int order,
  * physical. Pages are zero'd out.
  */
 int _lcd_vmalloc(unsigned long nr_pages, cptr_t *slot_out);
-
-#ifdef CONFIG_LVD
-void* _lvd_vmalloc(unsigned long nr_pages, cptr_t *slot_out);
-#endif
 
 int lcd_create_mo_metadata(hva_t pages_base, unsigned long size);
 
@@ -201,14 +189,6 @@ struct page *lcd_alloc_pages_exact_node(int nid, unsigned int flags,
 
 struct page *lcd_alloc_pages_node(int nid, unsigned int flags,
 					unsigned int order);
-#ifdef CONFIG_LVD
-struct page *lvd_alloc_pages_exact_node(int nid, unsigned int flags, 
-					unsigned int order);
-
-struct page *lvd_alloc_pages_node(int nid, unsigned int flags,
-					unsigned int order);
-#endif
-
 /**
  * lcd_alloc_pages -- Get free pages from the heap
  * @flags: GFP flags to control allocation
@@ -222,13 +202,6 @@ void *__lcd_get_free_pages(gfp_t mask, unsigned int order);
 
 void __lcd_free_pages(unsigned long addr, unsigned int order);
 
-#ifdef CONFIG_LVD
-struct page *lvd_alloc_pages(unsigned int flags, unsigned int order);
-
-void *__lvd_get_free_pages(gfp_t mask, unsigned int order);
-
-void __lvd_free_pages(unsigned long addr, unsigned int order);
-#endif
 /**
  * lcd_free_pages -- Free pages allocated via lcd_alloc_pages
  * @base: pointer to first struct page in the chunk
@@ -240,9 +213,6 @@ void __lvd_free_pages(unsigned long addr, unsigned int order);
  */
 void lcd_free_pages(struct page *base, unsigned int order);
 
-#ifdef CONFIG_LVD
-void lvd_free_pages(struct page *base, unsigned int order);
-#endif
 /**
  * lcd_vmalloc -- Allocate memory that is not necessarily physical contiguous
  * @sz: size in bytes of amount to allocate
@@ -252,10 +222,6 @@ void lvd_free_pages(struct page *base, unsigned int order);
  * page-multiple (just like regular vmalloc).
  */
 void* lcd_vmalloc(unsigned long sz);
-#ifdef CONFIG_LVD
-void* lvd_vmalloc(unsigned long sz);
-void lvd_vfree(void *ptr);
-#endif
 /**
  * lcd_vfree -- Free memory allocated via lcd_vmalloc.
  * @ptr: pointer to start memory allocated via lcd_vmalloc
@@ -607,9 +573,6 @@ void lcd_destroy_free_resource_tree(struct lcd_resource_tree *t);
  * is equivalent to virt_to_head_page.
  */
 struct page *lcd_virt_to_head_page(const void *addr);
-#ifdef CONFIG_LVD
-struct page *lvd_virt_to_head_page(const void *addr);
-#endif
 /**
  * lcd_page_address -- Return guest virtual address (as void *) associated 
  *                     with struct page
@@ -626,9 +589,7 @@ struct page *lvd_virt_to_head_page(const void *addr);
  * Necessary to satisfy slab dependency.
  */
 void *lcd_page_address(const struct page *page);
-#ifdef CONFIG_LVD
-void *lvd_page_address(const struct page *page);
-#endif
+
 /**
  * lcd_free_memcg_kmem_pages -- Free 2^order pages at addr
  * @addr: starting address of pages
@@ -642,9 +603,6 @@ void *lvd_page_address(const struct page *page);
  * Necessary to satisfy slab dependency.
  */
 void lcd_free_memcg_kmem_pages(unsigned long addr, unsigned int order);
-#ifdef CONFIG_LVD
-void lvd_free_memcg_kmem_pages(struct page *p, unsigned int order);
-#endif
 /**
 * lcd_ioremap_phys -- Map host device memory to guest physical region
 *

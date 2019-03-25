@@ -11,6 +11,7 @@
 #include <libfipc.h>
 
 enum fn_type {
+	MODULE_INIT,
 	NULL_INVOCATION, 
 	CALLEE,
 	FOO,

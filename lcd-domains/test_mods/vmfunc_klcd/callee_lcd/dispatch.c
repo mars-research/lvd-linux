@@ -8,10 +8,12 @@
 
 #include <lcd_config/post_hook.h>
 
+extern int callee_main(void);
 unsigned long noinline
 null_invocation(struct fipc_message *msg)
 {
 	fipc_set_reg1(msg, 0xbad);
+	printk("%s, called\n", __func__);
 	return 0;
 }
 
@@ -45,6 +47,9 @@ foo(struct fipc_message *msg)
 int handle_rpc_calls(struct fipc_message *msg)
 {
 	switch(msg->rpc_id) {
+	case MODULE_INIT:
+		callee_main();
+		break;
 	case NULL_INVOCATION:
 		null_invocation(msg);
 		break;

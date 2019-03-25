@@ -1929,6 +1929,7 @@ struct task_struct {
 	struct task_struct *oom_reaper_list;
 #endif
 	struct lcd *lcd;
+	struct lcd *vmfunc_lcd;
 	struct cptr_cache *cptr_cache;
 	struct lcd_resource_tree *lcd_resource_trees[2];
 	struct ptstate_t *ptstate;

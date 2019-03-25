@@ -1,12 +1,16 @@
 #include <linux/compiler.h>
 #include <liblcd/liblcd.h>
 #include <linux/vmalloc.h>
+#include <linux/sched.h>
 
 void *cpuid_page;
 EXPORT_SYMBOL(cpuid_page);
 
 static int num_pages;
 static void **cpuid_pages;
+
+const size_t lcd_stack_off = offsetof(struct task_struct, lcd_stack);
+EXPORT_SYMBOL(lcd_stack_off);
 
 int
 create_cpuid_pages(void)

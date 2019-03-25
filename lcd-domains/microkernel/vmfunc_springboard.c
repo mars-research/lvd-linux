@@ -5,14 +5,16 @@ __asm__(
 		".align 16	\n\t"
 		".globl vmfunc_kernel_springboard	\n\t"
 		".extern cpuid_page		\n\t"
+		".extern lcd_stack_off		\n\t"
 		"vmfunc_kernel_springboard:	\n\t"
 		"  mov cpuid_page, %rax		\n\t"
 		/* place esp_kernel in r13 */
 		"  mov 8(%rax), %r13		\n\t"
 		/* TODO: restore %gs */
 		"  mov %gs:current_task, %rax	\n\t"
+		"  mov lcd_stack_off, %rbx	\n\t"
 		/* save esp_lcd */
-		"  mov %rsp, 0x1908(%rax)	\n\t"
+		"  mov %rsp, (%rax, %rbx)	\n\t"
 		/* populate esp_kernel */
 		"  mov %r13, %rsp		\n\t"
 
@@ -28,7 +30,8 @@ __asm__(
 
 		/* restore stack for vmfunc domain */
 		"  mov %gs:current_task, %rax	\n\t"
-		"  mov 0x1908(%rax), %rsp	\n\t"
+		"  mov lcd_stack_off, %rbx	\n\t"
+		"  mov (%rax, %rbx), %rsp	\n\t"
 
 		/* LCD STACK RESTORED! */
 

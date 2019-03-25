@@ -103,6 +103,7 @@ static int vmfunc_prepare_switch(int ept)
 	gpa_cr3 = __gpa(cr3_base);
 
 	lcd = lcd_list[ept];
+	current->vmfunc_lcd = lcd;
 
 	if (lcd && !current->cr3_remapping) {
 		hpa_lcd_cr3 = lcd->lcd_arch->hpa_cr3;

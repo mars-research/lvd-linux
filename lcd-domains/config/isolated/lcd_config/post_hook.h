@@ -291,40 +291,22 @@ static inline void force_up_write(void *x)
 #define virt_to_page(addr) lcd_virt_to_head_page(addr)
 
 #undef alloc_pages_exact_node
-#ifdef CONFIG_LVD
-#define alloc_pages_exact_node(x, y, z) lvd_alloc_pages_exact_node(x,y,z)
-#else
 #define alloc_pages_exact_node(x, y, z) lcd_alloc_pages_exact_node(x,y,z)
-#endif
 
 #undef free_memcg_kmem_pages
-#ifdef CONFIG_LVD
-#define free_memcg_kmem_pages(x, y) lvd_free_memcg_kmem_pages(x, y)
-#else
 #define free_memcg_kmem_pages(x, y) lcd_free_memcg_kmem_pages(x, y)
-#endif
 
 #undef page_address
 #define page_address(page) lcd_page_address(page)
 
-#ifndef CONFIG_LVD
 #undef __pa
 #define __pa(vaddr) gpa_val(lcd_gva2gpa(__gva((unsigned long)vaddr)))
-#endif
 
 #undef free_page
-#ifdef CONFIG_LVD
-#define free_page(addr) __lvd_free_pages(addr, 0)
-#else
 #define free_page(addr) __lcd_free_pages(addr, 0)
-#endif
 
 #undef __get_free_page
-#ifdef CONFIG_LVD
-#define __get_free_page(gfp_mask) __lvd_get_free_pages(gfp_mask, 0)
-#else
 #define __get_free_page(gfp_mask) __lcd_get_free_pages(gfp_mask, 0)
-#endif
 
 /* The "real" get_current tries to read a percpu variable that using
  * the %gs segment register. */

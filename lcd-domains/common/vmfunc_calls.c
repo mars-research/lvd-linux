@@ -30,14 +30,18 @@ int handle_vmfunc_syncipc(struct fipc_message *msg)
  */
 int
 __weak
-handle_rpc_calls(struct fipc_message *msg)
+handle_rpc_calls(struct fipc_message *msg);
+#if 0
 {
 	printk("weak alias for %s! If you want to handle RPCs"
 		" please override the function in your module\n", __func__);
 	return 0;
 };
 EXPORT_SYMBOL(handle_rpc_calls);
-
+#endif
+#ifndef LCD_ISOLATE
+extern rpc_handler_t klcd_handler;
+#endif
 int noinline
 __vmfunc_dispatch(struct fipc_message *msg)
 {
@@ -55,7 +59,16 @@ __vmfunc_dispatch(struct fipc_message *msg)
 		break;
 #endif
 	case VMFUNC_RPC_CALL:
-		ret = handle_rpc_calls(msg);
+#ifdef LCD_ISOLATE
+		if (handle_rpc_calls)
+			ret = handle_rpc_calls(msg);
+#else
+		if (klcd_handler)
+			ret = klcd_handler(msg);
+#endif
+		else {
+			printk("rpc handler doesn't exist\n");
+		}
 		break;
 	default:
 #if 0

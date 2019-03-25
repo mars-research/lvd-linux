@@ -12,6 +12,7 @@ __asm__ (
 	"	.globl vmfunc_trampoline_entry	\n\t"
 	"	.type vmfunc_trampoline_entry, @function  \n\t"
 	"	.extern cpuid_page	\n\t"
+	"	.extern lcd_stack_off	\n\t"
 	"vmfunc_trampoline_entry:	\n\t"
 	/*
 	 * push all callee-saved regs according to ABI
@@ -50,9 +51,10 @@ __asm__ (
 	"  mov %rsp, 8(%rax)		\n\t"
 	/* get current pointer */
 	"  mov %gs:current_task, %r13	\n\t"
-	/* FIXME: how to get lcd_stack offset */
+	/* get lcd_stack offset */
+	"  mov lcd_stack_off, %r14	\n\t"
 	/* populate LCD stack */
-	"  mov 0x1908(%r13), %rsp		\n\t"
+	"  mov (%r13, %r14), %rsp		\n\t"
 
 	/* populate eax, ecx for vmfunc */
 	"  mov $0x0, %eax \n\t"

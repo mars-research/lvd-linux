@@ -18,11 +18,9 @@ lib-y += $(addprefix liblcd/lcd-domains/, \
 	create.o \
 	enter_exit.o \
 	heap.o \
-	heap_lvd.o \
 	mem_itree.o \
 	module_load.o \
 	ram_map.o \
-	ram_map_lvd.o \
 	sync_ipc.o \
 	ioremap.o \
 	trace.o \

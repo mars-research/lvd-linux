@@ -10,12 +10,11 @@
 #include <asm/lcd_domains/create.h>
 #include <asm/lcd_domains/libvmfunc.h>
 
-struct lcd *lcd = NULL;
-
 /* SYSCALL HANDLERS -------------------------------------------------- */
 
 static int handle_syscall_create(struct fipc_message *msg)
 {
+	struct lcd *lcd = current->vmfunc_lcd;
 	cptr_t lcd_slot;
 	int lcd_id;
 	/*
@@ -31,6 +30,7 @@ static int handle_syscall_create(struct fipc_message *msg)
 
 static int handle_syscall_cap_grant(struct fipc_message *msg)
 {
+	struct lcd *lcd = current->vmfunc_lcd;
 	cptr_t dest_lcd, src, dest;
 	/*
 	 * Args
@@ -46,6 +46,7 @@ static int handle_syscall_cap_grant(struct fipc_message *msg)
 
 static int handle_syscall_cap_revoke(struct fipc_message *msg)
 {
+	struct lcd *lcd = current->vmfunc_lcd;
 	cptr_t object;
 	/*
 	 * Get object cptr
@@ -59,6 +60,7 @@ static int handle_syscall_cap_revoke(struct fipc_message *msg)
 
 static int handle_syscall_cap_delete(struct fipc_message *msg)
 {
+	struct lcd *lcd = current->vmfunc_lcd;
 	cptr_t object;
 	/*
 	 * Get object cptr
@@ -74,6 +76,7 @@ static int handle_syscall_cap_delete(struct fipc_message *msg)
 
 static int handle_syscall_config_registers(struct fipc_message *msg)
 {
+	struct lcd *lcd = current->vmfunc_lcd;
 	cptr_t dest_lcd;
 	gva_t pc, sp;
 	gpa_t gva_root, utcb_page;
@@ -94,6 +97,7 @@ static int handle_syscall_config_registers(struct fipc_message *msg)
 
 static int handle_syscall_memory_grant_and_map(struct fipc_message *msg)
 {
+	struct lcd *lcd = current->vmfunc_lcd;
 	cptr_t dest_lcd, mo_cptr, dest_slot;
 	gpa_t base;
 	/*
@@ -112,6 +116,7 @@ static int handle_syscall_memory_grant_and_map(struct fipc_message *msg)
 
 static int handle_syscall_munmap(struct fipc_message *msg)
 {
+	struct lcd *lcd = current->vmfunc_lcd;
 	cptr_t mem_object;
 	/*
 	 * Get memory object cptr
@@ -127,6 +132,7 @@ static int handle_syscall_munmap(struct fipc_message *msg)
 
 static int handle_syscall_mmap(struct fipc_message *msg)
 {
+	struct lcd *lcd = current->vmfunc_lcd;
 	cptr_t mem_object;
 	gpa_t base;
 	/*
@@ -143,6 +149,7 @@ static int handle_syscall_mmap(struct fipc_message *msg)
 
 static int handle_syscall_vmalloc(struct fipc_message *msg)
 {
+	struct lcd *lcd = current->vmfunc_lcd;
 	cptr_t slot;
 	unsigned long nr_pages;
 	/*
@@ -161,6 +168,7 @@ static int handle_syscall_vmalloc(struct fipc_message *msg)
 
 static int handle_syscall_pages_alloc(struct fipc_message *msg)
 {
+	struct lcd *lcd = current->vmfunc_lcd;
 	cptr_t slot;
 	unsigned int flags;
 	unsigned int order;
@@ -174,12 +182,13 @@ static int handle_syscall_pages_alloc(struct fipc_message *msg)
 	/*
 	 * Do page alloc
 	 */
-	msg->regs[0] = (unsigned long)__lvd_alloc_pages(lcd, slot, flags, order);
+	msg->regs[0] = (unsigned long)__lcd_alloc_pages(lcd, slot, flags, order);
 	return 0;
 }
 
 static int handle_syscall_pages_alloc_exact_node(struct fipc_message *msg)
 {
+	struct lcd *lcd = current->vmfunc_lcd;
 	cptr_t slot;
 	int nid;
 	unsigned int flags;
@@ -195,12 +204,13 @@ static int handle_syscall_pages_alloc_exact_node(struct fipc_message *msg)
 	/*
 	 * Do page alloc
 	 */
-	msg->regs[0] = (unsigned long)__lvd_alloc_pages_exact_node(lcd, slot, nid, flags, order);
+	msg->regs[0] = (unsigned long)__lcd_alloc_pages_exact_node(lcd, slot, nid, flags, order);
 	return 0;
 }
 
 static int handle_syscall_putchar(struct fipc_message *msg)
 {
+	struct lcd *lcd = current->vmfunc_lcd;
 	char c;
 	/*
 	 * Put char and possibly print on host
@@ -211,6 +221,7 @@ static int handle_syscall_putchar(struct fipc_message *msg)
 
 static int handle_syscall_exit(struct fipc_message *msg, int *lcd_ret)
 {
+	__maybe_unused struct lcd *lcd = current->vmfunc_lcd;
 	/*
 	 * LCD's exit value in arg0
 	 */
@@ -220,6 +231,7 @@ static int handle_syscall_exit(struct fipc_message *msg, int *lcd_ret)
 
 static int handle_syscall_iommu_map_page(struct fipc_message *msg)
 {
+	struct lcd *lcd = current->vmfunc_lcd;
 	int ret;
 	bool force;
 	gpa_t gpa;
@@ -235,6 +247,7 @@ static int handle_syscall_iommu_map_page(struct fipc_message *msg)
 
 static int handle_syscall_iommu_unmap_page(struct fipc_message *msg)
 {
+	struct lcd *lcd = current->vmfunc_lcd;
 	int ret;
 	gpa_t gpa;
 	int order;
@@ -248,6 +261,7 @@ static int handle_syscall_iommu_unmap_page(struct fipc_message *msg)
 
 static int handle_syscall_assign_device(struct fipc_message *msg)
 {
+	struct lcd *lcd = current->vmfunc_lcd;
 	int domain, bus, devfn;
 	struct pci_dev *dev;
 	int ret;
@@ -271,6 +285,7 @@ static int handle_syscall_assign_device(struct fipc_message *msg)
 
 static int handle_syscall_deassign_device(struct fipc_message *msg)
 {
+	struct lcd *lcd = current->vmfunc_lcd;
 	int domain, bus, devfn;
 	struct pci_dev *dev;
 	int ret;

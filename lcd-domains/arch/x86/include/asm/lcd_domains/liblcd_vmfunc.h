@@ -21,6 +21,11 @@
 		msg->vmfunc_id = VMFUNC_LCD_SYSCALL;	\
 	} while(0)
 
+#define PREP_SYNC_CALL_MSG(msg, id)	do {		\
+		msg->rpc_id = id;			\
+		msg->vmfunc_id = VMFUNC_SYNC_IPC;	\
+	} while(0)
+
 extern int noinline vmfunc_wrapper(struct fipc_message *m);
 
 static inline void lcd_syscall_no_args(struct fipc_message *m, int id)

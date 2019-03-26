@@ -4,6 +4,7 @@
 #include <linux/mm.h>
 #include <linux/slab.h>
 #include <asm/lcd_domains/libvmfunc.h>
+#include <asm/lcd_domains/liblcd_vmfunc.h>
 #include <lcd_domains/microkernel.h>
 #include <liblcd/liblcd.h>
 #include <linux/stringify.h>
@@ -20,8 +21,15 @@ int handle_vmfunc_syscall(struct fipc_message *msg);
 int handle_vmfunc_syncipc(struct fipc_message *msg);
 
 #ifndef LCD_ISOLATE
+extern rpc_handler_t syncipc_handler;
+
 int handle_vmfunc_syncipc(struct fipc_message *msg)
 {
+	if (syncipc_handler)
+		syncipc_handler(msg);
+	else {
+		printk("%s, unhandled\n", __func__);
+	}
 	return 0;
 }
 #endif
@@ -141,9 +149,9 @@ vmfunc_wrapper(struct fipc_message *request)
 EXPORT_SYMBOL(vmfunc_wrapper);
 
 void noinline
-vmfunc_sync_call(struct fipc_message *request)
+vmfunc_sync_call(struct fipc_message *request, unsigned long id)
 {
-	request->vmfunc_id = VMFUNC_SYNC_IPC;
+	PREP_SYNC_CALL_MSG(request, id);
 	vmfunc_wrapper(request);
 }
 /*

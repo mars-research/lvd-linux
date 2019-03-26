@@ -18,6 +18,8 @@ __asm__(
 		/* populate esp_kernel */
 		"  mov %r13, %rsp		\n\t"
 
+		/* we are in trusted domain, re-enable irqs */
+		"  sti				\n\t"
 		/* stack is populated. we are good to go */
 		"  call vmfunc_dispatch		\n\t"
 
@@ -27,6 +29,9 @@ __asm__(
 		"  mov cpuid_page, %rax		\n\t"
 		/* save esp_kernel in the cpuid page */
 		"  mov %rsp, 8(%rax)		\n\t"
+
+		/* disable irqs, we jump back to untrusted domain */
+		"  cli			\n\t"
 
 		/* restore stack for vmfunc domain */
 		"  mov %gs:current_task, %rax	\n\t"
@@ -45,6 +50,5 @@ __asm__(
 		/* This is the return path */
 		"  mov $0, %rax		\n\t"
 		"  mov $1, %rcx		\n\t"
-
 		"  jmp vmfunc_springboard_return	\n\t"
 	);

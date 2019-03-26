@@ -45,6 +45,8 @@ __asm__ (
 	"  mov 48(%rax)," _REG6 " \n\t"
 	"  mov 56(%rax)," _REG7 " \n\t"
 
+	/* disable irqs before entering isolated domain */
+	"  cli				\n\t"
 	/* get cpuid page buffer */
 	"  mov cpuid_page, %rax		\n\t"
 	/* save rsp to the cpuid page at offset 8*/
@@ -53,6 +55,7 @@ __asm__ (
 	"  mov %gs:current_task, %r13	\n\t"
 	/* get lcd_stack offset */
 	"  mov lcd_stack_off, %r14	\n\t"
+
 	/* populate LCD stack */
 	"  mov (%r13, %r14), %rsp		\n\t"
 
@@ -98,6 +101,8 @@ __asm__ (
 	"  mov " _REG6 ", 48(%r13) \n\t"
 	"  mov " _REG7 ", 56(%r13) \n\t"
 
+	/* back in trusted domain, reenable irqs */
+	"  sti			\n\t"
 	/* everything is set, pop all regs */
 	"  pop %r15	\n\t"
 	"  pop %r14	\n\t"

@@ -27,6 +27,8 @@ int do_check(int ept)
 	gpa_t gpa_lcd_stack;
 	hpa_t hpa_lcd_stack;
 
+	if (!once)
+		return 0;
 	vmfunc_load_addr = kallsyms_lookup_name("__vmfunc_trampoline_load_addr");
 	vmfunc_sb_load_addr = kallsyms_lookup_name("__vmfunc_sboard_load_addr");
 	gpa_vmfunc_lcd = isolated_lcd_gva2gpa(__gva(vmfunc_load_addr));
@@ -134,9 +136,9 @@ int vmfunc_klcd_wrapper(struct fipc_message *msg, unsigned int ept)
 	ret = do_check(ept);
 	if (ret)
 		goto exit;
-	local_irq_disable();
+//	local_irq_disable();
 	vmfunc_trampoline_entry(msg);
-	local_irq_enable();
+//	local_irq_enable();
 exit:
 	return ret;
 }
@@ -156,9 +158,9 @@ int vmfunc_klcd_test_wrapper(struct fipc_message *msg, unsigned int ept, vmfunc_
 	if (ret)
 		goto exit;
 #if 1
-	local_irq_disable();
+//	local_irq_disable();
 	ret = vmfunc_test_wrapper(msg, test);
-	local_irq_enable();
+//	local_irq_enable();
 #endif
 exit:
 	return ret;

@@ -135,6 +135,8 @@ void noinline vmfunc_call_empty_switch(void);
 int vmfunc_klcd_wrapper(struct fipc_message *msg, unsigned int ept);
 int vmfunc_klcd_test_wrapper(struct fipc_message *msg, unsigned int ept, vmfunc_test_t type);
 
+void noinline
+vmfunc_sync_call(struct fipc_message *request);
 
 extern int __vmfunc_trampoline_page_size[], __vmfunc_trampoline_load_addr[];
 extern int __vmfunc_sboard_page_size[], __vmfunc_sboard_load_addr[];

@@ -951,7 +951,7 @@ int lvd_create_module_lvd(char *mdir, char *mname, cptr_t *lcd_out,
 			&m_vmfunc_sb_page_size
 			);
 	if (ret) {
-		LIBLCD_ERR("error loading kernel module");
+		LIBLCD_ERR("error loading kernel module, ret = %d", ret);
 		goto fail3;
 	}
 
@@ -980,6 +980,10 @@ int lvd_create_module_lvd(char *mdir, char *mname, cptr_t *lcd_out,
 	if (!mod)
 		goto skip;
 
+	if (!mod->klp_info) {
+		LIBLCD_ERR("module does not have ELF information. did you enable LIVE_PATCH?");
+		goto fail4;
+	}
 	/* get klp_info pointer */
 	klp_info = mod->klp_info;
 	info = &klp_info->info;

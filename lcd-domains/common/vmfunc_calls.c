@@ -140,6 +140,12 @@ vmfunc_wrapper(struct fipc_message *request)
 
 EXPORT_SYMBOL(vmfunc_wrapper);
 
+void noinline
+vmfunc_sync_call(struct fipc_message *request)
+{
+	request->vmfunc_id = VMFUNC_SYNC_IPC;
+	vmfunc_wrapper(request);
+}
 /*
  * vmfunc.trampoline.text functions
  * This section contains the code pages that are shared between the microkernel

@@ -964,4 +964,7 @@ int __lcd_ipc_init(void);
  */
 void __lcd_ipc_exit(void);
 
+
+void copy_msg_cap_vmfunc(struct lcd *sender, struct lcd *receiver,
+			cptr_t from_ptr, cptr_t to_ptr);
 #endif /* LCD_DOMAINS_INTERNAL_H */

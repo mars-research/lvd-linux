@@ -10,6 +10,21 @@
 #include <asm/lcd_domains/create.h>
 #include <asm/lcd_domains/libvmfunc.h>
 
+void copy_msg_cap_vmfunc(struct lcd *sender, struct lcd *receiver,
+			cptr_t from_ptr, cptr_t to_ptr)
+{
+	int ret;
+
+	ret = cap_grant(sender->cspace, from_ptr,
+			receiver->cspace, to_ptr);
+	if (ret) {
+		LCD_ERR("failed to transfer cap @ 0x%lx in lcd %p to slot @ 0x%lx in lcd %p",
+			cptr_val(from_ptr), sender, cptr_val(to_ptr),
+			receiver);
+	}
+}
+EXPORT_SYMBOL(copy_msg_cap_vmfunc);
+
 /* SYSCALL HANDLERS -------------------------------------------------- */
 
 static int handle_syscall_create(struct fipc_message *msg)

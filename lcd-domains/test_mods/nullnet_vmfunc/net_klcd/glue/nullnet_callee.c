@@ -18,7 +18,7 @@
 #include "../../ipc_helper.h"
 #include <linux/sort.h>
 #include <linux/priv_mempool.h>
-
+#include <lcd_domains/microkernel.h>
 #include <lcd_config/post_hook.h>
 
 #define NUM_PACKETS	(1000000)
@@ -162,6 +162,10 @@ int pool_pick(void)
 		}
 	}
 
+	/* if there is no discontinuity, then we will have a huge chunk until the end */
+	pools[pool_idx].valid = true;
+	pools[pool_idx].end_idx = MAX_POOLS - 1;
+
 	for (i = 0; i < MAX_POOLS; i++) {
 		printk("%s, pool %d: start idx = %d | end idx = %d\n",
 				__func__, i, pools[i].start_idx, pools[i].end_idx);
@@ -181,7 +185,7 @@ int pool_pick(void)
 void skb_data_pool_init(void)
 {
 	//pool = priv_pool_init(SKB_DATA_POOL, 10, SKB_DATA_SIZE);
-	pool_base = base_pools[pool_pick()];
+	pool_base = base_pools[pools[pool_pick()].start_idx];
 	pool_size = best_diff * ((1 << pool_order) * PAGE_SIZE);
 	pool = priv_pool_init(SKB_DATA_POOL, (void*) pool_base, pool_size, 2048);
 
@@ -498,7 +502,7 @@ int ndo_init(struct net_device *dev, struct trampoline_hidden_args *hidden_args)
 	async_msg_set_fn_type(request, NDO_INIT);
 	fipc_set_reg1(request, net_dev_container->other_ref.cptr);
 
-	ret = vmfunc_wrapper(request);
+	ret = vmfunc_klcd_wrapper(request, 1);
 
 	ret = fipc_get_reg1(request);
 	return ret;
@@ -528,7 +532,7 @@ void ndo_uninit(struct net_device *dev, struct trampoline_hidden_args *hidden_ar
 	async_msg_set_fn_type(request, NDO_UNINIT);
 	fipc_set_reg1(request, net_dev_container->other_ref.cptr);
 
-	ret = vmfunc_wrapper(request);
+	ret = vmfunc_klcd_wrapper(request, 1);
 
 	return;
 }
@@ -570,7 +574,7 @@ int ndo_validate_addr(struct net_device *dev, struct trampoline_hidden_args *hid
 
 	fipc_set_reg1(request, net_dev_container->other_ref.cptr);
 
-	ret = vmfunc_wrapper(request);
+	ret = vmfunc_klcd_wrapper(request, 1);
 
 	ret = fipc_get_reg1(request);
 
@@ -600,7 +604,7 @@ void ndo_set_rx_mode(struct net_device *dev, struct trampoline_hidden_args *hidd
 	async_msg_set_fn_type(request, NDO_SET_RX_MODE);
 	fipc_set_reg1(request, net_dev_container->other_ref.cptr);
 
-	ret = vmfunc_wrapper(request);
+	ret = vmfunc_klcd_wrapper(request, 1);
 
 	return;
 }
@@ -621,13 +625,14 @@ int ndo_set_mac_address_user(struct net_device *dev, void *addr, struct trampoli
 	int ret;
 	struct fipc_message r;
 	struct fipc_message *request = &r;
-	int sync_ret;
 	unsigned 	long addr_mem_sz;
 	unsigned 	long addr_offset;
 	cptr_t addr_cptr;
 	struct net_device_container *net_dev_container;
+#ifndef CONFIG_LVD
 	cptr_t sync_end;
-
+	int sync_ret;
+#endif
 	net_dev_container = container_of(dev, struct net_device_container, net_device);
 
 
@@ -640,7 +645,7 @@ int ndo_set_mac_address_user(struct net_device *dev, void *addr, struct trampoli
 		LIBLCD_ERR("virt to cptr failed");
 		goto fail_virt;
 	}
-
+#ifndef CONFIG_LVD
 	lcd_set_cr0(addr_cptr);
 	lcd_set_r0(addr_mem_sz);
 	lcd_set_r1(addr_offset);
@@ -654,13 +659,13 @@ int ndo_set_mac_address_user(struct net_device *dev, void *addr, struct trampoli
 		LIBLCD_ERR("failed to send");
 		goto fail_sync;
 	}
-
+#endif
 	ret = fipc_get_reg1(request);
 
 	LIBLCD_MSG("%s: returned %d", __func__, ret);
 
 fail_virt:
-fail_sync:
+//fail_sync:
 	return ret;
 }
 
@@ -699,7 +704,8 @@ int ndo_set_mac_address(struct net_device *dev, void *addr, struct trampoline_hi
 		LIBLCD_ERR("virt to cptr failed");
 		goto fail_virt;
 	}
-	ret = vmfunc_wrapper(request);
+	ret = vmfunc_klcd_wrapper(request, 1);
+#ifndef CONFIG_LVD
 	lcd_set_r0(addr_mem_sz);
 	lcd_set_r1(addr_offset);
 	lcd_set_cr0(addr_cptr);
@@ -709,10 +715,14 @@ int ndo_set_mac_address(struct net_device *dev, void *addr, struct trampoline_hi
 		LIBLCD_ERR("failed to send");
 		goto fail_sync;
 	}
+#endif
 	ret = fipc_get_reg1(request);
 	return ret;
 fail_virt:
+
+#ifndef CONFIG_LVD
 fail_sync:
+#endif
 	return ret;
 }
 
@@ -741,7 +751,7 @@ struct rtnl_link_stats64 *ndo_get_stats64(struct net_device *dev, struct rtnl_li
 
 	fipc_set_reg1(request, net_dev_container->other_ref.cptr);
 
-	ret = vmfunc_wrapper(request);
+	ret = vmfunc_klcd_wrapper(request, 1);
 	stats->tx_packets = fipc_get_reg1(request);
 	stats->tx_bytes = fipc_get_reg2(request);
 
@@ -771,7 +781,7 @@ int ndo_change_carrier(struct net_device *dev, bool new_carrier, struct trampoli
 	async_msg_set_fn_type(request, NDO_CHANGE_CARRIER);
 	fipc_set_reg1(request, net_dev_container->other_ref.cptr);
 
-	ret = vmfunc_wrapper(request);
+	ret = vmfunc_klcd_wrapper(request, 1);
 	ret = fipc_get_reg1(request);
 
 	return ret;
@@ -795,7 +805,7 @@ int validate(struct nlattr **tb, struct nlattr **data, struct trampoline_hidden_
 	struct fipc_message *request = &r;
 
 	async_msg_set_fn_type(request, VALIDATE);
-	ret = vmfunc_wrapper(request);
+	ret = vmfunc_klcd_wrapper(request, 1);
 	ret = fipc_get_reg1(request);
 	return ret;
 }
@@ -1045,6 +1055,44 @@ fail8:
 	return;
 }
 
+void setup_sync_callee(struct fipc_message *msg)
+{
+	int ret;
+	struct page *p;
+	unsigned int pool_ord;
+	cptr_t pool_cptr;
+	cptr_t lcd_pool_cptr;
+
+	/* get LCD's pool cptr */
+	lcd_pool_cptr = __cptr(msg->regs[0]);
+
+	p = virt_to_head_page(pool->pool);
+
+        pool_ord = ilog2(roundup_pow_of_two((
+				pool->total_pages * PAGE_SIZE)
+				>> PAGE_SHIFT));
+
+        ret = lcd_volunteer_pages(p, pool_ord, &pool_cptr);
+
+	if (ret) {
+		LIBLCD_ERR("volunteer shared data pool");
+		goto fail_vol;
+	}
+
+	pool_pfn_start = (unsigned long)pool->pool >> PAGE_SHIFT;
+	pool_pfn_end = pool_pfn_start + pool->total_pages;
+
+	printk("%s, pool pfn start %lu | end %lu\n", __func__,
+			pool_pfn_start, pool_pfn_end);
+
+	copy_msg_cap_vmfunc(current->lcd, current->vmfunc_lcd, pool_cptr, lcd_pool_cptr);
+
+	fipc_set_reg0(msg, pool_ord);
+
+fail_vol:
+	return;
+}
+
 //DONE
 void setup(struct net_device *dev, struct trampoline_hidden_args *hidden_args)
 {
@@ -1054,9 +1102,7 @@ void setup(struct net_device *dev, struct trampoline_hidden_args *hidden_args)
 	struct setup_container *setup_container;
 	struct net_device_container *net_dev_container;
 	struct net_device_ops_container *netdev_ops_container;
-	struct page *p;
-	unsigned int pool_ord;
-	cptr_t pool_cptr;
+
 
 	net_dev_container = container_of(dev,
 			struct net_device_container,
@@ -1093,48 +1139,8 @@ void setup(struct net_device *dev, struct trampoline_hidden_args *hidden_args)
 	fipc_set_reg3(_request, net_dev_container->my_ref.cptr);
 	fipc_set_reg4(_request, netdev_ops_container->my_ref.cptr);
 
-	ret = vmfunc_wrapper(_request);
+	ret = vmfunc_klcd_wrapper(_request, 1);
 
-	p = virt_to_head_page(pool->pool);
-
-        pool_ord = ilog2(roundup_pow_of_two((
-				pool->total_pages * PAGE_SIZE)
-				>> PAGE_SHIFT));
-
-        ret = lcd_volunteer_pages(p, pool_ord, &pool_cptr);
-
-	if (ret) {
-		LIBLCD_ERR("volunteer shared data pool");
-		goto fail_vol;
-	}	
-
-	pool_pfn_start = (unsigned long)pool->pool >> PAGE_SHIFT;
-	pool_pfn_end = pool_pfn_start + pool->total_pages;
-
-	printk("%s, pool pfn start %lu | end %lu\n", __func__,
-			pool_pfn_start, pool_pfn_end);
-
-	lcd_set_cr0(pool_cptr);
-	lcd_set_r0(pool_ord);
-
-	printk("%s, calling sync send", __func__);
-	ret = lcd_sync_send(hidden_args->sync_ep);
-	lcd_set_cr0(CAP_CPTR_NULL);
-
-	if (ret) {
-		LIBLCD_ERR("sync send");
-		goto fail_sync;
-	}
-#if 0
-	ret = thc_ipc_recv_response(hidden_args->async_chnl,
-			request_cookie,
-			&_response);
-
-	if (ret) {
-		LIBLCD_ERR("failed to recv ipc");
-		goto fail_ipc_rx;
-	}
-#endif
 	printk("%s:%d, done with msg %d\n", __func__, __LINE__, async_msg_get_fn_type(_request));
 
 	net_dev_container->net_device.flags = fipc_get_reg1(_request);
@@ -1152,10 +1158,7 @@ void setup(struct net_device *dev, struct trampoline_hidden_args *hidden_args)
 	net_dev_container->net_device.rtnl_link_ops
 		= &g_ops_container->rtnl_link_ops;
 fail_alloc:
-fail_sync:
-fail_vol:
 fail_insert:
-//fail_ipc_rx:
 	return;
 }
 
@@ -1171,7 +1174,7 @@ void LCD_TRAMPOLINE_LINKAGE(setup_trampoline) setup_trampoline(struct net_device
 }
 
 //DONE
-int register_netdevice_callee(struct fipc_message *request, struct thc_channel *channel, struct glue_cspace *cspace, struct cptr sync_ep)
+int register_netdevice_callee(struct fipc_message *request)
 {
 	struct net_device_container *dev_container;
 	int ret;
@@ -1196,7 +1199,7 @@ fail_lookup:
 }
 
 //DONE
-int ether_setup_callee(struct fipc_message *request, struct thc_channel *channel, struct glue_cspace *cspace, struct cptr sync_ep)
+int ether_setup_callee(struct fipc_message *request)
 {
 	int ret;
 	struct net_device_container *dev;
@@ -1211,6 +1214,7 @@ int ether_setup_callee(struct fipc_message *request, struct thc_channel *channel
 
 	LIBLCD_MSG("Calling ether_setup");
 	ether_setup(&dev->net_device);
+	LIBLCD_MSG("%s returned", __func__);
 fail_lookup:
 	return ret;
 }
@@ -1224,20 +1228,22 @@ int sync_recv_data(unsigned long *order, unsigned long *off, cptr_t *data_cptr, 
 		goto fail1;
 	}
 
+#ifndef CONFIG_LVD
 	lcd_set_cr0(*data_cptr);
 
 	ret = lcd_sync_recv(sync_ep);
 
 	lcd_set_cr0(CAP_CPTR_NULL);
-
+#endif
 	if (ret) {
 		LIBLCD_ERR("failed to recv");
 		goto fail2;
 	}
 
+#ifndef CONFIG_LVD
 	*order = lcd_r0();
 	*off = lcd_r1();
-
+#endif
 	ret = lcd_map_virt(*data_cptr, *order, data_gva);
 	if (ret) {
 		LIBLCD_ERR("failed to map void *addr");
@@ -1255,7 +1261,7 @@ fail1:
 
 
 //DONE
-int eth_mac_addr_callee(struct fipc_message *request, struct thc_channel *channel, struct glue_cspace *cspace, struct cptr sync_ep)
+int eth_mac_addr_callee(struct fipc_message *request)
 {
 	struct net_device_container *dev_container;
 	int ret;
@@ -1289,7 +1295,7 @@ fail_lookup:
 	return ret;
 }
 
-int eth_validate_addr_callee(struct fipc_message *request, struct thc_channel *channel, struct glue_cspace *cspace, struct cptr sync_ep)
+int eth_validate_addr_callee(struct fipc_message *request)
 {
 	int ret;
 	struct net_device_container *net_dev_container;
@@ -1311,7 +1317,7 @@ fail_lookup:
 	return ret;
 }
 
-int free_netdev_callee(struct fipc_message *request, struct thc_channel *channel, struct glue_cspace *cspace, struct cptr sync_ep)
+int free_netdev_callee(struct fipc_message *request)
 {
 	int ret;
 	struct net_device_container *dev_container;
@@ -1331,7 +1337,7 @@ fail_lookup:
 	return ret;
 }
 
-int netif_carrier_off_callee(struct fipc_message *request, struct thc_channel *channel, struct glue_cspace *cspace, struct cptr sync_ep)
+int netif_carrier_off_callee(struct fipc_message *request)
 {
 	int ret;
 	struct net_device_container *net_dev_container;
@@ -1348,7 +1354,7 @@ fail_lookup:
 	return ret;
 }
 
-int netif_carrier_on_callee(struct fipc_message *request, struct thc_channel *channel, struct glue_cspace *cspace, struct cptr sync_ep)
+int netif_carrier_on_callee(struct fipc_message *request)
 {
 	int ret;
 	struct net_device_container *net_dev_container;
@@ -1441,9 +1447,21 @@ int __rtnl_link_register_callee(struct fipc_message *request)
 		LCD_HANDLE_TO_TRAMPOLINE(
 			validate_hidden_args->t_handle);
 	ops_container->rtnl_link_ops.kind = "dummy"; 
+
+	printk("%s, acquiring rtnl_lock\n", __func__);
+	rtnl_lock();
+
+	printk("%s, acquired rtnl_lock, calling original func\n", __func__);
+
 	ret = __rtnl_link_register(( &ops_container->rtnl_link_ops ));
 
-	fipc_set_reg0(request, ops_container->my_ref.cptr);
+	printk("%s, original func returned ret %d\n", __func__, ret);
+
+	rtnl_unlock();
+
+	fipc_set_reg0(request, ret);
+
+	fipc_set_reg1(request, ops_container->my_ref.cptr);
 
 	g_ops_container = ops_container;
 
@@ -1453,7 +1471,7 @@ fail3:
 }
 
 //DONE
-int __rtnl_link_unregister_callee(struct fipc_message *request, struct thc_channel *channel, struct glue_cspace *cspace, struct cptr sync_ep)
+int __rtnl_link_unregister_callee(struct fipc_message *request)
 {
 	struct rtnl_link_ops *ops;
 	int ret = 0;
@@ -1469,7 +1487,7 @@ int __rtnl_link_unregister_callee(struct fipc_message *request, struct thc_chann
 }
 
 //DONE
-int rtnl_link_unregister_callee(struct fipc_message *request, struct thc_channel *channel, struct glue_cspace *cspace, struct cptr sync_ep)
+int rtnl_link_unregister_callee(struct fipc_message *request)
 {
 	struct rtnl_link_ops_container *ops_container;
 	int ret;
@@ -1497,7 +1515,7 @@ fail_lookup:
 }
 
 //DONE
-int alloc_netdev_mqs_callee(struct fipc_message *request, struct thc_channel *channel, struct glue_cspace *cspace, struct cptr sync_ep)
+int alloc_netdev_mqs_callee(struct fipc_message *request)
 {
 	int sizeof_priv;
 	int ret = 0;
@@ -1549,7 +1567,7 @@ int alloc_netdev_mqs_callee(struct fipc_message *request, struct thc_channel *ch
 	setup_hidden_args->struct_container = temp;
 	setup_hidden_args->cspace = c_cspace;
 	setup_hidden_args->sync_ep = sync_ep;
-	setup_hidden_args->async_chnl = channel;
+
 	temp->setup = LCD_HANDLE_TO_TRAMPOLINE(setup_hidden_args->t_handle);
 	ret = set_memory_x(((unsigned long)setup_hidden_args->t_handle) & PAGE_MASK,
 			ALIGN(LCD_TRAMPOLINE_SIZE(setup_trampoline),
@@ -1584,7 +1602,7 @@ fail_alloc:
 }
 
 #ifdef CONSUME_SKB_NO_HASHING
-int consume_skb_callee(struct fipc_message *request, struct thc_channel *channel, struct glue_cspace *cspace, struct cptr sync_ep)
+int consume_skb_callee(struct fipc_message *request)
 {
 	int ret = 0;
 	struct sk_buff *skb;
@@ -1600,7 +1618,7 @@ int consume_skb_callee(struct fipc_message *request, struct thc_channel *channel
 #else
 
 //TODO:
-int consume_skb_callee(struct fipc_message *request, struct thc_channel *channel, struct glue_cspace *cspace, struct cptr sync_ep)
+int consume_skb_callee(struct fipc_message *request)
 {
 	int ret = 0;
 	struct sk_buff_container *skb_c;

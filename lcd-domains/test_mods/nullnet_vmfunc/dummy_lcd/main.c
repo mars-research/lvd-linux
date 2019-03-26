@@ -19,7 +19,7 @@ cptr_t nullnet_sync_endpoint;
 
 int dummy_init_module(void);
 
-static int __noreturn dummy_lcd_init(void) 
+static int dummy_lcd_init(void)
 {
 	int ret = 0;
 
@@ -43,7 +43,7 @@ fail1:
 	lcd_exit(ret);
 }
 
-static int __dummy_lcd_init(void)
+int __dummy_lcd_init(void)
 {
 	return dummy_lcd_init();
 }
@@ -59,4 +59,15 @@ static void __exit dummy_lcd_exit(void)
 module_init(__dummy_lcd_init);
 module_exit(dummy_lcd_exit);
 MODULE_LICENSE("GPL");
+MODULE_INFO(livepatch, "Y");
 
+/* extract data from linker variables */
+size_t vmfunc_sboard_page_size = (size_t)&__vmfunc_sboard_page_size;
+unsigned long* vmfunc_sboard_load_addr = (unsigned long*) &__vmfunc_sboard_load_addr;
+
+/* extract data from linker variables */
+size_t vmfunc_trampoline_page_size = (size_t)&__vmfunc_trampoline_page_size;
+unsigned long* vmfunc_trampoline_load_addr = (unsigned long*) &__vmfunc_trampoline_load_addr;
+
+EXPORT_SYMBOL(vmfunc_sboard_load_addr);
+EXPORT_SYMBOL(vmfunc_trampoline_load_addr);

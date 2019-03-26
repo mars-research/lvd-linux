@@ -1,18 +1,21 @@
-obj-m += lcd_test_mod_nullnet_dummy_lcd.o
+obj-m += lcd_test_mod_nullnet_vmfunc_dummy_lcd.o
 
-lcd_test_mod_nullnet_dummy_lcd-y		+= main.o
+lcd_test_mod_nullnet_vmfunc_dummy_lcd-y		+= main.o
 
 # Original code
-lcd_test_mod_nullnet_dummy_lcd-y		+= dummy.o 
+lcd_test_mod_nullnet_vmfunc_dummy_lcd-y		+= dummy.o
 
 
-lcd_test_mod_nullnet_dummy_lcd-y		+= $(LIBLCD)
+lcd_test_mod_nullnet_vmfunc_dummy_lcd-y		+= $(LIBLCD)
 
 # glue code
-lcd_test_mod_nullnet_dummy_lcd-y		+= $(addprefix glue/, nullnet_caller.o \
+lcd_test_mod_nullnet_vmfunc_dummy_lcd-y		+= $(addprefix glue/, nullnet_caller.o \
 						dispatch.o )
 
-lcd_test_mod_nullnet_dummy_lcd-y		+= $(addprefix ../, cap.o)
+lcd_test_mod_nullnet_vmfunc_dummy_lcd-y		+= $(addprefix ../, cap.o)
 
 ccflags-y += $(ISOLATED_CFLAGS)
 
+extra-y += ../../../liblcd_build/common/vmfunc.lds
+
+ldflags-y += -T $(LIBLCD_BUILD_DIR)/common/vmfunc.lds

@@ -46,6 +46,8 @@ enum dispatch_t {
 	TRIGGER_EXIT =23,
 	TRIGGER_CLEAN,
 	PREP_CHANNEL=25,
+	MODULE_INIT,
+	SYNC_SETUP,
 };
 
 typedef enum {

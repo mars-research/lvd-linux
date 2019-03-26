@@ -37,11 +37,12 @@ static int boot_main(void)
 	/* ---------- Create LCDs ---------- */
 
 	m = lvd_create_module_klcd_no_thread(LCD_DIR("nullnet_vmfunc/net_klcd"),
-				"lcd_test_mod_nullnet_vmunc_net_klcd",
+				"lcd_test_mod_nullnet_vmfunc_net_klcd",
 				&net_klcd);
 
 	if (!m) {
 		LIBLCD_ERR("failed to create net klcd");
+		ret = -1;
 		goto fail3;
 	}
 	ret = lvd_create_module_lvd(LCD_DIR("nullnet_vmfunc/dummy_lcd"),

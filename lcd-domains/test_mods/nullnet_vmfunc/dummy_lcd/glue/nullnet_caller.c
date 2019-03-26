@@ -518,13 +518,11 @@ void consume_skb(struct sk_buff *skb)
 #ifdef SENDER_DISPATCH_LOOP
 	thc_set_msg_id(request, skb_c->cookie);
 #endif
-	fipc_send_msg_end (thc_channel_to_fipc(channel), request);
-
 	return;
 }
 
 // DONE
-int ndo_init_callee(struct fipc_message *request, struct thc_channel *channel, struct glue_cspace *cspace, struct cptr sync_ep)
+int ndo_init_callee(struct fipc_message *request)
 {
 	struct net_device_container *net_dev_container;
 	unsigned 	int request_cookie;
@@ -532,8 +530,6 @@ int ndo_init_callee(struct fipc_message *request, struct thc_channel *channel, s
 	cptr_t netdev_ref = __cptr(fipc_get_reg1(request));
 
 	request_cookie = thc_get_request_cookie(request);
-
-	fipc_recv_msg_end(thc_channel_to_fipc(channel), request);
 
 	ret = glue_cap_lookup_net_device_type(c_cspace, netdev_ref, &net_dev_container);
 	if (ret) {
@@ -550,7 +546,7 @@ fail_lookup:
 }
 
 // DONE
-int ndo_uninit_callee(struct fipc_message *request, struct thc_channel *channel, struct glue_cspace *cspace, struct cptr sync_ep)
+int ndo_uninit_callee(struct fipc_message *request)
 {
 	int ret;
 	unsigned int request_cookie;
@@ -558,7 +554,6 @@ int ndo_uninit_callee(struct fipc_message *request, struct thc_channel *channel,
 	cptr_t netdev_ref = __cptr(fipc_get_reg1(request));
 
 	request_cookie = thc_get_request_cookie(request);
-	fipc_recv_msg_end(thc_channel_to_fipc(channel), request);
 
 	ret = glue_cap_lookup_net_device_type(c_cspace, netdev_ref, &net_dev_container);
 	if (ret) {
@@ -577,7 +572,7 @@ extern uint64_t st_disp_loop, en_disp_loop;
 extern netdev_tx_t dummy_xmit(struct sk_buff *skb, struct net_device *dev);
 
 /* This function is used for testing bare fipc, non-async mtu sized packets */
-int ndo_start_xmit_bare_callee(struct fipc_message *_request, struct thc_channel *channel, struct glue_cspace *cspace, struct cptr sync_ep)
+int ndo_start_xmit_bare_callee(struct fipc_message *_request)
 {
 #ifdef MARSHAL
 	xmit_type_t xmit_type;
@@ -596,17 +591,15 @@ int ndo_start_xmit_bare_callee(struct fipc_message *_request, struct thc_channel
 	proto = fipc_get_reg5(_request);
 	len = fipc_get_reg6(_request);
 #endif
-	fipc_recv_msg_end(thc_channel_to_fipc(channel), _request);
 
 #ifdef MARSHAL
 	fipc_set_reg1(_request, skb_end|skbh_offset| proto | len | cptr_val(skb_ref));
 #endif
-	fipc_send_msg_end(thc_channel_to_fipc(channel), _request);
 
 	return 0;
 }
 
-int ndo_start_xmit_noawe_callee(struct fipc_message *_request, struct thc_channel *channel, struct glue_cspace *cspace, struct cptr sync_ep)
+int ndo_start_xmit_noawe_callee(struct fipc_message *_request)
 {
 	struct lcd_sk_buff_container static_skb_c;
 	struct lcd_sk_buff_container *skb_c = &static_skb_c;
@@ -628,8 +621,6 @@ int ndo_start_xmit_noawe_callee(struct fipc_message *_request, struct thc_channe
 	skb_end = fipc_get_reg4(_request);
 	proto = fipc_get_reg5(_request);
 	len = fipc_get_reg6(_request);
-	fipc_recv_msg_end(thc_channel_to_fipc(channel),
-				_request);
 
 	skb->head = (char*)data_pool + skbh_offset;
 	skb->end = skb_end;
@@ -654,8 +645,6 @@ int ndo_start_xmit_noawe_callee(struct fipc_message *_request, struct thc_channe
 	skb->data = skb->head + skb_lcd->head_data_off;
 #endif
 
-	skb_c->chnl = channel;
-
 	ret = dummy_xmit(skb, NULL);
 
 	fipc_set_reg1(_request, ret);
@@ -665,7 +654,7 @@ int ndo_start_xmit_noawe_callee(struct fipc_message *_request, struct thc_channe
 /* xmit_callee for async. This function receives the IPC and
  * sends back a response
  */
-int ndo_start_xmit_async_bare_callee(struct fipc_message *_request, struct thc_channel *channel, struct glue_cspace *cspace, struct cptr sync_ep)
+int ndo_start_xmit_async_bare_callee(struct fipc_message *_request)
 {
 	unsigned 	int request_cookie;
 	struct lcd_sk_buff_container static_skb_c;
@@ -688,8 +677,6 @@ int ndo_start_xmit_async_bare_callee(struct fipc_message *_request, struct thc_c
 	skb_end = fipc_get_reg4(_request);
 	proto = fipc_get_reg5(_request);
 	len = fipc_get_reg6(_request);
-	fipc_recv_msg_end(thc_channel_to_fipc(channel),
-				_request);
 
 	skb->head = (char*)data_pool + skbh_offset;
 	skb->end = skb_end;
@@ -714,11 +701,6 @@ int ndo_start_xmit_async_bare_callee(struct fipc_message *_request, struct thc_c
 	skb->data = skb->head + skb_lcd->head_data_off;
 #endif
 
-	fipc_recv_msg_end(thc_channel_to_fipc(channel),
-				_request);
-
-	skb_c->chnl = channel;
-
 	skb_c->cookie = request_cookie;
 
 	dummy_xmit(skb, NULL);
@@ -727,7 +709,7 @@ int ndo_start_xmit_async_bare_callee(struct fipc_message *_request, struct thc_c
 }
 
 // DONE
-int ndo_validate_addr_callee(struct fipc_message *request, struct thc_channel *channel, struct glue_cspace *cspace, struct cptr sync_ep)
+int ndo_validate_addr_callee(struct fipc_message *request)
 {
 	struct net_device_container *net_dev_container;
 	unsigned 	int request_cookie;
@@ -745,8 +727,6 @@ int ndo_validate_addr_callee(struct fipc_message *request, struct thc_channel *c
 
 	request_cookie = thc_get_request_cookie(request);
 
-	fipc_recv_msg_end(thc_channel_to_fipc(channel), request);
-
 	ret = net_dev_container->net_device.netdev_ops->ndo_validate_addr(&net_dev_container->net_device);
 
 
@@ -757,7 +737,7 @@ fail_lookup:
 }
 
 // DONE
-int ndo_set_rx_mode_callee(struct fipc_message *request, struct thc_channel *channel, struct glue_cspace *cspace, struct cptr sync_ep)
+int ndo_set_rx_mode_callee(struct fipc_message *request)
 {
 	int ret;
 	struct net_device_container *net_dev_container;
@@ -770,7 +750,6 @@ int ndo_set_rx_mode_callee(struct fipc_message *request, struct thc_channel *cha
 	}
 
 	request_cookie = thc_get_request_cookie(request);
-	fipc_recv_msg_end(thc_channel_to_fipc(channel), request);
 
 	net_dev_container->net_device.netdev_ops->ndo_set_rx_mode(&net_dev_container->net_device);
 
@@ -779,7 +758,7 @@ fail_lookup:
 }
 
 // DONE
-int ndo_set_mac_address_callee(struct fipc_message *request, struct thc_channel *channel, struct glue_cspace *cspace, struct cptr sync_ep)
+int ndo_set_mac_address_callee(struct fipc_message *request)
 {
 	struct net_device_container *net_dev_container;
 	unsigned 	int request_cookie;
@@ -796,8 +775,6 @@ int ndo_set_mac_address_callee(struct fipc_message *request, struct thc_channel 
 		LIBLCD_ERR("lookup");
 		goto fail_lookup;
 	}
-
-	fipc_recv_msg_end(thc_channel_to_fipc(channel), request);
 
 	sync_ret = lcd_cptr_alloc(&addr_cptr);
 	if (sync_ret) {
@@ -832,7 +809,7 @@ fail_sync:
 }
 
 // DONE
-int ndo_get_stats64_callee(struct fipc_message *request, struct thc_channel *channel, struct glue_cspace *cspace, struct cptr sync_ep)
+int ndo_get_stats64_callee(struct fipc_message *request)
 {
 	unsigned 	int request_cookie;
 	struct rtnl_link_stats64 stats;
@@ -841,7 +818,6 @@ int ndo_get_stats64_callee(struct fipc_message *request, struct thc_channel *cha
 	cptr_t netdev_ref = __cptr(fipc_get_reg1(request));
 
 	request_cookie = thc_get_request_cookie(request);
-	fipc_recv_msg_end(thc_channel_to_fipc(channel), request);
 
 	ret = glue_cap_lookup_net_device_type(c_cspace, netdev_ref,
 			&net_dev_container);
@@ -864,7 +840,7 @@ fail_lookup:
 }
 
 // DONE
-int ndo_change_carrier_callee(struct fipc_message *request, struct thc_channel *channel, struct glue_cspace *cspace, struct cptr sync_ep)
+int ndo_change_carrier_callee(struct fipc_message *request)
 {
 	unsigned 	int request_cookie;
 	int ret;
@@ -878,7 +854,6 @@ int ndo_change_carrier_callee(struct fipc_message *request, struct thc_channel *
 	}
 
 	request_cookie = thc_get_request_cookie(request);
-	fipc_recv_msg_end(thc_channel_to_fipc(channel), request);
 
 	ret = net_dev_container->net_device.netdev_ops->ndo_change_carrier(&net_dev_container->net_device, new_carrier);
 
@@ -889,7 +864,7 @@ fail_lookup:
 }
 
 // DONE
-int setup_callee(struct fipc_message *request, struct thc_channel *channel, struct glue_cspace *cspace, struct cptr sync_ep)
+int setup_callee(struct fipc_message *request)
 {
 	int ret;
 	unsigned 	int request_cookie;
@@ -904,8 +879,6 @@ int setup_callee(struct fipc_message *request, struct thc_channel *channel, stru
 	unsigned int pool_ord;
 
 	request_cookie = thc_get_request_cookie(request);
-
-	fipc_recv_msg_end(thc_channel_to_fipc(channel), request);
 
 	ret = glue_cap_lookup_net_device_type(c_cspace, netdev_ref, &net_dev_container);
 	if (ret) {
@@ -924,14 +897,18 @@ int setup_callee(struct fipc_message *request, struct thc_channel *channel, stru
 		goto fail_cptr;
 	}
 
+#ifdef CONFIG_LVD
+	fipc_set_reg0(request, cptr_val(pool_cptr));
+	vmfunc_sync_call(request, SYNC_SETUP);
+	pool_ord = fipc_get_reg0(request);
+#else
 	lcd_set_cr0(pool_cptr);
-
 	printk("%s, calling sync recv", __func__);
 	ret = lcd_sync_recv(sync_ep);
 	lcd_set_cr0(CAP_CPTR_NULL);
 
 	pool_ord = lcd_r0();
-
+#endif
 	ret = lcd_map_virt(pool_cptr, pool_ord, &pool_addr);
 	if (ret) {
 		LIBLCD_ERR("failed to map pool");
@@ -945,6 +922,7 @@ int setup_callee(struct fipc_message *request, struct thc_channel *channel, stru
 
 	g_rtnl_link_ops->setup(&net_dev_container->net_device);
 
+	printk("%s, returned",__func__);
 	netdev_ops = net_dev_container->net_device.netdev_ops;
 
 	netdev_ops_container = container_of(netdev_ops, struct net_device_ops_container, net_device_ops);
@@ -972,14 +950,13 @@ fail_cptr:
 }
 
 // TODO:
-int validate_callee(struct fipc_message *request, struct thc_channel *channel, struct glue_cspace *cspace, struct cptr sync_ep)
+int validate_callee(struct fipc_message *request)
 {
 	struct nlattr **tb;
 	struct nlattr **data;
 	unsigned 	int request_cookie;
 	int ret = 0;
 	request_cookie = thc_get_request_cookie(request);
-	fipc_recv_msg_end(thc_channel_to_fipc(channel), request);
 	tb = kzalloc(sizeof( void  * ), GFP_KERNEL);
 	if (!tb) {
 		LIBLCD_ERR("kzalloc");

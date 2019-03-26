@@ -22,16 +22,17 @@ struct trampoline_hidden_args {
 
 int __rtnl_link_register_callee(struct fipc_message *);
 
-int register_netdevice_callee(struct fipc_message *request, struct thc_channel *channel, struct glue_cspace *cspace, struct cptr sync_ep);
-int ether_setup_callee(struct fipc_message *request, struct thc_channel *channel, struct glue_cspace *cspace, struct cptr sync_ep);
-int eth_mac_addr_callee(struct fipc_message *request, struct thc_channel *channel, struct glue_cspace *cspace, struct cptr sync_ep);
-int eth_validate_addr_callee(struct fipc_message *request, struct thc_channel *channel, struct glue_cspace *cspace, struct cptr sync_ep);
-int free_netdev_callee(struct fipc_message *request, struct thc_channel *channel, struct glue_cspace *cspace, struct cptr sync_ep);
-int netif_carrier_off_callee(struct fipc_message *request, struct thc_channel *channel, struct glue_cspace *cspace, struct cptr sync_ep);
-int netif_carrier_on_callee(struct fipc_message *request, struct thc_channel *channel, struct glue_cspace *cspace, struct cptr sync_ep);
-int __rtnl_link_unregister_callee(struct fipc_message *request, struct thc_channel *channel, struct glue_cspace *cspace, struct cptr sync_ep);
-int rtnl_link_unregister_callee(struct fipc_message *request, struct thc_channel *channel, struct glue_cspace *cspace, struct cptr sync_ep);
-int alloc_netdev_mqs_callee(struct fipc_message *request, struct thc_channel *channel, struct glue_cspace *cspace, struct cptr sync_ep);
-int consume_skb_callee(struct fipc_message *request, struct thc_channel *channel, struct glue_cspace *cspace, struct cptr sync_ep);
+int register_netdevice_callee(struct fipc_message *request);
+int ether_setup_callee(struct fipc_message *request);
+int eth_mac_addr_callee(struct fipc_message *request);
+int eth_validate_addr_callee(struct fipc_message *request);
+int free_netdev_callee(struct fipc_message *request);
+int netif_carrier_off_callee(struct fipc_message *request);
+int netif_carrier_on_callee(struct fipc_message *request);
+int __rtnl_link_unregister_callee(struct fipc_message *request);
+int rtnl_link_unregister_callee(struct fipc_message *request);
+int alloc_netdev_mqs_callee(struct fipc_message *request);
+int consume_skb_callee(struct fipc_message *request);
 
+void setup_sync_callee(struct fipc_message *msg);
 #endif /* __NULLNET_CALLEE_H__ */

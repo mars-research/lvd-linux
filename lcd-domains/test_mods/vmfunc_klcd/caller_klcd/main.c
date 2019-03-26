@@ -18,7 +18,8 @@
 #include <lcd_config/post_hook.h>
 
 extern int vmfunc_wrapper(struct fipc_message *req);
-extern int vmfunc_init(void*, rpc_handler_t);
+extern int vmfunc_init(void *stack_page, rpc_handler_t rpc_handler,
+		rpc_handler_t sync_handler);
 unsigned long long stack;
 unsigned long long eip;
 extern void *lcd_stack;
@@ -90,7 +91,7 @@ static int caller_main(void)
 	 * Boot
 	 */
 	printk("%s entered,  lcd_stack %p\n", __func__, lcd_stack);
-	vmfunc_init(lcd_stack, handle_rpc_calls_klcd);
+	vmfunc_init(lcd_stack, handle_rpc_calls_klcd, NULL);
 	run_vmfunc_tests();
 #if 0
 	ret = lcd_enter();

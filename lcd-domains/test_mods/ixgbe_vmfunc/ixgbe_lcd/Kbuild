@@ -1,9 +1,9 @@
-obj-m += lcd_test_mod_ixgbe_ixgbe_lcd.o
+obj-m += lcd_test_mod_ixgbe_vmfunc_ixgbe_lcd.o
 
-lcd_test_mod_ixgbe_ixgbe_lcd-y		+= main.o
+lcd_test_mod_ixgbe_vmfunc_ixgbe_lcd-y		+= main.o
 
 # Original code
-lcd_test_mod_ixgbe_ixgbe_lcd-y		+= $(addprefix ixgbe/, ixgbe_main.o \
+lcd_test_mod_ixgbe_vmfunc_ixgbe_lcd-y		+= $(addprefix ixgbe/, ixgbe_main.o \
 						ixgbe_82599.o \
 						ixgbe_ethtool.o \
 						ixgbe_common.o \
@@ -11,13 +11,13 @@ lcd_test_mod_ixgbe_ixgbe_lcd-y		+= $(addprefix ixgbe/, ixgbe_main.o \
 						ixgbe_lib.o )
 
 
-lcd_test_mod_ixgbe_ixgbe_lcd-y		+= $(LIBLCD)
+lcd_test_mod_ixgbe_vmfunc_ixgbe_lcd-y		+= $(LIBLCD)
 
 # glue code
-lcd_test_mod_ixgbe_ixgbe_lcd-y		+= $(addprefix glue/, ixgbe_caller.o \
+lcd_test_mod_ixgbe_vmfunc_ixgbe_lcd-y		+= $(addprefix glue/, ixgbe_caller.o \
 						ixgbe_caller_dispatch.o )
 
-lcd_test_mod_ixgbe_ixgbe_lcd-y		+= $(addprefix ../, ixgbe_cap.o)
+lcd_test_mod_ixgbe_vmfunc_ixgbe_lcd-y		+= $(addprefix ../, ixgbe_cap.o)
 
 ccflags-y += $(ISOLATED_CFLAGS)
 

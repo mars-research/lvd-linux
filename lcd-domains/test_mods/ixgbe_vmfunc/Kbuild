@@ -1,6 +1,6 @@
-obj-$(LCD_CONFIG_BUILD_IXGBE_BOOT)	+= boot/
+obj-$(LCD_CONFIG_BUILD_IXGBE_VMFUNC_BOOT)	+= boot/
 
-obj-$(LCD_CONFIG_BUILD_IXGBE_IXGBE_LCD) += ixgbe_lcd/
+obj-$(LCD_CONFIG_BUILD_IXGBE_VMFUNC_IXGBE_LCD) += ixgbe_lcd/
 
-obj-$(LCD_CONFIG_BUILD_IXGBE_NET_KLCD) += net_klcd/
+obj-$(LCD_CONFIG_BUILD_IXGBE_VMFUNC_NET_KLCD) += net_klcd/
 

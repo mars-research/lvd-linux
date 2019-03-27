@@ -15,6 +15,7 @@
 #include <liblcd/liblcd.h>
 #include <liblcd/sync_ipc_poll.h>
 #include <linux/priv_mempool.h>
+#include <asm/lcd_domains/libvmfunc.h>
 
 #include "ixgbe_glue_helper.h"
 
@@ -103,6 +104,7 @@ enum dispatch_t {
 	SERVICE_EVENT_SCHED,
 	TRIGGER_DUMP,
 	TRIGGER_CLEAN,
+	MODULE_INIT,
 };
 
 typedef enum {
@@ -173,77 +175,19 @@ void glue_cap_remove(
 	cptr_t c);
 
 /* ASYNC HELPERS -------------------------------------------------- */
-
 static inline
 int
 async_msg_get_fn_type(struct fipc_message *msg)
 {
-	return fipc_get_flags(msg) >> THC_RESERVED_MSG_FLAG_BITS;
+	return msg->rpc_id;
 }
 
 static inline
 void
 async_msg_set_fn_type(struct fipc_message *msg, int type)
 {
-	uint32_t flags = fipc_get_flags(msg);
-	/* ensure type is in range */
-	type &= (1 << (32 - THC_RESERVED_MSG_FLAG_BITS)) - 1;
-	/* erase old type */
-	flags &= ((1 << THC_RESERVED_MSG_FLAG_BITS) - 1);
-	/* install new type */
-	flags |= (type << THC_RESERVED_MSG_FLAG_BITS);
-	fipc_set_flags(msg, flags);
+	msg->vmfunc_id = VMFUNC_RPC_CALL;
+	msg->rpc_id = type;
 }
 
-static inline
-int
-async_msg_blocking_send_start(struct thc_channel *chnl,
-			struct fipc_message **out)
-{
-	int ret;
-	for (;;) {
-		/* Poll until we get a free slot or error */
-		ret = fipc_send_msg_start(thc_channel_to_fipc(chnl), out);
-		if (!ret || ret != -EWOULDBLOCK)
-			return ret;
-		cpu_relax();
-		if (kthread_should_stop())
-			return -EIO;
-	}
-}
-
-static inline
-int
-fipc_test_blocking_send_start(struct thc_channel *chnl,
-			struct fipc_message **out)
-{
-	int ret;
-	for (;;) {
-		/* Poll until we get a free slot or error */
-		ret = fipc_send_msg_start(thc_channel_to_fipc(chnl), out);
-		if (!ret || ret != -EWOULDBLOCK)
-			return ret;
-		cpu_relax();
-	}
-}
-
-static inline
-int
-async_msg_blocking_recv_start(struct thc_channel *chnl,
-			struct fipc_message** out)
-{
-	int ret;
-	static int count = 0;
-
-	for (;;) {
-		/* Poll until we get a message or error */
-		ret = fipc_recv_msg_start(thc_channel_to_fipc(chnl),
-						out);
-		if ( !ret || ret != -EWOULDBLOCK )
-			return ret;
-		cpu_relax();
-		if (count++ % 512 == 0)
-			cond_resched();
-	}
-}
 #endif /* __IXGBE_COMMON_H__ */

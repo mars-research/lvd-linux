@@ -89,10 +89,6 @@ int dispatch_async_loop(struct fipc_message *message)
 			 */
 			return -1;
 
-		case PREP_CHANNEL:
-			trace(PREP_CHANNEL);
-			return prep_channel_callee(message);
-
 		default:
 			LIBLCD_ERR("unexpected function label: %d",
 					fn_type);

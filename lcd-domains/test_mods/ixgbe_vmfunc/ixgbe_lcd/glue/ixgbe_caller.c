@@ -19,7 +19,7 @@
 
 struct cptr sync_ep;
 static struct glue_cspace *c_cspace;
-extern struct glue_cspace *ixgbe_cspace;
+struct glue_cspace *ixgbe_cspace;
 extern cptr_t ixgbe_sync_endpoint;
 extern cptr_t ixgbe_register_channel;
 extern struct thc_channel_group ch_grp;
@@ -166,14 +166,11 @@ int pci_enable_msix_range(struct pci_dev *dev, struct msix_entry *entries, int m
 {
 	struct fipc_message r;
 	struct fipc_message *_request = &r;
-
 	int func_ret;
 	int sync_ret;
 	unsigned 	long p_mem_sz;
 	unsigned 	long p_offset;
 	cptr_t p_cptr;
-
-
 
 	async_msg_set_fn_type(_request,
 			PCI_ENABLE_MSIX_RANGE);
@@ -189,18 +186,12 @@ int pci_enable_msix_range(struct pci_dev *dev, struct msix_entry *entries, int m
 		LIBLCD_ERR("virt to cptr failed");
 		lcd_exit(-1);
 	}
-	vmfunc_wrapper(_request);
-	lcd_set_r0(ilog2(( p_mem_sz ) >> ( PAGE_SHIFT )));
-	lcd_set_r1(p_offset);
-	lcd_set_cr0(p_cptr);
-	/* TODO: sync wrapper */
 
-	sync_ret = lcd_sync_send(ixgbe_sync_endpoint);
-	lcd_set_cr0(CAP_CPTR_NULL);
-	if (sync_ret) {
-		LIBLCD_ERR("failed to send");
-		lcd_exit(-1);
-	}
+	fipc_set_reg2(_request, ilog2((p_mem_sz) >> (PAGE_SHIFT)));
+	fipc_set_reg3(_request, p_offset);
+	fipc_set_reg4(_request, cptr_val(p_cptr));
+
+	vmfunc_wrapper(_request);
 
 	func_ret = fipc_get_reg1(_request);
 
@@ -361,11 +352,8 @@ int probe_callee(struct fipc_message *_request)
 	int func_ret;
 	int ret = 0;
 	cptr_t other_ref;
-#ifdef IOMMU_ASSIGN
 	unsigned int devfn;
-#endif
 
-#ifdef PCI_REGIONS
 	cptr_t res0_cptr;
 	gpa_t gpa_addr;
 	unsigned int res0_len;
@@ -373,14 +361,10 @@ int probe_callee(struct fipc_message *_request)
 	cptr_t pool_cptr;
 	gva_t pool_addr;
 	unsigned int pool_ord;
-#endif
-
 
 	LIBLCD_MSG("%s called", __func__);
 	dma_mask = fipc_get_reg2(_request);
 	other_ref.cptr = fipc_get_reg1(_request);
-
-
 
 	dev_container = kzalloc(sizeof( struct pci_dev_container   ),
 		GFP_KERNEL);
@@ -400,7 +384,7 @@ int probe_callee(struct fipc_message *_request)
 	dev_container->pci_dev.device = 0x10fd;
 	dev_container->other_ref = other_ref;
 	dev_container->pci_dev.dev.dma_mask = &dma_mask;
-#ifdef PCI_REGIONS
+
 	ret = lcd_cptr_alloc(&res0_cptr);
 	if (ret) {
 		LIBLCD_ERR("failed to get cptr");
@@ -413,30 +397,23 @@ int probe_callee(struct fipc_message *_request)
 		goto fail_cptr;
 	}
 
-	lcd_set_cr0(res0_cptr);
-	lcd_set_cr1(pool_cptr);
+	fipc_set_reg0(_request, cptr_val(res0_cptr));
+	fipc_set_reg1(_request, cptr_val(pool_cptr));
 
-	/* TODO: sync wrapper */
+	vmfunc_sync_call(_request, SYNC_PROBE);
 
-	ret = lcd_sync_recv(ixgbe_sync_endpoint);
-	lcd_set_cr0(CAP_CPTR_NULL);
-	lcd_set_cr1(CAP_CPTR_NULL);
-
-	/* resource len */
-	res0_len = lcd_r0();
-	if (ret) {
-		LIBLCD_ERR("failed to recv sync");
-		goto fail_sync;
-	}
-	pool_ord = lcd_r1();
+	res0_len = fipc_get_reg0(_request);
+	pool_ord = fipc_get_reg1(_request);
 
 	ret = lcd_ioremap_phys(res0_cptr, res0_len, &gpa_addr);
+
 	if (ret) {
 		LIBLCD_ERR("failed to ioremap phys");
 		goto fail_ioremap;
 	}
 
 	dev_resource_0 = lcd_ioremap(gpa_val(gpa_addr), res0_len);
+
 	if (!dev_resource_0) {
 		LIBLCD_ERR("failed to ioremap virt");
 		goto fail_ioremap2;
@@ -455,9 +432,7 @@ int probe_callee(struct fipc_message *_request)
 			gva_val(pool_addr), pool_ord);
 
 	data_pool = (void*)gva_val(pool_addr);
-#endif
 
-#ifdef IOMMU_ASSIGN
 	devfn = PCI_DEVFN(dev_assign.slot, dev_assign.fn);
 
 	/* assign the device after we map the memory so that
@@ -470,28 +445,20 @@ int probe_callee(struct fipc_message *_request)
 	if (ret)
 		LIBLCD_ERR("Could not assign pci device to LCD: ret %d",
 				ret);
-#endif
 
 	/* XXX: Pass null for now. struct pci_dev is passed from the
 	 * kernel and needs analysis for wrapping it around a container
 	 */
 	func_ret = ixgbe_driver_container.pci_driver.probe(&dev_container->pci_dev, NULL);
 
-//	lcd_register_chardev("ixgbe_user", &ixgbe_user_fops);
+	fipc_set_reg1(_request, func_ret);
 
-
-	fipc_set_reg1(_request,
-			func_ret);
-
-#ifdef PCI_REGIONS
 fail_ioremap:
 fail_ioremap2:
 fail_alloc:
-fail_sync:
 fail_insert:
 fail_cptr:
 fail_pool:
-#endif
 	return ret;
 }
 
@@ -611,27 +578,21 @@ int eth_mac_addr(struct net_device *dev,
 
 	async_msg_set_fn_type(_request,
 			ETH_MAC_ADDR);
-	fipc_set_reg1(_request,
+	fipc_set_reg0(_request,
 			dev_container->other_ref.cptr);
-	sync_ret = lcd_virt_to_cptr(__gva(( unsigned  long   )p),
-		&p_cptr,
-		&p_mem_sz,
-		&p_offset);
+	sync_ret = lcd_virt_to_cptr(__gva(( unsigned  long   )p), &p_cptr,
+			&p_mem_sz, &p_offset);
+
 	if (sync_ret) {
 		LIBLCD_ERR("virt to cptr failed");
 		lcd_exit(-1);
 	}
+
+	fipc_set_reg1(_request, cptr_val(p_cptr));
+	fipc_set_reg2(_request, ilog2(( p_mem_sz ) >> ( PAGE_SHIFT )));
+	fipc_set_reg3(_request, p_offset);
+
 	vmfunc_wrapper(_request);
-	lcd_set_r0(ilog2(( p_mem_sz ) >> ( PAGE_SHIFT )));
-	lcd_set_r1(p_offset);
-	lcd_set_cr0(p_cptr);
-	/* TODO sync wrapper */
-	sync_ret = lcd_sync_send(ixgbe_sync_endpoint);
-	lcd_set_cr0(CAP_CPTR_NULL);
-	if (sync_ret) {
-		LIBLCD_ERR("failed to send");
-		lcd_exit(-1);
-	}
 
 	func_ret = fipc_get_reg1(_request);
 
@@ -958,38 +919,27 @@ int dev_addr_add(struct net_device *dev,
 	unsigned 	long addr_offset;
 	cptr_t addr_cptr;
 	int func_ret;
-	dev_container = container_of(dev,
-		struct net_device_container,
-		net_device);
 
-	async_msg_set_fn_type(_request,
-			DEV_ADDR_ADD);
-	sync_ret = lcd_virt_to_cptr(__gva(( unsigned  long   )addr),
-		&addr_cptr,
-		&addr_mem_sz,
-		&addr_offset);
+	dev_container = container_of(dev, struct net_device_container,
+			net_device);
+
+	async_msg_set_fn_type(_request, DEV_ADDR_ADD);
+
+	sync_ret = lcd_virt_to_cptr(__gva((unsigned long)addr),
+			&addr_cptr, &addr_mem_sz, &addr_offset);
 	if (sync_ret) {
 		LIBLCD_ERR("virt to cptr failed");
 		lcd_exit(-1);
 	}
-	fipc_set_reg1(_request,
-			dev_container->other_ref.cptr);
-	fipc_set_reg3(_request,
-			addr_type);
+
+	fipc_set_reg0(_request, dev_container->other_ref.cptr);
+	fipc_set_reg1(_request, addr_type);
+	fipc_set_reg2(_request, ilog2(( addr_mem_sz ) >> ( PAGE_SHIFT )));
+	fipc_set_reg3(_request, addr_offset);
+	fipc_set_reg4(_request, cptr_val(addr_cptr));
 	vmfunc_wrapper(_request);
-	lcd_set_r0(ilog2(( addr_mem_sz ) >> ( PAGE_SHIFT )));
-	lcd_set_r1(addr_offset);
-	lcd_set_cr0(addr_cptr);
-	/* TODO: sync wrapper */
-	sync_ret = lcd_sync_send(ixgbe_sync_endpoint);
-	lcd_set_cr0(CAP_CPTR_NULL);
-	if (sync_ret) {
-		LIBLCD_ERR("failed to send");
-		lcd_exit(-1);
-	}
 
 	func_ret = fipc_get_reg1(_request);
-
 
 	/* call local function */
 	liblcd_dev_addr_add(dev, addr, addr_type);
@@ -1023,21 +973,14 @@ int dev_addr_del(struct net_device *dev,
 		LIBLCD_ERR("virt to cptr failed");
 		lcd_exit(-1);
 	}
-	fipc_set_reg1(_request,
-			dev_container->other_ref.cptr);
-	fipc_set_reg3(_request,
-			addr_type);
+
+	fipc_set_reg0(_request, dev_container->other_ref.cptr);
+	fipc_set_reg1(_request, addr_type);
+	fipc_set_reg2(_request, ilog2(( addr_mem_sz ) >> ( PAGE_SHIFT )));
+	fipc_set_reg3(_request, addr_offset);
+	fipc_set_reg4(_request, cptr_val(addr_cptr));
+
 	vmfunc_wrapper(_request);
-	lcd_set_r0(ilog2(( addr_mem_sz ) >> ( PAGE_SHIFT )));
-	lcd_set_r1(addr_offset);
-	lcd_set_cr0(addr_cptr);
-	/* TODO: sync wrapper */
-	sync_ret = lcd_sync_send(ixgbe_sync_endpoint);
-	lcd_set_cr0(CAP_CPTR_NULL);
-	if (sync_ret) {
-		LIBLCD_ERR("failed to send");
-		lcd_exit(-1);
-	}
 
 	func_ret = fipc_get_reg1(_request);
 
@@ -1551,11 +1494,6 @@ int ndo_start_xmit_callee(struct fipc_message *_request)
 	int ret = 0;
 
 	int func_ret;
-	cptr_t skb_cptr, skbd_cptr;
-	unsigned long skb_ord, skb_off;
-	unsigned long skbd_ord, skbd_off;
-	gva_t skb_gva, skbd_gva;
-	unsigned int data_off;
 	cptr_t skb_ref;
 	xmit_type_t xmit_type;
 	unsigned long skbh_offset, skb_end;
@@ -1575,120 +1513,47 @@ int ndo_start_xmit_callee(struct fipc_message *_request)
 	proto = fipc_get_reg5(_request);
 
 
+	skb_c = mem = kmem_cache_alloc(skb_c_cache,
+				GFP_KERNEL);
+	skb = (struct sk_buff*)((char*)mem +
+			sizeof(struct sk_buff_container));
 
-	switch (xmit_type) {
-	case VOLUNTEER_XMIT:
-		ret = lcd_cptr_alloc(&skb_cptr);
-
-		if (ret) {
-			LIBLCD_ERR("failed to get cptr");
-			goto fail_sync;
-		}
-		ret = lcd_cptr_alloc(&skbd_cptr);
-		if (ret) {
-			LIBLCD_ERR("failed to get cptr");
-			goto fail_sync;
-		}
-
-		lcd_set_cr6(skb_cptr);
-		lcd_set_cr1(skbd_cptr);
-		ret = lcd_sync_recv(sync_ep);
-		lcd_set_cr0(CAP_CPTR_NULL);
-		lcd_set_cr1(CAP_CPTR_NULL);
-		if (ret) {
-			LIBLCD_ERR("failed to recv");
-			goto fail_sync;
-		}
-		skb_ord = lcd_r0();
-		skb_off = lcd_r1();
-		skbd_ord = lcd_r2();
-		skbd_off = lcd_r3();
-		data_off = lcd_r4();
-
-		ret = lcd_map_virt(skb_cptr, skb_ord, &skb_gva);
-		if (ret) {
-			LIBLCD_ERR("failed to map void *addr");
-			goto fail_sync;
-		}
-
-		ret = lcd_map_virt(skbd_cptr, skbd_ord, &skbd_gva);
-		if (ret) {
-			LIBLCD_ERR("failed to map void *addr");
-			goto fail_sync;
-		}
-
-		skb = (void*)(gva_val(skb_gva) + skb_off);
-		skb->head = (void*)(gva_val(skbd_gva) + skbd_off);
-		skb->data = skb->head + data_off;
-		break;
-
-	case SHARED_DATA_XMIT:
-		skb_c = mem = kmem_cache_alloc(skb_c_cache,
-					GFP_KERNEL);
-		skb = (struct sk_buff*)((char*)mem +
-				sizeof(struct sk_buff_container));
-
-		if (!skb) {
-			LIBLCD_MSG("out of mmeory");
-			goto fail_alloc;
-		}
-
-		skb->head = (char*)data_pool + skbh_offset;
-		skb->end = skb_end;
-
-		skb_lcd = SKB_LCD_MEMBERS(skb);
-		skb->private = true;
-		skb->protocol = proto;
-
-		P(len);
-		P(data_len);
-		P(queue_mapping);
-		P(xmit_more);
-		P(tail);
-		P(truesize);
-		P(ip_summed);
-		P(csum_start);
-		P(network_header);
-		P(csum_offset);
-		P(transport_header);
-
-		if (0)
-		LIBLCD_MSG("lcd-> l: %d | dlen %d | qm %d"
-			   " | xm %d | t %lu |ts %u",
-			skb->len, skb->data_len, skb->queue_mapping,
-			skb->xmit_more, skb->tail, skb->truesize);
-
-		skb->data = skb->head + skb_lcd->head_data_off;
-
-		//printk("%s, len %d", __func__, skb->len);
-
-		break;
-
-	default:
-		LIBLCD_ERR("%s, unknown xmit type", __func__);
-		break;
+	if (!skb) {
+		LIBLCD_MSG("out of mmeory");
+		goto fail_alloc;
 	}
+
+	skb->head = (char*)data_pool + skbh_offset;
+	skb->end = skb_end;
+
+	skb_lcd = SKB_LCD_MEMBERS(skb);
+	skb->private = true;
+	skb->protocol = proto;
+
+	P(len);
+	P(data_len);
+	P(queue_mapping);
+	P(xmit_more);
+	P(tail);
+	P(truesize);
+	P(ip_summed);
+	P(csum_start);
+	P(network_header);
+	P(csum_offset);
+	P(transport_header);
+
+	if (0)
+	LIBLCD_MSG("lcd-> l: %d | dlen %d | qm %d"
+		   " | xm %d | t %lu |ts %u",
+		skb->len, skb->data_len, skb->queue_mapping,
+		skb->xmit_more, skb->tail, skb->truesize);
+
+	skb->data = skb->head + skb_lcd->head_data_off;
+
 
 	skb_c->skb = skb;
 	glue_insert_skbuff(cptr_table, skb_c);
 	skb_c->other_ref = skb_ref;
-
-	if (xmit_type == VOLUNTEER_XMIT) {
-		skb_c->skbd_ord = skbd_ord;
-		skb_c->skb_cptr = skb_cptr;
-		skb_c->skbh_cptr = skbd_cptr;
-
-#ifdef IOMMU_ASSIGN
-		LIBLCD_MSG("%s, iommu map page", __func__);
-		ret = lcd_syscall_iommu_map_page(
-				lcd_gva2gpa(skbd_gva),
-				skbd_ord, true);
-
-		if (ret)
-			LIBLCD_ERR("Mapping failed for packet %p",
-					__pa(skb->data));
-#endif
-	} /* if */
 
 #ifdef LCD_MEASUREMENT
 	TS_START_LCD(xmit);
@@ -1707,7 +1572,6 @@ int ndo_start_xmit_callee(struct fipc_message *_request)
 #endif
 
 fail_alloc:
-fail_sync:
 	return ret;
 
 }
@@ -1782,18 +1646,16 @@ int ndo_set_mac_address_callee(struct fipc_message *_request)
 		LIBLCD_ERR("failed to get cptr");
 		lcd_exit(-1);
 	}
-	lcd_set_cr0(addr_cptr);
-	sync_ret = lcd_sync_recv(sync_ep);
-	lcd_set_cr0(CAP_CPTR_NULL);
-	if (sync_ret) {
-		LIBLCD_ERR("failed to recv");
-		lcd_exit(-1);
-	}
-	mem_order = lcd_r0();
-	addr_offset = lcd_r1();
-	sync_ret = lcd_map_virt(addr_cptr,
-		mem_order,
-		&addr_gva);
+
+	fipc_set_reg0(_request, cptr_val(addr_cptr));
+
+	vmfunc_sync_call(_request, SYNC_NDO_SET_MAC_ADDRESS);
+
+	mem_order = fipc_get_reg0(_request);
+	addr_offset = fipc_get_reg1(_request);
+
+	sync_ret = lcd_map_virt(addr_cptr, mem_order, &addr_gva);
+
 	if (sync_ret) {
 		LIBLCD_ERR("failed to map void *addr");
 		lcd_exit(-1);
@@ -2356,16 +2218,6 @@ struct sk_buff *__napi_alloc_skb(struct napi_struct *napi,
 	struct sk_buff *skb;
 	struct sk_buff_container *skb_c;
 
-	async_msg_set_fn_type(_request,
-			__NAPI_ALLOC_SKB);
-	fipc_set_reg1(_request,
-			len);
-	fipc_set_reg2(_request,
-			gfp_mask);
-
-	vmfunc_wrapper(_request);
-
-	/* sync half */
 	ret = lcd_cptr_alloc(&skb_cptr);
 
 	if (ret) {
@@ -2378,21 +2230,21 @@ struct sk_buff *__napi_alloc_skb(struct napi_struct *napi,
 		goto fail_sync;
 	}
 
-	lcd_set_cr0(skb_cptr);
-	lcd_set_cr1(skbd_cptr);
-	ret = lcd_sync_recv(ixgbe_sync_endpoint);
-	lcd_set_cr0(CAP_CPTR_NULL);
-	lcd_set_cr1(CAP_CPTR_NULL);
-	if (ret) {
-		LIBLCD_ERR("failed to recv");
-		goto fail_sync;
-	}
-	skb_ord = lcd_r0();
-	skb_off = lcd_r1();
-	skbd_ord = lcd_r2();
-	skbd_off = lcd_r3();
-	data_off = lcd_r4();
-	skb_ref.cptr = lcd_r5();
+
+	async_msg_set_fn_type(_request, __NAPI_ALLOC_SKB);
+	fipc_set_reg1(_request, len);
+	fipc_set_reg2(_request, gfp_mask);
+	fipc_set_reg3(_request, cptr_val(skb_cptr));
+	fipc_set_reg4(_request, cptr_val(skbd_cptr));
+
+	vmfunc_wrapper(_request);
+
+	skb_ord = fipc_get_reg0(_request);
+	skb_off = fipc_get_reg1(_request);
+	skbd_ord = fipc_get_reg2(_request);
+	skbd_off = fipc_get_reg3(_request);
+	data_off = fipc_get_reg4(_request);
+	skb_ref.cptr = fipc_get_reg5(_request);
 
 	ret = lcd_map_virt(skb_cptr, skb_ord, &skb_gva);
 	if (ret) {
@@ -2422,10 +2274,6 @@ struct sk_buff *__napi_alloc_skb(struct napi_struct *napi,
 	skb_c->skbh_cptr = skbd_cptr;
 
 	return skb;
-
-fail_sync:
-
-	return NULL;
 }
 
 #else

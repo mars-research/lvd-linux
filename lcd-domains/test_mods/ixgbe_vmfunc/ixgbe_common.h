@@ -105,6 +105,8 @@ enum dispatch_t {
 	TRIGGER_DUMP,
 	TRIGGER_CLEAN,
 	MODULE_INIT,
+	SYNC_PROBE,
+	SYNC_NDO_SET_MAC_ADDRESS,
 };
 
 typedef enum {

@@ -5,17 +5,22 @@
 
 #define trace(x) LIBLCD_MSG("net got " #x " msg")
 
-int net_klcd_syncipc_dispatch(struct fipc_message *msg)
+int net_klcd_syncipc_dispatch(struct fipc_message *message)
 {
-	int fn_type = lcd_r0();
+	int fn_type;
+	fn_type = async_msg_get_fn_type(message);
 
 	switch (fn_type) {
-
-	default:
-		LIBLCD_ERR("unexpected function label %d", fn_type);
-		return -EINVAL;
+		case SYNC_PROBE:
+			sync_probe_callee(message);
+			break;
+		case SYNC_NDO_SET_MAC_ADDRESS:
+			sync_ndo_set_mac_address_callee(message);
+			break;
+		default:
+			LIBLCD_ERR("%s, unexpected function label %d", __func__, fn_type);
+			return -EINVAL;
 	}
-
 	return 0;
 }
 

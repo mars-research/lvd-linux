@@ -72,6 +72,9 @@ int dispatch_async_loop(struct fipc_message *message);
 int glue_ixgbe_init(void);
 void glue_ixgbe_exit(void);
 
+int sync_probe_callee(struct fipc_message *msg);
+int sync_ndo_set_mac_address_callee(struct fipc_message *msg);
+
 int probe(struct pci_dev *dev,
 		struct pci_device_id *id,
 		struct trampoline_hidden_args *hidden_args);

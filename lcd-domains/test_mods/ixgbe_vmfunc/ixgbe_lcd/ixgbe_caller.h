@@ -35,6 +35,4 @@ int trigger_dump_callee(struct fipc_message *_request);
 
 int poll_callee(struct fipc_message *_request);
 
-int prep_channel_callee(struct fipc_message *_request);
-
 #endif /* __IXGBE_CALLER_H__ */

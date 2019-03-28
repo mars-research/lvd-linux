@@ -534,7 +534,7 @@ int lcd_create_mo_metadata(hva_t pages_base, unsigned long size)
 	 * Insert into caller's cspace
 	 */
 	ret = __lcd_insert_memory_object(lcd, slot, vptr, nr_pages,
-					LCD_MICROKERNEL_TYPE_ID_VMALLOC_MEM,
+					LCD_MICROKERNEL_TYPE_ID_VOLUNTEERED_VMALLOC_MEM,
 					&mo);
 	if (ret) {
 		LCD_ERR("failed to insert vmalloc mem capability into caller's cspace");

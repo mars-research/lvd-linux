@@ -15,6 +15,7 @@
 #include <linux/mm.h>
 #include <libcap.h>
 #include <liblcd/liblcd.h>
+#include <lcd_domains/microkernel.h>
 
 #include <lcd_config/post_hook.h>
 
@@ -213,6 +214,73 @@ fail1:
 	return ret;
 }
 
+static int do_kernel_pages_grant_map(cptr_t lcd, struct lcd_create_ctx *ctx)
+{
+	unsigned long offset;
+	unsigned long entry_text_start, entry_text_end;
+	unsigned long entry_text_start_page, entry_text_end_page;
+	unsigned long page_count = 1;
+	unsigned long idt_page;
+
+	int ret;
+	cptr_t *c;
+
+	entry_text_start = kallsyms_lookup_name("__entry_text_start");
+	entry_text_end = kallsyms_lookup_name("__entry_text_end");
+	idt_page = kallsyms_lookup_name("idt_table");
+
+	entry_text_start_page = entry_text_start & PAGE_MASK;
+	entry_text_end_page = entry_text_end & PAGE_MASK;
+
+	page_count += (entry_text_end_page - entry_text_start_page) >> PAGE_SHIFT;
+
+	LIBLCD_MSG("entry_text_start %lx , entry_text_end %lx, "
+			"entry_text_start_page %lx , entry_text_end_page %lx, page_count %lx",
+			entry_text_start, entry_text_end,
+			entry_text_start_page, entry_text_end_page, page_count);
+
+	LIBLCD_MSG("idt_page %lx", idt_page);
+
+	/* map .entry.text pages */
+	lcd_create_mo_metadata(va2hva((void*) entry_text_start_page), page_count * PAGE_SIZE);
+
+	/* IDT would be just one page */
+	lcd_create_mo_metadata(va2hva((void*) idt_page), PAGE_SIZE);
+
+	offset = entry_text_start_page -
+		gva_val(LCD_KERNEL_MODULE_REGION_GV_ADDR);
+
+	c = &(lcd_to_boot_info(ctx)->lcd_boot_cptrs.entry_text_pages);
+
+	LIBLCD_MSG("grant mem for entry_text pages ctx %p | vaddr %lx | offset %lx",
+			ctx, (void*) entry_text_start, offset);
+
+	ret = do_grant_and_map_for_mem(lcd, ctx, (void*) entry_text_start,
+				gpa_add(LCD_KERNEL_MODULE_REGION_GP_ADDR,
+					offset),
+				c);
+	if (ret)
+		goto fail;
+
+	offset = idt_page -
+		gva_val(LCD_KERNEL_MODULE_REGION_GV_ADDR);
+
+	c = &(lcd_to_boot_info(ctx)->lcd_boot_cptrs.idt_page);
+
+	LIBLCD_MSG("grant mem for entry_text pages ctx %p | vaddr %lx | offset %lx",
+			ctx, (void*) idt_page, offset);
+
+	ret = do_grant_and_map_for_mem(lcd, ctx, (void*) idt_page,
+				gpa_add(LCD_KERNEL_MODULE_REGION_GP_ADDR,
+					offset),
+				c);
+	if (ret)
+		goto fail;
+
+fail:
+	return ret;
+}
+
 static int setup_phys_addr_space(cptr_t lcd, struct lcd_create_ctx *ctx,
 				gva_t m_init_link_addr, gva_t m_core_link_addr,
 				gva_t m_vmfunc_tr_page_addr,
@@ -261,9 +329,14 @@ static int setup_phys_addr_space(cptr_t lcd, struct lcd_create_ctx *ctx,
 					);
 	if (ret)
 		goto fail4;
+	ret = do_kernel_pages_grant_map(lcd, ctx);
+
+	if (ret)
+		goto fail5;
 
 	return 0;
 
+fail5:
 fail4:  /* Just return; caller should kill new LCD and free up resources. */
 fail3:
 fail2:
@@ -1134,6 +1207,7 @@ skip:
 		goto fail7;
 	}
 #endif
+
 	/*
 	 * Return context and lcd
 	 */

@@ -147,6 +147,12 @@ DEFINE_PER_CPU_PAGE_ALIGNED(struct gdt_page, gdt_page) = { .gdt = {
 } };
 EXPORT_PER_CPU_SYMBOL_GPL(gdt_page);
 
+struct vmfunc_state_page vmfunc_state_page = { 
+	.demoted = 0,
+	.in_kernel = 1,
+};
+
+
 static int __init x86_mpx_setup(char *s)
 {
 	/* require an exact match without trailing characters */
@@ -1342,6 +1348,8 @@ void syscall_init(void)
  */
 DEFINE_PER_CPU(struct orig_ist, orig_ist);
 
+DEFINE_PER_CPU(unsigned long, lvd_irq_stack_addr);
+
 static DEFINE_PER_CPU(unsigned long, debug_stack_addr);
 DEFINE_PER_CPU(int, debug_stack_usage);
 
@@ -1515,6 +1523,9 @@ void cpu_init(void)
 					(unsigned long)estacks;
 			if (v == DEBUG_STACK-1)
 				per_cpu(debug_stack_addr, cpu) = (unsigned long)estacks;
+			if (v == IRQ_LVD_STACK-1)
+				per_cpu(lvd_irq_stack_addr, cpu) = (unsigned long)estacks;
+
 		}
 	}
 

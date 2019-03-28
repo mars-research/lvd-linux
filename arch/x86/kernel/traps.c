@@ -531,9 +531,11 @@ asmlinkage __visible notrace struct pt_regs *sync_stacks(struct pt_regs *eregs, 
 {
 	struct pt_regs *regs = ((struct pt_regs *)new_stack - 1);
 	unsigned vector = ~eregs->orig_ax;
+//	struct vmfunc_state_page *page = this_cpu_ptr(&vmfunc_state_page);
+//	unsigned in_kernel = page->in_kernel;
 
 //	if(vector != 48) {
-//		printk(KERN_ERR "IST stack:%p, kernel stack:%p\n", eregs, new_stack);
+//		printk(KERN_ERR "IST stack:%p, kernel stack:%p, in_kernel:%d\n", eregs, new_stack, in_kernel);
 //		printk(KERN_ERR "ss:0x%lx, sp:0x%lx, flags:0x%lx, cs:0x%lx, ip:0x%lx, vector:%d\n", 
 //			eregs->ss, eregs->sp, eregs->flags, eregs->cs, eregs->ip, vector);
 //		printk(KERN_ERR "irq_count:%d, irq_stack_ptr:%p\n", this_cpu_read(irq_count), this_cpu_read(irq_stack_ptr)); 
@@ -542,6 +544,23 @@ asmlinkage __visible notrace struct pt_regs *sync_stacks(struct pt_regs *eregs, 
 	return regs;
 }
 NOKPROBE_SYMBOL(sync_stacks);
+
+asmlinkage __visible notrace struct pt_regs *sync_regs_to_ist(struct pt_regs *eregs)
+{
+	struct pt_regs *regs = ((struct pt_regs *)__this_cpu_read(lvd_irq_stack_addr) - 1);
+	*regs = *eregs;
+	return regs;
+}
+NOKPROBE_SYMBOL(sync_regs_to_ist);
+
+asmlinkage __visible notrace void trace_rbx(unsigned long long rbx)
+{
+	if (rbx) 
+		printk("rbx:%d\n", rbx); 
+	return;
+}
+NOKPROBE_SYMBOL(trace_rbx);
+
 
 
 struct bad_iret_stack {

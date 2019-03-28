@@ -52,6 +52,9 @@ int main(void)
 	BLANK();
 #undef ENTRY
 
+	OFFSET(VMFUNC_demoted, vmfunc_state_page, demoted);
+	OFFSET(VMFUNC_in_kernel, vmfunc_state_page, in_kernel);
+
 	OFFSET(TSS_ist, tss_struct, x86_tss.ist);
 	OFFSET(TSS_sp0, tss_struct, x86_tss.sp0);
 	BLANK();

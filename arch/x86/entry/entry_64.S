@@ -62,6 +62,38 @@ ENDPROC(native_usergs_sysret64)
 #endif
 .endm
 
+.macro VMFUNC_TO_KERNEL
+	/* populate eax, ecx for vmfunc */
+	mov $0x0, %eax
+	mov $0x0, %ecx
+
+	/* vmfunc to domain 0 */
+	vmfunc
+	/* abort if ecx != 0 */
+	cmp $0x0, %ecx
+	je 0f
+	/* abort dropping into the hypervisor */
+	mov $0xabcd, %eax
+	cpuid
+0:
+.endm
+
+.macro VMFUNC_TO_LCD
+	/* populate eax, ecx for vmfunc */
+	mov $0x0, %eax
+	mov $0x1, %ecx
+
+	/* vmfunc to domain 0 */
+	vmfunc
+	/* abort if ecx != 1 */
+	cmp $0x1, %ecx
+	je 0f
+	/* abort dropping into the hypervisor */
+	mov $0xabcd, %eax
+	cpuid
+0:
+.endm
+
 /*
  * When dynamic function tracer is enabled it will add a breakpoint
  * to all locations that it is about to modify, sync CPUs, update
@@ -436,6 +468,27 @@ END(irq_entries_start)
 	SAVE_C_REGS
 	SAVE_EXTRA_REGS
 
+	/* RBX keeps the flag whether we VMFUNC back or not */
+	xorq	%rbx, %rbx
+
+
+	/* Test if we've been demoted and are under a hypervisor */
+	movl 	vmfunc_state_page + VMFUNC_demoted, %eax
+	testl   $1, %eax
+	jz	1f
+	
+	/* Test if we need to VMFUNC back to the kernel */
+	//testb   $1, VMFUNC_in_kernel(%rax)
+	movl 	vmfunc_state_page + VMFUNC_in_kernel, %eax
+	testl   $1, %eax
+	jnz	1f
+
+	/* We need to vmfunc back into the kernel */
+	VMFUNC_TO_KERNEL
+	/* Set the flag that we've VMFUNC'ed */
+	movq 	$1, %rbx
+1:
+
 	testb	$3, CS(%rsp)
 	jz	1f
 
@@ -486,6 +539,10 @@ END(irq_entries_start)
 	incl	PER_CPU_VAR(irq_count)
 	cmovzq	PER_CPU_VAR(irq_stack_ptr), %rsp
 	pushq	%rdi
+
+	/* Push on the stack whether we VMFUNC'ed or not */
+	//pushq	%rbx
+
 	/* We entered an interrupt context - irqs are off: */
 	TRACE_IRQS_OFF
 
@@ -507,13 +564,74 @@ ret_from_intr:
 	TRACE_IRQS_OFF
 	decl	PER_CPU_VAR(irq_count)
 
+	/* Restore VMFUNC'ed flag */
+	//popq    %rbx
+
 	/* Restore saved previous stack */
 	popq	%rsp
 
 	testb	$3, CS(%rsp)
-	jz	retint_kernel
+	jz	retint_vmfunc_kernel
 
-	/* Interrupt came from user space */
+/* Interrupt came from user space */
+GLOBAL(retint_vmfunc_user)
+	mov	%rsp,%rdi
+	call	prepare_exit_to_usermode
+	TRACE_IRQS_IRETQ
+	SWAPGS
+	jmp	restore_vmfunc_regs_and_iret
+
+/* Returning to kernel space */
+retint_vmfunc_kernel:
+#ifdef CONFIG_PREEMPT
+	/* Interrupts are off */
+	/* Check if we need preemption */
+	bt	$9, EFLAGS(%rsp)		/* were interrupts off? */
+	jnc	1f
+0:	cmpl	$0, PER_CPU_VAR(__preempt_count)
+	jnz	1f
+	call	preempt_schedule_irq
+	jmp	0b
+1:
+#endif
+	/*
+	 * The iretq could re-enable interrupts:
+	 */
+	TRACE_IRQS_IRETQ
+/*
+ * At this label, code paths which return to kernel and to user,
+ * which come from VMFUNC'ed interrupts merge.
+ */
+GLOBAL(restore_vmfunc_regs_and_iret)
+
+	//movq    %rbx, %rdi
+	//call    trace_rbx	
+	testq	%rbx, %rbx			/* VMFUNC back needed? */
+	jz	1f
+
+	/* Move everything to the IST stack if we 
+	 * need to VMFUNC back (IST is mapped in LCD) */
+
+	/* 
+	 * We're now on the stack mapped only inside the kernel, 
+	 * switch to the IST stack so we can restore everything after
+	 * VMFUNC 
+	 */ 
+	movq	%rsp, %rdi			/* pt_regs pointer */
+	call	sync_regs_to_ist
+	/* Clean up the kernel stack (40 = 5*8 + 8) */
+	REMOVE_PT_GPREGS_FROM_STACK 48 		/* Clean up the stack */
+	movq	%rax, %rsp			/* switch stack */
+
+	VMFUNC_TO_LCD
+
+1:
+	RESTORE_EXTRA_REGS
+	RESTORE_C_REGS
+	REMOVE_PT_GPREGS_FROM_STACK 8
+	INTERRUPT_RETURN
+
+/* Interrupt came from user space */
 GLOBAL(retint_user)
 	mov	%rsp,%rdi
 	call	prepare_exit_to_usermode

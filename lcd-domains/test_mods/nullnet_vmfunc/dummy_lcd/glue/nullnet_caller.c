@@ -782,15 +782,14 @@ int ndo_set_mac_address_callee(struct fipc_message *request)
 		goto fail_sync;
 	}
 
-	lcd_set_cr0(addr_cptr);
-	sync_ret = lcd_sync_recv(sync_ep);
-	lcd_set_cr0(CAP_CPTR_NULL);
-	if (sync_ret) {
-		LIBLCD_ERR("failed to recv");
-		goto fail_sync;
-	}
-	mem_order = lcd_r0();
-	addr_offset = lcd_r1();
+
+	fipc_set_reg0(request, cptr_val(addr_cptr));
+
+	vmfunc_sync_call(request, SYNC_NDO_SET_MAC_ADDRESS);
+
+	mem_order = fipc_get_reg0(request);
+	addr_offset = fipc_get_reg1(request);
+
 	LIBLCD_MSG("%s: cptr %lu | order %lu | offset %lu",
 		__func__, addr_cptr.cptr, mem_order, addr_offset);
 

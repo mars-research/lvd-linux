@@ -35,39 +35,11 @@ extern struct rtnl_link_stats64 g_stats;
 extern struct thc_channel *xmit_chnl;
 extern priv_pool_t *pool;
 
-/*
- * setup a new channel for the first time when an application thread
- * wishes to send a packet through this interface
- */
-int setup_once(struct trampoline_hidden_args *hidden_args)
-{
-	if(!strncmp(current->comm, "iperf",
-				strlen("iperf")) ||
-		!strncmp(current->comm, "netperf",
-				strlen("netperf"))) {
-
-		printk("===================================\n");
-		printk("===== Private Channel created =====\n");
-		printk("===================================\n");
-		if (thread < 4) {
-			current->ptstate->times_ndo_xmit = times_ndo_xmit[thread++];
-			printk("Assigning %p to pid %d\n", times_ndo_xmit[thread-1], current->pid);
-		}
-#ifndef NO_HASHING
-#ifdef DOUBLE_HASHING
-		spin_lock_init(&current->ptstate->hash_lock);
-		hash_init(current->ptstate->cptr_table);
-
-		// Add it once per thread
-		glue_insert_tid(tid_table, current->ptstate);
-		printk("Adding pts: %p and pid: %llu to the tid_table\n", current->ptstate, current->ptstate->pid);
-#endif
-#endif /* NO_HASHING */
-	}
-	return 0;
-}
-
+#ifdef CONFIG_LVD
+int __ndo_start_xmit_inner_async(struct sk_buff *skb, struct net_device *dev)
+#else
 int __ndo_start_xmit_inner_async(struct sk_buff *skb, struct net_device *dev, struct trampoline_hidden_args *hidden_args)
+#endif
 {
 	int ret = 0;
 	struct fipc_message r;
@@ -123,17 +95,22 @@ int __ndo_start_xmit_inner_async(struct sk_buff *skb, struct net_device *dev, st
 	skb_lcd->head_data_off = skb->data - skb->head;
 #endif
 
-	ret = vmfunc_wrapper(_request);
+	ret = vmfunc_klcd_wrapper(_request, 1);
 	ret = fipc_get_reg1(_request);
 
 fail:
 	return ret;
 }
 
+#if 0
 /*
  * This function measures the overhead of bare fipc in KLCD/LCD setting
  */
+#ifdef CONFIG_LVD
+int __ndo_start_xmit_bare_fipc_nomarshal(struct sk_buff *skb, struct net_device *dev)
+#else
 int __ndo_start_xmit_bare_fipc_nomarshal(struct sk_buff *skb, struct net_device *dev, struct trampoline_hidden_args *hidden_args)
+#endif
 {
 	struct fipc_message r;
 	struct fipc_message *_request = &r;
@@ -165,7 +142,7 @@ int __ndo_start_xmit_bare_fipc_nomarshal(struct sk_buff *skb, struct net_device 
 #endif
 	
 		async_msg_set_fn_type(_request, NDO_START_XMIT);
-		vmfunc_wrapper(_request);
+		vmfunc_klcd_wrapper(_request, 1);
 
 #ifdef TIMESTAMP
 	}
@@ -191,7 +168,11 @@ free:
  * this serves as our base. If we use this function for isolated xmit,
  * we should ideally get the same bandwidth as the native dummy driver
  */
+#ifdef CONFIG_LVD
+int __ndo_start_xmit_dummy(struct sk_buff *skb, struct net_device *dev)
+#else
 int __ndo_start_xmit_dummy(struct sk_buff *skb, struct net_device *dev, struct trampoline_hidden_args *hidden_args)
+#endif
 {
 	dev_kfree_skb(skb);
 	return NETDEV_TX_OK;
@@ -202,7 +183,11 @@ int __ndo_start_xmit_dummy(struct sk_buff *skb, struct net_device *dev, struct t
  * If we use this function, we should ideally see a overhead of a bare_fipc_ping_pong, as we do a
  * blocking send and blocking receive.
  */
+#ifdef CONFIG_LVD
+int ndo_start_xmit_noasync(struct sk_buff *skb, struct net_device *dev)
+#else
 int ndo_start_xmit_noasync(struct sk_buff *skb, struct net_device *dev, struct trampoline_hidden_args *hidden_args)
+#endif
 {
 	struct fipc_message r;
 	struct fipc_message *_request = &r;
@@ -251,7 +236,7 @@ int ndo_start_xmit_noasync(struct sk_buff *skb, struct net_device *dev, struct t
 	fipc_set_reg5(_request, skb->protocol);
 	fipc_set_reg6(_request, skb->len);
 
-	ret = vmfunc_wrapper(_request);
+	ret = vmfunc_klcd_wrapper(_request, 1);
 
 	ret = fipc_get_reg1(_request);
 free:
@@ -259,7 +244,11 @@ free:
 	return NETDEV_TX_OK;
 }
 
+#ifdef CONFIG_LVD
+int ndo_start_xmit_async_landing(struct sk_buff *first, struct net_device *dev)
+#else
 int ndo_start_xmit_async_landing(struct sk_buff *first, struct net_device *dev, struct trampoline_hidden_args *hidden_args)
+#endif
 {
 	struct sk_buff *skb = first;
 	int rc = NETDEV_TX_OK;
@@ -272,3 +261,4 @@ int ndo_start_xmit_async_landing(struct sk_buff *first, struct net_device *dev, 
 
 	return rc;
 }
+#endif

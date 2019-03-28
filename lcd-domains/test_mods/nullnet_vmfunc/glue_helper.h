@@ -48,6 +48,7 @@ enum dispatch_t {
 	PREP_CHANNEL=25,
 	MODULE_INIT,
 	SYNC_SETUP,
+	SYNC_NDO_SET_MAC_ADDRESS,
 };
 
 typedef enum {

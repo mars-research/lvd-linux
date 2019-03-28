@@ -18,7 +18,6 @@
 
 cptr_t net_klcd, dummy_lcd;
 struct lcd_create_ctx *dummy_ctx;
-cptr_t net_chnl;
 
 static int boot_main(void)
 {

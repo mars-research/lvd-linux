@@ -38,6 +38,7 @@ static int dummy_lcd_init(void)
 
 	ret = dummy_init_module();
 
+	return ret;
 fail2:
 fail1:
 	lcd_exit(ret);

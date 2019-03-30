@@ -151,7 +151,7 @@ struct vmfunc_state_page vmfunc_state_page = {
 	.demoted = 0,
 	.in_kernel = 1,
 };
-
+EXPORT_SYMBOL_GPL(vmfunc_state_page);
 
 static int __init x86_mpx_setup(char *s)
 {

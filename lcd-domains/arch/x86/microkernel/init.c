@@ -19,7 +19,9 @@
 
 #if defined(CONFIG_LVD)
 DEFINE_PER_CPU(struct page *, vmfunc_eptp_list_page);
+DEFINE_PER_CPU(struct page *, vmfunc_state_hpa_page);
 struct lcd_vmx_capability lcd_vmx_capability;
+extern struct vmfunc_state_page vmfunc_state_page;
 #else
 static atomic_t vmx_enable_failed;
 static DEFINE_PER_CPU(int, vmx_enabled);
@@ -560,11 +562,44 @@ static int vmx_alloc_vmfunc_ept_switching_page(void)
 	return 0;
 }
 
+static int vmx_map_vmfunc_state_page(void)
+{
+	int cpu;
+	struct gpa_hpa_pair gpa_hpa_pair; 
+
+	LCD_MSG("Mapping VMFUNC state page on all CPUs\n"); 
+
+	gpa_hpa_pair.gpa = virt_to_page(&vmfunc_state_page); 
+
+	for_each_possible_cpu(cpu) {
+		struct page *page;
+		int ret; 	
+
+		page = alloc_page(GFP_KERNEL | __GFP_ZERO);
+		
+		per_cpu(vmfunc_state_hpa_page, cpu) = page;  
+		if (!page)
+			return -ENOMEM;
+
+		gpa_hpa_pair.hpa = page;
+
+		ret = smp_call_function_single(cpu, on_cpu_ept_map_page, &gpa_hpa_pair, 1);
+		if(ret) 
+			return -EIO; 
+
+	}
+
+	return 0;
+}
+
 int lcd_arch_vmfunc_init(void)
 {
 	int ret = 0;
 
 	vmx_alloc_vmfunc_ept_switching_page();
+
+	vmx_map_vmfunc_state_page(); 
+
 	/*
 	 * Init lcd_arch_thread cache (using instead of kmalloc since
 	 * these structs need to be aligned properly)

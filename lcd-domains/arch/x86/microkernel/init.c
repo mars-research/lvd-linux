@@ -583,6 +583,8 @@ static int vmx_map_vmfunc_state_page(void)
 
 		gpa_hpa_pair.hpa = page;
 
+		memcpy(page_to_virt(page), &vmfunc_state_page, 4096); 
+
 		ret = smp_call_function_single(cpu, on_cpu_ept_map_page, &gpa_hpa_pair, 1);
 		if(ret) 
 			return -EIO; 

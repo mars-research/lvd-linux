@@ -321,6 +321,7 @@ struct orig_ist {
 };
 
 #ifdef CONFIG_X86_64
+DECLARE_PER_CPU(unsigned long, lvd_irq_stack_addr); 
 DECLARE_PER_CPU(struct orig_ist, orig_ist);
 
 union irq_stack_union {

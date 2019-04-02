@@ -39,6 +39,20 @@ extern gate_desc idt_table[];
 extern struct desc_ptr debug_idt_descr;
 extern gate_desc debug_idt_table[];
 
+struct vmfunc_state {
+	unsigned int in_kernel;
+	unsigned int cpuid; 
+	unsigned int kernel_gs_base;
+	unsigned int lcd_gs_base;
+};
+
+union vmfunc_state_page {
+	struct vmfunc_state vmfunc_state;
+	int data;
+} __attribute__((aligned(PAGE_SIZE)));
+
+//DECLARE_PER_CPU_PAGE_ALIGNED(struct vmfunc_state_page, vmfunc_state_page);
+
 struct gdt_page {
 	struct desc_struct gdt[GDT_ENTRIES];
 } __attribute__((aligned(PAGE_SIZE)));
@@ -393,7 +407,7 @@ static inline void alloc_system_vector(int vector)
 #define alloc_intr_gate(n, addr)				\
 	do {							\
 		alloc_system_vector(n);				\
-		set_intr_gate(n, addr);				\
+		set_intr_gate_ist(n, addr, IRQ_LVD_STACK);	\
 	} while (0)
 
 /*

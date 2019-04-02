@@ -19,6 +19,8 @@
 
 #define LCD_BFCALL_ADD_EPT 0x4BF00031
 #define LCD_BFCALL_DUMP_STACK 0x4BF00032
+#define LCD_BFCALL_ABORT 0x4BF00033
+#define LCD_BFCALL_MAP_PAGE 0x4BF00034
 
 /**
  * Add the page that contains EPT ids for VMFUNC calls
@@ -81,5 +83,30 @@ static inline unsigned int bfcall_dump_stack(void)
 	return eax; 
 }
 
+/*  Add an GPA to HPA mapping to kernel's EPT on this CPU */
+static inline unsigned int bfcall_ept_map_page(struct page *gpa, struct page *hpa)
+{
+	unsigned int eax, edx;
+	u64 rbx, rcx; 
+
+
+	eax = LCD_BFCALL_MAP_PAGE;
+	rbx = page_to_phys(gpa);
+	rcx = page_to_phys(hpa); 
+
+	LCD_MSG("mapping a page gpa: 0x%llx, hpa:0x%llx",
+		rbx, rcx);
+
+	/* ecx is often an input as well as an output. */
+	asm volatile("cpuid"
+	    : "=a" (eax),
+	      "=b" (rbx),
+	      "=c" (rcx),
+	      "=d" (edx)
+	    : "0" (eax), "1" (rbx), "2" (rcx)
+	    : "memory");
+
+	return eax; 
+}
 
 #endif /* ASM_X86_LCD_DOMAINS_BFLANK_H */

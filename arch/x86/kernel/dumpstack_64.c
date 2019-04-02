@@ -25,6 +25,8 @@ static char x86_stack_ids[][8] = {
 		[ NMI_STACK-1			]	= "NMI",
 		[ DOUBLEFAULT_STACK-1		]	= "#DF",
 		[ MCE_STACK-1			]	= "#MC",
+		[ IRQ_LVD_STACK-1		]	= "#LVD",
+
 #if DEBUG_STKSZ > EXCEPTION_STKSZ
 		[ N_EXCEPTION_STACKS ...
 		  N_EXCEPTION_STACKS_END	]	= "#DB[?]"

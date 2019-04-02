@@ -13,7 +13,9 @@
 #include "../rpc.h"
 #include "../rdtsc_helper.h"
 #include <linux/module.h>
+#include <linux/kallsyms.h>
 #include <asm/lcd_domains/libvmfunc.h>
+#include <asm/processor.h>
 
 #include <lcd_config/post_hook.h>
 
@@ -52,6 +54,8 @@ void run_vmfunc_tests(void)
 	/* test4: RPC call and get a call back */
 	memset(&msg, 0x0, sizeof(msg));
 	msg.rpc_id = FOO;
+	fipc_set_reg0(&msg, kallsyms_lookup_name("idt_table"));
+	fipc_set_reg1(&msg, (u64)&per_cpu(cpu_tss, 0));
 	vmfunc_klcd_test_wrapper(&msg, OTHER_DOMAIN, VMFUNC_TEST_RPC_CALL);
 	printk("%s: VMFUNC_TEST_RPC_CALLBACK: Value from other domain "
 			"r1: %lx, r2: %lx, r3: %lx, r4: %lx, r5: %lx, r6: %lx\n",

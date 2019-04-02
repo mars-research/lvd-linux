@@ -22,6 +22,16 @@ foo(struct fipc_message *msg)
 {
 	struct fipc_message kmsg = {0};
 	int ret = 0;
+	unsigned long *addr;
+
+	addr = (unsigned long *) fipc_get_reg0(msg);
+
+	printk("%s, idt_page %lx", __func__, *addr);
+
+	addr = (unsigned long *) fipc_get_reg1(msg);
+
+	printk("%s, cpu_tss %lx", __func__, (unsigned long) *addr);
+
 	kmsg.vmfunc_id = VMFUNC_RPC_CALL;
 	kmsg.rpc_id = BAR;
 

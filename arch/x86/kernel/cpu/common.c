@@ -147,9 +147,8 @@ DEFINE_PER_CPU_PAGE_ALIGNED(struct gdt_page, gdt_page) = { .gdt = {
 } };
 EXPORT_PER_CPU_SYMBOL_GPL(gdt_page);
 
-struct vmfunc_state_page vmfunc_state_page = { 
-	.demoted = 0,
-	.in_kernel = 1,
+union vmfunc_state_page vmfunc_state_page = { 
+	.vmfunc_state.in_kernel = 1,
 };
 EXPORT_SYMBOL(vmfunc_state_page);
 

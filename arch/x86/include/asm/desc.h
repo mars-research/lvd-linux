@@ -39,9 +39,16 @@ extern gate_desc idt_table[];
 extern struct desc_ptr debug_idt_descr;
 extern gate_desc debug_idt_table[];
 
-struct vmfunc_state_page {
-	unsigned int demoted; 
-	unsigned int in_kernel; 
+struct vmfunc_state {
+	unsigned int in_kernel;
+	unsigned int cpuid; 
+	unsigned int kernel_gs_base;
+	unsigned int lcd_gs_base;
+};
+
+union vmfunc_state_page {
+	struct vmfunc_state vmfunc_state;
+	int data;
 } __attribute__((aligned(PAGE_SIZE)));
 
 //DECLARE_PER_CPU_PAGE_ALIGNED(struct vmfunc_state_page, vmfunc_state_page);

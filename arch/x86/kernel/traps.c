@@ -530,7 +530,7 @@ NOKPROBE_SYMBOL(sync_regs);
 asmlinkage __visible notrace struct pt_regs *sync_stacks(struct pt_regs *eregs, void *new_stack)
 {
 	struct pt_regs *regs = ((struct pt_regs *)new_stack - 1);
-	unsigned vector = ~eregs->orig_ax;
+//	unsigned vector = ~eregs->orig_ax;
 //	struct vmfunc_state_page *page = this_cpu_ptr(&vmfunc_state_page);
 //	unsigned in_kernel = page->in_kernel;
 
@@ -556,7 +556,7 @@ NOKPROBE_SYMBOL(sync_regs_to_ist);
 asmlinkage __visible notrace void trace_rbx(unsigned long long rbx)
 {
 	if (rbx) 
-		printk("rbx:%d\n", rbx); 
+		printk("rbx:%lld\n", rbx); 
 	return;
 }
 NOKPROBE_SYMBOL(trace_rbx);

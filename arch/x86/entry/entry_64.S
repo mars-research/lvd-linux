@@ -62,35 +62,37 @@ ENDPROC(native_usergs_sysret64)
 #endif
 .endm
 
+.macro ABORT_LCD
+	/* abort LCD dropping into the hypervisor */
+	movl $0x4BF00033, %eax
+	cpuid
+.endm
+
 .macro VMFUNC_TO_KERNEL
 	/* populate eax, ecx for vmfunc */
-	mov $0x0, %eax
-	mov $0x0, %ecx
+	movl $0x0, %eax
+	movl $0x0, %ecx
 
 	/* vmfunc to domain 0 */
 	vmfunc
 	/* abort if ecx != 0 */
-	cmp $0x0, %ecx
+	cmpl $0x0, %ecx
 	je 0f
-	/* abort dropping into the hypervisor */
-	mov $0xabcd, %eax
-	cpuid
+	ABORT_LCD
 0:
 .endm
 
 .macro VMFUNC_TO_LCD
 	/* populate eax, ecx for vmfunc */
-	mov $0x0, %eax
-	mov $0x1, %ecx
+	movl $0x0, %eax
+	movl $0x1, %ecx
 
 	/* vmfunc to domain 0 */
 	vmfunc
 	/* abort if ecx != 1 */
-	cmp $0x1, %ecx
+	cmpl $0x1, %ecx
 	je 0f
-	/* abort dropping into the hypervisor */
-	mov $0xabcd, %eax
-	cpuid
+	ABORT_LCD
 0:
 .endm
 
@@ -468,29 +470,43 @@ END(irq_entries_start)
 	SAVE_C_REGS
 	SAVE_EXTRA_REGS
 
-	/* RBX keeps the flag whether we VMFUNC back or not */
+	/* rbx keeps the flag whether we VMFUNC back or not */
 	xorq	%rbx, %rbx
 
 
-	/* Test if we've been demoted and are under a hypervisor */
-	movl 	vmfunc_state_page + VMFUNC_demoted, %eax
-	testl   $1, %eax
-	jz	1f
-	
-	/* Test if we need to VMFUNC back to the kernel */
-	//testb   $1, VMFUNC_in_kernel(%rax)
+	/* Test if we've been demoted and moreover need 
+	 * to VMFUNC back to the kernel */
 	movl 	vmfunc_state_page + VMFUNC_in_kernel, %eax
 	testl   $1, %eax
 	jnz	1f
 
 	/* We need to vmfunc back into the kernel */
 	VMFUNC_TO_KERNEL
+	
+	/* Restore GS base */
+	/* Read saved gs base */
+	rdgsbase %eax
+	/* Exchange the current gs base (eax) with saved in vmfunc_state page */
+	movl	 %eax, vmfunc_state_page + VMFUNC_lcd_gs_base
+	movl	 vmfunc_state_page + VMFUNC_kernel_gs_base, %eax
+	wrgsbase %eax
+	
+	//movq    %rax, %rdi
+	//call    trace_rbx	
+
 	/* Set the flag that we've VMFUNC'ed */
 	movq 	$1, %rbx
+
+	/* We can't be in user mode in the LCD */
+	testb	$3, CS(%rsp)
+	jz	2f
+
+	ABORT_LCD
+
 1:
 
 	testb	$3, CS(%rsp)
-	jz	1f
+	jz	2f
 
 	/*
 	 * IRQ from user mode.  Switch to kernel gsbase and inform context
@@ -518,8 +534,8 @@ END(irq_entries_start)
 	call	sync_regs
 	movq	%rax, %rsp			/* switch stack */
 
-	jmp 2f
-1:
+	jmp 3f
+2:
 	/* We've entered on the IST stack, from the kernel, switch to 
            the stack that the kernel was using right before the interrupt */
 	movq	%rsp, %rdi			/* pt_regs pointer */
@@ -527,7 +543,7 @@ END(irq_entries_start)
 	call	sync_stacks
 	movq	%rax, %rsp			/* switch stack */
 
-2:
+3:
 	/*
 	 * Save previous stack pointer, optionally switch to interrupt stack.
 	 * irq_count is used to check if a CPU is already on an interrupt stack
@@ -539,9 +555,6 @@ END(irq_entries_start)
 	incl	PER_CPU_VAR(irq_count)
 	cmovzq	PER_CPU_VAR(irq_stack_ptr), %rsp
 	pushq	%rdi
-
-	/* Push on the stack whether we VMFUNC'ed or not */
-	//pushq	%rbx
 
 	/* We entered an interrupt context - irqs are off: */
 	TRACE_IRQS_OFF
@@ -564,11 +577,11 @@ ret_from_intr:
 	TRACE_IRQS_OFF
 	decl	PER_CPU_VAR(irq_count)
 
-	/* Restore VMFUNC'ed flag */
-	//popq    %rbx
-
 	/* Restore saved previous stack */
 	popq	%rsp
+	/* If we exit to user level we might not have 
+	 * valid gs after swapgs, save the IST pointer here */
+	movq    PER_CPU_VAR(lvd_irq_stack_addr), %r12
 
 	testb	$3, CS(%rsp)
 	jz	retint_vmfunc_kernel
@@ -591,7 +604,7 @@ retint_vmfunc_kernel:
 0:	cmpl	$0, PER_CPU_VAR(__preempt_count)
 	jnz	1f
 	call	preempt_schedule_irq
-	jmp	0b
+jmp	0b
 1:
 #endif
 	/*
@@ -618,10 +631,16 @@ GLOBAL(restore_vmfunc_regs_and_iret)
 	 * VMFUNC 
 	 */ 
 	movq	%rsp, %rdi			/* pt_regs pointer */
-	call	sync_regs_to_ist
-	/* Clean up the kernel stack (40 = 5*8 + 8) */
-	REMOVE_PT_GPREGS_FROM_STACK 48 		/* Clean up the stack */
+	movq    %r12, %rsi			/* stack to switch to (IST) */
+//	call	sync_regs_to_ist
+	call    sync_stacks
 	movq	%rax, %rsp			/* switch stack */
+
+	/* Restore gs base */
+	//rdgsbase %eax
+	/* Exchange the current gs base (eax) with saved in vmfunc_state page */
+	movl	vmfunc_state_page + VMFUNC_lcd_gs_base, %eax
+	wrgsbase %eax
 
 	VMFUNC_TO_LCD
 

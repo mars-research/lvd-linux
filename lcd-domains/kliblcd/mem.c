@@ -506,13 +506,12 @@ void lcd_free_pages(struct page *base, unsigned int order)
  * allocating and mapping memory. The memory is already allocated to us by the
  * kernel.
  */
-int lcd_create_mo_metadata(hva_t pages_base, unsigned long size)
+int lcd_create_mo_metadata(void *base, unsigned long size, enum lcd_microkernel_type_id sub_type)
 {
 
 	unsigned long nr_pages;
 	int ret;
 	cptr_t slot;
-	void *vptr = hva2va(pages_base);
 	struct lcd_memory_object *mo;
 	struct lcd *lcd = current->lcd;
 
@@ -533,8 +532,8 @@ int lcd_create_mo_metadata(hva_t pages_base, unsigned long size)
 	/*
 	 * Insert into caller's cspace
 	 */
-	ret = __lcd_insert_memory_object(lcd, slot, vptr, nr_pages,
-					LCD_MICROKERNEL_TYPE_ID_VOLUNTEERED_VMALLOC_MEM,
+	ret = __lcd_insert_memory_object(lcd, slot, base, nr_pages,
+					sub_type,
 					&mo);
 	if (ret) {
 		LCD_ERR("failed to insert vmalloc mem capability into caller's cspace");

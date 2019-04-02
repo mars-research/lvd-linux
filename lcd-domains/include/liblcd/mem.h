@@ -70,8 +70,6 @@ int _lcd_alloc_pages(unsigned int flags, unsigned int order,
  */
 int _lcd_vmalloc(unsigned long nr_pages, cptr_t *slot_out);
 
-int lcd_create_mo_metadata(hva_t pages_base, unsigned long size);
-
 /* 
  * What about free pages? Use lcd_cap_revoke and/or lcd_cap_delete with 
  * the pages cptr. All capabilities to the pages must go away for the

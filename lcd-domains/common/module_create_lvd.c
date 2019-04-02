@@ -221,7 +221,7 @@ static int do_kernel_pages_grant_map(cptr_t lcd, struct lcd_create_ctx *ctx)
 	unsigned long entry_text_start_page, entry_text_end_page;
 	unsigned long page_count = 1;
 	unsigned long idt_page;
-
+	struct page *p;
 	int ret;
 	cptr_t *c;
 
@@ -241,11 +241,15 @@ static int do_kernel_pages_grant_map(cptr_t lcd, struct lcd_create_ctx *ctx)
 
 	LIBLCD_MSG("idt_page %lx", idt_page);
 
+	p = virt_to_head_page((void*) entry_text_start_page);
+
 	/* map .entry.text pages */
-	lcd_create_mo_metadata(va2hva((void*) entry_text_start_page), page_count * PAGE_SIZE);
+	lcd_create_mo_metadata(p, page_count * PAGE_SIZE, LCD_MICROKERNEL_TYPE_ID_VOLUNTEERED_PAGE);
+
+	p = virt_to_head_page((void*) idt_page);
 
 	/* IDT would be just one page */
-	lcd_create_mo_metadata(va2hva((void*) idt_page), PAGE_SIZE);
+	lcd_create_mo_metadata(p, PAGE_SIZE, LCD_MICROKERNEL_TYPE_ID_VOLUNTEERED_PAGE);
 
 	offset = entry_text_start_page -
 		gva_val(LCD_KERNEL_MODULE_REGION_GV_ADDR);
@@ -480,7 +484,7 @@ static int map_cpu_page(void *addr, struct lcd_create_ctx *ctx)
 		flags |= _PAGE_PRESENT;
 		flags |= _PAGE_RW;
 
-		gp = (((u64)addr) & HPAGE_MASK) - 0xffff880000000000;
+		gp = (((u64)addr) & HPAGE_MASK) - _LCD_VIRT_BASE;
 		//gp = gpa_val(isolated_lcd_gva2gpa(__gva((u64)addr & HPAGE_MASK)));
 		printk("%s, set PTE gva: %llx, pmd_idx %llu, gp_addr %llx at vaddr:%p\n", __func__,
 					gva, pmd_idx, gp, &hva_pmd_page[pmd_idx]);
@@ -502,16 +506,23 @@ static int __do_ept_mapping(cptr_t lcd, void *addr, struct lcd_create_ctx *ctx, 
 	unsigned long offset;
 	cptr_t *c;
 	int ret = 0;
-	/* create volunteer metadata */
-	lcd_create_mo_metadata(va2hva(addr), size);
+	struct page *p;
 
-	offset = (u64) addr -
-		gva_val(LCD_PHYS_DIRECT_MAP_GV_ADDR);
+	addr = (void*) ((u64) addr & PAGE_MASK);
+
+	p = virt_to_head_page(addr);
+
+	/* create volunteer metadata */
+	lcd_create_mo_metadata(p, size, LCD_MICROKERNEL_TYPE_ID_VOLUNTEERED_PAGE);
+
+	offset = ((u64) addr -
+		gva_val(LCD_PHYS_DIRECT_MAP_GV_ADDR)) & PAGE_MASK;
 
 	c = &(lcd_to_boot_info(ctx)->lcd_boot_cptrs.percpu_pages);
 
-	LIBLCD_MSG("grant mem for entry_text pages ctx %p | vaddr %lx | offset %lx",
-			ctx, addr, offset);
+	LIBLCD_MSG("grant mem for per_cpu pages ctx %p | vaddr %lx |"
+		       " offset %lx | gpa %lx",
+			ctx, addr, offset, gpa_add(LCD_PHYS_DIRECT_MAP_GP_ADDR, offset));
 	ret = do_grant_and_map_for_mem(lcd, ctx, addr,
 				gpa_add(LCD_PHYS_DIRECT_MAP_GP_ADDR,
 					offset),

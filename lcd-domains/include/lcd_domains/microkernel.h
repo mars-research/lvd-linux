@@ -541,6 +541,9 @@ int __lcd_insert_memory_object(struct lcd *caller,
 			unsigned long nr_pages,
 			enum lcd_microkernel_type_id sub_type,
 			struct lcd_memory_object **mo_out);
+
+int lcd_create_mo_metadata(void *base, unsigned long size, enum lcd_microkernel_type_id type);
+
 /**
  * __lcd_alloc_pages_exact_node -- Alloc host pages and insert into caller's
  *                                 cspace

@@ -389,6 +389,7 @@ static int isolated_map_vmalloc_mem(struct lcd *lcd,
 		 * Map it in the LCD's guest physical
 		 */
 #ifdef CONFIG_LVD
+		LCD_MSG("%s gpa: %llx hpa: %llx", __func__, gpa, va2hpa(page_address(p)));
 		ret = lcd_arch_ept_map_all_cpus(lcd->lcd_arch,
 				gpa,
 				va2hpa(page_address(p)),
@@ -456,6 +457,7 @@ static int isolated_map_contiguous_mem(struct lcd *lcd,
 	 * caching, and we always map memory as WB in guest physical.
 	 */
 #ifdef CONFIG_LVD
+	LCD_MSG("%s gpa: %llx hpa: %llx", __func__, base, hpa_base);
 	/* in LVD's everything is one-to-one mapping */
 	ret = lcd_arch_ept_map_range_all_cpus(lcd->lcd_arch,
 					base,

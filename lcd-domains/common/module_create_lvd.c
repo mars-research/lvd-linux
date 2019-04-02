@@ -281,6 +281,274 @@ fail:
 	return ret;
 }
 
+static void dump_virt_addr_space(struct lcd_create_ctx *ctx)
+{
+	int i;
+
+	pgd_t *pgd = ctx->gv_pg_tables;
+
+	printk("Pgtable root gva: %lx | gpa: %lx\n",
+			gva_val(LCD_BOOTSTRAP_PAGE_TABLES_GV_ADDR),
+			gpa_val(LCD_BOOTSTRAP_PAGE_TABLES_GP_ADDR));
+
+	for (i = 0; i < 512; i++) {
+		if (pgd[i].pgd)
+			printk("PGD: idx = %d | val = %lx\n", i, gva_val(isolated_lcd_gpa2gva(__gpa(pgd[i].pgd & PAGE_MASK))));;
+	}
+	pgd += 512;
+
+	for (i = 0; i < 512; i++) {
+		if (pgd[i].pgd)
+			printk("PUD: idx = %d | val = %lx\n", i, gva_val(isolated_lcd_gpa2gva(__gpa(pgd[i].pgd & PAGE_MASK))));;
+	}
+
+	pgd += (1 * 512);
+
+	for (i = 0; i < 512; i++) {
+		if (pgd[i].pgd)
+			printk("PMD: idx = %d | val = %lx\n", i, gva_val(isolated_lcd_gpa2gva(__gpa(pgd[i].pgd & PAGE_MASK))));;
+	}
+}
+
+
+#ifndef PTX_MASK
+#define PTX_MASK                0x1FF
+#endif
+
+#define PGD_INDEX_P(addr)               (((addr) >> PGDIR_SHIFT) & PTX_MASK)
+#define PUD_INDEX_P(addr)               (((addr) >> PUD_SHIFT) & PTX_MASK)
+#define PMD_INDEX_P(addr)               (((addr) >> PMD_SHIFT) & PTX_MASK)
+
+#define PAGE_PA_MASK            (0xFFFFFFFFFULL << PAGE_SHIFT)
+#define PAGE_PA(page)           ((page) & PAGE_PA_MASK)
+
+static inline u64 *get_hva_pgtable_addr(struct lcd_create_ctx *ctx, u64 *pte)
+{
+	unsigned long offset;
+
+        if (!*pte)
+                return 0;
+
+	offset = (PAGE_PA(*pte) - gpa_val(LCD_BOOTSTRAP_PAGE_TABLES_GP_ADDR));
+
+	return (u64*)(ctx->gv_pg_tables + offset);
+}
+
+static inline u64 *pgd_root(struct lcd_create_ctx *ctx)
+{
+	return (u64*) ctx->gv_pg_tables;
+}
+
+static inline u64 get_free_pgtable_page_offset(struct lcd_create_ctx *ctx)
+{
+	static void *last_used_page = NULL;
+	u64 new_page;
+	u64 offset;
+	/*
+	 * We use 12 pages for mapping our 512 GB address space of LCDs. Refer
+	 * to address_spaces.h file. We actively use only 10 GB
+	 * - utcb, stack, heap and ioremap - 1G each
+	 * - rammap - 4G
+	 * - .ko - 2G
+	 * Since we use 2MB pages, a page can map 1G of vaddr space.  We need
+	 * 10 pages for mapping the above 10G vaddr range + 1 page for
+	 * pgdir_root + 1 for pud
+	 */
+	if (!last_used_page)
+		last_used_page = ctx->gv_pg_tables + (11 * PAGE_SIZE);
+
+	new_page = (u64) last_used_page + PAGE_SIZE;
+
+	last_used_page = (void *)new_page;
+
+	offset = new_page - (u64)ctx->gv_pg_tables;
+
+	return offset;
+}
+
+static inline gpa_t get_free_pgtable_page_gpa(struct lcd_create_ctx *ctx)
+{
+	u64 offset = get_free_pgtable_page_offset(ctx);
+
+	return gpa_add(LCD_BOOTSTRAP_PAGE_TABLES_GP_ADDR, offset);
+}
+
+static inline void *get_free_pgtable_page_hva(struct lcd_create_ctx *ctx, gpa_t gp_addr)
+{
+	u64 offset = gpa_val(gp_addr) - gpa_val(LCD_BOOTSTRAP_PAGE_TABLES_GP_ADDR);
+
+	if ((offset >> PAGE_SHIFT) > 16) {
+		LIBLCD_ERR("%s, we have allocated only 16 pages for page table pages!");
+	}
+
+	/* return the hva of the PT page to construct page tables */
+	return ctx->gv_pg_tables + offset;
+}
+
+static inline u64 *get_page_addr(u64 *pte) {
+
+	if (!*pte)
+		return 0;
+
+	return (u64*)PAGE_PA(*pte);
+}
+
+static int map_cpu_page(void *addr, struct lcd_create_ctx *ctx)
+{
+	/* we need to map a 2MB page */
+	u64 *_pgd_root = pgd_root(ctx);
+	u64 pgd_idx;
+	u64 pud_idx;
+	u64 pmd_idx;
+	u64 *pud_page;
+	u64 *pmd_page;
+	u64 *pte_page;
+	u64 *hva_pud_page;
+	u64 *hva_pmd_page;
+	u64 *hva_pte_page;
+	u64 gva = (u64) addr;
+
+	pgd_idx = PGD_INDEX_P(gva);
+	pud_page = &_pgd_root[pgd_idx];
+	hva_pud_page = get_hva_pgtable_addr(ctx, pud_page);
+
+	printk("%s: PGD_ROOT %p, ctx->gv_pg_tables %p\n", __func__, _pgd_root, ctx->gv_pg_tables);
+
+	printk("%s: PGD gva: %llx, pgd_idx %llu, pud_page %llx | hva_pud_page %p\n",
+			__func__, gva, pgd_idx, PAGE_PA(*pud_page), hva_pud_page);
+
+	pud_page = get_page_addr(pud_page);
+
+	/* no PUD */
+	if (!pud_page) {
+		gpa_t pud_gpa = get_free_pgtable_page_gpa(ctx);
+		unsigned int flags = 0;
+		pgd_t *pgd_entry;
+
+		flags |= _PAGE_PRESENT;
+		flags |= _PAGE_RW;
+
+		hva_pud_page = get_free_pgtable_page_hva(ctx, pud_gpa);
+
+		pgd_entry = (pgd_t*) &_pgd_root[pgd_idx];
+
+		printk("%s, set pgd entry %llu to %lx\n", __func__, pgd_idx, gpa_val(pud_gpa));
+		set_pgd(pgd_entry,
+			__pgd(gpa_val(pud_gpa) | flags));
+	}
+
+	pud_idx = PUD_INDEX_P(gva);
+	pmd_page = &hva_pud_page[pud_idx];
+	hva_pmd_page = get_hva_pgtable_addr(ctx, pmd_page);
+
+	printk("%s: PUD gva: %llx, pud_idx %llu, pmd_page %llx | hva_pmd_page %p\n",
+			__func__, gva, pud_idx, PAGE_PA(*pmd_page), hva_pmd_page);
+
+	pmd_page = get_page_addr(pmd_page);
+
+	if (!pmd_page) {
+		gpa_t pmd_gpa = get_free_pgtable_page_gpa(ctx);
+		unsigned int flags = 0;
+		pud_t *pud_entry;
+
+		flags |= _PAGE_PRESENT;
+		flags |= _PAGE_RW;
+
+		hva_pmd_page = get_free_pgtable_page_hva(ctx, pmd_gpa);
+
+		pud_entry = (pud_t*) &hva_pud_page[pud_idx];
+
+		printk("%s, set pud entry for %llu to %lx at pgtable vaddr:%p | entry addr %p\n", __func__,
+				pud_idx, gpa_val(pmd_gpa), hva_pud_page, pud_entry);
+
+		set_pud(pud_entry, __pud(gpa_val(pmd_gpa) | flags));
+	}
+
+	pmd_idx = PMD_INDEX_P(gva);
+	pte_page = &hva_pmd_page[pmd_idx];
+	hva_pte_page = get_hva_pgtable_addr(ctx, pte_page);
+
+	printk("%s: PMD gva: %llx, pmd_idx %llu, pte_page %llx | hva_pte_page %p\n",
+			__func__, gva, pmd_idx, PAGE_PA(*pte_page), hva_pte_page);
+
+	pte_page = get_page_addr(pte_page);
+
+	if (!pte_page) {
+		u64 gp;
+		unsigned int flags = 0;
+
+		flags |= _PAGE_PRESENT;
+		flags |= _PAGE_RW;
+
+		gp = (((u64)addr) & HPAGE_MASK) - 0xffff880000000000;
+		//gp = gpa_val(isolated_lcd_gva2gpa(__gva((u64)addr & HPAGE_MASK)));
+		printk("%s, set PTE gva: %llx, pmd_idx %llu, gp_addr %llx at vaddr:%p\n", __func__,
+					gva, pmd_idx, gp, &hva_pmd_page[pmd_idx]);
+
+		set_pmd((pmd_t*)&hva_pmd_page[pmd_idx], __pmd(gp | flags | _PAGE_PSE));
+	}
+
+	pmd_page = &hva_pmd_page[pud_idx];
+
+	return PAGE_PA(*pmd_page);
+}
+
+/* size = exception_stack_size */
+DECLARE_PER_CPU_PAGE_ALIGNED(char, exception_stacks
+        [(N_EXCEPTION_STACKS - 1) * EXCEPTION_STKSZ + DEBUG_STKSZ]);
+
+static int __do_ept_mapping(cptr_t lcd, void *addr, struct lcd_create_ctx *ctx, int size)
+{
+	unsigned long offset;
+	cptr_t *c;
+	int ret = 0;
+	/* create volunteer metadata */
+	lcd_create_mo_metadata(va2hva(addr), size);
+
+	offset = (u64) addr -
+		gva_val(LCD_PHYS_DIRECT_MAP_GV_ADDR);
+
+	c = &(lcd_to_boot_info(ctx)->lcd_boot_cptrs.percpu_pages);
+
+	LIBLCD_MSG("grant mem for entry_text pages ctx %p | vaddr %lx | offset %lx",
+			ctx, addr, offset);
+	ret = do_grant_and_map_for_mem(lcd, ctx, addr,
+				gpa_add(LCD_PHYS_DIRECT_MAP_GP_ADDR,
+					offset),
+				c);
+	return ret;
+}
+
+static int do_misc_pages_grant_map(cptr_t lcd, struct lcd_create_ctx *ctx)
+{
+	/* tss is exported */
+	int cpu;
+	unsigned int * except_stack_sz = (unsigned int*) kallsyms_lookup_name("exception_stack_sizes");
+
+	/* map per-cpu TSS */
+	for_each_online_cpu(cpu) {
+		struct tss_struct *tss = &per_cpu(cpu_tss, cpu);
+		char *ist_stacks = per_cpu(exception_stacks, cpu);
+		int i, j;
+
+		map_cpu_page(tss, ctx);
+		__do_ept_mapping(lcd, tss, ctx, PAGE_SIZE);
+
+		for (i = 0; i < N_EXCEPTION_STACKS; i++) {
+			unsigned int num_pages = except_stack_sz[i] >> PAGE_SHIFT;
+
+			for (j = 0; j < num_pages; j++)
+				map_cpu_page(ist_stacks + j * PAGE_SIZE, ctx);
+
+			__do_ept_mapping(lcd, ist_stacks, ctx, except_stack_sz[i]);
+
+			ist_stacks += except_stack_sz[i];
+		}
+	}
+
+	return 0;
+}
+
 static int setup_phys_addr_space(cptr_t lcd, struct lcd_create_ctx *ctx,
 				gva_t m_init_link_addr, gva_t m_core_link_addr,
 				gva_t m_vmfunc_tr_page_addr,
@@ -329,13 +597,20 @@ static int setup_phys_addr_space(cptr_t lcd, struct lcd_create_ctx *ctx,
 					);
 	if (ret)
 		goto fail4;
+
 	ret = do_kernel_pages_grant_map(lcd, ctx);
 
 	if (ret)
 		goto fail5;
 
+	ret = do_misc_pages_grant_map(lcd, ctx);
+
+	if (ret)
+		goto fail6;
+
 	return 0;
 
+fail6:
 fail5:
 fail4:  /* Just return; caller should kill new LCD and free up resources. */
 fail3:
@@ -345,7 +620,6 @@ fail1:
 }
 
 /* VIRTUAL ADDRESS SPACE ------------------------------ */
-
 static void setup_lcd_pmd(struct lcd_mem_region *reg, pmd_t *pmd,
 			unsigned int gigabyte_idx)
 {
@@ -495,6 +769,8 @@ static int setup_addr_spaces_lvd(cptr_t lcd, struct lcd_create_ctx *ctx,
 	 * Set up virtual address space
 	 */
 	setup_virt_addr_space(ctx);
+
+	dump_virt_addr_space(ctx);
 	return 0;
 
 fail1: /* just return non-zero ret; caller will free mem */

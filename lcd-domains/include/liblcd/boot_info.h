@@ -25,6 +25,7 @@ struct lcd_boot_cptrs {
 	cptr_t gv;
 	cptr_t entry_text_pages;
 	cptr_t idt_page;
+	cptr_t percpu_pages;
 };
 
 struct lcd_boot_info {
@@ -39,6 +40,8 @@ struct lcd_boot_info {
 	gva_t module_core_base;
 	gva_t module_vmfunc_tr_base;
 	gva_t module_vmfunc_sb_base;
+	gva_t entry_text_base;
+
 	unsigned long module_init_size;
 	unsigned long module_core_size;
 	unsigned long module_vmfunc_tr_size;

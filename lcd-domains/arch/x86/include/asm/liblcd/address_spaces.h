@@ -131,9 +131,14 @@
  *              +---------------------------+        /
  *              |     Unmapped in physical  |
  *              |          (1 GB)           |
- *              +---------------------------+ 0xFFFF FF7F FFFF FFFF 
- *              |                           |           
- *              |                           |
+ *              +---------------------------+ 0xFFFF FF7F FFFF FFFF   \
+ *              |                           |                         |
+ *              |                           |                         |
+ *              +---------------------------+ 0xFFFF C7FF FFFF FFFF      119.5 TBs
+ *              |     Direct mapping of     |                         |
+ *              |      all phys memory      |                         |
+ *              |          (64 TB)          |                         |
+ *              +---------------------------+ 0xFFFF 8800 0000 0000   /
  *              :                           :
  *              :        Unmapped           :
  *              :                           :
@@ -152,6 +157,8 @@
 
 /* Region sizes */
 
+#define LCD_PHYS_DIRECT_MAP_REGION_SIZE	(64UL << 40) /* ........ 64 TB */
+#define LCD_HOLE_DIRECT_MAP_TO_START_LCD	((55UL << 40) + (512UL << 30)) /* ........ 55.5 TB */
 #define LCD_MISC_REGION_SIZE (1UL << 30) /* .................... 1 GB  */
 #define LCD_STACK_REGION_SIZE (1UL << 30) /* ................... 1 GB  */
 #define LCD_HEAP_REGION_SIZE (1UL << 30) /* .................... 1 GB  */
@@ -176,8 +183,11 @@
 	(ilog2(LCD_STACK_SIZE >> PAGE_SHIFT))
 
 /* Offsets. */
-
+#define LCD_PHYS_DIRECT_MAP_REGION_OFFSET (1UL << 30)
 #define LCD_MISC_REGION_OFFSET (1UL << 30)
+
+#define _LCD_MISC_REGION_OFFSET ((1UL << 30) + (119UL << 40) + (512UL << 30)) /* 64 TB (phys map) + 55.5 TB (hole) + 1 GB (hole) */
+
 #define LCD_UTCB_OFFSET LCD_MISC_REGION_OFFSET
 #define LCD_BOOTSTRAP_PAGES_OFFSET (LCD_UTCB_OFFSET + LCD_UTCB_SIZE)
 #define LCD_BOOTSTRAP_PAGE_TABLES_OFFSET \
@@ -217,6 +227,10 @@
 
 #define LCD_PHYS_BASE (0UL)
 #define LCD_VIRT_BASE (0xFFFFFF8000000000UL)
+#define _LCD_VIRT_BASE (0xFFFF87FFC0000000UL)
+
+#define LCD_PHYS_DIRECT_MAP_GP_ADDR (__gpa(LCD_PHYS_BASE + LCD_PHYS_DIRECT_MAP_REGION_OFFSET))
+#define LCD_PHYS_DIRECT_MAP_GV_ADDR (__gva(_LCD_VIRT_BASE + LCD_PHYS_DIRECT_MAP_REGION_OFFSET))
 
 #define LCD_UTCB_GP_ADDR (__gpa(LCD_PHYS_BASE + LCD_UTCB_OFFSET))
 #define LCD_UTCB_GV_ADDR (__gva(LCD_VIRT_BASE + LCD_UTCB_OFFSET))

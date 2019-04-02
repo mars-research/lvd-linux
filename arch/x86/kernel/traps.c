@@ -81,6 +81,8 @@ gate_desc debug_idt_table[NR_VECTORS] __page_aligned_bss;
 /* Must be page-aligned because the real IDT is used in a fixmap. */
 gate_desc idt_table[NR_VECTORS] __page_aligned_bss;
 
+EXPORT_SYMBOL_GPL(idt_table);
+
 DECLARE_BITMAP(used_vectors, NR_VECTORS);
 EXPORT_SYMBOL_GPL(used_vectors);
 

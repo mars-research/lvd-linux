@@ -477,6 +477,39 @@ fail1:
 	return ret;
 }
 
+static int isolated_map_contiguous_mem_hpa(struct lcd *lcd,
+				struct lcd_memory_object *mo,
+				gpa_t base, hpa_t hpa_base)
+{
+	int ret;
+	/*
+	 * Map memory object.
+	 *
+	 * XXX: No matter what the memory object is, we map it
+	 * the same way. This is kind of subtle. We can get away
+	 * with it because we allow the LCD to use the PAT to control
+	 * caching, and we always map memory as WB in guest physical.
+	 */
+#ifdef CONFIG_LVD
+	LCD_MSG("%s gpa: %llx hpa: %llx", __func__, base, hpa_base);
+	/* in LVD's everything is one-to-one mapping */
+	ret = lcd_arch_ept_map_range_all_cpus(lcd->lcd_arch,
+					base,
+					hpa_base,
+					mo->nr_pages);
+#else
+	ret = lcd_arch_ept_map_range(lcd->lcd_arch, base, hpa_base,
+				mo->nr_pages);
+#endif
+	if (ret) {
+		LCD_ERR("map");
+		goto fail1;
+	}
+
+fail1:
+	return ret;
+}
+
 static int isolated_map_memory_object(struct lcd *lcd, 
 				struct lcd_memory_object *mo,
 				gpa_t base)
@@ -489,6 +522,20 @@ static int isolated_map_memory_object(struct lcd *lcd,
 		return isolated_map_contiguous_mem(lcd, mo, base);
 	else
 		return isolated_map_vmalloc_mem(lcd, mo, base);
+}
+
+static int isolated_map_memory_object_hpa(struct lcd *lcd,
+				struct lcd_memory_object *mo,
+				gpa_t base, hpa_t hpa_base)
+{
+	/*
+	 * The mapping process depends on the memory object type
+	 * (physical memory, vmalloc memory, etc.)
+	 */
+	if (__lcd_memory_object_is_contiguous(mo))
+		return isolated_map_contiguous_mem_hpa(lcd, mo, base, hpa_base);
+	else
+		return printk("%s, not implemented for vmalloc mem\n", __func__);
 }
 
 int __lcd_do_map_memory_object(struct lcd *lcd, 
@@ -585,6 +632,75 @@ out:
 	return ret;
 }
 
+int __lcd_do_map_memory_object_hpa(struct lcd *lcd,
+			struct lcd_memory_object *mo,
+			struct lcd_mapping_metadata *meta,
+			gpa_t base,
+			hpa_t hpa_base,
+			struct cnode *cnode)
+{
+	int ret;
+	/*
+	 * If memory object is already mapped, fail
+	 */
+	if (!meta) {
+		/*
+		 * First time mapping; init metadata
+		 *
+		 * zalloc sets is_mapped = 0
+		 */
+		meta = kzalloc(sizeof(*meta), GFP_KERNEL);
+		if (!meta) {
+			LCD_ERR("malloc failed");
+			ret = -ENOMEM;
+			goto out;
+		}
+		cap_cnode_set_metadata(cnode, meta);
+	}
+	if (meta->is_mapped) {
+		ret = -EALREADYMAPPED;
+		goto out;
+	}
+	/*
+	 * We need to handle mapping differently depending on
+	 * the LCD type (isolated vs non-isolated)
+	 */
+	switch (lcd->type) {
+	case LCD_TYPE_ISOLATED:
+		ret = isolated_map_memory_object_hpa(lcd, mo, base, hpa_base);
+		break;
+	case LCD_TYPE_NONISOLATED:
+	case LCD_TYPE_TOP:
+		/*
+		 * For now, map is a no-op for non-isolated code. (All host
+		 * physical is available to non-isolated code. Recall that
+		 * this function is about mapping in physical, not virtual.)
+		 */
+		ret = 0;
+		break;
+	default:
+		LCD_ERR("unrecognized lcd type %d", lcd->type);
+		ret = -EINVAL;
+		break;
+	}
+	if (ret)
+		goto out;
+	/*
+	 * Mark page as mapped, and where it's mapped
+	 *
+	 * (So that isolated and non-isolated code have the same semantics
+	 * here, in both cases we indicate the memory object as mapped.)
+	 */
+	meta->is_mapped = 1;
+
+	meta->where_mapped = base;
+	ret = 0;
+	goto out;
+
+out:
+	return ret;
+}
+
 int __lcd_map_memory_object(struct lcd *caller, cptr_t mo_cptr, gpa_t base)
 {
 	int ret;
@@ -602,6 +718,38 @@ int __lcd_map_memory_object(struct lcd *caller, cptr_t mo_cptr, gpa_t base)
 	 * Do the map
 	 */
 	ret = __lcd_do_map_memory_object(caller, mo, meta, base, cnode);
+	if (ret)
+		goto fail2;
+	/*
+	 * Release cnode, etc.
+	 */
+	__lcd_put_memory_object(caller, cnode, mo);
+
+	return 0;
+
+fail2:
+	__lcd_put_memory_object(caller, cnode, mo);
+fail1:
+	return ret;
+}
+
+int __lcd_map_memory_object_hpa(struct lcd *caller, cptr_t mo_cptr, gpa_t base, hpa_t hpa_base)
+{
+	int ret;
+	struct lcd_mapping_metadata *meta;
+	struct lcd_memory_object *mo;
+	struct cnode *cnode;
+	/*
+	 * Look up memory object and metadata in caller's cspace
+	 */
+	ret = __lcd_get_memory_object(caller, mo_cptr, &cnode, &mo);
+	if (ret)
+		goto fail1;
+	meta = cap_cnode_metadata(cnode);
+	/*
+	 * Do the map
+	 */
+	ret = __lcd_do_map_memory_object_hpa(caller, mo, meta, base, hpa_base, cnode);
 	if (ret)
 		goto fail2;
 	/*

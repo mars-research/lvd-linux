@@ -103,6 +103,8 @@ int lcd_save_cr3(cptr_t lcd, void *ptables_lcd);
 int lcd_memory_grant_and_map(cptr_t lcd, cptr_t mo, cptr_t dest_slot,
 			gpa_t base);
 
+int lcd_memory_grant_and_map_hpa(cptr_t lcd, cptr_t mo, cptr_t dest_slot,
+			gpa_t base, hpa_t hpa_base);
 /**
  * lcd_cap_grant -- Grant the LCD a capability (config its cspace)
  * @lcd: the LCD to configure
@@ -152,6 +154,7 @@ struct lcd_create_ctx {
 	void *gv_pg_tables;
 	void *stack;
 	void *vmfunc_page;
+	void *vmfunc_state_page;
 	unsigned long global_vmfunc_page;
 	void *m_init_bits;
 	void *m_core_bits;

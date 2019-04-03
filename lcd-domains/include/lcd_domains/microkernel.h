@@ -341,6 +341,8 @@ int __lcd_save_cr3(struct lcd *caller, cptr_t lcd, hpa_t hpa_lcd_cr3);
 int __lcd_memory_grant_and_map(struct lcd *caller, cptr_t lcd, 
 			cptr_t mo_cptr, cptr_t dest_slot, gpa_t base);
 
+int __lcd_memory_grant_and_map_hpa(struct lcd *caller, cptr_t lcd,
+			cptr_t mo_cptr, cptr_t dest_slot, gpa_t base, hpa_t hpa_base);
 /**
  * __lcd_cap_grant -- Grant LCD capability directly (rather than via IPC)
  * @caller: LCD doing the granting
@@ -635,6 +637,8 @@ int __lcd_do_map_memory_object(struct lcd *lcd,
  * passes to __lcd_do_map_memory_object.
  */
 int __lcd_map_memory_object(struct lcd *caller, cptr_t mo_cptr, gpa_t base);
+
+int __lcd_map_memory_object_hpa(struct lcd *caller, cptr_t mo_cptr, gpa_t base, hpa_t hpa_base);
 
 /**
  * __lcd_unmap_memory_object -- Unmap memory object from LCD's physical

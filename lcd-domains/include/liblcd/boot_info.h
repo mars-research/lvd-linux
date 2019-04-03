@@ -22,9 +22,11 @@ struct lcd_boot_cptrs {
 	cptr_t stack;
 	cptr_t vmfunc_tr_page;
 	cptr_t vmfunc_sb_page;
+	cptr_t vmfunc_state_page;
 	cptr_t gv;
 	cptr_t entry_text_pages;
 	cptr_t idt_page;
+	cptr_t idtr_base;
 	cptr_t percpu_pages;
 };
 

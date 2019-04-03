@@ -68,6 +68,14 @@ ENDPROC(native_usergs_sysret64)
 	cpuid
 .endm
 
+.macro BF_PRINT
+	/* abort LCD dropping into the hypervisor */
+	movl $0x4BF00035, %eax
+	cpuid
+.endm
+
+
+
 .macro VMFUNC_TO_KERNEL
 	/* populate eax, ecx for vmfunc */
 	movl $0x0, %eax
@@ -482,7 +490,9 @@ END(irq_entries_start)
 
 	/* We need to vmfunc back into the kernel */
 	VMFUNC_TO_KERNEL
-	
+
+	//BF_PRINT
+		
 	/* Restore GS base */
 	/* Read saved gs base */
 	rdgsbase %eax
@@ -828,6 +838,17 @@ ENTRY(\sym)
 	.if \shift_ist != -1 && \paranoid == 0
 	.error "using shift_ist requires paranoid=1"
 	.endif
+
+	/* Test if we've been demoted and moreover need 
+	 * to VMFUNC back to the kernel */
+	pushq   %rax
+	movl 	vmfunc_state_page + VMFUNC_in_kernel, %eax
+	testl   $1, %eax
+	popq    %rax
+	jnz	1f
+	ABORT_LCD
+
+1:
 
 	ASM_CLAC
 	PARAVIRT_ADJUST_EXCEPTION_FRAME
@@ -1242,6 +1263,16 @@ END(error_exit)
 
 /* Runs on exception stack */
 ENTRY(nmi)
+	/* Test if we've been demoted and moreover need 
+	 * to VMFUNC back to the kernel */
+	pushq   %rax
+	movl 	vmfunc_state_page + VMFUNC_in_kernel, %eax
+	testl   $1, %eax
+	popq    %rax
+	jnz	1f
+	ABORT_LCD
+
+1:
 	/*
 	 * Fix up the exception frame if we're on Xen.
 	 * PARAVIRT_ADJUST_EXCEPTION_FRAME is guaranteed to push at most
@@ -1252,6 +1283,8 @@ ENTRY(nmi)
 	 * Xen is a different story, because the Xen frame itself overlaps
 	 * the "NMI executing" variable.
 	 */
+	/* AB: comment this out quickly for now, it's paravirt_nop on 
+	   baremetal if I understand correctly */ 
 	PARAVIRT_ADJUST_EXCEPTION_FRAME
 
 	/*

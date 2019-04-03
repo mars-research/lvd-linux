@@ -16,6 +16,7 @@
 #include <libcap.h>
 #include <liblcd/liblcd.h>
 #include <lcd_domains/microkernel.h>
+#include <asm/desc.h>
 
 #include <lcd_config/post_hook.h>
 
@@ -539,11 +540,15 @@ static int do_misc_pages_grant_map(cptr_t lcd, struct lcd_create_ctx *ctx)
 	/* map per-cpu TSS */
 	for_each_online_cpu(cpu) {
 		struct tss_struct *tss = &per_cpu(cpu_tss, cpu);
+		struct gdt_page *gdt = &per_cpu(gdt_page, cpu);
 		char *ist_stacks = per_cpu(exception_stacks, cpu);
 		int i, j;
 
 		map_cpu_page(tss, ctx);
 		__do_ept_mapping(lcd, tss, ctx, PAGE_SIZE);
+
+		map_cpu_page(gdt, ctx);
+		__do_ept_mapping(lcd, gdt, ctx, PAGE_SIZE);
 
 		for (i = 0; i < N_EXCEPTION_STACKS; i++) {
 			unsigned int num_pages = except_stack_sz[i] >> PAGE_SHIFT;

@@ -5,10 +5,15 @@
 #include "../rpc.h"
 #include <linux/module.h>
 #include <asm/lcd_domains/libvmfunc.h>
+#include <asm/desc.h>
+#include <asm/irq_vectors.h>
 
 #include <lcd_config/post_hook.h>
 
 extern int callee_main(void);
+
+#define NUM_IST_STACKS	7
+
 unsigned long noinline
 null_invocation(struct fipc_message *msg)
 {
@@ -17,29 +22,102 @@ null_invocation(struct fipc_message *msg)
 	return 0;
 }
 
+#ifdef CONFIG_DUMP_IRQ_REGS
+void dump_tss(struct tss_struct *tss, int cpu)
+{
+	int i;
+	printk("Dumping TSS for cpu %d\n", cpu);
+
+	for (i = 0; i < NUM_IST_STACKS; i++) {
+		printk("tss->x86_tss.ist[%d] = %llx", i, tss->x86_tss.ist[i]);
+	}
+}
+
+void dump_gdt(struct gdt_page *gdt, int cpu)
+{
+	int i;
+	printk("--> Dumping GDT for cpu %d<--\n", cpu);
+
+	for (i = 0; i < GDT_ENTRIES; i++) {
+		printk("gdt->gdt[%d] = %x:%x base: %lx", i,
+				gdt->gdt[i].a,
+				gdt->gdt[i].b,
+				(unsigned long) gdt->gdt[i].base0 | (gdt->gdt[i].base1 << 16) | (gdt->gdt[i].base2 << 24));
+	}
+}
+
+void dump_idt(struct gate_struct64 *idt)
+{
+	int i;
+	printk("--> Dumping IDT <--\n");
+
+	for (i = 0; i < NR_VECTORS; i++) {
+		printk("idt_base[%d].offset = %lx", i,
+				(unsigned long) idt[i].offset_low | (unsigned long)(idt[i].offset_middle << 16) | (unsigned long)((unsigned long)idt[i].offset_high << 32));
+	}
+}
+
+void write_exception_stack(void *base, unsigned long sz)
+{
+	int i = 0;
+	int num_pages = sz >> PAGE_SHIFT;
+
+	for (i = 0; i < num_pages; i++) {
+		/* touch every page */
+		*((unsigned long*)(base - i * PAGE_SIZE)) = 0xaabbccdd + i;
+		/* read back */
+		printk("data @ %p = %lx", base - i * PAGE_SIZE, *((unsigned long*)(base - i * PAGE_SIZE)));
+	}
+}
+#endif
+
 unsigned long noinline
 foo(struct fipc_message *msg)
 {
 	struct fipc_message kmsg = {0};
 	int ret = 0;
-	unsigned long *addr;
+#ifdef CONFIG_DUMP_IRQ_REGS
+	void *lvd_stack;
+	struct tss_struct *tss;
+	struct gdt_page *gdt;
+	struct gate_struct64 *idt_base;
 
-	addr = (unsigned long *) fipc_get_reg0(msg);
+	unsigned long sz;
+	int cpu;
 
-	printk("%s, idt_page %lx", __func__, *addr);
+	cpu = fipc_get_reg5(msg);
 
-	addr = (unsigned long *) fipc_get_reg1(msg);
+	printk("====== cpu %d ========", cpu);
 
-	printk("%s, cpu_tss %lx", __func__, (unsigned long) *addr);
+	idt_base = (struct gate_struct64 *) fipc_get_reg0(msg);
+	printk("%s, idt_table %p", __func__, idt_base);
+	dump_idt(idt_base);
 
-	addr = (unsigned long *) fipc_get_reg2(msg);
+	tss = (struct tss_struct *) fipc_get_reg1(msg);
+	printk("%s, cpu_tss %p", __func__, tss);
+	dump_tss(tss, cpu);
 
-	printk("%s, gdt_page %lx", __func__, (unsigned long) *addr);
+	gdt = (struct gdt_page *) fipc_get_reg2(msg);
+	printk("%s, gdt_page %p", __func__, gdt);
+	dump_gdt(gdt, cpu);
 
-	addr = (unsigned long *) fipc_get_reg3(msg);
+	lvd_stack = (void*) fipc_get_reg3(msg);
+	printk("%s, lvd_stack %p", __func__, lvd_stack);
+	sz = fipc_get_reg4(msg);
 
-	printk("%s, exception_stacks %lx", __func__, (unsigned long) *addr);
+	write_exception_stack(lvd_stack, sz);
+#endif
 
+#if 1
+	{
+		int i = 0;
+		asm volatile("int $48");
+		do {
+			asm volatile("nop");
+			i++;
+		} while (i < 10000);
+	}
+#endif
 	kmsg.vmfunc_id = VMFUNC_RPC_CALL;
 	kmsg.rpc_id = BAR;
 

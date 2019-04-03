@@ -35,6 +35,14 @@ DECLARE_PER_CPU_PAGE_ALIGNED(char, exception_stacks
 void run_vmfunc_tests(void)
 {
 	struct fipc_message msg = {0};
+	int cpu;
+	unsigned char idt_ptr[10];
+	unsigned long idt_base;
+
+	asm volatile("sidt %[idt_ptr]"
+			:[idt_ptr]"=m"(idt_ptr));
+
+	idt_base = *((unsigned long *)&idt_ptr[2]);
 
 	/* test1: empty switch */
 	vmfunc_klcd_test_wrapper(&msg, OTHER_DOMAIN, VMFUNC_TEST_EMPTY_SWITCH);
@@ -55,15 +63,27 @@ void run_vmfunc_tests(void)
 	printk("%s: VMFUNC_TEST_RPC_CALL: Passed!\n\tValue from other domain %lx\n",
 				__func__, fipc_get_reg1(&msg));
 
-	/* test4: RPC call and get a call back */
-	memset(&msg, 0x0, sizeof(msg));
-	msg.rpc_id = FOO;
-	fipc_set_reg0(&msg, kallsyms_lookup_name("idt_table"));
-	fipc_set_reg1(&msg, (u64)&per_cpu(cpu_tss, 0));
-	fipc_set_reg2(&msg, (u64)&per_cpu(gdt_page, 0));
-	fipc_set_reg3(&msg, (u64)&per_cpu(exception_stacks, 0));
+	//for_each_online_cpu(cpu) {
+	cpu = smp_processor_id();
+	{
+		//char *ist_stack = &per_cpu(exception_stacks, cpu);
+		struct tss_struct *tss = &per_cpu(cpu_tss, cpu);
+		char *lvd_stack = (char*) tss->x86_tss.ist[IRQ_LVD_STACK - 1];
+		unsigned int * except_stack_sz = (unsigned int*) kallsyms_lookup_name("exception_stack_sizes");
 
-	vmfunc_klcd_test_wrapper(&msg, OTHER_DOMAIN, VMFUNC_TEST_RPC_CALL);
+		/* test4: RPC call and get a call back */
+		memset(&msg, 0x0, sizeof(msg));
+		msg.rpc_id = FOO;
+		fipc_set_reg0(&msg, (u64) idt_base);
+		fipc_set_reg1(&msg, (u64) tss);
+		fipc_set_reg2(&msg, (u64) &per_cpu(gdt_page, cpu));
+		fipc_set_reg3(&msg, (u64) lvd_stack);
+		fipc_set_reg4(&msg, (u64) except_stack_sz[IRQ_LVD_STACK - 1]);
+		fipc_set_reg5(&msg, cpu);
+
+		vmfunc_klcd_test_wrapper(&msg, OTHER_DOMAIN, VMFUNC_TEST_RPC_CALL);
+	}
+
 	printk("%s: VMFUNC_TEST_RPC_CALLBACK: Value from other domain "
 			"r1: %lx, r2: %lx, r3: %lx, r4: %lx, r5: %lx, r6: %lx\n",
 			__func__,
@@ -74,6 +94,7 @@ void run_vmfunc_tests(void)
 			fipc_get_reg5(&msg),
 			fipc_get_reg6(&msg)
 			);
+
 
 	memset(&msg, 0x0, sizeof(msg));
 	msg.rpc_id = MODULE_INIT;

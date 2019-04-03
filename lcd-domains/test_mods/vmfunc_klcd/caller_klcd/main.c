@@ -16,6 +16,7 @@
 #include <linux/kallsyms.h>
 #include <asm/lcd_domains/libvmfunc.h>
 #include <asm/processor.h>
+#include <asm/desc.h>
 
 #include <lcd_config/post_hook.h>
 
@@ -27,6 +28,9 @@ unsigned long long eip;
 extern void *lcd_stack;
 
 int handle_rpc_calls_klcd(struct fipc_message *msg);
+
+DECLARE_PER_CPU_PAGE_ALIGNED(char, exception_stacks
+        [(N_EXCEPTION_STACKS - 1) * EXCEPTION_STKSZ + DEBUG_STKSZ]);
 
 void run_vmfunc_tests(void)
 {
@@ -56,6 +60,9 @@ void run_vmfunc_tests(void)
 	msg.rpc_id = FOO;
 	fipc_set_reg0(&msg, kallsyms_lookup_name("idt_table"));
 	fipc_set_reg1(&msg, (u64)&per_cpu(cpu_tss, 0));
+	fipc_set_reg2(&msg, (u64)&per_cpu(gdt_page, 0));
+	fipc_set_reg3(&msg, (u64)&per_cpu(exception_stacks, 0));
+
 	vmfunc_klcd_test_wrapper(&msg, OTHER_DOMAIN, VMFUNC_TEST_RPC_CALL);
 	printk("%s: VMFUNC_TEST_RPC_CALLBACK: Value from other domain "
 			"r1: %lx, r2: %lx, r3: %lx, r4: %lx, r5: %lx, r6: %lx\n",

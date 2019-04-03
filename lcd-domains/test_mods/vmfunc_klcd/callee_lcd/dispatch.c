@@ -32,6 +32,14 @@ foo(struct fipc_message *msg)
 
 	printk("%s, cpu_tss %lx", __func__, (unsigned long) *addr);
 
+	addr = (unsigned long *) fipc_get_reg2(msg);
+
+	printk("%s, gdt_page %lx", __func__, (unsigned long) *addr);
+
+	addr = (unsigned long *) fipc_get_reg3(msg);
+
+	printk("%s, exception_stacks %lx", __func__, (unsigned long) *addr);
+
 	kmsg.vmfunc_id = VMFUNC_RPC_CALL;
 	kmsg.rpc_id = BAR;
 

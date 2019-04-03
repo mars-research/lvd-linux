@@ -18,8 +18,10 @@ __asm__(
 		/* populate esp_kernel */
 		"  mov %r13, %rsp		\n\t"
 
+#ifdef CONFIG_LVD_DISABLE_IRQS
 		/* we are in trusted domain, re-enable irqs */
 		"  sti				\n\t"
+#endif
 		/* stack is populated. we are good to go */
 		"  call vmfunc_dispatch		\n\t"
 
@@ -30,8 +32,10 @@ __asm__(
 		/* save esp_kernel in the cpuid page */
 		"  mov %rsp, 8(%rax)		\n\t"
 
+#ifdef CONFIG_LVD_DISABLE_IRQS
 		/* disable irqs, we jump back to untrusted domain */
 		"  cli			\n\t"
+#endif
 
 		/* restore stack for vmfunc domain */
 		"  mov %gs:current_task, %rax	\n\t"

@@ -46,7 +46,9 @@ __asm__ (
 	"  mov 56(%rax)," _REG7 " \n\t"
 
 	/* disable irqs before entering isolated domain */
+#ifdef CONFIG_LVD_DISABLE_IRQS
 	"  cli				\n\t"
+#endif
 	/* get cpuid page buffer */
 	"  mov cpuid_page, %rax		\n\t"
 	/* save rsp to the cpuid page at offset 8*/
@@ -101,8 +103,10 @@ __asm__ (
 	"  mov " _REG6 ", 48(%r13) \n\t"
 	"  mov " _REG7 ", 56(%r13) \n\t"
 
+#ifdef CONFIG_LVD_DISABLE_IRQS
 	/* back in trusted domain, reenable irqs */
 	"  sti			\n\t"
+#endif
 	/* everything is set, pop all regs */
 	"  pop %r15	\n\t"
 	"  pop %r14	\n\t"

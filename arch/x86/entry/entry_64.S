@@ -488,6 +488,8 @@ END(irq_entries_start)
 	testl   $1, %eax
 	jnz	1f
 
+	ABORT_LCD
+
 	/* We need to vmfunc back into the kernel */
 	VMFUNC_TO_KERNEL
 

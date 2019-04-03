@@ -508,11 +508,13 @@ static inline void load_trace_idt(void)
  */
 static inline void load_current_idt(void)
 {
+#if 0
 	if (is_debug_idt_enabled())
 		load_debug_idt();
 	else if (is_trace_idt_enabled())
 		load_trace_idt();
 	else
-		load_idt((const struct desc_ptr *)&idt_descr);
+#endif
+	load_idt((const struct desc_ptr *)&idt_descr);
 }
 #endif /* _ASM_X86_DESC_H */

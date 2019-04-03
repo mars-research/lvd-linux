@@ -1300,13 +1300,14 @@ EXPORT_PER_CPU_SYMBOL(__preempt_count);
  */
 const unsigned int exception_stack_sizes[N_EXCEPTION_STACKS] = {
 	  [0 ... N_EXCEPTION_STACKS - 1]	= EXCEPTION_STKSZ,
-	  [DEBUG_STACK - 1]			= DEBUG_STKSZ
+	  [DEBUG_STACK - 1]			= DEBUG_STKSZ,
+	  [IRQ_LVD_STACK - 1]			= IRQ_LVD_STACK_SIZE
 };
 /* For mapping the exception stacks in LVD */
 EXPORT_SYMBOL(exception_stack_sizes);
 
 DEFINE_PER_CPU_PAGE_ALIGNED(char, exception_stacks
-	[(N_EXCEPTION_STACKS - 1) * EXCEPTION_STKSZ + DEBUG_STKSZ]);
+	[(N_EXCEPTION_STACKS - 2) * EXCEPTION_STKSZ + DEBUG_STKSZ + IRQ_LVD_STACK_SIZE]);
 /* For mapping the exception stacks in LVD */
 EXPORT_PER_CPU_SYMBOL(exception_stacks);
 

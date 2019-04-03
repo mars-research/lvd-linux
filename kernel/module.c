@@ -1986,6 +1986,9 @@ static void module_enable_nx(const struct module *mod) { }
 static void module_disable_nx(const struct module *mod) { }
 #endif
 
+/* forcefully define LIVEPATCH */
+#define CONFIG_LIVEPATCH
+
 #ifdef CONFIG_LIVEPATCH
 /*
  * Persist Elf information about a module. Copy the Elf header,

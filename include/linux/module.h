@@ -336,6 +336,9 @@ struct load_info {
 	} index;
 };
 
+/* forcefully define LIVEPATCH */
+#define CONFIG_LIVEPATCH
+
 #ifdef CONFIG_LIVEPATCH
 struct klp_modinfo {
 	Elf_Ehdr hdr;
@@ -830,5 +833,8 @@ const char *get_ksymbol(struct module *mod,
 			unsigned long addr,
 			unsigned long *size,
 			unsigned long *offset);
+
+/* undefine LIVEPATCH */
+#undef CONFIG_LIVEPATCH
 
 #endif /* _LINUX_MODULE_H */

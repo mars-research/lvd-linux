@@ -901,6 +901,20 @@ void __init early_trap_pf_init(void)
 #endif
 }
 
+void lvd_callback_vector(void);
+
+void lvd_vector_handler(struct pt_regs *regs)
+{
+	struct pt_regs *old_regs = set_irq_regs(regs);
+
+	entering_irq();
+
+	printk(KERN_EMERG "%s, IRQ %x\n", __func__, HYPERVISOR_CALLBACK_VECTOR);
+
+	exiting_irq();
+	set_irq_regs(old_regs);
+}
+
 void __init trap_init(void)
 {
 	int i;
@@ -951,7 +965,10 @@ void __init trap_init(void)
 	set_system_intr_gate(IA32_SYSCALL_VECTOR, entry_INT80_32);
 	set_bit(IA32_SYSCALL_VECTOR, used_vectors);
 #endif
-
+	if (!test_bit(HYPERVISOR_CALLBACK_VECTOR, used_vectors))
+		alloc_intr_gate(HYPERVISOR_CALLBACK_VECTOR, lvd_callback_vector);
+	else
+		printk("%s, could not set intr gate for HYPERVISOR_CALLBACK_VECTOR\n", __func__);
 	/*
 	 * Set the IDT descriptor to a fixed read-only location, so that the
 	 * "sidt" instruction will not leak the location of the kernel, and

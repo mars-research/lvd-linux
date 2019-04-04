@@ -488,7 +488,7 @@ END(irq_entries_start)
 	testl   $1, %eax
 	jnz	1f
 
-	ABORT_LCD
+	//ABORT_LCD
 
 	/* We need to vmfunc back into the kernel */
 	VMFUNC_TO_KERNEL
@@ -1092,6 +1092,9 @@ apicinterrupt3 HYPERVISOR_CALLBACK_VECTOR \
 	xen_hvm_callback_vector xen_evtchn_do_upcall
 
 #endif /* CONFIG_XEN */
+
+apicinterrupt3 HYPERVISOR_CALLBACK_VECTOR \
+	lvd_callback_vector lvd_vector_handler
 
 #if IS_ENABLED(CONFIG_HYPERV)
 apicinterrupt3 HYPERVISOR_CALLBACK_VECTOR \

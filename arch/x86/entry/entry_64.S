@@ -497,11 +497,11 @@ END(irq_entries_start)
 		
 	/* Restore GS base */
 	/* Read saved gs base */
-	rdgsbase %eax
-	/* Exchange the current gs base (eax) with saved in vmfunc_state page */
-	movl	 %eax, vmfunc_state_page + VMFUNC_lcd_gs_base
-	movl	 vmfunc_state_page + VMFUNC_kernel_gs_base, %eax
-	wrgsbase %eax
+//	rdgsbase %eax
+//	/* Exchange the current gs base (eax) with saved in vmfunc_state page */
+//	movl	 %eax, vmfunc_state_page + VMFUNC_lcd_gs_base
+//	movl	 vmfunc_state_page + VMFUNC_kernel_gs_base, %eax
+//	wrgsbase %eax
 	
 	//movq    %rax, %rdi
 	//call    trace_rbx	
@@ -651,8 +651,8 @@ GLOBAL(restore_vmfunc_regs_and_iret)
 	/* Restore gs base */
 	//rdgsbase %eax
 	/* Exchange the current gs base (eax) with saved in vmfunc_state page */
-	movl	vmfunc_state_page + VMFUNC_lcd_gs_base, %eax
-	wrgsbase %eax
+//	movl	vmfunc_state_page + VMFUNC_lcd_gs_base, %eax
+//	wrgsbase %eax
 
 	VMFUNC_TO_LCD
 

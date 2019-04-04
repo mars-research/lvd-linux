@@ -111,11 +111,11 @@ foo(struct fipc_message *msg)
 #if 1
 	{
 		int i = 0;
-		asm volatile("int $48");
+		asm volatile("int $0xf3");
 		do {
 			asm volatile("nop");
 			i++;
-		} while (i < 10000);
+		} while (i < 100000000);
 	}
 #endif
 	kmsg.vmfunc_id = VMFUNC_RPC_CALL;

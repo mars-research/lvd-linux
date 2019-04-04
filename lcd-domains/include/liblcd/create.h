@@ -160,6 +160,7 @@ struct lcd_create_ctx {
 	void *m_core_bits;
 	void *m_vmfunc_tr_bits;
 	void *m_vmfunc_sb_bits;
+	void *last_pgtable_page;
 };
 
 /**

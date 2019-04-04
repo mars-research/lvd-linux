@@ -44,6 +44,8 @@ struct vmfunc_state {
 	unsigned int cpuid; 
 	unsigned int kernel_gs_base;
 	unsigned int lcd_gs_base;
+	unsigned int entered_lcd; 
+	unsigned long kernel_esp; 
 };
 
 union vmfunc_state_page {

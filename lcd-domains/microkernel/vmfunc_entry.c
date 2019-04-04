@@ -1,8 +1,7 @@
 #include <asm/lcd_domains/libvmfunc.h>
 #include <linux/sched.h>
 #include <asm/current.h>
-
-extern void *cpuid_page;
+#include <asm/asm-offsets.h>
 
 void
 vmfunc_trampoline_entry(struct fipc_message *msg); //rdi
@@ -11,7 +10,7 @@ __asm__ (
 	"	.align 16	\n\t"
 	"	.globl vmfunc_trampoline_entry	\n\t"
 	"	.type vmfunc_trampoline_entry, @function  \n\t"
-	"	.extern cpuid_page	\n\t"
+	"	.extern vmfunc_state_page	\n\t"
 	"	.extern lcd_stack_off	\n\t"
 	"vmfunc_trampoline_entry:	\n\t"
 	/*
@@ -49,15 +48,16 @@ __asm__ (
 #ifdef CONFIG_LVD_DISABLE_IRQS
 	"  cli				\n\t"
 #endif
-	/* get cpuid page buffer */
-	"  mov cpuid_page, %rax		\n\t"
-	/* save rsp to the cpuid page at offset 8*/
-	"  mov %rsp, 8(%rax)		\n\t"
+
+	/* save rsp to the vmfunc_state_page at offset 24 */
+	"  mov %rsp, " __stringify(VMFUNC_kernel_esp) " + vmfunc_state_page	\n\t"
 	/* get current pointer */
 	"  mov %gs:current_task, %r13	\n\t"
 	/* get lcd_stack offset */
 	"  mov lcd_stack_off, %r14	\n\t"
 
+	/* set entered_lcd = 1 at offset 16 in vmfunc_state_page */
+	"  movl $0x1, " __stringify(VMFUNC_entered_lcd) " + vmfunc_state_page	\n\t"
 	/* populate LCD stack */
 	"  mov (%r13, %r14), %rsp		\n\t"
 
@@ -86,11 +86,11 @@ __asm__ (
 	"	.text		\n\t"
 	"	.align 16	\n\t"
 	"	.globl vmfunc_trampoline_out \n\t"
-	"	.extern cpuid_page	\n\t"
 	"vmfunc_trampoline_out:		\n\t"
-	/* restore stack */
-	"  mov cpuid_page, %rbx	\n\t"
-	"  mov 8(%rbx), %rsp	\n\t"
+	/* restore kernel_stack from offset 24 */
+	"  mov " __stringify(VMFUNC_kernel_esp) " + vmfunc_state_page, %rsp	\n\t"
+	/* set entered_lcd = 0 at offset 16 in vmfunc_state_page */
+	"  movl $0x0, " __stringify(VMFUNC_entered_lcd) " + vmfunc_state_page	\n\t"
 	/* stack pointer is restored, let's get our msg buffer */
 	"  pop %r13 \n\t"
 	/* construct response fipc_message from registers */

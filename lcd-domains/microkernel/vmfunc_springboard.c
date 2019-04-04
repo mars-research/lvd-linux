@@ -1,15 +1,16 @@
 #include <asm/current.h>
+#include <asm/asm-offsets.h>
 
 __asm__(
 		".text	\n\t"
 		".align 16	\n\t"
 		".globl vmfunc_kernel_springboard	\n\t"
-		".extern cpuid_page		\n\t"
+		".extern vmfunc_state_page	\n\t"
 		".extern lcd_stack_off		\n\t"
 		"vmfunc_kernel_springboard:	\n\t"
-		"  mov cpuid_page, %rax		\n\t"
-		/* place esp_kernel in r13 */
-		"  mov 8(%rax), %r13		\n\t"
+
+		/* restore kernel_stack from offset 24 */
+		"  mov " __stringify(VMFUNC_kernel_esp) " + vmfunc_state_page, %r13	\n\t"
 		/* TODO: restore %gs */
 		"  mov %gs:current_task, %rax	\n\t"
 		"  mov lcd_stack_off, %rbx	\n\t"
@@ -17,6 +18,9 @@ __asm__(
 		"  mov %rsp, (%rax, %rbx)	\n\t"
 		/* populate esp_kernel */
 		"  mov %r13, %rsp		\n\t"
+
+		/* set entered_lcd = 0 at offset 16 in vmfunc_state_page */
+		"  movl $0x0, " __stringify(VMFUNC_entered_lcd) " + vmfunc_state_page	\n\t"
 
 #ifdef CONFIG_LVD_DISABLE_IRQS
 		/* we are in trusted domain, re-enable irqs */
@@ -27,10 +31,8 @@ __asm__(
 
 		/* we are ready to jump back to the caller */
 		/* save kernel stack */
-		/* get cpuid page buffer */
-		"  mov cpuid_page, %rax		\n\t"
-		/* save esp_kernel in the cpuid page */
-		"  mov %rsp, 8(%rax)		\n\t"
+		/* save rsp to the vmfunc_state_page at offset 24 */
+		"  mov %rsp, " __stringify(VMFUNC_kernel_esp) " + vmfunc_state_page	\n\t"
 
 #ifdef CONFIG_LVD_DISABLE_IRQS
 		/* disable irqs, we jump back to untrusted domain */

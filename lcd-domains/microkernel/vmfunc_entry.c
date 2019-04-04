@@ -57,7 +57,7 @@ __asm__ (
 	"  mov lcd_stack_off, %r14	\n\t"
 
 	/* set entered_lcd = 1 at offset 16 in vmfunc_state_page */
-	"  movl $0x1, " __stringify(VMFUNC_entered_lcd) " + vmfunc_state_page	\n\t"
+	"  movq $0x1, " __stringify(VMFUNC_entered_lcd) " + vmfunc_state_page	\n\t"
 	/* populate LCD stack */
 	"  mov (%r13, %r14), %rsp		\n\t"
 
@@ -90,7 +90,7 @@ __asm__ (
 	/* restore kernel_stack from offset 24 */
 	"  mov " __stringify(VMFUNC_kernel_esp) " + vmfunc_state_page, %rsp	\n\t"
 	/* set entered_lcd = 0 at offset 16 in vmfunc_state_page */
-	"  movl $0x0, " __stringify(VMFUNC_entered_lcd) " + vmfunc_state_page	\n\t"
+	"  movq $0x0, " __stringify(VMFUNC_entered_lcd) " + vmfunc_state_page	\n\t"
 	/* stack pointer is restored, let's get our msg buffer */
 	"  pop %r13 \n\t"
 	/* construct response fipc_message from registers */

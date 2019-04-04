@@ -20,7 +20,7 @@ __asm__(
 		"  mov %r13, %rsp		\n\t"
 
 		/* set entered_lcd = 0 at offset 16 in vmfunc_state_page */
-		"  movl $0x0, " __stringify(VMFUNC_entered_lcd) " + vmfunc_state_page	\n\t"
+		"  movq $0x0, " __stringify(VMFUNC_entered_lcd) " + vmfunc_state_page	\n\t"
 
 #ifdef CONFIG_LVD_DISABLE_IRQS
 		/* we are in trusted domain, re-enable irqs */

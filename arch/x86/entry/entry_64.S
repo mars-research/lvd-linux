@@ -471,6 +471,13 @@ END(irq_entries_start)
  * Entry runs with interrupts off.
  */
 
+/* Here our options
+ *
+ * -- Preempted in LCD
+ * 
+ *
+ */
+
 /* 0(%rsp): ~(interrupt number) */
 	.macro interrupt func
 	cld
@@ -478,25 +485,22 @@ END(irq_entries_start)
 	SAVE_C_REGS
 	SAVE_EXTRA_REGS
 
-	/* rbx keeps the flag whether we VMFUNC back or not */
+	/* rbx keeps the flag whether we entered with VMFUNC_in_kernel or not */
 	xorq	%rbx, %rbx
-	/* r12 keeps the flag whether we entered with 
-	   VMFUNC_entered_lcd set or not */
+	/* r12 keeps the flag whether we entered with VMFUNC_entered_lcd set or not */
 	xorq	%r12, %r12
 
-	/* Test if we've been demoted and moreover need 
-	 * to VMFUNC back to the kernel */
-	movl 	vmfunc_state_page + VMFUNC_in_kernel, %eax
-	testl   $1, %eax
-	jnz	1f
+	/* Test if we've been demoted and moreover need to 
+	 * VMFUNC back to the kernel */
+	movq 	vmfunc_state_page + VMFUNC_in_kernel, %rbx
+	testq   $1, %rbx
+	jnz	2f
 
-	//ABORT_LCD
+	/* Note: ebx is 0 here */
 
 	/* We need to vmfunc back into the kernel */
 	VMFUNC_TO_KERNEL
 
-	//BF_PRINT
-		
 	/* Restore GS base */
 	/* Read saved gs base */
 //	rdgsbase %eax
@@ -505,29 +509,33 @@ END(irq_entries_start)
 //	movl	 vmfunc_state_page + VMFUNC_kernel_gs_base, %eax
 //	wrgsbase %eax
 	
-	//movq    %rax, %rdi
-	//call    trace_rbx	
-
-	/* Set the flag that we've VMFUNC'ed */
-	movq 	$1, %rbx
-
 	/* We can't be in user mode in the LCD */
 	testb	$3, CS(%rsp)
 	jz	2f
 
 	ABORT_LCD
 
-1:
+2:
+
+	/* Now we have access access to vmfunc_state_page inside the kernel, lets 
+         *  see if we're inside LCD or not */
+	movq 	vmfunc_state_page + VMFUNC_entered_lcd, %r12
+	movq    $0, vmfunc_state_page + VMFUNC_entered_lcd
 
 	testb	$3, CS(%rsp)
-	jz	2f
+	jz	4f
 
 	/* We've entered from user mode, but lets check if we're preempted 
            right after VMFUNC and don't trust our stack, maybe LCD 
 	   somehow escaped in ring 3 and tries to overwrite our kernel stack 
            by forcing us to switch to the kernel stack again */
 
-	/* ToDo: test if we're "in LCD" and don't trust our stack */
+	testq   $1, %r12
+	jz	3f
+	
+	ABORT_LCD
+	
+3:
 
 	/*
 	 * IRQ from user mode.  Switch to kernel gsbase and inform context
@@ -555,29 +563,25 @@ END(irq_entries_start)
 	call	sync_regs
 	movq	%rax, %rsp			/* switch stack */
 
-	jmp 4f
-2:
+	jmp 6f
+4:
 	/* We're entered on the IST stack from the kernel, but maybe 
-           we were preempted right after executing the VMFUNC instruction 
-	   and esp still points into LCD */
+         * we were preempted right after executing the VMFUNC instruction 
+	 * and esp still points into LCD (r12 will be 1) */
 
-	movl 	vmfunc_state_page + VMFUNC_entered_lcd, %eax
-	testl   $1, %eax
-	jz	3f
+	testq   $1, %r12
+	jz	5f
 
-	/* Set the flag that we've flipped the VMFUNC_entered_lcd flag */
-	movq 	$1, %r12
-	movl    $0, vmfunc_state_page + VMFUNC_entered_lcd
-
-	/* Since we've entered into LCD, our stack is saved in the 
+	/* Since we just entered LCD, our stack is saved in the 
 	   VMFUNC state page */
 	movq	%rsp, %rdi			/* pt_regs pointer */
-	movq	vmfunc_state_page + VMFUNC_kernel_esp, %rsi /* sack to switch to */
+	movq	vmfunc_state_page + VMFUNC_kernel_esp, %r13
+	movq    %r13, %rsi 			/* sack to switch to */
 	call	sync_stacks
 	movq	%rax, %rsp			/* switch stack */
-	jmp 4f
+	jmp 6f
 
-3:
+5:
 
 	/* We've entered on the IST stack, from the kernel, switch to 
            the stack that the kernel was using right before the interrupt */
@@ -586,7 +590,7 @@ END(irq_entries_start)
 	call	sync_stacks
 	movq	%rax, %rsp			/* switch stack */
 
-4:
+6:
 	/*
 	 * Save previous stack pointer, optionally switch to interrupt stack.
 	 * irq_count is used to check if a CPU is already on an interrupt stack
@@ -624,7 +628,7 @@ ret_from_intr:
 	popq	%rsp
 	/* If we exit to user level we might not have 
 	 * valid gs after swapgs, save the IST pointer here */
-	movq    PER_CPU_VAR(lvd_irq_stack_addr), %r13
+	//movq    PER_CPU_VAR(lvd_irq_stack_addr), %r13
 
 	testb	$3, CS(%rsp)
 	jz	retint_vmfunc_kernel
@@ -635,7 +639,8 @@ GLOBAL(retint_vmfunc_user)
 	call	prepare_exit_to_usermode
 	TRACE_IRQS_IRETQ
 	SWAPGS
-	jmp	restore_vmfunc_regs_and_iret
+	/* we know that on the exit to user we don't need VMFUNC */
+	jmp	restore_regs_and_iret
 
 /* Returning to kernel space */
 retint_vmfunc_kernel:
@@ -659,17 +664,17 @@ jmp	0b
  * which come from VMFUNC'ed interrupts merge.
  */
 GLOBAL(restore_vmfunc_regs_and_iret)
-	/* Set the flag that we've flipped the VMFUNC_entered_lcd flag */
-	testq   %r12, %r12
-	jz      1f
-	movl    $1, vmfunc_state_page + VMFUNC_entered_lcd
-
-1:
-
-	//movq    %rbx, %rdi
-	//call    trace_rbx	
-	testq	%rbx, %rbx			/* VMFUNC back needed? */
+	/* Restore the state of the VMFUNC_entered_lcd as we saw it on entry 
+	*  If the VMFUNC_entered_lcd wasn't set then we don't need to VMFUNC
+	*  either  
+	*/
+	testq	%r12, %r12
 	jz	2f
+	movq    %r12, vmfunc_state_page + VMFUNC_entered_lcd
+	movq 	%r13, vmfunc_state_page + VMFUNC_kernel_esp
+
+	testq	%rbx, %rbx			/* VMFUNC back needed? */
+	jnz	2f
 
 	/* Move everything to the IST stack if we 
 	 * need to VMFUNC back (IST is mapped in LCD) */
@@ -680,7 +685,7 @@ GLOBAL(restore_vmfunc_regs_and_iret)
 	 * VMFUNC 
 	 */ 
 	movq	%rsp, %rdi			/* pt_regs pointer */
-	movq    %r13, %rsi			/* stack to switch to (IST) */
+	movq    PER_CPU_VAR(lvd_irq_stack_addr), %rsi	/* stack to switch to (IST) */
 //	call	sync_regs_to_ist
 	call    sync_stacks
 	movq	%rax, %rsp			/* switch stack */

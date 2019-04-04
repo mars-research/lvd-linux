@@ -56,6 +56,9 @@ int main(void)
 	OFFSET(VMFUNC_cpuid, vmfunc_state, cpuid);
 	OFFSET(VMFUNC_kernel_gs_base, vmfunc_state, kernel_gs_base);
 	OFFSET(VMFUNC_lcd_gs_base, vmfunc_state, lcd_gs_base);
+	OFFSET(VMFUNC_entered_lcd, vmfunc_state, entered_lcd);
+	OFFSET(VMFUNC_kernel_esp, vmfunc_state, kernel_esp);
+
 
 	OFFSET(TSS_ist, tss_struct, x86_tss.ist);
 	OFFSET(TSS_sp0, tss_struct, x86_tss.sp0);

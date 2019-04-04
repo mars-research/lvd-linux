@@ -40,11 +40,11 @@ extern struct desc_ptr debug_idt_descr;
 extern gate_desc debug_idt_table[];
 
 struct vmfunc_state {
-	unsigned int in_kernel;
-	unsigned int cpuid; 
+	unsigned long in_kernel;
+	unsigned long cpuid; 
 	unsigned int kernel_gs_base;
 	unsigned int lcd_gs_base;
-	unsigned int entered_lcd; 
+	unsigned long entered_lcd; 
 	unsigned long kernel_esp; 
 };
 

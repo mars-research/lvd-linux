@@ -909,7 +909,8 @@ void lvd_vector_handler(struct pt_regs *regs)
 
 	entering_irq();
 
-	printk(KERN_EMERG "%s, IRQ %x\n", __func__, HYPERVISOR_CALLBACK_VECTOR);
+	printk(KERN_EMERG "%s [%d]: IRQ %x\n",
+		__func__, smp_processor_id(), HYPERVISOR_CALLBACK_VECTOR);
 
 	exiting_irq();
 	set_irq_regs(old_regs);

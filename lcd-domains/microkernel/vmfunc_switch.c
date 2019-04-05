@@ -157,6 +157,9 @@ int vmfunc_klcd_test_wrapper(struct fipc_message *msg, unsigned int ept, vmfunc_
 	ret = do_check(ept);
 	if (ret)
 		goto exit;
+
+	printk("%s [%d]: Starting VMFUNC tests\n",
+			__func__, smp_processor_id());
 #if 1
 //	local_irq_disable();
 	ret = vmfunc_test_wrapper(msg, test);

@@ -68,7 +68,8 @@ ENDPROC(native_usergs_sysret64)
 	cpuid
 .endm
 
-.macro BF_PRINT
+.macro DEBUG_LCD
+	pushq %rax
 	/* abort LCD dropping into the hypervisor */
 	movl $0x4BF00035, %eax
 	cpuid
@@ -890,7 +891,7 @@ ENTRY(\sym)
 	testl   $1, %eax
 	popq    %rax
 	jnz	1f
-	ABORT_LCD
+	DEBUG_LCD
 
 1:
 

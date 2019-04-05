@@ -111,7 +111,10 @@ foo(struct fipc_message *msg)
 #if 1
 	{
 		int i = 0;
-		asm volatile("int $0xf3");
+		for (; i < 500; i++)
+			asm volatile("int $0xf3");
+
+		i = 0;
 		do {
 			asm volatile("nop");
 			i++;

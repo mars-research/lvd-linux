@@ -91,6 +91,7 @@ int do_check(int ept)
 	return ret;
 }
 
+#ifndef CONFIG_DEFEAT_LAZY_TLB
 static int vmfunc_prepare_switch(int ept)
 {
 	struct lcd *lcd = NULL;
@@ -110,7 +111,8 @@ static int vmfunc_prepare_switch(int ept)
 	if (lcd && !current->cr3_remapping) {
 		hpa_lcd_cr3 = lcd->lcd_arch->hpa_cr3;
 
-		LCD_MSG("Add mapping gpa: %lx, hpa: %lx", gpa_val(gpa_cr3),
+		LCD_MSG("[%d] %s: current->cr3 %llx", smp_processor_id(), current->comm, gpa_val(gpa_cr3));
+		LCD_MSG("Add mapping inside LVDs EPT for gpa_cr3: %lx, hpa: %lx", gpa_val(gpa_cr3),
 				hpa_val(hpa_lcd_cr3));
 
 		lcd_arch_ept_map_all_cpus(lcd_list[ept]->lcd_arch, gpa_cr3,
@@ -124,18 +126,21 @@ static int vmfunc_prepare_switch(int ept)
 
 	return 0;
 }
+#endif
 
 int vmfunc_klcd_wrapper(struct fipc_message *msg, unsigned int ept)
 {
-	int ret;
+	int ret = 0;
 	if (ept > 511) {
 		ret = -EINVAL;
 		goto exit;
 	}
+#ifndef CONFIG_DEFEAT_LAZY_TLB
 	vmfunc_prepare_switch(ept);
 	ret = do_check(ept);
 	if (ret)
 		goto exit;
+#endif
 //	local_irq_disable();
 	vmfunc_trampoline_entry(msg);
 //	local_irq_enable();
@@ -145,7 +150,7 @@ exit:
 
 int vmfunc_klcd_test_wrapper(struct fipc_message *msg, unsigned int ept, vmfunc_test_t test)
 {
-	int ret;
+	int ret = 0;
 	if (ept > 511) {
 		ret = -EINVAL;
 		goto exit;
@@ -153,6 +158,7 @@ int vmfunc_klcd_test_wrapper(struct fipc_message *msg, unsigned int ept, vmfunc_
 	/* FIXME: This should be done only once per process.
 	 * create a TLS variable to mark if cr3 switch is already active.
 	 */
+#ifndef CONFIG_DEFEAT_LAZY_TLB
 	vmfunc_prepare_switch(ept);
 	ret = do_check(ept);
 	if (ret)
@@ -160,14 +166,59 @@ int vmfunc_klcd_test_wrapper(struct fipc_message *msg, unsigned int ept, vmfunc_
 
 	printk("%s [%d]: Starting VMFUNC tests\n",
 			__func__, smp_processor_id());
-#if 1
+#endif
 //	local_irq_disable();
 	ret = vmfunc_test_wrapper(msg, test);
 //	local_irq_enable();
-#endif
 exit:
 	return ret;
 }
+
+#ifdef CONFIG_DEFEAT_LAZY_TLB
+int noinline
+remap_cr3(void)
+{
+	struct lcd *lcd = NULL;
+	phys_addr_t cr3_base;
+	gpa_t gpa_cr3;
+	hpa_t hpa_lcd_cr3;
+	/* we always switch to eptp_list[1] */
+	int ept = 1;
+	int ret = 0;
+
+	if (current->mapped_cr3 != __pa(current->active_mm->pgd))
+		printk(KERN_EMERG "%s, remap gpa:%lx , hpa %lx\n",
+			__func__, __pa(current->active_mm->pgd),
+			hpa_val(lcd_list[ept]->lcd_arch->hpa_cr3));
+
+	cr3_base = __pa(current->active_mm->pgd);
+
+	/* gpa is the same as phys_addr */
+	gpa_cr3 = __gpa(cr3_base);
+
+	lcd = lcd_list[ept];
+	current->vmfunc_lcd = lcd;
+
+	if (lcd && (current->mapped_cr3 != cr3_base)) {
+		hpa_lcd_cr3 = lcd->lcd_arch->hpa_cr3;
+
+		ret = lcd_arch_ept_map_all_cpus(lcd_list[ept]->lcd_arch, gpa_cr3,
+			hpa_lcd_cr3,
+			1, /* create, if not present */
+			0 /* don't overwrite, if present */);
+
+		current->mapped_cr3 = cr3_base;
+		if (ret)
+			goto fail;
+	}
+
+	return 0;
+fail:
+	LCD_MSG("Remapping of cr3 failed for gpa: %llx, hpa: %llx",
+			gpa_val(gpa_cr3), hpa_val(hpa_lcd_cr3));
+	return ret;
+}
+#endif
 
 int noinline
 //__vmfunc_wrapper
@@ -177,6 +228,9 @@ vmfunc_test_wrapper(struct fipc_message *request, vmfunc_test_t test)
 	switch (test) {
 	case VMFUNC_TEST_EMPTY_SWITCH:
 		printk("%s: Invoking EMPTY_SWITCH test\n", __func__);
+#ifdef CONFIG_DEFEAT_LAZY_TLB
+		remap_cr3();
+#endif
 		vmfunc_call_empty_switch();
 		break;
 	case VMFUNC_TEST_DUMMY_CALL:

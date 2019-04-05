@@ -433,7 +433,6 @@ static inline u64 *pgd_root(struct lcd_create_ctx *ctx)
 
 static inline u64 get_free_pgtable_page_offset(struct lcd_create_ctx *ctx)
 {
-	static void *last_used_page = NULL;
 	u64 new_page;
 	u64 offset;
 	/*
@@ -446,12 +445,12 @@ static inline u64 get_free_pgtable_page_offset(struct lcd_create_ctx *ctx)
 	 * 10 pages for mapping the above 10G vaddr range + 1 page for
 	 * pgdir_root + 1 for pud
 	 */
-	if (!last_used_page)
-		last_used_page = ctx->gv_pg_tables + (11 * PAGE_SIZE);
+	if (!ctx->last_pgtable_page)
+		ctx->last_pgtable_page = ctx->gv_pg_tables + (11 * PAGE_SIZE);
 
-	new_page = (u64) last_used_page + PAGE_SIZE;
+	new_page = (u64) ctx->last_pgtable_page + PAGE_SIZE;
 
-	last_used_page = (void *)new_page;
+	ctx->last_pgtable_page = (void *)new_page;
 
 	offset = new_page - (u64)ctx->gv_pg_tables;
 

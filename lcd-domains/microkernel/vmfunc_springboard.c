@@ -1,5 +1,6 @@
-#include <asm/current.h>
 #include <asm/asm-offsets.h>
+#include <asm/current.h>
+#include <asm/lcd_domains/libvmfunc.h>
 
 __asm__(
 		".text	\n\t"
@@ -39,6 +40,32 @@ __asm__(
 		"  cli			\n\t"
 #endif
 
+#ifdef CONFIG_DEFEAT_LAZY_TLB
+		/*
+		 * vmfunc_dispatch populates all the return values in these
+		 * regs. We are making a C call here, let's save and restore
+		 */
+		"  push " _REG0 " \n\t"
+		"  push " _REG1 " \n\t"
+		"  push " _REG2 " \n\t"
+		"  push " _REG3 " \n\t"
+		"  push " _REG4 " \n\t"
+		"  push " _REG5 " \n\t"
+		"  push " _REG6 " \n\t"
+		"  push " _REG7 " \n\t"
+
+		/* we need a valid stack here */
+		"  call remap_cr3	\n\t"
+
+		"  pop " _REG7 " \n\t"
+		"  pop " _REG6 " \n\t"
+		"  pop " _REG5 " \n\t"
+		"  pop " _REG4 " \n\t"
+		"  pop " _REG3 " \n\t"
+		"  pop " _REG2 " \n\t"
+		"  pop " _REG1 " \n\t"
+		"  pop " _REG0 " \n\t"
+#endif
 		/* restore stack for vmfunc domain */
 		"  mov %gs:current_task, %rax	\n\t"
 		"  mov lcd_stack_off, %rbx	\n\t"

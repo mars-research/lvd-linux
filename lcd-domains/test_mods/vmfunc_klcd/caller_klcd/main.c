@@ -50,7 +50,7 @@ void run_vmfunc_tests(void)
 	/* test2: dummy unhandled call type */
 	vmfunc_klcd_test_wrapper(&msg, OTHER_DOMAIN, VMFUNC_TEST_DUMMY_CALL);
 
-	printk("%s: VMFUNC_TEST_EMPTY_SWITCH: Passed\n\tValue from other domain r1: %lx, r2:%lx, r3:%lx\n",
+	printk("%s: VMFUNC_TEST_DUMMY_CALL: Passed\n\tValue from other domain r1: %lx, r2:%lx, r3:%lx\n",
 			__func__,
 			fipc_get_reg1(&msg),
 			fipc_get_reg2(&msg),

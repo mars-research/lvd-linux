@@ -1940,6 +1940,7 @@ struct task_struct {
 	/* to save lcd_stack when moving in/out of vmfunc domain */
 	void *lcd_stack;
 
+	phys_addr_t mapped_cr3;
 /* CPU-specific state of this task */
 	struct thread_struct thread;
 /*

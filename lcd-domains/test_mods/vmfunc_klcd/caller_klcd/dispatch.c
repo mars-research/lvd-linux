@@ -16,16 +16,17 @@ null_invocation(void)
 unsigned long noinline
 bar(struct fipc_message *msg)
 {
-	printk("%s, bar called with reg0: %lx, reg1: %lx, reg2, %lx, reg3: %lx, reg4: %lx, reg5: %lx\n",
+	printk("%s, bar called with reg0: %lx, reg1: %lx, reg2, %lx, reg3: %lx, reg4: %lx, reg5: %lx reg6: %lx\n",
 			__func__,
 			fipc_get_reg0(msg),
 			fipc_get_reg1(msg),
 			fipc_get_reg2(msg),
 			fipc_get_reg3(msg),
 			fipc_get_reg4(msg),
-			fipc_get_reg5(msg));
+			fipc_get_reg5(msg),
+			fipc_get_reg6(msg));
 	fipc_set_reg1(msg, 0x100);
-	return 0x12;
+	return 0;
 }
 
 int handle_rpc_calls_klcd(struct fipc_message *msg)

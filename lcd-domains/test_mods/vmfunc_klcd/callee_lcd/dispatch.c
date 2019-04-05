@@ -115,7 +115,7 @@ foo(struct fipc_message *msg)
 		do {
 			asm volatile("nop");
 			i++;
-		} while (i < 100000000);
+		} while (i < 1000000000);
 	}
 #endif
 	kmsg.vmfunc_id = VMFUNC_RPC_CALL;
@@ -131,11 +131,13 @@ foo(struct fipc_message *msg)
 	vmfunc_wrapper(&kmsg);
 
 	ret = fipc_get_reg1(&kmsg);
-	fipc_set_reg2(&kmsg, 0xbb + ret);
-	fipc_set_reg3(&kmsg, 0xcc + ret);
-	fipc_set_reg4(&kmsg, 0xdd + ret);
-	fipc_set_reg5(&kmsg, 0xee + ret);
-	fipc_set_reg6(&kmsg, 0xff + ret);
+	printk("%s,got ret val in reg1 = %x. expected = 0x100", __func__, ret);
+	fipc_set_reg1(msg, 0xaa + ret);
+	fipc_set_reg2(msg, 0xbb + ret);
+	fipc_set_reg3(msg, 0xcc + ret);
+	fipc_set_reg4(msg, 0xdd + ret);
+	fipc_set_reg5(msg, 0xee + ret);
+	fipc_set_reg6(msg, 0xff + ret);
 
 	return 0;
 }

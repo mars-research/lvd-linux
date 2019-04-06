@@ -13,6 +13,7 @@
 extern int callee_main(void);
 
 #define NUM_IST_STACKS	7
+//#define CONFIG_DUMP_IRQ_REGS 1
 
 unsigned long noinline
 null_invocation(struct fipc_message *msg)
@@ -119,6 +120,10 @@ foo(struct fipc_message *msg)
 			asm volatile("nop");
 			i++;
 		} while (i < 1000000000);
+
+		// Touch NULL to trigger a page fault
+		// asm volatile ("movq %rax, 0x0");
+
 	}
 #endif
 	kmsg.vmfunc_id = VMFUNC_RPC_CALL;

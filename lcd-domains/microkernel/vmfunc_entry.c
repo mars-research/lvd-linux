@@ -17,7 +17,9 @@ __asm__ (
 	 * push all callee-saved regs according to ABI
 	 */
 #ifdef CONFIG_DEFEAT_LAZY_TLB
+	"  push %rdi    \n\t"
 	"  call remap_cr3	\n\t"
+	"  pop  %rdi    \n\t"
 #endif
 	"  push %rbp	\n\t"
 	"  push %rbx	\n\t"

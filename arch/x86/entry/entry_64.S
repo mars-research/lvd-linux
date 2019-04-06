@@ -990,19 +990,19 @@ idtentry \sym \do_sym has_error_code=\has_error_code
 .endm
 #endif
 
-idtentry divide_error			do_divide_error			has_error_code=0
-idtentry overflow			do_overflow			has_error_code=0
-idtentry bounds				do_bounds			has_error_code=0
-idtentry invalid_op			do_invalid_op			has_error_code=0
-idtentry device_not_available		do_device_not_available		has_error_code=0
+idtentry divide_error			do_divide_error			has_error_code=0 paranoid=1
+idtentry overflow			do_overflow			has_error_code=0 paranoid=1
+idtentry bounds				do_bounds			has_error_code=0 paranoid=1
+idtentry invalid_op			do_invalid_op			has_error_code=0 paranoid=1
+idtentry device_not_available		do_device_not_available		has_error_code=0 paranoid=1
 idtentry double_fault			do_double_fault			has_error_code=1 paranoid=2
-idtentry coprocessor_segment_overrun	do_coprocessor_segment_overrun	has_error_code=0
-idtentry invalid_TSS			do_invalid_TSS			has_error_code=1
-idtentry segment_not_present		do_segment_not_present		has_error_code=1
-idtentry spurious_interrupt_bug		do_spurious_interrupt_bug	has_error_code=0
-idtentry coprocessor_error		do_coprocessor_error		has_error_code=0
-idtentry alignment_check		do_alignment_check		has_error_code=1
-idtentry simd_coprocessor_error		do_simd_coprocessor_error	has_error_code=0
+idtentry coprocessor_segment_overrun	do_coprocessor_segment_overrun	has_error_code=0 paranoid=1
+idtentry invalid_TSS			do_invalid_TSS			has_error_code=1 paranoid=1
+idtentry segment_not_present		do_segment_not_present		has_error_code=1 paranoid=1
+idtentry spurious_interrupt_bug		do_spurious_interrupt_bug	has_error_code=0 paranoid=1
+idtentry coprocessor_error		do_coprocessor_error		has_error_code=0 paranoid=1
+idtentry alignment_check		do_alignment_check		has_error_code=1 paranoid=1
+idtentry simd_coprocessor_error		do_simd_coprocessor_error	has_error_code=0 paranoid=1
 
 
 	/*
@@ -1051,7 +1051,7 @@ ENTRY(do_softirq_own_stack)
 END(do_softirq_own_stack)
 
 #ifdef CONFIG_XEN
-idtentry xen_hypervisor_callback xen_do_hypervisor_callback has_error_code=0
+idtentry xen_hypervisor_callback xen_do_hypervisor_callback has_error_code=0 paranoid=1
 
 /*
  * A note on the "critical region" in our callback handler.
@@ -1146,19 +1146,19 @@ apicinterrupt3 HYPERVISOR_CALLBACK_VECTOR \
 
 idtentry debug			do_debug		has_error_code=0	paranoid=1 shift_ist=DEBUG_STACK
 idtentry int3			do_int3			has_error_code=0	paranoid=1 shift_ist=DEBUG_STACK
-idtentry stack_segment		do_stack_segment	has_error_code=1
+idtentry stack_segment		do_stack_segment	has_error_code=1	paranoid=1
 
 #ifdef CONFIG_XEN
-idtentry xen_debug		do_debug		has_error_code=0
-idtentry xen_int3		do_int3			has_error_code=0
-idtentry xen_stack_segment	do_stack_segment	has_error_code=1
+idtentry xen_debug		do_debug		has_error_code=0	paranoid=1
+idtentry xen_int3		do_int3			has_error_code=0	paranoid=1
+idtentry xen_stack_segment	do_stack_segment	has_error_code=1	paranoid=1
 #endif
 
-idtentry general_protection	do_general_protection	has_error_code=1
-trace_idtentry page_fault	do_page_fault		has_error_code=1
+idtentry general_protection	do_general_protection	has_error_code=1	paranoid=1
+trace_idtentry page_fault	do_page_fault		has_error_code=1	paranoid=1
 
 #ifdef CONFIG_KVM_GUEST
-idtentry async_page_fault	do_async_page_fault	has_error_code=1
+idtentry async_page_fault	do_async_page_fault	has_error_code=1	paranoid=1
 #endif
 
 #ifdef CONFIG_X86_MCE

@@ -1209,6 +1209,7 @@ void setup(struct net_device *dev, struct trampoline_hidden_args *hidden_args)
 		&g_ops_container->rtnl_link_ops;
 fail_alloc:
 fail_insert:
+	printk("%s: returned", __func__);
 	return;
 }
 
@@ -1647,6 +1648,7 @@ int alloc_netdev_mqs_callee(struct fipc_message *request)
 
 	dev_container = container_of(net_device, struct net_device_container, net_device);
 	
+	printk("%s: returned", __func__);
 //	dev_container->other_ref.cptr = netdev_otherref.cptr;
 
 	/*ret = glue_cap_insert_net_device_type(c_cspace, dev_container , &dev_container->my_ref);

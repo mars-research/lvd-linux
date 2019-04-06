@@ -227,12 +227,12 @@ int lcd_arch_ept_walk_cpu(lcd_arch_epte_t *dir, gpa_t a, int create,
 			 * Get host virtual addr of fresh page, and
 			 * set the epte's addr to the host physical addr
 			 */
-			page = __hva(__get_free_page(GFP_KERNEL));
+			page = __hva(__get_free_page(GFP_KERNEL | GFP_ATOMIC | __GFP_ZERO));
 			if (!hva_val(page)) {
 				LCD_ERR("alloc failed\n");
 				return -ENOMEM;
 			}
-			memset(hva2va(page), 0, PAGE_SIZE);
+			//memset(hva2va(page), 0, PAGE_SIZE);
 			vmx_epte_set(&dir[idx], hva2hpa(page), i);
 		}
 

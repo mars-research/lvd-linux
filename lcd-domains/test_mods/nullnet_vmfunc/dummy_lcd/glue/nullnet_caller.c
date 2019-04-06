@@ -484,6 +484,7 @@ struct net_device *alloc_netdev_mqs(int sizeof_priv, const char *name, unsigned 
 		goto fail_ipc;
 	}
 
+	printk("%s: returned", __func__);
 	//ret1->other_ref.cptr = fipc_get_reg5(request);
 
 
@@ -922,6 +923,7 @@ int setup_callee(struct fipc_message *request)
 	g_rtnl_link_ops->setup(&net_dev_container->net_device);
 
 	printk("%s, returned",__func__);
+
 	netdev_ops = net_dev_container->net_device.netdev_ops;
 
 	netdev_ops_container = container_of(netdev_ops, struct net_device_ops_container, net_device_ops);

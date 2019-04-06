@@ -27,13 +27,18 @@
 #define IRQ_LVD_STACK_ORDER (2 + KASAN_STACK_ORDER)
 #define IRQ_LVD_STACK_SIZE (PAGE_SIZE << IRQ_STACK_ORDER)
 
+#define EXP_LVD_STACK_ORDER (2 + KASAN_STACK_ORDER)
+#define EXP_LVD_STACK_SIZE (PAGE_SIZE << IRQ_STACK_ORDER)
+
+
 
 #define DOUBLEFAULT_STACK 1
 #define NMI_STACK 2
 #define DEBUG_STACK 3
 #define MCE_STACK 4
 #define IRQ_LVD_STACK 5 
-#define N_EXCEPTION_STACKS 5  /* hw limit: 7 */
+#define EXP_LVD_STACK 6 
+#define N_EXCEPTION_STACKS 6 /* hw limit: 7 */
 
 /*
  * Set __PAGE_OFFSET to the most negative possible address +

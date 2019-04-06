@@ -897,7 +897,7 @@ void __init early_trap_init(void)
 void __init early_trap_pf_init(void)
 {
 #ifdef CONFIG_X86_64
-	set_intr_gate(X86_TRAP_PF, page_fault);
+	set_intr_gate_ist(X86_TRAP_PF, page_fault, EXP_LVD_STACK);
 #endif
 }
 
@@ -928,31 +928,31 @@ void __init trap_init(void)
 	early_iounmap(p, 4);
 #endif
 
-	set_intr_gate(X86_TRAP_DE, divide_error);
+	set_intr_gate_ist(X86_TRAP_DE, divide_error, EXP_LVD_STACK);
 	set_intr_gate_ist(X86_TRAP_NMI, &nmi_vmfunc_simple, NMI_STACK);
 	//set_intr_gate_ist(X86_TRAP_NMI, &nmi, NMI_STACK);
 	/* int4 can be called from all */
-	set_system_intr_gate(X86_TRAP_OF, &overflow);
-	set_intr_gate(X86_TRAP_BR, bounds);
-	set_intr_gate(X86_TRAP_UD, invalid_op);
-	set_intr_gate(X86_TRAP_NM, device_not_available);
+	set_system_intr_gate_ist(X86_TRAP_OF, &overflow, EXP_LVD_STACK);
+	set_intr_gate_ist(X86_TRAP_BR, bounds, EXP_LVD_STACK);
+	set_intr_gate_ist(X86_TRAP_UD, invalid_op, EXP_LVD_STACK);
+	set_intr_gate_ist(X86_TRAP_NM, device_not_available, EXP_LVD_STACK);
 #ifdef CONFIG_X86_32
 	set_task_gate(X86_TRAP_DF, GDT_ENTRY_DOUBLEFAULT_TSS);
 #else
 	set_intr_gate_ist(X86_TRAP_DF, &double_fault, DOUBLEFAULT_STACK);
 #endif
-	set_intr_gate(X86_TRAP_OLD_MF, coprocessor_segment_overrun);
-	set_intr_gate(X86_TRAP_TS, invalid_TSS);
-	set_intr_gate(X86_TRAP_NP, segment_not_present);
-	set_intr_gate(X86_TRAP_SS, stack_segment);
-	set_intr_gate(X86_TRAP_GP, general_protection);
-	set_intr_gate(X86_TRAP_SPURIOUS, spurious_interrupt_bug);
-	set_intr_gate(X86_TRAP_MF, coprocessor_error);
-	set_intr_gate(X86_TRAP_AC, alignment_check);
+	set_intr_gate_ist(X86_TRAP_OLD_MF, coprocessor_segment_overrun, EXP_LVD_STACK);
+	set_intr_gate_ist(X86_TRAP_TS, invalid_TSS, EXP_LVD_STACK);
+	set_intr_gate_ist(X86_TRAP_NP, segment_not_present, EXP_LVD_STACK);
+	set_intr_gate_ist(X86_TRAP_SS, stack_segment, EXP_LVD_STACK);
+	set_intr_gate_ist(X86_TRAP_GP, general_protection, EXP_LVD_STACK);
+	set_intr_gate_ist(X86_TRAP_SPURIOUS, spurious_interrupt_bug, EXP_LVD_STACK);
+	set_intr_gate_ist(X86_TRAP_MF, coprocessor_error, EXP_LVD_STACK);
+	set_intr_gate_ist(X86_TRAP_AC, alignment_check, EXP_LVD_STACK);
 #ifdef CONFIG_X86_MCE
 	set_intr_gate_ist(X86_TRAP_MC, &machine_check, MCE_STACK);
 #endif
-	set_intr_gate(X86_TRAP_XF, simd_coprocessor_error);
+	set_intr_gate_ist(X86_TRAP_XF, simd_coprocessor_error, EXP_LVD_STACK);
 
 	/* Reserve all the builtin and the syscall vector: */
 	for (i = 0; i < FIRST_EXTERNAL_VECTOR; i++)

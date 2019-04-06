@@ -1155,7 +1155,9 @@ idtentry xen_stack_segment	do_stack_segment	has_error_code=1	paranoid=1
 #endif
 
 idtentry general_protection	do_general_protection	has_error_code=1	paranoid=1
-trace_idtentry page_fault	do_page_fault		has_error_code=1	paranoid=1
+trace_idtentry page_fault	do_page_fault		has_error_code=1
+#idtentry page_fault		do_page_fault		has_error_code=1	paranoid=1
+
 
 #ifdef CONFIG_KVM_GUEST
 idtentry async_page_fault	do_async_page_fault	has_error_code=1	paranoid=1

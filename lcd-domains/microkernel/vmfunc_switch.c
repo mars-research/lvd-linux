@@ -186,10 +186,10 @@ remap_cr3(void)
 	int ept = 1;
 	int ret = 0;
 
-	if (current->mapped_cr3 != __pa(current->active_mm->pgd))
-		printk(KERN_EMERG "%s, remap gpa:%lx , hpa %lx\n",
-			__func__, __pa(current->active_mm->pgd),
-			hpa_val(lcd_list[ept]->lcd_arch->hpa_cr3));
+//	if (current->mapped_cr3 != __pa(current->active_mm->pgd))
+//		printk(KERN_EMERG "%s, remap gpa:%lx , hpa %lx\n",
+//			__func__, __pa(current->active_mm->pgd),
+//			hpa_val(lcd_list[ept]->lcd_arch->hpa_cr3));
 
 	cr3_base = __pa(current->active_mm->pgd);
 

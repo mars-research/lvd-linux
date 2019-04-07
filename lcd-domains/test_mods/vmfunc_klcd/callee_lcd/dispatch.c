@@ -122,7 +122,7 @@ foo(struct fipc_message *msg)
 		} while (i < 1000000000);
 
 		// Touch NULL to trigger a page fault
-		// asm volatile ("movq %rax, 0x0");
+		asm volatile ("movq %rax, 0x0");
 
 	}
 #endif

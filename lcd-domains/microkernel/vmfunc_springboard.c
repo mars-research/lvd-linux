@@ -10,7 +10,7 @@ __asm__(
 		".extern lcd_stack_off		\n\t"
 		"vmfunc_kernel_springboard:	\n\t"
 
-		/* restore kernel_stack from offset 24 */
+		/* restore kernel_stack from vmfunc_state_page */
 		"  mov " __stringify(VMFUNC_kernel_esp) " + vmfunc_state_page, %r13	\n\t"
 		/* TODO: restore %gs */
 		"  mov %gs:current_task, %rax	\n\t"
@@ -20,7 +20,7 @@ __asm__(
 		/* populate esp_kernel */
 		"  mov %r13, %rsp		\n\t"
 
-		/* set entered_lcd = 0 at offset 16 in vmfunc_state_page */
+		/* set entered_lcd = 0 in vmfunc_state_page */
 		"  movq $0x0, " __stringify(VMFUNC_entered_lcd) " + vmfunc_state_page	\n\t"
 
 #ifdef CONFIG_LVD_DISABLE_IRQS
@@ -32,7 +32,7 @@ __asm__(
 
 		/* we are ready to jump back to the caller */
 		/* save kernel stack */
-		/* save rsp to the vmfunc_state_page at offset 24 */
+		/* save rsp to the vmfunc_state_page */
 		"  mov %rsp, " __stringify(VMFUNC_kernel_esp) " + vmfunc_state_page	\n\t"
 
 #ifdef CONFIG_LVD_DISABLE_IRQS
@@ -66,6 +66,9 @@ __asm__(
 		"  pop " _REG1 " \n\t"
 		"  pop " _REG0 " \n\t"
 #endif
+
+		/* set entered_lcd = 1 in vmfunc_state_page */
+		"  movq $0x1, " __stringify(VMFUNC_entered_lcd) " + vmfunc_state_page	\n\t"
 		/* restore stack for vmfunc domain */
 		"  mov %gs:current_task, %rax	\n\t"
 		"  mov lcd_stack_off, %rbx	\n\t"

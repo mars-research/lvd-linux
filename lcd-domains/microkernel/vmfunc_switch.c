@@ -9,6 +9,7 @@
 #define NUM_LCDS		5
 /* this is the only function Intel VT-x support */
 #define VM_FUNCTION	0
+#define NUM_ITERATIONS		1000000
 
 /* exported by the microkernel. We trust that it's sane */
 extern void *cpuid_page;
@@ -221,17 +222,42 @@ fail:
 #endif
 
 int noinline
-//__vmfunc_wrapper
 vmfunc_test_wrapper(struct fipc_message *request, vmfunc_test_t test)
 {
+#ifdef CONFIG_DO_BF_PAGE_WALK
+	unsigned long vmfunc_load_addr =
+		kallsyms_lookup_name("__vmfunc_trampoline_load_addr");
+	gva_t gva_lcd_stack = gva_add(LCD_STACK_GV_ADDR, LCD_STACK_SIZE - sizeof(void*));
+	unsigned long idtr_base;
+	unsigned char idt_ptr[10];
 
+	asm volatile("sidt %[idt_ptr]"
+			:[idt_ptr]"=m"(idt_ptr));
+
+	idtr_base = *(unsigned long *)&idt_ptr[2];
+#endif
 	switch (test) {
 	case VMFUNC_TEST_EMPTY_SWITCH:
 		printk("%s: Invoking EMPTY_SWITCH test\n", __func__);
-#ifdef CONFIG_DEFEAT_LAZY_TLB
-		remap_cr3();
+#ifdef CONFIG_DO_BF_PAGE_WALK
+		bfcall_guest_page_walk(vmfunc_load_addr, __pa(current->active_mm->pgd), 1);
+		bfcall_guest_page_walk(gva_val(gva_lcd_stack), __pa(current->active_mm->pgd), 1);
+		bfcall_guest_page_walk(idtr_base, __pa(current->active_mm->pgd), 1);
+		bfcall_guest_page_walk(0xffff8827df00b000UL, __pa(current->active_mm->pgd), 1);
 #endif
-		vmfunc_call_empty_switch();
+		{
+			int i = 0;
+			u64 start = rdtsc(), end;
+			for (; i < NUM_ITERATIONS; i++) {
+#ifdef CONFIG_DEFEAT_LAZY_TLB
+				remap_cr3();
+#endif
+				vmfunc_call_empty_switch();
+			}
+			end = rdtsc();
+			printk("%d iterations of vmfunc back-to-back took %llu cycles (avg: %llu cycles)\n",
+					NUM_ITERATIONS, end - start, (end - start) / NUM_ITERATIONS);
+		}
 		break;
 	case VMFUNC_TEST_DUMMY_CALL:
 		/* only upto vmfunc_id 0x3 is handled */

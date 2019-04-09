@@ -92,10 +92,20 @@ __asm__ (
 	"	.align 16	\n\t"
 	"	.globl vmfunc_trampoline_out \n\t"
 	"vmfunc_trampoline_out:		\n\t"
+	/* save lcd_stack */
+	"  mov %rsp, %r13	\n\t"
 	/* restore kernel_stack from vmfunc_state_page*/
 	"  mov " __stringify(VMFUNC_kernel_esp) " + vmfunc_state_page, %rsp	\n\t"
 	/* set entered_lcd = 0 in vmfunc_state_page */
 	"  movq $0x0, " __stringify(VMFUNC_entered_lcd) " + vmfunc_state_page	\n\t"
+
+	/* get current pointer */
+	"  mov %gs:current_task, %r14	\n\t"
+	/* get lcd_stack offset */
+	"  mov lcd_stack_off, %r15	\n\t"
+	/* save LCD stack after return */
+	"  mov %r13, (%r14, %r15)	\n\t"
+
 	/* stack pointer is restored, let's get our msg buffer */
 	"  pop %r13 \n\t"
 	/* construct response fipc_message from registers */

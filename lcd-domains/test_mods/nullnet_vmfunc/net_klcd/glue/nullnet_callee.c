@@ -751,7 +751,7 @@ struct rtnl_link_stats64 *ndo_get_stats64(struct net_device *dev, struct rtnl_li
 struct rtnl_link_stats64 *ndo_get_stats64(struct net_device *dev, struct rtnl_link_stats64 *stats, struct trampoline_hidden_args *hidden_args)
 #endif
 {
-	int ret;
+//	int ret;
 	struct fipc_message r;
 	struct fipc_message *request = &r;
 	struct net_device_container *net_dev_container;
@@ -763,9 +763,13 @@ struct rtnl_link_stats64 *ndo_get_stats64(struct net_device *dev, struct rtnl_li
 
 	fipc_set_reg1(request, net_dev_container->other_ref.cptr);
 
+#if 0
 	ret = vmfunc_klcd_wrapper(request, 1);
 	stats->tx_packets = fipc_get_reg1(request);
 	stats->tx_bytes = fipc_get_reg2(request);
+#endif
+	stats->tx_packets = g_stats.tx_packets;
+	stats->tx_bytes = g_stats.tx_bytes;
 
 	return stats;
 }

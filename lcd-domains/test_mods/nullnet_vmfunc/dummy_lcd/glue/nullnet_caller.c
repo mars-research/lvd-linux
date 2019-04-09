@@ -215,7 +215,6 @@ int register_netdevice(struct net_device *dev)
 	}
 	ret = fipc_get_reg4(request);
 	return ret;
-
 }
 
 //DONE

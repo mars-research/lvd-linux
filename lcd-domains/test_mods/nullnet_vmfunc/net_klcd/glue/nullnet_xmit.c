@@ -95,6 +95,8 @@ int __ndo_start_xmit_inner_async(struct sk_buff *skb, struct net_device *dev, st
 	skb_lcd->head_data_off = skb->data - skb->head;
 #endif
 
+	printk("%s, sending packet\n", __func__);
+
 	ret = vmfunc_klcd_wrapper(_request, 1);
 	ret = fipc_get_reg1(_request);
 

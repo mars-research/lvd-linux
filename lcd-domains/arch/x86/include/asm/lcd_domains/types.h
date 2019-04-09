@@ -143,6 +143,8 @@ struct lcd_arch {
 
 	hpa_t hpa_cr3;
 
+	bool idle_cr3_mapped;
+
 	/* id of this specific EPT that we use in VMFUNC */
 	unsigned int ept_id; 
 

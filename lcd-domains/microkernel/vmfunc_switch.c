@@ -6,6 +6,7 @@
 #include <asm/liblcd/address_spaces.h>
 #include <libfipc.h>
 #include <linux/kallsyms.h>
+#include <asm/pgtable_64.h>
 
 #define NUM_LCDS		5
 /* this is the only function Intel VT-x support */
@@ -15,6 +16,7 @@
 /* exported by the microkernel. We trust that it's sane */
 extern void *cpuid_page;
 extern struct lcd *lcd_list[NUM_LCDS];
+unsigned long init_pgd;
 
 int do_check(int ept)
 {
@@ -143,6 +145,16 @@ int vmfunc_klcd_wrapper(struct fipc_message *msg, unsigned int ept)
 	if (ret)
 		goto exit;
 #endif
+	if (!init_pgd)
+		init_pgd = kallsyms_lookup_name("init_level4_pgt");
+
+	printk("%s [%d]: entereing on cpu %d, reg0: %lx | lcd_stack %p\n",
+			current->comm,
+			current->pid,
+			smp_processor_id(),
+			fipc_get_reg0(msg),
+			current->lcd_stack);
+
 	vmfunc_trampoline_entry(msg);
 exit:
 	return ret;
@@ -167,6 +179,9 @@ int vmfunc_klcd_test_wrapper(struct fipc_message *msg, unsigned int ept, vmfunc_
 	printk("%s [%d]: Starting VMFUNC tests\n",
 			__func__, smp_processor_id());
 #endif
+	if (!init_pgd)
+		init_pgd = kallsyms_lookup_name("init_level4_pgt");
+
 	ret = vmfunc_test_wrapper(msg, test);
 exit:
 	return ret;
@@ -189,40 +204,36 @@ remap_cr3(void)
 	//		__func__, __pa(current->active_mm->pgd),
 	//		hpa_val(lcd_list[ept]->lcd_arch->hpa_cr3));
 
-	cr3_base = __pa(current->active_mm->pgd);
-
-	/* gpa is the same as phys_addr */
-	gpa_cr3 = __gpa(cr3_base);
-
 	lcd = lcd_list[ept];
 	current->vmfunc_lcd = lcd;
+	if (lcd)
+		hpa_lcd_cr3 = lcd->lcd_arch->hpa_cr3;
 
-	if (lcd && !current->cr3_remapping) {
-		unsigned long init_pgd = kallsyms_lookup_name("init_level4_pgt");
-		gpa_t gpa_idle_cr3;
+	/* map init_level4_pgt */
+	if (lcd && !lcd->lcd_arch->idle_cr3_mapped) {
 
 		if (!init_pgd)
 			goto skip;
 
-		gpa_idle_cr3 = __gpa(__pa(init_pgd));
+		gpa_cr3 = __gpa(__pa(init_pgd));
 
-		/* map init_level4_pgt */
-		hpa_lcd_cr3 = lcd->lcd_arch->hpa_cr3;
-
-		ret = lcd_arch_ept_map_all_cpus(lcd_list[ept]->lcd_arch, gpa_idle_cr3,
+		ret = lcd_arch_ept_map_all_cpus(lcd_list[ept]->lcd_arch, gpa_cr3,
 			hpa_lcd_cr3,
 			1, /* create, if not present */
 			0 /* don't overwrite, if present */);
 
-		current->cr3_remapping = 1;
+		lcd->lcd_arch->idle_cr3_mapped = 1;
+
 		if (ret)
 			goto fail;
 	}
 
 skip:
-	if (lcd && (current->mapped_cr3 != cr3_base)) {
-		hpa_lcd_cr3 = lcd->lcd_arch->hpa_cr3;
+	cr3_base = __pa(current->active_mm->pgd);
+	/* gpa is the same as phys_addr */
+	gpa_cr3 = __gpa(cr3_base);
 
+	if (lcd && (current->mapped_cr3 != cr3_base)) {
 		ret = lcd_arch_ept_map_all_cpus(lcd_list[ept]->lcd_arch, gpa_cr3,
 			hpa_lcd_cr3,
 			1, /* create, if not present */
@@ -235,7 +246,8 @@ skip:
 
 	return 0;
 fail:
-	LCD_MSG("Remapping of cr3 failed for gpa: %llx, hpa: %llx",
+	LCD_MSG("%s[%d] Remapping of cr3 failed for gpa: %llx, hpa: %llx",
+			current->comm, current->pid,
 			gpa_val(gpa_cr3), hpa_val(hpa_lcd_cr3));
 	return ret;
 }

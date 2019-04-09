@@ -202,7 +202,8 @@ static int do_kernel_module_grant_map(cptr_t lcd, struct lcd_create_ctx *ctx,
 	offset = gva_val(m_init_link_addr) -
 		gva_val(LCD_KERNEL_MODULE_REGION_GV_ADDR);
 	c = &(lcd_to_boot_info(ctx)->lcd_boot_cptrs.module_init);
-	LIBLCD_MSG("grant mem for init pages ctx %p | init_bits %lx | offset %lx, pa: %p", ctx, ctx->m_init_bits, offset, __pa(ctx->m_init_bits));
+	LIBLCD_MSG("grant mem for init pages ctx %p | init_bits %lx | offset %lx, pa: %p",
+			ctx, ctx->m_init_bits, offset, page_address(vmalloc_to_page(ctx->m_init_bits)));
 	ret = do_grant_and_map_for_mem(lcd, ctx, ctx->m_init_bits,
 				gpa_add(LCD_KERNEL_MODULE_REGION_GP_ADDR,
 					offset),
@@ -385,20 +386,29 @@ static void dump_virt_addr_space(struct lcd_create_ctx *ctx)
 
 	for (i = 0; i < 512; i++) {
 		if (pgd[i].pgd)
-			printk("PGD: idx = %d | val = %lx\n", i, gva_val(isolated_lcd_gpa2gva(__gpa(pgd[i].pgd & PAGE_MASK))));;
+			printk("PGD: idx = %d | gpa_val = %lx, gva_val = %lx\n",
+					i,
+					pgd[i].pgd & PAGE_MASK,
+					gva_val(isolated_lcd_gpa2gva(__gpa(pgd[i].pgd & PAGE_MASK))));
 	}
 	pgd += 512;
 
 	for (i = 0; i < 512; i++) {
 		if (pgd[i].pgd)
-			printk("PUD: idx = %d | val = %lx\n", i, gva_val(isolated_lcd_gpa2gva(__gpa(pgd[i].pgd & PAGE_MASK))));;
+			printk("PUD: idx = %d | gpa_val = %lx, gva_val = %lx\n",
+					i,
+					pgd[i].pgd & PAGE_MASK,
+					gva_val(isolated_lcd_gpa2gva(__gpa(pgd[i].pgd & PAGE_MASK))));
 	}
 
-	pgd += (1 * 512);
+	pgd += (10 * 512);
 
 	for (i = 0; i < 512; i++) {
 		if (pgd[i].pgd)
-			printk("PMD: idx = %d | val = %lx\n", i, gva_val(isolated_lcd_gpa2gva(__gpa(pgd[i].pgd & PAGE_MASK))));;
+			printk("PMD: idx = %d | gpa_val = %lx, gva_val = %lx\n",
+					i,
+					pgd[i].pgd & PAGE_MASK,
+					gva_val(isolated_lcd_gpa2gva(__gpa(pgd[i].pgd & PAGE_MASK))));
 	}
 }
 
@@ -633,7 +643,7 @@ static int map_cpu_page(void *addr, struct lcd_create_ctx *ctx)
 		flags |= _PAGE_PRESENT;
 		flags |= _PAGE_RW;
 
-		gp = (((u64)addr) & HPAGE_MASK) - _LCD_VIRT_BASE;
+		gp = ((((u64)addr) & HPAGE_MASK) - LCD_DIRECT_MAP_VIRT_BASE) + LCD_PHYS_DIRECT_MAP_REGION_OFFSET;
 		//gp = gpa_val(isolated_lcd_gva2gpa(__gva((u64)addr & HPAGE_MASK)));
 		printk("%s, set PTE gva: %llx, pmd_idx %llu, gp_addr %llx at vaddr:%p\n", __func__,
 					gva, pmd_idx, gp, &hva_pmd_page[pmd_idx]);
@@ -729,6 +739,8 @@ static int setup_phys_addr_space(cptr_t lcd, struct lcd_create_ctx *ctx,
 	 * Map and grant bootstrap pages, page tables, and stack
 	 */
 	c = &(lcd_to_boot_info(ctx)->lcd_boot_cptrs.boot_pages);
+	LIBLCD_MSG("mapping bootstrap pages gpa: %lx hpa: %p",
+			gpa_val(LCD_BOOTSTRAP_PAGES_GP_ADDR), ctx->lcd_boot_info);
 	ret = do_grant_and_map_for_mem(lcd, ctx, ctx->lcd_boot_info,
 				LCD_BOOTSTRAP_PAGES_GP_ADDR,
 				c);
@@ -737,12 +749,16 @@ static int setup_phys_addr_space(cptr_t lcd, struct lcd_create_ctx *ctx,
 
 	/* in vmfunc LCDS, there are no additional guest page tables for LCDs */
 	c = &(lcd_to_boot_info(ctx)->lcd_boot_cptrs.gv);
+	LIBLCD_MSG("mapping bootstrap pgtable pages gpa: %lx hpa: %p",
+			gpa_val(LCD_BOOTSTRAP_PAGE_TABLES_GP_ADDR), ctx->gv_pg_tables);
 	ret = do_grant_and_map_for_mem(lcd, ctx, ctx->gv_pg_tables,
 				LCD_BOOTSTRAP_PAGE_TABLES_GP_ADDR, c);
 	if (ret)
 		goto fail2;
 
 	c = &(lcd_to_boot_info(ctx)->lcd_boot_cptrs.stack);
+	LIBLCD_MSG("mapping stack pages gpa: %lx hpa: %p",
+			gpa_val(LCD_STACK_GP_ADDR), ctx->stack);
 	ret = do_grant_and_map_for_mem(lcd, ctx, ctx->stack,
 				LCD_STACK_GP_ADDR,
 				c);
@@ -785,7 +801,7 @@ fail1:
 
 /* VIRTUAL ADDRESS SPACE ------------------------------ */
 static void setup_lcd_pmd(struct lcd_mem_region *reg, pmd_t *pmd,
-			unsigned int gigabyte_idx)
+			unsigned int gigabyte_idx, bool verbose)
 {
 	unsigned int k;
 	unsigned long gp;
@@ -800,6 +816,9 @@ static void setup_lcd_pmd(struct lcd_mem_region *reg, pmd_t *pmd,
 		 */
 		gp = LCD_PHYS_BASE + gigabyte_idx * (1UL << 30) +
 			k * (1UL << 21);
+		if (verbose)
+			printk("%s, k:%d, gbyte_idx: %x, gp: %lx at pmd[%d]: %p\n",\
+					__func__, k, gigabyte_idx, gp, k, &pmd[k]);
 		set_pmd(&pmd[k], __pmd(gp | reg->flags | _PAGE_PSE));
 	}
 }
@@ -822,7 +841,10 @@ static void setup_lcd_pmds(pmd_t *pmds)
 		lo = reg->offset >> 30;
 		hi = lo + (reg->size >> 30);
 		for (j = lo; j < hi; j++) {
-			setup_lcd_pmd(reg, pmd_entry, j);
+			if (i == LCD_NR_MEM_REGIONS - 1)
+				setup_lcd_pmd(reg, pmd_entry, j, true);
+			else
+				setup_lcd_pmd(reg, pmd_entry, j, false);
 			pmd_entry += 512;
 		}
 	}
@@ -847,8 +869,12 @@ static void setup_lcd_pud(pud_t *pud)
 		/*
 		 * Point to correct pmd's
 		 */
+		//lo = (reg->offset - LCD_TOP_512GB_REGION_OFFSET) >> 30;
 		lo = reg->offset >> 30;
 		hi = lo + (reg->size >> 30);
+		if (1)
+			printk("%s, region %u, lo : %u, hi : %u\n",
+					__func__, i, lo, hi);
 		for (j = lo; j < hi; j++) {
 			pud_entry = &pud[j];
 			set_pud(pud_entry,
@@ -902,6 +928,8 @@ static void setup_virt_addr_space(struct lcd_create_ctx *ctx)
 	setup_lcd_pmds(cursor);
 }
 
+int lcd_arch_ept_gpa_to_hpa_cpu(struct lcd_arch *lcd, gpa_t ga, hpa_t *ha_out, bool verbose, int cpu);
+
 static int setup_addr_spaces_lvd(cptr_t lcd, struct lcd_create_ctx *ctx,
 			gva_t m_init_link_addr, gva_t m_core_link_addr,
 			gva_t m_vmfunc_tr_page_addr,
@@ -935,6 +963,72 @@ static int setup_addr_spaces_lvd(cptr_t lcd, struct lcd_create_ctx *ctx,
 	setup_virt_addr_space(ctx);
 
 	dump_virt_addr_space(ctx);
+
+	{
+		struct lcd *lcd_struct;
+		struct cnode *lcd_cnode;
+		gpa_t ga;
+		hpa_t hpa_out;
+		u64 addr, offset, gva;
+		unsigned char idt_ptr[10];
+		unsigned long idtr_base;
+
+
+		asm volatile("sidt %[idt_ptr]"
+				:[idt_ptr]"=m"(idt_ptr));
+
+		idtr_base = *(unsigned long *)&idt_ptr[2];
+
+		ret = __lcd_get(current->lcd, lcd, &lcd_cnode, &lcd_struct);
+		if (ret)
+			goto fail1;
+
+		LIBLCD_MSG("Walking kernel_module_region %lx", gva_val(LCD_KERNEL_MODULE_REGION_GV_ADDR));
+		walk_lvd_pgtable((void *)gva_val(LCD_KERNEL_MODULE_REGION_GV_ADDR), ctx);
+
+		LIBLCD_MSG("Walking kernel_module_region %lx", gva_val(gva_add(LCD_STACK_GV_ADDR, LCD_STACK_SIZE)) - 8);
+		walk_lvd_pgtable((void *)gva_val(gva_add(LCD_STACK_GV_ADDR, LCD_STACK_SIZE)) - 8, ctx);
+
+		LIBLCD_MSG("Walking m_vmfunc_tr_page_addr %lx", gva_val(m_vmfunc_tr_page_addr));
+		offset = gva_val(m_vmfunc_tr_page_addr) & ~HPAGE_MASK;
+		addr = walk_lvd_pgtable((void *)gva_val(m_vmfunc_tr_page_addr), ctx);
+		ga = __gpa(addr + offset);
+		ret = lcd_arch_ept_gpa_to_hpa_cpu(lcd_struct->lcd_arch, ga, &hpa_out, true, smp_processor_id());
+		LIBLCD_MSG("ept walk gpa = %lx , hpa = %lx, ret = %d", gpa_val(ga), hpa_val(hpa_out), ret);
+
+		//0xffffffffff57c000
+		gva = idtr_base;
+		LIBLCD_MSG("Walking idtr_base_addr %lx", gva);
+		offset = gva & ~HPAGE_MASK;
+		addr = walk_lvd_pgtable((void *)gva, ctx);
+		ga = __gpa(addr + offset);
+		ret = lcd_arch_ept_gpa_to_hpa_cpu(lcd_struct->lcd_arch, ga, &hpa_out, true, smp_processor_id());
+		LIBLCD_MSG("ept walk gpa = %lx , hpa = %lx, ret = %d", gpa_val(ga), hpa_val(hpa_out), ret);
+
+		__lcd_put(current->lcd, lcd_cnode, lcd_struct);
+	}
+
+	printk("LCD_KERNEL_MODULE_REGION_GP_ADDR = %lx | LCD_KERNEL_MODULE_REGION_GV_ADDR = %lx\n",
+			gpa_val(LCD_KERNEL_MODULE_REGION_GP_ADDR),
+			gva_val(LCD_KERNEL_MODULE_REGION_GV_ADDR));
+	printk("LCD_IOREMAP_GP_ADDR = %lx | LCD_IOREMAP_GV_ADDR = %lx\n",
+			gpa_val(LCD_IOREMAP_GP_ADDR),
+			gva_val(LCD_IOREMAP_GV_ADDR));
+	printk("LCD_RAM_MAP_GP_ADDR = %lx | LCD_RAM_MAP_GV_ADDR = %lx\n",
+			gpa_val(LCD_RAM_MAP_GP_ADDR),
+			gva_val(LCD_RAM_MAP_GV_ADDR));
+	printk("LCD_HEAP_GP_ADDR = %lx | LCD_HEAP_GV_ADDR = %lx\n",
+			gpa_val(LCD_HEAP_GP_ADDR),
+			gva_val(LCD_HEAP_GV_ADDR));
+	printk("LCD_STACK_GP_ADDR = %lx | LCD_STACK_GV_ADDR = %lx\n",
+			gpa_val(LCD_STACK_GP_ADDR),
+			gva_val(LCD_STACK_GV_ADDR));
+	printk("LCD_UTCB_GP_ADDR = %lx | LCD_UTCB_GV_ADDR = %lx\n",
+			gpa_val(LCD_UTCB_GP_ADDR),
+			gva_val(LCD_UTCB_GV_ADDR));
+	printk("LCD_PHYS_DIRECT_MAP_GP_ADDR = %lx | LCD_PHYS_DIRECT_MAP_GV_ADDR = %lx\n",
+			gpa_val(LCD_PHYS_DIRECT_MAP_GP_ADDR),
+			gva_val(LCD_PHYS_DIRECT_MAP_GV_ADDR));
 	return 0;
 
 fail1: /* just return non-zero ret; caller will free mem */

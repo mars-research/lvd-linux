@@ -183,10 +183,28 @@
 	(ilog2(LCD_STACK_SIZE >> PAGE_SHIFT))
 
 /* Offsets. */
+#ifdef LCD_BUMP_VIRT_BASE
 #define LCD_PHYS_DIRECT_MAP_REGION_OFFSET (1UL << 30)
-#define LCD_MISC_REGION_OFFSET (1UL << 30)
+#else
+/* place direct map region in the 497GB hole */
+#define LCD_PHYS_DIRECT_MAP_REGION_OFFSET (13UL << 30)
+#endif
 
-#define _LCD_MISC_REGION_OFFSET ((1UL << 30) + (119UL << 40) + (512UL << 30)) /* 64 TB (phys map) + 55.5 TB (hole) + 1 GB (hole) */
+/* region offset at 1GB +
+ * 	64 TB region
+ * 	55.5 TB hole
+ */
+#define LCD_TOP_512GB_REGION_OFFSET (LCD_PHYS_DIRECT_MAP_REGION_OFFSET + \
+			LCD_PHYS_DIRECT_MAP_REGION_SIZE + \
+			LCD_HOLE_DIRECT_MAP_TO_START_LCD)
+
+#ifdef LCD_BUMP_VIRT_BASE
+#define LCD_MISC_REGION_OFFSET (LCD_PHYS_DIRECT_MAP_REGION_OFFSET + \
+			LCD_PHYS_DIRECT_MAP_REGION_SIZE + \
+			LCD_HOLE_DIRECT_MAP_TO_START_LCD + (1 << 30))
+#else
+#define LCD_MISC_REGION_OFFSET (1UL << 30)
+#endif
 
 #define LCD_UTCB_OFFSET LCD_MISC_REGION_OFFSET
 #define LCD_BOOTSTRAP_PAGES_OFFSET (LCD_UTCB_OFFSET + LCD_UTCB_SIZE)
@@ -226,11 +244,23 @@
 /* Addresses */
 
 #define LCD_PHYS_BASE (0UL)
+
+#ifdef LCD_BUMP_VIRT_BASE
+#define LCD_VIRT_BASE (0xFFFF87FFC0000000UL)
+#else
 #define LCD_VIRT_BASE (0xFFFFFF8000000000UL)
-#define _LCD_VIRT_BASE (0xFFFF87FFC0000000UL)
+
+/*
+ * On the host, the direct map region is mapped at
+ * LCD_DIRECT_MAP_KERNEL_GV_ADDR (which varies with the kernel version used).
+ * Refer Documentation/x86/x86-64/mm.txt
+ * Inside LVDs, we should map it at the same GVA.
+ */
+#define LCD_DIRECT_MAP_VIRT_BASE	(0xFFFF880000000000UL)
+#endif
 
 #define LCD_PHYS_DIRECT_MAP_GP_ADDR (__gpa(LCD_PHYS_BASE + LCD_PHYS_DIRECT_MAP_REGION_OFFSET))
-#define LCD_PHYS_DIRECT_MAP_GV_ADDR (__gva(_LCD_VIRT_BASE + LCD_PHYS_DIRECT_MAP_REGION_OFFSET))
+#define LCD_PHYS_DIRECT_MAP_GV_ADDR (__gva(LCD_DIRECT_MAP_VIRT_BASE))
 
 #define LCD_UTCB_GP_ADDR (__gpa(LCD_PHYS_BASE + LCD_UTCB_OFFSET))
 #define LCD_UTCB_GV_ADDR (__gva(LCD_VIRT_BASE + LCD_UTCB_OFFSET))
@@ -320,7 +350,7 @@ __lcd_build_checks__(void)
 
 	/* All memory should fit into 512 GBs. This is because we only
 	 * use one pud (internally in common/module_create.c). */
-	BUILD_BUG_ON((LCD_KERNEL_MODULE_REGION_OFFSET + 
+	BUILD_BUG_ON((LCD_KERNEL_MODULE_REGION_OFFSET +
 			LCD_KERNEL_MODULE_REGION_SIZE) > (512UL << 30));
 }
 

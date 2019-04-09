@@ -2,6 +2,7 @@
 #include <lcd_domains/types.h>
 #include <asm/lcd_domains/libvmfunc.h>
 #include <asm/lcd_domains/ept_lcd.h>
+#include <asm/lcd_domains/bflank.h>
 #include <asm/liblcd/address_spaces.h>
 #include <libfipc.h>
 #include <linux/kallsyms.h>
@@ -142,9 +143,7 @@ int vmfunc_klcd_wrapper(struct fipc_message *msg, unsigned int ept)
 	if (ret)
 		goto exit;
 #endif
-//	local_irq_disable();
 	vmfunc_trampoline_entry(msg);
-//	local_irq_enable();
 exit:
 	return ret;
 }
@@ -168,9 +167,7 @@ int vmfunc_klcd_test_wrapper(struct fipc_message *msg, unsigned int ept, vmfunc_
 	printk("%s [%d]: Starting VMFUNC tests\n",
 			__func__, smp_processor_id());
 #endif
-//	local_irq_disable();
 	ret = vmfunc_test_wrapper(msg, test);
-//	local_irq_enable();
 exit:
 	return ret;
 }
@@ -187,10 +184,10 @@ remap_cr3(void)
 	int ept = 1;
 	int ret = 0;
 
-//	if (current->mapped_cr3 != __pa(current->active_mm->pgd))
-//		printk(KERN_EMERG "%s, remap gpa:%lx , hpa %lx\n",
-//			__func__, __pa(current->active_mm->pgd),
-//			hpa_val(lcd_list[ept]->lcd_arch->hpa_cr3));
+	//if (current->mapped_cr3 != __pa(current->active_mm->pgd))
+	//	printk(KERN_EMERG "%s, remap gpa:%lx , hpa %lx\n",
+	//		__func__, __pa(current->active_mm->pgd),
+	//		hpa_val(lcd_list[ept]->lcd_arch->hpa_cr3));
 
 	cr3_base = __pa(current->active_mm->pgd);
 
@@ -200,6 +197,29 @@ remap_cr3(void)
 	lcd = lcd_list[ept];
 	current->vmfunc_lcd = lcd;
 
+	if (lcd && !current->cr3_remapping) {
+		unsigned long init_pgd = kallsyms_lookup_name("init_level4_pgt");
+		gpa_t gpa_idle_cr3;
+
+		if (!init_pgd)
+			goto skip;
+
+		gpa_idle_cr3 = __gpa(__pa(init_pgd));
+
+		/* map init_level4_pgt */
+		hpa_lcd_cr3 = lcd->lcd_arch->hpa_cr3;
+
+		ret = lcd_arch_ept_map_all_cpus(lcd_list[ept]->lcd_arch, gpa_idle_cr3,
+			hpa_lcd_cr3,
+			1, /* create, if not present */
+			0 /* don't overwrite, if present */);
+
+		current->cr3_remapping = 1;
+		if (ret)
+			goto fail;
+	}
+
+skip:
 	if (lcd && (current->mapped_cr3 != cr3_base)) {
 		hpa_lcd_cr3 = lcd->lcd_arch->hpa_cr3;
 
@@ -239,12 +259,16 @@ vmfunc_test_wrapper(struct fipc_message *request, vmfunc_test_t test)
 	switch (test) {
 	case VMFUNC_TEST_EMPTY_SWITCH:
 		printk("%s: Invoking EMPTY_SWITCH test\n", __func__);
+		remap_cr3();
+		vmfunc_call_empty_switch();
 #ifdef CONFIG_DO_BF_PAGE_WALK
 		bfcall_guest_page_walk(vmfunc_load_addr, __pa(current->active_mm->pgd), 1);
 		bfcall_guest_page_walk(gva_val(gva_lcd_stack), __pa(current->active_mm->pgd), 1);
 		bfcall_guest_page_walk(idtr_base, __pa(current->active_mm->pgd), 1);
 		bfcall_guest_page_walk(0xffff8827df00b000UL, __pa(current->active_mm->pgd), 1);
 #endif
+
+#ifdef CONFIG_VMFUNC_SWITCH_MICROBENCHMARK
 		{
 			int i = 0;
 			u64 start = rdtsc(), end;
@@ -258,6 +282,7 @@ vmfunc_test_wrapper(struct fipc_message *request, vmfunc_test_t test)
 			printk("%d iterations of vmfunc back-to-back took %llu cycles (avg: %llu cycles)\n",
 					NUM_ITERATIONS, end - start, (end - start) / NUM_ITERATIONS);
 		}
+#endif	/* CONFIG_VMFUNC_SWITCH_MICROBENCHMARK */
 		break;
 	case VMFUNC_TEST_DUMMY_CALL:
 		/* only upto vmfunc_id 0x3 is handled */

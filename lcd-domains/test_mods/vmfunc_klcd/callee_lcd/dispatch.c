@@ -14,12 +14,20 @@ extern int callee_main(void);
 
 #define NUM_IST_STACKS	7
 //#define CONFIG_DUMP_IRQ_REGS 1
+#define PGROUNDUP(sz)  (((sz)+PAGE_SIZE-1) & ~(PAGE_SIZE-1))
 
 unsigned long noinline
 null_invocation(struct fipc_message *msg)
 {
+	int i;
 	fipc_set_reg1(msg, 0xbad);
-	printk("%s, called\n", __func__);
+	for (i = 0; i < 10; i++) {
+		void *rsp_ptr;
+		asm volatile("mov %%rsp, %[rsp_ptr]"
+			: [rsp_ptr]"=r"(rsp_ptr));
+
+		printk("%s, called, rsp %p", __func__, rsp_ptr);
+	}
 	return 0;
 }
 
@@ -112,8 +120,20 @@ foo(struct fipc_message *msg)
 #if 1
 	{
 		int i = 0;
-		for(i = 0; i < 500; i++)
+		void *rsp_ptr;
+		unsigned long rsp_top;
+
+		for(i = 0; i < 100; i++) {
+			asm volatile("mov %%rsp, %[rsp_ptr]"
+					: [rsp_ptr]"=r"(rsp_ptr));
+			printk("rsp before int 0xf3 %p", rsp_ptr);
+
 			asm volatile("int $0xf3");
+
+			asm volatile("mov %%rsp, %[rsp_ptr]"
+					: [rsp_ptr]"=r"(rsp_ptr));
+			printk("rsp before int 0xf3 %p", rsp_ptr);
+		}
 		
 		i = 0;
 		do {
@@ -121,8 +141,19 @@ foo(struct fipc_message *msg)
 			i++;
 		} while (i < 1000000000);
 
+		rsp_top = PGROUNDUP((unsigned long)rsp_ptr);
+
+		{
+			void *cur = rsp_ptr;
+			printk("stack dump:\nbase: %lx", rsp_top);
+
+			while ((unsigned long) cur < rsp_top) {
+				printk("%p: %lx", cur, *((unsigned long*)cur));
+				cur += sizeof(void *);
+			}
+		}
 		// Touch NULL to trigger a page fault
-		asm volatile ("movq %rax, 0x0");
+		//asm volatile ("movq %rax, 0x0");
 
 	}
 #endif

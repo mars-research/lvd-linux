@@ -47,9 +47,11 @@ void run_vmfunc_tests(void)
 	/* test1: empty switch */
 	vmfunc_klcd_test_wrapper(&msg, OTHER_DOMAIN, VMFUNC_TEST_EMPTY_SWITCH);
 	printk("%s: VMFUNC_TEST_EMPTY_SWITCH: Passed\n", __func__);
+
 	/* test2: dummy unhandled call type */
 	vmfunc_klcd_test_wrapper(&msg, OTHER_DOMAIN, VMFUNC_TEST_DUMMY_CALL);
 
+	printk("%s, lcd->stack %p\n", __func__, current->lcd_stack);
 	printk("%s: VMFUNC_TEST_DUMMY_CALL: Passed\n\tValue from other domain r1: %lx, r2:%lx, r3:%lx\n",
 			__func__,
 			fipc_get_reg1(&msg),
@@ -57,6 +59,7 @@ void run_vmfunc_tests(void)
 			fipc_get_reg3(&msg)
 			);
 
+	printk("%s, lcd->stack %p\n", __func__, current->lcd_stack);
 	/* test3: RPC call, null_invocation */
 	msg.rpc_id = NULL_INVOCATION;
 	vmfunc_klcd_test_wrapper(&msg, OTHER_DOMAIN, VMFUNC_TEST_RPC_CALL);
@@ -98,10 +101,10 @@ void run_vmfunc_tests(void)
 
 	memset(&msg, 0x0, sizeof(msg));
 	msg.rpc_id = MODULE_INIT;
+	printk("%s, before MODULE_INIT lcd->stack %p\n", __func__, current->lcd_stack);
 	vmfunc_klcd_test_wrapper(&msg, OTHER_DOMAIN, VMFUNC_TEST_RPC_CALL);
 	printk("%s: VMFUNC_TEST_RPC_CALL: MODULE_INIT Passed!\n",
 				__func__);
-
 }
 
 static int caller_main(void)

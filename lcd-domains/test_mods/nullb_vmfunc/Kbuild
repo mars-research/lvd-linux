@@ -1,0 +1,6 @@
+obj-$(LCD_CONFIG_BUILD_NULLB_BOOT)	+= boot/
+
+obj-$(LCD_CONFIG_BUILD_NULLB_NULLB_LCD) += nullb_lcd/
+
+obj-$(LCD_CONFIG_BUILD_NULLB_BLK_KLCD) += blk_klcd/
+

@@ -1,0 +1,32 @@
+Apr 29 18:48:14 localhost kernel: [ 1508.732131] [nullb-release] current: ffff881010f08000 name: fio ptstate:           (null) cpu:29 
+Apr 29 18:48:14 localhost kernel: [ 1508.732132] [nullb-release] cleaning-up current: ffff881010f08000 name: fio pid: 14923 ptstate:           (null) 
+Apr 29 18:48:14 localhost kernel: [ 1508.732224] [nullb-release] current: ffff880810a33b00 name: fio ptstate: ffff88200fd87000 cpu:9 
+Apr 29 18:48:14 localhost kernel: [ 1508.732225] -->cleanup ch current: ffff880810a33b00 name: fio ptstate: ffff88200fd87000 cpu:9
+Apr 29 18:48:14 localhost kernel: [ 1508.732242] [nullb-release] cleaning-up current: ffff880810a33b00 name: fio pid: 14928 ptstate:           (null) 
+Apr 29 18:48:14 localhost kernel: [ 1508.732248] [nullb-release] current: ffff880810a33b00 name: fio ptstate:           (null) cpu:9 
+Apr 29 18:48:14 localhost kernel: [ 1508.732249] [nullb-release] cleaning-up current: ffff880810a33b00 name: fio pid: 14928 ptstate:           (null) 
+Apr 29 18:48:14 localhost kernel: [ 1508.732351] async thread --> current: ffff881008b0bb00 pid: 14895 name: kworker/29:0H 
+Apr 29 18:48:14 localhost kernel: [ 1508.733043] async thread --> current: ffff881008b0d880 pid: 14902 name: kworker/13:0H 
+Apr 29 18:48:14 localhost kernel: [ 1508.733221] [nullb-release] current: ffff88080e168000 name: fio ptstate: ffff88200fd82a00 cpu:5 
+Apr 29 18:48:14 localhost kernel: [ 1508.733670] -->cleanup ch current: ffff88080e168000 name: fio ptstate: ffff88200fd82a00 cpu:5
+Apr 29 18:48:14 localhost kernel: [ 1508.733682] assertion failure at /local/devel/xcap-capability-linux/lcd-domains/libasync/src/common/thc.c:574
+Apr 29 18:48:14 localhost kernel: [ 1508.733687] PANIC: double fault, error_code: 0x0
+Apr 29 18:48:14 localhost kernel: [ 1508.733698] [nullb-release] cleaning-up current: ffff88080e168000 name: fio pid: 14927 ptstate:           (null) 
+Apr 29 18:48:14 localhost kernel: [ 1508.738846] CPU: 13 PID: 14902 Comm: kworker/13:0H Tainted: G           OE   4.8.4 #187
+Apr 29 18:48:14 localhost kernel: [ 1508.738847] Hardware name: Dell Inc. PowerEdge R820/04K5X5, BIOS 2.3.4 01/22/2016
+Apr 29 18:48:14 localhost kernel: [ 1508.738856] Workqueue: kblockd blk_mq_run_work_fn
+Apr 29 18:48:14 localhost kernel: [ 1508.738859] task: ffff881008b0d880 task.stack: ffff88101bfe4000
+Apr 29 18:48:14 localhost kernel: [ 1508.738860] RIP: 0010:[<0000000000000000>]  [<          (null)>]           (null)
+Apr 29 18:48:14 localhost kernel: [ 1508.738863] RSP: 0018:0000000000000000  EFLAGS: 00010286
+Apr 29 18:48:14 localhost kernel: [ 1508.738864] RAX: 0000000000000061 RBX: ffff88200e40ec00 RCX: 0000000000000006
+Apr 29 18:48:14 localhost kernel: [ 1508.738865] RDX: 0000000000000000 RSI: 0000000000000202 RDI: ffff88200e40ece0
+Apr 29 18:48:14 localhost kernel: [ 1508.738866] RBP: 0000000000000000 R08: 0000000000000da3 R09: 0000000000000004
+Apr 29 18:48:14 localhost kernel: [ 1508.738866] R10: 0000000000000000 R11: 0000000000000002 R12: ffff88101333a4a0
+Apr 29 18:48:14 localhost kernel: [ 1508.738867] R13: 0000000000000002 R14: ffff88101bfe7c88 R15: ffff88080e671400
+Apr 29 18:48:14 localhost kernel: [ 1508.738869] FS:  0000000000000000(0000) GS:ffff88101f8c0000(0000) knlGS:0000000000000000
+Apr 29 18:48:14 localhost kernel: [ 1508.738870] CS:  0010 DS: 0000 ES: 0000 CR0: 0000000080050033
+Apr 29 18:48:14 localhost kernel: [ 1508.738871] CR2: fffffffffffffff8 CR3: 000000101b5a0000 CR4: 00000000000426e0
+
+Message Input
+
+Jot something down

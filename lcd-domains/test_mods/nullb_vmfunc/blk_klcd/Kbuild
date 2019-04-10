@@ -1,0 +1,18 @@
+obj-m += lcd_test_mod_nullb_blk_klcd.o
+
+lcd_test_mod_nullb_blk_klcd-y		+= main.o
+
+# glue code
+lcd_test_mod_nullb_blk_klcd-y		+= $(addprefix glue/, nullb_callee.o \
+						nullb_callee_dispatch.o )
+
+lcd_test_mod_nullb_blk_klcd-y		+= $(addprefix ../, cap.o)
+
+cppflags-y += $(NONISOLATED_CFLAGS)
+
+extra-y += glue/nullb_callee.lds
+
+ldflags-y += -T $(LCD_TEST_MODULES_BUILD_DIR)/nullb/blk_klcd/glue/nullb_callee.lds
+
+ccflags-y += $(NONISOLATED_CFLAGS)
+

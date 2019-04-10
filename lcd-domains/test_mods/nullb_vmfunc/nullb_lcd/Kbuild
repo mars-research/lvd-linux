@@ -1,0 +1,18 @@
+obj-m += lcd_test_mod_nullb_nullb_lcd.o
+
+lcd_test_mod_nullb_nullb_lcd-y		+= main.o
+
+# Original code
+lcd_test_mod_nullb_nullb_lcd-y		+= null_blk.o 
+
+
+lcd_test_mod_nullb_nullb_lcd-y		+= $(LIBLCD)
+
+# glue code
+lcd_test_mod_nullb_nullb_lcd-y		+= $(addprefix glue/, nullb_caller.o \
+						nullb_caller_dispatch.o )
+
+lcd_test_mod_nullb_nullb_lcd-y		+= $(addprefix ../, cap.o)
+
+ccflags-y += $(ISOLATED_CFLAGS)
+

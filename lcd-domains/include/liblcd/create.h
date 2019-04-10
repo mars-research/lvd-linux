@@ -105,6 +105,9 @@ int lcd_memory_grant_and_map(cptr_t lcd, cptr_t mo, cptr_t dest_slot,
 
 int lcd_memory_grant_and_map_hpa(cptr_t lcd, cptr_t mo, cptr_t dest_slot,
 			gpa_t base, hpa_t hpa_base);
+
+int lcd_memory_grant_and_map_cpu(cptr_t lcd, cptr_t mo, cptr_t dest_slot,
+			gpa_t base, int cpu);
 /**
  * lcd_cap_grant -- Grant the LCD a capability (config its cspace)
  * @lcd: the LCD to configure

@@ -30,8 +30,8 @@ int lcd_arch_ept_walk_cpu(lcd_arch_epte_t *dir, gpa_t a, int create,
 int lcd_arch_ept_map_all_cpus(struct lcd_arch *lcd, gpa_t ga, hpa_t ha,
 		int create, int overwrite);
 
-int lcd_arch_ept_map_this_cpu(struct lcd_arch *lcd, gpa_t ga, hpa_t ha,
-		int create, int overwrite);
+int lcd_arch_ept_map_cpu(struct lcd_arch *lcd, gpa_t ga, hpa_t ha,
+		int create, int overwrite, int cpu);
 
 /**
  * Maps
@@ -46,10 +46,15 @@ int lcd_arch_ept_map_this_cpu(struct lcd_arch *lcd, gpa_t ga, hpa_t ha,
  */
 int lcd_arch_ept_map_range_all_cpus(struct lcd_arch *lcd, gpa_t ga_start,
 			hpa_t ha_start, unsigned long npages);
+
+int lcd_arch_ept_map_range_cpu(struct lcd_arch *lcd, gpa_t ga_start,
+			hpa_t ha_start, unsigned long npages, int cpu);
 /**
  * Simple routine combining ept walk and unset.
  */
 int lcd_arch_ept_unmap_all_cpus(struct lcd_arch *lcd, gpa_t a);
+
+int lcd_arch_ept_unmap_cpu(struct lcd_arch *lcd, gpa_t a, int cpu);
 
 /**
  * Unmaps

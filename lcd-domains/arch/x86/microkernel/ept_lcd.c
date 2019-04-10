@@ -246,11 +246,11 @@ int lcd_arch_ept_walk_cpu(lcd_arch_epte_t *dir, gpa_t a, int create,
 	return 0;
 }
 
-int lcd_arch_ept_map_this_cpu(struct lcd_arch *lcd, gpa_t ga, hpa_t ha,
-				int create, int overwrite)
+int lcd_arch_ept_map_cpu(struct lcd_arch *lcd, gpa_t ga, hpa_t ha,
+				int create, int overwrite, int cpu)
 {
 	int ret = 0;
-	int cpu = smp_processor_id();
+
 
 	/*
 	 * Walk ept
@@ -316,6 +316,34 @@ int lcd_arch_ept_map_all_cpus(struct lcd_arch *lcd, gpa_t ga, hpa_t ha,
 	return ret;
 }
 
+int lcd_arch_ept_map_range_cpu(struct lcd_arch *lcd, gpa_t ga_start,
+			hpa_t ha_start, unsigned long npages, int cpu)
+{
+	unsigned long off;
+	unsigned long len;
+
+	len = npages * PAGE_SIZE;
+	for (off = 0; off < len; off += PAGE_SIZE) {
+		if (lcd_arch_ept_map_cpu(lcd,
+					/* gpa */
+					gpa_add(ga_start, off),
+					/* hpa */
+					hpa_add(ha_start, off),
+					/* create */
+					1,
+					/* no overwrite */
+					0,
+					cpu)) {
+			LCD_ERR("error mapping gpa %lx to hpa %lx\n",
+				gpa_val(gpa_add(ga_start, off)),
+				hpa_val(hpa_add(ha_start, off)));
+			return -EIO;
+		}
+	}
+
+	return 0;
+}
+
 int lcd_arch_ept_map_range_all_cpus(struct lcd_arch *lcd, gpa_t ga_start,
 			hpa_t ha_start, unsigned long npages)
 {
@@ -339,6 +367,28 @@ int lcd_arch_ept_map_range_all_cpus(struct lcd_arch *lcd, gpa_t ga_start,
 			return -EIO;
 		}
 	}
+
+	return 0;
+}
+
+int lcd_arch_ept_unmap_cpu(struct lcd_arch *lcd, gpa_t a, int cpu)
+{
+	int ret;
+
+	/*
+	 * Walk ept
+	 */
+	lcd_arch_epte_t *ept_entry;
+	lcd_arch_epte_t *dir = (lcd_arch_epte_t *)lcd->eptp_lcd[cpu];
+	ret = lcd_arch_ept_walk_cpu(dir, a, 0, &ept_entry);
+
+	if (ret)
+		return ret;
+
+	/*
+	 * Unset
+	 */
+	lcd_arch_ept_unset(ept_entry);
 
 	return 0;
 }

@@ -17,6 +17,7 @@
 #include <liblcd/liblcd.h>
 #include <lcd_domains/microkernel.h>
 #include <asm/desc.h>
+#include <linux/percpu.h>
 
 #include <lcd_config/post_hook.h>
 
@@ -175,6 +176,90 @@ static int do_grant_and_map_for_mem_hpa(cptr_t lcd, struct lcd_create_ctx *ctx,
 fail3:
 	cptr_free(lcd_to_boot_cptr_cache(ctx), *dest);
 fail2:
+fail1:
+	return ret;
+}
+
+static int do_grant_and_map_for_mem_cpu(cptr_t lcd, struct lcd_create_ctx *ctx,
+				void *mem, gpa_t map_base,
+				cptr_t *dest, int cpu)
+{
+	int ret;
+	cptr_t mo;
+	unsigned long size, offset;
+	/*
+	 * Look up the cptr for the *creator*
+	 */
+	ret = lcd_virt_to_cptr(__gva((unsigned long)mem), &mo, &size,
+			&offset);
+	if (ret) {
+		LIBLCD_ERR("lookup failed");
+		goto fail1;
+	}
+	/*
+	 * Alloc a cptr in the new LCD cptr cache
+	 */
+	ret = cptr_alloc(lcd_to_boot_cptr_cache(ctx), dest);
+	if (ret) {
+		LIBLCD_ERR("cptr alloc failed");
+		goto fail2;
+	}
+	/*
+	 * Grant and map the memory
+	 */
+	ret = lcd_memory_grant_and_map_cpu(lcd, mo, *dest, map_base, cpu);
+	if (ret) {
+		LIBLCD_ERR("grant and map failed");
+		goto fail3;
+	}
+
+	return 0;
+
+fail3:
+	cptr_free(lcd_to_boot_cptr_cache(ctx), *dest);
+fail2:
+fail1:
+	return ret;
+}
+#define LVD_PERCPU_STACK
+
+static int do_grant_map_percpu_stack_pools(struct lcd_create_ctx *ctx, cptr_t lcd)
+{
+	struct lcd *lcd_struct;
+	struct cnode *lcd_cnode;
+	int ret;
+	int cpu;
+
+	ret = __lcd_get(current->lcd, lcd, &lcd_cnode, &lcd_struct);
+	if (ret)
+		goto fail1;
+	__lcd_put(current->lcd, lcd_cnode, lcd_struct);
+
+	for_each_online_cpu(cpu) {
+		struct lcd_stack *this_stack = per_cpu_ptr(lcd_struct->lcd_stacks, cpu);
+		void **stack_pools = this_stack->stacks;
+		int i;
+		cptr_t c;
+
+		/*
+		 * Since, we have percpu EPTs, let's map the pool of stacks on
+		 * the same GPA on all EPTs. The pool will span from
+		 * LCD_STACK_SIZE to NUM_STACKS_PER_CPU * LCD_STACK_SIZE
+		 */
+		for (i = 0; i < NUM_STACKS_PER_CPU; i++) {
+			unsigned long gpa_stack = gpa_val(LCD_STACK_GP_ADDR);
+			gpa_stack -= i * LCD_STACK_SIZE;
+
+			LIBLCD_MSG("mapping stack pages on cpu:%d gpa: %lx hpa: %p",
+					cpu,
+					gpa_stack,
+					stack_pools[i]);
+			ret = do_grant_and_map_for_mem_cpu(lcd, ctx, stack_pools[i],
+					__gpa(gpa_stack), &c, cpu);
+		}
+	}
+
+
 fail1:
 	return ret;
 }
@@ -756,12 +841,16 @@ static int setup_phys_addr_space(cptr_t lcd, struct lcd_create_ctx *ctx,
 	if (ret)
 		goto fail2;
 
+#ifdef LVD_PERCPU_STACK
+	do_grant_map_percpu_stack_pools(ctx, lcd);
+#else
 	c = &(lcd_to_boot_info(ctx)->lcd_boot_cptrs.stack);
 	LIBLCD_MSG("mapping stack pages gpa: %lx hpa: %p",
 			gpa_val(LCD_STACK_GP_ADDR), ctx->stack);
 	ret = do_grant_and_map_for_mem(lcd, ctx, ctx->stack,
 				LCD_STACK_GP_ADDR,
 				c);
+#endif
 	if (ret)
 		goto fail3;
 	/*
@@ -1115,14 +1204,60 @@ static int do_cptr_cache_init(struct cptr_cache *cache)
 void *lcd_stack;
 EXPORT_SYMBOL(lcd_stack);
 
+void **lcd_stacks;
+EXPORT_SYMBOL(lcd_stacks);
+
+/*
+ * For each cpu, create a bitmap and a pool of stacks
+ */
+int create_lvd_stack_pools(struct lcd_create_ctx *ctx, cptr_t lcd)
+{
+	struct lcd *lcd_struct;
+	struct cnode *lcd_cnode;
+	int ret;
+	int cpu;
+
+	ret = __lcd_get(current->lcd, lcd, &lcd_cnode, &lcd_struct);
+
+	if (ret)
+		goto fail1;
+
+	__lcd_put(current->lcd, lcd_cnode, lcd_struct);
+
+	lcd_struct->lcd_stacks = __alloc_percpu(sizeof(struct lcd_stack), 0);
+
+	if (!lcd_struct->lcd_stacks) {
+		LIBLCD_ERR("%s, alloc_percpu failed", __func__);
+		goto fail1;
+	}
+
+	for_each_online_cpu(cpu) {
+		struct lcd_stack *this_stack = per_cpu_ptr(lcd_struct->lcd_stacks, cpu);
+		int i;
+
+		this_stack->bitmap = ~0ll;
+		this_stack->stacks = kzalloc(sizeof(void*) * NUM_STACKS_PER_CPU, GFP_KERNEL);
+
+		for (i = 0; i < NUM_STACKS_PER_CPU; i++) {
+			struct page *p;
+			p = lcd_alloc_pages(0, LCD_STACK_ORDER);
+			if (!p) {
+				LIBLCD_ERR("%s, stack page allocation failed", __func__);
+				goto fail2;
+			}
+			this_stack->stacks[i] = lcd_page_address(p);
+		}
+	}
+
+fail2:
+fail1:
+	return ret;
+}
+
 static int get_pages_for_lvd(struct lcd_create_ctx *ctx)
 {
 	struct page *p1, *p2, *p3, *p4;
 	int ret;
-#ifdef LVD_PERCPU_STACK
-	int c;
-	void **stack_pages;
-#endif
 
 	/*
 	 * We explicity zero things out. If this code is used inside
@@ -1169,36 +1304,6 @@ static int get_pages_for_lvd(struct lcd_create_ctx *ctx)
 	ctx->stack = lcd_page_address(p3);
 	lcd_stack = (void*) gva_val(gva_add(LCD_STACK_GV_ADDR, LCD_STACK_SIZE - sizeof(void *)));
 
-
-#ifdef LVD_PERCPU_STACK
-	ctx->stack = kzalloc(sizeof(void*) * num_online_cpus(), GFP_KERNEL);
-
-	stack_pages = kzalloc(sizeof(void*) * num_online_cpus(), GFP_KERNEL);
-
-	if (!ctx->stack || !stack_pages) {
-		LIBLCD_ERR("alloc boot page tables failed");
-		ret = -ENOMEM;
-		goto fail4;
-	}
-
-	for_each_online_cpu(c) {
-		/*
-		 * Alloc stack
-		 */
-		p3 = lcd_alloc_pages(0, LCD_STACK_ORDER);
-		if (!p3) {
-			LIBLCD_ERR("alloc stack pages failed");
-			ret = -ENOMEM;
-			goto fail5;
-		}
-		memset(lcd_page_address(p3), 0, LCD_STACK_SIZE);
-		ctx->stack[c] = lcd_page_address(p3);
-		stack_pages[c] = p3;
-	}
-
-	kfree(stack_pages);
-#endif
-
 	/*
 	 * Alloc vmfunc_state_page
 	 */
@@ -1206,22 +1311,14 @@ static int get_pages_for_lvd(struct lcd_create_ctx *ctx)
 	if (!p4) {
 		LIBLCD_ERR("alloc vmfunc_state_page failed");
 		ret = -ENOMEM;
-		goto fail6;
+		goto fail5;
 	}
 	ctx->vmfunc_state_page = lcd_page_address(p4);
 
 	return 0;
 
-fail6:
-
-#ifdef LVD_PERCPU_STACK
 fail5:
-	for ( ; c >= 0; c--) {
-		lcd_free_pages(stack_pages[c], LCD_BOOTSTRAP_PAGE_TABLES_ORDER);
-	}
-
-	kzfree(stack_pages);
-#endif
+	lcd_free_pages(p3, LCD_STACK_ORDER);
 fail4:
 	lcd_free_pages(p2, LCD_BOOTSTRAP_PAGE_TABLES_ORDER);
 fail3:
@@ -1587,6 +1684,8 @@ int lvd_create_module_lvd(char *mdir, char *mname, cptr_t *lcd_out,
 		LIBLCD_ERR("error creating empty LCD");
 		goto fail4;
 	}
+
+	create_lvd_stack_pools(ctx, lcd);
 
 	/*
 	 * vmfuncwrapper.text hosts vmfunc wrapper. SHT_RELA of this text

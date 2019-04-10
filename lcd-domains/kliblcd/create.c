@@ -158,6 +158,12 @@ int lcd_memory_grant_and_map_hpa(cptr_t lcd, cptr_t mo, cptr_t dest_slot,
 					dest_slot, base, hpa_base);
 }
 
+int lcd_memory_grant_and_map_cpu(cptr_t lcd, cptr_t mo, cptr_t dest_slot,
+			gpa_t base, int cpu)
+{
+	return __lcd_memory_grant_and_map_cpu(current->lcd, lcd, mo,
+					dest_slot, base, cpu);
+}
 
 int lcd_cap_grant(cptr_t lcd, cptr_t src, cptr_t dest)
 {
@@ -183,6 +189,7 @@ EXPORT_SYMBOL(lvd_create_klcd);
 EXPORT_SYMBOL(lcd_config_registers);
 EXPORT_SYMBOL(lcd_memory_grant_and_map);
 EXPORT_SYMBOL(lcd_memory_grant_and_map_hpa);
+EXPORT_SYMBOL(lcd_memory_grant_and_map_cpu);
 EXPORT_SYMBOL(lcd_cap_grant);
 EXPORT_SYMBOL(lcd_run);
 EXPORT_SYMBOL(lcd_set_struct_module_hva);

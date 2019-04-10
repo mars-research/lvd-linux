@@ -9,6 +9,7 @@
 
 extern void dummy_cleanup_module(void);
 extern int __dummy_lcd_init(void);
+extern void __dummy_lcd_exit(void);
 
 int handle_rpc_calls(struct fipc_message *message)
 {
@@ -19,6 +20,10 @@ int handle_rpc_calls(struct fipc_message *message)
 		case MODULE_INIT:
 			trace(MODULE_INIT);
 			return __dummy_lcd_init();
+		case MODULE_EXIT:
+			trace(MODULE_EXIT);
+			__dummy_lcd_exit();
+			return 0;
 		case NDO_INIT:
 			trace(NDO_INIT);
 			return ndo_init_callee(message);
@@ -28,7 +33,7 @@ int handle_rpc_calls(struct fipc_message *message)
 			/* wait until uninit is called */
 			return -1;
 		case NDO_START_XMIT:
-			trace(NDO_START_XMIT);
+			/* trace(NDO_START_XMIT); */
 			return ndo_start_xmit_async_bare_callee(message);
 		case NDO_VALIDATE_ADDR:
 			trace(NDO_VALIDATE_ADDR);

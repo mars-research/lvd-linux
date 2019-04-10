@@ -107,6 +107,9 @@ int boot_lcd_thread(void *data)
 	msleep(2000);
 	LIBLCD_MSG("Exiting thread");
 	if (!ret) {
+		/* trigger exit module */
+		lcd_stop(net_klcd);
+
 		lcd_destroy_module_klcd(net_klcd,
 				"lcd_test_mod_nullnet_vmfunc_net_klcd");
 		if (current->lcd)

@@ -78,7 +78,16 @@ fail2:
  */
 static void __exit net_klcd_exit(void)
 {
+	struct fipc_message m = {0};
+
 	LIBLCD_MSG("%s: exiting", __func__);
+
+	/* call module_init for lcd */
+	m.vmfunc_id = VMFUNC_RPC_CALL;
+	m.rpc_id = MODULE_EXIT;
+	LIBLCD_MSG("Calling MODULE_EXIT of dummy_lcd");
+	vmfunc_klcd_wrapper(&m, OTHER_DOMAIN);
+
 	/*
 	 * Tear down net glue
 	 */

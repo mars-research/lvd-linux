@@ -18,6 +18,7 @@ struct glue_cspace *nullnet_cspace;
 cptr_t nullnet_sync_endpoint;
 
 int dummy_init_module(void);
+void dummy_cleanup_module(void);
 
 static int dummy_lcd_init(void)
 {
@@ -49,12 +50,20 @@ int __dummy_lcd_init(void)
 	return dummy_lcd_init();
 }
 
-static void __exit dummy_lcd_exit(void)
+static void dummy_lcd_exit(void)
 {
 	LIBLCD_MSG("%s: exiting", __func__);
+
+	dummy_cleanup_module();
+
 	glue_nullnet_exit();
 	lcd_exit(0);
 	return;
+}
+
+void __dummy_lcd_exit(void)
+{
+	dummy_lcd_exit();
 }
 
 module_init(__dummy_lcd_init);

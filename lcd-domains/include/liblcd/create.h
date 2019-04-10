@@ -140,6 +140,8 @@ int lcd_set_struct_module_hva(cptr_t lcd, struct module *mod);
  */
 int lcd_run(cptr_t lcd);
 
+int lcd_stop(cptr_t lcd);
+
 /* HIGHER-LEVEL LCD CREATE FROM KERNEL MODULE ------------------------------ */
 
 /**

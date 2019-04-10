@@ -822,6 +822,7 @@ int __lcd_kthread_main(void *data);
  */
 int __lcd_run(struct lcd *caller, cptr_t lcd);
 
+int __lcd_stop(struct lcd *caller, cptr_t lcd);
 /**
  * __lcd_run_init -- Invoke this when microkernel initializes
  */

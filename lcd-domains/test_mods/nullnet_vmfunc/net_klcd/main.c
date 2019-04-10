@@ -62,7 +62,7 @@ static int net_klcd_init(void)
 	m.vmfunc_id = VMFUNC_RPC_CALL;
 	m.rpc_id = MODULE_INIT;
 	LIBLCD_MSG("vmfunc_init successfull! Calling MODULE_INIT of dummy_lcd");
-	vmfunc_klcd_test_wrapper(&m, OTHER_DOMAIN, VMFUNC_TEST_RPC_CALL);
+	vmfunc_klcd_wrapper(&m, OTHER_DOMAIN);
 
 	return 0;
 

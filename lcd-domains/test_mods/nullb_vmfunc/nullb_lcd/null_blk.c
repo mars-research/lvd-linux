@@ -1048,7 +1048,7 @@ int null_init(void)
 	if (null_major < 0)
 		return null_major;
 
-	#ifndef LCD_ISOLATE
+#ifndef LCD_ISOLATE
 	if (use_lightnvm) {
 		ppa_cache = kmem_cache_create("ppa_cache", 64 * sizeof(u64),
 								0, 0, NULL);
@@ -1090,19 +1090,20 @@ static void __exit null_exit(void)
 void null_exit(void)
 #endif
 {
-	//struct nullb *nullb;
-	
-	//printk("calling unregister_blkdev \n");
-	//unregister_blkdev(null_major, "nullb");
-
-	//mutex_lock(&lock);
-	//while (!list_empty(&nullb_list)) {
-	//	nullb = list_entry(nullb_list.next, struct nullb, list);
-	//	null_del_dev(nullb);
-	//}
-	//mutex_unlock(&lock);
+#ifndef LCD_ISOLATE
+	struct nullb *nullb;
+#endif	
+	printk("calling unregister_blkdev \n");
+	unregister_blkdev(null_major, "nullb");
 
 #ifndef LCD_ISOLATE
+	/* XXX: Revisit this */
+	mutex_lock(&lock);
+	while (!list_empty(&nullb_list)) {
+		nullb = list_entry(nullb_list.next, struct nullb, list);
+		null_del_dev(nullb);
+	}
+	mutex_unlock(&lock);
 	kmem_cache_destroy(ppa_cache);
 #endif
 }

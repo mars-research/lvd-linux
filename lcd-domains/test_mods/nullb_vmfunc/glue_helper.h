@@ -4,7 +4,7 @@
 #include <linux/kthread.h>
 #include <linux/module.h>
 
-/*Block layer deps */
+/* Block layer deps */
 #include <linux/blkdev.h>
 #include <linux/blk-mq.h>
 #include <libcap.h>
@@ -13,9 +13,8 @@
 #include <liblcd/glue_cspace.h>
 #include <liblcd/liblcd.h>
 #include <liblcd/sync_ipc_poll.h>
+#include <asm/lcd_domains/libvmfunc.h>
 
-
-#define PMFS_ASYNC_RPC_BUFFER_ORDER 20
 #define SENDER_DISPATCH_LOOP
 
 enum dispatch_t {
@@ -45,7 +44,9 @@ enum dispatch_t {
 	OPEN_CHARDEV,
 	RELEASE_CHARDEV,
 	MMAP_CHARDEV,
-        DESTROY_LCD
+        DESTROY_LCD,
+	MODULE_INIT,
+	MODULE_EXIT
 };
 
 /* CONTAINERS ------------------------------------------------------------ */
@@ -191,39 +192,15 @@ static inline
 int
 async_msg_get_fn_type(struct fipc_message *msg)
 {
-        return fipc_get_flags(msg) >> THC_RESERVED_MSG_FLAG_BITS;
+	return msg->rpc_id;
 }
 
 static inline
 void
 async_msg_set_fn_type(struct fipc_message *msg, int type)
 {
-        uint32_t flags = fipc_get_flags(msg);
-        /* ensure type is in range */
-        type &= (1 << (32 - THC_RESERVED_MSG_FLAG_BITS)) - 1;
-        /* erase old type */
-        flags &= ((1 << THC_RESERVED_MSG_FLAG_BITS) - 1);
-        /* install new type */
-        flags |= (type << THC_RESERVED_MSG_FLAG_BITS);
-        fipc_set_flags(msg, flags);
-}
-
-static inline
-int
-async_msg_blocking_send_start(struct thc_channel *chnl,
-                        struct fipc_message **out)
-{
-        int ret;
-        for (;;) {
-                /* Poll until we get a free slot or error */
-                ret = fipc_send_msg_start(thc_channel_to_fipc(chnl), out);
-                if (!ret || ret != -EWOULDBLOCK)
-                        return ret;
-                //cpu_relax();
-                if (kthread_should_stop())
-                        return -EIO;
-        }
+	msg->vmfunc_id = VMFUNC_RPC_CALL;
+	msg->rpc_id = type;
 }
 
 #endif /* _GLUE_HELPER_H_ */
-

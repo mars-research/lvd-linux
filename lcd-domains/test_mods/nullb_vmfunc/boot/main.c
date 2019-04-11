@@ -18,12 +18,15 @@
 
 cptr_t blk_klcd, nullb_lcd;
 struct lcd_create_ctx *dummy_ctx;
-cptr_t blk_chnl_cptr;
-cptr_t blk_dest, nullb_dest_cptr;
+static unsigned int bind_cpu = 2;
+
+module_param(bind_cpu, uint, 0644);
+MODULE_PARM_DESC(bind_cpu, "Bind kthread to this cpu");
 
 static int boot_main(void)
 {
 	int ret;
+	struct module *m = NULL;
 	/*
 	 * Enter lcd mode
 	 */
@@ -37,69 +40,29 @@ static int boot_main(void)
 		goto fail1;
 	}
 
-	/* ---------- Create blk channel ---------- */
-
-	/* how is this EP different from the above? looks
-	 * like this one is shared between two LCDs */
-	ret = lcd_create_sync_endpoint(&blk_chnl_cptr);
-	if (ret) {
-		LIBLCD_ERR("lcd create sync endpoint");
-		goto fail2;
-	}
-
 	/* ---------- Create LCDs ---------- */
-
 	/* Until now the boot module is current. Inside this function,
 	 * a new lcd struct is created, a kthread is associated with the newly
 	 * allocated lcd struct and the cptr for this lcd is inserted into the
 	 * boot's cspace and the cptr is returned outside as blk_klcd */
-	ret = lcd_create_module_klcd(LCD_DIR("nullb/blk_klcd"),
-				"lcd_test_mod_nullb_blk_klcd",
+	m = lvd_create_module_klcd_no_thread(LCD_DIR("nullb_vmfunc/blk_klcd"),
+				"lcd_test_mod_nullb_vmfunc_blk_klcd",
 				&blk_klcd);
 
-	if (ret) {
+	if (!m) {
 		LIBLCD_ERR("failed to create net klcd");
+		ret = -1;
 		goto fail3;
 	}
-	ret = lcd_create_module_lcd(LCD_DIR("nullb/nullb_lcd"),
-				"lcd_test_mod_nullb_nullb_lcd",
+
+	ret = lvd_create_module_lvd(LCD_DIR("nullb_vmfunc/nullb_lcd"),
+				"lcd_test_mod_nullb_vmfunc_nullb_lcd",
 				&nullb_lcd,
-				&dummy_ctx);
+				&dummy_ctx, 1);
 	if (ret) {
 		LIBLCD_ERR("failed to create dummy lcd");
 		goto fail4;
 	}
-
-	ret = cptr_alloc(lcd_to_boot_cptr_cache(dummy_ctx), 
-			&nullb_dest_cptr);
-	if (ret) {
-		LIBLCD_ERR("alloc cptr");
-		goto fail5;
-	}
-	
-	/* why is this so hard to remember?
-	 * blk_chnl_cptr is the slot where the ep exists for the current (klcd) 
-	 * we need to grant that to the LCD. This happens through the boot cptr
-	 * cache. The capability is granted to the nullb_lcd at nullb_dest_cptr slot */
-	ret = lcd_cap_grant(nullb_lcd, blk_chnl_cptr, nullb_dest_cptr);
-	if (ret) {
-		LIBLCD_ERR("grant");
-		goto fail6;
-	}
-	
-	/* ---------- Set up boot info ---------- */
-	/* Looks like the current is represented by the boot module and the klcd
-	 * is separate from it. So the EP has to be granted to the blk_klcd as well! */
-	blk_dest = __cptr(3);
-	ret = lcd_cap_grant(blk_klcd, blk_chnl_cptr, blk_dest);
-	if (ret) {
-		LIBLCD_ERR("grant");
-		goto fail7;
-	}
-
-	LIBLCD_MSG("blk_chnl in boot space %d",nullb_dest_cptr);
-	lcd_to_boot_info(dummy_ctx)->cptrs[0] = nullb_dest_cptr;
-
 
 	/* ---------- RUN! ---------- */
 
@@ -120,31 +83,19 @@ static int boot_main(void)
 		LIBLCD_ERR("failed to start nullb lcd");
 		goto fail9;
 	}
-	/*
-	 * Wait for 4 seconds
-	 */
-	//msleep(100000);
-	/*
-	 * Tear everything down
-	 */
-	ret = 0;
-	// return
-	goto fail1;
 
+	ret = 0;
+	goto fail1;
 
 	/* The destroy's will free up everything ... */
 fail9:
 fail8:
-fail7:
 	lcd_cap_delete(nullb_lcd);
 	lcd_destroy_create_ctx(dummy_ctx);
-fail6:
-fail5:
 fail4:
 	//lcd_cap_delete(blk_klcd);
 	lcd_destroy_module_klcd(blk_klcd, "lcd_test_mod_nullb_blk_klcd");
 fail3:
-fail2:
 	lcd_exit(0); /* will free endpoints */
 fail1:
 	return ret;
@@ -168,13 +119,17 @@ int boot_lcd_thread(void *data)
 	}
 	LIBLCD_MSG("Exiting thread");
 
-	//msleep(10000);	
-	lcd_destroy_module_klcd(blk_klcd, "lcd_test_mod_nullb_blk_klcd");
-	msleep(10000);	
-	lcd_cap_delete(nullb_lcd);
-	lcd_destroy_create_ctx(dummy_ctx);
-	
-	lcd_exit(0);
+	if (!ret) {
+		/* trigger exit module */
+		lcd_stop(blk_klcd);
+
+		lcd_destroy_module_klcd(blk_klcd, "lcd_test_mod_nullb_blk_klcd");
+		if (current->lcd)
+			lcd_cap_delete(nullb_lcd);
+		if (dummy_ctx)
+			lcd_destroy_create_ctx(dummy_ctx);
+		lcd_exit(0);
+	}
 	return 0;
 }
 
@@ -185,6 +140,8 @@ static int boot_init(void)
 	LIBLCD_MSG("%s: entering", __func__);
 
 	boot_task = kthread_create(boot_lcd_thread, NULL, "boot_lcd_thread");
+
+	kthread_bind(boot_task, bind_cpu);
 
 	if (!IS_ERR(boot_task))
 		wake_up_process(boot_task);

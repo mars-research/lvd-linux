@@ -92,4 +92,20 @@ void lcd_arch_ept_dump_all_cpus(struct lcd_arch *lcd);
 
 void lcd_arch_ept_dump_this_cpu(struct lcd_arch *lcd);
 
+/**
+ * Translate guest physical address to host virtual.
+ */
+static inline int lcd_arch_ept_gpa_to_hva_cpu(struct lcd_arch *lcd, gpa_t gpa,
+			hva_t *hva_out, int cpu)
+{
+	hpa_t hpa;
+	int ret;
+
+	ret = lcd_arch_ept_gpa_to_hpa_cpu(lcd, gpa, &hpa, true, cpu);
+
+	if (ret)
+		return ret;
+	*hva_out = hpa2hva(hpa);
+	return 0;
+}
 #endif /* ASM_X86_LCD_DOMAINS_EPT_LCD_H */

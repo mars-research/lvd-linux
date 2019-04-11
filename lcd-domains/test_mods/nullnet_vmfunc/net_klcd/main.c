@@ -28,7 +28,7 @@ int net_klcd_syncipc_dispatch(struct fipc_message *message);
 static int net_klcd_init(void) 
 {
 	int ret;
-	struct fipc_message m = {0};
+	struct fipc_message m;
 	/*
 	 * Set up cptr cache, etc.
 	 */
@@ -39,6 +39,8 @@ static int net_klcd_init(void)
 		goto fail1;
 	}
 #endif
+	INIT_FIPC_MSG(&m);
+
 	/* save cspace for future use
 	 * when userspace functions call function pointers,
 	 * we need to get access to the sync_ep of this klcd
@@ -78,9 +80,11 @@ fail2:
  */
 static void __exit net_klcd_exit(void)
 {
-	struct fipc_message m = {0};
+	struct fipc_message m;
 
 	LIBLCD_MSG("%s: exiting", __func__);
+
+	INIT_FIPC_MSG(&m);
 
 	/* call module_init for lcd */
 	m.vmfunc_id = VMFUNC_RPC_CALL;

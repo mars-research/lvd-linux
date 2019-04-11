@@ -134,6 +134,8 @@ typedef enum {
 
 #define ASYNC_RPC_BUFFER_ORDER 15
 
+#define INIT_FIPC_MSG(msg)		memset(msg, 0x0, sizeof(*msg))
+
 struct pcidev_info {
 	unsigned int domain, bus, slot, fn;
 };

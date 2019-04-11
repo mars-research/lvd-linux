@@ -34,7 +34,7 @@ DECLARE_PER_CPU_PAGE_ALIGNED(char, exception_stacks
 
 void run_vmfunc_tests(void)
 {
-	struct fipc_message msg = {0};
+	struct fipc_message msg;
 	int cpu;
 	unsigned char idt_ptr[10];
 	unsigned long idt_base;
@@ -43,6 +43,8 @@ void run_vmfunc_tests(void)
 			:[idt_ptr]"=m"(idt_ptr));
 
 	idt_base = *((unsigned long *)&idt_ptr[2]);
+
+	INIT_FIPC_MSG(&msg);
 
 	/* test1: empty switch */
 	vmfunc_klcd_test_wrapper(&msg, OTHER_DOMAIN, VMFUNC_TEST_EMPTY_SWITCH);

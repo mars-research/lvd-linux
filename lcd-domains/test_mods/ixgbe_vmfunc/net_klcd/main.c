@@ -64,7 +64,7 @@ struct task_struct *task_klcd;
 static int net_klcd_init(void)
 {
 	int ret;
-	struct fipc_message m = {0};
+	struct fipc_message m;
 	/*
 	 * Set up cptr cache, etc.
 	 */
@@ -79,7 +79,7 @@ static int net_klcd_init(void)
 		goto fail1;
 	}
 #endif
-
+	INIT_FIPC_MSG(&m);
 	/*
 	 * Init net glue
 	 */

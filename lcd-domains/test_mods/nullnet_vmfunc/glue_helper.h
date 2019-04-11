@@ -78,6 +78,8 @@ struct skbuff_members {
 	unsigned int        truesize;
 } __attribute__((aligned));
 
+#define INIT_FIPC_MSG(msg)		memset(msg, 0x0, sizeof(*msg))
+
 #define SKB_LCD_MEMBERS(SKB)	((struct skbuff_members*)((char*)skb_end_pointer(SKB) - (char*)SKB_LCD_MEMBERS_SZ))
 
 #define C(x)	skb_lcd->x = skb->x

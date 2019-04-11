@@ -12,9 +12,8 @@ lcd_test_mod_ixgbe_vmfunc_net_klcd-y		+= $(addprefix ../, ixgbe_cap.o)
 
 cppflags-y += $(NONISOLATED_CFLAGS)
 
-extra-y += glue/ixgbe_callee.lds
+#extra-y += glue/ixgbe_callee.lds
 
-ldflags-y += -T $(LCD_TEST_MODULES_BUILD_DIR)/ixgbe_vmfunc/net_klcd/glue/ixgbe_callee.lds
+#ldflags-y += -T $(LCD_TEST_MODULES_BUILD_DIR)/ixgbe_vmfunc/net_klcd/glue/ixgbe_callee.lds
 
 ccflags-y += $(NONISOLATED_CFLAGS)
-

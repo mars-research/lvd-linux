@@ -19,7 +19,10 @@
 
 cptr_t net_klcd, ixgbe_lcd;
 struct lcd_create_ctx *ixgbe_ctx;
-cptr_t net_chnl;
+static unsigned int bind_cpu = 2;
+
+module_param(bind_cpu, uint, 0644);
+MODULE_PARM_DESC(bind_cpu, "Bind kthread to this cpu");
 
 static int boot_main(void)
 {
@@ -96,9 +99,7 @@ int boot_lcd_thread(void *data)
 	int ret = 0;
 	while (!kthread_should_stop()) {
 		if (!once) {
-			LCD_MAIN({
-				ret = boot_main();
-			});
+			ret = boot_main();
 		}
 		once = 1;
 		wait_event_interruptible(wq, shutdown != 0);
@@ -106,7 +107,12 @@ int boot_lcd_thread(void *data)
 	LIBLCD_MSG("Exiting thread");
 
 	if (!ret) {
-		lcd_destroy_module_klcd(net_klcd, "lcd_test_mod_ixgbe_vmfunc_net_klcd");
+		/* trigger exit module */
+		lcd_stop(net_klcd);
+
+		lcd_destroy_module_klcd(net_klcd,
+				"lcd_test_mod_ixgbe_vmfunc_net_klcd");
+
 		if (current->lcd)
 			lcd_cap_delete(ixgbe_lcd);
 		if (ixgbe_ctx)
@@ -123,6 +129,8 @@ static int boot_init(void)
 	LIBLCD_MSG("%s: entering", __func__);
 
 	boot_task = kthread_create(boot_lcd_thread, NULL, "boot_lcd_thread");
+
+	kthread_bind(boot_task, bind_cpu);
 
 	if (!IS_ERR(boot_task))
 		wake_up_process(boot_task);

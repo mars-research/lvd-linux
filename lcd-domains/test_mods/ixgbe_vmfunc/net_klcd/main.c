@@ -16,21 +16,13 @@ extern int vmfunc_init(void *stack_page, rpc_handler_t rpc_handler,
 		rpc_handler_t sync_handler);
 extern int ixgbe_trigger_dump(void);
 extern int ixgbe_service_event_sched(void);
-extern int trigger_exit_to_lcd(enum dispatch_t);
 extern struct timer_list service_timer;
 extern struct glue_cspace *c_cspace;
 extern void *lcd_stack;
 
-/* mechanism for unloading LCD gracefully */
-static bool unload_lcd =0;
-static bool clean_up = false;
-module_param_named(unload, unload_lcd, bool, S_IWUSR);
-
 /* to dump ixgbe registers */
-static bool ixgbe_dump =0;
+static bool ixgbe_dump = 0;
 module_param_named(dump_regs, ixgbe_dump, bool, S_IWUSR);
-module_param_named(clean, clean_up, bool, S_IWUSR);
-
 
 int net_klcd_dispatch_async_loop(struct fipc_message *message);
 int net_klcd_syncipc_dispatch(struct fipc_message *message);
@@ -68,11 +60,12 @@ static int net_klcd_init(void)
 	/*
 	 * Set up cptr cache, etc.
 	 */
+#ifndef CONFIG_LVD
 	/*
 	 * there is no separate LCD for KLCD module, we operate in the context
 	 * of boot thread
 	 */
-#if 0
+
 	ret = lcd_enter();
 	if (ret) {
 		LIBLCD_ERR("lcd enter");
@@ -95,19 +88,16 @@ static int net_klcd_init(void)
 	/* call module_init for lcd */
 	m.vmfunc_id = VMFUNC_RPC_CALL;
 	m.rpc_id = MODULE_INIT;
-	vmfunc_klcd_test_wrapper(&m, OTHER_DOMAIN, VMFUNC_TEST_RPC_CALL);
+	vmfunc_klcd_wrapper(&m, OTHER_DOMAIN);
 
 	return 0;
 
 fail2:
+#ifndef CONFIG_LVD
+fail1:
+#endif
 	lcd_exit(ret);
 	return ret;
-}
-
-static int __net_klcd_init(void)
-{
-	LIBLCD_MSG("%s: entering", __func__);
-	return net_klcd_init();
 }
 
 /*
@@ -116,19 +106,33 @@ static int __net_klcd_init(void)
  */
 static void __exit net_klcd_exit(void)
 {
+	struct fipc_message m;
+
 	LIBLCD_MSG("%s: exiting", __func__);
+
+	INIT_FIPC_MSG(&m);
+
+	/* call module_init for lcd */
+	m.vmfunc_id = VMFUNC_RPC_CALL;
+	m.rpc_id = MODULE_EXIT;
+	LIBLCD_MSG("Calling MODULE_EXIT of dummy_lcd");
+	vmfunc_klcd_wrapper(&m, OTHER_DOMAIN);
 
 	/*
 	 * Tear down net glue
 	 */
 	glue_ixgbe_exit();
 
+#ifndef CONFIG_LVD
+	/*
+	 * in case of lvd, boot module calls lcd_exit
+	 */
 	lcd_exit(0);
+#endif
 
 	return;
 }
 
-module_init(__net_klcd_init);
+module_init(net_klcd_init);
 module_exit(net_klcd_exit);
 MODULE_LICENSE("GPL");
-

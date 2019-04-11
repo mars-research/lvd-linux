@@ -30,7 +30,6 @@
 
 u32 thread = 0;
 struct glue_cspace *c_cspace = NULL;
-struct cptr sync_ep;
 extern struct cspace *klcd_cspace;
 struct timer_list service_timer;
 struct napi_struct *napi_q0;
@@ -287,6 +286,7 @@ fail1:
         return ret;
 }
 
+#ifndef CONFIG_LVD
 LCD_TRAMPOLINE_DATA(probe_trampoline);
 int  LCD_TRAMPOLINE_LINKAGE(probe_trampoline)
 probe_trampoline(struct pci_dev *dev,
@@ -304,7 +304,9 @@ probe_trampoline(struct pci_dev *dev,
 		hidden_args);
 
 }
+#endif
 
+#ifndef CONFIG_LVD
 LCD_TRAMPOLINE_DATA(remove_trampoline);
 void  LCD_TRAMPOLINE_LINKAGE(remove_trampoline)
 remove_trampoline(struct pci_dev *dev)
@@ -319,7 +321,7 @@ remove_trampoline(struct pci_dev *dev)
 		hidden_args);
 
 }
-
+#endif
 
 int pci_disable_msix_callee(struct fipc_message *_request)
 {
@@ -388,8 +390,10 @@ int __pci_register_driver_callee(struct fipc_message *_request)
 	struct module_container *owner_container;
 	char *name;
 
+#ifndef CONFIG_LVD
 	struct trampoline_hidden_args *drv_probe_hidden_args;
 	struct trampoline_hidden_args *drv_remove_hidden_args;
+#endif
 	int func_ret = 0;
 	int ret = 0;
 
@@ -423,7 +427,7 @@ int __pci_register_driver_callee(struct fipc_message *_request)
 	}
 	owner_container->other_ref.cptr = fipc_get_reg3(_request);
 
-
+#ifndef CONFIG_LVD
 	drv_probe_hidden_args = kzalloc(sizeof( *drv_probe_hidden_args ),
 		GFP_KERNEL);
 	if (!drv_probe_hidden_args) {
@@ -463,7 +467,7 @@ int __pci_register_driver_callee(struct fipc_message *_request)
 	ret = set_memory_x(( ( unsigned  long   )drv_remove_hidden_args->t_handle ) & ( PAGE_MASK ),
 		( ALIGN(LCD_TRAMPOLINE_SIZE(remove_trampoline),
 		PAGE_SIZE) ) >> ( PAGE_SHIFT ));
-
+#endif
 	drv_container->pci_driver.name = driver_name;
 	drv_container->pci_driver.id_table = ixgbe_pci_tbl;
 	name = "ixgbe_lcd";
@@ -489,10 +493,12 @@ int __pci_register_driver_callee(struct fipc_message *_request)
 
 	return ret;
 fail_alloc:
+#ifndef CONFIG_LVD
 fail_alloc1:
 fail_alloc2:
 fail_dup1:
 fail_dup2:
+#endif
 fail_insert:
 	return ret;
 }
@@ -513,23 +519,22 @@ int alloc_etherdev_mqs_callee(struct fipc_message *_request)
 	rxqs = fipc_get_reg3(_request);
 	netdev_ref.cptr = fipc_get_reg4(_request);
 
-	func_ret = alloc_etherdev_mqs(sizeof_priv,
-		txqs,
-		rxqs);
+	func_ret = alloc_etherdev_mqs(sizeof_priv, txqs, rxqs);
+
 	g_ndev = func_ret;
-	func_ret_container = container_of(func_ret,
-		struct net_device_container, net_device);
+	func_ret_container = container_of(func_ret, struct
+			net_device_container, net_device);
 	func_ret_container->other_ref = netdev_ref;
-	ret = glue_cap_insert_net_device_type(c_cspace,
-		func_ret_container,
-		&func_ret_container->my_ref);
+
+	ret = glue_cap_insert_net_device_type(c_cspace, func_ret_container,
+			&func_ret_container->my_ref);
+
 	if (ret) {
 		LIBLCD_ERR("lcd insert");
 		goto fail_insert;
 	}
 
-	fipc_set_reg1(_request,
-			func_ret_container->my_ref.cptr);
+	fipc_set_reg1(_request, func_ret_container->my_ref.cptr);
 
 fail_insert:
 	return ret;
@@ -695,8 +700,12 @@ void remove(struct pci_dev *dev,
 	return;
 }
 
+#ifdef CONFIG_LVD
+int ndo_open(struct net_device *dev)
+#else
 int ndo_open(struct net_device *dev,
 		struct trampoline_hidden_args *hidden_args)
+#endif
 {
 	struct net_device_container *dev_container;
 	struct fipc_message r;
@@ -722,6 +731,7 @@ int ndo_open(struct net_device *dev,
 
 }
 
+#ifndef CONFIG_LVD
 LCD_TRAMPOLINE_DATA(ndo_open_trampoline);
 int  LCD_TRAMPOLINE_LINKAGE(ndo_open_trampoline)
 ndo_open_trampoline(struct net_device *dev)
@@ -736,9 +746,14 @@ ndo_open_trampoline(struct net_device *dev)
 		hidden_args);
 
 }
+#endif
 
+#ifdef CONFIG_LVD
+int ndo_stop(struct net_device *dev)
+#else
 int ndo_stop(struct net_device *dev,
 		struct trampoline_hidden_args *hidden_args)
+#endif
 {
 	struct net_device_container *dev_container;
 	struct fipc_message r;
@@ -760,6 +775,7 @@ int ndo_stop(struct net_device *dev,
 	return func_ret;
 }
 
+#ifndef CONFIG_LVD
 LCD_TRAMPOLINE_DATA(ndo_stop_trampoline);
 int  LCD_TRAMPOLINE_LINKAGE(ndo_stop_trampoline)
 ndo_stop_trampoline(struct net_device *dev)
@@ -774,10 +790,16 @@ ndo_stop_trampoline(struct net_device *dev)
 		hidden_args);
 
 }
+#endif
 
+#ifdef CONFIG_LVD
+int ndo_start_xmit(struct sk_buff *skb,
+		struct net_device *dev)
+#else
 int ndo_start_xmit(struct sk_buff *skb,
 		struct net_device *dev,
 		struct trampoline_hidden_args *hidden_args)
+#endif
 {
 	struct net_device_container *dev_container;
 	struct fipc_message r;
@@ -879,6 +901,7 @@ fail_alloc:
 	return func_ret;
 }
 
+#ifndef CONFIG_LVD
 LCD_TRAMPOLINE_DATA(ndo_start_xmit_trampoline);
 int  LCD_TRAMPOLINE_LINKAGE(ndo_start_xmit_trampoline)
 ndo_start_xmit_trampoline(struct sk_buff *skb,
@@ -896,9 +919,14 @@ ndo_start_xmit_trampoline(struct sk_buff *skb,
 		hidden_args);
 
 }
+#endif
 
+#ifdef CONFIG_LVD
+void ndo_set_rx_mode(struct net_device *dev)
+#else
 void ndo_set_rx_mode(struct net_device *dev,
 		struct trampoline_hidden_args *hidden_args)
+#endif
 {
 	struct net_device_container *dev_container;
 	struct fipc_message r;
@@ -917,6 +945,7 @@ void ndo_set_rx_mode(struct net_device *dev,
 	return;
 }
 
+#ifndef CONFIG_LVD
 LCD_TRAMPOLINE_DATA(ndo_set_rx_mode_trampoline);
 void  LCD_TRAMPOLINE_LINKAGE(ndo_set_rx_mode_trampoline)
 ndo_set_rx_mode_trampoline(struct net_device *dev)
@@ -931,9 +960,14 @@ ndo_set_rx_mode_trampoline(struct net_device *dev)
 		hidden_args);
 
 }
+#endif
 
+#ifdef CONFIG_LVD
+int ndo_validate_addr(struct net_device *dev)
+#else
 int ndo_validate_addr(struct net_device *dev,
 		struct trampoline_hidden_args *hidden_args)
+#endif
 {
 	struct net_device_container *dev_container;
 	struct fipc_message r;
@@ -955,6 +989,7 @@ int ndo_validate_addr(struct net_device *dev,
 	return func_ret;
 }
 
+#ifndef CONFIG_LVD
 LCD_TRAMPOLINE_DATA(ndo_validate_addr_trampoline);
 int  LCD_TRAMPOLINE_LINKAGE(ndo_validate_addr_trampoline)
 ndo_validate_addr_trampoline(struct net_device *dev)
@@ -969,6 +1004,7 @@ ndo_validate_addr_trampoline(struct net_device *dev)
 		hidden_args);
 
 }
+#endif
 
 void *mac_addr;
 
@@ -998,9 +1034,14 @@ int sync_ndo_set_mac_address_callee(struct fipc_message *message)
 	return 0;
 }
 
+#ifdef CONFIG_LVD
+int ndo_set_mac_address(struct net_device *dev,
+		void *addr)
+#else
 int ndo_set_mac_address(struct net_device *dev,
 		void *addr,
 		struct trampoline_hidden_args *hidden_args)
+#endif
 {
 	struct net_device_container *dev_container;
 	struct fipc_message r;
@@ -1025,6 +1066,7 @@ int ndo_set_mac_address(struct net_device *dev,
 	return func_ret;
 }
 
+#ifndef CONFIG_LVD
 LCD_TRAMPOLINE_DATA(ndo_set_mac_address_trampoline);
 int  LCD_TRAMPOLINE_LINKAGE(ndo_set_mac_address_trampoline)
 ndo_set_mac_address_trampoline(struct net_device *dev,
@@ -1042,10 +1084,16 @@ ndo_set_mac_address_trampoline(struct net_device *dev,
 		hidden_args);
 
 }
+#endif
 
+#ifdef CONFIG_LVD
+int ndo_change_mtu(struct net_device *dev,
+		int new_mtu)
+#else
 int ndo_change_mtu(struct net_device *dev,
 		int new_mtu,
 		struct trampoline_hidden_args *hidden_args)
+#endif
 {
 	struct net_device_container *dev_container;
 	struct fipc_message r;
@@ -1068,6 +1116,7 @@ int ndo_change_mtu(struct net_device *dev,
 	return func_ret;
 }
 
+#ifndef CONFIG_LVD
 LCD_TRAMPOLINE_DATA(ndo_change_mtu_trampoline);
 int  LCD_TRAMPOLINE_LINKAGE(ndo_change_mtu_trampoline)
 ndo_change_mtu_trampoline(struct net_device *dev,
@@ -1085,9 +1134,14 @@ ndo_change_mtu_trampoline(struct net_device *dev,
 		hidden_args);
 
 }
+#endif
 
+#ifdef CONFIG_LVD
+void ndo_tx_timeout(struct net_device *dev)
+#else
 void ndo_tx_timeout(struct net_device *dev,
 		struct trampoline_hidden_args *hidden_args)
+#endif
 {
 	struct net_device_container *dev_container;
 	struct fipc_message r;
@@ -1105,6 +1159,7 @@ void ndo_tx_timeout(struct net_device *dev,
 	return;
 }
 
+#ifndef CONFIG_LVD
 LCD_TRAMPOLINE_DATA(ndo_tx_timeout_trampoline);
 void LCD_TRAMPOLINE_LINKAGE(ndo_tx_timeout_trampoline)
 ndo_tx_timeout_trampoline(struct net_device *dev)
@@ -1119,11 +1174,18 @@ ndo_tx_timeout_trampoline(struct net_device *dev)
 		hidden_args);
 	return;
 }
+#endif
 
+#ifdef CONFIG_LVD
+int ndo_set_tx_maxrate(struct net_device *dev,
+		int queue_index,
+		unsigned int maxrate)
+#else
 int ndo_set_tx_maxrate(struct net_device *dev,
 		int queue_index,
 		unsigned int maxrate,
 		struct trampoline_hidden_args *hidden_args)
+#endif
 {
 	struct net_device_container *dev_container;
 	struct fipc_message r;
@@ -1149,6 +1211,7 @@ int ndo_set_tx_maxrate(struct net_device *dev,
 	return func_ret;
 }
 
+#ifndef CONFIG_LVD
 LCD_TRAMPOLINE_DATA(ndo_set_tx_maxrate_trampoline);
 int  LCD_TRAMPOLINE_LINKAGE(ndo_set_tx_maxrate_trampoline)
 ndo_set_tx_maxrate_trampoline(struct net_device *dev,
@@ -1169,37 +1232,16 @@ ndo_set_tx_maxrate_trampoline(struct net_device *dev,
 		hidden_args);
 
 }
+#endif
 
-struct rtnl_link_stats64 *ndo_get_stats64_user(struct net_device *dev,
-		struct rtnl_link_stats64 *stats,
-		struct trampoline_hidden_args *hidden_args)
-{
-	struct net_device_container *dev_container;
-	struct fipc_message r;
-	struct fipc_message *_request = &r;
-
-	dev_container = container_of(dev,
-		struct net_device_container,
-		net_device);
-	thc_init();
-
-	async_msg_set_fn_type(_request,
-			NDO_GET_STATS64);
-	fipc_set_reg1(_request,
-			dev_container->other_ref.cptr);
-	vmfunc_klcd_wrapper(_request, 1);
-
-	stats->rx_packets += fipc_get_reg1(_request);
-	stats->rx_bytes += fipc_get_reg2(_request);
-	stats->tx_packets += fipc_get_reg3(_request);
-	stats->tx_bytes += fipc_get_reg4(_request);
-
-	return stats;
-}
-
+#ifdef CONFIG_LVD
+struct rtnl_link_stats64 *ndo_get_stats64(struct net_device *dev,
+		struct rtnl_link_stats64 *stats)
+#else
 struct rtnl_link_stats64 *ndo_get_stats64(struct net_device *dev,
 		struct rtnl_link_stats64 *stats,
 		struct trampoline_hidden_args *hidden_args)
+#endif
 {
 	struct net_device_container *dev_container;
 	struct fipc_message r;
@@ -1207,49 +1249,12 @@ struct rtnl_link_stats64 *ndo_get_stats64(struct net_device *dev,
 
 	struct rtnl_link_stats64 *func_ret = stats;
 
-#ifdef TIMESTAMP
-	if (times_ndo_xmit)
-		fipc_test_stat_print_info(times_ndo_xmit,
-						NUM_PACKETS);
-#endif
-#ifdef STATS
-	printk("---------- counter  ---------------\n");
-	printk("%s, global tx = %llu | global free = %llu\n",
-			__func__, global_tx_count, global_free_count);
-	printk("-----------------------------------\n");
-#endif
-#ifdef LCD_MEASUREMENT
-	printk("---------- LCD ---------------\n");
-	if (times_lcd)
-		fipc_test_stat_print_info(times_lcd,
-						NUM_PACKETS);
-#endif
-#ifdef FREE_TIMESTAMP
-	if (times_free)
-		fipc_test_stat_print_info(times_free,
-						NUM_PACKETS);
-#endif
-
-	if (!current->ptstate) {
-		func_ret = &g_stats;
-		return func_ret;
-		LIBLCD_MSG("%s, Calling from non-LCD (%s) context! creating thc runtime", __func__, current->comm);
-		LCD_MAIN({
-			func_ret = ndo_get_stats64_user(dev,
-		stats,
-		hidden_args);
-		}
-		);
-		return func_ret;
-	}
 	dev_container = container_of(dev,
 		struct net_device_container,
 		net_device);
 
-	async_msg_set_fn_type(_request,
-			NDO_GET_STATS64);
-	fipc_set_reg1(_request,
-			dev_container->other_ref.cptr);
+	async_msg_set_fn_type(_request, NDO_GET_STATS64);
+	fipc_set_reg1(_request, dev_container->other_ref.cptr);
 
 	LIBLCD_MSG("netdev lcd_ref %lu", dev_container->other_ref.cptr);
 
@@ -1262,6 +1267,7 @@ struct rtnl_link_stats64 *ndo_get_stats64(struct net_device *dev,
 	return func_ret;
 }
 
+#ifndef CONFIG_LVD
 LCD_TRAMPOLINE_DATA(ndo_get_stats64_trampoline);
 struct rtnl_link_stats64  LCD_TRAMPOLINE_LINKAGE(ndo_get_stats64_trampoline)
 *ndo_get_stats64_trampoline(struct net_device *dev,
@@ -1279,8 +1285,9 @@ struct rtnl_link_stats64  LCD_TRAMPOLINE_LINKAGE(ndo_get_stats64_trampoline)
 		hidden_args);
 
 }
+#endif
 
-
+#ifndef CONFIG_LVD
 void setup_netdev_ops(struct net_device_container *dev_c,
 	struct net_device_ops_container *netdev_ops_container,
 	struct cptr sync_ep)
@@ -1510,6 +1517,7 @@ fail_alloc11:
 fail_dup11:
 	return;
 }
+#endif
 
 int register_netdev_callee(struct fipc_message *_request)
 {
@@ -1553,9 +1561,22 @@ int register_netdev_callee(struct fipc_message *_request)
 	dev->mpls_features = fipc_get_reg6(_request);
 
 	memcpy(dev->dev_addr, mac_addr, ETH_ALEN);
+
+#ifdef CONFIG_LVD
+	netdev_ops_container->net_device_ops.ndo_open = ndo_open;
+	netdev_ops_container->net_device_ops.ndo_stop = ndo_stop;
+	netdev_ops_container->net_device_ops.ndo_start_xmit = ndo_start_xmit;
+	netdev_ops_container->net_device_ops.ndo_set_rx_mode = ndo_set_rx_mode;
+	netdev_ops_container->net_device_ops.ndo_validate_addr = ndo_validate_addr;
+	netdev_ops_container->net_device_ops.ndo_set_mac_address = ndo_set_mac_address;
+	netdev_ops_container->net_device_ops.ndo_change_mtu = ndo_change_mtu;
+	netdev_ops_container->net_device_ops.ndo_tx_timeout = ndo_tx_timeout;
+	netdev_ops_container->net_device_ops.ndo_set_tx_maxrate = ndo_set_tx_maxrate;
+	netdev_ops_container->net_device_ops.ndo_get_stats64 = ndo_get_stats64;
+#else
 	/* setup netdev_ops */
 	setup_netdev_ops(dev_container, netdev_ops_container, sync_ep);
-
+#endif
 	func_ret = register_netdev(( &dev_container->net_device ));
 
 	fipc_set_reg1(_request,
@@ -1584,7 +1605,6 @@ int ether_setup_callee(struct fipc_message *_request)
 	}
 
 	ether_setup(( &dev_container->net_device ));
-
 
 fail_lookup:
 	return ret;
@@ -2586,6 +2606,7 @@ int sync(struct net_device *dev,
 	return 0;
 }
 
+#ifndef CONFIG_LVD
 LCD_TRAMPOLINE_DATA(sync_trampoline);
 int  LCD_TRAMPOLINE_LINKAGE(sync_trampoline)
 sync_trampoline(struct net_device *dev,
@@ -2603,6 +2624,7 @@ sync_trampoline(struct net_device *dev,
 		hidden_args);
 
 }
+#endif
 
 int unsync_user(struct net_device *dev,
 		unsigned char *mac,
@@ -2673,6 +2695,7 @@ int unsync(struct net_device *dev,
 	return 0;
 }
 
+#ifndef CONFIG_LVD
 LCD_TRAMPOLINE_DATA(unsync_trampoline);
 int  LCD_TRAMPOLINE_LINKAGE(unsync_trampoline)
 unsync_trampoline(struct net_device *dev,
@@ -2690,6 +2713,7 @@ unsync_trampoline(struct net_device *dev,
 		hidden_args);
 
 }
+#endif
 
 struct trampoline_hidden_args *unsync_hidden_args;
 struct unsync_container *unsync_container;
@@ -2702,7 +2726,9 @@ int __hw_addr_sync_dev_callee(struct fipc_message *_request)
 
 	int func_ret;
 	addr_list _type;
+#ifndef CONFIG_LVD
 	struct trampoline_hidden_args *sync_hidden_args;
+#endif
 
 	ret = glue_cap_lookup_net_device_type(c_cspace,
 		__cptr(fipc_get_reg1(_request)),
@@ -2720,6 +2746,7 @@ int __hw_addr_sync_dev_callee(struct fipc_message *_request)
 		goto fail_alloc;
 	}
 
+#ifndef CONFIG_LVD
 	sync_hidden_args = kzalloc(sizeof( *sync_hidden_args ),
 		GFP_KERNEL);
 	if (!sync_hidden_args) {
@@ -2740,7 +2767,7 @@ int __hw_addr_sync_dev_callee(struct fipc_message *_request)
 	ret = set_memory_x(( ( unsigned  long   )sync_hidden_args->t_handle ) & ( PAGE_MASK ),
 		( ALIGN(LCD_TRAMPOLINE_SIZE(sync_trampoline),
 		PAGE_SIZE) ) >> ( PAGE_SHIFT ));
-
+#endif
 
 	unsync_container = kzalloc(sizeof( struct unsync_container   ),
 		GFP_KERNEL);
@@ -2748,6 +2775,8 @@ int __hw_addr_sync_dev_callee(struct fipc_message *_request)
 		LIBLCD_ERR("kzalloc");
 		goto fail_alloc;
 	}
+
+#ifndef CONFIG_LVD
 	unsync_hidden_args = kzalloc(sizeof( *unsync_hidden_args ),
 		GFP_KERNEL);
 	if (!unsync_hidden_args) {
@@ -2768,7 +2797,7 @@ int __hw_addr_sync_dev_callee(struct fipc_message *_request)
 	ret = set_memory_x(( ( unsigned  long   )unsync_hidden_args->t_handle ) & ( PAGE_MASK ),
 		( ALIGN(LCD_TRAMPOLINE_SIZE(unsync_trampoline),
 		PAGE_SIZE) ) >> ( PAGE_SHIFT ));
-
+#endif
 	func_ret = __hw_addr_sync_dev(
 		_type == UC_LIST ? &dev1_container->net_device.uc :
 			&dev1_container->net_device.mc,
@@ -2782,10 +2811,12 @@ int __hw_addr_sync_dev_callee(struct fipc_message *_request)
 	return ret;
 fail_lookup:
 fail_alloc:
+#ifndef CONFIG_LVD
 fail_alloc1:
 fail_dup1:
 fail_alloc2:
 fail_dup2:
+#endif
 	return ret;
 }
 
@@ -2858,25 +2889,14 @@ int _free_irq_callee(struct fipc_message *_request)
 }
 #endif /* HOST_IRQ */
 
-int poll_once(struct napi_struct *napi,
-		int budget,
-		struct trampoline_hidden_args *hidden_args)
-{
-	struct fipc_message r;
-	struct fipc_message *_request = &r;
-
-	async_msg_set_fn_type(_request,
-			POLL);
-
-	fipc_set_reg0(_request, true);
-	/* No need to wait for a response here */
-	vmfunc_klcd_wrapper(_request, 1);
-	return 0;
-}
-
+#ifdef CONFIG_LVD
+int poll(struct napi_struct *napi,
+		int budget)
+#else
 int poll(struct napi_struct *napi,
 		int budget,
 		struct trampoline_hidden_args *hidden_args)
+#endif
 {
 	int ret = 0;
 	struct fipc_message r;
@@ -2884,24 +2904,15 @@ int poll(struct napi_struct *napi,
 
 	printk("%s, poll - budget %d\n", __func__, budget);
 
-	if (!current->ptstate) {
-		LIBLCD_MSG("%s, Calling from a non-LCD context! creating thc runtime!", __func__);
-		ret = poll_once(napi,
-			budget, hidden_args);
-		return ret;
-	}
+	async_msg_set_fn_type(_request, POLL);
+	fipc_set_reg0(_request, budget);
 
-	async_msg_set_fn_type(_request,
-			POLL);
-	fipc_set_reg0(_request,
-			budget);
-
-	/* No need to wait for a response here */
 	vmfunc_klcd_wrapper(_request, 1);
 
 	return ret;
 }
 
+#ifndef CONFIG_LVD
 LCD_TRAMPOLINE_DATA(poll_trampoline);
 int  LCD_TRAMPOLINE_LINKAGE(poll_trampoline)
 poll_trampoline(struct napi_struct *napi,
@@ -2919,6 +2930,7 @@ poll_trampoline(struct napi_struct *napi,
 		hidden_args);
 
 }
+#endif
 
 int netif_napi_add_callee(struct fipc_message *_request)
 {
@@ -2927,7 +2939,9 @@ int netif_napi_add_callee(struct fipc_message *_request)
 	int weight;
 	int ret;
 
+#ifndef CONFIG_LVD
 	struct trampoline_hidden_args *poll_hidden_args;
+#endif
 
 	ret = glue_cap_lookup_net_device_type(c_cspace,
 		__cptr(fipc_get_reg1(_request)),
@@ -2944,8 +2958,7 @@ int netif_napi_add_callee(struct fipc_message *_request)
 	}
 	weight = fipc_get_reg3(_request);
 
-
-
+#ifndef CONFIG_LVD
 	poll_hidden_args = kzalloc(sizeof( *poll_hidden_args ),
 		GFP_KERNEL);
 	if (!poll_hidden_args) {
@@ -2966,6 +2979,9 @@ int netif_napi_add_callee(struct fipc_message *_request)
 	ret = set_memory_x(( ( unsigned  long   )poll_hidden_args->t_handle ) & ( PAGE_MASK ),
 		( ALIGN(LCD_TRAMPOLINE_SIZE(poll_trampoline),
 		PAGE_SIZE) ) >> ( PAGE_SHIFT ));
+#endif
+	poll_container->poll = poll;
+
 	napi_q0 = kzalloc(sizeof( *napi_q0 ),
 		GFP_KERNEL);
 	if (!napi_q0) {
@@ -2985,8 +3001,10 @@ int netif_napi_add_callee(struct fipc_message *_request)
 
 fail_lookup:
 fail_alloc:
+#ifndef CONFIG_LVD
 fail_alloc1:
 fail_dup1:
+#endif
 	return ret;
 }
 

@@ -27,7 +27,9 @@ int callee(struct fipc_message *msg2)
 	int ret = 0;
 	unsigned long transaction_id = 0;
 	u64 start, end;
-	struct fipc_message msg = {0};
+	struct fipc_message msg;
+
+	INIT_FIPC_MSG(&msg);
 
 	start = lcd_RDTSC_START();
 	for (transaction_id = 0; 

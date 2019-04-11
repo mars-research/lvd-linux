@@ -19,6 +19,30 @@ extern void *cpuid_page;
 extern struct lcd *lcd_list[NUM_LCDS];
 unsigned long init_pgd;
 
+/* Linux kernel only provides ffs variant, which operates on 32-bit registers.
+ * For promoting the bsf instruction to 64-bit, intel manual suggests to use
+ * REX.W prefix to the instruction. However, when the operands are 64-bits, gcc
+ * already promotes bsf to 64-bit.
+ */
+static __always_inline int ffsll(long long x)
+{
+	long long r;
+
+	/*
+	 * AMD64 says BSFL won't clobber the dest reg if x==0; Intel64 says the
+	 * dest reg is undefined if x==0, but their CPU architect says its
+	 * value is written to set it to the same as before, except that the
+	 * top 32 bits will be cleared.
+	 *
+	 * We cannot do this on 32 bits because at the very least some
+	 * 486 CPUs did not behave this way.
+	 */
+	asm("bsf %1,%0"
+	    : "=r" (r)
+	    : "rm" (x), "0" (-1));
+	return r + 1;
+}
+
 int do_check(int ept)
 {
 	unsigned long vmfunc_load_addr;
@@ -133,6 +157,36 @@ static int vmfunc_prepare_switch(int ept)
 }
 #endif
 
+void pick_stack(int ept)
+{
+	struct lcd *lcd = lcd_list[ept];
+	int cpu = get_cpu();
+	struct lcd_stack *this_stack = per_cpu_ptr(lcd->lcd_stacks, cpu);
+	int bit = ffsll(this_stack->bitmap);
+
+	if (bit && (bit <= NUM_STACKS_PER_CPU)) {
+		bit -= 1;
+		/* mark this bit as taken */
+		this_stack->bitmap &= ~(1LL << bit);
+		current->lcd_stack_bit = bit;
+		current->lcd_stack = (void*) (gva_val(LCD_STACK_GV_ADDR) - bit * LCD_STACK_SIZE + LCD_STACK_SIZE - sizeof(void*));
+	} else {
+		printk("Ran out of stacks on cpu %d, bitmap:%llx, ffsl ret=%d\n",
+				cpu, this_stack->bitmap, bit);
+	}
+	put_cpu();
+}
+
+void drop_stack(int ept)
+{
+	struct lcd *lcd = lcd_list[ept];
+	struct lcd_stack *this_stack = per_cpu_ptr(lcd->lcd_stacks, get_cpu());
+
+	current->lcd_stack = NULL;
+	this_stack->bitmap |= (1LL << current->lcd_stack_bit);
+	put_cpu();
+}
+
 int vmfunc_klcd_wrapper(struct fipc_message *msg, unsigned int ept)
 {
 	int ret = 0;
@@ -149,6 +203,9 @@ int vmfunc_klcd_wrapper(struct fipc_message *msg, unsigned int ept)
 	if (!init_pgd)
 		init_pgd = kallsyms_lookup_name("init_level4_pgt");
 
+	if (current->nested_count++ == 0)
+		pick_stack(ept);
+
 	printk("%s [%d]: entereing on cpu %d, reg0: %lx | lcd_stack %p\n",
 			current->comm,
 			current->pid,
@@ -157,6 +214,10 @@ int vmfunc_klcd_wrapper(struct fipc_message *msg, unsigned int ept)
 			current->lcd_stack);
 
 	vmfunc_trampoline_entry(msg);
+
+	if (--current->nested_count == 0)
+		drop_stack(ept);
+
 exit:
 	return ret;
 }

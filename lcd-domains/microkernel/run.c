@@ -679,6 +679,47 @@ fail1:
 	return ret;
 }
 
+int __lcd_stop(struct lcd *caller, cptr_t lcd)
+{
+	struct lcd *lcd_struct;
+	struct cnode *cnode;
+	int ret;
+	/*
+	 * Look up and lock
+	 */
+	ret = __lcd_get(caller, lcd, &cnode, &lcd_struct);
+	if (ret)
+		goto fail1;
+	/*
+	 * If lcd is not in running state, fail
+	 */
+	if (!lcd_status_running(lcd_struct)) {
+		LCD_DEBUG(LCD_DEBUG_ERR,
+			"cannot run: lcd is in state %d",
+			get_lcd_status(lcd_struct));
+		ret = -EINVAL;
+		goto fail2;
+	}
+	/*
+	 * This will run the kthread for the first time
+	 */
+	if (lcd_struct->type == LCD_TYPE_NONISOLATED)
+		if (lcd_struct->m)
+			lcd_struct->m->exit();
+	/*
+	 * Unlock
+	 */
+	__lcd_put(caller, cnode, lcd_struct);
+
+	return 0;
+
+fail2:
+	__lcd_put(caller, cnode, lcd_struct);
+fail1:
+	return ret;
+}
+
+
 /* INIT/EXIT -------------------------------------------------- */
 
 int __lcd_run_init(void)

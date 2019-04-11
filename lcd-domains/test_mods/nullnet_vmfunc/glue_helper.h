@@ -47,6 +47,7 @@ enum dispatch_t {
 	TRIGGER_CLEAN,
 	PREP_CHANNEL,  /* 25 */
 	MODULE_INIT,
+	MODULE_EXIT,
 	SYNC_SETUP,
 	SYNC_NDO_SET_MAC_ADDRESS,
 };
@@ -76,6 +77,8 @@ struct skbuff_members {
 	unsigned int 	head_data_off;
 	unsigned int        truesize;
 } __attribute__((aligned));
+
+#define INIT_FIPC_MSG(msg)		memset(msg, 0x0, sizeof(*msg))
 
 #define SKB_LCD_MEMBERS(SKB)	((struct skbuff_members*)((char*)skb_end_pointer(SKB) - (char*)SKB_LCD_MEMBERS_SZ))
 

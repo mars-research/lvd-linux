@@ -16,7 +16,7 @@
 
 #include <lcd_config/post_hook.h>
 
-cptr_t net_klcd, dummy_lcd;
+cptr_t blk_klcd, nullb_lcd;
 struct lcd_create_ctx *dummy_ctx;
 static unsigned int bind_cpu = 2;
 
@@ -27,10 +27,13 @@ static int boot_main(void)
 {
 	int ret;
 	struct module *m = NULL;
-
 	/*
 	 * Enter lcd mode
 	 */
+	/* setup memory for LCD, assign in current->lcd 
+	 * setup cspace, utcb, endpoint - hardcoded at cptr(1),
+	 * comment says it is for CALL EP (not clear though!)
+	 * thc_init */
 	ret = lcd_enter();
 	if (ret) {
 		LIBLCD_ERR("lcd enter failed");
@@ -38,19 +41,23 @@ static int boot_main(void)
 	}
 
 	/* ---------- Create LCDs ---------- */
-
-	m = lvd_create_module_klcd_no_thread(LCD_DIR("nullnet_vmfunc/net_klcd"),
-				"lcd_test_mod_nullnet_vmfunc_net_klcd",
-				&net_klcd);
+	/* Until now the boot module is current. Inside this function,
+	 * a new lcd struct is created, a kthread is associated with the newly
+	 * allocated lcd struct and the cptr for this lcd is inserted into the
+	 * boot's cspace and the cptr is returned outside as blk_klcd */
+	m = lvd_create_module_klcd_no_thread(LCD_DIR("nullb_vmfunc/blk_klcd"),
+				"lcd_test_mod_nullb_vmfunc_blk_klcd",
+				&blk_klcd);
 
 	if (!m) {
 		LIBLCD_ERR("failed to create net klcd");
 		ret = -1;
 		goto fail3;
 	}
-	ret = lvd_create_module_lvd(LCD_DIR("nullnet_vmfunc/dummy_lcd"),
-				"lcd_test_mod_nullnet_vmfunc_dummy_lcd",
-				&dummy_lcd,
+
+	ret = lvd_create_module_lvd(LCD_DIR("nullb_vmfunc/nullb_lcd"),
+				"lcd_test_mod_nullb_vmfunc_nullb_lcd",
+				&nullb_lcd,
 				&dummy_ctx, 1);
 	if (ret) {
 		LIBLCD_ERR("failed to create dummy lcd");
@@ -59,33 +66,35 @@ static int boot_main(void)
 
 	/* ---------- RUN! ---------- */
 
-	LIBLCD_MSG("starting network...");
-
-	/* run KLCD init */
-	ret = lcd_run(net_klcd);
+	LIBLCD_MSG("starting blk klcd...");
+	/* The capability pointer of the kthread that was created in the create_klcd
+	 * call will now be woken up here! This will wake up a common kernel thread and
+	 * the thread will call klcd_main() which my guess is the module init of klcd
+	 * module! */
+	ret = lcd_run(blk_klcd);
 	if (ret) {
-		LIBLCD_ERR("failed to start net klcd");
+		LIBLCD_ERR("failed to start blk klcd");
 		goto fail8;
 	}
-
-	LIBLCD_MSG("starting dummy ethernet...");
-
-	ret = lcd_run(dummy_lcd);
+	
+	LIBLCD_MSG("starting nullb lcd...");
+	ret = lcd_run(nullb_lcd);
 	if (ret) {
-		LIBLCD_ERR("failed to start dummy lcd");
+		LIBLCD_ERR("failed to start nullb lcd");
 		goto fail9;
 	}
 
-	return 0;
+	ret = 0;
+	goto fail1;
 
 	/* The destroy's will free up everything ... */
 fail9:
 fail8:
-	lcd_cap_delete(dummy_lcd);
+	lcd_cap_delete(nullb_lcd);
 	lcd_destroy_create_ctx(dummy_ctx);
 fail4:
-	//lcd_cap_delete(net_klcd);
-	lcd_destroy_module_klcd(net_klcd, "lcd_test_mod_nullnet_vmfunc_net_klcd");
+	//lcd_cap_delete(blk_klcd);
+	lcd_destroy_module_klcd(blk_klcd, "lcd_test_mod_nullb_blk_klcd");
 fail3:
 	lcd_exit(0); /* will free endpoints */
 fail1:
@@ -98,7 +107,7 @@ static int shutdown = 0;
 int boot_lcd_thread(void *data)
 {
 	static unsigned once = 0;
-	int ret = 0;
+	int ret;
 	while (!kthread_should_stop()) {
 		if (!once) {
 			LCD_MAIN({
@@ -108,19 +117,17 @@ int boot_lcd_thread(void *data)
 		once = 1;
 		wait_event_interruptible(wq, shutdown != 0);
 	}
-	msleep(2000);
 	LIBLCD_MSG("Exiting thread");
+
 	if (!ret) {
 		/* trigger exit module */
-		lcd_stop(net_klcd);
+		lcd_stop(blk_klcd);
 
-		lcd_destroy_module_klcd(net_klcd,
-				"lcd_test_mod_nullnet_vmfunc_net_klcd");
+		lcd_destroy_module_klcd(blk_klcd, "lcd_test_mod_nullb_blk_klcd");
 		if (current->lcd)
-			lcd_cap_delete(dummy_lcd);
+			lcd_cap_delete(nullb_lcd);
 		if (dummy_ctx)
 			lcd_destroy_create_ctx(dummy_ctx);
-
 		lcd_exit(0);
 	}
 	return 0;
@@ -130,11 +137,12 @@ struct task_struct *boot_task;
 
 static int boot_init(void)
 {
-	LIBLCD_MSG("%s: entering on cpu: %d", __func__, bind_cpu);
+	LIBLCD_MSG("%s: entering", __func__);
 
 	boot_task = kthread_create(boot_lcd_thread, NULL, "boot_lcd_thread");
 
 	kthread_bind(boot_task, bind_cpu);
+
 	if (!IS_ERR(boot_task))
 		wake_up_process(boot_task);
 	return 0;
@@ -145,13 +153,11 @@ static void boot_exit(void)
 	/* nothing to do */
 	if (!IS_ERR(boot_task)) {
 		LIBLCD_MSG("%s: exiting", __func__);
-		shutdown = 1;
-		wake_up_interruptible(&wq);
+               	shutdown = 1;
+                wake_up_interruptible(&wq);
 		kthread_stop(boot_task);
 	}
 }
-
 module_init(boot_init);
 module_exit(boot_exit);
-
 MODULE_LICENSE("GPL");

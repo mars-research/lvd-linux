@@ -83,7 +83,7 @@ void write_exception_stack(void *base, unsigned long sz)
 unsigned long noinline
 foo(struct fipc_message *msg)
 {
-	struct fipc_message kmsg = {0};
+	struct fipc_message kmsg;
 	int ret = 0;
 #ifdef CONFIG_DUMP_IRQ_REGS
 	void *lvd_stack;
@@ -93,6 +93,8 @@ foo(struct fipc_message *msg)
 
 	unsigned long sz;
 	int cpu;
+
+	INIT_FIPC_MSG(&kmsg);
 
 	cpu = fipc_get_reg5(msg);
 

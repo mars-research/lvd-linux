@@ -20,6 +20,7 @@ struct lcd_boot_cptrs {
 	cptr_t module_core;
 	cptr_t boot_pages;
 	cptr_t stack;
+	cptr_t pcpu_stacks[NR_CPUS];
 	cptr_t vmfunc_tr_page;
 	cptr_t vmfunc_sb_page;
 	cptr_t vmfunc_state_page;

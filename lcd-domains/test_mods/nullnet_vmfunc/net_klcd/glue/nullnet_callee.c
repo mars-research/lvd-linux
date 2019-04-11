@@ -1213,7 +1213,7 @@ void setup(struct net_device *dev, struct trampoline_hidden_args *hidden_args)
 		&g_ops_container->rtnl_link_ops;
 fail_alloc:
 fail_insert:
-	printk("%s: returned", __func__);
+	printk("%s: returned\n", __func__);
 	return;
 }
 
@@ -1557,7 +1557,10 @@ int rtnl_link_unregister_callee(struct fipc_message *request)
 {
 	struct rtnl_link_ops_container *ops_container;
 	int ret;
+
+#ifndef CONFIG_LVD
 	struct trampoline_hidden_args *validate_hidden_args;
+#endif
 
 	ret = glue_cap_lookup_rtnl_link_ops_type(c_cspace, __cptr(fipc_get_reg2(request)), &ops_container);
 
@@ -1570,10 +1573,12 @@ int rtnl_link_unregister_callee(struct fipc_message *request)
 
 	glue_cap_remove(c_cspace, ops_container->my_ref);
 
+#ifndef CONFIG_LVD
 	validate_hidden_args = LCD_TRAMPOLINE_TO_HIDDEN_ARGS(
 			ops_container->rtnl_link_ops.validate);
 	kfree(validate_hidden_args->t_handle);
 	kfree(validate_hidden_args);
+#endif
 	kfree(ops_container);
 
 fail_lookup:
@@ -1652,7 +1657,7 @@ int alloc_netdev_mqs_callee(struct fipc_message *request)
 
 	dev_container = container_of(net_device, struct net_device_container, net_device);
 	
-	printk("%s: returned", __func__);
+	printk("%s: returned\n", __func__);
 //	dev_container->other_ref.cptr = netdev_otherref.cptr;
 
 	/*ret = glue_cap_insert_net_device_type(c_cspace, dev_container , &dev_container->my_ref);

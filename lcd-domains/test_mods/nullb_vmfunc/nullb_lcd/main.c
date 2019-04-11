@@ -8,66 +8,67 @@
 #include <linux/kernel.h>
 #include <liblcd/liblcd.h>
 #include <liblcd/sync_ipc_poll.h>
-#include "./nullnet_caller.h"
+#include "./nullb_caller.h"
 
-#include "../rdtsc_helper.h"
 #include <lcd_config/post_hook.h>
 
-struct thc_channel *net_async;
-struct glue_cspace *nullnet_cspace;
-cptr_t nullnet_sync_endpoint;
+int nullb_done = 0;
 
-int dummy_init_module(void);
-void dummy_cleanup_module(void);
+int null_init(void);
+void null_exit(void);
 
-static int dummy_lcd_init(void)
+static int nullb_lcd_init(void)
 {
-	int ret = 0;
+	int r = 0;
 
 	printk("LCD enter \n");
-	ret = lcd_enter();
-	if (ret)
+
+	r = lcd_enter();
+
+	if (r)
 		goto fail1;
 	/*
-	 * Initialize nullnet glue
+	 * Initialize nullb glue
 	 */
-	ret = glue_nullnet_init();
-	if (ret) {
-		LIBLCD_ERR("nullnet init");
+	r = glue_nullb_init();
+	if (r) {
+		LIBLCD_ERR("nullb init");
 		goto fail2;
 	}
 
-	ret = dummy_init_module();
+	r = null_init();
 
-	return ret;
+	return r;
 fail2:
 fail1:
-	lcd_exit(ret);
+	lcd_exit(r);
 }
 
-int __dummy_lcd_init(void)
+int __nullb_lcd_init(void)
 {
-	return dummy_lcd_init();
+	return nullb_lcd_init();
 }
 
-static void dummy_lcd_exit(void)
+static void nullb_lcd_exit(void)
 {
 	LIBLCD_MSG("%s: exiting", __func__);
 
-	dummy_cleanup_module();
+	null_exit();
 
-	glue_nullnet_exit();
-	lcd_exit(0);
+	glue_nullb_exit();
+
+	lcd_exit(0); /* doesn't return */
+
 	return;
 }
 
-void __dummy_lcd_exit(void)
+void __nullb_lcd_exit(void)
 {
-	dummy_lcd_exit();
+	nullb_lcd_exit();
 }
 
-module_init(__dummy_lcd_init);
-module_exit(dummy_lcd_exit);
+module_init(__nullb_lcd_init);
+module_exit(nullb_lcd_exit);
 MODULE_LICENSE("GPL");
 MODULE_INFO(livepatch, "Y");
 

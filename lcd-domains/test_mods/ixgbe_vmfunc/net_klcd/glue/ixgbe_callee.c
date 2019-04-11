@@ -13,11 +13,12 @@
 
 #include <linux/hashtable.h>
 #include <asm/cacheflush.h>
-#include <asm/lcd_domains/ept.h>
 #include <lcd_domains/microkernel.h>
 
 #include <linux/priv_mempool.h>
 #include <linux/sort.h>
+#include <asm/lcd_domains/ept_lcd.h>
+
 #include <lcd_config/post_hook.h>
 
 /* This is the only device we strive for */
@@ -3105,8 +3106,8 @@ int napi_gro_receive_callee(struct fipc_message *_request)
 
 		lcd_struct = iommu_lcd;
 
-		ret = lcd_arch_ept_gpa_to_hva(lcd_struct->lcd_arch,
-			__gpa(page), &hva_out);
+		ret = lcd_arch_ept_gpa_to_hva_cpu(lcd_struct->lcd_arch,
+			__gpa(page), &hva_out, smp_processor_id());
 		if (ret) {
 			LIBLCD_WARN("getting gpa:hpa mapping %p:%llx",
 				(void*)page, hva_val(hva_out));
@@ -3250,8 +3251,8 @@ int napi_gro_receive_callee(struct fipc_message *_request)
 
 		lcd_struct = iommu_lcd;
 
-		ret = lcd_arch_ept_gpa_to_hva(lcd_struct->lcd_arch,
-			__gpa(page), &hva_out);
+		ret = lcd_arch_ept_gpa_to_hva_cpu(lcd_struct->lcd_arch,
+			__gpa(page), &hva_out, smp_processor_id());
 		if (ret) {
 			LIBLCD_WARN("getting gpa:hpa mapping %p:%llx",
 				(void*)page, hva_val(hva_out));

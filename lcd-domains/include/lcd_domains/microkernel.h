@@ -102,6 +102,13 @@ enum lcd_xmit_status {
 	LCD_XMIT_FAILED  = 2, /* when send/recv failed    */
 };
 
+#define NUM_STACKS_PER_CPU	8
+
+struct lcd_stack {
+	long long bitmap;
+	void **stacks;
+};
+
 struct lcd {
 	/*
 	 * Lock
@@ -185,6 +192,8 @@ struct lcd {
 	 * that. For now, I hope this should be enough.
 	 */
 	struct iommu_domain *domain;
+
+	struct lcd_stack __percpu *lcd_stacks;
 };
 
 /* similar to task structs */
@@ -343,6 +352,9 @@ int __lcd_memory_grant_and_map(struct lcd *caller, cptr_t lcd,
 
 int __lcd_memory_grant_and_map_hpa(struct lcd *caller, cptr_t lcd,
 			cptr_t mo_cptr, cptr_t dest_slot, gpa_t base, hpa_t hpa_base);
+
+int __lcd_memory_grant_and_map_cpu(struct lcd *caller, cptr_t lcd,
+			cptr_t mo_cptr, cptr_t dest_slot, gpa_t base, int cpu);
 /**
  * __lcd_cap_grant -- Grant LCD capability directly (rather than via IPC)
  * @caller: LCD doing the granting
@@ -640,6 +652,8 @@ int __lcd_map_memory_object(struct lcd *caller, cptr_t mo_cptr, gpa_t base);
 
 int __lcd_map_memory_object_hpa(struct lcd *caller, cptr_t mo_cptr, gpa_t base, hpa_t hpa_base);
 
+int __lcd_map_memory_object_cpu(struct lcd *caller, cptr_t mo_cptr, gpa_t base, int cpu);
+
 /**
  * __lcd_unmap_memory_object -- Unmap memory object from LCD's physical
  *                              address space
@@ -808,6 +822,7 @@ int __lcd_kthread_main(void *data);
  */
 int __lcd_run(struct lcd *caller, cptr_t lcd);
 
+int __lcd_stop(struct lcd *caller, cptr_t lcd);
 /**
  * __lcd_run_init -- Invoke this when microkernel initializes
  */

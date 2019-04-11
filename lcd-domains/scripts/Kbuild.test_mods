@@ -31,3 +31,4 @@ obj-m += vmfunc/
 obj-m += vmfunc_klcd/
 obj-m += nullnet_vmfunc/
 obj-m += ixgbe_vmfunc/
+obj-m += nullb_vmfunc/

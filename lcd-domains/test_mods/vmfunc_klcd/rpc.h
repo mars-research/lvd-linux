@@ -20,4 +20,6 @@ enum fn_type {
 int callee(struct fipc_message *);
 #define TRANSACTIONS 1000000
 
+#define INIT_FIPC_MSG(msg)             memset(msg, 0x0, sizeof(*msg))
+
 #endif /* LCD_ASYNC_RPC_TEST_H */

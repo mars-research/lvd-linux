@@ -105,6 +105,9 @@ int lcd_memory_grant_and_map(cptr_t lcd, cptr_t mo, cptr_t dest_slot,
 
 int lcd_memory_grant_and_map_hpa(cptr_t lcd, cptr_t mo, cptr_t dest_slot,
 			gpa_t base, hpa_t hpa_base);
+
+int lcd_memory_grant_and_map_cpu(cptr_t lcd, cptr_t mo, cptr_t dest_slot,
+			gpa_t base, int cpu);
 /**
  * lcd_cap_grant -- Grant the LCD a capability (config its cspace)
  * @lcd: the LCD to configure
@@ -136,6 +139,8 @@ int lcd_set_struct_module_hva(cptr_t lcd, struct module *mod);
  * @lcd: the LCD to run
  */
 int lcd_run(cptr_t lcd);
+
+int lcd_stop(cptr_t lcd);
 
 /* HIGHER-LEVEL LCD CREATE FROM KERNEL MODULE ------------------------------ */
 

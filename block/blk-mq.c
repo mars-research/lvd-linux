@@ -29,6 +29,9 @@
 #include "blk.h"
 #include "blk-mq.h"
 #include "blk-mq-tag.h"
+#include <linux/blk-lcd.h>
+
+#define CONFIG_LCD_CONTAINERS
 
 static DEFINE_MUTEX(all_q_mutex);
 static LIST_HEAD(all_q_list);
@@ -1972,7 +1975,13 @@ void blk_mq_release(struct request_queue *q)
 		if (!hctx)
 			continue;
 		kfree(hctx->ctxs);
+#ifdef CONFIG_LCD_CONTAINERS
+		/* free hctx_container */
+		kfree(container_of(hctx, struct blk_mq_hw_ctx_container,
+				blk_mq_hw_ctx));
+#else
 		kfree(hctx);
+#endif
 	}
 
 	kfree(q->mq_map);
@@ -2000,12 +2009,15 @@ struct request_queue *blk_mq_init_queue(struct blk_mq_tag_set *set)
 }
 EXPORT_SYMBOL(blk_mq_init_queue);
 
+
 static void blk_mq_realloc_hw_ctxs(struct blk_mq_tag_set *set,
 						struct request_queue *q)
 {
 	int i, j;
 	struct blk_mq_hw_ctx **hctxs = q->queue_hw_ctx;
-
+#ifdef CONFIG_LCD_CONTAINERS
+	struct blk_mq_hw_ctx_container *hwcnt;
+#endif
 	blk_mq_sysfs_unregister(q);
 	for (i = 0; i < set->nr_hw_queues; i++) {
 		int node;
@@ -2014,14 +2026,30 @@ static void blk_mq_realloc_hw_ctxs(struct blk_mq_tag_set *set,
 			continue;
 
 		node = blk_mq_hw_queue_to_node(q->mq_map, i);
+#ifdef CONFIG_LCD_CONTAINERS
+		/* allocation needs to be modified to hw_ctx_container */
+		hwcnt = kzalloc_node(sizeof(struct blk_mq_hw_ctx_container),
+					GFP_KERNEL, node);
+
+		if (!hwcnt)
+			break;
+
+		hctxs[i] = &hwcnt->blk_mq_hw_ctx;
+#else
 		hctxs[i] = kzalloc_node(sizeof(struct blk_mq_hw_ctx),
 					GFP_KERNEL, node);
 		if (!hctxs[i])
 			break;
+#endif
 
 		if (!zalloc_cpumask_var_node(&hctxs[i]->cpumask, GFP_KERNEL,
 						node)) {
+#ifdef CONFIG_LCD_CONTAINERS
+			kfree(container_of(hctxs[i], struct blk_mq_hw_ctx_container,
+						blk_mq_hw_ctx));
+#else
 			kfree(hctxs[i]);
+#endif
 			hctxs[i] = NULL;
 			break;
 		}
@@ -2032,7 +2060,12 @@ static void blk_mq_realloc_hw_ctxs(struct blk_mq_tag_set *set,
 
 		if (blk_mq_init_hctx(q, set, hctxs[i], i)) {
 			free_cpumask_var(hctxs[i]->cpumask);
+#ifdef CONFIG_LCD_CONTAINERS
+			kfree(container_of(hctxs[i], struct blk_mq_hw_ctx_container,
+						blk_mq_hw_ctx));
+#else
 			kfree(hctxs[i]);
+#endif
 			hctxs[i] = NULL;
 			break;
 		}
@@ -2050,7 +2083,12 @@ static void blk_mq_realloc_hw_ctxs(struct blk_mq_tag_set *set,
 			free_cpumask_var(hctx->cpumask);
 			kobject_put(&hctx->kobj);
 			kfree(hctx->ctxs);
+#ifdef CONFIG_LCD_CONTAINERS
+			kfree(container_of(hctxs[j], struct blk_mq_hw_ctx_container,
+						 blk_mq_hw_ctx));
+#else
 			kfree(hctx);
+#endif
 			hctxs[j] = NULL;
 
 		}

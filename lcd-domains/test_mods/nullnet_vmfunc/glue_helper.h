@@ -85,23 +85,6 @@ struct skbuff_members {
 #define C(x)	skb_lcd->x = skb->x
 #define P(x)	skb->x = skb_lcd->x
 
-#define CONSUME_SKB_SEND_ONLY
-#define CONSUME_SKB_NO_HASHING
-//#define SENDER_DISPATCH_LOOP
-
-//#define NO_AWE
-//#define NO_HASHING
-//#define NO_MARSHAL
-
-//#define DOUBLE_HASHING
-//#define ONE_SLOT
-
-//#define CACHE_ALIGNED __attribute__((aligned(64)))
-
-#define fipc_test_pause()    asm volatile ( "pause\n": : :"memory" );
-
-#define PMFS_ASYNC_RPC_BUFFER_ORDER 12
-// LCD_DEBUG
 /* CONTAINERS 	---------- */
 struct net_device_container {
 	struct net_device net_device;
@@ -254,73 +237,5 @@ async_msg_set_fn_type(struct fipc_message *msg, int type)
 	msg->vmfunc_id = VMFUNC_RPC_CALL;
 	msg->rpc_id = type;
 }
-
-#if 0
-static inline
-int
-async_msg_blocking_send_start(struct thc_channel *chnl, 
-			struct fipc_message **out)
-{
-	int ret;
-	for (;;) {
-		/* Poll until we get a free slot or error */
-		ret = fipc_send_msg_start(thc_channel_to_fipc(chnl), out);
-		if (!ret || ret != -EWOULDBLOCK)
-			return ret;
-		cpu_relax();
-		if (kthread_should_stop())
-			return -EIO;
-	}
-}
-
-static inline
-int fipc_test_blocking_recv_start ( struct thc_channel *chnl, struct fipc_message** out)
-{
-	int ret;
-
-	while ( 1 )
-	{
-#ifdef ONE_SLOT
-		// Poll until we get a message or error
-		ret = fipc_recv_msg_start_0( thc_channel_to_fipc(chnl),
-						out );
-#else
-		// Poll until we get a message or error
-		ret = fipc_recv_msg_start( thc_channel_to_fipc(chnl),
-						out );
-#endif
-		if ( !ret || ret != -EWOULDBLOCK )
-		{
-			return ret;
-		}	
-		fipc_test_pause();
-	}
-	return 0;
-}
-
-/**
- * This function will block until a message slot is available and stored in out.
- */
-static inline
-int fipc_test_blocking_send_start ( struct thc_channel * chnl, struct fipc_message** out )
-{
-	int ret;
-
-	while ( 1 )
-	{
-		// Poll until we get a free slot or error
-		ret = fipc_send_msg_start( thc_channel_to_fipc(chnl), out );
-
-		if ( !ret || ret != -EWOULDBLOCK )
-		{
-			return ret;
-		}
-
-		fipc_test_pause();
-	}
-
-	return 0;
-}
-#endif
 
 #endif /* _GLUE_HELPER_H_ */

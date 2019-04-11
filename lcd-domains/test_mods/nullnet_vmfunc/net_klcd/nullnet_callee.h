@@ -11,6 +11,7 @@ int glue_nullnet_init(void);
 
 void glue_nullnet_exit(void);
 
+#ifndef CONFIG_LVD
 struct trampoline_hidden_args {
 	void *struct_container;
 	struct glue_cspace *cspace;
@@ -18,7 +19,14 @@ struct trampoline_hidden_args {
 	struct thc_channel *async_chnl;
 	struct cptr sync_ep;
 };
+#endif
 
+/* XXX: How to determine this? */
+#define SKB_HASH_BITS      8
+
+struct skb_hash_table {
+	DECLARE_HASHTABLE(skb_table, SKB_HASH_BITS);
+};
 
 int __rtnl_link_register_callee(struct fipc_message *);
 
@@ -35,4 +43,5 @@ int alloc_netdev_mqs_callee(struct fipc_message *request);
 int consume_skb_callee(struct fipc_message *request);
 
 void setup_sync_callee(struct fipc_message *msg);
+
 #endif /* __NULLNET_CALLEE_H__ */

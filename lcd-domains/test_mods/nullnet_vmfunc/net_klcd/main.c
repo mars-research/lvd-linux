@@ -32,7 +32,7 @@ static int net_klcd_init(void)
 	/*
 	 * Set up cptr cache, etc.
 	 */
-#if 0
+#ifndef CONFIG_LVD
 	ret = lcd_enter();
 	if (ret) {
 		LIBLCD_ERR("lcd enter");
@@ -70,7 +70,9 @@ static int net_klcd_init(void)
 
 fail2:
 	lcd_exit(ret);
-//fail1:
+#ifndef CONFIG_LVD
+fail1:
+#endif
 	return ret;
 }
 
@@ -97,8 +99,12 @@ static void __exit net_klcd_exit(void)
 	 */
 	glue_nullnet_exit();
 
+#ifndef CONFIG_LVD
+	/*
+	 * In case of LVD, boot module calls lcd_exit
+	 */
 	lcd_exit(0);
-
+#endif
 	return;
 }
 

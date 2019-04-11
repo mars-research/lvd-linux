@@ -213,7 +213,7 @@ int register_netdevice(struct net_device *dev)
 		LIBLCD_ERR("thc_ipc_call");
 		lcd_exit(-1);
 	}
-	ret = fipc_get_reg4(request);
+	ret = fipc_get_reg0(request);
 	return ret;
 }
 
@@ -251,6 +251,7 @@ int sync_prep_data(void *data, unsigned long *sz, unsigned long *off, cptr_t *da
 
 
 // DONE
+#if 0
 int eth_mac_addr(struct net_device *dev, void *p)
 {
 	struct fipc_message r;
@@ -261,7 +262,7 @@ int eth_mac_addr(struct net_device *dev, void *p)
 	cptr_t p_cptr;
 	int ret;
 	struct net_device_container *dev_container;
-	uint32_t request_cookie;
+
 
 
 	dev_container = container_of(dev, struct net_device_container, net_device);
@@ -307,7 +308,7 @@ fail_sync:
 fail_ipc:
 	return ret;
 }
-
+#endif
 //DONE
 int eth_validate_addr(struct net_device *dev)
 {
@@ -501,23 +502,16 @@ void consume_skb(struct sk_buff *skb)
 	struct fipc_message r;
 	struct fipc_message *request = &r;
 	struct lcd_sk_buff_container *skb_c;
-	struct thc_channel *channel;
 
 	skb_c = container_of(skb,
 			struct lcd_sk_buff_container, skbuff);
 
-#ifdef SENDER_DISPATCH_LOOP
-	channel = (struct thc_channel*) skb_c->chnl;
-#else
-	channel = net_async;
-#endif
 	async_msg_set_fn_type(request, CONSUME_SKB);
 
-	thc_set_msg_type(request, msg_type_request);
+	fipc_set_reg0(request, cptr_val(skb_c->other_ref));
 
-#ifdef SENDER_DISPATCH_LOOP
-	thc_set_msg_id(request, skb_c->cookie);
-#endif
+	vmfunc_wrapper(request);
+
 	return;
 }
 
@@ -525,11 +519,11 @@ void consume_skb(struct sk_buff *skb)
 int ndo_init_callee(struct fipc_message *request)
 {
 	struct net_device_container *net_dev_container;
-	unsigned 	int request_cookie;
+
 	int ret;
 	cptr_t netdev_ref = __cptr(fipc_get_reg1(request));
 
-	request_cookie = thc_get_request_cookie(request);
+
 
 	ret = glue_cap_lookup_net_device_type(c_cspace, netdev_ref, &net_dev_container);
 	if (ret) {
@@ -549,11 +543,11 @@ fail_lookup:
 int ndo_uninit_callee(struct fipc_message *request)
 {
 	int ret;
-	unsigned int request_cookie;
+
 	struct net_device_container *net_dev_container;
 	cptr_t netdev_ref = __cptr(fipc_get_reg1(request));
 
-	request_cookie = thc_get_request_cookie(request);
+
 
 	ret = glue_cap_lookup_net_device_type(c_cspace, netdev_ref, &net_dev_container);
 	if (ret) {
@@ -656,7 +650,6 @@ int ndo_start_xmit_noawe_callee(struct fipc_message *_request)
  */
 int ndo_start_xmit_async_bare_callee(struct fipc_message *_request)
 {
-	unsigned 	int request_cookie;
 	struct lcd_sk_buff_container static_skb_c;
 	struct lcd_sk_buff_container *skb_c = &static_skb_c;
 	struct sk_buff *skb = &skb_c->skbuff;
@@ -667,8 +660,6 @@ int ndo_start_xmit_async_bare_callee(struct fipc_message *_request)
 	__be16 proto;
 	u32 len;
 	cptr_t skb_ref;
-
-	request_cookie = thc_get_request_cookie(_request);
 
 	skb_ref = __cptr(fipc_get_reg2(_request));
 
@@ -701,8 +692,7 @@ int ndo_start_xmit_async_bare_callee(struct fipc_message *_request)
 	skb->data = skb->head + skb_lcd->head_data_off;
 #endif
 
-	skb_c->cookie = request_cookie;
-
+	skb_c->other_ref = skb_ref;
 	dummy_xmit(skb, NULL);
 
 	return 0;
@@ -712,7 +702,6 @@ int ndo_start_xmit_async_bare_callee(struct fipc_message *_request)
 int ndo_validate_addr_callee(struct fipc_message *request)
 {
 	struct net_device_container *net_dev_container;
-	unsigned 	int request_cookie;
 	int ret;
 	cptr_t netdev_ref = __cptr(fipc_get_reg1(request));
 
@@ -725,10 +714,7 @@ int ndo_validate_addr_callee(struct fipc_message *request)
 	LIBLCD_MSG("%s, cptr lcd %lu", __func__, netdev_ref);
 	LIBLCD_MSG("%s, looked up cptr lcd %p |  %lu", __func__, net_dev_container, net_dev_container->other_ref.cptr);
 
-	request_cookie = thc_get_request_cookie(request);
-
 	ret = net_dev_container->net_device.netdev_ops->ndo_validate_addr(&net_dev_container->net_device);
-
 
 	fipc_set_reg1(request, ret);
 
@@ -741,15 +727,12 @@ int ndo_set_rx_mode_callee(struct fipc_message *request)
 {
 	int ret;
 	struct net_device_container *net_dev_container;
-	unsigned 	int request_cookie;
 
 	ret = glue_cap_lookup_net_device_type(c_cspace, __cptr(fipc_get_reg1(request)), &net_dev_container);
 	if (ret) {
 		LIBLCD_ERR("lookup");
 		goto fail_lookup;
 	}
-
-	request_cookie = thc_get_request_cookie(request);
 
 	net_dev_container->net_device.netdev_ops->ndo_set_rx_mode(&net_dev_container->net_device);
 
@@ -761,14 +744,14 @@ fail_lookup:
 int ndo_set_mac_address_callee(struct fipc_message *request)
 {
 	struct net_device_container *net_dev_container;
-	unsigned 	int request_cookie;
+
 	int ret;
 	int sync_ret;
 	unsigned 	long mem_order;
 	unsigned 	long addr_offset;
 	cptr_t addr_cptr;
 	gva_t addr_gva;
-	request_cookie = thc_get_request_cookie(request);
+
 
 	ret = glue_cap_lookup_net_device_type(c_cspace, __cptr(fipc_get_reg1(request)), &net_dev_container);
 	if (ret) {
@@ -810,13 +793,13 @@ fail_sync:
 // DONE
 int ndo_get_stats64_callee(struct fipc_message *request)
 {
-	unsigned 	int request_cookie;
+
 	struct rtnl_link_stats64 stats;
 	int ret;
 	struct net_device_container *net_dev_container;
 	cptr_t netdev_ref = __cptr(fipc_get_reg1(request));
 
-	request_cookie = thc_get_request_cookie(request);
+
 
 	ret = glue_cap_lookup_net_device_type(c_cspace, netdev_ref,
 			&net_dev_container);
@@ -841,7 +824,7 @@ fail_lookup:
 // DONE
 int ndo_change_carrier_callee(struct fipc_message *request)
 {
-	unsigned 	int request_cookie;
+
 	int ret;
 	struct net_device_container *net_dev_container;
 	bool new_carrier = fipc_get_reg2(request);
@@ -852,7 +835,7 @@ int ndo_change_carrier_callee(struct fipc_message *request)
 		goto fail_lookup;
 	}
 
-	request_cookie = thc_get_request_cookie(request);
+
 
 	ret = net_dev_container->net_device.netdev_ops->ndo_change_carrier(&net_dev_container->net_device, new_carrier);
 
@@ -866,7 +849,7 @@ fail_lookup:
 int setup_callee(struct fipc_message *request)
 {
 	int ret;
-	unsigned 	int request_cookie;
+
 	struct net_device_container *net_dev_container;
 	struct net_device_ops_container *netdev_ops_container;
 	const struct net_device_ops *netdev_ops;
@@ -877,7 +860,7 @@ int setup_callee(struct fipc_message *request)
 	gva_t pool_addr;
 	unsigned int pool_ord;
 
-	request_cookie = thc_get_request_cookie(request);
+
 
 	ret = glue_cap_lookup_net_device_type(c_cspace, netdev_ref, &net_dev_container);
 	if (ret) {
@@ -954,9 +937,9 @@ int validate_callee(struct fipc_message *request)
 {
 	struct nlattr **tb;
 	struct nlattr **data;
-	unsigned 	int request_cookie;
+
 	int ret = 0;
-	request_cookie = thc_get_request_cookie(request);
+
 	tb = kzalloc(sizeof( void  * ), GFP_KERNEL);
 	if (!tb) {
 		LIBLCD_ERR("kzalloc");

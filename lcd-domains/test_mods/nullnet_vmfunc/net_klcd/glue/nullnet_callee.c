@@ -62,21 +62,12 @@ module_param_array( ev_idx, byte, &ev_num, 0 );
 module_param_array( ev_msk, byte, NULL,    0 );
 #endif
 
-/* XXX: How to determine this? */
-#define CPTR_HASH_BITS      8
-static DEFINE_HASHTABLE(cptr_table, CPTR_HASH_BITS);
-
-#define TID_HASH_BITS      8
-static DEFINE_HASHTABLE(tid_table, TID_HASH_BITS);
-
 struct rtnl_link_stats64 pkt_stats;
 struct glue_cspace *c_cspace;
 struct thc_channel *net_async;
 struct cptr sync_ep;
 extern struct cspace *klcd_cspace;
 struct rtnl_link_ops_container *g_ops_container;
-DEFINE_MUTEX(hash_lock);
-DEFINE_SPINLOCK(hash_slock);
 
 static unsigned long pool_pfn_start, pool_pfn_end;
 
@@ -93,6 +84,7 @@ priv_pool_t *skbc_pool;
 void *pool_base = NULL;
 size_t pool_size = 0;
 
+DECLARE_PER_CPU(struct skb_hash_table, skb_hash);
 
 #ifdef TIMESTAMP
 uint64_t *times_ndo_xmit = NULL;
@@ -109,7 +101,6 @@ uint64_t *perf3 = NULL;
 uint64_t *perf4 = NULL;
 #endif
 struct kmem_cache *skb_c_cache = NULL;
-
 
 #ifdef CONFIG_LVD
 int __ndo_start_xmit_inner_async(struct sk_buff *skb, struct net_device *dev);
@@ -188,7 +179,6 @@ int pool_pick(void)
 
 void skb_data_pool_init(void)
 {
-	//pool = priv_pool_init(SKB_DATA_POOL, 10, SKB_DATA_SIZE);
 	pool_base = base_pools[pools[pool_pick()].start_idx];
 	pool_size = best_diff * ((1 << pool_order) * PAGE_SIZE);
 	pool = priv_pool_init(SKB_DATA_POOL, (void*) pool_base, pool_size, 2048);
@@ -223,6 +213,7 @@ inline xmit_type_t check_skb_range(struct sk_buff *skb)
 int glue_nullnet_init(void)
 {
 	int ret;
+	int cpu;
 	ret = glue_cap_init();
 	if (ret) {
 		LIBLCD_ERR("cap init");
@@ -234,8 +225,11 @@ int glue_nullnet_init(void)
 		goto fail2;
 	}
 
-//	hash_init(cptr_table);
-	hash_init(tid_table);
+	/* hash_init our percpu skb_hash_table */
+	for_each_online_cpu(cpu) {
+		struct skb_hash_table *this = &per_cpu(skb_hash, smp_processor_id());
+		hash_init(this->skb_table);
+	}
 
 	/* initialize our private pool */
 	skb_data_pool_init();
@@ -279,12 +273,12 @@ int glue_nullnet_init(void)
 				NULL);
 	if (!skb_c_cache)
 		printk("WARN: skb_container cache not created\n");
+
 	return 0;
 fail2:
 	glue_cap_exit();
 fail1:
 	return ret;
-
 }
 
 void glue_nullnet_exit()
@@ -327,136 +321,6 @@ void glue_nullnet_exit()
 		vfree(perf4);
 #endif
 }
-
-int inline glue_insert_skbuff(struct hlist_head *htable,
-			struct sk_buff_container *skb_c)
-{
-	BUG_ON(!skb_c->skb);
-
-	skb_c->my_ref = __cptr((unsigned long)skb_c->skb);
-#if 0
-	mutex_lock_interruptible(&hash_lock);
-	hash_add_rcu(cptr_table, &skb_c->hentry,
-			(unsigned long) skb_c->skb);
-	mutex_unlock(&hash_lock);
-#endif
-	spin_lock(&hash_slock);
-	hash_add(cptr_table, &skb_c->hentry,
-			(unsigned long) skb_c->skb);
-	spin_unlock(&hash_slock);
-	return 0;
-}
-
-int inline glue_lookup_skbuff(struct hlist_head *htable, struct cptr c, struct sk_buff_container **skb_cout)
-{
-        struct sk_buff_container *skb_c;
-
-	spin_lock(&hash_slock);
-        //hash_for_each_possible_rcu(cptr_table, skb_c, hentry, (unsigned long) cptr_val(c)) {
-        hash_for_each_possible(cptr_table, skb_c, hentry, (unsigned long) cptr_val(c)) {
-		if (!skb_c) {
-			WARN_ON(!skb_c);
-			continue;
-		}
-		if (skb_c->skb == (struct sk_buff*) c.cptr) {
-	                *skb_cout = skb_c;
-		}
-        }
-	spin_unlock(&hash_slock);
-        return 0;
-}
-
-void inline glue_remove_skbuff(struct sk_buff_container *skb_c)
-{
-#if 0
-	mutex_lock_interruptible(&hash_lock);
-	hash_del_rcu(&skb_c->hentry);
-	mutex_unlock(&hash_lock);
-#endif
-	spin_lock(&hash_slock);
-	hash_del(&skb_c->hentry);
-	spin_unlock(&hash_slock);
-}
-
-int inline glue_insert_skbuff_2(struct ptstate_t *pts,
-			struct sk_buff_container *skb_c)
-{
-	BUG_ON(!skb_c->skb);
-
-	skb_c->my_ref = __cptr((unsigned long)skb_c->skb);
-
-	spin_lock(&pts->hash_lock);
-	hash_add(pts->cptr_table, &skb_c->hentry,
-			(unsigned long) skb_c->skb);
-	spin_unlock(&pts->hash_lock);
-	return 0;
-}
-
-int inline glue_lookup_skbuff_2(struct ptstate_t *pts,
-			struct cptr c,
-			struct sk_buff_container **skb_cout)
-{
-        struct sk_buff_container *skb_c;
-
-	spin_lock(&pts->hash_lock);
-        //hash_for_each_possible_rcu(cptr_table, skb_c, hentry, (unsigned long) cptr_val(c)) {
-        hash_for_each_possible(pts->cptr_table, skb_c, hentry, (unsigned long) cptr_val(c)) {
-		if (!skb_c) {
-			WARN_ON(!skb_c);
-			continue;
-		}
-		if (skb_c->skb == (struct sk_buff*) c.cptr) {
-	                *skb_cout = skb_c;
-		}
-        }
-	spin_unlock(&pts->hash_lock);
-        return 0;
-}
-
-void inline glue_remove_skbuff_2(struct ptstate_t *pts,
-		struct sk_buff_container *skb_c)
-{
-	spin_lock(&pts->hash_lock);
-	hash_del(&skb_c->hentry);
-	spin_unlock(&pts->hash_lock);
-}
-
-
-int inline glue_insert_tid(struct hlist_head *htable,
-			struct ptstate_t *pts)
-{
-//	spin_lock(&hash_tid_lock);
-	hash_add_rcu(tid_table, &pts->hentry,
-			(unsigned long) pts->pid);
-//	spin_unlock(&hash_tid_lock);
-	return 0;
-}
-
-int inline glue_lookup_tid(struct hlist_head *htable, unsigned long pid, struct ptstate_t **pts_out)
-{
-        struct ptstate_t *ptstate;
-
-//	spin_lock(&hash_tid_lock);
-        hash_for_each_possible_rcu(tid_table, ptstate, hentry, pid) {
-		if (!ptstate) {
-			WARN_ON(!ptstate);
-			continue;
-		}
-		if (ptstate->pid == pid) {
-	                *pts_out = ptstate;
-		}
-        }
-//`	spin_unlock(&hash_tid_lock);
-        return 0;
-}
-
-void inline glue_remove_tid(struct ptstate_t *pts)
-{
-//	spin_lock(&hash_tid_lock);
-	hash_del_rcu(&pts->hentry);
-//	spin_unlock(&hash_tid_lock);
-}
-
 
 int sync_setup_memory(void *data, size_t sz, unsigned long *order, cptr_t *data_cptr, unsigned long *data_offset)
 {
@@ -751,7 +615,7 @@ struct rtnl_link_stats64 *ndo_get_stats64(struct net_device *dev, struct rtnl_li
 struct rtnl_link_stats64 *ndo_get_stats64(struct net_device *dev, struct rtnl_link_stats64 *stats, struct trampoline_hidden_args *hidden_args)
 #endif
 {
-//	int ret;
+	int ret;
 	struct fipc_message r;
 	struct fipc_message *request = &r;
 	struct net_device_container *net_dev_container;
@@ -763,14 +627,14 @@ struct rtnl_link_stats64 *ndo_get_stats64(struct net_device *dev, struct rtnl_li
 
 	fipc_set_reg1(request, net_dev_container->other_ref.cptr);
 
-#if 0
+#if 1
 	ret = vmfunc_klcd_wrapper(request, 1);
 	stats->tx_packets = fipc_get_reg1(request);
 	stats->tx_bytes = fipc_get_reg2(request);
-#endif
+#else
 	stats->tx_packets = g_stats.tx_packets;
 	stats->tx_bytes = g_stats.tx_bytes;
-
+#endif
 	return stats;
 }
 
@@ -1245,12 +1109,12 @@ int register_netdevice_callee(struct fipc_message *request)
 
 	dev_container->net_device.dev_addr = kmalloc(MAX_ADDR_LEN, GFP_KERNEL);
 
+	/* caller must hold rtnl mutex */
 	rtnl_lock();
 	ret = register_netdevice(( &dev_container->net_device ));
 	rtnl_unlock();
-	LIBLCD_MSG("unlocked ");
 
-	fipc_set_reg4(request, ret);
+	fipc_set_reg0(request, ret);
 fail_lookup:
 	return ret;
 }
@@ -1513,7 +1377,8 @@ int __rtnl_link_register_callee(struct fipc_message *request)
 	ops_container->rtnl_link_ops.kind = "dummy"; 
 
 	printk("%s, acquiring rtnl_lock\n", __func__);
-	//rtnl_lock();
+
+	rtnl_lock();
 
 	printk("%s, acquired rtnl_lock, calling original func\n", __func__);
 
@@ -1521,7 +1386,7 @@ int __rtnl_link_register_callee(struct fipc_message *request)
 
 	printk("%s, original func returned ret %d\n", __func__, ret);
 
-	//rtnl_unlock();
+	rtnl_unlock();
 
 	fipc_set_reg0(request, ret);
 
@@ -1547,7 +1412,6 @@ int __rtnl_link_unregister_callee(struct fipc_message *request)
 		LIBLCD_ERR("kzalloc");
 		lcd_exit(-1);
 	}
-	//ops->kind = fipc_get_reg1(request);
 	__rtnl_link_unregister(ops);
 	return ret;
 }
@@ -1676,105 +1540,3 @@ fail3:
 fail_alloc:
 	return ret;
 }
-
-#ifdef CONSUME_SKB_NO_HASHING
-int consume_skb_callee(struct fipc_message *request)
-{
-	int ret = 0;
-	struct sk_buff *skb;
-
-	skb = (struct sk_buff *) fipc_get_reg0(request);
-
-//	printk("%s, freeing %p\n", __func__, skb);
-	consume_skb(skb);
-
-	return ret;
-}
-
-#else
-
-//TODO:
-int consume_skb_callee(struct fipc_message *request)
-{
-	int ret = 0;
-	struct sk_buff_container *skb_c;
-	struct sk_buff *skb;
-
-#ifdef DOUBLE_HASHING
-	struct ptstate_t *pts_out;
-	int pid;
-#endif
-	cptr_t skb_cptr, skbh_cptr;
-	bool revoke = false;
-
-#ifdef DOUBLE_HASHING
-	pid = fipc_get_reg1(request);
-
-//	printk("Looking up for pid %d\n", pid);
-
-	glue_lookup_tid(tid_table,
-			pid,
-			&pts_out);
-
-//	printk("Got pts %p for pid %d\n", pts_out, pid);
-
-	glue_lookup_skbuff_2(pts_out,
-			__cptr(fipc_get_reg0(request)),
-			&skb_c);
-
-//	printk("Got skb %p for pts %p\n", skb_c, pts_out);
-#else
-	glue_lookup_skbuff(cptr_table,
-			__cptr(fipc_get_reg0(request)),
-			&skb_c);
-#endif
-
-	if (!skb_c) {
-		printk("%s, skb_c null\n", __func__);
-		goto skip;
-	} else {
-		skb = skb_c->skb;
-	}
-
-	WARN_ON(!skb);
-
-	if (!skb)
-		goto skip;
-
-	if (!skb->private) {
-		/* restore */
-		skb->head = skb_c->head;
-		skb->data = skb_c->data;
-
-		skb_cptr = skb_c->skb_cptr;
-		skbh_cptr = skb_c->skbh_cptr;
-		revoke = true;
-	}
-	//printk("%s, skb %p | skb_c %p\n", __func__, skb, skb_c);
-	consume_skb(skb_c->skb);
-
-	if (skb_c->tsk == current && revoke) {
-		lcd_cap_revoke(skb_cptr);
-		lcd_cap_revoke(skbh_cptr);
-		lcd_unvolunteer_pages(skb_cptr);
-		lcd_unvolunteer_pages(skbh_cptr);
-	}
-
-#ifdef DOUBLE_HASHING
-	glue_remove_skbuff_2(pts_out, skb_c);
-#else
-	glue_remove_skbuff(skb_c);
-#endif
-#ifdef SKBC_PRIVATE_POOL
-	WARN_ON(!skb_c);
-	if(skb_c)
-	priv_free(skb_c, SKB_CONTAINER_POOL);
-//	printk("free : %p\n", skb_c);
-#else
-//	printk("%s, skb %p\n", __func__, skb_c);
-	kmem_cache_free(skb_c_cache, skb_c);
-#endif
-skip:
-	return ret;
-}
-#endif /* CONSUME_SKB_NO_HASHING */

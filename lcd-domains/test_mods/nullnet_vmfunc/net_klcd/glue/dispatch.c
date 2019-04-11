@@ -13,8 +13,6 @@
 #define trace(x) LIBLCD_MSG("net got " #x " msg")
 
 struct glue_cspace *cspace;
-cptr_t sync_endpoint;
-struct thc_channel *channel;
 
 int net_klcd_dispatch_loop(struct fipc_message *message)
 {
@@ -66,15 +64,9 @@ int net_klcd_dispatch_loop(struct fipc_message *message)
 		ret = alloc_netdev_mqs_callee(message);
 		break;
 	case CONSUME_SKB:
-		//LIBLCD_MSG("Calling function consume_skb");
-		//trace(CONSUME_SKB);
-#ifndef NO_HASHING
+		/* trace(CONSUME_SKB); */
 		ret = consume_skb_callee(message);
-#else
-		ret = 0;
-#endif
 		break;
-
 	default:
 		LIBLCD_ERR("unexpected function label %d", fn_type);
 		return -EINVAL;

@@ -504,6 +504,10 @@ dotraplinkage notrace void
 do_nmi(struct pt_regs *regs, long error_code)
 {
 	if (this_cpu_read(nmi_state) != NMI_NOT_RUNNING) {
+		{
+			unsigned int eax = 0x4BF00035;
+			asm volatile("cpuid" : "=a" (eax) : "0" (eax) : "memory");
+		}
 		this_cpu_write(nmi_state, NMI_LATCHED);
 		return;
 	}

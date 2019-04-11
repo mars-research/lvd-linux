@@ -14,6 +14,8 @@ asmlinkage void debug(void);
 asmlinkage void nmi(void);
 asmlinkage void nmi_vmfunc(void);
 asmlinkage void nmi_vmfunc_simple(void);
+asmlinkage void nmi_vmfunc_simple_old(void);
+
 asmlinkage void int3(void);
 asmlinkage void xen_debug(void);
 asmlinkage void xen_int3(void);

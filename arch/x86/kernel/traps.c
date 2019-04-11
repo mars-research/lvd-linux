@@ -932,6 +932,8 @@ void __init trap_init(void)
 
 	set_intr_gate_ist(X86_TRAP_DE, divide_error, EXP_LVD_STACK);
 	set_intr_gate_ist(X86_TRAP_NMI, &nmi_vmfunc_simple, NMI_STACK);
+	//set_intr_gate_ist(X86_TRAP_NMI, &nmi_vmfunc_simple_old, NMI_STACK);
+
 	//set_intr_gate_ist(X86_TRAP_NMI, &nmi, NMI_STACK);
 	/* int4 can be called from all */
 	set_system_intr_gate_ist(X86_TRAP_OF, &overflow, EXP_LVD_STACK);

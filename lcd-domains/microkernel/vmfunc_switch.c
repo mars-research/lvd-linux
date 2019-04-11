@@ -12,6 +12,7 @@
 /* this is the only function Intel VT-x support */
 #define VM_FUNCTION	0
 #define NUM_ITERATIONS		1000000
+#define CONFIG_VMFUNC_SWITCH_MICROBENCHMARK 1
 
 /* exported by the microkernel. We trust that it's sane */
 extern void *cpuid_page;

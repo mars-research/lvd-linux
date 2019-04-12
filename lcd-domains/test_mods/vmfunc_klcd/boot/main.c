@@ -16,6 +16,10 @@
 cptr_t klcd, lcd;
 cptr_t dest_lcd, dest_klcd;
 struct lcd_create_ctx *lcd_ctx;
+static unsigned int bind_cpu = 2;
+
+module_param(bind_cpu, uint, 0644);
+MODULE_PARM_DESC(bind_cpu, "Bind kthread to this cpu");
 
 static int boot_main(void)
 {
@@ -140,9 +144,9 @@ struct task_struct *boot_task;
 
 static int boot_init(void)
 {
-
 	boot_task = kthread_create(boot_lcd_thread, NULL, "boot_lcd_thread");
 
+	kthread_bind(boot_task, bind_cpu);
 	if (!IS_ERR(boot_task))
 		wake_up_process(boot_task);
 	return 0;

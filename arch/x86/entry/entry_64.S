@@ -1455,7 +1455,7 @@ END(nmi_vmfunc_simple_old)
 /* Runs on exception stack */
 ENTRY(nmi_vmfunc_simple)
 
-	testb	$3, CS-RIP+8(%rsp)
+	testb	$3, CS-RIP+0(%rsp)
 	jz	.Lnmi_from_kernel_vmfunc_simple
 
 	/* Test if we've been demoted and moreover need 
@@ -1463,15 +1463,14 @@ ENTRY(nmi_vmfunc_simple)
 	pushq   %rbx
 	movq 	vmfunc_state_page + VMFUNC_in_kernel, %rbx
 	testq   $1, %rbx
-	jnz	.Lnmi_in_user_no_lcd_simple
 	popq    %rbx
-
+	jnz	.Lnmi_in_user_no_lcd_simple
+	
 	DEBUG_LCD
 	
 
 .Lnmi_in_user_no_lcd_simple:
 
-	popq    %rbx
 
 	/*
 	 * NMI from user mode.  We need to run on the thread stack, but we
@@ -1544,7 +1543,7 @@ ENTRY(nmi_vmfunc_simple)
 	jnz	1f
 
 //	DEBUG_LCD
-//
+
 	/* We need to vmfunc back into the kernel */
 	VMFUNC_TO_KERNEL
 1:
@@ -1593,7 +1592,7 @@ nmi_restore_vmfunc_simple:
 
 //	DEBUG_LCD
 	VMFUNC_TO_LCD
-//
+
 2:
 
 	RESTORE_EXTRA_REGS

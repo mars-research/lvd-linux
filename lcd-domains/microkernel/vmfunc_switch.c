@@ -206,13 +206,14 @@ int vmfunc_klcd_wrapper(struct fipc_message *msg, unsigned int ept)
 	if (current->nested_count++ == 0)
 		pick_stack(ept);
 
-	printk("%s [%d]: entereing on cpu %d, reg0: %lx | lcd_stack %p\n",
+#if 0
+	printk("%s [%d]: entering on cpu %d, reg0: %lx | lcd_stack %p\n",
 			current->comm,
 			current->pid,
 			smp_processor_id(),
 			fipc_get_reg0(msg),
 			current->lcd_stack);
-
+#endif
 	vmfunc_trampoline_entry(msg);
 
 	if (--current->nested_count == 0)
@@ -244,7 +245,14 @@ int vmfunc_klcd_test_wrapper(struct fipc_message *msg, unsigned int ept, vmfunc_
 	if (!init_pgd)
 		init_pgd = kallsyms_lookup_name("init_level4_pgt");
 
+	if (current->nested_count++ == 0)
+		pick_stack(ept);
+
 	ret = vmfunc_test_wrapper(msg, test);
+
+	if (--current->nested_count == 0)
+		drop_stack(ept);
+
 exit:
 	return ret;
 }
@@ -282,7 +290,7 @@ remap_cr3(void)
 		ret = lcd_arch_ept_map_all_cpus(lcd_list[ept]->lcd_arch, gpa_cr3,
 			hpa_lcd_cr3,
 			1, /* create, if not present */
-			0 /* don't overwrite, if present */);
+			1 /* overwrite, if present */);
 
 		lcd->lcd_arch->idle_cr3_mapped = 1;
 
@@ -295,11 +303,22 @@ skip:
 	/* gpa is the same as phys_addr */
 	gpa_cr3 = __gpa(cr3_base);
 
+	/*
+	 * XXX: We overwrite even if the entry is present. why?  Since the
+	 * Linux kernel uses lazy cr3 switch, we may run into a situation where
+	 * the application has entered this wrapper with cr3_a and later
+	 * through cr3_b due to a context switch. Since, we save only the last
+	 * save cr3 in mapped_cr3 varible, we won't even know if we have mapped
+	 * cr3_a if the application decides to enter with cr3_a.
+	 * t0 ........  t1 ........ t2
+	 * cr3_a -----> cr3_b ----> cr3_a
+	 * So, simply overwrite this mapping as it would not harm us.
+	 */
 	if (lcd && (current->mapped_cr3 != cr3_base)) {
 		ret = lcd_arch_ept_map_all_cpus(lcd_list[ept]->lcd_arch, gpa_cr3,
 			hpa_lcd_cr3,
 			1, /* create, if not present */
-			0 /* don't overwrite, if present */);
+			1 /* overwrite, if present */);
 
 		current->mapped_cr3 = cr3_base;
 		if (ret)

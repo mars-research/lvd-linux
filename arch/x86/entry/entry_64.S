@@ -497,19 +497,10 @@ END(irq_entries_start)
 	testq   $1, %rbx
 	jnz	2f
 
-	/* Note: ebx is 0 here */
-
-	/* We need to vmfunc back into the kernel */
+	/* We are not in kernel (rbx == 0),
+	   we need to vmfunc back into the kernel */
 	VMFUNC_TO_KERNEL
 
-	/* Restore GS base */
-	/* Read saved gs base */
-//	rdgsbase %eax
-//	/* Exchange the current gs base (eax) with saved in vmfunc_state page */
-//	movl	 %eax, vmfunc_state_page + VMFUNC_lcd_gs_base
-//	movl	 vmfunc_state_page + VMFUNC_kernel_gs_base, %eax
-//	wrgsbase %eax
-	
 	/* We can't be in user mode in the LCD */
 	testb	$3, CS(%rsp)
 	jz	2f
@@ -521,7 +512,6 @@ END(irq_entries_start)
 	/* Now we have access access to vmfunc_state_page inside the kernel, lets 
          *  see if we're inside LCD or not */
 	movq 	vmfunc_state_page + VMFUNC_entered_lcd, %r12
-	movq    $0, vmfunc_state_page + VMFUNC_entered_lcd
 
 	testb	$3, CS(%rsp)
 	jz	4f
@@ -573,6 +563,14 @@ END(irq_entries_start)
 	testq   $1, %r12
 	jz	5f
 
+	/* Restore GS base */
+	/* Read saved gs base */
+	//rdgsbase %eax
+	/* Exchange the current gs base (eax) with saved in vmfunc_state page */
+	// movl	 %eax, vmfunc_state_page + VMFUNC_lcd_gs_base
+	movq	 vmfunc_state_page + VMFUNC_kernel_gs_base, %rax
+	wrgsbase %rax
+	
 	/* Since we just entered LCD, our stack is saved in the 
 	   VMFUNC state page */
 	movq	%rsp, %rdi			/* pt_regs pointer */
@@ -580,6 +578,11 @@ END(irq_entries_start)
 	movq    %r13, %rsi 			/* sack to switch to */
 	call	sync_stacks
 	movq	%rax, %rsp			/* switch stack */
+
+	/* We've restored gs and kernel stack -- it's safe to update the 
+	   entered_lcd flag */
+	movq    $0, vmfunc_state_page + VMFUNC_entered_lcd
+
 	jmp 6f
 
 5:
@@ -674,6 +677,14 @@ GLOBAL(restore_vmfunc_regs_and_iret)
 	movq    %r12, vmfunc_state_page + VMFUNC_entered_lcd
 	movq 	%r13, vmfunc_state_page + VMFUNC_kernel_esp
 
+	/* Stack to switch to, i.e., IST. Save it here while we have gs */
+	movq    PER_CPU_VAR(lvd_irq_stack_addr), %r13
+	/* Restore gs base */
+	//rdgsbase %eax
+	/* Exchange the current gs base (eax) with saved in vmfunc_state page */
+	movq	vmfunc_state_page + VMFUNC_lcd_gs_base, %rax
+	//wrgsbase %rax
+
 	testq	%rbx, %rbx			/* VMFUNC back needed? */
 	jnz	2f
 
@@ -686,16 +697,11 @@ GLOBAL(restore_vmfunc_regs_and_iret)
 	 * VMFUNC 
 	 */ 
 	movq	%rsp, %rdi			/* pt_regs pointer */
-	movq    PER_CPU_VAR(lvd_irq_stack_addr), %rsi	/* stack to switch to (IST) */
+	movq    %r13, %rsi	/* stack to switch to (IST) */
 //	call	sync_regs_to_ist
 	call    sync_stacks
 	movq	%rax, %rsp			/* switch stack */
 
-	/* Restore gs base */
-	//rdgsbase %eax
-	/* Exchange the current gs base (eax) with saved in vmfunc_state page */
-//	movl	vmfunc_state_page + VMFUNC_lcd_gs_base, %eax
-//	wrgsbase %eax
 
 	VMFUNC_TO_LCD
 

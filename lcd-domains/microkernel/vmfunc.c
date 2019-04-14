@@ -23,15 +23,15 @@ void on_cpu_ept_map_page(void *info) {
 	return; 
 };
 
-static inline unsigned int read_gs_base(void) {
-	unsigned int eax;
+static inline unsigned long read_gs_base(void) {
+	unsigned long rax;
 
-	asm volatile("rdgsbase %%eax"
-	    : "=a" (eax)
+	asm volatile("rdgsbase %%rax"
+	    : "=a" (rax)
 	    : 
 	    : "memory");
 
-	return eax; 
+	return rax; 
 }
 
 

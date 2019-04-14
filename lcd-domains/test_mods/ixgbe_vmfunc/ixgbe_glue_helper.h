@@ -47,6 +47,14 @@ struct rtnl_link_stats64_container {
 	struct cptr my_ref;
 };
 
+struct sk_buff_container_2 {
+	/* just store the pointer */
+	struct sk_buff skb;
+	/* for hashtable insertion */
+	struct cptr other_ref;
+	struct cptr my_ref;
+};
+
 struct sk_buff_container {
 	/* just store the pointer */
 	struct sk_buff *skb;
@@ -91,6 +99,19 @@ struct poll_container {
 	cptr_t other_ref;
 };
 
+struct irqhandler_t_container {
+	irqreturn_t (*irqhandler)(int, void *);
+	void *data;
+	cptr_t my_ref;
+	cptr_t other_ref;
+};
+
+struct napi_struct_container {
+	struct napi_struct *napi_struct;
+	struct cptr other_ref;
+	struct cptr my_ref;
+};
+
 int glue_cap_insert_device_type(struct glue_cspace *cspace,
 		struct device_container *device_container,
 		struct cptr *c_out);
@@ -121,6 +142,10 @@ int glue_cap_insert_rtnl_link_stats64_type(struct glue_cspace *cspace,
 int glue_cap_insert_sk_buff_type(struct glue_cspace *cspace,
 		struct sk_buff_container *sk_buff_container,
 		struct cptr *c_out);
+int glue_cap_insert_napi_struct_type(struct glue_cspace *cspace,
+		struct napi_struct_container *napi_struct_container,
+		struct cptr *c_out);
+
 int glue_cap_lookup_device_type(struct glue_cspace *cspace,
 		struct cptr c,
 		struct device_container **device_container);
@@ -151,5 +176,8 @@ int glue_cap_lookup_rtnl_link_stats64_type(struct glue_cspace *cspace,
 int glue_cap_lookup_sk_buff_type(struct glue_cspace *cspace,
 		struct cptr c,
 		struct sk_buff_container **sk_buff_container);
+int glue_cap_lookup_napi_struct_type(struct glue_cspace *cspace,
+		struct cptr c,
+		struct napi_struct_container **napi_struct_container);
 
 #endif /* __IXGBE_GLUE_HELPER_H__ */

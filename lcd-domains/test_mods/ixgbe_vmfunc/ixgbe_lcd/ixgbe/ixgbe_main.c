@@ -217,10 +217,6 @@ static void ixgbe_service_task(struct work_struct *work);
 struct ixgbe_adapter *g_adapter = NULL;
 struct net_device *g_netdev = NULL;
 
-extern int _request_irq(unsigned int irq, irq_handler_t handler, unsigned long flags,
-	    const char *name, void *dev);
-extern void _free_irq(unsigned int irq, void *dev_id);
-
 static int ixgbe_read_pci_cfg_word_parent(struct ixgbe_adapter *adapter,
 					  u32 reg, u16 *value)
 {
@@ -356,7 +352,7 @@ static void ixgbe_check_minimum_link(struct ixgbe_adapter *adapter,
 }
 #endif /* LCD_ISOLATE */
 
-static void ixgbe_service_event_schedule(struct ixgbe_adapter *adapter)
+void ixgbe_service_event_schedule(struct ixgbe_adapter *adapter)
 {
 	if (!test_bit(__IXGBE_DOWN, &adapter->state) &&
 	    !test_bit(__IXGBE_REMOVING, &adapter->state) &&
@@ -3048,20 +3044,6 @@ int ixgbe_poll(struct napi_struct *napi, int budget)
 	return min(work_done, budget - 1);
 }
 
-extern unsigned long poll_state;
-
-int __ixgbe_poll(void)
-{
-	int ret = 0;
-	if (g_adapter) {
-		if (!test_and_set_bit(IXGBE_POLL_RUNNING, &poll_state)) {
-			ret = ixgbe_poll(&g_adapter->q_vector[0]->napi, 64);
-			clear_bit(IXGBE_POLL_RUNNING, &poll_state);
-		}
-	}
-	return ret;
-}
-
 /**
  * ixgbe_request_msix_irqs - Initialize MSI-X interrupts
  * @adapter: board private structure
@@ -3094,7 +3076,7 @@ static int ixgbe_request_msix_irqs(struct ixgbe_adapter *adapter)
 			continue;
 		}
 		printk("%s, i %d | vec %d", __func__, vector, entry->vector);
-		err = _request_irq(entry->vector, &ixgbe_msix_clean_rings, 0,
+		err = request_irq(entry->vector, &ixgbe_msix_clean_rings, 0,
 				  q_vector->name, q_vector);
 		if (err) {
 			e_err(probe, "request_irq failed for MSIX interrupt "
@@ -3256,7 +3238,7 @@ static void ixgbe_free_irq(struct ixgbe_adapter *adapter)
 		/* clear the affinity_mask in the IRQ descriptor */
 		irq_set_affinity_hint(entry->vector, NULL);
 
-		_free_irq(entry->vector, q_vector);
+		free_irq(entry->vector, q_vector);
 	}
 
 	free_irq(adapter->msix_entries[vector].vector, adapter);

@@ -205,15 +205,13 @@ int net_klcd_dispatch_async_loop(struct fipc_message *message)
 			trace(__HW_ADDR_UNSYNC_DEV);
 			return __hw_addr_unsync_dev_callee(message);
 
-#ifdef HOST_IRQ
-		case REQUEST_IRQ:
-			trace(REQUEST_IRQ);
-			return _request_irq_callee(message);
+		case REQUEST_THREADED_IRQ:
+			trace(REQUEST_THREADED_IRQ);
+			return request_threaded_irq_callee(message);
 
-		case _FREE_IRQ:
-			trace(_FREE_IRQ);
-			return _free_irq_callee(message);
-#endif
+		case FREE_IRQ:
+			trace(FREE_IRQ);
+			return free_irq_callee(message);
 
 		case NETIF_NAPI_ADD:
 			trace(NETIF_NAPI_ADD);

@@ -55,10 +55,8 @@ int netif_napi_add_callee(struct fipc_message *_request);
 int netif_napi_del_callee(struct fipc_message *_request);
 int netif_wake_subqueue_callee(struct fipc_message *_request);
 
-#ifdef HOST_IRQ
-int _request_irq_callee(struct fipc_message *_request);
-int _free_irq_callee(struct fipc_message *_request);
-#endif
+int request_threaded_irq_callee(struct fipc_message *_request);
+int free_irq_callee(struct fipc_message *_request);
 int netif_receive_skb_callee(struct fipc_message *_request);
 int napi_gro_receive_callee(struct fipc_message *_request);
 
@@ -75,11 +73,25 @@ void glue_ixgbe_exit(void);
 int sync_probe_callee(struct fipc_message *msg);
 int sync_ndo_set_mac_address_callee(struct fipc_message *msg);
 
+#ifdef CONFIG_LVD
 int probe(struct pci_dev *dev,
-		struct pci_device_id *id,
+		const struct pci_device_id *id);
+
+void remove(struct pci_dev *dev);
+#else
+int probe(struct pci_dev *dev,
+		const struct pci_device_id *id,
 		struct trampoline_hidden_args *hidden_args);
 
 void remove(struct pci_dev *dev,
 		struct trampoline_hidden_args *hidden_args);
+#endif /* CONFIG_LVD */
+
+/* XXX: How to determine this? */
+#define SKB_HASH_BITS      8
+
+struct skb_hash_table {
+	DECLARE_HASHTABLE(skb_table, SKB_HASH_BITS);
+};
 
 #endif /* __IXGBE_CALLEE_H__ */

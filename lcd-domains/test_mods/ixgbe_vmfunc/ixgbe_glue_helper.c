@@ -218,3 +218,23 @@ int glue_cap_lookup_sk_buff_type(struct glue_cspace *cspace,
 
 }
 
+int glue_cap_insert_napi_struct_type(struct glue_cspace *cspace,
+		struct napi_struct_container *napi_struct_container,
+		struct cptr *c_out)
+{
+	return glue_cspace_insert(cspace,
+		napi_struct_container,
+		glue_libcap_type_ops[ GLUE_TYPE_NAPI_STRUCT_CONTAINER ].libcap_type,
+		c_out);
+
+}
+int glue_cap_lookup_napi_struct_type(struct glue_cspace *cspace,
+		struct cptr c,
+		struct napi_struct_container **napi_struct_container)
+{
+	return glue_cspace_lookup(cspace,
+		c,
+		glue_libcap_type_ops[ GLUE_TYPE_NAPI_STRUCT_CONTAINER ].libcap_type,
+		( void  ** )napi_struct_container);
+
+}

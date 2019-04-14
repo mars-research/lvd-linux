@@ -5,13 +5,15 @@
 
 #define trace(x) LIBLCD_MSG("net got " #x " msg")
 
-extern void ixgbe_exit_module(void);
-extern bool poll_start;
+int __ixgbe_lcd_init(void);
+void __ixgbe_lcd_exit(void);
 
-int dispatch_async_loop(struct fipc_message *message)
+int handle_rpc_calls(struct fipc_message *message)
 {
 	int fn_type;
+
 	fn_type = async_msg_get_fn_type(message);
+
 	switch (fn_type) {
 		case NDO_OPEN:
 			trace(NDO_OPEN);
@@ -79,23 +81,18 @@ int dispatch_async_loop(struct fipc_message *message)
 			trace(POLL);
 			return poll_callee(message);
 
-		case TRIGGER_EXIT:
-			trace(TRIGGER_EXIT);
-			poll_start = false;
-			ixgbe_exit_module();
-			/* XXX: return failure to exit the dispatch
-			 * loop. After exit, there is no reason to
-			 * be spinning on the loop
-			 */
-			return -1;
+		case MODULE_INIT:
+			trace(MODULE_INIT);
+			return __ixgbe_lcd_init();
 
+		case MODULE_EXIT:
+			trace(MODULE_EXIT);
+			__ixgbe_lcd_exit();
+			break;
 		default:
 			LIBLCD_ERR("unexpected function label: %d",
 					fn_type);
 			return -EINVAL;
-
 	}
 	return 0;
-
 }
-

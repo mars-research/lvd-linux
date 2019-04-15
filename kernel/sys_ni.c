@@ -253,4 +253,5 @@ cond_syscall(sys_membarrier);
 
 /* LCD */
 cond_syscall(sys_init_lcd);
+cond_syscall(sys_lcd_null);
 

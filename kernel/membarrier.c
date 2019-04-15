@@ -64,3 +64,12 @@ SYSCALL_DEFINE2(membarrier, int, cmd, int, flags)
 		return -EINVAL;
 	}
 }
+
+/**
+ * sys_lcd_null - test null syscall 
+ *
+ */
+SYSCALL_DEFINE0(lcd_null)
+{
+	return 0;
+}

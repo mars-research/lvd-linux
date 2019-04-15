@@ -124,19 +124,24 @@ foo(struct fipc_message *msg)
 		int i = 0;
 		void *rsp_ptr;
 		unsigned long rsp_top;
+		u64 start = rdtsc(), end;
+		int num_iterations = 100000;
 
-		for(i = 0; i < 100; i++) {
+		for(i = 0; i < num_iterations; i++) {
 			asm volatile("mov %%rsp, %[rsp_ptr]"
-					: [rsp_ptr]"=r"(rsp_ptr));
-			printk("rsp before int 0xf3 %p", rsp_ptr);
+				: [rsp_ptr]"=r"(rsp_ptr));
+			//printk("rsp before int 0xf3 %p", rsp_ptr);
 
 			asm volatile("int $0xf3");
 
-			asm volatile("mov %%rsp, %[rsp_ptr]"
-					: [rsp_ptr]"=r"(rsp_ptr));
-			printk("rsp before int 0xf3 %p", rsp_ptr);
+			//asm volatile("mov %%rsp, %[rsp_ptr]"
+			//		: [rsp_ptr]"=r"(rsp_ptr));
+			//printk("rsp before int 0xf3 %p", rsp_ptr);
 		}
-		
+		end = rdtsc();
+		printk("%d iterations of int 0xf3 back-to-back took %llu cycles (avg: %llu cycles)\n",
+				num_iterations, end - start, (end - start) / num_iterations);
+
 		i = 0;
 		do {
 			asm volatile("nop");

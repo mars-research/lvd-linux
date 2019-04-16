@@ -28,6 +28,7 @@ struct pci_bus_container {
 };
 struct pci_dev_container {
 	struct pci_dev pci_dev;
+	struct pci_dev *pdev;
 	struct cptr other_ref;
 	struct cptr my_ref;
 };
@@ -107,7 +108,7 @@ struct irqhandler_t_container {
 };
 
 struct napi_struct_container {
-	struct napi_struct *napi_struct;
+	struct napi_struct napi_struct;
 	struct cptr other_ref;
 	struct cptr my_ref;
 };

@@ -214,7 +214,7 @@ int pci_enable_msix_range(struct pci_dev *dev, struct msix_entry *entries, int m
 
 	vmfunc_wrapper(_request);
 
-	func_ret = fipc_get_reg1(_request);
+	func_ret = fipc_get_reg0(_request);
 
 	return func_ret;
 }
@@ -473,7 +473,7 @@ int probe_callee(struct fipc_message *_request)
 	 */
 	func_ret = ixgbe_driver_container.pci_driver.probe(&dev_container->pci_dev, NULL);
 
-	fipc_set_reg1(_request, func_ret);
+	fipc_set_reg0(_request, func_ret);
 
 fail_ioremap:
 fail_ioremap2:
@@ -618,7 +618,7 @@ int eth_mac_addr(struct net_device *dev,
 
 	vmfunc_wrapper(_request);
 
-	func_ret = fipc_get_reg1(_request);
+	func_ret = fipc_get_reg0(_request);
 
 	return func_ret;
 }
@@ -876,7 +876,7 @@ int eth_platform_get_mac_address(struct device *dev,
 
 	func_ret = fipc_get_reg1(_request);
 
-	if (!func_ret) {
+	if (func_ret < 0) {
 		m.mac_addr_l = fipc_get_reg2(_request);
 		memcpy(mac_addr, m.mac_addr, ETH_ALEN);
 		for (i = 0; i < ETH_ALEN; i++) {
@@ -920,7 +920,7 @@ int dev_addr_add(struct net_device *dev,
 	fipc_set_reg4(_request, cptr_val(addr_cptr));
 	vmfunc_wrapper(_request);
 
-	func_ret = fipc_get_reg1(_request);
+	func_ret = fipc_get_reg0(_request);
 
 	/* call local function */
 	liblcd_dev_addr_add(dev, addr, addr_type);
@@ -963,7 +963,7 @@ int dev_addr_del(struct net_device *dev,
 
 	vmfunc_wrapper(_request);
 
-	func_ret = fipc_get_reg1(_request);
+	func_ret = fipc_get_reg0(_request);
 
 	/* call local function */
 	liblcd_dev_addr_del(dev, addr, addr_type);
@@ -1510,8 +1510,8 @@ int ndo_start_xmit_callee(struct fipc_message *_request)
 	TS_STOP_LCD(xmit);
 #endif
 
-	fipc_set_reg1(_request,
-			func_ret);
+	fipc_set_reg0(_request, func_ret);
+
 #ifdef LCD_MEASUREMENT
 	fipc_set_reg2(_request,
 			TS_DIFF(xmit));
@@ -1605,8 +1605,7 @@ int ndo_set_mac_address_callee(struct fipc_message *_request)
 	func_ret = dev_container->net_device.netdev_ops->ndo_set_mac_address(( &dev_container->net_device ),
 		( void  * )( ( gva_val(addr_gva) ) + ( addr_offset ) ));
 
-	fipc_set_reg1(_request,
-			func_ret);
+	fipc_set_reg0(_request, func_ret);
 
 fail_lookup:
 	return ret;
@@ -1752,7 +1751,6 @@ int trigger_dump_callee(struct fipc_message *_request)
 		LIBLCD_ERR("lookup");
 		goto fail_lookup;
 	}
-
 
 
 	__ixgbe_dump(&dev_container->net_device);
@@ -1950,7 +1948,7 @@ int request_threaded_irq(unsigned int irq, irq_handler_t handler,
 
 	vmfunc_wrapper(_request);
 
-	func_ret = fipc_get_reg1(_request);
+	func_ret = fipc_get_reg0(_request);
 
 fail_alloc:
 	return func_ret;
@@ -1986,12 +1984,7 @@ void netif_napi_add(struct net_device *dev,
 		struct net_device_container,
 		net_device);
 
-	napi_container = kzalloc(sizeof(struct napi_struct_container), GFP_KERNEL);
-
-	if (!napi_container) {
-		LIBLCD_ERR("kzalloc");
-		goto fail_alloc;
-	}
+	napi_container = container_of(napi, struct napi_struct_container, napi_struct);
 
 	poll_container = kzalloc(sizeof(struct poll_container), GFP_KERNEL);
 
@@ -2010,14 +2003,16 @@ void netif_napi_add(struct net_device *dev,
 	}
 
 	poll_container->poll = poll;
-	napi_container->napi_struct = napi;
 
 	async_msg_set_fn_type(_request, NETIF_NAPI_ADD);
-	fipc_set_reg1(_request, dev_container->other_ref.cptr);
-	fipc_set_reg2(_request, napi_container->my_ref.cptr);
-	fipc_set_reg3(_request, weight);
+	fipc_set_reg0(_request, dev_container->other_ref.cptr);
+	fipc_set_reg1(_request, napi_container->my_ref.cptr);
+	fipc_set_reg2(_request, weight);
 
 	vmfunc_wrapper(_request);
+
+	napi_container->other_ref = __cptr(fipc_get_reg0(_request));
+
 fail_insert:
 fail_alloc:
 	return;
@@ -2039,8 +2034,13 @@ void netif_napi_del(struct napi_struct *napi)
 {
 	struct fipc_message r;
 	struct fipc_message *_request = &r;
+	struct napi_struct_container *napi_container;
+
+	napi_container = container_of(napi, struct napi_struct_container, napi_struct);
 
 	async_msg_set_fn_type(_request, NETIF_NAPI_DEL);
+
+	fipc_set_reg0(_request, napi_container->other_ref.cptr);
 
 	vmfunc_wrapper(_request);
 
@@ -2106,23 +2106,24 @@ gro_result_t napi_gro_receive(struct napi_struct *napi,
 	cptr_t skb_cptr, skbh_cptr;
 	struct skb_shared_info *shinfo;
 	struct page *p = NULL;
+	struct napi_struct_container *napi_container;
 
-
+	napi_container = container_of(napi, struct napi_struct_container, napi_struct);
 
 	glue_lookup_skbuff(cptr_table,
 		__cptr((unsigned long)skb), &skb_c);
 
 	shinfo = skb_shinfo(skb);
 
-	async_msg_set_fn_type(_request,
-			NAPI_GRO_RECEIVE);
+	async_msg_set_fn_type(_request, NAPI_GRO_RECEIVE);
 
 	fipc_set_reg0(_request, skb_c->other_ref.cptr);
+	fipc_set_reg1(_request, napi_container->other_ref.cptr);
 
 	if (shinfo->nr_frags) {
 		skb_frag_t *frag = &shinfo->frags[0];
 
-		fipc_set_reg1(_request,	gpa_val(lcd_gva2gpa(
+		fipc_set_reg2(_request,	gpa_val(lcd_gva2gpa(
 			__gva(
 			(unsigned long)lcd_page_address(
 				skb_frag_page(frag))))));
@@ -2265,16 +2266,16 @@ gro_result_t napi_gro_receive(struct napi_struct *napi,
 	struct skb_shared_info *shinfo;
 	struct page *p = NULL;
 	u64 hash;
+	struct napi_struct_container *napi_container;
 
-
+	napi_container = container_of(napi, struct napi_struct_container, napi_struct);
 
 	shinfo = skb_shinfo(skb);
 
-	async_msg_set_fn_type(_request,
-			NAPI_GRO_RECEIVE);
+	async_msg_set_fn_type(_request, NAPI_GRO_RECEIVE);
 
-	fipc_set_reg0(_request, shinfo->nr_frags |
-				(skb->tail << 8));
+	fipc_set_reg0(_request, shinfo->nr_frags | (skb->tail << 8) |
+			(napi_container->other_ref.cptr << 16));
 
 	if (shinfo->nr_frags) {
 		skb_frag_t *frag = &shinfo->frags[0];

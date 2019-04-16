@@ -343,7 +343,7 @@ int pci_disable_msix_callee(struct fipc_message *_request)
 		goto fail_lookup;
 	}
 
-	pdev = &dev_container->pci_dev;
+	pdev = dev_container->pdev;
 
 	pci_disable_msix(pdev);
 fail_lookup:
@@ -373,7 +373,7 @@ int pci_enable_msix_range_callee(struct fipc_message *_request)
 		goto fail_lookup;
 	}
 
-	pdev = &dev_container->pci_dev;
+	pdev = dev_container->pdev;
 
 	minvec = fipc_get_reg0(_request);
 	maxvec = fipc_get_reg1(_request);
@@ -407,7 +407,7 @@ int pci_enable_msix_range_callee(struct fipc_message *_request)
 
 	LIBLCD_MSG("%s, returned %d", __func__, func_ret);
 
-	fipc_set_reg1(_request, func_ret);
+	fipc_set_reg0(_request, func_ret);
 
 fail_lookup:
 	return ret;
@@ -585,6 +585,8 @@ int sync_probe_callee(struct fipc_message *_request)
 	struct pci_dev_container *dev_container;
 	struct pci_dev *pdev;
 
+	LIBLCD_MSG("%s, called");
+
 	ret = glue_cap_lookup_pci_dev_type(c_cspace,
 			__cptr(fipc_get_reg2(_request)),
 			&dev_container);
@@ -594,7 +596,7 @@ int sync_probe_callee(struct fipc_message *_request)
 		goto fail_lookup;
 	}
 
-	pdev = &dev_container->pci_dev;
+	pdev = dev_container->pdev;
 
 	/*
 	 * ixgbe driver just needs res[0]
@@ -605,6 +607,10 @@ int sync_probe_callee(struct fipc_message *_request)
 	lcd_pool_cptr = __cptr(fipc_get_reg1(_request));
 
 	res0_len = pci_resource_len(pdev, 0);
+
+	LIBLCD_MSG("res0 start: %lx, len: %d",
+			pci_resource_start(pdev, 0),
+			get_order(res0_len));
 
 	ret = lcd_volunteer_dev_mem(__gpa(pci_resource_start(pdev, 0)),
 			get_order(res0_len),
@@ -696,13 +702,19 @@ int probe(struct pci_dev *dev,
 		goto fail_alloc;
 	}
 
-	/* pci_dev is used later. So let's insert it into KLCD's cspace */
+	dev_container->pdev = dev;
+
+	/*
+	 * Kernel does not give us pci_dev with a container wrapped in.
+	 * So, let's have a pointer!
+	 */
 	ret = glue_cap_insert_pci_dev_type(c_cspace, dev_container,
 			&dev_container->my_ref);
 	if (ret) {
 		LIBLCD_ERR("lcd insert");
 		goto fail_insert;
 	}
+
 
 	async_msg_set_fn_type(_request, PROBE);
 
@@ -713,7 +725,7 @@ int probe(struct pci_dev *dev,
 
 	printk("%s, send request done\n", __func__);
 
-	func_ret = fipc_get_reg1(_request);
+	func_ret = fipc_get_reg0(_request);
 
 	setup_timer(&service_timer, &ixgbe_service_timer, (unsigned long) NULL);
 
@@ -963,7 +975,7 @@ int ndo_start_xmit(struct sk_buff *skb,
 
 	skb_lcd->head_data_off = skb->data - skb->head;
 
-	func_ret = fipc_get_reg1(_request);
+	func_ret = fipc_get_reg0(_request);
 #ifdef LCD_MEASUREMENT
 	times_lcd[iter] = fipc_get_reg2(_request);
 	iter = (iter + 1) % NUM_PACKETS;
@@ -1600,8 +1612,8 @@ int register_netdev_callee(struct fipc_message *_request)
 	int ret;
 
 	int func_ret;
-	//node-0 90:e2:ba:b3:75:a1
-	u8 mac_addr[] = {0x90, 0xe2, 0xba, 0xb3, 0x75, 0xa1};
+	//node-0 90:e2:ba:b5:15:69
+	u8 mac_addr[] = {0x90, 0xe2, 0xba, 0xb5, 0x15, 0x69};
 
 	ret = glue_cap_lookup_net_device_type(c_cspace,
 		__cptr(fipc_get_reg0(_request)),
@@ -1728,7 +1740,7 @@ int eth_mac_addr_callee(struct fipc_message *_request)
 	func_ret = eth_mac_addr(( &dev_container->net_device ),
 		( void  * )( ( gva_val(p_gva) ) + ( p_offset ) ));
 
-	fipc_set_reg1(_request, func_ret);
+	fipc_set_reg0(_request, func_ret);
 
 fail_lookup:
 	return ret;
@@ -2017,7 +2029,8 @@ int eth_platform_get_mac_address_callee(struct fipc_message *_request)
 		u8 mac_addr[ETH_ALEN];
 		unsigned long mac_addr_l;
 	} m = { {0} };
-	u8 mac_addr[ETH_ALEN];
+
+	u8 mac_addr[ETH_ALEN] = {0x90, 0xe2, 0xba, 0xb5, 0x15, 0x69};
 
 
 	dev = &g_pdev->dev;
@@ -2027,19 +2040,16 @@ int eth_platform_get_mac_address_callee(struct fipc_message *_request)
 	LIBLCD_MSG("%s returned %d", __func__, func_ret);
 
 
-
 	/* pass on mac addr only if the function gets a
 	 * valid address
 	 */
-	if (!func_ret) {
+	if (func_ret < 0) {
 		memcpy(m.mac_addr, mac_addr, ETH_ALEN);
-		fipc_set_reg2(_request,
-			m.mac_addr_l);
+		fipc_set_reg2(_request, m.mac_addr_l);
 	}
 
 	fipc_set_reg1(_request,
 			func_ret);
-
 
 	return ret;
 }
@@ -2093,7 +2103,7 @@ int dev_addr_add_callee(struct fipc_message *_request)
 		addr_type);
 	rtnl_unlock();
 
-	fipc_set_reg1(_request, func_ret);
+	fipc_set_reg0(_request, func_ret);
 
 fail_lookup:
 	return ret;
@@ -2148,7 +2158,7 @@ int dev_addr_del_callee(struct fipc_message *_request)
 		addr_type);
 	rtnl_unlock();
 
-	fipc_set_reg1(_request, func_ret);
+	fipc_set_reg0(_request, func_ret);
 
 fail_lookup:
 	return ret;
@@ -2241,11 +2251,11 @@ int pci_disable_pcie_error_reporting_callee(struct fipc_message *_request)
 		goto fail_lookup;
 	}
 
-	pdev = &dev_container->pci_dev;
+	pdev = dev_container->pdev;
 
 	func_ret = pci_disable_pcie_error_reporting(pdev);
 
-	fipc_set_reg1(_request, func_ret);
+	fipc_set_reg0(_request, func_ret);
 
 fail_lookup:
 	return ret;
@@ -2268,8 +2278,8 @@ int pci_bus_read_config_word_callee(struct fipc_message *_request)
 
 	func_ret = pci_bus_read_config_word(bus, devfn, where, &val);
 
+	fipc_set_reg0(_request, func_ret);
 	fipc_set_reg1(_request, val);
-	fipc_set_reg2(_request, func_ret);
 
 	return 0;
 }
@@ -2292,7 +2302,7 @@ int pci_bus_write_config_word_callee(struct fipc_message *_request)
 
 	func_ret = pci_bus_write_config_word(bus, devfn, where, val);
 
-	fipc_set_reg1(_request, func_ret);
+	fipc_set_reg0(_request, func_ret);
 
 	return 0;
 }
@@ -2313,11 +2323,11 @@ int pci_cleanup_aer_uncorrect_error_status_callee(struct fipc_message *_request)
 		goto fail_lookup;
 	}
 
-	pdev = &dev_container->pci_dev;
+	pdev = dev_container->pdev;
 
 	func_ret = pci_cleanup_aer_uncorrect_error_status(pdev);
 
-	fipc_set_reg1(_request, func_ret);
+	fipc_set_reg0(_request, func_ret);
 
 fail_lookup:
 	return ret;
@@ -2338,7 +2348,7 @@ int pci_disable_device_callee(struct fipc_message *_request)
 		goto fail_lookup;
 	}
 
-	pdev = &dev_container->pci_dev;
+	pdev = dev_container->pdev;
 
 	pci_disable_device(pdev);
 
@@ -2362,11 +2372,11 @@ int pci_enable_pcie_error_reporting_callee(struct fipc_message *_request)
 		goto fail_lookup;
 	}
 
-	pdev = &dev_container->pci_dev;
+	pdev = dev_container->pdev;
 
 	func_ret = pci_enable_pcie_error_reporting(pdev);
 
-	fipc_set_reg1(_request, func_ret);
+	fipc_set_reg0(_request, func_ret);
 
 fail_lookup:
 	return ret;
@@ -2390,14 +2400,14 @@ int pcie_capability_read_word_callee(struct fipc_message *_request)
 		goto fail_lookup;
 	}
 
-	pdev = &dev_container->pci_dev;
+	pdev = dev_container->pdev;
 
 	pos = fipc_get_reg1(_request);
 	val = fipc_get_reg2(_request);
 
 	func_ret = pcie_capability_read_word(pdev, pos, &val);
 
-	fipc_set_reg1(_request, func_ret);
+	fipc_set_reg0(_request, func_ret);
 
 	fipc_set_reg2(_request, val);
 
@@ -2423,14 +2433,14 @@ int pcie_get_minimum_link_callee(struct fipc_message *_request)
 		goto fail_lookup;
 	}
 
-	pdev = &dev_container->pci_dev;
+	pdev = dev_container->pdev;
 
 	speed = fipc_get_reg1(_request);
 	width = fipc_get_reg2(_request);
 
 	func_ret = pcie_get_minimum_link(pdev, &speed, &width);
 
-	fipc_set_reg1(_request, func_ret);
+	fipc_set_reg0(_request, func_ret);
 
 fail_lookup:
 	return ret;
@@ -2452,11 +2462,11 @@ int pci_enable_device_mem_callee(struct fipc_message *_request)
 		goto fail_lookup;
 	}
 
-	pdev = &dev_container->pci_dev;
+	pdev = dev_container->pdev;
 
 	func_ret = pci_enable_device_mem(pdev);
 
-	fipc_set_reg1(_request, func_ret);
+	fipc_set_reg0(_request, func_ret);
 
 fail_lookup:
 	return ret;
@@ -2479,7 +2489,7 @@ int pci_request_selected_regions_callee(struct fipc_message *_request)
 		goto fail_lookup;
 	}
 
-	pdev = &dev_container->pci_dev;
+	pdev = dev_container->pdev;
 
 	type = fipc_get_reg1(_request);
 
@@ -2487,7 +2497,7 @@ int pci_request_selected_regions_callee(struct fipc_message *_request)
 				type,
 				driver_name);
 
-	fipc_set_reg1(_request, func_ret);
+	fipc_set_reg0(_request, func_ret);
 
 fail_lookup:
 	return ret;
@@ -2510,7 +2520,7 @@ int pci_request_selected_regions_exclusive_callee(struct fipc_message *_request)
 		goto fail_lookup;
 	}
 
-	pdev = &dev_container->pci_dev;
+	pdev = dev_container->pdev;
 
 	type = fipc_get_reg1(_request);
 
@@ -2518,7 +2528,7 @@ int pci_request_selected_regions_exclusive_callee(struct fipc_message *_request)
 				type,
 				driver_name);
 
-	fipc_set_reg1(_request, func_ret);
+	fipc_set_reg0(_request, func_ret);
 
 fail_lookup:
 	return ret;
@@ -2539,7 +2549,7 @@ int pci_set_master_callee(struct fipc_message *_request)
 		goto fail_lookup;
 	}
 
-	pdev = &dev_container->pci_dev;
+	pdev = dev_container->pdev;
 
 	pci_set_master(pdev);
 
@@ -2563,11 +2573,11 @@ int pci_save_state_callee(struct fipc_message *_request)
 		goto fail_lookup;
 	}
 
-	pdev = &dev_container->pci_dev;
+	pdev = dev_container->pdev;
 
 	func_ret = pci_save_state(pdev);
 
-	fipc_set_reg1(_request, func_ret);
+	fipc_set_reg0(_request, func_ret);
 
 fail_lookup:
 	return ret;
@@ -2589,7 +2599,7 @@ int pci_release_selected_regions_callee(struct fipc_message *_request)
 		goto fail_lookup;
 	}
 
-	pdev = &dev_container->pci_dev;
+	pdev = dev_container->pdev;
 
 	r = fipc_get_reg1(_request);
 	pci_release_selected_regions(pdev, r);
@@ -2615,7 +2625,7 @@ int pci_select_bars_callee(struct fipc_message *_request)
 		goto fail_lookup;
 	}
 
-	pdev = &dev_container->pci_dev;
+	pdev = dev_container->pdev;
 
 	flags = fipc_get_reg1(_request);
 
@@ -2644,12 +2654,12 @@ int pci_wake_from_d3_callee(struct fipc_message *_request)
 		goto fail_lookup;
 	}
 
-	pdev = &dev_container->pci_dev;
+	pdev = dev_container->pdev;
 	enable = fipc_get_reg1(_request);
 
 	func_ret = pci_wake_from_d3(pdev, enable);
 
-	fipc_set_reg1(_request, func_ret);
+	fipc_set_reg0(_request, func_ret);
 
 fail_lookup:
 	return ret;
@@ -3044,7 +3054,6 @@ int request_threaded_irq_callee(struct fipc_message *_request)
 
 	irq = fipc_get_reg0(_request);
 	irqhandler_container->other_ref.cptr = fipc_get_reg1(_request);
-	irq = fipc_get_reg1(_request);
 	flags = fipc_get_reg2(_request);
 
 	snprintf(vector_name, IFNAMSIZ + 9, "TxRx%d", irq);
@@ -3054,9 +3063,9 @@ int request_threaded_irq_callee(struct fipc_message *_request)
 
 	func_ret = request_threaded_irq(irq, msix_vector_handler,
 				NULL, flags,
-				vector_name, NULL);
+				vector_name, (void*) irqhandler_container);
 
-	fipc_set_reg1(_request, func_ret);
+	fipc_set_reg0(_request, func_ret);
 
 fail_alloc:
 	return ret;
@@ -3133,7 +3142,7 @@ int netif_napi_add_callee(struct fipc_message *_request)
 #endif
 
 	ret = glue_cap_lookup_net_device_type(c_cspace,
-			__cptr(fipc_get_reg1(_request)),
+			__cptr(fipc_get_reg0(_request)),
 			&dev_container);
 	if (ret) {
 		LIBLCD_ERR("lookup");
@@ -3147,15 +3156,27 @@ int netif_napi_add_callee(struct fipc_message *_request)
 		goto fail_alloc;
 	}
 
-	ret = glue_cap_lookup_napi_struct_type(c_cspace,
-			__cptr(fipc_get_reg2(_request)),
-			&napi_struct_container);
-	if (ret) {
-		LIBLCD_ERR("lookup");
-		goto fail_lookup;
+	napi_struct_container = kzalloc(sizeof(*napi_struct_container), GFP_KERNEL);
+
+	if (!napi_struct_container) {
+		LIBLCD_ERR("kzalloc napi_struct_container");
+		goto fail_alloc;
 	}
 
-	weight = fipc_get_reg3(_request);
+	napi_struct_container->other_ref = __cptr(fipc_get_reg1(_request));
+
+	napi = &napi_struct_container->napi_struct;
+
+	ret = glue_cap_insert_napi_struct_type(c_cspace,
+		napi_struct_container,
+		&napi_struct_container->my_ref);
+
+	if (ret) {
+		LIBLCD_ERR("lcd insert");
+		goto fail_insert;
+	}
+
+	weight = fipc_get_reg2(_request);
 
 #ifndef CONFIG_LVD
 	poll_hidden_args = kzalloc(sizeof( *poll_hidden_args ),
@@ -3181,20 +3202,16 @@ int netif_napi_add_callee(struct fipc_message *_request)
 #endif
 	poll_container->poll = poll;
 
-	napi = kzalloc(sizeof(*napi), GFP_KERNEL);
-
-	if (!napi) {
-		LIBLCD_ERR("kzalloc");
-		goto fail_alloc;
-	}
-
 	netif_napi_add((&dev_container->net_device),
 				napi,
 				(poll_container->poll),
 				weight);
 
+	fipc_set_reg0(_request, napi_struct_container->my_ref.cptr);
+
 	LIBLCD_MSG("%s, napi %p | napi->dev %p", __func__, napi, napi->dev);
 
+fail_insert:
 fail_lookup:
 fail_alloc:
 #ifndef CONFIG_LVD
@@ -3234,7 +3251,7 @@ int netif_napi_del_callee(struct fipc_message *_request)
 		LIBLCD_ERR("cap lookup failed");
 		goto fail_lookup;
 	}
-	napi = napi_container->napi_struct;
+	napi = &napi_container->napi_struct;
 
 	netif_napi_del(napi);
 
@@ -3317,16 +3334,16 @@ int napi_gro_receive_callee(struct fipc_message *_request)
 	skb_ref = __cptr(fipc_get_reg0(_request));
 
 	ret = glue_cap_lookup_napi_struct_type(c_cspace,
-				__cptr(fipc_get_reg2(_request)),
+				__cptr(fipc_get_reg1(_request)),
 				&napi_container);
 	if (ret) {
 		LIBLCD_ERR("cap lookup failed");
 		goto fail_lookup;
 	}
 
-	page = fipc_get_reg1(_request);
+	page = fipc_get_reg2(_request);
 
-	napi = napi_container->napi_struct;
+	napi = &napi_container->napi_struct;
 
 	glue_lookup_skbuff(cptr_table, skb_ref, &skb_c);
 
@@ -3444,19 +3461,21 @@ int napi_gro_receive_callee(struct fipc_message *_request)
 		truesize,
 		csum_ipsum,
 		hash_l4sw,
-		nr_frags_tail;
+		nr_frags_tail_cptr;
 	unsigned int pull_len;
 	unsigned char nr_frags;
+	cptr_t napi_struct_ref;
 
 	u32 frag_off = 0, frag_size = 0;
-	nr_frags_tail = fipc_get_reg0(_request);
+	nr_frags_tail_cptr = fipc_get_reg0(_request);
 
-	nr_frags = nr_frags_tail & 0xff;
+	nr_frags = nr_frags_tail_cptr & 0xff;
 	/* this is the amount of data copied to the skb->data
 	 * by copy_to_linear_data. We have to do it again with
 	 * the skb allocated here
 	 */
-	pull_len = nr_frags_tail >> 8;
+	pull_len = nr_frags_tail_cptr >> 8;
+	napi_struct_ref = __cptr(nr_frags_tail_cptr >> 16);
 
 	if (nr_frags) {
 		page = fipc_get_reg1(_request);
@@ -3473,9 +3492,8 @@ int napi_gro_receive_callee(struct fipc_message *_request)
 	hash_l4sw = fipc_get_reg4(_request);
 	csum_ipsum = fipc_get_reg6(_request);
 
-	/* TODO: Marshall this correctly. we don't have extra regs */
 	ret = glue_cap_lookup_napi_struct_type(c_cspace,
-				__cptr(fipc_get_reg2(_request)),
+				napi_struct_ref,
 				&napi_container);
 	if (ret) {
 		LIBLCD_ERR("cap lookup failed");
@@ -3483,7 +3501,7 @@ int napi_gro_receive_callee(struct fipc_message *_request)
 	}
 
 	WARN_ON(nr_frags > 1);
-	napi = napi_container->napi_struct;
+	napi = &napi_container->napi_struct;
 
 #define IXGBE_HDR_SIZE	256
 
@@ -3587,7 +3605,7 @@ int __napi_alloc_skb_callee(struct fipc_message *_request)
 		goto fail_lookup;
 	}
 
-	napi = napi_container->napi_struct;
+	napi = &napi_container->napi_struct;
 
 	skb = __napi_alloc_skb(napi, len, gfp_mask);
 

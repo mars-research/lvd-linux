@@ -45,6 +45,9 @@
 #include "ixgbe_type.h"
 #include "ixgbe_common.h"
 
+#include <libcap_types.h>
+#include "../../ixgbe_glue_helper.h"
+
 #if defined(CONFIG_IXGBE_DCB)
 #include "ixgbe_dcb.h"
 #endif
@@ -396,7 +399,15 @@ struct ixgbe_q_vector {
 	u16 itr;		/* Interrupt throttle rate written to EITR */
 	struct ixgbe_ring_container rx, tx;
 
-	struct napi_struct napi;
+	union {
+		struct napi_struct_container napi_struct_container;
+		struct {
+			struct napi_struct napi;
+			cptr_t my_ref;
+			cptr_t other_ref;
+		};
+	};
+
 	cpumask_t affinity_mask;
 	int numa_node;
 	struct rcu_head rcu;	/* to avoid race with update stats on free */

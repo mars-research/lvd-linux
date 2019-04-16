@@ -27,7 +27,7 @@ static int ixgbe_lcd_init(void)
 	if (ret)
 		goto fail1;
 
-	loops_per_jiffy = lcd_get_boot_info()->cptrs[1].cptr;
+	/* loops_per_jiffy = lcd_get_boot_info()->cptrs[1].cptr; */
 
 	printk("ixgbe lpj %lu\n", loops_per_jiffy);
 	/*

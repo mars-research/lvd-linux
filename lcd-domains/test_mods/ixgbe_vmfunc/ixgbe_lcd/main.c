@@ -67,7 +67,7 @@ static void ixgbe_lcd_exit(void)
 
 	glue_ixgbe_exit();
 
-	lcd_exit(0);
+	lvd_exit(0);
 
 	return;
 }

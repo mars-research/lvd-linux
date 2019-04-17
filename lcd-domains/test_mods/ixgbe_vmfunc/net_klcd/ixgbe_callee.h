@@ -61,6 +61,8 @@ int netif_receive_skb_callee(struct fipc_message *_request);
 int napi_gro_receive_callee(struct fipc_message *_request);
 
 int __napi_alloc_skb_callee(struct fipc_message *_request);
+int __napi_schedule_irqoff_callee(struct fipc_message *_request);
+
 int eth_type_trans_callee(struct fipc_message *_request);
 int skb_add_rx_frag_callee(struct fipc_message *_request);
 int dispatch_sync_loop(void);

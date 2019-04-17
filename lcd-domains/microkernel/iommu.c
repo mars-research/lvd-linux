@@ -231,6 +231,7 @@ int lcd_iommu_map_domain(struct lcd *lcd, struct pci_dev *pdev)
 
 	/* step 0. Check if iommu is present */
 	if (!iommu_present(&pci_bus_type)) {
+		LIBLCD_ERR("iommu not present!");
 		ret = -ENODEV;
 		goto out;
 	}

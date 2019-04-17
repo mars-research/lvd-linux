@@ -39,6 +39,9 @@ struct kmem_cache *skb_cache;
 #define CPTR_HASH_BITS      5
 static DEFINE_HASHTABLE(cptr_table, CPTR_HASH_BITS);
 
+#define NAPI_HASH_BITS	5
+DEFINE_HASHTABLE(napi_hashtable, NAPI_HASH_BITS);
+
 extern int init_default_flow_dissectors(void);
 
 #define IXGBE_RX_HDR_SIZE	256
@@ -159,7 +162,41 @@ void glue_remove_skbuff(struct sk_buff_container *skb_c)
 	hash_del(&skb_c->hentry);
 }
 
-struct thc_channel_group_item *ptrs[32] = {0};
+int inline glue_insert_napi_hash(struct napi_struct_container *napi_c)
+{
+	/* assign address of napi_struct to napi */
+	napi_c->napi = &napi_c->napi_struct;
+
+	BUG_ON(!napi_c->napi);
+
+	napi_c->my_ref = __cptr((unsigned long)napi_c->napi);
+
+	hash_add(napi_hashtable, &napi_c->hentry, (unsigned long) napi_c->napi);
+
+	return 0;
+}
+
+int inline glue_lookup_napi_hash(struct cptr c, struct napi_struct_container **napi_cout)
+{
+        struct napi_struct_container *napi_c;
+
+        hash_for_each_possible(napi_hashtable, napi_c,
+				hentry, (unsigned long) cptr_val(c)) {
+		if (!napi_c) {
+			WARN_ON(!napi_c);
+			continue;
+		}
+		if (napi_c->napi == (struct napi_struct*) c.cptr) {
+	                *napi_cout = napi_c;
+		}
+        }
+        return 0;
+}
+
+void inline glue_remove_napi_hash(struct napi_struct_container *napi_c)
+{
+	hash_del(&napi_c->hentry);
+}
 
 void pci_disable_msix(struct pci_dev *dev)
 {
@@ -1978,7 +2015,6 @@ void netif_napi_add(struct net_device *dev,
 	struct fipc_message r;
 	struct fipc_message *_request = &r;
 	struct napi_struct_container *napi_container;
-	int ret;
 
 	dev_container = container_of(dev,
 		struct net_device_container,
@@ -1993,14 +2029,9 @@ void netif_napi_add(struct net_device *dev,
 		goto fail_alloc;
 	}
 
-	ret = glue_cap_insert_napi_struct_type(c_cspace,
-		napi_container,
-		&napi_container->my_ref);
+	glue_insert_napi_hash(napi_container);
 
-	if (ret) {
-		LIBLCD_ERR("lcd insert");
-		goto fail_insert;
-	}
+	LIBLCD_MSG("napi_struct_my_ref %lx", napi_container->my_ref.cptr);
 
 	poll_container->poll = poll;
 
@@ -2013,19 +2044,29 @@ void netif_napi_add(struct net_device *dev,
 
 	napi_container->other_ref = __cptr(fipc_get_reg0(_request));
 
-fail_insert:
 fail_alloc:
 	return;
 }
 
+int ixgbe_poll(struct napi_struct *napi, int budget);
+
 int poll_callee(struct fipc_message *_request)
 {
 	int budget;
-	//struct napi_struct *napi;
+	struct napi_struct_container *napi_c = NULL;
+	static int once = 1;
 
 	budget = fipc_get_reg0(_request);
 
-	//ixgbe_poll(napi, budget);
+	glue_lookup_napi_hash(__cptr(fipc_get_reg1(_request)), &napi_c);
+
+	/* BUG_ON(!napi_c->napi); */
+	if (once) {
+		printk("%s, napi_c %p | napi_c->napi %p", __func__, napi_c,
+				napi_c ? napi_c->napi : NULL);
+		once = 0;
+	}
+	ixgbe_poll(napi_c->napi, budget);
 
 	return 0;
 }
@@ -2406,3 +2447,20 @@ __be16 eth_type_trans(struct sk_buff *skb,
 	return ret;
 }
 #endif
+
+void __napi_schedule_irqoff(struct napi_struct *napi)
+{
+	struct fipc_message r;
+	struct fipc_message *_request = &r;
+	struct napi_struct_container *napi_container;
+
+	napi_container = container_of(napi, struct napi_struct_container, napi_struct);
+
+	async_msg_set_fn_type(_request, __NAPI_SCHEDULE_IRQOFF);
+
+	fipc_set_reg0(_request, napi_container->other_ref.cptr);
+
+	vmfunc_wrapper(_request);
+
+	return;
+}

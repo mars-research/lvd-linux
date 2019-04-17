@@ -235,6 +235,10 @@ int net_klcd_dispatch_async_loop(struct fipc_message *message)
 			trace(NAPI_ALLOC_SKB);
 			return __napi_alloc_skb_callee(message);
 
+		case __NAPI_SCHEDULE_IRQOFF:
+			trace(__NAPI_SCHEDULE_IRQOFF);
+			return __napi_schedule_irqoff_callee(message);
+
 		default:
 			LIBLCD_ERR("unexpected function label: %d",
 					fn_type);

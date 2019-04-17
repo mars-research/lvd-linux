@@ -53,7 +53,7 @@ int handle_rpc_calls(struct fipc_message *message)
 			return ndo_set_tx_maxrate_callee(message);
 
 		case NDO_GET_STATS64:
-			trace(NDO_GET_STATS64);
+			/* trace(NDO_GET_STATS64); */
 			return ndo_get_stats64_callee(message);
 
 		case PROBE:

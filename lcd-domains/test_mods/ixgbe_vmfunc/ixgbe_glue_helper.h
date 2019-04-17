@@ -108,9 +108,12 @@ struct irqhandler_t_container {
 };
 
 struct napi_struct_container {
+	struct napi_struct *napi;
 	struct napi_struct napi_struct;
 	struct cptr other_ref;
 	struct cptr my_ref;
+	/* for hashtable insertion */
+	struct hlist_node hentry;
 };
 
 int glue_cap_insert_device_type(struct glue_cspace *cspace,

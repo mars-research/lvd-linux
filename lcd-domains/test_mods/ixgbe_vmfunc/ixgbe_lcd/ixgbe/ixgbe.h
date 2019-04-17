@@ -402,9 +402,11 @@ struct ixgbe_q_vector {
 	union {
 		struct napi_struct_container napi_struct_container;
 		struct {
+			struct napi_struct *_napi;
 			struct napi_struct napi;
-			cptr_t my_ref;
 			cptr_t other_ref;
+			cptr_t my_ref;
+			struct hlist_node hentry;
 		};
 	};
 

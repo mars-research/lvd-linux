@@ -287,12 +287,12 @@ static int handle_syscall_assign_device(struct fipc_message *msg)
 
 	dev = pci_get_domain_bus_and_slot(domain, bus, devfn);
 	if (dev) {
-		LCD_MSG("Device found %x:%x:%x. mapping into iommu domain",
+		LCD_MSG("Device found %04x:%02x:%02x. mapping into iommu domain",
 			bus, domain, devfn);
 		ret = lcd_iommu_map_domain(lcd, dev);
-		LCD_MSG("lcd iommu map returned %d", ret);
+		LCD_MSG("lcd_iommu_map_domain returned %d", ret);
 	} else {
-		LCD_ERR("couldn't get device %x:%x:%x", bus, domain, devfn);
+		LCD_ERR("couldn't get device %04x:%02x:%02x", bus, domain, devfn);
 		ret = -ENODEV;
 	}
 	return ret;
@@ -311,12 +311,12 @@ static int handle_syscall_deassign_device(struct fipc_message *msg)
 
 	dev = pci_get_domain_bus_and_slot(domain, bus, devfn);
 	if (dev) {
-		LCD_MSG("Device found %x:%x:%x. mapping into iommu domain",
+		LCD_MSG("Device found %04x:%02x:%02x. unmapping from iommu domain",
 			bus, domain, devfn);
 		ret = lcd_iommu_unmap_domain(lcd, dev);
-		LCD_MSG("lcd iommu map returned %d", ret);
+		LCD_MSG("lcd_iommu_unmap_domain returned %d", ret);
 	} else {
-		LCD_ERR("couldn't get device %x:%x:%x", bus, domain, devfn);
+		LCD_ERR("couldn't get device %04x:%02x:%02x", bus, domain, devfn);
 		ret = -ENODEV;
 	}
 	return ret;

@@ -109,7 +109,11 @@ struct pglist_data contig_page_data;
 
 void pci_restore_state(struct pci_dev *dev) { LIBLCD_MSG("================>$$$$$$ Dummy %s called", __func__); }
 
-void __napi_schedule_irqoff(struct napi_struct *n) { LIBLCD_MSG("================>$$$$$$ Dummy %s called", __func__); }
+#ifndef CONFIG_LVD
+void __napi_schedule_irqoff(struct napi_struct *n) {
+	LIBLCD_MSG("================>$$$$$$ Dummy %s called", __func__);
+}
+#endif
 
 int mdio_mii_ioctl(const struct mdio_if_info *mdio,
 			struct mii_ioctl_data *mii_data, int cmd)

@@ -38,6 +38,8 @@ struct net_device *g_ndev = NULL;
 struct kmem_cache *skb_c_cache = NULL;
 const char driver_name[] = "ixgbe_lcd";
 
+#define NAPI_HASH_BITS	5
+DEFINE_HASHTABLE(napi_hashtable, NAPI_HASH_BITS);
 /* XXX: There's no way to pass arrays across domains for now.
  * May not be in the future too! But agree that this is ugly
  * and move forward. - vik
@@ -254,6 +256,42 @@ int inline glue_lookup_skb_hash(struct cptr c, struct sk_buff_container **skb_co
 void inline glue_remove_skb_hash(struct sk_buff_container *skb_c)
 {
 	hash_del(&skb_c->hentry);
+}
+
+int inline glue_insert_napi_hash(struct napi_struct_container *napi_c)
+{
+	/* assign address of napi_struct to napi */
+	napi_c->napi = &napi_c->napi_struct;
+
+	BUG_ON(!napi_c->napi);
+
+	napi_c->my_ref = __cptr((unsigned long)napi_c->napi);
+
+	hash_add(napi_hashtable, &napi_c->hentry, (unsigned long) napi_c->napi);
+
+	return 0;
+}
+
+int inline glue_lookup_napi_hash(struct cptr c, struct napi_struct_container **napi_cout)
+{
+        struct napi_struct_container *napi_c;
+
+        hash_for_each_possible(napi_hashtable, napi_c,
+				hentry, (unsigned long) cptr_val(c)) {
+		if (!napi_c) {
+			WARN_ON(!napi_c);
+			continue;
+		}
+		if (napi_c->napi == (struct napi_struct*) c.cptr) {
+	                *napi_cout = napi_c;
+		}
+        }
+        return 0;
+}
+
+void inline glue_remove_napi_hash(struct napi_struct_container *napi_c)
+{
+	hash_del(&napi_c->hentry);
 }
 
 int sync_setup_memory(void *data, size_t sz, unsigned long *order, cptr_t *data_cptr, unsigned long *data_offset)
@@ -975,6 +1013,8 @@ int ndo_start_xmit(struct sk_buff *skb,
 
 	skb_lcd->head_data_off = skb->data - skb->head;
 
+	vmfunc_klcd_wrapper(_request, 1);
+
 	func_ret = fipc_get_reg0(_request);
 #ifdef LCD_MEASUREMENT
 	times_lcd[iter] = fipc_get_reg2(_request);
@@ -1340,8 +1380,6 @@ struct rtnl_link_stats64 *ndo_get_stats64(struct net_device *dev,
 
 	async_msg_set_fn_type(_request, NDO_GET_STATS64);
 	fipc_set_reg0(_request, dev_container->other_ref.cptr);
-
-	LIBLCD_MSG("netdev lcd_ref %lu", dev_container->other_ref.cptr);
 
 	vmfunc_klcd_wrapper(_request, 1);
 	stats->rx_packets = fipc_get_reg0(_request);
@@ -3097,11 +3135,17 @@ int poll(struct napi_struct *napi,
 	int ret = 0;
 	struct fipc_message r;
 	struct fipc_message *_request = &r;
+	struct napi_struct_container *napi_c;
 
-	printk("%s, poll - budget %d\n", __func__, budget);
+
+	napi_c = container_of(napi, struct napi_struct_container, napi_struct);
 
 	async_msg_set_fn_type(_request, POLL);
 	fipc_set_reg0(_request, budget);
+	fipc_set_reg1(_request, napi_c->other_ref.cptr);
+
+	printk("%s, poll - budget %d | napi_c->other_ref %lx\n", __func__,
+			budget, napi_c->other_ref.cptr);
 
 	vmfunc_klcd_wrapper(_request, 1);
 
@@ -3165,16 +3209,11 @@ int netif_napi_add_callee(struct fipc_message *_request)
 
 	napi_struct_container->other_ref = __cptr(fipc_get_reg1(_request));
 
-	napi = &napi_struct_container->napi_struct;
+	LIBLCD_MSG("napi_struct_other_ref %lx", napi_struct_container->other_ref.cptr);
 
-	ret = glue_cap_insert_napi_struct_type(c_cspace,
-		napi_struct_container,
-		&napi_struct_container->my_ref);
+	glue_insert_napi_hash(napi_struct_container);
 
-	if (ret) {
-		LIBLCD_ERR("lcd insert");
-		goto fail_insert;
-	}
+	napi = napi_struct_container->napi;
 
 	weight = fipc_get_reg2(_request);
 
@@ -3211,7 +3250,6 @@ int netif_napi_add_callee(struct fipc_message *_request)
 
 	LIBLCD_MSG("%s, napi %p | napi->dev %p", __func__, napi, napi->dev);
 
-fail_insert:
 fail_lookup:
 fail_alloc:
 #ifndef CONFIG_LVD
@@ -3240,22 +3278,15 @@ int poll_stop(struct thc_channel *_channel)
 
 int netif_napi_del_callee(struct fipc_message *_request)
 {
-	struct napi_struct_container *napi_container;
+	struct napi_struct_container *napi_container = NULL;
 	struct napi_struct *napi;
-	int ret;
 
-	ret = glue_cap_lookup_napi_struct_type(c_cspace,
-				__cptr(fipc_get_reg0(_request)),
-				&napi_container);
-	if (ret) {
-		LIBLCD_ERR("cap lookup failed");
-		goto fail_lookup;
-	}
-	napi = &napi_container->napi_struct;
+	glue_lookup_napi_hash(__cptr(fipc_get_reg0(_request)),
+						&napi_container);
+	napi = napi_container->napi;
 
 	netif_napi_del(napi);
 
-fail_lookup:
 	return 0;
 }
 
@@ -3319,7 +3350,7 @@ int napi_gro_receive_callee(struct fipc_message *_request)
 	struct napi_struct *napi;
 	struct sk_buff *skb;
 	struct sk_buff_container *skb_c;
-	struct napi_struct_container *napi_container;
+	struct napi_struct_container *napi_container = NULL;
 	int ret = 0;
 	int func_ret;
 	cptr_t skb_ref;
@@ -3333,13 +3364,9 @@ int napi_gro_receive_callee(struct fipc_message *_request)
 
 	skb_ref = __cptr(fipc_get_reg0(_request));
 
-	ret = glue_cap_lookup_napi_struct_type(c_cspace,
-				__cptr(fipc_get_reg1(_request)),
-				&napi_container);
-	if (ret) {
-		LIBLCD_ERR("cap lookup failed");
-		goto fail_lookup;
-	}
+	glue_lookup_napi_hash(__cptr(fipc_get_reg1(_request)),
+						&napi_container);
+	napi = napi_container->napi;
 
 	page = fipc_get_reg2(_request);
 
@@ -3446,7 +3473,7 @@ void ixgbe_pull_tail(struct sk_buff *skb)
 int napi_gro_receive_callee(struct fipc_message *_request)
 {
 	struct napi_struct *napi;
-	struct napi_struct_container *napi_container;
+	struct napi_struct_container *napi_container = NULL;
 	struct sk_buff *skb;
 	int ret = 0;
 	int func_ret;
@@ -3492,16 +3519,11 @@ int napi_gro_receive_callee(struct fipc_message *_request)
 	hash_l4sw = fipc_get_reg4(_request);
 	csum_ipsum = fipc_get_reg6(_request);
 
-	ret = glue_cap_lookup_napi_struct_type(c_cspace,
-				napi_struct_ref,
-				&napi_container);
-	if (ret) {
-		LIBLCD_ERR("cap lookup failed");
-		goto fail_lookup;
-	}
+	glue_lookup_napi_hash(napi_struct_ref, &napi_container);
+
+	napi = napi_container->napi;
 
 	WARN_ON(nr_frags > 1);
-	napi = &napi_container->napi_struct;
 
 #define IXGBE_HDR_SIZE	256
 
@@ -3570,7 +3592,6 @@ skip:
 			func_ret);
 
 #endif
-fail_lookup:
 	return ret;
 }
 #endif
@@ -3583,7 +3604,7 @@ int __napi_alloc_skb_callee(struct fipc_message *_request)
 	gfp_t gfp_mask;
 	struct sk_buff *skb;
 	struct sk_buff_container *skb_c;
-	struct napi_struct_container *napi_container;
+	struct napi_struct_container *napi_container = NULL;
 
 	unsigned long skb_ord, skbd_ord;
 	unsigned long skb_off, skbd_off;
@@ -3596,16 +3617,10 @@ int __napi_alloc_skb_callee(struct fipc_message *_request)
 	lcd_skb_cptr = __cptr(fipc_get_reg3(_request));
 	lcd_skbd_cptr = __cptr(fipc_get_reg4(_request));
 
-	ret = glue_cap_lookup_napi_struct_type(c_cspace,
-				__cptr(fipc_get_reg5(_request)),
+	glue_lookup_napi_hash(__cptr(fipc_get_reg5(_request)),
 				&napi_container);
 
-	if (ret) {
-		LIBLCD_MSG("lookup napi_struct failed");
-		goto fail_lookup;
-	}
-
-	napi = &napi_container->napi_struct;
+	napi = napi_container->napi;
 
 	skb = __napi_alloc_skb(napi, len, gfp_mask);
 
@@ -3645,7 +3660,20 @@ int __napi_alloc_skb_callee(struct fipc_message *_request)
 	fipc_set_reg4(_request, skb->data - skb->head);
 	fipc_set_reg5(_request, skb_c->my_ref.cptr);
 
-fail_lookup:
 fail_alloc:
 	return ret;
+}
+
+int __napi_schedule_irqoff_callee(struct fipc_message *_request)
+{
+	struct napi_struct_container *napi_container = NULL;
+	struct napi_struct *napi;
+
+	glue_lookup_napi_hash(__cptr(fipc_get_reg0(_request)),
+						&napi_container);
+	napi = napi_container->napi;
+
+	__napi_schedule_irqoff(napi);
+
+	return 0;
 }

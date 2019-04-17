@@ -15,7 +15,7 @@ int blk_mq_map_queue_callee(struct fipc_message *request);
 int blk_queue_logical_block_size_callee(struct fipc_message *request);
 int blk_queue_physical_block_size_callee(struct fipc_message *request);
 int alloc_disk_node_callee(struct fipc_message *request);
-int add_disk_callee(struct fipc_message *request);
+int device_add_disk_callee(struct fipc_message *request);
 int put_disk_callee(struct fipc_message *request);
 int del_gendisk_callee(struct fipc_message *request);
 int disk_node_callee(struct fipc_message *request);

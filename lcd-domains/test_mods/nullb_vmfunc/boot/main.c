@@ -107,12 +107,10 @@ static int shutdown = 0;
 int boot_lcd_thread(void *data)
 {
 	static unsigned once = 0;
-	int ret;
+	int ret = 0;
 	while (!kthread_should_stop()) {
 		if (!once) {
-			LCD_MAIN({
-				ret = boot_main();
-			});
+			ret = boot_main();
 		}
 		once = 1;
 		wait_event_interruptible(wq, shutdown != 0);

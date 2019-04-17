@@ -61,9 +61,10 @@ int blk_mq_alloc_tag_set(struct blk_mq_tag_set *set)
 	struct blk_mq_ops_container *ops_container;
 	int ret;
 	struct fipc_message r;
-	struct fipc_message *request = &r;	int func_ret;
+	struct fipc_message *request = &r;
+	int func_ret = 0;
 
-	set_container = container_of(set, struct blk_mq_tag_set_container, blk_mq_tag_set);
+	set_container = container_of(set, struct blk_mq_tag_set_container, tag_set);
 	ops_container = container_of(set->ops, struct blk_mq_ops_container, blk_mq_ops);
 	ops_container_g = ops_container;
 
@@ -93,9 +94,9 @@ int blk_mq_alloc_tag_set(struct blk_mq_tag_set *set)
 
 	set_container->other_ref.cptr = fipc_get_reg0(request);
 	ops_container->other_ref.cptr = fipc_get_reg1(request);
-	func_ret = fipc_get_reg3(request);
+	func_ret = fipc_get_reg2(request);
 
-	printk("LCD received %d from block_al-tg-set \n",func_ret);
+	LIBLCD_MSG("%s received %d from", __func__, func_ret);
 
 	return func_ret;
 
@@ -129,7 +130,7 @@ struct request_queue *blk_mq_init_queue(struct blk_mq_tag_set *set)
                 goto fail_insert;
         }
 	
-	set_container = container_of(set, struct blk_mq_tag_set_container, blk_mq_tag_set);
+	set_container = container_of(set, struct blk_mq_tag_set_container, tag_set);
 
 	async_msg_set_fn_type(request, BLK_MQ_INIT_QUEUE);
 	fipc_set_reg0(request, set_container->other_ref.cptr);
@@ -139,7 +140,7 @@ struct request_queue *blk_mq_init_queue(struct blk_mq_tag_set *set)
 	
 	rq_container->other_ref.cptr = fipc_get_reg0(request);
 
-	printk("blk_mq_init returns local request queue struct!! \n");	
+	printk("%s returns local request queue struct!! \n", __func__);
 	return &rq_container->request_queue;
 
 fail_insert:
@@ -193,8 +194,7 @@ void blk_mq_free_tag_set(struct blk_mq_tag_set *set)
 	struct blk_mq_tag_set_container *set_container;
 	struct blk_mq_ops_container *ops_container;
 
-	set_container = container_of(set, struct blk_mq_tag_set_container, 
-						blk_mq_tag_set);
+	set_container = container_of(set, struct blk_mq_tag_set_container, tag_set);
 
 	ops_container = container_of(set->ops, struct blk_mq_ops_container,
 			blk_mq_ops);
@@ -278,7 +278,7 @@ void blk_queue_physical_block_size(struct request_queue *rq, unsigned int size)
 	fipc_set_reg1(request, rq_container->other_ref.cptr);
 
 	vmfunc_wrapper(request);
-	
+
 	return;
 }
 
@@ -358,7 +358,7 @@ void device_add_disk(struct device *parent, struct gendisk *disk)
 		goto fail_insert3;
 	}
 	
-	async_msg_set_fn_type(request, ADD_DISK);
+	async_msg_set_fn_type(request, DEVICE_ADD_DISK);
 	fipc_set_reg0(request, disk_container->other_ref.cptr);
 	fipc_set_reg1(request, blo_container->my_ref.cptr);
 	fipc_set_reg2(request, module_container->my_ref.cptr);
@@ -373,7 +373,7 @@ void device_add_disk(struct device *parent, struct gendisk *disk)
 	vmfunc_wrapper(request);
 	
 	blo_container->other_ref.cptr = fipc_get_reg0(request);
-	module_container->other_ref.cptr = fipc_get_reg0(request);
+	module_container->other_ref.cptr = fipc_get_reg1(request);
 	printk("add_disk ends here in lcd glue \n");
 
 	return;
@@ -391,7 +391,9 @@ void put_disk(struct gendisk *disk)
 
 	struct gendisk_container *disk_container;
 	struct module_container *module_container;
-	struct block_device_operations_container *blo_container;	disk_container = container_of(disk, struct gendisk_container, gendisk);
+	struct block_device_operations_container *blo_container;
+
+	disk_container = container_of(disk, struct gendisk_container, gendisk);
 
 	blo_container = container_of(disk->fops,
 			struct block_device_operations_container, block_device_operations);
@@ -405,10 +407,10 @@ void put_disk(struct gendisk *disk)
 	
 	vmfunc_wrapper(request);
 
-	
 	glue_cap_remove(c_cspace, disk_container->my_ref);
 	glue_cap_remove(c_cspace, blo_container->my_ref);
 	glue_cap_remove(c_cspace, module_container->my_ref);
+
 	kfree(disk_container);
 	return;
 }
@@ -426,7 +428,6 @@ void del_gendisk(struct gendisk *gp)
 	
 	vmfunc_wrapper(request);
 	
-	glue_cap_remove(c_cspace, disk_container->my_ref);
 	return;
 }
 
@@ -539,7 +540,7 @@ int init_hctx_fn_callee(struct fipc_message *request)
 	struct blk_mq_ops_container *ops_container;
 	unsigned int index;
 
-	int ret;
+	int ret = 0;
 
 	ctx_container = kzalloc(sizeof(*ctx_container), GFP_KERNEL);
 	if (!ctx_container) {

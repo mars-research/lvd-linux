@@ -13,6 +13,7 @@
 #include <linux/blk-mq.h>
 #include <linux/hrtimer.h>
 #include <linux/lightnvm.h>
+#include "../glue_helper.h"
 
 #ifdef LCD_ISOLATE
 #include <lcd_config/post_hook.h>
@@ -42,12 +43,6 @@ struct nullb_queue {
 	unsigned int queue_depth;
 
 	struct nullb_cmd *cmds;
-};
-
-struct blk_mq_tag_set_container {
-	struct blk_mq_tag_set set;
-	u64 ref1;
-	u64 ref2;
 };
 
 struct nullb {
@@ -513,14 +508,8 @@ static int null_init_hctx(struct blk_mq_hw_ctx *hctx, void *data,
 }
 
 #ifdef LCD_ISOLATE
-struct blk_mq_ops_container {
-	struct blk_mq_ops mq_ops;
-	u64 ref1;
-	u64 ref2;
-};
-
 static struct blk_mq_ops_container null_mq_ops_container = {
-	.mq_ops = {
+	.blk_mq_ops = {
 		.queue_rq       = null_queue_rq,
 		.map_queue      = blk_mq_map_queue,
 		.init_hctx	= null_init_hctx,
@@ -566,7 +555,7 @@ static void null_del_dev(struct nullb *nullb)
 	printk("calling blk_cleanup \n");
 	blk_cleanup_queue(nullb->q);
 	if (queue_mode == NULL_Q_MQ)
-		blk_mq_free_tag_set(&nullb->tag_set_container->set);
+		blk_mq_free_tag_set(&nullb->tag_set_container->tag_set);
 	if (!use_lightnvm)
 		put_disk(nullb->disk);
 	cleanup_queues(nullb);
@@ -722,21 +711,10 @@ static void null_release(struct gendisk *disk, fmode_t mode)
 }
 
 #ifdef LCD_ISOLATE
-struct block_device_operations_container {
-	struct block_device_operations null_fops;
-	u64 ref1;
-	u64 ref2;
-};
-struct module_container {
-	struct module module;
-	u64 ref1;
-	u64 ref2;
-};
-
 static struct module_container module_container;
 
 static const struct block_device_operations_container null_ops_container = {
-	.null_fops = {
+	.block_device_operations = {
 		.owner =	&module_container.module,
 		.open =		null_open,
 		.release =	null_release,
@@ -849,33 +827,33 @@ static int null_add_dev(void)
 		goto out_free_nullb;
 
 	if (queue_mode == NULL_Q_MQ) {
-#ifdef LCD_ISOLATE	
-		nullb->tag_set_container->set.ops = &null_mq_ops_container.mq_ops;
-		nullb->tag_set_container->set.nr_hw_queues = submit_queues;
+#ifdef LCD_ISOLATE
+		nullb->tag_set_container->tag_set.ops = &null_mq_ops_container.blk_mq_ops;
+		nullb->tag_set_container->tag_set.nr_hw_queues = submit_queues;
 		printk("submit_queues %d \n",submit_queues);
-		nullb->tag_set_container->set.queue_depth = hw_queue_depth;
-		nullb->tag_set_container->set.numa_node = home_node;
-		nullb->tag_set_container->set.cmd_size	= sizeof(struct nullb_cmd);
-		nullb->tag_set_container->set.flags = BLK_MQ_F_SHOULD_MERGE;
+		nullb->tag_set_container->tag_set.queue_depth = hw_queue_depth;
+		nullb->tag_set_container->tag_set.numa_node = home_node;
+		nullb->tag_set_container->tag_set.cmd_size	= sizeof(struct nullb_cmd);
+		nullb->tag_set_container->tag_set.flags = BLK_MQ_F_SHOULD_MERGE;
 		/* TODO allocate memory for nullb in the klcd glue, exchange my_ref 
 			and other_ref */
-		nullb->tag_set_container->set.driver_data = nullb;
+		nullb->tag_set_container->tag_set.driver_data = nullb;
 
-		rv = blk_mq_alloc_tag_set(&nullb->tag_set_container->set);
+		rv = blk_mq_alloc_tag_set(&nullb->tag_set_container->tag_set);
 		printk("blk_mq alloc tag set retruns %d \n",rv);
 		if (rv)
 			goto out_cleanup_queues;
 
 		/*TODO AB - allocate request_queue container in the glue. IDL doesn't 
 			create container for ptr returned! */	
-		nullb->q = blk_mq_init_queue(&nullb->tag_set_container->set);
+		nullb->q = blk_mq_init_queue(&nullb->tag_set_container->tag_set);
 		if (IS_ERR(nullb->q)) {
 			rv = -ENOMEM;
 			printk("blk_mq_init_queue returns NULL! \n");
 			goto out_cleanup_tags;
 		}
 #else
-		nullb->tag_set.ops = &null_mq_ops_container.mq_ops;
+		nullb->tag_set.ops = &null_mq_ops_container.blk_mq_ops;
 		nullb->tag_set.nr_hw_queues = submit_queues;
 		nullb->tag_set.queue_depth = hw_queue_depth;
 		nullb->tag_set.numa_node = home_node;
@@ -954,19 +932,14 @@ static int null_add_dev(void)
 	disk->flags |= GENHD_FL_EXT_DEVT | GENHD_FL_SUPPRESS_PARTITION_INFO;
 	disk->major		= null_major;
 	disk->first_minor	= nullb->index;
-	disk->fops		= &null_ops_container.null_fops;
+	disk->fops		= &null_ops_container.block_device_operations;
 	/* TODO Nullb's memory will be allocated in the klcd glue, so my_ref for nullb
 		should be marshalled here */
 	disk->private_data	= nullb;
 	disk->queue		= nullb->q;
 	strncpy(disk->disk_name, nullb->disk_name, DISK_NAME_LEN);
 
-	//add_disk(disk);
-	/* AB - add_disk is defined as a static inline in genhd.h 
-	 * so redefinition of the same symbol in the glue creates 
-	 * problems. Instead, I call the function what add_disk calls 
-	 * directly from here! */
-	device_add_disk(NULL, disk);
+	add_disk(disk);
 
 #ifndef LCD_ISOLATE
 done:
@@ -988,7 +961,7 @@ out_cleanup_blk_queue:
 
 out_cleanup_tags:
 	if (queue_mode == NULL_Q_MQ)
-		blk_mq_free_tag_set(&nullb->tag_set_container->set);
+		blk_mq_free_tag_set(&nullb->tag_set_container->tag_set);
 
 out_cleanup_queues:
 	cleanup_queues(nullb);

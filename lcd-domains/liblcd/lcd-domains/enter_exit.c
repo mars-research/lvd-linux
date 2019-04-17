@@ -136,6 +136,17 @@ __noreturn lcd_exit(int retval)
 	lcd_syscall_exit(retval); /* doesn't return */
 }
 
+void
+LIBLCD_FUNC_ATTR
+lvd_exit(int retval)
+{
+	lcd_printk("=================");
+	lcd_printk("LVD SHUTTING DOWN");
+	lcd_printk("=================");
+
+	LIBLCD_MSG("exiting");
+}
+
 void __noreturn lcd_abort(void)
 {
 	lcd_syscall_exit(-EIO); /* doesn't return */

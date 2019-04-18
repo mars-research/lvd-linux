@@ -21,7 +21,6 @@ struct blk_mq_tag_set *set_g;
 
 struct blk_mq_ops_container *g_blk_mq_ops_container;
 
-
 /* hack for init_request */
 int hw_depth;
 struct request **rq_map;
@@ -80,8 +79,6 @@ int blk_mq_init_queue_callee(struct fipc_message *request)
                 goto fail_lookup;
         }
 
-	printk("in blk glue - calling the real blk_mq_init \n");
-
 	rq = blk_mq_init_queue(&set_container->tag_set);
 
 	if (!rq) {
@@ -95,7 +92,6 @@ int blk_mq_init_queue_callee(struct fipc_message *request)
         rq_container = container_of(rq, struct request_queue_container,
                                                 request_queue);
 
-	printk("inserting cap of rq_container \n");
 	ret = glue_cap_insert_request_queue_type(c_cspace, rq_container, &rq_container->my_ref);
         if (ret) {
                 LIBLCD_ERR("lcd insert");
@@ -266,7 +262,8 @@ int alloc_disk_node_callee(struct fipc_message *request)
 		goto fail_alloc;
 	}
 
-	printk("address of disk returned by the kernel %p \n",disk);
+	printk("%s disk: %p \n", __func__, disk);
+
 	disk_container = container_of(disk, struct gendisk_container, gendisk);
 
 	/* Hack for remove */
@@ -334,7 +331,7 @@ fail_lookup:
 
 int del_gendisk_callee(struct fipc_message *request)
 {
-	struct gendisk *gp;
+	struct gendisk *disk;
 	struct gendisk_container *disk_container;
 	int ret;
 
@@ -345,9 +342,17 @@ int del_gendisk_callee(struct fipc_message *request)
                 goto fail_lookup;
         }
 
-	gp = &disk_container->gendisk;
+	disk = &disk_container->gendisk;
 
-	del_gendisk(gp);
+	printk("Calling del_gendisk on cpu: %d, disk %p \n", raw_smp_processor_id(), disk);
+
+	{
+		struct kobject *kobj = &disk_to_dev(disk)->kobj;
+		printk("%s, disk_to_dev(disk) %p, kobj %p, kobj->sd %p\n", __func__,
+				disk_to_dev(disk), kobj, kobj->sd);
+	}
+
+	del_gendisk(disk);
 
 fail_lookup:
 	return ret;
@@ -373,8 +378,6 @@ int register_blkdev_callee(struct fipc_message *request)
 	int major;
 	unsigned int devno;
 
-	/* Hardcoded string for now! */
-	LIBLCD_MSG("Calling register_blkdev");
 	devno = fipc_get_reg0(request);
 
 	ret = register_blkdev(devno, "nullb");
@@ -385,6 +388,7 @@ int register_blkdev_callee(struct fipc_message *request)
 		LIBLCD_ERR("register_blkdev failed! ret = %d", ret);
 		goto fail;
 	}
+
 	null_major = major = ret;
 	fipc_set_reg0(request, major);
 fail:
@@ -397,7 +401,6 @@ int unregister_blkdev_callee(struct fipc_message *request)
 	int ret = 0;
 
 	devno = fipc_get_reg0(request);
-	LIBLCD_MSG("calling unregister blk_dev");
 	unregister_blkdev(devno, "nullb");
 	return ret;
 }
@@ -643,11 +646,11 @@ int open(struct block_device *device, fmode_t mode, struct trampoline_hidden_arg
 	async_msg_set_fn_type(request, OPEN);
 	fipc_set_reg0(request, mode);
 
-	printk("***** [nullb-open] current: %p name: %s pid: %d ptstate: %p cpu:%d \n", current, current->comm, current->pid, current->ptstate, smp_processor_id());
+	printk("%s, %s:%d on cpu:%d\n", __func__, current->comm, current->pid, smp_processor_id());
 	vmfunc_klcd_wrapper(request, 1);
-	printk("***** [nullb-open] done \n");
 
 	ret = fipc_get_reg0(request);
+
 	return ret;
 }
 
@@ -660,15 +663,17 @@ void release(struct gendisk *disk, fmode_t mode, struct trampoline_hidden_args *
 	struct fipc_message r;
 	struct fipc_message *request = &r;
 	struct gendisk_container *disk_container;
-	printk("[nullb-release] current: %p name: %s ptstate: %p cpu:%d \n", current, current->comm, current->ptstate, smp_processor_id());
 
 	disk_container = container_of(disk, struct gendisk_container, gendisk);
+
+	printk("%s, %s:%d on cpu:%d\n", __func__, current->comm, current->pid, smp_processor_id());
 
 	async_msg_set_fn_type(request, RELEASE);
 	fipc_set_reg0(request, disk_container->other_ref.cptr);
 	fipc_set_reg1(request, mode);
 
-	printk("[nullb-release] cleaning-up current: %p name: %s pid: %d ptstate: %p \n", current, current->comm, current->pid, current->ptstate);
+	vmfunc_klcd_wrapper(request, 1);
+
 	return;
 }
 
@@ -682,7 +687,6 @@ int LCD_TRAMPOLINE_LINKAGE(open_trampoline) open_trampoline(struct block_device 
 	LCD_TRAMPOLINE_PROLOGUE(hidden_args, open_trampoline);
 	open_fp = open;
 	return open_fp(device, mode, hidden_args);
-
 }
 #endif
 
@@ -696,7 +700,6 @@ void LCD_TRAMPOLINE_LINKAGE(release_trampoline) release_trampoline(struct gendis
 	LCD_TRAMPOLINE_PROLOGUE(hidden_args, release_trampoline);
 	rel_fp = release;
 	return rel_fp(disk, mode, hidden_args);
-
 }
 #endif
 
@@ -1012,7 +1015,6 @@ int device_add_disk_callee(struct fipc_message *request)
          * are creating our own struct module instance, we need to do
          * the initialization ourselves.
          */
-        
         module_container->module.state = MODULE_STATE_LIVE;
 	
 	/* without this add_disk will fail */
@@ -1104,9 +1106,14 @@ int device_add_disk_callee(struct fipc_message *request)
 	sprintf(disk_name, "nullb%d", disk->first_minor);
 	strncpy(disk->disk_name, disk_name, DISK_NAME_LEN);
 
-	printk("cpuid in call to add_disk %d \n", raw_smp_processor_id());
+	printk("Calling add_disk on cpu: %d, disk %p \n", raw_smp_processor_id(), disk);
 	add_disk(disk);
 
+	{
+		struct kobject *kobj = &disk_to_dev(disk)->kobj;
+		printk("%s, disk_to_dev(disk) %p, kobj %p, kobj->sd %p\n", __func__,
+				disk_to_dev(disk), kobj, kobj->sd);
+	}
 	fipc_set_reg0(request, blo_container->my_ref.cptr);
 	fipc_set_reg1(request, module_container->my_ref.cptr);
 

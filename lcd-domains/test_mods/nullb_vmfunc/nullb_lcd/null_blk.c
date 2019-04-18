@@ -545,9 +545,7 @@ static void null_del_dev(struct nullb *nullb)
 	printk("inside null del dev \n");
 	list_del_init(&nullb->list);
 	if (use_lightnvm) {
-#ifndef LCD_ISOLATE
 		nvm_unregister(nullb->disk_name);
-#endif
 	}
 	else
 		del_gendisk(nullb->disk);
@@ -1062,20 +1060,18 @@ static void __exit null_exit(void)
 void null_exit(void)
 #endif
 {
-#ifndef LCD_ISOLATE
 	struct nullb *nullb;
-#endif	
+
 	printk("calling unregister_blkdev \n");
 	unregister_blkdev(null_major, "nullb");
 
-#ifndef LCD_ISOLATE
-	/* XXX: Revisit this */
 	mutex_lock(&lock);
 	while (!list_empty(&nullb_list)) {
 		nullb = list_entry(nullb_list.next, struct nullb, list);
 		null_del_dev(nullb);
 	}
 	mutex_unlock(&lock);
+#ifndef LCD_ISOLATE
 	kmem_cache_destroy(ppa_cache);
 #endif
 }

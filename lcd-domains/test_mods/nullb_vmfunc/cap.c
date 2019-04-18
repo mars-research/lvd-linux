@@ -65,6 +65,13 @@ static struct type_ops_id glue_libcap_type_ops[GLUE_NR_TYPES] = {
         },
 	{
                 {
+                        .name = "struct blk_dev_ops",
+                        .delete = dummy_func,
+                        .revoke = dummy_func,
+                }
+        },
+	{
+                {
                         .name = "struct gendisk",
                         .delete = dummy_func,
                         .revoke = dummy_func,

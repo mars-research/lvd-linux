@@ -393,8 +393,10 @@ void put_disk(struct gendisk *disk)
 	blo_container = container_of(disk->fops,
 			struct block_device_operations_container, block_device_operations);
 
-	module_container = container_of(disk->fops->owner, struct module_container,
-			 module);	async_msg_set_fn_type(request, DEL_GENDISK);
+	module_container = container_of(disk->fops->owner, struct
+			module_container, module);
+
+	async_msg_set_fn_type(request, PUT_DISK);
 
 	fipc_set_reg0(request, disk_container->other_ref.cptr);
 	fipc_set_reg1(request, blo_container->other_ref.cptr);
@@ -465,9 +467,7 @@ int queue_rq_fn_callee(struct fipc_message *request)
 	struct request *rq = &rq_c.rq;
 	int ret = 0;
 	int func_ret;
-	
 
-	
 //	ret = glue_cap_lookup_blk_mq_hw_ctx_type(c_cspace, __cptr(fipc_get_reg1(request)),
 //						&ctx_container);
 //	if(ret) {

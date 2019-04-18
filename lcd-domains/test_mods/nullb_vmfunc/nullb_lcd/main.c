@@ -41,7 +41,8 @@ static int nullb_lcd_init(void)
 	return r;
 fail2:
 fail1:
-	lcd_exit(r);
+	lvd_exit(r);
+	return r;
 }
 
 int __nullb_lcd_init(void)
@@ -57,7 +58,7 @@ static void nullb_lcd_exit(void)
 
 	glue_nullb_exit();
 
-	lcd_exit(0);
+	lvd_exit(0);
 
 	return;
 }

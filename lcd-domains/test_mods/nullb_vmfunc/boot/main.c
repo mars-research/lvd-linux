@@ -94,7 +94,7 @@ fail8:
 	lcd_destroy_create_ctx(dummy_ctx);
 fail4:
 	//lcd_cap_delete(blk_klcd);
-	lcd_destroy_module_klcd(blk_klcd, "lcd_test_mod_nullb_blk_klcd");
+	lcd_destroy_module_klcd(blk_klcd, "lcd_test_mod_nullb_vmfunc_blk_klcd");
 fail3:
 	lcd_exit(0); /* will free endpoints */
 fail1:
@@ -121,7 +121,7 @@ int boot_lcd_thread(void *data)
 		/* trigger exit module */
 		lcd_stop(blk_klcd);
 
-		lcd_destroy_module_klcd(blk_klcd, "lcd_test_mod_nullb_blk_klcd");
+		lcd_destroy_module_klcd(blk_klcd, "lcd_test_mod_nullb_vmfunc_blk_klcd");
 		if (current->lcd)
 			lcd_cap_delete(nullb_lcd);
 		if (dummy_ctx)

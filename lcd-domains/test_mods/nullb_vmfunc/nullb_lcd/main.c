@@ -57,7 +57,7 @@ static void nullb_lcd_exit(void)
 
 	glue_nullb_exit();
 
-	lcd_exit(0); /* doesn't return */
+	lcd_exit(0);
 
 	return;
 }

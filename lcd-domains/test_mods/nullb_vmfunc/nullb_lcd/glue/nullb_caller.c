@@ -10,23 +10,19 @@
 #include <lcd_config/post_hook.h>
 
 #include "../../benchmark.h"
-extern cptr_t blk_sync_endpoint;
-extern cptr_t blk_register_chnl;
 static struct glue_cspace *c_cspace;
-extern struct thc_channel *blk_async_chl;
-extern struct thc_channel_group ch_grp;
-
-/* This is where auxiliary channel will be added */
-struct thc_channel *disp_chnl[2];
 
 struct blk_mq_hw_ctx_container *ctx_container_g; 
 struct blk_mq_ops_container *ops_container_g;
 
 struct lcd_request_container {
 	struct request rq;
-	void *channel;
-	unsigned int cookie;
 };
+
+void null_softirq_done_fn(struct request *rq);
+
+int null_open(struct block_device *bdev, fmode_t mode);
+void null_release(struct gendisk *disk, fmode_t mode);
 
 int glue_nullb_init(void)
 {
@@ -218,8 +214,7 @@ void blk_mq_start_request(struct request *rq)
 
 	struct lcd_request_container *rq_c;
 
-	rq_c = container_of(rq,
-			struct lcd_request_container, rq);
+	rq_c = container_of(rq, struct lcd_request_container, rq);
 
 	async_msg_set_fn_type(request, BLK_MQ_START_REQUEST);
 
@@ -572,7 +567,6 @@ int init_hctx_fn_callee(struct fipc_message *request)
 	        LIBLCD_ERR("call to init_hctx failed");
                 goto fail_hctx;
 	}
-	
 
 	LIBLCD_MSG("lcd ctx.cptr %lu", ctx_container->my_ref.cptr);
 	fipc_set_reg0(request, ctx_container->my_ref.cptr);
@@ -591,10 +585,39 @@ fail_alloc:
 int softirq_done_fn_callee(struct fipc_message *_request)
 {
 #if 0
-	struct request r;
-	struct request *request = &r;
+	struct request *rq;
+	struct request_container *rq_c;
 
-	softirq_done_fn(request);
+	null_softirq_done_fn(rq);
 #endif
+
+	printk("%s, called", __func__);
+	return 0;
+}
+
+int open_callee(struct fipc_message *_request)
+{
+	int ret;
+
+	fmode_t mode = fipc_get_reg0(_request);
+	ret = null_open(NULL, mode);
+
+	fipc_set_reg0(_request, ret);
+
+	return ret;
+}
+
+int release_callee(struct fipc_message *_request)
+{
+	struct gendisk_container *disk_container;
+	int ret;
+	fmode_t mode;
+
+	ret = glue_cap_lookup_gendisk_type(c_cspace, __cptr(fipc_get_reg0(_request)),
+					&disk_container);
+	mode = fipc_get_reg1(_request);
+
+	null_release(&disk_container->gendisk, mode);
+
 	return 0;
 }

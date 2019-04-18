@@ -318,7 +318,6 @@ static void end_cmd(struct nullb_cmd *cmd)
 	}
 
 	free_cmd(cmd);
-
 #ifndef LCD_ISOLATE
 	/* Restart queue if needed, as we are freeing a tag */
 	if (queue_mode == NULL_Q_RQ && blk_queue_stopped(q)) {
@@ -347,7 +346,7 @@ static void null_cmd_end_timer(struct nullb_cmd *cmd)
 }
 
 #endif
-static void null_softirq_done_fn(struct request *rq)
+void null_softirq_done_fn(struct request *rq)
 {
 	if (queue_mode == NULL_Q_MQ)
 		end_cmd(blk_mq_rq_to_pdu(rq));
@@ -469,7 +468,7 @@ static int null_queue_rq(struct blk_mq_hw_ctx *hctx,
 	cmd->nq = nq;
 	
 	
-	//printk("drv: calling start \n");
+	//printk("drv: calling start \n")#endif;
 	blk_mq_start_request(bd->rq);
 	//printk("drv: calling start done \n");
 
@@ -701,12 +700,12 @@ static struct nvm_dev_ops null_lnvm_dev_ops;
 #endif /* CONFIG_NVM */
 #endif /* LCD_ISOLATE */
 
-static int null_open(struct block_device *bdev, fmode_t mode)
+int null_open(struct block_device *bdev, fmode_t mode)
 {
 	return 0;
 }
 
-static void null_release(struct gendisk *disk, fmode_t mode)
+void null_release(struct gendisk *disk, fmode_t mode)
 {
 }
 

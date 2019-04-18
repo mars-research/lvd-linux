@@ -41,10 +41,6 @@ enum dispatch_t {
         SOFTIRQ_DONE_FN,
         OPEN,
 	RELEASE,
-	OPEN_CHARDEV,
-	RELEASE_CHARDEV,
-	MMAP_CHARDEV,
-        DESTROY_LCD,
 	MODULE_INIT,
 	MODULE_EXIT
 };

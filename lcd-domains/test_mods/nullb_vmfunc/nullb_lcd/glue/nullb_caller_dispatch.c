@@ -8,7 +8,7 @@
 int __nullb_lcd_init(void);
 void __nullb_lcd_exit(void);
 
-int dispatch_async_loop(struct fipc_message *message)
+int handle_rpc_calls(struct fipc_message *message)
 {
 	int fn_type;
 	fn_type = async_msg_get_fn_type(message);
@@ -28,6 +28,14 @@ int dispatch_async_loop(struct fipc_message *message)
 		case SOFTIRQ_DONE_FN:
 			trace(SOFTIRQ_DONE_FN);
 			return softirq_done_fn_callee(message);
+
+		case OPEN:
+			trace(OPEN);
+			return open_callee(message);
+
+		case RELEASE:
+			trace(RELEASE);
+			return release_callee(message);
 
 		case MODULE_INIT:
 			trace(MODULE_INIT);

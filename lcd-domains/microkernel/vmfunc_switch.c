@@ -160,7 +160,7 @@ static int vmfunc_prepare_switch(int ept)
 void pick_stack(int ept)
 {
 	struct lcd *lcd = lcd_list[ept];
-	int cpu = get_cpu();
+	int cpu = smp_processor_id();
 	struct lcd_stack *this_stack = per_cpu_ptr(lcd->lcd_stacks, cpu);
 	int bit = ffsll(this_stack->bitmap);
 
@@ -174,17 +174,16 @@ void pick_stack(int ept)
 		printk("Ran out of stacks on cpu %d, bitmap:%llx, ffsl ret=%d\n",
 				cpu, this_stack->bitmap, bit);
 	}
-	put_cpu();
 }
 
 void drop_stack(int ept)
 {
 	struct lcd *lcd = lcd_list[ept];
-	struct lcd_stack *this_stack = per_cpu_ptr(lcd->lcd_stacks, get_cpu());
+	int cpu = smp_processor_id();
+	struct lcd_stack *this_stack = per_cpu_ptr(lcd->lcd_stacks, cpu);
 
 	current->lcd_stack = NULL;
 	this_stack->bitmap |= (1LL << current->lcd_stack_bit);
-	put_cpu();
 }
 
 int vmfunc_klcd_wrapper(struct fipc_message *msg, unsigned int ept)
@@ -207,11 +206,11 @@ int vmfunc_klcd_wrapper(struct fipc_message *msg, unsigned int ept)
 		pick_stack(ept);
 
 #if 0
-	printk("%s [%d]: entering on cpu %d, reg0: %lx | lcd_stack %p\n",
+	printk("%s [%d]: entering on cpu %d, rpc_id: %x | lcd_stack %p\n",
 			current->comm,
 			current->pid,
 			smp_processor_id(),
-			fipc_get_reg0(msg),
+			msg->rpc_id,
 			current->lcd_stack);
 #endif
 	vmfunc_trampoline_entry(msg);

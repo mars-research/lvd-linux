@@ -926,6 +926,8 @@ ndo_stop_trampoline(struct net_device *dev)
 }
 #endif
 
+int ixgbe_trigger_dump(void);
+
 #ifdef CONFIG_LVD
 int ndo_start_xmit(struct sk_buff *skb,
 		struct net_device *dev)
@@ -941,7 +943,7 @@ int ndo_start_xmit(struct sk_buff *skb,
 	int func_ret = 0;
 	struct sk_buff_container *skb_c;
 	struct skbuff_members *skb_lcd;
-
+	static int once = 1;
 #ifdef TIMESTAMP
 	TS_DECL(mndo_xmit);
 #endif
@@ -959,6 +961,11 @@ int ndo_start_xmit(struct sk_buff *skb,
 				__func__, current->comm, current->pid,
 				skb->len, ntohs(skb->protocol));
 		return NETDEV_TX_OK;
+	}
+
+	if (once) {
+		ixgbe_trigger_dump();
+		once = 0;
 	}
 
 	dev_container = container_of(dev,
@@ -1013,6 +1020,7 @@ int ndo_start_xmit(struct sk_buff *skb,
 
 	skb_lcd->head_data_off = skb->data - skb->head;
 
+	printk("%s:%d %s skb->q %d\n", current->comm, current->pid, __func__, skb->queue_mapping);
 	vmfunc_klcd_wrapper(_request, 1);
 
 	func_ret = fipc_get_reg0(_request);
@@ -2012,10 +2020,6 @@ int napi_consume_skb_callee(struct fipc_message *_request)
 	kmem_cache_free(skb_c_cache, skb_c);
 #endif
 
-#ifndef NAPI_CONSUME_SEND_ONLY
-
-
-#endif
 	return ret;
 }
 
@@ -2154,11 +2158,19 @@ int dev_addr_del_callee(struct fipc_message *_request)
 	unsigned 	char addr_type;
 	int ret;
 	int func_ret;
+	void *addr;
+#ifdef PASS_DEV_ADDR_IN_REG
+	union __mac {
+		u8 mac_addr[ETH_ALEN];
+		unsigned long mac_addr_l;
+	} m = { {0} };
+#else
 	int sync_ret;
 	unsigned 	long mem_order;
 	unsigned 	long addr_offset;
 	cptr_t addr_cptr, lcd_cptr;
 	gva_t addr_gva;
+#endif
 
 	ret = glue_cap_lookup_net_device_type(c_cspace,
 		__cptr(fipc_get_reg0(_request)),
@@ -2167,14 +2179,18 @@ int dev_addr_del_callee(struct fipc_message *_request)
 		LIBLCD_ERR("lookup");
 		goto fail_lookup;
 	}
+
 	dev = &dev_container->net_device;
 	addr_type = fipc_get_reg1(_request);
 
-
+#ifdef PASS_DEV_ADDR_IN_REG
+	m.mac_addr_l = fipc_get_reg2(_request);
+	addr = (void *)m.mac_addr;
+#else
 	sync_ret = lcd_cptr_alloc(&addr_cptr);
 	if (sync_ret) {
 		LIBLCD_ERR("failed to get cptr");
-		lcd_exit(-1);
+		goto fail_cptr;
 	}
 
 	mem_order = fipc_get_reg2(_request);
@@ -2190,17 +2206,18 @@ int dev_addr_del_callee(struct fipc_message *_request)
 		LIBLCD_ERR("failed to map void *addr");
 		lcd_exit(-1);
 	}
+	addr = (void *)(gva_val(addr_gva) + addr_offset);
+#endif
 	rtnl_lock();
-	func_ret = dev_addr_del(dev,
-		( void  * )( ( gva_val(addr_gva) ) + ( addr_offset ) ),
-		addr_type);
+	func_ret = dev_addr_del(dev, addr, addr_type);
 	rtnl_unlock();
 
 	fipc_set_reg0(_request, func_ret);
-
+#ifndef PASS_DEV_ADDR_IN_REG
+fail_cptr:
+#endif
 fail_lookup:
 	return ret;
-
 }
 
 int device_set_wakeup_enable_callee(struct fipc_message *_request)
@@ -2717,20 +2734,18 @@ int trigger_exit_to_lcd(struct thc_channel *_channel, enum dispatch_t disp)
 	return 0;
 }
 
-int ixgbe_trigger_dump(struct thc_channel *_channel)
+int ixgbe_trigger_dump(void)
 {
 	struct fipc_message r;
 	struct fipc_message *_request = &r;
 	struct net_device_container *dev_container;
 
-	async_msg_set_fn_type(_request,
-			TRIGGER_DUMP);
+	async_msg_set_fn_type(_request, TRIGGER_DUMP);
 	dev_container = container_of(g_ndev,
 		struct net_device_container, net_device);
 	fipc_set_reg1(_request,
 			dev_container->other_ref.cptr);
 
-	/* No need to wait for a response here */
 	vmfunc_klcd_wrapper(_request, 1);
 
 	return 0;
@@ -3132,7 +3147,7 @@ int poll(struct napi_struct *napi,
 		struct trampoline_hidden_args *hidden_args)
 #endif
 {
-	int ret = 0;
+	int ret;
 	struct fipc_message r;
 	struct fipc_message *_request = &r;
 	struct napi_struct_container *napi_c;
@@ -3144,10 +3159,16 @@ int poll(struct napi_struct *napi,
 	fipc_set_reg0(_request, budget);
 	fipc_set_reg1(_request, napi_c->other_ref.cptr);
 
-	printk("%s, poll - budget %d | napi_c->other_ref %lx\n", __func__,
+	if (0)
+		printk("%s, poll - budget %d | napi_c->other_ref %lx\n", __func__,
 			budget, napi_c->other_ref.cptr);
 
 	vmfunc_klcd_wrapper(_request, 1);
+
+	ret = fipc_get_reg0(_request);
+
+	if (0)
+		printk("%s, returned %d\n", __func__, ret);
 
 	return ret;
 }
@@ -3247,6 +3268,7 @@ int netif_napi_add_callee(struct fipc_message *_request)
 				weight);
 
 	fipc_set_reg0(_request, napi_struct_container->my_ref.cptr);
+	fipc_set_reg1(_request, napi->state);
 
 	LIBLCD_MSG("%s, napi %p | napi->dev %p", __func__, napi, napi->dev);
 
@@ -3259,23 +3281,6 @@ fail_dup1:
 	return ret;
 }
 
-int poll_stop(struct thc_channel *_channel)
-{
-	struct fipc_message r;
-	struct fipc_message *_request = &r;
-	int ret = 0;
-
-	async_msg_set_fn_type(_request,
-			POLL);
-
-	fipc_set_reg0(_request, false);
-	/* No need to wait for a response here */
-	vmfunc_klcd_wrapper(_request, 1);
-
-	return ret;
-}
-
-
 int netif_napi_del_callee(struct fipc_message *_request)
 {
 	struct napi_struct_container *napi_container = NULL;
@@ -3287,6 +3292,7 @@ int netif_napi_del_callee(struct fipc_message *_request)
 
 	netif_napi_del(napi);
 
+	fipc_set_reg0(_request, napi->state);
 	return 0;
 }
 
@@ -3476,7 +3482,7 @@ int napi_gro_receive_callee(struct fipc_message *_request)
 	struct napi_struct_container *napi_container = NULL;
 	struct sk_buff *skb;
 	int ret = 0;
-	int func_ret;
+	int func_ret = 0;
 	unsigned long page = 0ul;
 	struct lcd *lcd_struct;
 	hva_t hva_out = {0};
@@ -3585,13 +3591,8 @@ int napi_gro_receive_callee(struct fipc_message *_request)
 	if (p)
 		set_page_count(p, old_pcount);
 skip:
-#ifndef NAPI_RX_SEND_ONLY
-
-
-	fipc_set_reg1(_request,
-			func_ret);
-
-#endif
+	printk("%s, returned %d\n", __func__, ret);
+	fipc_set_reg1(_request, func_ret);
 	return ret;
 }
 #endif
@@ -3673,7 +3674,47 @@ int __napi_schedule_irqoff_callee(struct fipc_message *_request)
 						&napi_container);
 	napi = napi_container->napi;
 
+	napi->state = fipc_get_reg1(_request);
+
 	__napi_schedule_irqoff(napi);
 
+	fipc_set_reg0(_request, napi->state);
+
+	return 0;
+}
+
+int napi_disable_callee(struct fipc_message *_request)
+{
+	struct napi_struct_container *napi_container = NULL;
+	struct napi_struct *napi;
+
+	glue_lookup_napi_hash(__cptr(fipc_get_reg0(_request)),
+						&napi_container);
+	napi = napi_container->napi;
+
+	napi->state = fipc_get_reg1(_request);
+
+	napi_disable(napi);
+
+	fipc_set_reg0(_request, napi->state);
+
+	return 0;
+}
+
+int napi_complete_done_callee(struct fipc_message *_request)
+{
+	struct napi_struct_container *napi_container = NULL;
+	struct napi_struct *napi;
+	int work_done;
+
+	glue_lookup_napi_hash(__cptr(fipc_get_reg0(_request)),
+						&napi_container);
+	napi = napi_container->napi;
+	work_done = fipc_get_reg1(_request);
+	napi->state = fipc_get_reg2(_request);
+
+	napi_complete_done(napi, work_done);
+
+	fipc_set_reg0(_request, napi->state);
 	return 0;
 }

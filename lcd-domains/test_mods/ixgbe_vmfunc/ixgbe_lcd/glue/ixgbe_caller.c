@@ -35,6 +35,9 @@ struct kmem_cache *skb2_cache;
 struct kmem_cache *skb_c_cache1;
 struct kmem_cache *skb_cache;
 
+struct napi_struct *napi_struct_array[32];
+static int napi_reg;
+
 /* XXX: How to determine this? */
 #define CPTR_HASH_BITS      5
 static DEFINE_HASHTABLE(cptr_table, CPTR_HASH_BITS);
@@ -479,7 +482,7 @@ int probe_callee(struct fipc_message *_request)
 	}
 	dev_container->pci_dev.resource[0].start = (resource_size_t) dev_resource_0;
 	dev_container->pci_dev.resource[0].end = (resource_size_t)((char*)dev_resource_0 + res0_len - 1);
-	LIBLCD_MSG("%s: status reg 0x%X\n", __func__, *(unsigned int *)((char*)dev_resource_0 + 0x8));
+	LIBLCD_MSG("%s: status reg 0x%X", __func__, *(unsigned int *)((char*)dev_resource_0 + 0x8));
 
 	ret = lcd_map_virt(pool_cptr, pool_ord, &pool_addr);
 	if (ret) {
@@ -856,9 +859,12 @@ void consume_skb(struct sk_buff *skb)
 {
 	struct fipc_message r;
 	struct fipc_message *_request = &r;
-	struct sk_buff_container *skb_c = NULL;
+	struct sk_buff_container_2 *skb_c = NULL;
 
 	async_msg_set_fn_type(_request, CONSUME_SKB);
+
+	skb_c = container_of(skb, struct sk_buff_container_2,
+				skb);
 
 	fipc_set_reg0(_request, skb_c->other_ref.cptr);
 
@@ -867,7 +873,6 @@ void consume_skb(struct sk_buff *skb)
 	kfree(skb);
 
 	kfree(skb_c);
-
 
 	return;
 }
@@ -972,32 +977,41 @@ int dev_addr_del(struct net_device *dev,
 	struct fipc_message r;
 	struct fipc_message *_request = &r;
 
+#ifdef PASS_DEV_ADDR_IN_REG
+	union __mac {
+		u8 mac_addr[ETH_ALEN];
+		unsigned long mac_addr_l;
+	} m = { {0} };
+#else
 	int sync_ret;
 	unsigned 	long addr_mem_sz;
 	unsigned 	long addr_offset;
 	cptr_t addr_cptr;
+#endif
 	int func_ret;
-	dev_container = container_of(dev,
-		struct net_device_container,
-		net_device);
 
-	async_msg_set_fn_type(_request,
-			DEV_ADDR_DEL);
+	dev_container = container_of(dev, struct net_device_container,
+			net_device);
+#ifndef PASS_DEV_ADDR_IN_REG
 	sync_ret = lcd_virt_to_cptr(__gva(( unsigned  long   )addr),
-		&addr_cptr,
-		&addr_mem_sz,
-		&addr_offset);
+			&addr_cptr, &addr_mem_sz, &addr_offset);
 	if (sync_ret) {
 		LIBLCD_ERR("virt to cptr failed");
 		lcd_exit(-1);
 	}
-
+#endif
+	async_msg_set_fn_type(_request, DEV_ADDR_DEL);
 	fipc_set_reg0(_request, dev_container->other_ref.cptr);
 	fipc_set_reg1(_request, addr_type);
+
+#ifdef PASS_DEV_ADDR_IN_REG
+	memcpy(m.mac_addr, addr, dev->addr_len);
+	fipc_set_reg2(_request, m.mac_addr_l);
+#else
 	fipc_set_reg2(_request, ilog2(( addr_mem_sz ) >> ( PAGE_SHIFT )));
 	fipc_set_reg3(_request, addr_offset);
 	fipc_set_reg4(_request, cptr_val(addr_cptr));
-
+#endif
 	vmfunc_wrapper(_request);
 
 	func_ret = fipc_get_reg0(_request);
@@ -1946,6 +1960,7 @@ int msix_vector_handler_callee(struct fipc_message *_request)
 	/* call real irq handler */
 	irqret = irqhandler_container->irqhandler(irq, irqhandler_container->data); 
 
+	/* printk("%s, irq:%d irqret %d\n", __func__, irq, irqret); */
 	fipc_set_reg0(_request, irqret);
 	return ret;
 }
@@ -2044,6 +2059,11 @@ void netif_napi_add(struct net_device *dev,
 
 	napi_container->other_ref = __cptr(fipc_get_reg0(_request));
 
+	/* XXX: napi_hashtable creates some trouble */
+	napi_struct_array[napi_reg++] = napi;
+
+	napi->state = fipc_get_reg1(_request);
+
 fail_alloc:
 	return;
 }
@@ -2054,19 +2074,28 @@ int poll_callee(struct fipc_message *_request)
 {
 	int budget;
 	struct napi_struct_container *napi_c = NULL;
+	struct napi_struct *napi;
 	static int once = 1;
+	int ret;
 
 	budget = fipc_get_reg0(_request);
 
+#if 0
 	glue_lookup_napi_hash(__cptr(fipc_get_reg1(_request)), &napi_c);
+#endif
+	napi = napi_struct_array[0];
 
 	/* BUG_ON(!napi_c->napi); */
 	if (once) {
-		printk("%s, napi_c %p | napi_c->napi %p", __func__, napi_c,
-				napi_c ? napi_c->napi : NULL);
+		//printk("%s, napi_c %p | napi_c->napi %p", __func__, napi_c,
+		//		napi_c ? napi_c->napi : NULL);
+		printk("%s, napi %p", __func__, napi);
 		once = 0;
 	}
-	ixgbe_poll(napi_c->napi, budget);
+
+	ret = ixgbe_poll(napi_c->napi, budget);
+
+	fipc_set_reg0(_request, ret);
 
 	return 0;
 }
@@ -2084,6 +2113,8 @@ void netif_napi_del(struct napi_struct *napi)
 	fipc_set_reg0(_request, napi_container->other_ref.cptr);
 
 	vmfunc_wrapper(_request);
+
+	napi->state = fipc_get_reg0(_request);
 
 	return;
 }
@@ -2298,11 +2329,7 @@ gro_result_t napi_gro_receive(struct napi_struct *napi,
 		struct sk_buff *skb)
 {
 	struct fipc_message r;
-	int ret = 0;
 	struct fipc_message *_request = &r;
-#ifndef NAPI_RX_SEND_ONLY
-
-#endif
 	int func_ret = 0;
 	struct skb_shared_info *shinfo;
 	struct page *p = NULL;
@@ -2338,7 +2365,7 @@ gro_result_t napi_gro_receive(struct napi_struct *napi,
 			(skb->csum_level << 16) |
 			(skb->ip_summed << 18));
 
-	//printk("%s, skb->tail %d", __func__, skb->tail);
+	printk("%s, skb->tail %d", __func__, skb->tail);
 
 	if (0)
 	print_hex_dump(KERN_DEBUG, "Frame contents: ",
@@ -2359,11 +2386,6 @@ gro_result_t napi_gro_receive(struct napi_struct *napi,
 		page_ref_dec(p);
 
 	return func_ret;
-
-#ifndef NAPI_RX_SEND_ONLY
-
-#endif
-	return ret;
 }
 
 struct sk_buff *__napi_alloc_skb(struct napi_struct *napi,
@@ -2399,7 +2421,7 @@ struct sk_buff *__napi_alloc_skb(struct napi_struct *napi,
 	/* make sure we initialize shinfo sequentially */
 	shinfo = skb_shinfo(skb);
 	memset(shinfo, 0, offsetof(struct skb_shared_info, dataref));
-//	printk("%s, alloc local skb", __func__);
+	printk("%s, alloc local skb for rx", __func__);
 out:
 	return skb;
 }
@@ -2459,8 +2481,51 @@ void __napi_schedule_irqoff(struct napi_struct *napi)
 	async_msg_set_fn_type(_request, __NAPI_SCHEDULE_IRQOFF);
 
 	fipc_set_reg0(_request, napi_container->other_ref.cptr);
+	fipc_set_reg1(_request, napi->state);
 
 	vmfunc_wrapper(_request);
 
+	napi->state = fipc_get_reg0(_request);
+
+	return;
+}
+
+void napi_disable(struct napi_struct *napi)
+{
+	struct fipc_message r;
+	struct fipc_message *_request = &r;
+	struct napi_struct_container *napi_container;
+
+	napi_container = container_of(napi, struct napi_struct_container, napi_struct);
+
+	async_msg_set_fn_type(_request, NAPI_DISABLE);
+
+	fipc_set_reg0(_request, napi_container->other_ref.cptr);
+	fipc_set_reg1(_request, napi->state);
+
+	vmfunc_wrapper(_request);
+
+	napi->state = fipc_get_reg0(_request);
+
+	return;
+}
+
+void napi_complete_done(struct napi_struct *napi, int work_done)
+{
+	struct fipc_message r;
+	struct fipc_message *_request = &r;
+	struct napi_struct_container *napi_container;
+
+	napi_container = container_of(napi, struct napi_struct_container, napi_struct);
+
+	async_msg_set_fn_type(_request, NAPI_COMPLETE_DONE);
+
+	fipc_set_reg0(_request, napi_container->other_ref.cptr);
+	fipc_set_reg1(_request, work_done);
+	fipc_set_reg2(_request, napi->state);
+
+	vmfunc_wrapper(_request);
+
+	napi->state = fipc_get_reg0(_request);
 	return;
 }

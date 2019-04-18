@@ -1,10 +1,6 @@
 #ifndef IXGBE_STUB_H
 #define IXGBE_STUB_H
 
-void napi_disable(struct napi_struct *n) { LIBLCD_MSG("================>$$$$$$ Dummy %s called", __func__); }
-
-void napi_complete_done(struct napi_struct *n, int work_done) { LIBLCD_MSG("================>$$$$$$ Dummy %s called", __func__); }
-
 #ifndef CONFIG_LVD
 int pci_enable_msi_range(struct pci_dev *dev, int minvec, int maxvec) {
 	LIBLCD_MSG("================>$$$$$$ Dummy %s called", __func__);
@@ -24,6 +20,12 @@ request_threaded_irq(unsigned int irq, irq_handler_t handler,
 }
 
 void free_irq(unsigned int a, void *p) {
+	LIBLCD_MSG("================>$$$$$$ Dummy %s called", __func__);
+}
+void napi_disable(struct napi_struct *n) {
+	LIBLCD_MSG("================>$$$$$$ Dummy %s called", __func__);
+}
+void napi_complete_done(struct napi_struct *n, int work_done) {
 	LIBLCD_MSG("================>$$$$$$ Dummy %s called", __func__);
 }
 #endif

@@ -80,7 +80,7 @@ int handle_rpc_calls(struct fipc_message *message)
 			return trigger_dump_callee(message);
 
 		case POLL:
-			trace(POLL);
+			/* trace(POLL); */
 			return poll_callee(message);
 
 		case MODULE_INIT:

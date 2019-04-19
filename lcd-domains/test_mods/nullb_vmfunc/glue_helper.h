@@ -28,7 +28,7 @@ enum dispatch_t {
         BLK_QUEUE_LOGICAL_BLOCK_SIZE,
         BLK_QUEUE_PHYSICAL_BLOCK_SIZE,
         ALLOC_DISK,
-	ADD_DISK,
+	DEVICE_ADD_DISK,
         PUT_DISK,
         DEL_GENDISK,
         DISK_NODE,
@@ -41,10 +41,6 @@ enum dispatch_t {
         SOFTIRQ_DONE_FN,
         OPEN,
 	RELEASE,
-	OPEN_CHARDEV,
-	RELEASE_CHARDEV,
-	MMAP_CHARDEV,
-        DESTROY_LCD,
 	MODULE_INIT,
 	MODULE_EXIT
 };
@@ -66,7 +62,7 @@ struct blk_mq_queue_data_container {
         cptr_t my_ref;
 };
 struct blk_mq_tag_set_container {
-        struct blk_mq_tag_set blk_mq_tag_set;
+        struct blk_mq_tag_set tag_set;
         cptr_t other_ref;
         cptr_t my_ref;
 };

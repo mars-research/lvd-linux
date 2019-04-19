@@ -31,6 +31,8 @@ int unsync_callee(struct fipc_message *_request);
 
 int ixgbe_service_event_schedule_callee(struct fipc_message *_request);
 
+int msix_vector_handler_callee(struct fipc_message *_request);
+
 int trigger_dump_callee(struct fipc_message *_request);
 
 int poll_callee(struct fipc_message *_request);

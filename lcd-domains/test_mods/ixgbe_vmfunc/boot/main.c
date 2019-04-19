@@ -39,7 +39,7 @@ static int boot_main(void)
 
 	/* ---------- Create KLCD ---------- */
 
-	m = lvd_create_module_klcd_no_thread(LCD_DIR("ixgbe/net_klcd"),
+	m = lvd_create_module_klcd_no_thread(LCD_DIR("ixgbe_vmfunc/net_klcd"),
 				"lcd_test_mod_ixgbe_vmfunc_net_klcd",
 				&net_klcd);
 
@@ -50,7 +50,7 @@ static int boot_main(void)
 	}
 
 	/* ---------- Create LCD ---------- */
-	ret = lvd_create_module_lvd(LCD_DIR("ixgbe/ixgbe_lcd"),
+	ret = lvd_create_module_lvd(LCD_DIR("ixgbe_vmfunc/ixgbe_lcd"),
 				"lcd_test_mod_ixgbe_vmfunc_ixgbe_lcd",
 				&ixgbe_lcd,
 				&ixgbe_ctx, 1);
@@ -58,6 +58,10 @@ static int boot_main(void)
 		LIBLCD_ERR("failed to create ixgbe lcd");
 		goto fail3;
 	}
+
+	/* for udelay calculation we need lpj inside LCD */
+	lcd_to_boot_info(ixgbe_ctx)->cptrs[1].cptr =
+			this_cpu_read(cpu_info.loops_per_jiffy);
 
 	/* ---------- RUN! ---------- */
 	LIBLCD_MSG("starting network...");

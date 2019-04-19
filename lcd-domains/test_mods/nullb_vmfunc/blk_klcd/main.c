@@ -63,9 +63,8 @@ static int blk_klcd_init(void)
 	return 0;
 
 fail2:
-	lcd_exit(ret);
-
 #ifndef CONFIG_LVD
+	lcd_exit(ret);
 fail1:
 #endif
 	return ret;
@@ -97,8 +96,9 @@ static void __exit _blk_klcd_exit(void)
 	 */
 	glue_blk_exit();
 
+#ifndef CONFIG_LVD
 	lcd_exit(0);
-
+#endif
 	return;
 }
 

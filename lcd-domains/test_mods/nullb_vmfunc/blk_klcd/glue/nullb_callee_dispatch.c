@@ -65,9 +65,9 @@ int blk_klcd_dispatch_loop(struct fipc_message *message)
 			trace(ALLOC_DISK);
 			return alloc_disk_node_callee(message);
 
-		case ADD_DISK:
+		case DEVICE_ADD_DISK:
 			trace(ADD_DISK);
-			return add_disk_callee(message);
+			return device_add_disk_callee(message);
 
 		case PUT_DISK:
 			trace(PUT_DISK);

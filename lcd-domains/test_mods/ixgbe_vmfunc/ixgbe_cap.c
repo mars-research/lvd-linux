@@ -33,6 +33,7 @@ enum glue_type {
 	GLUE_TYPE_PCI_DRIVER_CONTAINER,
 	GLUE_TYPE_RTNL_LINK_STATS64_CONTAINER,
 	GLUE_TYPE_SK_BUFF_CONTAINER,
+	GLUE_TYPE_NAPI_STRUCT_CONTAINER,
 	GLUE_NR_TYPES,
 };
 
@@ -108,6 +109,14 @@ static struct type_ops_id glue_libcap_type_ops[GLUE_NR_TYPES] = {
 			.revoke = dummy_func,
 		}
 	},
+	{
+		{
+			.name = "struct napi_struct",
+			.delete = dummy_func,
+			.revoke = dummy_func,
+		}
+	},
+
 };
 
 int glue_cap_init(void)

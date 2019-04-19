@@ -21,3 +21,6 @@ lcd_test_mod_ixgbe_vmfunc_ixgbe_lcd-y		+= $(addprefix ../, ixgbe_cap.o)
 
 ccflags-y += $(ISOLATED_CFLAGS)
 
+extra-y += ../../../liblcd_build/common/vmfunc.lds
+
+ldflags-y += -T $(LIBLCD_BUILD_DIR)/common/vmfunc.lds

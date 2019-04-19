@@ -1,22 +1,34 @@
 #ifndef IXGBE_STUB_H
 #define IXGBE_STUB_H
 
-void napi_disable(struct napi_struct *n) { LIBLCD_MSG("================>$$$$$$ Dummy %s called", __func__); }
+#ifndef CONFIG_LVD
+int pci_enable_msi_range(struct pci_dev *dev, int minvec, int maxvec) {
+	LIBLCD_MSG("================>$$$$$$ Dummy %s called", __func__);
+	return -ENOSYS;
+}
 
-void napi_complete_done(struct napi_struct *n, int work_done) { LIBLCD_MSG("================>$$$$$$ Dummy %s called", __func__); }
-
-int pci_enable_msi_range(struct pci_dev *dev, int minvec,
-				       int maxvec)
-{ LIBLCD_MSG("================>$$$$$$ Dummy %s called", __func__); return -ENOSYS; }
-
-void pci_disable_msi(struct pci_dev *dev) { LIBLCD_MSG("================>$$$$$$ Dummy %s called", __func__); }
+void pci_disable_msi(struct pci_dev *dev) {
+	LIBLCD_MSG("================>$$$$$$ Dummy %s called", __func__);
+}
 
 int __must_check
 request_threaded_irq(unsigned int irq, irq_handler_t handler,
 		     irq_handler_t thread_fn,
-		     unsigned long flags, const char *name, void *dev)
-{ LIBLCD_MSG("================>$$$$$$ Dummy %s called", __func__); return 0; }
+		     unsigned long flags, const char *name, void *dev) {
+	LIBLCD_MSG("================>$$$$$$ Dummy %s called", __func__);
+	return 0;
+}
 
+void free_irq(unsigned int a, void *p) {
+	LIBLCD_MSG("================>$$$$$$ Dummy %s called", __func__);
+}
+void napi_disable(struct napi_struct *n) {
+	LIBLCD_MSG("================>$$$$$$ Dummy %s called", __func__);
+}
+void napi_complete_done(struct napi_struct *n, int work_done) {
+	LIBLCD_MSG("================>$$$$$$ Dummy %s called", __func__);
+}
+#endif
 
 int call_netdevice_notifiers(unsigned long val, struct net_device *dev)
 { LIBLCD_MSG("================>$$$$$$ Dummy %s called", __func__); return 0; }
@@ -33,8 +45,6 @@ void synchronize_irq(unsigned int irq) { LIBLCD_MSG("================>$$$$$$ Dum
 
 
 void napi_gro_flush(struct napi_struct *napi, bool flush_old) { LIBLCD_MSG("================>$$$$$$ Dummy %s called", __func__); }
-
-void free_irq(unsigned int a, void *p) { LIBLCD_MSG("================>$$$$$$ Dummy %s called", __func__); }
 
 unsigned char *skb_put(struct sk_buff *skb, unsigned int len)
 {
@@ -101,7 +111,11 @@ struct pglist_data contig_page_data;
 
 void pci_restore_state(struct pci_dev *dev) { LIBLCD_MSG("================>$$$$$$ Dummy %s called", __func__); }
 
-void __napi_schedule_irqoff(struct napi_struct *n) { LIBLCD_MSG("================>$$$$$$ Dummy %s called", __func__); }
+#ifndef CONFIG_LVD
+void __napi_schedule_irqoff(struct napi_struct *n) {
+	LIBLCD_MSG("================>$$$$$$ Dummy %s called", __func__);
+}
+#endif
 
 int mdio_mii_ioctl(const struct mdio_if_info *mdio,
 			struct mii_ioctl_data *mii_data, int cmd)

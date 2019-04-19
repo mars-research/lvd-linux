@@ -205,15 +205,13 @@ int net_klcd_dispatch_async_loop(struct fipc_message *message)
 			trace(__HW_ADDR_UNSYNC_DEV);
 			return __hw_addr_unsync_dev_callee(message);
 
-#ifdef HOST_IRQ
-		case REQUEST_IRQ:
-			trace(REQUEST_IRQ);
-			return _request_irq_callee(message);
+		case REQUEST_THREADED_IRQ:
+			trace(REQUEST_THREADED_IRQ);
+			return request_threaded_irq_callee(message);
 
-		case _FREE_IRQ:
-			trace(_FREE_IRQ);
-			return _free_irq_callee(message);
-#endif
+		case FREE_IRQ:
+			trace(FREE_IRQ);
+			return free_irq_callee(message);
 
 		case NETIF_NAPI_ADD:
 			trace(NETIF_NAPI_ADD);
@@ -236,6 +234,18 @@ int net_klcd_dispatch_async_loop(struct fipc_message *message)
 		case __NAPI_ALLOC_SKB:
 			trace(NAPI_ALLOC_SKB);
 			return __napi_alloc_skb_callee(message);
+
+		case __NAPI_SCHEDULE_IRQOFF:
+			trace(__NAPI_SCHEDULE_IRQOFF);
+			return __napi_schedule_irqoff_callee(message);
+
+		case NAPI_DISABLE:
+			trace(NAPI_DISABLE);
+			return napi_disable_callee(message);
+
+		case NAPI_COMPLETE_DONE:
+			/* trace(NAPI_COMPLETE_DONE); */
+			return napi_complete_done_callee(message);
 
 		default:
 			LIBLCD_ERR("unexpected function label: %d",

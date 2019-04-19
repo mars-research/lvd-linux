@@ -12,52 +12,83 @@
 
 #include <lcd_config/post_hook.h>
 
-int ixgbe_done = 0;
-
 int ixgbe_init_module(void);
 void ixgbe_exit_module(void);
 unsigned long loops_per_jiffy;
-bool poll_start = false;
-extern int __ixgbe_poll(void);
-unsigned long poll_state = 0ul;
 
-int ixgbe_lcd_init(void)
+static int ixgbe_lcd_init(void)
 {
-	int r = 0;
+	int ret = 0;
 
 	printk("IXGBE LCD enter \n");
 
-	r = lcd_enter();
-	if (r)
+	ret = lcd_enter();
+
+	if (ret)
 		goto fail1;
+
+	/* loops_per_jiffy = lcd_get_boot_info()->cptrs[1].cptr; */
 
 	printk("ixgbe lpj %lu\n", loops_per_jiffy);
 	/*
 	 * Initialize ixgbe glue
 	 */
-	r = glue_ixgbe_init();
-	if (r) {
+	ret = glue_ixgbe_init();
+
+	if (ret) {
 		LIBLCD_ERR("ixgbe init");
 		goto fail2;
 	}
-	return r;
+
+	ret = ixgbe_init_module();
+
+	if (ret) {
+		LIBLCD_ERR("ixgbe register failed");
+		goto fail3;
+	}
+	return ret;
+
+fail3:
 fail2:
 fail1:
-	lcd_exit(r);
+	lcd_exit(ret);
 }
 
-static int __ixgbe_lcd_init(void)
+int __ixgbe_lcd_init(void)
 {
 	return ixgbe_lcd_init();
 }
 
-static void __exit ixgbe_lcd_exit(void)
+static void ixgbe_lcd_exit(void)
 {
 	LIBLCD_MSG("%s: exiting", __func__);
+
+	ixgbe_exit_module();
+
+	glue_ixgbe_exit();
+
+	lvd_exit(0);
+
 	return;
 }
 
-module_init(__ixgbe_lcd_init);
+void __ixgbe_lcd_exit(void)
+{
+	ixgbe_lcd_exit();
+}
+
+module_init(ixgbe_lcd_init);
 module_exit(ixgbe_lcd_exit);
 MODULE_LICENSE("GPL");
 MODULE_INFO(livepatch, "Y");
+
+/* extract data from linker variables */
+size_t vmfunc_sboard_page_size = (size_t)&__vmfunc_sboard_page_size;
+unsigned long* vmfunc_sboard_load_addr = (unsigned long*) &__vmfunc_sboard_load_addr;
+
+/* extract data from linker variables */
+size_t vmfunc_trampoline_page_size = (size_t)&__vmfunc_trampoline_page_size;
+unsigned long* vmfunc_trampoline_load_addr = (unsigned long*) &__vmfunc_trampoline_load_addr;
+
+EXPORT_SYMBOL(vmfunc_sboard_load_addr);
+EXPORT_SYMBOL(vmfunc_trampoline_load_addr);

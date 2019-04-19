@@ -15,8 +15,6 @@
 extern int vmfunc_init(void *stack_page, rpc_handler_t rpc_handler,
 		rpc_handler_t sync_handler);
 extern int ixgbe_trigger_dump(void);
-extern int ixgbe_service_event_sched(void);
-extern struct timer_list service_timer;
 extern struct glue_cspace *c_cspace;
 extern void *lcd_stack;
 
@@ -26,28 +24,6 @@ module_param_named(dump_regs, ixgbe_dump, bool, S_IWUSR);
 
 int net_klcd_dispatch_async_loop(struct fipc_message *message);
 int net_klcd_syncipc_dispatch(struct fipc_message *message);
-
-#ifdef HOST_IRQ
-extern struct napi_struct *napi_q0;
-
-irqreturn_t msix_clean_rings_host(int irq, void *data)
-{
-	napi_schedule_irqoff(napi_q0);
-	return IRQ_HANDLED;
-}
-#endif
-
-void ixgbe_service_timer(unsigned long data)
-{
-	unsigned long next_event_offset;
-
-	next_event_offset = HZ * 2;
-
-	/* Reset the timer */
-	mod_timer(&service_timer, next_event_offset + jiffies);
-
-	ixgbe_service_event_sched();
-}
 
 /* INIT / EXIT ---------------------------------------- */
 struct cspace *klcd_cspace;
@@ -88,6 +64,7 @@ static int net_klcd_init(void)
 	/* call module_init for lcd */
 	m.vmfunc_id = VMFUNC_RPC_CALL;
 	m.rpc_id = MODULE_INIT;
+	fipc_set_reg0(&m, this_cpu_read(cpu_info.loops_per_jiffy));
 	vmfunc_klcd_wrapper(&m, OTHER_DOMAIN);
 
 	return 0;

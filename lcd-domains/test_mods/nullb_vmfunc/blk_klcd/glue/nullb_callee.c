@@ -11,8 +11,6 @@
 #include <asm/cacheflush.h>
 #include <linux/atomic.h>
 
-#include <lcd_domains/user_interface.h>
-
 #include <lcd_config/post_hook.h>
 
 /* hacks for unregistering */
@@ -21,7 +19,7 @@ struct gendisk *disk_g;
 struct request_queue *rq_g;
 struct blk_mq_tag_set *set_g;
 
-extern struct request_queue *queue_nullb;
+struct blk_mq_ops_container *g_blk_mq_ops_container;
 
 /* hack for init_request */
 int hw_depth;
@@ -67,64 +65,33 @@ void glue_blk_exit(void)
 	glue_cap_exit();
 }
 
-/* Send a async message for graceful exit */
-void destroy_lcd(struct thc_channel *chnl)
-{
-	printk("cleanup...\n");
-	unregister_blkdev(null_major, "nullb"); 
-
-	if(disk_g) {
-		printk("calling del_gendisk \n");
-		del_gendisk(disk_g);
-	}
-	
-	if(rq_g) {
-		printk("calling blk_cleanup \n");
-		blk_cleanup_queue(rq_g);
-	}
-	
-	queue_nullb = NULL;
-	if(set_g) {
-		printk("calling free tag set \n");
-		blk_mq_free_tag_set(set_g);
-	}
-
-	if(disk_g) {
-		printk("calling put_disk \n");
-		put_disk(disk_g);
-	}
-}	
-
 int blk_mq_init_queue_callee(struct fipc_message *request)
 {
 	struct request_queue *rq;
-	cptr_t set_ref = __cptr(fipc_get_reg0(request));
 	int ret = 0;
 	struct blk_mq_tag_set_container *set_container;
         struct request_queue_container *rq_container;
 
-	ret = glue_cap_lookup_blk_mq_tag_set_type(c_cspace, set_ref, &set_container);
+	ret = glue_cap_lookup_blk_mq_tag_set_type(c_cspace,
+			__cptr(fipc_get_reg0(request)), &set_container);
         if (ret) {
                 LIBLCD_ERR("lookup");
                 goto fail_lookup;
         }
 
-	printk("in blk glue - calling the real blk_mq_init \n");
+	rq = blk_mq_init_queue(&set_container->tag_set);
 
-	rq = blk_mq_init_queue(&set_container->blk_mq_tag_set);
-	if(!rq) {
+	if (!rq) {
 		LIBLCD_ERR("blk layer returned bad address!");
 		goto fail_blk;
 	}
 
 	/* Hack for remove */
 	rq_g = rq;
-	queue_nullb = rq;
 
         rq_container = container_of(rq, struct request_queue_container,
                                                 request_queue);
 
-	printk("inserting cap of rq_container \n");
 	ret = glue_cap_insert_request_queue_type(c_cspace, rq_container, &rq_container->my_ref);
         if (ret) {
                 LIBLCD_ERR("lcd insert");
@@ -133,12 +100,11 @@ int blk_mq_init_queue_callee(struct fipc_message *request)
 	rq_container->other_ref.cptr = fipc_get_reg1(request);
 
 	fipc_set_reg0(request, rq_container->my_ref.cptr);
-	printk("blk klcd done! \n");	
+
 	return ret;
 
 fail_blk:	
 fail_lookup:
-	glue_cap_remove(c_cspace, rq_container->my_ref);	
 fail_insert:
 	return ret;	
 }
@@ -161,23 +127,23 @@ int blk_mq_free_tag_set_callee(struct fipc_message *request)
 {
 	struct blk_mq_tag_set_container *set_container;
 	struct blk_mq_ops_container *ops_container;
-	cptr_t set_ref = __cptr(fipc_get_reg0(request));
 	int ret;
-	
 
-
-        ret = glue_cap_lookup_blk_mq_tag_set_type(c_cspace, set_ref, &set_container);
+	ret = glue_cap_lookup_blk_mq_tag_set_type(c_cspace,
+			__cptr(fipc_get_reg0(request)), &set_container);
         if (ret) {
                 LIBLCD_ERR("lookup");
                 goto fail_lookup;
         }
-	ret = glue_cap_lookup_blk_mq_ops_type(c_cspace, set_ref, &ops_container);
+
+	ret = glue_cap_lookup_blk_mq_ops_type(c_cspace,
+			__cptr(fipc_get_reg1(request)), &ops_container);
         if (ret) {
                 LIBLCD_ERR("lookup");
                 goto fail_lookup;
         }
 	
-	blk_mq_free_tag_set(&set_container->blk_mq_tag_set);
+	blk_mq_free_tag_set(&set_container->tag_set);
 
 	glue_cap_remove(c_cspace, set_container->my_ref);
 	glue_cap_remove(c_cspace, ops_container->my_ref);
@@ -205,6 +171,7 @@ int blk_mq_start_request_callee(struct fipc_message *request)
 
 int blk_mq_map_queue_callee(struct fipc_message *request)
 {
+#if 0
 	struct request_queue *rq;
 	int ctx_index;
 	int ret = 0;
@@ -233,6 +200,8 @@ int blk_mq_map_queue_callee(struct fipc_message *request)
 
 fail_alloc:
 	return ret;
+#endif
+	return 0;
 }
 
 int blk_queue_logical_block_size_callee(struct fipc_message *request)
@@ -279,7 +248,7 @@ int alloc_disk_node_callee(struct fipc_message *request)
 {
 	int minors;
 	int node_id;
-	int ret;
+	int ret = 0;
 	struct gendisk *disk;
 	struct gendisk_container *disk_container;
 
@@ -293,7 +262,8 @@ int alloc_disk_node_callee(struct fipc_message *request)
 		goto fail_alloc;
 	}
 
-	printk("address of disk returned by the kernel %p \n",disk);
+	printk("%s disk: %p \n", __func__, disk);
+
 	disk_container = container_of(disk, struct gendisk_container, gendisk);
 
 	/* Hack for remove */
@@ -308,10 +278,8 @@ int alloc_disk_node_callee(struct fipc_message *request)
 	disk_container->other_ref.cptr = fipc_get_reg2(request);
 	fipc_set_reg0(request, disk_container->my_ref.cptr);
 
-	return ret;
 fail_insert:
 fail_alloc:
-	glue_cap_remove(c_cspace, disk_container->my_ref);
 	return ret;
 }
 
@@ -345,6 +313,7 @@ int put_disk_callee(struct fipc_message *request)
                 goto fail_lookup;
         }
 
+	disk = &disk_container->gendisk;
  	/* disk_container may be deleted after the call to put_disk,
 	 * so remove from cspace here */
 	glue_cap_remove(c_cspace, disk_container->my_ref);
@@ -362,7 +331,7 @@ fail_lookup:
 
 int del_gendisk_callee(struct fipc_message *request)
 {
-	struct gendisk *gp;
+	struct gendisk *disk;
 	struct gendisk_container *disk_container;
 	int ret;
 
@@ -373,9 +342,17 @@ int del_gendisk_callee(struct fipc_message *request)
                 goto fail_lookup;
         }
 
-	gp = &disk_container->gendisk;
+	disk = &disk_container->gendisk;
 
-	del_gendisk(gp);
+	printk("Calling del_gendisk on cpu: %d, disk %p \n", raw_smp_processor_id(), disk);
+
+	{
+		struct kobject *kobj = &disk_to_dev(disk)->kobj;
+		printk("%s, disk_to_dev(disk) %p, kobj %p, kobj->sd %p\n", __func__,
+				disk_to_dev(disk), kobj, kobj->sd);
+	}
+
+	del_gendisk(disk);
 
 fail_lookup:
 	return ret;
@@ -399,24 +376,23 @@ int register_blkdev_callee(struct fipc_message *request)
 {
 	int ret;
 	int major;
-	/* Hardcoded string for now! */
-	LIBLCD_MSG("Calling register_blkdev");
-	ret = register_blkdev(lcd_r1(), "nullb");
+	unsigned int devno;
+
+	devno = fipc_get_reg0(request);
+
+	ret = register_blkdev(devno, "nullb");
+
 	LIBLCD_MSG("register_blkdev returns %d", ret);
+
 	if (ret < 0) {
-		LIBLCD_ERR("Real call to register_blkdev failed!");
-		goto fail4;
-	} else {
-		/* register_blkdev can return the major number of the device,
-		 * which can be a large +ve number but the ret value passed
-		 * above if found +ve is treated as an error */
-		major = ret;
-		null_major = major;
-		ret = 0;
+		LIBLCD_ERR("register_blkdev failed! ret = %d", ret);
+		goto fail;
 	}
+
+	null_major = major = ret;
 	fipc_set_reg0(request, major);
-fail4:
-        return ret; 
+fail:
+        return 0;
 }
 
 int unregister_blkdev_callee(struct fipc_message *request)
@@ -425,7 +401,6 @@ int unregister_blkdev_callee(struct fipc_message *request)
 	int ret = 0;
 
 	devno = fipc_get_reg0(request);
-	LIBLCD_MSG("calling unregister blk_dev");
 	unregister_blkdev(devno, "nullb");
 	return ret;
 }
@@ -444,6 +419,7 @@ int blk_cleanup_queue_callee(struct fipc_message *request)
 
 	blk_cleanup_queue(&rq_container->request_queue);
 
+	glue_cap_remove(c_cspace, rq_container->my_ref);
 fail_lookup:
 	return ret;
 }
@@ -463,7 +439,7 @@ int _queue_rq_fn(struct blk_mq_hw_ctx *ctx, const struct blk_mq_queue_data *bd, 
 #endif
         struct blk_mq_hw_ctx_container *ctx_container;
 
-        printk("^^^^^^^^^^ [Klcd-queue-rq] enter ^^^^^^^^^^^ \n");
+	//printk("^^^^^^^^^^ [Klcd-queue-rq] enter ^^^^^^^^^^^ \n");
         /*XXX Beware!! hwctx can be unique per hw context of the driver, if multiple
          * exists, then we need one cspace insert function per hwctx. Should be handled
          * in the init_hctx routine */
@@ -473,10 +449,9 @@ int _queue_rq_fn(struct blk_mq_hw_ctx *ctx, const struct blk_mq_queue_data *bd, 
         ops_container = (struct blk_mq_ops_container *)hidden_args->struct_container;
 #endif
 
-        printk("hctx %p | cptr %lu\n",ctx, ctx_container->other_ref.cptr);
+        //printk("hctx %p | cptr %lu\n",ctx, ctx_container->other_ref.cptr);
 
-        vmfunc_klcd_wrapper(request, 1);
-
+#if 0
         async_msg_set_fn_type(request, QUEUE_RQ_FN);
 
         fipc_set_reg0(request, ctx->queue_num);
@@ -486,7 +461,8 @@ int _queue_rq_fn(struct blk_mq_hw_ctx *ctx, const struct blk_mq_queue_data *bd, 
         fipc_set_reg2(request, ops_container->other_ref.cptr);
 #endif
 
-
+        vmfunc_klcd_wrapper(request, 1);
+#endif
         blk_mq_start_request(bd->rq);
         blk_mq_end_request(bd->rq, 0);
 
@@ -494,7 +470,7 @@ int _queue_rq_fn(struct blk_mq_hw_ctx *ctx, const struct blk_mq_queue_data *bd, 
         ret = fipc_get_reg0(request);
 
 
-        printk("^^^^^ [Klcd-queue-rq] done ^^^^^^ \n");
+        /* printk("^^^^^ [Klcd-queue-rq] done ^^^^^^ \n"); */
         return BLK_MQ_RQ_QUEUE_OK;
         //return ret;
 
@@ -536,20 +512,6 @@ queue_rq_fn_trampoline(struct blk_mq_hw_ctx *ctx, const struct blk_mq_queue_data
 }
 #endif
 
-#ifndef CONFIG_LVD
-LCD_TRAMPOLINE_DATA(queue_rq_async_fn_trampoline);
-void LCD_TRAMPOLINE_LINKAGE(queue_rq_async_fn_trampoline)
-queue_rq_async_fn_trampoline(struct blk_mq_hw_ctx *ctx, struct blk_mq_queue_data_async *bd_async) 
-{
-	void ( *volatile queue_rq_async_fn_fp )(struct blk_mq_hw_ctx *, struct blk_mq_queue_data_async *, struct trampoline_hidden_args *);
-	struct trampoline_hidden_args *hidden_args;
-	LCD_TRAMPOLINE_PROLOGUE(hidden_args, queue_rq_async_fn_trampoline);
-	queue_rq_async_fn_fp = queue_rq_async;
-	return queue_rq_async_fn_fp(ctx, bd_async, hidden_args);
-
-}
-#endif
-
 #ifdef CONFIG_LVD
 struct blk_mq_hw_ctx *_map_queue_fn(struct request_queue *rq, int m)
 #else
@@ -585,16 +547,17 @@ int _init_hctx_fn(struct blk_mq_hw_ctx *ctx, void *data, unsigned int index, str
 #endif
 {
 	int ret;
-	struct fipc_message *request;
-
-	int func_ret;
+	struct fipc_message r;
+	struct fipc_message *request = &r;
+	int func_ret = 0;
 	struct blk_mq_hw_ctx_container *ctx_container;
-#ifndef CONFIG_LVD
+	/* TODO: Do we need hidden_args to pull this off? */
 	struct blk_mq_ops_container *ops_container;
-#endif
 
 	ctx_container = container_of(ctx, struct blk_mq_hw_ctx_container, blk_mq_hw_ctx); 
-#ifndef CONFIG_LVD
+#ifdef CONFIG_LVD
+	ops_container = g_blk_mq_ops_container;
+#else
 	ops_container = (struct blk_mq_ops_container *)hidden_args->struct_container;
 #endif
 
@@ -610,11 +573,9 @@ int _init_hctx_fn(struct blk_mq_hw_ctx *ctx, void *data, unsigned int index, str
 	fipc_set_reg0(request, ctx_container->my_ref.cptr);
 	fipc_set_reg1(request, index);
 	
-#ifndef CONFIG_LVD
 	/* ops container is passed to call ops.init_hctx in the LCD glue */
 	fipc_set_reg2(request, ops_container->other_ref.cptr);
-#endif
-	printk("calling lcd's glue \n");
+
 	vmfunc_klcd_wrapper(request, 1);
 
 	ctx_container->other_ref.cptr = fipc_get_reg0(request);
@@ -624,10 +585,8 @@ int _init_hctx_fn(struct blk_mq_hw_ctx *ctx, void *data, unsigned int index, str
 
 	printk("end of init_hctx procedure \n");
 	
-	return func_ret;
 fail_insert:
 	return func_ret;
-
 }
 
 #ifndef CONFIG_LVD
@@ -653,7 +612,6 @@ void _softirq_done_fn(struct request *request, struct trampoline_hidden_args *hi
 	struct fipc_message r;
 	struct fipc_message *_request = &r;
 
-	printk("why is sirq being called \n");
 	async_msg_set_fn_type(_request, SOFTIRQ_DONE_FN);
 
 	vmfunc_klcd_wrapper(_request, 1);
@@ -685,16 +643,13 @@ int open(struct block_device *device, fmode_t mode, struct trampoline_hidden_arg
 	struct fipc_message r;
 	struct fipc_message *request = &r;
 
+	async_msg_set_fn_type(request, OPEN);
+	fipc_set_reg0(request, mode);
 
-	if(strcmp(current->comm,"systemd-udevd") == 0) {
-		return -ENODEV;
-	}
-
-	async_msg_set_fn_type(request, REGISTER_BLKDEV);
-
-	printk("***** [nullb-open] current: %p name: %s pid: %d ptstate: %p cpu:%d \n", current, current->comm, current->pid, current->ptstate, smp_processor_id());
+	printk("%s, %s:%d on cpu:%d\n", __func__, current->comm, current->pid, smp_processor_id());
 	vmfunc_klcd_wrapper(request, 1);
-	printk("***** [nullb-open] done \n");
+
+	ret = fipc_get_reg0(request);
 
 	return ret;
 }
@@ -705,9 +660,20 @@ void release(struct gendisk *disk, fmode_t mode)
 void release(struct gendisk *disk, fmode_t mode, struct trampoline_hidden_args *hidden_args)
 #endif
 {
-	printk("[nullb-release] current: %p name: %s ptstate: %p cpu:%d \n", current, current->comm, current->ptstate, smp_processor_id());
+	struct fipc_message r;
+	struct fipc_message *request = &r;
+	struct gendisk_container *disk_container;
 
-	printk("[nullb-release] cleaning-up current: %p name: %s pid: %d ptstate: %p \n", current, current->comm, current->pid, current->ptstate);
+	disk_container = container_of(disk, struct gendisk_container, gendisk);
+
+	printk("%s, %s:%d on cpu:%d\n", __func__, current->comm, current->pid, smp_processor_id());
+
+	async_msg_set_fn_type(request, RELEASE);
+	fipc_set_reg0(request, disk_container->other_ref.cptr);
+	fipc_set_reg1(request, mode);
+
+	vmfunc_klcd_wrapper(request, 1);
+
 	return;
 }
 
@@ -721,7 +687,6 @@ int LCD_TRAMPOLINE_LINKAGE(open_trampoline) open_trampoline(struct block_device 
 	LCD_TRAMPOLINE_PROLOGUE(hidden_args, open_trampoline);
 	open_fp = open;
 	return open_fp(device, mode, hidden_args);
-
 }
 #endif
 
@@ -735,7 +700,6 @@ void LCD_TRAMPOLINE_LINKAGE(release_trampoline) release_trampoline(struct gendis
 	LCD_TRAMPOLINE_PROLOGUE(hidden_args, release_trampoline);
 	rel_fp = release;
 	return rel_fp(disk, mode, hidden_args);
-
 }
 #endif
 
@@ -751,7 +715,7 @@ int blk_mq_alloc_tag_set_callee(struct fipc_message *request)
 	struct trampoline_hidden_args *init_hctx_hidden_args;
 	struct trampoline_hidden_args *sirq_done_hidden_args;
 #endif
-	int func_ret;
+	int func_ret = 0;
 	int err;
 
 	/* Allocate tag_set_container struct here */
@@ -772,7 +736,7 @@ int blk_mq_alloc_tag_set_callee(struct fipc_message *request)
 	printk("set_other_ref %ld \n",set_container->other_ref.cptr);
 
 	/* Allocate ops_container */
-	ops_container = kzalloc(sizeof(struct blk_mq_ops_container), GFP_KERNEL);
+	g_blk_mq_ops_container = ops_container = kzalloc(sizeof(struct blk_mq_ops_container), GFP_KERNEL);
 	if (!set_container) {
 		LIBLCD_ERR("kzalloc");
 		goto fail_alloc2;
@@ -787,7 +751,7 @@ int blk_mq_alloc_tag_set_callee(struct fipc_message *request)
 	printk("ops_other_ref %ld \n",ops_container->other_ref.cptr);
 	
 	/* This is required because, the blk_mq_tag_set which is passed to blk layer is this one */
-	set_container->blk_mq_tag_set.ops = &ops_container->blk_mq_ops;
+	set_container->tag_set.ops = &ops_container->blk_mq_ops;
 
 #ifndef CONFIG_LVD
 	/* Setup function pointers and trampolines - TODO better to move this to a separate fn */
@@ -920,23 +884,29 @@ int blk_mq_alloc_tag_set_callee(struct fipc_message *request)
 
 #endif
 	/* Get the rest of the members from LCD */
-	set_container->blk_mq_tag_set.nr_hw_queues = fipc_get_reg1(request);
-	set_container->blk_mq_tag_set.queue_depth = fipc_get_reg2(request);
-	hw_depth = set_container->blk_mq_tag_set.queue_depth;
-	set_container->blk_mq_tag_set.reserved_tags = fipc_get_reg3(request);
-	set_container->blk_mq_tag_set.cmd_size = fipc_get_reg4(request);
-	set_container->blk_mq_tag_set.flags = fipc_get_reg5(request);
+	set_container->tag_set.nr_hw_queues = fipc_get_reg1(request);
+	set_container->tag_set.queue_depth = fipc_get_reg2(request);
+	hw_depth = set_container->tag_set.queue_depth;
+	set_container->tag_set.reserved_tags = fipc_get_reg3(request);
+	set_container->tag_set.cmd_size = fipc_get_reg4(request);
+	set_container->tag_set.flags = fipc_get_reg5(request);
+
+	/* init request */
+	ops_container->blk_mq_ops.init_request = init_request;
+	ops_container->blk_mq_ops.queue_rq = _queue_rq_fn;
+	ops_container->blk_mq_ops.map_queue = _map_queue_fn;
+	ops_container->blk_mq_ops.init_hctx = _init_hctx_fn;
+	ops_container->blk_mq_ops.complete = _softirq_done_fn;
 
 	/* call the real function */
-	func_ret = blk_mq_alloc_tag_set((&set_container->blk_mq_tag_set));
-	printk("*****block_alloc_tag set returns %d \n",func_ret);
-	vmfunc_klcd_wrapper(request, 1);
+	func_ret = blk_mq_alloc_tag_set((&set_container->tag_set));
+	LIBLCD_MSG("block_alloc_tag set returns %d",func_ret);
 
 	/* Hack for remove */
-	set_g = &set_container->blk_mq_tag_set;
+	set_g = &set_container->tag_set;
 	fipc_set_reg0(request, set_container->my_ref.cptr);
 	fipc_set_reg1(request, ops_container->my_ref.cptr);
-	fipc_set_reg3(request, func_ret);
+	fipc_set_reg2(request, func_ret);
 
 	return func_ret;
 
@@ -979,7 +949,7 @@ fail_alloc1:
 	return func_ret;
 }
 
-int add_disk_callee(struct fipc_message *request)
+int device_add_disk_callee(struct fipc_message *request)
 {
 	struct gendisk_container *disk_container;
 	struct block_device_operations_container *blo_container;
@@ -1045,7 +1015,6 @@ int add_disk_callee(struct fipc_message *request)
          * are creating our own struct module instance, we need to do
          * the initialization ourselves.
          */
-        
         module_container->module.state = MODULE_STATE_LIVE;
 	
 	/* without this add_disk will fail */
@@ -1129,20 +1098,25 @@ int add_disk_callee(struct fipc_message *request)
 	
 	size = 250 * 1024 * 1024 * 1024ULL;
 	set_capacity(disk, size >> 9);
-	
+
+	blo_container->block_device_operations.open = open;
+	blo_container->block_device_operations.release = release;
+
 	disk->fops = &blo_container->block_device_operations;
 	sprintf(disk_name, "nullb%d", disk->first_minor);
 	strncpy(disk->disk_name, disk_name, DISK_NAME_LEN);
 
-	printk("cpuid in call to add_disk %d \n", raw_smp_processor_id());
+	printk("Calling add_disk on cpu: %d, disk %p \n", raw_smp_processor_id(), disk);
 	add_disk(disk);
 
+	{
+		struct kobject *kobj = &disk_to_dev(disk)->kobj;
+		printk("%s, disk_to_dev(disk) %p, kobj %p, kobj->sd %p\n", __func__,
+				disk_to_dev(disk), kobj, kobj->sd);
+	}
 	fipc_set_reg0(request, blo_container->my_ref.cptr);
 	fipc_set_reg1(request, module_container->my_ref.cptr);
-	printk("calling ipc \n");
 
-	
-	printk("endof add_disk \n");
 	return ret;
 
 #ifndef CONFIG_LVD

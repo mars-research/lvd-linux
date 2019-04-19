@@ -57,7 +57,7 @@ static void dummy_lcd_exit(void)
 	dummy_cleanup_module();
 
 	glue_nullnet_exit();
-	lcd_exit(0);
+	lvd_exit(0);
 	return;
 }
 

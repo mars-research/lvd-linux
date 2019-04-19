@@ -1,7 +1,5 @@
 #include <lcd_config/pre_hook.h>
 
-//#include <linux/fs.h>
-
 #include <libcap.h>
 #include <liblcd/liblcd.h>
 #include <liblcd/sync_ipc_poll.h>
@@ -170,8 +168,7 @@ void blk_mq_end_request(struct request *rq, int error)
 	struct fipc_message *request = &r;
 	struct lcd_request_container *rq_c;
 
-	rq_c = container_of(rq,
-			struct lcd_request_container, rq);
+	rq_c = container_of(rq, struct lcd_request_container, rq);
 
 	async_msg_set_fn_type(request, BLK_MQ_END_REQUEST);
 
@@ -193,7 +190,7 @@ void blk_mq_free_tag_set(struct blk_mq_tag_set *set)
 	set_container = container_of(set, struct blk_mq_tag_set_container, tag_set);
 
 	ops_container = container_of(set->ops, struct blk_mq_ops_container,
-			blk_mq_ops);
+				blk_mq_ops);
 
 	async_msg_set_fn_type(request, BLK_MQ_FREE_TAG_SET);
 	
@@ -327,7 +324,8 @@ void device_add_disk(struct device *parent, struct gendisk *disk)
 	disk_container = container_of(disk, struct gendisk_container, gendisk);
 
 	blo_container = container_of(disk->fops, 
-			struct block_device_operations_container, block_device_operations);
+				struct block_device_operations_container,
+				block_device_operations);
 
 	module_container = container_of(disk->fops->owner, struct module_container,
 				module);
@@ -362,14 +360,14 @@ void device_add_disk(struct device *parent, struct gendisk *disk)
 	fipc_set_reg5(request, disk->major);
 	fipc_set_reg6(request, disk->first_minor);
 
-	/* Ran out of registers to marshall the string, so hardcoding it
-	 * in the klcd */
-
+	/*
+	 * Ran out of registers to marshall the string, so hardcoding it
+	 * in the klcd
+	 */
 	vmfunc_wrapper(request);
 	
 	blo_container->other_ref.cptr = fipc_get_reg0(request);
 	module_container->other_ref.cptr = fipc_get_reg1(request);
-	printk("add_disk ends here in lcd glue \n");
 
 	return;
 
@@ -568,7 +566,6 @@ int init_hctx_fn_callee(struct fipc_message *request)
                 goto fail_hctx;
 	}
 
-	LIBLCD_MSG("lcd ctx.cptr %lu", ctx_container->my_ref.cptr);
 	fipc_set_reg0(request, ctx_container->my_ref.cptr);
 	fipc_set_reg1(request, ret);
 	return ret;
@@ -600,6 +597,7 @@ int open_callee(struct fipc_message *_request)
 	int ret;
 
 	fmode_t mode = fipc_get_reg0(_request);
+
 	ret = null_open(NULL, mode);
 
 	fipc_set_reg0(_request, ret);

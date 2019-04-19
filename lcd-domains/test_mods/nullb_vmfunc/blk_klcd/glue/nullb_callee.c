@@ -92,7 +92,8 @@ int blk_mq_init_queue_callee(struct fipc_message *request)
         rq_container = container_of(rq, struct request_queue_container,
                                                 request_queue);
 
-	ret = glue_cap_insert_request_queue_type(c_cspace, rq_container, &rq_container->my_ref);
+	ret = glue_cap_insert_request_queue_type(c_cspace, rq_container,
+					&rq_container->my_ref);
         if (ret) {
                 LIBLCD_ERR("lcd insert");
                 goto fail_insert;
@@ -232,8 +233,9 @@ int blk_queue_physical_block_size_callee(struct fipc_message *request)
 	int ret;
 
 	size = fipc_get_reg0(request);
-	ret = glue_cap_lookup_request_queue_type(c_cspace, __cptr(fipc_get_reg1(request)),
-			&rq_container);
+	ret = glue_cap_lookup_request_queue_type(c_cspace,
+				__cptr(fipc_get_reg1(request)),
+				&rq_container);
 	if (ret) {
 		LIBLCD_ERR("lookup");
 		goto fail_lookup;
@@ -269,7 +271,8 @@ int alloc_disk_node_callee(struct fipc_message *request)
 	/* Hack for remove */
 	disk_g = disk;
 
-	ret = glue_cap_insert_gendisk_type(c_cspace, disk_container, &disk_container->my_ref);
+	ret = glue_cap_insert_gendisk_type(c_cspace, disk_container,
+				&disk_container->my_ref);
 	if (ret) {
 		LIBLCD_ERR("lcd insert");
 		goto fail_insert;
@@ -344,33 +347,14 @@ int del_gendisk_callee(struct fipc_message *request)
 
 	disk = &disk_container->gendisk;
 
-	printk("Calling del_gendisk on cpu: %d, disk %p \n", raw_smp_processor_id(), disk);
-
-	{
-		struct kobject *kobj = &disk_to_dev(disk)->kobj;
-		printk("%s, disk_to_dev(disk) %p, kobj %p, kobj->sd %p\n", __func__,
-				disk_to_dev(disk), kobj, kobj->sd);
-	}
+	printk("Calling del_gendisk on cpu: %d, disk %p \n",
+			raw_smp_processor_id(), disk);
 
 	del_gendisk(disk);
 
 fail_lookup:
 	return ret;
 }
-
-#ifndef CONFIG_LVD
-LCD_TRAMPOLINE_DATA(mmap_fops_trampoline);
-int LCD_TRAMPOLINE_LINKAGE(mmap_fops_trampoline) mmap_fops_trampoline(struct file *filp, struct vm_area_struct *vma)
-
-{
-	int ( *volatile mmap_fp )(struct file *filp, struct vm_area_struct *vma, struct trampoline_hidden_args *);
-	struct trampoline_hidden_args *hidden_args;
-	LCD_TRAMPOLINE_PROLOGUE(hidden_args, mmap_fops_trampoline);
-	mmap_fp = nullbu_mmap;
-	return mmap_fp(filp, vma, hidden_args);
-
-}
-#endif
 
 int register_blkdev_callee(struct fipc_message *request)
 {
@@ -382,7 +366,7 @@ int register_blkdev_callee(struct fipc_message *request)
 
 	ret = register_blkdev(devno, "nullb");
 
-	LIBLCD_MSG("register_blkdev returns %d", ret);
+	printk("register_blkdev returns %d\n", ret);
 
 	if (ret < 0) {
 		LIBLCD_ERR("register_blkdev failed! ret = %d", ret);
@@ -410,7 +394,8 @@ int blk_cleanup_queue_callee(struct fipc_message *request)
 	struct request_queue_container *rq_container;
         int ret = 0; 
 
-        ret = glue_cap_lookup_request_queue_type(c_cspace, __cptr(fipc_get_reg0(request)),
+        ret = glue_cap_lookup_request_queue_type(c_cspace,
+					__cptr(fipc_get_reg0(request)),
                                         &rq_container);
         if (ret) {
                  LIBLCD_ERR("lookup");
@@ -439,19 +424,16 @@ int _queue_rq_fn(struct blk_mq_hw_ctx *ctx, const struct blk_mq_queue_data *bd, 
 #endif
         struct blk_mq_hw_ctx_container *ctx_container;
 
-	//printk("^^^^^^^^^^ [Klcd-queue-rq] enter ^^^^^^^^^^^ \n");
         /*XXX Beware!! hwctx can be unique per hw context of the driver, if multiple
          * exists, then we need one cspace insert function per hwctx. Should be handled
          * in the init_hctx routine */
 
-        ctx_container = container_of(ctx, struct blk_mq_hw_ctx_container, blk_mq_hw_ctx);
+        ctx_container = container_of(ctx, struct blk_mq_hw_ctx_container,
+					blk_mq_hw_ctx);
 #ifndef CONFIG_LVD
         ops_container = (struct blk_mq_ops_container *)hidden_args->struct_container;
 #endif
 
-        //printk("hctx %p | cptr %lu\n",ctx, ctx_container->other_ref.cptr);
-
-#if 0
         async_msg_set_fn_type(request, QUEUE_RQ_FN);
 
         fipc_set_reg0(request, ctx->queue_num);
@@ -460,26 +442,18 @@ int _queue_rq_fn(struct blk_mq_hw_ctx *ctx, const struct blk_mq_queue_data *bd, 
 #ifndef CONFIG_LVD
         fipc_set_reg2(request, ops_container->other_ref.cptr);
 #endif
+	fipc_set_reg3(request, bd->rq->tag);
 
-        vmfunc_klcd_wrapper(request, 1);
-#endif
-        blk_mq_start_request(bd->rq);
-        blk_mq_end_request(bd->rq, 0);
+	vmfunc_klcd_wrapper(request, 1);
 
-        /* function ret -  makes no sense now but keeping it this way! */
         ret = fipc_get_reg0(request);
 
-
-        /* printk("^^^^^ [Klcd-queue-rq] done ^^^^^^ \n"); */
-        return BLK_MQ_RQ_QUEUE_OK;
-        //return ret;
-
-        printk("[Klcd-queue-rq] done with err \n");
         return ret;
 }
 
-int init_request(void *data, struct request *req, unsigned int hctx_idx, unsigned int rq_idx,
-			 unsigned int numa_node)
+int init_request(void *data, struct request *req, unsigned int hctx_idx,
+			unsigned int rq_idx,
+			unsigned int numa_node)
 {
 	static int init_done = 0;
 
@@ -523,6 +497,7 @@ struct blk_mq_hw_ctx *_map_queue_fn(struct request_queue *rq, int m, struct tram
 	 * the map. All the kernel does is to call blk_mq_map_queue.
 	 * So instead of going to the LCD, I am going to call
 	 * blk_mq_map_queue here! */
+	/* TODO: Call to LCD and call this function from there */
 	return blk_mq_map_queue(rq, m);
 }
 
@@ -581,9 +556,8 @@ int _init_hctx_fn(struct blk_mq_hw_ctx *ctx, void *data, unsigned int index, str
 	ctx_container->other_ref.cptr = fipc_get_reg0(request);
 	func_ret = fipc_get_reg1(request);
 	
-	printk("init_hctx hctx %p | cptr %lu\n",ctx, ctx_container->other_ref.cptr);
+	printk("init_hctx hctx %p | cptr %lu\n", ctx, ctx_container->other_ref.cptr);
 
-	printk("end of init_hctx procedure \n");
 	
 fail_insert:
 	return func_ret;
@@ -646,7 +620,8 @@ int open(struct block_device *device, fmode_t mode, struct trampoline_hidden_arg
 	async_msg_set_fn_type(request, OPEN);
 	fipc_set_reg0(request, mode);
 
-	printk("%s, %s:%d on cpu:%d\n", __func__, current->comm, current->pid, smp_processor_id());
+	printk("%s, %s:%d on cpu:%d\n", __func__, current->comm, current->pid,
+				smp_processor_id());
 	vmfunc_klcd_wrapper(request, 1);
 
 	ret = fipc_get_reg0(request);
@@ -666,7 +641,8 @@ void release(struct gendisk *disk, fmode_t mode, struct trampoline_hidden_args *
 
 	disk_container = container_of(disk, struct gendisk_container, gendisk);
 
-	printk("%s, %s:%d on cpu:%d\n", __func__, current->comm, current->pid, smp_processor_id());
+	printk("%s, %s:%d on cpu:%d\n", __func__, current->comm, current->pid,
+				smp_processor_id());
 
 	async_msg_set_fn_type(request, RELEASE);
 	fipc_set_reg0(request, disk_container->other_ref.cptr);
@@ -891,7 +867,7 @@ int blk_mq_alloc_tag_set_callee(struct fipc_message *request)
 	set_container->tag_set.cmd_size = fipc_get_reg4(request);
 	set_container->tag_set.flags = fipc_get_reg5(request);
 
-	/* init request */
+	/* XXX: Populate function pointers including init_request */
 	ops_container->blk_mq_ops.init_request = init_request;
 	ops_container->blk_mq_ops.queue_rq = _queue_rq_fn;
 	ops_container->blk_mq_ops.map_queue = _map_queue_fn;
@@ -1107,6 +1083,7 @@ int device_add_disk_callee(struct fipc_message *request)
 	strncpy(disk->disk_name, disk_name, DISK_NAME_LEN);
 
 	printk("Calling add_disk on cpu: %d, disk %p \n", raw_smp_processor_id(), disk);
+
 	add_disk(disk);
 
 	{

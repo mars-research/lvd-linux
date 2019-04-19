@@ -555,6 +555,14 @@ asmlinkage __visible notrace struct pt_regs *sync_regs_to_ist(struct pt_regs *er
 }
 NOKPROBE_SYMBOL(sync_regs_to_ist);
 
+asmlinkage __visible notrace void save_lcd_stack(struct pt_regs *eregs)
+{
+	current->lcd_stack = eregs->sp; 
+	return;
+}
+NOKPROBE_SYMBOL(save_lcd_stack);
+
+
 asmlinkage __visible notrace void trace_rbx(unsigned long long rbx)
 {
 	if (rbx) 

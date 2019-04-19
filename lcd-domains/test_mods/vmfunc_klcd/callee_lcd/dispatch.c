@@ -142,6 +142,18 @@ foo(struct fipc_message *msg)
 		printk("%d iterations of int 0xf3 back-to-back took %llu cycles (avg: %llu cycles)\n",
 				num_iterations, end - start, (end - start) / num_iterations);
 
+		for(i = 0; i < 10; i++) {
+			unsigned long ecx = 0xc0000101, edx, eax;
+
+			asm volatile("movq %0, %%rcx \t\n"
+				     "rdmsr         \t\n"
+					: "=a" (eax),
+	     				  "=d" (edx),
+			      		  "=c" (ecx)
+					: "0" (ecx) : "memory");
+
+		}
+
 		i = 0;
 		do {
 			asm volatile("nop");

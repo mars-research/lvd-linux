@@ -160,7 +160,7 @@ static int vmfunc_prepare_switch(int ept)
 void pick_stack(int ept)
 {
 	struct lcd *lcd = lcd_list[ept];
-	int cpu = smp_processor_id();
+	int cpu = get_cpu();
 	struct lcd_stack *this_stack = per_cpu_ptr(lcd->lcd_stacks, cpu);
 	int bit = ffsll(this_stack->bitmap);
 
@@ -174,21 +174,26 @@ void pick_stack(int ept)
 		printk("Ran out of stacks on cpu %d, bitmap:%llx, ffsl ret=%d\n",
 				cpu, this_stack->bitmap, bit);
 	}
+	put_cpu();
+	BUG_ON(!current->lcd_stack);
 }
 
 void drop_stack(int ept)
 {
 	struct lcd *lcd = lcd_list[ept];
-	int cpu = smp_processor_id();
-	struct lcd_stack *this_stack = per_cpu_ptr(lcd->lcd_stacks, cpu);
+	//int cpu = smp_processor_id();
+	struct lcd_stack *this_stack = per_cpu_ptr(lcd->lcd_stacks, get_cpu());
 
 	current->lcd_stack = NULL;
 	this_stack->bitmap |= (1LL << current->lcd_stack_bit);
+	put_cpu();
 }
 
 int vmfunc_klcd_wrapper(struct fipc_message *msg, unsigned int ept)
 {
 	int ret = 0;
+	unsigned long flags;
+
 	if (ept > 511) {
 		ret = -EINVAL;
 		goto exit;
@@ -202,9 +207,12 @@ int vmfunc_klcd_wrapper(struct fipc_message *msg, unsigned int ept)
 	if (!init_pgd)
 		init_pgd = kallsyms_lookup_name("init_level4_pgt");
 
+	local_irq_save(flags);
+
 	if (current->nested_count++ == 0)
 		pick_stack(ept);
 
+	local_irq_restore(flags);
 #if 0
 	printk("%s [%d]: entering on cpu %d, rpc_id: %x | lcd_stack %p\n",
 			current->comm,
@@ -215,8 +223,11 @@ int vmfunc_klcd_wrapper(struct fipc_message *msg, unsigned int ept)
 #endif
 	vmfunc_trampoline_entry(msg);
 
+	local_irq_save(flags);
 	if (--current->nested_count == 0)
 		drop_stack(ept);
+
+	local_irq_restore(flags);
 
 exit:
 	return ret;

@@ -58,6 +58,7 @@ int lcd_iommu_map_page(struct lcd *lcd, gpa_t gpa, unsigned int order,
 			 * one in the loop. If there is no mapping
 			 * we should not return error
 			 */
+			printk("%s, no mapping for gpa: %lx\n", __func__, gpa_val(ga));
 			ret = 0;
 			continue;
 		}

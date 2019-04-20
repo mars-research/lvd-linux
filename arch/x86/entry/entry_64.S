@@ -579,10 +579,15 @@ END(irq_entries_start)
 	call	sync_stacks
 	movq	%rax, %rsp			/* switch stack */
 
+	movq	vmfunc_state_page + VMFUNC_lcd_stack_saved, %rax
+	testq   $1, %rax 
+	jnz     1f
+	
 	/* Save LCD stack into current->lcd_stack */
-	//movq    %rsp, %rdi
-	//call    save_lcd_stack
-
+	movq    %rsp, %rdi
+	call    save_lcd_stack
+	movq    $1, vmfunc_state_page + VMFUNC_lcd_stack_saved
+1:
 	/* We've restored gs and kernel stack -- it's safe to update the 
 	   entered_lcd flag */
 	movq    $0, vmfunc_state_page + VMFUNC_entered_lcd

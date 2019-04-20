@@ -149,7 +149,8 @@ EXPORT_PER_CPU_SYMBOL_GPL(gdt_page);
 
 union vmfunc_state_page vmfunc_state_page = { 
 	.vmfunc_state.in_kernel = 1,
-	.vmfunc_state.entered_lcd = 0, 
+	.vmfunc_state.entered_lcd = 0,
+	.vmfunc_state.lcd_stack_saved = 1,	
 };
 EXPORT_SYMBOL(vmfunc_state_page);
 

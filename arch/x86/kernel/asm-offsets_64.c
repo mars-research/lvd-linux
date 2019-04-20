@@ -58,6 +58,7 @@ int main(void)
 	OFFSET(VMFUNC_lcd_gs_base, vmfunc_state, lcd_gs_base);
 	OFFSET(VMFUNC_entered_lcd, vmfunc_state, entered_lcd);
 	OFFSET(VMFUNC_kernel_esp, vmfunc_state, kernel_esp);
+	OFFSET(VMFUNC_lcd_stack_saved, vmfunc_state, lcd_stack_saved);
 
 
 	OFFSET(TSS_ist, tss_struct, x86_tss.ist);

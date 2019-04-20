@@ -17,6 +17,8 @@ __asm__(
 		"  mov lcd_stack_off, %rbx	\n\t"
 		/* save esp_lcd */
 		"  mov %rsp, (%rax, %rbx)	\n\t"
+
+		"  movq $0x1, " __stringify(VMFUNC_lcd_stack_saved) " + vmfunc_state_page	\n\t"
 		/* populate esp_kernel */
 		"  mov %r13, %rsp		\n\t"
 
@@ -74,6 +76,7 @@ __asm__(
 		"  mov lcd_stack_off, %rbx	\n\t"
 		"  mov (%rax, %rbx), %rsp	\n\t"
 
+		"  movq $0x0, " __stringify(VMFUNC_lcd_stack_saved) " + vmfunc_state_page	\n\t"
 		/* LCD STACK RESTORED! */
 
 		/* zero registers as we go to untrusted domain */

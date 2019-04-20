@@ -65,6 +65,7 @@ __asm__ (
 	"  movq $0x1, " __stringify(VMFUNC_entered_lcd) " + vmfunc_state_page	\n\t"
 	/* populate LCD stack */
 	"  mov (%r13, %r14), %rsp		\n\t"
+	"  movq $0x0, " __stringify(VMFUNC_lcd_stack_saved) " + vmfunc_state_page	\n\t"
 
 	/* populate eax, ecx for vmfunc */
 	"  mov $0x0, %eax \n\t"
@@ -92,19 +93,21 @@ __asm__ (
 	"	.align 16	\n\t"
 	"	.globl vmfunc_trampoline_out \n\t"
 	"vmfunc_trampoline_out:		\n\t"
-	/* save lcd_stack */
-	"  mov %rsp, %r13	\n\t"
 	/* restore kernel_stack from vmfunc_state_page*/
-	"  mov " __stringify(VMFUNC_kernel_esp) " + vmfunc_state_page, %rsp	\n\t"
+	"  mov " __stringify(VMFUNC_kernel_esp) " + vmfunc_state_page, %r13	\n\t"
+	/* TODO: restore %gs */
+	"  mov %gs:current_task, %rax	\n\t"
+	/* get lcd_stack offset */
+	"  mov lcd_stack_off, %rbx	\n\t"
+	/* save lcd_stack */
+	"  mov %rsp, (%rax, %rbx)	\n\t"
+
+	"  movq $0x1, " __stringify(VMFUNC_lcd_stack_saved) " + vmfunc_state_page	\n\t"
+	/* populate esp_kernel */
+	"  mov %r13, %rsp		\n\t"
+
 	/* set entered_lcd = 0 in vmfunc_state_page */
 	"  movq $0x0, " __stringify(VMFUNC_entered_lcd) " + vmfunc_state_page	\n\t"
-
-	/* get current pointer */
-	"  mov %gs:current_task, %r14	\n\t"
-	/* get lcd_stack offset */
-	"  mov lcd_stack_off, %r15	\n\t"
-	/* save LCD stack after return */
-	"  mov %r13, (%r14, %r15)	\n\t"
 
 	/* stack pointer is restored, let's get our msg buffer */
 	"  pop %r13 \n\t"

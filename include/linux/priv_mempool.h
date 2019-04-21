@@ -10,6 +10,9 @@
 
 #define SKB_CONTAINER_SIZE	128
 
+
+#define BLK_USER_BUF_SIZE	(1 << 20)	/* 1 MB blocks */
+
 typedef enum {
 	/* for skb->data */
 	SKB_DATA_POOL = 0,
@@ -19,6 +22,9 @@ typedef enum {
 
 	/* for skb_container */
 	SKB_CONTAINER_POOL,
+
+	/* nullblk iocb pool */
+	BLK_USER_BUF_POOL,
 
 	POOL_MAX,
 } pool_type_t;

@@ -10,6 +10,9 @@
 #include "../nullb_callee.h"
 #include <asm/cacheflush.h>
 #include <linux/atomic.h>
+#include <linux/priv_mempool.h>
+#include <linux/sort.h>
+#include <lcd_domains/microkernel.h>
 
 #include <lcd_config/post_hook.h>
 
@@ -35,8 +38,95 @@ struct trampoline_hidden_args {
 };
 #endif
 
+priv_pool_t *iocb_pool;
+void *pool_base = NULL;
+size_t pool_size = 0;
+static unsigned long pool_pfn_start, pool_pfn_end;
+
 static struct glue_cspace *c_cspace;
 extern struct cspace *klcd_cspace;
+
+#define MAX_POOLS	20
+
+char *base_pools[MAX_POOLS];
+int pool_order = 10;
+int start_idx[MAX_POOLS/2] = {-1}, end_idx[MAX_POOLS/2] = {-1};
+unsigned int best_diff = 0;
+int best_idx = -1;
+int pool_idx = 0;
+struct {
+	int start_idx;
+	int end_idx;
+	size_t size;
+	bool valid;
+} pools[MAX_POOLS] = { {0} };
+
+int compare_addr(const void *a, const void *b)
+{
+	return *(unsigned int *)a - *(unsigned int *)b;
+}
+
+int pool_pick(void)
+{
+	int i;
+	for (i = 0; i < MAX_POOLS; i++) {
+		base_pools[i] = (char*) __get_free_pages(GFP_KERNEL | __GFP_ZERO,
+	                            pool_order);
+	}
+
+	sort(base_pools, MAX_POOLS, sizeof(char*), compare_addr, NULL);
+
+	printk("%s, sorted order:\n", __func__);
+	for (i = 0; i < MAX_POOLS; i++) {
+		printk("%s, got pool %p\n", __func__, base_pools[i]);
+	}
+
+	pools[pool_idx].start_idx = 0;
+	pools[pool_idx].end_idx = MAX_POOLS - 1;
+	pools[pool_idx].valid = true;
+	for (i = 0; i < MAX_POOLS - 1; i++) {
+		printk("%s, comparing pool[%d]=%llx and pool[%d]=%llx\n", __func__,
+					i+1, (uint64_t)base_pools[i+1], i, (uint64_t) base_pools[i]);
+		if (((uint64_t) base_pools[i+1] - (uint64_t) base_pools[i]) != ((1 << pool_order) * PAGE_SIZE)) {
+			printk("%s, found discontinuity @ i %d\n", __func__, i);
+			pools[pool_idx].valid = true;
+			pools[pool_idx++].end_idx = i;
+			pools[pool_idx].start_idx = i + 1;
+		}
+	}
+
+	/* if there is no discontinuity, then we will have a huge chunk until the end */
+	pools[pool_idx].valid = true;
+	pools[pool_idx].end_idx = MAX_POOLS - 1;
+
+	for (i = 0; i < MAX_POOLS; i++) {
+		printk("%s, pool %d: start idx = %d | end idx = %d\n",
+				__func__, i, pools[i].start_idx, pools[i].end_idx);
+		if (!pools[i].valid)
+			continue;
+		if ((pools[i].end_idx - pools[i].start_idx + 1) > best_diff) {
+			best_idx = i;
+			best_diff = pools[i].end_idx - pools[i].start_idx + 1;
+		}
+	}
+	printk("%s, best diff %u | best idx %d | start = %d | end = %d\n",
+			__func__, best_diff, best_idx, pools[best_idx].start_idx, pools[best_idx].end_idx);
+	return best_idx;
+}
+
+
+void iocb_data_pool_init(void)
+{
+	pool_base = base_pools[pools[pool_pick()].start_idx];
+	pool_size = best_diff * ((1 << pool_order) * PAGE_SIZE);
+	iocb_pool = priv_pool_init(BLK_USER_BUF_POOL, (void*) pool_base, pool_size, BLK_USER_BUF_SIZE);
+}
+
+void iocb_data_pool_free(void)
+{
+	if (iocb_pool)
+		priv_pool_destroy(iocb_pool);
+}
 
 int glue_blk_init(void)
 {
@@ -51,6 +141,8 @@ int glue_blk_init(void)
 		LIBLCD_ERR("cap create");
 		goto fail2;
 	}
+
+	iocb_data_pool_init();
 	return 0;
 fail2:
 	glue_cap_exit();
@@ -63,6 +155,7 @@ void glue_blk_exit(void)
 {
 	glue_cap_destroy(c_cspace);
 	glue_cap_exit();
+	iocb_data_pool_free();
 }
 
 int blk_mq_init_queue_callee(struct fipc_message *request)
@@ -514,6 +607,44 @@ struct blk_mq_hw_ctx *LCD_TRAMPOLINE_LINKAGE(map_queue_fn_trampoline) map_queue_
 
 }
 #endif
+
+int init_hctx_sync_callee(struct fipc_message *_request)
+{
+	int ret;
+	struct page *p;
+	unsigned int pool_ord;
+	cptr_t pool_cptr;
+	cptr_t lcd_pool_cptr;
+
+	/* get LCD's pool cptr */
+	lcd_pool_cptr = __cptr(fipc_get_reg0(_request));
+
+	p = virt_to_head_page(iocb_pool->pool);
+
+        pool_ord = ilog2(roundup_pow_of_two((
+				iocb_pool->total_pages * PAGE_SIZE)
+				>> PAGE_SHIFT));
+
+        ret = lcd_volunteer_pages(p, pool_ord, &pool_cptr);
+
+	if (ret) {
+		LIBLCD_ERR("volunteer shared data pool");
+		goto fail_vol;
+	}
+
+	pool_pfn_start = (unsigned long)iocb_pool->pool >> PAGE_SHIFT;
+	pool_pfn_end = pool_pfn_start + iocb_pool->total_pages;
+
+	printk("%s, pool pfn start %lu | end %lu\n", __func__,
+			pool_pfn_start, pool_pfn_end);
+
+	copy_msg_cap_vmfunc(current->lcd, current->vmfunc_lcd, pool_cptr, lcd_pool_cptr);
+
+	fipc_set_reg0(_request, pool_ord);
+
+fail_vol:
+	return 0;
+}
 
 #ifdef CONFIG_LVD
 int _init_hctx_fn(struct blk_mq_hw_ctx *ctx, void *data, unsigned int index)

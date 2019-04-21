@@ -10,6 +10,7 @@
 #include "../../benchmark.h"
 static struct glue_cspace *c_cspace;
 
+void *iocb_data_pool;
 struct blk_mq_hw_ctx_container *ctx_container_g; 
 struct blk_mq_ops_container *ops_container_g;
 
@@ -532,7 +533,9 @@ int init_hctx_fn_callee(struct fipc_message *request)
 	struct blk_mq_hw_ctx_container *ctx_container;
 	struct blk_mq_ops_container *ops_container;
 	unsigned int index;
-
+	cptr_t pool_cptr;
+	gva_t pool_addr;
+	unsigned int pool_ord;
 	int ret = 0;
 
 	ctx_container = kzalloc(sizeof(*ctx_container), GFP_KERNEL);
@@ -558,7 +561,29 @@ int init_hctx_fn_callee(struct fipc_message *request)
                 LIBLCD_ERR("lookup");
                 goto fail_lookup;
         }
-	
+
+	/* receive shared data pool */
+	ret = lcd_cptr_alloc(&pool_cptr);
+	if (ret) {
+		LIBLCD_ERR("failed to get cptr");
+		goto fail_cptr;
+	}
+
+	fipc_set_reg0(request, cptr_val(pool_cptr));
+	vmfunc_sync_call(request, INIT_HCTX_SYNC);
+	pool_ord = fipc_get_reg0(request);
+
+	ret = lcd_map_virt(pool_cptr, pool_ord, &pool_addr);
+	if (ret) {
+		LIBLCD_ERR("failed to map pool");
+		goto fail_pool;
+	}
+
+	LIBLCD_MSG("%s, mapping private pool %p | ord %d", __func__,
+			gva_val(pool_addr), pool_ord);
+
+	iocb_data_pool = (void*)gva_val(pool_addr);
+
 	/* Passing NULL to data arg, hack to get nullb's address within the driver */
 	ret = ops_container->blk_mq_ops.init_hctx(&ctx_container->blk_mq_hw_ctx, NULL, index);
 	if(ret) {
@@ -570,6 +595,8 @@ int init_hctx_fn_callee(struct fipc_message *request)
 	fipc_set_reg1(request, ret);
 	return ret;
 
+fail_pool:
+fail_cptr:
 fail_hctx:
 fail_lookup:
 	glue_cap_remove(c_cspace, ctx_container->my_ref);

@@ -38,6 +38,7 @@ enum dispatch_t {
 	QUEUE_RQ_FN,
         MAP_QUEUE_FN,
         INIT_HCTX_FN,
+	INIT_HCTX_SYNC,
         SOFTIRQ_DONE_FN,
         OPEN,
 	RELEASE,

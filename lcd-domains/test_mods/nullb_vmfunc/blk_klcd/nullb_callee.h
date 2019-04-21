@@ -24,4 +24,6 @@ int unregister_blkdev_callee(struct fipc_message *request);
 int blk_cleanup_queue_callee(struct fipc_message *request);
 int lcd_register_chardev_callee(struct fipc_message *request);
 
+int init_hctx_sync_callee(struct fipc_message *request);
+
 #endif /* __NULLB_CALLEE_H__ */

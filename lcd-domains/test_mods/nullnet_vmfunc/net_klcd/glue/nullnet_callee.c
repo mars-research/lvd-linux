@@ -955,7 +955,7 @@ fail8:
 }
 #endif
 
-void setup_sync_callee(struct fipc_message *msg)
+void setup_sync_callee(struct fipc_message *_request)
 {
 	int ret;
 	struct page *p;
@@ -964,7 +964,7 @@ void setup_sync_callee(struct fipc_message *msg)
 	cptr_t lcd_pool_cptr;
 
 	/* get LCD's pool cptr */
-	lcd_pool_cptr = __cptr(msg->regs[0]);
+	lcd_pool_cptr = __cptr(fipc_get_reg0(_request));
 
 	p = virt_to_head_page(pool->pool);
 
@@ -987,7 +987,7 @@ void setup_sync_callee(struct fipc_message *msg)
 
 	copy_msg_cap_vmfunc(current->lcd, current->vmfunc_lcd, pool_cptr, lcd_pool_cptr);
 
-	fipc_set_reg0(msg, pool_ord);
+	fipc_set_reg0(_request, pool_ord);
 
 fail_vol:
 	return;

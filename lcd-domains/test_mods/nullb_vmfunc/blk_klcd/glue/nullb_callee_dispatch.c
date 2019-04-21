@@ -11,6 +11,9 @@ int blk_klcd_syncipc_dispatch(struct fipc_message *message)
 	fn_type = async_msg_get_fn_type(message);
 
         switch (fn_type) {
+	case INIT_HCTX_SYNC:
+		trace(INIT_HCTX_SYNC);
+		return init_hctx_sync_callee(message);
         default:
                 LIBLCD_ERR("unexpected function label %d", fn_type);
                 return -EINVAL;

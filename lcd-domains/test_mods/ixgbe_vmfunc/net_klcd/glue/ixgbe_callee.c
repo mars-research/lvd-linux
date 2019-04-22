@@ -18,6 +18,7 @@
 #include <linux/priv_mempool.h>
 #include <linux/sort.h>
 #include <asm/lcd_domains/ept_lcd.h>
+#include <linux/lcd_trace.h>
 
 #include <lcd_config/post_hook.h>
 
@@ -26,7 +27,7 @@
 #define IXGBE_DEV_ID_82599_SFP           0x10FB
 /* XXX: How to determine this? */
 #define CPTR_HASH_BITS      5
-#define MAX_POOLS	20
+#define MAX_POOLS	40
 
 u32 thread = 0;
 struct glue_cspace *c_cspace = NULL;
@@ -685,6 +686,7 @@ fail_vol:
 int ixgbe_service_event_sched(void)
 {
 	struct fipc_message r;
+	INIT_IPC_MSG(&r);
 	struct fipc_message *_request = &r;
 	struct net_device_container *dev_container;
 
@@ -705,7 +707,7 @@ void ixgbe_service_timer(unsigned long data)
 {
 	unsigned long next_event_offset;
 
-	next_event_offset = HZ * 2;
+	next_event_offset = HZ * 5;
 
 	/* Reset the timer */
 	mod_timer(&service_timer, next_event_offset + jiffies);
@@ -725,6 +727,7 @@ int probe(struct pci_dev *dev,
 	struct pci_dev_container *dev_container;
 	int ret = 0;
 	struct fipc_message r;
+	INIT_IPC_MSG(&r);
 	struct fipc_message *_request = &r;
 
 	int func_ret;
@@ -822,6 +825,7 @@ void remove(struct pci_dev *dev,
 #endif
 {
 	struct fipc_message r;
+	INIT_IPC_MSG(&r);
 	struct fipc_message *_request = &r;
 
 	async_msg_set_fn_type(_request, REMOVE);
@@ -842,6 +846,7 @@ int ndo_open(struct net_device *dev,
 {
 	struct net_device_container *dev_container;
 	struct fipc_message r;
+	INIT_IPC_MSG(&r);
 	struct fipc_message *_request = &r;
 
 	int func_ret;
@@ -892,6 +897,7 @@ int ndo_stop(struct net_device *dev,
 {
 	struct net_device_container *dev_container;
 	struct fipc_message r;
+	INIT_IPC_MSG(&r);
 	struct fipc_message *_request = &r;
 	int func_ret;
 
@@ -926,8 +932,6 @@ ndo_stop_trampoline(struct net_device *dev)
 }
 #endif
 
-int ixgbe_trigger_dump(void);
-
 #ifdef CONFIG_LVD
 int ndo_start_xmit(struct sk_buff *skb,
 		struct net_device *dev)
@@ -939,11 +943,11 @@ int ndo_start_xmit(struct sk_buff *skb,
 {
 	struct net_device_container *dev_container;
 	struct fipc_message r;
+	INIT_IPC_MSG(&r);
 	struct fipc_message *_request = &r;
 	int func_ret = 0;
 	struct sk_buff_container *skb_c;
 	struct skbuff_members *skb_lcd;
-	static int once = 1;
 #ifdef TIMESTAMP
 	TS_DECL(mndo_xmit);
 #endif
@@ -963,11 +967,6 @@ int ndo_start_xmit(struct sk_buff *skb,
 		return NETDEV_TX_OK;
 	}
 
-	if (once) {
-		ixgbe_trigger_dump();
-		once = 0;
-	}
-
 	dev_container = container_of(dev,
 			struct net_device_container,
 			net_device);
@@ -983,6 +982,9 @@ int ndo_start_xmit(struct sk_buff *skb,
 	}
 
 	skb_c->skb = skb;
+
+	if (0)
+		printk("%s, on cpu:%d skb:%p\n", __func__, smp_processor_id(), skb);
 
 	glue_insert_skb_hash(skb_c);
 
@@ -1020,7 +1022,10 @@ int ndo_start_xmit(struct sk_buff *skb,
 
 	skb_lcd->head_data_off = skb->data - skb->head;
 
-	printk("%s:%d %s skb->q %d\n", current->comm, current->pid, __func__, skb->queue_mapping);
+	if (0)
+		printk("%s:%d %s skb->q %d\n", current->comm, current->pid, __func__, skb->queue_mapping);
+
+	add_trace_entry(EVENT_XMIT, async_msg_get_fn_type(_request));
 	vmfunc_klcd_wrapper(_request, 1);
 
 	func_ret = fipc_get_reg0(_request);
@@ -1069,6 +1074,7 @@ void ndo_set_rx_mode(struct net_device *dev,
 {
 	struct net_device_container *dev_container;
 	struct fipc_message r;
+	INIT_IPC_MSG(&r);
 	struct fipc_message *_request = &r;
 
 	dev_container = container_of(dev,
@@ -1109,6 +1115,7 @@ int ndo_validate_addr(struct net_device *dev,
 {
 	struct net_device_container *dev_container;
 	struct fipc_message r;
+	INIT_IPC_MSG(&r);
 	struct fipc_message *_request = &r;
 	int func_ret;
 
@@ -1183,6 +1190,7 @@ int ndo_set_mac_address(struct net_device *dev,
 {
 	struct net_device_container *dev_container;
 	struct fipc_message r;
+	INIT_IPC_MSG(&r);
 	struct fipc_message *_request = &r;
 
 
@@ -1233,6 +1241,7 @@ int ndo_change_mtu(struct net_device *dev,
 {
 	struct net_device_container *dev_container;
 	struct fipc_message r;
+	INIT_IPC_MSG(&r);
 	struct fipc_message *_request = &r;
 	int func_ret;
 
@@ -1280,6 +1289,7 @@ void ndo_tx_timeout(struct net_device *dev,
 {
 	struct net_device_container *dev_container;
 	struct fipc_message r;
+	INIT_IPC_MSG(&r);
 	struct fipc_message *_request = &r;
 
 	dev_container = container_of(dev,
@@ -1322,6 +1332,7 @@ int ndo_set_tx_maxrate(struct net_device *dev,
 {
 	struct net_device_container *dev_container;
 	struct fipc_message r;
+	INIT_IPC_MSG(&r);
 	struct fipc_message *_request = &r;
 	int func_ret;
 
@@ -1378,6 +1389,7 @@ struct rtnl_link_stats64 *ndo_get_stats64(struct net_device *dev,
 {
 	struct net_device_container *dev_container;
 	struct fipc_message r;
+	INIT_IPC_MSG(&r);
 	struct fipc_message *_request = &r;
 
 	struct rtnl_link_stats64 *func_ret = stats;
@@ -1984,31 +1996,18 @@ int napi_consume_skb_callee(struct fipc_message *_request)
 	int ret = 0;
 	int budget;
 
-#ifdef FREE_TIMESTAMP
-	static int iter = 0;
-	TS_DECL(free);
-#endif
-
+	glue_lookup_skb_hash(__cptr(fipc_get_reg0(_request)), &skb_c);
 	budget = fipc_get_reg1(_request);
 
-	glue_lookup_skb_hash(__cptr(fipc_get_reg0(_request)), &skb_c);
-
 	skb = skb_c->skb;
-
-#ifdef FREE_TIMESTAMP
-	TS_START(free);
-#endif
 
 	if (check_skb_range(skb) == VOLUNTEER_XMIT)
 		printk("%s, skb possibly corrupted %p\n", __func__, skb);
 	
-	napi_consume_skb(skb, budget);
+	if (0)
+		printk("%s, on cpu:%d skb:%p\n", __func__, smp_processor_id(), skb);
 
-#ifdef FREE_TIMESTAMP
-	TS_STOP(free);
-	times_free[iter] = TS_DIFF(free);
-	iter = (iter + 1) % NUM_PACKETS;
-#endif
+	napi_consume_skb(skb, budget);
 
 	glue_remove_skb_hash(skb_c);
 
@@ -2244,8 +2243,6 @@ int netif_tx_stop_all_queues_callee(struct fipc_message *_request)
 	struct net_device_container *ndev_container;
 	struct net_device *dev;
 	int ret;
-
-
 
 	ret = glue_cap_lookup_net_device_type(c_cspace,
 		__cptr(fipc_get_reg0(_request)),
@@ -2723,6 +2720,7 @@ fail_lookup:
 int trigger_exit_to_lcd(struct thc_channel *_channel, enum dispatch_t disp)
 {
 	struct fipc_message r;
+	INIT_IPC_MSG(&r);
 	struct fipc_message *_request = &r;
 
 	async_msg_set_fn_type(_request,
@@ -2737,6 +2735,7 @@ int trigger_exit_to_lcd(struct thc_channel *_channel, enum dispatch_t disp)
 int ixgbe_trigger_dump(void)
 {
 	struct fipc_message r;
+	INIT_IPC_MSG(&r);
 	struct fipc_message *_request = &r;
 	struct net_device_container *dev_container;
 
@@ -2757,6 +2756,7 @@ int sync_user(struct net_device *dev,
 {
 	struct net_device_container *dev_container;
 	struct fipc_message r;
+	INIT_IPC_MSG(&r);
 	struct fipc_message *_request = &r;
 
 	int func_ret;
@@ -2794,6 +2794,7 @@ int sync(struct net_device *dev,
 {
 	struct net_device_container *dev_container;
 	struct fipc_message r;
+	INIT_IPC_MSG(&r);
 	struct fipc_message *_request = &r;
 
 	int func_ret;
@@ -2847,6 +2848,7 @@ int unsync_user(struct net_device *dev,
 {
 	struct net_device_container *dev_container;
 	struct fipc_message r;
+	INIT_IPC_MSG(&r);
 	struct fipc_message *_request = &r;
 
 	int func_ret;
@@ -2882,6 +2884,7 @@ int unsync(struct net_device *dev,
 {
 	struct net_device_container *dev_container;
 	struct fipc_message r;
+	INIT_IPC_MSG(&r);
 	struct fipc_message *_request = &r;
 
 	int func_ret;
@@ -3065,9 +3068,12 @@ fail_lookup:
 irqreturn_t msix_vector_handler(int irq, void *data)
 {
 	struct fipc_message r;
+	INIT_IPC_MSG(&r);
 	struct fipc_message *_request = &r;
 	struct irqhandler_t_container *irqhandler_container;
 	irqreturn_t irqret;
+
+	WARN_ONCE(!irqs_disabled(),"irqs enabled in %s\n", __func__);
 
 	irqhandler_container = (struct irqhandler_t_container*) data;
 
@@ -3076,12 +3082,21 @@ irqreturn_t msix_vector_handler(int irq, void *data)
 	/* pass this irqhandler's other ref cptr */
 	fipc_set_reg1(_request, irqhandler_container->other_ref.cptr);
 
+	add_trace_entry(EVENT_MSIX_HANDLER, async_msg_get_fn_type(_request));
+
 	vmfunc_klcd_wrapper(_request, 1);
 
 	irqret = fipc_get_reg0(_request);
 
 	return irqret;
 }
+
+struct irq_handler_data_map {
+	int irq;
+	struct irqhandler_t_container *irqhandler_data;
+}irq_map[2];
+
+int reg_irqs;
 
 int request_threaded_irq_callee(struct fipc_message *_request)
 {
@@ -3118,6 +3133,9 @@ int request_threaded_irq_callee(struct fipc_message *_request)
 				NULL, flags,
 				vector_name, (void*) irqhandler_container);
 
+	irq_map[reg_irqs].irq = irq;
+	irq_map[reg_irqs].irqhandler_data = irqhandler_container;
+
 	fipc_set_reg0(_request, func_ret);
 
 fail_alloc:
@@ -3127,13 +3145,22 @@ fail_alloc:
 int free_irq_callee(struct fipc_message *_request)
 {
 	unsigned 	int irq;
+	struct irqhandler_t_container *irqhandler_container;
 	int ret = 0;
+	int i;
 
-	irq = fipc_get_reg1(_request);
+	irq = fipc_get_reg0(_request);
 
 	LIBLCD_MSG("%s, freeing irq %d", __func__, irq);
 
-	free_irq(irq, NULL);
+	for (i = 0; i < 2; i++) {
+		if (irq_map[i].irq = irq) {
+			irqhandler_container = irq_map[i].irqhandler_data;
+			break;
+		}
+	}
+
+	free_irq(irq, irqhandler_container);
 
 	return ret;
 }
@@ -3149,26 +3176,30 @@ int poll(struct napi_struct *napi,
 {
 	int ret;
 	struct fipc_message r;
+	INIT_IPC_MSG(&r);
 	struct fipc_message *_request = &r;
 	struct napi_struct_container *napi_c;
-
 
 	napi_c = container_of(napi, struct napi_struct_container, napi_struct);
 
 	async_msg_set_fn_type(_request, POLL);
 	fipc_set_reg0(_request, budget);
 	fipc_set_reg1(_request, napi_c->other_ref.cptr);
+	fipc_set_reg2(_request, napi->state);
 
 	if (0)
 		printk("%s, poll - budget %d | napi_c->other_ref %lx\n", __func__,
 			budget, napi_c->other_ref.cptr);
 
+	add_trace_entry(EVENT_SOFTIRQ_POLL, async_msg_get_fn_type(_request));
 	vmfunc_klcd_wrapper(_request, 1);
 
 	ret = fipc_get_reg0(_request);
-
-	if (0)
-		printk("%s, returned %d\n", __func__, ret);
+#ifdef CONFIG_LCD_NAPI_STATE_SYNC
+	napi->state = fipc_get_reg1(_request);
+#endif
+	pr_debug("%s, napi %p, napi->state %lx\n", __func__, napi, napi->state);
+	pr_debug("%s, returned %d\n", __func__, ret);
 
 	return ret;
 }
@@ -3289,6 +3320,9 @@ int netif_napi_del_callee(struct fipc_message *_request)
 	glue_lookup_napi_hash(__cptr(fipc_get_reg0(_request)),
 						&napi_container);
 	napi = napi_container->napi;
+#ifdef CONFIG_LCD_NAPI_STATE_SYNC
+	napi->state = fipc_get_reg1(_request);
+#endif
 
 	netif_napi_del(napi);
 
@@ -3665,6 +3699,26 @@ fail_alloc:
 	return ret;
 }
 
+int ___napi_schedule_irqoff_callee(struct fipc_message *_request)
+{
+	struct napi_struct_container *napi_container = NULL;
+	struct napi_struct *napi;
+
+	glue_lookup_napi_hash(__cptr(fipc_get_reg0(_request)),
+						&napi_container);
+	napi = napi_container->napi;
+
+#ifdef CONFIG_LCD_NAPI_STATE_SYNC
+	napi->state = fipc_get_reg1(_request);
+#endif
+
+	napi_schedule_irqoff(napi);
+
+	fipc_set_reg0(_request, napi->state);
+
+	return 0;
+}
+
 int __napi_schedule_irqoff_callee(struct fipc_message *_request)
 {
 	struct napi_struct_container *napi_container = NULL;
@@ -3674,9 +3728,30 @@ int __napi_schedule_irqoff_callee(struct fipc_message *_request)
 						&napi_container);
 	napi = napi_container->napi;
 
+#ifdef CONFIG_LCD_NAPI_STATE_SYNC
 	napi->state = fipc_get_reg1(_request);
-
+#endif
 	__napi_schedule_irqoff(napi);
+
+	fipc_set_reg0(_request, napi->state);
+
+	return 0;
+}
+
+int __napi_enable_callee(struct fipc_message *_request)
+{
+	struct napi_struct_container *napi_container = NULL;
+	struct napi_struct *napi;
+
+	glue_lookup_napi_hash(__cptr(fipc_get_reg0(_request)),
+						&napi_container);
+	napi = napi_container->napi;
+
+#ifdef CONFIG_LCD_NAPI_STATE_SYNC
+	napi->state = fipc_get_reg1(_request);
+#endif
+
+	napi_enable(napi);
 
 	fipc_set_reg0(_request, napi->state);
 
@@ -3692,7 +3767,9 @@ int napi_disable_callee(struct fipc_message *_request)
 						&napi_container);
 	napi = napi_container->napi;
 
+#ifdef CONFIG_LCD_NAPI_STATE_SYNC
 	napi->state = fipc_get_reg1(_request);
+#endif
 
 	napi_disable(napi);
 
@@ -3711,10 +3788,43 @@ int napi_complete_done_callee(struct fipc_message *_request)
 						&napi_container);
 	napi = napi_container->napi;
 	work_done = fipc_get_reg1(_request);
+#ifdef CONFIG_LCD_NAPI_STATE_SYNC
 	napi->state = fipc_get_reg2(_request);
+#endif
 
+	add_trace_entry(EVENT_NAPI_COMPLETE_DONE, async_msg_get_fn_type(_request));
 	napi_complete_done(napi, work_done);
 
 	fipc_set_reg0(_request, napi->state);
 	return 0;
+}
+
+int synchronize_irq_callee(struct fipc_message *_request)
+{
+	unsigned int irq;
+
+	irq = fipc_get_reg0(_request);
+
+	synchronize_irq(irq);
+
+	return 0;
+}
+
+int __netif_tx_disable_callee(struct fipc_message *_request)
+{
+	struct net_device_container *dev_container;
+	int ret = 0;
+
+	ret = glue_cap_lookup_net_device_type(c_cspace,
+			__cptr(fipc_get_reg1(_request)),
+			&dev_container);
+	if (ret) {
+		LIBLCD_ERR("lookup");
+		goto fail_lookup;
+	}
+
+	netif_tx_disable(( &dev_container->net_device ));
+
+fail_lookup:
+	return ret;
 }

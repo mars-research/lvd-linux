@@ -184,4 +184,11 @@ int glue_cap_lookup_napi_struct_type(struct glue_cspace *cspace,
 		struct cptr c,
 		struct napi_struct_container **napi_struct_container);
 
+int glue_cap_insert_irqhandler_type(struct glue_cspace *cspace,
+		struct irqhandler_t_container *irqhandler_container,
+		struct cptr *c_out);
+int glue_cap_lookup_irqhandler_type(struct glue_cspace *cspace,
+		struct cptr c,
+		struct irqhandler_t_container **irqhandler_container);
+
 #endif /* __IXGBE_GLUE_HELPER_H__ */

@@ -35,9 +35,10 @@ struct kmem_cache *skb2_cache;
 struct kmem_cache *skb_c_cache1;
 struct kmem_cache *skb_cache;
 
+#ifdef NAPI_STRUCT_ARRAY
 struct napi_struct *napi_struct_array[32];
-static int napi_reg;
-
+static int napi_reg = 0;
+#endif
 /* XXX: How to determine this? */
 #define CPTR_HASH_BITS      5
 static DEFINE_HASHTABLE(cptr_table, CPTR_HASH_BITS);
@@ -204,6 +205,7 @@ void inline glue_remove_napi_hash(struct napi_struct_container *napi_c)
 void pci_disable_msix(struct pci_dev *dev)
 {
 	struct fipc_message r;
+	INIT_IPC_MSG(&r);
 	struct fipc_message *_request = &r;
 	struct pci_dev_container *device_container;
 
@@ -220,6 +222,7 @@ void pci_disable_msix(struct pci_dev *dev)
 int pci_enable_msix_range(struct pci_dev *dev, struct msix_entry *entries, int minvec, int maxvec)
 {
 	struct fipc_message r;
+	INIT_IPC_MSG(&r);
 	struct fipc_message *_request = &r;
 	int func_ret;
 	int sync_ret;
@@ -266,6 +269,7 @@ int __must_check __pci_register_driver(struct pci_driver *drv,
 	struct pci_driver_container *drv_container;
 	struct module_container *owner_container;
 	struct fipc_message r;
+	INIT_IPC_MSG(&r);
 	struct fipc_message *_request = &r;
 	int ret;
 	int func_ret;
@@ -317,6 +321,7 @@ struct net_device *alloc_etherdev_mqs(int sizeof_priv,
 {
 	struct net_device_container *func_ret_container;
 	struct fipc_message r;
+	INIT_IPC_MSG(&r);
 	struct fipc_message *_request = &r;
 	int ret;
 	struct net_device *func_ret;
@@ -528,6 +533,7 @@ void pci_unregister_driver(struct pci_driver *drv)
 {
 	struct pci_driver_container *drv_container;
 	struct fipc_message r;
+	INIT_IPC_MSG(&r);
 	struct fipc_message *_request = &r;
 
 	drv_container = container_of(drv,
@@ -573,6 +579,7 @@ int register_netdev(struct net_device *dev)
 {
 	struct net_device_container *dev_container;
 	struct fipc_message r;
+	INIT_IPC_MSG(&r);
 	struct fipc_message *_request = &r;
 
 	int func_ret;
@@ -609,6 +616,7 @@ void ether_setup(struct net_device *dev)
 {
 	struct net_device_container *dev_container;
 	struct fipc_message r;
+	INIT_IPC_MSG(&r);
 	struct fipc_message *_request = &r;
 
 	dev_container = container_of(dev,
@@ -629,6 +637,7 @@ int eth_mac_addr(struct net_device *dev,
 {
 	struct net_device_container *dev_container;
 	struct fipc_message r;
+	INIT_IPC_MSG(&r);
 	struct fipc_message *_request = &r;
 
 	int sync_ret;
@@ -667,6 +676,7 @@ int eth_validate_addr(struct net_device *dev)
 {
 	struct net_device_container *dev_container;
 	struct fipc_message r;
+	INIT_IPC_MSG(&r);
 	struct fipc_message *_request = &r;
 
 	int func_ret;
@@ -688,6 +698,7 @@ void free_netdev(struct net_device *dev)
 {
 	struct net_device_container *dev_container;
 	struct fipc_message r;
+	INIT_IPC_MSG(&r);
 	struct fipc_message *_request = &r;
 
 	dev_container = container_of(dev,
@@ -707,6 +718,7 @@ void netif_carrier_off(struct net_device *dev)
 {
 	struct net_device_container *dev_container;
 	struct fipc_message r;
+	INIT_IPC_MSG(&r);
 	struct fipc_message *_request = &r;
 
 	dev_container = container_of(dev,
@@ -728,6 +740,7 @@ void netif_carrier_on(struct net_device *dev)
 {
 	struct net_device_container *dev_container;
 	struct fipc_message r;
+	INIT_IPC_MSG(&r);
 	struct fipc_message *_request = &r;
 
 	dev_container = container_of(dev,
@@ -748,6 +761,7 @@ void netif_device_attach(struct net_device *dev)
 {
 	struct net_device_container *dev_container;
 	struct fipc_message r;
+	INIT_IPC_MSG(&r);
 	struct fipc_message *_request = &r;
 
 	dev_container = container_of(dev,
@@ -768,6 +782,7 @@ void netif_device_detach(struct net_device *dev)
 {
 	struct net_device_container *dev_container;
 	struct fipc_message r;
+	INIT_IPC_MSG(&r);
 	struct fipc_message *_request = &r;
 
 	dev_container = container_of(dev,
@@ -789,6 +804,7 @@ int netif_set_real_num_rx_queues(struct net_device *dev,
 {
 	struct net_device_container *dev_container;
 	struct fipc_message r;
+	INIT_IPC_MSG(&r);
 	struct fipc_message *_request = &r;
 
 	int func_ret;
@@ -813,6 +829,7 @@ int netif_set_real_num_tx_queues(struct net_device *dev,
 {
 	struct net_device_container *dev_container;
 	struct fipc_message r;
+	INIT_IPC_MSG(&r);
 	struct fipc_message *_request = &r;
 
 	int func_ret;
@@ -836,6 +853,7 @@ int netif_set_real_num_tx_queues(struct net_device *dev,
 void napi_consume_skb(struct sk_buff *skb, int budget)
 {
 	struct fipc_message r;
+	INIT_IPC_MSG(&r);
 	struct fipc_message *_request = &r;
 	struct sk_buff_container_2 *skb_c = NULL;
 
@@ -843,8 +861,7 @@ void napi_consume_skb(struct sk_buff *skb, int budget)
 				skb);
 
 	/* TODO: handle lookup failure */
-	async_msg_set_fn_type(_request,
-			NAPI_CONSUME_SKB);
+	async_msg_set_fn_type(_request, NAPI_CONSUME_SKB);
 
 	fipc_set_reg0(_request, skb_c->other_ref.cptr);
 	fipc_set_reg1(_request, budget);
@@ -858,6 +875,7 @@ void napi_consume_skb(struct sk_buff *skb, int budget)
 void consume_skb(struct sk_buff *skb)
 {
 	struct fipc_message r;
+	INIT_IPC_MSG(&r);
 	struct fipc_message *_request = &r;
 	struct sk_buff_container_2 *skb_c = NULL;
 
@@ -880,6 +898,7 @@ void consume_skb(struct sk_buff *skb)
 void unregister_netdev(struct net_device *dev)
 {
 	struct fipc_message r;
+	INIT_IPC_MSG(&r);
 	struct fipc_message *_request = &r;
 
 	struct net_device_container *dev_container;
@@ -901,6 +920,7 @@ int eth_platform_get_mac_address(struct device *dev,
 		u8 *mac_addr)
 {
 	struct fipc_message r;
+	INIT_IPC_MSG(&r);
 	struct fipc_message *_request = &r;
 
 	int func_ret;
@@ -935,6 +955,7 @@ int dev_addr_add(struct net_device *dev,
 {
 	struct net_device_container *dev_container;
 	struct fipc_message r;
+	INIT_IPC_MSG(&r);
 	struct fipc_message *_request = &r;
 
 	int sync_ret;
@@ -975,6 +996,7 @@ int dev_addr_del(struct net_device *dev,
 {
 	struct net_device_container *dev_container;
 	struct fipc_message r;
+	INIT_IPC_MSG(&r);
 	struct fipc_message *_request = &r;
 
 #ifdef PASS_DEV_ADDR_IN_REG
@@ -1025,6 +1047,7 @@ int device_set_wakeup_enable(struct device *dev,
 		bool enable)
 {
 	struct fipc_message r;
+	INIT_IPC_MSG(&r);
 	struct fipc_message *_request = &r;
 
 	int func_ret;
@@ -1042,6 +1065,7 @@ int device_set_wakeup_enable(struct device *dev,
 void netif_tx_stop_all_queues(struct net_device *dev)
 {
 	struct fipc_message r;
+	INIT_IPC_MSG(&r);
 	struct fipc_message *_request = &r;
 
 	struct net_device_container *dev_container;
@@ -1064,6 +1088,7 @@ void _netif_tx_wake_all_queues(struct net_device *dev)
 {
 	struct net_device_container *dev_queue_container;
 	struct fipc_message r;
+	INIT_IPC_MSG(&r);
 	struct fipc_message *_request = &r;
 
 	dev_queue_container = container_of(dev,
@@ -1084,6 +1109,7 @@ void _netif_tx_wake_all_queues(struct net_device *dev)
 int pci_disable_pcie_error_reporting(struct pci_dev *dev)
 {
 	struct fipc_message r;
+	INIT_IPC_MSG(&r);
 	struct fipc_message *_request = &r;
 	int func_ret;
 	struct pci_dev_container *device_container;
@@ -1107,6 +1133,7 @@ int pci_bus_read_config_word(struct pci_bus *bus,
 		unsigned short *val)
 {
 	struct fipc_message r;
+	INIT_IPC_MSG(&r);
 	struct fipc_message *_request = &r;
 	int func_ret;
 
@@ -1128,6 +1155,7 @@ int pci_bus_write_config_word(struct pci_bus *bus,
 		unsigned short val)
 {
 	struct fipc_message r;
+	INIT_IPC_MSG(&r);
 	struct fipc_message *_request = &r;
 	int func_ret;
 
@@ -1146,6 +1174,7 @@ int pci_bus_write_config_word(struct pci_bus *bus,
 int pci_cleanup_aer_uncorrect_error_status(struct pci_dev *dev)
 {
 	struct fipc_message r;
+	INIT_IPC_MSG(&r);
 	struct fipc_message *_request = &r;
 	int func_ret;
 	struct pci_dev_container *device_container;
@@ -1167,6 +1196,7 @@ int pci_cleanup_aer_uncorrect_error_status(struct pci_dev *dev)
 void pci_disable_device(struct pci_dev *dev)
 {
 	struct fipc_message r;
+	INIT_IPC_MSG(&r);
 	struct fipc_message *_request = &r;
 	struct pci_dev_container *device_container;
 
@@ -1185,6 +1215,7 @@ void pci_disable_device(struct pci_dev *dev)
 int pci_enable_pcie_error_reporting(struct pci_dev *dev)
 {
 	struct fipc_message r;
+	INIT_IPC_MSG(&r);
 	struct fipc_message *_request = &r;
 
 	int func_ret;
@@ -1208,6 +1239,7 @@ int pcie_capability_read_word(struct pci_dev *dev,
 		unsigned short *val)
 {
 	struct fipc_message r;
+	INIT_IPC_MSG(&r);
 	struct fipc_message *_request = &r;
 	int func_ret;
 	struct pci_dev_container *device_container;
@@ -1233,6 +1265,7 @@ int pcie_get_minimum_link(struct pci_dev *dev,
 		enum pcie_link_width *width)
 {
 	struct fipc_message r;
+	INIT_IPC_MSG(&r);
 	struct fipc_message *_request = &r;
 	int func_ret;
 	struct pci_dev_container *device_container;
@@ -1258,6 +1291,7 @@ int pci_enable_device_mem(struct pci_dev *dev)
 {
 	int func_ret = 0;
 	struct fipc_message r;
+	INIT_IPC_MSG(&r);
 	struct fipc_message *_request = &r;
 	struct pci_dev_container *device_container;
 
@@ -1280,6 +1314,7 @@ int pci_request_selected_regions(struct pci_dev *dev,
 		const char *reg)
 {
 	struct fipc_message r;
+	INIT_IPC_MSG(&r);
 	struct fipc_message *_request = &r;
 	int func_ret;
 	struct pci_dev_container *device_container;
@@ -1304,6 +1339,7 @@ int pci_request_selected_regions_exclusive(struct pci_dev *dev,
 		const char *reg)
 {
 	struct fipc_message r;
+	INIT_IPC_MSG(&r);
 	struct fipc_message *_request = &r;
 	int func_ret;
 	struct pci_dev_container *device_container;
@@ -1326,6 +1362,7 @@ int pci_request_selected_regions_exclusive(struct pci_dev *dev,
 void pci_set_master(struct pci_dev *dev)
 {
 	struct fipc_message r;
+	INIT_IPC_MSG(&r);
 	struct fipc_message *_request = &r;
 	struct pci_dev_container *device_container;
 
@@ -1343,6 +1380,7 @@ void pci_set_master(struct pci_dev *dev)
 int pci_save_state(struct pci_dev *dev)
 {
 	struct fipc_message r;
+	INIT_IPC_MSG(&r);
 	struct fipc_message *_request = &r;
 	int func_ret;
 	struct pci_dev_container *device_container;
@@ -1382,6 +1420,7 @@ void pci_release_selected_regions(struct pci_dev *dev, int r)
 int pci_select_bars(struct pci_dev *dev, unsigned long flags)
 {
 	struct fipc_message r;
+	INIT_IPC_MSG(&r);
 	struct fipc_message *_request = &r;
 	int func_ret = 0;
 	struct pci_dev_container *device_container;
@@ -1403,6 +1442,7 @@ int pci_select_bars(struct pci_dev *dev, unsigned long flags)
 int pci_wake_from_d3(struct pci_dev *dev, bool enable)
 {
 	struct fipc_message r;
+	INIT_IPC_MSG(&r);
 	struct fipc_message *_request = &r;
 	int func_ret = 0;
 	struct pci_dev_container *device_container;
@@ -1557,10 +1597,16 @@ int ndo_start_xmit_callee(struct fipc_message *_request)
 #endif
 	func_ret = ixgbe_xmit_frame(skb, g_netdev);
 
+	/* packet transmission failed - free skb_c right here */
+	if (func_ret) {
+		kmem_cache_free(skb2_cache, skb_c);
+	}
+
 #ifdef LCD_MEASUREMENT
 	TS_STOP_LCD(xmit);
 #endif
 
+	async_msg_set_fn_type(_request, 0xdeadbeef);
 	fipc_set_reg0(_request, func_ret);
 
 #ifdef LCD_MEASUREMENT
@@ -1782,6 +1828,9 @@ int ixgbe_service_event_schedule_callee(struct fipc_message *_request)
 		goto fail_lookup;
 	}
 
+	if (0)
+		printk("%s, napi %p, napi->state %lx", __func__, napi_struct_array[0],
+					napi_struct_array[0]->state);
 
 	__ixgbe_service_event_schedule(&dev_container->net_device);
 
@@ -1803,7 +1852,6 @@ int trigger_dump_callee(struct fipc_message *_request)
 		goto fail_lookup;
 	}
 
-
 	__ixgbe_dump(&dev_container->net_device);
 
 fail_lookup:
@@ -1822,6 +1870,7 @@ int __hw_addr_sync_dev(
 	struct net_device_container *dev1_container;
 	int ret = 0;
 	struct fipc_message r;
+	INIT_IPC_MSG(&r);
 	struct fipc_message *_request = &r;
 
 	int func_ret;
@@ -1867,6 +1916,7 @@ void __hw_addr_unsync_dev(
 {
 	struct net_device_container *dev1_container;
 	struct fipc_message r;
+	INIT_IPC_MSG(&r);
 	struct fipc_message *_request = &r;
 
 	dev1_container = container_of(dev1,
@@ -1971,6 +2021,7 @@ int request_threaded_irq(unsigned int irq, irq_handler_t handler,
 				unsigned long flags, const char *name, void *dev)
 {
 	struct fipc_message r;
+	INIT_IPC_MSG(&r);
 	struct fipc_message *_request = &r;
 	struct irqhandler_t_container *irqhandler_container;
 	int func_ret;
@@ -2009,11 +2060,12 @@ fail_alloc:
 void free_irq(unsigned int irq, void *dev_id)
 {
 	struct fipc_message r;
+	INIT_IPC_MSG(&r);
 	struct fipc_message *_request = &r;
 
 	async_msg_set_fn_type(_request, FREE_IRQ);
 
-	fipc_set_reg1(_request, irq);
+	fipc_set_reg0(_request, irq);
 
 	vmfunc_wrapper(_request);
 
@@ -2028,6 +2080,7 @@ void netif_napi_add(struct net_device *dev,
 	struct net_device_container *dev_container;
 	struct poll_container *poll_container;
 	struct fipc_message r;
+	INIT_IPC_MSG(&r);
 	struct fipc_message *_request = &r;
 	struct napi_struct_container *napi_container;
 
@@ -2060,7 +2113,10 @@ void netif_napi_add(struct net_device *dev,
 	napi_container->other_ref = __cptr(fipc_get_reg0(_request));
 
 	/* XXX: napi_hashtable creates some trouble */
-	napi_struct_array[napi_reg++] = napi;
+	napi_struct_array[napi_reg] = napi;
+	printk("%s, adding napi: %p to napi_struct_array idx: %d",
+					__func__, napi, napi_reg);
+	napi_reg++;
 
 	napi->state = fipc_get_reg1(_request);
 
@@ -2068,34 +2124,42 @@ fail_alloc:
 	return;
 }
 
-int ixgbe_poll(struct napi_struct *napi, int budget);
+extern int ixgbe_poll(struct napi_struct *napi, int budget);
 
 int poll_callee(struct fipc_message *_request)
 {
 	int budget;
+#ifndef NAPI_STRUCT_ARRAY
 	struct napi_struct_container *napi_c = NULL;
+#endif
 	struct napi_struct *napi;
-	static int once = 1;
+	static int count = 0;
 	int ret;
 
 	budget = fipc_get_reg0(_request);
 
-#if 0
+#ifndef NAPI_STRUCT_ARRAY
 	glue_lookup_napi_hash(__cptr(fipc_get_reg1(_request)), &napi_c);
+	BUG_ON(!napi_c->napi);
+	napi = napi_c->napi;
 #endif
 	napi = napi_struct_array[0];
 
-	/* BUG_ON(!napi_c->napi); */
-	if (once) {
+	if (!count) {
 		//printk("%s, napi_c %p | napi_c->napi %p", __func__, napi_c,
 		//		napi_c ? napi_c->napi : NULL);
-		printk("%s, napi %p", __func__, napi);
-		once = 0;
+		//printk("%s, napi %p", __func__, napi);
+		printk("%s, napi->state 0x%lx budget:%d", __func__,
+						napi->state, budget);
+		count = 1;
 	}
 
-	ret = ixgbe_poll(napi_c->napi, budget);
+	napi->state = fipc_get_reg2(_request);
+
+	ret = ixgbe_poll(napi, budget);
 
 	fipc_set_reg0(_request, ret);
+	//fipc_set_reg1(_request, napi->state);
 
 	return 0;
 }
@@ -2103,6 +2167,7 @@ int poll_callee(struct fipc_message *_request)
 void netif_napi_del(struct napi_struct *napi)
 {
 	struct fipc_message r;
+	INIT_IPC_MSG(&r);
 	struct fipc_message *_request = &r;
 	struct napi_struct_container *napi_container;
 
@@ -2111,6 +2176,7 @@ void netif_napi_del(struct napi_struct *napi)
 	async_msg_set_fn_type(_request, NETIF_NAPI_DEL);
 
 	fipc_set_reg0(_request, napi_container->other_ref.cptr);
+	//fipc_set_reg1(_request, napi->state);
 
 	vmfunc_wrapper(_request);
 
@@ -2124,6 +2190,7 @@ void netif_wake_subqueue(struct net_device *dev,
 {
 	struct net_device_container *dev_container;
 	struct fipc_message r;
+	INIT_IPC_MSG(&r);
 	struct fipc_message *_request = &r;
 
 	dev_container = container_of(dev,
@@ -2142,6 +2209,7 @@ void netif_wake_subqueue(struct net_device *dev,
 int netif_receive_skb(struct sk_buff *skb)
 {
 	struct fipc_message r;
+	INIT_IPC_MSG(&r);
 	struct fipc_message *_request = &r;
 
 	int func_ret;
@@ -2170,6 +2238,7 @@ gro_result_t napi_gro_receive(struct napi_struct *napi,
 		struct sk_buff *skb)
 {
 	struct fipc_message r;
+	INIT_IPC_MSG(&r);
 	struct fipc_message *_request = &r;
 
 	int func_ret;
@@ -2255,6 +2324,7 @@ struct sk_buff *__napi_alloc_skb(struct napi_struct *napi,
 		gfp_t gfp_mask)
 {
 	struct fipc_message r;
+	INIT_IPC_MSG(&r);
 	struct fipc_message *_request = &r;
 
 	cptr_t skb_cptr, skbd_cptr;
@@ -2329,6 +2399,7 @@ gro_result_t napi_gro_receive(struct napi_struct *napi,
 		struct sk_buff *skb)
 {
 	struct fipc_message r;
+	INIT_IPC_MSG(&r);
 	struct fipc_message *_request = &r;
 	int func_ret = 0;
 	struct skb_shared_info *shinfo;
@@ -2433,6 +2504,7 @@ __be16 eth_type_trans(struct sk_buff *skb,
 {
 	struct net_device_container *dev_container;
 	struct fipc_message r;
+	INIT_IPC_MSG(&r);
 	struct fipc_message *_request = &r;
 
 	__be16 func_ret;
@@ -2470,9 +2542,32 @@ __be16 eth_type_trans(struct sk_buff *skb,
 }
 #endif
 
+void ___napi_schedule_irqoff(struct napi_struct *napi)
+{
+	struct fipc_message r;
+	INIT_IPC_MSG(&r);
+	struct fipc_message *_request = &r;
+	struct napi_struct_container *napi_container;
+
+	napi_container = container_of(napi, struct napi_struct_container, napi_struct);
+
+	async_msg_set_fn_type(_request, ___NAPI_SCHEDULE_IRQOFF);
+
+	fipc_set_reg0(_request, napi_container->other_ref.cptr);
+	//fipc_set_reg1(_request, napi->state);
+
+	vmfunc_wrapper(_request);
+
+	napi->state = fipc_get_reg0(_request);
+
+	return;
+}
+
+
 void __napi_schedule_irqoff(struct napi_struct *napi)
 {
 	struct fipc_message r;
+	INIT_IPC_MSG(&r);
 	struct fipc_message *_request = &r;
 	struct napi_struct_container *napi_container;
 
@@ -2481,7 +2576,28 @@ void __napi_schedule_irqoff(struct napi_struct *napi)
 	async_msg_set_fn_type(_request, __NAPI_SCHEDULE_IRQOFF);
 
 	fipc_set_reg0(_request, napi_container->other_ref.cptr);
-	fipc_set_reg1(_request, napi->state);
+	//fipc_set_reg1(_request, napi->state);
+
+	vmfunc_wrapper(_request);
+
+	napi->state = fipc_get_reg0(_request);
+
+	return;
+}
+
+void __napi_enable(struct napi_struct *napi)
+{
+	struct fipc_message r;
+	INIT_IPC_MSG(&r);
+	struct fipc_message *_request = &r;
+	struct napi_struct_container *napi_container;
+
+	napi_container = container_of(napi, struct napi_struct_container, napi_struct);
+
+	async_msg_set_fn_type(_request, __NAPI_ENABLE);
+
+	fipc_set_reg0(_request, napi_container->other_ref.cptr);
+	//fipc_set_reg1(_request, napi->state);
 
 	vmfunc_wrapper(_request);
 
@@ -2493,6 +2609,7 @@ void __napi_schedule_irqoff(struct napi_struct *napi)
 void napi_disable(struct napi_struct *napi)
 {
 	struct fipc_message r;
+	INIT_IPC_MSG(&r);
 	struct fipc_message *_request = &r;
 	struct napi_struct_container *napi_container;
 
@@ -2501,7 +2618,7 @@ void napi_disable(struct napi_struct *napi)
 	async_msg_set_fn_type(_request, NAPI_DISABLE);
 
 	fipc_set_reg0(_request, napi_container->other_ref.cptr);
-	fipc_set_reg1(_request, napi->state);
+	//fipc_set_reg1(_request, napi->state);
 
 	vmfunc_wrapper(_request);
 
@@ -2513,6 +2630,7 @@ void napi_disable(struct napi_struct *napi)
 void napi_complete_done(struct napi_struct *napi, int work_done)
 {
 	struct fipc_message r;
+	INIT_IPC_MSG(&r);
 	struct fipc_message *_request = &r;
 	struct napi_struct_container *napi_container;
 
@@ -2522,10 +2640,49 @@ void napi_complete_done(struct napi_struct *napi, int work_done)
 
 	fipc_set_reg0(_request, napi_container->other_ref.cptr);
 	fipc_set_reg1(_request, work_done);
-	fipc_set_reg2(_request, napi->state);
+	//fipc_set_reg2(_request, napi->state);
 
 	vmfunc_wrapper(_request);
 
 	napi->state = fipc_get_reg0(_request);
+	return;
+}
+
+void synchronize_irq(unsigned int irq)
+{
+	struct fipc_message r;
+	INIT_IPC_MSG(&r);
+	struct fipc_message *_request = &r;
+
+	async_msg_set_fn_type(_request, SYNCHRONIZE_IRQ);
+
+	fipc_set_reg0(_request, irq);
+
+	vmfunc_wrapper(_request);
+
+	return;
+}
+
+void __netif_tx_disable(struct net_device *dev)
+{
+	struct net_device_container *dev_container;
+	struct fipc_message r;
+	INIT_IPC_MSG(&r);
+	struct fipc_message *_request = &r;
+
+	dev_container = container_of(dev,
+		struct net_device_container,
+		net_device);
+
+	async_msg_set_fn_type(_request, __NETIF_TX_DISABLE);
+	fipc_set_reg1(_request, dev_container->other_ref.cptr);
+
+	vmfunc_wrapper(_request);
+
+	/*
+	 * TODO: All the queue states are modified. we should synchronize all of
+	 * them. PITA!
+	 */
+
 	return;
 }

@@ -26,6 +26,7 @@
 #define LOCAL_SKB
 #define SENDER_DISPATCH_LOOP
 #define PASS_DEV_ADDR_IN_REG
+#define NAPI_STRUCT_ARRAY
 
 enum dispatch_t {
 	__PCI_REGISTER_DRIVER,
@@ -52,6 +53,7 @@ enum dispatch_t {
 	DEVICE_SET_WAKEUP_ENABLE,
 	NETIF_TX_STOP_ALL_QUEUES,
 	NETIF_TX_WAKE_ALL_QUEUES,
+	__NETIF_TX_DISABLE,
 	NETIF_NAPI_ADD,
 	NETIF_NAPI_DEL,
 	NETIF_WAKE_SUBQUEUE,
@@ -59,6 +61,8 @@ enum dispatch_t {
 	NAPI_GRO_RECEIVE,
 	__NAPI_ALLOC_SKB,
 	__NAPI_SCHEDULE_IRQOFF,
+	___NAPI_SCHEDULE_IRQOFF,
+	__NAPI_ENABLE,
 	NAPI_DISABLE,
 	NAPI_COMPLETE_DONE,
 	ETH_TYPE_TRANS,
@@ -112,6 +116,7 @@ enum dispatch_t {
 	MODULE_EXIT,
 	SYNC_PROBE,
 	SYNC_NDO_SET_MAC_ADDRESS,
+	SYNCHRONIZE_IRQ,
 };
 
 typedef enum {
@@ -121,7 +126,7 @@ typedef enum {
 
 typedef enum {
 	VOLUNTEER_XMIT = 0x1,
-	SHARED_DATA_XMIT = 0x2,
+	SHARED_DATA_XMIT = 0x2abcd,
 } xmit_type_t;
 
 typedef enum {
@@ -183,6 +188,7 @@ void glue_cap_remove(
 	struct glue_cspace *cspace,
 	cptr_t c);
 
+#define INIT_IPC_MSG(m)		memset(m, 0x0, sizeof(*m))
 /* ASYNC HELPERS -------------------------------------------------- */
 static inline
 int

@@ -13,6 +13,7 @@ int eth_mac_addr_callee(struct fipc_message *_request);
 int eth_validate_addr_callee(struct fipc_message *_request);
 int free_netdev_callee(struct fipc_message *_request);
 int netif_carrier_off_callee(struct fipc_message *_request);
+int __netif_tx_disable_callee(struct fipc_message *_request);
 int netif_carrier_on_callee(struct fipc_message *_request);
 int netif_device_attach_callee(struct fipc_message *_request);
 int netif_device_detach_callee(struct fipc_message *_request);
@@ -62,8 +63,11 @@ int napi_gro_receive_callee(struct fipc_message *_request);
 
 int __napi_alloc_skb_callee(struct fipc_message *_request);
 int __napi_schedule_irqoff_callee(struct fipc_message *_request);
+int ___napi_schedule_irqoff_callee(struct fipc_message *_request);
+int __napi_enable_callee(struct fipc_message *_request);
 int napi_disable_callee(struct fipc_message *_request);
 int napi_complete_done_callee(struct fipc_message *_request);
+int synchronize_irq_callee(struct fipc_message *_request);
 
 int eth_type_trans_callee(struct fipc_message *_request);
 int skb_add_rx_frag_callee(struct fipc_message *_request);

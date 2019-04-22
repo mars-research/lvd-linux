@@ -36,5 +36,7 @@ int msix_vector_handler_callee(struct fipc_message *_request);
 int trigger_dump_callee(struct fipc_message *_request);
 
 int poll_callee(struct fipc_message *_request);
+void __napi_enable(struct napi_struct *napi);
+void __netif_tx_disable(struct net_device *dev);
 
 #endif /* __IXGBE_CALLER_H__ */

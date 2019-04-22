@@ -28,6 +28,8 @@ void napi_disable(struct napi_struct *n) {
 void napi_complete_done(struct napi_struct *n, int work_done) {
 	LIBLCD_MSG("================>$$$$$$ Dummy %s called", __func__);
 }
+
+void synchronize_irq(unsigned int irq) { LIBLCD_MSG("================>$$$$$$ Dummy %s called", __func__); }
 #endif
 
 int call_netdevice_notifiers(unsigned long val, struct net_device *dev)
@@ -40,9 +42,6 @@ bool cancel_work_sync(struct work_struct *work) { LIBLCD_MSG("================>$
  * just make the assert macro happy by faking that we did.
  */
 int rtnl_is_locked(void) { LIBLCD_MSG("================>$$$$$$ Dummy %s called", __func__); return 1; }
-
-void synchronize_irq(unsigned int irq) { LIBLCD_MSG("================>$$$$$$ Dummy %s called", __func__); }
-
 
 void napi_gro_flush(struct napi_struct *napi, bool flush_old) { LIBLCD_MSG("================>$$$$$$ Dummy %s called", __func__); }
 

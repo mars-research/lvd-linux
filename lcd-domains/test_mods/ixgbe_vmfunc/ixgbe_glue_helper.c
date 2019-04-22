@@ -238,3 +238,24 @@ int glue_cap_lookup_napi_struct_type(struct glue_cspace *cspace,
 		( void  ** )napi_struct_container);
 
 }
+
+int glue_cap_insert_irqhandler_type(struct glue_cspace *cspace,
+		struct irqhandler_t_container *irqhandler_container,
+		struct cptr *c_out)
+{
+	return glue_cspace_insert(cspace,
+		irqhandler_container,
+		glue_libcap_type_ops[ GLUE_TYPE_NAPI_STRUCT_CONTAINER ].libcap_type,
+		c_out);
+
+}
+int glue_cap_lookup_irqhandler_type(struct glue_cspace *cspace,
+		struct cptr c,
+		struct irqhandler_t_container **irqhandler_container)
+{
+	return glue_cspace_lookup(cspace,
+		c,
+		glue_libcap_type_ops[ GLUE_TYPE_IRQ_HANDLER_CONTAINER ].libcap_type,
+		( void  ** )irqhandler_container);
+
+}

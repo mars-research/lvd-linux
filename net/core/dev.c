@@ -141,6 +141,7 @@
 #include <linux/netfilter_ingress.h>
 #include <linux/sctp.h>
 #include <linux/crash_dump.h>
+#include <linux/lcd_trace.h>
 
 #include "net-sysfs.h"
 
@@ -5243,6 +5244,7 @@ static void net_rx_action(struct softirq_action *h)
 		}
 
 		n = list_first_entry(&list, struct napi_struct, poll_list);
+		add_trace_entry(EVENT_NET_RX_ACTION, 0);
 		budget -= napi_poll(n, &repoll);
 
 		/* If softirq window is exhausted then punt.

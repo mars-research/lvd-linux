@@ -1,3 +1,4 @@
+#include <asm/msr.h>
 #include <asm/ptrace.h>
 #include <asm/current.h>
 #include <linux/percpu.h>
@@ -9,18 +10,53 @@ DEFINE_PER_CPU(unsigned char, ring_head);
 
 #define NUM_TRACE_ENTRIES	(RING_BUFFER_SIZE / sizeof(struct ring_trace_entry))
 
-char *trace_event_type_string[] = {
-	"xmit",
-	"msix_hndlr",
-	"napi_comp_done",
-	"irq",
-	"nmi",
-	"exception",
-	"softirq_rx_poll",
-	"net_rx_action"
-};
+static const char *event_type_to_string(unsigned type)
+{
+	switch (type) {
+		case EVENT_XMIT:
+			return "XMIT";
 
-asmlinkage __visible notrace void __add_trace_entry(trace_event_t type,
+		case EVENT_MSIX_HANDLER:
+			return "MSIX_HANDLER";
+
+		case EVENT_NAPI_COMPLETE_DONE:
+			return "NAPI_COMP_DONE";
+
+		case EVENT_IRQ:
+			return "IRQ";
+
+		case EVENT_NMI:
+			return "NMI";
+
+		case EVENT_EXCEPTION:
+			return "EXCEPTION";
+
+		case EVENT_IRQ_EXIT:
+			return "IRQ_EXIT";
+
+		case EVENT_SOFTIRQ_POLL:
+			return "SOFTIRQ_POLL";
+
+		case EVENT_NET_RX_ACTION:
+			return "NET_RX_ACTION";
+
+		case EVENT_VMFUNC_TRAMP_ENTRY:
+			return "TRAMP_ENTRY";
+
+		case EVENT_VMFUNC_TRAMP_EXIT:
+			return "TRAMP_EXIT";
+
+		case EVENT_VMFUNC_SBOARD_KLCD_ENTER:
+			return "SBOARD_ENTER";
+
+		case EVENT_VMFUNC_SBOARD_KLCD_LEAVE:
+			return "SBOARD_LEAVE";
+		default:
+			return "Undefined item";
+	}
+}
+
+asmlinkage __visible notrace void __add_trace_entry(unsigned type,
 		unsigned long rdi, unsigned long rsp, unsigned long eflags,
 		unsigned long ip)
 {
@@ -28,20 +64,25 @@ asmlinkage __visible notrace void __add_trace_entry(trace_event_t type,
 	unsigned char *ring_buf_base = per_cpu(ring_buffer, cpu);
 	struct ring_trace_entry *ring_buf = (struct ring_trace_entry*) ring_buf_base;
 	unsigned char head_idx = __this_cpu_read(ring_head);
-	struct ring_trace_entry *entry = (struct ring_trace_entry*) &ring_buf[head_idx];
+	struct ring_trace_entry *entry;
+
+	__this_cpu_write(ring_head, (++head_idx % NUM_TRACE_ENTRIES));
+
+	entry = (struct ring_trace_entry*) &ring_buf[head_idx];
 	entry->rip = ip;
 	entry->rsp = rsp;
 	entry->rdi = rdi;
 	entry->eflags = eflags;
 	entry->lcd_stack = (unsigned long) current->lcd_stack;
 	entry->lcd_stack_bit = current->lcd_stack_bit;
+	entry->lcd_nc = current->nested_count;
 	entry->pid = current->pid;
+	entry->gsbase = native_read_msr(MSR_GS_BASE);
 	entry->context = (!!in_irq() << IN_IRQ_SHIFT)
 				| (!!in_softirq() << IN_SOFTIRQ_SHIFT)
 				| (!!in_nmi() << IN_NMI_SHIFT);
 	entry->type = type;
 	snprintf(entry->name, PROC_NAME_MAX, current->comm);
-	__this_cpu_write(ring_head, (++head_idx % NUM_TRACE_ENTRIES));
 }
 
 __asm__(
@@ -63,7 +104,7 @@ EXPORT_SYMBOL(add_trace_entry);
 
 
 asmlinkage __visible notrace void add_trace_entry_tf(struct pt_regs *regs,
-		trace_event_t type)
+		unsigned type)
 {
 	__add_trace_entry(type, regs->di, regs->sp, regs->flags, regs->ip);
 }
@@ -90,17 +131,18 @@ void dump_ring_trace_buffer(void)
 		struct ring_trace_entry *entry = &trace_entries[head_idx % NUM_TRACE_ENTRIES];
 		if (i == 0)
 			printk("head ==> ");
-		printk("type:%16s cpu: %d [%c|%c|%c] comm: %s pid: %d rip: %08lx rsp: %08lx "
-				"rdi: %08lx lcd_stack: %08lx[esp_lcd_bmap: %x] "
-				"eflags: %lx [IF: %d]\n",
-				trace_event_type_string[entry->type - 1],
+		printk("type:%16s(%x) cpu: %d [%c|%c|%c] comm: %s pid: %d rip: %16lx rsp: %16lx "
+				"rdi: %09lx gsbase: %16lx lcd_stack: %16lx[bmap: %x nc:%u] "
+				"eflags: %08lx [IF: %d]\n",
+				event_type_to_string(entry->type),
+				entry->type,
 				raw_smp_processor_id(),
 				entry->context & (IN_NMI) ? 'N' : '-',
 				entry->context & (IN_SOFTIRQ) ? 'S' : '-',
 				entry->context & (IN_IRQ) ? 'I' : '-',
 				entry->name, entry->pid, entry->rip,
-				entry->rsp, entry->rdi, entry->lcd_stack,
-				entry->lcd_stack_bit, entry->eflags,
+				entry->rsp, entry->rdi, entry->gsbase, entry->lcd_stack,
+				entry->lcd_stack_bit, entry->lcd_nc, entry->eflags,
 				!!(entry->eflags & IF_FLAG));
 	}
 }

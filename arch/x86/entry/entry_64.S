@@ -619,6 +619,12 @@ END(irq_entries_start)
 	/* We entered an interrupt context - irqs are off: */
 	TRACE_IRQS_OFF
 
+	/* Trace IRQ into LCDs buffer, rdi = trap frame, rsi = event type */
+	pushq   %rdi
+	movq    $4, %rsi
+	call    add_trace_entry_tf
+	popq    %rdi
+
 	call	\func	/* rdi points to pt_regs */
 	.endm
 
@@ -951,6 +957,14 @@ ENTRY(\sym)
 	subq	$EXCEPTION_STKSZ, CPU_TSS_IST(\shift_ist)
 	.endif
 
+	/* Trace IRQ into LCDs buffer, rdi = trap frame, rsi = event type */
+	pushq   %rdi
+	pushq   %rsi
+	movq    $6, %rsi
+	call    add_trace_entry_tf
+	popq    %rsi
+	popq    %rdi
+
 	call	\do_sym
 
 	.if \shift_ist != -1
@@ -986,6 +1000,8 @@ ENTRY(\sym)
 	.else
 	xorl	%esi, %esi			/* no error code */
 	.endif
+
+
 
 	call	\do_sym
 
@@ -1523,6 +1539,12 @@ ENTRY(nmi_vmfunc_simple)
 	 * done with the NMI stack.
 	 */
 
+	/* Trace IRQ into LCDs buffer, rdi = trap frame, rsi = event type */
+	movq    %rsp, %rdi
+	movq    $5, %rsi
+	call    add_trace_entry_tf
+
+
 	movq	%rsp, %rdi
 	movq	$-1, %rsi
 	call	do_nmi
@@ -1580,6 +1602,11 @@ ENTRY(nmi_vmfunc_simple)
 	 */
 	call	paranoid_entry_vmfunc_nmi
 //	call    paranoid_entry
+
+	/* Trace IRQ into LCDs buffer, rdi = trap frame, rsi = event type */
+	movq    %rsp, %rdi
+	movq    $5, %rsi
+	call    add_trace_entry_tf
 
 	/* paranoidentry do_nmi, 0; without TRACE_IRQS_OFF */
 	movq	%rsp, %rdi

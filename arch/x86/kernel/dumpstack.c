@@ -22,7 +22,7 @@
 int panic_on_unrecovered_nmi;
 int panic_on_io_nmi;
 unsigned int code_bytes = 64;
-int kstack_depth_to_print = 3 * STACKSLOTS_PER_LINE;
+int kstack_depth_to_print = 20 * STACKSLOTS_PER_LINE;
 static int die_counter;
 
 static void printk_stack_address(unsigned long address, int reliable,

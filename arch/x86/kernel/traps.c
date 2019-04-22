@@ -557,7 +557,7 @@ NOKPROBE_SYMBOL(sync_regs_to_ist);
 
 asmlinkage __visible notrace void save_lcd_stack(struct pt_regs *eregs)
 {
-	current->lcd_stack = eregs->sp; 
+	current->lcd_stack = (void*) eregs->sp;
 	return;
 }
 NOKPROBE_SYMBOL(save_lcd_stack);

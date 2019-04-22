@@ -3301,6 +3301,9 @@ void dump_stack_print_info(const char *log_lvl)
 		printk("%sHardware name: %s\n",
 		       log_lvl, dump_stack_arch_desc_str);
 
+	printk("vmfunc_lcd: %p lcd_stack: %p[bitmap: %x] nested: %d\n",
+			current->vmfunc_lcd, current->lcd_stack,
+			current->lcd_stack_bit, current->nested_count);
 	print_worker_info(log_lvl, current);
 }
 

@@ -36,6 +36,7 @@
 #include <asm/smap.h>
 #include <asm/pgtable_types.h>
 #include <linux/err.h>
+#include <linux/lcd_trace.h>
 
 /* Avoid __ASSEMBLER__'ifying <linux/audit.h> just for this.  */
 #include <linux/elf-em.h>
@@ -619,9 +620,12 @@ END(irq_entries_start)
 	/* We entered an interrupt context - irqs are off: */
 	TRACE_IRQS_OFF
 
+	/* No matter which path we took, save current LCD stack */
+	movq	vmfunc_state_page + VMFUNC_kernel_esp, %r13
+
 	/* Trace IRQ into LCDs buffer, rdi = trap frame, rsi = event type */
 	pushq   %rdi
-	movq    $4, %rsi
+	movq    $EVENT_IRQ, %rsi
 	call    add_trace_entry_tf
 	popq    %rdi
 
@@ -641,6 +645,7 @@ common_interrupt:
 ret_from_intr:
 	DISABLE_INTERRUPTS(CLBR_NONE)
 	TRACE_IRQS_OFF
+
 	decl	PER_CPU_VAR(irq_count)
 
 	/* Restore saved previous stack */
@@ -648,6 +653,14 @@ ret_from_intr:
 	/* If we exit to user level we might not have 
 	 * valid gs after swapgs, save the IST pointer here */
 	//movq    PER_CPU_VAR(lvd_irq_stack_addr), %r13
+
+	/* Restore the kernel stack in the VMFUNC state page */
+	movq 	%r13, vmfunc_state_page + VMFUNC_kernel_esp
+
+	/* Trace IRQ into LCDs buffer, rdi = trap frame, rsi = event type */
+	movq    %rsp, %rdi
+	movq    $EVENT_IRQ_EXIT, %rsi
+	call    add_trace_entry_tf
 
 	testb	$3, CS(%rsp)
 	jz	retint_vmfunc_kernel
@@ -690,7 +703,6 @@ GLOBAL(restore_vmfunc_regs_and_iret)
 	testq	%r12, %r12
 	jz	2f
 	movq    %r12, vmfunc_state_page + VMFUNC_entered_lcd
-	movq 	%r13, vmfunc_state_page + VMFUNC_kernel_esp
 
 	/* Stack to switch to, i.e., IST. Save it here while we have gs */
 	movq    PER_CPU_VAR(lvd_irq_stack_addr), %r13
@@ -960,7 +972,7 @@ ENTRY(\sym)
 	/* Trace IRQ into LCDs buffer, rdi = trap frame, rsi = event type */
 	pushq   %rdi
 	pushq   %rsi
-	movq    $6, %rsi
+	movq    $EVENT_EXCEPTION, %rsi
 	call    add_trace_entry_tf
 	popq    %rsi
 	popq    %rdi
@@ -1541,7 +1553,7 @@ ENTRY(nmi_vmfunc_simple)
 
 	/* Trace IRQ into LCDs buffer, rdi = trap frame, rsi = event type */
 	movq    %rsp, %rdi
-	movq    $5, %rsi
+	movq    $EVENT_NMI, %rsi
 	call    add_trace_entry_tf
 
 
@@ -1605,7 +1617,7 @@ ENTRY(nmi_vmfunc_simple)
 
 	/* Trace IRQ into LCDs buffer, rdi = trap frame, rsi = event type */
 	movq    %rsp, %rdi
-	movq    $5, %rsi
+	movq    $EVENT_NMI, %rsi
 	call    add_trace_entry_tf
 
 	/* paranoidentry do_nmi, 0; without TRACE_IRQS_OFF */

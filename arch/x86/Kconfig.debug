@@ -361,4 +361,11 @@ config PUNIT_ATOM_DEBUG
 	  The current power state can be read from
 	  /sys/kernel/debug/punit_atom/dev_power_state
 
+config LCD_TRACE_BUFFER
+	bool "Trace ring buffer for LCD debugging"
+	default n
+	---help---
+	  Trace ring buffer for dumping irq/softirq/lcd_enter events.
+
+	  If unsure, say N.
 endmenu

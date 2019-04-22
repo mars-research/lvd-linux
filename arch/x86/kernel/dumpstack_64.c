@@ -15,7 +15,7 @@
 #include <linux/nmi.h>
 
 #include <asm/stacktrace.h>
-
+#include <linux/lcd_trace.h>
 
 #define N_EXCEPTION_STACKS_END \
 		(N_EXCEPTION_STACKS + DEBUG_STKSZ/EXCEPTION_STKSZ - 2)
@@ -330,6 +330,8 @@ void show_regs(struct pt_regs *regs)
 		printk(KERN_DEFAULT "Stack:\n");
 		show_stack_log_lvl(NULL, regs, (unsigned long *)sp,
 				   0, KERN_DEFAULT);
+
+		dump_ring_trace_buffer();
 
 		printk(KERN_DEFAULT "Code: ");
 

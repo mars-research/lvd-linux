@@ -54,6 +54,8 @@ asmlinkage extern void ret_from_fork(void);
 
 __visible DEFINE_PER_CPU(unsigned long, rsp_scratch);
 
+#define EFLAGS_IF	(1 << 9)
+
 /* Prints also some state that isn't saved in the pt_regs */
 void __show_regs(struct pt_regs *regs, int all)
 {
@@ -64,8 +66,8 @@ void __show_regs(struct pt_regs *regs, int all)
 
 	printk(KERN_EMERG "RIP: %04lx:[<%016lx>] ", regs->cs & 0xffff, regs->ip);
 	printk_address(regs->ip);
-	printk(KERN_EMERG "RSP: %04lx:%016lx  EFLAGS: %08lx\n", regs->ss,
-			regs->sp, regs->flags);
+	printk(KERN_EMERG "RSP: %04lx:%016lx  EFLAGS: %08lx [IF: %x]\n", regs->ss,
+			regs->sp, regs->flags, !!(regs->flags & EFLAGS_IF));
 	printk(KERN_EMERG "RAX: %016lx RBX: %016lx RCX: %016lx\n",
 	       regs->ax, regs->bx, regs->cx);
 	printk(KERN_EMERG "RDX: %016lx RSI: %016lx RDI: %016lx\n",

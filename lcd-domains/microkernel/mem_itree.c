@@ -164,9 +164,10 @@ static void do_mem_itree_delete(struct lcd_mem_itree *tree,
 					__lcd_memory_object_start(mo),
 					&node);
 	if (ret) {
-		LCD_ERR("couldn't find memory object in tree, skipping delete");
+		LCD_ERR("couldn't find memory object %p (nr_pages %d) in tree, skipping delete!",
+				mo->object, mo->nr_pages);
 		mutex_unlock(&tree->lock);
-		BUG();
+		WARN(ret, "%s:\n", __func__);
 		return;
 	}
 	/*

@@ -331,7 +331,9 @@ void show_regs(struct pt_regs *regs)
 		show_stack_log_lvl(NULL, regs, (unsigned long *)sp,
 				   0, KERN_DEFAULT);
 
+#ifdef CONFIG_LCD_TRACE_BUFFER
 		dump_ring_trace_buffer();
+#endif
 
 		printk(KERN_DEFAULT "Code: ");
 

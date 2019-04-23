@@ -5244,7 +5244,9 @@ static void net_rx_action(struct softirq_action *h)
 		}
 
 		n = list_first_entry(&list, struct napi_struct, poll_list);
+#ifdef CONFIG_LCD_TRACE_BUFFER
 		add_trace_entry(EVENT_NET_RX_ACTION, 0);
+#endif
 		budget -= napi_poll(n, &repoll);
 
 		/* If softirq window is exhausted then punt.

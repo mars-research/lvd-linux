@@ -623,12 +623,13 @@ END(irq_entries_start)
 	/* No matter which path we took, save current LCD stack */
 	movq	vmfunc_state_page + VMFUNC_kernel_esp, %r13
 
+#ifdef CONFIG_LCD_TRACE_BUFFER
 	/* Trace IRQ into LCDs buffer, rdi = trap frame, rsi = event type */
 	pushq   %rdi
 	movq    $EVENT_IRQ, %rsi
 	call    add_trace_entry_tf
 	popq    %rdi
-
+#endif
 	call	\func	/* rdi points to pt_regs */
 	.endm
 
@@ -657,10 +658,12 @@ ret_from_intr:
 	/* Restore the kernel stack in the VMFUNC state page */
 	movq 	%r13, vmfunc_state_page + VMFUNC_kernel_esp
 
+#ifdef CONFIG_LCD_TRACE_BUFFER
 	/* Trace IRQ into LCDs buffer, rdi = trap frame, rsi = event type */
 	movq    %rsp, %rdi
 	movq    $EVENT_IRQ_EXIT, %rsi
 	call    add_trace_entry_tf
+#endif
 
 	testb	$3, CS(%rsp)
 	jz	retint_vmfunc_kernel
@@ -969,6 +972,7 @@ ENTRY(\sym)
 	subq	$EXCEPTION_STKSZ, CPU_TSS_IST(\shift_ist)
 	.endif
 
+#ifdef CONFIG_LCD_TRACE_BUFFER
 	/* Trace IRQ into LCDs buffer, rdi = trap frame, rsi = event type */
 	pushq   %rdi
 	pushq   %rsi
@@ -976,6 +980,7 @@ ENTRY(\sym)
 	call    add_trace_entry_tf
 	popq    %rsi
 	popq    %rdi
+#endif
 
 	call	\do_sym
 
@@ -1551,11 +1556,12 @@ ENTRY(nmi_vmfunc_simple)
 	 * done with the NMI stack.
 	 */
 
+#ifdef CONFIG_LCD_TRACE_BUFFER
 	/* Trace IRQ into LCDs buffer, rdi = trap frame, rsi = event type */
 	movq    %rsp, %rdi
 	movq    $EVENT_NMI, %rsi
 	call    add_trace_entry_tf
-
+#endif
 
 	movq	%rsp, %rdi
 	movq	$-1, %rsi
@@ -1615,10 +1621,12 @@ ENTRY(nmi_vmfunc_simple)
 	call	paranoid_entry_vmfunc_nmi
 //	call    paranoid_entry
 
+#ifdef CONFIG_LCD_TRACE_BUFFER
 	/* Trace IRQ into LCDs buffer, rdi = trap frame, rsi = event type */
 	movq    %rsp, %rdi
 	movq    $EVENT_NMI, %rsi
 	call    add_trace_entry_tf
+#endif
 
 	/* paranoidentry do_nmi, 0; without TRACE_IRQS_OFF */
 	movq	%rsp, %rdi

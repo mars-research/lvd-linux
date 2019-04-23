@@ -192,7 +192,10 @@ static void dummy_setup(struct net_device *dev)
 	dev->features	|= NETIF_F_SG | NETIF_F_FRAGLIST;
 	dev->features	|= NETIF_F_ALL_TSO | NETIF_F_UFO;
 	dev->features	|= NETIF_F_HW_CSUM | NETIF_F_HIGHDMA | NETIF_F_LLTX | NETIF_F_PRIV_DATA_POOL;
-	dev->features	|= NETIF_F_GSO_ENCAP_ALL | NETIF_F_CHAIN_SKB;
+	dev->features	|= NETIF_F_GSO_ENCAP_ALL;
+#ifndef CONFIG_LVD
+	dev->features	|= NETIF_F_CHAIN_SKB;
+#endif
 	dev->hw_features |= dev->features;
 	dev->hw_enc_features |= dev->features;
 

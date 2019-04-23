@@ -6,7 +6,10 @@
 #include <linux/lcd_trace.h>
 
 DEFINE_PER_CPU_PAGE_ALIGNED(unsigned char, ring_buffer[RING_BUFFER_SIZE]);
+EXPORT_PER_CPU_SYMBOL(ring_buffer);
+
 DEFINE_PER_CPU(unsigned char, ring_head);
+EXPORT_PER_CPU_SYMBOL(ring_head);
 
 #define NUM_TRACE_ENTRIES	(RING_BUFFER_SIZE / sizeof(struct ring_trace_entry))
 

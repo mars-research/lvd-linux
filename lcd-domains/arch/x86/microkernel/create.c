@@ -21,6 +21,7 @@
 #ifdef CONFIG_MAP_TRACE_BUFFER_BFLANK
 #include <linux/lcd_trace.h>
 #endif
+
 /* These are initialized by init.c */
 struct kmem_cache *lcd_arch_cache;
 struct lcd_vmcs_config lcd_global_vmcs_config;
@@ -994,7 +995,7 @@ int lcd_arch_create(struct lcd_arch **out)
 		eptp_list[lcd_arch->ept_id] = eptp;
 #ifdef CONFIG_MAP_TRACE_BUFFER_BFLANK
 		/* pass GVA of this buffer on idx:3 */
-		eptp_list[3] = this_ring_buf;
+		eptp_list[3] = (uint64_t) this_ring_buf;
 		/* pass num_pages of ring buffer on idx:4 */
 		eptp_list[4] = RING_BUFFER_SIZE >> PAGE_SHIFT;
 		/* pass curr_head of ring_buffer on idx:5 */

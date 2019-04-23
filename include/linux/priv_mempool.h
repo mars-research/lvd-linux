@@ -62,6 +62,7 @@ typedef struct {
 	unsigned int pool_order;
 	spinlock_t pool_spin_lock;
 	bool dump_once;
+	struct dentry *stats;
 } priv_pool_t;
 
 
@@ -73,5 +74,7 @@ priv_pool_t *priv_pool_init(pool_type_t type, void *pool_base,
 			size_t pool_size,
 			unsigned int obj_size);
 void priv_pool_destroy(priv_pool_t *p);
+
+void priv_pool_dumpstats(priv_pool_t *p);
 
 #endif /* PRIV_MEMPOOL_H */

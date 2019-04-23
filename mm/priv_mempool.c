@@ -7,6 +7,7 @@
 #include <linux/mm.h>
 #include <linux/percpu.h>
 #include <linux/cma.h>
+#include <linux/debugfs.h>
 
 #undef pr_fmt
 #define pr_fmt(fmt)	"%s:%d : " fmt, __func__, smp_processor_id()
@@ -17,12 +18,9 @@ static priv_pool_t pool_array[POOL_MAX];
 static unsigned long pool_cma_size = 1024 * 1024 * 50;
 static struct cma *pool_cma;
 
-static int __init early_parse_pool_cma(char *p)
-{
-	pool_cma_size = ALIGN(memparse(p, NULL), PAGE_SIZE);
-	return 0;
-}
-early_param("pool_cma", early_parse_pool_cma);
+static priv_pool_t pool_array[POOL_MAX];
+struct dentry *mempool_debugfs_dir;
+struct dentry *g_stats_file;
 
 static priv_pool_t *get_pool(pool_type_t type)
 {
@@ -34,7 +32,7 @@ static priv_pool_t *get_pool(pool_type_t type)
 	return &pool_array[type];
 }
 
-#define CACHE_SIZE	0x80
+#define CACHE_SIZE	0x100
 
 void construct_global_pool(priv_pool_t *p)
 {
@@ -108,18 +106,27 @@ void priv_pool_dumpstats(priv_pool_t *p)
 	}
 
 	printk("global pool stack head %p | head->list %p | head->next %p\n",
-		p->stack.head, p->stack.head->list, p->stack.head->next);
+		p->stack.head, p->stack.head ? p->stack.head->list : NULL,
+		p->stack.head ? p->stack.head->next : NULL);
+
 	p->dump_once = true;
 	printk("===============================================================\n");
 }
+EXPORT_SYMBOL(priv_pool_dumpstats);
 
 void priv_pool_destroy(priv_pool_t *p)
 {
 	if (!p)
 		return;
 
+	/*
+	 * XXX: Let the creator free it Easy to handle between kmalloc/vmalloc
+	 * allocations
+	 */
+#if 0
 	if (p->pool)
 		free_pages((unsigned long)p->pool, p->pool_order);
+#endif
 
 #ifdef PBUF
 	if (p->buf)
@@ -288,9 +295,9 @@ priv_pool_t *priv_pool_init(pool_type_t type, void *pool_base,
 
 	p->num_cpus = num_online_cpus() * 2;
 
-	p->pool_order = 10;
 
 	if (!pool_base) {
+		p->pool_order = 10;
 		/* alloc total_size pages */
 		pool = p->pool = (char*) __get_free_pages(GFP_KERNEL | __GFP_ZERO,
 	                            p->pool_order);
@@ -331,6 +338,9 @@ void *priv_alloc(pool_type_t type)
 	char *pbufend;
 #endif
 	struct object *head;
+	bool retry = true;
+	unsigned long flags;
+
 	priv_pool_t *p = get_pool(type);
 
 	if (!p)
@@ -339,6 +349,7 @@ void *priv_alloc(pool_type_t type)
 	/* disable preempt until we manipulate all percpu pointers */
 	preempt_disable();
 
+retry:
 	head = (struct object*) *this_cpu_ptr(p->head);
 
 	/* if head is not null */
@@ -379,6 +390,12 @@ void *priv_alloc(pool_type_t type)
 		WARN_ONCE(!p->stack.head, "Out of memory! This must be crazy\n");
 		if (!p->dump_once)
 			priv_pool_dumpstats(p);
+
+		if (retry) {
+			retry = false;
+			goto retry;
+		}
+
 		goto out;
 	}
 	{
@@ -532,14 +549,57 @@ void priv_free(void *addr, pool_type_t type)
 }
 EXPORT_SYMBOL(priv_free);
 
+static int stats_print(struct seq_file *s, void *unused)
+{
+	int i;
+
+	seq_printf(s, "%8s %8s %5s %5s %8s\n", "pool", "poolbase", "poolpages",
+					"objsize", "totalobjs");
+	for (i = 0; i < POOL_MAX; i++) {
+		priv_pool_t *p = &pool_array[i];
+		switch (i) {
+		case SKB_DATA_POOL:
+			seq_printf(s, "%16s ", "skb_data_pool");
+			break;
+		case SKB_FRAG_POOL:
+			seq_printf(s, "%16s ", "skb_frag_pool");
+			break;
+		case SKB_CONTAINER_POOL:
+			seq_printf(s, "%16s ", "skb_container_pool");
+			break;
+		}
+		seq_printf(s, "%016lx %05u %05u %05u\n", (unsigned long)
+				p->pool, p->total_pages, p->obj_size,
+				p->total_objs);
+	}
+	return 0;
+}
+
+static int stats_open(struct inode *inode, struct file *file)
+{
+	return single_open(file, stats_print, inode->i_private);
+}
+
+static const struct file_operations debugfs_ops = {
+	.open = stats_open,
+	.read = seq_read,
+	.llseek = seq_lseek,
+	.release = single_release,
+};
+
 int priv_init(void)
 {
+	mempool_debugfs_dir = debugfs_create_dir("priv_mempool", 0);
+	g_stats_file = debugfs_create_file("stats", 0400, mempool_debugfs_dir,
+			NULL, &debugfs_ops);
 	return 0;
 }
 module_init(priv_init);
 
 void priv_exit(void)
 {
+	debugfs_remove(g_stats_file);
+	debugfs_remove(mempool_debugfs_dir);
 	return;
 }
 module_exit(priv_exit);

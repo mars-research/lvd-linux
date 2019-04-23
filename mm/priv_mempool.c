@@ -12,11 +12,7 @@
 #undef pr_fmt
 #define pr_fmt(fmt)	"%s:%d : " fmt, __func__, smp_processor_id()
 
-//#define CMA_ALLOC
-static priv_pool_t pool_array[POOL_MAX];
-
-static unsigned long pool_cma_size = 1024 * 1024 * 50;
-static struct cma *pool_cma;
+#define SPINLOCK
 
 static priv_pool_t pool_array[POOL_MAX];
 struct dentry *mempool_debugfs_dir;
@@ -349,6 +345,12 @@ void *priv_alloc(pool_type_t type)
 	/* disable preempt until we manipulate all percpu pointers */
 	preempt_disable();
 
+#ifdef SPINLOCK
+		/* lock global pool */
+	spin_lock_irqsave(&p->pool_spin_lock, flags);
+#endif
+
+
 retry:
 	head = (struct object*) *this_cpu_ptr(p->head);
 
@@ -404,10 +406,6 @@ retry:
 #endif
 		struct atom snapshot, new;
 
-#ifdef SPINLOCK
-		/* lock global pool */
-		spin_lock(&p->pool_spin_lock);
-#endif
 		// this is old
 		snapshot = p->stack;
 
@@ -426,8 +424,7 @@ retry:
 #else
 		this_cpu_write(*(p->cached), CACHE_SIZE - 1);
 #endif
-		/* unlock global pool */
-		spin_unlock(&p->pool_spin_lock)
+
 #else
 		if (cmpxchg_double(&p->stack.head, &p->stack.version, snapshot.head, snapshot.version,
 					new.head, new.version)) {
@@ -450,6 +447,11 @@ retry:
 #endif
 	}
 out:
+
+#ifdef SPINLOCK
+	/* unlock global pool */
+	spin_unlock_irqrestore(&p->pool_spin_lock, flags);
+#endif
 	/* enable preemption */
 	preempt_enable();
 	return m;
@@ -461,6 +463,8 @@ void priv_free(void *addr, pool_type_t type)
 {
 	struct object *p, *head;
 	priv_pool_t *pool;
+	unsigned long flags;
+
 	if (!addr)
 		return;
 
@@ -473,6 +477,11 @@ void priv_free(void *addr, pool_type_t type)
 
 	/* disable preempt until we manipulate all percpu pointers */
 	preempt_disable();
+
+#ifdef SPINLOCK
+	/* lock global pool */
+	spin_lock_irqsave(&pool->pool_spin_lock, flags);
+#endif
 
 	head = (struct object*)*this_cpu_ptr(pool->head);
 	p->next = (struct object*)head;
@@ -497,10 +506,6 @@ void priv_free(void *addr, pool_type_t type)
 		struct bundle *donation = (struct bundle *)*this_cpu_ptr(pool->head);
 		struct atom snapshot, new;
 
-#ifdef SPINLOCK
-		/* lock global pool */
-		spin_lock(&pool->pool_spin_lock);
-#endif
 
 		new.head = donation;
 		donation->list = ((struct object*)*this_cpu_ptr(pool->head))->next;
@@ -530,9 +535,6 @@ void priv_free(void *addr, pool_type_t type)
 #ifdef SPINLOCK
 		pool->stack.head = new.head;
 		pool->stack.version = new.version;
-
-		/* unlock global pool */
-		spin_unlock(&pool->pool_spin_lock);
 #else
 		} while (!cmpxchg_double(&pool->stack.head, &pool->stack.version, snapshot.head, snapshot.version,
 					new.head, new.version));
@@ -544,6 +546,10 @@ void priv_free(void *addr, pool_type_t type)
 				new.head, new.version);
 	}
 
+#ifdef SPINLOCK
+	/* unlock global pool */
+	spin_unlock_irqrestore(&pool->pool_spin_lock, flags);
+#endif
 	/* enable preemption */
 	preempt_enable();
 }

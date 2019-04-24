@@ -617,6 +617,9 @@ END(irq_entries_start)
 	cmovzq	PER_CPU_VAR(irq_stack_ptr), %rsp
 	pushq	%rdi
 
+	/* Save kernel stack no matter what */
+	movq	vmfunc_state_page + VMFUNC_kernel_esp, %r13
+
 	/* We entered an interrupt context - irqs are off: */
 	TRACE_IRQS_OFF
 

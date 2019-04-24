@@ -10,6 +10,7 @@
 #include <lcd_domains/types.h>
 #include <asm/lcd_domains/types.h>
 #include <asm/lcd_domains/microkernel.h>
+#include <liblcd/address_spaces.h>
 
 /* INVEPT / INVVPID --------------------------------------------------*/
 
@@ -198,7 +199,7 @@ enum vmx_epte_mts {
  *
  *  See Intel SDM V3 Figure 28-1 and 28.2.2.
  */
-static void vmx_epte_set(lcd_arch_epte_t *epte, hpa_t a, int level)
+static void vmx_epte_set(lcd_arch_epte_t *epte, gpa_t ga, hpa_t a, int level)
 {
 	/*
 	 * zero out epte, and set
@@ -217,8 +218,24 @@ static void vmx_epte_set(lcd_arch_epte_t *epte, hpa_t a, int level)
  		 * & section 28.2.5.2 of the Intel Software Developer 
  		 * Manual Vol 3 for effective memory type.
  		 */
-		*epte |= VMX_EPTE_MT_WB << VMX_EPT_MT_EPTE_SHIFT;
-		*epte &= ~VMX_EPT_IPAT_BIT;
+		/*
+		 * XXX: To support ioremap, set the effective memory type to be
+		 * uncacheable. According to Intel SDM 28.2.6.2, If IPAT
+		 * (ignore PAT) is set, the memory type set in EPT (bits 5:3)
+		 * would take effect.
+		 * TODO: create new iommu_map api which would propagate this
+		 * setting.
+		 */
+		if ((gpa_val(ga) >= gpa_val(LCD_IOREMAP_GP_ADDR)) &&
+				(gpa_val(ga) <= gpa_val(gpa_add(LCD_IOREMAP_GP_ADDR,
+							LCD_IOREMAP_REGION_SIZE)))) {
+			*epte |= VMX_EPTE_MT_UC << VMX_EPT_MT_EPTE_SHIFT;
+			*epte |= VMX_EPT_IPAT_BIT;
+			printk("%s, set (epte:%lx) UC to gpa:%lx hpa: %lx\n", __func__, *epte, gpa_val(ga), hpa_val(a));
+		} else {
+			*epte |= VMX_EPTE_MT_WB << VMX_EPT_MT_EPTE_SHIFT;
+			*epte &= ~VMX_EPT_IPAT_BIT;
+		}
 	}
 }
 #ifndef CONFIG_LVD
@@ -268,9 +285,9 @@ int lcd_arch_ept_walk(struct lcd_arch *lcd, gpa_t a, int create,
 }
 #endif
 
-void lcd_arch_ept_set(lcd_arch_epte_t *epte, hpa_t a)
+void lcd_arch_ept_set(lcd_arch_epte_t *epte, gpa_t ga, hpa_t a)
 {
-	vmx_epte_set(epte, a, 3);
+	vmx_epte_set(epte, ga, a, 3);
 }
 
 int lcd_arch_ept_unset(lcd_arch_epte_t *epte)

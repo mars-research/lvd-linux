@@ -10,6 +10,7 @@
 #include <lcd_domains/types.h>
 #include <asm/lcd_domains/types.h>
 #include <asm/lcd_domains/microkernel.h>
+#include <liblcd/address_spaces.h>
 
 /* INVEPT / INVVPID --------------------------------------------------*/
 
@@ -167,6 +168,14 @@ enum vmx_epte_mts {
 	VMX_EPTE_MT_WB = 6, /* write back */
 };
 
+static inline bool is_ioremap_addr(gpa_t gpa) {
+	if ((gpa_val(gpa) >= gpa_val(LCD_IOREMAP_GP_ADDR)) &&
+				(gpa_val(gpa) <= gpa_val(gpa_add(LCD_IOREMAP_GP_ADDR,
+							LCD_IOREMAP_REGION_SIZE))))
+		return true;
+
+	return false;
+}
 /**
  * Sets address in epte along with default access settings. Since
  * we are using a page walk length of 4, epte's at all levels have
@@ -181,7 +190,7 @@ enum vmx_epte_mts {
  *
  *  See Intel SDM V3 Figure 28-1 and 28.2.2.
  */
-static void vmx_epte_set(lcd_arch_epte_t *epte, hpa_t a, int level)
+static void vmx_epte_set(lcd_arch_epte_t *epte, gpa_t ga, hpa_t a, int level)
 {
 	/*
 	 * zero out epte, and set
@@ -199,8 +208,21 @@ static void vmx_epte_set(lcd_arch_epte_t *epte, hpa_t a, int level)
 		 * & section 28.2.5.2 of the Intel Software Developer
 		 * Manual Vol 3 for effective memory type.
 		 */
-		*epte |= VMX_EPTE_MT_WB << VMX_EPT_MT_EPTE_SHIFT;
-		*epte &= ~VMX_EPT_IPAT_BIT;
+		/*
+		 * XXX: To support ioremap, set the effective memory type to be
+		 * uncacheable.  This is a hack, we ideally need a new api
+		 * which should do it for us.
+		 */
+		if ((gpa_val(ga) >= gpa_val(LCD_IOREMAP_GP_ADDR)) &&
+				(gpa_val(ga) <= gpa_val(gpa_add(LCD_IOREMAP_GP_ADDR,
+							LCD_IOREMAP_REGION_SIZE)))) {
+			*epte |= VMX_EPTE_MT_UC << VMX_EPT_MT_EPTE_SHIFT;
+			*epte |= VMX_EPT_IPAT_BIT;
+			printk("%s, set (epte:%lx) UC to gpa:%lx hpa: %lx\n", __func__, *epte, gpa_val(ga), hpa_val(a));
+		} else {
+			*epte |= VMX_EPTE_MT_WB << VMX_EPT_MT_EPTE_SHIFT;
+			*epte &= ~VMX_EPT_IPAT_BIT;
+		}
 	}
 }
 
@@ -233,7 +255,7 @@ int lcd_arch_ept_walk_cpu(lcd_arch_epte_t *dir, gpa_t a, int create,
 				return -ENOMEM;
 			}
 			//memset(hva2va(page), 0, PAGE_SIZE);
-			vmx_epte_set(&dir[idx], hva2hpa(page), i);
+			vmx_epte_set(&dir[idx], a, hva2hpa(page), i);
 		}
 
 		dir = (lcd_arch_epte_t *) hva2va(vmx_epte_hva(dir[idx]));
@@ -274,7 +296,7 @@ int lcd_arch_ept_map_cpu(struct lcd_arch *lcd, gpa_t ga, hpa_t ha,
 	/*
 	 * Map the guest physical addr to the host physical addr.
 	 */
-	lcd_arch_ept_set(ept_entry, ha);
+	lcd_arch_ept_set(ept_entry, ga, ha);
 
 	return ret;
 }
@@ -310,7 +332,7 @@ int lcd_arch_ept_map_all_cpus(struct lcd_arch *lcd, gpa_t ga, hpa_t ha,
 		/*
 		 * Map the guest physical addr to the host physical addr.
 		 */
-		lcd_arch_ept_set(ept_entry, ha);
+		lcd_arch_ept_set(ept_entry, ga, ha);
 	}
 
 	return ret;

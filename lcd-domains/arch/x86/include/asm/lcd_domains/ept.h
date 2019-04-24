@@ -23,7 +23,7 @@ int lcd_arch_ept_walk(struct lcd_arch *lcd, gpa_t a, int create,
 /**
  * Set the guest physical => host physical mapping in the ept entry.
  */
-void lcd_arch_ept_set(lcd_arch_epte_t *epte, hpa_t a);
+void lcd_arch_ept_set(lcd_arch_epte_t *epte, gpa_t ga, hpa_t a);
 /**
  * Read the host physical address stored in epte.
  */

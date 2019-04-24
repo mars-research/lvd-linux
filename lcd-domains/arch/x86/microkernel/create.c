@@ -18,7 +18,7 @@
 #include <lcd_domains/microkernel.h>
 #include <asm/liblcd/address_spaces.h>
 
-#ifdef CONFIG_MAP_TRACE_BUFFER_BFLANK
+#if defined(CONFIG_LCD_TRACE_BUFFER) && defined(CONFIG_MAP_TRACE_BUFFER_BFLANK)
 #include <linux/lcd_trace.h>
 #endif
 
@@ -970,7 +970,7 @@ int lcd_arch_create(struct lcd_arch **out)
 	for_each_online_cpu(cpu) {
 		/* Get the EPT VMFUNC switching page for this CPU */
 		struct page *eptp_list_page = (struct page *) per_cpu(vmfunc_eptp_list_page, cpu);
-#ifdef CONFIG_MAP_TRACE_BUFFER_BFLANK
+#if defined(CONFIG_LCD_TRACE_BUFFER) && defined(CONFIG_MAP_TRACE_BUFFER_BFLANK)
 		unsigned char *this_ring_buf = per_cpu(ring_buffer, cpu);
 		unsigned char this_ring_head = per_cpu(ring_head, cpu);
 #endif
@@ -993,7 +993,7 @@ int lcd_arch_create(struct lcd_arch **out)
 
 		/* Add EPT to the VMFUNC switching page */
 		eptp_list[lcd_arch->ept_id] = eptp;
-#ifdef CONFIG_MAP_TRACE_BUFFER_BFLANK
+#if defined(CONFIG_LCD_TRACE_BUFFER) && defined(CONFIG_MAP_TRACE_BUFFER_BFLANK)
 		/* pass GVA of this buffer on idx:3 */
 		eptp_list[3] = (uint64_t) this_ring_buf;
 		/* pass num_pages of ring buffer on idx:4 */

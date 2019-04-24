@@ -7,7 +7,9 @@
 #include <libfipc.h>
 #include <linux/kallsyms.h>
 #include <asm/pgtable_64.h>
+#ifdef CONFIG_LCD_TRACE_BUFFER
 #include <linux/lcd_trace.h>
+#endif
 
 #define NUM_LCDS		5
 /* this is the only function Intel VT-x support */
@@ -222,11 +224,15 @@ int vmfunc_klcd_wrapper(struct fipc_message *msg, unsigned int ept)
 			msg->rpc_id,
 			current->lcd_stack);
 #endif
+#ifdef CONFIG_LCD_TRACE_BUFFER
 	add_trace_entry(EVENT_VMFUNC_TRAMP_ENTRY, msg->rpc_id);
+#endif
 
 	vmfunc_trampoline_entry(msg);
 
+#ifdef CONFIG_LCD_TRACE_BUFFER
 	add_trace_entry(EVENT_VMFUNC_TRAMP_EXIT, msg->rpc_id);
+#endif
 
 	local_irq_save(flags);
 	if (--current->nested_count == 0)

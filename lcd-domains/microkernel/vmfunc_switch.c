@@ -14,7 +14,7 @@
 #define NUM_LCDS		5
 /* this is the only function Intel VT-x support */
 #define VM_FUNCTION	0
-#define NUM_ITERATIONS		1000000
+#define NUM_ITERATIONS		10000000
 #define CONFIG_VMFUNC_SWITCH_MICROBENCHMARK 1
 
 /* exported by the microkernel. We trust that it's sane */
@@ -247,6 +247,8 @@ exit:
 int vmfunc_klcd_test_wrapper(struct fipc_message *msg, unsigned int ept, vmfunc_test_t test)
 {
 	int ret = 0;
+	unsigned long flags;
+
 	if (ept > 511) {
 		ret = -EINVAL;
 		goto exit;
@@ -266,13 +268,17 @@ int vmfunc_klcd_test_wrapper(struct fipc_message *msg, unsigned int ept, vmfunc_
 	if (!init_pgd)
 		init_pgd = kallsyms_lookup_name("init_level4_pgt");
 
+	local_irq_save(flags);
 	if (current->nested_count++ == 0)
 		pick_stack(ept);
+	local_irq_restore(flags);
 
 	ret = vmfunc_test_wrapper(msg, test);
 
+	local_irq_save(flags);
 	if (--current->nested_count == 0)
 		drop_stack(ept);
+	local_irq_restore(flags);
 
 exit:
 	return ret;
@@ -373,7 +379,9 @@ vmfunc_test_wrapper(struct fipc_message *request, vmfunc_test_t test)
 	switch (test) {
 	case VMFUNC_TEST_EMPTY_SWITCH:
 		printk("%s: Invoking EMPTY_SWITCH test\n", __func__);
+#ifdef CONFIG_DEFEAT_LAZY_TLB
 		remap_cr3();
+#endif
 		vmfunc_call_empty_switch();
 #ifdef CONFIG_DO_BF_PAGE_WALK
 		bfcall_guest_page_walk(vmfunc_load_addr, __pa(current->active_mm->pgd), 1);
@@ -387,9 +395,6 @@ vmfunc_test_wrapper(struct fipc_message *request, vmfunc_test_t test)
 			int i = 0;
 			u64 start = rdtsc(), end;
 			for (; i < NUM_ITERATIONS; i++) {
-#ifdef CONFIG_DEFEAT_LAZY_TLB
-				remap_cr3();
-#endif
 				vmfunc_call_empty_switch();
 			}
 			end = rdtsc();
@@ -405,6 +410,20 @@ vmfunc_test_wrapper(struct fipc_message *request, vmfunc_test_t test)
 					__func__, request->vmfunc_id);
 		vmfunc_trampoline_entry(request);
 		break;
+	case VMFUNC_TEST_RPC_CALL_BENCHMARK:
+		request->vmfunc_id = VMFUNC_RPC_CALL;
+		{
+			int i = 0;
+			u64 start = rdtsc(), end;
+			for (; i < NUM_ITERATIONS; i++) {
+				vmfunc_trampoline_entry(request);
+			}
+			end = rdtsc();
+			printk("%d iterations of rpc_call took %llu cycles (avg: %llu cycles)\n",
+					NUM_ITERATIONS, end - start, (end - start) / NUM_ITERATIONS);
+		}
+		break;
+
 	case VMFUNC_TEST_RPC_CALL:
 		request->vmfunc_id = VMFUNC_RPC_CALL;
 		vmfunc_trampoline_entry(request);

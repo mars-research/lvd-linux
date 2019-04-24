@@ -31,6 +31,15 @@ null_invocation(struct fipc_message *msg)
 	return 0;
 }
 
+int val;
+
+unsigned long noinline
+marshal_one(struct fipc_message *msg)
+{
+	val = fipc_get_reg0(msg);
+	return 0;
+}
+
 #ifdef CONFIG_DUMP_IRQ_REGS
 void dump_tss(struct tss_struct *tss, int cpu)
 {
@@ -125,7 +134,7 @@ foo(struct fipc_message *msg)
 		void *rsp_ptr;
 		unsigned long rsp_top;
 		u64 start = rdtsc(), end;
-		int num_iterations = 100000;
+		int num_iterations = 1000000;
 
 		for(i = 0; i < num_iterations; i++) {
 			asm volatile("mov %%rsp, %[rsp_ptr]"
@@ -208,6 +217,9 @@ int handle_rpc_calls(struct fipc_message *msg)
 		break;
 	case NULL_INVOCATION:
 		null_invocation(msg);
+		break;
+	case MARSHAL_ONE:
+		marshal_one(msg);
 		break;
 	case FOO:
 		foo(msg);

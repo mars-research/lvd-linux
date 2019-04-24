@@ -16,6 +16,7 @@ enum fn_type {
 	CALLEE,
 	FOO,
 	BAR,
+	MARSHAL_ONE,
 };
 int callee(struct fipc_message *);
 #define TRANSACTIONS 1000000

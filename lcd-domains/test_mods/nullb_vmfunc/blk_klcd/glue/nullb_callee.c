@@ -49,12 +49,26 @@ extern struct cspace *klcd_cspace;
 #define IOCB_POOL_SIZE		(256UL << 20)
 #define IOCB_POOL_PAGES		(IOCB_POOL_SIZE >> PAGE_SHIFT)
 #define IOCB_POOL_ORDER		ilog2(IOCB_POOL_PAGES)
+#define QUEUE_RQ_BUF_SIZE	4096
+
+/* Create a shadow copy of the user data into LCDs */
+#define CONFIG_COPY_USER_DATA
+/*
+ * Abhi says that the max limit on io_vec is 256 entries (with each one
+ * spanning a whole page, amounting to 1M  data per bio)
+ */
+#define MAX_BVECS		256
+struct bio_vec_queue {
+	struct bio_vec bvec_array[MAX_BVECS];
+};
+
+DEFINE_PER_CPU(struct bio_vec_queue, bio_vec_queues);
 
 void iocb_data_pool_init(void)
 {
 	pool_base = vzalloc(IOCB_POOL_SIZE);
 	pool_size = IOCB_POOL_SIZE;
-	iocb_pool = priv_pool_init(BLK_USER_BUF_POOL, (void*) pool_base, pool_size, BLK_USER_BUF_SIZE);
+	iocb_pool = priv_pool_init(BLK_USER_BUF_POOL, (void*) pool_base, pool_size, QUEUE_RQ_BUF_SIZE);
 }
 
 void iocb_data_pool_free(void)
@@ -448,6 +462,11 @@ int _queue_rq_fn(struct blk_mq_hw_ctx *ctx, const struct blk_mq_queue_data *bd, 
         int ret;
 	struct fipc_message r;
         struct fipc_message *request = &r;
+	struct bio_vec_queue *bvec_queue = &per_cpu(bio_vec_queues, smp_processor_id());
+	struct bio_vec *bvec_array = bvec_queue->bvec_array;
+#ifdef CONFIG_COPY_USER_DATA
+	int i = 0;
+#endif
 
 #ifndef CONFIG_LVD
         struct blk_mq_ops_container *ops_container;
@@ -474,8 +493,38 @@ int _queue_rq_fn(struct blk_mq_hw_ctx *ctx, const struct blk_mq_queue_data *bd, 
 #endif
 	fipc_set_reg3(request, bd->rq->tag);
 
+#ifdef CONFIG_COPY_USER_DATA
+	{
+		struct bio *bio = bd->rq->bio;
+		struct bio_vec bvec;
+		struct bvec_iter iter;
+
+		for_each_bio(bio) {
+			bio_for_each_segment(bvec, bio, iter) {
+				void *buf = page_address(bvec.bv_page);
+				void *lcd_buf = priv_alloc(BLK_USER_BUF_POOL);
+				if (lcd_buf)
+					memcpy(lcd_buf, buf + bvec.bv_offset, bvec.bv_len);
+				bvec_array[i] = bvec;
+				bvec_array[i].bv_page = (struct page *) lcd_buf;
+				i++;
+			}
+		}
+	}
+	i--;
+#endif
+
 	vmfunc_klcd_wrapper(request, 1);
 
+#ifdef CONFIG_COPY_USER_DATA
+	{
+		for (; i >= 0; i--) {
+			void *lcd_buf = (void*) bvec_array[i].bv_page;
+			if (lcd_buf)
+				priv_free(lcd_buf, BLK_USER_BUF_POOL);
+		}
+	}
+#endif
         ret = fipc_get_reg0(request);
 
         return ret;

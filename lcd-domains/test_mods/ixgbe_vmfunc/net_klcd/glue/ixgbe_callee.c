@@ -3170,7 +3170,7 @@ fail_lookup:
 	return ret;
 }
 
-#define HANDLE_IRQ_LOCALLY
+//#define HANDLE_IRQ_LOCALLY
 
 irqreturn_t msix_vector_handler(int irq, void *data)
 {
@@ -3207,7 +3207,7 @@ irqreturn_t msix_vector_handler(int irq, void *data)
 struct irq_handler_data_map {
 	int irq;
 	struct irqhandler_t_container *irqhandler_data;
-}irq_map[2];
+}irq_map[32];
 
 int reg_irqs;
 
@@ -3267,7 +3267,7 @@ int free_irq_callee(struct fipc_message *_request)
 
 	LIBLCD_MSG("%s, freeing irq %d", __func__, irq);
 
-	for (i = 0; i < 2; i++) {
+	for (i = 0; i < 32; i++) {
 		if (irq_map[i].irq == irq) {
 			irqhandler_container = irq_map[i].irqhandler_data;
 			break;

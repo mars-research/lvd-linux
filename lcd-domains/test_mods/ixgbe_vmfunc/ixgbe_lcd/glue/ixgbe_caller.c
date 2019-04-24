@@ -2125,18 +2125,23 @@ void netif_napi_add(struct net_device *dev,
 
 	async_msg_set_fn_type(_request, NETIF_NAPI_ADD);
 	fipc_set_reg0(_request, dev_container->other_ref.cptr);
-	fipc_set_reg1(_request, napi_container->my_ref.cptr);
 	fipc_set_reg2(_request, weight);
 
-	vmfunc_wrapper(_request);
-
-	napi_container->other_ref = __cptr(fipc_get_reg0(_request));
-
+#ifdef NAPI_STRUCT_ARRAY
 	/* XXX: napi_hashtable creates some trouble */
 	napi_struct_array[napi_reg] = napi;
 	printk("%s, adding napi: %p to napi_struct_array idx: %d",
 					__func__, napi, napi_reg);
+	/* pass the idx into napi_struct array */
+	fipc_set_reg1(_request, napi_reg);
 	napi_reg++;
+#else
+	fipc_set_reg1(_request, napi_container->my_ref.cptr);
+#endif
+	vmfunc_wrapper(_request);
+
+	napi_container->other_ref = __cptr(fipc_get_reg0(_request));
+
 
 	napi->state = fipc_get_reg1(_request);
 
@@ -2149,7 +2154,9 @@ extern int ixgbe_poll(struct napi_struct *napi, int budget);
 int poll_callee(struct fipc_message *_request)
 {
 	int budget;
-#ifndef NAPI_STRUCT_ARRAY
+#ifdef NAPI_STRUCT_ARRAY
+	int napi_idx;
+#else
 	struct napi_struct_container *napi_c = NULL;
 #endif
 	struct napi_struct *napi;
@@ -2158,12 +2165,17 @@ int poll_callee(struct fipc_message *_request)
 
 	budget = fipc_get_reg0(_request);
 
-#ifndef NAPI_STRUCT_ARRAY
+#ifdef NAPI_STRUCT_ARRAY
+	napi_idx = fipc_get_reg1(_request);
+	if (napi_idx > 32) {
+		printk("%s, napi_idx 32! BUG", __func__);
+	}
+	napi = napi_struct_array[napi_idx];
+#else
 	glue_lookup_napi_hash(__cptr(fipc_get_reg1(_request)), &napi_c);
 	BUG_ON(!napi_c->napi);
 	napi = napi_c->napi;
 #endif
-	napi = napi_struct_array[0];
 
 	if (!count) {
 		//printk("%s, napi_c %p | napi_c->napi %p", __func__, napi_c,
@@ -2456,7 +2468,7 @@ gro_result_t napi_gro_receive(struct napi_struct *napi,
 			(skb->csum_level << 16) |
 			(skb->ip_summed << 18));
 
-	printk("%s, skb->tail %d | napi_c %lx", __func__, skb->tail, napi_container->other_ref.cptr);
+	//printk("%s, skb->tail %d | napi_c %lx", __func__, skb->tail, napi_container->other_ref.cptr);
 
 	if (0)
 	print_hex_dump(KERN_DEBUG, "Frame contents: ",
@@ -2512,7 +2524,7 @@ struct sk_buff *__napi_alloc_skb(struct napi_struct *napi,
 	/* make sure we initialize shinfo sequentially */
 	shinfo = skb_shinfo(skb);
 	memset(shinfo, 0, offsetof(struct skb_shared_info, dataref));
-	printk("%s, alloc local skb for rx", __func__);
+	//printk("%s, alloc local skb for rx", __func__);
 out:
 	return skb;
 }

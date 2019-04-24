@@ -2148,7 +2148,12 @@ static bool ixgbe_add_rx_frag(struct ixgbe_ring *rx_ring,
 	/* Even if we own the page, we are not allowed to use atomic_set()
 	 * This would break get_page_unless_zero() users.
 	 */
-	page_ref_inc(page);
+	/*
+	 * XXX: Linux kernel needs to do this because someone might reclaim the
+	 * pages However, inside LCDs, there is no notion of reclamation. We
+	 * just have it
+	 */
+	/* page_ref_inc(page); */
 
 	return true;
 }

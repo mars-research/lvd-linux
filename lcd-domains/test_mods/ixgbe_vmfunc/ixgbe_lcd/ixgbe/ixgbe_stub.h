@@ -30,6 +30,8 @@ void napi_complete_done(struct napi_struct *n, int work_done) {
 }
 
 void synchronize_irq(unsigned int irq) { LIBLCD_MSG("================>$$$$$$ Dummy %s called", __func__); }
+
+bool napi_hash_del(struct napi_struct *napi) { LIBLCD_MSG("================>$$$$$$ Dummy %s called", __func__); return true; }
 #endif
 
 int call_netdevice_notifiers(unsigned long val, struct net_device *dev)
@@ -197,7 +199,5 @@ void usleep_range(unsigned long min, unsigned long max)
 {
 	udelay((max + min) >> 1);
 }
-
-bool napi_hash_del(struct napi_struct *napi) { LIBLCD_MSG("================>$$$$$$ Dummy %s called", __func__); return true; }
 
 #endif /* IXGBE_STUB_H */

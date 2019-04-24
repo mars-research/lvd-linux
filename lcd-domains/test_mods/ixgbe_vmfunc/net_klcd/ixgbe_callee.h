@@ -67,6 +67,7 @@ int ___napi_schedule_irqoff_callee(struct fipc_message *_request);
 int __napi_enable_callee(struct fipc_message *_request);
 int napi_disable_callee(struct fipc_message *_request);
 int napi_complete_done_callee(struct fipc_message *_request);
+int napi_hash_del_callee(struct fipc_message *_request);
 int synchronize_irq_callee(struct fipc_message *_request);
 
 int eth_type_trans_callee(struct fipc_message *_request);

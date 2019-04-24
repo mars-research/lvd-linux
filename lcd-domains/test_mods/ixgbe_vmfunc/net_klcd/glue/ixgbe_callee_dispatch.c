@@ -318,6 +318,11 @@ int net_klcd_dispatch_async_loop(struct fipc_message *message)
 			ret =  napi_disable_callee(message);
 			break;
 
+		case NAPI_HASH_DEL:
+			trace(NAPI_HASH_DEL);
+			ret =  napi_hash_del_callee(message);
+			break;
+
 		case NAPI_COMPLETE_DONE:
 			/* trace(NAPI_COMPLETE_DONE); */
 			ret =  napi_complete_done_callee(message);

@@ -38,9 +38,17 @@ struct pci_dev *g_pdev = NULL;
 struct net_device *g_ndev = NULL;
 struct kmem_cache *skb_c_cache = NULL;
 const char driver_name[] = "ixgbe_lcd";
+struct napi_struct *napi_q0;
+
+struct stats {
+	unsigned long num_consumed;
+	unsigned long num_sent;
+} g_stats;
 
 #define NAPI_HASH_BITS	5
 DEFINE_HASHTABLE(napi_hashtable, NAPI_HASH_BITS);
+
+DEFINE_HASHTABLE(skb_hashtable, NAPI_HASH_BITS);
 /* XXX: There's no way to pass arrays across domains for now.
  * May not be in the future too! But agree that this is ugly
  * and move forward. - vik
@@ -58,6 +66,8 @@ static const struct pci_device_id ixgbe_pci_tbl[] = {
  */
 DEFINE_PER_CPU(struct skb_hash_table, skb_hash);
 
+int ixgbe_trigger_dump(void);
+
 static unsigned long pool_pfn_start, pool_pfn_end;
 priv_pool_t *pool;
 void *pool_base = NULL;
@@ -66,6 +76,13 @@ size_t pool_size = 0;
 priv_pool_t *skbc_pool;
 #endif
 
+#ifdef CONFIG_VMALLOC_SHARED_POOL
+#define SKB_DATA_POOL_SIZE	(256UL << 20)
+#define SKB_DATA_POOL_PAGES	(SKB_DATA_POOL_SIZE >> PAGE_SHIFT)
+#define SKB_DATA_POOL_ORDER	ilog2(roundup_pow_of_two(SKB_DATA_POOL_PAGES))
+#endif
+
+#ifndef CONFIG_VMALLOC_SHARED_POOL
 /* Pool allocation logic */
 char *base_pools[MAX_POOLS];
 int pool_order = 10;
@@ -137,25 +154,45 @@ int pool_pick(void)
 			__func__, best_diff, best_idx, pools[best_idx].start_idx, pools[best_idx].end_idx);
        	return best_idx;
 }
+#endif
 
 void skb_data_pool_init(void)
 {
 	printk("%s, init pool for skbdata | size %zu | %lx\n", __func__,
 			SKB_DATA_SIZE, SKB_DATA_SIZE);
 	// XXX: round it to 2KiB
+#ifdef CONFIG_VMALLOC_SHARED_POOL
+	pool_base = vzalloc(SKB_DATA_POOL_SIZE);
+	pool_size = SKB_DATA_POOL_SIZE;
+#else
 	pool_base = base_pools[pools[pool_pick()].start_idx];
 	pool_size = best_diff * ((1 << pool_order) * PAGE_SIZE);
+#endif
 	pool = priv_pool_init(SKB_DATA_POOL, (void*) pool_base, pool_size, 2048);
+
+	priv_pool_dumpstats(pool);
+
 #ifdef SKBC_PRIVATE_POOL
-	skbc_pool = priv_pool_init(SKB_CONTAINER_POOL, 0x20,
-				SKB_CONTAINER_SIZE * 2);
+	skbc_pool = priv_pool_init(SKB_CONTAINER_POOL, 0x20, SKB_CONTAINER_SIZE * 2);
 #endif
 }
 
 void skb_data_pool_free(void)
 {
+#ifdef CONFIG_VMALLOC_SHARED_POOL
+	vfree(pool->pool);
+#else
+	__free_pages(pool->pool, pool->pool_order);
+#endif
 	priv_pool_destroy(pool);
+
 #ifdef SKBC_PRIVATE_POOL
+#ifdef CONFIG_VMALLOC_SHARED_POOL
+	vfree(skbc_pool->pool);
+#else
+	__free_pages(skbc_pool->pool, skbc_pool->pool_order);
+#endif
+
 	priv_pool_destroy(skbc_pool);
 #endif
 }
@@ -223,26 +260,38 @@ void glue_ixgbe_exit(void)
 
 int inline glue_insert_skb_hash(struct sk_buff_container *skb_c)
 {
+#ifndef SKB_GLOBAL_HASHTABLE
 	int cpu = smp_processor_id();
 	struct skb_hash_table *this = &per_cpu(skb_hash, cpu);
+#endif
 
 	BUG_ON(!skb_c->skb);
 
 	skb_c->my_ref = __cptr((unsigned long)skb_c->skb);
 
+#ifdef SKB_GLOBAL_HASHTABLE
+	hash_add(skb_hashtable, &skb_c->hentry,
+			(unsigned long) skb_c->skb);
+#else
 	hash_add(this->skb_table, &skb_c->hentry,
 			(unsigned long) skb_c->skb);
-
+#endif
 	return 0;
 }
 
 int inline glue_lookup_skb_hash(struct cptr c, struct sk_buff_container **skb_cout)
 {
+#ifndef SKB_GLOBAL_HASHTABLE
 	int cpu = smp_processor_id();
 	struct skb_hash_table *this = &per_cpu(skb_hash, cpu);
+#endif
         struct sk_buff_container *skb_c;
 
+#ifdef SKB_GLOBAL_HASHTABLE
+        hash_for_each_possible(skb_hashtable, skb_c, hentry, (unsigned long) cptr_val(c)) {
+#else
         hash_for_each_possible(this->skb_table, skb_c, hentry, (unsigned long) cptr_val(c)) {
+#endif
 		if (!skb_c) {
 			WARN_ON(!skb_c);
 			continue;
@@ -385,6 +434,8 @@ int pci_disable_msix_callee(struct fipc_message *_request)
 	pdev = dev_container->pdev;
 
 	pci_disable_msix(pdev);
+
+	LIBLCD_MSG("%s returned");
 fail_lookup:
 	return ret;
 }
@@ -616,7 +667,9 @@ int sync_probe_callee(struct fipc_message *_request)
 	int ret;
 	cptr_t res0_cptr;
 	unsigned int res0_len;
+#ifndef CONFIG_VMALLOC_SHARED_POOL
 	struct page *p;
+#endif
 	unsigned int pool_ord;
 	cptr_t pool_cptr;
 	cptr_t lcd_pool_cptr;
@@ -659,19 +712,28 @@ int sync_probe_callee(struct fipc_message *_request)
 		goto fail_vol;
 	}
 
+#ifdef CONFIG_VMALLOC_SHARED_POOL
+        ret = lcd_volunteer_vmalloc_mem(__gva((unsigned long)pool->pool), SKB_DATA_POOL_PAGES, &pool_cptr);
+	pool_ord = SKB_DATA_POOL_ORDER;
+#else
         p = virt_to_head_page(pool->pool);
 
 	pool_ord = ilog2(roundup_pow_of_two((1 << pool_order) * best_diff));
         ret = lcd_volunteer_pages(p, pool_ord, &pool_cptr);
+#endif
 
 	if (ret) {
 		LIBLCD_ERR("volunteer shared region");
 		goto fail_vol;
 	}
 
+#ifdef CONFIG_VMALLOC_SHARED_POOL
+	pool_pfn_start = (unsigned long)pool->pool >> PAGE_SHIFT;
+	pool_pfn_end = pool_pfn_start + SKB_DATA_POOL_PAGES;
+#else
 	pool_pfn_start = (unsigned long)pool->pool >> PAGE_SHIFT;
 	pool_pfn_end = pool_pfn_start + ((1 << pool_order) * best_diff);
-
+#endif
 	copy_msg_cap_vmfunc(current->lcd, current->vmfunc_lcd, pool_cptr, lcd_pool_cptr);
 	copy_msg_cap_vmfunc(current->lcd, current->vmfunc_lcd, res0_cptr, lcd_res0_cptr);
 
@@ -686,9 +748,9 @@ fail_vol:
 int ixgbe_service_event_sched(void)
 {
 	struct fipc_message r;
-	INIT_IPC_MSG(&r);
 	struct fipc_message *_request = &r;
 	struct net_device_container *dev_container;
+	INIT_IPC_MSG(&r);
 
 	async_msg_set_fn_type(_request, SERVICE_EVENT_SCHED);
 
@@ -703,6 +765,9 @@ int ixgbe_service_event_sched(void)
 	return 0;
 }
 
+extern bool reinit;
+extern bool ixgbe_dump;
+
 void ixgbe_service_timer(unsigned long data)
 {
 	unsigned long next_event_offset;
@@ -713,6 +778,15 @@ void ixgbe_service_timer(unsigned long data)
 	mod_timer(&service_timer, next_event_offset + jiffies);
 
 	ixgbe_service_event_sched();
+	if (reinit) {
+		pool = priv_pool_init(SKB_DATA_POOL, (void*) pool_base, pool_size, 2048);
+		reinit = false;
+	}
+
+	if (ixgbe_dump) {
+		ixgbe_trigger_dump();
+		ixgbe_dump = false;
+	}
 }
 
 #ifdef CONFIG_LVD
@@ -727,10 +801,10 @@ int probe(struct pci_dev *dev,
 	struct pci_dev_container *dev_container;
 	int ret = 0;
 	struct fipc_message r;
-	INIT_IPC_MSG(&r);
 	struct fipc_message *_request = &r;
-
 	int func_ret;
+
+	INIT_IPC_MSG(&r);
 	/* assign pdev to a global instance */
 	g_pdev = dev;
 
@@ -825,14 +899,12 @@ void remove(struct pci_dev *dev,
 #endif
 {
 	struct fipc_message r;
-	INIT_IPC_MSG(&r);
 	struct fipc_message *_request = &r;
+	INIT_IPC_MSG(&r);
 
 	async_msg_set_fn_type(_request, REMOVE);
 
 	vmfunc_klcd_wrapper(_request, 1);
-
-	del_timer_sync(&service_timer);
 
 	return;
 }
@@ -846,10 +918,10 @@ int ndo_open(struct net_device *dev,
 {
 	struct net_device_container *dev_container;
 	struct fipc_message r;
-	INIT_IPC_MSG(&r);
 	struct fipc_message *_request = &r;
-
 	int func_ret;
+
+	INIT_IPC_MSG(&r);
 
 	dev_container = container_of(dev,
 		struct net_device_container,
@@ -897,9 +969,9 @@ int ndo_stop(struct net_device *dev,
 {
 	struct net_device_container *dev_container;
 	struct fipc_message r;
-	INIT_IPC_MSG(&r);
 	struct fipc_message *_request = &r;
 	int func_ret;
+	INIT_IPC_MSG(&r);
 
 	dev_container = container_of(dev,
 			struct net_device_container,
@@ -907,6 +979,8 @@ int ndo_stop(struct net_device *dev,
 
 	async_msg_set_fn_type(_request, NDO_STOP);
 	fipc_set_reg0(_request, dev_container->other_ref.cptr);
+
+	del_timer_sync(&service_timer);
 
 	vmfunc_klcd_wrapper(_request, 1);
 
@@ -943,7 +1017,6 @@ int ndo_start_xmit(struct sk_buff *skb,
 {
 	struct net_device_container *dev_container;
 	struct fipc_message r;
-	INIT_IPC_MSG(&r);
 	struct fipc_message *_request = &r;
 	int func_ret = 0;
 	struct sk_buff_container *skb_c;
@@ -959,6 +1032,7 @@ int ndo_start_xmit(struct sk_buff *skb,
 	TS_START(mndo_xmit);
 #endif
 	xmit_type_t xmit_type = check_skb_range(skb);
+	INIT_IPC_MSG(&r);
 
 	if (xmit_type == VOLUNTEER_XMIT) {
 		printk("%s, comm %s | pid %d | skblen %d " "| skb->proto %02X\n",
@@ -1034,6 +1108,8 @@ int ndo_start_xmit(struct sk_buff *skb,
 	iter = (iter + 1) % NUM_PACKETS;
 #endif
 
+	g_stats.num_sent++;
+
 #ifdef TIMESTAMP
 	TS_STOP(mndo_xmit);
 	times_ndo_xmit[iter] = TS_DIFF(mndo_xmit);
@@ -1074,8 +1150,8 @@ void ndo_set_rx_mode(struct net_device *dev,
 {
 	struct net_device_container *dev_container;
 	struct fipc_message r;
-	INIT_IPC_MSG(&r);
 	struct fipc_message *_request = &r;
+	INIT_IPC_MSG(&r);
 
 	dev_container = container_of(dev,
 			struct net_device_container,
@@ -1115,9 +1191,9 @@ int ndo_validate_addr(struct net_device *dev,
 {
 	struct net_device_container *dev_container;
 	struct fipc_message r;
-	INIT_IPC_MSG(&r);
 	struct fipc_message *_request = &r;
 	int func_ret;
+	INIT_IPC_MSG(&r);
 
 	dev_container = container_of(dev,
 		struct net_device_container,
@@ -1190,11 +1266,9 @@ int ndo_set_mac_address(struct net_device *dev,
 {
 	struct net_device_container *dev_container;
 	struct fipc_message r;
-	INIT_IPC_MSG(&r);
 	struct fipc_message *_request = &r;
-
-
 	int func_ret;
+	INIT_IPC_MSG(&r);
 
 	mac_addr = addr;
 	dev_container = container_of(dev,
@@ -1241,9 +1315,9 @@ int ndo_change_mtu(struct net_device *dev,
 {
 	struct net_device_container *dev_container;
 	struct fipc_message r;
-	INIT_IPC_MSG(&r);
 	struct fipc_message *_request = &r;
 	int func_ret;
+	INIT_IPC_MSG(&r);
 
 	dev_container = container_of(dev,
 			struct net_device_container,
@@ -1289,8 +1363,8 @@ void ndo_tx_timeout(struct net_device *dev,
 {
 	struct net_device_container *dev_container;
 	struct fipc_message r;
-	INIT_IPC_MSG(&r);
 	struct fipc_message *_request = &r;
+	INIT_IPC_MSG(&r);
 
 	dev_container = container_of(dev,
 		struct net_device_container,
@@ -1332,9 +1406,9 @@ int ndo_set_tx_maxrate(struct net_device *dev,
 {
 	struct net_device_container *dev_container;
 	struct fipc_message r;
-	INIT_IPC_MSG(&r);
 	struct fipc_message *_request = &r;
 	int func_ret;
+	INIT_IPC_MSG(&r);
 
 	dev_container = container_of(dev,
 		struct net_device_container,
@@ -1389,11 +1463,11 @@ struct rtnl_link_stats64 *ndo_get_stats64(struct net_device *dev,
 {
 	struct net_device_container *dev_container;
 	struct fipc_message r;
-	INIT_IPC_MSG(&r);
 	struct fipc_message *_request = &r;
 
 	struct rtnl_link_stats64 *func_ret = stats;
 
+	INIT_IPC_MSG(&r);
 	dev_container = container_of(dev,
 		struct net_device_container,
 		net_device);
@@ -1407,6 +1481,11 @@ struct rtnl_link_stats64 *ndo_get_stats64(struct net_device *dev,
 	stats->tx_packets = fipc_get_reg2(_request);
 	stats->tx_bytes = fipc_get_reg3(_request);
 
+	printk("%s, global stats sent: %lu consumed: %lu in-flight?: %lu\n",
+				__func__,
+				g_stats.num_sent,
+				g_stats.num_consumed,
+				g_stats.num_sent - g_stats.num_consumed);
 	return func_ret;
 }
 
@@ -1995,9 +2074,19 @@ int napi_consume_skb_callee(struct fipc_message *_request)
 	struct sk_buff_container *skb_c = NULL;
 	int ret = 0;
 	int budget;
+	cptr_t skb_cptr;
 
-	glue_lookup_skb_hash(__cptr(fipc_get_reg0(_request)), &skb_c);
+	skb_cptr = __cptr(fipc_get_reg0(_request));
+	glue_lookup_skb_hash(skb_cptr, &skb_c);
+
 	budget = fipc_get_reg1(_request);
+
+	//WARN_ON(!skb_c);
+
+	if (!skb_c) {
+		printk("%s, did not find an entry for skb %lx\n", __func__, cptr_val(skb_cptr));
+		goto skip;
+	}
 
 	skb = skb_c->skb;
 
@@ -2009,6 +2098,8 @@ int napi_consume_skb_callee(struct fipc_message *_request)
 
 	napi_consume_skb(skb, budget);
 
+	g_stats.num_consumed++;
+
 	glue_remove_skb_hash(skb_c);
 
 #ifdef SKBC_PRIVATE_POOL
@@ -2018,7 +2109,7 @@ int napi_consume_skb_callee(struct fipc_message *_request)
 #else
 	kmem_cache_free(skb_c_cache, skb_c);
 #endif
-
+skip:
 	return ret;
 }
 
@@ -2102,12 +2193,19 @@ int dev_addr_add_callee(struct fipc_message *_request)
 	unsigned 	char addr_type;
 	int ret;
 	int func_ret;
+	void *addr;
+#ifdef PASS_DEV_ADDR_IN_REG
+	union __mac {
+		u8 mac_addr[ETH_ALEN];
+		unsigned long mac_addr_l;
+	} m = { {0} };
+#else
 	int sync_ret;
 	unsigned 	long mem_order;
 	unsigned 	long addr_offset;
 	cptr_t addr_cptr, lcd_cptr;
 	gva_t addr_gva;
-
+#endif
 	ret = glue_cap_lookup_net_device_type(c_cspace,
 		__cptr(fipc_get_reg0(_request)),
 		&dev_container);
@@ -2118,10 +2216,14 @@ int dev_addr_add_callee(struct fipc_message *_request)
 	dev = &dev_container->net_device;
 	addr_type = fipc_get_reg1(_request);
 
+#ifdef PASS_DEV_ADDR_IN_REG
+	m.mac_addr_l = fipc_get_reg2(_request);
+	addr = (void *)m.mac_addr;
+#else
 	sync_ret = lcd_cptr_alloc(&addr_cptr);
 	if (sync_ret) {
 		LIBLCD_ERR("failed to get cptr");
-		lcd_exit(-1);
+		goto fail_cptr;
 	}
 
 	mem_order = fipc_get_reg2(_request);
@@ -2138,14 +2240,17 @@ int dev_addr_add_callee(struct fipc_message *_request)
 		lcd_exit(-1);
 	}
 
+	addr = (void *)(gva_val(addr_gva) + addr_offset);
+#endif
+	printk("%s, add %lx\n", __func__, m.mac_addr_l);
 	rtnl_lock();
-	func_ret = dev_addr_add(dev,
-		( void  * )( ( gva_val(addr_gva) ) + ( addr_offset ) ),
-		addr_type);
+	func_ret = dev_addr_add(dev, addr, addr_type);
 	rtnl_unlock();
 
 	fipc_set_reg0(_request, func_ret);
-
+#ifndef PASS_DEV_ADDR_IN_REG
+fail_cptr:
+#endif
 fail_lookup:
 	return ret;
 }
@@ -2207,6 +2312,8 @@ int dev_addr_del_callee(struct fipc_message *_request)
 	}
 	addr = (void *)(gva_val(addr_gva) + addr_offset);
 #endif
+	printk("%s, del %lx\n", __func__, m.mac_addr_l);
+
 	rtnl_lock();
 	func_ret = dev_addr_del(dev, addr, addr_type);
 	rtnl_unlock();
@@ -2720,8 +2827,8 @@ fail_lookup:
 int trigger_exit_to_lcd(struct thc_channel *_channel, enum dispatch_t disp)
 {
 	struct fipc_message r;
-	INIT_IPC_MSG(&r);
 	struct fipc_message *_request = &r;
+	INIT_IPC_MSG(&r);
 
 	async_msg_set_fn_type(_request,
 			disp);
@@ -2735,9 +2842,9 @@ int trigger_exit_to_lcd(struct thc_channel *_channel, enum dispatch_t disp)
 int ixgbe_trigger_dump(void)
 {
 	struct fipc_message r;
-	INIT_IPC_MSG(&r);
 	struct fipc_message *_request = &r;
 	struct net_device_container *dev_container;
+	INIT_IPC_MSG(&r);
 
 	async_msg_set_fn_type(_request, TRIGGER_DUMP);
 	dev_container = container_of(g_ndev,
@@ -2756,16 +2863,14 @@ int sync_user(struct net_device *dev,
 {
 	struct net_device_container *dev_container;
 	struct fipc_message r;
-	INIT_IPC_MSG(&r);
 	struct fipc_message *_request = &r;
-
 	int func_ret;
-
 	union __mac {
 		u8 mac_addr[ETH_ALEN];
 		unsigned long mac_addr_l;
 	} m = { {0} };
 
+	INIT_IPC_MSG(&r);
 
 	dev_container = container_of(dev,
 		struct net_device_container,
@@ -2794,14 +2899,14 @@ int sync(struct net_device *dev,
 {
 	struct net_device_container *dev_container;
 	struct fipc_message r;
-	INIT_IPC_MSG(&r);
 	struct fipc_message *_request = &r;
-
 	int func_ret;
 	union __mac {
 		u8 mac_addr[ETH_ALEN];
 		unsigned long mac_addr_l;
 	} m = { {0} };
+
+	INIT_IPC_MSG(&r);
 
 	dev_container = container_of(dev,
 		struct net_device_container,
@@ -2848,14 +2953,14 @@ int unsync_user(struct net_device *dev,
 {
 	struct net_device_container *dev_container;
 	struct fipc_message r;
-	INIT_IPC_MSG(&r);
 	struct fipc_message *_request = &r;
-
 	int func_ret;
 	union __mac {
 		u8 mac_addr[ETH_ALEN];
 		unsigned long mac_addr_l;
 	} m = { {0} };
+
+	INIT_IPC_MSG(&r);
 
 	dev_container = container_of(dev,
 		struct net_device_container,
@@ -2884,14 +2989,14 @@ int unsync(struct net_device *dev,
 {
 	struct net_device_container *dev_container;
 	struct fipc_message r;
-	INIT_IPC_MSG(&r);
 	struct fipc_message *_request = &r;
-
 	int func_ret;
 	union __mac {
 		u8 mac_addr[ETH_ALEN];
 		unsigned long mac_addr_l;
 	} m = { {0} };
+
+	INIT_IPC_MSG(&r);
 
 	dev_container = container_of(dev,
 		struct net_device_container,
@@ -3065,13 +3170,16 @@ fail_lookup:
 	return ret;
 }
 
+#define HANDLE_IRQ_LOCALLY
+
 irqreturn_t msix_vector_handler(int irq, void *data)
 {
 	struct fipc_message r;
-	INIT_IPC_MSG(&r);
 	struct fipc_message *_request = &r;
 	struct irqhandler_t_container *irqhandler_container;
 	irqreturn_t irqret;
+
+	INIT_IPC_MSG(&r);
 
 	WARN_ONCE(!irqs_disabled(),"irqs enabled in %s\n", __func__);
 
@@ -3079,15 +3187,20 @@ irqreturn_t msix_vector_handler(int irq, void *data)
 
 	async_msg_set_fn_type(_request, MSIX_IRQ_HANDLER);
 	fipc_set_reg0(_request, irq);
+
 	/* pass this irqhandler's other ref cptr */
 	fipc_set_reg1(_request, irqhandler_container->other_ref.cptr);
 
+#ifdef HANDLE_IRQ_LOCALLY
+	irqret = IRQ_HANDLED;
+	napi_schedule_irqoff(napi_q0);
+#else
 	add_trace_entry(EVENT_MSIX_HANDLER, async_msg_get_fn_type(_request));
 
 	vmfunc_klcd_wrapper(_request, 1);
 
 	irqret = fipc_get_reg0(_request);
-
+#endif
 	return irqret;
 }
 
@@ -3136,6 +3249,7 @@ int request_threaded_irq_callee(struct fipc_message *_request)
 	irq_map[reg_irqs].irq = irq;
 	irq_map[reg_irqs].irqhandler_data = irqhandler_container;
 
+	reg_irqs++;
 	fipc_set_reg0(_request, func_ret);
 
 fail_alloc:
@@ -3154,13 +3268,14 @@ int free_irq_callee(struct fipc_message *_request)
 	LIBLCD_MSG("%s, freeing irq %d", __func__, irq);
 
 	for (i = 0; i < 2; i++) {
-		if (irq_map[i].irq = irq) {
+		if (irq_map[i].irq == irq) {
 			irqhandler_container = irq_map[i].irqhandler_data;
 			break;
 		}
 	}
 
 	free_irq(irq, irqhandler_container);
+	reg_irqs--;
 
 	return ret;
 }
@@ -3176,9 +3291,10 @@ int poll(struct napi_struct *napi,
 {
 	int ret;
 	struct fipc_message r;
-	INIT_IPC_MSG(&r);
 	struct fipc_message *_request = &r;
 	struct napi_struct_container *napi_c;
+
+	INIT_IPC_MSG(&r);
 
 	napi_c = container_of(napi, struct napi_struct_container, napi_struct);
 
@@ -3265,7 +3381,7 @@ int netif_napi_add_callee(struct fipc_message *_request)
 
 	glue_insert_napi_hash(napi_struct_container);
 
-	napi = napi_struct_container->napi;
+	napi_q0 = napi = napi_struct_container->napi;
 
 	weight = fipc_get_reg2(_request);
 
@@ -3301,7 +3417,8 @@ int netif_napi_add_callee(struct fipc_message *_request)
 	fipc_set_reg0(_request, napi_struct_container->my_ref.cptr);
 	fipc_set_reg1(_request, napi->state);
 
-	LIBLCD_MSG("%s, napi %p | napi->dev %p", __func__, napi, napi->dev);
+	LIBLCD_MSG("%s, napi %p | napi->dev %p | napi_c->myref: %lx", __func__,
+					napi, napi->dev, napi_struct_container->my_ref.cptr);
 
 fail_lookup:
 fail_alloc:
@@ -3528,21 +3645,24 @@ int napi_gro_receive_callee(struct fipc_message *_request)
 		truesize,
 		csum_ipsum,
 		hash_l4sw,
-		nr_frags_tail_cptr;
+		nr_frags_tail, prot_cptr;
 	unsigned int pull_len;
 	unsigned char nr_frags;
 	cptr_t napi_struct_ref;
 
 	u32 frag_off = 0, frag_size = 0;
-	nr_frags_tail_cptr = fipc_get_reg0(_request);
+	nr_frags_tail = fipc_get_reg0(_request);
 
-	nr_frags = nr_frags_tail_cptr & 0xff;
+	nr_frags = nr_frags_tail & 0xff;
 	/* this is the amount of data copied to the skb->data
 	 * by copy_to_linear_data. We have to do it again with
 	 * the skb allocated here
 	 */
-	pull_len = nr_frags_tail_cptr >> 8;
-	napi_struct_ref = __cptr(nr_frags_tail_cptr >> 16);
+	pull_len = nr_frags_tail >> 8;
+
+	prot_cptr = fipc_get_reg2(_request);
+	/* last 16 bits of the address is ffff */
+	napi_struct_ref = __cptr(prot_cptr >> 16 | (0xffffull << 48));
 
 	if (nr_frags) {
 		page = fipc_get_reg1(_request);
@@ -3554,12 +3674,18 @@ int napi_gro_receive_callee(struct fipc_message *_request)
 		frag_off -= pull_len;
 	}
 
-	prot = fipc_get_reg2(_request);
+	prot = prot_cptr & 0xFFFF;
 	truesize = fipc_get_reg5(_request);
 	hash_l4sw = fipc_get_reg4(_request);
 	csum_ipsum = fipc_get_reg6(_request);
 
 	glue_lookup_napi_hash(napi_struct_ref, &napi_container);
+
+	if (!napi_container) {
+		printk("%s, couldn't retrieve napi_container for cptr: %lx\n", __func__,
+					napi_struct_ref.cptr);
+		goto skip;
+	}
 
 	napi = napi_container->napi;
 
@@ -3625,7 +3751,7 @@ int napi_gro_receive_callee(struct fipc_message *_request)
 	if (p)
 		set_page_count(p, old_pcount);
 skip:
-	printk("%s, returned %d\n", __func__, ret);
+	//printk("%s, returned %d\n", __func__, ret);
 	fipc_set_reg1(_request, func_ret);
 	return ret;
 }
@@ -3775,6 +3901,26 @@ int napi_disable_callee(struct fipc_message *_request)
 
 	fipc_set_reg0(_request, napi->state);
 
+	return 0;
+}
+
+int napi_hash_del_callee(struct fipc_message *_request)
+{
+	struct napi_struct_container *napi_container = NULL;
+	struct napi_struct *napi;
+	bool sync_needed;
+
+	glue_lookup_napi_hash(__cptr(fipc_get_reg0(_request)),
+						&napi_container);
+	napi = napi_container->napi;
+#ifdef CONFIG_LCD_NAPI_STATE_SYNC
+	napi->state = fipc_get_reg2(_request);
+#endif
+
+	sync_needed = napi_hash_del(napi);
+
+	fipc_set_reg0(_request, sync_needed);
+	fipc_set_reg1(_request, napi->state);
 	return 0;
 }
 

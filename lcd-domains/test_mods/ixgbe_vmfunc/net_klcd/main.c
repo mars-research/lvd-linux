@@ -19,8 +19,11 @@ extern struct glue_cspace *c_cspace;
 extern void *lcd_stack;
 
 /* to dump ixgbe registers */
-static bool ixgbe_dump = 0;
+bool ixgbe_dump = false;
 module_param_named(dump_regs, ixgbe_dump, bool, S_IWUSR);
+
+bool reinit = false;
+module_param_named(reinit_pool, reinit, bool, S_IWUSR);
 
 int net_klcd_dispatch_async_loop(struct fipc_message *message);
 int net_klcd_syncipc_dispatch(struct fipc_message *message);

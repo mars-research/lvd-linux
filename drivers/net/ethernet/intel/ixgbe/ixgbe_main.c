@@ -165,10 +165,15 @@ module_param(allow_unsupported_sfp, uint, 0);
 MODULE_PARM_DESC(allow_unsupported_sfp,
 		 "Allow unsupported and untested SFP+ modules on 82599-based adapters");
 
-#define DEFAULT_MSG_ENABLE (NETIF_MSG_DRV|NETIF_MSG_PROBE|NETIF_MSG_LINK)
+#define DEFAULT_MSG_ENABLE (NETIF_MSG_DRV|NETIF_MSG_PROBE|NETIF_MSG_LINK|NETIF_MSG_HW|NETIF_MSG_TX_DONE\
+				|NETIF_MSG_RX_STATUS)
 static int debug = -1;
 module_param(debug, int, 0);
 MODULE_PARM_DESC(debug, "Debug level (0=none,...,16=all)");
+
+static bool dump = false;
+module_param_named(dump_regs, dump, bool, S_IWUSR);
+MODULE_PARM_DESC(dump, "Dump ixgbe descriptors");
 
 MODULE_AUTHOR("Intel Corporation, <linux.nics@intel.com>");
 MODULE_DESCRIPTION("Intel(R) 10 Gigabit PCI Express Network Driver");
@@ -5632,7 +5637,7 @@ static int ixgbe_sw_init(struct ixgbe_adapter *adapter)
 	unsigned int rss, fdir;
 	u32 fwsm;
 	int i;
-#define NUM_HW_QUEUES		4
+#define NUM_HW_QUEUES		num_online_cpus()
 	/* PCI config space info */
 
 	hw->vendor_id = pdev->vendor;
@@ -7248,6 +7253,10 @@ static void ixgbe_service_task(struct work_struct *work)
 	}
 
 	ixgbe_service_event_complete(adapter);
+        if (dump) {
+                ixgbe_dump(adapter);
+                dump = false;
+        }
 }
 
 static int ixgbe_tso(struct ixgbe_ring *tx_ring,

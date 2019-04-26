@@ -1099,7 +1099,9 @@ int ndo_start_xmit(struct sk_buff *skb,
 	if (0)
 		printk("%s:%d %s skb->q %d\n", current->comm, current->pid, __func__, skb->queue_mapping);
 
+#ifdef CONFIG_LCD_TRACE_BUFFER
 	add_trace_entry(EVENT_XMIT, async_msg_get_fn_type(_request));
+#endif
 	vmfunc_klcd_wrapper(_request, 1);
 
 	func_ret = fipc_get_reg0(_request);
@@ -3170,7 +3172,7 @@ fail_lookup:
 	return ret;
 }
 
-//#define HANDLE_IRQ_LOCALLY
+#define HANDLE_IRQ_LOCALLY
 
 irqreturn_t msix_vector_handler(int irq, void *data)
 {
@@ -3195,8 +3197,9 @@ irqreturn_t msix_vector_handler(int irq, void *data)
 	irqret = IRQ_HANDLED;
 	napi_schedule_irqoff(napi_q0);
 #else
+#ifdef CONFIG_LCD_TRACE_BUFFER
 	add_trace_entry(EVENT_MSIX_HANDLER, async_msg_get_fn_type(_request));
-
+#endif
 	vmfunc_klcd_wrapper(_request, 1);
 
 	irqret = fipc_get_reg0(_request);
@@ -3259,7 +3262,7 @@ fail_alloc:
 int free_irq_callee(struct fipc_message *_request)
 {
 	unsigned 	int irq;
-	struct irqhandler_t_container *irqhandler_container;
+	struct irqhandler_t_container *irqhandler_container = NULL;
 	int ret = 0;
 	int i;
 
@@ -3274,6 +3277,9 @@ int free_irq_callee(struct fipc_message *_request)
 		}
 	}
 
+	if (!irqhandler_container)
+		printk("%s unable to retrieve container data for irq %d",
+				__func__, irq);
 	free_irq(irq, irqhandler_container);
 	reg_irqs--;
 
@@ -3307,7 +3313,9 @@ int poll(struct napi_struct *napi,
 		printk("%s, poll - budget %d | napi_c->other_ref %lx\n", __func__,
 			budget, napi_c->other_ref.cptr);
 
+#ifdef CONFIG_LCD_TRACE_BUFFER
 	add_trace_entry(EVENT_SOFTIRQ_POLL, async_msg_get_fn_type(_request));
+#endif
 	vmfunc_klcd_wrapper(_request, 1);
 
 	ret = fipc_get_reg0(_request);
@@ -3938,7 +3946,9 @@ int napi_complete_done_callee(struct fipc_message *_request)
 	napi->state = fipc_get_reg2(_request);
 #endif
 
+#ifdef CONFIG_LCD_TRACE_BUFFER
 	add_trace_entry(EVENT_NAPI_COMPLETE_DONE, async_msg_get_fn_type(_request));
+#endif
 	napi_complete_done(napi, work_done);
 
 	fipc_set_reg0(_request, napi->state);

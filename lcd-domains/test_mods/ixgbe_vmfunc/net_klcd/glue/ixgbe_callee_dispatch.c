@@ -1,7 +1,10 @@
 #include <lcd_config/pre_hook.h>
 #include <liblcd/liblcd.h>
 #include "../ixgbe_callee.h"
+
+#ifdef CONFIG_LCD_TRACE_BUFFER
 #include <linux/lcd_trace.h>
+#endif
 
 #include <lcd_config/post_hook.h>
 
@@ -32,7 +35,9 @@ int net_klcd_dispatch_async_loop(struct fipc_message *message)
 	int ret;
 	fn_type = async_msg_get_fn_type(message);
 
+#ifdef CONFIG_LCD_TRACE_BUFFER
 	add_trace_entry(EVENT_VMFUNC_SBOARD_KLCD_ENTER, async_msg_get_fn_type(message));
+#endif
 
 	switch (fn_type) {
 		case __PCI_REGISTER_DRIVER:
@@ -341,7 +346,8 @@ int net_klcd_dispatch_async_loop(struct fipc_message *message)
 
 	}
 
+#ifdef CONFIG_LCD_TRACE_BUFFER
 	add_trace_entry(EVENT_VMFUNC_SBOARD_KLCD_LEAVE, async_msg_get_fn_type(message));
-
+#endif
 	return ret;
 }

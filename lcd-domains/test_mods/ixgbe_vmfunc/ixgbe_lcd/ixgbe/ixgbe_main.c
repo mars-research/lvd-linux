@@ -2153,7 +2153,7 @@ static bool ixgbe_add_rx_frag(struct ixgbe_ring *rx_ring,
 	 * pages However, inside LCDs, there is no notion of reclamation. We
 	 * just have it
 	 */
-	/* page_ref_inc(page); */
+	page_ref_inc(page);
 
 	return true;
 }
@@ -5848,7 +5848,6 @@ static int ixgbe_sw_init(struct ixgbe_adapter *adapter)
 	hw->subsystem_vendor_id = pdev->subsystem_vendor;
 	hw->subsystem_device_id = pdev->subsystem_device;
 
-#define NUM_HW_QUEUES		1
 	/* XXX: This decides the number of hardware queues
 	 * It checks the number of online cpus and sets the number of
 	 * queues to the number of cpus. Fake it now to enable

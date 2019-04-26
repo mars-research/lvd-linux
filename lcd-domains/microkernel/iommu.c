@@ -42,8 +42,10 @@ int lcd_iommu_map_page(struct lcd *lcd, gpa_t gpa, unsigned int order,
 	gfn_start = gpa_to_gfn(gpa_val(gpa));
 
 	/* If domain pointer is null */
-	if (!lcd->domain)
+	if (!lcd->domain) {
+		LIBLCD_ERR("lcd->domain is null");
 		return -EINVAL;
+	}
 
 	for (i = 0; i < gfn_end; ++i) {
 		gpa_t ga = gfn_to_gpa(gfn_start + i);
@@ -87,9 +89,9 @@ int lcd_iommu_map_page(struct lcd *lcd, gpa_t gpa, unsigned int order,
 			BUG_ON(ret != PAGE_SIZE);
 		}
 
-		if (0) {
-		printk("%s, mapping gpa:hpa %lx:%lx pair\n", __func__,
-		       gpa_val(ga), hpa_val(hpa));
+		if (1) {
+			printk("%s, mapping gpa:hpa %lx:%lx pair\n", __func__,
+					       gpa_val(ga), hpa_val(hpa));
 		}
 		/* map */
 		ret = iommu_map(lcd->domain, gpa_val(ga), hpa_val(hpa),

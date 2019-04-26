@@ -734,7 +734,7 @@ static int ixgbe_acquire_msix_vectors(struct ixgbe_adapter *adapter)
 	 * be somewhat conservative and only ask for (roughly) the same number
 	 * of vectors as there are CPUs.
 	 */
-	vectors = min_t(int, vectors, num_online_cpus());
+	vectors = min_t(int, vectors, NUM_HW_QUEUES);
 
 	/* Some vectors are necessary for non-queue interrupts */
 	vectors += NON_Q_VECTORS;

@@ -113,25 +113,29 @@ static inline unsigned int bfcall_ept_map_page(struct page *gpa, struct page *hp
 static inline unsigned int bfcall_guest_page_walk(unsigned long gva, unsigned long cr3_base, unsigned int eptp_idx)
 {
 	unsigned int eax, edx;
-	u64 rbx, rcx;
+	u64 rbx, rcx, r8;
 
 
 	eax = LCD_BFCALL_GUEST_PAGE_WALK;
 	rbx = (u64) gva;
 	rcx = (u64) cr3_base;
+	/* do not dump the whole vcpu state */
 	edx = 0;
+	r8 = (u64) eptp_idx; 
 
 	LCD_MSG("%s page_walk for gva: %llx, cr3: 0x%llx",
 		__func__, rbx, rcx);
 
 	/* ecx is often an input as well as an output. */
-	asm volatile("cpuid"
+	asm volatile(
+		"mov %[r8], %%r8	\n\t"
+		"cpuid"
 	    : "=a" (eax),
 	      "=b" (rbx),
 	      "=c" (rcx),
 	      "=d" (edx)
-	    : "0" (eax), "1" (rbx), "2" (rcx), "3" (edx)
-	    : "memory");
+	    : "0" (eax), "1" (rbx), "2" (rcx), "3" (edx), [r8]"r"(r8)
+	    : "memory", "r8");
 
 	return eax;
 }

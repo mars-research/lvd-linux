@@ -12,7 +12,7 @@
 #undef pr_fmt
 #define pr_fmt(fmt)	"%s:%d : " fmt, __func__, smp_processor_id()
 
-#define SPINLOCK
+//#define SPINLOCK
 
 static priv_pool_t pool_array[POOL_MAX];
 struct dentry *mempool_debugfs_dir;
@@ -334,7 +334,7 @@ void *priv_alloc(pool_type_t type)
 	char *pbufend;
 #endif
 	struct object *head;
-	bool retry = true;
+	//bool retry = true;
 	unsigned long flags;
 
 	priv_pool_t *p = get_pool(type);
@@ -350,8 +350,8 @@ void *priv_alloc(pool_type_t type)
 	spin_lock_irqsave(&p->pool_spin_lock, flags);
 #endif
 
-
-retry:
+	local_irq_save(flags);
+//retry:
 	head = (struct object*) *this_cpu_ptr(p->head);
 
 	/* if head is not null */
@@ -360,10 +360,12 @@ retry:
 		m = head;
 		*this_cpu_ptr(p->head) = head->next;
 		this_cpu_dec(*p->cached);
+		local_irq_restore(flags);
 		goto out;
 	} else {
 		pr_debug("reset cached\n");
 		this_cpu_write(*(p->cached), 0);
+		local_irq_restore(flags);
 	}
 
 #ifdef PBUF
@@ -393,10 +395,10 @@ retry:
 		if (!p->dump_once)
 			priv_pool_dumpstats(p);
 
-		if (retry) {
-			retry = false;
-			goto retry;
-		}
+//		if (retry) {
+//			retry = false;
+//			goto retry;
+//		}
 
 		goto out;
 	}
@@ -475,13 +477,12 @@ void priv_free(void *addr, pool_type_t type)
 
 	p = (struct object*) addr;
 
-	/* disable preempt until we manipulate all percpu pointers */
-	preempt_disable();
-
 #ifdef SPINLOCK
 	/* lock global pool */
 	spin_lock_irqsave(&pool->pool_spin_lock, flags);
 #endif
+
+	local_irq_save(flags);
 
 	head = (struct object*)*this_cpu_ptr(pool->head);
 	p->next = (struct object*)head;
@@ -502,10 +503,13 @@ void priv_free(void *addr, pool_type_t type)
 						*this_cpu_ptr(pool->marker), (*this_cpu_ptr(pool->marker))->next);
 			dump_stack();
 		}
+		local_irq_restore(flags);
 	} else if (*this_cpu_ptr(pool->cached) == (CACHE_SIZE << 1)) {
 		struct bundle *donation = (struct bundle *)*this_cpu_ptr(pool->head);
 		struct atom snapshot, new;
 
+
+		local_irq_restore(flags);
 
 		new.head = donation;
 		donation->list = ((struct object*)*this_cpu_ptr(pool->head))->next;
@@ -544,14 +548,14 @@ void priv_free(void *addr, pool_type_t type)
 				donation, snapshot.head,
 				snapshot.head, snapshot.version,
 				new.head, new.version);
+	} else {
+		local_irq_restore(flags);
 	}
 
 #ifdef SPINLOCK
 	/* unlock global pool */
 	spin_unlock_irqrestore(&pool->pool_spin_lock, flags);
 #endif
-	/* enable preemption */
-	preempt_enable();
 }
 EXPORT_SYMBOL(priv_free);
 

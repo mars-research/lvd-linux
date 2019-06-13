@@ -638,7 +638,6 @@ fail2:
 fail1:
 	return ret;
 }
-
 int __lcd_memory_grant_and_map_cpu(struct lcd *caller, cptr_t lcd,
 			cptr_t mo_cptr, cptr_t dest_slot, gpa_t base, int cpu)
 {
@@ -671,6 +670,55 @@ int __lcd_memory_grant_and_map_cpu(struct lcd *caller, cptr_t lcd,
 	 * Map in lcd's address space
 	 */
 	ret = __lcd_map_memory_object_cpu(lcd_struct, dest_slot, base, cpu);
+	if (ret)
+		goto fail3;
+	/*
+	 * Put lcd
+	 */
+	__lcd_put(caller, lcd_cnode, lcd_struct);
+
+	return 0;
+
+fail3:
+	cap_delete(lcd_struct->cspace, dest_slot);
+fail2:
+	__lcd_put(caller, lcd_cnode, lcd_struct);
+fail1:
+	return ret;
+}
+
+int __lcd_memory_grant_and_map_percpu(struct lcd *caller, cptr_t lcd,
+			cptr_t mo_cptr, cptr_t dest_slot, gpa_t base, int cpu)
+{
+	struct lcd *lcd_struct;
+	struct cnode *lcd_cnode;
+	int ret;
+	/*
+	 * Look up and lock lcd
+	 */
+	ret = __lcd_get(caller, lcd, &lcd_cnode, &lcd_struct);
+	if (ret)
+		goto fail1;
+	/*
+	 * If lcd is not an embryo, fail - we only allow direct grants when
+	 * the lcd is being set up
+	 */
+	if (!lcd_status_embryo(lcd_struct)) {
+		LCD_ERR("lcd is not an embryo");
+		ret = -EINVAL;
+		goto fail2;
+	}
+	/*
+	 * Grant lcd a capability to memory object
+	 */
+	ret = cap_grant(caller->cspace, mo_cptr,
+			lcd_struct->cspace, dest_slot);
+	if (ret)
+		goto fail2;
+	/*
+	 * Map in lcd's address space
+	 */
+	ret = __lcd_map_memory_object_percpu(lcd_struct, dest_slot, base, cpu);
 	if (ret)
 		goto fail3;
 	/*

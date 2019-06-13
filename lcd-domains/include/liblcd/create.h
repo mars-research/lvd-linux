@@ -108,6 +108,9 @@ int lcd_memory_grant_and_map_hpa(cptr_t lcd, cptr_t mo, cptr_t dest_slot,
 
 int lcd_memory_grant_and_map_cpu(cptr_t lcd, cptr_t mo, cptr_t dest_slot,
 			gpa_t base, int cpu);
+
+int lcd_memory_grant_and_map_percpu(cptr_t lcd, cptr_t mo, cptr_t dest_slot,
+			gpa_t base, int cpu);
 /**
  * lcd_cap_grant -- Grant the LCD a capability (config its cspace)
  * @lcd: the LCD to configure
@@ -159,7 +162,7 @@ struct lcd_create_ctx {
 	void *gv_pg_tables;
 	void *stack;
 	void *vmfunc_page;
-	void *vmfunc_state_page;
+	union vmfunc_state_page __percpu *vmfunc_state_page;
 	unsigned long global_vmfunc_page;
 	void *m_init_bits;
 	void *m_core_bits;

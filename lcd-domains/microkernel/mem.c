@@ -361,6 +361,22 @@ static int contiguous_memory_object_hpa(struct lcd_memory_object *mo,
 	return 0;
 }
 
+static int contiguous_memory_object_hpa_percpu(struct lcd_memory_object *mo,
+					hpa_t *hpa_base)
+{
+	switch (mo->sub_type) {
+	case LCD_MICROKERNEL_TYPE_ID_PAGE:
+	case LCD_MICROKERNEL_TYPE_ID_VOLUNTEERED_PAGE:
+		*hpa_base = __hpa(per_cpu_ptr_to_phys(page_address(mo->object)));
+		break;
+	default:
+		LCD_ERR("unexpected memory object type: %d\n",
+			mo->sub_type);
+		return -EINVAL;
+	}
+
+	return 0;
+}
 static int isolated_map_vmalloc_mem(struct lcd *lcd, 
 				struct lcd_memory_object *vmalloc_mo,
 				gpa_t base)
@@ -555,6 +571,51 @@ fail2:
 fail1:
 	return ret;
 }
+
+static int isolated_map_contiguous_mem_percpu(struct lcd *lcd,
+				struct lcd_memory_object *mo,
+				gpa_t base, int cpu)
+{
+	int ret;
+	hpa_t hpa_base;
+	/*
+	 * Get host physical address of start of memory object
+	 */
+	ret = contiguous_memory_object_hpa_percpu(mo, &hpa_base);
+	if (ret) {
+		LCD_ERR("invalid memory object");
+		goto fail1;
+	}
+	/*
+	 * Map memory object.
+	 *
+	 * XXX: No matter what the memory object is, we map it
+	 * the same way. This is kind of subtle. We can get away
+	 * with it because we allow the LCD to use the PAT to control
+	 * caching, and we always map memory as WB in guest physical.
+	 */
+#ifdef CONFIG_LVD
+	LCD_MSG("%s gpa: %llx hpa: %llx", __func__, base, hpa_base);
+	/* in LVD's everything is one-to-one mapping */
+	ret = lcd_arch_ept_map_range_cpu(lcd->lcd_arch,
+					base,
+					hpa_base,
+					mo->nr_pages,
+					cpu);
+#else
+	ret = lcd_arch_ept_map_range(lcd->lcd_arch, base, hpa_base,
+				mo->nr_pages);
+#endif
+	if (ret) {
+		LCD_ERR("map");
+		goto fail2;
+	}
+
+fail2:
+fail1:
+	return ret;
+}
+
 static int isolated_map_memory_object(struct lcd *lcd, 
 				struct lcd_memory_object *mo,
 				gpa_t base)
@@ -597,6 +658,20 @@ static int isolated_map_memory_object_cpu(struct lcd *lcd,
 		return printk("%s, not implemented for vmalloc mem\n", __func__);
 }
 
+static int isolated_map_memory_object_percpu(struct lcd *lcd, 
+				struct lcd_memory_object *mo,
+				gpa_t base, int cpu)
+{
+	/*
+	 * The mapping process depends on the memory object type
+	 * (physical memory, vmalloc memory, etc.)
+	 */
+	if (__lcd_memory_object_is_contiguous(mo))
+		return isolated_map_contiguous_mem_percpu(lcd, mo, base, cpu);
+	else
+		return printk("%s, not implemented for vmalloc mem\n", __func__);
+}
+
 int __lcd_do_map_memory_object_cpu(struct lcd *lcd, 
 			struct lcd_memory_object *mo,
 			struct lcd_mapping_metadata *meta,
@@ -632,6 +707,74 @@ int __lcd_do_map_memory_object_cpu(struct lcd *lcd,
 	switch (lcd->type) {
 	case LCD_TYPE_ISOLATED:
 		ret = isolated_map_memory_object_cpu(lcd, mo, base, cpu);
+		break;
+	case LCD_TYPE_NONISOLATED:
+	case LCD_TYPE_TOP:
+		/*
+		 * For now, map is a no-op for non-isolated code. (All host 
+		 * physical is available to non-isolated code. Recall that
+		 * this function is about mapping in physical, not virtual.)
+		 */
+		ret = 0;
+		break;
+	default:
+		LCD_ERR("unrecognized lcd type %d", lcd->type);
+		ret = -EINVAL;
+		break;
+	}
+	if (ret)
+		goto out;
+	/*
+	 * Mark page as mapped, and where it's mapped
+	 *
+	 * (So that isolated and non-isolated code have the same semantics
+	 * here, in both cases we indicate the memory object as mapped.)
+	 */
+	meta->is_mapped = 1;
+	meta->where_mapped = base;
+
+	ret = 0;
+	goto out;
+
+out:
+	return ret;
+}
+
+int __lcd_do_map_memory_object_percpu(struct lcd *lcd, 
+			struct lcd_memory_object *mo,
+			struct lcd_mapping_metadata *meta,
+			gpa_t base,
+			struct cnode *cnode, int cpu)
+{
+	int ret;
+	/*
+	 * If memory object is already mapped, fail
+	 */
+	if (!meta) {
+		/*
+		 * First time mapping; init metadata
+		 *
+		 * zalloc sets is_mapped = 0
+		 */
+		meta = kzalloc(sizeof(*meta), GFP_KERNEL); 
+		if (!meta) {
+			LCD_ERR("malloc failed");
+			ret = -ENOMEM;
+			goto out;
+		}
+		cap_cnode_set_metadata(cnode, meta);
+	}
+	if (meta->is_mapped) {
+		ret = -EALREADYMAPPED;
+		goto out;
+	}
+	/*
+	 * We need to handle mapping differently depending on
+	 * the LCD type (isolated vs non-isolated)
+	 */
+	switch (lcd->type) {
+	case LCD_TYPE_ISOLATED:
+		ret = isolated_map_memory_object_percpu(lcd, mo, base, cpu);
 		break;
 	case LCD_TYPE_NONISOLATED:
 	case LCD_TYPE_TOP:
@@ -909,6 +1052,38 @@ int __lcd_map_memory_object_cpu(struct lcd *caller, cptr_t mo_cptr, gpa_t base, 
 	 * Do the map
 	 */
 	ret = __lcd_do_map_memory_object_cpu(caller, mo, meta, base, cnode, cpu);
+	if (ret)
+		goto fail2;
+	/*
+	 * Release cnode, etc.
+	 */
+	__lcd_put_memory_object(caller, cnode, mo);
+
+	return 0;
+
+fail2:
+	__lcd_put_memory_object(caller, cnode, mo);
+fail1:
+	return ret;
+}
+
+int __lcd_map_memory_object_percpu(struct lcd *caller, cptr_t mo_cptr, gpa_t base, int cpu)
+{
+	int ret;
+	struct lcd_mapping_metadata *meta;
+	struct lcd_memory_object *mo;
+	struct cnode *cnode;
+	/*
+	 * Look up memory object and metadata in caller's cspace
+	 */
+	ret = __lcd_get_memory_object(caller, mo_cptr, &cnode, &mo);
+	if (ret)
+		goto fail1;
+	meta = cap_cnode_metadata(cnode);
+	/*
+	 * Do the map
+	 */
+	ret = __lcd_do_map_memory_object_percpu(caller, mo, meta, base, cnode, cpu);
 	if (ret)
 		goto fail2;
 	/*

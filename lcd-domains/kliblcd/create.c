@@ -165,6 +165,13 @@ int lcd_memory_grant_and_map_cpu(cptr_t lcd, cptr_t mo, cptr_t dest_slot,
 					dest_slot, base, cpu);
 }
 
+int lcd_memory_grant_and_map_percpu(cptr_t lcd, cptr_t mo, cptr_t dest_slot,
+			gpa_t base, int cpu)
+{
+	return __lcd_memory_grant_and_map_percpu(current->lcd, lcd, mo,
+					dest_slot, base, cpu);
+}
+
 int lcd_cap_grant(cptr_t lcd, cptr_t src, cptr_t dest)
 {
 	return __lcd_cap_grant(current->lcd, lcd, src, dest);

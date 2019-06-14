@@ -23,6 +23,7 @@ LIBLCD_FUNC_ATTR
 lcd_enter(void)
 {
 	int ret;
+	int i;
 	/*
 	 * Aside from the call endpoint, order is important ...
 	 *
@@ -31,6 +32,14 @@ lcd_enter(void)
 	 * then).
 	 *
          * Create our call endpoint (for call/reply interactions)                       */
+	for (i = 0; i < nr_cpu_ids; i++) {
+		cpumask_set_cpu(i, &__cpu_possible_mask);
+		cpumask_set_cpu(i, &__cpu_online_mask);
+		cpumask_set_cpu(i, &__cpu_present_mask);
+		cpumask_set_cpu(i, &__cpu_active_mask);
+	}
+
+
         ret = _lcd_create_sync_endpoint(LCD_CPTR_CALL_ENDPOINT);
         if (ret) {
                 LIBLCD_ERR("creating call endpoint");

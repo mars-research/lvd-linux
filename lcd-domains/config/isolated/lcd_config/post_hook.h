@@ -10,6 +10,9 @@
  */
 
 #include <liblcd/liblcd.h>
+#include <asm/desc.h>
+extern union vmfunc_state_page vmfunc_state_page;
+
 
 /*
  * Misc macros, etc.
@@ -82,8 +85,23 @@
 #undef nr_cpus_node
 #define nr_cpus_node(x) 1
 
+#undef nr_cpu_ids
+#define nr_cpu_ids     10
+
+#undef for_each_cpu
+#define for_each_cpu(cpu, mask)                        \
+       for ((cpu) = 0; (cpu) < nr_cpu_ids; (cpu)++, (void)mask)
+
+#define on_each_lcd(func, arg, wait)           \
+       do {                                    \
+               int i;                          \
+               for (i = 0; i < nr_cpu_ids; i++) {      \
+                       func(arg, i);   \
+               }                                       \
+       } while (0)                             \
+
 #undef smp_processor_id
-#define smp_processor_id() 0
+#define smp_processor_id() vmfunc_state_page.vmfunc_state.cpuid
 
 #undef num_possible_nodes
 #define num_possible_nodes() 1
@@ -151,6 +169,36 @@
 #undef put_online_cpus
 #define put_online_cpus() do { } while(0)
 
+#ifdef CONFIG_SMP
+#undef spin_lock_init
+#define spin_lock_init(x)       lcd_spin_lock_init(x)
+
+#undef spin_lock
+#define spin_lock(x)            lcd_spin_lock(x)
+
+#undef spin_unlock
+#define spin_unlock(x)          lcd_spin_unlock(x)
+
+#undef spin_lock_irqsave
+#define spin_lock_irqsave(x,flags)      spin_lock(x)
+
+#undef spin_lock_irq
+#define spin_lock_irq(x)        spin_lock(x)
+
+#undef spin_unlock_irq
+#define spin_unlock_irq(x)      spin_unlock(x)
+
+#undef spin_unlock_irqrestore
+#define spin_unlock_irqrestore(x,flags)         spin_unlock(x)
+
+#undef _raw_spin_lock
+#define _raw_spin_lock(x)       spin_lock(x)
+
+#undef _raw_spin_unlock
+#define _raw_spin_unlock(x)     spin_unlock(x)
+
+#else /* CONFIG_SMP */
+
 #undef spin_lock_init
 #define spin_lock_init(x) do { } while(0)
 
@@ -172,6 +220,14 @@
 #undef spin_unlock_irq
 #define spin_unlock_irq(x) do { } while(0)
 
+#undef _raw_spin_lock
+#define _raw_spin_lock(x) do { } while (0)
+
+#undef _raw_spin_unlock
+#define _raw_spin_unlock(x) do { } while (0)
+
+#endif /* CONFIG_SMP */
+
 #undef rcu_barrier
 #define rcu_barrier() do { smp_mb(); } while(0)
 
@@ -186,12 +242,6 @@
 
 #undef might_sleep_if
 #define might_sleep_if(x) do { } while (0)
-
-#undef _raw_spin_lock
-#define _raw_spin_lock(x) do { } while (0)
-
-#undef _raw_spin_unlock
-#define _raw_spin_unlock(x) do { } while (0)
 
 static inline void force_down_read(void *x)
 {

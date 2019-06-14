@@ -62,7 +62,7 @@
 #undef CONFIG_LOCKDEP
 #undef CONFIG_DEBUG_LOCK_ALLOC
 #undef CONFIG_LOCK_STAT
-#undef CONFIG_SMP
+//#undef CONFIG_SMP
 #undef CONFIG_KALLSYMS
 #undef CONFIG_SWAP
 #undef CONFIG_TRANSPARENT_HUGEPAGE
@@ -72,7 +72,7 @@
 #endif
 
 #undef CONFIG_NR_CPUS
-#define CONFIG_NR_CPUS 1
+#define CONFIG_NR_CPUS 10
 
 #undef CONFIG_NODES_SHIFT /* force max numnodes to 1 */
 

@@ -21,6 +21,12 @@ struct task_struct fake_task = {
 	.cred = &fake_cred,
 };
 struct task_struct *current_task = &fake_task;
+
+struct cpumask __cpu_possible_mask;
+struct cpumask __cpu_online_mask;
+struct cpumask __cpu_present_mask;
+struct cpumask __cpu_active_mask;
+
 /*
  * Make sure these cause trouble. This kernel_stack value is non-canonical,
  * so will hopefully cause a GP exception. This phys_base sets bits past
@@ -28,6 +34,7 @@ struct task_struct *current_task = &fake_task;
  */
 unsigned long kernel_stack = 0x800000badbadf00dUL;
 unsigned long phys_base = 0x800000badbadf00dUL;
+extern union vmfunc_state_page vmfunc_state_page;
  
 unsigned long _copy_from_user(void *to, const void __user *from, unsigned n)
 {

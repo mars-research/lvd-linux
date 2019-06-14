@@ -42,6 +42,7 @@ lib-y += $(addprefix liblcd/lib/, \
 	dynamic_queue_limits.o \
 	checksum.o \
 	scatterlist.o \
+	spinlock.o \
 	)
 
 lib-y += $(addprefix liblcd/mm/, \

@@ -1535,44 +1535,34 @@ extern struct net_device *g_netdev;
 int ndo_start_xmit_callee(struct fipc_message *_request)
 {
 	struct sk_buff *skb;
-#ifdef SKB_CONTAINER_HAS_SKBP
-	struct sk_buff_container *skb_c = NULL;
-#else
 	struct sk_buff_container_2 *skb_c = NULL;
-#endif
 	int ret = 0;
 	int func_ret;
 	cptr_t skb_ref;
-	xmit_type_t xmit_type;
 	unsigned long skbh_offset, skb_end;
 	struct skbuff_members *skb_lcd;
 	__be16 proto;
-#ifdef SKB_CONTAINER_HAS_SKBP
-	void *mem;
-#endif
 
 #ifdef LCD_MEASUREMENT
 	TS_DECL(xmit);
 #endif
-	xmit_type = fipc_get_reg0(_request);
+#ifdef CONFIG_NO_HASHING
+	skb_ref = __cptr(fipc_get_reg0(_request));
+#else
 	skb_ref = __cptr(fipc_get_reg2(_request));
+#endif
 	skbh_offset = fipc_get_reg3(_request);
 	skb_end = fipc_get_reg4(_request);
 	proto = fipc_get_reg5(_request);
 
-#ifdef SKB_CONTAINER_HAS_SKBP
-	skb_c = kmem_cache_alloc(skb_c_cache, GFP_KERNEL);
-#else
 	skb_c = kmem_cache_alloc(skb2_cache, GFP_KERNEL);
-#endif
 
 	if (!skb_c) {
 		LIBLCD_MSG("out of mmeory");
 		goto fail_alloc;
 	}
-#ifndef SKB_CONTAINER_HAS_SKBP
+	//printk("%s, lcd: %lu got %p from kmem_cache", __func__, smp_processor_id(), skb_c);
 	skb = &skb_c->skb;
-#endif
 
 	skb->head = (char*)data_pool + skbh_offset;
 	skb->end = skb_end;
@@ -1600,15 +1590,6 @@ int ndo_start_xmit_callee(struct fipc_message *_request)
 		skb->xmit_more, skb->tail, skb->truesize);
 
 	skb->data = skb->head + skb_lcd->head_data_off;
-
-#ifdef SKB_CONTAINER_HAS_SKBP
-	skb_c->skb = skb;
-#endif
-
-#ifdef SKB_CONTAINER_HAS_SKBP
-	if (0)
-		glue_insert_skbuff(cptr_table, skb_c);
-#endif
 
 	skb_c->other_ref = skb_ref;
 

@@ -1019,7 +1019,11 @@ int ndo_start_xmit(struct sk_buff *skb,
 	struct fipc_message r;
 	struct fipc_message *_request = &r;
 	int func_ret = 0;
+	static int once = 1;
+
+#ifndef CONFIG_NO_HASHING
 	struct sk_buff_container *skb_c;
+#endif
 	struct skbuff_members *skb_lcd;
 #ifdef TIMESTAMP
 	TS_DECL(mndo_xmit);
@@ -1045,6 +1049,7 @@ int ndo_start_xmit(struct sk_buff *skb,
 			struct net_device_container,
 			net_device);
 
+#ifndef CONFIG_NO_HASHING
 #ifdef SKBC_PRIVATE_POOL
 	skb_c = priv_alloc(SKB_CONTAINER_POOL);
 #else
@@ -1059,18 +1064,19 @@ int ndo_start_xmit(struct sk_buff *skb,
 
 	if (0)
 		printk("%s, on cpu:%d skb:%p\n", __func__, smp_processor_id(), skb);
-
-	glue_insert_skb_hash(skb_c);
-
+#endif
 	/* pad to 17 bytes, don't care the ret val */
 	skb_put_padto(skb, 17);
 	async_msg_set_fn_type(_request, NDO_START_XMIT);
 
-	fipc_set_reg0(_request, xmit_type);
+#ifdef CONFIG_NO_HASHING
+	fipc_set_reg0(_request, (unsigned long) skb);
+#else
+	glue_insert_skb_hash(skb_c);
+	fipc_set_reg2(_request, skb_c->my_ref.cptr);
+#endif
 
 	fipc_set_reg1(_request, dev_container->other_ref.cptr);
-
-	fipc_set_reg2(_request, skb_c->my_ref.cptr);
 
 	fipc_set_reg3(_request,
 			(unsigned long)
@@ -1117,9 +1123,13 @@ int ndo_start_xmit(struct sk_buff *skb,
 	times_ndo_xmit[iter] = TS_DIFF(mndo_xmit);
 	iter = (iter + 1) % NUM_PACKETS;
 #endif
+#ifndef CONFIG_NO_HASHING
 fail_alloc:
-	if (func_ret != NETDEV_TX_OK)
+#endif
+	if (once && (func_ret != NETDEV_TX_OK)) {
+		once = 0;
 		printk("%s, got %d\n", __func__, func_ret);
+	}
 	return func_ret;
 }
 
@@ -2029,8 +2039,13 @@ int netif_set_real_num_rx_queues_callee(struct fipc_message *_request)
 	}
 
 	rxq = fipc_get_reg3(_request);
+
+	LIBLCD_MSG("%s, rxq %d | num_rx_queues %d", __func__, rxq, dev_container->net_device.num_rx_queues);
+
 	func_ret = netif_set_real_num_rx_queues(( &dev_container->net_device ),
 		rxq);
+
+	LIBLCD_MSG("netif_set_real_num_rx_queues returns %d", func_ret);
 
 	fipc_set_reg1(_request,
 			func_ret);
@@ -2073,15 +2088,20 @@ fail_lookup:
 int napi_consume_skb_callee(struct fipc_message *_request)
 {
 	struct sk_buff *skb;
+#ifndef CONFIG_NO_HASHING
 	struct sk_buff_container *skb_c = NULL;
+#endif
 	int ret = 0;
 	int budget;
 	cptr_t skb_cptr;
 
 	skb_cptr = __cptr(fipc_get_reg0(_request));
-	glue_lookup_skb_hash(skb_cptr, &skb_c);
-
 	budget = fipc_get_reg1(_request);
+
+#ifdef CONFIG_NO_HASHING
+	skb = (struct sk_buff*) skb_cptr.cptr;
+#else
+	glue_lookup_skb_hash(skb_cptr, &skb_c);
 
 	//WARN_ON(!skb_c);
 
@@ -2091,6 +2111,7 @@ int napi_consume_skb_callee(struct fipc_message *_request)
 	}
 
 	skb = skb_c->skb;
+#endif
 
 	if (check_skb_range(skb) == VOLUNTEER_XMIT)
 		printk("%s, skb possibly corrupted %p\n", __func__, skb);
@@ -2102,8 +2123,8 @@ int napi_consume_skb_callee(struct fipc_message *_request)
 
 	g_stats.num_consumed++;
 
+#ifndef CONFIG_NO_HASHING
 	glue_remove_skb_hash(skb_c);
-
 #ifdef SKBC_PRIVATE_POOL
 	WARN_ON(!skb_c);
 	if(skb_c)
@@ -2111,7 +2132,10 @@ int napi_consume_skb_callee(struct fipc_message *_request)
 #else
 	kmem_cache_free(skb_c_cache, skb_c);
 #endif
+#ifndef CONFIG_NO_HASHING
 skip:
+#endif
+#endif
 	return ret;
 }
 

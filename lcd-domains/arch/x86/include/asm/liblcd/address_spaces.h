@@ -169,7 +169,7 @@
 /* Component Sizes. */
 
 #define LCD_UTCB_SIZE PAGE_SIZE /* ........................... 4  KBs */
-#define LCD_BOOTSTRAP_PAGES_SIZE (1 * PAGE_SIZE) /* .......... 4  KBs */
+#define LCD_BOOTSTRAP_PAGES_SIZE (4 * PAGE_SIZE) /* .......... 16  KBs */
 #define LCD_BOOTSTRAP_PAGE_TABLES_SIZE (16 * PAGE_SIZE) /* ... 64 KBs */
 #define LCD_STACK_SIZE (2 * PAGE_SIZE) /* .................... 8  KBs */
 

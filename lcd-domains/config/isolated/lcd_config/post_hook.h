@@ -86,7 +86,7 @@ extern union vmfunc_state_page vmfunc_state_page;
 #define nr_cpus_node(x) 1
 
 #undef nr_cpu_ids
-#define nr_cpu_ids     10
+#define nr_cpu_ids     20
 
 #undef for_each_cpu
 #define for_each_cpu(cpu, mask)                        \

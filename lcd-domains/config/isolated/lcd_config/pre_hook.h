@@ -72,7 +72,7 @@
 #endif
 
 #undef CONFIG_NR_CPUS
-#define CONFIG_NR_CPUS 10
+#define CONFIG_NR_CPUS 20
 
 #undef CONFIG_NODES_SHIFT /* force max numnodes to 1 */
 

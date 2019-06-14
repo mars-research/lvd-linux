@@ -66,7 +66,7 @@ LCD_BUILD_DIR=$(LCD_DOMAINS_TOP_SRC_DIR)/$(LCD_BUILD_DIR_REL)
 
 # Since non-isolated code sets up the boot cptr cache for isolated code
 # you need to use the same config for both environments.
-LCD_CSPACE_DEPTH_BITS=2 # depth = 4
+LCD_CSPACE_DEPTH_BITS=3 # depth = 8
 LCD_CSPACE_CNODE_TABLE_BITS=3 # cnode tables have 8 slots
 
 # ------------------------------------------------------------

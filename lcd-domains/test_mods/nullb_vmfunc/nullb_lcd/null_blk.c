@@ -15,6 +15,8 @@
 #include <linux/lightnvm.h>
 #include "../glue_helper.h"
 
+#include <liblcd/spinlock.h>
+
 #ifdef LCD_ISOLATE
 #include <lcd_config/post_hook.h>
 #endif
@@ -60,7 +62,7 @@ struct nullb {
 	struct hrtimer timer;
 #endif
 	unsigned int queue_depth;
-	spinlock_t lock;
+	lcd_spinlock_t lock;
 
 	struct nullb_queue *queues;
 	unsigned int nr_queues;

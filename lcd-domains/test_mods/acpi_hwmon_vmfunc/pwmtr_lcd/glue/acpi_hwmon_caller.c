@@ -9,7 +9,7 @@
 
 #include <lcd_config/post_hook.h>
 
-static struct glue_cspace *c_cspace;
+static struct glue_cspace *lcd_cspace;
 extern struct acpi_driver acpi_power_meter_driver;
 struct acpi_driver *driver = &acpi_power_meter_driver;
 
@@ -21,7 +21,7 @@ int glue_acpi_hwmon_init(void)
 		LIBLCD_ERR("cap init");
 		goto fail1;
 	}
-	ret = glue_cap_create(&c_cspace);
+	ret = glue_cap_create(&lcd_cspace);
 	if (ret) {
 		LIBLCD_ERR("cap create");
 		goto fail2;
@@ -36,7 +36,7 @@ fail1:
 
 void glue_acpi_hwmon_exit(void)
 {
-	glue_cap_destroy(c_cspace);
+	glue_cap_destroy(lcd_cspace);
 	glue_cap_exit();
 
 }
@@ -90,23 +90,48 @@ int acpi_bus_register_driver(struct acpi_driver *driver)
 {
 	struct fipc_message r;
 	struct fipc_message *_request = &r;
+	struct acpi_driver_container *acpi_container;
 	int func_ret, ret;
 
+	acpi_container = container_of(driver, struct acpi_driver_container,
+			acpi_driver);
+
+	ret = glue_cap_insert_acpi_driver_type(lcd_cspace, acpi_container,
+			&acpi_container->my_ref);
+
+	if (ret) {
+		LIBLCD_ERR("glue_cap_insert failed with ret %d", ret);
+		goto fail_insert;
+	}
+
 	async_msg_set_fn_type(_request, ACPI_BUS_REGISTER_DRIVER);
+	fipc_set_reg0(_request, acpi_container->my_ref.cptr);
 	ret = vmfunc_wrapper(_request);
 	func_ret = fipc_get_reg0(_request);
+	acpi_container->other_ref.cptr = fipc_get_reg1(_request);
+
 	return func_ret;
 
+fail_insert:
+	return ret;
 }
 
 void acpi_bus_unregister_driver(struct acpi_driver *driver)
 {
 	struct fipc_message r;
 	struct fipc_message *_request = &r;
+	struct acpi_driver_container *acpi_container;
 	int ret;
-	async_msg_set_fn_type(_request,
-			ACPI_BUS_UNREGISTER_DRIVER);
+
+	acpi_container = container_of(driver, struct acpi_driver_container,
+			acpi_driver);
+
+	async_msg_set_fn_type(_request, ACPI_BUS_UNREGISTER_DRIVER);
+	fipc_set_reg0(_request, acpi_container->my_ref.cptr);
 	ret = vmfunc_wrapper(_request);
+
+	glue_cap_remove(lcd_cspace, acpi_container->my_ref);
+
 	return;
 }
 

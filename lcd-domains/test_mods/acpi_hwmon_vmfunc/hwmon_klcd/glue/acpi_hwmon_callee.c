@@ -1,7 +1,35 @@
 #include "../acpi_hwmon_callee.h"
 #include <liblcd/trampoline.h>
 
+#define ACPI_POWER_METER_DEVICE_NAME	"Power Meter"
+#define ACPI_POWER_METER_CLASS		"pwr_meter_resource"
+
 static struct glue_cspace *c_cspace;
+struct acpi_device *g_acpi_device;
+static int cap_in_hardware;
+
+/* Module init/exit routines */
+static int __init enable_cap_knobs(const struct dmi_system_id *d)
+{
+	cap_in_hardware = 1;
+	return 0;
+}
+
+static struct dmi_system_id __initdata pm_dmi_table[] = {
+	{
+		enable_cap_knobs, "IBM Active Energy Manager",
+		{
+			DMI_MATCH(DMI_SYS_VENDOR, "IBM")
+		},
+	},
+	{}
+};
+
+static const struct acpi_device_id power_meter_ids[] = {
+	{"ACPI000D", 0},
+	{"", 0},
+};
+MODULE_DEVICE_TABLE(acpi, power_meter_ids);
 
 int glue_acpi_hwmon_init(void)
 {
@@ -30,9 +58,6 @@ void glue_acpi_hwmon_exit(void)
 	glue_cap_exit();
 }
 
-#define ACPI_POWER_METER_DEVICE_NAME	"Power Meter"
-#define ACPI_POWER_METER_CLASS		"pwr_meter_resource"
-struct acpi_device *g_acpi_device;
 
 int acpi_bus_generate_netlink_event_callee(struct fipc_message *_request)
 {
@@ -111,39 +136,121 @@ fail_alloc2:
 
 }
 
+#ifdef CONFIG_LVD
+int add(struct acpi_device *device)
+#else
+int add(struct acpi_device *device,
+		struct trampoline_hidden_args *hidden_args)
+#endif
+{
+	struct fipc_message r;
+	struct fipc_message *_request = &r;
+	int func_ret;
+
+	async_msg_set_fn_type(_request, ACPI_OP_ADD);
+	vmfunc_wrapper(_request);
+	func_ret = fipc_get_reg1(_request);
+	return func_ret;
+}
+
+#ifdef CONFIG_LVD
+int remove(struct acpi_device *device)
+#else
+int remove(struct acpi_device *device,
+		struct trampoline_hidden_args *hidden_args)
+#endif
+{
+	struct fipc_message r;
+	struct fipc_message *_request = &r;
+	int func_ret;
+
+	async_msg_set_fn_type(_request, ACPI_OP_REMOVE);
+	vmfunc_wrapper(_request);
+	func_ret = fipc_get_reg1(_request);
+	return func_ret;
+}
+
+#ifdef CONFIG_LVD
+void notify(struct acpi_device *device,
+		unsigned int event)
+#else
+void notify(struct acpi_device *device,
+		unsigned int event,
+		struct trampoline_hidden_args *hidden_args)
+#endif
+{
+	struct fipc_message r;
+	struct fipc_message *_request = &r;
+
+	async_msg_set_fn_type(_request, ACPI_OP_NOTIFY);
+	fipc_set_reg1(_request, event);
+
+	vmfunc_wrapper(_request);
+	return;
+}
+
 int acpi_bus_register_driver_callee(struct fipc_message *_request)
 {
-	struct acpi_driver *driver = NULL;
+	struct acpi_driver_container *acpi_container;
+	struct acpi_driver *driver;
 	int ret = 0;
 	int func_ret = 0;
-	driver = kzalloc(sizeof( *driver ),
-		GFP_KERNEL);
-	if (!driver) {
+
+	acpi_container = kzalloc(sizeof(*acpi_container), GFP_KERNEL);
+	if (!acpi_container) {
 		LIBLCD_ERR("kzalloc");
 		goto fail_alloc;
 	}
-	func_ret = acpi_bus_register_driver(driver);
-	fipc_set_reg1(_request,
-			func_ret);
-fail_alloc:
-	return ret;
+	driver = &acpi_container->acpi_driver;
 
+	strncpy(driver->name, "power_meter", sizeof(driver->name));
+	strncpy(driver->class, ACPI_POWER_METER_CLASS, sizeof(driver->class));
+	driver->ids = power_meter_ids;
+	driver->ops.add = add;
+	driver->ops.remove = remove;
+	driver->ops.notify = notify;
+
+	acpi_container->other_ref.cptr = fipc_get_reg0(_request);
+
+	ret = glue_cap_insert_acpi_driver_type(c_cspace, acpi_container,
+			&acpi_container->my_ref);
+
+	if (ret) {
+		LIBLCD_ERR("glue_cap_insert failed with ret %d", ret);
+		goto fail_insert;
+	}
+
+	func_ret = acpi_bus_register_driver(driver);
+	fipc_set_reg0(_request, func_ret);
+	fipc_set_reg1(_request, acpi_container->my_ref.cptr);
+
+fail_alloc:
+fail_insert:
+	return ret;
 }
 
 int acpi_bus_unregister_driver_callee(struct fipc_message *_request)
 {
-	struct acpi_driver *driver = NULL;
+	struct acpi_driver_container *acpi_container;
+	struct acpi_driver *driver;
 	int ret = 0;
-	driver = kzalloc(sizeof( *driver ),
-		GFP_KERNEL);
-	if (!driver) {
-		LIBLCD_ERR("kzalloc");
-		goto fail_alloc;
-	}
-	acpi_bus_unregister_driver(driver);
-fail_alloc:
-	return ret;
+	cptr_t my_ref;
 
+	my_ref.cptr = fipc_get_reg0(_request);
+	ret = glue_cap_lookup_acpi_driver_type(c_cspace, my_ref,
+			&acpi_container);
+
+	if (ret) {
+		LIBLCD_ERR("glue_cap_lookup failed with ret %d", ret);
+		goto fail_lookup;
+	}
+	driver = &acpi_container->acpi_driver;
+
+	acpi_bus_unregister_driver(driver);
+
+	glue_cap_remove(c_cspace, acpi_container->my_ref);
+fail_lookup:
+	return ret;
 }
 
 int acpi_evaluate_integer_callee(struct fipc_message *_request)
@@ -441,21 +548,14 @@ fail_alloc:
 
 int dmi_check_system_callee(struct fipc_message *_request)
 {
-	struct dmi_system_id *list = NULL;
 	int ret = 0;
 	int func_ret = 0;
-	list = kzalloc(sizeof( *list ),
-		GFP_KERNEL);
-	if (!list) {
-		LIBLCD_ERR("kzalloc");
-		goto fail_alloc;
-	}
-	func_ret = dmi_check_system(list);
-	fipc_set_reg1(_request,
-			func_ret);
-fail_alloc:
-	return ret;
 
+	func_ret = dmi_check_system(pm_dmi_table);
+
+	fipc_set_reg0(_request, func_ret);
+
+	return ret;
 }
 
 int hwmon_device_register_callee(struct fipc_message *_request)
@@ -650,57 +750,4 @@ int sysfs_notify_callee(struct fipc_message *_request)
 fail_alloc:
 	return ret;
 
-}
-
-#ifdef CONFIG_LVD
-int add(struct acpi_device *device)
-#else
-int add(struct acpi_device *device,
-		struct trampoline_hidden_args *hidden_args)
-#endif
-{
-	struct fipc_message r;
-	struct fipc_message *_request = &r;
-	int func_ret;
-
-	async_msg_set_fn_type(_request, ACPI_OP_ADD);
-	vmfunc_wrapper(_request);
-	func_ret = fipc_get_reg1(_request);
-	return func_ret;
-}
-
-#ifdef CONFIG_LVD
-int remove(struct acpi_device *device)
-#else
-int remove(struct acpi_device *device,
-		struct trampoline_hidden_args *hidden_args)
-#endif
-{
-	struct fipc_message r;
-	struct fipc_message *_request = &r;
-	int func_ret;
-
-	async_msg_set_fn_type(_request, ACPI_OP_REMOVE);
-	vmfunc_wrapper(_request);
-	func_ret = fipc_get_reg1(_request);
-	return func_ret;
-}
-
-#ifdef CONFIG_LVD
-void notify(struct acpi_device *device,
-		unsigned int event)
-#else
-void notify(struct acpi_device *device,
-		unsigned int event,
-		struct trampoline_hidden_args *hidden_args)
-#endif
-{
-	struct fipc_message r;
-	struct fipc_message *_request = &r;
-
-	async_msg_set_fn_type(_request, ACPI_OP_NOTIFY);
-	fipc_set_reg1(_request, event);
-
-	vmfunc_wrapper(_request);
-	return;
 }

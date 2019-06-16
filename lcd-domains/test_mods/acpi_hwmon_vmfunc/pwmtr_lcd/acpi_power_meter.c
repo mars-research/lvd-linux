@@ -60,6 +60,10 @@ ACPI_MODULE_NAME(ACPI_POWER_METER_NAME);
 static int cap_in_hardware;
 static bool force_cap_on;
 
+#ifdef LCD_ISOLATE
+static int acpi_disabled = 0 ;
+#endif
+
 static int can_cap_in_hardware(void)
 {
 	return force_cap_on || cap_in_hardware;
@@ -954,7 +958,12 @@ static int acpi_power_meter_resume(struct device *dev)
 
 static SIMPLE_DEV_PM_OPS(acpi_power_meter_pm, NULL, acpi_power_meter_resume);
 
+#ifdef LCD_ISOLATE
+struct acpi_driver_container acpi_power_meter_driver_container = {
+	.acpi_driver = {
+#else
 struct acpi_driver acpi_power_meter_driver = {
+#endif
 	.name = "power_meter",
 	.class = ACPI_POWER_METER_CLASS,
 	.ids = power_meter_ids,
@@ -964,6 +973,9 @@ struct acpi_driver acpi_power_meter_driver = {
 		.notify = acpi_power_meter_notify,
 		},
 	.drv.pm = &acpi_power_meter_pm,
+#ifdef LCD_ISOLATE
+	}
+#endif
 };
 
 /* Module init/exit routines */
@@ -996,7 +1008,7 @@ int acpi_power_meter_init(void)
 
 	dmi_check_system(pm_dmi_table);
 
-	result = acpi_bus_register_driver(&acpi_power_meter_driver);
+	result = acpi_bus_register_driver(&acpi_power_meter_driver_container.acpi_driver);
 	if (result < 0)
 		return result;
 
@@ -1009,7 +1021,7 @@ static void __exit acpi_power_meter_exit(void)
 void acpi_power_meter_exit(void)
 #endif
 {
-	acpi_bus_unregister_driver(&acpi_power_meter_driver);
+	acpi_bus_unregister_driver(&acpi_power_meter_driver_container.acpi_driver);
 }
 
 #ifndef LCD_ISOLATE

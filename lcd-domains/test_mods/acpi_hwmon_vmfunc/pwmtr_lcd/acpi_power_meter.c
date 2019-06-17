@@ -753,7 +753,7 @@ static int read_capabilities(struct acpi_power_meter_resource *resource)
 	acpi_string *str;
 	acpi_status status;
 
-	status = acpi_evaluate_object(resource->acpi_dev->handle, "_PMC", NULL,
+	status = _acpi_evaluate_object(resource->acpi_dev, "_PMC", NULL,
 				      &buffer);
 	if (ACPI_FAILURE(status)) {
 		ACPI_EXCEPTION((AE_INFO, status, "Evaluating _PMC"));

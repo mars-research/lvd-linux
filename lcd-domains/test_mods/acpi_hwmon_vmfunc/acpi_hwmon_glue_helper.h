@@ -24,6 +24,13 @@ struct acpi_device_container {
 	struct cptr other_ref;
 	struct cptr my_ref;
 };
+
+struct acpi_device_ptr_container {
+	struct acpi_device *acpi_device_ptr;
+	struct cptr other_ref;
+	struct cptr my_ref;
+};
+
 struct acpi_driver_container {
 	struct acpi_driver acpi_driver;
 	struct cptr other_ref;
@@ -50,9 +57,10 @@ struct device_attribute_container {
 	struct cptr my_ref;
 };
 struct device_container {
-	struct device device;
+	struct device *dev;
 	struct cptr other_ref;
 	struct cptr my_ref;
+	struct hlist_node hentry;
 };
 struct dmi_system_id_container {
 	struct dmi_system_id dmi_system_id;
@@ -76,6 +84,9 @@ int glue_cap_insert_acpi_buffer_type(struct glue_cspace *cspace,
 		struct cptr *c_out);
 int glue_cap_insert_acpi_device_type(struct glue_cspace *cspace,
 		struct acpi_device_container *acpi_device_container,
+		struct cptr *c_out);
+int glue_cap_insert_acpi_device_ptr_type(struct glue_cspace *cspace,
+		struct acpi_device_ptr_container *acpi_device_container,
 		struct cptr *c_out);
 int glue_cap_insert_acpi_driver_type(struct glue_cspace *cspace,
 		struct acpi_driver_container *acpi_driver_container,
@@ -107,6 +118,9 @@ int glue_cap_lookup_acpi_buffer_type(struct glue_cspace *cspace,
 int glue_cap_lookup_acpi_device_type(struct glue_cspace *cspace,
 		struct cptr c,
 		struct acpi_device_container **acpi_device_container);
+int glue_cap_lookup_acpi_device_ptr_type(struct glue_cspace *cspace,
+		struct cptr c,
+		struct acpi_device_ptr_container **acpi_device_container);
 int glue_cap_lookup_acpi_driver_type(struct glue_cspace *cspace,
 		struct cptr c,
 		struct acpi_driver_container **acpi_driver_container);

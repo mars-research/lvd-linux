@@ -1,5 +1,15 @@
-#include "../acpi_hwmon_callee.h"
+#include <lcd_config/pre_hook.h>
+
+#include <libcap.h>
+#include <liblcd/liblcd.h>
+#include <liblcd/sync_ipc_poll.h>
+#include <liblcd/glue_cspace.h>
 #include <liblcd/trampoline.h>
+#include <lcd_domains/microkernel.h>
+
+#include "../acpi_hwmon_callee.h"
+
+#include <lcd_config/post_hook.h>
 
 #define ACPI_POWER_METER_DEVICE_NAME	"Power Meter"
 #define ACPI_POWER_METER_CLASS		"pwr_meter_resource"
@@ -146,11 +156,55 @@ int add(struct acpi_device *device,
 	struct fipc_message r;
 	struct fipc_message *_request = &r;
 	int func_ret;
+	int ret;
+	struct acpi_device_ptr_container *acpi_ptr_c;
+	struct device_container *device_container;
 
+	acpi_ptr_c = kzalloc(sizeof(*acpi_ptr_c), GFP_KERNEL);
+	if (!acpi_ptr_c) {
+		LIBLCD_ERR("kzalloc");
+		ret = -ENOMEM;
+		goto fail_alloc;
+	}
+
+	acpi_ptr_c->acpi_device_ptr = device;
+
+	ret = glue_cap_insert_acpi_device_ptr_type(c_cspace, acpi_ptr_c,
+			&acpi_ptr_c->my_ref);
+
+	if (ret) {
+		LIBLCD_ERR("glue_cap_insert failed with ret %d", ret);
+		goto fail_insert;
+	}
+
+	device_container = kzalloc(sizeof(*device_container), GFP_KERNEL);
+	if (!device_container) {
+		LIBLCD_ERR("kzalloc");
+		ret = -ENOMEM;
+		goto fail_alloc;
+	}
+
+	ret = glue_cap_insert_device_type(c_cspace, device_container,
+			&device_container->my_ref);
+
+	if (ret) {
+		LIBLCD_ERR("glue_cap_insert failed with ret %d", ret);
+		goto fail_insert;
+	}
+
+	device_container->dev = &device->dev;
 	async_msg_set_fn_type(_request, ACPI_OP_ADD);
+	fipc_set_reg0(_request, acpi_ptr_c->my_ref.cptr);
+	fipc_set_reg1(_request, device_container->my_ref.cptr);
+
 	vmfunc_wrapper(_request);
+
 	func_ret = fipc_get_reg1(_request);
+
 	return func_ret;
+fail_alloc:
+fail_insert:
+	return ret;
 }
 
 #ifdef CONFIG_LVD
@@ -356,67 +410,83 @@ fail_alloc:
 
 int acpi_evaluate_object_callee(struct fipc_message *_request)
 {
-	__maybe_unused void *handle = NULL;
-	char *pathname = 0;
+	char *pathname;
 	struct acpi_object_list *external_params = NULL;
-	struct acpi_buffer *return_buffer = NULL;
+	struct acpi_buffer buffer;
+	struct acpi_device_ptr_container *acpi_ptr_c;
+	struct device_container *device_container;
+	struct acpi_device *acpi_device;
 	int ret = 0;
-	int func_ret = 0;
-	int sync_ret;
-	cptr_t sync_ep;
+	unsigned int func_ret = 0;
 	unsigned 	long mem_order;
-	unsigned 	long handle_offset;
-	cptr_t handle_cptr;
-	gva_t handle_gva;
-	pathname = kzalloc(sizeof( char   ),
-		GFP_KERNEL);
+	unsigned 	long p_offset;
+	cptr_t p_cptr, lcd_cptr;
+	gva_t p_gva;
+
+	pathname = kzalloc(sizeof(unsigned long), GFP_KERNEL);
 	if (!pathname) {
 		LIBLCD_ERR("kzalloc");
-		lcd_exit(-1);
-	}
-	external_params = kzalloc(sizeof( *external_params ),
-		GFP_KERNEL);
-	if (!external_params) {
-		LIBLCD_ERR("kzalloc");
 		goto fail_alloc;
 	}
-	return_buffer = kzalloc(sizeof( *return_buffer ),
-		GFP_KERNEL);
-	if (!return_buffer) {
-		LIBLCD_ERR("kzalloc");
-		goto fail_alloc;
-	}
-	sync_ret = lcd_cptr_alloc(&handle_cptr);
-	if (sync_ret) {
-		LIBLCD_ERR("failed to get cptr");
-		lcd_exit(-1);
-	}
-	lcd_set_cr0(handle_cptr);
-	sync_ret = lcd_sync_recv(sync_ep);
-	lcd_set_cr0(CAP_CPTR_NULL);
-	if (sync_ret) {
-		LIBLCD_ERR("failed to recv");
-		lcd_exit(-1);
-	}
-	mem_order = lcd_r0();
-	handle_offset = lcd_r1();
-	sync_ret = lcd_map_virt(handle_cptr,
-		mem_order,
-		&handle_gva);
-	if (sync_ret) {
-		LIBLCD_ERR("failed to map void *handle");
-		lcd_exit(-1);
-	}
-	pathname = (char*) fipc_get_reg1(_request);
-	func_ret = acpi_evaluate_object(( void  * )( ( gva_val(handle_gva) ) + ( handle_offset ) ),
-		pathname,
-		external_params,
-		return_buffer);
-	fipc_set_reg1(_request,
-			func_ret);
-fail_alloc:
-	return ret;
 
+	ret = glue_cap_lookup_acpi_device_ptr_type(c_cspace, __cptr(fipc_get_reg1(_request)),
+			&acpi_ptr_c);
+
+	if (ret) {
+		LIBLCD_ERR("glue_cap_lookup failed with ret %d", ret);
+		goto fail_lookup;
+	}
+
+	acpi_ptr_c->other_ref.cptr = fipc_get_reg0(_request);
+	acpi_device = acpi_ptr_c->acpi_device_ptr;
+
+	ret = glue_cap_lookup_device_type(c_cspace, __cptr(fipc_get_reg4(_request)),
+			&device_container);
+
+	if (ret) {
+		LIBLCD_ERR("glue_cap_lookup failed with ret %d", ret);
+		goto fail_lookup;
+	}
+
+	device_container->other_ref.cptr = fipc_get_reg6(_request);
+	strncpy(pathname, (char*)&_request->regs[2], sizeof(_request->regs[2]));
+
+	ret = lcd_cptr_alloc(&p_cptr);
+	if (ret) {
+		LIBLCD_ERR("failed to get cptr");
+		goto fail_alloc;
+	}
+
+	mem_order = fipc_get_reg3(_request);
+	/*
+	 * FIXME: Due to lack of registers, let's assign zero as it is a page
+	 * of data. The offset will be zero.
+	 */
+	p_offset = 0;
+	lcd_cptr = __cptr(fipc_get_reg5(_request));
+
+	copy_msg_cap_vmfunc(current->vmfunc_lcd, current->lcd, lcd_cptr,
+			p_cptr);
+
+	ret = lcd_map_virt(p_cptr, mem_order, &p_gva);
+
+	if (ret) {
+		LIBLCD_ERR("failed to map void *p");
+		goto fail_virt;
+	}
+	buffer.length = (1 << mem_order) * PAGE_SIZE;
+	buffer.pointer = (void*)(gva_val(p_gva) + p_offset);
+
+	func_ret = acpi_evaluate_object(acpi_device,
+			pathname,
+			external_params,
+			&buffer);
+
+	fipc_set_reg0(_request, func_ret);
+fail_alloc:
+fail_lookup:
+fail_virt:
+	return ret;
 }
 
 int acpi_exception_callee(struct fipc_message *_request)

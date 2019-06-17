@@ -375,37 +375,72 @@ fail_alloc:
 
 int acpi_extract_package_callee(struct fipc_message *_request)
 {
-	union acpi_object *package = NULL;
-	struct acpi_buffer *format = NULL;
-	struct acpi_buffer *buffer = NULL;
-	int ret = 0;
-	int func_ret = 0;
-	package = kzalloc(sizeof( *package ),
-		GFP_KERNEL);
-	if (!package) {
-		LIBLCD_ERR("kzalloc");
-		goto fail_alloc;
-	}
-	format = kzalloc(sizeof( *format ),
-		GFP_KERNEL);
-	if (!format) {
-		LIBLCD_ERR("kzalloc");
-		goto fail_alloc;
-	}
-	buffer = kzalloc(sizeof( *buffer ),
-		GFP_KERNEL);
-	if (!buffer) {
-		LIBLCD_ERR("kzalloc");
-		goto fail_alloc;
-	}
-	func_ret = acpi_extract_package(package,
-		format,
-		buffer);
-	fipc_set_reg1(_request,
-			func_ret);
-fail_alloc:
-	return ret;
+	union acpi_object *package;
+	struct acpi_buffer format;
+	struct acpi_buffer buffer;
+	unsigned 	long p_mem_order;
+	unsigned 	long p_offset;
+	cptr_t p_cptr, lcd_cptr;
+	gva_t p_gva;
+	unsigned 	long pk_mem_order;
+	unsigned 	long pk_offset;
+	cptr_t pk_cptr, lcd_pk_cptr;
+	gva_t pk_gva;
+	int ret;
+	int func_ret;
 
+	ret = lcd_cptr_alloc(&pk_cptr);
+	if (ret) {
+		LIBLCD_ERR("failed to get cptr");
+		goto fail_alloc;
+	}
+
+	pk_mem_order = fipc_get_reg0(_request);
+	pk_offset = fipc_get_reg1(_request);
+	lcd_pk_cptr = __cptr(fipc_get_reg1(_request));
+
+	copy_msg_cap_vmfunc(current->vmfunc_lcd, current->lcd, lcd_pk_cptr,
+			pk_cptr);
+
+	ret = lcd_map_virt(pk_cptr, pk_mem_order, &pk_gva);
+
+	if (ret) {
+		LIBLCD_ERR("failed to map package");
+		goto fail_virt;
+	}
+
+	package = (void*)(gva_val(pk_gva) + pk_offset);
+
+	/* map buffer */
+	ret = lcd_cptr_alloc(&p_cptr);
+	if (ret) {
+		LIBLCD_ERR("failed to get cptr");
+		goto fail_alloc;
+	}
+
+	p_mem_order = fipc_get_reg3(_request);
+	p_offset = fipc_get_reg4(_request);
+	lcd_cptr = __cptr(fipc_get_reg5(_request));
+
+	copy_msg_cap_vmfunc(current->vmfunc_lcd, current->lcd, lcd_cptr,
+			p_cptr);
+
+	ret = lcd_map_virt(p_cptr, p_mem_order, &p_gva);
+
+	if (ret) {
+		LIBLCD_ERR("failed to map void *p");
+		goto fail_virt;
+	}
+
+	buffer.length = (1 << p_mem_order) * PAGE_SIZE;
+	buffer.pointer = (void*)(gva_val(p_gva) + p_offset);
+	format.length = fipc_get_reg6(_request);
+
+	func_ret = acpi_extract_package(package, &format, &buffer);
+	fipc_set_reg0(_request, func_ret);
+fail_alloc:
+fail_virt:
+	return ret;
 }
 
 int acpi_evaluate_object_callee(struct fipc_message *_request)

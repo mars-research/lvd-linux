@@ -26,6 +26,7 @@ struct type_ops_id {
 enum glue_type {
 	GLUE_TYPE_ACPI_BUFFER_CONTAINER,
 	GLUE_TYPE_ACPI_DEVICE_CONTAINER,
+	GLUE_TYPE_ACPI_DEVICE_PTR_CONTAINER,
 	GLUE_TYPE_ACPI_DRIVER_CONTAINER,
 	GLUE_TYPE_ACPI_DEVICE_OPS_CONTAINER,
 	GLUE_TYPE_ACPI_OBJECT_CONTAINER,
@@ -55,6 +56,13 @@ static struct type_ops_id glue_libcap_type_ops[GLUE_NR_TYPES] = {
 	{
 		{
 			.name = "struct acpi_device",
+			.delete = dummy_func,
+			.revoke = dummy_func,
+		}
+	},
+	{
+		{
+			.name = "struct acpi_device_ptr",
 			.delete = dummy_func,
 			.revoke = dummy_func,
 		}
@@ -160,6 +168,26 @@ int glue_cap_lookup_acpi_device_type(struct glue_cspace *cspace,
 		glue_libcap_type_ops[ GLUE_TYPE_ACPI_DEVICE_CONTAINER ].libcap_type,
 		( void  ** )acpi_device_container);
 
+}
+
+int glue_cap_insert_acpi_device_ptr_type(struct glue_cspace *cspace,
+		struct acpi_device_ptr_container *acpi_device_ptr_container,
+		struct cptr *c_out)
+{
+	return glue_cspace_insert(cspace,
+		acpi_device_ptr_container,
+		glue_libcap_type_ops[ GLUE_TYPE_ACPI_DEVICE_PTR_CONTAINER ].libcap_type,
+		c_out);
+}
+
+int glue_cap_lookup_acpi_device_ptr_type(struct glue_cspace *cspace,
+		struct cptr c,
+		struct acpi_device_ptr_container **acpi_device_ptr_container)
+{
+	return glue_cspace_lookup(cspace,
+		c,
+		glue_libcap_type_ops[ GLUE_TYPE_ACPI_DEVICE_PTR_CONTAINER ].libcap_type,
+		( void  ** )acpi_device_ptr_container);
 }
 
 int glue_cap_insert_acpi_driver_type(struct glue_cspace *cspace,

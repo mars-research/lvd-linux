@@ -207,12 +207,56 @@ unsigned int acpi_extract_package(union acpi_object *package,
 	struct fipc_message r;
 	struct fipc_message *_request = &r;
 	int func_ret, ret;
-	async_msg_set_fn_type(_request,
-			ACPI_EXTRACT_PACKAGE);
+	struct page *p;
+	cptr_t p_cptr;
+	unsigned long p_offset;
+	unsigned long p_mem_sz;
+	cptr_t pk_cptr;
+	unsigned long pk_offset;
+	unsigned long pk_mem_sz;
+
+
+	p = lcd_alloc_pages(GFP_KERNEL, 0);
+
+	if (!p) {
+		LIBLCD_ERR("page alloc failed");
+		ret = -ENOMEM;
+		goto fail_alloc;
+	}
+
+	buffer->pointer = lcd_page_address(p);
+
+	ret = lcd_virt_to_cptr(__gva((unsigned long)buffer->pointer), &p_cptr,
+			&p_mem_sz, &p_offset);
+
+	if (ret) {
+		LIBLCD_ERR("virt to cptr failed");
+		goto fail_virt;
+	}
+
+	ret = lcd_virt_to_cptr(__gva((unsigned long)package), &pk_cptr,
+			&pk_mem_sz, &pk_offset);
+
+	if (ret) {
+		LIBLCD_ERR("virt to cptr failed");
+		goto fail_virt;
+	}
+
+	fipc_set_reg0(_request, ilog2((pk_mem_sz) >> (PAGE_SHIFT)));
+	fipc_set_reg1(_request, pk_offset);
+	fipc_set_reg2(_request, cptr_val(pk_cptr));
+	fipc_set_reg3(_request, ilog2((p_mem_sz) >> (PAGE_SHIFT)));
+	fipc_set_reg4(_request, p_offset);
+	fipc_set_reg5(_request, cptr_val(p_cptr));
+	fipc_set_reg6(_request, format->length);
+
+	async_msg_set_fn_type(_request, ACPI_EXTRACT_PACKAGE);
 	ret = vmfunc_wrapper(_request);
 	func_ret = fipc_get_reg0(_request);
 	return func_ret;
-
+fail_alloc:
+fail_virt:
+	return ret;
 }
 
 unsigned int _acpi_evaluate_object(struct acpi_device *acpi_device,

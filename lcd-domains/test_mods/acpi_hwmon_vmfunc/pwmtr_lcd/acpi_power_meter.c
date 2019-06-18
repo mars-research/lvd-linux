@@ -19,6 +19,8 @@
  * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
  */
 
+#include <lcd_config/pre_hook.h>
+
 #include <linux/module.h>
 #include <linux/hwmon.h>
 #include <linux/hwmon-sysfs.h>
@@ -31,6 +33,10 @@
 #include <linux/time.h>
 #include <linux/err.h>
 #include <linux/acpi.h>
+
+#include "acpi_hwmon_caller.h"
+
+#include <lcd_config/post_hook.h>
 
 #define ACPI_POWER_METER_NAME		"power_meter"
 ACPI_MODULE_NAME(ACPI_POWER_METER_NAME);
@@ -61,7 +67,7 @@ static int cap_in_hardware;
 static bool force_cap_on;
 
 #ifdef LCD_ISOLATE
-static int acpi_disabled = 0 ;
+static int _acpi_disabled = 0 ;
 #endif
 
 static int can_cap_in_hardware(void)
@@ -103,7 +109,11 @@ struct acpi_power_meter_resource {
 	u64		avg_interval;
 	int			sensors_valid;
 	unsigned long		sensors_last_updated;
+#ifdef LCD_ISOLATE
+	struct sensor_device_attribute_container sensor_container[NUM_SENSORS];
+#else
 	struct sensor_device_attribute	sensors[NUM_SENSORS];
+#endif
 	int			num_sensors;
 	s64			trip[2];
 	int			num_domain_devices;
@@ -631,6 +641,57 @@ end:
 }
 
 /* Registration and deregistration */
+#ifdef LCD_ISOLATE
+static int register_attrs(struct acpi_power_meter_resource *resource,
+			  struct sensor_template *attrs)
+{
+	struct device *dev = &resource->acpi_dev->dev;
+	struct sensor_device_attribute_container *sensor_ctrs =
+		&resource->sensor_container[resource->num_sensors];
+	int res = 0;
+
+	while (attrs->label) {
+		sensor_ctrs->sensor_attr.dev_attr.attr.name = attrs->label;
+		sensor_ctrs->sensor_attr.dev_attr.attr.mode = S_IRUGO;
+		sensor_ctrs->sensor_attr.dev_attr.show = attrs->show;
+		sensor_ctrs->sensor_attr.index = attrs->index;
+
+		if (attrs->set) {
+			sensor_ctrs->sensor_attr.dev_attr.attr.mode |= S_IWUSR;
+			sensor_ctrs->sensor_attr.dev_attr.store = attrs->set;
+		}
+
+		sysfs_attr_init(&sensor_ctrs->sensor_attr.dev_attr.attr);
+		res = device_create_file(dev, &sensor_ctrs->sensor_attr.dev_attr);
+		if (res) {
+			sensor_ctrs->sensor_attr.dev_attr.attr.name = NULL;
+			goto error;
+		}
+		sensor_ctrs++;
+		resource->num_sensors++;
+		attrs++;
+	}
+
+error:
+	return res;
+}
+
+static void remove_attrs(struct acpi_power_meter_resource *resource)
+{
+	int i;
+
+	for (i = 0; i < resource->num_sensors; i++) {
+		if (!resource->sensor_container[i].sensor_attr.dev_attr.attr.name)
+			continue;
+		device_remove_file(&resource->acpi_dev->dev,
+				   &resource->sensor_container[i].sensor_attr.dev_attr);
+	}
+
+	remove_domain_devices(resource);
+
+	resource->num_sensors = 0;
+}
+#else
 static int register_attrs(struct acpi_power_meter_resource *resource,
 			  struct sensor_template *attrs)
 {
@@ -680,6 +741,7 @@ static void remove_attrs(struct acpi_power_meter_resource *resource)
 
 	resource->num_sensors = 0;
 }
+#endif
 
 static int setup_attrs(struct acpi_power_meter_resource *resource)
 {
@@ -1003,7 +1065,7 @@ int acpi_power_meter_init(void)
 {
 	int result;
 
-	if (acpi_disabled)
+	if (_acpi_disabled)
 		return -ENODEV;
 
 	dmi_check_system(pm_dmi_table);

@@ -72,6 +72,14 @@ struct kobject_container {
 	struct cptr other_ref;
 	struct cptr my_ref;
 };
+
+struct sensor_device_attribute_container {
+	struct sensor_device_attribute sensor_attr;
+	struct cptr other_ref;
+	struct cptr my_ref;
+	char *buf;
+};
+
 struct trampoline_hidden_args {
 	void *struct_container;
 	struct glue_cspace *cspace;
@@ -112,6 +120,11 @@ int glue_cap_insert_dmi_system_id_type(struct glue_cspace *cspace,
 int glue_cap_insert_kobject_type(struct glue_cspace *cspace,
 		struct kobject_container *kobject_container,
 		struct cptr *c_out);
+
+int glue_cap_insert_sensor_device_attribute_type(struct glue_cspace *cspace,
+		struct sensor_device_attribute_container *sensor_device_attribute_container,
+		struct cptr *c_out);
+
 int glue_cap_lookup_acpi_buffer_type(struct glue_cspace *cspace,
 		struct cptr c,
 		struct acpi_buffer_container **acpi_buffer_container);
@@ -145,5 +158,8 @@ int glue_cap_lookup_dmi_system_id_type(struct glue_cspace *cspace,
 int glue_cap_lookup_kobject_type(struct glue_cspace *cspace,
 		struct cptr c,
 		struct kobject_container **kobject_container);
+int glue_cap_lookup_sensor_device_attribute_type(struct glue_cspace *cspace,
+		struct cptr c,
+		struct sensor_device_attribute_container **sensor_device_attribute_container);
 
 #endif	/* __ACPI_HWMON_GLUE_HELPER_H__ */

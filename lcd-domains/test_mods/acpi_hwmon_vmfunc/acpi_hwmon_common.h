@@ -41,6 +41,8 @@ enum dispatch_t {
 	ACPI_OP_NOTIFY,
 	MODULE_INIT,
 	MODULE_EXIT,
+	ATTR_SHOW,
+	ATTR_STORE,
 };
 
 /* CSPACES ------------------------------------------------------------ */

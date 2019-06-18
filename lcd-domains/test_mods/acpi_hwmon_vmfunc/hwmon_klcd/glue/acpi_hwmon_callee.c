@@ -14,6 +14,9 @@
 #define ACPI_POWER_METER_DEVICE_NAME	"Power Meter"
 #define ACPI_POWER_METER_CLASS		"pwr_meter_resource"
 
+#define CPTR_HASH_BITS      5
+static DEFINE_HASHTABLE(cptr_table, CPTR_HASH_BITS);
+
 static struct glue_cspace *c_cspace;
 struct acpi_device *g_acpi_device;
 static int cap_in_hardware;
@@ -54,6 +57,9 @@ int glue_acpi_hwmon_init(void)
 		LIBLCD_ERR("cap create");
 		goto fail2;
 	}
+
+	hash_init(cptr_table);
+
 	return 0;
 fail2:
 	glue_cap_exit();
@@ -68,6 +74,33 @@ void glue_acpi_hwmon_exit(void)
 	glue_cap_exit();
 }
 
+int glue_insert_device(struct hlist_head *htable, struct device_container *dev_c)
+{
+	BUG_ON(!dev_c->dev);
+
+	dev_c->my_ref = __cptr((unsigned long)dev_c->dev);
+
+	hash_add(cptr_table, &dev_c->hentry, (unsigned long) dev_c->dev);
+
+	return 0;
+}
+
+int glue_lookup_device(struct hlist_head *htable, struct cptr c, struct
+		device_container **dev_cout) {
+	struct device_container *dev_c;
+
+	hash_for_each_possible(cptr_table, dev_c,
+			hentry, (unsigned long) cptr_val(c)) {
+		if (dev_c->dev == (struct device*) c.cptr)
+			*dev_cout = dev_c;
+	}
+	return 0;
+}
+
+void glue_remove_device(struct device_container *dev_c)
+{
+	hash_del(&dev_c->hentry);
+}
 
 int acpi_bus_generate_netlink_event_callee(struct fipc_message *_request)
 {
@@ -184,15 +217,10 @@ int add(struct acpi_device *device,
 		goto fail_alloc;
 	}
 
-	ret = glue_cap_insert_device_type(c_cspace, device_container,
-			&device_container->my_ref);
-
-	if (ret) {
-		LIBLCD_ERR("glue_cap_insert failed with ret %d", ret);
-		goto fail_insert;
-	}
-
 	device_container->dev = &device->dev;
+
+	glue_insert_device(cptr_table, device_container);
+
 	async_msg_set_fn_type(_request, ACPI_OP_ADD);
 	fipc_set_reg0(_request, acpi_ptr_c->my_ref.cptr);
 	fipc_set_reg1(_request, device_container->my_ref.cptr);
@@ -449,7 +477,7 @@ int acpi_evaluate_object_callee(struct fipc_message *_request)
 	struct acpi_object_list *external_params = NULL;
 	struct acpi_buffer buffer;
 	struct acpi_device_ptr_container *acpi_ptr_c;
-	struct device_container *device_container;
+	struct device_container *device_container = NULL;
 	struct acpi_device *acpi_device;
 	int ret = 0;
 	unsigned int func_ret = 0;
@@ -475,13 +503,8 @@ int acpi_evaluate_object_callee(struct fipc_message *_request)
 	acpi_ptr_c->other_ref.cptr = fipc_get_reg0(_request);
 	acpi_device = acpi_ptr_c->acpi_device_ptr;
 
-	ret = glue_cap_lookup_device_type(c_cspace, __cptr(fipc_get_reg4(_request)),
+	glue_lookup_device(cptr_table, __cptr(fipc_get_reg4(_request)),
 			&device_container);
-
-	if (ret) {
-		LIBLCD_ERR("glue_cap_lookup failed with ret %d", ret);
-		goto fail_lookup;
-	}
 
 	device_container->other_ref.cptr = fipc_get_reg6(_request);
 	strncpy(pathname, (char*)&_request->regs[2], sizeof(_request->regs[2]));
@@ -555,31 +578,168 @@ int acpi_exception_callee(struct fipc_message *_request)
 
 }
 
+#ifdef CONFIG_LVD
+ssize_t attr_show(struct device *dev, struct device_attribute *attr, char *buf)
+#else
+ssize_t attr_show(struct device *dev, struct device_attribute *attr, char *buf
+		struct trampoline_hidden_args *hidden_args)
+#endif
+{
+	struct fipc_message r;
+	struct fipc_message *_request = &r;
+	ssize_t func_ret;
+	struct device_container *device_container = NULL;
+	struct sensor_device_attribute *s_attr;
+	struct sensor_device_attribute_container *s_attr_cnt;
+
+	s_attr = container_of(attr, struct sensor_device_attribute,
+			dev_attr);
+	s_attr_cnt = container_of(s_attr, struct
+			sensor_device_attribute_container, sensor_attr);
+
+	glue_lookup_device(cptr_table, __cptr((unsigned long) dev),
+			&device_container);
+
+	async_msg_set_fn_type(_request, ATTR_SHOW);
+
+	fipc_set_reg0(_request, device_container->other_ref.cptr);
+	fipc_set_reg1(_request, s_attr_cnt->other_ref.cptr);
+
+	vmfunc_wrapper(_request);
+
+	func_ret = fipc_get_reg1(_request);
+
+	/*
+	 * copy from our shared page to the kernel provided buffer
+	 */
+	memcpy(buf, s_attr_cnt->buf, func_ret);
+
+	return func_ret;
+}
+
+#ifdef CONFIG_LVD
+ssize_t attr_store(struct device *dev, struct device_attribute *attr, const char *buf, size_t count)
+#else
+ssize_t attr_store(struct device *dev, struct device_attribute *attr, char *buf
+		struct trampoline_hidden_args *hidden_args)
+#endif
+{
+	struct fipc_message r;
+	struct fipc_message *_request = &r;
+	ssize_t func_ret;
+	struct device_container *device_container = NULL;
+	struct sensor_device_attribute *s_attr;
+	struct sensor_device_attribute_container *s_attr_cnt;
+
+	s_attr = container_of(attr, struct sensor_device_attribute,
+			dev_attr);
+	s_attr_cnt = container_of(s_attr, struct
+			sensor_device_attribute_container, sensor_attr);
+
+	glue_lookup_device(cptr_table, __cptr((unsigned long) dev),
+			&device_container);
+
+	async_msg_set_fn_type(_request, ATTR_STORE);
+
+	fipc_set_reg0(_request, device_container->other_ref.cptr);
+	fipc_set_reg1(_request, s_attr_cnt->other_ref.cptr);
+	fipc_set_reg2(_request, count);
+
+	memcpy(s_attr_cnt->buf, buf, count);
+	vmfunc_wrapper(_request);
+
+	func_ret = fipc_get_reg0(_request);
+
+	return func_ret;
+}
+
 int device_create_file_callee(struct fipc_message *_request)
 {
 	struct device *dev = NULL;
-	struct device_attribute *attr = NULL;
+	struct device_container *device_container = NULL;
+	struct device_attribute *dev_attr;
+	struct sensor_device_attribute_container *s_attr_cnt;
 	int ret = 0;
 	int func_ret = 0;
-	dev = kzalloc(sizeof( *dev ),
-		GFP_KERNEL);
-	if (!dev) {
-		LIBLCD_ERR("kzalloc");
-		goto fail_alloc;
-	}
-	attr = kzalloc(sizeof( *attr ),
-		GFP_KERNEL);
-	if (!attr) {
-		LIBLCD_ERR("kzalloc");
-		goto fail_alloc;
-	}
-	func_ret = device_create_file(dev,
-		attr);
-	fipc_set_reg1(_request,
-			func_ret);
-fail_alloc:
-	return ret;
+	unsigned 	long mem_order;
+	unsigned 	long p_offset;
+	cptr_t p_cptr, lcd_cptr;
+	gva_t p_gva;
+	unsigned 	long buf_order;
+	unsigned 	long buf_offset;
+	cptr_t buf_cptr, lcd_buf_cptr;
+	gva_t buf_gva;
 
+	glue_lookup_device(cptr_table, __cptr(fipc_get_reg0(_request)),
+			&device_container);
+
+	dev = device_container->dev;
+
+	s_attr_cnt = kzalloc(sizeof(*s_attr_cnt), GFP_KERNEL);
+
+	if (!s_attr_cnt) {
+		LIBLCD_ERR("kzalloc");
+		goto fail_alloc;
+	}
+
+	s_attr_cnt->other_ref.cptr = fipc_get_reg1(_request);
+
+	ret = lcd_cptr_alloc(&p_cptr);
+	if (ret) {
+		LIBLCD_ERR("failed to get cptr");
+		goto fail_alloc;
+	}
+
+	ret = lcd_cptr_alloc(&buf_cptr);
+	if (ret) {
+		LIBLCD_ERR("failed to get cptr");
+		goto fail_alloc;
+	}
+
+	mem_order = fipc_get_reg2(_request);
+	p_offset = fipc_get_reg3(_request);
+	lcd_cptr = __cptr(fipc_get_reg4(_request));
+
+	copy_msg_cap_vmfunc(current->vmfunc_lcd, current->lcd, lcd_cptr,
+			p_cptr);
+
+	ret = lcd_map_virt(p_cptr, mem_order, &p_gva);
+
+	if (ret) {
+		LIBLCD_ERR("failed to map void *p");
+		goto fail_virt;
+	}
+	buf_order = buf_offset = 0;
+	lcd_buf_cptr = __cptr(fipc_get_reg6(_request));
+
+	copy_msg_cap_vmfunc(current->vmfunc_lcd, current->lcd, lcd_buf_cptr,
+			buf_cptr);
+
+	ret = lcd_map_virt(buf_cptr, buf_order, &buf_gva);
+
+	if (ret) {
+		LIBLCD_ERR("failed to map void *p");
+		goto fail_virt;
+	}
+
+	s_attr_cnt->buf = (char*)(gva_val(buf_gva) + buf_offset);
+
+	dev_attr = &s_attr_cnt->sensor_attr.dev_attr;
+	dev_attr->attr.mode = fipc_get_reg5(_request);
+	dev_attr->attr.name = (char*)(gva_val(p_gva) + p_offset);
+
+	dev_attr->show = attr_show;
+
+	if (dev_attr->attr.mode & S_IWUSR) {
+		dev_attr->store = attr_store;
+	}
+
+	func_ret = device_create_file(dev, dev_attr);
+
+	fipc_set_reg0(_request, func_ret);
+fail_alloc:
+fail_virt:
+	return ret;
 }
 
 int device_remove_file_callee(struct fipc_message *_request)

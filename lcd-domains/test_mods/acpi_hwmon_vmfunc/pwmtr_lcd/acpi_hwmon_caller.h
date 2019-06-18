@@ -11,4 +11,10 @@ int acpi_op_add_callee(struct fipc_message *_request);
 int acpi_op_remove_callee(struct fipc_message *_request);
 int acpi_op_notify_callee(struct fipc_message *_request);
 
+acpi_status
+_acpi_evaluate_object(struct acpi_device *acpi_device,
+		     acpi_string pathname,
+		     struct acpi_object_list *external_params,
+		     struct acpi_buffer *return_buffer);
+
 #endif	/* __ACPI_HWMON_CALLER_H__ */

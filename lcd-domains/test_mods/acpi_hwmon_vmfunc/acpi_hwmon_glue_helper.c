@@ -35,6 +35,7 @@ enum glue_type {
 	GLUE_TYPE_DEVICE_CONTAINER,
 	GLUE_TYPE_DMI_SYSTEM_ID_CONTAINER,
 	GLUE_TYPE_KOBJECT_CONTAINER,
+	GLUE_TYPE_SENSOR_DEVICE_ATTRIBUTE_CONTAINER,
 	GLUE_NR_TYPES,
 
 };
@@ -122,8 +123,14 @@ static struct type_ops_id glue_libcap_type_ops[GLUE_NR_TYPES] = {
 			.delete = dummy_func,
 			.revoke = dummy_func,
 		}
-	}
-
+	},
+	{
+		{
+			.name = "struct sensor_device_attribute",
+			.delete = dummy_func,
+			.revoke = dummy_func,
+		}
+	},
 };
 
 int glue_cap_insert_acpi_buffer_type(struct glue_cspace *cspace,
@@ -364,6 +371,26 @@ int glue_cap_lookup_kobject_type(struct glue_cspace *cspace,
 		glue_libcap_type_ops[ GLUE_TYPE_KOBJECT_CONTAINER ].libcap_type,
 		( void  ** )kobject_container);
 
+}
+
+int glue_cap_insert_sensor_device_attribute_type(struct glue_cspace *cspace,
+		struct sensor_device_attribute_container *sensor_device_attribute_container,
+		struct cptr *c_out)
+{
+	return glue_cspace_insert(cspace,
+		sensor_device_attribute_container,
+		glue_libcap_type_ops[ GLUE_TYPE_SENSOR_DEVICE_ATTRIBUTE_CONTAINER ].libcap_type,
+		c_out);
+}
+
+int glue_cap_lookup_sensor_device_attribute_type(struct glue_cspace *cspace,
+		struct cptr c,
+		struct sensor_device_attribute_container **sensor_device_attribute_container)
+{
+	return glue_cspace_lookup(cspace,
+		c,
+		glue_libcap_type_ops[ GLUE_TYPE_SENSOR_DEVICE_ATTRIBUTE_CONTAINER ].libcap_type,
+		( void  ** )sensor_device_attribute_container);
 }
 
 static struct cap_type_system *glue_libcap_type_system;

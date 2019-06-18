@@ -825,47 +825,43 @@ int dmi_check_system_callee(struct fipc_message *_request)
 
 int hwmon_device_register_callee(struct fipc_message *_request)
 {
-	struct device *dev = NULL;
+	struct device_container *hwdev_container = NULL;
+	struct device_container *device_container = NULL;
+	struct device *dev;
 	int ret = 0;
-	struct device_container *func_ret_container = NULL;
-	struct device *func_ret = NULL;
-	dev = kzalloc(sizeof( *dev ),
-		GFP_KERNEL);
-	if (!dev) {
-		LIBLCD_ERR("kzalloc");
-		goto fail_alloc;
-	}
-	func_ret_container->other_ref.cptr = fipc_get_reg2(_request);
-	func_ret = hwmon_device_register(dev);
-	ret = glue_cap_insert_device_type(c_cspace,
-		func_ret_container,
-		&func_ret_container->my_ref);
-	if (ret) {
-		LIBLCD_ERR("lcd insert");
-		goto fail_insert;
-	}
-	fipc_set_reg1(_request,
-			func_ret_container->other_ref.cptr);
-fail_alloc:
-fail_insert:
-	return ret;
+	struct device *func_ret;
 
+	glue_lookup_device(cptr_table, __cptr(fipc_get_reg0(_request)),
+			&device_container);
+
+	dev = device_container->dev;
+
+	hwdev_container->other_ref.cptr = fipc_get_reg1(_request);
+
+	func_ret = hwmon_device_register(dev);
+
+	hwdev_container->dev = func_ret;
+
+	glue_insert_device(cptr_table, hwdev_container);
+
+	fipc_set_reg0(_request, hwdev_container->my_ref.cptr);
+
+	return ret;
 }
 
 int hwmon_device_unregister_callee(struct fipc_message *_request)
 {
-	struct device *dev = NULL;
+	struct device_container *hwdev_container = NULL;
+	struct device *hw_dev;
 	int ret = 0;
-	dev = kzalloc(sizeof( *dev ),
-		GFP_KERNEL);
-	if (!dev) {
-		LIBLCD_ERR("kzalloc");
-		goto fail_alloc;
-	}
-	hwmon_device_unregister(dev);
-fail_alloc:
-	return ret;
 
+	glue_lookup_device(cptr_table, __cptr(fipc_get_reg0(_request)),
+			&hwdev_container);
+
+	hw_dev = hwdev_container->dev;
+
+	hwmon_device_unregister(hw_dev);
+	return ret;
 }
 
 int kobject_create_and_add_callee(struct fipc_message *_request)

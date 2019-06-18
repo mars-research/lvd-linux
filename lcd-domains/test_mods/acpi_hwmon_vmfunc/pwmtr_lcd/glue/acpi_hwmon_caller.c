@@ -474,28 +474,67 @@ int dmi_check_system(const struct dmi_system_id *list)
 
 struct device *hwmon_device_register(struct device *dev)
 {
-	struct device_container *func_ret_container = NULL;
+	struct device_container *hw_dev_cnt = NULL;
+	struct device_container *device_container = NULL;
 	struct fipc_message r;
 	struct fipc_message *_request = &r;
 	int ret;
 
-	async_msg_set_fn_type(_request,
-			HWMON_DEVICE_REGISTER);
+	glue_lookup_device(cptr_table, __cptr((unsigned long) dev),
+			&device_container);
+
+	hw_dev_cnt = kzalloc(sizeof(*hw_dev_cnt), GFP_KERNEL);
+
+	if (!hw_dev_cnt) {
+		LIBLCD_ERR("alloc failed");
+		ret = -ENOMEM;
+		goto fail_alloc;
+	}
+
+
+	hw_dev_cnt->dev = kzalloc(sizeof(struct device), GFP_KERNEL);
+
+	if (!hw_dev_cnt->dev) {
+		LIBLCD_ERR("alloc failed");
+		ret = -ENOMEM;
+		goto fail_alloc;
+	}
+
+	hw_dev_cnt->dev->parent = dev;
+
+	glue_insert_device(cptr_table, hw_dev_cnt);
+
+	async_msg_set_fn_type(_request, HWMON_DEVICE_REGISTER);
+	fipc_set_reg0(_request, device_container->other_ref.cptr);
+	fipc_set_reg1(_request, hw_dev_cnt->my_ref.cptr);
+
 	ret = vmfunc_wrapper(_request);
 
-	return func_ret_container->dev;
+	hw_dev_cnt->other_ref.cptr = fipc_get_reg0(_request);
+
+	return hw_dev_cnt->dev;
+
+fail_alloc:
+	return NULL;
 }
 
 void hwmon_device_unregister(struct device *dev)
 {
 	struct fipc_message r;
 	struct fipc_message *_request = &r;
+	struct device_container *hwdev_container = NULL;
 	int ret;
-	async_msg_set_fn_type(_request,
-			HWMON_DEVICE_UNREGISTER);
-	ret = vmfunc_wrapper(_request);
-	return;
 
+	glue_lookup_device(cptr_table, __cptr((unsigned long) dev),
+			&hwdev_container);
+
+	async_msg_set_fn_type(_request, HWMON_DEVICE_UNREGISTER);
+
+	fipc_set_reg0(_request, hwdev_container->other_ref.cptr);
+
+	ret = vmfunc_wrapper(_request);
+
+	return;
 }
 
 struct kobject *kobject_create_and_add(const char *name,

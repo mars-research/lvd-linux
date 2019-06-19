@@ -17,4 +17,6 @@ _acpi_evaluate_object(struct acpi_device *acpi_device,
 		     struct acpi_object_list *external_params,
 		     struct acpi_buffer *return_buffer);
 
+struct kobject *_kobject_create_and_add(const char *name, struct device *dev);
+
 #endif	/* __ACPI_HWMON_CALLER_H__ */

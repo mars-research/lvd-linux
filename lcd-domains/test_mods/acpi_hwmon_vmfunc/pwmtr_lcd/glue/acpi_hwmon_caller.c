@@ -570,14 +570,58 @@ int dmi_check_system(const struct dmi_system_id *list)
 	struct fipc_message r;
 	struct fipc_message *_request = &r;
 	int ret, func_ret;
+	cptr_t id_cptr;
+	unsigned long id_offset;
+	unsigned long id_mem_sz;
+	struct dmi_system_id_container *dmi_id_container;
+
+	ret = lcd_virt_to_cptr(__gva((unsigned long)list->ident), &id_cptr,
+			&id_mem_sz, &id_offset);
+
+	if (ret) {
+		LIBLCD_ERR("virt to cptr failed");
+		goto fail_virt;
+	}
+
+	dmi_id_container = kzalloc(sizeof(*dmi_id_container), GFP_KERNEL);
+
+	if (!dmi_id_container) {
+		LIBLCD_ERR("kzalloc");
+		ret = -ENOMEM;
+		goto fail_alloc;
+	}
+
+	dmi_id_container->dmi_system_id = (struct dmi_system_id*) list;
+
+	ret = glue_cap_insert_dmi_system_id_type(lcd_cspace, dmi_id_container,
+			&dmi_id_container->my_ref);
+
+	if (ret) {
+		LIBLCD_ERR("lcd insert");
+		goto fail_insert;
+	}
+
 
 	async_msg_set_fn_type(_request, DMI_CHECK_SYSTEM);
+	fipc_set_reg0(_request, dmi_id_container->my_ref.cptr);
+	fipc_set_reg1(_request, ilog2((id_mem_sz) >> (PAGE_SHIFT)));
+	fipc_set_reg2(_request, id_offset);
+	fipc_set_reg3(_request, cptr_val(id_cptr));
+	strncpy((char*)&_request->regs[4], list->matches[0].substr,
+			sizeof(_request->regs[4]));
+	fipc_set_reg5(_request, list->matches[0].slot |
+			(list->matches[0].exact_match << 7));
+
 	ret = vmfunc_wrapper(_request);
 
 	func_ret = fipc_get_reg0(_request);
+	dmi_id_container->other_ref.cptr = fipc_get_reg1(_request);
 
 	return func_ret;
-
+fail_insert:
+fail_alloc:
+fail_virt:
+	return ret;
 }
 
 struct device *hwmon_device_register(struct device *dev)
@@ -969,6 +1013,29 @@ int attr_store_callee(struct fipc_message *_request)
 			&s_attr_cnt->sensor_attr.dev_attr, s_attr_cnt->buf,
 			count);
 
+	fipc_set_reg0(_request, func_ret);
+
+fail_lookup:
+	return ret;
+}
+
+int dmi_callback_callee(struct fipc_message *_request)
+{
+	int ret = 0;
+	int func_ret;
+	struct dmi_system_id_container *dmi_id_container = NULL;
+	struct dmi_system_id *d;
+
+	ret = glue_cap_lookup_dmi_system_id_type(lcd_cspace,
+			__cptr(fipc_get_reg0(_request)), &dmi_id_container);
+
+	if (ret) {
+		LIBLCD_ERR("glue_cap_lookup failed with ret %d", ret);
+		goto fail_lookup;
+	}
+
+	d = dmi_id_container->dmi_system_id;
+	func_ret = d->callback(d);
 	fipc_set_reg0(_request, func_ret);
 
 fail_lookup:

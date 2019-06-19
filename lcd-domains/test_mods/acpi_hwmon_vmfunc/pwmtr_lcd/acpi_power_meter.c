@@ -1046,13 +1046,21 @@ struct acpi_driver acpi_power_meter_driver = {
 };
 
 /* Module init/exit routines */
-static int __init enable_cap_knobs(const struct dmi_system_id *d)
+static int
+#ifndef LCD_ISOLATE
+__init
+#endif
+enable_cap_knobs(const struct dmi_system_id *d)
 {
 	cap_in_hardware = 1;
 	return 0;
 }
 
-static struct dmi_system_id __initdata pm_dmi_table[] = {
+static struct dmi_system_id
+#ifndef LCD_ISOLATE
+__initdata
+#endif
+pm_dmi_table[] = {
 	{
 		enable_cap_knobs, "IBM Active Energy Manager",
 		{

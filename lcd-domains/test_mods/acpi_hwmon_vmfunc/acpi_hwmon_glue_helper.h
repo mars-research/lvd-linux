@@ -64,10 +64,17 @@ struct device_container {
 	struct hlist_node hentry;
 };
 struct dmi_system_id_container {
-	struct dmi_system_id dmi_system_id;
+	struct dmi_system_id *dmi_system_id;
 	struct cptr other_ref;
 	struct cptr my_ref;
 };
+struct dmi_system_id_ptr_container {
+	struct dmi_system_id *dmi_system_id_ptr;
+	struct cptr other_ref;
+	struct cptr my_ref;
+	struct hlist_node hentry;
+};
+
 struct kobject_container {
 	struct kobject kobject;
 	struct cptr other_ref;

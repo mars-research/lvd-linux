@@ -42,10 +42,6 @@ int hwmon_klcd_dispatch_loop(struct fipc_message *message)
 			trace(ACPI_EVALUATE_OBJECT);
 			return acpi_evaluate_object_callee(message);
 
-		case ACPI_EXCEPTION:
-			trace(ACPI_EXCEPTION);
-			return acpi_exception_callee(message);
-
 		case DEVICE_CREATE_FILE:
 			trace(DEVICE_CREATE_FILE);
 			return device_create_file_callee(message);

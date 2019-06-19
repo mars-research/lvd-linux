@@ -12,8 +12,8 @@
 #include <lcd_config/post_hook.h>
 
 static struct glue_cspace *lcd_cspace;
-extern struct acpi_driver acpi_power_meter_driver;
-struct acpi_driver *driver = &acpi_power_meter_driver;
+extern struct acpi_driver_container acpi_power_meter_driver_container;
+struct acpi_driver *driver = &acpi_power_meter_driver_container.acpi_driver;
 
 #define CPTR_HASH_BITS      5
 static DEFINE_HASHTABLE(cptr_table, CPTR_HASH_BITS);
@@ -259,30 +259,28 @@ void acpi_bus_unregister_driver(struct acpi_driver *driver)
 
 unsigned int acpi_evaluate_integer(void *handle,
 		char *pathname,
-		struct acpi_object_list *arguments,
+		struct acpi_object_list *args,
 		unsigned long long *data)
 {
 	struct fipc_message r;
 	struct fipc_message *_request = &r;
-	int sync_ret;
-	unsigned 	long handle_mem_sz;
-	unsigned 	long handle_offset;
-	cptr_t handle_cptr;
 	int func_ret, ret;
-	async_msg_set_fn_type(_request,
-			ACPI_EVALUATE_INTEGER);
-	sync_ret = lcd_virt_to_cptr(__gva(( unsigned  long   )handle),
-		&handle_cptr,
-		&handle_mem_sz,
-		&handle_offset);
-	if (sync_ret) {
-		LIBLCD_ERR("virt to cptr failed");
-		lcd_exit(-1);
-	}
-	fipc_set_reg2(_request,
-			*data);
+	struct acpi_handle_container *acpi_handle_container = NULL;
+
+	glue_lookup_acpi_handle(acpi_table, __cptr((unsigned long) handle),
+			&acpi_handle_container);
+
+	async_msg_set_fn_type(_request, ACPI_EVALUATE_INTEGER);
+	fipc_set_reg0(_request, acpi_handle_container->other_ref.cptr);
+	strncpy((char*)&_request->regs[1], pathname,
+			sizeof(_request->regs[1]));
+	fipc_set_reg2(_request, args->pointer->type);
+	fipc_set_reg3(_request, args->count);
+
 	ret = vmfunc_wrapper(_request);
 	func_ret = fipc_get_reg0(_request);
+	*data = fipc_get_reg1(_request);
+
 	return func_ret;
 }
 

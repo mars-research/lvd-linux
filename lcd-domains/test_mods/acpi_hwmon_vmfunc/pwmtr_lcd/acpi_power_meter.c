@@ -68,6 +68,7 @@ static bool force_cap_on;
 
 #ifdef LCD_ISOLATE
 static int _acpi_disabled = 0 ;
+#define acpi_exception	LIBLCD_MSG
 #endif
 
 static int can_cap_in_hardware(void)

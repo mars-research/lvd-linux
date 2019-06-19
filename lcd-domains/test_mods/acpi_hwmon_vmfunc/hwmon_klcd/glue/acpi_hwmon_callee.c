@@ -15,7 +15,8 @@
 #define ACPI_POWER_METER_CLASS		"pwr_meter_resource"
 
 #define CPTR_HASH_BITS      5
-static DEFINE_HASHTABLE(cptr_table, CPTR_HASH_BITS);
+static DEFINE_HASHTABLE(dev_hash, CPTR_HASH_BITS);
+static DEFINE_HASHTABLE(acpidev_hash, CPTR_HASH_BITS);
 
 static struct glue_cspace *c_cspace;
 struct acpi_device *g_acpi_device;
@@ -58,7 +59,7 @@ int glue_acpi_hwmon_init(void)
 		goto fail2;
 	}
 
-	hash_init(cptr_table);
+	hash_init(dev_hash);
 
 	return 0;
 fail2:
@@ -80,7 +81,7 @@ int glue_insert_device(struct hlist_head *htable, struct device_container *dev_c
 
 	dev_c->my_ref = __cptr((unsigned long)dev_c->dev);
 
-	hash_add(cptr_table, &dev_c->hentry, (unsigned long) dev_c->dev);
+	hash_add(dev_hash, &dev_c->hentry, (unsigned long) dev_c->dev);
 
 	return 0;
 }
@@ -89,7 +90,7 @@ int glue_lookup_device(struct hlist_head *htable, struct cptr c, struct
 		device_container **dev_cout) {
 	struct device_container *dev_c;
 
-	hash_for_each_possible(cptr_table, dev_c,
+	hash_for_each_possible(dev_hash, dev_c,
 			hentry, (unsigned long) cptr_val(c)) {
 		if (dev_c->dev == (struct device*) c.cptr)
 			*dev_cout = dev_c;
@@ -102,6 +103,36 @@ void glue_remove_device(struct device_container *dev_c)
 	hash_del(&dev_c->hentry);
 }
 
+int glue_insert_acpi_device(struct hlist_head *htable, struct acpi_device_ptr_container *acpi_dev_c)
+{
+	BUG_ON(!acpi_dev_c->acpi_device_ptr);
+
+	acpi_dev_c->my_ref = __cptr((unsigned
+				long)acpi_dev_c->acpi_device_ptr);
+
+	hash_add(dev_hash, &acpi_dev_c->hentry, (unsigned long)
+			acpi_dev_c->acpi_device_ptr);
+
+	return 0;
+}
+
+int glue_lookup_acpi_device(struct hlist_head *htable, struct cptr c, struct
+		acpi_device_ptr_container **dev_cout) {
+	struct acpi_device_ptr_container *dev_c;
+
+	hash_for_each_possible(dev_hash, dev_c, hentry, (unsigned long)
+			cptr_val(c)) {
+		if (dev_c->acpi_device_ptr == (struct acpi_device*) c.cptr)
+			*dev_cout = dev_c;
+	}
+	return 0;
+}
+
+void glue_remove_acpi_device(struct acpi_device_ptr_container *dev_c)
+{
+	hash_del(&dev_c->hentry);
+}
+
 int acpi_bus_generate_netlink_event_callee(struct fipc_message *_request)
 {
 	const char *device_class;
@@ -110,17 +141,66 @@ int acpi_bus_generate_netlink_event_callee(struct fipc_message *_request)
 	int data;
 	int ret = 0;
 	int func_ret = 0;
+	unsigned 	long dc_mem_order;
+	unsigned 	long dc_offset;
+	cptr_t dc_cptr, lcd_dc_cptr;
+	gva_t dc_gva;
+	unsigned 	long bus_mem_order;
+	unsigned 	long bus_offset;
+	cptr_t bus_cptr, lcd_bus_cptr;
+	gva_t bus_gva;
 
-	device_class = ACPI_POWER_METER_CLASS;
-	bus_id = dev_name(&g_acpi_device->dev);
-	type = fipc_get_reg3(_request);
-	data = fipc_get_reg4(_request);
+	ret = lcd_cptr_alloc(&dc_cptr);
+	if (ret) {
+		LIBLCD_ERR("failed to get cptr");
+		goto fail_alloc;
+	}
+
+	dc_mem_order = fipc_get_reg0(_request);
+	dc_offset = fipc_get_reg1(_request);
+	lcd_dc_cptr = __cptr(fipc_get_reg2(_request));
+
+	copy_msg_cap_vmfunc(current->vmfunc_lcd, current->lcd, lcd_dc_cptr,
+			dc_cptr);
+
+	ret = lcd_map_virt(dc_cptr, dc_mem_order, &dc_gva);
+
+	if (ret) {
+		LIBLCD_ERR("failed to map void *p");
+		goto fail_virt;
+	}
+
+	ret = lcd_cptr_alloc(&bus_cptr);
+	if (ret) {
+		LIBLCD_ERR("failed to get cptr");
+		goto fail_alloc;
+	}
+
+	bus_mem_order = fipc_get_reg3(_request);
+	bus_offset = fipc_get_reg4(_request);
+	lcd_bus_cptr = __cptr(fipc_get_reg5(_request));
+
+	copy_msg_cap_vmfunc(current->vmfunc_lcd, current->lcd, lcd_bus_cptr,
+			bus_cptr);
+
+	ret = lcd_map_virt(bus_cptr, bus_mem_order, &bus_gva);
+
+	if (ret) {
+		LIBLCD_ERR("failed to map void *p");
+		goto fail_virt;
+	}
+
+	device_class = (void*)(gva_val(dc_gva) + dc_offset);
+	bus_id = (void*)(gva_val(bus_gva) + bus_offset);
+	type = fipc_get_reg6(_request) & 0xFF;
+	data = fipc_get_reg6(_request) >> 8;
 
 	func_ret = acpi_bus_generate_netlink_event(device_class, bus_id, type,
 			data);
 
-	fipc_set_reg1(_request, func_ret);
-
+	fipc_set_reg0(_request, func_ret);
+fail_alloc:
+fail_virt:
 	return ret;
 }
 
@@ -171,6 +251,28 @@ int acpi_bus_get_device_callee(struct fipc_message *_request)
 	func_ret = acpi_bus_get_device(handle, devices);
 	fipc_set_reg0(_request, func_ret);
 
+	{
+		struct device_container *device_container = NULL;
+		struct acpi_device *acpi_dev;
+
+		device_container = kzalloc(sizeof(*device_container),
+				GFP_KERNEL);
+
+		if (!device_container) {
+			LIBLCD_ERR("kzalloc");
+			ret = -ENOMEM;
+			goto fail_alloc;
+		}
+
+		acpi_dev = devices[0];
+
+		device_container->dev = &acpi_dev->dev;
+
+		glue_insert_device(dev_hash, device_container);
+
+		fipc_set_reg1(_request, device_container->my_ref.cptr);
+	}
+
 fail_alloc:
 fail_lookup:
 fail_virt:
@@ -201,13 +303,7 @@ int add(struct acpi_device *device,
 
 	acpi_ptr_c->acpi_device_ptr = device;
 
-	ret = glue_cap_insert_acpi_device_ptr_type(c_cspace, acpi_ptr_c,
-			&acpi_ptr_c->my_ref);
-
-	if (ret) {
-		LIBLCD_ERR("glue_cap_insert failed with ret %d", ret);
-		goto fail_insert;
-	}
+	glue_insert_acpi_device(acpidev_hash, acpi_ptr_c);
 
 	device_container = kzalloc(sizeof(*device_container), GFP_KERNEL);
 	if (!device_container) {
@@ -218,7 +314,7 @@ int add(struct acpi_device *device,
 
 	device_container->dev = &device->dev;
 
-	glue_insert_device(cptr_table, device_container);
+	glue_insert_device(dev_hash, device_container);
 
 	async_msg_set_fn_type(_request, ACPI_OP_ADD);
 	fipc_set_reg0(_request, acpi_ptr_c->my_ref.cptr);
@@ -230,7 +326,6 @@ int add(struct acpi_device *device,
 
 	return func_ret;
 fail_alloc:
-fail_insert:
 	return ret;
 }
 
@@ -244,10 +339,15 @@ int remove(struct acpi_device *device,
 	struct fipc_message r;
 	struct fipc_message *_request = &r;
 	int func_ret;
+	struct acpi_device_ptr_container *acpi_ptr_c = NULL;
+
+	glue_lookup_acpi_device(acpidev_hash, __cptr((unsigned long) device),
+			&acpi_ptr_c);
 
 	async_msg_set_fn_type(_request, ACPI_OP_REMOVE);
+	fipc_set_reg0(_request, acpi_ptr_c->other_ref.cptr);
 	vmfunc_wrapper(_request);
-	func_ret = fipc_get_reg1(_request);
+	func_ret = fipc_get_reg0(_request);
 	return func_ret;
 }
 
@@ -502,7 +602,7 @@ int acpi_evaluate_object_callee(struct fipc_message *_request)
 	acpi_ptr_c->other_ref.cptr = fipc_get_reg0(_request);
 	acpi_device = acpi_ptr_c->acpi_device_ptr;
 
-	glue_lookup_device(cptr_table, __cptr(fipc_get_reg4(_request)),
+	glue_lookup_device(dev_hash, __cptr(fipc_get_reg4(_request)),
 			&device_container);
 
 	device_container->other_ref.cptr = fipc_get_reg6(_request);
@@ -564,6 +664,7 @@ int acpi_evaluate_object_callee(struct fipc_message *_request)
 
 			fipc_set_reg1(_request,
 					acpi_handle_container->my_ref.cptr);
+
 		}
 	}
 	fipc_set_reg0(_request, func_ret);
@@ -573,37 +674,6 @@ fail_lookup:
 fail_virt:
 fail_insert:
 	return ret;
-}
-
-int acpi_exception_callee(struct fipc_message *_request)
-{
-	char *module_name = 0;
-	unsigned 	int line_number = 0;
-	int status = 0;
-	char *format = 0;
-	int ret = 0;
-	module_name = kzalloc(sizeof( char   ),
-		GFP_KERNEL);
-	if (!module_name) {
-		LIBLCD_ERR("kzalloc");
-		lcd_exit(-1);
-	}
-	format = kzalloc(sizeof( char   ),
-		GFP_KERNEL);
-	if (!format) {
-		LIBLCD_ERR("kzalloc");
-		lcd_exit(-1);
-	}
-	module_name = (char*) fipc_get_reg1(_request);
-	line_number = fipc_get_reg2(_request);
-	status = fipc_get_reg3(_request);
-	format = (char*) fipc_get_reg4(_request);
-	acpi_exception(module_name,
-			line_number,
-			status,
-			format);
-	return ret;
-
 }
 
 #ifdef CONFIG_LVD
@@ -625,7 +695,7 @@ ssize_t attr_show(struct device *dev, struct device_attribute *attr, char *buf
 	s_attr_cnt = container_of(s_attr, struct
 			sensor_device_attribute_container, sensor_attr);
 
-	glue_lookup_device(cptr_table, __cptr((unsigned long) dev),
+	glue_lookup_device(dev_hash, __cptr((unsigned long) dev),
 			&device_container);
 
 	async_msg_set_fn_type(_request, ATTR_SHOW);
@@ -664,7 +734,7 @@ ssize_t attr_store(struct device *dev, struct device_attribute *attr, char *buf
 	s_attr_cnt = container_of(s_attr, struct
 			sensor_device_attribute_container, sensor_attr);
 
-	glue_lookup_device(cptr_table, __cptr((unsigned long) dev),
+	glue_lookup_device(dev_hash, __cptr((unsigned long) dev),
 			&device_container);
 
 	async_msg_set_fn_type(_request, ATTR_STORE);
@@ -698,7 +768,7 @@ int device_create_file_callee(struct fipc_message *_request)
 	cptr_t buf_cptr, lcd_buf_cptr;
 	gva_t buf_gva;
 
-	glue_lookup_device(cptr_table, __cptr(fipc_get_reg0(_request)),
+	glue_lookup_device(dev_hash, __cptr(fipc_get_reg0(_request)),
 			&device_container);
 
 	dev = device_container->dev;
@@ -777,7 +847,7 @@ int device_remove_file_callee(struct fipc_message *_request)
 	struct device_container *device_container = NULL;
 	struct sensor_device_attribute_container *s_attr_cnt = NULL;
 
-	glue_lookup_device(cptr_table, __cptr(fipc_get_reg0(_request)),
+	glue_lookup_device(dev_hash, __cptr(fipc_get_reg0(_request)),
 			&device_container);
 
 	dev = device_container->dev;
@@ -799,45 +869,33 @@ int get_device_callee(struct fipc_message *_request)
 {
 	struct device *dev = NULL;
 	int ret = 0;
-	struct device_container *func_ret_container = NULL;
-	struct device *func_ret = NULL;
-	dev = kzalloc(sizeof( *dev ),
-		GFP_KERNEL);
-	if (!dev) {
-		LIBLCD_ERR("kzalloc");
-		goto fail_alloc;
-	}
-	func_ret_container->other_ref.cptr = fipc_get_reg2(_request);
-	func_ret = get_device(dev);
-	ret = glue_cap_insert_device_type(c_cspace,
-		func_ret_container,
-		&func_ret_container->my_ref);
-	if (ret) {
-		LIBLCD_ERR("lcd insert");
-		goto fail_insert;
-	}
-	fipc_set_reg1(_request,
-			func_ret_container->other_ref.cptr);
-fail_alloc:
-fail_insert:
-	return ret;
+	struct device_container *device_container = NULL;
+	struct device *func_ret;
 
+	glue_lookup_device(dev_hash, __cptr(fipc_get_reg0(_request)),
+			&device_container);
+
+	dev = device_container->dev;
+
+	func_ret = get_device(dev);
+
+	return ret;
 }
 
 int put_device_callee(struct fipc_message *_request)
 {
 	struct device *dev = NULL;
 	int ret = 0;
-	dev = kzalloc(sizeof( *dev ),
-		GFP_KERNEL);
-	if (!dev) {
-		LIBLCD_ERR("kzalloc");
-		goto fail_alloc;
-	}
-	put_device(dev);
-fail_alloc:
-	return ret;
+	struct device_container *device_container = NULL;
 
+	glue_lookup_device(dev_hash, __cptr(fipc_get_reg0(_request)),
+			&device_container);
+
+	dev = device_container->dev;
+
+	put_device(dev);
+
+	return ret;
 }
 
 int dmi_check_system_callee(struct fipc_message *_request)
@@ -860,7 +918,7 @@ int hwmon_device_register_callee(struct fipc_message *_request)
 	int ret = 0;
 	struct device *func_ret;
 
-	glue_lookup_device(cptr_table, __cptr(fipc_get_reg0(_request)),
+	glue_lookup_device(dev_hash, __cptr(fipc_get_reg0(_request)),
 			&device_container);
 
 	dev = device_container->dev;
@@ -871,7 +929,7 @@ int hwmon_device_register_callee(struct fipc_message *_request)
 
 	hwdev_container->dev = func_ret;
 
-	glue_insert_device(cptr_table, hwdev_container);
+	glue_insert_device(dev_hash, hwdev_container);
 
 	fipc_set_reg0(_request, hwdev_container->my_ref.cptr);
 
@@ -884,7 +942,7 @@ int hwmon_device_unregister_callee(struct fipc_message *_request)
 	struct device *hw_dev;
 	int ret = 0;
 
-	glue_lookup_device(cptr_table, __cptr(fipc_get_reg0(_request)),
+	glue_lookup_device(dev_hash, __cptr(fipc_get_reg0(_request)),
 			&hwdev_container);
 
 	hw_dev = hwdev_container->dev;
@@ -907,7 +965,7 @@ int kobject_create_and_add_callee(struct fipc_message *_request)
 	unsigned long mem_order;
 	gva_t p_gva;
 
-	glue_lookup_device(cptr_table, __cptr(fipc_get_reg0(_request)),
+	glue_lookup_device(dev_hash, __cptr(fipc_get_reg0(_request)),
 			&device_container);
 
 	ret = lcd_cptr_alloc(&p_cptr);
@@ -955,111 +1013,149 @@ fail_virt:
 
 int kobject_put_callee(struct fipc_message *_request)
 {
+	struct kobject_ptr_container *kobjp_cnt = NULL;
 	struct kobject *kobj = NULL;
 	int ret = 0;
-	kobj = kzalloc(sizeof( *kobj ),
-		GFP_KERNEL);
-	if (!kobj) {
-		LIBLCD_ERR("kzalloc");
-		goto fail_alloc;
-	}
-	kobject_put(kobj);
-fail_alloc:
-	return ret;
 
+	ret = glue_cap_lookup_kobject_ptr_type(c_cspace,
+			__cptr(fipc_get_reg0(_request)),
+			&kobjp_cnt);
+
+	if (ret) {
+		LIBLCD_ERR("glue_cap_lookup failed with ret %d", ret);
+		goto fail_lookup;
+	}
+
+	kobj = kobjp_cnt->kobject;
+
+	kobject_put(kobj);
+
+fail_lookup:
+	return ret;
 }
 
 int sysfs_create_link_callee(struct fipc_message *_request)
 {
 	struct kobject *kobj = NULL;
 	struct kobject *target = NULL;
-	char *name = 0;
+	struct kobject_ptr_container *kobjp_cnt = NULL;
+	struct device_container *device_container = NULL;
+	struct device *dev;
+	const char *name = 0;
 	int ret = 0;
 	int func_ret = 0;
-	kobj = kzalloc(sizeof( *kobj ),
-		GFP_KERNEL);
-	if (!kobj) {
-		LIBLCD_ERR("kzalloc");
-		goto fail_alloc;
-	}
-	target = kzalloc(sizeof( *target ),
-		GFP_KERNEL);
-	if (!target) {
-		LIBLCD_ERR("kzalloc");
-		goto fail_alloc;
-	}
-	name = kzalloc(sizeof( char   ),
-		GFP_KERNEL);
-	if (!name) {
-		LIBLCD_ERR("kzalloc");
-		lcd_exit(-1);
-	}
-	name = (char*) fipc_get_reg1(_request);
-	func_ret = sysfs_create_link(kobj,
-		target,
-		name);
-	fipc_set_reg1(_request,
-			func_ret);
-fail_alloc:
-	return ret;
 
+	ret = glue_cap_lookup_kobject_ptr_type(c_cspace,
+			__cptr(fipc_get_reg0(_request)),
+			&kobjp_cnt);
+
+	if (ret) {
+		LIBLCD_ERR("glue_cap_lookup failed with ret %d", ret);
+		goto fail_lookup;
+	}
+
+	kobj = kobjp_cnt->kobject;
+
+	glue_lookup_device(dev_hash, __cptr(fipc_get_reg1(_request)),
+			&device_container);
+
+	dev = device_container->dev;
+	target = &dev->kobj;
+	name = kobject_name(target);
+	LIBLCD_MSG("dev: %p, target_kobj: %p name: %s", __func__,
+				dev, target, name);
+
+	func_ret = sysfs_create_link(kobj, target, name);
+	fipc_set_reg0(_request, func_ret);
+fail_lookup:
+	return ret;
 }
 
 int sysfs_remove_link_callee(struct fipc_message *_request)
 {
 	struct kobject *kobj = NULL;
-	char *name = 0;
+	struct kobject_ptr_container *kobjp_cnt = NULL;
+	struct device_container *device_container = NULL;
+	struct device *dev;
+	const char *name = 0;
 	int ret = 0;
-	kobj = kzalloc(sizeof( *kobj ),
-		GFP_KERNEL);
-	if (!kobj) {
-		LIBLCD_ERR("kzalloc");
-		goto fail_alloc;
-	}
-	name = kzalloc(sizeof( char   ),
-		GFP_KERNEL);
-	if (!name) {
-		LIBLCD_ERR("kzalloc");
-		lcd_exit(-1);
-	}
-	name = (char*) fipc_get_reg1(_request);
-	sysfs_remove_link(kobj,
-			name);
-fail_alloc:
-	return ret;
 
+	ret = glue_cap_lookup_kobject_ptr_type(c_cspace,
+			__cptr(fipc_get_reg0(_request)),
+			&kobjp_cnt);
+
+	if (ret) {
+		LIBLCD_ERR("glue_cap_lookup failed with ret %d", ret);
+		goto fail_lookup;
+	}
+
+	kobj = kobjp_cnt->kobject;
+
+	glue_lookup_device(dev_hash, __cptr(fipc_get_reg1(_request)),
+			&device_container);
+
+	dev = device_container->dev;
+	name = kobject_name(&dev->kobj);
+
+	LIBLCD_MSG("dev: %p, name: %s", __func__,
+				dev, name);
+
+	sysfs_remove_link(kobj, name);
+fail_lookup:
+	return ret;
 }
 
 int sysfs_notify_callee(struct fipc_message *_request)
 {
 	struct kobject *kobj = NULL;
+	struct kobject_ptr_container *kobjp_cnt = NULL;
 	char *dir = 0;
 	char *attr = 0;
 	int ret = 0;
-	kobj = kzalloc(sizeof( *kobj ),
-		GFP_KERNEL);
-	if (!kobj) {
-		LIBLCD_ERR("kzalloc");
+	cptr_t p_cptr;
+	cptr_t lcd_cptr;
+	unsigned long p_offset;
+	unsigned long p_mem_order;
+	gva_t p_gva;
+
+
+	ret = glue_cap_lookup_kobject_ptr_type(c_cspace,
+			__cptr(fipc_get_reg0(_request)),
+			&kobjp_cnt);
+
+	if (ret) {
+		LIBLCD_ERR("glue_cap_lookup failed with ret %d", ret);
+		goto fail_lookup;
+	}
+
+	kobj = kobjp_cnt->kobject;
+
+	p_mem_order = fipc_get_reg1(_request);
+	p_offset = fipc_get_reg2(_request);
+	lcd_cptr = __cptr(fipc_get_reg3(_request));
+
+	ret = lcd_cptr_alloc(&p_cptr);
+	if (ret) {
+		LIBLCD_ERR("failed to get cptr");
 		goto fail_alloc;
 	}
-	dir = kzalloc(sizeof( char   ),
-		GFP_KERNEL);
-	if (!dir) {
-		LIBLCD_ERR("kzalloc");
-		lcd_exit(-1);
-	}
-	attr = kzalloc(sizeof( char   ),
-		GFP_KERNEL);
-	if (!attr) {
-		LIBLCD_ERR("kzalloc");
-		lcd_exit(-1);
-	}
-	dir = (char*) fipc_get_reg1(_request);
-	attr = (char*) fipc_get_reg2(_request);
-	sysfs_notify(kobj,
-			dir,
-			attr);
-fail_alloc:
-	return ret;
 
+	copy_msg_cap_vmfunc(current->vmfunc_lcd, current->lcd, lcd_cptr,
+			p_cptr);
+
+	ret = lcd_map_virt(p_cptr, p_mem_order, &p_gva);
+
+	if (ret) {
+		LIBLCD_ERR("failed to map void *p");
+		goto fail_virt;
+	}
+
+	dir = NULL;
+	attr = (char*) (gva_val(p_gva) + p_offset);
+
+	sysfs_notify(kobj, dir, attr);
+fail_alloc:
+fail_lookup:
+fail_virt:
+	return ret;
 }

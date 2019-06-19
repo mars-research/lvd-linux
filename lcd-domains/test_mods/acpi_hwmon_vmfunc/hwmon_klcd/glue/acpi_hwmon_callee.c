@@ -436,68 +436,45 @@ fail_lookup:
 
 int acpi_evaluate_integer_callee(struct fipc_message *_request)
 {
-	__maybe_unused void *handle = NULL;
+	void *handle = NULL;
+	struct acpi_handle_container *acpi_handle_container = NULL;
 	char *pathname;
-	struct acpi_object_list *arguments = NULL;
-	unsigned long long *data = 0;
+	union acpi_object arg0;
+	struct acpi_object_list args;
+	unsigned long long data;
 	int ret = 0;
 	int func_ret = 0;
-	int sync_ret;
-	cptr_t sync_ep;
-	unsigned 	long mem_order;
-	unsigned 	long handle_offset;
-	cptr_t handle_cptr;
-	gva_t handle_gva;
-	pathname = kzalloc(sizeof( char   ),
-		GFP_KERNEL);
+
+	pathname = kzalloc(sizeof(unsigned long), GFP_KERNEL);
 	if (!pathname) {
-		LIBLCD_ERR("kzalloc");
-		lcd_exit(-1);
-	}
-	arguments = kzalloc(sizeof( *arguments ),
-		GFP_KERNEL);
-	if (!arguments) {
 		LIBLCD_ERR("kzalloc");
 		goto fail_alloc;
 	}
-	data = kzalloc(sizeof( long   ),
-		GFP_KERNEL);
-	if (!data) {
-		LIBLCD_ERR("kzalloc");
-		lcd_exit(-1);
+
+	ret = glue_cap_lookup_acpi_handle_type(c_cspace,
+			__cptr(fipc_get_reg0(_request)),
+			&acpi_handle_container);
+
+	if (ret) {
+		LIBLCD_ERR("glue_cap_lookup failed with ret %d", ret);
+		goto fail_lookup;
 	}
-	sync_ret = lcd_cptr_alloc(&handle_cptr);
-	if (sync_ret) {
-		LIBLCD_ERR("failed to get cptr");
-		lcd_exit(-1);
-	}
-	lcd_set_cr0(handle_cptr);
-	sync_ret = lcd_sync_recv(sync_ep);
-	lcd_set_cr0(CAP_CPTR_NULL);
-	if (sync_ret) {
-		LIBLCD_ERR("failed to recv");
-		lcd_exit(-1);
-	}
-	mem_order = lcd_r0();
-	handle_offset = lcd_r1();
-	sync_ret = lcd_map_virt(handle_cptr,
-		mem_order,
-		&handle_gva);
-	if (sync_ret) {
-		LIBLCD_ERR("failed to map void *handle");
-		lcd_exit(-1);
-	}
-	pathname = (char*) fipc_get_reg1(_request);
-	data = (unsigned long long *) fipc_get_reg2(_request);
-	func_ret = acpi_evaluate_integer(( void  * )( ( gva_val(handle_gva) ) + ( handle_offset ) ),
-		pathname,
-		arguments,
-		data);
-	fipc_set_reg1(_request,
-			func_ret);
+
+	handle = acpi_handle_container->acpi_handle;
+
+	strncpy(pathname, (char*)&_request->regs[1],
+			sizeof(_request->regs[1]));
+
+	arg0.type = fipc_get_reg2(_request);
+	args.count = fipc_get_reg3(_request);
+	args.pointer = &arg0;
+
+	func_ret = acpi_evaluate_integer(handle, pathname, &args, &data);
+	fipc_set_reg0(_request, func_ret);
+	fipc_set_reg1(_request, data);
+fail_lookup:
 fail_alloc:
 	return ret;
-
 }
 
 int acpi_extract_package_callee(struct fipc_message *_request)

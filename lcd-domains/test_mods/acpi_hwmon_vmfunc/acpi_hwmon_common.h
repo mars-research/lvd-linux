@@ -43,6 +43,7 @@ enum dispatch_t {
 	MODULE_EXIT,
 	ATTR_SHOW,
 	ATTR_STORE,
+	DMI_CALLBACK,
 };
 
 /* CSPACES ------------------------------------------------------------ */

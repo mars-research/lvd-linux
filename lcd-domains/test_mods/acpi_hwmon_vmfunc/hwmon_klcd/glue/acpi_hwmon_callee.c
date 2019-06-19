@@ -17,28 +17,12 @@
 #define CPTR_HASH_BITS      5
 static DEFINE_HASHTABLE(dev_hash, CPTR_HASH_BITS);
 static DEFINE_HASHTABLE(acpidev_hash, CPTR_HASH_BITS);
+static DEFINE_HASHTABLE(dmi_hash, CPTR_HASH_BITS);
 
 static struct glue_cspace *c_cspace;
 struct acpi_device *g_acpi_device;
-static int cap_in_hardware;
 
 /* Module init/exit routines */
-static int __init enable_cap_knobs(const struct dmi_system_id *d)
-{
-	cap_in_hardware = 1;
-	return 0;
-}
-
-static struct dmi_system_id __initdata pm_dmi_table[] = {
-	{
-		enable_cap_knobs, "IBM Active Energy Manager",
-		{
-			DMI_MATCH(DMI_SYS_VENDOR, "IBM")
-		},
-	},
-	{}
-};
-
 static const struct acpi_device_id power_meter_ids[] = {
 	{"ACPI000D", 0},
 	{"", 0},
@@ -129,6 +113,36 @@ int glue_lookup_acpi_device(struct hlist_head *htable, struct cptr c, struct
 }
 
 void glue_remove_acpi_device(struct acpi_device_ptr_container *dev_c)
+{
+	hash_del(&dev_c->hentry);
+}
+
+int glue_insert_dmi_system_id(struct hlist_head *htable, struct dmi_system_id_ptr_container *dmi_id_c)
+{
+	BUG_ON(!dmi_id_c->dmi_system_id_ptr);
+
+	dmi_id_c->my_ref = __cptr((unsigned
+				long)dmi_id_c->dmi_system_id_ptr);
+
+	hash_add(dev_hash, &dmi_id_c->hentry, (unsigned long)
+			dmi_id_c->dmi_system_id_ptr);
+
+	return 0;
+}
+
+int glue_lookup_dmi_system_id(struct hlist_head *htable, struct cptr c, struct
+		dmi_system_id_ptr_container **dev_cout) {
+	struct dmi_system_id_ptr_container *dev_c;
+
+	hash_for_each_possible(dev_hash, dev_c, hentry, (unsigned long)
+			cptr_val(c)) {
+		if (dev_c->dmi_system_id_ptr == (struct dmi_system_id*) c.cptr)
+			*dev_cout = dev_c;
+	}
+	return 0;
+}
+
+void glue_remove_dmi_system_id(struct dmi_system_id_ptr_container *dev_c)
 {
 	hash_del(&dev_c->hentry);
 }
@@ -875,15 +889,88 @@ int put_device_callee(struct fipc_message *_request)
 	return ret;
 }
 
+static int enable_cap_knobs(const struct dmi_system_id *d)
+{
+	struct fipc_message r;
+	struct fipc_message *_request = &r;
+	int func_ret;
+	struct dmi_system_id_ptr_container *dmi_id_container = NULL;
+
+	glue_lookup_dmi_system_id(dmi_hash, __cptr((unsigned long)d), &dmi_id_container);
+
+	async_msg_set_fn_type(_request, DMI_CALLBACK);
+	fipc_set_reg0(_request, dmi_id_container->other_ref.cptr);
+
+	vmfunc_wrapper(_request);
+
+	func_ret = fipc_get_reg0(_request);
+
+	return func_ret;
+}
+
+static struct dmi_system_id pm_dmi_table[] = {
+	{
+		.callback = enable_cap_knobs,
+	},
+	{}
+};
+
+
 int dmi_check_system_callee(struct fipc_message *_request)
 {
 	int ret = 0;
 	int func_ret = 0;
+	struct dmi_system_id_ptr_container *dmi_id_container;
+	cptr_t id_cptr, lcd_id_cptr;
+	unsigned long id_offset, id_mem_order;
+	gva_t id_gva;
+
+	dmi_id_container = kzalloc(sizeof(*dmi_id_container), GFP_KERNEL);
+
+	if (!dmi_id_container) {
+		LIBLCD_ERR("kzalloc");
+		ret = -ENOMEM;
+		goto fail_alloc;
+	}
+
+	dmi_id_container->dmi_system_id_ptr = pm_dmi_table;
+
+	glue_insert_dmi_system_id(dmi_hash, dmi_id_container);
+
+	id_mem_order = fipc_get_reg1(_request);
+	id_offset = fipc_get_reg2(_request);
+	lcd_id_cptr = __cptr(fipc_get_reg3(_request));
+
+	copy_msg_cap_vmfunc(current->vmfunc_lcd, current->lcd, lcd_id_cptr,
+			id_cptr);
+
+	ret = lcd_map_virt(id_cptr, id_mem_order, &id_gva);
+
+	if (ret) {
+		LIBLCD_ERR("failed to map void *p");
+		goto fail_virt;
+	}
+
+	pm_dmi_table->ident = (char*)(gva_val(id_gva) + id_offset);
+
+	strncpy(pm_dmi_table->matches[0].substr, (char*)&_request->regs[4],
+			sizeof(_request->regs[4]));
+
+	pm_dmi_table->matches[0].slot = fipc_get_reg5(_request) & 0x7F;
+	pm_dmi_table->matches[0].exact_match = (fipc_get_reg5(_request) >> 7) & 0x1;
+
+	pm_dmi_table->callback = enable_cap_knobs;
+
+	dmi_id_container->other_ref.cptr = fipc_get_reg0(_request);
 
 	func_ret = dmi_check_system(pm_dmi_table);
 
 	fipc_set_reg0(_request, func_ret);
+	fipc_set_reg1(_request, dmi_id_container->my_ref.cptr);
 
+	return func_ret;
+fail_alloc:
+fail_virt:
 	return ret;
 }
 

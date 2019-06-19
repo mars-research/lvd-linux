@@ -15,3 +15,7 @@ lcd_test_mod_acpi_hwmon_vmfunc_pwmtr_lcd-y		+= $(addprefix glue/, acpi_hwmon_cal
 lcd_test_mod_acpi_hwmon_vmfunc_pwmtr_lcd-y		+= $(addprefix ../, acpi_hwmon_glue_helper.o)
 
 ccflags-y += $(ISOLATED_CFLAGS)
+
+extra-y += ../../../liblcd_build/common/vmfunc.lds
+
+ldflags-y += -T $(LIBLCD_BUILD_DIR)/common/vmfunc.lds

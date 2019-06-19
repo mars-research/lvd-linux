@@ -449,6 +449,7 @@ int glue_cap_lookup_acpi_handle_type(struct glue_cspace *cspace,
 		( void  ** )acpi_handle_container);
 }
 
+
 static struct cap_type_system *glue_libcap_type_system;
 
 int glue_cap_init(void)
@@ -526,4 +527,3 @@ void glue_cap_remove(
 {
 	glue_cspace_remove(cspace, c);
 }
-

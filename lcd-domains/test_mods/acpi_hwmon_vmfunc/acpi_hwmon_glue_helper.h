@@ -29,6 +29,7 @@ struct acpi_device_ptr_container {
 	struct acpi_device *acpi_device_ptr;
 	struct cptr other_ref;
 	struct cptr my_ref;
+	struct hlist_node hentry;
 };
 
 struct acpi_driver_container {
@@ -185,4 +186,5 @@ int glue_cap_lookup_sensor_device_attribute_type(struct glue_cspace *cspace,
 int glue_cap_lookup_acpi_handle_type(struct glue_cspace *cspace,
 		struct cptr c,
 		struct acpi_handle_container **acpi_handle_container);
+
 #endif	/* __ACPI_HWMON_GLUE_HELPER_H__ */

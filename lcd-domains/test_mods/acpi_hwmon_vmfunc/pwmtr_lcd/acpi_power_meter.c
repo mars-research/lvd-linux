@@ -118,7 +118,11 @@ struct acpi_power_meter_resource {
 	s64			trip[2];
 	int			num_domain_devices;
 	struct acpi_device	**domain_devices;
+#ifdef LCD_ISOLATE
 	struct kobject		*holders_dir;
+#else
+	struct kobject		*holders_dir;
+#endif
 };
 
 struct sensor_template {
@@ -570,7 +574,7 @@ static int read_domain_devices(struct acpi_power_meter_resource *resource)
 	union acpi_object *pss;
 	acpi_status status;
 
-	status = acpi_evaluate_object(resource->acpi_dev->handle, "_PMD", NULL,
+	status = _acpi_evaluate_object(resource->acpi_dev->handle, "_PMD", NULL,
 				      &buffer);
 	if (ACPI_FAILURE(status)) {
 		ACPI_EXCEPTION((AE_INFO, status, "Evaluating _PMD"));
@@ -583,7 +587,7 @@ static int read_domain_devices(struct acpi_power_meter_resource *resource)
 		dev_err(&resource->acpi_dev->dev, ACPI_POWER_METER_NAME
 			"Invalid _PMD data\n");
 		res = -EFAULT;
-		goto end;
+	goto end;
 	}
 
 	if (!pss->package.count)
@@ -596,8 +600,8 @@ static int read_domain_devices(struct acpi_power_meter_resource *resource)
 		goto end;
 	}
 
-	resource->holders_dir = kobject_create_and_add("measures",
-					&resource->acpi_dev->dev.kobj);
+	resource->holders_dir = _kobject_create_and_add("measures",
+					&resource->acpi_dev->dev);
 	if (!resource->holders_dir) {
 		res = -ENOMEM;
 		goto exit_free;

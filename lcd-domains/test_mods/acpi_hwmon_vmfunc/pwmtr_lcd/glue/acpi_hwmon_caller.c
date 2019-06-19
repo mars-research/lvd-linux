@@ -17,6 +17,7 @@ struct acpi_driver *driver = &acpi_power_meter_driver;
 
 #define CPTR_HASH_BITS      5
 static DEFINE_HASHTABLE(cptr_table, CPTR_HASH_BITS);
+static DEFINE_HASHTABLE(acpi_table, CPTR_HASH_BITS);
 
 int glue_acpi_hwmon_init(void)
 {
@@ -77,6 +78,34 @@ void glue_remove_device(struct device_container *dev_c)
 	hash_del(&dev_c->hentry);
 }
 
+int glue_insert_acpi_handle(struct hlist_head *htable, struct acpi_handle_container *acpi_hc)
+{
+	BUG_ON(!acpi_hc->acpi_handle);
+
+	acpi_hc->my_ref = __cptr((unsigned long)acpi_hc->acpi_handle);
+
+	hash_add(cptr_table, &acpi_hc->hentry, (unsigned long) acpi_hc->acpi_handle);
+
+	return 0;
+}
+
+int glue_lookup_acpi_handle(struct hlist_head *htable, struct cptr c, struct
+		acpi_handle_container **acpi_hcout) {
+	struct acpi_handle_container *acpi_hc;
+
+	hash_for_each_possible(cptr_table, acpi_hc,
+			hentry, (unsigned long) cptr_val(c)) {
+		if (acpi_hc->acpi_handle == (void *) c.cptr)
+			*acpi_hcout = acpi_hc;
+	}
+	return 0;
+}
+
+void glue_remove_acpi_handle(struct acpi_handle_container *acpi_hc)
+{
+	hash_del(&acpi_hc->hentry);
+}
+
 int acpi_bus_generate_netlink_event(const char *device_class,
 		const char *bus_id,
 		unsigned char type,
@@ -97,29 +126,40 @@ int acpi_bus_generate_netlink_event(const char *device_class,
 }
 
 int acpi_bus_get_device(void *handle,
-		struct acpi_device **device)
+		struct acpi_device **devices)
 {
 	struct fipc_message r;
 	struct fipc_message *_request = &r;
-	int sync_ret;
-	unsigned 	long handle_mem_sz;
-	unsigned 	long handle_offset;
-	cptr_t handle_cptr;
+	unsigned 	long p_mem_sz;
+	unsigned 	long p_offset;
+	cptr_t p_cptr;
 	int func_ret;
 	int ret;
+	struct acpi_handle_container *acpi_handle_container = NULL;
+
+	ret = lcd_virt_to_cptr(__gva((unsigned long)devices), &p_cptr,
+			&p_mem_sz, &p_offset);
+
+	if (ret) {
+		LIBLCD_ERR("virt to cptr failed");
+		goto fail_virt;
+	}
+
+	glue_lookup_acpi_handle(acpi_table, __cptr((unsigned long) handle),
+			&acpi_handle_container);
 
 	async_msg_set_fn_type(_request, ACPI_BUS_GET_DEVICE);
-	sync_ret = lcd_virt_to_cptr(__gva(( unsigned  long   )handle),
-		&handle_cptr,
-		&handle_mem_sz,
-		&handle_offset);
-	if (sync_ret) {
-		LIBLCD_ERR("virt to cptr failed");
-		lcd_exit(-1);
-	}
+	fipc_set_reg0(_request, acpi_handle_container->other_ref.cptr);
+	fipc_set_reg1(_request, ilog2((p_mem_sz) >> (PAGE_SHIFT)));
+	fipc_set_reg2(_request, p_offset);
+	fipc_set_reg3(_request, cptr_val(p_cptr));
+
 	ret = vmfunc_wrapper(_request);
+
 	func_ret = fipc_get_reg0(_request);
 	return func_ret;
+fail_virt:
+	return ret;
 }
 
 int acpi_bus_register_driver(struct acpi_driver *driver)
@@ -311,6 +351,28 @@ unsigned int _acpi_evaluate_object(struct acpi_device *acpi_device,
 
 	ret = vmfunc_wrapper(_request);
 	func_ret = fipc_get_reg0(_request);
+
+	{
+		union acpi_object *pss = buffer->pointer;
+
+		if (pss && pss->package.count == 1) {
+			union acpi_object *element = &(pss->package.elements[0]);
+			void *acpi_handle = element->reference.handle;
+
+			struct acpi_handle_container *acpi_handle_container;
+			acpi_handle_container = kzalloc(sizeof(*acpi_handle_container), GFP_KERNEL);
+
+			if (!acpi_handle_container) {
+				LIBLCD_ERR("alloc failed");
+				goto fail_alloc;
+			}
+			glue_insert_acpi_handle(acpi_table,
+					acpi_handle_container);
+
+			acpi_handle_container->acpi_handle = acpi_handle;
+			acpi_handle_container->other_ref.cptr = fipc_get_reg1(_request);
+		}
+	}
 	return func_ret;
 fail_alloc:
 fail_virt:
@@ -417,14 +479,28 @@ fail_insert:
 }
 
 void device_remove_file(struct device *dev,
-		const struct device_attribute *attr)
+		const struct device_attribute *devattr)
 {
 	struct fipc_message r;
 	struct fipc_message *_request = &r;
 	int ret;
+	struct device_container *device_container = NULL;
+	struct sensor_device_attribute *s_attr;
+	struct sensor_device_attribute_container *s_attr_cnt;
 
-	async_msg_set_fn_type(_request,
-			DEVICE_REMOVE_FILE);
+	s_attr = container_of(devattr, struct sensor_device_attribute,
+			dev_attr);
+	s_attr_cnt = container_of(s_attr, struct
+			sensor_device_attribute_container, sensor_attr);
+
+	glue_lookup_device(cptr_table, __cptr((unsigned long) dev),
+			&device_container);
+
+	async_msg_set_fn_type(_request, DEVICE_REMOVE_FILE);
+
+	fipc_set_reg0(_request, device_container->other_ref.cptr);
+	fipc_set_reg1(_request, s_attr_cnt->other_ref.cptr);
+
 	ret = vmfunc_wrapper(_request);
 	return;
 
@@ -537,18 +613,63 @@ void hwmon_device_unregister(struct device *dev)
 	return;
 }
 
-struct kobject *kobject_create_and_add(const char *name,
-		struct kobject *parent)
+struct kobject *_kobject_create_and_add(const char *name,
+		struct device *dev)
 {
+	struct device_container *device_container = NULL;
 	struct kobject_container *func_ret_container = NULL;
 	struct fipc_message r;
 	struct fipc_message *_request = &r;
 	int ret;
+	cptr_t p_cptr;
+	unsigned long p_offset;
+	unsigned long p_mem_sz;
 
-	async_msg_set_fn_type(_request,
-			KOBJECT_CREATE_AND_ADD);
+	glue_lookup_device(cptr_table, __cptr((unsigned long) dev),
+			&device_container);
+
+	ret = lcd_virt_to_cptr(__gva((unsigned long)name), &p_cptr,
+			&p_mem_sz, &p_offset);
+
+	if (ret) {
+		LIBLCD_ERR("virt to cptr failed");
+		goto fail_virt;
+	}
+
+	func_ret_container = kzalloc(sizeof(*func_ret_container), GFP_KERNEL);
+
+	if (!func_ret_container) {
+		LIBLCD_ERR("alloc failed");
+		ret = -ENOMEM;
+		goto fail_alloc;
+	}
+
+	ret = glue_cap_insert_kobject_type(lcd_cspace, func_ret_container,
+			&func_ret_container->my_ref);
+
+	if (ret) {
+		LIBLCD_ERR("glue_cap_insert failed with ret %d", ret);
+		goto fail_insert;
+	}
+
+	async_msg_set_fn_type(_request, KOBJECT_CREATE_AND_ADD);
+
+	fipc_set_reg0(_request, device_container->other_ref.cptr);
+	fipc_set_reg1(_request, ilog2((p_mem_sz) >> (PAGE_SHIFT)));
+	fipc_set_reg2(_request, p_offset);
+	fipc_set_reg3(_request, cptr_val(p_cptr));
+	/* send our reference for the return kobject pointer */
+	fipc_set_reg4(_request, func_ret_container->my_ref.cptr);
+
 	ret = vmfunc_wrapper(_request);
+
+	func_ret_container->other_ref.cptr = fipc_get_reg0(_request);
+
 	return &func_ret_container->kobject;
+fail_insert:
+fail_alloc:
+fail_virt:
+	return NULL;
 }
 
 void kobject_put(struct kobject *kobj)

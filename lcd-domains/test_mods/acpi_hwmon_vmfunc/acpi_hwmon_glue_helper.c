@@ -35,7 +35,9 @@ enum glue_type {
 	GLUE_TYPE_DEVICE_CONTAINER,
 	GLUE_TYPE_DMI_SYSTEM_ID_CONTAINER,
 	GLUE_TYPE_KOBJECT_CONTAINER,
+	GLUE_TYPE_KOBJECT_PTR_CONTAINER,
 	GLUE_TYPE_SENSOR_DEVICE_ATTRIBUTE_CONTAINER,
+	GLUE_TYPE_ACPI_HANDLE_CONTAINER,
 	GLUE_NR_TYPES,
 
 };
@@ -126,7 +128,21 @@ static struct type_ops_id glue_libcap_type_ops[GLUE_NR_TYPES] = {
 	},
 	{
 		{
+			.name = "struct kobject_ptr",
+			.delete = dummy_func,
+			.revoke = dummy_func,
+		}
+	},
+	{
+		{
 			.name = "struct sensor_device_attribute",
+			.delete = dummy_func,
+			.revoke = dummy_func,
+		}
+	},
+	{
+		{
+			.name = "struct acpi_handle_container",
 			.delete = dummy_func,
 			.revoke = dummy_func,
 		}
@@ -373,6 +389,26 @@ int glue_cap_lookup_kobject_type(struct glue_cspace *cspace,
 
 }
 
+int glue_cap_insert_kobject_ptr_type(struct glue_cspace *cspace,
+		struct kobject_ptr_container *kobject_p_container,
+		struct cptr *c_out)
+{
+	return glue_cspace_insert(cspace,
+		kobject_p_container,
+		glue_libcap_type_ops[ GLUE_TYPE_KOBJECT_PTR_CONTAINER ].libcap_type,
+		c_out);
+}
+
+int glue_cap_lookup_kobject_ptr_type(struct glue_cspace *cspace,
+		struct cptr c,
+		struct kobject_ptr_container **kobject_p_container)
+{
+	return glue_cspace_lookup(cspace,
+		c,
+		glue_libcap_type_ops[ GLUE_TYPE_KOBJECT_PTR_CONTAINER ].libcap_type,
+		( void  ** )kobject_p_container);
+}
+
 int glue_cap_insert_sensor_device_attribute_type(struct glue_cspace *cspace,
 		struct sensor_device_attribute_container *sensor_device_attribute_container,
 		struct cptr *c_out)
@@ -391,6 +427,26 @@ int glue_cap_lookup_sensor_device_attribute_type(struct glue_cspace *cspace,
 		c,
 		glue_libcap_type_ops[ GLUE_TYPE_SENSOR_DEVICE_ATTRIBUTE_CONTAINER ].libcap_type,
 		( void  ** )sensor_device_attribute_container);
+}
+
+int glue_cap_insert_acpi_handle_type(struct glue_cspace *cspace,
+		struct acpi_handle_container *acpi_handle_container,
+		struct cptr *c_out)
+{
+	return glue_cspace_insert(cspace,
+		acpi_handle_container,
+		glue_libcap_type_ops[ GLUE_TYPE_ACPI_HANDLE_CONTAINER ].libcap_type,
+		c_out);
+}
+
+int glue_cap_lookup_acpi_handle_type(struct glue_cspace *cspace,
+		struct cptr c,
+		struct acpi_handle_container **acpi_handle_container)
+{
+	return glue_cspace_lookup(cspace,
+		c,
+		glue_libcap_type_ops[ GLUE_TYPE_ACPI_HANDLE_CONTAINER ].libcap_type,
+		( void  ** )acpi_handle_container);
 }
 
 static struct cap_type_system *glue_libcap_type_system;

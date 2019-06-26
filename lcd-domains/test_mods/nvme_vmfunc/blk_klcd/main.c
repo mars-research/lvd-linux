@@ -50,7 +50,7 @@ static int blk_klcd_init(void)
 	 * Init net glue
 	 */
 	ret = glue_nvme_init();
-	LIBLCD_MSG("-===== > glue ixgbe init called\n");
+	LIBLCD_MSG("-===== > glue nvme init called\n");
 	if (ret) {
 		LIBLCD_ERR("net init");
 		goto fail2;

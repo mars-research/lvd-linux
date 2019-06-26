@@ -1578,7 +1578,7 @@ int __pci_register_driver_callee(struct fipc_message *_request)
 	drv_container->pci_driver.id_table = nvme_pci_tbl;
 	drv_container->pci_driver.probe = probe;
 	drv_container->pci_driver.remove = remove;
-	name = "ixgbe_lcd";
+	name = "nvme_lcd";
 
 	/* XXX: We should rather call __pci_register_driver
 	 * (at least according to the RPC semantics).

@@ -152,15 +152,6 @@ int glue_cap_insert_blk_mq_ops_type(struct glue_cspace *cspace,
                                 c_out);
 }
 
-int glue_cap_insert_module_type(struct glue_cspace *cspace,
-        		struct module_container *module_container,
-        		cptr_t *c_out) {
-
-
-        return glue_cspace_insert(cspace, module_container,
-                                glue_libcap_type_ops[GLUE_TYPE_MODULE].libcap_type,
-                                c_out);
-}
 
 int glue_cap_insert_blk_dev_ops_type(struct glue_cspace *cspace,
 			struct block_device_operations_container *blo_container,
@@ -287,15 +278,6 @@ int glue_cap_lookup_blk_mq_queue_data_type(struct glue_cspace *cspace,
 
 }
 
-int glue_cap_lookup_module_type(struct glue_cspace *cspace,
-        			cptr_t c,
-        			struct module_container **module_container) {
-
-        return glue_cspace_lookup(
-                cspace, c,
-                glue_libcap_type_ops[GLUE_TYPE_MODULE].libcap_type,
-                (void **)module_container);
-}
 
 int glue_cap_lookup_request_queue_type(struct glue_cspace *cspace,
 			cptr_t c,

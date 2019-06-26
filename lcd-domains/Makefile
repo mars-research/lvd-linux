@@ -50,7 +50,7 @@ export LCD_DOMAINS_CFLAGS=\
 	-DLCD_TEST_MODS_PATH=\"$(PWD)/build/test_mods\"
 
 # Don't print "Entering directory..." etc.
-MAKEFLAGS += --no-print-directory
+MAKEFLAGS +=  --no-print-directory
 
 # Since we aren't hooked into the Linux build, we need
 # to define this so we can use it in this file. (The

@@ -12,7 +12,7 @@
 #include <linux/kernel.h>
 #include <linux/kmod.h>
 
-#include "../glue_helper.h"
+#include "../glue_helper.h" 
 
 #include <lcd_config/post_hook.h>
 

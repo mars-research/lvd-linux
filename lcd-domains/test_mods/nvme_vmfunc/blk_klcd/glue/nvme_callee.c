@@ -5,22 +5,35 @@
 #include <liblcd/sync_ipc_poll.h>
 #include <liblcd/glue_cspace.h>
 #include <liblcd/trampoline.h>
-#include "../../glue_helper.h"
-#include "../../benchmark.h"
-#include "../nullb_callee.h"
+
+#include "../../nvme_glue_helper.h"
+//#include "../../benchmark.h"
+#include "../nvme_callee.h"
 #include <asm/cacheflush.h>
 #include <linux/atomic.h>
 #include <linux/priv_mempool.h>
 #include <linux/sort.h>
+#include <linux/aer.h>
 #include <lcd_domains/microkernel.h>
 
+#define MAX_POOLS	40
+
 #include <lcd_config/post_hook.h>
+
+priv_pool_t *iocb_pool;
+static unsigned long pool_pfn_start, pool_pfn_end;
+priv_pool_t *pool;
+void *pool_base = NULL;
+size_t pool_size = 0;
 
 /* hacks for unregistering */
 int null_major;
 struct gendisk *disk_g;
 struct request_queue *rq_g;
 struct blk_mq_tag_set *set_g;
+
+struct pci_dev *g_pdev = NULL;
+const char driver_name[] = "nvme_lcd";
 
 struct blk_mq_ops_container *g_blk_mq_ops_container;
 
@@ -38,10 +51,7 @@ struct trampoline_hidden_args {
 };
 #endif
 
-priv_pool_t *iocb_pool;
-void *pool_base = NULL;
-size_t pool_size = 0;
-static unsigned long pool_pfn_start, pool_pfn_end;
+
 
 static struct glue_cspace *c_cspace;
 extern struct cspace *klcd_cspace;
@@ -63,6 +73,89 @@ struct bio_vec_queue {
 };
 
 DEFINE_PER_CPU(struct bio_vec_queue, bio_vec_queues);
+
+
+#define PCI_CLASS_STORAGE_EXPRESS	0x010802
+static const struct pci_device_id nvme_pci_tbl[] = {
+	{ PCI_DEVICE_CLASS(PCI_CLASS_STORAGE_EXPRESS, 0xffffff) },
+	{ 0 },
+};
+
+#ifndef CONFIG_VMALLOC_SHARED_POOL
+/* Pool allocation logic */
+char *base_pools[MAX_POOLS];
+int pool_order = 10;
+int start_idx[MAX_POOLS/2] = {-1}, end_idx[MAX_POOLS/2] = {-1};
+unsigned int best_diff = 0;
+int best_idx = -1;
+int pool_idx = 0;
+
+struct {
+	int start_idx;
+	int end_idx;
+	size_t size;
+	bool valid;
+} pools[MAX_POOLS] = { {0} };
+
+
+int compare_addr(const void *a, const void *b)
+{
+	return *(unsigned int *)a - *(unsigned int *)b;
+}
+
+int pool_pick(void)
+{
+	int i;
+
+	/* allocate series of pages */
+	for (i = 0; i < MAX_POOLS; i++) {
+		base_pools[i] = (char*) __get_free_pages(GFP_KERNEL | __GFP_ZERO,
+	                            pool_order);
+	}
+
+	/* sort all of base addresses */
+	sort(base_pools, MAX_POOLS, sizeof(char*), compare_addr, NULL);
+
+	printk("%s, sorted order:\n", __func__);
+	for (i = 0; i < MAX_POOLS; i++) {
+		printk("%s, got pool %p\n", __func__, base_pools[i]);
+	}
+
+	pools[pool_idx].start_idx = 0;
+	pools[pool_idx].end_idx = MAX_POOLS - 1;
+	pools[pool_idx].valid = true;
+
+	for (i = 0; i < MAX_POOLS - 1; i++) {
+		printk("%s, comparing pool[%d]=%llx and pool[%d]=%llx\n", __func__,
+					i+1, (uint64_t)base_pools[i+1], i, (uint64_t) base_pools[i]);
+		if (((uint64_t) base_pools[i+1] - (uint64_t) base_pools[i]) != ((1 << pool_order) * PAGE_SIZE)) {
+			printk("%s, found discontinuity @ i %d\n", __func__, i);
+			pools[pool_idx].valid = true;
+			pools[pool_idx++].end_idx = i;
+			pools[pool_idx].start_idx = i + 1;
+		}
+	}
+	/* if there is no discontinuity, then we will have a huge chunk until the end */
+	pools[pool_idx].valid = true;
+	pools[pool_idx].end_idx = MAX_POOLS - 1;
+
+	for (i = 0; i < pool_idx + 1; i++) {
+		printk("%s, pool %d: start idx = %d | end idx = %d\n",
+				__func__, i, pools[i].start_idx, pools[i].end_idx);
+		if (!pools[i].valid)
+			continue;
+		if ((pools[i].end_idx - pools[i].start_idx + 1) > best_diff) {
+			best_idx = i;
+			best_diff = pools[i].end_idx - pools[i].start_idx + 1;
+		}
+	}
+	printk("%s, best diff %u | best idx %d | start = %d | end = %d\n",
+			__func__, best_diff, best_idx, pools[best_idx].start_idx, pools[best_idx].end_idx);
+       	return best_idx;
+}
+#endif
+
+
 
 void iocb_data_pool_init(void)
 {
@@ -1236,3 +1329,1076 @@ fail_lookup1:
 
 	return ret;
 }
+
+int sync_setup_memory(void *data, size_t sz, unsigned long *order, cptr_t *data_cptr, unsigned long *data_offset)
+{
+        int ret;
+        struct page *p;
+        unsigned long data_len;
+        unsigned long mem_len;
+        /*
+         * Determine page that contains (start of) data
+         */
+        p = virt_to_head_page(data);
+        if (!p) {
+                LIBLCD_ERR("failed to translate to page");
+                ret = -EINVAL;
+                goto fail1;
+        }
+        data_len = sz;
+        mem_len = ALIGN(data + data_len - page_address(p), PAGE_SIZE);
+        *order = ilog2(roundup_pow_of_two(mem_len >> PAGE_SHIFT));
+        /*
+         * Volunteer memory
+         */
+        *data_offset = data - page_address(p);
+        ret = lcd_volunteer_pages(p, *order, data_cptr);
+        if (ret) {
+                LIBLCD_ERR("failed to volunteer memory");
+                goto fail2;
+        }
+        /*
+         * Done
+         */
+        return 0;
+fail2:
+fail1:
+        return ret;
+}
+
+#ifndef CONFIG_LVD
+LCD_TRAMPOLINE_DATA(probe_trampoline);
+int  LCD_TRAMPOLINE_LINKAGE(probe_trampoline)
+probe_trampoline(struct pci_dev *dev,
+		struct pci_device_id *id)
+{
+	int ( *volatile probe_fp )(struct pci_dev *,
+		struct pci_device_id *,
+		struct trampoline_hidden_args *);
+	struct trampoline_hidden_args *hidden_args;
+	LCD_TRAMPOLINE_PROLOGUE(hidden_args,
+			probe_trampoline);
+	probe_fp = probe;
+	return probe_fp(dev,
+		id,
+		hidden_args);
+
+}
+#endif
+
+#ifndef CONFIG_LVD
+LCD_TRAMPOLINE_DATA(remove_trampoline);
+void  LCD_TRAMPOLINE_LINKAGE(remove_trampoline)
+remove_trampoline(struct pci_dev *dev)
+{
+	void ( *volatile remove_fp )(struct pci_dev *,
+		struct trampoline_hidden_args *);
+	struct trampoline_hidden_args *hidden_args;
+	LCD_TRAMPOLINE_PROLOGUE(hidden_args,
+			remove_trampoline);
+	remove_fp = remove;
+	return remove_fp(dev,
+		hidden_args);
+
+}
+#endif
+
+int pci_disable_msix_callee(struct fipc_message *_request)
+{
+	struct pci_dev_container *dev_container;
+	struct pci_dev *pdev;
+	int ret;
+
+	ret = glue_cap_lookup_pci_dev_type(c_cspace,
+			__cptr(fipc_get_reg0(_request)),
+			&dev_container);
+	if (ret) {
+		LIBLCD_ERR("lookup");
+		goto fail_lookup;
+	}
+
+	pdev = dev_container->pdev;
+
+	pci_disable_msix(pdev);
+
+	LIBLCD_MSG("%s returned");
+fail_lookup:
+	return ret;
+}
+
+int pci_enable_msix_range_callee(struct fipc_message *_request)
+{
+	int ret = 0;
+	int func_ret;
+	int sync_ret;
+	unsigned 	long mem_order;
+	unsigned 	long p_offset;
+	cptr_t p_cptr, lcd_cptr;
+	gva_t p_gva;
+	int minvec, maxvec;
+	struct msix_entry *entries;
+	struct pci_dev_container *dev_container;
+	struct pci_dev *pdev;
+
+	ret = glue_cap_lookup_pci_dev_type(c_cspace,
+			__cptr(fipc_get_reg5(_request)),
+			&dev_container);
+
+	if (ret) {
+		LIBLCD_ERR("lookup");
+		goto fail_lookup;
+	}
+
+	pdev = dev_container->pdev;
+
+	minvec = fipc_get_reg0(_request);
+	maxvec = fipc_get_reg1(_request);
+
+	sync_ret = lcd_cptr_alloc(&p_cptr);
+	if (sync_ret) {
+		LIBLCD_ERR("failed to get cptr");
+		lcd_exit(-1);
+	}
+
+	mem_order = fipc_get_reg2(_request);
+	p_offset = fipc_get_reg3(_request);
+	lcd_cptr = __cptr(fipc_get_reg4(_request));
+
+	copy_msg_cap_vmfunc(current->vmfunc_lcd, current->lcd, lcd_cptr,
+			p_cptr);
+
+	sync_ret = lcd_map_virt(p_cptr, mem_order, &p_gva);
+
+	if (sync_ret) {
+		LIBLCD_ERR("failed to map void *p");
+		lcd_exit(-1);
+	}
+
+	entries = (struct msix_entry*)(void*)(gva_val(p_gva) + p_offset);
+
+	LIBLCD_MSG("%s, dev->msix_enabled %d | minvec %d | maxvec %d",
+			__func__, pdev->msix_enabled, minvec, maxvec);
+
+	func_ret = pci_enable_msix_range(pdev, entries, minvec, maxvec);
+
+	LIBLCD_MSG("%s, returned %d", __func__, func_ret);
+
+	fipc_set_reg0(_request, func_ret);
+
+fail_lookup:
+	return ret;
+}
+
+
+int __pci_register_driver_callee(struct fipc_message *_request)
+{
+	struct pci_driver_container *drv_container;
+	struct module_container *owner_container;
+	char *name;
+
+#ifndef CONFIG_LVD
+	struct trampoline_hidden_args *drv_probe_hidden_args;
+	struct trampoline_hidden_args *drv_remove_hidden_args;
+#endif
+	int func_ret = 0;
+	int ret = 0;
+
+	drv_container = kzalloc(sizeof( struct pci_driver_container   ),
+		GFP_KERNEL);
+	if (!drv_container) {
+		LIBLCD_ERR("kzalloc");
+		goto fail_alloc;
+	}
+
+	ret = glue_cap_insert_pci_driver_type(c_cspace,
+		drv_container,
+		&drv_container->my_ref);
+	if (ret) {
+		LIBLCD_ERR("lcd insert");
+		goto fail_insert;
+	}
+	drv_container->other_ref.cptr = fipc_get_reg0(_request);
+	owner_container = kzalloc(sizeof( struct module_container   ),
+		GFP_KERNEL);
+	if (!owner_container) {
+		LIBLCD_ERR("kzalloc");
+		goto fail_alloc;
+	}
+	ret = glue_cap_insert_module_type(c_cspace,
+		owner_container,
+		&owner_container->my_ref);
+	if (ret) {
+		LIBLCD_ERR("lcd insert");
+		goto fail_insert;
+	}
+	owner_container->other_ref.cptr = fipc_get_reg1(_request);
+
+#ifndef CONFIG_LVD
+	drv_probe_hidden_args = kzalloc(sizeof( *drv_probe_hidden_args ),
+		GFP_KERNEL);
+	if (!drv_probe_hidden_args) {
+		LIBLCD_ERR("kzalloc hidden args");
+		goto fail_alloc1;
+	}
+	drv_probe_hidden_args->t_handle = LCD_DUP_TRAMPOLINE(probe_trampoline);
+	if (!drv_probe_hidden_args->t_handle) {
+		LIBLCD_ERR("duplicate trampoline");
+		goto fail_dup1;
+	}
+	drv_probe_hidden_args->t_handle->hidden_args = drv_probe_hidden_args;
+	drv_probe_hidden_args->struct_container = drv_container;
+	drv_probe_hidden_args->cspace = c_cspace;
+	drv_probe_hidden_args->sync_ep = sync_ep;
+	drv_container->pci_driver.probe = LCD_HANDLE_TO_TRAMPOLINE(drv_probe_hidden_args->t_handle);
+	ret = set_memory_x(( ( unsigned  long   )drv_probe_hidden_args->t_handle ) & ( PAGE_MASK ),
+		( ALIGN(LCD_TRAMPOLINE_SIZE(probe_trampoline),
+		PAGE_SIZE) ) >> ( PAGE_SHIFT ));
+
+	drv_remove_hidden_args = kzalloc(sizeof( *drv_remove_hidden_args ),
+		GFP_KERNEL);
+	if (!drv_remove_hidden_args) {
+		LIBLCD_ERR("kzalloc hidden args");
+		goto fail_alloc2;
+	}
+	drv_remove_hidden_args->t_handle = LCD_DUP_TRAMPOLINE(remove_trampoline);
+	if (!drv_remove_hidden_args->t_handle) {
+		LIBLCD_ERR("duplicate trampoline");
+		goto fail_dup2;
+	}
+	drv_remove_hidden_args->t_handle->hidden_args = drv_remove_hidden_args;
+	drv_remove_hidden_args->struct_container = drv_container;
+	drv_remove_hidden_args->cspace = c_cspace;
+	drv_remove_hidden_args->sync_ep = sync_ep;
+	drv_container->pci_driver.remove = LCD_HANDLE_TO_TRAMPOLINE(drv_remove_hidden_args->t_handle);
+	ret = set_memory_x(( ( unsigned  long   )drv_remove_hidden_args->t_handle ) & ( PAGE_MASK ),
+		( ALIGN(LCD_TRAMPOLINE_SIZE(remove_trampoline),
+		PAGE_SIZE) ) >> ( PAGE_SHIFT ));
+#endif
+	drv_container->pci_driver.name = driver_name;
+	drv_container->pci_driver.id_table = nvme_pci_tbl;
+	drv_container->pci_driver.probe = probe;
+	drv_container->pci_driver.remove = remove;
+	name = "ixgbe_lcd";
+
+	/* XXX: We should rather call __pci_register_driver
+	 * (at least according to the RPC semantics).
+	 * However, kobject subsys is not happy with us on mangling
+	 * the module name. If we call pci_register_driver instead,
+	 * module pointer is taken from THIS_MODULE and kobject is
+	 * happy. So, do _not_ do such crap! kobject is unhappy
+	owner_container->module.state = MODULE_STATE_LIVE;
+	strcpy(owner_container->module.name, "ixgbe_lcd");
+	atomic_inc(&owner_container->module.refcnt);
+	*/
+
+	func_ret = pci_register_driver(&drv_container->pci_driver);
+
+	LIBLCD_MSG("%s returned %d", __func__, func_ret);
+
+	fipc_set_reg1(_request, drv_container->my_ref.cptr);
+	fipc_set_reg2(_request, owner_container->my_ref.cptr);
+	fipc_set_reg3(_request, func_ret);
+
+	return ret;
+fail_alloc:
+#ifndef CONFIG_LVD
+fail_alloc1:
+fail_alloc2:
+fail_dup1:
+fail_dup2:
+#endif
+fail_insert:
+	return ret;
+}
+
+int sync_probe_callee(struct fipc_message *_request)
+{
+	int ret;
+	cptr_t res0_cptr;
+	unsigned int res0_len;
+#ifndef CONFIG_VMALLOC_SHARED_POOL
+	struct page *p;
+#endif
+	unsigned int pool_ord;
+	cptr_t pool_cptr;
+	cptr_t lcd_pool_cptr;
+	cptr_t lcd_res0_cptr;
+	struct pci_dev_container *dev_container;
+	struct pci_dev *pdev;
+
+	LIBLCD_MSG("%s, called");
+
+	ret = glue_cap_lookup_pci_dev_type(c_cspace,
+			__cptr(fipc_get_reg2(_request)),
+			&dev_container);
+
+	if (ret) {
+		LIBLCD_ERR("lookup");
+		goto fail_lookup;
+	}
+
+	pdev = dev_container->pdev;
+
+	/*
+	 * ixgbe driver just needs res[0]
+	 */
+
+	/* get LCD's pool cptr */
+	lcd_res0_cptr = __cptr(fipc_get_reg0(_request));
+	lcd_pool_cptr = __cptr(fipc_get_reg1(_request));
+
+	res0_len = pci_resource_len(pdev, 0);
+
+	LIBLCD_MSG("res0 start: %lx, len: %d",
+			pci_resource_start(pdev, 0),
+			get_order(res0_len));
+
+	ret = lcd_volunteer_dev_mem(__gpa(pci_resource_start(pdev, 0)),
+			get_order(res0_len),
+			&res0_cptr);
+	if (ret) {
+		LIBLCD_ERR("volunteer devmem");
+		goto fail_vol;
+	}
+
+#ifdef CONFIG_VMALLOC_SHARED_POOL
+        ret = lcd_volunteer_vmalloc_mem(__gva((unsigned long)pool->pool), SKB_DATA_POOL_PAGES, &pool_cptr);
+	pool_ord = SKB_DATA_POOL_ORDER;
+#else
+        p = virt_to_head_page(pool->pool);
+
+	pool_ord = ilog2(roundup_pow_of_two((1 << pool_order) * best_diff));
+        ret = lcd_volunteer_pages(p, pool_ord, &pool_cptr);
+#endif
+
+	if (ret) {
+		LIBLCD_ERR("volunteer shared region");
+		goto fail_vol;
+	}
+
+#ifdef CONFIG_VMALLOC_SHARED_POOL
+	pool_pfn_start = (unsigned long)pool->pool >> PAGE_SHIFT;
+	pool_pfn_end = pool_pfn_start + SKB_DATA_POOL_PAGES;
+#else
+	pool_pfn_start = (unsigned long)pool->pool >> PAGE_SHIFT;
+	pool_pfn_end = pool_pfn_start + ((1 << pool_order) * best_diff);
+#endif
+	copy_msg_cap_vmfunc(current->lcd, current->vmfunc_lcd, pool_cptr, lcd_pool_cptr);
+	copy_msg_cap_vmfunc(current->lcd, current->vmfunc_lcd, res0_cptr, lcd_res0_cptr);
+
+	fipc_set_reg0(_request, res0_len);
+	fipc_set_reg1(_request, pool_ord);
+
+fail_lookup:
+fail_vol:
+	return 0;
+}
+
+#ifdef CONFIG_LVD
+int probe(struct pci_dev *dev,
+		const struct pci_device_id *id)
+#else
+int probe(struct pci_dev *dev,
+		const struct pci_device_id *id,
+		struct trampoline_hidden_args *hidden_args)
+#endif
+{
+	struct pci_dev_container *dev_container;
+	int ret = 0;
+	struct fipc_message r;
+	struct fipc_message *_request = &r;
+	int func_ret;
+
+	INIT_IPC_MSG(&r);
+	/* assign pdev to a global instance */
+	g_pdev = dev;
+
+	LIBLCD_MSG("%s, irq # %d | msix_enabled %d", __func__, dev->irq, dev->msix_enabled);
+
+	dev_container = kzalloc(sizeof( struct pci_dev_container   ),
+		GFP_KERNEL);
+	if (!dev_container) {
+		LIBLCD_ERR("kzalloc dev_container");
+		goto fail_alloc;
+	}
+
+	dev_container->pdev = dev;
+
+	/*
+	 * Kernel does not give us pci_dev with a container wrapped in.
+	 * So, let's have a pointer!
+	 */
+	ret = glue_cap_insert_pci_dev_type(c_cspace, dev_container,
+			&dev_container->my_ref);
+	if (ret) {
+		LIBLCD_ERR("lcd insert");
+		goto fail_insert;
+	}
+
+
+	async_msg_set_fn_type(_request, PROBE);
+
+	fipc_set_reg1(_request, dev_container->my_ref.cptr);
+	fipc_set_reg2(_request, *dev->dev.dma_mask);
+
+	vmfunc_klcd_wrapper(_request, 1);
+
+	printk("%s, send request done\n", __func__);
+
+	func_ret = fipc_get_reg0(_request);
+
+	//setup_timer(&service_timer, &ixgbe_service_timer, (unsigned long) NULL);
+
+	return func_ret;
+
+fail_insert:
+fail_alloc:
+	return ret;
+}
+
+int pci_unregister_driver_callee(struct fipc_message *_request)
+{
+	struct pci_driver_container *drv_container;
+	int ret;
+#ifndef CONFIG_LVD
+	struct trampoline_hidden_args *drv_probe_hidden_args;
+#endif
+	ret = glue_cap_lookup_pci_driver_type(c_cspace,
+		__cptr(fipc_get_reg0(_request)),
+		&drv_container);
+	if (ret) {
+		LIBLCD_ERR("lookup");
+		goto fail_lookup;
+	}
+
+	LIBLCD_MSG("Calling pci_unregister_driver");
+
+	pci_unregister_driver(( &drv_container->pci_driver ));
+
+	/* destroy our skb->data pool */
+	//skb_data_pool_free();
+
+	LIBLCD_MSG("Called pci_unregister_driver");
+	glue_cap_remove(c_cspace, drv_container->my_ref);
+
+	/* XXX: Do not do anything like this! read the comments
+	 * under pci_unregister_driver
+	 * atomic_dec_if_positive(&drv_container->pci_driver.driver.owner->refcnt);
+	 */
+#ifndef CONFIG_LVD
+	drv_probe_hidden_args = LCD_TRAMPOLINE_TO_HIDDEN_ARGS(drv_container->pci_driver.probe);
+	kfree(drv_probe_hidden_args->t_handle);
+	kfree(drv_probe_hidden_args);
+#endif
+	kfree(drv_container);
+
+fail_lookup:
+	return ret;
+}
+
+#ifdef CONFIG_LVD
+void remove(struct pci_dev *dev)
+#else
+void remove(struct pci_dev *dev,
+		struct trampoline_hidden_args *hidden_args)
+#endif
+{
+	struct fipc_message r;
+	struct fipc_message *_request = &r;
+	INIT_IPC_MSG(&r);
+
+	async_msg_set_fn_type(_request, REMOVE);
+
+	vmfunc_klcd_wrapper(_request, 1);
+
+	return;
+}
+
+int device_set_wakeup_enable_callee(struct fipc_message *_request)
+{
+	struct device *dev;
+	bool enable;
+	int ret = 0;
+
+	int func_ret;
+
+	dev = &g_pdev->dev;
+	enable = fipc_get_reg1(_request);
+	func_ret = device_set_wakeup_enable(dev,
+		enable);
+
+	fipc_set_reg1(_request,
+			func_ret);
+
+	return ret;
+}
+
+int pci_disable_pcie_error_reporting_callee(struct fipc_message *_request)
+{
+	int ret = 0;
+	int func_ret;
+	struct pci_dev_container *dev_container;
+	struct pci_dev *pdev;
+
+	ret = glue_cap_lookup_pci_dev_type(c_cspace,
+			__cptr(fipc_get_reg0(_request)),
+			&dev_container);
+
+	if (ret) {
+		LIBLCD_ERR("lookup");
+		goto fail_lookup;
+	}
+
+	pdev = dev_container->pdev;
+
+	func_ret = pci_disable_pcie_error_reporting(pdev);
+
+	fipc_set_reg0(_request, func_ret);
+
+fail_lookup:
+	return ret;
+}
+
+int pci_bus_read_config_word_callee(struct fipc_message *_request)
+{
+	struct pci_dev *pdev;
+	struct pci_bus *bus;
+	unsigned int devfn;
+	int where;
+	unsigned short val;
+	int func_ret;
+
+	pdev = g_pdev;
+	bus = pdev->bus;
+
+	devfn = fipc_get_reg0(_request);
+	where = fipc_get_reg1(_request);
+
+	func_ret = pci_bus_read_config_word(bus, devfn, where, &val);
+
+	fipc_set_reg0(_request, func_ret);
+	fipc_set_reg1(_request, val);
+
+	return 0;
+}
+
+int pci_bus_write_config_word_callee(struct fipc_message *_request)
+{
+	struct pci_dev *pdev;
+	struct pci_bus *bus;
+	unsigned int devfn;
+	int where;
+	unsigned short val;
+	int func_ret;
+
+	pdev = g_pdev;
+	bus = pdev->bus;
+
+	devfn = fipc_get_reg0(_request);
+	where = fipc_get_reg1(_request);
+	val = fipc_get_reg2(_request);
+
+	func_ret = pci_bus_write_config_word(bus, devfn, where, val);
+
+	fipc_set_reg0(_request, func_ret);
+
+	return 0;
+}
+
+int pci_cleanup_aer_uncorrect_error_status_callee(struct fipc_message *_request)
+{
+	int ret = 0;
+	int func_ret;
+	struct pci_dev_container *dev_container;
+	struct pci_dev *pdev;
+
+	ret = glue_cap_lookup_pci_dev_type(c_cspace,
+			__cptr(fipc_get_reg0(_request)),
+			&dev_container);
+
+	if (ret) {
+		LIBLCD_ERR("lookup");
+		goto fail_lookup;
+	}
+
+	pdev = dev_container->pdev;
+
+	func_ret = pci_cleanup_aer_uncorrect_error_status(pdev);
+
+	fipc_set_reg0(_request, func_ret);
+
+fail_lookup:
+	return ret;
+}
+
+int pci_disable_device_callee(struct fipc_message *_request)
+{
+	int ret = 0;
+	struct pci_dev_container *dev_container;
+	struct pci_dev *pdev;
+
+	ret = glue_cap_lookup_pci_dev_type(c_cspace,
+			__cptr(fipc_get_reg0(_request)),
+			&dev_container);
+
+	if (ret) {
+		LIBLCD_ERR("lookup");
+		goto fail_lookup;
+	}
+
+	pdev = dev_container->pdev;
+
+	pci_disable_device(pdev);
+
+fail_lookup:
+	return ret;
+}
+
+int pci_enable_pcie_error_reporting_callee(struct fipc_message *_request)
+{
+	int ret = 0;
+	int func_ret;
+	struct pci_dev_container *dev_container;
+	struct pci_dev *pdev;
+
+	ret = glue_cap_lookup_pci_dev_type(c_cspace,
+			__cptr(fipc_get_reg0(_request)),
+			&dev_container);
+
+	if (ret) {
+		LIBLCD_ERR("lookup");
+		goto fail_lookup;
+	}
+
+	pdev = dev_container->pdev;
+
+	func_ret = pci_enable_pcie_error_reporting(pdev);
+
+	fipc_set_reg0(_request, func_ret);
+
+fail_lookup:
+	return ret;
+}
+
+int pcie_capability_read_word_callee(struct fipc_message *_request)
+{
+	int pos;
+	unsigned short val;
+	int ret = 0;
+	int func_ret;
+	struct pci_dev_container *dev_container;
+	struct pci_dev *pdev;
+
+	ret = glue_cap_lookup_pci_dev_type(c_cspace,
+			__cptr(fipc_get_reg0(_request)),
+			&dev_container);
+
+	if (ret) {
+		LIBLCD_ERR("lookup");
+		goto fail_lookup;
+	}
+
+	pdev = dev_container->pdev;
+
+	pos = fipc_get_reg1(_request);
+	val = fipc_get_reg2(_request);
+
+	func_ret = pcie_capability_read_word(pdev, pos, &val);
+
+	fipc_set_reg0(_request, func_ret);
+
+	fipc_set_reg2(_request, val);
+
+fail_lookup:
+	return ret;
+}
+
+int pcie_get_minimum_link_callee(struct fipc_message *_request)
+{
+	enum pci_bus_speed speed;
+	enum pcie_link_width width;
+	int ret = 0;
+	int func_ret;
+	struct pci_dev_container *dev_container;
+	struct pci_dev *pdev;
+
+	ret = glue_cap_lookup_pci_dev_type(c_cspace,
+			__cptr(fipc_get_reg0(_request)),
+			&dev_container);
+
+	if (ret) {
+		LIBLCD_ERR("lookup");
+		goto fail_lookup;
+	}
+
+	pdev = dev_container->pdev;
+
+	speed = fipc_get_reg1(_request);
+	width = fipc_get_reg2(_request);
+
+	func_ret = pcie_get_minimum_link(pdev, &speed, &width);
+
+	fipc_set_reg0(_request, func_ret);
+
+fail_lookup:
+	return ret;
+}
+
+int pci_enable_device_mem_callee(struct fipc_message *_request)
+{
+	int ret = 0;
+	int func_ret;
+	struct pci_dev_container *dev_container;
+	struct pci_dev *pdev;
+
+	ret = glue_cap_lookup_pci_dev_type(c_cspace,
+			__cptr(fipc_get_reg0(_request)),
+			&dev_container);
+
+	if (ret) {
+		LIBLCD_ERR("lookup");
+		goto fail_lookup;
+	}
+
+	pdev = dev_container->pdev;
+
+	func_ret = pci_enable_device_mem(pdev);
+
+	fipc_set_reg0(_request, func_ret);
+
+fail_lookup:
+	return ret;
+}
+
+int pci_request_selected_regions_callee(struct fipc_message *_request)
+{
+	int type;
+	int ret = 0;
+	int func_ret;
+	struct pci_dev_container *dev_container;
+	struct pci_dev *pdev;
+
+	ret = glue_cap_lookup_pci_dev_type(c_cspace,
+			__cptr(fipc_get_reg0(_request)),
+			&dev_container);
+
+	if (ret) {
+		LIBLCD_ERR("lookup");
+		goto fail_lookup;
+	}
+
+	pdev = dev_container->pdev;
+
+	type = fipc_get_reg1(_request);
+
+	func_ret = pci_request_selected_regions(pdev,
+				type,
+				driver_name);
+
+	fipc_set_reg0(_request, func_ret);
+
+fail_lookup:
+	return ret;
+}
+
+int pci_request_selected_regions_exclusive_callee(struct fipc_message *_request)
+{
+	int type;
+	int ret = 0;
+	int func_ret;
+	struct pci_dev_container *dev_container;
+	struct pci_dev *pdev;
+
+	ret = glue_cap_lookup_pci_dev_type(c_cspace,
+			__cptr(fipc_get_reg0(_request)),
+			&dev_container);
+
+	if (ret) {
+		LIBLCD_ERR("lookup");
+		goto fail_lookup;
+	}
+
+	pdev = dev_container->pdev;
+
+	type = fipc_get_reg1(_request);
+
+	func_ret = pci_request_selected_regions_exclusive(pdev,
+				type,
+				driver_name);
+
+	fipc_set_reg0(_request, func_ret);
+
+fail_lookup:
+	return ret;
+}
+
+int pci_set_master_callee(struct fipc_message *_request)
+{
+	int ret = 0;
+	struct pci_dev_container *dev_container;
+	struct pci_dev *pdev;
+
+	ret = glue_cap_lookup_pci_dev_type(c_cspace,
+			__cptr(fipc_get_reg0(_request)),
+			&dev_container);
+
+	if (ret) {
+		LIBLCD_ERR("lookup");
+		goto fail_lookup;
+	}
+
+	pdev = dev_container->pdev;
+
+	pci_set_master(pdev);
+
+fail_lookup:
+	return ret;
+}
+
+int pci_save_state_callee(struct fipc_message *_request)
+{
+	int ret = 0;
+	int func_ret;
+	struct pci_dev_container *dev_container;
+	struct pci_dev *pdev;
+
+	ret = glue_cap_lookup_pci_dev_type(c_cspace,
+			__cptr(fipc_get_reg0(_request)),
+			&dev_container);
+
+	if (ret) {
+		LIBLCD_ERR("lookup");
+		goto fail_lookup;
+	}
+
+	pdev = dev_container->pdev;
+
+	func_ret = pci_save_state(pdev);
+
+	fipc_set_reg0(_request, func_ret);
+
+fail_lookup:
+	return ret;
+}
+
+int pci_release_selected_regions_callee(struct fipc_message *_request)
+{
+	int r;
+	int ret = 0;
+	struct pci_dev_container *dev_container;
+	struct pci_dev *pdev;
+
+	ret = glue_cap_lookup_pci_dev_type(c_cspace,
+			__cptr(fipc_get_reg0(_request)),
+			&dev_container);
+
+	if (ret) {
+		LIBLCD_ERR("lookup");
+		goto fail_lookup;
+	}
+
+	pdev = dev_container->pdev;
+
+	r = fipc_get_reg1(_request);
+	pci_release_selected_regions(pdev, r);
+
+fail_lookup:
+	return ret;
+}
+
+int pci_select_bars_callee(struct fipc_message *_request)
+{
+	unsigned long flags;
+	int ret = 0;
+	int func_ret;
+	struct pci_dev_container *dev_container;
+	struct pci_dev *pdev;
+
+	ret = glue_cap_lookup_pci_dev_type(c_cspace,
+			__cptr(fipc_get_reg0(_request)),
+			&dev_container);
+
+	if (ret) {
+		LIBLCD_ERR("lookup");
+		goto fail_lookup;
+	}
+
+	pdev = dev_container->pdev;
+
+	flags = fipc_get_reg1(_request);
+
+	func_ret = pci_select_bars(pdev, flags);
+
+	fipc_set_reg0(_request, func_ret);
+
+fail_lookup:
+	return ret;
+}
+
+int pci_wake_from_d3_callee(struct fipc_message *_request)
+{
+	bool enable;
+	int ret = 0;
+	int func_ret;
+	struct pci_dev_container *dev_container;
+	struct pci_dev *pdev;
+
+	ret = glue_cap_lookup_pci_dev_type(c_cspace,
+			__cptr(fipc_get_reg0(_request)),
+			&dev_container);
+
+	if (ret) {
+		LIBLCD_ERR("lookup");
+		goto fail_lookup;
+	}
+
+	pdev = dev_container->pdev;
+	enable = fipc_get_reg1(_request);
+
+	func_ret = pci_wake_from_d3(pdev, enable);
+
+	fipc_set_reg0(_request, func_ret);
+
+fail_lookup:
+	return ret;
+}
+
+int trigger_exit_to_lcd(struct thc_channel *_channel, enum dispatch_t disp)
+{
+	struct fipc_message r;
+	struct fipc_message *_request = &r;
+	INIT_IPC_MSG(&r);
+
+	async_msg_set_fn_type(_request,
+			disp);
+
+	/* No need to wait for a response here */
+	vmfunc_klcd_wrapper(_request, 1);
+
+	return 0;
+}
+
+irqreturn_t msix_vector_handler(int irq, void *data)
+{
+	struct fipc_message r;
+	struct fipc_message *_request = &r;
+	struct irqhandler_t_container *irqhandler_container;
+	irqreturn_t irqret;
+
+	INIT_IPC_MSG(&r);
+
+	WARN_ONCE(!irqs_disabled(),"irqs enabled in %s\n", __func__);
+
+	irqhandler_container = (struct irqhandler_t_container*) data;
+
+	async_msg_set_fn_type(_request, MSIX_IRQ_HANDLER);
+	fipc_set_reg0(_request, irq);
+
+	/* pass this irqhandler's other ref cptr */
+	fipc_set_reg1(_request, irqhandler_container->other_ref.cptr);
+
+#ifdef HANDLE_IRQ_LOCALLY
+	irqret = IRQ_HANDLED;
+//	napi_schedule_irqoff(napi_q0);
+#else
+#ifdef CONFIG_LCD_TRACE_BUFFER
+	add_trace_entry(EVENT_MSIX_HANDLER, async_msg_get_fn_type(_request));
+#endif
+	vmfunc_klcd_wrapper(_request, 1);
+
+	irqret = fipc_get_reg0(_request);
+#endif
+	return irqret;
+}
+
+struct irq_handler_data_map {
+	int irq;
+	struct irqhandler_t_container *irqhandler_data;
+}irq_map[32];
+
+int reg_irqs;
+
+int request_threaded_irq_callee(struct fipc_message *_request)
+{
+	int ret = 0;
+	int func_ret = 0;
+	int irq;
+	unsigned long flags;
+	struct irqhandler_t_container *irqhandler_container;
+	unsigned char *vector_name;
+
+	irqhandler_container = kzalloc(sizeof(struct irqhandler_t_container),
+					GFP_KERNEL);
+	if (!irqhandler_container) {
+		LIBLCD_ERR("kzalloc");
+		goto fail_alloc;
+	}
+	vector_name = kzalloc(IFNAMSIZ + 9, GFP_KERNEL);
+
+	if (!vector_name) {
+		LIBLCD_ERR("kzalloc");
+		goto fail_alloc;
+	}
+
+	irq = fipc_get_reg0(_request);
+	irqhandler_container->other_ref.cptr = fipc_get_reg1(_request);
+	flags = fipc_get_reg2(_request);
+
+	snprintf(vector_name, IFNAMSIZ + 9, "TxRx%d", irq);
+
+	LIBLCD_MSG("%s, request_threaded_irq for %d | name: %s",
+			__func__, irq, vector_name);
+
+	func_ret = request_threaded_irq(irq, msix_vector_handler,
+				NULL, flags,
+				vector_name, (void*) irqhandler_container);
+
+	irq_map[reg_irqs].irq = irq;
+	irq_map[reg_irqs].irqhandler_data = irqhandler_container;
+
+	reg_irqs++;
+	fipc_set_reg0(_request, func_ret);
+
+fail_alloc:
+	return ret;
+}
+
+int free_irq_callee(struct fipc_message *_request)
+{
+	unsigned 	int irq;
+	struct irqhandler_t_container *irqhandler_container = NULL;
+	int ret = 0;
+	int i;
+
+	irq = fipc_get_reg0(_request);
+
+	LIBLCD_MSG("%s, freeing irq %d", __func__, irq);
+
+	for (i = 0; i < 32; i++) {
+		if (irq_map[i].irq == irq) {
+			irqhandler_container = irq_map[i].irqhandler_data;
+			break;
+		}
+	}
+
+	if (!irqhandler_container)
+		printk("%s unable to retrieve container data for irq %d",
+				__func__, irq);
+	free_irq(irq, irqhandler_container);
+	reg_irqs--;
+
+	return ret;
+}
+
+int synchronize_irq_callee(struct fipc_message *_request)
+{
+	unsigned int irq;
+
+	irq = fipc_get_reg0(_request);
+
+	synchronize_irq(irq);
+
+	return 0;
+}
+
+

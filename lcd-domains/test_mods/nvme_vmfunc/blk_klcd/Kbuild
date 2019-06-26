@@ -14,6 +14,6 @@ cppflags-y += $(NONISOLATED_CFLAGS)
 
 #extra-y += glue/nvme_callee.lds
 
-#ldflags-y += -T $(LCD_TEST_MODULES_BUILD_DIR)/ixgbe_vmfunc/blk_klcd/glue/nvme_callee.lds
+#ldflags-y += -T $(LCD_TEST_MODULES_BUILD_DIR)/nvme_vmfunc/blk_klcd/glue/nvme_callee.lds
 
 ccflags-y += $(NONISOLATED_CFLAGS)

@@ -1,5 +1,5 @@
 /*
- * main.c - runs when ixgbe lcd boots
+ * main.c - runs when nvme lcd boots
  */
 
 #include <lcd_config/pre_hook.h>
@@ -12,15 +12,15 @@
 
 #include <lcd_config/post_hook.h>
 
-int ixgbe_init_module(void);
-void ixgbe_exit_module(void);
+int nvme_init_module(void);
+void nvme_exit_module(void);
 unsigned long loops_per_jiffy;
 
 static int nvme_lcd_init(void)
 {
 	int ret = 0;
 
-	printk("IXGBE LCD enter \n");
+	printk("NVME LCD enter \n");
 
 	ret = lcd_enter();
 
@@ -29,21 +29,21 @@ static int nvme_lcd_init(void)
 
 	/* loops_per_jiffy = lcd_get_boot_info()->cptrs[1].cptr; */
 
-	printk("ixgbe lpj %lu\n", loops_per_jiffy);
+	printk("nvme lpj %lu\n", loops_per_jiffy);
 	/*
-	 * Initialize ixgbe glue
+	 * Initialize nvme glue
 	 */
-	ret = glue_ixgbe_init();
+	ret = glue_nvme_init();
 
 	if (ret) {
-		LIBLCD_ERR("ixgbe init");
+		LIBLCD_ERR("nvme init");
 		goto fail2;
 	}
 
-	ret = ixgbe_init_module();
+	ret = nvme_init_module();
 
 	if (ret) {
-		LIBLCD_ERR("ixgbe register failed");
+		LIBLCD_ERR("nvme register failed");
 		goto fail3;
 	}
 	return ret;
@@ -63,9 +63,9 @@ static void nvme_lcd_exit(void)
 {
 	LIBLCD_MSG("%s: exiting", __func__);
 
-	ixgbe_exit_module();
+	nvme_exit_module();
 
-	glue_ixgbe_exit();
+	glue_nvme_exit();
 
 	lvd_exit(0);
 

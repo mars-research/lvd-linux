@@ -51,5 +51,5 @@ int nvme_init_module(void)
 
 void nvme_exit_module(void)
 {
-	pci_unregister_driver(&ixgbe_driver_container.pci_driver);
+	pci_unregister_driver(&nvme_driver_container.pci_driver);
 }

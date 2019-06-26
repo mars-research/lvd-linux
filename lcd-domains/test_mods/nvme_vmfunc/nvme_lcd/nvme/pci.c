@@ -77,7 +77,7 @@ MODULE_PARM_DESC(use_cmb_sqes, "use controller's memory buffer for I/O SQes");
 #ifndef LCD_ISOLATE
 static struct workqueue_struct *nvme_workq;
 #else
-#define queue_work(a, b)	do { } while(0)
+#define queue_work(a, b)	false
 #endif
 
 struct nvme_dev;

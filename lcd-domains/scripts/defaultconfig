@@ -77,3 +77,7 @@ ixgbe_vmfunc/net_klcd nonisolated
 nullb_vmfunc/boot nonisolated
 nullb_vmfunc/nullb_lcd isolated
 nullb_vmfunc/blk_klcd nonisolated
+
+nvme_vmfunc/boot nonisolated
+nvme_vmfunc/nvme_lcd isolated
+nvme_vmfunc/blk_klcd nonisolated

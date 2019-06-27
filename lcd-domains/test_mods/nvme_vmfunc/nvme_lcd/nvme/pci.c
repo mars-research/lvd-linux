@@ -11,9 +11,18 @@
  * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License for
  * more details.
  */
-
-#include <lcd_config/pre_hook.h>
+/*
+#ifdef LCD_ISOLATE
+#define spinlock_t lcd_spinlock_t
+//#define spinlock lcd_spinlock
+#endif
+*/
  
+ 
+#include <lcd_config/pre_hook.h>
+
+
+
 #include <linux/aer.h>
 #include <linux/bitops.h>
 #include <linux/blkdev.h>
@@ -65,7 +74,9 @@
 #define NVME_AQ_BLKMQ_DEPTH	(NVME_AQ_DEPTH - NVME_NR_AERS)
 
 static int use_threaded_interrupts;
+#ifndef LCD_ISOLATE
 module_param(use_threaded_interrupts, int, 0);
+#endif
 
 static bool use_cmb_sqes = true;
 
@@ -86,6 +97,9 @@ struct nvme_queue;
 static int nvme_reset(struct nvme_dev *dev);
 static void nvme_process_cq(struct nvme_queue *nvmeq);
 static void nvme_dev_disable(struct nvme_dev *dev, bool shutdown);
+
+/* global instance of device struct */
+struct nvme_dev g_nvme_dev*;
 
 /*
  * Represents an NVM Express device.  Each nvme_dev is a PCI function.
@@ -131,7 +145,11 @@ struct nvme_queue {
 	struct device *q_dmadev;
 	struct nvme_dev *dev;
 	char irqname[24];	/* nvme4294967295-65535\0 */
+#ifndef LCD_ISOLATE
 	spinlock_t q_lock;
+#else
+    lcd_spinlock_t q_lock;
+#endif
 	struct nvme_command *sq_cmds;
 	struct nvme_command __iomem *sq_cmds_io;
 	volatile struct nvme_completion *cqes;
@@ -895,8 +913,11 @@ static enum blk_eh_timer_return nvme_timeout(struct request *req, bool reserved)
 			 "I/O %d QID %d timeout, reset controller\n",
 			 req->tag, nvmeq->qid);
 		nvme_dev_disable(dev, false);
+#ifndef LCD_ISOLATE
 		queue_work(nvme_workq, &dev->reset_work);
-
+#else
+        dev->reset_work(NULL);
+#endif
 		/*
 		 * Mark the request as handled, since the inline shutdown
 		 * forces all outstanding requests to complete.
@@ -1698,7 +1719,7 @@ static void nvme_dev_disable(struct nvme_dev *dev, bool shutdown)
 	int i;
 	u32 csts = -1;
 
-	del_timer_sync(&dev->watchdog_timer);
+	//del_timer_sync(&dev->watchdog_timer);
 
 	mutex_lock(&dev->shutdown_lock);
 	if (pci_is_enabled(to_pci_dev(dev->dev))) {
@@ -1776,7 +1797,11 @@ static void nvme_remove_dead_ctrl(struct nvme_dev *dev, int status)
 
 static void nvme_reset_work(struct work_struct *work)
 {
+#ifndef LCD_ISOLATE
 	struct nvme_dev *dev = container_of(work, struct nvme_dev, reset_work);
+#else
+    struct nvme_dev *dev = g_nvme_dev;
+#endif
 	int result = -ENODEV;
 
 	if (WARN_ON(dev->ctrl.state == NVME_CTRL_RESETTING))
@@ -1822,7 +1847,10 @@ static void nvme_reset_work(struct work_struct *work)
 	if (dev->online_queues > 1)
 		nvme_queue_async_events(&dev->ctrl);
 
-	mod_timer(&dev->watchdog_timer, round_jiffies(jiffies + HZ));
+    /* TODO: fix the watchdog timer
+     *
+     */
+	//mod_timer(&dev->watchdog_timer, round_jiffies(jiffies + HZ));
 
 	/*
 	 * Keep the controller around but remove all namespaces if we don't have
@@ -1947,6 +1975,9 @@ static int nvme_probe(struct pci_dev *pdev, const struct pci_device_id *id)
 		goto free;
 
 	dev->dev = get_device(&pdev->dev);
+    
+    g_dev = dev;
+    
 	pci_set_drvdata(pdev, dev);
 
 	result = nvme_dev_map(dev);

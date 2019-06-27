@@ -144,6 +144,43 @@ int pci_cleanup_aer_uncorrect_error_status(struct pci_dev *dev)
 	return func_ret;
 }
 
+void pci_disable_device(struct pci_dev *dev)
+{
+	struct fipc_message r;
+	struct fipc_message *_request = &r;
+	struct pci_dev_container *device_container;
+
+	INIT_IPC_MSG(&r);
+	device_container = container_of(dev,
+				struct pci_dev_container,
+				pci_dev);
+
+	async_msg_set_fn_type(_request, PCI_DISABLE_DEVICE);
+	fipc_set_reg0(_request, device_container->other_ref.cptr);
+
+	vmfunc_wrapper(_request);
+
+	return;
+}
+
+void pci_disable_msix(struct pci_dev *dev)
+{
+	struct fipc_message r;
+	struct fipc_message *_request = &r;
+	struct pci_dev_container *device_container;
+	INIT_IPC_MSG(&r);
+
+	device_container = container_of(dev,
+				struct pci_dev_container,
+				pci_dev);
+
+	async_msg_set_fn_type(_request, PCI_DISABLE_MSIX);
+	fipc_set_reg0(_request, device_container->other_ref.cptr);
+	vmfunc_wrapper(_request);
+
+	return;
+}
+
 int pci_disable_pcie_error_reporting(struct pci_dev *dev)
 {
 	struct fipc_message r;
@@ -163,6 +200,229 @@ int pci_disable_pcie_error_reporting(struct pci_dev *dev)
 
 	func_ret = fipc_get_reg0(_request);
 
+	return func_ret;
+}
+
+int pci_enable_device_mem(struct pci_dev *dev)
+{
+	int func_ret = 0;
+	struct fipc_message r;
+	struct fipc_message *_request = &r;
+	struct pci_dev_container *device_container;
+
+	INIT_IPC_MSG(&r);
+	device_container = container_of(dev,
+				struct pci_dev_container,
+				pci_dev);
+
+	async_msg_set_fn_type(_request, PCI_ENABLE_DEVICE_MEM);
+	fipc_set_reg0(_request, device_container->other_ref.cptr);
+
+	vmfunc_wrapper(_request);
+
+	func_ret = fipc_get_reg0(_request);
+
+	return func_ret;
+}
+
+int pci_enable_msix_range(struct pci_dev *dev, struct msix_entry *entries, int minvec, int maxvec)
+{
+	struct fipc_message r;
+	struct fipc_message *_request = &r;
+	int func_ret;
+	int sync_ret;
+	unsigned 	long p_mem_sz;
+	unsigned 	long p_offset;
+	cptr_t p_cptr;
+	struct pci_dev_container *device_container;
+	INIT_IPC_MSG(&r);
+
+	device_container = container_of(dev,
+				struct pci_dev_container,
+				pci_dev);
+
+	async_msg_set_fn_type(_request, PCI_ENABLE_MSIX_RANGE);
+
+	fipc_set_reg0(_request, minvec);
+	fipc_set_reg1(_request, maxvec);
+
+	sync_ret = lcd_virt_to_cptr(__gva(( unsigned  long )entries),
+		&p_cptr,
+		&p_mem_sz,
+		&p_offset);
+
+	if (sync_ret) {
+		LIBLCD_ERR("virt to cptr failed");
+		lcd_exit(-1);
+	}
+
+	fipc_set_reg2(_request, ilog2((p_mem_sz) >> (PAGE_SHIFT)));
+	fipc_set_reg3(_request, p_offset);
+	fipc_set_reg4(_request, cptr_val(p_cptr));
+	fipc_set_reg5(_request, device_container->other_ref.cptr);
+
+	vmfunc_wrapper(_request);
+
+	func_ret = fipc_get_reg0(_request);
+
+	return func_ret;
+}
+
+int __must_check __pci_register_driver(struct pci_driver *drv,
+		struct module *owner,
+		const char* name)
+{
+	struct pci_driver_container *drv_container;
+	struct module_container *owner_container;
+	struct fipc_message r;
+	struct fipc_message *_request = &r;
+	int ret;
+	int func_ret;
+	INIT_IPC_MSG(&r);
+
+	drv_container = container_of(drv,
+		struct pci_driver_container,
+		pci_driver);
+	ret = glue_cap_insert_pci_driver_type(c_cspace,
+		drv_container,
+		&drv_container->my_ref);
+	if (ret) {
+		LIBLCD_ERR("lcd insert");
+		goto fail_insert;
+	}
+	owner_container = container_of(owner,
+		struct module_container,
+		module);
+	ret = glue_cap_insert_module_type(c_cspace,
+		owner_container,
+		&owner_container->my_ref);
+	if (ret) {
+		LIBLCD_ERR("lcd insert");
+		goto fail_insert;
+	}
+
+	async_msg_set_fn_type(_request,
+			__PCI_REGISTER_DRIVER);
+	fipc_set_reg0(_request, drv_container->my_ref.cptr);
+	fipc_set_reg1(_request, owner_container->my_ref.cptr);
+
+	vmfunc_wrapper(_request);
+
+	drv_container->other_ref.cptr = fipc_get_reg1(_request);
+	owner_container->other_ref.cptr = fipc_get_reg2(_request);
+	drv_container->pci_driver.driver.owner = &owner_container->module;
+	func_ret = fipc_get_reg3(_request);
+
+	LIBLCD_MSG("%s returned %d", __func__, func_ret);
+
+	return func_ret;
+
+fail_insert:
+	return ret;
+}
+
+void pci_set_master(struct pci_dev *dev)
+{
+	struct fipc_message r;
+	struct fipc_message *_request = &r;
+	struct pci_dev_container *device_container;
+
+	INIT_IPC_MSG(&r);
+	device_container = container_of(dev,
+				struct pci_dev_container,
+				pci_dev);
+	async_msg_set_fn_type(_request, PCI_SET_MASTER);
+	fipc_set_reg0(_request, device_container->other_ref.cptr);
+
+	vmfunc_wrapper(_request);
+
+	return;
+}
+
+int pci_save_state(struct pci_dev *dev)
+{
+	struct fipc_message r;
+	struct fipc_message *_request = &r;
+	int func_ret;
+	struct pci_dev_container *device_container;
+
+	INIT_IPC_MSG(&r);
+	device_container = container_of(dev,
+				struct pci_dev_container,
+				pci_dev);
+	async_msg_set_fn_type(_request, PCI_SAVE_STATE);
+	fipc_set_reg0(_request, device_container->other_ref.cptr);
+
+	vmfunc_wrapper(_request);
+
+	func_ret = fipc_get_reg0(_request);
+
+	return func_ret;
+}
+
+void pci_release_selected_regions(struct pci_dev *dev, int r)
+{
+	struct fipc_message req;
+	struct fipc_message *_request = &req;
+	struct pci_dev_container *device_container;
+
+	device_container = container_of(dev,
+				struct pci_dev_container,
+				pci_dev);
+
+	async_msg_set_fn_type(_request, PCI_RELEASE_SELECTED_REGIONS);
+	fipc_set_reg0(_request, device_container->other_ref.cptr);
+	fipc_set_reg1(_request, r);
+
+	vmfunc_wrapper(_request);
+
+	return;
+}
+
+int pci_request_selected_regions(struct pci_dev *dev,
+		int type,
+		const char *reg)
+{
+	struct fipc_message r;
+	struct fipc_message *_request = &r;
+	int func_ret;
+	struct pci_dev_container *device_container;
+
+	INIT_IPC_MSG(&r);
+	device_container = container_of(dev,
+				struct pci_dev_container,
+				pci_dev);
+
+	async_msg_set_fn_type(_request, PCI_REQUEST_SELECTED_REGIONS);
+	fipc_set_reg0(_request, device_container->other_ref.cptr);
+	fipc_set_reg1(_request, type);
+
+	vmfunc_wrapper(_request);
+
+	func_ret = fipc_get_reg0(_request);
+
+	return func_ret;
+}
+
+int pci_select_bars(struct pci_dev *dev, unsigned long flags)
+{
+	struct fipc_message r;
+	struct fipc_message *_request = &r;
+	int func_ret = 0;
+	struct pci_dev_container *device_container;
+
+	INIT_IPC_MSG(&r);
+	device_container = container_of(dev,
+				struct pci_dev_container,
+				pci_dev);
+
+	async_msg_set_fn_type(_request, PCI_SELECT_BARS);
+	fipc_set_reg0(_request, device_container->other_ref.cptr);
+	fipc_set_reg1(_request, flags);
+
+	vmfunc_wrapper(_request);
+
+	func_ret = fipc_get_reg0(_request);
 	return func_ret;
 }
 
@@ -268,6 +528,27 @@ void blk_mq_free_tag_set(struct blk_mq_tag_set *set)
 
 	glue_cap_remove(c_cspace, set_container->my_ref);
 	glue_cap_remove(c_cspace, ops_container->my_ref);
+	return;
+}
+
+void pci_unregister_driver(struct pci_driver *drv)
+{
+	struct pci_driver_container *drv_container;
+	struct fipc_message r;
+	struct fipc_message *_request = &r;
+	INIT_IPC_MSG(&r);
+
+	drv_container = container_of(drv,
+		struct pci_driver_container,
+		pci_driver);
+
+	async_msg_set_fn_type(_request, PCI_UNREGISTER_DRIVER);
+	fipc_set_reg0(_request, drv_container->other_ref.cptr);
+
+	vmfunc_wrapper(_request);
+
+	glue_cap_remove(c_cspace, drv_container->my_ref);
+
 	return;
 }
 

@@ -50,6 +50,44 @@ void glue_nullb_exit(void)
 	glue_cap_exit();
 }
 
+struct request * TODO_nvme_alloc_request(struct request_queue *q,
+		struct nvme_command *cmd, unsigned int flags)
+{
+    struct request_queue_container *rq_container;
+    struct nvme_command_container *cmd_container;
+    struct request *ret = NULL;
+    struct fipc_message r;
+	struct fipc_message *request = &r;
+    
+    rq_container = container_of(q, struct request_queue_container,
+						request_queue);
+    cmd_container = container_of(cmd, struct nvme_command_container,
+						cmd);
+                        
+    async_msg_set_fn_type(request, NVME_ALLOC_REQUEST);
+    
+    return ret;
+}
+
+int TODO_nvme_setup_cmd(struct nvme_ns *ns, struct request *req,
+		struct nvme_command *cmd)
+{
+    struct nvme_ns_container *ns_container;
+    struct lcd_request_container *req_container;
+    struct nvme_command_container *cmd_container;
+	struct fipc_message r;
+	struct fipc_message *request = &r;
+    
+    ns_container = container_of(ns, struct nvme_ns_container, nvme_ns);
+    req_container = container_of(req, struct lcd_request_container, rq);
+    cmd_container = container_of(cmd, struct nvme_command_container, cmd);
+    
+    vmfunc_wrapper(request);
+    
+    return 0;
+    
+}
+
 int blk_mq_alloc_tag_set(struct blk_mq_tag_set *set)
 {
 	struct blk_mq_tag_set_container *set_container;
@@ -98,6 +136,24 @@ int blk_mq_alloc_tag_set(struct blk_mq_tag_set *set)
 fail_insert1:
 fail_insert2:
 	return func_ret;
+}
+
+void blk_mq_complete_request(struct request *rq, int error)
+{
+    struct lcd_request_container *rq_container;
+    struct fipc_message r;
+	struct fipc_message *request = &r;
+    
+    rq_container = container_of(rq, struct lcd_request_container, rq);
+    
+    async_msg_set_fn_type(request, BLK_MQ_COMPLETE_REQUEST);
+    fipc_set_reg0(request, rq->tag);
+    fipc_set_reg1(request, error);
+    
+    vmfunc_wrapper(request);
+    
+    return;
+    
 }
 
 int pci_enable_pcie_error_reporting(struct pci_dev *dev)
@@ -446,10 +502,10 @@ struct request_queue *blk_mq_init_queue(struct blk_mq_tag_set *set)
 
 	ret = glue_cap_insert_request_queue_type(c_cspace, rq_container, &rq_container->my_ref);
 
-        if (ret) {
-		LIBLCD_ERR("lcd insert");
-                goto fail_insert;
-        }
+    if (ret) {
+    LIBLCD_ERR("lcd insert");
+            goto fail_insert;
+    }
 	
 	set_container = container_of(set, struct blk_mq_tag_set_container, tag_set);
 
@@ -604,23 +660,21 @@ void blk_queue_logical_block_size(struct request_queue *rq, unsigned short size)
 	return;
 }
 
-void blk_queue_physical_block_size(struct request_queue *rq, unsigned int size)
+
+void _TODO_blk_execute_rq_nowait(struct request_queue *q, struct gendisk *bd_disk,
+			   struct request *rq, int at_head,
+			   rq_end_io_fn *done)
 {
-	struct fipc_message r;
+    struct fipc_message r;
 	struct fipc_message *request = &r;
-	struct request_queue_container *rq_container;
-
-	rq_container = container_of(rq, struct request_queue_container,
-					request_queue);
-	async_msg_set_fn_type(request, BLK_QUEUE_PHYSICAL_BLOCK_SIZE);
-
-	fipc_set_reg0(request, size);
-	fipc_set_reg1(request, rq_container->other_ref.cptr);
-
-	vmfunc_wrapper(request);
-
-	return;
+    
+    
+    async_msg_set_fn_type(request, BLK_EXECUTE_RQ_NOWAIT);
+    
+    vmfunc_wrapper(request);
+    
 }
+
 
 struct gendisk *alloc_disk_node(int minors, int node_id) 
 {

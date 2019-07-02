@@ -202,6 +202,8 @@ void glue_blk_exit(void)
 	iocb_data_pool_free();
 }
 
+
+
 int blk_mq_init_queue_callee(struct fipc_message *request)
 {
 	struct request_queue *rq;
@@ -305,6 +307,20 @@ int blk_mq_start_request_callee(struct fipc_message *request)
 	blk_mq_start_request(rq);
 
 	return ret;
+}
+
+int blk_mq_complete_request_callee(struct fipc_message *request)
+{
+    struct request *rq;
+	int ret = 0;
+    int error;
+	int tag = fipc_get_reg0(request);
+    rq = rq_map[tag];
+    error = fipc_get_reg1(request);
+    
+    blk_mq_complete_request(rq, error);
+    
+    return ret;
 }
 
 int blk_mq_map_queue_callee(struct fipc_message *request)
@@ -529,15 +545,15 @@ int unregister_blkdev_callee(struct fipc_message *request)
 int blk_cleanup_queue_callee(struct fipc_message *request)
 {
 	struct request_queue_container *rq_container;
-        int ret = 0; 
+    int ret = 0; 
 
-        ret = glue_cap_lookup_request_queue_type(c_cspace,
-					__cptr(fipc_get_reg0(request)),
-                                        &rq_container);
-        if (ret) {
-                 LIBLCD_ERR("lookup");
-                 goto fail_lookup;
-        }
+    ret = glue_cap_lookup_request_queue_type(c_cspace,
+                __cptr(fipc_get_reg0(request)),
+                                    &rq_container);
+    if (ret) {
+             LIBLCD_ERR("lookup");
+             goto fail_lookup;
+    }
 
 	blk_cleanup_queue(&rq_container->request_queue);
 
@@ -639,7 +655,9 @@ int init_request(void *data, struct request *req, unsigned int hctx_idx,
 		init_done = 1;
 	}
 
-	rq_map[rq_idx] = req;
+	
+    
+    rq_map[rq_idx] = req;
 	printk("init_request: req %p req->tag %d rq_idx %d \n",req, req->tag, rq_idx);
 	return 0;	
 }
@@ -986,10 +1004,10 @@ int blk_mq_alloc_tag_set_callee(struct fipc_message *request)
 	err = set_memory_x(((unsigned long)queue_rq_async_hidden_args->t_handle) & PAGE_MASK,
                         ALIGN(LCD_TRAMPOLINE_SIZE(queue_rq_async_fn_trampoline),
                                 PAGE_SIZE) >> PAGE_SHIFT);
-        if (err) {
-                LIBLCD_ERR("set mem nx");
-                goto fail_x_async;
-        }
+    if (err) {
+            LIBLCD_ERR("set mem nx");
+            goto fail_x_async;
+    }
 
 	/* init request */
 	ops_container->blk_mq_ops.init_request = init_request;
@@ -1014,10 +1032,10 @@ int blk_mq_alloc_tag_set_callee(struct fipc_message *request)
 	err = set_memory_x(((unsigned long)map_queue_hidden_args->t_handle) & PAGE_MASK,
                         ALIGN(LCD_TRAMPOLINE_SIZE(map_queue_fn_trampoline),
                                 PAGE_SIZE) >> PAGE_SHIFT);
-        if (err) {
-                LIBLCD_ERR("set mem nx");
-                goto fail_x2;
-        }
+    if (err) {
+            LIBLCD_ERR("set mem nx");
+            goto fail_x2;
+    }
 
 	init_hctx_hidden_args = kzalloc(sizeof( *init_hctx_hidden_args ), GFP_KERNEL);
 	if (!init_hctx_hidden_args) {
@@ -1036,13 +1054,13 @@ int blk_mq_alloc_tag_set_callee(struct fipc_message *request)
 	ops_container->blk_mq_ops.init_hctx = LCD_HANDLE_TO_TRAMPOLINE(init_hctx_hidden_args->t_handle);
 
 	printk("init_hctx in setup %p \n",ops_container->blk_mq_ops.init_hctx);
-        err = set_memory_x(((unsigned long)init_hctx_hidden_args->t_handle) & PAGE_MASK,
-                        ALIGN(LCD_TRAMPOLINE_SIZE(init_hctx_fn_trampoline),
-                                PAGE_SIZE) >> PAGE_SHIFT);
-        if (err) {
-                LIBLCD_ERR("set mem nx");
-                goto fail_x3;
-        }
+    err = set_memory_x(((unsigned long)init_hctx_hidden_args->t_handle) & PAGE_MASK,
+                    ALIGN(LCD_TRAMPOLINE_SIZE(init_hctx_fn_trampoline),
+                            PAGE_SIZE) >> PAGE_SHIFT);
+    if (err) {
+            LIBLCD_ERR("set mem nx");
+            goto fail_x3;
+    }
 
 	sirq_done_hidden_args = kzalloc(sizeof( *sirq_done_hidden_args ), GFP_KERNEL);
 	if (!sirq_done_hidden_args) {
@@ -1160,12 +1178,12 @@ int device_add_disk_callee(struct fipc_message *request)
 		goto fail_lookup1;
 	}
 
-       	ret = glue_cap_lookup_request_queue_type(c_cspace, __cptr(fipc_get_reg3(request)),
-                                        &rq_container);
-        if(ret) {
-                 LIBLCD_ERR("lookup");
-                 goto fail_lookup2;
-        }
+    ret = glue_cap_lookup_request_queue_type(c_cspace, __cptr(fipc_get_reg3(request)),
+                                    &rq_container);
+    if(ret) {
+             LIBLCD_ERR("lookup");
+             goto fail_lookup2;
+    }
  
 	blo_container = kzalloc(sizeof(*blo_container), GFP_KERNEL);
 	if(!blo_container) {
@@ -1189,31 +1207,31 @@ int device_add_disk_callee(struct fipc_message *request)
 
 	module_container->other_ref.cptr = fipc_get_reg2(request);
 	
-        /*
-         * Some special module inits required:
-         *
-         *   -- module refcnt = reference count (changed to atomic, no
-	 *   percpu alloc needed as in 3.12 (pmfs))
-         *   -- module state = MODULE_STATE_LIVE
-         *   -- module name = "pmfs"
-         *
-         * These are normally done by the module loader. But since we
-         * are creating our own struct module instance, we need to do
-         * the initialization ourselves.
-         */
-        module_container->module.state = MODULE_STATE_LIVE;
+    /*
+     * Some special module inits required:
+     *
+     *   -- module refcnt = reference count (changed to atomic, no
+     *   percpu alloc needed as in 3.12 (pmfs))
+     *   -- module state = MODULE_STATE_LIVE
+     *   -- module name = "pmfs"
+     *
+     * These are normally done by the module loader. But since we
+     * are creating our own struct module instance, we need to do
+     * the initialization ourselves.
+     */
+    module_container->module.state = MODULE_STATE_LIVE;
 	
 	/* without this add_disk will fail */
 	atomic_inc(&module_container->module.refcnt);
 
-        strcpy(module_container->module.name, "nullb");
+    strcpy(module_container->module.name, "nullb");
 
 	ret = glue_cap_insert_module_type( c_cspace, module_container,
 			&module_container->my_ref);
-        if (ret) {
-                LIBLCD_ERR("insert");
-                goto fail_insert2;
-        }
+    if (ret) {
+            LIBLCD_ERR("insert");
+            goto fail_insert2;
+    }
 
 	/* setup the fops */	
 	blo_container->block_device_operations.owner = &module_container->module;

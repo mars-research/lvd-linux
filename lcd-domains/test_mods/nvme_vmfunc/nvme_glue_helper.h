@@ -10,6 +10,7 @@
 #include <linux/rtnetlink.h>
 #include <linux/blkdev.h>
 #include <linux/blk-mq.h>
+#include "nvme.h"
 
 struct device_container {
 	struct device device;
@@ -43,39 +44,6 @@ struct pci_driver_container {
 	struct cptr my_ref;
 };
 
-
-
-
-
-#if 0
-struct sk_buff_container_2 {
-	/* just store the pointer */
-	struct sk_buff skb;
-	/* for hashtable insertion */
-	struct cptr other_ref;
-	struct cptr my_ref;
-};
-
-
-struct sk_buff_container {
-	/* just store the pointer */
-	struct sk_buff *skb;
-	/* store the order when volunteered. comes handy during unmap */
-	unsigned int skb_ord, skbd_ord;
-	cptr_t skb_cptr, skbh_cptr;
-	/*
-	 * as head, data pointer is different in LCD and KLCD, store it
-	 * while crossing the boundary
-	 */
-	unsigned char *head, *data;
-	/* for hashtable insertion */
-	struct hlist_node hentry;
-	struct cptr other_ref;
-	struct cptr my_ref;
-	struct task_struct *tsk;
-	void *channel;
-};
-#endif
 
 
 
@@ -162,6 +130,34 @@ struct request_queue_container {
 };
 
 
+/*
+struct nvme_dev_container {
+    struct nvme_dev nvme_dev;
+    cptr_t other_ref;
+    cptr_t my_ref;
+}
+
+struct nvme_cmd_container {
+    struct nvme_cmd nvme_cmd;
+    cptr_t other_ref;
+    cptr_t my_ref;
+}
+*/
+struct nvme_ns_container {
+    struct nvme_ns nvme_ns;
+    cptr_t other_ref;
+    cptr_t my_ref;
+};
+struct nvme_ctrl_container {
+    struct nvme_ctrl nvme_ctrl;
+    cptr_t other_ref;
+    cptr_t my_ref;
+};
+struct nvme_command_container {
+    struct nvme_command cmd;
+    cptr_t other_ref;
+    cptr_t my_ref;
+};
 
 int glue_cap_insert_device_type(struct glue_cspace *cspace,
 		struct device_container *device_container,

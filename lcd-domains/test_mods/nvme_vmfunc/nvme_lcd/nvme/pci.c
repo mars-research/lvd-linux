@@ -99,7 +99,7 @@ static void nvme_process_cq(struct nvme_queue *nvmeq);
 static void nvme_dev_disable(struct nvme_dev *dev, bool shutdown);
 
 /* global instance of device struct */
-struct nvme_dev g_nvme_dev*;
+struct nvme_dev *g_nvme_dev;
 
 /*
  * Represents an NVM Express device.  Each nvme_dev is a PCI function.
@@ -873,12 +873,19 @@ static void abort_endio(struct request *req, int error)
 {
 	struct nvme_iod *iod = blk_mq_rq_to_pdu(req);
 	struct nvme_queue *nvmeq = iod->nvmeq;
+#ifndef LCD_ISOLATE
 	u16 status = req->errors;
+    dev_warn(nvmeq->dev->ctrl.device, "Abort status: 0x%x", status);
+#endif
 
-	dev_warn(nvmeq->dev->ctrl.device, "Abort status: 0x%x", status);
+	
 	atomic_inc(&nvmeq->dev->ctrl.abort_limit);
 	blk_mq_free_request(req);
 }
+
+#ifdef LCD_ISOLATE
+static void nvme_reset_work(struct work_struct *work);
+#endif
 
 static enum blk_eh_timer_return nvme_timeout(struct request *req, bool reserved)
 {
@@ -916,7 +923,7 @@ static enum blk_eh_timer_return nvme_timeout(struct request *req, bool reserved)
 #ifndef LCD_ISOLATE
 		queue_work(nvme_workq, &dev->reset_work);
 #else
-        dev->reset_work(NULL);
+        nvme_reset_work(NULL);
 #endif
 		/*
 		 * Mark the request as handled, since the inline shutdown
@@ -1283,6 +1290,8 @@ static int nvme_configure_admin_queue(struct nvme_dev *dev)
 	return result;
 }
 
+//This needs to be commented out or it complains that it's not used
+#ifndef LCD_ISOLATE
 static bool nvme_should_reset(struct nvme_dev *dev, u32 csts)
 {
 
@@ -1309,6 +1318,7 @@ static bool nvme_should_reset(struct nvme_dev *dev, u32 csts)
 
 	return true;
 }
+#endif
 
 #ifndef LCD_ISOLATE
 static void nvme_watchdog_timer(unsigned long data)
@@ -1530,17 +1540,17 @@ static void nvme_del_cq_end(struct request *req, int error)
 	struct nvme_queue *nvmeq = req->end_io_data;
 
 	if (!error) {
-		unsigned long flags;
+		//unsigned long flags;
 
 		/*
 		 * We might be called with the AQ q_lock held
 		 * and the I/O queue q_lock should always
 		 * nest inside the AQ one.
 		 */
-		spin_lock_irqsave_nested(&nvmeq->q_lock, flags,
-					SINGLE_DEPTH_NESTING);
+        // TODO: Get the irqsave variants working
+		spin_lock(&nvmeq->q_lock);
 		nvme_process_cq(nvmeq);
-		spin_unlock_irqrestore(&nvmeq->q_lock, flags);
+		spin_unlock(&nvmeq->q_lock);
 	}
 
 	nvme_del_queue_end(req, error);
@@ -1736,7 +1746,7 @@ static void nvme_dev_disable(struct nvme_dev *dev, bool shutdown)
 		 * queue_count can be 0 here.
 		 */
 		if (dev->queue_count)
-			nvme_suspend_queue(dev->queues[0]);
+			 nvme_suspend_queue(dev->queues[0]);
 	} else {
 		nvme_disable_io_queues(dev);
 		nvme_disable_admin_queue(dev, shutdown);
@@ -1785,14 +1795,33 @@ static void nvme_pci_free_ctrl(struct nvme_ctrl *ctrl)
 	kfree(dev);
 }
 
+static void nvme_remove_dead_ctrl_work(struct work_struct *work)
+{
+#ifndef LCD_ISOLATE
+	struct nvme_dev *dev = container_of(work, struct nvme_dev, remove_work);
+#else
+    struct nvme_dev *dev = g_nvme_dev;
+#endif
+	struct pci_dev *pdev = to_pci_dev(dev->dev);
+
+	nvme_kill_queues(&dev->ctrl);
+	if (pci_get_drvdata(pdev))
+		device_release_driver(&pdev->dev);
+	nvme_put_ctrl(&dev->ctrl);
+}
+
 static void nvme_remove_dead_ctrl(struct nvme_dev *dev, int status)
 {
 	dev_warn(dev->ctrl.device, "Removing after probe failure status: %d\n", status);
 
 	kref_get(&dev->ctrl.kref);
 	nvme_dev_disable(dev, false);
-	if (!schedule_work(&dev->remove_work))
+#ifdef LCD_ISOLATE
+    nvme_remove_dead_ctrl_work(NULL);
+#else	
+    if (!schedule_work(&dev->remove_work))
 		nvme_put_ctrl(&dev->ctrl);
+#endif
 }
 
 static void nvme_reset_work(struct work_struct *work)
@@ -1878,24 +1907,16 @@ static void nvme_reset_work(struct work_struct *work)
 	nvme_remove_dead_ctrl(dev, result);
 }
 
-static void nvme_remove_dead_ctrl_work(struct work_struct *work)
-{
-	struct nvme_dev *dev = container_of(work, struct nvme_dev, remove_work);
-	struct pci_dev *pdev = to_pci_dev(dev->dev);
 
-	nvme_kill_queues(&dev->ctrl);
-	if (pci_get_drvdata(pdev))
-		device_release_driver(&pdev->dev);
-	nvme_put_ctrl(&dev->ctrl);
-}
 
 static int nvme_reset(struct nvme_dev *dev)
 {
 	if (!dev->ctrl.admin_q || blk_queue_dying(dev->ctrl.admin_q))
 		return -ENODEV;
 
-	if (!queue_work(nvme_workq, &dev->reset_work))
-		return -EBUSY;
+	//if (!queue_ work(nvme_workq, &dev->reset_work))
+	//	return -EBUSY;
+    nvme_reset_work(NULL);
 
 	flush_work(&dev->reset_work);
 	return 0;
@@ -1976,7 +1997,7 @@ static int nvme_probe(struct pci_dev *pdev, const struct pci_device_id *id)
 
 	dev->dev = get_device(&pdev->dev);
     
-    g_dev = dev;
+    g_nvme_dev = dev;
     
 	pci_set_drvdata(pdev, dev);
 
@@ -1989,7 +2010,7 @@ static int nvme_probe(struct pci_dev *pdev, const struct pci_device_id *id)
 	//setup_timer(&dev->watchdog_timer, nvme_watchdog_timer,
 	//	(unsigned long)dev);
 	mutex_init(&dev->shutdown_lock);
-	init_completion(&dev->ioq_wait);
+	//init_completion(&dev->ioq_wait);
 
 	result = nvme_setup_prp_pools(dev);
 	if (result)
@@ -2002,7 +2023,8 @@ static int nvme_probe(struct pci_dev *pdev, const struct pci_device_id *id)
 
 	dev_info(dev->ctrl.device, "pci function %s\n", dev_name(&pdev->dev));
 
-	queue_work(nvme_workq, &dev->reset_work);
+	//queue_ work(nvme_workq, &dev->reset_work);
+    nvme_reset_work(NULL);
 	return 0;
 
  release_pools:
@@ -2024,7 +2046,12 @@ static void nvme_reset_notify(struct pci_dev *pdev, bool prepare)
 	if (prepare)
 		nvme_dev_disable(dev, false);
 	else
-		queue_work(nvme_workq, &dev->reset_work);
+#ifndef LCD_ISOLATE
+    queue_work(nvme_workq, &dev->reset_work);
+#else
+    nvme_reset_work(NULL);
+#endif
+		
 }
 
 static void nvme_shutdown(struct pci_dev *pdev)
@@ -2090,10 +2117,16 @@ static int nvme_suspend(struct device *dev)
 
 static int nvme_resume(struct device *dev)
 {
-	struct pci_dev *pdev = to_pci_dev(dev);
-	struct nvme_dev *ndev = pci_get_drvdata(pdev);
+	
+	
 
+#ifndef LCD_ISOLATE
+    struct pci_dev *pdev = to_pci_dev(dev);
+    struct nvme_dev *ndev = pci_get_drvdata(pdev);
 	queue_work(nvme_workq, &ndev->reset_work);
+#else
+    nvme_reset_work(NULL);
+#endif
 	return 0;
 }
 #endif
@@ -2128,11 +2161,17 @@ static pci_ers_result_t nvme_error_detected(struct pci_dev *pdev,
 
 static pci_ers_result_t nvme_slot_reset(struct pci_dev *pdev)
 {
-	struct nvme_dev *dev = pci_get_drvdata(pdev);
-
-	dev_info(dev->ctrl.device, "restart after slot reset\n");
+#ifndef LCD_ISOLATE
+	struct  nvme_dev *dev = pci_get_drvdata(pdev);
+    dev_info(dev->ctrl.device, "restart after slot reset\n");
+#endif
+	
 	pci_restore_state(pdev);
+#ifndef LCD_ISOLATE
 	queue_work(nvme_workq, &dev->reset_work);
+#else
+    nvme_reset_work(NULL);
+#endif
 	return PCI_ERS_RESULT_RECOVERED;
 }
 
@@ -2192,14 +2231,16 @@ static int __init nvme_init(void)
 #endif
 {
 	int result;
-
+#ifndef LCD_ISOLATE
 	nvme_workq = alloc_workqueue("nvme", WQ_UNBOUND | WQ_MEM_RECLAIM, 0);
 	if (!nvme_workq)
 		return -ENOMEM;
-
+#endif
 	result = pci_register_driver(&nvme_driver);
+#ifndef LCD_ISOLATE
 	if (result)
 		destroy_workqueue(nvme_workq);
+#endif
 	return result;
 }
 
@@ -2210,12 +2251,14 @@ static void __exit nvme_exit(void)
 #endif
 {
 	pci_unregister_driver(&nvme_driver);
-	destroy_workqueue(nvme_workq);
+	//destroy_workqueue(nvme_workq);
 	_nvme_check_size();
 }
 
+#ifndef LCD_ISOLATE
 MODULE_AUTHOR("Matthew Wilcox <willy@linux.intel.com>");
 MODULE_LICENSE("GPL");
 MODULE_VERSION("1.0");
 module_init(nvme_init);
 module_exit(nvme_exit);
+#endif

@@ -44,6 +44,7 @@ enum dispatch_t {
 	ATTR_SHOW,
 	ATTR_STORE,
 	DMI_CALLBACK,
+	SYNC_ACPI_EVALUATE_OBJECT,
 };
 
 /* CSPACES ------------------------------------------------------------ */
@@ -58,6 +59,10 @@ void glue_cap_exit(void);
 void glue_cap_remove(
 	struct glue_cspace *cspace,
 	cptr_t c);
+
+#define LOWER32_BITS	32
+#define LOWER_HALF(x)	(x & ((1ULL << LOWER32_BITS) - 1))
+#define UPPER_HALF(x)	(x >> LOWER32_BITS)
 
 #define INIT_FIPC_MSG(m)		memset(m, 0x0, sizeof(*m))
 

@@ -67,7 +67,7 @@ static int cap_in_hardware;
 static bool force_cap_on;
 
 #ifdef LCD_ISOLATE
-static int _acpi_disabled = 0 ;
+static int _acpi_disabled = 0;
 #define acpi_exception	LIBLCD_MSG
 #endif
 
@@ -862,7 +862,8 @@ static int read_capabilities(struct acpi_power_meter_resource *resource)
 	for (i = 11; i < 14; i++) {
 		union acpi_object *element = &(pss->package.elements[i]);
 
-		if (element->type != ACPI_TYPE_STRING) {
+		printk("%s, element: %p", __func__, element);
+		if (element && element->type != ACPI_TYPE_STRING) {
 			res = -EINVAL;
 			goto error;
 		}

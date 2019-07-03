@@ -1,5 +1,6 @@
 #include <lcd_config/pre_hook.h>
 
+#include <linux/mm.h>
 #include <libcap.h>
 #include <liblcd/liblcd.h>
 #include <liblcd/sync_ipc_poll.h>
@@ -44,6 +45,8 @@ int glue_acpi_hwmon_init(void)
 	}
 
 	hash_init(dev_hash);
+	hash_init(acpidev_hash);
+	hash_init(dmi_hash);
 
 	return 0;
 fail2:
@@ -147,6 +150,42 @@ void glue_remove_dmi_system_id(struct dmi_system_id_ptr_container *dev_c)
 	hash_del(&dev_c->hentry);
 }
 
+int sync_setup_memory(void *data, size_t sz, unsigned long *order, cptr_t *data_cptr, unsigned long *data_offset)
+{
+        int ret;
+        struct page *p;
+        unsigned long data_len;
+        unsigned long mem_len;
+        /*
+         * Determine page that contains (start of) data
+         */
+        p = virt_to_head_page(data);
+        if (!p) {
+                LIBLCD_ERR("failed to translate to page");
+                ret = -EINVAL;
+                goto fail1;
+        }
+        data_len = sz;
+        mem_len = ALIGN(data + data_len - page_address(p), PAGE_SIZE);
+        *order = ilog2(roundup_pow_of_two(mem_len >> PAGE_SHIFT));
+        /*
+         * Volunteer memory
+         */
+        *data_offset = data - page_address(p);
+        ret = lcd_volunteer_pages(p, *order, data_cptr);
+        if (ret) {
+                LIBLCD_ERR("failed to volunteer memory");
+                goto fail2;
+        }
+        /*
+         * Done
+         */
+        return 0;
+fail2:
+fail1:
+        return ret;
+}
+
 int acpi_bus_generate_netlink_event_callee(struct fipc_message *_request)
 {
 	const char *device_class;
@@ -163,6 +202,9 @@ int acpi_bus_generate_netlink_event_callee(struct fipc_message *_request)
 	unsigned 	long bus_offset;
 	cptr_t bus_cptr, lcd_bus_cptr;
 	gva_t bus_gva;
+
+	LIBLCD_MSG("%s, called", __func__);
+
 
 	ret = lcd_cptr_alloc(&dc_cptr);
 	if (ret) {
@@ -229,6 +271,9 @@ int acpi_bus_get_device_callee(struct fipc_message *_request)
 	cptr_t p_cptr, lcd_cptr;
 	gva_t p_gva;
 	struct acpi_handle_container *acpi_handle_container = NULL;
+
+	LIBLCD_MSG("%s, called", __func__);
+
 
 	p_mem_order = fipc_get_reg1(_request);
 	p_offset = fipc_get_reg2(_request);
@@ -308,6 +353,8 @@ int add(struct acpi_device *device,
 	struct acpi_device_ptr_container *acpi_ptr_c;
 	struct device_container *device_container;
 
+	LIBLCD_MSG("%s, called! handle: %p", __func__, device->handle);
+
 	acpi_ptr_c = kzalloc(sizeof(*acpi_ptr_c), GFP_KERNEL);
 	if (!acpi_ptr_c) {
 		LIBLCD_ERR("kzalloc");
@@ -334,9 +381,11 @@ int add(struct acpi_device *device,
 	fipc_set_reg0(_request, acpi_ptr_c->my_ref.cptr);
 	fipc_set_reg1(_request, device_container->my_ref.cptr);
 
-	vmfunc_wrapper(_request);
+	vmfunc_klcd_wrapper(_request, 1);
 
-	func_ret = fipc_get_reg1(_request);
+	func_ret = fipc_get_reg0(_request);
+
+	printk("%s, add returns %d\n", __func__, func_ret);
 
 	return func_ret;
 fail_alloc:
@@ -355,12 +404,14 @@ int remove(struct acpi_device *device,
 	int func_ret;
 	struct acpi_device_ptr_container *acpi_ptr_c = NULL;
 
+	LIBLCD_MSG("%s, called", __func__);
+
 	glue_lookup_acpi_device(acpidev_hash, __cptr((unsigned long) device),
 			&acpi_ptr_c);
 
 	async_msg_set_fn_type(_request, ACPI_OP_REMOVE);
 	fipc_set_reg0(_request, acpi_ptr_c->other_ref.cptr);
-	vmfunc_wrapper(_request);
+	vmfunc_klcd_wrapper(_request, 1);
 	func_ret = fipc_get_reg0(_request);
 	return func_ret;
 }
@@ -377,10 +428,12 @@ void notify(struct acpi_device *device,
 	struct fipc_message r;
 	struct fipc_message *_request = &r;
 
+	LIBLCD_MSG("%s, called", __func__);
+
 	async_msg_set_fn_type(_request, ACPI_OP_NOTIFY);
 	fipc_set_reg1(_request, event);
 
-	vmfunc_wrapper(_request);
+	vmfunc_klcd_wrapper(_request, 1);
 	return;
 }
 
@@ -390,6 +443,9 @@ int acpi_bus_register_driver_callee(struct fipc_message *_request)
 	struct acpi_driver *driver;
 	int ret = 0;
 	int func_ret = 0;
+
+	LIBLCD_MSG("%s, called", __func__);
+
 
 	acpi_container = kzalloc(sizeof(*acpi_container), GFP_KERNEL);
 	if (!acpi_container) {
@@ -416,6 +472,7 @@ int acpi_bus_register_driver_callee(struct fipc_message *_request)
 	}
 
 	func_ret = acpi_bus_register_driver(driver);
+
 	fipc_set_reg0(_request, func_ret);
 	fipc_set_reg1(_request, acpi_container->my_ref.cptr);
 
@@ -429,12 +486,11 @@ int acpi_bus_unregister_driver_callee(struct fipc_message *_request)
 	struct acpi_driver_container *acpi_container;
 	struct acpi_driver *driver;
 	int ret = 0;
-	cptr_t my_ref;
 
-	my_ref.cptr = fipc_get_reg0(_request);
-	ret = glue_cap_lookup_acpi_driver_type(c_cspace, my_ref,
-			&acpi_container);
+	LIBLCD_MSG("%s, called", __func__);
 
+	ret = glue_cap_lookup_acpi_driver_type(c_cspace,
+			__cptr(fipc_get_reg0(_request)), &acpi_container);
 	if (ret) {
 		LIBLCD_ERR("glue_cap_lookup failed with ret %d", ret);
 		goto fail_lookup;
@@ -458,6 +514,9 @@ int acpi_evaluate_integer_callee(struct fipc_message *_request)
 	unsigned long long data;
 	int ret = 0;
 	int func_ret = 0;
+
+	LIBLCD_MSG("%s, called", __func__);
+
 
 	pathname = kzalloc(sizeof(unsigned long), GFP_KERNEL);
 	if (!pathname) {
@@ -506,6 +565,10 @@ int acpi_extract_package_callee(struct fipc_message *_request)
 	gva_t pk_gva;
 	int ret;
 	int func_ret;
+	char *format_buf;
+
+	LIBLCD_MSG("%s, called", __func__);
+
 
 	ret = lcd_cptr_alloc(&pk_cptr);
 	if (ret) {
@@ -513,8 +576,8 @@ int acpi_extract_package_callee(struct fipc_message *_request)
 		goto fail_alloc;
 	}
 
-	pk_mem_order = fipc_get_reg0(_request);
-	pk_offset = fipc_get_reg1(_request);
+	pk_mem_order = LOWER_HALF(fipc_get_reg0(_request));
+	pk_offset = UPPER_HALF(fipc_get_reg0(_request));
 	lcd_pk_cptr = __cptr(fipc_get_reg1(_request));
 
 	copy_msg_cap_vmfunc(current->vmfunc_lcd, current->lcd, lcd_pk_cptr,
@@ -536,9 +599,9 @@ int acpi_extract_package_callee(struct fipc_message *_request)
 		goto fail_alloc;
 	}
 
-	p_mem_order = fipc_get_reg3(_request);
-	p_offset = fipc_get_reg4(_request);
-	lcd_cptr = __cptr(fipc_get_reg5(_request));
+	p_mem_order = LOWER_HALF(fipc_get_reg2(_request));
+	p_offset = UPPER_HALF(fipc_get_reg2(_request));
+	lcd_cptr = __cptr(fipc_get_reg3(_request));
 
 	copy_msg_cap_vmfunc(current->vmfunc_lcd, current->lcd, lcd_cptr,
 			p_cptr);
@@ -550,12 +613,35 @@ int acpi_extract_package_callee(struct fipc_message *_request)
 		goto fail_virt;
 	}
 
-	buffer.length = (1 << p_mem_order) * PAGE_SIZE;
+	format.length = fipc_get_reg4(_request);
+
+	format_buf = kzalloc(format.length, GFP_KERNEL);
+
+	if (!format_buf) {
+		LIBLCD_ERR("alloc failed");
+		goto fail_alloc;
+	}
+
+	memset(format_buf, 'N', format.length);
+	format.pointer = format_buf;
+
 	buffer.pointer = (void*)(gva_val(p_gva) + p_offset);
-	format.length = fipc_get_reg6(_request);
+	buffer.length = fipc_get_reg5(_request);
+
+	printk("%s, package: %p type: %x package_count: %u\n", __func__, package,
+			package->type, package->package.count);
+
+	package->package.elements = (union acpi_object *)((char*) package +
+			fipc_get_reg6(_request));
 
 	func_ret = acpi_extract_package(package, &format, &buffer);
+	printk("%s, acpi_extract_package returns %d\n", __func__,
+				func_ret);
 	fipc_set_reg0(_request, func_ret);
+	fipc_set_reg1(_request, (unsigned long) package->package.elements -
+			(unsigned long) package);
+
+	kfree(format_buf);
 fail_alloc:
 fail_virt:
 	return ret;
@@ -566,9 +652,10 @@ int acpi_evaluate_object_callee(struct fipc_message *_request)
 	char *pathname;
 	struct acpi_object_list *external_params = NULL;
 	struct acpi_buffer buffer;
-	struct acpi_device_ptr_container *acpi_ptr_c;
+	struct acpi_device_ptr_container *acpi_ptr_c = NULL;
 	struct device_container *device_container = NULL;
 	struct acpi_device *acpi_device;
+	void *handle;
 	int ret = 0;
 	unsigned int func_ret = 0;
 	unsigned 	long mem_order;
@@ -576,13 +663,15 @@ int acpi_evaluate_object_callee(struct fipc_message *_request)
 	cptr_t p_cptr, lcd_cptr;
 	gva_t p_gva;
 
+	LIBLCD_MSG("%s, called", __func__);
+
 	pathname = kzalloc(sizeof(unsigned long), GFP_KERNEL);
 	if (!pathname) {
 		LIBLCD_ERR("kzalloc");
 		goto fail_alloc;
 	}
 
-	ret = glue_cap_lookup_acpi_device_ptr_type(c_cspace, __cptr(fipc_get_reg1(_request)),
+	glue_lookup_acpi_device(acpidev_hash, __cptr(fipc_get_reg1(_request)),
 			&acpi_ptr_c);
 
 	if (ret) {
@@ -605,12 +694,8 @@ int acpi_evaluate_object_callee(struct fipc_message *_request)
 		goto fail_alloc;
 	}
 
-	mem_order = fipc_get_reg3(_request);
-	/*
-	 * FIXME: Due to lack of registers, let's assign zero as it is a page
-	 * of data. The offset will be zero.
-	 */
-	p_offset = 0;
+	mem_order = LOWER_HALF(fipc_get_reg3(_request));
+	p_offset = UPPER_HALF(fipc_get_reg3(_request));
 	lcd_cptr = __cptr(fipc_get_reg5(_request));
 
 	copy_msg_cap_vmfunc(current->vmfunc_lcd, current->lcd, lcd_cptr,
@@ -622,17 +707,40 @@ int acpi_evaluate_object_callee(struct fipc_message *_request)
 		LIBLCD_ERR("failed to map void *p");
 		goto fail_virt;
 	}
-	buffer.length = (1 << mem_order) * PAGE_SIZE;
+	//buffer.length = (1 << mem_order) * PAGE_SIZE;
+	buffer.length = (1 << 2) * PAGE_SIZE;
 	buffer.pointer = (void*)(gva_val(p_gva) + p_offset);
 
-	func_ret = acpi_evaluate_object(acpi_device,
-			pathname,
-			external_params,
-			&buffer);
+	handle = acpi_device->handle;
+
+	printk("%s calling acpi_eval_obj with handle: %p, pathname: %s, ext_params: %p, buffer.p: %p\n",
+				__func__, handle, pathname, external_params, buffer.pointer);
+
+	func_ret = acpi_evaluate_object(handle, pathname,
+			external_params, &buffer);
+
+	printk("%s, returned %u\n", __func__, func_ret);
 
 	{
 		union acpi_object *pss = buffer.pointer;
 
+		printk("%s, pss: %p type: %x package_count: %u elements: %p (elements - pss): %lx\n", __func__,
+				pss, pss->type, pss->package.count, pss->package.elements,
+				(unsigned long) pss->package.elements - (unsigned long) pss);
+
+		if (pss && pss->package.count == 14) {
+			int i;
+			for (i = 11; i < 14; i++) {
+				union acpi_object *element = &(pss->package.elements[i]);
+				printk("%s, element[%d]: %p | length: %u\n",
+						__func__, i, element,
+						element->string.length);
+			}
+
+			fipc_set_reg2(_request, (unsigned long)
+					pss->package.elements - (unsigned long)
+					pss);
+		}
 		if (pss && pss->package.count == 1) {
 			union acpi_object *element = &(pss->package.elements[0]);
 			void *acpi_handle = element->reference.handle;
@@ -655,7 +763,6 @@ int acpi_evaluate_object_callee(struct fipc_message *_request)
 
 			fipc_set_reg1(_request,
 					acpi_handle_container->my_ref.cptr);
-
 		}
 	}
 	fipc_set_reg0(_request, func_ret);
@@ -681,6 +788,9 @@ ssize_t attr_show(struct device *dev, struct device_attribute *attr, char *buf
 	struct sensor_device_attribute *s_attr;
 	struct sensor_device_attribute_container *s_attr_cnt;
 
+	LIBLCD_MSG("%s, called", __func__);
+
+
 	s_attr = container_of(attr, struct sensor_device_attribute,
 			dev_attr);
 	s_attr_cnt = container_of(s_attr, struct
@@ -694,7 +804,7 @@ ssize_t attr_show(struct device *dev, struct device_attribute *attr, char *buf
 	fipc_set_reg0(_request, device_container->other_ref.cptr);
 	fipc_set_reg1(_request, s_attr_cnt->other_ref.cptr);
 
-	vmfunc_wrapper(_request);
+	vmfunc_klcd_wrapper(_request, 1);
 
 	func_ret = fipc_get_reg1(_request);
 
@@ -720,6 +830,9 @@ ssize_t attr_store(struct device *dev, struct device_attribute *attr, char *buf
 	struct sensor_device_attribute *s_attr;
 	struct sensor_device_attribute_container *s_attr_cnt;
 
+	LIBLCD_MSG("%s, called", __func__);
+
+
 	s_attr = container_of(attr, struct sensor_device_attribute,
 			dev_attr);
 	s_attr_cnt = container_of(s_attr, struct
@@ -735,7 +848,7 @@ ssize_t attr_store(struct device *dev, struct device_attribute *attr, char *buf
 	fipc_set_reg2(_request, count);
 
 	memcpy(s_attr_cnt->buf, buf, count);
-	vmfunc_wrapper(_request);
+	vmfunc_klcd_wrapper(_request, 1);
 
 	func_ret = fipc_get_reg0(_request);
 
@@ -758,6 +871,9 @@ int device_create_file_callee(struct fipc_message *_request)
 	unsigned 	long buf_offset;
 	cptr_t buf_cptr, lcd_buf_cptr;
 	gva_t buf_gva;
+
+	LIBLCD_MSG("%s, called", __func__);
+
 
 	glue_lookup_device(dev_hash, __cptr(fipc_get_reg0(_request)),
 			&device_container);
@@ -785,9 +901,9 @@ int device_create_file_callee(struct fipc_message *_request)
 		goto fail_alloc;
 	}
 
-	mem_order = fipc_get_reg2(_request);
-	p_offset = fipc_get_reg3(_request);
-	lcd_cptr = __cptr(fipc_get_reg4(_request));
+	mem_order = LOWER_HALF(fipc_get_reg2(_request));
+	p_offset = UPPER_HALF(fipc_get_reg2(_request));
+	lcd_cptr = __cptr(fipc_get_reg3(_request));
 
 	copy_msg_cap_vmfunc(current->vmfunc_lcd, current->lcd, lcd_cptr,
 			p_cptr);
@@ -798,8 +914,11 @@ int device_create_file_callee(struct fipc_message *_request)
 		LIBLCD_ERR("failed to map void *p");
 		goto fail_virt;
 	}
-	buf_order = buf_offset = 0;
-	lcd_buf_cptr = __cptr(fipc_get_reg6(_request));
+
+	lcd_buf_cptr = __cptr(fipc_get_reg5(_request));
+
+	buf_order = LOWER_HALF(fipc_get_reg6(_request));
+	buf_offset = UPPER_HALF(fipc_get_reg6(_request));
 
 	copy_msg_cap_vmfunc(current->vmfunc_lcd, current->lcd, lcd_buf_cptr,
 			buf_cptr);
@@ -838,6 +957,9 @@ int device_remove_file_callee(struct fipc_message *_request)
 	struct device_container *device_container = NULL;
 	struct sensor_device_attribute_container *s_attr_cnt = NULL;
 
+	LIBLCD_MSG("%s, called", __func__);
+
+
 	glue_lookup_device(dev_hash, __cptr(fipc_get_reg0(_request)),
 			&device_container);
 
@@ -863,6 +985,9 @@ int get_device_callee(struct fipc_message *_request)
 	struct device_container *device_container = NULL;
 	struct device *func_ret;
 
+	LIBLCD_MSG("%s, called", __func__);
+
+
 	glue_lookup_device(dev_hash, __cptr(fipc_get_reg0(_request)),
 			&device_container);
 
@@ -878,6 +1003,9 @@ int put_device_callee(struct fipc_message *_request)
 	struct device *dev = NULL;
 	int ret = 0;
 	struct device_container *device_container = NULL;
+
+	LIBLCD_MSG("%s, called", __func__);
+
 
 	glue_lookup_device(dev_hash, __cptr(fipc_get_reg0(_request)),
 			&device_container);
@@ -896,12 +1024,15 @@ static int enable_cap_knobs(const struct dmi_system_id *d)
 	int func_ret;
 	struct dmi_system_id_ptr_container *dmi_id_container = NULL;
 
+	LIBLCD_MSG("%s, called", __func__);
+
+
 	glue_lookup_dmi_system_id(dmi_hash, __cptr((unsigned long)d), &dmi_id_container);
 
 	async_msg_set_fn_type(_request, DMI_CALLBACK);
 	fipc_set_reg0(_request, dmi_id_container->other_ref.cptr);
 
-	vmfunc_wrapper(_request);
+	vmfunc_klcd_wrapper(_request, 1);
 
 	func_ret = fipc_get_reg0(_request);
 
@@ -911,6 +1042,7 @@ static int enable_cap_knobs(const struct dmi_system_id *d)
 static struct dmi_system_id pm_dmi_table[] = {
 	{
 		.callback = enable_cap_knobs,
+		.ident = "IBM Active Energy Manager",
 	},
 	{}
 };
@@ -921,9 +1053,14 @@ int dmi_check_system_callee(struct fipc_message *_request)
 	int ret = 0;
 	int func_ret = 0;
 	struct dmi_system_id_ptr_container *dmi_id_container;
+#if 0
 	cptr_t id_cptr, lcd_id_cptr;
 	unsigned long id_offset, id_mem_order;
 	gva_t id_gva;
+#endif
+
+	LIBLCD_MSG("%s, called", __func__);
+
 
 	dmi_id_container = kzalloc(sizeof(*dmi_id_container), GFP_KERNEL);
 
@@ -937,6 +1074,7 @@ int dmi_check_system_callee(struct fipc_message *_request)
 
 	glue_insert_dmi_system_id(dmi_hash, dmi_id_container);
 
+#if 0
 	id_mem_order = fipc_get_reg1(_request);
 	id_offset = fipc_get_reg2(_request);
 	lcd_id_cptr = __cptr(fipc_get_reg3(_request));
@@ -952,7 +1090,7 @@ int dmi_check_system_callee(struct fipc_message *_request)
 	}
 
 	pm_dmi_table->ident = (char*)(gva_val(id_gva) + id_offset);
-
+#endif
 	strncpy(pm_dmi_table->matches[0].substr, (char*)&_request->regs[4],
 			sizeof(_request->regs[4]));
 
@@ -970,7 +1108,9 @@ int dmi_check_system_callee(struct fipc_message *_request)
 
 	return func_ret;
 fail_alloc:
+#if 0
 fail_virt:
+#endif
 	return ret;
 }
 
@@ -981,6 +1121,9 @@ int hwmon_device_register_callee(struct fipc_message *_request)
 	struct device *dev;
 	int ret = 0;
 	struct device *func_ret;
+
+	LIBLCD_MSG("%s, called", __func__);
+
 
 	glue_lookup_device(dev_hash, __cptr(fipc_get_reg0(_request)),
 			&device_container);
@@ -1006,6 +1149,9 @@ int hwmon_device_unregister_callee(struct fipc_message *_request)
 	struct device *hw_dev;
 	int ret = 0;
 
+	LIBLCD_MSG("%s, called", __func__);
+
+
 	glue_lookup_device(dev_hash, __cptr(fipc_get_reg0(_request)),
 			&hwdev_container);
 
@@ -1028,6 +1174,9 @@ int kobject_create_and_add_callee(struct fipc_message *_request)
 	unsigned long p_offset;
 	unsigned long mem_order;
 	gva_t p_gva;
+
+	LIBLCD_MSG("%s, called", __func__);
+
 
 	glue_lookup_device(dev_hash, __cptr(fipc_get_reg0(_request)),
 			&device_container);
@@ -1081,6 +1230,9 @@ int kobject_put_callee(struct fipc_message *_request)
 	struct kobject *kobj = NULL;
 	int ret = 0;
 
+	LIBLCD_MSG("%s, called", __func__);
+
+
 	ret = glue_cap_lookup_kobject_ptr_type(c_cspace,
 			__cptr(fipc_get_reg0(_request)),
 			&kobjp_cnt);
@@ -1108,6 +1260,9 @@ int sysfs_create_link_callee(struct fipc_message *_request)
 	const char *name = 0;
 	int ret = 0;
 	int func_ret = 0;
+
+	LIBLCD_MSG("%s, called", __func__);
+
 
 	ret = glue_cap_lookup_kobject_ptr_type(c_cspace,
 			__cptr(fipc_get_reg0(_request)),
@@ -1143,6 +1298,9 @@ int sysfs_remove_link_callee(struct fipc_message *_request)
 	struct device *dev;
 	const char *name = 0;
 	int ret = 0;
+
+	LIBLCD_MSG("%s, called", __func__);
+
 
 	ret = glue_cap_lookup_kobject_ptr_type(c_cspace,
 			__cptr(fipc_get_reg0(_request)),
@@ -1181,6 +1339,9 @@ int sysfs_notify_callee(struct fipc_message *_request)
 	unsigned long p_offset;
 	unsigned long p_mem_order;
 	gva_t p_gva;
+
+
+	LIBLCD_MSG("%s, called", __func__);
 
 
 	ret = glue_cap_lookup_kobject_ptr_type(c_cspace,

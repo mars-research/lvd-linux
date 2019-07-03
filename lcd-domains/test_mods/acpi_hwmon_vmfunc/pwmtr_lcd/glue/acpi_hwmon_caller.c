@@ -34,6 +34,7 @@ int glue_acpi_hwmon_init(void)
 	}
 
 	hash_init(cptr_table);
+	hash_init(acpi_table);
 
 	return 0;
 fail2:
@@ -249,7 +250,7 @@ void acpi_bus_unregister_driver(struct acpi_driver *driver)
 			acpi_driver);
 
 	async_msg_set_fn_type(_request, ACPI_BUS_UNREGISTER_DRIVER);
-	fipc_set_reg0(_request, acpi_container->my_ref.cptr);
+	fipc_set_reg0(_request, acpi_container->other_ref.cptr);
 	ret = vmfunc_wrapper(_request);
 
 	glue_cap_remove(lcd_cspace, acpi_container->my_ref);
@@ -291,24 +292,12 @@ unsigned int acpi_extract_package(union acpi_object *package,
 	struct fipc_message r;
 	struct fipc_message *_request = &r;
 	int func_ret, ret;
-	struct page *p;
 	cptr_t p_cptr;
 	unsigned long p_offset;
 	unsigned long p_mem_sz;
 	cptr_t pk_cptr;
 	unsigned long pk_offset;
 	unsigned long pk_mem_sz;
-
-
-	p = lcd_alloc_pages(GFP_KERNEL, 0);
-
-	if (!p) {
-		LIBLCD_ERR("page alloc failed");
-		ret = -ENOMEM;
-		goto fail_alloc;
-	}
-
-	buffer->pointer = lcd_page_address(p);
 
 	ret = lcd_virt_to_cptr(__gva((unsigned long)buffer->pointer), &p_cptr,
 			&p_mem_sz, &p_offset);
@@ -326,20 +315,88 @@ unsigned int acpi_extract_package(union acpi_object *package,
 		goto fail_virt;
 	}
 
-	fipc_set_reg0(_request, ilog2((pk_mem_sz) >> (PAGE_SHIFT)));
-	fipc_set_reg1(_request, pk_offset);
-	fipc_set_reg2(_request, cptr_val(pk_cptr));
-	fipc_set_reg3(_request, ilog2((p_mem_sz) >> (PAGE_SHIFT)));
-	fipc_set_reg4(_request, p_offset);
-	fipc_set_reg5(_request, cptr_val(p_cptr));
-	fipc_set_reg6(_request, format->length);
-
 	async_msg_set_fn_type(_request, ACPI_EXTRACT_PACKAGE);
+	fipc_set_reg0(_request, ilog2((pk_mem_sz) >> (PAGE_SHIFT))
+				| (pk_offset << 32));
+	fipc_set_reg1(_request, cptr_val(pk_cptr));
+	fipc_set_reg2(_request, ilog2((p_mem_sz) >> (PAGE_SHIFT))
+				| (p_offset << 32));
+	fipc_set_reg3(_request, cptr_val(p_cptr));
+	fipc_set_reg4(_request, format->length);
+	fipc_set_reg5(_request, buffer->length);
+	fipc_set_reg6(_request, (unsigned long) package->package.elements -
+			(unsigned long) package);
+
+	printk("%s, package: %p type: %x package_count: %u", __func__, package,
+			package->type, package->package.count);
+
+
 	ret = vmfunc_wrapper(_request);
 	func_ret = fipc_get_reg0(_request);
+	{
+		union acpi_object *pss = package;
+
+		pss->package.elements = (union acpi_object*)((char *) pss + fipc_get_reg1(_request));
+
+		printk("%s, package: %p type: %x package_count: %u", __func__, pss, pss->type, pss->package.count);
+		if (pss && pss->package.count == 14) {
+			int i;
+			for (i = 11; i < 14; i++) {
+				union acpi_object *element = &(pss->package.elements[i]);
+				printk("%s, element[%d]: %p", __func__, i, element);
+			}
+		}
+	}
 	return func_ret;
-fail_alloc:
 fail_virt:
+	return ret;
+}
+
+int acpi_evaluate_object_sync(union acpi_object *pss)
+{
+	struct fipc_message r;
+	struct fipc_message *_request = &r;
+	char *strings[3];
+	cptr_t p_cptr[3];
+	unsigned long p_offset[3];
+	unsigned long p_mem_sz[3];
+	int ret;
+
+	async_msg_set_fn_type(_request, SYNC_ACPI_EVALUATE_OBJECT);
+
+	if (pss && pss->package.count == 14) {
+		int i, j;
+		int idx;
+		for (i = 11; i < 14; i++) {
+			union acpi_object *element = &(pss->package.elements[i]);
+			idx = i - 11;
+			j = idx * 2;
+			if (element->type == ACPI_TYPE_STRING) {
+				strings[idx] = (char*) kzalloc(element->string.length, GFP_KERNEL);
+				if (!strings[idx]) {
+					LIBLCD_ERR("alloc failed");
+					goto fail_alloc;
+				}
+
+				ret = lcd_virt_to_cptr(__gva((unsigned long)strings[idx]),
+							&p_cptr[idx], &p_mem_sz[idx],
+							&p_offset[idx]);
+
+				if (ret) {
+					LIBLCD_ERR("virt to cptr failed");
+					goto fail_virt;
+				}
+
+				_request->regs[j] = ilog2((p_mem_sz[idx]) >> (PAGE_SHIFT))
+							| (p_offset[idx] << 32);
+
+				_request->regs[j+1] = cptr_val(p_cptr[idx]); 
+			}
+		}
+	}
+	vmfunc_wrapper(_request);
+fail_virt:
+fail_alloc:
 	return ret;
 }
 
@@ -352,7 +409,8 @@ unsigned int _acpi_evaluate_object(struct acpi_device *acpi_device,
 	struct fipc_message *_request = &r;
 	struct acpi_device_container *acpi_container;
 	struct device_container *device_container = NULL;
-	int func_ret, ret;
+	int ret;
+	unsigned int func_ret;
 	struct page *p;
 	cptr_t p_cptr;
 	unsigned long p_offset;
@@ -366,7 +424,7 @@ unsigned int _acpi_evaluate_object(struct acpi_device *acpi_device,
 
 	async_msg_set_fn_type(_request, ACPI_EVALUATE_OBJECT);
 
-	p = lcd_alloc_pages(GFP_KERNEL, 0);
+	p = lcd_alloc_pages(GFP_KERNEL, 2);
 
 	if (!p) {
 		LIBLCD_ERR("page alloc failed");
@@ -384,11 +442,15 @@ unsigned int _acpi_evaluate_object(struct acpi_device *acpi_device,
 		goto fail_virt;
 	}
 
+	printk("%s, buffer->pointer: %p p_mem_sz: %lx p_offset: %lx", __func__,
+			buffer->pointer, p_mem_sz, p_offset);
+
 	/* We haven't exchanged our cptr yet */
 	fipc_set_reg0(_request, acpi_container->my_ref.cptr);
 	fipc_set_reg1(_request, acpi_container->other_ref.cptr);
 	strncpy((char*)&_request->regs[2], pathname, sizeof(_request->regs[2]));
-	fipc_set_reg3(_request, ilog2((p_mem_sz) >> (PAGE_SHIFT)));
+	fipc_set_reg3(_request, ilog2((p_mem_sz) >> (PAGE_SHIFT))
+				| (p_offset << 32));
 	fipc_set_reg4(_request, device_container->other_ref.cptr);
 	fipc_set_reg5(_request, cptr_val(p_cptr));
 	fipc_set_reg6(_request, device_container->my_ref.cptr);
@@ -398,7 +460,27 @@ unsigned int _acpi_evaluate_object(struct acpi_device *acpi_device,
 
 	{
 		union acpi_object *pss = buffer->pointer;
+		//unsigned long elements_offset = (unsigned long)((char *) pss + fipc_get_reg2(_request));
 
+		printk("%s, pss: %p type: %x package_count: %u elements: %p (elements - pss): %lx reg2: %lx", __func__,
+				pss, pss->type, pss->package.count, pss->package.elements,
+				(unsigned long) pss->package.elements - (unsigned long) pss,
+				fipc_get_reg2(_request));
+
+		if (pss && pss->package.count == 14) {
+			int i;
+			acpi_evaluate_object_sync(pss);
+
+			pss->package.elements = (union acpi_object*)((char *) pss + fipc_get_reg2(_request));
+
+			for (i = 11; i < 14; i++) {
+				union acpi_object *element = &(pss->package.elements[i]);
+				printk("%s, element[%d]: %p | length: %u",
+						__func__, i, element,
+						element->string.length);
+			}
+
+		}
 		if (pss && pss->package.count == 1) {
 			union acpi_object *element = &(pss->package.elements[0]);
 			void *acpi_handle = element->reference.handle;
@@ -487,11 +569,13 @@ int device_create_file(struct device *dev,
 
 	fipc_set_reg0(_request, device_container->other_ref.cptr);
 	fipc_set_reg1(_request, s_attr_cnt->my_ref.cptr);
-	fipc_set_reg2(_request, (ilog2((p_mem_sz) >> (PAGE_SHIFT))));
-	fipc_set_reg3(_request, p_offset);
-	fipc_set_reg4(_request, cptr_val(p_cptr));
-	fipc_set_reg5(_request, devattr->attr.mode);
-	fipc_set_reg6(_request, cptr_val(buf_cptr));
+	fipc_set_reg2(_request, (ilog2((p_mem_sz) >> (PAGE_SHIFT)))
+				| (p_offset << 32));
+	fipc_set_reg3(_request, cptr_val(p_cptr));
+	fipc_set_reg4(_request, devattr->attr.mode);
+	fipc_set_reg5(_request, cptr_val(buf_cptr));
+	fipc_set_reg6(_request, (ilog2((buf_mem_sz) >> (PAGE_SHIFT)))
+				| (buf_offset << 32));
 
 	ret = vmfunc_wrapper(_request);
 
@@ -570,10 +654,11 @@ int dmi_check_system(const struct dmi_system_id *list)
 	struct fipc_message r;
 	struct fipc_message *_request = &r;
 	int ret, func_ret;
+	struct dmi_system_id_container *dmi_id_container;
+#if 0
 	cptr_t id_cptr;
 	unsigned long id_offset;
 	unsigned long id_mem_sz;
-	struct dmi_system_id_container *dmi_id_container;
 
 	ret = lcd_virt_to_cptr(__gva((unsigned long)list->ident), &id_cptr,
 			&id_mem_sz, &id_offset);
@@ -582,7 +667,7 @@ int dmi_check_system(const struct dmi_system_id *list)
 		LIBLCD_ERR("virt to cptr failed");
 		goto fail_virt;
 	}
-
+#endif
 	dmi_id_container = kzalloc(sizeof(*dmi_id_container), GFP_KERNEL);
 
 	if (!dmi_id_container) {
@@ -604,9 +689,11 @@ int dmi_check_system(const struct dmi_system_id *list)
 
 	async_msg_set_fn_type(_request, DMI_CHECK_SYSTEM);
 	fipc_set_reg0(_request, dmi_id_container->my_ref.cptr);
+#if 0
 	fipc_set_reg1(_request, ilog2((id_mem_sz) >> (PAGE_SHIFT)));
 	fipc_set_reg2(_request, id_offset);
 	fipc_set_reg3(_request, cptr_val(id_cptr));
+#endif
 	strncpy((char*)&_request->regs[4], list->matches[0].substr,
 			sizeof(_request->regs[4]));
 	fipc_set_reg5(_request, list->matches[0].slot |
@@ -620,7 +707,7 @@ int dmi_check_system(const struct dmi_system_id *list)
 	return func_ret;
 fail_insert:
 fail_alloc:
-fail_virt:
+//fail_virt:
 	return ret;
 }
 
@@ -887,12 +974,7 @@ int acpi_op_add_callee(struct fipc_message *_request)
 		goto fail_alloc;
 	}
 
-	device_container->dev = kzalloc(sizeof(struct device), GFP_KERNEL);
-
-	if (!device_container->dev) {
-		LIBLCD_ERR("kzalloc");
-		goto fail_alloc;
-	}
+	device_container->dev = &acpi_device->dev;
 
 	ret = glue_insert_device(cptr_table, device_container);
 

@@ -5,9 +5,9 @@
 
 #include <lcd_config/post_hook.h>
 
-#define trace(x) LIBLCD_MSG("net got " #x " msg")
+#define trace(x) LIBLCD_MSG("pwmtr got " #x " msg")
 
-int dispatch_async_loop(struct fipc_message *message)
+int handle_rpc_calls(struct fipc_message *message)
 {
 	int fn_type;
 	fn_type = async_msg_get_fn_type(message);
@@ -23,6 +23,27 @@ int dispatch_async_loop(struct fipc_message *message)
 		case ACPI_OP_NOTIFY:
 			trace(ACPI_OP_NOTIFY);
 			return acpi_op_notify_callee(message);
+
+		case ATTR_SHOW:
+			trace(ATTR_SHOW);
+			return attr_show_callee(message);
+
+		case ATTR_STORE:
+			trace(ATTR_STORE);
+			return attr_store_callee(message);
+
+		case DMI_CALLBACK:
+			trace(DMI_CALLBACK);
+			return dmi_callback_callee(message);
+
+		case MODULE_INIT:
+			trace(MODULE_INIT);
+			return __pwmtr_lcd_init();
+
+		case MODULE_EXIT:
+			trace(MODULE_EXIT);
+			__pwmtr_lcd_exit();
+			break;
 
 		default:
 			LIBLCD_ERR("unexpected function label: %d",

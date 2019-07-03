@@ -5,7 +5,7 @@
 
 #include <lcd_config/post_hook.h>
 
-#define trace(x) LIBLCD_MSG("net got " #x " msg")
+#define trace(x) LIBLCD_MSG("hwmon got " #x " msg")
 
 int hwmon_klcd_dispatch_loop(struct fipc_message *message)
 {

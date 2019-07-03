@@ -21,12 +21,20 @@ int null_major;
 struct gendisk *disk_g;
 struct request_queue *rq_g;
 struct blk_mq_tag_set *set_g;
+unsigned int submit_queues;
 
 struct blk_mq_ops_container *g_blk_mq_ops_container;
 
 /* hack for init_request */
 int hw_depth;
-struct request **rq_map;
+
+struct request_map {
+	int queue_num;
+	struct request **rq_map;
+	bool init_done;
+};
+
+struct request_map **maps;
 
 #ifndef CONFIG_LVD
 struct trampoline_hidden_args {
@@ -159,10 +167,12 @@ int blk_mq_end_request_callee(struct fipc_message *request)
 	struct request *rq;
 	int ret = 0;
 	int error = 0;
+	int tag = fipc_get_reg0(request);
+	int queue_num = fipc_get_reg1(request);
 
-	rq = rq_map[fipc_get_reg0(request)];	
+	rq = maps[queue_num]->rq_map[tag];
 
-	error = fipc_get_reg1(request);
+	error = fipc_get_reg2(request);
 	
 	blk_mq_end_request(rq, error);
 	return ret;
@@ -207,8 +217,10 @@ int blk_mq_start_request_callee(struct fipc_message *request)
 	struct request *rq;
 	int ret = 0;
 	int tag = fipc_get_reg0(request);
-	rq = rq_map[tag];
+	int queue_num = fipc_get_reg1(request);
 	
+	rq = maps[queue_num]->rq_map[tag];
+
 	blk_mq_start_request(rq);
 
 	return ret;
@@ -462,9 +474,9 @@ int _queue_rq_fn(struct blk_mq_hw_ctx *ctx, const struct blk_mq_queue_data *bd, 
         int ret;
 	struct fipc_message r;
         struct fipc_message *request = &r;
+#ifdef CONFIG_COPY_USER_DATA
 	struct bio_vec_queue *bvec_queue = &per_cpu(bio_vec_queues, smp_processor_id());
 	struct bio_vec *bvec_array = bvec_queue->bvec_array;
-#ifdef CONFIG_COPY_USER_DATA
 	int i = 0;
 #endif
 
@@ -534,20 +546,45 @@ int init_request(void *data, struct request *req, unsigned int hctx_idx,
 			unsigned int rq_idx,
 			unsigned int numa_node)
 {
-	static int init_done = 0;
-
-	if(!init_done) {
-		rq_map = kzalloc((sizeof(struct request *) * (hw_depth + 1)),
-					GFP_KERNEL);
-		if(!rq_map) {
-			LIBLCD_ERR("cannot allocate mem for rq_map");
+	if (!maps) {
+		maps = kzalloc(sizeof(struct request_map*) * submit_queues,
+				GFP_KERNEL);
+		if (!maps) {
+			LIBLCD_ERR("cannot allocate mem for maps");
 			return -1;
 		}
-		init_done = 1;
+
+		printk("%s, initializing maps: %p!\n", __func__, maps);
 	}
 
-	rq_map[rq_idx] = req;
-	printk("init_request: req %p req->tag %d rq_idx %d \n",req, req->tag, rq_idx);
+	if (!maps[hctx_idx]) {
+		maps[hctx_idx] = kzalloc(sizeof(struct request_map),
+				GFP_KERNEL);
+
+		if (!maps[hctx_idx]) {
+			LIBLCD_ERR("cannot allocate mem for maps[hctx_idx]");
+			return -1;
+		}
+
+		printk("%s, initializing maps: %p!\n", __func__, maps[hctx_idx]);
+	}
+
+	if (!maps[hctx_idx]->init_done) {
+		maps[hctx_idx]->rq_map = kzalloc((sizeof(struct request *) *
+					(hw_depth + submit_queues)),
+				GFP_KERNEL);
+		if (!maps[hctx_idx]->rq_map) {
+			LIBLCD_ERR("cannot allocate mem for maps.rq_map");
+			return -1;
+		}
+		printk("%s, initializing maps[hctx_idx:%d]->rq_map:%p\n",
+				__func__, hctx_idx, maps[hctx_idx]->rq_map);
+		maps[hctx_idx]->init_done = true;
+	}
+
+	printk("%s, maps[hctx_idx:%d]->rq_map[rq_idx:%d] = %p, req->tag: %d\n",
+			__func__, hctx_idx, rq_idx, req, req->tag);
+	maps[hctx_idx]->rq_map[rq_idx] = req;
 	return 0;	
 }
 
@@ -977,7 +1014,8 @@ int blk_mq_alloc_tag_set_callee(struct fipc_message *request)
 
 #endif
 	/* Get the rest of the members from LCD */
-	set_container->tag_set.nr_hw_queues = fipc_get_reg1(request);
+	submit_queues = set_container->tag_set.nr_hw_queues =
+		fipc_get_reg1(request);
 	set_container->tag_set.queue_depth = fipc_get_reg2(request);
 	hw_depth = set_container->tag_set.queue_depth;
 	set_container->tag_set.reserved_tags = fipc_get_reg3(request);

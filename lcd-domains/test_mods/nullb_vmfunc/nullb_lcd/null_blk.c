@@ -92,7 +92,7 @@ enum {
 #ifdef LCD_ISOLATE
 /*TODO have to hardcode a value that nr_online_cpus return 
  * I doubt that nr_online_cpus will be accessible from here */
-static int submit_queues;
+static int submit_queues = nr_cpu_ids;
 #else
 static int submit_queues;
 module_param(submit_queues, int, S_IRUGO);

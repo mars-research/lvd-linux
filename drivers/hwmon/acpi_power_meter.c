@@ -19,6 +19,8 @@
  * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
  */
 
+#define pr_fmt(fmt)	"%s: " fmt, __func__
+
 #include <linux/module.h>
 #include <linux/hwmon.h>
 #include <linux/hwmon-sysfs.h>
@@ -556,8 +558,11 @@ static int read_domain_devices(struct acpi_power_meter_resource *resource)
 	union acpi_object *pss;
 	acpi_status status;
 
+	pr_info("calling acpi_eval_obj with handle: %p\n", resource->acpi_dev->handle);
 	status = acpi_evaluate_object(resource->acpi_dev->handle, "_PMD", NULL,
 				      &buffer);
+	pr_info("acpi_eval_obj returned %d objects\n", ((union acpi_object
+					*)(buffer.pointer))->package.count);
 	if (ACPI_FAILURE(status)) {
 		ACPI_EXCEPTION((AE_INFO, status, "Evaluating _PMD"));
 		return -ENODEV;
@@ -601,6 +606,8 @@ static int read_domain_devices(struct acpi_power_meter_resource *resource)
 
 		/* Create a symlink to domain objects */
 		resource->domain_devices[i] = NULL;
+		pr_info("calling acpi_bus_get_device with handle: %p\n",
+				element->reference.handle);
 		if (acpi_bus_get_device(element->reference.handle,
 					&resource->domain_devices[i]))
 			continue;
@@ -749,8 +756,11 @@ static int read_capabilities(struct acpi_power_meter_resource *resource)
 	acpi_string *str;
 	acpi_status status;
 
+	pr_info("calling acpi_eval_obj with handle: %p\n", resource->acpi_dev->handle);
 	status = acpi_evaluate_object(resource->acpi_dev->handle, "_PMC", NULL,
 				      &buffer);
+	pr_info("acpi_eval_obj returned %d objects\n", ((union acpi_object
+					*)(buffer.pointer))->package.count);
 	if (ACPI_FAILURE(status)) {
 		ACPI_EXCEPTION((AE_INFO, status, "Evaluating _PMC"));
 		return -ENODEV;
@@ -824,6 +834,8 @@ static void acpi_power_meter_notify(struct acpi_device *device, u32 event)
 	struct acpi_power_meter_resource *resource;
 	int res;
 
+	pr_info("acpi_dev: %p event: %u\n", device, event);
+
 	if (!device || !acpi_driver_data(device))
 		return;
 
@@ -871,6 +883,8 @@ static int acpi_power_meter_add(struct acpi_device *device)
 	int res;
 	struct acpi_power_meter_resource *resource;
 
+	pr_info("acpi_dev: %p\n", device);
+
 	if (!device)
 		return -EINVAL;
 
@@ -897,6 +911,7 @@ static int acpi_power_meter_add(struct acpi_device *device)
 	if (res)
 		goto exit_free;
 
+	pr_info("calling hwmon_device_register dev: %p\n", &device->dev);
 	resource->hwmon_dev = hwmon_device_register(&device->dev);
 	if (IS_ERR(resource->hwmon_dev)) {
 		res = PTR_ERR(resource->hwmon_dev);
@@ -917,6 +932,8 @@ exit:
 static int acpi_power_meter_remove(struct acpi_device *device)
 {
 	struct acpi_power_meter_resource *resource;
+
+	pr_info("acpi_dev: %p\n", device);
 
 	if (!device || !acpi_driver_data(device))
 		return -EINVAL;

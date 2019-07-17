@@ -647,6 +647,43 @@ fail_virt:
 	return ret;
 }
 
+int acpi_evaluate_object_sync_callee(struct fipc_message *_request)
+{
+	unsigned 	long mem_order;
+	unsigned 	long p_offset;
+	cptr_t p_cptr, lcd_cptr;
+	gva_t p_gva;
+	char *strings[3];
+	cptr_t p_cptr[3];
+	unsigned long p_offset[3];
+	unsigned long p_mem_sz[3];
+
+	ret = lcd_cptr_alloc(&p_cptr);
+	if (ret) {
+		LIBLCD_ERR("failed to get cptr");
+		goto fail_alloc;
+	}
+
+	mem_order = LOWER_HALF(fipc_get_reg3(_request));
+	p_offset = UPPER_HALF(fipc_get_reg3(_request));
+	lcd_cptr = __cptr(fipc_get_reg5(_request));
+
+	copy_msg_cap_vmfunc(current->vmfunc_lcd, current->lcd, lcd_cptr,
+			p_cptr);
+
+	ret = lcd_map_virt(p_cptr, mem_order, &p_gva);
+
+	if (ret) {
+		LIBLCD_ERR("failed to map void *p");
+		goto fail_virt;
+	}
+	buffer.length = (1 << 2) * PAGE_SIZE;
+	buffer.pointer = (void*)(gva_val(p_gva) + p_offset);
+
+
+
+}
+
 int acpi_evaluate_object_callee(struct fipc_message *_request)
 {
 	char *pathname;
@@ -655,18 +692,21 @@ int acpi_evaluate_object_callee(struct fipc_message *_request)
 	struct acpi_device_ptr_container *acpi_ptr_c = NULL;
 	struct device_container *device_container = NULL;
 	struct acpi_device *acpi_device;
+	struct acpi_object_container *acpi_obj_container;
 	void *handle;
 	int ret = 0;
 	unsigned int func_ret = 0;
-	unsigned 	long mem_order;
-	unsigned 	long p_offset;
-	cptr_t p_cptr, lcd_cptr;
-	gva_t p_gva;
 
 	LIBLCD_MSG("%s, called", __func__);
 
 	pathname = kzalloc(sizeof(unsigned long), GFP_KERNEL);
 	if (!pathname) {
+		LIBLCD_ERR("kzalloc");
+		goto fail_alloc;
+	}
+
+	acpi_obj_container = kzalloc(sizeof(*acpi_obj_container), GFP_KERNEL);
+	if (!acpi_obj_container) {
 		LIBLCD_ERR("kzalloc");
 		goto fail_alloc;
 	}
@@ -688,33 +728,13 @@ int acpi_evaluate_object_callee(struct fipc_message *_request)
 	device_container->other_ref.cptr = fipc_get_reg6(_request);
 	strncpy(pathname, (char*)&_request->regs[2], sizeof(_request->regs[2]));
 
-	ret = lcd_cptr_alloc(&p_cptr);
-	if (ret) {
-		LIBLCD_ERR("failed to get cptr");
-		goto fail_alloc;
-	}
-
-	mem_order = LOWER_HALF(fipc_get_reg3(_request));
-	p_offset = UPPER_HALF(fipc_get_reg3(_request));
-	lcd_cptr = __cptr(fipc_get_reg5(_request));
-
-	copy_msg_cap_vmfunc(current->vmfunc_lcd, current->lcd, lcd_cptr,
-			p_cptr);
-
-	ret = lcd_map_virt(p_cptr, mem_order, &p_gva);
-
-	if (ret) {
-		LIBLCD_ERR("failed to map void *p");
-		goto fail_virt;
-	}
-	//buffer.length = (1 << mem_order) * PAGE_SIZE;
-	buffer.length = (1 << 2) * PAGE_SIZE;
-	buffer.pointer = (void*)(gva_val(p_gva) + p_offset);
-
 	handle = acpi_device->handle;
+	buffer.length = fipc_get_reg3(_request);
+	buffer.pointer = fipc_get_reg5(_request);
 
-	printk("%s calling acpi_eval_obj with handle: %p, pathname: %s, ext_params: %p, buffer.p: %p\n",
-				__func__, handle, pathname, external_params, buffer.pointer);
+	printk("%s calling acpi_eval_obj with handle: %p, pathname: %s, "
+			"ext_params: %p, buffer.p: %p\n", __func__, handle,
+			pathname, external_params, buffer.pointer);
 
 	func_ret = acpi_evaluate_object(handle, pathname,
 			external_params, &buffer);
@@ -724,10 +744,13 @@ int acpi_evaluate_object_callee(struct fipc_message *_request)
 	{
 		union acpi_object *pss = buffer.pointer;
 
-		printk("%s, pss: %p type: %x package_count: %u elements: %p (elements - pss): %lx\n", __func__,
-				pss, pss->type, pss->package.count, pss->package.elements,
-				(unsigned long) pss->package.elements - (unsigned long) pss);
+		printk("%s, pss: %p type: %x package_count: %u elements: %p "
+				"(elements - pss): %lx\n", __func__, pss,
+				pss->type, pss->package.count,
+				pss->package.elements, (unsigned long)
+				pss->package.elements - (unsigned long) pss);
 
+		fipc_set_reg3(_request, pss->package.count - 11);
 		if (pss && pss->package.count == 14) {
 			int i;
 			for (i = 11; i < 14; i++) {
@@ -735,11 +758,8 @@ int acpi_evaluate_object_callee(struct fipc_message *_request)
 				printk("%s, element[%d]: %p | length: %u\n",
 						__func__, i, element,
 						element->string.length);
+				_request->regs[i-7] = element->string.length;
 			}
-
-			fipc_set_reg2(_request, (unsigned long)
-					pss->package.elements - (unsigned long)
-					pss);
 		}
 		if (pss && pss->package.count == 1) {
 			union acpi_object *element = &(pss->package.elements[0]);
@@ -766,6 +786,7 @@ int acpi_evaluate_object_callee(struct fipc_message *_request)
 		}
 	}
 	fipc_set_reg0(_request, func_ret);
+	fipc_set_reg2(_request, buffer.length);
 
 fail_alloc:
 fail_lookup:

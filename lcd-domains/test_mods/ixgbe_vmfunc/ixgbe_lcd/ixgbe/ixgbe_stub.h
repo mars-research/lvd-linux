@@ -81,6 +81,13 @@ void init_timer_key(struct timer_list *timer, unsigned int flags,
 }
 
 int del_timer(struct timer_list * timer) { LIBLCD_MSG("================>$$$$$$ Dummy %s called", __func__); return 0; }
+int del_timer_sync(struct timer_list * timer) { LIBLCD_MSG("================>$$$$$$ Dummy %s called", __func__); return 0; }
+
+int irq_set_affinity_hint(unsigned int irq, const struct cpumask *m) {
+	LIBLCD_MSG("================>$$$$$$ Dummy %s called", __func__);
+	return 0;
+}
+
 int mod_timer(struct timer_list *timer, unsigned long expires) { LIBLCD_MSG("================>$$$$$$ Dummy %s called", __func__); return 0; }
 
 struct net_device *netdev_all_upper_get_next_dev_rcu(struct net_device *dev,

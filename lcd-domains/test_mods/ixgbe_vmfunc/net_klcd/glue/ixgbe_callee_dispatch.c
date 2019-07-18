@@ -286,7 +286,7 @@ int net_klcd_dispatch_async_loop(struct fipc_message *message)
 			break;
 
 		case NETIF_WAKE_SUBQUEUE:
-			trace(NETIF_WAKE_SUBQUEUE);
+			//trace(NETIF_WAKE_SUBQUEUE);
 			ret =  netif_wake_subqueue_callee(message);
 			break;
 

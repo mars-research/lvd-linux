@@ -24,7 +24,7 @@ static int dummy_lcd_init(void)
 {
 	int ret = 0;
 
-	printk("LCD enter \n");
+	printk("LCD enter: current:%p \n", current);
 	ret = lcd_enter();
 	if (ret)
 		goto fail1;

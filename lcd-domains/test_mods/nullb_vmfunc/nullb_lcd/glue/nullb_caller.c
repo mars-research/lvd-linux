@@ -11,11 +11,12 @@
 static struct glue_cspace *c_cspace;
 
 void *iocb_data_pool;
-struct blk_mq_hw_ctx_container *ctx_container_g; 
+struct blk_mq_hw_ctx_container *ctx_containers[nr_cpu_ids];
 struct blk_mq_ops_container *ops_container_g;
 
 struct lcd_request_container {
 	struct request rq;
+	unsigned int queue_num;
 };
 
 void null_softirq_done_fn(struct request *rq);
@@ -174,7 +175,8 @@ void blk_mq_end_request(struct request *rq, int error)
 	async_msg_set_fn_type(request, BLK_MQ_END_REQUEST);
 
 	fipc_set_reg0(request, rq->tag);	
-	fipc_set_reg1(request, error);
+	fipc_set_reg1(request, rq_c->queue_num);
+	fipc_set_reg2(request, error);
 
 	vmfunc_wrapper(request);
 
@@ -217,6 +219,7 @@ void blk_mq_start_request(struct request *rq)
 	async_msg_set_fn_type(request, BLK_MQ_START_REQUEST);
 
 	fipc_set_reg0(request, rq->tag);
+	fipc_set_reg1(request, rq_c->queue_num);
 
 	vmfunc_wrapper(request);
 
@@ -459,13 +462,15 @@ void unregister_blkdev(unsigned int devno, const char *name)
 }
 
 int queue_rq_fn_callee(struct fipc_message *request)
-{	struct blk_mq_hw_ctx_container *ctx_container = ctx_container_g;
+{
+	struct blk_mq_hw_ctx_container *ctx_container;
 	struct blk_mq_ops_container *ops_container = ops_container_g;
 	struct blk_mq_queue_data bd;
 	struct lcd_request_container rq_c;
 	struct request *rq = &rq_c.rq;
 	int ret = 0;
 	int func_ret;
+	int queue_num;
 
 //	ret = glue_cap_lookup_blk_mq_hw_ctx_type(c_cspace, __cptr(fipc_get_reg1(request)),
 //						&ctx_container);
@@ -474,7 +479,9 @@ int queue_rq_fn_callee(struct fipc_message *request)
 //		goto fail_lookup;
 //	}
 	
-	ctx_container->blk_mq_hw_ctx.queue_num = fipc_get_reg0(request);
+	queue_num = fipc_get_reg0(request);
+	ctx_container = ctx_containers[queue_num];
+	ctx_container->blk_mq_hw_ctx.queue_num = queue_num;
 
 //	ret = glue_cap_lookup_blk_mq_ops_type(c_cspace, __cptr(fipc_get_reg2(request)),
 //				&ops_container);
@@ -485,6 +492,7 @@ int queue_rq_fn_callee(struct fipc_message *request)
 
 	rq->tag = fipc_get_reg3(request);
 	bd.rq = rq;
+	rq_c.queue_num = queue_num;
 
 	func_ret = ops_container->blk_mq_ops.queue_rq(&ctx_container->blk_mq_hw_ctx,
 				&bd);
@@ -529,7 +537,6 @@ fail_alloc:
 
 int init_hctx_fn_callee(struct fipc_message *request)
 {
-
 	struct blk_mq_hw_ctx_container *ctx_container;
 	struct blk_mq_ops_container *ops_container;
 	unsigned int index;
@@ -537,6 +544,7 @@ int init_hctx_fn_callee(struct fipc_message *request)
 	gva_t pool_addr;
 	unsigned int pool_ord;
 	int ret = 0;
+	static int once = 1;
 
 	ctx_container = kzalloc(sizeof(*ctx_container), GFP_KERNEL);
 	if (!ctx_container) {
@@ -544,7 +552,9 @@ int init_hctx_fn_callee(struct fipc_message *request)
 		goto fail_alloc;
 	}
 
-	ctx_container_g = ctx_container;	
+	index = fipc_get_reg1(request);
+
+	ctx_containers[index] = ctx_container;
 
 	ret = glue_cap_insert_blk_mq_hw_ctx_type(c_cspace, ctx_container, &ctx_container->my_ref);
 	if (ret) {
@@ -553,7 +563,6 @@ int init_hctx_fn_callee(struct fipc_message *request)
 	}
 	
 	ctx_container->other_ref.cptr = fipc_get_reg0(request); 
-	index = fipc_get_reg1(request);
 
 	ret = glue_cap_lookup_blk_mq_ops_type(c_cspace,
 			__cptr(fipc_get_reg2(request)), &ops_container);
@@ -562,28 +571,30 @@ int init_hctx_fn_callee(struct fipc_message *request)
                 goto fail_lookup;
         }
 
-	/* receive shared data pool */
-	ret = lcd_cptr_alloc(&pool_cptr);
-	if (ret) {
-		LIBLCD_ERR("failed to get cptr");
-		goto fail_cptr;
+	if (once) {
+		/* receive shared data pool */
+		ret = lcd_cptr_alloc(&pool_cptr);
+		if (ret) {
+			LIBLCD_ERR("failed to get cptr");
+			goto fail_cptr;
+		}
+
+		fipc_set_reg0(request, cptr_val(pool_cptr));
+		vmfunc_sync_call(request, INIT_HCTX_SYNC);
+		pool_ord = fipc_get_reg0(request);
+
+		ret = lcd_map_virt(pool_cptr, pool_ord, &pool_addr);
+		if (ret) {
+			LIBLCD_ERR("failed to map pool");
+			goto fail_pool;
+		}
+
+		LIBLCD_MSG("%s, mapping private pool %p | ord %d", __func__,
+				gva_val(pool_addr), pool_ord);
+
+		iocb_data_pool = (void*)gva_val(pool_addr);
+		once = 0;
 	}
-
-	fipc_set_reg0(request, cptr_val(pool_cptr));
-	vmfunc_sync_call(request, INIT_HCTX_SYNC);
-	pool_ord = fipc_get_reg0(request);
-
-	ret = lcd_map_virt(pool_cptr, pool_ord, &pool_addr);
-	if (ret) {
-		LIBLCD_ERR("failed to map pool");
-		goto fail_pool;
-	}
-
-	LIBLCD_MSG("%s, mapping private pool %p | ord %d", __func__,
-			gva_val(pool_addr), pool_ord);
-
-	iocb_data_pool = (void*)gva_val(pool_addr);
-
 	/* Passing NULL to data arg, hack to get nullb's address within the driver */
 	ret = ops_container->blk_mq_ops.init_hctx(&ctx_container->blk_mq_hw_ctx, NULL, index);
 	if(ret) {

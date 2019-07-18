@@ -33,3 +33,4 @@ obj-m += nullnet_vmfunc/
 obj-m += ixgbe_vmfunc/
 obj-m += nullb_vmfunc/
 obj-m += nvme_vmfunc/
+obj-m += acpi_hwmon_vmfunc/

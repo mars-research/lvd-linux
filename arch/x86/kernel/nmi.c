@@ -504,6 +504,11 @@ dotraplinkage notrace void
 do_nmi(struct pt_regs *regs, long error_code)
 {
 	if (this_cpu_read(nmi_state) != NMI_NOT_RUNNING) {
+		/*
+		 * Crash on nested NMI invocation!
+		 * nmi_state is not NMI_NOT_RUNNING
+		 */
+		dump_stack();
 		{
 			unsigned int eax = 0x4BF00035;
 			asm volatile("cpuid" : "=a" (eax) : "0" (eax) : "memory");

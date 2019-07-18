@@ -6,15 +6,15 @@ TODO                 U __bitmap_weight
 TODO                 U blk_execute_rq_nowait
 TODO                 U blk_get_queue
                  U blk_mq_alloc_tag_set
-TODO                 U blk_mq_complete_request
+ TODO                 U blk_mq_complete_request
                  U blk_mq_end_request 
 TODO                 U blk_mq_free_request
                  U blk_mq_free_tag_set
                  U blk_mq_init_queue
                  U blk_mq_map_queue
                  U blk_mq_start_request
-TODO                 U blk_mq_start_stopped_hw_queues
-TODO                 U blk_mq_stop_hw_queues
+ TODO                 U blk_mq_start_stopped_hw_queues
+ TODO                 U blk_mq_stop_hw_queues
 TODO                 U blk_mq_tags_cpumask
 TODO                 U blk_mq_tagset_busy_iter
 TODO                 U blk_mq_tag_to_rq
@@ -108,7 +108,7 @@ TODO                 U pci_enable_sriov
                  U pci_set_master
                  U pci_unregister_driver
 TODO                 U pci_vfs_assigned
-TODO                 U put_device
+ TODO                 U put_device
 SPECIAL                 U queue_work_on
                  U _raw_spin_lock
                  U _raw_spin_lock_irq

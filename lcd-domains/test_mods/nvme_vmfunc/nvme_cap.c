@@ -39,6 +39,9 @@ enum glue_type {
         GLUE_TYPE_BLK_MQ_HW_CTX,
         GLUE_TYPE_BLK_MQ_QUEUE_DATA,
         GLUE_TYPE_REQUEST_QUEUE,
+    GLUE_TYPE_NVME_COMMAND_CONTAINER,
+    GLUE_TYPE_NVME_NS_CONTAINER,
+    GLUE_TYPE_NVME_CONTROL_CONTAINER,
 	GLUE_NR_TYPES,
 };
 
@@ -99,7 +102,6 @@ static struct type_ops_id glue_libcap_type_ops[GLUE_NR_TYPES] = {
 			.revoke = dummy_func,
 		}
 	},
-
 	{
 		{
 			.name = "struct irq_handler_container",
@@ -114,7 +116,6 @@ static struct type_ops_id glue_libcap_type_ops[GLUE_NR_TYPES] = {
                 .revoke = dummy_func,
         }
     },
-
 	{
         {
                 .name = "struct blk_mq_tag_set",
@@ -150,13 +151,35 @@ static struct type_ops_id glue_libcap_type_ops[GLUE_NR_TYPES] = {
                 .revoke = dummy_func,
         }
     },
-	{
+    {
         {
                 .name = "struct request_queue",
                 .delete = dummy_func,
                 .revoke = dummy_func,
         }
     },
+	{
+        {
+                .name = "struct nvme_command",
+                .delete = dummy_func,
+                .revoke = dummy_func,
+        }
+    },
+    {
+        {
+                .name = "struct nvme_ns",
+                .delete = dummy_func,
+                .revoke = dummy_func,
+        }
+    },
+    {
+        {
+                .name = "struct nvme_control",
+                .delete = dummy_func,
+                .revoke = dummy_func,
+        }
+    },
+    
 };
 
 int glue_cap_init(void)

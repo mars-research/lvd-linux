@@ -52,6 +52,7 @@ static int boot_main(void)
 	/* ---------- Create LCD ---------- */
 	ret = lvd_create_module_lvd(LCD_DIR("nvme_vmfunc/nvme_lcd"),
 				"lcd_test_mod_nvme_vmfunc_nvme_lcd",
+                
 				&nvme_lcd,
 				&nvme_ctx, 1);
 	if (ret) {

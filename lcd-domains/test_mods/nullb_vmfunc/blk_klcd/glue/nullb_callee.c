@@ -118,10 +118,10 @@ int blk_mq_init_queue_callee(struct fipc_message *request)
 
 	ret = glue_cap_lookup_blk_mq_tag_set_type(c_cspace,
 			__cptr(fipc_get_reg0(request)), &set_container);
-        if (ret) {
-                LIBLCD_ERR("lookup");
-                goto fail_lookup;
-        }
+    if (ret) {
+            LIBLCD_ERR("lookup");
+            goto fail_lookup;
+    }
 
 	rq = blk_mq_init_queue(&set_container->tag_set);
 

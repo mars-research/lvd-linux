@@ -172,7 +172,7 @@ void iocb_data_pool_free(void)
 	}
 }
 
-int glue_blk_init(void)
+int glue_nvme_init(void)
 {
 	int ret;
 	ret = glue_cap_init();
@@ -195,7 +195,7 @@ fail1:
 
 }
 
-void glue_blk_exit(void)
+void glue_nvme_exit(void)
 {
 	glue_cap_destroy(c_cspace);
 	glue_cap_exit();
@@ -309,6 +309,24 @@ int blk_mq_start_request_callee(struct fipc_message *request)
 	return ret;
 }
 
+int blk_mq_start_stopped_hw_queues_callee(struct fipc_message *request)
+{
+    struct request_queue_container *rq_container;
+    int ret = glue_cap_lookup_request_queue_type(c_cspace,
+			__cptr(fipc_get_reg0(request)), &rq_container);
+    bool async;
+    
+    async_msg_set_fn_type(request, BLK_MQ_START_STOPPED_HW_QUEUES);
+    
+    async = fipc_get_reg1(request);
+    
+    vmfunc_wrapper(request);
+    
+    blk_mq_start_stopped_hw_queues(&rq_container->request_queue, async);
+    
+    return ret;
+}
+
 int blk_mq_complete_request_callee(struct fipc_message *request)
 {
     struct request *rq;
@@ -379,6 +397,19 @@ fail_lookup:
 	return ret;
 }
 
+// we don't need the irq or cpu mask to be stored on this side at all
+int *blk_mq_tags_cpumask_callee(struct fipc_message *request)
+{
+    
+    struct blk_mq_tags_container *tags_c = container_of(tags, struct blk_mq_tags_container, blk_mq_tags);
+    
+    fipc_set_reg0(request, tags_c->other_ref.cptr);
+    
+    async_msg_set_fn_type(request, BLK_MQ_TAGS_CPUMASK);
+    
+    vmfunc_wrapper(request);
+}
+
 int blk_queue_physical_block_size_callee(struct fipc_message *request)
 {
 	unsigned int size;
@@ -398,6 +429,7 @@ int blk_queue_physical_block_size_callee(struct fipc_message *request)
 fail_lookup:
 	return ret;
 }
+
 
 int alloc_disk_node_callee(struct fipc_message *request)
 {
@@ -517,7 +549,7 @@ int register_blkdev_callee(struct fipc_message *request)
 
 	devno = fipc_get_reg0(request);
 
-	ret = register_blkdev(devno, "nullb");
+	ret = register_blkdev(devno, "nvme");
 
 	printk("register_blkdev returns %d\n", ret);
 
@@ -538,7 +570,7 @@ int unregister_blkdev_callee(struct fipc_message *request)
 	int ret = 0;
 
 	devno = fipc_get_reg0(request);
-	unregister_blkdev(devno, "nullb");
+	unregister_blkdev(devno, "nvme");
 	return ret;
 }
 
@@ -1224,7 +1256,7 @@ int device_add_disk_callee(struct fipc_message *request)
 	/* without this add_disk will fail */
 	atomic_inc(&module_container->module.refcnt);
 
-    strcpy(module_container->module.name, "nullb");
+    strcpy(module_container->module.name, "nvme");
 
 	ret = glue_cap_insert_module_type( c_cspace, module_container,
 			&module_container->my_ref);
@@ -1307,7 +1339,7 @@ int device_add_disk_callee(struct fipc_message *request)
 	blo_container->block_device_operations.release = release;
 
 	disk->fops = &blo_container->block_device_operations;
-	sprintf(disk_name, "nullb%d", disk->first_minor);
+	sprintf(disk_name, "nvme%d", disk->first_minor);
 	strncpy(disk->disk_name, disk_name, DISK_NAME_LEN);
 
 	printk("Calling add_disk on cpu: %d, disk %p \n", raw_smp_processor_id(), disk);
@@ -1771,6 +1803,46 @@ int probe(struct pci_dev *dev,
 
 fail_insert:
 fail_alloc:
+	return ret;
+}
+
+#ifdef CONFIG_LVD
+int poll(struct blk_mq_hw_ctx *hctx, unsigned int tag)
+#else
+int poll(struct blk_mq_hw_ctx *hctx, unsigned int tag,
+		struct trampoline_hidden_args *hidden_args)
+#endif
+{
+	int ret;
+	struct fipc_message r;
+	struct fipc_message *_request = &r;
+	struct blk_mq_hw_ctx_container *hctx_c;
+
+	INIT_IPC_MSG(&r);
+
+	hctx_c = container_of(hctx, struct blk_mq_hw_ctx_container, blk_mq_hw_ctx);
+
+	async_msg_set_fn_type(_request, POLL);
+	fipc_set_reg0(_request, tag);
+	fipc_set_reg1(_request, hctx_c->other_ref.cptr);
+	//fipc_set_reg2(_request, hctx_c->state);
+
+	/*if (0)
+		printk("%s, poll - budget %d | napi_c->other_ref %lx\n", __func__,
+			budget, napi_c->other_ref.cptr);*/
+
+#ifdef CONFIG_LCD_TRACE_BUFFER
+	add_trace_entry(EVENT_SOFTIRQ_POLL, async_msg_get_fn_type(_request));
+#endif
+	vmfunc_klcd_wrapper(_request, 1);
+
+	ret = fipc_get_reg0(_request);
+/*#ifdef CONFIG_LCD_NAPI_STATE_SYNC
+	napi->state = fipc_get_reg1(_request);
+#endif*/
+	//pr_debug("%s, napi %p, napi->state %lx\n", __func__, napi, napi->state);
+	pr_debug("%s, returned %d\n", __func__, ret);
+
 	return ret;
 }
 

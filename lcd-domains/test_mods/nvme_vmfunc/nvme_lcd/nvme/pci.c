@@ -775,7 +775,7 @@ static irqreturn_t nvme_irq_check(int irq, void *data)
 	return IRQ_NONE;
 }
 
-static int nvme_poll(struct blk_mq_hw_ctx *hctx, unsigned int tag)
+int nvme_poll(struct blk_mq_hw_ctx *hctx, unsigned int tag)
 {
 	struct nvme_queue *nvmeq = hctx->driver_data;
 
@@ -2190,6 +2190,7 @@ static const struct pci_error_handlers nvme_err_handler = {
 /* Move to pci_ids.h later */
 #define PCI_CLASS_STORAGE_EXPRESS	0x010802
 
+#ifndef LCD_ISOLATE
 static const struct pci_device_id nvme_id_table[] = {
 	{ PCI_VDEVICE(INTEL, 0x0953),
 		.driver_data = NVME_QUIRK_STRIPE_SIZE |
@@ -2210,9 +2211,20 @@ static const struct pci_device_id nvme_id_table[] = {
 	{ PCI_DEVICE(PCI_VENDOR_ID_APPLE, 0x2001) },
 	{ 0, }
 };
+#else
+static const struct pci_device_id nvme_id_table[] = {
+{ PCI_DEVICE_CLASS(PCI_CLASS_STORAGE_EXPRESS, 0xffffff) },
+{ 0, }
+};
+#endif
 MODULE_DEVICE_TABLE(pci, nvme_id_table);
 
+#ifdef LCD_ISOLATE
+struct pci_driver_container nvme_driver_container = {
+    .pci_driver = {
+#else
 static struct pci_driver nvme_driver = {
+#endif
 	.name		= "nvme",
 	.id_table	= nvme_id_table,
 	.probe		= nvme_probe,
@@ -2223,6 +2235,9 @@ static struct pci_driver nvme_driver = {
 	},
 	.sriov_configure = nvme_pci_sriov_configure,
 	.err_handler	= &nvme_err_handler,
+#ifdef LCD_ISOLATE
+	}
+#endif
 };
 #ifdef LCD_ISOLATE
 int nvme_init(void)
@@ -2236,7 +2251,7 @@ static int __init nvme_init(void)
 	if (!nvme_workq)
 		return -ENOMEM;
 #endif
-	result = pci_register_driver(&nvme_driver);
+	result = pci_register_driver(&nvme_driver_container.pci_driver);
 #ifndef LCD_ISOLATE
 	if (result)
 		destroy_workqueue(nvme_workq);
@@ -2250,7 +2265,7 @@ void nvme_exit(void)
 static void __exit nvme_exit(void)
 #endif
 {
-	pci_unregister_driver(&nvme_driver);
+	pci_unregister_driver(&nvme_driver_container.pci_driver);
 	//destroy_workqueue(nvme_workq);
 	_nvme_check_size();
 }

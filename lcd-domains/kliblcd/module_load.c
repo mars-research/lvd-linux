@@ -69,7 +69,7 @@ int __kliblcd_module_host_load(char *mdir, char *module_name,
 	m = find_module(module_name);
 	mutex_unlock(&module_mutex);	
 	if (!m) {
-		LIBLCD_ERR("couldn't find module");
+		LIBLCD_ERR("couldn't find module: %s in mdir (%s)", module_name, mdir);
 		ret = -EIO;
 		goto fail2;
 	}

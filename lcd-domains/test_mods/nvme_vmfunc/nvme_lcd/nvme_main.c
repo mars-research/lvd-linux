@@ -37,7 +37,7 @@ struct pci_driver_container nvme_driver_container = {
 };
 
 
-int nvme_init_module(void)
+int nvme_init(void)
 {
 	int ret;
 	ret = pci_register_driver(&nvme_driver_container.pci_driver);
@@ -49,7 +49,7 @@ int nvme_init_module(void)
 	return 0;
 }
 
-void nvme_exit_module(void)
+void nvme_exit(void)
 {
 	pci_unregister_driver(&nvme_driver_container.pci_driver);
 }

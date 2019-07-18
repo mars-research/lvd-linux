@@ -12,8 +12,8 @@
 
 #include <lcd_config/post_hook.h>
 
-int nvme_init_module(void);
-void nvme_exit_module(void);
+int nvme_init(void);
+void nvme_exit(void);
 unsigned long loops_per_jiffy;
 
 static int nvme_lcd_init(void)
@@ -40,7 +40,7 @@ static int nvme_lcd_init(void)
 		goto fail2;
 	}
 
-	ret = nvme_init_module();
+	ret = nvme_init();
 
 	if (ret) {
 		LIBLCD_ERR("nvme register failed");
@@ -63,7 +63,7 @@ static void nvme_lcd_exit(void)
 {
 	LIBLCD_MSG("%s: exiting", __func__);
 
-	nvme_exit_module();
+	nvme_exit();
 
 	glue_nvme_exit();
 

@@ -2040,12 +2040,12 @@ int netif_set_real_num_rx_queues_callee(struct fipc_message *_request)
 
 	rxq = fipc_get_reg3(_request);
 
-	LIBLCD_MSG("%s, rxq %d | num_rx_queues %d", __func__, rxq, dev_container->net_device.num_rx_queues);
+	printk("%s, rxq %d | num_rx_queues %d", __func__, rxq, dev_container->net_device.num_rx_queues);
 
 	func_ret = netif_set_real_num_rx_queues(( &dev_container->net_device ),
 		rxq);
 
-	LIBLCD_MSG("netif_set_real_num_rx_queues returns %d", func_ret);
+	printk("netif_set_real_num_rx_queues returns %d", func_ret);
 
 	fipc_set_reg1(_request,
 			func_ret);
@@ -3494,6 +3494,7 @@ int netif_wake_subqueue_callee(struct fipc_message *_request)
 	}
 
 	queue_index = fipc_get_reg3(_request);
+	//printk("%s, qindex: %d\n", __func__, queue_index);
 	netif_wake_subqueue(( &dev_container->net_device ),
 			queue_index);
 

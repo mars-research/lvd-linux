@@ -19,7 +19,7 @@
  * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
  */
 
-#define pr_fmt(fmt)	"%s: " fmt, __func__
+#include <lcd_config/pre_hook.h>
 
 #include <linux/module.h>
 #include <linux/hwmon.h>
@@ -33,6 +33,10 @@
 #include <linux/time.h>
 #include <linux/err.h>
 #include <linux/acpi.h>
+
+#include "acpi_hwmon_caller.h"
+
+#include <lcd_config/post_hook.h>
 
 #define ACPI_POWER_METER_NAME		"power_meter"
 ACPI_MODULE_NAME(ACPI_POWER_METER_NAME);
@@ -61,6 +65,11 @@ ACPI_MODULE_NAME(ACPI_POWER_METER_NAME);
 
 static int cap_in_hardware;
 static bool force_cap_on;
+
+#ifdef LCD_ISOLATE
+static int _acpi_disabled = 0;
+#define acpi_exception	LIBLCD_MSG
+#endif
 
 static int can_cap_in_hardware(void)
 {
@@ -101,12 +110,20 @@ struct acpi_power_meter_resource {
 	u64		avg_interval;
 	int			sensors_valid;
 	unsigned long		sensors_last_updated;
+#ifdef LCD_ISOLATE
+	struct sensor_device_attribute_container sensor_container[NUM_SENSORS];
+#else
 	struct sensor_device_attribute	sensors[NUM_SENSORS];
+#endif
 	int			num_sensors;
 	s64			trip[2];
 	int			num_domain_devices;
 	struct acpi_device	**domain_devices;
+#ifdef LCD_ISOLATE
 	struct kobject		*holders_dir;
+#else
+	struct kobject		*holders_dir;
+#endif
 };
 
 struct sensor_template {
@@ -558,11 +575,8 @@ static int read_domain_devices(struct acpi_power_meter_resource *resource)
 	union acpi_object *pss;
 	acpi_status status;
 
-	pr_info("calling acpi_eval_obj with handle: %p\n", resource->acpi_dev->handle);
-	status = acpi_evaluate_object(resource->acpi_dev->handle, "_PMD", NULL,
+	status = _acpi_evaluate_object(resource->acpi_dev->handle, "_PMD", NULL,
 				      &buffer);
-	pr_info("acpi_eval_obj returned %d objects\n", ((union acpi_object
-					*)(buffer.pointer))->package.count);
 	if (ACPI_FAILURE(status)) {
 		ACPI_EXCEPTION((AE_INFO, status, "Evaluating _PMD"));
 		return -ENODEV;
@@ -574,7 +588,7 @@ static int read_domain_devices(struct acpi_power_meter_resource *resource)
 		dev_err(&resource->acpi_dev->dev, ACPI_POWER_METER_NAME
 			"Invalid _PMD data\n");
 		res = -EFAULT;
-		goto end;
+	goto end;
 	}
 
 	if (!pss->package.count)
@@ -587,8 +601,8 @@ static int read_domain_devices(struct acpi_power_meter_resource *resource)
 		goto end;
 	}
 
-	resource->holders_dir = kobject_create_and_add("measures",
-					&resource->acpi_dev->dev.kobj);
+	resource->holders_dir = _kobject_create_and_add("measures",
+					&resource->acpi_dev->dev);
 	if (!resource->holders_dir) {
 		res = -ENOMEM;
 		goto exit_free;
@@ -606,8 +620,6 @@ static int read_domain_devices(struct acpi_power_meter_resource *resource)
 
 		/* Create a symlink to domain objects */
 		resource->domain_devices[i] = NULL;
-		pr_info("calling acpi_bus_get_device with handle: %p\n",
-				element->reference.handle);
 		if (acpi_bus_get_device(element->reference.handle,
 					&resource->domain_devices[i]))
 			continue;
@@ -634,6 +646,57 @@ end:
 }
 
 /* Registration and deregistration */
+#ifdef LCD_ISOLATE
+static int register_attrs(struct acpi_power_meter_resource *resource,
+			  struct sensor_template *attrs)
+{
+	struct device *dev = &resource->acpi_dev->dev;
+	struct sensor_device_attribute_container *sensor_ctrs =
+		&resource->sensor_container[resource->num_sensors];
+	int res = 0;
+
+	while (attrs->label) {
+		sensor_ctrs->sensor_attr.dev_attr.attr.name = attrs->label;
+		sensor_ctrs->sensor_attr.dev_attr.attr.mode = S_IRUGO;
+		sensor_ctrs->sensor_attr.dev_attr.show = attrs->show;
+		sensor_ctrs->sensor_attr.index = attrs->index;
+
+		if (attrs->set) {
+			sensor_ctrs->sensor_attr.dev_attr.attr.mode |= S_IWUSR;
+			sensor_ctrs->sensor_attr.dev_attr.store = attrs->set;
+		}
+
+		sysfs_attr_init(&sensor_ctrs->sensor_attr.dev_attr.attr);
+		res = device_create_file(dev, &sensor_ctrs->sensor_attr.dev_attr);
+		if (res) {
+			sensor_ctrs->sensor_attr.dev_attr.attr.name = NULL;
+			goto error;
+		}
+		sensor_ctrs++;
+		resource->num_sensors++;
+		attrs++;
+	}
+
+error:
+	return res;
+}
+
+static void remove_attrs(struct acpi_power_meter_resource *resource)
+{
+	int i;
+
+	for (i = 0; i < resource->num_sensors; i++) {
+		if (!resource->sensor_container[i].sensor_attr.dev_attr.attr.name)
+			continue;
+		device_remove_file(&resource->acpi_dev->dev,
+				   &resource->sensor_container[i].sensor_attr.dev_attr);
+	}
+
+	remove_domain_devices(resource);
+
+	resource->num_sensors = 0;
+}
+#else
 static int register_attrs(struct acpi_power_meter_resource *resource,
 			  struct sensor_template *attrs)
 {
@@ -683,6 +746,7 @@ static void remove_attrs(struct acpi_power_meter_resource *resource)
 
 	resource->num_sensors = 0;
 }
+#endif
 
 static int setup_attrs(struct acpi_power_meter_resource *resource)
 {
@@ -756,11 +820,8 @@ static int read_capabilities(struct acpi_power_meter_resource *resource)
 	acpi_string *str;
 	acpi_status status;
 
-	pr_info("calling acpi_eval_obj with handle: %p\n", resource->acpi_dev->handle);
-	status = acpi_evaluate_object(resource->acpi_dev->handle, "_PMC", NULL,
+	status = _acpi_evaluate_object(resource->acpi_dev, "_PMC", NULL,
 				      &buffer);
-	pr_info("acpi_eval_obj returned %d objects\n", ((union acpi_object
-					*)(buffer.pointer))->package.count);
 	if (ACPI_FAILURE(status)) {
 		ACPI_EXCEPTION((AE_INFO, status, "Evaluating _PMC"));
 		return -ENODEV;
@@ -801,7 +862,8 @@ static int read_capabilities(struct acpi_power_meter_resource *resource)
 	for (i = 11; i < 14; i++) {
 		union acpi_object *element = &(pss->package.elements[i]);
 
-		if (element->type != ACPI_TYPE_STRING) {
+		printk("%s, element: %p", __func__, element);
+		if (element && element->type != ACPI_TYPE_STRING) {
 			res = -EINVAL;
 			goto error;
 		}
@@ -833,8 +895,6 @@ static void acpi_power_meter_notify(struct acpi_device *device, u32 event)
 {
 	struct acpi_power_meter_resource *resource;
 	int res;
-
-	pr_info("acpi_dev: %p event: %u\n", device, event);
 
 	if (!device || !acpi_driver_data(device))
 		return;
@@ -883,8 +943,6 @@ static int acpi_power_meter_add(struct acpi_device *device)
 	int res;
 	struct acpi_power_meter_resource *resource;
 
-	pr_info("acpi_dev: %p\n", device);
-
 	if (!device)
 		return -EINVAL;
 
@@ -911,7 +969,6 @@ static int acpi_power_meter_add(struct acpi_device *device)
 	if (res)
 		goto exit_free;
 
-	pr_info("calling hwmon_device_register dev: %p\n", &device->dev);
 	resource->hwmon_dev = hwmon_device_register(&device->dev);
 	if (IS_ERR(resource->hwmon_dev)) {
 		res = PTR_ERR(resource->hwmon_dev);
@@ -932,8 +989,6 @@ exit:
 static int acpi_power_meter_remove(struct acpi_device *device)
 {
 	struct acpi_power_meter_resource *resource;
-
-	pr_info("acpi_dev: %p\n", device);
 
 	if (!device || !acpi_driver_data(device))
 		return -EINVAL;
@@ -971,7 +1026,12 @@ static int acpi_power_meter_resume(struct device *dev)
 
 static SIMPLE_DEV_PM_OPS(acpi_power_meter_pm, NULL, acpi_power_meter_resume);
 
-static struct acpi_driver acpi_power_meter_driver = {
+#ifdef LCD_ISOLATE
+struct acpi_driver_container acpi_power_meter_driver_container = {
+	.acpi_driver = {
+#else
+struct acpi_driver acpi_power_meter_driver = {
+#endif
 	.name = "power_meter",
 	.class = ACPI_POWER_METER_CLASS,
 	.ids = power_meter_ids,
@@ -981,16 +1041,27 @@ static struct acpi_driver acpi_power_meter_driver = {
 		.notify = acpi_power_meter_notify,
 		},
 	.drv.pm = &acpi_power_meter_pm,
+#ifdef LCD_ISOLATE
+	}
+#endif
 };
 
 /* Module init/exit routines */
-static int __init enable_cap_knobs(const struct dmi_system_id *d)
+static int
+#ifndef LCD_ISOLATE
+__init
+#endif
+enable_cap_knobs(const struct dmi_system_id *d)
 {
 	cap_in_hardware = 1;
 	return 0;
 }
 
-static struct dmi_system_id __initdata pm_dmi_table[] = {
+static struct dmi_system_id
+#ifndef LCD_ISOLATE
+__initdata
+#endif
+pm_dmi_table[] = {
 	{
 		enable_cap_knobs, "IBM Active Energy Manager",
 		{
@@ -1000,27 +1071,36 @@ static struct dmi_system_id __initdata pm_dmi_table[] = {
 	{}
 };
 
+#ifndef LCD_ISOLATE
 static int __init acpi_power_meter_init(void)
+#else
+int acpi_power_meter_init(void)
+#endif
 {
 	int result;
 
-	if (acpi_disabled)
+	if (_acpi_disabled)
 		return -ENODEV;
 
 	dmi_check_system(pm_dmi_table);
 
-	result = acpi_bus_register_driver(&acpi_power_meter_driver);
+	result = acpi_bus_register_driver(&acpi_power_meter_driver_container.acpi_driver);
 	if (result < 0)
 		return result;
 
 	return 0;
 }
 
+#ifndef LCD_ISOLATE
 static void __exit acpi_power_meter_exit(void)
+#else
+void acpi_power_meter_exit(void)
+#endif
 {
-	acpi_bus_unregister_driver(&acpi_power_meter_driver);
+	acpi_bus_unregister_driver(&acpi_power_meter_driver_container.acpi_driver);
 }
 
+#ifndef LCD_ISOLATE
 MODULE_AUTHOR("Darrick J. Wong <darrick.wong@oracle.com>");
 MODULE_DESCRIPTION("ACPI 4.0 power meter driver");
 MODULE_LICENSE("GPL");
@@ -1030,3 +1110,4 @@ MODULE_PARM_DESC(force_cap_on, "Enable power cap even it is unsafe to do so.");
 
 module_init(acpi_power_meter_init);
 module_exit(acpi_power_meter_exit);
+#endif

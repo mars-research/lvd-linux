@@ -104,8 +104,12 @@ struct kmem_cache *skb_c_cache = NULL;
 
 #ifdef CONFIG_LVD
 int __ndo_start_xmit_inner_async(struct sk_buff *skb, struct net_device *dev);
+int __ndo_start_xmit_dummy(struct sk_buff *skb, struct net_device *dev);
+int __ndo_start_xmit_bare_fipc_nomarshal(struct sk_buff *skb, struct net_device *dev);
 #else
 int __ndo_start_xmit_inner_async(struct sk_buff *skb, struct net_device *dev, struct trampoline_hidden_args *hidden_args);
+int __ndo_start_xmit_dummy(struct sk_buff *skb, struct net_device *dev, struct trampoline_hidden_args *hidden_args);
+int __ndo_start_xmit_bare_fipc_nomarshal(struct sk_buff *skb, struct net_device *dev, struct trampoline_hidden_args *hidden_args);
 #endif
 
 #define MAX_POOLS	20

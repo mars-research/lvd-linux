@@ -22,6 +22,8 @@
 #define NUM_CORES	32
 #define NUM_THREADS	NUM_CORES
 
+#define HASHING
+
 extern inline xmit_type_t check_skb_range(struct sk_buff *skb);
 extern struct glue_cspace *c_cspace;
 
@@ -110,15 +112,21 @@ int __ndo_start_xmit_inner_async(struct sk_buff *skb, struct net_device *dev, st
 
 	skb_c->skb = skb;
 
+#ifdef HASHING
 	glue_insert_skb_hash(skb_c);
+#endif
 
 	/* inform LCD that it is async */
 	fipc_set_reg0(_request, 1);
 
 	fipc_set_reg1(_request,
 			net_dev_container->other_ref.cptr);
+#ifdef HASHING
 	fipc_set_reg2(_request,
 			skb_c->my_ref.cptr);
+#else
+	fipc_set_reg2(_request, (unsigned long) skb);
+#endif
 	fipc_set_reg3(_request,
 			(unsigned long)
 			((void*)skb->head - pool->pool));
@@ -284,9 +292,9 @@ free:
 int consume_skb_callee(struct fipc_message *request)
 {
 	int ret = 0;
-	struct sk_buff_container *skb_c = NULL;
 	struct sk_buff *skb;
-
+#ifdef HASHING
+	struct sk_buff_container *skb_c = NULL;
 	glue_lookup_skb_hash(__cptr(fipc_get_reg0(request)),
 			&skb_c);
 	if (!skb_c) {
@@ -304,5 +312,9 @@ int consume_skb_callee(struct fipc_message *request)
 
 	//kmem_cache_free(skb_c_cache, skb_c);
 skip:
+#else
+	skb = (struct sk_buff*) fipc_get_reg0(request);
+	consume_skb(skb);
+#endif
 	return ret;
 }

@@ -49,7 +49,7 @@ struct ring_trace_entry {
 };
 
 void add_trace_entry(unsigned type, unsigned long rdi);
-void dump_ring_trace_buffer(void);
+asmlinkage __visible notrace void dump_ring_trace_buffer(void);
 asmlinkage __visible notrace void add_trace_entry_tf(struct pt_regs *regs, unsigned type);
 
 DECLARE_PER_CPU_PAGE_ALIGNED(unsigned char, ring_buffer[RING_BUFFER_SIZE]);

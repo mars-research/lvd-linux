@@ -136,7 +136,7 @@ int __init ring_trace_init(void)
 }
 late_initcall(ring_trace_init);
 
-void dump_ring_trace_buffer(void)
+asmlinkage __visible notrace void dump_ring_trace_buffer(void)
 {
 	unsigned char head_idx = __this_cpu_read(ring_head);
 	unsigned char *this_ring = per_cpu(ring_buffer, raw_smp_processor_id());

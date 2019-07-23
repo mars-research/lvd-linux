@@ -69,13 +69,6 @@ ENDPROC(native_usergs_sysret64)
 	cpuid
 .endm
 
-.macro DEBUG_LCD
-	pushq %rax
-	/* abort LCD dropping into the hypervisor */
-	movl $0x4BF00035, %eax
-	cpuid
-.endm
-
 
 
 .macro VMFUNC_TO_KERNEL
@@ -105,6 +98,43 @@ ENDPROC(native_usergs_sysret64)
 	ABORT_LCD
 0:
 .endm
+
+.macro ILLEGAL_NMI
+	pushq %rax
+	/* Dump state of the illegal NMI */
+	movl $0x4BF00038, %eax
+	cpuid
+
+	/* VMFUNC back into the kernel to access debug info */
+	VMFUNC_TO_KERNEL
+	/* Dump trace (run on the debug stack)*/
+	movq    PER_CPU_VAR(debug_stack_addr), %rsp
+	call dump_ring_trace_buffer	
+	
+	/* Halt the CPU dropping into the hypervisor */
+	movl $0x4BF00039, %eax
+	cpuid
+
+.endm
+
+
+.macro ILLEGAL_EXCEPTION
+	pushq %rax
+	/* Dump state of the illegal exception */
+	movl $0x4BF00035, %eax
+	cpuid
+
+	/* VMFUNC back into the kernel to access debug info */
+	VMFUNC_TO_KERNEL
+	/* Dump trace (run on the debug stack)*/
+	movq    PER_CPU_VAR(debug_stack_addr), %rsp
+	call dump_ring_trace_buffer	
+
+	/* Halt the CPU dropping into the hypervisor */
+	movl $0x4BF00039, %eax
+	cpuid
+.endm
+
 
 /*
  * When dynamic function tracer is enabled it will add a breakpoint
@@ -932,7 +962,7 @@ ENTRY(\sym)
 	testq   $1, %rax
 	popq    %rax
 	jnz	1f
-	DEBUG_LCD
+	ILLEGAL_EXCEPTION
 
 1:
 
@@ -1394,7 +1424,7 @@ ENTRY(nmi_vmfunc_simple)
 	popq    %rbx
 	jnz	.Lnmi_in_user_no_lcd_simple
 	
-	DEBUG_LCD
+	ILLEGAL_NMI
 	
 
 .Lnmi_in_user_no_lcd_simple:
@@ -1618,7 +1648,7 @@ ENTRY(nmi_vmfunc_full)
 	popq    %rbx
 	jnz	.Lnmi_in_user_no_lcd_full
 	
-	DEBUG_LCD
+	ILLEGAL_NMI
 	
 
 .Lnmi_in_user_no_lcd_full:

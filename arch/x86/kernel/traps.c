@@ -78,6 +78,10 @@ gate_desc debug_idt_table[NR_VECTORS] __page_aligned_bss;
 #include <asm/proto.h>
 #endif
 
+#ifdef CONFIG_LCD_TRACE_BUFFER
+#include <linux/lcd_trace.h>
+#endif
+
 /* Must be page-aligned because the real IDT is used in a fixmap. */
 gate_desc idt_table[NR_VECTORS] __page_aligned_bss;
 
@@ -470,6 +474,12 @@ NOKPROBE_SYMBOL(do_general_protection);
 /* May run on IST stack. */
 dotraplinkage void notrace do_int3(struct pt_regs *regs, long error_code)
 {
+
+#ifdef CONFIG_LCD_TRACE_BUFFER
+	add_trace_entry_tf(regs, EVENT_DO_INT3);
+#endif
+
+
 #ifdef CONFIG_DYNAMIC_FTRACE
 	/*
 	 * ftrace must be first, everything else may cause a recursive crash.
@@ -939,8 +949,10 @@ void __init trap_init(void)
 #endif
 
 	set_intr_gate_ist(X86_TRAP_DE, divide_error, EXP_LVD_STACK);
-	set_intr_gate_ist(X86_TRAP_NMI, &nmi_vmfunc_simple, NMI_STACK);
-	//set_intr_gate_ist(X86_TRAP_NMI, &nmi_vmfunc_simple_old, NMI_STACK);
+	
+
+	set_intr_gate_ist(X86_TRAP_NMI, &nmi_vmfunc_full, NMI_STACK);
+	//set_intr_gate_ist(X86_TRAP_NMI, &nmi_vmfunc_simple, NMI_STACK);
 
 	//set_intr_gate_ist(X86_TRAP_NMI, &nmi, NMI_STACK);
 	/* int4 can be called from all */

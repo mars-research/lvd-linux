@@ -36,6 +36,11 @@
 #define CREATE_TRACE_POINTS
 #include <trace/events/nmi.h>
 
+#ifdef CONFIG_LCD_TRACE_BUFFER
+#include <linux/lcd_trace.h>
+#endif
+
+
 struct nmi_desc {
 	spinlock_t lock;
 	struct list_head head;
@@ -508,11 +513,15 @@ do_nmi(struct pt_regs *regs, long error_code)
 		 * Crash on nested NMI invocation!
 		 * nmi_state is not NMI_NOT_RUNNING
 		 */
+#if 0		
 		dump_stack();
+		dump_ring_trace_buffer();
+
 		{
 			unsigned int eax = 0x4BF00035;
 			asm volatile("cpuid" : "=a" (eax) : "0" (eax) : "memory");
 		}
+#endif
 		this_cpu_write(nmi_state, NMI_LATCHED);
 		return;
 	}

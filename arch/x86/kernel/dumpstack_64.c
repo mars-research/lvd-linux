@@ -15,7 +15,10 @@
 #include <linux/nmi.h>
 
 #include <asm/stacktrace.h>
+
+#ifdef CONFIG_LCD_TRACE_BUFFER
 #include <linux/lcd_trace.h>
+#endif
 
 #define N_EXCEPTION_STACKS_END \
 		(N_EXCEPTION_STACKS + DEBUG_STKSZ/EXCEPTION_STKSZ - 2)

@@ -54,6 +54,19 @@ static const char *event_type_to_string(unsigned type)
 
 		case EVENT_VMFUNC_SBOARD_KLCD_LEAVE:
 			return "SBOARD_LEAVE";
+
+		case EVENT_DO_PAGE_FAULT:
+			return "DO_PAGE_FAULT";
+
+		case EVENT_DO_PAGE_FAULT_LEAVE:
+			return "DO_PAGE_FAULT_LEAVE";
+
+		case EVENT_DO_INT3:
+			return "DO_INT3";
+
+		case EVENT_DO_INT3_LEAVE:
+			return "DO_INT3_LEAVE";
+
 		default:
 			return "Undefined item";
 	}

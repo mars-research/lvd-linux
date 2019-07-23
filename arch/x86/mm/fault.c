@@ -27,6 +27,11 @@
 #define CREATE_TRACE_POINTS
 #include <asm/trace/exceptions.h>
 
+#ifdef CONFIG_LCD_TRACE_BUFFER
+#include <linux/lcd_trace.h>
+#endif
+
+
 /*
  * Page fault error code bits:
  *
@@ -1182,6 +1187,11 @@ __do_page_fault(struct pt_regs *regs, unsigned long error_code,
 
 	tsk = current;
 	mm = tsk->mm;
+
+
+#ifdef CONFIG_LCD_TRACE_BUFFER
+	add_trace_entry_tf(regs, EVENT_DO_PAGE_FAULT);
+#endif
 
 	/*
 	 * Detect and handle instructions that would cause a page fault for

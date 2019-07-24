@@ -1354,6 +1354,8 @@ void syscall_init(void)
 DEFINE_PER_CPU(struct orig_ist, orig_ist);
 
 DEFINE_PER_CPU(unsigned long, lvd_irq_stack_addr);
+DEFINE_PER_CPU(unsigned long, lvd_debug_stack_addr);
+EXPORT_PER_CPU_SYMBOL(lvd_debug_stack_addr);
 
 DEFINE_PER_CPU(unsigned long, debug_stack_addr);
 DEFINE_PER_CPU(int, debug_stack_usage);
@@ -1530,6 +1532,8 @@ void cpu_init(void)
 				per_cpu(debug_stack_addr, cpu) = (unsigned long)estacks;
 			if (v == IRQ_LVD_STACK-1)
 				per_cpu(lvd_irq_stack_addr, cpu) = (unsigned long)estacks;
+			if (v == DEBUG_LVD_STACK-1)
+				per_cpu(lvd_debug_stack_addr, cpu) = (unsigned long)estacks;
 
 		}
 	}

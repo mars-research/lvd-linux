@@ -599,6 +599,7 @@ static int vmx_map_vmfunc_state_page(void)
 		this_cpu_vmfunc_page->vmfunc_state.cpuid = cpu;
 		this_cpu_vmfunc_page->vmfunc_state.in_kernel = 1; 
 
+		this_cpu_vmfunc_page->vmfunc_state.debug_stack = per_cpu(lvd_debug_stack_addr, cpu);  
 
 		ret = smp_call_function_single(cpu, 
 				on_cpu_ept_map_page, 
@@ -612,8 +613,10 @@ static int vmx_map_vmfunc_state_page(void)
 		if(ret) 
 			return -EIO; 
 
-		LCD_MSG("vmfunc state page: gs_base:0x%lx, cpu:%d\n", 
-			this_cpu_vmfunc_page->vmfunc_state.kernel_gs_base, this_cpu_vmfunc_page->vmfunc_state.cpuid); 
+		LCD_MSG("vmfunc state page: gs_base:0x%lx, cpu:%d, debug_stack:%lx\n", 
+			this_cpu_vmfunc_page->vmfunc_state.kernel_gs_base, 
+			this_cpu_vmfunc_page->vmfunc_state.cpuid,
+			this_cpu_vmfunc_page->vmfunc_state.debug_stack); 
 
 	}
 

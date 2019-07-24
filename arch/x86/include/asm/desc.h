@@ -47,7 +47,7 @@ struct vmfunc_state {
 	unsigned long entered_lcd; 
 	unsigned long kernel_esp;
 	unsigned long lcd_stack_saved; 
-
+	unsigned long debug_stack; 
 };
 
 union vmfunc_state_page {

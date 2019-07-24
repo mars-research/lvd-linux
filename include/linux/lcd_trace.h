@@ -30,6 +30,8 @@
 #define EVENT_DO_PAGE_FAULT_LEAVE	15
 #define EVENT_DO_INT3			16
 #define EVENT_DO_INT3_LEAVE		17
+#define EVENT_NMI_LEAVE			18
+#define EVENT_NMI_FULL			19
 
 #ifndef __ASSEMBLY__
 struct ring_trace_entry {

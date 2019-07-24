@@ -108,7 +108,7 @@ ENDPROC(native_usergs_sysret64)
 	/* VMFUNC back into the kernel to access debug info */
 	VMFUNC_TO_KERNEL
 	/* Dump trace (run on the debug stack)*/
-	movq    PER_CPU_VAR(debug_stack_addr), %rsp
+	movq    vmfunc_state_page + VMFUNC_debug_stack, %rsp
 	call dump_ring_trace_buffer	
 	
 	/* Halt the CPU dropping into the hypervisor */
@@ -127,7 +127,7 @@ ENDPROC(native_usergs_sysret64)
 	/* VMFUNC back into the kernel to access debug info */
 	VMFUNC_TO_KERNEL
 	/* Dump trace (run on the debug stack)*/
-	movq    PER_CPU_VAR(debug_stack_addr), %rsp
+	movq    vmfunc_state_page + VMFUNC_debug_stack, %rsp
 	call dump_ring_trace_buffer	
 
 	/* Halt the CPU dropping into the hypervisor */
@@ -1549,6 +1549,13 @@ ENTRY(nmi_vmfunc_simple)
 	SWAPGS_UNSAFE_STACK
 nmi_restore_vmfunc_simple:
 
+#ifdef CONFIG_LCD_TRACE_BUFFER
+	/* Trace IRQ into LCDs buffer, rdi = trap frame, rsi = event type */
+	movq    %rsp, %rdi
+	movq    $EVENT_NMI_LEAVE, %rsi
+	call    add_trace_entry_tf
+#endif
+
 	/* Restore the state of the VMFUNC_entered_lcd as we saw it on entry 
 	*  If the VMFUNC_entered_lcd wasn't set then we don't need to VMFUNC
 	*  either  
@@ -1700,7 +1707,7 @@ ENTRY(nmi_vmfunc_full)
 #ifdef CONFIG_LCD_TRACE_BUFFER
 	/* Trace IRQ into LCDs buffer, rdi = trap frame, rsi = event type */
 	movq    %rsp, %rdi
-	movq    $EVENT_NMI, %rsi
+	movq    $EVENT_NMI_FULL, %rsi
 	call    add_trace_entry_tf
 #endif
 
@@ -1937,7 +1944,7 @@ end_repeat_nmi_vmfunc_full:
 #ifdef CONFIG_LCD_TRACE_BUFFER
 	/* Trace IRQ into LCDs buffer, rdi = trap frame, rsi = event type */
 	movq    %rsp, %rdi
-	movq    $EVENT_NMI, %rsi
+	movq    $EVENT_NMI_FULL, %rsi
 	call    add_trace_entry_tf
 #endif
 
@@ -1945,6 +1952,13 @@ end_repeat_nmi_vmfunc_full:
 	movq	%rsp, %rdi
 	movq	$-1, %rsi
 	call	do_nmi
+
+#ifdef CONFIG_LCD_TRACE_BUFFER
+	/* Trace IRQ into LCDs buffer, rdi = trap frame, rsi = event type */
+	movq    %rsp, %rdi
+	movq    $EVENT_NMI_LEAVE, %rsi
+	call    add_trace_entry_tf
+#endif
 
 	testl	%ebx, %ebx			/* swapgs needed? */
 	jnz	nmi_restore_vmfunc_full

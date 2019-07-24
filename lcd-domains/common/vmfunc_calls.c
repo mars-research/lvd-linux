@@ -9,6 +9,10 @@
 #include <liblcd/liblcd.h>
 #include <linux/stringify.h>
 
+#ifdef CONFIG_LCD_TRACE_BUFFER
+#include <linux/lcd_trace.h>
+#endif
+
 #include <lcd_config/post_hook.h>
 
 #define VMFUNC_WRAPPER_SECTION		".vmfuncwrapper.text"
@@ -55,6 +59,10 @@ __vmfunc_dispatch(struct fipc_message *msg)
 {
 	int ret = 0;
 
+#ifdef CONFIG_LCD_TRACE_BUFFER
+	add_trace_entry(EVENT_VMFUNC_SBOARD_KLCD_ENTER, msg->rpc_id);
+#endif
+
 	switch(msg->vmfunc_id) {
 
 #ifndef LCD_ISOLATE
@@ -89,6 +97,10 @@ __vmfunc_dispatch(struct fipc_message *msg)
 		fipc_set_reg3(msg, 0xcad);
 		break;
 	}
+
+#ifdef CONFIG_LCD_TRACE_BUFFER
+	add_trace_entry(EVENT_VMFUNC_SBOARD_KLCD_LEAVE, msg->rpc_id);
+#endif
 
 	return ret;
 }

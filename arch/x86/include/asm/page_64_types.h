@@ -31,7 +31,8 @@
 #define MCE_STACK 4
 #define IRQ_LVD_STACK 5 
 #define EXP_LVD_STACK 6 
-#define N_EXCEPTION_STACKS 6 /* hw limit: 7 */
+#define DEBUG_LVD_STACK 7 
+#define N_EXCEPTION_STACKS 7 /* hw limit: 7 */
 
 /*
  * Set __PAGE_OFFSET to the most negative possible address +

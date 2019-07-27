@@ -67,6 +67,12 @@ static const char *event_type_to_string(unsigned type)
 		case EVENT_DO_INT3_LEAVE:
 			return "DO_INT3_LEAVE";
 
+		case EVENT_NMI_LEAVE:
+			return "EVENT_NMI_LEAVE";
+
+		case EVENT_NMI_FULL: 
+			return "EVENT_NMI_FULL";
+
 		default:
 			return "Undefined item";
 	}
@@ -143,11 +149,13 @@ asmlinkage __visible notrace void dump_ring_trace_buffer(void)
 	struct ring_trace_entry *trace_entries = (struct ring_trace_entry*) this_ring;
 	int i;
 
+	printk("head:%d\n", head_idx); 
+
 	for (i = 0; i < NUM_TRACE_ENTRIES; i++, head_idx--) {
 		struct ring_trace_entry *entry = &trace_entries[head_idx % NUM_TRACE_ENTRIES];
 		if (i == 0)
 			printk("head ==> ");
-		printk("type:%16s(%x) cpu: %d [%c|%c|%c] comm: %s pid: %d rip: %16lx rsp: %16lx "
+		printk("type:%16s(%d) cpu: %d [%c|%c|%c] comm: %s pid: %d rip: %16lx rsp: %16lx "
 				"rdi: %09lx gsbase: %16lx lcd_stack: %16lx[bmap: %x nc:%u] "
 				"eflags: %08lx [IF: %d]\n",
 				event_type_to_string(entry->type),

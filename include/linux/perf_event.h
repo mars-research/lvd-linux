@@ -1092,6 +1092,9 @@ extern void perf_event_fork(struct task_struct *tsk);
 /* Callchains */
 DECLARE_PER_CPU(struct perf_callchain_entry, perf_callchain_entry);
 
+DECLARE_PER_CPU(void *, lvd_cpu_hw_events_ds);
+DECLARE_PER_CPU(void *, lvd_cpu_hw_events_pebs);
+
 extern void perf_callchain_user(struct perf_callchain_entry_ctx *entry, struct pt_regs *regs);
 extern void perf_callchain_kernel(struct perf_callchain_entry_ctx *entry, struct pt_regs *regs);
 extern struct perf_callchain_entry *

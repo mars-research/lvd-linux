@@ -1431,6 +1431,15 @@ do_page_fault(struct pt_regs *regs, unsigned long error_code)
 }
 NOKPROBE_SYMBOL(do_page_fault);
 
+dotraplinkage void notrace
+debug_lvd_page_fault(struct pt_regs *regs, unsigned long error_code)
+{
+	unsigned long address = read_cr2(); /* Get the faulting address */
+	printk("page fault, addr:%lx, error:%lx", address, error_code); 
+}
+NOKPROBE_SYMBOL(do_page_fault);
+
+
 #ifdef CONFIG_TRACING
 static nokprobe_inline void
 trace_page_fault_entries(unsigned long address, struct pt_regs *regs,

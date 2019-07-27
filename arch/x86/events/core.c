@@ -46,6 +46,13 @@ DEFINE_PER_CPU(struct cpu_hw_events, cpu_hw_events) = {
 	.enabled = 1,
 };
 
+DEFINE_PER_CPU(void *, lvd_cpu_hw_events_ds);
+EXPORT_PER_CPU_SYMBOL(lvd_cpu_hw_events_ds);
+
+DEFINE_PER_CPU(void *, lvd_cpu_hw_events_pebs);
+EXPORT_PER_CPU_SYMBOL(lvd_cpu_hw_events_pebs);
+
+
 struct static_key rdpmc_always_available = STATIC_KEY_INIT_FALSE;
 
 u64 __read_mostly hw_cache_event_ids

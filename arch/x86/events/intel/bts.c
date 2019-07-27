@@ -90,6 +90,7 @@ bts_buffer_setup_aux(int cpu, void **pages, int nr_pages, bool overwrite)
 	/* count all the high order buffers */
 	for (pg = 0, nbuf = 0; pg < nr_pages;) {
 		page = virt_to_page(pages[pg]);
+		printk("bts buffer page:%p\n", pages[pg]); 
 		if (WARN_ON_ONCE(!PagePrivate(page) && nr_pages > 1))
 			return NULL;
 		pg += 1 << page_private(page);
@@ -105,6 +106,8 @@ bts_buffer_setup_aux(int cpu, void **pages, int nr_pages, bool overwrite)
 	buf = kzalloc_node(offsetof(struct bts_buffer, buf[nbuf]), GFP_KERNEL, node);
 	if (!buf)
 		return NULL;
+
+	printk("bts buffer:%p\n", buf); 
 
 	buf->nr_pages = nr_pages;
 	buf->nr_bufs = nbuf;

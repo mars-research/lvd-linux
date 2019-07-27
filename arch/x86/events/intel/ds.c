@@ -282,6 +282,10 @@ static int alloc_pebs_buffer(int cpu)
 	if (unlikely(!buffer))
 		return -ENOMEM;
 
+	printk("ds:%p, pebs buffer:%p\n", ds, buffer); 
+
+	per_cpu(lvd_cpu_hw_events_pebs, cpu) = buffer; 
+
 	/*
 	 * HSW+ already provides us the eventing ip; no need to allocate this
 	 * buffer then.
@@ -369,6 +373,9 @@ static int alloc_ds_buffer(int cpu)
 		return -ENOMEM;
 
 	per_cpu(cpu_hw_events, cpu).ds = ds;
+
+	/* Save it here for LCDs so we can map it later */
+	per_cpu(lvd_cpu_hw_events_ds, cpu) = ds; 
 
 	return 0;
 }

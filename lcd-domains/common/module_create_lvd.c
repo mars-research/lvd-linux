@@ -18,6 +18,8 @@
 #include <lcd_domains/microkernel.h>
 #include <asm/desc.h>
 #include <linux/percpu.h>
+#include <linux/perf_event.h>
+#include <asm/perf_event.h>
 
 #include <lcd_config/post_hook.h>
 
@@ -404,7 +406,6 @@ static int do_kernel_pages_grant_map(cptr_t lcd, struct lcd_create_ctx *ctx)
 	unsigned long idtr_base;
 	unsigned char idt_ptr[10];
 
-
 	asm volatile("sidt %[idt_ptr]"
 			:[idt_ptr]"=m"(idt_ptr));
 
@@ -441,6 +442,14 @@ static int do_kernel_pages_grant_map(cptr_t lcd, struct lcd_create_ctx *ctx)
 
 	/* IDTR would be just one page */
 	lcd_create_mo_metadata(p, PAGE_SIZE, LCD_MICROKERNEL_TYPE_ID_VOLUNTEERED_PAGE);
+
+	///
+	/* lookup ds and pebs */
+	p = virt_to_head_page((void*) idtr_base);
+
+	/* IDTR would be just one page */
+	lcd_create_mo_metadata(p, PAGE_SIZE, LCD_MICROKERNEL_TYPE_ID_VOLUNTEERED_PAGE);
+
 
 
 	offset = entry_text_start_page -
@@ -851,7 +860,26 @@ static int do_misc_pages_grant_map(cptr_t lcd, struct lcd_create_ctx *ctx)
 
 			ist_stacks += except_stack_sz[i];
 		}
+
 	}
+
+	for_each_possible_cpu(cpu) {
+		/* lookup idtr_base */
+		char *ds = (char*) per_cpu(lvd_cpu_hw_events_ds, cpu);
+		char *pebs =  (char*) per_cpu(lvd_cpu_hw_events_pebs, cpu);
+
+		LIBLCD_MSG("grant mem for cpu_hw_events.ds %p", per_cpu(lvd_cpu_hw_events_ds, cpu));
+
+		map_cpu_page(ds, ctx);
+		__do_ept_mapping(lcd, ds, ctx, PAGE_SIZE);
+
+		LIBLCD_MSG("grant mem for cpu_hw_events.pebs %p", per_cpu(lvd_cpu_hw_events_pebs, cpu));
+
+		map_cpu_page(pebs, ctx);
+		__do_ept_mapping(lcd, pebs, ctx, PAGE_SIZE);
+
+	};
+
 
 	return 0;
 }

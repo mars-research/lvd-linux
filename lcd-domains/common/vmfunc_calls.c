@@ -59,7 +59,7 @@ __vmfunc_dispatch(struct fipc_message *msg)
 {
 	int ret = 0;
 
-#ifdef CONFIG_LCD_TRACE_BUFFER
+#if defined(CONFIG_LCD_TRACE_BUFFER) && !defined(LCD_ISOLATE)
 	add_trace_entry(EVENT_VMFUNC_SBOARD_KLCD_ENTER, msg->rpc_id);
 #endif
 
@@ -98,7 +98,7 @@ __vmfunc_dispatch(struct fipc_message *msg)
 		break;
 	}
 
-#ifdef CONFIG_LCD_TRACE_BUFFER
+#if defined(CONFIG_LCD_TRACE_BUFFER) && !defined(LCD_ISOLATE)
 	add_trace_entry(EVENT_VMFUNC_SBOARD_KLCD_LEAVE, msg->rpc_id);
 #endif
 

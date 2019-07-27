@@ -313,11 +313,19 @@ remap_cr3(void)
 			goto skip;
 
 		gpa_cr3 = __gpa(__pa(init_pgd));
-
+#ifdef REMAP_CR3_ALL_CPUS
 		ret = lcd_arch_ept_map_all_cpus(lcd_list[ept]->lcd_arch, gpa_cr3,
 			hpa_lcd_cr3,
 			1, /* create, if not present */
 			1 /* overwrite, if present */);
+#else
+		ret = lcd_arch_ept_map_cpu(lcd_list[ept]->lcd_arch, gpa_cr3,
+			hpa_lcd_cr3,
+			1, /* create, if not present */
+			1, /* overwrite, if present */
+			smp_processor_id());
+
+#endif
 
 		lcd->lcd_arch->idle_cr3_mapped = 1;
 

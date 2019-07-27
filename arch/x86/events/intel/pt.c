@@ -492,6 +492,8 @@ static struct topa *topa_alloc(int cpu, gfp_t gfp)
 	if (!p)
 		return NULL;
 
+	printk("topa page:%p\n", page_address(p));
+
 	topa = page_address(p);
 	topa->last = 0;
 	topa->phys = page_to_phys(p);

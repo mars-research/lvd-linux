@@ -82,6 +82,8 @@ asmlinkage void trace_rbx(unsigned long long rbx);
 #endif
 dotraplinkage void do_general_protection(struct pt_regs *, long);
 dotraplinkage void do_page_fault(struct pt_regs *, unsigned long);
+dotraplinkage void debug_lvd_page_fault(struct pt_regs *, unsigned long);
+
 #ifdef CONFIG_TRACING
 dotraplinkage void trace_do_page_fault(struct pt_regs *, unsigned long);
 #else

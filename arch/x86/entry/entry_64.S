@@ -1413,7 +1413,11 @@ ENTRY(error_exit)
 	jmp	retint_user
 END(error_exit)
 
-/* Runs on exception stack */
+/* Runs on exception stack 
+ * AB: there might be a vuln here --- if LCD pushes itself to ring3, and then 
+ * changes the gs the SWAPGS_UNSAFE_STACK might put us in trouble -- I should
+ * think of an entry path similar to IRQs
+ */
 ENTRY(nmi_vmfunc_simple)
 
 	testb	$3, CS-RIP+0(%rsp)
@@ -1925,11 +1929,6 @@ end_repeat_nmi_vmfunc_full:
 	testq   $1, %r12
 	jnz	1f
 
-	/* Make sure that exceptions that might be fired inside the NMI
-	 * (Linux allows breakpoints inside NMIs) see that we're in kernel
-	 */	
-	movq 	$1, vmfunc_state_page + VMFUNC_in_kernel
-
 	/* We need to vmfunc back into the kernel */
 	VMFUNC_TO_KERNEL
 1:
@@ -1996,7 +1995,7 @@ nmi_restore_vmfunc_full:
 	 * return here 
 	 */
 	// Restore the "not-in-kernel" flag as we saw it on entry
-	movq    $0, vmfunc_state_page + VMFUNC_in_kernel
+	//movq    $0, vmfunc_state_page + VMFUNC_in_kernel
 	/* If another NMI hits here, it will VMFUNC into the 
 	 * kernel and back into LCD on exit, we waste a bit of cycles, 
 	 * but it's ok, we'll just VMFUNC back to LCD one more time 

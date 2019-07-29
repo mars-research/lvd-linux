@@ -38,6 +38,10 @@ static char x86_stack_ids[][8] = {
 #endif
 };
 
+char *x86_stack_name(unsigned int id) {
+	return x86_stack_ids[id];
+};
+
 static unsigned long *in_exception_stack(unsigned cpu, unsigned long stack,
 					 unsigned *usedp, char **idp)
 {

@@ -26,6 +26,12 @@
 #define EVENT_VMFUNC_TRAMP_EXIT		11
 #define EVENT_VMFUNC_SBOARD_KLCD_ENTER	12
 #define EVENT_VMFUNC_SBOARD_KLCD_LEAVE	13
+#define EVENT_DO_PAGE_FAULT		14
+#define EVENT_DO_PAGE_FAULT_LEAVE	15
+#define EVENT_DO_INT3			16
+#define EVENT_DO_INT3_LEAVE		17
+#define EVENT_NMI_LEAVE			18
+#define EVENT_NMI_FULL			19
 
 #ifndef __ASSEMBLY__
 struct ring_trace_entry {
@@ -44,12 +50,25 @@ struct ring_trace_entry {
 	char name[PROC_NAME_MAX];
 };
 
+
+struct ring_trace_header {
+	unsigned long head;
+	unsigned long size; 
+};
+
+#define NUM_TRACE_ENTRIES	((RING_BUFFER_SIZE - sizeof(struct ring_trace_header)) / sizeof(struct ring_trace_entry))
+
+struct ring_trace_buffer {
+	struct ring_trace_header header; 
+	struct ring_trace_entry entries[NUM_TRACE_ENTRIES];
+};
+
 void add_trace_entry(unsigned type, unsigned long rdi);
-void dump_ring_trace_buffer(void);
+asmlinkage __visible notrace void dump_ring_trace_buffer(void);
 asmlinkage __visible notrace void add_trace_entry_tf(struct pt_regs *regs, unsigned type);
 
-DECLARE_PER_CPU_PAGE_ALIGNED(unsigned char, ring_buffer[RING_BUFFER_SIZE]);
-DECLARE_PER_CPU(unsigned char, ring_head);
+
+DECLARE_PER_CPU_PAGE_ALIGNED(struct ring_trace_buffer, ring_buffer);
 #endif /* __ASSEMBLY__ */
 
 #endif /* LCD_TRACE_H */

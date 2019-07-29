@@ -7,7 +7,7 @@
 #include <asm/lcd_domains/libvmfunc.h>
 #include <asm/desc.h>
 #include <asm/irq_vectors.h>
-
+#include <asm/lcd_domains/bflank.h>
 #include <lcd_config/post_hook.h>
 
 extern int callee_main(void);
@@ -133,7 +133,9 @@ foo(struct fipc_message *msg)
 		int i = 0;
 		void *rsp_ptr;
 		unsigned long rsp_top;
+		u64 s_exits = bfcall_dump_perf(), e_exits; 
 		u64 start = rdtsc(), end;
+
 		int num_iterations = 1000000;
 
 		for(i = 0; i < num_iterations; i++) {
@@ -148,8 +150,11 @@ foo(struct fipc_message *msg)
 			//printk("rsp before int 0xf3 %p", rsp_ptr);
 		}
 		end = rdtsc();
-		printk("%d iterations of int 0xf3 back-to-back took %llu cycles (avg: %llu cycles)\n",
-				num_iterations, end - start, (end - start) / num_iterations);
+
+		e_exits = bfcall_dump_perf(); 
+
+		printk("%d iterations of int 0xf3 back-to-back took %llu cycles (avg: %llu cycles, total exits:%llu)\n",
+				num_iterations, end - start, (end - start) / num_iterations, e_exits - s_exits);
 
 		for(i = 0; i < 10; i++) {
 			unsigned long ecx = 0xc0000101, edx, eax;

@@ -15,6 +15,8 @@
 #include <linux/lightnvm.h>
 #include "../glue_helper.h"
 
+#include <liblcd/spinlock.h>
+
 #ifdef LCD_ISOLATE
 #include <liblcd/spinlock.h>
 #include <lcd_config/post_hook.h>
@@ -61,11 +63,7 @@ struct nullb {
 	struct hrtimer timer;
 #endif
 	unsigned int queue_depth;
-#ifndef LCD_ISOLATE
-	spinlock_t lock;
-#else
-    lcd_spinlock_t lock;
-#endif
+	lcd_spinlock_t lock;
 
 	struct nullb_queue *queues;
 	unsigned int nr_queues;
@@ -94,7 +92,7 @@ enum {
 #ifdef LCD_ISOLATE
 /*TODO have to hardcode a value that nr_online_cpus return 
  * I doubt that nr_online_cpus will be accessible from here */
-static int submit_queues;
+static int submit_queues = nr_cpu_ids;
 #else
 static int submit_queues;
 module_param(submit_queues, int, S_IRUGO);

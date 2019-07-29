@@ -27,6 +27,11 @@
 #define CREATE_TRACE_POINTS
 #include <asm/trace/exceptions.h>
 
+#ifdef CONFIG_LCD_TRACE_BUFFER
+#include <linux/lcd_trace.h>
+#endif
+
+
 /*
  * Page fault error code bits:
  *
@@ -1183,6 +1188,11 @@ __do_page_fault(struct pt_regs *regs, unsigned long error_code,
 	tsk = current;
 	mm = tsk->mm;
 
+
+#ifdef CONFIG_LCD_TRACE_BUFFER
+	add_trace_entry_tf(regs, EVENT_DO_PAGE_FAULT);
+#endif
+
 	/*
 	 * Detect and handle instructions that would cause a page fault for
 	 * both a tracked kernel page and a userspace page.
@@ -1420,6 +1430,15 @@ do_page_fault(struct pt_regs *regs, unsigned long error_code)
 	exception_exit(prev_state);
 }
 NOKPROBE_SYMBOL(do_page_fault);
+
+dotraplinkage void notrace
+debug_lvd_page_fault(struct pt_regs *regs, unsigned long error_code)
+{
+	unsigned long address = read_cr2(); /* Get the faulting address */
+	printk("page fault, addr:%lx, error:%lx", address, error_code); 
+}
+NOKPROBE_SYMBOL(do_page_fault);
+
 
 #ifdef CONFIG_TRACING
 static nokprobe_inline void

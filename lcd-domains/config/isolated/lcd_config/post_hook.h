@@ -360,8 +360,9 @@ static inline void force_up_write(void *x)
 
 /* The "real" get_current tries to read a percpu variable that using
  * the %gs segment register. */
+extern struct task_struct *lcd_current_task;
 #undef get_current
-#define get_current() (current_task)
+#define get_current() (lcd_current_task)
 
 /* XXX: For IXGBE device layer
  * Polluting this file is inappropriate. Ideally we should have a

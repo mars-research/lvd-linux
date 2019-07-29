@@ -69,13 +69,6 @@ ENDPROC(native_usergs_sysret64)
 	cpuid
 .endm
 
-.macro DEBUG_LCD
-	pushq %rax
-	/* abort LCD dropping into the hypervisor */
-	movl $0x4BF00035, %eax
-	cpuid
-.endm
-
 
 
 .macro VMFUNC_TO_KERNEL
@@ -105,6 +98,45 @@ ENDPROC(native_usergs_sysret64)
 	ABORT_LCD
 0:
 .endm
+
+.macro ILLEGAL_NMI
+	pushq %rax
+	/* Dump state of the illegal NMI */
+	movl $0x4BF00038, %eax
+	cpuid
+
+	/* VMFUNC back into the kernel to access debug info */
+	VMFUNC_TO_KERNEL
+	/* Dump trace (run on the debug stack)*/
+	movq    vmfunc_state_page + VMFUNC_debug_stack, %rsp
+	call dump_ring_trace_buffer	
+	
+	/* Halt the CPU dropping into the hypervisor */
+	movl $0x4BF00039, %eax
+	cpuid
+
+.endm
+
+
+.macro ILLEGAL_EXCEPTION
+	pushq %rax
+	/* Dump state of the illegal exception */
+	movl $0x4BF00035, %eax
+	cpuid
+
+	/* VMFUNC back into the kernel to access debug info */
+	VMFUNC_TO_KERNEL
+	/* Dump trace (run on the debug stack)*/
+	movq    vmfunc_state_page + VMFUNC_debug_stack, %rsp
+	call dump_ring_trace_buffer	
+
+	//debug_lvd_page_fault
+
+	/* Halt the CPU dropping into the hypervisor */
+	movl $0x4BF00039, %eax
+	cpuid
+.endm
+
 
 /*
  * When dynamic function tracer is enabled it will add a breakpoint
@@ -923,14 +955,16 @@ ENTRY(\sym)
 	.error "using shift_ist requires paranoid=1"
 	.endif
 
-	/* Test if we've been demoted and moreover need 
-	 * to VMFUNC back to the kernel */
+	/* We assume exceptions can't happen inside LCD. If one 
+           happens, the LCD tries to attack us. 
+           Test if we've been demoted and are not inside the kernel, 
+           i.e., inside the LCD */
 	pushq   %rax
 	movq 	vmfunc_state_page + VMFUNC_in_kernel, %rax
 	testq   $1, %rax
 	popq    %rax
 	jnz	1f
-	DEBUG_LCD
+	ILLEGAL_EXCEPTION
 
 1:
 
@@ -1379,145 +1413,24 @@ ENTRY(error_exit)
 	jmp	retint_user
 END(error_exit)
 
-/* Runs on exception stack */
-ENTRY(nmi_vmfunc_simple_old)
-        /* Test if we've been demoted and moreover need 
-         * to VMFUNC back to the kernel */
-        pushq   %rax
-        movq    vmfunc_state_page + VMFUNC_in_kernel, %rax
-        testq   $1, %rax
-        jnz     1f
-        popq    %rax
-        ABORT_LCD
-
-1:
-
-        testb   $3, CS-RIP+8(%rsp)
-        jz      .Lnmi_from_kernel_vmfunc_simple_old
-
-        /* Test if we've been demoted and moreover need 
-         * to VMFUNC back to the kernel */
-        movl    vmfunc_state_page + VMFUNC_in_kernel, %eax
-        testl   $1, %eax
-        jnz     .Lnmi_in_user_no_lcd_simple_old
-
-        ABORT_LCD
-
-.Lnmi_in_user_no_lcd_simple_old:
-
-        /*
-         * NMI from user mode.  We need to run on the thread stack, but we
-         * can't go through the normal entry paths: NMIs are masked, and
-         * we don't want to enable interrupts, because then we'll end
-         * up in an awkward situation in which IRQs are on but NMIs
-         * are off.
-         *
-         * We also must not push anything to the stack before switching
-         * stacks lest we corrupt the "NMI executing" variable.
-         */
-
-        SWAPGS_UNSAFE_STACK
-        cld
-        popq    %rax
-        pushq   $-1             /* pt_regs->orig_ax */
-        pushq   %rdi            /* pt_regs->di */
-        pushq   %rsi            /* pt_regs->si */
-        pushq   %rdx            /* pt_regs->dx */
-        pushq   %rcx            /* pt_regs->cx */
-        pushq   %rax            /* pt_regs->ax */
-        pushq   %r8             /* pt_regs->r8 */
-        pushq   %r9             /* pt_regs->r9 */
-        pushq   %r10            /* pt_regs->r10 */
-        pushq   %r11            /* pt_regs->r11 */
-        pushq   %rbx            /* pt_regs->rbx */
-        pushq   %rbp            /* pt_regs->rbp */
-        pushq   %r12            /* pt_regs->r12 */
-        pushq   %r13            /* pt_regs->r13 */
-        pushq   %r14            /* pt_regs->r14 */
-        pushq   %r15            /* pt_regs->r15 */
-
-        /*
-         * At this point we no longer need to worry about stack damage
-         * due to nesting -- we're on the normal thread stack and we're
-         * done with the NMI stack.
-         */
-
-        movq    %rsp, %rdi
-        movq    $-1, %rsi
-        call    do_nmi
-
-        /*
-         * Return back to user mode.  We must *not* do the normal exit
-         * work, because we don't want to enable interrupts.  Fortunately,
-         * do_nmi doesn't modify pt_regs.
-         */
-        SWAPGS
-        jmp restore_regs_and_iret
-
-.Lnmi_from_kernel_vmfunc_simple_old:
-
-        popq    %rax
-
-        /*
-         * Everything below this point can be preempted by a nested NMI.
-         * If this happens, then the inner NMI will change the "iret"
-         * frame to point back to repeat_nmi.
-         */
-        pushq   $-1                             /* ORIG_RAX: no syscall to restart */
-        ALLOC_PT_GPREGS_ON_STACK
-
-        /*
-         * Use paranoid_entry to handle SWAPGS, but no need to use paranoid_exit
-         * as we should not be calling schedule in NMI context.
-         * Even with normal interrupts enabled. An NMI should not be
-         * setting NEED_RESCHED or anything that normal interrupts and
-         * exceptions might do.
-         */
-        call    paranoid_entry
-
-        /* paranoidentry do_nmi, 0; without TRACE_IRQS_OFF */
-        movq    %rsp, %rdi
-        movq    $-1, %rsi
-        call    do_nmi
-
-        testl   %ebx, %ebx                      /* swapgs needed? */
-        jnz     nmi_restore_vmfunc_simple_old
-//nmi_swapgs:
-        SWAPGS_UNSAFE_STACK
-nmi_restore_vmfunc_simple_old:
-        RESTORE_EXTRA_REGS
-        RESTORE_C_REGS
-
-        /* Point RSP at the "iret" frame. */
-        REMOVE_PT_GPREGS_FROM_STACK 8
-
-        std
-
-        /*
-         * INTERRUPT_RETURN reads the "iret" frame and exits the NMI
-         * stack in a single instruction.  We are returning to kernel
-         * mode, so this cannot result in a fault.
-         */
-        INTERRUPT_RETURN
-END(nmi_vmfunc_simple_old)
-
-
-
-/* Runs on exception stack */
+/* Runs on exception stack 
+ * AB: there might be a vuln here --- if LCD pushes itself to ring3, and then 
+ * changes the gs the SWAPGS_UNSAFE_STACK might put us in trouble -- I should
+ * think of an entry path similar to IRQs
+ */
 ENTRY(nmi_vmfunc_simple)
 
 	testb	$3, CS-RIP+0(%rsp)
 	jz	.Lnmi_from_kernel_vmfunc_simple
 
-	/* Test if we've been demoted and moreover need 
-	 * to VMFUNC back to the kernel */
+	/* Test if we're inside LCDs, but in ring3 (which is a bug) */
 	pushq   %rbx
 	movq 	vmfunc_state_page + VMFUNC_in_kernel, %rbx
 	testq   $1, %rbx
 	popq    %rbx
 	jnz	.Lnmi_in_user_no_lcd_simple
 	
-	DEBUG_LCD
+	ILLEGAL_NMI
 	
 
 .Lnmi_in_user_no_lcd_simple:
@@ -1642,6 +1555,13 @@ ENTRY(nmi_vmfunc_simple)
 	SWAPGS_UNSAFE_STACK
 nmi_restore_vmfunc_simple:
 
+#ifdef CONFIG_LCD_TRACE_BUFFER
+	/* Trace IRQ into LCDs buffer, rdi = trap frame, rsi = event type */
+	movq    %rsp, %rdi
+	movq    $EVENT_NMI_LEAVE, %rsi
+	call    add_trace_entry_tf
+#endif
+
 	/* Restore the state of the VMFUNC_entered_lcd as we saw it on entry 
 	*  If the VMFUNC_entered_lcd wasn't set then we don't need to VMFUNC
 	*  either  
@@ -1676,19 +1596,20 @@ nmi_restore_vmfunc_simple:
 	INTERRUPT_RETURN
 END(nmi_vmfunc_simple)
 
-
 /* Runs on exception stack */
-ENTRY(nmi_vmfunc)
-	/* Test if we've been demoted and moreover need 
-	 * to VMFUNC back to the kernel */
-	pushq   %rax
-	movl 	vmfunc_state_page + VMFUNC_in_kernel, %eax
-	testl   $1, %eax
-	popq    %rax
-	jnz	1f
-	ABORT_LCD
+ENTRY(nmi_vmfunc_full)
+	/*
+	 * Fix up the exception frame if we're on Xen.
+	 * PARAVIRT_ADJUST_EXCEPTION_FRAME is guaranteed to push at most
+	 * one value to the stack on native, so it may clobber the rdx
+	 * scratch slot, but it won't clobber any of the important
+	 * slots past it.
+	 *
+	 * Xen is a different story, because the Xen frame itself overlaps
+	 * the "NMI executing" variable.
+	 */
+	PARAVIRT_ADJUST_EXCEPTION_FRAME
 
-1:
 	/*
 	 * We allow breakpoints in NMIs. If a breakpoint occurs, then
 	 * the iretq it performs will take us out of NMI context.
@@ -1731,17 +1652,20 @@ ENTRY(nmi_vmfunc)
 	pushq	%rdx
 
 	testb	$3, CS-RIP+8(%rsp)
-	jz	.Lnmi_from_kernel_vmfunc
+	jz	.Lnmi_from_kernel_vmfunc_full
 
-	/* Test if we've been demoted and moreover need 
-	 * to VMFUNC back to the kernel */
-	movl 	vmfunc_state_page + VMFUNC_in_kernel, %edx
-	testl   $1, %edx
-	jnz	.Lnmi_in_user_no_lcd
+	/* Test if we're running inside LCDs but in ring3 (which is a bug) */
+	pushq   %rbx
+	movq 	vmfunc_state_page + VMFUNC_in_kernel, %rbx
+	testq   $1, %rbx
+	popq    %rbx
+	jnz	.Lnmi_in_user_no_lcd_full
+	
+	ILLEGAL_NMI
+	
 
-	ABORT_LCD
+.Lnmi_in_user_no_lcd_full:
 
-.Lnmi_in_user_no_lcd:
 
 	/*
 	 * NMI from user mode.  We need to run on the thread stack, but we
@@ -1786,6 +1710,13 @@ ENTRY(nmi_vmfunc)
 	 * done with the NMI stack.
 	 */
 
+#ifdef CONFIG_LCD_TRACE_BUFFER
+	/* Trace IRQ into LCDs buffer, rdi = trap frame, rsi = event type */
+	movq    %rsp, %rdi
+	movq    $EVENT_NMI_FULL, %rsi
+	call    add_trace_entry_tf
+#endif
+
 	movq	%rsp, %rdi
 	movq	$-1, %rsi
 	call	do_nmi
@@ -1796,11 +1727,190 @@ ENTRY(nmi_vmfunc)
 	 * do_nmi doesn't modify pt_regs.
 	 */
 	SWAPGS
-	jmp restore_regs_and_iret
+	jmp	restore_c_regs_and_iret
 
-.Lnmi_from_kernel_vmfunc:
+.Lnmi_from_kernel_vmfunc_full:
+	/*
+	 * Here's what our stack frame will look like:
+	 * +---------------------------------------------------------+
+	 * | original SS                                             |
+	 * | original Return RSP                                     |
+	 * | original RFLAGS                                         |
+	 * | original CS                                             |
+	 * | original RIP                                            |
+	 * +---------------------------------------------------------+
+	 * | temp storage for rdx                                    |
+	 * +---------------------------------------------------------+
+	 * | "NMI executing" variable                                |
+	 * +---------------------------------------------------------+
+	 * | iret SS          } Copied from "outermost" frame        |
+	 * | iret Return RSP  } on each loop iteration; overwritten  |
+	 * | iret RFLAGS      } by a nested NMI to force another     |
+	 * | iret CS          } iteration if needed.                 |
+	 * | iret RIP         }                                      |
+	 * +---------------------------------------------------------+
+	 * | outermost SS          } initialized in first_nmi;       |
+	 * | outermost Return RSP  } will not be changed before      |
+	 * | outermost RFLAGS      } NMI processing is done.         |
+	 * | outermost CS          } Copied to "iret" frame on each  |
+	 * | outermost RIP         } iteration.                      |
+	 * +---------------------------------------------------------+
+	 * | pt_regs                                                 |
+	 * +---------------------------------------------------------+
+	 *
+	 * The "original" frame is used by hardware.  Before re-enabling
+	 * NMIs, we need to be done with it, and we need to leave enough
+	 * space for the asm code here.
+	 *
+	 * We return by executing IRET while RSP points to the "iret" frame.
+	 * That will either return for real or it will loop back into NMI
+	 * processing.
+	 *
+	 * The "outermost" frame is copied to the "iret" frame on each
+	 * iteration of the loop, so each iteration starts with the "iret"
+	 * frame pointing to the final return target.
+	 */
 
-	popq    %rdx
+	/*
+	 * Determine whether we're a nested NMI.
+	 *
+	 * If we interrupted kernel code between repeat_nmi and
+	 * end_repeat_nmi, then we are a nested NMI.  We must not
+	 * modify the "iret" frame because it's being written by
+	 * the outer NMI.  That's okay; the outer NMI handler is
+	 * about to about to call do_nmi anyway, so we can just
+	 * resume the outer NMI.
+	 */
+
+	movq	$repeat_nmi_vmfunc_full, %rdx
+	cmpq	8(%rsp), %rdx
+	ja	1f
+	movq	$end_repeat_nmi_vmfunc_full, %rdx
+	cmpq	8(%rsp), %rdx
+	ja	nested_nmi_out_vmfunc_full
+1:
+
+	/*
+	 * Now check "NMI executing".  If it's set, then we're nested.
+	 * This will not detect if we interrupted an outer NMI just
+	 * before IRET.
+	 */
+	cmpl	$1, -8(%rsp)
+	je	nested_nmi_vmfunc_full
+
+	/*
+	 * Now test if the previous stack was an NMI stack.  This covers
+	 * the case where we interrupt an outer NMI after it clears
+	 * "NMI executing" but before IRET.  We need to be careful, though:
+	 * there is one case in which RSP could point to the NMI stack
+	 * despite there being no NMI active: naughty userspace controls
+	 * RSP at the very beginning of the SYSCALL targets.  We can
+	 * pull a fast one on naughty userspace, though: we program
+	 * SYSCALL to mask DF, so userspace cannot cause DF to be set
+	 * if it controls the kernel's RSP.  We set DF before we clear
+	 * "NMI executing".
+	 */
+	lea	6*8(%rsp), %rdx
+	/* Compare the NMI stack (rdx) with the stack we came from (4*8(%rsp)) */
+	cmpq	%rdx, 4*8(%rsp)
+	/* If the stack pointer is above the NMI stack, this is a normal NMI */
+	ja	first_nmi_vmfunc_full
+
+	subq	$EXCEPTION_STKSZ, %rdx
+	cmpq	%rdx, 4*8(%rsp)
+	/* If it is below the NMI stack, it is a normal NMI */
+	jb	first_nmi_vmfunc_full
+
+	/* Ah, it is within the NMI stack. */
+
+	testb	$(X86_EFLAGS_DF >> 8), (3*8 + 1)(%rsp)
+	jz	first_nmi_vmfunc_full	/* RSP was user controlled. */
+
+	/* This is a nested NMI. */
+
+nested_nmi_vmfunc_full:
+	/*
+	 * Modify the "iret" frame to point to repeat_nmi, forcing another
+	 * iteration of NMI handling.
+	 */
+	subq	$8, %rsp
+	leaq	-10*8(%rsp), %rdx
+	pushq	$__KERNEL_DS
+	pushq	%rdx
+	pushfq
+	pushq	$__KERNEL_CS
+	pushq	$repeat_nmi_vmfunc_full
+
+	/* Put stack back */
+	addq	$(6*8), %rsp
+
+nested_nmi_out_vmfunc_full:
+	popq	%rdx
+
+	/* We are returning to kernel mode, so this cannot result in a fault. */
+	INTERRUPT_RETURN
+
+first_nmi_vmfunc_full:
+	/* Restore rdx. */
+	movq	(%rsp), %rdx
+
+	/* Make room for "NMI executing". */
+	pushq	$0
+
+	/* Leave room for the "iret" frame */
+	subq	$(5*8), %rsp
+
+	/* Copy the "original" frame to the "outermost" frame */
+	.rept 5
+	pushq	11*8(%rsp)
+	.endr
+
+	/* Everything up to here is safe from nested NMIs */
+
+#ifdef CONFIG_DEBUG_ENTRY
+	/*
+	 * For ease of testing, unmask NMIs right away.  Disabled by
+	 * default because IRET is very expensive.
+	 */
+	pushq	$0		/* SS */
+	pushq	%rsp		/* RSP (minus 8 because of the previous push) */
+	addq	$8, (%rsp)	/* Fix up RSP */
+	pushfq			/* RFLAGS */
+	pushq	$__KERNEL_CS	/* CS */
+	pushq	$1f		/* RIP */
+	INTERRUPT_RETURN	/* continues at repeat_nmi below */
+1:
+#endif
+
+repeat_nmi_vmfunc_full:
+	/*
+	 * If there was a nested NMI, the first NMI's iret will return
+	 * here. But NMIs are still enabled and we can take another
+	 * nested NMI. The nested NMI checks the interrupted RIP to see
+	 * if it is between repeat_nmi and end_repeat_nmi, and if so
+	 * it will just return, as we are about to repeat an NMI anyway.
+	 * This makes it safe to copy to the stack frame that a nested
+	 * NMI will update.
+	 *
+	 * RSP is pointing to "outermost RIP".  gsbase is unknown, but, if
+	 * we're repeating an NMI, gsbase has the same value that it had on
+	 * the first iteration.  paranoid_entry will load the kernel
+	 * gsbase if needed before we call do_nmi.  "NMI executing"
+	 * is zero.
+	 */
+	movq	$1, 10*8(%rsp)		/* Set "NMI executing". */
+
+	/*
+	 * Copy the "outermost" frame to the "iret" frame.  NMIs that nest
+	 * here must not modify the "iret" frame while we're writing to
+	 * it or it will end up containing garbage.
+	 */
+	addq	$(10*8), %rsp
+	.rept 5
+	pushq	-6*8(%rsp)
+	.endr
+	subq	$(5*8), %rsp
+end_repeat_nmi_vmfunc_full:
 
 	/*
 	 * Everything below this point can be preempted by a nested NMI.
@@ -1810,6 +1920,19 @@ ENTRY(nmi_vmfunc)
 	pushq	$-1				/* ORIG_RAX: no syscall to restart */
 	ALLOC_PT_GPREGS_ON_STACK
 
+	cld
+	SAVE_C_REGS 
+	SAVE_EXTRA_REGS 
+
+	/* Test if we're not in kernel and are running inside LCD */
+	movq 	vmfunc_state_page + VMFUNC_in_kernel, %r12
+	testq   $1, %r12
+	jnz	1f
+
+	/* We need to vmfunc back into the kernel */
+	VMFUNC_TO_KERNEL
+1:
+
 	/*
 	 * Use paranoid_entry to handle SWAPGS, but no need to use paranoid_exit
 	 * as we should not be calling schedule in NMI context.
@@ -1817,25 +1940,67 @@ ENTRY(nmi_vmfunc)
 	 * setting NEED_RESCHED or anything that normal interrupts and
 	 * exceptions might do.
 	 */
-	call	paranoid_entry
+	call	paranoid_entry_vmfunc_nmi
+
+#ifdef CONFIG_LCD_TRACE_BUFFER
+	/* Trace IRQ into LCDs buffer, rdi = trap frame, rsi = event type */
+	movq    %rsp, %rdi
+	movq    $EVENT_NMI_FULL, %rsi
+	call    add_trace_entry_tf
+#endif
 
 	/* paranoidentry do_nmi, 0; without TRACE_IRQS_OFF */
 	movq	%rsp, %rdi
 	movq	$-1, %rsi
 	call	do_nmi
 
+#ifdef CONFIG_LCD_TRACE_BUFFER
+	/* Trace IRQ into LCDs buffer, rdi = trap frame, rsi = event type */
+	movq    %rsp, %rdi
+	movq    $EVENT_NMI_LEAVE, %rsi
+	call    add_trace_entry_tf
+#endif
+
 	testl	%ebx, %ebx			/* swapgs needed? */
-	jnz	nmi_restore_vmfunc
-//nmi_swapgs:
+	jnz	nmi_restore_vmfunc_full
+nmi_swapgs_vmfunc_full:
 	SWAPGS_UNSAFE_STACK
-nmi_restore_vmfunc:
+nmi_restore_vmfunc_full:
+	/* Restore the VMFUNC_in_kernel flag as we saw it on entry
+         * maybe an IRQ that we preempted is about to check if it's set
+	 */
+	testq	%r12, %r12
+	jnz	2f
+
+	/* We need to VMFUNC back to LCD */
+        
 	RESTORE_EXTRA_REGS
 	RESTORE_C_REGS
 
 	/* Point RSP at the "iret" frame. */
 	REMOVE_PT_GPREGS_FROM_STACK 6*8
 
+	/*
+	 * Clear "NMI executing".  Set DF first so that we can easily
+	 * distinguish the remaining code between here and IRET from
+	 * the SYSCALL entry and exit paths.  On a native kernel, we
+	 * could just inspect RIP, but, on paravirt kernels,
+	 * INTERRUPT_RETURN can translate into a jump into a
+	 * hypercall page.
+	 */
 	std
+	movq	$0, 5*8(%rsp)		/* clear "NMI executing" */
+	/* If another NMI hits in between these two instructions, 
+	 * it will execute as if it is a normal in-kernel NMI and 
+	 * return here 
+	 */
+	// Restore the "not-in-kernel" flag as we saw it on entry
+	//movq    $0, vmfunc_state_page + VMFUNC_in_kernel
+	/* If another NMI hits here, it will VMFUNC into the 
+	 * kernel and back into LCD on exit, we waste a bit of cycles, 
+	 * but it's ok, we'll just VMFUNC back to LCD one more time 
+	 */	
+	VMFUNC_TO_LCD
 
 	/*
 	 * INTERRUPT_RETURN reads the "iret" frame and exits the NMI
@@ -1843,7 +2008,34 @@ nmi_restore_vmfunc:
 	 * mode, so this cannot result in a fault.
 	 */
 	INTERRUPT_RETURN
-END(nmi_vmfunc)
+
+2:
+	/* We were in kernel, not need to VMFUNC back or restore 
+	 * VMFUNC_in_kernel flag */
+	RESTORE_EXTRA_REGS
+	RESTORE_C_REGS
+
+	/* Point RSP at the "iret" frame. */
+	REMOVE_PT_GPREGS_FROM_STACK 6*8
+
+	/*
+	 * Clear "NMI executing".  Set DF first so that we can easily
+	 * distinguish the remaining code between here and IRET from
+	 * the SYSCALL entry and exit paths.  On a native kernel, we
+	 * could just inspect RIP, but, on paravirt kernels,
+	 * INTERRUPT_RETURN can translate into a jump into a
+	 * hypercall page.
+	 */
+	std
+	movq	$0, 5*8(%rsp)		/* clear "NMI executing" */
+
+	/*
+	 * INTERRUPT_RETURN reads the "iret" frame and exits the NMI
+	 * stack in a single instruction.  We are returning to kernel
+	 * mode, so this cannot result in a fault.
+	 */
+	INTERRUPT_RETURN
+END(nmi_vmfunc_full)
 
 
 /* Runs on exception stack */

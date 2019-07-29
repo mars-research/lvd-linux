@@ -1354,8 +1354,10 @@ void syscall_init(void)
 DEFINE_PER_CPU(struct orig_ist, orig_ist);
 
 DEFINE_PER_CPU(unsigned long, lvd_irq_stack_addr);
+DEFINE_PER_CPU(unsigned long, lvd_debug_stack_addr);
+EXPORT_PER_CPU_SYMBOL(lvd_debug_stack_addr);
 
-static DEFINE_PER_CPU(unsigned long, debug_stack_addr);
+DEFINE_PER_CPU(unsigned long, debug_stack_addr);
 DEFINE_PER_CPU(int, debug_stack_usage);
 
 int is_debug_stack(unsigned long addr)
@@ -1457,7 +1459,6 @@ static void wait_for_master_cpu(int cpu)
  * A lot of state is already set up in PDA init for 64 bit
  */
 #ifdef CONFIG_X86_64
-
 void cpu_init(void)
 {
 	struct orig_ist *oist;
@@ -1526,10 +1527,13 @@ void cpu_init(void)
 			estacks += exception_stack_sizes[v];
 			oist->ist[v] = t->x86_tss.ist[v] =
 					(unsigned long)estacks;
+			printk("%s stack %p\n", x86_stack_name(v), estacks); 
 			if (v == DEBUG_STACK-1)
 				per_cpu(debug_stack_addr, cpu) = (unsigned long)estacks;
 			if (v == IRQ_LVD_STACK-1)
 				per_cpu(lvd_irq_stack_addr, cpu) = (unsigned long)estacks;
+			if (v == DEBUG_LVD_STACK-1)
+				per_cpu(lvd_debug_stack_addr, cpu) = (unsigned long)estacks;
 
 		}
 	}

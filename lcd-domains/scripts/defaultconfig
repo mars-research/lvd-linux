@@ -81,3 +81,7 @@ nullb_vmfunc/blk_klcd nonisolated
 nvme_vmfunc/boot nonisolated
 nvme_vmfunc/nvme_lcd isolated
 nvme_vmfunc/blk_klcd nonisolated
+
+acpi_hwmon_vmfunc/boot nonisolated
+acpi_hwmon_vmfunc/pwmtr_lcd isolated
+acpi_hwmon_vmfunc/hwmon_klcd nonisolated

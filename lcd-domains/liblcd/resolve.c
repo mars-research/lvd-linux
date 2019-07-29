@@ -20,7 +20,7 @@ struct task_struct fake_task = {
 	.pid = 12345678,
 	.cred = &fake_cred,
 };
-struct task_struct *current_task = &fake_task;
+struct task_struct *lcd_current_task = &fake_task;
 
 struct cpumask __cpu_possible_mask;
 struct cpumask __cpu_online_mask;

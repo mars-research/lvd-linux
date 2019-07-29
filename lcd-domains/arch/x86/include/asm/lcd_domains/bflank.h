@@ -22,6 +22,7 @@
 #define LCD_BFCALL_ABORT 0x4BF00033
 #define LCD_BFCALL_MAP_PAGE 0x4BF00034
 #define LCD_BFCALL_GUEST_PAGE_WALK 0x4BF00036
+#define LCD_BFCALL_DUMP_PERF 0x4BF00037
 
 /**
  * Add the page that contains EPT ids for VMFUNC calls
@@ -139,5 +140,24 @@ static inline unsigned int bfcall_guest_page_walk(unsigned long gva, unsigned lo
 
 	return eax;
 }
+
+static inline unsigned int bfcall_dump_perf(void)
+{
+	unsigned int eax, ebx = 0, ecx = 0, edx = 0; 
+
+	eax = LCD_BFCALL_DUMP_PERF; 
+	
+	/* ecx is often an input as well as an output. */
+	asm volatile("cpuid"
+	    : "=a" (eax),
+	      "=b" (ebx),
+	      "=c" (ecx),
+	      "=d" (edx)
+	    : "0" (eax), "1" (ebx), "2" (ecx), "3" (edx)
+	    : "memory");
+
+	return eax; 
+}
+
 
 #endif /* ASM_X86_LCD_DOMAINS_BFLANK_H */

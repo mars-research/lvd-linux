@@ -17,6 +17,7 @@
 #include <asm/lcd_domains/libvmfunc.h>
 #include <asm/processor.h>
 #include <asm/desc.h>
+#include <asm/lcd_domains/bflank.h>
 
 #include <lcd_config/post_hook.h>
 
@@ -139,6 +140,34 @@ static int caller_main(void)
 	printk("%s entered,  lcd_stack %p\n", __func__, lcd_stack);
 	vmfunc_init(lcd_stack, handle_rpc_calls_klcd, NULL);
 	run_vmfunc_tests();
+
+	{
+		int i = 0; 
+		u64 s_exits = bfcall_dump_perf(), e_exits; 
+		u64 start = rdtsc(), end;
+
+		void *rsp_ptr;
+		int num_iterations = 1000000;
+
+		for(i = 0; i < num_iterations; i++) {
+			asm volatile("mov %%rsp, %[rsp_ptr]"
+				: [rsp_ptr]"=r"(rsp_ptr));
+			//printk("rsp before int 0xf3 %p", rsp_ptr);
+
+			asm volatile("int $0xf3");
+
+			//asm volatile("mov %%rsp, %[rsp_ptr]"
+			//		: [rsp_ptr]"=r"(rsp_ptr));
+			//printk("rsp before int 0xf3 %p", rsp_ptr);
+		}
+		end = rdtsc();
+
+		e_exits = bfcall_dump_perf(); 
+
+		printk("caller lcd: %d iterations of int 0xf3 back-to-back took %llu cycles (avg: %llu cycles, total exits:%llu)\n",
+				num_iterations, end - start, (end - start) / num_iterations, e_exits - s_exits);
+
+	}
 #if 0
 	ret = lcd_enter();
 	if (ret)

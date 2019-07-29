@@ -15,7 +15,10 @@
 #include <linux/nmi.h>
 
 #include <asm/stacktrace.h>
+
+#ifdef CONFIG_LCD_TRACE_BUFFER
 #include <linux/lcd_trace.h>
+#endif
 
 #define N_EXCEPTION_STACKS_END \
 		(N_EXCEPTION_STACKS + DEBUG_STKSZ/EXCEPTION_STKSZ - 2)
@@ -25,13 +28,18 @@ static char x86_stack_ids[][8] = {
 		[ NMI_STACK-1			]	= "NMI",
 		[ DOUBLEFAULT_STACK-1		]	= "#DF",
 		[ MCE_STACK-1			]	= "#MC",
-		[ IRQ_LVD_STACK-1		]	= "#LVD",
+		[ IRQ_LVD_STACK-1		]	= "#LVDI",
 		[ EXP_LVD_STACK-1		]	= "#LVDE",
+		[ DEBUG_LVD_STACK-1		]	= "#LVDD",
 
 #if DEBUG_STKSZ > EXCEPTION_STKSZ
 		[ N_EXCEPTION_STACKS ...
 		  N_EXCEPTION_STACKS_END	]	= "#DB[?]"
 #endif
+};
+
+char *x86_stack_name(unsigned int id) {
+	return x86_stack_ids[id];
 };
 
 static unsigned long *in_exception_stack(unsigned cpu, unsigned long stack,

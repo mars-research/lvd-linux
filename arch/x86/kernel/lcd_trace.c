@@ -5,13 +5,12 @@
 #include <linux/sched.h>
 #include <linux/lcd_trace.h>
 
-DEFINE_PER_CPU_PAGE_ALIGNED(unsigned char, ring_buffer[RING_BUFFER_SIZE]);
+DEFINE_PER_CPU_PAGE_ALIGNED(struct ring_trace_buffer, ring_buffer) = {
+	.header.size = NUM_TRACE_ENTRIES,
+	.header.head = 0,
+};
+
 EXPORT_PER_CPU_SYMBOL(ring_buffer);
-
-DEFINE_PER_CPU(unsigned char, ring_head);
-EXPORT_PER_CPU_SYMBOL(ring_head);
-
-#define NUM_TRACE_ENTRIES	(RING_BUFFER_SIZE / sizeof(struct ring_trace_entry))
 
 static const char *event_type_to_string(unsigned type)
 {
@@ -54,6 +53,25 @@ static const char *event_type_to_string(unsigned type)
 
 		case EVENT_VMFUNC_SBOARD_KLCD_LEAVE:
 			return "SBOARD_LEAVE";
+
+		case EVENT_DO_PAGE_FAULT:
+			return "DO_PAGE_FAULT";
+
+		case EVENT_DO_PAGE_FAULT_LEAVE:
+			return "DO_PAGE_FAULT_LEAVE";
+
+		case EVENT_DO_INT3:
+			return "DO_INT3";
+
+		case EVENT_DO_INT3_LEAVE:
+			return "DO_INT3_LEAVE";
+
+		case EVENT_NMI_LEAVE:
+			return "EVENT_NMI_LEAVE";
+
+		case EVENT_NMI_FULL: 
+			return "EVENT_NMI_FULL";
+
 		default:
 			return "Undefined item";
 	}
@@ -64,14 +82,13 @@ asmlinkage __visible notrace void __add_trace_entry(unsigned type,
 		unsigned long ip)
 {
 	int cpu = raw_smp_processor_id();
-	unsigned char *ring_buf_base = per_cpu(ring_buffer, cpu);
-	struct ring_trace_entry *ring_buf = (struct ring_trace_entry*) ring_buf_base;
-	unsigned char head_idx = __this_cpu_read(ring_head);
+	struct ring_trace_buffer *ring_buf = &per_cpu(ring_buffer, cpu);
 	struct ring_trace_entry *entry;
+	unsigned long idx = ring_buf->header.head;
+       	
+	ring_buf->header.head += 1; 
 
-	__this_cpu_write(ring_head, (++head_idx % NUM_TRACE_ENTRIES));
-
-	entry = (struct ring_trace_entry*) &ring_buf[head_idx];
+	entry = (struct ring_trace_entry*) &ring_buf->entries[idx % ring_buf->header.size];
 	entry->rip = ip;
 	entry->rsp = rsp;
 	entry->rdi = rdi;
@@ -114,27 +131,31 @@ asmlinkage __visible notrace void add_trace_entry_tf(struct pt_regs *regs,
 
 int __init ring_trace_init(void)
 {
-	int cpu;
-	for_each_online_cpu(cpu) {
-		per_cpu(ring_head, cpu) = 0;
-	}
+//	int cpu;
+//	for_each_possible_cpu(cpu) {
+//		struct ring_trace_buffer *ring_buf = &per_cpu(ring_buffer, cpu);
+//		ring_buf->header.head = 0; 
+//		ring_buf->header.size = NUM_TRACE_ENTRIES;
+//	}
 	printk("LCD ring trace buffer initialized for %d cpus\n", num_online_cpus());
 	return 0;
 }
 late_initcall(ring_trace_init);
 
-void dump_ring_trace_buffer(void)
+asmlinkage __visible notrace void dump_ring_trace_buffer(void)
 {
-	unsigned char head_idx = __this_cpu_read(ring_head);
-	unsigned char *this_ring = per_cpu(ring_buffer, raw_smp_processor_id());
-	struct ring_trace_entry *trace_entries = (struct ring_trace_entry*) this_ring;
+	struct ring_trace_buffer *ring_buf = this_cpu_ptr(&ring_buffer);
+	unsigned long idx = ring_buf->header.head;
+
 	int i;
 
-	for (i = 0; i < NUM_TRACE_ENTRIES; i++, head_idx--) {
-		struct ring_trace_entry *entry = &trace_entries[head_idx % NUM_TRACE_ENTRIES];
+	printk("head:%ld\n", idx);
+
+	for (i = 0; i < ring_buf->header.size; i++, idx--) {
+		struct ring_trace_entry *entry = &ring_buf->entries[idx % ring_buf->header.size];
 		if (i == 0)
 			printk("head ==> ");
-		printk("type:%16s(%x) cpu: %d [%c|%c|%c] comm: %s pid: %d rip: %16lx rsp: %16lx "
+		printk("type:%16s(%d) cpu: %d [%c|%c|%c] comm: %s pid: %d rip: %16lx rsp: %16lx "
 				"rdi: %09lx gsbase: %16lx lcd_stack: %16lx[bmap: %x nc:%u] "
 				"eflags: %08lx [IF: %d]\n",
 				event_type_to_string(entry->type),

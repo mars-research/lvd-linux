@@ -68,11 +68,11 @@ struct unsync_container {
 };
 */
 
-struct poll_container {
-	int ( *poll )(struct napi_struct *, int);
-	cptr_t my_ref;
-	cptr_t other_ref;
-};
+// struct poll_container {
+	// int ( *poll )(struct napi_struct *, int);
+	// cptr_t my_ref;
+	// cptr_t other_ref;
+// };
 
 struct irqhandler_t_container {
 	irqreturn_t (*irqhandler)(int, void *);

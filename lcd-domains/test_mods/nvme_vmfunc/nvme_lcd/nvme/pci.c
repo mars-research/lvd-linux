@@ -66,7 +66,14 @@
 #define NVME_AQ_DEPTH		256
 #define SQ_SIZE(depth)		(depth * sizeof(struct nvme_command))
 #define CQ_SIZE(depth)		(depth * sizeof(struct nvme_completion))
-		
+	
+#ifdef LCD_ISOLATE
+unsigned char admin_timeout = 60;
+unsigned char nvme_io_timeout = 30;
+unsigned char shutdown_timeout = 5;
+unsigned int nvme_max_retries = 5;
+#endif
+	
 /*
  * We handle AEN commands ourselves and don't even let the
  * block layer know about them.
@@ -1329,7 +1336,7 @@ static void nvme_watchdog_timer(unsigned long data)
 	/* Skip controllers under certain specific conditions. */
 	if (nvme_should_reset(dev, csts)) {
 		if (queue_work(nvme_workq, &dev->reset_work))
-			dev_warn(dev->dev,
+			LIBLCD_MSG(//dev->dev,
 				"Failed status: 0x%x, reset controller.\n",
 				csts);
 		return;
@@ -1404,7 +1411,11 @@ static void __iomem *nvme_map_cmb(struct nvme_dev *dev)
 		size = bar_size - offset;
 
 	dma_addr = pci_resource_start(pdev, NVME_CMB_BIR(cmbloc)) + offset;
+#ifndef LCD_ISOLATE
 	cmb = ioremap_wc(dma_addr, size);
+#else
+    cmb = lcd_ioremap(dma_addr, size);
+#endif
 	if (!cmb)
 		return NULL;
 
@@ -1685,7 +1696,8 @@ static int nvme_pci_enable(struct nvme_dev *dev)
 	 */
 	if (pdev->vendor == PCI_VENDOR_ID_APPLE && pdev->device == 0x2001) {
 		dev->q_depth = 2;
-		dev_warn(dev->dev, "detected Apple NVMe controller, set "
+		LIBLCD_MSG(//dev->dev, 
+        "detected Apple NVMe controller, set "
 			"queue depth=%u to work around controller resets\n",
 			dev->q_depth);
 	}
@@ -1921,30 +1933,43 @@ static int nvme_reset(struct nvme_dev *dev)
 	flush_work(&dev->reset_work);
 	return 0;
 }
-
-static int nvme_pci_reg_read32(struct nvme_ctrl *ctrl, u32 off, u32 *val)
+#ifndef LCD_ISOLATE
+static 
+#endif
+int nvme_pci_reg_read32(struct nvme_ctrl *ctrl, u32 off, u32 *val)
 {
 	*val = readl(to_nvme_dev(ctrl)->bar + off);
 	return 0;
 }
 
-static int nvme_pci_reg_write32(struct nvme_ctrl *ctrl, u32 off, u32 val)
+#ifndef LCD_ISOLATE
+static 
+#endif
+int nvme_pci_reg_write32(struct nvme_ctrl *ctrl, u32 off, u32 val)
 {
 	writel(val, to_nvme_dev(ctrl)->bar + off);
 	return 0;
 }
 
-static int nvme_pci_reg_read64(struct nvme_ctrl *ctrl, u32 off, u64 *val)
+#ifndef LCD_ISOLATE
+static 
+#endif
+int nvme_pci_reg_read64(struct nvme_ctrl *ctrl, u32 off, u64 *val)
 {
 	*val = readq(to_nvme_dev(ctrl)->bar + off);
 	return 0;
 }
 
-static int nvme_pci_reset_ctrl(struct nvme_ctrl *ctrl)
+#ifndef LCD_ISOLATE
+static 
+#endif
+int nvme_pci_reset_ctrl(struct nvme_ctrl *ctrl)
 {
 	return nvme_reset(to_nvme_dev(ctrl));
 }
 
+
+//TODO
 static const struct nvme_ctrl_ops nvme_pci_ctrl_ops = {
 	.name			= "pcie",
 	.module			= THIS_MODULE,

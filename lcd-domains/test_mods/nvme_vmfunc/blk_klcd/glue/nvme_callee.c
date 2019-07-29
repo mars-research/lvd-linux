@@ -202,6 +202,53 @@ void glue_nvme_exit(void)
 	iocb_data_pool_free();
 }
 
+// int nvme_pci_reg_read32(struct nvme_ctrl *ctrl, u32 off, u32 *val)
+// {
+	// //TODO
+    // struct fipc_message r;
+	// struct fipc_message *request = &r;
+    
+    // struct nvme_dev *dev = container_of(ctrl, struct nvme_dev, ctrl);
+    
+    // fipc_set_reg0(dev->bar);
+    // fipc_set_reg1(off);
+    
+    // async_msg_set_fn_type(NVME_PCI_REG_READ32);
+    
+	// return 0;
+// }
+
+// int nvme_pci_reg_write32(struct nvme_ctrl *ctrl, u32 off, u32 val)
+// {
+	// //TODO
+    // struct fipc_message r;
+	// struct fipc_message *request = &r;
+    
+    // async_msg_set_fn_type(NVME_PCI_REG_WRITE32);
+	// return 0;
+// }
+
+// int nvme_pci_reg_read64(struct nvme_ctrl *ctrl, u32 off, u64 *val)
+// {
+	// //TODO
+    // struct fipc_message r;
+	// struct fipc_message *request = &r;
+    
+    // async_msg_set_fn_type(NVME_PCI_REG_READ64);
+	// return 0;
+// }
+
+// int nvme_pci_reset_ctrl(struct nvme_ctrl *ctrl)
+// {
+    // //TODO
+    // struct fipc_message r;
+	// struct fipc_message *request = &r;
+    
+    // async_msg_set_fn_type(NVME_PCI_RESET_CTRL);
+	// return nvme_reset(to_nvme_dev(ctrl));
+// }
+
+
 
 
 int blk_mq_init_queue_callee(struct fipc_message *request)
@@ -397,8 +444,9 @@ fail_lookup:
 	return ret;
 }
 
-// we don't need the irq or cpu mask to be stored on this side at all
-int *blk_mq_tags_cpumask_callee(struct fipc_message *request)
+/*
+
+int blk_mq_tags_cpumask_callee(struct fipc_message *request)
 {
     
     struct blk_mq_tags_container *tags_c = container_of(tags, struct blk_mq_tags_container, blk_mq_tags);
@@ -408,7 +456,10 @@ int *blk_mq_tags_cpumask_callee(struct fipc_message *request)
     async_msg_set_fn_type(request, BLK_MQ_TAGS_CPUMASK);
     
     vmfunc_wrapper(request);
+    
+    return (int*)fipc_get_reg0(request);
 }
+*/
 
 int blk_queue_physical_block_size_callee(struct fipc_message *request)
 {

@@ -143,6 +143,39 @@ int glue_cap_lookup_irqhandler_type(struct glue_cspace *cspace,
 
 }
 
+int glue_cap_lookup_nvme_command_type(struct glue_cspace *cspace,
+		struct cptr c,
+		struct nvme_command_container **nvme_command_container)
+{
+	return glue_cspace_lookup(cspace,
+		c,
+		glue_libcap_type_ops[ GLUE_TYPE_NVME_COMMAND_CONTAINER ].libcap_type,
+		( void  ** )nvme_command_container);
+
+}
+
+int glue_cap_lookup_nvme_ns_type(struct glue_cspace *cspace,
+		struct cptr c,
+		struct nvme_ns_container **nvme_ns_container)
+{
+	return glue_cspace_lookup(cspace,
+		c,
+		glue_libcap_type_ops[ GLUE_TYPE_NVME_NS_CONTAINER ].libcap_type,
+		( void  ** )nvme_ns_container);
+
+}
+
+int glue_cap_lookup_nvme_ctrl_type(struct glue_cspace *cspace,
+		struct cptr c,
+		struct nvme_ctrl_container **nvme_ctrl_container)
+{
+	return glue_cspace_lookup(cspace,
+		c,
+		glue_libcap_type_ops[ GLUE_TYPE_NVME_CONTROL_CONTAINER ].libcap_type,
+		( void  ** )nvme_ctrl_container);
+
+}
+
 int glue_cap_insert_blk_mq_ops_type(struct glue_cspace *cspace, 
 			struct blk_mq_ops_container *blk_mq_ops_container,
 		        cptr_t *c_out) {
@@ -174,20 +207,20 @@ int glue_cap_insert_nvme_command_type(struct glue_cspace *cspace,
 }
 
 int glue_cap_insert_nvme_ns_type(struct glue_cspace *cspace,
-			struct nvme_command *cmd_container,
+			struct nvme_ns *ns_container,
 			cptr_t *c_out) { 
 
-	 return glue_cspace_insert(cspace, cmd_container,
+	 return glue_cspace_insert(cspace, ns_container,
 			 	glue_libcap_type_ops[GLUE_TYPE_NVME_NS_CONTAINER].libcap_type,
 				c_out);
 
 }
 
 int glue_cap_insert_nvme_control_type(struct glue_cspace *cspace,
-			struct nvme_command *cmd_container,
+			struct nvme_ctrl *ctrl_container,
 			cptr_t *c_out) { 
 
-	 return glue_cspace_insert(cspace, cmd_container,
+	 return glue_cspace_insert(cspace, ctrl_container,
 			 	glue_libcap_type_ops[GLUE_TYPE_NVME_CONTROL_CONTAINER].libcap_type,
 				c_out);
 

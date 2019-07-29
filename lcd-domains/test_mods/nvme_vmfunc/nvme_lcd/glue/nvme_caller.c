@@ -12,6 +12,8 @@
 //#include "../../benchmark.h"
 static struct glue_cspace *c_cspace;
 
+//unsigned char nvme_io_timeout = 30;
+
 void *iocb_data_pool;
 struct blk_mq_hw_ctx_container *ctx_container_g; 
 struct blk_mq_ops_container *ops_container_g;
@@ -25,15 +27,53 @@ struct lcd_request_container {
 #ifdef IOMMU_ASSIGN
 /* device for IOMMU assignment */
 // TODO: replace with real values
-struct pcidev_info dev_assign = { 0x0000, 0x00, 0x00, 0x0 };
+struct pcidev_info dev_assign = { 0x0000, 0x04, 0x00, 0x0 };
 #endif
 
-void null_softirq_done_fn(struct request *rq);
+/* XXX: How to determine this? */
+#define CPTR_HASH_BITS      5
+static DEFINE_HASHTABLE(cptr_table, CPTR_HASH_BITS);
+
+//void null_softirq_done_fn(struct request *rq);
 
 //int null_open(struct block_device *bdev, fmode_t mode);
 //void null_release(struct gendisk *disk, fmode_t mode);
 
-int glue_nvme_init(void)
+/*
+void stub(void)
+{
+    //TODO
+    struct fipc_message r;
+	struct fipc_message *request = &r;
+    
+    async_msg_set_fn_type(request, NVME_SETUP_CMD);
+    
+    vmfunc_wrapper(request);
+}
+*/
+
+//publicly visable read and write primatives
+
+// int nvme_pci_reg_read32_callee(struct fipc_message *_request)
+// {
+    // int ret;
+    // int* read_val;
+    // u32 offset;
+    // nvme_ctrl_container ctrl_c;
+    // nvme_ctrl ctrl;
+    
+    
+    
+    // offset = (u32)fipc_get_reg1();
+    
+    // ret = nvme_pci_reg_read32(dev, asdf, read_val);
+    
+    // fipc_set_reg0(read_val);
+    // return 0;
+// }
+
+
+int glue_ixgbe_init(void)
 {
 	int ret;
 	ret = glue_cap_init();
@@ -46,12 +86,63 @@ int glue_nvme_init(void)
 		LIBLCD_ERR("cap create");
 		goto fail2;
 	}
+
+	hash_init(cptr_table);
+
+        // LIBLCD_MSG("dissector init ret %d",
+                // init_default_flow_dissectors());
+
+	// skb2_cache = kmem_cache_create("skb2_cache",
+				// sizeof(struct sk_buff_container_2),
+				// 0,
+				// SLAB_HWCACHE_ALIGN|SLAB_PANIC,
+				// NULL);
+	// if (!skb2_cache) {
+		// LIBLCD_ERR("skb_container cache not created");
+		// goto fail2;
+	// }
+
+	// /* merge two datastructures into one for allocation */
+	// skb_c_cache = kmem_cache_create("skb_c_cache",
+				// sizeof(struct sk_buff_container)
+				// + sizeof(struct sk_buff),
+				// 0,
+				// SLAB_HWCACHE_ALIGN|SLAB_PANIC,
+				// NULL);
+	// if (!skb_c_cache) {
+		// LIBLCD_ERR("skb_container cache not created");
+		// goto fail2;
+	// }
+
+	// /* container only slab for rx */
+	// skb_c_cache1 = kmem_cache_create("skb_c_cache1",
+				// sizeof(struct sk_buff_container),
+				// 0,
+				// SLAB_HWCACHE_ALIGN|SLAB_PANIC,
+				// NULL);
+	// if (!skb_c_cache1) {
+		// LIBLCD_ERR("skb_container cache not created");
+		// goto fail2;
+	// }
+
+	// /* skb->data cache */
+	// skb_cache = kmem_cache_create("skb+data",
+				// sizeof(struct sk_buff) +
+				// SKB_DATA_ALIGN(SKB_ALLOC_SIZE),
+				// 0,
+				// SLAB_HWCACHE_ALIGN|SLAB_PANIC,
+				// NULL);
+	// if (!skb_cache) {
+		// LIBLCD_ERR("skb_container cache not created");
+		// goto fail2;
+	// }
+
 	return 0;
+
 fail2:
 	glue_cap_exit();
 fail1:
 	return ret;
-
 }
 
 void glue_nvme_exit(void)
@@ -60,11 +151,259 @@ void glue_nvme_exit(void)
 	glue_cap_exit();
 }
 
-
-
-struct request * TODO_nvme_alloc_request(struct request_queue *q,
-		struct nvme_command *cmd, unsigned int flags)
+void nvme_cancel_request(struct request *req, void *data, bool reserved)
 {
+    //TODO
+    struct fipc_message r;
+	struct fipc_message *request = &r;
+    
+    async_msg_set_fn_type(request, NVME_CANCEL_REQUEST);
+    
+    vmfunc_wrapper(request);
+}
+
+void nvme_complete_async_event(struct nvme_ctrl *ctrl,
+		struct nvme_completion *cqe)
+{
+    //TODO
+    struct fipc_message r;
+	struct fipc_message *request = &r;
+    
+    async_msg_set_fn_type(request, NVME_COMPLETE_ASYNC_EVENT);
+    
+    vmfunc_wrapper(request);
+}
+
+int nvme_disable_ctrl(struct nvme_ctrl *ctrl, u64 cap)
+{
+    //TODO
+    struct fipc_message r;
+	struct fipc_message *request = &r;
+    
+    async_msg_set_fn_type(request, NVME_DISABLE_CTRL);
+    
+    vmfunc_wrapper(request);
+    
+    return 0;
+}
+
+int nvme_enable_ctrl(struct nvme_ctrl *ctrl, u64 cap)
+{
+    //TODO
+    struct fipc_message r;
+	struct fipc_message *request = &r;
+    
+    async_msg_set_fn_type(request, NVME_ENABLE_CTRL);
+    
+    vmfunc_wrapper(request);
+    
+    return 0;
+}
+
+int nvme_init_ctrl(struct nvme_ctrl *ctrl, struct device *dev,
+		const struct nvme_ctrl_ops *ops, unsigned long quirks)
+{
+    //TODO
+    struct fipc_message r;
+	struct fipc_message *request = &r;
+    
+    async_msg_set_fn_type(request, NVME_INIT_CTRL);
+    
+    vmfunc_wrapper(request);
+    
+    return 0;
+}
+
+bool nvme_change_ctrl_state(struct nvme_ctrl *ctrl,
+		enum nvme_ctrl_state new_state)
+{
+    //TODO
+    struct fipc_message r;
+	struct fipc_message *request = &r;
+    
+    async_msg_set_fn_type(request, NVME_INIT_CTRL);
+    
+    vmfunc_wrapper(request);
+    
+    return 0;
+}
+
+void complete(struct completion *x)
+{
+    // should never reach
+    LIBLCD_ERR("Call to complete");
+}
+
+bool flush_work(struct work_struct *work)
+{
+    return false;
+}
+
+
+
+extern unsigned long wait_for_completion_io_timeout(struct completion *x,
+						    unsigned long timeout)
+{
+    LIBLCD_ERR("Call to wait for completetion io timeout");
+    return -1;
+}
+int nvme_init_identify(struct nvme_ctrl *ctrl)
+{
+    //TODO
+    struct fipc_message r;
+	struct fipc_message *request = &r;
+    
+    async_msg_set_fn_type(request, NVME_INIT_IDENTIFY);
+    
+    vmfunc_wrapper(request);
+    
+    return 0;
+}
+
+void nvme_kill_queues(struct nvme_ctrl *ctrl)
+{
+    //TODO
+    struct fipc_message r;
+	struct fipc_message *request = &r;
+    
+    async_msg_set_fn_type(request, NVME_KILL_QUEUES);
+    
+    vmfunc_wrapper(request);
+}
+
+void nvme_put_ctrl(struct nvme_ctrl *ctrl)
+{
+    //TODO
+    struct fipc_message r;
+	struct fipc_message *request = &r;
+    
+    async_msg_set_fn_type(request, NVME_PUT_CTRL);
+    
+    vmfunc_wrapper(request);
+}
+
+void nvme_queue_async_events(struct nvme_ctrl *ctrl)
+{
+    //TODO
+    struct fipc_message r;
+	struct fipc_message *request = &r;
+    
+    async_msg_set_fn_type(request, NVME_QUEUE_ASYNC_EVENTS);
+    
+    vmfunc_wrapper(request);
+}
+
+void nvme_queue_scan(struct nvme_ctrl *ctrl)
+{
+    //TODO
+    struct fipc_message r;
+	struct fipc_message *request = &r;
+    
+    async_msg_set_fn_type(request, NVME_QUEUE_SCAN);
+    
+    vmfunc_wrapper(request);
+}
+
+void nvme_remove_namespaces(struct nvme_ctrl *ctrl)
+{
+    //TODO
+    struct fipc_message r;
+	struct fipc_message *request = &r;
+    
+    async_msg_set_fn_type(request, NVME_REMOVE_NAMESPACES);
+    
+    vmfunc_wrapper(request);
+}
+
+void nvme_requeue_req(struct request *req)
+{
+    //TODO
+    struct fipc_message r;
+	struct fipc_message *request = &r;
+    
+    async_msg_set_fn_type(request, NVME_REQUEUE_REQ);
+    
+    vmfunc_wrapper(request);
+}
+
+int nvme_set_queue_count(struct nvme_ctrl *ctrl, int *count)
+{
+    //TODO
+    struct fipc_message r;
+	struct fipc_message *request = &r;
+    
+    async_msg_set_fn_type(request, NVME_SET_QUEUE_COUNT);
+    
+    vmfunc_wrapper(request);
+    
+    return 0;
+}
+
+int nvme_shutdown_ctrl(struct nvme_ctrl *ctrl)
+{
+    //TODO
+    struct fipc_message r;
+	struct fipc_message *request = &r;
+    
+    async_msg_set_fn_type(request, NVME_SHUTDOWN_CTRL);
+    
+    vmfunc_wrapper(request);
+    
+    return 0;
+}
+
+void nvme_start_queues(struct nvme_ctrl *ctrl)
+{
+    //TODO
+    struct fipc_message r;
+	struct fipc_message *request = &r;
+    
+    async_msg_set_fn_type(request, NVME_START_QUEUES);
+    
+    vmfunc_wrapper(request);
+}
+
+void nvme_stop_queues(struct nvme_ctrl *ctrl)
+{
+    //TODO
+    struct fipc_message r;
+	struct fipc_message *request = &r;
+    
+    async_msg_set_fn_type(request, NVME_STOP_QUEUES);
+    
+    vmfunc_wrapper(request);
+}
+
+int nvme_submit_sync_cmd(struct request_queue *q, struct nvme_command *cmd,
+		void *buffer, unsigned bufflen)
+{
+    //TODO
+    struct fipc_message r;
+	struct fipc_message *request = &r;
+    
+    async_msg_set_fn_type(request, NVME_SUBMIT_SYNC_CMD);
+    
+    vmfunc_wrapper(request);
+    
+    return 0;
+}
+
+void nvme_uninit_ctrl(struct nvme_ctrl *ctrl)
+{
+    //TODO
+    struct fipc_message r;
+	struct fipc_message *request = &r;
+    
+    async_msg_set_fn_type(request, NVME_UNINIT_CTRL);
+    
+    vmfunc_wrapper(request);
+}
+
+ 
+struct request *nvme_alloc_request(struct request_queue *q,
+		struct nvme_command *cmd, unsigned int flags, int qid)
+{
+    //TODO
     struct request_queue_container *rq_container;
     struct nvme_command_container *cmd_container;
     struct request *ret = NULL;
@@ -80,12 +419,15 @@ struct request * TODO_nvme_alloc_request(struct request_queue *q,
                         
     async_msg_set_fn_type(request, NVME_ALLOC_REQUEST);
     
+    vmfunc_wrapper(request);
+    
     return ret;
 }
 
-int TODO_nvme_setup_cmd(struct nvme_ns *ns, struct request *req,
+int nvme_setup_cmd(struct nvme_ns *ns, struct request *req,
 		struct nvme_command *cmd)
 {
+    //TODO
     struct nvme_ns_container *ns_container;
     struct lcd_request_container *req_container;
     struct nvme_command_container *cmd_container;
@@ -106,6 +448,121 @@ int TODO_nvme_setup_cmd(struct nvme_ns *ns, struct request *req,
     return 0;
     
 }
+
+void blk_mq_stop_hw_queues(struct request_queue *q)
+{
+    //TODO
+    struct fipc_message r;
+	struct fipc_message *request = &r;
+    
+    async_msg_set_fn_type(request, BLK_MQ_STOP_HW_QUEUES);
+    
+    vmfunc_wrapper(request);
+    
+    //return 0;
+}
+
+int blk_rq_map_sg(struct request_queue *q, struct request *rq,
+		  struct scatterlist *sglist)
+{
+    //TODO
+    struct fipc_message r;
+	struct fipc_message *request = &r;
+    
+    async_msg_set_fn_type(request, BLK_RQ_MAP_SG);
+    
+    vmfunc_wrapper(request);
+    
+    return 0;
+}
+
+
+
+int blk_rq_map_integrity_sg(struct request_queue *q, struct bio *bio,
+			    struct scatterlist *sglist)
+{
+    //TODO
+    struct fipc_message r;
+	struct fipc_message *request = &r;
+    
+    async_msg_set_fn_type(request, BLK_RQ_MAP_INTEGRITY_SG);
+    
+    vmfunc_wrapper(request);
+    
+    return 0;
+}
+
+int blk_rq_count_integrity_sg(struct request_queue *q, struct bio *bio)
+{
+    //TODO
+    struct fipc_message r;
+	struct fipc_message *request = &r;
+    
+    async_msg_set_fn_type(request, BLK_RQ_COUNT_INTEGRITY_SG);
+    
+    vmfunc_wrapper(request);
+    
+    return 0;
+}
+
+void blk_put_queue(struct request_queue *q)
+{
+    //TODO
+    struct fipc_message r;
+	struct fipc_message *request = &r;
+    
+    async_msg_set_fn_type(request, BLK_PUT_QUEUE);
+    
+    vmfunc_wrapper(request);
+}
+
+void blk_mq_update_nr_hw_queues(struct blk_mq_tag_set *set, int nr_hw_queues)
+{
+    //TODO
+    struct fipc_message r;
+	struct fipc_message *request = &r;
+    
+    async_msg_set_fn_type(request, BLK_MQ_UPDATE_NR_HW_QUEUES);
+    
+    vmfunc_wrapper(request);
+}
+
+struct request *blk_mq_tag_to_rq(struct blk_mq_tags *tags, unsigned int tag)
+{
+    //TODO
+    struct fipc_message r;
+	struct fipc_message *request = &r;
+    
+    async_msg_set_fn_type(request, BLK_MQ_TAG_TO_RQ);
+    
+    vmfunc_wrapper(request);
+    
+    return NULL;
+}
+
+void blk_mq_tagset_busy_iter(struct blk_mq_tag_set *tagset,
+		busy_tag_iter_fn *fn, void *priv)
+{
+    //TODO
+    struct fipc_message r;
+	struct fipc_message *request = &r;
+    
+    async_msg_set_fn_type(request, BLK_MQ_TAGSET_BUSY_ITER);
+    
+    vmfunc_wrapper(request);
+}
+
+void blk_mq_free_request(struct request *rq)
+{
+    struct fipc_message r;
+	struct fipc_message *request = &r;
+    
+    async_msg_set_fn_type(request, BLK_MQ_FREE_REQUEST);
+    
+    vmfunc_wrapper(request);
+}
+
+
 
 int blk_mq_alloc_tag_set(struct blk_mq_tag_set *set)
 {
@@ -191,6 +648,18 @@ void blk_mq_start_stopped_hw_queues(struct request_queue *q, bool async)
     vmfunc_wrapper(request);
     
 }
+
+void pci_restore_state(struct pci_dev *dev)
+{
+    struct fipc_message r;
+	struct fipc_message *request = &r;
+    
+    async_msg_set_fn_type(request, PCI_RESTORE_STATE);
+    
+    vmfunc_wrapper(request);
+}
+
+
 
 int pci_enable_pcie_error_reporting(struct pci_dev *dev)
 {
@@ -562,6 +1031,19 @@ fail_alloc:
 	return NULL;
 }
 
+bool blk_get_queue(struct request_queue *q)
+{
+    //TODO
+    struct fipc_message r;
+	struct fipc_message *request = &r;
+    
+    async_msg_set_fn_type(request, BLK_MQ_TAGSET_BUSY_ITER);
+    
+    vmfunc_wrapper(request);
+    
+    return (bool) fipc_get_reg0(request);
+}
+
 void blk_cleanup_queue(struct request_queue *q)
 {
 	struct request_queue_container *rq_container;
@@ -644,6 +1126,23 @@ void pci_unregister_driver(struct pci_driver *drv)
 	return;
 }
 
+                 
+bool pci_device_is_present(struct pci_dev *pdev)
+{
+    //TODO
+    struct fipc_message r;
+	struct fipc_message *request = &r;
+    
+    
+    async_msg_set_fn_type(request, PCI_DEVICE_IS_PRESENT);
+    
+    vmfunc_wrapper(request);
+    
+    return (bool)fipc_get_reg0(request);
+    
+}
+     
+     
 void blk_mq_start_request(struct request *rq)
 {
 	struct fipc_message r;
@@ -696,24 +1195,30 @@ void blk_queue_logical_block_size(struct request_queue *rq, unsigned short size)
 	return;
 }
 
+
 // we don't need the irq or cpu mask to be stored on this side at all
 struct cpumask *blk_mq_tags_cpumask(struct blk_mq_tags *tags)
 {
+    //TODO
     struct fipc_message r;
 	struct fipc_message *request = &r;
-    struct blk_mq_tags_container *tags_c = container_of(tags, struct blk_mq_tags_container, blk_mq_tags);
+    //struct blk_mq_tags_container *tags_c = container_of(tags, struct blk_mq_tags_container, blk_mq_tags);
     
-    fipc_set_reg0(request, tags_c->other_ref.cptr);
+    //fipc_set_reg0(request, tags_c->other_ref.cptr);
     
     async_msg_set_fn_type(request, BLK_MQ_TAGS_CPUMASK);
     
     vmfunc_wrapper(request);
+    
+    return NULL;
 }
 
-void _TODO_blk_execute_rq_nowait(struct request_queue *q, struct gendisk *bd_disk,
+
+void blk_execute_rq_nowait(struct request_queue *q, struct gendisk *bd_disk,
 			   struct request *rq, int at_head,
 			   rq_end_io_fn *done)
 {
+    //TODO
     struct fipc_message r;
 	struct fipc_message *request = &r;
     
@@ -723,6 +1228,7 @@ void _TODO_blk_execute_rq_nowait(struct request_queue *q, struct gendisk *bd_dis
     vmfunc_wrapper(request);
     
 }
+
 
 
 struct gendisk *alloc_disk_node(int minors, int node_id) 
@@ -760,6 +1266,25 @@ fail_insert:
 	kfree(disk_container);
 fail_alloc:
 	return NULL;
+}
+
+struct device *get_device(struct device *dev)
+{
+    	struct fipc_message r;
+	struct fipc_message *request = &r;
+	async_msg_set_fn_type(request, GET_DEVICE);
+	vmfunc_wrapper(request);
+    return NULL;
+}
+
+void device_release_driver(struct device *dev)
+{
+    struct fipc_message r;
+	struct fipc_message *request = &r;
+    
+    async_msg_set_fn_type(request, DEVICE_RELEASE_DRIVER);
+    
+    vmfunc_wrapper(request);
 }
 
 void device_add_disk(struct device *parent, struct gendisk *disk)
@@ -926,6 +1451,22 @@ int msix_vector_handler_callee(struct fipc_message *_request)
 	return ret;
 }
 
+void free_irq(unsigned int irq, void *dev_id)
+{
+	struct fipc_message r;
+	struct fipc_message *_request = &r;
+
+	INIT_IPC_MSG(&r);
+	async_msg_set_fn_type(_request, FREE_IRQ);
+
+	fipc_set_reg0(_request, irq);
+
+	vmfunc_wrapper(_request);
+
+	return;
+}
+
+
 void put_device(struct device *dev)
 {
     struct device_container* device_container;
@@ -942,6 +1483,7 @@ void put_device(struct device *dev)
 
 u64 dma_mask = 0;
 void *data_pool;
+#define PCI_CLASS_STORAGE_EXPRESS	0x010802
 
 struct pci_dev *g_pdev;
 int probe_callee(struct fipc_message *_request)
@@ -978,9 +1520,9 @@ int probe_callee(struct fipc_message *_request)
 		LIBLCD_ERR("lcd insert");
 		goto fail_insert;
 	}
-	dev_container->pci_dev.dev.kobj.name = "ixgbe_lcd";
-	dev_container->pci_dev.vendor = 0x8086;
-	dev_container->pci_dev.device = 0x10fd;
+	dev_container->pci_dev.dev.kobj.name = "nvme_lcd";
+	dev_container->pci_dev.vendor = PCI_ANY_ID;
+	dev_container->pci_dev.device = PCI_ANY_ID;
 	dev_container->other_ref = other_ref;
 	dev_container->pci_dev.dev.dma_mask = &dma_mask;
 
@@ -1265,34 +1807,109 @@ int softirq_done_fn_callee(struct fipc_message *_request)
 	return 0;
 }
 
-/*
-int open_callee(struct fipc_message *_request)
+struct dma_pool *dma_pool_create(const char *name, struct device *dev,
+                                        size_t size, size_t align, size_t boundary)
 {
-	int ret;
-
-	fmode_t mode = fipc_get_reg0(_request);
-
-	ret = null_open(NULL, mode);
-
-	fipc_set_reg0(_request, ret);
-
-	return ret;
+    //TODO
+    struct fipc_message r;
+	struct fipc_message *request = &r;
+    
+    async_msg_set_fn_type(request, DMA_POOL_CREATE);
+    
+    vmfunc_wrapper(request);
+    
+    return (void*) fipc_get_reg0(request);
 }
-*/
 
-/*
-int release_callee(struct fipc_message *_request)
+void dma_pool_destroy(struct dma_pool *pool)
 {
-	struct gendisk_container *disk_container;
-	int ret;
-	fmode_t mode;
-
-	ret = glue_cap_lookup_gendisk_type(c_cspace, __cptr(fipc_get_reg0(_request)),
-					&disk_container);
-	mode = fipc_get_reg1(_request);
-
-	null_release(&disk_container->gendisk, mode);
-
-	return 0;
+    //TODO
+    struct fipc_message r;
+	struct fipc_message *request = &r;
+    
+    async_msg_set_fn_type(request, DMA_POOL_DESTROY);
+    
+    vmfunc_wrapper(request);
 }
-*/
+
+void *dma_pool_alloc(struct dma_pool *pool, gfp_t mem_flags,
+		     dma_addr_t *handle)
+{
+    //TODO
+    struct fipc_message r;
+	struct fipc_message *request = &r;
+    
+    async_msg_set_fn_type(request, DMA_POOL_ALLOC);
+    
+    vmfunc_wrapper(request);
+    
+    return (void*) fipc_get_reg0(request);
+}
+
+void dma_pool_free(struct dma_pool *pool, void *vaddr, dma_addr_t dma)
+{
+    //TODO
+    struct fipc_message r;
+	struct fipc_message *request = &r;
+    
+    async_msg_set_fn_type(request, DMA_POOL_FREE);
+    
+    vmfunc_wrapper(request);
+    
+    //return (void*) fipc_get_reg0(request);
+}
+
+// extern int nvme_init_request(void *data, struct request *req,
+				// unsigned int hctx_idx, unsigned int rq_idx,
+				// unsigned int numa_node);
+
+// //
+// int nvme_init_request_callee(struct fipc_message *_request)
+// {
+    // //TODO TODO
+    // void *data;
+    // struct request *req;
+    // unsigned int hctx_idx, rq_idx,numa_node;
+    // int ret;
+    
+    // data = (void*) fipc_get_reg0(_request);
+    
+    // hctx_idx = fipc_get_reg2(_request);
+    // rq_idx = fipc_get_reg3(_request);
+    // numa_node = fipc_get_reg4(_request);
+    
+    // ret = nvme_init_request(data, req, hctx_idx, rq_idx, numa_node);
+    
+    // return ret;
+// }
+
+
+// int open_callee(struct fipc_message *_request)
+// {
+	// int ret;
+
+	// fmode_t mode = fipc_get_reg0(_request);
+
+	// ret = null_open(NULL, mode);
+
+	// fipc_set_reg0(_request, ret);
+
+	// return ret;
+// }
+
+
+
+// int release_callee(struct fipc_message *_request)
+// {
+	// struct gendisk_container *disk_container;
+	// int ret;
+	// fmode_t mode;
+
+	// ret = glue_cap_lookup_gendisk_type(c_cspace, __cptr(fipc_get_reg0(_request)),
+					// &disk_container);
+	// mode = fipc_get_reg1(_request);
+
+	// null_release(&disk_container->gendisk, mode);
+
+	// return 0;
+// }

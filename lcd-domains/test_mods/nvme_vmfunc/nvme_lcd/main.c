@@ -15,6 +15,7 @@
 int nvme_init(void);
 void nvme_exit(void);
 unsigned long loops_per_jiffy;
+//int jiffies = 1000;
 
 static int nvme_lcd_init(void)
 {

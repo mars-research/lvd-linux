@@ -54,6 +54,11 @@ enum dispatch_t {
     PCI_VFS_ASSIGNED,
     PUT_DEVICE,
     
+    DMA_POOL_ALLOC,
+    DMA_POOL_CREATE,
+    DMA_POOL_DESTROY,
+    DMA_POOL_FREE,
+    
 	PROBE,
 	REMOVE,
 	SYNC,
@@ -98,6 +103,8 @@ enum dispatch_t {
         REGISTER_BLKDEV,
         UNREGISTER_BLKDEV,
         REGISTER_CHARDEV,
+        GET_DEVICE,
+        DEVICE_RELEASE_DRIVER,
 	QUEUE_RQ_FN,
         MAP_QUEUE_FN,
         INIT_HCTX_FN,
@@ -129,6 +136,11 @@ enum dispatch_t {
     NVME_STOP_QUEUES,
     NVME_SUBMIT_SYNC_CMD,
     NVME_UNINIT_CTRL,
+    
+    NVME_PCI_REG_READ32,
+    NVME_PCI_REG_WRITE32,
+    NVME_PCI_REG_READ64,
+    NVME_PCI_RESET_CTRL,
     
 	MODULE_INIT,
 	MODULE_EXIT,

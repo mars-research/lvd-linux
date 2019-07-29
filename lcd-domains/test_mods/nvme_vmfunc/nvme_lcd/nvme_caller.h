@@ -10,6 +10,7 @@ void glue_nvme_exit(void);
 int ndo_open_callee(struct fipc_message *_request);
 int ndo_stop_callee(struct fipc_message *_request);
 
+int poll_callee(struct fipc_message *_request);
 
 int probe_callee(struct fipc_message *_request);
 

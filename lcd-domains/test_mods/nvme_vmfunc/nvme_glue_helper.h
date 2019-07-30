@@ -11,6 +11,7 @@
 #include <linux/blkdev.h>
 #include <linux/blk-mq.h>
 #include "nvme.h"
+#include "iod.h"
 
 struct device_container {
 	struct device device;
@@ -154,10 +155,16 @@ struct nvme_ctrl_container {
     cptr_t my_ref;
 };
 struct nvme_command_container {
-    struct nvme_command cmd;
+    struct nvme_command nvme_cmd;
     cptr_t other_ref;
     cptr_t my_ref;
 };
+struct nvme_iod_container {
+    struct nvme_iod nvme_iod;
+    cptr_t other_ref;
+    cptr_t my_ref;
+}
+
 
 int glue_cap_insert_device_type(struct glue_cspace *cspace,
 		struct device_container *device_container,

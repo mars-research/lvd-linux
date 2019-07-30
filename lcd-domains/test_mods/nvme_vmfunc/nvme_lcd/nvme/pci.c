@@ -173,6 +173,8 @@ struct nvme_queue {
 	u8 cqe_seen;
 };
 
+#ifndef NVME_IOD
+#define NVME_IOD
 /*
  * The nvme_iod describes the data in an I/O, including the list of PRP
  * entries.  You can't see it in this data structure because C doesn't let
@@ -190,6 +192,7 @@ struct nvme_iod {
 	struct scatterlist *sg;
 	struct scatterlist inline_sg[0];
 };
+#endif
 
 /*
  * Check we didin't inadvertently grow the command struct

@@ -1999,8 +1999,12 @@ nmi_restore_vmfunc_full:
 	/* If another NMI hits here, it will VMFUNC into the 
 	 * kernel and back into LCD on exit, we waste a bit of cycles, 
 	 * but it's ok, we'll just VMFUNC back to LCD one more time 
-	 */	
+	 */
+	push %rax
+	push %rcx	
 	VMFUNC_TO_LCD
+	pop %rcx
+	pop %rax
 
 	/*
 	 * INTERRUPT_RETURN reads the "iret" frame and exits the NMI

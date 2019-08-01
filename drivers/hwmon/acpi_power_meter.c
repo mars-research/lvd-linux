@@ -561,13 +561,13 @@ static int read_domain_devices(struct acpi_power_meter_resource *resource)
 	pr_info("calling acpi_eval_obj with handle: %p\n", resource->acpi_dev->handle);
 	status = acpi_evaluate_object(resource->acpi_dev->handle, "_PMD", NULL,
 				      &buffer);
-	pr_info("acpi_eval_obj returned %d objects\n", ((union acpi_object
-					*)(buffer.pointer))->package.count);
 	if (ACPI_FAILURE(status)) {
 		ACPI_EXCEPTION((AE_INFO, status, "Evaluating _PMD"));
 		return -ENODEV;
 	}
 
+	pr_info("acpi_eval_obj returned %d objects\n", ((union acpi_object *)
+					(buffer.pointer))->package.count);
 	pss = buffer.pointer;
 	if (!pss ||
 	    pss->type != ACPI_TYPE_PACKAGE) {
@@ -759,13 +759,13 @@ static int read_capabilities(struct acpi_power_meter_resource *resource)
 	pr_info("calling acpi_eval_obj with handle: %p\n", resource->acpi_dev->handle);
 	status = acpi_evaluate_object(resource->acpi_dev->handle, "_PMC", NULL,
 				      &buffer);
-	pr_info("acpi_eval_obj returned %d objects\n", ((union acpi_object
-					*)(buffer.pointer))->package.count);
 	if (ACPI_FAILURE(status)) {
 		ACPI_EXCEPTION((AE_INFO, status, "Evaluating _PMC"));
 		return -ENODEV;
 	}
 
+	pr_info("acpi_eval_obj returned %d objects\n", ((union acpi_object *)
+					(buffer.pointer))->package.count);
 	pss = buffer.pointer;
 	if (!pss ||
 	    pss->type != ACPI_TYPE_PACKAGE ||

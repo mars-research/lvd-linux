@@ -1,0 +1,465 @@
+#include <lcd_config/pre_hook.h>
+
+#include "../coretemp_hwmon_caller.h"
+
+#include <lcd_config/post_hook.h>
+
+static struct glue_cspace *c_cspace;
+
+#define CPTR_HASH_BITS      5
+static DEFINE_HASHTABLE(pdev_hash, CPTR_HASH_BITS);
+
+int glue_coretemp_hwmon_init(void)
+{
+	int ret;
+	ret = glue_cap_init();
+	if (ret) {
+		LIBLCD_ERR("cap init");
+		goto fail1;
+	}
+	ret = glue_cap_create(&c_cspace);
+	if (ret) {
+		LIBLCD_ERR("cap create");
+		goto fail2;
+	}
+	return 0;
+fail2:
+	glue_cap_exit();
+fail1:
+	return ret;
+
+}
+
+void glue_coretemp_hwmon_exit(void)
+{
+	glue_cap_destroy(c_cspace);
+	glue_cap_exit();
+
+}
+
+int glue_insert_pdevice(struct platform_device_ptr_container *pdev_c)
+{
+	BUG_ON(!pdev_c->pdev);
+
+	pdev_c->my_ref = __cptr((unsigned long)pdev_c->pdev);
+
+	hash_add(pdev_hash, &pdev_c->hentry, (unsigned long) pdev_c->pdev);
+
+	return 0;
+}
+
+int glue_lookup_pdevice(struct cptr c, struct platform_device_ptr_container **pdev_cout) {
+	struct platform_device_ptr_container *pdev_c;
+
+	hash_for_each_possible(pdev_hash, pdev_c,
+			hentry, (unsigned long) cptr_val(c)) {
+		if (pdev_c->pdev == (struct platform_device*) c.cptr)
+			*pdev_cout = pdev_c;
+	}
+	return 0;
+}
+
+void glue_remove_pdevice(struct platform_device_ptr_container *pdev_c)
+{
+	hash_del(&pdev_c->hentry);
+}
+
+
+const struct x86_cpu_id *x86_match_cpu(const struct x86_cpu_id *match)
+{
+	struct fipc_message r;
+	struct fipc_message *_request = &r;
+	int ret;
+	struct x86_cpu_id *func_ret;
+	const struct x86_cpu_id *_match = &match[0];
+
+	func_ret = kzalloc(sizeof(struct x86_cpu_id), GFP_KERNEL);
+	if (!func_ret) {
+		LIBLCD_ERR("kzalloc");
+		goto fail_alloc;
+	}
+
+	async_msg_set_fn_type(_request, X86_MATCH_CPU);
+	fipc_set_reg0(_request, _match->vendor);
+	fipc_set_reg1(_request, _match->family);
+	fipc_set_reg2(_request, _match->model);
+	fipc_set_reg3(_request, _match->feature);
+
+	ret = vmfunc_wrapper(_request);
+	func_ret->vendor = fipc_get_reg0(_request);
+	func_ret->family = fipc_get_reg1(_request);
+	func_ret->model = fipc_get_reg2(_request);
+	func_ret->feature = fipc_get_reg3(_request);
+
+fail_alloc:
+	return func_ret;
+}
+
+int probe_callee(struct fipc_message *_request)
+{
+	struct platform_device_container *pdev_container;
+	struct platform_driver_container *pdrv_container;
+	int func_ret;
+	int ret = 0;
+
+	LIBLCD_MSG("%s called", __func__);
+
+	pdev_container = kzalloc(sizeof(struct platform_device_container),
+		GFP_KERNEL);
+	if (!pdev_container) {
+		LIBLCD_ERR("kzalloc");
+		goto fail_alloc;
+	}
+
+	ret = glue_cap_insert_platform_device_type(c_cspace, pdev_container,
+				&pdev_container->my_ref);
+
+	if (ret) {
+		LIBLCD_ERR("lcd insert");
+		goto fail_insert;
+	}
+	pdev_container->other_ref = __cptr(fipc_get_reg0(_request));
+
+	ret = glue_cap_lookup_platform_driver_type(c_cspace,
+			__cptr(fipc_get_reg1(_request)),
+			&pdrv_container);
+
+	if (ret) {
+		LIBLCD_ERR("lcd lookup");
+		goto fail_lookup;
+	}
+
+	func_ret = pdrv_container->platform_driver.probe(
+			&pdev_container->platform_device);
+
+	fipc_set_reg0(_request, func_ret);
+
+fail_alloc:
+fail_lookup:
+fail_insert:
+	return ret;
+}
+
+int remove_callee(struct fipc_message *_request)
+{
+	struct platform_device_container *pdev_container;
+	struct platform_driver_container *pdrv_container;
+	int ret = 0;
+	int func_ret = 0;
+
+	ret = glue_cap_lookup_platform_device_type(c_cspace,
+			__cptr(fipc_get_reg0(_request)),
+			&pdev_container);
+
+	if (ret) {
+		LIBLCD_ERR("lcd lookup");
+		goto fail_lookup;
+	}
+
+	ret = glue_cap_lookup_platform_driver_type(c_cspace,
+			__cptr(fipc_get_reg1(_request)),
+			&pdrv_container);
+
+	if (ret) {
+		LIBLCD_ERR("lcd lookup");
+		goto fail_lookup;
+	}
+
+	func_ret = pdrv_container->platform_driver.remove(&pdev_container->platform_device);
+	fipc_set_reg1(_request, func_ret);
+fail_lookup:
+	return ret;
+}
+
+int __platform_driver_register(struct platform_driver *driver,
+		struct module *mod)
+{
+	struct fipc_message r;
+	struct fipc_message *_request = &r;
+	int ret;
+	int func_ret;
+	struct platform_driver_container *pdrv_container;
+
+	pdrv_container = container_of(driver, struct platform_driver_container,
+					platform_driver);
+
+	ret = glue_cap_insert_platform_driver_type(c_cspace, pdrv_container,
+				&pdrv_container->my_ref);
+	if (ret) {
+		LIBLCD_MSG("cap insert failed %d", ret);
+		goto fail_insert;
+	}
+
+	async_msg_set_fn_type(_request, __PLATFORM_DRIVER_REGISTER);
+	fipc_set_reg0(_request, pdrv_container->my_ref.cptr);
+	ret = vmfunc_wrapper(_request);
+	pdrv_container->other_ref = __cptr(fipc_get_reg0(_request));
+	func_ret = fipc_get_reg1(_request);
+
+	return func_ret;
+fail_insert:
+	return ret;
+}
+
+int __register_cpu_notifier(struct notifier_block *nb)
+{
+	struct fipc_message r;
+	struct fipc_message *_request = &r;
+	int ret;
+	int func_ret;
+	async_msg_set_fn_type(_request,
+			__REGISTER_CPU_NOTIFIER);
+	ret = vmfunc_wrapper(_request);
+	func_ret = fipc_get_reg0(_request);
+	return func_ret;
+}
+
+void platform_driver_unregister(struct platform_driver *driver)
+{
+	struct fipc_message r;
+	struct fipc_message *_request = &r;
+	int ret;
+	async_msg_set_fn_type(_request,
+			PLATFORM_DRIVER_UNREGISTER);
+	ret = vmfunc_wrapper(_request);
+	return;
+}
+
+void __unregister_cpu_notifier(struct notifier_block *nb)
+{
+	struct fipc_message r;
+	struct fipc_message *_request = &r;
+	int ret;
+	async_msg_set_fn_type(_request,
+			__UNREGISTER_CPU_NOTIFIER);
+	ret = vmfunc_wrapper(_request);
+	return;
+}
+
+int platform_device_add(struct platform_device *pdev)
+{
+	struct fipc_message r;
+	struct fipc_message *_request = &r;
+	int ret;
+	int func_ret;
+	async_msg_set_fn_type(_request,
+			PLATFORM_DEVICE_ADD);
+	ret = vmfunc_wrapper(_request);
+	func_ret = fipc_get_reg0(_request);
+	return func_ret;
+}
+
+struct platform_device *platform_device_alloc(const char *name,
+		int id)
+{
+	struct platform_device_container *func_ret_container = NULL;
+	struct fipc_message r;
+	struct fipc_message *_request = &r;
+	int ret;
+	struct platform_device *func_ret = &func_ret_container->platform_device;
+	async_msg_set_fn_type(_request,
+			PLATFORM_DEVICE_ALLOC);
+	fipc_set_reg1(_request,
+			(u64) name);
+	fipc_set_reg2(_request,
+			id);
+	ret = vmfunc_wrapper(_request);
+	return func_ret;
+}
+
+void platform_device_put(struct platform_device *pdev)
+{
+	struct fipc_message r;
+	struct fipc_message *_request = &r;
+	int ret;
+	async_msg_set_fn_type(_request,
+			PLATFORM_DEVICE_PUT);
+	ret = vmfunc_wrapper(_request);
+	return;
+
+}
+
+struct pci_dev *pci_get_domain_bus_and_slot(int domain,
+		unsigned int bus,
+		unsigned int devfn)
+{
+	struct pci_dev_container *func_ret_container = NULL;
+	struct fipc_message r;
+	struct fipc_message *_request = &r;
+	struct pci_dev *func_ret = &func_ret_container->pci_dev;
+	int ret;
+
+	async_msg_set_fn_type(_request,
+			PCI_GET_DOMAIN_BUS_AND_SLOT);
+	fipc_set_reg1(_request,
+			domain);
+	fipc_set_reg2(_request,
+			bus);
+	fipc_set_reg3(_request,
+			devfn);
+	ret = vmfunc_wrapper(_request);
+	return func_ret;
+}
+
+struct device *devm_hwmon_device_register_with_groups(struct device *dev,
+		const char *name,
+		void *drvdata,
+		const struct attribute_group **groups)
+{
+	struct device_container *func_ret_container = NULL;
+	struct fipc_message r;
+	struct fipc_message *_request = &r;
+	int ret;
+	struct device *func_ret;
+	struct platform_device_container *pdev_container;
+	struct platform_device *pdev;
+
+	func_ret_container = kzalloc(sizeof(struct device_container), GFP_KERNEL);
+
+	if (!func_ret_container) {
+		LIBLCD_ERR("kzalloc func_ret_container");
+		goto fail_alloc;
+	}
+
+	func_ret = &func_ret_container->device;
+
+	ret = glue_cap_insert_device_type(c_cspace,
+				func_ret_container,
+				&func_ret_container->my_ref);
+	if (ret) {
+		LIBLCD_ERR("lcd insert");
+		goto fail_insert;
+	}
+
+	pdev = container_of(dev, struct platform_device, dev);
+	pdev_container = container_of(pdev, struct platform_device_container,
+			platform_device);
+	async_msg_set_fn_type(_request,
+			DEVM_HWMON_DEVICE_REGISTER_WITH_GROUPS);
+	fipc_set_reg0(_request, func_ret_container->my_ref.cptr);
+	fipc_set_reg1(_request, (u64) name);
+	fipc_set_reg2(_request, pdev_container->other_ref.cptr);
+	ret = vmfunc_wrapper(_request);
+	func_ret_container->other_ref.cptr = fipc_get_reg0(_request);
+	return func_ret;
+fail_insert:
+fail_alloc:
+	return NULL;
+}
+
+int rdmsr_safe_on_cpu(unsigned int cpu,
+		unsigned int msr_no,
+		unsigned int *l,
+		unsigned int *h)
+{
+	struct fipc_message r;
+	struct fipc_message *_request = &r;
+	int ret;
+	int func_ret;
+	async_msg_set_fn_type(_request,
+			RDMSR_SAFE_ON_CPU);
+	fipc_set_reg1(_request,
+			cpu);
+	fipc_set_reg2(_request,
+			msr_no);
+	ret = vmfunc_wrapper(_request);
+	func_ret = fipc_get_reg0(_request);
+	return func_ret;
+}
+
+int rdmsr_on_cpu(unsigned int cpu,
+		unsigned int msr_no,
+		unsigned int *l,
+		unsigned int *h)
+{
+	struct fipc_message r;
+	struct fipc_message *_request = &r;
+	int ret;
+	int func_ret;
+	async_msg_set_fn_type(_request,
+			RDMSR_ON_CPU);
+	fipc_set_reg1(_request,
+			cpu);
+	fipc_set_reg2(_request,
+			msr_no);
+	ret = vmfunc_wrapper(_request);
+	func_ret = fipc_get_reg0(_request);
+	return func_ret;
+}
+
+int sysfs_create_group(struct kobject *kobj,
+		const struct attribute_group *grp)
+{
+	struct fipc_message r;
+	struct fipc_message *_request = &r;
+	int ret;
+	int func_ret;
+	async_msg_set_fn_type(_request,
+			SYSFS_CREATE_GROUP);
+	ret = vmfunc_wrapper(_request);
+	func_ret = fipc_get_reg0(_request);
+	return func_ret;
+}
+
+void sysfs_remove_group(struct kobject *kobj,
+		const struct attribute_group *grp)
+{
+	struct fipc_message r;
+	struct fipc_message *_request = &r;
+	int ret;
+	async_msg_set_fn_type(_request,
+			SYSFS_REMOVE_GROUP);
+	ret = vmfunc_wrapper(_request);
+	return;
+}
+
+int notifier_fn_t_callee(struct fipc_message *_request)
+{
+	struct notifier_block *nb = NULL;
+	unsigned 	long action = 0;
+	//void *data = NULL;
+	int ret = 0;
+	int func_ret = 0;
+	int sync_ret;
+	unsigned 	long mem_order;
+	unsigned 	long data_offset;
+	cptr_t data_cptr;
+	gva_t data_gva;
+
+	nb = kzalloc(sizeof( *nb ),
+		GFP_KERNEL);
+	if (!nb) {
+		LIBLCD_ERR("kzalloc");
+		goto fail_alloc;
+	}
+	action = fipc_get_reg1(_request);
+	sync_ret = lcd_cptr_alloc(&data_cptr);
+	if (sync_ret) {
+		LIBLCD_ERR("failed to get cptr");
+		lcd_exit(-1);
+	}
+	lcd_set_cr0(data_cptr);
+//	sync_ret = lcd_sync_recv(sync_ep);
+	lcd_set_cr0(CAP_CPTR_NULL);
+	if (sync_ret) {
+		LIBLCD_ERR("failed to recv");
+		lcd_exit(-1);
+	}
+	mem_order = lcd_r0();
+	data_offset = lcd_r1();
+	sync_ret = lcd_map_virt(data_cptr,
+		mem_order,
+		&data_gva);
+	if (sync_ret) {
+		LIBLCD_ERR("failed to map void *data");
+		lcd_exit(-1);
+	}
+	func_ret = nb->notifier_call(nb,
+		action,
+		( void  * )( ( gva_val(data_gva) ) + ( data_offset ) ));
+	fipc_set_reg1(_request,
+			func_ret);
+fail_alloc:
+	return ret;
+}
+

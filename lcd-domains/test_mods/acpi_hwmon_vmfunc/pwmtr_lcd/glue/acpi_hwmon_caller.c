@@ -361,11 +361,12 @@ int acpi_evaluate_object_sync(unsigned long buf_len, unsigned long num_elements,
 	cptr_t p_cptr[3];
 	unsigned long p_offset[3];
 	unsigned long p_mem_sz[3];
-	int ret;
+	int ret = 0;
 	void *buf_ptr;
-	cptr_t p_cptr;
-	unsigned long p_offset;
-	unsigned long p_mem_sz;
+	cptr_t _p_cptr;
+	unsigned long _p_offset;
+	unsigned long _p_mem_sz;
+	struct acpi_buffer *buffer = NULL;
 
 	async_msg_set_fn_type(_request, SYNC_ACPI_EVALUATE_OBJECT);
 
@@ -376,16 +377,16 @@ int acpi_evaluate_object_sync(unsigned long buf_len, unsigned long num_elements,
 		goto fail_alloc;
 	}
 
-	ret = lcd_virt_to_cptr(__gva((unsigned long)buf_ptr), &p_cptr,
-			&p_mem_sz, &p_offset);
+	ret = lcd_virt_to_cptr(__gva((unsigned long)buf_ptr), &_p_cptr,
+			&_p_mem_sz, &_p_offset);
 
 	if (ret) {
 		LIBLCD_ERR("virt to cptr failed");
 		goto fail_virt;
 	}
-	fipc_set_reg0(_request, ilog2((p_mem_sz) >> (PAGE_SHIFT))
-				| (p_offset << 32));
-	fipc_set_reg1(_request, cptr_val(p_cptr));
+	fipc_set_reg0(_request, ilog2((_p_mem_sz) >> (PAGE_SHIFT))
+				| (_p_offset << 32));
+	fipc_set_reg1(_request, cptr_val(_p_cptr));
 
 
 	{
@@ -399,7 +400,7 @@ int acpi_evaluate_object_sync(unsigned long buf_len, unsigned long num_elements,
 
 		if (pss && pss->package.count == 14) {
 			int i;
-			acpi_evaluate_object_sync(pss);
+			//acpi_evaluate_object_sync(pss);
 
 			pss->package.elements = (union acpi_object*)((char *) pss + fipc_get_reg2(_request));
 
@@ -430,6 +431,9 @@ int acpi_evaluate_object_sync(unsigned long buf_len, unsigned long num_elements,
 		}
 	}
 
+	{
+
+	union acpi_object *pss = buffer->pointer;
 	if (pss && pss->package.count == 14) {
 		int i, j;
 		int idx;
@@ -460,6 +464,7 @@ int acpi_evaluate_object_sync(unsigned long buf_len, unsigned long num_elements,
 			}
 		}
 	}
+	}
 	vmfunc_wrapper(_request);
 fail_virt:
 fail_alloc:
@@ -480,6 +485,7 @@ unsigned int _acpi_evaluate_object(struct acpi_device *acpi_device,
 	unsigned long buffer_length;
 	unsigned long num_elements;
 	unsigned long lengths[20] = {0};
+	unsigned long p_mem_sz = 0, p_offset = 0;
 	int i;
 
 	acpi_container = container_of(acpi_device, struct
@@ -499,7 +505,7 @@ unsigned int _acpi_evaluate_object(struct acpi_device *acpi_device,
 	strncpy((char*)&_request->regs[2], pathname, sizeof(_request->regs[2]));
 	fipc_set_reg3(_request, buffer->length);
 	fipc_set_reg4(_request, device_container->other_ref.cptr);
-	fipc_set_reg5(_request, buffer->pointer);
+	//fipc_set_reg5(_request, buffer->pointer);
 	fipc_set_reg6(_request, device_container->my_ref.cptr);
 
 	ret = vmfunc_wrapper(_request);
@@ -516,9 +522,6 @@ unsigned int _acpi_evaluate_object(struct acpi_device *acpi_device,
 	}
 
 	return func_ret;
-fail_alloc:
-fail_virt:
-	return ret;
 }
 
 int device_create_file(struct device *dev,

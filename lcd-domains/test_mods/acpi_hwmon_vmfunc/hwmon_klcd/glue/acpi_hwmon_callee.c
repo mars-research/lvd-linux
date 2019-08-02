@@ -650,13 +650,17 @@ fail_virt:
 int acpi_evaluate_object_sync_callee(struct fipc_message *_request)
 {
 	unsigned 	long mem_order;
-	unsigned 	long p_offset;
+	unsigned long p_offset;
 	cptr_t p_cptr, lcd_cptr;
 	gva_t p_gva;
+	struct acpi_buffer buffer;
+#if 0
 	char *strings[3];
 	cptr_t p_cptr[3];
 	unsigned long p_offset[3];
 	unsigned long p_mem_sz[3];
+#endif
+	int ret;
 
 	ret = lcd_cptr_alloc(&p_cptr);
 	if (ret) {
@@ -680,8 +684,9 @@ int acpi_evaluate_object_sync_callee(struct fipc_message *_request)
 	buffer.length = (1 << 2) * PAGE_SIZE;
 	buffer.pointer = (void*)(gva_val(p_gva) + p_offset);
 
-
-
+fail_virt:
+fail_alloc:
+	return ret;
 }
 
 int acpi_evaluate_object_callee(struct fipc_message *_request)
@@ -730,7 +735,7 @@ int acpi_evaluate_object_callee(struct fipc_message *_request)
 
 	handle = acpi_device->handle;
 	buffer.length = fipc_get_reg3(_request);
-	buffer.pointer = fipc_get_reg5(_request);
+	//buffer.pointer = fipc_get_reg5(_request);
 
 	printk("%s calling acpi_eval_obj with handle: %p, pathname: %s, "
 			"ext_params: %p, buffer.p: %p\n", __func__, handle,
@@ -790,7 +795,6 @@ int acpi_evaluate_object_callee(struct fipc_message *_request)
 
 fail_alloc:
 fail_lookup:
-fail_virt:
 fail_insert:
 	return ret;
 }

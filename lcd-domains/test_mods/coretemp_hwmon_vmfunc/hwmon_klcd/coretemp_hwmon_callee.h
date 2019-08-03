@@ -17,8 +17,8 @@ int rdmsr_safe_on_cpu_callee(struct fipc_message *_request);
 int rdmsr_on_cpu_callee(struct fipc_message *_request);
 int sysfs_create_group_callee(struct fipc_message *_request);
 int sysfs_remove_group_callee(struct fipc_message *_request);
-int dispatch_sync_loop(struct fipc_message *message);
-int dispatch_async_loop(struct fipc_message *message);
+int cpu_maps_update_begin_callee(struct fipc_message *_request);
+int cpu_maps_update_done_callee(struct fipc_message *_request);
 int glue_coretemp_hwmon_init(void);
 void glue_coretemp_hwmon_exit(void);
 

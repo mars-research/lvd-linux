@@ -20,6 +20,14 @@ int hwmon_klcd_dispatch_loop(struct fipc_message *message)
 			trace(__PLATFORM_DRIVER_REGISTER);
 			return __platform_driver_register_callee(message);
 
+		case CPU_MAPS_UPDATE_BEGIN:
+			trace(CPU_MAPS_UPDATE_BEGIN);
+			return cpu_maps_update_begin_callee(message);
+
+		case CPU_MAPS_UPDATE_DONE:
+			trace(CPU_MAPS_UPDATE_DONE);
+			return cpu_maps_update_done_callee(message);
+
 		case __REGISTER_CPU_NOTIFIER:
 			trace(__REGISTER_CPU_NOTIFIER);
 			return __register_cpu_notifier_callee(message);

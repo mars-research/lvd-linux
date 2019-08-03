@@ -73,6 +73,8 @@ const struct x86_cpu_id *x86_match_cpu(const struct x86_cpu_id *match)
 	struct x86_cpu_id *func_ret;
 	const struct x86_cpu_id *_match = &match[0];
 
+	INIT_FIPC_MSG(_request);
+
 	func_ret = kzalloc(sizeof(struct x86_cpu_id), GFP_KERNEL);
 	if (!func_ret) {
 		LIBLCD_ERR("kzalloc");
@@ -129,10 +131,13 @@ int probe_callee(struct fipc_message *_request)
 		goto fail_lookup;
 	}
 
+	pdrv_container->other_ref = __cptr(fipc_get_reg2(_request));
+
 	func_ret = pdrv_container->platform_driver.probe(
 			&pdev_container->platform_device);
 
 	fipc_set_reg0(_request, func_ret);
+	fipc_set_reg1(_request, pdev_container->my_ref.cptr);
 
 fail_alloc:
 fail_lookup:
@@ -165,8 +170,9 @@ int remove_callee(struct fipc_message *_request)
 		goto fail_lookup;
 	}
 
-	func_ret = pdrv_container->platform_driver.remove(&pdev_container->platform_device);
-	fipc_set_reg1(_request, func_ret);
+	func_ret = pdrv_container->platform_driver.remove(
+				&pdev_container->platform_device);
+	fipc_set_reg0(_request, func_ret);
 fail_lookup:
 	return ret;
 }
@@ -179,6 +185,8 @@ int __platform_driver_register(struct platform_driver *driver,
 	int ret;
 	int func_ret;
 	struct platform_driver_container *pdrv_container;
+
+	INIT_FIPC_MSG(_request);
 
 	pdrv_container = container_of(driver, struct platform_driver_container,
 					platform_driver);
@@ -207,20 +215,42 @@ int __register_cpu_notifier(struct notifier_block *nb)
 	struct fipc_message *_request = &r;
 	int ret;
 	int func_ret;
-	async_msg_set_fn_type(_request,
-			__REGISTER_CPU_NOTIFIER);
+	struct notifier_block_container *nb_container;
+
+	INIT_FIPC_MSG(_request);
+
+	nb_container = container_of(nb, struct notifier_block_container,
+					notifier_block);
+
+	ret = glue_cap_insert_notifier_block_type(c_cspace, nb_container,
+				&nb_container->my_ref);
+	if (ret) {
+		LIBLCD_MSG("cap insert failed %d", ret);
+		goto fail_insert;
+	}
+
+	async_msg_set_fn_type(_request, __REGISTER_CPU_NOTIFIER);
+	fipc_set_reg0(_request, nb_container->my_ref.cptr);
 	ret = vmfunc_wrapper(_request);
 	func_ret = fipc_get_reg0(_request);
+	nb_container->other_ref = __cptr(fipc_get_reg1(_request));
 	return func_ret;
+fail_insert:
+	return ret;
 }
 
 void platform_driver_unregister(struct platform_driver *driver)
 {
 	struct fipc_message r;
 	struct fipc_message *_request = &r;
+	struct platform_driver_container *pdrv_container;
 	int ret;
-	async_msg_set_fn_type(_request,
-			PLATFORM_DRIVER_UNREGISTER);
+
+	pdrv_container = container_of(driver, struct platform_driver_container,
+					platform_driver);
+
+	async_msg_set_fn_type(_request, PLATFORM_DRIVER_UNREGISTER);
+	fipc_set_reg0(_request, pdrv_container->my_ref.cptr);
 	ret = vmfunc_wrapper(_request);
 	return;
 }
@@ -229,9 +259,14 @@ void __unregister_cpu_notifier(struct notifier_block *nb)
 {
 	struct fipc_message r;
 	struct fipc_message *_request = &r;
+	struct notifier_block_container *nb_container;
 	int ret;
-	async_msg_set_fn_type(_request,
-			__UNREGISTER_CPU_NOTIFIER);
+
+	nb_container = container_of(nb, struct notifier_block_container,
+					notifier_block);
+
+	async_msg_set_fn_type(_request, __UNREGISTER_CPU_NOTIFIER);
+	fipc_set_reg0(_request, nb_container->other_ref.cptr);
 	ret = vmfunc_wrapper(_request);
 	return;
 }
@@ -356,14 +391,16 @@ int rdmsr_safe_on_cpu(unsigned int cpu,
 	struct fipc_message *_request = &r;
 	int ret;
 	int func_ret;
-	async_msg_set_fn_type(_request,
-			RDMSR_SAFE_ON_CPU);
-	fipc_set_reg1(_request,
-			cpu);
-	fipc_set_reg2(_request,
-			msr_no);
+	async_msg_set_fn_type(_request, RDMSR_SAFE_ON_CPU);
+
+	fipc_set_reg0(_request, cpu);
+	fipc_set_reg1(_request, msr_no);
+
 	ret = vmfunc_wrapper(_request);
 	func_ret = fipc_get_reg0(_request);
+	*l = fipc_get_reg1(_request);
+	*h = fipc_get_reg2(_request);
+
 	return func_ret;
 }
 
@@ -376,14 +413,13 @@ int rdmsr_on_cpu(unsigned int cpu,
 	struct fipc_message *_request = &r;
 	int ret;
 	int func_ret;
-	async_msg_set_fn_type(_request,
-			RDMSR_ON_CPU);
-	fipc_set_reg1(_request,
-			cpu);
-	fipc_set_reg2(_request,
-			msr_no);
+	async_msg_set_fn_type(_request, RDMSR_ON_CPU);
+	fipc_set_reg0(_request, cpu);
+	fipc_set_reg1(_request, msr_no);
 	ret = vmfunc_wrapper(_request);
 	func_ret = fipc_get_reg0(_request);
+	*l = fipc_get_reg1(_request);
+	*h = fipc_get_reg2(_request);
 	return func_ret;
 }
 
@@ -415,51 +451,53 @@ void sysfs_remove_group(struct kobject *kobj,
 
 int notifier_fn_t_callee(struct fipc_message *_request)
 {
-	struct notifier_block *nb = NULL;
-	unsigned 	long action = 0;
-	//void *data = NULL;
+	struct notifier_block_container *nb_container = NULL;
+	struct notifier_block *nb;
+	unsigned long action;
+	void *hcpu = NULL;
 	int ret = 0;
 	int func_ret = 0;
-	int sync_ret;
-	unsigned 	long mem_order;
-	unsigned 	long data_offset;
-	cptr_t data_cptr;
-	gva_t data_gva;
 
-	nb = kzalloc(sizeof( *nb ),
-		GFP_KERNEL);
-	if (!nb) {
-		LIBLCD_ERR("kzalloc");
-		goto fail_alloc;
+	ret = glue_cap_lookup_notifier_block_type(c_cspace,
+			__cptr(fipc_get_reg0(_request)),
+			&nb_container);
+
+	if (ret) {
+		LIBLCD_ERR("lcd lookup");
+		goto fail_lookup;
 	}
+
 	action = fipc_get_reg1(_request);
-	sync_ret = lcd_cptr_alloc(&data_cptr);
-	if (sync_ret) {
-		LIBLCD_ERR("failed to get cptr");
-		lcd_exit(-1);
-	}
-	lcd_set_cr0(data_cptr);
-//	sync_ret = lcd_sync_recv(sync_ep);
-	lcd_set_cr0(CAP_CPTR_NULL);
-	if (sync_ret) {
-		LIBLCD_ERR("failed to recv");
-		lcd_exit(-1);
-	}
-	mem_order = lcd_r0();
-	data_offset = lcd_r1();
-	sync_ret = lcd_map_virt(data_cptr,
-		mem_order,
-		&data_gva);
-	if (sync_ret) {
-		LIBLCD_ERR("failed to map void *data");
-		lcd_exit(-1);
-	}
-	func_ret = nb->notifier_call(nb,
-		action,
-		( void  * )( ( gva_val(data_gva) ) + ( data_offset ) ));
-	fipc_set_reg1(_request,
-			func_ret);
-fail_alloc:
+	hcpu = (void*)fipc_get_reg2(_request);
+	nb = &nb_container->notifier_block;
+	func_ret = nb->notifier_call(nb, action, hcpu);
+	fipc_set_reg1(_request, func_ret);
+fail_lookup:
 	return ret;
+}
+
+void cpu_maps_update_begin(void)
+{
+	struct fipc_message r;
+	struct fipc_message *_request = &r;
+	int ret;
+
+	INIT_FIPC_MSG(_request);
+	async_msg_set_fn_type(_request, CPU_MAPS_UPDATE_BEGIN);
+	ret = vmfunc_wrapper(_request);
+	return;
+}
+
+void cpu_maps_update_done(void)
+{
+	struct fipc_message r;
+	struct fipc_message *_request = &r;
+	int ret;
+
+	INIT_FIPC_MSG(_request);
+	async_msg_set_fn_type(_request, CPU_MAPS_UPDATE_DONE);
+
+	ret = vmfunc_wrapper(_request);
+	return;
 }
 

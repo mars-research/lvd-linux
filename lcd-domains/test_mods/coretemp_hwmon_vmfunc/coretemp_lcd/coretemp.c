@@ -800,8 +800,16 @@ static int coretemp_cpu_callback(struct notifier_block *nfb,
 	return NOTIFY_OK;
 }
 
+#ifdef LCD_ISOLATE
+static struct notifier_block_container coretemp_cpu_notifier_container = {
+	.notifier_block = {
+#else
 static struct notifier_block coretemp_cpu_notifier __refdata = {
+#endif
 	.notifier_call = coretemp_cpu_callback,
+#ifdef LCD_ISOLATE
+	}
+#endif
 };
 
 static const struct x86_cpu_id __initconst coretemp_ids[] = {
@@ -842,7 +850,7 @@ static int __init coretemp_init(void)
 	}
 #endif
 
-	__register_hotcpu_notifier(&coretemp_cpu_notifier);
+	__register_hotcpu_notifier(&coretemp_cpu_notifier_container.notifier_block);
 	cpu_notifier_register_done();
 	return 0;
 
@@ -863,7 +871,7 @@ static void __exit coretemp_exit(void)
 	struct pdev_entry *p, *n;
 
 	cpu_notifier_register_begin();
-	__unregister_hotcpu_notifier(&coretemp_cpu_notifier);
+	__unregister_hotcpu_notifier(&coretemp_cpu_notifier_container.notifier_block);
 	mutex_lock(&pdev_list_mutex);
 	list_for_each_entry_safe(p, n, &pdev_list, list) {
 		platform_device_unregister(p->pdev);

@@ -155,7 +155,7 @@ int probe(struct platform_device *pdev,
 
 	pdrv_container = hidden_args->struct_container;
 
-	INIT_FIPC_MSG(&r);
+	INIT_FIPC_MSG(_request);
 
 	pdev_container = kzalloc(sizeof(struct platform_device_container),
 			GFP_KERNEL);
@@ -176,6 +176,7 @@ int probe(struct platform_device *pdev,
 	vmfunc_klcd_wrapper(_request, 1);
 
 	func_ret = fipc_get_reg0(_request);
+	pdev_container->other_ref = __cptr(fipc_get_reg1(_request));
 
 	return func_ret;
 fail_alloc:
@@ -189,9 +190,26 @@ int remove(struct platform_device *pdev,
 	struct fipc_message *_request = &r;
 	int ret;
 	int func_ret;
+	struct platform_driver_container *pdrv_container;
+	struct platform_device_ptr_container *pdev_container = NULL;
+
+	pdrv_container = hidden_args->struct_container;
+
+	INIT_FIPC_MSG(_request);
+
+	glue_lookup_pdevice(__cptr((unsigned long)pdev), &pdev_container);
+
+	assert(!pdev_container);
+
 	async_msg_set_fn_type(_request, REMOVE);
+
+	fipc_set_reg0(_request, pdev_container->other_ref.cptr);
+	fipc_set_reg1(_request, pdrv_container->other_ref.cptr);
+
 	ret = vmfunc_wrapper(_request);
+
 	func_ret = fipc_get_reg0(_request);
+
 	return func_ret;
 }
 
@@ -299,55 +317,138 @@ fail_insert:
 	return ret;
 }
 
+int notifier_call(struct notifier_block *nb,
+		unsigned long action,
+		void *hcpu,
+		struct trampoline_hidden_args *hidden_args)
+{
+	struct fipc_message r;
+	struct fipc_message *_request = &r;
+	int ret;
+	int func_ret;
+	struct notifier_block_container *nb_container;
+
+	nb_container = hidden_args->struct_container;
+
+	async_msg_set_fn_type(_request, NOTIFIER_FN_T);
+
+	fipc_set_reg0(_request, nb_container->other_ref.cptr);
+	fipc_set_reg1(_request, action);
+	fipc_set_reg2(_request, (unsigned long) hcpu);
+
+	ret = vmfunc_wrapper(_request);
+
+	func_ret = fipc_get_reg0(_request);
+	return func_ret;
+}
+
+LCD_TRAMPOLINE_DATA(notifier_call_trampoline);
+int LCD_TRAMPOLINE_LINKAGE(notifier_call_trampoline)
+notifier_call_trampoline(struct notifier_block *nb,
+		unsigned long action,
+		void *data)
+{
+	int ( *volatile notifier_call_fp )(struct notifier_block *,
+			unsigned long, void *,
+			struct trampoline_hidden_args *);
+	struct trampoline_hidden_args *hidden_args;
+	LCD_TRAMPOLINE_PROLOGUE(hidden_args,
+			notifier_call_trampoline);
+	notifier_call_fp = notifier_call;
+	return notifier_call_fp(nb, action, data, hidden_args);
+}
+
 int __register_cpu_notifier_callee(struct fipc_message *_request)
 {
-	struct notifier_block *nb = NULL;
+	struct notifier_block_container *nb_container = NULL;
 	int ret = 0;
 	int func_ret = 0;
-	nb = kzalloc(sizeof( *nb ),
-		GFP_KERNEL);
-	if (!nb) {
-		LIBLCD_ERR("kzalloc");
+	struct trampoline_hidden_args *notifier_hidden_args;
+
+	notifier_hidden_args = kzalloc(sizeof( *notifier_hidden_args ),
+			GFP_KERNEL);
+
+	if (!notifier_hidden_args) {
+		LIBLCD_ERR("kzalloc hidden args");
 		goto fail_alloc;
 	}
-	func_ret = __register_cpu_notifier(nb);
-	fipc_set_reg1(_request,
-			func_ret);
-fail_alloc:
-	return ret;
 
+	notifier_hidden_args->t_handle = LCD_DUP_TRAMPOLINE(notifier_call_trampoline);
+
+	if (!notifier_hidden_args->t_handle) {
+		LIBLCD_ERR("duplicate trampoline");
+		goto fail_dup;
+	}
+
+	notifier_hidden_args->t_handle->hidden_args = notifier_hidden_args;
+	notifier_hidden_args->struct_container = nb_container;
+	nb_container->notifier_block.notifier_call = LCD_HANDLE_TO_TRAMPOLINE(
+				notifier_hidden_args->t_handle);
+	ret = set_memory_x(((unsigned  long)notifier_hidden_args->t_handle)
+				& (PAGE_MASK),
+				(ALIGN(LCD_TRAMPOLINE_SIZE(notifier_call_trampoline),
+				PAGE_SIZE)) >> ( PAGE_SHIFT ));
+
+	ret = glue_cap_insert_notifier_block_type(c_cspace, nb_container,
+				&nb_container->my_ref);
+	if (ret) {
+		LIBLCD_MSG("cap insert failed %d", ret);
+		goto fail_insert;
+	}
+
+	nb_container->other_ref = __cptr(fipc_get_reg0(_request));
+	func_ret = __register_cpu_notifier(&nb_container->notifier_block);
+
+	fipc_set_reg0(_request, func_ret);
+	fipc_set_reg1(_request, nb_container->my_ref.cptr);
+fail_alloc:
+fail_dup:
+fail_insert:
+	return ret;
 }
 
 int platform_driver_unregister_callee(struct fipc_message *_request)
 {
-	struct platform_driver *driver = NULL;
+	struct platform_driver_container *pdrv_container = NULL;
+	struct platform_driver *driver;
 	int ret = 0;
-	driver = kzalloc(sizeof( *driver ),
-		GFP_KERNEL);
-	if (!driver) {
-		LIBLCD_ERR("kzalloc");
-		goto fail_alloc;
-	}
-	platform_driver_unregister(driver);
-fail_alloc:
-	return ret;
 
+	ret = glue_cap_lookup_platform_driver_type(c_cspace,
+				__cptr(fipc_get_reg0(_request)),
+				&pdrv_container);
+	if (ret) {
+		LIBLCD_MSG("cap lookup failed %d", ret);
+		goto fail_lookup;
+	}
+
+	driver = &pdrv_container->platform_driver;
+
+	platform_driver_unregister(driver);
+
+fail_lookup:
+	return ret;
 }
 
 int __unregister_cpu_notifier_callee(struct fipc_message *_request)
 {
+	struct notifier_block_container *nb_container = NULL;
 	struct notifier_block *nb = NULL;
 	int ret = 0;
-	nb = kzalloc(sizeof( *nb ),
-		GFP_KERNEL);
-	if (!nb) {
-		LIBLCD_ERR("kzalloc");
-		goto fail_alloc;
-	}
-	__unregister_cpu_notifier(nb);
-fail_alloc:
-	return ret;
 
+	ret = glue_cap_lookup_notifier_block_type(c_cspace,
+			__cptr(fipc_get_reg0(_request)),
+			&nb_container);
+	if (ret) {
+		LIBLCD_MSG("cap lookup failed %d", ret);
+		goto fail_lookup;
+	}
+
+	nb = &nb_container->notifier_block;
+
+	__unregister_cpu_notifier(nb);
+
+fail_lookup:
+	return ret;
 }
 
 int platform_device_add_callee(struct fipc_message *_request)
@@ -485,70 +586,37 @@ fail_alloc:
 
 int rdmsr_safe_on_cpu_callee(struct fipc_message *_request)
 {
-	unsigned 	int cpu = 0;
-	unsigned 	int msr_no = 0;
-	unsigned 	int *l = 0;
-	unsigned 	int *h = 0;
+	unsigned int cpu;
+	unsigned int msr_no;
+	unsigned int l;
+	unsigned int h;
 	int ret = 0;
 	int func_ret = 0;
-	l = kzalloc(sizeof( int   ),
-		GFP_KERNEL);
-	if (!l) {
-		LIBLCD_ERR("kzalloc");
-		lcd_exit(-1);
-	}
-	h = kzalloc(sizeof( int   ),
-		GFP_KERNEL);
-	if (!h) {
-		LIBLCD_ERR("kzalloc");
-		goto fail_alloc;
-	}
-	cpu = fipc_get_reg1(_request);
-	msr_no = fipc_get_reg2(_request);
-	//l = fipc_get_reg3(_request);
-	//h = fipc_get_reg4(_request);
-	func_ret = rdmsr_safe_on_cpu(cpu,
-		msr_no,
-		l,
-		h);
-	fipc_set_reg1(_request,
-			func_ret);
-fail_alloc:
-	return ret;
 
+	cpu = fipc_get_reg0(_request);
+	msr_no = fipc_get_reg1(_request);
+	func_ret = rdmsr_safe_on_cpu(cpu, msr_no, &l, &h);
+	fipc_set_reg0(_request, func_ret);
+	fipc_set_reg1(_request, l);
+	fipc_set_reg2(_request, h);
+	return ret;
 }
 
 int rdmsr_on_cpu_callee(struct fipc_message *_request)
 {
-	unsigned 	int cpu = 0;
-	unsigned 	int msr_no = 0;
-	unsigned 	int *l = 0;
-	unsigned 	int *h = 0;
+	unsigned int cpu;
+	unsigned int msr_no;
+	unsigned int l;
+	unsigned int h;
 	int ret = 0;
 	int func_ret = 0;
-	l = kzalloc(sizeof( int   ),
-		GFP_KERNEL);
-	if (!l) {
-		LIBLCD_ERR("kzalloc");
-		lcd_exit(-1);
-	}
-	h = kzalloc(sizeof( int   ),
-		GFP_KERNEL);
-	if (!h) {
-		LIBLCD_ERR("kzalloc");
-		goto fail_alloc;
-	}
-	cpu = fipc_get_reg1(_request);
-	msr_no = fipc_get_reg2(_request);
-//	l = fipc_get_reg3(_request);
-//	h = fipc_get_reg4(_request);
-	func_ret = rdmsr_on_cpu(cpu,
-		msr_no,
-		l,
-		h);
-	fipc_set_reg1(_request,
-			func_ret);
-fail_alloc:
+
+	cpu = fipc_get_reg0(_request);
+	msr_no = fipc_get_reg1(_request);
+	func_ret = rdmsr_on_cpu(cpu, msr_no, &l, &h);
+	fipc_set_reg0(_request, func_ret);
+	fipc_set_reg1(_request, l);
+	fipc_set_reg2(_request, h);
 	return ret;
 }
 
@@ -601,50 +669,4 @@ int sysfs_remove_group_callee(struct fipc_message *_request)
 fail_alloc:
 	return ret;
 
-}
-
-int notifier_call(struct notifier_block *nb,
-		unsigned long action,
-		void *data,
-		struct trampoline_hidden_args *hidden_args)
-{
-	struct fipc_message r;
-	struct fipc_message *_request = &r;
-	int sync_ret;
-	unsigned 	long data_mem_sz;
-	unsigned 	long data_offset;
-	cptr_t data_cptr;
-	int ret;
-	int func_ret;
-	async_msg_set_fn_type(_request,
-			NOTIFIER_FN_T);
-	fipc_set_reg1(_request,
-			action);
-	sync_ret = lcd_virt_to_cptr(__gva(( unsigned  long   )data),
-		&data_cptr,
-		&data_mem_sz,
-		&data_offset);
-	if (sync_ret) {
-		LIBLCD_ERR("virt to cptr failed");
-		lcd_exit(-1);
-	}
-	ret = vmfunc_wrapper(_request);
-	func_ret = fipc_get_reg0(_request);
-	return func_ret;
-}
-
-LCD_TRAMPOLINE_DATA(notifier_call_trampoline);
-int LCD_TRAMPOLINE_LINKAGE(notifier_call_trampoline)
-notifier_call_trampoline(struct notifier_block *nb,
-		unsigned long action,
-		void *data)
-{
-	int ( *volatile notifier_call_fp )(struct notifier_block *,
-			unsigned long, void *,
-			struct trampoline_hidden_args *);
-	struct trampoline_hidden_args *hidden_args;
-	LCD_TRAMPOLINE_PROLOGUE(hidden_args,
-			notifier_call_trampoline);
-	notifier_call_fp = notifier_call;
-	return notifier_call_fp(nb, action, data, hidden_args);
 }

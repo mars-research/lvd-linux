@@ -20,6 +20,11 @@ int hwmon_klcd_dispatch_loop(struct fipc_message *message)
 			trace(__PLATFORM_DRIVER_REGISTER);
 			return __platform_driver_register_callee(message);
 
+		case PLATFORM_DEVICE_UNREGISTER:
+			trace(PLATFORM_DEVICE_UNREGISTER);
+			return platform_device_unregister_callee(message);
+
+
 		case CPU_MAPS_UPDATE_BEGIN:
 			trace(CPU_MAPS_UPDATE_BEGIN);
 			return cpu_maps_update_begin_callee(message);

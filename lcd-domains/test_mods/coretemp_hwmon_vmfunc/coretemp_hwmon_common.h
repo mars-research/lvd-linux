@@ -18,6 +18,7 @@
 enum dispatch_t {
 	X86_MATCH_CPU,
 	__PLATFORM_DRIVER_REGISTER,
+	PLATFORM_DEVICE_UNREGISTER,
 	__REGISTER_CPU_NOTIFIER,
 	PLATFORM_DRIVER_UNREGISTER,
 	__UNREGISTER_CPU_NOTIFIER,
@@ -37,6 +38,7 @@ enum dispatch_t {
 	REMOVE,
 	MODULE_INIT,
 	MODULE_EXIT,
+	ATTR_SHOW,
 };
 
 /* CSPACES ------------------------------------------------------------ */

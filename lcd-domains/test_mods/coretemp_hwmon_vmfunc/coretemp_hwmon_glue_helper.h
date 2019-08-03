@@ -12,10 +12,17 @@
 #include "coretemp_hwmon_common.h"
 
 struct attribute_group_container {
-	struct attribute_group attribute_group;
+	struct attribute_group attr_group;
 	struct cptr other_ref;
 	struct cptr my_ref;
 };
+
+struct device_attribute_container {
+	struct device_attribute dev_attr;
+	struct cptr other_ref;
+	struct cptr my_ref;
+};
+
 struct device_container {
 	struct device device;
 	struct cptr other_ref;
@@ -30,10 +37,11 @@ struct device_ptr_container {
 };
 
 struct kobject_container {
-	struct kobject kobject;
+	struct kobject *kobj;
 	struct cptr other_ref;
 	struct cptr my_ref;
 };
+
 struct module_container {
 	struct module module;
 	struct cptr other_ref;
@@ -82,6 +90,9 @@ struct trampoline_hidden_args {
 int glue_cap_insert_attribute_group_type(struct glue_cspace *cspace,
 		struct attribute_group_container *attribute_group_container,
 		struct cptr *c_out);
+int glue_cap_insert_device_attribute_type(struct glue_cspace *cspace,
+		struct device_attribute_container *device_attribute_container,
+		struct cptr *c_out);
 int glue_cap_insert_device_type(struct glue_cspace *cspace,
 		struct device_container *device_container,
 		struct cptr *c_out);
@@ -109,6 +120,9 @@ int glue_cap_insert_x86_cpu_id_type(struct glue_cspace *cspace,
 int glue_cap_lookup_attribute_group_type(struct glue_cspace *cspace,
 		struct cptr c,
 		struct attribute_group_container **attribute_group_container);
+int glue_cap_lookup_device_attribute_type(struct glue_cspace *cspace,
+		struct cptr c,
+		struct device_attribute_container **device_attribute_container);
 int glue_cap_lookup_device_type(struct glue_cspace *cspace,
 		struct cptr c,
 		struct device_container **device_container);

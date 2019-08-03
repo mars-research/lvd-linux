@@ -64,7 +64,6 @@ void glue_remove_pdevice(struct platform_device_ptr_container *pdev_c)
 	hash_del(&pdev_c->hentry);
 }
 
-
 const struct x86_cpu_id *x86_match_cpu(const struct x86_cpu_id *match)
 {
 	struct fipc_message r;
@@ -277,8 +276,14 @@ int platform_device_add(struct platform_device *pdev)
 	struct fipc_message *_request = &r;
 	int ret;
 	int func_ret;
-	async_msg_set_fn_type(_request,
-			PLATFORM_DEVICE_ADD);
+	struct platform_device_container *pdev_container;
+
+	pdev_container = container_of(pdev, struct platform_device_container,
+					platform_device);
+
+	async_msg_set_fn_type(_request, PLATFORM_DEVICE_ADD);
+
+	fipc_set_reg0(_request, pdev_container->other_ref.cptr);
 	ret = vmfunc_wrapper(_request);
 	func_ret = fipc_get_reg0(_request);
 	return func_ret;
@@ -287,19 +292,31 @@ int platform_device_add(struct platform_device *pdev)
 struct platform_device *platform_device_alloc(const char *name,
 		int id)
 {
-	struct platform_device_container *func_ret_container = NULL;
+	struct platform_device_container *func_ret_container;
 	struct fipc_message r;
 	struct fipc_message *_request = &r;
+	struct platform_device *func_ret;
 	int ret;
-	struct platform_device *func_ret = &func_ret_container->platform_device;
-	async_msg_set_fn_type(_request,
-			PLATFORM_DEVICE_ALLOC);
-	fipc_set_reg1(_request,
-			(u64) name);
-	fipc_set_reg2(_request,
-			id);
+
+	func_ret_container = kzalloc(sizeof(*func_ret_container), GFP_KERNEL);
+
+	if (!func_ret_container) {
+		LIBLCD_ERR("kzalloc failed");
+		goto fail_alloc;
+	}
+
+	func_ret = &func_ret_container->platform_device;
+
+	async_msg_set_fn_type(_request, PLATFORM_DEVICE_ALLOC);
+	fipc_set_reg0(_request, func_ret_container->my_ref.cptr);
+	memcpy(&_request->regs[1], name, sizeof(unsigned long));
+	fipc_set_reg2(_request, id);
+
 	ret = vmfunc_wrapper(_request);
+	func_ret_container->other_ref.cptr = fipc_get_reg0(_request);
 	return func_ret;
+fail_alloc:
+	return NULL;
 }
 
 void platform_device_put(struct platform_device *pdev)
@@ -307,33 +324,50 @@ void platform_device_put(struct platform_device *pdev)
 	struct fipc_message r;
 	struct fipc_message *_request = &r;
 	int ret;
-	async_msg_set_fn_type(_request,
-			PLATFORM_DEVICE_PUT);
+	struct platform_device_container *pdev_container;
+
+	pdev_container = container_of(pdev, struct platform_device_container,
+					platform_device);
+
+	async_msg_set_fn_type(_request, PLATFORM_DEVICE_PUT);
+
+	fipc_set_reg0(_request, pdev_container->other_ref.cptr);
 	ret = vmfunc_wrapper(_request);
 	return;
-
 }
 
 struct pci_dev *pci_get_domain_bus_and_slot(int domain,
 		unsigned int bus,
 		unsigned int devfn)
 {
-	struct pci_dev_container *func_ret_container = NULL;
+	struct pci_dev_container *pci_dev_container;
 	struct fipc_message r;
 	struct fipc_message *_request = &r;
-	struct pci_dev *func_ret = &func_ret_container->pci_dev;
+	struct pci_dev *pci_dev;
 	int ret;
+	int func_ret;
 
-	async_msg_set_fn_type(_request,
-			PCI_GET_DOMAIN_BUS_AND_SLOT);
-	fipc_set_reg1(_request,
-			domain);
-	fipc_set_reg2(_request,
-			bus);
-	fipc_set_reg3(_request,
-			devfn);
+	pci_dev_container = kzalloc(sizeof(*pci_dev_container), GFP_KERNEL);
+
+	if (!pci_dev_container) {
+		LIBLCD_ERR("kzalloc failed");
+		goto fail_alloc;
+	}
+	pci_dev = &pci_dev_container->pci_dev;
+
+	async_msg_set_fn_type(_request, PCI_GET_DOMAIN_BUS_AND_SLOT);
+	fipc_set_reg0(_request, domain);
+	fipc_set_reg1(_request, bus);
+	fipc_set_reg2(_request, devfn);
 	ret = vmfunc_wrapper(_request);
-	return func_ret;
+	func_ret = fipc_get_reg0(_request);
+	if (func_ret) {
+		pci_dev->vendor = fipc_get_reg1(_request);
+		pci_dev->device = fipc_get_reg2(_request);
+		return pci_dev;
+	}
+fail_alloc:
+	return NULL;
 }
 
 struct device *devm_hwmon_device_register_with_groups(struct device *dev,
@@ -342,6 +376,7 @@ struct device *devm_hwmon_device_register_with_groups(struct device *dev,
 		const struct attribute_group **groups)
 {
 	struct device_container *func_ret_container = NULL;
+	struct kobject_container *kobj_container;
 	struct fipc_message r;
 	struct fipc_message *_request = &r;
 	int ret;
@@ -356,7 +391,23 @@ struct device *devm_hwmon_device_register_with_groups(struct device *dev,
 		goto fail_alloc;
 	}
 
+	kobj_container = kzalloc(sizeof(struct kobject_container), GFP_KERNEL);
+
+	if (!kobj_container) {
+		LIBLCD_ERR("kzalloc kobj_container");
+		goto fail_alloc;
+	}
+
 	func_ret = &func_ret_container->device;
+
+	kobj_container->kobj = &func_ret->kobj;
+
+	ret = glue_cap_insert_kobject_type(c_cspace, kobj_container,
+			&kobj_container->my_ref);
+	if (ret) {
+		LIBLCD_ERR("lcd insert");
+		goto fail_insert;
+	}
 
 	ret = glue_cap_insert_device_type(c_cspace,
 				func_ret_container,
@@ -376,6 +427,8 @@ struct device *devm_hwmon_device_register_with_groups(struct device *dev,
 	fipc_set_reg2(_request, pdev_container->other_ref.cptr);
 	ret = vmfunc_wrapper(_request);
 	func_ret_container->other_ref.cptr = fipc_get_reg0(_request);
+	kobj_container->other_ref.cptr = fipc_get_reg1(_request);
+
 	return func_ret;
 fail_insert:
 fail_alloc:
@@ -430,11 +483,49 @@ int sysfs_create_group(struct kobject *kobj,
 	struct fipc_message *_request = &r;
 	int ret;
 	int func_ret;
-	async_msg_set_fn_type(_request,
-			SYSFS_CREATE_GROUP);
+	struct device *dev;
+	struct device_container *device_container;
+	struct attribute **attrs = grp->attrs;
+	struct device_attribute *dev_attr;
+	struct device_attribute_container *dev_attr_container;
+	struct attribute_group_container *attr_grp_ctr;
+
+	dev = container_of(kobj, struct device, kobj);
+	device_container = container_of(dev, struct device_container, device);
+	attr_grp_ctr = container_of(grp, struct attribute_group_container, attr_group);
+
+	dev_attr = container_of(attrs[0], struct device_attribute, attr);
+	dev_attr_container = container_of(dev_attr, struct device_attribute_container,
+				dev_attr);
+
+	ret = glue_cap_insert_device_attribute_type(c_cspace, dev_attr_container,
+				&dev_attr_container->my_ref);
+
+	if (ret) {
+		LIBLCD_ERR("lcd insert");
+		goto fail_insert;
+	}
+
+	ret = glue_cap_insert_attribute_group_type(c_cspace, attr_grp_ctr,
+				&attr_grp_ctr->my_ref);
+
+	if (ret) {
+		LIBLCD_ERR("lcd insert");
+		goto fail_insert;
+	}
+
+	async_msg_set_fn_type(_request, SYSFS_CREATE_GROUP);
+	fipc_set_reg0(_request, device_container->other_ref.cptr);
+	fipc_set_reg1(_request, attrs[0]->mode);
+	memcpy(&_request->regs[2], attrs[0]->name, sizeof(unsigned long));
+	fipc_set_reg3(_request, dev_attr_container->my_ref.cptr);
+	fipc_set_reg4(_request, attr_grp_ctr->my_ref.cptr);
 	ret = vmfunc_wrapper(_request);
 	func_ret = fipc_get_reg0(_request);
+	attr_grp_ctr->other_ref.cptr = fipc_get_reg1(_request);
 	return func_ret;
+fail_insert:
+	return ret;
 }
 
 void sysfs_remove_group(struct kobject *kobj,
@@ -443,8 +534,18 @@ void sysfs_remove_group(struct kobject *kobj,
 	struct fipc_message r;
 	struct fipc_message *_request = &r;
 	int ret;
-	async_msg_set_fn_type(_request,
-			SYSFS_REMOVE_GROUP);
+	struct device_container *device_container;
+	struct attribute_group_container *attr_grp_ctr;
+	struct device *dev;
+
+	dev = container_of(kobj, struct device, kobj);
+	device_container = container_of(dev, struct device_container, device);
+
+	attr_grp_ctr = container_of(grp, struct attribute_group_container, attr_group);
+
+	async_msg_set_fn_type(_request, SYSFS_REMOVE_GROUP);
+	fipc_set_reg0(_request, device_container->other_ref.cptr);
+	fipc_set_reg1(_request, attr_grp_ctr->other_ref.cptr);
 	ret = vmfunc_wrapper(_request);
 	return;
 }
@@ -501,3 +602,21 @@ void cpu_maps_update_done(void)
 	return;
 }
 
+void platform_device_unregister(struct platform_device *pdev)
+{
+	struct platform_device_container *pdev_container;
+	struct fipc_message r;
+	struct fipc_message *_request = &r;
+	int ret;
+
+	INIT_FIPC_MSG(_request);
+
+
+	pdev_container = container_of(pdev, struct platform_device_container,
+					platform_device);
+
+	async_msg_set_fn_type(_request, PLATFORM_DEVICE_UNREGISTER);
+	fipc_set_reg0(_request, pdev_container->other_ref.cptr);
+	ret = vmfunc_wrapper(_request);
+	return;
+}

@@ -22,6 +22,7 @@ struct type_ops_id {
 
 enum glue_type {
 	GLUE_TYPE_ATTRIBUTE_GROUP_CONTAINER,
+	GLUE_TYPE_DEVICE_ATTRIBUTE_CONTAINER,
 	GLUE_TYPE_DEVICE_CONTAINER,
 	GLUE_TYPE_KOBJECT_CONTAINER,
 	GLUE_TYPE_MODULE_CONTAINER,
@@ -44,6 +45,13 @@ static struct type_ops_id glue_libcap_type_ops[GLUE_NR_TYPES] = {
 	{
 		{
 			.name = "struct attribute_group",
+			.delete = dummy_func,
+			.revoke = dummy_func,
+		}
+	},
+	{
+		{
+			.name = "struct device_attribute",
 			.delete = dummy_func,
 			.revoke = dummy_func,
 		}
@@ -126,6 +134,28 @@ int glue_cap_lookup_attribute_group_type(struct glue_cspace *cspace,
 		c,
 		glue_libcap_type_ops[ GLUE_TYPE_ATTRIBUTE_GROUP_CONTAINER ].libcap_type,
 		( void  ** )attribute_group_container);
+
+}
+
+int glue_cap_insert_device_attribute_type(struct glue_cspace *cspace,
+		struct device_attribute_container *device_attribute_container,
+		struct cptr *c_out)
+{
+	return glue_cspace_insert(cspace,
+		device_attribute_container,
+		glue_libcap_type_ops[ GLUE_TYPE_DEVICE_ATTRIBUTE_CONTAINER ].libcap_type,
+		c_out);
+
+}
+
+int glue_cap_lookup_device_attribute_type(struct glue_cspace *cspace,
+		struct cptr c,
+		struct device_attribute_container **device_attribute_container)
+{
+	return glue_cspace_lookup(cspace,
+		c,
+		glue_libcap_type_ops[ GLUE_TYPE_DEVICE_ATTRIBUTE_CONTAINER ].libcap_type,
+		( void  ** )device_attribute_container);
 
 }
 

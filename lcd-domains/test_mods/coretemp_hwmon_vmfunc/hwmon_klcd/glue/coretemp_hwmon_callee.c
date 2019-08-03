@@ -453,70 +453,72 @@ fail_lookup:
 
 int platform_device_add_callee(struct fipc_message *_request)
 {
-	struct platform_device *pdev = NULL;
+	struct platform_device *pdev;
+	struct platform_device_ptr_container *pdev_ptr_container = NULL;
 	int ret = 0;
-	int func_ret = 0;
-	pdev = kzalloc(sizeof( *pdev ),
-		GFP_KERNEL);
-	if (!pdev) {
-		LIBLCD_ERR("kzalloc");
-		goto fail_alloc;
-	}
-	func_ret = platform_device_add(pdev);
-	fipc_set_reg1(_request,
-			func_ret);
-fail_alloc:
-	return ret;
+	int func_ret;
 
+	glue_lookup_pdevice(__cptr(fipc_get_reg0(_request)), &pdev_ptr_container);
+
+	assert(!pdev_ptr_container);
+
+	pdev = pdev_ptr_container->pdev;
+
+	func_ret = platform_device_add(pdev);
+	fipc_set_reg0(_request, func_ret);
+	return ret;
 }
 
 int platform_device_alloc_callee(struct fipc_message *_request)
 {
-	char *name = 0;
 	int id = 0;
 	int ret = 0;
-	struct platform_device_container *func_ret_container = NULL;
-	struct platform_device *func_ret = NULL;
-	name = kzalloc(sizeof( char   ),
-		GFP_KERNEL);
+	struct platform_device_ptr_container *pdev_ptr_container;
+	struct platform_device *pdev = NULL;
+	char *name;
+
+	pdev_ptr_container = kzalloc(sizeof(*pdev_ptr_container), GFP_KERNEL);
+
+	if (!pdev_ptr_container) {
+		LIBLCD_ERR("alloc failed");
+		goto fail_alloc;
+	}
+
+	name = kzalloc(sizeof(unsigned long), GFP_KERNEL);
+
 	if (!name) {
 		LIBLCD_ERR("kzalloc");
 		goto fail_alloc;
 	}
-	//name = fipc_get_reg1(_request);
-	id = fipc_get_reg2(_request);
-	func_ret_container->other_ref.cptr = fipc_get_reg2(_request);
-	func_ret = platform_device_alloc(name,
-		id);
-	ret = glue_cap_insert_platform_device_type(c_cspace,
-		func_ret_container,
-		&func_ret_container->my_ref);
-	if (ret) {
-		LIBLCD_ERR("lcd insert");
-		goto fail_insert;
-	}
-	fipc_set_reg1(_request,
-			func_ret_container->other_ref.cptr);
-fail_alloc:
-fail_insert:
-	return ret;
 
+	pdev_ptr_container->other_ref.cptr = fipc_get_reg0(_request);
+	memcpy(name, &_request->regs[1], sizeof(unsigned long));
+	id = fipc_get_reg2(_request);
+
+	pdev = platform_device_alloc(name, id);
+
+	pdev_ptr_container->pdev = pdev;
+	glue_insert_pdevice(pdev_ptr_container);
+	fipc_set_reg1(_request, pdev_ptr_container->other_ref.cptr);
+
+fail_alloc:
+	return ret;
 }
 
 int platform_device_put_callee(struct fipc_message *_request)
 {
-	struct platform_device *pdev = NULL;
+	struct platform_device *pdev;
+	struct platform_device_ptr_container *pdev_ptr_container = NULL;
 	int ret = 0;
-	pdev = kzalloc(sizeof( *pdev ),
-		GFP_KERNEL);
-	if (!pdev) {
-		LIBLCD_ERR("kzalloc");
-		goto fail_alloc;
-	}
-	platform_device_put(pdev);
-fail_alloc:
-	return ret;
 
+	glue_lookup_pdevice(__cptr(fipc_get_reg0(_request)), &pdev_ptr_container);
+
+	assert(!pdev_ptr_container);
+
+	pdev = pdev_ptr_container->pdev;
+
+	platform_device_put(pdev);
+	return ret;
 }
 
 int pci_get_domain_bus_and_slot_callee(struct fipc_message *_request)
@@ -525,25 +527,17 @@ int pci_get_domain_bus_and_slot_callee(struct fipc_message *_request)
 	unsigned 	int bus = 0;
 	unsigned 	int devfn = 0;
 	int ret = 0;
-	struct pci_dev_container *func_ret_container = NULL;
-	struct pci_dev *func_ret = NULL;
-	domain = fipc_get_reg1(_request);
-	bus = fipc_get_reg2(_request);
-	devfn = fipc_get_reg3(_request);
-	func_ret_container->other_ref.cptr = fipc_get_reg2(_request);
-	func_ret = pci_get_domain_bus_and_slot(domain,
-		bus,
-		devfn);
-	ret = glue_cap_insert_pci_dev_type(c_cspace,
-		func_ret_container,
-		&func_ret_container->my_ref);
-	if (ret) {
-		LIBLCD_ERR("lcd insert");
-		goto fail_insert;
-	}
-	fipc_set_reg1(_request,
-			func_ret_container->other_ref.cptr);
-fail_insert:
+	struct pci_dev *pci_dev;
+
+	domain = fipc_get_reg0(_request);
+	bus = fipc_get_reg1(_request);
+	devfn = fipc_get_reg2(_request);
+
+	pci_dev = pci_get_domain_bus_and_slot(domain, bus, devfn);
+
+	fipc_set_reg0(_request, pci_dev ? 1 : 0);
+	fipc_set_reg1(_request, pci_dev->vendor);
+	fipc_set_reg2(_request, pci_dev->device);
 	return ret;
 }
 
@@ -556,6 +550,7 @@ int devm_hwmon_device_register_with_groups_callee(struct fipc_message *_request)
 	int ret = 0;
 	struct device_ptr_container *devp_container = NULL;
 	struct device *func_ret = NULL;	
+	struct kobject_container *kobj_container;
 
 	glue_lookup_pdevice(__cptr(fipc_get_reg2(_request)), &pdev_container);
 
@@ -570,6 +565,13 @@ int devm_hwmon_device_register_with_groups_callee(struct fipc_message *_request)
 		goto fail_alloc;
 	}
 
+	kobj_container = kzalloc(sizeof(struct kobject_container), GFP_KERNEL);
+
+	if (!kobj_container) {
+		LIBLCD_ERR("kzalloc failed");
+		goto fail_alloc;
+	}
+
 	devp_container->other_ref.cptr = fipc_get_reg0(_request);
 
 	func_ret = devm_hwmon_device_register_with_groups(dev, name, NULL,
@@ -579,7 +581,18 @@ int devm_hwmon_device_register_with_groups_callee(struct fipc_message *_request)
 
 	glue_insert_device(devp_container);
 
+	kobj_container->kobj = &func_ret->kobj;
+
+	ret = glue_cap_insert_kobject_type(c_cspace, kobj_container,
+			&kobj_container->my_ref);
+	if (ret) {
+		LIBLCD_ERR("lcd insert");
+		goto fail_insert;
+	}
+
 	fipc_set_reg0(_request, devp_container->my_ref.cptr);
+	fipc_set_reg1(_request, kobj_container->my_ref.cptr);
+fail_insert:
 fail_alloc:
 	return ret;
 }
@@ -620,53 +633,172 @@ int rdmsr_on_cpu_callee(struct fipc_message *_request)
 	return ret;
 }
 
+int attr_show(struct device *dev, struct device_attribute *attr,
+			char *buf, struct trampoline_hidden_args *hidden_args)
+{
+	struct fipc_message r;
+	struct fipc_message *_request = &r;
+	int func_ret;
+	struct device_ptr_container *devp_container = NULL;
+	struct device_attribute_container *dattr_ctr;
+
+	dattr_ctr = hidden_args->struct_container;
+
+	INIT_FIPC_MSG(_request);
+	async_msg_set_fn_type(_request, ATTR_SHOW);
+
+	glue_lookup_device(__cptr((unsigned long) dev), &devp_container);
+
+	assert(!devp_container);
+
+	fipc_set_reg0(_request, devp_container->other_ref.cptr);
+	fipc_set_reg1(_request, dattr_ctr->other_ref.cptr);
+	vmfunc_klcd_wrapper(_request, 1);
+	func_ret = fipc_get_reg0(_request);
+	return func_ret;
+}
+
+LCD_TRAMPOLINE_DATA(show_trampoline);
+int LCD_TRAMPOLINE_LINKAGE(show_trampoline)
+show_trampoline(struct device *dev, struct device_attribute *attr,
+			char *buf)
+{
+	int ( *volatile show_fp )(struct device *dev,
+			struct device_attribute *attr,
+			char *buf,
+			struct trampoline_hidden_args *);
+	struct trampoline_hidden_args *hidden_args;
+	LCD_TRAMPOLINE_PROLOGUE(hidden_args,
+			show_trampoline);
+	show_fp = attr_show;
+	return show_fp(dev, attr, buf, hidden_args);
+}
+
+
 int sysfs_create_group_callee(struct fipc_message *_request)
 {
 	struct kobject *kobj = NULL;
-	struct attribute_group *grp = NULL;
+	struct attribute_group_container *agrp_container;
+	struct device_ptr_container *dev_ptr_container = NULL;
 	int ret = 0;
 	int func_ret = 0;
-	kobj = kzalloc(sizeof( *kobj ),
-		GFP_KERNEL);
-	if (!kobj) {
-		LIBLCD_ERR("kzalloc");
-		goto fail_alloc;
-	}
-	grp = kzalloc(sizeof( *grp ),
-		GFP_KERNEL);
-	if (!grp) {
-		LIBLCD_ERR("kzalloc");
-		goto fail_alloc;
-	}
-	func_ret = sysfs_create_group(kobj,
-		grp);
-	fipc_set_reg1(_request,
-			func_ret);
-fail_alloc:
-	return ret;
+	struct device_attribute_container **dattr_ctrs;
+	struct trampoline_hidden_args *attr_show_hidden_args;
+	int i;
+	struct attribute_group *agrp;
 
+	glue_lookup_device(__cptr(fipc_get_reg0(_request)), &dev_ptr_container);
+
+	assert(!dev_ptr_container);
+
+	kobj = &dev_ptr_container->dev->kobj;
+
+	agrp_container = kzalloc(sizeof(*agrp_container), GFP_KERNEL);
+
+	if (!agrp_container) {
+		LIBLCD_ERR("kzalloc");
+		goto fail_alloc;
+	}
+
+	ret = glue_cap_insert_attribute_group_type(c_cspace, agrp_container,
+				&agrp_container->my_ref);
+
+	if (ret) {
+		LIBLCD_ERR("lcd insert");
+		goto fail_insert;
+	}
+
+	agrp_container->other_ref = __cptr(fipc_get_reg4(_request));
+
+	agrp = &agrp_container->attr_group;
+
+	dattr_ctrs = kzalloc(sizeof(struct device_attribute_container *) * 2, GFP_KERNEL);
+
+	for (i = 0; i < 2; i++) {
+		dattr_ctrs[i] = kzalloc(sizeof(struct device_attribute_container),
+				GFP_KERNEL);
+	}
+
+	dattr_ctrs[0]->dev_attr.attr.mode = fipc_get_reg1(_request);
+	dattr_ctrs[0]->dev_attr.attr.name = kzalloc(sizeof(unsigned long),
+							GFP_KERNEL);
+
+	attr_show_hidden_args = kzalloc(sizeof( *attr_show_hidden_args ),
+		GFP_KERNEL);
+	if (!attr_show_hidden_args) {
+		LIBLCD_ERR("kzalloc hidden args");
+		goto fail_alloc1;
+	}
+	attr_show_hidden_args->t_handle = LCD_DUP_TRAMPOLINE(show_trampoline);
+	if (!attr_show_hidden_args->t_handle) {
+		LIBLCD_ERR("duplicate trampoline");
+		goto fail_dup1;
+	}
+	attr_show_hidden_args->t_handle->hidden_args = attr_show_hidden_args;
+	attr_show_hidden_args->struct_container = dattr_ctrs[0];
+
+	dattr_ctrs[0]->dev_attr.show = LCD_HANDLE_TO_TRAMPOLINE(attr_show_hidden_args->t_handle);
+	ret = set_memory_x(( ( unsigned  long   )attr_show_hidden_args->t_handle ) & ( PAGE_MASK ),
+		( ALIGN(LCD_TRAMPOLINE_SIZE(show_trampoline),
+		PAGE_SIZE) ) >> ( PAGE_SHIFT ));
+
+	memcpy((void*) dattr_ctrs[0]->dev_attr.attr.name, (void*) &_request->regs[2],
+					sizeof(unsigned long));
+
+	agrp->attrs[0] = &dattr_ctrs[0]->dev_attr.attr;
+
+	func_ret = sysfs_create_group(kobj, agrp);
+
+	fipc_set_reg0(_request, func_ret);
+	fipc_set_reg1(_request, agrp_container->my_ref.cptr);
+
+fail_alloc:
+fail_alloc1:
+fail_dup1:
+fail_insert:
+	return ret;
 }
 
 int sysfs_remove_group_callee(struct fipc_message *_request)
 {
 	struct kobject *kobj = NULL;
 	struct attribute_group *grp = NULL;
+	struct device_ptr_container *dev_ptr_container = NULL;
+	struct attribute_group_container *attr_grp_ctr = NULL;
 	int ret = 0;
-	kobj = kzalloc(sizeof( *kobj ),
-		GFP_KERNEL);
-	if (!kobj) {
-		LIBLCD_ERR("kzalloc");
-		goto fail_alloc;
+
+	glue_lookup_device(__cptr(fipc_get_reg0(_request)), &dev_ptr_container);
+
+	assert(!dev_ptr_container);
+
+	kobj = &dev_ptr_container->dev->kobj;
+
+	ret = glue_cap_lookup_attribute_group_type(c_cspace,
+					__cptr(fipc_get_reg1(_request)),
+					&attr_grp_ctr);
+	if (ret) {
+		LIBLCD_ERR("lookup failed");
+		goto fail_lookup;
 	}
-	grp = kzalloc(sizeof( *grp ),
-		GFP_KERNEL);
-	if (!grp) {
-		LIBLCD_ERR("kzalloc");
-		goto fail_alloc;
-	}
-	sysfs_remove_group(kobj,
-			grp);
-fail_alloc:
+
+	grp = &attr_grp_ctr->attr_group;
+
+	sysfs_remove_group(kobj, grp);
+fail_lookup:
 	return ret;
 
+}
+
+int platform_device_unregister_callee(struct fipc_message *_request)
+{
+	struct platform_device_ptr_container *pdev_container = NULL;
+	int ret = 0;
+
+	glue_lookup_pdevice(__cptr(fipc_get_reg0(_request)), &pdev_container);
+
+	assert(!pdev_container);
+
+	platform_device_unregister(pdev_container->pdev);
+
+	return ret;
 }

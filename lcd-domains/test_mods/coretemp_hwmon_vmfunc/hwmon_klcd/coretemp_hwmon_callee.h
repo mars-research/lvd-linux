@@ -5,6 +5,7 @@
 
 int x86_match_cpu_callee(struct fipc_message *_request);
 int __platform_driver_register_callee(struct fipc_message *_request);
+int platform_device_unregister_callee(struct fipc_message *_request);
 int __register_cpu_notifier_callee(struct fipc_message *_request);
 int platform_driver_unregister_callee(struct fipc_message *_request);
 int __unregister_cpu_notifier_callee(struct fipc_message *_request);

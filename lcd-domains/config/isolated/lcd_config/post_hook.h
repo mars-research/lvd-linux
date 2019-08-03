@@ -388,6 +388,8 @@ extern struct task_struct *lcd_current_task;
 #define netdev_info(dev, msg...)        LIBLCD_MSG(msg)
 
 #define  __dynamic_netdev_dbg(desc, dev, fmt...)        LIBLCD_MSG(fmt)
+#define  __dynamic_dev_dbg(desc, dev, fmt...)        LIBLCD_MSG(fmt)
+#define  dev_notice(dev, fmt...)		LIBLCD_MSG(fmt)
 
 #define system_state    1
 

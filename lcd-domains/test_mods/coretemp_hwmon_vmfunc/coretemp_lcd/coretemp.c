@@ -99,10 +99,21 @@ struct temp_data {
 	int attr_size;
 	bool is_pkg_data;
 	bool valid;
+#ifdef LCD_ISOLATE
+	struct {
+		struct device_attribute_container dev_attr_c;
+		int index;
+	} sd_attrs[TOTAL_ATTRS];
+#else
 	struct sensor_device_attribute sd_attrs[TOTAL_ATTRS];
+#endif
 	char attr_name[TOTAL_ATTRS][CORETEMP_NAME_LENGTH];
 	struct attribute *attrs[TOTAL_ATTRS + 1];
+#ifdef LCD_ISOLATE
+	struct attribute_group_container attr_group_ctr;
+#else
 	struct attribute_group attr_group;
+#endif
 	struct mutex update_lock;
 };
 
@@ -411,15 +422,29 @@ static int create_core_attrs(struct temp_data *tdata, struct device *dev,
 	for (i = 0; i < tdata->attr_size; i++) {
 		snprintf(tdata->attr_name[i], CORETEMP_NAME_LENGTH,
 			 "temp%d_%s", attr_no, suffixes[i]);
+#ifndef LCD_ISOLATE
 		sysfs_attr_init(&tdata->sd_attrs[i].dev_attr.attr);
 		tdata->sd_attrs[i].dev_attr.attr.name = tdata->attr_name[i];
 		tdata->sd_attrs[i].dev_attr.attr.mode = S_IRUGO;
 		tdata->sd_attrs[i].dev_attr.show = rd_ptr[i];
 		tdata->sd_attrs[i].index = attr_no;
 		tdata->attrs[i] = &tdata->sd_attrs[i].dev_attr.attr;
+#else
+		sysfs_attr_init(&tdata->sd_attrs[i].dev_attr_c.dev_attr.attr);
+		tdata->sd_attrs[i].dev_attr_c.dev_attr.attr.name = tdata->attr_name[i];
+		tdata->sd_attrs[i].dev_attr_c.dev_attr.attr.mode = S_IRUGO;
+		tdata->sd_attrs[i].dev_attr_c.dev_attr.show = rd_ptr[i];
+		tdata->sd_attrs[i].index = attr_no;
+		tdata->attrs[i] = &tdata->sd_attrs[i].dev_attr_c.dev_attr.attr;
+#endif
 	}
+#ifdef LCD_ISOLATE
+	tdata->attr_group_ctr.attr_group.attrs = tdata->attrs;
+	return sysfs_create_group(&dev->kobj, &tdata->attr_group_ctr.attr_group);
+#else
 	tdata->attr_group.attrs = tdata->attrs;
 	return sysfs_create_group(&dev->kobj, &tdata->attr_group);
+#endif
 }
 
 
@@ -564,7 +589,11 @@ static void coretemp_remove_core(struct platform_data *pdata,
 	struct temp_data *tdata = pdata->core_data[indx];
 
 	/* Remove the sysfs attributes */
+#ifdef LCD_ISOLATE
+	sysfs_remove_group(&pdata->hwmon_dev->kobj, &tdata->attr_group_ctr.attr_group);
+#else
 	sysfs_remove_group(&pdata->hwmon_dev->kobj, &tdata->attr_group);
+#endif
 
 	kfree(pdata->core_data[indx]);
 	pdata->core_data[indx] = NULL;

@@ -54,8 +54,10 @@
  * When set, it replaces the driver's suboptimal heuristic.
  */
 static int force_tjmax;
+#ifndef LCD_ISOLATE
 module_param_named(tjmax, force_tjmax, int, 0444);
 MODULE_PARM_DESC(tjmax, "TjMax value in degrees Celsius");
+#endif
 
 #define BASE_SYSFS_ATTR_NO	2	/* Sysfs Base attr no for coretemp */
 #define NUM_REAL_CORES		128	/* Number of Real cores per cpu */
@@ -64,9 +66,15 @@ MODULE_PARM_DESC(tjmax, "TjMax value in degrees Celsius");
 #define TOTAL_ATTRS		(MAX_CORE_ATTRS + 1)
 #define MAX_CORE_DATA		(NUM_REAL_CORES + BASE_SYSFS_ATTR_NO)
 
+#ifdef LCD_ISOLATE
+#define TO_PHYS_ID(cpu)		__cpu_data(cpu)->phys_proc_id
+#define TO_CORE_ID(cpu)		__cpu_data(cpu)->cpu_core_id
+#define TO_ATTR_NO(cpu)		(TO_CORE_ID(cpu) + BASE_SYSFS_ATTR_NO)
+#else
 #define TO_PHYS_ID(cpu)		(cpu_data(cpu).phys_proc_id)
 #define TO_CORE_ID(cpu)		(cpu_data(cpu).cpu_core_id)
 #define TO_ATTR_NO(cpu)		(TO_CORE_ID(cpu) + BASE_SYSFS_ATTR_NO)
+#endif
 
 #ifdef CONFIG_SMP
 #define for_each_sibling(i, cpu) \
@@ -450,7 +458,12 @@ static int create_core_attrs(struct temp_data *tdata, struct device *dev,
 
 static int chk_ucode_version(unsigned int cpu)
 {
+#ifdef LCD_ISOLATE
+	struct cpuinfo_x86 *c = __cpu_data(cpu);
+#else
 	struct cpuinfo_x86 *c = &cpu_data(cpu);
+#endif
+
 
 	/*
 	 * Check if we have problem with errata AE18 of Core processors:
@@ -504,7 +517,11 @@ static int create_core_data(struct platform_device *pdev, unsigned int cpu,
 {
 	struct temp_data *tdata;
 	struct platform_data *pdata = platform_get_drvdata(pdev);
+#ifdef LCD_ISOLATE
+	struct cpuinfo_x86 *c = __cpu_data(cpu);
+#else
 	struct cpuinfo_x86 *c = &cpu_data(cpu);
+#endif
 	u32 eax, edx;
 	int err, attr_no;
 
@@ -724,7 +741,11 @@ static bool is_any_core_online(struct platform_data *pdata)
 
 static void get_core_online(unsigned int cpu)
 {
+#ifdef LCD_ISOLATE
+	struct cpuinfo_x86 *c = __cpu_data(cpu);
+#else
 	struct cpuinfo_x86 *c = &cpu_data(cpu);
+#endif
 	struct platform_device *pdev = coretemp_get_pdev(cpu);
 	int err;
 

@@ -39,6 +39,7 @@ enum dispatch_t {
 	MODULE_INIT,
 	MODULE_EXIT,
 	ATTR_SHOW,
+	CPU_DATA,
 };
 
 /* CSPACES ------------------------------------------------------------ */

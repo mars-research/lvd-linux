@@ -24,6 +24,18 @@ int dispatch_async_loop(struct fipc_message *message)
 			__coretemp_lcd_exit();
 			break;
 
+		case PROBE:
+			trace(PROBE);
+			return probe_callee(message);
+
+		case REMOVE:
+			trace(REMOVE);
+			return remove_callee(message);
+
+		case ATTR_SHOW:
+			trace(ATTR_SHOW);
+			return attr_show_callee(message);
+
 		default:
 			LIBLCD_ERR("unexpected function label: %d",
 					fn_type);

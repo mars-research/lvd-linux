@@ -24,7 +24,6 @@ int hwmon_klcd_dispatch_loop(struct fipc_message *message)
 			trace(PLATFORM_DEVICE_UNREGISTER);
 			return platform_device_unregister_callee(message);
 
-
 		case CPU_MAPS_UPDATE_BEGIN:
 			trace(CPU_MAPS_UPDATE_BEGIN);
 			return cpu_maps_update_begin_callee(message);
@@ -81,6 +80,9 @@ int hwmon_klcd_dispatch_loop(struct fipc_message *message)
 			trace(SYSFS_REMOVE_GROUP);
 			return sysfs_remove_group_callee(message);
 
+		case CPU_DATA:
+			trace(CPU_DATA);
+			return __cpu_data_callee(message);
 		default:
 			LIBLCD_ERR("unexpected function label: %d",
 					fn_type);

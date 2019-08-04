@@ -4,6 +4,7 @@
 #include <linux/cpu.h>
 #include <linux/hashtable.h>
 #include <liblcd/trampoline.h>
+#include <lcd_domains/microkernel.h>
 #include "../coretemp_hwmon_callee.h"
 
 #include <lcd_config/post_hook.h>
@@ -199,7 +200,7 @@ int remove(struct platform_device *pdev,
 
 	glue_lookup_pdevice(__cptr((unsigned long)pdev), &pdev_container);
 
-	assert(!pdev_container);
+	assert(pdev_container != NULL);
 
 	async_msg_set_fn_type(_request, REMOVE);
 
@@ -460,7 +461,7 @@ int platform_device_add_callee(struct fipc_message *_request)
 
 	glue_lookup_pdevice(__cptr(fipc_get_reg0(_request)), &pdev_ptr_container);
 
-	assert(!pdev_ptr_container);
+	assert(pdev_ptr_container != NULL);
 
 	pdev = pdev_ptr_container->pdev;
 
@@ -513,7 +514,7 @@ int platform_device_put_callee(struct fipc_message *_request)
 
 	glue_lookup_pdevice(__cptr(fipc_get_reg0(_request)), &pdev_ptr_container);
 
-	assert(!pdev_ptr_container);
+	assert(pdev_ptr_container != NULL);
 
 	pdev = pdev_ptr_container->pdev;
 
@@ -554,7 +555,7 @@ int devm_hwmon_device_register_with_groups_callee(struct fipc_message *_request)
 
 	glue_lookup_pdevice(__cptr(fipc_get_reg2(_request)), &pdev_container);
 
-	assert(!pdev_container);
+	assert(pdev_container != NULL);
 
 	dev = &pdev_container->pdev->dev;
 
@@ -649,7 +650,7 @@ int attr_show(struct device *dev, struct device_attribute *attr,
 
 	glue_lookup_device(__cptr((unsigned long) dev), &devp_container);
 
-	assert(!devp_container);
+	assert(devp_container != NULL);
 
 	fipc_set_reg0(_request, devp_container->other_ref.cptr);
 	fipc_set_reg1(_request, dattr_ctr->other_ref.cptr);
@@ -689,7 +690,7 @@ int sysfs_create_group_callee(struct fipc_message *_request)
 
 	glue_lookup_device(__cptr(fipc_get_reg0(_request)), &dev_ptr_container);
 
-	assert(!dev_ptr_container);
+	assert(dev_ptr_container != NULL);
 
 	kobj = &dev_ptr_container->dev->kobj;
 
@@ -769,7 +770,7 @@ int sysfs_remove_group_callee(struct fipc_message *_request)
 
 	glue_lookup_device(__cptr(fipc_get_reg0(_request)), &dev_ptr_container);
 
-	assert(!dev_ptr_container);
+	assert(dev_ptr_container != NULL);
 
 	kobj = &dev_ptr_container->dev->kobj;
 
@@ -796,9 +797,61 @@ int platform_device_unregister_callee(struct fipc_message *_request)
 
 	glue_lookup_pdevice(__cptr(fipc_get_reg0(_request)), &pdev_container);
 
-	assert(!pdev_container);
+	assert(pdev_container != NULL);
 
 	platform_device_unregister(pdev_container->pdev);
 
 	return ret;
+}
+
+int __cpu_data_callee(struct fipc_message *_request)
+{
+	struct cpuinfo_x86 *c;
+	int cpu;
+	int sync_ret;
+	unsigned 	long mem_order;
+	unsigned 	long p_offset;
+	cptr_t p_cptr, lcd_cptr;
+	gva_t p_gva;
+	struct cpuinfo_x86 *lcd_cpuinfo;
+
+	sync_ret = lcd_cptr_alloc(&p_cptr);
+	if (sync_ret) {
+		LIBLCD_ERR("failed to get cptr");
+		goto fail_alloc;
+	}
+
+	cpu = fipc_get_reg0(_request);
+	mem_order = fipc_get_reg1(_request);
+	p_offset = fipc_get_reg2(_request);
+	lcd_cptr = __cptr(fipc_get_reg3(_request));
+
+	copy_msg_cap_vmfunc(current->vmfunc_lcd, current->lcd, lcd_cptr,
+			p_cptr);
+
+	sync_ret = lcd_map_virt(p_cptr, mem_order, &p_gva);
+
+	if (sync_ret) {
+		LIBLCD_ERR("failed to map void *p");
+		goto fail_virt;
+	}
+
+	lcd_cpuinfo = (struct cpuinfo_x86*)(void*)(gva_val(p_gva) + p_offset);
+
+	c = &cpu_data(cpu);
+
+	/* copy entire data structure */
+	memcpy(lcd_cpuinfo, c, sizeof(struct cpuinfo_x86));
+#if 0
+	fipc_set_reg0(_request, c->x86_model_id);
+	fipc_set_reg1(_request, c->x86_model);
+	fipc_set_reg2(_request, c->x86_mask);
+	fipc_set_reg3(_request, c->x86_capability);
+	fipc_set_reg4(_request, c->microcode);
+	fipc_set_reg5(_request, c->phys_proc_id);
+	fipc_set_reg6(_request, c->cpu_core_id);
+#endif
+fail_virt:
+fail_alloc:
+	return 0;
 }

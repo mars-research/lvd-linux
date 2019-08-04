@@ -8,6 +8,7 @@ static struct glue_cspace *c_cspace;
 
 #define CPTR_HASH_BITS      5
 static DEFINE_HASHTABLE(pdev_hash, CPTR_HASH_BITS);
+struct cpuinfo_x86* cpudata[nr_cpu_ids] = { 0 };
 
 int glue_coretemp_hwmon_init(void)
 {
@@ -619,4 +620,102 @@ void platform_device_unregister(struct platform_device *pdev)
 	fipc_set_reg0(_request, pdev_container->other_ref.cptr);
 	ret = vmfunc_wrapper(_request);
 	return;
+}
+
+struct cpuinfo_x86 * __cpu_data(int cpu)
+{
+	struct fipc_message r;
+	struct fipc_message *_request = &r;
+	struct cpuinfo_x86 *this_cpu;
+	int ret;
+	int sync_ret;
+	unsigned 	long p_mem_sz;
+	unsigned 	long p_offset;
+	cptr_t p_cptr;
+
+	assert(cpu < nr_cpu_ids);
+
+	this_cpu = cpudata[cpu];
+
+	if (this_cpu)
+		goto exit;
+	else {
+		this_cpu = kzalloc(sizeof(*this_cpu), GFP_KERNEL);
+		if (!this_cpu) {
+			LIBLCD_ERR("allocation failed");
+			goto fail_alloc;
+		}
+
+		INIT_FIPC_MSG(_request);
+
+		async_msg_set_fn_type(_request, CPU_DATA);
+		fipc_set_reg0(_request, cpu);
+
+		sync_ret = lcd_virt_to_cptr(__gva(( unsigned  long )this_cpu),
+					&p_cptr, &p_mem_sz, &p_offset);
+
+		if (sync_ret) {
+			LIBLCD_ERR("virt to cptr failed");
+			goto fail_cptr;
+		}
+
+		fipc_set_reg1(_request, ilog2((p_mem_sz) >> (PAGE_SHIFT)));
+		fipc_set_reg2(_request, p_offset);
+		fipc_set_reg3(_request, cptr_val(p_cptr));
+
+		ret = vmfunc_wrapper(_request);
+#if 0
+		this_cpu->x86_model_id = fipc_get_reg0(_request);
+		this_cpu->x86_model = fipc_get_reg1(_request);
+		this_cpu->x86_mask = fipc_get_reg2(_request);
+		this_cpu->x86_capability = fipc_get_reg3(_request);
+		this_cpu->microcode = fipc_get_reg4(_request);
+		this_cpu->phys_proc_id = fipc_get_reg5(_request);
+		this_cpu->cpu_core_id = fipc_get_reg6(_request);
+#endif
+		cpudata[cpu] = this_cpu;
+	}
+fail_cptr:
+fail_alloc:
+exit:
+	return this_cpu;
+}
+
+int attr_show_callee(struct fipc_message *_request)
+{
+	struct device_container *dev_container = NULL;
+	struct device_attribute_container *dev_attr_container = NULL;
+	struct device *dev;
+	struct device_attribute *dev_attr;
+	int ret;
+
+	union {
+		char buf[8];
+		unsigned long _buf;
+	} buffer;
+
+	ret = glue_cap_lookup_device_type(c_cspace,
+				__cptr(fipc_get_reg0(_request)),
+				&dev_container);
+	if (ret) {
+		LIBLCD_ERR("lcd lookup");
+		goto fail_lookup;
+	}
+
+	dev = &dev_container->device;
+
+	ret = glue_cap_lookup_device_attribute_type(c_cspace,
+				__cptr(fipc_get_reg1(_request)),
+				&dev_attr_container);
+	if (ret) {
+		LIBLCD_ERR("lcd lookup");
+		goto fail_lookup;
+	}
+
+	dev_attr = &dev_attr_container->dev_attr;
+	dev_attr_container->dev_attr.show(dev, dev_attr, buffer.buf);
+
+	fipc_set_reg0(_request, buffer._buf);
+fail_lookup:
+	return ret;
 }

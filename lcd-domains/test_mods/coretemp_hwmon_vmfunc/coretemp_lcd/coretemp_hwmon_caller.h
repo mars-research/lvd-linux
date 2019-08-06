@@ -3,6 +3,11 @@
 
 #include "../coretemp_hwmon_glue_helper.h"
 
+struct __sensor_device_attribute {
+	struct device_attribute_container dev_attr_c;
+	int index;
+};
+
 int dispatch_sync_loop(struct fipc_message *message);
 int dispatch_async_loop(struct fipc_message *message);
 int glue_coretemp_hwmon_init(void);

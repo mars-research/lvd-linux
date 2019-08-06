@@ -151,7 +151,6 @@ int probe(struct platform_device *pdev,
 		struct trampoline_hidden_args *hidden_args)
 {
 	struct platform_device_ptr_container *pdev_container = NULL;
-	int ret = 0;
 	struct fipc_message r;
 	struct fipc_message *_request = &r;
 	int func_ret;
@@ -584,6 +583,9 @@ int devm_hwmon_device_register_with_groups_callee(struct fipc_message *_request)
 	func_ret = devm_hwmon_device_register_with_groups(dev, DRVNAME, pdata,
 			groups);
 
+	printk("%s, dev: %p other_ref: %lx\n", __func__, func_ret,
+				devp_container->other_ref.cptr);
+
 	devp_container->dev = func_ret;
 
 	glue_insert_device(devp_container);
@@ -650,7 +652,8 @@ int attr_show(struct device *dev, struct device_attribute *attr,
 	struct device_ptr_container *devp_container = NULL;
 	struct device_attribute_container *dattr_ctr;
 
-	dattr_ctr = hidden_args->struct_container;
+	//dattr_ctr = hidden_args->struct_container;
+	dattr_ctr = container_of(attr, struct device_attribute_container, dev_attr);
 
 	INIT_FIPC_MSG(_request);
 	async_msg_set_fn_type(_request, ATTR_SHOW);
@@ -659,10 +662,13 @@ int attr_show(struct device *dev, struct device_attribute *attr,
 
 	assert(devp_container != NULL);
 
+	printk("%s, dattr: %p other_ref: %lx\n", __func__, attr,
+				dattr_ctr->other_ref.cptr);
 	fipc_set_reg0(_request, devp_container->other_ref.cptr);
 	fipc_set_reg1(_request, dattr_ctr->other_ref.cptr);
 	vmfunc_klcd_wrapper(_request, 1);
 	func_ret = fipc_get_reg0(_request);
+	memcpy(buf, &_request->regs[1], sizeof(unsigned long)*2);
 	return func_ret;
 }
 
@@ -731,8 +737,13 @@ int sysfs_create_group_callee(struct fipc_message *_request)
 	}
 
 	dattr_ctrs[0]->dev_attr.attr.mode = fipc_get_reg1(_request);
-	dattr_ctrs[0]->dev_attr.attr.name = kzalloc(sizeof(unsigned long),
+	dattr_ctrs[0]->dev_attr.attr.name = kzalloc(sizeof(unsigned long)*2,
 							GFP_KERNEL);
+
+	dattr_ctrs[0]->other_ref.cptr = fipc_get_reg4(_request);
+	printk("%s, dev_attr: %p, other_Ref: %lx\n", __func__,
+					&dattr_ctrs[0]->dev_attr,
+					fipc_get_reg4(_request));
 
 	attr_show_hidden_args = kzalloc(sizeof( *attr_show_hidden_args ),
 		GFP_KERNEL);
@@ -754,7 +765,7 @@ int sysfs_create_group_callee(struct fipc_message *_request)
 		PAGE_SIZE) ) >> ( PAGE_SHIFT ));
 
 	memcpy((void*) dattr_ctrs[0]->dev_attr.attr.name, (void*) &_request->regs[2],
-					sizeof(unsigned long));
+					sizeof(unsigned long)*2);
 
 	agrp->attrs[0] = &dattr_ctrs[0]->dev_attr.attr;
 

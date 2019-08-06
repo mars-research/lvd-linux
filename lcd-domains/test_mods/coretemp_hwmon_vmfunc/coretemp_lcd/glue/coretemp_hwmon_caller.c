@@ -494,7 +494,7 @@ int sysfs_create_group(struct kobject *kobj,
 	device_container = container_of(dev, struct device_container, device);
 	attr_grp_ctr = container_of(grp, struct attribute_group_container, attr_group);
 
-	dev_attr = container_of(attrs[0], struct device_attribute, attr);
+	dev_attr = container_of(attrs[2], struct device_attribute, attr);
 	dev_attr_container = container_of(dev_attr, struct device_attribute_container,
 				dev_attr);
 
@@ -516,10 +516,10 @@ int sysfs_create_group(struct kobject *kobj,
 
 	async_msg_set_fn_type(_request, SYSFS_CREATE_GROUP);
 	fipc_set_reg0(_request, device_container->other_ref.cptr);
-	fipc_set_reg1(_request, attrs[0]->mode);
-	memcpy(&_request->regs[2], attrs[0]->name, sizeof(unsigned long));
-	fipc_set_reg3(_request, dev_attr_container->my_ref.cptr);
-	fipc_set_reg4(_request, attr_grp_ctr->my_ref.cptr);
+	fipc_set_reg1(_request, attrs[2]->mode);
+	memcpy(&_request->regs[2], attrs[2]->name, sizeof(unsigned long)*2);
+	fipc_set_reg4(_request, dev_attr_container->my_ref.cptr);
+	fipc_set_reg5(_request, attr_grp_ctr->my_ref.cptr);
 	ret = vmfunc_wrapper(_request);
 	func_ret = fipc_get_reg0(_request);
 	attr_grp_ctr->other_ref.cptr = fipc_get_reg1(_request);
@@ -681,10 +681,14 @@ int attr_show_callee(struct fipc_message *_request)
 	struct device *dev;
 	struct device_attribute *dev_attr;
 	int ret;
+	ssize_t func_ret;
 
 	union {
-		char buf[8];
-		unsigned long _buf;
+		char buf[16];
+		struct {
+			unsigned long _buf1;
+			unsigned long _buf2;
+		};
 	} buffer;
 
 	ret = glue_cap_lookup_device_type(c_cspace,
@@ -706,9 +710,12 @@ int attr_show_callee(struct fipc_message *_request)
 	}
 
 	dev_attr = &dev_attr_container->dev_attr;
-	dev_attr_container->dev_attr.show(dev, dev_attr, buffer.buf);
 
-	fipc_set_reg0(_request, buffer._buf);
+	func_ret = dev_attr->show(dev, dev_attr, buffer.buf);
+
+	fipc_set_reg0(_request, func_ret);
+	fipc_set_reg1(_request, buffer._buf1);
+	fipc_set_reg2(_request, buffer._buf2);
 fail_lookup:
 	return ret;
 }

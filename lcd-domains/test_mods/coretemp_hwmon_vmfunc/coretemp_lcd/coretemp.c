@@ -49,6 +49,13 @@
 
 #define DRVNAME	"coretemp"
 
+#ifdef LCD_ISOLATE
+#define __to_sensor_dev_attr(_dev_attr) \
+	container_of(container_of(_dev_attr, struct device_attribute_container, dev_attr), \
+		struct __sensor_device_attribute, dev_attr_c)
+#else
+#define __to_sensor_dev_attr(_dev_attr)		to_sensor_dev_attr(_dev_attr)
+#endif
 /*
  * force_tjmax only matters when TjMax can't be read from the CPU itself.
  * When set, it replaces the driver's suboptimal heuristic.
@@ -61,7 +68,7 @@ MODULE_PARM_DESC(tjmax, "TjMax value in degrees Celsius");
 
 #define BASE_SYSFS_ATTR_NO	2	/* Sysfs Base attr no for coretemp */
 #define NUM_REAL_CORES		128	/* Number of Real cores per cpu */
-#define CORETEMP_NAME_LENGTH	19	/* String Length of attrs */
+#define CORETEMP_NAME_LENGTH	16	/* String Length of attrs */
 #define MAX_CORE_ATTRS		4	/* Maximum no of basic attrs */
 #define TOTAL_ATTRS		(MAX_CORE_ATTRS + 1)
 #define MAX_CORE_DATA		(NUM_REAL_CORES + BASE_SYSFS_ATTR_NO)
@@ -108,10 +115,7 @@ struct temp_data {
 	bool is_pkg_data;
 	bool valid;
 #ifdef LCD_ISOLATE
-	struct {
-		struct device_attribute_container dev_attr_c;
-		int index;
-	} sd_attrs[TOTAL_ATTRS];
+	struct __sensor_device_attribute sd_attrs[TOTAL_ATTRS];
 #else
 	struct sensor_device_attribute sd_attrs[TOTAL_ATTRS];
 #endif
@@ -145,9 +149,16 @@ static DEFINE_MUTEX(pdev_list_mutex);
 static ssize_t show_label(struct device *dev,
 				struct device_attribute *devattr, char *buf)
 {
-	struct sensor_device_attribute *attr = to_sensor_dev_attr(devattr);
+	struct __sensor_device_attribute *attr = __to_sensor_dev_attr(devattr);
 	struct platform_data *pdata = dev_get_drvdata(dev);
 	struct temp_data *tdata = pdata->core_data[attr->index];
+
+	printk("%s called, attr: %p pdata: %p attr_idx: %d", __func__,
+				attr, pdata, attr->index);
+	if (!tdata) {
+		printk("%s, tdata null", __func__);
+		return sprintf(buf, "null\n");
+	}
 
 	if (tdata->is_pkg_data)
 		return sprintf(buf, "Physical id %u\n", pdata->phys_proc_id);
@@ -159,7 +170,7 @@ static ssize_t show_crit_alarm(struct device *dev,
 				struct device_attribute *devattr, char *buf)
 {
 	u32 eax, edx;
-	struct sensor_device_attribute *attr = to_sensor_dev_attr(devattr);
+	struct __sensor_device_attribute *attr = __to_sensor_dev_attr(devattr);
 	struct platform_data *pdata = dev_get_drvdata(dev);
 	struct temp_data *tdata = pdata->core_data[attr->index];
 
@@ -171,7 +182,7 @@ static ssize_t show_crit_alarm(struct device *dev,
 static ssize_t show_tjmax(struct device *dev,
 			struct device_attribute *devattr, char *buf)
 {
-	struct sensor_device_attribute *attr = to_sensor_dev_attr(devattr);
+	struct __sensor_device_attribute *attr = __to_sensor_dev_attr(devattr);
 	struct platform_data *pdata = dev_get_drvdata(dev);
 
 	return sprintf(buf, "%d\n", pdata->core_data[attr->index]->tjmax);
@@ -180,7 +191,7 @@ static ssize_t show_tjmax(struct device *dev,
 static ssize_t show_ttarget(struct device *dev,
 				struct device_attribute *devattr, char *buf)
 {
-	struct sensor_device_attribute *attr = to_sensor_dev_attr(devattr);
+	struct __sensor_device_attribute *attr = __to_sensor_dev_attr(devattr);
 	struct platform_data *pdata = dev_get_drvdata(dev);
 
 	return sprintf(buf, "%d\n", pdata->core_data[attr->index]->ttarget);
@@ -190,14 +201,19 @@ static ssize_t show_temp(struct device *dev,
 			struct device_attribute *devattr, char *buf)
 {
 	u32 eax, edx;
-	struct sensor_device_attribute *attr = to_sensor_dev_attr(devattr);
+	struct __sensor_device_attribute *attr = __to_sensor_dev_attr(devattr);
 	struct platform_data *pdata = dev_get_drvdata(dev);
 	struct temp_data *tdata = pdata->core_data[attr->index];
 
 	mutex_lock(&tdata->update_lock);
 
+	printk("%s, tdata: %p tdata->valid: %d", __func__, tdata, tdata->valid);
 	/* Check whether the time interval has elapsed */
+#ifdef LCD_ISOLATE
+	if (!tdata->valid) {
+#else
 	if (!tdata->valid || time_after(jiffies, tdata->last_updated + HZ)) {
+#endif
 		rdmsr_on_cpu(tdata->cpu, tdata->status_reg, &eax, &edx);
 		/*
 		 * Ignore the valid bit. In all observed cases the register
@@ -205,6 +221,8 @@ static ssize_t show_temp(struct device *dev,
 		 * Return it instead of reporting an error which doesn't
 		 * really help at all.
 		 */
+		printk("%s, tjmax: %u eax %u, edx %u", __func__, tdata->tjmax,
+					eax, edx);
 		tdata->temp = tdata->tjmax - ((eax >> 16) & 0x7f) * 1000;
 		tdata->valid = 1;
 		tdata->last_updated = jiffies;

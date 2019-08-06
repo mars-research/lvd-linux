@@ -67,8 +67,8 @@ MODULE_PARM_DESC(tjmax, "TjMax value in degrees Celsius");
 #define MAX_CORE_DATA		(NUM_REAL_CORES + BASE_SYSFS_ATTR_NO)
 
 #ifdef LCD_ISOLATE
-#define TO_PHYS_ID(cpu)		__cpu_data(cpu)->phys_proc_id
-#define TO_CORE_ID(cpu)		__cpu_data(cpu)->cpu_core_id
+#define TO_PHYS_ID(cpu)		(__cpu_data(cpu) ? __cpu_data(cpu)->phys_proc_id : -1)
+#define TO_CORE_ID(cpu)		(__cpu_data(cpu) ? __cpu_data(cpu)->cpu_core_id : -1)
 #define TO_ATTR_NO(cpu)		(TO_CORE_ID(cpu) + BASE_SYSFS_ATTR_NO)
 #else
 #define TO_PHYS_ID(cpu)		(cpu_data(cpu).phys_proc_id)
@@ -486,11 +486,14 @@ static struct platform_device *coretemp_get_pdev(unsigned int cpu)
 
 	list_for_each_entry(p, &pdev_list, list)
 		if (p->phys_proc_id == phys_proc_id) {
+			printk("%s, phys_proc_id: %d pdev: %p", __func__, phys_proc_id,
+					p->pdev);
 			mutex_unlock(&pdev_list_mutex);
 			return p->pdev;
 		}
 
 	mutex_unlock(&pdev_list_mutex);
+	printk("%s, phys_proc_id: %d pdev: NULL", __func__, phys_proc_id);
 	return NULL;
 }
 
@@ -512,7 +515,7 @@ static struct temp_data *init_temp_data(unsigned int cpu, int pkg_flag)
 	return tdata;
 }
 
-static int create_core_data(struct platform_device *pdev, unsigned int cpu,
+static noinline int create_core_data(struct platform_device *pdev, unsigned int cpu,
 			    int pkg_flag)
 {
 	struct temp_data *tdata;
@@ -525,6 +528,7 @@ static int create_core_data(struct platform_device *pdev, unsigned int cpu,
 	u32 eax, edx;
 	int err, attr_no;
 
+	LIBLCD_MSG("%s Getting pdata: %p to pdev: %p", __func__, pdata, pdev);
 	/*
 	 * Find attr number for sysfs:
 	 * We map the attr number to core id of the CPU
@@ -632,6 +636,7 @@ static int coretemp_probe(struct platform_device *pdev)
 
 	pdata->phys_proc_id = pdev->id;
 	platform_set_drvdata(pdev, pdata);
+	LIBLCD_MSG("%s Setting pdata: %p to pdev: %p", __func__, pdata, pdev);
 
 	pdata->hwmon_dev = devm_hwmon_device_register_with_groups(dev, DRVNAME,
 								  pdata, NULL);
@@ -642,6 +647,8 @@ static int coretemp_remove(struct platform_device *pdev)
 {
 	struct platform_data *pdata = platform_get_drvdata(pdev);
 	int i;
+
+	LIBLCD_MSG("%s Getting pdata: %p to pdev: %p", __func__, pdata, pdev);
 
 	for (i = MAX_CORE_DATA - 1; i >= 0; --i)
 		if (pdata->core_data[i])
@@ -686,6 +693,7 @@ static int coretemp_device_add(unsigned int cpu)
 		goto exit_device_put;
 	}
 
+	printk("%s adding pdev: %p to cpu: %d", __func__, pdev, cpu);
 	err = platform_device_add(pdev);
 	if (err) {
 		pr_err("Device addition failed (%d)\n", err);
@@ -695,6 +703,7 @@ static int coretemp_device_add(unsigned int cpu)
 	pdev_entry->pdev = pdev;
 	pdev_entry->phys_proc_id = pdev->id;
 
+	printk("%s, adding pdev: %p to list on cpu: %d", __func__, pdev, cpu);
 	list_add_tail(&pdev_entry->list, &pdev_list);
 	mutex_unlock(&pdev_list_mutex);
 
@@ -757,6 +766,7 @@ static void get_core_online(unsigned int cpu)
 	if (!cpu_has(c, X86_FEATURE_DTHERM))
 		return;
 
+	printk("%s, get_pdev returns pdev:%p for cpu: %d", __func__, pdev, cpu);
 	if (!pdev) {
 		/* Check the microcode version of the CPU */
 		if (chk_ucode_version(cpu))
@@ -796,6 +806,7 @@ static void put_core_offline(unsigned int cpu)
 		return;
 
 	pdata = platform_get_drvdata(pdev);
+	LIBLCD_MSG("%s Getting pdata: %p to pdev: %p", __func__, pdata, pdev);
 
 	indx = TO_ATTR_NO(cpu);
 

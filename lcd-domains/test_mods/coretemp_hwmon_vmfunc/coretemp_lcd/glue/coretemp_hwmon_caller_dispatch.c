@@ -6,7 +6,7 @@
 #include <lcd_config/post_hook.h>
 
 #define trace(x)	LIBLCD_MSG("got msg %s", #x)
-int dispatch_async_loop(struct fipc_message *message)
+int handle_rpc_calls(struct fipc_message *message)
 {
 	int fn_type;
 	fn_type = async_msg_get_fn_type(message);

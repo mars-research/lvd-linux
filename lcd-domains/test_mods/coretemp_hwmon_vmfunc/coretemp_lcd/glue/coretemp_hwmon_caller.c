@@ -106,21 +106,14 @@ int probe_callee(struct fipc_message *_request)
 
 	LIBLCD_MSG("%s called", __func__);
 
-	pdev_container = kzalloc(sizeof(struct platform_device_container),
-		GFP_KERNEL);
-	if (!pdev_container) {
-		LIBLCD_ERR("kzalloc");
-		goto fail_alloc;
-	}
-
-	ret = glue_cap_insert_platform_device_type(c_cspace, pdev_container,
-				&pdev_container->my_ref);
+	ret = glue_cap_lookup_platform_device_type(c_cspace,
+			__cptr(fipc_get_reg0(_request)),
+			&pdev_container);
 
 	if (ret) {
-		LIBLCD_ERR("lcd insert");
-		goto fail_insert;
+		LIBLCD_ERR("lcd lookup");
+		goto fail_lookup;
 	}
-	pdev_container->other_ref = __cptr(fipc_get_reg0(_request));
 
 	ret = glue_cap_lookup_platform_driver_type(c_cspace,
 			__cptr(fipc_get_reg1(_request)),
@@ -131,17 +124,13 @@ int probe_callee(struct fipc_message *_request)
 		goto fail_lookup;
 	}
 
-	pdrv_container->other_ref = __cptr(fipc_get_reg2(_request));
 
 	func_ret = pdrv_container->platform_driver.probe(
 			&pdev_container->platform_device);
 
 	fipc_set_reg0(_request, func_ret);
-	fipc_set_reg1(_request, pdev_container->my_ref.cptr);
 
-fail_alloc:
 fail_lookup:
-fail_insert:
 	return ret;
 }
 
@@ -293,30 +282,40 @@ int platform_device_add(struct platform_device *pdev)
 struct platform_device *platform_device_alloc(const char *name,
 		int id)
 {
-	struct platform_device_container *func_ret_container;
+	struct platform_device_container *pdev_container;
 	struct fipc_message r;
 	struct fipc_message *_request = &r;
-	struct platform_device *func_ret;
+	struct platform_device *pdev;
 	int ret;
 
-	func_ret_container = kzalloc(sizeof(*func_ret_container), GFP_KERNEL);
+	pdev_container = kzalloc(sizeof(*pdev_container), GFP_KERNEL);
 
-	if (!func_ret_container) {
+	if (!pdev_container) {
 		LIBLCD_ERR("kzalloc failed");
 		goto fail_alloc;
 	}
 
-	func_ret = &func_ret_container->platform_device;
+	pdev = &pdev_container->platform_device;
+
+	ret = glue_cap_insert_platform_device_type(c_cspace, pdev_container,
+				&pdev_container->my_ref);
+
+	if (ret) {
+		LIBLCD_ERR("lcd insert");
+		goto fail_insert;
+	}
 
 	async_msg_set_fn_type(_request, PLATFORM_DEVICE_ALLOC);
-	fipc_set_reg0(_request, func_ret_container->my_ref.cptr);
+	fipc_set_reg0(_request, pdev_container->my_ref.cptr);
 	memcpy(&_request->regs[1], name, sizeof(unsigned long));
 	fipc_set_reg2(_request, id);
 
 	ret = vmfunc_wrapper(_request);
-	func_ret_container->other_ref.cptr = fipc_get_reg0(_request);
-	return func_ret;
+	pdev_container->other_ref.cptr = fipc_get_reg0(_request);
+	pdev->id = id;
+	return pdev;
 fail_alloc:
+fail_insert:
 	return NULL;
 }
 
@@ -429,7 +428,7 @@ struct device *devm_hwmon_device_register_with_groups(struct device *dev,
 	ret = vmfunc_wrapper(_request);
 	func_ret_container->other_ref.cptr = fipc_get_reg0(_request);
 	kobj_container->other_ref.cptr = fipc_get_reg1(_request);
-
+	dev_set_drvdata(func_ret, drvdata);
 	return func_ret;
 fail_insert:
 fail_alloc:
@@ -637,9 +636,10 @@ struct cpuinfo_x86 * __cpu_data(int cpu)
 
 	this_cpu = cpudata[cpu];
 
-	if (this_cpu)
+	if (this_cpu) {
+		printk("%s, found cpuinfo:%p for cpu %d", __func__, this_cpu, cpu);
 		goto exit;
-	else {
+	} else {
 		this_cpu = kzalloc(sizeof(*this_cpu), GFP_KERNEL);
 		if (!this_cpu) {
 			LIBLCD_ERR("allocation failed");
@@ -664,15 +664,8 @@ struct cpuinfo_x86 * __cpu_data(int cpu)
 		fipc_set_reg3(_request, cptr_val(p_cptr));
 
 		ret = vmfunc_wrapper(_request);
-#if 0
-		this_cpu->x86_model_id = fipc_get_reg0(_request);
-		this_cpu->x86_model = fipc_get_reg1(_request);
-		this_cpu->x86_mask = fipc_get_reg2(_request);
-		this_cpu->x86_capability = fipc_get_reg3(_request);
-		this_cpu->microcode = fipc_get_reg4(_request);
-		this_cpu->phys_proc_id = fipc_get_reg5(_request);
-		this_cpu->cpu_core_id = fipc_get_reg6(_request);
-#endif
+
+		LIBLCD_MSG("%s assigning %p to cpudata[%d]", __func__, this_cpu, cpu);
 		cpudata[cpu] = this_cpu;
 	}
 fail_cptr:

@@ -54,26 +54,71 @@ void stub(void)
 
 //publicly visable read and write primatives
 
-// int nvme_pci_reg_read32_callee(struct fipc_message *_request)
-// {
-    // int ret;
-    // int* read_val;
-    // u32 offset;
-    // nvme_ctrl_container ctrl_c;
-    // nvme_ctrl ctrl;
+int nvme_pci_reg_read32_callee(struct fipc_message *_request)
+{
+    int ret;
+    u32 *read_val;
+    u32 offset;
+    nvme_dev_container dev_c;
     
+    glue_cap_lookup_nvme_dev_type(c_cspace, __cptr(fipc_get_reg0(_request)), &dev_c);
+    dev_c->nvme_dev->bar = fipc_get_reg1(request);
     
+    offset = (u32)fipc_get_reg2(_request);
     
-    // offset = (u32)fipc_get_reg1();
+    ret = nvme_pci_reg_read32(dev_c->nvme_dev->ctrl, offset, read_val);
     
-    // ret = nvme_pci_reg_read32(dev, asdf, read_val);
-    
-    // fipc_set_reg0(read_val);
-    // return 0;
-// }
+    fipc_set_reg0(*read_val);
+    return 0; 
+}
 
+int nvme_pci_reg_write32_callee(struct fipc_message *_request)
+{
+    int ret;
+    u32 write_val;
+    u32 offset;
+    nvme_dev_container dev_c;
+    
+    glue_cap_lookup_nvme_dev_type(c_cspace, __cptr(fipc_get_reg0(_request)), &dev_c);
+    
+    dev_c->nvme_dev->bar = fipc_get_reg1;
+    
+    offset = (u32)fipc_get_reg2(_request);
+    write_val = (u32)fipc_get_reg3(_request)
+    
+    ret = nvme_pci_reg_write32(dev_c->nvme_dev->ctrl, offset, read_val);
+    return 0;
+}
 
-int glue_ixgbe_init(void)
+int nvme_pci_reg_read64_callee(struct fipc_message *_request)
+{
+    int ret;
+    u64 *read_val;
+    u32 offset;
+    nvme_dev_container dev_c;
+    
+    glue_cap_lookup_nvme_dev_type(c_cspace, __cptr(fipc_get_reg0(_request)), &dev_c);
+    dev_c->nvme_dev->bar = fipc_get_reg1(request);
+    
+    offset = (u32)fipc_get_reg2(_request);
+    
+    ret = nvme_pci_reg_read32(dev_c->nvme_dev->ctrl, offset, read_val);
+    
+    fipc_set_reg0(*read_val);
+    return 0; 
+}
+
+int nvme_reset_callee(struct fipc_message *_request)
+{
+    nvme_dev_container dev_c;
+    
+    glue_cap_lookup_nvme_dev_type(c_cspace, __cptr(fipc_get_reg0(_request)), &dev_c);
+    dev_c->nvme_dev->bar = fipc_get_reg1(request);
+    
+    
+}
+
+int glue_nvme_init(void)
 {
 	int ret;
 	ret = glue_cap_init();
@@ -198,20 +243,40 @@ int nvme_enable_ctrl(struct nvme_ctrl *ctrl, u64 cap)
     vmfunc_wrapper(request);
     
     return 0;
-}
+} 
 
+
+
+static const struct nvme_ctrl_ops nvme_pci_ctrl_ops = {
+    .name			= "pcie",
+    .module			= THIS_MODULE,
+    .reg_read32		= nvme_pci_reg_read32,
+    .reg_write32		= nvme_pci_reg_write32,
+    .reg_read64		= nvme_pci_reg_read64,
+//    .reset_ctrl		= nvme_pci_reset_ctrl, //Just getting this working for now
+//    .free_ctrl		= nvme_pci_free_ctrl,
+//    .post_scan		= nvme_pci_post_scan,
+//   .submit_async_event	= nvme_pci_submit_async_event,
+};
 int nvme_init_ctrl(struct nvme_ctrl *ctrl, struct device *dev,
 		const struct nvme_ctrl_ops *ops, unsigned long quirks)
 {
     //TODO
     struct fipc_message r;
 	struct fipc_message *request = &r;
+    struct pci_dev_container pdev_c = container_of(dev, struct pci_dev, dev);
+    struct nvme_dev_container ndev_c = container_of(ctrl, struct nvme_dev, ctrl)
+    
+    
+    fipc_set_reg0(request, pdev_c->other_ref.cptr);
+    fipc_set_reg1(request, ndev_c->other_ref.cptr);
+    fipc_set_reg2(request, quirks);
     
     async_msg_set_fn_type(request, NVME_INIT_CTRL);
     
     vmfunc_wrapper(request);
     
-    return 0;
+    return fipc_get_reg0(request);
 }
 
 bool nvme_change_ctrl_state(struct nvme_ctrl *ctrl,
@@ -405,7 +470,7 @@ struct request *nvme_alloc_request(struct request_queue *q,
 {
     //TODO
     struct request_queue_container *rq_container;
-    struct nvme_command_container *cmd_container;
+//    struct nvme_command_container *cmd_container;
     struct request *ret = NULL;
     struct fipc_message r;
 	struct fipc_message *request = &r;
@@ -414,8 +479,8 @@ struct request *nvme_alloc_request(struct request_queue *q,
     
     rq_container = container_of(q, struct request_queue_container,
 						request_queue);
-    cmd_container = container_of(cmd, struct nvme_command_container,
-						cmd);
+    //cmd_container = container_of(cmd, struct nvme_command_container,
+	//					command);
                         
     async_msg_set_fn_type(request, NVME_ALLOC_REQUEST);
     
@@ -430,13 +495,13 @@ int nvme_setup_cmd(struct nvme_ns *ns, struct request *req,
     //TODO
     struct nvme_ns_container *ns_container;
     struct lcd_request_container *req_container;
-    struct nvme_command_container *cmd_container;
+//    struct nvme_command_container *cmd_container;
 	struct fipc_message r;
 	struct fipc_message *request = &r;
     
     ns_container = container_of(ns, struct nvme_ns_container, nvme_ns);
     req_container = container_of(req, struct lcd_request_container, rq);
-    cmd_container = container_of(cmd, struct nvme_command_container, cmd);
+    //cmd_container = container_of(cmd, struct nvme_command_container, cmd);
     
     fipc_set_reg0(request, req->cmd_type);
     fipc_set_reg1(request, req->cmd_flags);
@@ -1268,14 +1333,7 @@ fail_alloc:
 	return NULL;
 }
 
-struct device *get_device(struct device *dev)
-{
-    	struct fipc_message r;
-	struct fipc_message *request = &r;
-	async_msg_set_fn_type(request, GET_DEVICE);
-	vmfunc_wrapper(request);
-    return NULL;
-}
+
 
 void device_release_driver(struct device *dev)
 {
@@ -1466,20 +1524,65 @@ void free_irq(unsigned int irq, void *dev_id)
 	return;
 }
 
+// struct device *get_device(struct device *dev)
+// {
+    // struct fipc_message r;
+	// struct fipc_message *request = &r;
+    
+    // glue_cap_insert_device_type(c_cspace, __cptr(fipc_get_reg0(_request)), &hctx_c);
+    
+	// async_msg_set_fn_type(request, GET_DEVICE);
+    
+    // fipc_set_reg0(request, dev->kobj);
+	// vmfunc_wrapper(request);
+    // return NULL;
+// }
 
+struct device *get_device(struct device *dev) 
+{
+	struct pci_dev_container *device_container;
+    struct pci_dev *pci_dev;
+	struct fipc_message r;
+	struct fipc_message *_request = &r;
+	int ret;
+    
+    pci_dev = container_of(dev, struct pci_dev, dev);
+    device_container = container_of(pci_dev, struct pci_dev_container, pci_dev);
+	async_msg_set_fn_type(_request, GET_DEVICE);
+	fipc_set_reg0(_request, device_container->my_ref.cptr);
+
+	ret = vmfunc_wrapper(_request);
+	return dev;
+}
 void put_device(struct device *dev)
 {
-    struct device_container* device_container;
-    
-    struct fipc_message r;
-	struct fipc_message *request = &r;
-    
-    device_container = container_of(dev, struct device_container, device);
-    
-    fipc_set_reg0(request, device_container->other_ref.cptr);
-    async_msg_set_fn_type(request, PUT_DEVICE);
-	vmfunc_wrapper(request);
+    struct pci_dev_container *device_container;
+    struct pci_dev *pci_dev;
+	struct fipc_message r;
+	struct fipc_message *_request = &r;
+	int ret;
+
+    pci_dev = container_of(dev, struct pci_dev, dev);
+    device_container = container_of(pci_dev, struct pci_dev_container, pci_dev);
+	async_msg_set_fn_type(_request, PUT_DEVICE);
+	fipc_set_reg0(_request, device_container->my_ref.cptr);
+ 
+	ret = vmfunc_wrapper(_request);
+	return;
 }
+
+// void pci_set_drvdata(struct pci_dev *pdev, void *data)
+// {
+    // struct fipc_message r;
+	// struct fipc_message *_request = &r;
+    
+    // struct pci_dev_container *dev_c = container_of(pci_dev, struct pci_dev_container, pci_dev);
+    // fipc_set_reg0(_request, );
+    // async_msg_set_fn_type(_request, PCI_SET_DRVDATA);
+    
+    // vmfunc_wrapper(_request);
+    // return;
+// }
 
 u64 dma_mask = 0;
 void *data_pool;
@@ -1495,18 +1598,18 @@ int probe_callee(struct fipc_message *_request)
 	cptr_t other_ref;
 	unsigned int devfn;
 
-	cptr_t res0_cptr;
-	gpa_t gpa_addr;
-	unsigned int res0_len;
-	volatile void *dev_resource_0;
-	cptr_t pool_cptr;
-	gva_t pool_addr;
-	unsigned int pool_ord;
-
+	// cptr_t res0_cptr;
+	// gpa_t gpa_addr;
+	// unsigned int res0_len;
+	// volatile void *dev_resource_0;
+	// cptr_t pool_cptr;
+	// gva_t pool_addr;
+	// unsigned int pool_ord;
+    
 	LIBLCD_MSG("%s called", __func__);
 	other_ref.cptr = fipc_get_reg1(_request);
 	dma_mask = fipc_get_reg2(_request);
-
+    
 	dev_container = kzalloc(sizeof( struct pci_dev_container   ),
 		GFP_KERNEL);
 	if (!dev_container) {
@@ -1528,54 +1631,54 @@ int probe_callee(struct fipc_message *_request)
 
 	g_pdev = &dev_container->pci_dev;
 
-	ret = lcd_cptr_alloc(&res0_cptr);
-	if (ret) {
-		LIBLCD_ERR("failed to get cptr");
-		goto fail_cptr;
-	}
+	// ret = lcd_cptr_alloc(&res0_cptr);
+	// if (ret) {
+		// LIBLCD_ERR("failed to get cptr");
+		// goto fail_cptr;
+	// }
 
-	ret = lcd_cptr_alloc(&pool_cptr);
-	if (ret) {
-		LIBLCD_ERR("failed to get cptr");
-		goto fail_cptr;
-	}
+	// ret = lcd_cptr_alloc(&pool_cptr);
+	// if (ret) {
+		// LIBLCD_ERR("failed to get cptr");
+		// goto fail_cptr;
+	// }
 
-	fipc_set_reg0(_request, cptr_val(res0_cptr));
-	fipc_set_reg1(_request, cptr_val(pool_cptr));
-	fipc_set_reg2(_request, dev_container->other_ref.cptr);
+	// fipc_set_reg0(_request, cptr_val(res0_cptr));
+	// fipc_set_reg1(_request, cptr_val(pool_cptr));
+	// fipc_set_reg2(_request, dev_container->other_ref.cptr);
+ 
+	// vmfunc_sync_call(_request, SYNC_PROBE);
 
-	vmfunc_sync_call(_request, SYNC_PROBE);
+	// res0_len = fipc_get_reg0(_request);
+	// pool_ord = fipc_get_reg1(_request);
 
-	res0_len = fipc_get_reg0(_request);
-	pool_ord = fipc_get_reg1(_request);
+	// ret = lcd_ioremap_phys(res0_cptr, res0_len, &gpa_addr);
 
-	ret = lcd_ioremap_phys(res0_cptr, res0_len, &gpa_addr);
+	// if (ret) {
+		// LIBLCD_ERR("failed to ioremap phys");
+		// goto fail_ioremap;
+	// }
 
-	if (ret) {
-		LIBLCD_ERR("failed to ioremap phys");
-		goto fail_ioremap;
-	}
+	// dev_resource_0 = lcd_ioremap(gpa_val(gpa_addr), res0_len);
 
-	dev_resource_0 = lcd_ioremap(gpa_val(gpa_addr), res0_len);
+	// if (!dev_resource_0) {
+		// LIBLCD_ERR("failed to ioremap virt");
+		// goto fail_ioremap2;
+	// }
+	// dev_container->pci_dev.resource[0].start = (resource_size_t) dev_resource_0;
+	// dev_container->pci_dev.resource[0].end = (resource_size_t)((char*)dev_resource_0 + res0_len - 1);
+	// LIBLCD_MSG("%s: status reg 0x%X", __func__, *(unsigned int *)((char*)dev_resource_0 + 0x8));
 
-	if (!dev_resource_0) {
-		LIBLCD_ERR("failed to ioremap virt");
-		goto fail_ioremap2;
-	}
-	dev_container->pci_dev.resource[0].start = (resource_size_t) dev_resource_0;
-	dev_container->pci_dev.resource[0].end = (resource_size_t)((char*)dev_resource_0 + res0_len - 1);
-	LIBLCD_MSG("%s: status reg 0x%X", __func__, *(unsigned int *)((char*)dev_resource_0 + 0x8));
+	// ret = lcd_map_virt(pool_cptr, pool_ord, &pool_addr);
+	// if (ret) {
+		// LIBLCD_ERR("failed to map pool");
+		// goto fail_pool;
+	// }
 
-	ret = lcd_map_virt(pool_cptr, pool_ord, &pool_addr);
-	if (ret) {
-		LIBLCD_ERR("failed to map pool");
-		goto fail_pool;
-	}
+	// LIBLCD_MSG("%s, mapping private pool %p | ord %d", __func__,
+			// gva_val(pool_addr), pool_ord);
 
-	LIBLCD_MSG("%s, mapping private pool %p | ord %d", __func__,
-			gva_val(pool_addr), pool_ord);
-
-	data_pool = (void*)gva_val(pool_addr);
+	// data_pool = (void*)gva_val(pool_addr);
 
 	devfn = PCI_DEVFN(dev_assign.slot, dev_assign.fn);
 
@@ -1588,7 +1691,7 @@ int probe_callee(struct fipc_message *_request)
 				devfn);
 	if (ret)
 		LIBLCD_ERR("Could not assign pci device to LCD: ret %d",
-				ret);
+				ret); 
 
 	/* XXX: Pass null for now. struct pci_dev is passed from the
 	 * kernel and needs analysis for wrapping it around a container
@@ -1597,12 +1700,12 @@ int probe_callee(struct fipc_message *_request)
 
 	fipc_set_reg0(_request, func_ret);
 
-fail_ioremap:
-fail_ioremap2:
+// fail_ioremap:
+// fail_ioremap2:
 fail_alloc:
 fail_insert:
-fail_cptr:
-fail_pool:
+// fail_cptr:
+// fail_pool:
 	return ret;
 }
 

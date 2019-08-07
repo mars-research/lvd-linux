@@ -18,6 +18,19 @@ int handle_rpc_calls(struct fipc_message *message)
 
 	switch (fn_type) {
         
+        case NVME_PCI_REG_READ32:
+            trace(NVME_PCI_REG_READ32);
+            return nvme_pci_reg_read32(message);
+        case NVME_PCI_REG_WRITE32:
+            trace(NVME_PCI_REG_WRITE32);
+            return nvme_pci_reg_write32(message);
+        case NVME_PCI_REG_READ64:
+            trace(NVME_PCI_REG_READ64);
+            return nvme_pci_reg_read64(message);
+        case NVME_PCI_RESET_CTRL:
+            trace(NVME_PCI_RESET_CTRL);
+            return nvme_pci_reset_ctrl(message);
+        
         case QUEUE_RQ_FN:
 			trace(QUEUE_RQ_FN);
 			return queue_rq_fn_callee(message);
@@ -46,24 +59,24 @@ int handle_rpc_calls(struct fipc_message *message)
 			trace(PROBE);
 			return probe_callee(message);
 
-		case REMOVE:
-			trace(REMOVE);
-			return remove_callee(message);
+		// case REMOVE:
+			// trace(REMOVE);
+			// return remove_callee(message);
 
-		case SYNC:
-			trace(SYNC);
-			return sync_callee(message);
+		// case SYNC:
+			// trace(SYNC);
+			// return sync_callee(message);
 
-		case UNSYNC:
-			trace(UNSYNC);
-			return unsync_callee(message);
+		// case UNSYNC:
+			// trace(UNSYNC);
+			// return unsync_callee(message);
 
 		// case SERVICE_EVENT_SCHED:
 			// return ixgbe_service_event_schedule_callee(message);
 
 		case TRIGGER_DUMP:
 			trace(TRIGGER_DUMP);
-			return trigger_dump_callee(message);
+			//return trigger_dump_callee(message);
 
 		case POLL:
 			/* trace(POLL); */

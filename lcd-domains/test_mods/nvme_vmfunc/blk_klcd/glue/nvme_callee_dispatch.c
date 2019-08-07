@@ -16,10 +16,11 @@ int blk_klcd_syncipc_dispatch(struct fipc_message *message)
 	fn_type = async_msg_get_fn_type(message);
 
 	switch (fn_type) {
-        /*
+        
 		case SYNC_PROBE:
 			sync_probe_callee(message);
 			break;
+        /*
 		case SYNC_NDO_SET_MAC_ADDRESS:
 			sync_ndo_set_mac_address_callee(message);
 			break;
@@ -72,7 +73,7 @@ int blk_klcd_dispatch_async_loop(struct fipc_message *message)
 			ret =  pci_cleanup_aer_uncorrect_error_status_callee(message);
 			break;
 
-		case PCI_DISABLE_DEVICE:
+		case PCI_DISABLE_DEVICE: 
 			trace(PCI_DISABLE_DEVICE);
 			ret =  pci_disable_device_callee(message);
 			break;
@@ -142,6 +143,70 @@ int blk_klcd_dispatch_async_loop(struct fipc_message *message)
 			ret =  pci_wake_from_d3_callee(message);
 			break;
 
+        case BLK_MQ_ALLOC_TAG_SET:
+			trace(BLK_MQ_ALLOC_TAG_SET);
+			return blk_mq_alloc_tag_set_callee(message);
+
+		case BLK_MQ_INIT_QUEUE:
+			trace(BLK_MQ_INIT_QUEUE);
+			return blk_mq_init_queue_callee(message);
+
+		case BLK_MQ_END_REQUEST:
+			/* trace(BLK_MQ_END_REQUEST); */
+			return blk_mq_end_request_callee(message);
+
+		case BLK_MQ_FREE_TAG_SET:
+			trace(BLK_MQ_FREE_TAG_SET);
+			return blk_mq_free_tag_set_callee(message);
+
+		case BLK_MQ_START_REQUEST:
+			/* trace(BLK_MQ_START_REQUEST); */
+			return blk_mq_start_request_callee(message);
+
+		case BLK_MQ_MAP_QUEUE:
+			trace(BLK_MQ_MAP_QUEUE);
+			return blk_mq_map_queue_callee(message);
+
+		case BLK_QUEUE_LOGICAL_BLOCK_SIZE:
+			trace(BLK_QUEUE_LOGICAL_BLOCK_SIZE);
+			return blk_queue_logical_block_size_callee(message);
+
+		case BLK_QUEUE_PHYSICAL_BLOCK_SIZE:
+			trace(BLK_QUEUE_PHYSICAL_BLOCK_SIZE);
+			return blk_queue_physical_block_size_callee(message);
+
+		case BLK_CLEANUP_QUEUE:
+			trace(BLK_CLEANUP_QUEUE);
+			return blk_cleanup_queue_callee(message);
+
+		case ALLOC_DISK:
+			trace(ALLOC_DISK);
+			return alloc_disk_node_callee(message);
+
+		case DEVICE_ADD_DISK:
+			trace(ADD_DISK);
+			return device_add_disk_callee(message);
+
+		case PUT_DISK:
+			trace(PUT_DISK);
+			return put_disk_callee(message);
+
+		case DEL_GENDISK:
+			trace(DEL_GENDISK);
+			return del_gendisk_callee(message);
+
+		case REGISTER_BLKDEV:
+			trace(REGISTER_BLKDEV);
+			return register_blkdev_callee(message);
+
+		case UNREGISTER_BLKDEV:
+			trace(UNREGISTER_BLKDEV);
+			return unregister_blkdev_callee(message);
+
+        case GET_DEVICE:
+            trace(GET_DEVICE);
+            ret = get_device_callee(message);
+            
 		case REQUEST_THREADED_IRQ:
 			trace(REQUEST_THREADED_IRQ);
 			ret =  request_threaded_irq_callee(message);
@@ -156,6 +221,77 @@ int blk_klcd_dispatch_async_loop(struct fipc_message *message)
 			trace(SYNCHRONIZE_IRQ);
 			ret =  synchronize_irq_callee(message);
 			break;
+        case NVME_ALLOC_REQUEST:
+            trace(NVME_ALLOC_REQUEST);
+            break;
+        case NVME_CANCEL_REQUEST:
+            trace(NVME_CANCEL_REQUEST);
+            break;
+        case NVME_CHANGE_CTRL_STATE:
+            trace(NVME_CHANGE_CTRL_STATE);
+            break;
+        case NVME_COMPLETE_ASYNC_EVENT:
+            trace(NVME_COMPLETE_ASYNC_EVENT);
+            break;
+        case NVME_DISABLE_CTRL:
+            trace(NVME_DISABLE_CTRL);
+            break;
+        case NVME_ENABLE_CTRL:
+            trace(NVME_ENABLE_CTRL);
+            //nvme_enable_ctrl_callee(message);
+            break;
+        case NVME_INIT_CTRL:
+            trace(NVME_INIT_CTRL);
+            nvme_init_ctrl_callee(message);
+            break;
+        case NVME_INIT_IDENTIFY:
+            trace(NVME_INIT_IDENTIFY);
+            break;
+        case NVME_IO_TIMEOUT_DISPATCH:
+            trace(NVME_IO_TIMEOUT_DISPATCH);
+            break;
+        case NVME_KILL_QUEUES:
+            trace(NVME_KILL_QUEUES);
+            break;
+        case NVME_MAX_RETRIES:
+            trace(NVME_MAX_RETRIES);
+            break;
+        case NVME_PUT_CTRL:
+            trace(NVME_PUT_CTRL);
+            break;
+        case NVME_QUEUE_ASYNC_EVENTS:
+            trace(NVME_QUEUE_ASYNC_EV);
+            break;
+        case NVME_QUEUE_SCAN:
+            trace(NVME_QUEUE_SCAN);
+            break;
+        case NVME_REMOVE_NAMESPACES:
+            trace(NVME_REMOVE_NAMESPACE);
+            break;
+        case NVME_REQUEUE_REQ:
+            trace(NVME_REQUEUE_REQ);
+            break;
+        case NVME_SET_QUEUE_COUNT:
+            trace(NVME_SET_QUEUE_COUNT);
+            break;
+        case NVME_SETUP_CMD:
+            trace(NVME_SETUP_CMD);
+            break;
+        case NVME_SHUTDOWN_CTRL:
+            trace(NVME_SHUTDOWN_CTRL);
+            break;
+        case NVME_START_QUEUES:
+            trace(NVME_START_QUEUES);
+            break;
+        case NVME_STOP_QUEUES:
+            trace(NVME_STOP_QUEUES);
+            break;
+        case NVME_SUBMIT_SYNC_CMD:
+            trace(NVME_SUBMIT_SYNC_CMD);
+            break;
+        case NVME_UNINIT_CTRL:
+            trace(NVME_UNINIT_CTRL);
+            break;
 
 		default:
 			LIBLCD_ERR("unexpected function label: %d",

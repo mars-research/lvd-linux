@@ -108,6 +108,9 @@ static void nvme_dev_disable(struct nvme_dev *dev, bool shutdown);
 /* global instance of device struct */
 struct nvme_dev *g_nvme_dev;
 
+
+#ifndef NVME_DEV_H
+#define NVME_DEV_H
 /*
  * Represents an NVM Express device.  Each nvme_dev is a PCI function.
  */
@@ -136,8 +139,10 @@ struct nvme_dev {
 	u64 cmb_size;
 	u32 cmbsz;
 	struct nvme_ctrl ctrl;
+    
 	struct completion ioq_wait;
 };
+#endif
 
 static inline struct nvme_dev *to_nvme_dev(struct nvme_ctrl *ctrl)
 {
@@ -1924,7 +1929,10 @@ static void nvme_reset_work(struct work_struct *work)
 
 
 
-static int nvme_reset(struct nvme_dev *dev)
+#ifndef LCD_ISOLATE
+static
+#endif 
+int nvme_reset(struct nvme_dev *dev)
 {
 	if (!dev->ctrl.admin_q || blk_queue_dying(dev->ctrl.admin_q))
 		return -ENODEV;
@@ -1933,7 +1941,7 @@ static int nvme_reset(struct nvme_dev *dev)
 	//	return -EBUSY;
     nvme_reset_work(NULL);
 
-	flush_work(&dev->reset_work);
+	//flush_work(&dev->reset_work);
 	return 0;
 }
 #ifndef LCD_ISOLATE
@@ -2002,6 +2010,7 @@ static int nvme_dev_map(struct nvme_dev *dev)
        return -ENODEV;
 }
 
+#pragma message "hello"
 static int nvme_probe(struct pci_dev *pdev, const struct pci_device_id *id)
 {
 	int node, result = -ENOMEM;
@@ -2027,11 +2036,14 @@ static int nvme_probe(struct pci_dev *pdev, const struct pci_device_id *id)
     
     g_nvme_dev = dev;
     
+    LIBLCD_WARN("Setting drv data\n");
 	pci_set_drvdata(pdev, dev);
 
+
+    LIBLCD_WARN("Mapping Device\n");
 	result = nvme_dev_map(dev);
 	if (result)
-		goto free;
+		goto free; 
 
 	//INIT_WORK(&dev->reset_work, nvme_reset_work);
 	//INIT_WORK(&dev->remove_work, nvme_remove_dead_ctrl_work);
@@ -2051,6 +2063,7 @@ static int nvme_probe(struct pci_dev *pdev, const struct pci_device_id *id)
 
 	dev_info(dev->ctrl.device, "pci function %s\n", dev_name(&pdev->dev));
 
+    LIBLCD_MSG("Reseting work");
 	//queue_ work(nvme_workq, &dev->reset_work);
     nvme_reset_work(NULL);
 	return 0;
@@ -2058,7 +2071,7 @@ static int nvme_probe(struct pci_dev *pdev, const struct pci_device_id *id)
  release_pools:
 	nvme_release_prp_pools(dev);
  put_pci:
-	put_device(dev->dev);
+	put_device(dev->dev); 
 	nvme_dev_unmap(dev);
  free:
 	kfree(dev->queues);

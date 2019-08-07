@@ -20,6 +20,30 @@ int glue_cap_lookup_device_type(struct glue_cspace *cspace,
 
 }
 
+
+int glue_cap_insert_nvme_dev_type(struct glue_cspace *cspace,
+		struct nvme_dev_container *nvme_dev,
+		struct cptr *c_out) 
+{
+	return glue_cspace_insert(cspace,
+		nvme_dev,
+		glue_libcap_type_ops[ GLUE_TYPE_NVME_DEV_CONTAINER ].libcap_type,
+		c_out);
+
+} 
+
+int glue_cap_lookup_nvme_dev_type(struct glue_cspace *cspace,
+		struct cptr c,
+		struct nvme_dev_container **nvme_dev_container)
+{
+	return glue_cspace_lookup(cspace,
+		c,
+		glue_libcap_type_ops[ GLUE_TYPE_NVME_DEV_CONTAINER ].libcap_type,
+		( void  ** )nvme_dev_container);
+
+}
+
+
 int glue_cap_insert_module_type(struct glue_cspace *cspace,
 		struct module_container *module_container,
 		struct cptr *c_out)

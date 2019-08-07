@@ -1437,7 +1437,7 @@ debug_lvd_page_fault(struct pt_regs *regs, unsigned long error_code)
 	unsigned long address = read_cr2(); /* Get the faulting address */
 	printk("page fault, addr:%lx, error:%lx", address, error_code); 
 }
-NOKPROBE_SYMBOL(do_page_fault);
+NOKPROBE_SYMBOL(debug_lvd_page_fault);
 
 
 #ifdef CONFIG_TRACING

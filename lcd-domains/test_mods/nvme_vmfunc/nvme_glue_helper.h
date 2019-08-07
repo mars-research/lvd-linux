@@ -12,9 +12,10 @@
 #include <linux/blk-mq.h>
 #include "nvme.h"
 #include "iod.h"
+#include "nvme_dev.h"
 
 struct device_container {
-	struct device device;
+	struct device* device;
 	struct cptr other_ref;
 	struct cptr my_ref;
 };
@@ -131,19 +132,13 @@ struct request_queue_container {
 };
 
 
-/*
+
 struct nvme_dev_container {
     struct nvme_dev nvme_dev;
     cptr_t other_ref;
     cptr_t my_ref;
-}
+};
 
-struct nvme_cmd_container {
-    struct nvme_cmd nvme_cmd;
-    cptr_t other_ref;
-    cptr_t my_ref;
-}
-*/
 struct nvme_ns_container {
     struct nvme_ns nvme_ns;
     cptr_t other_ref;
@@ -163,7 +158,7 @@ struct nvme_iod_container {
     struct nvme_iod nvme_iod;
     cptr_t other_ref;
     cptr_t my_ref;
-}
+};
 
 
 int glue_cap_insert_device_type(struct glue_cspace *cspace,
@@ -229,6 +224,9 @@ int glue_cap_insert_blk_mq_queue_data_type(struct glue_cspace *cspace,
 int glue_cap_insert_request_queue_type(struct glue_cspace *cspace,
                         struct request_queue_container *req_queue_container,
                         cptr_t *c_out);
+int glue_cap_insert_nvme_dev_type(struct glue_cspace *cspace,
+                        struct nvme_dev_container *nvme_dev,
+                        cptr_t *c_out);
 
 int glue_cap_lookup_blk_mq_ops_type(struct glue_cspace *cspace,
                         cptr_t c,
@@ -260,8 +258,11 @@ int glue_cap_lookup_request_queue_type(struct glue_cspace *cspace,
 
 int glue_cap_lookup_blk_dev_ops_type(struct glue_cspace *cspace,
 		 	cptr_t c,
-			struct block_device_operations_container **blo_container);
+			struct block_device_operations_container **nvme_dev);
 
+int glue_cap_lookup_nvme_dev_type(struct glue_cspace *cspace,
+		 	cptr_t c,
+			struct nvme_dev_container **nvme_dev);
 void glue_cap_remove(struct glue_cspace *cspace, cptr_t c);   
         
         
@@ -284,7 +285,6 @@ int glue_cap_lookup_pci_device_id_type(struct glue_cspace *cspace,
 int glue_cap_lookup_pci_driver_type(struct glue_cspace *cspace,
 		struct cptr c,
 		struct pci_driver_container **pci_driver_container);
-
 int glue_cap_insert_irqhandler_type(struct glue_cspace *cspace,
 		struct irqhandler_t_container *irqhandler_container,
 		struct cptr *c_out);

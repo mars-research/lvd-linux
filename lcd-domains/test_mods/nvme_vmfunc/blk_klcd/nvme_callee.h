@@ -47,7 +47,8 @@ int pci_select_bars_callee(struct fipc_message *_request);
 int pci_wake_from_d3_callee(struct fipc_message *_request);
 int __hw_addr_sync_dev_callee(struct fipc_message *_request);
 int __hw_addr_unsync_dev_callee(struct fipc_message *_request);
-
+int get_device_callee(struct fipc_message *_request);
+int put_device_callee(struct fipc_message *_request);
 int request_threaded_irq_callee(struct fipc_message *_request);
 int free_irq_callee(struct fipc_message *_request);
 
@@ -59,6 +60,8 @@ int dispatch_async_loop(struct fipc_message *message);
 
 int glue_nvme_init(void);
 void glue_nvme_exit(void);
+
+int nvme_init_ctrl_callee(struct fipc_message *request);
 
 int sync_probe_callee(struct fipc_message *msg);
 int sync_ndo_set_mac_address_callee(struct fipc_message *msg);

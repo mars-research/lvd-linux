@@ -202,40 +202,85 @@ void glue_nvme_exit(void)
 	iocb_data_pool_free();
 }
 
-// int nvme_pci_reg_read32(struct nvme_ctrl *ctrl, u32 off, u32 *val)
-// {
-	// //TODO
-    // struct fipc_message r;
-	// struct fipc_message *request = &r;
+int nvme_pci_reg_read32(struct nvme_ctrl *ctrl, u32 off, u32 *val)
+{
+	//TODO
+    struct fipc_message r;
+	struct fipc_message *request = &r;
+     
+    struct nvme_dev *dev = container_of(ctrl, struct nvme_dev, ctrl);
+    struct nvme_dev_container *dev_c = container_of(dev, struct nvme_dev_container, nvme_dev);
     
-    // struct nvme_dev *dev = container_of(ctrl, struct nvme_dev, ctrl);
+    fipc_set_reg0(request, dev_c->other_ref.cptr);
+    fipc_set_reg1(request, (long)dev->bar);
+    fipc_set_reg2(request, off);
     
-    // fipc_set_reg0(dev->bar);
-    // fipc_set_reg1(off);
     
-    // async_msg_set_fn_type(NVME_PCI_REG_READ32);
-    
-	// return 0;
-// }
+    async_msg_set_fn_type(request, NVME_PCI_REG_READ32);
+    vmfunc_wrapper(request);
+    *val =  fipc_get_reg0(request);
+    return 0;
+}
 
-// int nvme_pci_reg_write32(struct nvme_ctrl *ctrl, u32 off, u32 val)
-// {
-	// //TODO
-    // struct fipc_message r;
-	// struct fipc_message *request = &r;
+int nvme_pci_reg_write32(struct nvme_ctrl *ctrl, u32 off, u32 val)
+{
+	struct fipc_message r;
+	struct fipc_message *request = &r;
     
-    // async_msg_set_fn_type(NVME_PCI_REG_WRITE32);
-	// return 0;
-// }
+    struct nvme_dev *dev = container_of(ctrl, struct nvme_dev, ctrl);
+    struct nvme_dev_container *dev_c = container_of(dev, struct nvme_dev_container, nvme_dev);
+    
+    fipc_set_reg0(request, dev_c->other_ref.cptr);
+    fipc_set_reg1(request, (long)dev->bar);
+    fipc_set_reg2(request, off);
+    fipc_set_reg3(request, val);
+    
+    async_msg_set_fn_type(request, NVME_PCI_REG_WRITE32);
+    vmfunc_wrapper(request);
+    return 0;  
+}
 
-// int nvme_pci_reg_read64(struct nvme_ctrl *ctrl, u32 off, u64 *val)
+int nvme_pci_reg_read64(struct nvme_ctrl *ctrl, u32 off, u64 *val)
+{
+	//TODO
+    struct fipc_message r;
+	struct fipc_message *request = &r;
+     
+    struct nvme_dev *dev = container_of(ctrl, struct nvme_dev, ctrl);
+    struct nvme_dev_container *dev_c = container_of(dev, struct nvme_dev_container, nvme_dev);
+    
+    fipc_set_reg0(request, dev_c->other_ref.cptr);
+    fipc_set_reg1(request, (long)dev->bar);
+    fipc_set_reg2(request, off);
+    
+    
+    async_msg_set_fn_type(request, NVME_PCI_REG_READ64);
+    vmfunc_wrapper(request);
+    *val =  fipc_get_reg0(request);
+    return 0;
+}
+
+// int nvme_reset(struct nvme_dev *dev)
 // {
-	// //TODO
     // struct fipc_message r;
 	// struct fipc_message *request = &r;
+     
+    // struct nvme_dev_container *dev_c = container_of(dev, struct nvme_dev_container, nvme_dev);
     
-    // async_msg_set_fn_type(NVME_PCI_REG_READ64);
-	// return 0;
+    // async_msg_set_fn_type(request, NVME_RESET);
+    
+    // fipc_set_reg0(reqeust, dev_c->other_ref.cptr);
+    // fipc_set_reg1(request, dev->bar);
+    // fipc_set_reg2(request, dev->ctrl.admin_q->queue_flags);
+    // fipc_set_reg3(request, dev->ctrl.state);
+    // fipc_set_reg4(request, dev->ctrl.ctrl_config);
+    
+    // vmfunc_wrapper(request);
+    
+    // dev->ctrl.state = fipc_get_reg0(request);
+    
+    // return 0;//same as other side
+    
 // }
 
 // int nvme_pci_reset_ctrl(struct nvme_ctrl *ctrl)
@@ -962,6 +1007,76 @@ void release(struct gendisk *disk, fmode_t mode, struct trampoline_hidden_args *
 	vmfunc_klcd_wrapper(request, 1);
 
 	return;
+}
+static const struct nvme_ctrl_ops nvme_pci_ctrl_ops = {
+    .name			= "pcie",
+    .module			= THIS_MODULE,
+    .reg_read32		= nvme_pci_reg_read32,
+    .reg_write32		= nvme_pci_reg_write32,
+    .reg_read64		= nvme_pci_reg_read64,
+//    .reset_ctrl		= nvme_pci_reset_ctrl, Just getting this working for now
+//    .free_ctrl		= nvme_pci_free_ctrl,
+//    .post_scan		= nvme_pci_post_scan,
+//    .submit_async_event	= nvme_pci_submit_async_event,
+}; 
+
+int nvme_init_ctrl_callee(struct fipc_message *request)
+{
+    struct pci_dev_container *pdev_c = NULL;
+    struct nvme_dev_container *ndev_c;
+	int ret = 0;
+    kernel_ulong_t driver_data;
+    
+    //struct pci_device_id id;
+    
+    glue_cap_lookup_pci_dev_type(c_cspace, __cptr(fipc_get_reg0(request)), &pdev_c);
+    //pdev = pdev_c->pci_dev;
+    
+    glue_cap_lookup_nvme_dev_type(c_cspace, __cptr(fipc_get_reg1(request)), &ndev_c);
+    //ndev = ndev_c->nvme_dev;
+    
+    driver_data = fipc_get_reg2(request);
+    
+    ret = nvme_init_ctrl(&ndev_c->nvme_dev.ctrl, &pdev_c->pci_dev.dev, &nvme_pci_ctrl_ops,
+			driver_data);
+    fipc_set_reg0(request, ret);
+    return 0;
+}
+
+int get_device_callee(struct fipc_message *_request)
+{
+	struct device *dev = NULL;
+	int ret = 0;
+	struct nvme_dev_container *nvme_dev_container = NULL;
+	struct device *func_ret;
+
+	LIBLCD_MSG("%s, called", __func__);
+
+
+	glue_cap_lookup_nvme_dev_type(c_cspace, __cptr(fipc_get_reg0(_request)),
+			&nvme_dev_container);
+
+	dev = nvme_dev_container->nvme_dev.dev;
+
+	func_ret = get_device(dev);
+    fipc_set_reg0(_request, (long)func_ret);
+	return ret;
+}
+
+
+int put_device_callee(struct fipc_message *_request)
+{
+	struct device *dev;
+    struct nvme_dev_container *nvme_dev_container;
+	int ret = 0;
+
+	LIBLCD_MSG("%s, called", __func__);
+
+    glue_cap_lookup_nvme_dev_type(c_cspace, __cptr(fipc_get_reg0(_request)),
+			&nvme_dev_container);
+    dev = nvme_dev_container->nvme_dev.dev; 
+	put_device(dev);
+	return ret;
 }
 
 #ifndef CONFIG_LVD
@@ -1762,22 +1877,25 @@ int sync_probe_callee(struct fipc_message *_request)
 		goto fail_vol;
 	}
 
+/*
 #ifdef CONFIG_VMALLOC_SHARED_POOL
         ret = lcd_volunteer_vmalloc_mem(__gva((unsigned long)pool->pool), SKB_DATA_POOL_PAGES, &pool_cptr);
 	pool_ord = SKB_DATA_POOL_ORDER;
 #else
-        p = virt_to_head_page(pool->pool);
+*/
+    p = virt_to_head_page(pool->pool);
 
 	pool_ord = ilog2(roundup_pow_of_two((1 << pool_order) * best_diff));
-        ret = lcd_volunteer_pages(p, pool_ord, &pool_cptr);
-#endif
+    ret = lcd_volunteer_pages(p, pool_ord, &pool_cptr);
+//#endif
 
 	if (ret) {
 		LIBLCD_ERR("volunteer shared region");
 		goto fail_vol;
 	}
 
-#ifdef CONFIG_VMALLOC_SHARED_POOL
+//#ifdef CONFIG_VMALLOC_SHARED_POOL
+#if 0
 	pool_pfn_start = (unsigned long)pool->pool >> PAGE_SHIFT;
 	pool_pfn_end = pool_pfn_start + SKB_DATA_POOL_PAGES;
 #else
@@ -1841,7 +1959,6 @@ int probe(struct pci_dev *dev,
 
 	fipc_set_reg1(_request, dev_container->my_ref.cptr);
 	fipc_set_reg2(_request, *dev->dev.dma_mask);
-
 	vmfunc_klcd_wrapper(_request, 1);
 
 	printk("%s, send request done\n", __func__);
@@ -1883,7 +2000,7 @@ int poll(struct blk_mq_hw_ctx *hctx, unsigned int tag,
 			budget, napi_c->other_ref.cptr);*/
 
 #ifdef CONFIG_LCD_TRACE_BUFFER
-	add_trace_entry(EVENT_SOFTIRQ_POLL, async_msg_get_fn_type(_request));
+	//add_trace_entry(EVENT_SOFTIRQ_POLL, async_msg_get_fn_type(_request));
 #endif
 	vmfunc_klcd_wrapper(_request, 1);
 
@@ -2443,7 +2560,7 @@ irqreturn_t msix_vector_handler(int irq, void *data)
 //	napi_schedule_irqoff(napi_q0);
 #else
 #ifdef CONFIG_LCD_TRACE_BUFFER
-	add_trace_entry(EVENT_MSIX_HANDLER, async_msg_get_fn_type(_request));
+	//add_trace_entry(EVENT_MSIX_HANDLER, async_msg_get_fn_type(_request));
 #endif
 	vmfunc_klcd_wrapper(_request, 1);
 

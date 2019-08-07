@@ -42,6 +42,7 @@ enum glue_type {
     GLUE_TYPE_NVME_COMMAND_CONTAINER,
     GLUE_TYPE_NVME_NS_CONTAINER,
     GLUE_TYPE_NVME_CONTROL_CONTAINER,
+    GLUE_TYPE_NVME_DEV_CONTAINER,
 	GLUE_NR_TYPES,
 };
 
@@ -179,7 +180,13 @@ static struct type_ops_id glue_libcap_type_ops[GLUE_NR_TYPES] = {
                 .revoke = dummy_func,
         }
     },
-    
+    {
+		{
+			.name = "struct nvme_dev",
+			.delete = dummy_func,
+			.revoke = dummy_func,
+		}
+	},
 };
 
 int glue_cap_init(void)

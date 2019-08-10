@@ -188,6 +188,14 @@ int blk_klcd_dispatch_async_loop(struct fipc_message *message)
 			trace(BLK_CLEANUP_QUEUE);
 			return blk_cleanup_queue_callee(message);
 
+		case BLK_MQ_STOP_HW_QUEUES:
+			trace(BLK_MQ_STOP_HW_QUEUES);
+			return blk_mq_stop_hw_queues_callee(message);
+
+		case IRQ_SET_AFFINITY_HINT:
+			trace(IRQ_SET_AFFINITY_HINT);
+			return irq_set_affinity_hint_callee(message);
+
 		case ALLOC_DISK:
 			trace(ALLOC_DISK);
 			return alloc_disk_node_callee(message);
@@ -277,7 +285,7 @@ int blk_klcd_dispatch_async_loop(struct fipc_message *message)
 
 		case NVME_KILL_QUEUES:
 			trace(NVME_KILL_QUEUES);
-			break;
+			return nvme_kill_queues_callee(message);
 
 		case NVME_MAX_RETRIES:
 			trace(NVME_MAX_RETRIES);
@@ -289,15 +297,16 @@ int blk_klcd_dispatch_async_loop(struct fipc_message *message)
 
 		case NVME_QUEUE_ASYNC_EVENTS:
 			trace(NVME_QUEUE_ASYNC_EV);
+			return nvme_queue_async_events_callee(message);
 			break;
 
 		case NVME_QUEUE_SCAN:
 			trace(NVME_QUEUE_SCAN);
-			break;
+			return nvme_queue_scan_callee(message);
 
 		case NVME_REMOVE_NAMESPACES:
 			trace(NVME_REMOVE_NAMESPACE);
-			break;
+			return nvme_remove_namespaces_callee(message);
 
 		case NVME_REQUEUE_REQ:
 			trace(NVME_REQUEUE_REQ);
@@ -313,11 +322,11 @@ int blk_klcd_dispatch_async_loop(struct fipc_message *message)
 
 		case NVME_SHUTDOWN_CTRL:
 			trace(NVME_SHUTDOWN_CTRL);
-			break;
+			return nvme_shutdown_ctrl_callee(message);
 
 		case NVME_START_QUEUES:
 			trace(NVME_START_QUEUES);
-			break;
+			return nvme_start_queues_callee(message);
 
 		case NVME_STOP_QUEUES:
 			trace(NVME_STOP_QUEUES);

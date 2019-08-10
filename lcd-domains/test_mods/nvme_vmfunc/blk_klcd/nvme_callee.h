@@ -12,6 +12,7 @@ int blk_mq_init_queue_callee(struct fipc_message *request);
 int blk_mq_end_request_callee(struct fipc_message *request);
 int blk_mq_free_tag_set_callee(struct fipc_message *request);
 int blk_mq_start_request_callee(struct fipc_message *request);
+int blk_mq_start_stopped_hw_queues_callee(struct fipc_message *request);
 int blk_mq_map_queue_callee(struct fipc_message *request);
 int blk_queue_logical_block_size_callee(struct fipc_message *request);
 int blk_queue_physical_block_size_callee(struct fipc_message *request);
@@ -33,6 +34,7 @@ int pci_bus_write_config_word_callee(struct fipc_message *_request);
 int pci_cleanup_aer_uncorrect_error_status_callee(struct fipc_message *_request);
 int pci_disable_device_callee(struct fipc_message *_request);
 int pci_disable_msix_callee(struct fipc_message *_request);
+int pci_disable_msi_callee(struct fipc_message *_request);
 int pci_enable_msix_range_callee(struct fipc_message *_request);
 int pci_enable_pcie_error_reporting_callee(struct fipc_message *_request);
 int pcie_capability_read_word_callee(struct fipc_message *_request);
@@ -47,7 +49,8 @@ int pci_select_bars_callee(struct fipc_message *_request);
 int pci_wake_from_d3_callee(struct fipc_message *_request);
 int __hw_addr_sync_dev_callee(struct fipc_message *_request);
 int __hw_addr_unsync_dev_callee(struct fipc_message *_request);
-
+int get_device_callee(struct fipc_message *_request);
+int put_device_callee(struct fipc_message *_request);
 int request_threaded_irq_callee(struct fipc_message *_request);
 int free_irq_callee(struct fipc_message *_request);
 
@@ -60,22 +63,22 @@ int dispatch_async_loop(struct fipc_message *message);
 int glue_nvme_init(void);
 void glue_nvme_exit(void);
 
+int nvme_init_ctrl_callee(struct fipc_message *request);
+int nvme_uninit_ctrl_callee(struct fipc_message *request);
+int nvme_change_ctrl_state_callee(struct fipc_message *request);
+int nvme_stop_queues_callee(struct fipc_message *_request);
+int nvme_put_ctrl_callee(struct fipc_message *_request);
+int nvme_enable_ctrl_callee(struct fipc_message *_request);
+int nvme_disable_ctrl_callee(struct fipc_message *_request);
+
 int sync_probe_callee(struct fipc_message *msg);
 int sync_ndo_set_mac_address_callee(struct fipc_message *msg);
 
-#ifdef CONFIG_LVD
-int probe(struct pci_dev *dev,
-		const struct pci_device_id *id);
-
-void remove(struct pci_dev *dev);
-#else
 int probe(struct pci_dev *dev,
 		const struct pci_device_id *id,
 		struct trampoline_hidden_args *hidden_args);
 
 void remove(struct pci_dev *dev,
 		struct trampoline_hidden_args *hidden_args);
-#endif /* CONFIG_LVD */
-
 
 #endif /* __NVME_CALLEE_H__ */

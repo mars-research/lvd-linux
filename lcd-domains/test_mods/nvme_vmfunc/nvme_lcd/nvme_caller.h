@@ -25,9 +25,18 @@ int trigger_dump_callee(struct fipc_message *_request);
 int queue_rq_fn_callee(struct fipc_message *request);
 int map_queue_fn_callee(struct fipc_message *request);
 int init_hctx_fn_callee(struct fipc_message *request);
+int exit_hctx_fn_callee(struct fipc_message *request);
+int init_request_fn_callee(struct fipc_message *request);
+int poll_fn_callee(struct fipc_message *request);
 int softirq_done_fn_callee(struct fipc_message *request);
 int open_callee(struct fipc_message *request);
 int release_callee(struct fipc_message *request);
 
-
+int nvme_pci_reg_read32_callee(struct fipc_message *_request);
+int nvme_pci_reg_write32_callee(struct fipc_message *_request);
+int nvme_pci_reg_read64_callee(struct fipc_message *_request);
+int nvme_pci_reset_ctrl_callee(struct fipc_message *_request);
+int nvme_pci_free_ctrl_callee(struct fipc_message *_request);
+int nvme_pci_post_scan_callee(struct fipc_message *_request);
+int nvme_pci_submit_async_event_callee(struct fipc_message *_request);
 #endif /* __NVME_CALLER_H__ */

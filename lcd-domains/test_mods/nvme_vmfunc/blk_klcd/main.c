@@ -14,37 +14,16 @@
 
 extern int vmfunc_init(void *stack_page, rpc_handler_t rpc_handler,
 		rpc_handler_t sync_handler);
-extern int nvme_trigger_dump(void);
 extern struct glue_cspace *c_cspace;
 extern void *lcd_stack;
 
-
 int blk_klcd_dispatch_async_loop(struct fipc_message *message);
 int blk_klcd_syncipc_dispatch(struct fipc_message *message);
-
-/* INIT / EXIT ---------------------------------------- */
-struct cspace *klcd_cspace;
-struct task_struct *task_klcd;
 
 static int blk_klcd_init(void)
 {
 	int ret;
 	struct fipc_message m;
-	/*
-	 * Set up cptr cache, etc.
-	 */
-#ifndef CONFIG_LVD
-	/*
-	 * there is no separate LCD for KLCD module, we operate in the context
-	 * of boot thread
-	 */
-
-	ret = lcd_enter();
-	if (ret) {
-		LIBLCD_ERR("lcd enter");
-		goto fail1;
-	}
-#endif
 	INIT_FIPC_MSG(&m);
 	/*
 	 * Init net glue
@@ -61,15 +40,11 @@ static int blk_klcd_init(void)
 	/* call module_init for lcd */
 	m.vmfunc_id = VMFUNC_RPC_CALL;
 	m.rpc_id = MODULE_INIT;
-	fipc_set_reg0(&m, this_cpu_read(cpu_info.loops_per_jiffy));
 	vmfunc_klcd_wrapper(&m, OTHER_DOMAIN);
 
 	return 0;
 
 fail2:
-#ifndef CONFIG_LVD
-fail1:
-#endif
 	lcd_exit(ret);
 	return ret;
 }
@@ -96,13 +71,6 @@ static void __exit blk_klcd_exit(void)
 	 * Tear down net glue
 	 */
 	glue_nvme_exit();
-
-#ifndef CONFIG_LVD
-	/*
-	 * in case of lvd, boot module calls lcd_exit
-	 */
-	lcd_exit(0);
-#endif
 
 	return;
 }

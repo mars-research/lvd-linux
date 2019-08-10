@@ -38,6 +38,7 @@ enum dispatch_t {
 	PCI_DISABLE_DEVICE,
 	PCI_DISABLE_MSIX,
 	PCI_DISABLE_MSI,
+	PCI_ENABLE_MSIX,
 	PCI_ENABLE_MSIX_RANGE,
 	PCI_ENABLE_PCIE_ERROR_REPORTING,
 	PCIE_CAPABILITY_READ_WORD,
@@ -173,6 +174,10 @@ typedef enum {
 */
 
 #define ASYNC_RPC_BUFFER_ORDER 15
+
+#define LOWER32_BITS    32
+#define LOWER_HALF(x)   (x & ((1ULL << LOWER32_BITS) - 1))
+#define UPPER_HALF(x)   (x >> LOWER32_BITS)
 
 #define INIT_FIPC_MSG(msg)		memset(msg, 0x0, sizeof(*msg))
 

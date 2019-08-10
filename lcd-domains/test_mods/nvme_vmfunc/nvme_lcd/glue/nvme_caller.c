@@ -519,17 +519,24 @@ extern unsigned long wait_for_completion_io_timeout(struct completion *x,
     LIBLCD_ERR("Call to wait for completetion io timeout");
     return -1;
 }
+
 int nvme_init_identify(struct nvme_ctrl *ctrl)
 {
-    //TODO
-    struct fipc_message r;
-	struct fipc_message *request = &r;
+	struct fipc_message r;
+	struct fipc_message *_request = &r;
+	struct nvme_ctrl_container *nvme_ctrl_c;
+	int ret;
 
-    async_msg_set_fn_type(request, NVME_INIT_IDENTIFY);
+	nvme_ctrl_c = container_of(ctrl, struct nvme_ctrl_container, nvme_ctrl);
 
-    vmfunc_wrapper(request);
+	async_msg_set_fn_type(_request, NVME_INIT_IDENTIFY);
+	fipc_set_reg0(_request, nvme_ctrl_c->other_ref.cptr);
 
-    return 0;
+	vmfunc_wrapper(_request);
+
+	ret = fipc_get_reg0(_request);
+
+	return ret;
 }
 
 void nvme_kill_queues(struct nvme_ctrl *ctrl)
@@ -603,15 +610,28 @@ void nvme_requeue_req(struct request *req)
 
 int nvme_set_queue_count(struct nvme_ctrl *ctrl, int *count)
 {
-    //TODO
-    struct fipc_message r;
-	struct fipc_message *request = &r;
+	struct fipc_message r;
+	struct fipc_message *_request = &r;
+	struct nvme_ctrl_container *nvme_ctrl_c;
+	int ret;
+	int q_count;
 
-    async_msg_set_fn_type(request, NVME_SET_QUEUE_COUNT);
+	nvme_ctrl_c = container_of(ctrl, struct nvme_ctrl_container, nvme_ctrl);
 
-    vmfunc_wrapper(request);
+	async_msg_set_fn_type(_request, NVME_SET_QUEUE_COUNT);
+	fipc_set_reg0(_request, nvme_ctrl_c->other_ref.cptr);
+	/* requesting this many number of queues */
+	fipc_set_reg1(_request, *count);
 
-    return 0;
+	vmfunc_wrapper(_request);
+
+	ret = fipc_get_reg0(_request);
+	/* q_count has the number of approved queues */
+	q_count = fipc_get_reg1(_request);
+	LIBLCD_MSG("%s, requested q_count: %d , approved: %d", __func__,
+					*count, q_count);
+	*count = q_count;
+	return ret;
 }
 
 int nvme_shutdown_ctrl(struct nvme_ctrl *ctrl)
@@ -991,6 +1011,24 @@ void pci_disable_device(struct pci_dev *dev)
 	return;
 }
 
+void pci_disable_msi(struct pci_dev *dev)
+{
+	struct fipc_message r;
+	struct fipc_message *_request = &r;
+	struct pci_dev_container *device_container;
+
+	INIT_IPC_MSG(&r);
+	device_container = container_of(dev,
+				struct pci_dev_container,
+				pci_dev);
+
+	async_msg_set_fn_type(_request, PCI_DISABLE_MSI);
+	fipc_set_reg0(_request, device_container->other_ref.cptr);
+	vmfunc_wrapper(_request);
+
+	return;
+}
+
 void pci_disable_msix(struct pci_dev *dev)
 {
 	struct fipc_message r;
@@ -1053,7 +1091,51 @@ int pci_enable_device_mem(struct pci_dev *dev)
 	return func_ret;
 }
 
-int pci_enable_msix_range(struct pci_dev *dev, struct msix_entry *entries, int minvec, int maxvec)
+int pci_enable_msix(struct pci_dev *dev, struct msix_entry *entries, int nvec)
+{
+	struct fipc_message r;
+	struct fipc_message *_request = &r;
+	int func_ret;
+	int sync_ret;
+	unsigned 	long p_mem_sz;
+	unsigned 	long p_offset;
+	cptr_t p_cptr;
+	struct pci_dev_container *device_container;
+	INIT_IPC_MSG(&r);
+
+	device_container = container_of(dev,
+				struct pci_dev_container,
+				pci_dev);
+
+	async_msg_set_fn_type(_request, PCI_ENABLE_MSIX_RANGE);
+
+	fipc_set_reg0(_request, nvec);
+
+	sync_ret = lcd_virt_to_cptr(__gva(( unsigned  long )entries),
+		&p_cptr,
+		&p_mem_sz,
+		&p_offset);
+
+	if (sync_ret) {
+		LIBLCD_ERR("virt to cptr failed");
+		lcd_exit(-1);
+	}
+
+	fipc_set_reg1(_request, ilog2((p_mem_sz) >> (PAGE_SHIFT)));
+	fipc_set_reg2(_request, p_offset);
+	fipc_set_reg3(_request, cptr_val(p_cptr));
+	fipc_set_reg4(_request, device_container->other_ref.cptr);
+
+	vmfunc_wrapper(_request);
+
+	func_ret = fipc_get_reg0(_request);
+
+	return func_ret;
+}
+
+
+int pci_enable_msix_range(struct pci_dev *dev, struct msix_entry *entries, int
+		minvec, int maxvec)
 {
 	struct fipc_message r;
 	struct fipc_message *_request = &r;
@@ -1101,7 +1183,6 @@ int __must_check __pci_register_driver(struct pci_driver *drv,
 		const char* name)
 {
 	struct pci_driver_container *drv_container;
-	struct module_container *owner_container;
 	struct fipc_message r;
 	struct fipc_message *_request = &r;
 	int ret;
@@ -1116,26 +1197,13 @@ int __must_check __pci_register_driver(struct pci_driver *drv,
 		LIBLCD_ERR("lcd insert");
 		goto fail_insert;
 	}
-	owner_container = container_of(owner,
-		struct module_container,
-		module);
-	ret = glue_cap_insert_module_type(c_cspace,
-		owner_container,
-		&owner_container->my_ref);
-	if (ret) {
-		LIBLCD_ERR("lcd insert");
-		goto fail_insert;
-	}
 
 	async_msg_set_fn_type(_request, __PCI_REGISTER_DRIVER);
 	fipc_set_reg0(_request, drv_container->my_ref.cptr);
-	fipc_set_reg1(_request, owner_container->my_ref.cptr);
 
 	vmfunc_wrapper(_request);
 
 	drv_container->other_ref.cptr = fipc_get_reg0(_request);
-	owner_container->other_ref.cptr = fipc_get_reg1(_request);
-	drv_container->pci_driver.driver.owner = &owner_container->module;
 	func_ret = fipc_get_reg2(_request);
 
 	LIBLCD_MSG("%s returned %d", __func__, func_ret);
@@ -1811,6 +1879,7 @@ int probe_callee(struct fipc_message *_request)
 {
 	struct pci_dev_container *dev_container;
 	struct pci_driver_container *pdrv_container;
+	struct pci_device_id *id;
 
 	int func_ret;
 	int ret = 0;
@@ -1826,8 +1895,8 @@ int probe_callee(struct fipc_message *_request)
 
 	LIBLCD_MSG("%s called", __func__);
 
-	ret = glue_cap_lookup_pci_driver_type(c_cspace, __cptr(fipc_get_reg0(_request)),
-				&pdrv_container);
+	ret = glue_cap_lookup_pci_driver_type(c_cspace,
+			__cptr(fipc_get_reg0(_request)), &pdrv_container);
 
 	if (ret) {
 		LIBLCD_ERR("fail lookup");
@@ -1849,6 +1918,25 @@ int probe_callee(struct fipc_message *_request)
 		LIBLCD_ERR("lcd insert");
 		goto fail_insert;
 	}
+
+	id = kzalloc(sizeof(*id), GFP_KERNEL);
+
+	if (!id) {
+		LIBLCD_ERR("kzalloc");
+		goto fail_alloc;
+	}
+
+	id->device = LOWER_HALF(fipc_get_reg3(_request));
+	id->vendor = UPPER_HALF(fipc_get_reg3(_request));
+
+	id->subdevice = LOWER_HALF(fipc_get_reg4(_request));
+	id->subvendor = UPPER_HALF(fipc_get_reg4(_request));
+
+	id->class_mask = LOWER_HALF(fipc_get_reg5(_request));
+	id->class = UPPER_HALF(fipc_get_reg5(_request));
+
+	id->driver_data = fipc_get_reg6(_request);
+
 	dev_container->pci_dev.dev.kobj.name = "nvme_lcd";
 	dev_container->pci_dev.vendor = PCI_ANY_ID;
 	dev_container->pci_dev.device = PCI_ANY_ID;
@@ -1925,10 +2013,7 @@ int probe_callee(struct fipc_message *_request)
 		LIBLCD_ERR("Could not assign pci device to LCD: ret %d",
 				ret);
 
-	/* XXX: Pass null for now. struct pci_dev is passed from the
-	 * kernel and needs analysis for wrapping it around a container
-	 */
-	func_ret = pdrv_container->pci_driver.probe(&dev_container->pci_dev, NULL);
+	func_ret = pdrv_container->pci_driver.probe(&dev_container->pci_dev, id);
 
 	fipc_set_reg0(_request, func_ret);
 

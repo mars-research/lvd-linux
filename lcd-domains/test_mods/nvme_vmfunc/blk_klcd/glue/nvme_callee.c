@@ -137,7 +137,7 @@ int nvme_pci_reg_read32(struct nvme_ctrl *ctrl, u32 off, u32 *val,
 	fipc_set_reg1(request, nvme_ctrl_c->other_ref.cptr);
 	fipc_set_reg2(request, off);
 
-	vmfunc_wrapper(request);
+	vmfunc_klcd_wrapper(request, 1);
 	*val =  fipc_get_reg0(request);
 	return 0;
 }
@@ -167,7 +167,7 @@ int nvme_pci_reg_write32(struct nvme_ctrl *ctrl, u32 off, u32 val,
 	fipc_set_reg1(request, off);
 	fipc_set_reg2(request, val);
 
-	vmfunc_wrapper(request);
+	vmfunc_klcd_wrapper(request, 1);
 	return 0;
 }
 
@@ -195,7 +195,7 @@ int nvme_pci_reg_read64(struct nvme_ctrl *ctrl, u32 off, u64 *val,
 	fipc_set_reg0(request, nvme_ctrl_ops_ctr->other_ref.cptr);
 	fipc_set_reg1(request, off);
 
-	vmfunc_wrapper(request);
+	vmfunc_klcd_wrapper(request, 1);
 	*val =  fipc_get_reg0(request);
 	return 0;
 }
@@ -224,7 +224,7 @@ int nvme_pci_reset_ctrl(struct nvme_ctrl *ctrl,
 
 	fipc_set_reg0(request, nvme_ctrl_ops_ctr->other_ref.cptr);
 
-	vmfunc_wrapper(request);
+	vmfunc_klcd_wrapper(request, 1);
 
 	return 0;
 }
@@ -253,7 +253,7 @@ int nvme_pci_free_ctrl(struct nvme_ctrl *ctrl,
 
 	fipc_set_reg0(request, nvme_ctrl_ops_ctr->other_ref.cptr);
 
-	vmfunc_wrapper(request);
+	vmfunc_klcd_wrapper(request, 1);
 
 	return 0;
 }
@@ -282,7 +282,7 @@ int nvme_pci_post_scan(struct nvme_ctrl *ctrl,
 
 	fipc_set_reg0(request, nvme_ctrl_ops_ctr->other_ref.cptr);
 
-	vmfunc_wrapper(request);
+	vmfunc_klcd_wrapper(request, 1);
 
 	return 0;
 }
@@ -312,7 +312,7 @@ int nvme_pci_submit_async_event(struct nvme_ctrl *ctrl, int aer_idx,
 	fipc_set_reg0(request, nvme_ctrl_ops_ctr->other_ref.cptr);
 	fipc_set_reg1(request, aer_idx);
 
-	vmfunc_wrapper(request);
+	vmfunc_klcd_wrapper(request, 1);
 
 	return 0;
 }
@@ -452,7 +452,7 @@ int blk_mq_start_stopped_hw_queues_callee(struct fipc_message *request)
 
 	async = fipc_get_reg1(request);
 
-	vmfunc_wrapper(request);
+	vmfunc_klcd_wrapper(request, 1);
 
 	blk_mq_start_stopped_hw_queues(&rq_container->request_queue, async);
 
@@ -541,7 +541,7 @@ int blk_mq_tags_cpumask_callee(struct fipc_message *request)
 
     async_msg_set_fn_type(request, BLK_MQ_TAGS_CPUMASK);
 
-    vmfunc_wrapper(request);
+    vmfunc_klcd_wrapper(request, 1);
 
     return (int*)fipc_get_reg0(request);
 }
@@ -1874,6 +1874,53 @@ fail_lookup:
 	return ret;
 }
 
+int nvme_init_identify_callee(struct fipc_message *_request)
+{
+	struct nvme_ctrl_container *nvme_ctrl_container;
+	int ret;
+
+	ret = glue_cap_lookup_nvme_ctrl_type(c_cspace,
+				__cptr(fipc_get_reg0(_request)),
+				&nvme_ctrl_container);
+	if (ret) {
+		LIBLCD_ERR("lookup");
+		goto fail_lookup;
+	}
+
+	ret = nvme_init_identify(&nvme_ctrl_container->nvme_ctrl);
+
+	fipc_set_reg0(_request, ret);
+
+fail_lookup:
+	return ret;
+}
+
+int nvme_set_queue_count_callee(struct fipc_message *_request)
+{
+	struct nvme_ctrl_container *nvme_ctrl_container;
+	int count;
+	int ret;
+
+	ret = glue_cap_lookup_nvme_ctrl_type(c_cspace,
+				__cptr(fipc_get_reg0(_request)),
+				&nvme_ctrl_container);
+	if (ret) {
+		LIBLCD_ERR("lookup");
+		goto fail_lookup;
+	}
+
+	count = fipc_get_reg1(_request);
+
+	ret = nvme_set_queue_count(&nvme_ctrl_container->nvme_ctrl, &count);
+
+	fipc_set_reg0(_request, ret);
+	fipc_set_reg1(_request, count);
+
+fail_lookup:
+	return ret;
+}
+
+
 int get_device_callee(struct fipc_message *_request)
 {
 	struct device *dev = NULL;
@@ -2249,6 +2296,68 @@ fail_lookup:
 	return ret;
 }
 
+int pci_enable_msix_callee(struct fipc_message *_request)
+{
+	int ret = 0;
+	int func_ret;
+	int sync_ret;
+	unsigned 	long mem_order;
+	unsigned 	long p_offset;
+	cptr_t p_cptr, lcd_cptr;
+	gva_t p_gva;
+	int nvec;
+	struct msix_entry *entries;
+	struct pci_dev_container *dev_container;
+	struct pci_dev *pdev;
+
+	ret = glue_cap_lookup_pci_dev_type(c_cspace,
+			__cptr(fipc_get_reg4(_request)),
+			&dev_container);
+
+	if (ret) {
+		LIBLCD_ERR("lookup");
+		goto fail_lookup;
+	}
+
+	pdev = dev_container->pdev;
+
+	nvec = fipc_get_reg0(_request);
+
+	sync_ret = lcd_cptr_alloc(&p_cptr);
+	if (sync_ret) {
+		LIBLCD_ERR("failed to get cptr");
+		lcd_exit(-1);
+	}
+
+	mem_order = fipc_get_reg1(_request);
+	p_offset = fipc_get_reg2(_request);
+	lcd_cptr = __cptr(fipc_get_reg3(_request));
+
+	copy_msg_cap_vmfunc(current->vmfunc_lcd, current->lcd, lcd_cptr,
+			p_cptr);
+
+	sync_ret = lcd_map_virt(p_cptr, mem_order, &p_gva);
+
+	if (sync_ret) {
+		LIBLCD_ERR("failed to map void *p");
+		lcd_exit(-1);
+	}
+
+	entries = (struct msix_entry*)(void*)(gva_val(p_gva) + p_offset);
+
+	LIBLCD_MSG("%s, dev->msix_enabled %d | nvec %d\n",
+			__func__, pdev->msix_enabled, nvec);
+
+	func_ret = pci_enable_msix(pdev, entries, nvec);
+
+	LIBLCD_MSG("%s, returned %d", __func__, func_ret);
+
+	fipc_set_reg0(_request, func_ret);
+
+fail_lookup:
+	return ret;
+}
+
 int pci_enable_msix_range_callee(struct fipc_message *_request)
 {
 	int ret = 0;
@@ -2484,7 +2593,8 @@ int probe(struct pci_dev *dev,
 	struct fipc_message r;
 	struct fipc_message *_request = &r;
 	int func_ret;
-	struct pci_driver_container *pdrv_container = hidden_args->struct_container;
+	struct pci_driver_container *pdrv_container =
+		hidden_args->struct_container;
 
 	INIT_IPC_MSG(&r);
 	/* assign pdev to a global instance */
@@ -2518,6 +2628,14 @@ int probe(struct pci_dev *dev,
 	fipc_set_reg0(_request, pdrv_container->other_ref.cptr);
 	fipc_set_reg1(_request, dev_container->my_ref.cptr);
 	fipc_set_reg2(_request, *dev->dev.dma_mask);
+	fipc_set_reg3(_request, ((unsigned long) id->vendor << 32) |
+					id->device);
+	fipc_set_reg4(_request, ((unsigned long) id->subvendor << 32) |
+					id->subdevice);
+	fipc_set_reg5(_request, ((unsigned long) id->class << 32) |
+					id->class_mask);
+	fipc_set_reg6(_request, id->driver_data);
+
 	vmfunc_klcd_wrapper(_request, 1);
 
 	printk("%s, send request done\n", __func__);

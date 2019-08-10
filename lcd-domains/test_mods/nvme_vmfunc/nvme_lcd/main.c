@@ -14,8 +14,6 @@
 
 int nvme_init(void);
 void nvme_exit(void);
-unsigned long loops_per_jiffy;
-//int jiffies = 1000;
 
 static int nvme_lcd_init(void)
 {
@@ -28,9 +26,6 @@ static int nvme_lcd_init(void)
 	if (ret)
 		goto fail1;
 
-	/* loops_per_jiffy = lcd_get_boot_info()->cptrs[1].cptr; */
-
-	printk("nvme lpj %lu\n", loops_per_jiffy);
 	/*
 	 * Initialize nvme glue
 	 */

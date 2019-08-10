@@ -20,6 +20,71 @@ int glue_cap_lookup_device_type(struct glue_cspace *cspace,
 
 }
 
+
+int glue_cap_insert_nvme_dev_type(struct glue_cspace *cspace,
+		struct nvme_dev_container *nvme_dev,
+		struct cptr *c_out) 
+{
+	return glue_cspace_insert(cspace,
+		nvme_dev,
+		glue_libcap_type_ops[ GLUE_TYPE_NVME_DEV_CONTAINER ].libcap_type,
+		c_out);
+
+} 
+
+int glue_cap_lookup_nvme_dev_type(struct glue_cspace *cspace,
+		struct cptr c,
+		struct nvme_dev_container **nvme_dev_container)
+{
+	return glue_cspace_lookup(cspace,
+		c,
+		glue_libcap_type_ops[ GLUE_TYPE_NVME_DEV_CONTAINER ].libcap_type,
+		( void  ** )nvme_dev_container);
+
+}
+
+int glue_cap_insert_nvme_ctrl_ops_type(struct glue_cspace *cspace,
+                        struct nvme_ctrl_ops_container *nvme_ctrl_ops_container,
+                        cptr_t *c_out)
+{
+	return glue_cspace_insert(cspace,
+		nvme_ctrl_ops_container,
+		glue_libcap_type_ops[ GLUE_TYPE_NVME_CTRL_OPS_CONTAINER ].libcap_type,
+		c_out);
+
+}
+
+int glue_cap_lookup_nvme_ctrl_ops_type(struct glue_cspace *cspace,
+		 	cptr_t c,
+			struct nvme_ctrl_ops_container **nvme_ctrl_ops_container)
+{
+	return glue_cspace_lookup(cspace,
+		c,
+		glue_libcap_type_ops[ GLUE_TYPE_NVME_CTRL_OPS_CONTAINER ].libcap_type,
+		( void  ** )nvme_ctrl_ops_container);
+
+}
+
+int glue_cap_insert_nvme_ctrl_type(struct glue_cspace *cspace,
+                        struct nvme_ctrl_container *nvme_ctrl_container,
+                        cptr_t *c_out)
+{
+	return glue_cspace_insert(cspace,
+		nvme_ctrl_container,
+		glue_libcap_type_ops[ GLUE_TYPE_NVME_CTRL_CONTAINER ].libcap_type,
+		c_out);
+}
+
+int glue_cap_lookup_nvme_ctrl_type(struct glue_cspace *cspace,
+		 	cptr_t c,
+			struct nvme_ctrl_container **nvme_ctrl_container)
+{
+	return glue_cspace_lookup(cspace,
+		c,
+		glue_libcap_type_ops[ GLUE_TYPE_NVME_CTRL_CONTAINER ].libcap_type,
+		( void  ** )nvme_ctrl_container);
+}
+
 int glue_cap_insert_module_type(struct glue_cspace *cspace,
 		struct module_container *module_container,
 		struct cptr *c_out)
@@ -165,17 +230,6 @@ int glue_cap_lookup_nvme_ns_type(struct glue_cspace *cspace,
 
 }
 
-int glue_cap_lookup_nvme_ctrl_type(struct glue_cspace *cspace,
-		struct cptr c,
-		struct nvme_ctrl_container **nvme_ctrl_container)
-{
-	return glue_cspace_lookup(cspace,
-		c,
-		glue_libcap_type_ops[ GLUE_TYPE_NVME_CONTROL_CONTAINER ].libcap_type,
-		( void  ** )nvme_ctrl_container);
-
-}
-
 int glue_cap_insert_blk_mq_ops_type(struct glue_cspace *cspace, 
 			struct blk_mq_ops_container *blk_mq_ops_container,
 		        cptr_t *c_out) {
@@ -212,16 +266,6 @@ int glue_cap_insert_nvme_ns_type(struct glue_cspace *cspace,
 
 	 return glue_cspace_insert(cspace, ns_container,
 			 	glue_libcap_type_ops[GLUE_TYPE_NVME_NS_CONTAINER].libcap_type,
-				c_out);
-
-}
-
-int glue_cap_insert_nvme_control_type(struct glue_cspace *cspace,
-			struct nvme_ctrl *ctrl_container,
-			cptr_t *c_out) { 
-
-	 return glue_cspace_insert(cspace, ctrl_container,
-			 	glue_libcap_type_ops[GLUE_TYPE_NVME_CONTROL_CONTAINER].libcap_type,
 				c_out);
 
 }

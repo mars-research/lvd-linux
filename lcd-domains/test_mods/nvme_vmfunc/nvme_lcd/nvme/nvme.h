@@ -20,18 +20,13 @@
 //#define spinlock lcd_spinlock
 #endif
 */
-//#include <lcd_config/pre_hook.h>
-
 #include <linux/nvme.h>
 #include <linux/pci.h>
 #include <linux/kref.h>
 #include <linux/blk-mq.h>
 
 #include <libcap_types.h>
-//#include "../../nvme_glue_helper.h"
 #include <liblcd/spinlock.h>
-
-//#include <lcd_config/post_hook.h>
 
 enum {
 	/*

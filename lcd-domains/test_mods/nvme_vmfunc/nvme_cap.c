@@ -32,16 +32,19 @@ enum glue_type {
 	GLUE_TYPE_PCI_DEVICE_ID_CONTAINER,
 	GLUE_TYPE_PCI_DRIVER_CONTAINER,
 	GLUE_TYPE_IRQ_HANDLER_CONTAINER,
-    GLUE_TYPE_BLK_MQ_OPS,
+	GLUE_TYPE_BLK_MQ_OPS,
         GLUE_TYPE_BLK_MQ_TAG_SET,
 	GLUE_TYPE_BLK_DEV_OPS,
 	GLUE_TYPE_GENDISK,
         GLUE_TYPE_BLK_MQ_HW_CTX,
         GLUE_TYPE_BLK_MQ_QUEUE_DATA,
         GLUE_TYPE_REQUEST_QUEUE,
-    GLUE_TYPE_NVME_COMMAND_CONTAINER,
-    GLUE_TYPE_NVME_NS_CONTAINER,
-    GLUE_TYPE_NVME_CONTROL_CONTAINER,
+	GLUE_TYPE_NVME_COMMAND_CONTAINER,
+	GLUE_TYPE_NVME_NS_CONTAINER,
+	GLUE_TYPE_NVME_CONTROL_CONTAINER,
+	GLUE_TYPE_NVME_DEV_CONTAINER,
+	GLUE_TYPE_NVME_CTRL_OPS_CONTAINER,
+	GLUE_TYPE_NVME_CTRL_CONTAINER,
 	GLUE_NR_TYPES,
 };
 
@@ -109,20 +112,20 @@ static struct type_ops_id glue_libcap_type_ops[GLUE_NR_TYPES] = {
 			.revoke = dummy_func,
 		}
 	},
-    {
-        {
-                .name = "struct blk_mq_ops",
-                .delete = dummy_func,
-                .revoke = dummy_func,
-        }
-    },
 	{
-        {
-                .name = "struct blk_mq_tag_set",
-                .delete = dummy_func,
-                .revoke = dummy_func,
-        }
-    },
+		{
+			.name = "struct blk_mq_ops",
+			.delete = dummy_func,
+			.revoke = dummy_func,
+		}
+	},
+	{
+		{
+			.name = "struct blk_mq_tag_set",
+			.delete = dummy_func,
+			.revoke = dummy_func,
+		}
+	},
 	{
                 {
                         .name = "struct blk_dev_ops",
@@ -145,41 +148,61 @@ static struct type_ops_id glue_libcap_type_ops[GLUE_NR_TYPES] = {
                 }
         },
 	{
-        {
-                .name = "struct blk_mq_queue_data",
-                .delete = dummy_func,
-                .revoke = dummy_func,
-        }
-    },
-    {
-        {
-                .name = "struct request_queue",
-                .delete = dummy_func,
-                .revoke = dummy_func,
-        }
-    },
+		{
+			.name = "struct blk_mq_queue_data",
+			.delete = dummy_func,
+			.revoke = dummy_func,
+		}
+	},
 	{
-        {
-                .name = "struct nvme_command",
-                .delete = dummy_func,
-                .revoke = dummy_func,
-        }
-    },
-    {
-        {
-                .name = "struct nvme_ns",
-                .delete = dummy_func,
-                .revoke = dummy_func,
-        }
-    },
-    {
-        {
-                .name = "struct nvme_control",
-                .delete = dummy_func,
-                .revoke = dummy_func,
-        }
-    },
-    
+		{
+			.name = "struct request_queue",
+			.delete = dummy_func,
+			.revoke = dummy_func,
+		}
+	},
+	{
+		{
+			.name = "struct nvme_command",
+			.delete = dummy_func,
+			.revoke = dummy_func,
+		}
+	},
+	{
+		{
+			.name = "struct nvme_ns",
+			.delete = dummy_func,
+			.revoke = dummy_func,
+		}
+	},
+	{
+		{
+			.name = "struct nvme_control",
+			.delete = dummy_func,
+			.revoke = dummy_func,
+		}
+	},
+	{
+		{
+			.name = "struct nvme_dev",
+			.delete = dummy_func,
+			.revoke = dummy_func,
+		}
+	},
+	{
+		{
+			.name = "struct nvme_ctrl_ops",
+			.delete = dummy_func,
+			.revoke = dummy_func,
+		}
+	},
+	{
+		{
+			.name = "struct nvme_ctrl",
+			.delete = dummy_func,
+			.revoke = dummy_func,
+		}
+	},
 };
 
 int glue_cap_init(void)

@@ -14,6 +14,7 @@ int blk_mq_free_tag_set_callee(struct fipc_message *request);
 int blk_mq_start_request_callee(struct fipc_message *request);
 int blk_mq_start_stopped_hw_queues_callee(struct fipc_message *request);
 int blk_mq_map_queue_callee(struct fipc_message *request);
+int blk_mq_stop_hw_queues_callee(struct fipc_message *_request);
 int blk_queue_logical_block_size_callee(struct fipc_message *request);
 int blk_queue_physical_block_size_callee(struct fipc_message *request);
 int alloc_disk_node_callee(struct fipc_message *request);
@@ -54,6 +55,7 @@ int get_device_callee(struct fipc_message *_request);
 int put_device_callee(struct fipc_message *_request);
 int request_threaded_irq_callee(struct fipc_message *_request);
 int free_irq_callee(struct fipc_message *_request);
+int irq_set_affinity_hint_callee(struct fipc_message *_request);
 
 int synchronize_irq_callee(struct fipc_message *_request);
 
@@ -69,8 +71,16 @@ int nvme_uninit_ctrl_callee(struct fipc_message *request);
 int nvme_change_ctrl_state_callee(struct fipc_message *request);
 int nvme_stop_queues_callee(struct fipc_message *_request);
 int nvme_put_ctrl_callee(struct fipc_message *_request);
+int nvme_queue_async_events_callee(struct fipc_message *_request);
+int nvme_kill_queues_callee(struct fipc_message *_request);
+
+int nvme_queue_scan_callee(struct fipc_message *_request);
+int nvme_start_queues_callee(struct fipc_message *_request);
+int nvme_remove_namespaces_callee(struct fipc_message *_request);
+
 int nvme_enable_ctrl_callee(struct fipc_message *_request);
 int nvme_disable_ctrl_callee(struct fipc_message *_request);
+int nvme_shutdown_ctrl_callee(struct fipc_message *_request);
 int nvme_init_identify_callee(struct fipc_message *_request);
 int nvme_set_queue_count_callee(struct fipc_message *_request);
 

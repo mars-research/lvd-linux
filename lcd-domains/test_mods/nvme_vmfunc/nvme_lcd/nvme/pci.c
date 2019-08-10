@@ -958,7 +958,7 @@ static enum blk_eh_timer_return nvme_timeout(struct request *req, bool reserved)
 #ifndef LCD_ISOLATE
 		queue_work(nvme_workq, &dev->reset_work);
 #else
-        nvme_reset_work(NULL);
+		nvme_reset_work(NULL);
 #endif
 		/*
 		 * Mark the request as handled, since the inline shutdown
@@ -1044,7 +1044,11 @@ static int nvme_suspend_queue(struct nvme_queue *nvmeq)
 	spin_unlock_irq(&nvmeq->q_lock);
 
 	if (!nvmeq->qid && nvmeq->dev->ctrl.admin_q)
+#ifdef LCD_ISOLATE
+		__blk_mq_stop_hw_queues(&nvmeq->dev->ctrl);
+#else
 		blk_mq_stop_hw_queues(nvmeq->dev->ctrl.admin_q);
+#endif
 
 	irq_set_affinity_hint(vector, NULL);
 	free_irq(vector, nvmeq);
@@ -1982,7 +1986,7 @@ int nvme_reset(struct nvme_dev *dev)
 
 	//if (!queue_ work(nvme_workq, &dev->reset_work))
 	//	return -EBUSY;
-    nvme_reset_work(NULL);
+	nvme_reset_work(NULL);
 
 	//flush_work(&dev->reset_work);
 	return 0;

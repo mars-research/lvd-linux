@@ -541,13 +541,16 @@ int nvme_init_identify(struct nvme_ctrl *ctrl)
 
 void nvme_kill_queues(struct nvme_ctrl *ctrl)
 {
-    //TODO
-    struct fipc_message r;
-	struct fipc_message *request = &r;
+	struct fipc_message r;
+	struct fipc_message *_request = &r;
+	struct nvme_ctrl_container *nvme_ctrl_c;
 
-    async_msg_set_fn_type(request, NVME_KILL_QUEUES);
+	nvme_ctrl_c = container_of(ctrl, struct nvme_ctrl_container, nvme_ctrl);
 
-    vmfunc_wrapper(request);
+	async_msg_set_fn_type(_request, NVME_KILL_QUEUES);
+	fipc_set_reg0(_request, nvme_ctrl_c->other_ref.cptr);
+
+	vmfunc_wrapper(_request);
 }
 
 void nvme_put_ctrl(struct nvme_ctrl *ctrl)
@@ -566,35 +569,44 @@ void nvme_put_ctrl(struct nvme_ctrl *ctrl)
 
 void nvme_queue_async_events(struct nvme_ctrl *ctrl)
 {
-    //TODO
-    struct fipc_message r;
-	struct fipc_message *request = &r;
+	struct fipc_message r;
+	struct fipc_message *_request = &r;
+	struct nvme_ctrl_container *nvme_ctrl_c;
 
-    async_msg_set_fn_type(request, NVME_QUEUE_ASYNC_EVENTS);
+	nvme_ctrl_c = container_of(ctrl, struct nvme_ctrl_container, nvme_ctrl);
 
-    vmfunc_wrapper(request);
+	async_msg_set_fn_type(_request, NVME_QUEUE_ASYNC_EVENTS);
+	fipc_set_reg0(_request, nvme_ctrl_c->other_ref.cptr);
+
+	vmfunc_wrapper(_request);
 }
 
 void nvme_queue_scan(struct nvme_ctrl *ctrl)
 {
-    //TODO
-    struct fipc_message r;
-	struct fipc_message *request = &r;
+	struct fipc_message r;
+	struct fipc_message *_request = &r;
+	struct nvme_ctrl_container *nvme_ctrl_c;
 
-    async_msg_set_fn_type(request, NVME_QUEUE_SCAN);
+	nvme_ctrl_c = container_of(ctrl, struct nvme_ctrl_container, nvme_ctrl);
 
-    vmfunc_wrapper(request);
+	async_msg_set_fn_type(_request, NVME_QUEUE_SCAN);
+	fipc_set_reg0(_request, nvme_ctrl_c->other_ref.cptr);
+
+	vmfunc_wrapper(_request);
 }
 
 void nvme_remove_namespaces(struct nvme_ctrl *ctrl)
 {
-    //TODO
-    struct fipc_message r;
-	struct fipc_message *request = &r;
+	struct fipc_message r;
+	struct fipc_message *_request = &r;
+	struct nvme_ctrl_container *nvme_ctrl_c;
 
-    async_msg_set_fn_type(request, NVME_REMOVE_NAMESPACES);
+	nvme_ctrl_c = container_of(ctrl, struct nvme_ctrl_container, nvme_ctrl);
 
-    vmfunc_wrapper(request);
+	async_msg_set_fn_type(_request, NVME_REMOVE_NAMESPACES);
+	fipc_set_reg0(_request, nvme_ctrl_c->other_ref.cptr);
+
+	vmfunc_wrapper(_request);
 }
 
 void nvme_requeue_req(struct request *req)
@@ -636,26 +648,34 @@ int nvme_set_queue_count(struct nvme_ctrl *ctrl, int *count)
 
 int nvme_shutdown_ctrl(struct nvme_ctrl *ctrl)
 {
-    //TODO
-    struct fipc_message r;
-	struct fipc_message *request = &r;
+	struct fipc_message r;
+	struct fipc_message *_request = &r;
+	struct nvme_ctrl_container *nvme_ctrl_c;
+	int func_ret;
 
-    async_msg_set_fn_type(request, NVME_SHUTDOWN_CTRL);
+	nvme_ctrl_c = container_of(ctrl, struct nvme_ctrl_container, nvme_ctrl);
 
-    vmfunc_wrapper(request);
+	async_msg_set_fn_type(_request, NVME_SHUTDOWN_CTRL);
+	fipc_set_reg0(_request, nvme_ctrl_c->other_ref.cptr);
 
-    return 0;
+	vmfunc_wrapper(_request);
+	func_ret = fipc_get_reg0(_request);
+
+	return func_ret;
 }
 
 void nvme_start_queues(struct nvme_ctrl *ctrl)
 {
-    //TODO
-    struct fipc_message r;
-	struct fipc_message *request = &r;
+	struct fipc_message r;
+	struct fipc_message *_request = &r;
+	struct nvme_ctrl_container *nvme_ctrl_c;
 
-    async_msg_set_fn_type(request, NVME_START_QUEUES);
+	nvme_ctrl_c = container_of(ctrl, struct nvme_ctrl_container, nvme_ctrl);
 
-    vmfunc_wrapper(request);
+	async_msg_set_fn_type(_request, NVME_START_QUEUES);
+	fipc_set_reg0(_request, nvme_ctrl_c->other_ref.cptr);
+
+	vmfunc_wrapper(_request);
 }
 
 void nvme_stop_queues(struct nvme_ctrl *ctrl)
@@ -735,17 +755,37 @@ int nvme_setup_cmd(struct nvme_ns *ns, struct request *req,
 
 }
 
-void blk_mq_stop_hw_queues(struct request_queue *q)
+void __blk_mq_stop_hw_queues(struct nvme_ctrl *ctrl)
 {
-    //TODO
-    struct fipc_message r;
-	struct fipc_message *request = &r;
+	struct fipc_message r;
+	struct fipc_message *_request = &r;
+	struct nvme_ctrl_container *nvme_ctrl_container;
 
-    async_msg_set_fn_type(request, BLK_MQ_STOP_HW_QUEUES);
+	nvme_ctrl_container = container_of(ctrl, struct nvme_ctrl_container,
+				nvme_ctrl);
 
-    vmfunc_wrapper(request);
+	async_msg_set_fn_type(_request, BLK_MQ_STOP_HW_QUEUES);
+	fipc_set_reg0(_request, nvme_ctrl_container->other_ref.cptr);
 
-    //return 0;
+	vmfunc_wrapper(_request);
+}
+
+int irq_set_affinity_hint(unsigned int irq, const struct cpumask *m)
+{
+	struct fipc_message r;
+	struct fipc_message *_request = &r;
+	int func_ret;
+
+	async_msg_set_fn_type(_request, IRQ_SET_AFFINITY_HINT);
+	fipc_set_reg0(_request, irq);
+	fipc_set_reg1(_request, (unsigned long) m);
+	if (m)
+		fipc_set_reg2(_request, m->bits[0]);
+
+	vmfunc_wrapper(_request);
+	func_ret = fipc_get_reg0(_request);
+
+	return func_ret;
 }
 
 int blk_rq_map_sg(struct request_queue *q, struct request *rq,
@@ -829,13 +869,13 @@ struct request *blk_mq_tag_to_rq(struct blk_mq_tags *tags, unsigned int tag)
 void blk_mq_tagset_busy_iter(struct blk_mq_tag_set *tagset,
 		busy_tag_iter_fn *fn, void *priv)
 {
-    //TODO
-    struct fipc_message r;
+	//TODO
+	struct fipc_message r;
 	struct fipc_message *request = &r;
 
-    async_msg_set_fn_type(request, BLK_MQ_TAGSET_BUSY_ITER);
+	async_msg_set_fn_type(request, BLK_MQ_TAGSET_BUSY_ITER);
 
-    vmfunc_wrapper(request);
+	vmfunc_wrapper(request);
 }
 
 void blk_mq_free_request(struct request *rq)
@@ -1935,13 +1975,14 @@ int probe_callee(struct fipc_message *_request)
 	id->class_mask = LOWER_HALF(fipc_get_reg5(_request));
 	id->class = UPPER_HALF(fipc_get_reg5(_request));
 
-	id->driver_data = fipc_get_reg6(_request);
+	id->driver_data = UPPER_HALF(fipc_get_reg6(_request));
 
 	dev_container->pci_dev.dev.kobj.name = "nvme_lcd";
 	dev_container->pci_dev.vendor = PCI_ANY_ID;
 	dev_container->pci_dev.device = PCI_ANY_ID;
 	dev_container->other_ref.cptr = fipc_get_reg1(_request);
 	dev_container->pci_dev.dev.dma_mask = &dma_mask;
+	atomic_set(&dev_container->pci_dev.enable_cnt, LOWER_HALF(fipc_get_reg6(_request)));
 
 	g_pdev = &dev_container->pci_dev;
 

@@ -338,4 +338,5 @@ int __init nvme_core_init(void);
 #endif
 void nvme_core_exit(void);
 
+void __blk_mq_stop_hw_queues(struct nvme_ctrl *ctrl);
 #endif /* _NVME_H */

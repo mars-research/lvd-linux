@@ -84,6 +84,10 @@ int blk_klcd_dispatch_async_loop(struct fipc_message *message)
 			ret =  pci_disable_msix_callee(message);
 			break;
 
+		case PCI_ENABLE_MSIX:
+			trace(PCI_ENABLE_MSIX);
+			return pci_enable_msix_callee(message);
+
 		case PCI_ENABLE_MSIX_RANGE:
 			trace(PCI_ENABLE_MSIX_RANGE);
 			ret =  pci_enable_msix_range_callee(message);
@@ -265,7 +269,7 @@ int blk_klcd_dispatch_async_loop(struct fipc_message *message)
 
 		case NVME_INIT_IDENTIFY:
 			trace(NVME_INIT_IDENTIFY);
-			break;
+			return nvme_init_identify_callee(message);
 
 		case NVME_IO_TIMEOUT_DISPATCH:
 			trace(NVME_IO_TIMEOUT_DISPATCH);
@@ -301,7 +305,7 @@ int blk_klcd_dispatch_async_loop(struct fipc_message *message)
 
 		case NVME_SET_QUEUE_COUNT:
 			trace(NVME_SET_QUEUE_COUNT);
-			break;
+			return nvme_set_queue_count_callee(message);
 
 		case NVME_SETUP_CMD:
 			trace(NVME_SETUP_CMD);

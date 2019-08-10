@@ -1507,7 +1507,11 @@ static int nvme_setup_io_queues(struct nvme_dev *dev)
 	if (size > 8192) {
 		iounmap(dev->bar);
 		do {
+#ifdef LCD_ISOLATE
+			dev->bar = (void *) pci_resource_start(pdev, 0);
+#else
 			dev->bar = ioremap(pci_resource_start(pdev, 0), size);
+#endif
 			if (dev->bar)
 				break;
 			if (!--nr_io_queues)

@@ -35,6 +35,7 @@ int pci_cleanup_aer_uncorrect_error_status_callee(struct fipc_message *_request)
 int pci_disable_device_callee(struct fipc_message *_request);
 int pci_disable_msix_callee(struct fipc_message *_request);
 int pci_disable_msi_callee(struct fipc_message *_request);
+int pci_enable_msix_callee(struct fipc_message *_request);
 int pci_enable_msix_range_callee(struct fipc_message *_request);
 int pci_enable_pcie_error_reporting_callee(struct fipc_message *_request);
 int pcie_capability_read_word_callee(struct fipc_message *_request);
@@ -70,6 +71,8 @@ int nvme_stop_queues_callee(struct fipc_message *_request);
 int nvme_put_ctrl_callee(struct fipc_message *_request);
 int nvme_enable_ctrl_callee(struct fipc_message *_request);
 int nvme_disable_ctrl_callee(struct fipc_message *_request);
+int nvme_init_identify_callee(struct fipc_message *_request);
+int nvme_set_queue_count_callee(struct fipc_message *_request);
 
 int sync_probe_callee(struct fipc_message *msg);
 int sync_ndo_set_mac_address_callee(struct fipc_message *msg);

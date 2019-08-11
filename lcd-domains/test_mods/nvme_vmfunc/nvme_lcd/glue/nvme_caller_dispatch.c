@@ -93,6 +93,7 @@ int handle_rpc_calls(struct fipc_message *message)
 
 		case MODULE_INIT:
 			trace(MODULE_INIT);
+			loops_per_jiffy = fipc_get_reg0(message);
 			return __nvme_lcd_init();
 
 		case MODULE_EXIT:

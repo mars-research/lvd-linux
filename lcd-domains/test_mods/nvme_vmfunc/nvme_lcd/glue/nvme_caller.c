@@ -6,7 +6,9 @@
 #include <liblcd/glue_cspace.h>
 #include "../../nvme_common.h"
 #include "../nvme_caller.h"
+#include "../nvme_dev.h"
 #include <asm/lcd_domains/liblcd.h>
+
 #include <lcd_config/post_hook.h>
 
 //#include "../../benchmark.h"
@@ -99,7 +101,8 @@ int nvme_pci_reg_read32_callee(struct fipc_message *_request)
 		goto fail_lookup;
 	}
 
-	ret = glue_cap_lookup_nvme_ctrl_type(c_cspace, __cptr(fipc_get_reg1(_request)),
+	ret = glue_cap_lookup_nvme_ctrl_type(c_cspace,
+				__cptr(fipc_get_reg1(_request)),
 				&nvme_ctrl_container);
 	if (ret) {
 		LIBLCD_ERR("lookup failed");
@@ -113,6 +116,7 @@ int nvme_pci_reg_read32_callee(struct fipc_message *_request)
 	ret = nvme_ctrl_ops_container->nvme_ctrl_ops.reg_read32(ctrl,
 						offset, &read_val);
 
+	printk("%s, offset: %x, val: %x", __func__, offset, read_val);
 	fipc_set_reg0(_request, read_val);
 
 	return 0;
@@ -474,6 +478,9 @@ int nvme_enable_ctrl(struct nvme_ctrl *ctrl, u64 cap)
 	vmfunc_wrapper(_request);
 
 	ret = fipc_get_reg0(_request);
+	ctrl->page_size = fipc_get_reg1(_request);
+
+	LIBLCD_MSG("%s, ret = %d", __func__, ret);
 
 	return ret;
 }
@@ -888,8 +895,6 @@ void blk_mq_free_request(struct request *rq)
     vmfunc_wrapper(request);
 }
 
-
-
 int blk_mq_alloc_tag_set(struct blk_mq_tag_set *set)
 {
 	struct blk_mq_tag_set_container *set_container;
@@ -898,9 +903,12 @@ int blk_mq_alloc_tag_set(struct blk_mq_tag_set *set)
 	struct fipc_message r;
 	struct fipc_message *request = &r;
 	int func_ret = 0;
+	int i;
 
 	set_container = container_of(set, struct blk_mq_tag_set_container, tag_set);
 	ops_container = container_of(set->ops, struct blk_mq_ops_container, blk_mq_ops);
+
+	ops_container->data = set->driver_data;
 
 	ret = glue_cap_insert_blk_mq_ops_type(c_cspace, ops_container,
 			&ops_container->my_ref);
@@ -934,10 +942,27 @@ int blk_mq_alloc_tag_set(struct blk_mq_tag_set *set)
 
 	LIBLCD_MSG("%s received %d from", __func__, func_ret);
 
+	set->tags = kzalloc_node(nr_cpu_ids * sizeof(struct blk_mq_tags *),
+				 GFP_KERNEL, set->numa_node);
+
+	if (!set->tags) {
+		LIBLCD_ERR("alloc failed");
+		goto fail_alloc;
+	}
+
+	for (i = 0; i < nr_cpu_ids; i++) {
+		set->tags[i] = kzalloc(sizeof(struct blk_mq_tags), GFP_KERNEL);
+		if (!set->tags[i]) {
+			LIBLCD_ERR("fail alloc");
+			goto fail_alloc;
+		}
+	}
+
 	return func_ret;
 
 fail_insert1:
 fail_insert2:
+fail_alloc:
 	return func_ret;
 }
 
@@ -1147,7 +1172,7 @@ int pci_enable_msix(struct pci_dev *dev, struct msix_entry *entries, int nvec)
 				struct pci_dev_container,
 				pci_dev);
 
-	async_msg_set_fn_type(_request, PCI_ENABLE_MSIX_RANGE);
+	async_msg_set_fn_type(_request, PCI_ENABLE_MSIX);
 
 	fipc_set_reg0(_request, nvec);
 
@@ -1173,6 +1198,31 @@ int pci_enable_msix(struct pci_dev *dev, struct msix_entry *entries, int nvec)
 	return func_ret;
 }
 
+int pci_enable_msi_range(struct pci_dev *dev, int minvec, int maxvec)
+{
+	struct fipc_message r;
+	struct fipc_message *_request = &r;
+	int func_ret;
+	struct pci_dev_container *device_container;
+
+	INIT_IPC_MSG(&r);
+
+	device_container = container_of(dev,
+				struct pci_dev_container,
+				pci_dev);
+
+	async_msg_set_fn_type(_request, PCI_ENABLE_MSI_RANGE);
+
+	fipc_set_reg0(_request, device_container->other_ref.cptr);
+	fipc_set_reg1(_request, minvec);
+	fipc_set_reg2(_request, maxvec);
+
+	vmfunc_wrapper(_request);
+
+	func_ret = fipc_get_reg0(_request);
+
+	return func_ret;
+}
 
 int pci_enable_msix_range(struct pci_dev *dev, struct msix_entry *entries, int
 		minvec, int maxvec)
@@ -1210,6 +1260,10 @@ int pci_enable_msix_range(struct pci_dev *dev, struct msix_entry *entries, int
 	fipc_set_reg3(_request, p_offset);
 	fipc_set_reg4(_request, cptr_val(p_cptr));
 	fipc_set_reg5(_request, device_container->other_ref.cptr);
+
+	LIBLCD_MSG("%s pdev: %p sending pdev_other.cptr %lx", __func__,
+			dev,
+			device_container->other_ref.cptr);
 
 	vmfunc_wrapper(_request);
 
@@ -1364,9 +1418,14 @@ struct request_queue *blk_mq_init_queue(struct blk_mq_tag_set *set)
 	int ret;
 	struct fipc_message r;
 	struct fipc_message *request = &r;
-
 	struct blk_mq_tag_set_container *set_container;
 	struct request_queue_container *rq_container;
+	struct nvme_dev *nvme_dev;
+	struct nvme_ctrl_container *nvme_ctrl_container;
+
+	nvme_dev = container_of(set, struct nvme_dev, admin_tagset);
+	nvme_ctrl_container = container_of(&nvme_dev->ctrl, struct nvme_ctrl_container,
+					nvme_ctrl);
 
 	/* XXX Scary! request_queue size can vary from inside and outside
 	 * LCDs? This is a bit fragile! */
@@ -1377,18 +1436,20 @@ struct request_queue *blk_mq_init_queue(struct blk_mq_tag_set *set)
 		goto fail_alloc;
 	}
 
-	ret = glue_cap_insert_request_queue_type(c_cspace, rq_container, &rq_container->my_ref);
+	ret = glue_cap_insert_request_queue_type(c_cspace, rq_container,
+			&rq_container->my_ref);
 
-    if (ret) {
-    LIBLCD_ERR("lcd insert");
-            goto fail_insert;
-    }
+	if (ret) {
+		LIBLCD_ERR("lcd insert");
+		goto fail_insert;
+	}
 
 	set_container = container_of(set, struct blk_mq_tag_set_container, tag_set);
 
 	async_msg_set_fn_type(request, BLK_MQ_INIT_QUEUE);
 	fipc_set_reg0(request, set_container->other_ref.cptr);
 	fipc_set_reg1(request, rq_container->my_ref.cptr);
+	fipc_set_reg2(request, nvme_ctrl_container->other_ref.cptr);
 
 	vmfunc_wrapper(request);
 
@@ -1640,16 +1701,26 @@ fail_alloc:
 	return NULL;
 }
 
-
-
 void device_release_driver(struct device *dev)
 {
-    struct fipc_message r;
-	struct fipc_message *request = &r;
+	struct fipc_message r;
+	struct fipc_message *_request = &r;
+	struct pci_dev_container *device_container;
+	struct pci_dev *pdev;
 
-    async_msg_set_fn_type(request, DEVICE_RELEASE_DRIVER);
+	INIT_IPC_MSG(&r);
 
-    vmfunc_wrapper(request);
+	pdev = container_of(dev, struct pci_dev,
+				dev);
+	device_container = container_of(pdev,
+				struct pci_dev_container,
+				pci_dev);
+
+	async_msg_set_fn_type(_request, DEVICE_RELEASE_DRIVER);
+
+	fipc_set_reg0(_request, device_container->other_ref.cptr);
+
+	vmfunc_wrapper(_request);
 }
 
 void device_add_disk(struct device *parent, struct gendisk *disk)
@@ -1811,7 +1882,7 @@ int msix_vector_handler_callee(struct fipc_message *_request)
 	/* call real irq handler */
 	irqret = irqhandler_container->irqhandler(irq, irqhandler_container->data);
 
-	/* printk("%s, irq:%d irqret %d\n", __func__, irq, irqret); */
+	printk("%s, irq:%d irqret %d\n", __func__, irq, irqret);
 	fipc_set_reg0(_request, irqret);
 	return ret;
 }
@@ -1857,6 +1928,7 @@ int request_threaded_irq(unsigned int irq, irq_handler_t handler,
 
 	func_ret = fipc_get_reg0(_request);
 
+	LIBLCD_MSG("%s ,returned", __func__);
 fail_alloc:
 	return func_ret;
 }
@@ -1999,6 +2071,10 @@ int probe_callee(struct fipc_message *_request)
 		goto fail_cptr;
 	}
 
+	LIBLCD_MSG("%s pdev: %p sending pdev_other.cptr %lx", __func__,
+			g_pdev,
+			dev_container->other_ref.cptr);
+
 	fipc_set_reg0(_request, cptr_val(res0_cptr));
 	fipc_set_reg1(_request, cptr_val(pool_cptr));
 	fipc_set_reg2(_request, dev_container->other_ref.cptr);
@@ -2109,12 +2185,12 @@ int poll_callee(struct fipc_message *_request)
 
 int queue_rq_fn_callee(struct fipc_message *request)
 {	struct blk_mq_hw_ctx_container *ctx_container = ctx_container_g;
-	struct blk_mq_ops_container *ops_container = ops_container_g;
+//	struct blk_mq_ops_container *ops_container = ops_container_g;
 	struct blk_mq_queue_data bd;
 	struct lcd_request_container rq_c;
 	struct request *rq = &rq_c.rq;
 	int ret = 0;
-	int func_ret;
+	int func_ret = 0;
 
 //	ret = glue_cap_lookup_blk_mq_hw_ctx_type(c_cspace, __cptr(fipc_get_reg1(request)),
 //						&ctx_container);
@@ -2135,9 +2211,11 @@ int queue_rq_fn_callee(struct fipc_message *request)
 	rq->tag = fipc_get_reg3(request);
 	bd.rq = rq;
 
+#if 0
 	func_ret = ops_container->blk_mq_ops.queue_rq(&ctx_container->blk_mq_hw_ctx,
 				&bd);
 
+#endif
 	fipc_set_reg0(request, func_ret);
 
 //fail_lookup:
@@ -2178,14 +2256,11 @@ fail_alloc:
 
 int init_hctx_fn_callee(struct fipc_message *request)
 {
-
 	struct blk_mq_hw_ctx_container *ctx_container;
 	struct blk_mq_ops_container *ops_container;
 	unsigned int index;
-	cptr_t pool_cptr;
-	gva_t pool_addr;
-	unsigned int pool_ord;
 	int ret = 0;
+	void *driver_data;
 
 	ctx_container = kzalloc(sizeof(*ctx_container), GFP_KERNEL);
 	if (!ctx_container) {
@@ -2195,7 +2270,8 @@ int init_hctx_fn_callee(struct fipc_message *request)
 
 	ctx_container_g = ctx_container;
 
-	ret = glue_cap_insert_blk_mq_hw_ctx_type(c_cspace, ctx_container, &ctx_container->my_ref);
+	ret = glue_cap_insert_blk_mq_hw_ctx_type(c_cspace, ctx_container,
+			&ctx_container->my_ref);
 	if (ret) {
 		LIBLCD_ERR("lcd insert");
 		goto fail_insert;
@@ -2211,31 +2287,10 @@ int init_hctx_fn_callee(struct fipc_message *request)
                 goto fail_lookup;
         }
 
-	/* receive shared data pool */
-	ret = lcd_cptr_alloc(&pool_cptr);
-	if (ret) {
-		LIBLCD_ERR("failed to get cptr");
-		goto fail_cptr;
-	}
+	driver_data = ops_container->data;
 
-	fipc_set_reg0(request, cptr_val(pool_cptr));
-	vmfunc_sync_call(request, INIT_HCTX_SYNC);
-	pool_ord = fipc_get_reg0(request);
-
-	ret = lcd_map_virt(pool_cptr, pool_ord, &pool_addr);
-	if (ret) {
-		LIBLCD_ERR("failed to map pool");
-		goto fail_pool;
-	}
-
-	LIBLCD_MSG("%s, mapping private pool %p | ord %d", __func__,
-			gva_val(pool_addr), pool_ord);
-
-	iocb_data_pool = (void*)gva_val(pool_addr);
-
-	/* Passing NULL to data arg, hack to get address within the driver */
-    //copied from nullb, not sure if this needs to be changed
-	ret = ops_container->blk_mq_ops.init_hctx(&ctx_container->blk_mq_hw_ctx, NULL, index);
+	ret = ops_container->blk_mq_ops.init_hctx(&ctx_container->blk_mq_hw_ctx,
+				driver_data, index);
 	if(ret) {
 	        LIBLCD_ERR("call to init_hctx failed");
                 goto fail_hctx;
@@ -2245,8 +2300,6 @@ int init_hctx_fn_callee(struct fipc_message *request)
 	fipc_set_reg1(request, ret);
 	return ret;
 
-fail_pool:
-fail_cptr:
 fail_hctx:
 fail_lookup:
 	glue_cap_remove(c_cspace, ctx_container->my_ref);

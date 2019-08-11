@@ -40,6 +40,7 @@ static int blk_klcd_init(void)
 	/* call module_init for lcd */
 	m.vmfunc_id = VMFUNC_RPC_CALL;
 	m.rpc_id = MODULE_INIT;
+	fipc_set_reg0(&m, this_cpu_read(cpu_info.loops_per_jiffy));
 	vmfunc_klcd_wrapper(&m, OTHER_DOMAIN);
 
 	return 0;

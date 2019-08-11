@@ -88,6 +88,10 @@ int blk_klcd_dispatch_async_loop(struct fipc_message *message)
 			trace(PCI_ENABLE_MSIX);
 			return pci_enable_msix_callee(message);
 
+		case PCI_ENABLE_MSI_RANGE:
+			trace(PCI_ENABLE_MSI_RANGE);
+			return pci_enable_msi_range_callee(message);
+
 		case PCI_ENABLE_MSIX_RANGE:
 			trace(PCI_ENABLE_MSIX_RANGE);
 			ret =  pci_enable_msix_range_callee(message);
@@ -172,6 +176,10 @@ int blk_klcd_dispatch_async_loop(struct fipc_message *message)
 			trace(BLK_MQ_START_STOPPED_HW_QUEUES);
 			return blk_mq_start_stopped_hw_queues_callee(message);
 
+		case BLK_MQ_TAGSET_BUSY_ITER:
+			trace(BLK_MQ_TAGSET_BUSY_ITER);
+			return blk_mq_tagset_busy_iter_callee(message);
+
 		case BLK_MQ_MAP_QUEUE:
 			trace(BLK_MQ_MAP_QUEUE);
 			return blk_mq_map_queue_callee(message);
@@ -203,6 +211,10 @@ int blk_klcd_dispatch_async_loop(struct fipc_message *message)
 		case DEVICE_ADD_DISK:
 			trace(ADD_DISK);
 			return device_add_disk_callee(message);
+
+		case DEVICE_RELEASE_DRIVER:
+			trace(DEVICE_RELEASE_DRIVER);
+			return device_release_driver_callee(message);
 
 		case PUT_DISK:
 			trace(PUT_DISK);

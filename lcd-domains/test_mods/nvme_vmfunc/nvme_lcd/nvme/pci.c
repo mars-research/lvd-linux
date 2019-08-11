@@ -55,6 +55,7 @@
 #include "nvme.h"
 
 #include "../nvme_caller.h"
+#include "../nvme_dev.h"
 
 #include "nvme_stub.h"
 #include <asm/lcd_domains/liblcd.h>
@@ -106,63 +107,6 @@ static void nvme_dev_disable(struct nvme_dev *dev, bool shutdown);
 
 /* global instance of device struct */
 struct nvme_dev *g_nvme_dev;
-
-
-#ifndef NVME_DEV_H
-#define NVME_DEV_H
-/*
- * Represents an NVM Express device.  Each nvme_dev is a PCI function.
- */
-struct nvme_dev {
-	struct nvme_queue **queues;
-#ifdef LCD_ISOLATE
-	union {
-		struct blk_mq_tag_set_container tagset_container;
-		struct blk_mq_tag_set tagset;
-	};
-#else
-	struct blk_mq_tag_set tagset;
-#endif
-
-#ifdef LCD_ISOLATE
-	union {
-		struct blk_mq_tag_set_container admin_tagset_container;
-		struct blk_mq_tag_set admin_tagset;
-	};
-#else
-	struct blk_mq_tag_set admin_tagset;
-#endif
-	u32 __iomem *dbs;
-	struct device *dev;
-	struct dma_pool *prp_page_pool;
-	struct dma_pool *prp_small_pool;
-	unsigned queue_count;
-	unsigned online_queues;
-	unsigned max_qid;
-	int q_depth;
-	u32 db_stride;
-	struct msix_entry *entry;
-	void __iomem *bar;
-	struct work_struct reset_work;
-	struct work_struct remove_work;
-	struct timer_list watchdog_timer;
-	struct mutex shutdown_lock;
-	bool subsystem;
-	void __iomem *cmb;
-	dma_addr_t cmb_dma_addr;
-	u64 cmb_size;
-	u32 cmbsz;
-#ifdef LCD_ISOLATE
-	union {
-		struct nvme_ctrl_container nvme_ctrl_c;
-		struct nvme_ctrl ctrl;
-	};
-#else
-	struct nvme_ctrl ctrl;
-#endif
-	struct completion ioq_wait;
-};
-#endif
 
 static inline struct nvme_dev *to_nvme_dev(struct nvme_ctrl *ctrl)
 {
@@ -1330,6 +1274,8 @@ static int nvme_configure_admin_queue(struct nvme_dev *dev)
 	if (result)
 		goto free_nvmeq;
 
+
+	printk("%s, CSTS: %x", __func__, readl(dev->bar + NVME_REG_CSTS));
 	nvmeq->cq_vector = 0;
 	result = queue_request_irq(dev, nvmeq, nvmeq->irqname);
 	if (result) {
@@ -1910,6 +1856,7 @@ static void nvme_reset_work(struct work_struct *work)
 	if (dev->ctrl.ctrl_config & NVME_CC_ENABLE)
 		nvme_dev_disable(dev, false);
 
+	LIBLCD_MSG("====> %s Calling nvme_change_ctrl_state", __func__);
 	if (!nvme_change_ctrl_state(&dev->ctrl, NVME_CTRL_RESETTING))
 		goto out;
 
@@ -1917,10 +1864,12 @@ static void nvme_reset_work(struct work_struct *work)
 	if (result)
 		goto out;
 
+	LIBLCD_MSG("====> %s Calling nvme_configure_admin_queue", __func__);
 	result = nvme_configure_admin_queue(dev);
 	if (result)
 		goto out;
 
+	LIBLCD_MSG("====> %s Calling nvme_init_queue", __func__);
 	nvme_init_queue(dev->queues[0], 0);
 	result = nvme_alloc_admin_tags(dev);
 	if (result)
@@ -1930,6 +1879,7 @@ static void nvme_reset_work(struct work_struct *work)
 	if (result)
 		goto out;
 
+	LIBLCD_MSG("====> %s calling setup_io_queues", __func__);
 	result = nvme_setup_io_queues(dev);
 	if (result)
 		goto out;
@@ -2092,11 +2042,11 @@ static int nvme_probe(struct pci_dev *pdev, const struct pci_device_id *id)
 
 	g_nvme_dev = dev;
 
-	LIBLCD_WARN("Setting drv data\n");
+	LIBLCD_MSG("Setting drv data\n");
 
 	pci_set_drvdata(pdev, dev);
 
-	LIBLCD_WARN("Mapping Device\n");
+	LIBLCD_MSG("Mapping Device\n");
 
 	result = nvme_dev_map(dev);
 	if (result)

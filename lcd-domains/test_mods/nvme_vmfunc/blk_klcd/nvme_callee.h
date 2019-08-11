@@ -5,6 +5,7 @@
 
 int __pci_register_driver_callee(struct fipc_message *_request);
 int pci_unregister_driver_callee(struct fipc_message *_request);
+int device_release_driver_callee(struct fipc_message *_request);
 
 
 int blk_mq_alloc_tag_set_callee(struct fipc_message *request);
@@ -15,6 +16,7 @@ int blk_mq_start_request_callee(struct fipc_message *request);
 int blk_mq_start_stopped_hw_queues_callee(struct fipc_message *request);
 int blk_mq_map_queue_callee(struct fipc_message *request);
 int blk_mq_stop_hw_queues_callee(struct fipc_message *_request);
+int blk_mq_tagset_busy_iter_callee(struct fipc_message *_request);
 int blk_queue_logical_block_size_callee(struct fipc_message *request);
 int blk_queue_physical_block_size_callee(struct fipc_message *request);
 int alloc_disk_node_callee(struct fipc_message *request);
@@ -38,6 +40,7 @@ int pci_disable_msix_callee(struct fipc_message *_request);
 int pci_disable_msi_callee(struct fipc_message *_request);
 int pci_enable_msix_callee(struct fipc_message *_request);
 int pci_enable_msix_range_callee(struct fipc_message *_request);
+int pci_enable_msi_range_callee(struct fipc_message *_request);
 int pci_enable_pcie_error_reporting_callee(struct fipc_message *_request);
 int pcie_capability_read_word_callee(struct fipc_message *_request);
 int pcie_get_minimum_link_callee(struct fipc_message *_request);

@@ -143,7 +143,7 @@ static int update_avg_interval(struct acpi_power_meter_resource *resource)
 	unsigned long long data;
 	acpi_status status;
 
-	status = acpi_evaluate_integer(resource->acpi_dev->handle, "_GAI",
+	status = _acpi_evaluate_integer(resource->acpi_dev, "_GAI",
 				       NULL, &data);
 	if (ACPI_FAILURE(status)) {
 		ACPI_EXCEPTION((AE_INFO, status, "Evaluating _GAI"));
@@ -191,7 +191,7 @@ static ssize_t set_avg_interval(struct device *dev,
 	arg0.integer.value = temp;
 
 	mutex_lock(&resource->lock);
-	status = acpi_evaluate_integer(resource->acpi_dev->handle, "_PAI",
+	status = _acpi_evaluate_integer(resource->acpi_dev, "_PAI",
 				       &args, &data);
 	if (!ACPI_FAILURE(status))
 		resource->avg_interval = temp;
@@ -215,7 +215,7 @@ static int update_cap(struct acpi_power_meter_resource *resource)
 	unsigned long long data;
 	acpi_status status;
 
-	status = acpi_evaluate_integer(resource->acpi_dev->handle, "_GHL",
+	status = _acpi_evaluate_integer(resource->acpi_dev, "_GHL",
 				       NULL, &data);
 	if (ACPI_FAILURE(status)) {
 		ACPI_EXCEPTION((AE_INFO, status, "Evaluating _GHL"));
@@ -262,7 +262,7 @@ static ssize_t set_cap(struct device *dev, struct device_attribute *devattr,
 	arg0.integer.value = temp;
 
 	mutex_lock(&resource->lock);
-	status = acpi_evaluate_integer(resource->acpi_dev->handle, "_SHL",
+	status = _acpi_evaluate_integer(resource->acpi_dev, "_SHL",
 				       &args, &data);
 	if (!ACPI_FAILURE(status))
 		resource->cap = temp;
@@ -299,7 +299,7 @@ static int set_acpi_trip(struct acpi_power_meter_resource *resource)
 	arg_objs[0].integer.value = resource->trip[1];
 	arg_objs[1].integer.value = resource->trip[0];
 
-	status = acpi_evaluate_integer(resource->acpi_dev->handle, "_PTP",
+	status = _acpi_evaluate_integer(resource->acpi_dev, "_PTP",
 				       &args, &data);
 	if (ACPI_FAILURE(status)) {
 		ACPI_EXCEPTION((AE_INFO, status, "Evaluating _PTP"));
@@ -351,7 +351,7 @@ static int update_meter(struct acpi_power_meter_resource *resource)
 			resource->sensors_valid)
 		return 0;
 
-	status = acpi_evaluate_integer(resource->acpi_dev->handle, "_PMM",
+	status = _acpi_evaluate_integer(resource->acpi_dev, "_PMM",
 				       NULL, &data);
 	if (ACPI_FAILURE(status)) {
 		ACPI_EXCEPTION((AE_INFO, status, "Evaluating _PMM"));
@@ -575,7 +575,7 @@ static int read_domain_devices(struct acpi_power_meter_resource *resource)
 	union acpi_object *pss;
 	acpi_status status;
 
-	status = _acpi_evaluate_object(resource->acpi_dev->handle, "_PMD", NULL,
+	status = _acpi_evaluate_object(resource->acpi_dev, "_PMD", NULL,
 				      &buffer);
 	if (ACPI_FAILURE(status)) {
 		ACPI_EXCEPTION((AE_INFO, status, "Evaluating _PMD"));
@@ -601,8 +601,8 @@ static int read_domain_devices(struct acpi_power_meter_resource *resource)
 		goto end;
 	}
 
-	resource->holders_dir = _kobject_create_and_add("measures",
-					&resource->acpi_dev->dev);
+	resource->holders_dir = kobject_create_and_add("measures",
+					&resource->acpi_dev->dev.kobj);
 	if (!resource->holders_dir) {
 		res = -ENOMEM;
 		goto exit_free;

@@ -121,11 +121,7 @@ struct nvme_queue {
 	struct device *q_dmadev;
 	struct nvme_dev *dev;
 	char irqname[24];	/* nvme4294967295-65535\0 */
-#ifndef LCD_ISOLATE
 	spinlock_t q_lock;
-#else
-    lcd_spinlock_t q_lock;
-#endif
 	struct nvme_command *sq_cmds;
 	struct nvme_command __iomem *sq_cmds_io;
 	volatile struct nvme_completion *cqes;

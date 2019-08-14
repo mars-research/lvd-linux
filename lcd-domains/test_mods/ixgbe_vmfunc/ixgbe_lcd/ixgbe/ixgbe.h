@@ -757,7 +757,7 @@ struct ixgbe_adapter {
 	int fdir_filter_count;
 	u32 fdir_pballoc;
 	u32 atr_sample_rate;
-	lcd_spinlock_t fdir_perfect_lock;
+	spinlock_t fdir_perfect_lock;
 
 #ifdef IXGBE_FCOE
 	struct ixgbe_fcoe fcoe;

@@ -42,7 +42,6 @@ lib-y += $(addprefix liblcd/lib/, \
 	dynamic_queue_limits.o \
 	checksum.o \
 	scatterlist.o \
-	spinlock.o \
 	)
 
 lib-y += $(addprefix liblcd/mm/, \
@@ -68,6 +67,13 @@ lib-y += $(addprefix liblcd/net/, \
 	skbuff.o \
 	flow_dissector.o \
 	)
+
+lib-y += $(addprefix liblcd/locking/, \
+	qspinlock.o \
+	spinlock.o \
+	qrwlock.o \
+	)
+
 
 lib-y += liblcd/resolve.o
 

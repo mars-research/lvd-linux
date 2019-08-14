@@ -819,35 +819,6 @@ int blk_rq_map_sg(struct request_queue *q, struct request *rq,
     return 0;
 }
 
-
-
-int blk_rq_map_integrity_sg(struct request_queue *q, struct bio *bio,
-			    struct scatterlist *sglist)
-{
-    //TODO
-    struct fipc_message r;
-	struct fipc_message *request = &r;
-
-    async_msg_set_fn_type(request, BLK_RQ_MAP_INTEGRITY_SG);
-
-    vmfunc_wrapper(request);
-
-    return 0;
-}
-
-int blk_rq_count_integrity_sg(struct request_queue *q, struct bio *bio)
-{
-    //TODO
-    struct fipc_message r;
-	struct fipc_message *request = &r;
-
-    async_msg_set_fn_type(request, BLK_RQ_COUNT_INTEGRITY_SG);
-
-    vmfunc_wrapper(request);
-
-    return 0;
-}
-
 void blk_put_queue(struct request_queue *q)
 {
     //TODO

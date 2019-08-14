@@ -263,10 +263,6 @@ int blk_klcd_dispatch_async_loop(struct fipc_message *message)
 			trace(NVME_CANCEL_REQUEST);
 			break;
 
-		case NVME_COMPLETE_ASYNC_EVENT:
-			trace(NVME_COMPLETE_ASYNC_EVENT);
-			break;
-
 		case NVME_DISABLE_CTRL:
 			trace(NVME_DISABLE_CTRL);
 			return nvme_disable_ctrl_callee(message);
@@ -312,6 +308,10 @@ int blk_klcd_dispatch_async_loop(struct fipc_message *message)
 			return nvme_queue_async_events_callee(message);
 			break;
 
+		case NVME_COMPLETE_ASYNC_EVENT:
+			trace(NVME_COMPLETE_ASYNC_EVENT);
+			return nvme_complete_async_event_callee(message);
+
 		case NVME_QUEUE_SCAN:
 			trace(NVME_QUEUE_SCAN);
 			return nvme_queue_scan_callee(message);
@@ -322,6 +322,7 @@ int blk_klcd_dispatch_async_loop(struct fipc_message *message)
 
 		case NVME_REQUEUE_REQ:
 			trace(NVME_REQUEUE_REQ);
+			//return nvme_requeue_req_callee(message);
 			break;
 
 		case NVME_SET_QUEUE_COUNT:

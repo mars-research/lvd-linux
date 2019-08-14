@@ -11,7 +11,6 @@
 
 #include <lcd_config/post_hook.h>
 
-//#include "../../benchmark.h"
 static struct glue_cspace *c_cspace;
 
 //unsigned char nvme_io_timeout = 30;
@@ -28,7 +27,6 @@ struct lcd_request_container {
 
 #ifdef IOMMU_ASSIGN
 /* device for IOMMU assignment */
-// TODO: replace with real values
 struct pcidev_info dev_assign = { 0x0000, 0x04, 0x00, 0x0 };
 #endif
 
@@ -346,16 +344,27 @@ void nvme_cancel_request(struct request *req, void *data, bool reserved)
 	vmfunc_wrapper(request);
 }
 
+/*
+ * XXX: Calls out during hot path!
+ * It triggers a workqueue which calls back ops->submit_async_event
+ */
 void nvme_complete_async_event(struct nvme_ctrl *ctrl,
 		struct nvme_completion *cqe)
 {
-	//TODO
 	struct fipc_message r;
-	struct fipc_message *request = &r;
+	struct fipc_message *_request = &r;
+	struct nvme_ctrl_container *nvme_ctrl_c;
 
-	async_msg_set_fn_type(request, NVME_COMPLETE_ASYNC_EVENT);
+	nvme_ctrl_c = container_of(ctrl, struct nvme_ctrl_container,
+			nvme_ctrl);
 
-	vmfunc_wrapper(request);
+	async_msg_set_fn_type(_request, NVME_COMPLETE_ASYNC_EVENT);
+
+	fipc_set_reg0(_request, nvme_ctrl_c->my_ref.cptr);
+	fipc_set_reg1(_request, cqe->status);
+	fipc_set_reg2(_request, cqe->result);
+
+	vmfunc_wrapper(_request);
 }
 
 int nvme_init_ctrl(struct nvme_ctrl *ctrl, struct device *dev,
@@ -518,8 +527,6 @@ bool flush_work(struct work_struct *work)
     return false;
 }
 
-
-
 extern unsigned long wait_for_completion_io_timeout(struct completion *x,
 						    unsigned long timeout)
 {
@@ -618,13 +625,16 @@ void nvme_remove_namespaces(struct nvme_ctrl *ctrl)
 
 void nvme_requeue_req(struct request *req)
 {
-    //TODO
-    struct fipc_message r;
-	struct fipc_message *request = &r;
+	struct fipc_message r;
+	struct fipc_message *_request = &r;
+	struct request_container *rq_c;
 
-    async_msg_set_fn_type(request, NVME_REQUEUE_REQ);
+	rq_c = container_of(req, struct request_container, request);
 
-    vmfunc_wrapper(request);
+	async_msg_set_fn_type(_request, NVME_REQUEUE_REQ);
+	fipc_set_reg0(_request, rq_c->other_ref.cptr);
+
+	vmfunc_wrapper(_request);
 }
 
 int nvme_set_queue_count(struct nvme_ctrl *ctrl, int *count)
@@ -998,7 +1008,6 @@ void blk_mq_start_stopped_hw_queues(struct request_queue *q, bool async)
 	fipc_set_reg1(request, async);
 
 	vmfunc_wrapper(request);
-
 }
 
 void pci_restore_state(struct pci_dev *dev)

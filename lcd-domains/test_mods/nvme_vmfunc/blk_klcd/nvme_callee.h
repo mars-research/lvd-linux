@@ -75,6 +75,7 @@ int nvme_change_ctrl_state_callee(struct fipc_message *request);
 int nvme_stop_queues_callee(struct fipc_message *_request);
 int nvme_put_ctrl_callee(struct fipc_message *_request);
 int nvme_queue_async_events_callee(struct fipc_message *_request);
+int nvme_complete_async_event_callee(struct fipc_message *_request);
 int nvme_kill_queues_callee(struct fipc_message *_request);
 
 int nvme_queue_scan_callee(struct fipc_message *_request);

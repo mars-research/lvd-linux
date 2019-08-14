@@ -1859,6 +1859,28 @@ fail_lookup:
 	return ret;
 }
 
+int nvme_complete_async_event_callee(struct fipc_message *_request)
+{
+	struct nvme_ctrl_container *nvme_ctrl_container;
+	struct nvme_completion cqe;
+	int ret;
+
+	ret = glue_cap_lookup_nvme_ctrl_type(c_cspace,
+				__cptr(fipc_get_reg0(_request)),
+				&nvme_ctrl_container);
+	if (ret) {
+		LIBLCD_ERR("lookup");
+		goto fail_lookup;
+	}
+
+	cqe.status = fipc_get_reg0(_request);
+	cqe.result = fipc_get_reg1(_request);
+	nvme_complete_async_event(&nvme_ctrl_container->nvme_ctrl, &cqe);
+
+fail_lookup:
+	return ret;
+}
+
 int nvme_kill_queues_callee(struct fipc_message *_request)
 {
 	struct nvme_ctrl_container *nvme_ctrl_container;

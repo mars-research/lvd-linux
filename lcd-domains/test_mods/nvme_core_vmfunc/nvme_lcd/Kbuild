@@ -1,0 +1,23 @@
+obj-m += lcd_test_mod_nvme_core_vmfunc_nvme_lcd.o
+
+lcd_test_mod_nvme_core_vmfunc_nvme_lcd-y		+= main.o
+
+# Original code
+lcd_test_mod_nvme_core_vmfunc_nvme_lcd-y		+= $(addprefix nvme/, pci.o \
+								core.o \
+							)
+
+
+lcd_test_mod_nvme_core_vmfunc_nvme_lcd-y		+= $(LIBLCD)
+
+# glue code
+lcd_test_mod_nvme_core_vmfunc_nvme_lcd-y		+= $(addprefix glue/, nvme_caller.o \
+						nvme_caller_dispatch.o )
+
+lcd_test_mod_nvme_core_vmfunc_nvme_lcd-y		+= $(addprefix ../, nvme_cap.o)
+
+ccflags-y += $(ISOLATED_CFLAGS)
+
+extra-y += ../../../liblcd_build/common/vmfunc.lds
+
+ldflags-y += -T $(LIBLCD_BUILD_DIR)/common/vmfunc.lds

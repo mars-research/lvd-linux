@@ -62,7 +62,7 @@ struct nullb {
 	struct hrtimer timer;
 #endif
 	unsigned int queue_depth;
-	lcd_spinlock_t lock;
+	spinlock_t lock;
 
 	struct nullb_queue *queues;
 	unsigned int nr_queues;

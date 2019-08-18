@@ -79,11 +79,7 @@ void inline glue_remove_skb_hash(struct sk_buff_container *skb_c)
 }
 
 
-#ifdef CONFIG_LVD
-int __ndo_start_xmit_inner_async(struct sk_buff *skb, struct net_device *dev)
-#else
 int __ndo_start_xmit_inner_async(struct sk_buff *skb, struct net_device *dev, struct trampoline_hidden_args *hidden_args)
-#endif
 {
 	int ret = 0;
 	struct fipc_message r;
@@ -165,11 +161,7 @@ fail:
 /*
  * This function measures the overhead of bare fipc in KLCD/LCD setting
  */
-#ifdef CONFIG_LVD
-int __ndo_start_xmit_bare_fipc_nomarshal(struct sk_buff *skb, struct net_device *dev)
-#else
 int __ndo_start_xmit_bare_fipc_nomarshal(struct sk_buff *skb, struct net_device *dev, struct trampoline_hidden_args *hidden_args)
-#endif
 {
 	struct fipc_message r;
 	struct fipc_message *_request = &r;
@@ -219,11 +211,7 @@ free:
  * this serves as our base. If we use this function for isolated xmit,
  * we should ideally get the same bandwidth as the native dummy driver
  */
-#ifdef CONFIG_LVD
-int __ndo_start_xmit_dummy(struct sk_buff *skb, struct net_device *dev)
-#else
 int __ndo_start_xmit_dummy(struct sk_buff *skb, struct net_device *dev, struct trampoline_hidden_args *hidden_args)
-#endif
 {
 	dev_kfree_skb(skb);
 	return NETDEV_TX_OK;
@@ -234,11 +222,7 @@ int __ndo_start_xmit_dummy(struct sk_buff *skb, struct net_device *dev, struct t
  * If we use this function, we should ideally see a overhead of a bare_fipc_ping_pong, as we do a
  * blocking send and blocking receive.
  */
-#ifdef CONFIG_LVD
-int ndo_start_xmit_noasync(struct sk_buff *skb, struct net_device *dev)
-#else
 int ndo_start_xmit_noasync(struct sk_buff *skb, struct net_device *dev, struct trampoline_hidden_args *hidden_args)
-#endif
 {
 	struct fipc_message r;
 	struct fipc_message *_request = &r;

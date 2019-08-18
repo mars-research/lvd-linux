@@ -124,7 +124,30 @@ struct thc_channel_group_item *ptrs[32];
 
 extern struct thc_channel_group ch_grp;
 
-//DONE
+void rtnl_lock()
+{
+	struct fipc_message r;
+	struct fipc_message *request = &r;
+
+	async_msg_set_fn_type(request, RTNL_LOCK);
+
+	vmfunc_wrapper(request);
+
+	return;
+}
+
+void rtnl_unlock()
+{
+	struct fipc_message r;
+	struct fipc_message *request = &r;
+
+	async_msg_set_fn_type(request, RTNL_UNLOCK);
+
+	vmfunc_wrapper(request);
+
+	return;
+}
+
 int __rtnl_link_register(struct rtnl_link_ops *ops)
 {
 	struct rtnl_link_ops_container *ops_container;
@@ -168,7 +191,6 @@ fail1:
 	return ret;
 }
 
-//DONE
 void __rtnl_link_unregister(struct rtnl_link_ops *ops)
 {
 	int err;
@@ -176,10 +198,11 @@ void __rtnl_link_unregister(struct rtnl_link_ops *ops)
 	struct fipc_message *request = &r;
 	struct rtnl_link_ops_container *ops_container;
 
-	ops_container = container_of(ops, struct rtnl_link_ops_container, rtnl_link_ops);
+	ops_container = container_of(ops, struct rtnl_link_ops_container,
+			rtnl_link_ops);
 	async_msg_set_fn_type(request, __RTNL_LINK_UNREGISTER);
 
-	fipc_set_reg1(request, ops_container->other_ref.cptr);
+	fipc_set_reg0(request, ops_container->other_ref.cptr);
 
 	err = vmfunc_wrapper(request);
 	if (err) {
@@ -189,7 +212,6 @@ void __rtnl_link_unregister(struct rtnl_link_ops *ops)
 	return;
 }
 
-//DONE
 int register_netdevice(struct net_device *dev)
 {
 	struct net_device_container *dev_container;
@@ -202,9 +224,11 @@ int register_netdevice(struct net_device *dev)
 
 	dev_container = container_of(dev, struct net_device_container, net_device);
 
-	netdev_ops_container = container_of(dev->netdev_ops, struct net_device_ops_container, net_device_ops);
+	netdev_ops_container = container_of(dev->netdev_ops, struct
+			net_device_ops_container, net_device_ops);
 
-	rtnl_link_ops_container = container_of(dev->rtnl_link_ops, struct rtnl_link_ops_container, rtnl_link_ops);
+	rtnl_link_ops_container = container_of(dev->rtnl_link_ops, struct
+			rtnl_link_ops_container, rtnl_link_ops);
 
 	async_msg_set_fn_type(request, REGISTER_NETDEVICE);
 	fipc_set_reg1(request, dev_container->other_ref.cptr);
@@ -217,7 +241,6 @@ int register_netdevice(struct net_device *dev)
 	return ret;
 }
 
-//DONE
 void ether_setup(struct net_device *dev)
 {
 	int err;
@@ -309,7 +332,6 @@ fail_ipc:
 	return ret;
 }
 #endif
-//DONE
 int eth_validate_addr(struct net_device *dev)
 {
 	int ret;
@@ -338,7 +360,6 @@ fail_ipc:
 	return ret;
 }
 
-//DONE
 void free_netdev(struct net_device *dev)
 {
 	int ret;
@@ -362,7 +383,6 @@ fail_ipc:
 	return;
 }
 
-//DONE
 void netif_carrier_off(struct net_device *dev)
 {
 	int ret;
@@ -384,7 +404,6 @@ fail_ipc:
 	return;
 }
 
-//DONE
 void netif_carrier_on(struct net_device *dev)
 {
 	int ret;
@@ -408,17 +427,18 @@ fail_ipc:
 	return;
 }
 
-// DONE
 void rtnl_link_unregister(struct rtnl_link_ops *ops)
 {
 	struct rtnl_link_ops_container *ops_container;
 	int err;
 	struct fipc_message r;
 	struct fipc_message *request = &r;
-	ops_container = container_of(ops, struct rtnl_link_ops_container, rtnl_link_ops);
+
+	ops_container = container_of(ops, struct rtnl_link_ops_container,
+			rtnl_link_ops);
 
 	async_msg_set_fn_type(request, RTNL_LINK_UNREGISTER);
-	fipc_set_reg2(request, ops_container->other_ref.cptr);
+	fipc_set_reg0(request, ops_container->other_ref.cptr);
 
 	err = vmfunc_wrapper(request);
 	if (err) {
@@ -428,13 +448,13 @@ void rtnl_link_unregister(struct rtnl_link_ops *ops)
 
 	glue_cap_remove(c_cspace, ops_container->my_ref);
 
-
 fail2:
 	return;
 }
 
-// DONE
-struct net_device *alloc_netdev_mqs(int sizeof_priv, const char *name, unsigned char name_assign_type, void (*setup)(struct net_device* dev), unsigned int txqs, unsigned int rxqs)
+struct net_device *alloc_netdev_mqs(int sizeof_priv, const char *name, unsigned
+		char name_assign_type, void (*setup)(struct net_device* dev),
+		unsigned int txqs, unsigned int rxqs)
 {
 	struct setup_container *setup_container;
 	int ret;
@@ -456,7 +476,8 @@ struct net_device *alloc_netdev_mqs(int sizeof_priv, const char *name, unsigned 
 
 	setup_container->setup = setup;
 
-	ret = glue_cap_insert_setup_type(c_cspace, setup_container, &setup_container->my_ref);
+	ret = glue_cap_insert_setup_type(c_cspace, setup_container,
+			&setup_container->my_ref);
 
 	if (ret) {
 		LIBLCD_ERR("lcd insert");
@@ -519,19 +540,17 @@ void consume_skb(struct sk_buff *skb)
 int ndo_init_callee(struct fipc_message *request)
 {
 	struct net_device_container *net_dev_container;
-
 	int ret;
-	cptr_t netdev_ref = __cptr(fipc_get_reg1(request));
 
-
-
-	ret = glue_cap_lookup_net_device_type(c_cspace, netdev_ref, &net_dev_container);
+	ret = glue_cap_lookup_net_device_type(c_cspace,
+			__cptr(fipc_get_reg1(request)), &net_dev_container);
 	if (ret) {
 		LIBLCD_ERR("lookup");
 		goto fail_lookup;
 	}
 
-	ret = net_dev_container->net_device.netdev_ops->ndo_init(&net_dev_container->net_device);
+	ret =
+		net_dev_container->net_device.netdev_ops->ndo_init(&net_dev_container->net_device);
 
 	fipc_set_reg1(request, ret);
 
@@ -698,7 +717,6 @@ int ndo_start_xmit_async_bare_callee(struct fipc_message *_request)
 	return 0;
 }
 
-// DONE
 int ndo_validate_addr_callee(struct fipc_message *request)
 {
 	struct net_device_container *net_dev_container;
@@ -722,7 +740,6 @@ fail_lookup:
 	return ret;
 }
 
-// DONE
 int ndo_set_rx_mode_callee(struct fipc_message *request)
 {
 	int ret;
@@ -740,7 +757,6 @@ fail_lookup:
 	return ret;
 }
 
-// DONE
 int ndo_set_mac_address_callee(struct fipc_message *request)
 {
 	struct net_device_container *net_dev_container;
@@ -790,7 +806,6 @@ fail_sync:
 	return 0;
 }
 
-// DONE
 int ndo_get_stats64_callee(struct fipc_message *request)
 {
 
@@ -821,7 +836,6 @@ fail_lookup:
 	return ret;
 }
 
-// DONE
 int ndo_change_carrier_callee(struct fipc_message *request)
 {
 
@@ -845,11 +859,10 @@ fail_lookup:
 	return ret;
 }
 
-// DONE
 int setup_callee(struct fipc_message *request)
 {
 	int ret;
-
+	struct setup_container *setup_container;
 	struct net_device_container *net_dev_container;
 	struct net_device_ops_container *netdev_ops_container;
 	const struct net_device_ops *netdev_ops;
@@ -860,17 +873,25 @@ int setup_callee(struct fipc_message *request)
 	gva_t pool_addr;
 	unsigned int pool_ord;
 
-
-
-	ret = glue_cap_lookup_net_device_type(c_cspace, netdev_ref, &net_dev_container);
+	ret = glue_cap_lookup_net_device_type(c_cspace, netdev_ref,
+			&net_dev_container);
 	if (ret) {
 		LIBLCD_ERR("lookup");
 		goto fail_lookup;
 	}
 
-	// save other ref cptr
+	/* save other ref cptr */
 	net_dev_container->other_ref = netdev_other_ref;
-	LIBLCD_MSG("%s, lcd other ref %p | %lu", __func__, net_dev_container, net_dev_container->other_ref.cptr);
+
+	ret = glue_cap_lookup_setup_type(c_cspace, __cptr(fipc_get_reg2(request)),
+			&setup_container);
+	if (ret) {
+		LIBLCD_ERR("lookup");
+		goto fail_lookup;
+	}
+
+	LIBLCD_MSG("%s, lcd other ref %p | %lu", __func__, net_dev_container,
+			net_dev_container->other_ref.cptr);
 
 	/* receive shared data pool */
 	ret = lcd_cptr_alloc(&pool_cptr);
@@ -879,18 +900,10 @@ int setup_callee(struct fipc_message *request)
 		goto fail_cptr;
 	}
 
-#ifdef CONFIG_LVD
 	fipc_set_reg0(request, cptr_val(pool_cptr));
 	vmfunc_sync_call(request, SYNC_SETUP);
 	pool_ord = fipc_get_reg0(request);
-#else
-	lcd_set_cr0(pool_cptr);
-	printk("%s, calling sync recv", __func__);
-	ret = lcd_sync_recv(sync_ep);
-	lcd_set_cr0(CAP_CPTR_NULL);
 
-	pool_ord = lcd_r0();
-#endif
 	ret = lcd_map_virt(pool_cptr, pool_ord, &pool_addr);
 	if (ret) {
 		LIBLCD_ERR("failed to map pool");
@@ -902,17 +915,19 @@ int setup_callee(struct fipc_message *request)
 
 	data_pool = (void*)gva_val(pool_addr);
 
-	g_rtnl_link_ops->setup(&net_dev_container->net_device);
+	setup_container->setup(&net_dev_container->net_device);
 
 	printk("%s, returned",__func__);
 
 	netdev_ops = net_dev_container->net_device.netdev_ops;
 
-	netdev_ops_container = container_of(netdev_ops, struct net_device_ops_container, net_device_ops);
+	netdev_ops_container = container_of(netdev_ops, struct
+			net_device_ops_container, net_device_ops);
 
 	netdev_ops_container->other_ref = netdev_ops_ref;
 
-	ret = glue_cap_insert_net_device_ops_type(c_cspace, netdev_ops_container, &netdev_ops_container->my_ref);
+	ret = glue_cap_insert_net_device_ops_type(c_cspace,
+			netdev_ops_container, &netdev_ops_container->my_ref);
 	if (ret) {
 		LIBLCD_ERR("lcd insert");
 		goto fail_insert;

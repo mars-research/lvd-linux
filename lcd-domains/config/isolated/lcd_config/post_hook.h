@@ -377,11 +377,6 @@ extern struct task_struct *lcd_current_task;
 #undef dev_info
 #define dev_info(dev, fmt, ...) LIBLCD_MSG(fmt)
 
-/* net layer locks
- */
-#define rtnl_lock()     do { } while(0)
-#define rtnl_unlock()   do { } while(0)
-
 #define netdev_warn(dev, msg...)        LIBLCD_WARN(msg)
 #define netdev_err(dev, msg...)         LIBLCD_ERR(msg)
 #define netdev_crit(dev, msg...)        LIBLCD_ERR(msg)

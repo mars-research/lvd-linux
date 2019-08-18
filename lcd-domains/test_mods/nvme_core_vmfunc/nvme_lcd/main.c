@@ -13,7 +13,10 @@
 #include <lcd_config/post_hook.h>
 
 int nvme_init(void);
+int nvme_core_init(void);
+
 void nvme_exit(void);
+void nvme_core_exit(void);
 unsigned long loops_per_jiffy;
 
 static int nvme_lcd_init(void)
@@ -36,6 +39,8 @@ static int nvme_lcd_init(void)
 		LIBLCD_ERR("nvme init");
 		goto fail2;
 	}
+
+	ret = nvme_core_init();
 
 	ret = nvme_init();
 
@@ -61,6 +66,8 @@ static void nvme_lcd_exit(void)
 	LIBLCD_MSG("%s: exiting", __func__);
 
 	nvme_exit();
+
+	nvme_core_exit();
 
 	glue_nvme_exit();
 

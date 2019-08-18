@@ -10,6 +10,7 @@ int device_release_driver_callee(struct fipc_message *_request);
 
 int blk_mq_alloc_tag_set_callee(struct fipc_message *request);
 int blk_mq_init_queue_callee(struct fipc_message *request);
+int blk_get_queue_callee(struct fipc_message *request);
 int blk_mq_end_request_callee(struct fipc_message *request);
 int blk_mq_free_tag_set_callee(struct fipc_message *request);
 int blk_mq_start_request_callee(struct fipc_message *request);
@@ -60,8 +61,45 @@ int request_threaded_irq_callee(struct fipc_message *_request);
 int free_irq_callee(struct fipc_message *_request);
 int irq_set_affinity_hint_callee(struct fipc_message *_request);
 
+int capable_callee(struct fipc_message *_request);
+
 int synchronize_irq_callee(struct fipc_message *_request);
 
+int __unregister_chrdev_callee(struct fipc_message *_request);
+int __register_chrdev_callee(struct fipc_message *_request);
+int ida_destroy_callee(struct fipc_message *_request);
+int ida_get_new_above_callee(struct fipc_message *_request);
+int ida_init_callee(struct fipc_message *_request);
+int ida_pre_get_callee(struct fipc_message *_request);
+int ida_remove_callee(struct fipc_message *_request);
+int ida_simple_get_callee(struct fipc_message *_request);
+int ida_simple_remove_callee(struct fipc_message *_request);
+int blk_set_queue_dying_callee(struct fipc_message *_request);
+int blk_rq_unmap_user_callee(struct fipc_message *_request);
+int blk_rq_map_kern_callee(struct fipc_message *_request);
+int blk_queue_write_cache_callee(struct fipc_message *_request);
+int blk_queue_virt_boundary_callee(struct fipc_message *_request);
+int blk_queue_max_segments_callee(struct fipc_message *_request);
+int blk_queue_max_hw_sectors_callee(struct fipc_message *_request);
+int blk_queue_max_discard_sectors_callee(struct fipc_message *_request);
+int blk_queue_chunk_sectors_callee(struct fipc_message *_request);
+int blk_mq_unfreeze_queue_callee(struct fipc_message *_request);
+int blk_mq_stop_hw_queues_callee(struct fipc_message *_request);
+int blk_mq_requeue_request_callee(struct fipc_message *_request);
+int blk_mq_request_started_callee(struct fipc_message *_request);
+int blk_mq_kick_requeue_list_callee(struct fipc_message *_request);
+int blk_mq_freeze_queue_callee(struct fipc_message *_request);
+int blk_mq_cancel_requeue_work_callee(struct fipc_message *_request);
+int blk_mq_alloc_request_hctx_callee(struct fipc_message *_request);
+int blk_mq_alloc_request_callee(struct fipc_message *_request);
+int blk_mq_abort_requeue_list_callee(struct fipc_message *_request);
+int blk_execute_rq_callee(struct fipc_message *_request);
+int bdput_callee(struct fipc_message *_request);
+int bdget_disk_callee(struct fipc_message *_request);
+int __class_create_callee(struct fipc_message *_request);
+int class_destroy_callee(struct fipc_message *_request);
+int device_create_callee(struct fipc_message *_request);
+int device_destroy_callee(struct fipc_message *_request);
 int dispatch_sync_loop(void);
 
 int dispatch_async_loop(struct fipc_message *message);

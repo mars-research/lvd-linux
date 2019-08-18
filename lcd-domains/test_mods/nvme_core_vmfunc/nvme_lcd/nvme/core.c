@@ -1,4 +1,5 @@
 /*
+ *
  * NVM Express device driver
  * Copyright (c) 2011-2014, Intel Corporation.
  *
@@ -72,7 +73,9 @@ EXPORT_SYMBOL_GPL(nvme_max_retries);
 #endif
 
 static int nvme_char_major;
+#ifndef LCD_ISOLATE
 module_param(nvme_char_major, int, 0);
+#endif
 
 static LIST_HEAD(nvme_ctrl_list);
 static DEFINE_SPINLOCK(dev_list_lock);
@@ -86,8 +89,8 @@ void nvme_cancel_request(struct request *req, void *data, bool reserved)
 	if (!blk_mq_request_started(req))
 		return;
 
-	dev_dbg_ratelimited(((struct nvme_ctrl *) data)->device,
-				"Cancelling I/O %d", req->tag);
+//	dev_dbg_ratelimited(((struct nvme_ctrl *) data)->device,
+//				"Cancelling I/O %d", req->tag);
 
 	status = NVME_SC_ABORT_REQ;
 	if (blk_queue_dying(req->q))
@@ -445,7 +448,7 @@ int __nvme_submit_user_cmd(struct request_queue *q, struct nvme_command *cmd,
 			}
 
 			if (write) {
-				if (copy_from_user(meta, meta_buffer,
+				if (_lcd_copy_from_user(meta, meta_buffer,
 						meta_len)) {
 					ret = -EFAULT;
 					goto out_free_meta;
@@ -475,7 +478,7 @@ int __nvme_submit_user_cmd(struct request_queue *q, struct nvme_command *cmd,
 	if (result)
 		*result = le32_to_cpu(cqe.result);
 	if (meta && !ret && !write) {
-		if (copy_to_user(meta_buffer, meta, meta_len))
+		if (_lcd_copy_to_user(meta_buffer, meta, meta_len))
 			ret = -EFAULT;
 	}
  out_free_meta:
@@ -499,9 +502,13 @@ int nvme_submit_user_cmd(struct request_queue *q, struct nvme_command *cmd,
 			result, timeout);
 }
 
+void nvme_keep_alive_work(struct work_struct *work);
+
 static void nvme_keep_alive_end_io(struct request *rq, int error)
 {
+#ifndef LCD_ISOLATE
 	struct nvme_ctrl *ctrl = rq->end_io_data;
+#endif
 
 	blk_mq_free_request(rq);
 
@@ -511,7 +518,11 @@ static void nvme_keep_alive_end_io(struct request *rq, int error)
 		return;
 	}
 
+#ifdef LCD_ISOLATE
+	nvme_keep_alive_work(NULL);
+#else
 	schedule_delayed_work(&ctrl->ka_work, ctrl->kato * HZ);
+#endif
 }
 
 static int nvme_keep_alive(struct nvme_ctrl *ctrl)
@@ -535,7 +546,7 @@ static int nvme_keep_alive(struct nvme_ctrl *ctrl)
 	return 0;
 }
 
-static void nvme_keep_alive_work(struct work_struct *work)
+void nvme_keep_alive_work(struct work_struct *work)
 {
 	struct nvme_ctrl *ctrl = container_of(to_delayed_work(work),
 			struct nvme_ctrl, ka_work);
@@ -553,8 +564,12 @@ void nvme_start_keep_alive(struct nvme_ctrl *ctrl)
 	if (unlikely(ctrl->kato == 0))
 		return;
 
+#ifndef LCD_ISOLATE
 	INIT_DELAYED_WORK(&ctrl->ka_work, nvme_keep_alive_work);
 	schedule_delayed_work(&ctrl->ka_work, ctrl->kato * HZ);
+#else
+	nvme_keep_alive_work(NULL);
+#endif
 }
 EXPORT_SYMBOL_GPL(nvme_start_keep_alive);
 
@@ -563,7 +578,9 @@ void nvme_stop_keep_alive(struct nvme_ctrl *ctrl)
 	if (unlikely(ctrl->kato == 0))
 		return;
 
+#ifndef LCD_ISOLATE
 	cancel_delayed_work_sync(&ctrl->ka_work);
+#endif
 }
 EXPORT_SYMBOL_GPL(nvme_stop_keep_alive);
 
@@ -715,7 +732,7 @@ static int nvme_submit_io(struct nvme_ns *ns, struct nvme_user_io __user *uio)
 	unsigned length, meta_len;
 	void __user *metadata;
 
-	if (copy_from_user(&io, uio, sizeof(io)))
+	if (_lcd_copy_from_user(&io, uio, sizeof(io)))
 		return -EFAULT;
 	if (io.flags)
 		return -EINVAL;
@@ -768,7 +785,7 @@ static int nvme_user_cmd(struct nvme_ctrl *ctrl, struct nvme_ns *ns,
 
 	if (!capable(CAP_SYS_ADMIN))
 		return -EACCES;
-	if (copy_from_user(&cmd, ucmd, sizeof(cmd)))
+	if (_lcd_copy_from_user(&cmd, ucmd, sizeof(cmd)))
 		return -EFAULT;
 	if (cmd.flags)
 		return -EINVAL;
@@ -787,14 +804,20 @@ static int nvme_user_cmd(struct nvme_ctrl *ctrl, struct nvme_ns *ns,
 	c.common.cdw10[5] = cpu_to_le32(cmd.cdw15);
 
 	if (cmd.timeout_ms)
+#ifdef LCD_ISOLATE
+		timeout = 0;
+#else
 		timeout = msecs_to_jiffies(cmd.timeout_ms);
+#endif
 
 	status = nvme_submit_user_cmd(ns ? ns->queue : ctrl->admin_q, &c,
 			(void __user *)(uintptr_t)cmd.addr, cmd.data_len,
 			&cmd.result, timeout);
 	if (status >= 0) {
+#ifndef LCD_ISOLATE
 		if (put_user(cmd.result, &ucmd->result))
 			return -EFAULT;
+#endif
 	}
 
 	return status;
@@ -849,7 +872,9 @@ static void nvme_release(struct gendisk *disk, fmode_t mode)
 {
 	struct nvme_ns *ns = disk->private_data;
 
+#ifndef LCD_ISOLATE
 	module_put(ns->ctrl->ops->module);
+#endif
 	nvme_put_ns(ns);
 }
 
@@ -1094,8 +1119,12 @@ static const struct block_device_operations nvme_fops = {
 
 static int nvme_wait_ready(struct nvme_ctrl *ctrl, u64 cap, bool enabled)
 {
+#ifndef LCD_ISOLATE
 	unsigned long timeout =
 		((NVME_CAP_TIMEOUT(cap) + 1) * HZ / 2) + jiffies;
+#else
+	static int times = 0;
+#endif
 	u32 csts, bit = enabled ? NVME_CSTS_RDY : 0;
 	int ret;
 
@@ -1104,6 +1133,12 @@ static int nvme_wait_ready(struct nvme_ctrl *ctrl, u64 cap, bool enabled)
 			break;
 
 		msleep(100);
+
+#ifdef LCD_ISOLATE
+		if (times++ == 30) {
+			return -ENODEV;
+		}
+#else
 		if (fatal_signal_pending(current))
 			return -EINTR;
 		if (time_after(jiffies, timeout)) {
@@ -1112,6 +1147,7 @@ static int nvme_wait_ready(struct nvme_ctrl *ctrl, u64 cap, bool enabled)
 						"initialisation" : "reset");
 			return -ENODEV;
 		}
+#endif
 	}
 
 	return ret;
@@ -1180,7 +1216,11 @@ EXPORT_SYMBOL_GPL(nvme_enable_ctrl);
 
 int nvme_shutdown_ctrl(struct nvme_ctrl *ctrl)
 {
+#ifndef LCD_ISOLATE
 	unsigned long timeout = SHUTDOWN_TIMEOUT + jiffies;
+#else
+	static int times = 0;
+#endif
 	u32 csts;
 	int ret;
 
@@ -1196,6 +1236,11 @@ int nvme_shutdown_ctrl(struct nvme_ctrl *ctrl)
 			break;
 
 		msleep(100);
+#ifdef LCD_ISOLATE
+		if (times++ == 30) {
+			return -ENODEV;
+		}
+#else
 		if (fatal_signal_pending(current))
 			return -EINTR;
 		if (time_after(jiffies, timeout)) {
@@ -1203,6 +1248,7 @@ int nvme_shutdown_ctrl(struct nvme_ctrl *ctrl)
 				"Device shutdown incomplete; abort shutdown\n");
 			return -ENODEV;
 		}
+#endif
 	}
 
 	return ret;
@@ -1411,12 +1457,20 @@ static long nvme_dev_ioctl(struct file *file, unsigned int cmd,
 	}
 }
 
+#ifdef LCD_ISOLATE
+static const struct file_operations_container nvme_dev_fops_container = {
+	.fops = {
+#else
 static const struct file_operations nvme_dev_fops = {
+#endif
 	.owner		= THIS_MODULE,
 	.open		= nvme_dev_open,
 	.release	= nvme_dev_release,
 	.unlocked_ioctl	= nvme_dev_ioctl,
 	.compat_ioctl	= nvme_dev_ioctl,
+#ifdef LCD_ISOLATE
+	}
+#endif
 };
 
 #ifndef LCD_ISOLATE
@@ -1866,7 +1920,11 @@ void nvme_queue_scan(struct nvme_ctrl *ctrl)
 	 * removal.
 	 */
 	if (ctrl->state == NVME_CTRL_LIVE)
+#ifdef LCD_ISOLATE
+		nvme_scan_work(NULL);
+#else
 		schedule_work(&ctrl->scan_work);
+#endif
 }
 EXPORT_SYMBOL_GPL(nvme_queue_scan);
 
@@ -1917,7 +1975,11 @@ void nvme_complete_async_event(struct nvme_ctrl *ctrl,
 
 	if (status == NVME_SC_SUCCESS || status == NVME_SC_ABORT_REQ) {
 		++ctrl->event_limit;
+#ifdef LCD_ISOLATE
+		nvme_async_event_work(NULL);
+#else
 		schedule_work(&ctrl->async_event_work);
+#endif
 	}
 
 	if (status != NVME_SC_SUCCESS)
@@ -1937,22 +1999,32 @@ EXPORT_SYMBOL_GPL(nvme_complete_async_event);
 void nvme_queue_async_events(struct nvme_ctrl *ctrl)
 {
 	ctrl->event_limit = NVME_NR_AERS;
+#ifdef LCD_ISOLATE
+	nvme_async_event_work(NULL);
+#else
 	schedule_work(&ctrl->async_event_work);
+#endif
 }
 EXPORT_SYMBOL_GPL(nvme_queue_async_events);
 
+#ifdef LCD_ISOLATE
+static struct ida_container nvme_instance_ida = {
+		.ida = IDA_INIT(ida)
+	};
+#else
 static DEFINE_IDA(nvme_instance_ida);
+#endif
 
 static int nvme_set_instance(struct nvme_ctrl *ctrl)
 {
 	int instance, error;
 
 	do {
-		if (!ida_pre_get(&nvme_instance_ida, GFP_KERNEL))
+		if (!ida_pre_get(&nvme_instance_ida.ida, GFP_KERNEL))
 			return -ENODEV;
 
 		spin_lock(&dev_list_lock);
-		error = ida_get_new(&nvme_instance_ida, &instance);
+		error = ida_get_new(&nvme_instance_ida.ida, &instance);
 		spin_unlock(&dev_list_lock);
 	} while (error == -EAGAIN);
 
@@ -1966,14 +2038,16 @@ static int nvme_set_instance(struct nvme_ctrl *ctrl)
 static void nvme_release_instance(struct nvme_ctrl *ctrl)
 {
 	spin_lock(&dev_list_lock);
-	ida_remove(&nvme_instance_ida, ctrl->instance);
+	ida_remove(&nvme_instance_ida.ida, ctrl->instance);
 	spin_unlock(&dev_list_lock);
 }
 
 void nvme_uninit_ctrl(struct nvme_ctrl *ctrl)
 {
+#ifndef LCD_ISOLATE
 	flush_work(&ctrl->async_event_work);
 	flush_work(&ctrl->scan_work);
+#endif
 	nvme_remove_namespaces(ctrl);
 
 	device_destroy(nvme_class, MKDEV(nvme_char_major, ctrl->instance));
@@ -2019,8 +2093,10 @@ int nvme_init_ctrl(struct nvme_ctrl *ctrl, struct device *dev,
 	ctrl->dev = dev;
 	ctrl->ops = ops;
 	ctrl->quirks = quirks;
+#ifndef LCD_ISOLATE
 	INIT_WORK(&ctrl->scan_work, nvme_scan_work);
 	INIT_WORK(&ctrl->async_event_work, nvme_async_event_work);
+#endif
 
 	ret = nvme_set_instance(ctrl);
 	if (ret)
@@ -2122,7 +2198,7 @@ int __init nvme_core_init(void)
 	int result;
 
 	result = __register_chrdev(nvme_char_major, 0, NVME_MINORS, "nvme",
-							&nvme_dev_fops);
+					&nvme_dev_fops_container.fops);
 	if (result < 0)
 		return result;
 	else if (result > 0)

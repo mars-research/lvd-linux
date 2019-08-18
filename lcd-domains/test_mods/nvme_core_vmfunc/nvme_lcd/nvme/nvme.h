@@ -28,6 +28,8 @@
 #include <libcap_types.h>
 #include <liblcd/spinlock.h>
 
+#include "../nvme_caller.h"
+
 enum {
 	/*
 	 * Driver internal status code for commands that were cancelled due
@@ -117,8 +119,10 @@ struct nvme_ctrl {
 	struct mutex namespaces_mutex;
 	struct device *device;	/* char device */
 	struct list_head node;
-	struct ida ns_ida;
-
+	union {
+		struct ida ns_ida;
+		struct ida_container ida_container;
+	};
 	char name[12];
 	char serial[20];
 	char model[40];

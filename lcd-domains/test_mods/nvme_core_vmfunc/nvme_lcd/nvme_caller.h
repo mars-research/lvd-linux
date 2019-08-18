@@ -32,4 +32,11 @@ int softirq_done_fn_callee(struct fipc_message *request);
 int open_callee(struct fipc_message *request);
 int release_callee(struct fipc_message *request);
 
+int fops_open_callee(struct fipc_message *_request);
+int fops_release_callee(struct fipc_message *_request);
+int fops_unlocked_ioctl_callee(struct fipc_message *_request);
+
+unsigned long _lcd_copy_from_user(void *to, const void *from, unsigned long n);
+unsigned long _lcd_copy_to_user(void  *to, const void *from, unsigned long n);
+
 #endif /* __NVME_CALLER_H__ */

@@ -12,5 +12,10 @@ SECTIONS
 	LCD_TRAMPOLINE_LINKER_SECTION(complete_fn_trampoline)
 	LCD_TRAMPOLINE_LINKER_SECTION(timeout_fn_trampoline)
 	LCD_TRAMPOLINE_LINKER_SECTION(poll_fn_trampoline)
+	LCD_TRAMPOLINE_LINKER_SECTION(bd_open_trampoline)
+	LCD_TRAMPOLINE_LINKER_SECTION(bd_release_trampoline)
+	LCD_TRAMPOLINE_LINKER_SECTION(fops_open_trampoline)
+	LCD_TRAMPOLINE_LINKER_SECTION(fops_release_trampoline)
+	LCD_TRAMPOLINE_LINKER_SECTION(fops_unlocked_ioctl_trampoline)
 }
 INSERT AFTER .text;

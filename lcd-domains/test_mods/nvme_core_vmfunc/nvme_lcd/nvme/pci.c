@@ -977,11 +977,7 @@ static int nvme_suspend_queue(struct nvme_queue *nvmeq)
 	spin_unlock_irq(&nvmeq->q_lock);
 
 	if (!nvmeq->qid && nvmeq->dev->ctrl.admin_q)
-#ifdef LCD_ISOLATE
-		__blk_mq_stop_hw_queues(&nvmeq->dev->ctrl);
-#else
 		blk_mq_stop_hw_queues(nvmeq->dev->ctrl.admin_q);
-#endif
 
 	irq_set_affinity_hint(vector, NULL);
 	free_irq(vector, nvmeq);
@@ -1246,6 +1242,7 @@ static int nvme_configure_admin_queue(struct nvme_dev *dev)
 		return result;
 
 	nvmeq = dev->queues[0];
+	printk("%s, ====> Calling nvme_alloc_queue", __func__);
 	if (!nvmeq) {
 		nvmeq = nvme_alloc_queue(dev, 0, NVME_AQ_DEPTH);
 		if (!nvmeq)
@@ -1965,12 +1962,7 @@ int nvme_pci_reset_ctrl(struct nvme_ctrl *ctrl)
 	return nvme_reset(to_nvme_dev(ctrl));
 }
 
-#ifdef LCD_ISOLATE
-const struct nvme_ctrl_ops_container nvme_pci_ctrl_ops_container = {
-	.nvme_ctrl_ops = {
-#else
 static const struct nvme_ctrl_ops nvme_pci_ctrl_ops = {
-#endif
 	.name			= "pcie",
 	.module			= THIS_MODULE,
 	.reg_read32		= nvme_pci_reg_read32,
@@ -1980,9 +1972,6 @@ static const struct nvme_ctrl_ops nvme_pci_ctrl_ops = {
 	.free_ctrl		= nvme_pci_free_ctrl,
 	.post_scan		= nvme_pci_post_scan,
 	.submit_async_event	= nvme_pci_submit_async_event,
-#ifdef LCD_ISOLATE
-	}
-#endif
 };
 
 static int nvme_dev_map(struct nvme_dev *dev)
@@ -2059,7 +2048,7 @@ static int nvme_probe(struct pci_dev *pdev, const struct pci_device_id *id)
 #endif
 
 	result = nvme_init_ctrl(&dev->ctrl, &pdev->dev,
-			&nvme_pci_ctrl_ops_container.nvme_ctrl_ops,
+			&nvme_pci_ctrl_ops,
 			id->driver_data);
 	if (result)
 		goto release_pools;

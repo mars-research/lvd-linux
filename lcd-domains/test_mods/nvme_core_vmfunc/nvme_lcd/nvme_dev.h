@@ -45,7 +45,6 @@ struct nvme_dev {
 	u32 cmbsz;
 #ifdef LCD_ISOLATE
 	union {
-		struct nvme_ctrl_container nvme_ctrl_c;
 		struct nvme_ctrl ctrl;
 	};
 #else

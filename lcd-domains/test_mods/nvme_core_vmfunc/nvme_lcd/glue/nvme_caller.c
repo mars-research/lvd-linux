@@ -32,6 +32,7 @@ struct pcidev_info dev_assign = { 0x0000, 0x04, 0x00, 0x0 };
 #define CPTR_HASH_BITS      5
 static DEFINE_HASHTABLE(cptr_table, CPTR_HASH_BITS);
 
+static DEFINE_HASHTABLE(dev_table, CPTR_HASH_BITS);
 //void null_softirq_done_fn(struct request *rq);
 
 //int null_open(struct block_device *bdev, fmode_t mode);
@@ -80,6 +81,34 @@ void glue_nvme_exit(void)
 	glue_cap_exit();
 }
 
+int glue_insert_device(struct device_container *dev_c)
+{
+	BUG_ON(!dev_c->dev);
+
+	dev_c->my_ref = __cptr((unsigned long)dev_c->dev);
+
+	hash_add(dev_table, &dev_c->hentry, (unsigned long) dev_c->dev);
+
+	return 0;
+}
+
+int glue_lookup_device(struct cptr c, struct
+		device_container **dev_cout) {
+	struct device_container *dev_c;
+
+	hash_for_each_possible(dev_table, dev_c,
+			hentry, (unsigned long) cptr_val(c)) {
+		if (dev_c->dev == (struct device*) c.cptr)
+			*dev_cout = dev_c;
+	}
+	return 0;
+}
+
+void glue_remove_device(struct device_container *dev_c)
+{
+	hash_del(&dev_c->hentry);
+}
+
 void complete(struct completion *x)
 {
     // should never reach
@@ -98,17 +127,17 @@ extern unsigned long wait_for_completion_io_timeout(struct completion *x,
     return -1;
 }
 
-void __blk_mq_stop_hw_queues(struct nvme_ctrl *ctrl)
+void blk_mq_stop_hw_queues(struct request_queue *rq)
 {
 	struct fipc_message r;
 	struct fipc_message *_request = &r;
-	struct nvme_ctrl_container *nvme_ctrl_container;
+	struct request_queue_container *rq_container;
 
-	nvme_ctrl_container = container_of(ctrl, struct nvme_ctrl_container,
-				nvme_ctrl);
+	rq_container = container_of(rq, struct request_queue_container,
+				request_queue);
 
 	async_msg_set_fn_type(_request, BLK_MQ_STOP_HW_QUEUES);
-	fipc_set_reg0(_request, nvme_ctrl_container->other_ref.cptr);
+	fipc_set_reg0(_request, rq_container->other_ref.cptr);
 
 	vmfunc_wrapper(_request);
 }
@@ -130,7 +159,7 @@ int irq_set_affinity_hint(unsigned int irq, const struct cpumask *m)
 
 	return func_ret;
 }
-
+#if 0
 int blk_rq_map_sg(struct request_queue *q, struct request *rq,
 		  struct scatterlist *sglist)
 {
@@ -144,7 +173,7 @@ int blk_rq_map_sg(struct request_queue *q, struct request *rq,
 
     return 0;
 }
-
+#endif
 void blk_put_queue(struct request_queue *q)
 {
     //TODO
@@ -194,12 +223,17 @@ void blk_mq_tagset_busy_iter(struct blk_mq_tag_set *tagset,
 
 void blk_mq_free_request(struct request *rq)
 {
-    struct fipc_message r;
-	struct fipc_message *request = &r;
+	struct fipc_message r;
+	struct fipc_message *_request = &r;
+	struct request_container *req_container;
 
-    async_msg_set_fn_type(request, BLK_MQ_FREE_REQUEST);
+	req_container = container_of(rq, struct request_container,
+				request);
 
-    vmfunc_wrapper(request);
+	async_msg_set_fn_type(_request, BLK_MQ_FREE_REQUEST);
+	fipc_set_reg0(_request, req_container->other_ref.cptr);
+
+	vmfunc_wrapper(_request);
 }
 
 int blk_mq_alloc_tag_set(struct blk_mq_tag_set *set)
@@ -726,12 +760,6 @@ struct request_queue *blk_mq_init_queue(struct blk_mq_tag_set *set)
 	struct fipc_message *request = &r;
 	struct blk_mq_tag_set_container *set_container;
 	struct request_queue_container *rq_container;
-	struct nvme_dev *nvme_dev;
-	struct nvme_ctrl_container *nvme_ctrl_container;
-
-	nvme_dev = container_of(set, struct nvme_dev, admin_tagset);
-	nvme_ctrl_container = container_of(&nvme_dev->ctrl, struct nvme_ctrl_container,
-					nvme_ctrl);
 
 	/* XXX Scary! request_queue size can vary from inside and outside
 	 * LCDs? This is a bit fragile! */
@@ -755,13 +783,13 @@ struct request_queue *blk_mq_init_queue(struct blk_mq_tag_set *set)
 	async_msg_set_fn_type(request, BLK_MQ_INIT_QUEUE);
 	fipc_set_reg0(request, set_container->other_ref.cptr);
 	fipc_set_reg1(request, rq_container->my_ref.cptr);
-	fipc_set_reg2(request, nvme_ctrl_container->other_ref.cptr);
 
 	vmfunc_wrapper(request);
 
 	rq_container->other_ref.cptr = fipc_get_reg0(request);
 
 	printk("%s returns local request queue struct!! \n", __func__);
+	printk("%s, storing other_ref.cptr %lx", __func__, fipc_get_reg0(request));
 	return &rq_container->request_queue;
 
 fail_insert:
@@ -770,17 +798,25 @@ fail_alloc:
 	return NULL;
 }
 
-bool blk_get_queue(struct request_queue *q)
+bool blk_get_queue(struct request_queue *rq)
 {
-    //TODO
-    struct fipc_message r;
-	struct fipc_message *request = &r;
+	struct fipc_message r;
+	struct fipc_message *_request = &r;
+	struct request_queue_container *rq_container;
+	int ret;
+	int func_ret;
 
-    async_msg_set_fn_type(request, BLK_MQ_TAGSET_BUSY_ITER);
+	rq_container = container_of(rq, struct request_queue_container,
+			request_queue);
 
-    vmfunc_wrapper(request);
+	async_msg_set_fn_type(_request, BLK_GET_QUEUE);
+	fipc_set_reg0(_request, rq_container->other_ref.cptr);
 
-    return (bool) fipc_get_reg0(request);
+	ret = vmfunc_wrapper(_request);
+
+	func_ret = fipc_get_reg0(_request);
+
+	return func_ret;
 }
 
 void blk_cleanup_queue(struct request_queue *q)
@@ -1033,50 +1069,48 @@ void device_add_disk(struct device *parent, struct gendisk *disk)
 {
 	struct gendisk_container *disk_container;
 	struct block_device_operations_container *blo_container;
-	struct module_container *module_container;
 	struct request_queue_container *rq_container;
+	struct device_container *device_container = NULL;
 	int ret;
 	struct fipc_message r;
 	struct fipc_message *request = &r;
 
 	disk_container = container_of(disk, struct gendisk_container, gendisk);
 
+	glue_lookup_device(__cptr((unsigned long)parent), &device_container);
+
 	blo_container = container_of(disk->fops,
 				struct block_device_operations_container,
 				block_device_operations);
 
-	module_container = container_of(disk->fops->owner, struct module_container,
-				module);
-
 	rq_container = container_of(disk->queue, struct request_queue_container,
 				request_queue);
 
-	ret = glue_cap_insert_module_type(c_cspace, module_container, &module_container->my_ref);
-	if (ret) {
-		LIBLCD_ERR("lcd insert");
-		goto fail_insert1;
-	}
-
-	ret = glue_cap_insert_gendisk_type(c_cspace, disk_container, &disk_container->my_ref);
+	ret = glue_cap_insert_gendisk_type(c_cspace, disk_container,
+			&disk_container->my_ref);
 	if (ret) {
 		 LIBLCD_ERR("lcd insert");
 		 goto fail_insert2;
 	}
 
-	ret = glue_cap_insert_blk_dev_ops_type(c_cspace, blo_container, &blo_container->my_ref);
+	ret = glue_cap_insert_blk_dev_ops_type(c_cspace, blo_container,
+			&blo_container->my_ref);
 	if(ret) {
 		LIBLCD_ERR("lcd insert");
 		goto fail_insert3;
 	}
 
 	async_msg_set_fn_type(request, DEVICE_ADD_DISK);
-	fipc_set_reg0(request, disk_container->other_ref.cptr);
-	fipc_set_reg1(request, blo_container->my_ref.cptr);
-	fipc_set_reg2(request, module_container->my_ref.cptr);
+
+	fipc_set_reg0(request, device_container->other_ref.cptr);
+	fipc_set_reg1(request, disk_container->other_ref.cptr);
+	fipc_set_reg2(request, blo_container->my_ref.cptr);
 	fipc_set_reg3(request, rq_container->other_ref.cptr);
 	fipc_set_reg4(request, disk->flags);
-	fipc_set_reg5(request, disk->major);
-	fipc_set_reg6(request, disk->first_minor);
+	fipc_set_reg5(request, get_capacity(disk));
+	memcpy((void*) request->regs[6], disk->disk_name, sizeof(unsigned long));
+	//fipc_set_reg5(request, disk->major);
+	//fipc_set_reg6(request, disk->first_minor);
 
 	/*
 	 * Ran out of registers to marshall the string, so hardcoding it
@@ -1085,13 +1119,10 @@ void device_add_disk(struct device *parent, struct gendisk *disk)
 	vmfunc_wrapper(request);
 
 	blo_container->other_ref.cptr = fipc_get_reg0(request);
-	module_container->other_ref.cptr = fipc_get_reg1(request);
-
 	return;
 
 fail_insert3:
 fail_insert2:
-fail_insert1:
 	return;
 }
 
@@ -1101,7 +1132,6 @@ void put_disk(struct gendisk *disk)
 	struct fipc_message *request = &r;
 
 	struct gendisk_container *disk_container;
-	struct module_container *module_container;
 	struct block_device_operations_container *blo_container;
 
 	disk_container = container_of(disk, struct gendisk_container, gendisk);
@@ -1109,20 +1139,15 @@ void put_disk(struct gendisk *disk)
 	blo_container = container_of(disk->fops,
 			struct block_device_operations_container, block_device_operations);
 
-	module_container = container_of(disk->fops->owner, struct
-			module_container, module);
-
 	async_msg_set_fn_type(request, PUT_DISK);
 
 	fipc_set_reg0(request, disk_container->other_ref.cptr);
 	fipc_set_reg1(request, blo_container->other_ref.cptr);
-	fipc_set_reg2(request, module_container->other_ref.cptr);
 
 	vmfunc_wrapper(request);
 
 	glue_cap_remove(c_cspace, disk_container->my_ref);
 	glue_cap_remove(c_cspace, blo_container->my_ref);
-	glue_cap_remove(c_cspace, module_container->my_ref);
 
 	kfree(disk_container);
 	return;
@@ -1256,16 +1281,16 @@ void free_irq(unsigned int irq, void *dev_id)
 
 struct device *get_device(struct device *dev)
 {
-	struct pci_dev_container *device_container;
-	struct pci_dev *pci_dev;
+	struct device_container *device_container = NULL;
 	struct fipc_message r;
 	struct fipc_message *_request = &r;
 	int ret;
 
-	pci_dev = container_of(dev, struct pci_dev, dev);
-	device_container = container_of(pci_dev, struct pci_dev_container, pci_dev);
+	glue_lookup_device(__cptr((unsigned long)dev), &device_container);
+
 	async_msg_set_fn_type(_request, GET_DEVICE);
 	fipc_set_reg0(_request, device_container->other_ref.cptr);
+	fipc_set_reg1(_request, device_container->my_ref.cptr);
 
 	ret = vmfunc_wrapper(_request);
 	return dev;
@@ -1273,16 +1298,16 @@ struct device *get_device(struct device *dev)
 
 void put_device(struct device *dev)
 {
-	struct pci_dev_container *pdev_container;
-	struct pci_dev *pci_dev;
+	struct device_container *device_container = NULL;
 	struct fipc_message r;
 	struct fipc_message *_request = &r;
 	int ret;
 
-	pci_dev = container_of(dev, struct pci_dev, dev);
-	pdev_container = container_of(pci_dev, struct pci_dev_container, pci_dev);
+	glue_lookup_device(__cptr((unsigned long)dev), &device_container);
+
 	async_msg_set_fn_type(_request, PUT_DEVICE);
-	fipc_set_reg0(_request, pdev_container->other_ref.cptr);
+
+	fipc_set_reg0(_request, device_container->other_ref.cptr);
 
 	ret = vmfunc_wrapper(_request);
 	return;
@@ -1298,6 +1323,7 @@ int probe_callee(struct fipc_message *_request)
 	struct pci_dev_container *dev_container;
 	struct pci_driver_container *pdrv_container;
 	struct pci_device_id *id;
+	struct device_container *device_container;
 
 	int func_ret;
 	int ret = 0;
@@ -1329,6 +1355,7 @@ int probe_callee(struct fipc_message *_request)
 		LIBLCD_ERR("kzalloc");
 		goto fail_alloc;
 	}
+
 	ret = glue_cap_insert_pci_dev_type(c_cspace,
 		dev_container,
 		&dev_container->my_ref);
@@ -1336,6 +1363,19 @@ int probe_callee(struct fipc_message *_request)
 		LIBLCD_ERR("lcd insert");
 		goto fail_insert;
 	}
+
+	device_container = kzalloc(sizeof( struct device_container   ),
+		GFP_KERNEL);
+	if (!device_container) {
+		LIBLCD_ERR("kzalloc");
+		goto fail_alloc;
+	}
+
+	device_container->dev = &dev_container->pci_dev.dev;
+
+	glue_insert_device(device_container);
+
+	device_container->other_ref.cptr = fipc_get_reg2(_request);
 
 	id = kzalloc(sizeof(*id), GFP_KERNEL);
 
@@ -1360,7 +1400,8 @@ int probe_callee(struct fipc_message *_request)
 	dev_container->pci_dev.device = PCI_ANY_ID;
 	dev_container->other_ref.cptr = fipc_get_reg1(_request);
 	dev_container->pci_dev.dev.dma_mask = &dma_mask;
-	atomic_set(&dev_container->pci_dev.enable_cnt, LOWER_HALF(fipc_get_reg6(_request)));
+	atomic_set(&dev_container->pci_dev.enable_cnt,
+			LOWER_HALF(fipc_get_reg6(_request)));
 
 	g_pdev = &dev_container->pci_dev;
 
@@ -1774,3 +1815,1028 @@ void dma_pool_free(struct dma_pool *pool, void *vaddr, dma_addr_t dma)
 
 	// return 0;
 // }
+
+void __unregister_chrdev(unsigned int major, unsigned int baseminor, unsigned
+		int count, const char *name)
+{
+	int ret;
+	struct fipc_message r;
+	struct fipc_message *_request = &r;
+	async_msg_set_fn_type(_request, __UNREGISTER_CHRDEV);
+	fipc_set_reg0(_request, major);
+	fipc_set_reg1(_request, baseminor);
+	fipc_set_reg2(_request, count);
+	ret = vmfunc_wrapper(_request);
+	return;
+}
+
+int __register_chrdev(unsigned int major,
+		unsigned int baseminor,
+		unsigned int count,
+		const char *name,
+		const struct file_operations *fops)
+{
+	struct fipc_message r;
+	struct fipc_message *_request = &r;
+	struct file_operations_container *fops_container;
+	int func_ret;
+	int ret;
+
+	fops_container = container_of(fops, struct file_operations_container, fops);
+
+	ret = glue_cap_insert_file_operations_type(c_cspace, fops_container,
+				&fops_container->my_ref);
+
+	if (ret) {
+		LIBLCD_ERR("lcd insert");
+		goto fail_insert;
+	}
+
+	async_msg_set_fn_type(_request, __REGISTER_CHRDEV);
+	fipc_set_reg0(_request, fops_container->my_ref.cptr);
+	fipc_set_reg1(_request, major);
+	fipc_set_reg2(_request, baseminor);
+	fipc_set_reg3(_request, count);
+
+	ret = vmfunc_wrapper(_request);
+	func_ret = fipc_get_reg0(_request);
+	fops_container->other_ref.cptr = fipc_get_reg0(_request);
+	return func_ret;
+fail_insert:
+	return ret;
+}
+
+void ida_destroy(struct ida *ida)
+{
+	struct fipc_message r;
+	struct fipc_message *_request = &r;
+	struct ida_container *ida_container = NULL;
+	int ret;
+
+	ida_container = container_of(ida, struct ida_container, ida);
+
+	async_msg_set_fn_type(_request, IDA_DESTROY);
+	fipc_set_reg0(_request, ida_container->other_ref.cptr);
+	ret = vmfunc_wrapper(_request);
+	return;
+}
+
+int ida_get_new_above(struct ida *ida,
+		int starting_id,
+		int *p_id)
+{
+	struct fipc_message r;
+	struct fipc_message *_request = &r;
+	struct ida_container *ida_container = NULL;
+	int func_ret;
+	int ret;
+
+	ida_container = container_of(ida, struct ida_container, ida);
+	async_msg_set_fn_type(_request, IDA_GET_NEW_ABOVE);
+	fipc_set_reg0(_request, ida_container->other_ref.cptr);
+	fipc_set_reg1(_request, starting_id);
+
+	ret = vmfunc_wrapper(_request);
+
+	func_ret = fipc_get_reg0(_request);
+	*p_id = fipc_get_reg1(_request);
+
+	return func_ret;
+}
+
+void ida_init(struct ida *ida)
+{
+	struct ida_container *ida_container = NULL;
+	struct fipc_message r;
+	struct fipc_message *_request = &r;
+	int ret;
+
+	ida_container = container_of(ida, struct ida_container, ida);
+
+	ret = glue_cap_insert_ida_type(c_cspace, ida_container,
+			&ida_container->my_ref);
+
+	if (ret) {
+		LIBLCD_ERR("lcd insert");
+		goto fail_insert;
+	}
+
+	async_msg_set_fn_type(_request, IDA_INIT);
+	fipc_set_reg0(_request, ida_container->my_ref.cptr);
+	ret = vmfunc_wrapper(_request);
+	ida_container->other_ref.cptr = fipc_get_reg0(_request);
+fail_insert:
+	return;
+}
+
+int ida_pre_get(struct ida *ida,
+		gfp_t gfp_mask)
+{
+	struct fipc_message r;
+	struct fipc_message *_request = &r;
+	struct ida_container *ida_container = NULL;
+	int ret;
+	int func_ret;
+
+	ida_container = container_of(ida, struct ida_container, ida);
+
+	ret = glue_cap_insert_ida_type(c_cspace, ida_container,
+			&ida_container->my_ref);
+
+	if (ret) {
+		LIBLCD_ERR("lcd insert");
+		goto fail_insert;
+	}
+
+	async_msg_set_fn_type(_request, IDA_PRE_GET);
+	fipc_set_reg0(_request, ida_container->my_ref.cptr);
+	fipc_set_reg1(_request, gfp_mask);
+
+	ret = vmfunc_wrapper(_request);
+	func_ret = fipc_get_reg0(_request);
+	ida_container->other_ref.cptr = fipc_get_reg1(_request);
+	return func_ret;
+fail_insert:
+	return ret;
+}
+
+void ida_remove(struct ida *ida, int id)
+{
+	struct fipc_message r;
+	struct fipc_message *_request = &r;
+	struct ida_container *ida_container = NULL;
+	int ret;
+
+	ida_container = container_of(ida, struct ida_container, ida);
+	async_msg_set_fn_type(_request, IDA_REMOVE);
+
+	fipc_set_reg0(_request, ida_container->other_ref.cptr);
+	fipc_set_reg1(_request, id);
+	ret = vmfunc_wrapper(_request);
+	return;
+}
+
+int ida_simple_get(struct ida *ida,
+		unsigned int start,
+		unsigned int end,
+		gfp_t gfp_mask)
+{
+	struct fipc_message r;
+	struct fipc_message *_request = &r;
+	struct ida_container *ida_container = NULL;
+	int ret;
+	int func_ret;
+
+	async_msg_set_fn_type(_request, IDA_SIMPLE_GET);
+	ida_container = container_of(ida, struct ida_container, ida);
+
+	fipc_set_reg0(_request, ida_container->other_ref.cptr);
+	fipc_set_reg1(_request, start);
+	fipc_set_reg2(_request, end);
+	fipc_set_reg3(_request, gfp_mask);
+
+	ret = vmfunc_wrapper(_request);
+
+	func_ret = fipc_get_reg0(_request);
+	return func_ret;
+}
+
+void ida_simple_remove(struct ida *ida, unsigned int id)
+{
+	int ret;
+	struct fipc_message r;
+	struct fipc_message *_request = &r;
+	struct ida_container *ida_container = NULL;
+
+	async_msg_set_fn_type(_request, IDA_SIMPLE_REMOVE);
+
+	ida_container = container_of(ida, struct ida_container, ida);
+
+	fipc_set_reg0(_request, ida_container->other_ref.cptr);
+	fipc_set_reg1(_request, id);
+	ret = vmfunc_wrapper(_request);
+
+	return;
+}
+
+void blk_set_queue_dying(struct request_queue *q)
+{
+	int ret;
+	struct fipc_message r;
+	struct fipc_message *_request = &r;
+	struct request_queue_container *q_container;
+
+	q_container = container_of(q, struct request_queue_container,
+			request_queue);
+
+	async_msg_set_fn_type(_request, BLK_SET_QUEUE_DYING);
+	fipc_set_reg0(_request, q_container->other_ref.cptr);
+	ret = vmfunc_wrapper(_request);
+	return;
+
+}
+
+int blk_rq_unmap_user(struct bio *bio)
+{
+	int ret;
+	int func_ret;
+	struct fipc_message r;
+	struct fipc_message *_request = &r;
+	async_msg_set_fn_type(_request,
+			BLK_RQ_UNMAP_USER);
+	ret = vmfunc_wrapper(_request);
+	func_ret = fipc_get_reg0(_request);
+	return func_ret;
+
+}
+
+void blk_queue_write_cache(struct request_queue *q,
+		bool wc,
+		bool fua)
+{
+	int ret;
+	struct fipc_message r;
+	struct fipc_message *_request = &r;
+	struct request_queue_container *q_container;
+
+	q_container = container_of(q, struct request_queue_container,
+			request_queue);
+
+	async_msg_set_fn_type(_request, BLK_QUEUE_WRITE_CACHE);
+	fipc_set_reg0(_request, q_container->other_ref.cptr);
+	fipc_set_reg1(_request, wc);
+	fipc_set_reg2(_request, fua);
+	ret = vmfunc_wrapper(_request);
+	return;
+}
+
+void blk_queue_virt_boundary(struct request_queue *q,
+		unsigned long mask)
+{
+	int ret;
+	struct fipc_message r;
+	struct fipc_message *_request = &r;
+	struct request_queue_container *q_container;
+
+	q_container = container_of(q, struct request_queue_container,
+			request_queue);
+
+	async_msg_set_fn_type(_request, BLK_QUEUE_VIRT_BOUNDARY);
+	fipc_set_reg0(_request, q_container->other_ref.cptr);
+	fipc_set_reg1(_request, mask);
+	ret = vmfunc_wrapper(_request);
+
+	q->limits.virt_boundary_mask = mask;
+	return;
+}
+
+void blk_queue_max_segments(struct request_queue *q,
+		unsigned short max_segments)
+{
+	int ret;
+	struct fipc_message r;
+	struct fipc_message *_request = &r;
+	struct request_queue_container *q_container;
+
+	q_container = container_of(q, struct request_queue_container,
+			request_queue);
+
+	async_msg_set_fn_type(_request, BLK_QUEUE_MAX_SEGMENTS);
+	fipc_set_reg0(_request, q_container->other_ref.cptr);
+	fipc_set_reg1(_request, max_segments);
+
+	ret = vmfunc_wrapper(_request);
+
+	q->limits.max_segments = max_segments;
+	return;
+
+}
+
+void blk_queue_max_hw_sectors(struct request_queue *q,
+		unsigned int max_hw_sectors)
+{
+	int ret;
+	struct fipc_message r;
+	struct fipc_message *_request = &r;
+	struct request_queue_container *q_container;
+
+	q_container = container_of(q, struct request_queue_container,
+			request_queue);
+
+	async_msg_set_fn_type(_request, BLK_QUEUE_MAX_HW_SECTORS);
+	fipc_set_reg0(_request, q_container->other_ref.cptr);
+	fipc_set_reg1(_request, max_hw_sectors);
+	ret = vmfunc_wrapper(_request);
+	return;
+}
+
+void blk_queue_max_discard_sectors(struct request_queue *q,
+		unsigned int max_discard_sectors)
+{
+	int ret;
+	struct fipc_message r;
+	struct fipc_message *_request = &r;
+	struct request_queue_container *q_container;
+
+	q_container = container_of(q, struct request_queue_container,
+			request_queue);
+
+	async_msg_set_fn_type(_request, BLK_QUEUE_MAX_DISCARD_SECTORS);
+	fipc_set_reg0(_request, q_container->other_ref.cptr);
+	fipc_set_reg1(_request, max_discard_sectors);
+	ret = vmfunc_wrapper(_request);
+	return;
+
+}
+
+void blk_queue_chunk_sectors(struct request_queue *q,
+		unsigned int chunk_sectors)
+{
+	int ret;
+	struct fipc_message r;
+	struct fipc_message *_request = &r;
+	struct request_queue_container *q_container;
+
+	q_container = container_of(q, struct request_queue_container,
+			request_queue);
+
+	async_msg_set_fn_type(_request, BLK_QUEUE_CHUNK_SECTORS);
+	fipc_set_reg0(_request, q_container->other_ref.cptr);
+	fipc_set_reg1(_request, chunk_sectors);
+	ret = vmfunc_wrapper(_request);
+	return;
+}
+
+void blk_mq_unfreeze_queue(struct request_queue *q)
+{
+	int ret;
+	struct fipc_message r;
+	struct fipc_message *_request = &r;
+	struct request_queue_container *q_container;
+
+	q_container = container_of(q, struct request_queue_container,
+			request_queue);
+
+	async_msg_set_fn_type(_request, BLK_MQ_UNFREEZE_QUEUE);
+	fipc_set_reg0(_request, q_container->other_ref.cptr);
+
+	ret = vmfunc_wrapper(_request);
+	return;
+}
+
+void blk_mq_requeue_request(struct request *rq)
+{
+	int ret;
+	struct fipc_message r;
+	struct fipc_message *_request = &r;
+	async_msg_set_fn_type(_request,
+			BLK_MQ_REQUEUE_REQUEST);
+	ret = vmfunc_wrapper(_request);
+	return;
+
+}
+
+int blk_mq_request_started(struct request *rq)
+{
+	int func_ret;
+	int ret;
+	struct fipc_message r;
+	struct fipc_message *_request = &r;
+	async_msg_set_fn_type(_request,
+			BLK_MQ_REQUEST_STARTED);
+	ret = vmfunc_wrapper(_request);
+	func_ret = fipc_get_reg0(_request);
+	return func_ret;
+
+}
+
+void blk_mq_kick_requeue_list(struct request_queue *q)
+{
+	int ret;
+	struct fipc_message r;
+	struct fipc_message *_request = &r;
+	struct request_queue_container *q_container;
+
+	q_container = container_of(q, struct request_queue_container,
+			request_queue);
+
+	async_msg_set_fn_type(_request, BLK_MQ_KICK_REQUEUE_LIST);
+	fipc_set_reg0(_request, q_container->other_ref.cptr);
+
+	ret = vmfunc_wrapper(_request);
+	return;
+}
+
+void blk_mq_freeze_queue(struct request_queue *q)
+{
+	int ret;
+	struct fipc_message r;
+	struct fipc_message *_request = &r;
+	struct request_queue_container *q_container;
+
+	q_container = container_of(q, struct request_queue_container,
+			request_queue);
+
+	async_msg_set_fn_type(_request, BLK_MQ_FREEZE_QUEUE);
+	fipc_set_reg0(_request, q_container->other_ref.cptr);
+	ret = vmfunc_wrapper(_request);
+	return;
+}
+
+void blk_mq_cancel_requeue_work(struct request_queue *q)
+{
+	int ret;
+	struct fipc_message r;
+	struct fipc_message *_request = &r;
+	struct request_queue_container *q_container;
+
+	q_container = container_of(q, struct request_queue_container,
+			request_queue);
+
+	async_msg_set_fn_type(_request, BLK_MQ_CANCEL_REQUEUE_WORK);
+	fipc_set_reg0(_request, q_container->other_ref.cptr);
+
+	ret = vmfunc_wrapper(_request);
+	return;
+}
+
+struct request *blk_mq_alloc_request_hctx(struct request_queue *rq,
+		int rw,
+		unsigned int flags,
+		unsigned int hctx_idx)
+{
+	int ret;
+	struct request *func_ret;
+	struct request_container *func_ret_container = NULL;
+	struct fipc_message r;
+	struct fipc_message *_request = &r;
+	struct request_queue_container *rq_container;
+
+	rq_container = container_of(rq, struct request_queue_container,
+			request_queue);
+
+	func_ret_container = kzalloc(sizeof( struct request_container   ),
+			GFP_KERNEL);
+
+	if (!func_ret_container) {
+		LIBLCD_ERR("kzalloc");
+		goto fail_alloc;
+	}
+
+	func_ret = &func_ret_container->request;
+
+	func_ret->q = rq;
+
+	ret = glue_cap_insert_request_type(c_cspace, func_ret_container,
+		&func_ret_container->my_ref);
+	if (ret) {
+		LIBLCD_ERR("lcd insert");
+		goto fail_insert;
+	}
+	async_msg_set_fn_type(_request, BLK_MQ_ALLOC_REQUEST_HCTX);
+	fipc_set_reg0(_request, rq_container->other_ref.cptr);
+	fipc_set_reg1(_request, func_ret_container->my_ref.cptr);
+	fipc_set_reg2(_request, rw);
+	fipc_set_reg3(_request, flags);
+	fipc_set_reg4(_request, hctx_idx);
+
+	ret = vmfunc_wrapper(_request);
+	func_ret_container->other_ref.cptr = fipc_get_reg0(_request);
+
+	return func_ret;
+fail_alloc:
+fail_insert:
+	return NULL;
+}
+
+struct request *blk_mq_alloc_request(struct request_queue *rq,
+		int rw,
+		unsigned int flags)
+{
+	int ret;
+	struct request *func_ret;
+	struct request_container *func_ret_container = NULL;
+	struct fipc_message r;
+	struct fipc_message *_request = &r;
+	struct request_queue_container *rq_container;
+
+	rq_container = container_of(rq, struct request_queue_container,
+			request_queue);
+
+	func_ret_container = kzalloc(sizeof( struct request_container   ),
+			GFP_KERNEL);
+
+	if (!func_ret_container) {
+		LIBLCD_ERR("kzalloc");
+		goto fail_alloc;
+	}
+
+	func_ret = &func_ret_container->request;
+
+	func_ret->q = rq;
+
+	ret = glue_cap_insert_request_type(c_cspace, func_ret_container,
+		&func_ret_container->my_ref);
+	if (ret) {
+		LIBLCD_ERR("lcd insert");
+		goto fail_insert;
+	}
+	async_msg_set_fn_type(_request, BLK_MQ_ALLOC_REQUEST);
+	fipc_set_reg0(_request, rq_container->other_ref.cptr);
+	fipc_set_reg1(_request, func_ret_container->my_ref.cptr);
+	fipc_set_reg2(_request, rw);
+	fipc_set_reg3(_request, flags);
+
+	ret = vmfunc_wrapper(_request);
+	func_ret_container->other_ref.cptr = fipc_get_reg0(_request);
+
+	return func_ret;
+fail_alloc:
+fail_insert:
+	return NULL;
+}
+
+void blk_mq_abort_requeue_list(struct request_queue *q)
+{
+	int ret;
+	struct fipc_message r;
+	struct fipc_message *_request = &r;
+	struct request_queue_container *q_container;
+
+	q_container = container_of(q, struct request_queue_container,
+			request_queue);
+
+	async_msg_set_fn_type(_request, BLK_MQ_ABORT_REQUEUE_LIST);
+	fipc_set_reg0(_request, q_container->other_ref.cptr);
+
+	ret = vmfunc_wrapper(_request);
+	return;
+}
+
+int blk_execute_rq(struct request_queue *q,
+		struct gendisk *bd_disk,
+		struct request *req,
+		int at_head)
+{
+	int ret;
+	int func_ret;
+	struct fipc_message r;
+	struct fipc_message *_request = &r;
+	struct request_queue_container *rq_container;
+	struct request_container *req_container = NULL;
+	struct gendisk_container *gdisk_container;
+
+	rq_container = container_of(q, struct request_queue_container,
+			request_queue);
+	req_container = container_of(req, struct request_container,
+				request);
+
+	if (bd_disk) {
+		gdisk_container = container_of(bd_disk, struct
+				gendisk_container, gendisk);
+	}
+
+	async_msg_set_fn_type(_request, BLK_EXECUTE_RQ);
+	fipc_set_reg0(_request, rq_container->other_ref.cptr);
+	fipc_set_reg1(_request, req_container->other_ref.cptr);
+
+	if (bd_disk)
+		fipc_set_reg2(_request, gdisk_container->other_ref.cptr);
+
+	fipc_set_reg3(_request, at_head);
+	ret = vmfunc_wrapper(_request);
+	func_ret = fipc_get_reg0(_request);
+	return func_ret;
+}
+
+void bdput(struct block_device *bdev)
+{
+	int ret;
+	struct fipc_message r;
+	struct fipc_message *_request = &r;
+	struct block_device_container *bdev_container;
+
+	bdev_container = container_of(bdev, struct block_device_container,
+				block_device);
+	async_msg_set_fn_type(_request, BDPUT);
+	fipc_set_reg0(_request, bdev_container->other_ref.cptr);
+	ret = vmfunc_wrapper(_request);
+	return;
+}
+
+struct block_device *bdget_disk(struct gendisk *disk, int partno)
+{
+	int ret;
+	struct block_device_container *func_ret_container = NULL;
+	struct fipc_message r;
+	struct fipc_message *_request = &r;
+	struct gendisk_container *gdisk_container;
+	struct block_device *func_ret;
+
+	gdisk_container = container_of(disk, struct gendisk_container, gendisk);
+
+	func_ret_container = kzalloc(sizeof(struct block_device_container),
+			GFP_KERNEL);
+
+	if (!func_ret_container) {
+		LIBLCD_ERR("kzalloc");
+		goto fail_alloc;
+	}
+
+	ret = glue_cap_insert_block_device_type(c_cspace, func_ret_container,
+			&func_ret_container->my_ref);
+
+	if (ret) {
+		LIBLCD_ERR("lcd insert");
+		goto fail_insert;
+	}
+
+	async_msg_set_fn_type(_request, BDGET_DISK);
+	fipc_set_reg0(_request, gdisk_container->other_ref.cptr);
+	fipc_set_reg1(_request, partno);
+	fipc_set_reg2(_request, func_ret_container->my_ref.cptr);
+
+	ret = vmfunc_wrapper(_request);
+	func_ret_container->other_ref.cptr = fipc_get_reg0(_request);
+
+	func_ret = &func_ret_container->block_device;
+
+	return func_ret;
+fail_insert:
+fail_alloc:
+	return NULL;
+}
+
+struct class *__class_create(struct module *owner, const char *name,
+		struct lock_class_key *key)
+{
+	int ret;
+	struct fipc_message r;
+	struct fipc_message *_request = &r;
+	struct class_container *func_ret_container;
+	struct class *func_ret;
+
+	func_ret_container = kzalloc(sizeof(struct class_container),
+			GFP_KERNEL);
+
+	if (!func_ret_container) {
+		LIBLCD_ERR("kzalloc");
+		goto fail_alloc;
+	}
+
+	ret = glue_cap_insert_class_type(c_cspace, func_ret_container,
+			&func_ret_container->my_ref);
+
+	if (ret) {
+		LIBLCD_ERR("lcd insert");
+		goto fail_insert;
+	}
+
+	async_msg_set_fn_type(_request, __CLASS_CREATE);
+	fipc_set_reg0(_request, func_ret_container->my_ref.cptr);
+
+	ret = vmfunc_wrapper(_request);
+
+	func_ret_container->other_ref.cptr = fipc_get_reg0(_request);
+	func_ret = &func_ret_container->class;
+
+	return func_ret;
+fail_alloc:
+fail_insert:
+	return NULL;
+}
+
+void class_destroy(struct class *cls)
+{
+	int ret;
+	struct fipc_message r;
+	struct fipc_message *_request = &r;
+	struct class_container *class_container;
+
+	class_container = container_of(cls, struct class_container, class);
+
+	async_msg_set_fn_type(_request, CLASS_DESTROY);
+	fipc_set_reg0(_request, class_container->other_ref.cptr);
+
+	ret = vmfunc_wrapper(_request);
+	return;
+}
+
+struct device *device_create(struct class *class,
+		struct device *parent,
+		dev_t devt,
+		void *drvdata,
+		const char *fmt,
+		...)
+{
+	int ret;
+	struct device_container *func_ret_container = NULL;
+	struct device *func_ret;
+	struct fipc_message r;
+	struct fipc_message *_request = &r;
+	struct class_container *class_container;
+	va_list valist;
+	int instance;
+	struct device_container *device_container = NULL;
+
+	class_container = container_of(class, struct class_container, class);
+
+	func_ret_container = kzalloc(sizeof( struct device_container   ),
+		GFP_KERNEL);
+	if (!func_ret_container) {
+		LIBLCD_ERR("kzalloc");
+		goto fail_alloc;
+	}
+
+	glue_lookup_device(__cptr((unsigned long) parent), &device_container);
+
+	func_ret = &func_ret_container->device;
+	func_ret_container->dev = &func_ret_container->device;
+
+	glue_insert_device(func_ret_container);
+
+	va_start(valist, fmt);
+	instance = va_arg(valist, int);
+	va_end(valist);
+
+	async_msg_set_fn_type(_request, DEVICE_CREATE);
+	fipc_set_reg0(_request, class_container->other_ref.cptr);
+	fipc_set_reg1(_request, device_container->other_ref.cptr);
+	fipc_set_reg2(_request, devt);
+	fipc_set_reg3(_request, func_ret_container->my_ref.cptr);
+	fipc_set_reg4(_request, instance);
+
+	ret = vmfunc_wrapper(_request);
+
+	func_ret_container->other_ref.cptr = fipc_get_reg0(_request);
+
+	return func_ret;
+fail_alloc:
+	return NULL;
+}
+
+void device_destroy(struct class *class,
+		dev_t devt)
+{
+	int ret;
+	struct fipc_message r;
+	struct fipc_message *_request = &r;
+	struct class_container *class_container;
+
+	class_container = container_of(class, struct class_container, class);
+	async_msg_set_fn_type(_request, DEVICE_DESTROY);
+	fipc_set_reg0(_request, class_container->other_ref.cptr);
+	fipc_set_reg1(_request, devt);
+	ret = vmfunc_wrapper(_request);
+	return;
+}
+
+int fops_open_callee(struct fipc_message *_request)
+{
+        struct inode *inode = NULL;
+        struct file_container *file_container = NULL;
+	struct file_operations_container *fops_container;
+        struct file *file = NULL;
+        int ret = 0;
+        int func_ret = 0;
+
+	inode = kzalloc(sizeof( *inode ), GFP_KERNEL);
+
+	if (!inode) {
+		LIBLCD_ERR("kzalloc");
+		goto fail_alloc;
+	}
+
+	inode->i_rdev = fipc_get_reg2(_request);
+
+        file_container = kzalloc(sizeof( struct file_container   ),
+                GFP_KERNEL);
+        if (!file_container) {
+                LIBLCD_ERR("kzalloc");
+                goto fail_alloc;
+        }
+        file = &file_container->file;
+        ret = glue_cap_insert_file_type(c_cspace,
+                file_container,
+                &file_container->my_ref);
+        if (ret) {
+                LIBLCD_ERR("lcd insert");
+                goto fail_insert;
+        }
+
+        file_container->other_ref.cptr = fipc_get_reg1(_request);
+
+	ret = glue_cap_lookup_file_operations_type(c_cspace,
+				__cptr(fipc_get_reg0(_request)),
+				&fops_container);
+
+	if (ret) {
+		LIBLCD_ERR("fail lookup");
+		goto fail_lookup;
+	}
+
+	func_ret = fops_container->fops.open(inode, file);
+
+	fipc_set_reg0(_request, func_ret);
+	fipc_set_reg1(_request, file_container->my_ref.cptr);
+
+fail_alloc:
+fail_lookup:
+fail_insert:
+	return ret;
+
+}
+
+int fops_release_callee(struct fipc_message *_request)
+{
+	struct inode *inode = NULL;
+	struct file *file = NULL;
+	int ret = 0;
+	int func_ret = 0;
+        struct file_container *file_container = NULL;
+	struct file_operations_container *fops_container;
+
+	ret = glue_cap_lookup_file_type(c_cspace,
+			__cptr(fipc_get_reg1(_request)), &file_container);
+
+        if (ret) {
+                LIBLCD_ERR("lcd lookup");
+                goto fail_lookup;
+        }
+
+        file = &file_container->file;
+
+	ret = glue_cap_lookup_file_operations_type(c_cspace,
+				__cptr(fipc_get_reg0(_request)),
+				&fops_container);
+
+	if (ret) {
+		LIBLCD_ERR("fail lookup");
+		goto fail_lookup;
+	}
+
+	func_ret = fops_container->fops.release(inode, file);
+
+	fipc_set_reg0(_request, func_ret);
+
+fail_lookup:
+	return ret;
+}
+
+int fops_unlocked_ioctl_callee(struct fipc_message *_request)
+{
+	struct file *file = NULL;
+	int ret = 0;
+	int func_ret = 0;
+        struct file_container *file_container = NULL;
+	struct file_operations_container *fops_container;
+	unsigned 	int cmd = 0;
+	unsigned 	long arg = 0;
+
+	cmd = fipc_get_reg2(_request);
+	arg = fipc_get_reg3(_request);
+
+	ret = glue_cap_lookup_file_type(c_cspace,
+			__cptr(fipc_get_reg1(_request)), &file_container);
+
+        if (ret) {
+                LIBLCD_ERR("lcd lookup");
+                goto fail_lookup;
+        }
+
+        file = &file_container->file;
+
+	ret = glue_cap_lookup_file_operations_type(c_cspace,
+				__cptr(fipc_get_reg0(_request)),
+				&fops_container);
+
+	if (ret) {
+		LIBLCD_ERR("fail lookup");
+		goto fail_lookup;
+	}
+
+	func_ret = fops_container->fops.unlocked_ioctl(file, cmd, arg);
+
+	fipc_set_reg0(_request, func_ret);
+
+fail_lookup:
+	return ret;
+}
+
+bool capable(int cap)
+{
+	int ret;
+	struct fipc_message r;
+	struct fipc_message *_request = &r;
+	bool yes;
+
+	async_msg_set_fn_type(_request, CAPABLE);
+	fipc_set_reg0(_request, cap);
+
+	ret = vmfunc_wrapper(_request);
+	yes = fipc_get_reg0(_request);
+	return yes;
+}
+
+int revalidate_disk(struct gendisk *disk)
+{
+	int ret;
+	int func_ret;
+	struct gendisk_container *gdisk_container;
+	struct fipc_message r;
+	struct fipc_message *_request = &r;
+
+	gdisk_container = container_of(disk, struct gendisk_container, gendisk);
+
+	async_msg_set_fn_type(_request, REVALIDATE_DISK);
+	fipc_set_reg0(_request, gdisk_container->other_ref.cptr);
+
+	ret = vmfunc_wrapper(_request);
+	func_ret = fipc_get_reg0(_request);
+
+	return func_ret;
+}
+
+void blk_add_request_payload(struct request *rq, struct page *page,
+		int offset, unsigned int len)
+{
+	struct bio *bio = rq->bio;
+
+	bio->bi_io_vec->bv_page = page;
+	bio->bi_io_vec->bv_offset = offset;
+	bio->bi_io_vec->bv_len = len;
+
+	bio->bi_iter.bi_size = len;
+	bio->bi_vcnt = 1;
+	bio->bi_phys_segments = 1;
+
+	rq->__data_len = rq->resid_len = len;
+	rq->nr_phys_segments = 1;
+}
+
+int blk_rq_map_user(struct request_queue *q, struct request *rq,
+		    struct rq_map_data *map_data, void __user *ubuf,
+		    unsigned long len, gfp_t gfp_mask)
+{
+	LIBLCD_MSG("%s, called", __func__);
+	return 0;
+}
+
+int blk_rq_map_kern(struct request_queue *q, struct request *rq, void *kbuf,
+		    unsigned int len, gfp_t gfp_mask)
+{
+	struct fipc_message r;
+	struct fipc_message *_request = &r;
+	int func_ret;
+	int ret;
+	unsigned 	long p_mem_sz;
+	unsigned 	long p_offset;
+	cptr_t p_cptr;
+	struct request_container *rq_container = NULL;
+	struct request_queue_container *q_container;
+
+	q_container = container_of(q, struct request_queue_container,
+			request_queue);
+	rq_container = container_of(rq, struct request_container, request);
+
+	ret = lcd_virt_to_cptr(__gva(( unsigned  long )kbuf), &p_cptr,
+			&p_mem_sz, &p_offset);
+
+	if (ret) {
+		LIBLCD_ERR("virt to cptr failed");
+		goto fail_virt;
+	}
+
+	LIBLCD_MSG("%s, called", __func__);
+
+	printk("%s, passing q->other_ref.cptr %lx", __func__,
+				q_container->other_ref.cptr);
+	async_msg_set_fn_type(_request, BLK_RQ_MAP_KERN);
+	fipc_set_reg0(_request, q_container->other_ref.cptr);
+	fipc_set_reg1(_request, rq_container->other_ref.cptr);
+	fipc_set_reg2(_request, ilog2((p_mem_sz) >> (PAGE_SHIFT)));
+	fipc_set_reg3(_request, p_offset);
+	fipc_set_reg4(_request, cptr_val(p_cptr));
+	fipc_set_reg5(_request, len);
+	fipc_set_reg6(_request, gfp_mask);
+
+	ret = vmfunc_wrapper(_request);
+
+	func_ret = fipc_get_reg0(_request);
+
+	return func_ret;
+fail_virt:
+	return ret;
+}
+
+unsigned long _lcd_copy_from_user(void *to, const void *from, unsigned long n)
+{
+	LIBLCD_MSG("%s, called", __func__);
+	return 0;
+}
+
+unsigned long _lcd_copy_to_user(void  *to, const void *from, unsigned long n)
+{
+	LIBLCD_MSG("%s, called", __func__);
+	return 0;
+}

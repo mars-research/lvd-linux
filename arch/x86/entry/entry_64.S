@@ -107,9 +107,11 @@ ENDPROC(native_usergs_sysret64)
 
 	/* VMFUNC back into the kernel to access debug info */
 	VMFUNC_TO_KERNEL
+#ifdef CONFIG_LCD_TRACE_BUFFER
 	/* Dump trace (run on the debug stack)*/
 	movq    vmfunc_state_page + VMFUNC_debug_stack, %rsp
 	call dump_ring_trace_buffer	
+#endif
 	
 	/* Halt the CPU dropping into the hypervisor */
 	movl $0x4BF00039, %eax
@@ -126,10 +128,11 @@ ENDPROC(native_usergs_sysret64)
 
 	/* VMFUNC back into the kernel to access debug info */
 	VMFUNC_TO_KERNEL
+#ifdef CONFIG_LCD_TRACE_BUFFER
 	/* Dump trace (run on the debug stack)*/
 	movq    vmfunc_state_page + VMFUNC_debug_stack, %rsp
 	call dump_ring_trace_buffer	
-
+#endif
 	//debug_lvd_page_fault
 
 	/* Halt the CPU dropping into the hypervisor */

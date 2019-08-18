@@ -160,6 +160,10 @@ int blk_klcd_dispatch_async_loop(struct fipc_message *message)
 			trace(BLK_MQ_INIT_QUEUE);
 			return blk_mq_init_queue_callee(message);
 
+		case BLK_GET_QUEUE:
+			trace(BLK_GET_QUEUE);
+			return blk_get_queue_callee(message);
+
 		case BLK_MQ_END_REQUEST:
 			/* trace(BLK_MQ_END_REQUEST); */
 			return blk_mq_end_request_callee(message);
@@ -184,6 +188,10 @@ int blk_klcd_dispatch_async_loop(struct fipc_message *message)
 			trace(BLK_MQ_MAP_QUEUE);
 			return blk_mq_map_queue_callee(message);
 
+		case BLK_RQ_MAP_KERN:
+			trace(BLK_RQ_MAP_KERN);
+			return blk_rq_map_kern_callee(message);
+
 		case BLK_QUEUE_LOGICAL_BLOCK_SIZE:
 			trace(BLK_QUEUE_LOGICAL_BLOCK_SIZE);
 			return blk_queue_logical_block_size_callee(message);
@@ -195,10 +203,6 @@ int blk_klcd_dispatch_async_loop(struct fipc_message *message)
 		case BLK_CLEANUP_QUEUE:
 			trace(BLK_CLEANUP_QUEUE);
 			return blk_cleanup_queue_callee(message);
-
-		case BLK_MQ_STOP_HW_QUEUES:
-			trace(BLK_MQ_STOP_HW_QUEUES);
-			return blk_mq_stop_hw_queues_callee(message);
 
 		case IRQ_SET_AFFINITY_HINT:
 			trace(IRQ_SET_AFFINITY_HINT);
@@ -254,6 +258,142 @@ int blk_klcd_dispatch_async_loop(struct fipc_message *message)
 			trace(SYNCHRONIZE_IRQ);
 			ret =  synchronize_irq_callee(message);
 			break;
+
+		case __UNREGISTER_CHRDEV:
+			trace(__UNREGISTER_CHRDEV);
+			return __unregister_chrdev_callee(message);
+
+		case __REGISTER_CHRDEV:
+			trace(__REGISTER_CHRDEV);
+			return __register_chrdev_callee(message);
+
+		case IDA_DESTROY:
+			trace(IDA_DESTROY);
+			return ida_destroy_callee(message);
+
+		case IDA_GET_NEW_ABOVE:
+			trace(IDA_GET_NEW_ABOVE);
+			return ida_get_new_above_callee(message);
+
+		case IDA_INIT:
+			trace(IDA_INIT);
+			return ida_init_callee(message);
+
+		case IDA_PRE_GET:
+			trace(IDA_PRE_GET);
+			return ida_pre_get_callee(message);
+
+		case IDA_REMOVE:
+			trace(IDA_REMOVE);
+			return ida_remove_callee(message);
+
+		case IDA_SIMPLE_GET:
+			trace(IDA_SIMPLE_GET);
+			return ida_simple_get_callee(message);
+
+		case IDA_SIMPLE_REMOVE:
+			trace(IDA_SIMPLE_REMOVE);
+			return ida_simple_remove_callee(message);
+
+		case BLK_SET_QUEUE_DYING:
+			trace(BLK_SET_QUEUE_DYING);
+			return blk_set_queue_dying_callee(message);
+
+		case BLK_RQ_UNMAP_USER:
+			trace(BLK_RQ_UNMAP_USER);
+			return blk_rq_unmap_user_callee(message);
+
+		case BLK_QUEUE_WRITE_CACHE:
+			trace(BLK_QUEUE_WRITE_CACHE);
+			return blk_queue_write_cache_callee(message);
+
+		case BLK_QUEUE_VIRT_BOUNDARY:
+			trace(BLK_QUEUE_VIRT_BOUNDARY);
+			return blk_queue_virt_boundary_callee(message);
+
+		case BLK_QUEUE_MAX_SEGMENTS:
+			trace(BLK_QUEUE_MAX_SEGMENTS);
+			return blk_queue_max_segments_callee(message);
+
+		case BLK_QUEUE_MAX_HW_SECTORS:
+			trace(BLK_QUEUE_MAX_HW_SECTORS);
+			return blk_queue_max_hw_sectors_callee(message);
+
+		case BLK_QUEUE_MAX_DISCARD_SECTORS:
+			trace(BLK_QUEUE_MAX_DISCARD_SECTORS);
+			return blk_queue_max_discard_sectors_callee(message);
+
+		case BLK_QUEUE_CHUNK_SECTORS:
+			trace(BLK_QUEUE_CHUNK_SECTORS);
+			return blk_queue_chunk_sectors_callee(message);
+
+		case BLK_MQ_UNFREEZE_QUEUE:
+			trace(BLK_MQ_UNFREEZE_QUEUE);
+			return blk_mq_unfreeze_queue_callee(message);
+
+		case BLK_MQ_STOP_HW_QUEUES:
+			trace(BLK_MQ_STOP_HW_QUEUES);
+			return blk_mq_stop_hw_queues_callee(message);
+
+		case BLK_MQ_REQUEUE_REQUEST:
+			trace(BLK_MQ_REQUEUE_REQUEST);
+			return blk_mq_requeue_request_callee(message);
+
+		case BLK_MQ_REQUEST_STARTED:
+			trace(BLK_MQ_REQUEST_STARTED);
+			return blk_mq_request_started_callee(message);
+
+		case BLK_MQ_KICK_REQUEUE_LIST:
+			trace(BLK_MQ_KICK_REQUEUE_LIST);
+			return blk_mq_kick_requeue_list_callee(message);
+
+		case BLK_MQ_FREEZE_QUEUE:
+			trace(BLK_MQ_FREEZE_QUEUE);
+			return blk_mq_freeze_queue_callee(message);
+
+		case BLK_MQ_CANCEL_REQUEUE_WORK:
+			trace(BLK_MQ_CANCEL_REQUEUE_WORK);
+			return blk_mq_cancel_requeue_work_callee(message);
+
+		case BLK_MQ_ALLOC_REQUEST_HCTX:
+			trace(BLK_MQ_ALLOC_REQUEST_HCTX);
+			return blk_mq_alloc_request_hctx_callee(message);
+
+		case BLK_MQ_ALLOC_REQUEST:
+			trace(BLK_MQ_ALLOC_REQUEST);
+			return blk_mq_alloc_request_callee(message);
+
+		case BLK_MQ_ABORT_REQUEUE_LIST:
+			trace(BLK_MQ_ABORT_REQUEUE_LIST);
+			return blk_mq_abort_requeue_list_callee(message);
+
+		case BLK_EXECUTE_RQ:
+			trace(BLK_EXECUTE_RQ);
+			return blk_execute_rq_callee(message);
+
+		case BDPUT:
+			trace(BDPUT);
+			return bdput_callee(message);
+
+		case BDGET_DISK:
+			trace(BDGET_DISK);
+			return bdget_disk_callee(message);
+
+		case __CLASS_CREATE:
+			trace(__CLASS_CREATE);
+			return __class_create_callee(message);
+
+		case CLASS_DESTROY:
+			trace(CLASS_DESTROY);
+			return class_destroy_callee(message);
+
+		case DEVICE_CREATE:
+			trace(DEVICE_CREATE);
+			return device_create_callee(message);
+
+		case DEVICE_DESTROY:
+			trace(DEVICE_DESTROY);
+			return device_destroy_callee(message);
 
 		default:
 			LIBLCD_ERR("unexpected function label: %d",

@@ -1,3 +1,71 @@
+#include "nvme_glue_helper.h"
+
+int glue_cap_insert_bio_type(struct glue_cspace *cspace,
+		struct bio_container *bio_container,
+		struct cptr *c_out)
+{
+	return glue_cspace_insert(cspace,
+		bio_container,
+		glue_libcap_type_ops[ GLUE_TYPE_BIO_CONTAINER ].libcap_type,
+		c_out);
+
+}
+
+int glue_cap_lookup_bio_type(struct glue_cspace *cspace,
+		struct cptr c,
+		struct bio_container **bio_container)
+{
+	return glue_cspace_lookup(cspace,
+		c,
+		glue_libcap_type_ops[ GLUE_TYPE_BIO_CONTAINER ].libcap_type,
+		( void  ** )bio_container);
+
+}
+
+int glue_cap_insert_block_device_type(struct glue_cspace *cspace,
+		struct block_device_container *block_device_container,
+		struct cptr *c_out)
+{
+	return glue_cspace_insert(cspace,
+		block_device_container,
+		glue_libcap_type_ops[ GLUE_TYPE_BLOCK_DEVICE_CONTAINER ].libcap_type,
+		c_out);
+
+}
+
+int glue_cap_lookup_block_device_type(struct glue_cspace *cspace,
+		struct cptr c,
+		struct block_device_container **block_device_container)
+{
+	return glue_cspace_lookup(cspace,
+		c,
+		glue_libcap_type_ops[ GLUE_TYPE_BLOCK_DEVICE_CONTAINER ].libcap_type,
+		( void  ** )block_device_container);
+
+}
+
+int glue_cap_insert_class_type(struct glue_cspace *cspace,
+		struct class_container *class_container,
+		struct cptr *c_out)
+{
+	return glue_cspace_insert(cspace,
+		class_container,
+		glue_libcap_type_ops[ GLUE_TYPE_CLASS_CONTAINER ].libcap_type,
+		c_out);
+
+}
+
+int glue_cap_lookup_class_type(struct glue_cspace *cspace,
+		struct cptr c,
+		struct class_container **class_container)
+{
+	return glue_cspace_lookup(cspace,
+		c,
+		glue_libcap_type_ops[ GLUE_TYPE_CLASS_CONTAINER ].libcap_type,
+		( void  ** )class_container);
+
+}
+
 int glue_cap_insert_device_type(struct glue_cspace *cspace,
 		struct device_container *device_container,
 		struct cptr *c_out)
@@ -19,71 +87,6 @@ int glue_cap_lookup_device_type(struct glue_cspace *cspace,
 		( void  ** )device_container);
 
 }
-
-int glue_cap_insert_nvme_ctrl_ops_type(struct glue_cspace *cspace,
-                        struct nvme_ctrl_ops_container *nvme_ctrl_ops_container,
-                        cptr_t *c_out)
-{
-	return glue_cspace_insert(cspace,
-		nvme_ctrl_ops_container,
-		glue_libcap_type_ops[ GLUE_TYPE_NVME_CTRL_OPS_CONTAINER ].libcap_type,
-		c_out);
-
-}
-
-int glue_cap_lookup_nvme_ctrl_ops_type(struct glue_cspace *cspace,
-		 	cptr_t c,
-			struct nvme_ctrl_ops_container **nvme_ctrl_ops_container)
-{
-	return glue_cspace_lookup(cspace,
-		c,
-		glue_libcap_type_ops[ GLUE_TYPE_NVME_CTRL_OPS_CONTAINER ].libcap_type,
-		( void  ** )nvme_ctrl_ops_container);
-
-}
-
-int glue_cap_insert_nvme_ctrl_type(struct glue_cspace *cspace,
-                        struct nvme_ctrl_container *nvme_ctrl_container,
-                        cptr_t *c_out)
-{
-	return glue_cspace_insert(cspace,
-		nvme_ctrl_container,
-		glue_libcap_type_ops[ GLUE_TYPE_NVME_CTRL_CONTAINER ].libcap_type,
-		c_out);
-}
-
-int glue_cap_lookup_nvme_ctrl_type(struct glue_cspace *cspace,
-		 	cptr_t c,
-			struct nvme_ctrl_container **nvme_ctrl_container)
-{
-	return glue_cspace_lookup(cspace,
-		c,
-		glue_libcap_type_ops[ GLUE_TYPE_NVME_CTRL_CONTAINER ].libcap_type,
-		( void  ** )nvme_ctrl_container);
-}
-
-int glue_cap_insert_module_type(struct glue_cspace *cspace,
-		struct module_container *module_container,
-		struct cptr *c_out)
-{
-	return glue_cspace_insert(cspace,
-		module_container,
-		glue_libcap_type_ops[ GLUE_TYPE_MODULE_CONTAINER ].libcap_type,
-		c_out);
-
-}
-
-int glue_cap_lookup_module_type(struct glue_cspace *cspace,
-		struct cptr c,
-		struct module_container **module_container)
-{
-	return glue_cspace_lookup(cspace,
-		c,
-		glue_libcap_type_ops[ GLUE_TYPE_MODULE_CONTAINER ].libcap_type,
-		( void  ** )module_container);
-
-}
-
 
 int glue_cap_insert_pci_bus_type(struct glue_cspace *cspace,
 		struct pci_bus_container *pci_bus_container,
@@ -185,34 +188,12 @@ int glue_cap_lookup_irqhandler_type(struct glue_cspace *cspace,
 
 }
 
-int glue_cap_lookup_nvme_command_type(struct glue_cspace *cspace,
-		struct cptr c,
-		struct nvme_command_container **nvme_command_container)
-{
-	return glue_cspace_lookup(cspace,
-		c,
-		glue_libcap_type_ops[ GLUE_TYPE_NVME_COMMAND_CONTAINER ].libcap_type,
-		( void  ** )nvme_command_container);
-
-}
-
-int glue_cap_lookup_nvme_ns_type(struct glue_cspace *cspace,
-		struct cptr c,
-		struct nvme_ns_container **nvme_ns_container)
-{
-	return glue_cspace_lookup(cspace,
-		c,
-		glue_libcap_type_ops[ GLUE_TYPE_NVME_NS_CONTAINER ].libcap_type,
-		( void  ** )nvme_ns_container);
-
-}
-
 int glue_cap_insert_blk_mq_ops_type(struct glue_cspace *cspace, 
 			struct blk_mq_ops_container *blk_mq_ops_container,
 		        cptr_t *c_out) {
 
         return glue_cspace_insert(cspace, blk_mq_ops_container,  
-                                glue_libcap_type_ops[GLUE_TYPE_BLK_MQ_OPS].libcap_type,
+                                glue_libcap_type_ops[GLUE_TYPE_BLK_MQ_OPS_CONTAINER].libcap_type,
                                 c_out);
 }
 
@@ -222,27 +203,7 @@ int glue_cap_insert_blk_dev_ops_type(struct glue_cspace *cspace,
 			cptr_t *c_out) { 
 
 	 return glue_cspace_insert(cspace, blo_container,
-			 	glue_libcap_type_ops[GLUE_TYPE_BLK_DEV_OPS].libcap_type,
-				c_out);
-
-}
-
-int glue_cap_insert_nvme_command_type(struct glue_cspace *cspace,
-			struct nvme_command *cmd_container,
-			cptr_t *c_out) { 
-
-	 return glue_cspace_insert(cspace, cmd_container,
-			 	glue_libcap_type_ops[GLUE_TYPE_NVME_COMMAND_CONTAINER].libcap_type,
-				c_out);
-
-}
-
-int glue_cap_insert_nvme_ns_type(struct glue_cspace *cspace,
-			struct nvme_ns *ns_container,
-			cptr_t *c_out) { 
-
-	 return glue_cspace_insert(cspace, ns_container,
-			 	glue_libcap_type_ops[GLUE_TYPE_NVME_NS_CONTAINER].libcap_type,
+			 	glue_libcap_type_ops[GLUE_TYPE_BLK_DEV_OPS_CONTAINER].libcap_type,
 				c_out);
 
 }
@@ -252,7 +213,7 @@ int glue_cap_insert_blk_mq_tag_set_type(struct glue_cspace *cspace,
 			 cptr_t *c_out) {
 	
        return glue_cspace_insert(cspace, set_container,  
-                                glue_libcap_type_ops[GLUE_TYPE_BLK_MQ_TAG_SET].libcap_type,
+                                glue_libcap_type_ops[GLUE_TYPE_BLK_MQ_TAG_SET_CONTAINER].libcap_type,
                                 c_out);
 }
 
@@ -261,7 +222,7 @@ int glue_cap_insert_gendisk_type(struct glue_cspace *cspace,
 			cptr_t *c_out) {
 
         return glue_cspace_insert(cspace, disk_container,  
-                                glue_libcap_type_ops[GLUE_TYPE_GENDISK].libcap_type,
+                                glue_libcap_type_ops[GLUE_TYPE_GENDISK_CONTAINER].libcap_type,
                                 c_out);
 
 }
@@ -271,7 +232,7 @@ int glue_cap_insert_blk_mq_hw_ctx_type(struct glue_cspace *cspace,
 			cptr_t *c_out) {
 
         return glue_cspace_insert(cspace, ctx_container,  
-                                glue_libcap_type_ops[GLUE_TYPE_BLK_MQ_HW_CTX].libcap_type,
+                                glue_libcap_type_ops[GLUE_TYPE_BLK_MQ_HW_CTX_CONTAINER].libcap_type,
                                 c_out);
 
 }
@@ -281,8 +242,30 @@ int glue_cap_insert_blk_mq_queue_data_type(struct glue_cspace *cspace,
 			cptr_t *c_out) {
 
         return glue_cspace_insert(cspace, bd_container,  
-                                glue_libcap_type_ops[GLUE_TYPE_BLK_MQ_QUEUE_DATA].libcap_type,
+                                glue_libcap_type_ops[GLUE_TYPE_BLK_MQ_QUEUE_DATA_CONTAINER].libcap_type,
                                 c_out);
+
+}
+
+int glue_cap_insert_request_type(struct glue_cspace *cspace,
+		struct request_container *request_container,
+		struct cptr *c_out)
+{
+	return glue_cspace_insert(cspace,
+		request_container,
+		glue_libcap_type_ops[ GLUE_TYPE_REQUEST_CONTAINER ].libcap_type,
+		c_out);
+
+}
+
+int glue_cap_lookup_request_type(struct glue_cspace *cspace,
+		struct cptr c,
+		struct request_container **request_container)
+{
+	return glue_cspace_lookup(cspace,
+		c,
+		glue_libcap_type_ops[ GLUE_TYPE_REQUEST_CONTAINER ].libcap_type,
+		( void  ** )request_container);
 
 }
 
@@ -291,7 +274,7 @@ int glue_cap_insert_request_queue_type(struct glue_cspace *cspace,
 			cptr_t *c_out) {
 
         return glue_cspace_insert(cspace, req_queue_container,  
-                                glue_libcap_type_ops[GLUE_TYPE_REQUEST_QUEUE].libcap_type,
+                                glue_libcap_type_ops[GLUE_TYPE_REQUEST_QUEUE_CONTAINER].libcap_type,
                                 c_out);
 
 }
@@ -302,7 +285,7 @@ int glue_cap_lookup_blk_mq_ops_type(struct glue_cspace *cspace,
 
         return glue_cspace_lookup(
                 cspace, c,
-                glue_libcap_type_ops[GLUE_TYPE_BLK_MQ_OPS].libcap_type,
+                glue_libcap_type_ops[GLUE_TYPE_BLK_MQ_OPS_CONTAINER].libcap_type,
                 (void **)blk_mq_ops_container);
 
 }
@@ -313,7 +296,7 @@ int glue_cap_lookup_blk_mq_tag_set_type(struct glue_cspace *cspace,
 
         return glue_cspace_lookup(
                 cspace, c,
-                glue_libcap_type_ops[GLUE_TYPE_BLK_MQ_TAG_SET].libcap_type,
+                glue_libcap_type_ops[GLUE_TYPE_BLK_MQ_TAG_SET_CONTAINER].libcap_type,
                 (void **)set_container);
 
 }
@@ -324,7 +307,7 @@ int glue_cap_lookup_blk_dev_ops_type(struct glue_cspace *cspace,
 
         return glue_cspace_lookup(
                 cspace, c,
-                glue_libcap_type_ops[GLUE_TYPE_BLK_DEV_OPS].libcap_type,
+                glue_libcap_type_ops[GLUE_TYPE_BLK_DEV_OPS_CONTAINER].libcap_type,
                 (void **)blo_container);
 
 }
@@ -335,7 +318,7 @@ int glue_cap_lookup_gendisk_type(struct glue_cspace *cspace,
 
         return glue_cspace_lookup(
                 cspace, c,
-                glue_libcap_type_ops[GLUE_TYPE_GENDISK].libcap_type,
+                glue_libcap_type_ops[GLUE_TYPE_GENDISK_CONTAINER].libcap_type,
                 (void **)disk_container);
 
 }
@@ -346,7 +329,7 @@ int glue_cap_lookup_blk_mq_hw_ctx_type(struct glue_cspace *cspace,
 
         return glue_cspace_lookup(
                 cspace, c,
-                glue_libcap_type_ops[GLUE_TYPE_BLK_MQ_HW_CTX].libcap_type,
+                glue_libcap_type_ops[GLUE_TYPE_BLK_MQ_HW_CTX_CONTAINER].libcap_type,
                 (void **)ctx_container);
 
 }
@@ -357,7 +340,7 @@ int glue_cap_lookup_blk_mq_queue_data_type(struct glue_cspace *cspace,
 
         return glue_cspace_lookup(
                 cspace, c,
-                glue_libcap_type_ops[GLUE_TYPE_BLK_MQ_QUEUE_DATA].libcap_type,
+                glue_libcap_type_ops[GLUE_TYPE_BLK_MQ_QUEUE_DATA_CONTAINER].libcap_type,
                 (void **)bd_container);
 
 }
@@ -369,7 +352,73 @@ int glue_cap_lookup_request_queue_type(struct glue_cspace *cspace,
 
         return glue_cspace_lookup(
                 cspace, c,
-                glue_libcap_type_ops[GLUE_TYPE_REQUEST_QUEUE].libcap_type,
+                glue_libcap_type_ops[GLUE_TYPE_REQUEST_QUEUE_CONTAINER].libcap_type,
                 (void **)req_queue_container);
+
+}
+
+int glue_cap_insert_ida_type(struct glue_cspace *cspace,
+		struct ida_container *ida_container,
+		struct cptr *c_out)
+{
+	return glue_cspace_insert(cspace,
+		ida_container,
+		glue_libcap_type_ops[ GLUE_TYPE_IDA_CONTAINER ].libcap_type,
+		c_out);
+
+}
+
+int glue_cap_lookup_ida_type(struct glue_cspace *cspace,
+		struct cptr c,
+		struct ida_container **ida_container)
+{
+	return glue_cspace_lookup(cspace,
+		c,
+		glue_libcap_type_ops[ GLUE_TYPE_IDA_CONTAINER ].libcap_type,
+		( void  ** )ida_container);
+
+}
+
+int glue_cap_insert_file_type(struct glue_cspace *cspace,
+		struct file_container *file_container,
+		struct cptr *c_out)
+{
+	return glue_cspace_insert(cspace,
+		file_container,
+		glue_libcap_type_ops[ GLUE_TYPE_FILE_CONTAINER ].libcap_type,
+		c_out);
+
+}
+
+int glue_cap_lookup_file_type(struct glue_cspace *cspace,
+		struct cptr c,
+		struct file_container **file_container)
+{
+	return glue_cspace_lookup(cspace,
+		c,
+		glue_libcap_type_ops[ GLUE_TYPE_FILE_CONTAINER ].libcap_type,
+		( void  ** )file_container);
+
+}
+
+int glue_cap_insert_file_operations_type(struct glue_cspace *cspace,
+		struct file_operations_container *file_operations_container,
+		struct cptr *c_out)
+{
+	return glue_cspace_insert(cspace,
+		file_operations_container,
+		glue_libcap_type_ops[ GLUE_TYPE_FILE_OPERATIONS_CONTAINER ].libcap_type,
+		c_out);
+
+}
+
+int glue_cap_lookup_file_operations_type(struct glue_cspace *cspace,
+		struct cptr c,
+		struct file_operations_container **file_operations_container)
+{
+	return glue_cspace_lookup(cspace,
+		c,
+		glue_libcap_type_ops[ GLUE_TYPE_FILE_OPERATIONS_CONTAINER ].libcap_type,
+		( void  ** )file_operations_container);
 
 }

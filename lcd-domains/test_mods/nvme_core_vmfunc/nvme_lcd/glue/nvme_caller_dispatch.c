@@ -17,36 +17,6 @@ int handle_rpc_calls(struct fipc_message *message)
 	fn_type = async_msg_get_fn_type(message);
 
 	switch (fn_type) {
-        
-#if 0
-		case NVME_PCI_REG_READ32:
-			trace(NVME_PCI_REG_READ32);
-			return nvme_pci_reg_read32_callee(message);
-
-		case NVME_PCI_REG_WRITE32:
-			trace(NVME_PCI_REG_WRITE32);
-			return nvme_pci_reg_write32_callee(message);
-
-		case NVME_PCI_REG_READ64:
-			trace(NVME_PCI_REG_READ64);
-			return nvme_pci_reg_read64_callee(message);
-
-		case NVME_PCI_RESET_CTRL:
-			trace(NVME_PCI_RESET_CTRL);
-			return nvme_pci_reset_ctrl_callee(message);
-
-		case NVME_PCI_FREE_CTRL:
-			trace(NVME_PCI_FREE_CTRL);
-			return nvme_pci_free_ctrl_callee(message);
-
-		case NVME_PCI_POST_SCAN:
-			trace(NVME_PCI_POST_SCAN);
-			return nvme_pci_post_scan_callee(message);
-
-		case NVME_PCI_SUBMIT_ASYNC_EVENT:
-			trace(NVME_PCI_SUBMIT_ASYNC_EVENT);
-			return nvme_pci_submit_async_event_callee(message);
-#endif
 		case QUEUE_RQ_FN:
 			trace(QUEUE_RQ_FN);
 			return queue_rq_fn_callee(message);
@@ -74,6 +44,18 @@ int handle_rpc_calls(struct fipc_message *message)
 		case POLL_FN:
 			trace(POLL_FN);
 			return poll_fn_callee(message);
+
+		case FOPS_OPEN_FN:
+			trace(FOPS_OPEN_FN);
+			return fops_open_callee(message);
+
+		case FOPS_RELEASE_FN:
+			trace(FOPS_RELEASE_FN);
+			return fops_release_callee(message);
+
+		case FOPS_UNLOCKED_IOCTL_FN:
+			trace(FOPS_UNLOCKED_IOCTL_FN);
+			return fops_unlocked_ioctl_callee(message);
 
 	        // case OPEN:
 			// trace(OPEN);

@@ -62,6 +62,10 @@ lib-y += $(addprefix liblcd/arch/x86/dma/, \
 	pci-dma.o \
 	)
 
+lib-y += $(addprefix liblcd/block/, \
+	blk-merge.o \
+	)
+
 lib-y += $(addprefix liblcd/net/, \
 	dev_addr_lists.o \
 	dev.o \

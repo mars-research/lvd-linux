@@ -1105,8 +1105,12 @@ static const struct pr_ops nvme_pr_ops = {
 	.pr_preempt	= nvme_pr_preempt,
 	.pr_clear	= nvme_pr_clear,
 };
-
+#ifdef LCD_ISOLATE
+static const struct block_device_operations_container nvme_fops_container = {
+	. block_device_operations = {
+#else
 static const struct block_device_operations nvme_fops = {
+#endif
 	.owner		= THIS_MODULE,
 	.ioctl		= nvme_ioctl,
 	.compat_ioctl	= nvme_compat_ioctl,
@@ -1115,6 +1119,9 @@ static const struct block_device_operations nvme_fops = {
 	.getgeo		= nvme_getgeo,
 	.revalidate_disk= nvme_revalidate_disk,
 	.pr_ops		= &nvme_pr_ops,
+#ifdef LCD_ISOLATE
+	}
+#endif
 };
 
 static int nvme_wait_ready(struct nvme_ctrl *ctrl, u64 cap, bool enabled)
@@ -1750,7 +1757,7 @@ static void nvme_alloc_ns(struct nvme_ctrl *ctrl, unsigned nsid)
 	blk_queue_logical_block_size(ns->queue, 1 << ns->lba_shift);
 	nvme_set_queue_limits(ctrl, ns->queue);
 
-	disk->fops = &nvme_fops;
+	disk->fops = &nvme_fops_container.block_device_operations;
 	disk->private_data = ns;
 	disk->queue = ns->queue;
 	disk->flags = GENHD_FL_EXT_DEVT;

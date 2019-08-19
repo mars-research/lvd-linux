@@ -1266,9 +1266,12 @@ int bd_open(struct block_device *device, fmode_t mode,
 	int ret = 0;
 	struct fipc_message r;
 	struct fipc_message *request = &r;
+	struct block_device_operations_container *bdops_container =
+		hidden_args->struct_container;
 
-	async_msg_set_fn_type(request, BD_OPEN);
-	fipc_set_reg0(request, mode);
+	async_msg_set_fn_type(request, BD_OPEN_FN);
+	fipc_set_reg0(request, bdops_container->other_ref.cptr);
+	fipc_set_reg1(request, mode);
 
 	printk("%s, %s:%d on cpu:%d\n", __func__, current->comm, current->pid,
 				smp_processor_id());
@@ -1285,15 +1288,18 @@ void bd_release(struct gendisk *disk, fmode_t mode,
 	struct fipc_message r;
 	struct fipc_message *request = &r;
 	struct gendisk_container *disk_container;
+	struct block_device_operations_container *bdops_container =
+		hidden_args->struct_container;
 
 	disk_container = container_of(disk, struct gendisk_container, gendisk);
 
 	printk("%s, %s:%d on cpu:%d\n", __func__, current->comm, current->pid,
 				smp_processor_id());
 
-	async_msg_set_fn_type(request, BD_RELEASE);
-	fipc_set_reg0(request, disk_container->other_ref.cptr);
-	fipc_set_reg1(request, mode);
+	async_msg_set_fn_type(request, BD_RELEASE_FN);
+	fipc_set_reg0(request, bdops_container->other_ref.cptr);
+	fipc_set_reg1(request, disk_container->other_ref.cptr);
+	fipc_set_reg2(request, mode);
 
 	vmfunc_klcd_wrapper(request, 1);
 
@@ -1396,6 +1402,43 @@ void LCD_TRAMPOLINE_LINKAGE(bd_release_trampoline) bd_release_trampoline(struct 
 	return rel_fp(disk, mode, hidden_args);
 }
 
+long bd_ioctl(struct block_device *bdev, fmode_t mode, unsigned int cmd,
+		unsigned long arg, struct trampoline_hidden_args *hidden_args)
+{
+	int ret;
+	long func_ret;
+	struct fipc_message r;
+	struct fipc_message *_request = &r;
+	struct block_device_operations_container *bdops_container =
+		hidden_args->struct_container;
+
+	async_msg_set_fn_type(_request, BD_IOCTL_FN);
+	fipc_set_reg0(_request, bdops_container->other_ref.cptr);
+	fipc_set_reg1(_request, mode);
+	fipc_set_reg2(_request, cmd);
+	fipc_set_reg3(_request, arg);
+
+	ret = vmfunc_klcd_wrapper(_request, 1);
+
+	func_ret = fipc_get_reg0(_request);
+
+	return func_ret;
+}
+
+LCD_TRAMPOLINE_DATA(bd_ioctl_trampoline);
+long LCD_TRAMPOLINE_LINKAGE(bd_ioctl_trampoline)
+bd_ioctl_trampoline(struct block_device *bdev, fmode_t mode, unsigned int cmd,
+		unsigned long arg)
+{
+	long ( *volatile bd_ioctl_fn_fp )(struct block_device*, fmode_t, unsigned int,
+			unsigned long,
+			struct trampoline_hidden_args *);
+	struct trampoline_hidden_args *hidden_args;
+	LCD_TRAMPOLINE_PROLOGUE(hidden_args, bd_ioctl_trampoline);
+	bd_ioctl_fn_fp = bd_ioctl;
+	return bd_ioctl_fn_fp(bdev, mode, cmd, arg, hidden_args);
+}
+
 int device_add_disk_callee(struct fipc_message *request)
 {
 	struct gendisk_container *disk_container;
@@ -1405,6 +1448,7 @@ int device_add_disk_callee(struct fipc_message *request)
 	struct gendisk *disk;
 	struct trampoline_hidden_args *open_hargs;
 	struct trampoline_hidden_args *rel_hargs;
+	struct trampoline_hidden_args *ioctl_hargs;
 	struct device *parent;
 	int ret;
 
@@ -1492,6 +1536,33 @@ int device_add_disk_callee(struct fipc_message *request)
                 LIBLCD_ERR("set mem nx");
                 goto fail_x2;
         }
+
+	/* ioctl */
+	ioctl_hargs = kzalloc(sizeof(*ioctl_hargs), GFP_KERNEL);
+        if (!ioctl_hargs) {
+                LIBLCD_ERR("kzalloc hidden args");
+                goto fail_alloc5;
+        }
+
+        ioctl_hargs->t_handle = LCD_DUP_TRAMPOLINE(bd_ioctl_trampoline);
+        if (!ioctl_hargs->t_handle) {
+                LIBLCD_ERR("duplicate trampoline");
+                goto fail_dup2;
+        }
+
+	ioctl_hargs->t_handle->hidden_args = ioctl_hargs;
+        ioctl_hargs->struct_container = blo_container;
+
+        blo_container->block_device_operations.ioctl = LCD_HANDLE_TO_TRAMPOLINE(ioctl_hargs->t_handle);
+
+        ret = set_memory_x(((unsigned long)ioctl_hargs->t_handle) & PAGE_MASK,
+                        ALIGN(LCD_TRAMPOLINE_SIZE(bd_ioctl_trampoline),
+                                PAGE_SIZE) >> PAGE_SHIFT);
+        if (ret) {
+                LIBLCD_ERR("set mem nx");
+                goto fail_x2;
+        }
+
 
 	disk = &disk_container->gendisk;
 	printk("address of disk before calling add_diks %p \n",disk);

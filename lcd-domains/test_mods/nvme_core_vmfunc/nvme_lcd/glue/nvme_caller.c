@@ -30,13 +30,7 @@ struct pcidev_info dev_assign = { 0x0000, 0x04, 0x00, 0x0 };
 
 /* XXX: How to determine this? */
 #define CPTR_HASH_BITS      5
-static DEFINE_HASHTABLE(cptr_table, CPTR_HASH_BITS);
-
 static DEFINE_HASHTABLE(dev_table, CPTR_HASH_BITS);
-//void null_softirq_done_fn(struct request *rq);
-
-//int null_open(struct block_device *bdev, fmode_t mode);
-//void null_release(struct gendisk *disk, fmode_t mode);
 
 /*
 void stub(void)
@@ -65,7 +59,7 @@ int glue_nvme_init(void)
 		goto fail2;
 	}
 
-	hash_init(cptr_table);
+	hash_init(dev_table);
 
 	return 0;
 
@@ -159,21 +153,7 @@ int irq_set_affinity_hint(unsigned int irq, const struct cpumask *m)
 
 	return func_ret;
 }
-#if 0
-int blk_rq_map_sg(struct request_queue *q, struct request *rq,
-		  struct scatterlist *sglist)
-{
-    //TODO
-    struct fipc_message r;
-	struct fipc_message *request = &r;
 
-    async_msg_set_fn_type(request, BLK_RQ_MAP_SG);
-
-    vmfunc_wrapper(request);
-
-    return 0;
-}
-#endif
 void blk_put_queue(struct request_queue *q)
 {
     //TODO
@@ -235,6 +215,8 @@ void blk_mq_free_request(struct request *rq)
 
 	vmfunc_wrapper(_request);
 }
+
+size_t cmd_size;
 
 int blk_mq_alloc_tag_set(struct blk_mq_tag_set *set)
 {
@@ -298,6 +280,8 @@ int blk_mq_alloc_tag_set(struct blk_mq_tag_set *set)
 			goto fail_alloc;
 		}
 	}
+
+	cmd_size = set->cmd_size;
 
 	return func_ret;
 
@@ -1785,37 +1769,6 @@ void dma_pool_free(struct dma_pool *pool, void *vaddr, dma_addr_t dma)
     // return ret;
 // }
 
-
-// int open_callee(struct fipc_message *_request)
-// {
-	// int ret;
-
-	// fmode_t mode = fipc_get_reg0(_request);
-
-	// ret = null_open(NULL, mode);
-
-	// fipc_set_reg0(_request, ret);
-
-	// return ret;
-// }
-
-
-
-// int release_callee(struct fipc_message *_request)
-// {
-	// struct gendisk_container *disk_container;
-	// int ret;
-	// fmode_t mode;
-
-	// ret = glue_cap_lookup_gendisk_type(c_cspace, __cptr(fipc_get_reg0(_request)),
-					// &disk_container);
-	// mode = fipc_get_reg1(_request);
-
-	// null_release(&disk_container->gendisk, mode);
-
-	// return 0;
-// }
-
 void __unregister_chrdev(unsigned int major, unsigned int baseminor, unsigned
 		int count, const char *name)
 {
@@ -2722,6 +2675,101 @@ int fops_unlocked_ioctl_callee(struct fipc_message *_request)
 fail_lookup:
 	return ret;
 }
+
+int bd_open_callee(struct fipc_message *_request)
+{
+        int ret = 0;
+        int func_ret = 0;
+	fmode_t mode;
+	struct block_device *bdev = NULL;
+	struct block_device_operations_container *bdops_container;
+
+	ret = glue_cap_lookup_blk_dev_ops_type(c_cspace,
+				__cptr(fipc_get_reg0(_request)),
+				&bdops_container);
+
+	if (ret) {
+		LIBLCD_ERR("fail lookup");
+		goto fail_lookup;
+	}
+
+	mode = fipc_get_reg1(_request);
+
+	func_ret = bdops_container->block_device_operations.open(bdev, mode);
+
+	fipc_set_reg0(_request, func_ret);
+
+fail_lookup:
+	return ret;
+}
+
+int bd_release_callee(struct fipc_message *_request)
+{
+	int ret = 0;
+	struct block_device_operations_container *bdops_container;
+	struct gendisk_container *disk_container;
+	struct gendisk *disk;
+	fmode_t mode;
+
+	ret = glue_cap_lookup_blk_dev_ops_type(c_cspace,
+				__cptr(fipc_get_reg0(_request)),
+				&bdops_container);
+
+	if (ret) {
+		LIBLCD_ERR("fail lookup");
+		goto fail_lookup;
+	}
+
+	ret = glue_cap_lookup_gendisk_type(c_cspace,
+			__cptr(fipc_get_reg1(_request)), &disk_container);
+
+        if (ret) {
+                LIBLCD_ERR("lcd lookup");
+                goto fail_lookup;
+        }
+
+	disk = &disk_container->gendisk;
+
+	mode = fipc_get_reg1(_request);
+
+	bdops_container->block_device_operations.release(disk, mode);
+
+
+fail_lookup:
+	return ret;
+}
+
+int bd_ioctl_callee(struct fipc_message *_request)
+{
+	int ret;
+	int func_ret;
+	unsigned int cmd;
+	unsigned long arg;
+	fmode_t mode;
+	struct block_device *bdev = NULL;
+	struct block_device_operations_container *bdops_container;
+
+	ret = glue_cap_lookup_blk_dev_ops_type(c_cspace,
+				__cptr(fipc_get_reg0(_request)),
+				&bdops_container);
+
+	if (ret) {
+		LIBLCD_ERR("fail lookup");
+		goto fail_lookup;
+	}
+
+	mode = fipc_get_reg1(_request);
+	cmd = fipc_get_reg2(_request);
+	arg = fipc_get_reg3(_request);
+
+	func_ret = bdops_container->block_device_operations.ioctl(bdev, mode, cmd, arg);
+
+	fipc_set_reg0(_request, func_ret);
+
+fail_lookup:
+	return ret;
+}
+
 
 bool capable(int cap)
 {

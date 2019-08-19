@@ -326,15 +326,29 @@ static void nvme_free_iod(struct nvme_dev *dev, struct request *req)
 	int i;
 	__le64 **list = iod_list(req);
 	dma_addr_t prp_dma = iod->first_dma;
+#ifdef LCD_ISOLATE
+	size_t alloc_sz;
+#endif
 
 	nvme_cleanup_cmd(req);
 
-	if (iod->npages == 0)
+	if (iod->npages == 0) {
+#ifdef LCD_ISOLATE
+		alloc_sz = 256 * 2;
+		dma_free_coherent(dev->dev, alloc_sz, list[0], prp_dma);
+#else
 		dma_pool_free(dev->prp_small_pool, list[0], prp_dma);
+#endif
+	}
 	for (i = 0; i < iod->npages; i++) {
 		__le64 *prp_list = list[i];
 		dma_addr_t next_prp_dma = le64_to_cpu(prp_list[last_prp]);
+#ifdef LCD_ISOLATE
+		alloc_sz = PAGE_SIZE * 2;
+		dma_free_coherent(dev->dev, alloc_sz, list[0], prp_dma);
+#else
 		dma_pool_free(dev->prp_page_pool, prp_list, prp_dma);
+#endif
 		prp_dma = next_prp_dma;
 	}
 
@@ -424,6 +438,9 @@ static bool nvme_setup_prps(struct nvme_dev *dev, struct request *req,
 	__le64 **list = iod_list(req);
 	dma_addr_t prp_dma;
 	int nprps, i;
+#ifdef LCD_ISOLATE
+	size_t alloc_sz;
+#endif
 
 	length -= (page_size - offset);
 	if (length <= 0)
@@ -445,14 +462,24 @@ static bool nvme_setup_prps(struct nvme_dev *dev, struct request *req,
 
 	nprps = DIV_ROUND_UP(length, page_size);
 	if (nprps <= (256 / 8)) {
+#ifdef LCD_ISOLATE
+		alloc_sz = 256 * 2;
+#endif
 		pool = dev->prp_small_pool;
 		iod->npages = 0;
 	} else {
+#ifdef LCD_ISOLATE
+		alloc_sz = PAGE_SIZE * 2;
+#endif
 		pool = dev->prp_page_pool;
 		iod->npages = 1;
 	}
-
+#ifdef LCD_ISOLATE
+	prp_list = dma_alloc_coherent(dev->dev, alloc_sz, &prp_dma, GFP_KERNEL);
+#else
 	prp_list = dma_pool_alloc(pool, GFP_ATOMIC, &prp_dma);
+#endif
+
 	if (!prp_list) {
 		iod->first_dma = dma_addr;
 		iod->npages = -1;
@@ -464,7 +491,12 @@ static bool nvme_setup_prps(struct nvme_dev *dev, struct request *req,
 	for (;;) {
 		if (i == page_size >> 3) {
 			__le64 *old_prp_list = prp_list;
+#ifdef LCD_ISOLATE
+			prp_list = dma_alloc_coherent(dev->dev, PAGE_SIZE +
+					PAGE_SIZE, &prp_dma, GFP_KERNEL);
+#else
 			prp_list = dma_pool_alloc(pool, GFP_ATOMIC, &prp_dma);
+#endif
 			if (!prp_list)
 				return false;
 			list[iod->npages++] = prp_list;
@@ -1755,7 +1787,7 @@ static void nvme_dev_disable(struct nvme_dev *dev, bool shutdown)
 	mutex_unlock(&dev->shutdown_lock);
 }
 
-#if 0
+#ifndef LCD_ISOLATE
 static int nvme_setup_prp_pools(struct nvme_dev *dev)
 {
 	dev->prp_page_pool = dma_pool_create("prp list page", dev->dev,
@@ -1772,13 +1804,13 @@ static int nvme_setup_prp_pools(struct nvme_dev *dev)
 	}
 	return 0;
 }
-#endif
 
 static void nvme_release_prp_pools(struct nvme_dev *dev)
 {
 	dma_pool_destroy(dev->prp_page_pool);
 	dma_pool_destroy(dev->prp_small_pool);
 }
+#endif
 
 static void nvme_pci_free_ctrl(struct nvme_ctrl *ctrl)
 {
@@ -2041,7 +2073,7 @@ static int nvme_probe(struct pci_dev *pdev, const struct pci_device_id *id)
 	init_completion(&dev->ioq_wait);
 #endif
 
-#if 0
+#ifndef LCD_ISOLATE
 	result = nvme_setup_prp_pools(dev);
 	if (result)
 		goto put_pci;
@@ -2065,8 +2097,10 @@ static int nvme_probe(struct pci_dev *pdev, const struct pci_device_id *id)
 	return 0;
 
 release_pools:
+#ifndef LCD_ISOLATE
 	nvme_release_prp_pools(dev);
-//put_pci:
+put_pci:
+#endif
 	put_device(dev->dev);
 	nvme_dev_unmap(dev);
 free:
@@ -2124,7 +2158,9 @@ static void nvme_remove(struct pci_dev *pdev)
 	nvme_dev_remove_admin(dev);
 	nvme_free_queues(dev, 0);
 	nvme_release_cmb(dev);
+#ifndef LCD_ISOLATE
 	nvme_release_prp_pools(dev);
+#endif
 	nvme_dev_unmap(dev);
 	nvme_put_ctrl(&dev->ctrl);
 }

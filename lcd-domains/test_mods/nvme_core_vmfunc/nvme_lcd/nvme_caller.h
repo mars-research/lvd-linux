@@ -29,8 +29,9 @@ int exit_hctx_fn_callee(struct fipc_message *request);
 int init_request_fn_callee(struct fipc_message *request);
 int poll_fn_callee(struct fipc_message *request);
 int softirq_done_fn_callee(struct fipc_message *request);
-int open_callee(struct fipc_message *request);
-int release_callee(struct fipc_message *request);
+int bd_open_callee(struct fipc_message *request);
+int bd_release_callee(struct fipc_message *request);
+int bd_ioctl_callee(struct fipc_message *_request);
 
 int fops_open_callee(struct fipc_message *_request);
 int fops_release_callee(struct fipc_message *_request);

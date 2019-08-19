@@ -57,6 +57,19 @@ int handle_rpc_calls(struct fipc_message *message)
 			trace(FOPS_UNLOCKED_IOCTL_FN);
 			return fops_unlocked_ioctl_callee(message);
 
+		case BD_OPEN_FN:
+			trace(BD_OPEN_FN);
+			return bd_open_callee(message);
+
+		case BD_RELEASE_FN:
+			trace(BD_RELEASE_FN);
+			return bd_release_callee(message);
+
+		case BD_IOCTL_FN:
+			trace(BD_IOCTL_FN);
+			return bd_ioctl_callee(message);
+
+
 	        // case OPEN:
 			// trace(OPEN);
 			// return open_callee(message);

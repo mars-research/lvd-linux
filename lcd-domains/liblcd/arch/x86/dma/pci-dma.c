@@ -172,7 +172,6 @@ bool arch_dma_alloc_attrs(struct device **dev, gfp_t *gfp)
 		return false;
 #endif
 	return true;
-
 }
 EXPORT_SYMBOL(arch_dma_alloc_attrs);
 

@@ -762,7 +762,8 @@ struct request_queue *blk_mq_init_queue(struct blk_mq_tag_set *set)
 		goto fail_insert;
 	}
 
-	set_container = container_of(set, struct blk_mq_tag_set_container, tag_set);
+	set_container = container_of(set, struct blk_mq_tag_set_container,
+			tag_set);
 
 	async_msg_set_fn_type(request, BLK_MQ_INIT_QUEUE);
 	fipc_set_reg0(request, set_container->other_ref.cptr);
@@ -2830,6 +2831,7 @@ int blk_rq_map_user(struct request_queue *q, struct request *rq,
 	return 0;
 }
 
+#if 0
 int blk_rq_map_kern(struct request_queue *q, struct request *rq, void *kbuf,
 		    unsigned int len, gfp_t gfp_mask)
 {
@@ -2876,6 +2878,7 @@ int blk_rq_map_kern(struct request_queue *q, struct request *rq, void *kbuf,
 fail_virt:
 	return ret;
 }
+#endif
 
 unsigned long _lcd_copy_from_user(void *to, const void *from, unsigned long n)
 {

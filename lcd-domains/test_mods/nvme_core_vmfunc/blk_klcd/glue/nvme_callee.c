@@ -754,7 +754,8 @@ int _init_hctx_fn(struct blk_mq_hw_ctx *ctx, void *data, unsigned int index, str
 	ctx_container = container_of(ctx, struct blk_mq_hw_ctx_container, blk_mq_hw_ctx);
 	ops_container = (struct blk_mq_ops_container *)hidden_args->struct_container;
 
-	ret = glue_cap_insert_blk_mq_hw_ctx_type(c_cspace, ctx_container, &ctx_container->my_ref);
+	ret = glue_cap_insert_blk_mq_hw_ctx_type(c_cspace, ctx_container,
+			&ctx_container->my_ref);
 	if (ret) {
 		LIBLCD_ERR("klcd insert");
 		goto fail_insert;
@@ -1206,13 +1207,16 @@ int blk_mq_alloc_tag_set_callee(struct fipc_message *request)
 	printk("set_other_ref %ld \n",set_container->other_ref.cptr);
 
 	/* Allocate ops_container */
-	g_blk_mq_ops_container = ops_container = kzalloc(sizeof(struct blk_mq_ops_container), GFP_KERNEL);
-	if (!set_container) {
+	g_blk_mq_ops_container = ops_container = kzalloc(sizeof(struct
+				blk_mq_ops_container), GFP_KERNEL);
+
+	if (!g_blk_mq_ops_container) {
 		LIBLCD_ERR("kzalloc");
 		goto fail_alloc2;
 	}
 
-	err = glue_cap_insert_blk_mq_ops_type(c_cspace, ops_container, &ops_container->my_ref);
+	err = glue_cap_insert_blk_mq_ops_type(c_cspace, ops_container,
+			&ops_container->my_ref);
 	if (err) {
 		LIBLCD_ERR("lcd insert");
 		goto fail_insert2;

@@ -63,6 +63,9 @@ lib-y += $(addprefix liblcd/arch/x86/dma/, \
 	)
 
 lib-y += $(addprefix liblcd/block/, \
+	bio.o \
+	blk-core.o \
+	blk-map.o \
 	blk-merge.o \
 	)
 

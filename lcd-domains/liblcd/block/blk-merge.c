@@ -138,3 +138,98 @@ int blk_rq_map_sg(struct request_queue *q, struct request *rq,
 	return nsegs;
 }
 EXPORT_SYMBOL(blk_rq_map_sg);
+
+static unsigned int __blk_recalc_rq_segments(struct request_queue *q,
+					     struct bio *bio,
+					     bool no_sg_merge)
+{
+	struct bio_vec bv, bvprv = { NULL };
+	int cluster, prev = 0;
+	unsigned int seg_size, nr_phys_segs;
+	struct bio *fbio, *bbio;
+	struct bvec_iter iter;
+
+	if (!bio)
+		return 0;
+
+	/*
+	 * This should probably be returning 0, but blk_add_request_payload()
+	 * (Christoph!!!!)
+	 */
+	if (bio_op(bio) == REQ_OP_DISCARD || bio_op(bio) == REQ_OP_SECURE_ERASE)
+		return 1;
+
+	if (bio_op(bio) == REQ_OP_WRITE_SAME)
+		return 1;
+
+	fbio = bio;
+	cluster = blk_queue_cluster(q);
+	seg_size = 0;
+	nr_phys_segs = 0;
+	for_each_bio(bio) {
+		bio_for_each_segment(bv, bio, iter) {
+			/*
+			 * If SG merging is disabled, each bio vector is
+			 * a segment
+			 */
+			if (no_sg_merge)
+				goto new_segment;
+
+			if (prev && cluster) {
+				if (seg_size + bv.bv_len
+				    > queue_max_segment_size(q))
+					goto new_segment;
+				if (!BIOVEC_PHYS_MERGEABLE(&bvprv, &bv))
+					goto new_segment;
+				if (!BIOVEC_SEG_BOUNDARY(q, &bvprv, &bv))
+					goto new_segment;
+
+				seg_size += bv.bv_len;
+				bvprv = bv;
+				continue;
+			}
+new_segment:
+			if (nr_phys_segs == 1 && seg_size >
+			    fbio->bi_seg_front_size)
+				fbio->bi_seg_front_size = seg_size;
+
+			nr_phys_segs++;
+			bvprv = bv;
+			prev = 1;
+			seg_size = bv.bv_len;
+		}
+		bbio = bio;
+	}
+
+	if (nr_phys_segs == 1 && seg_size > fbio->bi_seg_front_size)
+		fbio->bi_seg_front_size = seg_size;
+	if (seg_size > bbio->bi_seg_back_size)
+		bbio->bi_seg_back_size = seg_size;
+
+	return nr_phys_segs;
+}
+
+void blk_recount_segments(struct request_queue *q, struct bio *bio)
+{
+	unsigned short seg_cnt;
+
+	/* estimate segment number by bi_vcnt for non-cloned bio */
+	if (bio_flagged(bio, BIO_CLONED))
+		seg_cnt = bio_segments(bio);
+	else
+		seg_cnt = bio->bi_vcnt;
+
+	if (test_bit(QUEUE_FLAG_NO_SG_MERGE, &q->queue_flags) &&
+			(seg_cnt < queue_max_segments(q)))
+		bio->bi_phys_segments = seg_cnt;
+	else {
+		struct bio *nxt = bio->bi_next;
+
+		bio->bi_next = NULL;
+		bio->bi_phys_segments = __blk_recalc_rq_segments(q, bio, false);
+		bio->bi_next = nxt;
+	}
+
+	bio_set_flag(bio, BIO_SEG_VALID);
+}
+EXPORT_SYMBOL(blk_recount_segments);

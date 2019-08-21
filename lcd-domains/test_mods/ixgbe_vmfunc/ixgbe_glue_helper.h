@@ -103,6 +103,7 @@ struct poll_container {
 struct irqhandler_t_container {
 	irqreturn_t (*irqhandler)(int, void *);
 	void *data;
+	int napi_idx;
 	cptr_t my_ref;
 	cptr_t other_ref;
 };

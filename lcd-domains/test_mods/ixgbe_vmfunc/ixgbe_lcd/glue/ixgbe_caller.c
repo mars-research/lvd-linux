@@ -2025,6 +2025,7 @@ int request_threaded_irq(unsigned int irq, irq_handler_t handler,
 	struct fipc_message *_request = &r;
 	struct irqhandler_t_container *irqhandler_container;
 	int func_ret;
+	static int irq_regd;
 
 	INIT_IPC_MSG(&r);
 	printk("%s, irq # %d", __func__, irq);
@@ -2049,6 +2050,9 @@ int request_threaded_irq(unsigned int irq, irq_handler_t handler,
 	fipc_set_reg0(_request, irq);
 	fipc_set_reg1(_request, irqhandler_container->my_ref.cptr);
 	fipc_set_reg2(_request, flags);
+	memcpy((void*)&_request->regs[3], name, sizeof(unsigned long));
+
+	fipc_set_reg4(_request, irq_regd++);
 
 	vmfunc_wrapper(_request);
 

@@ -45,6 +45,11 @@ struct stats {
 	unsigned long num_sent;
 } g_stats;
 
+#ifdef NAPI_STRUCT_ARRAY
+struct napi_struct *napi_struct_array[32];
+static int napi_reg;
+#endif
+
 #define NAPI_HASH_BITS	5
 DEFINE_HASHTABLE(napi_hashtable, NAPI_HASH_BITS);
 
@@ -3196,7 +3201,7 @@ fail_lookup:
 	return ret;
 }
 
-#define HANDLE_IRQ_LOCALLY
+//#define HANDLE_IRQ_LOCALLY
 
 irqreturn_t msix_vector_handler(int irq, void *data)
 {
@@ -3204,6 +3209,10 @@ irqreturn_t msix_vector_handler(int irq, void *data)
 	struct fipc_message *_request = &r;
 	struct irqhandler_t_container *irqhandler_container;
 	irqreturn_t irqret;
+	int napi_idx;
+#ifdef HANDLE_IRQ_LOCALLY
+	struct napi_struct *napi;
+#endif
 
 	INIT_IPC_MSG(&r);
 
@@ -3216,18 +3225,31 @@ irqreturn_t msix_vector_handler(int irq, void *data)
 
 	/* pass this irqhandler's other ref cptr */
 	fipc_set_reg1(_request, irqhandler_container->other_ref.cptr);
+	napi_idx = irqhandler_container->napi_idx;
 
+	if (napi_idx == NUM_HW_QUEUES) {
+		vmfunc_klcd_wrapper(_request, 1);
+		irqret = fipc_get_reg0(_request);
+		goto exit;
+
+	} else {
 #ifdef HANDLE_IRQ_LOCALLY
 	irqret = IRQ_HANDLED;
-	napi_schedule_irqoff(napi_q0);
+	if ((napi_idx >= 0) && (napi_idx < NUM_HW_QUEUES)) {
+		napi = napi_struct_array[napi_idx];
+		napi_schedule_irqoff(napi);
+	}
+	//napi_schedule_irqoff(napi_q0);
 #else
 #ifdef CONFIG_LCD_TRACE_BUFFER
 	add_trace_entry(EVENT_MSIX_HANDLER, async_msg_get_fn_type(_request));
 #endif
-	vmfunc_klcd_wrapper(_request, 1);
+		vmfunc_klcd_wrapper(_request, 1);
 
-	irqret = fipc_get_reg0(_request);
+		irqret = fipc_get_reg0(_request);
+	}
 #endif
+exit:
 	return irqret;
 }
 
@@ -3263,11 +3285,11 @@ int request_threaded_irq_callee(struct fipc_message *_request)
 	irq = fipc_get_reg0(_request);
 	irqhandler_container->other_ref.cptr = fipc_get_reg1(_request);
 	flags = fipc_get_reg2(_request);
+	memcpy((void*) vector_name, (void*) &_request->regs[3], sizeof(unsigned long));
+	irqhandler_container->napi_idx = fipc_get_reg4(_request);
 
-	snprintf(vector_name, IFNAMSIZ + 9, "TxRx%d", irq);
-
-	LIBLCD_MSG("%s, request_threaded_irq for %d | name: %s",
-			__func__, irq, vector_name);
+	LIBLCD_MSG("%s, request_threaded_irq for %d | name: %s | napi_idx %d",
+			__func__, irq, vector_name, fipc_get_reg3(_request));
 
 	func_ret = request_threaded_irq(irq, msix_vector_handler,
 				NULL, flags,
@@ -3414,6 +3436,9 @@ int netif_napi_add_callee(struct fipc_message *_request)
 	glue_insert_napi_hash(napi_struct_container);
 
 	napi_q0 = napi = napi_struct_container->napi;
+#ifdef NAPI_STRUCT_ARRAY
+	napi_struct_array[napi_reg++] = napi;
+#endif
 
 	weight = fipc_get_reg2(_request);
 

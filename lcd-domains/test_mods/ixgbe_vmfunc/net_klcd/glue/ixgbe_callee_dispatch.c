@@ -40,6 +40,15 @@ int net_klcd_dispatch_async_loop(struct fipc_message *message)
 #endif
 
 	switch (fn_type) {
+
+		case RTNL_LOCK:
+			rtnl_lock_callee(message);
+			break;
+
+		case RTNL_UNLOCK:
+			rtnl_unlock_callee(message);
+			break;
+
 		case __PCI_REGISTER_DRIVER:
 			trace(__PCI_REGISTER_DRIVER);
 			ret =  __pci_register_driver_callee(message);

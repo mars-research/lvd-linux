@@ -72,6 +72,10 @@ int synchronize_irq_callee(struct fipc_message *_request);
 
 int eth_type_trans_callee(struct fipc_message *_request);
 int skb_add_rx_frag_callee(struct fipc_message *_request);
+
+void rtnl_lock_callee(struct fipc_message *request);
+void rtnl_unlock_callee(struct fipc_message *request);
+
 int dispatch_sync_loop(void);
 
 int dispatch_async_loop(struct fipc_message *message);
@@ -82,19 +86,11 @@ void glue_ixgbe_exit(void);
 int sync_probe_callee(struct fipc_message *msg);
 int sync_ndo_set_mac_address_callee(struct fipc_message *msg);
 
-#ifdef CONFIG_LVD
-int probe(struct pci_dev *dev,
-		const struct pci_device_id *id);
-
-void remove(struct pci_dev *dev);
-#else
 int probe(struct pci_dev *dev,
 		const struct pci_device_id *id,
 		struct trampoline_hidden_args *hidden_args);
-
 void remove(struct pci_dev *dev,
 		struct trampoline_hidden_args *hidden_args);
-#endif /* CONFIG_LVD */
 
 /* XXX: How to determine this? */
 #define SKB_HASH_BITS      8

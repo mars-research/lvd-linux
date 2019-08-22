@@ -268,45 +268,30 @@ int __must_check __pci_register_driver(struct pci_driver *drv,
 		const char* name)
 {
 	struct pci_driver_container *drv_container;
-	struct module_container *owner_container;
 	struct fipc_message r;
 	struct fipc_message *_request = &r;
 	int ret;
 	int func_ret;
 	INIT_IPC_MSG(&r);
 
-	drv_container = container_of(drv,
-		struct pci_driver_container,
-		pci_driver);
-	ret = glue_cap_insert_pci_driver_type(c_cspace,
-		drv_container,
-		&drv_container->my_ref);
-	if (ret) {
-		LIBLCD_ERR("lcd insert");
-		goto fail_insert;
-	}
-	owner_container = container_of(owner,
-		struct module_container,
-		module);
-	ret = glue_cap_insert_module_type(c_cspace,
-		owner_container,
-		&owner_container->my_ref);
+	drv_container = container_of(drv, struct pci_driver_container,
+			pci_driver);
+
+	ret = glue_cap_insert_pci_driver_type(c_cspace, drv_container,
+			&drv_container->my_ref);
 	if (ret) {
 		LIBLCD_ERR("lcd insert");
 		goto fail_insert;
 	}
 
-	async_msg_set_fn_type(_request,
-			__PCI_REGISTER_DRIVER);
+	async_msg_set_fn_type(_request, __PCI_REGISTER_DRIVER);
+
 	fipc_set_reg0(_request, drv_container->my_ref.cptr);
-	fipc_set_reg1(_request, owner_container->my_ref.cptr);
 
 	vmfunc_wrapper(_request);
 
-	drv_container->other_ref.cptr = fipc_get_reg1(_request);
-	owner_container->other_ref.cptr = fipc_get_reg2(_request);
-	drv_container->pci_driver.driver.owner = &owner_container->module;
-	func_ret = fipc_get_reg3(_request);
+	drv_container->other_ref.cptr = fipc_get_reg0(_request);
+	func_ret = fipc_get_reg1(_request);
 
 	LIBLCD_MSG("%s returned %d", __func__, func_ret);
 
@@ -417,12 +402,11 @@ struct pci_dev *g_pdev;
 int probe_callee(struct fipc_message *_request)
 {
 	struct pci_dev_container *dev_container;
-
+	struct pci_driver_container *drv_container;
 	int func_ret;
 	int ret = 0;
 	cptr_t other_ref;
 	unsigned int devfn;
-
 	cptr_t res0_cptr;
 	gpa_t gpa_addr;
 	unsigned int res0_len;
@@ -432,8 +416,17 @@ int probe_callee(struct fipc_message *_request)
 	unsigned int pool_ord;
 
 	LIBLCD_MSG("%s called", __func__);
+
 	other_ref.cptr = fipc_get_reg1(_request);
 	dma_mask = fipc_get_reg2(_request);
+
+	ret = glue_cap_lookup_pci_driver_type(c_cspace,
+			__cptr(fipc_get_reg0(_request)), &drv_container);
+
+	if (ret) {
+		LIBLCD_ERR("lcd insert");
+		goto fail_lookup;
+	}
 
 	dev_container = kzalloc(sizeof( struct pci_dev_container   ),
 		GFP_KERNEL);
@@ -470,7 +463,8 @@ int probe_callee(struct fipc_message *_request)
 
 	fipc_set_reg0(_request, cptr_val(res0_cptr));
 	fipc_set_reg1(_request, cptr_val(pool_cptr));
-	fipc_set_reg2(_request, dev_container->other_ref.cptr);
+	fipc_set_reg2(_request, dev_container->my_ref.cptr);
+	fipc_set_reg3(_request, dev_container->other_ref.cptr);
 
 	vmfunc_sync_call(_request, SYNC_PROBE);
 
@@ -521,16 +515,18 @@ int probe_callee(struct fipc_message *_request)
 	/* XXX: Pass null for now. struct pci_dev is passed from the
 	 * kernel and needs analysis for wrapping it around a container
 	 */
-	func_ret = ixgbe_driver_container.pci_driver.probe(&dev_container->pci_dev, NULL);
+	func_ret = drv_container->pci_driver.probe(&dev_container->pci_dev, NULL);
 
 	fipc_set_reg0(_request, func_ret);
 
 fail_ioremap:
 fail_ioremap2:
-fail_alloc:
-fail_insert:
 fail_cptr:
 fail_pool:
+fail_insert:
+	kfree(dev_container);
+fail_alloc:
+fail_lookup:
 	return ret;
 }
 
@@ -559,8 +555,25 @@ int remove_callee(struct fipc_message *_request)
 {
 	/* async loop should get 0 */
 	int ret = 0;
-
 	unsigned int __maybe_unused devfn;
+	struct pci_driver_container *drv_container;
+	struct pci_dev_container *dev_container;
+
+	ret = glue_cap_lookup_pci_driver_type(c_cspace,
+			__cptr(fipc_get_reg0(_request)), &drv_container);
+
+	if (ret) {
+		LIBLCD_ERR("lcd insert");
+		goto fail_lookup;
+	}
+
+	ret = glue_cap_lookup_pci_dev_type(c_cspace,
+			__cptr(fipc_get_reg1(_request)), &dev_container);
+
+	if (ret) {
+		LIBLCD_ERR("lcd insert");
+		goto fail_lookup;
+	}
 
 
 #ifdef IOMMU_ASSIGN
@@ -575,8 +588,9 @@ int remove_callee(struct fipc_message *_request)
 #endif
 
 	/* XXX: refer the comments under probe_callee */
-	ixgbe_driver_container.pci_driver.remove(g_pdev);
+	drv_container->pci_driver.remove(&dev_container->pci_dev);
 
+fail_lookup:
 	return ret;
 }
 
@@ -1158,6 +1172,7 @@ int pci_bus_read_config_word(struct pci_bus *bus,
 
 	INIT_IPC_MSG(&r);
 	async_msg_set_fn_type(_request, PCI_BUS_READ_CONFIG_WORD);
+
 	fipc_set_reg0(_request, devfn);
 	fipc_set_reg1(_request, where);
 
@@ -2001,7 +2016,7 @@ fail_lookup:
 int msix_vector_handler_callee(struct fipc_message *_request)
 {
 	struct irqhandler_t_container *irqhandler_container;
-	irqreturn_t irqret;
+	irqreturn_t irqret = IRQ_HANDLED;
 	int irq;
 	int ret = 0;
 
@@ -2009,7 +2024,11 @@ int msix_vector_handler_callee(struct fipc_message *_request)
 	irqhandler_container = (struct irqhandler_t_container *) fipc_get_reg1(_request); 
 
 	/* call real irq handler */
-	irqret = irqhandler_container->irqhandler(irq, irqhandler_container->data); 
+	if (irqhandler_container && irqhandler_container->irqhandler)
+		irqret = irqhandler_container->irqhandler(irq, irqhandler_container->data);
+	else
+		printk("irqhandler_ctr %p irqhandler %p",
+				irqhandler_container, irqhandler_container->irqhandler);
 
 	/* printk("%s, irq:%d irqret %d\n", __func__, irq, irqret); */
 	fipc_set_reg0(_request, irqret);
@@ -2723,6 +2742,30 @@ void __netif_tx_disable(struct net_device *dev)
 	 * TODO: All the queue states are modified. we should synchronize all of
 	 * them. PITA!
 	 */
+
+	return;
+}
+
+void rtnl_lock()
+{
+	struct fipc_message r;
+	struct fipc_message *request = &r;
+
+	async_msg_set_fn_type(request, RTNL_LOCK);
+
+	vmfunc_wrapper(request);
+
+	return;
+}
+
+void rtnl_unlock()
+{
+	struct fipc_message r;
+	struct fipc_message *request = &r;
+
+	async_msg_set_fn_type(request, RTNL_UNLOCK);
+
+	vmfunc_wrapper(request);
 
 	return;
 }

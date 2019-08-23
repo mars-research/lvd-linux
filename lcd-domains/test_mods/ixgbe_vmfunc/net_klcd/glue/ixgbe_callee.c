@@ -2841,16 +2841,36 @@ fail_lookup:
 
 #define HANDLE_IRQ_LOCALLY
 
+#ifdef HANDLE_IRQ_LOCALLY
 irqreturn_t msix_vector_handler(int irq, void *data)
 {
+	struct irqhandler_t_container *irqhandler_container;
+	struct napi_struct *napi;
+	int napi_idx;
+	irqreturn_t irqret;
+
+	WARN_ONCE(!irqs_disabled(),"irqs enabled in %s\n", __func__);
+
+	irqhandler_container = (struct irqhandler_t_container*) data;
+	napi_idx = irqhandler_container->napi_idx;
+
+	irqret = IRQ_HANDLED;
+
+	if ((napi_idx >= 0) && (napi_idx < NUM_HW_QUEUES)) {
+		napi = napi_struct_array[napi_idx];
+		napi_schedule_irqoff(napi);
+	}
+
+	return irqret;
+}
+#else
+irqreturn_t msix_vector_handler(int irq, void *data)
+{
+	irqreturn_t irqret;
 	struct fipc_message r;
 	struct fipc_message *_request = &r;
 	struct irqhandler_t_container *irqhandler_container;
-	irqreturn_t irqret;
 	int napi_idx;
-#ifdef HANDLE_IRQ_LOCALLY
-	struct napi_struct *napi;
-#endif
 
 	INIT_IPC_MSG(&r);
 
@@ -2865,32 +2885,17 @@ irqreturn_t msix_vector_handler(int irq, void *data)
 	fipc_set_reg1(_request, irqhandler_container->other_ref.cptr);
 	napi_idx = irqhandler_container->napi_idx;
 
-	if (napi_idx == NUM_HW_QUEUES) {
-		vmfunc_klcd_wrapper(_request, 1);
-		irqret = fipc_get_reg0(_request);
-		goto exit;
-
-	} else {
-#ifdef HANDLE_IRQ_LOCALLY
-		irqret = IRQ_HANDLED;
-		if ((napi_idx >= 0) && (napi_idx < NUM_HW_QUEUES)) {
-			napi = napi_struct_array[napi_idx];
-			napi_schedule_irqoff(napi);
-		}
-		//napi_schedule_irqoff(napi_q0);
-	}
-#else
 #ifdef CONFIG_LCD_TRACE_BUFFER
+	if (napi_idx != NUM_HW_QUEUES)
 		add_trace_entry(EVENT_MSIX_HANDLER, async_msg_get_fn_type(_request));
 #endif
-		vmfunc_klcd_wrapper(_request, 1);
 
-		irqret = fipc_get_reg0(_request);
-	}
-#endif
-exit:
+	vmfunc_klcd_wrapper(_request, 1);
+	irqret = fipc_get_reg0(_request);
+
 	return irqret;
 }
+#endif	/* !HANDLE_IRQ_LOCALLY */
 
 struct irq_handler_data_map {
 	int irq;

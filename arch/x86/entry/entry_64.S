@@ -615,8 +615,8 @@ END(irq_entries_start)
 	call	sync_stacks
 	movq	%rax, %rsp			/* switch stack */
 
-	movq	vmfunc_state_page + VMFUNC_lcd_stack_saved, %rax
-	testq   $1, %rax 
+	movq	vmfunc_state_page + VMFUNC_lcd_stack_saved, %r14
+	testq   $1, %r14 
 	jnz     1f
 	
 	/* Save LCD stack into current->lcd_stack */
@@ -744,6 +744,7 @@ GLOBAL(restore_vmfunc_regs_and_iret)
 	testq	%r12, %r12
 	jz	2f
 	movq    %r12, vmfunc_state_page + VMFUNC_entered_lcd
+	movq    %r14, vmfunc_state_page + VMFUNC_lcd_stack_saved
 
 	/* Stack to switch to, i.e., IST. Save it here while we have gs */
 	movq    PER_CPU_VAR(lvd_irq_stack_addr), %r13

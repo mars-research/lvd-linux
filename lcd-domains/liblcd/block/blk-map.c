@@ -57,11 +57,16 @@ int blk_rq_map_kern(struct request_queue *q, struct request *rq, void *kbuf,
 	struct bio *bio;
 	int ret;
 
-	if (len > (queue_max_hw_sectors(q) << 9))
-		return -EINVAL;
-	if (!len || !kbuf)
-		return -EINVAL;
+	LIBLCD_MSG("%s, called", __func__);
 
+	if (len > (queue_max_hw_sectors(q) << 9)) {
+		LIBLCD_ERR("len (%d) > max_hw_sectors << 9 (%d)", len, (queue_max_hw_sectors(q) << 9));
+		return -EINVAL;
+	}
+	if (!len || !kbuf) {
+		LIBLCD_ERR("kbuf :%s ", kbuf);
+		return -EINVAL;
+	}
 #ifndef LCD_ISOLATE
 	/*
 	 * XXX: object_is_on_stack checks if a pointer is in the range of current's
@@ -74,9 +79,10 @@ int blk_rq_map_kern(struct request_queue *q, struct request *rq, void *kbuf,
 #endif
 		bio = bio_map_kern(q, kbuf, len, gfp_mask);
 
-	if (IS_ERR(bio))
+	if (IS_ERR(bio)) {
+		LIBLCD_ERR("bio_map_kern returned: %p", bio);
 		return PTR_ERR(bio);
-
+	}
 	if (!reading)
 		bio_set_op_attrs(bio, REQ_OP_WRITE, 0);
 
@@ -84,13 +90,21 @@ int blk_rq_map_kern(struct request_queue *q, struct request *rq, void *kbuf,
 		rq->cmd_flags |= REQ_COPY_USER;
 
 	ret = blk_rq_append_bio(rq, bio);
+
+	LIBLCD_MSG("%s, blk_rq_append_bio returned %d", __func__, ret);
+
 	if (unlikely(ret)) {
+		LIBLCD_ERR("blk_rq_append_bio returned %d", ret);
 		/* request is too big */
 		bio_put(bio);
 		return ret;
 	}
 
+#if 0
 	blk_queue_bounce(q, &rq->bio);
+#endif
+
+	LIBLCD_MSG("%s, returned %d", __func__, ret);
 	return 0;
 }
 //EXPORT_SYMBOL(blk_rq_map_kern);

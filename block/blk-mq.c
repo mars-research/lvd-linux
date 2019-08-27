@@ -233,6 +233,15 @@ __blk_mq_alloc_request(struct blk_mq_alloc_data *data, int op, int op_flags)
 	return NULL;
 }
 
+struct request *blk_mq_get_rq_from_tag(struct request_queue *q, int tag)
+{
+	if (!q || !q->queue_hw_ctx || !q->queue_hw_ctx[0])
+		return -EINVAL;
+	if (q->queue_hw_ctx[0])
+	return q->queue_hw_ctx[0]->tags->rqs[tag];
+}
+EXPORT_SYMBOL(blk_mq_get_rq_from_tag);
+
 struct request *blk_mq_alloc_request(struct request_queue *q, int rw,
 		unsigned int flags)
 {

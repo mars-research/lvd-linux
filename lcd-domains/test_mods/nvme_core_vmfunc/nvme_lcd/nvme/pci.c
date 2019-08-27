@@ -591,7 +591,7 @@ static void nvme_unmap_data(struct nvme_dev *dev, struct request *req)
 /*
  * NOTE: ns is NULL when called on the admin queue.
  */
-static int nvme_queue_rq(struct blk_mq_hw_ctx *hctx,
+int nvme_queue_rq(struct blk_mq_hw_ctx *hctx,
 			 const struct blk_mq_queue_data *bd)
 {
 	struct nvme_ns *ns = hctx->queue->queuedata;
@@ -615,22 +615,33 @@ static int nvme_queue_rq(struct blk_mq_hw_ctx *hctx,
 		}
 	}
 
+	LIBLCD_MSG("%s, calling nvme_map_len", __func__);
 	map_len = nvme_map_len(req);
+
+	LIBLCD_MSG("%s, calling nvme_init_iod", __func__);
+
 	ret = nvme_init_iod(req, map_len, dev);
 	if (ret)
 		return ret;
+
+	LIBLCD_MSG("%s, calling nvme_setup_cmd", __func__);
 
 	ret = nvme_setup_cmd(ns, req, &cmnd);
 	if (ret)
 		goto out;
 
-	if (req->nr_phys_segments)
+	if (req->nr_phys_segments) {
+		LIBLCD_MSG("%s, calling nvme_map_data", __func__);
 		ret = nvme_map_data(dev, req, map_len, &cmnd);
+	}
 
 	if (ret)
 		goto out;
 
 	cmnd.common.command_id = req->tag;
+
+	LIBLCD_MSG("%s, calling blk_mq_start_request", __func__);
+
 	blk_mq_start_request(req);
 
 	spin_lock_irq(&nvmeq->q_lock);
@@ -642,7 +653,12 @@ static int nvme_queue_rq(struct blk_mq_hw_ctx *hctx,
 		spin_unlock_irq(&nvmeq->q_lock);
 		goto out;
 	}
+
+	LIBLCD_MSG("%s, calling __nvme_submit_cmd", __func__);
 	__nvme_submit_cmd(nvmeq, &cmnd);
+
+	LIBLCD_MSG("%s, calling nvme_process_cq", __func__);
+
 	nvme_process_cq(nvmeq);
 	spin_unlock_irq(&nvmeq->q_lock);
 	return BLK_MQ_RQ_QUEUE_OK;
@@ -727,8 +743,14 @@ static void __nvme_process_cq(struct nvme_queue *nvmeq, unsigned int *tag)
 		}
 
 		req = blk_mq_tag_to_rq(*nvmeq->tags, cqe.command_id);
+
+		LIBLCD_MSG("%s req: %p", __func__, req);
+
 		if (req->cmd_type == REQ_TYPE_DRV_PRIV && req->special)
 			memcpy(req->special, &cqe, sizeof(cqe));
+
+		LIBLCD_MSG("%s calling blk_mq_complete_request", __func__);
+
 		blk_mq_complete_request(req, le16_to_cpu(cqe.status) >> 1);
 
 	}

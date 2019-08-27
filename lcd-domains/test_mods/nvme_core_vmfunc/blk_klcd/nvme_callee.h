@@ -14,6 +14,8 @@ int blk_get_queue_callee(struct fipc_message *request);
 int blk_mq_end_request_callee(struct fipc_message *request);
 int blk_mq_free_tag_set_callee(struct fipc_message *request);
 int blk_mq_start_request_callee(struct fipc_message *request);
+int blk_mq_complete_request_callee(struct fipc_message *request);
+int blk_mq_free_request_callee(struct fipc_message *request);
 int blk_mq_start_stopped_hw_queues_callee(struct fipc_message *request);
 int blk_mq_map_queue_callee(struct fipc_message *request);
 int blk_mq_stop_hw_queues_callee(struct fipc_message *_request);

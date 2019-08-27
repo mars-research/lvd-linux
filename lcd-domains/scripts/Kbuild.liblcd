@@ -67,6 +67,7 @@ lib-y += $(addprefix liblcd/block/, \
 	blk-core.o \
 	blk-map.o \
 	blk-merge.o \
+	blk-mq.o \
 	)
 
 lib-y += $(addprefix liblcd/net/, \

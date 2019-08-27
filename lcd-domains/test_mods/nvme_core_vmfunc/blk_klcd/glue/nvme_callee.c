@@ -17,7 +17,7 @@
 
 #include <lcd_config/post_hook.h>
 
-#define HANDLE_IRQ_LOCALLY
+//#define HANDLE_IRQ_LOCALLY
 #define CHRDEV_NAME	"nvme_lcd"
 
 #define CPTR_HASH_BITS      5
@@ -291,16 +291,32 @@ fail_lookup:
 	return ret;
 }
 
-int blk_mq_start_request_callee(struct fipc_message *request)
+int blk_mq_start_request_callee(struct fipc_message *_request)
 {
 
 	struct request *rq;
 	int ret = 0;
-	int tag = fipc_get_reg0(request);
-	rq = rq_map[tag];
+	struct request_queue_container *q_container;
+	struct request_queue *q;
+	int tag;
+
+	ret = glue_cap_lookup_request_queue_type(c_cspace,
+			__cptr(fipc_get_reg0(_request)), &q_container);
+
+	if (ret) {
+		 LIBLCD_ERR("lookup");
+		 goto fail_lookup;
+	}
+
+	q = &q_container->request_queue;
+
+	tag = fipc_get_reg1(_request);
+
+	rq = blk_mq_get_rq_from_tag(q, tag);
 
 	blk_mq_start_request(rq);
 
+fail_lookup:
 	return ret;
 }
 
@@ -330,18 +346,35 @@ fail_lookup:
 	return ret;
 }
 
-int blk_mq_complete_request_callee(struct fipc_message *request)
+int blk_mq_complete_request_callee(struct fipc_message *_request)
 {
-    struct request *rq;
+
+	struct request *rq;
 	int ret = 0;
-    int error;
-	int tag = fipc_get_reg0(request);
-    rq = rq_map[tag];
-    error = fipc_get_reg1(request);
+	struct request_queue_container *q_container;
+	struct request_queue *q;
+	int tag;
+	int error;
 
-    blk_mq_complete_request(rq, error);
+	ret = glue_cap_lookup_request_queue_type(c_cspace,
+			__cptr(fipc_get_reg0(_request)), &q_container);
 
-    return ret;
+	if (ret) {
+		 LIBLCD_ERR("lookup");
+		 goto fail_lookup;
+	}
+
+	q = &q_container->request_queue;
+
+	tag = fipc_get_reg1(_request);
+	error = fipc_get_reg0(_request);
+
+	rq = blk_mq_get_rq_from_tag(q, tag);
+
+	blk_mq_complete_request(rq, error);
+
+fail_lookup:
+	return ret;
 }
 
 int blk_mq_map_queue_callee(struct fipc_message *request)
@@ -3690,6 +3723,9 @@ int blk_mq_alloc_request_callee(struct fipc_message *_request)
 		goto fail_insert;
 	}
 	fipc_set_reg0(_request, func_ret_container->my_ref.cptr);
+	fipc_set_reg1(_request, func_ret->tag);
+	fipc_set_reg2(_request, rq->limits.max_hw_sectors);
+	fipc_set_reg3(_request, rq->limits.max_segments);
 
 fail_alloc:
 fail_lookup:
@@ -3722,9 +3758,13 @@ fail_lookup:
 int blk_mq_free_request_callee(struct fipc_message *_request)
 {
 	struct request *rq = NULL;
-	struct request_container *req_container = NULL;
+	//struct request_container *req_container = NULL;
+	struct request_queue_container *q_container;
+	struct request_queue *q;
 	int ret;
+	int tag;
 
+#if 0
 	ret = glue_cap_lookup_request_type(c_cspace,
 			__cptr(fipc_get_reg0(_request)), &req_container);
 
@@ -3734,9 +3774,25 @@ int blk_mq_free_request_callee(struct fipc_message *_request)
 	}
 
 	rq = &req_container->request;
+#endif
+
+	ret = glue_cap_lookup_request_queue_type(c_cspace,
+			__cptr(fipc_get_reg1(_request)), &q_container);
+
+	if (ret) {
+		 LIBLCD_ERR("lookup");
+		 goto fail_lookup;
+	}
+
+	q = &q_container->request_queue;
+
+	tag = fipc_get_reg2(_request);
+	rq = blk_mq_get_rq_from_tag(q, tag);
+#if 0
+	rq = q->queue_hw_ctx[0]->tags->rqs[tag];
+#endif
 
 	blk_mq_free_request(rq);
-
 fail_lookup:
 	return ret;
 }
@@ -3831,9 +3887,10 @@ int blk_execute_rq_callee(struct fipc_message *_request)
 	int ret = 0;
 	int func_ret = 0;
 	struct request_queue_container *rq_container;
-	struct request_container *req_container = NULL;
+	//struct request_container *req_container = NULL;
 	struct gendisk_container *gdisk_container;
 	cptr_t gdisk_cptr;
+	int tag;
 
 	ret = glue_cap_lookup_request_queue_type(c_cspace,
 			__cptr(fipc_get_reg0(_request)), &rq_container);
@@ -3845,6 +3902,7 @@ int blk_execute_rq_callee(struct fipc_message *_request)
 
 	q = &rq_container->request_queue;
 
+#if 0
 	ret = glue_cap_lookup_request_type(c_cspace,
 			__cptr(fipc_get_reg1(_request)), &req_container);
 
@@ -3854,6 +3912,9 @@ int blk_execute_rq_callee(struct fipc_message *_request)
 	}
 
 	rq = req_container->req;
+#endif
+	tag = fipc_get_reg2(_request);
+	rq = blk_mq_get_rq_from_tag(q, tag);
 
 	gdisk_cptr.cptr = fipc_get_reg2(_request);
 

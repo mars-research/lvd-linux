@@ -41,6 +41,10 @@ int handle_rpc_calls(struct fipc_message *message)
 			trace(SOFTIRQ_DONE_FN);
 			return softirq_done_fn_callee(message);
 
+		case TIMEOUT_FN:
+			trace(TIMEOUT_FN);
+			return timeout_fn_callee(message);
+
 		case POLL_FN:
 			trace(POLL_FN);
 			return poll_fn_callee(message);

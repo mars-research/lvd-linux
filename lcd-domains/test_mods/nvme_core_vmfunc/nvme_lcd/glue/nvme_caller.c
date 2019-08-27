@@ -16,6 +16,7 @@ static struct glue_cspace *c_cspace;
 void *iocb_data_pool;
 struct blk_mq_hw_ctx_container *ctx_container_g;
 struct blk_mq_ops_container *ops_container_g;
+struct blk_mq_tag_set *admin_tagset;
 
 extern struct pci_driver_container nvme_driver_container;
 
@@ -206,17 +207,72 @@ void blk_mq_free_request(struct request *rq)
 	struct fipc_message r;
 	struct fipc_message *_request = &r;
 	struct request_container *req_container;
+	struct request_queue_container *q_container;
+
+	dump_stack();
+
+	printk("%s, rq: %p q: %p" , __func__, rq, rq->q);
 
 	req_container = container_of(rq, struct request_container,
 				request);
 
+	q_container = container_of(rq->q, struct request_queue_container,
+					request_queue);
+
 	async_msg_set_fn_type(_request, BLK_MQ_FREE_REQUEST);
 	fipc_set_reg0(_request, req_container->other_ref.cptr);
+	fipc_set_reg1(_request, q_container->other_ref.cptr);
+	fipc_set_reg2(_request, rq->tag);
 
 	vmfunc_wrapper(_request);
 }
 
 size_t cmd_size;
+
+int create_rq_maps(struct blk_mq_tag_set *set)
+{
+	int ret = 0;
+	int i;
+
+	set->tags = kzalloc_node(set->nr_hw_queues * sizeof(struct blk_mq_tags *),
+				 GFP_KERNEL, set->numa_node);
+
+	if (!set->tags) {
+		LIBLCD_ERR("alloc failed");
+		ret = -ENOMEM;
+		goto fail_alloc;
+	}
+
+	for (i = 0; i < set->nr_hw_queues; i++) {
+		struct blk_mq_tags *tags;
+		int j;
+		tags = set->tags[i] = kzalloc(sizeof(struct blk_mq_tags), GFP_KERNEL);
+		if (!set->tags[i]) {
+			LIBLCD_ERR("fail alloc");
+			ret = -ENOMEM;
+			goto fail_alloc;
+		}
+		tags->rqs = kzalloc(set->queue_depth * sizeof(struct request*),
+					GFP_KERNEL);
+		if (!tags->rqs) {
+			LIBLCD_ERR("alloc failed");
+			ret = -ENOMEM;
+			goto fail_alloc;
+		}
+
+		for (j = 0; j < set->queue_depth; j++) {
+			tags->rqs[j] = kzalloc(sizeof(struct request) + set->cmd_size,
+						GFP_KERNEL);
+			if (!tags->rqs[j]) {
+				LIBLCD_ERR("alloc failed");
+				ret = -ENOMEM;
+				goto fail_alloc;
+			}
+		}
+	}
+fail_alloc:
+	return ret;
+}
 
 int blk_mq_alloc_tag_set(struct blk_mq_tag_set *set)
 {
@@ -226,7 +282,6 @@ int blk_mq_alloc_tag_set(struct blk_mq_tag_set *set)
 	struct fipc_message r;
 	struct fipc_message *request = &r;
 	int func_ret = 0;
-	int i;
 
 	set_container = container_of(set, struct blk_mq_tag_set_container, tag_set);
 	ops_container = container_of(set->ops, struct blk_mq_ops_container, blk_mq_ops);
@@ -265,48 +320,35 @@ int blk_mq_alloc_tag_set(struct blk_mq_tag_set *set)
 
 	LIBLCD_MSG("%s received %d from", __func__, func_ret);
 
-	set->tags = kzalloc_node(nr_cpu_ids * sizeof(struct blk_mq_tags *),
-				 GFP_KERNEL, set->numa_node);
+	create_rq_maps(set);
 
-	if (!set->tags) {
-		LIBLCD_ERR("alloc failed");
-		goto fail_alloc;
-	}
-
-	for (i = 0; i < nr_cpu_ids; i++) {
-		set->tags[i] = kzalloc(sizeof(struct blk_mq_tags), GFP_KERNEL);
-		if (!set->tags[i]) {
-			LIBLCD_ERR("fail alloc");
-			goto fail_alloc;
-		}
-	}
-
-	cmd_size = set->cmd_size;
+	admin_tagset = set;
 
 	return func_ret;
 
 fail_insert1:
 fail_insert2:
-fail_alloc:
 	return func_ret;
 }
 
 void blk_mq_complete_request(struct request *rq, int error)
 {
-    struct lcd_request_container *rq_container;
-    struct fipc_message r;
-	struct fipc_message *request = &r;
+	struct fipc_message r;
+	struct fipc_message *_request = &r;
+	struct request_queue *q = rq->q;
+	struct request_queue_container *q_container;
 
-    rq_container = container_of(rq, struct lcd_request_container, rq);
+	q_container = container_of(q, struct request_queue_container,
+			request_queue);
 
-    async_msg_set_fn_type(request, BLK_MQ_COMPLETE_REQUEST);
-    fipc_set_reg0(request, rq->tag);
-    fipc_set_reg1(request, error);
+	async_msg_set_fn_type(_request, BLK_MQ_COMPLETE_REQUEST);
+	fipc_set_reg0(_request, q_container->other_ref.cptr);
+	fipc_set_reg1(_request, rq->tag);
+	fipc_set_reg2(_request, error);
 
-    vmfunc_wrapper(request);
+	vmfunc_wrapper(_request);
 
-    return;
-
+	return;
 }
 
 void blk_mq_start_stopped_hw_queues(struct request_queue *q, bool async)
@@ -775,6 +817,7 @@ struct request_queue *blk_mq_init_queue(struct blk_mq_tag_set *set)
 
 	printk("%s returns local request queue struct!! \n", __func__);
 	printk("%s, storing other_ref.cptr %lx", __func__, fipc_get_reg0(request));
+	ctx_container_g->blk_mq_hw_ctx.queue = &rq_container->request_queue;
 	return &rq_container->request_queue;
 
 fail_insert:
@@ -906,17 +949,18 @@ bool pci_device_is_present(struct pci_dev *pdev)
 void blk_mq_start_request(struct request *rq)
 {
 	struct fipc_message r;
-	struct fipc_message *request = &r;
+	struct fipc_message *_request = &r;
+	struct request_queue *q = rq->q;
+	struct request_queue_container *q_container;
 
-	struct lcd_request_container *rq_c;
+	q_container = container_of(q, struct request_queue_container,
+			request_queue);
 
-	rq_c = container_of(rq, struct lcd_request_container, rq);
+	async_msg_set_fn_type(_request, BLK_MQ_START_REQUEST);
+	fipc_set_reg0(_request, q_container->other_ref.cptr);
+	fipc_set_reg1(_request, rq->tag);
 
-	async_msg_set_fn_type(request, BLK_MQ_START_REQUEST);
-
-	fipc_set_reg0(request, rq->tag);
-
-	vmfunc_wrapper(request);
+	vmfunc_wrapper(_request);
 
 	return;
 }
@@ -1515,12 +1559,20 @@ int poll_callee(struct fipc_message *_request)
 	return 0;
 }
 
+int nvme_queue_rq(struct blk_mq_hw_ctx *hctx,
+			 const struct blk_mq_queue_data *bd);
+
 int queue_rq_fn_callee(struct fipc_message *request)
-{	struct blk_mq_hw_ctx_container *ctx_container = ctx_container_g;
+{
+	struct blk_mq_hw_ctx_container *ctx_container = ctx_container_g;
 //	struct blk_mq_ops_container *ops_container = ops_container_g;
 	struct blk_mq_queue_data bd;
+#if 0
 	struct lcd_request_container rq_c;
 	struct request *rq = &rq_c.rq;
+#endif
+	struct request *rq;
+	int tag;
 	int ret = 0;
 	int func_ret = 0;
 
@@ -1540,14 +1592,21 @@ int queue_rq_fn_callee(struct fipc_message *request)
 //		goto fail_lookup;
 //	}
 
-	rq->tag = fipc_get_reg3(request);
+	tag = fipc_get_reg3(request);
+	rq = admin_tagset->tags[0]->rqs[tag];
+	rq->tag = tag;
 	bd.rq = rq;
 
+	printk("%s, hctx: %p tag %d", __func__, &ctx_container->blk_mq_hw_ctx,
+						tag);
+	func_ret = nvme_queue_rq(&ctx_container->blk_mq_hw_ctx, &bd);
 #if 0
 	func_ret = ops_container->blk_mq_ops.queue_rq(&ctx_container->blk_mq_hw_ctx,
 				&bd);
 
 #endif
+
+	LIBLCD_MSG("%s, returned ", __func__, func_ret);
 	fipc_set_reg0(request, func_ret);
 
 //fail_lookup:
@@ -1693,6 +1752,11 @@ int poll_fn_callee(struct fipc_message *_request)
 	return 0;
 }
 
+int timeout_fn_callee(struct fipc_message *_request)
+{
+	printk("%s, called", __func__);
+	return 0;
+}
 
 struct dma_pool *dma_pool_create(const char *name, struct device *dev,
                                         size_t size, size_t align, size_t boundary)
@@ -2081,6 +2145,7 @@ void blk_queue_max_hw_sectors(struct request_queue *q,
 	fipc_set_reg0(_request, q_container->other_ref.cptr);
 	fipc_set_reg1(_request, max_hw_sectors);
 	ret = vmfunc_wrapper(_request);
+	q->limits.max_hw_sectors = max_hw_sectors;
 	return;
 }
 
@@ -2273,6 +2338,7 @@ struct request *blk_mq_alloc_request(struct request_queue *rq,
 	struct fipc_message r;
 	struct fipc_message *_request = &r;
 	struct request_queue_container *rq_container;
+	int tag;
 
 	rq_container = container_of(rq, struct request_queue_container,
 			request_queue);
@@ -2303,8 +2369,20 @@ struct request *blk_mq_alloc_request(struct request_queue *rq,
 
 	ret = vmfunc_wrapper(_request);
 	func_ret_container->other_ref.cptr = fipc_get_reg0(_request);
+	tag = fipc_get_reg1(_request);
+	rq->limits.max_hw_sectors = fipc_get_reg2(_request);
+	rq->limits.max_segments = fipc_get_reg3(_request);
 
+#if 0
 	return func_ret;
+#endif
+
+	printk("%s, rq: %p tag %d", __func__,
+			admin_tagset->tags[0]->rqs[tag],
+			tag);
+
+	admin_tagset->tags[0]->rqs[tag]->q = rq;
+	return admin_tagset->tags[0]->rqs[tag];
 fail_alloc:
 fail_insert:
 	return NULL;
@@ -2353,6 +2431,7 @@ int blk_execute_rq(struct request_queue *q,
 	async_msg_set_fn_type(_request, BLK_EXECUTE_RQ);
 	fipc_set_reg0(_request, rq_container->other_ref.cptr);
 	fipc_set_reg1(_request, req_container->other_ref.cptr);
+	fipc_set_reg2(_request, req->tag);
 
 	if (bd_disk)
 		fipc_set_reg2(_request, gdisk_container->other_ref.cptr);

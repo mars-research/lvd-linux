@@ -221,17 +221,18 @@ static int dummy_validate(struct nlattr *tb[], struct nlattr *data[])
 #ifdef LCD_ISOLATE
 static struct rtnl_link_ops_container dummy_link_ops_container __read_mostly = {
 	.rtnl_link_ops = {
-		.kind		= DRV_NAME,
-		.setup		= dummy_setup,
-		.validate	= dummy_validate,
-	}
-};
 #else
 static struct rtnl_link_ops dummy_link_ops __read_mostly = {
+#endif
 	.kind		= DRV_NAME,
 	.setup		= dummy_setup,
 	.validate	= dummy_validate,
+#ifdef LCD_ISOLATE
+	}
+#endif
 };
+
+#ifndef LCD_ISOLATE
 /* Number of dummy devices to be set up by this module. */
 module_param(numdummies, int, 0);
 MODULE_PARM_DESC(numdummies, "Number of dummy pseudo devices");

@@ -31,6 +31,7 @@ struct pci_dev_container {
 	struct pci_dev *pdev;
 	struct cptr other_ref;
 	struct cptr my_ref;
+	struct hlist_node hentry;
 };
 struct pci_device_id_container {
 	struct pci_device_id pci_device_id;
@@ -103,6 +104,7 @@ struct poll_container {
 struct irqhandler_t_container {
 	irqreturn_t (*irqhandler)(int, void *);
 	void *data;
+	int napi_idx;
 	cptr_t my_ref;
 	cptr_t other_ref;
 };

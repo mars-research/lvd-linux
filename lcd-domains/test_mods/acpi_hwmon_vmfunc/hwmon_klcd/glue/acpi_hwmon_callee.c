@@ -90,7 +90,7 @@ void glue_remove_device(struct device_container *dev_c)
 	hash_del(&dev_c->hentry);
 }
 
-int glue_insert_acpi_device(struct hlist_head *htable, struct acpi_device_ptr_container *acpi_dev_c)
+int glue_insert_acpi_device(struct acpi_device_ptr_container *acpi_dev_c)
 {
 	BUG_ON(!acpi_dev_c->acpi_device_ptr);
 
@@ -103,7 +103,7 @@ int glue_insert_acpi_device(struct hlist_head *htable, struct acpi_device_ptr_co
 	return 0;
 }
 
-int glue_lookup_acpi_device(struct hlist_head *htable, struct cptr c, struct
+int glue_lookup_acpi_device(struct cptr c, struct
 		acpi_device_ptr_container **dev_cout) {
 	struct acpi_device_ptr_container *dev_c;
 
@@ -364,7 +364,7 @@ int add(struct acpi_device *device,
 
 	acpi_ptr_c->acpi_device_ptr = device;
 
-	glue_insert_acpi_device(acpidev_hash, acpi_ptr_c);
+	glue_insert_acpi_device(acpi_ptr_c);
 
 	device_container = kzalloc(sizeof(*device_container), GFP_KERNEL);
 	if (!device_container) {
@@ -406,7 +406,7 @@ int remove(struct acpi_device *device,
 
 	LIBLCD_MSG("%s, called", __func__);
 
-	glue_lookup_acpi_device(acpidev_hash, __cptr((unsigned long) device),
+	glue_lookup_acpi_device(__cptr((unsigned long) device),
 			&acpi_ptr_c);
 
 	async_msg_set_fn_type(_request, ACPI_OP_REMOVE);
@@ -695,7 +695,6 @@ int acpi_evaluate_object_callee(struct fipc_message *_request)
 	struct acpi_object_list *external_params = NULL;
 	struct acpi_buffer buffer;
 	struct acpi_device_ptr_container *acpi_ptr_c = NULL;
-	struct device_container *device_container = NULL;
 	struct acpi_device *acpi_device;
 	struct acpi_object_container *acpi_obj_container;
 	void *handle;
@@ -716,7 +715,7 @@ int acpi_evaluate_object_callee(struct fipc_message *_request)
 		goto fail_alloc;
 	}
 
-	glue_lookup_acpi_device(acpidev_hash, __cptr(fipc_get_reg1(_request)),
+	glue_lookup_acpi_device(__cptr(fipc_get_reg1(_request)),
 			&acpi_ptr_c);
 
 	if (ret) {
@@ -727,10 +726,6 @@ int acpi_evaluate_object_callee(struct fipc_message *_request)
 	acpi_ptr_c->other_ref.cptr = fipc_get_reg0(_request);
 	acpi_device = acpi_ptr_c->acpi_device_ptr;
 
-	glue_lookup_device(dev_hash, __cptr(fipc_get_reg4(_request)),
-			&device_container);
-
-	device_container->other_ref.cptr = fipc_get_reg6(_request);
 	strncpy(pathname, (char*)&_request->regs[2], sizeof(_request->regs[2]));
 
 	handle = acpi_device->handle;
@@ -1193,7 +1188,8 @@ int kobject_create_and_add_callee(struct fipc_message *_request)
 	int ret = 0;
 	struct kobject_ptr_container *func_ret_container = NULL;
 	struct kobject *func_ret = NULL;
-	struct device_container *device_container = NULL;
+	struct acpi_device_ptr_container *acpi_device_container = NULL;
+	struct acpi_device *acpi_dev;
 	cptr_t p_cptr;
 	cptr_t lcd_cptr;
 	unsigned long p_offset;
@@ -1202,9 +1198,8 @@ int kobject_create_and_add_callee(struct fipc_message *_request)
 
 	LIBLCD_MSG("%s, called", __func__);
 
-
-	glue_lookup_device(dev_hash, __cptr(fipc_get_reg0(_request)),
-			&device_container);
+	glue_lookup_acpi_device(__cptr(fipc_get_reg0(_request)),
+			&acpi_device_container);
 
 	ret = lcd_cptr_alloc(&p_cptr);
 	if (ret) {
@@ -1228,7 +1223,9 @@ int kobject_create_and_add_callee(struct fipc_message *_request)
 
 	name = (char*)(gva_val(p_gva) + p_offset);
 
-	parent = &device_container->dev->kobj;
+	acpi_dev = acpi_device_container->acpi_device_ptr;
+
+	parent = &acpi_dev->dev.kobj;
 
 	func_ret_container->other_ref.cptr = fipc_get_reg4(_request);
 

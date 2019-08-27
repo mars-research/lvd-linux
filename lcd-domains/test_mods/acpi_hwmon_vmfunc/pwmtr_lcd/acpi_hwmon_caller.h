@@ -24,6 +24,11 @@ _acpi_evaluate_object(struct acpi_device *acpi_device,
 		     struct acpi_object_list *external_params,
 		     struct acpi_buffer *return_buffer);
 
+unsigned int _acpi_evaluate_integer(struct acpi_device *acpi_dev,
+		char *pathname,
+		struct acpi_object_list *args,
+		unsigned long long *data);
+
 struct kobject *_kobject_create_and_add(const char *name, struct device *dev);
 
 #endif	/* __ACPI_HWMON_CALLER_H__ */

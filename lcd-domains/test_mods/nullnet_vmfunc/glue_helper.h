@@ -50,6 +50,8 @@ enum dispatch_t {
 	MODULE_EXIT,
 	SYNC_SETUP,
 	SYNC_NDO_SET_MAC_ADDRESS,
+	RTNL_LOCK,
+	RTNL_UNLOCK,
 };
 
 typedef enum {

@@ -19,6 +19,14 @@ int net_klcd_dispatch_loop(struct fipc_message *message)
 	int ret;
 	int fn_type = async_msg_get_fn_type(message);
 	switch (fn_type) {
+	case RTNL_LOCK:
+		rtnl_lock_callee(message);
+		break;
+
+	case RTNL_UNLOCK:
+		rtnl_unlock_callee(message);
+		break;
+
 	case __RTNL_LINK_REGISTER:
 		trace(__RTNL_LINK_REGISTER);
 		return __rtnl_link_register_callee(message);

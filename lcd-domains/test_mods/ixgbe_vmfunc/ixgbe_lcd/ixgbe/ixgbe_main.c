@@ -10349,6 +10349,7 @@ static const struct pci_error_handlers ixgbe_err_handler = {
 	.slot_reset = ixgbe_io_slot_reset,
 	.resume = ixgbe_io_resume,
 };
+
 #ifndef LCD_ISOLATE
 static struct pci_driver ixgbe_driver = {
 #else
@@ -10414,7 +10415,6 @@ int ixgbe_init_module(void)
 #ifdef CONFIG_IXGBE_DCA
 	dca_register_notify(&dca_notifier);
 #endif
-
 	return 0;
 }
 

@@ -32,6 +32,8 @@
 #ifdef CONFIG_PCI_IOV
 #include "ixgbe_sriov.h"
 #endif
+#include "../ixgbe_caller.h"
+
 #include <lcd_config/post_hook.h>
 
 #ifdef CONFIG_IXGBE_DCB

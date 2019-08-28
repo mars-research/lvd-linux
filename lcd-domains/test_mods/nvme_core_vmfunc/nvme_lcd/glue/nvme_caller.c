@@ -6,7 +6,6 @@
 #include <liblcd/glue_cspace.h>
 #include "../../nvme_common.h"
 #include "../nvme_caller.h"
-#include "../nvme_dev.h"
 #include <asm/lcd_domains/liblcd.h>
 
 #include <lcd_config/post_hook.h>
@@ -177,19 +176,6 @@ void blk_mq_update_nr_hw_queues(struct blk_mq_tag_set *set, int nr_hw_queues)
     vmfunc_wrapper(request);
 }
 
-struct request *blk_mq_tag_to_rq(struct blk_mq_tags *tags, unsigned int tag)
-{
-    //TODO
-    struct fipc_message r;
-	struct fipc_message *request = &r;
-
-    async_msg_set_fn_type(request, BLK_MQ_TAG_TO_RQ);
-
-    vmfunc_wrapper(request);
-
-    return NULL;
-}
-
 void blk_mq_tagset_busy_iter(struct blk_mq_tag_set *tagset,
 		busy_tag_iter_fn *fn, void *priv)
 {
@@ -227,52 +213,7 @@ void blk_mq_free_request(struct request *rq)
 	vmfunc_wrapper(_request);
 }
 
-size_t cmd_size;
-
-int create_rq_maps(struct blk_mq_tag_set *set)
-{
-	int ret = 0;
-	int i;
-
-	set->tags = kzalloc_node(set->nr_hw_queues * sizeof(struct blk_mq_tags *),
-				 GFP_KERNEL, set->numa_node);
-
-	if (!set->tags) {
-		LIBLCD_ERR("alloc failed");
-		ret = -ENOMEM;
-		goto fail_alloc;
-	}
-
-	for (i = 0; i < set->nr_hw_queues; i++) {
-		struct blk_mq_tags *tags;
-		int j;
-		tags = set->tags[i] = kzalloc(sizeof(struct blk_mq_tags), GFP_KERNEL);
-		if (!set->tags[i]) {
-			LIBLCD_ERR("fail alloc");
-			ret = -ENOMEM;
-			goto fail_alloc;
-		}
-		tags->rqs = kzalloc(set->queue_depth * sizeof(struct request*),
-					GFP_KERNEL);
-		if (!tags->rqs) {
-			LIBLCD_ERR("alloc failed");
-			ret = -ENOMEM;
-			goto fail_alloc;
-		}
-
-		for (j = 0; j < set->queue_depth; j++) {
-			tags->rqs[j] = kzalloc(sizeof(struct request) + set->cmd_size,
-						GFP_KERNEL);
-			if (!tags->rqs[j]) {
-				LIBLCD_ERR("alloc failed");
-				ret = -ENOMEM;
-				goto fail_alloc;
-			}
-		}
-	}
-fail_alloc:
-	return ret;
-}
+int create_rq_maps(struct blk_mq_tag_set *set);
 
 int blk_mq_alloc_tag_set(struct blk_mq_tag_set *set)
 {
@@ -869,17 +810,19 @@ void blk_cleanup_queue(struct request_queue *q)
 void blk_mq_end_request(struct request *rq, int error)
 {
 	struct fipc_message r;
-	struct fipc_message *request = &r;
-	struct lcd_request_container *rq_c;
+	struct fipc_message *_request = &r;
+	struct request_queue *q = rq->q;
+	struct request_queue_container *q_container;
 
-	rq_c = container_of(rq, struct lcd_request_container, rq);
+	q_container = container_of(q, struct request_queue_container,
+			request_queue);
 
-	async_msg_set_fn_type(request, BLK_MQ_END_REQUEST);
+	async_msg_set_fn_type(_request, BLK_MQ_END_REQUEST);
+	fipc_set_reg0(_request, q_container->other_ref.cptr);
+	fipc_set_reg1(_request, rq->tag);
+	fipc_set_reg2(_request, error);
 
-	fipc_set_reg0(request, rq->tag);
-	fipc_set_reg1(request, error);
-
-	vmfunc_wrapper(request);
+	vmfunc_wrapper(_request);
 
 	return;
 }
@@ -999,25 +942,6 @@ void blk_queue_logical_block_size(struct request_queue *rq, unsigned short size)
 	return;
 }
 
-
-// we don't need the irq or cpu mask to be stored on this side at all
-struct cpumask *blk_mq_tags_cpumask(struct blk_mq_tags *tags)
-{
-    //TODO
-    struct fipc_message r;
-	struct fipc_message *request = &r;
-    //struct blk_mq_tags_container *tags_c = container_of(tags, struct blk_mq_tags_container, blk_mq_tags);
-
-    //fipc_set_reg0(request, tags_c->other_ref.cptr);
-
-    async_msg_set_fn_type(request, BLK_MQ_TAGS_CPUMASK);
-
-    vmfunc_wrapper(request);
-
-    return NULL;
-}
-
-
 void blk_execute_rq_nowait(struct request_queue *q, struct gendisk *bd_disk,
 			   struct request *rq, int at_head,
 			   rq_end_io_fn *done)
@@ -1032,8 +956,6 @@ void blk_execute_rq_nowait(struct request_queue *q, struct gendisk *bd_disk,
     vmfunc_wrapper(request);
 
 }
-
-
 
 struct gendisk *alloc_disk_node(int minors, int node_id)
 {
@@ -1593,7 +1515,7 @@ int queue_rq_fn_callee(struct fipc_message *request)
 //	}
 
 	tag = fipc_get_reg3(request);
-	rq = admin_tagset->tags[0]->rqs[tag];
+	rq = blk_mq_tag_to_rq(admin_tagset->tags[0], tag);
 	rq->tag = tag;
 	bd.rq = rq;
 
@@ -1700,16 +1622,19 @@ fail_alloc:
 	return ret;
 }
 
+void nvme_complete_rq(struct request *req);
+
 int softirq_done_fn_callee(struct fipc_message *_request)
 {
-    /*
 	struct request *rq;
-	struct request_container *rq_c;
+	int tag;
 
-	null_softirq_done_fn(rq);
-    */
+	tag = fipc_get_reg0(_request);
 
-	printk("%s, called", __func__);
+	rq = blk_mq_tag_to_rq(admin_tagset->tags[0], tag);
+
+	nvme_complete_rq(rq);
+
 	return 0;
 }
 
@@ -2328,64 +2253,37 @@ fail_insert:
 	return NULL;
 }
 
-struct request *blk_mq_alloc_request(struct request_queue *rq,
+struct request *blk_mq_alloc_request(struct request_queue *q,
 		int rw,
 		unsigned int flags)
 {
 	int ret;
-	struct request *func_ret;
-	struct request_container *func_ret_container = NULL;
+	struct request *rq;
 	struct fipc_message r;
 	struct fipc_message *_request = &r;
-	struct request_queue_container *rq_container;
+	struct request_queue_container *q_container;
 	int tag;
 
-	rq_container = container_of(rq, struct request_queue_container,
+	q_container = container_of(q, struct request_queue_container,
 			request_queue);
 
-	func_ret_container = kzalloc(sizeof( struct request_container   ),
-			GFP_KERNEL);
-
-	if (!func_ret_container) {
-		LIBLCD_ERR("kzalloc");
-		goto fail_alloc;
-	}
-
-	func_ret = &func_ret_container->request;
-
-	func_ret->q = rq;
-
-	ret = glue_cap_insert_request_type(c_cspace, func_ret_container,
-		&func_ret_container->my_ref);
-	if (ret) {
-		LIBLCD_ERR("lcd insert");
-		goto fail_insert;
-	}
 	async_msg_set_fn_type(_request, BLK_MQ_ALLOC_REQUEST);
-	fipc_set_reg0(_request, rq_container->other_ref.cptr);
-	fipc_set_reg1(_request, func_ret_container->my_ref.cptr);
+	fipc_set_reg0(_request, q_container->other_ref.cptr);
 	fipc_set_reg2(_request, rw);
 	fipc_set_reg3(_request, flags);
 
 	ret = vmfunc_wrapper(_request);
-	func_ret_container->other_ref.cptr = fipc_get_reg0(_request);
+
 	tag = fipc_get_reg1(_request);
-	rq->limits.max_hw_sectors = fipc_get_reg2(_request);
-	rq->limits.max_segments = fipc_get_reg3(_request);
+	q->limits.max_hw_sectors = fipc_get_reg2(_request);
+	q->limits.max_segments = fipc_get_reg3(_request);
 
-#if 0
-	return func_ret;
-#endif
+	rq = blk_mq_tag_to_rq(admin_tagset->tags[0], tag);
 
-	printk("%s, rq: %p tag %d", __func__,
-			admin_tagset->tags[0]->rqs[tag],
-			tag);
+	printk("%s, rq: %p tag %d", __func__, rq, tag);
 
-	admin_tagset->tags[0]->rqs[tag]->q = rq;
-	return admin_tagset->tags[0]->rqs[tag];
-fail_alloc:
-fail_insert:
-	return NULL;
+	rq->q = q;
+	return rq;
 }
 
 void blk_mq_abort_requeue_list(struct request_queue *q)

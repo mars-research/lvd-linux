@@ -244,17 +244,33 @@ fail_lookup:
 	return ret;
 }
 
-int blk_mq_end_request_callee(struct fipc_message *request)
+int blk_mq_end_request_callee(struct fipc_message *_request)
 {
 	struct request *rq;
 	int ret = 0;
-	int error = 0;
+	struct request_queue_container *q_container;
+	struct request_queue *q;
+	int tag;
+	int error;
 
-	rq = rq_map[fipc_get_reg0(request)];
+	ret = glue_cap_lookup_request_queue_type(c_cspace,
+			__cptr(fipc_get_reg0(_request)), &q_container);
 
-	error = fipc_get_reg1(request);
+	if (ret) {
+		 LIBLCD_ERR("lookup");
+		 goto fail_lookup;
+	}
+
+	q = &q_container->request_queue;
+
+	tag = fipc_get_reg1(_request);
+	error = fipc_get_reg0(_request);
+
+	rq = blk_mq_get_rq_from_tag(q, tag);
 
 	blk_mq_end_request(rq, error);
+
+fail_lookup:
 	return ret;
 }
 
@@ -348,7 +364,6 @@ fail_lookup:
 
 int blk_mq_complete_request_callee(struct fipc_message *_request)
 {
-
 	struct request *rq;
 	int ret = 0;
 	struct request_queue_container *q_container;
@@ -877,13 +892,15 @@ int LCD_TRAMPOLINE_LINKAGE(exit_hctx_fn_trampoline) exit_hctx_fn_trampoline(stru
 	return exit_hctx_fn_fp(ctx, index, hidden_args);
 }
 
-void _complete_fn(struct request *request,
+void _complete_fn(struct request *rq,
 		struct trampoline_hidden_args *hidden_args)
 {
 	struct fipc_message r;
 	struct fipc_message *_request = &r;
 
 	async_msg_set_fn_type(_request, SOFTIRQ_DONE_FN);
+
+	fipc_set_reg0(_request, rq->tag);
 
 	vmfunc_klcd_wrapper(_request, 1);
 
@@ -3681,55 +3698,32 @@ int blk_mq_alloc_request_callee(struct fipc_message *_request)
 	int rw;
 	unsigned int flags;
 	int ret;
-	struct request_container *func_ret_container = NULL;
-	struct request *func_ret = NULL;
-	struct request_queue_container *rq_container;
-	struct request_queue *rq;
-
-	func_ret_container = kzalloc(sizeof( struct request_container   ),
-			GFP_KERNEL);
-
-	if (!func_ret_container) {
-		LIBLCD_ERR("kzalloc");
-		ret = -ENOMEM;
-		goto fail_alloc;
-	}
+	struct request *rq;
+	struct request_queue_container *q_container;
+	struct request_queue *q;
 
 	ret = glue_cap_lookup_request_queue_type(c_cspace,
-			__cptr(fipc_get_reg0(_request)), &rq_container);
+			__cptr(fipc_get_reg0(_request)), &q_container);
 
 	if (ret) {
 		 LIBLCD_ERR("lookup");
 		 goto fail_lookup;
 	}
 
-	rq = &rq_container->request_queue;
+	q = &q_container->request_queue;
 
 	rw = fipc_get_reg2(_request);
 	flags = fipc_get_reg3(_request);
-	func_ret_container->other_ref.cptr = fipc_get_reg1(_request);
 
-	func_ret = blk_mq_alloc_request(rq, rw, flags);
+	rq = blk_mq_alloc_request(q, rw, flags);
 
-	func_ret_container->req = func_ret;
+	printk("%s, rq: %p, q: %p, rq->q %p\n", __func__, rq, q, rq->q);
 
-	printk("%s, returned request: %p\n", __func__, func_ret);
-	printk("%s, rq: %p, q: %p, rq->q %p\n", __func__, func_ret, rq, func_ret->q);
-	ret = glue_cap_insert_request_type(c_cspace, func_ret_container,
-			&func_ret_container->my_ref);
+	fipc_set_reg1(_request, rq->tag);
+	fipc_set_reg2(_request, q->limits.max_hw_sectors);
+	fipc_set_reg3(_request, q->limits.max_segments);
 
-	if (ret) {
-		LIBLCD_ERR("lcd insert");
-		goto fail_insert;
-	}
-	fipc_set_reg0(_request, func_ret_container->my_ref.cptr);
-	fipc_set_reg1(_request, func_ret->tag);
-	fipc_set_reg2(_request, rq->limits.max_hw_sectors);
-	fipc_set_reg3(_request, rq->limits.max_segments);
-
-fail_alloc:
 fail_lookup:
-fail_insert:
 	return ret;
 }
 

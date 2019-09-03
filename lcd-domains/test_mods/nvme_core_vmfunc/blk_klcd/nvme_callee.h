@@ -7,7 +7,6 @@ int __pci_register_driver_callee(struct fipc_message *_request);
 int pci_unregister_driver_callee(struct fipc_message *_request);
 int device_release_driver_callee(struct fipc_message *_request);
 
-
 int blk_mq_alloc_tag_set_callee(struct fipc_message *request);
 int blk_mq_init_queue_callee(struct fipc_message *request);
 int blk_get_queue_callee(struct fipc_message *request);
@@ -22,6 +21,8 @@ int blk_mq_stop_hw_queues_callee(struct fipc_message *_request);
 int blk_mq_tagset_busy_iter_callee(struct fipc_message *_request);
 int blk_queue_logical_block_size_callee(struct fipc_message *request);
 int blk_queue_physical_block_size_callee(struct fipc_message *request);
+int blk_mq_update_nr_hw_queues_callee(struct fipc_message *request);
+
 int alloc_disk_node_callee(struct fipc_message *request);
 int device_add_disk_callee(struct fipc_message *request);
 int put_disk_callee(struct fipc_message *request);
@@ -55,6 +56,9 @@ int pci_save_state_callee(struct fipc_message *_request);
 int pci_release_selected_regions_callee(struct fipc_message *_request);
 int pci_select_bars_callee(struct fipc_message *_request);
 int pci_wake_from_d3_callee(struct fipc_message *_request);
+int pci_restore_state_callee(struct fipc_message *_request);
+int pci_device_is_present_callee(struct fipc_message *_request);
+
 int __hw_addr_sync_dev_callee(struct fipc_message *_request);
 int __hw_addr_unsync_dev_callee(struct fipc_message *_request);
 int get_device_callee(struct fipc_message *_request);

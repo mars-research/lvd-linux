@@ -23,6 +23,7 @@
 #define CPTR_HASH_BITS      5
 static DEFINE_HASHTABLE(file_hash, CPTR_HASH_BITS);
 static DEFINE_HASHTABLE(dev_table, CPTR_HASH_BITS);
+static DEFINE_HASHTABLE(pdev_hash, CPTR_HASH_BITS);
 
 priv_pool_t *iocb_pool;
 static unsigned long pool_pfn_start, pool_pfn_end;
@@ -42,7 +43,6 @@ struct blk_mq_ops_container *g_blk_mq_ops_container;
 
 /* hack for init_request */
 int hw_depth;
-struct request **rq_map;
 static struct glue_cspace *c_cspace;
 
 #define IOCB_POOL_SIZE		(256UL << 20)
@@ -173,6 +173,42 @@ void glue_remove_device(struct device_container *dev_c)
 	hash_del(&dev_c->hentry);
 }
 
+int inline glue_insert_pdev_hash(struct pci_dev_container *dev_container)
+{
+	BUG_ON(!dev_container->pdev);
+
+	dev_container->my_ref = __cptr((unsigned long)dev_container->pdev);
+
+	hash_add(pdev_hash, &dev_container->hentry,
+				(unsigned long) dev_container->pdev);
+
+	return 0;
+}
+
+int inline glue_lookup_pdev_hash(struct cptr c, struct pci_dev_container
+		**dev_container_out)
+{
+        struct pci_dev_container *dev_container;
+
+        hash_for_each_possible(pdev_hash, dev_container,
+				hentry, (unsigned long) cptr_val(c)) {
+		if (!dev_container) {
+			WARN_ON(!dev_container);
+			continue;
+		}
+		if (dev_container->pdev == (struct pci_dev*) c.cptr) {
+	                *dev_container_out = dev_container;
+			break;
+		}
+        }
+        return 0;
+}
+
+void inline glue_remove_pdev_hash(struct pci_dev_container *dev_container)
+{
+	hash_del(&dev_container->hentry);
+}
+
 
 int blk_mq_init_queue_callee(struct fipc_message *request)
 {
@@ -274,6 +310,26 @@ fail_lookup:
 	return ret;
 }
 
+int blk_mq_update_nr_hw_queues_callee(struct fipc_message *request)
+{
+	struct blk_mq_tag_set_container *set_container;
+	int ret;
+	int nr_hw_queues;
+
+	ret = glue_cap_lookup_blk_mq_tag_set_type(c_cspace,
+			__cptr(fipc_get_reg0(request)), &set_container);
+        if (ret) {
+                LIBLCD_ERR("lookup");
+                goto fail_lookup;
+        }
+
+	nr_hw_queues = fipc_get_reg1(request);
+	blk_mq_update_nr_hw_queues(&set_container->tag_set, nr_hw_queues);
+
+fail_lookup:
+	return ret;
+}
+
 int blk_mq_free_tag_set_callee(struct fipc_message *request)
 {
 	struct blk_mq_tag_set_container *set_container;
@@ -336,6 +392,27 @@ fail_lookup:
 	return ret;
 }
 
+int blk_put_queue_callee(struct fipc_message *request)
+{
+	struct request_queue_container *rq_container;
+	int ret;
+
+	ret = glue_cap_lookup_request_queue_type(c_cspace,
+			__cptr(fipc_get_reg0(request)), &rq_container);
+
+	if (ret) {
+		 LIBLCD_ERR("lookup");
+		 goto fail_lookup;
+	}
+
+	vmfunc_klcd_wrapper(request, 1);
+
+	blk_put_queue(&rq_container->request_queue);
+
+fail_lookup:
+	return ret;
+}
+
 int blk_mq_start_stopped_hw_queues_callee(struct fipc_message *request)
 {
 	struct request_queue_container *rq_container;
@@ -349,8 +426,6 @@ int blk_mq_start_stopped_hw_queues_callee(struct fipc_message *request)
 		 LIBLCD_ERR("lookup");
 		 goto fail_lookup;
 	}
-
-	async_msg_set_fn_type(request, BLK_MQ_START_STOPPED_HW_QUEUES);
 
 	async = fipc_get_reg1(request);
 
@@ -430,19 +505,25 @@ fail_alloc:
 int blk_queue_logical_block_size_callee(struct fipc_message *request)
 {
 	unsigned short size;
-	struct request_queue_container *rq_container;
+	struct request_queue_container *q_container;
+	struct request_queue *q;
 	int ret;
 
 	size = fipc_get_reg0(request);
 	ret = glue_cap_lookup_request_queue_type(c_cspace,
-			__cptr(fipc_get_reg1(request)), &rq_container);
+			__cptr(fipc_get_reg1(request)), &q_container);
 
 	if (ret) {
 		 LIBLCD_ERR("lookup");
 		 goto fail_lookup;
 	}
 
-	blk_queue_logical_block_size(&rq_container->request_queue, size);
+	q = &q_container->request_queue;
+
+	blk_queue_logical_block_size(q, size);
+	fipc_set_reg0(request, q->limits.logical_block_size);
+	fipc_set_reg1(request, q->limits.physical_block_size);
+	fipc_set_reg2(request, q->limits.io_min);
 
 fail_lookup:
 	return ret;
@@ -453,23 +534,6 @@ int blk_mq_tagset_busy_iter_callee(struct fipc_message *_request)
 	LCD_MSG("%s, called", __func__);
 	return 0;
 }
-
-/*
-
-int blk_mq_tags_cpumask_callee(struct fipc_message *request)
-{
-
-    struct blk_mq_tags_container *tags_c = container_of(tags, struct blk_mq_tags_container, blk_mq_tags);
-
-    fipc_set_reg0(request, tags_c->other_ref.cptr);
-
-    async_msg_set_fn_type(request, BLK_MQ_TAGS_CPUMASK);
-
-    vmfunc_klcd_wrapper(request, 1);
-
-    return (int*)fipc_get_reg0(request);
-}
-*/
 
 int blk_queue_physical_block_size_callee(struct fipc_message *request)
 {
@@ -628,15 +692,15 @@ int unregister_blkdev_callee(struct fipc_message *request)
 int blk_cleanup_queue_callee(struct fipc_message *request)
 {
 	struct request_queue_container *rq_container;
-    int ret = 0;
+	int ret = 0;
 
-    ret = glue_cap_lookup_request_queue_type(c_cspace,
-                __cptr(fipc_get_reg0(request)),
-                                    &rq_container);
-    if (ret) {
-             LIBLCD_ERR("lookup");
-             goto fail_lookup;
-    }
+	ret = glue_cap_lookup_request_queue_type(c_cspace,
+			__cptr(fipc_get_reg0(request)),
+			&rq_container);
+	if (ret) {
+		LIBLCD_ERR("lookup");
+		goto fail_lookup;
+	}
 
 	blk_cleanup_queue(&rq_container->request_queue);
 
@@ -718,25 +782,30 @@ int _queue_rq_fn(struct blk_mq_hw_ctx *ctx, const struct blk_mq_queue_data *bd, 
         return ret;
 }
 
-int _init_request_fn(void *data, struct request *req, unsigned int hctx_idx,
+int _init_request_fn(void *data, struct request *rq, unsigned int hctx_idx,
 			unsigned int rq_idx,
 			unsigned int numa_node,
 			struct trampoline_hidden_args *hidden_args)
 {
-	static int init_done = 0;
+	struct fipc_message r;
+	struct fipc_message *request = &r;
+	int func_ret = 0;
+	struct blk_mq_ops_container *ops_container =
+		hidden_args->struct_container;
 
-	if(!init_done) {
-		rq_map = kzalloc((sizeof(struct request *) * (hw_depth + 1)),
-				GFP_KERNEL);
-		if(!rq_map) {
-			LIBLCD_ERR("cannot allocate mem for rq_map");
-			return -1;
-		}
-		init_done = 1;
-	}
+	async_msg_set_fn_type(request, INIT_REQUEST_FN);
+	fipc_set_reg0(request, rq->tag);
+	fipc_set_reg1(request, hctx_idx);
+	fipc_set_reg2(request, rq_idx);
+	fipc_set_reg3(request, numa_node);
 
-	rq_map[rq_idx] = req;
-	printk("init_request: req %p req->tag %d rq_idx %d \n",req, req->tag, rq_idx);
+	/* ops container is passed to call ops.init_hctx in the LCD glue */
+	fipc_set_reg4(request, ops_container->other_ref.cptr);
+
+	vmfunc_klcd_wrapper(request, 1);
+
+	func_ret = fipc_get_reg0(request);
+
 	return 0;
 }
 
@@ -797,10 +866,14 @@ int _init_hctx_fn(struct blk_mq_hw_ctx *ctx, void *data, unsigned int index, str
 	struct fipc_message *request = &r;
 	int func_ret = 0;
 	struct blk_mq_hw_ctx_container *ctx_container;
-	struct blk_mq_ops_container *ops_container = hidden_args->struct_container;
+	struct blk_mq_ops_container *ops_container =
+		hidden_args->struct_container;
 
-	ctx_container = container_of(ctx, struct blk_mq_hw_ctx_container, blk_mq_hw_ctx);
-	ops_container = (struct blk_mq_ops_container *)hidden_args->struct_container;
+	ctx_container = container_of(ctx, struct blk_mq_hw_ctx_container,
+			blk_mq_hw_ctx);
+
+	ops_container = (struct blk_mq_ops_container
+			*)hidden_args->struct_container;
 
 	ret = glue_cap_insert_blk_mq_hw_ctx_type(c_cspace, ctx_container,
 			&ctx_container->my_ref);
@@ -809,14 +882,10 @@ int _init_hctx_fn(struct blk_mq_hw_ctx *ctx, void *data, unsigned int index, str
 		goto fail_insert;
 	}
 
-	vmfunc_klcd_wrapper(request, 1);
-
 	async_msg_set_fn_type(request, INIT_HCTX_FN);
-	fipc_set_reg0(request, ctx_container->my_ref.cptr);
-	fipc_set_reg1(request, index);
-
-	/* ops container is passed to call ops.init_hctx in the LCD glue */
-	fipc_set_reg2(request, ops_container->other_ref.cptr);
+	fipc_set_reg0(request, ops_container->other_ref.cptr);
+	fipc_set_reg1(request, ctx_container->my_ref.cptr);
+	fipc_set_reg2(request, index);
 
 	vmfunc_klcd_wrapper(request, 1);
 
@@ -841,43 +910,29 @@ int LCD_TRAMPOLINE_LINKAGE(init_hctx_fn_trampoline) init_hctx_fn_trampoline(stru
 
 }
 
-int _exit_hctx_fn(struct blk_mq_hw_ctx *ctx, unsigned int index, struct trampoline_hidden_args *hidden_args)
+int _exit_hctx_fn(struct blk_mq_hw_ctx *ctx, unsigned int index, struct
+		trampoline_hidden_args *hidden_args)
 {
-	int ret;
 	struct fipc_message r;
 	struct fipc_message *request = &r;
-	int func_ret = 0;
 	struct blk_mq_hw_ctx_container *ctx_container;
 	struct blk_mq_ops_container *ops_container = hidden_args->struct_container;
 
-	ctx_container = container_of(ctx, struct blk_mq_hw_ctx_container, blk_mq_hw_ctx);
-	ops_container = (struct blk_mq_ops_container *)hidden_args->struct_container;
-
-	ret = glue_cap_insert_blk_mq_hw_ctx_type(c_cspace, ctx_container,
-			&ctx_container->my_ref);
-	if (ret) {
-		LIBLCD_ERR("klcd insert");
-		goto fail_insert;
-	}
-
-	vmfunc_klcd_wrapper(request, 1);
+	ctx_container = container_of(ctx, struct blk_mq_hw_ctx_container,
+			blk_mq_hw_ctx);
+	ops_container = (struct blk_mq_ops_container
+			*)hidden_args->struct_container;
 
 	async_msg_set_fn_type(request, EXIT_HCTX_FN);
-	fipc_set_reg0(request, ctx_container->my_ref.cptr);
-	fipc_set_reg1(request, index);
-
-	/* ops container is passed to call ops.exit_hctx in the LCD glue */
-	fipc_set_reg2(request, ops_container->other_ref.cptr);
+	fipc_set_reg0(request, ops_container->other_ref.cptr);
+	fipc_set_reg1(request, ctx_container->other_ref.cptr);
+	fipc_set_reg2(request, index);
 
 	vmfunc_klcd_wrapper(request, 1);
-
-	ctx_container->other_ref.cptr = fipc_get_reg0(request);
-	func_ret = fipc_get_reg1(request);
 
 	printk("exit_hctx hctx %p | cptr %lu\n", ctx, ctx_container->other_ref.cptr);
 
-fail_insert:
-	return func_ret;
+	return 0;
 }
 
 LCD_TRAMPOLINE_DATA(exit_hctx_fn_trampoline);
@@ -897,10 +952,14 @@ void _complete_fn(struct request *rq,
 {
 	struct fipc_message r;
 	struct fipc_message *_request = &r;
+	struct blk_mq_ops_container *ops_container = hidden_args->struct_container;
 
-	async_msg_set_fn_type(_request, SOFTIRQ_DONE_FN);
+	ops_container = (struct blk_mq_ops_container
+			*)hidden_args->struct_container;
 
-	fipc_set_reg0(_request, rq->tag);
+	async_msg_set_fn_type(_request, COMPLETE_FN);
+	fipc_set_reg0(_request, ops_container->other_ref.cptr);
+	fipc_set_reg1(_request, rq->tag);
 
 	vmfunc_klcd_wrapper(_request, 1);
 
@@ -946,14 +1005,22 @@ void LCD_TRAMPOLINE_LINKAGE(timeout_fn_trampoline) timeout_fn_trampoline(struct 
 	return timeout_fn_fp(request, reserved, hidden_args);
 }
 
-void _poll_fn(struct request *request, bool reserved,
+void _poll_fn(struct blk_mq_hw_ctx *ctx, unsigned int tag,
 		struct trampoline_hidden_args *hidden_args)
 {
 	struct fipc_message r;
 	struct fipc_message *_request = &r;
+	struct blk_mq_hw_ctx_container *ctx_container;
+	struct blk_mq_ops_container *ops_container =
+		hidden_args->struct_container;
+
+	ctx_container = container_of(ctx, struct blk_mq_hw_ctx_container,
+			blk_mq_hw_ctx);
 
 	async_msg_set_fn_type(_request, POLL_FN);
-	fipc_set_reg1(_request, reserved);
+	fipc_set_reg0(_request, ops_container->other_ref.cptr);
+	fipc_set_reg1(_request, ctx_container->other_ref.cptr);
+	fipc_set_reg2(_request, tag);
 
 	vmfunc_klcd_wrapper(_request, 1);
 
@@ -961,16 +1028,16 @@ void _poll_fn(struct request *request, bool reserved,
 }
 
 LCD_TRAMPOLINE_DATA(poll_fn_trampoline);
-void LCD_TRAMPOLINE_LINKAGE(poll_fn_trampoline) poll_fn_trampoline(struct request
-			*request, bool reserved)
+void LCD_TRAMPOLINE_LINKAGE(poll_fn_trampoline) poll_fn_trampoline(struct
+		blk_mq_hw_ctx *ctx, unsigned int tag)
 
 {
-	void ( *volatile poll_fn_fp )(struct request *, bool,
+	void ( *volatile poll_fn_fp )(struct blk_mq_hw_ctx *, unsigned int,
 				struct trampoline_hidden_args *);
 	struct trampoline_hidden_args *hidden_args;
 	LCD_TRAMPOLINE_PROLOGUE(hidden_args, poll_fn_trampoline);
 	poll_fn_fp = _poll_fn;
-	return poll_fn_fp(request, reserved, hidden_args);
+	return poll_fn_fp(ctx, tag, hidden_args);
 }
 
 void setup_blk_mq_ops(struct blk_mq_ops_container *ops_container)
@@ -1830,6 +1897,7 @@ int pci_enable_msix_callee(struct fipc_message *_request)
 	LIBLCD_MSG("%s, returned %d", __func__, func_ret);
 
 	fipc_set_reg0(_request, func_ret);
+	fipc_set_reg1(_request, pdev->msix_enabled);
 
 fail_lookup:
 	return ret;
@@ -2161,12 +2229,7 @@ int probe(struct pci_dev *dev,
 	 * Kernel does not give us pci_dev with a container wrapped in.
 	 * So, let's have a pointer!
 	 */
-	ret = glue_cap_insert_pci_dev_type(c_cspace, dev_container,
-			&dev_container->my_ref);
-	if (ret) {
-		LIBLCD_ERR("lcd insert");
-		goto fail_insert;
-	}
+	glue_insert_pdev_hash(dev_container);
 
 	async_msg_set_fn_type(_request, PROBE);
 
@@ -2192,7 +2255,6 @@ int probe(struct pci_dev *dev,
 
 	return func_ret;
 
-fail_insert:
 fail_alloc:
 	return ret;
 }
@@ -2278,9 +2340,17 @@ void remove(struct pci_dev *dev,
 {
 	struct fipc_message r;
 	struct fipc_message *_request = &r;
+	struct pci_dev_container *dev_container = NULL;
+	struct pci_driver_container *pdrv_container =
+		hidden_args->struct_container;
+
 	INIT_IPC_MSG(&r);
 
+	glue_lookup_pdev_hash(__cptr((unsigned long) dev), &dev_container);
+
 	async_msg_set_fn_type(_request, REMOVE);
+	fipc_set_reg0(_request, pdrv_container->other_ref.cptr);
+	fipc_set_reg1(_request, dev_container->other_ref.cptr);
 
 	vmfunc_klcd_wrapper(_request, 1);
 
@@ -2422,6 +2492,55 @@ int pci_disable_device_callee(struct fipc_message *_request)
 	pdev = dev_container->pdev;
 
 	pci_disable_device(pdev);
+
+fail_lookup:
+	return ret;
+}
+
+int pci_device_is_present_callee(struct fipc_message *_request)
+{
+	int ret = 0;
+	int func_ret;
+	struct pci_dev_container *dev_container;
+	struct pci_dev *pdev;
+
+	ret = glue_cap_lookup_pci_dev_type(c_cspace,
+			__cptr(fipc_get_reg0(_request)),
+			&dev_container);
+
+	if (ret) {
+		LIBLCD_ERR("lookup");
+		goto fail_lookup;
+	}
+
+	pdev = dev_container->pdev;
+
+	func_ret = pci_device_is_present(pdev);
+
+	fipc_set_reg0(_request, func_ret);
+
+fail_lookup:
+	return ret;
+}
+
+int pci_restore_state_callee(struct fipc_message *_request)
+{
+	int ret = 0;
+	struct pci_dev_container *dev_container;
+	struct pci_dev *pdev;
+
+	ret = glue_cap_lookup_pci_dev_type(c_cspace,
+			__cptr(fipc_get_reg0(_request)),
+			&dev_container);
+
+	if (ret) {
+		LIBLCD_ERR("lookup");
+		goto fail_lookup;
+	}
+
+	pdev = dev_container->pdev;
+
+	pci_restore_state(pdev);
 
 fail_lookup:
 	return ret;

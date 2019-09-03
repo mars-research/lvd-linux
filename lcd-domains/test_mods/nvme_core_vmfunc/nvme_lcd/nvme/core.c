@@ -503,13 +503,13 @@ int nvme_submit_user_cmd(struct request_queue *q, struct nvme_command *cmd,
 			result, timeout);
 }
 
-void nvme_keep_alive_work(struct work_struct *work);
+#ifdef LCD_ISOLATE
+void nvme_keep_alive_work(struct nvme_ctrl *ctrl);
+#endif
 
 static void nvme_keep_alive_end_io(struct request *rq, int error)
 {
-#ifndef LCD_ISOLATE
 	struct nvme_ctrl *ctrl = rq->end_io_data;
-#endif
 
 	blk_mq_free_request(rq);
 
@@ -520,7 +520,7 @@ static void nvme_keep_alive_end_io(struct request *rq, int error)
 	}
 
 #ifdef LCD_ISOLATE
-	nvme_keep_alive_work(NULL);
+	nvme_keep_alive_work(ctrl);
 #else
 	schedule_delayed_work(&ctrl->ka_work, ctrl->kato * HZ);
 #endif
@@ -547,10 +547,16 @@ static int nvme_keep_alive(struct nvme_ctrl *ctrl)
 	return 0;
 }
 
+#ifdef LCD_ISOLATE
+void nvme_keep_alive_work(struct nvme_ctrl *ctrl)
+#else
 void nvme_keep_alive_work(struct work_struct *work)
+#endif
 {
+#ifndef LCD_ISOLATE
 	struct nvme_ctrl *ctrl = container_of(to_delayed_work(work),
 			struct nvme_ctrl, ka_work);
+#endif
 
 	if (nvme_keep_alive(ctrl)) {
 		/* allocation failure, reset the controller */
@@ -569,7 +575,7 @@ void nvme_start_keep_alive(struct nvme_ctrl *ctrl)
 	INIT_DELAYED_WORK(&ctrl->ka_work, nvme_keep_alive_work);
 	schedule_delayed_work(&ctrl->ka_work, ctrl->kato * HZ);
 #else
-	nvme_keep_alive_work(NULL);
+	nvme_keep_alive_work(ctrl);
 #endif
 }
 EXPORT_SYMBOL_GPL(nvme_start_keep_alive);
@@ -1322,6 +1328,8 @@ int nvme_init_identify(struct nvme_ctrl *ctrl)
 	atomic_set(&ctrl->abort_limit, id->acl + 1);
 	ctrl->vwc = id->vwc;
 	ctrl->cntlid = le16_to_cpup(&id->cntlid);
+	printk("====> %s, SERIAL: %s <====", __func__, id->sn);
+	printk("====> %s, MODEL: %s <====", __func__, id->mn);
 	memcpy(ctrl->serial, id->sn, sizeof(id->sn));
 	memcpy(ctrl->model, id->mn, sizeof(id->mn));
 	memcpy(ctrl->firmware_rev, id->fr, sizeof(id->fr));
@@ -1890,11 +1898,16 @@ static void nvme_scan_ns_sequential(struct nvme_ctrl *ctrl, unsigned nn)
 
 	nvme_remove_invalid_namespaces(ctrl, nn);
 }
-
+#ifdef LCD_ISOLATE
+static void nvme_scan_work(struct nvme_ctrl *ctrl)
+#else
 static void nvme_scan_work(struct work_struct *work)
+#endif
 {
+#ifndef LCD_ISOLATE
 	struct nvme_ctrl *ctrl =
 		container_of(work, struct nvme_ctrl, scan_work);
+#endif
 	struct nvme_id_ctrl *id;
 	unsigned nn;
 
@@ -1929,7 +1942,7 @@ void nvme_queue_scan(struct nvme_ctrl *ctrl)
 	 */
 	if (ctrl->state == NVME_CTRL_LIVE)
 #ifdef LCD_ISOLATE
-		nvme_scan_work(NULL);
+		nvme_scan_work(ctrl);
 #else
 		schedule_work(&ctrl->scan_work);
 #endif
@@ -1959,10 +1972,17 @@ void nvme_remove_namespaces(struct nvme_ctrl *ctrl)
 }
 EXPORT_SYMBOL_GPL(nvme_remove_namespaces);
 
+#ifdef LCD_ISOLATE
+static void nvme_async_event_work(struct nvme_ctrl *ctrl)
+#else
 static void nvme_async_event_work(struct work_struct *work)
+#endif
 {
+
+#ifndef LCD_ISOLATE
 	struct nvme_ctrl *ctrl =
 		container_of(work, struct nvme_ctrl, async_event_work);
+#endif
 
 	spin_lock_irq(&ctrl->lock);
 	while (ctrl->event_limit > 0) {
@@ -1984,7 +2004,7 @@ void nvme_complete_async_event(struct nvme_ctrl *ctrl,
 	if (status == NVME_SC_SUCCESS || status == NVME_SC_ABORT_REQ) {
 		++ctrl->event_limit;
 #ifdef LCD_ISOLATE
-		nvme_async_event_work(NULL);
+		nvme_async_event_work(ctrl);
 #else
 		schedule_work(&ctrl->async_event_work);
 #endif
@@ -2008,7 +2028,7 @@ void nvme_queue_async_events(struct nvme_ctrl *ctrl)
 {
 	ctrl->event_limit = NVME_NR_AERS;
 #ifdef LCD_ISOLATE
-	nvme_async_event_work(NULL);
+	nvme_async_event_work(ctrl);
 #else
 	schedule_work(&ctrl->async_event_work);
 #endif

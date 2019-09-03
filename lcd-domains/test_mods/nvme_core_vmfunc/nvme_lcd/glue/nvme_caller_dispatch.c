@@ -26,7 +26,7 @@ int handle_rpc_calls(struct fipc_message *message)
 			return map_queue_fn_callee(message);
 
 		case INIT_HCTX_FN:
-			trace(INIT_HCTX_FN);
+			/* trace(INIT_HCTX_FN); */
 			return init_hctx_fn_callee(message);
 
 		case EXIT_HCTX_FN:
@@ -34,12 +34,12 @@ int handle_rpc_calls(struct fipc_message *message)
 			return exit_hctx_fn_callee(message);
 
 		case INIT_REQUEST_FN:
-			trace(INIT_REQUEST_FN);
+			/* trace(INIT_REQUEST_FN); */
 			return init_request_fn_callee(message);
 
-		case SOFTIRQ_DONE_FN:
-			trace(SOFTIRQ_DONE_FN);
-			return softirq_done_fn_callee(message);
+		case COMPLETE_FN:
+			trace(COMPLETE_FN);
+			return complete_fn_callee(message);
 
 		case TIMEOUT_FN:
 			trace(TIMEOUT_FN);
@@ -72,24 +72,14 @@ int handle_rpc_calls(struct fipc_message *message)
 		case BD_IOCTL_FN:
 			trace(BD_IOCTL_FN);
 			return bd_ioctl_callee(message);
-
-
-	        // case OPEN:
-			// trace(OPEN);
-			// return open_callee(message);
-
-		// case RELEASE:
-			// trace(RELEASE);
-			// return release_callee(message);
             
 		case PROBE:
 			trace(PROBE);
 			return probe_callee(message);
 
-		// case REMOVE:
-			// trace(REMOVE);
-			// return remove_callee(message);
-
+		case REMOVE:
+			trace(REMOVE);
+			return remove_callee(message);
 
 		case MODULE_INIT:
 			trace(MODULE_INIT);

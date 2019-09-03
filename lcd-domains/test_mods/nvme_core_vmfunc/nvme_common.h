@@ -104,7 +104,7 @@ enum dispatch_t {
 	GET_DEVICE,
 	DEVICE_RELEASE_DRIVER,
 	QUEUE_RQ_FN,
-	SOFTIRQ_DONE_FN,
+	COMPLETE_FN,
 	MAP_QUEUE_FN,
 	INIT_HCTX_FN,
 	INIT_HCTX_SYNC,
@@ -161,29 +161,6 @@ enum dispatch_t {
 	REVALIDATE_DISK,
 };
 
-/*
-typedef enum {
-	MC_LIST = 1,
-	UC_LIST = 2,
-} addr_list;
-*/
-
-/*
-typedef enum {
-	VOLUNTEER_XMIT = 0x1,
-	SHARED_DATA_XMIT = 0x2abcd,
-} xmit_type_t;
-*/
-
-/*
-typedef enum {
-	IXGBE_POLL_RUNNING,
-	IXGBE_POLL_STOPPED,
-} ixgbe_poll_state_t;
-*/
-
-#define ASYNC_RPC_BUFFER_ORDER 15
-
 #define LOWER32_BITS    32
 #define LOWER_HALF(x)   (x & ((1ULL << LOWER32_BITS) - 1))
 #define UPPER_HALF(x)   (x >> LOWER32_BITS)
@@ -194,8 +171,6 @@ struct pcidev_info {
 	unsigned int domain, bus, slot, fn;
 };
 
-
-
 /* CSPACES ------------------------------------------------------------ */
 int glue_cap_init(void);
 
@@ -205,9 +180,7 @@ void glue_cap_destroy(struct glue_cspace *cspace);
 
 void glue_cap_exit(void);
 
-void glue_cap_remove(
-	struct glue_cspace *cspace,
-	cptr_t c);
+void glue_cap_remove( struct glue_cspace *cspace, cptr_t c);
 
 #define INIT_IPC_MSG(m)		memset(m, 0x0, sizeof(*m))
 /* ASYNC HELPERS -------------------------------------------------- */

@@ -950,7 +950,7 @@ static void abort_endio(struct request *req, int error)
 }
 
 #ifdef LCD_ISOLATE
-static void nvme_reset_work(struct work_struct *work);
+static void nvme_reset_work(struct nvme_dev *dev);
 #endif
 
 static enum blk_eh_timer_return nvme_timeout(struct request *req, bool reserved)
@@ -989,7 +989,7 @@ static enum blk_eh_timer_return nvme_timeout(struct request *req, bool reserved)
 #ifndef LCD_ISOLATE
 		queue_work(nvme_workq, &dev->reset_work);
 #else
-		nvme_reset_work(NULL);
+		nvme_reset_work(dev);
 #endif
 		/*
 		 * Mark the request as handled, since the inline shutdown
@@ -1138,6 +1138,9 @@ static int nvme_alloc_sq_cmds(struct nvme_dev *dev, struct nvme_queue *nvmeq,
 	} else {
 		nvmeq->sq_cmds = dma_alloc_coherent(dev->dev, SQ_SIZE(depth),
 					&nvmeq->sq_dma_addr, GFP_KERNEL);
+
+		printk("%s, nvmeq->sq_cmds %p", __func__, nvmeq->sq_cmds);
+
 		if (!nvmeq->sq_cmds)
 			return -ENOMEM;
 	}
@@ -1152,18 +1155,25 @@ static struct nvme_queue *nvme_alloc_queue(struct nvme_dev *dev, int qid,
 	if (!nvmeq)
 		return NULL;
 
+	printk("%s qid: %d, depth: %d", __func__, qid, depth);
+
 	nvmeq->cqes = dma_zalloc_coherent(dev->dev, CQ_SIZE(depth),
 					  &nvmeq->cq_dma_addr, GFP_KERNEL);
+
+	printk("%s, nvmeq->cqes %p", __func__, nvmeq->cqes);
+
 	if (!nvmeq->cqes)
 		goto free_nvmeq;
 
 	if (nvme_alloc_sq_cmds(dev, nvmeq, qid, depth))
 		goto free_cqdma;
 
+	printk("%s, ret after nvme_alloc_sq_cmds", __func__);
 	nvmeq->q_dmadev = dev->dev;
 	nvmeq->dev = dev;
 	snprintf(nvmeq->irqname, sizeof(nvmeq->irqname), "nvme%dq%d",
 			dev->ctrl.instance, qid);
+	printk("%s init nvme: %p qlock %p",__func__, nvmeq, &nvmeq->q_lock);
 	spin_lock_init(&nvmeq->q_lock);
 	nvmeq->cq_head = 0;
 	nvmeq->cq_phase = 1;
@@ -1217,6 +1227,7 @@ static int nvme_create_queue(struct nvme_queue *nvmeq, int qid)
 	struct nvme_dev *dev = nvmeq->dev;
 	int result;
 
+	printk("%s, qid = %d", __func__, qid);
 	nvmeq->cq_vector = qid - 1;
 	result = adapter_alloc_cq(dev, qid, nvmeq);
 	if (result < 0)
@@ -1226,10 +1237,14 @@ static int nvme_create_queue(struct nvme_queue *nvmeq, int qid)
 	if (result < 0)
 		goto release_cq;
 
+	printk("%s, req_irq: cq_vec: %d irq: %d", __func__, nvmeq->cq_vector,
+				dev->entry[nvmeq->cq_vector].vector);
+
 	result = queue_request_irq(dev, nvmeq, nvmeq->irqname);
 	if (result < 0)
 		goto release_sq;
 
+	printk("%s, calling nvme_init_queue %p", __func__, nvmeq);
 	nvme_init_queue(nvmeq, qid);
 	return result;
 
@@ -1429,6 +1444,7 @@ static int nvme_create_io_queues(struct nvme_dev *dev)
 	int ret = 0;
 
 	for (i = dev->queue_count; i <= dev->max_qid; i++) {
+		printk("%s, alloc queue %d", __func__, i);
 		if (!nvme_alloc_queue(dev, i, dev->q_depth)) {
 			ret = -ENOMEM;
 			break;
@@ -1437,6 +1453,7 @@ static int nvme_create_io_queues(struct nvme_dev *dev)
 
 	max = min(dev->max_qid, dev->queue_count - 1);
 	for (i = dev->online_queues; i <= max; i++) {
+		printk("%s, creating queue %d", __func__, i);
 		ret = nvme_create_queue(dev->queues[i], i);
 		if (ret) {
 			nvme_free_queues(dev, i);
@@ -1520,7 +1537,12 @@ static int nvme_setup_io_queues(struct nvme_dev *dev)
 	struct pci_dev *pdev = to_pci_dev(dev->dev);
 	int result, i, vecs, nr_io_queues, size;
 
+#ifdef LCD_ISOLATE
+	/* XXX: Just enable only one queue for now */
+	nr_io_queues = 1;
+#else
 	nr_io_queues = num_online_cpus();
+#endif
 	result = nvme_set_queue_count(&dev->ctrl, &nr_io_queues);
 	if (result < 0)
 		return result;
@@ -1892,12 +1914,14 @@ static void nvme_pci_free_ctrl(struct nvme_ctrl *ctrl)
 	kfree(dev);
 }
 
+#ifdef LCD_ISOLATE
+static void nvme_remove_dead_ctrl_work(struct nvme_dev *dev)
+#else
 static void nvme_remove_dead_ctrl_work(struct work_struct *work)
+#endif
 {
 #ifndef LCD_ISOLATE
 	struct nvme_dev *dev = container_of(work, struct nvme_dev, remove_work);
-#else
-    struct nvme_dev *dev = g_nvme_dev;
 #endif
 	struct pci_dev *pdev = to_pci_dev(dev->dev);
 
@@ -1914,19 +1938,21 @@ static void nvme_remove_dead_ctrl(struct nvme_dev *dev, int status)
 	kref_get(&dev->ctrl.kref);
 	nvme_dev_disable(dev, false);
 #ifdef LCD_ISOLATE
-	nvme_remove_dead_ctrl_work(NULL);
+	nvme_remove_dead_ctrl_work(dev);
 #else
 	if (!schedule_work(&dev->remove_work))
 		nvme_put_ctrl(&dev->ctrl);
 #endif
 }
 
+#ifdef LCD_ISOLATE
+static void nvme_reset_work(struct nvme_dev *dev)
+#else
 static void nvme_reset_work(struct work_struct *work)
+#endif
 {
 #ifndef LCD_ISOLATE
 	struct nvme_dev *dev = container_of(work, struct nvme_dev, reset_work);
-#else
-	struct nvme_dev *dev = g_nvme_dev;
 #endif
 	int result = -ENODEV;
 
@@ -2020,7 +2046,7 @@ int nvme_reset(struct nvme_dev *dev)
 
 	//if (!queue_ work(nvme_workq, &dev->reset_work))
 	//	return -EBUSY;
-	nvme_reset_work(NULL);
+	nvme_reset_work(dev);
 
 	//flush_work(&dev->reset_work);
 	return 0;
@@ -2158,7 +2184,7 @@ static int nvme_probe(struct pci_dev *pdev, const struct pci_device_id *id)
 #ifndef LCD_ISOLATE
 	queue_ work(nvme_workq, &dev->reset_work);
 #else
-	nvme_reset_work(NULL);
+	nvme_reset_work(dev);
 #endif
 	return 0;
 
@@ -2186,7 +2212,7 @@ static void nvme_reset_notify(struct pci_dev *pdev, bool prepare)
 #ifndef LCD_ISOLATE
 	queue_work(nvme_workq, &dev->reset_work);
 #else
-	nvme_reset_work(NULL);
+	nvme_reset_work(dev);
 #endif
 }
 
@@ -2263,12 +2289,13 @@ static int nvme_suspend(struct device *dev)
 
 static int nvme_resume(struct device *dev)
 {
-#ifndef LCD_ISOLATE
 	struct pci_dev *pdev = to_pci_dev(dev);
 	struct nvme_dev *ndev = pci_get_drvdata(pdev);
+
+#ifndef LCD_ISOLATE
 	queue_work(nvme_workq, &ndev->reset_work);
 #else
-	nvme_reset_work(NULL);
+	nvme_reset_work(ndev);
 #endif
 	return 0;
 }
@@ -2304,16 +2331,14 @@ static pci_ers_result_t nvme_error_detected(struct pci_dev *pdev,
 
 static pci_ers_result_t nvme_slot_reset(struct pci_dev *pdev)
 {
-#ifndef LCD_ISOLATE
 	struct  nvme_dev *dev = pci_get_drvdata(pdev);
 	dev_info(dev->ctrl.device, "restart after slot reset\n");
-#endif
 
 	pci_restore_state(pdev);
 #ifndef LCD_ISOLATE
 	queue_work(nvme_workq, &dev->reset_work);
 #else
-	nvme_reset_work(NULL);
+	nvme_reset_work(dev);
 #endif
 	return PCI_ERS_RESULT_RECOVERED;
 }

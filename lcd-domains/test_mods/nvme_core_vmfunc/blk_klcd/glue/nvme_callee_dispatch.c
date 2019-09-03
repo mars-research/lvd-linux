@@ -149,7 +149,17 @@ int blk_klcd_dispatch_async_loop(struct fipc_message *message)
 
 		case PCI_WAKE_FROM_D3:
 			trace(PCI_WAKE_FROM_D3);
-			ret =  pci_wake_from_d3_callee(message);
+			ret = pci_wake_from_d3_callee(message);
+			break;
+
+		case PCI_RESTORE_STATE:
+			trace(PCI_RESTORE_STATE);
+			ret = pci_restore_state_callee(message);
+			break;
+
+		case PCI_DEVICE_IS_PRESENT:
+			trace(PCI_DEVICE_IS_PRESENT);
+			ret = pci_device_is_present_callee(message);
 			break;
 
 		case BLK_MQ_ALLOC_TAG_SET:
@@ -334,6 +344,10 @@ int blk_klcd_dispatch_async_loop(struct fipc_message *message)
 		case BLK_MQ_UNFREEZE_QUEUE:
 			trace(BLK_MQ_UNFREEZE_QUEUE);
 			return blk_mq_unfreeze_queue_callee(message);
+
+		case BLK_MQ_UPDATE_NR_HW_QUEUES:
+			trace(BLK_MQ_UPDATE_NR_HW_QUEUES);
+			return blk_mq_update_nr_hw_queues_callee(message);
 
 		case BLK_MQ_STOP_HW_QUEUES:
 			trace(BLK_MQ_STOP_HW_QUEUES);

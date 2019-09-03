@@ -45,6 +45,7 @@ struct pci_dev_container {
 	struct pci_dev *pdev;
 	struct cptr other_ref;
 	struct cptr my_ref;
+	struct hlist_node hentry;
 };
 
 struct pci_device_id_container {

@@ -17,6 +17,41 @@ static struct biovec_slab bvec_slabs[BVEC_POOL_NR] __read_mostly = {
 };
 #undef BV
 
+static inline bool bio_remaining_done(struct bio *bio)
+{
+	/*
+	 * If we're not chaining, then ->__bi_remaining is always 1 and
+	 * we always end io on the first invocation.
+	 */
+	if (!bio_flagged(bio, BIO_CHAIN))
+		return true;
+
+	BUG_ON(atomic_read(&bio->__bi_remaining) <= 0);
+
+	if (atomic_dec_and_test(&bio->__bi_remaining)) {
+		bio_clear_flag(bio, BIO_CHAIN);
+		return true;
+	}
+
+	return false;
+}
+
+static struct bio *__bio_chain_endio(struct bio *bio)
+{
+	struct bio *parent = bio->bi_private;
+
+	if (!parent->bi_error)
+		parent->bi_error = bio->bi_error;
+	bio_put(bio);
+	return parent;
+}
+
+static void bio_chain_endio(struct bio *bio)
+{
+	bio_endio(__bio_chain_endio(bio));
+}
+
+
 void bvec_free(mempool_t *pool, struct bio_vec *bv, unsigned int idx)
 {
 	if (!idx)
@@ -604,3 +639,56 @@ cleanup:
 	bio_put(bio);
 	return ERR_PTR(-ENOMEM);
 }
+
+/**
+ * bio_advance - increment/complete a bio by some number of bytes
+ * @bio:	bio to advance
+ * @bytes:	number of bytes to complete
+ *
+ * This updates bi_sector, bi_size and bi_idx; if the number of bytes to
+ * complete doesn't align with a bvec boundary, then bv_len and bv_offset will
+ * be updated on the last bvec as well.
+ *
+ * @bio will then represent the remaining, uncompleted portion of the io.
+ */
+void bio_advance(struct bio *bio, unsigned bytes)
+{
+	if (bio_integrity(bio))
+		bio_integrity_advance(bio, bytes);
+
+	bio_advance_iter(bio, &bio->bi_iter, bytes);
+}
+EXPORT_SYMBOL(bio_advance);
+
+/**
+ * bio_endio - end I/O on a bio
+ * @bio:	bio
+ *
+ * Description:
+ *   bio_endio() will end I/O on the whole bio. bio_endio() is the preferred
+ *   way to end I/O on a bio. No one should call bi_end_io() directly on a
+ *   bio unless they own it and thus know that it has an end_io function.
+ **/
+void bio_endio(struct bio *bio)
+{
+again:
+	if (!bio_remaining_done(bio))
+		return;
+
+	/*
+	 * Need to have a real endio function for chained bios, otherwise
+	 * various corner cases will break (like stacking block devices that
+	 * save/restore bi_end_io) - however, we want to avoid unbounded
+	 * recursion and blowing the stack. Tail call optimization would
+	 * handle this, but compiling with frame pointers also disables
+	 * gcc's sibling call optimization.
+	 */
+	if (bio->bi_end_io == bio_chain_endio) {
+		bio = __bio_chain_endio(bio);
+		goto again;
+	}
+
+	if (bio->bi_end_io)
+		bio->bi_end_io(bio);
+}
+EXPORT_SYMBOL(bio_endio);

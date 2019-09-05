@@ -209,6 +209,15 @@ new_segment:
 	return nr_phys_segs;
 }
 
+void blk_recalc_rq_segments(struct request *rq)
+{
+	bool no_sg_merge = !!test_bit(QUEUE_FLAG_NO_SG_MERGE,
+			&rq->q->queue_flags);
+
+	rq->nr_phys_segments = __blk_recalc_rq_segments(rq->q, rq->bio,
+			no_sg_merge);
+}
+
 void blk_recount_segments(struct request_queue *q, struct bio *bio)
 {
 	unsigned short seg_cnt;

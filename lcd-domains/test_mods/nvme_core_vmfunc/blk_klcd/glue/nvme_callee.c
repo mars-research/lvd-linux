@@ -405,8 +405,6 @@ int blk_put_queue_callee(struct fipc_message *request)
 		 goto fail_lookup;
 	}
 
-	vmfunc_klcd_wrapper(request, 1);
-
 	blk_put_queue(&rq_container->request_queue);
 
 fail_lookup:
@@ -428,8 +426,6 @@ int blk_mq_start_stopped_hw_queues_callee(struct fipc_message *request)
 	}
 
 	async = fipc_get_reg1(request);
-
-	vmfunc_klcd_wrapper(request, 1);
 
 	blk_mq_start_stopped_hw_queues(&rq_container->request_queue, async);
 
@@ -720,9 +716,8 @@ int _queue_rq_fn(struct blk_mq_hw_ctx *ctx, const struct blk_mq_queue_data *bd, 
 	int i = 0;
 #endif
 
-#ifndef CONFIG_LVD
-        struct blk_mq_ops_container *ops_container;
-#endif
+	struct blk_mq_ops_container *ops_container =
+		hidden_args->struct_container;
         struct blk_mq_hw_ctx_container *ctx_container;
 
         /*XXX Beware!! hwctx can be unique per hw context of the driver, if multiple
@@ -731,18 +726,12 @@ int _queue_rq_fn(struct blk_mq_hw_ctx *ctx, const struct blk_mq_queue_data *bd, 
 
         ctx_container = container_of(ctx, struct blk_mq_hw_ctx_container,
 					blk_mq_hw_ctx);
-#ifndef CONFIG_LVD
-        ops_container = (struct blk_mq_ops_container *)hidden_args->struct_container;
-#endif
 
         async_msg_set_fn_type(request, QUEUE_RQ_FN);
 
         fipc_set_reg0(request, ctx->queue_num);
         fipc_set_reg1(request, ctx_container->other_ref.cptr);
-
-#ifndef CONFIG_LVD
         fipc_set_reg2(request, ops_container->other_ref.cptr);
-#endif
 	fipc_set_reg3(request, bd->rq->tag);
 
 #ifdef CONFIG_COPY_USER_DATA
@@ -960,7 +949,7 @@ void _complete_fn(struct request *rq,
 	async_msg_set_fn_type(_request, COMPLETE_FN);
 	fipc_set_reg0(_request, ops_container->other_ref.cptr);
 	fipc_set_reg1(_request, rq->tag);
-
+	fipc_set_reg2(_request, get_queue_num(rq));
 	vmfunc_klcd_wrapper(_request, 1);
 
 	return;
@@ -1796,47 +1785,37 @@ remove_trampoline(struct pci_dev *dev)
 
 int pci_disable_msi_callee(struct fipc_message *_request)
 {
-	struct pci_dev_container *dev_container;
+	struct pci_dev_container *dev_container = NULL;
 	struct pci_dev *pdev;
-	int ret;
+	int ret = 0;
 
-	ret = glue_cap_lookup_pci_dev_type(c_cspace,
-			__cptr(fipc_get_reg0(_request)),
+	glue_lookup_pdev_hash(__cptr(fipc_get_reg0(_request)),
 			&dev_container);
-	if (ret) {
-		LIBLCD_ERR("lookup");
-		goto fail_lookup;
-	}
 
 	pdev = dev_container->pdev;
 
 	pci_disable_msi(pdev);
 
 	LIBLCD_MSG("%s returned");
-fail_lookup:
 	return ret;
 }
 
 int pci_disable_msix_callee(struct fipc_message *_request)
 {
-	struct pci_dev_container *dev_container;
+	struct pci_dev_container *dev_container = NULL;
 	struct pci_dev *pdev;
-	int ret;
+	int ret = 0;
 
-	ret = glue_cap_lookup_pci_dev_type(c_cspace,
-			__cptr(fipc_get_reg0(_request)),
+	glue_lookup_pdev_hash(__cptr(fipc_get_reg0(_request)),
 			&dev_container);
-	if (ret) {
-		LIBLCD_ERR("lookup");
-		goto fail_lookup;
-	}
 
 	pdev = dev_container->pdev;
 
 	pci_disable_msix(pdev);
 
+	fipc_set_reg0(_request, pdev->msix_enabled);
+
 	LIBLCD_MSG("%s returned");
-fail_lookup:
 	return ret;
 }
 
@@ -1851,17 +1830,11 @@ int pci_enable_msix_callee(struct fipc_message *_request)
 	gva_t p_gva;
 	int nvec;
 	struct msix_entry *entries;
-	struct pci_dev_container *dev_container;
+	struct pci_dev_container *dev_container = NULL;
 	struct pci_dev *pdev;
 
-	ret = glue_cap_lookup_pci_dev_type(c_cspace,
-			__cptr(fipc_get_reg4(_request)),
+	glue_lookup_pdev_hash(__cptr(fipc_get_reg4(_request)),
 			&dev_container);
-
-	if (ret) {
-		LIBLCD_ERR("lookup");
-		goto fail_lookup;
-	}
 
 	pdev = dev_container->pdev;
 
@@ -1899,18 +1872,16 @@ int pci_enable_msix_callee(struct fipc_message *_request)
 	fipc_set_reg0(_request, func_ret);
 	fipc_set_reg1(_request, pdev->msix_enabled);
 
-fail_lookup:
 	return ret;
 }
 
 int device_release_driver_callee(struct fipc_message *_request)
 {
 	int ret = 0;
-	struct pci_dev_container *dev_container;
+	struct pci_dev_container *dev_container = NULL;
 	struct device *dev;
 
-	ret = glue_cap_lookup_pci_dev_type(c_cspace,
-			__cptr(fipc_get_reg0(_request)),
+	glue_lookup_pdev_hash(__cptr(fipc_get_reg0(_request)),
 			&dev_container);
 
 	if (ret) {
@@ -1930,11 +1901,10 @@ int pci_enable_msi_range_callee(struct fipc_message *_request)
 	int ret = 0;
 	int func_ret;
 	int minvec, maxvec;
-	struct pci_dev_container *dev_container;
+	struct pci_dev_container *dev_container = NULL;
 	struct pci_dev *pdev;
 
-	ret = glue_cap_lookup_pci_dev_type(c_cspace,
-			__cptr(fipc_get_reg0(_request)),
+	glue_lookup_pdev_hash(__cptr(fipc_get_reg0(_request)),
 			&dev_container);
 
 	if (ret) {
@@ -1968,14 +1938,13 @@ int pci_enable_msix_range_callee(struct fipc_message *_request)
 	gva_t p_gva;
 	int minvec, maxvec;
 	struct msix_entry *entries;
-	struct pci_dev_container *dev_container;
+	struct pci_dev_container *dev_container = NULL;
 	struct pci_dev *pdev;
 
 	LCD_MSG("%s Looking up with pdev_other.cptr %lx", __func__,
 			__cptr(fipc_get_reg5(_request)));
 
-	ret = glue_cap_lookup_pci_dev_type(c_cspace,
-			__cptr(fipc_get_reg5(_request)),
+	glue_lookup_pdev_hash(__cptr(fipc_get_reg5(_request)),
 			&dev_container);
 
 	if (ret) {
@@ -2018,6 +1987,7 @@ int pci_enable_msix_range_callee(struct fipc_message *_request)
 	LIBLCD_MSG("%s, returned %d", __func__, func_ret);
 
 	fipc_set_reg0(_request, func_ret);
+	fipc_set_reg1(_request, pdev->msix_enabled);
 
 fail_lookup:
 	return ret;
@@ -2125,19 +2095,14 @@ int sync_probe_callee(struct fipc_message *_request)
 	cptr_t pool_cptr;
 	cptr_t lcd_pool_cptr;
 	cptr_t lcd_res0_cptr;
-	struct pci_dev_container *dev_container;
+	struct pci_dev_container *dev_container = NULL;
 	struct pci_dev *pdev;
 
 	LIBLCD_MSG("%s, called", __func__);
 
-	ret = glue_cap_lookup_pci_dev_type(c_cspace,
-			__cptr(fipc_get_reg2(_request)),
-			&dev_container);
 
-	if (ret) {
-		LIBLCD_ERR("lookup");
-		goto fail_lookup;
-	}
+	glue_lookup_pdev_hash(__cptr(fipc_get_reg2(_request)),
+			&dev_container);
 
 	pdev = dev_container->pdev;
 
@@ -2181,7 +2146,6 @@ int sync_probe_callee(struct fipc_message *_request)
 	fipc_set_reg0(_request, res0_len);
 	fipc_set_reg1(_request, pool_ord);
 
-fail_lookup:
 fail_vol:
 	return 0;
 }
@@ -2190,7 +2154,7 @@ int probe(struct pci_dev *dev,
 		const struct pci_device_id *id,
 		struct trampoline_hidden_args *hidden_args)
 {
-	struct pci_dev_container *dev_container;
+	struct pci_dev_container *dev_container = NULL;
 	struct device_container *device_container;
 	int ret = 0;
 	struct fipc_message r;
@@ -2252,6 +2216,7 @@ int probe(struct pci_dev *dev,
 	printk("%s, send request done\n", __func__);
 
 	func_ret = fipc_get_reg0(_request);
+	dev_container->other_ref.cptr = fipc_get_reg1(_request);
 
 	return func_ret;
 
@@ -2380,17 +2345,11 @@ int pci_disable_pcie_error_reporting_callee(struct fipc_message *_request)
 {
 	int ret = 0;
 	int func_ret;
-	struct pci_dev_container *dev_container;
+	struct pci_dev_container *dev_container = NULL;
 	struct pci_dev *pdev;
 
-	ret = glue_cap_lookup_pci_dev_type(c_cspace,
-			__cptr(fipc_get_reg0(_request)),
+	glue_lookup_pdev_hash(__cptr(fipc_get_reg0(_request)),
 			&dev_container);
-
-	if (ret) {
-		LIBLCD_ERR("lookup");
-		goto fail_lookup;
-	}
 
 	pdev = dev_container->pdev;
 
@@ -2398,7 +2357,6 @@ int pci_disable_pcie_error_reporting_callee(struct fipc_message *_request)
 
 	fipc_set_reg0(_request, func_ret);
 
-fail_lookup:
 	return ret;
 }
 
@@ -2452,17 +2410,11 @@ int pci_cleanup_aer_uncorrect_error_status_callee(struct fipc_message *_request)
 {
 	int ret = 0;
 	int func_ret;
-	struct pci_dev_container *dev_container;
+	struct pci_dev_container *dev_container = NULL;
 	struct pci_dev *pdev;
 
-	ret = glue_cap_lookup_pci_dev_type(c_cspace,
-			__cptr(fipc_get_reg0(_request)),
+	glue_lookup_pdev_hash(__cptr(fipc_get_reg0(_request)),
 			&dev_container);
-
-	if (ret) {
-		LIBLCD_ERR("lookup");
-		goto fail_lookup;
-	}
 
 	pdev = dev_container->pdev;
 
@@ -2470,30 +2422,22 @@ int pci_cleanup_aer_uncorrect_error_status_callee(struct fipc_message *_request)
 
 	fipc_set_reg0(_request, func_ret);
 
-fail_lookup:
 	return ret;
 }
 
 int pci_disable_device_callee(struct fipc_message *_request)
 {
 	int ret = 0;
-	struct pci_dev_container *dev_container;
+	struct pci_dev_container *dev_container = NULL;
 	struct pci_dev *pdev;
 
-	ret = glue_cap_lookup_pci_dev_type(c_cspace,
-			__cptr(fipc_get_reg0(_request)),
+	glue_lookup_pdev_hash(__cptr(fipc_get_reg0(_request)),
 			&dev_container);
-
-	if (ret) {
-		LIBLCD_ERR("lookup");
-		goto fail_lookup;
-	}
 
 	pdev = dev_container->pdev;
 
 	pci_disable_device(pdev);
 
-fail_lookup:
 	return ret;
 }
 
@@ -2501,17 +2445,11 @@ int pci_device_is_present_callee(struct fipc_message *_request)
 {
 	int ret = 0;
 	int func_ret;
-	struct pci_dev_container *dev_container;
+	struct pci_dev_container *dev_container = NULL;
 	struct pci_dev *pdev;
 
-	ret = glue_cap_lookup_pci_dev_type(c_cspace,
-			__cptr(fipc_get_reg0(_request)),
+	glue_lookup_pdev_hash(__cptr(fipc_get_reg0(_request)),
 			&dev_container);
-
-	if (ret) {
-		LIBLCD_ERR("lookup");
-		goto fail_lookup;
-	}
 
 	pdev = dev_container->pdev;
 
@@ -2519,30 +2457,22 @@ int pci_device_is_present_callee(struct fipc_message *_request)
 
 	fipc_set_reg0(_request, func_ret);
 
-fail_lookup:
 	return ret;
 }
 
 int pci_restore_state_callee(struct fipc_message *_request)
 {
 	int ret = 0;
-	struct pci_dev_container *dev_container;
+	struct pci_dev_container *dev_container = NULL;
 	struct pci_dev *pdev;
 
-	ret = glue_cap_lookup_pci_dev_type(c_cspace,
-			__cptr(fipc_get_reg0(_request)),
+	glue_lookup_pdev_hash(__cptr(fipc_get_reg0(_request)),
 			&dev_container);
-
-	if (ret) {
-		LIBLCD_ERR("lookup");
-		goto fail_lookup;
-	}
 
 	pdev = dev_container->pdev;
 
 	pci_restore_state(pdev);
 
-fail_lookup:
 	return ret;
 }
 
@@ -2550,17 +2480,11 @@ int pci_enable_pcie_error_reporting_callee(struct fipc_message *_request)
 {
 	int ret = 0;
 	int func_ret;
-	struct pci_dev_container *dev_container;
+	struct pci_dev_container *dev_container = NULL;
 	struct pci_dev *pdev;
 
-	ret = glue_cap_lookup_pci_dev_type(c_cspace,
-			__cptr(fipc_get_reg0(_request)),
+	glue_lookup_pdev_hash(__cptr(fipc_get_reg0(_request)),
 			&dev_container);
-
-	if (ret) {
-		LIBLCD_ERR("lookup");
-		goto fail_lookup;
-	}
 
 	pdev = dev_container->pdev;
 
@@ -2568,7 +2492,6 @@ int pci_enable_pcie_error_reporting_callee(struct fipc_message *_request)
 
 	fipc_set_reg0(_request, func_ret);
 
-fail_lookup:
 	return ret;
 }
 
@@ -2578,17 +2501,11 @@ int pcie_capability_read_word_callee(struct fipc_message *_request)
 	unsigned short val;
 	int ret = 0;
 	int func_ret;
-	struct pci_dev_container *dev_container;
+	struct pci_dev_container *dev_container = NULL;
 	struct pci_dev *pdev;
 
-	ret = glue_cap_lookup_pci_dev_type(c_cspace,
-			__cptr(fipc_get_reg0(_request)),
+	glue_lookup_pdev_hash(__cptr(fipc_get_reg0(_request)),
 			&dev_container);
-
-	if (ret) {
-		LIBLCD_ERR("lookup");
-		goto fail_lookup;
-	}
 
 	pdev = dev_container->pdev;
 
@@ -2601,7 +2518,6 @@ int pcie_capability_read_word_callee(struct fipc_message *_request)
 
 	fipc_set_reg2(_request, val);
 
-fail_lookup:
 	return ret;
 }
 
@@ -2611,17 +2527,11 @@ int pcie_get_minimum_link_callee(struct fipc_message *_request)
 	enum pcie_link_width width;
 	int ret = 0;
 	int func_ret;
-	struct pci_dev_container *dev_container;
+	struct pci_dev_container *dev_container = NULL;
 	struct pci_dev *pdev;
 
-	ret = glue_cap_lookup_pci_dev_type(c_cspace,
-			__cptr(fipc_get_reg0(_request)),
+	glue_lookup_pdev_hash(__cptr(fipc_get_reg0(_request)),
 			&dev_container);
-
-	if (ret) {
-		LIBLCD_ERR("lookup");
-		goto fail_lookup;
-	}
 
 	pdev = dev_container->pdev;
 
@@ -2632,7 +2542,6 @@ int pcie_get_minimum_link_callee(struct fipc_message *_request)
 
 	fipc_set_reg0(_request, func_ret);
 
-fail_lookup:
 	return ret;
 }
 
@@ -2640,17 +2549,11 @@ int pci_enable_device_mem_callee(struct fipc_message *_request)
 {
 	int ret = 0;
 	int func_ret;
-	struct pci_dev_container *dev_container;
+	struct pci_dev_container *dev_container = NULL;
 	struct pci_dev *pdev;
 
-	ret = glue_cap_lookup_pci_dev_type(c_cspace,
-			__cptr(fipc_get_reg0(_request)),
+	glue_lookup_pdev_hash(__cptr(fipc_get_reg0(_request)),
 			&dev_container);
-
-	if (ret) {
-		LIBLCD_ERR("lookup");
-		goto fail_lookup;
-	}
 
 	pdev = dev_container->pdev;
 
@@ -2658,7 +2561,6 @@ int pci_enable_device_mem_callee(struct fipc_message *_request)
 
 	fipc_set_reg0(_request, func_ret);
 
-fail_lookup:
 	return ret;
 }
 
@@ -2667,17 +2569,11 @@ int pci_request_selected_regions_callee(struct fipc_message *_request)
 	int type;
 	int ret = 0;
 	int func_ret;
-	struct pci_dev_container *dev_container;
+	struct pci_dev_container *dev_container = NULL;
 	struct pci_dev *pdev;
 
-	ret = glue_cap_lookup_pci_dev_type(c_cspace,
-			__cptr(fipc_get_reg0(_request)),
+	glue_lookup_pdev_hash(__cptr(fipc_get_reg0(_request)),
 			&dev_container);
-
-	if (ret) {
-		LIBLCD_ERR("lookup");
-		goto fail_lookup;
-	}
 
 	pdev = dev_container->pdev;
 
@@ -2689,7 +2585,6 @@ int pci_request_selected_regions_callee(struct fipc_message *_request)
 
 	fipc_set_reg0(_request, func_ret);
 
-fail_lookup:
 	return ret;
 }
 
@@ -2698,17 +2593,11 @@ int pci_request_selected_regions_exclusive_callee(struct fipc_message *_request)
 	int type;
 	int ret = 0;
 	int func_ret;
-	struct pci_dev_container *dev_container;
+	struct pci_dev_container *dev_container = NULL;
 	struct pci_dev *pdev;
 
-	ret = glue_cap_lookup_pci_dev_type(c_cspace,
-			__cptr(fipc_get_reg0(_request)),
+	glue_lookup_pdev_hash(__cptr(fipc_get_reg0(_request)),
 			&dev_container);
-
-	if (ret) {
-		LIBLCD_ERR("lookup");
-		goto fail_lookup;
-	}
 
 	pdev = dev_container->pdev;
 
@@ -2720,30 +2609,22 @@ int pci_request_selected_regions_exclusive_callee(struct fipc_message *_request)
 
 	fipc_set_reg0(_request, func_ret);
 
-fail_lookup:
 	return ret;
 }
 
 int pci_set_master_callee(struct fipc_message *_request)
 {
 	int ret = 0;
-	struct pci_dev_container *dev_container;
+	struct pci_dev_container *dev_container = NULL;
 	struct pci_dev *pdev;
 
-	ret = glue_cap_lookup_pci_dev_type(c_cspace,
-			__cptr(fipc_get_reg0(_request)),
+	glue_lookup_pdev_hash(__cptr(fipc_get_reg0(_request)),
 			&dev_container);
-
-	if (ret) {
-		LIBLCD_ERR("lookup");
-		goto fail_lookup;
-	}
 
 	pdev = dev_container->pdev;
 
 	pci_set_master(pdev);
 
-fail_lookup:
 	return ret;
 }
 
@@ -2751,17 +2632,11 @@ int pci_save_state_callee(struct fipc_message *_request)
 {
 	int ret = 0;
 	int func_ret;
-	struct pci_dev_container *dev_container;
+	struct pci_dev_container *dev_container = NULL;
 	struct pci_dev *pdev;
 
-	ret = glue_cap_lookup_pci_dev_type(c_cspace,
-			__cptr(fipc_get_reg0(_request)),
+	glue_lookup_pdev_hash(__cptr(fipc_get_reg0(_request)),
 			&dev_container);
-
-	if (ret) {
-		LIBLCD_ERR("lookup");
-		goto fail_lookup;
-	}
 
 	pdev = dev_container->pdev;
 
@@ -2769,7 +2644,6 @@ int pci_save_state_callee(struct fipc_message *_request)
 
 	fipc_set_reg0(_request, func_ret);
 
-fail_lookup:
 	return ret;
 }
 
@@ -2777,24 +2651,17 @@ int pci_release_selected_regions_callee(struct fipc_message *_request)
 {
 	int r;
 	int ret = 0;
-	struct pci_dev_container *dev_container;
+	struct pci_dev_container *dev_container = NULL;
 	struct pci_dev *pdev;
 
-	ret = glue_cap_lookup_pci_dev_type(c_cspace,
-			__cptr(fipc_get_reg0(_request)),
+	glue_lookup_pdev_hash(__cptr(fipc_get_reg0(_request)),
 			&dev_container);
-
-	if (ret) {
-		LIBLCD_ERR("lookup");
-		goto fail_lookup;
-	}
 
 	pdev = dev_container->pdev;
 
 	r = fipc_get_reg1(_request);
 	pci_release_selected_regions(pdev, r);
 
-fail_lookup:
 	return ret;
 }
 
@@ -2803,17 +2670,11 @@ int pci_select_bars_callee(struct fipc_message *_request)
 	unsigned long flags;
 	int ret = 0;
 	int func_ret;
-	struct pci_dev_container *dev_container;
+	struct pci_dev_container *dev_container = NULL;
 	struct pci_dev *pdev;
 
-	ret = glue_cap_lookup_pci_dev_type(c_cspace,
-			__cptr(fipc_get_reg0(_request)),
+	glue_lookup_pdev_hash(__cptr(fipc_get_reg0(_request)),
 			&dev_container);
-
-	if (ret) {
-		LIBLCD_ERR("lookup");
-		goto fail_lookup;
-	}
 
 	pdev = dev_container->pdev;
 
@@ -2823,7 +2684,6 @@ int pci_select_bars_callee(struct fipc_message *_request)
 
 	fipc_set_reg0(_request, func_ret);
 
-fail_lookup:
 	return ret;
 }
 
@@ -2832,17 +2692,11 @@ int pci_wake_from_d3_callee(struct fipc_message *_request)
 	bool enable;
 	int ret = 0;
 	int func_ret;
-	struct pci_dev_container *dev_container;
+	struct pci_dev_container *dev_container = NULL;
 	struct pci_dev *pdev;
 
-	ret = glue_cap_lookup_pci_dev_type(c_cspace,
-			__cptr(fipc_get_reg0(_request)),
+	glue_lookup_pdev_hash(__cptr(fipc_get_reg0(_request)),
 			&dev_container);
-
-	if (ret) {
-		LIBLCD_ERR("lookup");
-		goto fail_lookup;
-	}
 
 	pdev = dev_container->pdev;
 	enable = fipc_get_reg1(_request);
@@ -2851,7 +2705,6 @@ int pci_wake_from_d3_callee(struct fipc_message *_request)
 
 	fipc_set_reg0(_request, func_ret);
 
-fail_lookup:
 	return ret;
 }
 
@@ -2906,10 +2759,11 @@ irqreturn_t msix_vector_handler(int irq, void *data)
 
 struct irq_handler_data_map {
 	int irq;
+	void *data;
 	struct irqhandler_t_container *irqhandler_data;
 }irq_map[32];
 
-int reg_irqs;
+static int reg_irqs = 0;
 
 int request_threaded_irq_callee(struct fipc_message *_request)
 {
@@ -2919,6 +2773,7 @@ int request_threaded_irq_callee(struct fipc_message *_request)
 	unsigned long flags;
 	struct irqhandler_t_container *irqhandler_container;
 	unsigned char *vector_name;
+	void *data;
 
 	irqhandler_container = kzalloc(sizeof(struct irqhandler_t_container),
 					GFP_KERNEL);
@@ -2936,19 +2791,21 @@ int request_threaded_irq_callee(struct fipc_message *_request)
 	irq = fipc_get_reg0(_request);
 	irqhandler_container->other_ref.cptr = fipc_get_reg1(_request);
 	flags = fipc_get_reg2(_request);
+	data = (void*) fipc_get_reg6(_request);
 
 	memcpy(vector_name, (void *)&_request->regs[3], sizeof(unsigned long) * 3);
 
-	LIBLCD_MSG("%s, request_threaded_irq for %d | name: %s",
-			__func__, irq, vector_name);
+	LIBLCD_MSG("%s, request_threaded_irq for %d | name: %s | data %p",
+			__func__, irq, vector_name, data);
 
-#if 1
 	func_ret = request_threaded_irq(irq, msix_vector_handler,
 				NULL, flags,
 				vector_name, (void*) irqhandler_container);
-#endif
-	func_ret = 0;
+
+	printk("%s, storing in irq_map at idx: %d\n", __func__, reg_irqs);
+
 	irq_map[reg_irqs].irq = irq;
+	irq_map[reg_irqs].data = data;
 	irq_map[reg_irqs].irqhandler_data = irqhandler_container;
 
 	reg_irqs++;
@@ -2963,25 +2820,29 @@ int free_irq_callee(struct fipc_message *_request)
 	unsigned int irq;
 	struct irqhandler_t_container *irqhandler_container = NULL;
 	int ret = 0;
+	void *data;
 	int i;
 
 	irq = fipc_get_reg0(_request);
+	data = (void*) fipc_get_reg1(_request);
 
-	LIBLCD_MSG("%s, freeing irq %d", __func__, irq);
+	LIBLCD_MSG("%s, freeing irq %d | data %p", __func__, irq, data);
 
 	for (i = 0; i < 32; i++) {
-		if (irq_map[i].irq == irq) {
+		if ((irq_map[i].irq == irq) && (irq_map[i].data == data)) {
 			irqhandler_container = irq_map[i].irqhandler_data;
 			break;
 		}
 	}
 
-	if (!irqhandler_container)
+	if (!irqhandler_container) {
 		printk("%s unable to retrieve container data for irq %d",
 				__func__, irq);
+		goto exit;
+	}
 	free_irq(irq, irqhandler_container);
 	reg_irqs--;
-
+exit:
 	return ret;
 }
 
@@ -3820,6 +3681,7 @@ int blk_mq_alloc_request_callee(struct fipc_message *_request)
 	struct request *rq;
 	struct request_queue_container *q_container;
 	struct request_queue *q;
+	struct blk_mq_ops_container *ops_container;
 
 	ret = glue_cap_lookup_request_queue_type(c_cspace,
 			__cptr(fipc_get_reg0(_request)), &q_container);
@@ -3834,13 +3696,17 @@ int blk_mq_alloc_request_callee(struct fipc_message *_request)
 	rw = fipc_get_reg2(_request);
 	flags = fipc_get_reg3(_request);
 
+	ops_container = container_of(q->mq_ops, struct blk_mq_ops_container,
+			blk_mq_ops);
 	rq = blk_mq_alloc_request(q, rw, flags);
 
 	printk("%s, rq: %p, q: %p, rq->q %p\n", __func__, rq, q, rq->q);
 
+	fipc_set_reg0(_request, get_queue_num(rq));
 	fipc_set_reg1(_request, rq->tag);
 	fipc_set_reg2(_request, q->limits.max_hw_sectors);
 	fipc_set_reg3(_request, q->limits.max_segments);
+	fipc_set_reg4(_request, ops_container->other_ref.cptr);
 
 fail_lookup:
 	return ret;

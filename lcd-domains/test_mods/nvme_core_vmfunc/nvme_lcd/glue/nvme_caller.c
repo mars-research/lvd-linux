@@ -16,6 +16,7 @@ void *iocb_data_pool;
 struct blk_mq_hw_ctx_container *ctx_container_g;
 struct blk_mq_ops_container *ops_container_g;
 struct blk_mq_tag_set *admin_tagset;
+struct blk_mq_tag_set *io_tagset;
 
 #ifdef IOMMU_ASSIGN
 /* device for IOMMU assignment */
@@ -25,6 +26,9 @@ struct pcidev_info dev_assign = { 0x0000, 0x04, 0x00, 0x0 };
 /* XXX: How to determine this? */
 #define CPTR_HASH_BITS      5
 static DEFINE_HASHTABLE(dev_table, CPTR_HASH_BITS);
+
+extern struct blk_mq_ops_container nvme_mq_ops_container;
+extern struct blk_mq_ops_container nvme_mq_admin_ops_container;
 
 int glue_nvme_init(void)
 {
@@ -190,8 +194,6 @@ void blk_mq_free_request(struct request *rq)
 	struct request_container *req_container;
 	struct request_queue_container *q_container;
 
-	dump_stack();
-
 	printk("%s, rq: %p q: %p" , __func__, rq, rq->q);
 
 	req_container = container_of(rq, struct request_container,
@@ -204,6 +206,10 @@ void blk_mq_free_request(struct request *rq)
 	fipc_set_reg0(_request, req_container->other_ref.cptr);
 	fipc_set_reg1(_request, q_container->other_ref.cptr);
 	fipc_set_reg2(_request, rq->tag);
+
+	rq->cmd_flags = 0;
+#define REQ_ATOM_STARTED	1
+	clear_bit(REQ_ATOM_STARTED, &rq->atomic_flags);
 
 	vmfunc_wrapper(_request);
 }
@@ -228,7 +234,10 @@ int blk_mq_alloc_tag_set(struct blk_mq_tag_set *set)
 	create_rq_maps(set);
 
 	/* save our tagset to admin tagset */
-	admin_tagset = set;
+	if (ops_container == &nvme_mq_admin_ops_container)
+		admin_tagset = set;
+	else if (ops_container == &nvme_mq_ops_container)
+		io_tagset = set;
 
 	ret = glue_cap_insert_blk_mq_ops_type(c_cspace, ops_container,
 			&ops_container->my_ref);
@@ -419,6 +428,8 @@ void pci_disable_msix(struct pci_dev *dev)
 	fipc_set_reg0(_request, device_container->other_ref.cptr);
 	vmfunc_wrapper(_request);
 
+	dev->msix_enabled = fipc_get_reg0(_request);
+
 	return;
 }
 
@@ -579,6 +590,7 @@ int pci_enable_msix_range(struct pci_dev *dev, struct msix_entry *entries, int
 	vmfunc_wrapper(_request);
 
 	func_ret = fipc_get_reg0(_request);
+	dev->msix_enabled = fipc_get_reg1(_request);
 
 	return func_ret;
 }
@@ -827,7 +839,8 @@ void blk_mq_end_request(struct request *rq, int error)
 	fipc_set_reg2(_request, error);
 
 	vmfunc_wrapper(_request);
-
+	printk("%s, update_request returns %d", __func__,
+			blk_update_request(rq, error, blk_rq_bytes(rq)));
 	return;
 }
 
@@ -1179,7 +1192,7 @@ int msix_vector_handler_callee(struct fipc_message *_request)
 	irqret = irqhandler_container->irqhandler(irq,
 			irqhandler_container->data);
 
-	printk("%s, irq:%d irqret %d\n", __func__, irq, irqret);
+	//printk("%s, irq:%d irqret %d\n", __func__, irq, irqret);
 	fipc_set_reg0(_request, irqret);
 	return ret;
 }
@@ -1216,9 +1229,11 @@ int request_threaded_irq(unsigned int irq, irq_handler_t handler,
 	fipc_set_reg0(_request, irq);
 	fipc_set_reg1(_request, irqhandler_container->my_ref.cptr);
 	fipc_set_reg2(_request, flags);
-
 	/* reg3, reg4, reg5 */
 	memcpy((void*)&_request->regs[3], name, sizeof(unsigned long) * 3);
+	fipc_set_reg6(_request, (unsigned long)  dev);
+
+	LIBLCD_MSG("%s, irq %d | data %p", __func__, irq, dev);
 
 	vmfunc_wrapper(_request);
 
@@ -1238,7 +1253,9 @@ void free_irq(unsigned int irq, void *dev_id)
 	async_msg_set_fn_type(_request, FREE_IRQ);
 
 	fipc_set_reg0(_request, irq);
+	fipc_set_reg1(_request, (unsigned long) dev_id);
 
+	LIBLCD_MSG("%s, freeing irq %d | data %p", __func__, irq, dev_id);
 	vmfunc_wrapper(_request);
 
 	return;
@@ -1446,6 +1463,7 @@ int probe_callee(struct fipc_message *_request)
 	func_ret = pdrv_container->pci_driver.probe(&dev_container->pci_dev, id);
 
 	fipc_set_reg0(_request, func_ret);
+	fipc_set_reg1(_request, dev_container->my_ref.cptr);
 
 fail_ioremap:
 fail_ioremap2:
@@ -1525,54 +1543,64 @@ fail_lookup:
 int nvme_queue_rq(struct blk_mq_hw_ctx *hctx,
 			 const struct blk_mq_queue_data *bd);
 
+struct request *get_rq_from_tagset(struct blk_mq_ops_container *ops_container,
+			int tag, int qnum)
+{
+	struct request *rq = NULL;
+
+	if (ops_container == &nvme_mq_ops_container) {
+		rq = blk_mq_tag_to_rq(io_tagset->tags[qnum], tag);
+	} else if (ops_container == &nvme_mq_admin_ops_container) {
+		assert(qnum == 0);
+		rq = blk_mq_tag_to_rq(admin_tagset->tags[qnum], tag);
+	}
+	return rq;
+}
+
 int queue_rq_fn_callee(struct fipc_message *request)
 {
-	struct blk_mq_hw_ctx_container *ctx_container = ctx_container_g;
-//	struct blk_mq_ops_container *ops_container = ops_container_g;
+	struct blk_mq_hw_ctx_container *ctx_container;
+	struct blk_mq_ops_container *ops_container;
 	struct blk_mq_queue_data bd;
-#if 0
-	struct lcd_request_container rq_c;
-	struct request *rq = &rq_c.rq;
-#endif
 	struct request *rq;
 	int tag;
+	int qnum;
 	int ret = 0;
 	int func_ret = 0;
 
-//	ret = glue_cap_lookup_blk_mq_hw_ctx_type(c_cspace, __cptr(fipc_get_reg1(request)),
-//						&ctx_container);
-//	if(ret) {
-//		LIBLCD_ERR("lookup");
-//		goto fail_lookup;
-//	}
+	ret = glue_cap_lookup_blk_mq_hw_ctx_type(c_cspace,
+			__cptr(fipc_get_reg1(request)), &ctx_container);
+	if (ret) {
+		LIBLCD_ERR("lookup");
+		goto fail_lookup;
+	}
 
-	ctx_container->blk_mq_hw_ctx.queue_num = fipc_get_reg0(request);
+	qnum = ctx_container->blk_mq_hw_ctx.queue_num = fipc_get_reg0(request);
 
-//	ret = glue_cap_lookup_blk_mq_ops_type(c_cspace, __cptr(fipc_get_reg2(request)),
-//				&ops_container);
-//	if(ret) {
-//		LIBLCD_ERR("lookup");
-//		goto fail_lookup;
-//	}
+	ret = glue_cap_lookup_blk_mq_ops_type(c_cspace,
+			__cptr(fipc_get_reg2(request)), &ops_container);
+	if (ret) {
+		LIBLCD_ERR("lookup");
+		goto fail_lookup;
+	}
 
 	tag = fipc_get_reg3(request);
-	rq = blk_mq_tag_to_rq(admin_tagset->tags[0], tag);
+
+	rq = get_rq_from_tagset(ops_container, tag, qnum);
+
 	rq->tag = tag;
 	bd.rq = rq;
 
 	printk("%s, hctx: %p tag %d", __func__, &ctx_container->blk_mq_hw_ctx,
 						tag);
-	func_ret = nvme_queue_rq(&ctx_container->blk_mq_hw_ctx, &bd);
-#if 0
-	func_ret = ops_container->blk_mq_ops.queue_rq(&ctx_container->blk_mq_hw_ctx,
+	func_ret =
+		ops_container->blk_mq_ops.queue_rq(&ctx_container->blk_mq_hw_ctx,
 				&bd);
-
-#endif
 
 	LIBLCD_MSG("%s, returned ", __func__, func_ret);
 	fipc_set_reg0(request, func_ret);
 
-//fail_lookup:
+fail_lookup:
 	return ret;
 }
 
@@ -1663,14 +1691,13 @@ fail_lookup:
 	return ret;
 }
 
-void nvme_complete_rq(struct request *req);
-
 int complete_fn_callee(struct fipc_message *_request)
 {
 	struct request *rq;
 	struct blk_mq_ops_container *ops_container;
 	int tag;
 	int ret;
+	int qnum;
 
 	ret = glue_cap_lookup_blk_mq_ops_type(c_cspace,
 			__cptr(fipc_get_reg0(_request)), &ops_container);
@@ -1680,10 +1707,11 @@ int complete_fn_callee(struct fipc_message *_request)
         }
 
 	tag = fipc_get_reg1(_request);
+	qnum = fipc_get_reg2(_request);
 
-	rq = blk_mq_tag_to_rq(admin_tagset->tags[0], tag);
+	rq = get_rq_from_tagset(ops_container, tag, qnum);
 
-	nvme_complete_rq(rq);
+	ops_container->blk_mq_ops.complete(rq);
 
 fail_lookup:
 	return ret;
@@ -1713,8 +1741,9 @@ int exit_hctx_fn_callee(struct fipc_message *_request)
 
 	index = fipc_get_reg2(_request);
 
-	ops_container->blk_mq_ops.exit_hctx(&ctx_container->blk_mq_hw_ctx,
-			index);
+	if (ops_container->blk_mq_ops.exit_hctx)
+		ops_container->blk_mq_ops.exit_hctx(&ctx_container->blk_mq_hw_ctx,
+				index);
 fail_lookup:
 	return ret;
 }
@@ -1742,7 +1771,7 @@ int init_request_fn_callee(struct fipc_message *_request)
 	rq_idx = fipc_get_reg2(_request);
 	numa_node = fipc_get_reg3(_request);
 
-	rq = blk_mq_tag_to_rq(admin_tagset->tags[0], tag);
+	rq = get_rq_from_tagset(ops_container, tag, hctx_idx);
 
 	func_ret = ops_container->blk_mq_ops.init_request(ops_container->data,
 			rq, hctx_idx, rq_idx, numa_node);
@@ -2278,7 +2307,9 @@ struct request *blk_mq_alloc_request(struct request_queue *q,
 	struct fipc_message r;
 	struct fipc_message *_request = &r;
 	struct request_queue_container *q_container;
+	struct blk_mq_ops_container *ops_container;
 	int tag;
+	int qnum;
 
 	q_container = container_of(q, struct request_queue_container,
 			request_queue);
@@ -2290,16 +2321,26 @@ struct request *blk_mq_alloc_request(struct request_queue *q,
 
 	ret = vmfunc_wrapper(_request);
 
+	ret = glue_cap_lookup_blk_mq_ops_type(c_cspace,
+			__cptr(fipc_get_reg4(_request)), &ops_container);
+	if(ret) {
+		LIBLCD_ERR("lookup");
+		goto fail_lookup;
+	}
+
+	qnum = fipc_get_reg0(_request);
 	tag = fipc_get_reg1(_request);
 	q->limits.max_hw_sectors = fipc_get_reg2(_request);
 	q->limits.max_segments = fipc_get_reg3(_request);
 
-	rq = blk_mq_tag_to_rq(admin_tagset->tags[0], tag);
+	rq = get_rq_from_tagset(ops_container, tag, qnum);
 
 	printk("%s, rq: %p tag %d", __func__, rq, tag);
 
 	rq->q = q;
 	return rq;
+fail_lookup:
+	return NULL;
 }
 
 void blk_mq_abort_requeue_list(struct request_queue *q)

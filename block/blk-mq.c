@@ -236,9 +236,11 @@ __blk_mq_alloc_request(struct blk_mq_alloc_data *data, int op, int op_flags)
 struct request *blk_mq_get_rq_from_tag(struct request_queue *q, int tag)
 {
 	if (!q || !q->queue_hw_ctx || !q->queue_hw_ctx[0])
-		return -EINVAL;
+		goto exit;
 	if (q->queue_hw_ctx[0])
-	return q->queue_hw_ctx[0]->tags->rqs[tag];
+		return q->queue_hw_ctx[0]->tags->rqs[tag];
+exit:
+	return NULL;
 }
 EXPORT_SYMBOL(blk_mq_get_rq_from_tag);
 
@@ -368,6 +370,12 @@ void blk_mq_free_request(struct request *rq)
 	blk_mq_free_hctx_request(hctx, rq);
 }
 EXPORT_SYMBOL_GPL(blk_mq_free_request);
+
+int get_queue_num(struct request *rq)
+{
+	return rq->q->mq_ops->map_queue(rq->q, rq->mq_ctx->cpu)->queue_num;
+}
+EXPORT_SYMBOL_GPL(get_queue_num);
 
 inline void __blk_mq_end_request(struct request *rq, int error)
 {

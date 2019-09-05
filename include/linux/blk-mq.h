@@ -189,6 +189,7 @@ void blk_mq_flush_plug_list(struct blk_plug *plug, bool from_schedule);
 struct request *blk_mq_get_rq_from_tag(struct request_queue *q, int tag);
 void blk_mq_insert_request(struct request *, bool, bool, bool);
 void blk_mq_free_request(struct request *rq);
+int get_queue_num(struct request *rq);
 void blk_mq_free_hctx_request(struct blk_mq_hw_ctx *, struct request *rq);
 bool blk_mq_can_queue(struct blk_mq_hw_ctx *);
 

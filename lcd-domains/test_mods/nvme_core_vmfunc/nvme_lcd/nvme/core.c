@@ -203,14 +203,14 @@ static struct nvme_ns *nvme_get_ns_from_disk(struct gendisk *disk)
 
 	spin_lock(&dev_list_lock);
 	ns = disk->private_data;
-#ifndef LCD_ISOLATE
 	if (ns) {
 		if (!kref_get_unless_zero(&ns->kref))
 			goto fail;
+#ifndef LCD_ISOLATE
 		if (!try_module_get(ns->ctrl->ops->module))
 			goto fail_put_ns;
-	}
 #endif
+	}
 	spin_unlock(&dev_list_lock);
 
 	return ns;
@@ -218,10 +218,10 @@ static struct nvme_ns *nvme_get_ns_from_disk(struct gendisk *disk)
 #ifndef LCD_ISOLATE
 fail_put_ns:
 	kref_put(&ns->kref, nvme_free_ns);
+#endif
 fail:
 	spin_unlock(&dev_list_lock);
 	return NULL;
-#endif
 }
 
 void nvme_requeue_req(struct request *req)

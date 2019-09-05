@@ -23,6 +23,7 @@
 #define CPTR_HASH_BITS      5
 static DEFINE_HASHTABLE(file_hash, CPTR_HASH_BITS);
 static DEFINE_HASHTABLE(dev_table, CPTR_HASH_BITS);
+static DEFINE_HASHTABLE(bdev_table, CPTR_HASH_BITS);
 static DEFINE_HASHTABLE(pdev_hash, CPTR_HASH_BITS);
 
 priv_pool_t *iocb_pool;
@@ -209,6 +210,33 @@ void inline glue_remove_pdev_hash(struct pci_dev_container *dev_container)
 	hash_del(&dev_container->hentry);
 }
 
+int glue_insert_bdevice(struct block_device_container *bdev_c)
+{
+	BUG_ON(!bdev_c->bdev);
+
+	bdev_c->my_ref = __cptr((unsigned long)bdev_c->bdev);
+
+	hash_add(bdev_table, &bdev_c->hentry, (unsigned long) bdev_c->bdev);
+
+	return 0;
+}
+
+int glue_lookup_bdevice(struct cptr c, struct
+		block_device_container **bdev_cout) {
+	struct block_device_container *bdev_c;
+
+	hash_for_each_possible(bdev_table, bdev_c,
+			hentry, (unsigned long) cptr_val(c)) {
+		if (bdev_c->bdev == (struct block_device*) c.cptr)
+			*bdev_cout = bdev_c;
+	}
+	return 0;
+}
+
+void glue_remove_bdevice(struct block_device_container *bdev_c)
+{
+	hash_del(&bdev_c->hentry);
+}
 
 int blk_mq_init_queue_callee(struct fipc_message *request)
 {
@@ -705,7 +733,8 @@ fail_lookup:
 	return ret;
 }
 
-int _queue_rq_fn(struct blk_mq_hw_ctx *ctx, const struct blk_mq_queue_data *bd, struct trampoline_hidden_args *hidden_args)
+int _queue_rq_fn(struct blk_mq_hw_ctx *ctx, const struct blk_mq_queue_data *bd,
+		struct trampoline_hidden_args *hidden_args)
 {
         int ret;
 	struct fipc_message r;
@@ -733,7 +762,12 @@ int _queue_rq_fn(struct blk_mq_hw_ctx *ctx, const struct blk_mq_queue_data *bd, 
         fipc_set_reg1(request, ctx_container->other_ref.cptr);
         fipc_set_reg2(request, ops_container->other_ref.cptr);
 	fipc_set_reg3(request, bd->rq->tag);
+	fipc_set_reg4(request, blk_rq_bytes(bd->rq));
 
+	if (blk_rq_bytes(bd->rq)) {
+		printk("%s rq has %d bytes\n", __func__, blk_rq_bytes(bd->rq));
+		dump_stack();
+	}
 #ifdef CONFIG_COPY_USER_DATA
 	{
 		struct bio *bio = bd->rq->bio;
@@ -1376,12 +1410,31 @@ int bd_open(struct block_device *device, fmode_t mode,
 	int ret = 0;
 	struct fipc_message r;
 	struct fipc_message *request = &r;
+	struct block_device_container *bdev_container;
+	struct gendisk_container *gdisk_container;
 	struct block_device_operations_container *bdops_container =
 		hidden_args->struct_container;
 
+	bdev_container = kzalloc(sizeof(struct block_device_container),
+			GFP_KERNEL);
+
+	if (!bdev_container) {
+		LIBLCD_ERR("kzalloc");
+		goto fail_alloc;
+	}
+
+	bdev_container->bdev = device;
+
+	glue_insert_bdevice(bdev_container);
+
+	gdisk_container = container_of(device->bd_disk, struct gendisk_container,
+				gendisk);
+
 	async_msg_set_fn_type(request, BD_OPEN_FN);
 	fipc_set_reg0(request, bdops_container->other_ref.cptr);
-	fipc_set_reg1(request, mode);
+	fipc_set_reg1(request, bdev_container->my_ref.cptr);
+	fipc_set_reg2(request, mode);
+	fipc_set_reg3(request, gdisk_container->other_ref.cptr);
 
 	printk("%s, %s:%d on cpu:%d\n", __func__, current->comm, current->pid,
 				smp_processor_id());
@@ -1389,6 +1442,9 @@ int bd_open(struct block_device *device, fmode_t mode,
 
 	ret = fipc_get_reg0(request);
 
+	bdev_container->other_ref.cptr = fipc_get_reg1(request);
+
+fail_alloc:
 	return ret;
 }
 
@@ -1519,14 +1575,18 @@ long bd_ioctl(struct block_device *bdev, fmode_t mode, unsigned int cmd,
 	long func_ret;
 	struct fipc_message r;
 	struct fipc_message *_request = &r;
+	struct block_device_container *bdev_container = NULL;
 	struct block_device_operations_container *bdops_container =
 		hidden_args->struct_container;
 
+	glue_lookup_bdevice(__cptr((unsigned long) bdev), &bdev_container);
+
 	async_msg_set_fn_type(_request, BD_IOCTL_FN);
 	fipc_set_reg0(_request, bdops_container->other_ref.cptr);
-	fipc_set_reg1(_request, mode);
-	fipc_set_reg2(_request, cmd);
-	fipc_set_reg3(_request, arg);
+	fipc_set_reg1(_request, bdev_container->other_ref.cptr);
+	fipc_set_reg2(_request, mode);
+	fipc_set_reg3(_request, cmd);
+	fipc_set_reg4(_request, arg);
 
 	ret = vmfunc_klcd_wrapper(_request, 1);
 
@@ -3946,48 +4006,28 @@ int bdget_disk_callee(struct fipc_message *_request)
 	struct gendisk *disk = NULL;
 	int partno = 0;
 	int ret = 0;
-	struct block_device_container *func_ret_container = NULL;
-	struct block_device *func_ret = NULL;
+	struct block_device_container *bdev_container = NULL;
+	struct block_device *bdev;
 	struct gendisk_container *gdisk_container;
 
-	ret = glue_cap_lookup_gendisk_type(c_cspace, __cptr(fipc_get_reg0(_request)),
-				&gdisk_container);
+	ret = glue_cap_lookup_gendisk_type(c_cspace,
+			__cptr(fipc_get_reg0(_request)), &gdisk_container);
 
 	if (ret) {
                 LIBLCD_ERR("lookup");
                 goto fail_lookup;
         }
 
-	func_ret_container = kzalloc(sizeof(struct block_device_container),
-			GFP_KERNEL);
-
-	if (!func_ret_container) {
-		LIBLCD_ERR("kzalloc");
-		goto fail_alloc;
-	}
-
 	partno = fipc_get_reg1(_request);
-	func_ret_container->other_ref.cptr = fipc_get_reg2(_request);
 
 	disk = gdisk_container->gdisk;
 
-	func_ret = bdget_disk(disk, partno);
+	bdev = bdget_disk(disk, partno);
 
-	func_ret_container->bdev = func_ret;
+	glue_lookup_bdevice(__cptr((unsigned long) bdev), &bdev_container);
 
-	ret = glue_cap_insert_block_device_type(c_cspace,
-		func_ret_container,
-		&func_ret_container->my_ref);
+	fipc_set_reg0(_request, bdev_container->other_ref.cptr);
 
-	if (ret) {
-		LIBLCD_ERR("lcd insert");
-		goto fail_insert;
-	}
-
-	fipc_set_reg0(_request,
-			func_ret_container->other_ref.cptr);
-fail_alloc:
-fail_insert:
 fail_lookup:
 	return ret;
 }

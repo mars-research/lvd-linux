@@ -736,6 +736,8 @@ int pci_select_bars(struct pci_dev *dev, unsigned long flags)
 	return func_ret;
 }
 
+void assign_q_to_rqs(struct blk_mq_tag_set *set, struct request_queue *q);
+
 struct request_queue *blk_mq_init_queue(struct blk_mq_tag_set *set)
 {
 	int ret;
@@ -743,6 +745,7 @@ struct request_queue *blk_mq_init_queue(struct blk_mq_tag_set *set)
 	struct fipc_message *request = &r;
 	struct blk_mq_tag_set_container *set_container;
 	struct request_queue_container *rq_container;
+	struct request_queue *q;
 
 	/* XXX Scary! request_queue size can vary from inside and outside
 	 * LCDs? This is a bit fragile! */
@@ -775,8 +778,14 @@ struct request_queue *blk_mq_init_queue(struct blk_mq_tag_set *set)
 	printk("%s returns local request queue struct!! \n", __func__);
 	printk("%s, storing other_ref.cptr %lx", __func__, fipc_get_reg0(request));
 	ctx_container_g->blk_mq_hw_ctx.queue = &rq_container->request_queue;
-	return &rq_container->request_queue;
 
+	q = &rq_container->request_queue;
+
+	if (set == io_tagset) {
+		assign_q_to_rqs(io_tagset, q);
+	}
+
+	return q;
 fail_insert:
 	kfree(rq_container);
 fail_alloc:
@@ -1070,7 +1079,7 @@ void device_add_disk(struct device *parent, struct gendisk *disk)
 		 goto fail_insert2;
 	}
 
-	ret = glue_cap_insert_blk_dev_ops_type(c_cspace, blo_container,
+	ret =glue_cap_insert_blk_dev_ops_type(c_cspace, blo_container,
 			&blo_container->my_ref);
 	if(ret) {
 		LIBLCD_ERR("lcd insert");
@@ -2415,43 +2424,34 @@ void bdput(struct block_device *bdev)
 struct block_device *bdget_disk(struct gendisk *disk, int partno)
 {
 	int ret;
-	struct block_device_container *func_ret_container = NULL;
+	struct block_device_container *bdev_container = NULL;
 	struct fipc_message r;
 	struct fipc_message *_request = &r;
 	struct gendisk_container *gdisk_container;
-	struct block_device *func_ret;
+	struct block_device *bdev;
 
 	gdisk_container = container_of(disk, struct gendisk_container, gendisk);
-
-	func_ret_container = kzalloc(sizeof(struct block_device_container),
-			GFP_KERNEL);
-
-	if (!func_ret_container) {
-		LIBLCD_ERR("kzalloc");
-		goto fail_alloc;
-	}
-
-	ret = glue_cap_insert_block_device_type(c_cspace, func_ret_container,
-			&func_ret_container->my_ref);
-
-	if (ret) {
-		LIBLCD_ERR("lcd insert");
-		goto fail_insert;
-	}
 
 	async_msg_set_fn_type(_request, BDGET_DISK);
 	fipc_set_reg0(_request, gdisk_container->other_ref.cptr);
 	fipc_set_reg1(_request, partno);
-	fipc_set_reg2(_request, func_ret_container->my_ref.cptr);
 
 	ret = vmfunc_wrapper(_request);
-	func_ret_container->other_ref.cptr = fipc_get_reg0(_request);
 
-	func_ret = &func_ret_container->block_device;
 
-	return func_ret;
-fail_insert:
-fail_alloc:
+	ret = glue_cap_lookup_block_device_type(c_cspace,
+				__cptr(fipc_get_reg0(_request)),
+				&bdev_container);
+
+	if (ret) {
+		LIBLCD_ERR("fail lookup");
+		goto fail_lookup;
+	}
+
+	bdev = &bdev_container->block_device;
+
+	return bdev;
+fail_lookup:
 	return NULL;
 }
 
@@ -2716,8 +2716,10 @@ int bd_open_callee(struct fipc_message *_request)
         int ret = 0;
         int func_ret = 0;
 	fmode_t mode;
-	struct block_device *bdev = NULL;
+	struct block_device *bdev;
+	struct block_device_container *bdev_container;
 	struct block_device_operations_container *bdops_container;
+	struct gendisk_container *disk_container;
 
 	ret = glue_cap_lookup_blk_dev_ops_type(c_cspace,
 				__cptr(fipc_get_reg0(_request)),
@@ -2728,12 +2730,45 @@ int bd_open_callee(struct fipc_message *_request)
 		goto fail_lookup;
 	}
 
-	mode = fipc_get_reg1(_request);
+	bdev_container = kzalloc(sizeof(struct block_device_container),
+			GFP_KERNEL);
+
+	if (!bdev_container) {
+		LIBLCD_ERR("kzalloc");
+		goto fail_alloc;
+	}
+
+	ret = glue_cap_insert_block_device_type(c_cspace, bdev_container,
+			&bdev_container->my_ref);
+
+	if (ret) {
+		LIBLCD_ERR("lcd insert");
+		goto fail_insert;
+	}
+
+	bdev_container->other_ref.cptr = fipc_get_reg1(_request);
+
+	bdev = &bdev_container->block_device;
+
+	mode = fipc_get_reg2(_request);
+
+	ret = glue_cap_lookup_gendisk_type(c_cspace,
+			__cptr(fipc_get_reg3(_request)), &disk_container);
+
+        if (ret) {
+                LIBLCD_ERR("lcd lookup");
+                goto fail_lookup;
+        }
+
+	bdev->bd_disk = &disk_container->gendisk;
 
 	func_ret = bdops_container->block_device_operations.open(bdev, mode);
 
 	fipc_set_reg0(_request, func_ret);
+	fipc_set_reg1(_request, bdev_container->my_ref.cptr);
 
+fail_alloc:
+fail_insert:
 fail_lookup:
 	return ret;
 }
@@ -2782,6 +2817,7 @@ int bd_ioctl_callee(struct fipc_message *_request)
 	unsigned long arg;
 	fmode_t mode;
 	struct block_device *bdev = NULL;
+	struct block_device_container *bdev_container;
 	struct block_device_operations_container *bdops_container;
 
 	ret = glue_cap_lookup_blk_dev_ops_type(c_cspace,
@@ -2793,9 +2829,20 @@ int bd_ioctl_callee(struct fipc_message *_request)
 		goto fail_lookup;
 	}
 
-	mode = fipc_get_reg1(_request);
-	cmd = fipc_get_reg2(_request);
-	arg = fipc_get_reg3(_request);
+	ret = glue_cap_lookup_block_device_type(c_cspace,
+				__cptr(fipc_get_reg1(_request)),
+				&bdev_container);
+
+	if (ret) {
+		LIBLCD_ERR("fail lookup");
+		goto fail_lookup;
+	}
+
+	bdev = &bdev_container->block_device;
+
+	mode = fipc_get_reg2(_request);
+	cmd = fipc_get_reg3(_request);
+	arg = fipc_get_reg4(_request);
 
 	func_ret = bdops_container->block_device_operations.ioctl(bdev, mode, cmd, arg);
 

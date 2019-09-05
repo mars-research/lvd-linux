@@ -85,6 +85,7 @@ struct block_device_container {
 	struct block_device *bdev;
 	cptr_t other_ref;
 	cptr_t my_ref;
+	struct hlist_node hentry;
 };
 
 struct block_device_operations_container {

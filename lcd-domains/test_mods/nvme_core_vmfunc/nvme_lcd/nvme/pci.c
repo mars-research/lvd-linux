@@ -764,6 +764,8 @@ static void __nvme_process_cq(struct nvme_queue *nvmeq, unsigned int *tag)
 			phase = !phase;
 		}
 
+		printk("%s, head: %d tag: %d cmd_id: %d phase: %d", __func__,
+				head, tag? *tag: -2, cqe.command_id, phase);
 		if (tag && *tag == cqe.command_id)
 			*tag = -1;
 
@@ -1256,7 +1258,7 @@ static int nvme_create_queue(struct nvme_queue *nvmeq, int qid)
 }
 
 #ifdef LCD_ISOLATE
-static struct blk_mq_ops_container nvme_mq_admin_ops_container = {
+struct blk_mq_ops_container nvme_mq_admin_ops_container = {
 	.blk_mq_ops = {
 #else
 static struct blk_mq_ops nvme_mq_admin_ops = {
@@ -1273,7 +1275,12 @@ static struct blk_mq_ops nvme_mq_admin_ops = {
 #endif
 };
 
+#ifdef LCD_ISOLATE
+struct blk_mq_ops_container nvme_mq_ops_container = {
+	.blk_mq_ops = {
+#else
 static struct blk_mq_ops nvme_mq_ops = {
+#endif
 	.queue_rq	= nvme_queue_rq,
 	.complete	= nvme_complete_rq,
 	.map_queue	= blk_mq_map_queue,
@@ -1281,6 +1288,9 @@ static struct blk_mq_ops nvme_mq_ops = {
 	.init_request	= nvme_init_request,
 	.timeout	= nvme_timeout,
 	.poll		= nvme_poll,
+#ifdef LCD_ISOLATE
+	}
+#endif
 };
 
 static void nvme_dev_remove_admin(struct nvme_dev *dev)
@@ -1729,7 +1739,7 @@ static void nvme_disable_io_queues(struct nvme_dev *dev)
 static int nvme_dev_add(struct nvme_dev *dev)
 {
 	if (!dev->ctrl.tagset) {
-		dev->tagset.ops = &nvme_mq_ops;
+		dev->tagset.ops = &nvme_mq_ops_container.blk_mq_ops;
 		dev->tagset.nr_hw_queues = dev->online_queues - 1;
 		dev->tagset.timeout = NVME_IO_TIMEOUT;
 		dev->tagset.numa_node = dev_to_node(dev->dev);
@@ -2033,8 +2043,6 @@ static void nvme_reset_work(struct work_struct *work)
  out:
 	nvme_remove_dead_ctrl(dev, result);
 }
-
-
 
 #ifndef LCD_ISOLATE
 static

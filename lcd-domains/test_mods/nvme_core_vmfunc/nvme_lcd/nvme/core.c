@@ -89,8 +89,10 @@ void nvme_cancel_request(struct request *req, void *data, bool reserved)
 	if (!blk_mq_request_started(req))
 		return;
 
-//	dev_dbg_ratelimited(((struct nvme_ctrl *) data)->device,
-//				"Cancelling I/O %d", req->tag);
+#ifndef LCD_ISOLATE
+	dev_dbg_ratelimited(((struct nvme_ctrl *) data)->device,
+				"Cancelling I/O %d", req->tag);
+#endif
 
 	status = NVME_SC_ABORT_REQ;
 	if (blk_queue_dying(req->q))
@@ -627,9 +629,10 @@ int nvme_identify_ns(struct nvme_ctrl *dev, unsigned nsid,
 	struct nvme_command c = { };
 	int error;
 
+	printk("%s, for ns_id %u", __func__, nsid);
 	/* gcc-4.4.4 (at least) has issues with initializers and anon unions */
-	c.identify.opcode = nvme_admin_identify,
-	c.identify.nsid = cpu_to_le32(nsid),
+	c.identify.opcode = nvme_admin_identify;
+	c.identify.nsid = cpu_to_le32(nsid);
 
 	*id = kmalloc(sizeof(struct nvme_id_ns), GFP_KERNEL);
 	if (!*id)
@@ -637,6 +640,7 @@ int nvme_identify_ns(struct nvme_ctrl *dev, unsigned nsid,
 
 	error = nvme_submit_sync_cmd(dev->admin_q, &c, *id,
 			sizeof(struct nvme_id_ns));
+	printk("%s, submit_sync_cmd returned %d", __func__, error);
 	if (error)
 		kfree(*id);
 	return error;
@@ -959,6 +963,9 @@ static int nvme_revalidate_disk(struct gendisk *disk)
 				__func__);
 		return -ENODEV;
 	}
+	printk("%s, id->ncap %llu nsze %llu nsfeat %d", __func__,
+			id->ncap, id->nsze, id->nsfeat);
+
 	if (id->ncap == 0) {
 		kfree(id);
 		return -ENODEV;
@@ -973,6 +980,8 @@ static int nvme_revalidate_disk(struct gendisk *disk)
 		}
 		ns->type = NVME_NS_LIGHTNVM;
 	}
+
+	printk("%s, continuing with non-lightnvm", __func__);
 
 	if (ns->ctrl->vs >= NVME_VS(1, 1))
 		memcpy(ns->eui, id->eui64, sizeof(ns->eui));
@@ -1316,7 +1325,13 @@ int nvme_init_identify(struct nvme_ctrl *ctrl)
 
 	if (ctrl->vs >= NVME_VS(1, 1))
 		ctrl->subsystem = NVME_CAP_NSSRC(cap);
-
+	if (0)
+	{
+		struct nvme_id_ns *id;
+		nvme_identify_ns(ctrl, 1, &id);
+		printk("%s, id->ncap %llu nsze %llu nsfeat %d", __func__,
+			id->ncap, id->nsze, id->nsfeat);
+	}
 	ret = nvme_identify_ctrl(ctrl, &id);
 	if (ret) {
 		dev_err(ctrl->device, "Identify Controller failed (%d)\n", ret);
@@ -1328,11 +1343,12 @@ int nvme_init_identify(struct nvme_ctrl *ctrl)
 	atomic_set(&ctrl->abort_limit, id->acl + 1);
 	ctrl->vwc = id->vwc;
 	ctrl->cntlid = le16_to_cpup(&id->cntlid);
-	printk("====> %s, SERIAL: %s <====", __func__, id->sn);
-	printk("====> %s, MODEL: %s <====", __func__, id->mn);
 	memcpy(ctrl->serial, id->sn, sizeof(id->sn));
 	memcpy(ctrl->model, id->mn, sizeof(id->mn));
 	memcpy(ctrl->firmware_rev, id->fr, sizeof(id->fr));
+
+	printk("====> %s, SERIAL: %s MODEL: %s FW: %s", __func__,
+			ctrl->serial, ctrl->model, ctrl->firmware_rev);
 	if (id->mdts)
 		max_hw_sectors = 1 << (id->mdts + page_shift - 9);
 	else
@@ -1917,6 +1933,8 @@ static void nvme_scan_work(struct work_struct *work)
 	if (nvme_identify_ctrl(ctrl, &id))
 		return;
 
+	printk("====> %s, SERIAL: %20s MODEL: %40s FW: %8s", __func__,
+			id->sn, id->mn, id->fr);
 	nn = le32_to_cpu(id->nn);
 	if (ctrl->vs >= NVME_VS(1, 1) &&
 	    !(ctrl->quirks & NVME_QUIRK_IDENTIFY_CNS)) {

@@ -174,6 +174,10 @@ int blk_klcd_dispatch_async_loop(struct fipc_message *message)
 			trace(BLK_GET_QUEUE);
 			return blk_get_queue_callee(message);
 
+		case BLK_PUT_QUEUE:
+			trace(BLK_PUT_QUEUE);
+			return blk_put_queue_callee(message);
+
 		case BLK_MQ_END_REQUEST:
 			/* trace(BLK_MQ_END_REQUEST); */
 			return blk_mq_end_request_callee(message);

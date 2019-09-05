@@ -83,3 +83,26 @@ fail_alloc:
 	return ret;
 }
 EXPORT_SYMBOL(create_rq_maps);
+
+void assign_q_to_rqs(struct blk_mq_tag_set *set, struct request_queue *q)
+{
+	int i;
+
+	BUG_ON(set->tags == NULL);
+	for (i = 0; i < set->nr_hw_queues; i++) {
+		struct blk_mq_tags *tags;
+		int j;
+
+		tags = set->tags[i];
+
+		BUG_ON(tags == NULL);
+		BUG_ON(tags->rqs == NULL);
+
+		for (j = 0; j < set->queue_depth; j++) {
+			struct request *rq = tags->rqs[j];
+			BUG_ON(rq == NULL);
+			rq->q = q;
+		}
+	}
+}
+EXPORT_SYMBOL(assign_q_to_rqs);

@@ -26,7 +26,7 @@ int handle_rpc_calls(struct fipc_message *message)
 			return map_queue_fn_callee(message);
 
 		case INIT_HCTX_FN:
-			/* trace(INIT_HCTX_FN); */
+			trace(INIT_HCTX_FN);
 			return init_hctx_fn_callee(message);
 
 		case EXIT_HCTX_FN:

@@ -683,6 +683,7 @@ int nvme_queue_rq(struct blk_mq_hw_ctx *hctx,
 		goto out;
 
 	cmnd.common.command_id = req->tag;
+	printk("%s, nvmeq: %p, req->tag %d", __func__, nvmeq, req->tag);
 
 	LIBLCD_MSG("%s, calling blk_mq_start_request", __func__);
 
@@ -755,6 +756,11 @@ static void __nvme_process_cq(struct nvme_queue *nvmeq, unsigned int *tag)
 	head = nvmeq->cq_head;
 	phase = nvmeq->cq_phase;
 
+	if (!nvme_cqe_valid(nvmeq, head, phase)) {
+		printk("%s: CQE Invalid! nvmeq: %p, head: %d, phase: %d "
+				"status: %d", __func__, nvmeq, head, phase,
+				le16_to_cpu(nvmeq->cqes[head].status) & 1);
+	}
 	while (nvme_cqe_valid(nvmeq, head, phase)) {
 		struct nvme_completion cqe = nvmeq->cqes[head];
 		struct request *req;
@@ -764,8 +770,12 @@ static void __nvme_process_cq(struct nvme_queue *nvmeq, unsigned int *tag)
 			phase = !phase;
 		}
 
-		printk("%s, head: %d tag: %d cmd_id: %d phase: %d", __func__,
-				head, tag? *tag: -2, cqe.command_id, phase);
+		printk("%s, nvmeq: %p, qid: %d, cmd_id: %d, head: %d, tag: %d, phase: %d "
+				" qdepth: %d",
+				__func__, nvmeq, nvmeq->qid, cqe.command_id,
+				head,
+				tag? *tag: -2, phase, nvmeq->q_depth);
+
 		if (tag && *tag == cqe.command_id)
 			*tag = -1;
 
@@ -784,6 +794,8 @@ static void __nvme_process_cq(struct nvme_queue *nvmeq, unsigned int *tag)
 		 */
 		if (unlikely(nvmeq->qid == 0 &&
 				cqe.command_id >= NVME_AQ_BLKMQ_DEPTH)) {
+			printk("%s, qid %d, cmd_id: %d", __func__,
+					nvmeq->qid, cqe.command_id);
 			nvme_complete_async_event(&nvmeq->dev->ctrl, &cqe);
 			continue;
 		}
@@ -869,6 +881,7 @@ static void nvme_pci_submit_async_event(struct nvme_ctrl *ctrl, int aer_idx)
 	c.common.opcode = nvme_admin_async_event;
 	c.common.command_id = NVME_AQ_BLKMQ_DEPTH + aer_idx;
 
+	printk("%s called", __func__);
 	spin_lock_irq(&nvmeq->q_lock);
 	__nvme_submit_cmd(nvmeq, &c);
 	spin_unlock_irq(&nvmeq->q_lock);
@@ -1162,7 +1175,7 @@ static struct nvme_queue *nvme_alloc_queue(struct nvme_dev *dev, int qid,
 	nvmeq->cqes = dma_zalloc_coherent(dev->dev, CQ_SIZE(depth),
 					  &nvmeq->cq_dma_addr, GFP_KERNEL);
 
-	printk("%s, nvmeq->cqes %p", __func__, nvmeq->cqes);
+	printk("%s, nvmeq: %p nvmeq->cqes %p", __func__, nvmeq, nvmeq->cqes);
 
 	if (!nvmeq->cqes)
 		goto free_nvmeq;

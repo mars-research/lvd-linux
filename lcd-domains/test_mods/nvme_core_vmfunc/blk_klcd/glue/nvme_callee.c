@@ -332,6 +332,7 @@ int blk_mq_end_request_callee(struct fipc_message *_request)
 
 	rq = blk_mq_get_rq_from_tag(q, tag);
 
+	printk("%s, rq: %p\n", __func__, rq);
 	blk_mq_end_request(rq, error);
 
 fail_lookup:
@@ -414,7 +415,10 @@ int blk_mq_start_request_callee(struct fipc_message *_request)
 
 	rq = blk_mq_get_rq_from_tag(q, tag);
 
-	blk_mq_start_request(rq);
+	assert(rq != NULL);
+	printk("%s, rq: %p\n", __func__, rq);
+	if (rq)
+		blk_mq_start_request(rq);
 
 fail_lookup:
 	return ret;
@@ -485,6 +489,7 @@ int blk_mq_complete_request_callee(struct fipc_message *_request)
 
 	rq = blk_mq_get_rq_from_tag(q, tag);
 
+	printk("%s, rq: %p\n", __func__, rq);
 	blk_mq_complete_request(rq, error);
 
 fail_lookup:
@@ -748,7 +753,9 @@ int _queue_rq_fn(struct blk_mq_hw_ctx *ctx, const struct blk_mq_queue_data *bd,
 	struct blk_mq_ops_container *ops_container =
 		hidden_args->struct_container;
         struct blk_mq_hw_ctx_container *ctx_container;
+	void *lcd_buf = NULL;
 
+	INIT_FIPC_MSG(request);
         /*XXX Beware!! hwctx can be unique per hw context of the driver, if multiple
          * exists, then we need one cspace insert function per hwctx. Should be handled
          * in the init_hctx routine */
@@ -767,7 +774,22 @@ int _queue_rq_fn(struct blk_mq_hw_ctx *ctx, const struct blk_mq_queue_data *bd,
 	if (blk_rq_bytes(bd->rq)) {
 		printk("%s rq has %d bytes\n", __func__, blk_rq_bytes(bd->rq));
 		dump_stack();
+		fipc_set_reg6(request, bd->rq->cmd_type);
 	}
+
+	if (blk_rq_bytes(bd->rq)) {
+		struct req_iterator iter;
+		struct bio_vec bvec;
+
+		rq_for_each_segment(bvec, bd->rq, iter) {
+			void *buf = page_address(bvec.bv_page);
+			lcd_buf = priv_alloc(BLK_USER_BUF_POOL);
+			if (lcd_buf)
+				memcpy(lcd_buf, buf + bvec.bv_offset, bvec.bv_len);
+			fipc_set_reg5(request, (unsigned long)(pool_base - lcd_buf));
+		}
+	}
+
 #ifdef CONFIG_COPY_USER_DATA
 	{
 		struct bio *bio = bd->rq->bio;
@@ -789,7 +811,21 @@ int _queue_rq_fn(struct blk_mq_hw_ctx *ctx, const struct blk_mq_queue_data *bd,
 	i--;
 #endif
 
+	printk("%s, rq: %p\n", __func__, bd->rq);
 	vmfunc_klcd_wrapper(request, 1);
+
+	if (blk_rq_bytes(bd->rq)) {
+		struct req_iterator iter;
+		struct bio_vec bvec;
+
+		rq_for_each_segment(bvec, bd->rq, iter) {
+			void *buf = page_address(bvec.bv_page);
+			if (lcd_buf) {
+				memcpy(buf + bvec.bv_offset, lcd_buf, bvec.bv_len);
+				priv_free(lcd_buf, BLK_USER_BUF_POOL);
+			}
+		}
+	}
 
 #ifdef CONFIG_COPY_USER_DATA
 	{
@@ -3827,6 +3863,7 @@ int blk_mq_free_request_callee(struct fipc_message *_request)
 
 	tag = fipc_get_reg2(_request);
 	rq = blk_mq_get_rq_from_tag(q, tag);
+	printk("%s, rq: %p\n", __func__, rq);
 #if 0
 	rq = q->queue_hw_ctx[0]->tags->rqs[tag];
 #endif
@@ -3954,6 +3991,7 @@ int blk_execute_rq_callee(struct fipc_message *_request)
 #endif
 	tag = fipc_get_reg2(_request);
 	rq = blk_mq_get_rq_from_tag(q, tag);
+	printk("%s, rq: %p\n", __func__, rq);
 
 	gdisk_cptr.cptr = fipc_get_reg2(_request);
 

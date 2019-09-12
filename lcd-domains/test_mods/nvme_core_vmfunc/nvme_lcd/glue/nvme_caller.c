@@ -10,13 +10,15 @@
 
 #include <lcd_config/post_hook.h>
 
+#define NR_HW_CTXS	1
+
 static struct glue_cspace *c_cspace;
 
-void *iocb_data_pool;
-struct blk_mq_hw_ctx_container *ctx_container_g;
-struct blk_mq_ops_container *ops_container_g;
+void *data_pool;
 struct blk_mq_tag_set *admin_tagset;
 struct blk_mq_tag_set *io_tagset;
+struct blk_mq_hw_ctx_container *admin_hctx_containers[NR_HW_CTXS];
+struct blk_mq_hw_ctx_container *io_hctx_containers[NR_HW_CTXS];
 
 #ifdef IOMMU_ASSIGN
 /* device for IOMMU assignment */
@@ -775,11 +777,29 @@ struct request_queue *blk_mq_init_queue(struct blk_mq_tag_set *set)
 
 	rq_container->other_ref.cptr = fipc_get_reg0(request);
 
+	q = &rq_container->request_queue;
+
 	printk("%s returns local request queue struct!! \n", __func__);
 	printk("%s, storing other_ref.cptr %lx", __func__, fipc_get_reg0(request));
-	ctx_container_g->blk_mq_hw_ctx.queue = &rq_container->request_queue;
 
-	q = &rq_container->request_queue;
+	{
+		struct blk_mq_hw_ctx_container **ctx_containers;
+		int i;
+
+		ctx_containers = (set == admin_tagset) ? admin_hctx_containers :
+				io_hctx_containers;
+		for (i = 0; i < set->nr_hw_queues; i++) {
+			struct blk_mq_hw_ctx_container *hctx_c = ctx_containers[i];
+			struct blk_mq_hw_ctx *hctx;
+
+			hctx = hctx_c ? &hctx_c->blk_mq_hw_ctx: NULL;
+
+			if (hctx) {
+				hctx->queue_num = i;
+				hctx->queue = q;
+			}
+		}
+	}
 
 	if (set == io_tagset) {
 		assign_q_to_rqs(io_tagset, q);
@@ -1201,7 +1221,7 @@ int msix_vector_handler_callee(struct fipc_message *_request)
 	irqret = irqhandler_container->irqhandler(irq,
 			irqhandler_container->data);
 
-	//printk("%s, irq:%d irqret %d\n", __func__, irq, irqret);
+	printk("%s, irq:%d irqret %d\n", __func__, irq, irqret);
 	fipc_set_reg0(_request, irqret);
 	return ret;
 }
@@ -1305,7 +1325,6 @@ void put_device(struct device *dev)
 }
 
 u64 dma_mask = 0;
-void *data_pool;
 #define PCI_CLASS_STORAGE_EXPRESS	0x010802
 
 struct pci_dev *g_pdev;
@@ -1549,9 +1568,6 @@ fail_lookup:
 	return 0;
 }
 
-int nvme_queue_rq(struct blk_mq_hw_ctx *hctx,
-			 const struct blk_mq_queue_data *bd);
-
 struct request *get_rq_from_tagset(struct blk_mq_ops_container *ops_container,
 			int tag, int qnum)
 {
@@ -1570,12 +1586,15 @@ int queue_rq_fn_callee(struct fipc_message *request)
 {
 	struct blk_mq_hw_ctx_container *ctx_container;
 	struct blk_mq_ops_container *ops_container;
+	struct blk_mq_hw_ctx *hctx;
 	struct blk_mq_queue_data bd;
 	struct request *rq;
 	int tag;
 	int qnum;
 	int ret = 0;
 	int func_ret = 0;
+	unsigned int data_len;
+	void *kbuf;
 
 	ret = glue_cap_lookup_blk_mq_hw_ctx_type(c_cspace,
 			__cptr(fipc_get_reg1(request)), &ctx_container);
@@ -1584,6 +1603,7 @@ int queue_rq_fn_callee(struct fipc_message *request)
 		goto fail_lookup;
 	}
 
+	hctx = &ctx_container->blk_mq_hw_ctx;
 	qnum = ctx_container->blk_mq_hw_ctx.queue_num = fipc_get_reg0(request);
 
 	ret = glue_cap_lookup_blk_mq_ops_type(c_cspace,
@@ -1599,12 +1619,28 @@ int queue_rq_fn_callee(struct fipc_message *request)
 
 	rq->tag = tag;
 	bd.rq = rq;
+	data_len = fipc_get_reg4(request);
 
-	printk("%s, hctx: %p tag %d", __func__, &ctx_container->blk_mq_hw_ctx,
-						tag);
-	func_ret =
-		ops_container->blk_mq_ops.queue_rq(&ctx_container->blk_mq_hw_ctx,
-				&bd);
+	if (data_len) {
+		rq->cmd_type = fipc_get_reg6(request);
+		kbuf = lcd_page_address(lcd_alloc_pages(GFP_KERNEL, 0));
+		bd.rq->__data_len = data_len;
+		ret = blk_rq_map_kern(rq->q, rq, kbuf, bd.rq->__data_len, 0);
+		printk("%s, calling blk_rq_map_kern with kbuf: %p, len: %u returned %d",
+					__func__, kbuf, bd.rq->__data_len, ret);
+	}
+
+	printk("%s, %s q: %p, rq: %p, hctx: %p tag %d driver_data: %p", __func__,
+		(ops_container == &nvme_mq_admin_ops_container) ? "ADMINQ" : "IOQ",
+		rq->q, rq, hctx, tag, hctx->driver_data);
+
+	func_ret = ops_container->blk_mq_ops.queue_rq(hctx, &bd);
+
+	if (data_len) {
+		unsigned long buf_offset = fipc_get_reg5(request);
+		void *kbuf_klcd = data_pool + buf_offset;
+		memcpy(kbuf_klcd, kbuf, PAGE_SIZE);
+	}
 
 	LIBLCD_MSG("%s, returned ", __func__, func_ret);
 	fipc_set_reg0(request, func_ret);
@@ -1647,7 +1683,9 @@ fail_alloc:
 
 int init_hctx_fn_callee(struct fipc_message *request)
 {
+	struct blk_mq_hw_ctx_container **ctx_containers = NULL;
 	struct blk_mq_hw_ctx_container *ctx_container;
+	struct blk_mq_hw_ctx *hctx;
 	struct blk_mq_ops_container *ops_container;
 	unsigned int index;
 	int ret = 0;
@@ -1660,13 +1698,20 @@ int init_hctx_fn_callee(struct fipc_message *request)
                 goto fail_lookup;
         }
 
+	index = fipc_get_reg2(request);
+
+	/* save our tagset to admin tagset */
+	if (ops_container == &nvme_mq_admin_ops_container)
+		ctx_containers = admin_hctx_containers;
+	else if (ops_container == &nvme_mq_ops_container)
+		ctx_containers = io_hctx_containers;
+
 	ctx_container = kzalloc(sizeof(*ctx_container), GFP_KERNEL);
 	if (!ctx_container) {
 		LIBLCD_ERR("kzalloc");
 		goto fail_alloc;
 	}
-
-	ctx_container_g = ctx_container;
+	ctx_containers[index] = ctx_container;
 	ctx_container->other_ref.cptr = fipc_get_reg1(request);
 
 	ret = glue_cap_insert_blk_mq_hw_ctx_type(c_cspace, ctx_container,
@@ -1676,9 +1721,10 @@ int init_hctx_fn_callee(struct fipc_message *request)
 		goto fail_insert;
 	}
 
-	index = fipc_get_reg2(request);
 
 	driver_data = ops_container->data;
+
+	hctx = &ctx_container->blk_mq_hw_ctx;
 
 	ret = ops_container->blk_mq_ops.init_hctx(&ctx_container->blk_mq_hw_ctx,
 				driver_data, index);
@@ -1686,6 +1732,11 @@ int init_hctx_fn_callee(struct fipc_message *request)
 	        LIBLCD_ERR("call to init_hctx failed");
                 goto fail_hctx;
 	}
+
+	printk("%s, %s hctx: %p idx: %d driver_data: %p", __func__,
+		(ops_container == &nvme_mq_admin_ops_container) ? "ADMINQ" : "IOQ",
+		hctx, index, hctx->driver_data);
+
 
 	fipc_set_reg0(request, ctx_container->my_ref.cptr);
 	fipc_set_reg1(request, ret);

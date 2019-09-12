@@ -11,6 +11,7 @@
 #include <asm/cacheflush.h>
 #include <linux/atomic.h>
 #include <linux/priv_mempool.h>
+#include <linux/hdreg.h>
 #include <linux/sort.h>
 #include <linux/aer.h>
 #include <lcd_domains/microkernel.h>
@@ -1645,6 +1646,86 @@ bd_ioctl_trampoline(struct block_device *bdev, fmode_t mode, unsigned int cmd,
 	return bd_ioctl_fn_fp(bdev, mode, cmd, arg, hidden_args);
 }
 
+int bd_getgeo(struct block_device *device, struct hd_geometry *geo,
+			struct trampoline_hidden_args *hidden_args)
+{
+	int ret = 0;
+	struct fipc_message r;
+	struct fipc_message *request = &r;
+	struct block_device_container *bdev_container = NULL;
+	struct gendisk_container *gdisk_container;
+	struct block_device_operations_container *bdops_container =
+		hidden_args->struct_container;
+
+	glue_lookup_bdevice(__cptr((unsigned long) device), &bdev_container);
+
+	gdisk_container = container_of(device->bd_disk, struct gendisk_container,
+				gendisk);
+
+	async_msg_set_fn_type(request, BD_GETGEO_FN);
+	fipc_set_reg0(request, bdops_container->other_ref.cptr);
+	fipc_set_reg1(request, bdev_container->other_ref.cptr);
+
+	printk("%s, %s:%d on cpu:%d\n", __func__, current->comm, current->pid,
+				smp_processor_id());
+	vmfunc_klcd_wrapper(request, 1);
+
+	ret = fipc_get_reg0(request);
+
+	geo->heads = fipc_get_reg1(request);
+	geo->sectors = fipc_get_reg2(request);
+	geo->cylinders = fipc_get_reg3(request);
+
+	return ret;
+}
+
+LCD_TRAMPOLINE_DATA(bd_getgeo_trampoline);
+int LCD_TRAMPOLINE_LINKAGE(bd_getgeo_trampoline) bd_getgeo_trampoline(struct block_device *device, struct hd_geometry *geo)
+
+{
+	int ( *volatile getgeo_fp )(struct block_device *, struct hd_geometry*,
+			struct trampoline_hidden_args *);
+	struct trampoline_hidden_args *hidden_args;
+	LCD_TRAMPOLINE_PROLOGUE(hidden_args, bd_getgeo_trampoline);
+	getgeo_fp = bd_getgeo;
+	return getgeo_fp(device, geo, hidden_args);
+}
+
+void bd_revalidate_disk(struct gendisk *disk,
+		struct trampoline_hidden_args *hidden_args)
+{
+	struct fipc_message r;
+	struct fipc_message *request = &r;
+	struct gendisk_container *disk_container;
+	struct block_device_operations_container *bdops_container =
+		hidden_args->struct_container;
+
+	disk_container = container_of(disk, struct gendisk_container, gendisk);
+
+	printk("%s, %s:%d on cpu:%d\n", __func__, current->comm, current->pid,
+				smp_processor_id());
+
+	async_msg_set_fn_type(request, BD_REVALIDATE_DISK_FN);
+	fipc_set_reg0(request, bdops_container->other_ref.cptr);
+	fipc_set_reg1(request, disk_container->other_ref.cptr);
+
+	vmfunc_klcd_wrapper(request, 1);
+
+	return;
+}
+
+LCD_TRAMPOLINE_DATA(bd_revalidate_disk_trampoline);
+void LCD_TRAMPOLINE_LINKAGE(bd_revalidate_disk_trampoline) bd_revalidate_disk_trampoline(struct gendisk *disk)
+
+{
+	void ( *volatile revalidate_disk_fp )(struct gendisk *, struct
+			trampoline_hidden_args *);
+	struct trampoline_hidden_args *hidden_args;
+	LCD_TRAMPOLINE_PROLOGUE(hidden_args, bd_revalidate_disk_trampoline);
+	revalidate_disk_fp = bd_revalidate_disk;
+	return revalidate_disk_fp(disk, hidden_args);
+}
+
 int device_add_disk_callee(struct fipc_message *request)
 {
 	struct gendisk_container *disk_container;
@@ -1655,6 +1736,8 @@ int device_add_disk_callee(struct fipc_message *request)
 	struct trampoline_hidden_args *open_hargs;
 	struct trampoline_hidden_args *rel_hargs;
 	struct trampoline_hidden_args *ioctl_hargs;
+	struct trampoline_hidden_args *getgeo_hargs;
+	struct trampoline_hidden_args *revalidate_disk_hargs;
 	struct device *parent;
 	int ret;
 
@@ -1697,7 +1780,7 @@ int device_add_disk_callee(struct fipc_message *request)
         open_hargs = kzalloc(sizeof(*open_hargs), GFP_KERNEL);
         if (!open_hargs) {
                 LIBLCD_ERR("kzalloc hidden args");
-                goto fail_alloc4;
+                goto fail_alloc2;
         }
 
         open_hargs->t_handle = LCD_DUP_TRAMPOLINE(bd_open_trampoline);
@@ -1721,7 +1804,7 @@ int device_add_disk_callee(struct fipc_message *request)
 	rel_hargs = kzalloc(sizeof(*rel_hargs), GFP_KERNEL);
         if (!rel_hargs) {
                 LIBLCD_ERR("kzalloc hidden args");
-                goto fail_alloc5;
+                goto fail_alloc3;
         }
 
         rel_hargs->t_handle = LCD_DUP_TRAMPOLINE(bd_release_trampoline);
@@ -1747,13 +1830,13 @@ int device_add_disk_callee(struct fipc_message *request)
 	ioctl_hargs = kzalloc(sizeof(*ioctl_hargs), GFP_KERNEL);
         if (!ioctl_hargs) {
                 LIBLCD_ERR("kzalloc hidden args");
-                goto fail_alloc5;
+                goto fail_alloc4;
         }
 
         ioctl_hargs->t_handle = LCD_DUP_TRAMPOLINE(bd_ioctl_trampoline);
         if (!ioctl_hargs->t_handle) {
                 LIBLCD_ERR("duplicate trampoline");
-                goto fail_dup2;
+                goto fail_dup3;
         }
 
 	ioctl_hargs->t_handle->hidden_args = ioctl_hargs;
@@ -1766,9 +1849,56 @@ int device_add_disk_callee(struct fipc_message *request)
                                 PAGE_SIZE) >> PAGE_SHIFT);
         if (ret) {
                 LIBLCD_ERR("set mem nx");
-                goto fail_x2;
+                goto fail_x3;
         }
 
+	getgeo_hargs = kzalloc(sizeof(*getgeo_hargs), GFP_KERNEL);
+        if (!getgeo_hargs) {
+                LIBLCD_ERR("kzalloc hidden args");
+                goto fail_alloc5;
+        }
+
+        getgeo_hargs->t_handle = LCD_DUP_TRAMPOLINE(bd_getgeo_trampoline);
+        if (!getgeo_hargs->t_handle) {
+                LIBLCD_ERR("duplicate trampoline");
+                goto fail_dup4;
+        }
+
+        getgeo_hargs->t_handle->hidden_args = getgeo_hargs;
+        getgeo_hargs->struct_container = blo_container;
+        blo_container->block_device_operations.getgeo = LCD_HANDLE_TO_TRAMPOLINE(getgeo_hargs->t_handle);
+
+        ret = set_memory_x(((unsigned long)getgeo_hargs->t_handle) & PAGE_MASK,
+                        ALIGN(LCD_TRAMPOLINE_SIZE(bd_getgeo_trampoline),
+                                PAGE_SIZE) >> PAGE_SHIFT);
+        if (ret) {
+                LIBLCD_ERR("set mem nx");
+                goto fail_x4;
+        }
+
+	revalidate_disk_hargs = kzalloc(sizeof(*revalidate_disk_hargs), GFP_KERNEL);
+        if (!revalidate_disk_hargs) {
+                LIBLCD_ERR("kzalloc hidden args");
+                goto fail_alloc6;
+        }
+
+        revalidate_disk_hargs->t_handle = LCD_DUP_TRAMPOLINE(bd_revalidate_disk_trampoline);
+        if (!revalidate_disk_hargs->t_handle) {
+                LIBLCD_ERR("duplicate trampoline");
+                goto fail_dup5;
+        }
+
+        revalidate_disk_hargs->t_handle->hidden_args = revalidate_disk_hargs;
+        revalidate_disk_hargs->struct_container = blo_container;
+        blo_container->block_device_operations.revalidate_disk = LCD_HANDLE_TO_TRAMPOLINE(revalidate_disk_hargs->t_handle);
+
+        ret = set_memory_x(((unsigned long)revalidate_disk_hargs->t_handle) & PAGE_MASK,
+                        ALIGN(LCD_TRAMPOLINE_SIZE(bd_revalidate_disk_trampoline),
+                                PAGE_SIZE) >> PAGE_SHIFT);
+        if (ret) {
+                LIBLCD_ERR("set mem nx");
+                goto fail_x5;
+        }
 
 	disk = &disk_container->gendisk;
 	printk("address of disk before calling add_diks %p \n",disk);
@@ -1798,14 +1928,31 @@ int device_add_disk_callee(struct fipc_message *request)
 
 	return ret;
 
+fail_x5:
+	kfree(revalidate_disk_hargs->t_handle);
+fail_dup5:
+	kfree(revalidate_disk_hargs);
+fail_alloc6:
+fail_x4:
+	kfree(getgeo_hargs->t_handle);
+fail_dup4:
+	kfree(getgeo_hargs);
+fail_alloc5:
+fail_x3:
+	kfree(ioctl_hargs->t_handle);
+fail_dup3:
+	kfree(ioctl_hargs);
+fail_alloc4:
 fail_x2:
+	kfree(rel_hargs->t_handle);
 fail_dup2:
 	kfree(rel_hargs);
-fail_alloc5:
+fail_alloc3:
 fail_x1:
+	kfree(open_hargs->t_handle);
 fail_dup1:
 	kfree(open_hargs);
-fail_alloc4:
+fail_alloc2:
 	glue_cap_remove(c_cspace, blo_container->my_ref);
 fail_insert1:
 	kfree(blo_container);

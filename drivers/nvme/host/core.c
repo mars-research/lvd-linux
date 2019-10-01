@@ -896,15 +896,22 @@ static int nvme_revalidate_disk(struct gendisk *disk)
 	u16 old_ms;
 	unsigned short bs;
 
+	dump_stack();
+
 	if (test_bit(NVME_NS_DEAD, &ns->flags)) {
 		set_capacity(disk, 0);
 		return -ENODEV;
 	}
+	printk("%s, calling identify_ns with ns_id %d\n", __func__, ns->ns_id);
 	if (nvme_identify_ns(ns->ctrl, ns->ns_id, &id)) {
 		dev_warn(disk_to_dev(ns->disk), "%s: Identify failure\n",
 				__func__);
 		return -ENODEV;
 	}
+
+	printk("%s, ncap: %llu  nsze: %llu nsfeat: %d\n", __func__, id->ncap,
+			id->nsze, id->nsfeat);
+
 	if (id->ncap == 0) {
 		kfree(id);
 		return -ENODEV;
@@ -1678,6 +1685,7 @@ static void nvme_alloc_ns(struct nvme_ctrl *ctrl, unsigned nsid)
 	disk->flags = GENHD_FL_EXT_DEVT;
 	sprintf(disk->disk_name, "nvme%dn%d", ctrl->instance, ns->instance);
 
+	printk("%s, calling nvme_revalidate_disk\n", __func__);
 	if (nvme_revalidate_disk(ns->disk))
 		goto out_free_disk;
 
@@ -1689,6 +1697,7 @@ static void nvme_alloc_ns(struct nvme_ctrl *ctrl, unsigned nsid)
 	if (ns->type == NVME_NS_LIGHTNVM)
 		return;
 
+	printk("%s, add disk %p\n", __func__, ns->disk);
 	device_add_disk(ctrl->device, ns->disk);
 	if (sysfs_create_group(&disk_to_dev(ns->disk)->kobj,
 					&nvme_ns_attr_group))

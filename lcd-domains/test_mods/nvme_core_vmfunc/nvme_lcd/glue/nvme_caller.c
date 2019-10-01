@@ -1,5 +1,6 @@
 #include <lcd_config/pre_hook.h>
 
+#include <linux/hdreg.h>
 #include <libcap.h>
 #include <liblcd/liblcd.h>
 #include <liblcd/sync_ipc_poll.h>
@@ -196,7 +197,7 @@ void blk_mq_free_request(struct request *rq)
 	struct request_container *req_container;
 	struct request_queue_container *q_container;
 
-	printk("%s, rq: %p q: %p" , __func__, rq, rq->q);
+	//printk("%s, rq: %p q: %p" , __func__, rq, rq->q);
 
 	req_container = container_of(rq, struct request_container,
 				request);
@@ -1221,7 +1222,7 @@ int msix_vector_handler_callee(struct fipc_message *_request)
 	irqret = irqhandler_container->irqhandler(irq,
 			irqhandler_container->data);
 
-	printk("%s, irq:%d irqret %d\n", __func__, irq, irqret);
+	//printk("%s, irq:%d irqret %d\n", __func__, irq, irqret);
 	fipc_set_reg0(_request, irqret);
 	return ret;
 }
@@ -1622,8 +1623,11 @@ int queue_rq_fn_callee(struct fipc_message *request)
 	data_len = fipc_get_reg4(request);
 
 	if (data_len) {
+		unsigned long buf_offset = fipc_get_reg5(request);
+		void *kbuf_klcd = data_pool + buf_offset;
 		rq->cmd_type = fipc_get_reg6(request);
 		kbuf = lcd_page_address(lcd_alloc_pages(GFP_KERNEL, 0));
+		memcpy(kbuf, kbuf_klcd, PAGE_SIZE);
 		bd.rq->__data_len = data_len;
 		ret = blk_rq_map_kern(rq->q, rq, kbuf, bd.rq->__data_len, 0);
 		printk("%s, calling blk_rq_map_kern with kbuf: %p, len: %u returned %d",
@@ -2898,6 +2902,90 @@ int bd_ioctl_callee(struct fipc_message *_request)
 	func_ret = bdops_container->block_device_operations.ioctl(bdev, mode, cmd, arg);
 
 	fipc_set_reg0(_request, func_ret);
+
+fail_lookup:
+	return ret;
+}
+
+int bd_getgeo_callee(struct fipc_message *_request)
+{
+        int ret = 0;
+        int func_ret = 0;
+	struct block_device *bdev;
+	struct block_device_container *bdev_container;
+	struct block_device_operations_container *bdops_container;
+	struct gendisk_container *disk_container;
+	struct hd_geometry geo;
+
+	ret = glue_cap_lookup_blk_dev_ops_type(c_cspace,
+				__cptr(fipc_get_reg0(_request)),
+				&bdops_container);
+
+	if (ret) {
+		LIBLCD_ERR("fail lookup");
+		goto fail_lookup;
+	}
+
+	ret = glue_cap_lookup_block_device_type(c_cspace,
+				__cptr(fipc_get_reg1(_request)),
+				&bdev_container);
+
+	if (ret) {
+		LIBLCD_ERR("fail lookup");
+		goto fail_lookup;
+	}
+
+	bdev = &bdev_container->block_device;
+
+	ret = glue_cap_lookup_gendisk_type(c_cspace,
+			__cptr(fipc_get_reg2(_request)), &disk_container);
+
+        if (ret) {
+                LIBLCD_ERR("lcd lookup");
+                goto fail_lookup;
+        }
+
+	bdev->bd_disk = &disk_container->gendisk;
+
+	func_ret = bdops_container->block_device_operations.getgeo(bdev, &geo);
+
+	fipc_set_reg0(_request, func_ret);
+	fipc_set_reg1(_request, geo.heads);
+	fipc_set_reg2(_request, geo.sectors);
+	fipc_set_reg3(_request, geo.cylinders);
+
+fail_lookup:
+	return ret;
+}
+
+int bd_revalidate_disk_callee(struct fipc_message *_request)
+{
+	int ret = 0;
+	struct block_device_operations_container *bdops_container;
+	struct gendisk_container *disk_container;
+	struct gendisk *disk;
+
+	ret = glue_cap_lookup_blk_dev_ops_type(c_cspace,
+				__cptr(fipc_get_reg0(_request)),
+				&bdops_container);
+
+	if (ret) {
+		LIBLCD_ERR("fail lookup");
+		goto fail_lookup;
+	}
+
+	ret = glue_cap_lookup_gendisk_type(c_cspace,
+			__cptr(fipc_get_reg1(_request)), &disk_container);
+
+        if (ret) {
+                LIBLCD_ERR("lcd lookup");
+                goto fail_lookup;
+        }
+
+	disk = &disk_container->gendisk;
+
+	bdops_container->block_device_operations.revalidate_disk(disk);
+
 
 fail_lookup:
 	return ret;

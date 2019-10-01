@@ -1665,6 +1665,7 @@ int bd_getgeo(struct block_device *device, struct hd_geometry *geo,
 	async_msg_set_fn_type(request, BD_GETGEO_FN);
 	fipc_set_reg0(request, bdops_container->other_ref.cptr);
 	fipc_set_reg1(request, bdev_container->other_ref.cptr);
+	fipc_set_reg2(request, gdisk_container->other_ref.cptr);
 
 	printk("%s, %s:%d on cpu:%d\n", __func__, current->comm, current->pid,
 				smp_processor_id());
@@ -4010,7 +4011,7 @@ int blk_mq_free_request_callee(struct fipc_message *_request)
 
 	tag = fipc_get_reg2(_request);
 	rq = blk_mq_get_rq_from_tag(q, tag);
-	printk("%s, rq: %p\n", __func__, rq);
+	//printk("%s, rq: %p\n", __func__, rq);
 #if 0
 	rq = q->queue_hw_ctx[0]->tags->rqs[tag];
 #endif

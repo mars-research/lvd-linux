@@ -280,6 +280,10 @@ static void __nvme_submit_cmd(struct nvme_queue *nvmeq,
 	else
 		memcpy(&nvmeq->sq_cmds[tail], cmd, sizeof(*cmd));
 
+	printk("%s, %s nvmeq: %p submitting cmd at tail:%d\n", __func__,
+				nvmeq->qid == 0 ? "ADMIN" : "IO",
+				nvmeq, tail);
+
 	if (++tail == nvmeq->q_depth)
 		tail = 0;
 	writel(tail, nvmeq->q_db);
@@ -587,6 +591,8 @@ static int nvme_queue_rq(struct blk_mq_hw_ctx *hctx,
 	if (ret)
 		return ret;
 
+	printk("%s, q: %p rq: %p hctx: %p hctx_qnum: %d\n", __func__,
+			req->q, req, hctx, hctx->queue_num);
 	ret = nvme_setup_cmd(ns, req, &cmnd);
 	if (ret)
 		goto out;
@@ -662,9 +668,23 @@ static void __nvme_process_cq(struct nvme_queue *nvmeq, unsigned int *tag)
 	head = nvmeq->cq_head;
 	phase = nvmeq->cq_phase;
 
+	if (!nvme_cqe_valid(nvmeq, head, phase)) {
+		printk("%s: CQE Invalid! %s nvmeq: %p, head: %d, phase: %d "
+				"status: %d\n", __func__,
+				nvmeq->qid == 0 ? "ADMIN" : "IO",
+				nvmeq, head, phase,
+				le16_to_cpu(nvmeq->cqes[head].status) & 1);
+	}
+
 	while (nvme_cqe_valid(nvmeq, head, phase)) {
 		struct nvme_completion cqe = nvmeq->cqes[head];
 		struct request *req;
+
+		printk("%s, %s nvmeq: %p, qid: %d, cmd_id: %d, head: %d, tag:%s %d, phase: %d\n",
+				__func__,
+				nvmeq->qid == 0 ? "ADMIN" : "IO",
+				nvmeq, nvmeq->qid, cqe.command_id,
+				head, tag? "VALID": "INVALID", tag ? *tag: 0xdead, phase);
 
 		if (++head == nvmeq->q_depth) {
 			head = 0;
@@ -689,6 +709,7 @@ static void __nvme_process_cq(struct nvme_queue *nvmeq, unsigned int *tag)
 		 */
 		if (unlikely(nvmeq->qid == 0 &&
 				cqe.command_id >= NVME_AQ_BLKMQ_DEPTH)) {
+			dump_stack();
 			nvme_complete_async_event(&nvmeq->dev->ctrl, &cqe);
 			continue;
 		}
@@ -730,6 +751,8 @@ static irqreturn_t nvme_irq(int irq, void *data)
 	nvme_process_cq(nvmeq);
 	result = nvmeq->cqe_seen ? IRQ_HANDLED : IRQ_NONE;
 	nvmeq->cqe_seen = 0;
+	printk("%s irq %d for %s nvmeq: %p | res = %d\n", __func__, irq,
+			nvmeq->qid == 0 ? "ADMIN" : "IO", nvmeq, result);
 	spin_unlock(&nvmeq->q_lock);
 	return result;
 }
@@ -955,6 +978,8 @@ static int nvme_suspend_queue(struct nvme_queue *nvmeq)
 {
 	int vector;
 
+	printk("%s, nvmeq: %p\n", __func__, nvmeq);
+
 	spin_lock_irq(&nvmeq->q_lock);
 	if (nvmeq->cq_vector == -1) {
 		spin_unlock_irq(&nvmeq->q_lock);
@@ -969,6 +994,7 @@ static int nvme_suspend_queue(struct nvme_queue *nvmeq)
 		blk_mq_stop_hw_queues(nvmeq->dev->ctrl.admin_q);
 
 	irq_set_affinity_hint(vector, NULL);
+	printk("%s, freeing irq: %d\n", __func__, vector);
 	free_irq(vector, nvmeq);
 
 	return 0;
@@ -1114,7 +1140,12 @@ static int nvme_create_queue(struct nvme_queue *nvmeq, int qid)
 	if (result < 0)
 		goto release_cq;
 
+	printk("%s, IO cq_vector: %d | irq: %d\n", __func__,
+			nvmeq->cq_vector,
+			dev->entry[nvmeq->cq_vector].vector);
+
 	result = queue_request_irq(dev, nvmeq, nvmeq->irqname);
+
 	if (result < 0)
 		goto release_sq;
 
@@ -1234,6 +1265,10 @@ static int nvme_configure_admin_queue(struct nvme_dev *dev)
 		goto free_nvmeq;
 
 	nvmeq->cq_vector = 0;
+
+	printk("%s, ADMINQ cq_vector: %d | irq: %d\n", __func__,
+			nvmeq->cq_vector,
+			dev->entry[nvmeq->cq_vector].vector);
 	result = queue_request_irq(dev, nvmeq, nvmeq->irqname);
 	if (result) {
 		nvmeq->cq_vector = -1;
@@ -1297,6 +1332,7 @@ static int nvme_create_io_queues(struct nvme_dev *dev)
 	int ret = 0;
 
 	for (i = dev->queue_count; i <= dev->max_qid; i++) {
+		printk("%s, nvme_alloc_queue: %d\n", __func__, i);
 		if (!nvme_alloc_queue(dev, i, dev->q_depth)) {
 			ret = -ENOMEM;
 			break;
@@ -1305,6 +1341,7 @@ static int nvme_create_io_queues(struct nvme_dev *dev)
 
 	max = min(dev->max_qid, dev->queue_count - 1);
 	for (i = dev->online_queues; i <= max; i++) {
+		printk("%s, nvme_create_queue: %d\n", __func__, i);
 		ret = nvme_create_queue(dev->queues[i], i);
 		if (ret) {
 			nvme_free_queues(dev, i);
@@ -1384,7 +1421,10 @@ static int nvme_setup_io_queues(struct nvme_dev *dev)
 	struct pci_dev *pdev = to_pci_dev(dev->dev);
 	int result, i, vecs, nr_io_queues, size;
 
-	nr_io_queues = num_online_cpus();
+	//nr_io_queues = num_online_cpus();
+	nr_io_queues = 1;
+	printk("%s, nr_io_queues: %d\n", __func__, nr_io_queues);
+
 	result = nvme_set_queue_count(&dev->ctrl, &nr_io_queues);
 	if (result < 0)
 		return result;
@@ -1416,6 +1456,7 @@ static int nvme_setup_io_queues(struct nvme_dev *dev)
 		adminq->q_db = dev->dbs;
 	}
 
+	printk("%s free irq %d\n", __func__, dev->entry[0].vector);
 	/* Deregister the admin queue's interrupt */
 	free_irq(dev->entry[0].vector, adminq);
 
@@ -1431,6 +1472,9 @@ static int nvme_setup_io_queues(struct nvme_dev *dev)
 	for (i = 0; i < nr_io_queues; i++)
 		dev->entry[i].entry = i;
 	vecs = pci_enable_msix_range(pdev, dev->entry, 1, nr_io_queues);
+
+	printk("%s calling msix_range 1 to nr_io_qs: %d returned %d\n", __func__, nr_io_queues, vecs);
+
 	if (vecs < 0) {
 		vecs = pci_enable_msi_range(pdev, 1, min(nr_io_queues, 32));
 		if (vecs < 0) {
@@ -1450,6 +1494,9 @@ static int nvme_setup_io_queues(struct nvme_dev *dev)
 	nr_io_queues = vecs;
 	dev->max_qid = nr_io_queues;
 
+	printk("%s, ADMINQ cq_vector: %d | irq: %d\n", __func__,
+			adminq->cq_vector,
+			dev->entry[adminq->cq_vector].vector);
 	result = queue_request_irq(dev, adminq, adminq->irqname);
 	if (result) {
 		adminq->cq_vector = -1;
@@ -1689,16 +1736,20 @@ static void nvme_dev_disable(struct nvme_dev *dev, bool shutdown)
 		csts = readl(dev->bar + NVME_REG_CSTS);
 	}
 
-	for (i = dev->queue_count - 1; i > 0; i--)
+	printk("%s, qcount %d\n", __func__, dev->queue_count);
+	for (i = dev->queue_count - 1; i > 0; i--) {
+		printk("%s, calling suspend_queue for qnum: %d\n", __func__, i);
 		nvme_suspend_queue(dev->queues[i]);
-
+	}
 	if (csts & NVME_CSTS_CFS || !(csts & NVME_CSTS_RDY)) {
 		/* A device might become IO incapable very soon during
 		 * probe, before the admin queue is configured. Thus,
 		 * queue_count can be 0 here.
 		 */
-		if (dev->queue_count)
+		if (dev->queue_count) {
+			printk("%s, calling suspend_queue for admin queue\n", __func__);
 			nvme_suspend_queue(dev->queues[0]);
+		}
 	} else {
 		nvme_disable_io_queues(dev);
 		nvme_disable_admin_queue(dev, shutdown);

@@ -72,7 +72,15 @@ int handle_rpc_calls(struct fipc_message *message)
 		case BD_IOCTL_FN:
 			trace(BD_IOCTL_FN);
 			return bd_ioctl_callee(message);
-            
+
+		case BD_GETGEO_FN:
+			trace(BD_GETGEO_FN);
+			return bd_getgeo_callee(message);
+
+		case BD_REVALIDATE_DISK_FN:
+			trace(BD_REVALIDATE_DISK_FN);
+			return bd_revalidate_disk_callee(message);
+
 		case PROBE:
 			trace(PROBE);
 			return probe_callee(message);

@@ -15,6 +15,8 @@ SECTIONS
 	LCD_TRAMPOLINE_LINKER_SECTION(bd_open_trampoline)
 	LCD_TRAMPOLINE_LINKER_SECTION(bd_release_trampoline)
 	LCD_TRAMPOLINE_LINKER_SECTION(bd_ioctl_trampoline)
+	LCD_TRAMPOLINE_LINKER_SECTION(bd_getgeo_trampoline)
+	LCD_TRAMPOLINE_LINKER_SECTION(bd_revalidate_disk_trampoline)
 	LCD_TRAMPOLINE_LINKER_SECTION(fops_open_trampoline)
 	LCD_TRAMPOLINE_LINKER_SECTION(fops_release_trampoline)
 	LCD_TRAMPOLINE_LINKER_SECTION(fops_unlocked_ioctl_trampoline)

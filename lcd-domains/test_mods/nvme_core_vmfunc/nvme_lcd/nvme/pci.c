@@ -308,6 +308,11 @@ static int nvme_init_request(void *data, struct request *req,
 	return 0;
 }
 
+struct cmd_header {
+	__u8			opcode;
+	__u8			flags;
+	__u16			command_id;
+};
 /**
  * __nvme_submit_cmd() - Copy a command into a queue and ring the doorbell
  * @nvmeq: The queue to use
@@ -318,6 +323,7 @@ static int nvme_init_request(void *data, struct request *req,
 static void __nvme_submit_cmd(struct nvme_queue *nvmeq,
 						struct nvme_command *cmd)
 {
+	struct cmd_header *cmd_h = (struct cmd_header*) cmd;
 	u16 tail = nvmeq->sq_tail;
 
 	if (nvmeq->sq_cmds_io)
@@ -325,6 +331,9 @@ static void __nvme_submit_cmd(struct nvme_queue *nvmeq,
 	else
 		memcpy(&nvmeq->sq_cmds[tail], cmd, sizeof(*cmd));
 
+	printk("%s, %s nvmeq: %p submitting cmd at tail:%d, cmd_id: %d", __func__,
+				nvmeq->qid == 0 ? "ADMIN" : "IO",
+				nvmeq, tail, cmd_h->command_id);
 	if (++tail == nvmeq->q_depth)
 		tail = 0;
 	writel(tail, nvmeq->q_db);
@@ -683,7 +692,8 @@ int nvme_queue_rq(struct blk_mq_hw_ctx *hctx,
 		goto out;
 
 	cmnd.common.command_id = req->tag;
-	printk("%s, nvmeq: %p, req->tag %d", __func__, nvmeq, req->tag);
+	printk("%s, %s nvmeq: %p, req->tag %d", __func__, nvmeq->qid == 0 ?
+			"ADMIN" : "IO", nvmeq, req->tag);
 
 	LIBLCD_MSG("%s, calling blk_mq_start_request", __func__);
 
@@ -757,24 +767,34 @@ static void __nvme_process_cq(struct nvme_queue *nvmeq, unsigned int *tag)
 	phase = nvmeq->cq_phase;
 
 	if (!nvme_cqe_valid(nvmeq, head, phase)) {
-		printk("%s: CQE Invalid! nvmeq: %p, head: %d, phase: %d "
-				"status: %d", __func__, nvmeq, head, phase,
+		printk("%s: CQE Invalid! %s nvmeq: %p, head: %d, phase: %d "
+				"status: %d", __func__,
+				nvmeq->qid == 0 ? "ADMIN" : "IO",
+				nvmeq, head, phase,
 				le16_to_cpu(nvmeq->cqes[head].status) & 1);
 	}
 	while (nvme_cqe_valid(nvmeq, head, phase)) {
 		struct nvme_completion cqe = nvmeq->cqes[head];
 		struct request *req;
 
+		printk("%s, %s nvmeq: %p, qid: %d, cmd_id: %d, head: %d, tag:%s %d, phase: %d ",
+				__func__,
+				nvmeq->qid == 0 ? "ADMIN" : "IO",
+				nvmeq, nvmeq->qid, cqe.command_id,
+				head, tag? "VALID": "INVALID", tag ? *tag: 0xdead,
+				phase);
+		printk("%s, nvmeq: %p, sq_id: %d, res: %u", __func__, nvmeq,
+					cqe.sq_id, cqe.result);
+		/* likely a spurious irq */
+		if (cqe.result) {
+			printk("%s, skipping a likely spurious irq", __func__);
+			break;
+		}
+
 		if (++head == nvmeq->q_depth) {
 			head = 0;
 			phase = !phase;
 		}
-
-		printk("%s, nvmeq: %p, qid: %d, cmd_id: %d, head: %d, tag: %d, phase: %d "
-				" qdepth: %d",
-				__func__, nvmeq, nvmeq->qid, cqe.command_id,
-				head,
-				tag? *tag: -2, phase, nvmeq->q_depth);
 
 		if (tag && *tag == cqe.command_id)
 			*tag = -1;
@@ -843,6 +863,8 @@ static irqreturn_t nvme_irq(int irq, void *data)
 	nvme_process_cq(nvmeq);
 	result = nvmeq->cqe_seen ? IRQ_HANDLED : IRQ_NONE;
 	nvmeq->cqe_seen = 0;
+	printk("%s irq %d for %s nvmeq: %p | res = %d", __func__, irq,
+			nvmeq->qid == 0 ? "ADMIN" : "IO", nvmeq, result);
 	spin_unlock(&nvmeq->q_lock);
 	return result;
 }
@@ -1170,7 +1192,7 @@ static struct nvme_queue *nvme_alloc_queue(struct nvme_dev *dev, int qid,
 	if (!nvmeq)
 		return NULL;
 
-	printk("%s qid: %d, depth: %d", __func__, qid, depth);
+	printk("%s nvmeq: %p qid: %d, depth: %d", __func__, nvmeq, qid, depth);
 
 	nvmeq->cqes = dma_zalloc_coherent(dev->dev, CQ_SIZE(depth),
 					  &nvmeq->cq_dma_addr, GFP_KERNEL);
@@ -1684,7 +1706,6 @@ static void nvme_del_cq_end(struct request *req, int error)
 		 * and the I/O queue q_lock should always
 		 * nest inside the AQ one.
 		 */
-        // TODO: Get the irqsave variants working
 		spin_lock(&nvmeq->q_lock);
 		nvme_process_cq(nvmeq);
 		spin_unlock(&nvmeq->q_lock);

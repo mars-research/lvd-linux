@@ -33,7 +33,8 @@ int complete_fn_callee(struct fipc_message *request);
 int bd_open_callee(struct fipc_message *request);
 int bd_release_callee(struct fipc_message *request);
 int bd_ioctl_callee(struct fipc_message *_request);
-
+int bd_getgeo_callee(struct fipc_message *_request);
+int bd_revalidate_disk_callee(struct fipc_message *_request);
 int fops_open_callee(struct fipc_message *_request);
 int fops_release_callee(struct fipc_message *_request);
 int fops_unlocked_ioctl_callee(struct fipc_message *_request);

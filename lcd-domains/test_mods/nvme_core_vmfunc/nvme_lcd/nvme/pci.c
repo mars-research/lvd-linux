@@ -585,15 +585,21 @@ static int nvme_map_data(struct nvme_dev *dev, struct request *req,
 
 	sg_init_table(iod->sg, req->nr_phys_segments);
 	iod->nents = blk_rq_map_sg(q, req, iod->sg);
-	if (!iod->nents)
+	if (!iod->nents) {
+		printk("%s, failed blk_rq_map_sg", __func__);
 		goto out;
+	}
 
 	ret = BLK_MQ_RQ_QUEUE_BUSY;
-	if (!dma_map_sg(dev->dev, iod->sg, iod->nents, dma_dir))
+	if (!dma_map_sg(dev->dev, iod->sg, iod->nents, dma_dir)) {
+		printk("%s, failed dma_map_sg", __func__);
 		goto out;
+	}
 
-	if (!nvme_setup_prps(dev, req, size))
+	if (!nvme_setup_prps(dev, req, size)) {
+		printk("%s, failed nvme_setup_prps", __func__);
 		goto out_unmap;
+	}
 
 	ret = BLK_MQ_RQ_QUEUE_ERROR;
 	if (blk_integrity_rq(req)) {
@@ -692,8 +698,8 @@ int nvme_queue_rq(struct blk_mq_hw_ctx *hctx,
 		goto out;
 
 	cmnd.common.command_id = req->tag;
-	printk("%s, %s nvmeq: %p, req->tag %d", __func__, nvmeq->qid == 0 ?
-			"ADMIN" : "IO", nvmeq, req->tag);
+	printk("%s, %s nvmeq: %p, req->tag %d req->errors %d", __func__, nvmeq->qid == 0 ?
+			"ADMIN" : "IO", nvmeq, req->tag, req->errors);
 
 	LIBLCD_MSG("%s, calling blk_mq_start_request", __func__);
 
@@ -759,6 +765,16 @@ static inline bool nvme_cqe_valid(struct nvme_queue *nvmeq, u16 head,
 	return (le16_to_cpu(nvmeq->cqes[head].status) & 1) == phase;
 }
 
+static inline void nvme_dump_cqes(struct nvme_queue *nvmeq) {
+	int i;
+	for (i = 0; i < nvmeq->q_depth; i++) {
+		volatile struct nvme_completion *cq = &nvmeq->cqes[i];
+		printk("| cq idx: %d res: %d sqhd: %d sqid: %d cmd_id: %d st: %d |",
+				i, cq->result, cq->sq_head, cq->sq_id,
+				cq->command_id, cq->status);
+	}
+}
+
 static void __nvme_process_cq(struct nvme_queue *nvmeq, unsigned int *tag)
 {
 	u16 head, phase;
@@ -785,12 +801,18 @@ static void __nvme_process_cq(struct nvme_queue *nvmeq, unsigned int *tag)
 				phase);
 		printk("%s, nvmeq: %p, sq_id: %d, res: %u", __func__, nvmeq,
 					cqe.sq_id, cqe.result);
+#if 0
+		if (head == 2) {
+			nvme_dump_cqes(nvmeq);
+		}
+
 		/* likely a spurious irq */
 		if (cqe.result) {
 			printk("%s, skipping a likely spurious irq", __func__);
+			nvme_dump_cqes(nvmeq);
 			break;
 		}
-
+#endif
 		if (++head == nvmeq->q_depth) {
 			head = 0;
 			phase = !phase;
@@ -822,7 +844,7 @@ static void __nvme_process_cq(struct nvme_queue *nvmeq, unsigned int *tag)
 
 		req = blk_mq_tag_to_rq(*nvmeq->tags, cqe.command_id);
 
-		LIBLCD_MSG("%s req: %p", __func__, req);
+		LIBLCD_MSG("%s req: %p errors: %d", __func__, req, req->errors);
 
 		if (req->cmd_type == REQ_TYPE_DRV_PRIV && req->special)
 			memcpy(req->special, &cqe, sizeof(cqe));
@@ -1498,7 +1520,7 @@ static int nvme_create_io_queues(struct nvme_dev *dev)
 
 	max = min(dev->max_qid, dev->queue_count - 1);
 	for (i = dev->online_queues; i <= max; i++) {
-		printk("%s, creating queue %d", __func__, i);
+		printk("%s, nvme_create_queue: %d", __func__, i);
 		ret = nvme_create_queue(dev->queues[i], i);
 		if (ret) {
 			nvme_free_queues(dev, i);
@@ -1588,6 +1610,7 @@ static int nvme_setup_io_queues(struct nvme_dev *dev)
 #else
 	nr_io_queues = num_online_cpus();
 #endif
+	printk("%s, nr_io_queues: %d\n", __func__, nr_io_queues);
 	result = nvme_set_queue_count(&dev->ctrl, &nr_io_queues);
 	if (result < 0)
 		return result;
@@ -1623,6 +1646,7 @@ static int nvme_setup_io_queues(struct nvme_dev *dev)
 		adminq->q_db = dev->dbs;
 	}
 
+	printk("%s free irq %d\n", __func__, dev->entry[0].vector);
 	/* Deregister the admin queue's interrupt */
 	free_irq(dev->entry[0].vector, adminq);
 
@@ -1637,7 +1661,11 @@ static int nvme_setup_io_queues(struct nvme_dev *dev)
 
 	for (i = 0; i < nr_io_queues; i++)
 		dev->entry[i].entry = i;
+
 	vecs = pci_enable_msix_range(pdev, dev->entry, 1, nr_io_queues);
+
+	printk("%s calling msix_range 1 to nr_io_qs: %d returned %d\n",
+			__func__, nr_io_queues, vecs);
 	if (vecs < 0) {
 		vecs = pci_enable_msi_range(pdev, 1, min(nr_io_queues, 32));
 		if (vecs < 0) {
@@ -1656,6 +1684,10 @@ static int nvme_setup_io_queues(struct nvme_dev *dev)
 	 */
 	nr_io_queues = vecs;
 	dev->max_qid = nr_io_queues;
+
+	printk("%s, ADMINQ cq_vector: %d | irq: %d", __func__,
+			adminq->cq_vector,
+			dev->entry[adminq->cq_vector].vector);
 
 	result = queue_request_irq(dev, adminq, adminq->irqname);
 	if (result) {

@@ -156,6 +156,8 @@ void blk_put_queue(struct request_queue *q)
 
 	vmfunc_wrapper(request);
 
+	glue_cap_remove(c_cspace, q_container->my_ref);
+
 	return;
 }
 
@@ -848,7 +850,6 @@ void blk_cleanup_queue(struct request_queue *q)
 
 	vmfunc_wrapper(request);
 
-	glue_cap_remove(c_cspace, rq_container->my_ref);
 	kfree(rq_container);
 	return;
 }
@@ -1115,9 +1116,7 @@ void device_add_disk(struct device *parent, struct gendisk *disk)
 	fipc_set_reg3(request, rq_container->other_ref.cptr);
 	fipc_set_reg4(request, disk->flags);
 	fipc_set_reg5(request, get_capacity(disk));
-	memcpy((void*) request->regs[6], disk->disk_name, sizeof(unsigned long));
-	//fipc_set_reg5(request, disk->major);
-	//fipc_set_reg6(request, disk->first_minor);
+	memcpy((void*) &request->regs[6], disk->disk_name, sizeof(unsigned long));
 
 	/*
 	 * Ran out of registers to marshall the string, so hardcoding it
@@ -1596,6 +1595,7 @@ int queue_rq_fn_callee(struct fipc_message *request)
 	int func_ret = 0;
 	unsigned int data_len;
 	void *kbuf;
+	struct page *lcd_page;
 
 	ret = glue_cap_lookup_blk_mq_hw_ctx_type(c_cspace,
 			__cptr(fipc_get_reg1(request)), &ctx_container);
@@ -1625,9 +1625,16 @@ int queue_rq_fn_callee(struct fipc_message *request)
 	if (data_len) {
 		unsigned long buf_offset = fipc_get_reg5(request);
 		void *kbuf_klcd = data_pool + buf_offset;
+		printk("%s copying data from %p", __func__, kbuf_klcd);
 		rq->cmd_type = fipc_get_reg6(request);
-		kbuf = lcd_page_address(lcd_alloc_pages(GFP_KERNEL, 0));
-		memcpy(kbuf, kbuf_klcd, PAGE_SIZE);
+		lcd_page = lcd_alloc_pages(GFP_KERNEL, 0);
+		if (lcd_page) {
+			kbuf = lcd_page_address(lcd_page);
+			memcpy(kbuf, kbuf_klcd, PAGE_SIZE);
+		} else {
+			printk("%s page alloc failed", __func__);
+			goto exit;
+		}
 		bd.rq->__data_len = data_len;
 		ret = blk_rq_map_kern(rq->q, rq, kbuf, bd.rq->__data_len, 0);
 		printk("%s, calling blk_rq_map_kern with kbuf: %p, len: %u returned %d",
@@ -1643,13 +1650,17 @@ int queue_rq_fn_callee(struct fipc_message *request)
 	if (data_len) {
 		unsigned long buf_offset = fipc_get_reg5(request);
 		void *kbuf_klcd = data_pool + buf_offset;
-		memcpy(kbuf_klcd, kbuf, PAGE_SIZE);
+		if (lcd_page) {
+			memcpy(kbuf_klcd, kbuf, PAGE_SIZE);
+			lcd_free_pages(lcd_page, 0);
+		}
 	}
 
 	LIBLCD_MSG("%s, returned ", __func__, func_ret);
 	fipc_set_reg0(request, func_ret);
 
 fail_lookup:
+exit:
 	return ret;
 }
 
@@ -2402,6 +2413,7 @@ struct request *blk_mq_alloc_request(struct request_queue *q,
 	printk("%s, rq: %p tag %d", __func__, rq, tag);
 
 	rq->q = q;
+	rq->nr_phys_segments = 0;
 	return rq;
 fail_lookup:
 	return NULL;
@@ -2855,10 +2867,9 @@ int bd_release_callee(struct fipc_message *_request)
 
 	disk = &disk_container->gendisk;
 
-	mode = fipc_get_reg1(_request);
+	mode = fipc_get_reg2(_request);
 
 	bdops_container->block_device_operations.release(disk, mode);
-
 
 fail_lookup:
 	return ret;

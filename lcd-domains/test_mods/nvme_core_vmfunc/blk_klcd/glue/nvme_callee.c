@@ -53,7 +53,7 @@ static struct glue_cspace *c_cspace;
 #define QUEUE_RQ_BUF_SIZE	4096
 
 /* Create a shadow copy of the user data into LCDs */
-#define CONFIG_COPY_USER_DATA
+//#define CONFIG_COPY_USER_DATA
 /*
  * Abhi says that the max limit on io_vec is 256 entries (with each one
  * spanning a whole page, amounting to 1M  data per bio)
@@ -329,7 +329,7 @@ int blk_mq_end_request_callee(struct fipc_message *_request)
 	q = &q_container->request_queue;
 
 	tag = fipc_get_reg1(_request);
-	error = fipc_get_reg0(_request);
+	error = fipc_get_reg2(_request);
 
 	rq = blk_mq_get_rq_from_tag(q, tag);
 
@@ -439,6 +439,8 @@ int blk_put_queue_callee(struct fipc_message *request)
 	}
 
 	blk_put_queue(&rq_container->request_queue);
+
+	glue_cap_remove(c_cspace, rq_container->my_ref);
 
 fail_lookup:
 	return ret;
@@ -734,7 +736,6 @@ int blk_cleanup_queue_callee(struct fipc_message *request)
 
 	blk_cleanup_queue(&rq_container->request_queue);
 
-	glue_cap_remove(c_cspace, rq_container->my_ref);
 fail_lookup:
 	return ret;
 }
@@ -745,9 +746,9 @@ int _queue_rq_fn(struct blk_mq_hw_ctx *ctx, const struct blk_mq_queue_data *bd,
         int ret;
 	struct fipc_message r;
         struct fipc_message *request = &r;
+#ifdef CONFIG_COPY_USER_DATA
 	struct bio_vec_queue *bvec_queue = &per_cpu(bio_vec_queues, smp_processor_id());
 	struct bio_vec *bvec_array = bvec_queue->bvec_array;
-#ifdef CONFIG_COPY_USER_DATA
 	int i = 0;
 #endif
 
@@ -785,9 +786,15 @@ int _queue_rq_fn(struct blk_mq_hw_ctx *ctx, const struct blk_mq_queue_data *bd,
 		rq_for_each_segment(bvec, bd->rq, iter) {
 			void *buf = page_address(bvec.bv_page);
 			lcd_buf = priv_alloc(BLK_USER_BUF_POOL);
+			printk("%s, pool_base: %p alloc from priv: %p offset: 0x%lx\n",
+					__func__, pool_base, lcd_buf,
+					(unsigned long)(lcd_buf - pool_base));
 			if (lcd_buf)
 				memcpy(lcd_buf, buf + bvec.bv_offset, bvec.bv_len);
-			fipc_set_reg5(request, (unsigned long)(pool_base - lcd_buf));
+			//print_hex_dump(KERN_INFO, "i/o:", DUMP_PREFIX_OFFSET, 32, 1,
+			//		lcd_buf, bvec.bv_len, true);
+			//memset(lcd_buf, 0x0, bvec.bv_len);
+			fipc_set_reg5(request, (unsigned long)(lcd_buf - pool_base));
 		}
 	}
 
@@ -1905,8 +1912,6 @@ int device_add_disk_callee(struct fipc_message *request)
 	printk("address of disk before calling add_diks %p \n",disk);
 
 	disk->flags = fipc_get_reg4(request);
-	//disk->major = fipc_get_reg5(request);
-	//disk->first_minor = fipc_get_reg6(request);
 	disk->queue = &rq_container->request_queue;
 	set_capacity(disk, fipc_get_reg5(request));
 
@@ -1914,7 +1919,8 @@ int device_add_disk_callee(struct fipc_message *request)
 
 	disk->fops = &blo_container->block_device_operations;
 
-	printk("Calling add_disk on cpu: %d, disk %p \n", raw_smp_processor_id(), disk);
+	printk("Adding disk on cpu: %d, disk %p disk_name: %s\n",
+			raw_smp_processor_id(), disk, disk->disk_name);
 
 	device_add_disk(parent, disk);
 

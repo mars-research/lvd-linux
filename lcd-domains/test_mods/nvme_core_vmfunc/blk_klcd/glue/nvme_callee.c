@@ -87,6 +87,13 @@ void iocb_data_pool_free(void)
 	}
 }
 
+bool is_in_range(void *mem) {
+	if ((mem < pool_base) || (mem > (pool_base + pool_size))) {
+		return false;
+	}
+	return true;
+}
+
 int glue_nvme_init(void)
 {
 	int ret;
@@ -746,16 +753,12 @@ int _queue_rq_fn(struct blk_mq_hw_ctx *ctx, const struct blk_mq_queue_data *bd,
         int ret;
 	struct fipc_message r;
         struct fipc_message *request = &r;
-#ifdef CONFIG_COPY_USER_DATA
-	struct bio_vec_queue *bvec_queue = &per_cpu(bio_vec_queues, smp_processor_id());
-	struct bio_vec *bvec_array = bvec_queue->bvec_array;
-	int i = 0;
-#endif
-
+	union rq_pack pack;
 	struct blk_mq_ops_container *ops_container =
 		hidden_args->struct_container;
         struct blk_mq_hw_ctx_container *ctx_container;
-	void *lcd_buf = NULL;
+	void *lcd_buf[MAX_RQ_BUFS] = {0};
+	struct ext_registers *this_reg_page = get_register_page(smp_processor_id());
 
 	INIT_FIPC_MSG(request);
         /*XXX Beware!! hwctx can be unique per hw context of the driver, if multiple
@@ -765,59 +768,46 @@ int _queue_rq_fn(struct blk_mq_hw_ctx *ctx, const struct blk_mq_queue_data *bd,
         ctx_container = container_of(ctx, struct blk_mq_hw_ctx_container,
 					blk_mq_hw_ctx);
 
+	pack.qnum = ctx->queue_num;
+	pack.cmd_typ = bd->rq->cmd_type;
+	pack.tag = bd->rq->tag;
+	pack.rq_bytes = blk_rq_bytes(bd->rq);
+
         async_msg_set_fn_type(request, QUEUE_RQ_FN);
 
-        fipc_set_reg0(request, ctx->queue_num);
+        fipc_set_reg0(request, pack.reg);
         fipc_set_reg1(request, ctx_container->other_ref.cptr);
         fipc_set_reg2(request, ops_container->other_ref.cptr);
-	fipc_set_reg3(request, bd->rq->tag);
-	fipc_set_reg4(request, blk_rq_bytes(bd->rq));
 
 	if (blk_rq_bytes(bd->rq)) {
 		printk("%s rq has %d bytes\n", __func__, blk_rq_bytes(bd->rq));
-		dump_stack();
-		fipc_set_reg6(request, bd->rq->cmd_type);
+		//dump_stack();
 	}
 
 	if (blk_rq_bytes(bd->rq)) {
 		struct req_iterator iter;
 		struct bio_vec bvec;
+		int i = 0;
 
 		rq_for_each_segment(bvec, bd->rq, iter) {
 			void *buf = page_address(bvec.bv_page);
-			lcd_buf = priv_alloc(BLK_USER_BUF_POOL);
-			printk("%s, pool_base: %p alloc from priv: %p offset: 0x%lx\n",
-					__func__, pool_base, lcd_buf,
-					(unsigned long)(lcd_buf - pool_base));
-			if (lcd_buf)
-				memcpy(lcd_buf, buf + bvec.bv_offset, bvec.bv_len);
+			lcd_buf[i] = priv_alloc(BLK_USER_BUF_POOL);
+			printk("%s, pool_base: %p alloc from priv[%d]: %p offset: 0x%lx\n",
+					__func__, pool_base,
+					smp_processor_id(),
+					lcd_buf[i],
+					(unsigned long)(lcd_buf[i] - pool_base));
+			if (lcd_buf[i] && is_in_range(lcd_buf[i]))
+				memcpy(lcd_buf[i], buf + bvec.bv_offset, bvec.bv_len);
+			else
+				LIBLCD_ERR("%s Allocated buffer not in range", __func__);
 			//print_hex_dump(KERN_INFO, "i/o:", DUMP_PREFIX_OFFSET, 32, 1,
 			//		lcd_buf, bvec.bv_len, true);
 			//memset(lcd_buf, 0x0, bvec.bv_len);
-			fipc_set_reg5(request, (unsigned long)(lcd_buf - pool_base));
+			this_reg_page->regs[i] = (unsigned long)(lcd_buf[i] - pool_base);
+			i++;
 		}
 	}
-
-#ifdef CONFIG_COPY_USER_DATA
-	{
-		struct bio *bio = bd->rq->bio;
-		struct bio_vec bvec;
-		struct bvec_iter iter;
-
-		for_each_bio(bio) {
-			bio_for_each_segment(bvec, bio, iter) {
-				void *buf = page_address(bvec.bv_page);
-				void *lcd_buf = priv_alloc(BLK_USER_BUF_POOL);
-				if (lcd_buf)
-					memcpy(lcd_buf, buf + bvec.bv_offset, bvec.bv_len);
-				bvec_array[i] = bvec;
-				bvec_array[i].bv_page = (struct page *) lcd_buf;
-				i++;
-			}
-		}
-	}
-	i--;
-#endif
 
 	printk("%s, rq: %p\n", __func__, bd->rq);
 	vmfunc_klcd_wrapper(request, 1);
@@ -825,25 +815,17 @@ int _queue_rq_fn(struct blk_mq_hw_ctx *ctx, const struct blk_mq_queue_data *bd,
 	if (blk_rq_bytes(bd->rq)) {
 		struct req_iterator iter;
 		struct bio_vec bvec;
+		int i = 0;
 
 		rq_for_each_segment(bvec, bd->rq, iter) {
 			void *buf = page_address(bvec.bv_page);
-			if (lcd_buf) {
-				memcpy(buf + bvec.bv_offset, lcd_buf, bvec.bv_len);
-				priv_free(lcd_buf, BLK_USER_BUF_POOL);
+			if (lcd_buf[i]) {
+				memcpy(buf + bvec.bv_offset, lcd_buf[i], bvec.bv_len);
+				priv_free(lcd_buf[i], BLK_USER_BUF_POOL);
 			}
 		}
 	}
 
-#ifdef CONFIG_COPY_USER_DATA
-	{
-		for (; i >= 0; i--) {
-			void *lcd_buf = (void*) bvec_array[i].bv_page;
-			if (lcd_buf)
-				priv_free(lcd_buf, BLK_USER_BUF_POOL);
-		}
-	}
-#endif
         ret = fipc_get_reg0(request);
 
         return ret;

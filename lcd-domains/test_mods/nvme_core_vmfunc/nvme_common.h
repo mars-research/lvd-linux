@@ -173,6 +173,18 @@ struct pcidev_info {
 	unsigned int domain, bus, slot, fn;
 };
 
+#define MAX_RQ_BUFS	64
+
+union rq_pack {
+	struct {
+		uint8_t qnum;
+		uint8_t cmd_typ;
+		uint16_t tag;
+		uint32_t rq_bytes;
+	};
+	uint64_t reg;
+};
+
 /* CSPACES ------------------------------------------------------------ */
 int glue_cap_init(void);
 

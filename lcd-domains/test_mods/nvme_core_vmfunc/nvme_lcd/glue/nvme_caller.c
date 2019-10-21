@@ -806,6 +806,8 @@ struct request_queue *blk_mq_init_queue(struct blk_mq_tag_set *set)
 
 	if (set == io_tagset) {
 		assign_q_to_rqs(io_tagset, q);
+	} else {
+		assign_q_to_rqs(admin_tagset, q);
 	}
 
 	return q;
@@ -1741,8 +1743,15 @@ int init_hctx_fn_callee(struct fipc_message *request)
 
 	hctx = &ctx_container->blk_mq_hw_ctx;
 
-	ret = ops_container->blk_mq_ops.init_hctx(&ctx_container->blk_mq_hw_ctx,
-				driver_data, index);
+	if (ops_container == &nvme_mq_admin_ops_container) {
+		hctx->tags = admin_tagset->tags[0];
+	} else if (ops_container == &nvme_mq_ops_container) {
+		hctx->tags = io_tagset->tags[index];
+	}
+
+
+	ret = ops_container->blk_mq_ops.init_hctx(hctx, driver_data, index);
+
 	if(ret) {
 	        LIBLCD_ERR("call to init_hctx failed");
                 goto fail_hctx;
@@ -1773,6 +1782,7 @@ int complete_fn_callee(struct fipc_message *_request)
 	int tag;
 	int ret;
 	int qnum;
+	struct nvme_iod *iod;
 
 	ret = glue_cap_lookup_blk_mq_ops_type(c_cspace,
 			__cptr(fipc_get_reg0(_request)), &ops_container);
@@ -1785,7 +1795,11 @@ int complete_fn_callee(struct fipc_message *_request)
 	qnum = fipc_get_reg2(_request);
 
 	rq = get_rq_from_tagset(ops_container, tag, qnum);
-
+	iod = blk_mq_rq_to_pdu(rq);
+	printk("%s, rq: %p tag: %d qnum: %d iod: %p nvmeq:%p dev: %p",
+			__func__, rq, tag, qnum,
+			iod, iod ? iod->nvmeq: NULL,
+			iod ? (iod->nvmeq ? iod->nvmeq : NULL) : NULL);
 	ops_container->blk_mq_ops.complete(rq);
 
 fail_lookup:
@@ -1831,7 +1845,7 @@ int init_request_fn_callee(struct fipc_message *_request)
 	unsigned int rq_idx;
 	unsigned int numa_node;
 	struct blk_mq_ops_container *ops_container;
-	int func_ret;
+	int func_ret = 0;
 	int ret;
 
 	ret = glue_cap_lookup_blk_mq_ops_type(c_cspace,
@@ -1846,10 +1860,14 @@ int init_request_fn_callee(struct fipc_message *_request)
 	rq_idx = fipc_get_reg2(_request);
 	numa_node = fipc_get_reg3(_request);
 
-	rq = get_rq_from_tagset(ops_container, tag, hctx_idx);
+	rq = get_rq_from_tagset(ops_container, rq_idx, hctx_idx);
 
-	func_ret = ops_container->blk_mq_ops.init_request(ops_container->data,
+	printk("%s, idx: %d rq: %p", __func__, rq_idx, rq);
+	if (rq)
+		func_ret = ops_container->blk_mq_ops.init_request(ops_container->data,
 			rq, hctx_idx, rq_idx, numa_node);
+	else
+		printk("%s failed for rq_idx: %d", __func__, rq_idx);
 
 	fipc_set_reg0(_request, func_ret);
 
@@ -2410,7 +2428,11 @@ struct request *blk_mq_alloc_request(struct request_queue *q,
 
 	rq = get_rq_from_tagset(ops_container, tag, qnum);
 
-	printk("%s, rq: %p tag %d", __func__, rq, tag);
+	if (ops_container == &nvme_mq_ops_container) {
+		printk("%s, IO rq: %p tag %d", __func__, rq, tag);
+	} else {
+		printk("%s, ADMIN rq: %p tag %d", __func__, rq, tag);
+	}
 
 	rq->q = q;
 	rq->nr_phys_segments = 0;

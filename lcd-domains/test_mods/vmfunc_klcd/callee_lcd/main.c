@@ -50,6 +50,15 @@ int callee(struct fipc_message *msg2)
 int callee_main(void)
 {
 	int ret;
+	struct ext_registers *reg_page = get_register_page(0);
+
+	printk("%s, register page %p", __func__, reg_page);
+	{
+		int i;
+		for (i = 0; i < PAGE_SIZE/64; i++) {
+			printk("reg_page->regs[%d] = %llx", i, reg_page->regs[i]);
+		}
+	}
 	/*
 	 * Boot LCD
 	 */

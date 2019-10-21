@@ -110,13 +110,20 @@ void run_vmfunc_tests(void)
 			fipc_get_reg6(&msg)
 			);
 
-
+	{
+	struct ext_registers *this_reg_page = get_register_page(smp_processor_id());
+	int i;
+	printk("%s, register page %p\n", __func__, this_reg_page);
+	for (i = 0; i < PAGE_SIZE/64; i++) {
+		this_reg_page->regs[i] = 0xabcd + i;
+	}
 	memset(&msg, 0x0, sizeof(msg));
 	msg.rpc_id = MODULE_INIT;
 	printk("%s, before MODULE_INIT lcd->stack %p\n", __func__, current->lcd_stack);
 	vmfunc_klcd_test_wrapper(&msg, OTHER_DOMAIN, VMFUNC_TEST_RPC_CALL);
 	printk("%s: VMFUNC_TEST_RPC_CALL: MODULE_INIT Passed!\n",
 				__func__);
+	}
 }
 
 static int caller_main(void)

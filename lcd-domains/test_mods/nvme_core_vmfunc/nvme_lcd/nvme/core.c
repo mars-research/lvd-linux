@@ -841,21 +841,28 @@ static int nvme_ioctl(struct block_device *bdev, fmode_t mode,
 
 	switch (cmd) {
 	case NVME_IOCTL_ID:
+		printk("%s, NVME_IOCTL_ID", __func__);
 		force_successful_syscall_return();
 		return ns->ns_id;
 	case NVME_IOCTL_ADMIN_CMD:
+		printk("%s, NVME_ADMIN_CMD", __func__);
 		return nvme_user_cmd(ns->ctrl, NULL, (void __user *)arg);
 	case NVME_IOCTL_IO_CMD:
+		printk("%s, NVME_IO_CMD", __func__);
 		return nvme_user_cmd(ns->ctrl, ns, (void __user *)arg);
 	case NVME_IOCTL_SUBMIT_IO:
+		printk("%s, NVME_SUBMIT_IO", __func__);
 		return nvme_submit_io(ns, (void __user *)arg);
 #ifdef CONFIG_BLK_DEV_NVME_SCSI
 	case SG_GET_VERSION_NUM:
+		printk("%s, SG_GET_VERSION_NUM", __func__);
 		return nvme_sg_get_version_num((void __user *)arg);
 	case SG_IO:
+		printk("%s, SG_IO", __func__);
 		return nvme_sg_io(ns, (void __user *)arg);
 #endif
 	default:
+		printk("%s, NONE: %d", __func__, cmd);
 		return -ENOTTY;
 	}
 }
@@ -866,6 +873,7 @@ static int nvme_compat_ioctl(struct block_device *bdev, fmode_t mode,
 {
 	switch (cmd) {
 	case SG_IO:
+		printk("%s, SG_IO", __func__);
 		return -ENOIOCTLCMD;
 	}
 	return nvme_ioctl(bdev, mode, cmd, arg);
@@ -1473,18 +1481,24 @@ static long nvme_dev_ioctl(struct file *file, unsigned int cmd,
 
 	switch (cmd) {
 	case NVME_IOCTL_ADMIN_CMD:
+		printk("%s, NVME_IOCTL_ADMIN_CMD", __func__);
 		return nvme_user_cmd(ctrl, NULL, argp);
 	case NVME_IOCTL_IO_CMD:
+		printk("%s, NVME_IOCTL_IO_CMD", __func__);
 		return nvme_dev_user_cmd(ctrl, argp);
 	case NVME_IOCTL_RESET:
+		printk("%s, NVME_IOCTL_RESET", __func__);
 		dev_warn(ctrl->device, "resetting controller\n");
 		return ctrl->ops->reset_ctrl(ctrl);
 	case NVME_IOCTL_SUBSYS_RESET:
+		printk("%s, NVME_IOCTL_SUBSYS_RESET", __func__);
 		return nvme_reset_subsystem(ctrl);
 	case NVME_IOCTL_RESCAN:
+		printk("%s, NVME_IOCTL_RESCAN", __func__);
 		nvme_queue_scan(ctrl);
 		return 0;
 	default:
+		printk("%s, NONE %d", __func__, cmd);
 		return -ENOTTY;
 	}
 }

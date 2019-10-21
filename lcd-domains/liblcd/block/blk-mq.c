@@ -8,6 +8,9 @@
 
 struct request *blk_mq_tag_to_rq(struct blk_mq_tags *tags, unsigned int tag)
 {
+
+	printk("%s tag: %d nr_tags: %d", __func__, tag,
+			tags->nr_tags);
 	if (tag < tags->nr_tags)
 		return tags->rqs[tag];
 
@@ -38,6 +41,8 @@ int create_rq_maps(struct blk_mq_tag_set *set)
 {
 	int ret = 0;
 	int i;
+	/* Account for the flush_rq request as well */
+	int depth = set->queue_depth + 1;
 
 	set->tags = kzalloc_node(set->nr_hw_queues * sizeof(struct blk_mq_tags *),
 				 GFP_KERNEL, set->numa_node);
@@ -54,14 +59,15 @@ int create_rq_maps(struct blk_mq_tag_set *set)
 
 		tags = set->tags[i] = kzalloc(sizeof(struct blk_mq_tags), GFP_KERNEL);
 
-		tags->nr_tags = set->queue_depth;
+		printk("%s setting nr_tags to %d", __func__, depth);
+		tags->nr_tags = depth;
 
 		if (!set->tags[i]) {
 			LIBLCD_ERR("fail alloc");
 			ret = -ENOMEM;
 			goto fail_alloc;
 		}
-		tags->rqs = kzalloc(set->queue_depth * sizeof(struct request*),
+		tags->rqs = kzalloc(depth * sizeof(struct request*),
 					GFP_KERNEL);
 		if (!tags->rqs) {
 			LIBLCD_ERR("alloc failed");
@@ -69,7 +75,7 @@ int create_rq_maps(struct blk_mq_tag_set *set)
 			goto fail_alloc;
 		}
 
-		for (j = 0; j < set->queue_depth; j++) {
+		for (j = 0; j < depth; j++) {
 			tags->rqs[j] = kzalloc(sizeof(struct request) + set->cmd_size,
 						GFP_KERNEL);
 			if (!tags->rqs[j]) {
@@ -98,7 +104,7 @@ void assign_q_to_rqs(struct blk_mq_tag_set *set, struct request_queue *q)
 		BUG_ON(tags == NULL);
 		BUG_ON(tags->rqs == NULL);
 
-		for (j = 0; j < set->queue_depth; j++) {
+		for (j = 0; j < set->queue_depth + 1; j++) {
 			struct request *rq = tags->rqs[j];
 			BUG_ON(rq == NULL);
 			rq->q = q;

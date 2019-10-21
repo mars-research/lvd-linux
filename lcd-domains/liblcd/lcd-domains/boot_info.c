@@ -19,3 +19,10 @@ lcd_get_boot_info(void)
 {
 	return (struct lcd_boot_info *)gva_val(LCD_BOOTSTRAP_PAGES_GV_ADDR);
 }
+
+struct ext_registers *
+LIBLCD_FUNC_ATTR
+get_register_page(int cpu)
+{
+	return (struct ext_registers*)gva_val(LCD_REGISTER_PAGE_GV_ADDR);
+}

@@ -94,4 +94,10 @@ static inline void lcd_dump_boot_info(struct lcd_boot_info *b)
 	printk(KERN_ERR "\n");  
 }
 
+struct ext_registers {
+	uint64_t regs[PAGE_SIZE/8];
+};
+
+struct ext_registers *get_register_page(int cpu);
+
 #endif /* LIBLCD_BOOTINFO_H */

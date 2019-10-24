@@ -372,7 +372,7 @@ int blk_mq_end_request_callee(struct fipc_message *_request)
 
 	rq = blk_mq_get_rq_from_tag(q, tag);
 
-	printk("%s, rq: %p\n", __func__, rq);
+	//printk("%s, rq: %p\n", __func__, rq);
 	blk_mq_end_request(rq, error);
 
 fail_lookup:
@@ -456,7 +456,7 @@ int blk_mq_start_request_callee(struct fipc_message *_request)
 	rq = blk_mq_get_rq_from_tag(q, tag);
 
 	assert(rq != NULL);
-	printk("%s, rq: %p\n", __func__, rq);
+//	printk("%s, rq: %p\n", __func__, rq);
 	if (rq)
 		blk_mq_start_request(rq);
 
@@ -531,7 +531,7 @@ int blk_mq_complete_request_callee(struct fipc_message *_request)
 
 	rq = blk_mq_get_rq_from_tag(q, tag);
 
-	printk("%s, rq: %p\n", __func__, rq);
+	//printk("%s, rq: %p\n", __func__, rq);
 	blk_mq_complete_request(rq, error);
 
 fail_lookup:
@@ -824,6 +824,7 @@ int _queue_rq_fn(struct blk_mq_hw_ctx *ctx, const struct blk_mq_queue_data *bd,
 		rq_for_each_segment(bvec, bd->rq, iter) {
 			void *buf = page_address(bvec.bv_page);
 			lcd_buf[i] = priv_alloc(BLK_USER_BUF_POOL);
+			if (0)
 			printk("%s, pool_base: %p alloc from priv[%d]: %p offset: 0x%lx\n",
 					__func__, pool_base,
 					smp_processor_id(),
@@ -843,6 +844,7 @@ int _queue_rq_fn(struct blk_mq_hw_ctx *ctx, const struct blk_mq_queue_data *bd,
 		}
 	}
 
+	if (0)
 	printk("%s, rq: %p\n", __func__, bd->rq);
 	vmfunc_klcd_wrapper(request, 1);
 

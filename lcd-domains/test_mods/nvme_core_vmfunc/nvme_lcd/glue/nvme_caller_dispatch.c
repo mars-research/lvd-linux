@@ -18,7 +18,7 @@ int handle_rpc_calls(struct fipc_message *message)
 
 	switch (fn_type) {
 		case QUEUE_RQ_FN:
-			trace(QUEUE_RQ_FN);
+			//trace(QUEUE_RQ_FN);
 			return queue_rq_fn_callee(message);
 
 		case MAP_QUEUE_FN:
@@ -38,7 +38,7 @@ int handle_rpc_calls(struct fipc_message *message)
 			return init_request_fn_callee(message);
 
 		case COMPLETE_FN:
-			trace(COMPLETE_FN);
+			//trace(COMPLETE_FN);
 			return complete_fn_callee(message);
 
 		case TIMEOUT_FN:

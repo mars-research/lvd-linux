@@ -57,7 +57,7 @@ int blk_rq_map_kern(struct request_queue *q, struct request *rq, void *kbuf,
 	struct bio *bio;
 	int ret;
 
-	LIBLCD_MSG("%s, called", __func__);
+	//LIBLCD_MSG("%s, called", __func__);
 
 	if (len > (queue_max_hw_sectors(q) << 9)) {
 		LIBLCD_ERR("len (%d) > max_hw_sectors << 9 (%d)", len, (queue_max_hw_sectors(q) << 9));
@@ -91,7 +91,7 @@ int blk_rq_map_kern(struct request_queue *q, struct request *rq, void *kbuf,
 
 	ret = blk_rq_append_bio(rq, bio);
 
-	LIBLCD_MSG("%s, blk_rq_append_bio returned %d", __func__, ret);
+	//LIBLCD_MSG("%s, blk_rq_append_bio returned %d", __func__, ret);
 
 	if (unlikely(ret)) {
 		LIBLCD_ERR("blk_rq_append_bio returned %d", ret);
@@ -104,7 +104,7 @@ int blk_rq_map_kern(struct request_queue *q, struct request *rq, void *kbuf,
 	blk_queue_bounce(q, &rq->bio);
 #endif
 
-	LIBLCD_MSG("%s, returned %d", __func__, ret);
+	//LIBLCD_MSG("%s, returned %d", __func__, ret);
 	return 0;
 }
 //EXPORT_SYMBOL(blk_rq_map_kern);

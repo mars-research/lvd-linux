@@ -275,7 +275,7 @@ int blk_mq_alloc_tag_set(struct blk_mq_tag_set *set)
 	ops_container->other_ref.cptr = fipc_get_reg1(request);
 	func_ret = fipc_get_reg2(request);
 
-	LIBLCD_MSG("%s received %d from", __func__, func_ret);
+	//LIBLCD_MSG("%s received %d from", __func__, func_ret);
 
 	return func_ret;
 
@@ -873,8 +873,10 @@ void blk_mq_end_request(struct request *rq, int error)
 	fipc_set_reg2(_request, error);
 
 	vmfunc_wrapper(_request);
-	printk("%s, update_request returns %d", __func__,
-			blk_update_request(rq, error, blk_rq_bytes(rq)));
+	//if (0)
+	//printk("%s, update_request returns %d", __func__,
+			//blk_update_request(rq, error, blk_rq_bytes(rq)));
+	blk_update_request(rq, error, blk_rq_bytes(rq));
 	return;
 }
 
@@ -1648,17 +1650,19 @@ int queue_rq_fn_callee(struct fipc_message *request)
 		}
 
 		for (i = 0; i < num_pages; i++) {
-			printk("%s copying data from %p", __func__, kbuf_klcd[i]);
+			//printk("%s copying data from %p", __func__, kbuf_klcd[i]);
 			memcpy(kbuf, kbuf_klcd[i], PAGE_SIZE);
 			kbuf += PAGE_SIZE;
 		}
 
 		bd.rq->__data_len = data_len;
 		ret = blk_rq_map_kern(rq->q, rq, kbuf, bd.rq->__data_len, 0);
+		if (0)
 		printk("%s, calling blk_rq_map_kern with kbuf: %p, len: %u returned %d",
 					__func__, kbuf, bd.rq->__data_len, ret);
 	}
 
+	if (0)
 	printk("%s, %s q: %p, rq: %p, hctx: %p tag %d driver_data: %p", __func__,
 		(ops_container == &nvme_mq_admin_ops_container) ? "ADMINQ" : "IOQ",
 		rq->q, rq, hctx, tag, hctx->driver_data);
@@ -1677,7 +1681,7 @@ int queue_rq_fn_callee(struct fipc_message *request)
 		lcd_free_pages(lcd_page, ilog2(num_pages));
 	}
 
-	LIBLCD_MSG("%s, returned ", __func__, func_ret);
+	//LIBLCD_MSG("%s, returned ", __func__, func_ret);
 	fipc_set_reg0(request, func_ret);
 
 fail_lookup:
@@ -1815,6 +1819,7 @@ int complete_fn_callee(struct fipc_message *_request)
 
 	rq = get_rq_from_tagset(ops_container, tag, qnum);
 	iod = blk_mq_rq_to_pdu(rq);
+	if (0)
 	printk("%s, rq: %p tag: %d qnum: %d iod: %p nvmeq:%p dev: %p",
 			__func__, rq, tag, qnum,
 			iod, iod ? iod->nvmeq: NULL,

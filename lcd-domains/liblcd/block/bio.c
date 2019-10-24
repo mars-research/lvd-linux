@@ -268,7 +268,7 @@ struct bio *bio_alloc_bioset(gfp_t gfp_mask, int nr_iovecs, struct bio_set *bs)
 	struct bio *bio;
 	void *p = NULL;
 
-	LIBLCD_MSG("%s bs: %p", __func__, bs);
+	//LIBLCD_MSG("%s bs: %p", __func__, bs);
 	if (!bs) {
 		if (nr_iovecs > UIO_MAXIOV)
 			return NULL;
@@ -277,7 +277,7 @@ struct bio *bio_alloc_bioset(gfp_t gfp_mask, int nr_iovecs, struct bio_set *bs)
 			    nr_iovecs * sizeof(struct bio_vec),
 			    gfp_mask);
 
-		LIBLCD_MSG("%s p: %p", __func__, p);
+		//LIBLCD_MSG("%s p: %p", __func__, p);
 		front_pad = 0;
 		inline_vecs = nr_iovecs;
 	} else {
@@ -331,7 +331,7 @@ struct bio *bio_alloc_bioset(gfp_t gfp_mask, int nr_iovecs, struct bio_set *bs)
 		unsigned long idx = 0;
 
 		bvl = bvec_alloc(gfp_mask, nr_iovecs, &idx, bs->bvec_pool);
-		LIBLCD_MSG("%s bvl: %p", __func__, bvl);
+		//LIBLCD_MSG("%s bvl: %p", __func__, bvl);
 #ifndef LCD_ISOLATE
 		/* We assume the allocation never fails to avoid calling punt_bios_xx */
 		if (!bvl && gfp_mask != saved_gfp) {
@@ -353,7 +353,7 @@ struct bio *bio_alloc_bioset(gfp_t gfp_mask, int nr_iovecs, struct bio_set *bs)
 	bio->bi_max_vecs = nr_iovecs;
 	bio->bi_io_vec = bvl;
 
-	LIBLCD_MSG("%s returned bio: %p", __func__, bio);
+	//LIBLCD_MSG("%s returned bio: %p", __func__, bio);
 	return bio;
 
 err_free:
@@ -455,7 +455,7 @@ int bio_add_pc_page(struct request_queue *q, struct bio *bio, struct page
 		bio_clear_flag(bio, BIO_SEG_VALID);
 
  done:
-	LIBLCD_MSG("%s len: %d", __func__, len);
+	//LIBLCD_MSG("%s len: %d", __func__, len);
 	return len;
 
  failed:
@@ -523,7 +523,7 @@ struct bio *bio_map_kern(struct request_queue *q, void *data, unsigned int len,
 	}
 
 	bio->bi_end_io = bio_map_kern_endio;
-	LIBLCD_MSG("%s retu bio %p", __func__, bio);
+	//LIBLCD_MSG("%s retu bio %p", __func__, bio);
 	return bio;
 }
 EXPORT_SYMBOL(bio_map_kern);

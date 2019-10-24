@@ -49,6 +49,7 @@ lib-y += $(addprefix liblcd/mm/, \
 	slab.o \
 	slab_common.o \
 	util.o \
+	dmapool.o \
 	)
 
 lib-y += $(addprefix liblcd/arch/x86/lib/, \

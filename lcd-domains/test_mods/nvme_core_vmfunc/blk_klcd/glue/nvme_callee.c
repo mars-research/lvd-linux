@@ -15,6 +15,7 @@
 #include <linux/sort.h>
 #include <linux/aer.h>
 #include <lcd_domains/microkernel.h>
+#include <linux/nvme_ioctl.h>
 
 #include <lcd_config/post_hook.h>
 
@@ -26,6 +27,7 @@ static DEFINE_HASHTABLE(file_hash, CPTR_HASH_BITS);
 static DEFINE_HASHTABLE(dev_table, CPTR_HASH_BITS);
 static DEFINE_HASHTABLE(bdev_table, CPTR_HASH_BITS);
 static DEFINE_HASHTABLE(pdev_hash, CPTR_HASH_BITS);
+static DEFINE_HASHTABLE(user_hash, CPTR_HASH_BITS);
 
 priv_pool_t *iocb_pool;
 static unsigned long pool_pfn_start, pool_pfn_end;
@@ -244,6 +246,36 @@ int glue_lookup_bdevice(struct cptr c, struct
 void glue_remove_bdevice(struct block_device_container *bdev_c)
 {
 	hash_del(&bdev_c->hentry);
+}
+
+int glue_insert_user(struct user_ptr_container *user_c)
+{
+	BUG_ON(!user_c->user);
+
+	user_c->my_ref = __cptr((unsigned long)user_c->user);
+
+	hash_add(user_hash, &user_c->hentry, (unsigned long) user_c->user);
+
+	return 0;
+}
+
+int glue_lookup_user(struct cptr c, struct user_ptr_container **user_cout) {
+	struct user_ptr_container *user_c;
+
+	hash_for_each_possible(user_hash, user_c,
+			hentry, (unsigned long) cptr_val(c)) {
+		if (user_c->user == (unsigned long*) c.cptr) {
+			*user_cout = user_c;
+			goto exit;
+		}
+	}
+exit:
+	return 0;
+}
+
+void glue_remove_user(struct user_ptr_container *user_c)
+{
+	hash_del(&user_c->hentry);
 }
 
 int blk_mq_init_queue_callee(struct fipc_message *request)
@@ -799,8 +831,10 @@ int _queue_rq_fn(struct blk_mq_hw_ctx *ctx, const struct blk_mq_queue_data *bd,
 					(unsigned long)(lcd_buf[i] - pool_base));
 			if (lcd_buf[i] && is_in_range(lcd_buf[i]))
 				memcpy(lcd_buf[i], buf + bvec.bv_offset, bvec.bv_len);
-			else
+			else {
 				LIBLCD_ERR("%s Allocated buffer not in range", __func__);
+				continue;
+			}
 			//print_hex_dump(KERN_INFO, "i/o:", DUMP_PREFIX_OFFSET, 32, 1,
 			//		lcd_buf, bvec.bv_len, true);
 			//memset(lcd_buf, 0x0, bvec.bv_len);
@@ -822,6 +856,7 @@ int _queue_rq_fn(struct blk_mq_hw_ctx *ctx, const struct blk_mq_queue_data *bd,
 			if (lcd_buf[i]) {
 				memcpy(buf + bvec.bv_offset, lcd_buf[i], bvec.bv_len);
 				priv_free(lcd_buf[i], BLK_USER_BUF_POOL);
+				i++;
 			}
 		}
 	}
@@ -1604,8 +1639,23 @@ long bd_ioctl(struct block_device *bdev, fmode_t mode, unsigned int cmd,
 	struct block_device_container *bdev_container = NULL;
 	struct block_device_operations_container *bdops_container =
 		hidden_args->struct_container;
+	struct user_ptr_container *user_container;
+
+	user_container = kzalloc(sizeof(struct user_ptr_container), GFP_KERNEL);
+
+	if (!user_container) {
+		LIBLCD_ERR("error allocating memory");
+		ret = -ENOMEM;
+		goto fail_alloc;
+	}
+
+	if (arg) {
+		user_container->user = (unsigned long *)arg;
+		glue_insert_user(user_container);
+	}
 
 	glue_lookup_bdevice(__cptr((unsigned long) bdev), &bdev_container);
+
 
 	async_msg_set_fn_type(_request, BD_IOCTL_FN);
 	fipc_set_reg0(_request, bdops_container->other_ref.cptr);
@@ -1614,11 +1664,15 @@ long bd_ioctl(struct block_device *bdev, fmode_t mode, unsigned int cmd,
 	fipc_set_reg3(_request, cmd);
 	fipc_set_reg4(_request, arg);
 
+
+
 	ret = vmfunc_klcd_wrapper(_request, 1);
 
 	func_ret = fipc_get_reg0(_request);
 
 	return func_ret;
+fail_alloc:
+	return ret;
 }
 
 LCD_TRAMPOLINE_DATA(bd_ioctl_trampoline);
@@ -4318,8 +4372,10 @@ int device_destroy_callee(struct fipc_message *_request)
                 goto fail_lookup;
         }
 
+	class = cls_container->class_p;
 
 	devt = fipc_get_reg1(_request);
+
 	device_destroy(class, devt);
 
 fail_lookup:
@@ -4363,4 +4419,69 @@ int revalidate_disk_callee(struct fipc_message *_request)
 
 fail_lookup:
 	return ret;
+}
+
+int copy_from_user_callee(struct fipc_message *request)
+{
+	int ret = 0;
+	unsigned int cmd_ord, data_ord;
+	cptr_t cmd_cptr, data_cptr;
+	cptr_t lcd_cmd_cptr, lcd_data_cptr;
+	struct user_ptr_container *user_container = NULL;
+	unsigned long user_cmd;
+	int sub_cmd;
+
+	sub_cmd = fipc_get_reg0(request);
+	lcd_cmd_cptr = __cptr(fipc_get_reg1(request));
+	lcd_data_cptr = __cptr(fipc_get_reg2(request));
+	user_cmd = fipc_get_reg3(request);
+
+	glue_lookup_user(__cptr(user_cmd), &user_container);
+
+	assert(user_cmd == (unsigned long) user_container->user);
+
+	switch (sub_cmd) {
+	case NVME_PASSTHRU_CMD:
+		{
+		struct nvme_passthru_cmd *cmd = (struct nvme_passthru_cmd*)
+			user_container->user;
+		ret = lcd_volunteer_vmalloc_mem(__gva((unsigned long)cmd),
+				sizeof(*cmd), &cmd_cptr);
+		cmd_ord = ilog2(sizeof(*cmd));
+
+		if (ret) {
+			LIBLCD_ERR("volunteer shared region");
+			goto fail_vol1;
+		}
+
+		ret = lcd_volunteer_vmalloc_mem(__gva((unsigned long)cmd->addr),
+				cmd->data_len, &data_cptr);
+		data_ord = ilog2(cmd->data_len);
+
+		if (ret) {
+			LIBLCD_ERR("volunteer shared region");
+			goto fail_vol2;
+		}
+
+		copy_msg_cap_vmfunc(current->lcd, current->vmfunc_lcd,
+				cmd_cptr, lcd_cmd_cptr);
+		copy_msg_cap_vmfunc(current->lcd, current->vmfunc_lcd,
+				data_cptr, lcd_data_cptr);
+
+		fipc_set_reg0(request, cmd_ord);
+		fipc_set_reg1(request, data_ord);
+		break;
+		}
+	default:
+		printk("%s sub_cmd: %d not supported yet!\n", __func__, sub_cmd);
+		break;
+	}
+fail_vol2:
+fail_vol1:
+	return ret;
+}
+
+int copy_to_user_callee(struct fipc_message *request)
+{
+	return 0;
 }

@@ -8,6 +8,7 @@
 #include "../../nvme_common.h"
 #include "../nvme_caller.h"
 #include <asm/lcd_domains/liblcd.h>
+#include <linux/nvme_ioctl.h>
 
 #include <lcd_config/post_hook.h>
 
@@ -1673,7 +1674,7 @@ int queue_rq_fn_callee(struct fipc_message *request)
 			kbuf += PAGE_SIZE;
 		}
 
-		lcd_free_pages(lcd_page, 0);
+		lcd_free_pages(lcd_page, ilog2(num_pages));
 	}
 
 	LIBLCD_MSG("%s, returned ", __func__, func_ret);
@@ -2818,13 +2819,14 @@ fail_lookup:
 	return ret;
 }
 
+struct block_device *bdev = NULL;
+struct block_device_container *bdev_container = NULL;
+
 int bd_open_callee(struct fipc_message *_request)
 {
         int ret = 0;
         int func_ret = 0;
 	fmode_t mode;
-	struct block_device *bdev;
-	struct block_device_container *bdev_container;
 	struct block_device_operations_container *bdops_container;
 	struct gendisk_container *disk_container;
 
@@ -2837,23 +2839,30 @@ int bd_open_callee(struct fipc_message *_request)
 		goto fail_lookup;
 	}
 
-	bdev_container = kzalloc(sizeof(struct block_device_container),
-			GFP_KERNEL);
-
+	/*
+	 * Assuming we have only one block_device struct associated with each
+	 * device, we do not need to create and insert reference every time.
+	 * Insert only once.
+	 */
 	if (!bdev_container) {
-		LIBLCD_ERR("kzalloc");
-		goto fail_alloc;
+		bdev_container = kzalloc(sizeof(struct block_device_container),
+				GFP_KERNEL);
+
+		if (!bdev_container) {
+			LIBLCD_ERR("kzalloc");
+			goto fail_alloc;
+		}
+
+		ret = glue_cap_insert_block_device_type(c_cspace, bdev_container,
+				&bdev_container->my_ref);
+
+		if (ret) {
+			LIBLCD_ERR("lcd insert");
+			goto fail_insert;
+		}
+
+		bdev_container->other_ref.cptr = fipc_get_reg1(_request);
 	}
-
-	ret = glue_cap_insert_block_device_type(c_cspace, bdev_container,
-			&bdev_container->my_ref);
-
-	if (ret) {
-		LIBLCD_ERR("lcd insert");
-		goto fail_insert;
-	}
-
-	bdev_container->other_ref.cptr = fipc_get_reg1(_request);
 
 	bdev = &bdev_container->block_device;
 
@@ -3150,9 +3159,79 @@ fail_virt:
 }
 #endif
 
+int handle_passthru_cmd(const void *from, void *to, size_t n)
+{
+	int ret;
+	cptr_t cmd_cptr, data_cptr;
+	gva_t cmd_gva, data_gva;
+	unsigned int cmd_ord, data_ord;
+	void *cmd_addr, *data_addr;
+	struct fipc_message r;
+	struct fipc_message *_request = &r;
+	struct nvme_passthru_cmd *cmd = (struct nvme_passthru_cmd*) to;
+
+	ret = lcd_cptr_alloc(&cmd_cptr);
+	if (ret) {
+		LIBLCD_ERR("failed to get cptr");
+		goto fail_cptr;
+	}
+
+	ret = lcd_cptr_alloc(&data_cptr);
+	if (ret) {
+		LIBLCD_ERR("failed to get cptr");
+		goto fail_cptr;
+	}
+
+	async_msg_set_fn_type(_request, COPY_FROM_USER);
+	fipc_set_reg0(_request, NVME_PASSTHRU_CMD);
+	fipc_set_reg1(_request, cptr_val(cmd_cptr));
+	fipc_set_reg2(_request, cptr_val(data_cptr));
+	fipc_set_reg3(_request, (unsigned long) from);
+
+	vmfunc_wrapper(_request);
+
+	cmd_ord = fipc_get_reg0(_request);
+	data_ord = fipc_get_reg1(_request);
+
+	ret = lcd_map_virt(cmd_cptr, cmd_ord, &cmd_gva);
+
+	if (ret) {
+		LIBLCD_ERR("failed to map cmd region");
+		goto fail_cmd;
+	}
+
+	cmd_addr = (void*)gva_val(cmd_gva);
+
+	memcpy(cmd, cmd_addr, n);
+
+	ret = lcd_map_virt(data_cptr, data_ord, &data_gva);
+
+	if (ret) {
+		LIBLCD_ERR("failed to map data region");
+		goto fail_data;
+	}
+
+	data_addr = (void*)gva_val(data_gva);
+	cmd->addr = (uint64_t) data_addr;
+
+fail_cmd:
+fail_data:
+fail_cptr:
+	return ret;
+}
+
+void handle_user_io(const void *from, void *to) {
+
+}
+
 unsigned long _lcd_copy_from_user(void *to, const void *from, unsigned long n)
 {
 	LIBLCD_MSG("%s, called", __func__);
+	if (__builtin_types_compatible_p(typeof(from), struct nvme_passthru_cmd*)) {
+		handle_passthru_cmd(from, to, n);
+	} else if (__builtin_types_compatible_p(typeof(from), struct nvme_user_io*)) {
+		handle_user_io(from, to);
+	}
 	return 0;
 }
 

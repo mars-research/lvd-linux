@@ -139,6 +139,13 @@ struct file_ptr_container {
 	struct hlist_node hentry;
 };
 
+struct user_ptr_container {
+	unsigned long *user;
+	struct cptr other_ref;
+	struct cptr my_ref;
+	struct hlist_node hentry;
+};
+
 struct file_operations_container {
 	struct file_operations fops;
 	struct cptr other_ref;

@@ -161,8 +161,14 @@ enum dispatch_t {
 	SYNCHRONIZE_IRQ,
 	CAPABLE,
 	REVALIDATE_DISK,
+	COPY_FROM_USER,
+	COPY_TO_USER,
 };
 
+enum sub_cmd {
+	NVME_PASSTHRU_CMD,
+	NVME_SUBMIT_IO,
+};
 #define LOWER32_BITS    32
 #define LOWER_HALF(x)   (x & ((1ULL << LOWER32_BITS) - 1))
 #define UPPER_HALF(x)   (x >> LOWER32_BITS)

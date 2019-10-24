@@ -1309,6 +1309,9 @@ struct device *get_device(struct device *dev)
 	fipc_set_reg1(_request, device_container->my_ref.cptr);
 
 	ret = vmfunc_wrapper(_request);
+
+	/* initialize dma_pools for dma_pool_create */
+	INIT_LIST_HEAD(&dev->dma_pools);
 	return dev;
 }
 

@@ -421,6 +421,22 @@ int blk_klcd_dispatch_async_loop(struct fipc_message *message)
 			trace(DEVICE_DESTROY);
 			return device_destroy_callee(message);
 
+		case REVALIDATE_DISK:
+			trace(REVALIDATE_DISK);
+			return revalidate_disk_callee(message);
+
+		case COPY_FROM_USER:
+			trace(COPY_FROM_USER);
+			return copy_from_user_callee(message);
+
+		case COPY_TO_USER:
+			trace(COPY_TO_USER);
+			return copy_to_user_callee(message);
+
+		case CAPABLE:
+			trace(CAPABLE);
+			return capable_callee(message);
+
 		default:
 			LIBLCD_ERR("unexpected function label: %d",
 					fn_type);

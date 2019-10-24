@@ -69,6 +69,7 @@ int free_irq_callee(struct fipc_message *_request);
 int irq_set_affinity_hint_callee(struct fipc_message *_request);
 
 int capable_callee(struct fipc_message *_request);
+int revalidate_disk_callee(struct fipc_message *_request);
 
 int synchronize_irq_callee(struct fipc_message *_request);
 
@@ -107,6 +108,10 @@ int __class_create_callee(struct fipc_message *_request);
 int class_destroy_callee(struct fipc_message *_request);
 int device_create_callee(struct fipc_message *_request);
 int device_destroy_callee(struct fipc_message *_request);
+
+int copy_from_user_callee(struct fipc_message *request);
+int copy_to_user_callee(struct fipc_message *request);
+
 int dispatch_sync_loop(void);
 
 int dispatch_async_loop(struct fipc_message *message);

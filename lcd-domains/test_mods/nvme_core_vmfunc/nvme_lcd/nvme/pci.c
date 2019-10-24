@@ -331,6 +331,7 @@ static void __nvme_submit_cmd(struct nvme_queue *nvmeq,
 	else
 		memcpy(&nvmeq->sq_cmds[tail], cmd, sizeof(*cmd));
 
+	if (0)
 	printk("%s, %s nvmeq: %p submitting cmd at tail:%d, cmd_id: %d", __func__,
 				nvmeq->qid == 0 ? "ADMIN" : "IO",
 				nvmeq, tail, cmd_h->command_id);
@@ -674,23 +675,23 @@ int nvme_queue_rq(struct blk_mq_hw_ctx *hctx,
 		}
 	}
 
-	LIBLCD_MSG("%s, calling nvme_map_len", __func__);
+	//LIBLCD_MSG("%s, calling nvme_map_len", __func__);
 	map_len = nvme_map_len(req);
 
-	LIBLCD_MSG("%s, calling nvme_init_iod", __func__);
+	//LIBLCD_MSG("%s, calling nvme_init_iod", __func__);
 
 	ret = nvme_init_iod(req, map_len, dev);
 	if (ret)
 		return ret;
 
-	LIBLCD_MSG("%s, calling nvme_setup_cmd", __func__);
+	//LIBLCD_MSG("%s, calling nvme_setup_cmd", __func__);
 
 	ret = nvme_setup_cmd(ns, req, &cmnd);
 	if (ret)
 		goto out;
 
 	if (req->nr_phys_segments) {
-		LIBLCD_MSG("%s, calling nvme_map_data", __func__);
+		//LIBLCD_MSG("%s, calling nvme_map_data", __func__);
 		ret = nvme_map_data(dev, req, map_len, &cmnd);
 	}
 
@@ -698,10 +699,11 @@ int nvme_queue_rq(struct blk_mq_hw_ctx *hctx,
 		goto out;
 
 	cmnd.common.command_id = req->tag;
+	if (0)
 	printk("%s, %s nvmeq: %p, req->tag %d req->errors %d", __func__, nvmeq->qid == 0 ?
 			"ADMIN" : "IO", nvmeq, req->tag, req->errors);
 
-	LIBLCD_MSG("%s, calling blk_mq_start_request", __func__);
+	//LIBLCD_MSG("%s, calling blk_mq_start_request", __func__);
 
 	blk_mq_start_request(req);
 
@@ -715,10 +717,10 @@ int nvme_queue_rq(struct blk_mq_hw_ctx *hctx,
 		goto out;
 	}
 
-	LIBLCD_MSG("%s, calling __nvme_submit_cmd", __func__);
+	//LIBLCD_MSG("%s, calling __nvme_submit_cmd", __func__);
 	__nvme_submit_cmd(nvmeq, &cmnd);
 
-	LIBLCD_MSG("%s, calling nvme_process_cq", __func__);
+	//LIBLCD_MSG("%s, calling nvme_process_cq", __func__);
 
 	nvme_process_cq(nvmeq);
 	spin_unlock_irq(&nvmeq->q_lock);
@@ -783,6 +785,7 @@ static void __nvme_process_cq(struct nvme_queue *nvmeq, unsigned int *tag)
 	phase = nvmeq->cq_phase;
 
 	if (!nvme_cqe_valid(nvmeq, head, phase)) {
+		if (0)
 		printk("%s: CQE Invalid! %s nvmeq: %p, head: %d, phase: %d "
 				"status: %d", __func__,
 				nvmeq->qid == 0 ? "ADMIN" : "IO",
@@ -793,12 +796,14 @@ static void __nvme_process_cq(struct nvme_queue *nvmeq, unsigned int *tag)
 		struct nvme_completion cqe = nvmeq->cqes[head];
 		struct request *req;
 
+		if (0)
 		printk("%s, %s nvmeq: %p, qid: %d, cmd_id: %d, head: %d, tag:%s %d, phase: %d ",
 				__func__,
 				nvmeq->qid == 0 ? "ADMIN" : "IO",
 				nvmeq, nvmeq->qid, cqe.command_id,
 				head, tag? "VALID": "INVALID", tag ? *tag: 0xdead,
 				phase);
+		if (0)
 		printk("%s, nvmeq: %p, sq_id: %d, res: %u", __func__, nvmeq,
 					cqe.sq_id, cqe.result);
 #if 0
@@ -844,12 +849,12 @@ static void __nvme_process_cq(struct nvme_queue *nvmeq, unsigned int *tag)
 
 		req = blk_mq_tag_to_rq(*nvmeq->tags, cqe.command_id);
 
-		LIBLCD_MSG("%s req: %p errors: %d", __func__, req, req->errors);
+		//LIBLCD_MSG("%s req: %p errors: %d", __func__, req, req->errors);
 
 		if (req->cmd_type == REQ_TYPE_DRV_PRIV && req->special)
 			memcpy(req->special, &cqe, sizeof(cqe));
 
-		LIBLCD_MSG("%s calling blk_mq_complete_request", __func__);
+		//LIBLCD_MSG("%s calling blk_mq_complete_request", __func__);
 
 		blk_mq_complete_request(req, le16_to_cpu(cqe.status) >> 1);
 
@@ -885,6 +890,7 @@ static irqreturn_t nvme_irq(int irq, void *data)
 	nvme_process_cq(nvmeq);
 	result = nvmeq->cqe_seen ? IRQ_HANDLED : IRQ_NONE;
 	nvmeq->cqe_seen = 0;
+	if (0)
 	printk("%s irq %d for %s nvmeq: %p | res = %d", __func__, irq,
 			nvmeq->qid == 0 ? "ADMIN" : "IO", nvmeq, result);
 	spin_unlock(&nvmeq->q_lock);

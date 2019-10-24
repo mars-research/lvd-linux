@@ -383,7 +383,7 @@ int __nvme_submit_sync_cmd(struct request_queue *q, struct nvme_command *cmd,
 	req->special = cqe;
 
 	if (buffer && bufflen) {
-		LIBLCD_MSG("%s Calling blk_rq_map_kern", __func__);
+		//LIBLCD_MSG("%s Calling blk_rq_map_kern", __func__);
 		ret = blk_rq_map_kern(q, req, buffer, bufflen, GFP_KERNEL);
 		if (ret)
 			goto out;

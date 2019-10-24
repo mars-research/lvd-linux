@@ -187,11 +187,11 @@ int blk_klcd_dispatch_async_loop(struct fipc_message *message)
 			return blk_mq_free_tag_set_callee(message);
 
 		case BLK_MQ_START_REQUEST:
-			trace(BLK_MQ_START_REQUEST);
+			//trace(BLK_MQ_START_REQUEST);
 			return blk_mq_start_request_callee(message);
 
 		case BLK_MQ_COMPLETE_REQUEST:
-			trace(BLK_MQ_COMPLETE_REQUEST);
+			//trace(BLK_MQ_COMPLETE_REQUEST);
 			return blk_mq_complete_request_callee(message);
 
 		case BLK_MQ_START_STOPPED_HW_QUEUES:

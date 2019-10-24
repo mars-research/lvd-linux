@@ -9,8 +9,8 @@
 struct request *blk_mq_tag_to_rq(struct blk_mq_tags *tags, unsigned int tag)
 {
 
-	printk("%s tag: %d nr_tags: %d", __func__, tag,
-			tags->nr_tags);
+//	printk("%s tag: %d nr_tags: %d", __func__, tag,
+//			tags->nr_tags);
 	if (tag < tags->nr_tags)
 		return tags->rqs[tag];
 

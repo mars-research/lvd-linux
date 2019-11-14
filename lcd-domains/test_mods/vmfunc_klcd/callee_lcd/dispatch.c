@@ -138,6 +138,7 @@ foo(struct fipc_message *msg)
 
 		int num_iterations = 1000000;
 
+		asm volatile("int $0x29");
 		for(i = 0; i < num_iterations; i++) {
 			asm volatile("mov %%rsp, %[rsp_ptr]"
 				: [rsp_ptr]"=r"(rsp_ptr));
@@ -214,6 +215,34 @@ foo(struct fipc_message *msg)
 	return 0;
 }
 
+int memtest(struct fipc_message *msg)
+{
+	int pages = 0;
+	printk("%s, Running memory exhaustion test", __func__);
+	do {
+		struct page *p;
+		p = lcd_alloc_pages(GFP_KERNEL, 0);
+		printk("%s, page %d : %p", __func__, ++pages, p);
+		if (!p) {
+			LIBLCD_ERR("Page alloc failed at %d pages", pages);
+			break;
+		}
+	} while (1);
+	return 0;
+}
+
+void irq_handler(struct fipc_message *msg)
+{
+	struct fipc_message r;
+	struct fipc_message *request = &r;
+
+	r.vmfunc_id = VMFUNC_RPC_CALL;
+	r.rpc_id = NULL_INVOCATION;
+
+	printk("%s called", __func__);
+	vmfunc_wrapper(request);
+}
+
 int handle_rpc_calls(struct fipc_message *msg)
 {
 	switch(msg->rpc_id) {
@@ -231,6 +260,12 @@ int handle_rpc_calls(struct fipc_message *msg)
 		break;
 	case CALLEE:
 		callee(msg);
+		break;
+	case MEMTEST:
+		memtest(msg);
+		break;
+	case IRQ_HANDLER:
+		irq_handler(msg);
 		break;
 	default:
 		break;

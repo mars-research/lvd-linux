@@ -110,14 +110,33 @@ void run_vmfunc_tests(void)
 			fipc_get_reg6(&msg)
 			);
 
-
-	memset(&msg, 0x0, sizeof(msg));
+	INIT_FIPC_MSG(&msg);
 	msg.rpc_id = MODULE_INIT;
 	printk("%s, before MODULE_INIT lcd->stack %p\n", __func__, current->lcd_stack);
 	vmfunc_klcd_test_wrapper(&msg, OTHER_DOMAIN, VMFUNC_TEST_RPC_CALL);
 	printk("%s: VMFUNC_TEST_RPC_CALL: MODULE_INIT Passed!\n",
 				__func__);
+
+	INIT_FIPC_MSG(&msg);
+
+	msg.rpc_id = MEMTEST;
+	//vmfunc_klcd_test_wrapper(&msg, OTHER_DOMAIN, VMFUNC_TEST_RPC_CALL);
+
 }
+
+void klcd_lvd_callback_handler(void *arg)
+{
+	struct fipc_message r;
+	struct fipc_message *request = &r;
+
+	request->rpc_id = IRQ_HANDLER;
+	vmfunc_klcd_test_wrapper(request, OTHER_DOMAIN, VMFUNC_TEST_RPC_CALL);
+
+	return;
+}
+
+typedef void (*lvd_vector_override_t)(void *);
+extern lvd_vector_override_t lvd_vector_override_handler;
 
 static int caller_main(void)
 {
@@ -139,6 +158,9 @@ static int caller_main(void)
 	 */
 	printk("%s entered,  lcd_stack %p\n", __func__, lcd_stack);
 	vmfunc_init(lcd_stack, handle_rpc_calls_klcd, NULL);
+
+	lvd_vector_override_handler = klcd_lvd_callback_handler;
+
 	run_vmfunc_tests();
 
 	{

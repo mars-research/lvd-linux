@@ -4,6 +4,7 @@
 #include "../rdtsc_helper.h"
 #include "../rpc.h"
 #include <linux/module.h>
+#include <linux/rtnetlink.h>
 
 #include <lcd_config/post_hook.h>
 
@@ -11,6 +12,15 @@ unsigned long noinline
 null_invocation(void)
 {
        return 10;
+}
+
+unsigned long noinline
+dummy(struct fipc_message *msg)
+{
+	rtnl_lock();
+	null_invocation();
+	rtnl_unlock();
+	return 0;
 }
 
 unsigned long noinline
@@ -37,6 +47,9 @@ int handle_rpc_calls_klcd(struct fipc_message *msg)
 		break;
 	case BAR:
 		bar(msg);
+		break;
+	case DUMMY:
+		dummy(msg);
 		break;
 	default:
 		break;

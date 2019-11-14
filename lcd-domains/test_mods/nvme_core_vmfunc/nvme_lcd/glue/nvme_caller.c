@@ -1671,6 +1671,8 @@ int queue_rq_fn_callee(struct fipc_message *request)
 		if (0)
 		printk("%s, calling blk_rq_map_kern with kbuf: %p, len: %u returned %d",
 					__func__, kbuf, bd.rq->__data_len, ret);
+	} else {
+		printk("%s, datalen %d rq: %p", __func__, data_len, rq);
 	}
 
 	if (0)

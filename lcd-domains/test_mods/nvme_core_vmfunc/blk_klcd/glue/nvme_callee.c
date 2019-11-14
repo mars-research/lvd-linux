@@ -29,6 +29,7 @@ static DEFINE_HASHTABLE(dev_table, CPTR_HASH_BITS);
 static DEFINE_HASHTABLE(bdev_table, CPTR_HASH_BITS);
 static DEFINE_HASHTABLE(pdev_hash, CPTR_HASH_BITS);
 static DEFINE_HASHTABLE(user_hash, CPTR_HASH_BITS);
+static DEFINE_HASHTABLE(request_queue_hash, CPTR_HASH_BITS);
 
 priv_pool_t *iocb_pool;
 static unsigned long pool_pfn_start, pool_pfn_end;
@@ -279,12 +280,43 @@ void glue_remove_user(struct user_ptr_container *user_c)
 	hash_del(&user_c->hentry);
 }
 
+int glue_insert_request_queue(struct request_queue_container *rq_c)
+{
+	BUG_ON(!rq_c->rq);
+
+	rq_c->my_ref = __cptr((unsigned long)rq_c->rq);
+
+	hash_add(request_queue_hash, &rq_c->hentry, (unsigned long) rq_c->rq);
+
+	return 0;
+}
+
+int glue_lookup_request_queue(struct cptr c, struct request_queue_container **rq_cout)
+{
+	struct request_queue_container *rq_c;
+
+	hash_for_each_possible(request_queue_hash, rq_c,
+			hentry, (unsigned long) cptr_val(c)) {
+		if (rq_c->rq == (struct request_queue*) c.cptr) {
+			*rq_cout = rq_c;
+			goto exit;
+		}
+	}
+exit:
+	return 0;
+}
+
+void glue_remove_request_queue(struct request_queue_container *rq_c)
+{
+	hash_del(&rq_c->hentry);
+}
+
 int blk_mq_init_queue_callee(struct fipc_message *request)
 {
 	struct request_queue *rq;
 	int ret = 0;
 	struct blk_mq_tag_set_container *set_container;
-        struct request_queue_container *rq_container;
+        struct request_queue_container *rq_container = NULL;
 
 	ret = glue_cap_lookup_blk_mq_tag_set_type(c_cspace,
 			__cptr(fipc_get_reg0(request)), &set_container);
@@ -306,12 +338,9 @@ int blk_mq_init_queue_callee(struct fipc_message *request)
 	rq_container = container_of(rq, struct request_queue_container,
 			request_queue);
 
-	ret = glue_cap_insert_request_queue_type(c_cspace, rq_container,
-					&rq_container->my_ref);
-	if (ret) {
-		LIBLCD_ERR("lcd insert");
-		goto fail_insert;
-	}
+	rq_container->rq = rq;
+
+	ret = glue_insert_request_queue(rq_container);
 
 	printk("%s, request_queue %p | cptr: %lx\n", __func__, rq,
 						rq_container->my_ref.cptr);
@@ -323,17 +352,16 @@ int blk_mq_init_queue_callee(struct fipc_message *request)
 
 fail_blk:
 fail_lookup:
-fail_insert:
 	return ret;
 }
 
 int blk_get_queue_callee(struct fipc_message *_request)
 {
-	struct request_queue_container *rq_container;
+	struct request_queue_container *rq_container = NULL;
 	int func_ret;
 	int ret;
 
-	ret = glue_cap_lookup_request_queue_type(c_cspace,
+	ret = glue_lookup_request_queue(
 			__cptr(fipc_get_reg0(_request)), &rq_container);
 
 	if (ret) {
@@ -353,12 +381,12 @@ int blk_mq_end_request_callee(struct fipc_message *_request)
 {
 	struct request *rq;
 	int ret = 0;
-	struct request_queue_container *q_container;
+	struct request_queue_container *q_container = NULL;
 	struct request_queue *q;
 	int tag;
 	int error;
 
-	ret = glue_cap_lookup_request_queue_type(c_cspace,
+	ret = glue_lookup_request_queue(
 			__cptr(fipc_get_reg0(_request)), &q_container);
 
 	if (ret) {
@@ -438,11 +466,11 @@ int blk_mq_start_request_callee(struct fipc_message *_request)
 
 	struct request *rq;
 	int ret = 0;
-	struct request_queue_container *q_container;
+	struct request_queue_container *q_container = NULL;
 	struct request_queue *q;
 	int tag;
 
-	ret = glue_cap_lookup_request_queue_type(c_cspace,
+	ret = glue_lookup_request_queue(
 			__cptr(fipc_get_reg0(_request)), &q_container);
 
 	if (ret) {
@@ -467,10 +495,10 @@ fail_lookup:
 
 int blk_put_queue_callee(struct fipc_message *request)
 {
-	struct request_queue_container *rq_container;
+	struct request_queue_container *rq_container = NULL;
 	int ret;
 
-	ret = glue_cap_lookup_request_queue_type(c_cspace,
+	ret = glue_lookup_request_queue(
 			__cptr(fipc_get_reg0(request)), &rq_container);
 
 	if (ret) {
@@ -488,11 +516,11 @@ fail_lookup:
 
 int blk_mq_start_stopped_hw_queues_callee(struct fipc_message *request)
 {
-	struct request_queue_container *rq_container;
+	struct request_queue_container *rq_container = NULL;
 	int ret;
 	bool async;
 
-	ret = glue_cap_lookup_request_queue_type(c_cspace,
+	ret = glue_lookup_request_queue(
 			__cptr(fipc_get_reg0(request)), &rq_container);
 
 	if (ret) {
@@ -512,12 +540,12 @@ int blk_mq_complete_request_callee(struct fipc_message *_request)
 {
 	struct request *rq;
 	int ret = 0;
-	struct request_queue_container *q_container;
+	struct request_queue_container *q_container = NULL;
 	struct request_queue *q;
 	int tag;
 	int error;
 
-	ret = glue_cap_lookup_request_queue_type(c_cspace,
+	ret = glue_lookup_request_queue(
 			__cptr(fipc_get_reg0(_request)), &q_container);
 
 	if (ret) {
@@ -577,12 +605,12 @@ fail_alloc:
 int blk_queue_logical_block_size_callee(struct fipc_message *request)
 {
 	unsigned short size;
-	struct request_queue_container *q_container;
+	struct request_queue_container *q_container = NULL;
 	struct request_queue *q;
 	int ret;
 
 	size = fipc_get_reg0(request);
-	ret = glue_cap_lookup_request_queue_type(c_cspace,
+	ret = glue_lookup_request_queue(
 			__cptr(fipc_get_reg1(request)), &q_container);
 
 	if (ret) {
@@ -610,11 +638,11 @@ int blk_mq_tagset_busy_iter_callee(struct fipc_message *_request)
 int blk_queue_physical_block_size_callee(struct fipc_message *request)
 {
 	unsigned int size;
-	struct request_queue_container *rq_container;
+	struct request_queue_container *rq_container = NULL;
 	int ret;
 
 	size = fipc_get_reg0(request);
-	ret = glue_cap_lookup_request_queue_type(c_cspace,
+	ret = glue_lookup_request_queue(
 				__cptr(fipc_get_reg1(request)),
 				&rq_container);
 	if (ret) {
@@ -765,10 +793,10 @@ int unregister_blkdev_callee(struct fipc_message *request)
 
 int blk_cleanup_queue_callee(struct fipc_message *request)
 {
-	struct request_queue_container *rq_container;
+	struct request_queue_container *rq_container = NULL;
 	int ret = 0;
 
-	ret = glue_cap_lookup_request_queue_type(c_cspace,
+	ret = glue_lookup_request_queue(
 			__cptr(fipc_get_reg0(request)),
 			&rq_container);
 	if (ret) {
@@ -869,16 +897,20 @@ int _queue_rq_fn(struct blk_mq_hw_ctx *ctx, const struct blk_mq_queue_data *bd,
 		struct bio_vec bvec;
 		int i = 0;
 
+		if (!bd->rq->bio->bi_io_vec) {
+			printk("%s, io_vec list empty for rq: %p\n", __func__, bd->rq);
+			goto done;
+		}
 		rq_for_each_segment(bvec, bd->rq, iter) {
 			void *buf = page_address(bvec.bv_page);
-			if (lcd_buf[i]) {
+			if (lcd_buf[i] && buf) {
 				memcpy(buf + bvec.bv_offset, lcd_buf[i], bvec.bv_len);
 				priv_free(lcd_buf[i], BLK_USER_BUF_POOL);
 				i++;
 			}
 		}
 	}
-
+done:
         ret = fipc_get_reg0(request);
 
         return ret;
@@ -1554,11 +1586,11 @@ void bd_release(struct gendisk *disk, fmode_t mode,
 
 int blk_mq_stop_hw_queues_callee(struct fipc_message *_request)
 {
-	struct request_queue_container *rq_container;
+	struct request_queue_container *rq_container = NULL;
 	struct request_queue *rq;
 	int ret;
 
-	ret = glue_cap_lookup_request_queue_type(c_cspace,
+	ret = glue_lookup_request_queue(
 				__cptr(fipc_get_reg0(_request)),
 				&rq_container);
 	if (ret) {
@@ -1793,7 +1825,7 @@ int device_add_disk_callee(struct fipc_message *request)
 {
 	struct gendisk_container *disk_container;
 	struct block_device_operations_container *blo_container;
-	struct request_queue_container *rq_container;
+	struct request_queue_container *rq_container = NULL;
 	struct device_container *device_container = NULL;
 	struct gendisk *disk;
 	struct trampoline_hidden_args *open_hargs;
@@ -1815,7 +1847,7 @@ int device_add_disk_callee(struct fipc_message *request)
 		goto fail_lookup1;
 	}
 
-	ret = glue_cap_lookup_request_queue_type(c_cspace, __cptr(fipc_get_reg3(request)),
+	ret = glue_lookup_request_queue( __cptr(fipc_get_reg3(request)),
 			&rq_container);
 	if(ret) {
 		LIBLCD_ERR("lookup");
@@ -3616,10 +3648,10 @@ fail_lookup:
 int blk_set_queue_dying_callee(struct fipc_message *_request)
 {
 	struct request_queue *q = NULL;
-	struct request_queue_container *q_container;
+	struct request_queue_container *q_container = NULL;
 	int ret;
 
-	ret = glue_cap_lookup_request_queue_type(c_cspace,
+	ret = glue_lookup_request_queue(
 			__cptr(fipc_get_reg0(_request)), &q_container);
 
 	if (ret) {
@@ -3660,9 +3692,9 @@ int blk_queue_write_cache_callee(struct fipc_message *_request)
 	bool wc;
 	bool fua;
 	struct request_queue *q = NULL;
-	struct request_queue_container *q_container;
+	struct request_queue_container *q_container = NULL;
 
-	ret = glue_cap_lookup_request_queue_type(c_cspace,
+	ret = glue_lookup_request_queue(
 			__cptr(fipc_get_reg0(_request)), &q_container);
 
 	if (ret) {
@@ -3683,11 +3715,11 @@ fail_lookup:
 int blk_queue_virt_boundary_callee(struct fipc_message *_request)
 {
 	struct request_queue *q = NULL;
-	struct request_queue_container *q_container;
+	struct request_queue_container *q_container = NULL;
 	unsigned long mask;
 	int ret;
 
-	ret = glue_cap_lookup_request_queue_type(c_cspace,
+	ret = glue_lookup_request_queue(
 			__cptr(fipc_get_reg0(_request)), &q_container);
 
 	if (ret) {
@@ -3708,11 +3740,11 @@ fail_lookup:
 int blk_queue_max_segments_callee(struct fipc_message *_request)
 {
 	struct request_queue *q = NULL;
-	struct request_queue_container *q_container;
+	struct request_queue_container *q_container = NULL;
 	unsigned short max_segments;
 	int ret;
 
-	ret = glue_cap_lookup_request_queue_type(c_cspace,
+	ret = glue_lookup_request_queue(
 			__cptr(fipc_get_reg0(_request)), &q_container);
 
 	if (ret) {
@@ -3733,11 +3765,11 @@ fail_lookup:
 int blk_queue_max_hw_sectors_callee(struct fipc_message *_request)
 {
 	struct request_queue *q = NULL;
-	struct request_queue_container *q_container;
+	struct request_queue_container *q_container = NULL;
 	unsigned int max_hw_sectors;
 	int ret;
 
-	ret = glue_cap_lookup_request_queue_type(c_cspace,
+	ret = glue_lookup_request_queue(
 			__cptr(fipc_get_reg0(_request)), &q_container);
 
 	if (ret) {
@@ -3757,11 +3789,11 @@ fail_lookup:
 int blk_queue_max_discard_sectors_callee(struct fipc_message *_request)
 {
 	struct request_queue *q = NULL;
-	struct request_queue_container *q_container;
+	struct request_queue_container *q_container = NULL;
 	unsigned int max_discard_sectors;
 	int ret;
 
-	ret = glue_cap_lookup_request_queue_type(c_cspace,
+	ret = glue_lookup_request_queue(
 			__cptr(fipc_get_reg0(_request)), &q_container);
 
 	if (ret) {
@@ -3781,11 +3813,11 @@ fail_lookup:
 int blk_queue_chunk_sectors_callee(struct fipc_message *_request)
 {
 	struct request_queue *q = NULL;
-	struct request_queue_container *q_container;
+	struct request_queue_container *q_container = NULL;
 	unsigned int chunk_sectors;
 	int ret;
 
-	ret = glue_cap_lookup_request_queue_type(c_cspace,
+	ret = glue_lookup_request_queue(
 			__cptr(fipc_get_reg0(_request)), &q_container);
 
 	if (ret) {
@@ -3805,10 +3837,10 @@ fail_lookup:
 int blk_mq_unfreeze_queue_callee(struct fipc_message *_request)
 {
 	struct request_queue *q = NULL;
-	struct request_queue_container *q_container;
+	struct request_queue_container *q_container = NULL;
 	int ret;
 
-	ret = glue_cap_lookup_request_queue_type(c_cspace,
+	ret = glue_lookup_request_queue(
 			__cptr(fipc_get_reg0(_request)), &q_container);
 
 	if (ret) {
@@ -3862,10 +3894,10 @@ fail_alloc:
 int blk_mq_kick_requeue_list_callee(struct fipc_message *_request)
 {
 	struct request_queue *q = NULL;
-	struct request_queue_container *q_container;
+	struct request_queue_container *q_container = NULL;
 	int ret;
 
-	ret = glue_cap_lookup_request_queue_type(c_cspace,
+	ret = glue_lookup_request_queue(
 			__cptr(fipc_get_reg0(_request)), &q_container);
 
 	if (ret) {
@@ -3884,10 +3916,10 @@ fail_lookup:
 int blk_mq_freeze_queue_callee(struct fipc_message *_request)
 {
 	struct request_queue *q = NULL;
-	struct request_queue_container *q_container;
+	struct request_queue_container *q_container = NULL;
 	int ret;
 
-	ret = glue_cap_lookup_request_queue_type(c_cspace,
+	ret = glue_lookup_request_queue(
 			__cptr(fipc_get_reg0(_request)), &q_container);
 
 	if (ret) {
@@ -3906,10 +3938,10 @@ fail_lookup:
 int blk_mq_cancel_requeue_work_callee(struct fipc_message *_request)
 {
 	struct request_queue *q = NULL;
-	struct request_queue_container *q_container;
+	struct request_queue_container *q_container = NULL;
 	int ret;
 
-	ret = glue_cap_lookup_request_queue_type(c_cspace,
+	ret = glue_lookup_request_queue(
 			__cptr(fipc_get_reg0(_request)), &q_container);
 
 	if (ret) {
@@ -3933,7 +3965,7 @@ int blk_mq_alloc_request_hctx_callee(struct fipc_message *_request)
 	int ret;
 	struct request_container *func_ret_container = NULL;
 	struct request *func_ret = NULL;
-	struct request_queue_container *q_container;
+	struct request_queue_container *q_container = NULL;
 	struct request_queue *q;
 
 	func_ret_container = kzalloc(sizeof( struct request_container   ),
@@ -3945,7 +3977,7 @@ int blk_mq_alloc_request_hctx_callee(struct fipc_message *_request)
 		goto fail_alloc;
 	}
 
-	ret = glue_cap_lookup_request_queue_type(c_cspace,
+	ret = glue_lookup_request_queue(
 			__cptr(fipc_get_reg0(_request)), &q_container);
 
 	if (ret) {
@@ -3985,11 +4017,11 @@ int blk_mq_alloc_request_callee(struct fipc_message *_request)
 	unsigned int flags;
 	int ret;
 	struct request *rq;
-	struct request_queue_container *q_container;
+	struct request_queue_container *q_container = NULL;
 	struct request_queue *q;
 	struct blk_mq_ops_container *ops_container;
 
-	ret = glue_cap_lookup_request_queue_type(c_cspace,
+	ret = glue_lookup_request_queue(
 			__cptr(fipc_get_reg0(_request)), &q_container);
 
 	if (ret) {
@@ -4021,10 +4053,10 @@ fail_lookup:
 int blk_mq_abort_requeue_list_callee(struct fipc_message *_request)
 {
 	struct request_queue *q = NULL;
-	struct request_queue_container *q_container;
+	struct request_queue_container *q_container = NULL;
 	int ret;
 
-	ret = glue_cap_lookup_request_queue_type(c_cspace,
+	ret = glue_lookup_request_queue(
 			__cptr(fipc_get_reg0(_request)), &q_container);
 
 	if (ret) {
@@ -4044,7 +4076,7 @@ int blk_mq_free_request_callee(struct fipc_message *_request)
 {
 	struct request *rq = NULL;
 	//struct request_container *req_container = NULL;
-	struct request_queue_container *q_container;
+	struct request_queue_container *q_container = NULL;
 	struct request_queue *q;
 	int ret;
 	int tag;
@@ -4061,7 +4093,7 @@ int blk_mq_free_request_callee(struct fipc_message *_request)
 	rq = &req_container->request;
 #endif
 
-	ret = glue_cap_lookup_request_queue_type(c_cspace,
+	ret = glue_lookup_request_queue(
 			__cptr(fipc_get_reg1(_request)), &q_container);
 
 	if (ret) {
@@ -4091,7 +4123,7 @@ int blk_rq_map_kern_callee(struct fipc_message *_request)
 	gva_t p_gva;
 	struct request_queue *q = NULL;
 	struct request *rq = NULL;
-	struct request_queue_container *q_container;
+	struct request_queue_container *q_container = NULL;
 	struct request_container *rq_container = NULL;
 	int ret;
 	int func_ret;
@@ -4099,7 +4131,7 @@ int blk_rq_map_kern_callee(struct fipc_message *_request)
 	unsigned int len;
 	gfp_t gfp_mask;
 
-	ret = glue_cap_lookup_request_queue_type(c_cspace,
+	ret = glue_lookup_request_queue(
 			__cptr(fipc_get_reg0(_request)), &q_container);
 
 	if (ret) {
@@ -4172,13 +4204,13 @@ int blk_execute_rq_callee(struct fipc_message *_request)
 	int at_head = 0;
 	int ret = 0;
 	int func_ret = 0;
-	struct request_queue_container *rq_container;
+	struct request_queue_container *rq_container = NULL;
 	//struct request_container *req_container = NULL;
 	struct gendisk_container *gdisk_container;
 	cptr_t gdisk_cptr;
 	int tag;
 
-	ret = glue_cap_lookup_request_queue_type(c_cspace,
+	ret = glue_lookup_request_queue(
 			__cptr(fipc_get_reg0(_request)), &rq_container);
 
 	if (ret) {

@@ -837,7 +837,7 @@ int nvme_queue_rq(struct blk_mq_hw_ctx *hctx,
 
 	{
 		struct nvme_iod *iod = blk_mq_rq_to_pdu(req);
-		printk("rq %p @tag %d iod->sg %p", req, req->tag, iod->sg);
+		printk("rq %p bio %p @tag %d iod->sg %p", req, req->bio, req->tag, iod->sg);
 	}
 	//LIBLCD_MSG("%s, calling nvme_setup_cmd", __func__);
 

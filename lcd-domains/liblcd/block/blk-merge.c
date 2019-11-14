@@ -57,9 +57,14 @@ static int __blk_bios_map_sg(struct request_queue *q, struct bio *bio,
 	struct bio_vec bvec, bvprv = { NULL };
 	struct bvec_iter iter;
 	int nsegs, cluster;
+	struct bio *_bio = bio;
 
 	nsegs = 0;
 	cluster = blk_queue_cluster(q);
+
+	if (!bio) {
+		printk("%s:%d bio %p", __func__, __LINE__, bio);
+	}
 
 	switch (bio_op(bio)) {
 	case REQ_OP_DISCARD:
@@ -90,6 +95,26 @@ static int __blk_bios_map_sg(struct request_queue *q, struct bio *bio,
 			__blk_segment_map_sg(q, &bvec, sglist, &bvprv, sg,
 					     &nsegs, &cluster);
 
+	/* XXX: nsegs is zero. Something's wrong! */
+	if (!nsegs) {
+		struct bio *bio = _bio;
+		for_each_bio(bio)
+			bio_for_each_segment(bvec, bio, iter)
+				printk("%s, bvec.{bv_page %p offset %d len %d}",
+						__func__, bvec.bv_page, bvec.bv_offset, bvec.bv_len);
+
+
+		bio = _bio;
+
+		if (bio) {
+			printk("%s, bio %p {.bi_io_vec %p .bi_vcnt %d .bi_phys_segments %d .bi_iter %p}",
+					__func__, bio, bio->bi_io_vec, bio->bi_vcnt, bio->bi_phys_segments,
+					&bio->bi_iter);
+		} else {
+			printk("%s bio %p _bio %p", __func__, bio, _bio);
+		}
+	}
+
 	return nsegs;
 }
 
@@ -105,6 +130,7 @@ int blk_rq_map_sg(struct request_queue *q, struct request *rq,
 
 	if (rq->bio) {
 		nsegs = __blk_bios_map_sg(q, rq->bio, sglist, &sg);
+		WARN_ON(!nsegs);
 	} else {
 		printk("%s rq %p rq->bio %p", __func__, rq, rq->bio);
 	}

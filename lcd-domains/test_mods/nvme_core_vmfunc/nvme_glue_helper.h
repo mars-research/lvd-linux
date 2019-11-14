@@ -121,8 +121,10 @@ struct request_container {
 
 struct request_queue_container {
 	struct request_queue request_queue;
+	struct request_queue *rq;
 	struct cptr other_ref;
 	struct cptr my_ref;
+	struct hlist_node hentry;
 };
 
 struct file_container {

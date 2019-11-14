@@ -24,6 +24,7 @@ __blk_segment_map_sg(struct request_queue *q, struct bio_vec *bvec,
 			goto new_segment;
 
 		(*sg)->length += nbytes;
+		printk("%s, no new segment!", __func__);
 	} else {
 new_segment:
 		if (!*sg)
@@ -70,8 +71,10 @@ static int __blk_bios_map_sg(struct request_queue *q, struct bio *bio,
 		 * a payload we need to set up here (thank you Christoph) and
 		 * bi_vcnt is really the only way of telling if we need to.
 		 */
-		if (!bio->bi_vcnt)
+		if (!bio->bi_vcnt) {
+			printk("%s bi_vcnt is zero! return", __func__);
 			return 0;
+		}
 		/* Fall through */
 	case REQ_OP_WRITE_SAME:
 		*sg = sglist;
@@ -100,8 +103,11 @@ int blk_rq_map_sg(struct request_queue *q, struct request *rq,
 	struct scatterlist *sg = NULL;
 	int nsegs = 0;
 
-	if (rq->bio)
+	if (rq->bio) {
 		nsegs = __blk_bios_map_sg(q, rq->bio, sglist, &sg);
+	} else {
+		printk("%s rq %p rq->bio %p", __func__, rq, rq->bio);
+	}
 
 	if (unlikely(rq->cmd_flags & REQ_COPY_USER) &&
 	    (blk_rq_bytes(rq) & q->dma_pad_mask)) {

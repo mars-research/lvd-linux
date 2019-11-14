@@ -16,6 +16,8 @@ int blk_rq_append_bio(struct request *rq, struct bio *bio)
 {
 	if (!rq->bio) {
 		blk_rq_bio_prep(rq->q, rq, bio);
+	} else {
+		printk("%s, rq->bio is %p", __func__, rq->bio);
 	}
 #ifndef LCD_ISOLATE
 	else {

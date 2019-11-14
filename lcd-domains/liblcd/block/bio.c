@@ -410,6 +410,7 @@ int bio_add_pc_page(struct request_queue *q, struct bio *bio, struct page
 		    offset == prev->bv_offset + prev->bv_len) {
 			prev->bv_len += len;
 			bio->bi_iter.bi_size += len;
+			printk("%s adding to existing bio_vec %p", __func__, prev);
 			goto done;
 		}
 
@@ -417,12 +418,17 @@ int bio_add_pc_page(struct request_queue *q, struct bio *bio, struct page
 		 * If the queue doesn't support SG gaps and adding this
 		 * offset would create a gap, disallow it.
 		 */
-		if (bvec_gap_to_prev(q, prev, offset))
+		if (bvec_gap_to_prev(q, prev, offset)) {
+			printk("%s, bvec_gap_to_prev failed", __func__);
 			return 0;
+		}
 	}
 
-	if (bio->bi_vcnt >= bio->bi_max_vecs)
+	if (bio->bi_vcnt >= bio->bi_max_vecs) {
+		printk("%s, bi_vcnt %d bi_max_vecs %d", __func__, bio->bi_vcnt,
+					bio->bi_max_vecs);
 		return 0;
+	}
 
 	/*
 	 * setup the new entry, we might clear it again later if we
@@ -501,6 +507,10 @@ struct bio *bio_map_kern(struct request_queue *q, void *data, unsigned int len,
 	}
 
 	offset = offset_in_page(kaddr);
+	if (!nr_pages) {
+		printk("%s, nr_pages %d", __func__, nr_pages);
+	}
+
 	for (i = 0; i < nr_pages; i++) {
 		unsigned int bytes = PAGE_SIZE - offset;
 
@@ -513,6 +523,7 @@ struct bio *bio_map_kern(struct request_queue *q, void *data, unsigned int len,
 		if (bio_add_pc_page(q, bio, virt_to_page(data), bytes,
 				    offset) < bytes) {
 			/* we don't support partial mappings */
+			printk("%s, bio_add_pc_page failed", __func__);
 			bio_put(bio);
 			return ERR_PTR(-EINVAL);
 		}

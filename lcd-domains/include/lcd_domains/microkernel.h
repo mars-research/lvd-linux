@@ -106,6 +106,9 @@ enum lcd_xmit_status {
 
 struct lcd_stack {
 	long long bitmap;
+	long long lazy_bitmap;
+	spinlock_t lazy_bm_lock;
+	bool lazy_updated;
 	void **stacks;
 };
 

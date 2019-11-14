@@ -16,6 +16,7 @@
 #define VM_FUNCTION	0
 #define NUM_ITERATIONS		10000000
 #define CONFIG_VMFUNC_SWITCH_MICROBENCHMARK 1
+#define REMAP_CR3_ALL_CPUS
 
 /* exported by the microkernel. We trust that it's sane */
 extern void *cpuid_page;
@@ -172,10 +173,33 @@ void pick_stack(int ept)
 		/* mark this bit as taken */
 		this_stack->bitmap &= ~(1LL << bit);
 		current->lcd_stack_bit = bit;
-		current->lcd_stack = (void*) (gva_val(LCD_STACK_GV_ADDR) - bit * LCD_STACK_SIZE + LCD_STACK_SIZE - sizeof(void*));
+		current->lcd_stack = (void*) (gva_val(LCD_STACK_GV_ADDR)
+					- (cpu * (NUM_STACKS_PER_CPU + 1) * LCD_STACK_SIZE)
+					- (bit * LCD_STACK_SIZE)
+					+ LCD_STACK_SIZE - sizeof(void*));
+		/* record on which cpu allocated this stack */
+		current->lcd_stack_cpu = cpu;
 	} else {
 		printk("Ran out of stacks on cpu %d, bitmap:%llx, ffsl ret=%d\n",
 				cpu, this_stack->bitmap, bit);
+	}
+	if (this_stack->lazy_updated) {
+		int bit = ffsll(this_stack->lazy_bitmap);
+		spin_lock(&this_stack->lazy_bm_lock);
+
+		/* process all the lazy bits */
+		do {
+			if (bit && (bit <= NUM_STACKS_PER_CPU)) {
+				/* mark this bit as free in the original bitmap */
+				this_stack->bitmap |= (1LL << bit);
+				/* mark it as zero */
+				this_stack->lazy_bitmap &= ~(1LL << bit);
+			}
+		} while ((bit = ffsll(this_stack->lazy_bitmap)));
+
+		/* update variable to false */
+		this_stack->lazy_updated = false;
+		spin_unlock(&this_stack->lazy_bm_lock);
 	}
 	put_cpu();
 	BUG_ON(!current->lcd_stack);
@@ -184,12 +208,27 @@ void pick_stack(int ept)
 void drop_stack(int ept)
 {
 	struct lcd *lcd = lcd_list[ept];
-	//int cpu = smp_processor_id();
-	struct lcd_stack *this_stack = per_cpu_ptr(lcd->lcd_stacks, get_cpu());
 
-	current->lcd_stack = NULL;
-	this_stack->bitmap |= (1LL << current->lcd_stack_bit);
-	put_cpu();
+	/*
+	 * Perform normal deallocation if we are on the same cpu as the
+	 * allocated one
+	 */
+	if (smp_processor_id() == current->lcd_stack_cpu) {
+		struct lcd_stack *this_stack = per_cpu_ptr(lcd->lcd_stacks, get_cpu());
+
+		current->lcd_stack = NULL;
+		this_stack->bitmap |= (1LL << current->lcd_stack_bit);
+		put_cpu();
+	} else {
+		/*
+		 * perform lazy deallocation
+		 */
+		struct lcd_stack *other_stack = per_cpu_ptr(lcd->lcd_stacks, current->lcd_stack_cpu);
+		spin_lock(&other_stack->lazy_bm_lock);
+		other_stack->lazy_bitmap |= (1LL << current->lcd_stack_bit);
+		other_stack->lazy_updated = true;
+		spin_unlock(&other_stack->lazy_bm_lock);
+	}
 }
 
 int vmfunc_klcd_wrapper(struct fipc_message *msg, unsigned int ept)

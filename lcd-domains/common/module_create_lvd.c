@@ -296,6 +296,7 @@ static int do_grant_map_percpu_stack_pools(struct lcd_create_ctx *ctx, cptr_t lc
 		void **stack_pools = this_stack->stacks;
 		int i;
 		cptr_t c;
+		unsigned long gpa_stack = gpa_val(LCD_STACK_GP_ADDR) - (cpu * (NUM_STACKS_PER_CPU + 1) * LCD_STACK_SIZE);
 
 		/*
 		 * Since, we have percpu EPTs, let's map the pool of stacks on
@@ -303,15 +304,15 @@ static int do_grant_map_percpu_stack_pools(struct lcd_create_ctx *ctx, cptr_t lc
 		 * LCD_STACK_SIZE to NUM_STACKS_PER_CPU * LCD_STACK_SIZE
 		 */
 		for (i = 0; i < NUM_STACKS_PER_CPU; i++) {
-			unsigned long gpa_stack = gpa_val(LCD_STACK_GP_ADDR);
-			gpa_stack -= i * LCD_STACK_SIZE;
+			unsigned long _gpa_stack = gpa_stack - (i * LCD_STACK_SIZE);
 
-			LIBLCD_MSG("mapping stack pages on cpu:%d gpa: %lx hpa: %p",
+			LIBLCD_MSG("mapping stack pages on cpu:%d stack: %d gpa: %lx hpa: %p",
 					cpu,
-					gpa_stack,
+					i,
+					_gpa_stack,
 					stack_pools[i]);
-			ret = do_grant_and_map_for_mem_cpu(lcd, ctx, stack_pools[i],
-					__gpa(gpa_stack), &c, cpu);
+			ret = do_grant_and_map_for_mem(lcd, ctx, stack_pools[i],
+					__gpa(_gpa_stack), &c);
 		}
 	}
 
@@ -1499,6 +1500,9 @@ int create_lvd_stack_pools(struct lcd_create_ctx *ctx, cptr_t lcd)
 
 		this_stack->bitmap = ~0ll;
 		this_stack->stacks = kzalloc(sizeof(void*) * NUM_STACKS_PER_CPU, GFP_KERNEL);
+		this_stack->lazy_bitmap = ~0ll;
+		spin_lock_init(&this_stack->lazy_bm_lock);
+		this_stack->lazy_updated = false;
 
 		for (i = 0; i < NUM_STACKS_PER_CPU; i++) {
 			struct page *p;
@@ -2035,7 +2039,7 @@ int lvd_create_module_lvd(char *mdir, char *mname, cptr_t *lcd_out,
 		int i;
 
 		printk("%s, sechdrs %p | index.sym %x | info %p | info->hdr %p | klp_info->hdr.e_shnum %x\n", __func__,
-				info->sechdrs, info->index.sym, info, info->hdr, mod->klp_info->hdr.e_shnum); 
+				info->sechdrs, info->index.sym, info, info->hdr, mod->klp_info->hdr.e_shnum);
 
 		is_null |= CHECK_NULL(offsetof(struct load_info, hdr), info->hdr);
 		if (!is_null)

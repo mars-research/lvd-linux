@@ -11,7 +11,6 @@
 #include <linux/blkdev.h>
 #include <linux/blk-mq.h>
 #include "nvme.h"
-#include "iod.h"
 
 struct bio_container {
 	struct bio bio;

@@ -16,6 +16,7 @@
 #include <linux/aer.h>
 #include <lcd_domains/microkernel.h>
 #include <linux/nvme_ioctl.h>
+#include <asm/lcd_domains/ept_lcd.h>
 
 #include <lcd_config/post_hook.h>
 
@@ -723,6 +724,8 @@ int del_gendisk_callee(struct fipc_message *request)
 
 	del_gendisk(disk);
 
+	fipc_set_reg0(request, disk->flags);
+
 fail_lookup:
 	return ret;
 }
@@ -791,6 +794,7 @@ int _queue_rq_fn(struct blk_mq_hw_ctx *ctx, const struct blk_mq_queue_data *bd,
         struct blk_mq_hw_ctx_container *ctx_container;
 	void *lcd_buf[MAX_RQ_BUFS] = {0};
 	struct ext_registers *this_reg_page = get_register_page(smp_processor_id());
+	static int once = 0;
 
 	INIT_FIPC_MSG(request);
         /*XXX Beware!! hwctx can be unique per hw context of the driver, if multiple
@@ -814,6 +818,18 @@ int _queue_rq_fn(struct blk_mq_hw_ctx *ctx, const struct blk_mq_queue_data *bd,
 	if (blk_rq_bytes(bd->rq)) {
 		printk("%s rq has %d bytes\n", __func__, blk_rq_bytes(bd->rq));
 		//dump_stack();
+	}
+
+	if (!once && blk_rq_bytes(bd->rq) > 4096)
+	{
+		struct bio_vec bvec;
+		struct req_iterator iter;
+
+		rq_for_each_segment(bvec, bd->rq, iter)
+			printk("bvec: %p bv_page %p bv_offset %d\n",
+				&bvec, bvec.bv_page, bvec.bv_offset);
+
+		once = 1;
 	}
 
 	if (blk_rq_bytes(bd->rq)) {
@@ -1445,6 +1461,7 @@ int blk_mq_alloc_tag_set_callee(struct fipc_message *request)
 	set_container->tag_set.cmd_size = fipc_get_reg5(request);
 	set_container->tag_set.flags = fipc_get_reg6(request);
 
+	printk("%s, cmd_size %u\n", __func__, set_container->tag_set.cmd_size);
 	/* call the real function */
 	func_ret = blk_mq_alloc_tag_set((&set_container->tag_set));
 	LIBLCD_MSG("block_alloc_tag set returns %d",func_ret);
@@ -1970,6 +1987,7 @@ int device_add_disk_callee(struct fipc_message *request)
 	}
 #endif
 	fipc_set_reg0(request, blo_container->my_ref.cptr);
+	fipc_set_reg1(request, disk->flags);
 
 	return ret;
 

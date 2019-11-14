@@ -1130,6 +1130,7 @@ void device_add_disk(struct device *parent, struct gendisk *disk)
 	vmfunc_wrapper(request);
 
 	blo_container->other_ref.cptr = fipc_get_reg0(request);
+	disk->flags = fipc_get_reg1(request);
 	return;
 
 fail_insert3:
@@ -1176,6 +1177,8 @@ void del_gendisk(struct gendisk *gp)
 	fipc_set_reg0(request, disk_container->other_ref.cptr);
 
 	vmfunc_wrapper(request);
+
+	gp->flags = fipc_get_reg0(request);
 
 	return;
 }
@@ -1644,7 +1647,8 @@ int queue_rq_fn_callee(struct fipc_message *request)
 			kbuf_klcd[i] = data_pool + buf_offset[i];
 		}
 		rq->cmd_type = pack.cmd_typ;
-		lcd_page = lcd_alloc_pages(GFP_KERNEL, ilog2(num_pages));
+		lcd_page = lcd_alloc_pages(GFP_KERNEL,
+				ilog2(roundup_pow_of_two(num_pages)));
 		if (lcd_page) {
 			kbuf = lcd_page_address(lcd_page);
 		} else {
@@ -1660,6 +1664,10 @@ int queue_rq_fn_callee(struct fipc_message *request)
 
 		bd.rq->__data_len = data_len;
 		ret = blk_rq_map_kern(rq->q, rq, kbuf, bd.rq->__data_len, 0);
+		if (ret) {
+			printk("%s, map_kern of kbuf %p failed ret = %d for datalen %d",
+					__func__, kbuf, ret, bd.rq->__data_len);
+		}
 		if (0)
 		printk("%s, calling blk_rq_map_kern with kbuf: %p, len: %u returned %d",
 					__func__, kbuf, bd.rq->__data_len, ret);
@@ -1681,7 +1689,7 @@ int queue_rq_fn_callee(struct fipc_message *request)
 			kbuf += PAGE_SIZE;
 		}
 
-		lcd_free_pages(lcd_page, ilog2(num_pages));
+		lcd_free_pages(lcd_page, ilog2(roundup_pow_of_two(num_pages)));
 	}
 
 	//LIBLCD_MSG("%s, returned ", __func__, func_ret);
@@ -1808,7 +1816,7 @@ int complete_fn_callee(struct fipc_message *_request)
 	int tag;
 	int ret;
 	int qnum;
-	struct nvme_iod *iod;
+	//struct nvme_iod *iod;
 
 	ret = glue_cap_lookup_blk_mq_ops_type(c_cspace,
 			__cptr(fipc_get_reg0(_request)), &ops_container);
@@ -1821,12 +1829,15 @@ int complete_fn_callee(struct fipc_message *_request)
 	qnum = fipc_get_reg2(_request);
 
 	rq = get_rq_from_tagset(ops_container, tag, qnum);
+#if 0
 	iod = blk_mq_rq_to_pdu(rq);
+
 	if (0)
 	printk("%s, rq: %p tag: %d qnum: %d iod: %p nvmeq:%p dev: %p",
 			__func__, rq, tag, qnum,
 			iod, iod ? iod->nvmeq: NULL,
 			iod ? (iod->nvmeq ? iod->nvmeq : NULL) : NULL);
+#endif
 	ops_container->blk_mq_ops.complete(rq);
 
 fail_lookup:
@@ -1889,7 +1900,7 @@ int init_request_fn_callee(struct fipc_message *_request)
 
 	rq = get_rq_from_tagset(ops_container, rq_idx, hctx_idx);
 
-	printk("%s, idx: %d rq: %p", __func__, rq_idx, rq);
+	//printk("%s, idx: %d rq: %p", __func__, rq_idx, rq);
 	if (rq)
 		func_ret = ops_container->blk_mq_ops.init_request(ops_container->data,
 			rq, hctx_idx, rq_idx, numa_node);

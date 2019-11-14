@@ -65,6 +65,8 @@
  */
 #define NVME_AQ_BLKMQ_DEPTH	(NVME_AQ_DEPTH - NVME_NR_AERS)
 
+//#define CONFIG_NO_DMA_POOL
+
 static int use_threaded_interrupts;
 #ifndef LCD_ISOLATE
 module_param(use_threaded_interrupts, int, 0);
@@ -175,8 +177,6 @@ struct nvme_queue {
 	u8 cqe_seen;
 };
 
-#ifndef NVME_IOD
-#define NVME_IOD
 /*
  * The nvme_iod describes the data in an I/O, including the list of PRP
  * entries.  You can't see it in this data structure because C doesn't let
@@ -194,7 +194,6 @@ struct nvme_iod {
 	struct scatterlist *sg;
 	struct scatterlist inline_sg[0];
 };
-#endif
 
 /*
  * Check we didin't inadvertently grow the command struct
@@ -218,7 +217,7 @@ static inline void _nvme_check_size(void)
 /*
  * Max size of iod being embedded in the request payload
  */
-#define NVME_INT_PAGES		2
+#define NVME_INT_PAGES		32
 #define NVME_INT_BYTES(dev)	(NVME_INT_PAGES * (dev)->ctrl.page_size)
 
 /*
@@ -354,7 +353,7 @@ static int nvme_init_iod(struct request *rq, unsigned size,
 	int nseg = rq->nr_phys_segments;
 
 	if (nseg > NVME_INT_PAGES || size > NVME_INT_BYTES(dev)) {
-		iod->sg = kmalloc(nvme_iod_alloc_size(dev, size, nseg), GFP_ATOMIC);
+		iod->sg = kzalloc(nvme_iod_alloc_size(dev, size, nseg), GFP_ATOMIC);
 		if (!iod->sg)
 			return BLK_MQ_RQ_QUEUE_BUSY;
 	} else {
@@ -373,6 +372,23 @@ static int nvme_init_iod(struct request *rq, unsigned size,
 	return 0;
 }
 
+void dump_request(struct request *req);
+void dump_iod_list(struct request *req, struct nvme_iod *iod)
+{
+	__le64 **list = iod_list(req);
+	int i;
+	int npages = iod->npages;
+
+	dump_request(req);
+	if (npages == 0) {
+		printk("%s, list[0] %p", __func__, list[0]);
+	} else {
+		for (i = 0; i < npages; i++) {
+			printk("%s, list[%d] %p", __func__, i, list[i]);
+		}
+	}
+}
+
 static void nvme_free_iod(struct nvme_dev *dev, struct request *req)
 {
 	struct nvme_iod *iod = blk_mq_rq_to_pdu(req);
@@ -388,10 +404,18 @@ static void nvme_free_iod(struct nvme_dev *dev, struct request *req)
 
 	if (iod->npages == 0) {
 #ifdef CONFIG_NO_DMA_POOL
-		alloc_sz = 256 * 2;
+		alloc_sz = 256 * 1;
 		dma_free_coherent(dev->dev, alloc_sz, list[0], prp_dma);
 #else
-		dma_pool_free(dev->prp_small_pool, list[0], prp_dma);
+		if (list[0]) {
+			dma_pool_free(dev->prp_small_pool, list[0], prp_dma);
+		} else {
+			dump_iod_list(req, iod);
+			printk("%s req: %p req->tag: %d nr_segs: %d datalen %d list[0] null prp_dma: %llx",
+					__func__, req, req->tag,
+					req->nr_phys_segments, blk_rq_bytes(req),
+					prp_dma);
+		}
 #endif
 	}
 	for (i = 0; i < iod->npages; i++) {
@@ -401,13 +425,27 @@ static void nvme_free_iod(struct nvme_dev *dev, struct request *req)
 		alloc_sz = PAGE_SIZE * 2;
 		dma_free_coherent(dev->dev, alloc_sz, list[0], prp_dma);
 #else
-		dma_pool_free(dev->prp_page_pool, prp_list, prp_dma);
+		if (prp_list) {
+			dma_pool_free(dev->prp_page_pool, prp_list, prp_dma);
+		} else {
+			printk("%s prp_list null prp_dma: %llx", __func__, prp_dma);
+			dump_iod_list(req, iod);
+		}
+
 #endif
 		prp_dma = next_prp_dma;
 	}
 
-	if (iod->sg != iod->inline_sg)
+	if (iod->sg != iod->inline_sg) {
+		printk("freeing %p", iod->sg);
+#if 0
+		if (iod->hwbp) {
+			_unregister_wide_hw_breakpoint((struct perf_event*) iod->hwbp);
+			iod->hwbp = NULL;
+		}
+#endif
 		kfree(iod->sg);
+	}
 }
 
 #ifdef CONFIG_BLK_DEV_INTEGRITY
@@ -477,6 +515,7 @@ static void nvme_dif_complete(u32 p, u32 v, struct t10_pi_tuple *pi)
 }
 #endif
 
+char buffers[40][512];
 static bool nvme_setup_prps(struct nvme_dev *dev, struct request *req,
 		int total_len)
 {
@@ -492,13 +531,31 @@ static bool nvme_setup_prps(struct nvme_dev *dev, struct request *req,
 	__le64 **list = iod_list(req);
 	dma_addr_t prp_dma;
 	int nprps, i;
+	bool debug = true;
+	int j = 0;
 #ifdef LCD_ISOLATE
 	size_t alloc_sz;
 #endif
 
+	if (total_len == 28672)
+		debug = false;
+
+	if (debug) {
+		sprintf(buffers[j++], "%s, sg: %p dma_addr: %llx len: %d page_size: %d offset: %d"
+				" len -= (page_size - off) %d", __func__,
+				sg, dma_addr, length, page_size, offset,
+				length - (page_size - offset));
+	}
 	length -= (page_size - offset);
 	if (length <= 0)
 		return true;
+
+	if (debug) {
+		sprintf(buffers[j++], "%s, dma_len: %d page_size: %d offset: %d"
+				" dma_len -= (page_sz - off) %d", __func__,
+				dma_len, page_size, offset,
+				dma_len - (page_size - offset));
+	}
 
 	dma_len -= (page_size - offset);
 	if (dma_len) {
@@ -507,6 +564,11 @@ static bool nvme_setup_prps(struct nvme_dev *dev, struct request *req,
 		sg = sg_next(sg);
 		dma_addr = sg_dma_address(sg);
 		dma_len = sg_dma_len(sg);
+
+		if (debug) {
+			sprintf(buffers[j++],"%s, sg: %p dma_addr: %llx dma_len: %d", __func__,
+					sg, dma_addr, dma_len);
+		}
 	}
 
 	if (length <= page_size) {
@@ -517,13 +579,13 @@ static bool nvme_setup_prps(struct nvme_dev *dev, struct request *req,
 	nprps = DIV_ROUND_UP(length, page_size);
 	if (nprps <= (256 / 8)) {
 #ifdef LCD_ISOLATE
-		alloc_sz = 256 * 2;
+		alloc_sz = 256 * 1;
 #endif
 		pool = dev->prp_small_pool;
 		iod->npages = 0;
 	} else {
 #ifdef CONFIG_NO_DMA_POOL
-		alloc_sz = PAGE_SIZE * 2;
+		alloc_sz = PAGE_SIZE * 1;
 #endif
 		pool = dev->prp_page_pool;
 		iod->npages = 1;
@@ -533,6 +595,11 @@ static bool nvme_setup_prps(struct nvme_dev *dev, struct request *req,
 #else
 	prp_list = dma_pool_alloc(pool, GFP_ATOMIC, &prp_dma);
 #endif
+
+	if (debug) {
+		sprintf(buffers[j++], "%s, alloc_sz: %lu prp_dma: %llx prp_list: %p", __func__,
+				alloc_sz, prp_dma, prp_list);
+	}
 
 	if (!prp_list) {
 		iod->first_dma = dma_addr;
@@ -546,11 +613,21 @@ static bool nvme_setup_prps(struct nvme_dev *dev, struct request *req,
 		if (i == page_size >> 3) {
 			__le64 *old_prp_list = prp_list;
 #ifdef CONFIG_NO_DMA_POOL
-			prp_list = dma_alloc_coherent(dev->dev, PAGE_SIZE +
-					PAGE_SIZE, &prp_dma, GFP_KERNEL);
+			prp_list = dma_alloc_coherent(dev->dev, PAGE_SIZE,
+					&prp_dma, GFP_KERNEL);
 #else
 			prp_list = dma_pool_alloc(pool, GFP_ATOMIC, &prp_dma);
 #endif
+
+			if (debug) {
+				if (j >= 39)
+					j = 0;
+			sprintf(buffers[j++], "%s, i: %d alloc: 4096 prp_dma: %llx prp_list: %p"
+					" iod->pages %d",
+						__func__, i,
+						prp_dma, prp_list,
+						iod->npages);
+			}
 			if (!prp_list)
 				return false;
 			list[iod->npages++] = prp_list;
@@ -562,17 +639,80 @@ static bool nvme_setup_prps(struct nvme_dev *dev, struct request *req,
 		dma_len -= page_size;
 		dma_addr += page_size;
 		length -= page_size;
+		if (debug) {
+			if (j >= 39)
+				j = 0;
+			sprintf(buffers[j++], "%s, i: %d dma_len: %d dma_addr: %llx length: %d",
+						__func__, i,
+						dma_len, dma_addr,
+						length);
+		}
 		if (length <= 0)
 			break;
 		if (dma_len > 0)
 			continue;
-		BUG_ON(dma_len < 0);
+		if (dma_len < 0) {
+			int k = 0;
+			dump_stack();
+			for (k = 0; k < j; k++) {
+				printk(buffers[k]);
+			}
+			printk("%s dma_len %d total_len %d req_len %d",
+					__func__, dma_len,
+					total_len, blk_rq_bytes(req));
+			dump_request(req);
+			BUG_ON(dma_len < 0);
+		}
 		sg = sg_next(sg);
 		dma_addr = sg_dma_address(sg);
 		dma_len = sg_dma_len(sg);
+
+		if (debug) {
+			if (j >= 39)
+				j = 0;
+			sprintf(buffers[j++], "%s, sg: %p dma_addr: %llx dma_len: %d",
+					__func__, sg, dma_addr, dma_len);
+		}
 	}
 
 	return true;
+}
+
+void dump_request(struct request *req)
+{
+	struct nvme_iod *iod = blk_mq_rq_to_pdu(req);
+	printk("%s, req %p, q: %p nr_segs: %d rq_bytes %d bio %p",
+			__func__, req, req->q,
+			req->nr_phys_segments,
+			blk_rq_bytes(req), req->bio);
+
+	printk("iod: %p iod->sg %p iod->nents %d",
+			iod, iod ? iod->sg : NULL,
+			iod ? iod->nents : -1);
+
+	{
+		struct bio_vec bvec;
+		struct req_iterator iter;
+
+		rq_for_each_segment(bvec, req, iter)
+			printk("bvec: bv_page %p bv_offset %d",
+					lcd_page_address(bvec.bv_page), bvec.bv_offset);
+	}
+
+	{
+		struct scatterlist *s;
+		int i;
+		for_each_sg(iod->sg, s, iod->nents, i) {
+			//printk("sg: %p sg_magic: %lx sg_page(s): %p dma addr %llx len %d",
+			printk("sg: %p sg_page(s): %p dma addr %llx len %d",
+					s,
+					//s->sg_magic,
+					sg_page(s),
+					sg_dma_address(s),
+					sg_dma_len(s));
+
+		}
+	}
 }
 
 static int nvme_map_data(struct nvme_dev *dev, struct request *req,
@@ -583,11 +723,14 @@ static int nvme_map_data(struct nvme_dev *dev, struct request *req,
 	enum dma_data_direction dma_dir = rq_data_dir(req) ?
 			DMA_TO_DEVICE : DMA_FROM_DEVICE;
 	int ret = BLK_MQ_RQ_QUEUE_ERROR;
+	static int once = 0;
 
 	sg_init_table(iod->sg, req->nr_phys_segments);
 	iod->nents = blk_rq_map_sg(q, req, iod->sg);
 	if (!iod->nents) {
-		printk("%s, failed blk_rq_map_sg", __func__);
+		printk("%s, failed blk_rq_map_sg iod->nents %d rq: %p iod: %p",
+				__func__, iod->nents, req, iod);
+		dump_request(req);
 		goto out;
 	}
 
@@ -600,6 +743,11 @@ static int nvme_map_data(struct nvme_dev *dev, struct request *req,
 	if (!nvme_setup_prps(dev, req, size)) {
 		printk("%s, failed nvme_setup_prps", __func__);
 		goto out_unmap;
+	}
+
+	if (!once && blk_rq_bytes(req) > 4096) {
+		dump_request(req);
+		once = 1;
 	}
 
 	ret = BLK_MQ_RQ_QUEUE_ERROR;
@@ -625,6 +773,7 @@ static int nvme_map_data(struct nvme_dev *dev, struct request *req,
 	return BLK_MQ_RQ_QUEUE_OK;
 
 out_unmap:
+	printk("%s, failed", __func__);
 	dma_unmap_sg(dev->dev, iod->sg, iod->nents, dma_dir);
 out:
 	return ret;
@@ -681,22 +830,33 @@ int nvme_queue_rq(struct blk_mq_hw_ctx *hctx,
 	//LIBLCD_MSG("%s, calling nvme_init_iod", __func__);
 
 	ret = nvme_init_iod(req, map_len, dev);
-	if (ret)
+	if (ret) {
+		printk("%s, nvme_init_iod failed", __func__);
 		return ret;
+	}
 
+	{
+		struct nvme_iod *iod = blk_mq_rq_to_pdu(req);
+		printk("rq %p @tag %d iod->sg %p", req, req->tag, iod->sg);
+	}
 	//LIBLCD_MSG("%s, calling nvme_setup_cmd", __func__);
 
 	ret = nvme_setup_cmd(ns, req, &cmnd);
-	if (ret)
+	if (ret) {
+		printk("%s, nvme_setup_cmd failed", __func__);
 		goto out;
+	}
+
 
 	if (req->nr_phys_segments) {
 		//LIBLCD_MSG("%s, calling nvme_map_data", __func__);
 		ret = nvme_map_data(dev, req, map_len, &cmnd);
 	}
 
-	if (ret)
+	if (ret) {
+		printk("%s, nvme_map_data failed", __func__);
 		goto out;
+	}
 
 	cmnd.common.command_id = req->tag;
 	if (0)
@@ -714,6 +874,7 @@ int nvme_queue_rq(struct blk_mq_hw_ctx *hctx,
 		else
 			ret = BLK_MQ_RQ_QUEUE_ERROR;
 		spin_unlock_irq(&nvmeq->q_lock);
+		printk("%s, nvmeq->cq_vector < 0", __func__);
 		goto out;
 	}
 
@@ -726,6 +887,7 @@ int nvme_queue_rq(struct blk_mq_hw_ctx *hctx,
 	spin_unlock_irq(&nvmeq->q_lock);
 	return BLK_MQ_RQ_QUEUE_OK;
 out:
+	printk("%s freeing iod for req: %p", __func__, req);
 	nvme_free_iod(dev, req);
 	return ret;
 }
@@ -1442,6 +1604,7 @@ static int nvme_configure_admin_queue(struct nvme_dev *dev)
 	lo_hi_writeq(nvmeq->sq_dma_addr, dev->bar + NVME_REG_ASQ);
 	lo_hi_writeq(nvmeq->cq_dma_addr, dev->bar + NVME_REG_ACQ);
 
+	printk("%s ====> calling nvme_enable_ctrl", __func__);
 	result = nvme_enable_ctrl(&dev->ctrl, cap);
 	if (result)
 		goto free_nvmeq;

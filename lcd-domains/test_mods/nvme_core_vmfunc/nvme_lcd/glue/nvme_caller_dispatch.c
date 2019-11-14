@@ -70,7 +70,7 @@ int handle_rpc_calls(struct fipc_message *message)
 			return bd_release_callee(message);
 
 		case BD_IOCTL_FN:
-			trace(BD_IOCTL_FN);
+			//trace(BD_IOCTL_FN);
 			return bd_ioctl_callee(message);
 
 		case BD_GETGEO_FN:

@@ -841,17 +841,17 @@ static int nvme_ioctl(struct block_device *bdev, fmode_t mode,
 
 	switch (cmd) {
 	case NVME_IOCTL_ID:
-		printk("%s, NVME_IOCTL_ID", __func__);
+		//printk("%s, NVME_IOCTL_ID", __func__);
 		force_successful_syscall_return();
 		return ns->ns_id;
 	case NVME_IOCTL_ADMIN_CMD:
-		printk("%s, NVME_ADMIN_CMD", __func__);
+		//printk("%s, NVME_ADMIN_CMD", __func__);
 		return nvme_user_cmd(ns->ctrl, NULL, (void __user *)arg);
 	case NVME_IOCTL_IO_CMD:
-		printk("%s, NVME_IO_CMD", __func__);
+		//printk("%s, NVME_IO_CMD", __func__);
 		return nvme_user_cmd(ns->ctrl, ns, (void __user *)arg);
 	case NVME_IOCTL_SUBMIT_IO:
-		printk("%s, NVME_SUBMIT_IO", __func__);
+		//printk("%s, NVME_SUBMIT_IO", __func__);
 		return nvme_submit_io(ns, (void __user *)arg);
 #ifdef CONFIG_BLK_DEV_NVME_SCSI
 	case SG_GET_VERSION_NUM:
@@ -862,7 +862,7 @@ static int nvme_ioctl(struct block_device *bdev, fmode_t mode,
 		return nvme_sg_io(ns, (void __user *)arg);
 #endif
 	default:
-		printk("%s, NONE: %d", __func__, cmd);
+		//printk("%s, NONE: %d", __func__, cmd);
 		return -ENOTTY;
 	}
 }
@@ -1166,7 +1166,8 @@ static int nvme_wait_ready(struct nvme_ctrl *ctrl, u64 cap, bool enabled)
 		msleep(100);
 
 #ifdef LCD_ISOLATE
-		if (times++ == 30) {
+		if (times++ == 60) {
+			printk("%s tried 60 times", __func__);
 			return -ENODEV;
 		}
 #else
@@ -1239,8 +1240,10 @@ int nvme_enable_ctrl(struct nvme_ctrl *ctrl, u64 cap)
 	ctrl->ctrl_config |= NVME_CC_ENABLE;
 
 	ret = ctrl->ops->reg_write32(ctrl, NVME_REG_CC, ctrl->ctrl_config);
-	if (ret)
+	if (ret) {
+		printk("%s, reg_write32 failed ret = %d", __func__, ret);
 		return ret;
+	}
 	return nvme_wait_ready(ctrl, cap, true);
 }
 EXPORT_SYMBOL_GPL(nvme_enable_ctrl);

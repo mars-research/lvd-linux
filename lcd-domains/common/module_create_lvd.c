@@ -1055,7 +1055,7 @@ static int setup_phys_addr_space(cptr_t lcd, struct lcd_create_ctx *ctx,
 	 * Map and grant bootstrap pages, page tables, and stack
 	 */
 	c = &(lcd_to_boot_info(ctx)->lcd_boot_cptrs.boot_pages);
-	LIBLCD_MSG("mapping bootstrap pages gpa: %lx hpa: %p",
+	LIBLCD_MSG("mapping bootstrap pages gpa: %lx hva: %p",
 			gpa_val(LCD_BOOTSTRAP_PAGES_GP_ADDR), ctx->lcd_boot_info);
 	ret = do_grant_and_map_for_mem(lcd, ctx, ctx->lcd_boot_info,
 				LCD_BOOTSTRAP_PAGES_GP_ADDR,
@@ -1065,7 +1065,7 @@ static int setup_phys_addr_space(cptr_t lcd, struct lcd_create_ctx *ctx,
 
 	/* in vmfunc LCDS, there are no additional guest page tables for LCDs */
 	c = &(lcd_to_boot_info(ctx)->lcd_boot_cptrs.gv);
-	LIBLCD_MSG("mapping bootstrap pgtable pages gpa: %lx hpa: %p",
+	LIBLCD_MSG("mapping bootstrap pgtable pages gpa: %lx hva: %p",
 			gpa_val(LCD_BOOTSTRAP_PAGE_TABLES_GP_ADDR), ctx->gv_pg_tables);
 	ret = do_grant_and_map_for_mem(lcd, ctx, ctx->gv_pg_tables,
 				LCD_BOOTSTRAP_PAGE_TABLES_GP_ADDR, c);
@@ -1076,7 +1076,7 @@ static int setup_phys_addr_space(cptr_t lcd, struct lcd_create_ctx *ctx,
 	do_grant_map_percpu_stack_pools(ctx, lcd);
 #else
 	c = &(lcd_to_boot_info(ctx)->lcd_boot_cptrs.stack);
-	LIBLCD_MSG("mapping stack pages gpa: %lx hpa: %p",
+	LIBLCD_MSG("mapping stack pages gpa: %lx hva: %p",
 			gpa_val(LCD_STACK_GP_ADDR), ctx->stack);
 	ret = do_grant_and_map_for_mem(lcd, ctx, ctx->stack,
 				LCD_STACK_GP_ADDR,
@@ -1136,6 +1136,7 @@ static void setup_lcd_pmd(struct lcd_mem_region *reg, pmd_t *pmd,
 {
 	unsigned int k;
 	unsigned long gp;
+	unsigned long flags = 0;
 
 	for (k = 0; k < 512; k++) {
 		/*
@@ -1147,10 +1148,29 @@ static void setup_lcd_pmd(struct lcd_mem_region *reg, pmd_t *pmd,
 		 */
 		gp = LCD_PHYS_BASE + gigabyte_idx * (1UL << 30) +
 			k * (1UL << 21);
+
+		/* if the region is MISC region */
+		if (reg->offset == LCD_MISC_REGION_OFFSET) {
+			/*
+			 * Make the 2nd 2MB page read only. These are the
+			 * pagetable pages
+			 */
+			if (k == 2) {
+				flags = _PAGE_PRESENT;
+			} else {
+				flags = reg->flags;
+			}
+			verbose = 1;
+		} else {
+			flags = reg->flags;
+			verbose = 0;
+		}
+
 		if (verbose)
 			printk("%s, k:%d, gbyte_idx: %x, gp: %lx at pmd[%d]: %p\n",\
 					__func__, k, gigabyte_idx, gp, k, &pmd[k]);
-		set_pmd(&pmd[k], __pmd(gp | reg->flags | _PAGE_PSE));
+
+		set_pmd(&pmd[k], __pmd(gp | flags | _PAGE_PSE));
 	}
 }
 

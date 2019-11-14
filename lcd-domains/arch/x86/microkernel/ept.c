@@ -231,7 +231,7 @@ static void vmx_epte_set(lcd_arch_epte_t *epte, gpa_t ga, hpa_t a, int level)
 							LCD_IOREMAP_REGION_SIZE)))) {
 			*epte |= VMX_EPTE_MT_UC << VMX_EPT_MT_EPTE_SHIFT;
 			*epte |= VMX_EPT_IPAT_BIT;
-			printk("%s, set (epte:%lx) UC to gpa:%lx hpa: %lx\n", __func__, *epte, gpa_val(ga), hpa_val(a));
+			printk("%s, IOREMAP pages set (epte:%lx) UC to gpa:%lx hpa: %lx\n", __func__, *epte, gpa_val(ga), hpa_val(a));
 		} else {
 			*epte |= VMX_EPTE_MT_WB << VMX_EPT_MT_EPTE_SHIFT;
 			*epte &= ~VMX_EPT_IPAT_BIT;

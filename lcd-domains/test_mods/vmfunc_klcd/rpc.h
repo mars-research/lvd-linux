@@ -10,6 +10,9 @@
 
 #include <libfipc.h>
 
+#include <linux/perf_event.h>
+#include <linux/hw_breakpoint.h>
+
 enum fn_type {
 	MODULE_INIT,
 	NULL_INVOCATION, 
@@ -17,6 +20,8 @@ enum fn_type {
 	FOO,
 	BAR,
 	MARSHAL_ONE,
+	REGISTER_WIDE_HW_BREAKPOINT,
+	UNREGISTER_WIDE_HW_BREAKPOINT,
 };
 int callee(struct fipc_message *);
 #define TRANSACTIONS 1000000

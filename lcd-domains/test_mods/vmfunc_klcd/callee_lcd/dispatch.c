@@ -8,6 +8,8 @@
 #include <asm/desc.h>
 #include <asm/irq_vectors.h>
 #include <asm/lcd_domains/bflank.h>
+#include <linux/slab.h>
+
 #include <lcd_config/post_hook.h>
 
 extern int callee_main(void);
@@ -15,6 +17,13 @@ extern int callee_main(void);
 #define NUM_IST_STACKS	7
 //#define CONFIG_DUMP_IRQ_REGS 1
 #define PGROUNDUP(sz)  (((sz)+PAGE_SIZE-1) & ~(PAGE_SIZE-1))
+
+#define ALLOC_SZ	152
+
+//#define TRIGGER_BREAKPOINT
+
+void *hw_addr;
+struct perf_event *hwbp;
 
 unsigned long noinline
 null_invocation(struct fipc_message *msg)
@@ -28,6 +37,10 @@ null_invocation(struct fipc_message *msg)
 
 		printk("%s, called, rsp %p", __func__, rsp_ptr);
 	}
+#ifdef TRIGGER_BREAKPOINT
+	if (hw_addr)
+		*((unsigned int*)hw_addr) = 0xdead;
+#endif
 	return 0;
 }
 
@@ -214,17 +227,72 @@ foo(struct fipc_message *msg)
 	return 0;
 }
 
+struct perf_event *_register_wide_hw_breakpoint(struct perf_event_attr *attr,
+			    perf_overflow_handler_t triggered,
+			    void *context)
+{
+	int ret;
+	struct perf_event *func_ret;
+	struct fipc_message r;
+	struct fipc_message *_request = &r;
+
+	r.vmfunc_id = VMFUNC_RPC_CALL;
+	r.rpc_id = REGISTER_WIDE_HW_BREAKPOINT;
+
+	fipc_set_reg1(_request, attr->bp_len);
+	fipc_set_reg2(_request, attr->bp_type);
+	fipc_set_reg3(_request, attr->bp_addr);
+
+	ret = vmfunc_wrapper(_request);
+	func_ret = (struct perf_event *) fipc_get_reg0(_request);
+
+	return func_ret;
+}
+
+void _unregister_wide_hw_breakpoint(struct perf_event *hwbp)
+{
+	struct fipc_message r;
+	struct fipc_message *_request = &r;
+
+	r.vmfunc_id = VMFUNC_RPC_CALL;
+	r.rpc_id = UNREGISTER_WIDE_HW_BREAKPOINT;
+
+	fipc_set_reg0(_request, (unsigned long)hwbp);
+
+	vmfunc_wrapper(_request);
+}
+
+void create_hwbp(void)
+{
+	hw_addr = (void*) kmalloc(ALLOC_SZ, GFP_KERNEL);
+
+	if (hw_addr) {
+		struct perf_event_attr attr;
+		attr.bp_addr = (unsigned long) hw_addr;
+		attr.bp_len = HW_BREAKPOINT_LEN_8;
+		attr.bp_type = HW_BREAKPOINT_W;
+
+		hwbp = _register_wide_hw_breakpoint(&attr, NULL, NULL);
+
+		//*((unsigned int*)hw_addr) = 0xdeadbeef;
+	}
+
+}
+
 int handle_rpc_calls(struct fipc_message *msg)
 {
 	switch(msg->rpc_id) {
 	case MODULE_INIT:
 		callee_main();
+		create_hwbp();
 		break;
 	case NULL_INVOCATION:
 		null_invocation(msg);
 		break;
 	case MARSHAL_ONE:
 		marshal_one(msg);
+		if (hwbp)
+			_unregister_wide_hw_breakpoint(hwbp);
 		break;
 	case FOO:
 		foo(msg);

@@ -4,6 +4,7 @@
 #include "../rdtsc_helper.h"
 #include "../rpc.h"
 #include <linux/module.h>
+#include <linux/kthread.h>
 
 #include <lcd_config/post_hook.h>
 
@@ -26,6 +27,55 @@ bar(struct fipc_message *msg)
 			fipc_get_reg5(msg),
 			fipc_get_reg6(msg));
 	fipc_set_reg1(msg, 0x100);
+	schedule();
+	kthread_bind(current, 4);
+	return 0;
+}
+
+static void hwbp_handler(struct perf_event *bp,
+             struct perf_sample_data *data,
+             struct pt_regs *regs)
+{
+	dump_stack();
+	printk(KERN_INFO "Dump stack from sample_hbp_handler\n");
+}
+
+int register_wide_hw_breakpoint_callee(struct fipc_message *request)
+{
+	struct perf_event * __percpu *sample_hbp;
+	struct perf_event_attr attr;
+	int ret = 0;
+
+	hw_breakpoint_init(&attr);
+
+	attr.bp_addr = fipc_get_reg3(request);
+	attr.bp_len = fipc_get_reg1(request);
+	attr.bp_type = fipc_get_reg2(request);
+
+	sample_hbp = register_wide_hw_breakpoint(&attr,
+			(perf_overflow_handler_t) hwbp_handler, NULL);
+
+	if (IS_ERR((void __force *)sample_hbp)) {
+		ret = PTR_ERR((void __force *)sample_hbp);
+		printk(KERN_INFO "Breakpoint registration failed: %d\n", ret);
+		fipc_set_reg0(request, 0);
+	} else {
+		printk("%s registered hwbp for addr %llx perf: %p\n", __func__,
+				attr.bp_addr, sample_hbp);
+		fipc_set_reg0(request, (unsigned long) sample_hbp);
+	}
+	return ret;
+}
+
+int unregister_wide_hw_breakpoint_callee(struct fipc_message *request)
+{
+	struct perf_event * __percpu *sample_hbp;
+
+	sample_hbp = (struct perf_event * __percpu *) fipc_get_reg0(request);
+	printk("%s perf: %p\n", __func__, sample_hbp);
+
+	unregister_wide_hw_breakpoint(sample_hbp);
+
 	return 0;
 }
 
@@ -38,6 +88,15 @@ int handle_rpc_calls_klcd(struct fipc_message *msg)
 	case BAR:
 		bar(msg);
 		break;
+
+	case REGISTER_WIDE_HW_BREAKPOINT:
+		//trace(REGISTER_WIDE_HW_BREAKPOINT);
+		return register_wide_hw_breakpoint_callee(msg);
+
+	case UNREGISTER_WIDE_HW_BREAKPOINT:
+		//trace(REGISTER_WIDE_HW_BREAKPOINT);
+		return unregister_wide_hw_breakpoint_callee(msg);
+
 	default:
 		break;
 	};

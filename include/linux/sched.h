@@ -1942,6 +1942,8 @@ struct task_struct {
 
 	int lcd_stack_bit;
 
+	int lcd_stack_cpu;
+
 	int nested_count;
 
 	phys_addr_t mapped_cr3;

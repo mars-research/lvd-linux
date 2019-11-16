@@ -193,6 +193,7 @@ fail1:
 	return ret;
 }
 
+#if 0
 static int do_grant_and_map_for_mem_cpu(cptr_t lcd, struct lcd_create_ctx *ctx,
 				void *mem, gpa_t map_base,
 				cptr_t *dest, int cpu)
@@ -234,6 +235,7 @@ fail2:
 fail1:
 	return ret;
 }
+#endif
 
 #ifdef LVD_PERCPU_VMFUNC_STATE
 static int do_grant_and_map_for_mem_percpu(cptr_t lcd, struct lcd_create_ctx *ctx,

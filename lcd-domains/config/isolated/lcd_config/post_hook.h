@@ -202,6 +202,14 @@ extern union vmfunc_state_page vmfunc_state_page;
 #endif
 #endif
 
+#define netif_addr_lock_bh(x)	do { } while(0)
+
+#define netif_addr_lock_nested(x)	do { } while(0)
+
+#define netif_addr_unlock_bh(x)	do { } while(0)
+
+#define netif_addr_unlock(x)	do { } while(0)
+
 #ifndef CONFIG_SMP
 #undef spin_lock_init
 #define spin_lock_init(x) do { } while(0)

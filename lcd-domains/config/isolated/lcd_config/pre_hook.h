@@ -68,6 +68,9 @@
 #undef CONFIG_TRANSPARENT_HUGEPAGE
 #undef CONFIG_BLK_DEV_INTEGRITY
 
+/* queued spinlocks rely on per_cpu pointers */
+#undef CONFIG_QUEUED_SPINLOCKS
+
 #ifndef CONFIG_SLAB
 #define CONFIG_SLAB
 #endif

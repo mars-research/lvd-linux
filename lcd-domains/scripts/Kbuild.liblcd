@@ -79,7 +79,6 @@ lib-y += $(addprefix liblcd/net/, \
 	)
 
 lib-y += $(addprefix liblcd/locking/, \
-	qspinlock.o \
 	spinlock.o \
 	qrwlock.o \
 	)

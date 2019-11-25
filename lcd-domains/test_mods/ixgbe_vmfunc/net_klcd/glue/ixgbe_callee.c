@@ -3666,15 +3666,46 @@ fail_lookup:
 	return ret;
 }
 
-void rtnl_lock_callee(struct fipc_message *request)
+int rtnl_lock_callee(struct fipc_message *request)
 {
-	printk("%s, acquiring rtnl_lock\n", __func__);
 	rtnl_lock();
-	printk("%s, acquired rtnl_lock, calling original func\n", __func__);
+	return 0;
 }
 
-void rtnl_unlock_callee(struct fipc_message *request)
+int rtnl_unlock_callee(struct fipc_message *request)
 {
 	rtnl_unlock();
-	printk("%s, release rtnl_lock\n", __func__);
+	return 0;
+}
+
+int rtnl_is_locked_callee(struct fipc_message *request)
+{
+	int ret;
+	ret = rtnl_is_locked();
+	fipc_set_reg0(request, ret);
+	return 0;
+}
+
+int call_netdevice_notifiers_callee(struct fipc_message *_request)
+{
+	struct net_device_container *dev_container;
+	int ret = 0;
+	unsigned long val;
+
+	ret = glue_cap_lookup_net_device_type(c_cspace,
+			__cptr(fipc_get_reg1(_request)),
+			&dev_container);
+	if (ret) {
+		LIBLCD_ERR("lookup");
+		goto fail_lookup;
+	}
+
+	val = fipc_get_reg0(_request);
+
+	ret = call_netdevice_notifiers(val, &dev_container->net_device);
+
+	fipc_set_reg0(_request, ret);
+
+fail_lookup:
+	return ret;
 }

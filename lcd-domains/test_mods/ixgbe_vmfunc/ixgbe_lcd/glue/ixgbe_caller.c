@@ -2772,3 +2772,41 @@ void rtnl_unlock()
 
 	return;
 }
+
+int rtnl_is_locked()
+{
+	struct fipc_message r;
+	struct fipc_message *request = &r;
+	int ret;
+
+	async_msg_set_fn_type(request, RTNL_IS_LOCKED);
+
+	vmfunc_wrapper(request);
+
+	ret = fipc_get_reg0(request);
+
+	return ret;
+}
+
+int call_netdevice_notifiers(unsigned long val, struct net_device *dev)
+{
+	struct net_device_container *dev_container;
+	struct fipc_message r;
+	struct fipc_message *_request = &r;
+	int ret;
+
+	INIT_IPC_MSG(&r);
+	dev_container = container_of(dev, struct net_device_container,
+			net_device);
+
+	async_msg_set_fn_type(_request, CALL_NETDEVICE_NOTIFIERS);
+
+	fipc_set_reg0(_request, val);
+	fipc_set_reg1(_request, dev_container->other_ref.cptr);
+
+	vmfunc_wrapper(_request);
+
+	ret = fipc_get_reg0(_request);
+
+	return ret;
+}

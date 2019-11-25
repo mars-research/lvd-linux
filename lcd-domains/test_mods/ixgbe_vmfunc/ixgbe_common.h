@@ -125,6 +125,8 @@ enum dispatch_t {
 	SYNCHRONIZE_IRQ,
 	RTNL_LOCK,
 	RTNL_UNLOCK,
+	RTNL_IS_LOCKED,
+	CALL_NETDEVICE_NOTIFIERS,
 };
 
 typedef enum {

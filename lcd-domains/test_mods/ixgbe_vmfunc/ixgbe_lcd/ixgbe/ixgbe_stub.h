@@ -32,18 +32,20 @@ void napi_complete_done(struct napi_struct *n, int work_done) {
 void synchronize_irq(unsigned int irq) { LIBLCD_MSG("================>$$$$$$ Dummy %s called", __func__); }
 
 bool napi_hash_del(struct napi_struct *napi) { LIBLCD_MSG("================>$$$$$$ Dummy %s called", __func__); return true; }
-#endif
-
-int call_netdevice_notifiers(unsigned long val, struct net_device *dev)
-{ LIBLCD_MSG("================>$$$$$$ Dummy %s called", __func__); return 0; }
-
-bool cancel_work_sync(struct work_struct *work) { LIBLCD_MSG("================>$$$$$$ Dummy %s called", __func__); return true; }
 
 /* ASSERT_RTNL macro checks if rtnl_lock is held by the caller
  * during certain API calls. Inside LCDs we don't hold this lock,
  * just make the assert macro happy by faking that we did.
  */
 int rtnl_is_locked(void) { LIBLCD_MSG("================>$$$$$$ Dummy %s called", __func__); return 1; }
+
+int call_netdevice_notifiers(unsigned long val, struct net_device *dev)
+{ LIBLCD_MSG("================>$$$$$$ Dummy %s called", __func__); return 0; }
+
+#endif
+
+
+bool cancel_work_sync(struct work_struct *work) { LIBLCD_MSG("================>$$$$$$ Dummy %s called", __func__); return true; }
 
 void napi_gro_flush(struct napi_struct *napi, bool flush_old) { LIBLCD_MSG("================>$$$$$$ Dummy %s called", __func__); }
 

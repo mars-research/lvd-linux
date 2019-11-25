@@ -42,11 +42,15 @@ int net_klcd_dispatch_async_loop(struct fipc_message *message)
 	switch (fn_type) {
 
 		case RTNL_LOCK:
-			rtnl_lock_callee(message);
+			ret = rtnl_lock_callee(message);
 			break;
 
 		case RTNL_UNLOCK:
-			rtnl_unlock_callee(message);
+			ret = rtnl_unlock_callee(message);
+			break;
+
+		case RTNL_IS_LOCKED:
+			ret = rtnl_is_locked_callee(message);
 			break;
 
 		case __PCI_REGISTER_DRIVER:
@@ -345,6 +349,11 @@ int net_klcd_dispatch_async_loop(struct fipc_message *message)
 		case SYNCHRONIZE_IRQ:
 			trace(SYNCHRONIZE_IRQ);
 			ret =  synchronize_irq_callee(message);
+			break;
+
+		case CALL_NETDEVICE_NOTIFIERS:
+			trace(CALL_NETDEVICE_NOTIFIERS);
+			ret = call_netdevice_notifiers_callee(message);
 			break;
 
 		default:

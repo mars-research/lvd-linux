@@ -1307,6 +1307,9 @@ struct rtnl_link_stats64 *ndo_get_stats64(struct net_device *dev,
 	stats->rx_bytes = fipc_get_reg1(_request);
 	stats->tx_packets = fipc_get_reg2(_request);
 	stats->tx_bytes = fipc_get_reg3(_request);
+	stats->rx_errors = fipc_get_reg4(_request);
+	stats->rx_crc_errors = fipc_get_reg5(_request);
+	stats->rx_missed_errors = fipc_get_reg6(_request);
 
 	printk("%s, global stats sent: %lu consumed: %lu in-flight?: %lu\n",
 				__func__,
@@ -2839,7 +2842,7 @@ fail_lookup:
 	return ret;
 }
 
-#define HANDLE_IRQ_LOCALLY
+//#define HANDLE_IRQ_LOCALLY
 
 #ifdef HANDLE_IRQ_LOCALLY
 irqreturn_t msix_vector_handler(int irq, void *data)

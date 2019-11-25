@@ -1804,7 +1804,7 @@ fail_lookup:
 int ndo_get_stats64_callee(struct fipc_message *_request)
 {
 	struct net_device_container *dev_container;
-	struct rtnl_link_stats64 stats;
+	struct rtnl_link_stats64 stats = { 0 };
 	int ret;
 
 
@@ -1825,6 +1825,9 @@ int ndo_get_stats64_callee(struct fipc_message *_request)
 	fipc_set_reg1(_request, stats.rx_bytes);
 	fipc_set_reg2(_request, stats.tx_packets);
 	fipc_set_reg3(_request, stats.tx_bytes);
+	fipc_set_reg4(_request, stats.rx_errors);
+	fipc_set_reg5(_request, stats.rx_crc_errors);
+	fipc_set_reg6(_request, stats.rx_missed_errors);
 
 fail_lookup:
 	return ret;

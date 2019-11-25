@@ -916,6 +916,9 @@ apicinterrupt3 HYPERVISOR_CALLBACK_VECTOR \
 
 #endif /* CONFIG_XEN */
 
+apicinterrupt3 HYPERVISOR_CALLBACK_VECTOR \
+       lvd_callback_vector lvd_vector_handler
+
 #if IS_ENABLED(CONFIG_HYPERV)
 apicinterrupt3 HYPERVISOR_CALLBACK_VECTOR \
 	hyperv_callback_vector hyperv_vector_handler

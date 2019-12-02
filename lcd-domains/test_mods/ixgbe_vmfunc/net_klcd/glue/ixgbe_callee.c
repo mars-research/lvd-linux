@@ -3413,7 +3413,11 @@ int napi_gro_receive_callee(struct fipc_message *_request)
 
 		old_pcount = page_count(skb_frag_page(frag));
 
-		set_page_count(skb_frag_page(frag), 2);
+		if (!old_pcount)
+			set_page_count(skb_frag_page(frag), 2);
+		else
+			page_ref_inc(skb_frag_page(frag));
+
 	}
 
 	if (skb_is_nonlinear(skb))
@@ -3437,8 +3441,8 @@ int napi_gro_receive_callee(struct fipc_message *_request)
 
 	func_ret = napi_gro_receive(napi, skb);
 
-	if (p)
-		set_page_count(p, old_pcount);
+	//if (p)
+	//	set_page_count(p, old_pcount);
 skip:
 	//printk("%s, returned %d\n", __func__, ret);
 	fipc_set_reg1(_request, func_ret);

@@ -8,6 +8,7 @@
 #include <linux/bitops.h>
 #include <linux/slab.h>
 #include <linux/log2.h>
+#include <linux/page_ref.h>
 #include <libcap.h>
 #include <lcd_domains/microkernel.h>
 
@@ -150,6 +151,9 @@ static int page_delete(struct cspace *cspace, struct cnode *cnode,
 			void *object)
 {
 	struct lcd_memory_object *mo = object;
+	struct page *phead;
+	int i;
+
 	/*
 	 * Remove memory object from global memory interval tree
 	 */
@@ -158,7 +162,21 @@ static int page_delete(struct cspace *cspace, struct cnode *cnode,
 	 * Pages should be unmapped from all LCDs and not in use
 	 * by any code. Free them.
 	 */
+	LCD_MSG("%s, pages: %p, order: %d refcnt: %d", __func__, mo->object,
+			ilog2(mo->nr_pages), page_ref_count(mo->object));
+
+	phead = mo->object;
+
+	for (i = 1; i < mo->nr_pages; i++) {
+		struct page *p;
+		p = phead + i;
+
+		if (p && page_ref_count(p))
+			set_page_count(p, 0);
+	}
+
 	__free_pages(mo->object, ilog2(mo->nr_pages));
+
 	/*
 	 * Free mo, no one else should have a reference.
 	 */

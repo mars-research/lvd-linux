@@ -154,6 +154,12 @@ union vmfunc_state_page vmfunc_state_page = {
 };
 EXPORT_SYMBOL(vmfunc_state_page);
 
+DEFINE_PER_CPU(unsigned long long, vmfunc_counter) = 0;
+EXPORT_PER_CPU_SYMBOL(vmfunc_counter);
+
+DEFINE_PER_CPU(unsigned long long, vmfunc_irq_counter) = 0;
+EXPORT_PER_CPU_SYMBOL(vmfunc_irq_counter);
+
 static int __init x86_mpx_setup(char *s)
 {
 	/* require an exact match without trailing characters */

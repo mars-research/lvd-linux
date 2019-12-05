@@ -106,7 +106,9 @@ netdev_tx_t dummy_xmit(struct sk_buff *skb, struct net_device *dev)
 	//g_dstats.tx_bytes += skb->len;
 #endif
 
+#ifdef CONFIG_RUN_DUMMY_2
 	dev_kfree_skb(skb);
+#endif
 
 	return NETDEV_TX_OK;
 }

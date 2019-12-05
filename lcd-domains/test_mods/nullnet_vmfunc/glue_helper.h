@@ -19,6 +19,9 @@
 #include <liblcd/sync_ipc_poll.h>
 #include <asm/lcd_domains/libvmfunc.h>
 
+#define CONFIG_RUN_DUMMY_2
+#define COPY
+
 enum dispatch_t {
 	REGISTER_NETDEVICE,  /* 0 */
 	UNREGISTER_NETDEVICE,  /* 1 */

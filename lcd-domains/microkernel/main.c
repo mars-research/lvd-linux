@@ -168,6 +168,7 @@ static int __init lcd_init(void)
 		goto fail10;
 	}
 
+	lcd_debugfs_init();
 	LCD_MSG("lcd microkernel initialized");
 
 	return 0;
@@ -205,6 +206,7 @@ fail0:
 
 static void __exit lcd_exit(void)
 {
+	lcd_debugfs_exit();
 	thc_global_fini();
 	fipc_fini();
 	misc_deregister(&lcd_dev);

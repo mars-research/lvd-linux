@@ -23,6 +23,8 @@ extern void *cpuid_page;
 extern struct lcd *lcd_list[NUM_LCDS];
 unsigned long init_pgd;
 
+DECLARE_PER_CPU(unsigned long long, vmfunc_counter);
+
 /* Linux kernel only provides ffs variant, which operates on 32-bit registers.
  * For promoting the bsf instruction to 64-bit, intel manual suggests to use
  * REX.W prefix to the instruction. However, when the operands are 64-bits, gcc
@@ -265,6 +267,10 @@ int vmfunc_klcd_wrapper(struct fipc_message *msg, unsigned int ept)
 #endif
 #ifdef CONFIG_LCD_TRACE_BUFFER
 	add_trace_entry(EVENT_VMFUNC_TRAMP_ENTRY, msg->rpc_id);
+#endif
+
+#ifdef CONFIG_LCD_VMFUNC_COUNTERS
+	per_cpu(vmfunc_counter, smp_processor_id())++;
 #endif
 
 	vmfunc_trampoline_entry(msg);

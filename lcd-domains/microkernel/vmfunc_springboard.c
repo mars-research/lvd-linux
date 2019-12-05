@@ -2,6 +2,8 @@
 #include <asm/current.h>
 #include <asm/lcd_domains/libvmfunc.h>
 
+DECLARE_PER_CPU(unsigned long long, vmfunc_counter);
+
 __asm__(
 		".text	\n\t"
 		".align 16	\n\t"
@@ -31,6 +33,10 @@ __asm__(
 #endif
 		/* stack is populated. we are good to go */
 		"  call vmfunc_dispatch		\n\t"
+
+#ifdef CONFIG_LCD_VMFUNC_COUNTERS
+		"  incq  %gs:vmfunc_counter	\n\t"
+#endif
 
 		/* we are ready to jump back to the caller */
 		/* save kernel stack */

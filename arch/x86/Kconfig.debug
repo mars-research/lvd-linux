@@ -368,4 +368,12 @@ config LCD_TRACE_BUFFER
 	  Trace ring buffer for dumping irq/softirq/lcd_enter events.
 
 	  If unsure, say N.
+
+config LCD_VMFUNC_COUNTERS
+	bool "Count vmfunc transitions in irq and non-irq pass"
+	default n
+	---help---
+
+	  If unsure, say N.
+
 endmenu

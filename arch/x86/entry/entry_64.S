@@ -78,6 +78,11 @@ ENDPROC(native_usergs_sysret64)
 
 	/* vmfunc to domain 0 */
 	vmfunc
+
+#ifdef CONFIG_LCD_VMFUNC_COUNTERS
+	incq	PER_CPU_VAR(vmfunc_irq_counter)
+#endif
+
 	/* abort if ecx != 0 */
 	cmpl $0x0, %ecx
 	je 0f

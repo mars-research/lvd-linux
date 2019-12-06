@@ -575,10 +575,6 @@ END(irq_entries_start)
 	 */
 	SWAPGS
 
-#ifdef CONFIG_LCD_VMFUNC_COUNTERS
-	incq	PER_CPU_VAR(irq_counter)
-#endif
-
 	/*
 	 * We need to tell lockdep that IRQs are off.  We can't do this until
 	 * we fix gsbase, and we should do it before enter_from_user_mode
@@ -669,6 +665,10 @@ END(irq_entries_start)
 
 	/* No matter which path we took, save current LCD stack */
 	movq	vmfunc_state_page + VMFUNC_kernel_esp, %r13
+
+#ifdef CONFIG_LCD_VMFUNC_COUNTERS
+	incq	PER_CPU_VAR(irq_counter)
+#endif
 
 #ifdef CONFIG_LCD_TRACE_BUFFER
 	/* Trace IRQ into LCDs buffer, rdi = trap frame, rsi = event type */

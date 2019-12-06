@@ -3,18 +3,20 @@
 struct dentry *lvd_debug_dir;
 DECLARE_PER_CPU(unsigned long long, vmfunc_counter);
 DECLARE_PER_CPU(unsigned long long, vmfunc_irq_counter);
+DECLARE_PER_CPU(unsigned long long, irq_counter);
+DECLARE_PER_CPU(unsigned long long, exception_counter);
 
 static int vmfunc_stats_show(struct seq_file *s, void *data)
 {
 	int cpu = smp_processor_id();
-	unsigned long long this_vmfunc_count, this_vmfunc_irq_count;
 	seq_printf(s, "stats for cpu %d\n", cpu);
 	seq_puts(s, "------------------\n");
 
-	this_vmfunc_count = per_cpu(vmfunc_counter, cpu);
-	this_vmfunc_irq_count = per_cpu(vmfunc_irq_counter, cpu);
-	seq_printf(s, "vmfunc_count: %llu\n", this_vmfunc_count);
-	seq_printf(s, "vmfunc_irq_count: %llu\n", this_vmfunc_irq_count);
+	seq_printf(s, "vmfunc_count: %llu\n", per_cpu(vmfunc_counter, cpu));
+	seq_printf(s, "vmfunc_irq_count: %llu\n", per_cpu(vmfunc_irq_counter, cpu));
+	seq_printf(s, "total_irq_count: %llu\n", per_cpu(irq_counter, cpu));
+	seq_printf(s, "exception_count: %llu\n", per_cpu(exception_counter, cpu));
+
 	return 0;
 }
 

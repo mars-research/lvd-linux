@@ -575,6 +575,10 @@ END(irq_entries_start)
 	 */
 	SWAPGS
 
+#ifdef CONFIG_LCD_VMFUNC_COUNTERS
+	incq	PER_CPU_VAR(irq_counter)
+#endif
+
 	/*
 	 * We need to tell lockdep that IRQs are off.  We can't do this until
 	 * we fix gsbase, and we should do it before enter_from_user_mode
@@ -1004,6 +1008,10 @@ ENTRY(\sym)
 	TRACE_IRQS_OFF
 	.endif
 	.endif
+
+#ifdef CONFIG_LCD_VMFUNC_COUNTERS
+	incq	PER_CPU_VAR(exception_counter)
+#endif
 
 	movq	%rsp, %rdi			/* pt_regs pointer */
 

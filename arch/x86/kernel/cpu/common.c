@@ -160,6 +160,12 @@ EXPORT_PER_CPU_SYMBOL(vmfunc_counter);
 DEFINE_PER_CPU(unsigned long long, vmfunc_irq_counter) = 0;
 EXPORT_PER_CPU_SYMBOL(vmfunc_irq_counter);
 
+DEFINE_PER_CPU(unsigned long long, irq_counter) = 0;
+EXPORT_PER_CPU_SYMBOL(irq_counter);
+
+DEFINE_PER_CPU(unsigned long long, exception_counter) = 0;
+EXPORT_PER_CPU_SYMBOL(exception_counter);
+
 static int __init x86_mpx_setup(char *s)
 {
 	/* require an exact match without trailing characters */

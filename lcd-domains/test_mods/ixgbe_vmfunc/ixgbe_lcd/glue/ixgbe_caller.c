@@ -27,7 +27,8 @@ static struct net_device *g_net_device;
 
 #ifdef IOMMU_ASSIGN
 /* device for IOMMU assignment */
-struct pcidev_info dev_assign = { 0x0000, 0x06, 0x00, 0x1 };
+struct pcidev_info dev_assign = { 0x0000, 0x00, 0x00, 0x0 };
+extern unsigned long domain, bus, slot, fn;
 #endif
 
 struct kmem_cache *skb_c_cache;
@@ -416,6 +417,11 @@ int probe_callee(struct fipc_message *_request)
 	unsigned int pool_ord;
 
 	LIBLCD_MSG("%s called", __func__);
+
+	dev_assign.domain = domain;
+	dev_assign.bus = bus;
+	dev_assign.slot = slot;
+	dev_assign.fn = fn;
 
 	other_ref.cptr = fipc_get_reg1(_request);
 	dma_mask = fipc_get_reg2(_request);

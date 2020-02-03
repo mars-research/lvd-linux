@@ -58,7 +58,7 @@ struct lcd_mem_region {
 
 extern union vmfunc_state_page vmfunc_state_page;
 
-#define LCD_NR_MEM_REGIONS 6
+#define LCD_NR_MEM_REGIONS 7
 
 static struct lcd_mem_region lcd_mem_regions[LCD_NR_MEM_REGIONS] = {
 	{
@@ -77,6 +77,12 @@ static struct lcd_mem_region lcd_mem_regions[LCD_NR_MEM_REGIONS] = {
 		"heap",
 		.offset = LCD_HEAP_REGION_OFFSET,
 		.size =   LCD_HEAP_REGION_SIZE,
+		.flags =  LCD_WRITEBACK_FLAGS,
+	},
+	{
+		"direct-heap",
+		.offset = LCD_DIRECT_HEAP_REGION_OFFSET,
+		.size =   LCD_DIRECT_HEAP_REGION_SIZE,
 		.flags =  LCD_WRITEBACK_FLAGS,
 	},
 	{

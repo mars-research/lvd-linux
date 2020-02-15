@@ -153,8 +153,6 @@ foo(struct fipc_message *msg)
 
 		asm volatile("int $0x29");
 		for(i = 0; i < num_iterations; i++) {
-			asm volatile("mov %%rsp, %[rsp_ptr]"
-				: [rsp_ptr]"=r"(rsp_ptr));
 			//printk("rsp before int 0xf3 %p", rsp_ptr);
 
 			asm volatile("int $0xf3");
@@ -187,6 +185,8 @@ foo(struct fipc_message *msg)
 			asm volatile("nop");
 			i++;
 		} while (i < 1000000000);
+
+		asm volatile("mov %%rsp, %[rsp_ptr]" : [rsp_ptr]"=r"(rsp_ptr));
 
 		rsp_top = PGROUNDUP((unsigned long)rsp_ptr);
 
@@ -307,20 +307,66 @@ void create_hwbp(void)
 	}
 }
 
+#define HEAP_NUM_PAGES		8192
+
+struct page *pages[HEAP_NUM_PAGES] = {0};
+
+void alloc_free_pages(void)
+{
+	int i;
+
+	for (i = 0; i < HEAP_NUM_PAGES; i++) {
+		pages[i] = lcd_alloc_pages(GFP_KERNEL, 0);
+		if (!(i % 100))
+			printk("%s allocate %d pages", __func__, i);
+		if (!pages[i]) {
+			printk("%s allocation failed while alloc-ing %d th page", __func__, i);
+			break;
+		}
+	}
+
+	for (; i >= 0; i--) {
+		if (pages[i])
+			lcd_free_pages(pages[i], 0);
+	}
+}
+
+#define DHEAP_NUM_PAGES		8192
+
+struct page *dheap_pages[DHEAP_NUM_PAGES] = {0};
+void alloc_dheap_pages(void)
+{
+	int i;
+
+	for (i = 0; i < DHEAP_NUM_PAGES; i++) {
+		dheap_pages[i] = lcd_dheap_alloc_pages(GFP_KERNEL, 0);
+		if (!(i % 100))
+			printk("%s allocate %d pages", __func__, i);
+		if (!dheap_pages[i]) {
+			printk("%s allocation failed while alloc-ing %d th page", __func__, i);
+			break;
+		}
+	}
+
+	return;
+}
+
 int handle_rpc_calls(struct fipc_message *msg)
 {
 	switch(msg->rpc_id) {
 	case MODULE_INIT:
 		callee_main();
-		create_hwbp();
+		//create_hwbp();
+		//alloc_free_pages();
+		alloc_dheap_pages();
 		break;
 	case NULL_INVOCATION:
 		null_invocation(msg);
 		break;
 	case MARSHAL_ONE:
 		marshal_one(msg);
-		if (hwbp)
-			_unregister_wide_hw_breakpoint(hwbp);
+		//if (hwbp)
+		//	_unregister_wide_hw_breakpoint(hwbp);
 		break;
 	case FOO:
 		foo(msg);

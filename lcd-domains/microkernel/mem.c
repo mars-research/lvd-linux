@@ -475,7 +475,7 @@ static int isolated_map_contiguous_mem(struct lcd *lcd,
 	 * caching, and we always map memory as WB in guest physical.
 	 */
 #ifdef CONFIG_LVD
-	LCD_MSG("%s gpa: %llx hpa: %llx nr_pages:%lu", __func__, base, hpa_base, mo->nr_pages);
+	//LCD_MSG("%s gpa: %llx hpa: %llx nr_pages:%lu", __func__, base, hpa_base, mo->nr_pages);
 	/* in LVD's everything is one-to-one mapping */
 	ret = lcd_arch_ept_map_range_all_cpus(lcd->lcd_arch,
 					base,

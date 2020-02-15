@@ -91,6 +91,10 @@
 #define CREATE_TRACE_POINTS
 #include <trace/events/sched.h>
 
+#ifdef CONFIG_LCD_TRACE_BUFFER
+#include <linux/lcd_trace.h>
+#endif
+
 DEFINE_MUTEX(sched_domains_mutex);
 DEFINE_PER_CPU_SHARED_ALIGNED(struct rq, runqueues);
 
@@ -2882,6 +2886,9 @@ context_switch(struct rq *rq, struct task_struct *prev,
 	lockdep_unpin_lock(&rq->lock, cookie);
 	spin_release(&rq->lock.dep_map, 1, _THIS_IP_);
 
+#ifdef CONFIG_LCD_TRACE_BUFFER
+	add_trace_entry(EVENT_CTX_SWITCH, (prev->pid << 16) | (next->pid));
+#endif
 	/* Here we just switch the register state and the stack. */
 	switch_to(prev, next, prev);
 	barrier();
@@ -8667,6 +8674,9 @@ void dump_cpu_task(int cpu)
 {
 	pr_info("Task dump for CPU %d:\n", cpu);
 	sched_show_task(cpu_curr(cpu));
+#ifdef CONFIG_LCD_TRACE_BUFFER
+	dump_ring_trace_buffer_cpu(cpu);
+#endif
 }
 
 /*

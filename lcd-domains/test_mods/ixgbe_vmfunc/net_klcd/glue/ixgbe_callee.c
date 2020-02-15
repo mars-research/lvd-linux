@@ -2722,17 +2722,17 @@ unsync_trampoline(struct net_device *dev,
 		hidden_args);
 }
 
-struct trampoline_hidden_args *unsync_hidden_args;
-struct unsync_container *unsync_container;
+struct trampoline_hidden_args *unsync_hidden_args = NULL;
+struct unsync_container *unsync_container = NULL;
+struct sync_container *sync_container = NULL;
+struct trampoline_hidden_args *sync_hidden_args = NULL;
 
 int __hw_addr_sync_dev_callee(struct fipc_message *_request)
 {
 	struct net_device_container *dev1_container;
-	struct sync_container *sync_container;
 	int ret;
 	int func_ret;
 	addr_list _type;
-	struct trampoline_hidden_args *sync_hidden_args;
 
 	ret = glue_cap_lookup_net_device_type(c_cspace,
 		__cptr(fipc_get_reg1(_request)),
@@ -2743,57 +2743,63 @@ int __hw_addr_sync_dev_callee(struct fipc_message *_request)
 		LIBLCD_ERR("lookup");
 		goto fail_lookup;
 	}
-	sync_container = kzalloc(sizeof( struct sync_container   ),
-		GFP_KERNEL);
 	if (!sync_container) {
-		LIBLCD_ERR("kzalloc");
-		goto fail_alloc;
+		sync_container = kzalloc(sizeof( struct sync_container   ),
+				GFP_KERNEL);
+		if (!sync_container) {
+			LIBLCD_ERR("kzalloc");
+			goto fail_alloc;
+		}
 	}
 
-	sync_hidden_args = kzalloc(sizeof( *sync_hidden_args ),
-		GFP_KERNEL);
 	if (!sync_hidden_args) {
-		LIBLCD_ERR("kzalloc hidden args");
-		goto fail_alloc1;
-	}
-	sync_hidden_args->t_handle = LCD_DUP_TRAMPOLINE(sync_trampoline);
-	if (!sync_hidden_args->t_handle) {
-		LIBLCD_ERR("duplicate trampoline");
-		goto fail_dup1;
-	}
-	sync_hidden_args->t_handle->hidden_args = sync_hidden_args;
-	sync_hidden_args->struct_container = sync_container;
+		sync_hidden_args = kzalloc(sizeof( *sync_hidden_args ),
+				GFP_KERNEL);
+		if (!sync_hidden_args) {
+			LIBLCD_ERR("kzalloc hidden args");
+			goto fail_alloc1;
+		}
+		sync_hidden_args->t_handle = LCD_DUP_TRAMPOLINE(sync_trampoline);
+		if (!sync_hidden_args->t_handle) {
+			LIBLCD_ERR("duplicate trampoline");
+			goto fail_dup1;
+		}
+		sync_hidden_args->t_handle->hidden_args = sync_hidden_args;
+		sync_hidden_args->struct_container = sync_container;
 
-	sync_container->sync = LCD_HANDLE_TO_TRAMPOLINE(sync_hidden_args->t_handle);
-	ret = set_memory_x(( ( unsigned  long   )sync_hidden_args->t_handle ) & ( PAGE_MASK ),
-		( ALIGN(LCD_TRAMPOLINE_SIZE(sync_trampoline),
-		PAGE_SIZE) ) >> ( PAGE_SHIFT ));
-
-	unsync_container = kzalloc(sizeof( struct unsync_container   ),
-		GFP_KERNEL);
+		sync_container->sync = LCD_HANDLE_TO_TRAMPOLINE(sync_hidden_args->t_handle);
+		ret = set_memory_x(( ( unsigned  long   )sync_hidden_args->t_handle ) & ( PAGE_MASK ),
+				( ALIGN(LCD_TRAMPOLINE_SIZE(sync_trampoline),
+					PAGE_SIZE) ) >> ( PAGE_SHIFT ));
+	}
 	if (!unsync_container) {
-		LIBLCD_ERR("kzalloc");
-		goto fail_alloc;
+		unsync_container = kzalloc(sizeof( struct unsync_container   ),
+			GFP_KERNEL);
+		if (!unsync_container) {
+			LIBLCD_ERR("kzalloc");
+			goto fail_alloc;
+		}
 	}
-
-	unsync_hidden_args = kzalloc(sizeof( *unsync_hidden_args ),
-		GFP_KERNEL);
 	if (!unsync_hidden_args) {
-		LIBLCD_ERR("kzalloc hidden args");
-		goto fail_alloc2;
-	}
-	unsync_hidden_args->t_handle = LCD_DUP_TRAMPOLINE(unsync_trampoline);
-	if (!unsync_hidden_args->t_handle) {
-		LIBLCD_ERR("duplicate trampoline");
-		goto fail_dup2;
-	}
-	unsync_hidden_args->t_handle->hidden_args = unsync_hidden_args;
-	unsync_hidden_args->struct_container = unsync_container;
+		unsync_hidden_args = kzalloc(sizeof( *unsync_hidden_args ),
+				GFP_KERNEL);
+		if (!unsync_hidden_args) {
+			LIBLCD_ERR("kzalloc hidden args");
+			goto fail_alloc2;
+		}
+		unsync_hidden_args->t_handle = LCD_DUP_TRAMPOLINE(unsync_trampoline);
+		if (!unsync_hidden_args->t_handle) {
+			LIBLCD_ERR("duplicate trampoline");
+			goto fail_dup2;
+		}
+		unsync_hidden_args->t_handle->hidden_args = unsync_hidden_args;
+		unsync_hidden_args->struct_container = unsync_container;
 
-	unsync_container->unsync = LCD_HANDLE_TO_TRAMPOLINE(unsync_hidden_args->t_handle);
-	ret = set_memory_x(( ( unsigned  long   )unsync_hidden_args->t_handle ) & ( PAGE_MASK ),
-		( ALIGN(LCD_TRAMPOLINE_SIZE(unsync_trampoline),
-		PAGE_SIZE) ) >> ( PAGE_SHIFT ));
+		unsync_container->unsync = LCD_HANDLE_TO_TRAMPOLINE(unsync_hidden_args->t_handle);
+		ret = set_memory_x(( ( unsigned  long   )unsync_hidden_args->t_handle ) & ( PAGE_MASK ),
+				( ALIGN(LCD_TRAMPOLINE_SIZE(unsync_trampoline),
+					PAGE_SIZE) ) >> ( PAGE_SHIFT ));
+	}
 
 	func_ret = __hw_addr_sync_dev(
 		_type == UC_LIST ? &dev1_container->net_device.uc :
@@ -2802,8 +2808,7 @@ int __hw_addr_sync_dev_callee(struct fipc_message *_request)
 		( sync_container->sync ),
 		( unsync_container->unsync ));
 
-	fipc_set_reg1(_request,
-			func_ret);
+	fipc_set_reg0(_request, func_ret);
 
 	return ret;
 fail_lookup:

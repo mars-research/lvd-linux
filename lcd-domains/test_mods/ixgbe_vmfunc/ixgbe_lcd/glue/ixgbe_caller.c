@@ -1883,8 +1883,8 @@ fail_lookup:
 	return ret;
 }
 
-struct sync_container *sync_container;
-struct unsync_container *unsync_container;
+struct sync_container *sync_container = NULL;
+struct unsync_container *unsync_container = NULL;
 
 int __hw_addr_sync_dev(
 		struct netdev_hw_addr_list *list,
@@ -1902,30 +1902,33 @@ int __hw_addr_sync_dev(
 	dev1_container = container_of(dev1,
 		struct net_device_container,
 		net_device);
-	sync_container = kzalloc(sizeof( struct sync_container   ),
-		GFP_KERNEL);
 	if (!sync_container) {
-		LIBLCD_ERR("kzalloc");
-		goto fail_alloc;
+		sync_container = kzalloc(sizeof( struct sync_container   ),
+				GFP_KERNEL);
+		if (!sync_container) {
+			LIBLCD_ERR("kzalloc");
+			goto fail_alloc;
+		}
+		sync_container->sync = sync;
 	}
-	sync_container->sync = sync;
 
-	unsync_container = kzalloc(sizeof( struct unsync_container   ),
-		GFP_KERNEL);
 	if (!unsync_container) {
-		LIBLCD_ERR("kzalloc");
-		goto fail_alloc;
+		unsync_container = kzalloc(sizeof( struct unsync_container   ),
+				GFP_KERNEL);
+		if (!unsync_container) {
+			LIBLCD_ERR("kzalloc");
+			goto fail_alloc;
+		}
+		unsync_container->unsync = unsync;
 	}
-	unsync_container->unsync = unsync;
 
-	async_msg_set_fn_type(_request,
-			__HW_ADDR_SYNC_DEV);
-	fipc_set_reg1(_request,
-			dev1_container->other_ref.cptr);
+	async_msg_set_fn_type(_request, __HW_ADDR_SYNC_DEV);
+	fipc_set_reg1(_request, dev1_container->other_ref.cptr);
 	fipc_set_reg2(_request, list == &dev1->mc ? MC_LIST : UC_LIST);
 
 	vmfunc_wrapper(_request);
-	func_ret = fipc_get_reg1(_request);
+
+	func_ret = fipc_get_reg0(_request);
 
 	liblcd__hw_addr_sync_dev(list, dev1, sync, unsync);
 	return func_ret;

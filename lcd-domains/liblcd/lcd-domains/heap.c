@@ -479,6 +479,9 @@ static int setup_struct_page_array(void)
 	bytes = roundup_pow_of_two((1UL << LCD_HEAP_NR_PAGES_ORDER) *
 				sizeof(struct page));
 	order = ilog2(bytes >> PAGE_SHIFT);
+
+	LIBLCD_MSG("size needed for struct_page_array bytes: %d, order: %d",
+			bytes, order);
 	/*
 	 * Do the alloc
 	 */
@@ -571,4 +574,194 @@ void __lcd_free_pages(unsigned long addr, unsigned int order)
 {
 	if (addr)
 		lcd_free_pages(heap_addr_to_struct_page(__gva(addr)), order);
+}
+
+/* Direct heap APIs */
+
+struct lcd_direct_heap_allocator {
+	/* Size of metadata in bytes (includes this struct) */
+	unsigned long metadata_sz;
+
+	unsigned int metadata_order;
+	/* The minimum number of pages you can allocate is 2^min_order. */
+	unsigned int min_order;
+	/* The maximum number of pages you can allocate is 2^max_order. */
+	unsigned int max_order;
+	/* pointer to base of struct page array */
+	struct page* dheap_page_array;
+	/* alloc index */
+	unsigned int index;
+	/* actual pages */
+	void *page_data;
+
+	unsigned long page_data_offset;
+};
+
+struct lcd_direct_heap_allocator *dheap_allocator;
+
+int direct_heap_metadata_alloc(unsigned int alloc_order,
+				unsigned long *metadata_sz,
+				void **metadata_addr)
+{
+	int ret;
+	unsigned long i, j;
+	unsigned long nr_allocs;
+	unsigned total;
+	gpa_t dest;
+	struct lcd_resource_node *unused;
+
+	/*
+	 * Since we are embedding, we need to allocate in 2^alloc_order
+	 * chunks of pages.
+	 */
+	total = ALIGN(*metadata_sz, (1UL << (alloc_order + PAGE_SHIFT)));
+	nr_allocs = total >> (alloc_order + PAGE_SHIFT); /* > 0 */
+
+	for (i = 0; i < nr_allocs; i++) {
+
+		dest = gpa_add(LCD_DIRECT_HEAP_GP_ADDR,
+			i * (1UL << (alloc_order + PAGE_SHIFT)));
+
+		ret = do_one_heap_alloc(dest, alloc_order, &unused);
+		if (ret) {
+			LIBLCD_ERR("metadata alloca failed at i = %lx", i);
+			goto fail1;
+		}
+
+	}
+
+	*metadata_addr = (void *)gva_val(LCD_DIRECT_HEAP_GV_ADDR);
+	*metadata_sz = total;
+
+	return 0;
+
+fail1:
+	for (j = 0; j < i; j++) {
+
+		dest = gpa_add(LCD_DIRECT_HEAP_GP_ADDR,
+			j * (1UL << (alloc_order + PAGE_SHIFT)));
+
+		do_one_heap_free(dest);
+
+	}
+
+	return ret;
+}
+
+static inline struct page *dheap_addr_to_struct_page(gva_t addr)
+{
+	unsigned long idx;
+	unsigned long dheap_base = (unsigned long)dheap_allocator->page_data;
+	idx = (gva_val(addr) - dheap_base) >> PAGE_SHIFT;
+	return &dheap_allocator->dheap_page_array[idx];
+}
+
+static inline gva_t dheap_struct_page_to_addr(const struct page *p)
+{
+	unsigned long idx;
+	gva_t addr;
+	unsigned long dheap_base = (unsigned long)dheap_allocator->page_data;
+	idx = ((unsigned long) p - (unsigned long)&dheap_allocator->dheap_page_array[0]) / sizeof(struct page);
+	addr = __gva(dheap_base + idx * (1 << PAGE_SHIFT));
+	return addr;
+}
+
+void *lcd_dheap_page_address(const struct page *page)
+{
+	return (void *)gva_val(dheap_struct_page_to_addr(page));
+}
+
+struct page *lcd_dheap_alloc_pages(unsigned int flags, unsigned int order)
+{
+	int ret;
+	struct lcd_resource_node *unused;
+	gpa_t dest_gpa;
+	gva_t dest_gva;
+	struct page* page;
+
+	if (dheap_allocator->page_data_offset == 0) {
+		printk("dheap_allocator datastructure corrupt");
+		printk("%s, dheap metadata_sz %lu, order %d, page_data %p, page_data_offset %lu, dheap_page_array %p, index %d",
+				__func__, dheap_allocator->metadata_sz, dheap_allocator->metadata_order,
+				dheap_allocator->page_data, dheap_allocator->page_data_offset, dheap_allocator->dheap_page_array,
+				dheap_allocator->index);
+		return NULL;
+	}
+
+	dest_gpa = gpa_add(LCD_DIRECT_HEAP_GP_ADDR,
+			dheap_allocator->page_data_offset +
+			dheap_allocator->index * (1UL << PAGE_SHIFT));
+
+	dest_gva = gva_add(LCD_DIRECT_HEAP_GV_ADDR,
+			dheap_allocator->page_data_offset +
+			dheap_allocator->index * (1UL << PAGE_SHIFT));
+
+	//printk("%s, calling do_one_heap_alloc at dest %lx, order %d", __func__,
+	//			gpa_val(dest_gpa), order);
+	ret = do_one_heap_alloc(dest_gpa, order, &unused);
+
+	/* index points to the next array index in the page data */
+	dheap_allocator->index += (1 << order);
+
+	page = dheap_addr_to_struct_page(dest_gva);
+
+	//printk("page address %p", page);
+
+	return page;
+}
+
+static int setup_dheap_struct_page_array(void)
+{
+	unsigned int order;
+	unsigned long bytes;
+	/*
+	 * Compute number of struct pages we need + sizeof(lcd_direct_heap_allocator)
+	 */
+	bytes = roundup_pow_of_two(sizeof(struct lcd_direct_heap_allocator) +
+				((1UL << LCD_DIRECT_HEAP_NR_PAGES_ORDER) *
+				sizeof(struct page)));
+	order = ilog2(bytes >> PAGE_SHIFT);
+
+	LIBLCD_MSG("size needed for dheap_struct_page_array bytes: %d, order: %d",
+			bytes, order);
+	/*
+	 * Do the alloc
+	 */
+	direct_heap_metadata_alloc(LCD_DIRECT_HEAP_MAX_ORDER, &bytes, (void**) &dheap_allocator);
+
+	dheap_allocator->max_order = LCD_DIRECT_HEAP_MAX_ORDER;
+	dheap_allocator->min_order = LCD_DIRECT_HEAP_MIN_ORDER;
+	dheap_allocator->metadata_sz = bytes;
+	dheap_allocator->dheap_page_array = (void*)((void*) dheap_allocator + sizeof(*dheap_allocator));
+	dheap_allocator->index = 0;
+	dheap_allocator->page_data = (void *)((void*) dheap_allocator + dheap_allocator->metadata_sz);
+	dheap_allocator->page_data_offset = (unsigned long) dheap_allocator->page_data - gva_val(LCD_DIRECT_HEAP_GV_ADDR);
+	dheap_allocator->metadata_order = ilog2(bytes >> PAGE_SHIFT);
+
+	printk("%s, dheap metadata_sz %lu, order %d, page_data %p, page_data_offset %lu, dheap_page_array %p, index %d",
+				__func__, dheap_allocator->metadata_sz, dheap_allocator->metadata_order,
+				dheap_allocator->page_data, dheap_allocator->page_data_offset, dheap_allocator->dheap_page_array,
+				dheap_allocator->index);
+	return 0;
+}
+
+int __liblcd_direct_heap_init(void)
+{
+	int ret;
+
+	/*
+	 * Set up struct page array
+	 */
+	ret = setup_dheap_struct_page_array();
+	if (ret) {
+		LIBLCD_ERR("error setting up struct page array for heap");
+		goto fail2;
+	}
+
+	return 0;
+
+fail2:
+	//lcd_page_allocator_destroy(direct_heap_allocator); /* frees metadata */
+	dheap_allocator = NULL;
+	return ret;
 }

@@ -627,7 +627,7 @@ int register_netdev(struct net_device *dev)
 	fipc_set_reg5(_request,
 			dev->hw_enc_features);
 	fipc_set_reg6(_request,
-			dev->mpls_features);
+			dev->num_tc);
 
 	vmfunc_wrapper(_request);
 

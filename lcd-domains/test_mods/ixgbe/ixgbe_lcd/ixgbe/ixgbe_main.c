@@ -1064,8 +1064,11 @@ static void ixgbe_update_xoff_received(struct ixgbe_adapter *adapter)
 #else
 	bool pfc_en = false;
 #endif
+
+#ifdef CONFIG_IXGBE_DCB
 	if (adapter->ixgbe_ieee_pfc)
 		pfc_en |= !!(adapter->ixgbe_ieee_pfc->pfc_en);
+#endif
 
 	if (!(adapter->flags & IXGBE_FLAG_DCB_ENABLED) || !pfc_en) {
 		ixgbe_update_xoff_rx_lfc(adapter);
@@ -3519,9 +3522,10 @@ static void ixgbe_set_rx_drop_en(struct ixgbe_adapter *adapter)
 	bool pfc_en = false;
 #endif
 
+#ifdef CONFIG_IXGBE_DCB
 	if (adapter->ixgbe_ieee_pfc)
 		pfc_en |= !!(adapter->ixgbe_ieee_pfc->pfc_en);
-
+#endif
 	/*
 	 * We should set the drop enable bit if:
 	 *  SR-IOV is enabled
@@ -6936,8 +6940,10 @@ static void ixgbe_watchdog_update_link(struct ixgbe_adapter *adapter)
 		link_up = true;
 	}
 
+#ifdef CONFIG_IXGBE_DCB
 	if (adapter->ixgbe_ieee_pfc)
 		pfc_en |= !!(adapter->ixgbe_ieee_pfc->pfc_en);
+#endif
 
 	if (link_up && !((adapter->flags & IXGBE_FLAG_DCB_ENABLED) && pfc_en)) {
 		hw->mac.ops.fc_enable(hw);

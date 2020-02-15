@@ -2104,6 +2104,9 @@ static s32 ixgbe_reset_pipeline_82599(struct ixgbe_hw *hw)
 	if (!(anlp1_reg & IXGBE_ANLP1_AN_STATE_MASK)) {
 		hw_dbg(hw, "auto negotiation not completed\n");
 		ret_val = IXGBE_ERR_RESET_FAILED;
+		// XXX: AUTOC failed. but just continue
+		ret_val = 0;
+		return ret_val;
 		goto reset_pipeline_out;
 	}
 

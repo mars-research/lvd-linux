@@ -19,6 +19,7 @@ unsigned long domain = 0;
 unsigned long bus = 0;
 unsigned long slot = 0;
 unsigned long fn = 0;
+bool link_debug_verbose = true;
 
 static int ixgbe_lcd_init(void)
 {

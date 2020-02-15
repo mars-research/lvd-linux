@@ -52,6 +52,8 @@ static enum ixgbe_phy_type ixgbe_get_phy_type_from_id(u32 phy_id);
 static s32 ixgbe_get_phy_id(struct ixgbe_hw *hw);
 static s32 ixgbe_identify_qsfp_module_generic(struct ixgbe_hw *hw);
 
+extern bool link_debug_verbose;
+
 /**
  *  ixgbe_out_i2c_byte_ack - Send I2C byte with ack
  *  @hw: pointer to the hardware structure
@@ -350,9 +352,17 @@ s32 ixgbe_identify_phy_generic(struct ixgbe_hw *hw)
 			hw->phy.phy_semaphore_mask = IXGBE_GSSR_PHY0_SM;
 	}
 
+	if (link_debug_verbose)
+		printk("%s, phy.type %x \n", __func__, hw->phy.type);
+
 	if (hw->phy.type == ixgbe_phy_unknown) {
 		for (phy_addr = 0; phy_addr < IXGBE_MAX_PHY_ADDR; phy_addr++) {
 			hw->phy.mdio.prtad = phy_addr;
+
+			if (link_debug_verbose)
+				printk("%s, Calling mdio45_probe with phy_addr %x\n",
+						__func__, phy_addr);
+
 			if (_mdio45_probe(&hw->phy.mdio, phy_addr) == 0) {
 				ixgbe_get_phy_id(hw);
 				hw->phy.type =
@@ -431,6 +441,8 @@ static s32 ixgbe_get_phy_id(struct ixgbe_hw *hw)
 		hw->phy.id |= (u32)(phy_id_low & IXGBE_PHY_REVISION_MASK);
 		hw->phy.revision = (u32)(phy_id_low & ~IXGBE_PHY_REVISION_MASK);
 	}
+	if (link_debug_verbose)
+		printk("%s, phy id: %x | revision: %x\n", __func__, hw->phy.id, hw->phy.revision);
 	return status;
 }
 
@@ -542,6 +554,13 @@ s32 ixgbe_read_phy_reg_mdi(struct ixgbe_hw *hw, u32 reg_addr, u32 device_type,
 		   (hw->phy.mdio.prtad << IXGBE_MSCA_PHY_ADDR_SHIFT) |
 		   (IXGBE_MSCA_ADDR_CYCLE | IXGBE_MSCA_MDI_COMMAND));
 
+	if (link_debug_verbose)
+		printk("%s, Writint MSCA reg_addr %x dev_type %x prtad %x\n", __func__,
+			(reg_addr << IXGBE_MSCA_NP_ADDR_SHIFT),
+			(device_type << IXGBE_MSCA_DEV_TYPE_SHIFT),
+			(hw->phy.mdio.prtad << IXGBE_MSCA_PHY_ADDR_SHIFT)
+	      );
+
 	IXGBE_WRITE_REG(hw, IXGBE_MSCA, command);
 
 	/* Check every 10 usec to see if the address cycle completed.
@@ -570,6 +589,13 @@ s32 ixgbe_read_phy_reg_mdi(struct ixgbe_hw *hw, u32 reg_addr, u32 device_type,
 		   (hw->phy.mdio.prtad << IXGBE_MSCA_PHY_ADDR_SHIFT) |
 		   (IXGBE_MSCA_READ | IXGBE_MSCA_MDI_COMMAND));
 
+	if (link_debug_verbose)
+		printk("%s, 2. Writing MSCA reg_addr %x dev_type %x prtad %x\n", __func__,
+			(reg_addr << IXGBE_MSCA_NP_ADDR_SHIFT),
+			(device_type << IXGBE_MSCA_DEV_TYPE_SHIFT),
+			(hw->phy.mdio.prtad << IXGBE_MSCA_PHY_ADDR_SHIFT)
+	      );
+
 	IXGBE_WRITE_REG(hw, IXGBE_MSCA, command);
 
 	/* Check every 10 usec to see if the address cycle
@@ -596,6 +622,8 @@ s32 ixgbe_read_phy_reg_mdi(struct ixgbe_hw *hw, u32 reg_addr, u32 device_type,
 	data >>= IXGBE_MSRWD_READ_DATA_SHIFT;
 	*phy_data = (u16)(data);
 
+	if (link_debug_verbose)
+		printk("%s, read is complete phy_data: %x\n", __func__, data);
 	return 0;
 }
 
@@ -1166,10 +1194,14 @@ s32 ixgbe_identify_module_generic(struct ixgbe_hw *hw)
 {
 	switch (hw->mac.ops.get_media_type(hw)) {
 	case ixgbe_media_type_fiber:
+		if (link_debug_verbose)
+			printk("%s, calling ixgbe_identify_sfp_module_generic", __func__);
 		return ixgbe_identify_sfp_module_generic(hw);
 	case ixgbe_media_type_fiber_qsfp:
 		return ixgbe_identify_qsfp_module_generic(hw);
 	default:
+		if (link_debug_verbose)
+			printk("%s default case, not present", __func__);
 		hw->phy.sfp_type = ixgbe_sfp_type_not_present;
 		return IXGBE_ERR_SFP_NOT_PRESENT;
 	}
@@ -1196,6 +1228,9 @@ s32 ixgbe_identify_sfp_module_generic(struct ixgbe_hw *hw)
 	u8 cable_tech = 0;
 	u8 cable_spec = 0;
 	u16 enforce_sfp = 0;
+
+	if (link_debug_verbose)
+		printk("%s, called", __func__);
 
 	if (hw->mac.ops.get_media_type(hw) != ixgbe_media_type_fiber) {
 		hw->phy.sfp_type = ixgbe_sfp_type_not_present;

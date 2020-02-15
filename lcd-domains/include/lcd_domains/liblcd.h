@@ -67,7 +67,7 @@ void __liblcd_mem_itree_dump(void);
  * host's configuration (MAX_ORDER - 1; MAX_ORDER is defined in 
  * linux/mmzone.h at the top). For x86_64, this is 4 MBs (2^10 = 1024 pages).
  */
-#define LCD_HEAP_NR_PAGES_ORDER 12
+#define LCD_HEAP_NR_PAGES_ORDER 15
 #define LCD_HEAP_SIZE (1UL << (LCD_HEAP_NR_PAGES_ORDER + PAGE_SHIFT))
 #define LCD_HEAP_MIN_ORDER 0
 #define LCD_HEAP_MAX_ORDER (MAX_ORDER - 1)

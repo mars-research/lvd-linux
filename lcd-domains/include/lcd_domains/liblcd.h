@@ -82,6 +82,21 @@ int __liblcd_heap_init(void);
 #ifdef CONFIG_LVD
 int __liblvd_heap_init(void);
 #endif
+
+/*
+ * DIRECT HEAP
+ *
+ * Direct heap is just 1 GiB
+ * Used to allocate memory using the low-level allocator, which calls out to
+ * the microkernel for every allocation.
+ */
+#define LCD_DIRECT_HEAP_NR_PAGES_ORDER 17
+#define LCD_DIRECT_HEAP_SIZE (1UL << (LCD_DIRECT_HEAP_NR_PAGES_ORDER + PAGE_SHIFT))
+#define LCD_DIRECT_HEAP_MIN_ORDER 0
+#define LCD_DIRECT_HEAP_MAX_ORDER (MAX_ORDER - 1)
+
+
+int __liblcd_direct_heap_init(void);
 /* 
  * RAM MAPPING --------------------------------------------------
  *

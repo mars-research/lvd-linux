@@ -65,6 +65,17 @@ lcd_enter(void)
 		goto fail;
 	}
 	LIBLCD_MSG("heap and kmalloc initialized");
+
+	/*
+	 * Initialize dheap
+	 */
+	ret = __liblcd_direct_heap_init();
+	if (ret) {
+		LIBLCD_ERR("failed to initialize dheap");
+		goto fail;
+	}
+	LIBLCD_MSG("dheap initialized");
+
 	/*
 	 * Initialize RAM map
 	 */

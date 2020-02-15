@@ -1940,13 +1940,35 @@ struct task_struct {
 	/* to save lcd_stack when moving in/out of vmfunc domain */
 	void *lcd_stack;
 
+	/*
+	 * Saves the bit allocated from a bitmap for this call into the vmfunc
+	 * domain
+	 */
 	int lcd_stack_bit;
 
+	/*
+	 * Records the cpu on which the lcd stack was allocated. Used for lazy
+	 * deallocation
+	 */
 	int lcd_stack_cpu;
 
+	/*
+	 * Keeps track of how many nesting count into the vmfunc domain
+	 */
 	int nested_count;
 
+	/*
+	 * Physical address of the cr3 register we mapped into the VMFUNC EPT.
+	 * This is to check if this process needs a remapping of cr3.
+	 */
 	phys_addr_t mapped_cr3;
+
+	/*
+	 * Since we do not trust the code running inside vmfunc domain, use
+	 * this area to store fpu regs if kernel is using FPU
+	 */
+	struct fpu kernel_fpu;
+
 /* CPU-specific state of this task */
 	struct thread_struct thread;
 /*

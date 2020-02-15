@@ -27,7 +27,7 @@ static struct net_device *g_net_device;
 
 #ifdef IOMMU_ASSIGN
 /* device for IOMMU assignment */
-struct pcidev_info dev_assign = { 0x0000, 0x00, 0x00, 0x0 };
+struct pcidev_info dev_assign = { 0, 0, 0, 0 };
 extern unsigned long domain, bus, slot, fn;
 #endif
 
@@ -423,6 +423,8 @@ int probe_callee(struct fipc_message *_request)
 	dev_assign.slot = slot;
 	dev_assign.fn = fn;
 
+	printk("%s, Got pci device %04lx:%02lx:%02lx.%02lx", __func__,
+				domain, bus, slot, fn);
 	other_ref.cptr = fipc_get_reg1(_request);
 	dma_mask = fipc_get_reg2(_request);
 
@@ -449,7 +451,7 @@ int probe_callee(struct fipc_message *_request)
 	}
 	dev_container->pci_dev.dev.kobj.name = "ixgbe_lcd";
 	dev_container->pci_dev.vendor = 0x8086;
-	dev_container->pci_dev.device = 0x10fd;
+	dev_container->pci_dev.device = 0x10fb;
 	dev_container->other_ref = other_ref;
 	dev_container->pci_dev.dev.dma_mask = &dma_mask;
 
@@ -2042,7 +2044,7 @@ int msix_vector_handler_callee(struct fipc_message *_request)
 		printk("irqhandler_ctr %p irqhandler %p",
 				irqhandler_container, irqhandler_container->irqhandler);
 
-	/* printk("%s, irq:%d irqret %d\n", __func__, irq, irqret); */
+	//printk("%s, irq:%d irqret %d\n", __func__, irq, irqret);
 	fipc_set_reg0(_request, irqret);
 	return ret;
 }
@@ -2185,6 +2187,7 @@ int poll_callee(struct fipc_message *_request)
 	napi_idx = fipc_get_reg1(_request);
 	if (napi_idx > 32) {
 		printk("%s, napi_idx 32! BUG", __func__);
+		goto exit;
 	}
 	napi = napi_struct_array[napi_idx];
 #else
@@ -2207,8 +2210,11 @@ int poll_callee(struct fipc_message *_request)
 	ret = ixgbe_poll(napi, budget);
 
 	fipc_set_reg0(_request, ret);
-	//fipc_set_reg1(_request, napi->state);
+#ifdef CONFIG_LCD_NAPI_STATE_SYNC
+	fipc_set_reg1(_request, napi->state);
+#endif
 
+exit:
 	return 0;
 }
 

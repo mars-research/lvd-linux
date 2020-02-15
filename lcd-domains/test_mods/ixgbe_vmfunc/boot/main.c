@@ -24,6 +24,16 @@ static unsigned int bind_cpu = 2;
 module_param(bind_cpu, uint, 0644);
 MODULE_PARM_DESC(bind_cpu, "Bind kthread to this cpu");
 
+static unsigned int domain;
+static unsigned int bus;
+static unsigned int slot;
+static unsigned int fn;
+
+module_param(domain, uint, 0);
+module_param(bus, uint, 0);
+module_param(slot, uint, 0);
+module_param(fn, uint, 0);
+
 static int boot_main(void)
 {
 	int ret;
@@ -62,6 +72,11 @@ static int boot_main(void)
 	/* for udelay calculation we need lpj inside LCD */
 	lcd_to_boot_info(ixgbe_ctx)->cptrs[1].cptr =
 			this_cpu_read(cpu_info.loops_per_jiffy);
+
+	lcd_to_boot_info(ixgbe_ctx)->cptrs[2].cptr = domain;
+	lcd_to_boot_info(ixgbe_ctx)->cptrs[3].cptr = bus;
+	lcd_to_boot_info(ixgbe_ctx)->cptrs[4].cptr = slot;
+	lcd_to_boot_info(ixgbe_ctx)->cptrs[5].cptr = fn;
 
 	/* ---------- RUN! ---------- */
 	LIBLCD_MSG("starting network...");

@@ -1,4 +1,5 @@
 #include <linux/mm.h>
+#include <asm/desc.h>
 #include <lcd_domains/types.h>
 #include <asm/lcd_domains/libvmfunc.h>
 #include <asm/lcd_domains/ept_lcd.h>
@@ -9,6 +10,9 @@
 #include <asm/pgtable_64.h>
 #ifdef CONFIG_LCD_TRACE_BUFFER
 #include <linux/lcd_trace.h>
+#endif
+#ifdef CONFIG_LVD_PROTECT_FPU
+#include <asm/fpu/internal.h>
 #endif
 
 #define NUM_LCDS		5
@@ -236,6 +240,47 @@ void drop_stack(int ept)
 	}
 }
 
+#ifdef CONFIG_LVD_PROTECT_FPU
+void save_fpu_regs(void)
+{
+	/*
+	 * Check if kernel is using the FPU
+	 */
+	if (kernel_fpu_disabled()) {
+		//printk("%s: [%s:%d] kernel fpu state\n", __func__, current->comm, current->pid);
+		/* Save if kernel is using the FPU */
+		copy_fpregs_to_fpstate(&current->kernel_fpu);
+	} else {
+		struct fpu *fpu = &current->thread.fpu;
+		/* if not, save it only if fpregs_active is set */
+		if (fpu->fpregs_active) {
+			//printk("%s: [%s:%d] user fpu state\n", __func__, current->comm, current->pid);
+			copy_fpregs_to_fpstate(fpu);
+		}
+	}
+}
+
+void restore_fpu_regs(void)
+{
+	/*
+	 * Check if kernel was using the FPU
+	 */
+	if (kernel_fpu_disabled()) {
+		//printk("%s: [%s:%d] kernel fpu state\n", __func__, current->comm, current->pid);
+		/* Restore if kernel was using the FPU */
+		copy_kernel_to_fpregs(&current->kernel_fpu.state);
+	} else {
+		struct fpu *fpu = &current->thread.fpu;
+		/* if user was using it, restore it only if fpregs_active is set */
+		if (fpu->fpregs_active) {
+			//printk("%s: [%s:%d] user fpu state\n", __func__, current->comm, current->pid);
+			copy_kernel_to_fpregs(&fpu->state);
+		}
+	}
+
+}
+#endif
+
 int vmfunc_klcd_wrapper(struct fipc_message *msg, unsigned int ept)
 {
 	int ret = 0;
@@ -258,6 +303,10 @@ int vmfunc_klcd_wrapper(struct fipc_message *msg, unsigned int ept)
 
 	if (current->nested_count++ == 0)
 		pick_stack(ept);
+
+#ifdef CONFIG_LVD_PROTECT_FPU
+	save_fpu_regs();
+#endif
 
 	local_irq_restore(flags);
 #if 0

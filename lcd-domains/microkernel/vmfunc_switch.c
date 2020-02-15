@@ -436,6 +436,14 @@ skip:
 	gpa_cr3 = __gpa(cr3_base);
 
 	/*
+	 * For some weird reason, processes with pid 0 occasionally fails to
+	 * find the vmfunc page even if mapped before. So, try to always map
+	 * those processes, even if mapped.
+	 */
+	if (lcd && !current->pid)
+		goto force_map;
+
+	/*
 	 * XXX: We overwrite even if the entry is present. why?  Since the
 	 * Linux kernel uses lazy cr3 switch, we may run into a situation where
 	 * the application has entered this wrapper with cr3_a and later
@@ -447,6 +455,7 @@ skip:
 	 * So, simply overwrite this mapping as it would not harm us.
 	 */
 	if (lcd && (current->mapped_cr3 != cr3_base)) {
+force_map:
 		ret = lcd_arch_ept_map_all_cpus(lcd_list[ept]->lcd_arch, gpa_cr3,
 			hpa_lcd_cr3,
 			1, /* create, if not present */

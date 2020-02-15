@@ -37,11 +37,40 @@
 #include <linux/rtnetlink.h>
 #include <net/rtnetlink.h>
 #include <linux/u64_stats_sync.h>
+#include <linux/priv_mempool.h>
+#include <linux/vmalloc.h>
 
 #define DRV_NAME	"dummy"
 #define DRV_VERSION	"1.0"
 
+#define SKB_DATA_POOL_SIZE	(256UL << 20)
+#define SKB_DATA_POOL_PAGES	(SKB_DATA_POOL_SIZE >> PAGE_SHIFT)
+#define SKB_DATA_POOL_ORDER	ilog2(roundup_pow_of_two(SKB_DATA_POOL_PAGES))
+
 static int numdummies = 1;
+static bool use_priv_pool = false;
+
+priv_pool_t *pool;
+void *pool_base = NULL;
+size_t pool_size = 0;
+
+void skb_data_pool_init(void)
+{
+	printk("%s, init pool for skbdata | size %zu | %lx\n", __func__,
+			SKB_DATA_SIZE, SKB_DATA_SIZE);
+
+	pool_base = vzalloc(SKB_DATA_POOL_SIZE);
+	pool_size = SKB_DATA_POOL_SIZE;
+	pool = priv_pool_init(SKB_DATA_POOL, (void*) pool_base, pool_size, 2048);
+
+	priv_pool_dumpstats(pool);
+}
+
+void skb_data_pool_free(void)
+{
+	vfree(pool->pool);
+	priv_pool_destroy(pool);
+}
 
 /* fake multicast ability */
 static void set_multicast_list(struct net_device *dev)
@@ -150,6 +179,8 @@ static void dummy_setup(struct net_device *dev)
 	dev->features	|= NETIF_F_SG | NETIF_F_FRAGLIST;
 	dev->features	|= NETIF_F_ALL_TSO | NETIF_F_UFO;
 	dev->features	|= NETIF_F_HW_CSUM | NETIF_F_HIGHDMA | NETIF_F_LLTX;
+	if (use_priv_pool)
+		dev->features	|= NETIF_F_PRIV_DATA_POOL;
 	dev->features	|= NETIF_F_GSO_ENCAP_ALL;
 	dev->hw_features |= dev->features;
 	dev->hw_enc_features |= dev->features;
@@ -177,6 +208,9 @@ static struct rtnl_link_ops dummy_link_ops __read_mostly = {
 module_param(numdummies, int, 0);
 MODULE_PARM_DESC(numdummies, "Number of dummy pseudo devices");
 
+module_param(use_priv_pool, bool, false);
+MODULE_PARM_DESC(use_priv_pool, "Use private pool for skb->data");
+
 static int __init dummy_init_one(void)
 {
 	struct net_device *dev_dummy;
@@ -201,6 +235,9 @@ static int __init dummy_init_module(void)
 {
 	int i, err = 0;
 
+	if (use_priv_pool)
+		skb_data_pool_init();
+
 	rtnl_lock();
 	err = __rtnl_link_register(&dummy_link_ops);
 	if (err < 0)
@@ -222,6 +259,9 @@ out:
 static void __exit dummy_cleanup_module(void)
 {
 	rtnl_link_unregister(&dummy_link_ops);
+
+	if (use_priv_pool && pool)
+		skb_data_pool_free();
 }
 
 module_init(dummy_init_module);

@@ -52,10 +52,11 @@ static void kernel_fpu_enable(void)
 	this_cpu_write(in_kernel_fpu, false);
 }
 
-static bool kernel_fpu_disabled(void)
+bool kernel_fpu_disabled(void)
 {
 	return this_cpu_read(in_kernel_fpu);
 }
+EXPORT_SYMBOL(kernel_fpu_disabled);
 
 /*
  * Were we in an interrupt that interrupted kernel mode?

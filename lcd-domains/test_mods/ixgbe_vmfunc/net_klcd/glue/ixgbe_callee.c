@@ -3192,10 +3192,11 @@ int netif_napi_del_callee(struct fipc_message *_request)
 
 int netif_wake_subqueue_callee(struct fipc_message *_request)
 {
-	struct net_device_container *dev_container;
+	//struct net_device_container *dev_container;
 	unsigned 	short queue_index;
-	int ret;
+	int ret = 0;
 
+#if 0
 	ret = glue_cap_lookup_net_device_type(c_cspace,
 		__cptr(fipc_get_reg1(_request)),
 		&dev_container);
@@ -3203,13 +3204,15 @@ int netif_wake_subqueue_callee(struct fipc_message *_request)
 		LIBLCD_ERR("lookup");
 		goto fail_lookup;
 	}
+#endif
 
 	queue_index = fipc_get_reg3(_request);
 	//printk("%s, qindex: %d\n", __func__, queue_index);
-	netif_wake_subqueue(( &dev_container->net_device ),
-			queue_index);
+	//netif_wake_subqueue(( &dev_container->net_device ),
+	//		queue_index);
 
-fail_lookup:
+	netif_wake_subqueue(g_ndev, queue_index);
+//fail_lookup:
 	return ret;
 }
 

@@ -13,6 +13,7 @@
 #include <linux/miscdevice.h>
 #include <linux/compat.h>
 #include <linux/slab.h>
+#include <linux/sched.h>
 #include <asm/uaccess.h>
 #include <asm/pgtable.h>
 #include <linux/sysrq.h>
@@ -204,6 +205,14 @@ fail0:
 	return ret;
 }
 
+void remove_mapped_cr3(void)
+{
+	struct task_struct *proc_list;
+	for_each_process(proc_list) {
+		proc_list->mapped_cr3 = 0UL;
+	}
+}
+
 static void __exit lcd_exit(void)
 {
 	lcd_debugfs_exit();
@@ -223,6 +232,7 @@ static void __exit lcd_exit(void)
 #else
 	lcd_arch_exit();
 #endif
+	remove_mapped_cr3();
 	LCD_MSG("lcd microkernel exited");
 }
 

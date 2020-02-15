@@ -204,14 +204,33 @@ __asm__ (
 
 void noinline
 __vmfunc_trampoline
-vmfunc_call_empty_switch(void)
+__vmfunc_call_empty_switch(void)
+{
+	asm volatile(
+		/* populate eax, ecx */
+		"mov $0, %eax \n\t"
+		"mov $0, %ecx \n\t"
+		/* switch to domain 0 */
+		"vmfunc 	\n\t"
+		);
+}
+
+void noinline
+__vmfunc_trampoline
+vmfunc_call_empty_switch(int count)
 {
 	asm volatile(
 		/* populate eax, ecx */
 		"mov $0, %eax \n\t"
 		"mov $1, %ecx \n\t"
 		/* switch to domain 1 */
-		"vmfunc 	\n\t"
+		"vmfunc 	\n\t");
+	do {
+		asm volatile(
+			"add %eax, %eax \n\t");
+		count--;
+	} while (count > 0);
+	asm volatile(
 		/* zero ecx */
 		"xor %ecx, %ecx \n\t"
 		/* switch back to domain 0 */

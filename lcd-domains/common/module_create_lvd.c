@@ -1508,7 +1508,7 @@ int create_lvd_stack_pools(struct lcd_create_ctx *ctx, cptr_t lcd)
 
 		this_stack->bitmap = ~0ll;
 		this_stack->stacks = kzalloc(sizeof(void*) * NUM_STACKS_PER_CPU, GFP_KERNEL);
-		this_stack->lazy_bitmap = ~0ll;
+		this_stack->lazy_bitmap = 0ll;
 		spin_lock_init(&this_stack->lazy_bm_lock);
 		this_stack->lazy_updated = false;
 

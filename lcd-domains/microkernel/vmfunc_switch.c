@@ -187,7 +187,9 @@ void pick_stack(int ept)
 	}
 	if (this_stack->lazy_updated) {
 		int bit = ffsll(this_stack->lazy_bitmap);
-		spin_lock(&this_stack->lazy_bm_lock);
+		unsigned long flags;
+		printk("%s, clean lazy_stacks %llx\n", __func__, this_stack->lazy_bitmap);
+		spin_lock_irqsave(&this_stack->lazy_bm_lock, flags);
 
 		/* process all the lazy bits */
 		do {
@@ -195,13 +197,13 @@ void pick_stack(int ept)
 				/* mark this bit as free in the original bitmap */
 				this_stack->bitmap |= (1LL << bit);
 				/* mark it as zero */
-				this_stack->lazy_bitmap &= ~(1LL << bit);
+				this_stack->lazy_bitmap &= ~(1LL << (bit-1));
 			}
 		} while ((bit = ffsll(this_stack->lazy_bitmap)));
 
 		/* update variable to false */
 		this_stack->lazy_updated = false;
-		spin_unlock(&this_stack->lazy_bm_lock);
+		spin_unlock_irqrestore(&this_stack->lazy_bm_lock, flags);
 	}
 	put_cpu();
 	BUG_ON(!current->lcd_stack);
@@ -225,11 +227,12 @@ void drop_stack(int ept)
 		/*
 		 * perform lazy deallocation
 		 */
+		unsigned long flags;
 		struct lcd_stack *other_stack = per_cpu_ptr(lcd->lcd_stacks, current->lcd_stack_cpu);
-		spin_lock(&other_stack->lazy_bm_lock);
+		spin_lock_irqsave(&other_stack->lazy_bm_lock, flags);
 		other_stack->lazy_bitmap |= (1LL << current->lcd_stack_bit);
 		other_stack->lazy_updated = true;
-		spin_unlock(&other_stack->lazy_bm_lock);
+		spin_unlock_irqrestore(&other_stack->lazy_bm_lock, flags);
 	}
 }
 

@@ -438,7 +438,9 @@ vmfunc_test_wrapper(struct fipc_message *request, vmfunc_test_t test)
 #ifdef CONFIG_DEFEAT_LAZY_TLB
 		remap_cr3();
 #endif
-		vmfunc_call_empty_switch();
+		__vmfunc_call_empty_switch();
+		printk("Done!");
+		vmfunc_call_empty_switch(0);
 #ifdef CONFIG_DO_BF_PAGE_WALK
 		bfcall_guest_page_walk(vmfunc_load_addr, __pa(current->active_mm->pgd), 1);
 		bfcall_guest_page_walk(gva_val(gva_lcd_stack), __pa(current->active_mm->pgd), 1);
@@ -447,15 +449,41 @@ vmfunc_test_wrapper(struct fipc_message *request, vmfunc_test_t test)
 #endif
 
 #ifdef CONFIG_VMFUNC_SWITCH_MICROBENCHMARK
+
 		{
 			int i = 0;
 			u64 start = rdtsc(), end;
 			for (; i < NUM_ITERATIONS; i++) {
-				vmfunc_call_empty_switch();
+				__vmfunc_call_empty_switch();
 			}
 			end = rdtsc();
-			printk("%d iterations of vmfunc back-to-back took %llu cycles (avg: %llu cycles)\n",
-					NUM_ITERATIONS, end - start, (end - start) / NUM_ITERATIONS);
+			printk("%d iterations of vmfunc (same domain) back-to-back "
+					"took %llu cycles (avg: %llu cycles)\n",
+					NUM_ITERATIONS,
+					end - start,
+					(end - start) / NUM_ITERATIONS);
+		}
+
+
+		{
+			int j = 0;
+			for (; j < 5; j++) {
+				int i = 0;
+				u64 start = rdtsc(), end;
+				for (; i < NUM_ITERATIONS; i++) {
+					int k = 0;
+					for (; k < j; k++)
+						asm volatile("add %eax, %eax\n\t");
+					vmfunc_call_empty_switch(0);
+				}
+				end = rdtsc();
+				cond_resched();
+				printk("%d iterations of vmfunc back-to-back with %d add "
+						"insns took %llu cycles (avg: %llu cycles)\n",
+						NUM_ITERATIONS, j,
+						end - start,
+						(end - start) / NUM_ITERATIONS);
+			}
 		}
 #endif	/* CONFIG_VMFUNC_SWITCH_MICROBENCHMARK */
 		break;

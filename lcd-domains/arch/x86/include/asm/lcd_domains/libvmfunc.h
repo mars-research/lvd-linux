@@ -132,7 +132,8 @@ void vmfunc_trampoline_entry(struct fipc_message *msg);
 void vmfunc_springboard_entry(struct fipc_message *msg);
 int noinline vmfunc_wrapper(struct fipc_message *msg);
 int noinline vmfunc_test_wrapper(struct fipc_message *msg, vmfunc_test_t type);
-void noinline vmfunc_call_empty_switch(void);
+void noinline vmfunc_call_empty_switch(int);
+void noinline __vmfunc_call_empty_switch(void);
 int vmfunc_klcd_wrapper(struct fipc_message *msg, unsigned int ept);
 int vmfunc_klcd_test_wrapper(struct fipc_message *msg, unsigned int ept, vmfunc_test_t type);
 

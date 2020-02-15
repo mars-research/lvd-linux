@@ -125,6 +125,10 @@ __asm__ (
 	/* back in trusted domain, reenable irqs */
 	"  sti			\n\t"
 #endif
+
+#ifdef CONFIG_LVD_PROTECT_FPU
+	"  call  restore_fpu_regs	\n\t"
+#endif
 	/* everything is set, pop all regs */
 	"  pop %r15	\n\t"
 	"  pop %r14	\n\t"

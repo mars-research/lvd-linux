@@ -31,6 +31,29 @@ __asm__(
 		/* we are in trusted domain, re-enable irqs */
 		"  sti				\n\t"
 #endif
+
+#ifdef CONFIG_LVD_PROTECT_FPU
+		"  push " _REG0 " \n\t"
+		"  push " _REG1 " \n\t"
+		"  push " _REG2 " \n\t"
+		"  push " _REG3 " \n\t"
+		"  push " _REG4 " \n\t"
+		"  push " _REG5 " \n\t"
+		"  push " _REG6 " \n\t"
+		"  push " _REG7 " \n\t"
+
+		"  call restore_fpu_regs	\n\t"
+
+		"  pop " _REG7 " \n\t"
+		"  pop " _REG6 " \n\t"
+		"  pop " _REG5 " \n\t"
+		"  pop " _REG4 " \n\t"
+		"  pop " _REG3 " \n\t"
+		"  pop " _REG2 " \n\t"
+		"  pop " _REG1 " \n\t"
+		"  pop " _REG0 " \n\t"
+#endif
+
 		/* stack is populated. we are good to go */
 		"  call vmfunc_dispatch		\n\t"
 
@@ -64,7 +87,17 @@ __asm__(
 
 		/* we need a valid stack here */
 		"  call remap_cr3	\n\t"
+#endif
+		/*
+		 * WARNING: This call has to be between these push and pop
+		 * regs. Moving it anywhere else would break things as the
+		 * registers are used to carry information across the domains.
+		 */
+#ifdef CONFIG_LVD_PROTECT_FPU
+		"  call save_fpu_regs	\n\t"
+#endif
 
+#ifdef CONFIG_DEFEAT_LAZY_TLB
 		"  pop " _REG7 " \n\t"
 		"  pop " _REG6 " \n\t"
 		"  pop " _REG5 " \n\t"

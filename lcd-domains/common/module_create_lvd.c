@@ -25,7 +25,7 @@
 
 #define LVD_PERCPU_STACK
 #define LVD_PERCPU_VMFUNC_STATE
-
+#define PEBS_BUFFER_SIZE	(PAGE_SIZE << 4)
 /* MEMORY REGIONS -------------------------------------------------- */
 
 /*
@@ -893,7 +893,7 @@ static int do_misc_pages_grant_map(cptr_t lcd, struct lcd_create_ctx *ctx)
 		LIBLCD_MSG("grant mem for cpu_hw_events.pebs %p", per_cpu(lvd_cpu_hw_events_pebs, cpu));
 
 		map_cpu_page(pebs, ctx);
-		__do_ept_mapping(lcd, pebs, ctx, PAGE_SIZE);
+		__do_ept_mapping(lcd, pebs, ctx, PEBS_BUFFER_SIZE);
 
 	};
 

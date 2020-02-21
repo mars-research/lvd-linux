@@ -19,5 +19,6 @@ Vikram Narayanan, Yongzhe Huang, Gang Tan, Trent Jaeger, and Anton Burtsev. **Li
 LVDs are available as two git repositories:
 
 The hypervisor: [lvd-bareflank](https://github.com/mars-research/lvd-bflank)
+
 LVDs-compatible Linux kernel: [lvd-linux](https://github.com/mars-research/lvd-linux)
 

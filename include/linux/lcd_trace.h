@@ -49,6 +49,7 @@ struct ring_trace_entry {
 	unsigned type;
 	unsigned orig_type;
 	unsigned long long ts;
+	phys_addr_t mapped_cr3;
 	char name[PROC_NAME_MAX];
 };
 

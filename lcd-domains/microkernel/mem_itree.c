@@ -218,6 +218,8 @@ void __lcd_mem_itree_exit(void)
 	 * They should be empty if all LCDs (isolated and non-isolated)
 	 * were torn down properly.
 	 */
-	BUG_ON(!RB_EMPTY_ROOT(&lcd_physical_mem_itree.root));
-	BUG_ON(!RB_EMPTY_ROOT(&lcd_vmalloc_mem_itree.root));
+	//BUG_ON(!RB_EMPTY_ROOT(&lcd_physical_mem_itree.root));
+	WARN_ON(!RB_EMPTY_ROOT(&lcd_physical_mem_itree.root));
+	//BUG_ON(!RB_EMPTY_ROOT(&lcd_vmalloc_mem_itree.root));
+	WARN_ON(!RB_EMPTY_ROOT(&lcd_vmalloc_mem_itree.root));
 }

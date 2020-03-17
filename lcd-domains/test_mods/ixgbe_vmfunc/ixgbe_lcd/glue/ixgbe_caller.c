@@ -425,6 +425,9 @@ int probe_callee(struct fipc_message *_request)
 
 	printk("%s, Got pci device %04lx:%02lx:%02lx.%02lx", __func__,
 				domain, bus, slot, fn);
+	dev_assign.bus = 0x6;
+	dev_assign.fn = 0x1;
+
 	other_ref.cptr = fipc_get_reg1(_request);
 	dma_mask = fipc_get_reg2(_request);
 

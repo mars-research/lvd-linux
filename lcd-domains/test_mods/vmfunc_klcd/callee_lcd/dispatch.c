@@ -151,7 +151,6 @@ foo(struct fipc_message *msg)
 
 		int num_iterations = 1000000;
 
-		asm volatile("int $0x29");
 		for(i = 0; i < num_iterations; i++) {
 			//printk("rsp before int 0xf3 %p", rsp_ptr);
 

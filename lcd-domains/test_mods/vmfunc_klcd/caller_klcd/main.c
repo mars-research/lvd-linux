@@ -161,7 +161,6 @@ static int caller_main(void)
 	printk("%s entered,  lcd_stack %p\n", __func__, lcd_stack);
 	vmfunc_init(lcd_stack, handle_rpc_calls_klcd, NULL);
 
-	lvd_vector_override_handler = klcd_lvd_callback_handler;
 
 	run_vmfunc_tests();
 

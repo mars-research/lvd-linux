@@ -44,5 +44,6 @@ extern void irq_ts_restore(int TS_state);
  * messages.
  */
 extern int cpu_has_xfeatures(u64 xfeatures_mask, const char **feature_name);
+bool kernel_fpu_disabled(void);
 
 #endif /* _ASM_X86_FPU_API_H */

@@ -1,0 +1,24 @@
+#include <liblcd/trampoline_link.h>
+
+SECTIONS
+{
+	LCD_TRAMPOLINE_LINKER_SECTION(probe_trampoline)
+	LCD_TRAMPOLINE_LINKER_SECTION(remove_trampoline)
+	LCD_TRAMPOLINE_LINKER_SECTION(queue_rq_fn_trampoline)
+	LCD_TRAMPOLINE_LINKER_SECTION(map_queue_fn_trampoline)
+	LCD_TRAMPOLINE_LINKER_SECTION(init_request_fn_trampoline)
+	LCD_TRAMPOLINE_LINKER_SECTION(init_hctx_fn_trampoline)
+	LCD_TRAMPOLINE_LINKER_SECTION(exit_hctx_fn_trampoline)
+	LCD_TRAMPOLINE_LINKER_SECTION(complete_fn_trampoline)
+	LCD_TRAMPOLINE_LINKER_SECTION(timeout_fn_trampoline)
+	LCD_TRAMPOLINE_LINKER_SECTION(poll_fn_trampoline)
+	LCD_TRAMPOLINE_LINKER_SECTION(bd_open_trampoline)
+	LCD_TRAMPOLINE_LINKER_SECTION(bd_release_trampoline)
+	LCD_TRAMPOLINE_LINKER_SECTION(bd_ioctl_trampoline)
+	LCD_TRAMPOLINE_LINKER_SECTION(bd_getgeo_trampoline)
+	LCD_TRAMPOLINE_LINKER_SECTION(bd_revalidate_disk_trampoline)
+	LCD_TRAMPOLINE_LINKER_SECTION(fops_open_trampoline)
+	LCD_TRAMPOLINE_LINKER_SECTION(fops_release_trampoline)
+	LCD_TRAMPOLINE_LINKER_SECTION(fops_unlocked_ioctl_trampoline)
+}
+INSERT AFTER .text;

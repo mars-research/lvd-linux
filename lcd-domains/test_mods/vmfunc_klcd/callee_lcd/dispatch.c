@@ -8,6 +8,8 @@
 #include <asm/desc.h>
 #include <asm/irq_vectors.h>
 #include <asm/lcd_domains/bflank.h>
+#include <linux/slab.h>
+
 #include <lcd_config/post_hook.h>
 
 extern int callee_main(void);
@@ -15,6 +17,13 @@ extern int callee_main(void);
 #define NUM_IST_STACKS	7
 //#define CONFIG_DUMP_IRQ_REGS 1
 #define PGROUNDUP(sz)  (((sz)+PAGE_SIZE-1) & ~(PAGE_SIZE-1))
+
+#define ALLOC_SZ	152
+
+//#define TRIGGER_BREAKPOINT
+
+void *hw_addr;
+struct perf_event *hwbp;
 
 unsigned long noinline
 null_invocation(struct fipc_message *msg)
@@ -28,6 +37,10 @@ null_invocation(struct fipc_message *msg)
 
 		printk("%s, called, rsp %p", __func__, rsp_ptr);
 	}
+#ifdef TRIGGER_BREAKPOINT
+	if (hw_addr)
+		*((unsigned int*)hw_addr) = 0xdead;
+#endif
 	return 0;
 }
 
@@ -138,10 +151,7 @@ foo(struct fipc_message *msg)
 
 		int num_iterations = 1000000;
 
-		asm volatile("int $0x29");
 		for(i = 0; i < num_iterations; i++) {
-			asm volatile("mov %%rsp, %[rsp_ptr]"
-				: [rsp_ptr]"=r"(rsp_ptr));
 			//printk("rsp before int 0xf3 %p", rsp_ptr);
 
 			asm volatile("int $0xf3");
@@ -174,6 +184,8 @@ foo(struct fipc_message *msg)
 			asm volatile("nop");
 			i++;
 		} while (i < 1000000000);
+
+		asm volatile("mov %%rsp, %[rsp_ptr]" : [rsp_ptr]"=r"(rsp_ptr));
 
 		rsp_top = PGROUNDUP((unsigned long)rsp_ptr);
 
@@ -243,17 +255,117 @@ void irq_handler(struct fipc_message *msg)
 	vmfunc_wrapper(request);
 }
 
+struct perf_event *_register_wide_hw_breakpoint(struct perf_event_attr *attr,
+			    perf_overflow_handler_t triggered,
+			    void *context)
+{
+	int ret;
+	struct perf_event *func_ret;
+	struct fipc_message r;
+	struct fipc_message *_request = &r;
+
+	r.vmfunc_id = VMFUNC_RPC_CALL;
+	r.rpc_id = REGISTER_WIDE_HW_BREAKPOINT;
+
+	fipc_set_reg1(_request, attr->bp_len);
+	fipc_set_reg2(_request, attr->bp_type);
+	fipc_set_reg3(_request, attr->bp_addr);
+
+	ret = vmfunc_wrapper(_request);
+	func_ret = (struct perf_event *) fipc_get_reg0(_request);
+
+	return func_ret;
+}
+
+void _unregister_wide_hw_breakpoint(struct perf_event *hwbp)
+{
+	struct fipc_message r;
+	struct fipc_message *_request = &r;
+
+	r.vmfunc_id = VMFUNC_RPC_CALL;
+	r.rpc_id = UNREGISTER_WIDE_HW_BREAKPOINT;
+
+	fipc_set_reg0(_request, (unsigned long)hwbp);
+
+	vmfunc_wrapper(_request);
+}
+
+void create_hwbp(void)
+{
+	hw_addr = (void*) kmalloc(ALLOC_SZ, GFP_KERNEL);
+
+	if (hw_addr) {
+		struct perf_event_attr attr;
+		attr.bp_addr = (unsigned long) hw_addr;
+		attr.bp_len = HW_BREAKPOINT_LEN_8;
+		attr.bp_type = HW_BREAKPOINT_W;
+
+		hwbp = _register_wide_hw_breakpoint(&attr, NULL, NULL);
+
+		//*((unsigned int*)hw_addr) = 0xdeadbeef;
+	}
+}
+
+#define HEAP_NUM_PAGES		8192
+
+struct page *pages[HEAP_NUM_PAGES] = {0};
+
+void alloc_free_pages(void)
+{
+	int i;
+
+	for (i = 0; i < HEAP_NUM_PAGES; i++) {
+		pages[i] = lcd_alloc_pages(GFP_KERNEL, 0);
+		if (!(i % 100))
+			printk("%s allocate %d pages", __func__, i);
+		if (!pages[i]) {
+			printk("%s allocation failed while alloc-ing %d th page", __func__, i);
+			break;
+		}
+	}
+
+	for (; i >= 0; i--) {
+		if (pages[i])
+			lcd_free_pages(pages[i], 0);
+	}
+}
+
+#define DHEAP_NUM_PAGES		8192
+
+struct page *dheap_pages[DHEAP_NUM_PAGES] = {0};
+void alloc_dheap_pages(void)
+{
+	int i;
+
+	for (i = 0; i < DHEAP_NUM_PAGES; i++) {
+		dheap_pages[i] = lcd_dheap_alloc_pages(GFP_KERNEL, 0);
+		if (!(i % 100))
+			printk("%s allocate %d pages", __func__, i);
+		if (!dheap_pages[i]) {
+			printk("%s allocation failed while alloc-ing %d th page", __func__, i);
+			break;
+		}
+	}
+
+	return;
+}
+
 int handle_rpc_calls(struct fipc_message *msg)
 {
 	switch(msg->rpc_id) {
 	case MODULE_INIT:
 		callee_main();
+		//create_hwbp();
+		//alloc_free_pages();
+		alloc_dheap_pages();
 		break;
 	case NULL_INVOCATION:
 		null_invocation(msg);
 		break;
 	case MARSHAL_ONE:
 		marshal_one(msg);
+		//if (hwbp)
+		//	_unregister_wide_hw_breakpoint(hwbp);
 		break;
 	case FOO:
 		foo(msg);

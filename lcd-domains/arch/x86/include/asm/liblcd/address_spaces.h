@@ -84,7 +84,10 @@
  *              |          (1 GB)           |
  *              +---------------------------+ 0x0000 0002 c000 0000 (11 GB) 
  *              |       RAM Map Region      |                    
- *              |          (4 GB)           |
+ *              |          (3 GB)           |
+ *              +---------------------------+ 0x0000 0002 0000 0000 (8 GB)
+ *              |    Direct Heap Region     |
+ *              |          (1 GB)           |
  *              +---------------------------+ 0x0000 0001 c000 0000 (7 GB)
  *              |       HOLE / Unmapped     | 
  *              |          (1 GB)           |
@@ -162,7 +165,8 @@
 #define LCD_MISC_REGION_SIZE (1UL << 30) /* .................... 1 GB  */
 #define LCD_STACK_REGION_SIZE (1UL << 30) /* ................... 1 GB  */
 #define LCD_HEAP_REGION_SIZE (1UL << 30) /* .................... 1 GB  */
-#define LCD_RAM_MAP_REGION_SIZE (4UL << 30) /* ................. 4 GBs */
+#define LCD_DIRECT_HEAP_REGION_SIZE (1UL << 30) /* ................. 1 GB */
+#define LCD_RAM_MAP_REGION_SIZE (3UL << 30) /* ................. 3 GBs */
 #define LCD_IOREMAP_REGION_SIZE (1UL << 30) /* ................. 1 GB  */
 #define LCD_KERNEL_MODULE_REGION_SIZE (2UL << 30) /* ........... 2 GBs */
 
@@ -171,6 +175,7 @@
 #define LCD_UTCB_SIZE PAGE_SIZE /* ........................... 4  KBs */
 #define LCD_BOOTSTRAP_PAGES_SIZE (4 * PAGE_SIZE) /* .......... 16  KBs */
 #define LCD_BOOTSTRAP_PAGE_TABLES_SIZE (16 * PAGE_SIZE) /* ... 64 KBs */
+#define LCD_REGISTER_PAGE_SIZE PAGE_SIZE /* ....................... 4 KBs */
 #define LCD_STACK_SIZE (2 * PAGE_SIZE) /* .................... 8  KBs */
 
 /* Orders (for convenience) */
@@ -206,10 +211,14 @@
 #define LCD_MISC_REGION_OFFSET (1UL << 30)
 #endif
 
+#define PAGE_SIZE_2MB		(1UL << 21)
+
 #define LCD_UTCB_OFFSET LCD_MISC_REGION_OFFSET
-#define LCD_BOOTSTRAP_PAGES_OFFSET (LCD_UTCB_OFFSET + LCD_UTCB_SIZE)
+#define LCD_BOOTSTRAP_PAGES_OFFSET (LCD_UTCB_OFFSET + PAGE_SIZE_2MB)
 #define LCD_BOOTSTRAP_PAGE_TABLES_OFFSET \
-	(LCD_BOOTSTRAP_PAGES_OFFSET + LCD_BOOTSTRAP_PAGES_SIZE)
+	(LCD_BOOTSTRAP_PAGES_OFFSET + PAGE_SIZE_2MB)
+#define LCD_REGISTER_PAGE_OFFSET \
+	(LCD_BOOTSTRAP_PAGE_TABLES_OFFSET + PAGE_SIZE_2MB)
 
 /* HOLE */
 
@@ -226,8 +235,12 @@
 
 /* HOLE */
 
-#define LCD_RAM_MAP_REGION_OFFSET \
+#define LCD_DIRECT_HEAP_REGION_OFFSET \
 	(LCD_HEAP_REGION_OFFSET + LCD_HEAP_REGION_SIZE + (1UL << 30))
+#define LCD_DIRECT_HEAP_OFFSET LCD_DIRECT_HEAP_REGION_OFFSET
+
+#define LCD_RAM_MAP_REGION_OFFSET \
+	(LCD_DIRECT_HEAP_REGION_OFFSET + LCD_DIRECT_HEAP_REGION_SIZE + (0UL << 30))
 #define LCD_RAM_MAP_OFFSET LCD_RAM_MAP_REGION_OFFSET
 
 /* HOLE */
@@ -275,11 +288,19 @@
 #define LCD_BOOTSTRAP_PAGE_TABLES_GV_ADDR \
 	(__gva(LCD_VIRT_BASE + LCD_BOOTSTRAP_PAGE_TABLES_OFFSET))
 
+#define LCD_REGISTER_PAGE_GP_ADDR \
+	(__gpa(LCD_PHYS_BASE + LCD_REGISTER_PAGE_OFFSET))
+#define LCD_REGISTER_PAGE_GV_ADDR \
+	(__gva(LCD_VIRT_BASE + LCD_REGISTER_PAGE_OFFSET))
+
 #define LCD_STACK_GP_ADDR (__gpa(LCD_PHYS_BASE + LCD_STACK_OFFSET))
 #define LCD_STACK_GV_ADDR (__gva(LCD_VIRT_BASE + LCD_STACK_OFFSET))
 
 #define LCD_HEAP_GP_ADDR (__gpa(LCD_PHYS_BASE + LCD_HEAP_OFFSET))
 #define LCD_HEAP_GV_ADDR (__gva(LCD_VIRT_BASE + LCD_HEAP_OFFSET))
+
+#define LCD_DIRECT_HEAP_GP_ADDR (__gpa(LCD_PHYS_BASE + LCD_DIRECT_HEAP_OFFSET))
+#define LCD_DIRECT_HEAP_GV_ADDR (__gva(LCD_VIRT_BASE + LCD_DIRECT_HEAP_OFFSET))
 
 #define LCD_RAM_MAP_GP_ADDR (__gpa(LCD_PHYS_BASE + LCD_RAM_MAP_OFFSET))
 #define LCD_RAM_MAP_GV_ADDR (__gva(LCD_VIRT_BASE + LCD_RAM_MAP_OFFSET))

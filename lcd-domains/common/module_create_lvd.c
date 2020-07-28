@@ -25,7 +25,7 @@
 
 #define LVD_PERCPU_STACK
 #define LVD_PERCPU_VMFUNC_STATE
-
+#define PEBS_BUFFER_SIZE	(PAGE_SIZE << 4)
 /* MEMORY REGIONS -------------------------------------------------- */
 
 /*
@@ -58,7 +58,7 @@ struct lcd_mem_region {
 
 extern union vmfunc_state_page vmfunc_state_page;
 
-#define LCD_NR_MEM_REGIONS 6
+#define LCD_NR_MEM_REGIONS 7
 
 static struct lcd_mem_region lcd_mem_regions[LCD_NR_MEM_REGIONS] = {
 	{
@@ -80,6 +80,12 @@ static struct lcd_mem_region lcd_mem_regions[LCD_NR_MEM_REGIONS] = {
 		.flags =  LCD_WRITEBACK_FLAGS,
 	},
 	{
+		"direct-heap",
+		.offset = LCD_DIRECT_HEAP_REGION_OFFSET,
+		.size =   LCD_DIRECT_HEAP_REGION_SIZE,
+		.flags =  LCD_WRITEBACK_FLAGS,
+	},
+	{
 		"ram map",
 		.offset = LCD_RAM_MAP_REGION_OFFSET,
 		.size =   LCD_RAM_MAP_REGION_SIZE,
@@ -98,6 +104,14 @@ static struct lcd_mem_region lcd_mem_regions[LCD_NR_MEM_REGIONS] = {
 		.flags =  LCD_WRITEBACK_FLAGS,
 	},
 };
+
+/*
+ * ideally this page has to be LCD specific, but the interface of how to access
+ * it from KLCD (probably by sending in some sort of LCD id) has to be thought
+ * upon. So for now, let it remaina global per-cpu data structure
+ */
+DEFINE_PER_CPU_PAGE_ALIGNED(struct ext_registers, register_pages);
+EXPORT_PER_CPU_SYMBOL(register_pages);
 
 /* PHYSICAL ADDRESS SPACE -------------------------------------------------- */
 
@@ -185,6 +199,7 @@ fail1:
 	return ret;
 }
 
+#if 0
 static int do_grant_and_map_for_mem_cpu(cptr_t lcd, struct lcd_create_ctx *ctx,
 				void *mem, gpa_t map_base,
 				cptr_t *dest, int cpu)
@@ -226,6 +241,7 @@ fail2:
 fail1:
 	return ret;
 }
+#endif
 
 #ifdef LVD_PERCPU_VMFUNC_STATE
 static int do_grant_and_map_for_mem_percpu(cptr_t lcd, struct lcd_create_ctx *ctx,
@@ -288,6 +304,7 @@ static int do_grant_map_percpu_stack_pools(struct lcd_create_ctx *ctx, cptr_t lc
 		void **stack_pools = this_stack->stacks;
 		int i;
 		cptr_t c;
+		unsigned long gpa_stack = gpa_val(LCD_STACK_GP_ADDR) - (cpu * (NUM_STACKS_PER_CPU + 1) * LCD_STACK_SIZE);
 
 		/*
 		 * Since, we have percpu EPTs, let's map the pool of stacks on
@@ -295,15 +312,15 @@ static int do_grant_map_percpu_stack_pools(struct lcd_create_ctx *ctx, cptr_t lc
 		 * LCD_STACK_SIZE to NUM_STACKS_PER_CPU * LCD_STACK_SIZE
 		 */
 		for (i = 0; i < NUM_STACKS_PER_CPU; i++) {
-			unsigned long gpa_stack = gpa_val(LCD_STACK_GP_ADDR);
-			gpa_stack -= i * LCD_STACK_SIZE;
+			unsigned long _gpa_stack = gpa_stack - (i * LCD_STACK_SIZE);
 
-			LIBLCD_MSG("mapping stack pages on cpu:%d gpa: %lx hpa: %p",
+			LIBLCD_MSG("mapping stack pages on cpu:%d stack: %d gpa: %lx hpa: %p",
 					cpu,
-					gpa_stack,
+					i,
+					_gpa_stack,
 					stack_pools[i]);
-			ret = do_grant_and_map_for_mem_cpu(lcd, ctx, stack_pools[i],
-					__gpa(gpa_stack), &c, cpu);
+			ret = do_grant_and_map_for_mem(lcd, ctx, stack_pools[i],
+					__gpa(_gpa_stack), &c);
 		}
 	}
 
@@ -876,7 +893,7 @@ static int do_misc_pages_grant_map(cptr_t lcd, struct lcd_create_ctx *ctx)
 		LIBLCD_MSG("grant mem for cpu_hw_events.pebs %p", per_cpu(lvd_cpu_hw_events_pebs, cpu));
 
 		map_cpu_page(pebs, ctx);
-		__do_ept_mapping(lcd, pebs, ctx, PAGE_SIZE);
+		__do_ept_mapping(lcd, pebs, ctx, PEBS_BUFFER_SIZE);
 
 	};
 
@@ -940,6 +957,97 @@ fail:
 }
 #endif
 
+static int do_grant_and_map_for_mem_cpu_percpu(cptr_t lcd, struct lcd_create_ctx *ctx,
+				void *mem, gpa_t map_base,
+				cptr_t *dest, int cpu)
+{
+	int ret;
+	cptr_t mo;
+	unsigned long size, offset;
+	/*
+	 * Look up the cptr for the *creator*
+	 */
+	ret = lcd_virt_to_cptr(__gva((unsigned long)mem), &mo, &size,
+			&offset);
+	if (ret) {
+		LIBLCD_ERR("lookup failed");
+		goto fail1;
+	}
+	/*
+	 * Alloc a cptr in the new LCD cptr cache
+	 */
+	ret = cptr_alloc(lcd_to_boot_cptr_cache(ctx), dest);
+	if (ret) {
+		LIBLCD_ERR("cptr alloc failed");
+		goto fail2;
+	}
+	/*
+	 * Grant and map the memory
+	 */
+	ret = lcd_memory_grant_and_map_cpu(lcd, mo, *dest, map_base, cpu);
+	if (ret) {
+		LIBLCD_ERR("grant and map failed");
+		goto fail3;
+	}
+
+	return 0;
+
+fail3:
+	cptr_free(lcd_to_boot_cptr_cache(ctx), *dest);
+fail2:
+fail1:
+	return ret;
+}
+
+static int __do_ept_mapping_register_page(cptr_t lcd, void *addr,
+		struct lcd_create_ctx *ctx, int size, int cpu)
+{
+	cptr_t c;
+	int ret = 0;
+	struct page *p;
+	gpa_t gpa_addr;
+
+	addr = (void*) ((u64) addr & PAGE_MASK);
+
+	p = virt_to_page(addr);
+
+	printk("%s, vaddr: %p page: %p\n", __func__, addr, p);
+	/* create volunteer metadata */
+	lcd_create_mo_metadata(p, size, LCD_MICROKERNEL_TYPE_ID_VOLUNTEERED_PAGE);
+
+	gpa_addr = LCD_REGISTER_PAGE_GP_ADDR;
+
+	LIBLCD_MSG("grant mem for register_page ctx %p | vaddr %lx | offset %lx",
+			ctx, addr, gpa_addr);
+
+	ret = do_grant_and_map_for_mem_cpu_percpu(lcd, ctx, addr, gpa_addr, &c, cpu);
+
+	return ret;
+}
+
+static int do_grant_map_percpu_register_page(struct lcd_create_ctx *ctx, cptr_t lcd)
+{
+	int ret = 0;
+	int cpu;
+
+	for_each_online_cpu(cpu) {
+		struct ext_registers *this_register_page =
+			&per_cpu(register_pages, cpu);
+		/*
+		 * register_page will be mapped on the same GVA for all
+		 * cpus. The HPA mapping would be different for different CPUS.
+		 */
+		printk("%s, mapping vaddr: %p size: %lu\n", __func__,
+				this_register_page, PAGE_SIZE);
+		ret = __do_ept_mapping_register_page(lcd, this_register_page,
+				ctx, PAGE_SIZE, cpu);
+		if (ret)
+			goto fail;
+	}
+fail:
+	return ret;
+}
+
 static int setup_phys_addr_space(cptr_t lcd, struct lcd_create_ctx *ctx,
 				gva_t m_init_link_addr, gva_t m_core_link_addr,
 				gva_t m_vmfunc_tr_page_addr,
@@ -956,7 +1064,7 @@ static int setup_phys_addr_space(cptr_t lcd, struct lcd_create_ctx *ctx,
 	 * Map and grant bootstrap pages, page tables, and stack
 	 */
 	c = &(lcd_to_boot_info(ctx)->lcd_boot_cptrs.boot_pages);
-	LIBLCD_MSG("mapping bootstrap pages gpa: %lx hpa: %p",
+	LIBLCD_MSG("mapping bootstrap pages gpa: %lx hva: %p",
 			gpa_val(LCD_BOOTSTRAP_PAGES_GP_ADDR), ctx->lcd_boot_info);
 	ret = do_grant_and_map_for_mem(lcd, ctx, ctx->lcd_boot_info,
 				LCD_BOOTSTRAP_PAGES_GP_ADDR,
@@ -966,7 +1074,7 @@ static int setup_phys_addr_space(cptr_t lcd, struct lcd_create_ctx *ctx,
 
 	/* in vmfunc LCDS, there are no additional guest page tables for LCDs */
 	c = &(lcd_to_boot_info(ctx)->lcd_boot_cptrs.gv);
-	LIBLCD_MSG("mapping bootstrap pgtable pages gpa: %lx hpa: %p",
+	LIBLCD_MSG("mapping bootstrap pgtable pages gpa: %lx hva: %p",
 			gpa_val(LCD_BOOTSTRAP_PAGE_TABLES_GP_ADDR), ctx->gv_pg_tables);
 	ret = do_grant_and_map_for_mem(lcd, ctx, ctx->gv_pg_tables,
 				LCD_BOOTSTRAP_PAGE_TABLES_GP_ADDR, c);
@@ -977,7 +1085,7 @@ static int setup_phys_addr_space(cptr_t lcd, struct lcd_create_ctx *ctx,
 	do_grant_map_percpu_stack_pools(ctx, lcd);
 #else
 	c = &(lcd_to_boot_info(ctx)->lcd_boot_cptrs.stack);
-	LIBLCD_MSG("mapping stack pages gpa: %lx hpa: %p",
+	LIBLCD_MSG("mapping stack pages gpa: %lx hva: %p",
 			gpa_val(LCD_STACK_GP_ADDR), ctx->stack);
 	ret = do_grant_and_map_for_mem(lcd, ctx, ctx->stack,
 				LCD_STACK_GP_ADDR,
@@ -1015,7 +1123,12 @@ static int setup_phys_addr_space(cptr_t lcd, struct lcd_create_ctx *ctx,
 	if (ret)
 		goto fail7;
 
+	ret = do_grant_map_percpu_register_page(ctx, lcd);
+
+	if (ret)
+		goto fail8;
 	return 0;
+fail8:
 fail7:
 fail6:
 fail5:
@@ -1032,6 +1145,7 @@ static void setup_lcd_pmd(struct lcd_mem_region *reg, pmd_t *pmd,
 {
 	unsigned int k;
 	unsigned long gp;
+	unsigned long flags = 0;
 
 	for (k = 0; k < 512; k++) {
 		/*
@@ -1043,10 +1157,29 @@ static void setup_lcd_pmd(struct lcd_mem_region *reg, pmd_t *pmd,
 		 */
 		gp = LCD_PHYS_BASE + gigabyte_idx * (1UL << 30) +
 			k * (1UL << 21);
+
+		/* if the region is MISC region */
+		if (reg->offset == LCD_MISC_REGION_OFFSET) {
+			/*
+			 * Make the 2nd 2MB page read only. These are the
+			 * pagetable pages
+			 */
+			if (k == 2) {
+				flags = _PAGE_PRESENT;
+			} else {
+				flags = reg->flags;
+			}
+			verbose = 1;
+		} else {
+			flags = reg->flags;
+			verbose = 0;
+		}
+
 		if (verbose)
 			printk("%s, k:%d, gbyte_idx: %x, gp: %lx at pmd[%d]: %p\n",\
 					__func__, k, gigabyte_idx, gp, k, &pmd[k]);
-		set_pmd(&pmd[k], __pmd(gp | reg->flags | _PAGE_PSE));
+
+		set_pmd(&pmd[k], __pmd(gp | flags | _PAGE_PSE));
 	}
 }
 
@@ -1375,6 +1508,9 @@ int create_lvd_stack_pools(struct lcd_create_ctx *ctx, cptr_t lcd)
 
 		this_stack->bitmap = ~0ll;
 		this_stack->stacks = kzalloc(sizeof(void*) * NUM_STACKS_PER_CPU, GFP_KERNEL);
+		this_stack->lazy_bitmap = 0ll;
+		spin_lock_init(&this_stack->lazy_bm_lock);
+		this_stack->lazy_updated = false;
 
 		for (i = 0; i < NUM_STACKS_PER_CPU; i++) {
 			struct page *p;
@@ -1389,6 +1525,26 @@ int create_lvd_stack_pools(struct lcd_create_ctx *ctx, cptr_t lcd)
 
 fail2:
 fail1:
+	return ret;
+}
+
+struct ext_registers *get_register_page(int cpu) {
+	return &per_cpu(register_pages, cpu);
+}
+EXPORT_SYMBOL(get_register_page);
+/*
+ * For each cpu, create a register page for passing more arguments
+ */
+int create_lvd_register_page(struct lcd_create_ctx *ctx, cptr_t lcd)
+{
+	int ret = 0;
+	int cpu;
+
+	for_each_online_cpu(cpu) {
+		struct ext_registers *this_reg_page = &per_cpu(register_pages, cpu);
+		memset(this_reg_page, 0, sizeof(struct ext_registers));
+	}
+
 	return ret;
 }
 
@@ -1858,6 +2014,8 @@ int lvd_create_module_lvd(char *mdir, char *mname, cptr_t *lcd_out,
 
 	create_lvd_stack_pools(ctx, lcd);
 
+	create_lvd_register_page(ctx, lcd);
+
 #ifdef LVD_PERCPU_VMFUNC_STATE
 	create_lvd_vmfunc_state_page(ctx);
 #endif
@@ -1889,7 +2047,7 @@ int lvd_create_module_lvd(char *mdir, char *mname, cptr_t *lcd_out,
 		int i;
 
 		printk("%s, sechdrs %p | index.sym %x | info %p | info->hdr %p | klp_info->hdr.e_shnum %x\n", __func__,
-				info->sechdrs, info->index.sym, info, info->hdr, mod->klp_info->hdr.e_shnum); 
+				info->sechdrs, info->index.sym, info, info->hdr, mod->klp_info->hdr.e_shnum);
 
 		is_null |= CHECK_NULL(offsetof(struct load_info, hdr), info->hdr);
 		if (!is_null)

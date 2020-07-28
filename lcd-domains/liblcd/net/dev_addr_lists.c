@@ -687,12 +687,16 @@ static int __dev_mc_add(struct net_device *dev, const unsigned char *addr,
 {
 	int err;
 
+#ifndef LCD_ISOLATE
 	netif_addr_lock_bh(dev);
+#endif
 	err = __hw_addr_add_ex(&dev->mc, addr, dev->addr_len,
 			       NETDEV_HW_ADDR_T_MULTICAST, global, false, 0);
 	if (!err)
 		__dev_set_rx_mode(dev);
+#ifndef LCD_ISOLATE
 	netif_addr_unlock_bh(dev);
+#endif
 	return err;
 }
 /**

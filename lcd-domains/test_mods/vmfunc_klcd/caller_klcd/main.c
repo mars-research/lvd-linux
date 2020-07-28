@@ -111,32 +111,34 @@ void run_vmfunc_tests(void)
 			);
 
 	INIT_FIPC_MSG(&msg);
-	msg.rpc_id = MODULE_INIT;
-	printk("%s, before MODULE_INIT lcd->stack %p\n", __func__, current->lcd_stack);
+	{
+		struct ext_registers *this_reg_page = get_register_page(smp_processor_id());
+		int i;
+		printk("%s, register page %p\n", __func__, this_reg_page);
+		for (i = 0; i < PAGE_SIZE/64; i++) {
+			this_reg_page->regs[i] = 0xabcd + i;
+		}
+		msg.rpc_id = MODULE_INIT;
+		printk("%s, before MODULE_INIT lcd->stack %p\n", __func__, current->lcd_stack);
+		vmfunc_klcd_test_wrapper(&msg, OTHER_DOMAIN, VMFUNC_TEST_RPC_CALL);
+		printk("%s: VMFUNC_TEST_RPC_CALL: MODULE_INIT Passed!\n",
+					__func__);
+	}
+
+	msg.rpc_id = NULL_INVOCATION;
 	vmfunc_klcd_test_wrapper(&msg, OTHER_DOMAIN, VMFUNC_TEST_RPC_CALL);
-	printk("%s: VMFUNC_TEST_RPC_CALL: MODULE_INIT Passed!\n",
-				__func__);
+	printk("%s: VMFUNC_TEST_RPC_CALL: Passed!\n\tValue from other domain %lx\n",
+				__func__, fipc_get_reg1(&msg));
 
-	INIT_FIPC_MSG(&msg);
 
-	msg.rpc_id = MEMTEST;
-	//vmfunc_klcd_test_wrapper(&msg, OTHER_DOMAIN, VMFUNC_TEST_RPC_CALL);
+	/* test3a: RPC call microbenchmark */
+	memset(&msg, 0x0, sizeof(msg));
+	msg.rpc_id = MARSHAL_ONE;
+	fipc_set_reg0(&msg, (u64) 0xabcd);
+
+	vmfunc_klcd_test_wrapper(&msg, OTHER_DOMAIN, VMFUNC_TEST_RPC_CALL);
 
 }
-
-void klcd_lvd_callback_handler(void *arg)
-{
-	struct fipc_message r;
-	struct fipc_message *request = &r;
-
-	request->rpc_id = IRQ_HANDLER;
-	vmfunc_klcd_test_wrapper(request, OTHER_DOMAIN, VMFUNC_TEST_RPC_CALL);
-
-	return;
-}
-
-typedef void (*lvd_vector_override_t)(void *);
-extern lvd_vector_override_t lvd_vector_override_handler;
 
 static int caller_main(void)
 {
@@ -159,7 +161,6 @@ static int caller_main(void)
 	printk("%s entered,  lcd_stack %p\n", __func__, lcd_stack);
 	vmfunc_init(lcd_stack, handle_rpc_calls_klcd, NULL);
 
-	lvd_vector_override_handler = klcd_lvd_callback_handler;
 
 	run_vmfunc_tests();
 

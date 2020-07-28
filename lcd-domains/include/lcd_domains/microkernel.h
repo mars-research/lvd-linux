@@ -106,6 +106,9 @@ enum lcd_xmit_status {
 
 struct lcd_stack {
 	long long bitmap;
+	long long lazy_bitmap;
+	spinlock_t lazy_bm_lock;
+	bool lazy_updated;
 	void **stacks;
 };
 
@@ -994,4 +997,11 @@ void __lcd_ipc_exit(void);
 
 void copy_msg_cap_vmfunc(struct lcd *sender, struct lcd *receiver,
 			cptr_t from_ptr, cptr_t to_ptr);
+/*
+ * LCD debugfs
+ */
+int lcd_debugfs_init(void);
+
+void lcd_debugfs_exit(void);
+
 #endif /* LCD_DOMAINS_INTERNAL_H */

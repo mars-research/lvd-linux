@@ -118,6 +118,16 @@ alloc_page_blocks(struct lcd_page_allocator *pa, unsigned int order)
 	     current_order++) {
 
 		block_order = current_order - pa->min_order;
+		if (!(pa->free_lists)) {
+			printk("pa->free_lists null");
+			break;
+		}
+		if ((pa->free_lists[block_order].next == NULL) && (pa->free_lists[block_order].prev == NULL)) {
+			printk("pa->free_lists[block_order] is null for block_order %d", block_order);
+			printk("pa %p pa->free_lists %p", pa, pa->free_lists);
+			break;
+		}
+
 		free_list = &pa->free_lists[block_order];
 
 		if (list_empty(free_list))
@@ -141,6 +151,8 @@ alloc_page_blocks(struct lcd_page_allocator *pa, unsigned int order)
 		return pb;
 	}
 
+	printk("%s, exhausted pools? curr_order %d, max_order %d", __func__,
+					current_order, pa->max_order);
 	/* No luck */
 	return NULL;
 }
@@ -614,11 +626,15 @@ static unsigned long calc_metadata_size(unsigned int nr_pages_order,
 	 * Align for struct lcd_page_block
 	 */
 	rslt = ALIGN(rslt, sizeof(struct lcd_page_block));
+
+	LIBLCD_MSG("sizeof(struct lcd_page_blocks) %zu", sizeof(struct lcd_page_block));
 	/*
 	 * Giant array of struct lcd_page_blocks
 	 */
 	rslt += calc_nr_lcd_page_blocks(nr_pages_order, min_order) *
 		sizeof(struct lcd_page_block);
+
+	LIBLCD_MSG("Array of struct lcd_page_blocks %d", rslt);
 	/*
 	 * --------------------------------------------------
 	 *
@@ -634,6 +650,8 @@ static unsigned long calc_metadata_size(unsigned int nr_pages_order,
 	 * --------------------------------------------------
 	 */
 	*metadata_sz_out = rslt;
+
+	LIBLCD_MSG("Total metadata size %d", rslt);
 
 	return 0;
 }
@@ -654,6 +672,16 @@ int lcd_page_allocator_create(unsigned long nr_pages_order,
 	 * Calculate the size of the page allocator metadata (includes
 	 * the giant array of lcd_page_block's). Check to make sure
 	 * parameters are sane (everything fits).
+	 */
+	/* VN: Why do we have a very small Heap? 16 MiB
+	 * For maintaining the heap region, we need to maintain some metadata,
+	 *  - struct lcd_page_blocks array - similar to struct page
+	 *  - Lists of blocks of different orders - from min order to max order
+	 *  - sizeof(struct lcd_page_block) * nr_page_blocks should not be
+	 *            greater than 2^11 bytes (linux kmalloc's MAX_ORDER)
+	 *  However, it does not matter as we can call vmalloc in the Linux kernel to get a larger region.
+	 *  This is fixable.
+	 *  TODO: Change the alloc_metadata cbs pointer to alloc using vmalloc instead of kmalloc
 	 */
 	ret = calc_metadata_size(nr_pages_order,
 				min_order,
@@ -743,14 +771,20 @@ lcd_page_allocator_alloc(struct lcd_page_allocator *pa,
 	 * Alloc the page blocks
 	 */
 	pb = alloc_page_blocks(pa, order);
-	if (!pb)
+	if (!pb) {
+		LIBLCD_ERR("Alloc_page_blocks failed for order %d", order);
 		goto fail1;
+	}
+	//printk("%s, order: %d, pb: %p, pb->block_order %d pb->n %p", __func__,
+	//			order, pb, pb->block_order, pb->n);
 	/*
 	 * Suck in backing memory / demand page if necessary
 	 */
 	ret = pb_backing(pa, pb);
-	if (ret)
+	if (ret) {
+		LIBLCD_ERR("pb backing failed!");
 		goto fail2;
+	}
 
 	return pb;
 

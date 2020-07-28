@@ -78,6 +78,11 @@ ENDPROC(native_usergs_sysret64)
 
 	/* vmfunc to domain 0 */
 	vmfunc
+
+#ifdef CONFIG_LCD_VMFUNC_COUNTERS
+	incq	PER_CPU_VAR(vmfunc_irq_counter)
+#endif
+
 	/* abort if ecx != 0 */
 	cmpl $0x0, %ecx
 	je 0f
@@ -661,6 +666,10 @@ END(irq_entries_start)
 	/* No matter which path we took, save current LCD stack */
 	movq	vmfunc_state_page + VMFUNC_kernel_esp, %r13
 
+#ifdef CONFIG_LCD_VMFUNC_COUNTERS
+	incq	PER_CPU_VAR(irq_counter)
+#endif
+
 #ifdef CONFIG_LCD_TRACE_BUFFER
 	/* Trace IRQ into LCDs buffer, rdi = trap frame, rsi = event type */
 	pushq   %rdi
@@ -999,6 +1008,10 @@ ENTRY(\sym)
 	TRACE_IRQS_OFF
 	.endif
 	.endif
+
+#ifdef CONFIG_LCD_VMFUNC_COUNTERS
+	incq	PER_CPU_VAR(exception_counter)
+#endif
 
 	movq	%rsp, %rdi			/* pt_regs pointer */
 

@@ -32,6 +32,7 @@
 #define EVENT_DO_INT3_LEAVE		17
 #define EVENT_NMI_LEAVE			18
 #define EVENT_NMI_FULL			19
+#define EVENT_CTX_SWITCH		20
 
 #ifndef __ASSEMBLY__
 struct ring_trace_entry {
@@ -47,6 +48,8 @@ struct ring_trace_entry {
 	unsigned short pid;
 	unsigned type;
 	unsigned orig_type;
+	unsigned long long ts;
+	phys_addr_t mapped_cr3;
 	char name[PROC_NAME_MAX];
 };
 
@@ -65,6 +68,7 @@ struct ring_trace_buffer {
 
 void add_trace_entry(unsigned type, unsigned long rdi);
 asmlinkage __visible notrace void dump_ring_trace_buffer(void);
+asmlinkage __visible notrace void dump_ring_trace_buffer_cpu(int cpu);
 asmlinkage __visible notrace void add_trace_entry_tf(struct pt_regs *regs, unsigned type);
 
 

@@ -5637,7 +5637,7 @@ static int ixgbe_sw_init(struct ixgbe_adapter *adapter)
 	unsigned int rss, fdir;
 	u32 fwsm;
 	int i;
-#define NUM_HW_QUEUES		num_online_cpus()
+#define NUM_HW_QUEUES		20
 	/* PCI config space info */
 
 	hw->vendor_id = pdev->vendor;

@@ -71,6 +71,8 @@ static s32 ixgbe_write_i2c_byte_82599(struct ixgbe_hw *hw, u8 byte_offset,
 static s32 ixgbe_reset_pipeline_82599(struct ixgbe_hw *hw);
 static bool ixgbe_verify_lesm_fw_enabled_82599(struct ixgbe_hw *hw);
 
+extern bool link_debug_verbose;
+
 bool ixgbe_mng_enabled(struct ixgbe_hw *hw)
 {
 	u32 fwsm, manc, factps;
@@ -99,18 +101,24 @@ static void ixgbe_init_mac_link_ops_82599(struct ixgbe_hw *hw)
 	 */
 	if ((mac->ops.get_media_type(hw) == ixgbe_media_type_fiber) &&
 	    !ixgbe_mng_enabled(hw)) {
+		if (link_debug_verbose)
+			printk("%s, laser mode activated!\n", __func__);
 		mac->ops.disable_tx_laser =
 				       &ixgbe_disable_tx_laser_multispeed_fiber;
 		mac->ops.enable_tx_laser =
 					&ixgbe_enable_tx_laser_multispeed_fiber;
 		mac->ops.flap_tx_laser = &ixgbe_flap_tx_laser_multispeed_fiber;
 	} else {
+		if (link_debug_verbose)
+			printk("%s, NO fiber mode!\n", __func__);
 		mac->ops.disable_tx_laser = NULL;
 		mac->ops.enable_tx_laser = NULL;
 		mac->ops.flap_tx_laser = NULL;
 	}
 
 	if (hw->phy.multispeed_fiber) {
+		if (link_debug_verbose)
+			printk("%s, multispeed fiber mode!\n", __func__);
 		/* Set up dual speed SFP+ support */
 		mac->ops.setup_link = &ixgbe_setup_mac_link_multispeed_fiber;
 		mac->ops.setup_mac_link = ixgbe_setup_mac_link_82599;
@@ -121,10 +129,13 @@ static void ixgbe_init_mac_link_ops_82599(struct ixgbe_hw *hw)
 		     ixgbe_media_type_backplane) &&
 		    (hw->phy.smart_speed == ixgbe_smart_speed_auto ||
 		     hw->phy.smart_speed == ixgbe_smart_speed_on) &&
-		     !ixgbe_verify_lesm_fw_enabled_82599(hw))
+		     !ixgbe_verify_lesm_fw_enabled_82599(hw)) {
 			mac->ops.setup_link = &ixgbe_setup_mac_link_smartspeed;
-		else
+		} else {
 			mac->ops.setup_link = &ixgbe_setup_mac_link_82599;
+		}
+		if (link_debug_verbose)
+			printk("%s, ops.setup_link %p !\n", __func__, mac->ops.setup_link);
 	}
 }
 
@@ -174,6 +185,9 @@ static s32 ixgbe_setup_sfp_modules_82599(struct ixgbe_hw *hw)
 
 		if (ret_val) {
 			hw_dbg(hw, " sfp module setup not complete\n");
+			if (link_debug_verbose)
+				printk("%s sfp module setup not complete %d\n",
+						__func__, ret_val);
 			return IXGBE_ERR_SFP_SETUP_NOT_COMPLETE;
 		}
 	}
@@ -189,6 +203,8 @@ setup_sfp_err:
 	usleep_range(hw->eeprom.semaphore_delay * 1000,
 		     hw->eeprom.semaphore_delay * 2000);
 	hw_err(hw, "eeprom read at offset %d failed\n", data_offset);
+	if (link_debug_verbose)
+		printk("eeprom read at offset %d failed\n", data_offset);
 	return IXGBE_ERR_SFP_SETUP_NOT_COMPLETE;
 }
 
@@ -281,6 +297,8 @@ static s32 ixgbe_get_invariants_82599(struct ixgbe_hw *hw)
 	mac->max_tx_queues = IXGBE_82599_MAX_TX_QUEUES;
 	mac->max_msix_vectors = ixgbe_get_pcie_msix_count_generic(hw);
 
+	if (link_debug_verbose)
+		printk("%s, Done!\n", __func__);
 	return 0;
 }
 
@@ -318,6 +336,8 @@ static s32 ixgbe_init_phy_ops_82599(struct ixgbe_hw *hw)
 		phy->ops.write_i2c_byte = &ixgbe_write_i2c_byte_82599;
 	}
 
+	if (link_debug_verbose)
+		printk("%s, Calling phy->ops.identify\n", __func__);
 	/* Identify the PHY or SFP module */
 	ret_val = phy->ops.identify(hw);
 
@@ -956,6 +976,8 @@ static s32 ixgbe_reset_hw_82599(struct ixgbe_hw *hw)
 
 	/* PHY ops must be identified and initialized prior to reset */
 
+	if (link_debug_verbose)
+		printk("%s, Calling phy.ops.init\n", __func__);
 	/* Identify PHY and related function pointers */
 	status = hw->phy.ops.init(hw);
 
@@ -972,8 +994,11 @@ static s32 ixgbe_reset_hw_82599(struct ixgbe_hw *hw)
 		return status;
 
 	/* Reset PHY */
-	if (hw->phy.reset_disable == false && hw->phy.ops.reset != NULL)
+	if (hw->phy.reset_disable == false && hw->phy.ops.reset != NULL) {
+		if (link_debug_verbose)
+			printk("%s, Calling phy.ops.reset\n", __func__);
 		hw->phy.ops.reset(hw);
+	}
 
 	/* remember AUTOC from before we reset */
 	curr_lms = IXGBE_READ_REG(hw, IXGBE_AUTOC) & IXGBE_AUTOC_LMS_MASK;
@@ -987,6 +1012,8 @@ mac_reset_top:
 	 */
 	ctrl = IXGBE_CTRL_LNK_RST;
 	if (!hw->force_full_reset) {
+		if (link_debug_verbose)
+			printk("%s, Calling mac.ops.check_link\n", __func__);
 		hw->mac.ops.check_link(hw, &link_speed, &link_up, false);
 		if (link_up)
 			ctrl = IXGBE_CTRL_RST;
@@ -1833,13 +1860,23 @@ static s32 ixgbe_identify_phy_82599(struct ixgbe_hw *hw)
 {
 	s32 status;
 
+	if (link_debug_verbose)
+		printk("%s\n", __func__);
 	/* Detect PHY if not unknown - returns success if already detected. */
 	status = ixgbe_identify_phy_generic(hw);
+	if (link_debug_verbose)
+		printk("%s, 1. Calling phytype %x | status %d", __func__, hw->phy.type, status);
 	if (status) {
 		/* 82599 10GBASE-T requires an external PHY */
 		if (hw->mac.ops.get_media_type(hw) == ixgbe_media_type_copper)
 			return status;
+		if (link_debug_verbose)
+			printk("%s, calling ixgbe_identify_module_generic", __func__);
 		status = ixgbe_identify_module_generic(hw);
+		if (link_debug_verbose)
+			printk("%s, ixgbe_identify_module_generic returned %d", __func__, status);
+		if (link_debug_verbose)
+			printk("%s, hw->phy.type %x", __func__, hw->phy.type);
 	}
 
 	/* Set PHY type none if no PHY detected */
@@ -1852,6 +1889,8 @@ static s32 ixgbe_identify_phy_82599(struct ixgbe_hw *hw)
 	if (hw->phy.type == ixgbe_phy_sfp_unsupported)
 		return IXGBE_ERR_SFP_NOT_SUPPORTED;
 
+	if (link_debug_verbose)
+		printk("%s, 2. Calling phytype %x\n", __func__, hw->phy.type);
 	return status;
 }
 
@@ -2065,6 +2104,9 @@ static s32 ixgbe_reset_pipeline_82599(struct ixgbe_hw *hw)
 	if (!(anlp1_reg & IXGBE_ANLP1_AN_STATE_MASK)) {
 		hw_dbg(hw, "auto negotiation not completed\n");
 		ret_val = IXGBE_ERR_RESET_FAILED;
+		// XXX: AUTOC failed. but just continue
+		ret_val = 0;
+		return ret_val;
 		goto reset_pipeline_out;
 	}
 

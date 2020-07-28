@@ -15,6 +15,11 @@
 int ixgbe_init_module(void);
 void ixgbe_exit_module(void);
 unsigned long loops_per_jiffy;
+unsigned long domain = 0;
+unsigned long bus = 0;
+unsigned long slot = 0;
+unsigned long fn = 0;
+bool link_debug_verbose = true;
 
 static int ixgbe_lcd_init(void)
 {
@@ -27,7 +32,11 @@ static int ixgbe_lcd_init(void)
 	if (ret)
 		goto fail1;
 
-	/* loops_per_jiffy = lcd_get_boot_info()->cptrs[1].cptr; */
+	loops_per_jiffy = lcd_get_boot_info()->cptrs[1].cptr;
+	domain = lcd_get_boot_info()->cptrs[2].cptr;
+	bus = lcd_get_boot_info()->cptrs[3].cptr;
+	slot = lcd_get_boot_info()->cptrs[4].cptr;
+	fn = lcd_get_boot_info()->cptrs[5].cptr;
 
 	printk("ixgbe lpj %lu\n", loops_per_jiffy);
 	/*

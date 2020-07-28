@@ -31,7 +31,7 @@
 #define SKB_GLOBAL_HASHTABLE
 #define CONFIG_NO_HASHING
 
-#define NUM_HW_QUEUES		2
+#define NUM_HW_QUEUES		20
 
 enum dispatch_t {
 	__PCI_REGISTER_DRIVER,
@@ -125,6 +125,8 @@ enum dispatch_t {
 	SYNCHRONIZE_IRQ,
 	RTNL_LOCK,
 	RTNL_UNLOCK,
+	RTNL_IS_LOCKED,
+	CALL_NETDEVICE_NOTIFIERS,
 };
 
 typedef enum {

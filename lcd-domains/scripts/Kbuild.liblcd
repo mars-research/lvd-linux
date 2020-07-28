@@ -42,13 +42,14 @@ lib-y += $(addprefix liblcd/lib/, \
 	dynamic_queue_limits.o \
 	checksum.o \
 	scatterlist.o \
-	spinlock.o \
+	list_sort.o \
 	)
 
 lib-y += $(addprefix liblcd/mm/, \
 	slab.o \
 	slab_common.o \
 	util.o \
+	dmapool.o \
 	)
 
 lib-y += $(addprefix liblcd/arch/x86/lib/, \
@@ -62,12 +63,26 @@ lib-y += $(addprefix liblcd/arch/x86/dma/, \
 	pci-dma.o \
 	)
 
+lib-y += $(addprefix liblcd/block/, \
+	bio.o \
+	blk-core.o \
+	blk-map.o \
+	blk-merge.o \
+	blk-mq.o \
+	)
+
 lib-y += $(addprefix liblcd/net/, \
 	dev_addr_lists.o \
 	dev.o \
 	skbuff.o \
 	flow_dissector.o \
 	)
+
+lib-y += $(addprefix liblcd/locking/, \
+	spinlock.o \
+	qrwlock.o \
+	)
+
 
 lib-y += liblcd/resolve.o
 

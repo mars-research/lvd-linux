@@ -73,8 +73,10 @@ int synchronize_irq_callee(struct fipc_message *_request);
 int eth_type_trans_callee(struct fipc_message *_request);
 int skb_add_rx_frag_callee(struct fipc_message *_request);
 
-void rtnl_lock_callee(struct fipc_message *request);
-void rtnl_unlock_callee(struct fipc_message *request);
+int rtnl_lock_callee(struct fipc_message *request);
+int rtnl_unlock_callee(struct fipc_message *request);
+int rtnl_is_locked_callee(struct fipc_message *request);
+int call_netdevice_notifiers_callee(struct fipc_message *request);
 
 int dispatch_sync_loop(void);
 

@@ -22,7 +22,13 @@
 #define NUM_CORES	32
 #define NUM_THREADS	NUM_CORES
 
+#if !defined(CONFIG_RUN_DUMMY_1) && !defined(CONFIG_RUN_DUMMY_2)
+#error "Either RUN_DUMMY_1 or RUN_DUMMY_2 has to be defined"
+#endif
+
+#if defined(CONFIG_RUN_DUMMY_2)
 #define HASHING
+#endif
 
 extern inline xmit_type_t check_skb_range(struct sk_buff *skb);
 extern struct glue_cspace *c_cspace;
@@ -154,6 +160,9 @@ int __ndo_start_xmit_inner_async(struct sk_buff *skb, struct net_device *dev, st
 
 	ret = fipc_get_reg1(_request);
 
+#ifdef CONFIG_RUN_DUMMY_1
+	dev_kfree_skb(skb);
+#endif
 fail:
 	return ret;
 }

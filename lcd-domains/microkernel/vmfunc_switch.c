@@ -1,4 +1,5 @@
 #include <linux/mm.h>
+#include <asm/desc.h>
 #include <lcd_domains/types.h>
 #include <asm/lcd_domains/libvmfunc.h>
 #include <asm/lcd_domains/ept_lcd.h>
@@ -10,17 +11,23 @@
 #ifdef CONFIG_LCD_TRACE_BUFFER
 #include <linux/lcd_trace.h>
 #endif
+#ifdef CONFIG_LVD_PROTECT_FPU
+#include <asm/fpu/internal.h>
+#endif
 
 #define NUM_LCDS		5
 /* this is the only function Intel VT-x support */
 #define VM_FUNCTION	0
 #define NUM_ITERATIONS		10000000
 #define CONFIG_VMFUNC_SWITCH_MICROBENCHMARK 1
+#define REMAP_CR3_ALL_CPUS
 
 /* exported by the microkernel. We trust that it's sane */
 extern void *cpuid_page;
 extern struct lcd *lcd_list[NUM_LCDS];
 unsigned long init_pgd;
+
+DECLARE_PER_CPU(unsigned long long, vmfunc_counter);
 
 /* Linux kernel only provides ffs variant, which operates on 32-bit registers.
  * For promoting the bsf instruction to 64-bit, intel manual suggests to use
@@ -172,10 +179,35 @@ void pick_stack(int ept)
 		/* mark this bit as taken */
 		this_stack->bitmap &= ~(1LL << bit);
 		current->lcd_stack_bit = bit;
-		current->lcd_stack = (void*) (gva_val(LCD_STACK_GV_ADDR) - bit * LCD_STACK_SIZE + LCD_STACK_SIZE - sizeof(void*));
+		current->lcd_stack = (void*) (gva_val(LCD_STACK_GV_ADDR)
+					- (cpu * (NUM_STACKS_PER_CPU + 1) * LCD_STACK_SIZE)
+					- (bit * LCD_STACK_SIZE)
+					+ LCD_STACK_SIZE - sizeof(void*));
+		/* record on which cpu allocated this stack */
+		current->lcd_stack_cpu = cpu;
 	} else {
 		printk("Ran out of stacks on cpu %d, bitmap:%llx, ffsl ret=%d\n",
 				cpu, this_stack->bitmap, bit);
+	}
+	if (this_stack->lazy_updated) {
+		int bit = ffsll(this_stack->lazy_bitmap);
+		unsigned long flags;
+		printk("%s, clean lazy_stacks %llx\n", __func__, this_stack->lazy_bitmap);
+		spin_lock_irqsave(&this_stack->lazy_bm_lock, flags);
+
+		/* process all the lazy bits */
+		do {
+			if (bit && (bit <= NUM_STACKS_PER_CPU)) {
+				/* mark this bit as free in the original bitmap */
+				this_stack->bitmap |= (1LL << bit);
+				/* mark it as zero */
+				this_stack->lazy_bitmap &= ~(1LL << (bit-1));
+			}
+		} while ((bit = ffsll(this_stack->lazy_bitmap)));
+
+		/* update variable to false */
+		this_stack->lazy_updated = false;
+		spin_unlock_irqrestore(&this_stack->lazy_bm_lock, flags);
 	}
 	put_cpu();
 	BUG_ON(!current->lcd_stack);
@@ -184,13 +216,70 @@ void pick_stack(int ept)
 void drop_stack(int ept)
 {
 	struct lcd *lcd = lcd_list[ept];
-	//int cpu = smp_processor_id();
-	struct lcd_stack *this_stack = per_cpu_ptr(lcd->lcd_stacks, get_cpu());
 
-	current->lcd_stack = NULL;
-	this_stack->bitmap |= (1LL << current->lcd_stack_bit);
-	put_cpu();
+	/*
+	 * Perform normal deallocation if we are on the same cpu as the
+	 * allocated one
+	 */
+	if (smp_processor_id() == current->lcd_stack_cpu) {
+		struct lcd_stack *this_stack = per_cpu_ptr(lcd->lcd_stacks, get_cpu());
+
+		current->lcd_stack = NULL;
+		this_stack->bitmap |= (1LL << current->lcd_stack_bit);
+		put_cpu();
+	} else {
+		/*
+		 * perform lazy deallocation
+		 */
+		unsigned long flags;
+		struct lcd_stack *other_stack = per_cpu_ptr(lcd->lcd_stacks, current->lcd_stack_cpu);
+		spin_lock_irqsave(&other_stack->lazy_bm_lock, flags);
+		other_stack->lazy_bitmap |= (1LL << current->lcd_stack_bit);
+		other_stack->lazy_updated = true;
+		spin_unlock_irqrestore(&other_stack->lazy_bm_lock, flags);
+	}
 }
+
+#ifdef CONFIG_LVD_PROTECT_FPU
+void save_fpu_regs(void)
+{
+	/*
+	 * Check if kernel is using the FPU
+	 */
+	if (kernel_fpu_disabled()) {
+		//printk("%s: [%s:%d] kernel fpu state\n", __func__, current->comm, current->pid);
+		/* Save if kernel is using the FPU */
+		copy_fpregs_to_fpstate(&current->kernel_fpu);
+	} else {
+		struct fpu *fpu = &current->thread.fpu;
+		/* if not, save it only if fpregs_active is set */
+		if (fpu->fpregs_active) {
+			//printk("%s: [%s:%d] user fpu state\n", __func__, current->comm, current->pid);
+			copy_fpregs_to_fpstate(fpu);
+		}
+	}
+}
+
+void restore_fpu_regs(void)
+{
+	/*
+	 * Check if kernel was using the FPU
+	 */
+	if (kernel_fpu_disabled()) {
+		//printk("%s: [%s:%d] kernel fpu state\n", __func__, current->comm, current->pid);
+		/* Restore if kernel was using the FPU */
+		copy_kernel_to_fpregs(&current->kernel_fpu.state);
+	} else {
+		struct fpu *fpu = &current->thread.fpu;
+		/* if user was using it, restore it only if fpregs_active is set */
+		if (fpu->fpregs_active) {
+			//printk("%s: [%s:%d] user fpu state\n", __func__, current->comm, current->pid);
+			copy_kernel_to_fpregs(&fpu->state);
+		}
+	}
+
+}
+#endif
 
 int vmfunc_klcd_wrapper(struct fipc_message *msg, unsigned int ept)
 {
@@ -215,6 +304,10 @@ int vmfunc_klcd_wrapper(struct fipc_message *msg, unsigned int ept)
 	if (current->nested_count++ == 0)
 		pick_stack(ept);
 
+#ifdef CONFIG_LVD_PROTECT_FPU
+	save_fpu_regs();
+#endif
+
 	local_irq_restore(flags);
 #if 0
 	printk("%s [%d]: entering on cpu %d, rpc_id: %x | lcd_stack %p\n",
@@ -226,6 +319,10 @@ int vmfunc_klcd_wrapper(struct fipc_message *msg, unsigned int ept)
 #endif
 #ifdef CONFIG_LCD_TRACE_BUFFER
 	add_trace_entry(EVENT_VMFUNC_TRAMP_ENTRY, msg->rpc_id);
+#endif
+
+#ifdef CONFIG_LCD_VMFUNC_COUNTERS
+	per_cpu(vmfunc_counter, smp_processor_id())++;
 #endif
 
 	vmfunc_trampoline_entry(msg);
@@ -339,6 +436,14 @@ skip:
 	gpa_cr3 = __gpa(cr3_base);
 
 	/*
+	 * For some weird reason, processes with pid 0 occasionally fails to
+	 * find the vmfunc page even if mapped before. So, try to always map
+	 * those processes, even if mapped.
+	 */
+	if (lcd && !current->pid)
+		goto force_map;
+
+	/*
 	 * XXX: We overwrite even if the entry is present. why?  Since the
 	 * Linux kernel uses lazy cr3 switch, we may run into a situation where
 	 * the application has entered this wrapper with cr3_a and later
@@ -350,6 +455,7 @@ skip:
 	 * So, simply overwrite this mapping as it would not harm us.
 	 */
 	if (lcd && (current->mapped_cr3 != cr3_base)) {
+force_map:
 		ret = lcd_arch_ept_map_all_cpus(lcd_list[ept]->lcd_arch, gpa_cr3,
 			hpa_lcd_cr3,
 			1, /* create, if not present */
@@ -390,7 +496,9 @@ vmfunc_test_wrapper(struct fipc_message *request, vmfunc_test_t test)
 #ifdef CONFIG_DEFEAT_LAZY_TLB
 		remap_cr3();
 #endif
-		vmfunc_call_empty_switch();
+		__vmfunc_call_empty_switch();
+		printk("Done!");
+		vmfunc_call_empty_switch(0);
 #ifdef CONFIG_DO_BF_PAGE_WALK
 		bfcall_guest_page_walk(vmfunc_load_addr, __pa(current->active_mm->pgd), 1);
 		bfcall_guest_page_walk(gva_val(gva_lcd_stack), __pa(current->active_mm->pgd), 1);
@@ -399,15 +507,41 @@ vmfunc_test_wrapper(struct fipc_message *request, vmfunc_test_t test)
 #endif
 
 #ifdef CONFIG_VMFUNC_SWITCH_MICROBENCHMARK
+
 		{
 			int i = 0;
 			u64 start = rdtsc(), end;
 			for (; i < NUM_ITERATIONS; i++) {
-				vmfunc_call_empty_switch();
+				__vmfunc_call_empty_switch();
 			}
 			end = rdtsc();
-			printk("%d iterations of vmfunc back-to-back took %llu cycles (avg: %llu cycles)\n",
-					NUM_ITERATIONS, end - start, (end - start) / NUM_ITERATIONS);
+			printk("%d iterations of vmfunc (same domain) back-to-back "
+					"took %llu cycles (avg: %llu cycles)\n",
+					NUM_ITERATIONS,
+					end - start,
+					(end - start) / NUM_ITERATIONS);
+		}
+
+
+		{
+			int j = 0;
+			for (; j < 5; j++) {
+				int i = 0;
+				u64 start = rdtsc(), end;
+				for (; i < NUM_ITERATIONS; i++) {
+					int k = 0;
+					for (; k < j; k++)
+						asm volatile("add %eax, %eax\n\t");
+					vmfunc_call_empty_switch(0);
+				}
+				end = rdtsc();
+				cond_resched();
+				printk("%d iterations of vmfunc back-to-back with %d add "
+						"insns took %llu cycles (avg: %llu cycles)\n",
+						NUM_ITERATIONS, j,
+						end - start,
+						(end - start) / NUM_ITERATIONS);
+			}
 		}
 #endif	/* CONFIG_VMFUNC_SWITCH_MICROBENCHMARK */
 		break;

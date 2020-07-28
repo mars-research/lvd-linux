@@ -409,7 +409,7 @@ int pci_enable_msix_range_callee(struct fipc_message *_request)
 	sync_ret = lcd_cptr_alloc(&p_cptr);
 	if (sync_ret) {
 		LIBLCD_ERR("failed to get cptr");
-		lcd_exit(-1);
+		return -1;
 	}
 
 	mem_order = fipc_get_reg2(_request);
@@ -423,7 +423,7 @@ int pci_enable_msix_range_callee(struct fipc_message *_request)
 
 	if (sync_ret) {
 		LIBLCD_ERR("failed to map void *p");
-		lcd_exit(-1);
+		return -1;
 	}
 
 	entries = (struct msix_entry*)(void*)(gva_val(p_gva) + p_offset);
@@ -1105,7 +1105,7 @@ int sync_ndo_set_mac_address_callee(struct fipc_message *message)
 
 	if (sync_ret) {
 		LIBLCD_ERR("virt to cptr failed");
-		lcd_exit(-1);
+		return -1;
 	}
 
 	lcd_addr_cptr = __cptr(fipc_get_reg0(message));
@@ -1307,6 +1307,9 @@ struct rtnl_link_stats64 *ndo_get_stats64(struct net_device *dev,
 	stats->rx_bytes = fipc_get_reg1(_request);
 	stats->tx_packets = fipc_get_reg2(_request);
 	stats->tx_bytes = fipc_get_reg3(_request);
+	stats->rx_errors = fipc_get_reg4(_request);
+	stats->rx_crc_errors = fipc_get_reg5(_request);
+	stats->rx_missed_errors = fipc_get_reg6(_request);
 
 	printk("%s, global stats sent: %lu consumed: %lu in-flight?: %lu\n",
 				__func__,
@@ -1333,6 +1336,36 @@ struct rtnl_link_stats64  LCD_TRAMPOLINE_LINKAGE(ndo_get_stats64_trampoline)
 		hidden_args);
 }
 
+int ndo_setup_tc(struct net_device *dev, u32 handle, __be16
+			protocol, struct tc_to_netdev *tc,
+			struct trampoline_hidden_args *hidden_args)
+{
+	printk("%s called with dev: %p handle %u, proto: %d, tc: %p\n",
+				__func__, dev, handle, protocol, tc);
+	return 0;
+}
+
+LCD_TRAMPOLINE_DATA(ndo_setup_tc_trampoline);
+int LCD_TRAMPOLINE_LINKAGE(ndo_setup_tc_trampoline)
+ndo_setup_tc_trampoline(struct net_device *dev,
+		u32 handle, __be16 protocol, struct tc_to_netdev *tc)
+{
+	int (*volatile ndo_setup_tc_fp)(struct net_device *dev, u32 handle, __be16
+			protocol, struct tc_to_netdev *tc,
+			struct trampoline_hidden_args *);
+
+	struct trampoline_hidden_args *hidden_args;
+	LCD_TRAMPOLINE_PROLOGUE(hidden_args,
+			ndo_setup_tc_trampoline);
+	ndo_setup_tc_fp = ndo_setup_tc;
+	return ndo_setup_tc_fp(dev,
+		handle,
+		protocol,
+		tc,
+		hidden_args);
+}
+
+
 void setup_netdev_ops(struct net_device_ops_container *netdev_ops_container)
 {
 	struct trampoline_hidden_args *dev_netdev_ops_ndo_open_hidden_args;
@@ -1345,6 +1378,7 @@ void setup_netdev_ops(struct net_device_ops_container *netdev_ops_container)
 	struct trampoline_hidden_args *dev_netdev_ops_ndo_tx_timeout_hidden_args;
 	struct trampoline_hidden_args *dev_netdev_ops_ndo_set_tx_maxrate_hidden_args;
 	struct trampoline_hidden_args *dev_netdev_ops_ndo_get_stats64_hidden_args;
+	struct trampoline_hidden_args *dev_netdev_ops_ndo_setup_tc_hidden_args;
 	int ret;
 
 	dev_netdev_ops_ndo_open_hidden_args = kzalloc(sizeof( struct trampoline_hidden_args ),
@@ -1518,6 +1552,25 @@ void setup_netdev_ops(struct net_device_ops_container *netdev_ops_container)
 	ret = set_memory_x(( ( unsigned  long   )dev_netdev_ops_ndo_get_stats64_hidden_args->t_handle ) & ( PAGE_MASK ),
 		( ALIGN(LCD_TRAMPOLINE_SIZE(ndo_get_stats64_trampoline),
 		PAGE_SIZE) ) >> ( PAGE_SHIFT ));
+
+	dev_netdev_ops_ndo_setup_tc_hidden_args = kzalloc(sizeof( struct trampoline_hidden_args ),
+		GFP_KERNEL);
+	if (!dev_netdev_ops_ndo_setup_tc_hidden_args) {
+		LIBLCD_ERR("kzalloc hidden args");
+		goto fail_alloc11;
+	}
+	dev_netdev_ops_ndo_setup_tc_hidden_args->t_handle = LCD_DUP_TRAMPOLINE(ndo_setup_tc_trampoline);
+	if (!dev_netdev_ops_ndo_setup_tc_hidden_args->t_handle) {
+		LIBLCD_ERR("duplicate trampoline");
+		goto fail_dup11;
+	}
+	dev_netdev_ops_ndo_setup_tc_hidden_args->t_handle->hidden_args = dev_netdev_ops_ndo_setup_tc_hidden_args;
+	dev_netdev_ops_ndo_setup_tc_hidden_args->struct_container = netdev_ops_container;
+	netdev_ops_container->net_device_ops.ndo_setup_tc = LCD_HANDLE_TO_TRAMPOLINE(dev_netdev_ops_ndo_setup_tc_hidden_args->t_handle);
+	ret = set_memory_x(( ( unsigned  long   )dev_netdev_ops_ndo_setup_tc_hidden_args->t_handle ) & ( PAGE_MASK ),
+		( ALIGN(LCD_TRAMPOLINE_SIZE(ndo_setup_tc_trampoline),
+		PAGE_SIZE) ) >> ( PAGE_SHIFT ));
+
 fail_alloc1:
 fail_dup1:
 fail_alloc2:
@@ -1580,7 +1633,7 @@ int register_netdev_callee(struct fipc_message *_request)
 	dev->features = fipc_get_reg3(_request);
 	dev->hw_features = fipc_get_reg4(_request);
 	dev->hw_enc_features = fipc_get_reg5(_request);
-	dev->mpls_features = fipc_get_reg6(_request);
+	dev->num_tc = fipc_get_reg6(_request);
 
 	memcpy(dev->dev_addr, mac_addr, ETH_ALEN);
 
@@ -1643,7 +1696,7 @@ int eth_mac_addr_callee(struct fipc_message *_request)
 	sync_ret = lcd_cptr_alloc(&p_cptr);
 	if (sync_ret) {
 		LIBLCD_ERR("failed to get cptr");
-		lcd_exit(-1);
+		return -1;
 	}
 
 	lcd_p_cptr = __cptr(fipc_get_reg1(_request));
@@ -1658,7 +1711,7 @@ int eth_mac_addr_callee(struct fipc_message *_request)
 
 	if (sync_ret) {
 		LIBLCD_ERR("failed to map void *p");
-		lcd_exit(-1);
+		return -1;
 	}
 
 	func_ret = eth_mac_addr(( &dev_container->net_device ),
@@ -2038,7 +2091,7 @@ int dev_addr_add_callee(struct fipc_message *_request)
 
 	if (sync_ret) {
 		LIBLCD_ERR("failed to map void *addr");
-		lcd_exit(-1);
+		return -1;
 	}
 
 	addr = (void *)(gva_val(addr_gva) + addr_offset);
@@ -2107,7 +2160,7 @@ int dev_addr_del_callee(struct fipc_message *_request)
 
 	if (sync_ret) {
 		LIBLCD_ERR("failed to map void *addr");
-		lcd_exit(-1);
+		return -1;
 	}
 	addr = (void *)(gva_val(addr_gva) + addr_offset);
 #endif
@@ -2719,17 +2772,17 @@ unsync_trampoline(struct net_device *dev,
 		hidden_args);
 }
 
-struct trampoline_hidden_args *unsync_hidden_args;
-struct unsync_container *unsync_container;
+struct trampoline_hidden_args *unsync_hidden_args = NULL;
+struct unsync_container *unsync_container = NULL;
+struct sync_container *sync_container = NULL;
+struct trampoline_hidden_args *sync_hidden_args = NULL;
 
 int __hw_addr_sync_dev_callee(struct fipc_message *_request)
 {
 	struct net_device_container *dev1_container;
-	struct sync_container *sync_container;
 	int ret;
 	int func_ret;
 	addr_list _type;
-	struct trampoline_hidden_args *sync_hidden_args;
 
 	ret = glue_cap_lookup_net_device_type(c_cspace,
 		__cptr(fipc_get_reg1(_request)),
@@ -2740,57 +2793,63 @@ int __hw_addr_sync_dev_callee(struct fipc_message *_request)
 		LIBLCD_ERR("lookup");
 		goto fail_lookup;
 	}
-	sync_container = kzalloc(sizeof( struct sync_container   ),
-		GFP_KERNEL);
 	if (!sync_container) {
-		LIBLCD_ERR("kzalloc");
-		goto fail_alloc;
+		sync_container = kzalloc(sizeof( struct sync_container   ),
+				GFP_KERNEL);
+		if (!sync_container) {
+			LIBLCD_ERR("kzalloc");
+			goto fail_alloc;
+		}
 	}
 
-	sync_hidden_args = kzalloc(sizeof( *sync_hidden_args ),
-		GFP_KERNEL);
 	if (!sync_hidden_args) {
-		LIBLCD_ERR("kzalloc hidden args");
-		goto fail_alloc1;
-	}
-	sync_hidden_args->t_handle = LCD_DUP_TRAMPOLINE(sync_trampoline);
-	if (!sync_hidden_args->t_handle) {
-		LIBLCD_ERR("duplicate trampoline");
-		goto fail_dup1;
-	}
-	sync_hidden_args->t_handle->hidden_args = sync_hidden_args;
-	sync_hidden_args->struct_container = sync_container;
+		sync_hidden_args = kzalloc(sizeof( *sync_hidden_args ),
+				GFP_KERNEL);
+		if (!sync_hidden_args) {
+			LIBLCD_ERR("kzalloc hidden args");
+			goto fail_alloc1;
+		}
+		sync_hidden_args->t_handle = LCD_DUP_TRAMPOLINE(sync_trampoline);
+		if (!sync_hidden_args->t_handle) {
+			LIBLCD_ERR("duplicate trampoline");
+			goto fail_dup1;
+		}
+		sync_hidden_args->t_handle->hidden_args = sync_hidden_args;
+		sync_hidden_args->struct_container = sync_container;
 
-	sync_container->sync = LCD_HANDLE_TO_TRAMPOLINE(sync_hidden_args->t_handle);
-	ret = set_memory_x(( ( unsigned  long   )sync_hidden_args->t_handle ) & ( PAGE_MASK ),
-		( ALIGN(LCD_TRAMPOLINE_SIZE(sync_trampoline),
-		PAGE_SIZE) ) >> ( PAGE_SHIFT ));
-
-	unsync_container = kzalloc(sizeof( struct unsync_container   ),
-		GFP_KERNEL);
+		sync_container->sync = LCD_HANDLE_TO_TRAMPOLINE(sync_hidden_args->t_handle);
+		ret = set_memory_x(( ( unsigned  long   )sync_hidden_args->t_handle ) & ( PAGE_MASK ),
+				( ALIGN(LCD_TRAMPOLINE_SIZE(sync_trampoline),
+					PAGE_SIZE) ) >> ( PAGE_SHIFT ));
+	}
 	if (!unsync_container) {
-		LIBLCD_ERR("kzalloc");
-		goto fail_alloc;
+		unsync_container = kzalloc(sizeof( struct unsync_container   ),
+			GFP_KERNEL);
+		if (!unsync_container) {
+			LIBLCD_ERR("kzalloc");
+			goto fail_alloc;
+		}
 	}
-
-	unsync_hidden_args = kzalloc(sizeof( *unsync_hidden_args ),
-		GFP_KERNEL);
 	if (!unsync_hidden_args) {
-		LIBLCD_ERR("kzalloc hidden args");
-		goto fail_alloc2;
-	}
-	unsync_hidden_args->t_handle = LCD_DUP_TRAMPOLINE(unsync_trampoline);
-	if (!unsync_hidden_args->t_handle) {
-		LIBLCD_ERR("duplicate trampoline");
-		goto fail_dup2;
-	}
-	unsync_hidden_args->t_handle->hidden_args = unsync_hidden_args;
-	unsync_hidden_args->struct_container = unsync_container;
+		unsync_hidden_args = kzalloc(sizeof( *unsync_hidden_args ),
+				GFP_KERNEL);
+		if (!unsync_hidden_args) {
+			LIBLCD_ERR("kzalloc hidden args");
+			goto fail_alloc2;
+		}
+		unsync_hidden_args->t_handle = LCD_DUP_TRAMPOLINE(unsync_trampoline);
+		if (!unsync_hidden_args->t_handle) {
+			LIBLCD_ERR("duplicate trampoline");
+			goto fail_dup2;
+		}
+		unsync_hidden_args->t_handle->hidden_args = unsync_hidden_args;
+		unsync_hidden_args->struct_container = unsync_container;
 
-	unsync_container->unsync = LCD_HANDLE_TO_TRAMPOLINE(unsync_hidden_args->t_handle);
-	ret = set_memory_x(( ( unsigned  long   )unsync_hidden_args->t_handle ) & ( PAGE_MASK ),
-		( ALIGN(LCD_TRAMPOLINE_SIZE(unsync_trampoline),
-		PAGE_SIZE) ) >> ( PAGE_SHIFT ));
+		unsync_container->unsync = LCD_HANDLE_TO_TRAMPOLINE(unsync_hidden_args->t_handle);
+		ret = set_memory_x(( ( unsigned  long   )unsync_hidden_args->t_handle ) & ( PAGE_MASK ),
+				( ALIGN(LCD_TRAMPOLINE_SIZE(unsync_trampoline),
+					PAGE_SIZE) ) >> ( PAGE_SHIFT ));
+	}
 
 	func_ret = __hw_addr_sync_dev(
 		_type == UC_LIST ? &dev1_container->net_device.uc :
@@ -2799,8 +2858,7 @@ int __hw_addr_sync_dev_callee(struct fipc_message *_request)
 		( sync_container->sync ),
 		( unsync_container->unsync ));
 
-	fipc_set_reg1(_request,
-			func_ret);
+	fipc_set_reg0(_request, func_ret);
 
 	return ret;
 fail_lookup:
@@ -2839,7 +2897,7 @@ fail_lookup:
 	return ret;
 }
 
-#define HANDLE_IRQ_LOCALLY
+//#define HANDLE_IRQ_LOCALLY
 
 #ifdef HANDLE_IRQ_LOCALLY
 irqreturn_t msix_vector_handler(int irq, void *data)
@@ -2886,7 +2944,7 @@ irqreturn_t msix_vector_handler(int irq, void *data)
 	napi_idx = irqhandler_container->napi_idx;
 
 #ifdef CONFIG_LCD_TRACE_BUFFER
-	if (napi_idx != NUM_HW_QUEUES)
+	//if (napi_idx != NUM_HW_QUEUES)
 		add_trace_entry(EVENT_MSIX_HANDLER, async_msg_get_fn_type(_request));
 #endif
 
@@ -3134,10 +3192,11 @@ int netif_napi_del_callee(struct fipc_message *_request)
 
 int netif_wake_subqueue_callee(struct fipc_message *_request)
 {
-	struct net_device_container *dev_container;
+	//struct net_device_container *dev_container;
 	unsigned 	short queue_index;
-	int ret;
+	int ret = 0;
 
+#if 0
 	ret = glue_cap_lookup_net_device_type(c_cspace,
 		__cptr(fipc_get_reg1(_request)),
 		&dev_container);
@@ -3145,13 +3204,15 @@ int netif_wake_subqueue_callee(struct fipc_message *_request)
 		LIBLCD_ERR("lookup");
 		goto fail_lookup;
 	}
+#endif
 
 	queue_index = fipc_get_reg3(_request);
 	//printk("%s, qindex: %d\n", __func__, queue_index);
-	netif_wake_subqueue(( &dev_container->net_device ),
-			queue_index);
+	//netif_wake_subqueue(( &dev_container->net_device ),
+	//		queue_index);
 
-fail_lookup:
+	netif_wake_subqueue(g_ndev, queue_index);
+//fail_lookup:
 	return ret;
 }
 
@@ -3410,7 +3471,11 @@ int napi_gro_receive_callee(struct fipc_message *_request)
 
 		old_pcount = page_count(skb_frag_page(frag));
 
-		set_page_count(skb_frag_page(frag), 2);
+		if (!old_pcount)
+			set_page_count(skb_frag_page(frag), 2);
+		else
+			page_ref_inc(skb_frag_page(frag));
+
 	}
 
 	if (skb_is_nonlinear(skb))
@@ -3434,8 +3499,8 @@ int napi_gro_receive_callee(struct fipc_message *_request)
 
 	func_ret = napi_gro_receive(napi, skb);
 
-	if (p)
-		set_page_count(p, old_pcount);
+	//if (p)
+	//	set_page_count(p, old_pcount);
 skip:
 	//printk("%s, returned %d\n", __func__, ret);
 	fipc_set_reg1(_request, func_ret);
@@ -3663,15 +3728,46 @@ fail_lookup:
 	return ret;
 }
 
-void rtnl_lock_callee(struct fipc_message *request)
+int rtnl_lock_callee(struct fipc_message *request)
 {
-	printk("%s, acquiring rtnl_lock\n", __func__);
 	rtnl_lock();
-	printk("%s, acquired rtnl_lock, calling original func\n", __func__);
+	return 0;
 }
 
-void rtnl_unlock_callee(struct fipc_message *request)
+int rtnl_unlock_callee(struct fipc_message *request)
 {
 	rtnl_unlock();
-	printk("%s, release rtnl_lock\n", __func__);
+	return 0;
+}
+
+int rtnl_is_locked_callee(struct fipc_message *request)
+{
+	int ret;
+	ret = rtnl_is_locked();
+	fipc_set_reg0(request, ret);
+	return 0;
+}
+
+int call_netdevice_notifiers_callee(struct fipc_message *_request)
+{
+	struct net_device_container *dev_container;
+	int ret = 0;
+	unsigned long val;
+
+	ret = glue_cap_lookup_net_device_type(c_cspace,
+			__cptr(fipc_get_reg1(_request)),
+			&dev_container);
+	if (ret) {
+		LIBLCD_ERR("lookup");
+		goto fail_lookup;
+	}
+
+	val = fipc_get_reg0(_request);
+
+	ret = call_netdevice_notifiers(val, &dev_container->net_device);
+
+	fipc_set_reg0(_request, ret);
+
+fail_lookup:
+	return ret;
 }

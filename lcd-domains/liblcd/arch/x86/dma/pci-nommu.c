@@ -72,7 +72,12 @@ static int nommu_map_sg(struct device *hwdev, struct scatterlist *sg,
 
 	for_each_sg(sg, s, nents, i) {
 		BUG_ON(!sg_page(s));
+#ifdef LCD_ISOLATE
+		s->dma_address = nommu_map_page(hwdev, sg_page(s), sg->offset,
+				PAGE_SIZE, dir, attrs);
+#else
 		s->dma_address = sg_phys(s);
+#endif
 		if (!check_addr("map_sg", hwdev, s->dma_address, s->length))
 			return 0;
 		s->dma_length = s->length;

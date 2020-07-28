@@ -18,6 +18,7 @@ lcd_domains-y += $(addprefix microkernel/, \
 	      cap_types.o \
 	      console.o \
 	      create.o \
+	      debugfs.o \
 	      ipc.o \
 	      main.o \
 	      mem.o \

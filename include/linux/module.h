@@ -337,7 +337,9 @@ struct load_info {
 };
 
 /* forcefully define LIVEPATCH */
+#ifndef CONFIG_LIVEPATCH
 #define CONFIG_LIVEPATCH
+#endif
 
 #ifdef CONFIG_LIVEPATCH
 struct klp_modinfo {

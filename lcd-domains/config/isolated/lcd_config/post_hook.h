@@ -169,6 +169,7 @@ extern union vmfunc_state_page vmfunc_state_page;
 #undef put_online_cpus
 #define put_online_cpus() do { } while(0)
 
+#if 0
 #ifdef CONFIG_SMP
 #undef spin_lock_init
 #define spin_lock_init(x)       lcd_spin_lock_init(x)
@@ -197,8 +198,19 @@ extern union vmfunc_state_page vmfunc_state_page;
 #undef _raw_spin_unlock
 #define _raw_spin_unlock(x)     spin_unlock(x)
 
-#else /* CONFIG_SMP */
+//#else /* CONFIG_SMP */
+#endif
+#endif
 
+#define netif_addr_lock_bh(x)	do { } while(0)
+
+#define netif_addr_lock_nested(x)	do { } while(0)
+
+#define netif_addr_unlock_bh(x)	do { } while(0)
+
+#define netif_addr_unlock(x)	do { } while(0)
+
+#ifndef CONFIG_SMP
 #undef spin_lock_init
 #define spin_lock_init(x) do { } while(0)
 

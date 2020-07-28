@@ -217,6 +217,7 @@ static void ixgbe_service_task(struct work_struct *work);
 /* global instance of adapter struct */
 struct ixgbe_adapter *g_adapter = NULL;
 struct net_device *g_netdev = NULL;
+extern bool link_debug_verbose;
 
 static int ixgbe_read_pci_cfg_word_parent(struct ixgbe_adapter *adapter,
 					  u32 reg, u16 *value)
@@ -1062,8 +1063,11 @@ static void ixgbe_update_xoff_received(struct ixgbe_adapter *adapter)
 #else
 	bool pfc_en = false;
 #endif
+
+#ifdef CONFIG_IXGBE_DCB
 	if (adapter->ixgbe_ieee_pfc)
 		pfc_en |= !!(adapter->ixgbe_ieee_pfc->pfc_en);
+#endif
 
 	if (!(adapter->flags & IXGBE_FLAG_DCB_ENABLED) || !pfc_en) {
 		ixgbe_update_xoff_rx_lfc(adapter);
@@ -3509,8 +3513,10 @@ static void ixgbe_set_rx_drop_en(struct ixgbe_adapter *adapter)
 	bool pfc_en = false;
 #endif
 
+#ifdef CONFIG_IXGBE_DCB
 	if (adapter->ixgbe_ieee_pfc)
 		pfc_en |= !!(adapter->ixgbe_ieee_pfc->pfc_en);
+#endif
 
 	/*
 	 * We should set the drop enable bit if:
@@ -5329,19 +5335,27 @@ static int ixgbe_non_sfp_link_config(struct ixgbe_hw *hw)
 	if (hw->mac.ops.check_link)
 		ret = hw->mac.ops.check_link(hw, &speed, &link_up, false);
 
-	if (ret)
+	if (ret) {
+		if (link_debug_verbose)
+			printk("%s mac.ops.check_link failed with %d", __func__, ret);
 		return ret;
+	}
 
 	speed = hw->phy.autoneg_advertised;
 	if ((!speed) && (hw->mac.ops.get_link_capabilities))
 		ret = hw->mac.ops.get_link_capabilities(hw, &speed,
 							&autoneg);
-	if (ret)
+	if (ret) {
+		if (link_debug_verbose)
+			printk("%s mac.ops.get_link_capabilities failed with %d", __func__, ret);
 		return ret;
+	}
 
 	if (hw->mac.ops.setup_link)
 		ret = hw->mac.ops.setup_link(hw, speed, link_up);
 
+	if (link_debug_verbose)
+		printk("%s mac.ops.setup_link returned %d", __func__, ret);
 	return ret;
 }
 
@@ -6922,8 +6936,10 @@ static void ixgbe_watchdog_update_link(struct ixgbe_adapter *adapter)
 		link_up = true;
 	}
 
+#ifdef CONFIG_IXGBE_DCB
 	if (adapter->ixgbe_ieee_pfc)
 		pfc_en |= !!(adapter->ixgbe_ieee_pfc->pfc_en);
+#endif
 
 	if (link_up && !((adapter->flags & IXGBE_FLAG_DCB_ENABLED) && pfc_en)) {
 		hw->mac.ops.fc_enable(hw);
@@ -8234,7 +8250,14 @@ ixgbe_mdio_read(struct net_device *netdev, int prtad, int devad, u16 addr)
 
 	if (prtad != hw->phy.mdio.prtad)
 		return -EINVAL;
+
+	if (link_debug_verbose)
+		printk("%s, Calling phy.ops.read_reg\n", __func__);
+
 	rc = hw->phy.ops.read_reg(hw, addr, devad, &value);
+
+	if (link_debug_verbose)
+		printk("%s, Calling phy.ops.read_reg\n", __func__);
 	if (!rc)
 		rc = value;
 	return rc;
@@ -8248,6 +8271,10 @@ static int ixgbe_mdio_write(struct net_device *netdev, int prtad, int devad,
 
 	if (prtad != hw->phy.mdio.prtad)
 		return -EINVAL;
+
+	if (link_debug_verbose)
+		printk("%s, Calling phy.ops.write_reg\n", __func__);
+
 	return hw->phy.ops.write_reg(hw, addr, devad, value);
 }
 
@@ -9738,6 +9765,8 @@ static int ixgbe_probe(struct pci_dev *pdev, const struct pci_device_id *ent)
 	case ixgbe_mac_X550:
 	case ixgbe_mac_X550EM_x:
 	case ixgbe_mac_x550em_a:
+		if (link_debug_verbose)
+			printk("%s, write_reg WUS\n", __func__);
 		IXGBE_WRITE_REG(&adapter->hw, IXGBE_WUS, ~0);
 		break;
 	default:
@@ -9759,6 +9788,9 @@ static int ixgbe_probe(struct pci_dev *pdev, const struct pci_device_id *ent)
 
 	/* reset_hw fills in the perm_addr as well */
 	hw->phy.reset_if_overtemp = true;
+
+	if (link_debug_verbose)
+		printk("%s, Calling mac.ops.reset_hw\n", __func__);
 	err = hw->mac.ops.reset_hw(hw);
 	hw->phy.reset_if_overtemp = false;
 	if (err == IXGBE_ERR_SFP_NOT_PRESENT) {

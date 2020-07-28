@@ -196,6 +196,8 @@ struct page *lcd_alloc_pages_node(int nid, unsigned int flags,
  */
 struct page *lcd_alloc_pages(unsigned int flags, unsigned int order);
 
+struct page *lcd_dheap_alloc_pages(unsigned int flags, unsigned int order);
+
 void *__lcd_get_free_pages(gfp_t mask, unsigned int order);
 
 void __lcd_free_pages(unsigned long addr, unsigned int order);
@@ -588,6 +590,7 @@ struct page *lcd_virt_to_head_page(const void *addr);
  */
 void *lcd_page_address(const struct page *page);
 
+void *lcd_dheap_page_address(const struct page *page);
 /**
  * lcd_free_memcg_kmem_pages -- Free 2^order pages at addr
  * @addr: starting address of pages

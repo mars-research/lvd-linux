@@ -72,6 +72,9 @@ static const char *event_type_to_string(unsigned type)
 		case EVENT_NMI_FULL: 
 			return "EVENT_NMI_FULL";
 
+		case EVENT_CTX_SWITCH:
+			return "EVENT_CTX_SWITCH";
+
 		default:
 			return "Undefined item";
 	}
@@ -102,6 +105,8 @@ asmlinkage __visible notrace void __add_trace_entry(unsigned type,
 				| (!!in_softirq() << IN_SOFTIRQ_SHIFT)
 				| (!!in_nmi() << IN_NMI_SHIFT);
 	entry->type = type;
+	entry->ts = rdtsc();
+	entry->mapped_cr3 = current->mapped_cr3;
 	snprintf(entry->name, PROC_NAME_MAX, current->comm);
 }
 
@@ -142,6 +147,27 @@ int __init ring_trace_init(void)
 }
 late_initcall(ring_trace_init);
 
+static inline void print_entry(struct ring_trace_entry *e, int cpu)
+{
+	printk("type:%16s(%d) ts:%llu cpu: %d [%c|%c|%c] comm: %s pid: %d rip: %16lx rsp: %16lx "
+			"rdi: %09lx gsbase: %16lx lcd_stack: %16lx[bmap: %x nc:%u] "
+			"mapped_cr3: %llx "
+			"eflags: %08lx [IF: %d]\n",
+			event_type_to_string(e->type),
+			e->type,
+			e->ts,
+			cpu,
+			e->context & (IN_NMI) ? 'N' : '-',
+			e->context & (IN_SOFTIRQ) ? 'S' : '-',
+			e->context & (IN_IRQ) ? 'I' : '-',
+			e->name, e->pid, e->rip,
+			e->rsp, e->rdi, e->gsbase, e->lcd_stack,
+			e->lcd_stack_bit, e->lcd_nc,
+			e->mapped_cr3,
+			e->eflags,
+			!!(e->eflags & IF_FLAG));
+}
+
 asmlinkage __visible notrace void dump_ring_trace_buffer(void)
 {
 	struct ring_trace_buffer *ring_buf = this_cpu_ptr(&ring_buffer);
@@ -150,24 +176,32 @@ asmlinkage __visible notrace void dump_ring_trace_buffer(void)
 	int i;
 
 	printk("head:%ld\n", idx);
+	idx--;
 
 	for (i = 0; i < ring_buf->header.size; i++, idx--) {
 		struct ring_trace_entry *entry = &ring_buf->entries[idx % ring_buf->header.size];
 		if (i == 0)
 			printk("head ==> ");
-		printk("type:%16s(%d) cpu: %d [%c|%c|%c] comm: %s pid: %d rip: %16lx rsp: %16lx "
-				"rdi: %09lx gsbase: %16lx lcd_stack: %16lx[bmap: %x nc:%u] "
-				"eflags: %08lx [IF: %d]\n",
-				event_type_to_string(entry->type),
-				entry->type,
-				raw_smp_processor_id(),
-				entry->context & (IN_NMI) ? 'N' : '-',
-				entry->context & (IN_SOFTIRQ) ? 'S' : '-',
-				entry->context & (IN_IRQ) ? 'I' : '-',
-				entry->name, entry->pid, entry->rip,
-				entry->rsp, entry->rdi, entry->gsbase, entry->lcd_stack,
-				entry->lcd_stack_bit, entry->lcd_nc, entry->eflags,
-				!!(entry->eflags & IF_FLAG));
+		print_entry(entry, raw_smp_processor_id());
 	}
 }
 EXPORT_SYMBOL(dump_ring_trace_buffer);
+
+asmlinkage __visible notrace void dump_ring_trace_buffer_cpu(int cpu)
+{
+	struct ring_trace_buffer *ring_buf = per_cpu_ptr(&ring_buffer, cpu);
+	unsigned long idx = ring_buf->header.head;
+
+	int i;
+
+	printk("head:%ld\n", idx);
+	idx--;
+
+	for (i = 0; i < ring_buf->header.size; i++, idx--) {
+		struct ring_trace_entry *entry = &ring_buf->entries[idx % ring_buf->header.size];
+		if (i == 0)
+			printk("head ==> ");
+		print_entry(entry, cpu);
+	}
+}
+EXPORT_SYMBOL(dump_ring_trace_buffer_cpu);

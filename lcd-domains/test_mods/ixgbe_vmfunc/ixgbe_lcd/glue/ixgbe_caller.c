@@ -27,7 +27,8 @@ static struct net_device *g_net_device;
 
 #ifdef IOMMU_ASSIGN
 /* device for IOMMU assignment */
-struct pcidev_info dev_assign = { 0x0000, 0x06, 0x00, 0x1 };
+struct pcidev_info dev_assign = { 0, 0, 0, 0 };
+extern unsigned long domain, bus, slot, fn;
 #endif
 
 struct kmem_cache *skb_c_cache;
@@ -417,6 +418,16 @@ int probe_callee(struct fipc_message *_request)
 
 	LIBLCD_MSG("%s called", __func__);
 
+	dev_assign.domain = domain;
+	dev_assign.bus = bus;
+	dev_assign.slot = slot;
+	dev_assign.fn = fn;
+
+	printk("%s, Got pci device %04lx:%02lx:%02lx.%02lx", __func__,
+				domain, bus, slot, fn);
+	dev_assign.bus = 0x6;
+	dev_assign.fn = 0x1;
+
 	other_ref.cptr = fipc_get_reg1(_request);
 	dma_mask = fipc_get_reg2(_request);
 
@@ -443,7 +454,7 @@ int probe_callee(struct fipc_message *_request)
 	}
 	dev_container->pci_dev.dev.kobj.name = "ixgbe_lcd";
 	dev_container->pci_dev.vendor = 0x8086;
-	dev_container->pci_dev.device = 0x10fd;
+	dev_container->pci_dev.device = 0x10fb;
 	dev_container->other_ref = other_ref;
 	dev_container->pci_dev.dev.dma_mask = &dma_mask;
 
@@ -621,7 +632,7 @@ int register_netdev(struct net_device *dev)
 	fipc_set_reg5(_request,
 			dev->hw_enc_features);
 	fipc_set_reg6(_request,
-			dev->mpls_features);
+			dev->num_tc);
 
 	vmfunc_wrapper(_request);
 
@@ -1804,7 +1815,7 @@ fail_lookup:
 int ndo_get_stats64_callee(struct fipc_message *_request)
 {
 	struct net_device_container *dev_container;
-	struct rtnl_link_stats64 stats;
+	struct rtnl_link_stats64 stats = { 0 };
 	int ret;
 
 
@@ -1825,6 +1836,9 @@ int ndo_get_stats64_callee(struct fipc_message *_request)
 	fipc_set_reg1(_request, stats.rx_bytes);
 	fipc_set_reg2(_request, stats.tx_packets);
 	fipc_set_reg3(_request, stats.tx_bytes);
+	fipc_set_reg4(_request, stats.rx_errors);
+	fipc_set_reg5(_request, stats.rx_crc_errors);
+	fipc_set_reg6(_request, stats.rx_missed_errors);
 
 fail_lookup:
 	return ret;
@@ -1874,8 +1888,8 @@ fail_lookup:
 	return ret;
 }
 
-struct sync_container *sync_container;
-struct unsync_container *unsync_container;
+struct sync_container *sync_container = NULL;
+struct unsync_container *unsync_container = NULL;
 
 int __hw_addr_sync_dev(
 		struct netdev_hw_addr_list *list,
@@ -1893,30 +1907,33 @@ int __hw_addr_sync_dev(
 	dev1_container = container_of(dev1,
 		struct net_device_container,
 		net_device);
-	sync_container = kzalloc(sizeof( struct sync_container   ),
-		GFP_KERNEL);
 	if (!sync_container) {
-		LIBLCD_ERR("kzalloc");
-		goto fail_alloc;
+		sync_container = kzalloc(sizeof( struct sync_container   ),
+				GFP_KERNEL);
+		if (!sync_container) {
+			LIBLCD_ERR("kzalloc");
+			goto fail_alloc;
+		}
+		sync_container->sync = sync;
 	}
-	sync_container->sync = sync;
 
-	unsync_container = kzalloc(sizeof( struct unsync_container   ),
-		GFP_KERNEL);
 	if (!unsync_container) {
-		LIBLCD_ERR("kzalloc");
-		goto fail_alloc;
+		unsync_container = kzalloc(sizeof( struct unsync_container   ),
+				GFP_KERNEL);
+		if (!unsync_container) {
+			LIBLCD_ERR("kzalloc");
+			goto fail_alloc;
+		}
+		unsync_container->unsync = unsync;
 	}
-	unsync_container->unsync = unsync;
 
-	async_msg_set_fn_type(_request,
-			__HW_ADDR_SYNC_DEV);
-	fipc_set_reg1(_request,
-			dev1_container->other_ref.cptr);
+	async_msg_set_fn_type(_request, __HW_ADDR_SYNC_DEV);
+	fipc_set_reg1(_request, dev1_container->other_ref.cptr);
 	fipc_set_reg2(_request, list == &dev1->mc ? MC_LIST : UC_LIST);
 
 	vmfunc_wrapper(_request);
-	func_ret = fipc_get_reg1(_request);
+
+	func_ret = fipc_get_reg0(_request);
 
 	liblcd__hw_addr_sync_dev(list, dev1, sync, unsync);
 	return func_ret;
@@ -2030,7 +2047,7 @@ int msix_vector_handler_callee(struct fipc_message *_request)
 		printk("irqhandler_ctr %p irqhandler %p",
 				irqhandler_container, irqhandler_container->irqhandler);
 
-	/* printk("%s, irq:%d irqret %d\n", __func__, irq, irqret); */
+	//printk("%s, irq:%d irqret %d\n", __func__, irq, irqret);
 	fipc_set_reg0(_request, irqret);
 	return ret;
 }
@@ -2173,6 +2190,7 @@ int poll_callee(struct fipc_message *_request)
 	napi_idx = fipc_get_reg1(_request);
 	if (napi_idx > 32) {
 		printk("%s, napi_idx 32! BUG", __func__);
+		goto exit;
 	}
 	napi = napi_struct_array[napi_idx];
 #else
@@ -2195,8 +2213,11 @@ int poll_callee(struct fipc_message *_request)
 	ret = ixgbe_poll(napi, budget);
 
 	fipc_set_reg0(_request, ret);
-	//fipc_set_reg1(_request, napi->state);
+#ifdef CONFIG_LCD_NAPI_STATE_SYNC
+	fipc_set_reg1(_request, napi->state);
+#endif
 
+exit:
 	return 0;
 }
 
@@ -2768,4 +2789,42 @@ void rtnl_unlock()
 	vmfunc_wrapper(request);
 
 	return;
+}
+
+int rtnl_is_locked()
+{
+	struct fipc_message r;
+	struct fipc_message *request = &r;
+	int ret;
+
+	async_msg_set_fn_type(request, RTNL_IS_LOCKED);
+
+	vmfunc_wrapper(request);
+
+	ret = fipc_get_reg0(request);
+
+	return ret;
+}
+
+int call_netdevice_notifiers(unsigned long val, struct net_device *dev)
+{
+	struct net_device_container *dev_container;
+	struct fipc_message r;
+	struct fipc_message *_request = &r;
+	int ret;
+
+	INIT_IPC_MSG(&r);
+	dev_container = container_of(dev, struct net_device_container,
+			net_device);
+
+	async_msg_set_fn_type(_request, CALL_NETDEVICE_NOTIFIERS);
+
+	fipc_set_reg0(_request, val);
+	fipc_set_reg1(_request, dev_container->other_ref.cptr);
+
+	vmfunc_wrapper(_request);
+
+	ret = fipc_get_reg0(_request);
+
+	return ret;
 }

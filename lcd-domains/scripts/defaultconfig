@@ -93,3 +93,11 @@ acpi_hwmon_vmfunc/hwmon_klcd nonisolated
 coretemp_hwmon_vmfunc/boot nonisolated
 coretemp_hwmon_vmfunc/coretemp_lcd isolated
 coretemp_hwmon_vmfunc/hwmon_klcd nonisolated
+
+skx_edac_vmfunc/boot nonisolated
+skx_edac_vmfunc/skx_edac_lcd isolated
+skx_edac_vmfunc/edac_klcd nonisolated
+
+mei_me_vmfunc/boot nonisolated
+mei_me_vmfunc/mei_me_lcd isolated
+mei_me_vmfunc/mei_klcd nonisolated

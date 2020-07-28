@@ -36,3 +36,5 @@ obj-m += nvme_vmfunc/
 obj-m += nvme_core_vmfunc/
 obj-m += acpi_hwmon_vmfunc/
 obj-m += coretemp_hwmon_vmfunc/
+#obj-m += skx_edac_vmfunc/
+obj-m += mei_me_vmfunc/

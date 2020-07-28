@@ -85,3 +85,7 @@ acpi_hwmon_vmfunc/hwmon_klcd nonisolated
 coretemp_hwmon_vmfunc/boot nonisolated
 coretemp_hwmon_vmfunc/coretemp_lcd isolated
 coretemp_hwmon_vmfunc/hwmon_klcd nonisolated
+
+msr_vmfunc/boot nonisolated
+msr_vmfunc/msr_lcd isolated
+msr_vmfunc/msr_klcd nonisolated

@@ -830,6 +830,7 @@ static int __do_ept_mapping(cptr_t lcd, void *addr, struct lcd_create_ctx *ctx, 
 
 	p = virt_to_head_page(addr);
 
+	LIBLCD_MSG("creating metadata for addr %p page %p size %d", addr, p, size);
 	/* create volunteer metadata */
 	lcd_create_mo_metadata(p, size, LCD_MICROKERNEL_TYPE_ID_VOLUNTEERED_PAGE);
 
@@ -853,6 +854,7 @@ static int do_misc_pages_grant_map(cptr_t lcd, struct lcd_create_ctx *ctx)
 	/* tss is exported */
 	int cpu;
 	unsigned int * except_stack_sz = (unsigned int*) kallsyms_lookup_name("exception_stack_sizes");
+	char *old_ds, *old_pebs;
 
 	/* map per-cpu TSS */
 	for_each_online_cpu(cpu) {
@@ -880,21 +882,31 @@ static int do_misc_pages_grant_map(cptr_t lcd, struct lcd_create_ctx *ctx)
 
 	}
 
-	for_each_possible_cpu(cpu) {
+	old_ds = old_pebs = NULL;
+
+	for_each_online_cpu(cpu) {
 		/* lookup idtr_base */
 		char *ds = (char*) per_cpu(lvd_cpu_hw_events_ds, cpu);
 		char *pebs =  (char*) per_cpu(lvd_cpu_hw_events_pebs, cpu);
 
-		LIBLCD_MSG("grant mem for cpu_hw_events.ds %p", per_cpu(lvd_cpu_hw_events_ds, cpu));
+		if (ds != old_ds) {
+			LIBLCD_MSG("grant mem for cpu %d cpu_hw_events.ds %p",
+					cpu, per_cpu(lvd_cpu_hw_events_ds,
+						cpu));
 
-		map_cpu_page(ds, ctx);
-		__do_ept_mapping(lcd, ds, ctx, PAGE_SIZE);
+			map_cpu_page(ds, ctx);
+			__do_ept_mapping(lcd, ds, ctx, PAGE_SIZE);
+		}
 
-		LIBLCD_MSG("grant mem for cpu_hw_events.pebs %p", per_cpu(lvd_cpu_hw_events_pebs, cpu));
+		if (pebs != old_pebs) {
+			LIBLCD_MSG("grant mem for cpu %d cpu_hw_events.pebs %p",
+					cpu, per_cpu(lvd_cpu_hw_events_pebs, cpu));
 
-		map_cpu_page(pebs, ctx);
-		__do_ept_mapping(lcd, pebs, ctx, PEBS_BUFFER_SIZE);
-
+			map_cpu_page(pebs, ctx);
+			__do_ept_mapping(lcd, pebs, ctx, PAGE_SIZE);
+		}
+		old_ds = ds;
+		old_pebs = pebs;
 	};
 
 

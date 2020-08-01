@@ -130,14 +130,12 @@ void run_vmfunc_tests(void)
 	printk("%s: VMFUNC_TEST_RPC_CALL: Passed!\n\tValue from other domain %lx\n",
 				__func__, fipc_get_reg1(&msg));
 
-
 	/* test3a: RPC call microbenchmark */
 	memset(&msg, 0x0, sizeof(msg));
 	msg.rpc_id = MARSHAL_ONE;
 	fipc_set_reg0(&msg, (u64) 0xabcd);
 
 	vmfunc_klcd_test_wrapper(&msg, OTHER_DOMAIN, VMFUNC_TEST_RPC_CALL);
-
 }
 
 static int caller_main(void)

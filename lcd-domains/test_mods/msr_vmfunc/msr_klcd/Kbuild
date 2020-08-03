@@ -1,0 +1,17 @@
+obj-m += lcd_test_mod_msr_vmfunc_msr_klcd.o
+
+lcd_test_mod_msr_vmfunc_msr_klcd-y		+= main.o
+
+# glue code
+lcd_test_mod_msr_vmfunc_msr_klcd-y		+= $(addprefix glue/, msr_callee.o \
+						msr_callee_dispatch.o )
+
+lcd_test_mod_msr_vmfunc_msr_klcd-y		+= $(addprefix ../, msr_glue_helper.o)
+
+cppflags-y += $(NONISOLATED_CFLAGS)
+
+extra-y += glue/msr_callee.lds
+
+ldflags-y += -T $(LCD_TEST_MODULES_BUILD_DIR)/msr_vmfunc/msr_klcd/glue/msr_callee.lds
+
+ccflags-y += $(NONISOLATED_CFLAGS)

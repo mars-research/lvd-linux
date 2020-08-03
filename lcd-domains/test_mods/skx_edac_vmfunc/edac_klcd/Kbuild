@@ -1,0 +1,18 @@
+obj-m += lcd_test_mod_skx_edac_vmfunc_edac_klcd.o
+
+lcd_test_mod_skx_edac_vmfunc_edac_klcd-y		+= main.o
+
+# glue code
+lcd_test_mod_skx_edac_vmfunc_edac_klcd-y		+= $(addprefix glue/, skx_edac_vmfunc_callee.o \
+						skx_edac_vmfunc_callee_dispatch.o )
+
+lcd_test_mod_skx_edac_vmfunc_edac_klcd-y		+= $(addprefix ../, skx_edac_vmfunc_cap.o)
+
+cppflags-y += $(NONISOLATED_CFLAGS)
+
+extra-y += glue/skx_edac_vmfunc_callee.lds
+
+ldflags-y += -T $(LCD_TEST_MODULES_BUILD_DIR)/skx_edac_vmfunc/edac_klcd/glue/skx_edac_vmfunc_callee.lds
+
+ccflags-y += $(NONISOLATED_CFLAGS)
+

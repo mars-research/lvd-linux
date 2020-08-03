@@ -43,6 +43,7 @@ lib-y += $(addprefix liblcd/lib/, \
 	checksum.o \
 	scatterlist.o \
 	list_sort.o \
+	iomap.o \
 	)
 
 lib-y += $(addprefix liblcd/mm/, \

@@ -1,0 +1,18 @@
+obj-m += lcd_test_mod_mei_me_vmfunc_mei_klcd.o
+
+lcd_test_mod_mei_me_vmfunc_mei_klcd-y		+= main.o
+
+# glue code
+lcd_test_mod_mei_me_vmfunc_mei_klcd-y		+= $(addprefix glue/, mei_callee.o \
+						mei_callee_dispatch.o )
+
+lcd_test_mod_mei_me_vmfunc_mei_klcd-y		+= $(addprefix ../, mei_glue_helper.o)
+
+cppflags-y += $(NONISOLATED_CFLAGS)
+
+extra-y += glue/mei_callee.lds
+
+ldflags-y += -T $(LCD_TEST_MODULES_BUILD_DIR)/mei_me_vmfunc/mei_klcd/glue/mei_callee.lds
+
+ccflags-y += $(NONISOLATED_CFLAGS)
+

@@ -1,0 +1,6 @@
+obj-$(LCD_CONFIG_BUILD_MEI_ME_VMFUNC_BOOT)	+= boot/
+
+obj-$(LCD_CONFIG_BUILD_MEI_ME_VMFUNC_MEI_ME_LCD) += mei_me_lcd/
+
+obj-$(LCD_CONFIG_BUILD_MEI_ME_VMFUNC_MEI_KLCD) += mei_klcd/
+

@@ -1,0 +1,18 @@
+obj-m += lcd_test_mod_shpchp_vmfunc_pci_klcd.o
+
+lcd_test_mod_shpchp_vmfunc_pci_klcd-y		+= main.o
+
+# glue code
+lcd_test_mod_shpchp_vmfunc_pci_klcd-y		+= $(addprefix glue/, shpchp_callee.o \
+						shpchp_callee_dispatch.o )
+
+lcd_test_mod_shpchp_vmfunc_pci_klcd-y		+= $(addprefix ../, shpchp_cap.o)
+
+cppflags-y += $(NONISOLATED_CFLAGS)
+
+extra-y += glue/shpchp_callee.lds
+
+ldflags-y += -T $(LCD_TEST_MODULES_BUILD_DIR)/shpchp_vmfunc/pci_klcd/glue/shpchp_callee.lds
+
+ccflags-y += $(NONISOLATED_CFLAGS)
+

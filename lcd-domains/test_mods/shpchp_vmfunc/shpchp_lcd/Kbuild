@@ -1,0 +1,18 @@
+obj-m += lcd_test_mod_shpchp_vmfunc_shpchp_lcd.o
+
+lcd_test_mod_shpchp_vmfunc_shpchp_lcd-y		+= main.o
+
+# Original code
+lcd_test_mod_shpchp_vmfunc_shpchp_lcd-y		+= 
+
+
+lcd_test_mod_shpchp_vmfunc_shpchp_lcd-y		+= $(LIBLCD)
+
+# glue code
+lcd_test_mod_shpchp_vmfunc_shpchp_lcd-y		+= $(addprefix glue/, shpchp_vmfunc_caller.o \
+						shpchp_vmfunc_caller_dispatch.o )
+
+lcd_test_mod_shpchp_vmfunc_shpchp_lcd-y		+= $(addprefix ../, shpchp_vmfunc_cap.o)
+
+ccflags-y += $(ISOLATED_CFLAGS)
+

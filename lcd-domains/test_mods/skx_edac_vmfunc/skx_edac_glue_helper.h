@@ -43,7 +43,7 @@ struct inode_container {
 	struct cptr my_ref;
 };
 struct mem_ctl_info_container {
-	struct mem_ctl_info mem_ctl_info;
+	struct mem_ctl_info *mci;
 	struct cptr other_ref;
 	struct cptr my_ref;
 };
@@ -163,12 +163,42 @@ typedef enum {
 	DIMM_INFO,
 } type_id;
 
-struct kson {
-	type_id obj_type;
-	data_type_t type;
-	type_id ref;
-	u32 num_elements;
-	u32 obj_id;
+struct value {
+	/* value */
+	int obj_id;
+	/* value attributes */
+	type_id type;
+	data_type_t dtype;
 };
 
+struct kson {
+	/* key */
+	void *addr;
+	struct value value;
+};
+
+struct hash {
+	u32 num_objs;
+	struct kson objs[MAX_OBJS];
+};
+
+int find(struct hash *ht, void *addr)
+{
+	u32 i;
+	for (i = 0; i < ht->num_objs; i++) {
+		if (ht->objs[i].addr == addr) {
+			return ht->objs[i].obj_id;
+		}
+	}
+	return -1;
+}
+
+u32 insert(struct hash *ht, void *addr, struct value *val)
+{
+	ht->objs[ht->num_objs].addr = addr;
+	ht->objs[ht->num_objs].value.obj_id = ht->num_objs;
+	ht->objs[ht->num_objs].value.type = val->type;
+	ht->objs[ht->num_objs].value.dtype = val->dtype;
+	return ht->num_objs++;
+}
 #endif	/* __SKX_EDAC_GLUE_HELPER_H__ */

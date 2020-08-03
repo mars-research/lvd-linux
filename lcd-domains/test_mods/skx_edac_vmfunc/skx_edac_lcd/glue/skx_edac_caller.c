@@ -219,15 +219,107 @@ struct mem_ctl_info *edac_mc_alloc(unsigned int mc_num,
 	struct mem_ctl_info_container *func_ret_container = NULL;
 	struct fipc_message r;
 	struct fipc_message *_request = &r;
-	async_msg_set_fn_type(_request,
-			EDAC_MC_ALLOC);
-	fipc_set_reg1(_request,
-			mc_num);
-	fipc_set_reg2(_request,
-			n_layers);
-	fipc_set_reg3(_request,
-			sz_pvt);
+	struct ext_registers *_regs = get_register_page(smp_processor_id());
+	uint64_t *regs = &_regs->regs[0];
+
+	async_msg_set_fn_type(_request, EDAC_MC_ALLOC);
+	regs[i++] = mc_num;
+	regs[i++] = n_layers;
+
+	/* marshal layers array */
+	/* marshal array size */
+	regs[i++] = n_layers;
+	for (i = 0; i < n_layers; i++) {
+		/* marshall element */
+		regs[i++] = layers[i].type;
+		regs[i++] = layers[i].size;
+		regs[i++] = layers[i].is_virt_csrow;
+	}
+
+	regs[i++] = sz_pvt;
 	ret = vmfunc_wrapper(_request);
+
+	{
+
+#define MAX_OBJS	(4096/sizeof(struct hash))
+#define INIT_VAL(v)	memset(v, 0, sizeof(typeof(*v)))
+	struct hash hash = { 0 };
+	struct value v;
+	i = 0;
+	type_id type;
+	type = regs[i++];
+	//create_object(type);
+
+	struct mem_ctl_info_container *mci_container;
+
+	mci_container = kzalloc(sizeof(*mci_container), GFP_KERNEL);
+
+	if (!mci_container) {
+		LIBLCD_ERR("alloc failed");
+		goto fail_alloc;
+	}
+
+	mci_container->mci = kzalloc(sizeof(*mci_container->mci), GFP_KERNEL);
+
+	if (!mci_container->mci) {
+		LIBLCD_ERR("alloc failed");
+		goto fail_alloc;
+	}
+	INIT_VAL(&v);
+	/* struct mem_ctl_info ptr (root object) */
+	v.dtype = POINTER;
+	v.type = MEM_CTL_INFO;
+	idx = regs[i++];
+	insert_at(ht, (void*) mci_container->mci, &v, idx);
+
+	u32 n_layers = regs[i++];
+
+	mci->n_layers =	regs[i++];
+	mci->layers = kzalloc(sizeof(mci->layers*) * n_layers, GFP_KERNEL);
+
+	if (!mci->layers) {
+		LIBLCD_ERR("alloc failed");
+		goto fail_alloc;
+	}
+
+	mci->tot_dimms = regs[i++];
+
+	mci->dimms = kzalloc(sizeof(mci->dimms) * mci->tot_dimms, GFP_KERNEL);
+
+	if (!mci->dimms) {
+		LIBLCD_ERR("alloc failed");
+		goto fail_alloc;
+	}
+
+	for (j = 0; j < mci->tot_dimms; j++) {
+		mc->dimms[j] = kzalloc(sizeof(**mci->dimms), GFP_KERNEL);
+	}
+
+	for (j = 0; j < n_layers; j++);
+	/* struct dimm_info dimm; (array element) */
+	for (j = 0; j < mci->tot_dimms; j++) {
+		struct dimm_info *dimm = mci->dimms[j];
+		u32 ref_id;
+
+		{INIT_VAL(&v);
+		v.dtype = POINTER;
+		v.type = DIMM_INFO;
+
+		/* marshalling dimm */
+		if (!find(ht, (void*) dimm)) {
+			insert(ht, (void*) dimm, &v);
+		}
+
+		/* marshalling dimm->mci */
+		if (!find(ht, (void*) dimm->mci)) {
+			INIT_VAL(&v);
+			v.dtype = POINTER;
+			v.type = MEM_CTL_INFO
+			insert(ht, (void*) dimm->mci, MEM_CTL_INFO);
+		}
+	}
+
+	}
 	return func_ret;
 
 }
@@ -294,7 +386,7 @@ void mce_register_decode_chain(struct notifier_block *nb)
 
 	nb_container = container_of(nb, struct notifier_block_container,
 					notifier_block);
- 
+
 	ret = glue_cap_insert_notifier_block_type(c_cspace, nb_container,
 				&nb_container->my_ref);
 	if (ret) {

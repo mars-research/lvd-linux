@@ -1,0 +1,2 @@
+obj-$(LCD_CONFIG_BUILD_._LCD) += lcd/
+obj-$(LCD_CONFIG_BUILD_._KLCD) += klcd/

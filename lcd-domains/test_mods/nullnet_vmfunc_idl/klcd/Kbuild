@@ -1,0 +1,4 @@
+obj-m += dummy_driver_klcd.o
+obj-m += common.o
+cppflags-y += $(NONISOLATED_CFLAGS)
+ccflags-y += $(NONISOLATED_CFLAGS) -Wno-error=declaration-after-statement

@@ -1,0 +1,6 @@
+obj-m += dummy_driver_lcd.o
+obj-m += common.o
+cppflags-y += $(ISOLATED_CFLAGS)
+ccflags-y += $(ISOLATED_CFLAGS) -Wno-error=declaration-after-statement
+extra-y += ../../../liblcd_build/common/vmfunc.lds
+ldflags-y += -T $(LIBLCD_BUILD_DIR)/common/vmfunc.lds

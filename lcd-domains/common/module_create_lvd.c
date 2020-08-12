@@ -903,7 +903,7 @@ static int do_misc_pages_grant_map(cptr_t lcd, struct lcd_create_ctx *ctx)
 					cpu, per_cpu(lvd_cpu_hw_events_pebs, cpu));
 
 			map_cpu_page(pebs, ctx);
-			__do_ept_mapping(lcd, pebs, ctx, PAGE_SIZE);
+			__do_ept_mapping(lcd, pebs, ctx, PEBS_BUFFER_SIZE);
 		}
 		old_ds = ds;
 		old_pebs = pebs;

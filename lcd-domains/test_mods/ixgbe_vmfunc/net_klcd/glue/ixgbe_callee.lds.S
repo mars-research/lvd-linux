@@ -13,6 +13,8 @@ SECTIONS
 	LCD_TRAMPOLINE_LINKER_SECTION(ndo_set_tx_maxrate_trampoline)
 	LCD_TRAMPOLINE_LINKER_SECTION(ndo_get_stats64_trampoline)
 	LCD_TRAMPOLINE_LINKER_SECTION(ndo_setup_tc_trampoline)
+	LCD_TRAMPOLINE_LINKER_SECTION(ndo_set_features_trampoline)
+	LCD_TRAMPOLINE_LINKER_SECTION(ndo_fix_features_trampoline)
 	LCD_TRAMPOLINE_LINKER_SECTION(probe_trampoline)
 	LCD_TRAMPOLINE_LINKER_SECTION(remove_trampoline)
 	LCD_TRAMPOLINE_LINKER_SECTION(sync_trampoline)

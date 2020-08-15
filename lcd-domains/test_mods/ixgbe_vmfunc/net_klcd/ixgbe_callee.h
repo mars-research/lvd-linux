@@ -77,6 +77,8 @@ int rtnl_lock_callee(struct fipc_message *request);
 int rtnl_unlock_callee(struct fipc_message *request);
 int rtnl_is_locked_callee(struct fipc_message *request);
 int call_netdevice_notifiers_callee(struct fipc_message *request);
+int irq_set_affinity_hint_callee(struct fipc_message *_request);
+int netdev_rss_key_fill_callee(struct fipc_message *_request);
 
 int dispatch_sync_loop(void);
 

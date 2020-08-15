@@ -3,8 +3,10 @@
 
 struct device_container {
 	struct device device;
+	struct device* dev;
 	struct cptr other_ref;
 	struct cptr my_ref;
+	struct hlist_node hentry;
 };
 struct module_container {
 	struct module module;

@@ -56,6 +56,14 @@ int handle_rpc_calls(struct fipc_message *message)
 			/* trace(NDO_GET_STATS64); */
 			return ndo_get_stats64_callee(message);
 
+		case NDO_SET_FEATURES:
+			trace(NDO_SET_FEATURES);
+			return ndo_set_features_callee(message);
+
+		case NDO_FIX_FEATURES:
+			trace(NDO_FIX_FEATURES);
+			return ndo_fix_features_callee(message);
+
 		case PROBE:
 			trace(PROBE);
 			return probe_callee(message);

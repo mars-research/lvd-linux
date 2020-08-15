@@ -3087,7 +3087,7 @@ static int ixgbe_request_msix_irqs(struct ixgbe_adapter *adapter)
 			/* skip this unused q_vector */
 			continue;
 		}
-		printk("%s, i %d | vec %d", __func__, vector, entry->vector);
+		printk("%s, i %d | vec %d | q_vector %p", __func__, vector, entry->vector, q_vector);
 		err = request_irq(entry->vector, &ixgbe_msix_clean_rings, 0,
 				  q_vector->name, q_vector);
 		if (err) {
@@ -3097,6 +3097,7 @@ static int ixgbe_request_msix_irqs(struct ixgbe_adapter *adapter)
 		}
 		/* If Flow Director is enabled, set interrupt affinity */
 		if (adapter->flags & IXGBE_FLAG_FDIR_HASH_CAPABLE) {
+			printk("%s, FDIR_HASH_CAPABLE set", __func__);
 			/* assign the mask for this irq */
 			irq_set_affinity_hint(entry->vector,
 					      &q_vector->affinity_mask);
@@ -5268,6 +5269,7 @@ static void ixgbe_configure(struct ixgbe_adapter *adapter)
 	}
 
 	if (adapter->flags & IXGBE_FLAG_FDIR_HASH_CAPABLE) {
+		printk("%s, calling init_fdir_signature_82599", __func__);
 		ixgbe_init_fdir_signature_82599(&adapter->hw,
 						adapter->fdir_pballoc);
 	} else if (adapter->flags & IXGBE_FLAG_FDIR_PERFECT_CAPABLE) {
@@ -8388,6 +8390,7 @@ static struct rtnl_link_stats64 *ixgbe_get_stats64(struct net_device *netdev,
 			} while (u64_stats_fetch_retry_irq(&ring->syncp, start));
 			stats->rx_packets += packets;
 			stats->rx_bytes   += bytes;
+			printk("%s, rx_queue_%d_packets %llu", __func__, i, packets);
 		}
 	}
 

@@ -42,6 +42,13 @@ int rtnl_is_locked(void) { LIBLCD_MSG("================>$$$$$$ Dummy %s called",
 int call_netdevice_notifiers(unsigned long val, struct net_device *dev)
 { LIBLCD_MSG("================>$$$$$$ Dummy %s called", __func__); return 0; }
 
+int irq_set_affinity_hint(unsigned int irq, const struct cpumask *m) {
+	LIBLCD_MSG("================>$$$$$$ Dummy %s called", __func__);
+	return 0;
+}
+
+void netdev_rss_key_fill(void *buffer, size_t len) { LIBLCD_MSG("================>$$$$$$ Dummy %s called", __func__); }
+
 #endif
 
 
@@ -67,8 +74,6 @@ int pskb_expand_head(struct sk_buff *skb, int nhead, int ntail, gfp_t gfp_mask) 
 
 unsigned char *__pskb_pull_tail(struct sk_buff *skb, int delta) { LIBLCD_MSG("================>$$$$$$ Dummy %s called", __func__); return (char*)skb; }
 
-void netdev_rss_key_fill(void *buffer, size_t len) { LIBLCD_MSG("================>$$$$$$ Dummy %s called", __func__); }
-
 unsigned long dev_trans_start(struct net_device *dev)
 {
 	LIBLCD_MSG("================>$$$$$$ Dummy %s called", __func__);
@@ -84,11 +89,6 @@ void init_timer_key(struct timer_list *timer, unsigned int flags,
 
 int del_timer(struct timer_list * timer) { LIBLCD_MSG("================>$$$$$$ Dummy %s called", __func__); return 0; }
 int del_timer_sync(struct timer_list * timer) { LIBLCD_MSG("================>$$$$$$ Dummy %s called", __func__); return 0; }
-
-int irq_set_affinity_hint(unsigned int irq, const struct cpumask *m) {
-	LIBLCD_MSG("================>$$$$$$ Dummy %s called", __func__);
-	return 0;
-}
 
 int mod_timer(struct timer_list *timer, unsigned long expires) { LIBLCD_MSG("================>$$$$$$ Dummy %s called", __func__); return 0; }
 

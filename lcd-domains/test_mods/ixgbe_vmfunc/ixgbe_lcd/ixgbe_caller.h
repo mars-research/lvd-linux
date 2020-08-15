@@ -22,6 +22,8 @@ int ndo_change_mtu_callee(struct fipc_message *_request);
 int ndo_tx_timeout_callee(struct fipc_message *_request);
 int ndo_set_tx_maxrate_callee(struct fipc_message *_request);
 int ndo_get_stats64_callee(struct fipc_message *_request);
+int ndo_set_features_callee(struct fipc_message *_request);
+int ndo_fix_features_callee(struct fipc_message *_request);
 
 int probe_callee(struct fipc_message *_request);
 

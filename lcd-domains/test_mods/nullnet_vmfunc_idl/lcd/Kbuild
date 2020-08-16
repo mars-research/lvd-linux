@@ -1,6 +1,8 @@
-obj-m += dummy_driver_lcd.o
-obj-m += common.o
+obj-m += nullnet_lcd.o
+obj-m += ../common.o
+obj-m += main.o
+obj-m += dummy.o
 cppflags-y += $(ISOLATED_CFLAGS)
-ccflags-y += $(ISOLATED_CFLAGS) -Wno-error=declaration-after-statement
+ccflags-y += $(ISOLATED_CFLAGS) -std=gnu99 -Wno-error=declaration-after-statement -Wno-error=discarded-qualifiers
 extra-y += ../../../liblcd_build/common/vmfunc.lds
 ldflags-y += -T $(LIBLCD_BUILD_DIR)/common/vmfunc.lds

@@ -1,56 +1,72 @@
 #include "../common.h"
 
-void free_netdev_callee(struct fipc_message* message) {
-	unsigned int marshal_slot = 0;
+void free_netdev_callee(struct rpc_message* message) {
 	struct net_device* dev = fipc_unmarshal(struct net_device*);
 	if (dev) {
 	}
 	free_netdev(dev);
-	marshal_slot = 0;
+	message->end_slot = message->slots;
 	if (dev) {
 	}
 }
 
-void eth_validate_addr_callee(struct fipc_message* message) {
-	unsigned int marshal_slot = 0;
+void eth_validate_addr_callee(struct rpc_message* message) {
 	struct net_device* dev_key = fipc_unmarshal(struct net_device*);
 	struct net_device* dev = fipc_get_local(dev_key);
 	if (dev) {
 	}
 	int return_value = eth_validate_addr(dev);
-	marshal_slot = 0;
+	message->end_slot = message->slots;
 	if (dev) {
 	}
 	fipc_marshal(return_value);
 }
 
-void eth_mac_addr_callee(struct fipc_message* message) {
-	unsigned int marshal_slot = 0;
+void eth_mac_addr_callee(struct rpc_message* message) {
 	struct net_device* dev_key = fipc_unmarshal(struct net_device*);
 	struct net_device* dev = fipc_get_local(dev_key);
 	if (dev) {
 	}
-	int return_value = eth_mac_addr(dev);
-	marshal_slot = 0;
+	struct sockaddr_placeholder* p_key = (void*)fipc_unmarshal(struct sockaddr_placeholder*);
+	struct sockaddr_placeholder* p = fipc_get_local(p_key);
+	if (p) {
+		p->sa_family = fipc_unmarshal(unsigned short);
+		p->sa_data_0 = fipc_unmarshal(char);
+		p->sa_data_1 = fipc_unmarshal(char);
+		p->sa_data_2 = fipc_unmarshal(char);
+		p->sa_data_3 = fipc_unmarshal(char);
+		p->sa_data_4 = fipc_unmarshal(char);
+		p->sa_data_5 = fipc_unmarshal(char);
+		p->sa_data_6 = fipc_unmarshal(char);
+		p->sa_data_7 = fipc_unmarshal(char);
+		p->sa_data_8 = fipc_unmarshal(char);
+		p->sa_data_9 = fipc_unmarshal(char);
+		p->sa_data_10 = fipc_unmarshal(char);
+		p->sa_data_11 = fipc_unmarshal(char);
+		p->sa_data_12 = fipc_unmarshal(char);
+		p->sa_data_13 = fipc_unmarshal(char);
+	}
+	int return_value = eth_mac_addr(dev, p);
+	message->end_slot = message->slots;
 	if (dev) {
+	}
+	if (p) {
 	}
 	fipc_marshal(return_value);
 }
 
-void ether_setup_callee(struct fipc_message* message) {
-	unsigned int marshal_slot = 0;
+void ether_setup_callee(struct rpc_message* message) {
 	struct net_device* dev_key = fipc_unmarshal(struct net_device*);
 	struct net_device* dev = fipc_get_local(dev_key);
 	if (dev) {
 	}
 	ether_setup(dev);
-	marshal_slot = 0;
+	message->end_slot = message->slots;
 	if (dev) {
 	}
 }
 
-void register_netdevice_callee(struct fipc_message* message) {
-	unsigned int marshal_slot = 0;
+void register_netdevice_callee(struct rpc_message* message) {
 	struct net_device* dev_key = fipc_unmarshal(struct net_device*);
 	struct net_device* dev = fipc_get_local(dev_key);
 	if (dev) {
@@ -62,108 +78,114 @@ void register_netdevice_callee(struct fipc_message* message) {
 		dev->reg_state = fipc_unmarshal(int);
 	}
 	int return_value = register_netdevice(dev);
-	marshal_slot = 0;
+	message->end_slot = message->slots;
 	if (dev) {
 	}
 	fipc_marshal(return_value);
 }
 
-void netif_carrier_off_callee(struct fipc_message* message) {
-	unsigned int marshal_slot = 0;
+void netif_carrier_off_callee(struct rpc_message* message) {
 	struct net_device* dev_key = fipc_unmarshal(struct net_device*);
 	struct net_device* dev = fipc_get_local(dev_key);
 	if (dev) {
 	}
 	netif_carrier_off(dev);
-	marshal_slot = 0;
+	message->end_slot = message->slots;
 	if (dev) {
 	}
 }
 
-void __rtnl_link_register_callee(struct fipc_message* message) {
-	unsigned int marshal_slot = 0;
+void __rtnl_link_register_callee(struct rpc_message* message) {
 	struct rtnl_link_ops* ops_key = fipc_unmarshal(struct rtnl_link_ops*);
 	struct rtnl_link_ops* ops = fipc_create_shadow(ops_key);
 	if (ops) {
 		void (*ops_setup)(struct net_device* dev) = fipc_unmarshal(void*);
 		void (*ops_setup_trampoline)(struct net_device* dev) = inject_trampoline(_void_1_kernel_nullnet_net_device_setup, ops_setup);
 		ops->setup = ops_setup_trampoline;
+		int (*ops_validate)(struct nlattr** tb, struct nlattr** data) = fipc_unmarshal(void*);
+		int (*ops_validate_trampoline)(struct nlattr** tb, struct nlattr** data) = inject_trampoline(_int_1_kernel_nullnet_void_ptr_1_kernel_nullnet_void_ptr, ops_validate);
+		ops->validate = ops_validate_trampoline;
 	}
 	int return_value = __rtnl_link_register(ops);
-	marshal_slot = 0;
+	message->end_slot = message->slots;
 	if (ops) {
 	}
 	fipc_marshal(return_value);
 }
 
-void __rtnl_link_unregister_callee(struct fipc_message* message) {
-	unsigned int marshal_slot = 0;
+void __rtnl_link_unregister_callee(struct rpc_message* message) {
 	struct rtnl_link_ops* ops_key = fipc_unmarshal(struct rtnl_link_ops*);
 	struct rtnl_link_ops* ops = fipc_get_local(ops_key);
 	if (ops) {
 	}
 	__rtnl_link_unregister(ops);
-	marshal_slot = 0;
+	message->end_slot = message->slots;
 	if (ops) {
 	}
 	fipc_destroy_shadow(ops_key);
 }
 
-void rtnl_link_unregister_callee(struct fipc_message* message) {
-	unsigned int marshal_slot = 0;
+void rtnl_link_unregister_callee(struct rpc_message* message) {
 	struct rtnl_link_ops* ops_key = fipc_unmarshal(struct rtnl_link_ops*);
 	struct rtnl_link_ops* ops = fipc_get_local(ops_key);
 	if (ops) {
 	}
 	rtnl_link_unregister(ops);
-	marshal_slot = 0;
+	message->end_slot = message->slots;
 	if (ops) {
 	}
 	fipc_destroy_shadow(ops_key);
 }
 
-void alloc_netdev_mqs_callee(struct fipc_message* message) {
-	unsigned int marshal_slot = 0;
+void alloc_netdev_mqs_callee(struct rpc_message* message) {
 	int sizeof_priv = fipc_unmarshal(int);
+
+	char* name_key = fipc_unmarshal(char*);
+	unsigned long len = fipc_unmarshal(unsigned long);
+	char* name = fipc_create_shadow_impl(name_key, len + 1);
+	name[len] = '\0';
+	for (unsigned i = 0; i < len; ++i) {
+		name[i] = fipc_unmarshal(char);
+	}
+
 	unsigned char name_assign_type = fipc_unmarshal(unsigned char);
 	void (*setup_remote)(struct net_device* dev) = fipc_unmarshal(void*);
 	void (*setup)(struct net_device* dev) = inject_trampoline(_void_1_kernel_nullnet_net_device_setup_callee_alloc, setup_remote);
 	unsigned int txqs = fipc_unmarshal(unsigned int);
 	unsigned int rxqs = fipc_unmarshal(unsigned int);
-	struct net_device* return_value = alloc_netdev_mqs(sizeof_priv, name_assign_type, setup, txqs, rxqs);
-	marshal_slot = 0;
+	struct net_device* return_value = alloc_netdev_mqs(sizeof_priv, name, name_assign_type, setup, txqs, rxqs);
+	message->end_slot = message->slots;
+	if (name) {
+	}
 	struct net_device* return_value_key = fipc_get_remote(return_value);
 	fipc_marshal(return_value_key);
 	if (return_value) {
 	}
 }
 
-void netif_carrier_on_callee(struct fipc_message* message) {
-	unsigned int marshal_slot = 0;
+void netif_carrier_on_callee(struct rpc_message* message) {
 	struct net_device* dev_key = fipc_unmarshal(struct net_device*);
 	struct net_device* dev = fipc_get_local(dev_key);
 	if (dev) {
 	}
 	netif_carrier_on(dev);
-	marshal_slot = 0;
+	message->end_slot = message->slots;
 	if (dev) {
 	}
 }
 
-void consume_skb_callee(struct fipc_message* message) {
-	unsigned int marshal_slot = 0;
+void consume_skb_callee(struct rpc_message* message) {
 	struct sk_buff* skb_key = fipc_unmarshal(struct sk_buff*);
 	struct sk_buff* skb = fipc_get_local(skb_key);
 	if (skb) {
 	}
 	consume_skb(skb);
-	marshal_slot = 0;
+	message->end_slot = message->slots;
 	if (skb) {
 	}
 }
 
-void _int_1_kernel_nullnet_net_device_ndo_init_callee(struct fipc_message* message) {
-	unsigned int marshal_slot = 0;
+void _int_1_kernel_nullnet_net_device_ndo_init_callee(struct rpc_message* message) {
 	int (*real_pointer)(struct net_device* dev) = fipc_unmarshal(void*);
 	struct net_device* dev_key = fipc_unmarshal(struct net_device*);
 	struct net_device* dev = fipc_get_local(dev_key);
@@ -175,7 +197,7 @@ void _int_1_kernel_nullnet_net_device_ndo_init_callee(struct fipc_message* messa
 		}
 	}
 	int return_value = real_pointer(dev);
-	marshal_slot = 0;
+	message->end_slot = message->slots;
 	if (dev) {
 		struct pcpu_dstats* dev_dstats = dev->dstats;
 		if (dev_dstats) {
@@ -184,8 +206,7 @@ void _int_1_kernel_nullnet_net_device_ndo_init_callee(struct fipc_message* messa
 	fipc_marshal(return_value);
 }
 
-void _void_1_kernel_nullnet_net_device_ndo_uninit_callee(struct fipc_message* message) {
-	unsigned int marshal_slot = 0;
+void _void_1_kernel_nullnet_net_device_ndo_uninit_callee(struct rpc_message* message) {
 	void (*real_pointer)(struct net_device* dev) = fipc_unmarshal(void*);
 	struct net_device* dev_key = fipc_unmarshal(struct net_device*);
 	struct net_device* dev = fipc_get_local(dev_key);
@@ -197,7 +218,7 @@ void _void_1_kernel_nullnet_net_device_ndo_uninit_callee(struct fipc_message* me
 		}
 	}
 	real_pointer(dev);
-	marshal_slot = 0;
+	message->end_slot = message->slots;
 	if (dev) {
 		struct pcpu_dstats* dev_dstats = dev->dstats;
 		if (dev_dstats) {
@@ -205,8 +226,7 @@ void _void_1_kernel_nullnet_net_device_ndo_uninit_callee(struct fipc_message* me
 	}
 }
 
-void _int_1_kernel_nullnet_sk_buff_ndo_start_xmit_1_kernel_nullnet_net_device_stats_callee(struct fipc_message* message) {
-	unsigned int marshal_slot = 0;
+void _int_1_kernel_nullnet_sk_buff_ndo_start_xmit_1_kernel_nullnet_net_device_stats_callee(struct rpc_message* message) {
 	int (*real_pointer)(struct sk_buff* skb, struct net_device* dev) = fipc_unmarshal(void*);
 	struct sk_buff* skb_key = fipc_unmarshal(struct sk_buff*);
 	struct sk_buff* skb = fipc_get_local(skb_key);
@@ -218,7 +238,7 @@ void _int_1_kernel_nullnet_sk_buff_ndo_start_xmit_1_kernel_nullnet_net_device_st
 	if (dev) {
 	}
 	int return_value = real_pointer(skb, dev);
-	marshal_slot = 0;
+	message->end_slot = message->slots;
 	if (skb) {
 	}
 	if (dev) {
@@ -226,8 +246,43 @@ void _int_1_kernel_nullnet_sk_buff_ndo_start_xmit_1_kernel_nullnet_net_device_st
 	fipc_marshal(return_value);
 }
 
-void _1_kernel_nullnet_rtnl_link_stats64_1_kernel_nullnet_net_device_ndo_get_stats64_1_kernel_nullnet_rtnl_link_stats64_ndo_get_stats64_callee(struct fipc_message* message) {
-	unsigned int marshal_slot = 0;
+void _int_1_kernel_nullnet_net_device_ndo_validate_addr_callee(struct rpc_message* message) {
+	int (*real_pointer)(struct net_device* dev) = fipc_unmarshal(void*);
+	struct net_device* dev_key = fipc_unmarshal(struct net_device*);
+	struct net_device* dev = fipc_get_local(dev_key);
+	if (dev) {
+		struct sockaddr_placeholder* dev_dev_addr_key = (void*)fipc_unmarshal(struct sockaddr_placeholder*);
+		struct sockaddr_placeholder* dev_dev_addr = fipc_get_local(dev_dev_addr_key);
+		dev->dev_addr = (void*)dev_dev_addr;
+		if (dev_dev_addr) {
+			dev_dev_addr->sa_family = fipc_unmarshal(unsigned short);
+			dev_dev_addr->sa_data_0 = fipc_unmarshal(char);
+			dev_dev_addr->sa_data_1 = fipc_unmarshal(char);
+			dev_dev_addr->sa_data_2 = fipc_unmarshal(char);
+			dev_dev_addr->sa_data_3 = fipc_unmarshal(char);
+			dev_dev_addr->sa_data_4 = fipc_unmarshal(char);
+			dev_dev_addr->sa_data_5 = fipc_unmarshal(char);
+			dev_dev_addr->sa_data_6 = fipc_unmarshal(char);
+			dev_dev_addr->sa_data_7 = fipc_unmarshal(char);
+			dev_dev_addr->sa_data_8 = fipc_unmarshal(char);
+			dev_dev_addr->sa_data_9 = fipc_unmarshal(char);
+			dev_dev_addr->sa_data_10 = fipc_unmarshal(char);
+			dev_dev_addr->sa_data_11 = fipc_unmarshal(char);
+			dev_dev_addr->sa_data_12 = fipc_unmarshal(char);
+			dev_dev_addr->sa_data_13 = fipc_unmarshal(char);
+		}
+	}
+	int return_value = real_pointer(dev);
+	message->end_slot = message->slots;
+	if (dev) {
+		struct sockaddr_placeholder* dev_dev_addr = (void*)dev->dev_addr;
+		if (dev_dev_addr) {
+		}
+	}
+	fipc_marshal(return_value);
+}
+
+void _1_kernel_nullnet_rtnl_link_stats64_1_kernel_nullnet_net_device_ndo_get_stats64_1_kernel_nullnet_rtnl_link_stats64_ndo_get_stats64_callee(struct rpc_message* message) {
 	struct rtnl_link_stats64* (*real_pointer)(struct net_device* dev, struct rtnl_link_stats64* storage) = fipc_unmarshal(void*);
 	struct net_device* dev_key = fipc_unmarshal(struct net_device*);
 	struct net_device* dev = fipc_get_local(dev_key);
@@ -245,7 +300,7 @@ void _1_kernel_nullnet_rtnl_link_stats64_1_kernel_nullnet_net_device_ndo_get_sta
 		storage->tx_packets = fipc_unmarshal(unsigned int);
 	}
 	struct rtnl_link_stats64* return_value = real_pointer(dev, storage);
-	marshal_slot = 0;
+	message->end_slot = message->slots;
 	if (dev) {
 		struct pcpu_dstats* dev_dstats = dev->dstats;
 		if (dev_dstats) {
@@ -259,35 +314,53 @@ void _1_kernel_nullnet_rtnl_link_stats64_1_kernel_nullnet_net_device_ndo_get_sta
 	}
 }
 
-void _void_1_kernel_nullnet_net_device_ndo_set_rx_mode_callee(struct fipc_message* message) {
-	unsigned int marshal_slot = 0;
+void _void_1_kernel_nullnet_net_device_ndo_set_rx_mode_callee(struct rpc_message* message) {
 	void (*real_pointer)(struct net_device* dev) = fipc_unmarshal(void*);
 	struct net_device* dev_key = fipc_unmarshal(struct net_device*);
 	struct net_device* dev = fipc_get_local(dev_key);
 	if (dev) {
 	}
 	real_pointer(dev);
-	marshal_slot = 0;
+	message->end_slot = message->slots;
 	if (dev) {
 	}
 }
 
-void _int_1_kernel_nullnet_net_device_ndo_set_mac_address_callee(struct fipc_message* message) {
-	unsigned int marshal_slot = 0;
-	int (*real_pointer)(struct net_device* dev) = fipc_unmarshal(void*);
+void _int_1_kernel_nullnet_net_device_ndo_set_mac_address_1_kernel_nullnet_sockaddr_callee(struct rpc_message* message) {
+	int (*real_pointer)(struct net_device* dev, struct sockaddr_placeholder* addr) = fipc_unmarshal(void*);
 	struct net_device* dev_key = fipc_unmarshal(struct net_device*);
 	struct net_device* dev = fipc_get_local(dev_key);
 	if (dev) {
 	}
-	int return_value = real_pointer(dev);
-	marshal_slot = 0;
+	struct sockaddr_placeholder* addr_key = (void*)fipc_unmarshal(struct sockaddr_placeholder*);
+	struct sockaddr_placeholder* addr = fipc_get_local(addr_key);
+	if (addr) {
+		addr->sa_family = fipc_unmarshal(unsigned short);
+		addr->sa_data_0 = fipc_unmarshal(char);
+		addr->sa_data_1 = fipc_unmarshal(char);
+		addr->sa_data_2 = fipc_unmarshal(char);
+		addr->sa_data_3 = fipc_unmarshal(char);
+		addr->sa_data_4 = fipc_unmarshal(char);
+		addr->sa_data_5 = fipc_unmarshal(char);
+		addr->sa_data_6 = fipc_unmarshal(char);
+		addr->sa_data_7 = fipc_unmarshal(char);
+		addr->sa_data_8 = fipc_unmarshal(char);
+		addr->sa_data_9 = fipc_unmarshal(char);
+		addr->sa_data_10 = fipc_unmarshal(char);
+		addr->sa_data_11 = fipc_unmarshal(char);
+		addr->sa_data_12 = fipc_unmarshal(char);
+		addr->sa_data_13 = fipc_unmarshal(char);
+	}
+	int return_value = real_pointer(dev, addr);
+	message->end_slot = message->slots;
 	if (dev) {
+	}
+	if (addr) {
 	}
 	fipc_marshal(return_value);
 }
 
-void _int_1_kernel_nullnet_net_device_ndo_change_carrier_bool_callee(struct fipc_message* message) {
-	unsigned int marshal_slot = 0;
+void _int_1_kernel_nullnet_net_device_ndo_change_carrier_bool_callee(struct rpc_message* message) {
 	int (*real_pointer)(struct net_device* dev, bool new_carrier) = fipc_unmarshal(void*);
 	struct net_device* dev_key = fipc_unmarshal(struct net_device*);
 	struct net_device* dev = fipc_get_local(dev_key);
@@ -295,14 +368,13 @@ void _int_1_kernel_nullnet_net_device_ndo_change_carrier_bool_callee(struct fipc
 	}
 	bool new_carrier = fipc_unmarshal(bool);
 	int return_value = real_pointer(dev, new_carrier);
-	marshal_slot = 0;
+	message->end_slot = message->slots;
 	if (dev) {
 	}
 	fipc_marshal(return_value);
 }
 
-void _void_1_kernel_nullnet_net_device_get_drvinfo_1_kernel_nullnet_ethtool_drvinfo_get_drvinfo_callee(struct fipc_message* message) {
-	unsigned int marshal_slot = 0;
+void _void_1_kernel_nullnet_net_device_get_drvinfo_1_kernel_nullnet_ethtool_drvinfo_get_drvinfo_callee(struct rpc_message* message) {
 	void (*real_pointer)(struct net_device* dev, struct ethtool_drvinfo* info) = fipc_unmarshal(void*);
 	struct net_device* dev_key = fipc_unmarshal(struct net_device*);
 	struct net_device* dev = fipc_get_local(dev_key);
@@ -313,28 +385,26 @@ void _void_1_kernel_nullnet_net_device_get_drvinfo_1_kernel_nullnet_ethtool_drvi
 	if (info) {
 	}
 	real_pointer(dev, info);
-	marshal_slot = 0;
+	message->end_slot = message->slots;
 	if (dev) {
 	}
 	if (info) {
 	}
 }
 
-void _void_1_kernel_nullnet_net_device_destructor_callee(struct fipc_message* message) {
-	unsigned int marshal_slot = 0;
+void _void_1_kernel_nullnet_net_device_destructor_callee(struct rpc_message* message) {
 	void (*real_pointer)(struct net_device* dev) = fipc_unmarshal(void*);
 	struct net_device* dev_key = fipc_unmarshal(struct net_device*);
 	struct net_device* dev = fipc_get_local(dev_key);
 	if (dev) {
 	}
 	real_pointer(dev);
-	marshal_slot = 0;
+	message->end_slot = message->slots;
 	if (dev) {
 	}
 }
 
-void _void_1_kernel_nullnet_net_device_setup_callee(struct fipc_message* message) {
-	unsigned int marshal_slot = 0;
+void _void_1_kernel_nullnet_net_device_setup_callee(struct rpc_message* message) {
 	void (*real_pointer)(struct net_device* dev) = fipc_unmarshal(void*);
 	struct net_device* dev_key = fipc_unmarshal(struct net_device*);
 	struct net_device* dev = fipc_get_local(dev_key);
@@ -346,7 +416,7 @@ void _void_1_kernel_nullnet_net_device_setup_callee(struct fipc_message* message
 		dev->hw_enc_features = fipc_unmarshal(unsigned long long);
 	}
 	real_pointer(dev);
-	marshal_slot = 0;
+	message->end_slot = message->slots;
 	if (dev) {
 		struct net_device_ops* dev_netdev_ops = dev->netdev_ops;
 		if (dev_netdev_ops) {
@@ -358,8 +428,11 @@ void _void_1_kernel_nullnet_net_device_setup_callee(struct fipc_message* message
 	}
 }
 
-void _void_1_kernel_nullnet_net_device_setup_callee_alloc_callee(struct fipc_message* message) {
-	unsigned int marshal_slot = 0;
+void _int_1_kernel_nullnet_void_ptr_1_kernel_nullnet_void_ptr_callee(struct rpc_message* message) {
+	// EMPTY
+}
+
+void _void_1_kernel_nullnet_net_device_setup_callee_alloc_callee(struct rpc_message* message) {
 	void (*real_pointer)(struct net_device* dev) = fipc_unmarshal(void*);
 	struct net_device* dev_key = fipc_unmarshal(struct net_device*);
 	struct net_device* dev = fipc_create_shadow(dev_key);
@@ -371,7 +444,7 @@ void _void_1_kernel_nullnet_net_device_setup_callee_alloc_callee(struct fipc_mes
 		dev->hw_enc_features = fipc_unmarshal(unsigned long long);
 	}
 	real_pointer(dev);
-	marshal_slot = 0;
+	message->end_slot = message->slots;
 	if (dev) {
 		struct net_device_ops* dev_netdev_ops = dev->netdev_ops;
 		if (dev_netdev_ops) {
@@ -383,14 +456,13 @@ void _void_1_kernel_nullnet_net_device_setup_callee_alloc_callee(struct fipc_mes
 	}
 }
 
-LCD_TRAMPOLINE_DATA(trampoline_int_1_kernel_nullnet_net_device_ndo_init)
 LCD_TRAMPOLINE_LINKAGE(trampoline_int_1_kernel_nullnet_net_device_ndo_init)
 int trampoline_int_1_kernel_nullnet_net_device_ndo_init(struct net_device* dev) {
 	void* real_pointer;
 	LCD_TRAMPOLINE_PROLOGUE(real_pointer, trampoline_int_1_kernel_nullnet_net_device_ndo_init);
-	unsigned int marshal_slot = 0;
-	struct fipc_message message_buffer = {0};
-	struct fipc_message* message = &message_buffer;
+	struct rpc_message message_buffer = {0};
+	message_buffer.end_slot = message_buffer.slots;
+	struct rpc_message* message = &message_buffer;
 	fipc_marshal(real_pointer);
 	fipc_marshal(dev);
 	if (dev) {
@@ -400,7 +472,7 @@ int trampoline_int_1_kernel_nullnet_net_device_ndo_init(struct net_device* dev) 
 		}
 	}
 	fipc_send(RPC_PTR_INT_1_KERNEL_NULLNET_NET_DEVICE_NDO_INIT, message);
-	marshal_slot = 0;
+	message->end_slot = message->slots;
 	if (dev) {
 		struct pcpu_dstats* dev_dstats = dev->dstats;
 		if (dev_dstats) {
@@ -410,14 +482,13 @@ int trampoline_int_1_kernel_nullnet_net_device_ndo_init(struct net_device* dev) 
 	return return_value;
 }
 
-LCD_TRAMPOLINE_DATA(trampoline_void_1_kernel_nullnet_net_device_ndo_uninit)
 LCD_TRAMPOLINE_LINKAGE(trampoline_void_1_kernel_nullnet_net_device_ndo_uninit)
 void trampoline_void_1_kernel_nullnet_net_device_ndo_uninit(struct net_device* dev) {
 	void* real_pointer;
 	LCD_TRAMPOLINE_PROLOGUE(real_pointer, trampoline_void_1_kernel_nullnet_net_device_ndo_uninit);
-	unsigned int marshal_slot = 0;
-	struct fipc_message message_buffer = {0};
-	struct fipc_message* message = &message_buffer;
+	struct rpc_message message_buffer = {0};
+	message_buffer.end_slot = message_buffer.slots;
+	struct rpc_message* message = &message_buffer;
 	fipc_marshal(real_pointer);
 	fipc_marshal(dev);
 	if (dev) {
@@ -427,7 +498,7 @@ void trampoline_void_1_kernel_nullnet_net_device_ndo_uninit(struct net_device* d
 		}
 	}
 	fipc_send(RPC_PTR_VOID_1_KERNEL_NULLNET_NET_DEVICE_NDO_UNINIT, message);
-	marshal_slot = 0;
+	message->end_slot = message->slots;
 	if (dev) {
 		struct pcpu_dstats* dev_dstats = dev->dstats;
 		if (dev_dstats) {
@@ -435,14 +506,13 @@ void trampoline_void_1_kernel_nullnet_net_device_ndo_uninit(struct net_device* d
 	}
 }
 
-LCD_TRAMPOLINE_DATA(trampoline_int_1_kernel_nullnet_sk_buff_ndo_start_xmit_1_kernel_nullnet_net_device_stats)
 LCD_TRAMPOLINE_LINKAGE(trampoline_int_1_kernel_nullnet_sk_buff_ndo_start_xmit_1_kernel_nullnet_net_device_stats)
 int trampoline_int_1_kernel_nullnet_sk_buff_ndo_start_xmit_1_kernel_nullnet_net_device_stats(struct sk_buff* skb, struct net_device* dev) {
 	void* real_pointer;
 	LCD_TRAMPOLINE_PROLOGUE(real_pointer, trampoline_int_1_kernel_nullnet_sk_buff_ndo_start_xmit_1_kernel_nullnet_net_device_stats);
-	unsigned int marshal_slot = 0;
-	struct fipc_message message_buffer = {0};
-	struct fipc_message* message = &message_buffer;
+	struct rpc_message message_buffer = {0};
+	message_buffer.end_slot = message_buffer.slots;
+	struct rpc_message* message = &message_buffer;
 	fipc_marshal(real_pointer);
 	fipc_marshal(skb);
 	if (skb) {
@@ -452,7 +522,7 @@ int trampoline_int_1_kernel_nullnet_sk_buff_ndo_start_xmit_1_kernel_nullnet_net_
 	if (dev) {
 	}
 	fipc_send(RPC_PTR_INT_1_KERNEL_NULLNET_SK_BUFF_NDO_START_XMIT_1_KERNEL_NULLNET_NET_DEVICE_STATS, message);
-	marshal_slot = 0;
+	message->end_slot = message->slots;
 	if (skb) {
 	}
 	if (dev) {
@@ -461,14 +531,54 @@ int trampoline_int_1_kernel_nullnet_sk_buff_ndo_start_xmit_1_kernel_nullnet_net_
 	return return_value;
 }
 
-LCD_TRAMPOLINE_DATA(trampoline_1_kernel_nullnet_rtnl_link_stats64_1_kernel_nullnet_net_device_ndo_get_stats64_1_kernel_nullnet_rtnl_link_stats64_ndo_get_stats64)
+LCD_TRAMPOLINE_LINKAGE(trampoline_int_1_kernel_nullnet_net_device_ndo_validate_addr)
+int trampoline_int_1_kernel_nullnet_net_device_ndo_validate_addr(struct net_device* dev) {
+	void* real_pointer;
+	LCD_TRAMPOLINE_PROLOGUE(real_pointer, trampoline_int_1_kernel_nullnet_net_device_ndo_validate_addr);
+	struct rpc_message message_buffer = {0};
+	message_buffer.end_slot = message_buffer.slots;
+	struct rpc_message* message = &message_buffer;
+	fipc_marshal(real_pointer);
+	fipc_marshal(dev);
+	if (dev) {
+		struct sockaddr_placeholder* dev_dev_addr = (void*)dev->dev_addr;
+		fipc_marshal(dev_dev_addr);
+		if (dev_dev_addr) {
+			fipc_marshal(dev_dev_addr->sa_family);
+			fipc_marshal(dev_dev_addr->sa_data_0);
+			fipc_marshal(dev_dev_addr->sa_data_1);
+			fipc_marshal(dev_dev_addr->sa_data_2);
+			fipc_marshal(dev_dev_addr->sa_data_3);
+			fipc_marshal(dev_dev_addr->sa_data_4);
+			fipc_marshal(dev_dev_addr->sa_data_5);
+			fipc_marshal(dev_dev_addr->sa_data_6);
+			fipc_marshal(dev_dev_addr->sa_data_7);
+			fipc_marshal(dev_dev_addr->sa_data_8);
+			fipc_marshal(dev_dev_addr->sa_data_9);
+			fipc_marshal(dev_dev_addr->sa_data_10);
+			fipc_marshal(dev_dev_addr->sa_data_11);
+			fipc_marshal(dev_dev_addr->sa_data_12);
+			fipc_marshal(dev_dev_addr->sa_data_13);
+		}
+	}
+	fipc_send(RPC_PTR_INT_1_KERNEL_NULLNET_NET_DEVICE_NDO_VALIDATE_ADDR, message);
+	message->end_slot = message->slots;
+	if (dev) {
+		struct sockaddr_placeholder* dev_dev_addr = (void*)dev->dev_addr;
+		if (dev_dev_addr) {
+		}
+	}
+	int return_value = fipc_unmarshal(int);
+	return return_value;
+}
+
 LCD_TRAMPOLINE_LINKAGE(trampoline_1_kernel_nullnet_rtnl_link_stats64_1_kernel_nullnet_net_device_ndo_get_stats64_1_kernel_nullnet_rtnl_link_stats64_ndo_get_stats64)
 struct rtnl_link_stats64* trampoline_1_kernel_nullnet_rtnl_link_stats64_1_kernel_nullnet_net_device_ndo_get_stats64_1_kernel_nullnet_rtnl_link_stats64_ndo_get_stats64(struct net_device* dev, struct rtnl_link_stats64* storage) {
 	void* real_pointer;
 	LCD_TRAMPOLINE_PROLOGUE(real_pointer, trampoline_1_kernel_nullnet_rtnl_link_stats64_1_kernel_nullnet_net_device_ndo_get_stats64_1_kernel_nullnet_rtnl_link_stats64_ndo_get_stats64);
-	unsigned int marshal_slot = 0;
-	struct fipc_message message_buffer = {0};
-	struct fipc_message* message = &message_buffer;
+	struct rpc_message message_buffer = {0};
+	message_buffer.end_slot = message_buffer.slots;
+	struct rpc_message* message = &message_buffer;
 	fipc_marshal(real_pointer);
 	fipc_marshal(dev);
 	if (dev) {
@@ -483,7 +593,7 @@ struct rtnl_link_stats64* trampoline_1_kernel_nullnet_rtnl_link_stats64_1_kernel
 		fipc_marshal(storage->tx_packets);
 	}
 	fipc_send(RPC_PTR_1_KERNEL_NULLNET_RTNL_LINK_STATS64_1_KERNEL_NULLNET_NET_DEVICE_NDO_GET_STATS64_1_KERNEL_NULLNET_RTNL_LINK_STATS64_NDO_GET_STATS64, message);
-	marshal_slot = 0;
+	message->end_slot = message->slots;
 	if (dev) {
 		struct pcpu_dstats* dev_dstats = dev->dstats;
 		if (dev_dstats) {
@@ -497,73 +607,89 @@ struct rtnl_link_stats64* trampoline_1_kernel_nullnet_rtnl_link_stats64_1_kernel
 	return return_value;
 }
 
-LCD_TRAMPOLINE_DATA(trampoline_void_1_kernel_nullnet_net_device_ndo_set_rx_mode)
 LCD_TRAMPOLINE_LINKAGE(trampoline_void_1_kernel_nullnet_net_device_ndo_set_rx_mode)
 void trampoline_void_1_kernel_nullnet_net_device_ndo_set_rx_mode(struct net_device* dev) {
 	void* real_pointer;
 	LCD_TRAMPOLINE_PROLOGUE(real_pointer, trampoline_void_1_kernel_nullnet_net_device_ndo_set_rx_mode);
-	unsigned int marshal_slot = 0;
-	struct fipc_message message_buffer = {0};
-	struct fipc_message* message = &message_buffer;
+	struct rpc_message message_buffer = {0};
+	message_buffer.end_slot = message_buffer.slots;
+	struct rpc_message* message = &message_buffer;
 	fipc_marshal(real_pointer);
 	fipc_marshal(dev);
 	if (dev) {
 	}
 	fipc_send(RPC_PTR_VOID_1_KERNEL_NULLNET_NET_DEVICE_NDO_SET_RX_MODE, message);
-	marshal_slot = 0;
+	message->end_slot = message->slots;
 	if (dev) {
 	}
 }
 
-LCD_TRAMPOLINE_DATA(trampoline_int_1_kernel_nullnet_net_device_ndo_set_mac_address)
-LCD_TRAMPOLINE_LINKAGE(trampoline_int_1_kernel_nullnet_net_device_ndo_set_mac_address)
-int trampoline_int_1_kernel_nullnet_net_device_ndo_set_mac_address(struct net_device* dev) {
+LCD_TRAMPOLINE_LINKAGE(trampoline_int_1_kernel_nullnet_net_device_ndo_set_mac_address_1_kernel_nullnet_sockaddr)
+int trampoline_int_1_kernel_nullnet_net_device_ndo_set_mac_address_1_kernel_nullnet_sockaddr(struct net_device* dev, struct sockaddr_placeholder* addr) {
 	void* real_pointer;
-	LCD_TRAMPOLINE_PROLOGUE(real_pointer, trampoline_int_1_kernel_nullnet_net_device_ndo_set_mac_address);
-	unsigned int marshal_slot = 0;
-	struct fipc_message message_buffer = {0};
-	struct fipc_message* message = &message_buffer;
+	LCD_TRAMPOLINE_PROLOGUE(real_pointer, trampoline_int_1_kernel_nullnet_net_device_ndo_set_mac_address_1_kernel_nullnet_sockaddr);
+	struct rpc_message message_buffer = {0};
+	message_buffer.end_slot = message_buffer.slots;
+	struct rpc_message* message = &message_buffer;
 	fipc_marshal(real_pointer);
 	fipc_marshal(dev);
 	if (dev) {
 	}
-	fipc_send(RPC_PTR_INT_1_KERNEL_NULLNET_NET_DEVICE_NDO_SET_MAC_ADDRESS, message);
-	marshal_slot = 0;
+	fipc_marshal(addr);
+	if (addr) {
+		fipc_marshal(addr->sa_family);
+		fipc_marshal(addr->sa_data_0);
+		fipc_marshal(addr->sa_data_1);
+		fipc_marshal(addr->sa_data_2);
+		fipc_marshal(addr->sa_data_3);
+		fipc_marshal(addr->sa_data_4);
+		fipc_marshal(addr->sa_data_5);
+		fipc_marshal(addr->sa_data_6);
+		fipc_marshal(addr->sa_data_7);
+		fipc_marshal(addr->sa_data_8);
+		fipc_marshal(addr->sa_data_9);
+		fipc_marshal(addr->sa_data_10);
+		fipc_marshal(addr->sa_data_11);
+		fipc_marshal(addr->sa_data_12);
+		fipc_marshal(addr->sa_data_13);
+	}
+	fipc_send(RPC_PTR_INT_1_KERNEL_NULLNET_NET_DEVICE_NDO_SET_MAC_ADDRESS_1_KERNEL_NULLNET_SOCKADDR, message);
+	message->end_slot = message->slots;
 	if (dev) {
+	}
+	if (addr) {
 	}
 	int return_value = fipc_unmarshal(int);
 	return return_value;
 }
 
-LCD_TRAMPOLINE_DATA(trampoline_int_1_kernel_nullnet_net_device_ndo_change_carrier_bool)
 LCD_TRAMPOLINE_LINKAGE(trampoline_int_1_kernel_nullnet_net_device_ndo_change_carrier_bool)
 int trampoline_int_1_kernel_nullnet_net_device_ndo_change_carrier_bool(struct net_device* dev, bool new_carrier) {
 	void* real_pointer;
 	LCD_TRAMPOLINE_PROLOGUE(real_pointer, trampoline_int_1_kernel_nullnet_net_device_ndo_change_carrier_bool);
-	unsigned int marshal_slot = 0;
-	struct fipc_message message_buffer = {0};
-	struct fipc_message* message = &message_buffer;
+	struct rpc_message message_buffer = {0};
+	message_buffer.end_slot = message_buffer.slots;
+	struct rpc_message* message = &message_buffer;
 	fipc_marshal(real_pointer);
 	fipc_marshal(dev);
 	if (dev) {
 	}
 	fipc_marshal(new_carrier);
 	fipc_send(RPC_PTR_INT_1_KERNEL_NULLNET_NET_DEVICE_NDO_CHANGE_CARRIER_BOOL, message);
-	marshal_slot = 0;
+	message->end_slot = message->slots;
 	if (dev) {
 	}
 	int return_value = fipc_unmarshal(int);
 	return return_value;
 }
 
-LCD_TRAMPOLINE_DATA(trampoline_void_1_kernel_nullnet_net_device_get_drvinfo_1_kernel_nullnet_ethtool_drvinfo_get_drvinfo)
 LCD_TRAMPOLINE_LINKAGE(trampoline_void_1_kernel_nullnet_net_device_get_drvinfo_1_kernel_nullnet_ethtool_drvinfo_get_drvinfo)
 void trampoline_void_1_kernel_nullnet_net_device_get_drvinfo_1_kernel_nullnet_ethtool_drvinfo_get_drvinfo(struct net_device* dev, struct ethtool_drvinfo* info) {
 	void* real_pointer;
 	LCD_TRAMPOLINE_PROLOGUE(real_pointer, trampoline_void_1_kernel_nullnet_net_device_get_drvinfo_1_kernel_nullnet_ethtool_drvinfo_get_drvinfo);
-	unsigned int marshal_slot = 0;
-	struct fipc_message message_buffer = {0};
-	struct fipc_message* message = &message_buffer;
+	struct rpc_message message_buffer = {0};
+	message_buffer.end_slot = message_buffer.slots;
+	struct rpc_message* message = &message_buffer;
 	fipc_marshal(real_pointer);
 	fipc_marshal(dev);
 	if (dev) {
@@ -572,39 +698,37 @@ void trampoline_void_1_kernel_nullnet_net_device_get_drvinfo_1_kernel_nullnet_et
 	if (info) {
 	}
 	fipc_send(RPC_PTR_VOID_1_KERNEL_NULLNET_NET_DEVICE_GET_DRVINFO_1_KERNEL_NULLNET_ETHTOOL_DRVINFO_GET_DRVINFO, message);
-	marshal_slot = 0;
+	message->end_slot = message->slots;
 	if (dev) {
 	}
 	if (info) {
 	}
 }
 
-LCD_TRAMPOLINE_DATA(trampoline_void_1_kernel_nullnet_net_device_destructor)
 LCD_TRAMPOLINE_LINKAGE(trampoline_void_1_kernel_nullnet_net_device_destructor)
 void trampoline_void_1_kernel_nullnet_net_device_destructor(struct net_device* dev) {
 	void* real_pointer;
 	LCD_TRAMPOLINE_PROLOGUE(real_pointer, trampoline_void_1_kernel_nullnet_net_device_destructor);
-	unsigned int marshal_slot = 0;
-	struct fipc_message message_buffer = {0};
-	struct fipc_message* message = &message_buffer;
+	struct rpc_message message_buffer = {0};
+	message_buffer.end_slot = message_buffer.slots;
+	struct rpc_message* message = &message_buffer;
 	fipc_marshal(real_pointer);
 	fipc_marshal(dev);
 	if (dev) {
 	}
 	fipc_send(RPC_PTR_VOID_1_KERNEL_NULLNET_NET_DEVICE_DESTRUCTOR, message);
-	marshal_slot = 0;
+	message->end_slot = message->slots;
 	if (dev) {
 	}
 }
 
-LCD_TRAMPOLINE_DATA(trampoline_void_1_kernel_nullnet_net_device_setup)
 LCD_TRAMPOLINE_LINKAGE(trampoline_void_1_kernel_nullnet_net_device_setup)
 void trampoline_void_1_kernel_nullnet_net_device_setup(struct net_device* dev) {
 	void* real_pointer;
 	LCD_TRAMPOLINE_PROLOGUE(real_pointer, trampoline_void_1_kernel_nullnet_net_device_setup);
-	unsigned int marshal_slot = 0;
-	struct fipc_message message_buffer = {0};
-	struct fipc_message* message = &message_buffer;
+	struct rpc_message message_buffer = {0};
+	message_buffer.end_slot = message_buffer.slots;
+	struct rpc_message* message = &message_buffer;
 	fipc_marshal(real_pointer);
 	fipc_marshal(dev);
 	if (dev) {
@@ -615,7 +739,7 @@ void trampoline_void_1_kernel_nullnet_net_device_setup(struct net_device* dev) {
 		fipc_marshal(dev->hw_enc_features);
 	}
 	fipc_send(RPC_PTR_VOID_1_KERNEL_NULLNET_NET_DEVICE_SETUP, message);
-	marshal_slot = 0;
+	message->end_slot = message->slots;
 	if (dev) {
 		struct net_device_ops* dev_netdev_ops = dev->netdev_ops;
 		if (dev_netdev_ops) {
@@ -629,14 +753,19 @@ void trampoline_void_1_kernel_nullnet_net_device_setup(struct net_device* dev) {
 	}
 }
 
-LCD_TRAMPOLINE_DATA(trampoline_void_1_kernel_nullnet_net_device_setup_callee_alloc)
+LCD_TRAMPOLINE_LINKAGE(trampoline_int_1_kernel_nullnet_void_ptr_1_kernel_nullnet_void_ptr)
+int trampoline_int_1_kernel_nullnet_void_ptr_1_kernel_nullnet_void_ptr(struct nlattr** tb, struct nlattr** data) {
+	printk("validate() was called\n");
+	return 1;
+}
+
 LCD_TRAMPOLINE_LINKAGE(trampoline_void_1_kernel_nullnet_net_device_setup_callee_alloc)
 void trampoline_void_1_kernel_nullnet_net_device_setup_callee_alloc(struct net_device* dev) {
 	void* real_pointer;
 	LCD_TRAMPOLINE_PROLOGUE(real_pointer, trampoline_void_1_kernel_nullnet_net_device_setup_callee_alloc);
-	unsigned int marshal_slot = 0;
-	struct fipc_message message_buffer = {0};
-	struct fipc_message* message = &message_buffer;
+	struct rpc_message message_buffer = {0};
+	message_buffer.end_slot = message_buffer.slots;
+	struct rpc_message* message = &message_buffer;
 	fipc_marshal(real_pointer);
 	fipc_marshal(dev);
 	if (dev) {
@@ -647,7 +776,7 @@ void trampoline_void_1_kernel_nullnet_net_device_setup_callee_alloc(struct net_d
 		fipc_marshal(dev->hw_enc_features);
 	}
 	fipc_send(RPC_PTR_VOID_1_KERNEL_NULLNET_NET_DEVICE_SETUP_CALLEE_ALLOC, message);
-	marshal_slot = 0;
+	message->end_slot = message->slots;
 	if (dev) {
 		struct net_device_ops* dev_netdev_ops = dev->netdev_ops;
 		if (dev_netdev_ops) {
@@ -661,8 +790,12 @@ void trampoline_void_1_kernel_nullnet_net_device_setup_callee_alloc(struct net_d
 	}
 }
 
-void dispatch(struct fipc_message* message) {
-	switch (message->host_id) {
+void dispatch(struct fipc_message* received) {
+	enum dispatch_id rpc;
+	struct rpc_message message_buffer;
+	struct rpc_message* message = &message_buffer;
+	fipc_translate(received, &rpc, message);
+	switch (rpc) {
 	case RPC_FREE_NETDEV:
 		free_netdev_callee(message);
 		break;
@@ -723,6 +856,10 @@ void dispatch(struct fipc_message* message) {
 		_int_1_kernel_nullnet_sk_buff_ndo_start_xmit_1_kernel_nullnet_net_device_stats_callee(message);
 		break;
 
+	case RPC_PTR_INT_1_KERNEL_NULLNET_NET_DEVICE_NDO_VALIDATE_ADDR:
+		_int_1_kernel_nullnet_net_device_ndo_validate_addr_callee(message);
+		break;
+
 	case RPC_PTR_1_KERNEL_NULLNET_RTNL_LINK_STATS64_1_KERNEL_NULLNET_NET_DEVICE_NDO_GET_STATS64_1_KERNEL_NULLNET_RTNL_LINK_STATS64_NDO_GET_STATS64:
 		_1_kernel_nullnet_rtnl_link_stats64_1_kernel_nullnet_net_device_ndo_get_stats64_1_kernel_nullnet_rtnl_link_stats64_ndo_get_stats64_callee(message);
 		break;
@@ -731,8 +868,8 @@ void dispatch(struct fipc_message* message) {
 		_void_1_kernel_nullnet_net_device_ndo_set_rx_mode_callee(message);
 		break;
 
-	case RPC_PTR_INT_1_KERNEL_NULLNET_NET_DEVICE_NDO_SET_MAC_ADDRESS:
-		_int_1_kernel_nullnet_net_device_ndo_set_mac_address_callee(message);
+	case RPC_PTR_INT_1_KERNEL_NULLNET_NET_DEVICE_NDO_SET_MAC_ADDRESS_1_KERNEL_NULLNET_SOCKADDR:
+		_int_1_kernel_nullnet_net_device_ndo_set_mac_address_1_kernel_nullnet_sockaddr_callee(message);
 		break;
 
 	case RPC_PTR_INT_1_KERNEL_NULLNET_NET_DEVICE_NDO_CHANGE_CARRIER_BOOL:
@@ -749,6 +886,10 @@ void dispatch(struct fipc_message* message) {
 
 	case RPC_PTR_VOID_1_KERNEL_NULLNET_NET_DEVICE_SETUP:
 		_void_1_kernel_nullnet_net_device_setup_callee(message);
+		break;
+
+	case RPC_PTR_INT_1_KERNEL_NULLNET_VOID_PTR_1_KERNEL_NULLNET_VOID_PTR:
+		_int_1_kernel_nullnet_void_ptr_1_kernel_nullnet_void_ptr_callee(message);
 		break;
 
 	case RPC_PTR_VOID_1_KERNEL_NULLNET_NET_DEVICE_SETUP_CALLEE_ALLOC:

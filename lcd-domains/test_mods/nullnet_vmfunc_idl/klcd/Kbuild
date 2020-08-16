@@ -1,4 +1,4 @@
-obj-m += dummy_driver_klcd.o
-obj-m += common.o
-cppflags-y += $(NONISOLATED_CFLAGS)
-ccflags-y += $(NONISOLATED_CFLAGS) -Wno-error=declaration-after-statement
+obj-m += nullnet_klcd.o
+obj-m += main.o
+obj-m += ../common.o
+ccflags-y += $(NONISOLATED_CFLAGS) -std=gnu99 -Wno-error=declaration-after-statement -Wno-error=discarded-qualifiers

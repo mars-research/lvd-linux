@@ -8,7 +8,6 @@
 #include <linux/kernel.h>
 #include <liblcd/liblcd.h>
 #include <liblcd/sync_ipc_poll.h>
-#include "./nullnet_caller.h"
 
 #include "../rdtsc_helper.h"
 #include <lcd_config/post_hook.h>

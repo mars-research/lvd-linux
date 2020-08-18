@@ -4,6 +4,8 @@
 
 #include <lcd_config/pre_hook.h>
 
+#include "../common.h"
+
 #include <linux/module.h>
 #include <linux/kernel.h>
 #include <liblcd/liblcd.h>
@@ -30,16 +32,12 @@ static int dummy_lcd_init(void)
 	/*
 	 * Initialize nullnet glue
 	 */
-	ret = glue_nullnet_init();
-	if (ret) {
-		LIBLCD_ERR("nullnet init");
-		goto fail2;
-	}
+	hash_init(locals);
+	hash_init(remotes);
 
 	ret = dummy_init_module();
 
 	return ret;
-fail2:
 fail1:
 	lcd_exit(ret);
 }
@@ -55,7 +53,6 @@ static void dummy_lcd_exit(void)
 
 	dummy_cleanup_module();
 
-	glue_nullnet_exit();
 	lvd_exit(0);
 	return;
 }

@@ -13,6 +13,8 @@
 #include <net/rtnetlink.h>
 #include <asm/lcd_domains/libvmfunc.h>
 
+#include "glue_helper.h"
+
 #define MAX_MESSAGE_SLOTS 64
 
 #define fipc_marshal(value) *(message->end_slot++) = (uint64_t)value
@@ -27,8 +29,8 @@ struct ptr_node {
 	struct hlist_node hentry;
 };
 
-DECLARE_HASHTABLE(locals, 5);
-DECLARE_HASHTABLE(remotes, 5);
+extern DECLARE_HASHTABLE(locals, 5);
+extern DECLARE_HASHTABLE(remotes, 5);
 
 static inline void* fipc_get_remote(void* local) {
 	struct ptr_node* node;

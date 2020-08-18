@@ -755,7 +755,9 @@ void trampoline_void_1_kernel_nullnet_net_device_setup(struct net_device* dev) {
 
 LCD_TRAMPOLINE_LINKAGE(trampoline_int_1_kernel_nullnet_void_ptr_1_kernel_nullnet_void_ptr)
 int trampoline_int_1_kernel_nullnet_void_ptr_1_kernel_nullnet_void_ptr(struct nlattr** tb, struct nlattr** data) {
-	printk("validate() was called\n");
+	void* real_pointer;
+	LCD_TRAMPOLINE_PROLOGUE(real_pointer, trampoline_int_1_kernel_nullnet_void_ptr_1_kernel_nullnet_void_ptr);
+	printk("validate() was called: %p\n", real_pointer);
 	return 1;
 }
 

@@ -1,12 +1,13 @@
 #include <lcd_config/pre_hook.h>
 
+#include "../common.h"
+
 #include <linux/module.h>
 #include <linux/kernel.h>
 #include <liblcd/liblcd.h>
 #include <liblcd/sync_ipc_poll.h>
 #include <linux/kthread.h>
 #include <linux/delay.h>
-#include <thc.h>
 
 #include "../rdtsc_helper.h"
 #include "../perf_counter_helper.h"
@@ -47,15 +48,11 @@ static int net_klcd_init(void)
 	 */
 	klcd_cspace = get_current_cspace(current);
 	/*
-	 * Init net glue
+	 * Init hashmaps
 	 */
-	ret = glue_nullnet_init();
-	LIBLCD_MSG("-===== > glue nullnet init called\n");
-
-	if (ret) {
-		LIBLCD_ERR("net init");
-		goto fail2;
-	}
+	hash_init(locals);
+	hash_init(remotes);
+	LIBLCD_MSG("-===== > initialized glue hashmaps\n");
 
 	vmfunc_init(lcd_stack, net_klcd_dispatch_loop, net_klcd_syncipc_dispatch);
 
@@ -67,7 +64,6 @@ static int net_klcd_init(void)
 
 	return 0;
 
-fail2:
 	lcd_exit(ret);
 #ifndef CONFIG_LVD
 fail1:
@@ -94,9 +90,8 @@ static void __exit net_klcd_exit(void)
 	vmfunc_klcd_wrapper(&m, OTHER_DOMAIN);
 
 	/*
-	 * Tear down net glue
+	 * IDL-SPECIFIC: hashmap teardown?
 	 */
-	glue_nullnet_exit();
 
 #ifndef CONFIG_LVD
 	/*

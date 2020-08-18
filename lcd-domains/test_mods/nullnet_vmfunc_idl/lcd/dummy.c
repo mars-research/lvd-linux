@@ -31,6 +31,8 @@
 #include <lcd_config/pre_hook.h>
 #endif
 
+#include "../common.h"
+
 #include <linux/module.h>
 #include <linux/kernel.h>
 #include <linux/netdevice.h>

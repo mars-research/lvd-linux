@@ -13,7 +13,6 @@
 
 #include <libcap.h>
 #include <libfipc.h>
-#include <thc_ipc.h>
 #include <liblcd/glue_cspace.h>
 #include <liblcd/liblcd.h>
 #include <liblcd/sync_ipc_poll.h>

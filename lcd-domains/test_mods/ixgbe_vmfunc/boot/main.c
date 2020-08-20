@@ -165,6 +165,13 @@ static void boot_exit(void)
 		wake_up_interruptible(&wq);
 		kthread_stop(boot_task);
 	}
+
+	{
+		struct task_struct *proc_list;
+		for_each_process(proc_list) {
+			proc_list->mapped_cr3 = 0UL;
+		}
+	}
 }
 
 module_init(boot_init);

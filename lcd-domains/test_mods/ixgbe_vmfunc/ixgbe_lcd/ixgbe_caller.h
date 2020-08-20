@@ -25,6 +25,9 @@ int ndo_get_stats64_callee(struct fipc_message *_request);
 int ndo_set_features_callee(struct fipc_message *_request);
 int ndo_fix_features_callee(struct fipc_message *_request);
 
+int set_rxnfc_callee(struct fipc_message *_request);
+int get_rxnfc_callee(struct fipc_message *_request);
+
 int probe_callee(struct fipc_message *_request);
 
 int remove_callee(struct fipc_message *_request);

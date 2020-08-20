@@ -659,6 +659,7 @@ int register_netdev(struct net_device *dev)
 	struct fipc_message r;
 	struct fipc_message *_request = &r;
 	int func_ret;
+	struct ext_registers *ext_regs = get_register_page(smp_processor_id());
 
 	INIT_IPC_MSG(&r);
 	dev_container = container_of(dev,
@@ -681,6 +682,8 @@ int register_netdev(struct net_device *dev)
 			dev->hw_enc_features);
 	fipc_set_reg6(_request,
 			dev->num_tc);
+
+	memcpy(&ext_regs->regs[0], dev->dev_addr, ETH_ALEN);
 
 	vmfunc_wrapper(_request);
 
@@ -1001,12 +1004,10 @@ int eth_platform_get_mac_address(struct device *dev,
 	struct fipc_message *_request = &r;
 
 	int func_ret;
-	int i;
 	union mac {
 		u8 mac_addr[ETH_ALEN];
 		unsigned long mac_addr_l;
 	} m = { {0} };
-
 	INIT_IPC_MSG(&r);
 
 	async_msg_set_fn_type(_request,
@@ -1019,9 +1020,7 @@ int eth_platform_get_mac_address(struct device *dev,
 	if (func_ret < 0) {
 		m.mac_addr_l = fipc_get_reg2(_request);
 		memcpy(mac_addr, m.mac_addr, ETH_ALEN);
-		for (i = 0; i < ETH_ALEN; i++) {
-			printk("%02X:", m.mac_addr[i]);
-		}
+		printk("%pM", m.mac_addr);
 		LIBLCD_MSG("\n%s, got 0x%06lX", __func__, m.mac_addr_l);
 	}
 	return func_ret;
@@ -2944,9 +2943,13 @@ int irq_set_affinity_hint(unsigned int irq, const struct cpumask *m)
 	async_msg_set_fn_type(_request, IRQ_SET_AFFINITY_HINT);
 
 	fipc_set_reg0(_request, irq);
-	fipc_set_reg1(_request, m->bits[0]);
-	fipc_set_reg2(_request, m->bits[1]);
-	fipc_set_reg2(_request, m->bits[2]);
+	fipc_set_reg1(_request, m ? 1 : 0);
+
+	if (m) {
+		fipc_set_reg2(_request, m->bits[0]);
+		fipc_set_reg3(_request, m->bits[1]);
+		fipc_set_reg4(_request, m->bits[2]);
+	}
 
 	vmfunc_wrapper(_request);
 
@@ -2969,4 +2972,84 @@ void netdev_rss_key_fill(void *buffer, size_t len)
 	vmfunc_wrapper(_request);
 
 	memcpy(buffer, &_request->regs[0], len);
+}
+
+// ethtool_ops
+int get_rxnfc_callee(struct fipc_message *_request)
+{
+	struct net_device_container *dev_container;
+	int ret;
+	struct ext_registers *ext_regs = get_register_page(smp_processor_id());
+
+	void *rule_buf = NULL;
+	size_t rule_buf_sz = 0;
+	struct ethtool_rxnfc cmd = {0};
+
+	int func_ret;
+	ret = glue_cap_lookup_net_device_type(c_cspace,
+		__cptr(fipc_get_reg0(_request)),
+		&dev_container);
+	if (ret) {
+		LIBLCD_ERR("lookup");
+		goto fail_lookup;
+	}
+
+	memcpy(&cmd, ext_regs, sizeof(cmd));
+
+	if ((cmd.cmd == ETHTOOL_GRXCLSRLALL) && (cmd.rule_cnt > 0)) {
+		rule_buf_sz = cmd.rule_cnt * sizeof(u32);
+
+		printk("%s, cmd.rule_cnt %d rule_buf_sz %zu", __func__, cmd.rule_cnt, rule_buf_sz);
+
+		rule_buf = kzalloc(rule_buf_sz, GFP_KERNEL);
+
+		if (!rule_buf) {
+			LIBLCD_ERR("alloc failed");
+			func_ret = -ENOMEM;
+			goto fail_alloc;
+		}
+	}
+
+	func_ret = dev_container->net_device.ethtool_ops->get_rxnfc(( &dev_container->net_device ), &cmd, rule_buf);
+
+	memcpy(ext_regs, &cmd, sizeof(cmd));
+	if (rule_buf) {
+		printk("%s, copying rules to offset %llx (sz = %zu)", __func__, (u64) ext_regs + sizeof(cmd), rule_buf_sz);
+		memcpy((char*)ext_regs + sizeof(cmd), rule_buf, rule_buf_sz);
+	}
+
+fail_alloc:
+	fipc_set_reg0(_request, func_ret);
+fail_lookup:
+	return ret;
+}
+
+int set_rxnfc_callee(struct fipc_message *_request)
+{
+	struct net_device_container *dev_container;
+	int ret;
+	struct ext_registers *ext_regs = get_register_page(smp_processor_id());
+
+	struct ethtool_rxnfc cmd = {0};
+
+	int func_ret;
+	ret = glue_cap_lookup_net_device_type(c_cspace,
+		__cptr(fipc_get_reg0(_request)),
+		&dev_container);
+	if (ret) {
+		LIBLCD_ERR("lookup");
+		goto fail_lookup;
+	}
+
+	memcpy(&cmd, ext_regs, sizeof(cmd));
+
+	func_ret = dev_container->net_device.ethtool_ops->set_rxnfc(( &dev_container->net_device ), &cmd);
+
+	memcpy(ext_regs, &cmd, sizeof(cmd));
+
+	fipc_set_reg0(_request, func_ret);
+
+fail_lookup:
+	return ret;
+
 }

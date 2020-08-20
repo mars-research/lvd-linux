@@ -23,6 +23,11 @@ struct net_device_ops_container {
 	struct cptr other_ref;
 	struct cptr my_ref;
 };
+struct ethtool_ops_container {
+	struct ethtool_ops ethtool_ops;
+	struct cptr other_ref;
+	struct cptr my_ref;
+};
 struct pci_bus_container {
 	struct pci_bus pci_bus;
 	struct cptr other_ref;
@@ -132,6 +137,9 @@ int glue_cap_insert_net_device_type(struct glue_cspace *cspace,
 int glue_cap_insert_net_device_ops_type(struct glue_cspace *cspace,
 		struct net_device_ops_container *net_device_ops_container,
 		struct cptr *c_out);
+int glue_cap_insert_ethtool_ops_type(struct glue_cspace *cspace,
+		struct ethtool_ops_container *ethtool_ops_container,
+		struct cptr *c_out);
 int glue_cap_insert_pci_bus_type(struct glue_cspace *cspace,
 		struct pci_bus_container *pci_bus_container,
 		struct cptr *c_out);
@@ -166,6 +174,9 @@ int glue_cap_lookup_net_device_type(struct glue_cspace *cspace,
 int glue_cap_lookup_net_device_ops_type(struct glue_cspace *cspace,
 		struct cptr c,
 		struct net_device_ops_container **net_device_ops_container);
+int glue_cap_lookup_ethtool_ops_type(struct glue_cspace *cspace,
+		struct cptr c,
+		struct ethtool_ops_container **ethtool_ops_container);
 int glue_cap_lookup_pci_bus_type(struct glue_cspace *cspace,
 		struct cptr c,
 		struct pci_bus_container **pci_bus_container);

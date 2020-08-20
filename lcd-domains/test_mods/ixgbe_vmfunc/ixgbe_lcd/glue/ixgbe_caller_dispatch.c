@@ -103,6 +103,15 @@ int handle_rpc_calls(struct fipc_message *message)
 		case MSIX_IRQ_HANDLER:
 			msix_vector_handler_callee(message);
 			break;
+
+		case ETHTOOL_GET_RXNFC:
+			get_rxnfc_callee(message);
+			break;
+
+		case ETHTOOL_SET_RXNFC:
+			set_rxnfc_callee(message);
+			break;
+
 		default:
 			LIBLCD_ERR("unexpected function label: %d",
 					fn_type);

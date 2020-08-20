@@ -5273,6 +5273,7 @@ static void ixgbe_configure(struct ixgbe_adapter *adapter)
 		ixgbe_init_fdir_signature_82599(&adapter->hw,
 						adapter->fdir_pballoc);
 	} else if (adapter->flags & IXGBE_FLAG_FDIR_PERFECT_CAPABLE) {
+		printk("%s, calling init_fdir_perfect_82599", __func__);
 		ixgbe_init_fdir_perfect_82599(&adapter->hw,
 					      adapter->fdir_pballoc);
 		ixgbe_fdir_filter_restore(adapter);
@@ -9067,12 +9068,14 @@ static int ixgbe_set_features(struct net_device *netdev,
 
 		adapter->flags &= ~IXGBE_FLAG_FDIR_HASH_CAPABLE;
 		adapter->flags |= IXGBE_FLAG_FDIR_PERFECT_CAPABLE;
+		printk("%s, FDIR_HASH_CAPABLE unset and PERFECT_CAPABLE is set", __func__);
 	} else {
 		/* turn off perfect filters, enable ATR and reset */
 		if (adapter->flags & IXGBE_FLAG_FDIR_PERFECT_CAPABLE)
 			need_reset = true;
 
 		adapter->flags &= ~IXGBE_FLAG_FDIR_PERFECT_CAPABLE;
+		printk("%s, reset FDIR_PERFECT_CAPABLE", __func__);
 
 		/* We cannot enable ATR if SR-IOV is enabled */
 		if (adapter->flags & IXGBE_FLAG_SRIOV_ENABLED ||
@@ -9084,7 +9087,10 @@ static int ixgbe_set_features(struct net_device *netdev,
 		    (!adapter->atr_sample_rate))
 			; /* do nothing not supported */
 		else /* otherwise supported and set the flag */
+		{
 			adapter->flags |= IXGBE_FLAG_FDIR_HASH_CAPABLE;
+			printk("%s, FDIR_HASH_CAPABLE set", __func__);
+		}
 	}
 
 	if (changed & NETIF_F_RXALL)
@@ -9705,6 +9711,9 @@ static int ixgbe_probe(struct pci_dev *pdev, const struct pci_device_id *ent)
 	hw->back = adapter;
 	adapter->msg_enable = netif_msg_init(debug, DEFAULT_MSG_ENABLE);
 
+	/* forcefully setting this to avoid a reset when enabled via ethtool */
+	adapter->flags |= IXGBE_FLAG_FDIR_PERFECT_CAPABLE;
+
 #ifndef LCD_ISOLATE
 	hw->hw_addr = ioremap(pci_resource_start(pdev, 0),
 			      pci_resource_len(pdev, 0));
@@ -9921,6 +9930,7 @@ skip_sriov:
 				     adapter->hw.mac.perm_addr);
 
 	memcpy(netdev->dev_addr, hw->mac.perm_addr, netdev->addr_len);
+	printk("%s, %pM", __func__, netdev->dev_addr);
 
 	if (!is_valid_ether_addr(netdev->dev_addr)) {
 		LIBLCD_ERR("invalid MAC address\n");

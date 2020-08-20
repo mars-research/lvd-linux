@@ -848,8 +848,18 @@ int ndo_open(struct net_device *dev,
 	struct fipc_message r;
 	struct fipc_message *_request = &r;
 	int func_ret;
+	static u32 ndo_open_called = 0;
 
 	INIT_IPC_MSG(&r);
+
+	if (ndo_open_called) {
+		dump_stack();
+		printk("%s already called dev->flags %x (%s)\n", __func__, dev->flags,
+					(dev->flags & IFF_UP) ? "IFF_UP" : "IFF_DOWN");
+		return 0;
+	}
+
+	dump_stack();
 
 	dev_container = container_of(dev,
 		struct net_device_container,
@@ -867,8 +877,10 @@ int ndo_open(struct net_device *dev,
 	/* TODO: enable napi from within the LCD */
 	/* napi_enable(napi_q0); */
 
-	return func_ret;
+	printk("%s, returned %d\n", __func__, func_ret);
 
+	ndo_open_called++;
+	return func_ret;
 }
 
 LCD_TRAMPOLINE_DATA(ndo_open_trampoline);
@@ -1424,6 +1436,8 @@ netdev_features_t ndo_fix_features(struct net_device *dev,
 
 	INIT_IPC_MSG(&r);
 
+	printk("%s, called features %llx\n", __func__, features);
+
 	dev_container = container_of(dev,
 		struct net_device_container,
 		net_device);
@@ -1469,6 +1483,7 @@ int ndo_set_features(struct net_device *dev,
 
 	INIT_IPC_MSG(&r);
 
+	printk("%s, called features %llx\n", __func__, features);
 	dev_container = container_of(dev,
 		struct net_device_container,
 		net_device);
@@ -1497,6 +1512,155 @@ ndo_set_features_trampoline(struct net_device *dev, netdev_features_t features)
 	return ndo_set_features_fp(dev,
 		features,
 		hidden_args);
+}
+
+// ethtool ops
+int get_rxnfc(struct net_device *dev,
+		struct ethtool_rxnfc *cmd, u32 *rule_locs,
+		struct trampoline_hidden_args *hidden_args)
+{
+	struct net_device_container *dev_container;
+	struct fipc_message r;
+	struct fipc_message *_request = &r;
+	int func_ret;
+	struct ext_registers *ext_regs = get_register_page(smp_processor_id());
+
+	INIT_IPC_MSG(&r);
+
+	dev_container = container_of(dev,
+			struct net_device_container,
+			net_device);
+
+	printk("%s, called with cmd->cmd %x | rule_locs %p | cmd->rule_cnt %d\n",
+		       __func__, cmd->cmd, rule_locs, rule_locs ? cmd->rule_cnt : 0);
+
+	async_msg_set_fn_type(_request, ETHTOOL_GET_RXNFC);
+
+	memcpy(ext_regs, cmd, sizeof(*cmd));
+
+	fipc_set_reg0(_request, dev_container->other_ref.cptr);
+
+	vmfunc_klcd_wrapper(_request, 1);
+
+	func_ret = fipc_get_reg0(_request);
+
+	memcpy(cmd, ext_regs, sizeof(*cmd));
+
+	if (cmd->rule_cnt > 0 && rule_locs) {
+		memcpy(rule_locs, (char*) ext_regs + sizeof(*cmd), cmd->rule_cnt * sizeof(u32));
+		printk("%s copying rules to offset %llx (size %zu)\n", __func__, (u64) ext_regs + sizeof(*cmd), cmd->rule_cnt * sizeof(u32));
+	}
+	return func_ret;
+}
+
+LCD_TRAMPOLINE_DATA(get_rxnfc_trampoline);
+int  LCD_TRAMPOLINE_LINKAGE(get_rxnfc_trampoline)
+get_rxnfc_trampoline(struct net_device *dev, struct ethtool_rxnfc *cmd, u32 *rule_locs)
+{
+	int ( *volatile get_rxnfc_fp )(struct net_device *,
+			struct ethtool_rxnfc *, u32 *,
+		struct trampoline_hidden_args *);
+	struct trampoline_hidden_args *hidden_args;
+	LCD_TRAMPOLINE_PROLOGUE(hidden_args,
+			get_rxnfc_trampoline);
+	get_rxnfc_fp = get_rxnfc;
+	return get_rxnfc_fp(dev, cmd, rule_locs,
+		hidden_args);
+}
+
+int set_rxnfc(struct net_device *dev,
+		struct ethtool_rxnfc *cmd,
+		struct trampoline_hidden_args *hidden_args)
+{
+	struct net_device_container *dev_container;
+	struct fipc_message r;
+	struct fipc_message *_request = &r;
+	int func_ret;
+	struct ext_registers *ext_regs = get_register_page(smp_processor_id());
+
+	INIT_IPC_MSG(&r);
+
+	dev_container = container_of(dev,
+			struct net_device_container,
+			net_device);
+
+	async_msg_set_fn_type(_request, ETHTOOL_SET_RXNFC);
+
+	memcpy(ext_regs, cmd, sizeof(*cmd));
+
+	fipc_set_reg0(_request, dev_container->other_ref.cptr);
+
+	vmfunc_klcd_wrapper(_request, 1);
+
+	func_ret = fipc_get_reg0(_request);
+
+	memcpy(cmd, ext_regs, sizeof(*cmd));
+
+	return func_ret;
+}
+
+LCD_TRAMPOLINE_DATA(set_rxnfc_trampoline);
+int  LCD_TRAMPOLINE_LINKAGE(set_rxnfc_trampoline)
+set_rxnfc_trampoline(struct net_device *dev, struct ethtool_rxnfc *cmd)
+{
+	int ( *volatile set_rxnfc_fp )(struct net_device *,
+			struct ethtool_rxnfc *,
+		struct trampoline_hidden_args *);
+	struct trampoline_hidden_args *hidden_args;
+	LCD_TRAMPOLINE_PROLOGUE(hidden_args,
+			set_rxnfc_trampoline);
+	set_rxnfc_fp = set_rxnfc;
+	return set_rxnfc_fp(dev, cmd,
+		hidden_args);
+}
+
+void setup_ethtool_ops(struct ethtool_ops_container *ethtool_ops_container)
+{
+	struct trampoline_hidden_args *dev_ethtool_ops_get_rxnfc_hidden_args;
+	struct trampoline_hidden_args *dev_ethtool_ops_set_rxnfc_hidden_args;
+	int ret;
+
+	dev_ethtool_ops_get_rxnfc_hidden_args = kzalloc(sizeof( struct trampoline_hidden_args ),
+		GFP_KERNEL);
+	if (!dev_ethtool_ops_get_rxnfc_hidden_args) {
+		LIBLCD_ERR("kzalloc hidden args");
+		goto fail_alloc1;
+	}
+	dev_ethtool_ops_get_rxnfc_hidden_args->t_handle = LCD_DUP_TRAMPOLINE(get_rxnfc_trampoline);
+	if (!dev_ethtool_ops_get_rxnfc_hidden_args->t_handle) {
+		LIBLCD_ERR("duplicate trampoline");
+		goto fail_dup1;
+	}
+	dev_ethtool_ops_get_rxnfc_hidden_args->t_handle->hidden_args = dev_ethtool_ops_get_rxnfc_hidden_args;
+	dev_ethtool_ops_get_rxnfc_hidden_args->struct_container = ethtool_ops_container;
+	ethtool_ops_container->ethtool_ops.get_rxnfc = LCD_HANDLE_TO_TRAMPOLINE(dev_ethtool_ops_get_rxnfc_hidden_args->t_handle);
+	ret = set_memory_x(( ( unsigned  long   )dev_ethtool_ops_get_rxnfc_hidden_args->t_handle ) & ( PAGE_MASK ),
+		( ALIGN(LCD_TRAMPOLINE_SIZE(get_rxnfc_trampoline),
+		PAGE_SIZE) ) >> ( PAGE_SHIFT ));
+
+	dev_ethtool_ops_set_rxnfc_hidden_args = kzalloc(sizeof( struct trampoline_hidden_args ),
+		GFP_KERNEL);
+	if (!dev_ethtool_ops_set_rxnfc_hidden_args) {
+		LIBLCD_ERR("kzalloc hidden args");
+		goto fail_alloc2;
+	}
+	dev_ethtool_ops_set_rxnfc_hidden_args->t_handle = LCD_DUP_TRAMPOLINE(set_rxnfc_trampoline);
+	if (!dev_ethtool_ops_set_rxnfc_hidden_args->t_handle) {
+		LIBLCD_ERR("duplicate trampoline");
+		goto fail_dup2;
+	}
+	dev_ethtool_ops_set_rxnfc_hidden_args->t_handle->hidden_args = dev_ethtool_ops_set_rxnfc_hidden_args;
+	dev_ethtool_ops_set_rxnfc_hidden_args->struct_container = ethtool_ops_container;
+	ethtool_ops_container->ethtool_ops.set_rxnfc = LCD_HANDLE_TO_TRAMPOLINE(dev_ethtool_ops_set_rxnfc_hidden_args->t_handle);
+	ret = set_memory_x(( ( unsigned  long   )dev_ethtool_ops_set_rxnfc_hidden_args->t_handle ) & ( PAGE_MASK ),
+		( ALIGN(LCD_TRAMPOLINE_SIZE(set_rxnfc_trampoline),
+		PAGE_SIZE) ) >> ( PAGE_SHIFT ));
+
+fail_alloc1:
+fail_dup1:
+fail_alloc2:
+fail_dup2:
+	return;
 }
 
 void setup_netdev_ops(struct net_device_ops_container *netdev_ops_container)
@@ -1770,12 +1934,12 @@ int register_netdev_callee(struct fipc_message *_request)
 {
 	struct net_device_container *dev_container;
 	struct net_device_ops_container *netdev_ops_container;
+	struct ethtool_ops_container *ethtool_ops_container;
+
 	struct net_device *dev;
 	int ret;
-
+	struct ext_registers *ext_regs = get_register_page(smp_processor_id());
 	int func_ret;
-	//node-0 90:e2:ba:b5:15:69
-	u8 mac_addr[] = {0x90, 0xe2, 0xba, 0xb5, 0x15, 0x69};
 
 	ret = glue_cap_lookup_net_device_type(c_cspace,
 		__cptr(fipc_get_reg0(_request)),
@@ -1797,7 +1961,23 @@ int register_netdev_callee(struct fipc_message *_request)
 		LIBLCD_ERR("lcd insert");
 		goto fail_insert;
 	}
+
+	ethtool_ops_container = kzalloc(sizeof( struct ethtool_ops_container   ),
+		GFP_KERNEL);
+	if (!ethtool_ops_container) {
+		LIBLCD_ERR("kzalloc");
+		goto fail_alloc;
+	}
+	ret = glue_cap_insert_ethtool_ops_type(c_cspace,
+		ethtool_ops_container,
+		&ethtool_ops_container->my_ref);
+	if (ret) {
+		LIBLCD_ERR("lcd insert");
+		goto fail_insert;
+	}
+
 	dev_container->net_device.netdev_ops = &netdev_ops_container->net_device_ops;
+	dev_container->net_device.ethtool_ops = &ethtool_ops_container->ethtool_ops;
 
 	dev = &dev_container->net_device;
 	dev->flags = fipc_get_reg1(_request);
@@ -1807,10 +1987,12 @@ int register_netdev_callee(struct fipc_message *_request)
 	dev->hw_enc_features = fipc_get_reg5(_request);
 	dev->num_tc = fipc_get_reg6(_request);
 
-	memcpy(dev->dev_addr, mac_addr, ETH_ALEN);
+	memcpy(dev->dev_addr, &ext_regs->regs[0], ETH_ALEN);
 
 	/* setup netdev_ops */
 	setup_netdev_ops(netdev_ops_container);
+	setup_ethtool_ops(ethtool_ops_container);
+
 	func_ret = register_netdev(( &dev_container->net_device ));
 
 	fipc_set_reg0(_request, func_ret);
@@ -2179,15 +2361,13 @@ int eth_platform_get_mac_address_callee(struct fipc_message *_request)
 {
 	struct device *dev;
 	int ret = 0;
-
 	int func_ret;
 	union mac {
 		u8 mac_addr[ETH_ALEN];
 		unsigned long mac_addr_l;
 	} m = { {0} };
 
-	u8 mac_addr[ETH_ALEN] = {0x90, 0xe2, 0xba, 0xb5, 0x15, 0x69};
-
+	u8 mac_addr[ETH_ALEN] = {0x90, 0xe2, 0xba, 0xb3, 0xba, 0x9d};
 
 	dev = &g_pdev->dev;
 
@@ -2203,7 +2383,6 @@ int eth_platform_get_mac_address_callee(struct fipc_message *_request)
 		memcpy(m.mac_addr, mac_addr, ETH_ALEN);
 		fipc_set_reg2(_request, m.mac_addr_l);
 	}
-
 	fipc_set_reg1(_request,
 			func_ret);
 
@@ -2266,7 +2445,7 @@ int dev_addr_add_callee(struct fipc_message *_request)
 
 	addr = (void *)(gva_val(addr_gva) + addr_offset);
 #endif
-	printk("%s, add %lx\n", __func__, m.mac_addr_l);
+	printk("%s, add %pM\n", __func__, m.mac_addr);
 	func_ret = dev_addr_add(dev, addr, addr_type);
 
 	fipc_set_reg0(_request, func_ret);
@@ -2334,7 +2513,7 @@ int dev_addr_del_callee(struct fipc_message *_request)
 	}
 	addr = (void *)(gva_val(addr_gva) + addr_offset);
 #endif
-	printk("%s, del %lx\n", __func__, m.mac_addr_l);
+	printk("%s, del %pM\n", __func__, m.mac_addr);
 
 	func_ret = dev_addr_del(dev, addr, addr_type);
 
@@ -3946,23 +4125,25 @@ fail_lookup:
 
 int irq_set_affinity_hint_callee(struct fipc_message *_request)
 {
-	cpumask_t *affinity_mask;
+	cpumask_t *affinity_mask = NULL;
 	int ret;
 	int irq;
 
-	affinity_mask = kzalloc(sizeof(cpumask_t), GFP_KERNEL);
-
-	if (!affinity_mask) {
-		LIBLCD_ERR("alloc failed");
-		ret = -ENOMEM;
-		goto fail_alloc;
-	}
-
 	irq = fipc_get_reg0(_request);
 
-	affinity_mask->bits[0] = fipc_get_reg1(_request);
-	affinity_mask->bits[1] = fipc_get_reg2(_request);
-	affinity_mask->bits[2] = fipc_get_reg3(_request);
+	if (fipc_get_reg1(_request)) {
+		affinity_mask = kzalloc(sizeof(cpumask_t), GFP_KERNEL);
+
+		if (!affinity_mask) {
+			LIBLCD_ERR("alloc failed");
+			ret = -ENOMEM;
+			goto fail_alloc;
+		}
+
+		affinity_mask->bits[0] = fipc_get_reg2(_request);
+		affinity_mask->bits[1] = fipc_get_reg3(_request);
+		affinity_mask->bits[2] = fipc_get_reg4(_request);
+	}
 
 	ret = irq_set_affinity_hint(irq, affinity_mask);
 

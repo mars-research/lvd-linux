@@ -1,0 +1,13 @@
+obj-m += lcd_test_mod_nullnet_vmfunc_idl_klcd.o
+
+lcd_test_mod_nullnet_vmfunc_idl_klcd-y += nullnet_klcd.o
+lcd_test_mod_nullnet_vmfunc_idl_klcd-y += main.o
+lcd_test_mod_nullnet_vmfunc_idl_klcd-y += ../common.o
+
+extra-y += trampolines.lds
+
+cppflags-y += $(NONISOLATED_CFLAGS)
+
+ccflags-y += $(NONISOLATED_CFLAGS) -std=gnu99 -Wno-error=declaration-after-statement -Wno-error=discarded-qualifiers
+
+ldflags-y += -T $(LCD_TEST_MODULES_BUILD_DIR)/nullnet_vmfunc_idl/klcd/trampolines.lds

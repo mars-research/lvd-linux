@@ -1,5 +1,5 @@
-obj-m += lcd_test_mod_nullnet_vmfunc_idl_boot.o
+obj-m += lcd_test_mod_nullnet_idl_boot.o
 
-lcd_test_mod_nullnet_vmfunc_idl_boot-y		+= main.o
+lcd_test_mod_nullnet_idl_boot-y		+= main.o
 
 ccflags-y += $(NONISOLATED_CFLAGS)

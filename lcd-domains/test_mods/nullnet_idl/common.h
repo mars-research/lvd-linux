@@ -83,6 +83,8 @@ static inline void fipc_destroy_shadow(void* remote) {
 }
 
 enum dispatch_id {
+	RPC_RTNL_LOCK,
+	RPC_RTNL_UNLOCK,
 	RPC_FREE_NETDEV,
 	RPC_ETH_VALIDATE_ADDR,
 	RPC_ETH_MAC_ADDR,

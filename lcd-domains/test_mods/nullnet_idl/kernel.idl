@@ -5,6 +5,9 @@ module kernel_nullnet {
 	import <net/rtnetlink.h>
 	import <asm/lcd_domains/libvmfunc.h>
 
+	rpc void rtnl_lock();
+	rpc void rtnl_unlock();
+
 	projection <struct rtnl_link_stats64> rtnl_link_stats64_ndo_get_stats64 {
 		unsigned int tx_bytes;
 		unsigned int tx_packets;

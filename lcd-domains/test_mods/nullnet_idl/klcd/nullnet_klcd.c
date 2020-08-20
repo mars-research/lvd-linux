@@ -1,5 +1,15 @@
 #include "../common.h"
 
+void rtnl_lock_callee(struct rpc_message* message) {
+	rtnl_lock();
+	message->end_slot = message->slots;
+}
+
+void rtnl_unlock_callee(struct rpc_message* message) {
+	rtnl_unlock();
+	message->end_slot = message->slots;
+}
+
 void free_netdev_callee(struct rpc_message* message) {
 	struct net_device* dev = fipc_unmarshal(struct net_device*);
 	if (dev) {
@@ -798,51 +808,73 @@ void dispatch(struct fipc_message* received) {
 	struct rpc_message* message = &message_buffer;
 	fipc_translate(received, &rpc, message);
 	switch (rpc) {
+	case RPC_RTNL_LOCK:
+		klcd_trace(RPC_RTNL_LOCK);
+		rtnl_lock_callee(message);
+		break;
+
+	case RPC_RTNL_UNLOCK:
+		klcd_trace(RPC_RTNL_UNLOCK);
+		rtnl_unlock_callee(message);
+		break;
+		
 	case RPC_FREE_NETDEV:
+		klcd_trace(RPC_FREE_NETDEV);
 		free_netdev_callee(message);
 		break;
 
 	case RPC_ETH_VALIDATE_ADDR:
+		klcd_trace(RPC_ETH_VALIDATE_ADDR);
 		eth_validate_addr_callee(message);
 		break;
 
 	case RPC_ETH_MAC_ADDR:
+		klcd_trace(RPC_ETH_MAC_ADDR);
 		eth_mac_addr_callee(message);
 		break;
 
 	case RPC_ETHER_SETUP:
+		klcd_trace(RPC_ETHER_SETUP);
 		ether_setup_callee(message);
 		break;
 
 	case RPC_REGISTER_NETDEVICE:
+		klcd_trace(RPC_REGISTER_NETDEVICE);
 		register_netdevice_callee(message);
 		break;
 
 	case RPC_NETIF_CARRIER_OFF:
+		klcd_trace(RPC_NETIF_CARRIER_OFF);
 		netif_carrier_off_callee(message);
 		break;
 
 	case RPC___RTNL_LINK_REGISTER:
+		klcd_trace(RPC___RTNL_LINK_REGISTER);
 		__rtnl_link_register_callee(message);
 		break;
 
 	case RPC___RTNL_LINK_UNREGISTER:
+		klcd_trace(RPC___RTNL_LINK_UNREGISTER);
 		__rtnl_link_unregister_callee(message);
 		break;
 
 	case RPC_RTNL_LINK_UNREGISTER:
+		klcd_trace(RPC_RTNL_LINK_UNREGISTER);
 		rtnl_link_unregister_callee(message);
 		break;
 
 	case RPC_ALLOC_NETDEV_MQS:
+		klcd_trace(RPC_ALLOC_NETDEV_MQS);
 		alloc_netdev_mqs_callee(message);
 		break;
 
 	case RPC_NETIF_CARRIER_ON:
+		klcd_trace(RPC_NETIF_CARRIER_ON);
 		netif_carrier_on_callee(message);
 		break;
 
 	case RPC_CONSUME_SKB:
+		klcd_trace(RPC_CONSUME_SKB);
 		consume_skb_callee(message);
 		break;
 

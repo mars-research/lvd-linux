@@ -1,5 +1,21 @@
 #include "../common.h"
 
+void rtnl_lock() {
+	struct rpc_message message_buffer = {0};
+	message_buffer.end_slot = message_buffer.slots;
+	struct rpc_message* message = &message_buffer;
+	fipc_send(RPC_RTNL_LOCK, message);
+	message->end_slot = message->slots;
+}
+
+void rtnl_unlock() {
+	struct rpc_message message_buffer = {0};
+	message_buffer.end_slot = message_buffer.slots;
+	struct rpc_message* message = &message_buffer;
+	fipc_send(RPC_RTNL_UNLOCK, message);
+	message->end_slot = message->slots;
+}
+
 void free_netdev(struct net_device* dev) {
 	struct rpc_message message_buffer = {0};
 	message_buffer.end_slot = message_buffer.slots;
@@ -823,54 +839,67 @@ void dispatch(struct fipc_message* received) {
 	fipc_translate(received, &rpc, message);
 	switch (rpc) {
 	case RPC_PTR_INT_1_KERNEL_NULLNET_NET_DEVICE_NDO_INIT:
+		lcd_trace(RPC_PTR_INT_1_KERNEL_NULLNET_NET_DEVICE_NDO_INIT);
 		_int_1_kernel_nullnet_net_device_ndo_init_callee(message);
 		break;
 
 	case RPC_PTR_VOID_1_KERNEL_NULLNET_NET_DEVICE_NDO_UNINIT:
+		lcd_trace(RPC_PTR_VOID_1_KERNEL_NULLNET_NET_DEVICE_NDO_UNINIT);
 		_void_1_kernel_nullnet_net_device_ndo_uninit_callee(message);
 		break;
 
 	case RPC_PTR_INT_1_KERNEL_NULLNET_SK_BUFF_NDO_START_XMIT_1_KERNEL_NULLNET_NET_DEVICE_STATS:
+		lcd_trace(RPC_PTR_INT_1_KERNEL_NULLNET_SK_BUFF_NDO_START_XMIT_1_KERNEL_NULLNET_NET_DEVICE_STATS);
 		_int_1_kernel_nullnet_sk_buff_ndo_start_xmit_1_kernel_nullnet_net_device_stats_callee(message);
 		break;
 
 	case RPC_PTR_INT_1_KERNEL_NULLNET_NET_DEVICE_NDO_VALIDATE_ADDR:
+		lcd_trace(RPC_PTR_INT_1_KERNEL_NULLNET_NET_DEVICE_NDO_VALIDATE_ADDR);
 		_int_1_kernel_nullnet_net_device_ndo_validate_addr_callee(message);
 		break;
 
 	case RPC_PTR_1_KERNEL_NULLNET_RTNL_LINK_STATS64_1_KERNEL_NULLNET_NET_DEVICE_NDO_GET_STATS64_1_KERNEL_NULLNET_RTNL_LINK_STATS64_NDO_GET_STATS64:
+		lcd_trace(RPC_PTR_1_KERNEL_NULLNET_RTNL_LINK_STATS64_1_KERNEL_NULLNET_NET_DEVICE_NDO_GET_STATS64_1_KERNEL_NULLNET_RTNL_LINK_STATS64_NDO_GET_STATS64);
 		_1_kernel_nullnet_rtnl_link_stats64_1_kernel_nullnet_net_device_ndo_get_stats64_1_kernel_nullnet_rtnl_link_stats64_ndo_get_stats64_callee(message);
 		break;
 
 	case RPC_PTR_VOID_1_KERNEL_NULLNET_NET_DEVICE_NDO_SET_RX_MODE:
+		lcd_trace(RPC_PTR_VOID_1_KERNEL_NULLNET_NET_DEVICE_NDO_SET_RX_MODE);
 		_void_1_kernel_nullnet_net_device_ndo_set_rx_mode_callee(message);
 		break;
 
 	case RPC_PTR_INT_1_KERNEL_NULLNET_NET_DEVICE_NDO_SET_MAC_ADDRESS_1_KERNEL_NULLNET_SOCKADDR:
+		lcd_trace(RPC_PTR_INT_1_KERNEL_NULLNET_NET_DEVICE_NDO_SET_MAC_ADDRESS_1_KERNEL_NULLNET_SOCKADDR);
 		_int_1_kernel_nullnet_net_device_ndo_set_mac_address_1_kernel_nullnet_sockaddr_callee(message);
 		break;
 
 	case RPC_PTR_INT_1_KERNEL_NULLNET_NET_DEVICE_NDO_CHANGE_CARRIER_BOOL:
+		lcd_trace(RPC_PTR_INT_1_KERNEL_NULLNET_NET_DEVICE_NDO_CHANGE_CARRIER_BOOL);
 		_int_1_kernel_nullnet_net_device_ndo_change_carrier_bool_callee(message);
 		break;
 
 	case RPC_PTR_VOID_1_KERNEL_NULLNET_NET_DEVICE_GET_DRVINFO_1_KERNEL_NULLNET_ETHTOOL_DRVINFO_GET_DRVINFO:
+		lcd_trace(RPC_PTR_VOID_1_KERNEL_NULLNET_NET_DEVICE_GET_DRVINFO_1_KERNEL_NULLNET_ETHTOOL_DRVINFO_GET_DRVINFO);
 		_void_1_kernel_nullnet_net_device_get_drvinfo_1_kernel_nullnet_ethtool_drvinfo_get_drvinfo_callee(message);
 		break;
 
 	case RPC_PTR_VOID_1_KERNEL_NULLNET_NET_DEVICE_DESTRUCTOR:
+		lcd_trace(RPC_PTR_VOID_1_KERNEL_NULLNET_NET_DEVICE_DESTRUCTOR);
 		_void_1_kernel_nullnet_net_device_destructor_callee(message);
 		break;
 
 	case RPC_PTR_VOID_1_KERNEL_NULLNET_NET_DEVICE_SETUP:
+		lcd_trace(RPC_PTR_VOID_1_KERNEL_NULLNET_NET_DEVICE_SETUP);
 		_void_1_kernel_nullnet_net_device_setup_callee(message);
 		break;
 
 	case RPC_PTR_INT_1_KERNEL_NULLNET_VOID_PTR_1_KERNEL_NULLNET_VOID_PTR:
+		lcd_trace(RPC_PTR_INT_1_KERNEL_NULLNET_VOID_PTR_1_KERNEL_NULLNET_VOID_PTR);
 		_int_1_kernel_nullnet_void_ptr_1_kernel_nullnet_void_ptr_callee(message);
 		break;
 
 	case RPC_PTR_VOID_1_KERNEL_NULLNET_NET_DEVICE_SETUP_CALLEE_ALLOC:
+		lcd_trace(RPC_PTR_VOID_1_KERNEL_NULLNET_NET_DEVICE_SETUP_CALLEE_ALLOC);
 		_void_1_kernel_nullnet_net_device_setup_callee_alloc_callee(message);
 		break;
 

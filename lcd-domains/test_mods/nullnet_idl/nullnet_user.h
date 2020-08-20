@@ -21,4 +21,7 @@ struct sockaddr_placeholder {
     char sa_data_13;
 };
 
+#define klcd_trace(rpc) LIBLCD_MSG("KLCD received " #rpc)
+#define lcd_trace(rpc) LIBLCD_MSG("LCD received " #rpc)
+
 #endif

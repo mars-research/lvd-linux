@@ -22,8 +22,13 @@ extern int vmfunc_init(void *stack_page, rpc_handler_t rpc_handler,
 struct cspace *klcd_cspace;
 extern void *lcd_stack;
 
-int net_klcd_dispatch_loop(struct fipc_message *msg);
-int net_klcd_syncipc_dispatch(struct fipc_message *message);
+int dispatch(struct fipc_message *msg);
+
+int sync_stub(struct fipc_message *message)
+{
+	LIBLCD_MSG("sync stub was called");
+	return 0;
+}
 
 static int net_klcd_init(void) 
 {
@@ -54,12 +59,12 @@ static int net_klcd_init(void)
 	hash_init(remotes);
 	LIBLCD_MSG("-===== > initialized glue hashmaps\n");
 
-	vmfunc_init(lcd_stack, net_klcd_dispatch_loop, net_klcd_syncipc_dispatch);
+	vmfunc_init(lcd_stack, dispatch, sync_stub);
 
 	/* call module_init for lcd */
 	m.vmfunc_id = VMFUNC_RPC_CALL;
-	m.rpc_id = MODULE_INIT;
-	LIBLCD_MSG("vmfunc_init successfull! Calling MODULE_INIT of dummy_lcd");
+	m.rpc_id = RPC_LCD_INIT;
+	LIBLCD_MSG("vmfunc_init successfull! Calling LCD_INIT of dummy_lcd");
 	vmfunc_klcd_wrapper(&m, OTHER_DOMAIN);
 
 	return 0;
@@ -85,8 +90,8 @@ static void __exit net_klcd_exit(void)
 
 	/* call module_init for lcd */
 	m.vmfunc_id = VMFUNC_RPC_CALL;
-	m.rpc_id = MODULE_EXIT;
-	LIBLCD_MSG("Calling MODULE_EXIT of dummy_lcd");
+	m.rpc_id = RPC_LCD_EXIT;
+	LIBLCD_MSG("Calling LCD_EXIT of dummy_lcd");
 	vmfunc_klcd_wrapper(&m, OTHER_DOMAIN);
 
 	/*

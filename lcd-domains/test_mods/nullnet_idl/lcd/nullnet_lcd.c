@@ -143,6 +143,7 @@ int __rtnl_link_register(struct rtnl_link_ops* ops) {
 	if (ops) {
 	}
 	int return_value = fipc_unmarshal(int);
+	printk("[DEBUG] rtnl register *apparent* return value was: %d", return_value);
 	return return_value;
 }
 
@@ -473,6 +474,8 @@ void _int_1_kernel_nullnet_void_ptr_1_kernel_nullnet_void_ptr_callee(struct rpc_
 }
 
 void _void_1_kernel_nullnet_net_device_setup_callee_alloc_callee(struct rpc_message* message) {
+	LIBLCD_MSG("Entered problem call");
+
 	void (*real_pointer)(struct net_device* dev) = fipc_unmarshal(void*);
 	struct net_device* dev_key = fipc_unmarshal(struct net_device*);
 	struct net_device* dev = fipc_create_shadow(dev_key);
@@ -494,6 +497,8 @@ void _void_1_kernel_nullnet_net_device_setup_callee_alloc_callee(struct rpc_mess
 		}
 		fipc_marshal(dev->destructor);
 	}
+
+	LIBLCD_MSG("Exited problem call");
 }
 
 LCD_TRAMPOLINE_LINKAGE(trampoline_int_1_kernel_nullnet_net_device_ndo_init)
@@ -832,12 +837,23 @@ void trampoline_void_1_kernel_nullnet_net_device_setup_callee_alloc(struct net_d
 	}
 }
 
-void dispatch(struct fipc_message* received) {
+int handle_rpc_calls(struct fipc_message* received) {
 	enum dispatch_id rpc;
 	struct rpc_message message_buffer;
 	struct rpc_message* message = &message_buffer;
+	LIBLCD_MSG("Started dispatching LCD message");
 	fipc_translate(received, &rpc, message);
 	switch (rpc) {
+	case RPC_LCD_INIT:
+		lcd_trace(RPC_LCD_INIT);
+		__dummy_lcd_init();
+		break;
+
+	case RPC_LCD_EXIT:
+		lcd_trace(RPC_LCD_EXIT);
+		__dummy_lcd_exit();
+		break;
+
 	case RPC_PTR_INT_1_KERNEL_NULLNET_NET_DEVICE_NDO_INIT:
 		lcd_trace(RPC_PTR_INT_1_KERNEL_NULLNET_NET_DEVICE_NDO_INIT);
 		_int_1_kernel_nullnet_net_device_ndo_init_callee(message);
@@ -904,7 +920,13 @@ void dispatch(struct fipc_message* received) {
 		break;
 
 	default:
+		LIBLCD_ERR("Unknown message kind");
+		BUG();
 		break;
 	}
+
+	LIBLCD_MSG("Finished dispatching LCD message");
+
+	return 0;
 }
 

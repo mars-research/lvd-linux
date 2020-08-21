@@ -115,8 +115,12 @@ void __rtnl_link_register_callee(struct rpc_message* message) {
 		int (*ops_validate)(struct nlattr** tb, struct nlattr** data) = fipc_unmarshal(void*);
 		int (*ops_validate_trampoline)(struct nlattr** tb, struct nlattr** data) = inject_trampoline(_int_1_kernel_nullnet_void_ptr_1_kernel_nullnet_void_ptr, ops_validate);
 		ops->validate = ops_validate_trampoline;
+
+		// CUSTOM
+		ops->kind = "dummy";
 	}
 	int return_value = __rtnl_link_register(ops);
+	printk("[DEBUG] rtnl register return value was: %d", return_value);
 	message->end_slot = message->slots;
 	if (ops) {
 	}
@@ -734,6 +738,8 @@ void trampoline_void_1_kernel_nullnet_net_device_destructor(struct net_device* d
 
 LCD_TRAMPOLINE_LINKAGE(trampoline_void_1_kernel_nullnet_net_device_setup)
 void trampoline_void_1_kernel_nullnet_net_device_setup(struct net_device* dev) {
+	LIBLCD_MSG("Trampoline #1 is being called");
+
 	void* real_pointer;
 	LCD_TRAMPOLINE_PROLOGUE(real_pointer, trampoline_void_1_kernel_nullnet_net_device_setup);
 	struct rpc_message message_buffer = {0};
@@ -802,10 +808,11 @@ void trampoline_void_1_kernel_nullnet_net_device_setup_callee_alloc(struct net_d
 	}
 }
 
-void dispatch(struct fipc_message* received) {
+int dispatch(struct fipc_message* received) {
 	enum dispatch_id rpc;
 	struct rpc_message message_buffer;
 	struct rpc_message* message = &message_buffer;
+	LIBLCD_MSG("Started dispatching KLCD message");
 	fipc_translate(received, &rpc, message);
 	switch (rpc) {
 	case RPC_RTNL_LOCK:
@@ -931,7 +938,13 @@ void dispatch(struct fipc_message* received) {
 		break;
 
 	default:
+		LIBLCD_ERR("Unknown message kind (KLCD)");
+		BUG();
 		break;
 	}
+
+	LIBLCD_MSG("Finished dispatching KLCD message");
+
+	return 0;
 }
 

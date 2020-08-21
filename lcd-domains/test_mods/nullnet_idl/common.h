@@ -33,26 +33,42 @@ extern DECLARE_HASHTABLE(locals, 5);
 extern DECLARE_HASHTABLE(remotes, 5);
 
 static inline void* fipc_get_remote(void* local) {
+	LIBLCD_MSG("Started finding remote");
+
 	struct ptr_node* node;
 	hash_for_each_possible(remotes, node, hentry, (unsigned long)local) {
-		if (node->key == local) return node->ptr;
+		if (node->key == local) {
+			LIBLCD_MSG("Finished finding remote");
+			return node->ptr;
+		}
 	}
 
+	LIBLCD_ERR("Failed to find remote");
 	BUG();
+
 	return NULL;
 }
 
 static inline void* fipc_get_local(void* remote) {
+	LIBLCD_MSG("Started finding remote");
+
 	struct ptr_node* node;
 	hash_for_each_possible(locals, node, hentry, (unsigned long)remote) {
-		if (node->key == remote) return node->ptr;
+		if (node->key == remote) {
+			LIBLCD_MSG("Finished finding local");
+			return node->ptr;
+		}
 	}
 
+	LIBLCD_ERR("Failed to find local");
 	BUG();
+
 	return NULL;
 }
 
 static inline void* fipc_create_shadow_impl(void* remote, size_t size) {
+	LIBLCD_MSG("Started creating shadow");
+
 	void* local = kmalloc(size, GFP_KERNEL);
 	struct ptr_node* local_node = kmalloc(sizeof(struct ptr_node), GFP_KERNEL);
 	struct ptr_node* remote_node = kmalloc(sizeof(struct ptr_node), GFP_KERNEL);
@@ -62,27 +78,53 @@ static inline void* fipc_create_shadow_impl(void* remote, size_t size) {
 	remote_node->key = local;
 	hash_add(locals, &local_node->hentry, (unsigned long)remote);
 	hash_add(remotes, &remote_node->hentry, (unsigned long)local);
+
+	LIBLCD_MSG("Finished creating shadow");
+
 	return local;
 }
 
 static inline void fipc_destroy_shadow(void* remote) {
+	LIBLCD_MSG("Started destroying shadow");
+
 	struct ptr_node* local_node;
 	struct ptr_node* remote_node;
 	hash_for_each_possible(locals, local_node, hentry, (unsigned long)remote) {
-		if (local_node->key == remote) hash_del(&local_node->hentry);
+		LIBLCD_MSG("POI #1 reached");
+		if (local_node->key == remote) {
+			hash_del(&local_node->hentry);
+			break;
+		}
+
+		LIBLCD_MSG("POI #1 ended");
 	}
+
+	printk("[DEBUG] local_node: %p, remotes: %p, locals: %p", local_node, remotes, locals);
 
 	void* local = local_node->ptr;
 	hash_for_each_possible(remotes, remote_node, hentry, (unsigned long)local) {
-		if (remote_node->key == local) hash_del(&remote_node->hentry);
+		LIBLCD_MSG("POI #2 reached");
+		if (remote_node->key == local) {
+			hash_del(&remote_node->hentry);
+			break;
+		}
+		
+		LIBLCD_MSG("POI #2 ended");
 	}
 
+	LIBLCD_MSG("Freeing shadow");
 	kfree(local);
+	LIBLCD_MSG("Freeing shadow node");
 	kfree(local_node);
+	LIBLCD_MSG("Freeing remote node");
 	kfree(remote_node);
+
+	LIBLCD_MSG("Finished destroying shadow");
 }
 
 enum dispatch_id {
+	RPC_LCD_INIT,
+	RPC_LCD_EXIT,
 	RPC_RTNL_LOCK,
 	RPC_RTNL_UNLOCK,
 	RPC_FREE_NETDEV,
@@ -118,11 +160,16 @@ struct rpc_message {
 };
 
 static inline void* inject_trampoline_impl(struct lcd_trampoline_handle* handle, void* impl) {
+	LIBLCD_MSG("Injecting trampoline");
+	printk("[DEBUG] using remote pointer %p", impl);
+
 	handle->hidden_args = impl;
 	return handle->trampoline;
 }
 
 static inline void fipc_send(enum dispatch_id rpc, struct rpc_message* msg) {
+	LIBLCD_MSG("Started sending RPC");
+
 	unsigned slots_used = msg->end_slot - msg->slots;
 	struct fipc_message fmsg;
 	fmsg.vmfunc_id = VMFUNC_RPC_CALL;
@@ -143,9 +190,13 @@ static inline void fipc_send(enum dispatch_id rpc, struct rpc_message* msg) {
 	}
 
 	vmfunc_wrapper(&fmsg);
+
+	LIBLCD_MSG("Finished sending RPC");
 }
 
 static inline void fipc_translate(struct fipc_message* msg, enum dispatch_id* rpc, struct rpc_message* pckt) {
+	LIBLCD_MSG("Started translating message");
+
 	unsigned slots_used = msg->rpc_id >> 16;
 	*rpc = msg->rpc_id & 0xFFFF;
 
@@ -163,6 +214,7 @@ static inline void fipc_translate(struct fipc_message* msg, enum dispatch_id* rp
 		}
 	}
 
+	LIBLCD_MSG("Finished translating message");
 }
 
 LCD_TRAMPOLINE_DATA(trampoline_int_1_kernel_nullnet_net_device_ndo_init)

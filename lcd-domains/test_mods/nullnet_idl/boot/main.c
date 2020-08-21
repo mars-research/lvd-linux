@@ -39,21 +39,21 @@ static int boot_main(void)
 
 	/* ---------- Create LCDs ---------- */
 
-	m = lvd_create_module_klcd_no_thread(LCD_DIR("nullnet_vmfunc/net_klcd"),
-				"lcd_test_mod_nullnet_vmfunc_net_klcd",
+	m = lvd_create_module_klcd_no_thread(LCD_DIR("nullnet_idl/klcd"),
+				"lcd_test_mod_nullnet_idl_klcd",
 				&net_klcd);
 
 	if (!m) {
-		LIBLCD_ERR("failed to create net klcd");
+		LIBLCD_ERR("failed to create klcd");
 		ret = -1;
 		goto fail3;
 	}
-	ret = lvd_create_module_lvd(LCD_DIR("nullnet_vmfunc/dummy_lcd"),
-				"lcd_test_mod_nullnet_vmfunc_dummy_lcd",
+	ret = lvd_create_module_lvd(LCD_DIR("nullnet_idl/lcd"),
+				"lcd_test_mod_nullnet_idl_lcd",
 				&dummy_lcd,
 				&dummy_ctx, 1);
 	if (ret) {
-		LIBLCD_ERR("failed to create dummy lcd");
+		LIBLCD_ERR("failed to create lcd");
 		goto fail4;
 	}
 
@@ -64,7 +64,7 @@ static int boot_main(void)
 	/* run KLCD init */
 	ret = lcd_run(net_klcd);
 	if (ret) {
-		LIBLCD_ERR("failed to start net klcd");
+		LIBLCD_ERR("failed to start klcd");
 		goto fail8;
 	}
 
@@ -72,7 +72,7 @@ static int boot_main(void)
 
 	ret = lcd_run(dummy_lcd);
 	if (ret) {
-		LIBLCD_ERR("failed to start dummy lcd");
+		LIBLCD_ERR("failed to start lcd");
 		goto fail9;
 	}
 
@@ -85,7 +85,7 @@ fail8:
 	lcd_destroy_create_ctx(dummy_ctx);
 fail4:
 	//lcd_cap_delete(net_klcd);
-	lcd_destroy_module_klcd(net_klcd, "lcd_test_mod_nullnet_vmfunc_net_klcd");
+	lcd_destroy_module_klcd(net_klcd, "lcd_test_mod_nullnet_idl_klcd");
 fail3:
 	lcd_exit(0); /* will free endpoints */
 fail1:

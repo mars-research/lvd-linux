@@ -289,6 +289,8 @@ int dummy_init_module(void)
 	if (err < 0)
 		goto out;
 
+	printk("[DEBUG] numdummies: %d", numdummies);
+
 	for (i = 0; i < numdummies && !err; i++) {
 		err = dummy_init_one();
 		cond_resched();

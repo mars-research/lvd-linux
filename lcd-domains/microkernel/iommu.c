@@ -89,7 +89,7 @@ int lcd_iommu_map_page(struct lcd *lcd, gpa_t gpa, unsigned int order,
 			BUG_ON(ret != PAGE_SIZE);
 		}
 
-		if (1) {
+		if (0) {
 			printk("%s, mapping gpa:hpa %lx:%lx pair\n", __func__,
 					       gpa_val(ga), hpa_val(hpa));
 		}

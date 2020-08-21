@@ -634,6 +634,8 @@ int remove_callee(struct fipc_message *_request)
 		goto fail_lookup;
 	}
 
+	/* XXX: refer the comments under probe_callee */
+	drv_container->pci_driver.remove(&dev_container->pci_dev);
 
 #ifdef IOMMU_ASSIGN
 	devfn = PCI_DEVFN(dev_assign.slot, dev_assign.fn);
@@ -646,8 +648,6 @@ int remove_callee(struct fipc_message *_request)
 				ret);
 #endif
 
-	/* XXX: refer the comments under probe_callee */
-	drv_container->pci_driver.remove(&dev_container->pci_dev);
 
 fail_lookup:
 	return ret;
@@ -950,6 +950,9 @@ void napi_consume_skb(struct sk_buff *skb, int budget)
 
 	vmfunc_wrapper(_request);
 
+#ifdef CONFIG_SKB_COPY
+	kfree(skb->head);
+#endif
 	kmem_cache_free(skb2_cache, skb_c);
 	return;
 }
@@ -970,6 +973,9 @@ void consume_skb(struct sk_buff *skb)
 
 	vmfunc_wrapper(_request);
 
+#ifdef CONFIG_SKB_COPY
+	kfree(skb->head);
+#endif
 	kfree(skb);
 
 	kfree(skb_c);
@@ -1692,6 +1698,104 @@ fail_alloc:
 	return ret;
 }
 
+int ndo_start_xmit_copy_callee(struct fipc_message *_request)
+{
+	struct sk_buff *skb;
+	struct sk_buff_container_2 *skb_c = NULL;
+	int ret = 0;
+	int func_ret;
+	cptr_t skb_ref;
+	unsigned long skb_data_reg_offset, skb_end;
+	__be16 proto;
+	struct ext_registers *ext_regs = get_register_page(smp_processor_id());
+	u64 *regs = &ext_regs->regs[0];
+	u32 skb_data_off;
+	int i = 0;
+
+#ifdef LCD_MEASUREMENT
+	TS_DECL(xmit);
+#endif
+#ifdef CONFIG_NO_HASHING
+	skb_ref = __cptr(fipc_get_reg0(_request));
+#else
+	skb_ref = __cptr(fipc_get_reg2(_request));
+#endif
+	skb_data_reg_offset = fipc_get_reg3(_request);
+	skb_end = fipc_get_reg4(_request);
+	proto = fipc_get_reg5(_request);
+
+	skb_c = kmem_cache_alloc(skb2_cache, GFP_KERNEL);
+
+	if (!skb_c) {
+		LIBLCD_MSG("out of mmeory");
+		goto fail_alloc;
+	}
+	//printk("%s, lcd: %lu got %p from kmem_cache", __func__, smp_processor_id(), skb_c);
+	skb = &skb_c->skb;
+
+	skb->end = skb_end;
+
+	skb->protocol = proto;
+
+	GET_EREG(len);
+	GET_EREG(data_len);
+	GET_EREG(queue_mapping);
+	GET_EREG(xmit_more);
+	GET_EREG(tail);
+	GET_EREG(truesize);
+	GET_EREG(ip_summed);
+	GET_EREG(csum_start);
+	GET_EREG(network_header);
+	GET_EREG(csum_offset);
+	GET_EREG(transport_header);
+
+	skb_data_off = regs[i++];
+
+	// alloc_skb 
+	skb->head = skb->data = kzalloc(skb->len, GFP_KERNEL);
+
+	if (!skb->data) {
+		LIBLCD_ERR("Alloc skb->data failed");
+		goto fail_alloc;
+	}
+
+	memcpy(skb->head, &regs[i], skb->len - skb->data_len + skb_data_off);
+
+	if (0)
+	LIBLCD_MSG("lcd-> l: %d | dlen %d | qm %d"
+		   " | xm %d | t %lu |ts %u",
+		skb->len, skb->data_len, skb->queue_mapping,
+		skb->xmit_more, skb->tail, skb->truesize);
+
+	skb->data = skb->head + skb_data_off;
+
+	skb_c->other_ref = skb_ref;
+
+#ifdef LCD_MEASUREMENT
+	TS_START_LCD(xmit);
+#endif
+	func_ret = ixgbe_xmit_frame(skb, g_netdev);
+
+	/* packet transmission failed - free skb_c right here */
+	if (func_ret) {
+		kmem_cache_free(skb2_cache, skb_c);
+	}
+
+#ifdef LCD_MEASUREMENT
+	TS_STOP_LCD(xmit);
+#endif
+
+	async_msg_set_fn_type(_request, 0xdeadbeef);
+	fipc_set_reg0(_request, func_ret);
+
+#ifdef LCD_MEASUREMENT
+	fipc_set_reg2(_request,
+			TS_DIFF(xmit));
+#endif
+
+fail_alloc:
+	return ret;
+}
 int ndo_set_rx_mode_callee(struct fipc_message *_request)
 {
 	struct net_device_container *dev_container;

@@ -28,6 +28,9 @@ int handle_rpc_calls(struct fipc_message *message)
 		case NDO_START_XMIT:
 			return ndo_start_xmit_callee(message);
 
+		case NDO_START_XMIT_COPY:
+			return ndo_start_xmit_copy_callee(message);
+
 		case NDO_SET_RX_MODE:
 			trace(NDO_SET_RX_MODE);
 			return ndo_set_rx_mode_callee(message);

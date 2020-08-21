@@ -30,6 +30,7 @@
 #define CONFIG_VMALLOC_SHARED_POOL
 #define SKB_GLOBAL_HASHTABLE
 #define CONFIG_NO_HASHING
+#define CONFIG_SKB_COPY
 
 #define NUM_HW_QUEUES		20
 
@@ -98,6 +99,7 @@ enum dispatch_t {
 	NDO_OPEN,
 	NDO_STOP,
 	NDO_START_XMIT,
+	NDO_START_XMIT_COPY,
 	NDO_SELECT_QUEUE,
 	NDO_SET_RX_MODE,
 	NDO_VALIDATE_ADDR,
@@ -190,6 +192,9 @@ struct skbuff_members {
 
 #define C(x)	skb_lcd->x = skb->x
 #define P(x)	skb->x = skb_lcd->x
+
+#define SET_EREG(x) regs[i++] = skb->x
+#define GET_EREG(x) skb->x = regs[i++]
 
 /* CSPACES ------------------------------------------------------------ */
 int glue_cap_init(void);

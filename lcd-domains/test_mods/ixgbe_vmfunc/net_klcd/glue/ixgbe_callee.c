@@ -1059,6 +1059,119 @@ fail_alloc:
 	return func_ret;
 }
 
+int ndo_start_xmit_copy(struct sk_buff *skb,
+		struct net_device *dev,
+		struct trampoline_hidden_args *hidden_args)
+{
+	struct net_device_container *dev_container;
+	struct fipc_message r;
+	struct fipc_message *_request = &r;
+	int func_ret = 0;
+	static int once = 1;
+	struct ext_registers *ext_regs = get_register_page(smp_processor_id());
+	u64 *regs = &ext_regs->regs[0];
+	int i = 0;
+
+#ifndef CONFIG_NO_HASHING
+	struct sk_buff_container *skb_c;
+#endif
+
+#ifdef TIMESTAMP
+	TS_DECL(mndo_xmit);
+#endif
+
+#if defined(TIMESTAMP) || defined(LCD_MEASUREMENT)
+	static int iter = 0;
+#endif
+#ifdef TIMESTAMP
+	TS_START(mndo_xmit);
+#endif
+
+	INIT_IPC_MSG(&r);
+
+	dev_container = container_of(dev,
+			struct net_device_container,
+			net_device);
+
+#ifndef CONFIG_NO_HASHING
+#ifdef SKBC_PRIVATE_POOL
+	skb_c = priv_alloc(SKB_CONTAINER_POOL);
+#else
+	skb_c = kmem_cache_alloc(skb_c_cache, GFP_KERNEL);
+#endif
+	if (!skb_c) {
+		LIBLCD_MSG("no memory");
+		goto fail_alloc;
+	}
+
+	skb_c->skb = skb;
+
+	if (0)
+		printk("%s, on cpu:%d skb:%p\n", __func__, smp_processor_id(), skb);
+#endif
+	/* pad to 17 bytes, don't care the ret val */
+	skb_put_padto(skb, 17);
+	async_msg_set_fn_type(_request, NDO_START_XMIT_COPY);
+
+#ifdef CONFIG_NO_HASHING
+	fipc_set_reg0(_request, (unsigned long) skb);
+#else
+	glue_insert_skb_hash(skb_c);
+	fipc_set_reg2(_request, skb_c->my_ref.cptr);
+#endif
+
+	fipc_set_reg1(_request, dev_container->other_ref.cptr);
+
+	fipc_set_reg4(_request, skb->end);
+
+	fipc_set_reg5(_request, skb->protocol);
+
+	SET_EREG(len);
+	SET_EREG(data_len);
+	SET_EREG(queue_mapping);
+	SET_EREG(xmit_more);
+	SET_EREG(tail);
+	SET_EREG(truesize);
+	SET_EREG(ip_summed);
+	SET_EREG(csum_start);
+	SET_EREG(network_header);
+	SET_EREG(csum_offset);
+	SET_EREG(transport_header);
+	regs[i++] = skb->data - skb->head;
+	memcpy(&regs[i], skb->head, skb->len - skb->data_len + (skb->data - skb->head));
+
+	fipc_set_reg3(_request, i);
+
+	if (0)
+		printk("%s:%d %s skb->q %d\n", current->comm, current->pid, __func__, skb->queue_mapping);
+
+#ifdef CONFIG_LCD_TRACE_BUFFER
+	add_trace_entry(EVENT_XMIT, async_msg_get_fn_type(_request));
+#endif
+	vmfunc_klcd_wrapper(_request, 1);
+
+	func_ret = fipc_get_reg0(_request);
+#ifdef LCD_MEASUREMENT
+	times_lcd[iter] = fipc_get_reg2(_request);
+	iter = (iter + 1) % NUM_PACKETS;
+#endif
+
+	g_stats.num_sent++;
+
+#ifdef TIMESTAMP
+	TS_STOP(mndo_xmit);
+	times_ndo_xmit[iter] = TS_DIFF(mndo_xmit);
+	iter = (iter + 1) % NUM_PACKETS;
+#endif
+#ifndef CONFIG_NO_HASHING
+fail_alloc:
+#endif
+	if (once && (func_ret != NETDEV_TX_OK)) {
+		once = 0;
+		printk("%s, got %d\n", __func__, func_ret);
+	}
+	return func_ret;
+}
 LCD_TRAMPOLINE_DATA(ndo_start_xmit_trampoline);
 int  LCD_TRAMPOLINE_LINKAGE(ndo_start_xmit_trampoline)
 ndo_start_xmit_trampoline(struct sk_buff *skb,
@@ -1071,6 +1184,10 @@ ndo_start_xmit_trampoline(struct sk_buff *skb,
 	LCD_TRAMPOLINE_PROLOGUE(hidden_args,
 			ndo_start_xmit_trampoline);
 	ndo_start_xmit_fp = ndo_start_xmit;
+
+#ifdef CONFIG_SKB_COPY
+	ndo_start_xmit_fp = ndo_start_xmit_copy;
+#endif
 	return ndo_start_xmit_fp(skb,
 		dev,
 		hidden_args);
@@ -2293,8 +2410,10 @@ int napi_consume_skb_callee(struct fipc_message *_request)
 	skb = skb_c->skb;
 #endif
 
+#ifndef CONFIG_SKB_COPY
 	if (check_skb_range(skb) == VOLUNTEER_XMIT)
 		printk("%s, skb possibly corrupted %p\n", __func__, skb);
+#endif
 	
 	if (0)
 		printk("%s, on cpu:%d skb:%p\n", __func__, smp_processor_id(), skb);

@@ -15,6 +15,8 @@ int ndo_start_xmit_bare_callee(struct fipc_message *_request);
 int ndo_start_xmit_clean_callee(struct fipc_message *_request);
 
 int ndo_start_xmit_callee(struct fipc_message *_request);
+int ndo_start_xmit_copy_callee(struct fipc_message *_request);
+
 int ndo_set_rx_mode_callee(struct fipc_message *_request);
 int ndo_validate_addr_callee(struct fipc_message *_request);
 int ndo_set_mac_address_callee(struct fipc_message *_request);

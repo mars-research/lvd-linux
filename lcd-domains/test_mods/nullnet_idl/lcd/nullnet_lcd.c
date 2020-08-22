@@ -135,6 +135,7 @@ int __rtnl_link_register(struct rtnl_link_ops* ops) {
 	struct rpc_message* message = &message_buffer;
 	fipc_marshal(ops);
 	if (ops) {
+		printk("[DEBUG] setup: %p, validate: %p\n", ops->setup, ops->validate);
 		fipc_marshal(ops->setup);
 		fipc_marshal(ops->validate);
 	}
@@ -143,7 +144,7 @@ int __rtnl_link_register(struct rtnl_link_ops* ops) {
 	if (ops) {
 	}
 	int return_value = fipc_unmarshal(int);
-	printk("[DEBUG] rtnl register *apparent* return value was: %d", return_value);
+	printk("[DEBUG] rtnl register *apparent* return value was: %d\n", return_value);
 	return return_value;
 }
 
@@ -178,9 +179,12 @@ struct net_device* alloc_netdev_mqs(int sizeof_priv, const char* name, unsigned 
 	message_buffer.end_slot = message_buffer.slots;
 	struct rpc_message* message = &message_buffer;
 	fipc_marshal(sizeof_priv);
+	printk("[DEBUG] *real* sizeof_priv: %d\n", sizeof_priv);
 	fipc_marshal(name);
+	printk("[DEBUG] *real* name ptr: %p\n", name);
 
 	unsigned len = strlen(name);
+	printk("[DEBUG] *real* name len: %u\n", len);
 	fipc_marshal(len);
 	for (unsigned i = 0; i < len; ++i) {
 		fipc_marshal(name[i]);
@@ -925,6 +929,7 @@ int handle_rpc_calls(struct fipc_message* received) {
 		break;
 	}
 
+	fipc_pack(received, rpc, message);
 	LIBLCD_MSG("Finished dispatching LCD message");
 
 	return 0;

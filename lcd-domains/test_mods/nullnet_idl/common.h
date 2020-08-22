@@ -1,6 +1,8 @@
 #ifndef _COMMON_H_
 #define _COMMON_H_
 
+#include <asm/pgtable_types.h>
+#include <asm/cacheflush.h>
 #include <linux/types.h>
 #include <linux/hashtable.h>
 #include <libfipc.h>
@@ -21,7 +23,7 @@
 #define fipc_unmarshal(type) (type)*(message->end_slot++)
 #define fipc_create_shadow(remote) fipc_create_shadow_impl(remote, sizeof(*remote))
 
-#define inject_trampoline(id, pointer) inject_trampoline_impl(LCD_DUP_TRAMPOLINE(trampoline##id), pointer)
+#define inject_trampoline(id, pointer) inject_trampoline_impl(LCD_DUP_TRAMPOLINE(trampoline##id), pointer, LCD_TRAMPOLINE_SIZE(trampoline##id))
 
 struct ptr_node {
 	void* ptr;
@@ -99,7 +101,7 @@ static inline void fipc_destroy_shadow(void* remote) {
 		LIBLCD_MSG("POI #1 ended");
 	}
 
-	printk("[DEBUG] local_node: %p, remotes: %p, locals: %p", local_node, remotes, locals);
+	printk("[DEBUG] local_node: %p, remotes: %p, locals: %p\n", local_node, remotes, locals);
 
 	void* local = local_node->ptr;
 	hash_for_each_possible(remotes, remote_node, hentry, (unsigned long)local) {
@@ -159,62 +161,82 @@ struct rpc_message {
 	uint64_t slots[MAX_MESSAGE_SLOTS];
 };
 
-static inline void* inject_trampoline_impl(struct lcd_trampoline_handle* handle, void* impl) {
+static inline void* inject_trampoline_impl(struct lcd_trampoline_handle* handle, void* impl, size_t size) {
 	LIBLCD_MSG("Injecting trampoline");
-	printk("[DEBUG] using remote pointer %p", impl);
-
+	printk("[DEBUG] using remote pointer %p\n", impl);
+	printk("[DEBUG] returning trampoline at %p\n", handle->trampoline);
 	handle->hidden_args = impl;
-	return handle->trampoline;
+	int ret = set_memory_x(((unsigned long)handle) & PAGE_MASK, ALIGN(size, PAGE_SIZE) >> PAGE_SHIFT);
+	printk("[DEBUG] set_memory_x(%p, %d) (size: %zu) = %d\n", handle, (int)(ALIGN(size, PAGE_SIZE) >> PAGE_SHIFT), size, ret);
+	return LCD_HANDLE_TO_TRAMPOLINE(handle);
 }
 
-static inline void fipc_send(enum dispatch_id rpc, struct rpc_message* msg) {
-	LIBLCD_MSG("Started sending RPC");
+static inline void fipc_pack(struct fipc_message* fmsg, enum dispatch_id rpc, struct rpc_message* msg)
+{
+	LIBLCD_MSG("Started packing message");
 
 	unsigned slots_used = msg->end_slot - msg->slots;
-	struct fipc_message fmsg;
-	fmsg.vmfunc_id = VMFUNC_RPC_CALL;
-	fmsg.rpc_id = rpc | (slots_used << 16);
+	printk("[DEBUG] Using %u slots\n", slots_used);
+	fmsg->vmfunc_id = VMFUNC_RPC_CALL;
+	fmsg->rpc_id = rpc | (slots_used << 16);
 
 	unsigned fast_slots = min(slots_used, (unsigned)(FIPC_NR_REGS));
 	unsigned slow_slots = min(slots_used - (unsigned)(FIPC_NR_REGS), 0u);
+	printk("[DEBUG] Reserved %u fast_slots, %u slow_slots\n", fast_slots, slow_slots);
 
 	for (unsigned i = 0; i < fast_slots; ++i) {
-		fmsg.regs[i] = msg->slots[i];
+		fmsg->regs[i] = msg->slots[i];
+		printk("[DEBUG] Packing slot %u (%llx)\n", i, msg->slots[i]);
 	}
 
 	if (slow_slots) {
 		struct ext_registers* ext = get_register_page(smp_processor_id());
 		for (unsigned i = 0; i < slow_slots; ++i) {
 			ext->regs[i] = msg->slots[i + FIPC_NR_REGS];
+			printk("[DEBUG] Packing slow slot %u (%llx)\n", i + FIPC_NR_REGS, msg->slots[i + FIPC_NR_REGS]);
 		}
 	}
 
-	vmfunc_wrapper(&fmsg);
-
-	LIBLCD_MSG("Finished sending RPC");
+	LIBLCD_MSG("Finished packing message");
 }
 
 static inline void fipc_translate(struct fipc_message* msg, enum dispatch_id* rpc, struct rpc_message* pckt) {
 	LIBLCD_MSG("Started translating message");
 
 	unsigned slots_used = msg->rpc_id >> 16;
+	pckt->end_slot = pckt->slots;
 	*rpc = msg->rpc_id & 0xFFFF;
+	printk("[DEBUG] Received %u slots\n", slots_used);
 
 	unsigned fast_slots = min(slots_used, (unsigned)(FIPC_NR_REGS));
 	unsigned slow_slots = min(slots_used - (unsigned)(FIPC_NR_REGS), 0u);
+	printk("[DEBUG] Received %u fast_slots, %u slow_slots\n", fast_slots, slow_slots);
 
 	for (unsigned i = 0; i < fast_slots; ++i) {
 		pckt->slots[i] = msg->regs[i];
+		printk("[DEBUG] Unpacking slot %u (%lx)\n", i, msg->regs[i]);
 	}
 
 	if (slow_slots) {
 		struct ext_registers* ext = get_register_page(smp_processor_id());
 		for (unsigned i = 0; i < slow_slots; ++i) {
 			pckt->slots[i + FIPC_NR_REGS] = ext->regs[i];
+			printk("[DEBUG] Unpacking slot %u (%llx)\n", i + FIPC_NR_REGS, ext->regs[i]);
 		}
 	}
 
 	LIBLCD_MSG("Finished translating message");
+}
+
+static inline void fipc_send(enum dispatch_id rpc, struct rpc_message* msg) {
+	LIBLCD_MSG("Started sending RPC");
+	
+	struct fipc_message fmsg;
+	fipc_pack(&fmsg, rpc, msg);
+	vmfunc_wrapper(&fmsg);
+	fipc_translate(&fmsg, &rpc, msg);
+
+	LIBLCD_MSG("Finished sending RPC");
 }
 
 LCD_TRAMPOLINE_DATA(trampoline_int_1_kernel_nullnet_net_device_ndo_init)

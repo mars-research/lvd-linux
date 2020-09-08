@@ -1,0 +1,15 @@
+obj-m += lcd_test_mod_gen_nullnet_lcd.o
+lcd_test_mod_gen_nullnet_lcd-y += nullnet_lcd.o
+lcd_test_mod_gen_nullnet_lcd-y += ../common.o
+lcd_test_mod_gen_nullnet_lcd-y += $(LIBLCD)
+lcd_test_mod_gen_nullnet_lcd-y += dummy.o
+lcd_test_mod_gen_nullnet_lcd-y += main.o
+
+extra-y += trampolines.lds
+extra-y += ../../../liblcd_build/common/vmfunc.lds
+
+cppflags-y += $(ISOLATED_CFLAGS)
+ccflags-y += $(ISOLATED_CFLAGS) -std=gnu99 -Wno-error=declaration-after-statement -Wno-error=discarded-qualifiers
+
+ldflags-y += -T $(LCD_TEST_MODULES_BUILD_DIR)/gen_nullnet/lcd/trampolines.lds
+ldflags-y += -T $(LIBLCD_BUILD_DIR)/common/vmfunc.lds

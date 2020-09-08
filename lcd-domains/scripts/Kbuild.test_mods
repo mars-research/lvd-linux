@@ -39,4 +39,4 @@ obj-m += coretemp_hwmon_vmfunc/
 #obj-m += skx_edac_vmfunc/
 obj-m += mei_me_vmfunc/
 # obj-m += shpchp_vmfunc/
-obj-m += nullnet_idl/
+obj-m += gen_nullnet/

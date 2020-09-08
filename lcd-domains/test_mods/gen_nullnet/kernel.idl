@@ -1,0 +1,185 @@
+// Note that we do not presently support void*
+
+module kernel_nullnet {
+	import <linux/etherdevice.h>
+	import <net/rtnetlink.h>
+	import <asm/lcd_domains/libvmfunc.h>
+
+	rpc void rtnl_lock();
+	rpc void rtnl_unlock();
+
+	projection <struct rtnl_link_stats64> rtnl_link_stats64_ndo_get_stats64 {
+		unsigned int tx_bytes;
+		unsigned int tx_packets;
+	}
+
+	projection <struct pcpu_dstats> pcpu_dstats { }
+
+	projection <struct net_device> net_device_ndo_init {
+		projection pcpu_dstats * dstats;
+	}
+
+	projection <struct net_device> net_device_ndo_uninit {
+		projection pcpu_dstats * dstats;
+	}
+
+	projection <struct sk_buff> sk_buff_ndo_start_xmit {
+		int len;
+	}
+
+	projection <struct TODO_CUSTOM_MARSHALING> void_ptr {}
+
+	projection <struct sockaddr_placeholder> sockaddr {
+		unsigned short sa_family;
+		char sa_data_0;
+		char sa_data_1;
+		char sa_data_2;
+		char sa_data_3;
+		char sa_data_4;
+		char sa_data_5;
+		char sa_data_6;
+		char sa_data_7;
+		char sa_data_8;
+		char sa_data_9;
+		char sa_data_10;
+		char sa_data_11;
+		char sa_data_12;
+		char sa_data_13;
+	}
+
+	projection <struct net_device> net_device_ndo_validate_addr {
+		projection sockaddr* dev_addr; // byte array, not supported
+	}
+
+	projection <struct net_device> net_device_ndo_get_stats64 {
+		projection pcpu_dstats * dstats;
+	}
+
+	projection <struct rtnl_link_stats64> rtnl_link_stats64 { }
+	projection <struct net_device> net_device_stats { }
+	projection <struct net_device> net_device_ndo_set_rx_mode { }
+	projection <struct net_device> net_device_ndo_set_mac_address { }
+	projection <struct net_device> net_device_ndo_change_carrier { }
+
+	projection <struct net_device_ops> net_device_ops {
+		rpc int (*ndo_init) (projection net_device_ndo_init * dev);
+		rpc void (*ndo_uninit) (projection net_device_ndo_uninit* dev);
+		rpc int (*ndo_start_xmit)(projection sk_buff_ndo_start_xmit* skb, projection net_device_stats* dev);
+		rpc int (*ndo_validate_addr)(projection net_device_ndo_validate_addr* dev); // unuspported
+
+		rpc projection rtnl_link_stats64* (*ndo_get_stats64)
+											(projection net_device_ndo_get_stats64* dev,
+											 projection rtnl_link_stats64_ndo_get_stats64* storage);
+
+		rpc void (*ndo_set_rx_mode)(projection net_device_ndo_set_rx_mode* dev);
+		rpc int (*ndo_set_mac_address)(projection net_device_ndo_set_mac_address* dev, projection sockaddr* addr);
+		rpc int (*ndo_change_carrier)(projection net_device_ndo_change_carrier* dev, bool new_carrier);
+	}
+
+
+	projection <struct ethtool_drvinfo> ethtool_drvinfo_get_drvinfo { }
+
+	projection <struct net_device> net_device_get_drvinfo { }
+
+	projection <struct ethtool_ops> ethtool_ops {
+		rpc void (*get_drvinfo)(projection net_device_get_drvinfo * dev,
+										projection ethtool_drvinfo_get_drvinfo * info);
+	}
+
+	projection <struct net_device> net_device_destructor { }
+
+	projection <struct net_device> net_device_setup {
+			unsigned int flags;
+			unsigned int priv_flags;
+			unsigned long long features;
+			unsigned long long hw_features;
+			unsigned long long hw_enc_features;
+			projection net_device_ops[alloc(caller)] * netdev_ops;
+			projection ethtool_ops[alloc(caller)] * ethtool_ops;
+			rpc[out] void (*destructor)(projection net_device_destructor* dev);
+	}
+
+	projection <struct nlattr> nlattr { }
+
+	projection <struct nlattr> nlattr_validate { }
+
+	projection <struct rtnl_link_ops> rtnl_link_ops___rtnl_link_register {
+			rpc void (*setup)(projection net_device_setup * dev);
+			// Unsupported at this time, semantics unknown
+			rpc int (*validate)(projection void_ptr* tb, projection void_ptr* data);
+	}
+
+	projection <struct net_device> net_device_alloc_netdev_mqs { }
+
+	projection <struct rtnl_link_ops> rtnl_link_ops_rtnl_link_unregister { }
+
+	projection <struct rtnl_link_ops> rtnl_link_ops___rtnl_link_unregister { }
+
+	projection <struct net_device> net_device_register_netdevice {
+			unsigned int flags;
+			unsigned int priv_flags;
+			unsigned long long features;
+			unsigned long long hw_features;
+			unsigned long long hw_enc_features;
+			int reg_state;
+	}
+
+	projection <struct sk_buff> sk_buff_consume_skb {
+		// for consume_skb we don't need anything to be passed
+	}
+
+	projection <struct net_device> net_device_netif_carrier_off { }
+
+	projection <struct net_device> net_device_netif_carrier_on { }
+
+	projection <struct net_device> net_device_ether_setup { }
+
+	projection <struct net_device> net_device_eth_mac_addr { }
+
+	projection <struct net_device> net_device_eth_validate_addr { }
+
+	projection <struct net_device> net_device_free_netdev { }
+
+	// free_netdev frees the shadow copy
+	rpc void free_netdev(projection net_device_free_netdev
+								[dealloc(caller)] * dev);
+
+	rpc int eth_validate_addr(projection net_device_eth_validate_addr* dev);
+
+	rpc int eth_mac_addr(projection net_device_eth_mac_addr* dev, projection sockaddr* p); // emulate void* with char*
+
+	rpc void ether_setup(projection net_device_ether_setup* dev);
+
+	rpc int register_netdevice(projection net_device_register_netdevice* dev);
+
+	rpc void netif_carrier_off(projection net_device_netif_carrier_off* dev);
+
+
+	// Driver passes a pointer to the ops. Create a shadow copy on the callee
+	rpc int __rtnl_link_register(projection
+						rtnl_link_ops___rtnl_link_register[alloc(callee)] * ops);
+
+	// Deallocate the allocated rtnl_link_ops at the callee
+	rpc void __rtnl_link_unregister(projection
+						rtnl_link_ops___rtnl_link_unregister[dealloc(callee)] * ops);
+
+	// Deallocate the allocated rtnl_link_ops at the callee
+	rpc void rtnl_link_unregister(projection
+						rtnl_link_ops_rtnl_link_unregister[dealloc(callee)] * ops);
+
+	// Kernel allocates a piece of memory for us early in this function.  Before
+	// returning this object, kernel calls the _setup_ function provided by us
+	// and pass in a pointer to this newly created object.  When _setup_ is
+	// called, we need to create our shadow copy.
+	rpc projection net_device_alloc_netdev_mqs // implicit bind here
+				* alloc_netdev_mqs(
+					int sizeof_priv,
+					projection void_ptr *name, // this is problematic, atm
+					unsigned char name_assign_type,
+					rpc void (*setup)(projection net_device_setup[alloc(callee)] * dev),
+					unsigned int txqs, unsigned int rxqs);
+
+	 rpc void netif_carrier_on(projection net_device_netif_carrier_on* dev);
+
+	 rpc void consume_skb(projection sk_buff_consume_skb* skb);
+}

@@ -106,6 +106,6 @@ mei_me_vmfunc/mei_klcd nonisolated
 # shpchp_vmfunc/shpchp_lcd isolated
 # shpchp_vmfunc/pci_klcd nonisolated
 
-nullnet_idl/klcd nonisolated
-nullnet_idl/lcd isolated
-nullnet_idl/boot nonisolated
+gen_nullnet/klcd nonisolated
+gen_nullnet/lcd isolated
+gen_nullnet/boot nonisolated

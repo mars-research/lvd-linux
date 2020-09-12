@@ -148,7 +148,7 @@ module kernel_nullnet {
 
 	rpc int eth_mac_addr(projection net_device_eth_mac_addr* dev, projection sockaddr* p); // emulate void* with char*
 
-	rpc void ether_setup(projection net_device_ether_setup* dev);
+	rpc void ether_setup(projection net_device_ether_setup [bind(caller)]* dev);
 
 	rpc int register_netdevice(projection net_device_register_netdevice* dev);
 

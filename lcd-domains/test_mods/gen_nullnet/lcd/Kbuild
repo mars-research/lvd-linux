@@ -1,9 +1,9 @@
 obj-m += lcd_test_mod_gen_nullnet_lcd.o
 lcd_test_mod_gen_nullnet_lcd-y += nullnet_lcd.o
-lcd_test_mod_gen_nullnet_lcd-y += ../common.o
+lcd_test_mod_gen_nullnet_lcd-y += common.o
 lcd_test_mod_gen_nullnet_lcd-y += $(LIBLCD)
-lcd_test_mod_gen_nullnet_lcd-y += dummy.o
 lcd_test_mod_gen_nullnet_lcd-y += main.o
+lcd_test_mod_gen_nullnet_lcd-y += dummy.o
 
 extra-y += trampolines.lds
 extra-y += ../../../liblcd_build/common/vmfunc.lds

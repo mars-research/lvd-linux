@@ -86,7 +86,8 @@ void ether_setup(struct net_device* dev) {
 	struct rpc_message message_buffer = {0};
 	message_buffer.end_slot = message_buffer.slots;
 	struct rpc_message* message = &message_buffer;
-	fipc_marshal(dev);
+	struct net_device* dev_key = fipc_get_remote(dev);
+	fipc_marshal(dev_key);
 	if (dev) {
 	}
 	fipc_send_to_klcd(RPC_ETHER_SETUP, message);

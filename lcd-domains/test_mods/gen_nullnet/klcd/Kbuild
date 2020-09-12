@@ -1,6 +1,6 @@
 obj-m += lcd_test_mod_gen_nullnet_klcd.o
 lcd_test_mod_gen_nullnet_klcd-y += nullnet_klcd.o
-lcd_test_mod_gen_nullnet_klcd-y += ../common.o
+lcd_test_mod_gen_nullnet_klcd-y += common.o
 lcd_test_mod_gen_nullnet_klcd-y += main.o
 
 extra-y += trampolines.lds

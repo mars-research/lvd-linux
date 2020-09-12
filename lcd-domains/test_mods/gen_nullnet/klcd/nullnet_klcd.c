@@ -66,8 +66,8 @@ void eth_mac_addr_callee(struct rpc_message* message) {
 }
 
 void ether_setup_callee(struct rpc_message* message) {
-	struct net_device* dev_key = fipc_unmarshal(struct net_device*);
-	struct net_device* dev = fipc_get_local(dev_key);
+	LIBLCD_MSG("Entered ether_setup_callee");
+	struct net_device* dev = fipc_unmarshal(struct net_device*);
 	if (dev) {
 	}
 	ether_setup(dev);
@@ -106,43 +106,22 @@ void netif_carrier_off_callee(struct rpc_message* message) {
 }
 
 void __rtnl_link_register_callee(struct rpc_message* message) {
-	LIBLCD_MSG("#1");
 	struct rtnl_link_ops* ops_key = fipc_unmarshal(struct rtnl_link_ops*);
-	LIBLCD_MSG("#2");
 	struct rtnl_link_ops* ops = fipc_create_shadow(ops_key);
-	LIBLCD_MSG("#3");
 	if (ops) {
-		LIBLCD_MSG("#4");
 		void (*ops_setup)(struct net_device* dev) = fipc_unmarshal(void*);
-		LIBLCD_MSG("#5");
 		void (*ops_setup_trampoline)(struct net_device* dev) = inject_trampoline(_void_1_kernel_nullnet_net_device_setup, ops_setup);
-		LIBLCD_MSG("#6");
 		ops->setup = ops_setup_trampoline;
-		LIBLCD_MSG("#7");
 		int (*ops_validate)(struct nlattr** tb, struct nlattr** data) = fipc_unmarshal(void*);
-		LIBLCD_MSG("#8");
 		int (*ops_validate_trampoline)(struct nlattr** tb, struct nlattr** data) = inject_trampoline(_int_1_kernel_nullnet_void_ptr_1_kernel_nullnet_void_ptr, ops_validate);
-		LIBLCD_MSG("#9");
 		ops->validate = ops_validate_trampoline;
-		LIBLCD_MSG("#10");
-
-		// CUSTOM
 		ops->kind = "dummy";
-		LIBLCD_MSG("#11");
 	}
-	LIBLCD_MSG("#12");
 	int return_value = __rtnl_link_register(ops);
-	LIBLCD_MSG("#13");
-	printk("[DEBUG] rtnl register return value was: %d", return_value);
-	LIBLCD_MSG("#14");
 	message->end_slot = message->slots;
-	LIBLCD_MSG("#15");
 	if (ops) {
-		LIBLCD_MSG("#16");
 	}
-	LIBLCD_MSG("#17");
 	fipc_marshal(return_value);
-	LIBLCD_MSG("#18");
 }
 
 void __rtnl_link_unregister_callee(struct rpc_message* message) {

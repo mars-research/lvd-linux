@@ -2497,7 +2497,182 @@ int netif_receive_skb(struct sk_buff *skb)
 	return func_ret;
 }
 
-#ifndef LOCAL_SKB
+#ifdef LOCAL_SKB
+#ifdef CONFIG_SKB_COPY
+gro_result_t napi_gro_receive(struct napi_struct *napi,
+		struct sk_buff *skb)
+{
+	struct fipc_message r;
+	struct fipc_message *_request = &r;
+	int func_ret = 0;
+	struct skb_shared_info *shinfo;
+	struct page *p = NULL;
+	struct napi_struct_container *napi_container;
+	struct ext_registers *ext_regs = get_register_page(smp_processor_id());
+	u64 *regs = &ext_regs->regs[0];
+	u32 i = 0;
+
+	INIT_IPC_MSG(&r);
+	napi_container = container_of(napi, struct napi_struct_container, napi_struct);
+
+	shinfo = skb_shinfo(skb);
+
+	async_msg_set_fn_type(_request, NAPI_GRO_RECEIVE);
+
+	fipc_set_reg0(_request, shinfo->nr_frags);
+	fipc_set_reg1(_request, napi_container->other_ref.cptr);
+	fipc_set_reg2(_request, skb->protocol);
+	fipc_set_reg3(_request, skb->truesize);
+
+	SET_EREG(l4_hash);
+	SET_EREG(sw_hash);
+	SET_EREG(hash);
+	SET_EREG(queue_mapping);
+	SET_EREG(csum_level);
+	SET_EREG(ip_summed);
+	SET_EREG(len);
+	SET_EREG(data_len);
+
+
+	if (shinfo->nr_frags) {
+		skb_frag_t *frag = &shinfo->frags[0];
+		/* 
+		 * Earlier, the headers are copied to skb->data and the
+		 * pointers are adjusted accordingly in ixgbe_skb_pull_tail. We
+		 * do not need to do the same on the kernel side.
+		 */
+		u32 payload_sz = frag->size + skb->tail;
+		fipc_set_reg4(_request, payload_sz);
+		memcpy(&regs[i], lcd_page_address(skb_frag_page(frag)) + frag->page_offset - skb->tail,
+					payload_sz);
+	}
+
+	//printk("%s, skb->tail %d | napi_c %lx", __func__, skb->tail, napi_container->other_ref.cptr);
+
+	if (0)
+	print_hex_dump(KERN_DEBUG, "Frame contents: ",
+			       DUMP_PREFIX_OFFSET, 16, 1,
+			       skb->data, skb->len, false);
+
+	vmfunc_wrapper(_request);
+
+	func_ret = fipc_get_reg0(_request);
+
+	kmem_cache_free(skb_cache, skb);
+
+	/* simulate the effect of put_page called by kfree_skb
+	 * a page_ref_inc is done by the driver to make sure that
+	 * this page is not freed and reused again
+	 */
+	if (p)
+		page_ref_dec(p);
+
+	return func_ret;
+}
+#else
+gro_result_t napi_gro_receive(struct napi_struct *napi,
+		struct sk_buff *skb)
+{
+	struct fipc_message r;
+	struct fipc_message *_request = &r;
+	int func_ret = 0;
+	struct skb_shared_info *shinfo;
+	struct page *p = NULL;
+	u64 hash;
+	struct napi_struct_container *napi_container;
+
+	INIT_IPC_MSG(&r);
+	napi_container = container_of(napi, struct napi_struct_container, napi_struct);
+
+	shinfo = skb_shinfo(skb);
+
+	async_msg_set_fn_type(_request, NAPI_GRO_RECEIVE);
+
+	fipc_set_reg0(_request, shinfo->nr_frags | (skb->tail << 8));
+
+	if (shinfo->nr_frags) {
+		skb_frag_t *frag = &shinfo->frags[0];
+		u64 frag_sz = frag->size;
+		fipc_set_reg1(_request,	gpa_val(lcd_gva2gpa(
+			__gva(
+			(unsigned long)lcd_page_address(
+				skb_frag_page(frag))))));
+		p = skb_frag_page(frag);
+		fipc_set_reg3(_request, frag->page_offset |
+				(frag_sz << 32));
+	}
+	fipc_set_reg2(_request, skb->protocol |
+			(napi_container->other_ref.cptr << 16));
+	hash = skb->l4_hash | skb->sw_hash << 1;
+	fipc_set_reg4(_request, skb->hash |
+			(hash << 32));
+	fipc_set_reg5(_request, skb->truesize);
+	fipc_set_reg6(_request, skb->queue_mapping |
+			(skb->csum_level << 16) |
+			(skb->ip_summed << 18));
+
+	//printk("%s, skb->tail %d | napi_c %lx", __func__, skb->tail, napi_container->other_ref.cptr);
+
+	if (0)
+	print_hex_dump(KERN_DEBUG, "Frame contents: ",
+			       DUMP_PREFIX_OFFSET, 16, 1,
+			       skb->data, skb->len, false);
+
+	vmfunc_wrapper(_request);
+
+	func_ret = fipc_get_reg1(_request);
+
+	kmem_cache_free(skb_cache, skb);
+
+	/* simulate the effect of put_page called by kfree_skb
+	 * a page_ref_inc is done by the driver to make sure that
+	 * this page is not freed and reused again
+	 */
+	if (p)
+		page_ref_dec(p);
+
+	return func_ret;
+}
+#endif		/* COPY_SKB_DATA */
+
+struct sk_buff *__napi_alloc_skb(struct napi_struct *napi,
+			unsigned int len,
+			gfp_t gfp)
+{
+	struct sk_buff *skb;
+	unsigned int size = SKB_ALLOC_SIZE;
+	void *data;
+	struct skb_shared_info *shinfo;
+
+	skb = kmem_cache_alloc(skb_cache, gfp);	
+
+	memset(skb, 0x0, SKB_ALLOC_SIZE);
+
+	if (!skb) {
+		LIBLCD_ERR("%s: alloc failed", __func__);
+		goto out;
+	}
+	data = ((char*)skb + sizeof(struct sk_buff));
+
+	size -= SKB_DATA_ALIGN(sizeof(struct skb_shared_info));
+
+	//memset(skb, 0, offsetof(struct sk_buff, tail));
+	skb->truesize = SKB_TRUESIZE(size);
+	skb->head = data;
+	skb->data = data;
+	skb_reset_tail_pointer(skb);
+	skb->end = skb->tail + size;
+	skb->mac_header = (typeof(skb->mac_header))~0U;
+	skb->transport_header = (typeof(skb->transport_header))~0U;
+
+	/* make sure we initialize shinfo sequentially */
+	shinfo = skb_shinfo(skb);
+	memset(shinfo, 0, offsetof(struct skb_shared_info, dataref));
+	//printk("%s, alloc local skb for rx", __func__);
+out:
+	return skb;
+}
+#else
 gro_result_t napi_gro_receive(struct napi_struct *napi,
 		struct sk_buff *skb)
 {
@@ -2654,110 +2829,6 @@ struct sk_buff *__napi_alloc_skb(struct napi_struct *napi,
 	skb_c->skb_cptr = skb_cptr;
 	skb_c->skbh_cptr = skbd_cptr;
 
-	return skb;
-}
-
-#else
-
-gro_result_t napi_gro_receive(struct napi_struct *napi,
-		struct sk_buff *skb)
-{
-	struct fipc_message r;
-	struct fipc_message *_request = &r;
-	int func_ret = 0;
-	struct skb_shared_info *shinfo;
-	struct page *p = NULL;
-	u64 hash;
-	struct napi_struct_container *napi_container;
-
-	INIT_IPC_MSG(&r);
-	napi_container = container_of(napi, struct napi_struct_container, napi_struct);
-
-	shinfo = skb_shinfo(skb);
-
-	async_msg_set_fn_type(_request, NAPI_GRO_RECEIVE);
-
-	fipc_set_reg0(_request, shinfo->nr_frags | (skb->tail << 8));
-
-	if (shinfo->nr_frags) {
-		skb_frag_t *frag = &shinfo->frags[0];
-		u64 frag_sz = frag->size;
-		fipc_set_reg1(_request,	gpa_val(lcd_gva2gpa(
-			__gva(
-			(unsigned long)lcd_page_address(
-				skb_frag_page(frag))))));
-		p = skb_frag_page(frag);
-		fipc_set_reg3(_request, frag->page_offset |
-				(frag_sz << 32));
-	}
-	fipc_set_reg2(_request, skb->protocol |
-			(napi_container->other_ref.cptr << 16));
-	hash = skb->l4_hash | skb->sw_hash << 1;
-	fipc_set_reg4(_request, skb->hash |
-			(hash << 32));
-	fipc_set_reg5(_request, skb->truesize);
-	fipc_set_reg6(_request, skb->queue_mapping |
-			(skb->csum_level << 16) |
-			(skb->ip_summed << 18));
-
-	//printk("%s, skb->tail %d | napi_c %lx", __func__, skb->tail, napi_container->other_ref.cptr);
-
-	if (0)
-	print_hex_dump(KERN_DEBUG, "Frame contents: ",
-			       DUMP_PREFIX_OFFSET, 16, 1,
-			       skb->data, skb->len, false);
-
-	vmfunc_wrapper(_request);
-
-	func_ret = fipc_get_reg1(_request);
-
-	kmem_cache_free(skb_cache, skb);
-
-	/* simulate the effect of put_page called by kfree_skb
-	 * a page_ref_inc is done by the driver to make sure that
-	 * this page is not freed and reused again
-	 */
-	if (p)
-		page_ref_dec(p);
-
-	return func_ret;
-}
-
-struct sk_buff *__napi_alloc_skb(struct napi_struct *napi,
-			unsigned int len,
-			gfp_t gfp)
-{
-	struct sk_buff *skb;
-	unsigned int size = SKB_ALLOC_SIZE;
-	void *data;
-	struct skb_shared_info *shinfo;
-
-	skb = kmem_cache_alloc(skb_cache, gfp);	
-
-	memset(skb, 0x0, SKB_ALLOC_SIZE);
-
-	if (!skb) {
-		LIBLCD_ERR("%s: alloc failed", __func__);
-		goto out;
-	}
-	data = ((char*)skb + sizeof(struct sk_buff));
-
-	size -= SKB_DATA_ALIGN(sizeof(struct skb_shared_info));
-
-	//memset(skb, 0, offsetof(struct sk_buff, tail));
-	skb->truesize = SKB_TRUESIZE(size);
-	skb->head = data;
-	skb->data = data;
-	skb_reset_tail_pointer(skb);
-	skb->end = skb->tail + size;
-	skb->mac_header = (typeof(skb->mac_header))~0U;
-	skb->transport_header = (typeof(skb->transport_header))~0U;
-
-	/* make sure we initialize shinfo sequentially */
-	shinfo = skb_shinfo(skb);
-	memset(shinfo, 0, offsetof(struct skb_shared_info, dataref));
-	//printk("%s, alloc local skb for rx", __func__);
-out:
 	return skb;
 }
 #endif

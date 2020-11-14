@@ -3413,7 +3413,7 @@ irqreturn_t msix_vector_handler(int irq, void *data)
 
 #ifdef CONFIG_LCD_TRACE_BUFFER
 	//if (napi_idx != NUM_HW_QUEUES)
-		__add_trace_entry(EVENT_MSIX_HANDLER, async_msg_get_fn_type(_request), irq, napi_idx, irqhandler_container->other_ref.cptr);
+		//__add_trace_entry(EVENT_MSIX_HANDLER, async_msg_get_fn_type(_request), irq, napi_idx, irqhandler_container->other_ref.cptr);
 #endif
 
 	vmfunc_klcd_wrapper(_request, 1);
@@ -3718,99 +3718,7 @@ int netif_receive_skb_callee(struct fipc_message *_request)
 
 extern struct lcd *iommu_lcd;
 
-#ifndef LOCAL_SKB
-int napi_gro_receive_callee(struct fipc_message *_request)
-{
-	struct napi_struct *napi;
-	struct sk_buff *skb;
-	struct sk_buff_container *skb_c;
-	struct napi_struct_container *napi_container = NULL;
-	int ret = 0;
-	int func_ret;
-	cptr_t skb_ref;
-	cptr_t skb_cptr, skbh_cptr;
-	unsigned 	long page = 0ul;
-	struct lcd *lcd_struct;
-	hva_t hva_out;
-	struct skb_shared_info *shinfo;
-	struct page *p = NULL;
-	unsigned int old_pcount;
-
-	skb_ref = __cptr(fipc_get_reg0(_request));
-
-	glue_lookup_napi_hash(__cptr(fipc_get_reg1(_request)),
-						&napi_container);
-	napi = napi_container->napi;
-
-	page = fipc_get_reg2(_request);
-
-	napi = &napi_container->napi_struct;
-
-	glue_lookup_skbuff(cptr_table, skb_ref, &skb_c);
-
-	skb = skb_c->skb;
-	skb->head = skb_c->head;
-	skb->data = skb_c->data;
-	skb_cptr = skb_c->skb_cptr;
-	skbh_cptr = skb_c->skbh_cptr;
-
-	skb->dev = napi->dev;
-	shinfo = skb_shinfo(skb);
-
-	if (shinfo->nr_frags) {
-		skb_frag_t *frag = &shinfo->frags[0];
-
-		lcd_struct = iommu_lcd;
-
-		ret = lcd_arch_ept_gpa_to_hva_cpu(lcd_struct->lcd_arch,
-			__gpa(page), &hva_out, smp_processor_id());
-		if (ret) {
-			LIBLCD_WARN("getting gpa:hpa mapping %p:%llx",
-				(void*)page, hva_val(hva_out));
-			ret = 0;
-			goto skip;
-		}
-
-		/* set frag page */
-		p = frag->page.p = virt_to_page(hva_val(hva_out));
-		old_pcount = page_count(skb_frag_page(frag));
-
-		set_page_count(skb_frag_page(frag), 2);
-
-		if (0)
-		printk("%s, Frag #%d | page %p | refc %d\n", __func__,
-				shinfo->nr_frags,
-				frag->page.p,
-				page_count(frag->page.p));
-	}
-skip:
-	post_recv = true;
-
-	//skb_pull_inline(skb, ETH_HLEN);
-	skb->data += ETH_HLEN;
-
-	func_ret = napi_gro_receive(napi, skb);
-
-	if (p)
-		set_page_count(p, 1);
-
-	if (skb_c->tsk == current) {
-		lcd_cap_revoke(skb_cptr);
-		lcd_cap_revoke(skbh_cptr);
-		lcd_unvolunteer_pages(skb_cptr);
-		lcd_unvolunteer_pages(skbh_cptr);
-	}
-
-	glue_remove_skbuff(skb_c);
-	kfree(skb_c);
-
-	fipc_set_reg1(_request, func_ret);
-
-fail_lookup:
-	return ret;
-}
-
-#else
+#ifdef LOCAL_SKB
 void ixgbe_pull_tail(struct sk_buff *skb)
 {
 	struct skb_frag_struct *frag = &skb_shinfo(skb)->frags[0];
@@ -3844,6 +3752,78 @@ void ixgbe_pull_tail(struct sk_buff *skb)
 	skb->tail += pull_len;
 }
 
+#ifdef CONFIG_SKB_COPY
+int napi_gro_receive_callee(struct fipc_message *_request)
+{
+	struct napi_struct *napi;
+	struct napi_struct_container *napi_container = NULL;
+	struct sk_buff *skb;
+	int ret = 0;
+	int func_ret = 0;
+	unsigned char nr_frags;
+	cptr_t napi_struct_ref;
+	u32 frag_sz = 0;
+
+	struct ext_registers *ext_regs = get_register_page(smp_processor_id());
+	u64 *regs = &ext_regs->regs[0];
+	u32 i = 0;
+
+	nr_frags = fipc_get_reg0(_request);
+	napi_struct_ref = __cptr(fipc_get_reg1(_request));
+
+	/* lookup napi struct to alloc skb */
+	glue_lookup_napi_hash(napi_struct_ref, &napi_container);
+
+	if (!napi_container) {
+		printk("%s, couldn't retrieve napi_container for cptr: %lx\n", __func__,
+					napi_struct_ref.cptr);
+		goto skip;
+	}
+
+	napi = napi_container->napi;
+
+	WARN_ON(nr_frags > 1);
+
+	if (nr_frags > 0) {
+		frag_sz = fipc_get_reg4(_request);
+	}
+
+#define IXGBE_HDR_SIZE	256
+
+	skb = napi_alloc_skb(napi, IXGBE_HDR_SIZE + frag_sz);
+
+	skb->protocol = fipc_get_reg2(_request);
+	skb->truesize = fipc_get_reg3(_request);
+
+	skb->dev = napi->dev;
+
+	GET_EREG(l4_hash);
+	GET_EREG(sw_hash);
+	GET_EREG(hash);
+	GET_EREG(queue_mapping);
+	GET_EREG(csum_level);
+	GET_EREG(ip_summed);
+	GET_EREG(len);
+	GET_EREG(data_len);
+
+	if (nr_frags) {
+		memcpy(skb->data, &regs[i], frag_sz);
+	}
+
+	eth_skb_pad(skb);
+
+	skb->napi_id = napi->napi_id;
+
+	skb_pull_inline(skb, ETH_HLEN);
+
+	func_ret = napi_gro_receive(napi, skb);
+
+	fipc_set_reg0(_request, func_ret);
+
+skip:
+	return ret;
+}
+#else
 int napi_gro_receive_callee(struct fipc_message *_request)
 {
 	struct napi_struct *napi;
@@ -3974,6 +3954,99 @@ int napi_gro_receive_callee(struct fipc_message *_request)
 skip:
 	//printk("%s, returned %d\n", __func__, ret);
 	fipc_set_reg1(_request, func_ret);
+	return ret;
+}
+#endif		/* COPY_SKB_DATA */
+
+#else
+int napi_gro_receive_callee(struct fipc_message *_request)
+{
+	struct napi_struct *napi;
+	struct sk_buff *skb;
+	struct sk_buff_container *skb_c;
+	struct napi_struct_container *napi_container = NULL;
+	int ret = 0;
+	int func_ret;
+	cptr_t skb_ref;
+	cptr_t skb_cptr, skbh_cptr;
+	unsigned 	long page = 0ul;
+	struct lcd *lcd_struct;
+	hva_t hva_out;
+	struct skb_shared_info *shinfo;
+	struct page *p = NULL;
+	unsigned int old_pcount;
+
+	skb_ref = __cptr(fipc_get_reg0(_request));
+
+	glue_lookup_napi_hash(__cptr(fipc_get_reg1(_request)),
+						&napi_container);
+	napi = napi_container->napi;
+
+	page = fipc_get_reg2(_request);
+
+	napi = &napi_container->napi_struct;
+
+	glue_lookup_skbuff(cptr_table, skb_ref, &skb_c);
+
+	skb = skb_c->skb;
+	skb->head = skb_c->head;
+	skb->data = skb_c->data;
+	skb_cptr = skb_c->skb_cptr;
+	skbh_cptr = skb_c->skbh_cptr;
+
+	skb->dev = napi->dev;
+	shinfo = skb_shinfo(skb);
+
+	if (shinfo->nr_frags) {
+		skb_frag_t *frag = &shinfo->frags[0];
+
+		lcd_struct = iommu_lcd;
+
+		ret = lcd_arch_ept_gpa_to_hva_cpu(lcd_struct->lcd_arch,
+			__gpa(page), &hva_out, smp_processor_id());
+		if (ret) {
+			LIBLCD_WARN("getting gpa:hpa mapping %p:%llx",
+				(void*)page, hva_val(hva_out));
+			ret = 0;
+			goto skip;
+		}
+
+		/* set frag page */
+		p = frag->page.p = virt_to_page(hva_val(hva_out));
+		old_pcount = page_count(skb_frag_page(frag));
+
+		set_page_count(skb_frag_page(frag), 2);
+
+		if (0)
+		printk("%s, Frag #%d | page %p | refc %d\n", __func__,
+				shinfo->nr_frags,
+				frag->page.p,
+				page_count(frag->page.p));
+	}
+skip:
+	post_recv = true;
+
+	//skb_pull_inline(skb, ETH_HLEN);
+	skb->data += ETH_HLEN;
+
+	func_ret = napi_gro_receive(napi, skb);
+
+	if (p)
+		set_page_count(p, 1);
+
+	if (skb_c->tsk == current) {
+		lcd_cap_revoke(skb_cptr);
+		lcd_cap_revoke(skbh_cptr);
+		lcd_unvolunteer_pages(skb_cptr);
+		lcd_unvolunteer_pages(skbh_cptr);
+	}
+
+	glue_remove_skbuff(skb_c);
+	kfree(skb_c);
+
+	fipc_set_reg1(_request, func_ret);
+
+fail_lookup:
 	return ret;
 }
 #endif

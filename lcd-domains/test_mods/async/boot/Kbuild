@@ -1,7 +1,0 @@
-
-obj-m += lcd_test_mod_async_boot.o
-
-lcd_test_mod_async_boot-y             += boot.o
-
-ccflags-$(LCD_CONFIG_ASYNC_BOOT_NONISOLATED) += $(NONISOLATED_CFLAGS)
-

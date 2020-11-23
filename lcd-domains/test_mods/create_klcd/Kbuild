@@ -1,3 +1,0 @@
-
-obj-$(LCD_CONFIG_BUILD_CREATE_KLCD_BOOT) += boot/
-obj-$(LCD_CONFIG_BUILD_CREATE_KLCD_KLCD) += klcd/

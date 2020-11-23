@@ -1,6 +1,0 @@
-
-obj-m += lcd_test_mod_ipc2_boot.o
-
-lcd_test_mod_ipc2_boot-y             += boot.o
-
-ccflags-y += $(NONISOLATED_CFLAGS)

@@ -1,7 +1,0 @@
-
-
-
-/* REGISTER_FILESYSTEM */
-
-
-rpc int register_filesystem(projection <struct file_system_type> *fs);

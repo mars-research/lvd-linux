@@ -1,9 +1,0 @@
-
-obj-m  += lcd_test_mod_bug_lcd.o
-
-lcd_test_mod_bug_lcd-y              += lcd.o
-
-lcd_test_mod_bug_lcd-y += $(LIBLCD)
-
-# Optimizations *must* be turned off or this example won't work.
-ccflags-y += $(ISOLATED_CFLAGS) -O0

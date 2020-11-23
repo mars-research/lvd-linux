@@ -1,4 +1,0 @@
-
-obj-$(LCD_CONFIG_BUILD_IPC2_BOOT) += boot/
-obj-$(LCD_CONFIG_BUILD_IPC2_LCD1) += lcd1/
-obj-$(LCD_CONFIG_BUILD_IPC2_LCD2) += lcd2/

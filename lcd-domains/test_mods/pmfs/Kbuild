@@ -1,5 +1,0 @@
-
-obj-$(LCD_CONFIG_BUILD_PMFS_BOOT)     += boot/
-obj-$(LCD_CONFIG_BUILD_PMFS_PMFS_LCD) += pmfs_lcd/
-obj-$(LCD_CONFIG_BUILD_PMFS_VFS_KLCD) += vfs_klcd/
-

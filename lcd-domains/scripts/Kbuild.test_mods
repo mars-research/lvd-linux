@@ -13,26 +13,11 @@ include $(LCD_TEST_MODULES_BUILD_DIR)/Kbuild.config
 # Examples
 
 obj-m += liblcd_test/
-obj-m += load/
-obj-m += ipc1/
-obj-m += ipc2/
-obj-m += async/
-obj-m += create_klcd/
-obj-m += glue_example/
-obj-m += string_example/
-#obj-m += pmfs/
-obj-m += bug/
-obj-m += async_rpc/
-obj-m += llvm_example/
-obj-m += ioremap/
-obj-m += ixgbe/
-obj-m += nullnet/
 obj-m += vmfunc/
 obj-m += vmfunc_klcd/
 obj-m += nullnet_vmfunc/
 obj-m += ixgbe_vmfunc/
 obj-m += nullb_vmfunc/
-obj-m += nvme_vmfunc/
 obj-m += nvme_core_vmfunc/
 obj-m += acpi_hwmon_vmfunc/
 obj-m += coretemp_hwmon_vmfunc/

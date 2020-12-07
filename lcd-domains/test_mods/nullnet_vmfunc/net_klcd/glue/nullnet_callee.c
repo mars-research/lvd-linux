@@ -265,7 +265,7 @@ int glue_nullnet_init(void)
 #endif
 
 	skb_c_cache = kmem_cache_create("skb_c_cache",
-				sizeof(struct sk_buff_container),
+				sizeof(struct sk_buff_container_hash),
 				0,
 				SLAB_HWCACHE_ALIGN|SLAB_PANIC,
 				NULL);

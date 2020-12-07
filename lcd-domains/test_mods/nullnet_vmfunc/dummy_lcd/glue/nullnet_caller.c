@@ -4,6 +4,7 @@
 #include <liblcd/liblcd.h>
 #include <liblcd/sync_ipc_poll.h>
 #include <liblcd/glue_cspace.h>
+#include <liblcd/skbuff.h>
 #include "../../glue_helper.h"
 #include "../nullnet_caller.h"
 
@@ -21,6 +22,7 @@ void *data_pool;
 uint64_t con_skb_sum = 0;
 struct kmem_cache *skb_c_cache;
 struct kmem_cache *skbuff_cache;
+struct kmem_cache *skb2_cache;
 
 extern bool tdiff_valid;
 extern u64 tdiff_disp;
@@ -32,6 +34,9 @@ extern u64 tdiff_disp;
 /* XXX: How to determine this? */
 #define CPTR_HASH_BITS      5
 
+#if defined(CONFIG_RUN_DUMMY_2)
+#define HASHING
+#endif
 
 static DEFINE_HASHTABLE(cptr_table, CPTR_HASH_BITS);
 
@@ -76,6 +81,17 @@ int glue_nullnet_init(void)
 				NULL);
 	if (!skbuff_cache)
 		printk("WARN: skbuff cache not created\n");
+
+	skb2_cache = kmem_cache_create("skb2_cache",
+				sizeof(struct sk_buff_container_2),
+				0,
+				SLAB_HWCACHE_ALIGN|SLAB_PANIC,
+				NULL);
+	if (!skb2_cache) {
+		LIBLCD_ERR("skb_container cache not created");
+		goto fail2;
+	}
+
 	return 0;
 fail2:
 	glue_cap_exit();
@@ -88,9 +104,12 @@ void glue_nullnet_exit()
 {
 	glue_cap_destroy(c_cspace);
 	glue_cap_exit();
+
+	if (skb2_cache)
+		kmem_cache_destroy(skb2_cache);
 }
 
-int glue_insert_skbuff(struct hlist_head *htable, struct sk_buff_container *skb_c)
+int glue_insert_skbuff(struct hlist_head *htable, struct sk_buff_container_hash *skb_c)
 {
         BUG_ON(!skb_c->skb);
 
@@ -100,9 +119,9 @@ int glue_insert_skbuff(struct hlist_head *htable, struct sk_buff_container *skb_
         return 0;
 }
 
-int glue_lookup_skbuff(struct hlist_head *htable, struct cptr c, struct sk_buff_container **skb_cout)
+int glue_lookup_skbuff(struct hlist_head *htable, struct cptr c, struct sk_buff_container_hash **skb_cout)
 {
-        struct sk_buff_container *skb_c;
+        struct sk_buff_container_hash *skb_c;
 
         hash_for_each_possible(cptr_table, skb_c, hentry, (unsigned long) cptr_val(c)) {
 		if (skb_c->skb == (struct sk_buff*) c.cptr) {
@@ -112,7 +131,7 @@ int glue_lookup_skbuff(struct hlist_head *htable, struct cptr c, struct sk_buff_
         return 0;
 }
 
-void glue_remove_skbuff(struct sk_buff_container *skb_c)
+void glue_remove_skbuff(struct sk_buff_container_hash *skb_c)
 {
 	hash_del(&skb_c->hentry);
 }
@@ -524,6 +543,8 @@ void consume_skb(struct sk_buff *skb)
 	struct fipc_message *request = &r;
 	struct lcd_sk_buff_container *skb_c;
 
+	INIT_FIPC_MSG(&r);
+
 	skb_c = container_of(skb,
 			struct lcd_sk_buff_container, skbuff);
 
@@ -532,6 +553,10 @@ void consume_skb(struct sk_buff *skb)
 	fipc_set_reg0(request, cptr_val(skb_c->other_ref));
 
 	vmfunc_wrapper(request);
+	
+#ifdef CONFIG_SKB_COPY
+	//lcd_consume_skb(skb);
+#endif
 
 	return;
 }
@@ -664,6 +689,128 @@ int ndo_start_xmit_noawe_callee(struct fipc_message *_request)
 	return ret;
 }
 
+char data[20][1514] = {0};
+
+#ifdef CONFIG_SKB_COPY
+int ndo_start_xmit_async_bare_callee(struct fipc_message *_request)
+{
+	//struct sk_buff *skb;
+	//struct sk_buff_container *skb_c = NULL;
+
+	struct lcd_sk_buff_container static_skb_c;
+	struct lcd_sk_buff_container *skb_c = &static_skb_c;
+	struct sk_buff *skb = &skb_c->skbuff;
+
+	cptr_t skb_ref;
+	unsigned long skb_end;
+	__be16 proto;
+	struct ext_registers *ext_regs = get_register_page(smp_processor_id());
+	u64 *regs = &ext_regs->regs[0];
+	u32 skb_data_off;
+	int i = 0, len;
+	netdev_tx_t ret = NETDEV_TX_OK;
+	//struct skb_shared_info *skb_sh_b4, *skb_sh_af;
+
+#ifdef LCD_MEASUREMENT
+	TS_DECL(xmit);
+#endif
+
+#ifdef HASHING
+	skb_ref = __cptr(fipc_get_reg2(_request));
+	//printk("%s, skb_ref %lx", __func__, skb_ref.cptr);
+#else
+	skb_ref = __cptr(fipc_get_reg0(_request));
+#endif
+	len = fipc_get_reg3(_request);
+	skb_end = fipc_get_reg4(_request);
+	proto = fipc_get_reg5(_request);
+
+	//printk("%s, allocating skb with len %d", __func__, len);
+
+#if 0
+	skb = __alloc_skb(len, GFP_KERNEL, 0, 0);
+
+	if (!skb) {
+		LIBLCD_MSG("couldn't allocate skb");
+		goto fail_alloc;
+	}
+
+	if (skb_shinfo(skb)->nr_frags)
+		printk("%s, nr_frags %d", __func__, skb_shinfo(skb)->nr_frags);
+
+	skb_sh_b4 = skb_shinfo(skb);
+	//printf("%s, before skb_shinfo(skb) %p", skb_shinfo(skb));
+	//
+	skb_c = container_of(skb, struct sk_buff_container, skb);
+
+	//printk("%s, lcd: %lu got %p from kmem_cache", __func__, smp_processor_id(), skb_c);
+	skb = &skb_c->skb;
+#endif
+	skb->len = len;
+	//skb->end = skb_end;
+
+	skb->protocol = proto;
+
+	GET_EREG(data_len);
+	GET_EREG(queue_mapping);
+	GET_EREG(xmit_more);
+	GET_EREG(tail);
+	GET_EREG(truesize);
+	GET_EREG(ip_summed);
+	GET_EREG(csum_start);
+	GET_EREG(network_header);
+	GET_EREG(csum_offset);
+	GET_EREG(transport_header);
+
+	skb_data_off = regs[i++];
+
+#if 0
+	skb_sh_af = skb_shinfo(skb);
+
+	if (skb_sh_b4 != skb_sh_af) {
+		printk("%s, b4 %p | af %p", __func__, skb_sh_b4, skb_sh_af);
+	}
+       	if (skb_shinfo(skb) && skb_shinfo(skb)->nr_frags) {
+		skb_frag_t *frag = skb_shinfo(skb)->frags;
+		int j;
+		for (j = 0; j < skb_shinfo(skb)->nr_frags; j++) {
+			printk("frag [%d] page %p, offset %u size %u", j,
+						frag->page.p, frag->page_offset, frag->size); 
+		}
+	}
+#endif
+	skb->head = skb->data = data[smp_processor_id()];
+	memcpy(skb->head, &regs[i], skb->len - skb->data_len + skb_data_off);
+
+	if (0)
+	LIBLCD_MSG("lcd-> l: %d | dlen %d | qm %d"
+		   " | xm %d | t %lu |ts %u",
+		skb->len, skb->data_len, skb->queue_mapping,
+		skb->xmit_more, skb->tail, skb->truesize);
+
+	skb->data = skb->head + skb_data_off;
+
+	skb_c->other_ref = skb_ref;
+
+#ifdef LCD_MEASUREMENT
+	TS_START_LCD(xmit);
+#endif
+	ret = dummy_xmit(skb, NULL);
+
+	fipc_set_reg0(_request, ret);
+#ifdef LCD_MEASUREMENT
+	TS_STOP_LCD(xmit);
+#endif
+
+#ifdef LCD_MEASUREMENT
+	fipc_set_reg2(_request,
+			TS_DIFF(xmit));
+#endif
+
+//fail_alloc:
+	return ret;
+}
+#else		/* CONFIG_SKB_COPY */
 /* xmit_callee for async. This function receives the IPC and
  * sends back a response
  */
@@ -716,6 +863,7 @@ int ndo_start_xmit_async_bare_callee(struct fipc_message *_request)
 
 	return 0;
 }
+#endif		/* CONFIG_SKB_COPY */
 
 int ndo_validate_addr_callee(struct fipc_message *request)
 {

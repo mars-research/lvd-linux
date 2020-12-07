@@ -18,6 +18,7 @@
 
 struct lcd_page_allocator *heap_allocator;
 struct page *heap_page_array;
+bool iommu_assigned = false;
 
 /* LOW-LEVEL SYSCALLS -------------------------------------------------- */
 
@@ -123,7 +124,7 @@ static void __do_one_heap_free(struct lcd_resource_node *n)
 	cptr_t pages = n->cptr;
 	gpa_t base = __gpa(lcd_resource_node_start(n));
 
-	if (lcd_syscall_iommu_unmap_page(base, 0)) {
+	if (iommu_assigned && lcd_syscall_iommu_unmap_page(base, 0)) {
 		LIBLCD_ERR("iommu unmap page for gpa %llx failed", gpa_val(base));
 	}
 
@@ -174,7 +175,7 @@ static int do_one_heap_alloc(gpa_t dest, unsigned int alloc_order,
 		goto fail2;
 	}
 
-	if (lcd_syscall_iommu_map_page(dest, alloc_order, true)) {
+	if (iommu_assigned && lcd_syscall_iommu_map_page(dest, alloc_order, true)) {
 		LIBLCD_ERR("iommu map page for gpa %llx failed", gpa_val(dest));
 	}
 

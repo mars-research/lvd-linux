@@ -9040,10 +9040,15 @@ static int ixgbe_set_features(struct net_device *netdev,
 	netdev_features_t changed = netdev->features ^ features;
 	bool need_reset = false;
 
+	printk("%s called with features: %llx | changed %llx", __func__,
+				features, changed);
+
 	/* Make sure RSC matches LRO, reset if change */
 	if (!(features & NETIF_F_LRO)) {
-		if (adapter->flags2 & IXGBE_FLAG2_RSC_ENABLED)
+		if (adapter->flags2 & IXGBE_FLAG2_RSC_ENABLED) {
 			need_reset = true;
+			printk("%s:%d Setting need_reset to true!", __func__, __LINE__);
+		}
 		adapter->flags2 &= ~IXGBE_FLAG2_RSC_ENABLED;
 	} else if ((adapter->flags2 & IXGBE_FLAG2_RSC_CAPABLE) &&
 		   !(adapter->flags2 & IXGBE_FLAG2_RSC_ENABLED)) {
@@ -9051,6 +9056,7 @@ static int ixgbe_set_features(struct net_device *netdev,
 		    adapter->rx_itr_setting > IXGBE_MIN_RSC_ITR) {
 			adapter->flags2 |= IXGBE_FLAG2_RSC_ENABLED;
 			need_reset = true;
+			printk("%s:%d Setting need_reset to true!", __func__, __LINE__);
 		} else if ((changed ^ features) & NETIF_F_LRO) {
 			e_info(probe, "rx-usecs set too low, "
 			       "disabling RSC\n");
@@ -9062,20 +9068,32 @@ static int ixgbe_set_features(struct net_device *netdev,
 	 * enabled or disabled.  If the state changed, we need to reset.
 	 */
 	if ((features & NETIF_F_NTUPLE) || (features & NETIF_F_HW_TC)) {
+
+		printk("%s, NTUPLE: %s HW_TC: %s", __func__, (features & NETIF_F_NTUPLE) ? "ON": "OFF",
+				(features & NETIF_F_HW_TC) ? "ON": "OFF");
 		/* turn off ATR, enable perfect filters and reset */
-		if (!(adapter->flags & IXGBE_FLAG_FDIR_PERFECT_CAPABLE))
+		if (!(adapter->flags & IXGBE_FLAG_FDIR_PERFECT_CAPABLE)) {
 			need_reset = true;
+			printk("%s:%d Setting need_reset to true!", __func__, __LINE__);
+		}
 
 		adapter->flags &= ~IXGBE_FLAG_FDIR_HASH_CAPABLE;
 		adapter->flags |= IXGBE_FLAG_FDIR_PERFECT_CAPABLE;
-		printk("%s, FDIR_HASH_CAPABLE unset and PERFECT_CAPABLE is set", __func__);
+		printk("%s, FDIR_HASH_CAPABLE unset and PERFECT_CAPABLE is set | need_reset %d", __func__, need_reset);
 	} else {
+
+		printk("%s, FDIR_PERFECT_CAPABLE: %s\n", __func__,
+			(adapter->flags & IXGBE_FLAG_FDIR_PERFECT_CAPABLE) ? "ON": "OFF");
 		/* turn off perfect filters, enable ATR and reset */
-		if (adapter->flags & IXGBE_FLAG_FDIR_PERFECT_CAPABLE)
+		if (adapter->flags & IXGBE_FLAG_FDIR_PERFECT_CAPABLE) {
+			// already enabled. skip resetting
+			goto skip;
+			printk("%s:%d Setting need_reset to true!", __func__, __LINE__);
 			need_reset = true;
+		}
 
 		adapter->flags &= ~IXGBE_FLAG_FDIR_PERFECT_CAPABLE;
-		printk("%s, reset FDIR_PERFECT_CAPABLE", __func__);
+		printk("%s, reset FDIR_PERFECT_CAPABLE | need_reset %d", __func__, need_reset);
 
 		/* We cannot enable ATR if SR-IOV is enabled */
 		if (adapter->flags & IXGBE_FLAG_SRIOV_ENABLED ||
@@ -9089,10 +9107,10 @@ static int ixgbe_set_features(struct net_device *netdev,
 		else /* otherwise supported and set the flag */
 		{
 			adapter->flags |= IXGBE_FLAG_FDIR_HASH_CAPABLE;
-			printk("%s, FDIR_HASH_CAPABLE set", __func__);
+			printk("%s, FDIR_HASH_CAPABLE set | need_reset %d", __func__, need_reset);
 		}
 	}
-
+skip:
 	if (changed & NETIF_F_RXALL)
 		need_reset = true;
 

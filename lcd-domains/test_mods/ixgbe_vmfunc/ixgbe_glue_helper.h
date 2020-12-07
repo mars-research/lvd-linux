@@ -1,6 +1,8 @@
 #ifndef __IXGBE_GLUE_HELPER_H__
 #define __IXGBE_GLUE_HELPER_H__
 
+#include <liblcd/skbuff.h>
+
 struct device_container {
 	struct device device;
 	struct device* dev;
@@ -64,7 +66,7 @@ struct sk_buff_container_2 {
 	struct cptr my_ref;
 };
 
-struct sk_buff_container {
+struct sk_buff_container_hash {
 	/* just store the pointer */
 	struct sk_buff *skb;
 	/* store the order when volunteered. comes handy during unmap */

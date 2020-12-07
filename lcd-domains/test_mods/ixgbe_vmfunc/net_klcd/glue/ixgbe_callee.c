@@ -153,7 +153,7 @@ int glue_ixgbe_init(void)
 	skb_data_pool_init();
 
 	skb_c_cache = kmem_cache_create("skb_c_cache",
-				sizeof(struct sk_buff_container),
+				sizeof(struct sk_buff_container_hash),
 				0,
 				SLAB_HWCACHE_ALIGN|SLAB_PANIC,
 				NULL);
@@ -177,7 +177,7 @@ void glue_ixgbe_exit(void)
 		kmem_cache_destroy(skb_c_cache);
 }
 
-int inline glue_insert_skb_hash(struct sk_buff_container *skb_c)
+int inline glue_insert_skb_hash(struct sk_buff_container_hash *skb_c)
 {
 #ifndef SKB_GLOBAL_HASHTABLE
 	int cpu = smp_processor_id();
@@ -198,13 +198,13 @@ int inline glue_insert_skb_hash(struct sk_buff_container *skb_c)
 	return 0;
 }
 
-int inline glue_lookup_skb_hash(struct cptr c, struct sk_buff_container **skb_cout)
+int inline glue_lookup_skb_hash(struct cptr c, struct sk_buff_container_hash **skb_cout)
 {
 #ifndef SKB_GLOBAL_HASHTABLE
 	int cpu = smp_processor_id();
 	struct skb_hash_table *this = &per_cpu(skb_hash, cpu);
 #endif
-        struct sk_buff_container *skb_c;
+        struct sk_buff_container_hash *skb_c;
 
 #ifdef SKB_GLOBAL_HASHTABLE
         hash_for_each_possible(skb_hashtable, skb_c, hentry, (unsigned long) cptr_val(c)) {
@@ -223,7 +223,7 @@ int inline glue_lookup_skb_hash(struct cptr c, struct sk_buff_container **skb_co
         return 0;
 }
 
-void inline glue_remove_skb_hash(struct sk_buff_container *skb_c)
+void inline glue_remove_skb_hash(struct sk_buff_container_hash *skb_c)
 {
 	hash_del(&skb_c->hentry);
 }
@@ -948,7 +948,7 @@ int ndo_start_xmit(struct sk_buff *skb,
 	static int once = 1;
 
 #ifndef CONFIG_NO_HASHING
-	struct sk_buff_container *skb_c;
+	struct sk_buff_container_hash *skb_c;
 #endif
 	struct skbuff_members *skb_lcd;
 #ifdef TIMESTAMP
@@ -968,8 +968,11 @@ int ndo_start_xmit(struct sk_buff *skb,
 		printk("%s, comm %s | pid %d | skblen %d " "| skb->proto %02X\n",
 				__func__, current->comm, current->pid,
 				skb->len, ntohs(skb->protocol));
+		dump_stack();
 		return NETDEV_TX_OK;
 	}
+
+	//printk("%s, comm %s | skblen %d\n", __func__, current->comm, skb->len);
 
 	dev_container = container_of(dev,
 			struct net_device_container,
@@ -1073,7 +1076,7 @@ int ndo_start_xmit_copy(struct sk_buff *skb,
 	int i = 0;
 
 #ifndef CONFIG_NO_HASHING
-	struct sk_buff_container *skb_c;
+	struct sk_buff_container_hash *skb_c;
 #endif
 
 #ifdef TIMESTAMP
@@ -1140,8 +1143,6 @@ int ndo_start_xmit_copy(struct sk_buff *skb,
 	regs[i++] = skb->data - skb->head;
 	memcpy(&regs[i], skb->head, skb->len - skb->data_len + (skb->data - skb->head));
 
-	fipc_set_reg3(_request, i);
-
 	if (0)
 		printk("%s:%d %s skb->q %d\n", current->comm, current->pid, __func__, skb->queue_mapping);
 
@@ -1172,6 +1173,7 @@ fail_alloc:
 	}
 	return func_ret;
 }
+
 LCD_TRAMPOLINE_DATA(ndo_start_xmit_trampoline);
 int  LCD_TRAMPOLINE_LINKAGE(ndo_start_xmit_trampoline)
 ndo_start_xmit_trampoline(struct sk_buff *skb,
@@ -1183,10 +1185,11 @@ ndo_start_xmit_trampoline(struct sk_buff *skb,
 	struct trampoline_hidden_args *hidden_args;
 	LCD_TRAMPOLINE_PROLOGUE(hidden_args,
 			ndo_start_xmit_trampoline);
-	ndo_start_xmit_fp = ndo_start_xmit;
 
 #ifdef CONFIG_SKB_COPY
 	ndo_start_xmit_fp = ndo_start_xmit_copy;
+#else
+	ndo_start_xmit_fp = ndo_start_xmit;
 #endif
 	return ndo_start_xmit_fp(skb,
 		dev,
@@ -2386,7 +2389,7 @@ int napi_consume_skb_callee(struct fipc_message *_request)
 {
 	struct sk_buff *skb;
 #ifndef CONFIG_NO_HASHING
-	struct sk_buff_container *skb_c = NULL;
+	struct sk_buff_container_hash *skb_c = NULL;
 #endif
 	int ret = 0;
 	int budget;
@@ -2441,7 +2444,7 @@ skip:
 int consume_skb_callee(struct fipc_message *_request)
 {
 	struct sk_buff *skb;
-	struct sk_buff_container *skb_c = NULL;
+	struct sk_buff_container_hash *skb_c = NULL;
 	int ret = 0;
 
 	glue_lookup_skb_hash(__cptr(fipc_get_reg0(_request)), &skb_c);
@@ -3689,7 +3692,7 @@ int netif_wake_subqueue_callee(struct fipc_message *_request)
 int netif_receive_skb_callee(struct fipc_message *_request)
 {
 	struct sk_buff *skb;
-	struct sk_buff_container *skb_c = NULL;
+	struct sk_buff_container_hash *skb_c = NULL;
 	int ret = 0;
 
 	int func_ret;
@@ -3806,11 +3809,16 @@ int napi_gro_receive_callee(struct fipc_message *_request)
 	GET_EREG(len);
 	GET_EREG(data_len);
 
+	printk("%s, skb->len %d frag_sz %d\n", __func__, skb->len, frag_sz);
+
 	if (nr_frags) {
 		memcpy(skb->data, &regs[i], frag_sz);
 	}
 
-	eth_skb_pad(skb);
+	if (skb->len < 60) {
+		printk("skb->len %d < 60\n", skb->len);
+		eth_skb_pad(skb);
+	}
 
 	skb->napi_id = napi->napi_id;
 
@@ -3946,6 +3954,7 @@ int napi_gro_receive_callee(struct fipc_message *_request)
 	skb->sw_hash = (hash_l4sw >> 33) & 0x1;
 
 	skb_pull_inline(skb, ETH_HLEN);
+	skb_reset_mac_header(skb);
 
 	func_ret = napi_gro_receive(napi, skb);
 
@@ -3963,7 +3972,7 @@ int napi_gro_receive_callee(struct fipc_message *_request)
 {
 	struct napi_struct *napi;
 	struct sk_buff *skb;
-	struct sk_buff_container *skb_c;
+	struct sk_buff_container_hash *skb_c;
 	struct napi_struct_container *napi_container = NULL;
 	int ret = 0;
 	int func_ret;
@@ -4058,7 +4067,7 @@ int __napi_alloc_skb_callee(struct fipc_message *_request)
 	int ret = 0;
 	gfp_t gfp_mask;
 	struct sk_buff *skb;
-	struct sk_buff_container *skb_c;
+	struct sk_buff_container_hash *skb_c;
 	struct napi_struct_container *napi_container = NULL;
 
 	unsigned long skb_ord, skbd_ord;

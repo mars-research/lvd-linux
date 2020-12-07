@@ -30,9 +30,9 @@
 #define CONFIG_VMALLOC_SHARED_POOL
 #define SKB_GLOBAL_HASHTABLE
 #define CONFIG_NO_HASHING
-#define CONFIG_SKB_COPY
+//#define CONFIG_SKB_COPY
 
-#define NUM_HW_QUEUES		20
+#define NUM_HW_QUEUES		10
 
 enum dispatch_t {
 	__PCI_REGISTER_DRIVER,

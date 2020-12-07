@@ -105,15 +105,10 @@ void __dev_kfree_skb_any(struct sk_buff *skb, enum skb_free_reason reason) { LIB
 u32 ethtool_op_get_link(struct net_device *dev) { LIBLCD_MSG("================>$$$$$$ Dummy %s called", __func__); return 0; }
 int ethtool_op_get_ts_info(struct net_device *dev, struct ethtool_ts_info *eti) { LIBLCD_MSG("================>$$$$$$ Dummy %s called", __func__); return 0; }
 
-struct sk_buff *__alloc_skb(unsigned int size, gfp_t priority, int flags,
-			    int node) { LIBLCD_MSG("================>$$$$$$ Dummy %s called", __func__); return NULL; }
-
 int ipv6_find_hdr(const struct sk_buff *skb, unsigned int *offset, int target,
 		  unsigned short *fragoff, int *fragflg) { LIBLCD_MSG("================>$$$$$$ Dummy %s called", __func__); return 0; }
 
 void __local_bh_enable_ip(unsigned long ip, unsigned int cnt) { LIBLCD_MSG("================>$$$$$$ Dummy %s called", __func__); }
-
-void kfree_skb(struct sk_buff *skb) { LIBLCD_MSG("================>$$$$$$ Dummy %s called", __func__); }
 
 unsigned long volatile __jiffy_data jiffies;
 

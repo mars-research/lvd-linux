@@ -84,7 +84,7 @@ int glue_ixgbe_init(void)
 
 	/* merge two datastructures into one for allocation */
 	skb_c_cache = kmem_cache_create("skb_c_cache",
-				sizeof(struct sk_buff_container)
+				sizeof(struct sk_buff_container_hash)
 				+ sizeof(struct sk_buff),
 				0,
 				SLAB_HWCACHE_ALIGN|SLAB_PANIC,
@@ -96,7 +96,7 @@ int glue_ixgbe_init(void)
 
 	/* container only slab for rx */
 	skb_c_cache1 = kmem_cache_create("skb_c_cache1",
-				sizeof(struct sk_buff_container),
+				sizeof(struct sk_buff_container_hash),
 				0,
 				SLAB_HWCACHE_ALIGN|SLAB_PANIC,
 				NULL);
@@ -140,7 +140,7 @@ void glue_ixgbe_exit(void)
 		kmem_cache_destroy(skb_cache);
 }
 
-int glue_insert_skbuff(struct hlist_head *htable, struct sk_buff_container *skb_c)
+int glue_insert_skbuff(struct hlist_head *htable, struct sk_buff_container_hash *skb_c)
 {
 	BUG_ON(!skb_c->skb);
 
@@ -151,9 +151,9 @@ int glue_insert_skbuff(struct hlist_head *htable, struct sk_buff_container *skb_
 	return 0;
 }
 
-int glue_lookup_skbuff(struct hlist_head *htable, struct cptr c, struct sk_buff_container **skb_cout)
+int glue_lookup_skbuff(struct hlist_head *htable, struct cptr c, struct sk_buff_container_hash **skb_cout)
 {
-	struct sk_buff_container *skb_c;
+	struct sk_buff_container_hash *skb_c;
 
 	hash_for_each_possible(cptr_table, skb_c,
 			hentry, (unsigned long) cptr_val(c)) {
@@ -163,7 +163,7 @@ int glue_lookup_skbuff(struct hlist_head *htable, struct cptr c, struct sk_buff_
 	return 0;
 }
 
-void glue_remove_skbuff(struct sk_buff_container *skb_c)
+void glue_remove_skbuff(struct sk_buff_container_hash *skb_c)
 {
 	hash_del(&skb_c->hentry);
 }
@@ -460,7 +460,7 @@ int probe_callee(struct fipc_message *_request)
 	printk("%s, Got pci device %04lx:%02lx:%02lx.%02lx", __func__,
 				domain, bus, slot, fn);
 	dev_assign.bus = 0x6;
-	dev_assign.fn = 0x1;
+	dev_assign.fn = 0x0;
 
 	other_ref.cptr = fipc_get_reg1(_request);
 	dma_mask = fipc_get_reg3(_request);
@@ -951,9 +951,10 @@ void napi_consume_skb(struct sk_buff *skb, int budget)
 	vmfunc_wrapper(_request);
 
 #ifdef CONFIG_SKB_COPY
-	kfree(skb->head);
-#endif
+	//lcd_consume_skb(skb);
+#else
 	kmem_cache_free(skb2_cache, skb_c);
+#endif
 	return;
 }
 
@@ -1672,6 +1673,10 @@ int ndo_start_xmit_callee(struct fipc_message *_request)
 
 	skb_c->other_ref = skb_ref;
 
+	if (skb_shinfo(skb) && (skb_shinfo(skb)->nr_frags > 0)) {
+		printk("%s, something is wrong! skb->len %d nr_frags %d",
+					__func__, skb->len, skb_shinfo(skb)->nr_frags);
+	}
 #ifdef LCD_MEASUREMENT
 	TS_START_LCD(xmit);
 #endif
@@ -1701,16 +1706,17 @@ fail_alloc:
 int ndo_start_xmit_copy_callee(struct fipc_message *_request)
 {
 	struct sk_buff *skb;
-	struct sk_buff_container_2 *skb_c = NULL;
+	struct sk_buff_container *skb_c = NULL;
 	int ret = 0;
 	int func_ret;
 	cptr_t skb_ref;
-	unsigned long skb_data_reg_offset, skb_end;
+	unsigned long skb_end;
 	__be16 proto;
 	struct ext_registers *ext_regs = get_register_page(smp_processor_id());
 	u64 *regs = &ext_regs->regs[0];
 	u32 skb_data_off;
 	int i = 0;
+	u32 len = 0;
 
 #ifdef LCD_MEASUREMENT
 	TS_DECL(xmit);
@@ -1720,24 +1726,30 @@ int ndo_start_xmit_copy_callee(struct fipc_message *_request)
 #else
 	skb_ref = __cptr(fipc_get_reg2(_request));
 #endif
-	skb_data_reg_offset = fipc_get_reg3(_request);
 	skb_end = fipc_get_reg4(_request);
 	proto = fipc_get_reg5(_request);
+	len = regs[i++];
 
-	skb_c = kmem_cache_alloc(skb2_cache, GFP_KERNEL);
+	printk("%s, allocating skb with len %d", __func__, len);
+	skb = __alloc_skb(len, GFP_KERNEL, 0, 0);
 
-	if (!skb_c) {
-		LIBLCD_MSG("out of mmeory");
+	if (!skb) {
+		LIBLCD_MSG("couldn't allocate skb");
 		goto fail_alloc;
 	}
+
+	printk("%s, nr_frags %d", __func__, skb_shinfo(skb)->nr_frags);
+
+	skb_c = container_of(skb, struct sk_buff_container, skb);
+
 	//printk("%s, lcd: %lu got %p from kmem_cache", __func__, smp_processor_id(), skb_c);
 	skb = &skb_c->skb;
 
+	skb->len = len;
 	skb->end = skb_end;
 
 	skb->protocol = proto;
 
-	GET_EREG(len);
 	GET_EREG(data_len);
 	GET_EREG(queue_mapping);
 	GET_EREG(xmit_more);
@@ -1751,14 +1763,6 @@ int ndo_start_xmit_copy_callee(struct fipc_message *_request)
 
 	skb_data_off = regs[i++];
 
-	// alloc_skb 
-	skb->head = skb->data = kzalloc(skb->len, GFP_KERNEL);
-
-	if (!skb->data) {
-		LIBLCD_ERR("Alloc skb->data failed");
-		goto fail_alloc;
-	}
-
 	memcpy(skb->head, &regs[i], skb->len - skb->data_len + skb_data_off);
 
 	if (0)
@@ -1771,6 +1775,17 @@ int ndo_start_xmit_copy_callee(struct fipc_message *_request)
 
 	skb_c->other_ref = skb_ref;
 
+	if (skb_shinfo(skb)->nr_frags) {
+		skb_frag_t *frag = skb_shinfo(skb)->frags;
+		for (i = 0; i < skb_shinfo(skb)->nr_frags; i++) {
+			printk("frag [%d] page %p, offset %u size %u", i,
+						frag->page.p, frag->page_offset, frag->size); 
+		}
+	}
+
+	print_hex_dump(KERN_DEBUG, "Frame contents: ",
+			       DUMP_PREFIX_OFFSET, 16, 1,
+			       skb->data, skb->len, false);
 #ifdef LCD_MEASUREMENT
 	TS_START_LCD(xmit);
 #endif
@@ -1796,6 +1811,7 @@ int ndo_start_xmit_copy_callee(struct fipc_message *_request)
 fail_alloc:
 	return ret;
 }
+
 int ndo_set_rx_mode_callee(struct fipc_message *_request)
 {
 	struct net_device_container *dev_container;
@@ -2476,7 +2492,7 @@ int netif_receive_skb(struct sk_buff *skb)
 	struct fipc_message *_request = &r;
 
 	int func_ret;
-	struct sk_buff_container *skb_c = NULL;
+	struct sk_buff_container_hash *skb_c = NULL;
 
 
 	INIT_IPC_MSG(&r);
@@ -2532,7 +2548,6 @@ gro_result_t napi_gro_receive(struct napi_struct *napi,
 	SET_EREG(ip_summed);
 	SET_EREG(len);
 	SET_EREG(data_len);
-
 
 	if (shinfo->nr_frags) {
 		skb_frag_t *frag = &shinfo->frags[0];
@@ -2680,7 +2695,7 @@ gro_result_t napi_gro_receive(struct napi_struct *napi,
 	struct fipc_message *_request = &r;
 
 	int func_ret;
-	struct sk_buff_container *skb_c;
+	struct sk_buff_container_hash *skb_c;
 	unsigned long skb_sz, skb_off, skbh_sz, skbh_off;
 	cptr_t skb_cptr, skbh_cptr;
 	struct skb_shared_info *shinfo;
@@ -2771,7 +2786,7 @@ struct sk_buff *__napi_alloc_skb(struct napi_struct *napi,
 	cptr_t skb_ref;
 	gva_t skb_gva, skbd_gva;
 	struct sk_buff *skb;
-	struct sk_buff_container *skb_c;
+	struct sk_buff_container_hash *skb_c;
 
 	INIT_IPC_MSG(&r);
 	ret = lcd_cptr_alloc(&skb_cptr);

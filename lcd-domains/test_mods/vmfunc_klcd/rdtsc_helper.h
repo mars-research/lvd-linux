@@ -1,7 +1,9 @@
 #ifndef _RDTSC_HELPER_H
 #define _RDTSC_HELPER_H
 
+#include <linux/kernel.h>
 #include <linux/log2.h>
+#include <linux/slab.h>
 
 #define ABSOLUTE(x) ((x) > 0 ? (x) : -(x))
 #define OUTLIER_THRESHOLD 3000

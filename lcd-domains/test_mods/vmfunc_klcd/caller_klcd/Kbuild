@@ -4,4 +4,4 @@ ccflags-y += -DOTHER_DOMAIN=1
 
 obj-m  += lcd_test_mod_vmfunc_klcd_caller_klcd.o
 
-lcd_test_mod_vmfunc_klcd_caller_klcd-y              += main.o dispatch.o
+lcd_test_mod_vmfunc_klcd_caller_klcd-y              += main.o dispatch.o marshal_caller.o

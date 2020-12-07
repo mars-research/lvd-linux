@@ -8,13 +8,12 @@
 
 #include <lcd_config/pre_hook.h>
 
-#include <linux/slab.h>
 #include <liblcd/liblcd.h>
+#include <liblcd/boot_info.h>
 #include "../rpc.h"
 #include "../rdtsc_helper.h"
 #include <linux/module.h>
 #include <linux/kallsyms.h>
-#include <asm/lcd_domains/libvmfunc.h>
 #include <asm/processor.h>
 #include <asm/desc.h>
 #include <asm/lcd_domains/bflank.h>
@@ -32,6 +31,11 @@ int handle_rpc_calls_klcd(struct fipc_message *msg);
 
 DECLARE_PER_CPU_PAGE_ALIGNED(char, exception_stacks
         [(N_EXCEPTION_STACKS - 1) * EXCEPTION_STKSZ + DEBUG_STKSZ]);
+
+void run_marshal_tests(void) {
+
+
+}
 
 void run_vmfunc_tests(void)
 {
@@ -159,8 +163,11 @@ static int caller_main(void)
 	printk("%s entered,  lcd_stack %p\n", __func__, lcd_stack);
 	vmfunc_init(lcd_stack, handle_rpc_calls_klcd, NULL);
 
-	run_vmfunc_tests();
+	//run_vmfunc_tests();
 
+	run_marshal_tests();
+
+	if (0)
 	{
 		int i = 0; 
 		u64 s_exits = bfcall_dump_perf(), e_exits; 

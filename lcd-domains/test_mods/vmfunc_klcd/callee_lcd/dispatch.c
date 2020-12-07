@@ -9,6 +9,7 @@
 #include <asm/irq_vectors.h>
 #include <asm/lcd_domains/bflank.h>
 #include <linux/slab.h>
+#include "marshal_callee.h"
 
 #include <lcd_config/post_hook.h>
 
@@ -378,6 +379,18 @@ int handle_rpc_calls(struct fipc_message *msg)
 		break;
 	case IRQ_HANDLER:
 		irq_handler(msg);
+		break;
+	case MARSHAL_INT:
+		marshal_int_callee(msg);
+		break;	
+	case MARSHAL_ARRAY:
+		marshal_array_callee(msg);
+		break;
+	case MARSHAL_STRING:
+		marshal_string_callee(msg);
+		break;
+	case MARSHAL_VOIDP:
+		marshal_voidptr_callee(msg);
 		break;
 	default:
 		break;

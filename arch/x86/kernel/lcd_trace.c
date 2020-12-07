@@ -109,6 +109,7 @@ asmlinkage __visible notrace void __add_trace_entry(unsigned type,
 	entry->mapped_cr3 = current->mapped_cr3;
 	snprintf(entry->name, PROC_NAME_MAX, current->comm);
 }
+EXPORT_SYMBOL(__add_trace_entry);
 
 __asm__(
 	"	.text		\n\t"

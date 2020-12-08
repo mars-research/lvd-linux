@@ -17,6 +17,7 @@
 #include <asm/processor.h>
 #include <asm/desc.h>
 #include <asm/lcd_domains/bflank.h>
+#include "marshal_caller.h"
 
 #include <lcd_config/post_hook.h>
 
@@ -34,7 +35,20 @@ DECLARE_PER_CPU_PAGE_ALIGNED(char, exception_stacks
 
 void run_marshal_tests(void) {
 
+	printk("Running marshal_empty test!\n");
+	test_marshal_empty();
 
+	printk("Running marshal_int test!\n");
+	test_marshal_int();
+
+	printk("Running marshal_array test!\n");
+	test_marshal_array(32);
+
+	printk("Running marshal_string test!\n");
+	test_marshal_string(256);
+
+	printk("Running marshal_voidptr test!\n");
+	test_marshal_voidptr(PAGE_SIZE - 8);
 }
 
 void run_vmfunc_tests(void)
@@ -142,6 +156,16 @@ void run_vmfunc_tests(void)
 	vmfunc_klcd_test_wrapper(&msg, OTHER_DOMAIN, VMFUNC_TEST_RPC_CALL);
 }
 
+void init_lcd(void) {
+	struct fipc_message m;
+	struct fipc_message *msg = &m;
+	INIT_FIPC_MSG(msg);
+
+	async_msg_set_fn_type(msg, MODULE_INIT);
+
+	vmfunc_klcd_wrapper(msg, OTHER_DOMAIN);
+}
+
 static int caller_main(void)
 {
 	int ret = 0;
@@ -163,9 +187,12 @@ static int caller_main(void)
 	printk("%s entered,  lcd_stack %p\n", __func__, lcd_stack);
 	vmfunc_init(lcd_stack, handle_rpc_calls_klcd, NULL);
 
-	//run_vmfunc_tests();
+	run_vmfunc_tests();
 
-	run_marshal_tests();
+	{
+		//init_lcd();
+		run_marshal_tests();
+	}
 
 	if (0)
 	{

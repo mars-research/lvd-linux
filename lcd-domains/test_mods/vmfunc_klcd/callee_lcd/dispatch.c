@@ -358,7 +358,7 @@ int handle_rpc_calls(struct fipc_message *msg)
 		callee_main();
 		//create_hwbp();
 		//alloc_free_pages();
-		alloc_dheap_pages();
+		//alloc_dheap_pages();
 		break;
 	case NULL_INVOCATION:
 		null_invocation(msg);

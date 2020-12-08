@@ -6,6 +6,30 @@
 
 #include <lcd_config/post_hook.h>
 
+uint64_t test_marshal_empty(void) {
+	int i;
+	uint64_t start, end;
+
+	start = rdtsc();
+
+	for (i = 0; i < NUM_ITERATIONS; i++) {
+		struct fipc_message m;
+		struct fipc_message *msg = &m;
+		INIT_FIPC_MSG(msg);
+
+		async_msg_set_fn_type(msg, MARSHAL_INT);
+		fipc_set_reg0(msg, 0xdeadbeef);
+
+		vmfunc_klcd_wrapper_benchmark(msg, OTHER_DOMAIN);
+	}
+
+	end = rdtsc();
+
+	printk("%s: %d iterations of marshal int took %llu cycles (avg: %llu cycles)\n",
+				__func__, NUM_ITERATIONS, end - start, (end - start) / NUM_ITERATIONS);
+	return end - start;
+}
+
 uint64_t test_marshal_int(void) {
 	int i;
 	uint64_t start, end;
@@ -24,6 +48,9 @@ uint64_t test_marshal_int(void) {
 	}
 
 	end = rdtsc();
+
+	printk("%s: %d iterations of marshal int took %llu cycles (avg: %llu cycles)\n",
+				__func__, NUM_ITERATIONS, end - start, (end - start) / NUM_ITERATIONS);
 	return end - start;
 }
 
@@ -57,9 +84,15 @@ uint64_t test_marshal_array(size_t arr_sz) {
 		}
 
 		vmfunc_klcd_wrapper(msg, OTHER_DOMAIN);
+		if (fipc_get_reg0(msg) == 0xbad) {
+			break;
+		}
 	}
 
 	end = rdtsc();
+
+	printk("%s: %d iterations of marshal array[%zu] took %llu cycles (avg: %llu cycles)\n",
+				__func__, i, arr_sz, end - start, (end - start) / i);
 
 	return end - start;
 exit:
@@ -96,9 +129,17 @@ uint64_t test_marshal_string(size_t str_sz) {
 		memcpy(&this_reg_page->regs[0], string, strlen(string));
 
 		vmfunc_klcd_wrapper(msg, OTHER_DOMAIN);
+
+		if (fipc_get_reg0(msg) == 0xbad) {
+			break;
+		}
 	}
 
 	end = rdtsc();
+
+	printk("%s: %d iterations of marshal string (len: %zu) took %llu cycles (avg: %llu cycles)\n",
+				__func__, i, strlen(string), end - start, (end - start) / i);
+
 	return end - start;
 exit:
 	return -1;
@@ -137,9 +178,16 @@ uint64_t test_marshal_voidptr(size_t data_sz) {
 		memcpy(&this_reg_page->regs[0], p, data_sz);
 
 		vmfunc_klcd_wrapper(msg, OTHER_DOMAIN);
+
+		if (fipc_get_reg0(msg) == 0xbad) {
+			break;
+		}
 	}
 
 	end = rdtsc();
+
+	printk("%s: %d iterations of marshal void ptr (sz=%zu) took %llu cycles (avg: %llu cycles)\n",
+				__func__, i, data_sz, end - start, (end - start) / i);
 
 	return end - start;
 exit:

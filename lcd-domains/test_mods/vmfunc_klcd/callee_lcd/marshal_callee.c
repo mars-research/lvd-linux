@@ -25,9 +25,11 @@ int *array;
 int marshal_array_callee(struct fipc_message *msg) {
 	int j;
 	struct ext_registers *this_reg_page = get_register_page(smp_processor_id());
-	int array_sz = fipc_get_reg0(msg);
+	uint64_t array_sz = fipc_get_reg0(msg);
 
 	if (!array) {
+		printk("%s, allocating an array of size %llu", __func__, array_sz);
+
 		array = kmalloc(array_sz * sizeof(int), GFP_KERNEL);
 
 		if (!array) {
@@ -39,7 +41,11 @@ int marshal_array_callee(struct fipc_message *msg) {
 	for (j = 0; j < array_sz; j++) {
 		array[j] = this_reg_page->regs[j];
 	}
+
+	fipc_set_reg0(msg, 0);
+	return 0;
 exit:
+	fipc_set_reg0(msg, 0xbad);
 	return 0;
 }
 
@@ -47,9 +53,10 @@ char *string;
 
 int marshal_string_callee(struct fipc_message *msg) {
 	struct ext_registers *this_reg_page = get_register_page(smp_processor_id());
-	int str_sz = fipc_get_reg0(msg) + 1; // to accomodate null character
+	uint64_t str_sz = fipc_get_reg0(msg) + 1; // to accomodate null character
 
 	if (!string) {
+		printk("%s, allocating a string of size %llu", __func__, str_sz);
 		string = kmalloc(str_sz, GFP_KERNEL);
 
 		if (!string) {
@@ -59,16 +66,21 @@ int marshal_string_callee(struct fipc_message *msg) {
 	}
 
 	memcpy(string, &this_reg_page->regs[0], str_sz);
+
+	fipc_set_reg0(msg, 0);
+	return 0;
 exit:
+	fipc_set_reg0(msg, 0xbad);
 	return 0;
 }
 
 void *ptr;
 int marshal_voidptr_callee(struct fipc_message *msg) {
 	struct ext_registers *this_reg_page = get_register_page(smp_processor_id());
-	size_t data_sz = fipc_get_reg0(msg);
+	uint64_t data_sz = fipc_get_reg0(msg);
 
 	if (!ptr) {
+		printk("%s, allocating a buffer of size %llu", __func__, data_sz);
 		ptr = kmalloc(data_sz, GFP_KERNEL);
 
 		if (!ptr) {
@@ -78,6 +90,10 @@ int marshal_voidptr_callee(struct fipc_message *msg) {
 	}
 
 	memcpy(ptr, &this_reg_page->regs[0], data_sz);
+
+	fipc_set_reg0(msg, 0);
+	return 0;
 exit:
+	fipc_set_reg0(msg, 0xbad);
 	return 0;
 }

@@ -150,11 +150,6 @@ uint64_t test_marshal_voidptr(size_t data_sz) {
 	void *p;
 	uint64_t start, end;
 
-	if (data_sz > (PAGE_SIZE - 8)) {
-		printk("Cannot marshal void pointer of size %zu\n", data_sz);
-		goto exit;
-	}
-
 	p = kmalloc(data_sz, GFP_KERNEL);
 
 	if (!p) {

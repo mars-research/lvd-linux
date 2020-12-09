@@ -97,3 +97,30 @@ exit:
 	fipc_set_reg0(msg, 0xbad);
 	return 0;
 }
+
+
+union acpi_object *obj;
+
+int marshal_union_callee(struct fipc_message *msg) {
+	struct ext_registers *this_reg_page = get_register_page(smp_processor_id());
+	uint64_t *regs = &this_reg_page->regs[0];
+	int i = 0;
+
+	if (!obj) {
+		obj = kzalloc(sizeof(union acpi_object), GFP_KERNEL);
+
+		if (!obj) {
+			printk("allocation failed\n");
+			goto exit;
+		}
+	}
+
+	obj->type = regs[i++];
+
+	resolve_acpi_object_type_callee(obj, regs);
+
+	return 0;
+exit:
+	fipc_set_reg0(msg, 0xbad);
+	return 0;
+}

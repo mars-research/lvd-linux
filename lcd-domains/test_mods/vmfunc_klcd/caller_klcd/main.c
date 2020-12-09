@@ -48,7 +48,10 @@ void run_marshal_tests(void) {
 	test_marshal_string(256);
 
 	printk("Running marshal_voidptr test!\n");
-	test_marshal_voidptr(PAGE_SIZE - 8);
+	test_marshal_voidptr(PAGE_SIZE);
+
+	printk("Running marshal_union test!\n");
+	test_marshal_union();
 }
 
 void run_vmfunc_tests(void)

@@ -12,6 +12,7 @@
 #include <linux/perf_event.h>
 #include <linux/hw_breakpoint.h>
 #include <asm/lcd_domains/libvmfunc.h>
+#include <linux/acpi.h>
 
 #define TRANSACTIONS 1000000
 #define NUM_ITERATIONS	TRANSACTIONS
@@ -34,6 +35,7 @@ enum fn_type {
 	MARSHAL_ARRAY,
 	MARSHAL_STRING,
 	MARSHAL_VOIDP,
+	MARSHAL_UNION,
 };
 int callee(struct fipc_message *);
 

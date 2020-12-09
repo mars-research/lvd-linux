@@ -5,7 +5,7 @@ asflags-y += $(ISOLATED_ASFLAGS)
 
 obj-m  += lcd_test_mod_vmfunc_klcd_callee_lcd.o
 
-lcd_test_mod_vmfunc_klcd_callee_lcd-y              += main.o dispatch.o marshal_callee.o
+lcd_test_mod_vmfunc_klcd_callee_lcd-y              += main.o dispatch.o marshal_callee.o marshal_union_callee.o
 
 lcd_test_mod_vmfunc_klcd_callee_lcd-y += $(LIBLCD)
 

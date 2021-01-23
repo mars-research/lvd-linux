@@ -1,0 +1,18 @@
+obj-m += lcd_test_mod_nullnet_gen_net_klcd.o
+
+lcd_test_mod_nullnet_gen_net_klcd-y		+= main.o
+
+# glue code
+lcd_test_mod_nullnet_gen_net_klcd-y		+= $(addprefix glue/, nullnet_callee.o nullnet_xmit.o \
+						dispatch.o )
+
+lcd_test_mod_nullnet_gen_net_klcd-y		+= $(addprefix ../, cap.o)
+
+cppflags-y += $(NONISOLATED_CFLAGS)
+
+extra-y += glue/nullnet_callee.lds
+
+ldflags-y += -T $(LCD_TEST_MODULES_BUILD_DIR)/nullnet_gen/net_klcd/glue/nullnet_callee.lds
+
+ccflags-y += $(NONISOLATED_CFLAGS)
+

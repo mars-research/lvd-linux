@@ -22,6 +22,10 @@ nullnet_vmfunc/boot nonisolated
 nullnet_vmfunc/dummy_lcd isolated
 nullnet_vmfunc/net_klcd nonisolated
 
+nullnet_gen/boot nonisolated
+nullnet_gen/dummy_lcd isolated
+nullnet_gen/net_klcd nonisolated
+
 ixgbe_vmfunc/boot nonisolated
 ixgbe_vmfunc/ixgbe_lcd isolated
 ixgbe_vmfunc/net_klcd nonisolated

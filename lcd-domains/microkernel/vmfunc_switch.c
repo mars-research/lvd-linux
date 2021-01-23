@@ -388,7 +388,7 @@ remap_cr3(void)
 	struct lcd *lcd = NULL;
 	phys_addr_t cr3_base;
 	gpa_t gpa_cr3;
-	hpa_t hpa_lcd_cr3;
+	hpa_t hpa_lcd_cr3 = {0};
 	/* we always switch to eptp_list[1] */
 	int ept = 1;
 	int ret = 0;

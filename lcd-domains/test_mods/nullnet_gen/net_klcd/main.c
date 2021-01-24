@@ -12,6 +12,9 @@
 #include "../rdtsc_helper.h"
 #include "../perf_counter_helper.h"
 #include <asm/lcd_domains/libvmfunc.h>
+
+#include "../common.h"
+
 /* COMPILER: This is always included after all includes. */
 #include <lcd_config/post_hook.h>
 

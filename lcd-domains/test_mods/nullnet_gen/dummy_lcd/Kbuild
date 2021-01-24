@@ -8,11 +8,13 @@ lcd_test_mod_nullnet_gen_dummy_lcd-y		+= dummy.o
 
 lcd_test_mod_nullnet_gen_dummy_lcd-y		+= $(LIBLCD)
 
-# glue code
-lcd_test_mod_nullnet_gen_dummy_lcd-y		+= $(addprefix glue/, nullnet_caller.o \
-						dispatch.o )
+lcd_test_mod_nullnet_gen_dummy_lcd-y += $(addprefix ../, caller.o)
 
-lcd_test_mod_nullnet_gen_dummy_lcd-y		+= $(addprefix ../, cap.o)
+# # glue code
+# lcd_test_mod_nullnet_gen_dummy_lcd-y		+= $(addprefix glue/, nullnet_caller.o \
+# 						dispatch.o )
+# 
+# lcd_test_mod_nullnet_gen_dummy_lcd-y		+= $(addprefix ../, cap.o)
 
 ccflags-y += $(ISOLATED_CFLAGS)
 

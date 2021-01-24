@@ -1,0 +1,218 @@
+// FIXME: how _exactly_ does nullnet use the dev_addr field?
+
+module kernel {
+    rpc void netif_carrier_on( projection dev *dev ) {
+        projection < struct net_device > dev {
+            projection _global_netdev_ops *netdev_ops;
+        }
+    }
+
+    rpc void netif_carrier_off( projection dev *dev ) {
+        projection < struct net_device > dev {
+        }
+    }
+
+    // TODO: what to do with this guy
+    //  rpc void free_percpu(void *ptr) {
+    //  }
+
+    rpc u32 register_netdevice( projection dev  *dev ) {
+        projection < struct net_device > dev {
+            u64 [out] features;
+            u64 [out] hw_features;
+            u64 [out] hw_enc_features;
+            projection _global_netdev_ops *netdev_ops;
+            projection _global_ethtool_ops *ethtool_ops;
+            u32  flags;
+            u32  priv_flags;
+            u8  addr_assign_type;
+            array<u8, var_len>* dev_addr;
+            projection _global_rtnl_link_ops *rtnl_link_ops;
+        }
+    }
+
+    rpc void consume_skb( projection skb  *skb ) {
+        projection < struct sk_buff > skb {
+            u32  len;
+        }
+    }
+
+    rpc projection ret_net_device [alloc(caller)]* alloc_netdev_mqs(
+        u32 sizeof_priv,
+        const string *name,
+        u8 name_assign_type,
+        rpc_ptr setup setup,
+        u32 txqs,
+        u32 rxqs
+    ) {
+        projection < struct net_device > ret_net_device {
+            u64  features;
+            u64  hw_features;
+            u64  hw_enc_features;
+            projection _global_netdev_ops *netdev_ops;
+            projection _global_ethtool_ops[out] *ethtool_ops;
+            u32  flags;
+            u32 [out] priv_flags;
+            u8  addr_assign_type;
+            array<u8, var_len>* dev_addr;
+            projection _global_rtnl_link_ops *rtnl_link_ops;
+        }
+    }
+
+    rpc void free_netdev( projection dev  *dev ) {
+        projection < struct net_device > dev {
+            u64  features;
+            u64  hw_features;
+            u64  hw_enc_features;
+            projection _global_netdev_ops *netdev_ops;
+            projection _global_ethtool_ops *ethtool_ops;
+            u32  flags;
+            u32  priv_flags;
+            u8  addr_assign_type;
+            array<u8, var_len>* dev_addr;
+            projection _global_rtnl_link_ops *rtnl_link_ops;
+        }
+    }
+
+    rpc void rtnl_lock(  ) {
+    }
+
+    rpc void rtnl_unlock(  ) {
+    }
+
+    rpc void rtnl_link_unregister( projection _global_rtnl_link_ops  *_global_rtnl_link_ops ) {
+    }
+
+    rpc void __rtnl_link_unregister( projection _global_rtnl_link_ops  *_global_rtnl_link_ops ) {
+    }
+
+    rpc u32 __rtnl_link_register( projection _global_rtnl_link_ops  *_global_rtnl_link_ops ) {
+    }
+
+    // TODO: what do with you
+    //  rpc void* __alloc_percpu_gfp( u64 size, u64 align, u32 gfp ) {
+    //  }
+
+    rpc void ether_setup( projection dev  *dev ) {
+        projection < struct net_device > dev {
+            u32 [out] flags;
+            u32 [out] priv_flags;
+        }
+    }
+
+    rpc u32 eth_validate_addr( projection dev  *dev ) {
+        projection < struct net_device > dev {
+            array<u8, var_len>* dev_addr;
+        }
+    }
+
+    // FIXME: p is actually a void*
+    rpc u32 eth_mac_addr( projection dev  *dev, projection p  *p ) {
+        projection < struct net_device > dev {
+            u32  priv_flags;
+            array<u8, var_len>* dev_addr;
+        }
+
+        projection < struct sockaddr > p {
+        }
+    }
+
+    /*
+        Current issue with these is that we assume "direct" RPCs are defined on the kernel side
+        These exist in the driver, however
+        rpc u32 dummy_init_module() {}
+        rpc void dummy_cleanup_module() {}
+    */
+
+    rpc_ptr void setup( projection dev  *dev ) {
+        projection < struct net_device > dev {
+            u64 [out] features;
+            u64 [out] hw_features;
+            u64 [out] hw_enc_features;
+            projection _global_netdev_ops[out] *netdev_ops;
+            projection _global_ethtool_ops[out] *ethtool_ops;
+            u32 [out] flags;
+            u32 [out] priv_flags;
+            u8  addr_assign_type;
+            array<u8, var_len>* dev_addr;
+        }
+    }
+
+    rpc_ptr void get_drvinfo( projection dev  *dev, projection info  *info ) {
+        projection < struct net_device > dev {
+        }
+
+        projection < struct ethtool_drvinfo > info {
+        }
+    }
+
+    rpc_ptr u32 ndo_init( projection dev  *dev ) {
+        projection < struct net_device > dev {
+        }
+    }
+
+    rpc_ptr void ndo_uninit( projection dev  *dev ) {
+        projection < struct net_device > dev {
+        }
+    }
+
+    // NOTE: exploit promotion and convert enum to u64
+    rpc_ptr u64 ndo_start_xmit( projection skb  *skb, projection dev  *dev ) {
+        projection < struct sk_buff > skb {
+            u32  len;
+        }
+
+        projection < struct net_device > dev {
+        }
+    }
+
+    rpc_ptr void ndo_set_rx_mode( projection dev  *dev ) {
+        projection < struct net_device > dev {
+        }
+    }
+
+    rpc_ptr projection ret_rtnl_link_stats64* ndo_get_stats64( projection dev  *dev, projection stats  *stats ) {
+        projection < struct net_device > dev {
+        }
+
+        projection < struct rtnl_link_stats64 > stats {
+            u64 [out] tx_packets;
+            u64 [out] tx_bytes;
+        }
+
+        projection < struct rtnl_link_stats64 > ret_rtnl_link_stats64 {
+        }
+    }
+
+    rpc_ptr u32 ndo_change_carrier( projection dev  *dev, bool new_carrier ) {
+        projection < struct net_device > dev {
+            projection _global_netdev_ops *netdev_ops;
+        }
+    }
+
+    rpc_ptr u32 validate( projection tb  **tb, projection data  **data ) {
+        projection < struct nlattr > tb {
+        }
+
+        projection < struct nlattr > data {
+        }
+    }
+
+    projection < struct net_device_ops > _global_netdev_ops {
+        rpc_ptr ndo_init ndo_init;
+        rpc_ptr ndo_uninit ndo_uninit;
+        rpc_ptr ndo_start_xmit ndo_start_xmit;
+        rpc_ptr ndo_set_rx_mode ndo_set_rx_mode;
+        rpc_ptr ndo_get_stats64 ndo_get_stats64;
+        rpc_ptr ndo_change_carrier ndo_change_carrier;
+    }
+
+    projection < struct ethtool_ops > _global_ethtool_ops {
+        rpc_ptr get_drvinfo get_drvinfo;
+    }
+
+    projection < struct rtnl_link_ops > _global_rtnl_link_ops {
+        rpc_ptr setup setup;
+        rpc_ptr validate validate;
+    }
+}

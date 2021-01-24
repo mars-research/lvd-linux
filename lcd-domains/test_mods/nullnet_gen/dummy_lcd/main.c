@@ -10,6 +10,8 @@
 #include <liblcd/sync_ipc_poll.h>
 #include "./nullnet_caller.h"
 
+#include "../common.h"
+
 #include "../rdtsc_helper.h"
 #include <lcd_config/post_hook.h>
 
@@ -28,19 +30,10 @@ static int dummy_lcd_init(void)
 	ret = lcd_enter();
 	if (ret)
 		goto fail1;
-	/*
-	 * Initialize nullnet glue
-	 */
-	ret = glue_nullnet_init();
-	if (ret) {
-		LIBLCD_ERR("nullnet init");
-		goto fail2;
-	}
 
 	ret = dummy_init_module();
 
 	return ret;
-fail2:
 fail1:
 	lcd_exit(ret);
 }
@@ -56,7 +49,6 @@ static void dummy_lcd_exit(void)
 
 	dummy_cleanup_module();
 
-	glue_nullnet_exit();
 	lvd_exit(0);
 	return;
 }

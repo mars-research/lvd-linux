@@ -3,3 +3,4 @@ caller.c
 callee.c
 common.h
 log.txt
+trampolines.lds.S

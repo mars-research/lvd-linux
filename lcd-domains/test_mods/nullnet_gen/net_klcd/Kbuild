@@ -15,5 +15,8 @@ cppflags-y += $(NONISOLATED_CFLAGS)
 
 # ldflags-y += -T $(LCD_TEST_MODULES_BUILD_DIR)/nullnet_gen/net_klcd/glue/nullnet_callee.lds
 
+extra-y += $(addprefix ../, trampolines.lds)
+ldflags-y += -T $(LCD_TEST_MODULES_BUILD_DIR)/nullnet_gen/trampolines.lds
+
 ccflags-y += $(NONISOLATED_CFLAGS)
 

@@ -21,3 +21,8 @@ ccflags-y += $(ISOLATED_CFLAGS)
 extra-y += ../../../liblcd_build/common/vmfunc.lds
 
 ldflags-y += -T $(LIBLCD_BUILD_DIR)/common/vmfunc.lds
+
+cppflags-y += $(ISOLATED_CFLAGS)
+
+extra-y += $(addprefix ../, trampolines.lds)
+ldflags-y += -T $(LCD_TEST_MODULES_BUILD_DIR)/nullnet_gen/trampolines.lds

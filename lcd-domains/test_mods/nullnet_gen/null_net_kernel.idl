@@ -16,7 +16,7 @@ module kernel {
     //  rpc void free_percpu(void *ptr) {
     //  }
 
-    rpc u32 register_netdevice( projection dev  *dev ) {
+    rpc s32 register_netdevice( projection dev  *dev ) {
         projection < struct net_device > dev {
             u64 [out] features;
             u64 [out] hw_features;
@@ -38,7 +38,7 @@ module kernel {
     }
 
     rpc projection ret_net_device [alloc(caller)]* alloc_netdev_mqs(
-        u32 sizeof_priv,
+        s32 sizeof_priv,
         const string *name,
         u8 name_assign_type,
         rpc_ptr setup setup,
@@ -86,7 +86,7 @@ module kernel {
     rpc void __rtnl_link_unregister( projection _global_rtnl_link_ops  *_global_rtnl_link_ops ) {
     }
 
-    rpc u32 __rtnl_link_register( projection _global_rtnl_link_ops  *_global_rtnl_link_ops ) {
+    rpc s32 __rtnl_link_register( projection _global_rtnl_link_ops  *_global_rtnl_link_ops ) {
     }
 
     // TODO: what do with you
@@ -100,14 +100,14 @@ module kernel {
         }
     }
 
-    rpc u32 eth_validate_addr( projection dev  *dev ) {
+    rpc s32 eth_validate_addr( projection dev  *dev ) {
         projection < struct net_device > dev {
             array<u8, var_len>* dev_addr;
         }
     }
 
     // FIXME: p is actually a void*
-    rpc u32 eth_mac_addr( projection dev  *dev, projection p  *p ) {
+    rpc s32 eth_mac_addr( projection dev  *dev, projection p  *p ) {
         projection < struct net_device > dev {
             u32  priv_flags;
             array<u8, var_len>* dev_addr;

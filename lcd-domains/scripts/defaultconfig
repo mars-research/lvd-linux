@@ -10,9 +10,9 @@
 liblcd_test/boot nonisolated
 liblcd_test/lcd isolated
 
-vmfunc/boot nonisolated
-vmfunc/caller_lcd isolated
-vmfunc/callee_lcd isolated
+#vmfunc/boot nonisolated
+#vmfunc/caller_lcd isolated
+#vmfunc/callee_lcd isolated
 
 vmfunc_klcd/boot nonisolated
 vmfunc_klcd/caller_klcd isolated

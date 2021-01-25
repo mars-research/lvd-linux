@@ -30,7 +30,7 @@ int net_klcd_syncipc_dispatch(struct fipc_message *message);
 
 static int net_klcd_init(void) 
 {
-	int ret;
+	int ret = 0; // TODO: needed only because of later commenting
 	struct fipc_message m;
 	/*
 	 * Set up cptr cache, etc.
@@ -53,15 +53,17 @@ static int net_klcd_init(void)
 	/*
 	 * Init net glue
 	 */
-	ret = glue_nullnet_init();
-	LIBLCD_MSG("-===== > glue nullnet init called\n");
+	// ret = glue_nullnet_init();
+	// LIBLCD_MSG("-===== > glue nullnet init called\n");
 
 	if (ret) {
 		LIBLCD_ERR("net init");
 		goto fail2;
 	}
 
-	vmfunc_init(lcd_stack, net_klcd_dispatch_loop, net_klcd_syncipc_dispatch);
+	// FIXME: absolutely needs to be called for tests
+	// TODO: syncipc necessity unknown
+	// vmfunc_init(lcd_stack, net_klcd_dispatch_loop, net_klcd_syncipc_dispatch);
 
 	/* call module_init for lcd */
 	m.vmfunc_id = VMFUNC_RPC_CALL;
@@ -100,7 +102,7 @@ static void __exit net_klcd_exit(void)
 	/*
 	 * Tear down net glue
 	 */
-	glue_nullnet_exit();
+	// glue_nullnet_exit();
 
 #ifndef CONFIG_LVD
 	/*

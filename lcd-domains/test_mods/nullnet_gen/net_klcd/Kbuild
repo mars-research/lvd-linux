@@ -18,5 +18,5 @@ cppflags-y += $(NONISOLATED_CFLAGS)
 extra-y += $(addprefix ../, trampolines.lds)
 ldflags-y += -T $(LCD_TEST_MODULES_BUILD_DIR)/nullnet_gen/trampolines.lds
 
-ccflags-y += $(NONISOLATED_CFLAGS)
+ccflags-y += $(NONISOLATED_CFLAGS) -Wno-error=unused-variable
 

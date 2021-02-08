@@ -16,7 +16,7 @@ lcd_test_mod_nullnet_gen_dummy_lcd-y += $(addprefix ../, caller.o)
 # 
 # lcd_test_mod_nullnet_gen_dummy_lcd-y		+= $(addprefix ../, cap.o)
 
-ccflags-y += $(ISOLATED_CFLAGS)
+ccflags-y += $(ISOLATED_CFLAGS) -Wno-error=unused-variable
 
 extra-y += ../../../liblcd_build/common/vmfunc.lds
 

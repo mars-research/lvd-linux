@@ -8,7 +8,7 @@ lcd_test_mod_nullnet_gen_dummy_lcd-y		+= dummy.o
 
 lcd_test_mod_nullnet_gen_dummy_lcd-y		+= $(LIBLCD)
 
-lcd_test_mod_nullnet_gen_dummy_lcd-y += $(addprefix ../, caller.o)
+lcd_test_mod_nullnet_gen_dummy_lcd-y += $(addprefix ../, caller.o common.o)
 
 # # glue code
 # lcd_test_mod_nullnet_gen_dummy_lcd-y		+= $(addprefix glue/, nullnet_caller.o \

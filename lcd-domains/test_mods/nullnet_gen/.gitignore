@@ -2,5 +2,6 @@ generate
 caller.c
 callee.c
 common.h
+common.c
 log.txt
 trampolines.lds.S

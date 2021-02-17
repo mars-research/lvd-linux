@@ -21,13 +21,13 @@ module kernel {
             u64 [out] features;
             u64 [out] hw_features;
             u64 [out] hw_enc_features;
-            projection _global_netdev_ops *netdev_ops;
-            projection _global_ethtool_ops *ethtool_ops;
+            const projection _global_netdev_ops *netdev_ops;
+            const projection _global_ethtool_ops *ethtool_ops;
             u32  flags;
             u32  priv_flags;
             u8  addr_assign_type;
             array<u8, var_len>* dev_addr;
-            projection _global_rtnl_link_ops *rtnl_link_ops;
+            const projection _global_rtnl_link_ops *rtnl_link_ops;
         }
     }
 

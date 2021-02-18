@@ -1,9 +1,9 @@
-// FIXME: how _exactly_ does nullnet use the dev_addr field?
+// Nullnet does *not* use the dev_addr field
 
 module kernel {
     rpc void netif_carrier_on( projection dev *dev ) {
         projection < struct net_device > dev {
-            projection _global_netdev_ops *netdev_ops;
+            const projection _global_netdev_ops *netdev_ops;
         }
     }
 
@@ -26,7 +26,6 @@ module kernel {
             u32  flags;
             u32  priv_flags;
             u8  addr_assign_type;
-            array<u8, var_len>* dev_addr;
             const projection _global_rtnl_link_ops *rtnl_link_ops;
         }
     }
@@ -49,13 +48,12 @@ module kernel {
             u64  features;
             u64  hw_features;
             u64  hw_enc_features;
-            projection _global_netdev_ops *netdev_ops;
-            projection _global_ethtool_ops[out] *ethtool_ops;
+            const projection _global_netdev_ops *netdev_ops;
+            const projection _global_ethtool_ops[out] *ethtool_ops;
             u32  flags;
             u32 [out] priv_flags;
             u8  addr_assign_type;
-            array<u8, var_len>* dev_addr;
-            projection _global_rtnl_link_ops *rtnl_link_ops;
+            const projection _global_rtnl_link_ops *rtnl_link_ops;
         }
     }
 
@@ -64,13 +62,12 @@ module kernel {
             u64  features;
             u64  hw_features;
             u64  hw_enc_features;
-            projection _global_netdev_ops *netdev_ops;
-            projection _global_ethtool_ops *ethtool_ops;
+            const projection _global_netdev_ops *netdev_ops;
+            const projection _global_ethtool_ops *ethtool_ops;
             u32  flags;
             u32  priv_flags;
             u8  addr_assign_type;
-            array<u8, var_len>* dev_addr;
-            projection _global_rtnl_link_ops *rtnl_link_ops;
+            const projection _global_rtnl_link_ops *rtnl_link_ops;
         }
     }
 
@@ -102,7 +99,6 @@ module kernel {
 
     rpc s32 eth_validate_addr( projection dev  *dev ) {
         projection < struct net_device > dev {
-            array<u8, var_len>* dev_addr;
         }
     }
 
@@ -110,7 +106,6 @@ module kernel {
     rpc s32 eth_mac_addr( projection dev  *dev, projection p  *p ) {
         projection < struct net_device > dev {
             u32  priv_flags;
-            array<u8, var_len>* dev_addr;
         }
 
         projection < struct sockaddr > p {
@@ -129,12 +124,11 @@ module kernel {
             u64 [out] features;
             u64 [out] hw_features;
             u64 [out] hw_enc_features;
-            projection _global_netdev_ops[out] *netdev_ops;
-            projection _global_ethtool_ops[out] *ethtool_ops;
+            const projection _global_netdev_ops[out] *netdev_ops;
+            const projection _global_ethtool_ops[out] *ethtool_ops;
             u32 [out] flags;
             u32 [out] priv_flags;
             u8  addr_assign_type;
-            array<u8, var_len>* dev_addr;
         }
     }
 
@@ -146,7 +140,7 @@ module kernel {
         }
     }
 
-    rpc_ptr u32 ndo_init( projection dev  *dev ) {
+    rpc_ptr s32 ndo_init( projection dev  *dev ) {
         projection < struct net_device > dev {
         }
     }
@@ -157,7 +151,7 @@ module kernel {
     }
 
     // NOTE: exploit promotion and convert enum to u64
-    rpc_ptr u64 ndo_start_xmit( projection skb  *skb, projection dev  *dev ) {
+    rpc_ptr s64 ndo_start_xmit( projection skb  *skb, projection dev  *dev ) {
         projection < struct sk_buff > skb {
             u32  len;
         }
@@ -184,13 +178,13 @@ module kernel {
         }
     }
 
-    rpc_ptr u32 ndo_change_carrier( projection dev  *dev, bool new_carrier ) {
+    rpc_ptr s32 ndo_change_carrier( projection dev  *dev, bool new_carrier ) {
         projection < struct net_device > dev {
-            projection _global_netdev_ops *netdev_ops;
+            const projection _global_netdev_ops *netdev_ops;
         }
     }
 
-    rpc_ptr u32 validate( projection tb  **tb, projection data  **data ) {
+    rpc_ptr s32 validate( projection tb  **tb, projection data  **data ) {
         projection < struct nlattr > tb {
         }
 

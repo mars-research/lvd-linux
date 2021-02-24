@@ -1,7 +1,7 @@
 obj-m += lcd_test_mod_nullnet_gen_net_klcd.o
 
 lcd_test_mod_nullnet_gen_net_klcd-y		+= main.o
-lcd_test_mod_nullnet_gen_net_klcd-y		+= $(addprefix ../, callee.o common.o)
+lcd_test_mod_nullnet_gen_net_klcd-y		+= $(addprefix ../, server.o common.o)
 
 # # glue code
 # lcd_test_mod_nullnet_gen_net_klcd-y		+= $(addprefix glue/, nullnet_callee.o nullnet_xmit.o \
@@ -18,5 +18,5 @@ cppflags-y += $(NONISOLATED_CFLAGS)
 extra-y += $(addprefix ../, trampolines.lds)
 ldflags-y += -T $(LCD_TEST_MODULES_BUILD_DIR)/nullnet_gen/trampolines.lds
 
-ccflags-y += $(NONISOLATED_CFLAGS) -Wno-error=unused-variable
+ccflags-y += $(NONISOLATED_CFLAGS)
 

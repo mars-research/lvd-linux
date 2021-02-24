@@ -1,6 +1,6 @@
 generate
-caller.c
-callee.c
+client.c
+server.c
 common.h
 common.c
 log.txt

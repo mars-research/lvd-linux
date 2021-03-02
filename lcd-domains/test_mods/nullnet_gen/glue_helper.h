@@ -23,40 +23,40 @@
 #define COPY
 #define CONFIG_SKB_COPY
 
-enum dispatch_t {
-	REGISTER_NETDEVICE,  /* 0 */
-	UNREGISTER_NETDEVICE,  /* 1 */
-	ETHER_SETUP,  /* 2 */
-	ETH_MAC_ADDR,  /* 3 */
-	ETH_VALIDATE_ADDR,  /* 4 */
-	FREE_NETDEV,  /* 5 */
-	NETIF_CARRIER_OFF,  /* 6 */
-	NETIF_CARRIER_ON,
-	__RTNL_LINK_REGISTER,  /* 8 */
-	__RTNL_LINK_UNREGISTER,
-	RTNL_LINK_UNREGISTER,
-	ALLOC_NETDEV_MQS,
-	CONSUME_SKB,  /* 12 */
-	NDO_INIT,
-	NDO_UNINIT,
-	NDO_START_XMIT,
-	NDO_VALIDATE_ADDR,  /* 16 */
-	NDO_SET_RX_MODE,
-	NDO_SET_MAC_ADDRESS,
-	NDO_GET_STATS64,
-	NDO_CHANGE_CARRIER,  /* 20 */
-	VALIDATE,  /* 21 */
-	SETUP,  /* 22 */
-	TRIGGER_EXIT,  /* 23 */
-	TRIGGER_CLEAN,
-	PREP_CHANNEL,  /* 25 */
-	MODULE_INIT,
-	MODULE_EXIT,
-	SYNC_SETUP,
-	SYNC_NDO_SET_MAC_ADDRESS,
-	RTNL_LOCK,
-	RTNL_UNLOCK,
-};
+// enum dispatch_t {
+// 	REGISTER_NETDEVICE,  /* 0 */
+// 	UNREGISTER_NETDEVICE,  /* 1 */
+// 	ETHER_SETUP,  /* 2 */
+// 	ETH_MAC_ADDR,  /* 3 */
+// 	ETH_VALIDATE_ADDR,  /* 4 */
+// 	FREE_NETDEV,  /* 5 */
+// 	NETIF_CARRIER_OFF,  /* 6 */
+// 	NETIF_CARRIER_ON,
+// 	__RTNL_LINK_REGISTER,  /* 8 */
+// 	__RTNL_LINK_UNREGISTER,
+// 	RTNL_LINK_UNREGISTER,
+// 	ALLOC_NETDEV_MQS,
+// 	CONSUME_SKB,  /* 12 */
+// 	NDO_INIT,
+// 	NDO_UNINIT,
+// 	NDO_START_XMIT,
+// 	NDO_VALIDATE_ADDR,  /* 16 */
+// 	NDO_SET_RX_MODE,
+// 	NDO_SET_MAC_ADDRESS,
+// 	NDO_GET_STATS64,
+// 	NDO_CHANGE_CARRIER,  /* 20 */
+// 	VALIDATE,  /* 21 */
+// 	SETUP,  /* 22 */
+// 	TRIGGER_EXIT,  /* 23 */
+// 	TRIGGER_CLEAN,
+// 	PREP_CHANNEL,  /* 25 */
+// 	MODULE_INIT,
+// 	MODULE_EXIT,
+// 	SYNC_SETUP,
+// 	SYNC_NDO_SET_MAC_ADDRESS,
+// 	RTNL_LOCK,
+// 	RTNL_UNLOCK,
+// };
 
 typedef enum {
 	VOLUNTEER_XMIT,  /* 1 */
@@ -152,80 +152,6 @@ struct sk_buff_container_2 {
 	struct cptr other_ref;
 	struct cptr my_ref;
 };
-
-/* CSPACES ------------------------------------------------------------ */
-int glue_cap_init(void);
-
-int glue_cap_create(struct glue_cspace **cspace);
-
-void glue_cap_destroy(struct glue_cspace *cspace);
-
-void glue_cap_exit(void);
-
-void glue_cap_remove(
-	struct glue_cspace *cspace, 
-	cptr_t c);
-
-int glue_cap_insert_net_device_type(
-	struct glue_cspace *cspace, 
-	struct net_device_container *net_device_container,
-	cptr_t *c_out);
-
-int glue_cap_insert_net_device_ops_type(
-	struct glue_cspace *cspace, 
-	struct net_device_ops_container *net_device_ops_container,
-	cptr_t *c_out);
-
-int glue_cap_insert_nlattr_type(
-	struct glue_cspace *cspace, 
-	struct nlattr_container *nlattr_container,
-	cptr_t *c_out);
-
-int glue_cap_insert_rtnl_link_ops_type(
-	struct glue_cspace *cspace, 
-	struct rtnl_link_ops_container *rtnl_link_ops_container,
-	cptr_t *c_out);
-
-int glue_cap_insert_rtnl_link_stats64_type(
-	struct glue_cspace *cspace, 
-	struct rtnl_link_stats64_container *rtnl_link_stats64_container,
-	cptr_t *c_out);
-
-int glue_cap_insert_setup_type(
-	struct glue_cspace *cspace, 
-	struct setup_container *setup_container,
-	cptr_t *c_out);
-
-int glue_cap_lookup_net_device_type(
-	struct glue_cspace *cspace, 
-	cptr_t c,
-	struct net_device_container **net_device_container);
-
-int glue_cap_lookup_net_device_ops_type(
-	struct glue_cspace *cspace, 
-	cptr_t c,
-	struct net_device_ops_container **net_device_ops_container);
-
-
-int glue_cap_lookup_nlattr_type(
-	struct glue_cspace *cspace, 
-	cptr_t c,
-	struct nlattr_container **nlattr_container);
-
-int glue_cap_lookup_rtnl_link_ops_type(
-	struct glue_cspace *cspace, 
-	cptr_t c,
-	struct rtnl_link_ops_container **rtnl_link_ops_container);
-
-int glue_cap_lookup_rtnl_link_stats64_type(
-	struct glue_cspace *cspace, 
-	cptr_t c,
-	struct rtnl_link_stats64_container **rtnl_link_stats64_container);
-
-int glue_cap_lookup_setup_type(
-	struct glue_cspace *cspace, 
-	cptr_t c,
-	struct setup_container **setup_container);
 
 /* ASYNC HELPERS -------------------------------------------------- */
 

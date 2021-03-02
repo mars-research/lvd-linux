@@ -11,8 +11,7 @@
 #include <linux/module.h>
 #include <linux/kernel.h>
 #include <linux/kmod.h>
-
-#include "../glue_helper.h"
+#include <linux/kthread.h>
 
 #include <lcd_config/post_hook.h>
 

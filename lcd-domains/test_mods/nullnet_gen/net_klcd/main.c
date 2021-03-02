@@ -8,9 +8,9 @@
 #include <linux/delay.h>
 #include <thc.h>
 
-#include "./nullnet_callee.h"
 #include "../rdtsc_helper.h"
 #include "../perf_counter_helper.h"
+#include "../glue_helper.h"
 #include <asm/lcd_domains/libvmfunc.h>
 
 #include "../common.h"

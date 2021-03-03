@@ -2,6 +2,9 @@
 
 #include "common.h"
 #include <liblcd/liblcd.h>
+#include <liblcd/liblcd.h>
+#include <libfipc_types.h>
+#include <asm/lcd_domains/libvmfunc.h>
 
 #include <lcd_config/post_hook.h>
 
@@ -21,19 +24,20 @@ void glue_user_call_server(uint64_t* data, size_t id)
     struct fipc_message buffer = {0};
     struct fipc_message* msg = &buffer;
     struct ext_registers* page = 0;
+	size_t len = data[0];
 
     glue_user_trace("Packing message in LCD");
-	size_t len = data[0];
 	memcpy(msg->regs, data, 7);
 	glue_user_trace("Packed fast regs");
 	if (len > 6) {
 		glue_user_trace("Fetching slow regs");
 		page = get_register_page(smp_processor_id());
 		glue_user_trace("Fetched slow regs");
-		memcpy(page->regs, &packet->slots[7], len - 6);
+		memcpy(page->regs, &data[7], len - 6);
 		glue_user_trace("Packed slow regs");
 	}
 
+    msg->vmfunc_id = VMFUNC_RPC_CALL;
     msg->rpc_id = id;
     glue_user_trace("Committing to KLCD call");
     vmfunc_wrapper(msg);
@@ -46,7 +50,7 @@ void glue_user_call_server(uint64_t* data, size_t id)
 		glue_user_trace("Fetching slow regs");
 		page = get_register_page(smp_processor_id());
 		glue_user_trace("Fetched slow regs");
-		memcpy(&packet->slots[7], page->regs, len - 6);
+		memcpy(&data[7], page->regs, len - 6);
 		glue_user_trace("Unpacked slow regs");
 	}
 

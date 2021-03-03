@@ -25,8 +25,19 @@ extern int vmfunc_init(void *stack_page, rpc_handler_t rpc_handler,
 struct cspace *klcd_cspace;
 extern void *lcd_stack;
 
-int net_klcd_dispatch_loop(struct fipc_message *msg);
-int net_klcd_syncipc_dispatch(struct fipc_message *message);
+int net_klcd_dispatch_loop(struct fipc_message *msg)
+{
+	struct ext_registers* page = get_register_page(smp_processor_id());
+	(void)page;
+	LIBLCD_ERR("Haven't implemented the KLCD dispatcher!\n");
+	return -1;
+}
+
+int net_klcd_syncipc_dispatch(struct fipc_message *message)
+{
+	LIBLCD_ERR("Shouldn't have done a synchronous call!\n");
+	return -1;
+}
 
 static int net_klcd_init(void) 
 {
@@ -63,7 +74,7 @@ static int net_klcd_init(void)
 
 	// FIXME: absolutely needs to be called for tests
 	// TODO: syncipc necessity unknown
-	// vmfunc_init(lcd_stack, net_klcd_dispatch_loop, net_klcd_syncipc_dispatch);
+	vmfunc_init(lcd_stack, net_klcd_dispatch_loop, net_klcd_syncipc_dispatch);
 
 	/* call module_init for lcd */
 	m.vmfunc_id = VMFUNC_RPC_CALL;

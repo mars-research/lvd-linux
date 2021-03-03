@@ -27,22 +27,54 @@ extern void *lcd_stack;
 
 int net_klcd_dispatch_loop(struct fipc_message *msg)
 {
-	struct ext_registers* page = get_register_page(smp_processor_id());
-	(void)page;
-	LIBLCD_ERR("Haven't implemented the KLCD dispatcher!\n");
-	return -1;
+	const size_t id = msg->rpc_id;
+	size_t len = msg->regs[0];
+	struct glue_message* packet = &shared_buffer;
+	struct ext_registers* page = 0;
+
+	glue_user_trace("Got message in KLCD");
+	memcpy(packet->slots, msg->regs, 7);
+	glue_user_trace("Unpacked fast regs");
+	if (len > 6) {
+		glue_user_trace("Fetching slow regs");
+		page = get_register_page(smp_processor_id());
+		glue_user_trace("Fetched slow regs");
+		memcpy(&packet->slots[7], page->regs, len - 6);
+		glue_user_trace("Unpacked slow regs");
+	}
+	glue_user_trace("Received post-message in KLCD");
+
+	packet->position = 0;
+	if (!try_dispatch(id, packet)) {
+		glue_user_panic("Couldn't dispatch on KLCD side");
+	}
+
+	glue_user_trace("Processed message in KLCD");
+	len = packet->slots[0];
+	memcpy(msg->regs, packet->slots, 7);
+	glue_user_trace("Packed fast regs");
+	if (len > 6) {
+		glue_user_trace("Fetching slow regs");
+		page = get_register_page(smp_processor_id());
+		glue_user_trace("Fetched slow regs");
+		memcpy(page->regs, &packet->slots[7], len - 6);
+		glue_user_trace("Packed slow regs");
+	}
+	glue_user_trace("Processed post-message in KLCD");
+
+	return 0;
 }
 
 int net_klcd_syncipc_dispatch(struct fipc_message *message)
 {
-	LIBLCD_ERR("Shouldn't have done a synchronous call!\n");
+	glue_user_panic("Shouldn't have done a synchronous call!\n");
 	return -1;
 }
 
 static int net_klcd_init(void) 
 {
 	int ret = 0; // TODO: needed only because of later commenting
-	struct fipc_message m;
+	struct fipc_message m = {0};
 	/*
 	 * Set up cptr cache, etc.
 	 */
@@ -98,7 +130,7 @@ fail1:
  */
 static void __exit net_klcd_exit(void)
 {
-	struct fipc_message m;
+	struct fipc_message m = {0};
 
 	LIBLCD_MSG("%s: exiting", __func__);
 

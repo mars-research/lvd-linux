@@ -59,7 +59,40 @@ void glue_user_call_server(uint64_t* data, size_t id)
 
 void glue_user_call_client(uint64_t* data, size_t id)
 {
-    glue_user_panic("glue_user_call_client");
+    struct fipc_message buffer = {0};
+    struct fipc_message* msg = &buffer;
+    struct ext_registers* page = 0;
+	size_t len = data[0];
+
+    glue_user_trace("Packing message in KLCD");
+	memcpy(msg->regs, data, 7);
+	glue_user_trace("Packed fast regs");
+	if (len > 6) {
+		glue_user_trace("Fetching slow regs");
+		page = get_register_page(smp_processor_id());
+		glue_user_trace("Fetched slow regs");
+		memcpy(page->regs, &data[7], len - 6);
+		glue_user_trace("Packed slow regs");
+	}
+
+    msg->vmfunc_id = VMFUNC_RPC_CALL;
+    msg->rpc_id = id;
+    glue_user_trace("Committing to LCD call");
+    vmfunc_klcd_wrapper(msg, 1);
+
+    glue_user_trace("Unpacking message in KLCD");
+	len = msg->regs[0];
+	memcpy(data, msg->regs, 7);
+	glue_user_trace("Unpacked fast regs");
+	if (len > 6) {
+		glue_user_trace("Fetching slow regs");
+		page = get_register_page(smp_processor_id());
+		glue_user_trace("Fetched slow regs");
+		memcpy(&data[7], page->regs, len - 6);
+		glue_user_trace("Unpacked slow regs");
+	}
+
+	glue_user_trace("Completed call in KLCD");
 }
 
 void* glue_user_map_to_shadow(const void* obj)

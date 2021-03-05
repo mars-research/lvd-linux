@@ -33,13 +33,13 @@ int net_klcd_dispatch_loop(struct fipc_message *msg)
 	struct ext_registers* page = 0;
 
 	glue_user_trace("Got message in KLCD");
-	memcpy(packet->slots, msg->regs, 7);
+	memcpy(packet->slots, msg->regs, 7 * sizeof(uint64_t));
 	glue_user_trace("Unpacked fast regs");
 	if (len > 6) {
 		glue_user_trace("Fetching slow regs");
 		page = get_register_page(smp_processor_id());
 		glue_user_trace("Fetched slow regs");
-		memcpy(&packet->slots[7], page->regs, len - 6);
+		memcpy(&packet->slots[7], page->regs, (len - 6) * sizeof(uint64_t));
 		glue_user_trace("Unpacked slow regs");
 	}
 	glue_user_trace("Received post-message in KLCD");
@@ -51,13 +51,13 @@ int net_klcd_dispatch_loop(struct fipc_message *msg)
 
 	glue_user_trace("Processed message in KLCD");
 	len = packet->slots[0];
-	memcpy(msg->regs, packet->slots, 7);
+	memcpy(msg->regs, packet->slots, 7 * sizeof(uint64_t));
 	glue_user_trace("Packed fast regs");
 	if (len > 6) {
 		glue_user_trace("Fetching slow regs");
 		page = get_register_page(smp_processor_id());
 		glue_user_trace("Fetched slow regs");
-		memcpy(page->regs, &packet->slots[7], len - 6);
+		memcpy(page->regs, &packet->slots[7], (len - 6) * sizeof(uint64_t));
 		glue_user_trace("Packed slow regs");
 	}
 	glue_user_trace("Processed post-message in KLCD");

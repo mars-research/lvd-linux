@@ -35,17 +35,35 @@ void glue_user_call_server(uint64_t* data, size_t id)
     struct fipc_message* msg = &buffer;
     struct ext_registers* page = 0;
 	size_t len = data[0];
+    int i;
+
+    glue_user_trace("Original sent:");
+    for (i = 0; i < data[0] + 1; ++i) {
+        LIBLCD_MSG("%llx", data[i]);
+    }
 
     glue_user_trace("Packing message in LCD");
-	memcpy(msg->regs, data, 7);
+	memcpy(msg->regs, data, 7 * sizeof(uint64_t));
 	glue_user_trace("Packed fast regs");
 	if (len > 6) {
 		glue_user_trace("Fetching slow regs");
 		page = get_register_page(smp_processor_id());
 		glue_user_trace("Fetched slow regs");
-		memcpy(page->regs, &data[7], len - 6);
+		memcpy(page->regs, &data[7], (len - 6) * sizeof(uint64_t));
 		glue_user_trace("Packed slow regs");
 	}
+
+    glue_user_trace("Fast regs sent:");
+    for (i = 0; i < 7; ++i) {
+        LIBLCD_MSG("%llx", msg->regs[i]);
+    }
+
+    if (data[0] > 6) {
+        glue_user_trace("Slow regs sent:");
+        for (i = 7; i < msg->regs[0] - 6; ++i) {
+            LIBLCD_MSG("%llx", page->regs[i]);
+        }
+    }
 
     msg->vmfunc_id = VMFUNC_RPC_CALL;
     msg->rpc_id = id;
@@ -54,13 +72,13 @@ void glue_user_call_server(uint64_t* data, size_t id)
 
     glue_user_trace("Unpacking message in LCD");
 	len = msg->regs[0];
-	memcpy(data, msg->regs, 7);
+	memcpy(data, msg->regs, 7 * sizeof(uint64_t));
 	glue_user_trace("Unpacked fast regs");
 	if (len > 6) {
 		glue_user_trace("Fetching slow regs");
 		page = get_register_page(smp_processor_id());
 		glue_user_trace("Fetched slow regs");
-		memcpy(&data[7], page->regs, len - 6);
+		memcpy(&data[7], page->regs, (len - 6) * sizeof(uint64_t));
 		glue_user_trace("Unpacked slow regs");
 	}
 
@@ -73,6 +91,12 @@ void glue_user_call_client(uint64_t* data, size_t id)
     struct fipc_message* msg = &buffer;
     struct ext_registers* page = 0;
 	size_t len = data[0];
+    int i;
+
+    glue_user_trace("Original sent:");
+    for (i = 0; i < data[0] + 1; ++i) {
+        LIBLCD_MSG("%llx", data[i]);
+    }
 
     glue_user_trace("Packing message in KLCD");
 	memcpy(msg->regs, data, 7);
@@ -84,6 +108,18 @@ void glue_user_call_client(uint64_t* data, size_t id)
 		memcpy(page->regs, &data[7], len - 6);
 		glue_user_trace("Packed slow regs");
 	}
+
+    glue_user_trace("Fast regs sent:");
+    for (i = 0; i < 7; ++i) {
+        LIBLCD_MSG("%llx", msg->regs[i]);
+    }
+
+    if (data[0] > 6) {
+        glue_user_trace("Slow regs sent:");
+        for (i = 7; i < msg->regs[0] - 6; ++i) {
+            LIBLCD_MSG("%llx", page->regs[i]);
+        }
+    }
 
     msg->vmfunc_id = VMFUNC_RPC_CALL;
     msg->rpc_id = id;

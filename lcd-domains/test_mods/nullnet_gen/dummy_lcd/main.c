@@ -71,6 +71,8 @@ static int dummy_lcd_init(void)
 	if (ret)
 		goto fail1;
 
+	glue_user_init();
+
 	ret = dummy_init_module();
 
 	return ret;

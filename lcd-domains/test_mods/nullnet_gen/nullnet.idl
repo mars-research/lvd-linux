@@ -77,13 +77,13 @@ module kernel {
     rpc void rtnl_unlock(  ) {
     }
 
-    rpc void rtnl_link_unregister( projection _global_rtnl_link_ops  *_global_rtnl_link_ops ) {
+    rpc void rtnl_link_unregister(projection _global_rtnl_link_ops  *_global_rtnl_link_ops) {
     }
 
-    rpc void __rtnl_link_unregister( projection _global_rtnl_link_ops  *_global_rtnl_link_ops ) {
+    rpc void __rtnl_link_unregister(projection _global_rtnl_link_ops  *_global_rtnl_link_ops) {
     }
 
-    rpc s32 __rtnl_link_register( projection _global_rtnl_link_ops  *_global_rtnl_link_ops ) {
+    rpc s32 __rtnl_link_register(projection _global_rtnl_link_ops [alloc(callee)]* _global_rtnl_link_ops) {
     }
 
     // TODO: what do with you

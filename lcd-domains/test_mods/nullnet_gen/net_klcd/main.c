@@ -96,6 +96,7 @@ static int net_klcd_init(void)
 	/*
 	 * Init net glue
 	 */
+	glue_user_init();
 	// ret = glue_nullnet_init();
 	// LIBLCD_MSG("-===== > glue nullnet init called\n");
 

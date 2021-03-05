@@ -2,11 +2,21 @@
 
 #include "common.h"
 #include <liblcd/liblcd.h>
-#include <liblcd/liblcd.h>
 #include <libfipc_types.h>
 #include <asm/lcd_domains/libvmfunc.h>
+#include <linux/hashtable.h>
 
 #include <lcd_config/post_hook.h>
+
+DEFINE_HASHTABLE(shadow_ht, 4);
+DEFINE_HASHTABLE(from_shadow, 4);
+bool initialized = 0;
+
+struct shadow_link {
+    struct hlist_node hentry;
+    void* shadow;
+    const void* object;
+};
 
 void glue_user_panic(const char* msg)
 {
@@ -103,13 +113,47 @@ void* glue_user_map_to_shadow(const void* obj)
 
 const void* glue_user_map_from_shadow(const void* shadow)
 {
-    glue_user_panic("glue_user_map_from_shadow");
-    return 0;
+    struct shadow_link *link;
+
+    hash_for_each_possible(shadow_ht, link,
+    		    hentry, (unsigned long) shadow) {
+        if (!link)
+            glue_user_panic("Null detected in shadow_ht");
+
+        if (link->shadow == shadow) {
+            glue_user_trace("Found remote for shadow");
+            if (!link->object)
+                glue_user_panic("Remote for shadow was NULL");
+
+            return link->object;
+        }
+    }
+
+    glue_user_panic("Remote for shadow was not found");
+
+    return NULL;
 }
 
 void glue_user_add_shadow(const void* ptr, void* shadow)
 {
-    glue_user_panic("glue_user_add_shadow");
+    struct shadow_link *link = kzalloc(sizeof(*link), GFP_KERNEL);
+
+    if (!ptr)
+        glue_user_panic("Remote for shadowing was NULL");
+
+    if (!shadow)
+        glue_user_panic("New shadow was NULL");
+
+    if (!link) {
+        glue_user_panic("Couldn't allocate");
+    }
+
+    link->shadow = shadow;
+    link->object = ptr;
+
+    /* use shadow pointer as the key */
+    hash_add(shadow_ht, &link->hentry, (unsigned long) shadow);
+    glue_user_trace("Inserted shadow");
 }
 
 void* glue_user_alloc(size_t size)
@@ -125,6 +169,12 @@ void* glue_user_alloc(size_t size)
 void glue_user_free(void* ptr)
 {
     kfree(ptr);
+}
+
+void glue_user_init(void)
+{
+    hash_init(shadow_ht);
+    hash_init(from_shadow);
 }
 
 // TODO

@@ -1,7 +1,2 @@
 generate
-client.c
-server.c
-common.h
-common.c
 log.txt
-trampolines.lds.S

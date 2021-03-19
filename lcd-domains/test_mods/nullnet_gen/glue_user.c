@@ -209,6 +209,7 @@ void glue_user_free(void* ptr)
 
 void glue_user_init(void)
 {
+    glue_user_trace("Initialized glue layer");
     hash_init(shadow_ht);
     hash_init(from_shadow);
 }

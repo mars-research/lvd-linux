@@ -84,6 +84,11 @@ module kernel {
     }
 
     rpc s32 __rtnl_link_register(projection _global_rtnl_link_ops [alloc(callee)]* _global_rtnl_link_ops) {
+        projection < struct rtnl_link_ops > _global_rtnl_link_ops {
+            const string [alloc(callee)]* kind;
+            rpc_ptr setup setup;
+            rpc_ptr validate validate;
+        }
     }
 
     // TODO: what do with you

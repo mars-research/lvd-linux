@@ -38,7 +38,7 @@ module kernel {
 
     rpc projection ret_net_device [alloc(caller)]* alloc_netdev_mqs(
         s32 sizeof_priv,
-        const string *name,
+        const string [alloc(callee)]* name,
         u8 name_assign_type,
         rpc_ptr setup setup,
         u32 txqs,

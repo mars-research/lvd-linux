@@ -105,7 +105,7 @@ void alloc_netdev_mqs_callee(struct glue_message* msg)
 	struct net_device** ret_ptr = &ret;
 	
 	*sizeof_priv_ptr = glue_unpack(msg, int);
-	*name_ptr = glue_unpack(msg, char const*);
+	*name_ptr = glue_unpack_new_shadow(msg, char const*, sizeof(char) * glue_peek(msg));
 	if (*name_ptr) {
 		char* writable = (char*)*name_ptr;
 		size_t i, len;
@@ -224,11 +224,6 @@ void __rtnl_link_register_callee(struct glue_message* msg)
 	if (*_global_rtnl_link_ops_ptr) {
 		callee_unmarshal_kernel____rtnl_link_register___global_rtnl_link_ops__in(msg, *_global_rtnl_link_ops_ptr);
 	}
-
-	printk("IDLC TRACE: ops->setup: %p, ops->validate: %p, ops->kind: %s",
-		_global_rtnl_link_ops->setup,
-		_global_rtnl_link_ops->validate,
-		_global_rtnl_link_ops->kind);
 
 	ret = __rtnl_link_register(_global_rtnl_link_ops);
 

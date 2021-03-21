@@ -252,6 +252,7 @@ static int __init dummy_init_one(void)
 	 * we need alloc_netdev to allocate more memory for us
 	 * due to alignment this might be larger that the size of net_device_container
 	 */
+	LIBLCD_MSG("alloc_netdev call");
 	dev_dummy = alloc_netdev(0
 			, "dummy%d", NET_NAME_UNKNOWN, dummy_setup);
 	if (!dev_dummy)

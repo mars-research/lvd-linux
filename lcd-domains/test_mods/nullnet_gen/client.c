@@ -98,7 +98,7 @@ struct net_device* alloc_netdev_mqs(int sizeof_priv, char const* name, unsigned 
 	struct net_device** ret_ptr = &ret;
 	
 	glue_pack(msg, *sizeof_priv_ptr);
-	glue_pack_shadow(msg, *name_ptr);
+	glue_pack(msg, *name_ptr);
 	if (*name_ptr) {
 		size_t i, len;
 		char const* array = *name_ptr;
@@ -930,7 +930,7 @@ int try_dispatch(enum RPC_ID id, struct glue_message* msg)
 		glue_user_trace("__dummy_lcd_exit");
 		__dummy_lcd_exit();
 		break;
-		
+
 	case RPC_ID_setup:
 		glue_user_trace("setup\n");
 		setup_callee(msg);

@@ -320,7 +320,7 @@ void trmp_impl_setup(fptr_setup target, struct net_device* dev)
 	struct net_device** dev_ptr = &dev;
 	
 	glue_pack(msg, target);
-	glue_pack_shadow(msg, *dev_ptr);
+	glue_pack(msg, *dev_ptr);
 	if (*dev_ptr) {
 		caller_marshal_kernel__setup__dev__in(msg, *dev_ptr);
 	}
@@ -339,7 +339,7 @@ void setup_callee(struct glue_message* msg)
 	struct net_device* dev = 0;
 	struct net_device** dev_ptr = &dev;
 	
-	*dev_ptr = glue_unpack(msg, struct net_device*);
+	*dev_ptr = glue_unpack_new_shadow(msg, struct net_device*, sizeof(struct net_device));
 	if (*dev_ptr) {
 		callee_unmarshal_kernel__setup__dev__in(msg, *dev_ptr);
 	}

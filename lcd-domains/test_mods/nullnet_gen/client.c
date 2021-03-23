@@ -306,7 +306,7 @@ void trmp_impl_setup(fptr_setup target, struct net_device* dev)
 	struct net_device** dev_ptr = &dev;
 	
 	glue_pack(msg, target);
-	glue_pack_shadow(msg, *dev_ptr);
+	glue_pack(msg, *dev_ptr);
 	if (*dev_ptr) {
 		caller_marshal_kernel__setup__dev__in(msg, *dev_ptr);
 	}
@@ -321,23 +321,39 @@ void trmp_impl_setup(fptr_setup target, struct net_device* dev)
 
 void setup_callee(struct glue_message* msg)
 {
-	fptr_setup function_ptr = glue_unpack(msg, fptr_setup);
-	struct net_device* dev = 0;
-	struct net_device** dev_ptr = &dev;
+	fptr_setup function_ptr;
+	struct net_device* dev;
+	struct net_device** dev_ptr;
+
+	glue_user_trace("#1");
+	function_ptr = glue_unpack(msg, fptr_setup);
+	glue_user_trace("#2");
+	dev = 0;
+	glue_user_trace("#3");
+	dev_ptr = &dev;
+	glue_user_trace("#4");
 	
-	*dev_ptr = glue_unpack(msg, struct net_device*);
+	*dev_ptr = glue_unpack_new_shadow(msg, struct net_device*, sizeof(struct net_device));
+	glue_user_trace("#5");
 	if (*dev_ptr) {
+		glue_user_trace("#6");
 		callee_unmarshal_kernel__setup__dev__in(msg, *dev_ptr);
+		glue_user_trace("#7");
 	}
 
 	function_ptr(dev);
+	glue_user_trace("#8");
 
 	msg->position = 0;
+	glue_user_trace("#9");
 	if (*dev_ptr) {
+		glue_user_trace("#10");
 		callee_marshal_kernel__setup__dev__in(msg, *dev_ptr);
+		glue_user_trace("#11");
 	}
 
 	msg->slots[0] = msg->position;
+	glue_user_trace("#12");
 }
 
 LCD_TRAMPOLINE_DATA(trmp_setup)

@@ -2,6 +2,7 @@
 #define COMMON_H
 
 #include <liblcd/trampoline.h>
+#include <asm/cacheflush.h>
 
 #include "glue_user.h"
 
@@ -14,7 +15,7 @@
 	(type)glue_unpack_new_shadow_impl(glue_unpack(msg, void*), size)
 
 #define glue_unpack_rpc_ptr(msg, name) \
-	glue_peek(msg) ? (fptr_##name)glue_unpack_rpc_ptr_impl(glue_unpack(msg, void*), LCD_DUP_TRAMPOLINE(trmp_##name)) : 0
+	glue_peek(msg) ? (fptr_##name)glue_unpack_rpc_ptr_impl(glue_unpack(msg, void*), LCD_DUP_TRAMPOLINE(trmp_##name), LCD_TRAMPOLINE_SIZE(trmp_##name)) : NULL
 
 #define glue_peek(msg) glue_peek_impl(msg)
 #define glue_call_server(msg, rpc_id) \
@@ -39,6 +40,7 @@ struct glue_message {
 	uint64_t slots[GLUE_MAX_SLOTS];
 	uint64_t position;
 };
+
 extern struct glue_message shared_buffer;
 
 static inline struct glue_message* glue_init_msg(void)
@@ -47,14 +49,15 @@ static inline struct glue_message* glue_init_msg(void)
 	return &shared_buffer;
 }
 
-static inline void* glue_unpack_rpc_ptr_impl(void* target, struct lcd_trampoline_handle* handle)
+static inline void* glue_unpack_rpc_ptr_impl(void* target, struct lcd_trampoline_handle* handle, size_t size)
 {
-if (!target)
+	if (!target)
 		glue_user_panic("Target was NULL");
 
-if (!handle)
+	if (!handle)
 		glue_user_panic("Trmp was NULL");
 
+	set_memory_x(((unsigned long)handle) & PAGE_MASK, ALIGN(size, PAGE_SIZE) >> PAGE_SHIFT);
 	handle->hidden_args = target;
 	return LCD_HANDLE_TO_TRAMPOLINE(handle);
 }

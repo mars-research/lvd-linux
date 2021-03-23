@@ -48,8 +48,8 @@ module kernel {
             u64  features;
             u64  hw_features;
             u64  hw_enc_features;
-            const projection _global_netdev_ops *netdev_ops;
-            const projection _global_ethtool_ops[out] *ethtool_ops;
+            const projection _global_netdev_ops [out, alloc(caller)]* netdev_ops;
+            const projection _global_ethtool_ops[out, alloc(caller)] *ethtool_ops;
             u32  flags;
             u32 [out] priv_flags;
             u8  addr_assign_type;

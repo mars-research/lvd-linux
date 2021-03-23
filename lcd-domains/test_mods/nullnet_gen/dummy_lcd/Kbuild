@@ -1,0 +1,28 @@
+obj-m += lcd_test_mod_nullnet_gen_dummy_lcd.o
+
+lcd_test_mod_nullnet_gen_dummy_lcd-y		+= main.o
+
+# Original code
+lcd_test_mod_nullnet_gen_dummy_lcd-y		+= dummy.o
+
+
+lcd_test_mod_nullnet_gen_dummy_lcd-y		+= $(LIBLCD)
+
+lcd_test_mod_nullnet_gen_dummy_lcd-y += $(addprefix ../, client.o common.o glue_user.o)
+
+# # glue code
+# lcd_test_mod_nullnet_gen_dummy_lcd-y		+= $(addprefix glue/, nullnet_caller.o \
+# 						dispatch.o )
+# 
+# lcd_test_mod_nullnet_gen_dummy_lcd-y		+= $(addprefix ../, cap.o)
+
+ccflags-y += $(ISOLATED_CFLAGS)
+
+extra-y += ../../../liblcd_build/common/vmfunc.lds
+
+ldflags-y += -T $(LIBLCD_BUILD_DIR)/common/vmfunc.lds
+
+cppflags-y += $(ISOLATED_CFLAGS)
+
+extra-y += $(addprefix ../, trampolines.lds)
+ldflags-y += -T $(LCD_TEST_MODULES_BUILD_DIR)/nullnet_gen/trampolines.lds

@@ -117,7 +117,7 @@ int marshal_union_callee(struct fipc_message *msg) {
 
 	obj->type = regs[i++];
 
-	resolve_acpi_object_type_callee(obj, regs);
+	resolve_acpi_object_type_callee(obj, &regs[1]);
 
 	return 0;
 exit:

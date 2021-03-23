@@ -20,7 +20,7 @@ uint64_t test_marshal_empty(void) {
 		async_msg_set_fn_type(msg, MARSHAL_INT);
 		fipc_set_reg0(msg, 0xdeadbeef);
 
-		vmfunc_klcd_wrapper_benchmark(msg, OTHER_DOMAIN);
+		vmfunc_klcd_wrapper(msg, OTHER_DOMAIN);
 	}
 
 	end = rdtsc();

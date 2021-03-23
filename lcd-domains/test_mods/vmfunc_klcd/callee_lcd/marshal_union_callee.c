@@ -12,6 +12,9 @@ void unmarshal_int(union acpi_object *obj, uint64_t *regs) {
 void unmarshal_string(union acpi_object *obj, uint64_t *regs) {
 	int i = 0, len;
 	len = obj->string.length = regs[i++];
+	if (!obj->string.pointer) {
+		obj->string.pointer = kmalloc(len, GFP_KERNEL);
+	}
 	memcpy(obj->string.pointer, &regs[i++], len);
 }
 

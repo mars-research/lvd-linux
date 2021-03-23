@@ -2593,8 +2593,10 @@ gro_result_t napi_gro_receive(struct napi_struct *napi,
 	int func_ret = 0;
 	struct skb_shared_info *shinfo;
 	struct page *p = NULL;
-	u64 hash;
 	struct napi_struct_container *napi_container;
+	struct ext_registers *ext_regs = get_register_page(smp_processor_id());
+	u64 *regs = &ext_regs->regs[0];
+	u32 i = 0;
 
 	INIT_IPC_MSG(&r);
 	napi_container = container_of(napi, struct napi_struct_container, napi_struct);
@@ -2603,28 +2605,31 @@ gro_result_t napi_gro_receive(struct napi_struct *napi,
 
 	async_msg_set_fn_type(_request, NAPI_GRO_RECEIVE);
 
-	fipc_set_reg0(_request, shinfo->nr_frags | (skb->tail << 8));
+	fipc_set_reg0(_request, shinfo->nr_frags);
+	fipc_set_reg1(_request, skb->tail);
 
 	if (shinfo->nr_frags) {
 		skb_frag_t *frag = &shinfo->frags[0];
 		u64 frag_sz = frag->size;
-		fipc_set_reg1(_request,	gpa_val(lcd_gva2gpa(
+		fipc_set_reg2(_request,	gpa_val(lcd_gva2gpa(
 			__gva(
 			(unsigned long)lcd_page_address(
 				skb_frag_page(frag))))));
 		p = skb_frag_page(frag);
-		fipc_set_reg3(_request, frag->page_offset |
-				(frag_sz << 32));
+		fipc_set_reg3(_request, frag->page_offset);
+		fipc_set_reg4(_request, frag_sz);
 	}
-	fipc_set_reg2(_request, skb->protocol |
-			(napi_container->other_ref.cptr << 16));
-	hash = skb->l4_hash | skb->sw_hash << 1;
-	fipc_set_reg4(_request, skb->hash |
-			(hash << 32));
-	fipc_set_reg5(_request, skb->truesize);
-	fipc_set_reg6(_request, skb->queue_mapping |
-			(skb->csum_level << 16) |
-			(skb->ip_summed << 18));
+
+	fipc_set_reg5(_request, napi_container->other_ref.cptr);
+	fipc_set_reg6(_request, skb->truesize);
+
+	SET_EREG(protocol);
+	SET_EREG(l4_hash);
+	SET_EREG(sw_hash);
+	SET_EREG(hash);
+	SET_EREG(queue_mapping);
+	SET_EREG(csum_level);
+	SET_EREG(ip_summed);
 
 	//printk("%s, skb->tail %d | napi_c %lx", __func__, skb->tail, napi_container->other_ref.cptr);
 

@@ -266,12 +266,12 @@ int eth_validate_addr(struct net_device* dev)
 	return ret;
 }
 
-int eth_mac_addr(struct net_device* dev, void* p)
+int eth_mac_addr(struct net_device* dev, struct sockaddr* p)
 {
 	struct glue_message *msg = glue_init_msg();
 
 	struct net_device** dev_ptr = &dev;
-	struct sockaddr** p_ptr = (struct sockaddr**)&p;
+	struct sockaddr** p_ptr = &p;
 	int ret = 0;
 	int* ret_ptr = &ret;
 	
@@ -321,39 +321,23 @@ void trmp_impl_setup(fptr_setup target, struct net_device* dev)
 
 void setup_callee(struct glue_message* msg)
 {
-	fptr_setup function_ptr;
-	struct net_device* dev;
-	struct net_device** dev_ptr;
-
-	glue_user_trace("#1");
-	function_ptr = glue_unpack(msg, fptr_setup);
-	glue_user_trace("#2");
-	dev = 0;
-	glue_user_trace("#3");
-	dev_ptr = &dev;
-	glue_user_trace("#4");
+	fptr_setup function_ptr = glue_unpack(msg, fptr_setup);
+	struct net_device* dev = 0;
+	struct net_device** dev_ptr = &dev;
 	
 	*dev_ptr = glue_unpack_new_shadow(msg, struct net_device*, sizeof(struct net_device));
-	glue_user_trace("#5");
 	if (*dev_ptr) {
-		glue_user_trace("#6");
 		callee_unmarshal_kernel__setup__dev__in(msg, *dev_ptr);
-		glue_user_trace("#7");
 	}
 
 	function_ptr(dev);
-	glue_user_trace("#8");
 
 	msg->position = 0;
-	glue_user_trace("#9");
 	if (*dev_ptr) {
-		glue_user_trace("#10");
 		callee_marshal_kernel__setup__dev__in(msg, *dev_ptr);
-		glue_user_trace("#11");
 	}
 
 	msg->slots[0] = msg->position;
-	glue_user_trace("#12");
 }
 
 LCD_TRAMPOLINE_DATA(trmp_setup)
@@ -937,16 +921,6 @@ int LCD_TRAMPOLINE_LINKAGE(trmp_validate) trmp_validate(struct nlattr** tb, stru
 int try_dispatch(enum RPC_ID id, struct glue_message* msg)
 {
 	switch(id) {
-	case MODULE_INIT:
-		glue_user_trace("__dummy_lcd_init");
-		__dummy_lcd_init();
-		break;
-		
-	case MODULE_EXIT:
-		glue_user_trace("__dummy_lcd_exit");
-		__dummy_lcd_exit();
-		break;
-
 	case RPC_ID_setup:
 		glue_user_trace("setup\n");
 		setup_callee(msg);

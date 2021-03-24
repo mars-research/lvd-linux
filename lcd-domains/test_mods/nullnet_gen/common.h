@@ -104,8 +104,6 @@ static inline void glue_pack_shadow_impl(struct glue_message* msg, const void* p
 }
 
 enum RPC_ID {
-	MODULE_INIT,
-	MODULE_EXIT,
 	RPC_ID_netif_carrier_on,
 	RPC_ID_netif_carrier_off,
 	RPC_ID_register_netdevice,
@@ -653,7 +651,7 @@ typedef void (*fptr_impl_ndo_uninit)(fptr_ndo_uninit target, struct net_device* 
 LCD_TRAMPOLINE_DATA(trmp_ndo_uninit)
 void LCD_TRAMPOLINE_LINKAGE(trmp_ndo_uninit) trmp_ndo_uninit(struct net_device* dev);
 
-typedef netdev_tx_t (*fptr_ndo_start_xmit)(struct sk_buff* skb, struct net_device* dev);
+typedef long long (*fptr_ndo_start_xmit)(struct sk_buff* skb, struct net_device* dev);
 typedef long long (*fptr_impl_ndo_start_xmit)(fptr_ndo_start_xmit target, struct sk_buff* skb, struct net_device* dev);
 
 LCD_TRAMPOLINE_DATA(trmp_ndo_start_xmit)

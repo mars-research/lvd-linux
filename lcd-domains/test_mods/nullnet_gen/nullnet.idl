@@ -129,8 +129,8 @@ module kernel {
             u64 [out] features;
             u64 [out] hw_features;
             u64 [out] hw_enc_features;
-            const projection _global_netdev_ops[out] *netdev_ops;
-            const projection _global_ethtool_ops[out] *ethtool_ops;
+            const projection _global_netdev_ops [alloc(caller)]* [out] netdev_ops;
+            const projection _global_ethtool_ops [alloc(caller)]* [out] ethtool_ops;
             u32 [out] flags;
             u32 [out] priv_flags;
             u8  addr_assign_type;

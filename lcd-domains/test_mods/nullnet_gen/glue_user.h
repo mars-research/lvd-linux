@@ -4,7 +4,7 @@
 #include <linux/etherdevice.h>
 #include <net/rtnetlink.h>
 
-int __dummy_lcd_init(void);
-void __dummy_lcd_exit(void);
+int __module_lcd_init(void);
+void __module_lcd_exit(void);
 
 #endif

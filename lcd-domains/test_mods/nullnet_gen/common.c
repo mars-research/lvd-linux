@@ -931,12 +931,10 @@ void caller_marshal_kernel__setup__dev__in(
 	struct ethtool_ops const* const* ethtool_ops_ptr = &ptr->ethtool_ops;
 	unsigned char const* addr_assign_type_ptr = &ptr->addr_assign_type;
 	
-	glue_pack_shadow(msg, *netdev_ops_ptr);
 	if (*netdev_ops_ptr) {
 		caller_marshal_kernel___global_netdev_ops__out(msg, *netdev_ops_ptr);
 	}
 
-	glue_pack_shadow(msg, *ethtool_ops_ptr);
 	if (*ethtool_ops_ptr) {
 		caller_marshal_kernel___global_ethtool_ops__out(msg, *ethtool_ops_ptr);
 	}
@@ -952,13 +950,11 @@ void callee_unmarshal_kernel__setup__dev__in(
 	struct ethtool_ops const** ethtool_ops_ptr = &ptr->ethtool_ops;
 	unsigned char* addr_assign_type_ptr = &ptr->addr_assign_type;
 	
-	*netdev_ops_ptr = glue_unpack(msg, struct net_device_ops const*);
 	if (*netdev_ops_ptr) {
 		struct net_device_ops* writable = (struct net_device_ops*)*netdev_ops_ptr;
 		callee_unmarshal_kernel___global_netdev_ops__out(msg, writable);
 	}
 
-	*ethtool_ops_ptr = glue_unpack(msg, struct ethtool_ops const*);
 	if (*ethtool_ops_ptr) {
 		struct ethtool_ops* writable = (struct ethtool_ops*)*ethtool_ops_ptr;
 		callee_unmarshal_kernel___global_ethtool_ops__out(msg, writable);
@@ -982,10 +978,12 @@ void callee_marshal_kernel__setup__dev__in(
 	glue_pack(msg, *features_ptr);
 	glue_pack(msg, *hw_features_ptr);
 	glue_pack(msg, *hw_enc_features_ptr);
+	glue_pack(msg, *netdev_ops_ptr);
 	if (*netdev_ops_ptr) {
 		callee_marshal_kernel___global_netdev_ops__out(msg, *netdev_ops_ptr);
 	}
 
+	glue_pack(msg, *ethtool_ops_ptr);
 	if (*ethtool_ops_ptr) {
 		callee_marshal_kernel___global_ethtool_ops__out(msg, *ethtool_ops_ptr);
 	}
@@ -1009,11 +1007,13 @@ void caller_unmarshal_kernel__setup__dev__in(
 	*features_ptr = glue_unpack(msg, unsigned long long);
 	*hw_features_ptr = glue_unpack(msg, unsigned long long);
 	*hw_enc_features_ptr = glue_unpack(msg, unsigned long long);
+	*netdev_ops_ptr = glue_unpack_new_shadow(msg, struct net_device_ops const*, sizeof(struct net_device_ops));
 	if (*netdev_ops_ptr) {
 		struct net_device_ops* writable = (struct net_device_ops*)*netdev_ops_ptr;
 		caller_unmarshal_kernel___global_netdev_ops__out(msg, writable);
 	}
 
+	*ethtool_ops_ptr = glue_unpack_new_shadow(msg, struct ethtool_ops const*, sizeof(struct ethtool_ops));
 	if (*ethtool_ops_ptr) {
 		struct ethtool_ops* writable = (struct ethtool_ops*)*ethtool_ops_ptr;
 		caller_unmarshal_kernel___global_ethtool_ops__out(msg, writable);

@@ -9,11 +9,12 @@
 #include <lcd_config/post_hook.h>
 
 DEFINE_HASHTABLE(shadow_ht, 4);
-DEFINE_HASHTABLE(from_shadow, 4);
+DEFINE_HASHTABLE(to_shadow_ht, 4);
 bool initialized = 0;
 
 struct shadow_link {
     struct hlist_node hentry;
+    struct hlist_node to_hentry;
     void* shadow;
     const void* object;
 };
@@ -60,7 +61,7 @@ void glue_user_call_server(uint64_t* data, size_t id)
 
     if (data[0] > 6) {
         glue_user_trace("Slow regs sent:");
-        for (i = 7; i < msg->regs[0] - 6; ++i) {
+        for (i = 7; i < (msg->regs[0] - 6); ++i) {
             LIBLCD_MSG("%llx", page->regs[i]);
         }
     }
@@ -128,8 +129,16 @@ void glue_user_call_client(uint64_t* data, size_t id)
 
     glue_user_trace("Unpacking message in KLCD");
 	len = msg->regs[0];
+    printk("%s, Received %ld messages", __func__, len);
 	// FIXME: do we need to copy out len to data?
-	memcpy(data, &msg->regs[1], 7 * sizeof(uint64_t));
+	memcpy(data, &msg->regs[0], 7 * sizeof(uint64_t));
+	{
+		int i;
+		for (i = 0; i < 7; i++) {
+			printk("data[%d] = %llx\n",
+				i, data[i]);
+		}
+	}
 	glue_user_trace("Unpacked fast regs");
 	if (len > 6) {
 		glue_user_trace("Fetching slow regs");
@@ -144,14 +153,33 @@ void glue_user_call_client(uint64_t* data, size_t id)
 
 void* glue_user_map_to_shadow(const void* obj)
 {
-    glue_user_panic("glue_user_map_to_shadow");
-    return 0;
+    struct shadow_link *link;
+
+    LIBLCD_MSG("Lookup for key %p\n", obj);
+    hash_for_each_possible(to_shadow_ht, link,
+                    to_hentry, (unsigned long) obj) {
+        if (!link)
+            glue_user_panic("Null detected in shadow_ht");
+
+        if (link->object == obj) {
+            glue_user_trace("Found remote for shadow");
+            if (!link->shadow)
+                glue_user_panic("Remote for shadow was NULL");
+
+            return link->shadow;
+        }
+    }
+
+    glue_user_panic("Remote for shadow was not found in to_shadow_ht");
+
+    return NULL;
 }
 
 const void* glue_user_map_from_shadow(const void* shadow)
 {
     struct shadow_link *link;
 
+    LIBLCD_MSG("Lookup for key %p\n", shadow);
     hash_for_each_possible(shadow_ht, link,
     		    hentry, (unsigned long) shadow) {
         if (!link)
@@ -166,7 +194,7 @@ const void* glue_user_map_from_shadow(const void* shadow)
         }
     }
 
-    glue_user_panic("Remote for shadow was not found");
+    glue_user_panic("Remote for shadow was not found in shadow_ht");
 
     return NULL;
 }
@@ -190,7 +218,8 @@ void glue_user_add_shadow(const void* ptr, void* shadow)
 
     /* use shadow pointer as the key */
     hash_add(shadow_ht, &link->hentry, (unsigned long) shadow);
-    glue_user_trace("Inserted shadow");
+    hash_add(to_shadow_ht, &link->to_hentry, (unsigned long) link->object);
+    LIBLCD_MSG("Inserted shadow with <key %p, ptr %p>\n", shadow, ptr);
 }
 
 void* glue_user_alloc(size_t size)
@@ -199,6 +228,7 @@ void* glue_user_alloc(size_t size)
     if (!ptr) {
         glue_user_panic("Couldn't allocate");
     }
+    printk("%s, allocated %p | size %ld\n", __func__, ptr, size);
 
     return ptr;
 }
@@ -212,7 +242,7 @@ void glue_user_init(void)
 {
     glue_user_trace("Initialized glue layer");
     hash_init(shadow_ht);
-    hash_init(from_shadow);
+    hash_init(to_shadow_ht);
 }
 
 // TODO

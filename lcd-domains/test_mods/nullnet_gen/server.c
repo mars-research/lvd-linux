@@ -9,6 +9,10 @@ void netif_carrier_on_callee(struct glue_message* msg)
 	struct net_device* dev = 0;
 	struct net_device** dev_ptr = &dev;
 	
+	if (verbose_debug) {
+		printk("%s:%d, entered!\n", __func__, __LINE__);
+	}
+
 	*dev_ptr = glue_unpack(msg, struct net_device*);
 	if (*dev_ptr) {
 		callee_unmarshal_kernel__netif_carrier_on__dev__in(msg, *dev_ptr);
@@ -22,6 +26,9 @@ void netif_carrier_on_callee(struct glue_message* msg)
 	}
 
 	msg->slots[0] = msg->position;
+	if (verbose_debug) {
+		printk("%s:%d, returned!\n", __func__, __LINE__);
+	}
 }
 
 void netif_carrier_off_callee(struct glue_message* msg)
@@ -29,6 +36,10 @@ void netif_carrier_off_callee(struct glue_message* msg)
 	struct net_device* dev = 0;
 	struct net_device** dev_ptr = &dev;
 	
+	if (verbose_debug) {
+		printk("%s:%d, entered!\n", __func__, __LINE__);
+	}
+
 	*dev_ptr = glue_unpack(msg, struct net_device*);
 	if (*dev_ptr) {
 		callee_unmarshal_kernel__netif_carrier_off__dev__in(msg, *dev_ptr);
@@ -42,6 +53,9 @@ void netif_carrier_off_callee(struct glue_message* msg)
 	}
 
 	msg->slots[0] = msg->position;
+	if (verbose_debug) {
+		printk("%s:%d, returned!\n", __func__, __LINE__);
+	}
 }
 
 void register_netdevice_callee(struct glue_message* msg)
@@ -51,6 +65,10 @@ void register_netdevice_callee(struct glue_message* msg)
 	int ret = 0;
 	int* ret_ptr = &ret;
 	
+	if (verbose_debug) {
+		printk("%s:%d, entered!\n", __func__, __LINE__);
+	}
+
 	*dev_ptr = glue_unpack(msg, struct net_device*);
 	if (*dev_ptr) {
 		callee_unmarshal_kernel__register_netdevice__dev__in(msg, *dev_ptr);
@@ -65,6 +83,9 @@ void register_netdevice_callee(struct glue_message* msg)
 
 	glue_pack(msg, *ret_ptr);
 	msg->slots[0] = msg->position;
+	if (verbose_debug) {
+		printk("%s:%d, returned!\n", __func__, __LINE__);
+	}
 }
 
 void consume_skb_callee(struct glue_message* msg)
@@ -72,6 +93,10 @@ void consume_skb_callee(struct glue_message* msg)
 	struct sk_buff* skb = 0;
 	struct sk_buff** skb_ptr = &skb;
 	
+	if (verbose_debug) {
+		printk("%s:%d, entered!\n", __func__, __LINE__);
+	}
+
 	*skb_ptr = glue_unpack(msg, struct sk_buff*);
 	if (*skb_ptr) {
 		callee_unmarshal_kernel__consume_skb__skb__in(msg, *skb_ptr);
@@ -85,6 +110,9 @@ void consume_skb_callee(struct glue_message* msg)
 	}
 
 	msg->slots[0] = msg->position;
+	if (verbose_debug) {
+		printk("%s:%d, returned!\n", __func__, __LINE__);
+	}
 }
 
 void alloc_netdev_mqs_callee(struct glue_message* msg)
@@ -104,6 +132,10 @@ void alloc_netdev_mqs_callee(struct glue_message* msg)
 	struct net_device* ret = 0;
 	struct net_device** ret_ptr = &ret;
 	
+	if (verbose_debug) {
+		printk("%s:%d, entered!\n", __func__, __LINE__);
+	}
+
 	*sizeof_priv_ptr = glue_unpack(msg, int);
 	*name_ptr = glue_unpack_new_shadow(msg, char const*, sizeof(char) * glue_peek(msg));
 	if (*name_ptr) {
@@ -118,6 +150,7 @@ void alloc_netdev_mqs_callee(struct glue_message* msg)
 		}
 
 	}
+	printk("%s, name %s\n", __func__, name);
 
 	*name_assign_type_ptr = glue_unpack(msg, unsigned char);
 	*setup_ptr = glue_unpack_rpc_ptr(msg, setup);
@@ -125,14 +158,24 @@ void alloc_netdev_mqs_callee(struct glue_message* msg)
 	*rxqs_ptr = glue_unpack(msg, unsigned int);
 	ret = alloc_netdev_mqs(sizeof_priv, name, name_assign_type, setup, txqs, rxqs);
 
+	printk("%s, dev->netdev_ops %p\n", __func__, ret->netdev_ops);
+
 	msg->position = 0;
 	(void)name_ptr;
+
+	printk("%s, packing netdev_ptr %p\n", __func__, *ret_ptr);
+	printk("%s, ret %p | ret_ptr %p | &ret_ptr %p\n", __func__,
+				ret, ret_ptr, &ret_ptr);
 	glue_pack(msg, *ret_ptr);
 	if (*ret_ptr) {
+		printk("%s:%d, netdev %p | dev->netdev_ops %p\n", __func__, __LINE__, ret, ret->netdev_ops);
 		callee_marshal_kernel__alloc_netdev_mqs__ret_net_device__out(msg, *ret_ptr);
 	}
 
 	msg->slots[0] = msg->position;
+	if (verbose_debug) {
+		printk("%s:%d, returned!\n", __func__, __LINE__);
+	}
 }
 
 void free_netdev_callee(struct glue_message* msg)
@@ -140,6 +183,10 @@ void free_netdev_callee(struct glue_message* msg)
 	struct net_device* dev = 0;
 	struct net_device** dev_ptr = &dev;
 	
+	if (verbose_debug) {
+		printk("%s:%d, entered!\n", __func__, __LINE__);
+	}
+
 	*dev_ptr = glue_unpack(msg, struct net_device*);
 	if (*dev_ptr) {
 		callee_unmarshal_kernel__free_netdev__dev__in(msg, *dev_ptr);
@@ -153,24 +200,41 @@ void free_netdev_callee(struct glue_message* msg)
 	}
 
 	msg->slots[0] = msg->position;
+	if (verbose_debug) {
+		printk("%s:%d, returned!\n", __func__, __LINE__);
+	}
 }
 
 void rtnl_lock_callee(struct glue_message* msg)
 {
 	
+	if (verbose_debug) {
+		printk("%s:%d, entered!\n", __func__, __LINE__);
+	}
+
 	rtnl_lock();
 
 	msg->position = 0;
 	msg->slots[0] = msg->position;
+	if (verbose_debug) {
+		printk("%s:%d, returned!\n", __func__, __LINE__);
+	}
 }
 
 void rtnl_unlock_callee(struct glue_message* msg)
 {
 	
+	if (verbose_debug) {
+		printk("%s:%d, entered!\n", __func__, __LINE__);
+	}
+
 	rtnl_unlock();
 
 	msg->position = 0;
 	msg->slots[0] = msg->position;
+	if (verbose_debug) {
+		printk("%s:%d, returned!\n", __func__, __LINE__);
+	}
 }
 
 void rtnl_link_unregister_callee(struct glue_message* msg)
@@ -178,6 +242,10 @@ void rtnl_link_unregister_callee(struct glue_message* msg)
 	struct rtnl_link_ops* _global_rtnl_link_ops = 0;
 	struct rtnl_link_ops** _global_rtnl_link_ops_ptr = &_global_rtnl_link_ops;
 	
+	if (verbose_debug) {
+		printk("%s:%d, entered!\n", __func__, __LINE__);
+	}
+
 	*_global_rtnl_link_ops_ptr = glue_unpack(msg, struct rtnl_link_ops*);
 	if (*_global_rtnl_link_ops_ptr) {
 		callee_unmarshal_kernel___global_rtnl_link_ops__in(msg, *_global_rtnl_link_ops_ptr);
@@ -191,6 +259,9 @@ void rtnl_link_unregister_callee(struct glue_message* msg)
 	}
 
 	msg->slots[0] = msg->position;
+	if (verbose_debug) {
+		printk("%s:%d, returned!\n", __func__, __LINE__);
+	}
 }
 
 void __rtnl_link_unregister_callee(struct glue_message* msg)
@@ -198,6 +269,10 @@ void __rtnl_link_unregister_callee(struct glue_message* msg)
 	struct rtnl_link_ops* _global_rtnl_link_ops = 0;
 	struct rtnl_link_ops** _global_rtnl_link_ops_ptr = &_global_rtnl_link_ops;
 	
+	if (verbose_debug) {
+		printk("%s:%d, entered!\n", __func__, __LINE__);
+	}
+
 	*_global_rtnl_link_ops_ptr = glue_unpack(msg, struct rtnl_link_ops*);
 	if (*_global_rtnl_link_ops_ptr) {
 		callee_unmarshal_kernel___global_rtnl_link_ops__in(msg, *_global_rtnl_link_ops_ptr);
@@ -211,6 +286,9 @@ void __rtnl_link_unregister_callee(struct glue_message* msg)
 	}
 
 	msg->slots[0] = msg->position;
+	if (verbose_debug) {
+		printk("%s:%d, returned!\n", __func__, __LINE__);
+	}
 }
 
 void __rtnl_link_register_callee(struct glue_message* msg)
@@ -220,6 +298,10 @@ void __rtnl_link_register_callee(struct glue_message* msg)
 	int ret = 0;
 	int* ret_ptr = &ret;
 	
+	if (verbose_debug) {
+		printk("%s:%d, entered!\n", __func__, __LINE__);
+	}
+
 	*_global_rtnl_link_ops_ptr = glue_unpack_new_shadow(msg, struct rtnl_link_ops*, sizeof(struct rtnl_link_ops));
 	if (*_global_rtnl_link_ops_ptr) {
 		callee_unmarshal_kernel____rtnl_link_register___global_rtnl_link_ops__in(msg, *_global_rtnl_link_ops_ptr);
@@ -234,6 +316,9 @@ void __rtnl_link_register_callee(struct glue_message* msg)
 
 	glue_pack(msg, *ret_ptr);
 	msg->slots[0] = msg->position;
+	if (verbose_debug) {
+		printk("%s:%d, returned!\n", __func__, __LINE__);
+	}
 }
 
 void ether_setup_callee(struct glue_message* msg)
@@ -241,6 +326,10 @@ void ether_setup_callee(struct glue_message* msg)
 	struct net_device* dev = 0;
 	struct net_device** dev_ptr = &dev;
 	
+	if (verbose_debug) {
+		printk("%s:%d, entered!\n", __func__, __LINE__);
+	}
+
 	*dev_ptr = glue_unpack(msg, struct net_device*);
 	if (*dev_ptr) {
 		callee_unmarshal_kernel__ether_setup__dev__in(msg, *dev_ptr);
@@ -254,6 +343,9 @@ void ether_setup_callee(struct glue_message* msg)
 	}
 
 	msg->slots[0] = msg->position;
+	if (verbose_debug) {
+		printk("%s:%d, returned!\n", __func__, __LINE__);
+	}
 }
 
 void eth_validate_addr_callee(struct glue_message* msg)
@@ -263,6 +355,10 @@ void eth_validate_addr_callee(struct glue_message* msg)
 	int ret = 0;
 	int* ret_ptr = &ret;
 	
+	if (verbose_debug) {
+		printk("%s:%d, entered!\n", __func__, __LINE__);
+	}
+
 	*dev_ptr = glue_unpack(msg, struct net_device*);
 	if (*dev_ptr) {
 		callee_unmarshal_kernel__eth_validate_addr__dev__in(msg, *dev_ptr);
@@ -277,6 +373,9 @@ void eth_validate_addr_callee(struct glue_message* msg)
 
 	glue_pack(msg, *ret_ptr);
 	msg->slots[0] = msg->position;
+	if (verbose_debug) {
+		printk("%s:%d, returned!\n", __func__, __LINE__);
+	}
 }
 
 void eth_mac_addr_callee(struct glue_message* msg)
@@ -288,6 +387,10 @@ void eth_mac_addr_callee(struct glue_message* msg)
 	int ret = 0;
 	int* ret_ptr = &ret;
 	
+	if (verbose_debug) {
+		printk("%s:%d, entered!\n", __func__, __LINE__);
+	}
+
 	*dev_ptr = glue_unpack(msg, struct net_device*);
 	if (*dev_ptr) {
 		callee_unmarshal_kernel__eth_mac_addr__dev__in(msg, *dev_ptr);
@@ -311,6 +414,9 @@ void eth_mac_addr_callee(struct glue_message* msg)
 
 	glue_pack(msg, *ret_ptr);
 	msg->slots[0] = msg->position;
+	if (verbose_debug) {
+		printk("%s:%d, returned!\n", __func__, __LINE__);
+	}
 }
 
 void trmp_impl_setup(fptr_setup target, struct net_device* dev)
@@ -319,6 +425,10 @@ void trmp_impl_setup(fptr_setup target, struct net_device* dev)
 
 	struct net_device** dev_ptr = &dev;
 	
+	if (verbose_debug) {
+		printk("%s:%d, entered!\n", __func__, __LINE__);
+	}
+
 	glue_pack(msg, target);
 	glue_pack(msg, *dev_ptr);
 	if (*dev_ptr) {
@@ -327,10 +437,16 @@ void trmp_impl_setup(fptr_setup target, struct net_device* dev)
 
 	glue_call_client(msg, RPC_ID_setup);
 
+	printk("%s, after returning from LCD dev %p\n", __func__, *dev_ptr);
+	msg->position = 0;
 	if (*dev_ptr) {
 		caller_unmarshal_kernel__setup__dev__in(msg, *dev_ptr);
 	}
 
+	printk("%s, dev->netdev_ops %p\n", __func__, dev->netdev_ops);
+	if (verbose_debug) {
+		printk("%s:%d, returned!\n", __func__, __LINE__);
+	}
 }
 
 void setup_callee(struct glue_message* msg)
@@ -339,6 +455,10 @@ void setup_callee(struct glue_message* msg)
 	struct net_device* dev = 0;
 	struct net_device** dev_ptr = &dev;
 	
+	if (verbose_debug) {
+		printk("%s:%d, entered!\n", __func__, __LINE__);
+	}
+
 	*dev_ptr = glue_unpack_new_shadow(msg, struct net_device*, sizeof(struct net_device));
 	if (*dev_ptr) {
 		callee_unmarshal_kernel__setup__dev__in(msg, *dev_ptr);
@@ -352,6 +472,9 @@ void setup_callee(struct glue_message* msg)
 	}
 
 	msg->slots[0] = msg->position;
+	if (verbose_debug) {
+		printk("%s:%d, returned!\n", __func__, __LINE__);
+	}
 }
 
 LCD_TRAMPOLINE_DATA(trmp_setup)
@@ -371,6 +494,10 @@ void trmp_impl_get_drvinfo(fptr_get_drvinfo target, struct net_device* dev, stru
 	struct net_device** dev_ptr = &dev;
 	struct ethtool_drvinfo** info_ptr = &info;
 	
+	if (verbose_debug) {
+		printk("%s:%d, entered!\n", __func__, __LINE__);
+	}
+
 	glue_pack(msg, target);
 	glue_pack_shadow(msg, *dev_ptr);
 	if (*dev_ptr) {
@@ -384,6 +511,7 @@ void trmp_impl_get_drvinfo(fptr_get_drvinfo target, struct net_device* dev, stru
 
 	glue_call_client(msg, RPC_ID_get_drvinfo);
 
+	msg->position = 0;
 	if (*dev_ptr) {
 		caller_unmarshal_kernel__get_drvinfo__dev__in(msg, *dev_ptr);
 	}
@@ -392,6 +520,9 @@ void trmp_impl_get_drvinfo(fptr_get_drvinfo target, struct net_device* dev, stru
 		caller_unmarshal_kernel__get_drvinfo__info__in(msg, *info_ptr);
 	}
 
+	if (verbose_debug) {
+		printk("%s:%d, returned!\n", __func__, __LINE__);
+	}
 }
 
 void get_drvinfo_callee(struct glue_message* msg)
@@ -402,6 +533,10 @@ void get_drvinfo_callee(struct glue_message* msg)
 	struct net_device** dev_ptr = &dev;
 	struct ethtool_drvinfo** info_ptr = &info;
 	
+	if (verbose_debug) {
+		printk("%s:%d, entered!\n", __func__, __LINE__);
+	}
+
 	*dev_ptr = glue_unpack(msg, struct net_device*);
 	if (*dev_ptr) {
 		callee_unmarshal_kernel__get_drvinfo__dev__in(msg, *dev_ptr);
@@ -424,6 +559,9 @@ void get_drvinfo_callee(struct glue_message* msg)
 	}
 
 	msg->slots[0] = msg->position;
+	if (verbose_debug) {
+		printk("%s:%d, returned!\n", __func__, __LINE__);
+	}
 }
 
 LCD_TRAMPOLINE_DATA(trmp_get_drvinfo)
@@ -444,6 +582,10 @@ int trmp_impl_ndo_init(fptr_ndo_init target, struct net_device* dev)
 	int ret = 0;
 	int* ret_ptr = &ret;
 	
+	if (verbose_debug) {
+		printk("%s:%d, entered!\n", __func__, __LINE__);
+	}
+
 	glue_pack(msg, target);
 	glue_pack_shadow(msg, *dev_ptr);
 	if (*dev_ptr) {
@@ -452,11 +594,15 @@ int trmp_impl_ndo_init(fptr_ndo_init target, struct net_device* dev)
 
 	glue_call_client(msg, RPC_ID_ndo_init);
 
+	msg->position = 0;
 	if (*dev_ptr) {
 		caller_unmarshal_kernel__ndo_init__dev__in(msg, *dev_ptr);
 	}
 
 	*ret_ptr = glue_unpack(msg, int);
+	if (verbose_debug) {
+		printk("%s:%d, returned!\n", __func__, __LINE__);
+	}
 	return ret;
 }
 
@@ -468,6 +614,10 @@ void ndo_init_callee(struct glue_message* msg)
 	int ret = 0;
 	int* ret_ptr = &ret;
 	
+	if (verbose_debug) {
+		printk("%s:%d, entered!\n", __func__, __LINE__);
+	}
+
 	*dev_ptr = glue_unpack(msg, struct net_device*);
 	if (*dev_ptr) {
 		callee_unmarshal_kernel__ndo_init__dev__in(msg, *dev_ptr);
@@ -482,6 +632,9 @@ void ndo_init_callee(struct glue_message* msg)
 
 	glue_pack(msg, *ret_ptr);
 	msg->slots[0] = msg->position;
+	if (verbose_debug) {
+		printk("%s:%d, returned!\n", __func__, __LINE__);
+	}
 }
 
 LCD_TRAMPOLINE_DATA(trmp_ndo_init)
@@ -500,6 +653,10 @@ void trmp_impl_ndo_uninit(fptr_ndo_uninit target, struct net_device* dev)
 
 	struct net_device** dev_ptr = &dev;
 	
+	if (verbose_debug) {
+		printk("%s:%d, entered!\n", __func__, __LINE__);
+	}
+
 	glue_pack(msg, target);
 	glue_pack_shadow(msg, *dev_ptr);
 	if (*dev_ptr) {
@@ -508,10 +665,14 @@ void trmp_impl_ndo_uninit(fptr_ndo_uninit target, struct net_device* dev)
 
 	glue_call_client(msg, RPC_ID_ndo_uninit);
 
+	msg->position = 0;
 	if (*dev_ptr) {
 		caller_unmarshal_kernel__ndo_uninit__dev__in(msg, *dev_ptr);
 	}
 
+	if (verbose_debug) {
+		printk("%s:%d, returned!\n", __func__, __LINE__);
+	}
 }
 
 void ndo_uninit_callee(struct glue_message* msg)
@@ -520,6 +681,10 @@ void ndo_uninit_callee(struct glue_message* msg)
 	struct net_device* dev = 0;
 	struct net_device** dev_ptr = &dev;
 	
+	if (verbose_debug) {
+		printk("%s:%d, entered!\n", __func__, __LINE__);
+	}
+
 	*dev_ptr = glue_unpack(msg, struct net_device*);
 	if (*dev_ptr) {
 		callee_unmarshal_kernel__ndo_uninit__dev__in(msg, *dev_ptr);
@@ -533,6 +698,9 @@ void ndo_uninit_callee(struct glue_message* msg)
 	}
 
 	msg->slots[0] = msg->position;
+	if (verbose_debug) {
+		printk("%s:%d, returned!\n", __func__, __LINE__);
+	}
 }
 
 LCD_TRAMPOLINE_DATA(trmp_ndo_uninit)
@@ -554,6 +722,10 @@ long long trmp_impl_ndo_start_xmit(fptr_ndo_start_xmit target, struct sk_buff* s
 	long long ret = 0;
 	long long* ret_ptr = &ret;
 	
+	if (verbose_debug) {
+		printk("%s:%d, entered!\n", __func__, __LINE__);
+	}
+
 	glue_pack(msg, target);
 	glue_pack_shadow(msg, *skb_ptr);
 	if (*skb_ptr) {
@@ -567,6 +739,7 @@ long long trmp_impl_ndo_start_xmit(fptr_ndo_start_xmit target, struct sk_buff* s
 
 	glue_call_client(msg, RPC_ID_ndo_start_xmit);
 
+	msg->position = 0;
 	if (*skb_ptr) {
 		caller_unmarshal_kernel__ndo_start_xmit__skb__in(msg, *skb_ptr);
 	}
@@ -576,6 +749,9 @@ long long trmp_impl_ndo_start_xmit(fptr_ndo_start_xmit target, struct sk_buff* s
 	}
 
 	*ret_ptr = glue_unpack(msg, long long);
+	if (verbose_debug) {
+		printk("%s:%d, returned!\n", __func__, __LINE__);
+	}
 	return ret;
 }
 
@@ -589,6 +765,10 @@ void ndo_start_xmit_callee(struct glue_message* msg)
 	long long ret = 0;
 	long long* ret_ptr = &ret;
 	
+	if (verbose_debug) {
+		printk("%s:%d, entered!\n", __func__, __LINE__);
+	}
+
 	*skb_ptr = glue_unpack(msg, struct sk_buff*);
 	if (*skb_ptr) {
 		callee_unmarshal_kernel__ndo_start_xmit__skb__in(msg, *skb_ptr);
@@ -612,6 +792,9 @@ void ndo_start_xmit_callee(struct glue_message* msg)
 
 	glue_pack(msg, *ret_ptr);
 	msg->slots[0] = msg->position;
+	if (verbose_debug) {
+		printk("%s:%d, returned!\n", __func__, __LINE__);
+	}
 }
 
 LCD_TRAMPOLINE_DATA(trmp_ndo_start_xmit)
@@ -630,6 +813,10 @@ void trmp_impl_ndo_set_rx_mode(fptr_ndo_set_rx_mode target, struct net_device* d
 
 	struct net_device** dev_ptr = &dev;
 	
+	if (verbose_debug) {
+		printk("%s:%d, entered!\n", __func__, __LINE__);
+	}
+
 	glue_pack(msg, target);
 	glue_pack_shadow(msg, *dev_ptr);
 	if (*dev_ptr) {
@@ -638,10 +825,14 @@ void trmp_impl_ndo_set_rx_mode(fptr_ndo_set_rx_mode target, struct net_device* d
 
 	glue_call_client(msg, RPC_ID_ndo_set_rx_mode);
 
+	msg->position = 0;
 	if (*dev_ptr) {
 		caller_unmarshal_kernel__ndo_set_rx_mode__dev__in(msg, *dev_ptr);
 	}
 
+	if (verbose_debug) {
+		printk("%s:%d, returned!\n", __func__, __LINE__);
+	}
 }
 
 void ndo_set_rx_mode_callee(struct glue_message* msg)
@@ -650,6 +841,10 @@ void ndo_set_rx_mode_callee(struct glue_message* msg)
 	struct net_device* dev = 0;
 	struct net_device** dev_ptr = &dev;
 	
+	if (verbose_debug) {
+		printk("%s:%d, entered!\n", __func__, __LINE__);
+	}
+
 	*dev_ptr = glue_unpack(msg, struct net_device*);
 	if (*dev_ptr) {
 		callee_unmarshal_kernel__ndo_set_rx_mode__dev__in(msg, *dev_ptr);
@@ -663,6 +858,9 @@ void ndo_set_rx_mode_callee(struct glue_message* msg)
 	}
 
 	msg->slots[0] = msg->position;
+	if (verbose_debug) {
+		printk("%s:%d, returned!\n", __func__, __LINE__);
+	}
 }
 
 LCD_TRAMPOLINE_DATA(trmp_ndo_set_rx_mode)
@@ -684,6 +882,10 @@ struct rtnl_link_stats64* trmp_impl_ndo_get_stats64(fptr_ndo_get_stats64 target,
 	struct rtnl_link_stats64* ret = 0;
 	struct rtnl_link_stats64** ret_ptr = &ret;
 	
+	if (verbose_debug) {
+		printk("%s:%d, entered!\n", __func__, __LINE__);
+	}
+
 	glue_pack(msg, target);
 	glue_pack_shadow(msg, *dev_ptr);
 	if (*dev_ptr) {
@@ -697,6 +899,7 @@ struct rtnl_link_stats64* trmp_impl_ndo_get_stats64(fptr_ndo_get_stats64 target,
 
 	glue_call_client(msg, RPC_ID_ndo_get_stats64);
 
+	msg->position = 0;
 	if (*dev_ptr) {
 		caller_unmarshal_kernel__ndo_get_stats64__dev__in(msg, *dev_ptr);
 	}
@@ -710,6 +913,9 @@ struct rtnl_link_stats64* trmp_impl_ndo_get_stats64(fptr_ndo_get_stats64 target,
 		caller_unmarshal_kernel__ndo_get_stats64__ret_rtnl_link_stats64__out(msg, *ret_ptr);
 	}
 
+	if (verbose_debug) {
+		printk("%s:%d, returned!\n", __func__, __LINE__);
+	}
 	return ret;
 }
 
@@ -723,6 +929,10 @@ void ndo_get_stats64_callee(struct glue_message* msg)
 	struct rtnl_link_stats64* ret = 0;
 	struct rtnl_link_stats64** ret_ptr = &ret;
 	
+	if (verbose_debug) {
+		printk("%s:%d, entered!\n", __func__, __LINE__);
+	}
+
 	*dev_ptr = glue_unpack(msg, struct net_device*);
 	if (*dev_ptr) {
 		callee_unmarshal_kernel__ndo_get_stats64__dev__in(msg, *dev_ptr);
@@ -750,6 +960,9 @@ void ndo_get_stats64_callee(struct glue_message* msg)
 	}
 
 	msg->slots[0] = msg->position;
+	if (verbose_debug) {
+		printk("%s:%d, returned!\n", __func__, __LINE__);
+	}
 }
 
 LCD_TRAMPOLINE_DATA(trmp_ndo_get_stats64)
@@ -771,6 +984,10 @@ int trmp_impl_ndo_change_carrier(fptr_ndo_change_carrier target, struct net_devi
 	int ret = 0;
 	int* ret_ptr = &ret;
 	
+	if (verbose_debug) {
+		printk("%s:%d, entered!\n", __func__, __LINE__);
+	}
+
 	glue_pack(msg, target);
 	glue_pack_shadow(msg, *dev_ptr);
 	if (*dev_ptr) {
@@ -780,11 +997,15 @@ int trmp_impl_ndo_change_carrier(fptr_ndo_change_carrier target, struct net_devi
 	glue_pack(msg, *new_carrier_ptr);
 	glue_call_client(msg, RPC_ID_ndo_change_carrier);
 
+	msg->position = 0;
 	if (*dev_ptr) {
 		caller_unmarshal_kernel__ndo_change_carrier__dev__in(msg, *dev_ptr);
 	}
 
 	*ret_ptr = glue_unpack(msg, int);
+	if (verbose_debug) {
+		printk("%s:%d, returned!\n", __func__, __LINE__);
+	}
 	return ret;
 }
 
@@ -798,6 +1019,10 @@ void ndo_change_carrier_callee(struct glue_message* msg)
 	int ret = 0;
 	int* ret_ptr = &ret;
 	
+	if (verbose_debug) {
+		printk("%s:%d, entered!\n", __func__, __LINE__);
+	}
+
 	*dev_ptr = glue_unpack(msg, struct net_device*);
 	if (*dev_ptr) {
 		callee_unmarshal_kernel__ndo_change_carrier__dev__in(msg, *dev_ptr);
@@ -813,6 +1038,9 @@ void ndo_change_carrier_callee(struct glue_message* msg)
 
 	glue_pack(msg, *ret_ptr);
 	msg->slots[0] = msg->position;
+	if (verbose_debug) {
+		printk("%s:%d, returned!\n", __func__, __LINE__);
+	}
 }
 
 LCD_TRAMPOLINE_DATA(trmp_ndo_change_carrier)
@@ -834,6 +1062,10 @@ int trmp_impl_validate(fptr_validate target, struct nlattr** tb, struct nlattr**
 	int ret = 0;
 	int* ret_ptr = &ret;
 	
+	if (verbose_debug) {
+		printk("%s:%d, entered!\n", __func__, __LINE__);
+	}
+
 	glue_pack(msg, target);
 	glue_pack_shadow(msg, *tb_ptr);
 	if (*tb_ptr) {
@@ -855,6 +1087,7 @@ int trmp_impl_validate(fptr_validate target, struct nlattr** tb, struct nlattr**
 
 	glue_call_client(msg, RPC_ID_validate);
 
+	msg->position = 0;
 	if (*tb_ptr) {
 		if (**tb_ptr) {
 			caller_unmarshal_kernel__validate__tb__in(msg, **tb_ptr);
@@ -870,6 +1103,9 @@ int trmp_impl_validate(fptr_validate target, struct nlattr** tb, struct nlattr**
 	}
 
 	*ret_ptr = glue_unpack(msg, int);
+	if (verbose_debug) {
+		printk("%s:%d, returned!\n", __func__, __LINE__);
+	}
 	return ret;
 }
 
@@ -883,6 +1119,10 @@ void validate_callee(struct glue_message* msg)
 	int ret = 0;
 	int* ret_ptr = &ret;
 	
+	if (verbose_debug) {
+		printk("%s:%d, entered!\n", __func__, __LINE__);
+	}
+
 	*tb_ptr = glue_unpack(msg, struct nlattr**);
 	if (*tb_ptr) {
 		**tb_ptr = glue_unpack(msg, struct nlattr*);
@@ -920,6 +1160,9 @@ void validate_callee(struct glue_message* msg)
 
 	glue_pack(msg, *ret_ptr);
 	msg->slots[0] = msg->position;
+	if (verbose_debug) {
+		printk("%s:%d, returned!\n", __func__, __LINE__);
+	}
 }
 
 LCD_TRAMPOLINE_DATA(trmp_validate)

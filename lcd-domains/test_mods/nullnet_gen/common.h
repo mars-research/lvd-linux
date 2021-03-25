@@ -1,18 +1,23 @@
 #ifndef COMMON_H
 #define COMMON_H
 
+#include <liblcd/liblcd.h>
 #include <liblcd/trampoline.h>
 #include <asm/cacheflush.h>
 
 #include "glue_user.h"
 
+#define verbose_debug 0
 #define GLUE_MAX_SLOTS 128
 #define glue_pack(msg, value) glue_pack_impl((msg), (uint64_t)(value))
 #define glue_pack_shadow(msg, value) glue_pack_shadow_impl((msg), (value))
 #define glue_unpack(msg, type) (type)glue_unpack_impl((msg))
 #define glue_unpack_shadow(msg, type) (type)glue_unpack_shadow_impl(glue_unpack(msg, void*));
-#define glue_unpack_new_shadow(msg, type, size) \
-	(type)glue_unpack_new_shadow_impl(glue_unpack(msg, void*), size)
+#define glue_unpack_new_shadow(msg, type, size) ({\
+	if (verbose_debug)	\
+	printk("%s:%d called with type %s\n",__func__, __LINE__, \
+			__stringify(type));	\
+	(type)glue_unpack_new_shadow_impl(glue_unpack(msg, void*), size); })
 
 #define glue_unpack_rpc_ptr(msg, name) \
 	glue_peek(msg) ? (fptr_##name)glue_unpack_rpc_ptr_impl(glue_unpack(msg, void*), LCD_DUP_TRAMPOLINE(trmp_##name), LCD_TRAMPOLINE_SIZE(trmp_##name)) : NULL
@@ -46,6 +51,7 @@ extern struct glue_message shared_buffer;
 static inline struct glue_message* glue_init_msg(void)
 {
 	shared_buffer.position = 0;
+	memset(&shared_buffer, 0x0, sizeof(shared_buffer));
 	return &shared_buffer;
 }
 
@@ -73,6 +79,7 @@ static inline uint64_t glue_unpack_impl(struct glue_message* msg)
 {
 	if (msg->position >= msg->slots[0])
 		glue_user_panic("Unpacked past end of glue message");
+	printk("%s:%d msg->position %llu\n", __func__, __LINE__, msg->position + 1);
 	return msg->slots[msg->position++ + 1];
 }
 
@@ -80,16 +87,20 @@ static inline uint64_t glue_peek_impl(struct glue_message* msg)
 {
 	if (msg->position >= msg->slots[0])
 		glue_user_panic("Peeked past end of glue message");
+	printk("%s, returning slots[%llu] = %llx\n", __func__,
+				msg->position + 2, msg->slots[msg->position + 2]);
 	return msg->slots[msg->position + 2];
 }
 
 static inline void* glue_unpack_new_shadow_impl(const void* ptr, size_t size)
 {
-	void* shadow = 0;	if (!ptr)
+	void* shadow = 0;
+	if (!ptr)
 		return NULL;
 
 	shadow = glue_user_alloc(size);
 	glue_user_add_shadow(ptr, shadow);
+	LIBLCD_MSG("%s, ptr %p | shadow %p\n", __func__, ptr, shadow);
 	return shadow;
 }
 

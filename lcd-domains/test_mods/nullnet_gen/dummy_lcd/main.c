@@ -49,6 +49,12 @@ int handle_rpc_calls(struct fipc_message* msg)
 	glue_user_trace("Processed message in LCD");
 	len = packet->slots[0];
 	memcpy(msg->regs, packet->slots, 7 * sizeof(uint64_t));
+	{
+		int i;
+		for (i = 0; i < 7; i++) {
+			printk("msg->regs[%d] %lx", i, msg->regs[i]);
+		}
+	}
 	glue_user_trace("Packed fast regs");
 	if (len > 6) {
 		glue_user_trace("Fetching slow regs");
@@ -80,7 +86,7 @@ fail1:
 	lcd_exit(ret);
 }
 
-int __dummy_lcd_init(void)
+int __module_lcd_init(void)
 {
 	return dummy_lcd_init();
 }
@@ -95,12 +101,12 @@ static void dummy_lcd_exit(void)
 	return;
 }
 
-void __dummy_lcd_exit(void)
+void __module_lcd_exit(void)
 {
 	dummy_lcd_exit();
 }
 
-module_init(__dummy_lcd_init);
+module_init(__module_lcd_init);
 module_exit(dummy_lcd_exit);
 MODULE_LICENSE("GPL");
 MODULE_INFO(livepatch, "Y");

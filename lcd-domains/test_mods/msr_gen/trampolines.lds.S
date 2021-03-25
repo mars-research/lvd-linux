@@ -1,0 +1,10 @@
+#include <liblcd/trampoline_link.h>
+
+SECTIONS{
+	LCD_TRAMPOLINE_LINKER_SECTION(trmp_read)
+	LCD_TRAMPOLINE_LINKER_SECTION(trmp_write)
+	LCD_TRAMPOLINE_LINKER_SECTION(trmp_compat_ioctl)
+	LCD_TRAMPOLINE_LINKER_SECTION(trmp_open)
+}
+
+INSERT AFTER .text

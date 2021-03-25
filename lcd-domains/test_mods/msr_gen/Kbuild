@@ -1,0 +1,5 @@
+obj-$(LCD_CONFIG_BUILD_MSR_GEN_BOOT)	+= boot/
+
+obj-$(LCD_CONFIG_BUILD_MSR_GEN_MSR_LCD) += msr_lcd/
+
+obj-$(LCD_CONFIG_BUILD_MSR_GEN_MSR_KLCD) += msr_klcd/

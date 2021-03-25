@@ -512,9 +512,9 @@ void cpu_maps_update_done_callee(struct glue_message* msg)
 void wrmsr_safe_regs_on_cpu_callee(struct glue_message* msg)
 {
 	unsigned int cpu = 0;
-	unsigned int[8] regs = {0};
+	unsigned int* regs = 0;
 	unsigned int* cpu_ptr = &cpu;
-	unsigned int* regs_ptr = &regs;
+	unsigned int** regs_ptr = &regs;
 	int ret = 0;
 	int* ret_ptr = &ret;
 	
@@ -523,19 +523,24 @@ void wrmsr_safe_regs_on_cpu_callee(struct glue_message* msg)
 	}
 
 	*cpu_ptr = glue_unpack(msg, unsigned int);
-	int i;
-	unsigned int* array = regs_ptr;
-	size_t len = glue_unpack(msg, size_t);
-	// Warning: see David if this breaks
-	glue_user_trace("Warning: see David if this breaks");
-	for (i = 0; i < len; ++i) {
-		unsigned int* element = &array[i];
-		*element = glue_unpack(msg, unsigned int);
+	*regs_ptr = glue_unpack(msg, unsigned int*);
+	if (*regs_ptr) {
+		int i;
+		unsigned int* array = *regs_ptr;
+		size_t len = glue_unpack(msg, size_t);
+		// Warning: see David if this breaks
+		glue_user_trace("Warning: see David if this breaks");
+		for (i = 0; i < len; ++i) {
+			unsigned int* element = &array[i];
+			*element = glue_unpack(msg, unsigned int);
+		}
+
 	}
 
 	ret = wrmsr_safe_regs_on_cpu(cpu, regs);
 
 	msg->position = 0;
+	(void)regs_ptr;
 	glue_pack(msg, *ret_ptr);
 	msg->slots[0] = msg->position;
 	if (verbose_debug) {
@@ -546,9 +551,9 @@ void wrmsr_safe_regs_on_cpu_callee(struct glue_message* msg)
 void rdmsr_safe_regs_on_cpu_callee(struct glue_message* msg)
 {
 	unsigned int cpu = 0;
-	unsigned int[8] regs = {0};
+	unsigned int* regs = 0;
 	unsigned int* cpu_ptr = &cpu;
-	unsigned int* regs_ptr = &regs;
+	unsigned int** regs_ptr = &regs;
 	int ret = 0;
 	int* ret_ptr = &ret;
 	
@@ -557,19 +562,24 @@ void rdmsr_safe_regs_on_cpu_callee(struct glue_message* msg)
 	}
 
 	*cpu_ptr = glue_unpack(msg, unsigned int);
-	int i;
-	unsigned int* array = regs_ptr;
-	size_t len = glue_unpack(msg, size_t);
-	// Warning: see David if this breaks
-	glue_user_trace("Warning: see David if this breaks");
-	for (i = 0; i < len; ++i) {
-		unsigned int* element = &array[i];
-		*element = glue_unpack(msg, unsigned int);
+	*regs_ptr = glue_unpack(msg, unsigned int*);
+	if (*regs_ptr) {
+		int i;
+		unsigned int* array = *regs_ptr;
+		size_t len = glue_unpack(msg, size_t);
+		// Warning: see David if this breaks
+		glue_user_trace("Warning: see David if this breaks");
+		for (i = 0; i < len; ++i) {
+			unsigned int* element = &array[i];
+			*element = glue_unpack(msg, unsigned int);
+		}
+
 	}
 
 	ret = rdmsr_safe_regs_on_cpu(cpu, regs);
 
 	msg->position = 0;
+	(void)regs_ptr;
 	glue_pack(msg, *ret_ptr);
 	msg->slots[0] = msg->position;
 	if (verbose_debug) {

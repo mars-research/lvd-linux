@@ -499,12 +499,12 @@ void cpu_maps_update_done(void)
 	}
 }
 
-int wrmsr_safe_regs_on_cpu(unsigned int cpu, unsigned int regs)
+int wrmsr_safe_regs_on_cpu(unsigned int cpu, unsigned int* regs)
 {
 	struct glue_message *msg = glue_init_msg();
 
 	unsigned int* cpu_ptr = &cpu;
-	unsigned int* regs_ptr = &regs;
+	unsigned int** regs_ptr = &regs;
 	int ret = 0;
 	int* ret_ptr = &ret;
 	
@@ -513,18 +513,23 @@ int wrmsr_safe_regs_on_cpu(unsigned int cpu, unsigned int regs)
 	}
 
 	glue_pack(msg, *cpu_ptr);
-	size_t i, len = 8;
-	unsigned int* array = regs_ptr;
-	glue_pack(msg, len);
-	// Warning: see David if this breaks
-	glue_user_trace("Warning: see David if this breaks");
-	for (i = 0; i < len; ++i) {
-		unsigned int* element = &array[i];
-		glue_pack(msg, *element);
+	glue_pack_shadow(msg, *regs_ptr);
+	if (*regs_ptr) {
+		size_t i, len = 8;
+		unsigned int* array = *regs_ptr;
+		glue_pack(msg, len);
+		// Warning: see David if this breaks
+		glue_user_trace("Warning: see David if this breaks");
+		for (i = 0; i < len; ++i) {
+			unsigned int* element = &array[i];
+			glue_pack(msg, *element);
+		}
+
 	}
 
 	glue_call_server(msg, RPC_ID_wrmsr_safe_regs_on_cpu);
 
+	(void)regs_ptr;
 	*ret_ptr = glue_unpack(msg, int);
 	if (verbose_debug) {
 		printk("%s:%d, returned!\n", __func__, __LINE__);
@@ -532,12 +537,12 @@ int wrmsr_safe_regs_on_cpu(unsigned int cpu, unsigned int regs)
 	return ret;
 }
 
-int rdmsr_safe_regs_on_cpu(unsigned int cpu, unsigned int regs)
+int rdmsr_safe_regs_on_cpu(unsigned int cpu, unsigned int* regs)
 {
 	struct glue_message *msg = glue_init_msg();
 
 	unsigned int* cpu_ptr = &cpu;
-	unsigned int* regs_ptr = &regs;
+	unsigned int** regs_ptr = &regs;
 	int ret = 0;
 	int* ret_ptr = &ret;
 	
@@ -546,18 +551,23 @@ int rdmsr_safe_regs_on_cpu(unsigned int cpu, unsigned int regs)
 	}
 
 	glue_pack(msg, *cpu_ptr);
-	size_t i, len = 8;
-	unsigned int* array = regs_ptr;
-	glue_pack(msg, len);
-	// Warning: see David if this breaks
-	glue_user_trace("Warning: see David if this breaks");
-	for (i = 0; i < len; ++i) {
-		unsigned int* element = &array[i];
-		glue_pack(msg, *element);
+	glue_pack_shadow(msg, *regs_ptr);
+	if (*regs_ptr) {
+		size_t i, len = 8;
+		unsigned int* array = *regs_ptr;
+		glue_pack(msg, len);
+		// Warning: see David if this breaks
+		glue_user_trace("Warning: see David if this breaks");
+		for (i = 0; i < len; ++i) {
+			unsigned int* element = &array[i];
+			glue_pack(msg, *element);
+		}
+
 	}
 
 	glue_call_server(msg, RPC_ID_rdmsr_safe_regs_on_cpu);
 
+	(void)regs_ptr;
 	*ret_ptr = glue_unpack(msg, int);
 	if (verbose_debug) {
 		printk("%s:%d, returned!\n", __func__, __LINE__);

@@ -149,12 +149,12 @@ void caller_marshal_kernel__register_netdevice__dev__in(
 	unsigned char const* addr_assign_type_ptr = &ptr->addr_assign_type;
 	struct rtnl_link_ops const* const* rtnl_link_ops_ptr = &ptr->rtnl_link_ops;
 	
-	glue_pack_shadow(msg, *netdev_ops_ptr);
+	glue_pack(msg, *netdev_ops_ptr);
 	if (*netdev_ops_ptr) {
 		caller_marshal_kernel___global_netdev_ops__in(msg, *netdev_ops_ptr);
 	}
 
-	glue_pack_shadow(msg, *ethtool_ops_ptr);
+	glue_pack(msg, *ethtool_ops_ptr);
 	if (*ethtool_ops_ptr) {
 		caller_marshal_kernel___global_ethtool_ops__in(msg, *ethtool_ops_ptr);
 	}
@@ -162,7 +162,7 @@ void caller_marshal_kernel__register_netdevice__dev__in(
 	glue_pack(msg, *flags_ptr);
 	glue_pack(msg, *priv_flags_ptr);
 	glue_pack(msg, *addr_assign_type_ptr);
-	glue_pack_shadow(msg, *rtnl_link_ops_ptr);
+	glue_pack(msg, *rtnl_link_ops_ptr);
 	if (*rtnl_link_ops_ptr) {
 		caller_marshal_kernel___global_rtnl_link_ops__in(msg, *rtnl_link_ops_ptr);
 	}
@@ -180,13 +180,13 @@ void callee_unmarshal_kernel__register_netdevice__dev__in(
 	unsigned char* addr_assign_type_ptr = &ptr->addr_assign_type;
 	struct rtnl_link_ops const** rtnl_link_ops_ptr = &ptr->rtnl_link_ops;
 	
-	*netdev_ops_ptr = glue_unpack(msg, struct net_device_ops const*);
+	*netdev_ops_ptr = glue_unpack_shadow(msg, struct net_device_ops const*);
 	if (*netdev_ops_ptr) {
 		struct net_device_ops* writable = (struct net_device_ops*)*netdev_ops_ptr;
 		callee_unmarshal_kernel___global_netdev_ops__in(msg, writable);
 	}
 
-	*ethtool_ops_ptr = glue_unpack(msg, struct ethtool_ops const*);
+	*ethtool_ops_ptr = glue_unpack_shadow(msg, struct ethtool_ops const*);
 	if (*ethtool_ops_ptr) {
 		struct ethtool_ops* writable = (struct ethtool_ops*)*ethtool_ops_ptr;
 		callee_unmarshal_kernel___global_ethtool_ops__in(msg, writable);
@@ -195,7 +195,7 @@ void callee_unmarshal_kernel__register_netdevice__dev__in(
 	*flags_ptr = glue_unpack(msg, unsigned int);
 	*priv_flags_ptr = glue_unpack(msg, unsigned int);
 	*addr_assign_type_ptr = glue_unpack(msg, unsigned char);
-	*rtnl_link_ops_ptr = glue_unpack(msg, struct rtnl_link_ops const*);
+	*rtnl_link_ops_ptr = glue_unpack_shadow(msg, struct rtnl_link_ops const*);
 	if (*rtnl_link_ops_ptr) {
 		struct rtnl_link_ops* writable = (struct rtnl_link_ops*)*rtnl_link_ops_ptr;
 		callee_unmarshal_kernel___global_rtnl_link_ops__in(msg, writable);
@@ -371,11 +371,11 @@ void caller_marshal_kernel__alloc_netdev_mqs__ret_net_device__out(
 	struct rtnl_link_ops const* const* rtnl_link_ops_ptr = &ptr->rtnl_link_ops;
 	
 	if (*netdev_ops_ptr) {
-		caller_marshal_kernel___global_netdev_ops__out(msg, *netdev_ops_ptr);
+		caller_marshal_kernel___global_netdev_ops__in(msg, *netdev_ops_ptr);
 	}
 
 	if (*ethtool_ops_ptr) {
-		caller_marshal_kernel___global_ethtool_ops__out(msg, *ethtool_ops_ptr);
+		caller_marshal_kernel___global_ethtool_ops__in(msg, *ethtool_ops_ptr);
 	}
 
 	if (*rtnl_link_ops_ptr) {
@@ -394,12 +394,12 @@ void callee_unmarshal_kernel__alloc_netdev_mqs__ret_net_device__out(
 	
 	if (*netdev_ops_ptr) {
 		struct net_device_ops* writable = (struct net_device_ops*)*netdev_ops_ptr;
-		callee_unmarshal_kernel___global_netdev_ops__out(msg, writable);
+		callee_unmarshal_kernel___global_netdev_ops__in(msg, writable);
 	}
 
 	if (*ethtool_ops_ptr) {
 		struct ethtool_ops* writable = (struct ethtool_ops*)*ethtool_ops_ptr;
-		callee_unmarshal_kernel___global_ethtool_ops__out(msg, writable);
+		callee_unmarshal_kernel___global_ethtool_ops__in(msg, writable);
 	}
 
 	if (*rtnl_link_ops_ptr) {
@@ -428,12 +428,12 @@ void callee_marshal_kernel__alloc_netdev_mqs__ret_net_device__out(
 	glue_pack(msg, *hw_enc_features_ptr);
 	glue_pack_shadow(msg, *netdev_ops_ptr);
 	if (*netdev_ops_ptr) {
-		callee_marshal_kernel___global_netdev_ops__out(msg, *netdev_ops_ptr);
+		callee_marshal_kernel___global_netdev_ops__in(msg, *netdev_ops_ptr);
 	}
 
 	glue_pack_shadow(msg, *ethtool_ops_ptr);
 	if (*ethtool_ops_ptr) {
-		callee_marshal_kernel___global_ethtool_ops__out(msg, *ethtool_ops_ptr);
+		callee_marshal_kernel___global_ethtool_ops__in(msg, *ethtool_ops_ptr);
 	}
 
 	glue_pack(msg, *flags_ptr);
@@ -466,13 +466,13 @@ void caller_unmarshal_kernel__alloc_netdev_mqs__ret_net_device__out(
 	*netdev_ops_ptr = glue_unpack(msg, struct net_device_ops const*);
 	if (*netdev_ops_ptr) {
 		struct net_device_ops* writable = (struct net_device_ops*)*netdev_ops_ptr;
-		caller_unmarshal_kernel___global_netdev_ops__out(msg, writable);
+		caller_unmarshal_kernel___global_netdev_ops__in(msg, writable);
 	}
 
 	*ethtool_ops_ptr = glue_unpack(msg, struct ethtool_ops const*);
 	if (*ethtool_ops_ptr) {
 		struct ethtool_ops* writable = (struct ethtool_ops*)*ethtool_ops_ptr;
-		caller_unmarshal_kernel___global_ethtool_ops__out(msg, writable);
+		caller_unmarshal_kernel___global_ethtool_ops__in(msg, writable);
 	}
 
 	*flags_ptr = glue_unpack(msg, unsigned int);
@@ -484,90 +484,6 @@ void caller_unmarshal_kernel__alloc_netdev_mqs__ret_net_device__out(
 		caller_unmarshal_kernel___global_rtnl_link_ops__out(msg, writable);
 	}
 
-}
-
-void caller_marshal_kernel___global_netdev_ops__out(
-	struct glue_message* msg,
-	struct net_device_ops const* ptr)
-{
-	
-}
-
-void callee_unmarshal_kernel___global_netdev_ops__out(
-	struct glue_message* msg,
-	struct net_device_ops* ptr)
-{
-	
-}
-
-void callee_marshal_kernel___global_netdev_ops__out(
-	struct glue_message* msg,
-	struct net_device_ops const* ptr)
-{
-	fptr_ndo_init const* ndo_init_ptr = &ptr->ndo_init;
-	fptr_ndo_uninit const* ndo_uninit_ptr = &ptr->ndo_uninit;
-	fptr_ndo_start_xmit const* ndo_start_xmit_ptr = &ptr->ndo_start_xmit;
-	fptr_ndo_set_rx_mode const* ndo_set_rx_mode_ptr = &ptr->ndo_set_rx_mode;
-	fptr_ndo_get_stats64 const* ndo_get_stats64_ptr = &ptr->ndo_get_stats64;
-	fptr_ndo_change_carrier const* ndo_change_carrier_ptr = &ptr->ndo_change_carrier;
-	
-	glue_pack(msg, *ndo_init_ptr);
-	glue_pack(msg, *ndo_uninit_ptr);
-	glue_pack(msg, *ndo_start_xmit_ptr);
-	glue_pack(msg, *ndo_set_rx_mode_ptr);
-	glue_pack(msg, *ndo_get_stats64_ptr);
-	glue_pack(msg, *ndo_change_carrier_ptr);
-}
-
-void caller_unmarshal_kernel___global_netdev_ops__out(
-	struct glue_message* msg,
-	struct net_device_ops* ptr)
-{
-	fptr_ndo_init* ndo_init_ptr = &ptr->ndo_init;
-	fptr_ndo_uninit* ndo_uninit_ptr = &ptr->ndo_uninit;
-	fptr_ndo_start_xmit* ndo_start_xmit_ptr = &ptr->ndo_start_xmit;
-	fptr_ndo_set_rx_mode* ndo_set_rx_mode_ptr = &ptr->ndo_set_rx_mode;
-	fptr_ndo_get_stats64* ndo_get_stats64_ptr = &ptr->ndo_get_stats64;
-	fptr_ndo_change_carrier* ndo_change_carrier_ptr = &ptr->ndo_change_carrier;
-	
-	*ndo_init_ptr = glue_unpack_rpc_ptr(msg, ndo_init);
-	*ndo_uninit_ptr = glue_unpack_rpc_ptr(msg, ndo_uninit);
-	*ndo_start_xmit_ptr = glue_unpack_rpc_ptr(msg, ndo_start_xmit);
-	*ndo_set_rx_mode_ptr = glue_unpack_rpc_ptr(msg, ndo_set_rx_mode);
-	*ndo_get_stats64_ptr = glue_unpack_rpc_ptr(msg, ndo_get_stats64);
-	*ndo_change_carrier_ptr = glue_unpack_rpc_ptr(msg, ndo_change_carrier);
-}
-
-void caller_marshal_kernel___global_ethtool_ops__out(
-	struct glue_message* msg,
-	struct ethtool_ops const* ptr)
-{
-	
-}
-
-void callee_unmarshal_kernel___global_ethtool_ops__out(
-	struct glue_message* msg,
-	struct ethtool_ops* ptr)
-{
-	
-}
-
-void callee_marshal_kernel___global_ethtool_ops__out(
-	struct glue_message* msg,
-	struct ethtool_ops const* ptr)
-{
-	fptr_get_drvinfo const* get_drvinfo_ptr = &ptr->get_drvinfo;
-	
-	glue_pack(msg, *get_drvinfo_ptr);
-}
-
-void caller_unmarshal_kernel___global_ethtool_ops__out(
-	struct glue_message* msg,
-	struct ethtool_ops* ptr)
-{
-	fptr_get_drvinfo* get_drvinfo_ptr = &ptr->get_drvinfo;
-	
-	*get_drvinfo_ptr = glue_unpack_rpc_ptr(msg, get_drvinfo);
 }
 
 void caller_marshal_kernel___global_rtnl_link_ops__out(
@@ -1023,6 +939,90 @@ void caller_unmarshal_kernel__setup__dev__in(
 	*priv_flags_ptr = glue_unpack(msg, unsigned int);
 }
 
+void caller_marshal_kernel___global_netdev_ops__out(
+	struct glue_message* msg,
+	struct net_device_ops const* ptr)
+{
+	
+}
+
+void callee_unmarshal_kernel___global_netdev_ops__out(
+	struct glue_message* msg,
+	struct net_device_ops* ptr)
+{
+	
+}
+
+void callee_marshal_kernel___global_netdev_ops__out(
+	struct glue_message* msg,
+	struct net_device_ops const* ptr)
+{
+	fptr_ndo_init const* ndo_init_ptr = &ptr->ndo_init;
+	fptr_ndo_uninit const* ndo_uninit_ptr = &ptr->ndo_uninit;
+	fptr_ndo_start_xmit const* ndo_start_xmit_ptr = &ptr->ndo_start_xmit;
+	fptr_ndo_set_rx_mode const* ndo_set_rx_mode_ptr = &ptr->ndo_set_rx_mode;
+	fptr_ndo_get_stats64 const* ndo_get_stats64_ptr = &ptr->ndo_get_stats64;
+	fptr_ndo_change_carrier const* ndo_change_carrier_ptr = &ptr->ndo_change_carrier;
+	
+	glue_pack(msg, *ndo_init_ptr);
+	glue_pack(msg, *ndo_uninit_ptr);
+	glue_pack(msg, *ndo_start_xmit_ptr);
+	glue_pack(msg, *ndo_set_rx_mode_ptr);
+	glue_pack(msg, *ndo_get_stats64_ptr);
+	glue_pack(msg, *ndo_change_carrier_ptr);
+}
+
+void caller_unmarshal_kernel___global_netdev_ops__out(
+	struct glue_message* msg,
+	struct net_device_ops* ptr)
+{
+	fptr_ndo_init* ndo_init_ptr = &ptr->ndo_init;
+	fptr_ndo_uninit* ndo_uninit_ptr = &ptr->ndo_uninit;
+	fptr_ndo_start_xmit* ndo_start_xmit_ptr = &ptr->ndo_start_xmit;
+	fptr_ndo_set_rx_mode* ndo_set_rx_mode_ptr = &ptr->ndo_set_rx_mode;
+	fptr_ndo_get_stats64* ndo_get_stats64_ptr = &ptr->ndo_get_stats64;
+	fptr_ndo_change_carrier* ndo_change_carrier_ptr = &ptr->ndo_change_carrier;
+	
+	*ndo_init_ptr = glue_unpack_rpc_ptr(msg, ndo_init);
+	*ndo_uninit_ptr = glue_unpack_rpc_ptr(msg, ndo_uninit);
+	*ndo_start_xmit_ptr = glue_unpack_rpc_ptr(msg, ndo_start_xmit);
+	*ndo_set_rx_mode_ptr = glue_unpack_rpc_ptr(msg, ndo_set_rx_mode);
+	*ndo_get_stats64_ptr = glue_unpack_rpc_ptr(msg, ndo_get_stats64);
+	*ndo_change_carrier_ptr = glue_unpack_rpc_ptr(msg, ndo_change_carrier);
+}
+
+void caller_marshal_kernel___global_ethtool_ops__out(
+	struct glue_message* msg,
+	struct ethtool_ops const* ptr)
+{
+	
+}
+
+void callee_unmarshal_kernel___global_ethtool_ops__out(
+	struct glue_message* msg,
+	struct ethtool_ops* ptr)
+{
+	
+}
+
+void callee_marshal_kernel___global_ethtool_ops__out(
+	struct glue_message* msg,
+	struct ethtool_ops const* ptr)
+{
+	fptr_get_drvinfo const* get_drvinfo_ptr = &ptr->get_drvinfo;
+	
+	glue_pack(msg, *get_drvinfo_ptr);
+}
+
+void caller_unmarshal_kernel___global_ethtool_ops__out(
+	struct glue_message* msg,
+	struct ethtool_ops* ptr)
+{
+	fptr_get_drvinfo* get_drvinfo_ptr = &ptr->get_drvinfo;
+	
+	*get_drvinfo_ptr = glue_unpack_rpc_ptr(msg, get_drvinfo);
+}
+
 void caller_marshal_kernel__get_drvinfo__dev__in(
 	struct glue_message* msg,
 	struct net_device const* ptr)
@@ -1051,32 +1051,76 @@ void caller_unmarshal_kernel__get_drvinfo__dev__in(
 	
 }
 
-void caller_marshal_kernel__get_drvinfo__info__in(
+void caller_marshal_kernel__get_drvinfo__info__out(
 	struct glue_message* msg,
 	struct ethtool_drvinfo const* ptr)
 {
 	
 }
 
-void callee_unmarshal_kernel__get_drvinfo__info__in(
+void callee_unmarshal_kernel__get_drvinfo__info__out(
 	struct glue_message* msg,
 	struct ethtool_drvinfo* ptr)
 {
 	
 }
 
-void callee_marshal_kernel__get_drvinfo__info__in(
+void callee_marshal_kernel__get_drvinfo__info__out(
 	struct glue_message* msg,
 	struct ethtool_drvinfo const* ptr)
 {
+	char const* driver_ptr = &ptr->driver;
+	char const* version_ptr = &ptr->version;
 	
+	size_t i, len = 32;
+	char* array = driver_ptr;
+	glue_pack(msg, len);
+	// Warning: see David if this breaks
+	glue_user_trace("Warning: see David if this breaks");
+	for (i = 0; i < len; ++i) {
+		char* element = &array[i];
+		glue_pack(msg, *element);
+	}
+
+	size_t i, len = 32;
+	char* array = version_ptr;
+	glue_pack(msg, len);
+	// Warning: see David if this breaks
+	glue_user_trace("Warning: see David if this breaks");
+	for (i = 0; i < len; ++i) {
+		char* element = &array[i];
+		glue_pack(msg, *element);
+	}
+
 }
 
-void caller_unmarshal_kernel__get_drvinfo__info__in(
+void caller_unmarshal_kernel__get_drvinfo__info__out(
 	struct glue_message* msg,
 	struct ethtool_drvinfo* ptr)
 {
+	char* driver_ptr = &ptr->driver;
+	char* version_ptr = &ptr->version;
 	
+	int i;
+	char* array = driver_ptr;
+	size_t len = glue_unpack(msg, size_t);
+	// Warning: see David if this breaks
+	glue_user_trace("Warning: see David if this breaks");
+	for (i = 0; i < len; ++i) {
+		char* element = &array[i];
+		*element = glue_unpack(msg, char);
+	}
+
+	int i;
+	char* array = version_ptr;
+	size_t len = glue_unpack(msg, size_t);
+	// Warning: see David if this breaks
+	glue_user_trace("Warning: see David if this breaks");
+	for (i = 0; i < len; ++i) {
+		char* element = &array[i];
+		*element = glue_unpack(msg, char);
+	}
+
 }
 
 void caller_marshal_kernel__ndo_init__dev__in(

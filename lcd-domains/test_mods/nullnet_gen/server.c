@@ -150,7 +150,6 @@ void alloc_netdev_mqs_callee(struct glue_message* msg)
 		}
 
 	}
-	printk("%s, name %s\n", __func__, name);
 
 	*name_assign_type_ptr = glue_unpack(msg, unsigned char);
 	*setup_ptr = glue_unpack_rpc_ptr(msg, setup);
@@ -158,17 +157,10 @@ void alloc_netdev_mqs_callee(struct glue_message* msg)
 	*rxqs_ptr = glue_unpack(msg, unsigned int);
 	ret = alloc_netdev_mqs(sizeof_priv, name, name_assign_type, setup, txqs, rxqs);
 
-	printk("%s, dev->netdev_ops %p\n", __func__, ret->netdev_ops);
-
 	msg->position = 0;
 	(void)name_ptr;
-
-	printk("%s, packing netdev_ptr %p\n", __func__, *ret_ptr);
-	printk("%s, ret %p | ret_ptr %p | &ret_ptr %p\n", __func__,
-				ret, ret_ptr, &ret_ptr);
 	glue_pack(msg, *ret_ptr);
 	if (*ret_ptr) {
-		printk("%s:%d, netdev %p | dev->netdev_ops %p\n", __func__, __LINE__, ret, ret->netdev_ops);
 		callee_marshal_kernel__alloc_netdev_mqs__ret_net_device__out(msg, *ret_ptr);
 	}
 
@@ -437,41 +429,11 @@ void trmp_impl_setup(fptr_setup target, struct net_device* dev)
 
 	glue_call_client(msg, RPC_ID_setup);
 
-	printk("%s, after returning from LCD dev %p\n", __func__, *dev_ptr);
 	msg->position = 0;
 	if (*dev_ptr) {
 		caller_unmarshal_kernel__setup__dev__in(msg, *dev_ptr);
 	}
 
-	printk("%s, dev->netdev_ops %p\n", __func__, dev->netdev_ops);
-	if (verbose_debug) {
-		printk("%s:%d, returned!\n", __func__, __LINE__);
-	}
-}
-
-void setup_callee(struct glue_message* msg)
-{
-	fptr_setup function_ptr = glue_unpack(msg, fptr_setup);
-	struct net_device* dev = 0;
-	struct net_device** dev_ptr = &dev;
-	
-	if (verbose_debug) {
-		printk("%s:%d, entered!\n", __func__, __LINE__);
-	}
-
-	*dev_ptr = glue_unpack_new_shadow(msg, struct net_device*, sizeof(struct net_device));
-	if (*dev_ptr) {
-		callee_unmarshal_kernel__setup__dev__in(msg, *dev_ptr);
-	}
-
-	function_ptr(dev);
-
-	msg->position = 0;
-	if (*dev_ptr) {
-		callee_marshal_kernel__setup__dev__in(msg, *dev_ptr);
-	}
-
-	msg->slots[0] = msg->position;
 	if (verbose_debug) {
 		printk("%s:%d, returned!\n", __func__, __LINE__);
 	}
@@ -499,14 +461,14 @@ void trmp_impl_get_drvinfo(fptr_get_drvinfo target, struct net_device* dev, stru
 	}
 
 	glue_pack(msg, target);
-	glue_pack_shadow(msg, *dev_ptr);
+	glue_pack(msg, *dev_ptr);
 	if (*dev_ptr) {
 		caller_marshal_kernel__get_drvinfo__dev__in(msg, *dev_ptr);
 	}
 
-	glue_pack_shadow(msg, *info_ptr);
+	glue_pack(msg, *info_ptr);
 	if (*info_ptr) {
-		caller_marshal_kernel__get_drvinfo__info__in(msg, *info_ptr);
+		caller_marshal_kernel__get_drvinfo__info__out(msg, *info_ptr);
 	}
 
 	glue_call_client(msg, RPC_ID_get_drvinfo);
@@ -517,48 +479,9 @@ void trmp_impl_get_drvinfo(fptr_get_drvinfo target, struct net_device* dev, stru
 	}
 
 	if (*info_ptr) {
-		caller_unmarshal_kernel__get_drvinfo__info__in(msg, *info_ptr);
+		caller_unmarshal_kernel__get_drvinfo__info__out(msg, *info_ptr);
 	}
 
-	if (verbose_debug) {
-		printk("%s:%d, returned!\n", __func__, __LINE__);
-	}
-}
-
-void get_drvinfo_callee(struct glue_message* msg)
-{
-	fptr_get_drvinfo function_ptr = glue_unpack(msg, fptr_get_drvinfo);
-	struct net_device* dev = 0;
-	struct ethtool_drvinfo* info = 0;
-	struct net_device** dev_ptr = &dev;
-	struct ethtool_drvinfo** info_ptr = &info;
-	
-	if (verbose_debug) {
-		printk("%s:%d, entered!\n", __func__, __LINE__);
-	}
-
-	*dev_ptr = glue_unpack(msg, struct net_device*);
-	if (*dev_ptr) {
-		callee_unmarshal_kernel__get_drvinfo__dev__in(msg, *dev_ptr);
-	}
-
-	*info_ptr = glue_unpack(msg, struct ethtool_drvinfo*);
-	if (*info_ptr) {
-		callee_unmarshal_kernel__get_drvinfo__info__in(msg, *info_ptr);
-	}
-
-	function_ptr(dev, info);
-
-	msg->position = 0;
-	if (*dev_ptr) {
-		callee_marshal_kernel__get_drvinfo__dev__in(msg, *dev_ptr);
-	}
-
-	if (*info_ptr) {
-		callee_marshal_kernel__get_drvinfo__info__in(msg, *info_ptr);
-	}
-
-	msg->slots[0] = msg->position;
 	if (verbose_debug) {
 		printk("%s:%d, returned!\n", __func__, __LINE__);
 	}
@@ -587,7 +510,7 @@ int trmp_impl_ndo_init(fptr_ndo_init target, struct net_device* dev)
 	}
 
 	glue_pack(msg, target);
-	glue_pack_shadow(msg, *dev_ptr);
+	glue_pack(msg, *dev_ptr);
 	if (*dev_ptr) {
 		caller_marshal_kernel__ndo_init__dev__in(msg, *dev_ptr);
 	}
@@ -604,37 +527,6 @@ int trmp_impl_ndo_init(fptr_ndo_init target, struct net_device* dev)
 		printk("%s:%d, returned!\n", __func__, __LINE__);
 	}
 	return ret;
-}
-
-void ndo_init_callee(struct glue_message* msg)
-{
-	fptr_ndo_init function_ptr = glue_unpack(msg, fptr_ndo_init);
-	struct net_device* dev = 0;
-	struct net_device** dev_ptr = &dev;
-	int ret = 0;
-	int* ret_ptr = &ret;
-	
-	if (verbose_debug) {
-		printk("%s:%d, entered!\n", __func__, __LINE__);
-	}
-
-	*dev_ptr = glue_unpack(msg, struct net_device*);
-	if (*dev_ptr) {
-		callee_unmarshal_kernel__ndo_init__dev__in(msg, *dev_ptr);
-	}
-
-	ret = function_ptr(dev);
-
-	msg->position = 0;
-	if (*dev_ptr) {
-		callee_marshal_kernel__ndo_init__dev__in(msg, *dev_ptr);
-	}
-
-	glue_pack(msg, *ret_ptr);
-	msg->slots[0] = msg->position;
-	if (verbose_debug) {
-		printk("%s:%d, returned!\n", __func__, __LINE__);
-	}
 }
 
 LCD_TRAMPOLINE_DATA(trmp_ndo_init)
@@ -658,7 +550,7 @@ void trmp_impl_ndo_uninit(fptr_ndo_uninit target, struct net_device* dev)
 	}
 
 	glue_pack(msg, target);
-	glue_pack_shadow(msg, *dev_ptr);
+	glue_pack(msg, *dev_ptr);
 	if (*dev_ptr) {
 		caller_marshal_kernel__ndo_uninit__dev__in(msg, *dev_ptr);
 	}
@@ -670,34 +562,6 @@ void trmp_impl_ndo_uninit(fptr_ndo_uninit target, struct net_device* dev)
 		caller_unmarshal_kernel__ndo_uninit__dev__in(msg, *dev_ptr);
 	}
 
-	if (verbose_debug) {
-		printk("%s:%d, returned!\n", __func__, __LINE__);
-	}
-}
-
-void ndo_uninit_callee(struct glue_message* msg)
-{
-	fptr_ndo_uninit function_ptr = glue_unpack(msg, fptr_ndo_uninit);
-	struct net_device* dev = 0;
-	struct net_device** dev_ptr = &dev;
-	
-	if (verbose_debug) {
-		printk("%s:%d, entered!\n", __func__, __LINE__);
-	}
-
-	*dev_ptr = glue_unpack(msg, struct net_device*);
-	if (*dev_ptr) {
-		callee_unmarshal_kernel__ndo_uninit__dev__in(msg, *dev_ptr);
-	}
-
-	function_ptr(dev);
-
-	msg->position = 0;
-	if (*dev_ptr) {
-		callee_marshal_kernel__ndo_uninit__dev__in(msg, *dev_ptr);
-	}
-
-	msg->slots[0] = msg->position;
 	if (verbose_debug) {
 		printk("%s:%d, returned!\n", __func__, __LINE__);
 	}
@@ -732,7 +596,7 @@ long long trmp_impl_ndo_start_xmit(fptr_ndo_start_xmit target, struct sk_buff* s
 		caller_marshal_kernel__ndo_start_xmit__skb__in(msg, *skb_ptr);
 	}
 
-	glue_pack_shadow(msg, *dev_ptr);
+	glue_pack(msg, *dev_ptr);
 	if (*dev_ptr) {
 		caller_marshal_kernel__ndo_start_xmit__dev__in(msg, *dev_ptr);
 	}
@@ -753,48 +617,6 @@ long long trmp_impl_ndo_start_xmit(fptr_ndo_start_xmit target, struct sk_buff* s
 		printk("%s:%d, returned!\n", __func__, __LINE__);
 	}
 	return ret;
-}
-
-void ndo_start_xmit_callee(struct glue_message* msg)
-{
-	fptr_ndo_start_xmit function_ptr = glue_unpack(msg, fptr_ndo_start_xmit);
-	struct sk_buff* skb = 0;
-	struct net_device* dev = 0;
-	struct sk_buff** skb_ptr = &skb;
-	struct net_device** dev_ptr = &dev;
-	long long ret = 0;
-	long long* ret_ptr = &ret;
-	
-	if (verbose_debug) {
-		printk("%s:%d, entered!\n", __func__, __LINE__);
-	}
-
-	*skb_ptr = glue_unpack(msg, struct sk_buff*);
-	if (*skb_ptr) {
-		callee_unmarshal_kernel__ndo_start_xmit__skb__in(msg, *skb_ptr);
-	}
-
-	*dev_ptr = glue_unpack(msg, struct net_device*);
-	if (*dev_ptr) {
-		callee_unmarshal_kernel__ndo_start_xmit__dev__in(msg, *dev_ptr);
-	}
-
-	ret = function_ptr(skb, dev);
-
-	msg->position = 0;
-	if (*skb_ptr) {
-		callee_marshal_kernel__ndo_start_xmit__skb__in(msg, *skb_ptr);
-	}
-
-	if (*dev_ptr) {
-		callee_marshal_kernel__ndo_start_xmit__dev__in(msg, *dev_ptr);
-	}
-
-	glue_pack(msg, *ret_ptr);
-	msg->slots[0] = msg->position;
-	if (verbose_debug) {
-		printk("%s:%d, returned!\n", __func__, __LINE__);
-	}
 }
 
 LCD_TRAMPOLINE_DATA(trmp_ndo_start_xmit)
@@ -818,7 +640,7 @@ void trmp_impl_ndo_set_rx_mode(fptr_ndo_set_rx_mode target, struct net_device* d
 	}
 
 	glue_pack(msg, target);
-	glue_pack_shadow(msg, *dev_ptr);
+	glue_pack(msg, *dev_ptr);
 	if (*dev_ptr) {
 		caller_marshal_kernel__ndo_set_rx_mode__dev__in(msg, *dev_ptr);
 	}
@@ -830,34 +652,6 @@ void trmp_impl_ndo_set_rx_mode(fptr_ndo_set_rx_mode target, struct net_device* d
 		caller_unmarshal_kernel__ndo_set_rx_mode__dev__in(msg, *dev_ptr);
 	}
 
-	if (verbose_debug) {
-		printk("%s:%d, returned!\n", __func__, __LINE__);
-	}
-}
-
-void ndo_set_rx_mode_callee(struct glue_message* msg)
-{
-	fptr_ndo_set_rx_mode function_ptr = glue_unpack(msg, fptr_ndo_set_rx_mode);
-	struct net_device* dev = 0;
-	struct net_device** dev_ptr = &dev;
-	
-	if (verbose_debug) {
-		printk("%s:%d, entered!\n", __func__, __LINE__);
-	}
-
-	*dev_ptr = glue_unpack(msg, struct net_device*);
-	if (*dev_ptr) {
-		callee_unmarshal_kernel__ndo_set_rx_mode__dev__in(msg, *dev_ptr);
-	}
-
-	function_ptr(dev);
-
-	msg->position = 0;
-	if (*dev_ptr) {
-		callee_marshal_kernel__ndo_set_rx_mode__dev__in(msg, *dev_ptr);
-	}
-
-	msg->slots[0] = msg->position;
 	if (verbose_debug) {
 		printk("%s:%d, returned!\n", __func__, __LINE__);
 	}
@@ -887,12 +681,12 @@ struct rtnl_link_stats64* trmp_impl_ndo_get_stats64(fptr_ndo_get_stats64 target,
 	}
 
 	glue_pack(msg, target);
-	glue_pack_shadow(msg, *dev_ptr);
+	glue_pack(msg, *dev_ptr);
 	if (*dev_ptr) {
 		caller_marshal_kernel__ndo_get_stats64__dev__in(msg, *dev_ptr);
 	}
 
-	glue_pack_shadow(msg, *stats_ptr);
+	glue_pack(msg, *stats_ptr);
 	if (*stats_ptr) {
 		caller_marshal_kernel__ndo_get_stats64__stats__in(msg, *stats_ptr);
 	}
@@ -919,52 +713,6 @@ struct rtnl_link_stats64* trmp_impl_ndo_get_stats64(fptr_ndo_get_stats64 target,
 	return ret;
 }
 
-void ndo_get_stats64_callee(struct glue_message* msg)
-{
-	fptr_ndo_get_stats64 function_ptr = glue_unpack(msg, fptr_ndo_get_stats64);
-	struct net_device* dev = 0;
-	struct rtnl_link_stats64* stats = 0;
-	struct net_device** dev_ptr = &dev;
-	struct rtnl_link_stats64** stats_ptr = &stats;
-	struct rtnl_link_stats64* ret = 0;
-	struct rtnl_link_stats64** ret_ptr = &ret;
-	
-	if (verbose_debug) {
-		printk("%s:%d, entered!\n", __func__, __LINE__);
-	}
-
-	*dev_ptr = glue_unpack(msg, struct net_device*);
-	if (*dev_ptr) {
-		callee_unmarshal_kernel__ndo_get_stats64__dev__in(msg, *dev_ptr);
-	}
-
-	*stats_ptr = glue_unpack(msg, struct rtnl_link_stats64*);
-	if (*stats_ptr) {
-		callee_unmarshal_kernel__ndo_get_stats64__stats__in(msg, *stats_ptr);
-	}
-
-	ret = function_ptr(dev, stats);
-
-	msg->position = 0;
-	if (*dev_ptr) {
-		callee_marshal_kernel__ndo_get_stats64__dev__in(msg, *dev_ptr);
-	}
-
-	if (*stats_ptr) {
-		callee_marshal_kernel__ndo_get_stats64__stats__in(msg, *stats_ptr);
-	}
-
-	glue_pack_shadow(msg, *ret_ptr);
-	if (*ret_ptr) {
-		callee_marshal_kernel__ndo_get_stats64__ret_rtnl_link_stats64__out(msg, *ret_ptr);
-	}
-
-	msg->slots[0] = msg->position;
-	if (verbose_debug) {
-		printk("%s:%d, returned!\n", __func__, __LINE__);
-	}
-}
-
 LCD_TRAMPOLINE_DATA(trmp_ndo_get_stats64)
 struct rtnl_link_stats64* LCD_TRAMPOLINE_LINKAGE(trmp_ndo_get_stats64) trmp_ndo_get_stats64(struct net_device* dev, struct rtnl_link_stats64* stats)
 {
@@ -989,7 +737,7 @@ int trmp_impl_ndo_change_carrier(fptr_ndo_change_carrier target, struct net_devi
 	}
 
 	glue_pack(msg, target);
-	glue_pack_shadow(msg, *dev_ptr);
+	glue_pack(msg, *dev_ptr);
 	if (*dev_ptr) {
 		caller_marshal_kernel__ndo_change_carrier__dev__in(msg, *dev_ptr);
 	}
@@ -1007,40 +755,6 @@ int trmp_impl_ndo_change_carrier(fptr_ndo_change_carrier target, struct net_devi
 		printk("%s:%d, returned!\n", __func__, __LINE__);
 	}
 	return ret;
-}
-
-void ndo_change_carrier_callee(struct glue_message* msg)
-{
-	fptr_ndo_change_carrier function_ptr = glue_unpack(msg, fptr_ndo_change_carrier);
-	struct net_device* dev = 0;
-	bool new_carrier = 0;
-	struct net_device** dev_ptr = &dev;
-	bool* new_carrier_ptr = &new_carrier;
-	int ret = 0;
-	int* ret_ptr = &ret;
-	
-	if (verbose_debug) {
-		printk("%s:%d, entered!\n", __func__, __LINE__);
-	}
-
-	*dev_ptr = glue_unpack(msg, struct net_device*);
-	if (*dev_ptr) {
-		callee_unmarshal_kernel__ndo_change_carrier__dev__in(msg, *dev_ptr);
-	}
-
-	*new_carrier_ptr = glue_unpack(msg, bool);
-	ret = function_ptr(dev, new_carrier);
-
-	msg->position = 0;
-	if (*dev_ptr) {
-		callee_marshal_kernel__ndo_change_carrier__dev__in(msg, *dev_ptr);
-	}
-
-	glue_pack(msg, *ret_ptr);
-	msg->slots[0] = msg->position;
-	if (verbose_debug) {
-		printk("%s:%d, returned!\n", __func__, __LINE__);
-	}
 }
 
 LCD_TRAMPOLINE_DATA(trmp_ndo_change_carrier)
@@ -1107,62 +821,6 @@ int trmp_impl_validate(fptr_validate target, struct nlattr** tb, struct nlattr**
 		printk("%s:%d, returned!\n", __func__, __LINE__);
 	}
 	return ret;
-}
-
-void validate_callee(struct glue_message* msg)
-{
-	fptr_validate function_ptr = glue_unpack(msg, fptr_validate);
-	struct nlattr** tb = 0;
-	struct nlattr** data = 0;
-	struct nlattr*** tb_ptr = &tb;
-	struct nlattr*** data_ptr = &data;
-	int ret = 0;
-	int* ret_ptr = &ret;
-	
-	if (verbose_debug) {
-		printk("%s:%d, entered!\n", __func__, __LINE__);
-	}
-
-	*tb_ptr = glue_unpack(msg, struct nlattr**);
-	if (*tb_ptr) {
-		**tb_ptr = glue_unpack(msg, struct nlattr*);
-		if (**tb_ptr) {
-			callee_unmarshal_kernel__validate__tb__in(msg, **tb_ptr);
-		}
-
-	}
-
-	*data_ptr = glue_unpack(msg, struct nlattr**);
-	if (*data_ptr) {
-		**data_ptr = glue_unpack(msg, struct nlattr*);
-		if (**data_ptr) {
-			callee_unmarshal_kernel__validate__data__in(msg, **data_ptr);
-		}
-
-	}
-
-	ret = function_ptr(tb, data);
-
-	msg->position = 0;
-	if (*tb_ptr) {
-		if (**tb_ptr) {
-			callee_marshal_kernel__validate__tb__in(msg, **tb_ptr);
-		}
-
-	}
-
-	if (*data_ptr) {
-		if (**data_ptr) {
-			callee_marshal_kernel__validate__data__in(msg, **data_ptr);
-		}
-
-	}
-
-	glue_pack(msg, *ret_ptr);
-	msg->slots[0] = msg->position;
-	if (verbose_debug) {
-		printk("%s:%d, returned!\n", __func__, __LINE__);
-	}
 }
 
 LCD_TRAMPOLINE_DATA(trmp_validate)
@@ -1246,51 +904,6 @@ int try_dispatch(enum RPC_ID id, struct glue_message* msg)
 	case RPC_ID_eth_mac_addr:
 		glue_user_trace("eth_mac_addr\n");
 		eth_mac_addr_callee(msg);
-		break;
-
-	case RPC_ID_setup:
-		glue_user_trace("setup\n");
-		setup_callee(msg);
-		break;
-
-	case RPC_ID_get_drvinfo:
-		glue_user_trace("get_drvinfo\n");
-		get_drvinfo_callee(msg);
-		break;
-
-	case RPC_ID_ndo_init:
-		glue_user_trace("ndo_init\n");
-		ndo_init_callee(msg);
-		break;
-
-	case RPC_ID_ndo_uninit:
-		glue_user_trace("ndo_uninit\n");
-		ndo_uninit_callee(msg);
-		break;
-
-	case RPC_ID_ndo_start_xmit:
-		glue_user_trace("ndo_start_xmit\n");
-		ndo_start_xmit_callee(msg);
-		break;
-
-	case RPC_ID_ndo_set_rx_mode:
-		glue_user_trace("ndo_set_rx_mode\n");
-		ndo_set_rx_mode_callee(msg);
-		break;
-
-	case RPC_ID_ndo_get_stats64:
-		glue_user_trace("ndo_get_stats64\n");
-		ndo_get_stats64_callee(msg);
-		break;
-
-	case RPC_ID_ndo_change_carrier:
-		glue_user_trace("ndo_change_carrier\n");
-		ndo_change_carrier_callee(msg);
-		break;
-
-	case RPC_ID_validate:
-		glue_user_trace("validate\n");
-		validate_callee(msg);
 		break;
 
 	default:

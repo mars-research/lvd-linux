@@ -60,9 +60,12 @@ static inline void* glue_unpack_rpc_ptr_impl(void* target, struct lcd_trampoline
 static inline void
 glue_pack_impl(size_t* pos, struct fipc_message* msg, struct ext_registers* ext, uint64_t value)
 {
-	if (*pos >= FIPC_NR_REGS - 1)
+	if (*pos >= 128)
 		glue_user_panic("Glue message was too large");
-	msg->regs[(*pos)++ + 1] = value;
+	if (*pos < 6)
+		msg->regs[(*pos)++ + 1] = value;
+	else
+		ext->regs[(*pos)++ + 1] = value;
 }
 
 static inline uint64_t
@@ -70,7 +73,10 @@ glue_unpack_impl(size_t* pos, const struct fipc_message* msg, const struct ext_r
 {
 	if (*pos >= msg->regs[0])
 		glue_user_panic("Unpacked past end of glue message");
-	return msg->regs[(*pos)++ + 1];
+	if (*pos < 6)
+		return msg->regs[(*pos)++ + 1];
+	else
+		return ext->regs[(*pos)++ + 1];
 }
 
 static inline uint64_t
@@ -78,7 +84,10 @@ glue_peek_impl(size_t* pos, const struct fipc_message* msg, const struct ext_reg
 {
 	if (*pos >= msg->regs[0])
 		glue_user_panic("Peeked past end of glue message");
-	return msg->regs[(*pos) + 2];
+	if (*pos < 5)
+		return msg->regs[(*pos)++ + 2];
+	else
+		return ext->regs[(*pos)++ + 2];
 }
 
 static inline void* glue_unpack_new_shadow_impl(const void* ptr, size_t size)

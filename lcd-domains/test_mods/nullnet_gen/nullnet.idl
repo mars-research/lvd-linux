@@ -142,8 +142,8 @@ module kernel {
         }
 
         projection < struct ethtool_drvinfo > info {
-		array<char, 32> driver;
-		array<char, 32> version;
+		    // array<char, 32> driver;
+		    // array<char, 32> version;
         }
     }
 

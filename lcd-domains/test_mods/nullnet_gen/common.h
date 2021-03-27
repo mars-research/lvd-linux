@@ -2,34 +2,36 @@
 #define COMMON_H
 
 #include <liblcd/trampoline.h>
+#include <libfipc.h>
+#include <liblcd/boot_info.h>
 #include <asm/cacheflush.h>
 
 #include "glue_user.h"
 
-#define verbose_debug 1
-#define GLUE_MAX_SLOTS 128
-#define glue_pack(msg, value) glue_pack_impl((msg), (uint64_t)(value))
-#define glue_pack_shadow(msg, value) glue_pack_shadow_impl((msg), (value))
-#define glue_unpack(msg, type) (type)glue_unpack_impl((msg))
-#define glue_unpack_shadow(msg, type) (type)glue_unpack_shadow_impl(glue_unpack(msg, void*));
-#define glue_unpack_new_shadow(msg, type, size) \
-	(type)glue_unpack_new_shadow_impl(glue_unpack(msg, void*), size)
+#define verbose_debug 0
+#define glue_pack(pos, msg, ext, value) glue_pack_impl((pos), (msg), (ext), (uint64_t)(value))
+#define glue_pack_shadow(pos, msg, ext, value) glue_pack_shadow_impl((pos), (msg), (ext), (value))
+#define glue_unpack(pos, msg, ext, type) (type)glue_unpack_impl((pos), (msg), (ext))
+#define glue_unpack_shadow(pos, msg, ext, type) \
+(type)glue_unpack_shadow_impl(glue_unpack(pos, msg, ext, void*));
+
+#define glue_unpack_new_shadow(pos, msg, ext, type, size) \
+	(type)glue_unpack_new_shadow_impl(glue_unpack(pos, msg, ext, void*), size)
 
 #ifndef LCD_ISOLATE
-#define glue_unpack_rpc_ptr(msg, name) \
-	glue_peek(msg) ? (fptr_##name)glue_unpack_rpc_ptr_impl(glue_unpack(msg, void*), LCD_DUP_TRAMPOLINE(trmp_##name), LCD_TRAMPOLINE_SIZE(trmp_##name)) : NULL
+#define glue_unpack_rpc_ptr(pos, msg, ext, name) \
+	glue_peek(pos, msg, ext) ? (fptr_##name)glue_unpack_rpc_ptr_impl(glue_unpack(pos, msg, ext, void*), LCD_DUP_TRAMPOLINE(trmp_##name), LCD_TRAMPOLINE_SIZE(trmp_##name)) : NULL
 
 #else
-#define glue_unpack_rpc_ptr(msg, name) NULL
+#define glue_unpack_rpc_ptr(pos, msg, ext, name) NULL; glue_user_panic("Trampolines cannot be used on LCD side")
 #endif
 
-#define glue_peek(msg) glue_peek_impl(msg)
-#define glue_call_server(msg, rpc_id) \
-	msg->slots[0] = msg->position; msg->position = 0; glue_user_call_server(msg->slots, rpc_id);
+#define glue_peek(pos, msg, ext) glue_peek_impl(pos, msg, ext)
+#define glue_call_server(pos, msg, rpc_id) \
+	msg->regs[0] = *pos; *pos = 0; glue_user_call_server(msg, rpc_id);
 
-#define glue_call_client(msg, rpc_id) \
-	msg->slots[0] = msg->position; msg->position = 0; glue_user_call_client(msg->slots, rpc_id);
-
+#define glue_call_client(pos, msg, rpc_id) \
+	msg->regs[0] = *pos; *pos = 0; glue_user_call_client(msg, rpc_id);
 
 void glue_user_init(void);
 void glue_user_panic(const char* msg);
@@ -39,21 +41,8 @@ const void* glue_user_map_from_shadow(const void* shadow);
 void glue_user_add_shadow(const void* ptr, void* shadow);
 void* glue_user_alloc(size_t size);
 void glue_user_free(void* ptr);
-void glue_user_call_server(uint64_t* data, size_t rpc_id);
-void glue_user_call_client(uint64_t* data, size_t rpc_id);
-
-struct glue_message {
-	uint64_t slots[GLUE_MAX_SLOTS];
-	uint64_t position;
-};
-
-extern struct glue_message shared_buffer;
-
-static inline struct glue_message* glue_init_msg(void)
-{
-	shared_buffer.position = 0;
-	return &shared_buffer;
-}
+void glue_user_call_server(struct fipc_message* msg, size_t rpc_id);
+void glue_user_call_client(struct fipc_message* msg, size_t rpc_id);
 
 static inline void* glue_unpack_rpc_ptr_impl(void* target, struct lcd_trampoline_handle* handle, size_t size)
 {
@@ -68,25 +57,28 @@ static inline void* glue_unpack_rpc_ptr_impl(void* target, struct lcd_trampoline
 	return LCD_HANDLE_TO_TRAMPOLINE(handle);
 }
 
-static inline void glue_pack_impl(struct glue_message* msg, uint64_t value)
+static inline void
+glue_pack_impl(size_t* pos, struct fipc_message* msg, struct ext_registers* ext, uint64_t value)
 {
-	if (msg->position >= GLUE_MAX_SLOTS)
+	if (*pos >= FIPC_NR_REGS - 1)
 		glue_user_panic("Glue message was too large");
-	msg->slots[msg->position++ + 1] = value;
+	msg->regs[(*pos)++ + 1] = value;
 }
 
-static inline uint64_t glue_unpack_impl(struct glue_message* msg)
+static inline uint64_t
+glue_unpack_impl(size_t* pos, const struct fipc_message* msg, const struct ext_registers* ext)
 {
-	if (msg->position >= msg->slots[0])
+	if (*pos >= msg->regs[0])
 		glue_user_panic("Unpacked past end of glue message");
-	return msg->slots[msg->position++ + 1];
+	return msg->regs[(*pos)++ + 1];
 }
 
-static inline uint64_t glue_peek_impl(struct glue_message* msg)
+static inline uint64_t
+glue_peek_impl(size_t* pos, const struct fipc_message* msg, const struct ext_registers* ext)
 {
-	if (msg->position >= msg->slots[0])
+	if (*pos >= msg->regs[0])
 		glue_user_panic("Peeked past end of glue message");
-	return msg->slots[msg->position + 2];
+	return msg->regs[(*pos) + 2];
 }
 
 static inline void* glue_unpack_new_shadow_impl(const void* ptr, size_t size)
@@ -104,9 +96,9 @@ static inline void* glue_unpack_shadow_impl(const void* ptr)
 	return ptr ? glue_user_map_to_shadow(ptr) : NULL;
 }
 
-static inline void glue_pack_shadow_impl(struct glue_message* msg, const void* ptr)
+static inline void glue_pack_shadow_impl(size_t* pos, struct fipc_message* msg, struct ext_registers* ext, const void* ptr)
 {
-	glue_pack(msg, ptr ? glue_user_map_from_shadow(ptr) : NULL);
+	glue_pack(pos, msg, ext, ptr ? glue_user_map_from_shadow(ptr) : NULL);
 }
 
 enum RPC_ID {
@@ -137,503 +129,751 @@ enum RPC_ID {
 	RPC_ID_validate,
 };
 
-int try_dispatch(enum RPC_ID id, struct glue_message* msg);
+int try_dispatch(enum RPC_ID id, struct fipc_message* msg, struct ext_registers* ext);
 
 void caller_marshal_kernel__netif_carrier_on__dev__in(
-	struct glue_message*,
-	struct net_device const*);
+	size_t* pos,
+	struct fipc_message* msg,
+	struct ext_registers* ext,
+	struct net_device const* ptr);
 
 void callee_unmarshal_kernel__netif_carrier_on__dev__in(
-	struct glue_message*,
-	struct net_device*);
+	size_t* pos,
+	const struct fipc_message* msg,
+	const struct ext_registers* ext,
+	struct net_device* ptr);
 
 void callee_marshal_kernel__netif_carrier_on__dev__in(
-	struct glue_message*,
-	struct net_device const*);
+	size_t* pos,
+	struct fipc_message* msg,
+	struct ext_registers* ext,
+	struct net_device const* ptr);
 
 void caller_unmarshal_kernel__netif_carrier_on__dev__in(
-	struct glue_message*,
-	struct net_device*);
+	size_t* pos,
+	const struct fipc_message* msg,
+	const struct ext_registers* ext,
+	struct net_device* ptr);
 
 void caller_marshal_kernel___global_netdev_ops__in(
-	struct glue_message*,
-	struct net_device_ops const*);
+	size_t* pos,
+	struct fipc_message* msg,
+	struct ext_registers* ext,
+	struct net_device_ops const* ptr);
 
 void callee_unmarshal_kernel___global_netdev_ops__in(
-	struct glue_message*,
-	struct net_device_ops*);
+	size_t* pos,
+	const struct fipc_message* msg,
+	const struct ext_registers* ext,
+	struct net_device_ops* ptr);
 
 void callee_marshal_kernel___global_netdev_ops__in(
-	struct glue_message*,
-	struct net_device_ops const*);
+	size_t* pos,
+	struct fipc_message* msg,
+	struct ext_registers* ext,
+	struct net_device_ops const* ptr);
 
 void caller_unmarshal_kernel___global_netdev_ops__in(
-	struct glue_message*,
-	struct net_device_ops*);
+	size_t* pos,
+	const struct fipc_message* msg,
+	const struct ext_registers* ext,
+	struct net_device_ops* ptr);
 
 void caller_marshal_kernel__netif_carrier_off__dev__in(
-	struct glue_message*,
-	struct net_device const*);
+	size_t* pos,
+	struct fipc_message* msg,
+	struct ext_registers* ext,
+	struct net_device const* ptr);
 
 void callee_unmarshal_kernel__netif_carrier_off__dev__in(
-	struct glue_message*,
-	struct net_device*);
+	size_t* pos,
+	const struct fipc_message* msg,
+	const struct ext_registers* ext,
+	struct net_device* ptr);
 
 void callee_marshal_kernel__netif_carrier_off__dev__in(
-	struct glue_message*,
-	struct net_device const*);
+	size_t* pos,
+	struct fipc_message* msg,
+	struct ext_registers* ext,
+	struct net_device const* ptr);
 
 void caller_unmarshal_kernel__netif_carrier_off__dev__in(
-	struct glue_message*,
-	struct net_device*);
+	size_t* pos,
+	const struct fipc_message* msg,
+	const struct ext_registers* ext,
+	struct net_device* ptr);
 
 void caller_marshal_kernel__register_netdevice__dev__in(
-	struct glue_message*,
-	struct net_device const*);
+	size_t* pos,
+	struct fipc_message* msg,
+	struct ext_registers* ext,
+	struct net_device const* ptr);
 
 void callee_unmarshal_kernel__register_netdevice__dev__in(
-	struct glue_message*,
-	struct net_device*);
+	size_t* pos,
+	const struct fipc_message* msg,
+	const struct ext_registers* ext,
+	struct net_device* ptr);
 
 void callee_marshal_kernel__register_netdevice__dev__in(
-	struct glue_message*,
-	struct net_device const*);
+	size_t* pos,
+	struct fipc_message* msg,
+	struct ext_registers* ext,
+	struct net_device const* ptr);
 
 void caller_unmarshal_kernel__register_netdevice__dev__in(
-	struct glue_message*,
-	struct net_device*);
+	size_t* pos,
+	const struct fipc_message* msg,
+	const struct ext_registers* ext,
+	struct net_device* ptr);
 
 void caller_marshal_kernel___global_ethtool_ops__in(
-	struct glue_message*,
-	struct ethtool_ops const*);
+	size_t* pos,
+	struct fipc_message* msg,
+	struct ext_registers* ext,
+	struct ethtool_ops const* ptr);
 
 void callee_unmarshal_kernel___global_ethtool_ops__in(
-	struct glue_message*,
-	struct ethtool_ops*);
+	size_t* pos,
+	const struct fipc_message* msg,
+	const struct ext_registers* ext,
+	struct ethtool_ops* ptr);
 
 void callee_marshal_kernel___global_ethtool_ops__in(
-	struct glue_message*,
-	struct ethtool_ops const*);
+	size_t* pos,
+	struct fipc_message* msg,
+	struct ext_registers* ext,
+	struct ethtool_ops const* ptr);
 
 void caller_unmarshal_kernel___global_ethtool_ops__in(
-	struct glue_message*,
-	struct ethtool_ops*);
+	size_t* pos,
+	const struct fipc_message* msg,
+	const struct ext_registers* ext,
+	struct ethtool_ops* ptr);
 
 void caller_marshal_kernel___global_rtnl_link_ops__in(
-	struct glue_message*,
-	struct rtnl_link_ops const*);
+	size_t* pos,
+	struct fipc_message* msg,
+	struct ext_registers* ext,
+	struct rtnl_link_ops const* ptr);
 
 void callee_unmarshal_kernel___global_rtnl_link_ops__in(
-	struct glue_message*,
-	struct rtnl_link_ops*);
+	size_t* pos,
+	const struct fipc_message* msg,
+	const struct ext_registers* ext,
+	struct rtnl_link_ops* ptr);
 
 void callee_marshal_kernel___global_rtnl_link_ops__in(
-	struct glue_message*,
-	struct rtnl_link_ops const*);
+	size_t* pos,
+	struct fipc_message* msg,
+	struct ext_registers* ext,
+	struct rtnl_link_ops const* ptr);
 
 void caller_unmarshal_kernel___global_rtnl_link_ops__in(
-	struct glue_message*,
-	struct rtnl_link_ops*);
+	size_t* pos,
+	const struct fipc_message* msg,
+	const struct ext_registers* ext,
+	struct rtnl_link_ops* ptr);
 
 void caller_marshal_kernel__consume_skb__skb__in(
-	struct glue_message*,
-	struct sk_buff const*);
+	size_t* pos,
+	struct fipc_message* msg,
+	struct ext_registers* ext,
+	struct sk_buff const* ptr);
 
 void callee_unmarshal_kernel__consume_skb__skb__in(
-	struct glue_message*,
-	struct sk_buff*);
+	size_t* pos,
+	const struct fipc_message* msg,
+	const struct ext_registers* ext,
+	struct sk_buff* ptr);
 
 void callee_marshal_kernel__consume_skb__skb__in(
-	struct glue_message*,
-	struct sk_buff const*);
+	size_t* pos,
+	struct fipc_message* msg,
+	struct ext_registers* ext,
+	struct sk_buff const* ptr);
 
 void caller_unmarshal_kernel__consume_skb__skb__in(
-	struct glue_message*,
-	struct sk_buff*);
+	size_t* pos,
+	const struct fipc_message* msg,
+	const struct ext_registers* ext,
+	struct sk_buff* ptr);
 
 void caller_marshal_kernel__alloc_netdev_mqs__ret_net_device__out(
-	struct glue_message*,
-	struct net_device const*);
+	size_t* pos,
+	struct fipc_message* msg,
+	struct ext_registers* ext,
+	struct net_device const* ptr);
 
 void callee_unmarshal_kernel__alloc_netdev_mqs__ret_net_device__out(
-	struct glue_message*,
-	struct net_device*);
+	size_t* pos,
+	const struct fipc_message* msg,
+	const struct ext_registers* ext,
+	struct net_device* ptr);
 
 void callee_marshal_kernel__alloc_netdev_mqs__ret_net_device__out(
-	struct glue_message*,
-	struct net_device const*);
+	size_t* pos,
+	struct fipc_message* msg,
+	struct ext_registers* ext,
+	struct net_device const* ptr);
 
 void caller_unmarshal_kernel__alloc_netdev_mqs__ret_net_device__out(
-	struct glue_message*,
-	struct net_device*);
+	size_t* pos,
+	const struct fipc_message* msg,
+	const struct ext_registers* ext,
+	struct net_device* ptr);
 
 void caller_marshal_kernel___global_rtnl_link_ops__out(
-	struct glue_message*,
-	struct rtnl_link_ops const*);
+	size_t* pos,
+	struct fipc_message* msg,
+	struct ext_registers* ext,
+	struct rtnl_link_ops const* ptr);
 
 void callee_unmarshal_kernel___global_rtnl_link_ops__out(
-	struct glue_message*,
-	struct rtnl_link_ops*);
+	size_t* pos,
+	const struct fipc_message* msg,
+	const struct ext_registers* ext,
+	struct rtnl_link_ops* ptr);
 
 void callee_marshal_kernel___global_rtnl_link_ops__out(
-	struct glue_message*,
-	struct rtnl_link_ops const*);
+	size_t* pos,
+	struct fipc_message* msg,
+	struct ext_registers* ext,
+	struct rtnl_link_ops const* ptr);
 
 void caller_unmarshal_kernel___global_rtnl_link_ops__out(
-	struct glue_message*,
-	struct rtnl_link_ops*);
+	size_t* pos,
+	const struct fipc_message* msg,
+	const struct ext_registers* ext,
+	struct rtnl_link_ops* ptr);
 
 void caller_marshal_kernel__free_netdev__dev__in(
-	struct glue_message*,
-	struct net_device const*);
+	size_t* pos,
+	struct fipc_message* msg,
+	struct ext_registers* ext,
+	struct net_device const* ptr);
 
 void callee_unmarshal_kernel__free_netdev__dev__in(
-	struct glue_message*,
-	struct net_device*);
+	size_t* pos,
+	const struct fipc_message* msg,
+	const struct ext_registers* ext,
+	struct net_device* ptr);
 
 void callee_marshal_kernel__free_netdev__dev__in(
-	struct glue_message*,
-	struct net_device const*);
+	size_t* pos,
+	struct fipc_message* msg,
+	struct ext_registers* ext,
+	struct net_device const* ptr);
 
 void caller_unmarshal_kernel__free_netdev__dev__in(
-	struct glue_message*,
-	struct net_device*);
+	size_t* pos,
+	const struct fipc_message* msg,
+	const struct ext_registers* ext,
+	struct net_device* ptr);
 
 void caller_marshal_kernel____rtnl_link_register___global_rtnl_link_ops__in(
-	struct glue_message*,
-	struct rtnl_link_ops const*);
+	size_t* pos,
+	struct fipc_message* msg,
+	struct ext_registers* ext,
+	struct rtnl_link_ops const* ptr);
 
 void callee_unmarshal_kernel____rtnl_link_register___global_rtnl_link_ops__in(
-	struct glue_message*,
-	struct rtnl_link_ops*);
+	size_t* pos,
+	const struct fipc_message* msg,
+	const struct ext_registers* ext,
+	struct rtnl_link_ops* ptr);
 
 void callee_marshal_kernel____rtnl_link_register___global_rtnl_link_ops__in(
-	struct glue_message*,
-	struct rtnl_link_ops const*);
+	size_t* pos,
+	struct fipc_message* msg,
+	struct ext_registers* ext,
+	struct rtnl_link_ops const* ptr);
 
 void caller_unmarshal_kernel____rtnl_link_register___global_rtnl_link_ops__in(
-	struct glue_message*,
-	struct rtnl_link_ops*);
+	size_t* pos,
+	const struct fipc_message* msg,
+	const struct ext_registers* ext,
+	struct rtnl_link_ops* ptr);
 
 void caller_marshal_kernel__ether_setup__dev__in(
-	struct glue_message*,
-	struct net_device const*);
+	size_t* pos,
+	struct fipc_message* msg,
+	struct ext_registers* ext,
+	struct net_device const* ptr);
 
 void callee_unmarshal_kernel__ether_setup__dev__in(
-	struct glue_message*,
-	struct net_device*);
+	size_t* pos,
+	const struct fipc_message* msg,
+	const struct ext_registers* ext,
+	struct net_device* ptr);
 
 void callee_marshal_kernel__ether_setup__dev__in(
-	struct glue_message*,
-	struct net_device const*);
+	size_t* pos,
+	struct fipc_message* msg,
+	struct ext_registers* ext,
+	struct net_device const* ptr);
 
 void caller_unmarshal_kernel__ether_setup__dev__in(
-	struct glue_message*,
-	struct net_device*);
+	size_t* pos,
+	const struct fipc_message* msg,
+	const struct ext_registers* ext,
+	struct net_device* ptr);
 
 void caller_marshal_kernel__eth_validate_addr__dev__in(
-	struct glue_message*,
-	struct net_device const*);
+	size_t* pos,
+	struct fipc_message* msg,
+	struct ext_registers* ext,
+	struct net_device const* ptr);
 
 void callee_unmarshal_kernel__eth_validate_addr__dev__in(
-	struct glue_message*,
-	struct net_device*);
+	size_t* pos,
+	const struct fipc_message* msg,
+	const struct ext_registers* ext,
+	struct net_device* ptr);
 
 void callee_marshal_kernel__eth_validate_addr__dev__in(
-	struct glue_message*,
-	struct net_device const*);
+	size_t* pos,
+	struct fipc_message* msg,
+	struct ext_registers* ext,
+	struct net_device const* ptr);
 
 void caller_unmarshal_kernel__eth_validate_addr__dev__in(
-	struct glue_message*,
-	struct net_device*);
+	size_t* pos,
+	const struct fipc_message* msg,
+	const struct ext_registers* ext,
+	struct net_device* ptr);
 
 void caller_marshal_kernel__eth_mac_addr__dev__in(
-	struct glue_message*,
-	struct net_device const*);
+	size_t* pos,
+	struct fipc_message* msg,
+	struct ext_registers* ext,
+	struct net_device const* ptr);
 
 void callee_unmarshal_kernel__eth_mac_addr__dev__in(
-	struct glue_message*,
-	struct net_device*);
+	size_t* pos,
+	const struct fipc_message* msg,
+	const struct ext_registers* ext,
+	struct net_device* ptr);
 
 void callee_marshal_kernel__eth_mac_addr__dev__in(
-	struct glue_message*,
-	struct net_device const*);
+	size_t* pos,
+	struct fipc_message* msg,
+	struct ext_registers* ext,
+	struct net_device const* ptr);
 
 void caller_unmarshal_kernel__eth_mac_addr__dev__in(
-	struct glue_message*,
-	struct net_device*);
+	size_t* pos,
+	const struct fipc_message* msg,
+	const struct ext_registers* ext,
+	struct net_device* ptr);
 
 void caller_marshal_kernel__eth_mac_addr__p__in(
-	struct glue_message*,
-	struct sockaddr const*);
+	size_t* pos,
+	struct fipc_message* msg,
+	struct ext_registers* ext,
+	struct sockaddr const* ptr);
 
 void callee_unmarshal_kernel__eth_mac_addr__p__in(
-	struct glue_message*,
-	struct sockaddr*);
+	size_t* pos,
+	const struct fipc_message* msg,
+	const struct ext_registers* ext,
+	struct sockaddr* ptr);
 
 void callee_marshal_kernel__eth_mac_addr__p__in(
-	struct glue_message*,
-	struct sockaddr const*);
+	size_t* pos,
+	struct fipc_message* msg,
+	struct ext_registers* ext,
+	struct sockaddr const* ptr);
 
 void caller_unmarshal_kernel__eth_mac_addr__p__in(
-	struct glue_message*,
-	struct sockaddr*);
+	size_t* pos,
+	const struct fipc_message* msg,
+	const struct ext_registers* ext,
+	struct sockaddr* ptr);
 
 void caller_marshal_kernel__setup__dev__in(
-	struct glue_message*,
-	struct net_device const*);
+	size_t* pos,
+	struct fipc_message* msg,
+	struct ext_registers* ext,
+	struct net_device const* ptr);
 
 void callee_unmarshal_kernel__setup__dev__in(
-	struct glue_message*,
-	struct net_device*);
+	size_t* pos,
+	const struct fipc_message* msg,
+	const struct ext_registers* ext,
+	struct net_device* ptr);
 
 void callee_marshal_kernel__setup__dev__in(
-	struct glue_message*,
-	struct net_device const*);
+	size_t* pos,
+	struct fipc_message* msg,
+	struct ext_registers* ext,
+	struct net_device const* ptr);
 
 void caller_unmarshal_kernel__setup__dev__in(
-	struct glue_message*,
-	struct net_device*);
+	size_t* pos,
+	const struct fipc_message* msg,
+	const struct ext_registers* ext,
+	struct net_device* ptr);
 
 void caller_marshal_kernel___global_netdev_ops__out(
-	struct glue_message*,
-	struct net_device_ops const*);
+	size_t* pos,
+	struct fipc_message* msg,
+	struct ext_registers* ext,
+	struct net_device_ops const* ptr);
 
 void callee_unmarshal_kernel___global_netdev_ops__out(
-	struct glue_message*,
-	struct net_device_ops*);
+	size_t* pos,
+	const struct fipc_message* msg,
+	const struct ext_registers* ext,
+	struct net_device_ops* ptr);
 
 void callee_marshal_kernel___global_netdev_ops__out(
-	struct glue_message*,
-	struct net_device_ops const*);
+	size_t* pos,
+	struct fipc_message* msg,
+	struct ext_registers* ext,
+	struct net_device_ops const* ptr);
 
 void caller_unmarshal_kernel___global_netdev_ops__out(
-	struct glue_message*,
-	struct net_device_ops*);
+	size_t* pos,
+	const struct fipc_message* msg,
+	const struct ext_registers* ext,
+	struct net_device_ops* ptr);
 
 void caller_marshal_kernel___global_ethtool_ops__out(
-	struct glue_message*,
-	struct ethtool_ops const*);
+	size_t* pos,
+	struct fipc_message* msg,
+	struct ext_registers* ext,
+	struct ethtool_ops const* ptr);
 
 void callee_unmarshal_kernel___global_ethtool_ops__out(
-	struct glue_message*,
-	struct ethtool_ops*);
+	size_t* pos,
+	const struct fipc_message* msg,
+	const struct ext_registers* ext,
+	struct ethtool_ops* ptr);
 
 void callee_marshal_kernel___global_ethtool_ops__out(
-	struct glue_message*,
-	struct ethtool_ops const*);
+	size_t* pos,
+	struct fipc_message* msg,
+	struct ext_registers* ext,
+	struct ethtool_ops const* ptr);
 
 void caller_unmarshal_kernel___global_ethtool_ops__out(
-	struct glue_message*,
-	struct ethtool_ops*);
+	size_t* pos,
+	const struct fipc_message* msg,
+	const struct ext_registers* ext,
+	struct ethtool_ops* ptr);
 
 void caller_marshal_kernel__get_drvinfo__dev__in(
-	struct glue_message*,
-	struct net_device const*);
+	size_t* pos,
+	struct fipc_message* msg,
+	struct ext_registers* ext,
+	struct net_device const* ptr);
 
 void callee_unmarshal_kernel__get_drvinfo__dev__in(
-	struct glue_message*,
-	struct net_device*);
+	size_t* pos,
+	const struct fipc_message* msg,
+	const struct ext_registers* ext,
+	struct net_device* ptr);
 
 void callee_marshal_kernel__get_drvinfo__dev__in(
-	struct glue_message*,
-	struct net_device const*);
+	size_t* pos,
+	struct fipc_message* msg,
+	struct ext_registers* ext,
+	struct net_device const* ptr);
 
 void caller_unmarshal_kernel__get_drvinfo__dev__in(
-	struct glue_message*,
-	struct net_device*);
+	size_t* pos,
+	const struct fipc_message* msg,
+	const struct ext_registers* ext,
+	struct net_device* ptr);
 
 void caller_marshal_kernel__get_drvinfo__info__out(
-	struct glue_message*,
-	struct ethtool_drvinfo const*);
+	size_t* pos,
+	struct fipc_message* msg,
+	struct ext_registers* ext,
+	struct ethtool_drvinfo const* ptr);
 
 void callee_unmarshal_kernel__get_drvinfo__info__out(
-	struct glue_message*,
-	struct ethtool_drvinfo*);
+	size_t* pos,
+	const struct fipc_message* msg,
+	const struct ext_registers* ext,
+	struct ethtool_drvinfo* ptr);
 
 void callee_marshal_kernel__get_drvinfo__info__out(
-	struct glue_message*,
-	struct ethtool_drvinfo const*);
+	size_t* pos,
+	struct fipc_message* msg,
+	struct ext_registers* ext,
+	struct ethtool_drvinfo const* ptr);
 
 void caller_unmarshal_kernel__get_drvinfo__info__out(
-	struct glue_message*,
-	struct ethtool_drvinfo*);
+	size_t* pos,
+	const struct fipc_message* msg,
+	const struct ext_registers* ext,
+	struct ethtool_drvinfo* ptr);
 
 void caller_marshal_kernel__ndo_init__dev__in(
-	struct glue_message*,
-	struct net_device const*);
+	size_t* pos,
+	struct fipc_message* msg,
+	struct ext_registers* ext,
+	struct net_device const* ptr);
 
 void callee_unmarshal_kernel__ndo_init__dev__in(
-	struct glue_message*,
-	struct net_device*);
+	size_t* pos,
+	const struct fipc_message* msg,
+	const struct ext_registers* ext,
+	struct net_device* ptr);
 
 void callee_marshal_kernel__ndo_init__dev__in(
-	struct glue_message*,
-	struct net_device const*);
+	size_t* pos,
+	struct fipc_message* msg,
+	struct ext_registers* ext,
+	struct net_device const* ptr);
 
 void caller_unmarshal_kernel__ndo_init__dev__in(
-	struct glue_message*,
-	struct net_device*);
+	size_t* pos,
+	const struct fipc_message* msg,
+	const struct ext_registers* ext,
+	struct net_device* ptr);
 
 void caller_marshal_kernel__ndo_uninit__dev__in(
-	struct glue_message*,
-	struct net_device const*);
+	size_t* pos,
+	struct fipc_message* msg,
+	struct ext_registers* ext,
+	struct net_device const* ptr);
 
 void callee_unmarshal_kernel__ndo_uninit__dev__in(
-	struct glue_message*,
-	struct net_device*);
+	size_t* pos,
+	const struct fipc_message* msg,
+	const struct ext_registers* ext,
+	struct net_device* ptr);
 
 void callee_marshal_kernel__ndo_uninit__dev__in(
-	struct glue_message*,
-	struct net_device const*);
+	size_t* pos,
+	struct fipc_message* msg,
+	struct ext_registers* ext,
+	struct net_device const* ptr);
 
 void caller_unmarshal_kernel__ndo_uninit__dev__in(
-	struct glue_message*,
-	struct net_device*);
+	size_t* pos,
+	const struct fipc_message* msg,
+	const struct ext_registers* ext,
+	struct net_device* ptr);
 
 void caller_marshal_kernel__ndo_start_xmit__skb__in(
-	struct glue_message*,
-	struct sk_buff const*);
+	size_t* pos,
+	struct fipc_message* msg,
+	struct ext_registers* ext,
+	struct sk_buff const* ptr);
 
 void callee_unmarshal_kernel__ndo_start_xmit__skb__in(
-	struct glue_message*,
-	struct sk_buff*);
+	size_t* pos,
+	const struct fipc_message* msg,
+	const struct ext_registers* ext,
+	struct sk_buff* ptr);
 
 void callee_marshal_kernel__ndo_start_xmit__skb__in(
-	struct glue_message*,
-	struct sk_buff const*);
+	size_t* pos,
+	struct fipc_message* msg,
+	struct ext_registers* ext,
+	struct sk_buff const* ptr);
 
 void caller_unmarshal_kernel__ndo_start_xmit__skb__in(
-	struct glue_message*,
-	struct sk_buff*);
+	size_t* pos,
+	const struct fipc_message* msg,
+	const struct ext_registers* ext,
+	struct sk_buff* ptr);
 
 void caller_marshal_kernel__ndo_start_xmit__dev__in(
-	struct glue_message*,
-	struct net_device const*);
+	size_t* pos,
+	struct fipc_message* msg,
+	struct ext_registers* ext,
+	struct net_device const* ptr);
 
 void callee_unmarshal_kernel__ndo_start_xmit__dev__in(
-	struct glue_message*,
-	struct net_device*);
+	size_t* pos,
+	const struct fipc_message* msg,
+	const struct ext_registers* ext,
+	struct net_device* ptr);
 
 void callee_marshal_kernel__ndo_start_xmit__dev__in(
-	struct glue_message*,
-	struct net_device const*);
+	size_t* pos,
+	struct fipc_message* msg,
+	struct ext_registers* ext,
+	struct net_device const* ptr);
 
 void caller_unmarshal_kernel__ndo_start_xmit__dev__in(
-	struct glue_message*,
-	struct net_device*);
+	size_t* pos,
+	const struct fipc_message* msg,
+	const struct ext_registers* ext,
+	struct net_device* ptr);
 
 void caller_marshal_kernel__ndo_set_rx_mode__dev__in(
-	struct glue_message*,
-	struct net_device const*);
+	size_t* pos,
+	struct fipc_message* msg,
+	struct ext_registers* ext,
+	struct net_device const* ptr);
 
 void callee_unmarshal_kernel__ndo_set_rx_mode__dev__in(
-	struct glue_message*,
-	struct net_device*);
+	size_t* pos,
+	const struct fipc_message* msg,
+	const struct ext_registers* ext,
+	struct net_device* ptr);
 
 void callee_marshal_kernel__ndo_set_rx_mode__dev__in(
-	struct glue_message*,
-	struct net_device const*);
+	size_t* pos,
+	struct fipc_message* msg,
+	struct ext_registers* ext,
+	struct net_device const* ptr);
 
 void caller_unmarshal_kernel__ndo_set_rx_mode__dev__in(
-	struct glue_message*,
-	struct net_device*);
+	size_t* pos,
+	const struct fipc_message* msg,
+	const struct ext_registers* ext,
+	struct net_device* ptr);
 
 void caller_marshal_kernel__ndo_get_stats64__ret_rtnl_link_stats64__out(
-	struct glue_message*,
-	struct rtnl_link_stats64 const*);
+	size_t* pos,
+	struct fipc_message* msg,
+	struct ext_registers* ext,
+	struct rtnl_link_stats64 const* ptr);
 
 void callee_unmarshal_kernel__ndo_get_stats64__ret_rtnl_link_stats64__out(
-	struct glue_message*,
-	struct rtnl_link_stats64*);
+	size_t* pos,
+	const struct fipc_message* msg,
+	const struct ext_registers* ext,
+	struct rtnl_link_stats64* ptr);
 
 void callee_marshal_kernel__ndo_get_stats64__ret_rtnl_link_stats64__out(
-	struct glue_message*,
-	struct rtnl_link_stats64 const*);
+	size_t* pos,
+	struct fipc_message* msg,
+	struct ext_registers* ext,
+	struct rtnl_link_stats64 const* ptr);
 
 void caller_unmarshal_kernel__ndo_get_stats64__ret_rtnl_link_stats64__out(
-	struct glue_message*,
-	struct rtnl_link_stats64*);
+	size_t* pos,
+	const struct fipc_message* msg,
+	const struct ext_registers* ext,
+	struct rtnl_link_stats64* ptr);
 
 void caller_marshal_kernel__ndo_get_stats64__dev__in(
-	struct glue_message*,
-	struct net_device const*);
+	size_t* pos,
+	struct fipc_message* msg,
+	struct ext_registers* ext,
+	struct net_device const* ptr);
 
 void callee_unmarshal_kernel__ndo_get_stats64__dev__in(
-	struct glue_message*,
-	struct net_device*);
+	size_t* pos,
+	const struct fipc_message* msg,
+	const struct ext_registers* ext,
+	struct net_device* ptr);
 
 void callee_marshal_kernel__ndo_get_stats64__dev__in(
-	struct glue_message*,
-	struct net_device const*);
+	size_t* pos,
+	struct fipc_message* msg,
+	struct ext_registers* ext,
+	struct net_device const* ptr);
 
 void caller_unmarshal_kernel__ndo_get_stats64__dev__in(
-	struct glue_message*,
-	struct net_device*);
+	size_t* pos,
+	const struct fipc_message* msg,
+	const struct ext_registers* ext,
+	struct net_device* ptr);
 
 void caller_marshal_kernel__ndo_get_stats64__stats__in(
-	struct glue_message*,
-	struct rtnl_link_stats64 const*);
+	size_t* pos,
+	struct fipc_message* msg,
+	struct ext_registers* ext,
+	struct rtnl_link_stats64 const* ptr);
 
 void callee_unmarshal_kernel__ndo_get_stats64__stats__in(
-	struct glue_message*,
-	struct rtnl_link_stats64*);
+	size_t* pos,
+	const struct fipc_message* msg,
+	const struct ext_registers* ext,
+	struct rtnl_link_stats64* ptr);
 
 void callee_marshal_kernel__ndo_get_stats64__stats__in(
-	struct glue_message*,
-	struct rtnl_link_stats64 const*);
+	size_t* pos,
+	struct fipc_message* msg,
+	struct ext_registers* ext,
+	struct rtnl_link_stats64 const* ptr);
 
 void caller_unmarshal_kernel__ndo_get_stats64__stats__in(
-	struct glue_message*,
-	struct rtnl_link_stats64*);
+	size_t* pos,
+	const struct fipc_message* msg,
+	const struct ext_registers* ext,
+	struct rtnl_link_stats64* ptr);
 
 void caller_marshal_kernel__ndo_change_carrier__dev__in(
-	struct glue_message*,
-	struct net_device const*);
+	size_t* pos,
+	struct fipc_message* msg,
+	struct ext_registers* ext,
+	struct net_device const* ptr);
 
 void callee_unmarshal_kernel__ndo_change_carrier__dev__in(
-	struct glue_message*,
-	struct net_device*);
+	size_t* pos,
+	const struct fipc_message* msg,
+	const struct ext_registers* ext,
+	struct net_device* ptr);
 
 void callee_marshal_kernel__ndo_change_carrier__dev__in(
-	struct glue_message*,
-	struct net_device const*);
+	size_t* pos,
+	struct fipc_message* msg,
+	struct ext_registers* ext,
+	struct net_device const* ptr);
 
 void caller_unmarshal_kernel__ndo_change_carrier__dev__in(
-	struct glue_message*,
-	struct net_device*);
+	size_t* pos,
+	const struct fipc_message* msg,
+	const struct ext_registers* ext,
+	struct net_device* ptr);
 
 void caller_marshal_kernel__validate__tb__in(
-	struct glue_message*,
-	struct nlattr const*);
+	size_t* pos,
+	struct fipc_message* msg,
+	struct ext_registers* ext,
+	struct nlattr const* ptr);
 
 void callee_unmarshal_kernel__validate__tb__in(
-	struct glue_message*,
-	struct nlattr*);
+	size_t* pos,
+	const struct fipc_message* msg,
+	const struct ext_registers* ext,
+	struct nlattr* ptr);
 
 void callee_marshal_kernel__validate__tb__in(
-	struct glue_message*,
-	struct nlattr const*);
+	size_t* pos,
+	struct fipc_message* msg,
+	struct ext_registers* ext,
+	struct nlattr const* ptr);
 
 void caller_unmarshal_kernel__validate__tb__in(
-	struct glue_message*,
-	struct nlattr*);
+	size_t* pos,
+	const struct fipc_message* msg,
+	const struct ext_registers* ext,
+	struct nlattr* ptr);
 
 void caller_marshal_kernel__validate__data__in(
-	struct glue_message*,
-	struct nlattr const*);
+	size_t* pos,
+	struct fipc_message* msg,
+	struct ext_registers* ext,
+	struct nlattr const* ptr);
 
 void callee_unmarshal_kernel__validate__data__in(
-	struct glue_message*,
-	struct nlattr*);
+	size_t* pos,
+	const struct fipc_message* msg,
+	const struct ext_registers* ext,
+	struct nlattr* ptr);
 
 void callee_marshal_kernel__validate__data__in(
-	struct glue_message*,
-	struct nlattr const*);
+	size_t* pos,
+	struct fipc_message* msg,
+	struct ext_registers* ext,
+	struct nlattr const* ptr);
 
 void caller_unmarshal_kernel__validate__data__in(
-	struct glue_message*,
-	struct nlattr*);
+	size_t* pos,
+	const struct fipc_message* msg,
+	const struct ext_registers* ext,
+	struct nlattr* ptr);
 
 typedef void (*fptr_setup)(struct net_device* dev);
 typedef void (*fptr_impl_setup)(fptr_setup target, struct net_device* dev);

@@ -8,7 +8,7 @@
 
 #include "glue_user.h"
 
-#define verbose_debug 0
+#define verbose_debug 1
 #define glue_pack(pos, msg, ext, value) glue_pack_impl((pos), (msg), (ext), (uint64_t)(value))
 #define glue_pack_shadow(pos, msg, ext, value) glue_pack_shadow_impl((pos), (msg), (ext), (value))
 #define glue_unpack(pos, msg, ext, type) (type)glue_unpack_impl((pos), (msg), (ext))
@@ -85,9 +85,9 @@ glue_peek_impl(size_t* pos, const struct fipc_message* msg, const struct ext_reg
 	if (*pos >= msg->regs[0])
 		glue_user_panic("Peeked past end of glue message");
 	if (*pos < 5)
-		return msg->regs[(*pos)++ + 2];
+		return msg->regs[*pos + 2];
 	else
-		return ext->regs[(*pos)++ + 2];
+		return ext->regs[*pos + 2];
 }
 
 static inline void* glue_unpack_new_shadow_impl(const void* ptr, size_t size)

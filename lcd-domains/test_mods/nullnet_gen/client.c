@@ -88,19 +88,26 @@ int register_netdevice(struct net_device* dev)
 		printk("%s:%d, entered!\n", __func__, __LINE__);
 	}
 
+	printk("(0) pos: %zu, len: %zu\n", *pos, msg->regs[0]);
 	glue_pack_shadow(pos, msg, ext, *dev_ptr);
+	printk("(1) pos: %zu, len: %zu\n", *pos, msg->regs[0]);
 	if (*dev_ptr) {
 		caller_marshal_kernel__register_netdevice__dev__in(pos, msg, ext, *dev_ptr);
+		printk("(2) pos: %zu, len: %zu\n", *pos, msg->regs[0]);
 	}
 
 	glue_call_server(pos, msg, RPC_ID_register_netdevice);
 
+	printk("(3) pos: %zu, len: %zu\n", *pos, msg->regs[0]);
 	*pos = 0;
+	printk("(4) pos: %zu, len: %zu\n", *pos, msg->regs[0]);
 	if (*dev_ptr) {
 		caller_unmarshal_kernel__register_netdevice__dev__in(pos, msg, ext, *dev_ptr);
+		printk("(5) pos: %zu, len: %zu\n", *pos, msg->regs[0]);
 	}
 
 	*ret_ptr = glue_unpack(pos, msg, ext, int);
+	printk("(6) pos: %zu, len: %zu\n", *pos, msg->regs[0]);
 	if (verbose_debug) {
 		printk("%s:%d, returned!\n", __func__, __LINE__);
 	}
@@ -163,31 +170,44 @@ struct net_device* alloc_netdev_mqs(int sizeof_priv, char const* name, unsigned 
 		printk("%s:%d, entered!\n", __func__, __LINE__);
 	}
 
+	printk("(0) pos was: %zu", *pos);
 	glue_pack(pos, msg, ext, *sizeof_priv_ptr);
+	printk("(1) pos was: %zu", *pos);
 	glue_pack(pos, msg, ext, *name_ptr);
+	printk("(2) pos was: %zu", *pos);
 	if (*name_ptr) {
 		size_t i, len;
 		char const* array = *name_ptr;
 		for (len = 0; array[len]; ++len);
 		glue_pack(pos, msg, ext, len + 1);
+		printk("(3) pos was: %zu", *pos);
 		for (i = 0; i < len; ++i) {
 			char const* element = &array[i];
 			glue_pack(pos, msg, ext, *element);
+			printk("(4) pos was: %zu", *pos);
 		}
 
 	}
 
 	glue_pack(pos, msg, ext, *name_assign_type_ptr);
+	printk("(5) pos was: %zu", *pos);
 	glue_pack(pos, msg, ext, *setup_ptr);
+	printk("(6) pos was: %zu", *pos);
 	glue_pack(pos, msg, ext, *txqs_ptr);
+	printk("(7) pos was: %zu", *pos);
 	glue_pack(pos, msg, ext, *rxqs_ptr);
+	printk("(8) pos was: %zu", *pos);
 	glue_call_server(pos, msg, RPC_ID_alloc_netdev_mqs);
+	printk("(9) pos was: %zu", *pos);
 
 	*pos = 0;
+	printk("(bonus) pos was: %zu", *pos);
 	(void)name_ptr;
 	*ret_ptr = glue_unpack_shadow(pos, msg, ext, struct net_device*);
+	printk("(10) pos was: %zu", *pos);
 	if (*ret_ptr) {
 		caller_unmarshal_kernel__alloc_netdev_mqs__ret_net_device__out(pos, msg, ext, *ret_ptr);
+		printk("(11) pos was: %zu", *pos);
 	}
 
 	if (verbose_debug) {
@@ -359,9 +379,12 @@ int __rtnl_link_register(struct rtnl_link_ops* _global_rtnl_link_ops)
 		printk("%s:%d, entered!\n", __func__, __LINE__);
 	}
 
+	printk("(0) pos: %zu, len: %zu\n", *pos, msg->regs[0]);
 	glue_pack(pos, msg, ext, *_global_rtnl_link_ops_ptr);
+	printk("(1) pos: %zu, len: %zu\n", *pos, msg->regs[0]);
 	if (*_global_rtnl_link_ops_ptr) {
 		caller_marshal_kernel____rtnl_link_register___global_rtnl_link_ops__in(pos, msg, ext, *_global_rtnl_link_ops_ptr);
+		printk("(2) pos: %zu, len: %zu\n", *pos, msg->regs[0]);
 	}
 
 	glue_call_server(pos, msg, RPC_ID___rtnl_link_register);

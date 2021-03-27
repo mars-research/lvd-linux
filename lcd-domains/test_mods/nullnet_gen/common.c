@@ -173,22 +173,32 @@ void caller_marshal_kernel__register_netdevice__dev__in(
 	unsigned char const* addr_assign_type_ptr = &ptr->addr_assign_type;
 	struct rtnl_link_ops const* const* rtnl_link_ops_ptr = &ptr->rtnl_link_ops;
 	
+	printk("(2:0) pos: %zu, len: %zu\n", *pos, msg->regs[0]);
 	glue_pack(pos, msg, ext, *netdev_ops_ptr);
+	printk("(2:1) pos: %zu, len: %zu\n", *pos, msg->regs[0]);
 	if (*netdev_ops_ptr) {
 		caller_marshal_kernel___global_netdev_ops__in(pos, msg, ext, *netdev_ops_ptr);
+		printk("(2:2) pos: %zu, len: %zu\n", *pos, msg->regs[0]);
 	}
 
 	glue_pack(pos, msg, ext, *ethtool_ops_ptr);
+	printk("(2:3) pos: %zu, len: %zu\n", *pos, msg->regs[0]);
 	if (*ethtool_ops_ptr) {
 		caller_marshal_kernel___global_ethtool_ops__in(pos, msg, ext, *ethtool_ops_ptr);
+		printk("(2:4) pos: %zu, len: %zu\n", *pos, msg->regs[0]);
 	}
 
 	glue_pack(pos, msg, ext, *flags_ptr);
+	printk("(2:5) pos: %zu, len: %zu\n", *pos, msg->regs[0]);
 	glue_pack(pos, msg, ext, *priv_flags_ptr);
+	printk("(2:6) pos: %zu, len: %zu\n", *pos, msg->regs[0]);
 	glue_pack(pos, msg, ext, *addr_assign_type_ptr);
+	printk("(2:7) pos: %zu, len: %zu\n", *pos, msg->regs[0]);
 	glue_pack(pos, msg, ext, *rtnl_link_ops_ptr);
+	printk("(2:8) pos: %zu, len: %zu\n", *pos, msg->regs[0]);
 	if (*rtnl_link_ops_ptr) {
 		caller_marshal_kernel___global_rtnl_link_ops__in(pos, msg, ext, *rtnl_link_ops_ptr);
+		printk("(2:9) pos: %zu, len: %zu\n", *pos, msg->regs[0]);
 	}
 
 }
@@ -733,22 +743,28 @@ void caller_marshal_kernel____rtnl_link_register___global_rtnl_link_ops__in(
 	char const* const* kind_ptr = &ptr->kind;
 	fptr_setup const* setup_ptr = &ptr->setup;
 	fptr_validate const* validate_ptr = &ptr->validate;
-	
+
+	printk("(2:0) pos: %zu, len: %zu\n", *pos, msg->regs[0]);
 	glue_pack(pos, msg, ext, *kind_ptr);
+	printk("(2:1) pos: %zu, len: %zu\n", *pos, msg->regs[0]);
 	if (*kind_ptr) {
 		size_t i, len;
 		char const* array = *kind_ptr;
 		for (len = 0; array[len]; ++len);
 		glue_pack(pos, msg, ext, len + 1);
+		printk("(2:2) pos: %zu, len: %zu\n", *pos, msg->regs[0]);
 		for (i = 0; i < len; ++i) {
 			char const* element = &array[i];
 			glue_pack(pos, msg, ext, *element);
+			printk("(2:3) pos: %zu, len: %zu\n", *pos, msg->regs[0]);
 		}
 
 	}
 
 	glue_pack(pos, msg, ext, *setup_ptr);
+	printk("(2:4) pos: %zu, len: %zu\n", *pos, msg->regs[0]);
 	glue_pack(pos, msg, ext, *validate_ptr);
+	printk("(2:5) pos: %zu, len: %zu\n", *pos, msg->regs[0]);
 }
 
 void callee_unmarshal_kernel____rtnl_link_register___global_rtnl_link_ops__in(
@@ -761,22 +777,28 @@ void callee_unmarshal_kernel____rtnl_link_register___global_rtnl_link_ops__in(
 	fptr_setup* setup_ptr = &ptr->setup;
 	fptr_validate* validate_ptr = &ptr->validate;
 	
+	printk("(2:0) pos: %zu, len: %zu\n", *pos, msg->regs[0]);
 	*kind_ptr = glue_unpack_new_shadow(pos, msg, ext, char const*, sizeof(char) * glue_peek(pos, msg, ext));
+	printk("(2:1) pos: %zu, len: %zu\n", *pos, msg->regs[0]);
 	if (*kind_ptr) {
 		char* writable = (char*)*kind_ptr;
 		size_t i, len;
 		char* array = writable;
 		len = glue_unpack(pos, msg, ext, size_t) - 1;
+		printk("(2:2) pos: %zu, len: %zu\n", *pos, msg->regs[0]);
 		array[len] = '\0';
 		for (i = 0; i < len; ++i) {
 			char* element = &array[i];
 			*element = glue_unpack(pos, msg, ext, char);
+			printk("(2:3) pos: %zu, len: %zu\n", *pos, msg->regs[0]);
 		}
 
 	}
 
 	*setup_ptr = glue_unpack_rpc_ptr(pos, msg, ext, setup);
+	printk("(2:4) pos: %zu, len: %zu\n", *pos, msg->regs[0]);
 	*validate_ptr = glue_unpack_rpc_ptr(pos, msg, ext, validate);
+	printk("(2:5) pos: %zu, len: %zu\n", *pos, msg->regs[0]);
 }
 
 void callee_marshal_kernel____rtnl_link_register___global_rtnl_link_ops__in(

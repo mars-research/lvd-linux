@@ -44,7 +44,7 @@ void glue_user_call_client(struct fipc_message* msg, size_t id)
     msg->vmfunc_id = VMFUNC_RPC_CALL;
     msg->rpc_id = id;
     glue_user_trace("Committing to LCD call");
-    vmfunc_wrapper(msg);
+    vmfunc_klcd_wrapper(msg, OTHER_DOMAIN);
 	glue_user_trace("Completed call in KLCD");
 }
 

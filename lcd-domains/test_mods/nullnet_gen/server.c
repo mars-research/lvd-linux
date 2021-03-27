@@ -327,27 +327,20 @@ void __rtnl_link_register_callee(struct fipc_message* msg, struct ext_registers*
 		printk("%s:%d, entered!\n", __func__, __LINE__);
 	}
 
-	printk("(0) pos: %zu, len: %zu\n", *pos, msg->regs[0]);
 	*_global_rtnl_link_ops_ptr = glue_unpack_new_shadow(pos, msg, ext, struct rtnl_link_ops*, sizeof(struct rtnl_link_ops));
-	printk("(1) pos: %zu, len: %zu\n", *pos, msg->regs[0]);
 	if (*_global_rtnl_link_ops_ptr) {
 		callee_unmarshal_kernel____rtnl_link_register___global_rtnl_link_ops__in(pos, msg, ext, *_global_rtnl_link_ops_ptr);
-		printk("(2) pos: %zu, len: %zu\n", *pos, msg->regs[0]);
 	}
 
 	ret = __rtnl_link_register(_global_rtnl_link_ops);
 
 	*pos = 0;
-	printk("(3) pos: %zu, len: %zu\n", *pos, msg->regs[0]);
 	if (*_global_rtnl_link_ops_ptr) {
 		callee_marshal_kernel____rtnl_link_register___global_rtnl_link_ops__in(pos, msg, ext, *_global_rtnl_link_ops_ptr);
-		printk("(4) pos: %zu, len: %zu\n", *pos, msg->regs[0]);
 	}
 
 	glue_pack(pos, msg, ext, *ret_ptr);
-	printk("(5) pos: %zu, len: %zu\n", *pos, msg->regs[0]);
 	msg->regs[0] = *pos;
-	printk("(6) pos: %zu, len: %zu\n", *pos, msg->regs[0]);
 	if (verbose_debug) {
 		printk("%s:%d, returned!\n", __func__, __LINE__);
 	}

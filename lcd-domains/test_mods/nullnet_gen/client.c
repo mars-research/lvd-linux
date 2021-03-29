@@ -20,16 +20,22 @@ void netif_carrier_on(struct net_device* dev)
 		printk("%s:%d, entered!\n", __func__, __LINE__);
 	}
 
-	glue_pack_shadow(pos, msg, ext, *dev_ptr);
-	if (*dev_ptr) {
-		caller_marshal_kernel__netif_carrier_on__dev__in(pos, msg, ext, *dev_ptr);
+	{
+		glue_pack_shadow(pos, msg, ext, *dev_ptr);
+		if (*dev_ptr) {
+			caller_marshal_kernel__netif_carrier_on__dev__in(pos, msg, ext, *dev_ptr);
+		}
+
 	}
 
 	glue_call_server(pos, msg, RPC_ID_netif_carrier_on);
 
 	*pos = 0;
-	if (*dev_ptr) {
-		caller_unmarshal_kernel__netif_carrier_on__dev__in(pos, msg, ext, *dev_ptr);
+	{
+		if (*dev_ptr) {
+			caller_unmarshal_kernel__netif_carrier_on__dev__in(pos, msg, ext, *dev_ptr);
+		}
+
 	}
 
 	if (verbose_debug) {
@@ -53,16 +59,22 @@ void netif_carrier_off(struct net_device* dev)
 		printk("%s:%d, entered!\n", __func__, __LINE__);
 	}
 
-	glue_pack_shadow(pos, msg, ext, *dev_ptr);
-	if (*dev_ptr) {
-		caller_marshal_kernel__netif_carrier_off__dev__in(pos, msg, ext, *dev_ptr);
+	{
+		glue_pack_shadow(pos, msg, ext, *dev_ptr);
+		if (*dev_ptr) {
+			caller_marshal_kernel__netif_carrier_off__dev__in(pos, msg, ext, *dev_ptr);
+		}
+
 	}
 
 	glue_call_server(pos, msg, RPC_ID_netif_carrier_off);
 
 	*pos = 0;
-	if (*dev_ptr) {
-		caller_unmarshal_kernel__netif_carrier_off__dev__in(pos, msg, ext, *dev_ptr);
+	{
+		if (*dev_ptr) {
+			caller_unmarshal_kernel__netif_carrier_off__dev__in(pos, msg, ext, *dev_ptr);
+		}
+
 	}
 
 	if (verbose_debug) {
@@ -88,19 +100,28 @@ int register_netdevice(struct net_device* dev)
 		printk("%s:%d, entered!\n", __func__, __LINE__);
 	}
 
-	glue_pack_shadow(pos, msg, ext, *dev_ptr);
-	if (*dev_ptr) {
-		caller_marshal_kernel__register_netdevice__dev__in(pos, msg, ext, *dev_ptr);
+	{
+		glue_pack_shadow(pos, msg, ext, *dev_ptr);
+		if (*dev_ptr) {
+			caller_marshal_kernel__register_netdevice__dev__in(pos, msg, ext, *dev_ptr);
+		}
+
 	}
 
 	glue_call_server(pos, msg, RPC_ID_register_netdevice);
 
 	*pos = 0;
-	if (*dev_ptr) {
-		caller_unmarshal_kernel__register_netdevice__dev__in(pos, msg, ext, *dev_ptr);
+	{
+		if (*dev_ptr) {
+			caller_unmarshal_kernel__register_netdevice__dev__in(pos, msg, ext, *dev_ptr);
+		}
+
 	}
 
-	*ret_ptr = glue_unpack(pos, msg, ext, int);
+	{
+		*ret_ptr = glue_unpack(pos, msg, ext, int);
+	}
+
 	if (verbose_debug) {
 		printk("%s:%d, returned!\n", __func__, __LINE__);
 	}
@@ -123,16 +144,22 @@ void consume_skb(struct sk_buff* skb)
 		printk("%s:%d, entered!\n", __func__, __LINE__);
 	}
 
-	glue_pack_shadow(pos, msg, ext, *skb_ptr);
-	if (*skb_ptr) {
-		caller_marshal_kernel__consume_skb__skb__in(pos, msg, ext, *skb_ptr);
+	{
+		glue_pack_shadow(pos, msg, ext, *skb_ptr);
+		if (*skb_ptr) {
+			caller_marshal_kernel__consume_skb__skb__in(pos, msg, ext, *skb_ptr);
+		}
+
 	}
 
 	glue_call_server(pos, msg, RPC_ID_consume_skb);
 
 	*pos = 0;
-	if (*skb_ptr) {
-		caller_unmarshal_kernel__consume_skb__skb__in(pos, msg, ext, *skb_ptr);
+	{
+		if (*skb_ptr) {
+			caller_unmarshal_kernel__consume_skb__skb__in(pos, msg, ext, *skb_ptr);
+		}
+
 	}
 
 	if (verbose_debug) {
@@ -163,31 +190,70 @@ struct net_device* alloc_netdev_mqs(int sizeof_priv, char const* name, unsigned 
 		printk("%s:%d, entered!\n", __func__, __LINE__);
 	}
 
-	glue_pack(pos, msg, ext, *sizeof_priv_ptr);
-	glue_pack(pos, msg, ext, *name_ptr);
-	if (*name_ptr) {
-		size_t i, len;
-		char const* array = *name_ptr;
-		for (len = 0; array[len]; ++len);
-		glue_pack(pos, msg, ext, len + 1);
-		for (i = 0; i < len; ++i) {
-			char const* element = &array[i];
-			glue_pack(pos, msg, ext, *element);
+	{
+		glue_pack(pos, msg, ext, *sizeof_priv_ptr);
+	}
+
+	{
+		glue_pack(pos, msg, ext, *name_ptr);
+		if (*name_ptr) {
+			size_t i, len;
+			char const* array = *name_ptr;
+			for (len = 0; array[len]; ++len);
+			glue_pack(pos, msg, ext, len + 1);
+			for (i = 0; i < len; ++i) {
+				char const* element = &array[i];
+				glue_pack(pos, msg, ext, *element);
+			}
+
 		}
 
 	}
 
-	glue_pack(pos, msg, ext, *name_assign_type_ptr);
-	glue_pack(pos, msg, ext, *setup_ptr);
-	glue_pack(pos, msg, ext, *txqs_ptr);
-	glue_pack(pos, msg, ext, *rxqs_ptr);
+	{
+		glue_pack(pos, msg, ext, *name_assign_type_ptr);
+	}
+
+	{
+		glue_pack(pos, msg, ext, *setup_ptr);
+	}
+
+	{
+		glue_pack(pos, msg, ext, *txqs_ptr);
+	}
+
+	{
+		glue_pack(pos, msg, ext, *rxqs_ptr);
+	}
+
 	glue_call_server(pos, msg, RPC_ID_alloc_netdev_mqs);
 
 	*pos = 0;
-	(void)name_ptr;
-	*ret_ptr = glue_unpack_shadow(pos, msg, ext, struct net_device*);
-	if (*ret_ptr) {
-		caller_unmarshal_kernel__alloc_netdev_mqs__ret_net_device__out(pos, msg, ext, *ret_ptr);
+	{
+	}
+
+	{
+		(void)name_ptr;
+	}
+
+	{
+	}
+
+	{
+	}
+
+	{
+	}
+
+	{
+	}
+
+	{
+		*ret_ptr = glue_unpack_shadow(pos, msg, ext, struct net_device*);
+		if (*ret_ptr) {
+			caller_unmarshal_kernel__alloc_netdev_mqs__ret_net_device__out(pos, msg, ext, *ret_ptr);
+		}
+
 	}
 
 	if (verbose_debug) {
@@ -212,16 +278,22 @@ void free_netdev(struct net_device* dev)
 		printk("%s:%d, entered!\n", __func__, __LINE__);
 	}
 
-	glue_pack_shadow(pos, msg, ext, *dev_ptr);
-	if (*dev_ptr) {
-		caller_marshal_kernel__free_netdev__dev__in(pos, msg, ext, *dev_ptr);
+	{
+		glue_pack_shadow(pos, msg, ext, *dev_ptr);
+		if (*dev_ptr) {
+			caller_marshal_kernel__free_netdev__dev__in(pos, msg, ext, *dev_ptr);
+		}
+
 	}
 
 	glue_call_server(pos, msg, RPC_ID_free_netdev);
 
 	*pos = 0;
-	if (*dev_ptr) {
-		caller_unmarshal_kernel__free_netdev__dev__in(pos, msg, ext, *dev_ptr);
+	{
+		if (*dev_ptr) {
+			caller_unmarshal_kernel__free_netdev__dev__in(pos, msg, ext, *dev_ptr);
+		}
+
 	}
 
 	if (verbose_debug) {
@@ -291,16 +363,22 @@ void rtnl_link_unregister(struct rtnl_link_ops* _global_rtnl_link_ops)
 		printk("%s:%d, entered!\n", __func__, __LINE__);
 	}
 
-	glue_pack_shadow(pos, msg, ext, *_global_rtnl_link_ops_ptr);
-	if (*_global_rtnl_link_ops_ptr) {
-		caller_marshal_kernel___global_rtnl_link_ops__in(pos, msg, ext, *_global_rtnl_link_ops_ptr);
+	{
+		glue_pack_shadow(pos, msg, ext, *_global_rtnl_link_ops_ptr);
+		if (*_global_rtnl_link_ops_ptr) {
+			caller_marshal_kernel___global_rtnl_link_ops__in(pos, msg, ext, *_global_rtnl_link_ops_ptr);
+		}
+
 	}
 
 	glue_call_server(pos, msg, RPC_ID_rtnl_link_unregister);
 
 	*pos = 0;
-	if (*_global_rtnl_link_ops_ptr) {
-		caller_unmarshal_kernel___global_rtnl_link_ops__in(pos, msg, ext, *_global_rtnl_link_ops_ptr);
+	{
+		if (*_global_rtnl_link_ops_ptr) {
+			caller_unmarshal_kernel___global_rtnl_link_ops__in(pos, msg, ext, *_global_rtnl_link_ops_ptr);
+		}
+
 	}
 
 	if (verbose_debug) {
@@ -324,16 +402,22 @@ void __rtnl_link_unregister(struct rtnl_link_ops* _global_rtnl_link_ops)
 		printk("%s:%d, entered!\n", __func__, __LINE__);
 	}
 
-	glue_pack_shadow(pos, msg, ext, *_global_rtnl_link_ops_ptr);
-	if (*_global_rtnl_link_ops_ptr) {
-		caller_marshal_kernel___global_rtnl_link_ops__in(pos, msg, ext, *_global_rtnl_link_ops_ptr);
+	{
+		glue_pack_shadow(pos, msg, ext, *_global_rtnl_link_ops_ptr);
+		if (*_global_rtnl_link_ops_ptr) {
+			caller_marshal_kernel___global_rtnl_link_ops__in(pos, msg, ext, *_global_rtnl_link_ops_ptr);
+		}
+
 	}
 
 	glue_call_server(pos, msg, RPC_ID___rtnl_link_unregister);
 
 	*pos = 0;
-	if (*_global_rtnl_link_ops_ptr) {
-		caller_unmarshal_kernel___global_rtnl_link_ops__in(pos, msg, ext, *_global_rtnl_link_ops_ptr);
+	{
+		if (*_global_rtnl_link_ops_ptr) {
+			caller_unmarshal_kernel___global_rtnl_link_ops__in(pos, msg, ext, *_global_rtnl_link_ops_ptr);
+		}
+
 	}
 
 	if (verbose_debug) {
@@ -359,19 +443,28 @@ int __rtnl_link_register(struct rtnl_link_ops* _global_rtnl_link_ops)
 		printk("%s:%d, entered!\n", __func__, __LINE__);
 	}
 
-	glue_pack(pos, msg, ext, *_global_rtnl_link_ops_ptr);
-	if (*_global_rtnl_link_ops_ptr) {
-		caller_marshal_kernel____rtnl_link_register___global_rtnl_link_ops__in(pos, msg, ext, *_global_rtnl_link_ops_ptr);
+	{
+		glue_pack(pos, msg, ext, *_global_rtnl_link_ops_ptr);
+		if (*_global_rtnl_link_ops_ptr) {
+			caller_marshal_kernel____rtnl_link_register___global_rtnl_link_ops__in(pos, msg, ext, *_global_rtnl_link_ops_ptr);
+		}
+
 	}
 
 	glue_call_server(pos, msg, RPC_ID___rtnl_link_register);
 
 	*pos = 0;
-	if (*_global_rtnl_link_ops_ptr) {
-		caller_unmarshal_kernel____rtnl_link_register___global_rtnl_link_ops__in(pos, msg, ext, *_global_rtnl_link_ops_ptr);
+	{
+		if (*_global_rtnl_link_ops_ptr) {
+			caller_unmarshal_kernel____rtnl_link_register___global_rtnl_link_ops__in(pos, msg, ext, *_global_rtnl_link_ops_ptr);
+		}
+
 	}
 
-	*ret_ptr = glue_unpack(pos, msg, ext, int);
+	{
+		*ret_ptr = glue_unpack(pos, msg, ext, int);
+	}
+
 	if (verbose_debug) {
 		printk("%s:%d, returned!\n", __func__, __LINE__);
 	}
@@ -394,16 +487,22 @@ void ether_setup(struct net_device* dev)
 		printk("%s:%d, entered!\n", __func__, __LINE__);
 	}
 
-	glue_pack_shadow(pos, msg, ext, *dev_ptr);
-	if (*dev_ptr) {
-		caller_marshal_kernel__ether_setup__dev__in(pos, msg, ext, *dev_ptr);
+	{
+		glue_pack_shadow(pos, msg, ext, *dev_ptr);
+		if (*dev_ptr) {
+			caller_marshal_kernel__ether_setup__dev__in(pos, msg, ext, *dev_ptr);
+		}
+
 	}
 
 	glue_call_server(pos, msg, RPC_ID_ether_setup);
 
 	*pos = 0;
-	if (*dev_ptr) {
-		caller_unmarshal_kernel__ether_setup__dev__in(pos, msg, ext, *dev_ptr);
+	{
+		if (*dev_ptr) {
+			caller_unmarshal_kernel__ether_setup__dev__in(pos, msg, ext, *dev_ptr);
+		}
+
 	}
 
 	if (verbose_debug) {
@@ -429,19 +528,28 @@ int eth_validate_addr(struct net_device* dev)
 		printk("%s:%d, entered!\n", __func__, __LINE__);
 	}
 
-	glue_pack_shadow(pos, msg, ext, *dev_ptr);
-	if (*dev_ptr) {
-		caller_marshal_kernel__eth_validate_addr__dev__in(pos, msg, ext, *dev_ptr);
+	{
+		glue_pack_shadow(pos, msg, ext, *dev_ptr);
+		if (*dev_ptr) {
+			caller_marshal_kernel__eth_validate_addr__dev__in(pos, msg, ext, *dev_ptr);
+		}
+
 	}
 
 	glue_call_server(pos, msg, RPC_ID_eth_validate_addr);
 
 	*pos = 0;
-	if (*dev_ptr) {
-		caller_unmarshal_kernel__eth_validate_addr__dev__in(pos, msg, ext, *dev_ptr);
+	{
+		if (*dev_ptr) {
+			caller_unmarshal_kernel__eth_validate_addr__dev__in(pos, msg, ext, *dev_ptr);
+		}
+
 	}
 
-	*ret_ptr = glue_unpack(pos, msg, ext, int);
+	{
+		*ret_ptr = glue_unpack(pos, msg, ext, int);
+	}
+
 	if (verbose_debug) {
 		printk("%s:%d, returned!\n", __func__, __LINE__);
 	}
@@ -467,28 +575,43 @@ int eth_mac_addr(struct net_device* dev, void* p)
 		printk("%s:%d, entered!\n", __func__, __LINE__);
 	}
 
-	glue_pack_shadow(pos, msg, ext, *dev_ptr);
-	if (*dev_ptr) {
-		caller_marshal_kernel__eth_mac_addr__dev__in(pos, msg, ext, *dev_ptr);
+	{
+		glue_pack_shadow(pos, msg, ext, *dev_ptr);
+		if (*dev_ptr) {
+			caller_marshal_kernel__eth_mac_addr__dev__in(pos, msg, ext, *dev_ptr);
+		}
+
 	}
 
-	glue_pack_shadow(pos, msg, ext, *p_ptr);
-	if (*p_ptr) {
-		caller_marshal_kernel__eth_mac_addr__p__in(pos, msg, ext, *p_ptr);
+	{
+		glue_pack_shadow(pos, msg, ext, *p_ptr);
+		if (*p_ptr) {
+			caller_marshal_kernel__eth_mac_addr__p__in(pos, msg, ext, *p_ptr);
+		}
+
 	}
 
 	glue_call_server(pos, msg, RPC_ID_eth_mac_addr);
 
 	*pos = 0;
-	if (*dev_ptr) {
-		caller_unmarshal_kernel__eth_mac_addr__dev__in(pos, msg, ext, *dev_ptr);
+	{
+		if (*dev_ptr) {
+			caller_unmarshal_kernel__eth_mac_addr__dev__in(pos, msg, ext, *dev_ptr);
+		}
+
 	}
 
-	if (*p_ptr) {
-		caller_unmarshal_kernel__eth_mac_addr__p__in(pos, msg, ext, *p_ptr);
+	{
+		if (*p_ptr) {
+			caller_unmarshal_kernel__eth_mac_addr__p__in(pos, msg, ext, *p_ptr);
+		}
+
 	}
 
-	*ret_ptr = glue_unpack(pos, msg, ext, int);
+	{
+		*ret_ptr = glue_unpack(pos, msg, ext, int);
+	}
+
 	if (verbose_debug) {
 		printk("%s:%d, returned!\n", __func__, __LINE__);
 	}
@@ -508,16 +631,22 @@ void setup_callee(struct fipc_message* msg, struct ext_registers* ext)
 		printk("%s:%d, entered!\n", __func__, __LINE__);
 	}
 
-	*dev_ptr = glue_unpack_new_shadow(pos, msg, ext, struct net_device*, sizeof(struct net_device));
-	if (*dev_ptr) {
-		callee_unmarshal_kernel__setup__dev__in(pos, msg, ext, *dev_ptr);
+	{
+		*dev_ptr = glue_unpack_new_shadow(pos, msg, ext, struct net_device*, sizeof(struct net_device));
+		if (*dev_ptr) {
+			callee_unmarshal_kernel__setup__dev__in(pos, msg, ext, *dev_ptr);
+		}
+
 	}
 
 	function_ptr(dev);
 
 	*pos = 0;
-	if (*dev_ptr) {
-		callee_marshal_kernel__setup__dev__in(pos, msg, ext, *dev_ptr);
+	{
+		if (*dev_ptr) {
+			callee_marshal_kernel__setup__dev__in(pos, msg, ext, *dev_ptr);
+		}
+
 	}
 
 	msg->regs[0] = *pos;
@@ -541,25 +670,37 @@ void get_drvinfo_callee(struct fipc_message* msg, struct ext_registers* ext)
 		printk("%s:%d, entered!\n", __func__, __LINE__);
 	}
 
-	*dev_ptr = glue_unpack_shadow(pos, msg, ext, struct net_device*);
-	if (*dev_ptr) {
-		callee_unmarshal_kernel__get_drvinfo__dev__in(pos, msg, ext, *dev_ptr);
+	{
+		*dev_ptr = glue_unpack_shadow(pos, msg, ext, struct net_device*);
+		if (*dev_ptr) {
+			callee_unmarshal_kernel__get_drvinfo__dev__in(pos, msg, ext, *dev_ptr);
+		}
+
 	}
 
-	*info_ptr = glue_unpack_new_shadow(pos, msg, ext, struct ethtool_drvinfo*, sizeof(struct ethtool_drvinfo));
-	if (*info_ptr) {
-		callee_unmarshal_kernel__get_drvinfo__info__out(pos, msg, ext, *info_ptr);
+	{
+		*info_ptr = glue_unpack_new_shadow(pos, msg, ext, struct ethtool_drvinfo*, sizeof(struct ethtool_drvinfo));
+		if (*info_ptr) {
+			callee_unmarshal_kernel__get_drvinfo__info__out(pos, msg, ext, *info_ptr);
+		}
+
 	}
 
 	function_ptr(dev, info);
 
 	*pos = 0;
-	if (*dev_ptr) {
-		callee_marshal_kernel__get_drvinfo__dev__in(pos, msg, ext, *dev_ptr);
+	{
+		if (*dev_ptr) {
+			callee_marshal_kernel__get_drvinfo__dev__in(pos, msg, ext, *dev_ptr);
+		}
+
 	}
 
-	if (*info_ptr) {
-		callee_marshal_kernel__get_drvinfo__info__out(pos, msg, ext, *info_ptr);
+	{
+		if (*info_ptr) {
+			callee_marshal_kernel__get_drvinfo__info__out(pos, msg, ext, *info_ptr);
+		}
+
 	}
 
 	msg->regs[0] = *pos;
@@ -583,19 +724,28 @@ void ndo_init_callee(struct fipc_message* msg, struct ext_registers* ext)
 		printk("%s:%d, entered!\n", __func__, __LINE__);
 	}
 
-	*dev_ptr = glue_unpack_shadow(pos, msg, ext, struct net_device*);
-	if (*dev_ptr) {
-		callee_unmarshal_kernel__ndo_init__dev__in(pos, msg, ext, *dev_ptr);
+	{
+		*dev_ptr = glue_unpack_shadow(pos, msg, ext, struct net_device*);
+		if (*dev_ptr) {
+			callee_unmarshal_kernel__ndo_init__dev__in(pos, msg, ext, *dev_ptr);
+		}
+
 	}
 
 	ret = function_ptr(dev);
 
 	*pos = 0;
-	if (*dev_ptr) {
-		callee_marshal_kernel__ndo_init__dev__in(pos, msg, ext, *dev_ptr);
+	{
+		if (*dev_ptr) {
+			callee_marshal_kernel__ndo_init__dev__in(pos, msg, ext, *dev_ptr);
+		}
+
 	}
 
-	glue_pack(pos, msg, ext, *ret_ptr);
+	{
+		glue_pack(pos, msg, ext, *ret_ptr);
+	}
+
 	msg->regs[0] = *pos;
 	if (verbose_debug) {
 		printk("%s:%d, returned!\n", __func__, __LINE__);
@@ -615,16 +765,22 @@ void ndo_uninit_callee(struct fipc_message* msg, struct ext_registers* ext)
 		printk("%s:%d, entered!\n", __func__, __LINE__);
 	}
 
-	*dev_ptr = glue_unpack_shadow(pos, msg, ext, struct net_device*);
-	if (*dev_ptr) {
-		callee_unmarshal_kernel__ndo_uninit__dev__in(pos, msg, ext, *dev_ptr);
+	{
+		*dev_ptr = glue_unpack_shadow(pos, msg, ext, struct net_device*);
+		if (*dev_ptr) {
+			callee_unmarshal_kernel__ndo_uninit__dev__in(pos, msg, ext, *dev_ptr);
+		}
+
 	}
 
 	function_ptr(dev);
 
 	*pos = 0;
-	if (*dev_ptr) {
-		callee_marshal_kernel__ndo_uninit__dev__in(pos, msg, ext, *dev_ptr);
+	{
+		if (*dev_ptr) {
+			callee_marshal_kernel__ndo_uninit__dev__in(pos, msg, ext, *dev_ptr);
+		}
+
 	}
 
 	msg->regs[0] = *pos;
@@ -650,28 +806,43 @@ void ndo_start_xmit_callee(struct fipc_message* msg, struct ext_registers* ext)
 		printk("%s:%d, entered!\n", __func__, __LINE__);
 	}
 
-	*skb_ptr = glue_unpack(pos, msg, ext, struct sk_buff*);
-	if (*skb_ptr) {
-		callee_unmarshal_kernel__ndo_start_xmit__skb__in(pos, msg, ext, *skb_ptr);
+	{
+		*skb_ptr = glue_unpack(pos, msg, ext, struct sk_buff*);
+		if (*skb_ptr) {
+			callee_unmarshal_kernel__ndo_start_xmit__skb__in(pos, msg, ext, *skb_ptr);
+		}
+
 	}
 
-	*dev_ptr = glue_unpack_shadow(pos, msg, ext, struct net_device*);
-	if (*dev_ptr) {
-		callee_unmarshal_kernel__ndo_start_xmit__dev__in(pos, msg, ext, *dev_ptr);
+	{
+		*dev_ptr = glue_unpack_shadow(pos, msg, ext, struct net_device*);
+		if (*dev_ptr) {
+			callee_unmarshal_kernel__ndo_start_xmit__dev__in(pos, msg, ext, *dev_ptr);
+		}
+
 	}
 
 	ret = function_ptr(skb, dev);
 
 	*pos = 0;
-	if (*skb_ptr) {
-		callee_marshal_kernel__ndo_start_xmit__skb__in(pos, msg, ext, *skb_ptr);
+	{
+		if (*skb_ptr) {
+			callee_marshal_kernel__ndo_start_xmit__skb__in(pos, msg, ext, *skb_ptr);
+		}
+
 	}
 
-	if (*dev_ptr) {
-		callee_marshal_kernel__ndo_start_xmit__dev__in(pos, msg, ext, *dev_ptr);
+	{
+		if (*dev_ptr) {
+			callee_marshal_kernel__ndo_start_xmit__dev__in(pos, msg, ext, *dev_ptr);
+		}
+
 	}
 
-	glue_pack(pos, msg, ext, *ret_ptr);
+	{
+		glue_pack(pos, msg, ext, *ret_ptr);
+	}
+
 	msg->regs[0] = *pos;
 	if (verbose_debug) {
 		printk("%s:%d, returned!\n", __func__, __LINE__);
@@ -691,16 +862,22 @@ void ndo_set_rx_mode_callee(struct fipc_message* msg, struct ext_registers* ext)
 		printk("%s:%d, entered!\n", __func__, __LINE__);
 	}
 
-	*dev_ptr = glue_unpack_shadow(pos, msg, ext, struct net_device*);
-	if (*dev_ptr) {
-		callee_unmarshal_kernel__ndo_set_rx_mode__dev__in(pos, msg, ext, *dev_ptr);
+	{
+		*dev_ptr = glue_unpack_shadow(pos, msg, ext, struct net_device*);
+		if (*dev_ptr) {
+			callee_unmarshal_kernel__ndo_set_rx_mode__dev__in(pos, msg, ext, *dev_ptr);
+		}
+
 	}
 
 	function_ptr(dev);
 
 	*pos = 0;
-	if (*dev_ptr) {
-		callee_marshal_kernel__ndo_set_rx_mode__dev__in(pos, msg, ext, *dev_ptr);
+	{
+		if (*dev_ptr) {
+			callee_marshal_kernel__ndo_set_rx_mode__dev__in(pos, msg, ext, *dev_ptr);
+		}
+
 	}
 
 	msg->regs[0] = *pos;
@@ -726,30 +903,45 @@ void ndo_get_stats64_callee(struct fipc_message* msg, struct ext_registers* ext)
 		printk("%s:%d, entered!\n", __func__, __LINE__);
 	}
 
-	*dev_ptr = glue_unpack_shadow(pos, msg, ext, struct net_device*);
-	if (*dev_ptr) {
-		callee_unmarshal_kernel__ndo_get_stats64__dev__in(pos, msg, ext, *dev_ptr);
+	{
+		*dev_ptr = glue_unpack_shadow(pos, msg, ext, struct net_device*);
+		if (*dev_ptr) {
+			callee_unmarshal_kernel__ndo_get_stats64__dev__in(pos, msg, ext, *dev_ptr);
+		}
+
 	}
 
-	*stats_ptr = glue_unpack_new_shadow(pos, msg, ext, struct rtnl_link_stats64*, sizeof(struct rtnl_link_stats64));
-	if (*stats_ptr) {
-		callee_unmarshal_kernel__ndo_get_stats64__stats__in(pos, msg, ext, *stats_ptr);
+	{
+		*stats_ptr = glue_unpack_new_shadow(pos, msg, ext, struct rtnl_link_stats64*, sizeof(struct rtnl_link_stats64));
+		if (*stats_ptr) {
+			callee_unmarshal_kernel__ndo_get_stats64__stats__in(pos, msg, ext, *stats_ptr);
+		}
+
 	}
 
 	ret = function_ptr(dev, stats);
 
 	*pos = 0;
-	if (*dev_ptr) {
-		callee_marshal_kernel__ndo_get_stats64__dev__in(pos, msg, ext, *dev_ptr);
+	{
+		if (*dev_ptr) {
+			callee_marshal_kernel__ndo_get_stats64__dev__in(pos, msg, ext, *dev_ptr);
+		}
+
 	}
 
-	if (*stats_ptr) {
-		callee_marshal_kernel__ndo_get_stats64__stats__in(pos, msg, ext, *stats_ptr);
+	{
+		if (*stats_ptr) {
+			callee_marshal_kernel__ndo_get_stats64__stats__in(pos, msg, ext, *stats_ptr);
+		}
+
 	}
 
-	glue_pack_shadow(pos, msg, ext, *ret_ptr);
-	if (*ret_ptr) {
-		callee_marshal_kernel__ndo_get_stats64__ret_rtnl_link_stats64__out(pos, msg, ext, *ret_ptr);
+	{
+		glue_pack_shadow(pos, msg, ext, *ret_ptr);
+		if (*ret_ptr) {
+			callee_marshal_kernel__ndo_get_stats64__ret_rtnl_link_stats64__out(pos, msg, ext, *ret_ptr);
+		}
+
 	}
 
 	msg->regs[0] = *pos;
@@ -775,20 +967,35 @@ void ndo_change_carrier_callee(struct fipc_message* msg, struct ext_registers* e
 		printk("%s:%d, entered!\n", __func__, __LINE__);
 	}
 
-	*dev_ptr = glue_unpack_shadow(pos, msg, ext, struct net_device*);
-	if (*dev_ptr) {
-		callee_unmarshal_kernel__ndo_change_carrier__dev__in(pos, msg, ext, *dev_ptr);
+	{
+		*dev_ptr = glue_unpack_shadow(pos, msg, ext, struct net_device*);
+		if (*dev_ptr) {
+			callee_unmarshal_kernel__ndo_change_carrier__dev__in(pos, msg, ext, *dev_ptr);
+		}
+
 	}
 
-	*new_carrier_ptr = glue_unpack(pos, msg, ext, bool);
+	{
+		*new_carrier_ptr = glue_unpack(pos, msg, ext, bool);
+	}
+
 	ret = function_ptr(dev, new_carrier);
 
 	*pos = 0;
-	if (*dev_ptr) {
-		callee_marshal_kernel__ndo_change_carrier__dev__in(pos, msg, ext, *dev_ptr);
+	{
+		if (*dev_ptr) {
+			callee_marshal_kernel__ndo_change_carrier__dev__in(pos, msg, ext, *dev_ptr);
+		}
+
 	}
 
-	glue_pack(pos, msg, ext, *ret_ptr);
+	{
+	}
+
+	{
+		glue_pack(pos, msg, ext, *ret_ptr);
+	}
+
 	msg->regs[0] = *pos;
 	if (verbose_debug) {
 		printk("%s:%d, returned!\n", __func__, __LINE__);
@@ -812,20 +1019,26 @@ void validate_callee(struct fipc_message* msg, struct ext_registers* ext)
 		printk("%s:%d, entered!\n", __func__, __LINE__);
 	}
 
-	*tb_ptr = glue_unpack(pos, msg, ext, struct nlattr**);
-	if (*tb_ptr) {
-		**tb_ptr = glue_unpack(pos, msg, ext, struct nlattr*);
-		if (**tb_ptr) {
-			callee_unmarshal_kernel__validate__tb__in(pos, msg, ext, **tb_ptr);
+	{
+		*tb_ptr = glue_unpack(pos, msg, ext, struct nlattr**);
+		if (*tb_ptr) {
+			**tb_ptr = glue_unpack(pos, msg, ext, struct nlattr*);
+			if (**tb_ptr) {
+				callee_unmarshal_kernel__validate__tb__in(pos, msg, ext, **tb_ptr);
+			}
+
 		}
 
 	}
 
-	*data_ptr = glue_unpack(pos, msg, ext, struct nlattr**);
-	if (*data_ptr) {
-		**data_ptr = glue_unpack(pos, msg, ext, struct nlattr*);
-		if (**data_ptr) {
-			callee_unmarshal_kernel__validate__data__in(pos, msg, ext, **data_ptr);
+	{
+		*data_ptr = glue_unpack(pos, msg, ext, struct nlattr**);
+		if (*data_ptr) {
+			**data_ptr = glue_unpack(pos, msg, ext, struct nlattr*);
+			if (**data_ptr) {
+				callee_unmarshal_kernel__validate__data__in(pos, msg, ext, **data_ptr);
+			}
+
 		}
 
 	}
@@ -833,21 +1046,30 @@ void validate_callee(struct fipc_message* msg, struct ext_registers* ext)
 	ret = function_ptr(tb, data);
 
 	*pos = 0;
-	if (*tb_ptr) {
-		if (**tb_ptr) {
-			callee_marshal_kernel__validate__tb__in(pos, msg, ext, **tb_ptr);
+	{
+		if (*tb_ptr) {
+			if (**tb_ptr) {
+				callee_marshal_kernel__validate__tb__in(pos, msg, ext, **tb_ptr);
+			}
+
 		}
 
 	}
 
-	if (*data_ptr) {
-		if (**data_ptr) {
-			callee_marshal_kernel__validate__data__in(pos, msg, ext, **data_ptr);
+	{
+		if (*data_ptr) {
+			if (**data_ptr) {
+				callee_marshal_kernel__validate__data__in(pos, msg, ext, **data_ptr);
+			}
+
 		}
 
 	}
 
-	glue_pack(pos, msg, ext, *ret_ptr);
+	{
+		glue_pack(pos, msg, ext, *ret_ptr);
+	}
+
 	msg->regs[0] = *pos;
 	if (verbose_debug) {
 		printk("%s:%d, returned!\n", __func__, __LINE__);

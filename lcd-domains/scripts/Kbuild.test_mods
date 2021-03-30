@@ -13,7 +13,7 @@ include $(LCD_TEST_MODULES_BUILD_DIR)/Kbuild.config
 # Examples
 
 obj-m += liblcd_test/
-obj-m += vmfunc/
+#obj-m += vmfunc/
 obj-m += vmfunc_klcd/
 obj-m += nullnet_vmfunc/
 obj-m += ixgbe_vmfunc/
@@ -21,9 +21,11 @@ obj-m += nullb_vmfunc/
 obj-m += nvme_core_vmfunc/
 obj-m += acpi_hwmon_vmfunc/
 obj-m += coretemp_hwmon_vmfunc/
+obj-m += nullnet_gen/
 #obj-m += msr_vmfunc/
 #obj-m += skx_edac_vmfunc/
 #obj-m += mei_me_vmfunc/
 
 obj-m += nullnet_gen/
 obj-m += msr_gen/
+

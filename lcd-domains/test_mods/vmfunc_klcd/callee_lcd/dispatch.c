@@ -392,6 +392,9 @@ int handle_rpc_calls(struct fipc_message *msg)
 	case MARSHAL_VOIDP:
 		marshal_voidptr_callee(msg);
 		break;
+	case MARSHAL_UNION:
+		marshal_union_callee(msg);
+		break;
 	default:
 		break;
 	};

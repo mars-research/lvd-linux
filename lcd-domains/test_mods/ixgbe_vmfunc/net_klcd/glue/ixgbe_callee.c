@@ -3845,44 +3845,34 @@ int napi_gro_receive_callee(struct fipc_message *_request)
 	struct skb_shared_info *shinfo;
 	struct page *p = NULL;
 	unsigned int old_pcount;
-	__be16 prot;
-	u64 off_sz,
-		truesize,
-		csum_ipsum,
-		hash_l4sw,
-		nr_frags_tail, prot_cptr;
 	unsigned int pull_len;
 	unsigned char nr_frags;
 	cptr_t napi_struct_ref;
-
+	struct ext_registers *ext_regs = get_register_page(smp_processor_id());
+	u64 *regs = &ext_regs->regs[0];
+	u32 i = 0;
 	u32 frag_off = 0, frag_size = 0;
-	nr_frags_tail = fipc_get_reg0(_request);
+	u32 truesize;
 
-	nr_frags = nr_frags_tail & 0xff;
+	nr_frags = fipc_get_reg0(_request);
+
 	/* this is the amount of data copied to the skb->data
 	 * by copy_to_linear_data. We have to do it again with
 	 * the skb allocated here
 	 */
-	pull_len = nr_frags_tail >> 8;
-
-	prot_cptr = fipc_get_reg2(_request);
-	/* last 16 bits of the address is ffff */
-	napi_struct_ref = __cptr(prot_cptr >> 16 | (0xffffull << 48));
+	pull_len = fipc_get_reg1(_request);
 
 	if (nr_frags) {
-		page = fipc_get_reg1(_request);
-		off_sz = fipc_get_reg3(_request);
-		frag_size = off_sz >> 32;
-		frag_off = off_sz;
+		page = fipc_get_reg2(_request);
+		frag_off = fipc_get_reg3(_request);
+		frag_size = fipc_get_reg4(_request);
 		/* reverse the effects of pull_tail done at LCD end */
 		frag_size += pull_len;
 		frag_off -= pull_len;
 	}
 
-	prot = prot_cptr & 0xFFFF;
-	truesize = fipc_get_reg5(_request);
-	hash_l4sw = fipc_get_reg4(_request);
-	csum_ipsum = fipc_get_reg6(_request);
+	napi_struct_ref = __cptr(fipc_get_reg5(_request));
+	truesize = fipc_get_reg6(_request);
 
 	glue_lookup_napi_hash(napi_struct_ref, &napi_container);
 
@@ -3939,19 +3929,17 @@ int napi_gro_receive_callee(struct fipc_message *_request)
 	if (skb_is_nonlinear(skb))
 		ixgbe_pull_tail(skb);
 
-	skb->protocol = prot;
+	GET_EREG(protocol);
+	GET_EREG(l4_hash);
+	GET_EREG(sw_hash);
+	GET_EREG(hash);
+	GET_EREG(queue_mapping);
+	GET_EREG(csum_level);
+	GET_EREG(ip_summed);
 
 	eth_skb_pad(skb);
-
-	skb->queue_mapping = csum_ipsum & 0xffff;
-	skb->csum_level = (csum_ipsum >> 16)& 0x3;
-	skb->ip_summed = (csum_ipsum >> 18) & 0x3;
-	skb->queue_mapping = (csum_ipsum >> 2) & 0x3;
-
+	
 	skb->napi_id = napi->napi_id;
-	skb->hash = hash_l4sw;
-	skb->l4_hash = (hash_l4sw >> 32) & 0x1;
-	skb->sw_hash = (hash_l4sw >> 33) & 0x1;
 
 	skb_pull_inline(skb, ETH_HLEN);
 	skb_reset_mac_header(skb);

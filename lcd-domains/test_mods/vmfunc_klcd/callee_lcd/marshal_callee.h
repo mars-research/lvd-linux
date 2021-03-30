@@ -8,6 +8,7 @@ int marshal_int_callee(struct fipc_message *msg);
 int marshal_array_callee(struct fipc_message *msg);
 int marshal_string_callee(struct fipc_message *msg);
 int marshal_voidptr_callee(struct fipc_message *msg);
+int marshal_union_callee(struct fipc_message *msg);
 
 void unmarshal_int(union acpi_object *obj, uint64_t *regs);
 void unmarshal_string(union acpi_object *obj, uint64_t *regs);

@@ -39,8 +39,8 @@ static int boot_main(void)
 
 	/* ---------- Create LCDs ---------- */
 
-	m = lvd_create_module_klcd_no_thread(LCD_DIR("msr_vmfunc/msr_klcd"),
-				"lcd_test_mod_msr_vmfunc_msr_klcd",
+	m = lvd_create_module_klcd_no_thread(LCD_DIR("msr_gen/msr_klcd"),
+				"lcd_test_mod_msr_gen_msr_klcd",
 				&msr_klcd);
 
 	if (!m) {
@@ -48,8 +48,8 @@ static int boot_main(void)
 		ret = -1;
 		goto fail3;
 	}
-	ret = lvd_create_module_lvd(LCD_DIR("msr_vmfunc/msr_lcd"),
-				"lcd_test_mod_msr_vmfunc_msr_lcd",
+	ret = lvd_create_module_lvd(LCD_DIR("msr_gen/msr_lcd"),
+				"lcd_test_mod_msr_gen_msr_lcd",
 				&msr_lcd,
 				&msr_ctx, 1);
 	if (ret) {
@@ -85,7 +85,7 @@ fail8:
 	lcd_destroy_create_ctx(msr_ctx);
 fail4:
 	//lcd_cap_delete(msr_klcd);
-	lcd_destroy_module_klcd(msr_klcd, "lcd_test_mod_msr_vmfunc_msr_klcd");
+	lcd_destroy_module_klcd(msr_klcd, "lcd_test_mod_msr_gen_msr_klcd");
 fail3:
 	lcd_exit(0); /* will free endpoints */
 fail1:
@@ -115,7 +115,7 @@ int boot_lcd_thread(void *data)
 		lcd_stop(msr_klcd);
 
 		lcd_destroy_module_klcd(msr_klcd,
-				"lcd_test_mod_msr_vmfunc_msr_klcd");
+				"lcd_test_mod_msr_gen_msr_klcd");
 		if (current->lcd)
 			lcd_cap_delete(msr_lcd);
 		if (msr_ctx)

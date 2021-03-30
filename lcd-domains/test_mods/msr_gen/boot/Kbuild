@@ -1,6 +1,6 @@
-obj-m += lcd_test_mod_msr_vmfunc_boot.o
+obj-m += lcd_test_mod_msr_gen_boot.o
 
 
-lcd_test_mod_msr_vmfunc_boot-y		+= main.o
+lcd_test_mod_msr_gen_boot-y		+= main.o
 
 ccflags-y += $(NONISOLATED_CFLAGS)

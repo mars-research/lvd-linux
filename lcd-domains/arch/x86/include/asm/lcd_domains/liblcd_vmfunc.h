@@ -28,6 +28,7 @@
 	} while(0)
 
 extern int noinline vmfunc_wrapper(struct fipc_message *m);
+extern bool iommu_assigned;
 
 static inline void lcd_syscall_no_args(struct fipc_message *m, int id)
 {
@@ -214,6 +215,7 @@ static inline int lcd_syscall_assign_device(int domain, int bus, int devfn)
 {
 	struct fipc_message msg;
 	lcd_syscall_three_args(&msg, LCD_SYSCALL_ASSIGN_DEVICE, domain, bus, devfn);
+	iommu_assigned = true;
 	vmfunc_wrapper(&msg);
 	return 0;
 }
@@ -223,6 +225,7 @@ static inline int lcd_syscall_deassign_device(int domain, int bus, int devfn)
 	struct fipc_message msg;
 	lcd_syscall_three_args(&msg, LCD_SYSCALL_DEASSIGN_DEVICE, domain, bus, devfn);
 	vmfunc_wrapper(&msg);
+	iommu_assigned = false;
 	return 0;
 }
 

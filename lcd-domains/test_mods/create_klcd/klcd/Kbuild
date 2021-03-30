@@ -1,6 +1,0 @@
-
-obj-m  += lcd_test_mod_create_klcd_klcd.o
-
-lcd_test_mod_create_klcd_klcd-y              += klcd.o
-
-ccflags-y += $(NONISOLATED_CFLAGS)

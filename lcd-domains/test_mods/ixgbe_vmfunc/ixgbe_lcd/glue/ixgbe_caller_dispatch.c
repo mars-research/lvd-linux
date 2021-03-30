@@ -28,6 +28,9 @@ int handle_rpc_calls(struct fipc_message *message)
 		case NDO_START_XMIT:
 			return ndo_start_xmit_callee(message);
 
+		case NDO_START_XMIT_COPY:
+			return ndo_start_xmit_copy_callee(message);
+
 		case NDO_SET_RX_MODE:
 			trace(NDO_SET_RX_MODE);
 			return ndo_set_rx_mode_callee(message);
@@ -55,6 +58,14 @@ int handle_rpc_calls(struct fipc_message *message)
 		case NDO_GET_STATS64:
 			/* trace(NDO_GET_STATS64); */
 			return ndo_get_stats64_callee(message);
+
+		case NDO_SET_FEATURES:
+			trace(NDO_SET_FEATURES);
+			return ndo_set_features_callee(message);
+
+		case NDO_FIX_FEATURES:
+			trace(NDO_FIX_FEATURES);
+			return ndo_fix_features_callee(message);
 
 		case PROBE:
 			trace(PROBE);
@@ -95,6 +106,15 @@ int handle_rpc_calls(struct fipc_message *message)
 		case MSIX_IRQ_HANDLER:
 			msix_vector_handler_callee(message);
 			break;
+
+		case ETHTOOL_GET_RXNFC:
+			get_rxnfc_callee(message);
+			break;
+
+		case ETHTOOL_SET_RXNFC:
+			set_rxnfc_callee(message);
+			break;
+
 		default:
 			LIBLCD_ERR("unexpected function label: %d",
 					fn_type);

@@ -30,8 +30,9 @@
 #define CONFIG_VMALLOC_SHARED_POOL
 #define SKB_GLOBAL_HASHTABLE
 #define CONFIG_NO_HASHING
+//#define CONFIG_SKB_COPY
 
-#define NUM_HW_QUEUES		20
+#define NUM_HW_QUEUES		10
 
 enum dispatch_t {
 	__PCI_REGISTER_DRIVER,
@@ -98,6 +99,7 @@ enum dispatch_t {
 	NDO_OPEN,
 	NDO_STOP,
 	NDO_START_XMIT,
+	NDO_START_XMIT_COPY,
 	NDO_SELECT_QUEUE,
 	NDO_SET_RX_MODE,
 	NDO_VALIDATE_ADDR,
@@ -106,6 +108,10 @@ enum dispatch_t {
 	NDO_TX_TIMEOUT,
 	NDO_SET_TX_MAXRATE,
 	NDO_GET_STATS64,
+	NDO_SET_FEATURES,
+	NDO_FIX_FEATURES,
+	ETHTOOL_GET_RXNFC,
+	ETHTOOL_SET_RXNFC,
 	PROBE,
 	REMOVE,
 	SYNC,
@@ -127,6 +133,8 @@ enum dispatch_t {
 	RTNL_UNLOCK,
 	RTNL_IS_LOCKED,
 	CALL_NETDEVICE_NOTIFIERS,
+	IRQ_SET_AFFINITY_HINT,
+	NETDEV_RSS_KEY_FILL,
 };
 
 typedef enum {
@@ -184,6 +192,9 @@ struct skbuff_members {
 
 #define C(x)	skb_lcd->x = skb->x
 #define P(x)	skb->x = skb_lcd->x
+
+#define SET_EREG(x) regs[i++] = skb->x
+#define GET_EREG(x) skb->x = regs[i++]
 
 /* CSPACES ------------------------------------------------------------ */
 int glue_cap_init(void);

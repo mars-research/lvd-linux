@@ -17,6 +17,7 @@
 #include <lcd_config/post_hook.h>
 
 static int thc_initialized;
+extern void skb_init(void);
 
 int 
 LIBLCD_FUNC_ATTR
@@ -126,6 +127,10 @@ lcd_enter(void)
 	thc_initialized = 1;
 	LIBLCD_MSG("async runtime initialized");
 #endif
+
+	skb_init();
+	LIBLCD_MSG("skb cache initialized");
+
 	lcd_printk("===============");
 	lcd_printk("  LCD BOOTED   ");
 	lcd_printk("===============");

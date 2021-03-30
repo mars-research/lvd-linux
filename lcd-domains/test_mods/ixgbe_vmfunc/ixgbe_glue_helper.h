@@ -1,10 +1,14 @@
 #ifndef __IXGBE_GLUE_HELPER_H__
 #define __IXGBE_GLUE_HELPER_H__
 
+#include <liblcd/skbuff.h>
+
 struct device_container {
 	struct device device;
+	struct device* dev;
 	struct cptr other_ref;
 	struct cptr my_ref;
+	struct hlist_node hentry;
 };
 struct module_container {
 	struct module module;
@@ -18,6 +22,11 @@ struct net_device_container {
 };
 struct net_device_ops_container {
 	struct net_device_ops net_device_ops;
+	struct cptr other_ref;
+	struct cptr my_ref;
+};
+struct ethtool_ops_container {
+	struct ethtool_ops ethtool_ops;
 	struct cptr other_ref;
 	struct cptr my_ref;
 };
@@ -57,7 +66,7 @@ struct sk_buff_container_2 {
 	struct cptr my_ref;
 };
 
-struct sk_buff_container {
+struct sk_buff_container_hash {
 	/* just store the pointer */
 	struct sk_buff *skb;
 	/* store the order when volunteered. comes handy during unmap */
@@ -130,6 +139,9 @@ int glue_cap_insert_net_device_type(struct glue_cspace *cspace,
 int glue_cap_insert_net_device_ops_type(struct glue_cspace *cspace,
 		struct net_device_ops_container *net_device_ops_container,
 		struct cptr *c_out);
+int glue_cap_insert_ethtool_ops_type(struct glue_cspace *cspace,
+		struct ethtool_ops_container *ethtool_ops_container,
+		struct cptr *c_out);
 int glue_cap_insert_pci_bus_type(struct glue_cspace *cspace,
 		struct pci_bus_container *pci_bus_container,
 		struct cptr *c_out);
@@ -164,6 +176,9 @@ int glue_cap_lookup_net_device_type(struct glue_cspace *cspace,
 int glue_cap_lookup_net_device_ops_type(struct glue_cspace *cspace,
 		struct cptr c,
 		struct net_device_ops_container **net_device_ops_container);
+int glue_cap_lookup_ethtool_ops_type(struct glue_cspace *cspace,
+		struct cptr c,
+		struct ethtool_ops_container **ethtool_ops_container);
 int glue_cap_lookup_pci_bus_type(struct glue_cspace *cspace,
 		struct cptr c,
 		struct pci_bus_container **pci_bus_container);

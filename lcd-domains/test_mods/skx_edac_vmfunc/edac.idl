@@ -1,0 +1,24 @@
+
+projection <struct rank_info> rank_info {
+	projection csrow_info *csrow;
+	projection dimm_info *dimm;
+};
+
+projection <struct csrow_info> csrow_info {
+	projection rank_info [alloc(caller)] *channels[self->nr_channels];
+};
+
+projection <struct dimm_info> dimm_info {
+	projection mem_ctl_info *mci;
+};
+
+projection <struct mem_ctl_info> mem_ctl_info_edac_mc_alloc {
+	projection csrow_info [alloc(caller)] *csrows[self->n_csrows];
+	projection dimm_info [alloc(caller)] *dimms[self->n_dimms];
+};
+
+rpc projection mem_ctl_info *edac_mc_alloc(unsigned int mc_num, 
+		unsigned int n_layers,
+		projection edac_mc_layer layers[n_layers],
+		unsigned int sz_pvt);
+

@@ -54,6 +54,7 @@ static int napi_reg;
 DEFINE_HASHTABLE(napi_hashtable, NAPI_HASH_BITS);
 DEFINE_HASHTABLE(skb_hashtable, NAPI_HASH_BITS);
 DEFINE_HASHTABLE(pdev_hash, NAPI_HASH_BITS);
+static DEFINE_HASHTABLE(dev_hash, CPTR_HASH_BITS);
 
 /* XXX: There's no way to pass arrays across domains for now.
  * May not be in the future too! But agree that this is ugly
@@ -152,7 +153,7 @@ int glue_ixgbe_init(void)
 	skb_data_pool_init();
 
 	skb_c_cache = kmem_cache_create("skb_c_cache",
-				sizeof(struct sk_buff_container),
+				sizeof(struct sk_buff_container_hash),
 				0,
 				SLAB_HWCACHE_ALIGN|SLAB_PANIC,
 				NULL);
@@ -176,7 +177,7 @@ void glue_ixgbe_exit(void)
 		kmem_cache_destroy(skb_c_cache);
 }
 
-int inline glue_insert_skb_hash(struct sk_buff_container *skb_c)
+int inline glue_insert_skb_hash(struct sk_buff_container_hash *skb_c)
 {
 #ifndef SKB_GLOBAL_HASHTABLE
 	int cpu = smp_processor_id();
@@ -197,13 +198,13 @@ int inline glue_insert_skb_hash(struct sk_buff_container *skb_c)
 	return 0;
 }
 
-int inline glue_lookup_skb_hash(struct cptr c, struct sk_buff_container **skb_cout)
+int inline glue_lookup_skb_hash(struct cptr c, struct sk_buff_container_hash **skb_cout)
 {
 #ifndef SKB_GLOBAL_HASHTABLE
 	int cpu = smp_processor_id();
 	struct skb_hash_table *this = &per_cpu(skb_hash, cpu);
 #endif
-        struct sk_buff_container *skb_c;
+        struct sk_buff_container_hash *skb_c;
 
 #ifdef SKB_GLOBAL_HASHTABLE
         hash_for_each_possible(skb_hashtable, skb_c, hentry, (unsigned long) cptr_val(c)) {
@@ -222,7 +223,7 @@ int inline glue_lookup_skb_hash(struct cptr c, struct sk_buff_container **skb_co
         return 0;
 }
 
-void inline glue_remove_skb_hash(struct sk_buff_container *skb_c)
+void inline glue_remove_skb_hash(struct sk_buff_container_hash *skb_c)
 {
 	hash_del(&skb_c->hentry);
 }
@@ -298,6 +299,34 @@ int inline glue_lookup_pdev_hash(struct cptr c, struct pci_dev_container
 void inline glue_remove_pdev_hash(struct pci_dev_container *dev_container)
 {
 	hash_del(&dev_container->hentry);
+}
+
+int glue_insert_device(struct device_container *dev_c)
+{
+	BUG_ON(!dev_c->dev);
+
+	dev_c->my_ref = __cptr((unsigned long)dev_c->dev);
+
+	hash_add(dev_hash, &dev_c->hentry, (unsigned long) dev_c->dev);
+
+	return 0;
+}
+
+int glue_lookup_device(struct cptr c, struct
+		device_container **dev_cout) {
+	struct device_container *dev_c;
+
+	hash_for_each_possible(dev_hash, dev_c,
+			hentry, (unsigned long) cptr_val(c)) {
+		if (dev_c->dev == (struct device*) c.cptr)
+			*dev_cout = dev_c;
+	}
+	return 0;
+}
+
+void glue_remove_device(struct device_container *dev_c)
+{
+	hash_del(&dev_c->hentry);
 }
 
 int sync_setup_memory(void *data, size_t sz, unsigned long *order, cptr_t *data_cptr, unsigned long *data_offset)
@@ -573,7 +602,12 @@ int alloc_etherdev_mqs_callee(struct fipc_message *_request)
 		goto fail_insert;
 	}
 
-	fipc_set_reg1(_request, func_ret_container->my_ref.cptr);
+	fipc_set_reg0(_request, func_ret_container->my_ref.cptr);
+	fipc_set_reg1(_request, strlen(func_ret->name));
+	memcpy(&_request->regs[2], func_ret->name, strlen(func_ret->name));
+	fipc_set_reg4(_request, func_ret->priv_flags);
+	fipc_set_reg5(_request, func_ret->num_tx_queues);
+	fipc_set_reg6(_request, func_ret->real_num_tx_queues);
 
 fail_insert:
 	return ret;
@@ -691,6 +725,7 @@ int probe(struct pci_dev *dev,
 		struct trampoline_hidden_args *hidden_args)
 {
 	struct pci_dev_container *dev_container;
+	struct device_container *device_container;
 	int ret = 0;
 	struct fipc_message r;
 	struct fipc_message *_request = &r;
@@ -698,6 +733,7 @@ int probe(struct pci_dev *dev,
 	struct pci_driver_container *drv_container = hidden_args->struct_container;
 
 	INIT_IPC_MSG(&r);
+
 	/* assign pdev to a global instance */
 	g_pdev = dev;
 
@@ -713,6 +749,17 @@ int probe(struct pci_dev *dev,
 
 	dev_container->pdev = dev;
 
+	device_container = kzalloc(sizeof( struct device_container   ),
+		GFP_KERNEL);
+	if (!device_container) {
+		LIBLCD_ERR("kzalloc");
+		goto fail_alloc;
+	}
+
+	device_container->dev = &dev_container->pdev->dev;
+
+	glue_insert_device(device_container);
+
 	/*
 	 * Kernel does not give us pci_dev with a container wrapped in.
 	 * So, let's have a pointer!
@@ -722,7 +769,8 @@ int probe(struct pci_dev *dev,
 	async_msg_set_fn_type(_request, PROBE);
 	fipc_set_reg0(_request, drv_container->other_ref.cptr);
 	fipc_set_reg1(_request, dev_container->my_ref.cptr);
-	fipc_set_reg2(_request, *dev->dev.dma_mask);
+	fipc_set_reg2(_request, device_container->my_ref.cptr);
+	fipc_set_reg3(_request, *dev->dev.dma_mask);
 
 	vmfunc_klcd_wrapper(_request, 1);
 
@@ -800,8 +848,18 @@ int ndo_open(struct net_device *dev,
 	struct fipc_message r;
 	struct fipc_message *_request = &r;
 	int func_ret;
+	static u32 ndo_open_called = 0;
 
 	INIT_IPC_MSG(&r);
+
+	if (ndo_open_called) {
+		dump_stack();
+		printk("%s already called dev->flags %x (%s)\n", __func__, dev->flags,
+					(dev->flags & IFF_UP) ? "IFF_UP" : "IFF_DOWN");
+		return 0;
+	}
+
+	dump_stack();
 
 	dev_container = container_of(dev,
 		struct net_device_container,
@@ -819,8 +877,10 @@ int ndo_open(struct net_device *dev,
 	/* TODO: enable napi from within the LCD */
 	/* napi_enable(napi_q0); */
 
-	return func_ret;
+	printk("%s, returned %d\n", __func__, func_ret);
 
+	ndo_open_called++;
+	return func_ret;
 }
 
 LCD_TRAMPOLINE_DATA(ndo_open_trampoline);
@@ -888,7 +948,7 @@ int ndo_start_xmit(struct sk_buff *skb,
 	static int once = 1;
 
 #ifndef CONFIG_NO_HASHING
-	struct sk_buff_container *skb_c;
+	struct sk_buff_container_hash *skb_c;
 #endif
 	struct skbuff_members *skb_lcd;
 #ifdef TIMESTAMP
@@ -908,8 +968,11 @@ int ndo_start_xmit(struct sk_buff *skb,
 		printk("%s, comm %s | pid %d | skblen %d " "| skb->proto %02X\n",
 				__func__, current->comm, current->pid,
 				skb->len, ntohs(skb->protocol));
+		dump_stack();
 		return NETDEV_TX_OK;
 	}
+
+	//printk("%s, comm %s | skblen %d\n", __func__, current->comm, skb->len);
 
 	dev_container = container_of(dev,
 			struct net_device_container,
@@ -999,6 +1062,118 @@ fail_alloc:
 	return func_ret;
 }
 
+int ndo_start_xmit_copy(struct sk_buff *skb,
+		struct net_device *dev,
+		struct trampoline_hidden_args *hidden_args)
+{
+	struct net_device_container *dev_container;
+	struct fipc_message r;
+	struct fipc_message *_request = &r;
+	int func_ret = 0;
+	static int once = 1;
+	struct ext_registers *ext_regs = get_register_page(smp_processor_id());
+	u64 *regs = &ext_regs->regs[0];
+	int i = 0;
+
+#ifndef CONFIG_NO_HASHING
+	struct sk_buff_container_hash *skb_c;
+#endif
+
+#ifdef TIMESTAMP
+	TS_DECL(mndo_xmit);
+#endif
+
+#if defined(TIMESTAMP) || defined(LCD_MEASUREMENT)
+	static int iter = 0;
+#endif
+#ifdef TIMESTAMP
+	TS_START(mndo_xmit);
+#endif
+
+	INIT_IPC_MSG(&r);
+
+	dev_container = container_of(dev,
+			struct net_device_container,
+			net_device);
+
+#ifndef CONFIG_NO_HASHING
+#ifdef SKBC_PRIVATE_POOL
+	skb_c = priv_alloc(SKB_CONTAINER_POOL);
+#else
+	skb_c = kmem_cache_alloc(skb_c_cache, GFP_KERNEL);
+#endif
+	if (!skb_c) {
+		LIBLCD_MSG("no memory");
+		goto fail_alloc;
+	}
+
+	skb_c->skb = skb;
+
+	if (0)
+		printk("%s, on cpu:%d skb:%p\n", __func__, smp_processor_id(), skb);
+#endif
+	/* pad to 17 bytes, don't care the ret val */
+	skb_put_padto(skb, 17);
+	async_msg_set_fn_type(_request, NDO_START_XMIT_COPY);
+
+#ifdef CONFIG_NO_HASHING
+	fipc_set_reg0(_request, (unsigned long) skb);
+#else
+	glue_insert_skb_hash(skb_c);
+	fipc_set_reg2(_request, skb_c->my_ref.cptr);
+#endif
+
+	fipc_set_reg1(_request, dev_container->other_ref.cptr);
+
+	fipc_set_reg4(_request, skb->end);
+
+	fipc_set_reg5(_request, skb->protocol);
+
+	SET_EREG(len);
+	SET_EREG(data_len);
+	SET_EREG(queue_mapping);
+	SET_EREG(xmit_more);
+	SET_EREG(tail);
+	SET_EREG(truesize);
+	SET_EREG(ip_summed);
+	SET_EREG(csum_start);
+	SET_EREG(network_header);
+	SET_EREG(csum_offset);
+	SET_EREG(transport_header);
+	regs[i++] = skb->data - skb->head;
+	memcpy(&regs[i], skb->head, skb->len - skb->data_len + (skb->data - skb->head));
+
+	if (0)
+		printk("%s:%d %s skb->q %d\n", current->comm, current->pid, __func__, skb->queue_mapping);
+
+#ifdef CONFIG_LCD_TRACE_BUFFER
+	add_trace_entry(EVENT_XMIT, async_msg_get_fn_type(_request));
+#endif
+	vmfunc_klcd_wrapper(_request, 1);
+
+	func_ret = fipc_get_reg0(_request);
+#ifdef LCD_MEASUREMENT
+	times_lcd[iter] = fipc_get_reg2(_request);
+	iter = (iter + 1) % NUM_PACKETS;
+#endif
+
+	g_stats.num_sent++;
+
+#ifdef TIMESTAMP
+	TS_STOP(mndo_xmit);
+	times_ndo_xmit[iter] = TS_DIFF(mndo_xmit);
+	iter = (iter + 1) % NUM_PACKETS;
+#endif
+#ifndef CONFIG_NO_HASHING
+fail_alloc:
+#endif
+	if (once && (func_ret != NETDEV_TX_OK)) {
+		once = 0;
+		printk("%s, got %d\n", __func__, func_ret);
+	}
+	return func_ret;
+}
+
 LCD_TRAMPOLINE_DATA(ndo_start_xmit_trampoline);
 int  LCD_TRAMPOLINE_LINKAGE(ndo_start_xmit_trampoline)
 ndo_start_xmit_trampoline(struct sk_buff *skb,
@@ -1010,7 +1185,12 @@ ndo_start_xmit_trampoline(struct sk_buff *skb,
 	struct trampoline_hidden_args *hidden_args;
 	LCD_TRAMPOLINE_PROLOGUE(hidden_args,
 			ndo_start_xmit_trampoline);
+
+#ifdef CONFIG_SKB_COPY
+	ndo_start_xmit_fp = ndo_start_xmit_copy;
+#else
 	ndo_start_xmit_fp = ndo_start_xmit;
+#endif
 	return ndo_start_xmit_fp(skb,
 		dev,
 		hidden_args);
@@ -1365,6 +1545,243 @@ ndo_setup_tc_trampoline(struct net_device *dev,
 		hidden_args);
 }
 
+netdev_features_t ndo_fix_features(struct net_device *dev,
+		      netdev_features_t features,
+			struct trampoline_hidden_args *hidden_args)
+{
+	struct net_device_container *dev_container;
+	struct fipc_message r;
+	struct fipc_message *_request = &r;
+	netdev_features_t ret;
+
+	INIT_IPC_MSG(&r);
+
+	printk("%s, called features %llx\n", __func__, features);
+
+	dev_container = container_of(dev,
+		struct net_device_container,
+		net_device);
+
+	async_msg_set_fn_type(_request, NDO_FIX_FEATURES);
+	fipc_set_reg0(_request, dev_container->other_ref.cptr);
+	fipc_set_reg1(_request, features);
+	fipc_set_reg2(_request, dev->features);
+	fipc_set_reg3(_request, dev->hw_features);
+	fipc_set_reg4(_request, dev->hw_enc_features);
+
+	vmfunc_klcd_wrapper(_request, 1);
+
+	ret = fipc_get_reg0(_request);
+
+	return ret;
+}
+
+LCD_TRAMPOLINE_DATA(ndo_fix_features_trampoline);
+netdev_features_t LCD_TRAMPOLINE_LINKAGE(ndo_fix_features_trampoline)
+ndo_fix_features_trampoline(struct net_device *dev, netdev_features_t features)
+{
+	netdev_features_t (*volatile ndo_fix_features_fp)(struct net_device *dev, netdev_features_t,
+			struct trampoline_hidden_args *);
+
+	struct trampoline_hidden_args *hidden_args;
+	LCD_TRAMPOLINE_PROLOGUE(hidden_args,
+			ndo_fix_features_trampoline);
+	ndo_fix_features_fp = ndo_fix_features;
+	return ndo_fix_features_fp(dev,
+		features,
+		hidden_args);
+}
+
+int ndo_set_features(struct net_device *dev,
+		netdev_features_t features,
+			struct trampoline_hidden_args *hidden_args)
+{
+	struct net_device_container *dev_container;
+	struct fipc_message r;
+	struct fipc_message *_request = &r;
+	int ret;
+
+	INIT_IPC_MSG(&r);
+
+	printk("%s, called features %llx\n", __func__, features);
+	dev_container = container_of(dev,
+		struct net_device_container,
+		net_device);
+
+	async_msg_set_fn_type(_request, NDO_SET_FEATURES);
+	fipc_set_reg0(_request, dev_container->other_ref.cptr);
+	fipc_set_reg1(_request, features);
+
+	vmfunc_klcd_wrapper(_request, 1);
+
+	ret = fipc_get_reg0(_request);
+	return ret;
+}
+
+LCD_TRAMPOLINE_DATA(ndo_set_features_trampoline);
+int LCD_TRAMPOLINE_LINKAGE(ndo_set_features_trampoline)
+ndo_set_features_trampoline(struct net_device *dev, netdev_features_t features)
+{
+	int (*volatile ndo_set_features_fp)(struct net_device *dev, netdev_features_t,
+			struct trampoline_hidden_args *);
+
+	struct trampoline_hidden_args *hidden_args;
+	LCD_TRAMPOLINE_PROLOGUE(hidden_args,
+			ndo_set_features_trampoline);
+	ndo_set_features_fp = ndo_set_features;
+	return ndo_set_features_fp(dev,
+		features,
+		hidden_args);
+}
+
+// ethtool ops
+int get_rxnfc(struct net_device *dev,
+		struct ethtool_rxnfc *cmd, u32 *rule_locs,
+		struct trampoline_hidden_args *hidden_args)
+{
+	struct net_device_container *dev_container;
+	struct fipc_message r;
+	struct fipc_message *_request = &r;
+	int func_ret;
+	struct ext_registers *ext_regs = get_register_page(smp_processor_id());
+
+	INIT_IPC_MSG(&r);
+
+	dev_container = container_of(dev,
+			struct net_device_container,
+			net_device);
+
+	printk("%s, called with cmd->cmd %x | rule_locs %p | cmd->rule_cnt %d\n",
+		       __func__, cmd->cmd, rule_locs, rule_locs ? cmd->rule_cnt : 0);
+
+	async_msg_set_fn_type(_request, ETHTOOL_GET_RXNFC);
+
+	memcpy(ext_regs, cmd, sizeof(*cmd));
+
+	fipc_set_reg0(_request, dev_container->other_ref.cptr);
+
+	vmfunc_klcd_wrapper(_request, 1);
+
+	func_ret = fipc_get_reg0(_request);
+
+	memcpy(cmd, ext_regs, sizeof(*cmd));
+
+	if (cmd->rule_cnt > 0 && rule_locs) {
+		memcpy(rule_locs, (char*) ext_regs + sizeof(*cmd), cmd->rule_cnt * sizeof(u32));
+		printk("%s copying rules to offset %llx (size %zu)\n", __func__, (u64) ext_regs + sizeof(*cmd), cmd->rule_cnt * sizeof(u32));
+	}
+	return func_ret;
+}
+
+LCD_TRAMPOLINE_DATA(get_rxnfc_trampoline);
+int  LCD_TRAMPOLINE_LINKAGE(get_rxnfc_trampoline)
+get_rxnfc_trampoline(struct net_device *dev, struct ethtool_rxnfc *cmd, u32 *rule_locs)
+{
+	int ( *volatile get_rxnfc_fp )(struct net_device *,
+			struct ethtool_rxnfc *, u32 *,
+		struct trampoline_hidden_args *);
+	struct trampoline_hidden_args *hidden_args;
+	LCD_TRAMPOLINE_PROLOGUE(hidden_args,
+			get_rxnfc_trampoline);
+	get_rxnfc_fp = get_rxnfc;
+	return get_rxnfc_fp(dev, cmd, rule_locs,
+		hidden_args);
+}
+
+int set_rxnfc(struct net_device *dev,
+		struct ethtool_rxnfc *cmd,
+		struct trampoline_hidden_args *hidden_args)
+{
+	struct net_device_container *dev_container;
+	struct fipc_message r;
+	struct fipc_message *_request = &r;
+	int func_ret;
+	struct ext_registers *ext_regs = get_register_page(smp_processor_id());
+
+	INIT_IPC_MSG(&r);
+
+	dev_container = container_of(dev,
+			struct net_device_container,
+			net_device);
+
+	async_msg_set_fn_type(_request, ETHTOOL_SET_RXNFC);
+
+	memcpy(ext_regs, cmd, sizeof(*cmd));
+
+	fipc_set_reg0(_request, dev_container->other_ref.cptr);
+
+	vmfunc_klcd_wrapper(_request, 1);
+
+	func_ret = fipc_get_reg0(_request);
+
+	memcpy(cmd, ext_regs, sizeof(*cmd));
+
+	return func_ret;
+}
+
+LCD_TRAMPOLINE_DATA(set_rxnfc_trampoline);
+int  LCD_TRAMPOLINE_LINKAGE(set_rxnfc_trampoline)
+set_rxnfc_trampoline(struct net_device *dev, struct ethtool_rxnfc *cmd)
+{
+	int ( *volatile set_rxnfc_fp )(struct net_device *,
+			struct ethtool_rxnfc *,
+		struct trampoline_hidden_args *);
+	struct trampoline_hidden_args *hidden_args;
+	LCD_TRAMPOLINE_PROLOGUE(hidden_args,
+			set_rxnfc_trampoline);
+	set_rxnfc_fp = set_rxnfc;
+	return set_rxnfc_fp(dev, cmd,
+		hidden_args);
+}
+
+void setup_ethtool_ops(struct ethtool_ops_container *ethtool_ops_container)
+{
+	struct trampoline_hidden_args *dev_ethtool_ops_get_rxnfc_hidden_args;
+	struct trampoline_hidden_args *dev_ethtool_ops_set_rxnfc_hidden_args;
+	int ret;
+
+	dev_ethtool_ops_get_rxnfc_hidden_args = kzalloc(sizeof( struct trampoline_hidden_args ),
+		GFP_KERNEL);
+	if (!dev_ethtool_ops_get_rxnfc_hidden_args) {
+		LIBLCD_ERR("kzalloc hidden args");
+		goto fail_alloc1;
+	}
+	dev_ethtool_ops_get_rxnfc_hidden_args->t_handle = LCD_DUP_TRAMPOLINE(get_rxnfc_trampoline);
+	if (!dev_ethtool_ops_get_rxnfc_hidden_args->t_handle) {
+		LIBLCD_ERR("duplicate trampoline");
+		goto fail_dup1;
+	}
+	dev_ethtool_ops_get_rxnfc_hidden_args->t_handle->hidden_args = dev_ethtool_ops_get_rxnfc_hidden_args;
+	dev_ethtool_ops_get_rxnfc_hidden_args->struct_container = ethtool_ops_container;
+	ethtool_ops_container->ethtool_ops.get_rxnfc = LCD_HANDLE_TO_TRAMPOLINE(dev_ethtool_ops_get_rxnfc_hidden_args->t_handle);
+	ret = set_memory_x(( ( unsigned  long   )dev_ethtool_ops_get_rxnfc_hidden_args->t_handle ) & ( PAGE_MASK ),
+		( ALIGN(LCD_TRAMPOLINE_SIZE(get_rxnfc_trampoline),
+		PAGE_SIZE) ) >> ( PAGE_SHIFT ));
+
+	dev_ethtool_ops_set_rxnfc_hidden_args = kzalloc(sizeof( struct trampoline_hidden_args ),
+		GFP_KERNEL);
+	if (!dev_ethtool_ops_set_rxnfc_hidden_args) {
+		LIBLCD_ERR("kzalloc hidden args");
+		goto fail_alloc2;
+	}
+	dev_ethtool_ops_set_rxnfc_hidden_args->t_handle = LCD_DUP_TRAMPOLINE(set_rxnfc_trampoline);
+	if (!dev_ethtool_ops_set_rxnfc_hidden_args->t_handle) {
+		LIBLCD_ERR("duplicate trampoline");
+		goto fail_dup2;
+	}
+	dev_ethtool_ops_set_rxnfc_hidden_args->t_handle->hidden_args = dev_ethtool_ops_set_rxnfc_hidden_args;
+	dev_ethtool_ops_set_rxnfc_hidden_args->struct_container = ethtool_ops_container;
+	ethtool_ops_container->ethtool_ops.set_rxnfc = LCD_HANDLE_TO_TRAMPOLINE(dev_ethtool_ops_set_rxnfc_hidden_args->t_handle);
+	ret = set_memory_x(( ( unsigned  long   )dev_ethtool_ops_set_rxnfc_hidden_args->t_handle ) & ( PAGE_MASK ),
+		( ALIGN(LCD_TRAMPOLINE_SIZE(set_rxnfc_trampoline),
+		PAGE_SIZE) ) >> ( PAGE_SHIFT ));
+
+fail_alloc1:
+fail_dup1:
+fail_alloc2:
+fail_dup2:
+	return;
+}
 
 void setup_netdev_ops(struct net_device_ops_container *netdev_ops_container)
 {
@@ -1379,6 +1796,9 @@ void setup_netdev_ops(struct net_device_ops_container *netdev_ops_container)
 	struct trampoline_hidden_args *dev_netdev_ops_ndo_set_tx_maxrate_hidden_args;
 	struct trampoline_hidden_args *dev_netdev_ops_ndo_get_stats64_hidden_args;
 	struct trampoline_hidden_args *dev_netdev_ops_ndo_setup_tc_hidden_args;
+	struct trampoline_hidden_args *dev_netdev_ops_ndo_set_features_hidden_args;
+	struct trampoline_hidden_args *dev_netdev_ops_ndo_fix_features_hidden_args;
+
 	int ret;
 
 	dev_netdev_ops_ndo_open_hidden_args = kzalloc(sizeof( struct trampoline_hidden_args ),
@@ -1571,6 +1991,42 @@ void setup_netdev_ops(struct net_device_ops_container *netdev_ops_container)
 		( ALIGN(LCD_TRAMPOLINE_SIZE(ndo_setup_tc_trampoline),
 		PAGE_SIZE) ) >> ( PAGE_SHIFT ));
 
+	dev_netdev_ops_ndo_set_features_hidden_args = kzalloc(sizeof( struct trampoline_hidden_args ),
+		GFP_KERNEL);
+	if (!dev_netdev_ops_ndo_set_features_hidden_args) {
+		LIBLCD_ERR("kzalloc hidden args");
+		goto fail_alloc11;
+	}
+	dev_netdev_ops_ndo_set_features_hidden_args->t_handle = LCD_DUP_TRAMPOLINE(ndo_set_features_trampoline);
+	if (!dev_netdev_ops_ndo_set_features_hidden_args->t_handle) {
+		LIBLCD_ERR("duplicate trampoline");
+		goto fail_dup11;
+	}
+	dev_netdev_ops_ndo_set_features_hidden_args->t_handle->hidden_args = dev_netdev_ops_ndo_set_features_hidden_args;
+	dev_netdev_ops_ndo_set_features_hidden_args->struct_container = netdev_ops_container;
+	netdev_ops_container->net_device_ops.ndo_set_features = LCD_HANDLE_TO_TRAMPOLINE(dev_netdev_ops_ndo_set_features_hidden_args->t_handle);
+	ret = set_memory_x(( ( unsigned  long   )dev_netdev_ops_ndo_set_features_hidden_args->t_handle ) & ( PAGE_MASK ),
+		( ALIGN(LCD_TRAMPOLINE_SIZE(ndo_set_features_trampoline),
+		PAGE_SIZE) ) >> ( PAGE_SHIFT ));
+
+	dev_netdev_ops_ndo_fix_features_hidden_args = kzalloc(sizeof( struct trampoline_hidden_args ),
+		GFP_KERNEL);
+	if (!dev_netdev_ops_ndo_fix_features_hidden_args) {
+		LIBLCD_ERR("kzalloc hidden args");
+		goto fail_alloc11;
+	}
+	dev_netdev_ops_ndo_fix_features_hidden_args->t_handle = LCD_DUP_TRAMPOLINE(ndo_fix_features_trampoline);
+	if (!dev_netdev_ops_ndo_fix_features_hidden_args->t_handle) {
+		LIBLCD_ERR("duplicate trampoline");
+		goto fail_dup11;
+	}
+	dev_netdev_ops_ndo_fix_features_hidden_args->t_handle->hidden_args = dev_netdev_ops_ndo_fix_features_hidden_args;
+	dev_netdev_ops_ndo_fix_features_hidden_args->struct_container = netdev_ops_container;
+	netdev_ops_container->net_device_ops.ndo_fix_features = LCD_HANDLE_TO_TRAMPOLINE(dev_netdev_ops_ndo_fix_features_hidden_args->t_handle);
+	ret = set_memory_x(( ( unsigned  long   )dev_netdev_ops_ndo_fix_features_hidden_args->t_handle ) & ( PAGE_MASK ),
+		( ALIGN(LCD_TRAMPOLINE_SIZE(ndo_fix_features_trampoline),
+		PAGE_SIZE) ) >> ( PAGE_SHIFT ));
+
 fail_alloc1:
 fail_dup1:
 fail_alloc2:
@@ -1598,12 +2054,12 @@ int register_netdev_callee(struct fipc_message *_request)
 {
 	struct net_device_container *dev_container;
 	struct net_device_ops_container *netdev_ops_container;
+	struct ethtool_ops_container *ethtool_ops_container;
+
 	struct net_device *dev;
 	int ret;
-
+	struct ext_registers *ext_regs = get_register_page(smp_processor_id());
 	int func_ret;
-	//node-0 90:e2:ba:b5:15:69
-	u8 mac_addr[] = {0x90, 0xe2, 0xba, 0xb5, 0x15, 0x69};
 
 	ret = glue_cap_lookup_net_device_type(c_cspace,
 		__cptr(fipc_get_reg0(_request)),
@@ -1625,7 +2081,23 @@ int register_netdev_callee(struct fipc_message *_request)
 		LIBLCD_ERR("lcd insert");
 		goto fail_insert;
 	}
+
+	ethtool_ops_container = kzalloc(sizeof( struct ethtool_ops_container   ),
+		GFP_KERNEL);
+	if (!ethtool_ops_container) {
+		LIBLCD_ERR("kzalloc");
+		goto fail_alloc;
+	}
+	ret = glue_cap_insert_ethtool_ops_type(c_cspace,
+		ethtool_ops_container,
+		&ethtool_ops_container->my_ref);
+	if (ret) {
+		LIBLCD_ERR("lcd insert");
+		goto fail_insert;
+	}
+
 	dev_container->net_device.netdev_ops = &netdev_ops_container->net_device_ops;
+	dev_container->net_device.ethtool_ops = &ethtool_ops_container->ethtool_ops;
 
 	dev = &dev_container->net_device;
 	dev->flags = fipc_get_reg1(_request);
@@ -1635,16 +2107,16 @@ int register_netdev_callee(struct fipc_message *_request)
 	dev->hw_enc_features = fipc_get_reg5(_request);
 	dev->num_tc = fipc_get_reg6(_request);
 
-	memcpy(dev->dev_addr, mac_addr, ETH_ALEN);
+	memcpy(dev->dev_addr, &ext_regs->regs[0], ETH_ALEN);
 
 	/* setup netdev_ops */
 	setup_netdev_ops(netdev_ops_container);
+	setup_ethtool_ops(ethtool_ops_container);
+
 	func_ret = register_netdev(( &dev_container->net_device ));
 
-	fipc_set_reg1(_request,
-			func_ret);
-	fipc_set_reg2(_request,
-			dev->reg_state);
+	fipc_set_reg0(_request, func_ret);
+	fipc_set_reg1(_request, dev->reg_state);
 
 
 fail_lookup:
@@ -1917,7 +2389,7 @@ int napi_consume_skb_callee(struct fipc_message *_request)
 {
 	struct sk_buff *skb;
 #ifndef CONFIG_NO_HASHING
-	struct sk_buff_container *skb_c = NULL;
+	struct sk_buff_container_hash *skb_c = NULL;
 #endif
 	int ret = 0;
 	int budget;
@@ -1941,8 +2413,10 @@ int napi_consume_skb_callee(struct fipc_message *_request)
 	skb = skb_c->skb;
 #endif
 
+#ifndef CONFIG_SKB_COPY
 	if (check_skb_range(skb) == VOLUNTEER_XMIT)
 		printk("%s, skb possibly corrupted %p\n", __func__, skb);
+#endif
 	
 	if (0)
 		printk("%s, on cpu:%d skb:%p\n", __func__, smp_processor_id(), skb);
@@ -1970,7 +2444,7 @@ skip:
 int consume_skb_callee(struct fipc_message *_request)
 {
 	struct sk_buff *skb;
-	struct sk_buff_container *skb_c = NULL;
+	struct sk_buff_container_hash *skb_c = NULL;
 	int ret = 0;
 
 	glue_lookup_skb_hash(__cptr(fipc_get_reg0(_request)), &skb_c);
@@ -2009,15 +2483,13 @@ int eth_platform_get_mac_address_callee(struct fipc_message *_request)
 {
 	struct device *dev;
 	int ret = 0;
-
 	int func_ret;
 	union mac {
 		u8 mac_addr[ETH_ALEN];
 		unsigned long mac_addr_l;
 	} m = { {0} };
 
-	u8 mac_addr[ETH_ALEN] = {0x90, 0xe2, 0xba, 0xb5, 0x15, 0x69};
-
+	u8 mac_addr[ETH_ALEN] = {0x90, 0xe2, 0xba, 0xb3, 0xba, 0x9d};
 
 	dev = &g_pdev->dev;
 
@@ -2033,7 +2505,6 @@ int eth_platform_get_mac_address_callee(struct fipc_message *_request)
 		memcpy(m.mac_addr, mac_addr, ETH_ALEN);
 		fipc_set_reg2(_request, m.mac_addr_l);
 	}
-
 	fipc_set_reg1(_request,
 			func_ret);
 
@@ -2096,7 +2567,7 @@ int dev_addr_add_callee(struct fipc_message *_request)
 
 	addr = (void *)(gva_val(addr_gva) + addr_offset);
 #endif
-	printk("%s, add %lx\n", __func__, m.mac_addr_l);
+	printk("%s, add %pM\n", __func__, m.mac_addr);
 	func_ret = dev_addr_add(dev, addr, addr_type);
 
 	fipc_set_reg0(_request, func_ret);
@@ -2164,7 +2635,7 @@ int dev_addr_del_callee(struct fipc_message *_request)
 	}
 	addr = (void *)(gva_val(addr_gva) + addr_offset);
 #endif
-	printk("%s, del %lx\n", __func__, m.mac_addr_l);
+	printk("%s, del %pM\n", __func__, m.mac_addr);
 
 	func_ret = dev_addr_del(dev, addr, addr_type);
 
@@ -2945,7 +3416,7 @@ irqreturn_t msix_vector_handler(int irq, void *data)
 
 #ifdef CONFIG_LCD_TRACE_BUFFER
 	//if (napi_idx != NUM_HW_QUEUES)
-		add_trace_entry(EVENT_MSIX_HANDLER, async_msg_get_fn_type(_request));
+		//__add_trace_entry(EVENT_MSIX_HANDLER, async_msg_get_fn_type(_request), irq, napi_idx, irqhandler_container->other_ref.cptr);
 #endif
 
 	vmfunc_klcd_wrapper(_request, 1);
@@ -2970,6 +3441,7 @@ int request_threaded_irq_callee(struct fipc_message *_request)
 	unsigned long flags;
 	struct irqhandler_t_container *irqhandler_container;
 	unsigned char *vector_name;
+	unsigned str_len;
 
 	irqhandler_container = kzalloc(sizeof(struct irqhandler_t_container),
 					GFP_KERNEL);
@@ -2987,11 +3459,12 @@ int request_threaded_irq_callee(struct fipc_message *_request)
 	irq = fipc_get_reg0(_request);
 	irqhandler_container->other_ref.cptr = fipc_get_reg1(_request);
 	flags = fipc_get_reg2(_request);
-	memcpy((void*) vector_name, (void*) &_request->regs[3], sizeof(unsigned long));
-	irqhandler_container->napi_idx = fipc_get_reg4(_request);
+	str_len = fipc_get_reg3(_request);
+	memcpy((void*) vector_name, (void*) &_request->regs[4], str_len);
+	irqhandler_container->napi_idx = fipc_get_reg6(_request);
 
 	LIBLCD_MSG("%s, request_threaded_irq for %d | name: %s | napi_idx %d",
-			__func__, irq, vector_name, fipc_get_reg4(_request));
+			__func__, irq, vector_name, fipc_get_reg6(_request));
 
 	printk("%s, irqhandler_container->other_ref %lx\n", __func__,
 				irqhandler_container->other_ref.cptr);
@@ -3219,7 +3692,7 @@ int netif_wake_subqueue_callee(struct fipc_message *_request)
 int netif_receive_skb_callee(struct fipc_message *_request)
 {
 	struct sk_buff *skb;
-	struct sk_buff_container *skb_c = NULL;
+	struct sk_buff_container_hash *skb_c = NULL;
 	int ret = 0;
 
 	int func_ret;
@@ -3248,99 +3721,7 @@ int netif_receive_skb_callee(struct fipc_message *_request)
 
 extern struct lcd *iommu_lcd;
 
-#ifndef LOCAL_SKB
-int napi_gro_receive_callee(struct fipc_message *_request)
-{
-	struct napi_struct *napi;
-	struct sk_buff *skb;
-	struct sk_buff_container *skb_c;
-	struct napi_struct_container *napi_container = NULL;
-	int ret = 0;
-	int func_ret;
-	cptr_t skb_ref;
-	cptr_t skb_cptr, skbh_cptr;
-	unsigned 	long page = 0ul;
-	struct lcd *lcd_struct;
-	hva_t hva_out;
-	struct skb_shared_info *shinfo;
-	struct page *p = NULL;
-	unsigned int old_pcount;
-
-	skb_ref = __cptr(fipc_get_reg0(_request));
-
-	glue_lookup_napi_hash(__cptr(fipc_get_reg1(_request)),
-						&napi_container);
-	napi = napi_container->napi;
-
-	page = fipc_get_reg2(_request);
-
-	napi = &napi_container->napi_struct;
-
-	glue_lookup_skbuff(cptr_table, skb_ref, &skb_c);
-
-	skb = skb_c->skb;
-	skb->head = skb_c->head;
-	skb->data = skb_c->data;
-	skb_cptr = skb_c->skb_cptr;
-	skbh_cptr = skb_c->skbh_cptr;
-
-	skb->dev = napi->dev;
-	shinfo = skb_shinfo(skb);
-
-	if (shinfo->nr_frags) {
-		skb_frag_t *frag = &shinfo->frags[0];
-
-		lcd_struct = iommu_lcd;
-
-		ret = lcd_arch_ept_gpa_to_hva_cpu(lcd_struct->lcd_arch,
-			__gpa(page), &hva_out, smp_processor_id());
-		if (ret) {
-			LIBLCD_WARN("getting gpa:hpa mapping %p:%llx",
-				(void*)page, hva_val(hva_out));
-			ret = 0;
-			goto skip;
-		}
-
-		/* set frag page */
-		p = frag->page.p = virt_to_page(hva_val(hva_out));
-		old_pcount = page_count(skb_frag_page(frag));
-
-		set_page_count(skb_frag_page(frag), 2);
-
-		if (0)
-		printk("%s, Frag #%d | page %p | refc %d\n", __func__,
-				shinfo->nr_frags,
-				frag->page.p,
-				page_count(frag->page.p));
-	}
-skip:
-	post_recv = true;
-
-	//skb_pull_inline(skb, ETH_HLEN);
-	skb->data += ETH_HLEN;
-
-	func_ret = napi_gro_receive(napi, skb);
-
-	if (p)
-		set_page_count(p, 1);
-
-	if (skb_c->tsk == current) {
-		lcd_cap_revoke(skb_cptr);
-		lcd_cap_revoke(skbh_cptr);
-		lcd_unvolunteer_pages(skb_cptr);
-		lcd_unvolunteer_pages(skbh_cptr);
-	}
-
-	glue_remove_skbuff(skb_c);
-	kfree(skb_c);
-
-	fipc_set_reg1(_request, func_ret);
-
-fail_lookup:
-	return ret;
-}
-
-#else
+#ifdef LOCAL_SKB
 void ixgbe_pull_tail(struct sk_buff *skb)
 {
 	struct skb_frag_struct *frag = &skb_shinfo(skb)->frags[0];
@@ -3374,6 +3755,83 @@ void ixgbe_pull_tail(struct sk_buff *skb)
 	skb->tail += pull_len;
 }
 
+#ifdef CONFIG_SKB_COPY
+int napi_gro_receive_callee(struct fipc_message *_request)
+{
+	struct napi_struct *napi;
+	struct napi_struct_container *napi_container = NULL;
+	struct sk_buff *skb;
+	int ret = 0;
+	int func_ret = 0;
+	unsigned char nr_frags;
+	cptr_t napi_struct_ref;
+	u32 frag_sz = 0;
+
+	struct ext_registers *ext_regs = get_register_page(smp_processor_id());
+	u64 *regs = &ext_regs->regs[0];
+	u32 i = 0;
+
+	nr_frags = fipc_get_reg0(_request);
+	napi_struct_ref = __cptr(fipc_get_reg1(_request));
+
+	/* lookup napi struct to alloc skb */
+	glue_lookup_napi_hash(napi_struct_ref, &napi_container);
+
+	if (!napi_container) {
+		printk("%s, couldn't retrieve napi_container for cptr: %lx\n", __func__,
+					napi_struct_ref.cptr);
+		goto skip;
+	}
+
+	napi = napi_container->napi;
+
+	WARN_ON(nr_frags > 1);
+
+	if (nr_frags > 0) {
+		frag_sz = fipc_get_reg4(_request);
+	}
+
+#define IXGBE_HDR_SIZE	256
+
+	skb = napi_alloc_skb(napi, IXGBE_HDR_SIZE + frag_sz);
+
+	skb->protocol = fipc_get_reg2(_request);
+	skb->truesize = fipc_get_reg3(_request);
+
+	skb->dev = napi->dev;
+
+	GET_EREG(l4_hash);
+	GET_EREG(sw_hash);
+	GET_EREG(hash);
+	GET_EREG(queue_mapping);
+	GET_EREG(csum_level);
+	GET_EREG(ip_summed);
+	GET_EREG(len);
+	GET_EREG(data_len);
+
+	printk("%s, skb->len %d frag_sz %d\n", __func__, skb->len, frag_sz);
+
+	if (nr_frags) {
+		memcpy(skb->data, &regs[i], frag_sz);
+	}
+
+	if (skb->len < 60) {
+		printk("skb->len %d < 60\n", skb->len);
+		eth_skb_pad(skb);
+	}
+
+	skb->napi_id = napi->napi_id;
+
+	skb_pull_inline(skb, ETH_HLEN);
+
+	func_ret = napi_gro_receive(napi, skb);
+
+	fipc_set_reg0(_request, func_ret);
+
+skip:
+	return ret;
+}
+#else
 int napi_gro_receive_callee(struct fipc_message *_request)
 {
 	struct napi_struct *napi;
@@ -3496,6 +3954,7 @@ int napi_gro_receive_callee(struct fipc_message *_request)
 	skb->sw_hash = (hash_l4sw >> 33) & 0x1;
 
 	skb_pull_inline(skb, ETH_HLEN);
+	skb_reset_mac_header(skb);
 
 	func_ret = napi_gro_receive(napi, skb);
 
@@ -3504,6 +3963,99 @@ int napi_gro_receive_callee(struct fipc_message *_request)
 skip:
 	//printk("%s, returned %d\n", __func__, ret);
 	fipc_set_reg1(_request, func_ret);
+	return ret;
+}
+#endif		/* COPY_SKB_DATA */
+
+#else
+int napi_gro_receive_callee(struct fipc_message *_request)
+{
+	struct napi_struct *napi;
+	struct sk_buff *skb;
+	struct sk_buff_container_hash *skb_c;
+	struct napi_struct_container *napi_container = NULL;
+	int ret = 0;
+	int func_ret;
+	cptr_t skb_ref;
+	cptr_t skb_cptr, skbh_cptr;
+	unsigned 	long page = 0ul;
+	struct lcd *lcd_struct;
+	hva_t hva_out;
+	struct skb_shared_info *shinfo;
+	struct page *p = NULL;
+	unsigned int old_pcount;
+
+	skb_ref = __cptr(fipc_get_reg0(_request));
+
+	glue_lookup_napi_hash(__cptr(fipc_get_reg1(_request)),
+						&napi_container);
+	napi = napi_container->napi;
+
+	page = fipc_get_reg2(_request);
+
+	napi = &napi_container->napi_struct;
+
+	glue_lookup_skbuff(cptr_table, skb_ref, &skb_c);
+
+	skb = skb_c->skb;
+	skb->head = skb_c->head;
+	skb->data = skb_c->data;
+	skb_cptr = skb_c->skb_cptr;
+	skbh_cptr = skb_c->skbh_cptr;
+
+	skb->dev = napi->dev;
+	shinfo = skb_shinfo(skb);
+
+	if (shinfo->nr_frags) {
+		skb_frag_t *frag = &shinfo->frags[0];
+
+		lcd_struct = iommu_lcd;
+
+		ret = lcd_arch_ept_gpa_to_hva_cpu(lcd_struct->lcd_arch,
+			__gpa(page), &hva_out, smp_processor_id());
+		if (ret) {
+			LIBLCD_WARN("getting gpa:hpa mapping %p:%llx",
+				(void*)page, hva_val(hva_out));
+			ret = 0;
+			goto skip;
+		}
+
+		/* set frag page */
+		p = frag->page.p = virt_to_page(hva_val(hva_out));
+		old_pcount = page_count(skb_frag_page(frag));
+
+		set_page_count(skb_frag_page(frag), 2);
+
+		if (0)
+		printk("%s, Frag #%d | page %p | refc %d\n", __func__,
+				shinfo->nr_frags,
+				frag->page.p,
+				page_count(frag->page.p));
+	}
+skip:
+	post_recv = true;
+
+	//skb_pull_inline(skb, ETH_HLEN);
+	skb->data += ETH_HLEN;
+
+	func_ret = napi_gro_receive(napi, skb);
+
+	if (p)
+		set_page_count(p, 1);
+
+	if (skb_c->tsk == current) {
+		lcd_cap_revoke(skb_cptr);
+		lcd_cap_revoke(skbh_cptr);
+		lcd_unvolunteer_pages(skb_cptr);
+		lcd_unvolunteer_pages(skbh_cptr);
+	}
+
+	glue_remove_skbuff(skb_c);
+	kfree(skb_c);
+
+	fipc_set_reg1(_request, func_ret);
+
+fail_lookup:
 	return ret;
 }
 #endif
@@ -3515,7 +4067,7 @@ int __napi_alloc_skb_callee(struct fipc_message *_request)
 	int ret = 0;
 	gfp_t gfp_mask;
 	struct sk_buff *skb;
-	struct sk_buff_container *skb_c;
+	struct sk_buff_container_hash *skb_c;
 	struct napi_struct_container *napi_container = NULL;
 
 	unsigned long skb_ord, skbd_ord;
@@ -3770,4 +4322,57 @@ int call_netdevice_notifiers_callee(struct fipc_message *_request)
 
 fail_lookup:
 	return ret;
+}
+
+int irq_set_affinity_hint_callee(struct fipc_message *_request)
+{
+	cpumask_t *affinity_mask = NULL;
+	int ret;
+	int irq;
+
+	irq = fipc_get_reg0(_request);
+
+	if (fipc_get_reg1(_request)) {
+		affinity_mask = kzalloc(sizeof(cpumask_t), GFP_KERNEL);
+
+		if (!affinity_mask) {
+			LIBLCD_ERR("alloc failed");
+			ret = -ENOMEM;
+			goto fail_alloc;
+		}
+
+		affinity_mask->bits[0] = fipc_get_reg2(_request);
+		affinity_mask->bits[1] = fipc_get_reg3(_request);
+		affinity_mask->bits[2] = fipc_get_reg4(_request);
+	}
+
+	ret = irq_set_affinity_hint(irq, affinity_mask);
+
+fail_alloc:
+	fipc_set_reg0(_request, ret);
+	return ret;
+}
+
+int netdev_rss_key_fill_callee(struct fipc_message *_request)
+{
+	int len;
+	u8 *buffer;
+
+	len = fipc_get_reg0(_request);
+
+	buffer = kzalloc(len, GFP_KERNEL);
+
+	if (!buffer) {
+		LIBLCD_ERR("alloc failed");
+		goto fail_alloc;
+	}
+
+	netdev_rss_key_fill(buffer, len);
+
+	memcpy(&_request->regs[0], buffer, len);
+
+	kfree(buffer);
+
+fail_alloc:
+	return 0;
 }

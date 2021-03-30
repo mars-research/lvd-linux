@@ -13,10 +13,14 @@ SECTIONS
 	LCD_TRAMPOLINE_LINKER_SECTION(ndo_set_tx_maxrate_trampoline)
 	LCD_TRAMPOLINE_LINKER_SECTION(ndo_get_stats64_trampoline)
 	LCD_TRAMPOLINE_LINKER_SECTION(ndo_setup_tc_trampoline)
+	LCD_TRAMPOLINE_LINKER_SECTION(ndo_set_features_trampoline)
+	LCD_TRAMPOLINE_LINKER_SECTION(ndo_fix_features_trampoline)
 	LCD_TRAMPOLINE_LINKER_SECTION(probe_trampoline)
 	LCD_TRAMPOLINE_LINKER_SECTION(remove_trampoline)
 	LCD_TRAMPOLINE_LINKER_SECTION(sync_trampoline)
 	LCD_TRAMPOLINE_LINKER_SECTION(unsync_trampoline)
 	LCD_TRAMPOLINE_LINKER_SECTION(poll_trampoline)
+	LCD_TRAMPOLINE_LINKER_SECTION(get_rxnfc_trampoline)
+	LCD_TRAMPOLINE_LINKER_SECTION(set_rxnfc_trampoline)
 }
 INSERT AFTER .text;

@@ -42,6 +42,13 @@ int rtnl_is_locked(void) { LIBLCD_MSG("================>$$$$$$ Dummy %s called",
 int call_netdevice_notifiers(unsigned long val, struct net_device *dev)
 { LIBLCD_MSG("================>$$$$$$ Dummy %s called", __func__); return 0; }
 
+int irq_set_affinity_hint(unsigned int irq, const struct cpumask *m) {
+	LIBLCD_MSG("================>$$$$$$ Dummy %s called", __func__);
+	return 0;
+}
+
+void netdev_rss_key_fill(void *buffer, size_t len) { LIBLCD_MSG("================>$$$$$$ Dummy %s called", __func__); }
+
 #endif
 
 
@@ -67,8 +74,6 @@ int pskb_expand_head(struct sk_buff *skb, int nhead, int ntail, gfp_t gfp_mask) 
 
 unsigned char *__pskb_pull_tail(struct sk_buff *skb, int delta) { LIBLCD_MSG("================>$$$$$$ Dummy %s called", __func__); return (char*)skb; }
 
-void netdev_rss_key_fill(void *buffer, size_t len) { LIBLCD_MSG("================>$$$$$$ Dummy %s called", __func__); }
-
 unsigned long dev_trans_start(struct net_device *dev)
 {
 	LIBLCD_MSG("================>$$$$$$ Dummy %s called", __func__);
@@ -85,11 +90,6 @@ void init_timer_key(struct timer_list *timer, unsigned int flags,
 int del_timer(struct timer_list * timer) { LIBLCD_MSG("================>$$$$$$ Dummy %s called", __func__); return 0; }
 int del_timer_sync(struct timer_list * timer) { LIBLCD_MSG("================>$$$$$$ Dummy %s called", __func__); return 0; }
 
-int irq_set_affinity_hint(unsigned int irq, const struct cpumask *m) {
-	LIBLCD_MSG("================>$$$$$$ Dummy %s called", __func__);
-	return 0;
-}
-
 int mod_timer(struct timer_list *timer, unsigned long expires) { LIBLCD_MSG("================>$$$$$$ Dummy %s called", __func__); return 0; }
 
 struct net_device *netdev_all_upper_get_next_dev_rcu(struct net_device *dev,
@@ -105,15 +105,10 @@ void __dev_kfree_skb_any(struct sk_buff *skb, enum skb_free_reason reason) { LIB
 u32 ethtool_op_get_link(struct net_device *dev) { LIBLCD_MSG("================>$$$$$$ Dummy %s called", __func__); return 0; }
 int ethtool_op_get_ts_info(struct net_device *dev, struct ethtool_ts_info *eti) { LIBLCD_MSG("================>$$$$$$ Dummy %s called", __func__); return 0; }
 
-struct sk_buff *__alloc_skb(unsigned int size, gfp_t priority, int flags,
-			    int node) { LIBLCD_MSG("================>$$$$$$ Dummy %s called", __func__); return NULL; }
-
 int ipv6_find_hdr(const struct sk_buff *skb, unsigned int *offset, int target,
 		  unsigned short *fragoff, int *fragflg) { LIBLCD_MSG("================>$$$$$$ Dummy %s called", __func__); return 0; }
 
 void __local_bh_enable_ip(unsigned long ip, unsigned int cnt) { LIBLCD_MSG("================>$$$$$$ Dummy %s called", __func__); }
-
-void kfree_skb(struct sk_buff *skb) { LIBLCD_MSG("================>$$$$$$ Dummy %s called", __func__); }
 
 unsigned long volatile __jiffy_data jiffies;
 

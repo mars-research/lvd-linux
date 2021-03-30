@@ -264,10 +264,15 @@ int edac_mc_alloc_callee(struct fipc_message *_request)
 	int ret = 0;
 	struct mem_ctl_info_container *mci_container = NULL;
 	struct mem_ctl_info *mci = NULL;
-	struct ext_registers *ext_regs = get_register_page(smp_processor_id());
+	struct ext_registers *_regs = get_register_page(smp_processor_id());
+	uint64_t *regs = &_regs->regs[0];
+	u32 i = 0, j;
+#define MAX_OBJS	(4096/sizeof(struct hash))
+#define INIT_VAL(v)	memset(v, 0, sizeof(typeof(*v)))
+	struct hash hash = { 0 };
 
-	mc_num = fipc_get_reg0(_request);
-	n_layers = fipc_get_reg1(_request);
+	mc_num = regs[i++];
+	n_layers = regs[i++];
 
 	layers = kzalloc(sizeof(*layers ) * n_layers, GFP_KERNEL);
 
@@ -276,18 +281,16 @@ int edac_mc_alloc_callee(struct fipc_message *_request)
 		goto fail_alloc;
 	}
 
-	for (i = 0; i < n_layers; i++) {
-		layers[i].type = ext_regs[i*3+0];
-		layers[i].size = ext_regs[i*3+1];
-		layers[i].is_virt_csrow = ext_regs[i*3+2];
+	for (j = 0; j < n_layers; j++) {
+		layers[i].type = regs[i++];
+		layers[i].size = regs[i++];
+		layers[i].is_virt_csrow = regs[i++];
 	}
 
-	sz_pvt = fipc_get_reg2(_request);
+	sz_pvt = regs[i++];
 
-	mci = edac_mc_alloc(mc_num,
-		n_layers,
-		layers,
-		sz_pvt);
+	mci = edac_mc_alloc(mc_num, n_layers, layers, sz_pvt);
+
 	mci_container = kzalloc(sizeof(*mci_container), GFP_KERNEL);
 
 	if (!mci_container) {
@@ -296,44 +299,61 @@ int edac_mc_alloc_callee(struct fipc_message *_request)
 	}
 
 	glue_insert_mci(&mci_container);
+	/* reset for return value marshalling */
+	i = 0;
 
-	fipc_set_reg0(_response, mci_container->my_ref.cptr);
+	{
+	struct value v;
+	regs[i++] = mci_container->my_ref.cptr;
 
 	/* fill kson objects */
+	INIT_VAL(&v);
 	/* struct mem_ctl_info ptr (root object) */
-	kson_data[objs].obj_type = POINTER;
-	kson_data[objs].type_id = MEM_CTL_INFO;
-	kson_data[objs].ref = 0;
-	kson_data[objs].obj_id = objs++;
-	
-	/* struct csrow_info **csrows; (array) */
-	kson_data[objs].obj_type = ARRAY;
-	kson_data[objs].type_id = CSROW_INFO;
-	kson_data[objs].num_elements = mci->nr_csrows;
-	kson_data[objs].obj_id = objs++;
+	v.dtype = POINTER;
+	v.type = MEM_CTL_INFO;
+	insert(ht, (void*) mci, &v);
 
-	/* struct csrow_info csrow; (array element) */
-	for (i = 0; i < mci->nr_csrows; i++) {
-		kson_data[objs++].obj_type = ARRAY_ELEMENT;
-		kson_data[objs++].type_id = CSROW_INFO;
-		kson_data[objs].obj_id = objs++;
-	}
+	/* struct dimm_info dimm; (array element) */
+	for (j = 0; j < mci->tot_dimms; j++) {
+		struct dimm_info *dimm = mci->dimms[j];
+		u32 ref_id;
 
-	/* struct csrow_info csrow; */
-	for (i = 0; i < mci->nr_csrows; i++) {
-		kson_data[objs++].obj_type = ARRAY_ELEMENT;
-		kson_data[objs++].type_id = CSROW_INFO;
-		kson_data[objs].obj_id = objs++;
+		INIT_VAL(&v);
+		v.dtype = POINTER;
+		v.type = DIMM_INFO;
+
+		/* marshalling dimm */
+		if (!find(ht, (void*) dimm)) {
+			insert(ht, (void*) dimm, &v);
+		}
+
+		/* marshalling dimm->mci */
+		if (!find(ht, (void*) dimm->mci)) {
+			INIT_VAL(&v);
+			v.dtype = POINTER;
+			v.type = MEM_CTL_INFO
+			insert(ht, (void*) dimm->mci, MEM_CTL_INFO);
+		}
 	}
-	/* first in the object tree */
-	if (mci->cs_rows) {
-		ext_regs[reg++] = mci->nr_csrows;
-		ext_regs[reg++] = 
 	}
 
-	if (mci->layers) {
-		
+	/* pass 2 */
+	{
+		regs[i++] = MEM_CTL_INFO;
+		regs[i++] = find(ht, (void*) mci);
+		regs[i++] = mci->n_layers;
+		/* layers array */
+		regs[i++] = mci->n_layers;
+		regs[i++] = EDAC_MC_LAYER;
+
+		/* dimm array */
+		regs[i++] = mci->tot_dimms;
+		regs[i++] = DIMM_INFO;
+		for (j = 0; j < mci->tot_dimms; j++) {
+			regs[i++] = find(ht, (void*) dimm->mci);
+		}
 	}
+
 fail_alloc:
 	return ret;
 }

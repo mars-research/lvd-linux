@@ -71,6 +71,9 @@ asmlinkage __visible notrace void dump_ring_trace_buffer(void);
 asmlinkage __visible notrace void dump_ring_trace_buffer_cpu(int cpu);
 asmlinkage __visible notrace void add_trace_entry_tf(struct pt_regs *regs, unsigned type);
 
+asmlinkage __visible notrace void __add_trace_entry(unsigned type,
+		unsigned long rdi, unsigned long rsp, unsigned long eflags,
+		unsigned long ip);
 
 DECLARE_PER_CPU_PAGE_ALIGNED(struct ring_trace_buffer, ring_buffer);
 #endif /* __ASSEMBLY__ */

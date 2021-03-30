@@ -28,7 +28,6 @@ enum glue_type {
 	GLUE_TYPE_NLATTR,
 	GLUE_TYPE_RTNL_LINK_OPS,
 	GLUE_TYPE_RTNL_LINK_STATS64,
-	GLUE_TYPE_SK_BUFF,
 	GLUE_TYPE_SETUP,
 	GLUE_NR_TYPES,
 };
@@ -71,13 +70,6 @@ static struct type_ops_id glue_libcap_type_ops[GLUE_NR_TYPES] = {
 	{
 		{
 			.name = "struct rtnl_link_stats64",
-			.delete = dummy_func,
-			.revoke = dummy_func,
-		}
-	},
-	{
-		{
-			.name = "struct sk_buff",
 			.delete = dummy_func,
 			.revoke = dummy_func,
 		}
@@ -211,16 +203,6 @@ int glue_cap_insert_rtnl_link_stats64_type(
 				c_out);
 }
 
-int glue_cap_insert_sk_buff_type(
-	struct glue_cspace *cspace, 
-	struct sk_buff_container *sk_buff_container,
-	cptr_t *c_out)
-{
-	return glue_cspace_insert(cspace, sk_buff_container,  
-				glue_libcap_type_ops[GLUE_TYPE_SK_BUFF].libcap_type,
-				c_out);
-}
-
 int glue_cap_insert_setup_type(
 	struct glue_cspace *cspace, 
 	struct setup_container *setup_container,
@@ -282,17 +264,6 @@ int glue_cap_lookup_rtnl_link_stats64_type(
 		cspace, c, 
 		glue_libcap_type_ops[GLUE_TYPE_RTNL_LINK_STATS64].libcap_type,
 		(void **)rtnl_link_stats64_container);
-}
-
-int glue_cap_lookup_sk_buff_type(
-	struct glue_cspace *cspace, 
-	cptr_t c,
-	struct sk_buff_container **sk_buff_container)
-{
-	return glue_cspace_lookup(
-		cspace, c, 
-		glue_libcap_type_ops[GLUE_TYPE_SK_BUFF].libcap_type,
-		(void **)sk_buff_container);
 }
 
 int glue_cap_lookup_setup_type(

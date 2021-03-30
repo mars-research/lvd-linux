@@ -8,16 +8,16 @@
 
 #include <lcd_config/pre_hook.h>
 
-#include <linux/slab.h>
 #include <liblcd/liblcd.h>
+#include <liblcd/boot_info.h>
 #include "../rpc.h"
 #include "../rdtsc_helper.h"
 #include <linux/module.h>
 #include <linux/kallsyms.h>
-#include <asm/lcd_domains/libvmfunc.h>
 #include <asm/processor.h>
 #include <asm/desc.h>
 #include <asm/lcd_domains/bflank.h>
+#include "marshal_caller.h"
 
 #include <lcd_config/post_hook.h>
 
@@ -32,6 +32,27 @@ int handle_rpc_calls_klcd(struct fipc_message *msg);
 
 DECLARE_PER_CPU_PAGE_ALIGNED(char, exception_stacks
         [(N_EXCEPTION_STACKS - 1) * EXCEPTION_STKSZ + DEBUG_STKSZ]);
+
+void run_marshal_tests(void) {
+
+	printk("Running marshal_empty test!\n");
+	test_marshal_empty();
+
+	printk("Running marshal_int test!\n");
+	test_marshal_int();
+
+	printk("Running marshal_array test!\n");
+	test_marshal_array(32);
+
+	printk("Running marshal_string test!\n");
+	test_marshal_string(256);
+
+	printk("Running marshal_voidptr test!\n");
+	test_marshal_voidptr(PAGE_SIZE);
+
+	printk("Running marshal_union test!\n");
+	test_marshal_union();
+}
 
 void run_vmfunc_tests(void)
 {
@@ -130,14 +151,22 @@ void run_vmfunc_tests(void)
 	printk("%s: VMFUNC_TEST_RPC_CALL: Passed!\n\tValue from other domain %lx\n",
 				__func__, fipc_get_reg1(&msg));
 
-
 	/* test3a: RPC call microbenchmark */
 	memset(&msg, 0x0, sizeof(msg));
 	msg.rpc_id = MARSHAL_ONE;
 	fipc_set_reg0(&msg, (u64) 0xabcd);
 
 	vmfunc_klcd_test_wrapper(&msg, OTHER_DOMAIN, VMFUNC_TEST_RPC_CALL);
+}
 
+void init_lcd(void) {
+	struct fipc_message m;
+	struct fipc_message *msg = &m;
+	INIT_FIPC_MSG(msg);
+
+	async_msg_set_fn_type(msg, MODULE_INIT);
+
+	vmfunc_klcd_wrapper(msg, OTHER_DOMAIN);
 }
 
 static int caller_main(void)
@@ -163,6 +192,12 @@ static int caller_main(void)
 
 	run_vmfunc_tests();
 
+	{
+		//init_lcd();
+		run_marshal_tests();
+	}
+
+	if (0)
 	{
 		int i = 0; 
 		u64 s_exits = bfcall_dump_perf(), e_exits; 

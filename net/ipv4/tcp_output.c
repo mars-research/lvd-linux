@@ -3003,8 +3003,15 @@ struct sk_buff *tcp_make_synack(const struct sock *sk, struct dst_entry *dst,
 	struct tcphdr *th;
 	u16 user_mss;
 	int mss;
+	unsigned alloc_sz = MAX_TCP_HEADER;
 
-	skb = alloc_skb(MAX_TCP_HEADER, GFP_ATOMIC);
+	if (dst && dst->dev &&
+			(dst->dev->features &
+			NETIF_F_PRIV_DATA_POOL)) {
+		alloc_sz |= SKB_DATA_PRIV_POOL;
+	}
+
+	skb = alloc_skb(alloc_sz, GFP_ATOMIC);
 	if (unlikely(!skb)) {
 		dst_release(dst);
 		return NULL;

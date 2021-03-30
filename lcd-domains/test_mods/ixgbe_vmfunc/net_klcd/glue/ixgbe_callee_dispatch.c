@@ -356,12 +356,21 @@ int net_klcd_dispatch_async_loop(struct fipc_message *message)
 			ret = call_netdevice_notifiers_callee(message);
 			break;
 
+		case IRQ_SET_AFFINITY_HINT:
+			trace(IRQ_SET_AFFINITY_HINT);
+			ret = irq_set_affinity_hint_callee(message);
+			break;
+
+		case NETDEV_RSS_KEY_FILL:
+			trace(NETDEV_RSS_KEY_FILL);
+			ret = netdev_rss_key_fill_callee(message);
+			break;
+
 		default:
 			LIBLCD_ERR("unexpected function label: %d",
 					fn_type);
 			ret =  -EINVAL;
 			break;
-
 	}
 
 #ifdef CONFIG_LCD_TRACE_BUFFER

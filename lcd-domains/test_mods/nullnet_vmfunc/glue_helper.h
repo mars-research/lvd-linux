@@ -21,6 +21,7 @@
 
 #define CONFIG_RUN_DUMMY_2
 #define COPY
+#define CONFIG_SKB_COPY
 
 enum dispatch_t {
 	REGISTER_NETDEVICE,  /* 0 */
@@ -90,6 +91,9 @@ struct skbuff_members {
 #define C(x)	skb_lcd->x = skb->x
 #define P(x)	skb->x = skb_lcd->x
 
+#define SET_EREG(x) regs[i++] = skb->x
+#define GET_EREG(x) skb->x = regs[i++]
+
 /* CONTAINERS 	---------- */
 struct net_device_container {
 	struct net_device net_device;
@@ -123,7 +127,7 @@ struct setup_container {
 	cptr_t other_ref;
 	cptr_t my_ref;
 };
-struct sk_buff_container {
+struct sk_buff_container_hash {
 	/* just store the pointer */
 	struct sk_buff *skb;
 	/* store the order when volunteered. comes handy during unmap */
@@ -141,6 +145,13 @@ struct sk_buff_container {
 	struct task_struct *tsk;
 } CACHE_ALIGNED;
 
+struct sk_buff_container_2 {
+	/* just store the pointer */
+	struct sk_buff skb;
+	/* for hashtable insertion */
+	struct cptr other_ref;
+	struct cptr my_ref;
+};
 
 /* CSPACES ------------------------------------------------------------ */
 int glue_cap_init(void);
@@ -180,11 +191,6 @@ int glue_cap_insert_rtnl_link_stats64_type(
 	struct rtnl_link_stats64_container *rtnl_link_stats64_container,
 	cptr_t *c_out);
 
-int glue_cap_insert_sk_buff_type(
-	struct glue_cspace *cspace, 
-	struct sk_buff_container *sk_buff_container,
-	cptr_t *c_out);
-
 int glue_cap_insert_setup_type(
 	struct glue_cspace *cspace, 
 	struct setup_container *setup_container,
@@ -215,11 +221,6 @@ int glue_cap_lookup_rtnl_link_stats64_type(
 	struct glue_cspace *cspace, 
 	cptr_t c,
 	struct rtnl_link_stats64_container **rtnl_link_stats64_container);
-
-int glue_cap_lookup_sk_buff_type(
-	struct glue_cspace *cspace, 
-	cptr_t c,
-	struct sk_buff_container **sk_buff_container);
 
 int glue_cap_lookup_setup_type(
 	struct glue_cspace *cspace, 

@@ -86,6 +86,27 @@ int glue_cap_lookup_net_device_ops_type(struct glue_cspace *cspace,
 
 }
 
+int glue_cap_insert_ethtool_ops_type(struct glue_cspace *cspace,
+		struct ethtool_ops_container *ethtool_ops_container,
+		struct cptr *c_out)
+{
+	return glue_cspace_insert(cspace,
+		ethtool_ops_container,
+		glue_libcap_type_ops[ GLUE_TYPE_ETHTOOL_OPS_CONTAINER ].libcap_type,
+		c_out);
+
+}
+
+int glue_cap_lookup_ethtool_ops_type(struct glue_cspace *cspace,
+		struct cptr c,
+		struct ethtool_ops_container **ethtool_ops_container)
+{
+	return glue_cspace_lookup(cspace,
+		c,
+		glue_libcap_type_ops[ GLUE_TYPE_ETHTOOL_OPS_CONTAINER ].libcap_type,
+		( void  ** )ethtool_ops_container);
+}
+
 int glue_cap_insert_pci_bus_type(struct glue_cspace *cspace,
 		struct pci_bus_container *pci_bus_container,
 		struct cptr *c_out)

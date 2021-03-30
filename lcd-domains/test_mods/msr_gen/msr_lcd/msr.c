@@ -52,6 +52,8 @@
 #include <lcd_config/post_hook.h>
 #endif
 
+extern 
+struct device* __device_create(struct class* class, struct device* parent, unsigned int devt, void* drvdata, char const* fmt, unsigned int cpu);
 static struct class *msr_class;
 
 static ssize_t msr_read(struct file *file, char __user *buf,
@@ -193,7 +195,7 @@ static int msr_device_create(int cpu)
 {
 	struct device *dev;
 
-	dev = device_create(msr_class, NULL, MKDEV(MSR_MAJOR, cpu), NULL,
+	dev = __device_create(msr_class, NULL, MKDEV(MSR_MAJOR, cpu), NULL,
 			    "msr%d", cpu);
 	return PTR_ERR_OR_ZERO(dev);
 }
@@ -202,7 +204,7 @@ static void msr_device_destroy(int cpu)
 {
 	device_destroy(msr_class, MKDEV(MSR_MAJOR, cpu));
 }
-
+/*
 static int msr_class_cpu_callback(struct notifier_block *nfb,
 				  unsigned long action, void *hcpu)
 {
@@ -224,7 +226,7 @@ static int msr_class_cpu_callback(struct notifier_block *nfb,
 
 static struct notifier_block __refdata msr_class_cpu_notifier = {
 	.notifier_call = msr_class_cpu_callback,
-};
+};*/
 
 static char *msr_devnode(struct device *dev, umode_t *mode)
 {
@@ -258,7 +260,7 @@ int msr_init(void)
 		if (err != 0)
 			goto out_class;
 	}
-	__register_hotcpu_notifier(&msr_class_cpu_notifier);
+	//__register_hotcpu_notifier(&msr_class_cpu_notifier);
 	cpu_notifier_register_done();
 
 	err = 0;
@@ -289,7 +291,7 @@ void msr_exit(void)
 		msr_device_destroy(cpu);
 	class_destroy(msr_class);
 	__unregister_chrdev(MSR_MAJOR, 0, NR_CPUS, "cpu/msr");
-	__unregister_hotcpu_notifier(&msr_class_cpu_notifier);
+	//__unregister_hotcpu_notifier(&msr_class_cpu_notifier);
 	cpu_notifier_register_done();
 }
 

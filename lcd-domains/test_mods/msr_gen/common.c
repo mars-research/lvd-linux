@@ -876,3 +876,39 @@ void caller_unmarshal_kernel__device_destroy__class__in(
 	
 }
 
+void caller_marshal_kernel__class_destroy__cls__in(
+	size_t* pos,
+	struct fipc_message* msg,
+	struct ext_registers* ext,
+	struct class const* ptr)
+{
+	
+}
+
+void callee_unmarshal_kernel__class_destroy__cls__in(
+	size_t* pos,
+	const struct fipc_message* msg,
+	const struct ext_registers* ext,
+	struct class* ptr)
+{
+	
+}
+
+void callee_marshal_kernel__class_destroy__cls__in(
+	size_t* pos,
+	struct fipc_message* msg,
+	struct ext_registers* ext,
+	struct class const* ptr)
+{
+	
+}
+
+void caller_unmarshal_kernel__class_destroy__cls__in(
+	size_t* pos,
+	const struct fipc_message* msg,
+	const struct ext_registers* ext,
+	struct class* ptr)
+{
+	
+}
+

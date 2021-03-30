@@ -410,9 +410,17 @@ void __unregister_chrdev(unsigned int major, unsigned int baseminor, unsigned in
 	}
 
 	{
-		glue_pack_shadow(pos, msg, ext, *name_ptr);
+		glue_pack(pos, msg, ext, *name_ptr);
 		if (*name_ptr) {
-			glue_pack(pos, msg, ext, **name_ptr);
+			size_t i, len;
+			char const* array = *name_ptr;
+			for (len = 0; array[len]; ++len);
+			glue_pack(pos, msg, ext, len + 1);
+			for (i = 0; i < len; ++i) {
+				char const* element = &array[i];
+				glue_pack(pos, msg, ext, *element);
+			}
+
 		}
 
 	}
@@ -896,7 +904,7 @@ struct class* __class_create(struct module* owner, char const* name, struct lock
 	}
 
 	{
-		*ret_ptr = glue_unpack_shadow(pos, msg, ext, struct class*);
+		*ret_ptr = glue_unpack_new_shadow(pos, msg, ext, struct class*, sizeof(struct class));
 		if (*ret_ptr) {
 			caller_unmarshal_kernel____class_create__ret_class__out(pos, msg, ext, *ret_ptr);
 		}
@@ -941,7 +949,7 @@ struct device* __device_create(struct class* class, struct device* parent, unsig
 	}
 
 	{
-		glue_pack_shadow(pos, msg, ext, *parent_ptr);
+		glue_pack(pos, msg, ext, *parent_ptr);
 		if (*parent_ptr) {
 			caller_marshal_kernel____device_create__parent__in(pos, msg, ext, *parent_ptr);
 		}
@@ -952,6 +960,7 @@ struct device* __device_create(struct class* class, struct device* parent, unsig
 		glue_pack(pos, msg, ext, *devt_ptr);
 	}
 
+	if (0)
 	{
 		glue_pack_shadow(pos, msg, ext, *drvdata_ptr);
 		if (*drvdata_ptr) {
@@ -1064,6 +1073,45 @@ void device_destroy(struct class* class, unsigned int devt)
 	}
 
 	{
+	}
+
+	if (verbose_debug) {
+		printk("%s:%d, returned!\n", __func__, __LINE__);
+	}
+}
+
+void class_destroy(struct class* cls)
+{
+	struct fipc_message buffer = {0};
+	struct fipc_message *msg = &buffer;
+	struct ext_registers* ext = get_register_page(smp_processor_id());
+	size_t n_pos = 0;
+	size_t* pos = &n_pos;
+
+	struct class** cls_ptr = &cls;
+	
+	(void)ext;
+
+	if (verbose_debug) {
+		printk("%s:%d, entered!\n", __func__, __LINE__);
+	}
+
+	{
+		glue_pack_shadow(pos, msg, ext, *cls_ptr);
+		if (*cls_ptr) {
+			caller_marshal_kernel__class_destroy__cls__in(pos, msg, ext, *cls_ptr);
+		}
+
+	}
+
+	glue_call_server(pos, msg, RPC_ID_class_destroy);
+
+	*pos = 0;
+	{
+		if (*cls_ptr) {
+			caller_unmarshal_kernel__class_destroy__cls__in(pos, msg, ext, *cls_ptr);
+		}
+
 	}
 
 	if (verbose_debug) {

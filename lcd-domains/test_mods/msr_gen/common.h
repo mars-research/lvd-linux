@@ -12,8 +12,10 @@
 #define glue_pack(pos, msg, ext, value) glue_pack_impl((pos), (msg), (ext), (uint64_t)(value))
 #define glue_pack_shadow(pos, msg, ext, value) glue_pack_shadow_impl((pos), (msg), (ext), (value))
 #define glue_unpack(pos, msg, ext, type) (type)glue_unpack_impl((pos), (msg), (ext))
-#define glue_unpack_shadow(pos, msg, ext, type) \
-(type)glue_unpack_shadow_impl(glue_unpack(pos, msg, ext, void*));
+#define glue_unpack_shadow(pos, msg, ext, type) ({ \
+	if (verbose_debug) \
+		printk("%s:%d, unpack shadow for type %s\n", __func__, __LINE__, __stringify(type)); \
+	(type)glue_unpack_shadow_impl(glue_unpack(pos, msg, ext, void*)); })
 
 #define glue_unpack_new_shadow(pos, msg, ext, type, size) \
 	(type)glue_unpack_new_shadow_impl(glue_unpack(pos, msg, ext, void*), size)
@@ -130,6 +132,7 @@ enum RPC_ID {
 	RPC_ID___class_create,
 	RPC_ID___device_create,
 	RPC_ID_device_destroy,
+	RPC_ID_class_destroy,
 };
 
 int try_dispatch(enum RPC_ID id, struct fipc_message* msg, struct ext_registers* ext);
@@ -537,6 +540,30 @@ void callee_marshal_kernel__device_destroy__class__in(
 	struct class const* ptr);
 
 void caller_unmarshal_kernel__device_destroy__class__in(
+	size_t* pos,
+	const struct fipc_message* msg,
+	const struct ext_registers* ext,
+	struct class* ptr);
+
+void caller_marshal_kernel__class_destroy__cls__in(
+	size_t* pos,
+	struct fipc_message* msg,
+	struct ext_registers* ext,
+	struct class const* ptr);
+
+void callee_unmarshal_kernel__class_destroy__cls__in(
+	size_t* pos,
+	const struct fipc_message* msg,
+	const struct ext_registers* ext,
+	struct class* ptr);
+
+void callee_marshal_kernel__class_destroy__cls__in(
+	size_t* pos,
+	struct fipc_message* msg,
+	struct ext_registers* ext,
+	struct class const* ptr);
+
+void caller_unmarshal_kernel__class_destroy__cls__in(
 	size_t* pos,
 	const struct fipc_message* msg,
 	const struct ext_registers* ext,

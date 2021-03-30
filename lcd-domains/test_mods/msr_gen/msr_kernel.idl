@@ -45,7 +45,7 @@ rpc int __register_chrdev( unsigned int major, unsigned int baseminor, unsigned 
 	projection < struct module > owner {
 	}
 }
-rpc void __unregister_chrdev( unsigned int major, unsigned int baseminor, unsigned int count, const char* name ) {
+rpc void __unregister_chrdev( unsigned int major, unsigned int baseminor, unsigned int count, string [alloc(callee)] * name ) {
 }
 
 // Vararg function? 
@@ -72,7 +72,7 @@ rpc long long no_seek_end_llseek( projection file * file, long long offset, int 
 	projection < struct file > file {
 	}
 }
-rpc projection ret_class [alloc(caller), bind(caller)] * __class_create( projection owner [bind(callee)] * owner, string [alloc(callee)] *name) {//, projection key * key ) {
+rpc projection ret_class [alloc(caller)] * __class_create( projection owner [bind(callee)] * owner, string [alloc(callee)] *name) {//, projection key * key ) {
 	projection < struct class > ret_class {
 	}
 	projection < struct module > owner {
@@ -80,7 +80,7 @@ rpc projection ret_class [alloc(caller), bind(caller)] * __class_create( project
 	/*projection < struct lock_class_key > key {
 	}*/
 }
-rpc projection ret_device [alloc(caller), bind(callee)] * __device_create( projection class * class, projection parent * parent, u32 devt, void* drvdata, string [alloc(callee)] * fmt, u32 cpu ) {
+rpc projection ret_device [alloc(caller)] * __device_create( projection class * class, projection parent [alloc(callee)]* parent, u32 devt, void* drvdata, string [alloc(callee)] * fmt, u32 cpu ) {
 	projection < struct device > ret_device {
 	}
 	projection < struct class > class {
@@ -91,6 +91,10 @@ rpc projection ret_device [alloc(caller), bind(callee)] * __device_create( proje
 
 rpc void device_destroy( projection class * class, u32 devt ) {
 	projection < struct class > class {
+	}
+}
+rpc void class_destroy( projection cls * cls ) {
+	projection < struct class > cls {
 	}
 }
 

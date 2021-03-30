@@ -393,6 +393,8 @@ void __register_chrdev_callee(struct fipc_message* msg, struct ext_registers* ex
 
 	}
 
+	printk("%s, registering with major %u, minor %u, count %u, name %s\n",
+			__func__, major, baseminor, count, name);
 	ret = __register_chrdev(major, baseminor, count, name, fops);
 
 	*pos = 0;
@@ -457,10 +459,18 @@ void __unregister_chrdev_callee(struct fipc_message* msg, struct ext_registers* 
 	}
 
 	{
-		*name_ptr = glue_unpack(pos, msg, ext, char const*);
+		*name_ptr = glue_unpack_new_shadow(pos, msg, ext, char const*, sizeof(char) * glue_peek(pos, msg, ext));
 		if (*name_ptr) {
 			char* writable = (char*)*name_ptr;
-			*writable = glue_unpack(pos, msg, ext, char);
+			size_t i, len;
+			char* array = writable;
+			len = glue_unpack(pos, msg, ext, size_t) - 1;
+			array[len] = '\0';
+			for (i = 0; i < len; ++i) {
+				char* element = &array[i];
+				*element = glue_unpack(pos, msg, ext, char);
+			}
+
 		}
 
 	}
@@ -906,6 +916,8 @@ void __class_create_callee(struct fipc_message* msg, struct ext_registers* ext)
 
 	}
 
+	printk("%s, calling class create with %s\n",
+			__func__, name);
 	ret = class_create(THIS_MODULE, name);
 
 	*pos = 0;
@@ -967,7 +979,7 @@ void __device_create_callee(struct fipc_message* msg, struct ext_registers* ext)
 	}
 
 	{
-		*parent_ptr = glue_unpack(pos, msg, ext, struct device*);
+		*parent_ptr = glue_unpack_new_shadow(pos, msg, ext, struct device*, sizeof(struct device));
 		if (*parent_ptr) {
 			callee_unmarshal_kernel____device_create__parent__in(pos, msg, ext, *parent_ptr);
 		}
@@ -978,6 +990,7 @@ void __device_create_callee(struct fipc_message* msg, struct ext_registers* ext)
 		*devt_ptr = glue_unpack(pos, msg, ext, unsigned int);
 	}
 
+	if (0)
 	{
 		*drvdata_ptr = glue_unpack(pos, msg, ext, void*);
 		if (*drvdata_ptr) {
@@ -1005,6 +1018,10 @@ void __device_create_callee(struct fipc_message* msg, struct ext_registers* ext)
 	{
 		*cpu_ptr = glue_unpack(pos, msg, ext, unsigned int);
 	}
+
+
+	printk("%s, calling device_create with class %p, parent %p, devt %u, drvdata %p fmt %s cpu  %d\n",
+			__func__, class, parent, devt, drvdata, fmt, cpu);
 
 	ret = device_create(class, parent, devt, drvdata, fmt, cpu);
 
@@ -1038,7 +1055,7 @@ void __device_create_callee(struct fipc_message* msg, struct ext_registers* ext)
 	}
 
 	{
-		glue_pack_shadow(pos, msg, ext, *ret_ptr);
+		glue_pack(pos, msg, ext, *ret_ptr);
 		if (*ret_ptr) {
 			callee_marshal_kernel____device_create__ret_device__out(pos, msg, ext, *ret_ptr);
 		}
@@ -1088,6 +1105,42 @@ void device_destroy_callee(struct fipc_message* msg, struct ext_registers* ext)
 	}
 
 	{
+	}
+
+	msg->regs[0] = *pos;
+	if (verbose_debug) {
+		printk("%s:%d, returned!\n", __func__, __LINE__);
+	}
+}
+
+void class_destroy_callee(struct fipc_message* msg, struct ext_registers* ext)
+{
+	size_t n_pos = 0;
+	size_t* pos = &n_pos;
+
+	struct class* cls = 0;
+	struct class** cls_ptr = &cls;
+	
+	if (verbose_debug) {
+		printk("%s:%d, entered!\n", __func__, __LINE__);
+	}
+
+	{
+		*cls_ptr = glue_unpack(pos, msg, ext, struct class*);
+		if (*cls_ptr) {
+			callee_unmarshal_kernel__class_destroy__cls__in(pos, msg, ext, *cls_ptr);
+		}
+
+	}
+
+	class_destroy(cls);
+
+	*pos = 0;
+	{
+		if (*cls_ptr) {
+			callee_marshal_kernel__class_destroy__cls__in(pos, msg, ext, *cls_ptr);
+		}
+
 	}
 
 	msg->regs[0] = *pos;
@@ -1162,6 +1215,11 @@ int try_dispatch(enum RPC_ID id, struct fipc_message* msg, struct ext_registers*
 	case RPC_ID_device_destroy:
 		glue_user_trace("device_destroy\n");
 		device_destroy_callee(msg, ext);
+		break;
+
+	case RPC_ID_class_destroy:
+		glue_user_trace("class_destroy\n");
+		class_destroy_callee(msg, ext);
 		break;
 
 	default:

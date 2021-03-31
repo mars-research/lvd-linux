@@ -1,0 +1,105 @@
+/*
+ * Copyright (C) 2003 Jana Saout <jana@saout.de>
+ *
+ * This file is released under the GPL.
+ */
+
+#ifdef LCD_ISOLATE
+#include <lcd_config/pre_hook.h>
+#endif
+
+#include <linux/device-mapper.h>
+
+#include <linux/module.h>
+#include <linux/init.h>
+#include <linux/bio.h>
+
+#ifdef LCD_ISOLATE
+#include <lcd_config/post_hook.h>
+#endif
+
+#define DM_MSG_PREFIX "zero"
+
+/*
+ * Construct a dummy mapping that only returns zeros
+ */
+static int zero_ctr(struct dm_target *ti, unsigned int argc, char **argv)
+{
+	if (argc != 0) {
+		ti->error = "No arguments required";
+		return -EINVAL;
+	}
+
+	/*
+	 * Silently drop discards, avoiding -EOPNOTSUPP.
+	 */
+	ti->num_discard_bios = 1;
+
+	return 0;
+}
+
+/*
+ * Return zeros only on reads
+ */
+static int zero_map(struct dm_target *ti, struct bio *bio)
+{
+	switch (bio_op(bio)) {
+	case REQ_OP_READ:
+		if (bio->bi_opf & REQ_RAHEAD) {
+			/* readahead of null bytes only wastes buffer cache */
+			return -EIO;
+		}
+		zero_fill_bio(bio);
+		break;
+	case REQ_OP_WRITE:
+		/* writes get silently dropped */
+		break;
+	default:
+		return -EIO;
+	}
+
+	bio_endio(bio);
+
+	/* accepted bio, don't make new request */
+	return DM_MAPIO_SUBMITTED;
+}
+
+static struct target_type zero_target = {
+	.name   = "zero",
+	.version = {1, 1, 0},
+	.module = THIS_MODULE,
+	.ctr    = zero_ctr,
+	.map    = zero_map,
+};
+
+#ifndef LCD_ISOLATE
+static int __init dm_zero_init(void)
+#else
+int dm_zero_init(void)
+#endif
+{
+	int r = dm_register_target(&zero_target);
+
+	if (r < 0)
+		DMERR("register failed %d", r);
+
+	return r;
+}
+
+#ifndef LCD_ISOLATE
+static void __exit dm_zero_exit(void)
+#else
+void dm_zero_exit(void)
+#endif
+{
+	dm_unregister_target(&zero_target);
+}
+
+#ifndef LCD_ISOLATE
+module_init(dm_zero_init)
+module_exit(dm_zero_exit)
+
+MODULE_AUTHOR("Jana Saout <jana@saout.de>");
+MODULE_DESCRIPTION(DM_NAME " dummy target returning zeros");
+MODULE_LICENSE("GPL");
+#endif

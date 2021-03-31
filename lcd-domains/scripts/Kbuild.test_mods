@@ -28,3 +28,4 @@ obj-m += nullnet_gen/
 #obj-m += shpchp_vmfunc/
 #obj-m += nullnet_vmfunc_idl/
 #obj-m += msr_vmfunc/
+obj-m += dmzero_gen/

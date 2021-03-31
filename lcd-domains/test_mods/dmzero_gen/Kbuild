@@ -1,0 +1,6 @@
+obj-$(LCD_CONFIG_BUILD_DMZERO_GEN_BOOT)	+= boot/
+
+obj-$(LCD_CONFIG_BUILD_DMZERO_GEN_DMZERO_LCD) += dmzero_lcd/
+
+obj-$(LCD_CONFIG_BUILD_DMZERO_GEN_DM_KLCD) += dm_klcd/
+

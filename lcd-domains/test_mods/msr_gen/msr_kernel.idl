@@ -1,5 +1,5 @@
 module kernel {
-rpc_ptr long read( projection file [alloc(callee)] * file, char* buf, unsigned long count, long long* ppos ) {
+rpc_ptr long read( projection file [alloc(callee)] * file, array<char, count> [alloc(callee),in, out] *buf, unsigned long count, long long [alloc(callee)] * ppos ) {
     projection <struct inode> inode {
         unsigned int i_rdev;
     }
@@ -7,7 +7,7 @@ rpc_ptr long read( projection file [alloc(callee)] * file, char* buf, unsigned l
         projection inode [alloc(callee)] *f_inode;
 	}
 }
-rpc_ptr long write( projection file [alloc(callee)] * file, const char* buf, unsigned long count, long long* ppos ) {
+rpc_ptr long write( projection file [alloc(callee)] * file, const array<char, count> [alloc(callee)] *buf, unsigned long count, long long [alloc(callee)] * ppos ) {
     projection <struct inode> inode {
         unsigned int i_rdev;
     }

@@ -34,9 +34,18 @@ void read_callee(struct fipc_message* msg, struct ext_registers* ext)
 	}
 
 	{
-		*buf_ptr = glue_unpack(pos, msg, ext, char*);
+		*buf_ptr = glue_unpack_new_shadow(pos, msg, ext, char*, sizeof(char) * glue_peek(pos, msg, ext));
 		if (*buf_ptr) {
-			**buf_ptr = glue_unpack(pos, msg, ext, char);
+			int i;
+			char* array = *buf_ptr;
+			size_t len = glue_unpack(pos, msg, ext, size_t);
+			// Warning: see David if this breaks
+			glue_user_trace("Warning: see David if this breaks");
+			for (i = 0; i < len; ++i) {
+				char* element = &array[i];
+				*element = glue_unpack(pos, msg, ext, char);
+			}
+
 		}
 
 	}
@@ -46,7 +55,7 @@ void read_callee(struct fipc_message* msg, struct ext_registers* ext)
 	}
 
 	{
-		*ppos_ptr = glue_unpack(pos, msg, ext, long long*);
+		*ppos_ptr = glue_unpack_new_shadow(pos, msg, ext, long long*, sizeof(long long));
 		if (*ppos_ptr) {
 			**ppos_ptr = glue_unpack(pos, msg, ext, long long);
 		}
@@ -64,7 +73,19 @@ void read_callee(struct fipc_message* msg, struct ext_registers* ext)
 	}
 
 	{
-		(void)buf_ptr;
+		if (*buf_ptr) {
+			size_t i, len = *count_ptr;
+			char* array = *buf_ptr;
+			glue_pack(pos, msg, ext, len);
+			// Warning: see David if this breaks
+			glue_user_trace("Warning: see David if this breaks");
+			for (i = 0; i < len; ++i) {
+				char* element = &array[i];
+				glue_pack(pos, msg, ext, *element);
+			}
+
+		}
+
 	}
 
 	{
@@ -114,10 +135,19 @@ void write_callee(struct fipc_message* msg, struct ext_registers* ext)
 	}
 
 	{
-		*buf_ptr = glue_unpack(pos, msg, ext, char const*);
+		*buf_ptr = glue_unpack_new_shadow(pos, msg, ext, char const*, sizeof(char) * glue_peek(pos, msg, ext));
 		if (*buf_ptr) {
 			char* writable = (char*)*buf_ptr;
-			*writable = glue_unpack(pos, msg, ext, char);
+			int i;
+			char* array = writable;
+			size_t len = glue_unpack(pos, msg, ext, size_t);
+			// Warning: see David if this breaks
+			glue_user_trace("Warning: see David if this breaks");
+			for (i = 0; i < len; ++i) {
+				char* element = &array[i];
+				*element = glue_unpack(pos, msg, ext, char);
+			}
+
 		}
 
 	}
@@ -127,7 +157,7 @@ void write_callee(struct fipc_message* msg, struct ext_registers* ext)
 	}
 
 	{
-		*ppos_ptr = glue_unpack(pos, msg, ext, long long*);
+		*ppos_ptr = glue_unpack_new_shadow(pos, msg, ext, long long*, sizeof(long long));
 		if (*ppos_ptr) {
 			**ppos_ptr = glue_unpack(pos, msg, ext, long long);
 		}

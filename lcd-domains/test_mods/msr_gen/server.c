@@ -35,9 +35,18 @@ long trmp_impl_read(fptr_read target, struct file* file, char* buf, unsigned lon
 	}
 
 	{
-		glue_pack_shadow(pos, msg, ext, *buf_ptr);
+		glue_pack(pos, msg, ext, *buf_ptr);
 		if (*buf_ptr) {
-			glue_pack(pos, msg, ext, **buf_ptr);
+			size_t i, len = *count_ptr;
+			char* array = *buf_ptr;
+			glue_pack(pos, msg, ext, len);
+			// Warning: see David if this breaks
+			glue_user_trace("Warning: see David if this breaks");
+			for (i = 0; i < len; ++i) {
+				char* element = &array[i];
+				glue_pack(pos, msg, ext, *element);
+			}
+
 		}
 
 	}
@@ -47,7 +56,7 @@ long trmp_impl_read(fptr_read target, struct file* file, char* buf, unsigned lon
 	}
 
 	{
-		glue_pack_shadow(pos, msg, ext, *ppos_ptr);
+		glue_pack(pos, msg, ext, *ppos_ptr);
 		if (*ppos_ptr) {
 			glue_pack(pos, msg, ext, **ppos_ptr);
 		}
@@ -65,7 +74,19 @@ long trmp_impl_read(fptr_read target, struct file* file, char* buf, unsigned lon
 	}
 
 	{
-		(void)buf_ptr;
+		if (*buf_ptr) {
+			int i;
+			char* array = *buf_ptr;
+			size_t len = glue_unpack(pos, msg, ext, size_t);
+			// Warning: see David if this breaks
+			glue_user_trace("Warning: see David if this breaks");
+			for (i = 0; i < len; ++i) {
+				char* element = &array[i];
+				*element = glue_unpack(pos, msg, ext, char);
+			}
+
+		}
+
 	}
 
 	{
@@ -126,9 +147,18 @@ long trmp_impl_write(fptr_write target, struct file* file, char const* buf, unsi
 	}
 
 	{
-		glue_pack_shadow(pos, msg, ext, *buf_ptr);
+		glue_pack(pos, msg, ext, *buf_ptr);
 		if (*buf_ptr) {
-			glue_pack(pos, msg, ext, **buf_ptr);
+			size_t i, len = *count_ptr;
+			char const* array = *buf_ptr;
+			glue_pack(pos, msg, ext, len);
+			// Warning: see David if this breaks
+			glue_user_trace("Warning: see David if this breaks");
+			for (i = 0; i < len; ++i) {
+				char const* element = &array[i];
+				glue_pack(pos, msg, ext, *element);
+			}
+
 		}
 
 	}
@@ -138,7 +168,7 @@ long trmp_impl_write(fptr_write target, struct file* file, char const* buf, unsi
 	}
 
 	{
-		glue_pack_shadow(pos, msg, ext, *ppos_ptr);
+		glue_pack(pos, msg, ext, *ppos_ptr);
 		if (*ppos_ptr) {
 			glue_pack(pos, msg, ext, **ppos_ptr);
 		}

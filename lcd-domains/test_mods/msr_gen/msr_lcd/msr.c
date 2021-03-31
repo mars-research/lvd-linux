@@ -73,10 +73,14 @@ static ssize_t msr_read(struct file *file, char __user *buf,
 		err = rdmsr_safe_on_cpu(cpu, reg, &data[0], &data[1]);
 		if (err)
 			break;
+#ifdef LCD_ISOLATE
+		memcpy(tmp, &data, 8);
+#else
 		if (copy_to_user(tmp, &data, 8)) {
 			err = -EFAULT;
 			break;
 		}
+#endif
 		tmp += 2;
 		bytes += 8;
 	}
@@ -98,10 +102,14 @@ static ssize_t msr_write(struct file *file, const char __user *buf,
 		return -EINVAL;	/* Invalid chunk size */
 
 	for (; count; count -= 8) {
+#ifdef LCD_ISOLATE
+		memcpy(&data, tmp, 8);
+#else
 		if (copy_from_user(&data, tmp, 8)) {
 			err = -EFAULT;
 			break;
 		}
+#endif
 		err = wrmsr_safe_on_cpu(cpu, reg, data[0], data[1]);
 		if (err)
 			break;

@@ -1,0 +1,20 @@
+obj-m += lcd_test_mod_msr_gen_msr_lcd.o
+
+lcd_test_mod_msr_gen_msr_lcd-y		+= main.o
+
+# Original code
+lcd_test_mod_msr_gen_msr_lcd-y		+= msr.o
+
+
+lcd_test_mod_msr_gen_msr_lcd-y		+= $(LIBLCD)
+
+lcd_test_mod_msr_gen_msr_lcd-y += $(addprefix ../, client.o common.o glue_user.o)
+
+ccflags-y += $(ISOLATED_CFLAGS)
+
+extra-y += ../../../liblcd_build/common/vmfunc.lds
+
+ldflags-y += -T $(LIBLCD_BUILD_DIR)/common/vmfunc.lds
+
+cppflags-y += $(ISOLATED_CFLAGS)
+

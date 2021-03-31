@@ -47,7 +47,9 @@ export LCD_DOMAINS_CFLAGS=\
 	-Wall \
 	-DLCD_DOMAINS \
 	-DLINUX_KERNEL \
+	-Wno-error=incompatible-pointer-types \
 	-DLCD_TEST_MODS_PATH=\"$(PWD)/build/test_mods\"
+
 
 # Don't print "Entering directory..." etc.
 MAKEFLAGS += --no-print-directory

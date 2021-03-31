@@ -1862,7 +1862,7 @@ int pci_enable_msi_range_callee(struct fipc_message *_request)
 	struct pci_dev_container *dev_container = NULL;
 	struct pci_dev *pdev;
 
-	glue_lookup_pdev_hash(__cptr(fipc_get_reg0(_request)),
+	ret = glue_lookup_pdev_hash(__cptr(fipc_get_reg0(_request)),
 			&dev_container);
 
 	if (ret) {

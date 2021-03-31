@@ -44,6 +44,7 @@ lib-y += $(addprefix liblcd/lib/, \
 	scatterlist.o \
 	list_sort.o \
 	iomap.o \
+	kasprintf.o \
 	)
 
 lib-y += $(addprefix liblcd/mm/, \

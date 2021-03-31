@@ -66,8 +66,8 @@ extern union vmfunc_state_page vmfunc_state_page;
 #undef printk_ratelimit
 #define printk_ratelimit() true
 
-#undef kasprintf
-#define kasprintf(x, fmt, args...) ({ lcd_printk(fmt, args); (char *)1; });
+//#undef kasprintf
+//#define kasprintf(x, fmt, args...) ({ lcd_printk(fmt, args); (char *)1; });
 
 #undef unlikely
 #define unlikely(x) x

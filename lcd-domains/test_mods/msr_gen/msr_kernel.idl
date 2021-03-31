@@ -58,13 +58,13 @@ rpc void cpu_maps_update_done(  ) {
 }
 //rpc unsigned char* kasprintf( unsigned long gfp, unsigned char* fmt ) {
 //}
-rpc int wrmsr_safe_regs_on_cpu( unsigned int cpu, array<unsigned int, 8> *regs ) {
+rpc int wrmsr_safe_regs_on_cpu( unsigned int cpu, array<unsigned int, 8> [alloc(callee), in, out] *regs ) {
 }
-rpc int rdmsr_safe_regs_on_cpu( unsigned int cpu, array<unsigned int, 8> *regs ) {
+rpc int rdmsr_safe_regs_on_cpu( unsigned int cpu, array<unsigned int, 8> [alloc(callee), in, out] * regs ) {
 }
 rpc int wrmsr_safe_on_cpu( unsigned int cpu, unsigned int msr_no, unsigned int l, unsigned int h ) {
 }
-rpc int rdmsr_safe_on_cpu( unsigned int cpu, unsigned int msr_no, unsigned int* l, unsigned int* h ) {
+rpc int rdmsr_safe_on_cpu( unsigned int cpu, unsigned int msr_no, unsigned int [alloc(callee), out] * l, unsigned int [alloc(callee), out] * h ) {
 }
 rpc bool capable(int cap ) {
 }

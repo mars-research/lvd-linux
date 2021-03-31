@@ -584,7 +584,7 @@ void wrmsr_safe_regs_on_cpu_callee(struct fipc_message* msg, struct ext_register
 	}
 
 	{
-		*regs_ptr = glue_unpack(pos, msg, ext, unsigned int*);
+		*regs_ptr = glue_unpack_new_shadow(pos, msg, ext, unsigned int*, sizeof(unsigned int) * glue_peek(pos, msg, ext));
 		if (*regs_ptr) {
 			int i;
 			unsigned int* array = *regs_ptr;
@@ -607,7 +607,19 @@ void wrmsr_safe_regs_on_cpu_callee(struct fipc_message* msg, struct ext_register
 	}
 
 	{
-		(void)regs_ptr;
+		if (*regs_ptr) {
+			size_t i, len = 8;
+			unsigned int const* array = *regs_ptr;
+			glue_pack(pos, msg, ext, len);
+			// Warning: see David if this breaks
+			glue_user_trace("Warning: see David if this breaks");
+			for (i = 0; i < len; ++i) {
+				unsigned int const* element = &array[i];
+				glue_pack(pos, msg, ext, *element);
+			}
+
+		}
+
 	}
 
 	{
@@ -641,7 +653,7 @@ void rdmsr_safe_regs_on_cpu_callee(struct fipc_message* msg, struct ext_register
 	}
 
 	{
-		*regs_ptr = glue_unpack(pos, msg, ext, unsigned int*);
+		*regs_ptr = glue_unpack_new_shadow(pos, msg, ext, unsigned int*, sizeof(unsigned int) * glue_peek(pos, msg, ext));
 		if (*regs_ptr) {
 			int i;
 			unsigned int* array = *regs_ptr;
@@ -664,7 +676,19 @@ void rdmsr_safe_regs_on_cpu_callee(struct fipc_message* msg, struct ext_register
 	}
 
 	{
-		(void)regs_ptr;
+		if (*regs_ptr) {
+			size_t i, len = 8;
+			unsigned int const* array = *regs_ptr;
+			glue_pack(pos, msg, ext, len);
+			// Warning: see David if this breaks
+			glue_user_trace("Warning: see David if this breaks");
+			for (i = 0; i < len; ++i) {
+				unsigned int const* element = &array[i];
+				glue_pack(pos, msg, ext, *element);
+			}
+
+		}
+
 	}
 
 	{
@@ -767,19 +791,13 @@ void rdmsr_safe_on_cpu_callee(struct fipc_message* msg, struct ext_registers* ex
 	}
 
 	{
-		*l_ptr = glue_unpack(pos, msg, ext, unsigned int*);
-		if (*l_ptr) {
-			**l_ptr = glue_unpack(pos, msg, ext, unsigned int);
-		}
-
+		*l_ptr = glue_unpack_new_shadow(pos, msg, ext, unsigned int*, sizeof(unsigned int));
+		(void)l_ptr;
 	}
 
 	{
-		*h_ptr = glue_unpack(pos, msg, ext, unsigned int*);
-		if (*h_ptr) {
-			**h_ptr = glue_unpack(pos, msg, ext, unsigned int);
-		}
-
+		*h_ptr = glue_unpack_new_shadow(pos, msg, ext, unsigned int*, sizeof(unsigned int));
+		(void)h_ptr;
 	}
 
 	ret = rdmsr_safe_on_cpu(cpu, msr_no, l, h);
@@ -792,11 +810,17 @@ void rdmsr_safe_on_cpu_callee(struct fipc_message* msg, struct ext_registers* ex
 	}
 
 	{
-		(void)l_ptr;
+		if (*l_ptr) {
+			glue_pack(pos, msg, ext, **l_ptr);
+		}
+
 	}
 
 	{
-		(void)h_ptr;
+		if (*h_ptr) {
+			glue_pack(pos, msg, ext, **h_ptr);
+		}
+
 	}
 
 	{

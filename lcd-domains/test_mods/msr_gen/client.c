@@ -546,7 +546,7 @@ int wrmsr_safe_regs_on_cpu(unsigned int cpu, unsigned int* regs)
 	}
 
 	{
-		glue_pack_shadow(pos, msg, ext, *regs_ptr);
+		glue_pack(pos, msg, ext, *regs_ptr);
 		if (*regs_ptr) {
 			size_t i, len = 8;
 			unsigned int const* array = *regs_ptr;
@@ -569,7 +569,19 @@ int wrmsr_safe_regs_on_cpu(unsigned int cpu, unsigned int* regs)
 	}
 
 	{
-		(void)regs_ptr;
+		if (*regs_ptr) {
+			int i;
+			unsigned int* array = *regs_ptr;
+			size_t len = glue_unpack(pos, msg, ext, size_t);
+			// Warning: see David if this breaks
+			glue_user_trace("Warning: see David if this breaks");
+			for (i = 0; i < len; ++i) {
+				unsigned int* element = &array[i];
+				*element = glue_unpack(pos, msg, ext, unsigned int);
+			}
+
+		}
+
 	}
 
 	{
@@ -606,7 +618,7 @@ int rdmsr_safe_regs_on_cpu(unsigned int cpu, unsigned int* regs)
 	}
 
 	{
-		glue_pack_shadow(pos, msg, ext, *regs_ptr);
+		glue_pack(pos, msg, ext, *regs_ptr);
 		if (*regs_ptr) {
 			size_t i, len = 8;
 			unsigned int const* array = *regs_ptr;
@@ -629,7 +641,19 @@ int rdmsr_safe_regs_on_cpu(unsigned int cpu, unsigned int* regs)
 	}
 
 	{
-		(void)regs_ptr;
+		if (*regs_ptr) {
+			int i;
+			unsigned int* array = *regs_ptr;
+			size_t len = glue_unpack(pos, msg, ext, size_t);
+			// Warning: see David if this breaks
+			glue_user_trace("Warning: see David if this breaks");
+			for (i = 0; i < len; ++i) {
+				unsigned int* element = &array[i];
+				*element = glue_unpack(pos, msg, ext, unsigned int);
+			}
+
+		}
+
 	}
 
 	{
@@ -734,19 +758,13 @@ int rdmsr_safe_on_cpu(unsigned int cpu, unsigned int msr_no, unsigned int* l, un
 	}
 
 	{
-		glue_pack_shadow(pos, msg, ext, *l_ptr);
-		if (*l_ptr) {
-			glue_pack(pos, msg, ext, **l_ptr);
-		}
-
+		glue_pack(pos, msg, ext, *l_ptr);
+		(void)l_ptr;
 	}
 
 	{
-		glue_pack_shadow(pos, msg, ext, *h_ptr);
-		if (*h_ptr) {
-			glue_pack(pos, msg, ext, **h_ptr);
-		}
-
+		glue_pack(pos, msg, ext, *h_ptr);
+		(void)h_ptr;
 	}
 
 	glue_call_server(pos, msg, RPC_ID_rdmsr_safe_on_cpu);
@@ -759,11 +777,17 @@ int rdmsr_safe_on_cpu(unsigned int cpu, unsigned int msr_no, unsigned int* l, un
 	}
 
 	{
-		(void)l_ptr;
+		if (*l_ptr) {
+			**l_ptr = glue_unpack(pos, msg, ext, unsigned int);
+		}
+
 	}
 
 	{
-		(void)h_ptr;
+		if (*h_ptr) {
+			**h_ptr = glue_unpack(pos, msg, ext, unsigned int);
+		}
+
 	}
 
 	{

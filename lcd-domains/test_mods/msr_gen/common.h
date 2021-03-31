@@ -9,20 +9,37 @@
 #include "glue_user.h"
 
 #define verbose_debug 1
-#define glue_pack(pos, msg, ext, value) glue_pack_impl((pos), (msg), (ext), (uint64_t)(value))
-#define glue_pack_shadow(pos, msg, ext, value) glue_pack_shadow_impl((pos), (msg), (ext), (value))
-#define glue_unpack(pos, msg, ext, type) (type)glue_unpack_impl((pos), (msg), (ext))
+#define glue_pack(pos, msg, ext, value) ({ \
+	if (verbose_debug) \
+		printk("%s:%d, pack %llx at pos %zu\n", __func__, __LINE__, (uint64_t)(value), *pos); \
+		glue_pack_impl((pos), (msg), (ext), (uint64_t)(value)); })
+
+#define glue_pack_shadow(pos, msg, ext, value) ({ \
+	if (verbose_debug) \
+		printk("%s:%d, pack shadow pos %zu\n", __func__, __LINE__, *pos); \
+		glue_pack_shadow_impl((pos), (msg), (ext), (value)); })
+
+#define glue_unpack(pos, msg, ext, type) ({ \
+	size_t _pos = *pos;	\
+	type ___ret = (type)glue_unpack_impl((pos), (msg), (ext)); \
+	if (verbose_debug) \
+		printk("%s:%d, unpack type %s at pos %zu | val %llx\n", __func__, __LINE__, __stringify(type), _pos, (uint64_t)___ret); \
+		___ret; })
+
 #define glue_unpack_shadow(pos, msg, ext, type) ({ \
 	if (verbose_debug) \
 		printk("%s:%d, unpack shadow for type %s\n", __func__, __LINE__, __stringify(type)); \
 	(type)glue_unpack_shadow_impl(glue_unpack(pos, msg, ext, void*)); })
 
-#define glue_unpack_new_shadow(pos, msg, ext, type, size) \
-	(type)glue_unpack_new_shadow_impl(glue_unpack(pos, msg, ext, void*), size)
+#define glue_unpack_new_shadow(pos, msg, ext, type, size) ({ \
+	if (verbose_debug) \
+		printk("%s:%d, unpack new shadow for type %s | size %llu\n", __func__, __LINE__, __stringify(type), \
+				(unsigned long long) size); \
+	(type)glue_unpack_new_shadow_impl(glue_unpack(pos, msg, ext, void*), size); })
 
 #ifndef LCD_ISOLATE
 #define glue_unpack_rpc_ptr(pos, msg, ext, name) \
-	glue_peek(pos, msg, ext) ? (fptr_##name)glue_unpack_rpc_ptr_impl(glue_unpack(pos, msg, ext, void*), LCD_DUP_TRAMPOLINE(trmp_##name), LCD_TRAMPOLINE_SIZE(trmp_##name)) : NULL
+	glue_peek_impl_one(pos, msg, ext) ? (fptr_##name)glue_unpack_rpc_ptr_impl(glue_unpack(pos, msg, ext, void*), LCD_DUP_TRAMPOLINE(trmp_##name), LCD_TRAMPOLINE_SIZE(trmp_##name)) : NULL
 
 #else
 #define glue_unpack_rpc_ptr(pos, msg, ext, name) NULL; glue_user_panic("Trampolines cannot be used on LCD side")
@@ -45,6 +62,14 @@ void* glue_user_alloc(size_t size);
 void glue_user_free(void* ptr);
 void glue_user_call_server(struct fipc_message* msg, size_t rpc_id);
 void glue_user_call_client(struct fipc_message* msg, size_t rpc_id);
+
+static inline void glue_dump_msg(struct fipc_message *msg) {
+	int i;
+	for (i = 0; i < FIPC_NR_REGS; i++) {
+		printk("msg->regs[%d] = %lx\n", i, msg->regs[i]);
+	}	
+}
+
 
 static inline void* glue_unpack_rpc_ptr_impl(void* target, struct lcd_trampoline_handle* handle, size_t size)
 {
@@ -79,6 +104,17 @@ glue_unpack_impl(size_t* pos, const struct fipc_message* msg, const struct ext_r
 		return msg->regs[(*pos)++ + 1];
 	else
 		return ext->regs[(*pos)++ + 1];
+}
+
+static inline uint64_t
+glue_peek_impl_one(size_t* pos, const struct fipc_message* msg, const struct ext_registers* ext)
+{
+	if (*pos >= msg->regs[0])
+		glue_user_panic("Peeked past end of glue message");
+	if (*pos < 5)
+		return msg->regs[*pos + 1];
+	else
+		return ext->regs[*pos + 1];
 }
 
 static inline uint64_t
@@ -130,6 +166,7 @@ enum RPC_ID {
 	RPC_ID_capable,
 	RPC_ID_no_seek_end_llseek,
 	RPC_ID___class_create,
+	RPC_ID_devnode,
 	RPC_ID___device_create,
 	RPC_ID_device_destroy,
 	RPC_ID_class_destroy,
@@ -449,6 +486,30 @@ void caller_unmarshal_kernel____class_create__owner__in(
 	const struct ext_registers* ext,
 	struct module* ptr);
 
+void caller_marshal_kernel__devnode__device__in(
+	size_t* pos,
+	struct fipc_message* msg,
+	struct ext_registers* ext,
+	struct device const* ptr);
+
+void callee_unmarshal_kernel__devnode__device__in(
+	size_t* pos,
+	const struct fipc_message* msg,
+	const struct ext_registers* ext,
+	struct device* ptr);
+
+void callee_marshal_kernel__devnode__device__in(
+	size_t* pos,
+	struct fipc_message* msg,
+	struct ext_registers* ext,
+	struct device const* ptr);
+
+void caller_unmarshal_kernel__devnode__device__in(
+	size_t* pos,
+	const struct fipc_message* msg,
+	const struct ext_registers* ext,
+	struct device* ptr);
+
 void caller_marshal_kernel____device_create__ret_device__out(
 	size_t* pos,
 	struct fipc_message* msg,
@@ -592,6 +653,12 @@ typedef int (*fptr_impl_open)(fptr_open target, struct inode* inode, struct file
 
 LCD_TRAMPOLINE_DATA(trmp_open)
 int LCD_TRAMPOLINE_LINKAGE(trmp_open) trmp_open(struct inode* inode, struct file* file);
+
+typedef char * (*fptr_devnode)(struct device* dev, unsigned short* mode);
+typedef char const* (*fptr_impl_devnode)(fptr_devnode target, struct device* dev, unsigned short* mode);
+
+LCD_TRAMPOLINE_DATA(trmp_devnode)
+char const* LCD_TRAMPOLINE_LINKAGE(trmp_devnode) trmp_devnode(struct device* dev, unsigned short* mode);
 
 
 #endif

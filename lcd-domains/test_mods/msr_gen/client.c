@@ -917,6 +917,76 @@ struct class* __class_create(struct module* owner, char const* name, struct lock
 	return ret;
 }
 
+void devnode_callee(struct fipc_message* msg, struct ext_registers* ext)
+{
+	size_t n_pos = 0;
+	size_t* pos = &n_pos;
+
+	fptr_devnode function_ptr = glue_unpack(pos, msg, ext, fptr_devnode);
+	struct device* dev = 0;
+	unsigned short* mode = 0;
+	struct device** dev_ptr = &dev;
+	unsigned short** mode_ptr = &mode;
+	char const* ret = 0;
+	char const** ret_ptr = &ret;
+	
+	if (verbose_debug) {
+		printk("%s:%d, entered!\n", __func__, __LINE__);
+	}
+
+	{
+		*dev_ptr = glue_unpack_new_shadow(pos, msg, ext, struct device*, sizeof(struct device));
+		if (*dev_ptr) {
+			callee_unmarshal_kernel__devnode__device__in(pos, msg, ext, *dev_ptr);
+		}
+
+	}
+
+	if (0)
+	{
+		*mode_ptr = glue_unpack(pos, msg, ext, unsigned short*);
+		if (*mode_ptr) {
+			**mode_ptr = glue_unpack(pos, msg, ext, unsigned short);
+		}
+
+	}
+
+	ret = function_ptr(dev, mode);
+
+	*pos = 0;
+	{
+		if (*dev_ptr) {
+			callee_marshal_kernel__devnode__device__in(pos, msg, ext, *dev_ptr);
+		}
+
+	}
+
+	{
+		(void)mode_ptr;
+	}
+
+	{
+		glue_pack(pos, msg, ext, *ret_ptr);
+		if (*ret_ptr) {
+			size_t i, len;
+			char const* array = *ret_ptr;
+			for (len = 0; array[len]; ++len);
+			glue_pack(pos, msg, ext, len + 1);
+			for (i = 0; i < len; ++i) {
+				char const* element = &array[i];
+				glue_pack(pos, msg, ext, *element);
+			}
+
+		}
+
+	}
+
+	msg->regs[0] = *pos;
+	if (verbose_debug) {
+		printk("%s:%d, returned!\n", __func__, __LINE__);
+	}
+}
+
 struct device* __device_create(struct class* class, struct device* parent, unsigned int devt, void* drvdata, char const* fmt, unsigned int cpu)
 {
 	struct fipc_message buffer = {0};
@@ -988,6 +1058,7 @@ struct device* __device_create(struct class* class, struct device* parent, unsig
 		glue_pack(pos, msg, ext, *cpu_ptr);
 	}
 
+	glue_dump_msg(msg);
 	glue_call_server(pos, msg, RPC_ID___device_create);
 
 	*pos = 0;
@@ -1020,7 +1091,7 @@ struct device* __device_create(struct class* class, struct device* parent, unsig
 	}
 
 	{
-		*ret_ptr = glue_unpack_new_shadow(pos, msg, ext, struct device*, sizeof(struct device));
+		*ret_ptr = glue_unpack_shadow(pos, msg, ext, struct device*);
 		if (*ret_ptr) {
 			caller_unmarshal_kernel____device_create__ret_device__out(pos, msg, ext, *ret_ptr);
 		}
@@ -1150,6 +1221,11 @@ int try_dispatch(enum RPC_ID id, struct fipc_message* msg, struct ext_registers*
 	case RPC_ID_open:
 		glue_user_trace("open\n");
 		open_callee(msg, ext);
+		break;
+
+	case RPC_ID_devnode:
+		glue_user_trace("devnode\n");
+		devnode_callee(msg, ext);
 		break;
 
 	default:

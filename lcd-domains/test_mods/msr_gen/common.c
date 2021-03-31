@@ -732,6 +732,52 @@ void caller_unmarshal_kernel____class_create__owner__in(
 	
 }
 
+void caller_marshal_kernel__devnode__device__in(
+	size_t* pos,
+	struct fipc_message* msg,
+	struct ext_registers* ext,
+	struct device const* ptr)
+{
+	unsigned int const* devt_ptr = &ptr->devt;
+	
+	{
+		glue_pack(pos, msg, ext, *devt_ptr);
+	}
+
+}
+
+void callee_unmarshal_kernel__devnode__device__in(
+	size_t* pos,
+	const struct fipc_message* msg,
+	const struct ext_registers* ext,
+	struct device* ptr)
+{
+	unsigned int* devt_ptr = &ptr->devt;
+	
+	{
+		*devt_ptr = glue_unpack(pos, msg, ext, unsigned int);
+	}
+
+}
+
+void callee_marshal_kernel__devnode__device__in(
+	size_t* pos,
+	struct fipc_message* msg,
+	struct ext_registers* ext,
+	struct device const* ptr)
+{
+	
+}
+
+void caller_unmarshal_kernel__devnode__device__in(
+	size_t* pos,
+	const struct fipc_message* msg,
+	const struct ext_registers* ext,
+	struct device* ptr)
+{
+	
+}
+
 void caller_marshal_kernel____device_create__ret_device__out(
 	size_t* pos,
 	struct fipc_message* msg,
@@ -774,7 +820,12 @@ void caller_marshal_kernel____device_create__class__in(
 	struct ext_registers* ext,
 	struct class const* ptr)
 {
+	fptr_devnode const* devnode_ptr = &ptr->devnode;
 	
+	{
+		glue_pack(pos, msg, ext, *devnode_ptr);
+	}
+
 }
 
 void callee_unmarshal_kernel____device_create__class__in(
@@ -783,7 +834,12 @@ void callee_unmarshal_kernel____device_create__class__in(
 	const struct ext_registers* ext,
 	struct class* ptr)
 {
+	fptr_devnode* devnode_ptr = &ptr->devnode;
 	
+	{
+		*devnode_ptr = glue_unpack_rpc_ptr(pos, msg, ext, devnode);
+	}
+
 }
 
 void callee_marshal_kernel____device_create__class__in(

@@ -393,8 +393,6 @@ void __register_chrdev_callee(struct fipc_message* msg, struct ext_registers* ex
 
 	}
 
-	printk("%s, registering with major %u, minor %u, count %u, name %s\n",
-			__func__, major, baseminor, count, name);
 	ret = __register_chrdev(major, baseminor, count, name, fops);
 
 	*pos = 0;
@@ -916,8 +914,6 @@ void __class_create_callee(struct fipc_message* msg, struct ext_registers* ext)
 
 	}
 
-	printk("%s, calling class create with %s\n",
-			__func__, name);
 	ret = class_create(THIS_MODULE, name);
 
 	*pos = 0;
@@ -946,6 +942,90 @@ void __class_create_callee(struct fipc_message* msg, struct ext_registers* ext)
 	}
 }
 
+char const* trmp_impl_devnode(fptr_devnode target, struct device* dev, unsigned short* mode)
+{
+	struct fipc_message buffer = {0};
+	struct fipc_message *msg = &buffer;
+	struct ext_registers* ext = get_register_page(smp_processor_id());
+	size_t n_pos = 0;
+	size_t* pos = &n_pos;
+
+	struct device** dev_ptr = &dev;
+	unsigned short** mode_ptr = &mode;
+	char const* ret = 0;
+	char const** ret_ptr = &ret;
+	
+	(void)ext;
+
+	if (verbose_debug) {
+		printk("%s:%d, entered!\n", __func__, __LINE__);
+	}
+
+	glue_pack(pos, msg, ext, target);
+	{
+		glue_pack(pos, msg, ext, *dev_ptr);
+		if (*dev_ptr) {
+			caller_marshal_kernel__devnode__device__in(pos, msg, ext, *dev_ptr);
+		}
+
+	}
+
+	if (0)
+	{
+		glue_pack_shadow(pos, msg, ext, *mode_ptr);
+		if (*mode_ptr) {
+			glue_pack(pos, msg, ext, **mode_ptr);
+		}
+
+	}
+
+	glue_call_client(pos, msg, RPC_ID_devnode);
+
+	*pos = 0;
+	{
+		if (*dev_ptr) {
+			caller_unmarshal_kernel__devnode__device__in(pos, msg, ext, *dev_ptr);
+		}
+
+	}
+
+	{
+		(void)mode_ptr;
+	}
+
+	{
+		*ret_ptr = glue_unpack_new_shadow(pos, msg, ext, char const*, sizeof(char) * glue_peek(pos, msg, ext));
+		if (*ret_ptr) {
+			char* writable = (char*)*ret_ptr;
+			size_t i, len;
+			char* array = writable;
+			len = glue_unpack(pos, msg, ext, size_t) - 1;
+			array[len] = '\0';
+			for (i = 0; i < len; ++i) {
+				char* element = &array[i];
+				*element = glue_unpack(pos, msg, ext, char);
+			}
+
+		}
+
+	}
+
+	if (verbose_debug) {
+		printk("%s:%d, returned!\n", __func__, __LINE__);
+	}
+	return ret;
+}
+
+LCD_TRAMPOLINE_DATA(trmp_devnode)
+char const* LCD_TRAMPOLINE_LINKAGE(trmp_devnode) trmp_devnode(struct device* dev, unsigned short* mode)
+{
+	volatile fptr_impl_devnode impl;
+	fptr_devnode target;
+	LCD_TRAMPOLINE_PROLOGUE(target, trmp_devnode);
+	impl = trmp_impl_devnode;
+	return impl(target, dev, mode);
+}
+
 void __device_create_callee(struct fipc_message* msg, struct ext_registers* ext)
 {
 	size_t n_pos = 0;
@@ -970,6 +1050,7 @@ void __device_create_callee(struct fipc_message* msg, struct ext_registers* ext)
 		printk("%s:%d, entered!\n", __func__, __LINE__);
 	}
 
+	glue_dump_msg(msg);
 	{
 		*class_ptr = glue_unpack(pos, msg, ext, struct class*);
 		if (*class_ptr) {
@@ -999,12 +1080,17 @@ void __device_create_callee(struct fipc_message* msg, struct ext_registers* ext)
 	}
 
 	{
-		*fmt_ptr = glue_unpack_new_shadow(pos, msg, ext, char const*, sizeof(char) * glue_peek(pos, msg, ext));
+		size_t cur_pos = *pos + 0;
+		size_t sz = glue_peek(&cur_pos, msg, ext);
+		printk("%s got sz %zu\n", __func__, sz);
+		// 5
+		*fmt_ptr = glue_unpack_new_shadow(pos, msg, ext, char const*, sizeof(char) * sz);
 		if (*fmt_ptr) {
 			char* writable = (char*)*fmt_ptr;
 			size_t i, len;
 			char* array = writable;
 			len = glue_unpack(pos, msg, ext, size_t) - 1;
+			printk("%s, got len %zu\n", __func__, len);
 			array[len] = '\0';
 			for (i = 0; i < len; ++i) {
 				char* element = &array[i];
@@ -1018,10 +1104,6 @@ void __device_create_callee(struct fipc_message* msg, struct ext_registers* ext)
 	{
 		*cpu_ptr = glue_unpack(pos, msg, ext, unsigned int);
 	}
-
-
-	printk("%s, calling device_create with class %p, parent %p, devt %u, drvdata %p fmt %s cpu  %d\n",
-			__func__, class, parent, devt, drvdata, fmt, cpu);
 
 	ret = device_create(class, parent, devt, drvdata, fmt, cpu);
 

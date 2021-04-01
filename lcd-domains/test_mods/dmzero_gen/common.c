@@ -10,13 +10,7 @@ void caller_marshal_kernel__ctr__ti__in(
 	struct ext_registers* ext,
 	struct dm_target const* ptr)
 {
-	char* const* error_ptr = &ptr->error;
 	
-	{
-		glue_pack(pos, msg, ext, *error_ptr);
-		(void)error_ptr;
-	}
-
 }
 
 void callee_unmarshal_kernel__ctr__ti__in(
@@ -25,13 +19,7 @@ void callee_unmarshal_kernel__ctr__ti__in(
 	const struct ext_registers* ext,
 	struct dm_target* ptr)
 {
-	char** error_ptr = &ptr->error;
 	
-	{
-		*error_ptr = glue_unpack(pos, msg, ext, char*);
-		(void)error_ptr;
-	}
-
 }
 
 void callee_marshal_kernel__ctr__ti__in(
@@ -41,25 +29,9 @@ void callee_marshal_kernel__ctr__ti__in(
 	struct dm_target const* ptr)
 {
 	unsigned int const* num_discard_bios_ptr = &ptr->num_discard_bios;
-	char* const* error_ptr = &ptr->error;
 	
 	{
 		glue_pack(pos, msg, ext, *num_discard_bios_ptr);
-	}
-
-	{
-		if (*error_ptr) {
-			size_t i, len;
-			char const* array = *error_ptr;
-			for (len = 0; array[len]; ++len);
-			glue_pack(pos, msg, ext, len + 1);
-			for (i = 0; i < len; ++i) {
-				char const* element = &array[i];
-				glue_pack(pos, msg, ext, *element);
-			}
-
-		}
-
 	}
 
 }
@@ -71,25 +43,9 @@ void caller_unmarshal_kernel__ctr__ti__in(
 	struct dm_target* ptr)
 {
 	unsigned int* num_discard_bios_ptr = &ptr->num_discard_bios;
-	char** error_ptr = &ptr->error;
 	
 	{
 		*num_discard_bios_ptr = glue_unpack(pos, msg, ext, unsigned int);
-	}
-
-	{
-		if (*error_ptr) {
-			size_t i, len;
-			char* array = *error_ptr;
-			len = glue_unpack(pos, msg, ext, size_t) - 1;
-			array[len] = '\0';
-			for (i = 0; i < len; ++i) {
-				char* element = &array[i];
-				*element = glue_unpack(pos, msg, ext, char);
-			}
-
-		}
-
 	}
 
 }
@@ -204,6 +160,42 @@ void callee_marshal_kernel__zero_fill_bio__bio__in(
 }
 
 void caller_unmarshal_kernel__zero_fill_bio__bio__in(
+	size_t* pos,
+	const struct fipc_message* msg,
+	const struct ext_registers* ext,
+	struct bio* ptr)
+{
+	
+}
+
+void caller_marshal_kernel__bio_endio__bio__in(
+	size_t* pos,
+	struct fipc_message* msg,
+	struct ext_registers* ext,
+	struct bio const* ptr)
+{
+	
+}
+
+void callee_unmarshal_kernel__bio_endio__bio__in(
+	size_t* pos,
+	const struct fipc_message* msg,
+	const struct ext_registers* ext,
+	struct bio* ptr)
+{
+	
+}
+
+void callee_marshal_kernel__bio_endio__bio__in(
+	size_t* pos,
+	struct fipc_message* msg,
+	struct ext_registers* ext,
+	struct bio const* ptr)
+{
+	
+}
+
+void caller_unmarshal_kernel__bio_endio__bio__in(
 	size_t* pos,
 	const struct fipc_message* msg,
 	const struct ext_registers* ext,

@@ -58,6 +58,10 @@ coretemp_hwmon_vmfunc/hwmon_klcd nonisolated
 #shpchp_vmfunc/shpchp_lcd isolated
 #shpchp_vmfunc/pci_klcd nonisolated
 
-#msr_vmfunc/boot nonisolated
-#msr_vmfunc/msr_lcd isolated
-#msr_vmfunc/msr_klcd nonisolated
+msr_gen/boot nonisolated
+msr_gen/msr_lcd isolated
+msr_gen/msr_klcd nonisolated
+
+dmzero_gen/boot nonisolated
+dmzero_gen/dmzero_lcd isolated
+dmzero_gen/dm_klcd nonisolated

@@ -24,7 +24,7 @@ void ctr_callee(struct fipc_message* msg, struct ext_registers* ext)
 	}
 
 	{
-		*ti_ptr = glue_unpack(pos, msg, ext, struct dm_target*);
+		*ti_ptr = glue_unpack_new_shadow(pos, msg, ext, struct dm_target*, sizeof(struct dm_target));
 		if (*ti_ptr) {
 			callee_unmarshal_kernel__ctr__ti__in(pos, msg, ext, *ti_ptr);
 		}
@@ -35,6 +35,7 @@ void ctr_callee(struct fipc_message* msg, struct ext_registers* ext)
 		*argc_ptr = glue_unpack(pos, msg, ext, unsigned int);
 	}
 
+	if (0)
 	{
 		*argv_ptr = glue_unpack(pos, msg, ext, char**);
 		if (*argv_ptr) {
@@ -47,6 +48,7 @@ void ctr_callee(struct fipc_message* msg, struct ext_registers* ext)
 
 	}
 
+	printk("%s:%d calling ctr with ti %p argc %u argv %p\n", __func__, __LINE__, ti, argc, argv);
 	ret = function_ptr(ti, argc, argv);
 
 	*pos = 0;
@@ -60,6 +62,7 @@ void ctr_callee(struct fipc_message* msg, struct ext_registers* ext)
 	{
 	}
 
+	if (0)
 	{
 		if (*argv_ptr) {
 			(void)*argv_ptr;
@@ -110,6 +113,7 @@ void map_callee(struct fipc_message* msg, struct ext_registers* ext)
 
 	}
 
+	printk("%s:%d calling map with ti %p bio %p\n", __func__, __LINE__, ti, bio);
 	ret = function_ptr(ti, bio);
 
 	*pos = 0;
@@ -167,6 +171,45 @@ void zero_fill_bio(struct bio* bio)
 	{
 		if (*bio_ptr) {
 			caller_unmarshal_kernel__zero_fill_bio__bio__in(pos, msg, ext, *bio_ptr);
+		}
+
+	}
+
+	if (verbose_debug) {
+		printk("%s:%d, returned!\n", __func__, __LINE__);
+	}
+}
+
+void bio_endio(struct bio* bio)
+{
+	struct fipc_message buffer = {0};
+	struct fipc_message *msg = &buffer;
+	struct ext_registers* ext = get_register_page(smp_processor_id());
+	size_t n_pos = 0;
+	size_t* pos = &n_pos;
+
+	struct bio** bio_ptr = &bio;
+	
+	(void)ext;
+
+	if (verbose_debug) {
+		printk("%s:%d, entered!\n", __func__, __LINE__);
+	}
+
+	{
+		glue_pack_shadow(pos, msg, ext, *bio_ptr);
+		if (*bio_ptr) {
+			caller_marshal_kernel__bio_endio__bio__in(pos, msg, ext, *bio_ptr);
+		}
+
+	}
+
+	glue_call_server(pos, msg, RPC_ID_bio_endio);
+
+	*pos = 0;
+	{
+		if (*bio_ptr) {
+			caller_unmarshal_kernel__bio_endio__bio__in(pos, msg, ext, *bio_ptr);
 		}
 
 	}

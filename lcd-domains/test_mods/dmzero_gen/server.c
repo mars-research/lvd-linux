@@ -26,7 +26,7 @@ int trmp_impl_ctr(fptr_ctr target, struct dm_target* ti, unsigned int argc, char
 
 	glue_pack(pos, msg, ext, target);
 	{
-		glue_pack_shadow(pos, msg, ext, *ti_ptr);
+		glue_pack(pos, msg, ext, *ti_ptr);
 		if (*ti_ptr) {
 			caller_marshal_kernel__ctr__ti__in(pos, msg, ext, *ti_ptr);
 		}
@@ -37,6 +37,7 @@ int trmp_impl_ctr(fptr_ctr target, struct dm_target* ti, unsigned int argc, char
 		glue_pack(pos, msg, ext, *argc_ptr);
 	}
 
+	if (0)
 	{
 		glue_pack_shadow(pos, msg, ext, *argv_ptr);
 		if (*argv_ptr) {
@@ -62,6 +63,7 @@ int trmp_impl_ctr(fptr_ctr target, struct dm_target* ti, unsigned int argc, char
 	{
 	}
 
+	if (0)
 	{
 		if (*argv_ptr) {
 			(void)*argv_ptr;
@@ -182,12 +184,49 @@ void zero_fill_bio_callee(struct fipc_message* msg, struct ext_registers* ext)
 
 	}
 
+	printk("%s:%d calling zero_fill_bio with bio %p\n", __func__, __LINE__, bio);
 	zero_fill_bio(bio);
 
 	*pos = 0;
 	{
 		if (*bio_ptr) {
 			callee_marshal_kernel__zero_fill_bio__bio__in(pos, msg, ext, *bio_ptr);
+		}
+
+	}
+
+	msg->regs[0] = *pos;
+	if (verbose_debug) {
+		printk("%s:%d, returned!\n", __func__, __LINE__);
+	}
+}
+
+void bio_endio_callee(struct fipc_message* msg, struct ext_registers* ext)
+{
+	size_t n_pos = 0;
+	size_t* pos = &n_pos;
+
+	struct bio* bio = 0;
+	struct bio** bio_ptr = &bio;
+	
+	if (verbose_debug) {
+		printk("%s:%d, entered!\n", __func__, __LINE__);
+	}
+
+	{
+		*bio_ptr = glue_unpack(pos, msg, ext, struct bio*);
+		if (*bio_ptr) {
+			callee_unmarshal_kernel__bio_endio__bio__in(pos, msg, ext, *bio_ptr);
+		}
+
+	}
+
+	bio_endio(bio);
+
+	*pos = 0;
+	{
+		if (*bio_ptr) {
+			callee_marshal_kernel__bio_endio__bio__in(pos, msg, ext, *bio_ptr);
 		}
 
 	}
@@ -282,6 +321,11 @@ int try_dispatch(enum RPC_ID id, struct fipc_message* msg, struct ext_registers*
 	case RPC_ID_zero_fill_bio:
 		glue_user_trace("zero_fill_bio\n");
 		zero_fill_bio_callee(msg, ext);
+		break;
+
+	case RPC_ID_bio_endio:
+		glue_user_trace("bio_endio\n");
+		bio_endio_callee(msg, ext);
 		break;
 
 	case RPC_ID_dm_unregister_target:

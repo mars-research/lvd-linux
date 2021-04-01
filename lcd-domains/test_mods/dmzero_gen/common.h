@@ -8,19 +8,37 @@
 
 #include "glue_user.h"
 
-#define verbose_debug 0
-#define glue_pack(pos, msg, ext, value) glue_pack_impl((pos), (msg), (ext), (uint64_t)(value))
-#define glue_pack_shadow(pos, msg, ext, value) glue_pack_shadow_impl((pos), (msg), (ext), (value))
-#define glue_unpack(pos, msg, ext, type) (type)glue_unpack_impl((pos), (msg), (ext))
-#define glue_unpack_shadow(pos, msg, ext, type) \
-(type)glue_unpack_shadow_impl(glue_unpack(pos, msg, ext, void*));
+#define verbose_debug 1
+#define glue_pack(pos, msg, ext, value) do { \
+		glue_pack_impl((pos), (msg), (ext), (uint64_t)(value)); \
+		if (verbose_debug)	\
+			printk("%s:%d packing value %llx at pos %zu\n", __func__, __LINE__, (uint64_t)(value), *pos); \
+		} while(0)
 
-#define glue_unpack_new_shadow(pos, msg, ext, type, size) \
-	(type)glue_unpack_new_shadow_impl(glue_unpack(pos, msg, ext, void*), size)
+#define glue_pack_shadow(pos, msg, ext, value) ({ \
+	if (verbose_debug) \
+		printk("%s:%d, pack shadow value %llx at pos %zu\n", __func__, __LINE__, (uint64_t)(value), *pos); \
+		glue_pack_shadow_impl((pos), (msg), (ext), (value)); })
+
+#define glue_unpack(pos, msg, ext, type) ({ \
+	type __t = (type)glue_unpack_impl((pos), (msg), (ext)); \
+	if (verbose_debug) \
+		printk("%s:%d, unpack type %s | value %llx\n", __func__, __LINE__, __stringify(type), (uint64_t)(__t)); \
+	__t; })
+
+#define glue_unpack_shadow(pos, msg, ext, type) ({ \
+	if (verbose_debug) \
+		printk("%s:%d, unpack shadow for type %s\n", __func__, __LINE__, __stringify(type)); \
+	(type)glue_unpack_shadow_impl(glue_unpack(pos, msg, ext, void*)); })
+
+#define glue_unpack_new_shadow(pos, msg, ext, type, size) ({ \
+	if (verbose_debug) \
+		printk("%s:%d, unpack new shadow for type %s | size %llu\n", __func__, __LINE__, __stringify(type), (uint64_t) size); \
+	(type)glue_unpack_new_shadow_impl(glue_unpack(pos, msg, ext, void*), size); })
 
 #ifndef LCD_ISOLATE
 #define glue_unpack_rpc_ptr(pos, msg, ext, name) \
-	glue_peek(pos, msg, ext) ? (fptr_##name)glue_unpack_rpc_ptr_impl(glue_unpack(pos, msg, ext, void*), LCD_DUP_TRAMPOLINE(trmp_##name), LCD_TRAMPOLINE_SIZE(trmp_##name)) : NULL
+	glue_peek_impl_one(pos, msg, ext) ? (fptr_##name)glue_unpack_rpc_ptr_impl(glue_unpack(pos, msg, ext, void*), LCD_DUP_TRAMPOLINE(trmp_##name), LCD_TRAMPOLINE_SIZE(trmp_##name)) : NULL
 
 #else
 #define glue_unpack_rpc_ptr(pos, msg, ext, name) NULL; glue_user_panic("Trampolines cannot be used on LCD side")
@@ -80,6 +98,17 @@ glue_unpack_impl(size_t* pos, const struct fipc_message* msg, const struct ext_r
 }
 
 static inline uint64_t
+glue_peek_impl_one(size_t* pos, const struct fipc_message* msg, const struct ext_registers* ext)
+{
+	if (*pos >= msg->regs[0])
+		glue_user_panic("Peeked past end of glue message");
+	if (*pos < 5)
+		return msg->regs[*pos + 1];
+	else
+		return ext->regs[*pos + 1];
+}
+
+static inline uint64_t
 glue_peek_impl(size_t* pos, const struct fipc_message* msg, const struct ext_registers* ext)
 {
 	if (*pos >= msg->regs[0])
@@ -116,6 +145,7 @@ enum RPC_ID {
 	RPC_ID_ctr,
 	RPC_ID_map,
 	RPC_ID_zero_fill_bio,
+	RPC_ID_bio_endio,
 	RPC_ID_dm_unregister_target,
 	RPC_ID_dm_register_target,
 };
@@ -213,6 +243,30 @@ void callee_marshal_kernel__zero_fill_bio__bio__in(
 	struct bio const* ptr);
 
 void caller_unmarshal_kernel__zero_fill_bio__bio__in(
+	size_t* pos,
+	const struct fipc_message* msg,
+	const struct ext_registers* ext,
+	struct bio* ptr);
+
+void caller_marshal_kernel__bio_endio__bio__in(
+	size_t* pos,
+	struct fipc_message* msg,
+	struct ext_registers* ext,
+	struct bio const* ptr);
+
+void callee_unmarshal_kernel__bio_endio__bio__in(
+	size_t* pos,
+	const struct fipc_message* msg,
+	const struct ext_registers* ext,
+	struct bio* ptr);
+
+void callee_marshal_kernel__bio_endio__bio__in(
+	size_t* pos,
+	struct fipc_message* msg,
+	struct ext_registers* ext,
+	struct bio const* ptr);
+
+void caller_unmarshal_kernel__bio_endio__bio__in(
 	size_t* pos,
 	const struct fipc_message* msg,
 	const struct ext_registers* ext,

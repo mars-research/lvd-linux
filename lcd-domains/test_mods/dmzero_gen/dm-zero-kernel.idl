@@ -3,11 +3,11 @@ module kernel {
 	rpc_ptr int ctr( projection ti [alloc(callee)] * ti, unsigned int argc, char** argv ) {
 		projection < struct dm_target > ti {
 			unsigned int [out] num_discard_bios;
-			string [alloc(caller), out] *error;
+			//const string [alloc(caller), out] *error;
 		}
 	}
 
-	rpc_ptr int map( projection ti [alloc(callee)] * ti, projection bio [alloc(callee)] * bio ) {
+	rpc_ptr int map( projection ti [bind(callee)] * ti, projection bio [alloc(callee)] * bio ) {
 		projection < struct dm_target > ti {
 		}
 		projection < struct bio > bio {
@@ -20,6 +20,11 @@ module kernel {
 		}
 	}
 
+	rpc void bio_endio( projection bio * bio ) {
+		projection < struct bio > bio {
+		}
+	}
+	
 	rpc void dm_unregister_target( projection tt [bind(callee)] * tt ) {
 		projection < struct target_type > tt {
 			const string [bind(callee)] *name;

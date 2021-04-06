@@ -1816,9 +1816,14 @@ void caller_marshal_kernel__ndo_start_xmit__skb__in(
 	struct sk_buff const* ptr)
 {
 	unsigned int const* len_ptr = &ptr->len;
+	unsigned char* const* data_ptr = &ptr->data;
 	
 	{
 		glue_pack(pos, msg, ext, *len_ptr);
+	}
+
+	{
+		glue_pack(pos, msg, ext, (void*)*data_ptr - skb_data_pool);
 	}
 
 }
@@ -1830,9 +1835,14 @@ void callee_unmarshal_kernel__ndo_start_xmit__skb__in(
 	struct sk_buff* ptr)
 {
 	unsigned int* len_ptr = &ptr->len;
+	unsigned char** data_ptr = &ptr->data;
 	
 	{
 		*len_ptr = glue_unpack(pos, msg, ext, unsigned int);
+	}
+
+	{
+		*data_ptr = (unsigned char*)(glue_unpack(pos, msg, ext, size_t) + skb_data_pool);
 	}
 
 }
@@ -1843,7 +1853,12 @@ void callee_marshal_kernel__ndo_start_xmit__skb__in(
 	struct ext_registers* ext,
 	struct sk_buff const* ptr)
 {
+	unsigned char* const* data_ptr = &ptr->data;
 	
+	{
+		(void)data_ptr;
+	}
+
 }
 
 void caller_unmarshal_kernel__ndo_start_xmit__skb__in(
@@ -1852,7 +1867,12 @@ void caller_unmarshal_kernel__ndo_start_xmit__skb__in(
 	const struct ext_registers* ext,
 	struct sk_buff* ptr)
 {
+	unsigned char** data_ptr = &ptr->data;
 	
+	{
+		(void)data_ptr;
+	}
+
 }
 
 void caller_marshal_kernel__ndo_start_xmit__dev__in(

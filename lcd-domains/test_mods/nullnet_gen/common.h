@@ -12,11 +12,16 @@
 #define glue_pack(pos, msg, ext, value) glue_pack_impl((pos), (msg), (ext), (uint64_t)(value))
 #define glue_pack_shadow(pos, msg, ext, value) glue_pack_shadow_impl((pos), (msg), (ext), (value))
 #define glue_unpack(pos, msg, ext, type) (type)glue_unpack_impl((pos), (msg), (ext))
-#define glue_unpack_shadow(pos, msg, ext, type) \
-(type)glue_unpack_shadow_impl(glue_unpack(pos, msg, ext, void*));
 
-#define glue_unpack_new_shadow(pos, msg, ext, type, size) \
-	(type)glue_unpack_new_shadow_impl(glue_unpack(pos, msg, ext, void*), size)
+#define glue_unpack_shadow(pos, msg, ext, type) ({ \
+	if (verbose_debug) \
+		printk("%s:%d, unpack shadow for type %s\n", __func__, __LINE__, __stringify(type)); \
+	(type)glue_unpack_shadow_impl(glue_unpack(pos, msg, ext, void*)); })
+
+#define glue_unpack_new_shadow(pos, msg, ext, type, size) ({ \
+	if (verbose_debug) \
+		printk("%s:%d, unpack new shadow for type %s | size %llu\n", __func__, __LINE__, __stringify(type), (uint64_t) size); \
+	(type)glue_unpack_new_shadow_impl(glue_unpack(pos, msg, ext, void*), size); })
 
 #ifndef LCD_ISOLATE
 #define glue_unpack_rpc_ptr(pos, msg, ext, name) \
@@ -113,6 +118,7 @@ static inline void glue_pack_shadow_impl(size_t* pos, struct fipc_message* msg, 
 enum RPC_ID {
 	MODULE_INIT,
 	MODULE_EXIT,
+	RPC_ID_shared_mem_init,
 	RPC_ID_netif_carrier_on,
 	RPC_ID_netif_carrier_off,
 	RPC_ID_register_netdevice,

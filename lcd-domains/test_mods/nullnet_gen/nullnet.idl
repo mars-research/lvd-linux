@@ -33,6 +33,7 @@ module kernel {
     rpc void consume_skb( projection skb  *skb ) {
         projection < struct sk_buff > skb {
             unsigned int  len;
+	    //unsigned char *data;
         }
     }
 
@@ -158,9 +159,10 @@ module kernel {
     }
 
     // NOTE: exploit promotion and convert enum to unsigned long long
-    rpc_ptr long long ndo_start_xmit( projection skb  *skb, projection dev  [bind(callee)] *dev ) {
+    rpc_ptr long long ndo_start_xmit( projection skb [alloc(callee)] *skb, projection dev  [bind(callee)] *dev ) {
         projection < struct sk_buff > skb {
             unsigned int  len;
+	    unsigned char [shared<skb_data_pool>]  *data;
         }
 
         projection < struct net_device > dev {

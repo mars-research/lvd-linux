@@ -142,4 +142,143 @@ void glue_user_init(void)
     hash_init(to_shadow_ht);
 }
 
-// TODO
+#ifdef LCD_ISOLATE
+
+void *skb_data_pool = NULL;
+
+#define SKB_DATA_OBJ_SIZE	2048
+#define SKB_DATA_POOL	0
+void shared_mem_init(void) {
+	struct fipc_message buffer = {0};
+	struct fipc_message *msg = &buffer;
+	struct ext_registers* ext = get_register_page(smp_processor_id());
+	size_t n_pos = 0;
+	size_t* pos = &n_pos;
+
+	unsigned int pool_ord;
+	cptr_t pool_cptr;
+	gva_t pool_addr;
+	int ret;
+
+	ret = lcd_cptr_alloc(&pool_cptr);
+	if (ret) {
+		LIBLCD_ERR("failed to get cptr");
+		goto fail_cptr;
+	}
+
+	// obj size
+	glue_pack(pos, msg, ext, SKB_DATA_OBJ_SIZE);
+	// cptr
+	glue_pack(pos, msg, ext, cptr_val(pool_cptr));
+	// pool type
+	glue_pack(pos, msg, ext, SKB_DATA_POOL);
+
+	glue_call_server(pos, msg, RPC_ID_shared_mem_init);
+
+	*pos = 0;
+
+	pool_ord = glue_unpack(pos, msg, ext, unsigned int);
+
+	ret = lcd_map_virt(pool_cptr, pool_ord, &pool_addr);
+
+	if (ret) {
+		LIBLCD_ERR("failed to map pool");
+		goto fail_pool;
+	}
+
+	LIBLCD_MSG("%s, mapping private pool %p | ord %d", __func__,
+			gva_val(pool_addr), pool_ord);
+
+	skb_data_pool = (void*)gva_val(pool_addr);
+fail_pool:
+fail_cptr:
+	LIBLCD_ERR("%s, skb_data_pool uninitialized!", __func__);
+	return;
+}
+
+#else
+
+#include <linux/priv_mempool.h>
+#include <linux/vmalloc.h>
+#include <lcd_domains/microkernel.h>
+
+#define SHARED_POOL_SIZE	(256UL << 20)
+#define SHARED_POOL_PAGES	(SHARED_POOL_SIZE >> PAGE_SHIFT)
+#define SHARED_POOL_ORDER	ilog2(roundup_pow_of_two(SHARED_POOL_PAGES))
+
+
+priv_pool_t *skb_pool;
+void *skb_data_pool = NULL;
+
+void shared_mem_init_callee(struct fipc_message *msg, struct ext_registers* ext)
+{
+	size_t n_pos = 0;
+	size_t* pos = &n_pos;
+
+	size_t obj_size;
+	int ret;
+	size_t pool_size;
+	unsigned int pool_ord;
+	cptr_t pool_cptr;
+	cptr_t lcd_pool_cptr;
+	pool_type_t ptype;
+
+	obj_size = glue_unpack(pos, msg, ext, size_t);
+	lcd_pool_cptr = __cptr(glue_unpack(pos, msg, ext, uint64_t));
+
+	ptype = glue_unpack(pos, msg, ext, pool_type_t);
+
+	/*switch (ptype) {
+		case SKB_DATA_POOL:
+		case SKB_FRAG_POOL:
+		case SKB_CONTAINER_POOL:
+		case BLK_USER_BUF_POOL:
+			break;
+		default:
+			printk("%s, Unknown pool type %d requested. Cannot initialize!\n", __func__, ptype);
+			glue_user_panic("Check ptype arg!");
+			break;
+	}*/
+
+	// allocate memory
+	pool_size = SHARED_POOL_SIZE;
+	skb_data_pool = vzalloc(pool_size);
+
+	// initialize private pool
+	skb_pool = priv_pool_init(ptype, (void*) skb_data_pool, pool_size, obj_size);
+	// dump stats - debug info
+	priv_pool_dumpstats(skb_pool);
+
+	ret = lcd_volunteer_vmalloc_mem(__gva((unsigned long)skb_pool->pool),
+			SHARED_POOL_PAGES, &pool_cptr);
+	pool_ord = SHARED_POOL_ORDER;
+
+	if (ret) {
+		LIBLCD_ERR("volunteer shared region");
+		goto fail_vol;
+	}
+
+	copy_msg_cap_vmfunc(current->lcd, current->vmfunc_lcd, pool_cptr,
+			lcd_pool_cptr);
+
+	*pos = 0;
+	// return pool order
+	glue_pack(pos, msg, ext, SHARED_POOL_ORDER);
+
+	return;
+
+fail_vol:
+	// return pool order
+	glue_pack(pos, msg, ext, 0);
+	return;
+}
+
+void skb_data_shared_mem_uninit(void)
+{
+	if (skb_data_pool)
+		vfree(skb_data_pool);
+
+	if (skb_pool)
+		priv_pool_destroy(skb_pool);
+}
+#endif

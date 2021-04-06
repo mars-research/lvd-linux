@@ -807,7 +807,7 @@ void ndo_start_xmit_callee(struct fipc_message* msg, struct ext_registers* ext)
 	}
 
 	{
-		*skb_ptr = glue_unpack(pos, msg, ext, struct sk_buff*);
+		*skb_ptr = glue_unpack_new_shadow(pos, msg, ext, struct sk_buff*, sizeof(struct sk_buff));
 		if (*skb_ptr) {
 			callee_unmarshal_kernel__ndo_start_xmit__skb__in(pos, msg, ext, *skb_ptr);
 		}
@@ -1082,6 +1082,7 @@ int try_dispatch(enum RPC_ID id, struct fipc_message* msg, struct ext_registers*
 	case MODULE_INIT:
 		glue_user_trace("MODULE_INIT");
 		__module_lcd_init();
+		shared_mem_init();
 		break;
 
 	case MODULE_EXIT:

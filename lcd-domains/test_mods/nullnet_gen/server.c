@@ -338,7 +338,7 @@ void rtnl_link_unregister_callee(struct fipc_message* msg, struct ext_registers*
 	}
 
 	{
-		*_global_rtnl_link_ops_ptr = glue_unpack(pos, msg, ext, struct rtnl_link_ops*);
+		*_global_rtnl_link_ops_ptr = glue_unpack_shadow(pos, msg, ext, struct rtnl_link_ops*);
 		if (*_global_rtnl_link_ops_ptr) {
 			callee_unmarshal_kernel___global_rtnl_link_ops__in(pos, msg, ext, *_global_rtnl_link_ops_ptr);
 		}
@@ -374,7 +374,7 @@ void __rtnl_link_unregister_callee(struct fipc_message* msg, struct ext_register
 	}
 
 	{
-		*_global_rtnl_link_ops_ptr = glue_unpack(pos, msg, ext, struct rtnl_link_ops*);
+		*_global_rtnl_link_ops_ptr = glue_unpack_shadow(pos, msg, ext, struct rtnl_link_ops*);
 		if (*_global_rtnl_link_ops_ptr) {
 			callee_unmarshal_kernel___global_rtnl_link_ops__in(pos, msg, ext, *_global_rtnl_link_ops_ptr);
 		}

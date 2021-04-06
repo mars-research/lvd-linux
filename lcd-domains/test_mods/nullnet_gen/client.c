@@ -364,7 +364,7 @@ void rtnl_link_unregister(struct rtnl_link_ops* _global_rtnl_link_ops)
 	}
 
 	{
-		glue_pack_shadow(pos, msg, ext, *_global_rtnl_link_ops_ptr);
+		glue_pack(pos, msg, ext, *_global_rtnl_link_ops_ptr);
 		if (*_global_rtnl_link_ops_ptr) {
 			caller_marshal_kernel___global_rtnl_link_ops__in(pos, msg, ext, *_global_rtnl_link_ops_ptr);
 		}
@@ -403,7 +403,7 @@ void __rtnl_link_unregister(struct rtnl_link_ops* _global_rtnl_link_ops)
 	}
 
 	{
-		glue_pack_shadow(pos, msg, ext, *_global_rtnl_link_ops_ptr);
+		glue_pack(pos, msg, ext, *_global_rtnl_link_ops_ptr);
 		if (*_global_rtnl_link_ops_ptr) {
 			caller_marshal_kernel___global_rtnl_link_ops__in(pos, msg, ext, *_global_rtnl_link_ops_ptr);
 		}

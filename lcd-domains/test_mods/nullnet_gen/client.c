@@ -847,6 +847,8 @@ void ndo_start_xmit_callee(struct fipc_message* msg, struct ext_registers* ext)
 	if (verbose_debug) {
 		printk("%s:%d, returned!\n", __func__, __LINE__);
 	}
+	// FIXME: Until dealloc is supported
+	kfree(*skb_ptr);
 }
 
 void ndo_set_rx_mode_callee(struct fipc_message* msg, struct ext_registers* ext)

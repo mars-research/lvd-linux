@@ -85,8 +85,8 @@ static struct rtnl_link_stats64 *dummy_get_stats64(struct net_device *dev,
 		stats->tx_packets += tpackets;
 	}
 #else
-//	stats->tx_bytes = g_dstats.tx_bytes;
-//	stats->tx_packets = g_dstats.tx_packets;
+	stats->tx_bytes = g_dstats.tx_bytes;
+	stats->tx_packets = g_dstats.tx_packets;
 #endif
 	return stats;
 }
@@ -101,8 +101,8 @@ netdev_tx_t dummy_xmit(struct sk_buff *skb, struct net_device *dev)
 	dstats->tx_bytes += skb->len;
 	u64_stats_update_end(&dstats->syncp);
 #else
-	//g_dstats.tx_packets++;
-	//g_dstats.tx_bytes += skb->len;
+	g_dstats.tx_packets++;
+	g_dstats.tx_bytes += skb->len;
 #endif
 
 #ifdef CONFIG_RUN_DUMMY_2

@@ -15,7 +15,6 @@ void ctr_callee(struct fipc_message* msg, struct ext_registers* ext)
 	char** argv = 0;
 	struct dm_target** ti_ptr = &ti;
 	unsigned int* argc_ptr = &argc;
-	char*** argv_ptr = &argv;
 	int ret = 0;
 	int* ret_ptr = &ret;
 	
@@ -35,17 +34,7 @@ void ctr_callee(struct fipc_message* msg, struct ext_registers* ext)
 		*argc_ptr = glue_unpack(pos, msg, ext, unsigned int);
 	}
 
-	if (0)
 	{
-		*argv_ptr = glue_unpack(pos, msg, ext, char**);
-		if (*argv_ptr) {
-			**argv_ptr = glue_unpack(pos, msg, ext, char*);
-			if (**argv_ptr) {
-				***argv_ptr = glue_unpack(pos, msg, ext, char);
-			}
-
-		}
-
 	}
 
 	printk("%s:%d calling ctr with ti %p argc %u argv %p\n", __func__, __LINE__, ti, argc, argv);
@@ -62,12 +51,7 @@ void ctr_callee(struct fipc_message* msg, struct ext_registers* ext)
 	{
 	}
 
-	if (0)
 	{
-		if (*argv_ptr) {
-			(void)*argv_ptr;
-		}
-
 	}
 
 	{
@@ -88,7 +72,6 @@ void map_callee(struct fipc_message* msg, struct ext_registers* ext)
 	fptr_map function_ptr = glue_unpack(pos, msg, ext, fptr_map);
 	struct dm_target* ti = 0;
 	struct bio* bio = 0;
-	struct dm_target** ti_ptr = &ti;
 	struct bio** bio_ptr = &bio;
 	int ret = 0;
 	int* ret_ptr = &ret;
@@ -98,11 +81,6 @@ void map_callee(struct fipc_message* msg, struct ext_registers* ext)
 	}
 
 	{
-		*ti_ptr = glue_unpack_shadow(pos, msg, ext, struct dm_target*);
-		if (*ti_ptr) {
-			callee_unmarshal_kernel__map__ti__in(pos, msg, ext, *ti_ptr);
-		}
-
 	}
 
 	{
@@ -118,10 +96,6 @@ void map_callee(struct fipc_message* msg, struct ext_registers* ext)
 
 	*pos = 0;
 	{
-		if (*ti_ptr) {
-			callee_marshal_kernel__map__ti__in(pos, msg, ext, *ti_ptr);
-		}
-
 	}
 
 	{

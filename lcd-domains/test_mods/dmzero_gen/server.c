@@ -14,7 +14,6 @@ int trmp_impl_ctr(fptr_ctr target, struct dm_target* ti, unsigned int argc, char
 
 	struct dm_target** ti_ptr = &ti;
 	unsigned int* argc_ptr = &argc;
-	char*** argv_ptr = &argv;
 	int ret = 0;
 	int* ret_ptr = &ret;
 	
@@ -37,17 +36,7 @@ int trmp_impl_ctr(fptr_ctr target, struct dm_target* ti, unsigned int argc, char
 		glue_pack(pos, msg, ext, *argc_ptr);
 	}
 
-	if (0)
 	{
-		glue_pack_shadow(pos, msg, ext, *argv_ptr);
-		if (*argv_ptr) {
-			glue_pack_shadow(pos, msg, ext, **argv_ptr);
-			if (**argv_ptr) {
-				glue_pack(pos, msg, ext, ***argv_ptr);
-			}
-
-		}
-
 	}
 
 	glue_call_client(pos, msg, RPC_ID_ctr);
@@ -63,12 +52,7 @@ int trmp_impl_ctr(fptr_ctr target, struct dm_target* ti, unsigned int argc, char
 	{
 	}
 
-	if (0)
 	{
-		if (*argv_ptr) {
-			(void)*argv_ptr;
-		}
-
 	}
 
 	{
@@ -99,7 +83,6 @@ int trmp_impl_map(fptr_map target, struct dm_target* ti, struct bio* bio)
 	size_t n_pos = 0;
 	size_t* pos = &n_pos;
 
-	struct dm_target** ti_ptr = &ti;
 	struct bio** bio_ptr = &bio;
 	int ret = 0;
 	int* ret_ptr = &ret;
@@ -112,11 +95,6 @@ int trmp_impl_map(fptr_map target, struct dm_target* ti, struct bio* bio)
 
 	glue_pack(pos, msg, ext, target);
 	{
-		glue_pack(pos, msg, ext, *ti_ptr);
-		if (*ti_ptr) {
-			caller_marshal_kernel__map__ti__in(pos, msg, ext, *ti_ptr);
-		}
-
 	}
 
 	{
@@ -131,10 +109,6 @@ int trmp_impl_map(fptr_map target, struct dm_target* ti, struct bio* bio)
 
 	*pos = 0;
 	{
-		if (*ti_ptr) {
-			caller_unmarshal_kernel__map__ti__in(pos, msg, ext, *ti_ptr);
-		}
-
 	}
 
 	{
@@ -184,7 +158,6 @@ void zero_fill_bio_callee(struct fipc_message* msg, struct ext_registers* ext)
 
 	}
 
-	printk("%s:%d calling zero_fill_bio with bio %p\n", __func__, __LINE__, bio);
 	zero_fill_bio(bio);
 
 	*pos = 0;

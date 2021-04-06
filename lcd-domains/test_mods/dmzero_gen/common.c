@@ -266,7 +266,7 @@ void callee_unmarshal_kernel__dm_unregister_target__tt__in(
 	fptr_map* map_ptr = &ptr->map;
 	
 	{
-		*name_ptr = glue_unpack_shadow(pos, msg, ext, char const*);
+		*name_ptr = glue_unpack_new_shadow(pos, msg, ext, char const*, sizeof(char) * glue_peek(pos, msg, ext));
 		if (*name_ptr) {
 			char* writable = (char*)*name_ptr;
 			size_t i, len;

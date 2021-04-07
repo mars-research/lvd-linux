@@ -612,9 +612,6 @@ void trmp_impl_setup(fptr_setup target, struct net_device* dev)
 	}
 
 	if (verbose_debug) {
-		printk("%s:%d, ndo_init %p | ndo_uinit %p | ndo_start_xmit %p | ndo_set_rx_mode %p | ndo_get_stats %p\n", __func__, __LINE__,
-					dev->netdev_ops->ndo_init, dev->netdev_ops->ndo_uninit, dev->netdev_ops->ndo_start_xmit,
-					dev->netdev_ops->ndo_set_rx_mode, dev->netdev_ops->ndo_get_stats);
 		printk("%s:%d, returned!\n", __func__, __LINE__);
 	}
 }
@@ -1157,6 +1154,11 @@ int LCD_TRAMPOLINE_LINKAGE(trmp_validate) trmp_validate(struct nlattr** tb, stru
 int try_dispatch(enum RPC_ID id, struct fipc_message* msg, struct ext_registers* ext)
 {
 	switch(id) {
+	case RPC_ID_shared_mem_init:
+		glue_user_trace("shared_mem_init\n");
+		shared_mem_init_callee(msg, ext);
+		break;
+
 	case RPC_ID_netif_carrier_on:
 		glue_user_trace("netif_carrier_on\n");
 		netif_carrier_on_callee(msg, ext);
@@ -1227,10 +1229,6 @@ int try_dispatch(enum RPC_ID id, struct fipc_message* msg, struct ext_registers*
 		eth_mac_addr_callee(msg, ext);
 		break;
 
-	case RPC_ID_shared_mem_init:
-		glue_user_trace("shared_mem_init\n");
-		shared_mem_init_callee(msg, ext);
-		break;
 	default:
 		return 0;
 	}

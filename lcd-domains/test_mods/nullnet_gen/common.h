@@ -12,7 +12,6 @@
 #define glue_pack(pos, msg, ext, value) glue_pack_impl((pos), (msg), (ext), (uint64_t)(value))
 #define glue_pack_shadow(pos, msg, ext, value) glue_pack_shadow_impl((pos), (msg), (ext), (value))
 #define glue_unpack(pos, msg, ext, type) (type)glue_unpack_impl((pos), (msg), (ext))
-
 #define glue_unpack_shadow(pos, msg, ext, type) ({ \
 	if (verbose_debug) \
 		printk("%s:%d, unpack shadow for type %s\n", __func__, __LINE__, __stringify(type)); \
@@ -114,6 +113,13 @@ static inline void glue_pack_shadow_impl(size_t* pos, struct fipc_message* msg, 
 {
 	glue_pack(pos, msg, ext, ptr ? glue_user_map_from_shadow(ptr) : NULL);
 }
+
+#ifdef LCD_ISOLATE
+void shared_mem_init(void);
+#else
+void shared_mem_init_callee(struct fipc_message *msg, struct ext_registers* ext);
+#endif	/* LCD_ISOLATE */
+
 
 enum RPC_ID {
 	MODULE_INIT,

@@ -2219,3 +2219,14 @@ void caller_unmarshal_kernel__validate__data__in(
 	
 }
 
+
+#ifdef LCD_ISOLATE
+__attribute__((weak)) void shared_mem_init(void) {
+	LIBLCD_MSG("Weak shared_mem_init does nothing! Override if you want!");
+}
+#else
+__attribute__((weak)) void shared_mem_init_callee(struct fipc_message *msg, struct ext_registers* ext) {
+	LIBLCD_MSG("Weak shared_mem_init_callee does nothing! Override if you want!");
+}
+#endif	/* LCD_ISOLATE */
+

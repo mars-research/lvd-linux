@@ -1,0 +1,14 @@
+obj-m += lcd_test_mod_meime_gen_misc_klcd.o
+
+lcd_test_mod_meime_gen_misc_klcd-y		+= main.o
+
+# glue code
+lcd_test_mod_meime_gen_misc_klcd-y		+= $(addprefix ../, server.o common.o glue_user.o )
+
+cppflags-y += $(NONISOLATED_CFLAGS)
+
+extra-y += $(addprefix ../, trampolines.lds)
+
+ldflags-y += -T $(LCD_TEST_MODULES_BUILD_DIR)/meime_gen/trampolines.lds
+
+ccflags-y += $(NONISOLATED_CFLAGS)

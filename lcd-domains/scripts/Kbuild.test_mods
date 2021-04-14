@@ -31,3 +31,6 @@ obj-m += nullnet_gen/
 obj-m += dmzero_gen/
 obj-m += nullnet_gen/
 obj-m += msr_gen/
+#obj-m += coretemp_gen/
+#obj-m += alx_gen/
+obj-m += meime_gen/

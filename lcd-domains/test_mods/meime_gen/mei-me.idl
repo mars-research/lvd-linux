@@ -1,0 +1,441 @@
+module kernel {
+/*rpc bool mei_me_fw_type_nm( projection pdev * pdev ) {
+	projection < struct pci_dev > pdev {
+	}
+}
+rpc_ptr bool quirk_probe( projection pdev * pdev ) {
+	projection < struct pci_dev > pdev {
+		projection bus* bus;
+		unsigned int  devfn;
+	}
+	projection < struct pci_bus > bus {
+	}
+}*/
+
+	rpc_ptr int probe( projection pdev [alloc(callee)] * pdev, projection ent [alloc(callee)] * ent ) {
+		projection < struct pci_dev > pdev {
+		}
+		projection < struct pci_device_id > ent {
+			long unsigned int  driver_data;
+		}
+	}
+
+	rpc_ptr void remove( projection pdev [bind(callee)] * pdev ) {
+		projection < struct pci_dev > pdev {
+		}
+	}
+
+	rpc_ptr void shutdown( projection pdev [bind(callee)] * pdev ) {
+		projection < struct pci_dev > pdev {
+		}
+	}
+
+	// FIXME: need member_of
+	rpc int pci_bus_read_config_dword( projection bus * bus,
+			unsigned int devfn, int pos, unsigned int [alloc(callee), out] * value ) {
+		projection < struct pci_bus > bus {
+		}
+	}
+
+	rpc_ptr bool host_is_ready( projection dev * dev ) {
+		projection < struct mei_device > dev {
+		}
+	}
+	rpc_ptr bool hw_is_ready( projection dev * dev ) {
+		projection < struct mei_device > dev {
+		}
+	}
+	rpc_ptr int hw_reset( projection dev * dev, bool intr_enable ) {
+		projection < struct mei_device > dev {
+			projection dev* dev;
+		}
+		projection < struct device > dev {
+		}
+	}
+	rpc_ptr int hw_start( projection dev * dev ) {
+		projection < struct mei_device > dev {
+			projection dev* dev;
+		}
+		projection < struct device > dev {
+		}
+	}
+	rpc_ptr void hw_config( projection dev [bind(caller)] * dev ) {
+		projection < struct mei_device > dev {
+			projection dev* dev;
+		}
+		projection < struct device > dev {
+		}
+	}
+	rpc_ptr int fw_status( projection dev [bind(caller)] * dev, projection fw_status [alloc(callee)] * fw_status ) {
+		projection < struct mei_device > dev {
+			projection dev* dev;
+		}
+		projection < struct device > dev {
+		}
+		projection < struct mei_fw_status > fw_status {
+			int [out] count;
+			array< unsigned int, 6>  status;
+		}
+	}
+	rpc_ptr unsigned int pg_state( projection dev * dev ) {
+		projection < struct mei_device > dev {
+		}
+	}
+	rpc_ptr bool pg_in_transition( projection dev * dev ) {
+		projection < struct mei_device > dev {
+			unsigned int  pg_event;
+		}
+	}
+	rpc_ptr bool pg_is_enabled( projection dev * dev ) {
+		/*projection < struct hbm_version> hbm_version{
+		}*/
+		projection < struct mei_device > dev {
+			projection dev* dev;
+			//projection hbm_version version;
+			//unsigned int  hbm_f_pg_supported;
+		}
+		projection < struct device > dev {
+		}
+	}
+
+	rpc_ptr void intr_clear( projection dev [bind(caller)] * dev ) {
+		projection < struct mei_device > dev {
+		}
+	}
+
+	rpc_ptr void intr_enable( projection dev * dev ) {
+		projection < struct mei_device > dev {
+		}
+	}
+	rpc_ptr void intr_disable( projection dev * dev ) {
+		projection < struct mei_device > dev {
+		}
+	}
+	rpc_ptr int hbuf_free_slots( projection dev * dev ) {
+		projection < struct mei_device > dev {
+		}
+	}
+	rpc_ptr bool hbuf_is_ready( projection dev * dev ) {
+		projection < struct mei_device > dev {
+		}
+	}
+	rpc_ptr long unsigned int hbuf_max_len( projection dev * dev ) {
+		projection < struct mei_device > dev {
+		}
+	}
+	rpc_ptr int write( projection dev * dev, projection header * header, unsigned char* buf ) {
+		projection < struct mei_device > dev {
+			projection dev* dev;
+		}
+		projection < struct device > dev {
+		}
+		projection < struct mei_msg_hdr > header {
+		}
+	}
+	rpc_ptr int rdbuf_full_slots( projection dev * dev ) {
+		projection < struct mei_device > dev {
+			projection dev* dev;
+		}
+		projection < struct device > dev {
+		}
+	}
+	rpc_ptr unsigned int read_hdr( projection dev * dev ) {
+		projection < struct mei_device > dev {
+		}
+	}
+	rpc_ptr int read( projection dev * dev, unsigned char* buffer, long unsigned int buffer_length ) {
+		projection < struct mei_device > dev {
+		}
+	}
+	rpc void pci_disable_device( projection dev * dev ) {
+		projection < struct pci_dev > dev {
+		}
+	}
+	rpc void pci_set_master( projection dev * dev ) {
+		projection < struct pci_dev > dev {
+		}
+	}
+
+	rpc void pci_disable_msi( projection dev * dev ) {
+		projection < struct pci_dev > dev {
+			//unsigned int  transparent;
+		}
+	}
+
+	rpc int pci_enable_msi_range( projection dev * dev, int minvec, int maxvec ) {
+		projection < struct pci_dev > dev {
+			//unsigned int [out] msi_enabled;
+			//unsigned int [out] msix_enabled;
+		}
+	}
+
+rpc long unsigned int __msecs_to_jiffies( unsigned int m ) {
+}
+	rpc void pci_iounmap( projection dev * dev, void* addr ) {
+		projection < struct pci_dev > dev {
+		}
+	}
+
+rpc long schedule_timeout( long timeout ) {
+}
+
+rpc void finish_wait( projection q * q, projection wait * wait ) {
+	projection < struct __wait_queue_head > q {
+	}
+	projection < struct __wait_queue > wait {
+	}
+}
+rpc long prepare_to_wait_event( projection q * q, projection wait * wait, int state ) {
+	projection < struct __wait_queue_head > q {
+	}
+	projection < struct __wait_queue > wait {
+		unsigned int  flags;
+	}
+}
+	rpc_ptr unsigned int thread_fn(int irq, void *id) {
+	}
+
+	rpc_ptr unsigned int handler(int irq, void *id) {
+	}
+
+	rpc int request_threaded_irq( unsigned int irq, rpc_ptr handler handler,
+			rpc_ptr thread_fn thread_fn, long unsigned int irqflags,
+				string [alloc(callee)] * devname, void* dev_id ) {
+	}
+
+	rpc void free_irq( unsigned int irq, void* dev_id ) {
+	}
+
+	// FIXME: first param is a global
+	rpc bool queue_work_on( int cpu, projection wq * wq, projection work * work ) {
+		projection < struct workqueue_struct > wq {
+		}
+		projection < struct work_struct > work {
+		}
+	}
+
+	rpc void mei_cancel_work( projection dev [bind(callee)] * dev ) {
+		projection < struct mei_device > dev {
+		}
+	}
+
+rpc bool queue_delayed_work_on( int cpu, projection wq * wq, projection dwork * dwork, long unsigned int delay ) {
+	projection < struct workqueue_struct > wq {
+	}
+	projection < struct delayed_work > dwork {
+	}
+}
+
+
+	rpc void mei_hbm_pg_resume( projection dev [alloc(callee)] * dev ) {
+		projection < struct mei_device > dev {
+			//projection dev* dev;
+		}
+		/*projection < struct device > dev {
+		}*/
+	}
+
+	rpc int mei_hbm_pg( projection dev [bind(callee)] * dev, unsigned char pg_cmd ) {
+		projection < struct mei_device > dev {
+			projection dev* dev;
+			//unsigned int  hbm_f_pg_supported;
+		}
+		projection < struct device > dev {
+		}
+	}
+
+	// FIXME -> similar to container_of, we need member_of syntax
+	rpc void mei_device_init( projection dev [alloc<{{sizeof(struct mei_device) + sizeof(struct mei_me_hw)}}>(callee)] * dev,
+				//&member_of(projection pci_dev, dev), projection device * device,
+				projection device * device,
+				const projection _global_mei_hw_ops [alloc(callee)] * ops) {
+		
+		projection < struct delayed_work> delayed_work{
+			projection work_struct work;
+			projection timer_list timer;
+		}
+
+		
+		projection < struct work_struct> work_struct{
+		}
+		projection < struct timer_list> timer_list{
+		}
+		projection < struct mei_device > dev {
+			//projection dev* dev;
+			projection delayed_work timer_work;
+			unsigned int [out] dev_state;
+			unsigned int [out] pg_event;
+			//projection work_struct reset_work;
+			//projection ops* ops;
+		}
+		/*projection < struct device > dev {
+		}
+		*/
+		projection < struct device > device {
+		}
+	}
+
+	rpc void mei_stop( projection dev [bind(callee)] * dev ) {
+		projection < struct mei_device > dev {
+			projection dev* dev;
+			unsigned int [out] dev_state;
+		}
+		projection < struct device > dev {
+		}
+	}
+
+	// mei_device was allocated by the driver and kernel has a shadow
+	rpc int mei_start( projection dev [bind(callee)] * dev ) {
+		projection < struct mei_device > dev {
+			//projection device* dev;
+			unsigned int [out] dev_state;
+		}
+		/*	
+		projection < struct device > device {
+		}*/
+	}
+
+	rpc void [ioremap(caller)]  *pci_iomap( projection dev * pdev, int bar, long unsigned int maxlen ) {
+		projection < struct pci_dev > dev {
+		}
+	}
+
+	rpc void pci_unregister_driver( projection drv * drv ) {
+		projection < struct pci_driver > drv {
+			rpc_ptr probe probe;
+			rpc_ptr remove remove;
+			rpc_ptr shutdown shutdown;
+		}
+	}
+
+	rpc int __pci_register_driver( projection drv [alloc(callee)] * drv, projection owner * owner,
+					string [alloc(callee)] * mod_name ) {
+		projection < struct device_driver> device_driver{
+			rpc_ptr probe probe;
+			rpc_ptr remove remove;
+			rpc_ptr shutdown shutdown;
+		}
+		/*projection < struct pci_dynids> pci_dynids{
+		}*/
+		projection < struct pci_driver > drv {
+			string [alloc(callee)] *name;
+			rpc_ptr probe probe;
+			rpc_ptr remove remove;
+			rpc_ptr shutdown shutdown;
+			//projection device_driver driver;
+			//projection pci_dynids dynids;
+			//array<projection pci_device_id, null> [alloc(callee)] *id_table;
+		}
+		projection <struct pci_device_id> pci_device_id {
+			unsigned int vendor;
+			unsigned int device;
+			unsigned int subvendor;
+			unsigned int subdevice;
+			unsigned int class;
+			unsigned int class_mask;
+			unsigned long long driver_data;
+		}
+		projection < struct module > owner {
+		}
+	}
+
+	rpc int pci_request_regions( projection pdev * pdev, string [alloc(callee)] * res_name ) {
+		projection < struct pci_dev > pdev {
+		}
+	}
+
+	rpc void pci_release_regions( projection pdev * pdev ) {
+		projection < struct pci_dev > pdev {
+		}
+	}
+
+	// FIXME: who creates bus?
+	rpc bool pci_dev_run_wake( projection dev * dev ) {
+		projection < struct pci_dev > dev {
+			projection bus* bus;
+		}
+		projection < struct pci_bus > bus {
+		}
+	}
+
+	rpc int pci_enable_device( projection dev * dev ) {
+		projection < struct pci_dev > dev {
+		}
+	}
+
+	// FIXME: Passing linked list as the last arg
+	rpc int mei_irq_write_handler( projection dev [alloc(callee)] * dev, projection cmpl_list * cmpl_list ) {
+		projection < struct mei_device > dev {
+			//projection dev* dev;
+		}
+		/*
+		projection < struct device > dev {
+		}*/
+		projection < struct mei_cl_cb > cmpl_list {
+		}
+	}
+
+	// dev->dev is only used for dev_dbg
+	rpc int mei_irq_read_handler( projection dev [alloc(callee)] * dev,
+			projection cmpl_list * cmpl_list, int [alloc(callee), in, out] * slots ) {
+		projection < struct mei_device > dev {
+		//	projection dev* dev;
+		}
+		/*projection < struct device > dev {
+		}*/
+		projection < struct mei_cl_cb > cmpl_list {
+		}
+	}
+
+	rpc void mei_irq_compl_handler( projection dev [alloc(callee)] * dev, projection compl_list * compl_list ) {
+		projection < struct mei_device > dev {
+			//projection dev* dev;
+		}
+		/*
+		projection < struct device > dev {
+		} */
+		projection < struct list_head> list_head{
+			projection next* next;
+		}
+		projection < struct mei_cl_cb > compl_list {
+			projection list_head list;
+		}
+		
+		projection < struct list_head > next {
+		}
+	}
+
+	rpc void mei_deregister( projection dev [bind(callee)] * dev ) {
+		projection < struct mei_device > dev {
+		}
+	}
+
+	rpc int mei_register( projection dev [bind(callee)] * dev, projection parent * parent ) {
+		projection < struct mei_device > dev {
+		}
+		projection < struct device > parent {
+		}
+	}
+
+	projection < struct mei_hw_ops > _global_mei_hw_ops {
+		rpc_ptr fw_status fw_status;
+		rpc_ptr hbuf_free_slots hbuf_free_slots;
+		rpc_ptr hbuf_is_ready hbuf_is_ready;
+		rpc_ptr hbuf_max_len hbuf_max_len;
+		rpc_ptr host_is_ready host_is_ready;
+		rpc_ptr hw_config hw_config;
+		rpc_ptr hw_is_ready hw_is_ready;
+		rpc_ptr hw_reset hw_reset;
+		rpc_ptr hw_start hw_start;
+		rpc_ptr intr_clear intr_clear;
+		rpc_ptr intr_disable intr_disable;
+		rpc_ptr intr_enable intr_enable;
+		rpc_ptr pg_in_transition pg_in_transition;
+		rpc_ptr pg_is_enabled pg_is_enabled;
+		rpc_ptr pg_state pg_state;
+		rpc_ptr rdbuf_full_slots rdbuf_full_slots;
+		rpc_ptr read read;
+		rpc_ptr read_hdr read_hdr;
+		rpc_ptr write write;
+	}
+}

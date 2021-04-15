@@ -99,6 +99,7 @@ void remove_callee(struct fipc_message* msg, struct ext_registers* ext)
 			callee_marshal_kernel__remove__pdev__in(__pos, msg, ext, ctx, *pdev_ptr);
 		}
 
+		glue_remove_shadow(*pdev_ptr);
 	}
 
 	msg->regs[0] = *__pos;
@@ -948,7 +949,7 @@ void write_callee(struct fipc_message* msg, struct ext_registers* ext)
 	}
 
 	{
-		*header_ptr = glue_unpack(__pos, msg, ext, struct mei_msg_hdr*);
+		*header_ptr = glue_unpack_new_shadow(__pos, msg, ext, struct mei_msg_hdr*, sizeof(struct mei_msg_hdr));
 		if (*header_ptr) {
 			callee_unmarshal_kernel__write__header__in(__pos, msg, ext, ctx, *header_ptr);
 		}
@@ -956,7 +957,7 @@ void write_callee(struct fipc_message* msg, struct ext_registers* ext)
 	}
 
 	{
-		*buf_ptr = glue_unpack(__pos, msg, ext, unsigned char*);
+		*buf_ptr = glue_unpack_new_shadow(__pos, msg, ext, unsigned char*, (header->length));
 		if (*buf_ptr) {
 			**buf_ptr = glue_unpack(__pos, msg, ext, unsigned char);
 		}
@@ -1117,15 +1118,15 @@ void read_callee(struct fipc_message* msg, struct ext_registers* ext)
 	}
 
 	{
-		*buffer_ptr = glue_unpack(__pos, msg, ext, unsigned char*);
+		*buffer_length_ptr = glue_unpack(__pos, msg, ext, unsigned long);
+	}
+
+	{
+		*buffer_ptr = glue_unpack_new_shadow(__pos, msg, ext, unsigned char*, (buffer_length));
 		if (*buffer_ptr) {
 			**buffer_ptr = glue_unpack(__pos, msg, ext, unsigned char);
 		}
 
-	}
-
-	{
-		*buffer_length_ptr = glue_unpack(__pos, msg, ext, unsigned long);
 	}
 
 	ret = function_ptr(dev, buffer, buffer_length);
@@ -2154,7 +2155,7 @@ int mei_hbm_pg(struct mei_device* dev, unsigned char pg_cmd)
 	return ret;
 }
 
-void mei_device_init(struct mei_device* dev, struct device* device, struct mei_hw_ops const* ops)
+void lvd_mei_device_init(struct mei_device* dev, struct pci_dev* pdev, struct mei_hw_ops const* ops)
 {
 	struct fipc_message __buffer = {0};
 	struct fipc_message *msg = &__buffer;
@@ -2163,11 +2164,11 @@ void mei_device_init(struct mei_device* dev, struct device* device, struct mei_h
 	size_t* __pos = &n_pos;
 
 	struct mei_device** dev_ptr = &dev;
-	struct device** device_ptr = &device;
+	struct pci_dev** pdev_ptr = &pdev;
 	struct mei_hw_ops const** ops_ptr = &ops;
 	
-	__maybe_unused const struct mei_device_init_call_ctx call_ctx = {dev, device, ops};
-	__maybe_unused const struct mei_device_init_call_ctx *ctx = &call_ctx;
+	__maybe_unused const struct lvd_mei_device_init_call_ctx call_ctx = {dev, pdev, ops};
+	__maybe_unused const struct lvd_mei_device_init_call_ctx *ctx = &call_ctx;
 
 	(void)ext;
 
@@ -2178,15 +2179,15 @@ void mei_device_init(struct mei_device* dev, struct device* device, struct mei_h
 	{
 		glue_pack(__pos, msg, ext, *dev_ptr);
 		if (*dev_ptr) {
-			caller_marshal_kernel__mei_device_init__dev__in(__pos, msg, ext, ctx, *dev_ptr);
+			caller_marshal_kernel__lvd_mei_device_init__dev__in(__pos, msg, ext, ctx, *dev_ptr);
 		}
 
 	}
 
 	{
-		glue_pack_shadow(__pos, msg, ext, *device_ptr);
-		if (*device_ptr) {
-			caller_marshal_kernel__mei_device_init__device__in(__pos, msg, ext, ctx, *device_ptr);
+		glue_pack_shadow(__pos, msg, ext, *pdev_ptr);
+		if (*pdev_ptr) {
+			caller_marshal_kernel__lvd_mei_device_init__pci_dev__in(__pos, msg, ext, ctx, *pdev_ptr);
 		}
 
 	}
@@ -2199,19 +2200,19 @@ void mei_device_init(struct mei_device* dev, struct device* device, struct mei_h
 
 	}
 
-	glue_call_server(__pos, msg, RPC_ID_mei_device_init);
+	glue_call_server(__pos, msg, RPC_ID_lvd_mei_device_init);
 
 	*__pos = 0;
 	{
 		if (*dev_ptr) {
-			caller_unmarshal_kernel__mei_device_init__dev__in(__pos, msg, ext, ctx, *dev_ptr);
+			caller_unmarshal_kernel__lvd_mei_device_init__dev__in(__pos, msg, ext, ctx, *dev_ptr);
 		}
 
 	}
 
 	{
-		if (*device_ptr) {
-			caller_unmarshal_kernel__mei_device_init__device__in(__pos, msg, ext, ctx, *device_ptr);
+		if (*pdev_ptr) {
+			caller_unmarshal_kernel__lvd_mei_device_init__pci_dev__in(__pos, msg, ext, ctx, *pdev_ptr);
 		}
 
 	}
@@ -2415,7 +2416,7 @@ void pci_unregister_driver(struct pci_driver* drv)
 	}
 
 	{
-		glue_pack_shadow(__pos, msg, ext, *drv_ptr);
+		glue_pack(__pos, msg, ext, *drv_ptr);
 		if (*drv_ptr) {
 			caller_marshal_kernel__pci_unregister_driver__drv__in(__pos, msg, ext, ctx, *drv_ptr);
 		}
@@ -2469,7 +2470,7 @@ int __pci_register_driver(struct pci_driver* drv, struct module* owner, char con
 	}
 
 	{
-		glue_pack_shadow(__pos, msg, ext, *owner_ptr);
+		glue_pack(__pos, msg, ext, *owner_ptr);
 		if (*owner_ptr) {
 			caller_marshal_kernel____pci_register_driver__owner__in(__pos, msg, ext, ctx, *owner_ptr);
 		}
@@ -2764,9 +2765,9 @@ int mei_irq_write_handler(struct mei_device* dev, struct mei_cl_cb* cmpl_list)
 	}
 
 	{
-		glue_pack_shadow(__pos, msg, ext, *cmpl_list_ptr);
+		glue_pack(__pos, msg, ext, *cmpl_list_ptr);
 		if (*cmpl_list_ptr) {
-			caller_marshal_kernel__mei_irq_write_handler__cmpl_list__in(__pos, msg, ext, ctx, *cmpl_list_ptr);
+			caller_marshal_kernel__mei_irq_write_handler__cmpl_list__out(__pos, msg, ext, ctx, *cmpl_list_ptr);
 		}
 
 	}
@@ -2783,7 +2784,7 @@ int mei_irq_write_handler(struct mei_device* dev, struct mei_cl_cb* cmpl_list)
 
 	{
 		if (*cmpl_list_ptr) {
-			caller_unmarshal_kernel__mei_irq_write_handler__cmpl_list__in(__pos, msg, ext, ctx, *cmpl_list_ptr);
+			caller_unmarshal_kernel__mei_irq_write_handler__cmpl_list__out(__pos, msg, ext, ctx, *cmpl_list_ptr);
 		}
 
 	}
@@ -2830,9 +2831,9 @@ int mei_irq_read_handler(struct mei_device* dev, struct mei_cl_cb* cmpl_list, in
 	}
 
 	{
-		glue_pack_shadow(__pos, msg, ext, *cmpl_list_ptr);
+		glue_pack(__pos, msg, ext, *cmpl_list_ptr);
 		if (*cmpl_list_ptr) {
-			caller_marshal_kernel__mei_irq_read_handler__cmpl_list__in(__pos, msg, ext, ctx, *cmpl_list_ptr);
+			caller_marshal_kernel__mei_irq_read_handler__cmpl_list__out(__pos, msg, ext, ctx, *cmpl_list_ptr);
 		}
 
 	}
@@ -2857,7 +2858,7 @@ int mei_irq_read_handler(struct mei_device* dev, struct mei_cl_cb* cmpl_list, in
 
 	{
 		if (*cmpl_list_ptr) {
-			caller_unmarshal_kernel__mei_irq_read_handler__cmpl_list__in(__pos, msg, ext, ctx, *cmpl_list_ptr);
+			caller_unmarshal_kernel__mei_irq_read_handler__cmpl_list__out(__pos, msg, ext, ctx, *cmpl_list_ptr);
 		}
 
 	}
@@ -2908,9 +2909,9 @@ void mei_irq_compl_handler(struct mei_device* dev, struct mei_cl_cb* compl_list)
 	}
 
 	{
-		glue_pack_shadow(__pos, msg, ext, *compl_list_ptr);
+		glue_pack(__pos, msg, ext, *compl_list_ptr);
 		if (*compl_list_ptr) {
-			caller_marshal_kernel__mei_irq_compl_handler__compl_list__in(__pos, msg, ext, ctx, *compl_list_ptr);
+			caller_marshal_kernel__mei_irq_compl_handler__compl_list__out(__pos, msg, ext, ctx, *compl_list_ptr);
 		}
 
 	}
@@ -2927,7 +2928,7 @@ void mei_irq_compl_handler(struct mei_device* dev, struct mei_cl_cb* compl_list)
 
 	{
 		if (*compl_list_ptr) {
-			caller_unmarshal_kernel__mei_irq_compl_handler__compl_list__in(__pos, msg, ext, ctx, *compl_list_ptr);
+			caller_unmarshal_kernel__mei_irq_compl_handler__compl_list__out(__pos, msg, ext, ctx, *compl_list_ptr);
 		}
 
 	}
@@ -2988,7 +2989,6 @@ int mei_register(struct mei_device* dev, struct device* parent)
 	size_t* __pos = &n_pos;
 
 	struct mei_device** dev_ptr = &dev;
-	struct device** parent_ptr = &parent;
 	int ret = 0;
 	int* ret_ptr = &ret;
 	
@@ -3009,27 +3009,12 @@ int mei_register(struct mei_device* dev, struct device* parent)
 
 	}
 
-	{
-		glue_pack_shadow(__pos, msg, ext, *parent_ptr);
-		if (*parent_ptr) {
-			caller_marshal_kernel__mei_register__parent__in(__pos, msg, ext, ctx, *parent_ptr);
-		}
-
-	}
-
 	glue_call_server(__pos, msg, RPC_ID_mei_register);
 
 	*__pos = 0;
 	{
 		if (*dev_ptr) {
 			caller_unmarshal_kernel__mei_register__dev__in(__pos, msg, ext, ctx, *dev_ptr);
-		}
-
-	}
-
-	{
-		if (*parent_ptr) {
-			caller_unmarshal_kernel__mei_register__parent__in(__pos, msg, ext, ctx, *parent_ptr);
 		}
 
 	}

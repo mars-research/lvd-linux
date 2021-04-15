@@ -190,7 +190,7 @@ enum RPC_ID {
 	RPC_ID_queue_delayed_work_on,
 	RPC_ID_mei_hbm_pg_resume,
 	RPC_ID_mei_hbm_pg,
-	RPC_ID_mei_device_init,
+	RPC_ID_lvd_mei_device_init,
 	RPC_ID_mei_stop,
 	RPC_ID_mei_start,
 	RPC_ID_pci_iomap,
@@ -547,9 +547,9 @@ struct mei_hbm_pg_call_ctx {
 	unsigned char pg_cmd;
 };
 
-struct mei_device_init_call_ctx {
+struct lvd_mei_device_init_call_ctx {
 	struct mei_device* dev;
-	struct device* device;
+	struct pci_dev* pdev;
 	struct mei_hw_ops const* ops;
 };
 
@@ -646,6 +646,34 @@ void caller_unmarshal_kernel__probe__pdev__in(
 	const struct ext_registers* ext,
 	struct probe_call_ctx const* call_ctx,
 	struct pci_dev* ptr);
+
+void caller_marshal_kernel__probe__pci_bus__in(
+	size_t* __pos,
+	struct fipc_message* msg,
+	struct ext_registers* ext,
+	struct probe_call_ctx const* call_ctx,
+	struct pci_bus const* ptr);
+
+void callee_unmarshal_kernel__probe__pci_bus__in(
+	size_t* __pos,
+	const struct fipc_message* msg,
+	const struct ext_registers* ext,
+	struct probe_call_ctx const* call_ctx,
+	struct pci_bus* ptr);
+
+void callee_marshal_kernel__probe__pci_bus__in(
+	size_t* __pos,
+	struct fipc_message* msg,
+	struct ext_registers* ext,
+	struct probe_call_ctx const* call_ctx,
+	struct pci_bus const* ptr);
+
+void caller_unmarshal_kernel__probe__pci_bus__in(
+	size_t* __pos,
+	const struct fipc_message* msg,
+	const struct ext_registers* ext,
+	struct probe_call_ctx const* call_ctx,
+	struct pci_bus* ptr);
 
 void caller_marshal_kernel__probe__ent__in(
 	size_t* __pos,
@@ -1795,145 +1823,257 @@ void caller_unmarshal_kernel__mei_hbm_pg__dev__in(
 	struct mei_hbm_pg_call_ctx const* call_ctx,
 	struct mei_device* ptr);
 
-void caller_marshal_kernel__mei_device_init__dev__in(
+void caller_marshal_kernel__lvd_mei_device_init__dev__in(
 	size_t* __pos,
 	struct fipc_message* msg,
 	struct ext_registers* ext,
-	struct mei_device_init_call_ctx const* call_ctx,
+	struct lvd_mei_device_init_call_ctx const* call_ctx,
 	struct mei_device const* ptr);
 
-void callee_unmarshal_kernel__mei_device_init__dev__in(
+void callee_unmarshal_kernel__lvd_mei_device_init__dev__in(
 	size_t* __pos,
 	const struct fipc_message* msg,
 	const struct ext_registers* ext,
-	struct mei_device_init_call_ctx const* call_ctx,
+	struct lvd_mei_device_init_call_ctx const* call_ctx,
 	struct mei_device* ptr);
 
-void callee_marshal_kernel__mei_device_init__dev__in(
+void callee_marshal_kernel__lvd_mei_device_init__dev__in(
 	size_t* __pos,
 	struct fipc_message* msg,
 	struct ext_registers* ext,
-	struct mei_device_init_call_ctx const* call_ctx,
+	struct lvd_mei_device_init_call_ctx const* call_ctx,
 	struct mei_device const* ptr);
 
-void caller_unmarshal_kernel__mei_device_init__dev__in(
+void caller_unmarshal_kernel__lvd_mei_device_init__dev__in(
 	size_t* __pos,
 	const struct fipc_message* msg,
 	const struct ext_registers* ext,
-	struct mei_device_init_call_ctx const* call_ctx,
+	struct lvd_mei_device_init_call_ctx const* call_ctx,
 	struct mei_device* ptr);
 
-void caller_marshal_kernel__mei_device_init__delayed_work__in(
+void caller_marshal_kernel__lvd_mei_device_init__dev__out(
 	size_t* __pos,
 	struct fipc_message* msg,
 	struct ext_registers* ext,
-	struct mei_device_init_call_ctx const* call_ctx,
+	struct lvd_mei_device_init_call_ctx const* call_ctx,
+	struct mei_device const* ptr);
+
+void callee_unmarshal_kernel__lvd_mei_device_init__dev__out(
+	size_t* __pos,
+	const struct fipc_message* msg,
+	const struct ext_registers* ext,
+	struct lvd_mei_device_init_call_ctx const* call_ctx,
+	struct mei_device* ptr);
+
+void callee_marshal_kernel__lvd_mei_device_init__dev__out(
+	size_t* __pos,
+	struct fipc_message* msg,
+	struct ext_registers* ext,
+	struct lvd_mei_device_init_call_ctx const* call_ctx,
+	struct mei_device const* ptr);
+
+void caller_unmarshal_kernel__lvd_mei_device_init__dev__out(
+	size_t* __pos,
+	const struct fipc_message* msg,
+	const struct ext_registers* ext,
+	struct lvd_mei_device_init_call_ctx const* call_ctx,
+	struct mei_device* ptr);
+
+void caller_marshal_kernel__lvd_mei_device_init__delayed_work__out(
+	size_t* __pos,
+	struct fipc_message* msg,
+	struct ext_registers* ext,
+	struct lvd_mei_device_init_call_ctx const* call_ctx,
 	struct delayed_work const* ptr);
 
-void callee_unmarshal_kernel__mei_device_init__delayed_work__in(
+void callee_unmarshal_kernel__lvd_mei_device_init__delayed_work__out(
 	size_t* __pos,
 	const struct fipc_message* msg,
 	const struct ext_registers* ext,
-	struct mei_device_init_call_ctx const* call_ctx,
+	struct lvd_mei_device_init_call_ctx const* call_ctx,
 	struct delayed_work* ptr);
 
-void callee_marshal_kernel__mei_device_init__delayed_work__in(
+void callee_marshal_kernel__lvd_mei_device_init__delayed_work__out(
 	size_t* __pos,
 	struct fipc_message* msg,
 	struct ext_registers* ext,
-	struct mei_device_init_call_ctx const* call_ctx,
+	struct lvd_mei_device_init_call_ctx const* call_ctx,
 	struct delayed_work const* ptr);
 
-void caller_unmarshal_kernel__mei_device_init__delayed_work__in(
+void caller_unmarshal_kernel__lvd_mei_device_init__delayed_work__out(
 	size_t* __pos,
 	const struct fipc_message* msg,
 	const struct ext_registers* ext,
-	struct mei_device_init_call_ctx const* call_ctx,
+	struct lvd_mei_device_init_call_ctx const* call_ctx,
 	struct delayed_work* ptr);
 
-void caller_marshal_kernel__mei_device_init__work_struct__in(
+void caller_marshal_kernel__lvd_mei_device_init__work_struct__out(
 	size_t* __pos,
 	struct fipc_message* msg,
 	struct ext_registers* ext,
-	struct mei_device_init_call_ctx const* call_ctx,
+	struct lvd_mei_device_init_call_ctx const* call_ctx,
 	struct work_struct const* ptr);
 
-void callee_unmarshal_kernel__mei_device_init__work_struct__in(
+void callee_unmarshal_kernel__lvd_mei_device_init__work_struct__out(
 	size_t* __pos,
 	const struct fipc_message* msg,
 	const struct ext_registers* ext,
-	struct mei_device_init_call_ctx const* call_ctx,
+	struct lvd_mei_device_init_call_ctx const* call_ctx,
 	struct work_struct* ptr);
 
-void callee_marshal_kernel__mei_device_init__work_struct__in(
+void callee_marshal_kernel__lvd_mei_device_init__work_struct__out(
 	size_t* __pos,
 	struct fipc_message* msg,
 	struct ext_registers* ext,
-	struct mei_device_init_call_ctx const* call_ctx,
+	struct lvd_mei_device_init_call_ctx const* call_ctx,
 	struct work_struct const* ptr);
 
-void caller_unmarshal_kernel__mei_device_init__work_struct__in(
+void caller_unmarshal_kernel__lvd_mei_device_init__work_struct__out(
 	size_t* __pos,
 	const struct fipc_message* msg,
 	const struct ext_registers* ext,
-	struct mei_device_init_call_ctx const* call_ctx,
+	struct lvd_mei_device_init_call_ctx const* call_ctx,
 	struct work_struct* ptr);
 
-void caller_marshal_kernel__mei_device_init__timer_list__in(
+void caller_marshal_kernel__lvd_mei_device_init__timer_list__out(
 	size_t* __pos,
 	struct fipc_message* msg,
 	struct ext_registers* ext,
-	struct mei_device_init_call_ctx const* call_ctx,
+	struct lvd_mei_device_init_call_ctx const* call_ctx,
 	struct timer_list const* ptr);
 
-void callee_unmarshal_kernel__mei_device_init__timer_list__in(
+void callee_unmarshal_kernel__lvd_mei_device_init__timer_list__out(
 	size_t* __pos,
 	const struct fipc_message* msg,
 	const struct ext_registers* ext,
-	struct mei_device_init_call_ctx const* call_ctx,
+	struct lvd_mei_device_init_call_ctx const* call_ctx,
 	struct timer_list* ptr);
 
-void callee_marshal_kernel__mei_device_init__timer_list__in(
+void callee_marshal_kernel__lvd_mei_device_init__timer_list__out(
 	size_t* __pos,
 	struct fipc_message* msg,
 	struct ext_registers* ext,
-	struct mei_device_init_call_ctx const* call_ctx,
+	struct lvd_mei_device_init_call_ctx const* call_ctx,
 	struct timer_list const* ptr);
 
-void caller_unmarshal_kernel__mei_device_init__timer_list__in(
+void caller_unmarshal_kernel__lvd_mei_device_init__timer_list__out(
 	size_t* __pos,
 	const struct fipc_message* msg,
 	const struct ext_registers* ext,
-	struct mei_device_init_call_ctx const* call_ctx,
+	struct lvd_mei_device_init_call_ctx const* call_ctx,
 	struct timer_list* ptr);
 
-void caller_marshal_kernel__mei_device_init__device__in(
+void caller_marshal_kernel__lvd_mei_device_init__delayed_work__in(
 	size_t* __pos,
 	struct fipc_message* msg,
 	struct ext_registers* ext,
-	struct mei_device_init_call_ctx const* call_ctx,
-	struct device const* ptr);
+	struct lvd_mei_device_init_call_ctx const* call_ctx,
+	struct delayed_work const* ptr);
 
-void callee_unmarshal_kernel__mei_device_init__device__in(
+void callee_unmarshal_kernel__lvd_mei_device_init__delayed_work__in(
 	size_t* __pos,
 	const struct fipc_message* msg,
 	const struct ext_registers* ext,
-	struct mei_device_init_call_ctx const* call_ctx,
-	struct device* ptr);
+	struct lvd_mei_device_init_call_ctx const* call_ctx,
+	struct delayed_work* ptr);
 
-void callee_marshal_kernel__mei_device_init__device__in(
+void callee_marshal_kernel__lvd_mei_device_init__delayed_work__in(
 	size_t* __pos,
 	struct fipc_message* msg,
 	struct ext_registers* ext,
-	struct mei_device_init_call_ctx const* call_ctx,
-	struct device const* ptr);
+	struct lvd_mei_device_init_call_ctx const* call_ctx,
+	struct delayed_work const* ptr);
 
-void caller_unmarshal_kernel__mei_device_init__device__in(
+void caller_unmarshal_kernel__lvd_mei_device_init__delayed_work__in(
 	size_t* __pos,
 	const struct fipc_message* msg,
 	const struct ext_registers* ext,
-	struct mei_device_init_call_ctx const* call_ctx,
-	struct device* ptr);
+	struct lvd_mei_device_init_call_ctx const* call_ctx,
+	struct delayed_work* ptr);
+
+void caller_marshal_kernel__lvd_mei_device_init__work_struct__in(
+	size_t* __pos,
+	struct fipc_message* msg,
+	struct ext_registers* ext,
+	struct lvd_mei_device_init_call_ctx const* call_ctx,
+	struct work_struct const* ptr);
+
+void callee_unmarshal_kernel__lvd_mei_device_init__work_struct__in(
+	size_t* __pos,
+	const struct fipc_message* msg,
+	const struct ext_registers* ext,
+	struct lvd_mei_device_init_call_ctx const* call_ctx,
+	struct work_struct* ptr);
+
+void callee_marshal_kernel__lvd_mei_device_init__work_struct__in(
+	size_t* __pos,
+	struct fipc_message* msg,
+	struct ext_registers* ext,
+	struct lvd_mei_device_init_call_ctx const* call_ctx,
+	struct work_struct const* ptr);
+
+void caller_unmarshal_kernel__lvd_mei_device_init__work_struct__in(
+	size_t* __pos,
+	const struct fipc_message* msg,
+	const struct ext_registers* ext,
+	struct lvd_mei_device_init_call_ctx const* call_ctx,
+	struct work_struct* ptr);
+
+void caller_marshal_kernel__lvd_mei_device_init__timer_list__in(
+	size_t* __pos,
+	struct fipc_message* msg,
+	struct ext_registers* ext,
+	struct lvd_mei_device_init_call_ctx const* call_ctx,
+	struct timer_list const* ptr);
+
+void callee_unmarshal_kernel__lvd_mei_device_init__timer_list__in(
+	size_t* __pos,
+	const struct fipc_message* msg,
+	const struct ext_registers* ext,
+	struct lvd_mei_device_init_call_ctx const* call_ctx,
+	struct timer_list* ptr);
+
+void callee_marshal_kernel__lvd_mei_device_init__timer_list__in(
+	size_t* __pos,
+	struct fipc_message* msg,
+	struct ext_registers* ext,
+	struct lvd_mei_device_init_call_ctx const* call_ctx,
+	struct timer_list const* ptr);
+
+void caller_unmarshal_kernel__lvd_mei_device_init__timer_list__in(
+	size_t* __pos,
+	const struct fipc_message* msg,
+	const struct ext_registers* ext,
+	struct lvd_mei_device_init_call_ctx const* call_ctx,
+	struct timer_list* ptr);
+
+void caller_marshal_kernel__lvd_mei_device_init__pci_dev__in(
+	size_t* __pos,
+	struct fipc_message* msg,
+	struct ext_registers* ext,
+	struct lvd_mei_device_init_call_ctx const* call_ctx,
+	struct pci_dev const* ptr);
+
+void callee_unmarshal_kernel__lvd_mei_device_init__pci_dev__in(
+	size_t* __pos,
+	const struct fipc_message* msg,
+	const struct ext_registers* ext,
+	struct lvd_mei_device_init_call_ctx const* call_ctx,
+	struct pci_dev* ptr);
+
+void callee_marshal_kernel__lvd_mei_device_init__pci_dev__in(
+	size_t* __pos,
+	struct fipc_message* msg,
+	struct ext_registers* ext,
+	struct lvd_mei_device_init_call_ctx const* call_ctx,
+	struct pci_dev const* ptr);
+
+void caller_unmarshal_kernel__lvd_mei_device_init__pci_dev__in(
+	size_t* __pos,
+	const struct fipc_message* msg,
+	const struct ext_registers* ext,
+	struct lvd_mei_device_init_call_ctx const* call_ctx,
+	struct pci_dev* ptr);
 
 void caller_marshal_kernel___global_mei_hw_ops__in(
 	size_t* __pos,
@@ -2099,6 +2239,34 @@ void caller_unmarshal_kernel____pci_register_driver__drv__in(
 	struct __pci_register_driver_call_ctx const* call_ctx,
 	struct pci_driver* ptr);
 
+void caller_marshal_kernel____pci_register_driver__pci_device_id__in(
+	size_t* __pos,
+	struct fipc_message* msg,
+	struct ext_registers* ext,
+	struct __pci_register_driver_call_ctx const* call_ctx,
+	struct pci_device_id const* ptr);
+
+void callee_unmarshal_kernel____pci_register_driver__pci_device_id__in(
+	size_t* __pos,
+	const struct fipc_message* msg,
+	const struct ext_registers* ext,
+	struct __pci_register_driver_call_ctx const* call_ctx,
+	struct pci_device_id* ptr);
+
+void callee_marshal_kernel____pci_register_driver__pci_device_id__in(
+	size_t* __pos,
+	struct fipc_message* msg,
+	struct ext_registers* ext,
+	struct __pci_register_driver_call_ctx const* call_ctx,
+	struct pci_device_id const* ptr);
+
+void caller_unmarshal_kernel____pci_register_driver__pci_device_id__in(
+	size_t* __pos,
+	const struct fipc_message* msg,
+	const struct ext_registers* ext,
+	struct __pci_register_driver_call_ctx const* call_ctx,
+	struct pci_device_id* ptr);
+
 void caller_marshal_kernel____pci_register_driver__owner__in(
 	size_t* __pos,
 	struct fipc_message* msg,
@@ -2211,34 +2379,6 @@ void caller_unmarshal_kernel__pci_dev_run_wake__dev__in(
 	struct pci_dev_run_wake_call_ctx const* call_ctx,
 	struct pci_dev* ptr);
 
-void caller_marshal_kernel__pci_dev_run_wake__bus__in(
-	size_t* __pos,
-	struct fipc_message* msg,
-	struct ext_registers* ext,
-	struct pci_dev_run_wake_call_ctx const* call_ctx,
-	struct pci_bus const* ptr);
-
-void callee_unmarshal_kernel__pci_dev_run_wake__bus__in(
-	size_t* __pos,
-	const struct fipc_message* msg,
-	const struct ext_registers* ext,
-	struct pci_dev_run_wake_call_ctx const* call_ctx,
-	struct pci_bus* ptr);
-
-void callee_marshal_kernel__pci_dev_run_wake__bus__in(
-	size_t* __pos,
-	struct fipc_message* msg,
-	struct ext_registers* ext,
-	struct pci_dev_run_wake_call_ctx const* call_ctx,
-	struct pci_bus const* ptr);
-
-void caller_unmarshal_kernel__pci_dev_run_wake__bus__in(
-	size_t* __pos,
-	const struct fipc_message* msg,
-	const struct ext_registers* ext,
-	struct pci_dev_run_wake_call_ctx const* call_ctx,
-	struct pci_bus* ptr);
-
 void caller_marshal_kernel__pci_enable_device__dev__in(
 	size_t* __pos,
 	struct fipc_message* msg,
@@ -2295,33 +2435,61 @@ void caller_unmarshal_kernel__mei_irq_write_handler__dev__in(
 	struct mei_irq_write_handler_call_ctx const* call_ctx,
 	struct mei_device* ptr);
 
-void caller_marshal_kernel__mei_irq_write_handler__cmpl_list__in(
+void caller_marshal_kernel__mei_irq_write_handler__cmpl_list__out(
 	size_t* __pos,
 	struct fipc_message* msg,
 	struct ext_registers* ext,
 	struct mei_irq_write_handler_call_ctx const* call_ctx,
 	struct mei_cl_cb const* ptr);
 
-void callee_unmarshal_kernel__mei_irq_write_handler__cmpl_list__in(
+void callee_unmarshal_kernel__mei_irq_write_handler__cmpl_list__out(
 	size_t* __pos,
 	const struct fipc_message* msg,
 	const struct ext_registers* ext,
 	struct mei_irq_write_handler_call_ctx const* call_ctx,
 	struct mei_cl_cb* ptr);
 
-void callee_marshal_kernel__mei_irq_write_handler__cmpl_list__in(
+void callee_marshal_kernel__mei_irq_write_handler__cmpl_list__out(
 	size_t* __pos,
 	struct fipc_message* msg,
 	struct ext_registers* ext,
 	struct mei_irq_write_handler_call_ctx const* call_ctx,
 	struct mei_cl_cb const* ptr);
 
-void caller_unmarshal_kernel__mei_irq_write_handler__cmpl_list__in(
+void caller_unmarshal_kernel__mei_irq_write_handler__cmpl_list__out(
 	size_t* __pos,
 	const struct fipc_message* msg,
 	const struct ext_registers* ext,
 	struct mei_irq_write_handler_call_ctx const* call_ctx,
 	struct mei_cl_cb* ptr);
+
+void caller_marshal_kernel__mei_irq_write_handler__list_head__out(
+	size_t* __pos,
+	struct fipc_message* msg,
+	struct ext_registers* ext,
+	struct mei_irq_write_handler_call_ctx const* call_ctx,
+	struct list_head const* ptr);
+
+void callee_unmarshal_kernel__mei_irq_write_handler__list_head__out(
+	size_t* __pos,
+	const struct fipc_message* msg,
+	const struct ext_registers* ext,
+	struct mei_irq_write_handler_call_ctx const* call_ctx,
+	struct list_head* ptr);
+
+void callee_marshal_kernel__mei_irq_write_handler__list_head__out(
+	size_t* __pos,
+	struct fipc_message* msg,
+	struct ext_registers* ext,
+	struct mei_irq_write_handler_call_ctx const* call_ctx,
+	struct list_head const* ptr);
+
+void caller_unmarshal_kernel__mei_irq_write_handler__list_head__out(
+	size_t* __pos,
+	const struct fipc_message* msg,
+	const struct ext_registers* ext,
+	struct mei_irq_write_handler_call_ctx const* call_ctx,
+	struct list_head* ptr);
 
 void caller_marshal_kernel__mei_irq_read_handler__dev__in(
 	size_t* __pos,
@@ -2351,33 +2519,61 @@ void caller_unmarshal_kernel__mei_irq_read_handler__dev__in(
 	struct mei_irq_read_handler_call_ctx const* call_ctx,
 	struct mei_device* ptr);
 
-void caller_marshal_kernel__mei_irq_read_handler__cmpl_list__in(
+void caller_marshal_kernel__mei_irq_read_handler__cmpl_list__out(
 	size_t* __pos,
 	struct fipc_message* msg,
 	struct ext_registers* ext,
 	struct mei_irq_read_handler_call_ctx const* call_ctx,
 	struct mei_cl_cb const* ptr);
 
-void callee_unmarshal_kernel__mei_irq_read_handler__cmpl_list__in(
+void callee_unmarshal_kernel__mei_irq_read_handler__cmpl_list__out(
 	size_t* __pos,
 	const struct fipc_message* msg,
 	const struct ext_registers* ext,
 	struct mei_irq_read_handler_call_ctx const* call_ctx,
 	struct mei_cl_cb* ptr);
 
-void callee_marshal_kernel__mei_irq_read_handler__cmpl_list__in(
+void callee_marshal_kernel__mei_irq_read_handler__cmpl_list__out(
 	size_t* __pos,
 	struct fipc_message* msg,
 	struct ext_registers* ext,
 	struct mei_irq_read_handler_call_ctx const* call_ctx,
 	struct mei_cl_cb const* ptr);
 
-void caller_unmarshal_kernel__mei_irq_read_handler__cmpl_list__in(
+void caller_unmarshal_kernel__mei_irq_read_handler__cmpl_list__out(
 	size_t* __pos,
 	const struct fipc_message* msg,
 	const struct ext_registers* ext,
 	struct mei_irq_read_handler_call_ctx const* call_ctx,
 	struct mei_cl_cb* ptr);
+
+void caller_marshal_kernel__mei_irq_read_handler__list_head__out(
+	size_t* __pos,
+	struct fipc_message* msg,
+	struct ext_registers* ext,
+	struct mei_irq_read_handler_call_ctx const* call_ctx,
+	struct list_head const* ptr);
+
+void callee_unmarshal_kernel__mei_irq_read_handler__list_head__out(
+	size_t* __pos,
+	const struct fipc_message* msg,
+	const struct ext_registers* ext,
+	struct mei_irq_read_handler_call_ctx const* call_ctx,
+	struct list_head* ptr);
+
+void callee_marshal_kernel__mei_irq_read_handler__list_head__out(
+	size_t* __pos,
+	struct fipc_message* msg,
+	struct ext_registers* ext,
+	struct mei_irq_read_handler_call_ctx const* call_ctx,
+	struct list_head const* ptr);
+
+void caller_unmarshal_kernel__mei_irq_read_handler__list_head__out(
+	size_t* __pos,
+	const struct fipc_message* msg,
+	const struct ext_registers* ext,
+	struct mei_irq_read_handler_call_ctx const* call_ctx,
+	struct list_head* ptr);
 
 void caller_marshal_kernel__mei_irq_compl_handler__dev__in(
 	size_t* __pos,
@@ -2407,84 +2603,56 @@ void caller_unmarshal_kernel__mei_irq_compl_handler__dev__in(
 	struct mei_irq_compl_handler_call_ctx const* call_ctx,
 	struct mei_device* ptr);
 
-void caller_marshal_kernel__mei_irq_compl_handler__compl_list__in(
+void caller_marshal_kernel__mei_irq_compl_handler__compl_list__out(
 	size_t* __pos,
 	struct fipc_message* msg,
 	struct ext_registers* ext,
 	struct mei_irq_compl_handler_call_ctx const* call_ctx,
 	struct mei_cl_cb const* ptr);
 
-void callee_unmarshal_kernel__mei_irq_compl_handler__compl_list__in(
+void callee_unmarshal_kernel__mei_irq_compl_handler__compl_list__out(
 	size_t* __pos,
 	const struct fipc_message* msg,
 	const struct ext_registers* ext,
 	struct mei_irq_compl_handler_call_ctx const* call_ctx,
 	struct mei_cl_cb* ptr);
 
-void callee_marshal_kernel__mei_irq_compl_handler__compl_list__in(
+void callee_marshal_kernel__mei_irq_compl_handler__compl_list__out(
 	size_t* __pos,
 	struct fipc_message* msg,
 	struct ext_registers* ext,
 	struct mei_irq_compl_handler_call_ctx const* call_ctx,
 	struct mei_cl_cb const* ptr);
 
-void caller_unmarshal_kernel__mei_irq_compl_handler__compl_list__in(
+void caller_unmarshal_kernel__mei_irq_compl_handler__compl_list__out(
 	size_t* __pos,
 	const struct fipc_message* msg,
 	const struct ext_registers* ext,
 	struct mei_irq_compl_handler_call_ctx const* call_ctx,
 	struct mei_cl_cb* ptr);
 
-void caller_marshal_kernel__mei_irq_compl_handler__list_head__in(
+void caller_marshal_kernel__mei_irq_compl_handler__list_head__out(
 	size_t* __pos,
 	struct fipc_message* msg,
 	struct ext_registers* ext,
 	struct mei_irq_compl_handler_call_ctx const* call_ctx,
 	struct list_head const* ptr);
 
-void callee_unmarshal_kernel__mei_irq_compl_handler__list_head__in(
+void callee_unmarshal_kernel__mei_irq_compl_handler__list_head__out(
 	size_t* __pos,
 	const struct fipc_message* msg,
 	const struct ext_registers* ext,
 	struct mei_irq_compl_handler_call_ctx const* call_ctx,
 	struct list_head* ptr);
 
-void callee_marshal_kernel__mei_irq_compl_handler__list_head__in(
+void callee_marshal_kernel__mei_irq_compl_handler__list_head__out(
 	size_t* __pos,
 	struct fipc_message* msg,
 	struct ext_registers* ext,
 	struct mei_irq_compl_handler_call_ctx const* call_ctx,
 	struct list_head const* ptr);
 
-void caller_unmarshal_kernel__mei_irq_compl_handler__list_head__in(
-	size_t* __pos,
-	const struct fipc_message* msg,
-	const struct ext_registers* ext,
-	struct mei_irq_compl_handler_call_ctx const* call_ctx,
-	struct list_head* ptr);
-
-void caller_marshal_kernel__mei_irq_compl_handler__next__in(
-	size_t* __pos,
-	struct fipc_message* msg,
-	struct ext_registers* ext,
-	struct mei_irq_compl_handler_call_ctx const* call_ctx,
-	struct list_head const* ptr);
-
-void callee_unmarshal_kernel__mei_irq_compl_handler__next__in(
-	size_t* __pos,
-	const struct fipc_message* msg,
-	const struct ext_registers* ext,
-	struct mei_irq_compl_handler_call_ctx const* call_ctx,
-	struct list_head* ptr);
-
-void callee_marshal_kernel__mei_irq_compl_handler__next__in(
-	size_t* __pos,
-	struct fipc_message* msg,
-	struct ext_registers* ext,
-	struct mei_irq_compl_handler_call_ctx const* call_ctx,
-	struct list_head const* ptr);
-
-void caller_unmarshal_kernel__mei_irq_compl_handler__next__in(
+void caller_unmarshal_kernel__mei_irq_compl_handler__list_head__out(
 	size_t* __pos,
 	const struct fipc_message* msg,
 	const struct ext_registers* ext,

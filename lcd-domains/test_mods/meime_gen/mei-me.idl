@@ -94,7 +94,7 @@ module kernel {
 		projection < struct mei_device > dev {
 			projection dev* dev;
 			//projection hbm_version version;
-			unsigned int  hbm_f_pg_supported : 1;
+			unsigned int  hbm_f_pg_supported;// : 1;
 		}
 		projection < struct device > dev {
 		}
@@ -183,8 +183,8 @@ module kernel {
 
 	rpc int pci_enable_msi_range( projection dev * dev, int minvec, int maxvec ) {
 		projection < struct pci_dev > dev {
-			unsigned int [out] msi_enabled : 1;
-			unsigned int [out] msix_enabled : 1;
+			unsigned int [out] msi_enabled;// : 1;
+			unsigned int [out] msix_enabled;//: 1;
 		}
 	}
 
@@ -242,9 +242,8 @@ rpc long prepare_to_wait_event( projection q * q, projection wait * wait, int st
 	}
 
 	// FIXME: wq -> global system_wq
-	// dwork -> member_of(mei_device, timer_work)
 	rpc bool queue_delayed_work_on( int cpu, projection wq * wq,
-			projection dwork * dwork, long unsigned int delay ) {
+			projection dwork [bind_memberof<struct mei_device, timer_work>(callee)] * dwork, long unsigned int delay ) {
 		projection < struct workqueue_struct > wq {
 		}
 		projection < struct delayed_work > dwork {
@@ -269,10 +268,8 @@ rpc long prepare_to_wait_event( projection q * q, projection wait * wait, int st
 		}
 	}
 
-	// FIXME -> similar to container_of, we need member_of syntax
-	rpc void lvd_mei_device_init( projection dev [alloc<{{sizeof(struct mei_device) + sizeof(struct mei_me_hw)}}>(callee)] * dev,
-				//&member_of(projection pci_dev, dev), projection device * device,
-				projection pci_dev *pdev,
+	rpc void mei_device_init( projection dev [alloc<{{sizeof(struct mei_device) + sizeof(struct mei_me_hw)}}>(callee)] * dev,
+				projection device [bind_memberof<struct pci_dev, dev>(caller)] *device,
 				const projection _global_mei_hw_ops [alloc(callee)] * ops) {
 		
 		projection < struct delayed_work> delayed_work{

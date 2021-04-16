@@ -173,7 +173,8 @@ int pci_bus_read_config_dword(struct pci_bus* bus, unsigned int devfn, int pos, 
 	}
 
 	{
-		glue_pack_shadow(__pos, msg, ext, *bus_ptr);
+		const void* __adjusted = *bus_ptr;
+		glue_pack_shadow(__pos, msg, ext, __adjusted);
 		if (*bus_ptr) {
 			caller_marshal_kernel__pci_bus_read_config_dword__bus__in(__pos, msg, ext, ctx, *bus_ptr);
 		}
@@ -189,7 +190,8 @@ int pci_bus_read_config_dword(struct pci_bus* bus, unsigned int devfn, int pos, 
 	}
 
 	{
-		glue_pack(__pos, msg, ext, *value_ptr);
+		const void* __adjusted = *value_ptr;
+		glue_pack(__pos, msg, ext, __adjusted);
 		(void)value_ptr;
 	}
 
@@ -1176,7 +1178,8 @@ void pci_disable_device(struct pci_dev* dev)
 	}
 
 	{
-		glue_pack_shadow(__pos, msg, ext, *dev_ptr);
+		const void* __adjusted = *dev_ptr;
+		glue_pack_shadow(__pos, msg, ext, __adjusted);
 		if (*dev_ptr) {
 			caller_marshal_kernel__pci_disable_device__dev__in(__pos, msg, ext, ctx, *dev_ptr);
 		}
@@ -1218,7 +1221,8 @@ void pci_set_master(struct pci_dev* dev)
 	}
 
 	{
-		glue_pack_shadow(__pos, msg, ext, *dev_ptr);
+		const void* __adjusted = *dev_ptr;
+		glue_pack_shadow(__pos, msg, ext, __adjusted);
 		if (*dev_ptr) {
 			caller_marshal_kernel__pci_set_master__dev__in(__pos, msg, ext, ctx, *dev_ptr);
 		}
@@ -1260,7 +1264,8 @@ void pci_disable_msi(struct pci_dev* dev)
 	}
 
 	{
-		glue_pack_shadow(__pos, msg, ext, *dev_ptr);
+		const void* __adjusted = *dev_ptr;
+		glue_pack_shadow(__pos, msg, ext, __adjusted);
 		if (*dev_ptr) {
 			caller_marshal_kernel__pci_disable_msi__dev__in(__pos, msg, ext, ctx, *dev_ptr);
 		}
@@ -1306,7 +1311,8 @@ int pci_enable_msi_range(struct pci_dev* dev, int minvec, int maxvec)
 	}
 
 	{
-		glue_pack_shadow(__pos, msg, ext, *dev_ptr);
+		const void* __adjusted = *dev_ptr;
+		glue_pack_shadow(__pos, msg, ext, __adjusted);
 		if (*dev_ptr) {
 			caller_marshal_kernel__pci_enable_msi_range__dev__in(__pos, msg, ext, ctx, *dev_ptr);
 		}
@@ -1409,7 +1415,8 @@ void pci_iounmap(struct pci_dev* dev, void* addr)
 	}
 
 	{
-		glue_pack_shadow(__pos, msg, ext, *dev_ptr);
+		const void* __adjusted = *dev_ptr;
+		glue_pack_shadow(__pos, msg, ext, __adjusted);
 		if (*dev_ptr) {
 			caller_marshal_kernel__pci_iounmap__dev__in(__pos, msg, ext, ctx, *dev_ptr);
 		}
@@ -1417,7 +1424,8 @@ void pci_iounmap(struct pci_dev* dev, void* addr)
 	}
 
 	{
-		glue_pack_shadow(__pos, msg, ext, *addr_ptr);
+		const void* __adjusted = *addr_ptr;
+		glue_pack_shadow(__pos, msg, ext, __adjusted);
 		if (*addr_ptr) {
 		}
 
@@ -1504,7 +1512,8 @@ void finish_wait(struct __wait_queue_head* q, struct __wait_queue* wait)
 	}
 
 	{
-		glue_pack_shadow(__pos, msg, ext, *q_ptr);
+		const void* __adjusted = *q_ptr;
+		glue_pack_shadow(__pos, msg, ext, __adjusted);
 		if (*q_ptr) {
 			caller_marshal_kernel__finish_wait__q__in(__pos, msg, ext, ctx, *q_ptr);
 		}
@@ -1512,7 +1521,8 @@ void finish_wait(struct __wait_queue_head* q, struct __wait_queue* wait)
 	}
 
 	{
-		glue_pack_shadow(__pos, msg, ext, *wait_ptr);
+		const void* __adjusted = *wait_ptr;
+		glue_pack_shadow(__pos, msg, ext, __adjusted);
 		if (*wait_ptr) {
 			caller_marshal_kernel__finish_wait__wait__in(__pos, msg, ext, ctx, *wait_ptr);
 		}
@@ -1565,7 +1575,8 @@ long prepare_to_wait_event(struct __wait_queue_head* q, struct __wait_queue* wai
 	}
 
 	{
-		glue_pack_shadow(__pos, msg, ext, *q_ptr);
+		const void* __adjusted = *q_ptr;
+		glue_pack_shadow(__pos, msg, ext, __adjusted);
 		if (*q_ptr) {
 			caller_marshal_kernel__prepare_to_wait_event__q__in(__pos, msg, ext, ctx, *q_ptr);
 		}
@@ -1573,7 +1584,8 @@ long prepare_to_wait_event(struct __wait_queue_head* q, struct __wait_queue* wai
 	}
 
 	{
-		glue_pack_shadow(__pos, msg, ext, *wait_ptr);
+		const void* __adjusted = *wait_ptr;
+		glue_pack_shadow(__pos, msg, ext, __adjusted);
 		if (*wait_ptr) {
 			caller_marshal_kernel__prepare_to_wait_event__wait__in(__pos, msg, ext, ctx, *wait_ptr);
 		}
@@ -1759,7 +1771,8 @@ int request_threaded_irq(unsigned int irq, fptr_handler handler, fptr_thread_fn 
 	}
 
 	{
-		glue_pack(__pos, msg, ext, *devname_ptr);
+		const void* __adjusted = *devname_ptr;
+		glue_pack(__pos, msg, ext, __adjusted);
 		if (*devname_ptr) {
 			size_t i, len;
 			char const* array = *devname_ptr;
@@ -1775,7 +1788,8 @@ int request_threaded_irq(unsigned int irq, fptr_handler handler, fptr_thread_fn 
 	}
 
 	{
-		glue_pack_shadow(__pos, msg, ext, *dev_id_ptr);
+		const void* __adjusted = *dev_id_ptr;
+		glue_pack_shadow(__pos, msg, ext, __adjusted);
 		if (*dev_id_ptr) {
 		}
 
@@ -1839,7 +1853,8 @@ void free_irq(unsigned int irq, void* dev_id)
 	}
 
 	{
-		glue_pack_shadow(__pos, msg, ext, *dev_id_ptr);
+		const void* __adjusted = *dev_id_ptr;
+		glue_pack_shadow(__pos, msg, ext, __adjusted);
 		if (*dev_id_ptr) {
 		}
 
@@ -1888,7 +1903,8 @@ bool queue_work_on(int cpu, struct workqueue_struct* wq, struct work_struct* wor
 	}
 
 	{
-		glue_pack_shadow(__pos, msg, ext, *wq_ptr);
+		const void* __adjusted = *wq_ptr;
+		glue_pack_shadow(__pos, msg, ext, __adjusted);
 		if (*wq_ptr) {
 			caller_marshal_kernel__queue_work_on__wq__in(__pos, msg, ext, ctx, *wq_ptr);
 		}
@@ -1896,7 +1912,8 @@ bool queue_work_on(int cpu, struct workqueue_struct* wq, struct work_struct* wor
 	}
 
 	{
-		glue_pack_shadow(__pos, msg, ext, *work_ptr);
+		const void* __adjusted = *work_ptr;
+		glue_pack_shadow(__pos, msg, ext, __adjusted);
 		if (*work_ptr) {
 			caller_marshal_kernel__queue_work_on__work__in(__pos, msg, ext, ctx, *work_ptr);
 		}
@@ -1953,7 +1970,8 @@ void mei_cancel_work(struct mei_device* dev)
 	}
 
 	{
-		glue_pack(__pos, msg, ext, *dev_ptr);
+		const void* __adjusted = *dev_ptr;
+		glue_pack(__pos, msg, ext, __adjusted);
 		if (*dev_ptr) {
 			caller_marshal_kernel__mei_cancel_work__dev__in(__pos, msg, ext, ctx, *dev_ptr);
 		}
@@ -2004,7 +2022,8 @@ bool queue_delayed_work_on(int cpu, struct workqueue_struct* wq, struct delayed_
 	}
 
 	{
-		glue_pack_shadow(__pos, msg, ext, *wq_ptr);
+		const void* __adjusted = *wq_ptr;
+		glue_pack_shadow(__pos, msg, ext, __adjusted);
 		if (*wq_ptr) {
 			caller_marshal_kernel__queue_delayed_work_on__wq__in(__pos, msg, ext, ctx, *wq_ptr);
 		}
@@ -2012,7 +2031,8 @@ bool queue_delayed_work_on(int cpu, struct workqueue_struct* wq, struct delayed_
 	}
 
 	{
-		glue_pack_shadow(__pos, msg, ext, *dwork_ptr);
+		struct mei_device* __adjusted = container_of(*dwork_ptr, struct mei_device, timer_work);
+		glue_pack(__pos, msg, ext, __adjusted);
 		if (*dwork_ptr) {
 			caller_marshal_kernel__queue_delayed_work_on__dwork__in(__pos, msg, ext, ctx, *dwork_ptr);
 		}
@@ -2076,7 +2096,8 @@ void mei_hbm_pg_resume(struct mei_device* dev)
 	}
 
 	{
-		glue_pack(__pos, msg, ext, *dev_ptr);
+		const void* __adjusted = *dev_ptr;
+		glue_pack(__pos, msg, ext, __adjusted);
 		if (*dev_ptr) {
 			caller_marshal_kernel__mei_hbm_pg_resume__dev__in(__pos, msg, ext, ctx, *dev_ptr);
 		}
@@ -2121,7 +2142,8 @@ int mei_hbm_pg(struct mei_device* dev, unsigned char pg_cmd)
 	}
 
 	{
-		glue_pack(__pos, msg, ext, *dev_ptr);
+		const void* __adjusted = *dev_ptr;
+		glue_pack(__pos, msg, ext, __adjusted);
 		if (*dev_ptr) {
 			caller_marshal_kernel__mei_hbm_pg__dev__in(__pos, msg, ext, ctx, *dev_ptr);
 		}
@@ -2155,7 +2177,7 @@ int mei_hbm_pg(struct mei_device* dev, unsigned char pg_cmd)
 	return ret;
 }
 
-void lvd_mei_device_init(struct mei_device* dev, struct pci_dev* pdev, struct mei_hw_ops const* ops)
+void mei_device_init(struct mei_device* dev, struct device* device, struct mei_hw_ops const* ops)
 {
 	struct fipc_message __buffer = {0};
 	struct fipc_message *msg = &__buffer;
@@ -2164,11 +2186,11 @@ void lvd_mei_device_init(struct mei_device* dev, struct pci_dev* pdev, struct me
 	size_t* __pos = &n_pos;
 
 	struct mei_device** dev_ptr = &dev;
-	struct pci_dev** pdev_ptr = &pdev;
+	struct device** device_ptr = &device;
 	struct mei_hw_ops const** ops_ptr = &ops;
 	
-	__maybe_unused const struct lvd_mei_device_init_call_ctx call_ctx = {dev, pdev, ops};
-	__maybe_unused const struct lvd_mei_device_init_call_ctx *ctx = &call_ctx;
+	__maybe_unused const struct mei_device_init_call_ctx call_ctx = {dev, device, ops};
+	__maybe_unused const struct mei_device_init_call_ctx *ctx = &call_ctx;
 
 	(void)ext;
 
@@ -2177,42 +2199,45 @@ void lvd_mei_device_init(struct mei_device* dev, struct pci_dev* pdev, struct me
 	}
 
 	{
-		glue_pack(__pos, msg, ext, *dev_ptr);
+		const void* __adjusted = *dev_ptr;
+		glue_pack(__pos, msg, ext, __adjusted);
 		if (*dev_ptr) {
-			caller_marshal_kernel__lvd_mei_device_init__dev__in(__pos, msg, ext, ctx, *dev_ptr);
+			caller_marshal_kernel__mei_device_init__dev__in(__pos, msg, ext, ctx, *dev_ptr);
 		}
 
 	}
 
 	{
-		glue_pack_shadow(__pos, msg, ext, *pdev_ptr);
-		if (*pdev_ptr) {
-			caller_marshal_kernel__lvd_mei_device_init__pci_dev__in(__pos, msg, ext, ctx, *pdev_ptr);
+		struct pci_dev* __adjusted = container_of(*device_ptr, struct pci_dev, dev);
+		glue_pack_shadow(__pos, msg, ext, __adjusted);
+		if (*device_ptr) {
+			caller_marshal_kernel__mei_device_init__device__in(__pos, msg, ext, ctx, *device_ptr);
 		}
 
 	}
 
 	{
-		glue_pack(__pos, msg, ext, *ops_ptr);
+		const void* __adjusted = *ops_ptr;
+		glue_pack(__pos, msg, ext, __adjusted);
 		if (*ops_ptr) {
 			caller_marshal_kernel___global_mei_hw_ops__in(__pos, msg, ext, *ops_ptr);
 		}
 
 	}
 
-	glue_call_server(__pos, msg, RPC_ID_lvd_mei_device_init);
+	glue_call_server(__pos, msg, RPC_ID_mei_device_init);
 
 	*__pos = 0;
 	{
 		if (*dev_ptr) {
-			caller_unmarshal_kernel__lvd_mei_device_init__dev__in(__pos, msg, ext, ctx, *dev_ptr);
+			caller_unmarshal_kernel__mei_device_init__dev__in(__pos, msg, ext, ctx, *dev_ptr);
 		}
 
 	}
 
 	{
-		if (*pdev_ptr) {
-			caller_unmarshal_kernel__lvd_mei_device_init__pci_dev__in(__pos, msg, ext, ctx, *pdev_ptr);
+		if (*device_ptr) {
+			caller_unmarshal_kernel__mei_device_init__device__in(__pos, msg, ext, ctx, *device_ptr);
 		}
 
 	}
@@ -2250,7 +2275,8 @@ void mei_stop(struct mei_device* dev)
 	}
 
 	{
-		glue_pack(__pos, msg, ext, *dev_ptr);
+		const void* __adjusted = *dev_ptr;
+		glue_pack(__pos, msg, ext, __adjusted);
 		if (*dev_ptr) {
 			caller_marshal_kernel__mei_stop__dev__in(__pos, msg, ext, ctx, *dev_ptr);
 		}
@@ -2294,7 +2320,8 @@ int mei_start(struct mei_device* dev)
 	}
 
 	{
-		glue_pack(__pos, msg, ext, *dev_ptr);
+		const void* __adjusted = *dev_ptr;
+		glue_pack(__pos, msg, ext, __adjusted);
 		if (*dev_ptr) {
 			caller_marshal_kernel__mei_start__dev__in(__pos, msg, ext, ctx, *dev_ptr);
 		}
@@ -2353,7 +2380,8 @@ void* pci_iomap(struct pci_dev* pdev, int bar, unsigned long maxlen)
 	}
 
 	{
-		glue_pack_shadow(__pos, msg, ext, *pdev_ptr);
+		const void* __adjusted = *pdev_ptr;
+		glue_pack_shadow(__pos, msg, ext, __adjusted);
 		if (*pdev_ptr) {
 			caller_marshal_kernel__pci_iomap__dev__in(__pos, msg, ext, ctx, *pdev_ptr);
 		}
@@ -2416,7 +2444,8 @@ void pci_unregister_driver(struct pci_driver* drv)
 	}
 
 	{
-		glue_pack(__pos, msg, ext, *drv_ptr);
+		const void* __adjusted = *drv_ptr;
+		glue_pack(__pos, msg, ext, __adjusted);
 		if (*drv_ptr) {
 			caller_marshal_kernel__pci_unregister_driver__drv__in(__pos, msg, ext, ctx, *drv_ptr);
 		}
@@ -2462,7 +2491,8 @@ int __pci_register_driver(struct pci_driver* drv, struct module* owner, char con
 	}
 
 	{
-		glue_pack(__pos, msg, ext, *drv_ptr);
+		const void* __adjusted = *drv_ptr;
+		glue_pack(__pos, msg, ext, __adjusted);
 		if (*drv_ptr) {
 			caller_marshal_kernel____pci_register_driver__drv__in(__pos, msg, ext, ctx, *drv_ptr);
 		}
@@ -2470,7 +2500,8 @@ int __pci_register_driver(struct pci_driver* drv, struct module* owner, char con
 	}
 
 	{
-		glue_pack(__pos, msg, ext, *owner_ptr);
+		const void* __adjusted = *owner_ptr;
+		glue_pack(__pos, msg, ext, __adjusted);
 		if (*owner_ptr) {
 			caller_marshal_kernel____pci_register_driver__owner__in(__pos, msg, ext, ctx, *owner_ptr);
 		}
@@ -2478,7 +2509,8 @@ int __pci_register_driver(struct pci_driver* drv, struct module* owner, char con
 	}
 
 	{
-		glue_pack(__pos, msg, ext, *mod_name_ptr);
+		const void* __adjusted = *mod_name_ptr;
+		glue_pack(__pos, msg, ext, __adjusted);
 		if (*mod_name_ptr) {
 			size_t i, len;
 			char const* array = *mod_name_ptr;
@@ -2547,7 +2579,8 @@ int pci_request_regions(struct pci_dev* pdev, char const* res_name)
 	}
 
 	{
-		glue_pack_shadow(__pos, msg, ext, *pdev_ptr);
+		const void* __adjusted = *pdev_ptr;
+		glue_pack_shadow(__pos, msg, ext, __adjusted);
 		if (*pdev_ptr) {
 			caller_marshal_kernel__pci_request_regions__pdev__in(__pos, msg, ext, ctx, *pdev_ptr);
 		}
@@ -2555,7 +2588,8 @@ int pci_request_regions(struct pci_dev* pdev, char const* res_name)
 	}
 
 	{
-		glue_pack(__pos, msg, ext, *res_name_ptr);
+		const void* __adjusted = *res_name_ptr;
+		glue_pack(__pos, msg, ext, __adjusted);
 		if (*res_name_ptr) {
 			size_t i, len;
 			char const* array = *res_name_ptr;
@@ -2614,7 +2648,8 @@ void pci_release_regions(struct pci_dev* pdev)
 	}
 
 	{
-		glue_pack_shadow(__pos, msg, ext, *pdev_ptr);
+		const void* __adjusted = *pdev_ptr;
+		glue_pack_shadow(__pos, msg, ext, __adjusted);
 		if (*pdev_ptr) {
 			caller_marshal_kernel__pci_release_regions__pdev__in(__pos, msg, ext, ctx, *pdev_ptr);
 		}
@@ -2658,7 +2693,8 @@ bool pci_dev_run_wake(struct pci_dev* dev)
 	}
 
 	{
-		glue_pack_shadow(__pos, msg, ext, *dev_ptr);
+		const void* __adjusted = *dev_ptr;
+		glue_pack_shadow(__pos, msg, ext, __adjusted);
 		if (*dev_ptr) {
 			caller_marshal_kernel__pci_dev_run_wake__dev__in(__pos, msg, ext, ctx, *dev_ptr);
 		}
@@ -2707,7 +2743,8 @@ int pci_enable_device(struct pci_dev* dev)
 	}
 
 	{
-		glue_pack_shadow(__pos, msg, ext, *dev_ptr);
+		const void* __adjusted = *dev_ptr;
+		glue_pack_shadow(__pos, msg, ext, __adjusted);
 		if (*dev_ptr) {
 			caller_marshal_kernel__pci_enable_device__dev__in(__pos, msg, ext, ctx, *dev_ptr);
 		}
@@ -2757,7 +2794,8 @@ int mei_irq_write_handler(struct mei_device* dev, struct mei_cl_cb* cmpl_list)
 	}
 
 	{
-		glue_pack(__pos, msg, ext, *dev_ptr);
+		const void* __adjusted = *dev_ptr;
+		glue_pack(__pos, msg, ext, __adjusted);
 		if (*dev_ptr) {
 			caller_marshal_kernel__mei_irq_write_handler__dev__in(__pos, msg, ext, ctx, *dev_ptr);
 		}
@@ -2765,7 +2803,8 @@ int mei_irq_write_handler(struct mei_device* dev, struct mei_cl_cb* cmpl_list)
 	}
 
 	{
-		glue_pack(__pos, msg, ext, *cmpl_list_ptr);
+		const void* __adjusted = *cmpl_list_ptr;
+		glue_pack(__pos, msg, ext, __adjusted);
 		if (*cmpl_list_ptr) {
 			caller_marshal_kernel__mei_irq_write_handler__cmpl_list__out(__pos, msg, ext, ctx, *cmpl_list_ptr);
 		}
@@ -2823,7 +2862,8 @@ int mei_irq_read_handler(struct mei_device* dev, struct mei_cl_cb* cmpl_list, in
 	}
 
 	{
-		glue_pack(__pos, msg, ext, *dev_ptr);
+		const void* __adjusted = *dev_ptr;
+		glue_pack(__pos, msg, ext, __adjusted);
 		if (*dev_ptr) {
 			caller_marshal_kernel__mei_irq_read_handler__dev__in(__pos, msg, ext, ctx, *dev_ptr);
 		}
@@ -2831,7 +2871,8 @@ int mei_irq_read_handler(struct mei_device* dev, struct mei_cl_cb* cmpl_list, in
 	}
 
 	{
-		glue_pack(__pos, msg, ext, *cmpl_list_ptr);
+		const void* __adjusted = *cmpl_list_ptr;
+		glue_pack(__pos, msg, ext, __adjusted);
 		if (*cmpl_list_ptr) {
 			caller_marshal_kernel__mei_irq_read_handler__cmpl_list__out(__pos, msg, ext, ctx, *cmpl_list_ptr);
 		}
@@ -2839,7 +2880,8 @@ int mei_irq_read_handler(struct mei_device* dev, struct mei_cl_cb* cmpl_list, in
 	}
 
 	{
-		glue_pack(__pos, msg, ext, *slots_ptr);
+		const void* __adjusted = *slots_ptr;
+		glue_pack(__pos, msg, ext, __adjusted);
 		if (*slots_ptr) {
 			glue_pack(__pos, msg, ext, **slots_ptr);
 		}
@@ -2901,7 +2943,8 @@ void mei_irq_compl_handler(struct mei_device* dev, struct mei_cl_cb* compl_list)
 	}
 
 	{
-		glue_pack(__pos, msg, ext, *dev_ptr);
+		const void* __adjusted = *dev_ptr;
+		glue_pack(__pos, msg, ext, __adjusted);
 		if (*dev_ptr) {
 			caller_marshal_kernel__mei_irq_compl_handler__dev__in(__pos, msg, ext, ctx, *dev_ptr);
 		}
@@ -2909,7 +2952,8 @@ void mei_irq_compl_handler(struct mei_device* dev, struct mei_cl_cb* compl_list)
 	}
 
 	{
-		glue_pack(__pos, msg, ext, *compl_list_ptr);
+		const void* __adjusted = *compl_list_ptr;
+		glue_pack(__pos, msg, ext, __adjusted);
 		if (*compl_list_ptr) {
 			caller_marshal_kernel__mei_irq_compl_handler__compl_list__out(__pos, msg, ext, ctx, *compl_list_ptr);
 		}
@@ -2958,7 +3002,8 @@ void mei_deregister(struct mei_device* dev)
 	}
 
 	{
-		glue_pack(__pos, msg, ext, *dev_ptr);
+		const void* __adjusted = *dev_ptr;
+		glue_pack(__pos, msg, ext, __adjusted);
 		if (*dev_ptr) {
 			caller_marshal_kernel__mei_deregister__dev__in(__pos, msg, ext, ctx, *dev_ptr);
 		}
@@ -3002,7 +3047,8 @@ int mei_register(struct mei_device* dev, struct device* parent)
 	}
 
 	{
-		glue_pack(__pos, msg, ext, *dev_ptr);
+		const void* __adjusted = *dev_ptr;
+		glue_pack(__pos, msg, ext, __adjusted);
 		if (*dev_ptr) {
 			caller_marshal_kernel__mei_register__dev__in(__pos, msg, ext, ctx, *dev_ptr);
 		}

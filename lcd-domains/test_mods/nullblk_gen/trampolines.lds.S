@@ -1,0 +1,13 @@
+#include <liblcd/trampoline_link.h>
+
+SECTIONS{
+	LCD_TRAMPOLINE_LINKER_SECTION(trmp_release)
+	LCD_TRAMPOLINE_LINKER_SECTION(trmp_complete)
+	LCD_TRAMPOLINE_LINKER_SECTION(trmp_open)
+	LCD_TRAMPOLINE_LINKER_SECTION(trmp_queue_rq)
+	LCD_TRAMPOLINE_LINKER_SECTION(trmp_init_hctx)
+	LCD_TRAMPOLINE_LINKER_SECTION(trmp_map_queue)
+	LCD_TRAMPOLINE_LINKER_SECTION(trmp_set)
+}
+
+INSERT AFTER .text

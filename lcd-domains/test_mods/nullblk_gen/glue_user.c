@@ -48,7 +48,7 @@ void glue_user_call_client(struct fipc_message* msg, size_t id)
 	glue_user_trace("Completed call in KLCD");
 }
 
-void* glue_user_map_to_shadow(const void* obj)
+void* glue_user_map_to_shadow(const void* obj, bool fail)
 {
     struct shadow_link *link;
 
@@ -67,7 +67,8 @@ void* glue_user_map_to_shadow(const void* obj)
         }
     }
 
-    glue_user_panic("Remote for shadow was not found in to_shadow_ht");
+    if (fail)
+        glue_user_panic("Remote for shadow was not found in to_shadow_ht");
 
     return NULL;
 }

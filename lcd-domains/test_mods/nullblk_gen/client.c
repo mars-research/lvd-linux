@@ -556,7 +556,7 @@ void map_queue_callee(struct fipc_message* msg, struct ext_registers* ext)
 	}
 
 	{
-		*rq_ptr = glue_unpack_shadow(__pos, msg, ext, struct request_queue*);
+		*rq_ptr = glue_unpack_bind_or_new_shadow(__pos, msg, ext, struct request_queue*, sizeof(struct request_queue));
 		if (*rq_ptr) {
 			callee_unmarshal_kernel__map_queue__rq__in(__pos, msg, ext, ctx, *rq_ptr);
 		}
@@ -1179,7 +1179,7 @@ struct blk_mq_hw_ctx* blk_mq_map_queue(struct request_queue* q, int cpu)
 	}
 
 	{
-		*ret_ptr = glue_unpack_new_shadow(__pos, msg, ext, struct blk_mq_hw_ctx*, sizeof(struct blk_mq_hw_ctx));
+		*ret_ptr = glue_unpack_shadow(__pos, msg, ext, struct blk_mq_hw_ctx*);
 		if (*ret_ptr) {
 			caller_unmarshal_kernel__blk_mq_map_queue__ret_blk_mq_hw_ctx__out(__pos, msg, ext, ctx, *ret_ptr);
 		}

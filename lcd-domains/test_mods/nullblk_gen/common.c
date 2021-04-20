@@ -201,11 +201,22 @@ void caller_marshal_kernel__device_add_disk__disk__in(
 	struct device_add_disk_call_ctx const* ctx,
 	struct gendisk const* ptr)
 {
+	int const* major_ptr = &ptr->major;
+	int const* first_minor_ptr = &ptr->first_minor;
 	char const* disk_name_ptr = ptr->disk_name;
 	struct hd_struct const* part0_ptr = &ptr->part0;
 	struct block_device_operations* const* fops_ptr = &ptr->fops;
 	struct request_queue* const* queue_ptr = &ptr->queue;
+	int const* flags_ptr = &ptr->flags;
 	
+	{
+		glue_pack(__pos, msg, ext, *major_ptr);
+	}
+
+	{
+		glue_pack(__pos, msg, ext, *first_minor_ptr);
+	}
+
 	{
 		size_t i, len = 32;
 		char const* array = disk_name_ptr;
@@ -241,6 +252,10 @@ void caller_marshal_kernel__device_add_disk__disk__in(
 
 	}
 
+	{
+		glue_pack(__pos, msg, ext, *flags_ptr);
+	}
+
 }
 
 void callee_unmarshal_kernel__device_add_disk__disk__in(
@@ -250,11 +265,22 @@ void callee_unmarshal_kernel__device_add_disk__disk__in(
 	struct device_add_disk_call_ctx const* ctx,
 	struct gendisk* ptr)
 {
+	int* major_ptr = &ptr->major;
+	int* first_minor_ptr = &ptr->first_minor;
 	char* disk_name_ptr = ptr->disk_name;
 	struct hd_struct* part0_ptr = &ptr->part0;
 	struct block_device_operations** fops_ptr = &ptr->fops;
 	struct request_queue** queue_ptr = &ptr->queue;
+	int* flags_ptr = &ptr->flags;
 	
+	{
+		*major_ptr = glue_unpack(__pos, msg, ext, int);
+	}
+
+	{
+		*first_minor_ptr = glue_unpack(__pos, msg, ext, int);
+	}
+
 	{
 		int i;
 		char* array = disk_name_ptr;
@@ -286,6 +312,10 @@ void callee_unmarshal_kernel__device_add_disk__disk__in(
 			callee_unmarshal_kernel__device_add_disk__queue__in(__pos, msg, ext, ctx, *queue_ptr);
 		}
 
+	}
+
+	{
+		*flags_ptr = glue_unpack(__pos, msg, ext, int);
 	}
 
 }
@@ -862,7 +892,7 @@ void callee_unmarshal_kernel__queue_rq__bd__in(
 	struct request** rq_ptr = &ptr->rq;
 	
 	{
-		*rq_ptr = glue_unpack_new_shadow(__pos, msg, ext, struct request*, sizeof(struct request));
+		*rq_ptr = glue_unpack_new_shadow(__pos, msg, ext, struct request*, (sizeof(struct request)));
 		if (*rq_ptr) {
 			callee_unmarshal_kernel__queue_rq__rq__in(__pos, msg, ext, ctx, *rq_ptr);
 		}
@@ -1405,6 +1435,10 @@ void caller_marshal_kernel__blk_mq_alloc_tag_set__set__in(
 	struct blk_mq_tag_set const* ptr)
 {
 	struct blk_mq_ops* const* ops_ptr = &ptr->ops;
+	unsigned int const* nr_hw_queues_ptr = &ptr->nr_hw_queues;
+	unsigned int const* queue_depth_ptr = &ptr->queue_depth;
+	unsigned int const* cmd_size_ptr = &ptr->cmd_size;
+	unsigned int const* flags_ptr = &ptr->flags;
 	int const* numa_node_ptr = &ptr->numa_node;
 	void* const* driver_data_ptr = &ptr->driver_data;
 	
@@ -1415,6 +1449,22 @@ void caller_marshal_kernel__blk_mq_alloc_tag_set__set__in(
 			caller_marshal_kernel___global_blk_mq_ops__in(__pos, msg, ext, *ops_ptr);
 		}
 
+	}
+
+	{
+		glue_pack(__pos, msg, ext, *nr_hw_queues_ptr);
+	}
+
+	{
+		glue_pack(__pos, msg, ext, *queue_depth_ptr);
+	}
+
+	{
+		glue_pack(__pos, msg, ext, *cmd_size_ptr);
+	}
+
+	{
+		glue_pack(__pos, msg, ext, *flags_ptr);
 	}
 
 	{
@@ -1439,6 +1489,10 @@ void callee_unmarshal_kernel__blk_mq_alloc_tag_set__set__in(
 	struct blk_mq_tag_set* ptr)
 {
 	struct blk_mq_ops** ops_ptr = &ptr->ops;
+	unsigned int* nr_hw_queues_ptr = &ptr->nr_hw_queues;
+	unsigned int* queue_depth_ptr = &ptr->queue_depth;
+	unsigned int* cmd_size_ptr = &ptr->cmd_size;
+	unsigned int* flags_ptr = &ptr->flags;
 	int* numa_node_ptr = &ptr->numa_node;
 	void** driver_data_ptr = &ptr->driver_data;
 	
@@ -1448,6 +1502,22 @@ void callee_unmarshal_kernel__blk_mq_alloc_tag_set__set__in(
 			callee_unmarshal_kernel___global_blk_mq_ops__in(__pos, msg, ext, *ops_ptr);
 		}
 
+	}
+
+	{
+		*nr_hw_queues_ptr = glue_unpack(__pos, msg, ext, unsigned int);
+	}
+
+	{
+		*queue_depth_ptr = glue_unpack(__pos, msg, ext, unsigned int);
+	}
+
+	{
+		*cmd_size_ptr = glue_unpack(__pos, msg, ext, unsigned int);
+	}
+
+	{
+		*flags_ptr = glue_unpack(__pos, msg, ext, unsigned int);
 	}
 
 	{
@@ -1473,6 +1543,7 @@ void callee_marshal_kernel__blk_mq_alloc_tag_set__set__in(
 	struct blk_mq_ops* const* ops_ptr = &ptr->ops;
 	unsigned int const* nr_hw_queues_ptr = &ptr->nr_hw_queues;
 	unsigned int const* queue_depth_ptr = &ptr->queue_depth;
+	unsigned int const* flags_ptr = &ptr->flags;
 	void* const* driver_data_ptr = &ptr->driver_data;
 	
 	{
@@ -1491,6 +1562,10 @@ void callee_marshal_kernel__blk_mq_alloc_tag_set__set__in(
 	}
 
 	{
+		glue_pack(__pos, msg, ext, *flags_ptr);
+	}
+
+	{
 		(void)driver_data_ptr;
 	}
 
@@ -1506,6 +1581,7 @@ void caller_unmarshal_kernel__blk_mq_alloc_tag_set__set__in(
 	struct blk_mq_ops** ops_ptr = &ptr->ops;
 	unsigned int* nr_hw_queues_ptr = &ptr->nr_hw_queues;
 	unsigned int* queue_depth_ptr = &ptr->queue_depth;
+	unsigned int* flags_ptr = &ptr->flags;
 	void** driver_data_ptr = &ptr->driver_data;
 	
 	{
@@ -1521,6 +1597,10 @@ void caller_unmarshal_kernel__blk_mq_alloc_tag_set__set__in(
 
 	{
 		*queue_depth_ptr = glue_unpack(__pos, msg, ext, unsigned int);
+	}
+
+	{
+		*flags_ptr = glue_unpack(__pos, msg, ext, unsigned int);
 	}
 
 	{

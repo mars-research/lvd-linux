@@ -48,11 +48,11 @@ static int boot_main(void)
 		goto fail3;
 	}
 	ret = lvd_create_module_lvd(LCD_DIR("nullblk_gen/nullblk_lcd"),
-				"lcd_test_mod_nullblk_gen_dummy_lcd",
+				"lcd_test_mod_nullblk_gen_nullblk_lcd",
 				&nullblk_lcd,
 				&nullblk_ctx, 1);
 	if (ret) {
-		LIBLCD_ERR("failed to create dummy lcd");
+		LIBLCD_ERR("failed to create nullblk lcd");
 		goto fail4;
 	}
 
@@ -67,11 +67,11 @@ static int boot_main(void)
 		goto fail8;
 	}
 
-	LIBLCD_MSG("starting dummy block...");
+	LIBLCD_MSG("starting nullblk block...");
 
 	ret = lcd_run(nullblk_lcd);
 	if (ret) {
-		LIBLCD_ERR("failed to start dummy lcd");
+		LIBLCD_ERR("failed to start nullblk lcd");
 		goto fail9;
 	}
 

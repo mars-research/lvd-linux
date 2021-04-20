@@ -24,13 +24,13 @@ module kernel {
 		projection < struct hd_struct> hd_struct{
 		}
 		projection < struct gendisk > disk {
-			int [out] major;
-			int [out] first_minor;
+			int [out, in] major;
+			int [out, in] first_minor;
 			array<char, 32> disk_name;
 			projection hd_struct part0;
 			projection fops [alloc(callee)] * fops;
 			projection queue* queue;
-			int [out] flags;
+			int [out, in] flags;
 		}
 		projection < struct request_queue > queue {
 		}
@@ -68,7 +68,7 @@ module kernel {
 		}
 	}
 
-	rpc projection ret_gendisk [alloc(caller)] * alloc_disk_node( s32 minors, s32 node_id ) {
+	rpc projection ret_gendisk [alloc(caller)] * alloc_disk_node( int minors, int node_id ) {
 		projection < struct hd_struct> hd_struct{
 		}
 		projection < struct gendisk > ret_gendisk {
@@ -81,7 +81,9 @@ module kernel {
 		projection < struct blk_mq_hw_ctx > hctx {
 		}
 		projection < struct blk_mq_queue_data > bd {
-			projection rq [alloc(callee)] * rq;
+			// FIXME: Need an explicit copy annotation?
+			//projection rq [alloc<{{sizeof(struct request) + sizeof(struct nullb_cmd)}}>(callee)] * rq;
+			projection rq [alloc<{{sizeof(struct request)}}>(callee)] * rq;
 		}
 		projection < struct request > rq {
 		}
@@ -92,7 +94,8 @@ module kernel {
 		}
 	}
 
-	rpc_ptr projection blk_mq_hw_ctx [bind(callee)] *map_queue(projection rq [bind(callee)] *rq, const int cpu) {
+	rpc_ptr projection blk_mq_hw_ctx [bind(callee)] *map_queue(projection rq [alloc_once(callee)] *rq,
+					const int cpu) {
 		projection < struct blk_mq_hw_ctx > blk_mq_hw_ctx {
 		}
 		projection < struct request_queue > rq {
@@ -227,9 +230,11 @@ rpc s32 autoremove_wake_function( projection wait * wait, u32 mode, s32 sync, vo
 	rpc int blk_mq_alloc_tag_set( projection set [alloc(callee)] * set ) {
 		projection < struct blk_mq_tag_set > set {
 			projection _global_blk_mq_ops [alloc(callee)] * ops;
-			u32 [out] nr_hw_queues;
-			u32 [out] queue_depth;
-			s32  numa_node;
+			unsigned int [in, out] nr_hw_queues;
+			unsigned int [in, out] queue_depth;
+			unsigned int cmd_size;
+			unsigned int [in, out] flags;
+			int numa_node;
 			//array<projection tags,{{ctx->set->nr_hw_queues}}> [alloc(caller)] **tags;
 			void [alloc<{{sizeof(void*)}}>(callee)] *driver_data;
 		}
@@ -256,7 +261,7 @@ rpc s32 autoremove_wake_function( projection wait * wait, u32 mode, s32 sync, vo
 		}
 	}
 
-	rpc projection ret_blk_mq_hw_ctx [alloc(caller)] * blk_mq_map_queue( projection q * q, s32 cpu ) {
+	rpc projection ret_blk_mq_hw_ctx [bind(caller)] * blk_mq_map_queue( projection q * q, s32 cpu ) {
 		projection < struct blk_mq_hw_ctx > ret_blk_mq_hw_ctx {
 		}
 		projection < struct request_queue > q {

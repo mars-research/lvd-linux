@@ -983,6 +983,49 @@ void unregister_blkdev(unsigned int major, char const* name)
 	}
 }
 
+void put_disk(struct gendisk* disk)
+{
+	struct fipc_message __buffer = {0};
+	struct fipc_message *msg = &__buffer;
+	struct ext_registers* ext = get_register_page(smp_processor_id());
+	size_t n_pos = 0;
+	size_t* __pos = &n_pos;
+
+	struct gendisk** disk_ptr = &disk;
+	
+	__maybe_unused const struct put_disk_call_ctx call_ctx = {disk};
+	__maybe_unused const struct put_disk_call_ctx *ctx = &call_ctx;
+
+	(void)ext;
+
+	if (verbose_debug) {
+		printk("%s:%d, entered!\n", __func__, __LINE__);
+	}
+
+	{
+		const void* __adjusted = *disk_ptr;
+		glue_pack_shadow(__pos, msg, ext, __adjusted);
+		if (*disk_ptr) {
+			caller_marshal_kernel__put_disk__disk__in(__pos, msg, ext, ctx, *disk_ptr);
+		}
+
+	}
+
+	glue_call_server(__pos, msg, RPC_ID_put_disk);
+
+	*__pos = 0;
+	{
+		if (*disk_ptr) {
+			caller_unmarshal_kernel__put_disk__disk__in(__pos, msg, ext, ctx, *disk_ptr);
+		}
+
+	}
+
+	if (verbose_debug) {
+		printk("%s:%d, returned!\n", __func__, __LINE__);
+	}
+}
+
 void blk_mq_free_tag_set(struct blk_mq_tag_set* set)
 {
 	struct fipc_message __buffer = {0};

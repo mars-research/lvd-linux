@@ -48,7 +48,7 @@
 void glue_user_init(void);
 void glue_user_panic(const char* msg);
 void glue_user_trace(const char* msg);
-void* glue_user_map_to_shadow(const void* obj);
+void* glue_user_map_to_shadow(const void* obj, bool fail);
 const void* glue_user_map_from_shadow(const void* shadow);
 void glue_user_add_shadow(const void* ptr, void* shadow);
 void* glue_user_alloc(size_t size);
@@ -120,7 +120,7 @@ static inline void* glue_unpack_bind_or_new_shadow_impl(const void* ptr, size_t 
 	if (!ptr)
 		return NULL;
 
-	shadow = glue_user_map_to_shadow(ptr);
+	shadow = glue_user_map_to_shadow(ptr, false);
 	if (!shadow) {
 		shadow = glue_user_alloc(size);
 		glue_user_add_shadow(ptr, shadow);
@@ -130,7 +130,7 @@ static inline void* glue_unpack_bind_or_new_shadow_impl(const void* ptr, size_t 
 
 static inline void* glue_unpack_shadow_impl(const void* ptr)
 {
-	return ptr ? glue_user_map_to_shadow(ptr) : NULL;
+	return ptr ? glue_user_map_to_shadow(ptr, true) : NULL;
 }
 
 static inline void glue_pack_shadow_impl(size_t* pos, struct fipc_message* msg, struct ext_registers* ext, const void* ptr)
@@ -167,6 +167,7 @@ enum RPC_ID {
 	RPC_ID_finish_wait,
 	RPC_ID_autoremove_wake_function,
 	RPC_ID_unregister_blkdev,
+	RPC_ID_put_disk,
 	RPC_ID_blk_mq_free_tag_set,
 	RPC_ID_blk_mq_alloc_tag_set,
 	RPC_ID_blk_mq_init_queue,
@@ -310,6 +311,10 @@ struct autoremove_wake_function_call_ctx {
 struct unregister_blkdev_call_ctx {
 	unsigned int major;
 	char const* name;
+};
+
+struct put_disk_call_ctx {
+	struct gendisk* disk;
 };
 
 struct blk_mq_free_tag_set_call_ctx {
@@ -1103,6 +1108,62 @@ void caller_unmarshal_kernel__autoremove_wake_function__wait__in(
 	const struct ext_registers* ext,
 	struct autoremove_wake_function_call_ctx const* call_ctx,
 	struct __wait_queue* ptr);
+
+void caller_marshal_kernel__put_disk__disk__in(
+	size_t* __pos,
+	struct fipc_message* msg,
+	struct ext_registers* ext,
+	struct put_disk_call_ctx const* call_ctx,
+	struct gendisk const* ptr);
+
+void callee_unmarshal_kernel__put_disk__disk__in(
+	size_t* __pos,
+	const struct fipc_message* msg,
+	const struct ext_registers* ext,
+	struct put_disk_call_ctx const* call_ctx,
+	struct gendisk* ptr);
+
+void callee_marshal_kernel__put_disk__disk__in(
+	size_t* __pos,
+	struct fipc_message* msg,
+	struct ext_registers* ext,
+	struct put_disk_call_ctx const* call_ctx,
+	struct gendisk const* ptr);
+
+void caller_unmarshal_kernel__put_disk__disk__in(
+	size_t* __pos,
+	const struct fipc_message* msg,
+	const struct ext_registers* ext,
+	struct put_disk_call_ctx const* call_ctx,
+	struct gendisk* ptr);
+
+void caller_marshal_kernel__put_disk__hd_struct__in(
+	size_t* __pos,
+	struct fipc_message* msg,
+	struct ext_registers* ext,
+	struct put_disk_call_ctx const* call_ctx,
+	struct hd_struct const* ptr);
+
+void callee_unmarshal_kernel__put_disk__hd_struct__in(
+	size_t* __pos,
+	const struct fipc_message* msg,
+	const struct ext_registers* ext,
+	struct put_disk_call_ctx const* call_ctx,
+	struct hd_struct* ptr);
+
+void callee_marshal_kernel__put_disk__hd_struct__in(
+	size_t* __pos,
+	struct fipc_message* msg,
+	struct ext_registers* ext,
+	struct put_disk_call_ctx const* call_ctx,
+	struct hd_struct const* ptr);
+
+void caller_unmarshal_kernel__put_disk__hd_struct__in(
+	size_t* __pos,
+	const struct fipc_message* msg,
+	const struct ext_registers* ext,
+	struct put_disk_call_ctx const* call_ctx,
+	struct hd_struct* ptr);
 
 void caller_marshal_kernel__blk_mq_free_tag_set__set__in(
 	size_t* __pos,

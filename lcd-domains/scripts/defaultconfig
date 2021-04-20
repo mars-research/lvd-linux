@@ -70,3 +70,6 @@ meime_gen/boot nonisolated
 meime_gen/meime_lcd isolated
 meime_gen/misc_klcd nonisolated
 
+nullblk_gen/boot nonisolated
+nullblk_gen/nullblk_lcd isolated
+nullblk_gen/blk_klcd nonisolated

@@ -419,7 +419,12 @@ void caller_marshal_kernel__device_add_disk__hd_struct__in(
 	struct device_add_disk_call_ctx const* ctx,
 	struct hd_struct const* ptr)
 {
+	unsigned long long const* nr_sects_ptr = &ptr->nr_sects;
 	
+	{
+		glue_pack(__pos, msg, ext, *nr_sects_ptr);
+	}
+
 }
 
 void callee_unmarshal_kernel__device_add_disk__hd_struct__in(
@@ -429,7 +434,12 @@ void callee_unmarshal_kernel__device_add_disk__hd_struct__in(
 	struct device_add_disk_call_ctx const* ctx,
 	struct hd_struct* ptr)
 {
+	unsigned long long* nr_sects_ptr = &ptr->nr_sects;
 	
+	{
+		*nr_sects_ptr = glue_unpack(__pos, msg, ext, unsigned long long);
+	}
+
 }
 
 void callee_marshal_kernel__device_add_disk__hd_struct__in(
@@ -892,7 +902,7 @@ void callee_unmarshal_kernel__queue_rq__bd__in(
 	struct request** rq_ptr = &ptr->rq;
 	
 	{
-		*rq_ptr = glue_unpack_new_shadow(__pos, msg, ext, struct request*, (sizeof(struct request)));
+		*rq_ptr = glue_unpack_new_shadow(__pos, msg, ext, struct request*, (sizeof(struct request) + sizeof(struct __nullb_cmd)));
 		if (*rq_ptr) {
 			callee_unmarshal_kernel__queue_rq__rq__in(__pos, msg, ext, ctx, *rq_ptr);
 		}
@@ -1383,6 +1393,106 @@ void caller_unmarshal_kernel__autoremove_wake_function__wait__in(
 	const struct ext_registers* ext,
 	struct autoremove_wake_function_call_ctx const* ctx,
 	struct __wait_queue* ptr)
+{
+	
+}
+
+void caller_marshal_kernel__put_disk__disk__in(
+	size_t* __pos,
+	struct fipc_message* msg,
+	struct ext_registers* ext,
+	struct put_disk_call_ctx const* ctx,
+	struct gendisk const* ptr)
+{
+	struct hd_struct const* part0_ptr = &ptr->part0;
+	
+	{
+		caller_marshal_kernel__put_disk__hd_struct__in(__pos, msg, ext, ctx, part0_ptr);
+	}
+
+}
+
+void callee_unmarshal_kernel__put_disk__disk__in(
+	size_t* __pos,
+	const struct fipc_message* msg,
+	const struct ext_registers* ext,
+	struct put_disk_call_ctx const* ctx,
+	struct gendisk* ptr)
+{
+	struct hd_struct* part0_ptr = &ptr->part0;
+	
+	{
+		callee_unmarshal_kernel__put_disk__hd_struct__in(__pos, msg, ext, ctx, part0_ptr);
+	}
+
+}
+
+void callee_marshal_kernel__put_disk__disk__in(
+	size_t* __pos,
+	struct fipc_message* msg,
+	struct ext_registers* ext,
+	struct put_disk_call_ctx const* ctx,
+	struct gendisk const* ptr)
+{
+	struct hd_struct const* part0_ptr = &ptr->part0;
+	
+	{
+		callee_marshal_kernel__put_disk__hd_struct__in(__pos, msg, ext, ctx, part0_ptr);
+	}
+
+}
+
+void caller_unmarshal_kernel__put_disk__disk__in(
+	size_t* __pos,
+	const struct fipc_message* msg,
+	const struct ext_registers* ext,
+	struct put_disk_call_ctx const* ctx,
+	struct gendisk* ptr)
+{
+	struct hd_struct* part0_ptr = &ptr->part0;
+	
+	{
+		caller_unmarshal_kernel__put_disk__hd_struct__in(__pos, msg, ext, ctx, part0_ptr);
+	}
+
+}
+
+void caller_marshal_kernel__put_disk__hd_struct__in(
+	size_t* __pos,
+	struct fipc_message* msg,
+	struct ext_registers* ext,
+	struct put_disk_call_ctx const* ctx,
+	struct hd_struct const* ptr)
+{
+	
+}
+
+void callee_unmarshal_kernel__put_disk__hd_struct__in(
+	size_t* __pos,
+	const struct fipc_message* msg,
+	const struct ext_registers* ext,
+	struct put_disk_call_ctx const* ctx,
+	struct hd_struct* ptr)
+{
+	
+}
+
+void callee_marshal_kernel__put_disk__hd_struct__in(
+	size_t* __pos,
+	struct fipc_message* msg,
+	struct ext_registers* ext,
+	struct put_disk_call_ctx const* ctx,
+	struct hd_struct const* ptr)
+{
+	
+}
+
+void caller_unmarshal_kernel__put_disk__hd_struct__in(
+	size_t* __pos,
+	const struct fipc_message* msg,
+	const struct ext_registers* ext,
+	struct put_disk_call_ctx const* ctx,
+	struct hd_struct* ptr)
 {
 	
 }

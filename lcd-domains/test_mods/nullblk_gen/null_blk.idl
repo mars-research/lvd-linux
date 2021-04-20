@@ -22,6 +22,7 @@ module kernel {
 			//rpc_ptr release release;
 		}
 		projection < struct hd_struct> hd_struct{
+			u64 nr_sects;
 		}
 		projection < struct gendisk > disk {
 			int [out, in] major;
@@ -83,7 +84,7 @@ module kernel {
 		projection < struct blk_mq_queue_data > bd {
 			// FIXME: Need an explicit copy annotation?
 			//projection rq [alloc<{{sizeof(struct request) + sizeof(struct nullb_cmd)}}>(callee)] * rq;
-			projection rq [alloc<{{sizeof(struct request)}}>(callee)] * rq;
+			projection rq [alloc<{{sizeof(struct request) + sizeof(struct __nullb_cmd)}}>(callee)] * rq;
 		}
 		projection < struct request > rq {
 		}
@@ -141,7 +142,6 @@ rpc s32 autoremove_wake_function( projection wait * wait, u32 mode, s32 sync, vo
 	rpc void unregister_blkdev( unsigned int major, string [alloc(callee)] *name ) {
 	}
 
-	/* XXX: Not needed for our null_blk configuration
 	rpc void put_disk( projection disk * disk ) {
 		projection < struct hd_struct> hd_struct{
 		}
@@ -150,6 +150,8 @@ rpc s32 autoremove_wake_function( projection wait * wait, u32 mode, s32 sync, vo
 		}
 	}
 
+
+	/* XXX: Not needed for our null_blk configuration
 	rpc projection ret_request_queue* blk_init_queue_node( rpc_ptr rfn rfn, projection lock * lock, s32 node_id ) {
 		projection < struct request_queue > ret_request_queue {
 		}

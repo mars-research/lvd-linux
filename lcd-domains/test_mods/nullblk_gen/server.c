@@ -1043,6 +1043,45 @@ void unregister_blkdev_callee(struct fipc_message* msg, struct ext_registers* ex
 	}
 }
 
+void put_disk_callee(struct fipc_message* msg, struct ext_registers* ext)
+{
+	size_t n_pos = 0;
+	size_t* __pos = &n_pos;
+
+	struct gendisk* disk = 0;
+	struct gendisk** disk_ptr = &disk;
+	
+	__maybe_unused struct put_disk_call_ctx call_ctx = {disk};
+	__maybe_unused struct put_disk_call_ctx *ctx = &call_ctx;
+
+	if (verbose_debug) {
+		printk("%s:%d, entered!\n", __func__, __LINE__);
+	}
+
+	{
+		*disk_ptr = glue_unpack(__pos, msg, ext, struct gendisk*);
+		if (*disk_ptr) {
+			callee_unmarshal_kernel__put_disk__disk__in(__pos, msg, ext, ctx, *disk_ptr);
+		}
+
+	}
+
+	put_disk(disk);
+
+	*__pos = 0;
+	{
+		if (*disk_ptr) {
+			callee_marshal_kernel__put_disk__disk__in(__pos, msg, ext, ctx, *disk_ptr);
+		}
+
+	}
+
+	msg->regs[0] = *__pos;
+	if (verbose_debug) {
+		printk("%s:%d, returned!\n", __func__, __LINE__);
+	}
+}
+
 void blk_mq_free_tag_set_callee(struct fipc_message* msg, struct ext_registers* ext)
 {
 	size_t n_pos = 0;
@@ -1480,6 +1519,11 @@ int try_dispatch(enum RPC_ID id, struct fipc_message* msg, struct ext_registers*
 	case RPC_ID_unregister_blkdev:
 		glue_user_trace("unregister_blkdev\n");
 		unregister_blkdev_callee(msg, ext);
+		break;
+
+	case RPC_ID_put_disk:
+		glue_user_trace("put_disk\n");
+		put_disk_callee(msg, ext);
 		break;
 
 	case RPC_ID_blk_mq_free_tag_set:

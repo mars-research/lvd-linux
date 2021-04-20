@@ -35,3 +35,4 @@ obj-m += msr_gen/
 #obj-m += alx_gen/
 obj-m += meime_gen/
 obj-m += nullblk_gen/
+obj-m += coretemp_gen/

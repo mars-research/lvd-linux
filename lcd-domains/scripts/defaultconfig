@@ -73,3 +73,7 @@ meime_gen/misc_klcd nonisolated
 nullblk_gen/boot nonisolated
 nullblk_gen/nullblk_lcd isolated
 nullblk_gen/blk_klcd nonisolated
+
+coretemp_gen/boot nonisolated
+coretemp_gen/coretemp_lcd isolated
+coretemp_gen/hwmon_klcd nonisolated

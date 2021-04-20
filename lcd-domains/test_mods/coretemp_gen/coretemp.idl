@@ -1,0 +1,163 @@
+module kernel {
+	rpc void sysfs_remove_group(
+			projection kobj [bind_memberof<struct device, kobj>(caller)] *dev,
+			const projection grp [bind(callee)] *  grp ) {
+		projection < struct kobject > kobj {
+		}
+		projection < struct attribute_group > grp {
+			char*  name;
+		}
+	}
+	rpc_ptr int probe( projection pdev [bind(callee)] *  pdev ) {
+		projection < struct device> device{
+		}
+		projection < struct platform_device > pdev {
+			int  id;
+			projection device dev;
+		}
+	}
+	rpc_ptr int remove( projection pdev [bind(callee)] *  pdev ) {
+		projection < struct platform_device > pdev {
+		}
+	}
+
+	rpc int sysfs_create_group(
+		projection kobj [bind_memberof<struct device, kobj>(caller)] *dev,
+		const projection grp [alloc(callee)] *  grp ) {
+		projection < struct kobject > kobj {
+		}
+
+		projection < struct attribute_group > grp {
+			string [alloc(callee)] *name;
+			// FIXME: fix annotations
+			array <projection attr*, 5> [alloc(callee)] *attrs;
+		}
+
+		projection <struct attribute> attr {
+			unsigned short mode;
+		}
+	}
+
+	rpc int rdmsr_safe_on_cpu( unsigned int  cpu, unsigned int  msr_no,
+		unsigned int [alloc(callee), out] *l,
+		unsigned int [alloc(callee), out] *h ) {
+	}
+
+	rpc int rdmsr_on_cpu( unsigned int  cpu, unsigned int  msr_no,
+			unsigned int [alloc(callee), out] * l,
+			unsigned int [alloc(callee), out] * h ) {
+	}
+
+	rpc void cpu_maps_update_begin(  ) {
+	}
+
+	rpc void cpu_maps_update_done(  ) {
+	}
+
+	rpc void platform_driver_unregister( projection drv [bind(callee)]  *  drv ) {
+		projection < struct device_driver> device_driver{
+			rpc_ptr probe probe;
+			rpc_ptr remove remove;
+		}
+		projection < struct platform_driver > drv {
+			/*rpc_ptr probe probe;
+			rpc_ptr remove remove;
+			projection device_driver driver;*/
+		}
+	}
+
+	rpc int __platform_driver_register( projection drv [alloc(callee)] *  drv,
+				projection owner [alloc(callee)] *  owner ) {
+		projection < struct device_driver> device_driver {
+				//rpc_ptr probe probe;
+				//rpc_ptr remove remove;
+			string [alloc(callee)] *name;
+		}
+		projection < struct platform_driver > drv {
+			rpc_ptr probe probe;
+			rpc_ptr remove remove;
+			//projection device_driver driver;
+		}
+		projection < struct module > owner {
+		}
+	}
+
+	rpc projection ret_platform_device [alloc(caller)] * platform_device_alloc(
+				string [alloc(callee)] *name, int  id ) {
+		projection < struct platform_device > ret_platform_device {
+		}
+	}
+
+	rpc int platform_device_add( projection pdev *pdev ) {
+		/*projection < struct device> device{
+			projection parent* parent;
+			projection bus* bus;
+		}*/
+		projection < struct platform_device > pdev {
+			int  id;
+			//projection device dev;
+		}
+		/*projection < struct device > parent {
+		}
+		projection < struct bus_type > bus {
+			rpc_ptr probe probe;
+			rpc_ptr remove remove;
+		}*/
+	}
+
+	rpc void platform_device_put( projection pdev *  pdev ) {
+		projection < struct platform_device > pdev {
+		}
+	}
+
+	rpc void platform_device_unregister( projection pdev *  pdev ) {
+		/*projection < struct device> device{
+			}*/
+		projection < struct platform_device > pdev {
+			//projection device dev;
+		}
+	}
+
+	rpc const projection ret_x86_cpu_id [alloc(caller)] * x86_match_cpu(
+			const array<projection match, null> [alloc(callee)] *match ) {
+		projection < struct x86_cpu_id > ret_x86_cpu_id {
+			unsigned short vendor;
+			unsigned short family;
+			unsigned short model;
+			unsigned short feature;	
+			unsigned long long driver_data;
+		}
+		projection < struct x86_cpu_id > match {
+			unsigned short vendor;
+			unsigned short family;
+			unsigned short model;
+			unsigned short feature;
+			unsigned long long driver_data;
+		}
+	}
+
+	
+	rpc projection ret_pci_dev [alloc(caller)] * pci_get_domain_bus_and_slot(
+			int  domain, unsigned int  bus, unsigned int  devfn ) {
+		projection < struct pci_dev > ret_pci_dev {
+			unsigned short vendor;
+			unsigned short device;
+		}
+	}
+
+	rpc projection ret_device [alloc(caller)] * devm_hwmon_device_register_with_groups(
+			projection dev [bind_memberof<struct platform_device, dev>(caller)] *dev,
+			string [alloc(callee)] *  name, void*  drvdata,
+			const projection groups ** [unused]  groups ) {
+		projection < struct device > ret_device {
+		}
+		projection < struct list_head> list_head{
+		}
+		projection < struct device > dev {
+			//projection list_head devres_head;
+		}
+		projection < struct attribute_group > groups {
+		}
+	}
+
+}

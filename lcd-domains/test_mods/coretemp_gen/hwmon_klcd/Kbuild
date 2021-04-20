@@ -1,0 +1,14 @@
+obj-m += lcd_test_mod_coretemp_gen_hwmon_klcd.o
+
+lcd_test_mod_coretemp_gen_hwmon_klcd-y		+= main.o
+
+# glue code
+lcd_test_mod_coretemp_gen_hwmon_klcd-y		+= $(addprefix ../, server.o common.o glue_user.o )
+
+cppflags-y += $(NONISOLATED_CFLAGS)
+
+extra-y += ../trampolines.lds
+
+ldflags-y += -T $(LCD_TEST_MODULES_BUILD_DIR)/coretemp_gen/trampolines.lds
+
+ccflags-y += $(NONISOLATED_CFLAGS)

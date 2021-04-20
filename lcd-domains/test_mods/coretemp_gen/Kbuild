@@ -1,0 +1,6 @@
+obj-$(LCD_CONFIG_BUILD_CORETEMP_GEN_BOOT)	+= boot/
+
+obj-$(LCD_CONFIG_BUILD_CORETEMP_GEN_CORETEMP_LCD) += coretemp_lcd/
+
+obj-$(LCD_CONFIG_BUILD_CORETEMP_GEN_HWMON_KLCD) += hwmon_klcd/
+

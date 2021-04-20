@@ -48,7 +48,7 @@ void glue_user_call_client(struct fipc_message* msg, size_t id)
 	glue_user_trace("Completed call in KLCD");
 }
 
-void* glue_user_map_to_shadow(const void* obj)
+void* glue_user_map_to_shadow(const void* obj, bool fail)
 {
     struct shadow_link *link;
 
@@ -67,7 +67,8 @@ void* glue_user_map_to_shadow(const void* obj)
         }
     }
 
-    glue_user_panic("Remote for shadow was not found in to_shadow_ht");
+    if (fail)
+        glue_user_panic("Remote for shadow was not found in to_shadow_ht");
 
     return NULL;
 }
@@ -142,6 +143,7 @@ void glue_user_init(void)
     hash_init(to_shadow_ht);
 }
 
+#if 0
 #ifdef LCD_ISOLATE
 
 void *skb_data_pool = NULL;
@@ -281,4 +283,5 @@ void skb_data_shared_mem_uninit(void)
 	if (skb_pool)
 		priv_pool_destroy(skb_pool);
 }
+#endif
 #endif

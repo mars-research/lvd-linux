@@ -1789,7 +1789,7 @@ int request_threaded_irq(unsigned int irq, fptr_handler handler, fptr_thread_fn 
 
 	{
 		const void* __adjusted = *dev_id_ptr;
-		glue_pack_shadow(__pos, msg, ext, __adjusted);
+		glue_pack(__pos, msg, ext, __adjusted);
 		if (*dev_id_ptr) {
 		}
 
@@ -3034,6 +3034,7 @@ int mei_register(struct mei_device* dev, struct device* parent)
 	size_t* __pos = &n_pos;
 
 	struct mei_device** dev_ptr = &dev;
+	struct device** parent_ptr = &parent;
 	int ret = 0;
 	int* ret_ptr = &ret;
 	
@@ -3055,12 +3056,28 @@ int mei_register(struct mei_device* dev, struct device* parent)
 
 	}
 
+	{
+		struct pci_dev* __adjusted = container_of(*parent_ptr, struct pci_dev, dev);
+		glue_pack_shadow(__pos, msg, ext, __adjusted);
+		if (*parent_ptr) {
+			caller_marshal_kernel__mei_register__parent__in(__pos, msg, ext, ctx, *parent_ptr);
+		}
+
+	}
+
 	glue_call_server(__pos, msg, RPC_ID_mei_register);
 
 	*__pos = 0;
 	{
 		if (*dev_ptr) {
 			caller_unmarshal_kernel__mei_register__dev__in(__pos, msg, ext, ctx, *dev_ptr);
+		}
+
+	}
+
+	{
+		if (*parent_ptr) {
+			caller_unmarshal_kernel__mei_register__parent__in(__pos, msg, ext, ctx, *parent_ptr);
 		}
 
 	}

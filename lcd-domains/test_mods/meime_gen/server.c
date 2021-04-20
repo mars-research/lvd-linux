@@ -2100,7 +2100,7 @@ void request_threaded_irq_callee(struct fipc_message* msg, struct ext_registers*
 	}
 
 	{
-		*dev_id_ptr = glue_unpack(__pos, msg, ext, void*);
+		*dev_id_ptr = glue_unpack_new_shadow(__pos, msg, ext, void*, (sizeof(void*)));
 		if (*dev_id_ptr) {
 		}
 
@@ -2329,7 +2329,7 @@ void queue_delayed_work_on_callee(struct fipc_message* msg, struct ext_registers
 	}
 
 	{
-		struct mei_device* __mei_device = (struct mei_device *) glue_unpack_shadow(__pos, msg, ext, struct delayed_work*);
+		struct mei_device* __mei_device = glue_unpack_shadow(__pos, msg, ext, struct mei_device*);
 		*dwork_ptr = &__mei_device->timer_work;
 		if (*dwork_ptr) {
 			callee_unmarshal_kernel__queue_delayed_work_on__dwork__in(__pos, msg, ext, ctx, *dwork_ptr);
@@ -2495,7 +2495,7 @@ void mei_device_init_callee(struct fipc_message* msg, struct ext_registers* ext)
 	}
 
 	{
-		struct pci_dev* __pci_dev = (struct pci_dev *) glue_unpack(__pos, msg, ext, struct device*);
+		struct pci_dev* __pci_dev = glue_unpack(__pos, msg, ext, struct pci_dev*);
 		*device_ptr = &__pci_dev->dev;
 		if (*device_ptr) {
 			callee_unmarshal_kernel__mei_device_init__device__in(__pos, msg, ext, ctx, *device_ptr);
@@ -2715,7 +2715,7 @@ void pci_unregister_driver_callee(struct fipc_message* msg, struct ext_registers
 	}
 
 	{
-		*drv_ptr = glue_unpack(__pos, msg, ext, struct pci_driver*);
+		*drv_ptr = glue_unpack_shadow(__pos, msg, ext, struct pci_driver*);
 		if (*drv_ptr) {
 			callee_unmarshal_kernel__pci_unregister_driver__drv__in(__pos, msg, ext, ctx, *drv_ptr);
 		}
@@ -3265,6 +3265,7 @@ void mei_register_callee(struct fipc_message* msg, struct ext_registers* ext)
 	struct mei_device* dev = 0;
 	struct device* parent = 0;
 	struct mei_device** dev_ptr = &dev;
+	struct device** parent_ptr = &parent;
 	int ret = 0;
 	int* ret_ptr = &ret;
 	
@@ -3283,12 +3284,28 @@ void mei_register_callee(struct fipc_message* msg, struct ext_registers* ext)
 
 	}
 
+	{
+		struct pci_dev* __pci_dev = glue_unpack(__pos, msg, ext, struct pci_dev*);
+		*parent_ptr = &__pci_dev->dev;
+		if (*parent_ptr) {
+			callee_unmarshal_kernel__mei_register__parent__in(__pos, msg, ext, ctx, *parent_ptr);
+		}
+
+	}
+
 	ret = mei_register(dev, parent);
 
 	*__pos = 0;
 	{
 		if (*dev_ptr) {
 			callee_marshal_kernel__mei_register__dev__in(__pos, msg, ext, ctx, *dev_ptr);
+		}
+
+	}
+
+	{
+		if (*parent_ptr) {
+			callee_marshal_kernel__mei_register__parent__in(__pos, msg, ext, ctx, *parent_ptr);
 		}
 
 	}

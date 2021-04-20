@@ -48,7 +48,7 @@
 void glue_user_init(void);
 void glue_user_panic(const char* msg);
 void glue_user_trace(const char* msg);
-void* glue_user_map_to_shadow(const void* obj);
+void* glue_user_map_to_shadow(const void* obj, bool fail);
 const void* glue_user_map_from_shadow(const void* shadow);
 void glue_user_add_shadow(const void* ptr, void* shadow);
 void* glue_user_alloc(size_t size);
@@ -120,7 +120,7 @@ static inline void* glue_unpack_bind_or_new_shadow_impl(const void* ptr, size_t 
 	if (!ptr)
 		return NULL;
 
-	shadow = glue_user_map_to_shadow(ptr);
+	shadow = glue_user_map_to_shadow(ptr, false);
 	if (!shadow) {
 		shadow = glue_user_alloc(size);
 		glue_user_add_shadow(ptr, shadow);
@@ -130,7 +130,7 @@ static inline void* glue_unpack_bind_or_new_shadow_impl(const void* ptr, size_t 
 
 static inline void* glue_unpack_shadow_impl(const void* ptr)
 {
-	return ptr ? glue_user_map_to_shadow(ptr) : NULL;
+	return ptr ? glue_user_map_to_shadow(ptr, true) : NULL;
 }
 
 static inline void glue_pack_shadow_impl(size_t* pos, struct fipc_message* msg, struct ext_registers* ext, const void* ptr)

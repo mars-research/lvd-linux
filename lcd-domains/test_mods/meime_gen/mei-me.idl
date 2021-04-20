@@ -56,7 +56,7 @@ module kernel {
 
 	rpc_ptr void hw_config( projection dev [bind(caller)] * dev ) {
 		projection < struct mei_device > dev {
-			projection dev* dev;
+			//projection dev* dev;
 		}
 		projection < struct device > dev {
 		}
@@ -65,7 +65,7 @@ module kernel {
 	rpc_ptr int fw_status( projection dev [bind(caller)] * dev,
 			projection fw_status [alloc(callee)] * fw_status ) {
 		projection < struct mei_device > dev {
-			projection dev* dev;
+			//projection dev* dev;
 		}
 		projection < struct device > dev {
 		}
@@ -191,6 +191,8 @@ module kernel {
 	rpc long unsigned int __msecs_to_jiffies( unsigned int m ) {
 	}
 
+	// XXX: Cleanup isn't really there yet!
+	// What's needed? We need a map of the original hw_addr -> lvd space's hw_addr
 	rpc void pci_iounmap( projection dev * dev, void* addr ) {
 		projection < struct pci_dev > dev {
 		}
@@ -222,7 +224,9 @@ rpc long prepare_to_wait_event( projection q * q, projection wait * wait, int st
 
 	rpc int request_threaded_irq( unsigned int irq, rpc_ptr handler handler,
 			rpc_ptr thread_fn thread_fn, long unsigned int irqflags,
-				string [alloc(callee)] * devname, void* dev_id ) {
+				string [alloc(callee)] * devname,
+				// XXX: Careful! lookup might cause the thread to sleep in an irq context!
+				void [alloc<{{sizeof(void*)}}>(callee)] * dev_id ) {
 	}
 
 	rpc void free_irq( unsigned int irq, void* dev_id ) {
@@ -300,7 +304,7 @@ rpc long prepare_to_wait_event( projection q * q, projection wait * wait, int st
 
 	rpc void mei_stop( projection dev [bind(callee)] * dev ) {
 		projection < struct mei_device > dev {
-			projection dev* dev;
+			//projection dev* dev;
 			unsigned int [out] dev_state;
 		}
 		projection < struct device > dev {
@@ -323,11 +327,11 @@ rpc long prepare_to_wait_event( projection q * q, projection wait * wait, int st
 		}
 	}
 
-	rpc void pci_unregister_driver( projection drv [dealloc(callee)] * drv ) {
+	rpc void pci_unregister_driver( projection drv [bind(callee), dealloc(callee)] * drv ) {
 		projection < struct pci_driver > drv {
-			rpc_ptr probe probe;
+			/*rpc_ptr probe probe;
 			rpc_ptr remove remove;
-			rpc_ptr shutdown shutdown;
+			rpc_ptr shutdown shutdown;*/
 		}
 	}
 
@@ -437,7 +441,7 @@ rpc long prepare_to_wait_event( projection q * q, projection wait * wait, int st
 
 	// XXX: HACK unused!
 	rpc int mei_register( projection dev [bind(callee)] * dev,
-			projection parent * [unused] parent ) {
+			projection parent [bind_memberof<struct pci_dev, dev>(caller)] *parent) {
 		projection < struct mei_device > dev {
 		}
 		projection < struct device > parent {

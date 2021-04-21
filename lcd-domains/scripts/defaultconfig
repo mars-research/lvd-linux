@@ -77,3 +77,7 @@ nullblk_gen/blk_klcd nonisolated
 coretemp_gen/boot nonisolated
 coretemp_gen/coretemp_lcd isolated
 coretemp_gen/hwmon_klcd nonisolated
+
+skxedac_gen/boot nonisolated
+skxedac_gen/skx_lcd isolated
+skxedac_gen/edac_klcd nonisolated

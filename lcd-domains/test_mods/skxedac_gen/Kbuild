@@ -1,0 +1,6 @@
+obj-$(LCD_CONFIG_BUILD_SKXEDAC_GEN_BOOT)	+= boot/
+
+obj-$(LCD_CONFIG_BUILD_SKXEDAC_GEN_SKX_LCD) += skx_lcd/
+
+obj-$(LCD_CONFIG_BUILD_SKXEDAC_GEN_EDAC_KLCD) += edac_klcd/
+

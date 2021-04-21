@@ -455,17 +455,17 @@ static int do_kernel_pages_grant_map(cptr_t lcd, struct lcd_create_ctx *ctx)
 	lcd_create_mo_metadata(p, PAGE_SIZE, LCD_MICROKERNEL_TYPE_ID_VOLUNTEERED_PAGE);
 
 	/* lookup idtr_base */
-	p = virt_to_head_page((void*) idtr_base);
+	p = virt_to_page((void*) idtr_base);
 
 	/* IDTR would be just one page */
 	lcd_create_mo_metadata(p, PAGE_SIZE, LCD_MICROKERNEL_TYPE_ID_VOLUNTEERED_PAGE);
 
 	///
 	/* lookup ds and pebs */
-	p = virt_to_head_page((void*) idtr_base);
+	//p = virt_to_head_page((void*) idtr_base);
 
 	/* IDTR would be just one page */
-	lcd_create_mo_metadata(p, PAGE_SIZE, LCD_MICROKERNEL_TYPE_ID_VOLUNTEERED_PAGE);
+	//lcd_create_mo_metadata(p, PAGE_SIZE, LCD_MICROKERNEL_TYPE_ID_VOLUNTEERED_PAGE);
 
 
 

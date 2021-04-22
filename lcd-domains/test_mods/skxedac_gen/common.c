@@ -788,7 +788,6 @@ void caller_marshal_kernel__edac_mc_add_mc_with_groups__mci__in(
 	unsigned long const* mtype_cap_ptr = &ptr->mtype_cap;
 	unsigned long const* edac_ctl_cap_ptr = &ptr->edac_ctl_cap;
 	unsigned long const* edac_cap_ptr = &ptr->edac_cap;
-	char const* const* mod_name_ptr = &ptr->mod_name;
 	char const* const* dev_name_ptr = &ptr->dev_name;
 	char const* const* mod_ver_ptr = &ptr->mod_ver;
 	struct device* const* pdev_ptr = &ptr->pdev;
@@ -854,23 +853,6 @@ void caller_marshal_kernel__edac_mc_add_mc_with_groups__mci__in(
 	}
 
 	{
-		const void* __adjusted = *mod_name_ptr;
-		glue_pack(__pos, msg, ext, __adjusted);
-		if (*mod_name_ptr) {
-			size_t i, len;
-			char const* array = *mod_name_ptr;
-			for (len = 0; array[len]; ++len);
-			glue_pack(__pos, msg, ext, len + 1);
-			for (i = 0; i < len; ++i) {
-				char const* element = &array[i];
-				glue_pack(__pos, msg, ext, *element);
-			}
-
-		}
-
-	}
-
-	{
 		const void* __adjusted = *dev_name_ptr;
 		glue_pack(__pos, msg, ext, __adjusted);
 		if (*dev_name_ptr) {
@@ -929,7 +911,6 @@ void callee_unmarshal_kernel__edac_mc_add_mc_with_groups__mci__in(
 	unsigned long* mtype_cap_ptr = &ptr->mtype_cap;
 	unsigned long* edac_ctl_cap_ptr = &ptr->edac_ctl_cap;
 	unsigned long* edac_cap_ptr = &ptr->edac_cap;
-	char const** mod_name_ptr = &ptr->mod_name;
 	char const** dev_name_ptr = &ptr->dev_name;
 	char const** mod_ver_ptr = &ptr->mod_ver;
 	struct device** pdev_ptr = &ptr->pdev;
@@ -993,23 +974,6 @@ void callee_unmarshal_kernel__edac_mc_add_mc_with_groups__mci__in(
 	}
 
 	{
-		*mod_name_ptr = glue_unpack_new_shadow(__pos, msg, ext, char const*, sizeof(char) * glue_peek(__pos, msg, ext));
-		if (*mod_name_ptr) {
-			char* writable = (char*)*mod_name_ptr;
-			size_t i, len;
-			char* array = writable;
-			len = glue_unpack(__pos, msg, ext, size_t) - 1;
-			array[len] = '\0';
-			for (i = 0; i < len; ++i) {
-				char* element = &array[i];
-				*element = glue_unpack(__pos, msg, ext, char);
-			}
-
-		}
-
-	}
-
-	{
 		*dev_name_ptr = glue_unpack_new_shadow(__pos, msg, ext, char const*, sizeof(char) * glue_peek(__pos, msg, ext));
 		if (*dev_name_ptr) {
 			char* writable = (char*)*dev_name_ptr;
@@ -1062,7 +1026,6 @@ void callee_marshal_kernel__edac_mc_add_mc_with_groups__mci__in(
 {
 	struct dimm_info** const* dimms_ptr = &ptr->dimms;
 	char const* const* ctl_name_ptr = &ptr->ctl_name;
-	char const* const* mod_name_ptr = &ptr->mod_name;
 	char const* const* dev_name_ptr = &ptr->dev_name;
 	char const* const* mod_ver_ptr = &ptr->mod_ver;
 	struct device* const* pdev_ptr = &ptr->pdev;
@@ -1076,10 +1039,6 @@ void callee_marshal_kernel__edac_mc_add_mc_with_groups__mci__in(
 
 	{
 		(void)ctl_name_ptr;
-	}
-
-	{
-		(void)mod_name_ptr;
 	}
 
 	{
@@ -1108,7 +1067,6 @@ void caller_unmarshal_kernel__edac_mc_add_mc_with_groups__mci__in(
 {
 	struct dimm_info*** dimms_ptr = &ptr->dimms;
 	char const** ctl_name_ptr = &ptr->ctl_name;
-	char const** mod_name_ptr = &ptr->mod_name;
 	char const** dev_name_ptr = &ptr->dev_name;
 	char const** mod_ver_ptr = &ptr->mod_ver;
 	struct device** pdev_ptr = &ptr->pdev;
@@ -1122,10 +1080,6 @@ void caller_unmarshal_kernel__edac_mc_add_mc_with_groups__mci__in(
 
 	{
 		(void)ctl_name_ptr;
-	}
-
-	{
-		(void)mod_name_ptr;
 	}
 
 	{
@@ -1807,12 +1761,17 @@ void caller_marshal_kernel__pci_get_device__ret_pci_dev__out(
 	struct pci_dev const* ptr)
 {
 	struct pci_bus* const* bus_ptr = &ptr->bus;
+	struct device const* dev_ptr = &ptr->dev;
 	
 	{
 		if (*bus_ptr) {
 			caller_marshal_kernel__pci_get_device__bus__out(__pos, msg, ext, ctx, *bus_ptr);
 		}
 
+	}
+
+	{
+		caller_marshal_kernel__pci_get_device__device__out(__pos, msg, ext, ctx, dev_ptr);
 	}
 
 }
@@ -1825,12 +1784,17 @@ void callee_unmarshal_kernel__pci_get_device__ret_pci_dev__out(
 	struct pci_dev* ptr)
 {
 	struct pci_bus** bus_ptr = &ptr->bus;
+	struct device* dev_ptr = &ptr->dev;
 	
 	{
 		if (*bus_ptr) {
 			callee_unmarshal_kernel__pci_get_device__bus__out(__pos, msg, ext, ctx, *bus_ptr);
 		}
 
+	}
+
+	{
+		callee_unmarshal_kernel__pci_get_device__device__out(__pos, msg, ext, ctx, dev_ptr);
 	}
 
 }
@@ -1844,6 +1808,7 @@ void callee_marshal_kernel__pci_get_device__ret_pci_dev__out(
 {
 	struct pci_bus* const* bus_ptr = &ptr->bus;
 	unsigned int const* devfn_ptr = &ptr->devfn;
+	struct device const* dev_ptr = &ptr->dev;
 	
 	{
 		const void* __adjusted = *bus_ptr;
@@ -1858,6 +1823,10 @@ void callee_marshal_kernel__pci_get_device__ret_pci_dev__out(
 		glue_pack(__pos, msg, ext, *devfn_ptr);
 	}
 
+	{
+		callee_marshal_kernel__pci_get_device__device__out(__pos, msg, ext, ctx, dev_ptr);
+	}
+
 }
 
 void caller_unmarshal_kernel__pci_get_device__ret_pci_dev__out(
@@ -1869,6 +1838,7 @@ void caller_unmarshal_kernel__pci_get_device__ret_pci_dev__out(
 {
 	struct pci_bus** bus_ptr = &ptr->bus;
 	unsigned int* devfn_ptr = &ptr->devfn;
+	struct device* dev_ptr = &ptr->dev;
 	
 	{
 		*bus_ptr = glue_unpack_bind_or_new_shadow(__pos, msg, ext, struct pci_bus*, sizeof(struct pci_bus));
@@ -1880,6 +1850,10 @@ void caller_unmarshal_kernel__pci_get_device__ret_pci_dev__out(
 
 	{
 		*devfn_ptr = glue_unpack(__pos, msg, ext, unsigned int);
+	}
+
+	{
+		caller_unmarshal_kernel__pci_get_device__device__out(__pos, msg, ext, ctx, dev_ptr);
 	}
 
 }
@@ -1930,6 +1904,152 @@ void caller_unmarshal_kernel__pci_get_device__bus__out(
 	
 	{
 		*number_ptr = glue_unpack(__pos, msg, ext, unsigned char);
+	}
+
+}
+
+void caller_marshal_kernel__pci_get_device__device__out(
+	size_t* __pos,
+	struct fipc_message* msg,
+	struct ext_registers* ext,
+	struct pci_get_device_call_ctx const* ctx,
+	struct device const* ptr)
+{
+	struct kobject const* kobj_ptr = &ptr->kobj;
+	
+	{
+		caller_marshal_kernel__pci_get_device__kobject__out(__pos, msg, ext, ctx, kobj_ptr);
+	}
+
+}
+
+void callee_unmarshal_kernel__pci_get_device__device__out(
+	size_t* __pos,
+	const struct fipc_message* msg,
+	const struct ext_registers* ext,
+	struct pci_get_device_call_ctx const* ctx,
+	struct device* ptr)
+{
+	struct kobject* kobj_ptr = &ptr->kobj;
+	
+	{
+		callee_unmarshal_kernel__pci_get_device__kobject__out(__pos, msg, ext, ctx, kobj_ptr);
+	}
+
+}
+
+void callee_marshal_kernel__pci_get_device__device__out(
+	size_t* __pos,
+	struct fipc_message* msg,
+	struct ext_registers* ext,
+	struct pci_get_device_call_ctx const* ctx,
+	struct device const* ptr)
+{
+	struct kobject const* kobj_ptr = &ptr->kobj;
+	
+	{
+		callee_marshal_kernel__pci_get_device__kobject__out(__pos, msg, ext, ctx, kobj_ptr);
+	}
+
+}
+
+void caller_unmarshal_kernel__pci_get_device__device__out(
+	size_t* __pos,
+	const struct fipc_message* msg,
+	const struct ext_registers* ext,
+	struct pci_get_device_call_ctx const* ctx,
+	struct device* ptr)
+{
+	struct kobject* kobj_ptr = &ptr->kobj;
+	
+	{
+		caller_unmarshal_kernel__pci_get_device__kobject__out(__pos, msg, ext, ctx, kobj_ptr);
+	}
+
+}
+
+void caller_marshal_kernel__pci_get_device__kobject__out(
+	size_t* __pos,
+	struct fipc_message* msg,
+	struct ext_registers* ext,
+	struct pci_get_device_call_ctx const* ctx,
+	struct kobject const* ptr)
+{
+	char const* const* name_ptr = &ptr->name;
+	
+	{
+		(void)name_ptr;
+	}
+
+}
+
+void callee_unmarshal_kernel__pci_get_device__kobject__out(
+	size_t* __pos,
+	const struct fipc_message* msg,
+	const struct ext_registers* ext,
+	struct pci_get_device_call_ctx const* ctx,
+	struct kobject* ptr)
+{
+	char const** name_ptr = &ptr->name;
+	
+	{
+		(void)name_ptr;
+	}
+
+}
+
+void callee_marshal_kernel__pci_get_device__kobject__out(
+	size_t* __pos,
+	struct fipc_message* msg,
+	struct ext_registers* ext,
+	struct pci_get_device_call_ctx const* ctx,
+	struct kobject const* ptr)
+{
+	char const* const* name_ptr = &ptr->name;
+	
+	{
+		const void* __adjusted = *name_ptr;
+		glue_pack(__pos, msg, ext, __adjusted);
+		if (*name_ptr) {
+			size_t i, len;
+			char const* array = *name_ptr;
+			for (len = 0; array[len]; ++len);
+			glue_pack(__pos, msg, ext, len + 1);
+			for (i = 0; i < len; ++i) {
+				char const* element = &array[i];
+				glue_pack(__pos, msg, ext, *element);
+			}
+
+		}
+
+	}
+
+}
+
+void caller_unmarshal_kernel__pci_get_device__kobject__out(
+	size_t* __pos,
+	const struct fipc_message* msg,
+	const struct ext_registers* ext,
+	struct pci_get_device_call_ctx const* ctx,
+	struct kobject* ptr)
+{
+	char const** name_ptr = &ptr->name;
+	
+	{
+		*name_ptr = glue_unpack_bind_or_new_shadow(__pos, msg, ext, char const*, sizeof(char) * glue_peek(__pos, msg, ext));
+		if (*name_ptr) {
+			char* writable = (char*)*name_ptr;
+			size_t i, len;
+			char* array = writable;
+			len = glue_unpack(__pos, msg, ext, size_t) - 1;
+			array[len] = '\0';
+			for (i = 0; i < len; ++i) {
+				char* element = &array[i];
+				*element = glue_unpack(__pos, msg, ext, char);
+			}
+
+		}
+
 	}
 
 }

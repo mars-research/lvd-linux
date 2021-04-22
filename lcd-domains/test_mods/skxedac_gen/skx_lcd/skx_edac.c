@@ -54,6 +54,8 @@
 static LIST_HEAD(skx_edac_list);
 
 static u64 skx_tolm, skx_tohm;
+int edac_op_state = 0;
+int edac_report_status = EDAC_REPORTING_ENABLED;
 
 #define NUM_IMC			2	/* memory controllers per socket */
 #define NUM_CHANNELS		3	/* channels per memory controller */

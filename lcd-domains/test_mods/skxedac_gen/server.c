@@ -563,8 +563,15 @@ void edac_mc_add_mc_with_groups_callee(struct fipc_message* msg, struct ext_regi
 
 	}
 
+	mci->mod_name = "skx_edac.c";
+
+	printk("%s, mci->ctlname %s | mci->mtype_cap %ld "
+			"mci->edac_cap %ld | mci->mod_name %s | mci->dev_name %s | mci->mod_ver %s\n",
+			__func__, mci->ctl_name, mci->mtype_cap, mci->edac_cap, mci->mod_name, mci->dev_name, mci->mod_ver);
+
 	ret = edac_mc_add_mc_with_groups(mci, groups);
 
+	printk("%s returned %d\n", __func__, ret);
 	*__pos = 0;
 	{
 		if (*mci_ptr) {

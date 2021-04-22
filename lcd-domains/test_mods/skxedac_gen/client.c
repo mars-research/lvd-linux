@@ -594,6 +594,7 @@ int edac_mc_add_mc_with_groups(struct mem_ctl_info* mci, struct attribute_group 
 	if (verbose_debug) {
 		printk("%s:%d, returned!\n", __func__, __LINE__);
 	}
+	printk("%s, returned %d\n", __func__, ret);
 	return ret;
 }
 

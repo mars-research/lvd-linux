@@ -154,7 +154,7 @@ module kernel {
 			unsigned long mtype_cap;
 			unsigned long edac_ctl_cap;
 			unsigned long edac_cap;
-			string [alloc(callee)] *  mod_name;
+			//string [alloc(callee)] *  mod_name;
 			string [alloc(callee)] *  dev_name;
 			string [alloc(callee)] *  mod_ver;
 			projection device [alloc(callee)] *pdev;	
@@ -223,11 +223,20 @@ module kernel {
 		projection < struct pci_dev > ret_pci_dev {
 			projection bus [alloc_once(caller)] *bus;
 			unsigned int [out] devfn;
+			projection device dev;
 		}
 		projection < struct pci_dev > from {
 		}
 		projection < struct pci_bus > bus {
 			unsigned char [out] number;
+		}
+
+		projection < struct device > device {
+			projection kobject kobj;
+		}
+
+		projection < struct kobject > kobject {
+			string [alloc_once(caller)] *name;
 		}
 	}
 

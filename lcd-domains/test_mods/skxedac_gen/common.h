@@ -10,7 +10,7 @@
 
 #include "glue_user.h"
 
-#define verbose_debug 1
+#define verbose_debug 0
 #define glue_pack(pos, msg, ext, value) glue_pack_impl((pos), (msg), (ext), (uint64_t)(value))
 #define glue_pack_shadow(pos, msg, ext, value) glue_pack_shadow_impl((pos), (msg), (ext), (value))
 #define glue_unpack(pos, msg, ext, type) (type)glue_unpack_impl((pos), (msg), (ext))
@@ -73,7 +73,7 @@ static inline void* glue_unpack_rpc_ptr_impl(void* target, struct lcd_trampoline
 static inline void
 glue_pack_impl(size_t* pos, struct fipc_message* msg, struct ext_registers* ext, uint64_t value)
 {
-	if (*pos >= 500)
+	if (*pos >= 512)
 		glue_user_panic("Glue message was too large");
 	if (*pos < 6)
 		msg->regs[(*pos)++ + 1] = value;
@@ -949,6 +949,62 @@ void caller_unmarshal_kernel__pci_get_device__bus__out(
 	const struct ext_registers* ext,
 	struct pci_get_device_call_ctx const* call_ctx,
 	struct pci_bus* ptr);
+
+void caller_marshal_kernel__pci_get_device__device__out(
+	size_t* __pos,
+	struct fipc_message* msg,
+	struct ext_registers* ext,
+	struct pci_get_device_call_ctx const* call_ctx,
+	struct device const* ptr);
+
+void callee_unmarshal_kernel__pci_get_device__device__out(
+	size_t* __pos,
+	const struct fipc_message* msg,
+	const struct ext_registers* ext,
+	struct pci_get_device_call_ctx const* call_ctx,
+	struct device* ptr);
+
+void callee_marshal_kernel__pci_get_device__device__out(
+	size_t* __pos,
+	struct fipc_message* msg,
+	struct ext_registers* ext,
+	struct pci_get_device_call_ctx const* call_ctx,
+	struct device const* ptr);
+
+void caller_unmarshal_kernel__pci_get_device__device__out(
+	size_t* __pos,
+	const struct fipc_message* msg,
+	const struct ext_registers* ext,
+	struct pci_get_device_call_ctx const* call_ctx,
+	struct device* ptr);
+
+void caller_marshal_kernel__pci_get_device__kobject__out(
+	size_t* __pos,
+	struct fipc_message* msg,
+	struct ext_registers* ext,
+	struct pci_get_device_call_ctx const* call_ctx,
+	struct kobject const* ptr);
+
+void callee_unmarshal_kernel__pci_get_device__kobject__out(
+	size_t* __pos,
+	const struct fipc_message* msg,
+	const struct ext_registers* ext,
+	struct pci_get_device_call_ctx const* call_ctx,
+	struct kobject* ptr);
+
+void callee_marshal_kernel__pci_get_device__kobject__out(
+	size_t* __pos,
+	struct fipc_message* msg,
+	struct ext_registers* ext,
+	struct pci_get_device_call_ctx const* call_ctx,
+	struct kobject const* ptr);
+
+void caller_unmarshal_kernel__pci_get_device__kobject__out(
+	size_t* __pos,
+	const struct fipc_message* msg,
+	const struct ext_registers* ext,
+	struct pci_get_device_call_ctx const* call_ctx,
+	struct kobject* ptr);
 
 void caller_marshal_kernel__pci_get_device__from__in(
 	size_t* __pos,

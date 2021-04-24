@@ -37,3 +37,4 @@ obj-m += meime_gen/
 obj-m += nullblk_gen/
 obj-m += coretemp_gen/
 obj-m += skxedac_gen/
+obj-m += ixgbe_gen/

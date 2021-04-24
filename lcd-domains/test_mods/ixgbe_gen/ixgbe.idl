@@ -1,0 +1,2383 @@
+module kernel {
+	rpc_ptr int probe( projection pdev [alloc(callee)] * pdev, projection ent [alloc(callee)] * ent ) {
+		projection < struct device> device {
+			//projection device_parent* parent;
+			projection kobject kobj;
+		}
+		projection < struct kobject > kobject {
+			string [alloc_once(caller)] *name;
+		}
+		projection < struct pci_dev > pdev {
+			projection pci_dev_bus [alloc(callee)] * bus;
+			unsigned short vendor;
+			unsigned short device;
+			unsigned short subsystem_device;
+			//unsigned int is_virtfn : 1;
+			projection device dev;
+			array< projection resource, 11> resource;
+		}
+		projection < struct pci_bus > pci_dev_bus {
+		}
+		projection < struct device > device_parent {
+		}
+		projection < struct pci_device_id > ent {
+			long unsigned int  driver_data;
+		}
+		projection <struct resource> resource {
+		}
+	}
+
+	rpc_ptr void  remove( projection pdev [bind(callee)] * pdev ) {
+		projection < struct pci_dev > pdev {
+		}
+	}
+
+	rpc_ptr void  shutdown( projection pdev [bind(callee)] * pdev ) {
+		projection < struct pci_dev > pdev {
+		}
+	}
+
+	/*
+	XXX: Unused
+	rpc_ptr s32  sriov_configure( projection dev * [in] dev, s32  num_vfs ) {
+		projection < struct device> device {
+			projection device_parent* parent;
+			projection dev_pm_info power;
+		}
+		projection < struct dev_pm_info> dev_pm_info {
+		}
+		projection < struct pci_dev > dev {
+			projection pci_dev_bus* bus;
+			projection device dev;
+		}
+		projection < struct pci_bus > pci_dev_bus {
+		}
+		projection < struct device > device_parent {
+		}
+	}
+	rpc_ptr u32  error_detected( projection pdev * [in] pdev, u32  state ) {
+		projection < struct device> device {
+			projection device_parent* parent;
+			projection dev_pm_info power;
+		}
+		projection < struct dev_pm_info> dev_pm_info {
+		}
+		projection < struct pci_dev > pdev {
+			projection pci_dev_bus* bus;
+			projection device dev;
+			u32 [in, out] transparent;
+		}
+		projection < struct pci_bus > pci_dev_bus {
+		}
+		projection < struct device > device_parent {
+		}
+	}
+	rpc_ptr u32  slot_reset( projection pdev * [in] pdev ) {
+		projection < struct device> device {
+			projection device_parent* parent;
+			projection dev_pm_info power;
+		}
+		projection < struct dev_pm_info> dev_pm_info {
+		}
+		projection < struct pci_dev > pdev {
+			projection pci_dev_bus* bus;
+			projection device dev;
+			array< resource, 11> [in] resource;
+			u32 [in] transparent;
+		}
+		projection < struct pci_bus > pci_dev_bus {
+			projection pci_bus_self* self;
+		}
+		projection < struct device > device_parent {
+		}
+		projection < struct pci_dev > pci_bus_self {
+		}
+	}
+	rpc_ptr void  resume( projection pdev * [in] pdev ) {
+			projection < struct device> device {
+				projection device_parent* parent;
+				projection dev_pm_info power;
+			}
+				projection < struct dev_pm_info> dev_pm_info {
+				}
+		projection < struct pci_dev > pdev {
+			projection pci_dev_bus* bus;
+			projection device dev;
+		}
+		projection < struct pci_bus > pci_dev_bus {
+		}
+		projection < struct device > device_parent {
+		}
+	}
+	*/
+
+	rpc_ptr void  ndo_set_rx_mode( projection netdev [bind(callee)] *netdev ) {
+		projection < struct net_device > netdev {
+			u64 state;
+			long long unsigned int features;
+			unsigned int flags;
+		}
+	}
+
+	/*
+	XXX: VLAN unused
+	rpc_ptr s32  ndo_vlan_rx_add_vid( projection netdev * [in] netdev, u16 [unused] proto, u16  vid ) {
+			projection < struct device> device {
+				projection device_parent* parent;
+				projection dev_pm_info power;
+			}
+				projection < struct dev_pm_info> dev_pm_info {
+				}
+		projection < struct net_device > netdev {
+			projection net_device__global_netdev_ops* netdev_ops;
+			projection net_device__global_ethtool_ops* ethtool_ops;
+			projection device dev;
+		}
+		projection < struct device > device_parent {
+		}
+	}
+	rpc_ptr s32  ndo_set_vf_spoofchk( projection netdev * [in] netdev, s32  vf, bool  setting ) {
+			projection < struct device> device {
+				projection device_parent* parent;
+				projection dev_pm_info power;
+			}
+				projection < struct dev_pm_info> dev_pm_info {
+				}
+		projection < struct net_device > netdev {
+			projection net_device__global_netdev_ops* netdev_ops;
+			projection net_device__global_ethtool_ops* ethtool_ops;
+			projection device dev;
+		}
+		projection < struct device > device_parent {
+		}
+	}
+	rpc_ptr s32  ndo_set_vf_rss_query_en( projection netdev * [in] netdev, s32  vf, bool  setting ) {
+			projection < struct device> device {
+				projection device_parent* parent;
+				projection dev_pm_info power;
+			}
+				projection < struct dev_pm_info> dev_pm_info {
+				}
+		projection < struct net_device > netdev {
+			projection net_device__global_netdev_ops* netdev_ops;
+			projection net_device__global_ethtool_ops* ethtool_ops;
+			projection device dev;
+		}
+		projection < struct device > device_parent {
+		}
+	}
+	*/
+
+
+	/* TODO: ethtool_ops - come back later
+	rpc_ptr s32  get_settings( projection netdev * [in] netdev, projection ecmd * [in] ecmd ) {
+		projection < struct device> device {
+			projection device_parent* parent;
+			projection dev_pm_info power;
+		}
+		projection < struct dev_pm_info> dev_pm_info {
+		}
+		projection < struct net_device > netdev {
+			u64 [in] state;
+			projection net_device__global_netdev_ops* netdev_ops;
+			projection net_device__global_ethtool_ops* ethtool_ops;
+			projection device dev;
+		}
+		projection < struct device > device_parent {
+		}
+		projection < struct ethtool_cmd > ecmd {
+			u32 [in, out] supported;
+			u32 [in, out] advertising;
+			u16 [in, out] speed;
+			u8 [in, out] duplex;
+			u8 [in, out] port;
+			u8 [in, out] transceiver;
+			u8 [in, out] autoneg;
+			u16 [in, out] speed_hi;
+		}
+	}
+	rpc_ptr s32  set_settings( projection netdev * [in] netdev, projection ecmd * [in] ecmd ) {
+		projection < struct device> device {
+			projection device_parent* parent;
+			projection dev_pm_info power;
+		}
+		projection < struct dev_pm_info> dev_pm_info {
+		}
+		projection < struct net_device > netdev {
+			projection net_device__global_netdev_ops* netdev_ops;
+			projection net_device__global_ethtool_ops* ethtool_ops;
+			projection device dev;
+		}
+		projection < struct device > device_parent {
+		}
+		projection < struct ethtool_cmd > ecmd {
+			u32 [in] supported;
+			u32 [in] advertising;
+			u8 [in] duplex;
+			u8 [in] autoneg;
+		}
+	}
+	rpc_ptr void  get_drvinfo( projection netdev * [in] netdev, projection drvinfo * [in] drvinfo ) {
+		projection < struct device> device {
+			projection device_parent* parent;
+			projection dev_pm_info power;
+		}
+		projection < struct dev_pm_info> dev_pm_info {
+		}
+		projection < struct net_device > netdev {
+			projection net_device__global_netdev_ops* netdev_ops;
+			projection net_device__global_ethtool_ops* ethtool_ops;
+			projection device dev;
+		}
+		projection < struct device > device_parent {
+		}
+		projection < struct ethtool_drvinfo > drvinfo {
+		}
+	}
+	rpc_ptr s32  get_regs_len( projection netdev * [in] netdev ) {
+		projection < struct device> device {
+			projection device_parent* parent;
+			projection dev_pm_info power;
+		}
+		projection < struct dev_pm_info> dev_pm_info {
+		}
+		projection < struct net_device > netdev {
+			projection net_device__global_netdev_ops* netdev_ops;
+			projection net_device__global_ethtool_ops* ethtool_ops;
+			projection device dev;
+		}
+		projection < struct device > device_parent {
+		}
+	}
+	rpc_ptr void  get_regs( projection netdev * [in] netdev, projection regs * [in] regs, void*  p ) {
+		projection < struct device> device {
+			projection device_parent* parent;
+			projection dev_pm_info power;
+		}
+		projection < struct dev_pm_info> dev_pm_info {
+		}
+		projection < struct net_device > netdev {
+			projection net_device__global_netdev_ops* netdev_ops;
+			projection net_device__global_ethtool_ops* ethtool_ops;
+			projection device dev;
+		}
+		projection < struct device > device_parent {
+		}
+		projection < struct ethtool_regs > regs {
+		}
+	}
+	rpc_ptr void  get_wol( projection netdev * [in] netdev, projection wol * [in] wol ) {
+		projection < struct device> device {
+			projection device_parent* parent;
+			projection dev_pm_info power;
+		}
+		projection < struct dev_pm_info> dev_pm_info {
+		}
+		projection < struct net_device > netdev {
+			projection net_device__global_netdev_ops* netdev_ops;
+			projection net_device__global_ethtool_ops* ethtool_ops;
+			projection device dev;
+		}
+		projection < struct device > device_parent {
+		}
+		projection < struct ethtool_wolinfo > wol {
+		}
+	}
+	rpc_ptr s32  set_wol( projection netdev * [in] netdev, projection wol * [in] wol ) {
+		projection < struct device> device {
+			projection device_parent* parent;
+			projection dev_pm_info power;
+		}
+		projection < struct dev_pm_info> dev_pm_info {
+		}
+		projection < struct net_device > netdev {
+			projection net_device__global_netdev_ops* netdev_ops;
+			projection net_device__global_ethtool_ops* ethtool_ops;
+			projection device dev;
+		}
+		projection < struct device > device_parent {
+		}
+		projection < struct ethtool_wolinfo > wol {
+		}
+	}
+	rpc_ptr u32  get_msglevel( projection netdev * [in] netdev ) {
+		projection < struct device> device {
+			projection device_parent* parent;
+			projection dev_pm_info power;
+		}
+		projection < struct dev_pm_info> dev_pm_info {
+		}
+		projection < struct net_device > netdev {
+			projection net_device__global_netdev_ops* netdev_ops;
+			projection net_device__global_ethtool_ops* ethtool_ops;
+			projection device dev;
+		}
+		projection < struct device > device_parent {
+		}
+	}
+	rpc_ptr void  set_msglevel( projection netdev * [in] netdev, u32  data ) {
+		projection < struct device> device {
+			projection device_parent* parent;
+			projection dev_pm_info power;
+		}
+		projection < struct dev_pm_info> dev_pm_info {
+		}
+		projection < struct net_device > netdev {
+			projection net_device__global_netdev_ops* netdev_ops;
+			projection net_device__global_ethtool_ops* ethtool_ops;
+			projection device dev;
+		}
+		projection < struct device > device_parent {
+		}
+	}
+	rpc_ptr s32  nway_reset( projection netdev * [in] netdev ) {
+		projection < struct device> device {
+			projection device_parent* parent;
+			projection dev_pm_info power;
+		}
+		projection < struct dev_pm_info> dev_pm_info {
+		}
+		projection < struct net_device > netdev {
+			u64 [in] state;
+			projection net_device__global_netdev_ops* netdev_ops;
+			projection net_device__global_ethtool_ops* ethtool_ops;
+			projection device dev;
+		}
+		projection < struct device > device_parent {
+		}
+	}
+	rpc_ptr s32  get_eeprom_len( projection netdev * [in] netdev ) {
+		projection < struct device> device {
+			projection device_parent* parent;
+			projection dev_pm_info power;
+		}
+		projection < struct dev_pm_info> dev_pm_info {
+		}
+		projection < struct net_device > netdev {
+			projection net_device__global_netdev_ops* netdev_ops;
+			projection net_device__global_ethtool_ops* ethtool_ops;
+			projection device dev;
+		}
+		projection < struct device > device_parent {
+		}
+	}
+	rpc_ptr s32  get_eeprom( projection netdev * [in] netdev, projection eeprom * [in] eeprom, u8* [out] bytes ) {
+		projection < struct device> device {
+			projection device_parent* parent;
+			projection dev_pm_info power;
+		}
+		projection < struct dev_pm_info> dev_pm_info {
+		}
+		projection < struct net_device > netdev {
+			projection net_device__global_netdev_ops* netdev_ops;
+			projection net_device__global_ethtool_ops* ethtool_ops;
+			projection device dev;
+		}
+		projection < struct device > device_parent {
+		}
+		projection < struct ethtool_eeprom > eeprom {
+		}
+	}
+	rpc_ptr s32  set_eeprom( projection netdev * [in] netdev, projection eeprom * [in] eeprom, u8* [out] bytes ) {
+		projection < struct device> device {
+			projection device_parent* parent;
+			projection dev_pm_info power;
+		}
+		projection < struct dev_pm_info> dev_pm_info {
+		}
+		projection < struct net_device > netdev {
+			projection net_device__global_netdev_ops* netdev_ops;
+			projection net_device__global_ethtool_ops* ethtool_ops;
+			projection device dev;
+		}
+		projection < struct device > device_parent {
+		}
+		projection < struct ethtool_eeprom > eeprom {
+		}
+	}
+	rpc_ptr s32  get_coalesce( projection netdev * [in] netdev, projection ec * [in] ec ) {
+		projection < struct device> device {
+			projection device_parent* parent;
+			projection dev_pm_info power;
+		}
+		projection < struct dev_pm_info> dev_pm_info {
+		}
+		projection < struct net_device > netdev {
+			projection net_device__global_netdev_ops* netdev_ops;
+			projection net_device__global_ethtool_ops* ethtool_ops;
+			projection device dev;
+		}
+		projection < struct device > device_parent {
+		}
+		projection < struct ethtool_coalesce > ec {
+		}
+	}
+	rpc_ptr s32  set_coalesce( projection netdev * [in] netdev, projection ec * [in] ec ) {
+		projection < struct device> device {
+			projection device_parent* parent;
+			projection dev_pm_info power;
+		}
+		projection < struct dev_pm_info> dev_pm_info {
+		}
+		projection < struct net_device > netdev {
+			u64 [in] state;
+			projection net_device__global_netdev_ops* netdev_ops;
+			projection net_device__global_ethtool_ops* ethtool_ops;
+			projection device dev;
+		}
+		projection < struct device > device_parent {
+		}
+		projection < struct ethtool_coalesce > ec {
+		}
+	}
+	rpc_ptr void  get_ringparam( projection netdev * [in] netdev, projection ring * [in] ring ) {
+		projection < struct device> device {
+			projection device_parent* parent;
+			projection dev_pm_info power;
+		}
+		projection < struct dev_pm_info> dev_pm_info {
+		}
+		projection < struct net_device > netdev {
+			projection net_device__global_netdev_ops* netdev_ops;
+			projection net_device__global_ethtool_ops* ethtool_ops;
+			projection device dev;
+		}
+		projection < struct device > device_parent {
+		}
+		projection < struct ethtool_ringparam > ring {
+		}
+	}
+	rpc_ptr s32  set_ringparam( projection netdev * [in] netdev, projection ring * [in] ring ) {
+		projection < struct device> device {
+			projection device_parent* parent;
+			projection dev_pm_info power;
+		}
+		projection < struct dev_pm_info> dev_pm_info {
+		}
+		projection < struct net_device > netdev {
+			projection net_device__global_netdev_ops* netdev_ops;
+			projection net_device__global_ethtool_ops* ethtool_ops;
+			projection device dev;
+		}
+		projection < struct device > device_parent {
+		}
+		projection < struct ethtool_ringparam > ring {
+		}
+	}
+	rpc_ptr void  get_pauseparam( projection netdev * [in] netdev, projection pause * [in] pause ) {
+		projection < struct device> device {
+			projection device_parent* parent;
+			projection dev_pm_info power;
+		}
+		projection < struct dev_pm_info> dev_pm_info {
+		}
+		projection < struct net_device > netdev {
+			projection net_device__global_netdev_ops* netdev_ops;
+			projection net_device__global_ethtool_ops* ethtool_ops;
+			projection device dev;
+		}
+		projection < struct device > device_parent {
+		}
+		projection < struct ethtool_pauseparam > pause {
+		}
+	}
+	rpc_ptr s32  set_pauseparam( projection netdev * [in] netdev, projection pause * [in] pause ) {
+		projection < struct device> device {
+			projection device_parent* parent;
+			projection dev_pm_info power;
+		}
+		projection < struct dev_pm_info> dev_pm_info {
+		}
+		projection < struct net_device > netdev {
+			u64 [in] state;
+			projection net_device__global_netdev_ops* netdev_ops;
+			projection net_device__global_ethtool_ops* ethtool_ops;
+			projection device dev;
+		}
+		projection < struct device > device_parent {
+		}
+		projection < struct ethtool_pauseparam > pause {
+		}
+	}
+	rpc_ptr void  self_test( projection netdev * [in] netdev, projection eth_test * [in] eth_test, u64* [in, out] data ) {
+		projection < struct device> device {
+			projection device_parent* parent;
+			projection dev_pm_info power;
+		}
+		projection < struct dev_pm_info> dev_pm_info {
+		}
+		projection < struct net_device > netdev {
+			u64 [in] state;
+			projection net_device__global_netdev_ops* netdev_ops;
+			projection net_device__global_ethtool_ops* ethtool_ops;
+			projection device dev;
+		}
+		projection < struct device > device_parent {
+		}
+		projection < struct ethtool_test > eth_test {
+		}
+	}
+	rpc_ptr void  get_strings( projection netdev * [in] netdev, u32  stringset, u8* [in, out] data ) {
+		projection < struct device> device {
+			projection device_parent* parent;
+			projection dev_pm_info power;
+		}
+		projection < struct dev_pm_info> dev_pm_info {
+		}
+		projection < struct net_device > netdev {
+			projection net_device__global_netdev_ops* netdev_ops;
+			projection net_device__global_ethtool_ops* ethtool_ops;
+			u32 [in] num_tx_queues;
+			projection device dev;
+		}
+		projection < struct device > device_parent {
+		}
+	}
+	rpc_ptr s32  set_phys_id( projection netdev * [in] netdev, u32  state ) {
+		projection < struct device> device {
+			projection device_parent* parent;
+			projection dev_pm_info power;
+		}
+		projection < struct dev_pm_info> dev_pm_info {
+		}
+		projection < struct net_device > netdev {
+			projection net_device__global_netdev_ops* netdev_ops;
+			projection net_device__global_ethtool_ops* ethtool_ops;
+			projection device dev;
+		}
+		projection < struct device > device_parent {
+		}
+	}
+	rpc_ptr void  get_ethtool_stats( projection netdev * [in, out] netdev, projection stats * [unused] stats, u64* [in] data ) {
+		projection < struct net_device_stats> net_device_stats {
+		}
+		projection < struct device> device {
+			projection device_parent* parent;
+			projection dev_pm_info power;
+		}
+		projection < struct dev_pm_info> dev_pm_info {
+		}
+		projection < struct net_device > netdev {
+			projection net_device_stats stats;
+			projection net_device__global_netdev_ops* netdev_ops;
+			projection net_device__global_ethtool_ops* ethtool_ops;
+			u32 [in] num_tx_queues;
+			projection device dev;
+		}
+		projection < struct device > device_parent {
+		}
+		projection < struct ethtool_stats > stats {
+		}
+	}
+	rpc_ptr s32  get_sset_count( projection netdev * [in] netdev, s32  sset ) {
+		projection < struct device> device {
+			projection device_parent* parent;
+			projection dev_pm_info power;
+		}
+		projection < struct dev_pm_info> dev_pm_info {
+		}
+		projection < struct net_device > netdev {
+			projection net_device__global_netdev_ops* netdev_ops;
+			projection net_device__global_ethtool_ops* ethtool_ops;
+			u32 [in] num_tx_queues;
+			projection device dev;
+		}
+		projection < struct device > device_parent {
+		}
+	}
+	rpc_ptr s32  get_rxnfc( projection dev * [in] dev, projection cmd * [in] cmd, u32* [in] rule_locs ) {
+		projection < struct device> device {
+			projection device_parent* parent;
+			projection dev_pm_info power;
+		}
+		projection < struct dev_pm_info> dev_pm_info {
+		}
+		projection < struct net_device > dev {
+			projection net_device__global_netdev_ops* netdev_ops;
+			projection net_device__global_ethtool_ops* ethtool_ops;
+			projection device dev;
+		}
+		projection < struct device > device_parent {
+		}
+		projection < struct ethtool_rxnfc > cmd {
+		}
+	}
+	rpc_ptr s32  set_rxnfc( projection dev * [in] dev, projection cmd * [in] cmd ) {
+		projection < struct device> device {
+			projection device_parent* parent;
+			projection dev_pm_info power;
+		}
+		projection < struct dev_pm_info> dev_pm_info {
+		}
+		projection < struct net_device > dev {
+			projection net_device__global_netdev_ops* netdev_ops;
+			projection net_device__global_ethtool_ops* ethtool_ops;
+			projection device dev;
+		}
+		projection < struct device > device_parent {
+		}
+		projection < struct ethtool_rxnfc > cmd {
+		}
+	}
+	rpc_ptr u32  get_rxfh_key_size( projection netdev * [in] netdev ) {
+		projection < struct device> device {
+			projection device_parent* parent;
+			projection dev_pm_info power;
+		}
+		projection < struct dev_pm_info> dev_pm_info {
+		}
+		projection < struct net_device > netdev {
+			projection net_device__global_netdev_ops* netdev_ops;
+			projection net_device__global_ethtool_ops* ethtool_ops;
+			projection device dev;
+		}
+		projection < struct device > device_parent {
+		}
+	}
+	rpc_ptr u32 [in] get_rxfh_indir_size( projection netdev * [in] netdev ) {
+		projection < struct device> device {
+			projection device_parent* parent;
+			projection dev_pm_info power;
+		}
+		projection < struct dev_pm_info> dev_pm_info {
+		}
+		projection < struct net_device > netdev {
+			projection net_device__global_netdev_ops* netdev_ops;
+			projection net_device__global_ethtool_ops* ethtool_ops;
+			projection device dev;
+		}
+		projection < struct device > device_parent {
+		}
+	}
+	rpc_ptr s32  get_rxfh( projection netdev * [in] netdev, u32*  indir, u8*  key, u8* [out] hfunc ) {
+		projection < struct device> device {
+			projection device_parent* parent;
+			projection dev_pm_info power;
+		}
+		projection < struct dev_pm_info> dev_pm_info {
+		}
+		projection < struct net_device > netdev {
+			projection net_device__global_netdev_ops* netdev_ops;
+			projection net_device__global_ethtool_ops* ethtool_ops;
+			projection device dev;
+		}
+		projection < struct device > device_parent {
+		}
+	}
+	rpc_ptr s32  set_rxfh( projection netdev * [in] netdev, u32* [in] indir, u8*  key, u8  hfunc ) {
+		projection < struct device> device {
+			projection device_parent* parent;
+			projection dev_pm_info power;
+		}
+		projection < struct dev_pm_info> dev_pm_info {
+		}
+		projection < struct net_device > netdev {
+			projection net_device__global_netdev_ops* netdev_ops;
+			projection net_device__global_ethtool_ops* ethtool_ops;
+			projection device dev;
+		}
+		projection < struct device > device_parent {
+		}
+	}
+	rpc_ptr void  get_channels( projection dev * [in] dev, projection ch * [in] ch ) {
+		projection < struct device> device {
+			projection device_parent* parent;
+			projection dev_pm_info power;
+		}
+		projection < struct dev_pm_info> dev_pm_info {
+		}
+		projection < struct net_device > dev {
+			projection net_device__global_netdev_ops* netdev_ops;
+			projection net_device__global_ethtool_ops* ethtool_ops;
+			projection device dev;
+			u8 [in] num_tc;
+		}
+		projection < struct device > device_parent {
+		}
+		projection < struct ethtool_channels > ch {
+		}
+	}
+	rpc_ptr s32  set_channels( projection dev * [in, out] dev, projection ch * [in] ch ) {
+		projection < struct device> device {
+			projection device_parent* parent;
+			projection dev_pm_info power;
+		}
+		projection < struct dev_pm_info> dev_pm_info {
+		}
+		projection < struct net_device > dev {
+			u64 [in] state;
+			projection net_device__global_netdev_ops* netdev_ops;
+			projection net_device__global_ethtool_ops* ethtool_ops;
+			u32 [in] num_rx_queues;
+			projection net_device__tx* _tx;
+			u32 [in, out] num_tx_queues;
+			//u32 [in] reg_state;
+			projection device dev;
+			u8 [in, out] num_tc;
+			array< netdev_tc_txq, 16> [in] tc_to_txq;
+			array< u8, 16> [in] prio_tc_map;
+		}
+		projection < struct netdev_queue > net_device__tx {
+		}
+		projection < struct device > device_parent {
+		}
+		projection < struct ethtool_channels > ch {
+		}
+	}
+	rpc_ptr s32  get_ts_info( projection dev * [in] dev, projection info * [in] info ) {
+		projection < struct device> device {
+			projection device_parent* parent;
+			projection dev_pm_info power;
+		}
+		projection < struct dev_pm_info> dev_pm_info {
+		}
+		projection < struct net_device > dev {
+			projection net_device__global_netdev_ops* netdev_ops;
+			projection net_device__global_ethtool_ops* ethtool_ops;
+			projection device dev;
+		}
+		projection < struct device > device_parent {
+		}
+		projection < struct ethtool_ts_info > info {
+			u32 [in, out] so_timestamping;
+			s32 [in, out] phc_index;
+		}
+	}
+	rpc_ptr s32  get_module_info( projection dev * [in] dev, projection modinfo * [in] modinfo ) {
+		projection < struct device> device {
+			projection device_parent* parent;
+			projection dev_pm_info power;
+		}
+		projection < struct dev_pm_info> dev_pm_info {
+		}
+		projection < struct net_device > dev {
+			projection net_device__global_netdev_ops* netdev_ops;
+			projection net_device__global_ethtool_ops* ethtool_ops;
+			projection device dev;
+		}
+		projection < struct device > device_parent {
+		}
+		projection < struct ethtool_modinfo > modinfo {
+		}
+	}
+	rpc_ptr s32  get_module_eeprom( projection dev * [in] dev, projection ee * [in] ee, u8* [in] data ) {
+		projection < struct device> device {
+			projection device_parent* parent;
+			projection dev_pm_info power;
+		}
+		projection < struct dev_pm_info> dev_pm_info {
+		}
+		projection < struct net_device > dev {
+			projection net_device__global_netdev_ops* netdev_ops;
+			projection net_device__global_ethtool_ops* ethtool_ops;
+			projection device dev;
+		}
+		projection < struct device > device_parent {
+		}
+		projection < struct ethtool_eeprom > ee {
+		}
+	}
+	*/
+
+	rpc_ptr int ndo_stop( projection netdev [bind(callee)] * netdev ) {
+		projection < struct net_device > netdev {
+		}
+	}
+
+	rpc_ptr int ndo_open( projection netdev [bind(callee)] * netdev ) {
+
+		projection < struct net_device > netdev {
+			u64 state;
+			u32 [out] num_rx_queues;
+			projection net_device__tx* _tx;
+			u32 [out] num_tx_queues;
+			//u32 [in] reg_state;
+			u8 [in, out] num_tc;
+			//array< netdev_tc_txq, 16> [in] tc_to_txq;
+			array< u8, 16> [in] prio_tc_map;
+		}
+		projection < struct netdev_queue > net_device__tx {
+		}
+		projection < struct device > device_parent {
+		}
+	}
+
+rpc_ptr s32 [in, out] ndo_start_xmit( projection skb * [in, out] skb, projection netdev * [in] netdev ) {
+	projection < struct sk_buff > skb {
+		array< s8, 48> [in, out] cb;
+		u32 [in, out] len;
+		u32 [in, out] data_len;
+		u16 [in, out] mac_len;
+		u16 [in, out] queue_mapping;
+		//u8 [in, out] cloned;
+		array<u32, 0> [in, out] headers_start;
+		array<u8, 0> [in, out] __pkt_type_offset;
+		//u8 [in, out] pkt_type;
+		u32 [in] priority;
+		u16 [in] vlan_tci;
+		u16 [in, out] inner_network_header;
+		u16 [in] protocol;
+		u16 [in, out] transport_header;
+		u16 [in, out] network_header;
+		array<u32, 0> [in, out] headers_end;
+		u32 [in, out] tail;
+		u32 [in, out] end;
+		u8* [in, out] head;
+		u8* [in, out] data;
+	}
+	projection < struct net_device > netdev {
+	}
+}
+	rpc_ptr u64  ndo_features_check( projection skb *skb,
+			projection dev [bind(callee)] * dev, u64  features ) {
+		// TODO: skb_network_header is accessed. What to marshal?
+		projection < struct sk_buff > skb {
+			array<u32, 0> [in] headers_start;
+			array<u8, 0> [in] __pkt_type_offset;
+			//u8 [in] pkt_type;
+			u16 [in] network_header;
+			u8* [in] head;
+			u8* [in] data;
+		}
+		projection < struct net_device > dev {
+		}
+	}
+
+	/* XXX: kernel callback fptr
+	rpc_ptr u16  ndo_select_queue( projection dev [bind(callee)] * dev,
+		projection skb * [in] skb, void*  accel_priv, rpc_ptr [in] fallback fallback ) {
+		projection < struct net_device > dev {
+		}
+		// TODO: Missing fields in skb
+		projection < struct sk_buff > skb {
+			u16 [in] queue_mapping;
+		}
+	}
+	*/
+	// TODO: Need static void
+	rpc_ptr int ndo_set_mac_address( projection netdev [bind(callee)] * netdev, void*  p ) {
+		projection < struct net_device > netdev {
+			u8 addr_len;
+			array<u8, {{ctx->netdev->addr_len}}> [out] * dev_addr;
+		}
+	}
+	rpc_ptr int ndo_do_ioctl( projection netdev [bind(callee)] *netdev,
+			// TODO: Need static void 
+			projection req [alloc(callee)] *req, int cmd ) {
+		projection < struct net_device > netdev {
+		}
+		projection < struct ifreq > req {
+		}
+	}
+	rpc_ptr int ndo_change_mtu( projection netdev * [in] netdev, s32  new_mtu ) {
+		projection < struct net_device > netdev {
+			u32 [in, out] mtu;
+		}
+	}
+
+	rpc_ptr void  ndo_tx_timeout( projection netdev * [in] netdev ) {
+		projection < struct net_device > netdev {
+		}
+	}
+
+	rpc_ptr projection ret_rtnl_link_stats64 [bind(callee)] * ndo_get_stats64(
+		projection netdev * netdev, projection stats [alloc(caller)] * stats ) {
+		projection < struct net_device > netdev {
+		}
+		projection < struct rtnl_link_stats64 > ret_rtnl_link_stats64 {
+			u64 [in, out] rx_packets;
+			u64 [in, out] tx_packets;
+			u64 [in, out] rx_bytes;
+			u64 [in, out] tx_bytes;
+			u64 [in, out] rx_errors;
+			u64 [in, out] multicast;
+			u64 [in, out] rx_length_errors;
+			u64 [in, out] rx_crc_errors;
+			u64 [in, out] rx_missed_errors;
+		}
+
+		projection < struct rtnl_link_stats64 > stats {
+			u64 [in, out] rx_packets;
+			u64 [in, out] tx_packets;
+			u64 [in, out] rx_bytes;
+			u64 [in, out] tx_bytes;
+			u64 [in, out] rx_errors;
+			u64 [in, out] multicast;
+			u64 [in, out] rx_length_errors;
+			u64 [in, out] rx_crc_errors;
+			u64 [in, out] rx_missed_errors;
+		}
+	}
+	/* XXX: vlan unused
+	rpc_ptr s32  ndo_vlan_rx_kill_vid( projection netdev * [in] netdev, u16 [unused] proto, u16  vid ) {
+		projection < struct device> device {
+			projection device_parent* parent;
+			projection dev_pm_info power;
+		}
+		projection < struct dev_pm_info> dev_pm_info {
+		}
+		projection < struct net_device > netdev {
+			projection net_device__global_netdev_ops* netdev_ops;
+			projection net_device__global_ethtool_ops* ethtool_ops;
+			projection device dev;
+		}
+		projection < struct device > device_parent {
+		}
+	}
+	rpc_ptr s32  ndo_busy_poll( projection napi * [in] napi ) {
+		projection < struct napi_struct > napi {
+			projection napi_struct_gro_list* gro_list;
+		}
+		projection < struct sk_buff > napi_struct_gro_list {
+		}
+	}
+	rpc_ptr s32  ndo_set_vf_mac( projection netdev * [in] netdev, s32  vf, u8* [in] mac ) {
+			projection < struct device> device {
+				projection device_parent* parent;
+				projection dev_pm_info power;
+			}
+				projection < struct dev_pm_info> dev_pm_info {
+				}
+		projection < struct net_device > netdev {
+			projection net_device__global_netdev_ops* netdev_ops;
+			projection net_device__global_ethtool_ops* ethtool_ops;
+			projection device dev;
+		}
+		projection < struct device > device_parent {
+		}
+	}
+	rpc_ptr s32  ndo_set_vf_vlan( projection netdev * [in] netdev, s32  vf, u16  vlan, u8  qos ) {
+			projection < struct device> device {
+				projection device_parent* parent;
+				projection dev_pm_info power;
+			}
+				projection < struct dev_pm_info> dev_pm_info {
+				}
+		projection < struct net_device > netdev {
+			projection net_device__global_netdev_ops* netdev_ops;
+			projection net_device__global_ethtool_ops* ethtool_ops;
+			projection device dev;
+		}
+		projection < struct device > device_parent {
+		}
+	}
+	rpc_ptr s32  ndo_set_vf_rate( projection netdev * [in] netdev, s32  vf, s32  min_tx_rate, s32  max_tx_rate ) {
+			projection < struct device> device {
+				projection device_parent* parent;
+				projection dev_pm_info power;
+			}
+				projection < struct dev_pm_info> dev_pm_info {
+				}
+		projection < struct net_device > netdev {
+			projection net_device__global_netdev_ops* netdev_ops;
+			projection net_device__global_ethtool_ops* ethtool_ops;
+			projection device dev;
+		}
+		projection < struct device > device_parent {
+		}
+	}
+	rpc_ptr s32  ndo_set_vf_trust( projection netdev * [in] netdev, s32  vf, bool  setting ) {
+			projection < struct device> device {
+				projection device_parent* parent;
+				projection dev_pm_info power;
+			}
+				projection < struct dev_pm_info> dev_pm_info {
+				}
+		projection < struct net_device > netdev {
+			projection net_device__global_netdev_ops* netdev_ops;
+			projection net_device__global_ethtool_ops* ethtool_ops;
+			projection device dev;
+		}
+		projection < struct device > device_parent {
+		}
+	}
+	rpc_ptr s32  ndo_get_vf_config( projection netdev * [in] netdev, s32  vf, projection ivi * [in, out] ivi ) {
+			projection < struct device> device {
+				projection device_parent* parent;
+				projection dev_pm_info power;
+			}
+				projection < struct dev_pm_info> dev_pm_info {
+				}
+		projection < struct net_device > netdev {
+			projection net_device__global_netdev_ops* netdev_ops;
+			projection net_device__global_ethtool_ops* ethtool_ops;
+			projection device dev;
+		}
+		projection < struct device > device_parent {
+		}
+		projection < struct ifla_vf_info > ivi {
+			u32 [in, out] vf;
+			array< u8, 32> [in, out] mac;
+			u32 [in, out] vlan;
+			u32 [in, out] qos;
+			u32 [in, out] spoofchk;
+			u32 [in, out] min_tx_rate;
+			u32 [in, out] max_tx_rate;
+			u32 [in, out] rss_query_en;
+			u32 [in, out] trusted;
+		}
+	}
+	*/
+	rpc_ptr int ndo_setup_tc( projection dev * [in, out] dev, u32  handle, u16  proto, projection tc * [in] tc ) {
+		projection < struct net_device > dev {
+			u64 state;
+			u32 [in, out] num_rx_queues;
+			u32 [in, out] num_tx_queues;
+			//u32 [in] reg_state;
+			u8 [in, out] num_tc;
+			array< projection netdev_tc_txq, 16> [out] tc_to_txq;
+			array< u8, 16> [out] prio_tc_map;
+		}
+		projection < struct netdev_tc_txq > netdev_tc_txq {
+		}
+		projection < struct tc_to_netdev > tc {
+		}
+	}
+
+	rpc_ptr u64  ndo_fix_features( projection netdev * [in] netdev, u64  features ) {
+		projection < struct net_device > netdev {
+		}
+	}
+
+	rpc_ptr int ndo_set_features( projection netdev * [in] netdev, u64  features ) {
+		projection < struct net_device > netdev {
+			u64 [in, out] features;
+		}
+	}
+
+	/* XXX: unused
+	rpc_ptr s32  ndo_fdb_add( projection ndm * [in] ndm, projection tb *  tb, projection dev * [in] dev, u8* [in] addr, u16  vid, u16  flags ) {
+		projection < struct ndmsg > ndm {
+		}
+		projection < struct nlattr > tb {
+		}
+			projection < struct netdev_hw_addr_list> netdev_hw_addr_list {
+				projection list_head list;
+				s32 [in] count;
+			}
+				projection < struct list_head> list_head {
+					projection list_head_next* next;
+				}
+			projection < struct netdev_hw_addr_list> netdev_hw_addr_list {
+				projection list_head list;
+			}
+				projection < struct list_head> list_head {
+					projection list_head_next* next;
+				}
+			projection < struct device> device {
+				projection device_parent* parent;
+				projection dev_pm_info power;
+			}
+				projection < struct dev_pm_info> dev_pm_info {
+				}
+		projection < struct net_device > dev {
+			array< s8, 16> [in] name;
+			u64 [in] state;
+			projection net_device__global_netdev_ops* netdev_ops;
+			projection net_device__global_ethtool_ops* ethtool_ops;
+			u32 [in, out] flags;
+			u32 [in] priv_flags;
+			u8 [in] addr_len;
+			projection netdev_hw_addr_list uc;
+			projection netdev_hw_addr_list mc;
+			//u32 [in] reg_state;
+			projection device dev;
+		}
+		projection < struct list_head > list_head_next {
+		}
+		projection < struct list_head > list_head_next {
+		}
+		projection < struct device > device_parent {
+		}
+	}
+	rpc_ptr s32  ndo_bridge_setlink( projection dev * [in] dev, projection nlh * [in] nlh, u16 [unused] flags ) {
+			projection < struct device> device {
+				projection device_parent* parent;
+				projection dev_pm_info power;
+			}
+				projection < struct dev_pm_info> dev_pm_info {
+				}
+		projection < struct net_device > dev {
+			projection net_device__global_netdev_ops* netdev_ops;
+			projection net_device__global_ethtool_ops* ethtool_ops;
+			projection device dev;
+		}
+		projection < struct device > device_parent {
+		}
+		projection < struct nlmsghdr > nlh {
+			u32 [in] nlmsg_len;
+		}
+	}
+	rpc_ptr s32  ndo_bridge_getlink( projection skb * [in] skb, u32  pid, u32  seq, projection dev * [in] dev, u32  filter_mask, s32  nlflags ) {
+		projection < struct sk_buff > skb {
+			u32 [in, out] len;
+			u32 [in] data_len;
+			array<u32, 0> [in, out] headers_end;
+			u32 [in, out] tail;
+			u32 [in] end;
+			u8* [in] head;
+			u8* [in] data;
+		}
+			projection < struct device> device {
+				projection device_parent* parent;
+				projection dev_pm_info power;
+			}
+				projection < struct dev_pm_info> dev_pm_info {
+				}
+		projection < struct net_device > dev {
+			array< s8, 16> [in] name;
+			u64 [in] state;
+			projection net_device__global_netdev_ops* netdev_ops;
+			projection net_device__global_ethtool_ops* ethtool_ops;
+			u32 [in] flags;
+			u32 [in] mtu;
+			u8 [in] addr_len;
+			u8* [in] dev_addr;
+			projection device dev;
+		}
+		projection < struct device > device_parent {
+		}
+	}
+	rpc_ptr void  ndo_udp_tunnel_add( projection dev * [in] dev, projection ti * [in] ti ) {
+			projection < struct device> device {
+				projection device_parent* parent;
+				projection dev_pm_info power;
+			}
+				projection < struct dev_pm_info> dev_pm_info {
+				}
+		projection < struct net_device > dev {
+			projection net_device__global_netdev_ops* netdev_ops;
+			projection net_device__global_ethtool_ops* ethtool_ops;
+			projection device dev;
+		}
+		projection < struct device > device_parent {
+		}
+		projection < struct udp_tunnel_info > ti {
+		}
+	}
+	rpc_ptr void  ndo_udp_tunnel_del( projection dev * [in] dev, projection ti * [in] ti ) {
+			projection < struct device> device {
+				projection device_parent* parent;
+				projection dev_pm_info power;
+			}
+				projection < struct dev_pm_info> dev_pm_info {
+				}
+		projection < struct net_device > dev {
+			projection net_device__global_netdev_ops* netdev_ops;
+			projection net_device__global_ethtool_ops* ethtool_ops;
+			projection device dev;
+		}
+		projection < struct device > device_parent {
+		}
+		projection < struct udp_tunnel_info > ti {
+		}
+	}
+	rpc_ptr void* [in]alloc_sized(caller, 544, 544) ndo_dfwd_add_station( projection pdev * [in] pdev, projection vdev * [in] vdev ) {
+			projection < struct device> device {
+				projection device_parent* parent;
+				projection dev_pm_info power;
+			}
+				projection < struct dev_pm_info> dev_pm_info {
+				}
+		projection < struct net_device > pdev {
+			array< s8, 16> [in] name;
+			projection net_device__global_netdev_ops* netdev_ops;
+			projection net_device__global_ethtool_ops* ethtool_ops;
+			projection device dev;
+		}
+		projection < struct device > device_parent {
+		}
+			projection < struct device> device {
+				projection device_parent* parent;
+				projection dev_pm_info power;
+			}
+				projection < struct dev_pm_info> dev_pm_info {
+				}
+		projection < struct net_device > vdev {
+			array< s8, 16> [in] name;
+			projection net_device__global_netdev_ops* netdev_ops;
+			projection net_device__global_ethtool_ops* ethtool_ops;
+			u32 [in] num_rx_queues;
+			u32 [in] num_tx_queues;
+			projection device dev;
+		}
+		projection < struct device > device_parent {
+		}
+	}
+	rpc_ptr void  ndo_dfwd_del_station( projection pdev * [in, out] pdev, void*  priv ) {
+			projection < struct device> device {
+				projection device_parent* parent;
+				projection dev_pm_info power;
+			}
+				projection < struct dev_pm_info> dev_pm_info {
+				}
+		projection < struct net_device > pdev {
+			u64 [in] state;
+			projection net_device__global_netdev_ops* netdev_ops;
+			projection net_device__global_ethtool_ops* ethtool_ops;
+			u32 [in] num_rx_queues;
+			projection net_device__tx* _tx;
+			u32 [in, out] num_tx_queues;
+			//u32 [in] reg_state;
+			projection device dev;
+			u8 [in, out] num_tc;
+			array< netdev_tc_txq, 16> [in] tc_to_txq;
+			array< u8, 16> [in] prio_tc_map;
+		}
+		projection < struct netdev_queue > net_device__tx {
+		}
+		projection < struct device > device_parent {
+		}
+	}
+	*/
+
+	rpc_ptr int ndo_set_tx_maxrate( projection netdev [bind(callee)] *netdev, int queue_index, u32 maxrate ) {
+		projection < struct net_device > netdev {
+		}
+	}
+
+
+	/* XXX: false positive?
+	rpc_ptr s32  get_invariants( projection hw * [in, out] hw ) {
+		projection < struct ixgbe_mac_info> ixgbe_mac_info {
+		}
+		projection < struct ixgbe_hw > hw {
+			u8* [in, out] hw_addr;
+			projection ixgbe_mac_info mac;
+		}
+	}
+	*/
+
+
+	rpc int del_timer_sync( projection timer [bind(callee)] *timer ) {
+		projection < struct timer_list > timer {
+		}
+	}
+
+	/* FIXME: Setup hook for timers 
+	rpc void  init_timer_key( projection timer * [in] timer, u32  flags, s8*  name, projection key *  key ) {
+		projection < struct timer_list > timer {
+		}
+		projection < struct lock_class_key > key {
+		}
+	}
+	*/
+
+	/* XXX debugfs
+	rpc_ptr s32  read( projection filp * [in] filp, s8*  buffer, u64  count, s64* [in] ppos ) {
+		projection < struct file > filp {
+			void* [in] private_data;
+		}
+	}
+	rpc_ptr s32  write( projection filp * [in] filp, s8*  buffer, u64  count, s64* [in] ppos ) {
+		projection < struct file > filp {
+			void* [in] private_data;
+		}
+	}
+	rpc s32  ixgbe_dbg_reg_ops_read( projection filp * [in] filp, s8*  buffer, u64  count, s64* [in] ppos ) {
+		projection < struct file > filp {
+			void* [in] private_data;
+		}
+	}
+	rpc s32  ixgbe_dbg_reg_ops_write( projection filp * [in] filp, s8*  buffer, u64  count, s64* [in] ppos ) {
+		projection < struct file > filp {
+			void* [in] private_data;
+		}
+	}
+	*/
+
+	/* XXX: rcu
+	rpc void  kfree_call_rcu( projection head * [in, out] head, rpc_ptr [in] func func ) {
+		projection < struct callback_head > head {
+		}
+	}
+	*/
+	rpc void  pci_disable_msi( projection dev * [in] dev ) {
+		projection < struct pci_dev > dev {
+			projection pci_dev_bus* bus;
+			u32 [in, out] irq;
+		}
+		projection < struct pci_bus > pci_dev_bus {
+		}
+	}
+	rpc void  pci_disable_msix( projection dev * [in] dev ) {
+		projection < struct pci_dev > dev {
+			projection pci_dev_bus* bus;
+		}
+		projection < struct pci_bus > pci_dev_bus {
+		}
+	}
+	rpc void  pci_disable_device( projection dev * [in] dev ) {
+		projection < struct pci_dev > dev {
+			projection pci_dev_bus* bus;
+		}
+		projection < struct pci_bus > pci_dev_bus {
+		}
+	}
+	rpc int pci_bus_read_config_word( projection bus * bus,
+		unsigned int devfn, int pos,
+		unsigned short [alloc(callee), out] * value ) {
+		projection < struct pci_bus > bus {
+		}
+	}
+	rpc int pci_bus_write_config_word( projection bus * bus,
+		unsigned int devfn, int pos, unsigned short value ) {
+		projection < struct pci_bus > bus {
+		}
+	}
+
+	rpc void pci_dev_put( projection dev *  dev ) {
+		projection < struct device> device{
+		}
+		projection < struct pci_dev > dev {
+			//projection device dev;
+		}
+	}
+
+	// XXX: Need globals
+rpc bool  queue_work_on( s32  cpu, projection wq * [in] wq, projection work * [in] work ) {
+	projection < struct workqueue_struct > wq {
+	}
+		projection < struct list_head> list_head {
+		}
+	projection < struct work_struct > work {
+		projection list_head entry;
+	}
+}
+	rpc int pci_select_bars( projection dev * dev, long unsigned int flags ) {
+		projection < struct pci_dev > dev {
+		}
+	}
+
+	rpc int pcie_get_minimum_link( projection dev *dev, u32 [alloc(callee), in, out] *speed,
+				u32 [in, out, alloc(callee)] *width ) {
+		projection < struct pci_dev > dev {
+			projection pci_dev_bus* bus;
+			//u8 pcie_cap;
+		}
+		projection < struct pci_bus > pci_dev_bus {
+		}
+	}
+
+	// TODO: Need parent_bus and parent_dev
+	rpc int pcie_capability_read_word( projection dev * dev, s32  pos, u16* [out] val ) {
+		projection < struct pci_dev > dev {
+			projection pci_dev_bus* bus;
+			u8 pcie_cap;
+		}
+		projection < struct pci_bus > pci_dev_bus {
+		}
+	}
+	rpc void  pci_restore_state( projection dev * dev ) {
+		projection < struct pci_dev > dev {
+			u32 devfn;
+			u8 pcie_cap;
+		}
+	}
+	rpc s32  pci_set_power_state( projection dev * dev, s32  state ) {
+		projection < struct pci_dev > dev {
+		}
+	}
+	rpc s32  pci_save_state( projection dev * dev ) {
+		projection < struct pci_dev > dev {
+			u32 devfn;
+			u8 pcie_cap;
+		}
+	}
+	rpc void  pci_set_master( projection dev * dev ) {
+		projection < struct pci_dev > dev {
+		}
+	}
+	rpc int pci_request_selected_regions( projection pdev * pdev, s32  bars, string [alloc(callee)] *res_name ) {
+		projection < struct pci_dev > pdev {
+		}
+	}
+	rpc void  pci_release_selected_regions( projection pdev * pdev, s32  bars ) {
+		projection < struct pci_dev > pdev {
+		}
+	}
+
+	rpc s32 mod_timer( projection timer [bind(callee)] *timer, unsigned long expires ) {
+		projection < struct timer_list > timer {
+		}
+	}
+	rpc s32  pci_wake_from_d3( projection dev * [in] dev, bool  enable ) {
+		projection < struct pci_dev > dev {
+		}
+	}
+	rpc int pci_enable_device_mem( projection dev * [in] dev ) {
+		projection < struct pci_dev > dev {
+		}
+	}
+	rpc void [ioremap(caller)]   *ioremap_nocache( u64  phys_addr, unsigned long size ) {
+	}
+
+	// TODO: Call out for msleep_interruptible?
+	rpc unsigned long  msleep_interruptible( unsigned int msecs ) {
+	}
+
+	/* XXX: No need for debugfs now
+	rpc projection ret_dentry* [in] debugfs_create_dir( s8*  name, projection parent * [in] parent ) {
+		projection < struct dentry > ret_dentry {
+		}
+		projection < struct dentry > parent {
+		}
+	}
+	rpc projection ret_dentry* [in] debugfs_create_file( s8*  name, u16  mode, projection parent * [in] parent, void*  data, projection fops * [in] fops ) {
+		projection < struct dentry > ret_dentry {
+		}
+		projection < struct dentry > parent {
+		}
+		projection < struct file_operations > fops {
+			projection file_operations_owner* owner;
+		}
+		projection < struct module > file_operations_owner {
+		}
+	}
+	*/
+	// TODO: We have a liblcd func for this
+	rpc void  netdev_rss_key_fill( void* [out] buffer, unsigned long len ) {
+	}
+
+	rpc int rtnl_is_locked(  ) {
+	}
+
+	/* XXX: ethtool_ops
+	rpc s32  ethtool_op_get_ts_info( projection dev * [in] dev, projection info * [in] info ) {
+			projection < struct device> device {
+				projection device_parent* parent;
+				projection dev_pm_info power;
+			}
+				projection < struct dev_pm_info> dev_pm_info {
+				}
+		projection < struct net_device > dev {
+			projection net_device__global_netdev_ops* netdev_ops;
+			projection net_device__global_ethtool_ops* ethtool_ops;
+			projection device dev;
+		}
+		projection < struct device > device_parent {
+		}
+		projection < struct ethtool_ts_info > info {
+			u32 [in, out] so_timestamping;
+			s32 [in, out] phc_index;
+		}
+	}
+	rpc_ptr u32  get_link( projection dev * [in] dev ) {
+			projection < struct device> device {
+				projection device_parent* parent;
+				projection dev_pm_info power;
+			}
+				projection < struct dev_pm_info> dev_pm_info {
+				}
+		projection < struct net_device > dev {
+			u64 [in] state;
+			projection net_device__global_netdev_ops* netdev_ops;
+			projection net_device__global_ethtool_ops* ethtool_ops;
+			projection device dev;
+		}
+		projection < struct device > device_parent {
+		}
+	}
+	*/
+rpc int  skb_copy_bits( const projection skb * [in, out] skb, s32  offset, void* [in, out] to, s32  len ) {
+	projection < struct sk_buff > skb {
+		u32 [in, out] len;
+		u32 [in] data_len;
+		u32 [in] end;
+		u8* [in] head;
+		u8* [in, out] data;
+	}
+}
+/* XXX: already in liblcd
+rpc void  kfree_skb( projection skb * [in] skb ) {
+	projection < struct sk_buff > skb {
+		//u8 [in] cloned;
+		u32 [in] end;
+		u8* [in] head;
+	}
+}
+*/
+rpc s32  ___pskb_trim( projection skb * [in, out] skb, u32  len ) {
+	projection < struct sk_buff > skb {
+		array< s8, 48> [in, out] cb;
+		u32 [in, out] len;
+		u32 [in, out] data_len;
+		u16 [in, out] mac_len;
+		u16 [in, out] queue_mapping;
+		//u8 [in, out] cloned;
+		array<u32, 0> [in, out] headers_start;
+		array<u8, 0> [in, out] __pkt_type_offset;
+		//u8 [in, out] pkt_type;
+		u16 [in, out] inner_network_header;
+		u16 [in, out] transport_header;
+		u16 [in, out] network_header;
+		array<u32, 0> [in, out] headers_end;
+		u32 [in, out] tail;
+		u32 [in, out] end;
+		u8* [in, out] head;
+		u8* [in, out] data;
+	}
+}
+rpc s32  pskb_expand_head( projection skb * [in, out] skb, s32  nhead, s32  ntail, u32  gfp_mask ) {
+	projection < struct sk_buff > skb {
+		//u8 [in, out] cloned;
+		array<u32, 0> [in, out] headers_start;
+		array<u8, 0> [in, out] __pkt_type_offset;
+		//u8 [in, out] pkt_type;
+		u16 [in, out] inner_network_header;
+		u16 [in, out] transport_header;
+		u16 [in, out] network_header;
+		array<u32, 0> [in, out] headers_end;
+		u32 [in, out] tail;
+		u32 [in, out] end;
+		u8* [in, out] head;
+		u8* [in, out] data;
+	}
+}
+rpc void  consume_skb( projection skb * [in] skb ) {
+	projection < struct sk_buff > skb {
+		//u8 [in] cloned;
+		u32 [in] end;
+		u8* [in] head;
+	}
+}
+	/* XXX: in liblcd already!
+rpc projection ret_sk_buff* [in] __alloc_skb( u32  size, u32  gfp_mask, s32  flags, s32  node ) {
+	projection < struct sk_buff > ret_sk_buff {
+		//u8 [in, out] cloned;
+		array<u32, 0> [in, out] headers_start;
+		array<u8, 0> [in, out] __pkt_type_offset;
+		//u8 [in, out] pkt_type;
+		u16 [in, out] transport_header;
+		array<u32, 0> [in] headers_end;
+		u32 [in] tail;
+		u32 [in, out] end;
+		u8* [in, out] head;
+		u8* [in, out] data;
+
+	}
+}
+	*/
+rpc u8* [in, out] __pskb_pull_tail( projection skb * [in, out] skb, s32  delta ) {
+	projection < struct sk_buff > skb {
+		array< s8, 48> [in, out] cb;
+		u32 [in, out] len;
+		u32 [in, out] data_len;
+		u16 [in, out] mac_len;
+		u16 [in, out] queue_mapping;
+		//u8 [in, out] cloned;
+		array<u32, 0> [in, out] headers_start;
+		array<u8, 0> [in, out] __pkt_type_offset;
+		//u8 [in, out] pkt_type;
+		u16 [in, out] inner_network_header;
+		u16 [in, out] transport_header;
+		u16 [in, out] network_header;
+		array<u32, 0> [in, out] headers_end;
+		u32 [in, out] tail;
+		u32 [in, out] end;
+		u8* [in, out] head;
+		u8* [in, out] data;
+	}
+}
+rpc u8* [in] skb_put( projection skb * [in] skb, u32  len ) {
+	projection < struct sk_buff > skb {
+		u32 [in, out] len;
+		u32 [in] data_len;
+		array<u32, 0> [in, out] headers_end;
+		u32 [in, out] tail;
+		u32 [in] end;
+		u8* [in] head;
+		u8* [in] data;
+	}
+}
+rpc void  skb_tstamp_tx( projection orig_skb [in, out] *orig_skb, projection hwtstamps *  hwtstamps ) {
+	projection < struct sk_buff > orig_skb {
+		array< s8, 48> [in, out] cb;
+		u32 [in, out] len;
+		u32 [in, out] data_len;
+		u16 [in, out] mac_len;
+		u16 [in, out] queue_mapping;
+		//u8 [in, out] cloned;
+		array<u32, 0> [in, out] headers_start;
+		array<u8, 0> [in, out] __pkt_type_offset;
+		//u8 [in, out] pkt_type;
+		array<u32, 0> [in, out] headers_end;
+		u32 [in, out] tail;
+		u32 [in, out] end;
+		u8* [in, out] head;
+		u8* [in, out] data;
+	}
+	projection < struct skb_shared_hwtstamps > hwtstamps {
+	}
+}
+
+/*
+rpc ret_ktime_t ktime_get_with_offset( u32  offs ) {
+	projection < struct ktime > ret_ktime_t {
+	}
+}*/
+rpc s32  skb_pad( projection skb * [in, out] skb, s32  pad ) {
+	projection < struct sk_buff > skb {
+		array< s8, 48> [in, out] cb;
+		u32 [in, out] len;
+		u32 [in, out] data_len;
+		u16 [in, out] mac_len;
+		u16 [in, out] queue_mapping;
+		//u8 [in, out] cloned;
+		array<u32, 0> [in, out] headers_start;
+		array<u8, 0> [in, out] __pkt_type_offset;
+		//u8 [in, out] pkt_type;
+		u16 [in, out] inner_network_header;
+		u16 [in, out] transport_header;
+		u16 [in, out] network_header;
+		array<u32, 0> [in, out] headers_end;
+		u32 [in, out] tail;
+		u32 [in, out] end;
+		u8* [in, out] head;
+		u8* [in, out] data;
+	}
+}
+rpc void  napi_consume_skb( projection skb * [in] skb, s32  budget ) {
+	projection < struct sk_buff > skb {
+		array< s8, 48> [in] cb;
+		//u8 [in] cloned;
+		u32 [in] end;
+		u8* [in] head;
+	}
+}
+rpc void  __dev_kfree_skb_any( projection skb * [in] skb, u32  reason ) {
+	projection < struct sk_buff > skb {
+		array< s8, 48> [in] cb;
+		//u8 [in] cloned;
+		u32 [in] end;
+		u8* [in] head;
+	}
+}
+rpc projection ret_sk_buff* [in] __napi_alloc_skb( projection napi * [in] napi, u32  len, u32  gfp_mask ) {
+	projection < struct sk_buff > ret_sk_buff {
+		//u8 [in, out] cloned;
+		array<u32, 0> [in, out] headers_start;
+		array<u8, 0> [in, out] __pkt_type_offset;
+		//u8 [in, out] pkt_type;
+	}
+	projection < struct napi_struct > napi {
+		projection napi_struct_gro_list* gro_list;
+	}
+	projection < struct sk_buff > napi_struct_gro_list {
+	}
+}
+rpc void  napi_gro_flush( projection napi * [in, out] napi, bool  flush_old ) {
+	projection < struct napi_struct > napi {
+		projection napi_struct_gro_list* gro_list;
+	}
+	projection < struct sk_buff > napi_struct_gro_list {
+		array< s8, 48> [in, out] cb;
+		u32 [in, out] len;
+		u32 [in, out] data_len;
+		u16 [in, out] mac_len;
+		u16 [in, out] queue_mapping;
+		//u8 [in, out] cloned;
+		array<u32, 0> [in, out] headers_start;
+		array<u8, 0> [in, out] __pkt_type_offset;
+		//u8 [in, out] pkt_type;
+		u32 [in] hash;
+		u16 [in, out] vlan_proto;
+		u16 [in, out] vlan_tci;
+		u16 [in, out] inner_network_header;
+		u16 [in, out] protocol;
+		u16 [in, out] transport_header;
+		u16 [in, out] network_header;
+		array<u32, 0> [in, out] headers_end;
+		u32 [in, out] tail;
+		u32 [in, out] end;
+		u8* [in, out] head;
+		u8* [in, out] data;
+	}
+}
+rpc void  napi_complete_done( projection n * [in, out] n, s32  work_done ) {
+	projection < struct napi_struct > n {
+		u64 [in, out] state;
+		projection napi_struct_gro_list* gro_list;
+	}
+	projection < struct sk_buff > napi_struct_gro_list {
+		array< s8, 48> [in, out] cb;
+		u32 [in, out] len;
+		u32 [in, out] data_len;
+		u16 [in, out] mac_len;
+		u16 [in, out] queue_mapping;
+		//u8 [in, out] cloned;
+		array<u32, 0> [in, out] headers_start;
+		array<u8, 0> [in, out] __pkt_type_offset;
+		//u8 [in, out] pkt_type;
+		u32 [in] hash;
+		u16 [in, out] vlan_proto;
+		u16 [in, out] vlan_tci;
+		u16 [in, out] inner_network_header;
+		u16 [in, out] protocol;
+		u16 [in, out] transport_header;
+		u16 [in, out] network_header;
+		array<u32, 0> [in, out] headers_end;
+		u32 [in, out] tail;
+		u32 [in, out] end;
+		u8* [in, out] head;
+		u8* [in, out] data;
+	}
+}
+	rpc void  rtnl_unlock(  ) {
+	}
+	rpc void  rtnl_lock(  ) {
+	}
+	rpc s32 call_netdevice_notifiers( unsigned long val, projection dev * dev ) {
+		projection < struct net_device > dev {
+		}
+	}
+	rpc projection ret_rtnl_link_stats64 * dev_get_stats( projection dev *dev,
+			projection storage [alloc(callee)] * storage ) {
+		projection < struct rtnl_link_stats64 > ret_rtnl_link_stats64 {
+		}
+		projection < struct net_device > dev {
+		}
+		projection < struct rtnl_link_stats64 > storage {
+		}
+	}
+	/* XXX: under rcu lock
+	rpc void  netif_schedule_queue( projection txq * [in] txq ) {
+		projection < struct netdev_queue > txq {
+			u64 [in] state;
+		}
+	}
+	*/
+	rpc void  unregister_netdev( projection dev * [in, out] dev ) {
+		projection < struct net_device > dev {
+		}
+	}
+	rpc void  free_netdev( projection dev * [in, out] dev ) {
+		projection < struct net_device > dev {
+			// TODO: dev_addr is assigned NULL
+			u8* dev_addr;
+			//u32 [in, out] reg_state;
+		}
+	}
+	rpc void  netif_napi_del( projection napi * napi ) {
+		projection < struct napi_struct > napi {
+			u64 [in] state;
+			// TODO: gro_list is assigned NULL
+			projection napi_struct_gro_list* gro_list;
+		}
+		projection < struct sk_buff > napi_struct_gro_list {
+		}
+	}
+	rpc bool  napi_hash_del( projection napi * [in, out] napi ) {
+		projection < struct napi_struct > napi {
+			u64 [in] state;
+			// TODO: gro_list is assigned NULL
+			projection napi_struct_gro_list* gro_list;
+		}
+		projection < struct sk_buff > napi_struct_gro_list {
+		}
+	}
+
+	rpc int  register_netdev( projection dev* dev ) {
+		projection < struct net_device > dev {
+			array< char, 16> name;
+			long unsigned int state;
+			long long unsigned int [in, out] features;
+			long long unsigned int [in, out] hw_features;
+			long long unsigned int [in, out] vlan_features;
+			long long unsigned int [in, out] hw_enc_features;
+			long long unsigned int [in, out] mpls_features;
+			projection net_device__global_netdev_ops [alloc(callee)] * netdev_ops;
+			projection net_device__global_ethtool_ops [alloc(callee)] * ethtool_ops;
+			unsigned int flags;
+			unsigned char addr_len;
+			array<unsigned char, {{ctx->dev->addr_len}}> *dev_addr;
+			//unsigned int [in, out] reg_state : 8;
+		}
+	}
+
+	rpc void  netif_tx_stop_all_queues( projection dev * [in] dev ) {
+		projection < struct net_device > dev {
+			u32 num_tx_queues;
+		}
+	}
+	rpc void  netif_carrier_on( projection dev * [in, out] dev ) {
+		projection < struct net_device > dev {
+			u64 [in] state;
+			s32 [in, out] watchdog_timeo;
+			//u32 [in] reg_state;
+		}
+	}
+	rpc void  netif_carrier_off( projection dev * [in] dev ) {
+		projection < struct net_device > dev {
+			u64 [in] state;
+			//u32 [in] reg_state;
+		}
+	}
+rpc projection ret_net_device* [in] netdev_all_upper_get_next_dev_rcu( projection dev * [in] dev, projection iter **iter ) {
+	projection < struct net_device > ret_net_device {
+	}
+	projection < struct net_device > dev {
+	}
+	projection < struct list_head > iter {
+	}
+}
+
+	rpc void  napi_disable( projection n [bind(callee)] *n ) {
+		projection < struct napi_struct > n {
+			u64 [in] state;
+		}
+	}
+
+	rpc_ptr int poll(projection napi [bind(caller)] *napi, int budget) {
+		projection < struct napi_struct > napi {
+		}
+	}
+	rpc void  netif_napi_add( projection dev * dev, projection napi [alloc(callee)] * napi, rpc_ptr poll poll, int weight ) {
+		projection < struct net_device > dev {
+		}
+		projection < struct napi_struct > napi {
+			u64 state;
+			u32 [in, out] napi_id;
+		}
+	}
+	rpc void  __napi_schedule_irqoff( projection n [bind(callee)] * n ) {
+		projection < struct napi_struct > n {
+		}
+	}
+rpc u32  napi_gro_receive( projection napi * [in] napi, projection skb * [in, out] skb ) {
+	projection < struct napi_struct > napi {
+		projection napi_struct_gro_list* gro_list;
+		u32 [in] napi_id;
+	}
+	projection < struct sk_buff > napi_struct_gro_list {
+	}
+	projection < struct sk_buff > skb {
+		array< s8, 48> [in] cb;
+		u32 [in] len;
+		u32 [in, out] data_len;
+		u16 [in, out] mac_len;
+		array<u32, 0> [in] headers_start;
+		array<u8, 0> [in] __pkt_type_offset;
+		//u8 [in] pkt_type;
+		u32 [in] hash;
+		u16 [in] vlan_tci;
+		u16 [in] protocol;
+		u16 [in, out] network_header;
+		array<u32, 0> [in, out] headers_end;
+		u32 [in, out] tail;
+		u32 [in] end;
+		u8* [in] head;
+		u8* [in] data;
+	}
+}
+rpc s32 [in, out] netif_receive_skb( projection skb * [in, out] skb ) {
+
+
+	projection < struct sk_buff > skb {
+		
+		array< s8, 48> [in, out] cb;
+		u32 [in, out] len;
+		u32 [in, out] data_len;
+		u16 [in, out] mac_len;
+		u16 [in, out] queue_mapping;
+		//u8 [in, out] cloned;
+		array<u32, 0> [in, out] headers_start;
+		array<u8, 0> [in, out] __pkt_type_offset;
+		//u8 [in, out] pkt_type;
+		
+		u32 [in] hash;
+		u16 [in, out] vlan_proto;
+		u16 [in, out] vlan_tci;
+		u16 [in, out] inner_network_header;
+		u16 [in, out] protocol;
+		u16 [in, out] transport_header;
+		u16 [in, out] network_header;
+		array<u32, 0> [in, out] headers_end;
+		u32 [in, out] tail;
+		u32 [in, out] end;
+		u8* [in, out] head;
+		u8* [in, out] data;
+	}
+}
+rpc s32  skb_checksum_help( projection skb * [in, out] skb ) {
+
+
+	projection < struct sk_buff > skb {
+		
+		array< s8, 48> [in, out] cb;
+		u32 [in, out] len;
+		u32 [in, out] data_len;
+		u16 [in, out] mac_len;
+		u16 [in, out] queue_mapping;
+		//u8 [in, out] cloned;
+		array<u32, 0> [in, out] headers_start;
+		array<u8, 0> [in, out] __pkt_type_offset;
+	//	u8 [in, out] pkt_type;
+		
+		u16 [in, out] inner_network_header;
+		u16 [in, out] transport_header;
+		u16 [in, out] network_header;
+		array<u32, 0> [in, out] headers_end;
+		u32 [in, out] tail;
+		u32 [in, out] end;
+		u8* [in, out] head;
+		u8* [in, out] data;
+	}
+}
+	rpc void  netif_device_attach( projection dev *dev ) {
+		projection < struct net_device > dev {
+			u64 state;
+			u32 num_tx_queues;
+			s32 [in, out] watchdog_timeo;
+		}
+	}
+	rpc void  netif_tx_wake_queue( projection dev_queue *dev_queue ) {
+		projection < struct netdev_queue > dev_queue {
+			u64 [in] state;
+		}
+	}
+	rpc void  netif_device_detach( projection dev *dev ) {
+		projection < struct net_device > dev {
+			u64 [in] state;
+			u32 [in] num_tx_queues;
+		}
+	}
+	rpc void  netif_wake_subqueue( projection dev * dev, u16  queue_index ) {
+		projection < struct net_device > dev {
+		}
+	}
+	rpc int  netif_set_real_num_rx_queues( projection dev *dev, u32  rxq ) {
+		projection < struct net_device > dev {
+			u32 [in] num_rx_queues;
+			//u32 [in] reg_state;
+		}
+	}
+	rpc int netif_set_real_num_tx_queues( projection dev *dev, u32  txq ) {
+		projection < struct net_device > dev {
+			u32 [in, out] num_tx_queues;
+			//u32 [in] reg_state;
+			u8 [in, out] num_tc;
+		}
+	}
+	rpc int netif_set_xps_queue( projection dev * dev, const projection mask [alloc(callee)] * mask, u16  index ) {
+		projection < struct net_device > dev {
+		}
+		projection < struct cpumask > mask {
+			array< u64, 1> bits;
+		}
+	}
+
+	/* XXX: ptp
+	rpc timespec  ns_to_timespec( s64  nsec ) {
+		projection < struct timespec > ret_timespec {
+		}
+	}
+	*/
+	/* XXX: debugfs
+	rpc void  debugfs_remove_recursive( projection dentry * [in] dentry ) {
+		projection < struct dentry > dentry {
+		}
+	}
+	*/
+	/* XXX: bridge
+	rpc s32  ndo_dflt_bridge_getlink( projection skb * [in] skb, u32  pid, u32  seq, projection dev * [in] dev, u16  mode, u32  flags, u32  mask, s32  nlflags, u32  filter_mask, rpc_ptr [in] vlan_fill vlan_fill ) {
+		projection < struct sk_buff > skb {
+			u32 [in, out] len;
+			u32 [in] data_len;
+			array<u32, 0> [in, out] headers_end;
+			u32 [in, out] tail;
+			u32 [in] end;
+			u8* [in] head;
+			u8* [in] data;
+		}
+			projection < struct device> device {
+				projection device_parent* parent;
+				projection dev_pm_info power;
+			}
+				projection < struct dev_pm_info> dev_pm_info {
+				}
+		projection < struct net_device > dev {
+			array< s8, 16> [in] name;
+			u64 [in] state;
+			projection net_device__global_netdev_ops* netdev_ops;
+			projection net_device__global_ethtool_ops* ethtool_ops;
+			u32 [in] flags;
+			u32 [in] mtu;
+			u8 [in] addr_len;
+			u8* [in] dev_addr;
+			projection device dev;
+		}
+		projection < struct device > device_parent {
+		}
+	}
+	rpc s32  ndo_dflt_fdb_add( projection ndm * [in] ndm, projection tb * [unused] tb, projection dev * [in] dev, u8* [in] addr, u16  vid, u16  flags ) {
+		projection < struct ndmsg > ndm {
+		}
+		projection < struct nlattr > tb {
+		}
+			projection < struct netdev_hw_addr_list> netdev_hw_addr_list {
+				projection list_head list;
+				s32 [in] count;
+			}
+				projection < struct list_head> list_head {
+					projection list_head_next* next;
+				}
+			projection < struct netdev_hw_addr_list> netdev_hw_addr_list {
+				projection list_head list;
+			}
+				projection < struct list_head> list_head {
+					projection list_head_next* next;
+				}
+			projection < struct device> device {
+				projection device_parent* parent;
+				projection dev_pm_info power;
+			}
+				projection < struct dev_pm_info> dev_pm_info {
+				}
+		projection < struct net_device > dev {
+			array< s8, 16> [in] name;
+			u64 [in] state;
+			projection net_device__global_netdev_ops* netdev_ops;
+			projection net_device__global_ethtool_ops* ethtool_ops;
+			u32 [in, out] flags;
+			u32 [in] priv_flags;
+			u8 [in] addr_len;
+			projection netdev_hw_addr_list uc;
+			projection netdev_hw_addr_list mc;
+			//u32 [in] reg_state;
+			projection device dev;
+		}
+		projection < struct list_head > list_head_next {
+		}
+		projection < struct list_head > list_head_next {
+		}
+		projection < struct device > device_parent {
+		}
+	}
+	*/
+	/* XXX: ptp
+	rpc s32  ptp_clock_index( projection ptp * [in] ptp ) {
+		projection < struct ptp_clock > ptp {
+		}
+	}
+	rpc void  ptp_clock_event( projection ptp * [in] ptp, projection event * [in] event ) {
+		projection < struct ptp_clock > ptp {
+		}
+		projection < struct ptp_clock_event > event {
+			s32 [in] type;
+		}
+	}
+	rpc s32  ptp_clock_unregister( projection ptp * [in] ptp ) {
+		projection < struct ptp_clock > ptp {
+		}
+	}
+	rpc projection ret_ptp_clock* [in]alloc_sized(caller, 4720, 4720) ptp_clock_register( projection info * [in] info, projection parent * [in] parent ) {
+		projection < struct ptp_clock > ret_ptp_clock {
+		}
+		projection < struct ptp_clock_info > info {
+			projection ptp_clock_info_owner* owner;
+			s32 [in] n_alarm;
+			s32 [in] pps;
+		}
+		projection < struct module > ptp_clock_info_owner {
+		}
+			projection < struct kobject> kobject {
+			}
+			projection < struct dev_pm_info> dev_pm_info {
+			}
+		projection < struct device > parent {
+			projection device_parent* parent;
+			projection kobject kobj;
+			projection dev_pm_info power;
+		}
+			projection < struct dev_pm_info> dev_pm_info {
+			}
+		projection < struct device > device_parent {
+			projection dev_pm_info power;
+		}
+	}
+	*/
+
+	/* TODO: 2d pointer
+	rpc projection ret_nlattr* [in] nla_find( projection head * [in] head, s32  len, s32  attrtype ) {
+		projection < struct nlattr > ret_nlattr {
+		}
+		projection < struct nlattr > head {
+			u16 [in] nla_len;
+			u16 [in] nla_type;
+		}
+	}
+	*/
+	/* TODO: workqueue: need globals
+	rpc projection ret_workqueue_struct* [in, out]alloc_sized(caller, var_size, var_gp) __alloc_workqueue_key( s8*  fmt, u32  flags, s32  max_active, projection key * [unused] key, s8* [unused] lock_name ) {
+		projection < struct workqueue_struct > ret_workqueue_struct {
+		}
+		projection < struct lock_class_key > key {
+		}
+	}
+	rpc void  destroy_workqueue( projection wq * [in, out] wq ) {
+		projection < struct workqueue_struct > wq {
+		}
+	}
+
+	rpc bool [in, out] cancel_work_sync( projection work * [in, out] work ) {
+		projection < struct list_head> list_head {
+			projection list_head_next* next;
+		}
+		projection < struct work_struct > work {
+			[in, out] data;
+			projection list_head entry;
+		}
+		projection < struct list_head > list_head_next {
+		}
+	}
+	*/
+	/* XXX: ipv6 ... not now!
+	rpc s32  ipv6_find_hdr( projection skb * [in] skb, u32* [in, out] offset, s32  target, u16* [out] fragoff, s32* [in, out] flags ) {
+		projection < struct sk_buff > skb {
+			u32 [in] len;
+			u16 [in] network_header;
+			u8* [in] head;
+			u8* [in] data;
+		}
+	}
+	*/
+	rpc_ptr unsigned int thread_fn(int irq, void *id) {
+	}
+	rpc_ptr unsigned int handler(int irq, void *id) {
+	}
+	
+	rpc int request_threaded_irq( u32  irq, rpc_ptr handler handler, rpc_ptr thread_fn thread_fn, unsigned long irqflags, string [alloc(callee)] *devname,
+			void [alloc<{{sizeof(void*)}}>(callee)] *dev_id ) {
+	}
+	rpc void  free_irq( u32  irq, void [bind(callee)] * dev_id ) {
+	}
+	rpc void  synchronize_irq( u32  irq ) {
+	}
+
+	rpc int irq_set_affinity_hint( u32  irq, const projection m [alloc(callee)] * m ) {
+		projection < struct cpumask > m {
+			// TODO: check the defn of bits in IR
+			array< u64, 1> bits;
+		}
+	}
+	rpc int pci_enable_msix_range( projection dev * dev, array<projection entries, {{ctx->maxvec}}> [alloc(callee)] * entries, int minvec, int maxvec ) {
+		projection < struct pci_dev > dev {
+			projection pci_dev_bus* bus;
+		}
+		projection < struct pci_bus > pci_dev_bus {
+		}
+		projection < struct msix_entry > entries {
+		}
+	}
+	rpc int pci_enable_msi_range( projection dev *dev, int minvec, int maxvec ) {
+		projection < struct pci_dev > dev {
+			projection pci_dev_bus* bus;
+		}
+		projection < struct pci_bus > pci_dev_bus {
+		}
+	}
+	/* XXX: debugfs
+	rpc s32  simple_read_from_buffer( void*  to, u64  count, s64* [in, out] ppos, const nullptr* [in] from, u64  available ) {
+	}
+	rpc s32  simple_write_to_buffer( void* [in] to, u64  available, s64* [in, out] ppos, const nullptr*  from, u64  count ) {
+	}
+	rpc_ptr s32  open( projection inode * [in] inode, projection file * [in] file ) {
+		projection < struct inode > inode {
+		}
+		projection < struct file > file {
+			void* [in, out] private_data;
+		}
+	}
+	*/
+	rpc s32  dev_addr_del( projection dev * dev, const array<u8, {{ETH_ALEN}}> [bind(callee)]  *addr, u8  addr_type ) {
+		projection < struct net_device > dev {
+			u8 addr_len;
+		}
+	}
+	rpc s32  dev_addr_add( projection dev * dev, const array<u8, {{ETH_ALEN}}> [alloc(callee)] *addr, u8  addr_type ) {
+		projection < struct net_device > dev {
+			u8 addr_len;
+		}
+	}
+
+
+	rpc_ptr int sync(projection net_device [bind(callee)] *dev,
+					 const array<unsigned char, {{ETH_ALEN}}> [alloc(callee)] *addr) {
+
+		projection < struct net_device > net_device {
+		}
+	}
+	rpc_ptr int unsync(projection net_device [bind(callee)] *dev,
+					 const array<unsigned char, {{ETH_ALEN}}> [alloc(callee)] *addr) {
+
+		projection < struct net_device > net_device {
+		}
+	}
+	// TODO: check list_head
+	rpc void  __hw_addr_unsync_dev( projection list * [in] list, projection dev * [in] dev, rpc_ptr unsync unsync ) {
+		projection < struct list_head> list_head {
+			projection list_head_next* next;
+		}
+		projection < struct netdev_hw_addr_list > list {
+			projection list_head list;
+			s32 [in, out] count;
+		}
+		projection < struct list_head > list_head_next {
+		}
+		projection < struct net_device > dev {
+		}
+	}
+	// TODO: check list_head
+	rpc int  __hw_addr_sync_dev( projection list [bind_memberof<struct net_device, uc>(caller)] * list,
+			projection dev *dev, rpc_ptr sync sync, rpc_ptr unsync unsync ) {
+		projection < struct list_head> list_head {
+			projection list_head_next* next;
+		}
+		projection < struct netdev_hw_addr_list > list {
+			//projection list_head list;
+			//s32 [in, out] count;
+		}
+		projection < struct list_head > list_head_next {
+		}
+		projection < struct net_device > dev {
+		}
+	}
+
+	rpc int eth_platform_get_mac_address( projection dev [bind_memberof<struct pci_dev, dev>(caller)] * dev, array<u8, {{ETH_ALEN}}> [alloc(callee), out] * mac_addr ) {
+		projection < struct device > dev {
+		}
+	}
+
+	rpc projection ret_net_device [alloc<{{sizeof(struct net_device) + ctx->sizeof_priv}}>(caller)] *alloc_etherdev_mqs( s32  sizeof_priv, u32  txqs, u32  rxqs ) {
+		projection < struct net_device > ret_net_device {
+		}
+	}
+	rpc_ptr int ndo_validate_addr( projection dev [bind(callee)]* dev ) {
+		projection < struct net_device > dev {
+			u8* [in] dev_addr;
+		}
+	}
+	rpc unsigned long dev_trans_start( projection dev * [in] dev ) {
+		projection < struct net_device > dev {
+			u32 [in] priv_flags;
+			u32 [in] num_tx_queues;
+		}
+	}
+	// TODO: fix sizeof(mii_data)
+	rpc int mdio_mii_ioctl( const projection mdio [bind(callee)] * mdio, projection mii_data * [in, out] mii_data, s32  cmd ) {
+		projection < struct mdio_if_info > mdio {
+			s32 [in] prtad;
+			u32 [in] mmds;
+			u32 [in] mode_support;
+			projection mdio_if_info_dev* dev;
+		}
+		projection < struct net_device > mdio_if_info_dev {
+		}
+		projection < struct mii_ioctl_data > mii_data {
+		}
+	}
+	rpc int mdio45_probe( projection mdio [alloc(callee)] * mdio, int prtad ) {
+		projection < struct mdio_if_info > mdio {
+			s32 [in, out] prtad;
+			u32 [in, out] mmds;
+			projection mdio_if_info_dev* dev;
+		}
+		projection < struct net_device > mdio_if_info_dev {
+		}
+	}
+
+	rpc void pci_unregister_driver( projection drv [bind(callee), dealloc(callee)] * drv ) {
+		projection < struct pci_driver > drv {
+		}
+	}
+
+	rpc int __pci_register_driver( projection drv [alloc(callee)] * drv,
+		projection owner [alloc(callee)] * owner, string [alloc(callee)] * mod_name ) {
+		projection < struct device_driver> device_driver{
+		}
+		projection < struct pci_dynids> pci_dynids{
+		}
+		projection < struct pci_driver > drv {
+			string [alloc(callee)] *  name;
+			rpc_ptr probe probe;
+			rpc_ptr remove remove;
+			//projection device_driver driver;
+			//projection pci_dynids dynids;
+			array<projection pci_device_id, null> [alloc(callee)] *id_table;
+		}
+		projection <struct pci_device_id> pci_device_id {
+			unsigned int vendor;
+			unsigned int device;
+			unsigned int subvendor;
+			unsigned int subdevice;
+			unsigned int class;
+			unsigned int class_mask;
+			unsigned long long driver_data;
+		}
+		projection < struct module > owner {
+		}
+	}
+
+	/* XXX: ptp unused for now
+	rpc u64  timecounter_cyc2time( projection tc * [in] tc, u64  cycle_tstamp ) {
+		projection < struct timecounter > tc {
+			u64 [in] nsec;
+		}
+	}
+	rpc u64  timecounter_read( projection tc * [in, out] tc ) {
+		projection < struct timecounter > tc {
+			u64 [in, out] nsec;
+		}
+	}
+	rpc void  timecounter_init( projection tc * [in, out] tc, projection cc * [in] cc, u64  start_tstamp ) {
+		projection < struct timecounter > tc {
+			u64 [in, out] nsec;
+		}
+		projection < struct cyclecounter > cc {
+			u32 [in] shift;
+		}
+	}
+	*/
+	// TODO: Populate ethtool ops
+	projection < struct ethtool_ops > net_device__global_ethtool_ops {
+	}
+	projection < struct net_device_ops > net_device__global_netdev_ops {
+		/*rpc_ptr ndo_bridge_getlink ndo_bridge_getlink;
+		rpc_ptr ndo_bridge_setlink ndo_bridge_setlink;
+		rpc_ptr ndo_busy_poll ndo_busy_poll;
+		*/
+		rpc_ptr ndo_change_mtu ndo_change_mtu;
+		/*rpc_ptr ndo_dfwd_add_station ndo_dfwd_add_station;
+		rpc_ptr ndo_dfwd_del_station ndo_dfwd_del_station;
+		*/
+		rpc_ptr ndo_do_ioctl ndo_do_ioctl;
+		//rpc_ptr ndo_fdb_add ndo_fdb_add;
+		rpc_ptr ndo_features_check ndo_features_check;
+		rpc_ptr ndo_fix_features ndo_fix_features;
+		rpc_ptr ndo_get_stats64 ndo_get_stats64;
+		//rpc_ptr ndo_get_vf_config ndo_get_vf_config;
+		rpc_ptr ndo_open ndo_open;
+		//rpc_ptr ndo_select_queue ndo_select_queue;
+		rpc_ptr ndo_set_features ndo_set_features;
+		rpc_ptr ndo_set_mac_address ndo_set_mac_address;
+		rpc_ptr ndo_set_rx_mode ndo_set_rx_mode;
+		rpc_ptr ndo_set_tx_maxrate ndo_set_tx_maxrate;
+		/*rpc_ptr ndo_set_vf_mac ndo_set_vf_mac;
+		rpc_ptr ndo_set_vf_rate ndo_set_vf_rate;
+		rpc_ptr ndo_set_vf_rss_query_en ndo_set_vf_rss_query_en;
+		rpc_ptr ndo_set_vf_spoofchk ndo_set_vf_spoofchk;
+		rpc_ptr ndo_set_vf_trust ndo_set_vf_trust;
+		rpc_ptr ndo_set_vf_vlan ndo_set_vf_vlan;
+		*/
+		rpc_ptr ndo_setup_tc ndo_setup_tc;
+		rpc_ptr ndo_start_xmit ndo_start_xmit;
+		rpc_ptr ndo_stop ndo_stop;
+		rpc_ptr ndo_tx_timeout ndo_tx_timeout;
+		/*rpc_ptr ndo_udp_tunnel_add ndo_udp_tunnel_add;
+		rpc_ptr ndo_udp_tunnel_del ndo_udp_tunnel_del;
+		rpc_ptr ndo_vlan_rx_add_vid ndo_vlan_rx_add_vid;
+		rpc_ptr ndo_vlan_rx_kill_vid ndo_vlan_rx_kill_vid;
+		*/
+	}
+}

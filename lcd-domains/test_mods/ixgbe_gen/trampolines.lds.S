@@ -1,0 +1,29 @@
+#include <liblcd/trampoline_link.h>
+
+SECTIONS{
+	LCD_TRAMPOLINE_LINKER_SECTION(trmp_probe)
+	LCD_TRAMPOLINE_LINKER_SECTION(trmp_remove)
+	LCD_TRAMPOLINE_LINKER_SECTION(trmp_shutdown)
+	LCD_TRAMPOLINE_LINKER_SECTION(trmp_ndo_set_rx_mode)
+	LCD_TRAMPOLINE_LINKER_SECTION(trmp_ndo_stop)
+	LCD_TRAMPOLINE_LINKER_SECTION(trmp_ndo_open)
+	LCD_TRAMPOLINE_LINKER_SECTION(trmp_ndo_start_xmit)
+	LCD_TRAMPOLINE_LINKER_SECTION(trmp_ndo_features_check)
+	LCD_TRAMPOLINE_LINKER_SECTION(trmp_ndo_set_mac_address)
+	LCD_TRAMPOLINE_LINKER_SECTION(trmp_ndo_do_ioctl)
+	LCD_TRAMPOLINE_LINKER_SECTION(trmp_ndo_change_mtu)
+	LCD_TRAMPOLINE_LINKER_SECTION(trmp_ndo_tx_timeout)
+	LCD_TRAMPOLINE_LINKER_SECTION(trmp_ndo_get_stats64)
+	LCD_TRAMPOLINE_LINKER_SECTION(trmp_ndo_setup_tc)
+	LCD_TRAMPOLINE_LINKER_SECTION(trmp_ndo_fix_features)
+	LCD_TRAMPOLINE_LINKER_SECTION(trmp_ndo_set_features)
+	LCD_TRAMPOLINE_LINKER_SECTION(trmp_ndo_set_tx_maxrate)
+	LCD_TRAMPOLINE_LINKER_SECTION(trmp_poll)
+	LCD_TRAMPOLINE_LINKER_SECTION(trmp_thread_fn)
+	LCD_TRAMPOLINE_LINKER_SECTION(trmp_handler)
+	LCD_TRAMPOLINE_LINKER_SECTION(trmp_sync)
+	LCD_TRAMPOLINE_LINKER_SECTION(trmp_unsync)
+	LCD_TRAMPOLINE_LINKER_SECTION(trmp_ndo_validate_addr)
+}
+
+INSERT AFTER .text

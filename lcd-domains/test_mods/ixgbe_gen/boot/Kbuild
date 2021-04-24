@@ -1,0 +1,5 @@
+obj-m += lcd_test_mod_ixgbe_gen_boot.o
+
+lcd_test_mod_ixgbe_gen_boot-y		+= main.o
+
+ccflags-y += $(NONISOLATED_CFLAGS)

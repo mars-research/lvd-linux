@@ -81,3 +81,7 @@ coretemp_gen/hwmon_klcd nonisolated
 skxedac_gen/boot nonisolated
 skxedac_gen/skx_lcd isolated
 skxedac_gen/edac_klcd nonisolated
+
+ixgbe_gen/boot nonisolated
+ixgbe_gen/ixgbe_lcd isolated
+ixgbe_gen/net_klcd nonisolated

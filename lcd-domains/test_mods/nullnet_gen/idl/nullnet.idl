@@ -1,0 +1,186 @@
+module kernel {
+	rpc void  rtnl_lock(  ) {
+	}
+	rpc void  rtnl_unlock(  ) {
+	}
+	rpc void  consume_skb( projection skb*  skb ) {
+		projection < struct sk_buff > skb {
+		}
+	}
+	rpc_ptr int  net_device_ops_ndo_validate_addr( projection dev*  dev ) {
+		projection < struct net_device > dev {
+			projection __global_netdev_ops* netdev_ops;
+			projection __global_ethtool_ops* ethtool_ops;
+			unsigned char*  dev_addr;
+			projection __global_rtnl_link_ops* rtnl_link_ops;
+		}
+	}
+	rpc_ptr int  net_device_ops_ndo_set_mac_address( projection dev*  dev, void*  p ) {
+		projection < struct net_device > dev {
+			projection __global_netdev_ops* netdev_ops;
+			projection __global_ethtool_ops* ethtool_ops;
+			unsigned int  priv_flags;
+			unsigned char*  dev_addr;
+			projection __global_rtnl_link_ops* rtnl_link_ops;
+		}
+	}
+	rpc_ptr void  rtnl_link_ops_setup( projection dev*  dev ) {
+		projection < struct net_device > dev {
+			long long unsigned int [in, out] features;
+			long long unsigned int [in, out] hw_features;
+			long long unsigned int [in, out] hw_enc_features;
+			projection __global_netdev_ops* netdev_ops;
+			projection __global_ethtool_ops* ethtool_ops;
+			unsigned int [in, out] flags;
+			unsigned int [in, out] priv_flags;
+			projection __global_rtnl_link_ops* rtnl_link_ops;
+		}
+	}
+	rpc_ptr void  ethtool_ops_get_drvinfo( projection dev*  dev, projection info*  info ) {
+		projection < struct net_device > dev {
+			projection __global_netdev_ops* netdev_ops;
+			projection __global_ethtool_ops* ethtool_ops;
+			projection __global_rtnl_link_ops* rtnl_link_ops;
+		}
+		projection < struct ethtool_drvinfo > info {
+		}
+	}
+	rpc_ptr int  net_device_ops_ndo_init( projection dev*  dev ) {
+		projection < struct net_device > dev {
+			projection __global_netdev_ops* netdev_ops;
+			projection __global_ethtool_ops* ethtool_ops;
+			projection __global_rtnl_link_ops* rtnl_link_ops;
+		}
+	}
+	rpc_ptr void  net_device_ops_ndo_uninit( projection dev*  dev ) {
+		projection < struct net_device > dev {
+			projection __global_netdev_ops* netdev_ops;
+			projection __global_ethtool_ops* ethtool_ops;
+			projection __global_rtnl_link_ops* rtnl_link_ops;
+		}
+	}
+	rpc_ptr int  net_device_ops_ndo_start_xmit( projection skb*  skb, projection dev*  dev ) {
+		projection < struct sk_buff > skb {
+			unsigned int  len;
+		}
+		projection < struct net_device > dev {
+			projection __global_netdev_ops* netdev_ops;
+			projection __global_ethtool_ops* ethtool_ops;
+			projection __global_rtnl_link_ops* rtnl_link_ops;
+		}
+	}
+	rpc_ptr void  net_device_ops_ndo_set_rx_mode( projection dev*  dev ) {
+		projection < struct net_device > dev {
+			projection __global_netdev_ops* netdev_ops;
+			projection __global_ethtool_ops* ethtool_ops;
+			projection __global_rtnl_link_ops* rtnl_link_ops;
+		}
+	}
+	rpc_ptr projection ret_rtnl_link_stats64*  net_device_ops_ndo_get_stats64( projection dev*  dev, projection stats*  stats ) {
+		projection < struct rtnl_link_stats64 > ret_rtnl_link_stats64 {
+			long long unsigned int [in, out] tx_packets;
+			long long unsigned int [in, out] tx_bytes;
+		}
+		projection < struct net_device > dev {
+			projection __global_netdev_ops* netdev_ops;
+			projection __global_ethtool_ops* ethtool_ops;
+			projection __global_rtnl_link_ops* rtnl_link_ops;
+		}
+		projection < struct rtnl_link_stats64 > stats {
+			long long unsigned int [in, out] tx_packets;
+			long long unsigned int [in, out] tx_bytes;
+		}
+	}
+	rpc_ptr int  net_device_ops_ndo_change_carrier( projection dev*  dev, bool  new_carrier ) {
+		projection < struct net_device > dev {
+			projection __global_netdev_ops* netdev_ops;
+			projection __global_ethtool_ops* ethtool_ops;
+			projection __global_rtnl_link_ops* rtnl_link_ops;
+		}
+	}
+	rpc_ptr int  rtnl_link_ops_validate( projection tb**  tb, projection data** [unused] data ) {
+		projection < struct nlattr > tb {
+		}
+		projection < struct nlattr > data {
+		}
+	}
+	rpc void*  __alloc_percpu_gfp( long unsigned int  size, long unsigned int  align, unsigned int  gfp ) {
+	}
+	rpc void  ether_setup( projection dev*  dev ) {
+		projection < struct net_device > dev {
+			projection __global_netdev_ops* netdev_ops;
+			projection __global_ethtool_ops* ethtool_ops;
+			unsigned int [in, out] flags;
+			unsigned int [in, out] priv_flags;
+			projection __global_rtnl_link_ops* rtnl_link_ops;
+		}
+	}
+	rpc void  free_percpu( void*  ptr ) {
+	}
+	rpc void  netif_carrier_on( projection dev*  dev ) {
+		projection < struct net_device > dev {
+			projection __global_netdev_ops* netdev_ops;
+			projection __global_ethtool_ops* ethtool_ops;
+			projection __global_rtnl_link_ops* rtnl_link_ops;
+		}
+	}
+	rpc void  netif_carrier_off( projection dev*  dev ) {
+		projection < struct net_device > dev {
+			projection __global_netdev_ops* netdev_ops;
+			projection __global_ethtool_ops* ethtool_ops;
+			projection __global_rtnl_link_ops* rtnl_link_ops;
+		}
+	}
+	rpc int  register_netdevice( projection dev* [in, out] dev ) {
+		projection < struct net_device > dev {
+			long long unsigned int [in, out] features;
+			long long unsigned int [in, out] hw_features;
+			long long unsigned int [in, out] hw_enc_features;
+			projection __global_netdev_ops* netdev_ops;
+			projection __global_ethtool_ops* ethtool_ops;
+			unsigned int  flags;
+			unsigned char  addr_assign_type;
+			unsigned char* [in, out] dev_addr;
+			projection __global_rtnl_link_ops* rtnl_link_ops;
+		}
+	}
+	rpc projection ret_net_device* [in, out] alloc_netdev_mqs( int  sizeof_priv, string *  name, unsigned char  name_assign_type, rpc_ptr  setup setup, unsigned int  txqs, unsigned int  rxqs ) {
+		projection < struct net_device > ret_net_device {
+			projection __global_netdev_ops* netdev_ops;
+			projection __global_ethtool_ops* ethtool_ops;
+			unsigned int [in, out] priv_flags;
+			projection __global_rtnl_link_ops* rtnl_link_ops;
+		}
+	}
+	rpc void  free_netdev( projection dev*  dev ) {
+		projection < struct net_device > dev {
+			projection __global_netdev_ops* netdev_ops;
+			projection __global_ethtool_ops* ethtool_ops;
+			projection __global_rtnl_link_ops* rtnl_link_ops;
+		}
+	}
+	rpc void  rtnl_link_unregister( projection _global_rtnl_link_ops* [in, out] _global_rtnl_link_ops ) {
+	}
+	rpc void  __rtnl_link_unregister( projection _global_rtnl_link_ops* [in, out] _global_rtnl_link_ops ) {
+	}
+	rpc int  __rtnl_link_register( projection _global_rtnl_link_ops* [in, out] _global_rtnl_link_ops ) {
+	}
+	projection < struct ethtool_ops > _global_ethtool_ops {
+		rpc_ptr ethtool_ops_get_drvinfo get_drvinfo;
+	}
+	projection < struct net_device_ops > _global_net_device_ops {
+		rpc_ptr net_device_ops_ndo_change_carrier ndo_change_carrier;
+		rpc_ptr net_device_ops_ndo_get_stats64 ndo_get_stats64;
+		rpc_ptr net_device_ops_ndo_init ndo_init;
+		rpc_ptr net_device_ops_ndo_set_mac_address ndo_set_mac_address;
+		rpc_ptr net_device_ops_ndo_set_rx_mode ndo_set_rx_mode;
+		rpc_ptr net_device_ops_ndo_start_xmit ndo_start_xmit;
+		rpc_ptr net_device_ops_ndo_uninit ndo_uninit;
+		rpc_ptr net_device_ops_ndo_validate_addr ndo_validate_addr;
+	}
+	projection < struct rtnl_link_ops > _global_rtnl_link_ops {
+		char* [in, out] kind;
+		rpc_ptr rtnl_link_ops_setup setup;
+		rpc_ptr rtnl_link_ops_validate validate;
+	}
+}

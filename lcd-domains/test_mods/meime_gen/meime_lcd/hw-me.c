@@ -14,6 +14,8 @@
  *
  */
 
+#include <lcd_config/pre_hook.h>
+
 #include <linux/pci.h>
 
 #include <linux/kthread.h>
@@ -27,6 +29,15 @@
 
 #include "mei-trace.h"
 
+#include <lcd_config/post_hook.h>
+
+// TODO: Move this to post_hook
+#ifdef LCD_ISOLATE
+//#define wait_event_timeout	lvd_wait_event_timeout
+#endif
+//#define dev_err(dev, args...) do { printk(args); } while(0)
+//#define dev_warn(dev, args...) do { printk(args); } while(0)
+//#define dev_info(dev, args...) do { printk(args); } while(0)
 /**
  * mei_me_reg_read - Reads 32bit data from the mei device
  *
@@ -38,6 +49,11 @@
 static inline u32 mei_me_reg_read(const struct mei_me_hw *hw,
 			       unsigned long offset)
 {
+	printk("%s, hw %p\n", __func__, hw); 
+	printk("%s:%d, reading@ %p  + offset %lu\n", __func__, __LINE__, hw->mem_addr,  offset);
+	if (hw->mem_addr == 0) {
+		return 0;
+	}
 	return ioread32(hw->mem_addr + offset);
 }
 
@@ -107,8 +123,11 @@ static inline u32 mei_hcsr_read(const struct mei_device *dev)
 {
 	u32 reg;
 
+	printk("%s:%d, entered hcsr_read\n", __func__, __LINE__);
+	printk("%s, dev %p | hw %p\n", __func__, dev, to_me_hw(dev)); 
 	reg = mei_me_reg_read(to_me_hw(dev), H_CSR);
-	trace_mei_reg_read(dev->dev, "H_CSR", H_CSR, reg);
+	printk("%s:%d, Done with hcsr_read %x\n", __func__, __LINE__, reg);
+	//trace_mei_reg_read(dev->dev, "H_CSR", H_CSR, reg);
 
 	return reg;
 }
@@ -252,10 +271,17 @@ static inline enum mei_pg_state mei_me_pg_state(struct mei_device *dev)
  */
 static void mei_me_intr_clear(struct mei_device *dev)
 {
-	u32 hcsr = mei_hcsr_read(dev);
+	u32 hcsr;
+
+	printk("%s:%d, entered!\n", __func__, __LINE__);
+
+       	hcsr = mei_hcsr_read(dev);
+
+	printk("%s:%d, Done with hcsr_read\n", __func__, __LINE__);
 
 	if (hcsr & H_CSR_IS_MASK)
 		mei_hcsr_write(dev, hcsr);
+	printk("%s:%d, Done with hcsr_write\n", __func__, __LINE__);
 }
 /**
  * mei_me_intr_enable - enables mei device interrupts
@@ -555,6 +581,7 @@ static int mei_me_read_slots(struct mei_device *dev, unsigned char *buffer,
 	return 0;
 }
 
+#ifdef CONFIG_PM
 /**
  * mei_me_pg_set - write pg enter register
  *
@@ -684,6 +711,7 @@ out:
 
 	return ret;
 }
+#endif
 
 /**
  * mei_me_pg_in_transition - is device now in pg transition
@@ -775,6 +803,7 @@ static u32 mei_me_d0i3_unset(struct mei_device *dev)
 	return reg;
 }
 
+#ifdef CONFIG_PM
 /**
  * mei_me_d0i3_enter_sync - perform d0i3 entry procedure
  *
@@ -847,6 +876,7 @@ out:
 	dev_dbg(dev->dev, "d0i3 enter ret = %d\n", ret);
 	return ret;
 }
+#endif
 
 /**
  * mei_me_d0i3_enter - perform d0i3 entry procedure
@@ -1013,6 +1043,7 @@ static void mei_me_pg_intr(struct mei_device *dev)
  *
  * Return: 0 on success an error code otherwise
  */
+#ifdef CONFIG_PM
 int mei_me_pg_enter_sync(struct mei_device *dev)
 {
 	struct mei_me_hw *hw = to_me_hw(dev);
@@ -1039,6 +1070,7 @@ int mei_me_pg_exit_sync(struct mei_device *dev)
 	else
 		return mei_me_pg_legacy_exit_sync(dev);
 }
+#endif
 
 /**
  * mei_me_hw_reset - resets fw via mei csr register.
@@ -1348,14 +1380,18 @@ struct mei_device *mei_me_dev_init(struct pci_dev *pdev,
 	struct mei_device *dev;
 	struct mei_me_hw *hw;
 
+	printk("%s, sizeof devalloc %zu\n", __func__,
+			sizeof(struct mei_device) + sizeof(struct mei_me_hw));
 	dev = kzalloc(sizeof(struct mei_device) +
 			 sizeof(struct mei_me_hw), GFP_KERNEL);
 	if (!dev)
 		return NULL;
 	hw = to_me_hw(dev);
 
+	printk("%s, dev %p | hw %p | &mem_addr %p\n", __func__, dev, hw, &hw->mem_addr); 
 	mei_device_init(dev, &pdev->dev, &mei_me_hw_ops);
 	hw->cfg = cfg;
+	dev->dev = &pdev->dev;
 	return dev;
 }
 

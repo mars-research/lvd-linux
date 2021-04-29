@@ -38,6 +38,12 @@ module kernel {
 			unsigned int  irq;
 		}
 	}
+
+	rpc_ptr void pci_driver_shutdown( projection pdev [bind(callee)] * pdev ) {
+		projection < struct pci_dev > pdev {
+		}
+	}
+
 	rpc void  pci_set_master( projection dev*  dev ) {
 		projection < struct pci_dev > dev {
 			projection pci_dev_bus* bus;
@@ -124,11 +130,13 @@ module kernel {
 				const projection _global_mei_hw_ops [alloc(callee)] * ops) {
 		projection < struct mei_device > dev {
 			//projection mei_device_dev* dev;
-			__wait_queue_head [in, out] wait_hw_ready;
-			__wait_queue_head [in, out] wait_pg;
+			projection __wait_queue_head wait_hw_ready;
+			projection __wait_queue_head wait_pg;
 			unsigned int [in, out] dev_state;
 			unsigned int [in, out] pg_event;
 			//projection mei_device_ops* ops;
+		}
+		projection < struct __wait_queue_head > __wait_queue_head {
 		}
 		projection < struct device > mei_device_dev {
 		}
@@ -150,13 +158,13 @@ module kernel {
 	}
 	rpc int mei_start( projection dev [bind(callee)] * dev ) {
 		projection < struct mei_device > dev {
-			projection mei_device_dev* dev;
+			//projection mei_device_dev* dev;
 			unsigned int [out] dev_state;
 		}
 		projection < struct device > mei_device_dev {
 		}
 	}
-	rpc void [ioremap(caller)]  *pci_iomap( projection dev*  dev, int  bar, long unsigned int  maxlen ) {
+	rpc void [ioremap(caller)]  *pci_iomap( projection dev*  pdev, int  bar, long unsigned int  maxlen ) {
 		projection < struct pci_dev > dev {
 		}
 	}
@@ -183,9 +191,11 @@ module kernel {
 	rpc_ptr int  mei_hw_ops_hw_reset( projection dev [bind(caller)] *  dev, bool  intr_enable ) {
 		projection < struct mei_device > dev {
 			//projection mei_device_dev* dev;
-			__wait_queue_head  wait_pg;
+			projection __wait_queue_head  wait_pg;
 			unsigned int [in, out] pg_event;
 			//projection mei_device_ops* ops;
+		}
+		projection < struct __wait_queue_head > __wait_queue_head {
 		}
 		projection < struct device > mei_device_dev {
 		}
@@ -193,8 +203,10 @@ module kernel {
 	rpc_ptr int  mei_hw_ops_hw_start( projection dev [bind(caller)] *dev ) {
 		projection < struct mei_device > dev {
 			//projection mei_device_dev* dev;
-			__wait_queue_head [in, out] wait_hw_ready;
+			projection __wait_queue_head [in, out] wait_hw_ready;
 			//projection mei_device_ops* ops;
+		}
+		projection < struct __wait_queue_head > __wait_queue_head {
 		}
 		projection < struct device > mei_device_dev {
 		}
@@ -293,11 +305,11 @@ module kernel {
 		projection < struct device > mei_device_dev {
 		}
 		projection < struct mei_msg_hdr > header {
-			u32 length;
-			u32 host_addr;
-			u32 me_addr;
-			u32 internal;	
-			u32 msg_complete;
+			u32 me_addr : 8;
+			u32 host_addr : 8;
+			u32 length : 9;
+			u32 internal : 1;
+			u32 msg_complete : 1;
 		}
 	}
 	rpc_ptr int  mei_hw_ops_rdbuf_full_slots( projection dev [bind(caller)] *  dev ) {
@@ -323,13 +335,12 @@ module kernel {
 		projection < struct device > mei_device_dev {
 		}
 	}
-	rpc long int  schedule_timeout( long int  timeout ) {
+	rpc long schedule_timeout( long timeout ) {
 	}
-	rpc void  finish_wait( projection q*  q, projection wait* [in, out] wait ) {
-		projection < struct __wait_queue_head > q {
-			spinlock  lock;
+	rpc void finish_wait(projection wq [bind_memberof<struct mei_device, wait_hw_ready>(callee)] *wq, projection __wait_queue [bind(callee)] *wait) {
+		projection <struct __wait_queue_head> wq {
 		}
-		projection < struct __wait_queue > wait {
+		projection <struct __wait_queue> __wait_queue {
 		}
 	}
 	rpc void  mei_deregister( projection dev [bind(callee)] *  dev ) {
@@ -345,21 +356,21 @@ module kernel {
 		projection < struct device > parent {
 		}
 	}
-	rpc long int  prepare_to_wait_event( projection q* [in, out] q, projection wait* [in, out] wait, int  state ) {
-		projection < struct __wait_queue_head > q {
-			spinlock  lock;
+	rpc long prepare_to_wait_event(projection wq [bind_memberof<struct mei_device, wait_hw_ready>(callee)] *wq, projection __wait_queue [alloc(callee)] *wait, int state) {
+		projection <struct __wait_queue_head> wq {
 		}
-		projection < struct __wait_queue > wait {
-			unsigned int [in, out] flags;
+		projection <struct __wait_queue> __wait_queue {
 		}
 	}
 	rpc long unsigned int  __msecs_to_jiffies( unsigned int  m ) {
 	}
-	rpc bool  queue_delayed_work_on( int  cpu, projection wq*  wq, projection dwork* [in, out] dwork, long unsigned int  delay ) {
+	rpc bool  queue_delayed_work_on( int  cpu, projection wq* [unused]  wq,
+		projection dwork [bind_memberof<struct mei_device, timer_work>(caller)] * dwork,
+		long unsigned int  delay ) {
 		projection < struct workqueue_struct > wq {
 		}
 		projection < struct delayed_work > dwork {
-			projection delayed_work_wq* wq;
+			//projection delayed_work_wq* wq;
 			int [in, out] cpu;
 		}
 		projection < struct workqueue_struct > delayed_work_wq {
@@ -403,7 +414,7 @@ module kernel {
 			projection compl_list [alloc(callee), out] * compl_list ) {
 		projection < struct mei_device > dev {
 			projection mei_device_dev* dev;
-			projection mei_device_ops* ops;
+			//projection mei_device_ops* ops;
 		}
 		projection < struct device > mei_device_dev {
 		}
@@ -421,7 +432,7 @@ module kernel {
 			projection pci_dev_bus* bus;
 			unsigned int  devfn;
 			unsigned int [out] irq;
-			unsigned int [out] msi_enabled;// : 1;
+			unsigned int [out] msi_enabled : 1;
 		}
 		projection < struct pci_bus > pci_dev_bus {
 		}
@@ -434,14 +445,19 @@ module kernel {
 		}
 	}
 
-	rpc_ptr unsigned int thread_fn(int irq, void *id) { }
-	rpc_ptr unsigned int handler(int irq, void *id) { }
+	// XXX: Could fail while looking up the hashmap
+	//rpc_ptr unsigned int thread_fn(int irq, void [bind(callee)] *id) { }
+	rpc_ptr unsigned int thread_fn(int irq, void * [unused] id) { }
+	//rpc_ptr unsigned int handler(int irq, void [bind(callee)] *id) { }
+	rpc_ptr unsigned int handler(int irq, void * [unused] id) { }
 
 	rpc int  request_threaded_irq( unsigned int  irq, rpc_ptr  handler handler, rpc_ptr  thread_fn thread_fn, long unsigned int  irqflags,
 				string [alloc(callee)] * devname,
-				void [alloc<{{sizeof(void*)}}>(callee)] * dev_id ) {
+				//void [alloc<{{sizeof(void*)}}>(callee)] * dev_id ) {
+				void * [unused] dev_id ) {
 	}
-	rpc void  free_irq( unsigned int  irq, void*  dev_id ) {
+
+	rpc void  free_irq( unsigned int  irq, void* [unused] dev_id ) {
 	}
 	rpc void  pci_disable_device( projection dev*  dev ) {
 		projection < struct pci_dev > dev {
@@ -450,8 +466,9 @@ module kernel {
 	rpc int  pci_enable_msi_range( projection dev*  dev, int  minvec, int  maxvec ) {
 		projection < struct pci_dev > dev {
 			projection pci_dev_bus* bus;
-			unsigned int [out] msi_enabled;// : 1;
-			unsigned int [out] msix_enabled;//: 1;
+			unsigned int [out] msi_enabled : 1;
+			unsigned int [out] msix_enabled: 1;
+			unsigned int [out] irq;
 		}
 		projection < struct pci_bus > pci_dev_bus {
 		}
@@ -480,5 +497,21 @@ module kernel {
 		rpc_ptr mei_hw_ops_read read;
 		rpc_ptr mei_hw_ops_read_hdr read_hdr;
 		rpc_ptr mei_hw_ops_write write;
+	}
+	global projection wq *system_wq {
+		projection < struct workqueue_struct > wq {
+		}
+	}
+
+	/*rpc int abort_exclusive_wait(projection wq [bind_memberof<struct mei_device, wait_pg>(callee)] *wq, projection __wait_queue [bind(callee)] *wait, int state) {
+		projection <struct __wait_queue_head> wq {
+		}
+		projection <struct __wait_queue> __wait_queue {
+		}
+	}*/
+
+	rpc void __wake_up(projection wq [bind_memberof<struct mei_device, wait_hw_ready>(callee)] *wq, unsigned int mode, int nr_exclusive, void * [unused] key) {
+		projection <struct __wait_queue_head> wq {
+		}
 	}
 }

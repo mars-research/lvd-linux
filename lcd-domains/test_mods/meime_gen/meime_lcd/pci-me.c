@@ -186,16 +186,24 @@ static int mei_me_probe(struct pci_dev *pdev, const struct pci_device_id *ent)
 	hw = to_me_hw(dev);
 	/* mapping  IO device memory */
 	hw->mem_addr = pci_iomap(pdev, 0, 0);
+	printk("%s, got pci_iomap addr %p\n", __func__, hw->mem_addr);
+	//printk("%s, value at addr %llx\n", __func__, *((uint64_t*)hw->mem_addr));
 	if (!hw->mem_addr) {
 		dev_err(&pdev->dev, "mapping I/O device memory failure.\n");
 		err = -ENOMEM;
 		goto free_device;
 	}
+	printk("%s:%d mei_device %p | hw %p | hw->mem_addr %p\n", __func__, __LINE__,
+			dev, to_me_hw(dev), (to_me_hw(dev))->mem_addr);
 	pci_enable_msi(pdev);
 
+	printk("%s:%d mei_device %p | hw %p | hw->mem_addr %p\n", __func__, __LINE__,
+			dev, to_me_hw(dev), (to_me_hw(dev))->mem_addr);
 	 /* request and enable interrupt */
 	irqflags = pci_dev_msi_enabled(pdev) ? IRQF_ONESHOT : IRQF_SHARED;
 
+	printk("%s:%d mei_device %p | hw %p | hw->mem_addr %p\n", __func__, __LINE__,
+			dev, to_me_hw(dev), (to_me_hw(dev))->mem_addr);
 	err = request_threaded_irq(pdev->irq,
 			mei_me_irq_quick_handler,
 			mei_me_irq_thread_handler,
@@ -205,6 +213,8 @@ static int mei_me_probe(struct pci_dev *pdev, const struct pci_device_id *ent)
 		       pdev->irq);
 		goto disable_msi;
 	}
+	printk("%s:%d mei_device %p | hw %p | hw->mem_addr %p\n", __func__, __LINE__,
+			dev, to_me_hw(dev), (to_me_hw(dev))->mem_addr);
 
 	if (mei_start(dev)) {
 		dev_err(&pdev->dev, "init hw failure.\n");
@@ -212,6 +222,8 @@ static int mei_me_probe(struct pci_dev *pdev, const struct pci_device_id *ent)
 		goto release_irq;
 	}
 
+	printk("%s:%d mei_device %p | hw %p | hw->mem_addr %p\n", __func__, __LINE__,
+			dev, to_me_hw(dev), (to_me_hw(dev))->mem_addr);
 	pm_runtime_set_autosuspend_delay(&pdev->dev, MEI_ME_RPM_TIMEOUT);
 	pm_runtime_use_autosuspend(&pdev->dev);
 
@@ -305,7 +317,6 @@ static void mei_me_remove(struct pci_dev *pdev)
 
 
 }
-#undef CONFIG_PM_SLEEP
 #ifdef CONFIG_PM_SLEEP
 static int mei_me_pci_suspend(struct device *device)
 {
@@ -365,7 +376,6 @@ static int mei_me_pci_resume(struct device *device)
 }
 #endif /* CONFIG_PM_SLEEP */
 
-#undef CONFIG_PM
 #ifdef CONFIG_PM
 static int mei_me_pm_runtime_idle(struct device *device)
 {

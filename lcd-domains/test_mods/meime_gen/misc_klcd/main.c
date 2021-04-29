@@ -79,7 +79,7 @@ static int misc_klcd_init(void)
 	/* call module_init for lcd */
 	m.vmfunc_id = VMFUNC_RPC_CALL;
 	m.rpc_id = MODULE_INIT;
-	LIBLCD_MSG("vmfunc_init successfull! Calling MODULE_INIT of dummy_lcd");
+	LIBLCD_MSG("vmfunc_init successfull! Calling MODULE_INIT of meime_lcd");
 	vmfunc_klcd_wrapper(&m, OTHER_DOMAIN);
 
 	return 0;
@@ -107,7 +107,7 @@ static void __exit misc_klcd_exit(void)
 	/* call module_init for lcd */
 	m.vmfunc_id = VMFUNC_RPC_CALL;
 	m.rpc_id = MODULE_EXIT;
-	LIBLCD_MSG("Calling MODULE_EXIT of dummy_lcd");
+	LIBLCD_MSG("Calling MODULE_EXIT of meime_lcd");
 	vmfunc_klcd_wrapper(&m, OTHER_DOMAIN);
 
 	/*

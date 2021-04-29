@@ -48,7 +48,7 @@ static int boot_main(void)
 		goto fail3;
 	}
 	ret = lvd_create_module_lvd(LCD_DIR("meime_gen/meime_lcd"),
-				"lcd_test_mod_meime_gen_dummy_lcd",
+				"lcd_test_mod_meime_gen_meime_lcd",
 				&meime_lcd,
 				&dummy_ctx, 1);
 	if (ret) {
@@ -58,20 +58,20 @@ static int boot_main(void)
 
 	/* ---------- RUN! ---------- */
 
-	LIBLCD_MSG("starting network...");
+	LIBLCD_MSG("starting misc...");
 
 	/* run KLCD init */
 	ret = lcd_run(misc_klcd);
 	if (ret) {
-		LIBLCD_ERR("failed to start net klcd");
+		LIBLCD_ERR("failed to start misc klcd");
 		goto fail8;
 	}
 
-	LIBLCD_MSG("starting dummy ethernet...");
+	LIBLCD_MSG("starting mei-me");
 
 	ret = lcd_run(meime_lcd);
 	if (ret) {
-		LIBLCD_ERR("failed to start dummy lcd");
+		LIBLCD_ERR("failed to start meime lcd");
 		goto fail9;
 	}
 

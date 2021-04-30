@@ -1,0 +1,592 @@
+module kernel {
+	rpc_ptr int  ethtool_ops_set_settings( projection netdev [bind(callee)] *  netdev, projection ecmd [alloc_stack(callee)] *  ecmd ) {
+		projection < struct net_device > netdev {
+		}
+		projection < struct ethtool_cmd > ecmd {
+			unsigned int  advertising;
+			unsigned short  speed;
+			unsigned char  duplex;
+			unsigned char  autoneg;
+			unsigned short  speed_hi;
+		}
+	}
+	rpc_ptr int ethtool_ops_get_settings( projection netdev [bind(callee)] * netdev,
+			projection ecmd [alloc_stack(callee), out] * ecmd ) {
+		projection < struct net_device > netdev {
+		}
+		projection < struct ethtool_cmd > ecmd {
+			unsigned int [out] supported;
+			unsigned int [out] advertising;
+			unsigned short [out] speed;
+			unsigned char [out] duplex;
+			unsigned char [out] port;
+			unsigned char [out] phy_address;
+			unsigned char [out] transceiver;
+			unsigned char [out] autoneg;
+			unsigned short [out] speed_hi;
+		}
+	}
+	rpc_ptr unsigned int  ethtool_ops_get_msglevel( projection netdev*  netdev ) {
+		projection < struct net_device > netdev {
+		}
+	}
+	rpc_ptr void  ethtool_ops_set_msglevel( projection netdev*  netdev, unsigned int  data ) {
+		projection < struct net_device > netdev {
+		}
+	}
+	rpc_ptr unsigned int thread_fn(int irq, void *id) {
+	}
+
+	rpc_ptr unsigned int handler(int irq, void *id) {
+	}
+
+	rpc int request_threaded_irq( unsigned int irq,
+			rpc_ptr handler handler,
+			rpc_ptr thread_fn thread_fn,
+			long unsigned int irqflags,
+			string [alloc(callee)] * devname, void* dev_id ) {
+	}
+
+
+	rpc void  free_irq( unsigned int  irq, void*  dev_id ) {
+	}
+	rpc void  synchronize_irq( unsigned int  irq ) {
+	}
+	rpc void  rtnl_unlock(  ) {
+	}
+	rpc void  rtnl_lock(  ) {
+	}
+	rpc bool cancel_work_sync( projection work [bind(callee)] * work ) {
+		projection < struct list_head> list_head {
+			projection list_head_next* next;
+		}
+		projection < struct work_struct > work {
+			//atomic64_t [in, out] data;
+			//projection list_head entry;
+		}
+		projection < struct list_head > list_head_next {
+		}
+	}
+	rpc_ptr int probe( projection pdev [alloc(callee)] * pdev,
+			projection ent [alloc_stack(callee)] * ent ) {
+		projection < struct pci_dev > pdev {
+			projection pci_bus [alloc(callee)] *bus;
+		}
+		projection < struct pci_device_id > ent {
+			long unsigned int  driver_data;
+		}
+		projection < struct pci_bus> pci_bus {
+		}
+	}
+
+	rpc_ptr void remove( projection pdev [bind(callee)] * pdev ) {
+		projection < struct pci_dev > pdev {
+		}
+	}
+
+	rpc void pci_unregister_driver( projection drv [bind(callee), dealloc(callee)] * drv ) {
+		projection < struct pci_driver > drv {
+		}
+	}
+
+	rpc int __pci_register_driver( projection drv [alloc(callee)] * drv,
+		projection owner * [unused] owner, string [alloc(callee)] * mod_name ) {
+		projection < struct pci_driver > drv {
+			string [alloc(callee)] *  name;
+			rpc_ptr probe probe;
+			rpc_ptr remove remove;
+			array<projection pci_device_id, null> [alloc(callee)] *id_table;
+		}
+		projection <struct pci_device_id> pci_device_id {
+			unsigned int vendor;
+			unsigned int device;
+			unsigned int subvendor;
+			unsigned int subdevice;
+			unsigned int class;
+			unsigned int class_mask;
+			unsigned long long driver_data;
+		}
+		projection < struct module > owner {
+		}
+	}
+
+	rpc_ptr unsigned int  ethtool_ops_get_link( projection dev [bind(callee)] *  netdev ) {
+		projection < struct net_device > dev {
+			long unsigned int  state;
+		}
+	}
+	rpc int  pci_enable_msi_range( projection dev*  dev, int  minvec, int  maxvec ) {
+		projection < struct pci_dev > dev {
+		}
+	}
+	rpc_ptr void  ethtool_ops_get_pauseparam( projection netdev [bind(callee)] *  netdev, projection pause [alloc_stack(callee), out] * pause ) {
+		projection < struct net_device > netdev {
+		}
+		projection < struct ethtool_pauseparam > pause {
+			u32 autoneg;
+			u32 rx_pause;
+			u32 tx_pause;
+		}
+	}
+	rpc_ptr int ethtool_ops_set_pauseparam( projection netdev [bind(callee)] *  netdev, projection pause [alloc_stack(callee)] *  pause ) {
+		projection < struct net_device > netdev {
+		}
+		projection < struct ethtool_pauseparam > pause {
+			u32 autoneg;
+			u32 rx_pause;
+			u32 tx_pause;
+		}
+	}
+	rpc_ptr void  ethtool_ops_get_strings( projection netdev [bind(callee)] *  netdev,
+		unsigned int stringset, array<unsigned char, {{sizeof(__alx_gstrings_stats)}}>  [out] *buf) {
+		projection < struct net_device > netdev {
+		}
+	}
+	rpc_ptr void  ethtool_ops_get_ethtool_stats(  projection netdev [bind(callee)] *  netdev,
+			projection estats* [unused] estats,
+			array<long long unsigned int, {{__ALX_NUM_STATS * sizeof(u64)}}> [alloc(callee), out] *data ) {
+		projection < struct net_device > netdev {
+		}
+		projection < struct ethtool_stats > estats {
+		}
+	}
+	rpc_ptr int  ethtool_ops_get_sset_count( projection netdev [bind(callee)] *  netdev, int  sset ) {
+		projection < struct net_device > netdev {
+		}
+	}
+	rpc_ptr int net_device_ops_ndo_open( projection netdev [bind(callee)] *  netdev ) {
+		projection < struct net_device > netdev {
+		}
+	}
+	rpc_ptr int  net_device_ops_ndo_stop( projection netdev [bind(callee)] *  netdev ) {
+		projection < struct net_device > netdev {
+		}
+	}
+	rpc_ptr int  net_device_ops_ndo_start_xmit( projection skb [alloc(callee)] *  skb, projection netdev [bind(callee)] *  netdev ) {
+		projection < struct sk_buff > skb {
+			unsigned int  len;
+			unsigned char  ip_summed : 2;
+			unsigned int  end;
+			array<unsigned char, {{ctx->skb->len}}>  [alloc(callee)] *head;
+			//unsigned char*  data;
+		}
+		projection < struct net_device > netdev {
+		}
+	}
+	// TODO: bring in dev->mc list?
+	rpc_ptr void  net_device_ops_ndo_set_rx_mode( projection netdev [bind(callee)] *  netdev ) {
+		projection < struct netdev_hw_addr_list> netdev_hw_addr_list {
+			projection list_head list;
+		}
+		projection < struct list_head> list_head {
+			//projection list_head_next* next;
+		}
+		projection < struct net_device > netdev {
+			//unsigned short  dev_id;
+			projection netdev_hw_addr_list mc;
+		}
+		projection < struct list_head > list_head_next {
+		}
+	}
+	// TODO: need static void
+	rpc_ptr int  net_device_ops_ndo_set_mac_address( projection netdev*  netdev, projection sockaddr [alloc_stack(callee)]  *data ) {
+		projection < struct net_device > netdev {
+			unsigned char [in, out] addr_assign_type;
+			unsigned char  addr_len;
+			array<unsigned char, {{MAX_ADDR_LEN}}> [bind(caller), out] * dev_addr;
+		}
+		projection < struct sockaddr > sockaddr {
+			array<char, 14> sa_data;
+		}
+	}
+	rpc_ptr int net_device_ops_ndo_do_ioctl( projection netdev [bind(callee)] * netdev,
+			projection ifr [alloc_stack(callee)] * ifr, int cmd ) {
+		projection < struct net_device > netdev {
+			long unsigned int  state;
+		}
+		projection < struct ifreq > ifr {
+		}
+	}
+	rpc_ptr int  net_device_ops_ndo_change_mtu( projection netdev [bind(callee)] *  netdev, int  mtu ) {
+		projection < struct net_device > netdev {
+			long unsigned int  state;
+			unsigned int [in, out] mtu;
+		}
+	}
+	rpc_ptr void  net_device_ops_ndo_tx_timeout( projection dev [bind(callee)] *  dev ) {
+		projection < struct net_device > dev {
+		}
+	}
+
+	rpc_ptr projection ret_rtnl_link_stats64*  net_device_ops_ndo_get_stats64( projection dev [bind(callee)] *  dev, projection net_stats [alloc_stack(callee)] *net_stats ) {
+		projection < struct rtnl_link_stats64 > ret_rtnl_link_stats64 {
+			long long unsigned int [out] rx_packets;
+			long long unsigned int [out] tx_packets;
+			long long unsigned int [out] rx_bytes;
+			long long unsigned int [out] tx_bytes;
+			long long unsigned int [out] rx_errors;
+			long long unsigned int [out] tx_errors;
+			long long unsigned int [out] rx_dropped;
+			long long unsigned int [out] multicast;
+			long long unsigned int [out] collisions;
+			long long unsigned int [out] rx_length_errors;
+			long long unsigned int [out] rx_crc_errors;
+			long long unsigned int [out] rx_frame_errors;
+			long long unsigned int [out] rx_fifo_errors;
+			long long unsigned int [out] tx_aborted_errors;
+			long long unsigned int [out] tx_fifo_errors;
+			long long unsigned int [out] tx_window_errors;
+		}
+		projection < struct net_device > dev {
+		}
+		projection < struct rtnl_link_stats64 > net_stats {
+			long long unsigned int [out] rx_packets;
+			long long unsigned int [out] tx_packets;
+			long long unsigned int [out] rx_bytes;
+			long long unsigned int [out] tx_bytes;
+			long long unsigned int [out] rx_errors;
+			long long unsigned int [out] tx_errors;
+			long long unsigned int [out] rx_dropped;
+			long long unsigned int [out] multicast;
+			long long unsigned int [out] collisions;
+			long long unsigned int [out] rx_length_errors;
+			long long unsigned int [out] rx_crc_errors;
+			long long unsigned int [out] rx_frame_errors;
+			long long unsigned int [out] rx_fifo_errors;
+			long long unsigned int [out] tx_aborted_errors;
+			long long unsigned int [out] tx_fifo_errors;
+			long long unsigned int [out] tx_window_errors;
+		}
+	}
+	rpc_ptr long long unsigned int  net_device_ops_ndo_fix_features( projection netdev [bind(callee)] *  netdev, long long unsigned int  features ) {
+		projection < struct net_device > netdev {	
+			unsigned int  mtu;
+		}
+	}
+
+	rpc int pci_bus_write_config_word( projection bus * bus,
+		unsigned int devfn, int pos, unsigned short value ) {
+		projection < struct pci_bus > bus {
+		}
+	}
+	rpc int pci_bus_read_config_word( projection bus * bus,
+		unsigned int devfn, int pos,
+		unsigned short [alloc_stack(callee), out] * value ) {
+		projection < struct pci_bus > bus {
+		}
+	}
+
+	rpc_ptr int mdio_read(projection net_device [bind(callee)] *dev, int prtad, int devad,
+			 u16 addr) {
+		projection < struct net_device > net_device {
+		}
+	}
+	rpc_ptr int mdio_write(projection net_device [bind(callee)] *dev, int prtad, int devad,
+			  u16 addr, u16 val) {
+		projection < struct net_device > net_device {
+		}
+	}
+
+	//rpc int  mdio_mii_ioctl( const projection mdio [alloc_once(callee)] *  mdio, projection mii_data [bind_memberof<struct ifreq, ifr_ifru>(caller)] * mii_data, int  cmd ) {
+	rpc int  mdio_mii_ioctl( const projection mdio [alloc_once(callee)] *  mdio, projection mii_data  * mii_data, int  cmd ) {
+		projection < struct mdio_if_info > mdio {
+			int  prtad;
+			unsigned int  mmds;
+			unsigned int mode_support;
+			rpc_ptr mdio_read mdio_read;
+			rpc_ptr mdio_write mdio_write;
+			// TODO: aliased to struct netdev
+			//projection mdio_if_info_dev* dev;
+		}
+		projection < struct net_device > mdio_if_info_dev {
+		}
+		projection < struct mii_ioctl_data > mii_data {
+		}
+	}
+	rpc void  pci_disable_msi( projection dev*  dev ) {
+		projection < struct pci_dev > dev {
+			unsigned int [in, out] irq;
+			unsigned short  dev_flags;
+		}
+	}
+	rpc void  pci_disable_device( projection dev*  dev ) {
+		projection < struct pci_dev > dev {
+		}
+	}
+
+	rpc bool  queue_work_on( int  cpu, projection wq* [unused]  wq //global
+			, projection work [alloc(callee)] * work ) {
+		projection < struct workqueue_struct > wq {
+		}
+		projection < struct work_struct > work {
+			projection  atomic64_t [in, out] data;
+		}
+		projection <struct atomic64_t> atomic64_t {
+			long counter;
+		}
+	}
+	rpc void  consume_skb( projection skb [dealloc(caller)] *  skb ) {
+		projection < struct sk_buff > skb {
+			unsigned int  end;
+			array<unsigned char, {{ctx->skb->len}}> [dealloc(caller)] *  head;
+		}
+	}
+
+	rpc void  napi_complete_done( projection n [bind(callee)] *n, int  work_done ) {
+		projection < struct napi_struct > n {
+			long unsigned int [in, out] state;
+		}
+	}
+
+	rpc projection ret_net_device [alloc<{{sizeof(struct net_device) + ctx->sizeof_priv}}>(caller)] * alloc_etherdev_mqs( int sizeof_priv,
+				unsigned int txqs, unsigned int rxqs ) {
+		projection < struct net_device > ret_net_device {
+			array<unsigned char, {{MAX_ADDR_LEN}}> [alloc(caller)] *dev_addr;
+			unsigned int num_tx_queues;
+			// TODO: array
+			projection net_device__tx [alloc<{{ptr->num_tx_queues}}>(caller)] * _tx;
+		}
+
+		// XXX: needed? to manipulate to netdev_tx_queue and stuff
+		projection < struct netdev_queue > net_device__tx {
+		}
+	}
+
+	rpc void  free_netdev( projection dev [dealloc(caller)] *  dev ) {
+		projection < struct net_device > dev {
+			projection __global_netdev_ops [dealloc(callee)] * netdev_ops;
+			projection __global_ethtool_ops [dealloc(callee)] * ethtool_ops;
+			// TODO: array
+			//projection __tx [dealloc* _tx;
+		}
+		projection < struct netdev_queue > net_device__tx {
+		}
+	}
+
+	rpc void  netif_napi_del( projection napi [bind(callee), dealloc(callee)] * napi ) {
+		projection < struct napi_struct > napi {
+			long unsigned int  state;
+		}
+	}
+	rpc int  rtnl_is_locked(  ) {
+	}
+	rpc_ptr int  net_device_ops_ndo_validate_addr( projection dev*  dev ) {
+		projection < struct net_device > dev {
+			array<unsigned char, 6> [alloc_stack(callee)] *dev_addr;
+		}
+	}
+	rpc void  napi_disable( projection n [bind(callee)] *  n ) {
+		projection < struct napi_struct > n {
+			long unsigned int  state;
+		}
+	}
+	rpc_ptr int poll(projection napi * napi, int weight) {
+		projection < struct napi_struct > napi {
+		}
+	}
+	rpc void  netif_napi_add( projection dev* dev, projection napi [alloc(callee)] * napi, rpc_ptr  poll poll, int  weight ) {
+		projection < struct net_device > dev {
+			//array< char, 16>  name;
+		}
+		projection < struct napi_struct > napi {
+			long unsigned int  state;
+		}
+	}
+	rpc void  __napi_schedule( projection n [bind(callee)] *  n ) {
+		projection < struct napi_struct > n {
+		}
+	}
+	rpc void  __dev_kfree_skb_any( projection skb [dealloc(caller)] *  skb, unsigned int  reason ) {
+		projection < struct sk_buff > skb {
+			unsigned int  end;
+			unsigned int len;
+			array<unsigned char, {{ptr->len}}> [dealloc(caller)] *  head;
+		}
+	}
+	rpc void  netif_device_attach( projection dev*  dev ) {
+		projection < struct net_device > dev {
+			long unsigned int  [out] state;
+			unsigned int  num_tx_queues;
+			int [in, out] watchdog_timeo;
+		}
+	}
+	// TODO: How to shadow this _tx
+	rpc void  netif_tx_wake_queue( projection dev_queue* dev_queue ) {
+		projection < struct netdev_queue > dev_queue {
+			//projection netdev_queue_qdisc* qdisc;
+			long unsigned int [out] state;
+		}
+		projection < struct Qdisc > netdev_queue_qdisc {
+			long unsigned int  state;
+		}
+	}
+	rpc void  netif_device_detach( projection dev*  dev ) {
+		projection < struct net_device > dev {
+			long unsigned int [out] state;
+			unsigned int  num_tx_queues;
+		}
+	}
+	// TODO: How to shadow this _tx
+	rpc void  netif_schedule_queue( projection txq*  txq ) {
+		projection < struct netdev_queue > txq {
+			//projection netdev_queue_qdisc* qdisc;
+		}
+		projection < struct Qdisc > netdev_queue_qdisc {
+			//long unsigned int  state;
+			//projection Qdisc_next_sched* next_sched;
+		}
+		projection < struct Qdisc > Qdisc_next_sched {
+		}
+	}
+
+	rpc void  unregister_netdev( projection dev* dev ) {
+		projection < struct net_device > dev {
+		}
+	}
+	rpc int  register_netdev( projection dev* dev ) {
+		projection < struct device> device {
+			//projection device_parent* parent;
+		}
+		projection < struct net_device > dev {
+			array< char, 16> name;
+			// XXX: false positive. irq is never modified?
+			//int [out] irq;
+			long unsigned int [out] state;
+			// XXX; missing [out]
+			long long unsigned int [out] hw_features;
+			projection __global_netdev_ops [alloc(callee)] * netdev_ops;
+			projection __global_ethtool_ops [alloc(callee)] * ethtool_ops;
+			unsigned int [out] mtu;
+			array< unsigned char, 32> perm_addr;
+			unsigned char  addr_assign_type;
+			unsigned char [out] addr_len;
+			array<unsigned char, {{MAX_ADDR_LEN}}> *dev_addr;
+			unsigned int [out] num_tx_queues;
+			projection device dev;
+		}
+		projection < struct device > device_parent {
+		}
+	}
+	rpc void  netdev_update_features( projection dev*  dev ) {
+		projection < struct net_device > dev {
+		}
+	}
+	rpc void  netif_carrier_on( projection dev*  dev ) {
+		projection < struct net_device > dev {
+			// XXX: missing [out]
+			long unsigned int [out] state;
+			int [in, out] watchdog_timeo;
+		}
+	}
+	rpc void  netif_carrier_off( projection dev*  dev ) {
+		projection < struct net_device > dev {
+			// XXX: missing [out]
+			long unsigned int [out] state;
+		}
+	}
+	// TODO: If skb is locally allocated, then we must copy out during this call
+	rpc unsigned int napi_gro_receive( projection napi [bind(callee)] *  napi, projection skb [alloc(callee)] *skb ) {
+		projection < struct napi_struct > napi {
+		}
+		projection < struct sk_buff > skb {
+			unsigned int [in, out] len;
+			unsigned int [in, out] data_len;
+			unsigned char [in, out] ip_summed : 2;
+			unsigned short [in, out] protocol;
+			array<unsigned int, 0> [in, out] headers_end;
+			unsigned int [in, out] tail;
+			unsigned int [in, out] end;
+			unsigned char* [in, out] head;
+			unsigned char* [in, out] data;
+		}
+	}
+	// TODO: skb_put just does pointer arithmetic. Deal with it locally?
+	rpc unsigned char*  skb_put( projection skb*  skb, unsigned int  len ) {
+		projection < struct sk_buff > skb {
+			unsigned int [in, out] len;
+			unsigned int  data_len;
+			array<unsigned int, 0> [in, out] headers_end;
+			unsigned int [in, out] tail;
+			unsigned int  end;
+			unsigned char*  head;
+			unsigned char*  data;
+		}
+	}
+	// TODO: perform local allocation?
+	rpc projection ret_sk_buff*  __netdev_alloc_skb( projection dev*  dev, unsigned int  len, unsigned int  gfp_mask ) {
+		projection < struct sk_buff > ret_sk_buff {
+		}
+		projection < struct net_device > dev {
+		}
+	}
+	rpc int  pci_select_bars( projection dev*  dev, long unsigned int  flags ) {
+		projection < struct pci_dev > dev {
+		}
+	}
+	rpc int  pcie_set_readrq( projection dev*  dev, int  rq ) {
+		projection < struct pci_dev > dev {
+		}
+	}
+	rpc int  pcie_get_readrq( projection dev*  dev ) {
+		projection < struct pci_dev > dev {
+		}
+	}
+	rpc void  pci_set_master( projection dev*  dev ) {
+		projection < struct pci_dev > dev {
+		}
+	}
+	rpc int pci_enable_pcie_error_reporting(projection pdev *dev) {
+		projection < struct pci_dev > pdev {
+		}
+	}
+	rpc int pci_disable_pcie_error_reporting(projection pdev *dev) {
+		projection < struct pci_dev > pdev {
+		}
+	}
+	rpc int pci_request_selected_regions( projection pdev * pdev,
+			int bars, string [alloc(callee)] * res_name ) {
+		projection < struct pci_dev > pdev {
+		}
+	}
+	rpc void  pci_release_selected_regions( projection pdev*  pdev, int  bars ) {
+		projection < struct pci_dev > pdev {
+		}
+	}
+	rpc int  pci_enable_device( projection dev*  dev ) {
+		projection < struct pci_dev > dev {
+		}
+	}
+	rpc int  pci_enable_device_mem( projection dev*  dev ) {
+		projection < struct pci_dev > dev {
+		}
+	}
+	rpc void [ioremap(caller)]  *pci_ioremap_bar( projection pdev*  pdev, int  bar ) {
+		projection < struct pci_dev > pdev {
+		}
+	}
+	projection < struct ethtool_ops > __global_ethtool_ops {
+		rpc_ptr ethtool_ops_get_ethtool_stats get_ethtool_stats;
+		rpc_ptr ethtool_ops_get_link get_link;
+		rpc_ptr ethtool_ops_get_msglevel get_msglevel;
+		rpc_ptr ethtool_ops_get_pauseparam get_pauseparam;
+		rpc_ptr ethtool_ops_get_settings get_settings;
+		rpc_ptr ethtool_ops_get_sset_count get_sset_count;
+		rpc_ptr ethtool_ops_get_strings get_strings;
+		rpc_ptr ethtool_ops_set_msglevel set_msglevel;
+		rpc_ptr ethtool_ops_set_pauseparam set_pauseparam;
+		rpc_ptr ethtool_ops_set_settings set_settings;
+	}
+	projection < struct net_device_ops > __global_netdev_ops {
+		rpc_ptr net_device_ops_ndo_change_mtu ndo_change_mtu;
+		rpc_ptr net_device_ops_ndo_do_ioctl ndo_do_ioctl;
+		rpc_ptr net_device_ops_ndo_fix_features ndo_fix_features;
+		rpc_ptr net_device_ops_ndo_get_stats64 ndo_get_stats64;
+		rpc_ptr net_device_ops_ndo_open ndo_open;
+		rpc_ptr net_device_ops_ndo_set_mac_address ndo_set_mac_address;
+		rpc_ptr net_device_ops_ndo_set_rx_mode ndo_set_rx_mode;
+		rpc_ptr net_device_ops_ndo_start_xmit ndo_start_xmit;
+		rpc_ptr net_device_ops_ndo_stop ndo_stop;
+		rpc_ptr net_device_ops_ndo_tx_timeout ndo_tx_timeout;
+		rpc_ptr net_device_ops_ndo_validate_addr ndo_validate_addr;
+	}	
+}

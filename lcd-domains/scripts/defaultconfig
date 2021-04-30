@@ -66,6 +66,10 @@ dmzero_gen/boot nonisolated
 dmzero_gen/dmzero_lcd isolated
 dmzero_gen/dm_klcd nonisolated
 
+alx_gen/boot nonisolated
+alx_gen/alx_lcd isolated
+alx_gen/net_klcd nonisolated
+
 meime_gen/boot nonisolated
 meime_gen/meime_lcd isolated
 meime_gen/misc_klcd nonisolated

@@ -1,0 +1,12 @@
+obj-m += lcd_test_mod_alx_gen_net_klcd.o
+
+lcd_test_mod_alx_gen_net_klcd-y		+= main.o
+lcd_test_mod_alx_gen_net_klcd-y		+= $(addprefix ../, server.o common.o glue_user.o)
+
+cppflags-y += $(NONISOLATED_CFLAGS)
+
+#extra-y += $(addprefix ../, trampolines.lds)
+#ldflags-y += -T $(LCD_TEST_MODULES_BUILD_DIR)/alx_gen/trampolines.lds
+
+ccflags-y += $(NONISOLATED_CFLAGS)
+

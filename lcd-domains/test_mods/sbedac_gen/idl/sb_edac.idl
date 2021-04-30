@@ -1,0 +1,200 @@
+module kernel {
+	rpc_ptr int notifier_call( projection nb * [unused] nb,
+			long unsigned int [unused] val,
+			void [alloc<{{sizeof(struct mce)}}>(callee)] *  data ) {
+
+		projection < struct notifier_block > nb {
+			rpc_ptr notifier_call notifier_call;
+		}
+	}
+
+	rpc void mce_unregister_decode_chain( 
+		projection notifier_block [bind(callee), dealloc(callee)] *nb) {
+
+		projection < struct notifier_block > notifier_block {
+		}
+	}
+
+	rpc void mce_register_decode_chain( projection notifier_block [alloc(callee)] *nb) {
+		projection < struct notifier_block > notifier_block {
+		}
+	}
+
+	rpc void pci_dev_put( projection dev *  dev ) {
+		projection < struct device> device{
+		}
+		projection < struct pci_dev > dev {
+			//projection device dev;
+		}
+	}
+
+	rpc projection ret_pci_dev [bind(caller)] * pci_dev_get( projection dev *  dev ) {
+		projection < struct device> device{
+		}
+		projection < struct pci_dev > ret_pci_dev {
+			//projection device dev;
+		}
+		projection < struct device> device{
+		}
+		projection < struct pci_dev > dev {
+			//projection device dev;
+		}
+	}
+
+	rpc const projection ret_x86_cpu_id [alloc(caller)] * x86_match_cpu(
+			const array<projection match, null> [alloc(callee)] *match ) {
+		projection < struct x86_cpu_id > ret_x86_cpu_id {
+			unsigned short vendor;
+			unsigned short family;
+			unsigned short model;
+			unsigned short feature;	
+			unsigned long long driver_data;
+		}
+		projection < struct x86_cpu_id > match {
+			unsigned short vendor;
+			unsigned short family;
+			unsigned short model;
+			unsigned short feature;
+			unsigned long long driver_data;
+		}
+	}
+
+
+	rpc void edac_mc_handle_error( unsigned int  type,
+		projection mci * mci, unsigned short  error_count,
+		long unsigned int  page_frame_number, long unsigned int  offset_in_page,
+		long unsigned int  syndrome, int  top_layer, int  mid_layer,
+		int  low_layer, string [alloc(callee)] *_msg,
+		string [alloc(callee)] * other_detail ) {
+
+		projection < struct mem_ctl_info > mci {
+			int  mc_idx;
+			unsigned int  n_layers;
+			projection layers* layers;
+			projection dimms* dimms;
+		}
+		projection < struct edac_mc_layer > layers {
+		}
+		projection < struct dimm_info > dimms {
+		}
+	}
+
+	rpc int pci_enable_device( projection dev *  dev ) {
+		projection < struct pci_dev > dev {
+		}
+	}
+
+	rpc projection ret_mem_ctl_info* edac_mc_del_mc( projection dev [bind(callee)] *  dev ) {
+		projection < struct mem_ctl_info > ret_mem_ctl_info {
+			int  mc_idx;
+		}
+		projection < struct device > dev {
+		}
+	}
+
+
+	rpc int edac_mc_add_mc_with_groups( projection mci *  mci,
+			const projection groups ** [unused]  groups ) {
+		projection < struct mem_ctl_info > mci {
+			int  mc_idx;
+			unsigned int tot_dimms;
+			// XXX:
+			array<projection dimms, {{ctx->mci->tot_dimms}}> ** dimms;
+			string [alloc(callee)] *  ctl_name;
+			unsigned long mtype_cap;
+			unsigned long edac_ctl_cap;
+			unsigned long edac_cap;
+			//string [alloc(callee)] *  mod_name;
+			string [alloc(callee)] *  dev_name;
+			string [alloc(callee)] *  mod_ver;
+			projection device [alloc(callee)] *pdev;	
+		}
+
+		projection < struct device > device {
+		}
+
+		projection < struct dimm_info > dimms {
+			u32 grain;
+			u32 dtype;
+			u32 mtype;
+			u32 edac_mode;
+			u32 nr_pages;
+			array<unsigned int, 8> label;
+			//string label;
+		}
+
+		projection < struct attribute_group > groups {
+		}
+	}
+	// TODO: Free dimms and layers
+	rpc void edac_mc_free( projection mci [dealloc(caller)] *  mci ) {
+		projection < struct mem_ctl_info > mci {
+		}
+	}
+
+	// need array_sized
+	rpc projection ret_mem_ctl_info [alloc<{{sizeof(struct mem_ctl_info) + ctx->sz_pvt}}>(caller)] * edac_mc_alloc(
+		unsigned int  mc_num,
+		unsigned int  n_layers,
+		array<projection layers, {{ctx->n_layers}}> [alloc(callee)] *layers,
+		unsigned int  sz_pvt ) {
+
+		projection < struct mem_ctl_info > ret_mem_ctl_info {
+			int  mc_idx;
+			unsigned int n_layers;
+			unsigned int tot_dimms;
+			// need alloc_sized
+			array<projection ret_layers, {{ptr->n_layers}}> [alloc(caller)] *layers;
+			//array<projection ret_dimms, {{ptr->tot_dimms}}>  [alloc(caller)] * [alloc<{{sizeof(struct dimm_info*) * ptr->tot_dimms}}>(caller)]* dimms;
+			//array<array<projection ret_dimms, {{sizeof(struct dimm_info)}} > [alloc(caller)] *, {{ptr->tot_dimms}}> [alloc(caller)] *dimms;
+			array<array<projection ret_dimms,1> [alloc(caller)] *, {{ptr->tot_dimms}}> [alloc(caller)] *dimms;
+			//array<projection ret_dimms, {{ptr->tot_dimms}}>  [alloc<{{ptr->tot_dimms}}>(caller)] * [alloc<{{sizeof(struct dimm_info*) * ptr->tot_dimms}}>(caller)]* dimms;
+			void [alloc<{{sizeof(ctx->sz_pvt)}}>(caller)] *pvt_info;
+		}
+
+		projection < struct edac_mc_layer > ret_layers {
+			int type;
+			unsigned int size;
+			bool is_virt_csrow;
+		}
+
+		// TODO:
+		projection < struct dimm_info > ret_dimms {
+		}
+
+		projection < struct edac_mc_layer > layers {
+			int type;
+			unsigned int size;
+			bool is_virt_csrow;
+		}
+	}
+	rpc projection ret_pci_dev [alloc_once(caller)] * pci_get_device( unsigned int  vendor,
+			unsigned int  device, projection from * from ) {
+		projection < struct pci_dev > ret_pci_dev {
+			projection bus [alloc_once(caller)] *bus;
+			unsigned int [out] devfn;
+			unsigned short [out] device;
+			projection device dev;
+		}
+		projection < struct pci_dev > from {
+		}
+		projection < struct pci_bus > bus {
+			unsigned char [out] number;
+		}
+
+		projection < struct device > device {
+			projection kobject kobj;
+		}
+
+		projection < struct kobject > kobject {
+			string [alloc_once(caller)] *name;
+		}
+	}
+
+	rpc int pci_bus_read_config_dword( projection bus *  bus,
+			unsigned int  devfn, int  pos, unsigned int [alloc(callee), out] * value ) {
+		projection < struct pci_bus > bus {
+		}
+	}
+
+}

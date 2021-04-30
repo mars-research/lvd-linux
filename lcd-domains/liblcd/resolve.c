@@ -155,6 +155,7 @@ int kthread_stop(struct task_struct *k)
 	return 0;
 }
 
+#ifndef CONFIG_LVD
 int wake_up_process(struct task_struct *tsk)
 {
 	return 0;
@@ -164,7 +165,7 @@ void __wake_up(wait_queue_head_t *q, unsigned int mode, int nr, void *key)
 {
 	return;
 }
-
+#endif
 /* IOREMAPs -------------------------------------------------- */
 
 void *ioremap_cache(resource_size_t phys_addr, unsigned long size)

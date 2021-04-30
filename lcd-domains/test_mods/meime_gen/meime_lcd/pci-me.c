@@ -318,7 +318,7 @@ static void mei_me_remove(struct pci_dev *pdev)
 
 }
 #ifdef CONFIG_PM_SLEEP
-static int mei_me_pci_suspend(struct device *device)
+__maybe_unused static int mei_me_pci_suspend(struct device *device)
 {
 	struct pci_dev *pdev = to_pci_dev(device);
 	struct mei_device *dev = pci_get_drvdata(pdev);
@@ -338,7 +338,7 @@ static int mei_me_pci_suspend(struct device *device)
 	return 0;
 }
 
-static int mei_me_pci_resume(struct device *device)
+__maybe_unused static int mei_me_pci_resume(struct device *device)
 {
 	struct pci_dev *pdev = to_pci_dev(device);
 	struct mei_device *dev;

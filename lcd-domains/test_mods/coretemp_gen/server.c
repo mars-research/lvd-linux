@@ -4,6 +4,9 @@
 
 #include <lcd_config/post_hook.h>
 
+struct attribute_group * grp1 = 0;
+struct dev_attribute_group2 * dgrp2 = 0;
+
 void rdmsr_safe_on_cpu_callee(struct fipc_message* msg, struct ext_registers* ext)
 {
 	size_t n_pos = 0;
@@ -283,18 +286,18 @@ int LCD_TRAMPOLINE_LINKAGE(trmp_platform_driver_remove) trmp_platform_driver_rem
 	return impl(target, pdev);
 }
 
-void sysfs_remove_group_callee(struct fipc_message* msg, struct ext_registers* ext)
+void lvd_sysfs_remove_group_callee(struct fipc_message* msg, struct ext_registers* ext)
 {
 	size_t n_pos = 0;
 	size_t* __pos = &n_pos;
 
 	struct kobject* kobj = 0;
-	struct attribute_group const* grp = 0;
+	struct dev_attribute_group const* grp = 0;
 	struct kobject** kobj_ptr = &kobj;
-	struct attribute_group const** grp_ptr = &grp;
+	struct dev_attribute_group const** grp_ptr = &grp;
 	
-	__maybe_unused struct sysfs_remove_group_call_ctx call_ctx = {kobj, grp};
-	__maybe_unused struct sysfs_remove_group_call_ctx *ctx = &call_ctx;
+	__maybe_unused struct lvd_sysfs_remove_group_call_ctx call_ctx = {kobj, grp};
+	__maybe_unused struct lvd_sysfs_remove_group_call_ctx *ctx = &call_ctx;
 
 	if (verbose_debug) {
 		printk("%s:%d, entered!\n", __func__, __LINE__);
@@ -303,33 +306,33 @@ void sysfs_remove_group_callee(struct fipc_message* msg, struct ext_registers* e
 	{
 		*kobj_ptr = glue_unpack(__pos, msg, ext, struct kobject*);
 		if (*kobj_ptr) {
-			callee_unmarshal_kernel__sysfs_remove_group__kobj__in(__pos, msg, ext, ctx, *kobj_ptr);
+			callee_unmarshal_kernel__lvd_sysfs_remove_group__kobj__in(__pos, msg, ext, ctx, *kobj_ptr);
 		}
 
 	}
 
 	{
-		*grp_ptr = glue_unpack(__pos, msg, ext, struct attribute_group const*);
+		*grp_ptr = glue_unpack(__pos, msg, ext, struct dev_attribute_group const*);
 		if (*grp_ptr) {
-			struct attribute_group* writable = (struct attribute_group*)*grp_ptr;
-			callee_unmarshal_kernel__sysfs_remove_group__grp__in(__pos, msg, ext, ctx, writable);
+			struct dev_attribute_group* writable = (struct dev_attribute_group*)*grp_ptr;
+			callee_unmarshal_kernel__lvd_sysfs_remove_group__grp__in(__pos, msg, ext, ctx, writable);
 		}
 
 	}
 
-	sysfs_remove_group(kobj, grp);
+	sysfs_remove_group(kobj, grp1);
 
 	*__pos = 0;
 	{
 		if (*kobj_ptr) {
-			callee_marshal_kernel__sysfs_remove_group__kobj__in(__pos, msg, ext, ctx, *kobj_ptr);
+			callee_marshal_kernel__lvd_sysfs_remove_group__kobj__in(__pos, msg, ext, ctx, *kobj_ptr);
 		}
 
 	}
 
 	{
 		if (*grp_ptr) {
-			callee_marshal_kernel__sysfs_remove_group__grp__in(__pos, msg, ext, ctx, *grp_ptr);
+			callee_marshal_kernel__lvd_sysfs_remove_group__grp__in(__pos, msg, ext, ctx, *grp_ptr);
 		}
 
 	}
@@ -439,20 +442,20 @@ int LCD_TRAMPOLINE_LINKAGE(trmp_dev_attr_show) trmp_dev_attr_show(struct device*
 	return impl(target, dev, attr, buf);
 }
 
-void sysfs_create_group_callee(struct fipc_message* msg, struct ext_registers* ext)
+void lvd_sysfs_create_group_callee(struct fipc_message* msg, struct ext_registers* ext)
 {
 	size_t n_pos = 0;
 	size_t* __pos = &n_pos;
 
 	struct kobject* dev = 0;
-	struct attribute_group const* grp = 0;
+	struct dev_attribute_group const* grp = 0;
 	struct kobject** dev_ptr = &dev;
-	struct attribute_group const** grp_ptr = &grp;
+	struct dev_attribute_group const** grp_ptr = &grp;
 	int ret = 0;
 	int* ret_ptr = &ret;
 	
-	__maybe_unused struct sysfs_create_group_call_ctx call_ctx = {dev, grp};
-	__maybe_unused struct sysfs_create_group_call_ctx *ctx = &call_ctx;
+	__maybe_unused struct lvd_sysfs_create_group_call_ctx call_ctx = {dev, grp};
+	__maybe_unused struct lvd_sysfs_create_group_call_ctx *ctx = &call_ctx;
 
 	if (verbose_debug) {
 		printk("%s:%d, entered!\n", __func__, __LINE__);
@@ -462,33 +465,45 @@ void sysfs_create_group_callee(struct fipc_message* msg, struct ext_registers* e
 		struct device* __device = glue_unpack(__pos, msg, ext, struct device*);
 		*dev_ptr = &__device->kobj;
 		if (*dev_ptr) {
-			callee_unmarshal_kernel__sysfs_create_group__kobj__in(__pos, msg, ext, ctx, *dev_ptr);
+			callee_unmarshal_kernel__lvd_sysfs_create_group__kobj__in(__pos, msg, ext, ctx, *dev_ptr);
 		}
 
 	}
 
 	{
-		*grp_ptr = glue_unpack_new_shadow(__pos, msg, ext, struct attribute_group const*, (sizeof(struct attribute_group)), (DEFAULT_GFP_FLAGS));
+		*grp_ptr = glue_unpack_new_shadow(__pos, msg, ext, struct dev_attribute_group const*, (sizeof(struct dev_attribute_group)), (DEFAULT_GFP_FLAGS));
 		if (*grp_ptr) {
-			struct attribute_group* writable = (struct attribute_group*)*grp_ptr;
-			callee_unmarshal_kernel__sysfs_create_group__grp__in(__pos, msg, ext, ctx, writable);
+			struct dev_attribute_group* writable = (struct dev_attribute_group*)*grp_ptr;
+			callee_unmarshal_kernel__lvd_sysfs_create_group__grp__in(__pos, msg, ext, ctx, writable);
 		}
 
 	}
 
-	ret = sysfs_create_group(dev, grp);
+	{
+		int i = 0;
+		grp1 = kzalloc(sizeof(struct attribute_group), GFP_KERNEL);
+		dgrp2 = kzalloc(sizeof(struct dev_attribute_group2), GFP_KERNEL);
+		grp1->attrs = kzalloc(sizeof(struct attribute**), GFP_KERNEL);
+		*grp1->attrs = kzalloc(sizeof(struct attribute*) * 5, GFP_KERNEL);
+		for (i = 0; i < 5; i++) {
+			dgrp2->attrs[i] = &grp->dev_attrs[i]->attr;
+		}
+		grp1->attrs = dgrp2->attrs;
+	}
+
+	ret = sysfs_create_group(dev, grp1);
 
 	*__pos = 0;
 	{
 		if (*dev_ptr) {
-			callee_marshal_kernel__sysfs_create_group__kobj__in(__pos, msg, ext, ctx, *dev_ptr);
+			callee_marshal_kernel__lvd_sysfs_create_group__kobj__in(__pos, msg, ext, ctx, *dev_ptr);
 		}
 
 	}
 
 	{
 		if (*grp_ptr) {
-			callee_marshal_kernel__sysfs_create_group__grp__in(__pos, msg, ext, ctx, *grp_ptr);
+			callee_marshal_kernel__lvd_sysfs_create_group__grp__in(__pos, msg, ext, ctx, *grp_ptr);
 		}
 
 	}
@@ -1235,14 +1250,14 @@ int try_dispatch(enum RPC_ID id, struct fipc_message* msg, struct ext_registers*
 		platform_device_unregister_callee(msg, ext);
 		break;
 
-	case RPC_ID_sysfs_remove_group:
-		glue_user_trace("sysfs_remove_group\n");
-		sysfs_remove_group_callee(msg, ext);
+	case RPC_ID_lvd_sysfs_remove_group:
+		glue_user_trace("lvd_sysfs_remove_group\n");
+		lvd_sysfs_remove_group_callee(msg, ext);
 		break;
 
-	case RPC_ID_sysfs_create_group:
-		glue_user_trace("sysfs_create_group\n");
-		sysfs_create_group_callee(msg, ext);
+	case RPC_ID_lvd_sysfs_create_group:
+		glue_user_trace("lvd_sysfs_create_group\n");
+		lvd_sysfs_create_group_callee(msg, ext);
 		break;
 
 	case RPC_ID_pci_get_domain_bus_and_slot:

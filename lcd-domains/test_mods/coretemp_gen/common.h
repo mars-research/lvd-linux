@@ -156,9 +156,9 @@ enum RPC_ID {
 	RPC_ID_platform_device_unregister,
 	RPC_ID_platform_driver_probe,
 	RPC_ID_platform_driver_remove,
-	RPC_ID_sysfs_remove_group,
+	RPC_ID_lvd_sysfs_remove_group,
 	RPC_ID_dev_attr_show,
-	RPC_ID_sysfs_create_group,
+	RPC_ID_lvd_sysfs_create_group,
 	RPC_ID_pci_get_domain_bus_and_slot,
 	RPC_ID_devm_hwmon_device_register_with_groups,
 	RPC_ID_platform_driver_unregister,
@@ -225,9 +225,9 @@ struct platform_driver_remove_call_ctx {
 	struct platform_device* pdev;
 };
 
-struct sysfs_remove_group_call_ctx {
+struct lvd_sysfs_remove_group_call_ctx {
 	struct kobject* kobj;
-	struct attribute_group const* grp;
+	struct dev_attribute_group const* grp;
 };
 
 struct dev_attr_show_call_ctx {
@@ -236,9 +236,9 @@ struct dev_attr_show_call_ctx {
 	char const* buf;
 };
 
-struct sysfs_create_group_call_ctx {
+struct lvd_sysfs_create_group_call_ctx {
 	struct kobject* dev;
-	struct attribute_group const* grp;
+	struct dev_attribute_group const* grp;
 };
 
 struct pci_get_domain_bus_and_slot_call_ctx {
@@ -389,89 +389,89 @@ void caller_unmarshal_kernel__platform_driver_remove__pdev__in(
 	struct platform_driver_remove_call_ctx const* call_ctx,
 	struct platform_device* ptr);
 
-void caller_marshal_kernel__sysfs_remove_group__kobj__in(
+void caller_marshal_kernel__lvd_sysfs_remove_group__kobj__in(
 	size_t* __pos,
 	struct fipc_message* msg,
 	struct ext_registers* ext,
-	struct sysfs_remove_group_call_ctx const* call_ctx,
+	struct lvd_sysfs_remove_group_call_ctx const* call_ctx,
 	struct kobject const* ptr);
 
-void callee_unmarshal_kernel__sysfs_remove_group__kobj__in(
+void callee_unmarshal_kernel__lvd_sysfs_remove_group__kobj__in(
 	size_t* __pos,
 	const struct fipc_message* msg,
 	const struct ext_registers* ext,
-	struct sysfs_remove_group_call_ctx const* call_ctx,
+	struct lvd_sysfs_remove_group_call_ctx const* call_ctx,
 	struct kobject* ptr);
 
-void callee_marshal_kernel__sysfs_remove_group__kobj__in(
+void callee_marshal_kernel__lvd_sysfs_remove_group__kobj__in(
 	size_t* __pos,
 	struct fipc_message* msg,
 	struct ext_registers* ext,
-	struct sysfs_remove_group_call_ctx const* call_ctx,
+	struct lvd_sysfs_remove_group_call_ctx const* call_ctx,
 	struct kobject const* ptr);
 
-void caller_unmarshal_kernel__sysfs_remove_group__kobj__in(
+void caller_unmarshal_kernel__lvd_sysfs_remove_group__kobj__in(
 	size_t* __pos,
 	const struct fipc_message* msg,
 	const struct ext_registers* ext,
-	struct sysfs_remove_group_call_ctx const* call_ctx,
+	struct lvd_sysfs_remove_group_call_ctx const* call_ctx,
 	struct kobject* ptr);
 
-void caller_marshal_kernel__sysfs_remove_group__grp__in(
+void caller_marshal_kernel__lvd_sysfs_remove_group__grp__in(
 	size_t* __pos,
 	struct fipc_message* msg,
 	struct ext_registers* ext,
-	struct sysfs_remove_group_call_ctx const* call_ctx,
-	struct attribute_group const* ptr);
+	struct lvd_sysfs_remove_group_call_ctx const* call_ctx,
+	struct dev_attribute_group const* ptr);
 
-void callee_unmarshal_kernel__sysfs_remove_group__grp__in(
+void callee_unmarshal_kernel__lvd_sysfs_remove_group__grp__in(
 	size_t* __pos,
 	const struct fipc_message* msg,
 	const struct ext_registers* ext,
-	struct sysfs_remove_group_call_ctx const* call_ctx,
-	struct attribute_group* ptr);
+	struct lvd_sysfs_remove_group_call_ctx const* call_ctx,
+	struct dev_attribute_group* ptr);
 
-void callee_marshal_kernel__sysfs_remove_group__grp__in(
+void callee_marshal_kernel__lvd_sysfs_remove_group__grp__in(
 	size_t* __pos,
 	struct fipc_message* msg,
 	struct ext_registers* ext,
-	struct sysfs_remove_group_call_ctx const* call_ctx,
-	struct attribute_group const* ptr);
+	struct lvd_sysfs_remove_group_call_ctx const* call_ctx,
+	struct dev_attribute_group const* ptr);
 
-void caller_unmarshal_kernel__sysfs_remove_group__grp__in(
+void caller_unmarshal_kernel__lvd_sysfs_remove_group__grp__in(
 	size_t* __pos,
 	const struct fipc_message* msg,
 	const struct ext_registers* ext,
-	struct sysfs_remove_group_call_ctx const* call_ctx,
-	struct attribute_group* ptr);
+	struct lvd_sysfs_remove_group_call_ctx const* call_ctx,
+	struct dev_attribute_group* ptr);
 
-void caller_marshal_kernel__sysfs_remove_group__attr__in(
+void caller_marshal_kernel__lvd_sysfs_remove_group__dev_attr__in(
 	size_t* __pos,
 	struct fipc_message* msg,
 	struct ext_registers* ext,
-	struct sysfs_remove_group_call_ctx const* call_ctx,
-	struct attribute const* ptr);
+	struct lvd_sysfs_remove_group_call_ctx const* call_ctx,
+	struct device_attribute const* ptr);
 
-void callee_unmarshal_kernel__sysfs_remove_group__attr__in(
+void callee_unmarshal_kernel__lvd_sysfs_remove_group__dev_attr__in(
 	size_t* __pos,
 	const struct fipc_message* msg,
 	const struct ext_registers* ext,
-	struct sysfs_remove_group_call_ctx const* call_ctx,
-	struct attribute* ptr);
+	struct lvd_sysfs_remove_group_call_ctx const* call_ctx,
+	struct device_attribute* ptr);
 
-void callee_marshal_kernel__sysfs_remove_group__attr__in(
+void callee_marshal_kernel__lvd_sysfs_remove_group__dev_attr__in(
 	size_t* __pos,
 	struct fipc_message* msg,
 	struct ext_registers* ext,
-	struct sysfs_remove_group_call_ctx const* call_ctx,
-	struct attribute const* ptr);
+	struct lvd_sysfs_remove_group_call_ctx const* call_ctx,
+	struct device_attribute const* ptr);
 
-void caller_unmarshal_kernel__sysfs_remove_group__attr__in(
+void caller_unmarshal_kernel__lvd_sysfs_remove_group__dev_attr__in(
 	size_t* __pos,
 	const struct fipc_message* msg,
 	const struct ext_registers* ext,
-	struct sysfs_remove_group_call_ctx const* call_ctx,
-	struct attribute* ptr);
+	struct lvd_sysfs_remove_group_call_ctx const* call_ctx,
+	struct device_attribute* ptr);
 
 void caller_marshal_kernel__dev_attr_show__device__in(
 	size_t* __pos,
@@ -529,116 +529,116 @@ void caller_unmarshal_kernel__dev_attr_show__dev_attr__in(
 	struct dev_attr_show_call_ctx const* call_ctx,
 	struct device_attribute* ptr);
 
-void caller_marshal_kernel__sysfs_create_group__kobj__in(
+void caller_marshal_kernel__lvd_sysfs_create_group__kobj__in(
 	size_t* __pos,
 	struct fipc_message* msg,
 	struct ext_registers* ext,
-	struct sysfs_create_group_call_ctx const* call_ctx,
+	struct lvd_sysfs_create_group_call_ctx const* call_ctx,
 	struct kobject const* ptr);
 
-void callee_unmarshal_kernel__sysfs_create_group__kobj__in(
+void callee_unmarshal_kernel__lvd_sysfs_create_group__kobj__in(
 	size_t* __pos,
 	const struct fipc_message* msg,
 	const struct ext_registers* ext,
-	struct sysfs_create_group_call_ctx const* call_ctx,
+	struct lvd_sysfs_create_group_call_ctx const* call_ctx,
 	struct kobject* ptr);
 
-void callee_marshal_kernel__sysfs_create_group__kobj__in(
+void callee_marshal_kernel__lvd_sysfs_create_group__kobj__in(
 	size_t* __pos,
 	struct fipc_message* msg,
 	struct ext_registers* ext,
-	struct sysfs_create_group_call_ctx const* call_ctx,
+	struct lvd_sysfs_create_group_call_ctx const* call_ctx,
 	struct kobject const* ptr);
 
-void caller_unmarshal_kernel__sysfs_create_group__kobj__in(
+void caller_unmarshal_kernel__lvd_sysfs_create_group__kobj__in(
 	size_t* __pos,
 	const struct fipc_message* msg,
 	const struct ext_registers* ext,
-	struct sysfs_create_group_call_ctx const* call_ctx,
+	struct lvd_sysfs_create_group_call_ctx const* call_ctx,
 	struct kobject* ptr);
 
-void caller_marshal_kernel__sysfs_create_group__grp__in(
+void caller_marshal_kernel__lvd_sysfs_create_group__grp__in(
 	size_t* __pos,
 	struct fipc_message* msg,
 	struct ext_registers* ext,
-	struct sysfs_create_group_call_ctx const* call_ctx,
-	struct attribute_group const* ptr);
+	struct lvd_sysfs_create_group_call_ctx const* call_ctx,
+	struct dev_attribute_group const* ptr);
 
-void callee_unmarshal_kernel__sysfs_create_group__grp__in(
+void callee_unmarshal_kernel__lvd_sysfs_create_group__grp__in(
 	size_t* __pos,
 	const struct fipc_message* msg,
 	const struct ext_registers* ext,
-	struct sysfs_create_group_call_ctx const* call_ctx,
-	struct attribute_group* ptr);
+	struct lvd_sysfs_create_group_call_ctx const* call_ctx,
+	struct dev_attribute_group* ptr);
 
-void callee_marshal_kernel__sysfs_create_group__grp__in(
+void callee_marshal_kernel__lvd_sysfs_create_group__grp__in(
 	size_t* __pos,
 	struct fipc_message* msg,
 	struct ext_registers* ext,
-	struct sysfs_create_group_call_ctx const* call_ctx,
-	struct attribute_group const* ptr);
+	struct lvd_sysfs_create_group_call_ctx const* call_ctx,
+	struct dev_attribute_group const* ptr);
 
-void caller_unmarshal_kernel__sysfs_create_group__grp__in(
+void caller_unmarshal_kernel__lvd_sysfs_create_group__grp__in(
 	size_t* __pos,
 	const struct fipc_message* msg,
 	const struct ext_registers* ext,
-	struct sysfs_create_group_call_ctx const* call_ctx,
-	struct attribute_group* ptr);
+	struct lvd_sysfs_create_group_call_ctx const* call_ctx,
+	struct dev_attribute_group* ptr);
 
-void caller_marshal_kernel__sysfs_create_group__dev_attr__in(
+void caller_marshal_kernel__lvd_sysfs_create_group__dev_attr__in(
 	size_t* __pos,
 	struct fipc_message* msg,
 	struct ext_registers* ext,
-	struct sysfs_create_group_call_ctx const* call_ctx,
+	struct lvd_sysfs_create_group_call_ctx const* call_ctx,
 	struct device_attribute const* ptr);
 
-void callee_unmarshal_kernel__sysfs_create_group__dev_attr__in(
+void callee_unmarshal_kernel__lvd_sysfs_create_group__dev_attr__in(
 	size_t* __pos,
 	const struct fipc_message* msg,
 	const struct ext_registers* ext,
-	struct sysfs_create_group_call_ctx const* call_ctx,
+	struct lvd_sysfs_create_group_call_ctx const* call_ctx,
 	struct device_attribute* ptr);
 
-void callee_marshal_kernel__sysfs_create_group__dev_attr__in(
+void callee_marshal_kernel__lvd_sysfs_create_group__dev_attr__in(
 	size_t* __pos,
 	struct fipc_message* msg,
 	struct ext_registers* ext,
-	struct sysfs_create_group_call_ctx const* call_ctx,
+	struct lvd_sysfs_create_group_call_ctx const* call_ctx,
 	struct device_attribute const* ptr);
 
-void caller_unmarshal_kernel__sysfs_create_group__dev_attr__in(
+void caller_unmarshal_kernel__lvd_sysfs_create_group__dev_attr__in(
 	size_t* __pos,
 	const struct fipc_message* msg,
 	const struct ext_registers* ext,
-	struct sysfs_create_group_call_ctx const* call_ctx,
+	struct lvd_sysfs_create_group_call_ctx const* call_ctx,
 	struct device_attribute* ptr);
 
-void caller_marshal_kernel__sysfs_create_group__attr__in(
+void caller_marshal_kernel__lvd_sysfs_create_group__attr__in(
 	size_t* __pos,
 	struct fipc_message* msg,
 	struct ext_registers* ext,
-	struct sysfs_create_group_call_ctx const* call_ctx,
+	struct lvd_sysfs_create_group_call_ctx const* call_ctx,
 	struct attribute const* ptr);
 
-void callee_unmarshal_kernel__sysfs_create_group__attr__in(
+void callee_unmarshal_kernel__lvd_sysfs_create_group__attr__in(
 	size_t* __pos,
 	const struct fipc_message* msg,
 	const struct ext_registers* ext,
-	struct sysfs_create_group_call_ctx const* call_ctx,
+	struct lvd_sysfs_create_group_call_ctx const* call_ctx,
 	struct attribute* ptr);
 
-void callee_marshal_kernel__sysfs_create_group__attr__in(
+void callee_marshal_kernel__lvd_sysfs_create_group__attr__in(
 	size_t* __pos,
 	struct fipc_message* msg,
 	struct ext_registers* ext,
-	struct sysfs_create_group_call_ctx const* call_ctx,
+	struct lvd_sysfs_create_group_call_ctx const* call_ctx,
 	struct attribute const* ptr);
 
-void caller_unmarshal_kernel__sysfs_create_group__attr__in(
+void caller_unmarshal_kernel__lvd_sysfs_create_group__attr__in(
 	size_t* __pos,
 	const struct fipc_message* msg,
 	const struct ext_registers* ext,
-	struct sysfs_create_group_call_ctx const* call_ctx,
+	struct lvd_sysfs_create_group_call_ctx const* call_ctx,
 	struct attribute* ptr);
 
 void caller_marshal_kernel__pci_get_domain_bus_and_slot__ret_pci_dev__out(

@@ -264,7 +264,7 @@ void platform_driver_remove_callee(struct fipc_message* msg, struct ext_register
 	}
 }
 
-void sysfs_remove_group(struct kobject* kobj, struct attribute_group const* grp)
+void lvd_sysfs_remove_group(struct kobject* kobj, struct dev_attribute_group const* grp)
 {
 	struct fipc_message __buffer = {0};
 	struct fipc_message *msg = &__buffer;
@@ -273,23 +273,22 @@ void sysfs_remove_group(struct kobject* kobj, struct attribute_group const* grp)
 	size_t* __pos = &n_pos;
 
 	struct kobject** kobj_ptr = &kobj;
-	struct attribute_group const** grp_ptr = &grp;
+	struct dev_attribute_group const** grp_ptr = &grp;
 	
-	__maybe_unused const struct sysfs_remove_group_call_ctx call_ctx = {kobj, grp};
-	__maybe_unused const struct sysfs_remove_group_call_ctx *ctx = &call_ctx;
+	__maybe_unused const struct lvd_sysfs_remove_group_call_ctx call_ctx = {kobj, grp};
+	__maybe_unused const struct lvd_sysfs_remove_group_call_ctx *ctx = &call_ctx;
 
 	(void)ext;
 
 	if (verbose_debug) {
 		printk("%s:%d, entered!\n", __func__, __LINE__);
-		goto exit;
 	}
 
 	{
 		__maybe_unused const void* __adjusted = *kobj_ptr;
 		glue_pack_shadow(__pos, msg, ext, __adjusted);
 		if (*kobj_ptr) {
-			caller_marshal_kernel__sysfs_remove_group__kobj__in(__pos, msg, ext, ctx, *kobj_ptr);
+			caller_marshal_kernel__lvd_sysfs_remove_group__kobj__in(__pos, msg, ext, ctx, *kobj_ptr);
 		}
 
 	}
@@ -298,32 +297,29 @@ void sysfs_remove_group(struct kobject* kobj, struct attribute_group const* grp)
 		__maybe_unused const void* __adjusted = *grp_ptr;
 		glue_pack_shadow(__pos, msg, ext, __adjusted);
 		if (*grp_ptr) {
-			caller_marshal_kernel__sysfs_remove_group__grp__in(__pos, msg, ext, ctx, *grp_ptr);
+			caller_marshal_kernel__lvd_sysfs_remove_group__grp__in(__pos, msg, ext, ctx, *grp_ptr);
 		}
 
 	}
 
-	printk("%s, dummy call! not performing!\n", __func__);
-	//glue_call_server(__pos, msg, RPC_ID_sysfs_remove_group);
+	glue_call_server(__pos, msg, RPC_ID_lvd_sysfs_remove_group);
 
 	*__pos = 0;
 	{
 		if (*kobj_ptr) {
-			caller_unmarshal_kernel__sysfs_remove_group__kobj__in(__pos, msg, ext, ctx, *kobj_ptr);
+			caller_unmarshal_kernel__lvd_sysfs_remove_group__kobj__in(__pos, msg, ext, ctx, *kobj_ptr);
 		}
 
 	}
 
 	{
 		if (*grp_ptr) {
-			struct attribute_group* writable = (struct attribute_group*)*grp_ptr;
-			caller_unmarshal_kernel__sysfs_remove_group__grp__in(__pos, msg, ext, ctx, writable);
+			struct dev_attribute_group* writable = (struct dev_attribute_group*)*grp_ptr;
+			caller_unmarshal_kernel__lvd_sysfs_remove_group__grp__in(__pos, msg, ext, ctx, writable);
 		}
 
 	}
 
-exit:
-	printk("%s, dummy call! not performing!\n", __func__);
 	if (verbose_debug) {
 		printk("%s:%d, returned!\n", __func__, __LINE__);
 	}
@@ -414,7 +410,7 @@ void dev_attr_show_callee(struct fipc_message* msg, struct ext_registers* ext)
 	}
 }
 
-int sysfs_create_group(struct kobject* dev, struct attribute_group const* grp)
+int lvd_sysfs_create_group(struct kobject* dev, struct dev_attribute_group const* grp)
 {
 	struct fipc_message __buffer = {0};
 	struct fipc_message *msg = &__buffer;
@@ -423,25 +419,24 @@ int sysfs_create_group(struct kobject* dev, struct attribute_group const* grp)
 	size_t* __pos = &n_pos;
 
 	struct kobject** dev_ptr = &dev;
-	struct attribute_group const** grp_ptr = &grp;
+	struct dev_attribute_group const** grp_ptr = &grp;
 	int ret = 0;
 	int* ret_ptr = &ret;
 	
-	__maybe_unused const struct sysfs_create_group_call_ctx call_ctx = {dev, grp};
-	__maybe_unused const struct sysfs_create_group_call_ctx *ctx = &call_ctx;
+	__maybe_unused const struct lvd_sysfs_create_group_call_ctx call_ctx = {dev, grp};
+	__maybe_unused const struct lvd_sysfs_create_group_call_ctx *ctx = &call_ctx;
 
 	(void)ext;
 
 	if (verbose_debug) {
 		printk("%s:%d, entered!\n", __func__, __LINE__);
-		goto exit;
 	}
 
 	{
 		struct device* __adjusted = container_of(*dev_ptr, struct device, kobj);
 		glue_pack_shadow(__pos, msg, ext, __adjusted);
 		if (*dev_ptr) {
-			caller_marshal_kernel__sysfs_create_group__kobj__in(__pos, msg, ext, ctx, *dev_ptr);
+			caller_marshal_kernel__lvd_sysfs_create_group__kobj__in(__pos, msg, ext, ctx, *dev_ptr);
 		}
 
 	}
@@ -450,25 +445,25 @@ int sysfs_create_group(struct kobject* dev, struct attribute_group const* grp)
 		__maybe_unused const void* __adjusted = *grp_ptr;
 		glue_pack(__pos, msg, ext, __adjusted);
 		if (*grp_ptr) {
-			caller_marshal_kernel__sysfs_create_group__grp__in(__pos, msg, ext, ctx, *grp_ptr);
+			caller_marshal_kernel__lvd_sysfs_create_group__grp__in(__pos, msg, ext, ctx, *grp_ptr);
 		}
 
 	}
 
-	//glue_call_server(__pos, msg, RPC_ID_sysfs_create_group);
+	glue_call_server(__pos, msg, RPC_ID_lvd_sysfs_create_group);
 
 	*__pos = 0;
 	{
 		if (*dev_ptr) {
-			caller_unmarshal_kernel__sysfs_create_group__kobj__in(__pos, msg, ext, ctx, *dev_ptr);
+			caller_unmarshal_kernel__lvd_sysfs_create_group__kobj__in(__pos, msg, ext, ctx, *dev_ptr);
 		}
 
 	}
 
 	{
 		if (*grp_ptr) {
-			struct attribute_group* writable = (struct attribute_group*)*grp_ptr;
-			caller_unmarshal_kernel__sysfs_create_group__grp__in(__pos, msg, ext, ctx, writable);
+			struct dev_attribute_group* writable = (struct dev_attribute_group*)*grp_ptr;
+			caller_unmarshal_kernel__lvd_sysfs_create_group__grp__in(__pos, msg, ext, ctx, writable);
 		}
 
 	}
@@ -477,8 +472,6 @@ int sysfs_create_group(struct kobject* dev, struct attribute_group const* grp)
 		*ret_ptr = glue_unpack(__pos, msg, ext, int);
 	}
 
-exit:
-	printk("%s, dummy call! not performing!\n", __func__);
 	if (verbose_debug) {
 		printk("%s:%d, returned!\n", __func__, __LINE__);
 	}

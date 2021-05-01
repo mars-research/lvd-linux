@@ -52,7 +52,12 @@
 
 #define DRVNAME	"coretemp"
 
+struct dev_attribute_group {
+	struct device_attribute	**dev_attrs;
+};
 struct cpuinfo_x86* get_pcpu_cpu_data(int cpu);
+int lvd_sysfs_create_group(struct kobject* dev, struct dev_attribute_group const* grp);
+void lvd_sysfs_remove_group(struct kobject* kobj, struct dev_attribute_group const* grp);
 /*
  * force_tjmax only matters when TjMax can't be read from the CPU itself.
  * When set, it replaces the driver's suboptimal heuristic.
@@ -112,7 +117,9 @@ struct temp_data {
 	struct sensor_device_attribute sd_attrs[TOTAL_ATTRS];
 	char attr_name[TOTAL_ATTRS][CORETEMP_NAME_LENGTH];
 	struct attribute *attrs[TOTAL_ATTRS + 1];
+	struct attribute *dattrs[TOTAL_ATTRS + 1];
 	struct attribute_group attr_group;
+	struct dev_attribute_group dattr_group;
 	struct mutex update_lock;
 };
 
@@ -427,9 +434,17 @@ static int create_core_attrs(struct temp_data *tdata, struct device *dev,
 		tdata->sd_attrs[i].dev_attr.show = rd_ptr[i];
 		tdata->sd_attrs[i].index = attr_no;
 		tdata->attrs[i] = &tdata->sd_attrs[i].dev_attr.attr;
+#ifdef LCD_ISOLATE
+		tdata->dattrs[i] = &tdata->sd_attrs[i].dev_attr;
+#endif
 	}
+#ifdef LCD_ISOLATE
+	tdata->dattr_group.dev_attrs = tdata->dattrs;
+	return lvd_sysfs_create_group(&dev->kobj, &tdata->dattr_group);
+#else
 	tdata->attr_group.attrs = tdata->attrs;
 	return sysfs_create_group(&dev->kobj, &tdata->attr_group);
+#endif
 }
 
 
@@ -581,7 +596,11 @@ static void coretemp_remove_core(struct platform_data *pdata,
 	struct temp_data *tdata = pdata->core_data[indx];
 
 	/* Remove the sysfs attributes */
+#ifdef LCD_ISOLATE
+	lvd_sysfs_remove_group(&pdata->hwmon_dev->kobj, &tdata->dattr_group);
+#else
 	sysfs_remove_group(&pdata->hwmon_dev->kobj, &tdata->attr_group);
+#endif
 
 	kfree(pdata->core_data[indx]);
 	pdata->core_data[indx] = NULL;

@@ -22,13 +22,13 @@ module kernel {
 		}
 	}
 
-	rpc void  sysfs_remove_group( projection kobj*  kobj, const projection grp*  grp ) {
+	rpc void  lvd_sysfs_remove_group( projection kobj*  kobj, const projection grp*  grp ) {
 		projection < struct kobject > kobj {
 		}
-		projection < struct attribute_group > grp {
-			array<array<projection attr, 1> [dealloc(callee)] *, 5> [dealloc(callee)] *attrs;
+		projection < struct dev_attribute_group > grp {
+			array<array<projection dev_attr, 1> [dealloc(callee)] *, 5> [dealloc(callee)] *dev_attrs;
 		}
-		projection < struct attribute > attr {
+		projection < struct device_attribute > dev_attr {
 		}
 	}
 	rpc_ptr int dev_attr_show(projection device *dev, projection dev_attr [bind(callee)] *attr,
@@ -39,17 +39,26 @@ module kernel {
 		}
 	}
 
-	rpc int sysfs_create_group(
+	rpc int lvd_sysfs_create_group(
 		projection kobj [bind_memberof<struct device, kobj>(caller)] *dev,
 		const projection grp [alloc(callee)] *  grp ) {
 		projection < struct kobject > kobj {
 		}
 
-		projection < struct attribute_group > grp {
+		projection < struct dev_attribute_group > grp {
 			//array<array<projection attr, 1> [alloc(callee)] *, {{5}}> [alloc(callee)]> [alloc(callee)] *attrs;
-			casted<array<array<projection attr,1>*,5> *,
-			array<array<projection dev_attr, 1> [alloc(callee)] *, 5> [alloc(callee)]*> attrs;
+			//casted<array<array<projection attr,1>*,5> *,
+			//array<array<projection dev_attr, 1> [alloc(callee)] *, 5> [alloc(callee)]*> attrs;
+			array<array<projection dev_attr, 1> [alloc(callee)] *, 5> [alloc(callee)] *dev_attrs;
 		}
+
+		/*projection < struct dev_attribute_group > grp {
+			//array<array<projection attr, 1> [alloc(callee)] *, {{5}}> [alloc(callee)]> [alloc(callee)] *attrs;
+			//casted<array<array<projection attr,1>*,5> *,
+			//array<array<projection dev_attr, 1> [alloc(callee)] *, 5> [alloc(callee)]*> attrs;
+			//array<array<projection dev_attr, 1> [alloc(callee)] *, 5> [alloc(callee)] *dev_attrs;
+			array<projection dev_attr, 5> [alloc(callee)] *dev_attrs;
+		}*/
 
 		projection <struct attribute> attr {
 			string [alloc(callee)] *name;

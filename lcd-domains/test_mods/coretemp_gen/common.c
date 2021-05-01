@@ -144,77 +144,77 @@ void caller_unmarshal_kernel__platform_driver_remove__pdev__in(
 	
 }
 
-void caller_marshal_kernel__sysfs_remove_group__kobj__in(
+void caller_marshal_kernel__lvd_sysfs_remove_group__kobj__in(
 	size_t* __pos,
 	struct fipc_message* msg,
 	struct ext_registers* ext,
-	struct sysfs_remove_group_call_ctx const* ctx,
+	struct lvd_sysfs_remove_group_call_ctx const* ctx,
 	struct kobject const* ptr)
 {
 	
 }
 
-void callee_unmarshal_kernel__sysfs_remove_group__kobj__in(
+void callee_unmarshal_kernel__lvd_sysfs_remove_group__kobj__in(
 	size_t* __pos,
 	const struct fipc_message* msg,
 	const struct ext_registers* ext,
-	struct sysfs_remove_group_call_ctx const* ctx,
+	struct lvd_sysfs_remove_group_call_ctx const* ctx,
 	struct kobject* ptr)
 {
 	
 }
 
-void callee_marshal_kernel__sysfs_remove_group__kobj__in(
+void callee_marshal_kernel__lvd_sysfs_remove_group__kobj__in(
 	size_t* __pos,
 	struct fipc_message* msg,
 	struct ext_registers* ext,
-	struct sysfs_remove_group_call_ctx const* ctx,
+	struct lvd_sysfs_remove_group_call_ctx const* ctx,
 	struct kobject const* ptr)
 {
 	
 }
 
-void caller_unmarshal_kernel__sysfs_remove_group__kobj__in(
+void caller_unmarshal_kernel__lvd_sysfs_remove_group__kobj__in(
 	size_t* __pos,
 	const struct fipc_message* msg,
 	const struct ext_registers* ext,
-	struct sysfs_remove_group_call_ctx const* ctx,
+	struct lvd_sysfs_remove_group_call_ctx const* ctx,
 	struct kobject* ptr)
 {
 	
 }
 
-void caller_marshal_kernel__sysfs_remove_group__grp__in(
+void caller_marshal_kernel__lvd_sysfs_remove_group__grp__in(
 	size_t* __pos,
 	struct fipc_message* msg,
 	struct ext_registers* ext,
-	struct sysfs_remove_group_call_ctx const* ctx,
-	struct attribute_group const* ptr)
+	struct lvd_sysfs_remove_group_call_ctx const* ctx,
+	struct dev_attribute_group const* ptr)
 {
-	struct attribute** const* attrs_ptr = &ptr->attrs;
+	struct device_attribute** const* dev_attrs_ptr = &ptr->dev_attrs;
 	
 	{
-		__maybe_unused const void* __adjusted = *attrs_ptr;
+		__maybe_unused const void* __adjusted = *dev_attrs_ptr;
 		glue_pack(__pos, msg, ext, __adjusted);
-		if (*attrs_ptr) {
+		if (*dev_attrs_ptr) {
 			size_t i, len = 5;
-			struct attribute* const* array = *attrs_ptr;
+			struct device_attribute* const* array = *dev_attrs_ptr;
 			glue_pack(__pos, msg, ext, len);
 			// Warning: see David if this breaks
 			glue_user_trace("Warning: see David if this breaks");
 			for (i = 0; i < len; ++i) {
-				struct attribute* const* element = &array[i];
+				struct device_attribute* const* element = &array[i];
 				__maybe_unused const void* __adjusted = *element;
 				glue_pack(__pos, msg, ext, __adjusted);
 				if (*element) {
 					size_t i, len = 1;
-					struct attribute const* array = *element;
+					struct device_attribute const* array = *element;
 					glue_pack(__pos, msg, ext, len);
 					// Warning: see David if this breaks
 					glue_user_trace("Warning: see David if this breaks");
 					for (i = 0; i < len; ++i) {
-						struct attribute const* element = &array[i];
-						caller_marshal_kernel__sysfs_remove_group__attr__in(__pos, msg, ext, ctx, element);
+						struct device_attribute const* element = &array[i];
+						caller_marshal_kernel__lvd_sysfs_remove_group__dev_attr__in(__pos, msg, ext, ctx, element);
 					}
 
 				}
@@ -227,35 +227,35 @@ void caller_marshal_kernel__sysfs_remove_group__grp__in(
 
 }
 
-void callee_unmarshal_kernel__sysfs_remove_group__grp__in(
+void callee_unmarshal_kernel__lvd_sysfs_remove_group__grp__in(
 	size_t* __pos,
 	const struct fipc_message* msg,
 	const struct ext_registers* ext,
-	struct sysfs_remove_group_call_ctx const* ctx,
-	struct attribute_group* ptr)
+	struct lvd_sysfs_remove_group_call_ctx const* ctx,
+	struct dev_attribute_group* ptr)
 {
-	struct attribute*** attrs_ptr = &ptr->attrs;
+	struct device_attribute*** dev_attrs_ptr = &ptr->dev_attrs;
 	
 	{
-		*attrs_ptr = glue_unpack(__pos, msg, ext, struct attribute**);
-		if (*attrs_ptr) {
+		*dev_attrs_ptr = glue_unpack(__pos, msg, ext, struct device_attribute**);
+		if (*dev_attrs_ptr) {
 			int i;
-			struct attribute** array = *attrs_ptr;
+			struct device_attribute** array = *dev_attrs_ptr;
 			size_t len = glue_unpack(__pos, msg, ext, size_t);
 			// Warning: see David if this breaks
 			glue_user_trace("Warning: see David if this breaks");
 			for (i = 0; i < len; ++i) {
-				struct attribute** element = &array[i];
-				*element = glue_unpack(__pos, msg, ext, struct attribute*);
+				struct device_attribute** element = &array[i];
+				*element = glue_unpack(__pos, msg, ext, struct device_attribute*);
 				if (*element) {
 					int i;
-					struct attribute* array = *element;
+					struct device_attribute* array = *element;
 					size_t len = glue_unpack(__pos, msg, ext, size_t);
 					// Warning: see David if this breaks
 					glue_user_trace("Warning: see David if this breaks");
 					for (i = 0; i < len; ++i) {
-						struct attribute* element = &array[i];
-						callee_unmarshal_kernel__sysfs_remove_group__attr__in(__pos, msg, ext, ctx, element);
+						struct device_attribute* element = &array[i];
+						callee_unmarshal_kernel__lvd_sysfs_remove_group__dev_attr__in(__pos, msg, ext, ctx, element);
 					}
 
 				}
@@ -268,73 +268,73 @@ void callee_unmarshal_kernel__sysfs_remove_group__grp__in(
 
 }
 
-void callee_marshal_kernel__sysfs_remove_group__grp__in(
+void callee_marshal_kernel__lvd_sysfs_remove_group__grp__in(
 	size_t* __pos,
 	struct fipc_message* msg,
 	struct ext_registers* ext,
-	struct sysfs_remove_group_call_ctx const* ctx,
-	struct attribute_group const* ptr)
+	struct lvd_sysfs_remove_group_call_ctx const* ctx,
+	struct dev_attribute_group const* ptr)
 {
-	struct attribute** const* attrs_ptr = &ptr->attrs;
+	struct device_attribute** const* dev_attrs_ptr = &ptr->dev_attrs;
 	
 	{
-		(void)attrs_ptr;
-		glue_remove_shadow(*attrs_ptr);
+		(void)dev_attrs_ptr;
+		glue_remove_shadow(*dev_attrs_ptr);
 	}
 
 }
 
-void caller_unmarshal_kernel__sysfs_remove_group__grp__in(
+void caller_unmarshal_kernel__lvd_sysfs_remove_group__grp__in(
 	size_t* __pos,
 	const struct fipc_message* msg,
 	const struct ext_registers* ext,
-	struct sysfs_remove_group_call_ctx const* ctx,
-	struct attribute_group* ptr)
+	struct lvd_sysfs_remove_group_call_ctx const* ctx,
+	struct dev_attribute_group* ptr)
 {
-	struct attribute*** attrs_ptr = &ptr->attrs;
+	struct device_attribute*** dev_attrs_ptr = &ptr->dev_attrs;
 	
 	{
-		(void)attrs_ptr;
+		(void)dev_attrs_ptr;
 	}
 
 }
 
-void caller_marshal_kernel__sysfs_remove_group__attr__in(
+void caller_marshal_kernel__lvd_sysfs_remove_group__dev_attr__in(
 	size_t* __pos,
 	struct fipc_message* msg,
 	struct ext_registers* ext,
-	struct sysfs_remove_group_call_ctx const* ctx,
-	struct attribute const* ptr)
+	struct lvd_sysfs_remove_group_call_ctx const* ctx,
+	struct device_attribute const* ptr)
 {
 	
 }
 
-void callee_unmarshal_kernel__sysfs_remove_group__attr__in(
+void callee_unmarshal_kernel__lvd_sysfs_remove_group__dev_attr__in(
 	size_t* __pos,
 	const struct fipc_message* msg,
 	const struct ext_registers* ext,
-	struct sysfs_remove_group_call_ctx const* ctx,
-	struct attribute* ptr)
+	struct lvd_sysfs_remove_group_call_ctx const* ctx,
+	struct device_attribute* ptr)
 {
 	
 }
 
-void callee_marshal_kernel__sysfs_remove_group__attr__in(
+void callee_marshal_kernel__lvd_sysfs_remove_group__dev_attr__in(
 	size_t* __pos,
 	struct fipc_message* msg,
 	struct ext_registers* ext,
-	struct sysfs_remove_group_call_ctx const* ctx,
-	struct attribute const* ptr)
+	struct lvd_sysfs_remove_group_call_ctx const* ctx,
+	struct device_attribute const* ptr)
 {
 	
 }
 
-void caller_unmarshal_kernel__sysfs_remove_group__attr__in(
+void caller_unmarshal_kernel__lvd_sysfs_remove_group__dev_attr__in(
 	size_t* __pos,
 	const struct fipc_message* msg,
 	const struct ext_registers* ext,
-	struct sysfs_remove_group_call_ctx const* ctx,
-	struct attribute* ptr)
+	struct lvd_sysfs_remove_group_call_ctx const* ctx,
+	struct device_attribute* ptr)
 {
 	
 }
@@ -419,82 +419,77 @@ void caller_unmarshal_kernel__dev_attr_show__dev_attr__in(
 	
 }
 
-void caller_marshal_kernel__sysfs_create_group__kobj__in(
+void caller_marshal_kernel__lvd_sysfs_create_group__kobj__in(
 	size_t* __pos,
 	struct fipc_message* msg,
 	struct ext_registers* ext,
-	struct sysfs_create_group_call_ctx const* ctx,
+	struct lvd_sysfs_create_group_call_ctx const* ctx,
 	struct kobject const* ptr)
 {
 	
 }
 
-void callee_unmarshal_kernel__sysfs_create_group__kobj__in(
+void callee_unmarshal_kernel__lvd_sysfs_create_group__kobj__in(
 	size_t* __pos,
 	const struct fipc_message* msg,
 	const struct ext_registers* ext,
-	struct sysfs_create_group_call_ctx const* ctx,
+	struct lvd_sysfs_create_group_call_ctx const* ctx,
 	struct kobject* ptr)
 {
 	
 }
 
-void callee_marshal_kernel__sysfs_create_group__kobj__in(
+void callee_marshal_kernel__lvd_sysfs_create_group__kobj__in(
 	size_t* __pos,
 	struct fipc_message* msg,
 	struct ext_registers* ext,
-	struct sysfs_create_group_call_ctx const* ctx,
+	struct lvd_sysfs_create_group_call_ctx const* ctx,
 	struct kobject const* ptr)
 {
 	
 }
 
-void caller_unmarshal_kernel__sysfs_create_group__kobj__in(
+void caller_unmarshal_kernel__lvd_sysfs_create_group__kobj__in(
 	size_t* __pos,
 	const struct fipc_message* msg,
 	const struct ext_registers* ext,
-	struct sysfs_create_group_call_ctx const* ctx,
+	struct lvd_sysfs_create_group_call_ctx const* ctx,
 	struct kobject* ptr)
 {
 	
 }
 
-void caller_marshal_kernel__sysfs_create_group__grp__in(
+void caller_marshal_kernel__lvd_sysfs_create_group__grp__in(
 	size_t* __pos,
 	struct fipc_message* msg,
 	struct ext_registers* ext,
-	struct sysfs_create_group_call_ctx const* ctx,
-	struct attribute_group const* ptr)
+	struct lvd_sysfs_create_group_call_ctx const* ctx,
+	struct dev_attribute_group const* ptr)
 {
-	struct attribute** const* attrs_ptr = &ptr->attrs;
+	struct device_attribute** const* dev_attrs_ptr = &ptr->dev_attrs;
 	
 	{
-		struct device_attribute** __casted = (struct device_attribute**)*attrs_ptr;
-		struct device_attribute** const* __casted_ptr = &__casted;
-		{
-			__maybe_unused const void* __adjusted = *__casted_ptr;
-			glue_pack(__pos, msg, ext, __adjusted);
-			if (*__casted_ptr) {
-				size_t i, len = 5;
-				struct device_attribute* const* array = *__casted_ptr;
-				glue_pack(__pos, msg, ext, len);
-				// Warning: see David if this breaks
-				glue_user_trace("Warning: see David if this breaks");
-				for (i = 0; i < len; ++i) {
-					struct device_attribute* const* element = &array[i];
-					__maybe_unused const void* __adjusted = *element;
-					glue_pack(__pos, msg, ext, __adjusted);
-					if (*element) {
-						size_t i, len = 1;
-						struct device_attribute const* array = *element;
-						glue_pack(__pos, msg, ext, len);
-						// Warning: see David if this breaks
-						glue_user_trace("Warning: see David if this breaks");
-						for (i = 0; i < len; ++i) {
-							struct device_attribute const* element = &array[i];
-							caller_marshal_kernel__sysfs_create_group__dev_attr__in(__pos, msg, ext, ctx, element);
-						}
-
+		__maybe_unused const void* __adjusted = *dev_attrs_ptr;
+		glue_pack(__pos, msg, ext, __adjusted);
+		if (*dev_attrs_ptr) {
+			size_t i, len = 5;
+			struct device_attribute* const* array = *dev_attrs_ptr;
+			glue_pack(__pos, msg, ext, len);
+			// Warning: see David if this breaks
+			glue_user_trace("Warning: see David if this breaks");
+			for (i = 0; i < len; ++i) {
+				struct device_attribute* const* element = &array[i];
+				__maybe_unused const void* __adjusted = *element;
+				glue_pack(__pos, msg, ext, __adjusted);
+				if (*element) {
+					size_t i, len = 1;
+					struct device_attribute const* array = *element;
+					glue_pack(__pos, msg, ext, len);
+					// Warning: see David if this breaks
+					glue_user_trace("Warning: see David if this breaks");
+					for (i = 0; i < len; ++i) {
+						struct device_attribute const* element = &array[i];
+						caller_marshal_kernel__lvd_sysfs_create_group__dev_attr__in(__pos, msg, ext, ctx, element);
 					}
 
 				}
@@ -507,40 +502,35 @@ void caller_marshal_kernel__sysfs_create_group__grp__in(
 
 }
 
-void callee_unmarshal_kernel__sysfs_create_group__grp__in(
+void callee_unmarshal_kernel__lvd_sysfs_create_group__grp__in(
 	size_t* __pos,
 	const struct fipc_message* msg,
 	const struct ext_registers* ext,
-	struct sysfs_create_group_call_ctx const* ctx,
-	struct attribute_group* ptr)
+	struct lvd_sysfs_create_group_call_ctx const* ctx,
+	struct dev_attribute_group* ptr)
 {
-	struct attribute*** attrs_ptr = &ptr->attrs;
+	struct device_attribute*** dev_attrs_ptr = &ptr->dev_attrs;
 	
 	{
-		struct device_attribute** __casted = (struct device_attribute**)*attrs_ptr;
-		struct device_attribute*** __casted_ptr = &__casted;
-		{
-			*__casted_ptr = glue_unpack_new_shadow(__pos, msg, ext, struct device_attribute**, (sizeof(struct device_attribute*) * glue_peek(__pos, msg, ext)), (DEFAULT_GFP_FLAGS));
-			if (*__casted_ptr) {
-				int i;
-				struct device_attribute** array = *__casted_ptr;
-				size_t len = glue_unpack(__pos, msg, ext, size_t);
-				// Warning: see David if this breaks
-				glue_user_trace("Warning: see David if this breaks");
-				for (i = 0; i < len; ++i) {
-					struct device_attribute** element = &array[i];
-					*element = glue_unpack_new_shadow(__pos, msg, ext, struct device_attribute*, (sizeof(struct device_attribute) * glue_peek(__pos, msg, ext)), (DEFAULT_GFP_FLAGS));
-					if (*element) {
-						int i;
-						struct device_attribute* array = *element;
-						size_t len = glue_unpack(__pos, msg, ext, size_t);
-						// Warning: see David if this breaks
-						glue_user_trace("Warning: see David if this breaks");
-						for (i = 0; i < len; ++i) {
-							struct device_attribute* element = &array[i];
-							callee_unmarshal_kernel__sysfs_create_group__dev_attr__in(__pos, msg, ext, ctx, element);
-						}
-
+		*dev_attrs_ptr = glue_unpack_new_shadow(__pos, msg, ext, struct device_attribute**, (sizeof(struct device_attribute*) * glue_peek(__pos, msg, ext)), (DEFAULT_GFP_FLAGS));
+		if (*dev_attrs_ptr) {
+			int i;
+			struct device_attribute** array = *dev_attrs_ptr;
+			size_t len = glue_unpack(__pos, msg, ext, size_t);
+			// Warning: see David if this breaks
+			glue_user_trace("Warning: see David if this breaks");
+			for (i = 0; i < len; ++i) {
+				struct device_attribute** element = &array[i];
+				*element = glue_unpack_new_shadow(__pos, msg, ext, struct device_attribute*, (sizeof(struct device_attribute) * glue_peek(__pos, msg, ext)), (DEFAULT_GFP_FLAGS));
+				if (*element) {
+					int i;
+					struct device_attribute* array = *element;
+					size_t len = glue_unpack(__pos, msg, ext, size_t);
+					// Warning: see David if this breaks
+					glue_user_trace("Warning: see David if this breaks");
+					for (i = 0; i < len; ++i) {
+						struct device_attribute* element = &array[i];
+						callee_unmarshal_kernel__lvd_sysfs_create_group__dev_attr__in(__pos, msg, ext, ctx, element);
 					}
 
 				}
@@ -549,43 +539,52 @@ void callee_unmarshal_kernel__sysfs_create_group__grp__in(
 
 		}
 
-		*attrs_ptr = (struct attribute**)__casted;
 	}
 
 }
 
-void callee_marshal_kernel__sysfs_create_group__grp__in(
+void callee_marshal_kernel__lvd_sysfs_create_group__grp__in(
 	size_t* __pos,
 	struct fipc_message* msg,
 	struct ext_registers* ext,
-	struct sysfs_create_group_call_ctx const* ctx,
-	struct attribute_group const* ptr)
+	struct lvd_sysfs_create_group_call_ctx const* ctx,
+	struct dev_attribute_group const* ptr)
 {
+	struct device_attribute** const* dev_attrs_ptr = &ptr->dev_attrs;
 	
+	{
+		(void)dev_attrs_ptr;
+	}
+
 }
 
-void caller_unmarshal_kernel__sysfs_create_group__grp__in(
+void caller_unmarshal_kernel__lvd_sysfs_create_group__grp__in(
 	size_t* __pos,
 	const struct fipc_message* msg,
 	const struct ext_registers* ext,
-	struct sysfs_create_group_call_ctx const* ctx,
-	struct attribute_group* ptr)
+	struct lvd_sysfs_create_group_call_ctx const* ctx,
+	struct dev_attribute_group* ptr)
 {
+	struct device_attribute*** dev_attrs_ptr = &ptr->dev_attrs;
 	
+	{
+		(void)dev_attrs_ptr;
+	}
+
 }
 
-void caller_marshal_kernel__sysfs_create_group__dev_attr__in(
+void caller_marshal_kernel__lvd_sysfs_create_group__dev_attr__in(
 	size_t* __pos,
 	struct fipc_message* msg,
 	struct ext_registers* ext,
-	struct sysfs_create_group_call_ctx const* ctx,
+	struct lvd_sysfs_create_group_call_ctx const* ctx,
 	struct device_attribute const* ptr)
 {
 	struct attribute const* attr_ptr = &ptr->attr;
 	fptr_dev_attr_show const* show_ptr = &ptr->show;
 	
 	{
-		caller_marshal_kernel__sysfs_create_group__attr__in(__pos, msg, ext, ctx, attr_ptr);
+		caller_marshal_kernel__lvd_sysfs_create_group__attr__in(__pos, msg, ext, ctx, attr_ptr);
 	}
 
 	{
@@ -594,18 +593,18 @@ void caller_marshal_kernel__sysfs_create_group__dev_attr__in(
 
 }
 
-void callee_unmarshal_kernel__sysfs_create_group__dev_attr__in(
+void callee_unmarshal_kernel__lvd_sysfs_create_group__dev_attr__in(
 	size_t* __pos,
 	const struct fipc_message* msg,
 	const struct ext_registers* ext,
-	struct sysfs_create_group_call_ctx const* ctx,
+	struct lvd_sysfs_create_group_call_ctx const* ctx,
 	struct device_attribute* ptr)
 {
 	struct attribute* attr_ptr = &ptr->attr;
 	fptr_dev_attr_show* show_ptr = &ptr->show;
 	
 	{
-		callee_unmarshal_kernel__sysfs_create_group__attr__in(__pos, msg, ext, ctx, attr_ptr);
+		callee_unmarshal_kernel__lvd_sysfs_create_group__attr__in(__pos, msg, ext, ctx, attr_ptr);
 	}
 
 	{
@@ -614,41 +613,41 @@ void callee_unmarshal_kernel__sysfs_create_group__dev_attr__in(
 
 }
 
-void callee_marshal_kernel__sysfs_create_group__dev_attr__in(
+void callee_marshal_kernel__lvd_sysfs_create_group__dev_attr__in(
 	size_t* __pos,
 	struct fipc_message* msg,
 	struct ext_registers* ext,
-	struct sysfs_create_group_call_ctx const* ctx,
+	struct lvd_sysfs_create_group_call_ctx const* ctx,
 	struct device_attribute const* ptr)
 {
 	struct attribute const* attr_ptr = &ptr->attr;
 	
 	{
-		callee_marshal_kernel__sysfs_create_group__attr__in(__pos, msg, ext, ctx, attr_ptr);
+		callee_marshal_kernel__lvd_sysfs_create_group__attr__in(__pos, msg, ext, ctx, attr_ptr);
 	}
 
 }
 
-void caller_unmarshal_kernel__sysfs_create_group__dev_attr__in(
+void caller_unmarshal_kernel__lvd_sysfs_create_group__dev_attr__in(
 	size_t* __pos,
 	const struct fipc_message* msg,
 	const struct ext_registers* ext,
-	struct sysfs_create_group_call_ctx const* ctx,
+	struct lvd_sysfs_create_group_call_ctx const* ctx,
 	struct device_attribute* ptr)
 {
 	struct attribute* attr_ptr = &ptr->attr;
 	
 	{
-		caller_unmarshal_kernel__sysfs_create_group__attr__in(__pos, msg, ext, ctx, attr_ptr);
+		caller_unmarshal_kernel__lvd_sysfs_create_group__attr__in(__pos, msg, ext, ctx, attr_ptr);
 	}
 
 }
 
-void caller_marshal_kernel__sysfs_create_group__attr__in(
+void caller_marshal_kernel__lvd_sysfs_create_group__attr__in(
 	size_t* __pos,
 	struct fipc_message* msg,
 	struct ext_registers* ext,
-	struct sysfs_create_group_call_ctx const* ctx,
+	struct lvd_sysfs_create_group_call_ctx const* ctx,
 	struct attribute const* ptr)
 {
 	char const* const* name_ptr = &ptr->name;
@@ -677,11 +676,11 @@ void caller_marshal_kernel__sysfs_create_group__attr__in(
 
 }
 
-void callee_unmarshal_kernel__sysfs_create_group__attr__in(
+void callee_unmarshal_kernel__lvd_sysfs_create_group__attr__in(
 	size_t* __pos,
 	const struct fipc_message* msg,
 	const struct ext_registers* ext,
-	struct sysfs_create_group_call_ctx const* ctx,
+	struct lvd_sysfs_create_group_call_ctx const* ctx,
 	struct attribute* ptr)
 {
 	char const** name_ptr = &ptr->name;
@@ -710,11 +709,11 @@ void callee_unmarshal_kernel__sysfs_create_group__attr__in(
 
 }
 
-void callee_marshal_kernel__sysfs_create_group__attr__in(
+void callee_marshal_kernel__lvd_sysfs_create_group__attr__in(
 	size_t* __pos,
 	struct fipc_message* msg,
 	struct ext_registers* ext,
-	struct sysfs_create_group_call_ctx const* ctx,
+	struct lvd_sysfs_create_group_call_ctx const* ctx,
 	struct attribute const* ptr)
 {
 	char const* const* name_ptr = &ptr->name;
@@ -725,11 +724,11 @@ void callee_marshal_kernel__sysfs_create_group__attr__in(
 
 }
 
-void caller_unmarshal_kernel__sysfs_create_group__attr__in(
+void caller_unmarshal_kernel__lvd_sysfs_create_group__attr__in(
 	size_t* __pos,
 	const struct fipc_message* msg,
 	const struct ext_registers* ext,
-	struct sysfs_create_group_call_ctx const* ctx,
+	struct lvd_sysfs_create_group_call_ctx const* ctx,
 	struct attribute* ptr)
 {
 	char const** name_ptr = &ptr->name;

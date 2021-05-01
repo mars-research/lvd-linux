@@ -67,8 +67,14 @@ MODULE_PARM_DESC(tjmax, "TjMax value in degrees Celsius");
 #define TOTAL_ATTRS		(MAX_CORE_ATTRS + 1)
 #define MAX_CORE_DATA		(NUM_REAL_CORES + BASE_SYSFS_ATTR_NO)
 
+#ifdef LCD_ISOLATE
+#define TO_PHYS_ID(cpu)		(get_pcpu_cpu_data(cpu)->phys_proc_id)
+#define TO_CORE_ID(cpu)		(get_pcpu_cpu_data(cpu)->cpu_core_id)
+#else
 #define TO_PHYS_ID(cpu)		(cpu_data(cpu).phys_proc_id)
 #define TO_CORE_ID(cpu)		(cpu_data(cpu).cpu_core_id)
+#endif
+
 #define TO_ATTR_NO(cpu)		(TO_CORE_ID(cpu) + BASE_SYSFS_ATTR_NO)
 
 #ifdef CONFIG_SMP
@@ -428,8 +434,11 @@ static int create_core_attrs(struct temp_data *tdata, struct device *dev,
 
 static int chk_ucode_version(unsigned int cpu)
 {
+#ifdef LCD_ISOLATE
+	struct cpuinfo_x86 *c = get_pcpu_cpu_data(cpu);
+#else
 	struct cpuinfo_x86 *c = &cpu_data(cpu);
-
+#endif
 	/*
 	 * Check if we have problem with errata AE18 of Core processors:
 	 * Readings might stop update when processor visited too deep sleep,
@@ -482,7 +491,11 @@ static int create_core_data(struct platform_device *pdev, unsigned int cpu,
 {
 	struct temp_data *tdata;
 	struct platform_data *pdata = platform_get_drvdata(pdev);
+#ifdef LCD_ISOLATE
+	struct cpuinfo_x86 *c = get_pcpu_cpu_data(cpu);
+#else
 	struct cpuinfo_x86 *c = &cpu_data(cpu);
+#endif
 	u32 eax, edx;
 	int err, attr_no;
 
@@ -687,7 +700,11 @@ static bool is_any_core_online(struct platform_data *pdata)
 
 static void get_core_online(unsigned int cpu)
 {
+#ifdef LCD_ISOLATE
+	struct cpuinfo_x86 *c = get_pcpu_cpu_data(cpu);
+#else
 	struct cpuinfo_x86 *c = &cpu_data(cpu);
+#endif
 	struct platform_device *pdev = coretemp_get_pdev(cpu);
 	int err;
 

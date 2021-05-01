@@ -1,0 +1,170 @@
+module kernel {
+	rpc int rdmsr_safe_on_cpu( unsigned int  cpu, unsigned int  msr_no,
+		unsigned int [alloc_stack(callee), out] *l,
+		unsigned int [alloc_stack(callee), out] *h ) {
+	}
+	rpc void  cpu_maps_update_begin(  ) {
+	}
+	rpc void  cpu_maps_update_done(  ) {
+	}
+	rpc void  platform_device_unregister( projection pdev*  pdev ) {
+		projection < struct platform_device > pdev {
+			int [out] id;
+		}
+	}
+	rpc_ptr int  platform_driver_probe( projection pdev [bind(callee)] *  pdev ) {
+		projection < struct platform_device > pdev {
+			int  id;
+		}
+	}
+	rpc_ptr int  platform_driver_remove( projection pdev [bind(callee)] *  pdev ) {
+		projection < struct platform_device > pdev {
+		}
+	}
+
+	rpc void  sysfs_remove_group( projection kobj*  kobj, projection grp*  grp ) {
+		projection < struct kobject > kobj {
+		}
+		projection < struct attribute_group > grp {
+			array<array<projection attr, 1> [dealloc(callee)] *, 5> [dealloc(callee)] *attrs;
+		}
+		projection < struct attribute > attr {
+		}
+	}
+	rpc_ptr int dev_attr_show(projection device *dev, projection dev_attr [bind(callee)] *attr,
+			string [alloc_stack(callee), out] *buf) {
+		projection <struct device_attribute> dev_attr {
+		}
+		projection < struct device > device {
+		}
+	}
+
+	rpc int sysfs_create_group(
+		projection kobj [bind_memberof<struct device, kobj>(caller)] *dev,
+		const projection grp [alloc(callee)] *  grp ) {
+		projection < struct kobject > kobj {
+		}
+
+		projection < struct attribute_group > grp {
+			//array<array<projection attr, 1> [alloc(callee)] *, {{5}}> [alloc(callee)]> [alloc(callee)] *attrs;
+			casted<array<array<projection attr,1>*,5> *,
+			array<array<projection dev_attr, 1> [alloc(callee)] *, 5> [alloc(callee)]*> attrs;
+		}
+
+		projection <struct attribute> attr {
+			string [alloc(callee)] *name;
+			unsigned short mode;
+		}
+		projection <struct device_attribute> dev_attr {
+			projection attr attr;
+			rpc_ptr dev_attr_show show;
+		}
+	}
+
+	rpc projection ret_pci_dev [alloc(caller)] * pci_get_domain_bus_and_slot(
+			int  domain, unsigned int  bus, unsigned int  devfn ) {
+		projection < struct pci_dev > ret_pci_dev {
+			unsigned short vendor;
+			unsigned short device;
+		}
+	}
+
+	rpc projection ret_device [alloc(caller)] * devm_hwmon_device_register_with_groups(
+			projection dev [bind_memberof<struct platform_device, dev>(caller)] *dev,
+			string [alloc(callee)] *  name, void*  drvdata,
+			const projection groups ** [unused]  groups ) {
+		projection < struct device > ret_device {
+		}
+		projection < struct device > dev {
+		}
+		projection < struct attribute_group > groups {
+		}
+	}
+
+	rpc void  platform_driver_unregister( projection drv*  drv ) {
+		projection < struct platform_driver > drv {
+		}
+	}
+
+	rpc int __platform_driver_register( projection drv [alloc(callee)] *  drv,
+				projection owner *  [unused] owner ) {
+		projection < struct device_driver> device_driver {
+			string [alloc(callee)] *name;
+		}
+		projection < struct platform_driver > drv {
+			rpc_ptr platform_driver_probe probe;
+			rpc_ptr platform_driver_remove remove;
+		}
+		projection < struct module > owner {
+		}
+	}
+
+	rpc projection ret_platform_device [alloc(caller)] * platform_device_alloc(
+				string [alloc(callee)] *name, int  id ) {
+		projection < struct platform_device > ret_platform_device {
+		}
+	}
+	rpc int  platform_device_add( projection pdev*  pdev ) {
+		projection < struct device> device {
+			//projection device_parent* parent;
+			//projection device_bus* bus;
+		}
+		projection < struct platform_device > pdev {
+			int [out] id;
+			projection device dev;
+		}
+		projection < struct device > device_parent {
+		}
+		projection < struct bus_type > device_bus {
+		}
+	}
+	rpc void  platform_device_put( projection pdev*  pdev ) {
+		projection < struct platform_device > pdev {
+		}
+	}
+
+	rpc int rdmsr_on_cpu( unsigned int  cpu, unsigned int  msr_no,
+			unsigned int [alloc_stack(callee), out] * l,
+			unsigned int [alloc_stack(callee), out] * h ) {
+	}
+
+
+	rpc const projection ret_x86_cpu_id [alloc(caller)] * x86_match_cpu(
+			const array<projection match, null> [alloc(callee)] *match ) {
+		projection < struct x86_cpu_id > ret_x86_cpu_id {
+			unsigned short vendor;
+			unsigned short family;
+			unsigned short model;
+			unsigned short feature;	
+			unsigned long long driver_data;
+		}
+		projection < struct x86_cpu_id > match {
+			unsigned short vendor;
+			unsigned short family;
+			unsigned short model;
+			unsigned short feature;
+			unsigned long long driver_data;
+		}
+	}
+
+	rpc projection cpuinfo_x86 [alloc_once(caller)] * get_pcpu_cpu_data(int cpu) {
+		projection < struct cpuinfo_x86 > cpuinfo_x86 {
+			array<u32, {{NCAPINTS + NBUGINTS}}> [out] x86_capability;
+			u16 phys_proc_id;
+			u16 cpu_core_id;
+			u8 x86_vendor;
+			u8 x86_model;
+			u8 x86_mask;
+			u32 microcode;
+			array<char, 64>	x86_model_id;
+		}
+	}
+	/*
+	global projection cpuinfo_x86 *cpu_info {
+		projection < struct cpuinfo_x86 > cpuinfo_x86 {
+		}
+	}
+
+	global [get] unsigned long jiffies {
+	}*/
+}

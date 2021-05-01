@@ -194,7 +194,7 @@ void caller_marshal_kernel__sysfs_remove_group__grp__in(
 	struct attribute** const* attrs_ptr = &ptr->attrs;
 	
 	{
-		const void* __adjusted = *attrs_ptr;
+		__maybe_unused const void* __adjusted = *attrs_ptr;
 		glue_pack(__pos, msg, ext, __adjusted);
 		if (*attrs_ptr) {
 			size_t i, len = 5;
@@ -204,7 +204,7 @@ void caller_marshal_kernel__sysfs_remove_group__grp__in(
 			glue_user_trace("Warning: see David if this breaks");
 			for (i = 0; i < len; ++i) {
 				struct attribute* const* element = &array[i];
-				const void* __adjusted = *element;
+				__maybe_unused const void* __adjusted = *element;
 				glue_pack(__pos, msg, ext, __adjusted);
 				if (*element) {
 					size_t i, len = 1;
@@ -472,7 +472,7 @@ void caller_marshal_kernel__sysfs_create_group__grp__in(
 		struct device_attribute** __casted = (struct device_attribute**)*attrs_ptr;
 		struct device_attribute** const* __casted_ptr = &__casted;
 		{
-			const void* __adjusted = *__casted_ptr;
+			__maybe_unused const void* __adjusted = *__casted_ptr;
 			glue_pack(__pos, msg, ext, __adjusted);
 			if (*__casted_ptr) {
 				size_t i, len = 5;
@@ -482,7 +482,7 @@ void caller_marshal_kernel__sysfs_create_group__grp__in(
 				glue_user_trace("Warning: see David if this breaks");
 				for (i = 0; i < len; ++i) {
 					struct device_attribute* const* element = &array[i];
-					const void* __adjusted = *element;
+					__maybe_unused const void* __adjusted = *element;
 					glue_pack(__pos, msg, ext, __adjusted);
 					if (*element) {
 						size_t i, len = 1;
@@ -655,7 +655,7 @@ void caller_marshal_kernel__sysfs_create_group__attr__in(
 	unsigned short const* mode_ptr = &ptr->mode;
 	
 	{
-		const void* __adjusted = *name_ptr;
+		__maybe_unused const void* __adjusted = *name_ptr;
 		glue_pack(__pos, msg, ext, __adjusted);
 		if (*name_ptr) {
 			size_t i, len;
@@ -967,9 +967,14 @@ void caller_marshal_kernel____platform_driver_register__drv__in(
 	struct __platform_driver_register_call_ctx const* ctx,
 	struct platform_driver const* ptr)
 {
+	struct device_driver const* driver_ptr = &ptr->driver;
 	fptr_platform_driver_probe const* probe_ptr = &ptr->probe;
 	fptr_platform_driver_remove const* remove_ptr = &ptr->remove;
 	
+	{
+		caller_marshal_kernel____platform_driver_register__device_driver__in(__pos, msg, ext, ctx, driver_ptr);
+	}
+
 	{
 		glue_pack(__pos, msg, ext, *probe_ptr);
 	}
@@ -987,9 +992,14 @@ void callee_unmarshal_kernel____platform_driver_register__drv__in(
 	struct __platform_driver_register_call_ctx const* ctx,
 	struct platform_driver* ptr)
 {
+	struct device_driver* driver_ptr = &ptr->driver;
 	fptr_platform_driver_probe* probe_ptr = &ptr->probe;
 	fptr_platform_driver_remove* remove_ptr = &ptr->remove;
 	
+	{
+		callee_unmarshal_kernel____platform_driver_register__device_driver__in(__pos, msg, ext, ctx, driver_ptr);
+	}
+
 	{
 		*probe_ptr = glue_unpack_rpc_ptr(__pos, msg, ext, platform_driver_probe);
 	}
@@ -1007,7 +1017,12 @@ void callee_marshal_kernel____platform_driver_register__drv__in(
 	struct __platform_driver_register_call_ctx const* ctx,
 	struct platform_driver const* ptr)
 {
+	struct device_driver const* driver_ptr = &ptr->driver;
 	
+	{
+		callee_marshal_kernel____platform_driver_register__device_driver__in(__pos, msg, ext, ctx, driver_ptr);
+	}
+
 }
 
 void caller_unmarshal_kernel____platform_driver_register__drv__in(
@@ -1017,7 +1032,98 @@ void caller_unmarshal_kernel____platform_driver_register__drv__in(
 	struct __platform_driver_register_call_ctx const* ctx,
 	struct platform_driver* ptr)
 {
+	struct device_driver* driver_ptr = &ptr->driver;
 	
+	{
+		caller_unmarshal_kernel____platform_driver_register__device_driver__in(__pos, msg, ext, ctx, driver_ptr);
+	}
+
+}
+
+void caller_marshal_kernel____platform_driver_register__device_driver__in(
+	size_t* __pos,
+	struct fipc_message* msg,
+	struct ext_registers* ext,
+	struct __platform_driver_register_call_ctx const* ctx,
+	struct device_driver const* ptr)
+{
+	char const* const* name_ptr = &ptr->name;
+	
+	{
+		__maybe_unused const void* __adjusted = *name_ptr;
+		glue_pack(__pos, msg, ext, __adjusted);
+		if (*name_ptr) {
+			size_t i, len;
+			char const* array = *name_ptr;
+			for (len = 0; array[len]; ++len);
+			glue_pack(__pos, msg, ext, len + 1);
+			for (i = 0; i < len; ++i) {
+				char const* element = &array[i];
+				glue_pack(__pos, msg, ext, *element);
+			}
+
+		}
+
+	}
+
+}
+
+void callee_unmarshal_kernel____platform_driver_register__device_driver__in(
+	size_t* __pos,
+	const struct fipc_message* msg,
+	const struct ext_registers* ext,
+	struct __platform_driver_register_call_ctx const* ctx,
+	struct device_driver* ptr)
+{
+	char const** name_ptr = &ptr->name;
+	
+	{
+		*name_ptr = glue_unpack_new_shadow(__pos, msg, ext, char const*, (sizeof(char) * glue_peek(__pos, msg, ext)), (DEFAULT_GFP_FLAGS));
+		if (*name_ptr) {
+			char* writable = (char*)*name_ptr;
+			size_t i, len;
+			char* array = writable;
+			len = glue_unpack(__pos, msg, ext, size_t) - 1;
+			array[len] = '\0';
+			for (i = 0; i < len; ++i) {
+				char* element = &array[i];
+				*element = glue_unpack(__pos, msg, ext, char);
+			}
+
+		}
+
+	}
+
+}
+
+void callee_marshal_kernel____platform_driver_register__device_driver__in(
+	size_t* __pos,
+	struct fipc_message* msg,
+	struct ext_registers* ext,
+	struct __platform_driver_register_call_ctx const* ctx,
+	struct device_driver const* ptr)
+{
+	char const* const* name_ptr = &ptr->name;
+	
+	{
+		(void)name_ptr;
+	}
+
+}
+
+void caller_unmarshal_kernel____platform_driver_register__device_driver__in(
+	size_t* __pos,
+	const struct fipc_message* msg,
+	const struct ext_registers* ext,
+	struct __platform_driver_register_call_ctx const* ctx,
+	struct device_driver* ptr)
+{
+	char const** name_ptr = &ptr->name;
+	
+	{
+		(void)name_ptr;
+	}
+
 }
 
 void caller_marshal_kernel____platform_driver_register__owner__in(
@@ -1468,12 +1574,12 @@ void callee_marshal_kernel__get_pcpu_cpu_data__cpuinfo_x86__out(
 	
 	{
 		size_t i, len = (NCAPINTS + NBUGINTS);
-		unsigned int* array = x86_capability_ptr;
+		unsigned int const* array = x86_capability_ptr;
 		glue_pack(__pos, msg, ext, len);
 		// Warning: see David if this breaks
 		glue_user_trace("Warning: see David if this breaks");
 		for (i = 0; i < len; ++i) {
-			unsigned int* element = &array[i];
+			unsigned int const* element = &array[i];
 			glue_pack(__pos, msg, ext, *element);
 		}
 
@@ -1584,6 +1690,136 @@ void caller_unmarshal_kernel__get_pcpu_cpu_data__cpuinfo_x86__out(
 
 	}
 
+}
+
+void caller_marshal_kernel__notifier_call__nb__in(
+	size_t* __pos,
+	struct fipc_message* msg,
+	struct ext_registers* ext,
+	struct notifier_call_call_ctx const* ctx,
+	struct notifier_block const* ptr)
+{
+	
+}
+
+void callee_unmarshal_kernel__notifier_call__nb__in(
+	size_t* __pos,
+	const struct fipc_message* msg,
+	const struct ext_registers* ext,
+	struct notifier_call_call_ctx const* ctx,
+	struct notifier_block* ptr)
+{
+	
+}
+
+void callee_marshal_kernel__notifier_call__nb__in(
+	size_t* __pos,
+	struct fipc_message* msg,
+	struct ext_registers* ext,
+	struct notifier_call_call_ctx const* ctx,
+	struct notifier_block const* ptr)
+{
+	
+}
+
+void caller_unmarshal_kernel__notifier_call__nb__in(
+	size_t* __pos,
+	const struct fipc_message* msg,
+	const struct ext_registers* ext,
+	struct notifier_call_call_ctx const* ctx,
+	struct notifier_block* ptr)
+{
+	
+}
+
+void caller_marshal_kernel____register_cpu_notifier__notifier_block__in(
+	size_t* __pos,
+	struct fipc_message* msg,
+	struct ext_registers* ext,
+	struct __register_cpu_notifier_call_ctx const* ctx,
+	struct notifier_block const* ptr)
+{
+	fptr_notifier_call const* notifier_call_ptr = &ptr->notifier_call;
+	
+	{
+		glue_pack(__pos, msg, ext, *notifier_call_ptr);
+	}
+
+}
+
+void callee_unmarshal_kernel____register_cpu_notifier__notifier_block__in(
+	size_t* __pos,
+	const struct fipc_message* msg,
+	const struct ext_registers* ext,
+	struct __register_cpu_notifier_call_ctx const* ctx,
+	struct notifier_block* ptr)
+{
+	fptr_notifier_call* notifier_call_ptr = &ptr->notifier_call;
+	
+	{
+		*notifier_call_ptr = glue_unpack_rpc_ptr(__pos, msg, ext, notifier_call);
+	}
+
+}
+
+void callee_marshal_kernel____register_cpu_notifier__notifier_block__in(
+	size_t* __pos,
+	struct fipc_message* msg,
+	struct ext_registers* ext,
+	struct __register_cpu_notifier_call_ctx const* ctx,
+	struct notifier_block const* ptr)
+{
+	
+}
+
+void caller_unmarshal_kernel____register_cpu_notifier__notifier_block__in(
+	size_t* __pos,
+	const struct fipc_message* msg,
+	const struct ext_registers* ext,
+	struct __register_cpu_notifier_call_ctx const* ctx,
+	struct notifier_block* ptr)
+{
+	
+}
+
+void caller_marshal_kernel____unregister_cpu_notifier__notifier_block__in(
+	size_t* __pos,
+	struct fipc_message* msg,
+	struct ext_registers* ext,
+	struct __unregister_cpu_notifier_call_ctx const* ctx,
+	struct notifier_block const* ptr)
+{
+	
+}
+
+void callee_unmarshal_kernel____unregister_cpu_notifier__notifier_block__in(
+	size_t* __pos,
+	const struct fipc_message* msg,
+	const struct ext_registers* ext,
+	struct __unregister_cpu_notifier_call_ctx const* ctx,
+	struct notifier_block* ptr)
+{
+	
+}
+
+void callee_marshal_kernel____unregister_cpu_notifier__notifier_block__in(
+	size_t* __pos,
+	struct fipc_message* msg,
+	struct ext_registers* ext,
+	struct __unregister_cpu_notifier_call_ctx const* ctx,
+	struct notifier_block const* ptr)
+{
+	
+}
+
+void caller_unmarshal_kernel____unregister_cpu_notifier__notifier_block__in(
+	size_t* __pos,
+	const struct fipc_message* msg,
+	const struct ext_registers* ext,
+	struct __unregister_cpu_notifier_call_ctx const* ctx,
+	struct notifier_block* ptr)
+{
+	
 }
 
 

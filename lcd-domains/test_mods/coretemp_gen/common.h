@@ -169,6 +169,9 @@ enum RPC_ID {
 	RPC_ID_rdmsr_on_cpu,
 	RPC_ID_x86_match_cpu,
 	RPC_ID_get_pcpu_cpu_data,
+	RPC_ID_notifier_call,
+	RPC_ID___register_cpu_notifier,
+	RPC_ID___unregister_cpu_notifier,
 };
 
 int try_dispatch(enum RPC_ID id, struct fipc_message* msg, struct ext_registers* ext);
@@ -190,6 +193,12 @@ typedef int (*fptr_impl_dev_attr_show)(fptr_dev_attr_show target, struct device*
 
 LCD_TRAMPOLINE_DATA(trmp_dev_attr_show)
 int LCD_TRAMPOLINE_LINKAGE(trmp_dev_attr_show) trmp_dev_attr_show(struct device* dev, struct device_attribute* attr, char const* buf);
+
+typedef int (*fptr_notifier_call)(struct notifier_block* nb, unsigned long action, void* data);
+typedef int (*fptr_impl_notifier_call)(fptr_notifier_call target, struct notifier_block* nb, unsigned long action, void* data);
+
+LCD_TRAMPOLINE_DATA(trmp_notifier_call)
+int LCD_TRAMPOLINE_LINKAGE(trmp_notifier_call) trmp_notifier_call(struct notifier_block* nb, unsigned long action, void* data);
 
 struct rdmsr_safe_on_cpu_call_ctx {
 	unsigned int cpu;
@@ -218,7 +227,7 @@ struct platform_driver_remove_call_ctx {
 
 struct sysfs_remove_group_call_ctx {
 	struct kobject* kobj;
-	struct attribute_group* grp;
+	struct attribute_group const* grp;
 };
 
 struct dev_attr_show_call_ctx {
@@ -280,6 +289,20 @@ struct x86_match_cpu_call_ctx {
 
 struct get_pcpu_cpu_data_call_ctx {
 	int cpu;
+};
+
+struct notifier_call_call_ctx {
+	struct notifier_block* nb;
+	unsigned long action;
+	void* data;
+};
+
+struct __register_cpu_notifier_call_ctx {
+	struct notifier_block* nb;
+};
+
+struct __unregister_cpu_notifier_call_ctx {
+	struct notifier_block* nb;
 };
 
 void caller_marshal_kernel__platform_device_unregister__pdev__in(
@@ -786,6 +809,34 @@ void caller_unmarshal_kernel____platform_driver_register__drv__in(
 	struct __platform_driver_register_call_ctx const* call_ctx,
 	struct platform_driver* ptr);
 
+void caller_marshal_kernel____platform_driver_register__device_driver__in(
+	size_t* __pos,
+	struct fipc_message* msg,
+	struct ext_registers* ext,
+	struct __platform_driver_register_call_ctx const* call_ctx,
+	struct device_driver const* ptr);
+
+void callee_unmarshal_kernel____platform_driver_register__device_driver__in(
+	size_t* __pos,
+	const struct fipc_message* msg,
+	const struct ext_registers* ext,
+	struct __platform_driver_register_call_ctx const* call_ctx,
+	struct device_driver* ptr);
+
+void callee_marshal_kernel____platform_driver_register__device_driver__in(
+	size_t* __pos,
+	struct fipc_message* msg,
+	struct ext_registers* ext,
+	struct __platform_driver_register_call_ctx const* call_ctx,
+	struct device_driver const* ptr);
+
+void caller_unmarshal_kernel____platform_driver_register__device_driver__in(
+	size_t* __pos,
+	const struct fipc_message* msg,
+	const struct ext_registers* ext,
+	struct __platform_driver_register_call_ctx const* call_ctx,
+	struct device_driver* ptr);
+
 void caller_marshal_kernel____platform_driver_register__owner__in(
 	size_t* __pos,
 	struct fipc_message* msg,
@@ -1009,6 +1060,90 @@ void caller_unmarshal_kernel__get_pcpu_cpu_data__cpuinfo_x86__out(
 	const struct ext_registers* ext,
 	struct get_pcpu_cpu_data_call_ctx const* call_ctx,
 	struct cpuinfo_x86* ptr);
+
+void caller_marshal_kernel__notifier_call__nb__in(
+	size_t* __pos,
+	struct fipc_message* msg,
+	struct ext_registers* ext,
+	struct notifier_call_call_ctx const* call_ctx,
+	struct notifier_block const* ptr);
+
+void callee_unmarshal_kernel__notifier_call__nb__in(
+	size_t* __pos,
+	const struct fipc_message* msg,
+	const struct ext_registers* ext,
+	struct notifier_call_call_ctx const* call_ctx,
+	struct notifier_block* ptr);
+
+void callee_marshal_kernel__notifier_call__nb__in(
+	size_t* __pos,
+	struct fipc_message* msg,
+	struct ext_registers* ext,
+	struct notifier_call_call_ctx const* call_ctx,
+	struct notifier_block const* ptr);
+
+void caller_unmarshal_kernel__notifier_call__nb__in(
+	size_t* __pos,
+	const struct fipc_message* msg,
+	const struct ext_registers* ext,
+	struct notifier_call_call_ctx const* call_ctx,
+	struct notifier_block* ptr);
+
+void caller_marshal_kernel____register_cpu_notifier__notifier_block__in(
+	size_t* __pos,
+	struct fipc_message* msg,
+	struct ext_registers* ext,
+	struct __register_cpu_notifier_call_ctx const* call_ctx,
+	struct notifier_block const* ptr);
+
+void callee_unmarshal_kernel____register_cpu_notifier__notifier_block__in(
+	size_t* __pos,
+	const struct fipc_message* msg,
+	const struct ext_registers* ext,
+	struct __register_cpu_notifier_call_ctx const* call_ctx,
+	struct notifier_block* ptr);
+
+void callee_marshal_kernel____register_cpu_notifier__notifier_block__in(
+	size_t* __pos,
+	struct fipc_message* msg,
+	struct ext_registers* ext,
+	struct __register_cpu_notifier_call_ctx const* call_ctx,
+	struct notifier_block const* ptr);
+
+void caller_unmarshal_kernel____register_cpu_notifier__notifier_block__in(
+	size_t* __pos,
+	const struct fipc_message* msg,
+	const struct ext_registers* ext,
+	struct __register_cpu_notifier_call_ctx const* call_ctx,
+	struct notifier_block* ptr);
+
+void caller_marshal_kernel____unregister_cpu_notifier__notifier_block__in(
+	size_t* __pos,
+	struct fipc_message* msg,
+	struct ext_registers* ext,
+	struct __unregister_cpu_notifier_call_ctx const* call_ctx,
+	struct notifier_block const* ptr);
+
+void callee_unmarshal_kernel____unregister_cpu_notifier__notifier_block__in(
+	size_t* __pos,
+	const struct fipc_message* msg,
+	const struct ext_registers* ext,
+	struct __unregister_cpu_notifier_call_ctx const* call_ctx,
+	struct notifier_block* ptr);
+
+void callee_marshal_kernel____unregister_cpu_notifier__notifier_block__in(
+	size_t* __pos,
+	struct fipc_message* msg,
+	struct ext_registers* ext,
+	struct __unregister_cpu_notifier_call_ctx const* call_ctx,
+	struct notifier_block const* ptr);
+
+void caller_unmarshal_kernel____unregister_cpu_notifier__notifier_block__in(
+	size_t* __pos,
+	const struct fipc_message* msg,
+	const struct ext_registers* ext,
+	struct __unregister_cpu_notifier_call_ctx const* call_ctx,
+	struct notifier_block* ptr);
 
 
 #endif

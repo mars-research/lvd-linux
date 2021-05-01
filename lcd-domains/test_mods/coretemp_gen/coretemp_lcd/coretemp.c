@@ -52,6 +52,7 @@
 
 #define DRVNAME	"coretemp"
 
+struct cpuinfo_x86* get_pcpu_cpu_data(int cpu);
 /*
  * force_tjmax only matters when TjMax can't be read from the CPU itself.
  * When set, it replaces the driver's suboptimal heuristic.
@@ -592,7 +593,11 @@ static int coretemp_probe(struct platform_device *pdev)
 	struct platform_data *pdata;
 
 	/* Initialize the per-package data structures */
+#ifdef LCD_ISOLATE
+	pdata = kzalloc(sizeof(struct platform_data), GFP_KERNEL);
+#else
 	pdata = devm_kzalloc(dev, sizeof(struct platform_data), GFP_KERNEL);
+#endif
 	if (!pdata)
 		return -ENOMEM;
 

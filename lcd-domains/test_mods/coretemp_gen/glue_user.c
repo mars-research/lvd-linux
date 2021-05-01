@@ -34,32 +34,38 @@ void glue_user_call_server(struct fipc_message* msg, size_t id)
 {
     msg->vmfunc_id = VMFUNC_RPC_CALL;
     msg->rpc_id = id;
-    glue_user_trace("Committing to KLCD call");
+    if (verbose_debug)
+        glue_user_trace("Committing to KLCD call");
     vmfunc_wrapper(msg);
-	glue_user_trace("Completed call in LCD");
+    if (verbose_debug)
+        glue_user_trace("Completed call in LCD");
 }
 
 void glue_user_call_client(struct fipc_message* msg, size_t id)
 {
     msg->vmfunc_id = VMFUNC_RPC_CALL;
     msg->rpc_id = id;
-    glue_user_trace("Committing to LCD call");
+    if (verbose_debug)
+        glue_user_trace("Committing to LCD call");
     vmfunc_klcd_wrapper(msg, OTHER_DOMAIN);
-	glue_user_trace("Completed call in KLCD");
+    if (verbose_debug)
+	    glue_user_trace("Completed call in KLCD");
 }
 
 void* glue_user_map_to_shadow(const void* obj, bool fail)
 {
     struct shadow_link *link;
 
-    LIBLCD_MSG("Lookup for key %p\n", obj);
+    if (verbose_debug)
+        LIBLCD_MSG("Lookup for key %p\n", obj);
     hash_for_each_possible(to_shadow_ht, link,
                     to_hentry, (unsigned long) obj) {
         if (!link)
             glue_user_panic("Null detected in shadow_ht");
 
         if (link->object == obj) {
-            glue_user_trace("Found remote for shadow");
+            if (verbose_debug)
+                glue_user_trace("Found remote for shadow");
             if (!link->shadow)
                 glue_user_panic("Remote for shadow was NULL");
 
@@ -77,14 +83,16 @@ const void* glue_user_map_from_shadow(const void* shadow)
 {
     struct shadow_link *link;
 
-    LIBLCD_MSG("Lookup for key %p\n", shadow);
+    if (verbose_debug)
+        LIBLCD_MSG("Lookup for key %p\n", shadow);
     hash_for_each_possible(shadow_ht, link,
     		    hentry, (unsigned long) shadow) {
         if (!link)
             glue_user_panic("Null detected in shadow_ht");
 
         if (link->shadow == shadow) {
-            glue_user_trace("Found remote for shadow");
+            if (verbose_debug)
+                glue_user_trace("Found remote for shadow");
             if (!link->object)
                 glue_user_panic("Remote for shadow was NULL");
 
@@ -117,16 +125,29 @@ void glue_user_add_shadow(const void* ptr, void* shadow)
     /* use shadow pointer as the key */
     hash_add(shadow_ht, &link->hentry, (unsigned long) shadow);
     hash_add(to_shadow_ht, &link->to_hentry, (unsigned long) link->object);
-    LIBLCD_MSG("Inserted shadow with <key %p, ptr %p>\n", shadow, ptr);
+    if (verbose_debug)
+        LIBLCD_MSG("Inserted shadow with <key %p, ptr %p>\n", shadow, ptr);
 }
 
-void* glue_user_alloc(size_t size)
+void glue_user_remove_shadow(void* shadow)
 {
-    void* ptr = kzalloc(size, GFP_KERNEL);
+    if (!shadow)
+        glue_user_panic("Shadow was NULL");
+
+    // TODO: implement
+    //
+    LIBLCD_MSG("Remove shadow for shadow %p\n", shadow);
+}
+
+
+void* glue_user_alloc(size_t size, gfp_t flags)
+{
+    void* ptr = kzalloc(size, flags);
     if (!ptr) {
         glue_user_panic("Couldn't allocate");
     }
-    printk("%s, allocated %p | size %ld\n", __func__, ptr, size);
+    if (verbose_debug)
+        printk("%s, allocated %p | size %ld\n", __func__, ptr, size);
 
     return ptr;
 }

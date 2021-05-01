@@ -22,7 +22,7 @@ module kernel {
 		}
 	}
 
-	rpc void  sysfs_remove_group( projection kobj*  kobj, projection grp*  grp ) {
+	rpc void  sysfs_remove_group( projection kobj*  kobj, const projection grp*  grp ) {
 		projection < struct kobject > kobj {
 		}
 		projection < struct attribute_group > grp {
@@ -71,7 +71,7 @@ module kernel {
 
 	rpc projection ret_device [alloc(caller)] * devm_hwmon_device_register_with_groups(
 			projection dev [bind_memberof<struct platform_device, dev>(caller)] *dev,
-			string [alloc(callee)] *  name, void*  drvdata,
+			string [alloc(callee)] *  name, void [alloc<{{sizeof(void*)}}>(callee)] * drvdata,
 			const projection groups ** [unused]  groups ) {
 		projection < struct device > ret_device {
 		}
@@ -92,6 +92,7 @@ module kernel {
 			string [alloc(callee)] *name;
 		}
 		projection < struct platform_driver > drv {
+			projection device_driver driver;
 			rpc_ptr platform_driver_probe probe;
 			rpc_ptr platform_driver_remove remove;
 		}
@@ -149,7 +150,7 @@ module kernel {
 
 	rpc projection cpuinfo_x86 [alloc_once(caller)] * get_pcpu_cpu_data(int cpu) {
 		projection < struct cpuinfo_x86 > cpuinfo_x86 {
-			array<u32, {{NCAPINTS + NBUGINTS}}> [out] x86_capability;
+			const array<u32, {{NCAPINTS + NBUGINTS}}> [out] x86_capability;
 			u16 phys_proc_id;
 			u16 cpu_core_id;
 			u8 x86_vendor;
@@ -159,6 +160,26 @@ module kernel {
 			array<char, 64>	x86_model_id;
 		}
 	}
+
+	rpc_ptr int notifier_call( projection nb * [unused] nb,
+			unsigned long action,
+			void [alloc<{{sizeof(unsigned long)}}>(callee)] *  data ) {
+		projection < struct notifier_block > nb {
+		}
+	}
+
+	rpc int __register_cpu_notifier(projection notifier_block [alloc(callee)] *nb) {
+
+		projection < struct notifier_block > notifier_block {
+			rpc_ptr notifier_call notifier_call;
+		}
+	}
+	rpc void __unregister_cpu_notifier(projection notifier_block [bind(callee)] *nb) {
+
+		projection < struct notifier_block > notifier_block {
+		}
+	}
+
 	/*
 	global projection cpuinfo_x86 *cpu_info {
 		projection < struct cpuinfo_x86 > cpuinfo_x86 {

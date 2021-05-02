@@ -226,6 +226,10 @@ enum RPC_ID {
 	RPC_ID_pci_enable_device,
 	RPC_ID_pci_enable_device_mem,
 	RPC_ID_pci_ioremap_bar,
+	RPC_ID_get_loops_per_jiffy,
+	RPC_ID_get_jiffies,
+	RPC_ID_eth_validate_addr,
+	RPC_ID_ethtool_op_get_link,
 };
 
 int try_dispatch(enum RPC_ID id, struct fipc_message* msg, struct ext_registers* ext);
@@ -764,6 +768,20 @@ struct pci_ioremap_bar_call_ctx {
 	int bar;
 };
 
+struct get_loops_per_jiffy_call_ctx {
+};
+
+struct get_jiffies_call_ctx {
+};
+
+struct eth_validate_addr_call_ctx {
+	struct net_device* dev;
+};
+
+struct ethtool_op_get_link_call_ctx {
+	struct net_device* dev;
+};
+
 void caller_marshal_kernel__ethtool_ops_set_settings__netdev__in(
 	size_t* __pos,
 	struct fipc_message* msg,
@@ -987,6 +1005,34 @@ void caller_unmarshal_kernel__probe__pdev__in(
 	const struct ext_registers* ext,
 	struct probe_call_ctx const* call_ctx,
 	struct pci_dev* ptr);
+
+void caller_marshal_kernel__probe__device__in(
+	size_t* __pos,
+	struct fipc_message* msg,
+	struct ext_registers* ext,
+	struct probe_call_ctx const* call_ctx,
+	struct device const* ptr);
+
+void callee_unmarshal_kernel__probe__device__in(
+	size_t* __pos,
+	const struct fipc_message* msg,
+	const struct ext_registers* ext,
+	struct probe_call_ctx const* call_ctx,
+	struct device* ptr);
+
+void callee_marshal_kernel__probe__device__in(
+	size_t* __pos,
+	struct fipc_message* msg,
+	struct ext_registers* ext,
+	struct probe_call_ctx const* call_ctx,
+	struct device const* ptr);
+
+void caller_unmarshal_kernel__probe__device__in(
+	size_t* __pos,
+	const struct fipc_message* msg,
+	const struct ext_registers* ext,
+	struct probe_call_ctx const* call_ctx,
+	struct device* ptr);
 
 void caller_marshal_kernel__probe__pci_bus__in(
 	size_t* __pos,
@@ -2388,54 +2434,6 @@ void caller_unmarshal_kernel__free_netdev__dev__in(
 	struct free_netdev_call_ctx const* call_ctx,
 	struct net_device* ptr);
 
-void caller_marshal_kernel____global_netdev_ops__in(
-	size_t* __pos,
-	struct fipc_message* msg,
-	struct ext_registers* ext,
-	struct net_device_ops const* ptr);
-
-void callee_unmarshal_kernel____global_netdev_ops__in(
-	size_t* __pos,
-	const struct fipc_message* msg,
-	const struct ext_registers* ext,
-	struct net_device_ops* ptr);
-
-void callee_marshal_kernel____global_netdev_ops__in(
-	size_t* __pos,
-	struct fipc_message* msg,
-	struct ext_registers* ext,
-	struct net_device_ops const* ptr);
-
-void caller_unmarshal_kernel____global_netdev_ops__in(
-	size_t* __pos,
-	const struct fipc_message* msg,
-	const struct ext_registers* ext,
-	struct net_device_ops* ptr);
-
-void caller_marshal_kernel____global_ethtool_ops__in(
-	size_t* __pos,
-	struct fipc_message* msg,
-	struct ext_registers* ext,
-	struct ethtool_ops const* ptr);
-
-void callee_unmarshal_kernel____global_ethtool_ops__in(
-	size_t* __pos,
-	const struct fipc_message* msg,
-	const struct ext_registers* ext,
-	struct ethtool_ops* ptr);
-
-void callee_marshal_kernel____global_ethtool_ops__in(
-	size_t* __pos,
-	struct fipc_message* msg,
-	struct ext_registers* ext,
-	struct ethtool_ops const* ptr);
-
-void caller_unmarshal_kernel____global_ethtool_ops__in(
-	size_t* __pos,
-	const struct fipc_message* msg,
-	const struct ext_registers* ext,
-	struct ethtool_ops* ptr);
-
 void caller_marshal_kernel__netif_napi_del__napi__in(
 	size_t* __pos,
 	struct fipc_message* msg,
@@ -2828,33 +2826,53 @@ void caller_unmarshal_kernel__register_netdev__dev__in(
 	struct register_netdev_call_ctx const* call_ctx,
 	struct net_device* ptr);
 
-void caller_marshal_kernel__register_netdev__device__in(
+void caller_marshal_kernel____global_netdev_ops__in(
 	size_t* __pos,
 	struct fipc_message* msg,
 	struct ext_registers* ext,
-	struct register_netdev_call_ctx const* call_ctx,
-	struct device const* ptr);
+	struct net_device_ops const* ptr);
 
-void callee_unmarshal_kernel__register_netdev__device__in(
+void callee_unmarshal_kernel____global_netdev_ops__in(
 	size_t* __pos,
 	const struct fipc_message* msg,
 	const struct ext_registers* ext,
-	struct register_netdev_call_ctx const* call_ctx,
-	struct device* ptr);
+	struct net_device_ops* ptr);
 
-void callee_marshal_kernel__register_netdev__device__in(
+void callee_marshal_kernel____global_netdev_ops__in(
 	size_t* __pos,
 	struct fipc_message* msg,
 	struct ext_registers* ext,
-	struct register_netdev_call_ctx const* call_ctx,
-	struct device const* ptr);
+	struct net_device_ops const* ptr);
 
-void caller_unmarshal_kernel__register_netdev__device__in(
+void caller_unmarshal_kernel____global_netdev_ops__in(
 	size_t* __pos,
 	const struct fipc_message* msg,
 	const struct ext_registers* ext,
-	struct register_netdev_call_ctx const* call_ctx,
-	struct device* ptr);
+	struct net_device_ops* ptr);
+
+void caller_marshal_kernel____global_ethtool_ops__in(
+	size_t* __pos,
+	struct fipc_message* msg,
+	struct ext_registers* ext,
+	struct ethtool_ops const* ptr);
+
+void callee_unmarshal_kernel____global_ethtool_ops__in(
+	size_t* __pos,
+	const struct fipc_message* msg,
+	const struct ext_registers* ext,
+	struct ethtool_ops* ptr);
+
+void callee_marshal_kernel____global_ethtool_ops__in(
+	size_t* __pos,
+	struct fipc_message* msg,
+	struct ext_registers* ext,
+	struct ethtool_ops const* ptr);
+
+void caller_unmarshal_kernel____global_ethtool_ops__in(
+	size_t* __pos,
+	const struct fipc_message* msg,
+	const struct ext_registers* ext,
+	struct ethtool_ops* ptr);
 
 void caller_marshal_kernel__netdev_update_features__dev__in(
 	size_t* __pos,
@@ -3387,6 +3405,62 @@ void caller_unmarshal_kernel__pci_ioremap_bar__pdev__in(
 	const struct ext_registers* ext,
 	struct pci_ioremap_bar_call_ctx const* call_ctx,
 	struct pci_dev* ptr);
+
+void caller_marshal_kernel__eth_validate_addr__dev__in(
+	size_t* __pos,
+	struct fipc_message* msg,
+	struct ext_registers* ext,
+	struct eth_validate_addr_call_ctx const* call_ctx,
+	struct net_device const* ptr);
+
+void callee_unmarshal_kernel__eth_validate_addr__dev__in(
+	size_t* __pos,
+	const struct fipc_message* msg,
+	const struct ext_registers* ext,
+	struct eth_validate_addr_call_ctx const* call_ctx,
+	struct net_device* ptr);
+
+void callee_marshal_kernel__eth_validate_addr__dev__in(
+	size_t* __pos,
+	struct fipc_message* msg,
+	struct ext_registers* ext,
+	struct eth_validate_addr_call_ctx const* call_ctx,
+	struct net_device const* ptr);
+
+void caller_unmarshal_kernel__eth_validate_addr__dev__in(
+	size_t* __pos,
+	const struct fipc_message* msg,
+	const struct ext_registers* ext,
+	struct eth_validate_addr_call_ctx const* call_ctx,
+	struct net_device* ptr);
+
+void caller_marshal_kernel__ethtool_op_get_link__dev__in(
+	size_t* __pos,
+	struct fipc_message* msg,
+	struct ext_registers* ext,
+	struct ethtool_op_get_link_call_ctx const* call_ctx,
+	struct net_device const* ptr);
+
+void callee_unmarshal_kernel__ethtool_op_get_link__dev__in(
+	size_t* __pos,
+	const struct fipc_message* msg,
+	const struct ext_registers* ext,
+	struct ethtool_op_get_link_call_ctx const* call_ctx,
+	struct net_device* ptr);
+
+void callee_marshal_kernel__ethtool_op_get_link__dev__in(
+	size_t* __pos,
+	struct fipc_message* msg,
+	struct ext_registers* ext,
+	struct ethtool_op_get_link_call_ctx const* call_ctx,
+	struct net_device const* ptr);
+
+void caller_unmarshal_kernel__ethtool_op_get_link__dev__in(
+	size_t* __pos,
+	const struct fipc_message* msg,
+	const struct ext_registers* ext,
+	struct ethtool_op_get_link_call_ctx const* call_ctx,
+	struct net_device* ptr);
 
 
 #endif

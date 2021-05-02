@@ -68,14 +68,24 @@ module kernel {
 		}
 	}
 	rpc_ptr int probe( projection pdev [alloc(callee)] * pdev,
-			projection ent [alloc_stack(callee)] * ent ) {
+			projection ent [alloc(callee)] * ent ) {
 		projection < struct pci_dev > pdev {
+			projection device dev;
 			projection pci_bus [alloc(callee)] *bus;
+			unsigned int	devfn;
+			unsigned short	vendor;
+			unsigned short	device;
+			unsigned short	subsystem_vendor;
+			unsigned short	subsystem_device;
+			u8		revision;
 		}
 		projection < struct pci_device_id > ent {
 			long unsigned int  driver_data;
 		}
 		projection < struct pci_bus> pci_bus {
+		}
+		projection <struct device > device {
+			array<u64, 1> [alloc(callee)] *dma_mask;
 		}
 	}
 
@@ -189,7 +199,7 @@ module kernel {
 		}
 	}
 	// TODO: need static void
-	rpc_ptr int  net_device_ops_ndo_set_mac_address( projection netdev*  netdev, projection sockaddr [alloc_stack(callee)]  *data ) {
+	rpc_ptr int  net_device_ops_ndo_set_mac_address( projection netdev [bind(callee)] *  netdev, projection sockaddr [alloc_stack(callee)]  *data ) {
 		projection < struct net_device > netdev {
 			unsigned char [in, out] addr_assign_type;
 			unsigned char  addr_len;
@@ -218,7 +228,7 @@ module kernel {
 		}
 	}
 
-	rpc_ptr projection ret_rtnl_link_stats64*  net_device_ops_ndo_get_stats64( projection dev [bind(callee)] *  dev, projection net_stats [alloc_stack(callee)] *net_stats ) {
+	rpc_ptr projection ret_rtnl_link_stats64* [unused] net_device_ops_ndo_get_stats64( projection dev [bind(callee)] *  dev, projection net_stats [alloc_stack(callee)] *net_stats ) {
 		projection < struct rtnl_link_stats64 > ret_rtnl_link_stats64 {
 			long long unsigned int [out] rx_packets;
 			long long unsigned int [out] tx_packets;
@@ -354,8 +364,8 @@ module kernel {
 
 	rpc void  free_netdev( projection dev [dealloc(caller)] *  dev ) {
 		projection < struct net_device > dev {
-			projection __global_netdev_ops [dealloc(callee)] * netdev_ops;
-			projection __global_ethtool_ops [dealloc(callee)] * ethtool_ops;
+			//projection __global_netdev_ops [dealloc(callee)] * netdev_ops;
+			//projection __global_ethtool_ops [dealloc(callee)] * ethtool_ops;
 			// TODO: array
 			//projection __tx [dealloc* _tx;
 		}
@@ -370,9 +380,9 @@ module kernel {
 	}
 	rpc int  rtnl_is_locked(  ) {
 	}
-	rpc_ptr int  net_device_ops_ndo_validate_addr( projection dev*  dev ) {
+	rpc_ptr int  net_device_ops_ndo_validate_addr( projection dev [bind(callee)] *  dev ) {
 		projection < struct net_device > dev {
-			array<unsigned char, 6> [alloc_stack(callee)] *dev_addr;
+			array<unsigned char, 6> [bind(callee)] *dev_addr;
 		}
 	}
 	rpc void  napi_disable( projection n [bind(callee)] *  n ) {
@@ -448,7 +458,7 @@ module kernel {
 			//projection device_parent* parent;
 		}
 		projection < struct net_device > dev {
-			array< char, 16> name;
+			//array< char, 16> name;
 			// XXX: false positive. irq is never modified?
 			//int [out] irq;
 			long unsigned int [out] state;
@@ -462,7 +472,7 @@ module kernel {
 			unsigned char [out] addr_len;
 			array<unsigned char, {{MAX_ADDR_LEN}}> *dev_addr;
 			unsigned int [out] num_tx_queues;
-			projection device dev;
+			//projection device dev;
 		}
 		projection < struct device > device_parent {
 		}
@@ -554,10 +564,14 @@ module kernel {
 	}
 	rpc int  pci_enable_device( projection dev*  dev ) {
 		projection < struct pci_dev > dev {
+			u8 [out] pm_cap;
+			unsigned short [out] dev_flags;
 		}
 	}
 	rpc int  pci_enable_device_mem( projection dev*  dev ) {
 		projection < struct pci_dev > dev {
+			u8 [out] pm_cap;
+			unsigned short [out] dev_flags;
 		}
 	}
 	rpc void [ioremap(caller)]  *pci_ioremap_bar( projection pdev*  pdev, int  bar ) {
@@ -589,4 +603,19 @@ module kernel {
 		rpc_ptr net_device_ops_ndo_tx_timeout ndo_tx_timeout;
 		rpc_ptr net_device_ops_ndo_validate_addr ndo_validate_addr;
 	}	
+	rpc unsigned long get_loops_per_jiffy() {
+	}
+
+	rpc unsigned long get_jiffies() {
+	}
+
+	rpc int eth_validate_addr( projection dev  *dev ) {
+		projection < struct net_device > dev {
+		}
+	}
+
+	rpc u32 ethtool_op_get_link(projection  dev *dev) {
+		projection < struct net_device > dev {
+		}
+	}
 }

@@ -701,6 +701,11 @@ int trmp_impl_probe(fptr_probe target, struct pci_dev* pdev, struct pci_device_i
 
 	{
 		__maybe_unused const void* __adjusted = *ent_ptr;
+		glue_pack(__pos, msg, ext, __adjusted);
+		if (*ent_ptr) {
+			caller_marshal_kernel__probe__ent__in(__pos, msg, ext, ctx, *ent_ptr);
+		}
+
 	}
 
 	glue_call_client(__pos, msg, RPC_ID_probe);
@@ -879,7 +884,7 @@ void __pci_register_driver_callee(struct fipc_message* msg, struct ext_registers
 
 	}
 
-	ret = __pci_register_driver(drv, owner, mod_name);
+	ret = __pci_register_driver(drv, THIS_MODULE, mod_name);
 
 	*__pos = 0;
 	{
@@ -1676,7 +1681,7 @@ int trmp_impl_net_device_ops_ndo_set_mac_address(fptr_net_device_ops_ndo_set_mac
 	glue_pack(__pos, msg, ext, target);
 	{
 		__maybe_unused const void* __adjusted = *netdev_ptr;
-		glue_pack_shadow(__pos, msg, ext, __adjusted);
+		glue_pack(__pos, msg, ext, __adjusted);
 		if (*netdev_ptr) {
 			caller_marshal_kernel__net_device_ops_ndo_set_mac_address__netdev__in(__pos, msg, ext, ctx, *netdev_ptr);
 		}
@@ -1938,8 +1943,6 @@ struct rtnl_link_stats64* trmp_impl_net_device_ops_ndo_get_stats64(fptr_net_devi
 
 	struct net_device** dev_ptr = &dev;
 	struct rtnl_link_stats64** net_stats_ptr = &net_stats;
-	struct rtnl_link_stats64* ret = 0;
-	struct rtnl_link_stats64** ret_ptr = &ret;
 	
 	__maybe_unused const struct net_device_ops_ndo_get_stats64_call_ctx call_ctx = {dev, net_stats};
 	__maybe_unused const struct net_device_ops_ndo_get_stats64_call_ctx *ctx = &call_ctx;
@@ -1982,17 +1985,12 @@ struct rtnl_link_stats64* trmp_impl_net_device_ops_ndo_get_stats64(fptr_net_devi
 	}
 
 	{
-		*ret_ptr = glue_unpack(__pos, msg, ext, struct rtnl_link_stats64*);
-		if (*ret_ptr) {
-			caller_unmarshal_kernel__net_device_ops_ndo_get_stats64__ret_rtnl_link_stats64__out(__pos, msg, ext, ctx, *ret_ptr);
-		}
-
 	}
 
 	if (verbose_debug) {
 		printk("%s:%d, returned!\n", __func__, __LINE__);
 	}
-	return ret;
+	return net_stats;
 }
 
 LCD_TRAMPOLINE_DATA(trmp_net_device_ops_ndo_get_stats64)
@@ -2884,7 +2882,7 @@ int trmp_impl_net_device_ops_ndo_validate_addr(fptr_net_device_ops_ndo_validate_
 	glue_pack(__pos, msg, ext, target);
 	{
 		__maybe_unused const void* __adjusted = *dev_ptr;
-		glue_pack_shadow(__pos, msg, ext, __adjusted);
+		glue_pack(__pos, msg, ext, __adjusted);
 		if (*dev_ptr) {
 			caller_marshal_kernel__net_device_ops_ndo_validate_addr__dev__in(__pos, msg, ext, ctx, *dev_ptr);
 		}
@@ -3412,6 +3410,7 @@ void register_netdev_callee(struct fipc_message* msg, struct ext_registers* ext)
 
 	ret = register_netdev(dev);
 
+	printk("%s:%d register_netdev returned %d\n", __func__, __LINE__, ret);
 	*__pos = 0;
 	{
 		if (*dev_ptr) {
@@ -4245,8 +4244,6 @@ void pci_ioremap_bar_callee(struct fipc_message* msg, struct ext_registers* ext)
 	cptr_t resource_cptr;
 	__maybe_unused unsigned int resource_len;
 	cptr_t lcd_resource_cptr;
-	void* ret = 0;
-	void** ret_ptr = &ret;
 	
 	__maybe_unused struct pci_ioremap_bar_call_ctx call_ctx = {pdev, bar};
 	__maybe_unused struct pci_ioremap_bar_call_ctx *ctx = &call_ctx;
@@ -4271,12 +4268,12 @@ void pci_ioremap_bar_callee(struct fipc_message* msg, struct ext_registers* ext)
 		*bar_ptr = glue_unpack(__pos, msg, ext, int);
 	}
 
-	ret = pci_ioremap_bar(pdev, bar);
+	//ret = pci_ioremap_bar(pdev, bar);
 
 	*__pos = 0;
 
 	{
-		lcd_volunteer_dev_mem(__gpa((uint64_t)*ret_ptr), get_order(pci_resource_len(pdev, bar)), &resource_cptr);
+		lcd_volunteer_dev_mem(__gpa((uint64_t)pci_resource_start(pdev, bar)), get_order(pci_resource_len(pdev, bar)), &resource_cptr);
 		copy_msg_cap_vmfunc(current->lcd, current->vmfunc_lcd, resource_cptr, lcd_resource_cptr);
 		glue_pack(__pos, msg, ext, pci_resource_len(pdev, bar));
 	}
@@ -4289,6 +4286,152 @@ void pci_ioremap_bar_callee(struct fipc_message* msg, struct ext_registers* ext)
 	}
 
 	{
+	}
+
+	msg->regs[0] = *__pos;
+	if (verbose_debug) {
+		printk("%s:%d, returned!\n", __func__, __LINE__);
+	}
+}
+
+void get_loops_per_jiffy_callee(struct fipc_message* msg, struct ext_registers* ext)
+{
+	size_t n_pos = 0;
+	size_t* __pos = &n_pos;
+
+	unsigned long ret = 0;
+	unsigned long* ret_ptr = &ret;
+	
+	__maybe_unused struct get_loops_per_jiffy_call_ctx call_ctx = {};
+	__maybe_unused struct get_loops_per_jiffy_call_ctx *ctx = &call_ctx;
+
+	if (verbose_debug) {
+		printk("%s:%d, entered!\n", __func__, __LINE__);
+	}
+
+	ret = loops_per_jiffy;
+
+	*__pos = 0;
+	{
+		glue_pack(__pos, msg, ext, *ret_ptr);
+	}
+
+	msg->regs[0] = *__pos;
+	if (verbose_debug) {
+		printk("%s:%d, returned!\n", __func__, __LINE__);
+	}
+}
+
+void get_jiffies_callee(struct fipc_message* msg, struct ext_registers* ext)
+{
+	size_t n_pos = 0;
+	size_t* __pos = &n_pos;
+
+	unsigned long ret = 0;
+	unsigned long* ret_ptr = &ret;
+	
+	__maybe_unused struct get_jiffies_call_ctx call_ctx = {};
+	__maybe_unused struct get_jiffies_call_ctx *ctx = &call_ctx;
+
+	if (verbose_debug) {
+		printk("%s:%d, entered!\n", __func__, __LINE__);
+	}
+
+	ret = jiffies;
+
+	*__pos = 0;
+	{
+		glue_pack(__pos, msg, ext, *ret_ptr);
+	}
+
+	msg->regs[0] = *__pos;
+	if (verbose_debug) {
+		printk("%s:%d, returned!\n", __func__, __LINE__);
+	}
+}
+
+void eth_validate_addr_callee(struct fipc_message* msg, struct ext_registers* ext)
+{
+	size_t n_pos = 0;
+	size_t* __pos = &n_pos;
+
+	struct net_device* dev = 0;
+	struct net_device** dev_ptr = &dev;
+	int ret = 0;
+	int* ret_ptr = &ret;
+	
+	__maybe_unused struct eth_validate_addr_call_ctx call_ctx = {dev};
+	__maybe_unused struct eth_validate_addr_call_ctx *ctx = &call_ctx;
+
+	if (verbose_debug) {
+		printk("%s:%d, entered!\n", __func__, __LINE__);
+	}
+
+	{
+		*dev_ptr = glue_unpack(__pos, msg, ext, struct net_device*);
+		if (*dev_ptr) {
+			callee_unmarshal_kernel__eth_validate_addr__dev__in(__pos, msg, ext, ctx, *dev_ptr);
+		}
+
+	}
+
+	ret = eth_validate_addr(dev);
+
+	*__pos = 0;
+	{
+		if (*dev_ptr) {
+			callee_marshal_kernel__eth_validate_addr__dev__in(__pos, msg, ext, ctx, *dev_ptr);
+		}
+
+	}
+
+	{
+		glue_pack(__pos, msg, ext, *ret_ptr);
+	}
+
+	msg->regs[0] = *__pos;
+	if (verbose_debug) {
+		printk("%s:%d, returned!\n", __func__, __LINE__);
+	}
+}
+
+void ethtool_op_get_link_callee(struct fipc_message* msg, struct ext_registers* ext)
+{
+	size_t n_pos = 0;
+	size_t* __pos = &n_pos;
+
+	struct net_device* dev = 0;
+	struct net_device** dev_ptr = &dev;
+	unsigned int ret = 0;
+	unsigned int* ret_ptr = &ret;
+	
+	__maybe_unused struct ethtool_op_get_link_call_ctx call_ctx = {dev};
+	__maybe_unused struct ethtool_op_get_link_call_ctx *ctx = &call_ctx;
+
+	if (verbose_debug) {
+		printk("%s:%d, entered!\n", __func__, __LINE__);
+	}
+
+	{
+		*dev_ptr = glue_unpack(__pos, msg, ext, struct net_device*);
+		if (*dev_ptr) {
+			callee_unmarshal_kernel__ethtool_op_get_link__dev__in(__pos, msg, ext, ctx, *dev_ptr);
+		}
+
+	}
+
+	ret = ethtool_op_get_link(dev);
+
+	*__pos = 0;
+	{
+		if (*dev_ptr) {
+			callee_marshal_kernel__ethtool_op_get_link__dev__in(__pos, msg, ext, ctx, *dev_ptr);
+		}
+
+	}
+
+	{
+		glue_pack(__pos, msg, ext, *ret_ptr);
 	}
 
 	msg->regs[0] = *__pos;
@@ -4543,6 +4686,26 @@ int try_dispatch(enum RPC_ID id, struct fipc_message* msg, struct ext_registers*
 	case RPC_ID_pci_ioremap_bar:
 		glue_user_trace("pci_ioremap_bar\n");
 		pci_ioremap_bar_callee(msg, ext);
+		break;
+
+	case RPC_ID_get_loops_per_jiffy:
+		glue_user_trace("get_loops_per_jiffy\n");
+		get_loops_per_jiffy_callee(msg, ext);
+		break;
+
+	case RPC_ID_get_jiffies:
+		glue_user_trace("get_jiffies\n");
+		get_jiffies_callee(msg, ext);
+		break;
+
+	case RPC_ID_eth_validate_addr:
+		glue_user_trace("eth_validate_addr\n");
+		eth_validate_addr_callee(msg, ext);
+		break;
+
+	case RPC_ID_ethtool_op_get_link:
+		glue_user_trace("ethtool_op_get_link\n");
+		ethtool_op_get_link_callee(msg, ext);
 		break;
 
 	default:

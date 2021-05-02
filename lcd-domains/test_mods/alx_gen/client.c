@@ -4,6 +4,9 @@
 
 #include <lcd_config/post_hook.h>
 
+unsigned long loops_per_jiffy;
+unsigned long volatile jiffies;
+
 void ethtool_ops_set_settings_callee(struct fipc_message* msg, struct ext_registers* ext)
 {
 	size_t n_pos = 0;
@@ -617,9 +620,8 @@ void probe_callee(struct fipc_message* msg, struct ext_registers* ext)
 
 	fptr_probe function_ptr = glue_unpack(__pos, msg, ext, fptr_probe);
 	struct pci_dev* pdev = 0;
+	struct pci_device_id* ent = 0;
 	struct pci_dev** pdev_ptr = &pdev;
-	struct pci_device_id __ent;
-	struct pci_device_id* ent = &__ent;
 	struct pci_device_id** ent_ptr = &ent;
 	int ret = 0;
 	int* ret_ptr = &ret;
@@ -640,6 +642,7 @@ void probe_callee(struct fipc_message* msg, struct ext_registers* ext)
 	}
 
 	{
+		*ent_ptr = glue_unpack_new_shadow(__pos, msg, ext, struct pci_device_id*, (sizeof(struct pci_device_id)), (DEFAULT_GFP_FLAGS));
 		if (*ent_ptr) {
 			callee_unmarshal_kernel__probe__ent__in(__pos, msg, ext, ctx, *ent_ptr);
 		}
@@ -1468,7 +1471,7 @@ void net_device_ops_ndo_set_mac_address_callee(struct fipc_message* msg, struct 
 	}
 
 	{
-		*netdev_ptr = glue_unpack(__pos, msg, ext, struct net_device*);
+		*netdev_ptr = glue_unpack_shadow(__pos, msg, ext, struct net_device*);
 		if (*netdev_ptr) {
 			callee_unmarshal_kernel__net_device_ops_ndo_set_mac_address__netdev__in(__pos, msg, ext, ctx, *netdev_ptr);
 		}
@@ -1688,7 +1691,6 @@ void net_device_ops_ndo_get_stats64_callee(struct fipc_message* msg, struct ext_
 	struct rtnl_link_stats64* net_stats = &__net_stats;
 	struct rtnl_link_stats64** net_stats_ptr = &net_stats;
 	struct rtnl_link_stats64* ret = 0;
-	struct rtnl_link_stats64** ret_ptr = &ret;
 	
 	__maybe_unused struct net_device_ops_ndo_get_stats64_call_ctx call_ctx = {dev, net_stats};
 	__maybe_unused struct net_device_ops_ndo_get_stats64_call_ctx *ctx = &call_ctx;
@@ -1730,12 +1732,6 @@ void net_device_ops_ndo_get_stats64_callee(struct fipc_message* msg, struct ext_
 	}
 
 	{
-		__maybe_unused const void* __adjusted = *ret_ptr;
-		glue_pack_shadow(__pos, msg, ext, __adjusted);
-		if (*ret_ptr) {
-			callee_marshal_kernel__net_device_ops_ndo_get_stats64__ret_rtnl_link_stats64__out(__pos, msg, ext, ctx, *ret_ptr);
-		}
-
 	}
 
 	msg->regs[0] = *__pos;
@@ -2469,7 +2465,18 @@ struct net_device* alloc_etherdev_mqs(int sizeof_priv, unsigned int txqs, unsign
 	}
 
 	{
-		*ret_ptr = glue_unpack_new_shadow(__pos, msg, ext, struct net_device*, (sizeof(struct net_device) + ctx->sizeof_priv), (DEFAULT_GFP_FLAGS));
+		size_t alloc_size = sizeof(struct net_device);
+
+		if (ctx->sizeof_priv) {
+			/* ensure 32-byte alignment of private area */
+			alloc_size = ALIGN(alloc_size, NETDEV_ALIGN);
+			alloc_size += ctx->sizeof_priv;
+		}
+		/* ensure 32-byte alignment of whole construct */
+		alloc_size += NETDEV_ALIGN - 1;
+
+		//*ret_ptr = glue_unpack_new_shadow(__pos, msg, ext, struct net_device*, (sizeof(struct net_device) + ctx->sizeof_priv), (DEFAULT_GFP_FLAGS));
+		*ret_ptr = glue_unpack_new_shadow(__pos, msg, ext, struct net_device*, alloc_size, (DEFAULT_GFP_FLAGS));
 		if (*ret_ptr) {
 			caller_unmarshal_kernel__alloc_etherdev_mqs__ret_net_device__out(__pos, msg, ext, ctx, *ret_ptr);
 		}
@@ -2621,7 +2628,7 @@ void net_device_ops_ndo_validate_addr_callee(struct fipc_message* msg, struct ex
 	}
 
 	{
-		*dev_ptr = glue_unpack(__pos, msg, ext, struct net_device*);
+		*dev_ptr = glue_unpack_shadow(__pos, msg, ext, struct net_device*);
 		if (*dev_ptr) {
 			callee_unmarshal_kernel__net_device_ops_ndo_validate_addr__dev__in(__pos, msg, ext, ctx, *dev_ptr);
 		}
@@ -4097,9 +4104,19 @@ void* pci_ioremap_bar(struct pci_dev* pdev, int bar)
 
 	*__pos = 0;
 	{
+		int _ret;
 		ioremap_len = glue_unpack(__pos, msg, ext, uint64_t);
-		lcd_ioremap_phys(ioremap_cptr, ioremap_len, &ioremap_gpa);
+		_ret = lcd_ioremap_phys(ioremap_cptr, ioremap_len, &ioremap_gpa);
+		if (_ret) {
+			LIBLCD_ERR("failed to ioremap phys");
+		}	
+
+		printk("%s, calling lcd_ioremap %llx\n", __func__, ioremap_len);
 		*ret_ptr = lcd_ioremap(gpa_val(ioremap_gpa), ioremap_len);
+		printk("%s, lcd_ioremap returned %p\n", __func__, *ret_ptr);
+		if (!*ret_ptr) {
+			LIBLCD_ERR("failed to ioremap virt");
+		}
 	}
 
 	{
@@ -4118,11 +4135,184 @@ void* pci_ioremap_bar(struct pci_dev* pdev, int bar)
 	return ret;
 }
 
+unsigned long get_loops_per_jiffy(void)
+{
+	struct fipc_message __buffer = {0};
+	struct fipc_message *msg = &__buffer;
+	struct ext_registers* ext = get_register_page(smp_processor_id());
+	size_t n_pos = 0;
+	size_t* __pos = &n_pos;
+
+	unsigned long ret = 0;
+	unsigned long* ret_ptr = &ret;
+	
+	__maybe_unused const struct get_loops_per_jiffy_call_ctx call_ctx = {};
+	__maybe_unused const struct get_loops_per_jiffy_call_ctx *ctx = &call_ctx;
+
+	(void)ext;
+
+	if (verbose_debug) {
+		printk("%s:%d, entered!\n", __func__, __LINE__);
+	}
+
+	glue_call_server(__pos, msg, RPC_ID_get_loops_per_jiffy);
+
+	*__pos = 0;
+	{
+		*ret_ptr = glue_unpack(__pos, msg, ext, unsigned long);
+	}
+
+	if (verbose_debug) {
+		printk("%s:%d, returned!\n", __func__, __LINE__);
+	}
+	return ret;
+}
+
+unsigned long get_jiffies(void)
+{
+	struct fipc_message __buffer = {0};
+	struct fipc_message *msg = &__buffer;
+	struct ext_registers* ext = get_register_page(smp_processor_id());
+	size_t n_pos = 0;
+	size_t* __pos = &n_pos;
+
+	unsigned long ret = 0;
+	unsigned long* ret_ptr = &ret;
+	
+	__maybe_unused const struct get_jiffies_call_ctx call_ctx = {};
+	__maybe_unused const struct get_jiffies_call_ctx *ctx = &call_ctx;
+
+	(void)ext;
+
+	if (verbose_debug) {
+		printk("%s:%d, entered!\n", __func__, __LINE__);
+	}
+
+	glue_call_server(__pos, msg, RPC_ID_get_jiffies);
+
+	*__pos = 0;
+	{
+		*ret_ptr = glue_unpack(__pos, msg, ext, unsigned long);
+	}
+
+	if (verbose_debug) {
+		printk("%s:%d, returned!\n", __func__, __LINE__);
+	}
+	return ret;
+}
+
+int eth_validate_addr(struct net_device* dev)
+{
+	struct fipc_message __buffer = {0};
+	struct fipc_message *msg = &__buffer;
+	struct ext_registers* ext = get_register_page(smp_processor_id());
+	size_t n_pos = 0;
+	size_t* __pos = &n_pos;
+
+	struct net_device** dev_ptr = &dev;
+	int ret = 0;
+	int* ret_ptr = &ret;
+	
+	__maybe_unused const struct eth_validate_addr_call_ctx call_ctx = {dev};
+	__maybe_unused const struct eth_validate_addr_call_ctx *ctx = &call_ctx;
+
+	(void)ext;
+
+	if (verbose_debug) {
+		printk("%s:%d, entered!\n", __func__, __LINE__);
+	}
+
+	{
+		__maybe_unused const void* __adjusted = *dev_ptr;
+		glue_pack_shadow(__pos, msg, ext, __adjusted);
+		if (*dev_ptr) {
+			caller_marshal_kernel__eth_validate_addr__dev__in(__pos, msg, ext, ctx, *dev_ptr);
+		}
+
+	}
+
+	glue_call_server(__pos, msg, RPC_ID_eth_validate_addr);
+
+	*__pos = 0;
+	{
+		if (*dev_ptr) {
+			caller_unmarshal_kernel__eth_validate_addr__dev__in(__pos, msg, ext, ctx, *dev_ptr);
+		}
+
+	}
+
+	{
+		*ret_ptr = glue_unpack(__pos, msg, ext, int);
+	}
+
+	if (verbose_debug) {
+		printk("%s:%d, returned!\n", __func__, __LINE__);
+	}
+	return ret;
+}
+
+unsigned int ethtool_op_get_link(struct net_device* dev)
+{
+	struct fipc_message __buffer = {0};
+	struct fipc_message *msg = &__buffer;
+	struct ext_registers* ext = get_register_page(smp_processor_id());
+	size_t n_pos = 0;
+	size_t* __pos = &n_pos;
+
+	struct net_device** dev_ptr = &dev;
+	unsigned int ret = 0;
+	unsigned int* ret_ptr = &ret;
+	
+	__maybe_unused const struct ethtool_op_get_link_call_ctx call_ctx = {dev};
+	__maybe_unused const struct ethtool_op_get_link_call_ctx *ctx = &call_ctx;
+
+	(void)ext;
+
+	if (verbose_debug) {
+		printk("%s:%d, entered!\n", __func__, __LINE__);
+	}
+
+	{
+		__maybe_unused const void* __adjusted = *dev_ptr;
+		glue_pack_shadow(__pos, msg, ext, __adjusted);
+		if (*dev_ptr) {
+			caller_marshal_kernel__ethtool_op_get_link__dev__in(__pos, msg, ext, ctx, *dev_ptr);
+		}
+
+	}
+
+	glue_call_server(__pos, msg, RPC_ID_ethtool_op_get_link);
+
+	*__pos = 0;
+	{
+		if (*dev_ptr) {
+			caller_unmarshal_kernel__ethtool_op_get_link__dev__in(__pos, msg, ext, ctx, *dev_ptr);
+		}
+
+	}
+
+	{
+		*ret_ptr = glue_unpack(__pos, msg, ext, unsigned int);
+	}
+
+	if (verbose_debug) {
+		printk("%s:%d, returned!\n", __func__, __LINE__);
+	}
+	return ret;
+}
+
+void __init_globals(void) {
+
+	loops_per_jiffy = get_loops_per_jiffy();
+	jiffies = get_jiffies();
+}
+
 int try_dispatch(enum RPC_ID id, struct fipc_message* msg, struct ext_registers* ext)
 {
 	switch(id) {
 	case MODULE_INIT:
 		glue_user_trace("MODULE_INIT");
+		__init_globals();
 		__module_lcd_init();
 		shared_mem_init();
 		break;

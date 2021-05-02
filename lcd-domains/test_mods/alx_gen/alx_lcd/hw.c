@@ -408,6 +408,7 @@ int alx_reset_mac(struct alx_hw *hw)
 	u8 rev;
 	bool a_cr;
 
+	printk("%s:%d #1\n", __func__, __LINE__);
 	pmctrl = 0;
 	rev = alx_hw_revision(hw);
 	a_cr = alx_is_rev_a(rev) && alx_hw_with_cr(hw);
@@ -496,6 +497,7 @@ void alx_reset_phy(struct alx_hw *hw)
 	u32 val;
 	u16 phy_val;
 
+	printk("%s:%d #1\n", __func__, __LINE__);
 	/* (DSP)reset PHY core */
 	val = alx_read_mem32(hw, ALX_PHY_CTRL);
 	val &= ~(ALX_PHY_CTRL_DSPRST_OUT | ALX_PHY_CTRL_IDDQ |
@@ -566,6 +568,7 @@ void alx_reset_pcie(struct alx_hw *hw)
 	u32 val;
 	u16 val16;
 
+	printk("%s:%d #1\n", __func__, __LINE__);
 	/* Workaround for PCI problem when BIOS sets MMRBC incorrectly. */
 	pci_read_config_word(hw->pdev, PCI_COMMAND, &val16);
 	if (!(val16 & ALX_PCI_CMD) || (val16 & PCI_COMMAND_INTX_DISABLE)) {
@@ -604,6 +607,7 @@ void alx_reset_pcie(struct alx_hw *hw)
 	/* ASPM setting */
 	alx_enable_aspm(hw, true, true);
 
+	printk("%s:%d, #6", __func__, __LINE__);
 	udelay(10);
 }
 
@@ -728,6 +732,7 @@ int alx_setup_speed_duplex(struct alx_hw *hw, u32 ethadv, u8 flowctrl)
 	u32 val;
 	int err = 0;
 
+	printk("%s:%d, #5", __func__, __LINE__);
 	alx_write_phy_reg(hw, ALX_MII_DBG_ADDR, 0);
 	val = alx_read_mem32(hw, ALX_DRV);
 	ALX_SET_FIELD(val, ALX_DRV_PHY, 0);
@@ -855,10 +860,12 @@ bool alx_phy_configured(struct alx_hw *hw)
 {
 	u32 cfg, hw_cfg;
 
+	printk("%s:%d #1\n", __func__, __LINE__);
 	cfg = ethadv_to_hw_cfg(hw, hw->adv_cfg);
 	cfg = ALX_GET_FIELD(cfg, ALX_DRV_PHY);
 	hw_cfg = alx_get_phy_config(hw);
 
+	printk("%s:%d hw_cfg %u\n", __func__, __LINE__, hw_cfg);
 	if (hw_cfg == ALX_DRV_PHY_UNKNOWN)
 		return false;
 
@@ -867,7 +874,7 @@ bool alx_phy_configured(struct alx_hw *hw)
 
 int alx_read_phy_link(struct alx_hw *hw)
 {
-	//struct pci_dev *pdev = hw->pdev;
+	__maybe_unused struct pci_dev *pdev = hw->pdev;
 	u16 bmsr, giga;
 	int err;
 
@@ -1038,17 +1045,21 @@ bool alx_get_phy_info(struct alx_hw *hw)
 {
 	u16  devs1, devs2;
 
+	printk("%s:%d, #1", __func__, __LINE__);
 	if (alx_read_phy_reg(hw, MII_PHYSID1, &hw->phy_id[0]) ||
-	    alx_read_phy_reg(hw, MII_PHYSID2, &hw->phy_id[1]))
+	    alx_read_phy_reg(hw, MII_PHYSID2, &hw->phy_id[1])) {
+		printk("%s:%d, #2", __func__, __LINE__);
 		return false;
-
+	}
 	/* since we haven't PMA/PMD status2 register, we can't
 	 * use mdio45_probe function for prtad and mmds.
 	 * use fixed MMD3 to get mmds.
 	 */
 	if (alx_read_phy_ext(hw, 3, MDIO_DEVS1, &devs1) ||
-	    alx_read_phy_ext(hw, 3, MDIO_DEVS2, &devs2))
+	    alx_read_phy_ext(hw, 3, MDIO_DEVS2, &devs2)) {
+		printk("%s:%d, #3", __func__, __LINE__);
 		return false;
+	}
 	hw->mdio.mmds = devs1 | devs2 << 16;
 
 	return true;

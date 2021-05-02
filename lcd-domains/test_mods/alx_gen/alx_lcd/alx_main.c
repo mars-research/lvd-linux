@@ -50,6 +50,7 @@
 #include "alx.h"
 #include "hw.h"
 #include "reg.h"
+#include "udelay.h"
 
 #include <lcd_config/post_hook.h>
 
@@ -1316,6 +1317,7 @@ static int alx_probe(struct pci_dev *pdev, const struct pci_device_id *ent)
 		err = -EIO;
 		goto out_free_netdev;
 	}
+	printk("%s, hw_addr %p\n", __func__, hw->hw_addr);
 
 	netdev->netdev_ops = &alx_netdev_ops;
 	netdev->ethtool_ops = &alx_ethtool_ops;
@@ -1389,7 +1391,7 @@ static int alx_probe(struct pci_dev *pdev, const struct pci_device_id *ent)
 
 	err = register_netdev(netdev);
 	if (err) {
-		dev_err(&pdev->dev, "register netdevice failed\n");
+		dev_err(&pdev->dev, "register netdevice failed %d\n", err);
 		goto out_unmap;
 	}
 

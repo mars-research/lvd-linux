@@ -1226,7 +1226,11 @@ static int alx_ioctl(struct net_device *netdev, struct ifreq *ifr, int cmd)
 	if (!netif_running(netdev))
 		return -EAGAIN;
 
+#ifdef LCD_ISOLATE
+	return mdio_mii_ioctl(&alx->hw.mdio, (struct mii_ioctl_data*) ifr, cmd);
+#else
 	return mdio_mii_ioctl(&alx->hw.mdio, if_mii(ifr), cmd);
+#endif
 }
 
 #ifdef CONFIG_NET_POLL_CONTROLLER

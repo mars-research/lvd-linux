@@ -218,7 +218,7 @@ module kernel {
 		}
 	}
 	rpc_ptr int net_device_ops_ndo_do_ioctl( projection netdev [bind(callee)] * netdev,
-			projection ifr [alloc_stack(callee)] * ifr, int cmd ) {
+			projection ifr [alloc(callee)] * ifr, int cmd ) {
 		projection < struct net_device > netdev {
 			long unsigned int  state;
 		}
@@ -305,7 +305,7 @@ module kernel {
 		}
 	}
 
-	//rpc int  mdio_mii_ioctl( const projection mdio [alloc_once(callee)] *  mdio, projection mii_data [bind_memberof<struct ifreq, ifr_ifru>(caller)] * mii_data, int  cmd ) {
+	//rpc int  mdio_mii_ioctl( const projection mdio [alloc_once(callee)] *  mdio, projection mii_data [bind_memberof<struct ifreq, ifr_ifru_addr>(caller)] * mii_data, int  cmd ) {
 	rpc int  mdio_mii_ioctl( const projection mdio [alloc_once(callee)] *  mdio, projection mii_data  * mii_data, int  cmd ) {
 		projection < struct mdio_if_info > mdio {
 			int  prtad;

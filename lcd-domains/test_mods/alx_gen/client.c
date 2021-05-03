@@ -1487,10 +1487,9 @@ void net_device_ops_ndo_do_ioctl_callee(struct fipc_message* msg, struct ext_reg
 
 	fptr_net_device_ops_ndo_do_ioctl function_ptr = glue_unpack(__pos, msg, ext, fptr_net_device_ops_ndo_do_ioctl);
 	struct net_device* netdev = 0;
+	struct ifreq* ifr = 0;
 	int cmd = 0;
 	struct net_device** netdev_ptr = &netdev;
-	struct ifreq __ifr;
-	struct ifreq* ifr = &__ifr;
 	struct ifreq** ifr_ptr = &ifr;
 	int* cmd_ptr = &cmd;
 	int ret = 0;
@@ -1512,6 +1511,8 @@ void net_device_ops_ndo_do_ioctl_callee(struct fipc_message* msg, struct ext_reg
 	}
 
 	{
+		size_t __size = sizeof(struct ifreq);
+		*ifr_ptr = glue_unpack_new_shadow(__pos, msg, ext, struct ifreq*, (__size), (DEFAULT_GFP_FLAGS));
 		if (*ifr_ptr) {
 			callee_unmarshal_kernel__net_device_ops_ndo_do_ioctl__ifr__in(__pos, msg, ext, ctx, *ifr_ptr);
 		}

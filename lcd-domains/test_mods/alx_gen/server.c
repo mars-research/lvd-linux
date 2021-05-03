@@ -1725,6 +1725,11 @@ int trmp_impl_net_device_ops_ndo_do_ioctl(fptr_net_device_ops_ndo_do_ioctl targe
 
 	{
 		__maybe_unused const void* __adjusted = *ifr_ptr;
+		glue_pack(__pos, msg, ext, __adjusted);
+		if (*ifr_ptr) {
+			caller_marshal_kernel__net_device_ops_ndo_do_ioctl__ifr__in(__pos, msg, ext, ctx, *ifr_ptr);
+		}
+
 	}
 
 	{
@@ -2392,7 +2397,8 @@ void mdio_mii_ioctl_callee(struct fipc_message* msg, struct ext_registers* ext)
 	}
 
 	{
-		*mii_data_ptr = glue_unpack(__pos, msg, ext, struct mii_ioctl_data*);
+		struct ifreq* __ifreq = glue_unpack(__pos, msg, ext, struct ifreq*);
+		*mii_data_ptr = (struct mii_ioctl_data*) &__ifreq->ifr_ifru;
 		if (*mii_data_ptr) {
 			callee_unmarshal_kernel__mdio_mii_ioctl__mii_data__in(__pos, msg, ext, ctx, *mii_data_ptr);
 		}

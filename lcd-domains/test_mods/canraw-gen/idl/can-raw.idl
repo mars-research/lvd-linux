@@ -1,0 +1,330 @@
+module kernel {
+rpc_ptr int  proto_init( projection sk*  sk ) {
+	projection < struct sock > sk {
+	}
+}
+rpc projection ret_net_device*  dev_get_by_index( projection net*  net, int  ifindex ) {
+	projection < struct net_device > ret_net_device {
+	}
+	projection < struct net > net {
+	}
+}
+rpc_ptr int  proto_ops_bind( projection sock*  sock, projection uaddr*  uaddr, int  len ) {
+	projection < struct socket > sock {
+		projection socket_sk* sk;
+	}
+	projection < struct sock > socket_sk {
+	}
+	projection < struct sockaddr > uaddr {
+	}
+}
+rpc_ptr int  proto_ops_release( projection sock*  sock ) {
+	projection < struct socket > sock {
+		projection socket_sk* sk;
+	}
+	projection < struct sock > socket_sk {
+	}
+}
+rpc_ptr int  proto_ops_getname( projection sock*  sock, projection uaddr*  uaddr, int* [out] len, int  peer ) {
+	projection < struct socket > sock {
+		projection socket_sk* sk;
+	}
+	projection < struct sock > socket_sk {
+	}
+	projection < struct sockaddr > uaddr {
+	}
+}
+rpc_ptr int  proto_ops_setsockopt( projection sock*  sock, int  level, int  optname, char*  optval, unsigned int  optlen ) {
+	projection < struct socket > sock {
+		projection socket_sk* sk;
+	}
+	projection < struct sock > socket_sk {
+	}
+}
+rpc_ptr int  proto_ops_getsockopt( projection sock*  sock, int  level, int  optname, char*  optval, int*  optlen ) {
+	projection < struct socket > sock {
+		projection socket_sk* sk;
+	}
+	projection < struct sock > socket_sk {
+	}
+}
+rpc_ptr int  proto_ops_sendmsg( projection sock*  sock, projection msg*  msg, long unsigned int  size ) {
+	projection < struct socket > sock {
+		projection socket_sk* sk;
+	}
+	projection < struct sock > socket_sk {
+	}
+	projection < struct msghdr > msg {
+		void*  msg_name;
+		int  msg_namelen;
+		projection msghdr_msg_iocb* msg_iocb;
+	}
+	projection < struct kiocb > msghdr_msg_iocb {
+	}
+}
+rpc_ptr int  proto_ops_recvmsg( projection sock*  sock, projection msg*  msg, long unsigned int  size, int  flags ) {
+	projection < struct socket > sock {
+		projection socket_sk* sk;
+	}
+	projection < struct sock > socket_sk {
+	}
+	projection < struct msghdr > msg {
+		void*  msg_name;
+		int [in, out] msg_namelen;
+		unsigned int [in, out] msg_flags;
+	}
+}
+rpc_ptr int  proto_ops_mmap( projection file* [unused] file, projection sock*  sock, projection vma* [unused] vma ) {
+	projection < struct file > file {
+	}
+	projection < struct socket > sock {
+	}
+	projection < struct vm_area_struct > vma {
+	}
+}
+rpc_ptr int  proto_ops_shutdown( projection sock*  sock, int [unused] how ) {
+	projection < struct socket > sock {
+	}
+}
+rpc_ptr int  proto_ops_listen( projection sock*  sock, int [unused] backlog ) {
+	projection < struct socket > sock {
+	}
+}
+rpc_ptr int  proto_ops_accept( projection sock*  sock, projection newsock*  newsock, int [unused] flags ) {
+	projection < struct socket > sock {
+	}
+	projection < struct socket > newsock {
+	}
+}
+rpc_ptr int  proto_ops_socketpair( projection sock1*  sock1, projection sock2*  sock2 ) {
+	projection < struct socket > sock1 {
+	}
+	projection < struct socket > sock2 {
+	}
+}
+rpc_ptr int  proto_ops_connect( projection sock*  sock, projection saddr* [unused] saddr, int [unused] len, int [unused] flags ) {
+	projection < struct socket > sock {
+	}
+	projection < struct sockaddr > saddr {
+	}
+}
+rpc projection ret_sk_buff*  sock_alloc_send_skb( projection sk*  sk, long unsigned int  size, int  noblock, int*  errcode ) {
+	projection < struct sk_buff > ret_sk_buff {
+	}
+	projection < struct sock > sk {
+		int  sk_err;
+		projection sock_sk_socket* sk_socket;
+	}
+	projection < struct socket > sock_sk_socket {
+	}
+}
+rpc void  warn_slowpath_fmt( char*  file, int  line, char*  fmt ) {
+}
+rpc int  register_netdevice_notifier( projection nb*  nb ) {
+	projection < struct notifier_block > nb {
+	}
+}
+rpc int  unregister_netdevice_notifier( projection nb*  nb ) {
+	projection < struct notifier_block > nb {
+	}
+}
+rpc void  kfree_skb( projection skb*  skb ) {
+	projection < struct sk_buff > skb {
+		unsigned int  end;
+		unsigned char*  head;
+	}
+}
+rpc projection ret_sk_buff* [in, out] skb_clone( projection skb* [in, out] skb, unsigned int  gfp_mask ) {
+	projection < struct sk_buff > ret_sk_buff {
+	}
+	projection < struct sk_buff > skb {
+		projection sk_buff_sk* sk;
+		projection sk_buff_dev* dev;
+		array< char, 48> [in, out] cb;
+		unsigned int [in, out] len;
+		array<unsigned int, 0> [in, out] headers_end;
+		unsigned int [in, out] tail;
+		unsigned int [in, out] end;
+		unsigned char* [in, out] head;
+		unsigned char* [in, out] data;
+	}
+	projection < struct sock > sk_buff_sk {
+	}
+	projection < struct net_device > sk_buff_dev {
+	}
+}
+rpc void  _raw_write_lock_bh( projection lock*  lock ) {
+	projection < struct rwlock_t > lock {
+	}
+}
+rpc void  _raw_write_unlock_bh( projection lock*  lock ) {
+	projection < struct rwlock_t > lock {
+	}
+}
+rpc void*  __alloc_percpu( long unsigned int  size, long unsigned int  align ) {
+}
+rpc void  free_percpu( void*  ptr ) {
+}
+rpc int  sock_queue_rcv_skb( projection sk* [in, out] sk, projection skb*  skb ) {
+	projection < struct sock > sk {
+	}
+	projection < struct sk_buff > skb {
+	}
+}
+rpc void  can_proto_unregister( projection cp*  cp ) {
+	projection < struct can_proto > cp {
+		int  protocol;
+		projection _global_proto_ops* ops;
+		projection can_proto_prot* prot;
+	}
+	projection < struct proto > can_proto_prot {
+		rpc_ptr proto_init init;
+	}
+}
+rpc int  can_proto_register( projection cp*  cp ) {
+	projection < struct can_proto > cp {
+		int  protocol;
+		projection _global_proto_ops* ops;
+		projection can_proto_prot* prot;
+	}
+	projection < struct proto > can_proto_prot {
+		rpc_ptr proto_init init;
+	}
+}
+rpc_ptr void func(projection skb *skb, void *data) {
+	projection < struct sk_buff > skb {
+	}
+}
+rpc void  can_rx_unregister( projection dev* [in, out] dev, unsigned int  can_id, unsigned int  mask, rpc_ptr  func func, void*  data ) {
+	projection < struct net_device > dev {
+		unsigned short [in, out] type;
+	}
+}
+rpc int  can_rx_register( projection dev* [in, out] dev, unsigned int  can_id, unsigned int  mask, rpc_ptr  func func, void*  data, char*  ident ) {
+	projection < struct net_device > dev {
+		unsigned short [in, out] type;
+	}
+}
+rpc int  can_send( projection skb* [in, out] skb, int  loop ) {
+	projection < struct sk_buff > skb {
+		projection sk_buff_sk* sk;
+		projection sk_buff_dev* dev;
+		array< char, 48> [in, out] cb;
+		unsigned int [in, out] len;
+		array<unsigned int, 0> [in, out] headers_end;
+		unsigned int [in, out] tail;
+		unsigned int [in, out] end;
+		unsigned char* [in, out] head;
+		unsigned char* [in, out] data;
+	}
+	projection < struct sock > sk_buff_sk {
+	}
+	projection < struct net_device > sk_buff_dev {
+		unsigned short  type;
+	}
+}
+rpc_ptr int  proto_ops_ioctl( projection sock*  sock, unsigned int  cmd, long unsigned int  arg ) {
+	projection < struct socket > sock {
+		projection socket_sk* sk;
+	}
+	projection < struct sock > socket_sk {
+	}
+}
+rpc long unsigned int  copy_from_iter( void* [in, out] addr, long unsigned int  bytes, projection i*  i ) {
+	projection < struct iov_iter > i {
+	}
+}
+rpc long unsigned int  copy_to_iter( const void* [in, out] addr, long unsigned int  bytes, projection i*  i ) {
+	projection < struct iov_iter > i {
+	}
+}
+rpc_ptr unsigned int  proto_ops_poll( projection file*  file, projection sock*  sock, projection wait*  wait ) {
+	projection < struct file > file {
+	}
+	projection < struct socket > sock {
+		projection socket_sk* sk;
+	}
+	projection < struct sock > socket_sk {
+	}
+	projection < struct poll_table_struct > wait {
+	}
+}
+rpc void  release_sock( projection sk*  sk ) {
+	projection < struct sock > sk {
+	}
+}
+rpc void  skb_free_datagram( projection sk* [in, out] sk, projection skb*  skb ) {
+	projection < struct sock > sk {
+	}
+	projection < struct sk_buff > skb {
+		unsigned int  end;
+		unsigned char*  head;
+	}
+}
+rpc projection ret_sk_buff* [in, out] skb_recv_datagram( projection sk*  sk, unsigned int  flags, int  noblock, int* [in, out] err ) {
+	projection < struct sk_buff > ret_sk_buff {
+	}
+	projection < struct sock > sk {
+		int  sk_err;
+	}
+}
+rpc_ptr long proto_ops_sendpage( projection sock*  sock, projection page*  page, int  offset, long unsigned int  size, int  flags ) {
+	projection < struct socket > sock {
+	}
+	projection < struct page > page {
+	}
+}
+rpc void  lock_sock_nested( projection sk*  sk, int [unused] subclass ) {
+	projection < struct sock > sk {
+	}
+}
+rpc void  __sock_recv_ts_and_drops( projection msg*  msg, projection sk*  sk, projection skb*  skb ) {
+	projection < struct msghdr > msg {
+	}
+	projection < struct sock > sk {
+		//ktime  sk_stamp;
+		unsigned short  sk_tsflags;
+	}
+	projection < struct sk_buff > skb {
+	}
+}
+rpc void  __sock_tx_timestamp( unsigned short  tsflags, unsigned char* [in, out] tx_flags ) {
+}
+rpc unsigned char*  skb_put( projection skb*  skb, unsigned int  len ) {
+	projection < struct sk_buff > skb {
+		projection sk_buff_dev* dev;
+		unsigned int [in, out] len;
+		array<unsigned int, 0> [in, out] headers_end;
+		unsigned int [in, out] tail;
+		unsigned int  end;
+		unsigned char*  head;
+		unsigned char*  data;
+	}
+	projection < struct net_device > sk_buff_dev {
+	}
+}
+rpc void  sk_free( projection sk* [in, out] sk ) {
+	projection < struct sock > sk {
+	}
+}
+projection < struct proto_ops > _global_proto_ops {
+	rpc_ptr proto_ops_accept accept;
+	rpc_ptr proto_ops_bind bind;
+	rpc_ptr proto_ops_connect connect;
+	rpc_ptr proto_ops_getname getname;
+	rpc_ptr proto_ops_getsockopt getsockopt;
+	rpc_ptr proto_ops_ioctl ioctl;
+	rpc_ptr proto_ops_listen listen;
+	rpc_ptr proto_ops_mmap mmap;
+	rpc_ptr proto_ops_poll poll;
+	rpc_ptr proto_ops_recvmsg recvmsg;
+	rpc_ptr proto_ops_release release;
+	rpc_ptr proto_ops_sendmsg sendmsg;
+	rpc_ptr proto_ops_sendpage sendpage;
+	rpc_ptr proto_ops_setsockopt setsockopt;
+	rpc_ptr proto_ops_shutdown shutdown;
+	rpc_ptr proto_ops_socketpair socketpair;
+}
+
+
+}

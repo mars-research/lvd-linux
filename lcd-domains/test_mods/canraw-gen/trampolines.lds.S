@@ -1,0 +1,24 @@
+#include <liblcd/trampoline_link.h>
+
+SECTIONS{
+	LCD_TRAMPOLINE_LINKER_SECTION(trmp_proto_init)
+	LCD_TRAMPOLINE_LINKER_SECTION(trmp_proto_ops_bind)
+	LCD_TRAMPOLINE_LINKER_SECTION(trmp_proto_ops_release)
+	LCD_TRAMPOLINE_LINKER_SECTION(trmp_proto_ops_getname)
+	LCD_TRAMPOLINE_LINKER_SECTION(trmp_proto_ops_setsockopt)
+	LCD_TRAMPOLINE_LINKER_SECTION(trmp_proto_ops_getsockopt)
+	LCD_TRAMPOLINE_LINKER_SECTION(trmp_proto_ops_sendmsg)
+	LCD_TRAMPOLINE_LINKER_SECTION(trmp_proto_ops_recvmsg)
+	LCD_TRAMPOLINE_LINKER_SECTION(trmp_proto_ops_mmap)
+	LCD_TRAMPOLINE_LINKER_SECTION(trmp_proto_ops_shutdown)
+	LCD_TRAMPOLINE_LINKER_SECTION(trmp_proto_ops_listen)
+	LCD_TRAMPOLINE_LINKER_SECTION(trmp_proto_ops_accept)
+	LCD_TRAMPOLINE_LINKER_SECTION(trmp_proto_ops_socketpair)
+	LCD_TRAMPOLINE_LINKER_SECTION(trmp_proto_ops_connect)
+	LCD_TRAMPOLINE_LINKER_SECTION(trmp_func)
+	LCD_TRAMPOLINE_LINKER_SECTION(trmp_proto_ops_ioctl)
+	LCD_TRAMPOLINE_LINKER_SECTION(trmp_proto_ops_poll)
+	LCD_TRAMPOLINE_LINKER_SECTION(trmp_proto_ops_sendpage)
+}
+
+INSERT AFTER .text

@@ -4498,11 +4498,97 @@ void lvd_init_work(struct work_struct* work, fptr_work_fn work_fn)
 	}
 }
 
+void lvd_netif_trans_update(struct net_device* dev)
+{
+	struct fipc_message __buffer = {0};
+	struct fipc_message *msg = &__buffer;
+	struct ext_registers* ext = get_register_page(smp_processor_id());
+	size_t n_pos = 0;
+	size_t* __pos = &n_pos;
+
+	struct net_device** dev_ptr = &dev;
+	
+	__maybe_unused const struct lvd_netif_trans_update_call_ctx call_ctx = {dev};
+	__maybe_unused const struct lvd_netif_trans_update_call_ctx *ctx = &call_ctx;
+
+	(void)ext;
+
+	if (verbose_debug) {
+		printk("%s:%d, entered!\n", __func__, __LINE__);
+	}
+
+	{
+		__maybe_unused const void* __adjusted = *dev_ptr;
+		glue_pack_shadow(__pos, msg, ext, __adjusted);
+		if (*dev_ptr) {
+			caller_marshal_kernel__lvd_netif_trans_update__dev__in(__pos, msg, ext, ctx, *dev_ptr);
+		}
+
+	}
+
+	glue_call_server(__pos, msg, RPC_ID_lvd_netif_trans_update);
+
+	*__pos = 0;
+	{
+		if (*dev_ptr) {
+			caller_unmarshal_kernel__lvd_netif_trans_update__dev__in(__pos, msg, ext, ctx, *dev_ptr);
+		}
+
+	}
+
+	if (verbose_debug) {
+		printk("%s:%d, returned!\n", __func__, __LINE__);
+	}
+}
+
+void lvd_netif_tx_disable(struct net_device* dev)
+{
+	struct fipc_message __buffer = {0};
+	struct fipc_message *msg = &__buffer;
+	struct ext_registers* ext = get_register_page(smp_processor_id());
+	size_t n_pos = 0;
+	size_t* __pos = &n_pos;
+
+	struct net_device** dev_ptr = &dev;
+	
+	__maybe_unused const struct lvd_netif_tx_disable_call_ctx call_ctx = {dev};
+	__maybe_unused const struct lvd_netif_tx_disable_call_ctx *ctx = &call_ctx;
+
+	(void)ext;
+
+	if (verbose_debug) {
+		printk("%s:%d, entered!\n", __func__, __LINE__);
+	}
+
+	{
+		__maybe_unused const void* __adjusted = *dev_ptr;
+		glue_pack_shadow(__pos, msg, ext, __adjusted);
+		if (*dev_ptr) {
+			caller_marshal_kernel__lvd_netif_tx_disable__dev__in(__pos, msg, ext, ctx, *dev_ptr);
+		}
+
+	}
+
+	glue_call_server(__pos, msg, RPC_ID_lvd_netif_tx_disable);
+
+	*__pos = 0;
+	{
+		if (*dev_ptr) {
+			caller_unmarshal_kernel__lvd_netif_tx_disable__dev__in(__pos, msg, ext, ctx, *dev_ptr);
+		}
+
+	}
+
+	if (verbose_debug) {
+		printk("%s:%d, returned!\n", __func__, __LINE__);
+	}
+}
 void __init_globals(void) {
 
 	loops_per_jiffy = get_loops_per_jiffy();
 	jiffies = get_jiffies();
 }
+
 int try_dispatch(enum RPC_ID id, struct fipc_message* msg, struct ext_registers* ext)
 {
 	switch(id) {

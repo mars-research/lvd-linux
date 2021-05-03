@@ -2383,7 +2383,7 @@ void mdio_mii_ioctl_callee(struct fipc_message* msg, struct ext_registers* ext)
 
 	{
 		size_t __size = sizeof(struct mdio_if_info);
-		*mdio_ptr = glue_unpack_bind_or_new_shadow(__pos, msg, ext, struct mdio_if_info const*, __size);
+		*mdio_ptr = glue_unpack_bind_or_new_shadow(__pos, msg, ext, struct mdio_if_info const*, __size, DEFAULT_GFP_FLAGS);
 		if (*mdio_ptr) {
 			struct mdio_if_info* writable = (struct mdio_if_info*)*mdio_ptr;
 			callee_unmarshal_kernel__mdio_mii_ioctl__mdio__in(__pos, msg, ext, ctx, writable);
@@ -4628,6 +4628,84 @@ void lvd_init_work_callee(struct fipc_message* msg, struct ext_registers* ext)
 	}
 }
 
+void lvd_netif_trans_update_callee(struct fipc_message* msg, struct ext_registers* ext)
+{
+	size_t n_pos = 0;
+	size_t* __pos = &n_pos;
+
+	struct net_device* dev = 0;
+	struct net_device** dev_ptr = &dev;
+	
+	__maybe_unused struct lvd_netif_trans_update_call_ctx call_ctx = {dev};
+	__maybe_unused struct lvd_netif_trans_update_call_ctx *ctx = &call_ctx;
+
+	if (verbose_debug) {
+		printk("%s:%d, entered!\n", __func__, __LINE__);
+	}
+
+	{
+		*dev_ptr = glue_unpack(__pos, msg, ext, struct net_device*);
+		if (*dev_ptr) {
+			callee_unmarshal_kernel__lvd_netif_trans_update__dev__in(__pos, msg, ext, ctx, *dev_ptr);
+		}
+
+	}
+
+	netif_trans_update(dev);
+
+	*__pos = 0;
+	{
+		if (*dev_ptr) {
+			callee_marshal_kernel__lvd_netif_trans_update__dev__in(__pos, msg, ext, ctx, *dev_ptr);
+		}
+
+	}
+
+	msg->regs[0] = *__pos;
+	if (verbose_debug) {
+		printk("%s:%d, returned!\n", __func__, __LINE__);
+	}
+}
+
+void lvd_netif_tx_disable_callee(struct fipc_message* msg, struct ext_registers* ext)
+{
+	size_t n_pos = 0;
+	size_t* __pos = &n_pos;
+
+	struct net_device* dev = 0;
+	struct net_device** dev_ptr = &dev;
+	
+	__maybe_unused struct lvd_netif_tx_disable_call_ctx call_ctx = {dev};
+	__maybe_unused struct lvd_netif_tx_disable_call_ctx *ctx = &call_ctx;
+
+	if (verbose_debug) {
+		printk("%s:%d, entered!\n", __func__, __LINE__);
+	}
+
+	{
+		*dev_ptr = glue_unpack(__pos, msg, ext, struct net_device*);
+		if (*dev_ptr) {
+			callee_unmarshal_kernel__lvd_netif_tx_disable__dev__in(__pos, msg, ext, ctx, *dev_ptr);
+		}
+
+	}
+
+	netif_tx_disable(dev);
+
+	*__pos = 0;
+	{
+		if (*dev_ptr) {
+			callee_marshal_kernel__lvd_netif_tx_disable__dev__in(__pos, msg, ext, ctx, *dev_ptr);
+		}
+
+	}
+
+	msg->regs[0] = *__pos;
+	if (verbose_debug) {
+		printk("%s:%d, returned!\n", __func__, __LINE__);
+	}
+}
+
 int try_dispatch(enum RPC_ID id, struct fipc_message* msg, struct ext_registers* ext)
 {
 	switch(id) {
@@ -4914,6 +4992,16 @@ int try_dispatch(enum RPC_ID id, struct fipc_message* msg, struct ext_registers*
 	case RPC_ID_lvd_init_work:
 		glue_user_trace("lvd_init_work\n");
 		lvd_init_work_callee(msg, ext);
+		break;
+
+	case RPC_ID_lvd_netif_trans_update:
+		glue_user_trace("lvd_netif_trans_update\n");
+		lvd_netif_trans_update_callee(msg, ext);
+		break;
+
+	case RPC_ID_lvd_netif_tx_disable:
+		glue_user_trace("lvd_netif_tx_disable\n");
+		lvd_netif_tx_disable_callee(msg, ext);
 		break;
 
 	default:

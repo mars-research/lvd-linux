@@ -1977,13 +1977,14 @@ void callee_unmarshal_kernel__net_device_ops_ndo_set_rx_mode__netdev_hw_addr_lis
 
 	if (*count_ptr) {
 		int j = 0;
-		int i = 0;
 		for (; j < *count_ptr; j++) {
-			struct netdev_hw_addr *ha = glue_unpack_new_shadow(__pos, msg, ext, struct netdev_hw_addr*, (sizeof(struct netdev_hw_addr)), (DEFAULT_GFP_FLAGS));
+			struct netdev_hw_addr *ha = glue_unpack_bind_or_new_shadow(__pos, msg, ext, struct netdev_hw_addr*, (sizeof(struct netdev_hw_addr)), (DEFAULT_GFP_FLAGS));
+			int i = 0;
 			
 			for (; i < ETH_ALEN; i++) {
 					ha->addr[i] = glue_unpack(__pos, msg, ext, unsigned char);
 			}
+
 			list_add_tail(&ha->list, &ptr->list);
 		}
 	}
@@ -6676,6 +6677,86 @@ void caller_unmarshal_kernel__lvd_init_work__work__in(
 	const struct ext_registers* ext,
 	struct lvd_init_work_call_ctx const* ctx,
 	struct work_struct* ptr)
+{
+	
+}
+
+void caller_marshal_kernel__lvd_netif_trans_update__dev__in(
+	size_t* __pos,
+	struct fipc_message* msg,
+	struct ext_registers* ext,
+	struct lvd_netif_trans_update_call_ctx const* ctx,
+	struct net_device const* ptr)
+{
+	
+}
+
+void callee_unmarshal_kernel__lvd_netif_trans_update__dev__in(
+	size_t* __pos,
+	const struct fipc_message* msg,
+	const struct ext_registers* ext,
+	struct lvd_netif_trans_update_call_ctx const* ctx,
+	struct net_device* ptr)
+{
+	
+}
+
+void callee_marshal_kernel__lvd_netif_trans_update__dev__in(
+	size_t* __pos,
+	struct fipc_message* msg,
+	struct ext_registers* ext,
+	struct lvd_netif_trans_update_call_ctx const* ctx,
+	struct net_device const* ptr)
+{
+	
+}
+
+void caller_unmarshal_kernel__lvd_netif_trans_update__dev__in(
+	size_t* __pos,
+	const struct fipc_message* msg,
+	const struct ext_registers* ext,
+	struct lvd_netif_trans_update_call_ctx const* ctx,
+	struct net_device* ptr)
+{
+	
+}
+
+void caller_marshal_kernel__lvd_netif_tx_disable__dev__in(
+	size_t* __pos,
+	struct fipc_message* msg,
+	struct ext_registers* ext,
+	struct lvd_netif_tx_disable_call_ctx const* ctx,
+	struct net_device const* ptr)
+{
+	
+}
+
+void callee_unmarshal_kernel__lvd_netif_tx_disable__dev__in(
+	size_t* __pos,
+	const struct fipc_message* msg,
+	const struct ext_registers* ext,
+	struct lvd_netif_tx_disable_call_ctx const* ctx,
+	struct net_device* ptr)
+{
+	
+}
+
+void callee_marshal_kernel__lvd_netif_tx_disable__dev__in(
+	size_t* __pos,
+	struct fipc_message* msg,
+	struct ext_registers* ext,
+	struct lvd_netif_tx_disable_call_ctx const* ctx,
+	struct net_device const* ptr)
+{
+	
+}
+
+void caller_unmarshal_kernel__lvd_netif_tx_disable__dev__in(
+	size_t* __pos,
+	const struct fipc_message* msg,
+	const struct ext_registers* ext,
+	struct lvd_netif_tx_disable_call_ctx const* ctx,
+	struct net_device* ptr)
 {
 	
 }

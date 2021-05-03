@@ -655,4 +655,12 @@ module kernel {
 			long counter;
 		}*/
 	}
+	rpc void lvd_netif_trans_update(projection dev *dev) {
+		projection < struct net_device > dev {
+		}
+	}
+	rpc void lvd_netif_tx_disable(projection dev *dev) {
+		projection < struct net_device > dev {
+		}
+	}
 }

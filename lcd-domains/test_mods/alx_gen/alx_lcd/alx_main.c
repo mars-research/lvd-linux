@@ -61,6 +61,8 @@ struct alx_priv *g_alx;
 void lcd_consume_skb(struct sk_buff *skb);
 void lvd_netif_tx_start_all_queues(struct net_device* dev);
 void lvd_netif_tx_wake_all_queues(struct net_device* dev);
+void lvd_netif_trans_update(struct net_device *dev);
+void lvd_netif_tx_disable(struct net_device *dev);
 void lvd_napi_enable(struct napi_struct *n);
 typedef void (*fptr_work_fn)(struct work_struct* work);
 void lvd_init_work(struct work_struct* work, fptr_work_fn work_fn);
@@ -495,9 +497,9 @@ static void alx_add_mc_addr(struct alx_hw *hw, const u8 *addr, u32 *mc_hash)
 {
 	u32 crc32, bit, reg;
 
-	printk("%s:%d #1\n", __func__, __LINE__);
+	//printk("%s:%d #1\n", __func__, __LINE__);
 	crc32 = ether_crc(ETH_ALEN, addr);
-	printk("%s:%d #2\n", __func__, __LINE__);
+	//printk("%s:%d #2\n", __func__, __LINE__);
 	reg = (crc32 >> 31) & 0x1;
 	bit = (crc32 >> 26) & 0x1F;
 
@@ -511,10 +513,10 @@ static void __alx_set_rx_mode(struct net_device *netdev)
 	struct netdev_hw_addr *ha;
 	u32 mc_hash[2] = {};
 
-	printk("%s, &mc.list %p mc.list.prev %p | mc.list.next %p | count %d\n", __func__,
-			&netdev->mc.list, netdev->mc.list.prev, netdev->mc.list.next, netdev->mc.count);
+	//printk("%s, &mc.list %p mc.list.prev %p | mc.list.next %p | count %d\n", __func__,
+	//		&netdev->mc.list, netdev->mc.list.prev, netdev->mc.list.next, netdev->mc.count);
 	if (!(netdev->flags & IFF_ALLMULTI)) {
-		printk("%s:%d #3\n", __func__, __LINE__);
+		//printk("%s:%d #3\n", __func__, __LINE__);
 		netdev_for_each_mc_addr(ha, netdev)
 			alx_add_mc_addr(hw, ha->addr, mc_hash);
 
@@ -529,7 +531,7 @@ static void __alx_set_rx_mode(struct net_device *netdev)
 		hw->rx_ctrl |= ALX_MAC_CTRL_MULTIALL_EN;
 
 	alx_write_mem32(hw, ALX_MAC_CTRL, hw->rx_ctrl);
-	printk("%s:%d #4\n", __func__, __LINE__);
+	//printk("%s:%d #4\n", __func__, __LINE__);
 }
 
 static void alx_set_rx_mode(struct net_device *netdev)
@@ -794,10 +796,19 @@ static netdev_features_t alx_fix_features(struct net_device *netdev,
 
 static void alx_netif_stop(struct alx_priv *alx)
 {
+#ifdef LCD_ISOLATE
+	lvd_netif_trans_update(alx->dev);
+#else
 	netif_trans_update(alx->dev);
+#endif
 	if (netif_carrier_ok(alx->dev)) {
 		netif_carrier_off(alx->dev);
+
+#ifdef LCD_ISOLATE
+		lvd_netif_tx_disable(alx->dev);
+#else
 		netif_tx_disable(alx->dev);
+#endif
 		napi_disable(&alx->napi);
 	}
 }
@@ -824,7 +835,7 @@ static void alx_configure(struct alx_priv *alx)
 
 	alx_configure_basic(hw);
 	alx_disable_rss(hw);
-	printk("%s:%d setting rx mode!", __func__, __LINE__);
+	//printk("%s:%d setting rx mode!", __func__, __LINE__);
 	__alx_set_rx_mode(alx->dev);
 
 	alx_write_mem32(hw, ALX_MAC_CTRL, hw->rx_ctrl);

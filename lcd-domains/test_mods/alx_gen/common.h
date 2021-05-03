@@ -25,10 +25,10 @@
 		printk("%s:%d, unpack new shadow for type %s | size %llu\n", __func__, __LINE__, __stringify(type), (uint64_t) size); \
 	(type)glue_unpack_new_shadow_impl(glue_unpack(pos, msg, ext, void*), size, flags); })
 
-#define glue_unpack_bind_or_new_shadow(pos, msg, ext, type, size) ({ \
+#define glue_unpack_bind_or_new_shadow(pos, msg, ext, type, size, flags) ({ \
 	if (verbose_debug) \
 		printk("%s:%d, unpack or bind new shadow for type %s | size %llu\n", __func__, __LINE__, __stringify(type), (uint64_t) size); \
-	(type)glue_unpack_bind_or_new_shadow_impl(glue_unpack(pos, msg, ext, void*), size); })
+	(type)glue_unpack_bind_or_new_shadow_impl(glue_unpack(pos, msg, ext, void*), size, flags); })
 
 #ifndef LCD_ISOLATE
 #define glue_unpack_rpc_ptr(pos, msg, ext, name) \
@@ -126,7 +126,7 @@ static inline void* glue_unpack_new_shadow_impl(const void* ptr, size_t size, gf
 	return shadow;
 }
 
-static inline void* glue_unpack_bind_or_new_shadow_impl(const void* ptr, size_t size)
+static inline void* glue_unpack_bind_or_new_shadow_impl(const void* ptr, size_t size, gfp_t flags)
 {
 	void* shadow = 0;
 	if (!ptr)
@@ -134,7 +134,7 @@ static inline void* glue_unpack_bind_or_new_shadow_impl(const void* ptr, size_t 
 
 	shadow = glue_user_map_to_shadow(ptr, false);
 	if (!shadow) {
-		shadow = glue_user_alloc(size, DEFAULT_GFP_FLAGS);
+		shadow = glue_user_alloc(size, flags);
 		glue_user_add_shadow(ptr, shadow);
 	}
 	return shadow;
@@ -246,6 +246,8 @@ enum RPC_ID {
 	RPC_ID_work_fn,
 	RPC_ID_lvd_napi_enable,
 	RPC_ID_lvd_init_work,
+	RPC_ID_lvd_netif_trans_update,
+	RPC_ID_lvd_netif_tx_disable,
 };
 
 int try_dispatch(enum RPC_ID id, struct fipc_message* msg, struct ext_registers* ext);
@@ -823,6 +825,14 @@ struct lvd_napi_enable_call_ctx {
 struct lvd_init_work_call_ctx {
 	struct work_struct* work;
 	fptr_work_fn work_fn;
+};
+
+struct lvd_netif_trans_update_call_ctx {
+	struct net_device* dev;
+};
+
+struct lvd_netif_tx_disable_call_ctx {
+	struct net_device* dev;
 };
 
 void caller_marshal_kernel__ethtool_ops_set_settings__netdev__in(
@@ -3616,6 +3626,62 @@ void caller_unmarshal_kernel__lvd_init_work__work__in(
 	const struct ext_registers* ext,
 	struct lvd_init_work_call_ctx const* call_ctx,
 	struct work_struct* ptr);
+
+void caller_marshal_kernel__lvd_netif_trans_update__dev__in(
+	size_t* __pos,
+	struct fipc_message* msg,
+	struct ext_registers* ext,
+	struct lvd_netif_trans_update_call_ctx const* call_ctx,
+	struct net_device const* ptr);
+
+void callee_unmarshal_kernel__lvd_netif_trans_update__dev__in(
+	size_t* __pos,
+	const struct fipc_message* msg,
+	const struct ext_registers* ext,
+	struct lvd_netif_trans_update_call_ctx const* call_ctx,
+	struct net_device* ptr);
+
+void callee_marshal_kernel__lvd_netif_trans_update__dev__in(
+	size_t* __pos,
+	struct fipc_message* msg,
+	struct ext_registers* ext,
+	struct lvd_netif_trans_update_call_ctx const* call_ctx,
+	struct net_device const* ptr);
+
+void caller_unmarshal_kernel__lvd_netif_trans_update__dev__in(
+	size_t* __pos,
+	const struct fipc_message* msg,
+	const struct ext_registers* ext,
+	struct lvd_netif_trans_update_call_ctx const* call_ctx,
+	struct net_device* ptr);
+
+void caller_marshal_kernel__lvd_netif_tx_disable__dev__in(
+	size_t* __pos,
+	struct fipc_message* msg,
+	struct ext_registers* ext,
+	struct lvd_netif_tx_disable_call_ctx const* call_ctx,
+	struct net_device const* ptr);
+
+void callee_unmarshal_kernel__lvd_netif_tx_disable__dev__in(
+	size_t* __pos,
+	const struct fipc_message* msg,
+	const struct ext_registers* ext,
+	struct lvd_netif_tx_disable_call_ctx const* call_ctx,
+	struct net_device* ptr);
+
+void callee_marshal_kernel__lvd_netif_tx_disable__dev__in(
+	size_t* __pos,
+	struct fipc_message* msg,
+	struct ext_registers* ext,
+	struct lvd_netif_tx_disable_call_ctx const* call_ctx,
+	struct net_device const* ptr);
+
+void caller_unmarshal_kernel__lvd_netif_tx_disable__dev__in(
+	size_t* __pos,
+	const struct fipc_message* msg,
+	const struct ext_registers* ext,
+	struct lvd_netif_tx_disable_call_ctx const* call_ctx,
+	struct net_device* ptr);
 
 
 #endif

@@ -632,8 +632,18 @@ module kernel {
 		}
 	}
 
+	rpc void lvd_netif_tx_wake_all_queues(projection dev *dev) {
+		projection < struct net_device > dev {
+		}
+	}
+
 	rpc_ptr void work_fn(projection work *work) {
 		projection < struct work_struct > work {
+		}
+	}
+
+	rpc void lvd_napi_enable(projection napi [bind(callee)] *napi) {
+		projection < struct napi_struct > napi {
 		}
 	}
 

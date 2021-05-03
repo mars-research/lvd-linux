@@ -290,7 +290,7 @@ void handler_callee(struct fipc_message* msg, struct ext_registers* ext)
 	__maybe_unused struct handler_call_ctx call_ctx = {irq, id};
 	__maybe_unused struct handler_call_ctx *ctx = &call_ctx;
 
-	if (verbose_debug) {
+	if (0) {
 		printk("%s:%d, entered!\n", __func__, __LINE__);
 	}
 
@@ -309,7 +309,7 @@ void handler_callee(struct fipc_message* msg, struct ext_registers* ext)
 	}
 
 	msg->regs[0] = *__pos;
-	if (verbose_debug) {
+	if (0) {
 		printk("%s:%d, returned!\n", __func__, __LINE__);
 	}
 }
@@ -4320,6 +4320,49 @@ void lvd_netif_tx_start_all_queues(struct net_device* dev)
 	}
 }
 
+void lvd_netif_tx_wake_all_queues(struct net_device* dev)
+{
+	struct fipc_message __buffer = {0};
+	struct fipc_message *msg = &__buffer;
+	struct ext_registers* ext = get_register_page(smp_processor_id());
+	size_t n_pos = 0;
+	size_t* __pos = &n_pos;
+
+	struct net_device** dev_ptr = &dev;
+	
+	__maybe_unused const struct lvd_netif_tx_wake_all_queues_call_ctx call_ctx = {dev};
+	__maybe_unused const struct lvd_netif_tx_wake_all_queues_call_ctx *ctx = &call_ctx;
+
+	(void)ext;
+
+	if (verbose_debug) {
+		printk("%s:%d, entered!\n", __func__, __LINE__);
+	}
+
+	{
+		__maybe_unused const void* __adjusted = *dev_ptr;
+		glue_pack_shadow(__pos, msg, ext, __adjusted);
+		if (*dev_ptr) {
+			caller_marshal_kernel__lvd_netif_tx_wake_all_queues__dev__in(__pos, msg, ext, ctx, *dev_ptr);
+		}
+
+	}
+
+	glue_call_server(__pos, msg, RPC_ID_lvd_netif_tx_wake_all_queues);
+
+	*__pos = 0;
+	{
+		if (*dev_ptr) {
+			caller_unmarshal_kernel__lvd_netif_tx_wake_all_queues__dev__in(__pos, msg, ext, ctx, *dev_ptr);
+		}
+
+	}
+
+	if (verbose_debug) {
+		printk("%s:%d, returned!\n", __func__, __LINE__);
+	}
+}
+
 void work_fn_callee(struct fipc_message* msg, struct ext_registers* ext)
 {
 	size_t n_pos = 0;
@@ -4355,6 +4398,49 @@ void work_fn_callee(struct fipc_message* msg, struct ext_registers* ext)
 	}
 
 	msg->regs[0] = *__pos;
+	if (verbose_debug) {
+		printk("%s:%d, returned!\n", __func__, __LINE__);
+	}
+}
+
+void lvd_napi_enable(struct napi_struct* napi)
+{
+	struct fipc_message __buffer = {0};
+	struct fipc_message *msg = &__buffer;
+	struct ext_registers* ext = get_register_page(smp_processor_id());
+	size_t n_pos = 0;
+	size_t* __pos = &n_pos;
+
+	struct napi_struct** napi_ptr = &napi;
+	
+	__maybe_unused const struct lvd_napi_enable_call_ctx call_ctx = {napi};
+	__maybe_unused const struct lvd_napi_enable_call_ctx *ctx = &call_ctx;
+
+	(void)ext;
+
+	if (verbose_debug) {
+		printk("%s:%d, entered!\n", __func__, __LINE__);
+	}
+
+	{
+		__maybe_unused const void* __adjusted = *napi_ptr;
+		glue_pack(__pos, msg, ext, __adjusted);
+		if (*napi_ptr) {
+			caller_marshal_kernel__lvd_napi_enable__napi__in(__pos, msg, ext, ctx, *napi_ptr);
+		}
+
+	}
+
+	glue_call_server(__pos, msg, RPC_ID_lvd_napi_enable);
+
+	*__pos = 0;
+	{
+		if (*napi_ptr) {
+			caller_unmarshal_kernel__lvd_napi_enable__napi__in(__pos, msg, ext, ctx, *napi_ptr);
+		}
+
+	}
+
 	if (verbose_debug) {
 		printk("%s:%d, returned!\n", __func__, __LINE__);
 	}
@@ -4458,7 +4544,7 @@ int try_dispatch(enum RPC_ID id, struct fipc_message* msg, struct ext_registers*
 		break;
 
 	case RPC_ID_handler:
-		glue_user_trace("handler\n");
+		//glue_user_trace("handler\n");
 		handler_callee(msg, ext);
 		break;
 

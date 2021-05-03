@@ -34,22 +34,22 @@ void glue_user_call_server(struct fipc_message* msg, size_t id)
 {
     msg->vmfunc_id = VMFUNC_RPC_CALL;
     msg->rpc_id = id;
-    if (verbose_debug)
-        glue_user_trace("Committing to KLCD call");
+    /*if (verbose_debug)
+        glue_user_trace("Committing to KLCD call");*/
     vmfunc_wrapper(msg);
-    if (verbose_debug)
-        glue_user_trace("Completed call in LCD");
+    /*if (verbose_debug)
+        glue_user_trace("Completed call in LCD");*/
 }
 
 void glue_user_call_client(struct fipc_message* msg, size_t id)
 {
     msg->vmfunc_id = VMFUNC_RPC_CALL;
     msg->rpc_id = id;
-    if (verbose_debug)
-        glue_user_trace("Committing to LCD call");
+    /*if (verbose_debug)
+        glue_user_trace("Committing to LCD call");*/
     vmfunc_klcd_wrapper(msg, OTHER_DOMAIN);
-    if (verbose_debug)
-	    glue_user_trace("Completed call in KLCD");
+    /*if (verbose_debug)
+	    glue_user_trace("Completed call in KLCD");*/
 }
 
 void* glue_user_map_to_shadow(const void* obj, bool fail)

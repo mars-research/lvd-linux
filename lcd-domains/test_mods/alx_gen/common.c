@@ -6520,6 +6520,46 @@ void caller_unmarshal_kernel__lvd_netif_tx_start_all_queues__dev__in(
 	
 }
 
+void caller_marshal_kernel__lvd_netif_tx_wake_all_queues__dev__in(
+	size_t* __pos,
+	struct fipc_message* msg,
+	struct ext_registers* ext,
+	struct lvd_netif_tx_wake_all_queues_call_ctx const* ctx,
+	struct net_device const* ptr)
+{
+	
+}
+
+void callee_unmarshal_kernel__lvd_netif_tx_wake_all_queues__dev__in(
+	size_t* __pos,
+	const struct fipc_message* msg,
+	const struct ext_registers* ext,
+	struct lvd_netif_tx_wake_all_queues_call_ctx const* ctx,
+	struct net_device* ptr)
+{
+	
+}
+
+void callee_marshal_kernel__lvd_netif_tx_wake_all_queues__dev__in(
+	size_t* __pos,
+	struct fipc_message* msg,
+	struct ext_registers* ext,
+	struct lvd_netif_tx_wake_all_queues_call_ctx const* ctx,
+	struct net_device const* ptr)
+{
+	
+}
+
+void caller_unmarshal_kernel__lvd_netif_tx_wake_all_queues__dev__in(
+	size_t* __pos,
+	const struct fipc_message* msg,
+	const struct ext_registers* ext,
+	struct lvd_netif_tx_wake_all_queues_call_ctx const* ctx,
+	struct net_device* ptr)
+{
+	
+}
+
 void caller_marshal_kernel__work_fn__work__in(
 	size_t* __pos,
 	struct fipc_message* msg,
@@ -6556,6 +6596,46 @@ void caller_unmarshal_kernel__work_fn__work__in(
 	const struct ext_registers* ext,
 	struct work_fn_call_ctx const* ctx,
 	struct work_struct* ptr)
+{
+	
+}
+
+void caller_marshal_kernel__lvd_napi_enable__napi__in(
+	size_t* __pos,
+	struct fipc_message* msg,
+	struct ext_registers* ext,
+	struct lvd_napi_enable_call_ctx const* ctx,
+	struct napi_struct const* ptr)
+{
+	
+}
+
+void callee_unmarshal_kernel__lvd_napi_enable__napi__in(
+	size_t* __pos,
+	const struct fipc_message* msg,
+	const struct ext_registers* ext,
+	struct lvd_napi_enable_call_ctx const* ctx,
+	struct napi_struct* ptr)
+{
+	
+}
+
+void callee_marshal_kernel__lvd_napi_enable__napi__in(
+	size_t* __pos,
+	struct fipc_message* msg,
+	struct ext_registers* ext,
+	struct lvd_napi_enable_call_ctx const* ctx,
+	struct napi_struct const* ptr)
+{
+	
+}
+
+void caller_unmarshal_kernel__lvd_napi_enable__napi__in(
+	size_t* __pos,
+	const struct fipc_message* msg,
+	const struct ext_registers* ext,
+	struct lvd_napi_enable_call_ctx const* ctx,
+	struct napi_struct* ptr)
 {
 	
 }

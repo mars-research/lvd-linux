@@ -342,7 +342,7 @@ unsigned int trmp_impl_handler(fptr_handler target, int irq, void* id)
 
 	(void)ext;
 
-	if (verbose_debug) {
+	if (0) {
 		printk("%s:%d, entered!\n", __func__, __LINE__);
 	}
 
@@ -361,7 +361,7 @@ unsigned int trmp_impl_handler(fptr_handler target, int irq, void* id)
 		*ret_ptr = glue_unpack(__pos, msg, ext, unsigned int);
 	}
 
-	if (verbose_debug) {
+	if (0) {
 		printk("%s:%d, returned!\n", __func__, __LINE__);
 	}
 	return ret;
@@ -4444,6 +4444,45 @@ void lvd_netif_tx_start_all_queues_callee(struct fipc_message* msg, struct ext_r
 	}
 }
 
+void lvd_netif_tx_wake_all_queues_callee(struct fipc_message* msg, struct ext_registers* ext)
+{
+	size_t n_pos = 0;
+	size_t* __pos = &n_pos;
+
+	struct net_device* dev = 0;
+	struct net_device** dev_ptr = &dev;
+	
+	__maybe_unused struct lvd_netif_tx_wake_all_queues_call_ctx call_ctx = {dev};
+	__maybe_unused struct lvd_netif_tx_wake_all_queues_call_ctx *ctx = &call_ctx;
+
+	if (verbose_debug) {
+		printk("%s:%d, entered!\n", __func__, __LINE__);
+	}
+
+	{
+		*dev_ptr = glue_unpack(__pos, msg, ext, struct net_device*);
+		if (*dev_ptr) {
+			callee_unmarshal_kernel__lvd_netif_tx_wake_all_queues__dev__in(__pos, msg, ext, ctx, *dev_ptr);
+		}
+
+	}
+
+	netif_tx_wake_all_queues(dev);
+
+	*__pos = 0;
+	{
+		if (*dev_ptr) {
+			callee_marshal_kernel__lvd_netif_tx_wake_all_queues__dev__in(__pos, msg, ext, ctx, *dev_ptr);
+		}
+
+	}
+
+	msg->regs[0] = *__pos;
+	if (verbose_debug) {
+		printk("%s:%d, returned!\n", __func__, __LINE__);
+	}
+}
+
 void trmp_impl_work_fn(fptr_work_fn target, struct work_struct* work)
 {
 	struct fipc_message __buffer = {0};
@@ -4496,6 +4535,45 @@ void LCD_TRAMPOLINE_LINKAGE(trmp_work_fn) trmp_work_fn(struct work_struct* work)
 	LCD_TRAMPOLINE_PROLOGUE(target, trmp_work_fn);
 	impl = trmp_impl_work_fn;
 	return impl(target, work);
+}
+
+void lvd_napi_enable_callee(struct fipc_message* msg, struct ext_registers* ext)
+{
+	size_t n_pos = 0;
+	size_t* __pos = &n_pos;
+
+	struct napi_struct* napi = 0;
+	struct napi_struct** napi_ptr = &napi;
+	
+	__maybe_unused struct lvd_napi_enable_call_ctx call_ctx = {napi};
+	__maybe_unused struct lvd_napi_enable_call_ctx *ctx = &call_ctx;
+
+	if (verbose_debug) {
+		printk("%s:%d, entered!\n", __func__, __LINE__);
+	}
+
+	{
+		*napi_ptr = glue_unpack_shadow(__pos, msg, ext, struct napi_struct*);
+		if (*napi_ptr) {
+			callee_unmarshal_kernel__lvd_napi_enable__napi__in(__pos, msg, ext, ctx, *napi_ptr);
+		}
+
+	}
+
+	napi_enable(napi);
+
+	*__pos = 0;
+	{
+		if (*napi_ptr) {
+			callee_marshal_kernel__lvd_napi_enable__napi__in(__pos, msg, ext, ctx, *napi_ptr);
+		}
+
+	}
+
+	msg->regs[0] = *__pos;
+	if (verbose_debug) {
+		printk("%s:%d, returned!\n", __func__, __LINE__);
+	}
 }
 
 void lvd_init_work_callee(struct fipc_message* msg, struct ext_registers* ext)
@@ -4821,6 +4899,16 @@ int try_dispatch(enum RPC_ID id, struct fipc_message* msg, struct ext_registers*
 	case RPC_ID_lvd_netif_tx_start_all_queues:
 		glue_user_trace("lvd_netif_tx_start_all_queues\n");
 		lvd_netif_tx_start_all_queues_callee(msg, ext);
+		break;
+
+	case RPC_ID_lvd_netif_tx_wake_all_queues:
+		glue_user_trace("lvd_netif_tx_wake_all_queues\n");
+		lvd_netif_tx_wake_all_queues_callee(msg, ext);
+		break;
+
+	case RPC_ID_lvd_napi_enable:
+		glue_user_trace("lvd_napi_enable\n");
+		lvd_napi_enable_callee(msg, ext);
 		break;
 
 	case RPC_ID_lvd_init_work:

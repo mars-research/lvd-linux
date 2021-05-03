@@ -60,6 +60,8 @@ struct alx_priv *g_alx;
 
 void lcd_consume_skb(struct sk_buff *skb);
 void lvd_netif_tx_start_all_queues(struct net_device* dev);
+void lvd_netif_tx_wake_all_queues(struct net_device* dev);
+void lvd_napi_enable(struct napi_struct *n);
 typedef void (*fptr_work_fn)(struct work_struct* work);
 void lvd_init_work(struct work_struct* work, fptr_work_fn work_fn);
 extern struct workqueue_struct *system_wq;
@@ -873,8 +875,16 @@ static int alx_change_mtu(struct net_device *netdev, int mtu)
 
 static void alx_netif_start(struct alx_priv *alx)
 {
+#ifdef LCD_ISOLATE
+	lvd_netif_tx_wake_all_queues(alx->dev);
+#else
 	netif_tx_wake_all_queues(alx->dev);
+#endif
+#ifdef LCD_ISOLATE
+	lvd_napi_enable(&alx->napi);
+#else
 	napi_enable(&alx->napi);
+#endif
 	netif_carrier_on(alx->dev);
 }
 

@@ -242,7 +242,9 @@ enum RPC_ID {
 	RPC_ID_eth_validate_addr,
 	RPC_ID_ethtool_op_get_link,
 	RPC_ID_lvd_netif_tx_start_all_queues,
+	RPC_ID_lvd_netif_tx_wake_all_queues,
 	RPC_ID_work_fn,
+	RPC_ID_lvd_napi_enable,
 	RPC_ID_lvd_init_work,
 };
 
@@ -806,8 +808,16 @@ struct lvd_netif_tx_start_all_queues_call_ctx {
 	struct net_device* dev;
 };
 
+struct lvd_netif_tx_wake_all_queues_call_ctx {
+	struct net_device* dev;
+};
+
 struct work_fn_call_ctx {
 	struct work_struct* work;
+};
+
+struct lvd_napi_enable_call_ctx {
+	struct napi_struct* napi;
 };
 
 struct lvd_init_work_call_ctx {
@@ -3495,6 +3505,34 @@ void caller_unmarshal_kernel__lvd_netif_tx_start_all_queues__dev__in(
 	struct lvd_netif_tx_start_all_queues_call_ctx const* call_ctx,
 	struct net_device* ptr);
 
+void caller_marshal_kernel__lvd_netif_tx_wake_all_queues__dev__in(
+	size_t* __pos,
+	struct fipc_message* msg,
+	struct ext_registers* ext,
+	struct lvd_netif_tx_wake_all_queues_call_ctx const* call_ctx,
+	struct net_device const* ptr);
+
+void callee_unmarshal_kernel__lvd_netif_tx_wake_all_queues__dev__in(
+	size_t* __pos,
+	const struct fipc_message* msg,
+	const struct ext_registers* ext,
+	struct lvd_netif_tx_wake_all_queues_call_ctx const* call_ctx,
+	struct net_device* ptr);
+
+void callee_marshal_kernel__lvd_netif_tx_wake_all_queues__dev__in(
+	size_t* __pos,
+	struct fipc_message* msg,
+	struct ext_registers* ext,
+	struct lvd_netif_tx_wake_all_queues_call_ctx const* call_ctx,
+	struct net_device const* ptr);
+
+void caller_unmarshal_kernel__lvd_netif_tx_wake_all_queues__dev__in(
+	size_t* __pos,
+	const struct fipc_message* msg,
+	const struct ext_registers* ext,
+	struct lvd_netif_tx_wake_all_queues_call_ctx const* call_ctx,
+	struct net_device* ptr);
+
 void caller_marshal_kernel__work_fn__work__in(
 	size_t* __pos,
 	struct fipc_message* msg,
@@ -3522,6 +3560,34 @@ void caller_unmarshal_kernel__work_fn__work__in(
 	const struct ext_registers* ext,
 	struct work_fn_call_ctx const* call_ctx,
 	struct work_struct* ptr);
+
+void caller_marshal_kernel__lvd_napi_enable__napi__in(
+	size_t* __pos,
+	struct fipc_message* msg,
+	struct ext_registers* ext,
+	struct lvd_napi_enable_call_ctx const* call_ctx,
+	struct napi_struct const* ptr);
+
+void callee_unmarshal_kernel__lvd_napi_enable__napi__in(
+	size_t* __pos,
+	const struct fipc_message* msg,
+	const struct ext_registers* ext,
+	struct lvd_napi_enable_call_ctx const* call_ctx,
+	struct napi_struct* ptr);
+
+void callee_marshal_kernel__lvd_napi_enable__napi__in(
+	size_t* __pos,
+	struct fipc_message* msg,
+	struct ext_registers* ext,
+	struct lvd_napi_enable_call_ctx const* call_ctx,
+	struct napi_struct const* ptr);
+
+void caller_unmarshal_kernel__lvd_napi_enable__napi__in(
+	size_t* __pos,
+	const struct fipc_message* msg,
+	const struct ext_registers* ext,
+	struct lvd_napi_enable_call_ctx const* call_ctx,
+	struct napi_struct* ptr);
 
 void caller_marshal_kernel__lvd_init_work__work__in(
 	size_t* __pos,

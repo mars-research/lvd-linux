@@ -330,8 +330,10 @@ static inline void force_up_write(void *x)
 #undef cache_line_size
 #define cache_line_size() 64
 
+#ifndef CONFIG_LVD
 #undef jiffies
 #define jiffies 0UL
+#endif
 
 /*
  * Security

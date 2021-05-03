@@ -7628,12 +7628,14 @@ struct net_device *alloc_netdev_mqs(int sizeof_priv, const char *name,
 		void (*setup)(struct net_device *),
 		unsigned int txqs, unsigned int rxqs)
 {
-	struct net_device *dev;
-
-	struct net_device_container *dev_c;
-
 	size_t alloc_size;
+#ifdef CONFIG_LXDS
+	struct net_device_container *dev_c;
 	struct net_device_container *p;
+#else
+	struct net_device *dev;
+	struct net_device *p;
+#endif
 
 	BUG_ON(strlen(name) >= sizeof(dev->name));
 
@@ -7649,7 +7651,11 @@ struct net_device *alloc_netdev_mqs(int sizeof_priv, const char *name,
 	}
 #endif
 
+#ifdef CONFIG_LXDS
 	alloc_size = sizeof(struct net_device_container);
+#else
+	alloc_size = sizeof(struct net_device);
+#endif
 
 	if (sizeof_priv) {
 		/* ensure 32-byte alignment of private area */
@@ -7665,9 +7671,12 @@ struct net_device *alloc_netdev_mqs(int sizeof_priv, const char *name,
 	if (!p)
 		return NULL;
 
+#ifdef CONFIG_LXDS
 	dev_c = PTR_ALIGN(p, NETDEV_ALIGN);
-
 	dev = &dev_c->dev;
+#else
+	dev = PTR_ALIGN(p, NETDEV_ALIGN);
+#endif
 	dev->padded = (char *)dev - (char *)p;
 
 	dev->pcpu_refcnt = alloc_percpu(int);

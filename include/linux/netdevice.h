@@ -2045,7 +2045,11 @@ struct _net_device_container {
  */
 static inline void *netdev_priv(const struct net_device *dev)
 {
+#ifdef CONFIG_LXDS
 	return (char *)dev + ALIGN(sizeof(struct _net_device_container), NETDEV_ALIGN);
+#else
+	return (char *)dev + ALIGN(sizeof(struct net_device), NETDEV_ALIGN);
+#endif
 }
 
 /* Set the sysfs physical device reference for the network logical device

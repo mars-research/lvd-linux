@@ -38,6 +38,7 @@ lib-y += $(addprefix liblcd/lib/, \
 	rbtree.o \
 	crc16.o \
 	crc32.o \
+	bitrev.o \
 	parser.o \
 	cmdline.o \
 	dynamic_queue_limits.o \

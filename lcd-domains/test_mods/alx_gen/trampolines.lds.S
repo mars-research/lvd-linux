@@ -29,6 +29,7 @@ SECTIONS{
 	LCD_TRAMPOLINE_LINKER_SECTION(trmp_mdio_write)
 	LCD_TRAMPOLINE_LINKER_SECTION(trmp_net_device_ops_ndo_validate_addr)
 	LCD_TRAMPOLINE_LINKER_SECTION(trmp_poll)
+	LCD_TRAMPOLINE_LINKER_SECTION(trmp_work_fn)
 }
 
 INSERT AFTER .text

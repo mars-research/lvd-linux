@@ -500,7 +500,8 @@ void callee_unmarshal_kernel__probe__pdev__in(
 	}
 
 	{
-		*bus_ptr = glue_unpack_new_shadow(__pos, msg, ext, struct pci_bus*, (sizeof(struct pci_bus)), (DEFAULT_GFP_FLAGS));
+		size_t __size = sizeof(struct pci_bus);
+		*bus_ptr = glue_unpack_new_shadow(__pos, msg, ext, struct pci_bus*, (__size), (DEFAULT_GFP_FLAGS));
 		if (*bus_ptr) {
 			callee_unmarshal_kernel__probe__pci_bus__in(__pos, msg, ext, ctx, *bus_ptr);
 		}
@@ -618,7 +619,8 @@ void callee_unmarshal_kernel__probe__device__in(
 	unsigned long long** dma_mask_ptr = &ptr->dma_mask;
 	
 	{
-		*dma_mask_ptr = glue_unpack_new_shadow(__pos, msg, ext, unsigned long long*, (sizeof(unsigned long long) * glue_peek(__pos, msg, ext)), (DEFAULT_GFP_FLAGS));
+		size_t __size = sizeof(unsigned long long) * glue_peek(__pos, msg, ext);
+		*dma_mask_ptr = glue_unpack_new_shadow(__pos, msg, ext, unsigned long long*, (__size), (DEFAULT_GFP_FLAGS));
 		if (*dma_mask_ptr) {
 			int i;
 			unsigned long long* array = *dma_mask_ptr;
@@ -906,7 +908,8 @@ void callee_unmarshal_kernel____pci_register_driver__drv__in(
 	struct pci_device_id** id_table_ptr = &ptr->id_table;
 	
 	{
-		*name_ptr = glue_unpack_new_shadow(__pos, msg, ext, char const*, (sizeof(char) * glue_peek(__pos, msg, ext)), (DEFAULT_GFP_FLAGS));
+		size_t __size = sizeof(char) * glue_peek(__pos, msg, ext);
+		*name_ptr = glue_unpack_new_shadow(__pos, msg, ext, char const*, (__size), (DEFAULT_GFP_FLAGS));
 		if (*name_ptr) {
 			char* writable = (char*)*name_ptr;
 			size_t i, len;
@@ -931,7 +934,8 @@ void callee_unmarshal_kernel____pci_register_driver__drv__in(
 	}
 
 	{
-		*id_table_ptr = glue_unpack_new_shadow(__pos, msg, ext, struct pci_device_id*, (sizeof(struct pci_device_id) * glue_peek(__pos, msg, ext)), (DEFAULT_GFP_FLAGS));
+		size_t __size = sizeof(struct pci_device_id) * glue_peek(__pos, msg, ext);
+		*id_table_ptr = glue_unpack_new_shadow(__pos, msg, ext, struct pci_device_id*, (__size), (DEFAULT_GFP_FLAGS));
 		if (*id_table_ptr) {
 			size_t i, len;
 			struct pci_device_id* array = *id_table_ptr;
@@ -1215,7 +1219,12 @@ void callee_marshal_kernel__pci_enable_msi_range__dev__in(
 	struct pci_enable_msi_range_call_ctx const* ctx,
 	struct pci_dev const* ptr)
 {
+	int const* irq_ptr = &ptr->irq;
 	
+	{
+		glue_pack(__pos, msg, ext, *irq_ptr);
+	}
+
 }
 
 void caller_unmarshal_kernel__pci_enable_msi_range__dev__in(
@@ -1225,7 +1234,12 @@ void caller_unmarshal_kernel__pci_enable_msi_range__dev__in(
 	struct pci_enable_msi_range_call_ctx const* ctx,
 	struct pci_dev* ptr)
 {
+	int* irq_ptr = &ptr->irq;
 	
+	{
+		*irq_ptr = glue_unpack(__pos, msg, ext, int);
+	}
+
 }
 
 void caller_marshal_kernel__ethtool_ops_get_pauseparam__netdev__in(
@@ -1759,7 +1773,8 @@ void callee_unmarshal_kernel__net_device_ops_ndo_start_xmit__skb__in(
 	}
 
 	{
-		*head_ptr = glue_unpack_new_shadow(__pos, msg, ext, unsigned char*, (sizeof(unsigned char) * glue_peek(__pos, msg, ext)), (DEFAULT_GFP_FLAGS));
+		size_t __size = sizeof(unsigned char) * glue_peek(__pos, msg, ext);
+		*head_ptr = glue_unpack_new_shadow(__pos, msg, ext, unsigned char*, (__size), (DEFAULT_GFP_FLAGS));
 		if (*head_ptr) {
 			int i;
 			unsigned char* array = *head_ptr;
@@ -1917,12 +1932,30 @@ void caller_marshal_kernel__net_device_ops_ndo_set_rx_mode__netdev_hw_addr_list_
 	struct net_device_ops_ndo_set_rx_mode_call_ctx const* ctx,
 	struct netdev_hw_addr_list const* ptr)
 {
-	struct list_head const* list_ptr = &ptr->list;
+	//struct list_head const* list_ptr = &ptr->list;
+	int const* count_ptr = &ptr->count;
 	
 	{
-		caller_marshal_kernel__net_device_ops_ndo_set_rx_mode__list_head__in(__pos, msg, ext, ctx, list_ptr);
+		//caller_marshal_kernel__net_device_ops_ndo_set_rx_mode__list_head__in(__pos, msg, ext, ctx, list_ptr);
 	}
 
+	{
+		glue_pack(__pos, msg, ext, *count_ptr);
+	}
+
+	printk("%s, count %d\n", __func__, ptr->count);
+	if (*count_ptr) {
+		struct netdev_hw_addr *ha;
+		netdev_hw_addr_list_for_each(ha, ptr) {
+			int i = 0;
+			if (ha) {
+				glue_pack(__pos, msg, ext, ha);
+				for (; i < ETH_ALEN; i++) {
+					glue_pack(__pos, msg, ext, ha->addr[i]);
+				}
+			}
+		}
+	}
 }
 
 void callee_unmarshal_kernel__net_device_ops_ndo_set_rx_mode__netdev_hw_addr_list__in(
@@ -1932,12 +1965,28 @@ void callee_unmarshal_kernel__net_device_ops_ndo_set_rx_mode__netdev_hw_addr_lis
 	struct net_device_ops_ndo_set_rx_mode_call_ctx const* ctx,
 	struct netdev_hw_addr_list* ptr)
 {
-	struct list_head* list_ptr = &ptr->list;
-	
+	//struct list_head* list_ptr = &ptr->list;
+	int* count_ptr = &ptr->count;
 	{
-		callee_unmarshal_kernel__net_device_ops_ndo_set_rx_mode__list_head__in(__pos, msg, ext, ctx, list_ptr);
+		//callee_unmarshal_kernel__net_device_ops_ndo_set_rx_mode__list_head__in(__pos, msg, ext, ctx, list_ptr);
 	}
 
+	{
+		*count_ptr = glue_unpack(__pos, msg, ext, int);
+	}
+
+	if (*count_ptr) {
+		int j = 0;
+		int i = 0;
+		for (; j < *count_ptr; j++) {
+			struct netdev_hw_addr *ha = glue_unpack_new_shadow(__pos, msg, ext, struct netdev_hw_addr*, (sizeof(struct netdev_hw_addr)), (DEFAULT_GFP_FLAGS));
+			
+			for (; i < ETH_ALEN; i++) {
+					ha->addr[i] = glue_unpack(__pos, msg, ext, unsigned char);
+			}
+			list_add_tail(&ha->list, &ptr->list);
+		}
+	}
 }
 
 void callee_marshal_kernel__net_device_ops_ndo_set_rx_mode__netdev_hw_addr_list__in(
@@ -1977,7 +2026,17 @@ void caller_marshal_kernel__net_device_ops_ndo_set_rx_mode__list_head__in(
 	struct net_device_ops_ndo_set_rx_mode_call_ctx const* ctx,
 	struct list_head const* ptr)
 {
+	struct list_head* const* next_ptr = &ptr->next;
 	
+	{
+		__maybe_unused const void* __adjusted = *next_ptr;
+		glue_pack(__pos, msg, ext, __adjusted);
+		if (*next_ptr) {
+			caller_marshal_kernel__net_device_ops_ndo_set_rx_mode__list_head__in(__pos, msg, ext, ctx, *next_ptr);
+		}
+
+	}
+
 }
 
 void callee_unmarshal_kernel__net_device_ops_ndo_set_rx_mode__list_head__in(
@@ -1987,7 +2046,17 @@ void callee_unmarshal_kernel__net_device_ops_ndo_set_rx_mode__list_head__in(
 	struct net_device_ops_ndo_set_rx_mode_call_ctx const* ctx,
 	struct list_head* ptr)
 {
+	struct list_head** next_ptr = &ptr->next;
 	
+	{
+		size_t __size = sizeof(struct netdev_hw_addr);
+		*next_ptr = glue_unpack_new_shadow(__pos, msg, ext, struct list_head*, (__size), (DEFAULT_GFP_FLAGS));
+		if (*next_ptr) {
+			callee_unmarshal_kernel__net_device_ops_ndo_set_rx_mode__list_head__in(__pos, msg, ext, ctx, *next_ptr);
+		}
+
+	}
+
 }
 
 void callee_marshal_kernel__net_device_ops_ndo_set_rx_mode__list_head__in(
@@ -1997,7 +2066,15 @@ void callee_marshal_kernel__net_device_ops_ndo_set_rx_mode__list_head__in(
 	struct net_device_ops_ndo_set_rx_mode_call_ctx const* ctx,
 	struct list_head const* ptr)
 {
+	struct list_head* const* next_ptr = &ptr->next;
 	
+	{
+		if (*next_ptr) {
+			callee_marshal_kernel__net_device_ops_ndo_set_rx_mode__list_head__in(__pos, msg, ext, ctx, *next_ptr);
+		}
+
+	}
+
 }
 
 void caller_unmarshal_kernel__net_device_ops_ndo_set_rx_mode__list_head__in(
@@ -2007,7 +2084,15 @@ void caller_unmarshal_kernel__net_device_ops_ndo_set_rx_mode__list_head__in(
 	struct net_device_ops_ndo_set_rx_mode_call_ctx const* ctx,
 	struct list_head* ptr)
 {
+	struct list_head** next_ptr = &ptr->next;
 	
+	{
+		if (*next_ptr) {
+			caller_unmarshal_kernel__net_device_ops_ndo_set_rx_mode__list_head__in(__pos, msg, ext, ctx, *next_ptr);
+		}
+
+	}
+
 }
 
 void caller_marshal_kernel__net_device_ops_ndo_set_mac_address__netdev__in(
@@ -3332,12 +3417,7 @@ void caller_marshal_kernel__queue_work_on__work__in(
 	struct queue_work_on_call_ctx const* ctx,
 	struct work_struct const* ptr)
 {
-	struct atomic64_t const* data_ptr = &ptr->data;
 	
-	{
-		caller_marshal_kernel__queue_work_on__atomic64_t__io(__pos, msg, ext, ctx, data_ptr);
-	}
-
 }
 
 void callee_unmarshal_kernel__queue_work_on__work__in(
@@ -3347,12 +3427,7 @@ void callee_unmarshal_kernel__queue_work_on__work__in(
 	struct queue_work_on_call_ctx const* ctx,
 	struct work_struct* ptr)
 {
-	struct atomic64_t* data_ptr = &ptr->data;
 	
-	{
-		callee_unmarshal_kernel__queue_work_on__atomic64_t__io(__pos, msg, ext, ctx, data_ptr);
-	}
-
 }
 
 void callee_marshal_kernel__queue_work_on__work__in(
@@ -3362,12 +3437,7 @@ void callee_marshal_kernel__queue_work_on__work__in(
 	struct queue_work_on_call_ctx const* ctx,
 	struct work_struct const* ptr)
 {
-	struct atomic64_t const* data_ptr = &ptr->data;
 	
-	{
-		callee_marshal_kernel__queue_work_on__atomic64_t__io(__pos, msg, ext, ctx, data_ptr);
-	}
-
 }
 
 void caller_unmarshal_kernel__queue_work_on__work__in(
@@ -3377,72 +3447,7 @@ void caller_unmarshal_kernel__queue_work_on__work__in(
 	struct queue_work_on_call_ctx const* ctx,
 	struct work_struct* ptr)
 {
-	struct atomic64_t* data_ptr = &ptr->data;
 	
-	{
-		caller_unmarshal_kernel__queue_work_on__atomic64_t__io(__pos, msg, ext, ctx, data_ptr);
-	}
-
-}
-
-void caller_marshal_kernel__queue_work_on__atomic64_t__io(
-	size_t* __pos,
-	struct fipc_message* msg,
-	struct ext_registers* ext,
-	struct queue_work_on_call_ctx const* ctx,
-	struct atomic64_t const* ptr)
-{
-	long const* counter_ptr = &ptr->counter;
-	
-	{
-		glue_pack(__pos, msg, ext, *counter_ptr);
-	}
-
-}
-
-void callee_unmarshal_kernel__queue_work_on__atomic64_t__io(
-	size_t* __pos,
-	const struct fipc_message* msg,
-	const struct ext_registers* ext,
-	struct queue_work_on_call_ctx const* ctx,
-	struct atomic64_t* ptr)
-{
-	long* counter_ptr = &ptr->counter;
-	
-	{
-		*counter_ptr = glue_unpack(__pos, msg, ext, long);
-	}
-
-}
-
-void callee_marshal_kernel__queue_work_on__atomic64_t__io(
-	size_t* __pos,
-	struct fipc_message* msg,
-	struct ext_registers* ext,
-	struct queue_work_on_call_ctx const* ctx,
-	struct atomic64_t const* ptr)
-{
-	long const* counter_ptr = &ptr->counter;
-	
-	{
-		glue_pack(__pos, msg, ext, *counter_ptr);
-	}
-
-}
-
-void caller_unmarshal_kernel__queue_work_on__atomic64_t__io(
-	size_t* __pos,
-	const struct fipc_message* msg,
-	const struct ext_registers* ext,
-	struct queue_work_on_call_ctx const* ctx,
-	struct atomic64_t* ptr)
-{
-	long* counter_ptr = &ptr->counter;
-	
-	{
-		*counter_ptr = glue_unpack(__pos, msg, ext, long);
-	}
-
 }
 
 void caller_marshal_kernel__consume_skb__skb__in(
@@ -3705,7 +3710,8 @@ void caller_unmarshal_kernel__alloc_etherdev_mqs__ret_net_device__out(
 	struct netdev_queue** _tx_ptr = &ptr->_tx;
 	
 	{
-		*dev_addr_ptr = glue_unpack_new_shadow(__pos, msg, ext, unsigned char*, (sizeof(unsigned char) * glue_peek(__pos, msg, ext)), (DEFAULT_GFP_FLAGS));
+		size_t __size = sizeof(unsigned char) * glue_peek(__pos, msg, ext);
+		*dev_addr_ptr = glue_unpack_new_shadow(__pos, msg, ext, unsigned char*, (__size), (DEFAULT_GFP_FLAGS));
 		if (*dev_addr_ptr) {
 			int i;
 			unsigned char* array = *dev_addr_ptr;
@@ -3726,7 +3732,8 @@ void caller_unmarshal_kernel__alloc_etherdev_mqs__ret_net_device__out(
 	}
 
 	{
-		*_tx_ptr = glue_unpack_new_shadow(__pos, msg, ext, struct netdev_queue*, (ptr->num_tx_queues), (DEFAULT_GFP_FLAGS));
+		size_t __size = ptr->num_tx_queues;
+		*_tx_ptr = glue_unpack_new_shadow(__pos, msg, ext, struct netdev_queue*, (__size), (DEFAULT_GFP_FLAGS));
 		if (*_tx_ptr) {
 			caller_unmarshal_kernel__alloc_etherdev_mqs__net_device__tx__out(__pos, msg, ext, ctx, *_tx_ptr);
 		}
@@ -4632,7 +4639,8 @@ void callee_unmarshal_kernel__register_netdev__dev__in(
 	unsigned char** dev_addr_ptr = &ptr->dev_addr;
 	
 	{
-		*netdev_ops_ptr = glue_unpack_new_shadow(__pos, msg, ext, struct net_device_ops*, (sizeof(struct net_device_ops)), (DEFAULT_GFP_FLAGS));
+		size_t __size = sizeof(struct net_device_ops);
+		*netdev_ops_ptr = glue_unpack_new_shadow(__pos, msg, ext, struct net_device_ops*, (__size), (DEFAULT_GFP_FLAGS));
 		if (*netdev_ops_ptr) {
 			callee_unmarshal_kernel____global_netdev_ops__in(__pos, msg, ext, *netdev_ops_ptr);
 		}
@@ -4640,7 +4648,8 @@ void callee_unmarshal_kernel__register_netdev__dev__in(
 	}
 
 	{
-		*ethtool_ops_ptr = glue_unpack_new_shadow(__pos, msg, ext, struct ethtool_ops*, (sizeof(struct ethtool_ops)), (DEFAULT_GFP_FLAGS));
+		size_t __size = sizeof(struct ethtool_ops);
+		*ethtool_ops_ptr = glue_unpack_new_shadow(__pos, msg, ext, struct ethtool_ops*, (__size), (DEFAULT_GFP_FLAGS));
 		if (*ethtool_ops_ptr) {
 			callee_unmarshal_kernel____global_ethtool_ops__in(__pos, msg, ext, *ethtool_ops_ptr);
 		}
@@ -4690,6 +4699,8 @@ void callee_marshal_kernel__register_netdev__dev__in(
 	struct register_netdev_call_ctx const* ctx,
 	struct net_device const* ptr)
 {
+	char const* name_ptr = ptr->name;
+	int const* irq_ptr = &ptr->irq;
 	unsigned long const* state_ptr = &ptr->state;
 	unsigned long long const* hw_features_ptr = &ptr->hw_features;
 	struct net_device_ops* const* netdev_ops_ptr = &ptr->netdev_ops;
@@ -4699,6 +4710,23 @@ void callee_marshal_kernel__register_netdev__dev__in(
 	unsigned char* const* dev_addr_ptr = &ptr->dev_addr;
 	unsigned int const* num_tx_queues_ptr = &ptr->num_tx_queues;
 	
+	{
+		size_t i, len = 16;
+		char const* array = name_ptr;
+		glue_pack(__pos, msg, ext, len);
+		// Warning: see David if this breaks
+		glue_user_trace("Warning: see David if this breaks");
+		for (i = 0; i < len; ++i) {
+			char const* element = &array[i];
+			glue_pack(__pos, msg, ext, *element);
+		}
+
+	}
+
+	{
+		glue_pack(__pos, msg, ext, *irq_ptr);
+	}
+
 	{
 		glue_pack(__pos, msg, ext, *state_ptr);
 	}
@@ -4746,6 +4774,8 @@ void caller_unmarshal_kernel__register_netdev__dev__in(
 	struct register_netdev_call_ctx const* ctx,
 	struct net_device* ptr)
 {
+	char* name_ptr = ptr->name;
+	int* irq_ptr = &ptr->irq;
 	unsigned long* state_ptr = &ptr->state;
 	unsigned long long* hw_features_ptr = &ptr->hw_features;
 	struct net_device_ops** netdev_ops_ptr = &ptr->netdev_ops;
@@ -4755,6 +4785,23 @@ void caller_unmarshal_kernel__register_netdev__dev__in(
 	unsigned char** dev_addr_ptr = &ptr->dev_addr;
 	unsigned int* num_tx_queues_ptr = &ptr->num_tx_queues;
 	
+	{
+		int i;
+		char* array = name_ptr;
+		size_t len = glue_unpack(__pos, msg, ext, size_t);
+		// Warning: see David if this breaks
+		glue_user_trace("Warning: see David if this breaks");
+		for (i = 0; i < len; ++i) {
+			char* element = &array[i];
+			*element = glue_unpack(__pos, msg, ext, char);
+		}
+
+	}
+
+	{
+		*irq_ptr = glue_unpack(__pos, msg, ext, int);
+	}
+
 	{
 		*state_ptr = glue_unpack(__pos, msg, ext, unsigned long);
 	}
@@ -6429,6 +6476,126 @@ void caller_unmarshal_kernel__ethtool_op_get_link__dev__in(
 	const struct ext_registers* ext,
 	struct ethtool_op_get_link_call_ctx const* ctx,
 	struct net_device* ptr)
+{
+	
+}
+
+void caller_marshal_kernel__lvd_netif_tx_start_all_queues__dev__in(
+	size_t* __pos,
+	struct fipc_message* msg,
+	struct ext_registers* ext,
+	struct lvd_netif_tx_start_all_queues_call_ctx const* ctx,
+	struct net_device const* ptr)
+{
+	
+}
+
+void callee_unmarshal_kernel__lvd_netif_tx_start_all_queues__dev__in(
+	size_t* __pos,
+	const struct fipc_message* msg,
+	const struct ext_registers* ext,
+	struct lvd_netif_tx_start_all_queues_call_ctx const* ctx,
+	struct net_device* ptr)
+{
+	
+}
+
+void callee_marshal_kernel__lvd_netif_tx_start_all_queues__dev__in(
+	size_t* __pos,
+	struct fipc_message* msg,
+	struct ext_registers* ext,
+	struct lvd_netif_tx_start_all_queues_call_ctx const* ctx,
+	struct net_device const* ptr)
+{
+	
+}
+
+void caller_unmarshal_kernel__lvd_netif_tx_start_all_queues__dev__in(
+	size_t* __pos,
+	const struct fipc_message* msg,
+	const struct ext_registers* ext,
+	struct lvd_netif_tx_start_all_queues_call_ctx const* ctx,
+	struct net_device* ptr)
+{
+	
+}
+
+void caller_marshal_kernel__work_fn__work__in(
+	size_t* __pos,
+	struct fipc_message* msg,
+	struct ext_registers* ext,
+	struct work_fn_call_ctx const* ctx,
+	struct work_struct const* ptr)
+{
+	
+}
+
+void callee_unmarshal_kernel__work_fn__work__in(
+	size_t* __pos,
+	const struct fipc_message* msg,
+	const struct ext_registers* ext,
+	struct work_fn_call_ctx const* ctx,
+	struct work_struct* ptr)
+{
+	
+}
+
+void callee_marshal_kernel__work_fn__work__in(
+	size_t* __pos,
+	struct fipc_message* msg,
+	struct ext_registers* ext,
+	struct work_fn_call_ctx const* ctx,
+	struct work_struct const* ptr)
+{
+	
+}
+
+void caller_unmarshal_kernel__work_fn__work__in(
+	size_t* __pos,
+	const struct fipc_message* msg,
+	const struct ext_registers* ext,
+	struct work_fn_call_ctx const* ctx,
+	struct work_struct* ptr)
+{
+	
+}
+
+void caller_marshal_kernel__lvd_init_work__work__in(
+	size_t* __pos,
+	struct fipc_message* msg,
+	struct ext_registers* ext,
+	struct lvd_init_work_call_ctx const* ctx,
+	struct work_struct const* ptr)
+{
+	
+}
+
+void callee_unmarshal_kernel__lvd_init_work__work__in(
+	size_t* __pos,
+	const struct fipc_message* msg,
+	const struct ext_registers* ext,
+	struct lvd_init_work_call_ctx const* ctx,
+	struct work_struct* ptr)
+{
+	
+}
+
+void callee_marshal_kernel__lvd_init_work__work__in(
+	size_t* __pos,
+	struct fipc_message* msg,
+	struct ext_registers* ext,
+	struct lvd_init_work_call_ctx const* ctx,
+	struct work_struct const* ptr)
+{
+	
+}
+
+void caller_unmarshal_kernel__lvd_init_work__work__in(
+	size_t* __pos,
+	const struct fipc_message* msg,
+	const struct ext_registers* ext,
+	struct lvd_init_work_call_ctx const* ctx,
+	struct work_struct* ptr)
 {
 	
 }

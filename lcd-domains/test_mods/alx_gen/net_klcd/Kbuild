@@ -9,4 +9,3 @@ extra-y += $(addprefix ../, trampolines.lds)
 ldflags-y += -T $(LCD_TEST_MODULES_BUILD_DIR)/alx_gen/trampolines.lds
 
 ccflags-y += $(NONISOLATED_CFLAGS)
-

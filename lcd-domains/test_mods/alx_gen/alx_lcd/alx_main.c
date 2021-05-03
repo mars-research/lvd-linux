@@ -56,6 +56,16 @@
 
 const char alx_drv_name[] = "alx";
 
+struct alx_priv *g_alx;
+
+void lcd_consume_skb(struct sk_buff *skb);
+void lvd_netif_tx_start_all_queues(struct net_device* dev);
+typedef void (*fptr_work_fn)(struct work_struct* work);
+void lvd_init_work(struct work_struct* work, fptr_work_fn work_fn);
+extern struct workqueue_struct *system_wq;
+
+#define LVD_INIT_WORK(_work, _func)						\
+	lvd_init_work((_work), (_func))
 
 static void alx_free_txbuf(struct alx_priv *alx, int entry)
 {
@@ -100,7 +110,11 @@ static int alx_refill_rx_ring(struct alx_priv *alx, gfp_t gfp)
 		 * longer space, and offset the address whenever
 		 * 0x....fc0 is detected.
 		 */
+#ifdef LCD_ISOLATE
+		skb = alloc_skb(alx->rxbuf_size + 64, gfp);
+#else
 		skb = __netdev_alloc_skb(alx->dev, alx->rxbuf_size + 64, gfp);
+#endif
 		if (!skb)
 			break;
 
@@ -111,7 +125,11 @@ static int alx_refill_rx_ring(struct alx_priv *alx, gfp_t gfp)
 				     skb->data, alx->rxbuf_size,
 				     DMA_FROM_DEVICE);
 		if (dma_mapping_error(&alx->hw.pdev->dev, dma)) {
+#ifdef LCD_ISOLATE
+			lcd_consume_skb(skb);
+#else
 			dev_kfree_skb(skb);
+#endif
 			break;
 		}
 
@@ -119,7 +137,11 @@ static int alx_refill_rx_ring(struct alx_priv *alx, gfp_t gfp)
 		 * aligned, so we can't use IP alignment.
 		 */
 		if (WARN_ON(dma & 3)) {
+#ifdef LCD_ISOLATE
+			lcd_consume_skb(skb);
+#else
 			dev_kfree_skb(skb);
+#endif
 			break;
 		}
 
@@ -357,7 +379,8 @@ static irqreturn_t alx_intr_handle(struct alx_priv *alx, u32 intr)
 
 static irqreturn_t alx_intr_msi(int irq, void *data)
 {
-	struct alx_priv *alx = data;
+	//struct alx_priv *alx = data;
+	struct alx_priv *alx = g_alx;
 
 	return alx_intr_handle(alx, alx_read_mem32(&alx->hw, ALX_ISR));
 }
@@ -470,7 +493,9 @@ static void alx_add_mc_addr(struct alx_hw *hw, const u8 *addr, u32 *mc_hash)
 {
 	u32 crc32, bit, reg;
 
+	printk("%s:%d #1\n", __func__, __LINE__);
 	crc32 = ether_crc(ETH_ALEN, addr);
+	printk("%s:%d #2\n", __func__, __LINE__);
 	reg = (crc32 >> 31) & 0x1;
 	bit = (crc32 >> 26) & 0x1F;
 
@@ -484,7 +509,10 @@ static void __alx_set_rx_mode(struct net_device *netdev)
 	struct netdev_hw_addr *ha;
 	u32 mc_hash[2] = {};
 
+	printk("%s, &mc.list %p mc.list.prev %p | mc.list.next %p | count %d\n", __func__,
+			&netdev->mc.list, netdev->mc.list.prev, netdev->mc.list.next, netdev->mc.count);
 	if (!(netdev->flags & IFF_ALLMULTI)) {
+		printk("%s:%d #3\n", __func__, __LINE__);
 		netdev_for_each_mc_addr(ha, netdev)
 			alx_add_mc_addr(hw, ha->addr, mc_hash);
 
@@ -499,6 +527,7 @@ static void __alx_set_rx_mode(struct net_device *netdev)
 		hw->rx_ctrl |= ALX_MAC_CTRL_MULTIALL_EN;
 
 	alx_write_mem32(hw, ALX_MAC_CTRL, hw->rx_ctrl);
+	printk("%s:%d #4\n", __func__, __LINE__);
 }
 
 static void alx_set_rx_mode(struct net_device *netdev)
@@ -793,6 +822,7 @@ static void alx_configure(struct alx_priv *alx)
 
 	alx_configure_basic(hw);
 	alx_disable_rss(hw);
+	printk("%s:%d setting rx mode!", __func__, __LINE__);
 	__alx_set_rx_mode(alx->dev);
 
 	alx_write_mem32(hw, ALX_MAC_CTRL, hw->rx_ctrl);
@@ -861,18 +891,24 @@ static int __alx_open(struct alx_priv *alx, bool resume)
 
 	alx_configure(alx);
 
+	printk("%s:%d, done alx_configure", __func__, __LINE__);
 	err = alx_request_irq(alx);
 	if (err)
 		goto out_free_rings;
 
+	printk("%s:%d, done alx_request_irq", __func__, __LINE__);
 	/* clear old interrupts */
 	alx_write_mem32(&alx->hw, ALX_ISR, ~(u32)ALX_ISR_DIS);
 
 	alx_irq_enable(alx);
 
+	printk("%s:%d, done alx_irq_enable", __func__, __LINE__);
 	if (!resume)
+#ifdef LCD_ISOLATE
+		lvd_netif_tx_start_all_queues(alx->dev);
+#else
 		netif_tx_start_all_queues(alx->dev);
-
+#endif
 	alx_schedule_link_check(alx);
 	return 0;
 
@@ -989,7 +1025,7 @@ static void alx_link_check(struct work_struct *work)
 	rtnl_unlock();
 }
 
-static void alx_reset(struct work_struct *work)
+__maybe_unused static void alx_reset(struct work_struct *work)
 {
 	struct alx_priv *alx = container_of(work, struct alx_priv, reset_wk);
 
@@ -1300,7 +1336,7 @@ static int alx_probe(struct pci_dev *pdev, const struct pci_device_id *ent)
 	}
 
 	SET_NETDEV_DEV(netdev, &pdev->dev);
-	alx = netdev_priv(netdev);
+	g_alx = alx = netdev_priv(netdev);
 	spin_lock_init(&alx->hw.mdio_lock);
 	spin_lock_init(&alx->irq_lock);
 	spin_lock_init(&alx->stats_lock);
@@ -1385,8 +1421,13 @@ static int alx_probe(struct pci_dev *pdev, const struct pci_device_id *ent)
 		goto out_unmap;
 	}
 
+#ifdef LCD_ISOLATE
+	LVD_INIT_WORK(&alx->link_check_wk, alx_link_check);
+	LVD_INIT_WORK(&alx->reset_wk, alx_reset);
+#else
 	INIT_WORK(&alx->link_check_wk, alx_link_check);
 	INIT_WORK(&alx->reset_wk, alx_reset);
+#endif
 	netif_carrier_off(netdev);
 
 	err = register_netdev(netdev);

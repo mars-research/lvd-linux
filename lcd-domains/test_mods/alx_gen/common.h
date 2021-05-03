@@ -32,7 +32,7 @@
 
 #ifndef LCD_ISOLATE
 #define glue_unpack_rpc_ptr(pos, msg, ext, name) \
-	glue_peek(pos, msg, ext) ? (fptr_##name)glue_unpack_rpc_ptr_impl(glue_unpack(pos, msg, ext, void*), LCD_DUP_TRAMPOLINE(trmp_##name), LCD_TRAMPOLINE_SIZE(trmp_##name)) : NULL
+	(fptr_##name)glue_unpack_rpc_ptr_impl(glue_unpack(pos, msg, ext, void*), LCD_DUP_TRAMPOLINE(trmp_##name), LCD_TRAMPOLINE_SIZE(trmp_##name))
 
 #else
 #define glue_unpack_rpc_ptr(pos, msg, ext, name) NULL; glue_user_panic("Trampolines cannot be used on LCD side")
@@ -91,6 +91,17 @@ glue_unpack_impl(size_t* pos, const struct fipc_message* msg, const struct ext_r
 		return msg->regs[(*pos)++ + 1];
 	else
 		return ext->regs[(*pos)++ + 1];
+}
+
+static inline uint64_t
+glue_peek_impl_one(size_t* pos, const struct fipc_message* msg, const struct ext_registers* ext)
+{
+	if (*pos >= msg->regs[0])
+		glue_user_panic("Peeked past end of glue message");
+	if (*pos < 5)
+		return msg->regs[*pos + 1];
+	else
+		return ext->regs[*pos + 1];
 }
 
 static inline uint64_t
@@ -230,6 +241,9 @@ enum RPC_ID {
 	RPC_ID_get_jiffies,
 	RPC_ID_eth_validate_addr,
 	RPC_ID_ethtool_op_get_link,
+	RPC_ID_lvd_netif_tx_start_all_queues,
+	RPC_ID_work_fn,
+	RPC_ID_lvd_init_work,
 };
 
 int try_dispatch(enum RPC_ID id, struct fipc_message* msg, struct ext_registers* ext);
@@ -401,6 +415,12 @@ typedef int (*fptr_impl_poll)(fptr_poll target, struct napi_struct* napi, int we
 
 LCD_TRAMPOLINE_DATA(trmp_poll)
 int LCD_TRAMPOLINE_LINKAGE(trmp_poll) trmp_poll(struct napi_struct* napi, int weight);
+
+typedef void (*fptr_work_fn)(struct work_struct* work);
+typedef void (*fptr_impl_work_fn)(fptr_work_fn target, struct work_struct* work);
+
+LCD_TRAMPOLINE_DATA(trmp_work_fn)
+void LCD_TRAMPOLINE_LINKAGE(trmp_work_fn) trmp_work_fn(struct work_struct* work);
 
 struct ethtool_ops_set_settings_call_ctx {
 	struct net_device* netdev;
@@ -780,6 +800,19 @@ struct eth_validate_addr_call_ctx {
 
 struct ethtool_op_get_link_call_ctx {
 	struct net_device* dev;
+};
+
+struct lvd_netif_tx_start_all_queues_call_ctx {
+	struct net_device* dev;
+};
+
+struct work_fn_call_ctx {
+	struct work_struct* work;
+};
+
+struct lvd_init_work_call_ctx {
+	struct work_struct* work;
+	fptr_work_fn work_fn;
 };
 
 void caller_marshal_kernel__ethtool_ops_set_settings__netdev__in(
@@ -2266,34 +2299,6 @@ void caller_unmarshal_kernel__queue_work_on__work__in(
 	struct queue_work_on_call_ctx const* call_ctx,
 	struct work_struct* ptr);
 
-void caller_marshal_kernel__queue_work_on__atomic64_t__io(
-	size_t* __pos,
-	struct fipc_message* msg,
-	struct ext_registers* ext,
-	struct queue_work_on_call_ctx const* call_ctx,
-	struct atomic64_t const* ptr);
-
-void callee_unmarshal_kernel__queue_work_on__atomic64_t__io(
-	size_t* __pos,
-	const struct fipc_message* msg,
-	const struct ext_registers* ext,
-	struct queue_work_on_call_ctx const* call_ctx,
-	struct atomic64_t* ptr);
-
-void callee_marshal_kernel__queue_work_on__atomic64_t__io(
-	size_t* __pos,
-	struct fipc_message* msg,
-	struct ext_registers* ext,
-	struct queue_work_on_call_ctx const* call_ctx,
-	struct atomic64_t const* ptr);
-
-void caller_unmarshal_kernel__queue_work_on__atomic64_t__io(
-	size_t* __pos,
-	const struct fipc_message* msg,
-	const struct ext_registers* ext,
-	struct queue_work_on_call_ctx const* call_ctx,
-	struct atomic64_t* ptr);
-
 void caller_marshal_kernel__consume_skb__skb__in(
 	size_t* __pos,
 	struct fipc_message* msg,
@@ -3461,6 +3466,90 @@ void caller_unmarshal_kernel__ethtool_op_get_link__dev__in(
 	const struct ext_registers* ext,
 	struct ethtool_op_get_link_call_ctx const* call_ctx,
 	struct net_device* ptr);
+
+void caller_marshal_kernel__lvd_netif_tx_start_all_queues__dev__in(
+	size_t* __pos,
+	struct fipc_message* msg,
+	struct ext_registers* ext,
+	struct lvd_netif_tx_start_all_queues_call_ctx const* call_ctx,
+	struct net_device const* ptr);
+
+void callee_unmarshal_kernel__lvd_netif_tx_start_all_queues__dev__in(
+	size_t* __pos,
+	const struct fipc_message* msg,
+	const struct ext_registers* ext,
+	struct lvd_netif_tx_start_all_queues_call_ctx const* call_ctx,
+	struct net_device* ptr);
+
+void callee_marshal_kernel__lvd_netif_tx_start_all_queues__dev__in(
+	size_t* __pos,
+	struct fipc_message* msg,
+	struct ext_registers* ext,
+	struct lvd_netif_tx_start_all_queues_call_ctx const* call_ctx,
+	struct net_device const* ptr);
+
+void caller_unmarshal_kernel__lvd_netif_tx_start_all_queues__dev__in(
+	size_t* __pos,
+	const struct fipc_message* msg,
+	const struct ext_registers* ext,
+	struct lvd_netif_tx_start_all_queues_call_ctx const* call_ctx,
+	struct net_device* ptr);
+
+void caller_marshal_kernel__work_fn__work__in(
+	size_t* __pos,
+	struct fipc_message* msg,
+	struct ext_registers* ext,
+	struct work_fn_call_ctx const* call_ctx,
+	struct work_struct const* ptr);
+
+void callee_unmarshal_kernel__work_fn__work__in(
+	size_t* __pos,
+	const struct fipc_message* msg,
+	const struct ext_registers* ext,
+	struct work_fn_call_ctx const* call_ctx,
+	struct work_struct* ptr);
+
+void callee_marshal_kernel__work_fn__work__in(
+	size_t* __pos,
+	struct fipc_message* msg,
+	struct ext_registers* ext,
+	struct work_fn_call_ctx const* call_ctx,
+	struct work_struct const* ptr);
+
+void caller_unmarshal_kernel__work_fn__work__in(
+	size_t* __pos,
+	const struct fipc_message* msg,
+	const struct ext_registers* ext,
+	struct work_fn_call_ctx const* call_ctx,
+	struct work_struct* ptr);
+
+void caller_marshal_kernel__lvd_init_work__work__in(
+	size_t* __pos,
+	struct fipc_message* msg,
+	struct ext_registers* ext,
+	struct lvd_init_work_call_ctx const* call_ctx,
+	struct work_struct const* ptr);
+
+void callee_unmarshal_kernel__lvd_init_work__work__in(
+	size_t* __pos,
+	const struct fipc_message* msg,
+	const struct ext_registers* ext,
+	struct lvd_init_work_call_ctx const* call_ctx,
+	struct work_struct* ptr);
+
+void callee_marshal_kernel__lvd_init_work__work__in(
+	size_t* __pos,
+	struct fipc_message* msg,
+	struct ext_registers* ext,
+	struct lvd_init_work_call_ctx const* call_ctx,
+	struct work_struct const* ptr);
+
+void caller_unmarshal_kernel__lvd_init_work__work__in(
+	size_t* __pos,
+	const struct fipc_message* msg,
+	const struct ext_registers* ext,
+	struct lvd_init_work_call_ctx const* call_ctx,
+	struct work_struct* ptr);
 
 
 #endif

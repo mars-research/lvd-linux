@@ -2,10 +2,18 @@
 
 #include "common.h"
 
+#include <asm/lcd_domains/liblcd.h>
+#include <linux/workqueue.h>
+
 #include <lcd_config/post_hook.h>
 
 unsigned long loops_per_jiffy;
 unsigned long volatile jiffies;
+struct workqueue_struct {
+	int dummy;
+};
+struct workqueue_struct __system_wq;
+struct workqueue_struct *system_wq = &__system_wq;
 
 void ethtool_ops_set_settings_callee(struct fipc_message* msg, struct ext_registers* ext)
 {
@@ -237,7 +245,6 @@ void thread_fn_callee(struct fipc_message* msg, struct ext_registers* ext)
 	int irq = 0;
 	void* id = 0;
 	int* irq_ptr = &irq;
-	void** id_ptr = &id;
 	unsigned int ret = 0;
 	unsigned int* ret_ptr = &ret;
 	
@@ -252,21 +259,10 @@ void thread_fn_callee(struct fipc_message* msg, struct ext_registers* ext)
 		*irq_ptr = glue_unpack(__pos, msg, ext, int);
 	}
 
-	{
-		*id_ptr = glue_unpack(__pos, msg, ext, void*);
-		if (*id_ptr) {
-		}
-
-	}
-
 	ret = function_ptr(irq, id);
 
 	*__pos = 0;
 	{
-	}
-
-	{
-		(void)id_ptr;
 	}
 
 	{
@@ -288,7 +284,6 @@ void handler_callee(struct fipc_message* msg, struct ext_registers* ext)
 	int irq = 0;
 	void* id = 0;
 	int* irq_ptr = &irq;
-	void** id_ptr = &id;
 	unsigned int ret = 0;
 	unsigned int* ret_ptr = &ret;
 	
@@ -303,21 +298,10 @@ void handler_callee(struct fipc_message* msg, struct ext_registers* ext)
 		*irq_ptr = glue_unpack(__pos, msg, ext, int);
 	}
 
-	{
-		*id_ptr = glue_unpack(__pos, msg, ext, void*);
-		if (*id_ptr) {
-		}
-
-	}
-
 	ret = function_ptr(irq, id);
 
 	*__pos = 0;
 	{
-	}
-
-	{
-		(void)id_ptr;
 	}
 
 	{
@@ -340,10 +324,8 @@ int request_threaded_irq(unsigned int irq, fptr_handler handler, fptr_thread_fn 
 
 	unsigned int* irq_ptr = &irq;
 	fptr_handler* handler_ptr = &handler;
-	fptr_thread_fn* thread_fn_ptr = &thread_fn;
 	unsigned long* irqflags_ptr = &irqflags;
 	char const** devname_ptr = &devname;
-	void** dev_id_ptr = &dev_id;
 	int ret = 0;
 	int* ret_ptr = &ret;
 	
@@ -362,10 +344,6 @@ int request_threaded_irq(unsigned int irq, fptr_handler handler, fptr_thread_fn 
 
 	{
 		glue_pack(__pos, msg, ext, *handler_ptr);
-	}
-
-	{
-		glue_pack(__pos, msg, ext, *thread_fn_ptr);
 	}
 
 	{
@@ -389,14 +367,6 @@ int request_threaded_irq(unsigned int irq, fptr_handler handler, fptr_thread_fn 
 
 	}
 
-	{
-		__maybe_unused const void* __adjusted = *dev_id_ptr;
-		glue_pack_shadow(__pos, msg, ext, __adjusted);
-		if (*dev_id_ptr) {
-		}
-
-	}
-
 	glue_call_server(__pos, msg, RPC_ID_request_threaded_irq);
 
 	*__pos = 0;
@@ -410,14 +380,7 @@ int request_threaded_irq(unsigned int irq, fptr_handler handler, fptr_thread_fn 
 	}
 
 	{
-	}
-
-	{
 		(void)devname_ptr;
-	}
-
-	{
-		(void)dev_id_ptr;
 	}
 
 	{
@@ -634,7 +597,8 @@ void probe_callee(struct fipc_message* msg, struct ext_registers* ext)
 	}
 
 	{
-		*pdev_ptr = glue_unpack_new_shadow(__pos, msg, ext, struct pci_dev*, (sizeof(struct pci_dev)), (DEFAULT_GFP_FLAGS));
+		size_t __size = sizeof(struct pci_dev);
+		*pdev_ptr = glue_unpack_new_shadow(__pos, msg, ext, struct pci_dev*, (__size), (DEFAULT_GFP_FLAGS));
 		if (*pdev_ptr) {
 			callee_unmarshal_kernel__probe__pdev__in(__pos, msg, ext, ctx, *pdev_ptr);
 		}
@@ -642,7 +606,8 @@ void probe_callee(struct fipc_message* msg, struct ext_registers* ext)
 	}
 
 	{
-		*ent_ptr = glue_unpack_new_shadow(__pos, msg, ext, struct pci_device_id*, (sizeof(struct pci_device_id)), (DEFAULT_GFP_FLAGS));
+		size_t __size = sizeof(struct pci_device_id);
+		*ent_ptr = glue_unpack_new_shadow(__pos, msg, ext, struct pci_device_id*, (__size), (DEFAULT_GFP_FLAGS));
 		if (*ent_ptr) {
 			callee_unmarshal_kernel__probe__ent__in(__pos, msg, ext, ctx, *ent_ptr);
 		}
@@ -1163,7 +1128,8 @@ void ethtool_ops_get_ethtool_stats_callee(struct fipc_message* msg, struct ext_r
 	}
 
 	{
-		*data_ptr = glue_unpack_new_shadow(__pos, msg, ext, unsigned long long*, (sizeof(unsigned long long) * glue_peek(__pos, msg, ext)), (DEFAULT_GFP_FLAGS));
+		size_t __size = sizeof(unsigned long long) * glue_peek(__pos, msg, ext);
+		*data_ptr = glue_unpack_new_shadow(__pos, msg, ext, unsigned long long*, (__size), (DEFAULT_GFP_FLAGS));
 		(void)data_ptr;
 	}
 
@@ -1367,7 +1333,8 @@ void net_device_ops_ndo_start_xmit_callee(struct fipc_message* msg, struct ext_r
 	}
 
 	{
-		*skb_ptr = glue_unpack_new_shadow(__pos, msg, ext, struct sk_buff*, (sizeof(struct sk_buff)), (DEFAULT_GFP_FLAGS));
+		size_t __size = sizeof(struct sk_buff);
+		*skb_ptr = glue_unpack_new_shadow(__pos, msg, ext, struct sk_buff*, (__size), (DEFAULT_GFP_FLAGS));
 		if (*skb_ptr) {
 			callee_unmarshal_kernel__net_device_ops_ndo_start_xmit__skb__in(__pos, msg, ext, ctx, *skb_ptr);
 		}
@@ -1436,6 +1403,7 @@ void net_device_ops_ndo_set_rx_mode_callee(struct fipc_message* msg, struct ext_
 	function_ptr(netdev);
 
 	*__pos = 0;
+	if (0)
 	{
 		if (*netdev_ptr) {
 			callee_marshal_kernel__net_device_ops_ndo_set_rx_mode__netdev__in(__pos, msg, ext, ctx, *netdev_ptr);
@@ -2481,6 +2449,10 @@ struct net_device* alloc_etherdev_mqs(int sizeof_priv, unsigned int txqs, unsign
 			caller_unmarshal_kernel__alloc_etherdev_mqs__ret_net_device__out(__pos, msg, ext, ctx, *ret_ptr);
 		}
 
+	}
+	{
+		INIT_LIST_HEAD(&ret->mc.list);
+		ret->mc.count = 0;
 	}
 
 	if (verbose_debug) {
@@ -4127,7 +4099,11 @@ void* pci_ioremap_bar(struct pci_dev* pdev, int bar)
 	}
 
 	{
+		int _ret;
+		_ret = lcd_syscall_assign_device(0, 2, PCI_DEVFN(0, 0));
+		printk("%s, assign device returned %d\n", __func__, _ret);
 	}
+
 
 	if (verbose_debug) {
 		printk("%s:%d, returned!\n", __func__, __LINE__);
@@ -4301,12 +4277,146 @@ unsigned int ethtool_op_get_link(struct net_device* dev)
 	return ret;
 }
 
+void lvd_netif_tx_start_all_queues(struct net_device* dev)
+{
+	struct fipc_message __buffer = {0};
+	struct fipc_message *msg = &__buffer;
+	struct ext_registers* ext = get_register_page(smp_processor_id());
+	size_t n_pos = 0;
+	size_t* __pos = &n_pos;
+
+	struct net_device** dev_ptr = &dev;
+	
+	__maybe_unused const struct lvd_netif_tx_start_all_queues_call_ctx call_ctx = {dev};
+	__maybe_unused const struct lvd_netif_tx_start_all_queues_call_ctx *ctx = &call_ctx;
+
+	(void)ext;
+
+	if (verbose_debug) {
+		printk("%s:%d, entered!\n", __func__, __LINE__);
+	}
+
+	{
+		__maybe_unused const void* __adjusted = *dev_ptr;
+		glue_pack_shadow(__pos, msg, ext, __adjusted);
+		if (*dev_ptr) {
+			caller_marshal_kernel__lvd_netif_tx_start_all_queues__dev__in(__pos, msg, ext, ctx, *dev_ptr);
+		}
+
+	}
+
+	glue_call_server(__pos, msg, RPC_ID_lvd_netif_tx_start_all_queues);
+
+	*__pos = 0;
+	{
+		if (*dev_ptr) {
+			caller_unmarshal_kernel__lvd_netif_tx_start_all_queues__dev__in(__pos, msg, ext, ctx, *dev_ptr);
+		}
+
+	}
+
+	if (verbose_debug) {
+		printk("%s:%d, returned!\n", __func__, __LINE__);
+	}
+}
+
+void work_fn_callee(struct fipc_message* msg, struct ext_registers* ext)
+{
+	size_t n_pos = 0;
+	size_t* __pos = &n_pos;
+
+	fptr_work_fn function_ptr = glue_unpack(__pos, msg, ext, fptr_work_fn);
+	struct work_struct* work = 0;
+	struct work_struct** work_ptr = &work;
+	
+	__maybe_unused struct work_fn_call_ctx call_ctx = {work};
+	__maybe_unused struct work_fn_call_ctx *ctx = &call_ctx;
+
+	if (verbose_debug) {
+		printk("%s:%d, entered!\n", __func__, __LINE__);
+	}
+
+	{
+		*work_ptr = glue_unpack(__pos, msg, ext, struct work_struct*);
+		if (*work_ptr) {
+			callee_unmarshal_kernel__work_fn__work__in(__pos, msg, ext, ctx, *work_ptr);
+		}
+
+	}
+
+	function_ptr(work);
+
+	*__pos = 0;
+	{
+		if (*work_ptr) {
+			callee_marshal_kernel__work_fn__work__in(__pos, msg, ext, ctx, *work_ptr);
+		}
+
+	}
+
+	msg->regs[0] = *__pos;
+	if (verbose_debug) {
+		printk("%s:%d, returned!\n", __func__, __LINE__);
+	}
+}
+
+void lvd_init_work(struct work_struct* work, fptr_work_fn work_fn)
+{
+	struct fipc_message __buffer = {0};
+	struct fipc_message *msg = &__buffer;
+	struct ext_registers* ext = get_register_page(smp_processor_id());
+	size_t n_pos = 0;
+	size_t* __pos = &n_pos;
+
+	struct work_struct** work_ptr = &work;
+	fptr_work_fn* work_fn_ptr = &work_fn;
+	
+	__maybe_unused const struct lvd_init_work_call_ctx call_ctx = {work, work_fn};
+	__maybe_unused const struct lvd_init_work_call_ctx *ctx = &call_ctx;
+
+	(void)ext;
+
+	if (verbose_debug) {
+		printk("%s:%d, entered!\n", __func__, __LINE__);
+	}
+
+	{
+		__maybe_unused const void* __adjusted = *work_ptr;
+		glue_pack(__pos, msg, ext, __adjusted);
+		if (*work_ptr) {
+			caller_marshal_kernel__lvd_init_work__work__in(__pos, msg, ext, ctx, *work_ptr);
+		}
+
+	}
+
+	{
+		glue_pack(__pos, msg, ext, *work_fn_ptr);
+	}
+
+	printk("%s:%d calling server with work %p | work_fn %p\n", __func__, __LINE__, work, work_fn);
+	glue_call_server(__pos, msg, RPC_ID_lvd_init_work);
+
+	*__pos = 0;
+	{
+		if (*work_ptr) {
+			caller_unmarshal_kernel__lvd_init_work__work__in(__pos, msg, ext, ctx, *work_ptr);
+		}
+
+	}
+
+	{
+	}
+
+	if (verbose_debug) {
+		printk("%s:%d, returned!\n", __func__, __LINE__);
+	}
+}
+
 void __init_globals(void) {
 
 	loops_per_jiffy = get_loops_per_jiffy();
 	jiffies = get_jiffies();
 }
-
 int try_dispatch(enum RPC_ID id, struct fipc_message* msg, struct ext_registers* ext)
 {
 	switch(id) {
@@ -4460,6 +4570,11 @@ int try_dispatch(enum RPC_ID id, struct fipc_message* msg, struct ext_registers*
 	case RPC_ID_poll:
 		glue_user_trace("poll\n");
 		poll_callee(msg, ext);
+		break;
+
+	case RPC_ID_work_fn:
+		glue_user_trace("work_fn\n");
+		work_fn_callee(msg, ext);
 		break;
 
 	default:

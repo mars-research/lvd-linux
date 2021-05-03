@@ -34,17 +34,17 @@ module kernel {
 		projection < struct net_device > netdev {
 		}
 	}
-	rpc_ptr unsigned int thread_fn(int irq, void *id) {
+	rpc_ptr unsigned int thread_fn(int irq, void * [unused] id) {
 	}
 
-	rpc_ptr unsigned int handler(int irq, void *id) {
+	rpc_ptr unsigned int handler(int irq, void * [unused] id) {
 	}
 
 	rpc int request_threaded_irq( unsigned int irq,
 			rpc_ptr handler handler,
-			rpc_ptr thread_fn thread_fn,
+			rpc_ptr thread_fn [unused] thread_fn,
 			long unsigned int irqflags,
-			string [alloc(callee)] * devname, void* dev_id ) {
+			string [alloc(callee)] * devname, void [alloc<{{sizeof(void*)}}>(callee)] * [unused] dev_id ) {
 	}
 
 
@@ -127,6 +127,7 @@ module kernel {
 	}
 	rpc int  pci_enable_msi_range( projection dev*  dev, int  minvec, int  maxvec ) {
 		projection < struct pci_dev > dev {
+			int [out] irq;
 		}
 	}
 	rpc_ptr void  ethtool_ops_get_pauseparam( projection netdev [bind(callee)] *  netdev, projection pause [alloc_stack(callee), out] * pause ) {
@@ -166,7 +167,15 @@ module kernel {
 	}
 	rpc_ptr int net_device_ops_ndo_open( projection netdev [bind(callee)] *  netdev ) {
 		projection < struct net_device > netdev {
+			//projection netdev_hw_addr_list mc;
 		}
+
+		/*projection < struct netdev_hw_addr_list> netdev_hw_addr_list {
+			projection list_head list;
+		}
+		projection < struct list_head> list_head {
+			projection list_head [alloc<{{sizeof(struct netdev_hw_addr)}}>(callee)] * next;
+		}*/
 	}
 	rpc_ptr int  net_device_ops_ndo_stop( projection netdev [bind(callee)] *  netdev ) {
 		projection < struct net_device > netdev {
@@ -187,15 +196,14 @@ module kernel {
 	rpc_ptr void  net_device_ops_ndo_set_rx_mode( projection netdev [bind(callee)] *  netdev ) {
 		projection < struct netdev_hw_addr_list> netdev_hw_addr_list {
 			projection list_head list;
+			int count;
 		}
 		projection < struct list_head> list_head {
-			//projection list_head_next* next;
+			projection list_head [alloc<{{sizeof(struct netdev_hw_addr)}}>(callee)] * next;
 		}
 		projection < struct net_device > netdev {
 			//unsigned short  dev_id;
 			projection netdev_hw_addr_list mc;
-		}
-		projection < struct list_head > list_head_next {
 		}
 	}
 	// TODO: need static void
@@ -325,15 +333,15 @@ module kernel {
 	}
 
 	rpc bool  queue_work_on( int  cpu, projection wq* [unused]  wq //global
-			, projection work [alloc(callee)] * work ) {
+			, projection work [bind(callee)] * work ) {
 		projection < struct workqueue_struct > wq {
 		}
 		projection < struct work_struct > work {
-			projection  atomic64_t [in, out] data;
+			//projection  atomic64_t [in, out] data;
 		}
-		projection <struct atomic64_t> atomic64_t {
+		/*projection <struct atomic64_t> atomic64_t {
 			long counter;
-		}
+		}*/
 	}
 	rpc void  consume_skb( projection skb [dealloc(caller)] *  skb ) {
 		projection < struct sk_buff > skb {
@@ -458,9 +466,9 @@ module kernel {
 			//projection device_parent* parent;
 		}
 		projection < struct net_device > dev {
-			//array< char, 16> name;
+			array< char, 16> [out] name;
 			// XXX: false positive. irq is never modified?
-			//int [out] irq;
+			int [out] irq;
 			long unsigned int [out] state;
 			// XXX; missing [out]
 			long long unsigned int [out] hw_features;
@@ -617,5 +625,24 @@ module kernel {
 	rpc u32 ethtool_op_get_link(projection  dev *dev) {
 		projection < struct net_device > dev {
 		}
+	}
+
+	rpc void lvd_netif_tx_start_all_queues(projection dev *dev) {	
+		projection < struct net_device > dev {
+		}
+	}
+
+	rpc_ptr void work_fn(projection work *work) {
+		projection < struct work_struct > work {
+		}
+	}
+
+	rpc void lvd_init_work(projection work [alloc(callee)] *work, rpc_ptr work_fn work_fn) {
+		projection < struct work_struct > work {
+			//projection  atomic64_t [out] data;
+		}
+		/*projection <struct atomic64_t> atomic64_t {
+			long counter;
+		}*/
 	}
 }

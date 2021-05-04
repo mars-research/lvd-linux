@@ -64,6 +64,11 @@ void lvd_netif_tx_wake_all_queues(struct net_device* dev);
 void lvd_netif_trans_update(struct net_device *dev);
 void lvd_netif_tx_disable(struct net_device *dev);
 void lvd_napi_enable(struct napi_struct *n);
+void lvd_napi_schedule(struct napi_struct *n);
+typedef void (*fptr_work_fn)(struct work_struct* work);
+void lvd_init_work(struct work_struct* work, fptr_work_fn work_fn);
+extern struct workqueue_struct *system_wq;
+
 typedef void (*fptr_work_fn)(struct work_struct* work);
 void lvd_init_work(struct work_struct* work, fptr_work_fn work_fn);
 extern struct workqueue_struct *system_wq;
@@ -125,9 +130,13 @@ static int alx_refill_rx_ring(struct alx_priv *alx, gfp_t gfp)
 		if (((unsigned long)skb->data & 0xfff) == 0xfc0)
 			skb_reserve(skb, 64);
 
+#ifndef LCD_ISOLATE
 		dma = dma_map_single(&alx->hw.pdev->dev,
 				     skb->data, alx->rxbuf_size,
 				     DMA_FROM_DEVICE);
+#else
+		dma = __pa(skb->data);
+#endif
 		if (dma_mapping_error(&alx->hw.pdev->dev, dma)) {
 #ifdef LCD_ISOLATE
 			lcd_consume_skb(skb);
@@ -239,6 +248,7 @@ static int alx_clean_rx_irq(struct alx_priv *alx, int budget)
 
 	while (work < budget) {
 		rrd = &rxq->rrd[rxq->rrd_read_idx];
+		printk("rx_irq: rrd->word3 %X", rrd->word3);
 		if (!(rrd->word3 & cpu_to_le32(1 << RRD_UPDATED_SHIFT)))
 			break;
 		rrd->word3 &= ~cpu_to_le32(1 << RRD_UPDATED_SHIFT);
@@ -263,7 +273,12 @@ static int alx_clean_rx_irq(struct alx_priv *alx, int budget)
 		if (rrd->word3 & cpu_to_le32(1 << RRD_ERR_RES_SHIFT) ||
 		    rrd->word3 & cpu_to_le32(1 << RRD_ERR_LEN_SHIFT)) {
 			rrd->word3 = 0;
+#ifdef LCD_ISOLATE
+			printk("%s:%d rx error. freeing pkt!", __func__, __LINE__);
+			lcd_consume_skb(skb);
+#else
 			dev_kfree_skb_any(skb);
+#endif
 			goto next_pkt;
 		}
 
@@ -365,7 +380,11 @@ static irqreturn_t alx_intr_handle(struct alx_priv *alx, u32 intr)
 	}
 
 	if (intr & (ALX_ISR_TX_Q0 | ALX_ISR_RX_Q0)) {
+#ifdef LCD_ISOLATE
+		lvd_napi_schedule(&alx->napi);
+#else
 		napi_schedule(&alx->napi);
+#endif
 		/* mask rx/tx interrupt, enable them when napi complete */
 		alx->int_mask &= ~ALX_ISR_ALL_QUEUES;
 		write_int_mask = true;
@@ -463,7 +482,11 @@ static void alx_free_rxring_buf(struct alx_priv *alx)
 					 dma_unmap_addr(cur_buf, dma),
 					 dma_unmap_len(cur_buf, size),
 					 DMA_FROM_DEVICE);
+#ifdef LCD_ISOLATE
+			lcd_consume_skb(cur_buf->skb);
+#else
 			dev_kfree_skb(cur_buf->skb);
+#endif
 			cur_buf->skb = NULL;
 			dma_unmap_len_set(cur_buf, size, 0);
 			dma_unmap_addr_set(cur_buf, dma, 0);
@@ -1085,8 +1108,12 @@ static int alx_map_tx_skb(struct alx_priv *alx, struct sk_buff *skb)
 	tpd = first_tpd;
 
 	maplen = skb_headlen(skb);
+#ifndef LCD_ISOLATE
 	dma = dma_map_single(&alx->hw.pdev->dev, skb->data, maplen,
 			     DMA_TO_DEVICE);
+#else
+	dma = __pa(skb->data);
+#endif
 	if (dma_mapping_error(&alx->hw.pdev->dev, dma))
 		goto err_dma;
 

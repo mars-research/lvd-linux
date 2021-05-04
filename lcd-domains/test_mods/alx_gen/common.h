@@ -248,6 +248,7 @@ enum RPC_ID {
 	RPC_ID_lvd_init_work,
 	RPC_ID_lvd_netif_trans_update,
 	RPC_ID_lvd_netif_tx_disable,
+	RPC_ID_lvd_napi_schedule,
 };
 
 int try_dispatch(enum RPC_ID id, struct fipc_message* msg, struct ext_registers* ext);
@@ -833,6 +834,10 @@ struct lvd_netif_trans_update_call_ctx {
 
 struct lvd_netif_tx_disable_call_ctx {
 	struct net_device* dev;
+};
+
+struct lvd_napi_schedule_call_ctx {
+	struct napi_struct* napi;
 };
 
 void caller_marshal_kernel__ethtool_ops_set_settings__netdev__in(
@@ -3682,6 +3687,34 @@ void caller_unmarshal_kernel__lvd_netif_tx_disable__dev__in(
 	const struct ext_registers* ext,
 	struct lvd_netif_tx_disable_call_ctx const* call_ctx,
 	struct net_device* ptr);
+
+void caller_marshal_kernel__lvd_napi_schedule__napi__in(
+	size_t* __pos,
+	struct fipc_message* msg,
+	struct ext_registers* ext,
+	struct lvd_napi_schedule_call_ctx const* call_ctx,
+	struct napi_struct const* ptr);
+
+void callee_unmarshal_kernel__lvd_napi_schedule__napi__in(
+	size_t* __pos,
+	const struct fipc_message* msg,
+	const struct ext_registers* ext,
+	struct lvd_napi_schedule_call_ctx const* call_ctx,
+	struct napi_struct* ptr);
+
+void callee_marshal_kernel__lvd_napi_schedule__napi__in(
+	size_t* __pos,
+	struct fipc_message* msg,
+	struct ext_registers* ext,
+	struct lvd_napi_schedule_call_ctx const* call_ctx,
+	struct napi_struct const* ptr);
+
+void caller_unmarshal_kernel__lvd_napi_schedule__napi__in(
+	size_t* __pos,
+	const struct fipc_message* msg,
+	const struct ext_registers* ext,
+	struct lvd_napi_schedule_call_ctx const* call_ctx,
+	struct napi_struct* ptr);
 
 
 #endif

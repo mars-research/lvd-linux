@@ -1712,7 +1712,10 @@ void caller_marshal_kernel__net_device_ops_ndo_start_xmit__skb__in(
 	unsigned int const* len_ptr = &ptr->len;
 	unsigned char __ip_summed = ptr->ip_summed;
 	unsigned char const* __ip_summed_ptr = &__ip_summed;
+	unsigned short const* csum_start_ptr = &ptr->csum_start;
+	unsigned short const* csum_offset_ptr = &ptr->csum_offset;
 	unsigned int const* end_ptr = &ptr->end;
+	unsigned int const* truesize_ptr = &ptr->truesize;
 	unsigned char* const* head_ptr = &ptr->head;
 	
 	{
@@ -1724,19 +1727,36 @@ void caller_marshal_kernel__net_device_ops_ndo_start_xmit__skb__in(
 	}
 
 	{
+		glue_pack(__pos, msg, ext, *csum_start_ptr);
+	}
+
+	{
+		glue_pack(__pos, msg, ext, *csum_offset_ptr);
+	}
+
+	{
 		glue_pack(__pos, msg, ext, *end_ptr);
 	}
+
+	{
+		glue_pack(__pos, msg, ext, *truesize_ptr);
+	}
+
+	{
+		glue_pack(__pos, msg, ext, skb_headroom(ptr));
+	}
+
 
 	{
 		__maybe_unused const void* __adjusted = *head_ptr;
 		glue_pack(__pos, msg, ext, __adjusted);
 		if (*head_ptr) {
-			size_t i, len = (ctx->skb->len);
+			size_t i, len = (ptr->len);
 			unsigned char* array = *head_ptr;
 			glue_pack(__pos, msg, ext, len);
 			// Warning: see David if this breaks
 			glue_user_trace("Warning: see David if this breaks");
-			for (i = 0; i < len; ++i) {
+			for (i = 0; i < ptr->len; ++i) {
 				unsigned char* element = &array[i];
 				glue_pack(__pos, msg, ext, *element);
 			}
@@ -1757,9 +1777,13 @@ void callee_unmarshal_kernel__net_device_ops_ndo_start_xmit__skb__in(
 	unsigned int* len_ptr = &ptr->len;
 	unsigned char __ip_summed = ptr->ip_summed;
 	unsigned char* __ip_summed_ptr = &__ip_summed;
+	unsigned short* csum_start_ptr = &ptr->csum_start;
+	unsigned short* csum_offset_ptr = &ptr->csum_offset;
 	unsigned int* end_ptr = &ptr->end;
+	unsigned int* truesize_ptr = &ptr->truesize;
 	unsigned char** head_ptr = &ptr->head;
-	
+	unsigned int headroom;
+
 	{
 		*len_ptr = glue_unpack(__pos, msg, ext, unsigned int);
 	}
@@ -1769,12 +1793,28 @@ void callee_unmarshal_kernel__net_device_ops_ndo_start_xmit__skb__in(
 	}
 
 	{
+		*csum_start_ptr = glue_unpack(__pos, msg, ext, unsigned short);
+	}
+
+	{
+		*csum_offset_ptr = glue_unpack(__pos, msg, ext, unsigned short);
+	}
+
+	{
 		*end_ptr = glue_unpack(__pos, msg, ext, unsigned int);
 	}
 
 	{
-		size_t __size = sizeof(unsigned char) * glue_peek(__pos, msg, ext);
-		*head_ptr = glue_unpack_new_shadow(__pos, msg, ext, unsigned char*, (__size), (DEFAULT_GFP_FLAGS));
+		*truesize_ptr = glue_unpack(__pos, msg, ext, unsigned int);
+	}
+
+	{
+		headroom = glue_unpack(__pos, msg, ext, unsigned int);
+	}
+
+	{
+		//size_t __size = sizeof(unsigned char) * glue_peek(__pos, msg, ext);
+		*head_ptr = glue_unpack_new_shadow(__pos, msg, ext, unsigned char*, (ptr->truesize), (DEFAULT_GFP_FLAGS));
 		if (*head_ptr) {
 			int i;
 			unsigned char* array = *head_ptr;
@@ -1787,7 +1827,7 @@ void callee_unmarshal_kernel__net_device_ops_ndo_start_xmit__skb__in(
 			}
 
 		}
-
+		ptr->data = ptr->head + headroom;
 	}
 
 	{
@@ -3458,31 +3498,7 @@ void caller_marshal_kernel__consume_skb__skb__in(
 	struct consume_skb_call_ctx const* ctx,
 	struct sk_buff const* ptr)
 {
-	unsigned int const* end_ptr = &ptr->end;
-	unsigned char* const* head_ptr = &ptr->head;
 	
-	{
-		glue_pack(__pos, msg, ext, *end_ptr);
-	}
-
-	{
-		__maybe_unused const void* __adjusted = *head_ptr;
-		glue_pack(__pos, msg, ext, __adjusted);
-		if (*head_ptr) {
-			size_t i, len = (ctx->skb->len);
-			unsigned char* array = *head_ptr;
-			glue_pack(__pos, msg, ext, len);
-			// Warning: see David if this breaks
-			glue_user_trace("Warning: see David if this breaks");
-			for (i = 0; i < len; ++i) {
-				unsigned char* element = &array[i];
-				glue_pack(__pos, msg, ext, *element);
-			}
-
-		}
-
-	}
-
 }
 
 void callee_unmarshal_kernel__consume_skb__skb__in(
@@ -3492,30 +3508,7 @@ void callee_unmarshal_kernel__consume_skb__skb__in(
 	struct consume_skb_call_ctx const* ctx,
 	struct sk_buff* ptr)
 {
-	unsigned int* end_ptr = &ptr->end;
-	unsigned char** head_ptr = &ptr->head;
 	
-	{
-		*end_ptr = glue_unpack(__pos, msg, ext, unsigned int);
-	}
-
-	{
-		*head_ptr = glue_unpack(__pos, msg, ext, unsigned char*);
-		if (*head_ptr) {
-			int i;
-			unsigned char* array = *head_ptr;
-			size_t len = glue_unpack(__pos, msg, ext, size_t);
-			// Warning: see David if this breaks
-			glue_user_trace("Warning: see David if this breaks");
-			for (i = 0; i < len; ++i) {
-				unsigned char* element = &array[i];
-				*element = glue_unpack(__pos, msg, ext, unsigned char);
-			}
-
-		}
-
-	}
-
 }
 
 void callee_marshal_kernel__consume_skb__skb__in(
@@ -3525,12 +3518,7 @@ void callee_marshal_kernel__consume_skb__skb__in(
 	struct consume_skb_call_ctx const* ctx,
 	struct sk_buff const* ptr)
 {
-	unsigned char* const* head_ptr = &ptr->head;
 	
-	{
-		(void)head_ptr;
-	}
-
 }
 
 void caller_unmarshal_kernel__consume_skb__skb__in(
@@ -3540,13 +3528,7 @@ void caller_unmarshal_kernel__consume_skb__skb__in(
 	struct consume_skb_call_ctx const* ctx,
 	struct sk_buff* ptr)
 {
-	unsigned char** head_ptr = &ptr->head;
 	
-	{
-		glue_remove_shadow(*head_ptr);
-		(void)head_ptr;
-	}
-
 }
 
 void caller_marshal_kernel__napi_complete_done__n__in(
@@ -4187,36 +4169,7 @@ void caller_marshal_kernel____dev_kfree_skb_any__skb__in(
 	struct __dev_kfree_skb_any_call_ctx const* ctx,
 	struct sk_buff const* ptr)
 {
-	unsigned int const* end_ptr = &ptr->end;
-	unsigned int const* len_ptr = &ptr->len;
-	unsigned char* const* head_ptr = &ptr->head;
 	
-	{
-		glue_pack(__pos, msg, ext, *end_ptr);
-	}
-
-	{
-		glue_pack(__pos, msg, ext, *len_ptr);
-	}
-
-	{
-		__maybe_unused const void* __adjusted = *head_ptr;
-		glue_pack(__pos, msg, ext, __adjusted);
-		if (*head_ptr) {
-			size_t i, len = (ptr->len);
-			unsigned char* array = *head_ptr;
-			glue_pack(__pos, msg, ext, len);
-			// Warning: see David if this breaks
-			glue_user_trace("Warning: see David if this breaks");
-			for (i = 0; i < len; ++i) {
-				unsigned char* element = &array[i];
-				glue_pack(__pos, msg, ext, *element);
-			}
-
-		}
-
-	}
-
 }
 
 void callee_unmarshal_kernel____dev_kfree_skb_any__skb__in(
@@ -4226,35 +4179,7 @@ void callee_unmarshal_kernel____dev_kfree_skb_any__skb__in(
 	struct __dev_kfree_skb_any_call_ctx const* ctx,
 	struct sk_buff* ptr)
 {
-	unsigned int* end_ptr = &ptr->end;
-	unsigned int* len_ptr = &ptr->len;
-	unsigned char** head_ptr = &ptr->head;
 	
-	{
-		*end_ptr = glue_unpack(__pos, msg, ext, unsigned int);
-	}
-
-	{
-		*len_ptr = glue_unpack(__pos, msg, ext, unsigned int);
-	}
-
-	{
-		*head_ptr = glue_unpack(__pos, msg, ext, unsigned char*);
-		if (*head_ptr) {
-			int i;
-			unsigned char* array = *head_ptr;
-			size_t len = glue_unpack(__pos, msg, ext, size_t);
-			// Warning: see David if this breaks
-			glue_user_trace("Warning: see David if this breaks");
-			for (i = 0; i < len; ++i) {
-				unsigned char* element = &array[i];
-				*element = glue_unpack(__pos, msg, ext, unsigned char);
-			}
-
-		}
-
-	}
-
 }
 
 void callee_marshal_kernel____dev_kfree_skb_any__skb__in(
@@ -4264,12 +4189,7 @@ void callee_marshal_kernel____dev_kfree_skb_any__skb__in(
 	struct __dev_kfree_skb_any_call_ctx const* ctx,
 	struct sk_buff const* ptr)
 {
-	unsigned char* const* head_ptr = &ptr->head;
 	
-	{
-		(void)head_ptr;
-	}
-
 }
 
 void caller_unmarshal_kernel____dev_kfree_skb_any__skb__in(
@@ -4279,13 +4199,7 @@ void caller_unmarshal_kernel____dev_kfree_skb_any__skb__in(
 	struct __dev_kfree_skb_any_call_ctx const* ctx,
 	struct sk_buff* ptr)
 {
-	unsigned char** head_ptr = &ptr->head;
 	
-	{
-		glue_remove_shadow(*head_ptr);
-		(void)head_ptr;
-	}
-
 }
 
 void caller_marshal_kernel__netif_device_attach__dev__in(
@@ -6757,6 +6671,46 @@ void caller_unmarshal_kernel__lvd_netif_tx_disable__dev__in(
 	const struct ext_registers* ext,
 	struct lvd_netif_tx_disable_call_ctx const* ctx,
 	struct net_device* ptr)
+{
+	
+}
+
+void caller_marshal_kernel__lvd_napi_schedule__napi__in(
+	size_t* __pos,
+	struct fipc_message* msg,
+	struct ext_registers* ext,
+	struct lvd_napi_schedule_call_ctx const* ctx,
+	struct napi_struct const* ptr)
+{
+	
+}
+
+void callee_unmarshal_kernel__lvd_napi_schedule__napi__in(
+	size_t* __pos,
+	const struct fipc_message* msg,
+	const struct ext_registers* ext,
+	struct lvd_napi_schedule_call_ctx const* ctx,
+	struct napi_struct* ptr)
+{
+	
+}
+
+void callee_marshal_kernel__lvd_napi_schedule__napi__in(
+	size_t* __pos,
+	struct fipc_message* msg,
+	struct ext_registers* ext,
+	struct lvd_napi_schedule_call_ctx const* ctx,
+	struct napi_struct const* ptr)
+{
+	
+}
+
+void caller_unmarshal_kernel__lvd_napi_schedule__napi__in(
+	size_t* __pos,
+	const struct fipc_message* msg,
+	const struct ext_registers* ext,
+	struct lvd_napi_schedule_call_ctx const* ctx,
+	struct napi_struct* ptr)
 {
 	
 }

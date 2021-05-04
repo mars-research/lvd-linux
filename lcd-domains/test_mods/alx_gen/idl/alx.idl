@@ -139,7 +139,7 @@ module kernel {
 			u32 tx_pause;
 		}
 	}
-	rpc_ptr int ethtool_ops_set_pauseparam( projection netdev [bind(callee)] *  netdev, projection pause [alloc_stack(callee)] *  pause ) {
+	rpc_ptr int ethtool_ops_set_pauseparam( projection netdev [bind(callee)] *  netdev, projection pause [alloc(callee), dealloc(callee)] *  pause ) {
 		projection < struct net_device > netdev {
 		}
 		projection < struct ethtool_pauseparam > pause {
@@ -149,7 +149,7 @@ module kernel {
 		}
 	}
 	rpc_ptr void  ethtool_ops_get_strings( projection netdev [bind(callee)] *  netdev,
-		unsigned int stringset, array<unsigned char, {{sizeof(__alx_gstrings_stats)}}>  [out] *buf) {
+		unsigned int stringset, array<unsigned char, {{sizeof(__alx_gstrings_stats)}}>  [alloc(callee), out] *buf) {
 		projection < struct net_device > netdev {
 		}
 	}
@@ -185,8 +185,11 @@ module kernel {
 		projection < struct sk_buff > skb {
 			unsigned int  len;
 			unsigned char  ip_summed : 2;
+			u16	csum_start;
+			u16	csum_offset;
 			unsigned int  end;
-			array<unsigned char, {{ctx->skb->len}}>  [alloc(callee)] *head;
+			unsigned int  truesize;
+			array<unsigned char, {{ptr->skb->truesize}}>  [alloc(callee)] *head;
 			//unsigned char*  data;
 		}
 		projection < struct net_device > netdev {
@@ -345,8 +348,8 @@ module kernel {
 	}
 	rpc void  consume_skb( projection skb [dealloc(caller)] *  skb ) {
 		projection < struct sk_buff > skb {
-			unsigned int  end;
-			array<unsigned char, {{ctx->skb->len}}> [dealloc(caller)] *  head;
+			//unsigned int  end;
+			//array<unsigned char, {{ctx->skb->len}}> [dealloc(caller)] *  head;
 		}
 	}
 
@@ -414,11 +417,11 @@ module kernel {
 		projection < struct napi_struct > n {
 		}
 	}
-	rpc void  __dev_kfree_skb_any( projection skb [dealloc(caller)] *  skb, unsigned int  reason ) {
+	rpc void  __dev_kfree_skb_any( projection skb [bind(caller), dealloc(caller)] *  skb, unsigned int  reason ) {
 		projection < struct sk_buff > skb {
-			unsigned int  end;
-			unsigned int len;
-			array<unsigned char, {{ptr->len}}> [dealloc(caller)] *  head;
+			//unsigned int  end;
+			//unsigned int len;
+			//array<unsigned char, {{ptr->len}}> [dealloc(caller)] *  head;
 		}
 	}
 	rpc void  netif_device_attach( projection dev*  dev ) {
@@ -663,4 +666,9 @@ module kernel {
 		projection < struct net_device > dev {
 		}
 	}
+	rpc void lvd_napi_schedule(projection napi [bind(callee)] *napi) {
+		projection < struct napi_struct > napi {
+		}
+	}
+
 }

@@ -972,9 +972,8 @@ void ethtool_ops_set_pauseparam_callee(struct fipc_message* msg, struct ext_regi
 
 	fptr_ethtool_ops_set_pauseparam function_ptr = glue_unpack(__pos, msg, ext, fptr_ethtool_ops_set_pauseparam);
 	struct net_device* netdev = 0;
+	struct ethtool_pauseparam* pause = 0;
 	struct net_device** netdev_ptr = &netdev;
-	struct ethtool_pauseparam __pause;
-	struct ethtool_pauseparam* pause = &__pause;
 	struct ethtool_pauseparam** pause_ptr = &pause;
 	int ret = 0;
 	int* ret_ptr = &ret;
@@ -995,6 +994,8 @@ void ethtool_ops_set_pauseparam_callee(struct fipc_message* msg, struct ext_regi
 	}
 
 	{
+		size_t __size = sizeof(struct ethtool_pauseparam);
+		*pause_ptr = glue_unpack_new_shadow(__pos, msg, ext, struct ethtool_pauseparam*, (__size), (DEFAULT_GFP_FLAGS));
 		if (*pause_ptr) {
 			callee_unmarshal_kernel__ethtool_ops_set_pauseparam__pause__in(__pos, msg, ext, ctx, *pause_ptr);
 		}
@@ -1016,6 +1017,7 @@ void ethtool_ops_set_pauseparam_callee(struct fipc_message* msg, struct ext_regi
 			callee_marshal_kernel__ethtool_ops_set_pauseparam__pause__in(__pos, msg, ext, ctx, *pause_ptr);
 		}
 
+		glue_remove_shadow(*pause_ptr);
 	}
 
 	{
@@ -1061,7 +1063,8 @@ void ethtool_ops_get_strings_callee(struct fipc_message* msg, struct ext_registe
 	}
 
 	{
-		*buf_ptr = glue_unpack(__pos, msg, ext, unsigned char*);
+		size_t __size = sizeof(unsigned char) * glue_peek(__pos, msg, ext);
+		*buf_ptr = glue_unpack_new_shadow(__pos, msg, ext, unsigned char*, (__size), (DEFAULT_GFP_FLAGS));
 		(void)buf_ptr;
 	}
 
@@ -2854,6 +2857,7 @@ void __dev_kfree_skb_any(struct sk_buff* skb, unsigned int reason)
 	size_t* __pos = &n_pos;
 
 	struct sk_buff** skb_ptr = &skb;
+	unsigned char** skb_head_ptr = &skb->head;
 	unsigned int* reason_ptr = &reason;
 	
 	__maybe_unused const struct __dev_kfree_skb_any_call_ctx call_ctx = {skb, reason};
@@ -2867,7 +2871,7 @@ void __dev_kfree_skb_any(struct sk_buff* skb, unsigned int reason)
 
 	{
 		__maybe_unused const void* __adjusted = *skb_ptr;
-		glue_pack(__pos, msg, ext, __adjusted);
+		glue_pack_shadow(__pos, msg, ext, __adjusted);
 		if (*skb_ptr) {
 			caller_marshal_kernel____dev_kfree_skb_any__skb__in(__pos, msg, ext, ctx, *skb_ptr);
 		}
@@ -2882,11 +2886,11 @@ void __dev_kfree_skb_any(struct sk_buff* skb, unsigned int reason)
 
 	*__pos = 0;
 	{
-		glue_remove_shadow(*skb_ptr);
 		if (*skb_ptr) {
 			caller_unmarshal_kernel____dev_kfree_skb_any__skb__in(__pos, msg, ext, ctx, *skb_ptr);
 		}
-
+		glue_remove_shadow(*skb_head_ptr);
+		glue_remove_shadow(*skb_ptr);
 	}
 
 	{
@@ -4584,12 +4588,54 @@ void lvd_netif_tx_disable(struct net_device* dev)
 		printk("%s:%d, returned!\n", __func__, __LINE__);
 	}
 }
+
+void lvd_napi_schedule(struct napi_struct* napi)
+{
+	struct fipc_message __buffer = {0};
+	struct fipc_message *msg = &__buffer;
+	struct ext_registers* ext = get_register_page(smp_processor_id());
+	size_t n_pos = 0;
+	size_t* __pos = &n_pos;
+
+	struct napi_struct** napi_ptr = &napi;
+	
+	__maybe_unused const struct lvd_napi_schedule_call_ctx call_ctx = {napi};
+	__maybe_unused const struct lvd_napi_schedule_call_ctx *ctx = &call_ctx;
+
+	(void)ext;
+
+	if (verbose_debug) {
+		printk("%s:%d, entered!\n", __func__, __LINE__);
+	}
+
+	{
+		__maybe_unused const void* __adjusted = *napi_ptr;
+		glue_pack(__pos, msg, ext, __adjusted);
+		if (*napi_ptr) {
+			caller_marshal_kernel__lvd_napi_schedule__napi__in(__pos, msg, ext, ctx, *napi_ptr);
+		}
+
+	}
+
+	glue_call_server(__pos, msg, RPC_ID_lvd_napi_schedule);
+
+	*__pos = 0;
+	{
+		if (*napi_ptr) {
+			caller_unmarshal_kernel__lvd_napi_schedule__napi__in(__pos, msg, ext, ctx, *napi_ptr);
+		}
+
+	}
+
+	if (verbose_debug) {
+		printk("%s:%d, returned!\n", __func__, __LINE__);
+	}
+}
 void __init_globals(void) {
 
 	loops_per_jiffy = get_loops_per_jiffy();
 	jiffies = get_jiffies();
 }
-
 int try_dispatch(enum RPC_ID id, struct fipc_message* msg, struct ext_registers* ext)
 {
 	switch(id) {

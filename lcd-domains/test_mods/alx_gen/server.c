@@ -1091,6 +1091,11 @@ int trmp_impl_ethtool_ops_set_pauseparam(fptr_ethtool_ops_set_pauseparam target,
 
 	{
 		__maybe_unused const void* __adjusted = *pause_ptr;
+		glue_pack(__pos, msg, ext, __adjusted);
+		if (*pause_ptr) {
+			caller_marshal_kernel__ethtool_ops_set_pauseparam__pause__in(__pos, msg, ext, ctx, *pause_ptr);
+		}
+
 	}
 
 	glue_call_client(__pos, msg, RPC_ID_ethtool_ops_set_pauseparam);
@@ -1167,7 +1172,7 @@ void trmp_impl_ethtool_ops_get_strings(fptr_ethtool_ops_get_strings target, stru
 
 	{
 		__maybe_unused const void* __adjusted = *buf_ptr;
-		glue_pack_shadow(__pos, msg, ext, __adjusted);
+		glue_pack(__pos, msg, ext, __adjusted);
 		(void)buf_ptr;
 	}
 
@@ -1503,7 +1508,6 @@ int trmp_impl_net_device_ops_ndo_start_xmit(fptr_net_device_ops_ndo_start_xmit t
 
 	if (verbose_debug) {
 		printk("%s:%d, entered!\n", __func__, __LINE__);
-		return 0;
 	}
 
 	glue_pack(__pos, msg, ext, target);
@@ -4712,6 +4716,45 @@ void lvd_netif_tx_disable_callee(struct fipc_message* msg, struct ext_registers*
 	}
 }
 
+void lvd_napi_schedule_callee(struct fipc_message* msg, struct ext_registers* ext)
+{
+	size_t n_pos = 0;
+	size_t* __pos = &n_pos;
+
+	struct napi_struct* napi = 0;
+	struct napi_struct** napi_ptr = &napi;
+	
+	__maybe_unused struct lvd_napi_schedule_call_ctx call_ctx = {napi};
+	__maybe_unused struct lvd_napi_schedule_call_ctx *ctx = &call_ctx;
+
+	if (verbose_debug) {
+		printk("%s:%d, entered!\n", __func__, __LINE__);
+	}
+
+	{
+		*napi_ptr = glue_unpack_shadow(__pos, msg, ext, struct napi_struct*);
+		if (*napi_ptr) {
+			callee_unmarshal_kernel__lvd_napi_schedule__napi__in(__pos, msg, ext, ctx, *napi_ptr);
+		}
+
+	}
+
+	napi_schedule(napi);
+
+	*__pos = 0;
+	{
+		if (*napi_ptr) {
+			callee_marshal_kernel__lvd_napi_schedule__napi__in(__pos, msg, ext, ctx, *napi_ptr);
+		}
+
+	}
+
+	msg->regs[0] = *__pos;
+	if (verbose_debug) {
+		printk("%s:%d, returned!\n", __func__, __LINE__);
+	}
+}
+
 int try_dispatch(enum RPC_ID id, struct fipc_message* msg, struct ext_registers* ext)
 {
 	switch(id) {
@@ -5008,6 +5051,11 @@ int try_dispatch(enum RPC_ID id, struct fipc_message* msg, struct ext_registers*
 	case RPC_ID_lvd_netif_tx_disable:
 		glue_user_trace("lvd_netif_tx_disable\n");
 		lvd_netif_tx_disable_callee(msg, ext);
+		break;
+
+	case RPC_ID_lvd_napi_schedule:
+		glue_user_trace("lvd_napi_schedule\n");
+		lvd_napi_schedule_callee(msg, ext);
 		break;
 
 	default:

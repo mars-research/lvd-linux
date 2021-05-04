@@ -759,7 +759,11 @@ static int raw_sendmsg(struct socket *sock, struct msghdr *msg, size_t size)
 	can_skb_prv(skb)->ifindex = dev->ifindex;
 	can_skb_prv(skb)->skbcnt = 0;
 
+#ifdef LCD_ISOLATE
+	err = lvd_memcpy_from_msg(skb_put(skb, size), msg, size);
+#else
 	err = memcpy_from_msg(skb_put(skb, size), msg, size);
+#endif
 	if (err < 0)
 		goto free_skb;
 
@@ -771,7 +775,11 @@ static int raw_sendmsg(struct socket *sock, struct msghdr *msg, size_t size)
 
 	err = can_send(skb, ro->loopback);
 
+#ifdef LCD_ISOLATE
+	//TODO: call out to manipulate percpu data
+#else
 	dev_put(dev);
+#endif
 
 	if (err)
 		goto send_failed;
@@ -781,7 +789,11 @@ static int raw_sendmsg(struct socket *sock, struct msghdr *msg, size_t size)
 free_skb:
 	kfree_skb(skb);
 put_dev:
+#ifdef LCD_ISOLATE
+	//TODO: call out to manipulate percpu data
+#else
 	dev_put(dev);
+#endif
 send_failed:
 	return err;
 }

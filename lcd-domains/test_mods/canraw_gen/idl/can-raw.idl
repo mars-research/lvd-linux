@@ -50,21 +50,21 @@ rpc_ptr int  proto_ops_getsockopt( projection sock*  sock, int  level, int  optn
 	projection < struct sock > socket_sk {
 	}
 }
-rpc_ptr int  proto_ops_sendmsg( projection sock*  sock, projection msg*  msg, long unsigned int  size ) {
-	projection < struct socket > sock {
-		projection socket_sk* sk;
+	rpc_ptr int  proto_ops_sendmsg( projection sock [alloc_once(callee)] *  sock, projection msg [alloc_once(callee)] * [out]  msg, long unsigned int  size ) {
+		projection < struct socket > sock {
+			projection socket_sk* sk;
+		}
+		projection < struct sock > socket_sk {
+		}
+		projection < struct msghdr > msg {
+			casted<void *, array<char, {{ptr->msg_namelen}}> [alloc(callee), bind(callee)] *> [in, out] msg_name;
+			int  msg_namelen;
+			projection msghdr_msg_iocb* msg_iocb;
+		}
+		projection < struct kiocb > msghdr_msg_iocb {
+		}
 	}
-	projection < struct sock > socket_sk {
-	}
-	projection < struct msghdr > msg {
-		void*  msg_name;
-		int  msg_namelen;
-		projection msghdr_msg_iocb* msg_iocb;
-	}
-	projection < struct kiocb > msghdr_msg_iocb {
-	}
-}
-	rpc_ptr int  proto_ops_recvmsg( projection sock [alloc(callee)] *  sock, projection msg [alloc(callee)] * [out] msg, long unsigned int  size, int  flags ) {
+	rpc_ptr int  proto_ops_recvmsg( projection sock [alloc_once(callee)] *  sock, projection msg [alloc_once(callee)] * [out] msg, long unsigned int  size, int  flags ) {
 		projection < struct socket > sock {
 			projection socket_sk [alloc(callee)] * sk;
 		}
@@ -110,16 +110,16 @@ rpc_ptr int  proto_ops_connect( projection sock*  sock, projection saddr* [unuse
 	projection < struct sockaddr > saddr {
 	}
 }
-rpc projection ret_sk_buff*  sock_alloc_send_skb( projection sk*  sk, long unsigned int  size, int  noblock, int*  errcode ) {
-	projection < struct sk_buff > ret_sk_buff {
+	rpc projection ret_sk_buff [alloc(caller)] *sock_alloc_send_skb( projection sk*  sk, long unsigned int  size, int  noblock, int [alloc_stack(callee), out] *  err ) {
+		projection < struct sk_buff > ret_sk_buff {
+		}
+		projection < struct sock > sk {
+			//int  sk_err;
+			//projection sock_sk_socket* sk_socket;
+		}
+		projection < struct socket > sock_sk_socket {
+		}
 	}
-	projection < struct sock > sk {
-		int  sk_err;
-		projection sock_sk_socket* sk_socket;
-	}
-	projection < struct socket > sock_sk_socket {
-	}
-}
 /*rpc void  warn_slowpath_fmt( char*  file, int  line, char*  fmt ) {
 }*/
 	rpc_ptr int notifier_call( projection nb [bind(callee)] * nb,
@@ -227,24 +227,24 @@ rpc int  can_rx_register( projection dev* [in, out] dev, unsigned int  can_id, u
 		unsigned short [in, out] type;
 	}
 }
-rpc int  can_send( projection skb* [in, out] skb, int  loop ) {
-	projection < struct sk_buff > skb {
-		projection sk_buff_sk* sk;
-		projection sk_buff_dev* dev;
-		array< char, 48> [in, out] cb;
-		unsigned int [in, out] len;
-		array<unsigned int, 0> [in, out] headers_end;
-		unsigned int [in, out] tail;
-		unsigned int [in, out] end;
-		unsigned char* [in, out] head;
-		unsigned char* [in, out] data;
+	rpc int  can_send( projection skb* [in, out] skb, int  loop ) {
+		projection < struct sk_buff > skb {
+			projection sk_buff_sk* sk;
+			/*projection sk_buff_dev* dev;
+			array< char, 48> [in, out] cb;
+			unsigned int [in, out] len;
+			array<unsigned int, 0> [in, out] headers_end;
+			unsigned int [in, out] tail;
+			unsigned int [in, out] end;
+			unsigned char* [in, out] head;
+			unsigned char* [in, out] data;*/
+		}
+		projection < struct sock > sk_buff_sk {
+		}
+		projection < struct net_device > sk_buff_dev {
+			unsigned short  type;
+		}
 	}
-	projection < struct sock > sk_buff_sk {
-	}
-	projection < struct net_device > sk_buff_dev {
-		unsigned short  type;
-	}
-}
 rpc_ptr int  proto_ops_ioctl( projection sock*  sock, unsigned int  cmd, long unsigned int  arg ) {
 	projection < struct socket > sock {
 		projection socket_sk* sk;
@@ -307,13 +307,15 @@ rpc void  lock_sock_nested( projection sk*  sk, int [unused] subclass ) {
 		}
 		projection < struct sock > sk {
 			//ktime  sk_stamp;
-			//unsigned short  sk_tsflags;
+			unsigned long  sk_flags;
+			u32 sk_priority;
 		}
 		projection < struct sk_buff > skb {
+			u32 [out] priority;
 		}
 	}
-rpc void  __sock_tx_timestamp( unsigned short  tsflags, unsigned char* [in, out] tx_flags ) {
-}
+	rpc void  __sock_tx_timestamp( unsigned short  tsflags, unsigned char [in, out, alloc(callee), dealloc(callee)] *tx_flags ) {
+	}
 rpc unsigned char*  skb_put( projection skb*  skb, unsigned int  len ) {
 	projection < struct sk_buff > skb {
 		projection sk_buff_dev* dev;

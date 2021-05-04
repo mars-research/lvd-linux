@@ -1,0 +1,6 @@
+obj-$(LCD_CONFIG_BUILD_CANRAW_GEN_BOOT)	+= boot/
+
+obj-$(LCD_CONFIG_BUILD_CANRAW_GEN_CAN_LCD) += can_lcd/
+
+obj-$(LCD_CONFIG_BUILD_CANRAW_GEN_PROTO_KLCD) += proto_klcd/
+

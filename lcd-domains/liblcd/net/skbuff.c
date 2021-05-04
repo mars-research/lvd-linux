@@ -269,12 +269,12 @@ static void skb_release_all(struct sk_buff *skb)
  *	always call kfree_skb
  */
 
-void __kfree_skb(struct sk_buff *skb)
+void __lcd_kfree_skb(struct sk_buff *skb)
 {
 	skb_release_all(skb);
 	kfree_skbmem(skb);
 }
-EXPORT_SYMBOL(__kfree_skb);
+EXPORT_SYMBOL(__lcd_kfree_skb);
 
 /**
  *	kfree_skb - free an sk_buff
@@ -283,7 +283,7 @@ EXPORT_SYMBOL(__kfree_skb);
  *	Drop a reference to the buffer and free it if the usage count has
  *	hit zero.
  */
-void kfree_skb(struct sk_buff *skb)
+void lcd_kfree_skb(struct sk_buff *skb)
 {
 	if (unlikely(!skb))
 		return;
@@ -291,9 +291,9 @@ void kfree_skb(struct sk_buff *skb)
 		smp_rmb();
 	else if (likely(!atomic_dec_and_test(&skb->users)))
 		return;
-	__kfree_skb(skb);
+	__lcd_kfree_skb(skb);
 }
-EXPORT_SYMBOL(kfree_skb);
+EXPORT_SYMBOL(lcd_kfree_skb);
 
 
 /**
@@ -312,7 +312,7 @@ void lcd_consume_skb(struct sk_buff *skb)
 		smp_rmb();
 	else if (likely(!atomic_dec_and_test(&skb->users)))
 		return;
-	__kfree_skb(skb);
+	__lcd_kfree_skb(skb);
 }
 EXPORT_SYMBOL(lcd_consume_skb);
 #endif

@@ -118,8 +118,8 @@ rpc projection ret_sk_buff*  sock_alloc_send_skb( projection sk*  sk, long unsig
 	projection < struct socket > sock_sk_socket {
 	}
 }
-rpc void  warn_slowpath_fmt( char*  file, int  line, char*  fmt ) {
-}
+/*rpc void  warn_slowpath_fmt( char*  file, int  line, char*  fmt ) {
+}*/
 rpc int  register_netdevice_notifier( projection nb*  nb ) {
 	projection < struct notifier_block > nb {
 	}
@@ -153,6 +153,7 @@ rpc projection ret_sk_buff* [in, out] skb_clone( projection skb* [in, out] skb, 
 	projection < struct net_device > sk_buff_dev {
 	}
 }
+/*
 rpc void  _raw_write_lock_bh( projection lock*  lock ) {
 	projection < struct rwlock_t > lock {
 	}
@@ -164,14 +165,14 @@ rpc void  _raw_write_unlock_bh( projection lock*  lock ) {
 rpc void*  __alloc_percpu( long unsigned int  size, long unsigned int  align ) {
 }
 rpc void  free_percpu( void*  ptr ) {
-}
+}*/
 rpc int  sock_queue_rcv_skb( projection sk* [in, out] sk, projection skb*  skb ) {
 	projection < struct sock > sk {
 	}
 	projection < struct sk_buff > skb {
 	}
 }
-rpc void  can_proto_unregister( projection cp*  cp ) {
+rpc void  can_proto_unregister( const projection cp*  cp ) {
 	projection < struct can_proto > cp {
 		int  protocol;
 		projection _global_proto_ops* ops;
@@ -181,7 +182,7 @@ rpc void  can_proto_unregister( projection cp*  cp ) {
 		rpc_ptr proto_init init;
 	}
 }
-rpc int  can_proto_register( projection cp*  cp ) {
+rpc int  can_proto_register( const projection cp*  cp ) {
 	projection < struct can_proto > cp {
 		int  protocol;
 		projection _global_proto_ops* ops;

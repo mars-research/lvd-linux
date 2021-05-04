@@ -1,10 +1,8 @@
 #ifndef GLUE_USER_H
 #define GLUE_USER_H
 
-#include <linux/etherdevice.h>
-#include <net/rtnetlink.h>
-#include <linux/pci.h>
-#include <linux/aer.h>
+#include <net/sock.h>
+#include <linux/can/core.h>
 
 extern void *skb_data_pool;
 extern void shared_mem_init(void);

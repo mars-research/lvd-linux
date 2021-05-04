@@ -93,3 +93,7 @@ ixgbe_gen/net_klcd nonisolated
 sbedac_gen/boot nonisolated
 sbedac_gen/sb_lcd isolated
 sbedac_gen/edac_klcd nonisolated
+
+canraw_gen/boot nonisolated
+canraw_gen/can_lcd isolated
+canraw_gen/proto_klcd nonisolated

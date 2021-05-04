@@ -64,18 +64,18 @@ rpc_ptr int  proto_ops_sendmsg( projection sock*  sock, projection msg*  msg, lo
 	projection < struct kiocb > msghdr_msg_iocb {
 	}
 }
-rpc_ptr int  proto_ops_recvmsg( projection sock*  sock, projection msg*  msg, long unsigned int  size, int  flags ) {
-	projection < struct socket > sock {
-		projection socket_sk* sk;
+	rpc_ptr int  proto_ops_recvmsg( projection sock [alloc(callee)] *  sock, projection msg [alloc(callee)] * [out] msg, long unsigned int  size, int  flags ) {
+		projection < struct socket > sock {
+			projection socket_sk [alloc(callee)] * sk;
+		}
+		projection < struct sock > socket_sk {
+		}
+		projection < struct msghdr > msg {
+			int [out] msg_namelen;
+			casted<void *, array<char, {{ptr->msg_namelen}}> [alloc(callee), bind(callee)] *> [in, out] msg_name;
+			unsigned int [in, out] msg_flags;
+		}
 	}
-	projection < struct sock > socket_sk {
-	}
-	projection < struct msghdr > msg {
-		void*  msg_name;
-		int [in, out] msg_namelen;
-		unsigned int [in, out] msg_flags;
-	}
-}
 rpc_ptr int  proto_ops_mmap( projection file* [unused] file, projection sock*  sock, projection vma* [unused] vma ) {
 	projection < struct file > file {
 	}
@@ -256,10 +256,10 @@ rpc long unsigned int  copy_from_iter( void* [in, out] addr, long unsigned int  
 	projection < struct iov_iter > i {
 	}
 }
-rpc long unsigned int  copy_to_iter( const void* [in, out] addr, long unsigned int  bytes, projection i*  i ) {
-	projection < struct iov_iter > i {
-	}
-}
+	/*rpc long unsigned int  copy_to_iter( const void* [in, out] addr, long unsigned int  bytes, projection i*  i ) {
+		projection < struct iov_iter > i {
+		}
+	}*/
 rpc_ptr unsigned int  proto_ops_poll( projection file*  file, projection sock*  sock, projection wait*  wait ) {
 	projection < struct file > file {
 	}
@@ -275,21 +275,22 @@ rpc void  release_sock( projection sk*  sk ) {
 	projection < struct sock > sk {
 	}
 }
-rpc void  skb_free_datagram( projection sk* [in, out] sk, projection skb*  skb ) {
-	projection < struct sock > sk {
+	rpc void  skb_free_datagram( projection sk *sk, projection skb *skb ) {
+		projection < struct sock > sk {
+		}
+		projection < struct sk_buff > skb {
+		}
 	}
-	projection < struct sk_buff > skb {
-		unsigned int  end;
-		unsigned char*  head;
+	rpc projection ret_sk_buff [alloc(caller)] * skb_recv_datagram( projection sk*  sk, unsigned int  flags, int  noblock, int [alloc_stack(callee), out] *err ) {
+		projection < struct sk_buff > ret_sk_buff {
+			unsigned int  len;
+			array<unsigned char, {{ptr->len}}>  [alloc(caller)] *data;
+			array<char, 48> cb;
+		}
+		projection < struct sock > sk {
+			int  sk_err;
+		}
 	}
-}
-rpc projection ret_sk_buff* [in, out] skb_recv_datagram( projection sk*  sk, unsigned int  flags, int  noblock, int* [in, out] err ) {
-	projection < struct sk_buff > ret_sk_buff {
-	}
-	projection < struct sock > sk {
-		int  sk_err;
-	}
-}
 rpc_ptr long proto_ops_sendpage( projection sock*  sock, projection page*  page, int  offset, long unsigned int  size, int  flags ) {
 	projection < struct socket > sock {
 	}
@@ -300,16 +301,17 @@ rpc void  lock_sock_nested( projection sk*  sk, int [unused] subclass ) {
 	projection < struct sock > sk {
 	}
 }
-rpc void  __sock_recv_ts_and_drops( projection msg*  msg, projection sk*  sk, projection skb*  skb ) {
-	projection < struct msghdr > msg {
+	rpc void  __sock_recv_ts_and_drops( projection msg*  msg, projection sk*  sk,
+			projection skb*  skb ) {
+		projection < struct msghdr > msg {
+		}
+		projection < struct sock > sk {
+			//ktime  sk_stamp;
+			//unsigned short  sk_tsflags;
+		}
+		projection < struct sk_buff > skb {
+		}
 	}
-	projection < struct sock > sk {
-		//ktime  sk_stamp;
-		unsigned short  sk_tsflags;
-	}
-	projection < struct sk_buff > skb {
-	}
-}
 rpc void  __sock_tx_timestamp( unsigned short  tsflags, unsigned char* [in, out] tx_flags ) {
 }
 rpc unsigned char*  skb_put( projection skb*  skb, unsigned int  len ) {
@@ -347,5 +349,10 @@ rpc void  sk_free( projection sk* [in, out] sk ) {
 		rpc_ptr proto_ops_recvmsg recvmsg;
 		rpc_ptr proto_ops_mmap mmap;
 		rpc_ptr proto_ops_sendpage sendpage;
+	}
+
+	rpc int lvd_memcpy_to_msg(projection msg *msg, void *data, int len) {
+		projection < struct msghdr > msg {
+		}
 	}
 }

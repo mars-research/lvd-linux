@@ -1057,7 +1057,7 @@ void caller_marshal_kernel__proto_ops_recvmsg__sock__in(
 	
 	{
 		__maybe_unused const void* __adjusted = *sk_ptr;
-		glue_pack_shadow(__pos, __msg, __ext, __adjusted);
+		glue_pack(__pos, __msg, __ext, __adjusted);
 		if (*sk_ptr) {
 			caller_marshal_kernel__proto_ops_recvmsg__socket_sk__in(__pos, __msg, __ext, ctx, *sk_ptr);
 		}
@@ -1076,7 +1076,8 @@ void callee_unmarshal_kernel__proto_ops_recvmsg__sock__in(
 	struct sock** sk_ptr = &ptr->sk;
 	
 	{
-		*sk_ptr = glue_unpack(__pos, __msg, __ext, struct sock*);
+		size_t __size = sizeof(struct sock);
+		*sk_ptr = glue_unpack_new_shadow(__pos, __msg, __ext, struct sock*, (__size), (DEFAULT_GFP_FLAGS));
 		if (*sk_ptr) {
 			callee_unmarshal_kernel__proto_ops_recvmsg__socket_sk__in(__pos, __msg, __ext, ctx, *sk_ptr);
 		}
@@ -1161,7 +1162,7 @@ void caller_unmarshal_kernel__proto_ops_recvmsg__socket_sk__in(
 	
 }
 
-void caller_marshal_kernel__proto_ops_recvmsg__msg__in(
+void caller_marshal_kernel__proto_ops_recvmsg__msg__out(
 	size_t* __pos,
 	struct fipc_message* __msg,
 	struct ext_registers* __ext,
@@ -1169,19 +1170,29 @@ void caller_marshal_kernel__proto_ops_recvmsg__msg__in(
 	struct msghdr const* ptr)
 {
 	void* const* msg_name_ptr = &ptr->msg_name;
-	int const* msg_namelen_ptr = &ptr->msg_namelen;
 	unsigned int const* msg_flags_ptr = &ptr->msg_flags;
 	
 	{
-		__maybe_unused const void* __adjusted = *msg_name_ptr;
-		glue_pack_shadow(__pos, __msg, __ext, __adjusted);
-		if (*msg_name_ptr) {
+		char* __casted = (char*)*msg_name_ptr;
+		char* const* __casted_ptr = &__casted;
+		{
+			__maybe_unused const void* __adjusted = *__casted_ptr;
+			glue_pack(__pos, __msg, __ext, __adjusted);
+			if (*__casted_ptr) {
+				size_t i, len = (ptr->msg_namelen);
+				char* array = *__casted_ptr;
+				glue_pack(__pos, __msg, __ext, len);
+				// Warning: see David if this breaks
+				glue_user_trace("Warning: see David if this breaks");
+				for (i = 0; i < len; ++i) {
+					char* element = &array[i];
+					glue_pack(__pos, __msg, __ext, *element);
+				}
+
+			}
+
 		}
 
-	}
-
-	{
-		glue_pack(__pos, __msg, __ext, *msg_namelen_ptr);
 	}
 
 	{
@@ -1190,7 +1201,7 @@ void caller_marshal_kernel__proto_ops_recvmsg__msg__in(
 
 }
 
-void callee_unmarshal_kernel__proto_ops_recvmsg__msg__in(
+void callee_unmarshal_kernel__proto_ops_recvmsg__msg__out(
 	size_t* __pos,
 	const struct fipc_message* __msg,
 	const struct ext_registers* __ext,
@@ -1198,18 +1209,30 @@ void callee_unmarshal_kernel__proto_ops_recvmsg__msg__in(
 	struct msghdr* ptr)
 {
 	void** msg_name_ptr = &ptr->msg_name;
-	int* msg_namelen_ptr = &ptr->msg_namelen;
 	unsigned int* msg_flags_ptr = &ptr->msg_flags;
 	
 	{
-		*msg_name_ptr = glue_unpack(__pos, __msg, __ext, void*);
-		if (*msg_name_ptr) {
+		char* __casted = (char*)*msg_name_ptr;
+		char** __casted_ptr = &__casted;
+		{
+			size_t __size = sizeof(char) * glue_peek(__pos, __msg, __ext);
+			*__casted_ptr = glue_unpack_new_shadow(__pos, __msg, __ext, char*, (__size), (DEFAULT_GFP_FLAGS));
+			if (*__casted_ptr) {
+				int i;
+				char* array = *__casted_ptr;
+				size_t len = glue_unpack(__pos, __msg, __ext, size_t);
+				// Warning: see David if this breaks
+				glue_user_trace("Warning: see David if this breaks");
+				for (i = 0; i < len; ++i) {
+					char* element = &array[i];
+					*element = glue_unpack(__pos, __msg, __ext, char);
+				}
+
+			}
+
 		}
 
-	}
-
-	{
-		*msg_namelen_ptr = glue_unpack(__pos, __msg, __ext, int);
+		*msg_name_ptr = (void*)__casted;
 	}
 
 	{
@@ -1218,23 +1241,42 @@ void callee_unmarshal_kernel__proto_ops_recvmsg__msg__in(
 
 }
 
-void callee_marshal_kernel__proto_ops_recvmsg__msg__in(
+void callee_marshal_kernel__proto_ops_recvmsg__msg__out(
 	size_t* __pos,
 	struct fipc_message* __msg,
 	struct ext_registers* __ext,
 	struct proto_ops_recvmsg_call_ctx const* ctx,
 	struct msghdr const* ptr)
 {
-	void* const* msg_name_ptr = &ptr->msg_name;
 	int const* msg_namelen_ptr = &ptr->msg_namelen;
+	void* const* msg_name_ptr = &ptr->msg_name;
 	unsigned int const* msg_flags_ptr = &ptr->msg_flags;
 	
 	{
-		(void)msg_name_ptr;
+		glue_pack(__pos, __msg, __ext, *msg_namelen_ptr);
 	}
 
 	{
-		glue_pack(__pos, __msg, __ext, *msg_namelen_ptr);
+		char* __casted = (char*)*msg_name_ptr;
+		char* const* __casted_ptr = &__casted;
+		{
+			__maybe_unused const void* __adjusted = *__casted_ptr;
+			glue_pack_shadow(__pos, __msg, __ext, __adjusted);
+			if (*__casted_ptr) {
+				size_t i, len = (ptr->msg_namelen);
+				char* array = *__casted_ptr;
+				glue_pack(__pos, __msg, __ext, len);
+				// Warning: see David if this breaks
+				glue_user_trace("Warning: see David if this breaks");
+				for (i = 0; i < len; ++i) {
+					char* element = &array[i];
+					glue_pack(__pos, __msg, __ext, *element);
+				}
+
+			}
+
+		}
+
 	}
 
 	{
@@ -1243,23 +1285,42 @@ void callee_marshal_kernel__proto_ops_recvmsg__msg__in(
 
 }
 
-void caller_unmarshal_kernel__proto_ops_recvmsg__msg__in(
+void caller_unmarshal_kernel__proto_ops_recvmsg__msg__out(
 	size_t* __pos,
 	const struct fipc_message* __msg,
 	const struct ext_registers* __ext,
 	struct proto_ops_recvmsg_call_ctx const* ctx,
 	struct msghdr* ptr)
 {
-	void** msg_name_ptr = &ptr->msg_name;
 	int* msg_namelen_ptr = &ptr->msg_namelen;
+	void** msg_name_ptr = &ptr->msg_name;
 	unsigned int* msg_flags_ptr = &ptr->msg_flags;
 	
 	{
-		(void)msg_name_ptr;
+		*msg_namelen_ptr = glue_unpack(__pos, __msg, __ext, int);
 	}
 
 	{
-		*msg_namelen_ptr = glue_unpack(__pos, __msg, __ext, int);
+		char* __casted = (char*)*msg_name_ptr;
+		char** __casted_ptr = &__casted;
+		{
+			*__casted_ptr = glue_unpack(__pos, __msg, __ext, char*);
+			if (*__casted_ptr) {
+				int i;
+				char* array = *__casted_ptr;
+				size_t len = glue_unpack(__pos, __msg, __ext, size_t);
+				// Warning: see David if this breaks
+				glue_user_trace("Warning: see David if this breaks");
+				for (i = 0; i < len; ++i) {
+					char* element = &array[i];
+					*element = glue_unpack(__pos, __msg, __ext, char);
+				}
+
+			}
+
+		}
+
+		*msg_name_ptr = (void*)__casted;
 	}
 
 	{
@@ -4103,46 +4164,6 @@ void caller_unmarshal_kernel__copy_from_iter__i__in(
 	
 }
 
-void caller_marshal_kernel__copy_to_iter__i__in(
-	size_t* __pos,
-	struct fipc_message* __msg,
-	struct ext_registers* __ext,
-	struct copy_to_iter_call_ctx const* ctx,
-	struct iov_iter const* ptr)
-{
-	
-}
-
-void callee_unmarshal_kernel__copy_to_iter__i__in(
-	size_t* __pos,
-	const struct fipc_message* __msg,
-	const struct ext_registers* __ext,
-	struct copy_to_iter_call_ctx const* ctx,
-	struct iov_iter* ptr)
-{
-	
-}
-
-void callee_marshal_kernel__copy_to_iter__i__in(
-	size_t* __pos,
-	struct fipc_message* __msg,
-	struct ext_registers* __ext,
-	struct copy_to_iter_call_ctx const* ctx,
-	struct iov_iter const* ptr)
-{
-	
-}
-
-void caller_unmarshal_kernel__copy_to_iter__i__in(
-	size_t* __pos,
-	const struct fipc_message* __msg,
-	const struct ext_registers* __ext,
-	struct copy_to_iter_call_ctx const* ctx,
-	struct iov_iter* ptr)
-{
-	
-}
-
 void caller_marshal_kernel__proto_ops_poll__file__in(
 	size_t* __pos,
 	struct fipc_message* __msg,
@@ -4378,7 +4399,7 @@ void caller_unmarshal_kernel__release_sock__sk__in(
 	
 }
 
-void caller_marshal_kernel__skb_free_datagram__sk__io(
+void caller_marshal_kernel__skb_free_datagram__sk__in(
 	size_t* __pos,
 	struct fipc_message* __msg,
 	struct ext_registers* __ext,
@@ -4388,7 +4409,7 @@ void caller_marshal_kernel__skb_free_datagram__sk__io(
 	
 }
 
-void callee_unmarshal_kernel__skb_free_datagram__sk__io(
+void callee_unmarshal_kernel__skb_free_datagram__sk__in(
 	size_t* __pos,
 	const struct fipc_message* __msg,
 	const struct ext_registers* __ext,
@@ -4398,7 +4419,7 @@ void callee_unmarshal_kernel__skb_free_datagram__sk__io(
 	
 }
 
-void callee_marshal_kernel__skb_free_datagram__sk__io(
+void callee_marshal_kernel__skb_free_datagram__sk__in(
 	size_t* __pos,
 	struct fipc_message* __msg,
 	struct ext_registers* __ext,
@@ -4408,7 +4429,7 @@ void callee_marshal_kernel__skb_free_datagram__sk__io(
 	
 }
 
-void caller_unmarshal_kernel__skb_free_datagram__sk__io(
+void caller_unmarshal_kernel__skb_free_datagram__sk__in(
 	size_t* __pos,
 	const struct fipc_message* __msg,
 	const struct ext_registers* __ext,
@@ -4425,22 +4446,7 @@ void caller_marshal_kernel__skb_free_datagram__skb__in(
 	struct skb_free_datagram_call_ctx const* ctx,
 	struct sk_buff const* ptr)
 {
-	unsigned int const* end_ptr = &ptr->end;
-	unsigned char* const* head_ptr = &ptr->head;
 	
-	{
-		glue_pack(__pos, __msg, __ext, *end_ptr);
-	}
-
-	{
-		__maybe_unused const void* __adjusted = *head_ptr;
-		glue_pack_shadow(__pos, __msg, __ext, __adjusted);
-		if (*head_ptr) {
-			glue_pack(__pos, __msg, __ext, **head_ptr);
-		}
-
-	}
-
 }
 
 void callee_unmarshal_kernel__skb_free_datagram__skb__in(
@@ -4450,21 +4456,7 @@ void callee_unmarshal_kernel__skb_free_datagram__skb__in(
 	struct skb_free_datagram_call_ctx const* ctx,
 	struct sk_buff* ptr)
 {
-	unsigned int* end_ptr = &ptr->end;
-	unsigned char** head_ptr = &ptr->head;
 	
-	{
-		*end_ptr = glue_unpack(__pos, __msg, __ext, unsigned int);
-	}
-
-	{
-		*head_ptr = glue_unpack(__pos, __msg, __ext, unsigned char*);
-		if (*head_ptr) {
-			**head_ptr = glue_unpack(__pos, __msg, __ext, unsigned char);
-		}
-
-	}
-
 }
 
 void callee_marshal_kernel__skb_free_datagram__skb__in(
@@ -4474,12 +4466,7 @@ void callee_marshal_kernel__skb_free_datagram__skb__in(
 	struct skb_free_datagram_call_ctx const* ctx,
 	struct sk_buff const* ptr)
 {
-	unsigned char* const* head_ptr = &ptr->head;
 	
-	{
-		(void)head_ptr;
-	}
-
 }
 
 void caller_unmarshal_kernel__skb_free_datagram__skb__in(
@@ -4489,52 +4476,133 @@ void caller_unmarshal_kernel__skb_free_datagram__skb__in(
 	struct skb_free_datagram_call_ctx const* ctx,
 	struct sk_buff* ptr)
 {
-	unsigned char** head_ptr = &ptr->head;
+	
+}
+
+void caller_marshal_kernel__skb_recv_datagram__ret_sk_buff__out(
+	size_t* __pos,
+	struct fipc_message* __msg,
+	struct ext_registers* __ext,
+	struct skb_recv_datagram_call_ctx const* ctx,
+	struct sk_buff const* ptr)
+{
+	unsigned char* const* data_ptr = &ptr->data;
 	
 	{
-		(void)head_ptr;
+		(void)data_ptr;
 	}
 
 }
 
-void caller_marshal_kernel__skb_recv_datagram__ret_sk_buff__io(
-	size_t* __pos,
-	struct fipc_message* __msg,
-	struct ext_registers* __ext,
-	struct skb_recv_datagram_call_ctx const* ctx,
-	struct sk_buff const* ptr)
-{
-	
-}
-
-void callee_unmarshal_kernel__skb_recv_datagram__ret_sk_buff__io(
+void callee_unmarshal_kernel__skb_recv_datagram__ret_sk_buff__out(
 	size_t* __pos,
 	const struct fipc_message* __msg,
 	const struct ext_registers* __ext,
 	struct skb_recv_datagram_call_ctx const* ctx,
 	struct sk_buff* ptr)
 {
+	unsigned char** data_ptr = &ptr->data;
 	
+	{
+		(void)data_ptr;
+	}
+
 }
 
-void callee_marshal_kernel__skb_recv_datagram__ret_sk_buff__io(
+void callee_marshal_kernel__skb_recv_datagram__ret_sk_buff__out(
 	size_t* __pos,
 	struct fipc_message* __msg,
 	struct ext_registers* __ext,
 	struct skb_recv_datagram_call_ctx const* ctx,
 	struct sk_buff const* ptr)
 {
+	unsigned int const* len_ptr = &ptr->len;
+	unsigned char* const* data_ptr = &ptr->data;
+	char const* cb_ptr = ptr->cb;
 	
+	{
+		glue_pack(__pos, __msg, __ext, *len_ptr);
+	}
+
+	{
+		__maybe_unused const void* __adjusted = *data_ptr;
+		glue_pack(__pos, __msg, __ext, __adjusted);
+		if (*data_ptr) {
+			size_t i, len = (ptr->len);
+			unsigned char* array = *data_ptr;
+			glue_pack(__pos, __msg, __ext, len);
+			// Warning: see David if this breaks
+			glue_user_trace("Warning: see David if this breaks");
+			for (i = 0; i < len; ++i) {
+				unsigned char* element = &array[i];
+				glue_pack(__pos, __msg, __ext, *element);
+			}
+
+		}
+
+	}
+
+	{
+		size_t i, len = 48;
+		char const* array = cb_ptr;
+		glue_pack(__pos, __msg, __ext, len);
+		// Warning: see David if this breaks
+		glue_user_trace("Warning: see David if this breaks");
+		for (i = 0; i < len; ++i) {
+			char const* element = &array[i];
+			glue_pack(__pos, __msg, __ext, *element);
+		}
+
+	}
+
 }
 
-void caller_unmarshal_kernel__skb_recv_datagram__ret_sk_buff__io(
+void caller_unmarshal_kernel__skb_recv_datagram__ret_sk_buff__out(
 	size_t* __pos,
 	const struct fipc_message* __msg,
 	const struct ext_registers* __ext,
 	struct skb_recv_datagram_call_ctx const* ctx,
 	struct sk_buff* ptr)
 {
+	unsigned int* len_ptr = &ptr->len;
+	unsigned char** data_ptr = &ptr->data;
+	char* cb_ptr = ptr->cb;
 	
+	{
+		*len_ptr = glue_unpack(__pos, __msg, __ext, unsigned int);
+	}
+
+	{
+		size_t __size = sizeof(unsigned char) * glue_peek(__pos, __msg, __ext);
+		*data_ptr = glue_unpack_new_shadow(__pos, __msg, __ext, unsigned char*, (__size), (DEFAULT_GFP_FLAGS));
+		if (*data_ptr) {
+			int i;
+			unsigned char* array = *data_ptr;
+			size_t len = glue_unpack(__pos, __msg, __ext, size_t);
+			// Warning: see David if this breaks
+			glue_user_trace("Warning: see David if this breaks");
+			for (i = 0; i < len; ++i) {
+				unsigned char* element = &array[i];
+				*element = glue_unpack(__pos, __msg, __ext, unsigned char);
+			}
+
+		}
+
+	}
+
+	{
+		int i;
+		char* array = cb_ptr;
+		size_t len = glue_unpack(__pos, __msg, __ext, size_t);
+		// Warning: see David if this breaks
+		glue_user_trace("Warning: see David if this breaks");
+		for (i = 0; i < len; ++i) {
+			char* element = &array[i];
+			*element = glue_unpack(__pos, __msg, __ext, char);
+		}
+
+	}
+
 }
 
 void caller_marshal_kernel__skb_recv_datagram__sk__in(
@@ -4754,12 +4822,7 @@ void caller_marshal_kernel____sock_recv_ts_and_drops__sk__in(
 	struct __sock_recv_ts_and_drops_call_ctx const* ctx,
 	struct sock const* ptr)
 {
-	unsigned short const* sk_tsflags_ptr = &ptr->sk_tsflags;
 	
-	{
-		glue_pack(__pos, __msg, __ext, *sk_tsflags_ptr);
-	}
-
 }
 
 void callee_unmarshal_kernel____sock_recv_ts_and_drops__sk__in(
@@ -4769,12 +4832,7 @@ void callee_unmarshal_kernel____sock_recv_ts_and_drops__sk__in(
 	struct __sock_recv_ts_and_drops_call_ctx const* ctx,
 	struct sock* ptr)
 {
-	unsigned short* sk_tsflags_ptr = &ptr->sk_tsflags;
 	
-	{
-		*sk_tsflags_ptr = glue_unpack(__pos, __msg, __ext, unsigned short);
-	}
-
 }
 
 void callee_marshal_kernel____sock_recv_ts_and_drops__sk__in(
@@ -5152,6 +5210,46 @@ void caller_unmarshal_kernel__sk_free__sk__io(
 	const struct ext_registers* __ext,
 	struct sk_free_call_ctx const* ctx,
 	struct sock* ptr)
+{
+	
+}
+
+void caller_marshal_kernel__lvd_memcpy_to_msg__msg__in(
+	size_t* __pos,
+	struct fipc_message* __msg,
+	struct ext_registers* __ext,
+	struct lvd_memcpy_to_msg_call_ctx const* ctx,
+	struct msghdr const* ptr)
+{
+	
+}
+
+void callee_unmarshal_kernel__lvd_memcpy_to_msg__msg__in(
+	size_t* __pos,
+	const struct fipc_message* __msg,
+	const struct ext_registers* __ext,
+	struct lvd_memcpy_to_msg_call_ctx const* ctx,
+	struct msghdr* ptr)
+{
+	
+}
+
+void callee_marshal_kernel__lvd_memcpy_to_msg__msg__in(
+	size_t* __pos,
+	struct fipc_message* __msg,
+	struct ext_registers* __ext,
+	struct lvd_memcpy_to_msg_call_ctx const* ctx,
+	struct msghdr const* ptr)
+{
+	
+}
+
+void caller_unmarshal_kernel__lvd_memcpy_to_msg__msg__in(
+	size_t* __pos,
+	const struct fipc_message* __msg,
+	const struct ext_registers* __ext,
+	struct lvd_memcpy_to_msg_call_ctx const* ctx,
+	struct msghdr* ptr)
 {
 	
 }

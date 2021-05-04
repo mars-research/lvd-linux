@@ -70,6 +70,8 @@ MODULE_ALIAS("can-proto-1");
 
 #define MASK_ALL 0
 
+int lvd_memcpy_to_msg(struct msghdr *msg, void *data, int len);
+
 /*
  * A raw socket has a list of can_filters attached to it, each receiving
  * the CAN frames matching that filter.  If the filter list is empty,
@@ -804,7 +806,11 @@ static int raw_recvmsg(struct socket *sock, struct msghdr *msg, size_t size,
 	else
 		size = skb->len;
 
+#ifdef LCD_ISOLATE
+	err = lvd_memcpy_to_msg(msg, skb->data, size);
+#else
 	err = memcpy_to_msg(msg, skb->data, size);
+#endif
 	if (err < 0) {
 		skb_free_datagram(sk, skb);
 		return err;

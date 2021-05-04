@@ -594,7 +594,8 @@ void proto_ops_recvmsg_callee(struct fipc_message* __msg, struct ext_registers* 
 	}
 
 	{
-		*sock_ptr = glue_unpack(__pos, __msg, __ext, struct socket*);
+		size_t __size = sizeof(struct socket);
+		*sock_ptr = glue_unpack_new_shadow(__pos, __msg, __ext, struct socket*, (__size), (DEFAULT_GFP_FLAGS));
 		if (*sock_ptr) {
 			callee_unmarshal_kernel__proto_ops_recvmsg__sock__in(__pos, __msg, __ext, ctx, *sock_ptr);
 		}
@@ -602,9 +603,8 @@ void proto_ops_recvmsg_callee(struct fipc_message* __msg, struct ext_registers* 
 	}
 
 	{
-		*msg_ptr = glue_unpack(__pos, __msg, __ext, struct msghdr*);
 		if (*msg_ptr) {
-			callee_unmarshal_kernel__proto_ops_recvmsg__msg__in(__pos, __msg, __ext, ctx, *msg_ptr);
+			callee_unmarshal_kernel__proto_ops_recvmsg__msg__out(__pos, __msg, __ext, ctx, *msg_ptr);
 		}
 
 	}
@@ -628,8 +628,10 @@ void proto_ops_recvmsg_callee(struct fipc_message* __msg, struct ext_registers* 
 	}
 
 	{
+		__maybe_unused const void* __adjusted = *msg_ptr;
+		glue_pack(__pos, __msg, __ext, __adjusted);
 		if (*msg_ptr) {
-			callee_marshal_kernel__proto_ops_recvmsg__msg__in(__pos, __msg, __ext, ctx, *msg_ptr);
+			callee_marshal_kernel__proto_ops_recvmsg__msg__out(__pos, __msg, __ext, ctx, *msg_ptr);
 		}
 
 	}
@@ -1929,81 +1931,6 @@ unsigned long copy_from_iter(void* addr, unsigned long bytes, struct iov_iter* i
 	return ret;
 }
 
-unsigned long copy_to_iter(void const* addr, unsigned long bytes, struct iov_iter* i)
-{
-	struct fipc_message __buffer = {0};
-	struct fipc_message *__msg = &__buffer;
-	struct ext_registers* __ext = get_register_page(smp_processor_id());
-	size_t n_pos = 0;
-	size_t* __pos = &n_pos;
-
-	void const** addr_ptr = &addr;
-	unsigned long* bytes_ptr = &bytes;
-	struct iov_iter** i_ptr = &i;
-	unsigned long ret = 0;
-	unsigned long* ret_ptr = &ret;
-	
-	__maybe_unused const struct copy_to_iter_call_ctx call_ctx = {addr, bytes, i};
-	__maybe_unused const struct copy_to_iter_call_ctx *ctx = &call_ctx;
-
-	(void)__ext;
-
-	if (verbose_debug) {
-		printk("%s:%d, entered!\n", __func__, __LINE__);
-	}
-
-	{
-		__maybe_unused const void* __adjusted = *addr_ptr;
-		glue_pack_shadow(__pos, __msg, __ext, __adjusted);
-		if (*addr_ptr) {
-		}
-
-	}
-
-	{
-		glue_pack(__pos, __msg, __ext, *bytes_ptr);
-	}
-
-	{
-		__maybe_unused const void* __adjusted = *i_ptr;
-		glue_pack_shadow(__pos, __msg, __ext, __adjusted);
-		if (*i_ptr) {
-			caller_marshal_kernel__copy_to_iter__i__in(__pos, __msg, __ext, ctx, *i_ptr);
-		}
-
-	}
-
-	glue_call_server(__pos, __msg, RPC_ID_copy_to_iter);
-
-	*__pos = 0;
-	{
-		*addr_ptr = glue_unpack_shadow(__pos, __msg, __ext, void const*);
-		if (*addr_ptr) {
-			//void* writable = (void*)*addr_ptr;
-		}
-
-	}
-
-	{
-	}
-
-	{
-		if (*i_ptr) {
-			caller_unmarshal_kernel__copy_to_iter__i__in(__pos, __msg, __ext, ctx, *i_ptr);
-		}
-
-	}
-
-	{
-		*ret_ptr = glue_unpack(__pos, __msg, __ext, unsigned long);
-	}
-
-	if (verbose_debug) {
-		printk("%s:%d, returned!\n", __func__, __LINE__);
-	}
-	return ret;
-}
-
 void proto_ops_poll_callee(struct fipc_message* __msg, struct ext_registers* __ext)
 {
 	size_t n_pos = 0;
@@ -2151,7 +2078,7 @@ void skb_free_datagram(struct sock* sk, struct sk_buff* skb)
 		__maybe_unused const void* __adjusted = *sk_ptr;
 		glue_pack_shadow(__pos, __msg, __ext, __adjusted);
 		if (*sk_ptr) {
-			caller_marshal_kernel__skb_free_datagram__sk__io(__pos, __msg, __ext, ctx, *sk_ptr);
+			caller_marshal_kernel__skb_free_datagram__sk__in(__pos, __msg, __ext, ctx, *sk_ptr);
 		}
 
 	}
@@ -2169,9 +2096,8 @@ void skb_free_datagram(struct sock* sk, struct sk_buff* skb)
 
 	*__pos = 0;
 	{
-		*sk_ptr = glue_unpack_shadow(__pos, __msg, __ext, struct sock*);
 		if (*sk_ptr) {
-			caller_unmarshal_kernel__skb_free_datagram__sk__io(__pos, __msg, __ext, ctx, *sk_ptr);
+			caller_unmarshal_kernel__skb_free_datagram__sk__in(__pos, __msg, __ext, ctx, *sk_ptr);
 		}
 
 	}
@@ -2231,11 +2157,6 @@ struct sk_buff* skb_recv_datagram(struct sock* sk, unsigned int flags, int noblo
 
 	{
 		__maybe_unused const void* __adjusted = *err_ptr;
-		glue_pack_shadow(__pos, __msg, __ext, __adjusted);
-		if (*err_ptr) {
-			glue_pack(__pos, __msg, __ext, **err_ptr);
-		}
-
 	}
 
 	glue_call_server(__pos, __msg, RPC_ID_skb_recv_datagram);
@@ -2255,7 +2176,6 @@ struct sk_buff* skb_recv_datagram(struct sock* sk, unsigned int flags, int noblo
 	}
 
 	{
-		*err_ptr = glue_unpack_shadow(__pos, __msg, __ext, int*);
 		if (*err_ptr) {
 			**err_ptr = glue_unpack(__pos, __msg, __ext, int);
 		}
@@ -2263,9 +2183,10 @@ struct sk_buff* skb_recv_datagram(struct sock* sk, unsigned int flags, int noblo
 	}
 
 	{
-		*ret_ptr = glue_unpack_shadow(__pos, __msg, __ext, struct sk_buff*);
+		size_t __size = sizeof(struct sk_buff);
+		*ret_ptr = glue_unpack_new_shadow(__pos, __msg, __ext, struct sk_buff*, (__size), (DEFAULT_GFP_FLAGS));
 		if (*ret_ptr) {
-			caller_unmarshal_kernel__skb_recv_datagram__ret_sk_buff__io(__pos, __msg, __ext, ctx, *ret_ptr);
+			caller_unmarshal_kernel__skb_recv_datagram__ret_sk_buff__out(__pos, __msg, __ext, ctx, *ret_ptr);
 		}
 
 	}
@@ -2642,6 +2563,77 @@ void sk_free(struct sock* sk)
 	if (verbose_debug) {
 		printk("%s:%d, returned!\n", __func__, __LINE__);
 	}
+}
+
+int lvd_memcpy_to_msg(struct msghdr* msg, void* data, int len)
+{
+	struct fipc_message __buffer = {0};
+	struct fipc_message *__msg = &__buffer;
+	struct ext_registers* __ext = get_register_page(smp_processor_id());
+	size_t n_pos = 0;
+	size_t* __pos = &n_pos;
+
+	struct msghdr** msg_ptr = &msg;
+	void** data_ptr = &data;
+	int* len_ptr = &len;
+	int ret = 0;
+	int* ret_ptr = &ret;
+	
+	__maybe_unused const struct lvd_memcpy_to_msg_call_ctx call_ctx = {msg, data, len};
+	__maybe_unused const struct lvd_memcpy_to_msg_call_ctx *ctx = &call_ctx;
+
+	(void)__ext;
+
+	if (verbose_debug) {
+		printk("%s:%d, entered!\n", __func__, __LINE__);
+	}
+
+	{
+		__maybe_unused const void* __adjusted = *msg_ptr;
+		glue_pack_shadow(__pos, __msg, __ext, __adjusted);
+		if (*msg_ptr) {
+			caller_marshal_kernel__lvd_memcpy_to_msg__msg__in(__pos, __msg, __ext, ctx, *msg_ptr);
+		}
+
+	}
+
+	{
+		__maybe_unused const void* __adjusted = *data_ptr;
+		glue_pack_shadow(__pos, __msg, __ext, __adjusted);
+		if (*data_ptr) {
+		}
+
+	}
+
+	{
+		glue_pack(__pos, __msg, __ext, *len_ptr);
+	}
+
+	glue_call_server(__pos, __msg, RPC_ID_lvd_memcpy_to_msg);
+
+	*__pos = 0;
+	{
+		if (*msg_ptr) {
+			caller_unmarshal_kernel__lvd_memcpy_to_msg__msg__in(__pos, __msg, __ext, ctx, *msg_ptr);
+		}
+
+	}
+
+	{
+		(void)data_ptr;
+	}
+
+	{
+	}
+
+	{
+		*ret_ptr = glue_unpack(__pos, __msg, __ext, int);
+	}
+
+	if (verbose_debug) {
+		printk("%s:%d, returned!\n", __func__, __LINE__);
+	}
+	return ret;
 }
 
 int try_dispatch(enum RPC_ID id, struct fipc_message* __msg, struct ext_registers* __ext)

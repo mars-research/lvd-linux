@@ -180,7 +180,6 @@ enum RPC_ID {
 	RPC_ID_can_send,
 	RPC_ID_proto_ops_ioctl,
 	RPC_ID_copy_from_iter,
-	RPC_ID_copy_to_iter,
 	RPC_ID_proto_ops_poll,
 	RPC_ID_release_sock,
 	RPC_ID_skb_free_datagram,
@@ -191,6 +190,7 @@ enum RPC_ID {
 	RPC_ID___sock_tx_timestamp,
 	RPC_ID_skb_put,
 	RPC_ID_sk_free,
+	RPC_ID_lvd_memcpy_to_msg,
 };
 
 int try_dispatch(enum RPC_ID id, struct fipc_message* __msg, struct ext_registers* __ext);
@@ -480,12 +480,6 @@ struct copy_from_iter_call_ctx {
 	struct iov_iter* i;
 };
 
-struct copy_to_iter_call_ctx {
-	void const* addr;
-	unsigned long bytes;
-	struct iov_iter* i;
-};
-
 struct proto_ops_poll_call_ctx {
 	struct file* file;
 	struct socket* sock;
@@ -539,6 +533,12 @@ struct skb_put_call_ctx {
 
 struct sk_free_call_ctx {
 	struct sock* sk;
+};
+
+struct lvd_memcpy_to_msg_call_ctx {
+	struct msghdr* msg;
+	void* data;
+	int len;
 };
 
 void caller_marshal_kernel__proto_init__sk__in(
@@ -1129,28 +1129,28 @@ void caller_unmarshal_kernel__proto_ops_recvmsg__socket_sk__in(
 	struct proto_ops_recvmsg_call_ctx const* call_ctx,
 	struct sock* ptr);
 
-void caller_marshal_kernel__proto_ops_recvmsg__msg__in(
+void caller_marshal_kernel__proto_ops_recvmsg__msg__out(
 	size_t* __pos,
 	struct fipc_message* __msg,
 	struct ext_registers* __ext,
 	struct proto_ops_recvmsg_call_ctx const* call_ctx,
 	struct msghdr const* ptr);
 
-void callee_unmarshal_kernel__proto_ops_recvmsg__msg__in(
+void callee_unmarshal_kernel__proto_ops_recvmsg__msg__out(
 	size_t* __pos,
 	const struct fipc_message* __msg,
 	const struct ext_registers* __ext,
 	struct proto_ops_recvmsg_call_ctx const* call_ctx,
 	struct msghdr* ptr);
 
-void callee_marshal_kernel__proto_ops_recvmsg__msg__in(
+void callee_marshal_kernel__proto_ops_recvmsg__msg__out(
 	size_t* __pos,
 	struct fipc_message* __msg,
 	struct ext_registers* __ext,
 	struct proto_ops_recvmsg_call_ctx const* call_ctx,
 	struct msghdr const* ptr);
 
-void caller_unmarshal_kernel__proto_ops_recvmsg__msg__in(
+void caller_unmarshal_kernel__proto_ops_recvmsg__msg__out(
 	size_t* __pos,
 	const struct fipc_message* __msg,
 	const struct ext_registers* __ext,
@@ -2273,34 +2273,6 @@ void caller_unmarshal_kernel__copy_from_iter__i__in(
 	struct copy_from_iter_call_ctx const* call_ctx,
 	struct iov_iter* ptr);
 
-void caller_marshal_kernel__copy_to_iter__i__in(
-	size_t* __pos,
-	struct fipc_message* __msg,
-	struct ext_registers* __ext,
-	struct copy_to_iter_call_ctx const* call_ctx,
-	struct iov_iter const* ptr);
-
-void callee_unmarshal_kernel__copy_to_iter__i__in(
-	size_t* __pos,
-	const struct fipc_message* __msg,
-	const struct ext_registers* __ext,
-	struct copy_to_iter_call_ctx const* call_ctx,
-	struct iov_iter* ptr);
-
-void callee_marshal_kernel__copy_to_iter__i__in(
-	size_t* __pos,
-	struct fipc_message* __msg,
-	struct ext_registers* __ext,
-	struct copy_to_iter_call_ctx const* call_ctx,
-	struct iov_iter const* ptr);
-
-void caller_unmarshal_kernel__copy_to_iter__i__in(
-	size_t* __pos,
-	const struct fipc_message* __msg,
-	const struct ext_registers* __ext,
-	struct copy_to_iter_call_ctx const* call_ctx,
-	struct iov_iter* ptr);
-
 void caller_marshal_kernel__proto_ops_poll__file__in(
 	size_t* __pos,
 	struct fipc_message* __msg,
@@ -2441,28 +2413,28 @@ void caller_unmarshal_kernel__release_sock__sk__in(
 	struct release_sock_call_ctx const* call_ctx,
 	struct sock* ptr);
 
-void caller_marshal_kernel__skb_free_datagram__sk__io(
+void caller_marshal_kernel__skb_free_datagram__sk__in(
 	size_t* __pos,
 	struct fipc_message* __msg,
 	struct ext_registers* __ext,
 	struct skb_free_datagram_call_ctx const* call_ctx,
 	struct sock const* ptr);
 
-void callee_unmarshal_kernel__skb_free_datagram__sk__io(
+void callee_unmarshal_kernel__skb_free_datagram__sk__in(
 	size_t* __pos,
 	const struct fipc_message* __msg,
 	const struct ext_registers* __ext,
 	struct skb_free_datagram_call_ctx const* call_ctx,
 	struct sock* ptr);
 
-void callee_marshal_kernel__skb_free_datagram__sk__io(
+void callee_marshal_kernel__skb_free_datagram__sk__in(
 	size_t* __pos,
 	struct fipc_message* __msg,
 	struct ext_registers* __ext,
 	struct skb_free_datagram_call_ctx const* call_ctx,
 	struct sock const* ptr);
 
-void caller_unmarshal_kernel__skb_free_datagram__sk__io(
+void caller_unmarshal_kernel__skb_free_datagram__sk__in(
 	size_t* __pos,
 	const struct fipc_message* __msg,
 	const struct ext_registers* __ext,
@@ -2497,28 +2469,28 @@ void caller_unmarshal_kernel__skb_free_datagram__skb__in(
 	struct skb_free_datagram_call_ctx const* call_ctx,
 	struct sk_buff* ptr);
 
-void caller_marshal_kernel__skb_recv_datagram__ret_sk_buff__io(
+void caller_marshal_kernel__skb_recv_datagram__ret_sk_buff__out(
 	size_t* __pos,
 	struct fipc_message* __msg,
 	struct ext_registers* __ext,
 	struct skb_recv_datagram_call_ctx const* call_ctx,
 	struct sk_buff const* ptr);
 
-void callee_unmarshal_kernel__skb_recv_datagram__ret_sk_buff__io(
+void callee_unmarshal_kernel__skb_recv_datagram__ret_sk_buff__out(
 	size_t* __pos,
 	const struct fipc_message* __msg,
 	const struct ext_registers* __ext,
 	struct skb_recv_datagram_call_ctx const* call_ctx,
 	struct sk_buff* ptr);
 
-void callee_marshal_kernel__skb_recv_datagram__ret_sk_buff__io(
+void callee_marshal_kernel__skb_recv_datagram__ret_sk_buff__out(
 	size_t* __pos,
 	struct fipc_message* __msg,
 	struct ext_registers* __ext,
 	struct skb_recv_datagram_call_ctx const* call_ctx,
 	struct sk_buff const* ptr);
 
-void caller_unmarshal_kernel__skb_recv_datagram__ret_sk_buff__io(
+void caller_unmarshal_kernel__skb_recv_datagram__ret_sk_buff__out(
 	size_t* __pos,
 	const struct fipc_message* __msg,
 	const struct ext_registers* __ext,
@@ -2804,6 +2776,34 @@ void caller_unmarshal_kernel__sk_free__sk__io(
 	const struct ext_registers* __ext,
 	struct sk_free_call_ctx const* call_ctx,
 	struct sock* ptr);
+
+void caller_marshal_kernel__lvd_memcpy_to_msg__msg__in(
+	size_t* __pos,
+	struct fipc_message* __msg,
+	struct ext_registers* __ext,
+	struct lvd_memcpy_to_msg_call_ctx const* call_ctx,
+	struct msghdr const* ptr);
+
+void callee_unmarshal_kernel__lvd_memcpy_to_msg__msg__in(
+	size_t* __pos,
+	const struct fipc_message* __msg,
+	const struct ext_registers* __ext,
+	struct lvd_memcpy_to_msg_call_ctx const* call_ctx,
+	struct msghdr* ptr);
+
+void callee_marshal_kernel__lvd_memcpy_to_msg__msg__in(
+	size_t* __pos,
+	struct fipc_message* __msg,
+	struct ext_registers* __ext,
+	struct lvd_memcpy_to_msg_call_ctx const* call_ctx,
+	struct msghdr const* ptr);
+
+void caller_unmarshal_kernel__lvd_memcpy_to_msg__msg__in(
+	size_t* __pos,
+	const struct fipc_message* __msg,
+	const struct ext_registers* __ext,
+	struct lvd_memcpy_to_msg_call_ctx const* call_ctx,
+	struct msghdr* ptr);
 
 
 #endif

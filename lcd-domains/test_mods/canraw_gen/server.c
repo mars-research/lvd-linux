@@ -28,7 +28,7 @@ int trmp_impl_proto_init(fptr_proto_init target, struct sock* sk)
 	glue_pack(__pos, __msg, __ext, target);
 	{
 		__maybe_unused const void* __adjusted = *sk_ptr;
-		glue_pack_shadow(__pos, __msg, __ext, __adjusted);
+		glue_pack(__pos, __msg, __ext, __adjusted);
 		if (*sk_ptr) {
 			caller_marshal_kernel__proto_init__sk__in(__pos, __msg, __ext, ctx, *sk_ptr);
 		}
@@ -1236,6 +1236,93 @@ void sock_alloc_send_skb_callee(struct fipc_message* __msg, struct ext_registers
 	}
 }
 
+int trmp_impl_notifier_call(fptr_notifier_call target, struct notifier_block* nb, unsigned long msg, void* ptr)
+{
+	struct fipc_message __buffer = {0};
+	struct fipc_message *__msg = &__buffer;
+	struct ext_registers* __ext = get_register_page(smp_processor_id());
+	size_t n_pos = 0;
+	size_t* __pos = &n_pos;
+
+	struct notifier_block** nb_ptr = &nb;
+	unsigned long* msg_ptr = &msg;
+	void** ptr_ptr = &ptr;
+	int ret = 0;
+	int* ret_ptr = &ret;
+	
+	__maybe_unused const struct notifier_call_call_ctx call_ctx = {nb, msg, ptr};
+	__maybe_unused const struct notifier_call_call_ctx *ctx = &call_ctx;
+
+	(void)__ext;
+
+	if (verbose_debug) {
+		printk("%s:%d, entered!\n", __func__, __LINE__);
+	}
+
+	glue_pack(__pos, __msg, __ext, target);
+	{
+		__maybe_unused const void* __adjusted = *nb_ptr;
+		glue_pack(__pos, __msg, __ext, __adjusted);
+		if (*nb_ptr) {
+			caller_marshal_kernel__notifier_call__nb__in(__pos, __msg, __ext, ctx, *nb_ptr);
+		}
+
+	}
+
+	{
+		glue_pack(__pos, __msg, __ext, *msg_ptr);
+	}
+
+	{
+		struct netdev_notifier_info* __casted = (struct netdev_notifier_info*)*ptr_ptr;
+		struct netdev_notifier_info* const* __casted_ptr = &__casted;
+		{
+			__maybe_unused const void* __adjusted = *__casted_ptr;
+			glue_pack(__pos, __msg, __ext, __adjusted);
+			if (*__casted_ptr) {
+				caller_marshal_kernel__notifier_call__info__in(__pos, __msg, __ext, ctx, *__casted_ptr);
+			}
+
+		}
+
+	}
+
+	glue_call_client(__pos, __msg, RPC_ID_notifier_call);
+
+	*__pos = 0;
+	{
+		if (*nb_ptr) {
+			caller_unmarshal_kernel__notifier_call__nb__in(__pos, __msg, __ext, ctx, *nb_ptr);
+		}
+
+	}
+
+	{
+	}
+
+	{
+	}
+
+	{
+		*ret_ptr = glue_unpack(__pos, __msg, __ext, int);
+	}
+
+	if (verbose_debug) {
+		printk("%s:%d, returned!\n", __func__, __LINE__);
+	}
+	return ret;
+}
+
+LCD_TRAMPOLINE_DATA(trmp_notifier_call)
+int LCD_TRAMPOLINE_LINKAGE(trmp_notifier_call) trmp_notifier_call(struct notifier_block* nb, unsigned long msg, void* ptr)
+{
+	volatile fptr_impl_notifier_call impl;
+	fptr_notifier_call target;
+	LCD_TRAMPOLINE_PROLOGUE(target, trmp_notifier_call);
+	impl = trmp_impl_notifier_call;
+	return impl(target, nb, msg, ptr);
+}
+
 void register_netdevice_notifier_callee(struct fipc_message* __msg, struct ext_registers* __ext)
 {
 	size_t n_pos = 0;
@@ -1254,7 +1341,8 @@ void register_netdevice_notifier_callee(struct fipc_message* __msg, struct ext_r
 	}
 
 	{
-		*nb_ptr = glue_unpack(__pos, __msg, __ext, struct notifier_block*);
+		size_t __size = sizeof(struct notifier_block);
+		*nb_ptr = glue_unpack_new_shadow(__pos, __msg, __ext, struct notifier_block*, (__size), (DEFAULT_GFP_FLAGS));
 		if (*nb_ptr) {
 			callee_unmarshal_kernel__register_netdevice_notifier__nb__in(__pos, __msg, __ext, ctx, *nb_ptr);
 		}
@@ -1299,7 +1387,7 @@ void unregister_netdevice_notifier_callee(struct fipc_message* __msg, struct ext
 	}
 
 	{
-		*nb_ptr = glue_unpack(__pos, __msg, __ext, struct notifier_block*);
+		*nb_ptr = glue_unpack_shadow(__pos, __msg, __ext, struct notifier_block*);
 		if (*nb_ptr) {
 			callee_unmarshal_kernel__unregister_netdevice_notifier__nb__in(__pos, __msg, __ext, ctx, *nb_ptr);
 		}
@@ -1314,6 +1402,7 @@ void unregister_netdevice_notifier_callee(struct fipc_message* __msg, struct ext
 			callee_marshal_kernel__unregister_netdevice_notifier__nb__in(__pos, __msg, __ext, ctx, *nb_ptr);
 		}
 
+		glue_remove_shadow(*nb_ptr);
 	}
 
 	{
@@ -1506,7 +1595,7 @@ void can_proto_unregister_callee(struct fipc_message* __msg, struct ext_register
 	}
 
 	{
-		*cp_ptr = glue_unpack(__pos, __msg, __ext, struct can_proto const*);
+		*cp_ptr = glue_unpack_shadow(__pos, __msg, __ext, struct can_proto const*);
 		if (*cp_ptr) {
 			struct can_proto* writable = (struct can_proto*)*cp_ptr;
 			callee_unmarshal_kernel__can_proto_unregister__cp__in(__pos, __msg, __ext, ctx, writable);
@@ -1548,7 +1637,8 @@ void can_proto_register_callee(struct fipc_message* __msg, struct ext_registers*
 	}
 
 	{
-		*cp_ptr = glue_unpack(__pos, __msg, __ext, struct can_proto const*);
+		size_t __size = sizeof(struct can_proto);
+		*cp_ptr = glue_unpack_new_shadow(__pos, __msg, __ext, struct can_proto const*, (__size), (DEFAULT_GFP_FLAGS));
 		if (*cp_ptr) {
 			struct can_proto* writable = (struct can_proto*)*cp_ptr;
 			callee_unmarshal_kernel__can_proto_register__cp__in(__pos, __msg, __ext, ctx, writable);

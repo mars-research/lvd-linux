@@ -23,7 +23,8 @@ void proto_init_callee(struct fipc_message* __msg, struct ext_registers* __ext)
 	}
 
 	{
-		*sk_ptr = glue_unpack(__pos, __msg, __ext, struct sock*);
+		size_t __size = sizeof(struct raw_can_sock);
+		*sk_ptr = glue_unpack_new_shadow(__pos, __msg, __ext, struct sock*, (__size), (DEFAULT_GFP_FLAGS));
 		if (*sk_ptr) {
 			callee_unmarshal_kernel__proto_init__sk__in(__pos, __msg, __ext, ctx, *sk_ptr);
 		}
@@ -1051,6 +1052,81 @@ struct sk_buff* sock_alloc_send_skb(struct sock* sk, unsigned long size, int nob
 	return ret;
 }
 
+void notifier_call_callee(struct fipc_message* __msg, struct ext_registers* __ext)
+{
+	size_t n_pos = 0;
+	size_t* __pos = &n_pos;
+
+	fptr_notifier_call function_ptr = glue_unpack(__pos, __msg, __ext, fptr_notifier_call);
+	struct notifier_block* nb = 0;
+	unsigned long msg = 0;
+	void* ptr = 0;
+	struct notifier_block** nb_ptr = &nb;
+	unsigned long* msg_ptr = &msg;
+	void** ptr_ptr = &ptr;
+	int ret = 0;
+	int* ret_ptr = &ret;
+	
+	__maybe_unused struct notifier_call_call_ctx call_ctx = {nb, msg, ptr};
+	__maybe_unused struct notifier_call_call_ctx *ctx = &call_ctx;
+
+	if (verbose_debug) {
+		printk("%s:%d, entered!\n", __func__, __LINE__);
+	}
+
+	{
+		*nb_ptr = glue_unpack_shadow(__pos, __msg, __ext, struct notifier_block*);
+		if (*nb_ptr) {
+			callee_unmarshal_kernel__notifier_call__nb__in(__pos, __msg, __ext, ctx, *nb_ptr);
+		}
+
+	}
+
+	{
+		*msg_ptr = glue_unpack(__pos, __msg, __ext, unsigned long);
+	}
+
+	{
+		struct netdev_notifier_info* __casted = (struct netdev_notifier_info*)*ptr_ptr;
+		struct netdev_notifier_info** __casted_ptr = &__casted;
+		{
+			size_t __size = sizeof(struct netdev_notifier_info);
+			*__casted_ptr = glue_unpack_new_shadow(__pos, __msg, __ext, struct netdev_notifier_info*, (__size), (DEFAULT_GFP_FLAGS));
+			if (*__casted_ptr) {
+				callee_unmarshal_kernel__notifier_call__info__in(__pos, __msg, __ext, ctx, *__casted_ptr);
+			}
+
+		}
+
+		*ptr_ptr = (void*)__casted;
+	}
+
+	ret = function_ptr(nb, msg, ptr);
+
+	*__pos = 0;
+	{
+		if (*nb_ptr) {
+			callee_marshal_kernel__notifier_call__nb__in(__pos, __msg, __ext, ctx, *nb_ptr);
+		}
+
+	}
+
+	{
+	}
+
+	{
+	}
+
+	{
+		glue_pack(__pos, __msg, __ext, *ret_ptr);
+	}
+
+	__msg->regs[0] = *__pos;
+	if (verbose_debug) {
+		printk("%s:%d, returned!\n", __func__, __LINE__);
+	}
+}
+
 int register_netdevice_notifier(struct notifier_block* nb)
 {
 	struct fipc_message __buffer = {0};
@@ -1074,7 +1150,7 @@ int register_netdevice_notifier(struct notifier_block* nb)
 
 	{
 		__maybe_unused const void* __adjusted = *nb_ptr;
-		glue_pack_shadow(__pos, __msg, __ext, __adjusted);
+		glue_pack(__pos, __msg, __ext, __adjusted);
 		if (*nb_ptr) {
 			caller_marshal_kernel__register_netdevice_notifier__nb__in(__pos, __msg, __ext, ctx, *nb_ptr);
 		}
@@ -1124,7 +1200,7 @@ int unregister_netdevice_notifier(struct notifier_block* nb)
 
 	{
 		__maybe_unused const void* __adjusted = *nb_ptr;
-		glue_pack_shadow(__pos, __msg, __ext, __adjusted);
+		glue_pack(__pos, __msg, __ext, __adjusted);
 		if (*nb_ptr) {
 			caller_marshal_kernel__unregister_netdevice_notifier__nb__in(__pos, __msg, __ext, ctx, *nb_ptr);
 		}
@@ -1346,7 +1422,7 @@ void can_proto_unregister(struct can_proto const* cp)
 
 	{
 		__maybe_unused const void* __adjusted = *cp_ptr;
-		glue_pack_shadow(__pos, __msg, __ext, __adjusted);
+		glue_pack(__pos, __msg, __ext, __adjusted);
 		if (*cp_ptr) {
 			caller_marshal_kernel__can_proto_unregister__cp__in(__pos, __msg, __ext, ctx, *cp_ptr);
 		}
@@ -1392,7 +1468,7 @@ int can_proto_register(struct can_proto const* cp)
 
 	{
 		__maybe_unused const void* __adjusted = *cp_ptr;
-		glue_pack_shadow(__pos, __msg, __ext, __adjusted);
+		glue_pack(__pos, __msg, __ext, __adjusted);
 		if (*cp_ptr) {
 			caller_marshal_kernel__can_proto_register__cp__in(__pos, __msg, __ext, ctx, *cp_ptr);
 		}
@@ -2650,6 +2726,11 @@ int try_dispatch(enum RPC_ID id, struct fipc_message* __msg, struct ext_register
 	case RPC_ID_proto_ops_connect:
 		glue_user_trace("proto_ops_connect\n");
 		proto_ops_connect_callee(__msg, __ext);
+		break;
+
+	case RPC_ID_notifier_call:
+		glue_user_trace("notifier_call\n");
+		notifier_call_callee(__msg, __ext);
 		break;
 
 	case RPC_ID_func:

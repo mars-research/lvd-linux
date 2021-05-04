@@ -1,8 +1,10 @@
 module kernel {
-rpc_ptr int  proto_init( projection sk*  sk ) {
-	projection < struct sock > sk {
+	//TODO: struct raw_can_sock(raw_sock inside raw.c) is not visible outside. Make a copy to do sizeof()
+	rpc_ptr int  proto_init( projection sk [alloc<{{sizeof(struct raw_can_sock)}}>(callee)] *  sk ) {
+		projection < struct sock > sk {
+		}
 	}
-}
+
 rpc projection ret_net_device*  dev_get_by_index( projection net*  net, int  ifindex ) {
 	projection < struct net_device > ret_net_device {
 	}
@@ -120,14 +122,31 @@ rpc projection ret_sk_buff*  sock_alloc_send_skb( projection sk*  sk, long unsig
 }
 /*rpc void  warn_slowpath_fmt( char*  file, int  line, char*  fmt ) {
 }*/
-rpc int  register_netdevice_notifier( projection nb*  nb ) {
-	projection < struct notifier_block > nb {
+	rpc_ptr int notifier_call( projection nb [bind(callee)] * nb,
+			long unsigned int msg,
+			casted<void *, projection info [alloc<{{sizeof(struct netdev_notifier_info)}}>(callee)] *> ptr) {
+
+		projection < struct notifier_block > nb {
+		}
+
+		projection < struct netdev_notifier_info > info {
+			projection net_device [alloc(callee)] *dev;
+		}
+		projection < struct net_device > net_device {
+			int ifindex;
+			unsigned short type;
+		}
 	}
-}
-rpc int  unregister_netdevice_notifier( projection nb*  nb ) {
-	projection < struct notifier_block > nb {
+
+	rpc int  register_netdevice_notifier( projection nb [alloc(callee)] *  nb ) {
+		projection < struct notifier_block > nb {
+			rpc_ptr notifier_call notifier_call;
+		}
 	}
-}
+	rpc int  unregister_netdevice_notifier( projection nb [bind(callee), dealloc(callee)] *  nb ) {
+		projection < struct notifier_block > nb {
+		}
+	}
 rpc void  kfree_skb( projection skb*  skb ) {
 	projection < struct sk_buff > skb {
 		unsigned int  end;
@@ -172,26 +191,28 @@ rpc int  sock_queue_rcv_skb( projection sk* [in, out] sk, projection skb*  skb )
 	projection < struct sk_buff > skb {
 	}
 }
-rpc void  can_proto_unregister( const projection cp*  cp ) {
-	projection < struct can_proto > cp {
-		int  protocol;
-		projection _global_proto_ops* ops;
-		projection can_proto_prot* prot;
+
+	rpc void  can_proto_unregister( const projection cp [bind(callee)] *  cp ) {
+		projection < struct can_proto > cp {
+		}
 	}
-	projection < struct proto > can_proto_prot {
-		rpc_ptr proto_init init;
+	rpc int  can_proto_register( const projection cp [alloc(callee)] *  cp ) {
+		projection < struct can_proto > cp {
+			int type;
+			int  protocol;
+			projection _global_proto_ops [alloc(callee)] * ops;
+			projection can_proto_prot [alloc(callee)] * prot;
+		}
+		projection < struct proto > can_proto_prot {
+			array<char, 32> name;
+			projection owner [alloc(callee)] *owner;
+			unsigned int obj_size;
+			rpc_ptr proto_init init;
+		}
+		projection <struct module> owner {
+		}
 	}
-}
-rpc int  can_proto_register( const projection cp*  cp ) {
-	projection < struct can_proto > cp {
-		int  protocol;
-		projection _global_proto_ops* ops;
-		projection can_proto_prot* prot;
-	}
-	projection < struct proto > can_proto_prot {
-		rpc_ptr proto_init init;
-	}
-}
+
 rpc_ptr void func(projection skb *skb, void *data) {
 	projection < struct sk_buff > skb {
 	}
@@ -308,24 +329,23 @@ rpc void  sk_free( projection sk* [in, out] sk ) {
 	projection < struct sock > sk {
 	}
 }
-projection < struct proto_ops > _global_proto_ops {
-	rpc_ptr proto_ops_accept accept;
-	rpc_ptr proto_ops_bind bind;
-	rpc_ptr proto_ops_connect connect;
-	rpc_ptr proto_ops_getname getname;
-	rpc_ptr proto_ops_getsockopt getsockopt;
-	rpc_ptr proto_ops_ioctl ioctl;
-	rpc_ptr proto_ops_listen listen;
-	rpc_ptr proto_ops_mmap mmap;
-	rpc_ptr proto_ops_poll poll;
-	rpc_ptr proto_ops_recvmsg recvmsg;
-	rpc_ptr proto_ops_release release;
-	rpc_ptr proto_ops_sendmsg sendmsg;
-	rpc_ptr proto_ops_sendpage sendpage;
-	rpc_ptr proto_ops_setsockopt setsockopt;
-	rpc_ptr proto_ops_shutdown shutdown;
-	rpc_ptr proto_ops_socketpair socketpair;
-}
-
-
+	projection < struct proto_ops > _global_proto_ops {
+		int family;
+		rpc_ptr proto_ops_release release;
+		rpc_ptr proto_ops_bind bind;
+		rpc_ptr proto_ops_connect connect;
+		rpc_ptr proto_ops_socketpair socketpair;
+		rpc_ptr proto_ops_accept accept;
+		rpc_ptr proto_ops_getname getname;
+		rpc_ptr proto_ops_poll poll;
+		rpc_ptr proto_ops_ioctl ioctl;
+		rpc_ptr proto_ops_listen listen;
+		rpc_ptr proto_ops_shutdown shutdown;
+		rpc_ptr proto_ops_setsockopt setsockopt;
+		rpc_ptr proto_ops_getsockopt getsockopt;
+		rpc_ptr proto_ops_sendmsg sendmsg;
+		rpc_ptr proto_ops_recvmsg recvmsg;
+		rpc_ptr proto_ops_mmap mmap;
+		rpc_ptr proto_ops_sendpage sendpage;
+	}
 }

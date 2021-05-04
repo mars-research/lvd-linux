@@ -166,6 +166,7 @@ enum RPC_ID {
 	RPC_ID_proto_ops_socketpair,
 	RPC_ID_proto_ops_connect,
 	RPC_ID_sock_alloc_send_skb,
+	RPC_ID_notifier_call,
 	RPC_ID_register_netdevice_notifier,
 	RPC_ID_unregister_netdevice_notifier,
 	RPC_ID_kfree_skb,
@@ -277,6 +278,12 @@ typedef int (*fptr_impl_proto_ops_connect)(fptr_proto_ops_connect target, struct
 
 LCD_TRAMPOLINE_DATA(trmp_proto_ops_connect)
 int LCD_TRAMPOLINE_LINKAGE(trmp_proto_ops_connect) trmp_proto_ops_connect(struct socket* sock, struct sockaddr* saddr, int len, int flags);
+
+typedef int (*fptr_notifier_call)(struct notifier_block* nb, unsigned long msg, void* ptr);
+typedef int (*fptr_impl_notifier_call)(fptr_notifier_call target, struct notifier_block* nb, unsigned long msg, void* ptr);
+
+LCD_TRAMPOLINE_DATA(trmp_notifier_call)
+int LCD_TRAMPOLINE_LINKAGE(trmp_notifier_call) trmp_notifier_call(struct notifier_block* nb, unsigned long msg, void* ptr);
 
 typedef void (*fptr_func)(struct sk_buff* skb, void* data);
 typedef void (*fptr_impl_func)(fptr_func target, struct sk_buff* skb, void* data);
@@ -396,6 +403,12 @@ struct sock_alloc_send_skb_call_ctx {
 	unsigned long size;
 	int noblock;
 	int* errcode;
+};
+
+struct notifier_call_call_ctx {
+	struct notifier_block* nb;
+	unsigned long msg;
+	void* ptr;
 };
 
 struct register_netdevice_notifier_call_ctx {
@@ -1536,6 +1549,90 @@ void caller_unmarshal_kernel__sock_alloc_send_skb__sock_sk_socket__in(
 	struct sock_alloc_send_skb_call_ctx const* call_ctx,
 	struct socket* ptr);
 
+void caller_marshal_kernel__notifier_call__nb__in(
+	size_t* __pos,
+	struct fipc_message* __msg,
+	struct ext_registers* __ext,
+	struct notifier_call_call_ctx const* call_ctx,
+	struct notifier_block const* ptr);
+
+void callee_unmarshal_kernel__notifier_call__nb__in(
+	size_t* __pos,
+	const struct fipc_message* __msg,
+	const struct ext_registers* __ext,
+	struct notifier_call_call_ctx const* call_ctx,
+	struct notifier_block* ptr);
+
+void callee_marshal_kernel__notifier_call__nb__in(
+	size_t* __pos,
+	struct fipc_message* __msg,
+	struct ext_registers* __ext,
+	struct notifier_call_call_ctx const* call_ctx,
+	struct notifier_block const* ptr);
+
+void caller_unmarshal_kernel__notifier_call__nb__in(
+	size_t* __pos,
+	const struct fipc_message* __msg,
+	const struct ext_registers* __ext,
+	struct notifier_call_call_ctx const* call_ctx,
+	struct notifier_block* ptr);
+
+void caller_marshal_kernel__notifier_call__info__in(
+	size_t* __pos,
+	struct fipc_message* __msg,
+	struct ext_registers* __ext,
+	struct notifier_call_call_ctx const* call_ctx,
+	struct netdev_notifier_info const* ptr);
+
+void callee_unmarshal_kernel__notifier_call__info__in(
+	size_t* __pos,
+	const struct fipc_message* __msg,
+	const struct ext_registers* __ext,
+	struct notifier_call_call_ctx const* call_ctx,
+	struct netdev_notifier_info* ptr);
+
+void callee_marshal_kernel__notifier_call__info__in(
+	size_t* __pos,
+	struct fipc_message* __msg,
+	struct ext_registers* __ext,
+	struct notifier_call_call_ctx const* call_ctx,
+	struct netdev_notifier_info const* ptr);
+
+void caller_unmarshal_kernel__notifier_call__info__in(
+	size_t* __pos,
+	const struct fipc_message* __msg,
+	const struct ext_registers* __ext,
+	struct notifier_call_call_ctx const* call_ctx,
+	struct netdev_notifier_info* ptr);
+
+void caller_marshal_kernel__notifier_call__net_device__in(
+	size_t* __pos,
+	struct fipc_message* __msg,
+	struct ext_registers* __ext,
+	struct notifier_call_call_ctx const* call_ctx,
+	struct net_device const* ptr);
+
+void callee_unmarshal_kernel__notifier_call__net_device__in(
+	size_t* __pos,
+	const struct fipc_message* __msg,
+	const struct ext_registers* __ext,
+	struct notifier_call_call_ctx const* call_ctx,
+	struct net_device* ptr);
+
+void callee_marshal_kernel__notifier_call__net_device__in(
+	size_t* __pos,
+	struct fipc_message* __msg,
+	struct ext_registers* __ext,
+	struct notifier_call_call_ctx const* call_ctx,
+	struct net_device const* ptr);
+
+void caller_unmarshal_kernel__notifier_call__net_device__in(
+	size_t* __pos,
+	const struct fipc_message* __msg,
+	const struct ext_registers* __ext,
+	struct notifier_call_call_ctx const* call_ctx,
+	struct net_device* ptr);
+
 void caller_marshal_kernel__register_netdevice_notifier__nb__in(
 	size_t* __pos,
 	struct fipc_message* __msg,
@@ -1816,58 +1913,6 @@ void caller_unmarshal_kernel__can_proto_unregister__cp__in(
 	struct can_proto_unregister_call_ctx const* call_ctx,
 	struct can_proto* ptr);
 
-void caller_marshal_kernel___global_proto_ops__in(
-	size_t* __pos,
-	struct fipc_message* __msg,
-	struct ext_registers* __ext,
-	struct proto_ops const* ptr);
-
-void callee_unmarshal_kernel___global_proto_ops__in(
-	size_t* __pos,
-	const struct fipc_message* __msg,
-	const struct ext_registers* __ext,
-	struct proto_ops* ptr);
-
-void callee_marshal_kernel___global_proto_ops__in(
-	size_t* __pos,
-	struct fipc_message* __msg,
-	struct ext_registers* __ext,
-	struct proto_ops const* ptr);
-
-void caller_unmarshal_kernel___global_proto_ops__in(
-	size_t* __pos,
-	const struct fipc_message* __msg,
-	const struct ext_registers* __ext,
-	struct proto_ops* ptr);
-
-void caller_marshal_kernel__can_proto_unregister__can_proto_prot__in(
-	size_t* __pos,
-	struct fipc_message* __msg,
-	struct ext_registers* __ext,
-	struct can_proto_unregister_call_ctx const* call_ctx,
-	struct proto const* ptr);
-
-void callee_unmarshal_kernel__can_proto_unregister__can_proto_prot__in(
-	size_t* __pos,
-	const struct fipc_message* __msg,
-	const struct ext_registers* __ext,
-	struct can_proto_unregister_call_ctx const* call_ctx,
-	struct proto* ptr);
-
-void callee_marshal_kernel__can_proto_unregister__can_proto_prot__in(
-	size_t* __pos,
-	struct fipc_message* __msg,
-	struct ext_registers* __ext,
-	struct can_proto_unregister_call_ctx const* call_ctx,
-	struct proto const* ptr);
-
-void caller_unmarshal_kernel__can_proto_unregister__can_proto_prot__in(
-	size_t* __pos,
-	const struct fipc_message* __msg,
-	const struct ext_registers* __ext,
-	struct can_proto_unregister_call_ctx const* call_ctx,
-	struct proto* ptr);
-
 void caller_marshal_kernel__can_proto_register__cp__in(
 	size_t* __pos,
 	struct fipc_message* __msg,
@@ -1896,6 +1941,30 @@ void caller_unmarshal_kernel__can_proto_register__cp__in(
 	struct can_proto_register_call_ctx const* call_ctx,
 	struct can_proto* ptr);
 
+void caller_marshal_kernel___global_proto_ops__in(
+	size_t* __pos,
+	struct fipc_message* __msg,
+	struct ext_registers* __ext,
+	struct proto_ops const* ptr);
+
+void callee_unmarshal_kernel___global_proto_ops__in(
+	size_t* __pos,
+	const struct fipc_message* __msg,
+	const struct ext_registers* __ext,
+	struct proto_ops* ptr);
+
+void callee_marshal_kernel___global_proto_ops__in(
+	size_t* __pos,
+	struct fipc_message* __msg,
+	struct ext_registers* __ext,
+	struct proto_ops const* ptr);
+
+void caller_unmarshal_kernel___global_proto_ops__in(
+	size_t* __pos,
+	const struct fipc_message* __msg,
+	const struct ext_registers* __ext,
+	struct proto_ops* ptr);
+
 void caller_marshal_kernel__can_proto_register__can_proto_prot__in(
 	size_t* __pos,
 	struct fipc_message* __msg,
@@ -1923,6 +1992,34 @@ void caller_unmarshal_kernel__can_proto_register__can_proto_prot__in(
 	const struct ext_registers* __ext,
 	struct can_proto_register_call_ctx const* call_ctx,
 	struct proto* ptr);
+
+void caller_marshal_kernel__can_proto_register__owner__in(
+	size_t* __pos,
+	struct fipc_message* __msg,
+	struct ext_registers* __ext,
+	struct can_proto_register_call_ctx const* call_ctx,
+	struct module const* ptr);
+
+void callee_unmarshal_kernel__can_proto_register__owner__in(
+	size_t* __pos,
+	const struct fipc_message* __msg,
+	const struct ext_registers* __ext,
+	struct can_proto_register_call_ctx const* call_ctx,
+	struct module* ptr);
+
+void callee_marshal_kernel__can_proto_register__owner__in(
+	size_t* __pos,
+	struct fipc_message* __msg,
+	struct ext_registers* __ext,
+	struct can_proto_register_call_ctx const* call_ctx,
+	struct module const* ptr);
+
+void caller_unmarshal_kernel__can_proto_register__owner__in(
+	size_t* __pos,
+	const struct fipc_message* __msg,
+	const struct ext_registers* __ext,
+	struct can_proto_register_call_ctx const* call_ctx,
+	struct module* ptr);
 
 void caller_marshal_kernel__func__skb__in(
 	size_t* __pos,

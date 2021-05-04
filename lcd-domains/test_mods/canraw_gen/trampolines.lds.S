@@ -15,6 +15,7 @@ SECTIONS{
 	LCD_TRAMPOLINE_LINKER_SECTION(trmp_proto_ops_accept)
 	LCD_TRAMPOLINE_LINKER_SECTION(trmp_proto_ops_socketpair)
 	LCD_TRAMPOLINE_LINKER_SECTION(trmp_proto_ops_connect)
+	LCD_TRAMPOLINE_LINKER_SECTION(trmp_notifier_call)
 	LCD_TRAMPOLINE_LINKER_SECTION(trmp_func)
 	LCD_TRAMPOLINE_LINKER_SECTION(trmp_proto_ops_ioctl)
 	LCD_TRAMPOLINE_LINKER_SECTION(trmp_proto_ops_poll)

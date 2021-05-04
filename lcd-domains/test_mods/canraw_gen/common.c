@@ -1873,6 +1873,182 @@ void caller_unmarshal_kernel__sock_alloc_send_skb__sock_sk_socket__in(
 	
 }
 
+void caller_marshal_kernel__notifier_call__nb__in(
+	size_t* __pos,
+	struct fipc_message* __msg,
+	struct ext_registers* __ext,
+	struct notifier_call_call_ctx const* ctx,
+	struct notifier_block const* ptr)
+{
+	
+}
+
+void callee_unmarshal_kernel__notifier_call__nb__in(
+	size_t* __pos,
+	const struct fipc_message* __msg,
+	const struct ext_registers* __ext,
+	struct notifier_call_call_ctx const* ctx,
+	struct notifier_block* ptr)
+{
+	
+}
+
+void callee_marshal_kernel__notifier_call__nb__in(
+	size_t* __pos,
+	struct fipc_message* __msg,
+	struct ext_registers* __ext,
+	struct notifier_call_call_ctx const* ctx,
+	struct notifier_block const* ptr)
+{
+	
+}
+
+void caller_unmarshal_kernel__notifier_call__nb__in(
+	size_t* __pos,
+	const struct fipc_message* __msg,
+	const struct ext_registers* __ext,
+	struct notifier_call_call_ctx const* ctx,
+	struct notifier_block* ptr)
+{
+	
+}
+
+void caller_marshal_kernel__notifier_call__info__in(
+	size_t* __pos,
+	struct fipc_message* __msg,
+	struct ext_registers* __ext,
+	struct notifier_call_call_ctx const* ctx,
+	struct netdev_notifier_info const* ptr)
+{
+	struct net_device* const* dev_ptr = &ptr->dev;
+	
+	{
+		__maybe_unused const void* __adjusted = *dev_ptr;
+		glue_pack(__pos, __msg, __ext, __adjusted);
+		if (*dev_ptr) {
+			caller_marshal_kernel__notifier_call__net_device__in(__pos, __msg, __ext, ctx, *dev_ptr);
+		}
+
+	}
+
+}
+
+void callee_unmarshal_kernel__notifier_call__info__in(
+	size_t* __pos,
+	const struct fipc_message* __msg,
+	const struct ext_registers* __ext,
+	struct notifier_call_call_ctx const* ctx,
+	struct netdev_notifier_info* ptr)
+{
+	struct net_device** dev_ptr = &ptr->dev;
+	
+	{
+		size_t __size = sizeof(struct net_device);
+		*dev_ptr = glue_unpack_new_shadow(__pos, __msg, __ext, struct net_device*, (__size), (DEFAULT_GFP_FLAGS));
+		if (*dev_ptr) {
+			callee_unmarshal_kernel__notifier_call__net_device__in(__pos, __msg, __ext, ctx, *dev_ptr);
+		}
+
+	}
+
+}
+
+void callee_marshal_kernel__notifier_call__info__in(
+	size_t* __pos,
+	struct fipc_message* __msg,
+	struct ext_registers* __ext,
+	struct notifier_call_call_ctx const* ctx,
+	struct netdev_notifier_info const* ptr)
+{
+	struct net_device* const* dev_ptr = &ptr->dev;
+	
+	{
+		if (*dev_ptr) {
+			callee_marshal_kernel__notifier_call__net_device__in(__pos, __msg, __ext, ctx, *dev_ptr);
+		}
+
+	}
+
+}
+
+void caller_unmarshal_kernel__notifier_call__info__in(
+	size_t* __pos,
+	const struct fipc_message* __msg,
+	const struct ext_registers* __ext,
+	struct notifier_call_call_ctx const* ctx,
+	struct netdev_notifier_info* ptr)
+{
+	struct net_device** dev_ptr = &ptr->dev;
+	
+	{
+		if (*dev_ptr) {
+			caller_unmarshal_kernel__notifier_call__net_device__in(__pos, __msg, __ext, ctx, *dev_ptr);
+		}
+
+	}
+
+}
+
+void caller_marshal_kernel__notifier_call__net_device__in(
+	size_t* __pos,
+	struct fipc_message* __msg,
+	struct ext_registers* __ext,
+	struct notifier_call_call_ctx const* ctx,
+	struct net_device const* ptr)
+{
+	int const* ifindex_ptr = &ptr->ifindex;
+	unsigned short const* type_ptr = &ptr->type;
+	
+	{
+		glue_pack(__pos, __msg, __ext, *ifindex_ptr);
+	}
+
+	{
+		glue_pack(__pos, __msg, __ext, *type_ptr);
+	}
+
+}
+
+void callee_unmarshal_kernel__notifier_call__net_device__in(
+	size_t* __pos,
+	const struct fipc_message* __msg,
+	const struct ext_registers* __ext,
+	struct notifier_call_call_ctx const* ctx,
+	struct net_device* ptr)
+{
+	int* ifindex_ptr = &ptr->ifindex;
+	unsigned short* type_ptr = &ptr->type;
+	
+	{
+		*ifindex_ptr = glue_unpack(__pos, __msg, __ext, int);
+	}
+
+	{
+		*type_ptr = glue_unpack(__pos, __msg, __ext, unsigned short);
+	}
+
+}
+
+void callee_marshal_kernel__notifier_call__net_device__in(
+	size_t* __pos,
+	struct fipc_message* __msg,
+	struct ext_registers* __ext,
+	struct notifier_call_call_ctx const* ctx,
+	struct net_device const* ptr)
+{
+	
+}
+
+void caller_unmarshal_kernel__notifier_call__net_device__in(
+	size_t* __pos,
+	const struct fipc_message* __msg,
+	const struct ext_registers* __ext,
+	struct notifier_call_call_ctx const* ctx,
+	struct net_device* ptr)
+{
+	
+}
+
 void caller_marshal_kernel__register_netdevice_notifier__nb__in(
 	size_t* __pos,
 	struct fipc_message* __msg,
@@ -1880,7 +2056,12 @@ void caller_marshal_kernel__register_netdevice_notifier__nb__in(
 	struct register_netdevice_notifier_call_ctx const* ctx,
 	struct notifier_block const* ptr)
 {
+	fptr_notifier_call const* notifier_call_ptr = &ptr->notifier_call;
 	
+	{
+		glue_pack(__pos, __msg, __ext, *notifier_call_ptr);
+	}
+
 }
 
 void callee_unmarshal_kernel__register_netdevice_notifier__nb__in(
@@ -1890,7 +2071,12 @@ void callee_unmarshal_kernel__register_netdevice_notifier__nb__in(
 	struct register_netdevice_notifier_call_ctx const* ctx,
 	struct notifier_block* ptr)
 {
+	fptr_notifier_call* notifier_call_ptr = &ptr->notifier_call;
 	
+	{
+		*notifier_call_ptr = glue_unpack_rpc_ptr(__pos, __msg, __ext, notifier_call);
+	}
+
 }
 
 void callee_marshal_kernel__register_netdevice_notifier__nb__in(
@@ -2603,32 +2789,7 @@ void caller_marshal_kernel__can_proto_unregister__cp__in(
 	struct can_proto_unregister_call_ctx const* ctx,
 	struct can_proto const* ptr)
 {
-	int const* protocol_ptr = &ptr->protocol;
-	struct proto_ops* const* ops_ptr = &ptr->ops;
-	struct proto* const* prot_ptr = &ptr->prot;
 	
-	{
-		glue_pack(__pos, __msg, __ext, *protocol_ptr);
-	}
-
-	{
-		__maybe_unused const void* __adjusted = *ops_ptr;
-		glue_pack_shadow(__pos, __msg, __ext, __adjusted);
-		if (*ops_ptr) {
-			caller_marshal_kernel___global_proto_ops__in(__pos, __msg, __ext, *ops_ptr);
-		}
-
-	}
-
-	{
-		__maybe_unused const void* __adjusted = *prot_ptr;
-		glue_pack_shadow(__pos, __msg, __ext, __adjusted);
-		if (*prot_ptr) {
-			caller_marshal_kernel__can_proto_unregister__can_proto_prot__in(__pos, __msg, __ext, ctx, *prot_ptr);
-		}
-
-	}
-
 }
 
 void callee_unmarshal_kernel__can_proto_unregister__cp__in(
@@ -2638,30 +2799,7 @@ void callee_unmarshal_kernel__can_proto_unregister__cp__in(
 	struct can_proto_unregister_call_ctx const* ctx,
 	struct can_proto* ptr)
 {
-	int* protocol_ptr = &ptr->protocol;
-	struct proto_ops** ops_ptr = &ptr->ops;
-	struct proto** prot_ptr = &ptr->prot;
 	
-	{
-		*protocol_ptr = glue_unpack(__pos, __msg, __ext, int);
-	}
-
-	{
-		*ops_ptr = glue_unpack(__pos, __msg, __ext, struct proto_ops*);
-		if (*ops_ptr) {
-			callee_unmarshal_kernel___global_proto_ops__in(__pos, __msg, __ext, *ops_ptr);
-		}
-
-	}
-
-	{
-		*prot_ptr = glue_unpack(__pos, __msg, __ext, struct proto*);
-		if (*prot_ptr) {
-			callee_unmarshal_kernel__can_proto_unregister__can_proto_prot__in(__pos, __msg, __ext, ctx, *prot_ptr);
-		}
-
-	}
-
 }
 
 void callee_marshal_kernel__can_proto_unregister__cp__in(
@@ -2671,23 +2809,7 @@ void callee_marshal_kernel__can_proto_unregister__cp__in(
 	struct can_proto_unregister_call_ctx const* ctx,
 	struct can_proto const* ptr)
 {
-	struct proto_ops* const* ops_ptr = &ptr->ops;
-	struct proto* const* prot_ptr = &ptr->prot;
 	
-	{
-		if (*ops_ptr) {
-			callee_marshal_kernel___global_proto_ops__in(__pos, __msg, __ext, *ops_ptr);
-		}
-
-	}
-
-	{
-		if (*prot_ptr) {
-			callee_marshal_kernel__can_proto_unregister__can_proto_prot__in(__pos, __msg, __ext, ctx, *prot_ptr);
-		}
-
-	}
-
 }
 
 void caller_unmarshal_kernel__can_proto_unregister__cp__in(
@@ -2696,268 +2818,6 @@ void caller_unmarshal_kernel__can_proto_unregister__cp__in(
 	const struct ext_registers* __ext,
 	struct can_proto_unregister_call_ctx const* ctx,
 	struct can_proto* ptr)
-{
-	struct proto_ops** ops_ptr = &ptr->ops;
-	struct proto** prot_ptr = &ptr->prot;
-	
-	{
-		if (*ops_ptr) {
-			caller_unmarshal_kernel___global_proto_ops__in(__pos, __msg, __ext, *ops_ptr);
-		}
-
-	}
-
-	{
-		if (*prot_ptr) {
-			caller_unmarshal_kernel__can_proto_unregister__can_proto_prot__in(__pos, __msg, __ext, ctx, *prot_ptr);
-		}
-
-	}
-
-}
-
-void caller_marshal_kernel___global_proto_ops__in(
-	size_t* __pos,
-	struct fipc_message* __msg,
-	struct ext_registers* __ext,
-	struct proto_ops const* ptr)
-{
-	fptr_proto_ops_accept const* accept_ptr = &ptr->accept;
-	fptr_proto_ops_bind const* bind_ptr = &ptr->bind;
-	fptr_proto_ops_connect const* connect_ptr = &ptr->connect;
-	fptr_proto_ops_getname const* getname_ptr = &ptr->getname;
-	fptr_proto_ops_getsockopt const* getsockopt_ptr = &ptr->getsockopt;
-	fptr_proto_ops_ioctl const* ioctl_ptr = &ptr->ioctl;
-	fptr_proto_ops_listen const* listen_ptr = &ptr->listen;
-	fptr_proto_ops_mmap const* mmap_ptr = &ptr->mmap;
-	fptr_proto_ops_poll const* poll_ptr = &ptr->poll;
-	fptr_proto_ops_recvmsg const* recvmsg_ptr = &ptr->recvmsg;
-	fptr_proto_ops_release const* release_ptr = &ptr->release;
-	fptr_proto_ops_sendmsg const* sendmsg_ptr = &ptr->sendmsg;
-	fptr_proto_ops_sendpage const* sendpage_ptr = &ptr->sendpage;
-	fptr_proto_ops_setsockopt const* setsockopt_ptr = &ptr->setsockopt;
-	fptr_proto_ops_shutdown const* shutdown_ptr = &ptr->shutdown;
-	fptr_proto_ops_socketpair const* socketpair_ptr = &ptr->socketpair;
-	
-	{
-		glue_pack(__pos, __msg, __ext, *accept_ptr);
-	}
-
-	{
-		glue_pack(__pos, __msg, __ext, *bind_ptr);
-	}
-
-	{
-		glue_pack(__pos, __msg, __ext, *connect_ptr);
-	}
-
-	{
-		glue_pack(__pos, __msg, __ext, *getname_ptr);
-	}
-
-	{
-		glue_pack(__pos, __msg, __ext, *getsockopt_ptr);
-	}
-
-	{
-		glue_pack(__pos, __msg, __ext, *ioctl_ptr);
-	}
-
-	{
-		glue_pack(__pos, __msg, __ext, *listen_ptr);
-	}
-
-	{
-		glue_pack(__pos, __msg, __ext, *mmap_ptr);
-	}
-
-	{
-		glue_pack(__pos, __msg, __ext, *poll_ptr);
-	}
-
-	{
-		glue_pack(__pos, __msg, __ext, *recvmsg_ptr);
-	}
-
-	{
-		glue_pack(__pos, __msg, __ext, *release_ptr);
-	}
-
-	{
-		glue_pack(__pos, __msg, __ext, *sendmsg_ptr);
-	}
-
-	{
-		glue_pack(__pos, __msg, __ext, *sendpage_ptr);
-	}
-
-	{
-		glue_pack(__pos, __msg, __ext, *setsockopt_ptr);
-	}
-
-	{
-		glue_pack(__pos, __msg, __ext, *shutdown_ptr);
-	}
-
-	{
-		glue_pack(__pos, __msg, __ext, *socketpair_ptr);
-	}
-
-}
-
-void callee_unmarshal_kernel___global_proto_ops__in(
-	size_t* __pos,
-	const struct fipc_message* __msg,
-	const struct ext_registers* __ext,
-	struct proto_ops* ptr)
-{
-	fptr_proto_ops_accept* accept_ptr = &ptr->accept;
-	fptr_proto_ops_bind* bind_ptr = &ptr->bind;
-	fptr_proto_ops_connect* connect_ptr = &ptr->connect;
-	fptr_proto_ops_getname* getname_ptr = &ptr->getname;
-	fptr_proto_ops_getsockopt* getsockopt_ptr = &ptr->getsockopt;
-	fptr_proto_ops_ioctl* ioctl_ptr = &ptr->ioctl;
-	fptr_proto_ops_listen* listen_ptr = &ptr->listen;
-	fptr_proto_ops_mmap* mmap_ptr = &ptr->mmap;
-	fptr_proto_ops_poll* poll_ptr = &ptr->poll;
-	fptr_proto_ops_recvmsg* recvmsg_ptr = &ptr->recvmsg;
-	fptr_proto_ops_release* release_ptr = &ptr->release;
-	fptr_proto_ops_sendmsg* sendmsg_ptr = &ptr->sendmsg;
-	fptr_proto_ops_sendpage* sendpage_ptr = &ptr->sendpage;
-	fptr_proto_ops_setsockopt* setsockopt_ptr = &ptr->setsockopt;
-	fptr_proto_ops_shutdown* shutdown_ptr = &ptr->shutdown;
-	fptr_proto_ops_socketpair* socketpair_ptr = &ptr->socketpair;
-	
-	{
-		*accept_ptr = glue_unpack_rpc_ptr(__pos, __msg, __ext, proto_ops_accept);
-	}
-
-	{
-		*bind_ptr = glue_unpack_rpc_ptr(__pos, __msg, __ext, proto_ops_bind);
-	}
-
-	{
-		*connect_ptr = glue_unpack_rpc_ptr(__pos, __msg, __ext, proto_ops_connect);
-	}
-
-	{
-		*getname_ptr = glue_unpack_rpc_ptr(__pos, __msg, __ext, proto_ops_getname);
-	}
-
-	{
-		*getsockopt_ptr = glue_unpack_rpc_ptr(__pos, __msg, __ext, proto_ops_getsockopt);
-	}
-
-	{
-		*ioctl_ptr = glue_unpack_rpc_ptr(__pos, __msg, __ext, proto_ops_ioctl);
-	}
-
-	{
-		*listen_ptr = glue_unpack_rpc_ptr(__pos, __msg, __ext, proto_ops_listen);
-	}
-
-	{
-		*mmap_ptr = glue_unpack_rpc_ptr(__pos, __msg, __ext, proto_ops_mmap);
-	}
-
-	{
-		*poll_ptr = glue_unpack_rpc_ptr(__pos, __msg, __ext, proto_ops_poll);
-	}
-
-	{
-		*recvmsg_ptr = glue_unpack_rpc_ptr(__pos, __msg, __ext, proto_ops_recvmsg);
-	}
-
-	{
-		*release_ptr = glue_unpack_rpc_ptr(__pos, __msg, __ext, proto_ops_release);
-	}
-
-	{
-		*sendmsg_ptr = glue_unpack_rpc_ptr(__pos, __msg, __ext, proto_ops_sendmsg);
-	}
-
-	{
-		*sendpage_ptr = glue_unpack_rpc_ptr(__pos, __msg, __ext, proto_ops_sendpage);
-	}
-
-	{
-		*setsockopt_ptr = glue_unpack_rpc_ptr(__pos, __msg, __ext, proto_ops_setsockopt);
-	}
-
-	{
-		*shutdown_ptr = glue_unpack_rpc_ptr(__pos, __msg, __ext, proto_ops_shutdown);
-	}
-
-	{
-		*socketpair_ptr = glue_unpack_rpc_ptr(__pos, __msg, __ext, proto_ops_socketpair);
-	}
-
-}
-
-void callee_marshal_kernel___global_proto_ops__in(
-	size_t* __pos,
-	struct fipc_message* __msg,
-	struct ext_registers* __ext,
-	struct proto_ops const* ptr)
-{
-	
-}
-
-void caller_unmarshal_kernel___global_proto_ops__in(
-	size_t* __pos,
-	const struct fipc_message* __msg,
-	const struct ext_registers* __ext,
-	struct proto_ops* ptr)
-{
-	
-}
-
-void caller_marshal_kernel__can_proto_unregister__can_proto_prot__in(
-	size_t* __pos,
-	struct fipc_message* __msg,
-	struct ext_registers* __ext,
-	struct can_proto_unregister_call_ctx const* ctx,
-	struct proto const* ptr)
-{
-	fptr_proto_init const* init_ptr = &ptr->init;
-	
-	{
-		glue_pack(__pos, __msg, __ext, *init_ptr);
-	}
-
-}
-
-void callee_unmarshal_kernel__can_proto_unregister__can_proto_prot__in(
-	size_t* __pos,
-	const struct fipc_message* __msg,
-	const struct ext_registers* __ext,
-	struct can_proto_unregister_call_ctx const* ctx,
-	struct proto* ptr)
-{
-	fptr_proto_init* init_ptr = &ptr->init;
-	
-	{
-		*init_ptr = glue_unpack_rpc_ptr(__pos, __msg, __ext, proto_init);
-	}
-
-}
-
-void callee_marshal_kernel__can_proto_unregister__can_proto_prot__in(
-	size_t* __pos,
-	struct fipc_message* __msg,
-	struct ext_registers* __ext,
-	struct can_proto_unregister_call_ctx const* ctx,
-	struct proto const* ptr)
-{
-	
-}
-
-void caller_unmarshal_kernel__can_proto_unregister__can_proto_prot__in(
-	size_t* __pos,
-	const struct fipc_message* __msg,
-	const struct ext_registers* __ext,
-	struct can_proto_unregister_call_ctx const* ctx,
-	struct proto* ptr)
 {
 	
 }
@@ -2969,17 +2829,22 @@ void caller_marshal_kernel__can_proto_register__cp__in(
 	struct can_proto_register_call_ctx const* ctx,
 	struct can_proto const* ptr)
 {
+	int const* type_ptr = &ptr->type;
 	int const* protocol_ptr = &ptr->protocol;
 	struct proto_ops* const* ops_ptr = &ptr->ops;
 	struct proto* const* prot_ptr = &ptr->prot;
 	
+	{
+		glue_pack(__pos, __msg, __ext, *type_ptr);
+	}
+
 	{
 		glue_pack(__pos, __msg, __ext, *protocol_ptr);
 	}
 
 	{
 		__maybe_unused const void* __adjusted = *ops_ptr;
-		glue_pack_shadow(__pos, __msg, __ext, __adjusted);
+		glue_pack(__pos, __msg, __ext, __adjusted);
 		if (*ops_ptr) {
 			caller_marshal_kernel___global_proto_ops__in(__pos, __msg, __ext, *ops_ptr);
 		}
@@ -2988,7 +2853,7 @@ void caller_marshal_kernel__can_proto_register__cp__in(
 
 	{
 		__maybe_unused const void* __adjusted = *prot_ptr;
-		glue_pack_shadow(__pos, __msg, __ext, __adjusted);
+		glue_pack(__pos, __msg, __ext, __adjusted);
 		if (*prot_ptr) {
 			caller_marshal_kernel__can_proto_register__can_proto_prot__in(__pos, __msg, __ext, ctx, *prot_ptr);
 		}
@@ -3004,16 +2869,22 @@ void callee_unmarshal_kernel__can_proto_register__cp__in(
 	struct can_proto_register_call_ctx const* ctx,
 	struct can_proto* ptr)
 {
+	int* type_ptr = &ptr->type;
 	int* protocol_ptr = &ptr->protocol;
 	struct proto_ops** ops_ptr = &ptr->ops;
 	struct proto** prot_ptr = &ptr->prot;
 	
 	{
+		*type_ptr = glue_unpack(__pos, __msg, __ext, int);
+	}
+
+	{
 		*protocol_ptr = glue_unpack(__pos, __msg, __ext, int);
 	}
 
 	{
-		*ops_ptr = glue_unpack(__pos, __msg, __ext, struct proto_ops*);
+		size_t __size = sizeof(struct proto_ops);
+		*ops_ptr = glue_unpack_new_shadow(__pos, __msg, __ext, struct proto_ops*, (__size), (DEFAULT_GFP_FLAGS));
 		if (*ops_ptr) {
 			callee_unmarshal_kernel___global_proto_ops__in(__pos, __msg, __ext, *ops_ptr);
 		}
@@ -3021,7 +2892,8 @@ void callee_unmarshal_kernel__can_proto_register__cp__in(
 	}
 
 	{
-		*prot_ptr = glue_unpack(__pos, __msg, __ext, struct proto*);
+		size_t __size = sizeof(struct proto);
+		*prot_ptr = glue_unpack_new_shadow(__pos, __msg, __ext, struct proto*, (__size), (DEFAULT_GFP_FLAGS));
 		if (*prot_ptr) {
 			callee_unmarshal_kernel__can_proto_register__can_proto_prot__in(__pos, __msg, __ext, ctx, *prot_ptr);
 		}
@@ -3082,6 +2954,212 @@ void caller_unmarshal_kernel__can_proto_register__cp__in(
 
 }
 
+void caller_marshal_kernel___global_proto_ops__in(
+	size_t* __pos,
+	struct fipc_message* __msg,
+	struct ext_registers* __ext,
+	struct proto_ops const* ptr)
+{
+	int const* family_ptr = &ptr->family;
+	fptr_proto_ops_release const* release_ptr = &ptr->release;
+	fptr_proto_ops_bind const* bind_ptr = &ptr->bind;
+	fptr_proto_ops_connect const* connect_ptr = &ptr->connect;
+	fptr_proto_ops_socketpair const* socketpair_ptr = &ptr->socketpair;
+	fptr_proto_ops_accept const* accept_ptr = &ptr->accept;
+	fptr_proto_ops_getname const* getname_ptr = &ptr->getname;
+	fptr_proto_ops_poll const* poll_ptr = &ptr->poll;
+	fptr_proto_ops_ioctl const* ioctl_ptr = &ptr->ioctl;
+	fptr_proto_ops_listen const* listen_ptr = &ptr->listen;
+	fptr_proto_ops_shutdown const* shutdown_ptr = &ptr->shutdown;
+	fptr_proto_ops_setsockopt const* setsockopt_ptr = &ptr->setsockopt;
+	fptr_proto_ops_getsockopt const* getsockopt_ptr = &ptr->getsockopt;
+	fptr_proto_ops_sendmsg const* sendmsg_ptr = &ptr->sendmsg;
+	fptr_proto_ops_recvmsg const* recvmsg_ptr = &ptr->recvmsg;
+	fptr_proto_ops_mmap const* mmap_ptr = &ptr->mmap;
+	fptr_proto_ops_sendpage const* sendpage_ptr = &ptr->sendpage;
+	
+	{
+		glue_pack(__pos, __msg, __ext, *family_ptr);
+	}
+
+	{
+		glue_pack(__pos, __msg, __ext, *release_ptr);
+	}
+
+	{
+		glue_pack(__pos, __msg, __ext, *bind_ptr);
+	}
+
+	{
+		glue_pack(__pos, __msg, __ext, *connect_ptr);
+	}
+
+	{
+		glue_pack(__pos, __msg, __ext, *socketpair_ptr);
+	}
+
+	{
+		glue_pack(__pos, __msg, __ext, *accept_ptr);
+	}
+
+	{
+		glue_pack(__pos, __msg, __ext, *getname_ptr);
+	}
+
+	{
+		glue_pack(__pos, __msg, __ext, *poll_ptr);
+	}
+
+	{
+		glue_pack(__pos, __msg, __ext, *ioctl_ptr);
+	}
+
+	{
+		glue_pack(__pos, __msg, __ext, *listen_ptr);
+	}
+
+	{
+		glue_pack(__pos, __msg, __ext, *shutdown_ptr);
+	}
+
+	{
+		glue_pack(__pos, __msg, __ext, *setsockopt_ptr);
+	}
+
+	{
+		glue_pack(__pos, __msg, __ext, *getsockopt_ptr);
+	}
+
+	{
+		glue_pack(__pos, __msg, __ext, *sendmsg_ptr);
+	}
+
+	{
+		glue_pack(__pos, __msg, __ext, *recvmsg_ptr);
+	}
+
+	{
+		glue_pack(__pos, __msg, __ext, *mmap_ptr);
+	}
+
+	{
+		glue_pack(__pos, __msg, __ext, *sendpage_ptr);
+	}
+
+}
+
+void callee_unmarshal_kernel___global_proto_ops__in(
+	size_t* __pos,
+	const struct fipc_message* __msg,
+	const struct ext_registers* __ext,
+	struct proto_ops* ptr)
+{
+	int* family_ptr = &ptr->family;
+	fptr_proto_ops_release* release_ptr = &ptr->release;
+	fptr_proto_ops_bind* bind_ptr = &ptr->bind;
+	fptr_proto_ops_connect* connect_ptr = &ptr->connect;
+	fptr_proto_ops_socketpair* socketpair_ptr = &ptr->socketpair;
+	fptr_proto_ops_accept* accept_ptr = &ptr->accept;
+	fptr_proto_ops_getname* getname_ptr = &ptr->getname;
+	fptr_proto_ops_poll* poll_ptr = &ptr->poll;
+	fptr_proto_ops_ioctl* ioctl_ptr = &ptr->ioctl;
+	fptr_proto_ops_listen* listen_ptr = &ptr->listen;
+	fptr_proto_ops_shutdown* shutdown_ptr = &ptr->shutdown;
+	fptr_proto_ops_setsockopt* setsockopt_ptr = &ptr->setsockopt;
+	fptr_proto_ops_getsockopt* getsockopt_ptr = &ptr->getsockopt;
+	fptr_proto_ops_sendmsg* sendmsg_ptr = &ptr->sendmsg;
+	fptr_proto_ops_recvmsg* recvmsg_ptr = &ptr->recvmsg;
+	fptr_proto_ops_mmap* mmap_ptr = &ptr->mmap;
+	fptr_proto_ops_sendpage* sendpage_ptr = &ptr->sendpage;
+	
+	{
+		*family_ptr = glue_unpack(__pos, __msg, __ext, int);
+	}
+
+	{
+		*release_ptr = glue_unpack_rpc_ptr(__pos, __msg, __ext, proto_ops_release);
+	}
+
+	{
+		*bind_ptr = glue_unpack_rpc_ptr(__pos, __msg, __ext, proto_ops_bind);
+	}
+
+	{
+		*connect_ptr = glue_unpack_rpc_ptr(__pos, __msg, __ext, proto_ops_connect);
+	}
+
+	{
+		*socketpair_ptr = glue_unpack_rpc_ptr(__pos, __msg, __ext, proto_ops_socketpair);
+	}
+
+	{
+		*accept_ptr = glue_unpack_rpc_ptr(__pos, __msg, __ext, proto_ops_accept);
+	}
+
+	{
+		*getname_ptr = glue_unpack_rpc_ptr(__pos, __msg, __ext, proto_ops_getname);
+	}
+
+	{
+		*poll_ptr = glue_unpack_rpc_ptr(__pos, __msg, __ext, proto_ops_poll);
+	}
+
+	{
+		*ioctl_ptr = glue_unpack_rpc_ptr(__pos, __msg, __ext, proto_ops_ioctl);
+	}
+
+	{
+		*listen_ptr = glue_unpack_rpc_ptr(__pos, __msg, __ext, proto_ops_listen);
+	}
+
+	{
+		*shutdown_ptr = glue_unpack_rpc_ptr(__pos, __msg, __ext, proto_ops_shutdown);
+	}
+
+	{
+		*setsockopt_ptr = glue_unpack_rpc_ptr(__pos, __msg, __ext, proto_ops_setsockopt);
+	}
+
+	{
+		*getsockopt_ptr = glue_unpack_rpc_ptr(__pos, __msg, __ext, proto_ops_getsockopt);
+	}
+
+	{
+		*sendmsg_ptr = glue_unpack_rpc_ptr(__pos, __msg, __ext, proto_ops_sendmsg);
+	}
+
+	{
+		*recvmsg_ptr = glue_unpack_rpc_ptr(__pos, __msg, __ext, proto_ops_recvmsg);
+	}
+
+	{
+		*mmap_ptr = glue_unpack_rpc_ptr(__pos, __msg, __ext, proto_ops_mmap);
+	}
+
+	{
+		*sendpage_ptr = glue_unpack_rpc_ptr(__pos, __msg, __ext, proto_ops_sendpage);
+	}
+
+}
+
+void callee_marshal_kernel___global_proto_ops__in(
+	size_t* __pos,
+	struct fipc_message* __msg,
+	struct ext_registers* __ext,
+	struct proto_ops const* ptr)
+{
+	
+}
+
+void caller_unmarshal_kernel___global_proto_ops__in(
+	size_t* __pos,
+	const struct fipc_message* __msg,
+	const struct ext_registers* __ext,
+	struct proto_ops* ptr)
+{
+	
+}
+
 void caller_marshal_kernel__can_proto_register__can_proto_prot__in(
 	size_t* __pos,
 	struct fipc_message* __msg,
@@ -3089,8 +3167,37 @@ void caller_marshal_kernel__can_proto_register__can_proto_prot__in(
 	struct can_proto_register_call_ctx const* ctx,
 	struct proto const* ptr)
 {
+	char const* name_ptr = ptr->name;
+	struct module* const* owner_ptr = &ptr->owner;
+	unsigned int const* obj_size_ptr = &ptr->obj_size;
 	fptr_proto_init const* init_ptr = &ptr->init;
 	
+	{
+		size_t i, len = 32;
+		char const* array = name_ptr;
+		glue_pack(__pos, __msg, __ext, len);
+		// Warning: see David if this breaks
+		glue_user_trace("Warning: see David if this breaks");
+		for (i = 0; i < len; ++i) {
+			char const* element = &array[i];
+			glue_pack(__pos, __msg, __ext, *element);
+		}
+
+	}
+
+	{
+		__maybe_unused const void* __adjusted = *owner_ptr;
+		glue_pack(__pos, __msg, __ext, __adjusted);
+		if (*owner_ptr) {
+			caller_marshal_kernel__can_proto_register__owner__in(__pos, __msg, __ext, ctx, *owner_ptr);
+		}
+
+	}
+
+	{
+		glue_pack(__pos, __msg, __ext, *obj_size_ptr);
+	}
+
 	{
 		glue_pack(__pos, __msg, __ext, *init_ptr);
 	}
@@ -3104,8 +3211,37 @@ void callee_unmarshal_kernel__can_proto_register__can_proto_prot__in(
 	struct can_proto_register_call_ctx const* ctx,
 	struct proto* ptr)
 {
+	char* name_ptr = ptr->name;
+	struct module** owner_ptr = &ptr->owner;
+	unsigned int* obj_size_ptr = &ptr->obj_size;
 	fptr_proto_init* init_ptr = &ptr->init;
 	
+	{
+		int i;
+		char* array = name_ptr;
+		size_t len = glue_unpack(__pos, __msg, __ext, size_t);
+		// Warning: see David if this breaks
+		glue_user_trace("Warning: see David if this breaks");
+		for (i = 0; i < len; ++i) {
+			char* element = &array[i];
+			*element = glue_unpack(__pos, __msg, __ext, char);
+		}
+
+	}
+
+	{
+		size_t __size = sizeof(struct module);
+		*owner_ptr = glue_unpack_new_shadow(__pos, __msg, __ext, struct module*, (__size), (DEFAULT_GFP_FLAGS));
+		if (*owner_ptr) {
+			callee_unmarshal_kernel__can_proto_register__owner__in(__pos, __msg, __ext, ctx, *owner_ptr);
+		}
+
+	}
+
+	{
+		*obj_size_ptr = glue_unpack(__pos, __msg, __ext, unsigned int);
+	}
+
 	{
 		*init_ptr = glue_unpack_rpc_ptr(__pos, __msg, __ext, proto_init);
 	}
@@ -3119,7 +3255,15 @@ void callee_marshal_kernel__can_proto_register__can_proto_prot__in(
 	struct can_proto_register_call_ctx const* ctx,
 	struct proto const* ptr)
 {
+	struct module* const* owner_ptr = &ptr->owner;
 	
+	{
+		if (*owner_ptr) {
+			callee_marshal_kernel__can_proto_register__owner__in(__pos, __msg, __ext, ctx, *owner_ptr);
+		}
+
+	}
+
 }
 
 void caller_unmarshal_kernel__can_proto_register__can_proto_prot__in(
@@ -3128,6 +3272,54 @@ void caller_unmarshal_kernel__can_proto_register__can_proto_prot__in(
 	const struct ext_registers* __ext,
 	struct can_proto_register_call_ctx const* ctx,
 	struct proto* ptr)
+{
+	struct module** owner_ptr = &ptr->owner;
+	
+	{
+		if (*owner_ptr) {
+			caller_unmarshal_kernel__can_proto_register__owner__in(__pos, __msg, __ext, ctx, *owner_ptr);
+		}
+
+	}
+
+}
+
+void caller_marshal_kernel__can_proto_register__owner__in(
+	size_t* __pos,
+	struct fipc_message* __msg,
+	struct ext_registers* __ext,
+	struct can_proto_register_call_ctx const* ctx,
+	struct module const* ptr)
+{
+	
+}
+
+void callee_unmarshal_kernel__can_proto_register__owner__in(
+	size_t* __pos,
+	const struct fipc_message* __msg,
+	const struct ext_registers* __ext,
+	struct can_proto_register_call_ctx const* ctx,
+	struct module* ptr)
+{
+	
+}
+
+void callee_marshal_kernel__can_proto_register__owner__in(
+	size_t* __pos,
+	struct fipc_message* __msg,
+	struct ext_registers* __ext,
+	struct can_proto_register_call_ctx const* ctx,
+	struct module const* ptr)
+{
+	
+}
+
+void caller_unmarshal_kernel__can_proto_register__owner__in(
+	size_t* __pos,
+	const struct fipc_message* __msg,
+	const struct ext_registers* __ext,
+	struct can_proto_register_call_ctx const* ctx,
+	struct module* ptr)
 {
 	
 }

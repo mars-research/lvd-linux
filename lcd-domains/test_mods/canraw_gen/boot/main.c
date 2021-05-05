@@ -43,7 +43,7 @@ static int boot_main(void)
 				&proto_klcd);
 
 	if (!m) {
-		LIBLCD_ERR("failed to create net klcd");
+		LIBLCD_ERR("failed to create proto klcd");
 		ret = -1;
 		goto fail3;
 	}
@@ -52,7 +52,7 @@ static int boot_main(void)
 				&can_lcd,
 				&can_ctx, 1);
 	if (ret) {
-		LIBLCD_ERR("failed to create dummy lcd");
+		LIBLCD_ERR("failed to create can raw lcd");
 		goto fail4;
 	}
 
@@ -63,7 +63,7 @@ static int boot_main(void)
 	/* run KLCD init */
 	ret = lcd_run(proto_klcd);
 	if (ret) {
-		LIBLCD_ERR("failed to start net klcd");
+		LIBLCD_ERR("failed to start proto klcd");
 		goto fail8;
 	}
 

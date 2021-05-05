@@ -455,4 +455,8 @@ rpc void  _raw_write_unlock_bh( projection lock*  lock ) {
 		projection < struct sock > sock {
 		}
 	}
+
+	rpc unsigned long get_jiffies() {
+	}
+
 }

@@ -204,6 +204,7 @@ enum RPC_ID {
 	RPC_ID_lvd_memcpy_from_msg,
 	RPC_ID_lvd_dev_put,
 	RPC_ID_lvd_sock_orphan,
+	RPC_ID_get_jiffies,
 };
 
 int try_dispatch(enum RPC_ID id, struct fipc_message* __msg, struct ext_registers* __ext);
@@ -623,6 +624,9 @@ struct lvd_dev_put_call_ctx {
 
 struct lvd_sock_orphan_call_ctx {
 	struct sock* sk;
+};
+
+struct get_jiffies_call_ctx {
 };
 
 void caller_marshal_kernel__proto_init__sk__in(

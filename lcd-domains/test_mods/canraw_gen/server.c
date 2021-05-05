@@ -9,6 +9,7 @@
 #define lvd_sock_orphan		sock_orphan
 #define lvd_memcpy_to_msg	memcpy_to_msg
 #define lvd_memcpy_from_msg	memcpy_from_msg
+#define get_jiffies()		({ jiffies; })
 
 int trmp_impl_proto_init(fptr_proto_init target, struct sock* sk)
 {
@@ -3254,6 +3255,34 @@ void lvd_sock_orphan_callee(struct fipc_message* __msg, struct ext_registers* __
 	}
 }
 
+void get_jiffies_callee(struct fipc_message* __msg, struct ext_registers* __ext)
+{
+	size_t n_pos = 0;
+	size_t* __pos = &n_pos;
+
+	unsigned long ret = 0;
+	unsigned long* ret_ptr = &ret;
+	
+	__maybe_unused struct get_jiffies_call_ctx call_ctx = {};
+	__maybe_unused struct get_jiffies_call_ctx *ctx = &call_ctx;
+
+	if (verbose_debug) {
+		printk("%s:%d, entered!\n", __func__, __LINE__);
+	}
+
+	ret = get_jiffies();
+
+	*__pos = 0;
+	{
+		glue_pack(__pos, __msg, __ext, *ret_ptr);
+	}
+
+	__msg->regs[0] = *__pos;
+	if (verbose_debug) {
+		printk("%s:%d, returned!\n", __func__, __LINE__);
+	}
+}
+
 int try_dispatch(enum RPC_ID id, struct fipc_message* __msg, struct ext_registers* __ext)
 {
 	switch(id) {
@@ -3435,6 +3464,11 @@ int try_dispatch(enum RPC_ID id, struct fipc_message* __msg, struct ext_register
 	case RPC_ID_lvd_sock_orphan:
 		glue_user_trace("lvd_sock_orphan\n");
 		lvd_sock_orphan_callee(__msg, __ext);
+		break;
+
+	case RPC_ID_get_jiffies:
+		glue_user_trace("get_jiffies\n");
+		get_jiffies_callee(__msg, __ext);
 		break;
 
 	default:

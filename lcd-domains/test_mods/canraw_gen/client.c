@@ -1224,6 +1224,98 @@ struct sk_buff* skb_clone(struct sk_buff* skb, unsigned int gfp_mask)
 	return ret;
 }
 
+void* __alloc_percpu(unsigned long size, unsigned long align)
+{
+	struct fipc_message __buffer = {0};
+	struct fipc_message *__msg = &__buffer;
+	struct ext_registers* __ext = get_register_page(smp_processor_id());
+	size_t n_pos = 0;
+	size_t* __pos = &n_pos;
+
+	unsigned long* size_ptr = &size;
+	unsigned long* align_ptr = &align;
+	void* ret = 0;
+	void** ret_ptr = &ret;
+	
+	__maybe_unused const struct __alloc_percpu_call_ctx call_ctx = {size, align};
+	__maybe_unused const struct __alloc_percpu_call_ctx *ctx = &call_ctx;
+
+	(void)__ext;
+
+	if (verbose_debug) {
+		printk("%s:%d, entered!\n", __func__, __LINE__);
+	}
+
+	{
+		glue_pack(__pos, __msg, __ext, *size_ptr);
+	}
+
+	{
+		glue_pack(__pos, __msg, __ext, *align_ptr);
+	}
+
+	glue_call_server(__pos, __msg, RPC_ID___alloc_percpu);
+
+	*__pos = 0;
+	{
+	}
+
+	{
+	}
+
+	{
+		size_t __size = size;
+		*ret_ptr = glue_unpack_new_shadow(__pos, __msg, __ext, void*, (__size), (DEFAULT_GFP_FLAGS));
+		if (*ret_ptr) {
+		}
+
+	}
+
+	if (verbose_debug) {
+		printk("%s:%d, returned!\n", __func__, __LINE__);
+	}
+	return ret;
+}
+
+void free_percpu(void* ptr)
+{
+	struct fipc_message __buffer = {0};
+	struct fipc_message *__msg = &__buffer;
+	struct ext_registers* __ext = get_register_page(smp_processor_id());
+	size_t n_pos = 0;
+	size_t* __pos = &n_pos;
+
+	void** ptr_ptr = &ptr;
+	
+	__maybe_unused const struct free_percpu_call_ctx call_ctx = {ptr};
+	__maybe_unused const struct free_percpu_call_ctx *ctx = &call_ctx;
+
+	(void)__ext;
+
+	if (verbose_debug) {
+		printk("%s:%d, entered!\n", __func__, __LINE__);
+	}
+
+	{
+		__maybe_unused const void* __adjusted = *ptr_ptr;
+		glue_pack_shadow(__pos, __msg, __ext, __adjusted);
+		if (*ptr_ptr) {
+		}
+
+	}
+
+	glue_call_server(__pos, __msg, RPC_ID_free_percpu);
+
+	*__pos = 0;
+	{
+		(void)ptr_ptr;
+	}
+
+	if (verbose_debug) {
+		printk("%s:%d, returned!\n", __func__, __LINE__);
+	}
+}
+
 int sock_queue_rcv_skb(struct sock* sk, struct sk_buff* skb)
 {
 	struct fipc_message __buffer = {0};
@@ -1526,7 +1618,7 @@ void can_rx_unregister(struct net_device* dev, unsigned int can_id, unsigned int
 	}
 }
 
-int can_rx_register(struct net_device* dev, unsigned int can_id, unsigned int mask, fptr_func func, void* data, char * ident)
+int can_rx_register(struct net_device* dev, unsigned int can_id, unsigned int mask, fptr_func func, void* data, char* ident)
 {
 	struct fipc_message __buffer = {0};
 	struct fipc_message *__msg = &__buffer;
@@ -1539,7 +1631,7 @@ int can_rx_register(struct net_device* dev, unsigned int can_id, unsigned int ma
 	unsigned int* mask_ptr = &mask;
 	fptr_func* func_ptr = &func;
 	void** data_ptr = &data;
-	char const** ident_ptr = &ident;
+	char** ident_ptr = &ident;
 	int ret = 0;
 	int* ret_ptr = &ret;
 	
@@ -1685,6 +1777,156 @@ int can_send(struct sk_buff* skb, int loop)
 
 	{
 		*ret_ptr = glue_unpack(__pos, __msg, __ext, int);
+	}
+
+	if (verbose_debug) {
+		printk("%s:%d, returned!\n", __func__, __LINE__);
+	}
+	return ret;
+}
+
+int can_ioctl(struct socket* sock, unsigned int cmd, unsigned long arg)
+{
+	struct fipc_message __buffer = {0};
+	struct fipc_message *__msg = &__buffer;
+	struct ext_registers* __ext = get_register_page(smp_processor_id());
+	size_t n_pos = 0;
+	size_t* __pos = &n_pos;
+
+	struct socket** sock_ptr = &sock;
+	unsigned int* cmd_ptr = &cmd;
+	unsigned long* arg_ptr = &arg;
+	int ret = 0;
+	int* ret_ptr = &ret;
+	
+	__maybe_unused const struct can_ioctl_call_ctx call_ctx = {sock, cmd, arg};
+	__maybe_unused const struct can_ioctl_call_ctx *ctx = &call_ctx;
+
+	(void)__ext;
+
+	if (verbose_debug) {
+		printk("%s:%d, entered!\n", __func__, __LINE__);
+	}
+
+	{
+		__maybe_unused const void* __adjusted = *sock_ptr;
+		glue_pack(__pos, __msg, __ext, __adjusted);
+		if (*sock_ptr) {
+			caller_marshal_kernel__can_ioctl__sock__in(__pos, __msg, __ext, ctx, *sock_ptr);
+		}
+
+	}
+
+	{
+		glue_pack(__pos, __msg, __ext, *cmd_ptr);
+	}
+
+	{
+		glue_pack(__pos, __msg, __ext, *arg_ptr);
+	}
+
+	glue_call_server(__pos, __msg, RPC_ID_can_ioctl);
+
+	*__pos = 0;
+	{
+		if (*sock_ptr) {
+			caller_unmarshal_kernel__can_ioctl__sock__in(__pos, __msg, __ext, ctx, *sock_ptr);
+		}
+
+	}
+
+	{
+	}
+
+	{
+	}
+
+	{
+		*ret_ptr = glue_unpack(__pos, __msg, __ext, int);
+	}
+
+	if (verbose_debug) {
+		printk("%s:%d, returned!\n", __func__, __LINE__);
+	}
+	return ret;
+}
+
+unsigned int datagram_poll(struct file* file, struct socket* sock, struct poll_table_struct* wait)
+{
+	struct fipc_message __buffer = {0};
+	struct fipc_message *__msg = &__buffer;
+	struct ext_registers* __ext = get_register_page(smp_processor_id());
+	size_t n_pos = 0;
+	size_t* __pos = &n_pos;
+
+	struct file** file_ptr = &file;
+	struct socket** sock_ptr = &sock;
+	struct poll_table_struct** wait_ptr = &wait;
+	unsigned int ret = 0;
+	unsigned int* ret_ptr = &ret;
+	
+	__maybe_unused const struct datagram_poll_call_ctx call_ctx = {file, sock, wait};
+	__maybe_unused const struct datagram_poll_call_ctx *ctx = &call_ctx;
+
+	(void)__ext;
+
+	if (verbose_debug) {
+		printk("%s:%d, entered!\n", __func__, __LINE__);
+	}
+
+	{
+		__maybe_unused const void* __adjusted = *file_ptr;
+		glue_pack(__pos, __msg, __ext, __adjusted);
+		if (*file_ptr) {
+			caller_marshal_kernel__datagram_poll__file__in(__pos, __msg, __ext, ctx, *file_ptr);
+		}
+
+	}
+
+	{
+		__maybe_unused const void* __adjusted = *sock_ptr;
+		glue_pack(__pos, __msg, __ext, __adjusted);
+		if (*sock_ptr) {
+			caller_marshal_kernel__datagram_poll__sock__in(__pos, __msg, __ext, ctx, *sock_ptr);
+		}
+
+	}
+
+	{
+		__maybe_unused const void* __adjusted = *wait_ptr;
+		glue_pack(__pos, __msg, __ext, __adjusted);
+		if (*wait_ptr) {
+			caller_marshal_kernel__datagram_poll__wait__in(__pos, __msg, __ext, ctx, *wait_ptr);
+		}
+
+	}
+
+	glue_call_server(__pos, __msg, RPC_ID_datagram_poll);
+
+	*__pos = 0;
+	{
+		if (*file_ptr) {
+			caller_unmarshal_kernel__datagram_poll__file__in(__pos, __msg, __ext, ctx, *file_ptr);
+		}
+
+	}
+
+	{
+		if (*sock_ptr) {
+			caller_unmarshal_kernel__datagram_poll__sock__in(__pos, __msg, __ext, ctx, *sock_ptr);
+		}
+
+	}
+
+	{
+		if (*wait_ptr) {
+			caller_unmarshal_kernel__datagram_poll__wait__in(__pos, __msg, __ext, ctx, *wait_ptr);
+		}
+
+	}
+
+	{
+		*ret_ptr = glue_unpack(__pos, __msg, __ext, unsigned int);
 	}
 
 	if (verbose_debug) {
@@ -2836,6 +3078,49 @@ void lvd_dev_put(struct net_device* dev)
 	{
 		if (*dev_ptr) {
 			caller_unmarshal_kernel__lvd_dev_put__net_device__in(__pos, __msg, __ext, ctx, *dev_ptr);
+		}
+
+	}
+
+	if (verbose_debug) {
+		printk("%s:%d, returned!\n", __func__, __LINE__);
+	}
+}
+
+void lvd_sock_orphan(struct sock* sk)
+{
+	struct fipc_message __buffer = {0};
+	struct fipc_message *__msg = &__buffer;
+	struct ext_registers* __ext = get_register_page(smp_processor_id());
+	size_t n_pos = 0;
+	size_t* __pos = &n_pos;
+
+	struct sock** sk_ptr = &sk;
+	
+	__maybe_unused const struct lvd_sock_orphan_call_ctx call_ctx = {sk};
+	__maybe_unused const struct lvd_sock_orphan_call_ctx *ctx = &call_ctx;
+
+	(void)__ext;
+
+	if (verbose_debug) {
+		printk("%s:%d, entered!\n", __func__, __LINE__);
+	}
+
+	{
+		__maybe_unused const void* __adjusted = *sk_ptr;
+		glue_pack_shadow(__pos, __msg, __ext, __adjusted);
+		if (*sk_ptr) {
+			caller_marshal_kernel__lvd_sock_orphan__sock__in(__pos, __msg, __ext, ctx, *sk_ptr);
+		}
+
+	}
+
+	glue_call_server(__pos, __msg, RPC_ID_lvd_sock_orphan);
+
+	*__pos = 0;
+	{
+		if (*sk_ptr) {
+			caller_unmarshal_kernel__lvd_sock_orphan__sock__in(__pos, __msg, __ext, ctx, *sk_ptr);
 		}
 
 	}

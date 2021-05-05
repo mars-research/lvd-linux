@@ -171,6 +171,8 @@ enum RPC_ID {
 	RPC_ID_unregister_netdevice_notifier,
 	RPC_ID_kfree_skb,
 	RPC_ID_skb_clone,
+	RPC_ID___alloc_percpu,
+	RPC_ID_free_percpu,
 	RPC_ID_sock_queue_rcv_skb,
 	RPC_ID_can_proto_unregister,
 	RPC_ID_can_proto_register,
@@ -178,6 +180,8 @@ enum RPC_ID {
 	RPC_ID_can_rx_unregister,
 	RPC_ID_can_rx_register,
 	RPC_ID_can_send,
+	RPC_ID_can_ioctl,
+	RPC_ID_datagram_poll,
 	RPC_ID_proto_ops_ioctl,
 	RPC_ID_proto_ops_poll,
 	RPC_ID_release_sock,
@@ -199,6 +203,7 @@ enum RPC_ID {
 	RPC_ID_lvd_memcpy_to_msg,
 	RPC_ID_lvd_memcpy_from_msg,
 	RPC_ID_lvd_dev_put,
+	RPC_ID_lvd_sock_orphan,
 };
 
 int try_dispatch(enum RPC_ID id, struct fipc_message* __msg, struct ext_registers* __ext);
@@ -436,6 +441,15 @@ struct skb_clone_call_ctx {
 	unsigned int gfp_mask;
 };
 
+struct __alloc_percpu_call_ctx {
+	unsigned long size;
+	unsigned long align;
+};
+
+struct free_percpu_call_ctx {
+	void* ptr;
+};
+
 struct sock_queue_rcv_skb_call_ctx {
 	struct sock* sk;
 	struct sk_buff* skb;
@@ -468,12 +482,24 @@ struct can_rx_register_call_ctx {
 	unsigned int mask;
 	fptr_func func;
 	void* data;
-	char const* ident;
+	char* ident;
 };
 
 struct can_send_call_ctx {
 	struct sk_buff* skb;
 	int loop;
+};
+
+struct can_ioctl_call_ctx {
+	struct socket* sock;
+	unsigned int cmd;
+	unsigned long arg;
+};
+
+struct datagram_poll_call_ctx {
+	struct file* file;
+	struct socket* sock;
+	struct poll_table_struct* wait;
 };
 
 struct proto_ops_ioctl_call_ctx {
@@ -593,6 +619,10 @@ struct lvd_memcpy_from_msg_call_ctx {
 
 struct lvd_dev_put_call_ctx {
 	struct net_device* dev;
+};
+
+struct lvd_sock_orphan_call_ctx {
+	struct sock* sk;
 };
 
 void caller_marshal_kernel__proto_init__sk__in(
@@ -2271,6 +2301,118 @@ void caller_unmarshal_kernel__can_send__sk_buff_dev__in(
 	struct can_send_call_ctx const* call_ctx,
 	struct net_device* ptr);
 
+void caller_marshal_kernel__can_ioctl__sock__in(
+	size_t* __pos,
+	struct fipc_message* __msg,
+	struct ext_registers* __ext,
+	struct can_ioctl_call_ctx const* call_ctx,
+	struct socket const* ptr);
+
+void callee_unmarshal_kernel__can_ioctl__sock__in(
+	size_t* __pos,
+	const struct fipc_message* __msg,
+	const struct ext_registers* __ext,
+	struct can_ioctl_call_ctx const* call_ctx,
+	struct socket* ptr);
+
+void callee_marshal_kernel__can_ioctl__sock__in(
+	size_t* __pos,
+	struct fipc_message* __msg,
+	struct ext_registers* __ext,
+	struct can_ioctl_call_ctx const* call_ctx,
+	struct socket const* ptr);
+
+void caller_unmarshal_kernel__can_ioctl__sock__in(
+	size_t* __pos,
+	const struct fipc_message* __msg,
+	const struct ext_registers* __ext,
+	struct can_ioctl_call_ctx const* call_ctx,
+	struct socket* ptr);
+
+void caller_marshal_kernel__datagram_poll__file__in(
+	size_t* __pos,
+	struct fipc_message* __msg,
+	struct ext_registers* __ext,
+	struct datagram_poll_call_ctx const* call_ctx,
+	struct file const* ptr);
+
+void callee_unmarshal_kernel__datagram_poll__file__in(
+	size_t* __pos,
+	const struct fipc_message* __msg,
+	const struct ext_registers* __ext,
+	struct datagram_poll_call_ctx const* call_ctx,
+	struct file* ptr);
+
+void callee_marshal_kernel__datagram_poll__file__in(
+	size_t* __pos,
+	struct fipc_message* __msg,
+	struct ext_registers* __ext,
+	struct datagram_poll_call_ctx const* call_ctx,
+	struct file const* ptr);
+
+void caller_unmarshal_kernel__datagram_poll__file__in(
+	size_t* __pos,
+	const struct fipc_message* __msg,
+	const struct ext_registers* __ext,
+	struct datagram_poll_call_ctx const* call_ctx,
+	struct file* ptr);
+
+void caller_marshal_kernel__datagram_poll__sock__in(
+	size_t* __pos,
+	struct fipc_message* __msg,
+	struct ext_registers* __ext,
+	struct datagram_poll_call_ctx const* call_ctx,
+	struct socket const* ptr);
+
+void callee_unmarshal_kernel__datagram_poll__sock__in(
+	size_t* __pos,
+	const struct fipc_message* __msg,
+	const struct ext_registers* __ext,
+	struct datagram_poll_call_ctx const* call_ctx,
+	struct socket* ptr);
+
+void callee_marshal_kernel__datagram_poll__sock__in(
+	size_t* __pos,
+	struct fipc_message* __msg,
+	struct ext_registers* __ext,
+	struct datagram_poll_call_ctx const* call_ctx,
+	struct socket const* ptr);
+
+void caller_unmarshal_kernel__datagram_poll__sock__in(
+	size_t* __pos,
+	const struct fipc_message* __msg,
+	const struct ext_registers* __ext,
+	struct datagram_poll_call_ctx const* call_ctx,
+	struct socket* ptr);
+
+void caller_marshal_kernel__datagram_poll__wait__in(
+	size_t* __pos,
+	struct fipc_message* __msg,
+	struct ext_registers* __ext,
+	struct datagram_poll_call_ctx const* call_ctx,
+	struct poll_table_struct const* ptr);
+
+void callee_unmarshal_kernel__datagram_poll__wait__in(
+	size_t* __pos,
+	const struct fipc_message* __msg,
+	const struct ext_registers* __ext,
+	struct datagram_poll_call_ctx const* call_ctx,
+	struct poll_table_struct* ptr);
+
+void callee_marshal_kernel__datagram_poll__wait__in(
+	size_t* __pos,
+	struct fipc_message* __msg,
+	struct ext_registers* __ext,
+	struct datagram_poll_call_ctx const* call_ctx,
+	struct poll_table_struct const* ptr);
+
+void caller_unmarshal_kernel__datagram_poll__wait__in(
+	size_t* __pos,
+	const struct fipc_message* __msg,
+	const struct ext_registers* __ext,
+	struct datagram_poll_call_ctx const* call_ctx,
+	struct poll_table_struct* ptr);
+
 void caller_marshal_kernel__proto_ops_ioctl__sock__in(
 	size_t* __pos,
 	struct fipc_message* __msg,
@@ -3194,6 +3336,34 @@ void caller_unmarshal_kernel__lvd_dev_put__net_device__in(
 	const struct ext_registers* __ext,
 	struct lvd_dev_put_call_ctx const* call_ctx,
 	struct net_device* ptr);
+
+void caller_marshal_kernel__lvd_sock_orphan__sock__in(
+	size_t* __pos,
+	struct fipc_message* __msg,
+	struct ext_registers* __ext,
+	struct lvd_sock_orphan_call_ctx const* call_ctx,
+	struct sock const* ptr);
+
+void callee_unmarshal_kernel__lvd_sock_orphan__sock__in(
+	size_t* __pos,
+	const struct fipc_message* __msg,
+	const struct ext_registers* __ext,
+	struct lvd_sock_orphan_call_ctx const* call_ctx,
+	struct sock* ptr);
+
+void callee_marshal_kernel__lvd_sock_orphan__sock__in(
+	size_t* __pos,
+	struct fipc_message* __msg,
+	struct ext_registers* __ext,
+	struct lvd_sock_orphan_call_ctx const* call_ctx,
+	struct sock const* ptr);
+
+void caller_unmarshal_kernel__lvd_sock_orphan__sock__in(
+	size_t* __pos,
+	const struct fipc_message* __msg,
+	const struct ext_registers* __ext,
+	struct lvd_sock_orphan_call_ctx const* call_ctx,
+	struct sock* ptr);
 
 
 #endif

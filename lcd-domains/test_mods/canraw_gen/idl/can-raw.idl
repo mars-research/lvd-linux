@@ -194,11 +194,14 @@ rpc void  _raw_write_lock_bh( projection lock*  lock ) {
 rpc void  _raw_write_unlock_bh( projection lock*  lock ) {
 	projection < struct rwlock_t > lock {
 	}
-}
-rpc void*  __alloc_percpu( long unsigned int  size, long unsigned int  align ) {
-}
-rpc void  free_percpu( void*  ptr ) {
 }*/
+
+	rpc void [alloc<{{size}}>(caller)] *  __alloc_percpu( long unsigned int  size, long unsigned int  align ) {
+	}
+
+	rpc void  free_percpu( void*  ptr ) {
+	}
+
 	rpc int  sock_queue_rcv_skb( projection sk* sk, projection skb*  skb ) {
 		projection < struct sock > sk {
 		}
@@ -245,7 +248,7 @@ rpc void  free_percpu( void*  ptr ) {
 		projection < struct sock > sock {
 		}
 	}
-	rpc int  can_rx_register( projection dev* dev, unsigned int  can_id, unsigned int  mask, rpc_ptr  func func, void* data, string [alloc(callee)] *ident ) {
+	rpc int  can_rx_register( projection dev* dev, unsigned int  can_id, unsigned int  mask, rpc_ptr  func func, void* data, array<char, null> [alloc(callee)] *ident ) {
 		projection < struct net_device > dev {
 			unsigned short type;
 		}
@@ -271,6 +274,23 @@ rpc void  free_percpu( void*  ptr ) {
 			unsigned short  type;
 		}
 	}
+
+        rpc int can_ioctl( projection sock [alloc_once(callee)] * sock, unsigned int  cmd, unsigned long  arg ) {
+		projection < struct socket > sock {
+		}
+	}
+
+	rpc unsigned int  datagram_poll(  projection file [alloc_once(callee)] *  file, projection sock [alloc_once(callee)] *  sock, projection wait [alloc_once(callee)] *  wait ) {
+		projection < struct file > file {
+		}
+		projection < struct socket > sock {
+		}
+		projection < struct sock > socket_sk {
+		}
+		projection < struct poll_table_struct > wait {
+		}
+	}
+
 	rpc_ptr int  proto_ops_ioctl( projection sock [alloc_once(callee)] *  sock, unsigned int  cmd, long unsigned int  arg ) {
 		projection < struct socket > sock {
 			//projection socket_sk* sk;
@@ -428,6 +448,11 @@ rpc void  free_percpu( void*  ptr ) {
 
 	rpc void lvd_dev_put(projection net_device *dev) {
 		projection < struct net_device > net_device {
+		}
+	}
+
+	rpc void lvd_sock_orphan(projection sock *sk) {
+		projection < struct sock > sock {
 		}
 	}
 }

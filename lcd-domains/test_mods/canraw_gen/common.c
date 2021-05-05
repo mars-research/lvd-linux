@@ -3665,6 +3665,166 @@ void caller_unmarshal_kernel__can_send__sk_buff_dev__in(
 	
 }
 
+void caller_marshal_kernel__can_ioctl__sock__in(
+	size_t* __pos,
+	struct fipc_message* __msg,
+	struct ext_registers* __ext,
+	struct can_ioctl_call_ctx const* ctx,
+	struct socket const* ptr)
+{
+	
+}
+
+void callee_unmarshal_kernel__can_ioctl__sock__in(
+	size_t* __pos,
+	const struct fipc_message* __msg,
+	const struct ext_registers* __ext,
+	struct can_ioctl_call_ctx const* ctx,
+	struct socket* ptr)
+{
+	
+}
+
+void callee_marshal_kernel__can_ioctl__sock__in(
+	size_t* __pos,
+	struct fipc_message* __msg,
+	struct ext_registers* __ext,
+	struct can_ioctl_call_ctx const* ctx,
+	struct socket const* ptr)
+{
+	
+}
+
+void caller_unmarshal_kernel__can_ioctl__sock__in(
+	size_t* __pos,
+	const struct fipc_message* __msg,
+	const struct ext_registers* __ext,
+	struct can_ioctl_call_ctx const* ctx,
+	struct socket* ptr)
+{
+	
+}
+
+void caller_marshal_kernel__datagram_poll__file__in(
+	size_t* __pos,
+	struct fipc_message* __msg,
+	struct ext_registers* __ext,
+	struct datagram_poll_call_ctx const* ctx,
+	struct file const* ptr)
+{
+	
+}
+
+void callee_unmarshal_kernel__datagram_poll__file__in(
+	size_t* __pos,
+	const struct fipc_message* __msg,
+	const struct ext_registers* __ext,
+	struct datagram_poll_call_ctx const* ctx,
+	struct file* ptr)
+{
+	
+}
+
+void callee_marshal_kernel__datagram_poll__file__in(
+	size_t* __pos,
+	struct fipc_message* __msg,
+	struct ext_registers* __ext,
+	struct datagram_poll_call_ctx const* ctx,
+	struct file const* ptr)
+{
+	
+}
+
+void caller_unmarshal_kernel__datagram_poll__file__in(
+	size_t* __pos,
+	const struct fipc_message* __msg,
+	const struct ext_registers* __ext,
+	struct datagram_poll_call_ctx const* ctx,
+	struct file* ptr)
+{
+	
+}
+
+void caller_marshal_kernel__datagram_poll__sock__in(
+	size_t* __pos,
+	struct fipc_message* __msg,
+	struct ext_registers* __ext,
+	struct datagram_poll_call_ctx const* ctx,
+	struct socket const* ptr)
+{
+	
+}
+
+void callee_unmarshal_kernel__datagram_poll__sock__in(
+	size_t* __pos,
+	const struct fipc_message* __msg,
+	const struct ext_registers* __ext,
+	struct datagram_poll_call_ctx const* ctx,
+	struct socket* ptr)
+{
+	
+}
+
+void callee_marshal_kernel__datagram_poll__sock__in(
+	size_t* __pos,
+	struct fipc_message* __msg,
+	struct ext_registers* __ext,
+	struct datagram_poll_call_ctx const* ctx,
+	struct socket const* ptr)
+{
+	
+}
+
+void caller_unmarshal_kernel__datagram_poll__sock__in(
+	size_t* __pos,
+	const struct fipc_message* __msg,
+	const struct ext_registers* __ext,
+	struct datagram_poll_call_ctx const* ctx,
+	struct socket* ptr)
+{
+	
+}
+
+void caller_marshal_kernel__datagram_poll__wait__in(
+	size_t* __pos,
+	struct fipc_message* __msg,
+	struct ext_registers* __ext,
+	struct datagram_poll_call_ctx const* ctx,
+	struct poll_table_struct const* ptr)
+{
+	
+}
+
+void callee_unmarshal_kernel__datagram_poll__wait__in(
+	size_t* __pos,
+	const struct fipc_message* __msg,
+	const struct ext_registers* __ext,
+	struct datagram_poll_call_ctx const* ctx,
+	struct poll_table_struct* ptr)
+{
+	
+}
+
+void callee_marshal_kernel__datagram_poll__wait__in(
+	size_t* __pos,
+	struct fipc_message* __msg,
+	struct ext_registers* __ext,
+	struct datagram_poll_call_ctx const* ctx,
+	struct poll_table_struct const* ptr)
+{
+	
+}
+
+void caller_unmarshal_kernel__datagram_poll__wait__in(
+	size_t* __pos,
+	const struct fipc_message* __msg,
+	const struct ext_registers* __ext,
+	struct datagram_poll_call_ctx const* ctx,
+	struct poll_table_struct* ptr)
+{
+	
+}
+
 void caller_marshal_kernel__proto_ops_ioctl__sock__in(
 	size_t* __pos,
 	struct fipc_message* __msg,
@@ -5137,6 +5297,46 @@ void caller_unmarshal_kernel__lvd_dev_put__net_device__in(
 	const struct ext_registers* __ext,
 	struct lvd_dev_put_call_ctx const* ctx,
 	struct net_device* ptr)
+{
+	
+}
+
+void caller_marshal_kernel__lvd_sock_orphan__sock__in(
+	size_t* __pos,
+	struct fipc_message* __msg,
+	struct ext_registers* __ext,
+	struct lvd_sock_orphan_call_ctx const* ctx,
+	struct sock const* ptr)
+{
+	
+}
+
+void callee_unmarshal_kernel__lvd_sock_orphan__sock__in(
+	size_t* __pos,
+	const struct fipc_message* __msg,
+	const struct ext_registers* __ext,
+	struct lvd_sock_orphan_call_ctx const* ctx,
+	struct sock* ptr)
+{
+	
+}
+
+void callee_marshal_kernel__lvd_sock_orphan__sock__in(
+	size_t* __pos,
+	struct fipc_message* __msg,
+	struct ext_registers* __ext,
+	struct lvd_sock_orphan_call_ctx const* ctx,
+	struct sock const* ptr)
+{
+	
+}
+
+void caller_unmarshal_kernel__lvd_sock_orphan__sock__in(
+	size_t* __pos,
+	const struct fipc_message* __msg,
+	const struct ext_registers* __ext,
+	struct lvd_sock_orphan_call_ctx const* ctx,
+	struct sock* ptr)
 {
 	
 }

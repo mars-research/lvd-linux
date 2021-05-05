@@ -74,10 +74,32 @@ int lvd_memcpy_to_msg(struct msghdr *msg, void *data, int len);
 int lvd_memcpy_from_msg(void *data, struct msghdr *msg, int len);
 void lvd_dev_put(struct net_device *dev);
 void lvd_sock_put(struct sock* sk);
+void lvd_sock_orphan(struct sock *sk);
 
 #ifdef LCD_ISOLATE
 #undef dev_put
-#define dev_put	lvd_dev_put
+#define dev_put		lvd_dev_put
+
+#undef sock_put
+#define sock_put	lvd_sock_put
+
+#undef sock_orphan
+#define sock_orphan	lvd_sock_orphan
+
+#undef copy_from_user
+#define copy_from_user(to, from, len)	({ \
+		memcpy(to, from, len);	\
+		0;	\
+		})
+
+#undef copy_to_user
+#define copy_to_user(to, from, len)	({ \
+		memcpy(to, from, len);	\
+		0;	\
+		})
+
+
+struct net init_net;
 #endif
 /*
  * A raw socket has a list of can_filters attached to it, each receiving
@@ -148,6 +170,7 @@ static void raw_rcv(struct sk_buff *oskb, void *data)
 
 	// TODO: Deal with percpu ptrs
 	/* eliminate multiple filter matches for the same skb */
+#if 0
 	if (this_cpu_ptr(ro->uniq)->skb == oskb &&
 	    this_cpu_ptr(ro->uniq)->skbcnt == can_skb_prv(oskb)->skbcnt) {
 		if (ro->join_filters) {
@@ -166,7 +189,7 @@ static void raw_rcv(struct sk_buff *oskb, void *data)
 		if (ro->join_filters && ro->count > 1)
 			return;
 	}
-
+#endif
 	/* clone the given skb to be able to enqueue it into the rcv queue */
 	skb = skb_clone(oskb, GFP_ATOMIC);
 	if (!skb)
@@ -395,11 +418,7 @@ static int raw_release(struct socket *sock)
 	sock->sk = NULL;
 
 	release_sock(sk);
-#ifdef LCD_ISOLATE
-	lvd_sock_put(sk);
-#else
 	sock_put(sk);
-#endif
 
 	return 0;
 }
@@ -664,8 +683,12 @@ static int raw_getsockopt(struct socket *sock, int level, int optname,
 
 	if (level != SOL_CAN_RAW)
 		return -EINVAL;
+#ifdef LCD_ISOLATE
+	len = *optlen;
+#else
 	if (get_user(len, optlen))
 		return -EFAULT;
+#endif
 	if (len < 0)
 		return -EINVAL;
 
@@ -683,8 +706,14 @@ static int raw_getsockopt(struct socket *sock, int level, int optname,
 			len = 0;
 		release_sock(sk);
 
-		if (!err)
+		if (!err) {
+#ifdef LCD_ISOLATE
+			*optlen = len;
+			err = 0;
+#else
 			err = put_user(len, optlen);
+#endif
+		}
 		return err;
 
 	case CAN_RAW_ERR_FILTER:
@@ -721,8 +750,12 @@ static int raw_getsockopt(struct socket *sock, int level, int optname,
 		return -ENOPROTOOPT;
 	}
 
+#ifdef LCD_ISOLATE
+	*optlen = len;
+#else
 	if (put_user(len, optlen))
 		return -EFAULT;
+#endif
 	if (copy_to_user(optval, val, len))
 		return -EFAULT;
 	return 0;

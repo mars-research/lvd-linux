@@ -70,6 +70,7 @@ MODULE_ALIAS("can-proto-1");
 
 #define MASK_ALL 0
 
+void lvd_skb_reserve(struct sk_buff *skb, int len);
 int lvd_memcpy_to_msg(struct msghdr *msg, void *data, int len);
 int lvd_memcpy_from_msg(void *data, struct msghdr *msg, int len);
 void lvd_dev_put(struct net_device *dev);
@@ -306,18 +307,25 @@ static int raw_notifier(struct notifier_block *nb,
 	struct raw_sock *ro = container_of(nb, struct raw_sock, notifier);
 	struct sock *sk = &ro->sk;
 
+	printk("%s:%d #1", __func__, __LINE__);
+#ifndef LCD_ISOLATE
+	// XXX: Do not worry about namespaces for now
 	if (!net_eq(dev_net(dev), &init_net))
 		return NOTIFY_DONE;
-
+#endif
+	printk("%s:%d #2", __func__, __LINE__);
 	if (dev->type != ARPHRD_CAN)
 		return NOTIFY_DONE;
 
+	printk("%s:%d #3", __func__, __LINE__);
 	if (ro->ifindex != dev->ifindex)
 		return NOTIFY_DONE;
 
+	printk("%s:%d #4", __func__, __LINE__);
 	switch (msg) {
 
 	case NETDEV_UNREGISTER:
+	printk("%s:%d #5", __func__, __LINE__);
 		lock_sock(sk);
 		/* remove current filters & unregister */
 		if (ro->bound)
@@ -332,17 +340,28 @@ static int raw_notifier(struct notifier_block *nb,
 		release_sock(sk);
 
 		sk->sk_err = ENODEV;
-		if (!sock_flag(sk, SOCK_DEAD))
+		if (!sock_flag(sk, SOCK_DEAD)) {
+			printk("%s, SOCK_DEAD!\n", __func__);
+#ifndef LCD_ISOLATE
 			sk->sk_error_report(sk);
+#endif
+		}
+
 		break;
 
 	case NETDEV_DOWN:
+	printk("%s:%d #6", __func__, __LINE__);
 		sk->sk_err = ENETDOWN;
-		if (!sock_flag(sk, SOCK_DEAD))
+		if (!sock_flag(sk, SOCK_DEAD)) {
+			printk("%s, SOCK_DEAD!\n", __func__);
+#ifndef LCD_ISOLATE
 			sk->sk_error_report(sk);
+#endif
+		}
 		break;
 	}
 
+	printk("%s:%d #7", __func__, __LINE__);
 	return NOTIFY_DONE;
 }
 
@@ -491,8 +510,12 @@ static int raw_bind(struct socket *sock, struct sockaddr *uaddr, int len)
 
 	if (notify_enetdown) {
 		sk->sk_err = ENETDOWN;
-		if (!sock_flag(sk, SOCK_DEAD))
+		if (!sock_flag(sk, SOCK_DEAD)) {
+			printk("%s, SOCK_DEAD!\n", __func__);
+#ifndef LCD_ISOLATE
 			sk->sk_error_report(sk);
+#endif
+		}
 	}
 
 	return err;
@@ -800,7 +823,13 @@ static int raw_sendmsg(struct socket *sock, struct msghdr *msg, size_t size)
 	if (!skb)
 		goto put_dev;
 
+	printk("%s, skb %p | skb->head %p | skb->data %p | skb->len %u | skb->truesize %u\n", __func__,
+			skb, skb->head, skb->data, skb->len, skb->truesize);
+#ifdef LCD_ISOLATE
+	lvd_skb_reserve(skb, sizeof(struct can_skb_priv));
+#else
 	can_skb_reserve(skb);
+#endif
 	can_skb_prv(skb)->ifindex = dev->ifindex;
 	can_skb_prv(skb)->skbcnt = 0;
 
@@ -853,6 +882,8 @@ static int raw_recvmsg(struct socket *sock, struct msghdr *msg, size_t size,
 	if (!skb)
 		return err;
 
+	printk("%s, skb %p | skb->head %p | skb->data %p | skb->len %u | skb->truesize %u\n", __func__,
+			skb, skb->head, skb->data, skb->len, skb->truesize);
 	if (size < skb->len)
 		msg->msg_flags |= MSG_TRUNC;
 	else

@@ -32,7 +32,7 @@
 
 #ifndef LCD_ISOLATE
 #define glue_unpack_rpc_ptr(pos, msg, ext, name) \
-	glue_peek(pos, msg, ext) ? (fptr_##name)glue_unpack_rpc_ptr_impl(glue_unpack(pos, msg, ext, void*), LCD_DUP_TRAMPOLINE(trmp_##name), LCD_TRAMPOLINE_SIZE(trmp_##name)) : NULL
+	(fptr_##name)glue_unpack_rpc_ptr_impl(glue_unpack(pos, msg, ext, void*), LCD_DUP_TRAMPOLINE(trmp_##name), LCD_TRAMPOLINE_SIZE(trmp_##name))
 
 #else
 #define glue_unpack_rpc_ptr(pos, msg, ext, name) NULL; glue_user_panic("Trampolines cannot be used on LCD side")
@@ -205,6 +205,7 @@ enum RPC_ID {
 	RPC_ID_lvd_dev_put,
 	RPC_ID_lvd_sock_orphan,
 	RPC_ID_get_jiffies,
+	RPC_ID_lvd_skb_reserve,
 };
 
 int try_dispatch(enum RPC_ID id, struct fipc_message* __msg, struct ext_registers* __ext);
@@ -627,6 +628,11 @@ struct lvd_sock_orphan_call_ctx {
 };
 
 struct get_jiffies_call_ctx {
+};
+
+struct lvd_skb_reserve_call_ctx {
+	struct sk_buff* skb;
+	int len;
 };
 
 void caller_marshal_kernel__proto_init__sk__in(
@@ -1245,28 +1251,28 @@ void caller_unmarshal_kernel__proto_ops_recvmsg__socket_sk__in(
 	struct proto_ops_recvmsg_call_ctx const* call_ctx,
 	struct sock* ptr);
 
-void caller_marshal_kernel__proto_ops_recvmsg__msg__out(
+void caller_marshal_kernel__proto_ops_recvmsg__msg__io(
 	size_t* __pos,
 	struct fipc_message* __msg,
 	struct ext_registers* __ext,
 	struct proto_ops_recvmsg_call_ctx const* call_ctx,
 	struct msghdr const* ptr);
 
-void callee_unmarshal_kernel__proto_ops_recvmsg__msg__out(
+void callee_unmarshal_kernel__proto_ops_recvmsg__msg__io(
 	size_t* __pos,
 	const struct fipc_message* __msg,
 	const struct ext_registers* __ext,
 	struct proto_ops_recvmsg_call_ctx const* call_ctx,
 	struct msghdr* ptr);
 
-void callee_marshal_kernel__proto_ops_recvmsg__msg__out(
+void callee_marshal_kernel__proto_ops_recvmsg__msg__io(
 	size_t* __pos,
 	struct fipc_message* __msg,
 	struct ext_registers* __ext,
 	struct proto_ops_recvmsg_call_ctx const* call_ctx,
 	struct msghdr const* ptr);
 
-void caller_unmarshal_kernel__proto_ops_recvmsg__msg__out(
+void caller_unmarshal_kernel__proto_ops_recvmsg__msg__io(
 	size_t* __pos,
 	const struct fipc_message* __msg,
 	const struct ext_registers* __ext,
@@ -3368,6 +3374,34 @@ void caller_unmarshal_kernel__lvd_sock_orphan__sock__in(
 	const struct ext_registers* __ext,
 	struct lvd_sock_orphan_call_ctx const* call_ctx,
 	struct sock* ptr);
+
+void caller_marshal_kernel__lvd_skb_reserve__skb__in(
+	size_t* __pos,
+	struct fipc_message* __msg,
+	struct ext_registers* __ext,
+	struct lvd_skb_reserve_call_ctx const* call_ctx,
+	struct sk_buff const* ptr);
+
+void callee_unmarshal_kernel__lvd_skb_reserve__skb__in(
+	size_t* __pos,
+	const struct fipc_message* __msg,
+	const struct ext_registers* __ext,
+	struct lvd_skb_reserve_call_ctx const* call_ctx,
+	struct sk_buff* ptr);
+
+void callee_marshal_kernel__lvd_skb_reserve__skb__in(
+	size_t* __pos,
+	struct fipc_message* __msg,
+	struct ext_registers* __ext,
+	struct lvd_skb_reserve_call_ctx const* call_ctx,
+	struct sk_buff const* ptr);
+
+void caller_unmarshal_kernel__lvd_skb_reserve__skb__in(
+	size_t* __pos,
+	const struct fipc_message* __msg,
+	const struct ext_registers* __ext,
+	struct lvd_skb_reserve_call_ctx const* call_ctx,
+	struct sk_buff* ptr);
 
 
 #endif

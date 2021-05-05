@@ -9,6 +9,7 @@
 #define lvd_sock_orphan		sock_orphan
 #define lvd_memcpy_to_msg	memcpy_to_msg
 #define lvd_memcpy_from_msg	memcpy_from_msg
+#define lvd_skb_reserve		skb_reserve
 #define get_jiffies()		({ jiffies; })
 
 int trmp_impl_proto_init(fptr_proto_init target, struct sock* sk)
@@ -707,8 +708,11 @@ int trmp_impl_proto_ops_recvmsg(fptr_proto_ops_recvmsg target, struct socket* so
 	}
 
 	{
+		__maybe_unused const void* __adjusted = *msg_ptr;
+		msg->msg_namelen = 16;
+		glue_pack(__pos, __msg, __ext, __adjusted);
 		if (*msg_ptr) {
-			caller_marshal_kernel__proto_ops_recvmsg__msg__out(__pos, __msg, __ext, ctx, *msg_ptr);
+			caller_marshal_kernel__proto_ops_recvmsg__msg__io(__pos, __msg, __ext, ctx, *msg_ptr);
 		}
 
 	}
@@ -734,7 +738,7 @@ int trmp_impl_proto_ops_recvmsg(fptr_proto_ops_recvmsg target, struct socket* so
 	{
 		*msg_ptr = glue_unpack(__pos, __msg, __ext, struct msghdr*);
 		if (*msg_ptr) {
-			caller_unmarshal_kernel__proto_ops_recvmsg__msg__out(__pos, __msg, __ext, ctx, *msg_ptr);
+			caller_unmarshal_kernel__proto_ops_recvmsg__msg__io(__pos, __msg, __ext, ctx, *msg_ptr);
 		}
 
 	}
@@ -1075,6 +1079,7 @@ void sock_alloc_send_skb_callee(struct fipc_message* __msg, struct ext_registers
 
 	ret = sock_alloc_send_skb(sk, size, noblock, err);
 
+	printk("%s:%d skb truesize %u | skb->len %u \n", __func__, __LINE__, ret->truesize, ret->len);
 	*__pos = 0;
 	{
 		if (*sk_ptr) {
@@ -1137,7 +1142,7 @@ int trmp_impl_notifier_call(fptr_notifier_call target, struct notifier_block* nb
 	glue_pack(__pos, __msg, __ext, target);
 	{
 		__maybe_unused const void* __adjusted = *nb_ptr;
-		glue_pack(__pos, __msg, __ext, __adjusted);
+		glue_pack_shadow(__pos, __msg, __ext, __adjusted);
 		if (*nb_ptr) {
 			caller_marshal_kernel__notifier_call__nb__in(__pos, __msg, __ext, ctx, *nb_ptr);
 		}
@@ -2021,8 +2026,7 @@ void datagram_poll_callee(struct fipc_message* __msg, struct ext_registers* __ex
 	}
 
 	{
-		size_t __size = sizeof(struct file);
-		*file_ptr = glue_unpack_bind_or_new_shadow(__pos, __msg, __ext, struct file*, __size);
+		*file_ptr = glue_unpack(__pos, __msg, __ext, struct file*);
 		if (*file_ptr) {
 			callee_unmarshal_kernel__datagram_poll__file__in(__pos, __msg, __ext, ctx, *file_ptr);
 		}
@@ -2030,8 +2034,7 @@ void datagram_poll_callee(struct fipc_message* __msg, struct ext_registers* __ex
 	}
 
 	{
-		size_t __size = sizeof(struct socket);
-		*sock_ptr = glue_unpack_bind_or_new_shadow(__pos, __msg, __ext, struct socket*, __size);
+		*sock_ptr = glue_unpack(__pos, __msg, __ext, struct socket*);
 		if (*sock_ptr) {
 			callee_unmarshal_kernel__datagram_poll__sock__in(__pos, __msg, __ext, ctx, *sock_ptr);
 		}
@@ -2039,8 +2042,7 @@ void datagram_poll_callee(struct fipc_message* __msg, struct ext_registers* __ex
 	}
 
 	{
-		size_t __size = sizeof(struct poll_table_struct);
-		*wait_ptr = glue_unpack_bind_or_new_shadow(__pos, __msg, __ext, struct poll_table_struct*, __size);
+		*wait_ptr = glue_unpack(__pos, __msg, __ext, struct poll_table_struct*);
 		if (*wait_ptr) {
 			callee_unmarshal_kernel__datagram_poll__wait__in(__pos, __msg, __ext, ctx, *wait_ptr);
 		}
@@ -3083,6 +3085,8 @@ void lvd_memcpy_to_msg_callee(struct fipc_message* __msg, struct ext_registers* 
 		*len_ptr = glue_unpack(__pos, __msg, __ext, int);
 	}
 
+	printk("%s, msg %p | data %p | len %d\n", __func__, msg, data, len);
+
 	ret = lvd_memcpy_to_msg(msg, data, len);
 
 	*__pos = 0;
@@ -3283,6 +3287,54 @@ void get_jiffies_callee(struct fipc_message* __msg, struct ext_registers* __ext)
 	}
 }
 
+void lvd_skb_reserve_callee(struct fipc_message* __msg, struct ext_registers* __ext)
+{
+	size_t n_pos = 0;
+	size_t* __pos = &n_pos;
+
+	struct sk_buff* skb = 0;
+	int len = 0;
+	struct sk_buff** skb_ptr = &skb;
+	int* len_ptr = &len;
+	
+	__maybe_unused struct lvd_skb_reserve_call_ctx call_ctx = {skb, len};
+	__maybe_unused struct lvd_skb_reserve_call_ctx *ctx = &call_ctx;
+
+	if (verbose_debug) {
+		printk("%s:%d, entered!\n", __func__, __LINE__);
+	}
+
+	{
+		*skb_ptr = glue_unpack(__pos, __msg, __ext, struct sk_buff*);
+		if (*skb_ptr) {
+			callee_unmarshal_kernel__lvd_skb_reserve__skb__in(__pos, __msg, __ext, ctx, *skb_ptr);
+		}
+
+	}
+
+	{
+		*len_ptr = glue_unpack(__pos, __msg, __ext, int);
+	}
+
+	lvd_skb_reserve(skb, len);
+
+	*__pos = 0;
+	{
+		if (*skb_ptr) {
+			callee_marshal_kernel__lvd_skb_reserve__skb__in(__pos, __msg, __ext, ctx, *skb_ptr);
+		}
+
+	}
+
+	{
+	}
+
+	__msg->regs[0] = *__pos;
+	if (verbose_debug) {
+		printk("%s:%d, returned!\n", __func__, __LINE__);
+	}
+}
+
 int try_dispatch(enum RPC_ID id, struct fipc_message* __msg, struct ext_registers* __ext)
 {
 	switch(id) {
@@ -3469,6 +3521,11 @@ int try_dispatch(enum RPC_ID id, struct fipc_message* __msg, struct ext_register
 	case RPC_ID_get_jiffies:
 		glue_user_trace("get_jiffies\n");
 		get_jiffies_callee(__msg, __ext);
+		break;
+
+	case RPC_ID_lvd_skb_reserve:
+		glue_user_trace("lvd_skb_reserve\n");
+		lvd_skb_reserve_callee(__msg, __ext);
 		break;
 
 	default:

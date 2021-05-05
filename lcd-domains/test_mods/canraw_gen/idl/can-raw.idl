@@ -8,6 +8,8 @@ module kernel {
 	rpc projection ret_net_device [alloc(caller)] *  dev_get_by_index( projection net* [unused] net, int  ifindex ) {
 		projection < struct net_device > ret_net_device {
 			unsigned short type;
+			unsigned int flags;
+			int ifindex;
 		}
 		projection < struct net > net {
 		}
@@ -73,14 +75,14 @@ module kernel {
 		/*projection < struct kiocb > msghdr_msg_iocb {
 		}*/
 	}
-	rpc_ptr int  proto_ops_recvmsg( projection sock [alloc_once(callee)] *  sock, projection msg [alloc_once(callee)] * [out] msg, long unsigned int  size, int  flags ) {
+	rpc_ptr int  proto_ops_recvmsg( projection sock [alloc_once(callee)] *  sock, projection msg [alloc(callee), bind(callee)] * [in, out] msg, long unsigned int  size, int  flags ) {
 		projection < struct socket > sock {
 			projection socket_sk [alloc_once(callee)] * sk;
 		}
 		projection < struct sock > socket_sk {
 		}
 		projection < struct msghdr > msg {
-			int [out] msg_namelen;
+			int [in, out] msg_namelen;
 			casted<void *, array<char, {{ptr->msg_namelen}}> [alloc(callee), bind(callee)] *> [in, out] msg_name;
 			unsigned int [in, out] msg_flags;
 		}
@@ -121,7 +123,7 @@ module kernel {
 	}
 	rpc projection ret_sk_buff [alloc(caller)] *sock_alloc_send_skb( projection sk*  sk, long unsigned int  size, int  noblock, int [alloc_stack(callee), out] *  err ) {
 		projection < struct sk_buff > ret_sk_buff {
-			array<unsigned char, {{ptr->truesize}}>  [alloc(caller)] *data;
+			array<unsigned long, {{ptr->truesize / 8}}>  [alloc(caller)] *data;
 			unsigned int tail;
 			unsigned int end;
 			unsigned int len;
@@ -137,7 +139,7 @@ module kernel {
 	}
 /*rpc void  warn_slowpath_fmt( char*  file, int  line, char*  fmt ) {
 }*/
-	rpc_ptr int notifier_call( projection nb [bind(callee)] * nb,
+	rpc_ptr int notifier_call( projection nb [bind(caller)] * nb,
 			long unsigned int msg,
 			casted<void *, projection info [alloc<{{sizeof(struct netdev_notifier_info)}}>(callee)] *> ptr) {
 
@@ -280,7 +282,7 @@ rpc void  _raw_write_unlock_bh( projection lock*  lock ) {
 		}
 	}
 
-	rpc unsigned int  datagram_poll(  projection file [alloc_once(callee)] *  file, projection sock [alloc_once(callee)] *  sock, projection wait [alloc_once(callee)] *  wait ) {
+	rpc unsigned int  datagram_poll(  projection file *  file, projection sock *  sock, projection wait  *  wait ) {
 		projection < struct file > file {
 		}
 		projection < struct socket > sock {
@@ -331,6 +333,7 @@ rpc void  _raw_write_unlock_bh( projection lock*  lock ) {
 	rpc projection ret_sk_buff [alloc(caller)] * skb_recv_datagram( projection sk*  sk, unsigned int  flags, int  noblock, int [alloc_stack(callee), out] *err ) {
 		projection < struct sk_buff > ret_sk_buff {
 			unsigned int  len;
+			unsigned int truesize;
 			array<unsigned char, {{ptr->len}}>  [alloc(caller)] *data;
 			array<char, 48> cb;
 		}
@@ -344,7 +347,7 @@ rpc void  _raw_write_unlock_bh( projection lock*  lock ) {
 		projection < struct page > page {
 		}
 	}
-	rpc void  lock_sock_nested( projection sk*  sk, int [unused] subclass ) {
+	rpc void  lock_sock_nested( projection sk *  sk, int [unused] subclass ) {
 		projection < struct sock > sk {
 		}
 	}
@@ -459,4 +462,9 @@ rpc void  _raw_write_unlock_bh( projection lock*  lock ) {
 	rpc unsigned long get_jiffies() {
 	}
 
+	rpc void lvd_skb_reserve(projection skb *skb, int len) {
+		projection < struct sk_buff > skb {
+			unsigned int [in, out] tail;
+		}
+	}
 }

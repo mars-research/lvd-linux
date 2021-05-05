@@ -72,9 +72,19 @@ void callee_marshal_kernel__dev_get_by_index__ret_net_device__out(
 	struct net_device const* ptr)
 {
 	unsigned short const* type_ptr = &ptr->type;
+	unsigned int const* flags_ptr = &ptr->flags;
+	int const* ifindex_ptr = &ptr->ifindex;
 	
 	{
 		glue_pack(__pos, __msg, __ext, *type_ptr);
+	}
+
+	{
+		glue_pack(__pos, __msg, __ext, *flags_ptr);
+	}
+
+	{
+		glue_pack(__pos, __msg, __ext, *ifindex_ptr);
 	}
 
 }
@@ -87,9 +97,19 @@ void caller_unmarshal_kernel__dev_get_by_index__ret_net_device__out(
 	struct net_device* ptr)
 {
 	unsigned short* type_ptr = &ptr->type;
+	unsigned int* flags_ptr = &ptr->flags;
+	int* ifindex_ptr = &ptr->ifindex;
 	
 	{
 		*type_ptr = glue_unpack(__pos, __msg, __ext, unsigned short);
+	}
+
+	{
+		*flags_ptr = glue_unpack(__pos, __msg, __ext, unsigned int);
+	}
+
+	{
+		*ifindex_ptr = glue_unpack(__pos, __msg, __ext, int);
 	}
 
 }
@@ -1255,16 +1275,21 @@ void caller_unmarshal_kernel__proto_ops_recvmsg__socket_sk__in(
 	
 }
 
-void caller_marshal_kernel__proto_ops_recvmsg__msg__out(
+void caller_marshal_kernel__proto_ops_recvmsg__msg__io(
 	size_t* __pos,
 	struct fipc_message* __msg,
 	struct ext_registers* __ext,
 	struct proto_ops_recvmsg_call_ctx const* ctx,
 	struct msghdr const* ptr)
 {
+	int const* msg_namelen_ptr = &ptr->msg_namelen;
 	void* const* msg_name_ptr = &ptr->msg_name;
 	unsigned int const* msg_flags_ptr = &ptr->msg_flags;
 	
+	{
+		glue_pack(__pos, __msg, __ext, *msg_namelen_ptr);
+	}
+
 	{
 		char* __casted = (char*)*msg_name_ptr;
 		char* const* __casted_ptr = &__casted;
@@ -1294,16 +1319,21 @@ void caller_marshal_kernel__proto_ops_recvmsg__msg__out(
 
 }
 
-void callee_unmarshal_kernel__proto_ops_recvmsg__msg__out(
+void callee_unmarshal_kernel__proto_ops_recvmsg__msg__io(
 	size_t* __pos,
 	const struct fipc_message* __msg,
 	const struct ext_registers* __ext,
 	struct proto_ops_recvmsg_call_ctx const* ctx,
 	struct msghdr* ptr)
 {
+	int* msg_namelen_ptr = &ptr->msg_namelen;
 	void** msg_name_ptr = &ptr->msg_name;
 	unsigned int* msg_flags_ptr = &ptr->msg_flags;
 	
+	{
+		*msg_namelen_ptr = glue_unpack(__pos, __msg, __ext, int);
+	}
+
 	{
 		char* __casted = (char*)*msg_name_ptr;
 		char** __casted_ptr = &__casted;
@@ -1334,7 +1364,7 @@ void callee_unmarshal_kernel__proto_ops_recvmsg__msg__out(
 
 }
 
-void callee_marshal_kernel__proto_ops_recvmsg__msg__out(
+void callee_marshal_kernel__proto_ops_recvmsg__msg__io(
 	size_t* __pos,
 	struct fipc_message* __msg,
 	struct ext_registers* __ext,
@@ -1378,7 +1408,7 @@ void callee_marshal_kernel__proto_ops_recvmsg__msg__out(
 
 }
 
-void caller_unmarshal_kernel__proto_ops_recvmsg__msg__out(
+void caller_unmarshal_kernel__proto_ops_recvmsg__msg__io(
 	size_t* __pos,
 	const struct fipc_message* __msg,
 	const struct ext_registers* __ext,
@@ -1869,7 +1899,7 @@ void caller_marshal_kernel__sock_alloc_send_skb__ret_sk_buff__out(
 	struct sock_alloc_send_skb_call_ctx const* ctx,
 	struct sk_buff const* ptr)
 {
-	unsigned char* const* data_ptr = &ptr->data;
+	unsigned long* const* data_ptr = &ptr->data;
 	
 	{
 		(void)data_ptr;
@@ -1884,7 +1914,7 @@ void callee_unmarshal_kernel__sock_alloc_send_skb__ret_sk_buff__out(
 	struct sock_alloc_send_skb_call_ctx const* ctx,
 	struct sk_buff* ptr)
 {
-	unsigned char** data_ptr = &ptr->data;
+	unsigned long** data_ptr = &ptr->data;
 	
 	{
 		(void)data_ptr;
@@ -1899,7 +1929,7 @@ void callee_marshal_kernel__sock_alloc_send_skb__ret_sk_buff__out(
 	struct sock_alloc_send_skb_call_ctx const* ctx,
 	struct sk_buff const* ptr)
 {
-	unsigned char* const* data_ptr = &ptr->data;
+	unsigned long* const* data_ptr = &ptr->data;
 	unsigned int const* tail_ptr = &ptr->tail;
 	unsigned int const* end_ptr = &ptr->end;
 	unsigned int const* len_ptr = &ptr->len;
@@ -1909,13 +1939,13 @@ void callee_marshal_kernel__sock_alloc_send_skb__ret_sk_buff__out(
 		__maybe_unused const void* __adjusted = *data_ptr;
 		glue_pack(__pos, __msg, __ext, __adjusted);
 		if (*data_ptr) {
-			size_t i, len = (ptr->truesize);
-			unsigned char* array = *data_ptr;
+			size_t i, len = (ptr->truesize / 8);
+			unsigned long* array = *data_ptr;
 			glue_pack(__pos, __msg, __ext, len);
 			// Warning: see David if this breaks
 			glue_user_trace("Warning: see David if this breaks");
 			for (i = 0; i < len; ++i) {
-				unsigned char* element = &array[i];
+				unsigned long* element = &array[i];
 				glue_pack(__pos, __msg, __ext, *element);
 			}
 
@@ -1948,28 +1978,28 @@ void caller_unmarshal_kernel__sock_alloc_send_skb__ret_sk_buff__out(
 	struct sock_alloc_send_skb_call_ctx const* ctx,
 	struct sk_buff* ptr)
 {
-	unsigned char** data_ptr = &ptr->data;
+	unsigned long** data_ptr = &ptr->data;
 	unsigned int* tail_ptr = &ptr->tail;
 	unsigned int* end_ptr = &ptr->end;
 	unsigned int* len_ptr = &ptr->len;
 	unsigned int* truesize_ptr = &ptr->truesize;
 	
 	{
-		size_t __size = sizeof(unsigned char) * glue_peek(__pos, __msg, __ext);
-		*data_ptr = glue_unpack_new_shadow(__pos, __msg, __ext, unsigned char*, (__size), (DEFAULT_GFP_FLAGS));
+		size_t __size = sizeof(unsigned long) * glue_peek(__pos, __msg, __ext);
+		*data_ptr = glue_unpack_new_shadow(__pos, __msg, __ext, unsigned long*, (__size), (DEFAULT_GFP_FLAGS));
 		if (*data_ptr) {
 			int i;
-			unsigned char* array = *data_ptr;
+			unsigned long* array = *data_ptr;
 			size_t len = glue_unpack(__pos, __msg, __ext, size_t);
 			// Warning: see David if this breaks
 			glue_user_trace("Warning: see David if this breaks");
 			for (i = 0; i < len; ++i) {
-				unsigned char* element = &array[i];
-				*element = glue_unpack(__pos, __msg, __ext, unsigned char);
+				unsigned long* element = &array[i];
+				*element = glue_unpack(__pos, __msg, __ext, unsigned long);
 			}
 
 		}
-
+		ptr->head = ptr->data;
 	}
 
 	{
@@ -4143,11 +4173,16 @@ void callee_marshal_kernel__skb_recv_datagram__ret_sk_buff__out(
 	struct sk_buff const* ptr)
 {
 	unsigned int const* len_ptr = &ptr->len;
+	unsigned int const* truesize_ptr = &ptr->truesize;
 	unsigned char* const* data_ptr = &ptr->data;
 	char const* cb_ptr = ptr->cb;
 	
 	{
 		glue_pack(__pos, __msg, __ext, *len_ptr);
+	}
+
+	{
+		glue_pack(__pos, __msg, __ext, *truesize_ptr);
 	}
 
 	{
@@ -4191,11 +4226,16 @@ void caller_unmarshal_kernel__skb_recv_datagram__ret_sk_buff__out(
 	struct sk_buff* ptr)
 {
 	unsigned int* len_ptr = &ptr->len;
+	unsigned int* truesize_ptr = &ptr->truesize;
 	unsigned char** data_ptr = &ptr->data;
 	char* cb_ptr = ptr->cb;
 	
 	{
 		*len_ptr = glue_unpack(__pos, __msg, __ext, unsigned int);
+	}
+
+	{
+		*truesize_ptr = glue_unpack(__pos, __msg, __ext, unsigned int);
 	}
 
 	{
@@ -5339,6 +5379,66 @@ void caller_unmarshal_kernel__lvd_sock_orphan__sock__in(
 	struct sock* ptr)
 {
 	
+}
+
+void caller_marshal_kernel__lvd_skb_reserve__skb__in(
+	size_t* __pos,
+	struct fipc_message* __msg,
+	struct ext_registers* __ext,
+	struct lvd_skb_reserve_call_ctx const* ctx,
+	struct sk_buff const* ptr)
+{
+	unsigned int const* tail_ptr = &ptr->tail;
+	
+	{
+		glue_pack(__pos, __msg, __ext, *tail_ptr);
+	}
+
+}
+
+void callee_unmarshal_kernel__lvd_skb_reserve__skb__in(
+	size_t* __pos,
+	const struct fipc_message* __msg,
+	const struct ext_registers* __ext,
+	struct lvd_skb_reserve_call_ctx const* ctx,
+	struct sk_buff* ptr)
+{
+	unsigned int* tail_ptr = &ptr->tail;
+	
+	{
+		*tail_ptr = glue_unpack(__pos, __msg, __ext, unsigned int);
+	}
+
+}
+
+void callee_marshal_kernel__lvd_skb_reserve__skb__in(
+	size_t* __pos,
+	struct fipc_message* __msg,
+	struct ext_registers* __ext,
+	struct lvd_skb_reserve_call_ctx const* ctx,
+	struct sk_buff const* ptr)
+{
+	unsigned int const* tail_ptr = &ptr->tail;
+	
+	{
+		glue_pack(__pos, __msg, __ext, *tail_ptr);
+	}
+
+}
+
+void caller_unmarshal_kernel__lvd_skb_reserve__skb__in(
+	size_t* __pos,
+	const struct fipc_message* __msg,
+	const struct ext_registers* __ext,
+	struct lvd_skb_reserve_call_ctx const* ctx,
+	struct sk_buff* ptr)
+{
+	unsigned int* tail_ptr = &ptr->tail;
+	
+	{
+		*tail_ptr = glue_unpack(__pos, __msg, __ext, unsigned int);
+	}
+
 }
 
 

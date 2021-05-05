@@ -3101,7 +3101,7 @@ void callee_unmarshal_kernel__can_proto_register__can_proto_prot__in(
 		if (*owner_ptr) {
 			callee_unmarshal_kernel__can_proto_register__owner__in(__pos, __msg, __ext, ctx, *owner_ptr);
 		}
-
+		*owner_ptr = THIS_MODULE;
 	}
 
 	{

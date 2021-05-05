@@ -71,7 +71,14 @@ MODULE_ALIAS("can-proto-1");
 #define MASK_ALL 0
 
 int lvd_memcpy_to_msg(struct msghdr *msg, void *data, int len);
+int lvd_memcpy_from_msg(void *data, struct msghdr *msg, int len);
+void lvd_dev_put(struct net_device *dev);
+void lvd_sock_put(struct sock* sk);
 
+#ifdef LCD_ISOLATE
+#undef dev_put
+#define dev_put	lvd_dev_put
+#endif
 /*
  * A raw socket has a list of can_filters attached to it, each receiving
  * the CAN frames matching that filter.  If the filter list is empty,
@@ -139,6 +146,7 @@ static void raw_rcv(struct sk_buff *oskb, void *data)
 	if (!ro->fd_frames && oskb->len != CAN_MTU)
 		return;
 
+	// TODO: Deal with percpu ptrs
 	/* eliminate multiple filter matches for the same skb */
 	if (this_cpu_ptr(ro->uniq)->skb == oskb &&
 	    this_cpu_ptr(ro->uniq)->skbcnt == can_skb_prv(oskb)->skbcnt) {
@@ -387,7 +395,11 @@ static int raw_release(struct socket *sock)
 	sock->sk = NULL;
 
 	release_sock(sk);
+#ifdef LCD_ISOLATE
+	lvd_sock_put(sk);
+#else
 	sock_put(sk);
+#endif
 
 	return 0;
 }
@@ -760,6 +772,9 @@ static int raw_sendmsg(struct socket *sock, struct msghdr *msg, size_t size)
 	can_skb_prv(skb)->skbcnt = 0;
 
 #ifdef LCD_ISOLATE
+	// skb_put alters the tail pointer, unless we have range based objects,
+	// we cannot associate them to the same shadow object.
+	// For now, we can assume the data returned by skb_put is "new" data and take a copy
 	err = lvd_memcpy_from_msg(skb_put(skb, size), msg, size);
 #else
 	err = memcpy_from_msg(skb_put(skb, size), msg, size);
@@ -775,11 +790,7 @@ static int raw_sendmsg(struct socket *sock, struct msghdr *msg, size_t size)
 
 	err = can_send(skb, ro->loopback);
 
-#ifdef LCD_ISOLATE
-	//TODO: call out to manipulate percpu data
-#else
 	dev_put(dev);
-#endif
 
 	if (err)
 		goto send_failed;
@@ -789,11 +800,7 @@ static int raw_sendmsg(struct socket *sock, struct msghdr *msg, size_t size)
 free_skb:
 	kfree_skb(skb);
 put_dev:
-#ifdef LCD_ISOLATE
-	//TODO: call out to manipulate percpu data
-#else
 	dev_put(dev);
-#endif
 send_failed:
 	return err;
 }

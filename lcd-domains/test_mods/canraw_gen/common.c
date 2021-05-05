@@ -71,7 +71,12 @@ void callee_marshal_kernel__dev_get_by_index__ret_net_device__out(
 	struct dev_get_by_index_call_ctx const* ctx,
 	struct net_device const* ptr)
 {
+	unsigned short const* type_ptr = &ptr->type;
 	
+	{
+		glue_pack(__pos, __msg, __ext, *type_ptr);
+	}
+
 }
 
 void caller_unmarshal_kernel__dev_get_by_index__ret_net_device__out(
@@ -81,7 +86,12 @@ void caller_unmarshal_kernel__dev_get_by_index__ret_net_device__out(
 	struct dev_get_by_index_call_ctx const* ctx,
 	struct net_device* ptr)
 {
+	unsigned short* type_ptr = &ptr->type;
 	
+	{
+		*type_ptr = glue_unpack(__pos, __msg, __ext, unsigned short);
+	}
+
 }
 
 void caller_marshal_kernel__dev_get_by_index__net__in(
@@ -135,7 +145,7 @@ void caller_marshal_kernel__proto_ops_bind__sock__in(
 	
 	{
 		__maybe_unused const void* __adjusted = *sk_ptr;
-		glue_pack_shadow(__pos, __msg, __ext, __adjusted);
+		glue_pack(__pos, __msg, __ext, __adjusted);
 		if (*sk_ptr) {
 			caller_marshal_kernel__proto_ops_bind__socket_sk__in(__pos, __msg, __ext, ctx, *sk_ptr);
 		}
@@ -154,7 +164,8 @@ void callee_unmarshal_kernel__proto_ops_bind__sock__in(
 	struct sock** sk_ptr = &ptr->sk;
 	
 	{
-		*sk_ptr = glue_unpack(__pos, __msg, __ext, struct sock*);
+		size_t __size = sizeof(struct sock);
+		*sk_ptr = glue_unpack_bind_or_new_shadow(__pos, __msg, __ext, struct sock*, __size);
 		if (*sk_ptr) {
 			callee_unmarshal_kernel__proto_ops_bind__socket_sk__in(__pos, __msg, __ext, ctx, *sk_ptr);
 		}
@@ -206,7 +217,12 @@ void caller_marshal_kernel__proto_ops_bind__socket_sk__in(
 	struct proto_ops_bind_call_ctx const* ctx,
 	struct sock const* ptr)
 {
+	int const* sk_err_ptr = &ptr->sk_err;
 	
+	{
+		glue_pack(__pos, __msg, __ext, *sk_err_ptr);
+	}
+
 }
 
 void callee_unmarshal_kernel__proto_ops_bind__socket_sk__in(
@@ -216,7 +232,12 @@ void callee_unmarshal_kernel__proto_ops_bind__socket_sk__in(
 	struct proto_ops_bind_call_ctx const* ctx,
 	struct sock* ptr)
 {
+	int* sk_err_ptr = &ptr->sk_err;
 	
+	{
+		*sk_err_ptr = glue_unpack(__pos, __msg, __ext, int);
+	}
+
 }
 
 void callee_marshal_kernel__proto_ops_bind__socket_sk__in(
@@ -226,7 +247,12 @@ void callee_marshal_kernel__proto_ops_bind__socket_sk__in(
 	struct proto_ops_bind_call_ctx const* ctx,
 	struct sock const* ptr)
 {
+	int const* sk_err_ptr = &ptr->sk_err;
 	
+	{
+		glue_pack(__pos, __msg, __ext, *sk_err_ptr);
+	}
+
 }
 
 void caller_unmarshal_kernel__proto_ops_bind__socket_sk__in(
@@ -235,6 +261,61 @@ void caller_unmarshal_kernel__proto_ops_bind__socket_sk__in(
 	const struct ext_registers* __ext,
 	struct proto_ops_bind_call_ctx const* ctx,
 	struct sock* ptr)
+{
+	int* sk_err_ptr = &ptr->sk_err;
+	
+	{
+		*sk_err_ptr = glue_unpack(__pos, __msg, __ext, int);
+	}
+
+}
+
+void caller_marshal_kernel__proto_ops_bind__sockaddr_can__in(
+	size_t* __pos,
+	struct fipc_message* __msg,
+	struct ext_registers* __ext,
+	struct proto_ops_bind_call_ctx const* ctx,
+	struct sockaddr_can const* ptr)
+{
+	int const* can_ifindex_ptr = &ptr->can_ifindex;
+	
+	{
+		glue_pack(__pos, __msg, __ext, *can_ifindex_ptr);
+	}
+
+}
+
+void callee_unmarshal_kernel__proto_ops_bind__sockaddr_can__in(
+	size_t* __pos,
+	const struct fipc_message* __msg,
+	const struct ext_registers* __ext,
+	struct proto_ops_bind_call_ctx const* ctx,
+	struct sockaddr_can* ptr)
+{
+	int* can_ifindex_ptr = &ptr->can_ifindex;
+	
+	{
+		*can_ifindex_ptr = glue_unpack(__pos, __msg, __ext, int);
+	}
+
+}
+
+void callee_marshal_kernel__proto_ops_bind__sockaddr_can__in(
+	size_t* __pos,
+	struct fipc_message* __msg,
+	struct ext_registers* __ext,
+	struct proto_ops_bind_call_ctx const* ctx,
+	struct sockaddr_can const* ptr)
+{
+	
+}
+
+void caller_unmarshal_kernel__proto_ops_bind__sockaddr_can__in(
+	size_t* __pos,
+	const struct fipc_message* __msg,
+	const struct ext_registers* __ext,
+	struct proto_ops_bind_call_ctx const* ctx,
+	struct sockaddr_can* ptr)
 {
 	
 }
@@ -290,7 +371,7 @@ void caller_marshal_kernel__proto_ops_release__sock__in(
 	
 	{
 		__maybe_unused const void* __adjusted = *sk_ptr;
-		glue_pack_shadow(__pos, __msg, __ext, __adjusted);
+		glue_pack(__pos, __msg, __ext, __adjusted);
 		if (*sk_ptr) {
 			caller_marshal_kernel__proto_ops_release__socket_sk__in(__pos, __msg, __ext, ctx, *sk_ptr);
 		}
@@ -309,7 +390,8 @@ void callee_unmarshal_kernel__proto_ops_release__sock__in(
 	struct sock** sk_ptr = &ptr->sk;
 	
 	{
-		*sk_ptr = glue_unpack(__pos, __msg, __ext, struct sock*);
+		size_t __size = sizeof(struct sock);
+		*sk_ptr = glue_unpack_bind_or_new_shadow(__pos, __msg, __ext, struct sock*, __size);
 		if (*sk_ptr) {
 			callee_unmarshal_kernel__proto_ops_release__socket_sk__in(__pos, __msg, __ext, ctx, *sk_ptr);
 		}
@@ -405,7 +487,7 @@ void caller_marshal_kernel__proto_ops_getname__sock__in(
 	
 	{
 		__maybe_unused const void* __adjusted = *sk_ptr;
-		glue_pack_shadow(__pos, __msg, __ext, __adjusted);
+		glue_pack(__pos, __msg, __ext, __adjusted);
 		if (*sk_ptr) {
 			caller_marshal_kernel__proto_ops_getname__socket_sk__in(__pos, __msg, __ext, ctx, *sk_ptr);
 		}
@@ -424,7 +506,8 @@ void callee_unmarshal_kernel__proto_ops_getname__sock__in(
 	struct sock** sk_ptr = &ptr->sk;
 	
 	{
-		*sk_ptr = glue_unpack(__pos, __msg, __ext, struct sock*);
+		size_t __size = sizeof(struct sock);
+		*sk_ptr = glue_unpack_bind_or_new_shadow(__pos, __msg, __ext, struct sock*, __size);
 		if (*sk_ptr) {
 			callee_unmarshal_kernel__proto_ops_getname__socket_sk__in(__pos, __msg, __ext, ctx, *sk_ptr);
 		}
@@ -509,6 +592,66 @@ void caller_unmarshal_kernel__proto_ops_getname__socket_sk__in(
 	
 }
 
+void caller_marshal_kernel__proto_ops_getname__sockaddr_can__in(
+	size_t* __pos,
+	struct fipc_message* __msg,
+	struct ext_registers* __ext,
+	struct proto_ops_getname_call_ctx const* ctx,
+	struct sockaddr_can const* ptr)
+{
+	unsigned short const* can_family_ptr = &ptr->can_family;
+	int const* can_ifindex_ptr = &ptr->can_ifindex;
+	
+	{
+		glue_pack(__pos, __msg, __ext, *can_family_ptr);
+	}
+
+	{
+		glue_pack(__pos, __msg, __ext, *can_ifindex_ptr);
+	}
+
+}
+
+void callee_unmarshal_kernel__proto_ops_getname__sockaddr_can__in(
+	size_t* __pos,
+	const struct fipc_message* __msg,
+	const struct ext_registers* __ext,
+	struct proto_ops_getname_call_ctx const* ctx,
+	struct sockaddr_can* ptr)
+{
+	unsigned short* can_family_ptr = &ptr->can_family;
+	int* can_ifindex_ptr = &ptr->can_ifindex;
+	
+	{
+		*can_family_ptr = glue_unpack(__pos, __msg, __ext, unsigned short);
+	}
+
+	{
+		*can_ifindex_ptr = glue_unpack(__pos, __msg, __ext, int);
+	}
+
+}
+
+void callee_marshal_kernel__proto_ops_getname__sockaddr_can__in(
+	size_t* __pos,
+	struct fipc_message* __msg,
+	struct ext_registers* __ext,
+	struct proto_ops_getname_call_ctx const* ctx,
+	struct sockaddr_can const* ptr)
+{
+	
+}
+
+void caller_unmarshal_kernel__proto_ops_getname__sockaddr_can__in(
+	size_t* __pos,
+	const struct fipc_message* __msg,
+	const struct ext_registers* __ext,
+	struct proto_ops_getname_call_ctx const* ctx,
+	struct sockaddr_can* ptr)
+{
+	
+}
+
 void caller_marshal_kernel__proto_ops_getname__uaddr__in(
 	size_t* __pos,
 	struct fipc_message* __msg,
@@ -560,7 +703,7 @@ void caller_marshal_kernel__proto_ops_setsockopt__sock__in(
 	
 	{
 		__maybe_unused const void* __adjusted = *sk_ptr;
-		glue_pack_shadow(__pos, __msg, __ext, __adjusted);
+		glue_pack(__pos, __msg, __ext, __adjusted);
 		if (*sk_ptr) {
 			caller_marshal_kernel__proto_ops_setsockopt__socket_sk__in(__pos, __msg, __ext, ctx, *sk_ptr);
 		}
@@ -579,7 +722,8 @@ void callee_unmarshal_kernel__proto_ops_setsockopt__sock__in(
 	struct sock** sk_ptr = &ptr->sk;
 	
 	{
-		*sk_ptr = glue_unpack(__pos, __msg, __ext, struct sock*);
+		size_t __size = sizeof(struct sock);
+		*sk_ptr = glue_unpack_bind_or_new_shadow(__pos, __msg, __ext, struct sock*, __size);
 		if (*sk_ptr) {
 			callee_unmarshal_kernel__proto_ops_setsockopt__socket_sk__in(__pos, __msg, __ext, ctx, *sk_ptr);
 		}
@@ -675,7 +819,7 @@ void caller_marshal_kernel__proto_ops_getsockopt__sock__in(
 	
 	{
 		__maybe_unused const void* __adjusted = *sk_ptr;
-		glue_pack_shadow(__pos, __msg, __ext, __adjusted);
+		glue_pack(__pos, __msg, __ext, __adjusted);
 		if (*sk_ptr) {
 			caller_marshal_kernel__proto_ops_getsockopt__socket_sk__in(__pos, __msg, __ext, ctx, *sk_ptr);
 		}
@@ -694,7 +838,8 @@ void callee_unmarshal_kernel__proto_ops_getsockopt__sock__in(
 	struct sock** sk_ptr = &ptr->sk;
 	
 	{
-		*sk_ptr = glue_unpack(__pos, __msg, __ext, struct sock*);
+		size_t __size = sizeof(struct sock);
+		*sk_ptr = glue_unpack_bind_or_new_shadow(__pos, __msg, __ext, struct sock*, __size);
 		if (*sk_ptr) {
 			callee_unmarshal_kernel__proto_ops_getsockopt__socket_sk__in(__pos, __msg, __ext, ctx, *sk_ptr);
 		}
@@ -790,7 +935,7 @@ void caller_marshal_kernel__proto_ops_sendmsg__sock__in(
 	
 	{
 		__maybe_unused const void* __adjusted = *sk_ptr;
-		glue_pack_shadow(__pos, __msg, __ext, __adjusted);
+		glue_pack(__pos, __msg, __ext, __adjusted);
 		if (*sk_ptr) {
 			caller_marshal_kernel__proto_ops_sendmsg__socket_sk__in(__pos, __msg, __ext, ctx, *sk_ptr);
 		}
@@ -809,7 +954,8 @@ void callee_unmarshal_kernel__proto_ops_sendmsg__sock__in(
 	struct sock** sk_ptr = &ptr->sk;
 	
 	{
-		*sk_ptr = glue_unpack(__pos, __msg, __ext, struct sock*);
+		size_t __size = sizeof(struct sock);
+		*sk_ptr = glue_unpack_bind_or_new_shadow(__pos, __msg, __ext, struct sock*, __size);
 		if (*sk_ptr) {
 			callee_unmarshal_kernel__proto_ops_sendmsg__socket_sk__in(__pos, __msg, __ext, ctx, *sk_ptr);
 		}
@@ -903,27 +1049,32 @@ void caller_marshal_kernel__proto_ops_sendmsg__msg__in(
 {
 	void* const* msg_name_ptr = &ptr->msg_name;
 	int const* msg_namelen_ptr = &ptr->msg_namelen;
-	struct kiocb* const* msg_iocb_ptr = &ptr->msg_iocb;
 	
 	{
-		__maybe_unused const void* __adjusted = *msg_name_ptr;
-		glue_pack_shadow(__pos, __msg, __ext, __adjusted);
-		if (*msg_name_ptr) {
+		char* __casted = (char*)*msg_name_ptr;
+		char* const* __casted_ptr = &__casted;
+		{
+			__maybe_unused const void* __adjusted = *__casted_ptr;
+			glue_pack(__pos, __msg, __ext, __adjusted);
+			if (*__casted_ptr) {
+				size_t i, len = (ptr->msg_namelen);
+				char* array = *__casted_ptr;
+				glue_pack(__pos, __msg, __ext, len);
+				// Warning: see David if this breaks
+				glue_user_trace("Warning: see David if this breaks");
+				for (i = 0; i < len; ++i) {
+					char* element = &array[i];
+					glue_pack(__pos, __msg, __ext, *element);
+				}
+
+			}
+
 		}
 
 	}
 
 	{
 		glue_pack(__pos, __msg, __ext, *msg_namelen_ptr);
-	}
-
-	{
-		__maybe_unused const void* __adjusted = *msg_iocb_ptr;
-		glue_pack_shadow(__pos, __msg, __ext, __adjusted);
-		if (*msg_iocb_ptr) {
-			caller_marshal_kernel__proto_ops_sendmsg__msghdr_msg_iocb__in(__pos, __msg, __ext, ctx, *msg_iocb_ptr);
-		}
-
 	}
 
 }
@@ -937,25 +1088,33 @@ void callee_unmarshal_kernel__proto_ops_sendmsg__msg__in(
 {
 	void** msg_name_ptr = &ptr->msg_name;
 	int* msg_namelen_ptr = &ptr->msg_namelen;
-	struct kiocb** msg_iocb_ptr = &ptr->msg_iocb;
 	
 	{
-		*msg_name_ptr = glue_unpack(__pos, __msg, __ext, void*);
-		if (*msg_name_ptr) {
+		char* __casted = (char*)*msg_name_ptr;
+		char** __casted_ptr = &__casted;
+		{
+			size_t __size = sizeof(char) * glue_peek(__pos, __msg, __ext);
+			*__casted_ptr = glue_unpack_new_shadow(__pos, __msg, __ext, char*, (__size), (DEFAULT_GFP_FLAGS));
+			if (*__casted_ptr) {
+				int i;
+				char* array = *__casted_ptr;
+				size_t len = glue_unpack(__pos, __msg, __ext, size_t);
+				// Warning: see David if this breaks
+				glue_user_trace("Warning: see David if this breaks");
+				for (i = 0; i < len; ++i) {
+					char* element = &array[i];
+					*element = glue_unpack(__pos, __msg, __ext, char);
+				}
+
+			}
+
 		}
 
+		*msg_name_ptr = (void*)__casted;
 	}
 
 	{
 		*msg_namelen_ptr = glue_unpack(__pos, __msg, __ext, int);
-	}
-
-	{
-		*msg_iocb_ptr = glue_unpack(__pos, __msg, __ext, struct kiocb*);
-		if (*msg_iocb_ptr) {
-			callee_unmarshal_kernel__proto_ops_sendmsg__msghdr_msg_iocb__in(__pos, __msg, __ext, ctx, *msg_iocb_ptr);
-		}
-
 	}
 
 }
@@ -967,20 +1126,7 @@ void callee_marshal_kernel__proto_ops_sendmsg__msg__in(
 	struct proto_ops_sendmsg_call_ctx const* ctx,
 	struct msghdr const* ptr)
 {
-	void* const* msg_name_ptr = &ptr->msg_name;
-	struct kiocb* const* msg_iocb_ptr = &ptr->msg_iocb;
 	
-	{
-		(void)msg_name_ptr;
-	}
-
-	{
-		if (*msg_iocb_ptr) {
-			callee_marshal_kernel__proto_ops_sendmsg__msghdr_msg_iocb__in(__pos, __msg, __ext, ctx, *msg_iocb_ptr);
-		}
-
-	}
-
 }
 
 void caller_unmarshal_kernel__proto_ops_sendmsg__msg__in(
@@ -989,59 +1135,6 @@ void caller_unmarshal_kernel__proto_ops_sendmsg__msg__in(
 	const struct ext_registers* __ext,
 	struct proto_ops_sendmsg_call_ctx const* ctx,
 	struct msghdr* ptr)
-{
-	void** msg_name_ptr = &ptr->msg_name;
-	struct kiocb** msg_iocb_ptr = &ptr->msg_iocb;
-	
-	{
-		(void)msg_name_ptr;
-	}
-
-	{
-		if (*msg_iocb_ptr) {
-			caller_unmarshal_kernel__proto_ops_sendmsg__msghdr_msg_iocb__in(__pos, __msg, __ext, ctx, *msg_iocb_ptr);
-		}
-
-	}
-
-}
-
-void caller_marshal_kernel__proto_ops_sendmsg__msghdr_msg_iocb__in(
-	size_t* __pos,
-	struct fipc_message* __msg,
-	struct ext_registers* __ext,
-	struct proto_ops_sendmsg_call_ctx const* ctx,
-	struct kiocb const* ptr)
-{
-	
-}
-
-void callee_unmarshal_kernel__proto_ops_sendmsg__msghdr_msg_iocb__in(
-	size_t* __pos,
-	const struct fipc_message* __msg,
-	const struct ext_registers* __ext,
-	struct proto_ops_sendmsg_call_ctx const* ctx,
-	struct kiocb* ptr)
-{
-	
-}
-
-void callee_marshal_kernel__proto_ops_sendmsg__msghdr_msg_iocb__in(
-	size_t* __pos,
-	struct fipc_message* __msg,
-	struct ext_registers* __ext,
-	struct proto_ops_sendmsg_call_ctx const* ctx,
-	struct kiocb const* ptr)
-{
-	
-}
-
-void caller_unmarshal_kernel__proto_ops_sendmsg__msghdr_msg_iocb__in(
-	size_t* __pos,
-	const struct fipc_message* __msg,
-	const struct ext_registers* __ext,
-	struct proto_ops_sendmsg_call_ctx const* ctx,
-	struct kiocb* ptr)
 {
 	
 }
@@ -1077,7 +1170,7 @@ void callee_unmarshal_kernel__proto_ops_recvmsg__sock__in(
 	
 	{
 		size_t __size = sizeof(struct sock);
-		*sk_ptr = glue_unpack_new_shadow(__pos, __msg, __ext, struct sock*, (__size), (DEFAULT_GFP_FLAGS));
+		*sk_ptr = glue_unpack_bind_or_new_shadow(__pos, __msg, __ext, struct sock*, __size);
 		if (*sk_ptr) {
 			callee_unmarshal_kernel__proto_ops_recvmsg__socket_sk__in(__pos, __msg, __ext, ctx, *sk_ptr);
 		}
@@ -1776,7 +1869,12 @@ void caller_marshal_kernel__sock_alloc_send_skb__ret_sk_buff__out(
 	struct sock_alloc_send_skb_call_ctx const* ctx,
 	struct sk_buff const* ptr)
 {
+	unsigned char* const* data_ptr = &ptr->data;
 	
+	{
+		(void)data_ptr;
+	}
+
 }
 
 void callee_unmarshal_kernel__sock_alloc_send_skb__ret_sk_buff__out(
@@ -1786,7 +1884,12 @@ void callee_unmarshal_kernel__sock_alloc_send_skb__ret_sk_buff__out(
 	struct sock_alloc_send_skb_call_ctx const* ctx,
 	struct sk_buff* ptr)
 {
+	unsigned char** data_ptr = &ptr->data;
 	
+	{
+		(void)data_ptr;
+	}
+
 }
 
 void callee_marshal_kernel__sock_alloc_send_skb__ret_sk_buff__out(
@@ -1796,7 +1899,46 @@ void callee_marshal_kernel__sock_alloc_send_skb__ret_sk_buff__out(
 	struct sock_alloc_send_skb_call_ctx const* ctx,
 	struct sk_buff const* ptr)
 {
+	unsigned char* const* data_ptr = &ptr->data;
+	unsigned int const* tail_ptr = &ptr->tail;
+	unsigned int const* end_ptr = &ptr->end;
+	unsigned int const* len_ptr = &ptr->len;
+	unsigned int const* truesize_ptr = &ptr->truesize;
 	
+	{
+		__maybe_unused const void* __adjusted = *data_ptr;
+		glue_pack(__pos, __msg, __ext, __adjusted);
+		if (*data_ptr) {
+			size_t i, len = (ptr->truesize);
+			unsigned char* array = *data_ptr;
+			glue_pack(__pos, __msg, __ext, len);
+			// Warning: see David if this breaks
+			glue_user_trace("Warning: see David if this breaks");
+			for (i = 0; i < len; ++i) {
+				unsigned char* element = &array[i];
+				glue_pack(__pos, __msg, __ext, *element);
+			}
+
+		}
+
+	}
+
+	{
+		glue_pack(__pos, __msg, __ext, *tail_ptr);
+	}
+
+	{
+		glue_pack(__pos, __msg, __ext, *end_ptr);
+	}
+
+	{
+		glue_pack(__pos, __msg, __ext, *len_ptr);
+	}
+
+	{
+		glue_pack(__pos, __msg, __ext, *truesize_ptr);
+	}
+
 }
 
 void caller_unmarshal_kernel__sock_alloc_send_skb__ret_sk_buff__out(
@@ -1806,7 +1948,46 @@ void caller_unmarshal_kernel__sock_alloc_send_skb__ret_sk_buff__out(
 	struct sock_alloc_send_skb_call_ctx const* ctx,
 	struct sk_buff* ptr)
 {
+	unsigned char** data_ptr = &ptr->data;
+	unsigned int* tail_ptr = &ptr->tail;
+	unsigned int* end_ptr = &ptr->end;
+	unsigned int* len_ptr = &ptr->len;
+	unsigned int* truesize_ptr = &ptr->truesize;
 	
+	{
+		size_t __size = sizeof(unsigned char) * glue_peek(__pos, __msg, __ext);
+		*data_ptr = glue_unpack_new_shadow(__pos, __msg, __ext, unsigned char*, (__size), (DEFAULT_GFP_FLAGS));
+		if (*data_ptr) {
+			int i;
+			unsigned char* array = *data_ptr;
+			size_t len = glue_unpack(__pos, __msg, __ext, size_t);
+			// Warning: see David if this breaks
+			glue_user_trace("Warning: see David if this breaks");
+			for (i = 0; i < len; ++i) {
+				unsigned char* element = &array[i];
+				*element = glue_unpack(__pos, __msg, __ext, unsigned char);
+			}
+
+		}
+
+	}
+
+	{
+		*tail_ptr = glue_unpack(__pos, __msg, __ext, unsigned int);
+	}
+
+	{
+		*end_ptr = glue_unpack(__pos, __msg, __ext, unsigned int);
+	}
+
+	{
+		*len_ptr = glue_unpack(__pos, __msg, __ext, unsigned int);
+	}
+
+	{
+		*truesize_ptr = glue_unpack(__pos, __msg, __ext, unsigned int);
+	}
+
 }
 
 void caller_marshal_kernel__sock_alloc_send_skb__sk__in(
@@ -1816,20 +1997,10 @@ void caller_marshal_kernel__sock_alloc_send_skb__sk__in(
 	struct sock_alloc_send_skb_call_ctx const* ctx,
 	struct sock const* ptr)
 {
-	int const* sk_err_ptr = &ptr->sk_err;
-	struct socket* const* sk_socket_ptr = &ptr->sk_socket;
+	unsigned int const* sk_priority_ptr = &ptr->sk_priority;
 	
 	{
-		glue_pack(__pos, __msg, __ext, *sk_err_ptr);
-	}
-
-	{
-		__maybe_unused const void* __adjusted = *sk_socket_ptr;
-		glue_pack_shadow(__pos, __msg, __ext, __adjusted);
-		if (*sk_socket_ptr) {
-			caller_marshal_kernel__sock_alloc_send_skb__sock_sk_socket__in(__pos, __msg, __ext, ctx, *sk_socket_ptr);
-		}
-
+		glue_pack(__pos, __msg, __ext, *sk_priority_ptr);
 	}
 
 }
@@ -1841,19 +2012,10 @@ void callee_unmarshal_kernel__sock_alloc_send_skb__sk__in(
 	struct sock_alloc_send_skb_call_ctx const* ctx,
 	struct sock* ptr)
 {
-	int* sk_err_ptr = &ptr->sk_err;
-	struct socket** sk_socket_ptr = &ptr->sk_socket;
+	unsigned int* sk_priority_ptr = &ptr->sk_priority;
 	
 	{
-		*sk_err_ptr = glue_unpack(__pos, __msg, __ext, int);
-	}
-
-	{
-		*sk_socket_ptr = glue_unpack(__pos, __msg, __ext, struct socket*);
-		if (*sk_socket_ptr) {
-			callee_unmarshal_kernel__sock_alloc_send_skb__sock_sk_socket__in(__pos, __msg, __ext, ctx, *sk_socket_ptr);
-		}
-
+		*sk_priority_ptr = glue_unpack(__pos, __msg, __ext, unsigned int);
 	}
 
 }
@@ -1865,15 +2027,7 @@ void callee_marshal_kernel__sock_alloc_send_skb__sk__in(
 	struct sock_alloc_send_skb_call_ctx const* ctx,
 	struct sock const* ptr)
 {
-	struct socket* const* sk_socket_ptr = &ptr->sk_socket;
 	
-	{
-		if (*sk_socket_ptr) {
-			callee_marshal_kernel__sock_alloc_send_skb__sock_sk_socket__in(__pos, __msg, __ext, ctx, *sk_socket_ptr);
-		}
-
-	}
-
 }
 
 void caller_unmarshal_kernel__sock_alloc_send_skb__sk__in(
@@ -1882,54 +2036,6 @@ void caller_unmarshal_kernel__sock_alloc_send_skb__sk__in(
 	const struct ext_registers* __ext,
 	struct sock_alloc_send_skb_call_ctx const* ctx,
 	struct sock* ptr)
-{
-	struct socket** sk_socket_ptr = &ptr->sk_socket;
-	
-	{
-		if (*sk_socket_ptr) {
-			caller_unmarshal_kernel__sock_alloc_send_skb__sock_sk_socket__in(__pos, __msg, __ext, ctx, *sk_socket_ptr);
-		}
-
-	}
-
-}
-
-void caller_marshal_kernel__sock_alloc_send_skb__sock_sk_socket__in(
-	size_t* __pos,
-	struct fipc_message* __msg,
-	struct ext_registers* __ext,
-	struct sock_alloc_send_skb_call_ctx const* ctx,
-	struct socket const* ptr)
-{
-	
-}
-
-void callee_unmarshal_kernel__sock_alloc_send_skb__sock_sk_socket__in(
-	size_t* __pos,
-	const struct fipc_message* __msg,
-	const struct ext_registers* __ext,
-	struct sock_alloc_send_skb_call_ctx const* ctx,
-	struct socket* ptr)
-{
-	
-}
-
-void callee_marshal_kernel__sock_alloc_send_skb__sock_sk_socket__in(
-	size_t* __pos,
-	struct fipc_message* __msg,
-	struct ext_registers* __ext,
-	struct sock_alloc_send_skb_call_ctx const* ctx,
-	struct socket const* ptr)
-{
-	
-}
-
-void caller_unmarshal_kernel__sock_alloc_send_skb__sock_sk_socket__in(
-	size_t* __pos,
-	const struct fipc_message* __msg,
-	const struct ext_registers* __ext,
-	struct sock_alloc_send_skb_call_ctx const* ctx,
-	struct socket* ptr)
 {
 	
 }
@@ -2207,22 +2313,7 @@ void caller_marshal_kernel__kfree_skb__skb__in(
 	struct kfree_skb_call_ctx const* ctx,
 	struct sk_buff const* ptr)
 {
-	unsigned int const* end_ptr = &ptr->end;
-	unsigned char* const* head_ptr = &ptr->head;
 	
-	{
-		glue_pack(__pos, __msg, __ext, *end_ptr);
-	}
-
-	{
-		__maybe_unused const void* __adjusted = *head_ptr;
-		glue_pack_shadow(__pos, __msg, __ext, __adjusted);
-		if (*head_ptr) {
-			glue_pack(__pos, __msg, __ext, **head_ptr);
-		}
-
-	}
-
 }
 
 void callee_unmarshal_kernel__kfree_skb__skb__in(
@@ -2232,21 +2323,7 @@ void callee_unmarshal_kernel__kfree_skb__skb__in(
 	struct kfree_skb_call_ctx const* ctx,
 	struct sk_buff* ptr)
 {
-	unsigned int* end_ptr = &ptr->end;
-	unsigned char** head_ptr = &ptr->head;
 	
-	{
-		*end_ptr = glue_unpack(__pos, __msg, __ext, unsigned int);
-	}
-
-	{
-		*head_ptr = glue_unpack(__pos, __msg, __ext, unsigned char*);
-		if (*head_ptr) {
-			**head_ptr = glue_unpack(__pos, __msg, __ext, unsigned char);
-		}
-
-	}
-
 }
 
 void callee_marshal_kernel__kfree_skb__skb__in(
@@ -2256,12 +2333,7 @@ void callee_marshal_kernel__kfree_skb__skb__in(
 	struct kfree_skb_call_ctx const* ctx,
 	struct sk_buff const* ptr)
 {
-	unsigned char* const* head_ptr = &ptr->head;
 	
-	{
-		(void)head_ptr;
-	}
-
 }
 
 void caller_unmarshal_kernel__kfree_skb__skb__in(
@@ -2271,89 +2343,55 @@ void caller_unmarshal_kernel__kfree_skb__skb__in(
 	struct kfree_skb_call_ctx const* ctx,
 	struct sk_buff* ptr)
 {
-	unsigned char** head_ptr = &ptr->head;
 	
-	{
-		(void)head_ptr;
-	}
-
 }
 
-void caller_marshal_kernel__skb_clone__ret_sk_buff__io(
+void caller_marshal_kernel__skb_clone__ret_sk_buff__out(
 	size_t* __pos,
 	struct fipc_message* __msg,
 	struct ext_registers* __ext,
 	struct skb_clone_call_ctx const* ctx,
 	struct sk_buff const* ptr)
 {
-	
-}
-
-void callee_unmarshal_kernel__skb_clone__ret_sk_buff__io(
-	size_t* __pos,
-	const struct fipc_message* __msg,
-	const struct ext_registers* __ext,
-	struct skb_clone_call_ctx const* ctx,
-	struct sk_buff* ptr)
-{
-	
-}
-
-void callee_marshal_kernel__skb_clone__ret_sk_buff__io(
-	size_t* __pos,
-	struct fipc_message* __msg,
-	struct ext_registers* __ext,
-	struct skb_clone_call_ctx const* ctx,
-	struct sk_buff const* ptr)
-{
-	
-}
-
-void caller_unmarshal_kernel__skb_clone__ret_sk_buff__io(
-	size_t* __pos,
-	const struct fipc_message* __msg,
-	const struct ext_registers* __ext,
-	struct skb_clone_call_ctx const* ctx,
-	struct sk_buff* ptr)
-{
-	
-}
-
-void caller_marshal_kernel__skb_clone__skb__io(
-	size_t* __pos,
-	struct fipc_message* __msg,
-	struct ext_registers* __ext,
-	struct skb_clone_call_ctx const* ctx,
-	struct sk_buff const* ptr)
-{
-	struct sock* const* sk_ptr = &ptr->sk;
 	struct net_device* const* dev_ptr = &ptr->dev;
-	char const* cb_ptr = ptr->cb;
-	unsigned int const* len_ptr = &ptr->len;
-	unsigned int const* headers_end_ptr = ptr->headers_end;
-	unsigned int const* tail_ptr = &ptr->tail;
-	unsigned int const* end_ptr = &ptr->end;
-	unsigned char* const* head_ptr = &ptr->head;
-	unsigned char* const* data_ptr = &ptr->data;
 	
 	{
-		__maybe_unused const void* __adjusted = *sk_ptr;
-		glue_pack_shadow(__pos, __msg, __ext, __adjusted);
-		if (*sk_ptr) {
-			caller_marshal_kernel__skb_clone__sk_buff_sk__io(__pos, __msg, __ext, ctx, *sk_ptr);
-		}
-
-	}
-
-	{
-		__maybe_unused const void* __adjusted = *dev_ptr;
-		glue_pack_shadow(__pos, __msg, __ext, __adjusted);
 		if (*dev_ptr) {
-			caller_marshal_kernel__skb_clone__sk_buff_dev__io(__pos, __msg, __ext, ctx, *dev_ptr);
+			caller_marshal_kernel__skb_clone__sk_buff_dev__out(__pos, __msg, __ext, ctx, *dev_ptr);
 		}
 
 	}
 
+}
+
+void callee_unmarshal_kernel__skb_clone__ret_sk_buff__out(
+	size_t* __pos,
+	const struct fipc_message* __msg,
+	const struct ext_registers* __ext,
+	struct skb_clone_call_ctx const* ctx,
+	struct sk_buff* ptr)
+{
+	struct net_device** dev_ptr = &ptr->dev;
+	
+	{
+		if (*dev_ptr) {
+			callee_unmarshal_kernel__skb_clone__sk_buff_dev__out(__pos, __msg, __ext, ctx, *dev_ptr);
+		}
+
+	}
+
+}
+
+void callee_marshal_kernel__skb_clone__ret_sk_buff__out(
+	size_t* __pos,
+	struct fipc_message* __msg,
+	struct ext_registers* __ext,
+	struct skb_clone_call_ctx const* ctx,
+	struct sk_buff const* ptr)
+{
+	char const* cb_ptr = ptr->cb;
+	struct net_device* const* dev_ptr = &ptr->dev;
+	
 	{
 		size_t i, len = 48;
 		char const* array = cb_ptr;
@@ -2368,83 +2406,26 @@ void caller_marshal_kernel__skb_clone__skb__io(
 	}
 
 	{
-		glue_pack(__pos, __msg, __ext, *len_ptr);
-	}
-
-	{
-		size_t i, len = 0;
-		unsigned int const* array = headers_end_ptr;
-		glue_pack(__pos, __msg, __ext, len);
-		// Warning: see David if this breaks
-		glue_user_trace("Warning: see David if this breaks");
-		for (i = 0; i < len; ++i) {
-			unsigned int const* element = &array[i];
-			glue_pack(__pos, __msg, __ext, *element);
-		}
-
-	}
-
-	{
-		glue_pack(__pos, __msg, __ext, *tail_ptr);
-	}
-
-	{
-		glue_pack(__pos, __msg, __ext, *end_ptr);
-	}
-
-	{
-		__maybe_unused const void* __adjusted = *head_ptr;
-		glue_pack_shadow(__pos, __msg, __ext, __adjusted);
-		if (*head_ptr) {
-			glue_pack(__pos, __msg, __ext, **head_ptr);
-		}
-
-	}
-
-	{
-		__maybe_unused const void* __adjusted = *data_ptr;
-		glue_pack_shadow(__pos, __msg, __ext, __adjusted);
-		if (*data_ptr) {
-			glue_pack(__pos, __msg, __ext, **data_ptr);
+		__maybe_unused const void* __adjusted = *dev_ptr;
+		glue_pack(__pos, __msg, __ext, __adjusted);
+		if (*dev_ptr) {
+			callee_marshal_kernel__skb_clone__sk_buff_dev__out(__pos, __msg, __ext, ctx, *dev_ptr);
 		}
 
 	}
 
 }
 
-void callee_unmarshal_kernel__skb_clone__skb__io(
+void caller_unmarshal_kernel__skb_clone__ret_sk_buff__out(
 	size_t* __pos,
 	const struct fipc_message* __msg,
 	const struct ext_registers* __ext,
 	struct skb_clone_call_ctx const* ctx,
 	struct sk_buff* ptr)
 {
-	struct sock** sk_ptr = &ptr->sk;
-	struct net_device** dev_ptr = &ptr->dev;
 	char* cb_ptr = ptr->cb;
-	unsigned int* len_ptr = &ptr->len;
-	unsigned int* headers_end_ptr = ptr->headers_end;
-	unsigned int* tail_ptr = &ptr->tail;
-	unsigned int* end_ptr = &ptr->end;
-	unsigned char** head_ptr = &ptr->head;
-	unsigned char** data_ptr = &ptr->data;
+	struct net_device** dev_ptr = &ptr->dev;
 	
-	{
-		*sk_ptr = glue_unpack_shadow(__pos, __msg, __ext, struct sock*);
-		if (*sk_ptr) {
-			callee_unmarshal_kernel__skb_clone__sk_buff_sk__io(__pos, __msg, __ext, ctx, *sk_ptr);
-		}
-
-	}
-
-	{
-		*dev_ptr = glue_unpack_shadow(__pos, __msg, __ext, struct net_device*);
-		if (*dev_ptr) {
-			callee_unmarshal_kernel__skb_clone__sk_buff_dev__io(__pos, __msg, __ext, ctx, *dev_ptr);
-		}
-
-	}
-
 	{
 		int i;
 		char* array = cb_ptr;
@@ -2459,311 +2440,107 @@ void callee_unmarshal_kernel__skb_clone__skb__io(
 	}
 
 	{
-		*len_ptr = glue_unpack(__pos, __msg, __ext, unsigned int);
-	}
-
-	{
-		int i;
-		unsigned int* array = headers_end_ptr;
-		size_t len = glue_unpack(__pos, __msg, __ext, size_t);
-		// Warning: see David if this breaks
-		glue_user_trace("Warning: see David if this breaks");
-		for (i = 0; i < len; ++i) {
-			unsigned int* element = &array[i];
-			*element = glue_unpack(__pos, __msg, __ext, unsigned int);
-		}
-
-	}
-
-	{
-		*tail_ptr = glue_unpack(__pos, __msg, __ext, unsigned int);
-	}
-
-	{
-		*end_ptr = glue_unpack(__pos, __msg, __ext, unsigned int);
-	}
-
-	{
-		*head_ptr = glue_unpack_shadow(__pos, __msg, __ext, unsigned char*);
-		if (*head_ptr) {
-			**head_ptr = glue_unpack(__pos, __msg, __ext, unsigned char);
-		}
-
-	}
-
-	{
-		*data_ptr = glue_unpack_shadow(__pos, __msg, __ext, unsigned char*);
-		if (*data_ptr) {
-			**data_ptr = glue_unpack(__pos, __msg, __ext, unsigned char);
+		size_t __size = sizeof(struct net_device);
+		*dev_ptr = glue_unpack_bind_or_new_shadow(__pos, __msg, __ext, struct net_device*, __size);
+		if (*dev_ptr) {
+			caller_unmarshal_kernel__skb_clone__sk_buff_dev__out(__pos, __msg, __ext, ctx, *dev_ptr);
 		}
 
 	}
 
 }
 
-void callee_marshal_kernel__skb_clone__skb__io(
+void caller_marshal_kernel__skb_clone__sk_buff_dev__out(
+	size_t* __pos,
+	struct fipc_message* __msg,
+	struct ext_registers* __ext,
+	struct skb_clone_call_ctx const* ctx,
+	struct net_device const* ptr)
+{
+	
+}
+
+void callee_unmarshal_kernel__skb_clone__sk_buff_dev__out(
+	size_t* __pos,
+	const struct fipc_message* __msg,
+	const struct ext_registers* __ext,
+	struct skb_clone_call_ctx const* ctx,
+	struct net_device* ptr)
+{
+	
+}
+
+void callee_marshal_kernel__skb_clone__sk_buff_dev__out(
+	size_t* __pos,
+	struct fipc_message* __msg,
+	struct ext_registers* __ext,
+	struct skb_clone_call_ctx const* ctx,
+	struct net_device const* ptr)
+{
+	int const* ifindex_ptr = &ptr->ifindex;
+	
+	{
+		glue_pack(__pos, __msg, __ext, *ifindex_ptr);
+	}
+
+}
+
+void caller_unmarshal_kernel__skb_clone__sk_buff_dev__out(
+	size_t* __pos,
+	const struct fipc_message* __msg,
+	const struct ext_registers* __ext,
+	struct skb_clone_call_ctx const* ctx,
+	struct net_device* ptr)
+{
+	int* ifindex_ptr = &ptr->ifindex;
+	
+	{
+		*ifindex_ptr = glue_unpack(__pos, __msg, __ext, int);
+	}
+
+}
+
+void caller_marshal_kernel__skb_clone__skb__in(
 	size_t* __pos,
 	struct fipc_message* __msg,
 	struct ext_registers* __ext,
 	struct skb_clone_call_ctx const* ctx,
 	struct sk_buff const* ptr)
 {
-	struct sock* const* sk_ptr = &ptr->sk;
-	struct net_device* const* dev_ptr = &ptr->dev;
-	char const* cb_ptr = ptr->cb;
-	unsigned int const* len_ptr = &ptr->len;
-	unsigned int const* headers_end_ptr = ptr->headers_end;
-	unsigned int const* tail_ptr = &ptr->tail;
-	unsigned int const* end_ptr = &ptr->end;
-	unsigned char* const* head_ptr = &ptr->head;
-	unsigned char* const* data_ptr = &ptr->data;
 	
-	{
-		__maybe_unused const void* __adjusted = *sk_ptr;
-		glue_pack_shadow(__pos, __msg, __ext, __adjusted);
-		if (*sk_ptr) {
-			callee_marshal_kernel__skb_clone__sk_buff_sk__io(__pos, __msg, __ext, ctx, *sk_ptr);
-		}
-
-	}
-
-	{
-		__maybe_unused const void* __adjusted = *dev_ptr;
-		glue_pack_shadow(__pos, __msg, __ext, __adjusted);
-		if (*dev_ptr) {
-			callee_marshal_kernel__skb_clone__sk_buff_dev__io(__pos, __msg, __ext, ctx, *dev_ptr);
-		}
-
-	}
-
-	{
-		size_t i, len = 48;
-		char const* array = cb_ptr;
-		glue_pack(__pos, __msg, __ext, len);
-		// Warning: see David if this breaks
-		glue_user_trace("Warning: see David if this breaks");
-		for (i = 0; i < len; ++i) {
-			char const* element = &array[i];
-			glue_pack(__pos, __msg, __ext, *element);
-		}
-
-	}
-
-	{
-		glue_pack(__pos, __msg, __ext, *len_ptr);
-	}
-
-	{
-		size_t i, len = 0;
-		unsigned int const* array = headers_end_ptr;
-		glue_pack(__pos, __msg, __ext, len);
-		// Warning: see David if this breaks
-		glue_user_trace("Warning: see David if this breaks");
-		for (i = 0; i < len; ++i) {
-			unsigned int const* element = &array[i];
-			glue_pack(__pos, __msg, __ext, *element);
-		}
-
-	}
-
-	{
-		glue_pack(__pos, __msg, __ext, *tail_ptr);
-	}
-
-	{
-		glue_pack(__pos, __msg, __ext, *end_ptr);
-	}
-
-	{
-		__maybe_unused const void* __adjusted = *head_ptr;
-		glue_pack_shadow(__pos, __msg, __ext, __adjusted);
-		if (*head_ptr) {
-			glue_pack(__pos, __msg, __ext, **head_ptr);
-		}
-
-	}
-
-	{
-		__maybe_unused const void* __adjusted = *data_ptr;
-		glue_pack_shadow(__pos, __msg, __ext, __adjusted);
-		if (*data_ptr) {
-			glue_pack(__pos, __msg, __ext, **data_ptr);
-		}
-
-	}
-
 }
 
-void caller_unmarshal_kernel__skb_clone__skb__io(
+void callee_unmarshal_kernel__skb_clone__skb__in(
 	size_t* __pos,
 	const struct fipc_message* __msg,
 	const struct ext_registers* __ext,
 	struct skb_clone_call_ctx const* ctx,
 	struct sk_buff* ptr)
 {
-	struct sock** sk_ptr = &ptr->sk;
-	struct net_device** dev_ptr = &ptr->dev;
-	char* cb_ptr = ptr->cb;
-	unsigned int* len_ptr = &ptr->len;
-	unsigned int* headers_end_ptr = ptr->headers_end;
-	unsigned int* tail_ptr = &ptr->tail;
-	unsigned int* end_ptr = &ptr->end;
-	unsigned char** head_ptr = &ptr->head;
-	unsigned char** data_ptr = &ptr->data;
 	
-	{
-		*sk_ptr = glue_unpack_shadow(__pos, __msg, __ext, struct sock*);
-		if (*sk_ptr) {
-			caller_unmarshal_kernel__skb_clone__sk_buff_sk__io(__pos, __msg, __ext, ctx, *sk_ptr);
-		}
-
-	}
-
-	{
-		*dev_ptr = glue_unpack_shadow(__pos, __msg, __ext, struct net_device*);
-		if (*dev_ptr) {
-			caller_unmarshal_kernel__skb_clone__sk_buff_dev__io(__pos, __msg, __ext, ctx, *dev_ptr);
-		}
-
-	}
-
-	{
-		int i;
-		char* array = cb_ptr;
-		size_t len = glue_unpack(__pos, __msg, __ext, size_t);
-		// Warning: see David if this breaks
-		glue_user_trace("Warning: see David if this breaks");
-		for (i = 0; i < len; ++i) {
-			char* element = &array[i];
-			*element = glue_unpack(__pos, __msg, __ext, char);
-		}
-
-	}
-
-	{
-		*len_ptr = glue_unpack(__pos, __msg, __ext, unsigned int);
-	}
-
-	{
-		int i;
-		unsigned int* array = headers_end_ptr;
-		size_t len = glue_unpack(__pos, __msg, __ext, size_t);
-		// Warning: see David if this breaks
-		glue_user_trace("Warning: see David if this breaks");
-		for (i = 0; i < len; ++i) {
-			unsigned int* element = &array[i];
-			*element = glue_unpack(__pos, __msg, __ext, unsigned int);
-		}
-
-	}
-
-	{
-		*tail_ptr = glue_unpack(__pos, __msg, __ext, unsigned int);
-	}
-
-	{
-		*end_ptr = glue_unpack(__pos, __msg, __ext, unsigned int);
-	}
-
-	{
-		*head_ptr = glue_unpack_shadow(__pos, __msg, __ext, unsigned char*);
-		if (*head_ptr) {
-			**head_ptr = glue_unpack(__pos, __msg, __ext, unsigned char);
-		}
-
-	}
-
-	{
-		*data_ptr = glue_unpack_shadow(__pos, __msg, __ext, unsigned char*);
-		if (*data_ptr) {
-			**data_ptr = glue_unpack(__pos, __msg, __ext, unsigned char);
-		}
-
-	}
-
 }
 
-void caller_marshal_kernel__skb_clone__sk_buff_sk__io(
+void callee_marshal_kernel__skb_clone__skb__in(
 	size_t* __pos,
 	struct fipc_message* __msg,
 	struct ext_registers* __ext,
 	struct skb_clone_call_ctx const* ctx,
-	struct sock const* ptr)
+	struct sk_buff const* ptr)
 {
 	
 }
 
-void callee_unmarshal_kernel__skb_clone__sk_buff_sk__io(
+void caller_unmarshal_kernel__skb_clone__skb__in(
 	size_t* __pos,
 	const struct fipc_message* __msg,
 	const struct ext_registers* __ext,
 	struct skb_clone_call_ctx const* ctx,
-	struct sock* ptr)
+	struct sk_buff* ptr)
 {
 	
 }
 
-void callee_marshal_kernel__skb_clone__sk_buff_sk__io(
-	size_t* __pos,
-	struct fipc_message* __msg,
-	struct ext_registers* __ext,
-	struct skb_clone_call_ctx const* ctx,
-	struct sock const* ptr)
-{
-	
-}
-
-void caller_unmarshal_kernel__skb_clone__sk_buff_sk__io(
-	size_t* __pos,
-	const struct fipc_message* __msg,
-	const struct ext_registers* __ext,
-	struct skb_clone_call_ctx const* ctx,
-	struct sock* ptr)
-{
-	
-}
-
-void caller_marshal_kernel__skb_clone__sk_buff_dev__io(
-	size_t* __pos,
-	struct fipc_message* __msg,
-	struct ext_registers* __ext,
-	struct skb_clone_call_ctx const* ctx,
-	struct net_device const* ptr)
-{
-	
-}
-
-void callee_unmarshal_kernel__skb_clone__sk_buff_dev__io(
-	size_t* __pos,
-	const struct fipc_message* __msg,
-	const struct ext_registers* __ext,
-	struct skb_clone_call_ctx const* ctx,
-	struct net_device* ptr)
-{
-	
-}
-
-void callee_marshal_kernel__skb_clone__sk_buff_dev__io(
-	size_t* __pos,
-	struct fipc_message* __msg,
-	struct ext_registers* __ext,
-	struct skb_clone_call_ctx const* ctx,
-	struct net_device const* ptr)
-{
-	
-}
-
-void caller_unmarshal_kernel__skb_clone__sk_buff_dev__io(
-	size_t* __pos,
-	const struct fipc_message* __msg,
-	const struct ext_registers* __ext,
-	struct skb_clone_call_ctx const* ctx,
-	struct net_device* ptr)
-{
-	
-}
-
-void caller_marshal_kernel__sock_queue_rcv_skb__sk__io(
+void caller_marshal_kernel__sock_queue_rcv_skb__sk__in(
 	size_t* __pos,
 	struct fipc_message* __msg,
 	struct ext_registers* __ext,
@@ -2773,7 +2550,7 @@ void caller_marshal_kernel__sock_queue_rcv_skb__sk__io(
 	
 }
 
-void callee_unmarshal_kernel__sock_queue_rcv_skb__sk__io(
+void callee_unmarshal_kernel__sock_queue_rcv_skb__sk__in(
 	size_t* __pos,
 	const struct fipc_message* __msg,
 	const struct ext_registers* __ext,
@@ -2783,7 +2560,7 @@ void callee_unmarshal_kernel__sock_queue_rcv_skb__sk__io(
 	
 }
 
-void callee_marshal_kernel__sock_queue_rcv_skb__sk__io(
+void callee_marshal_kernel__sock_queue_rcv_skb__sk__in(
 	size_t* __pos,
 	struct fipc_message* __msg,
 	struct ext_registers* __ext,
@@ -2793,7 +2570,7 @@ void callee_marshal_kernel__sock_queue_rcv_skb__sk__io(
 	
 }
 
-void caller_unmarshal_kernel__sock_queue_rcv_skb__sk__io(
+void caller_unmarshal_kernel__sock_queue_rcv_skb__sk__in(
 	size_t* __pos,
 	const struct fipc_message* __msg,
 	const struct ext_registers* __ext,
@@ -2810,7 +2587,21 @@ void caller_marshal_kernel__sock_queue_rcv_skb__skb__in(
 	struct sock_queue_rcv_skb_call_ctx const* ctx,
 	struct sk_buff const* ptr)
 {
+	char const* cb_ptr = ptr->cb;
 	
+	{
+		size_t i, len = 48;
+		char const* array = cb_ptr;
+		glue_pack(__pos, __msg, __ext, len);
+		// Warning: see David if this breaks
+		glue_user_trace("Warning: see David if this breaks");
+		for (i = 0; i < len; ++i) {
+			char const* element = &array[i];
+			glue_pack(__pos, __msg, __ext, *element);
+		}
+
+	}
+
 }
 
 void callee_unmarshal_kernel__sock_queue_rcv_skb__skb__in(
@@ -2820,7 +2611,21 @@ void callee_unmarshal_kernel__sock_queue_rcv_skb__skb__in(
 	struct sock_queue_rcv_skb_call_ctx const* ctx,
 	struct sk_buff* ptr)
 {
+	char* cb_ptr = ptr->cb;
 	
+	{
+		int i;
+		char* array = cb_ptr;
+		size_t len = glue_unpack(__pos, __msg, __ext, size_t);
+		// Warning: see David if this breaks
+		glue_user_trace("Warning: see David if this breaks");
+		for (i = 0; i < len; ++i) {
+			char* element = &array[i];
+			*element = glue_unpack(__pos, __msg, __ext, char);
+		}
+
+	}
+
 }
 
 void callee_marshal_kernel__sock_queue_rcv_skb__skb__in(
@@ -3392,7 +3197,22 @@ void caller_marshal_kernel__func__skb__in(
 	struct func_call_ctx const* ctx,
 	struct sk_buff const* ptr)
 {
+	struct sock* const* sk_ptr = &ptr->sk;
+	unsigned int const* len_ptr = &ptr->len;
 	
+	{
+		__maybe_unused const void* __adjusted = *sk_ptr;
+		glue_pack(__pos, __msg, __ext, __adjusted);
+		if (*sk_ptr) {
+			caller_marshal_kernel__func__sk_buff_sk__in(__pos, __msg, __ext, ctx, *sk_ptr);
+		}
+
+	}
+
+	{
+		glue_pack(__pos, __msg, __ext, *len_ptr);
+	}
+
 }
 
 void callee_unmarshal_kernel__func__skb__in(
@@ -3402,7 +3222,21 @@ void callee_unmarshal_kernel__func__skb__in(
 	struct func_call_ctx const* ctx,
 	struct sk_buff* ptr)
 {
+	struct sock** sk_ptr = &ptr->sk;
+	unsigned int* len_ptr = &ptr->len;
 	
+	{
+		*sk_ptr = glue_unpack_shadow(__pos, __msg, __ext, struct sock*);
+		if (*sk_ptr) {
+			callee_unmarshal_kernel__func__sk_buff_sk__in(__pos, __msg, __ext, ctx, *sk_ptr);
+		}
+
+	}
+
+	{
+		*len_ptr = glue_unpack(__pos, __msg, __ext, unsigned int);
+	}
+
 }
 
 void callee_marshal_kernel__func__skb__in(
@@ -3412,7 +3246,15 @@ void callee_marshal_kernel__func__skb__in(
 	struct func_call_ctx const* ctx,
 	struct sk_buff const* ptr)
 {
+	struct sock* const* sk_ptr = &ptr->sk;
 	
+	{
+		if (*sk_ptr) {
+			callee_marshal_kernel__func__sk_buff_sk__in(__pos, __msg, __ext, ctx, *sk_ptr);
+		}
+
+	}
+
 }
 
 void caller_unmarshal_kernel__func__skb__in(
@@ -3422,10 +3264,98 @@ void caller_unmarshal_kernel__func__skb__in(
 	struct func_call_ctx const* ctx,
 	struct sk_buff* ptr)
 {
+	struct sock** sk_ptr = &ptr->sk;
+	
+	{
+		if (*sk_ptr) {
+			caller_unmarshal_kernel__func__sk_buff_sk__in(__pos, __msg, __ext, ctx, *sk_ptr);
+		}
+
+	}
+
+}
+
+void caller_marshal_kernel__func__sk_buff_sk__in(
+	size_t* __pos,
+	struct fipc_message* __msg,
+	struct ext_registers* __ext,
+	struct func_call_ctx const* ctx,
+	struct sock const* ptr)
+{
 	
 }
 
-void caller_marshal_kernel__can_rx_unregister__dev__io(
+void callee_unmarshal_kernel__func__sk_buff_sk__in(
+	size_t* __pos,
+	const struct fipc_message* __msg,
+	const struct ext_registers* __ext,
+	struct func_call_ctx const* ctx,
+	struct sock* ptr)
+{
+	
+}
+
+void callee_marshal_kernel__func__sk_buff_sk__in(
+	size_t* __pos,
+	struct fipc_message* __msg,
+	struct ext_registers* __ext,
+	struct func_call_ctx const* ctx,
+	struct sock const* ptr)
+{
+	
+}
+
+void caller_unmarshal_kernel__func__sk_buff_sk__in(
+	size_t* __pos,
+	const struct fipc_message* __msg,
+	const struct ext_registers* __ext,
+	struct func_call_ctx const* ctx,
+	struct sock* ptr)
+{
+	
+}
+
+void caller_marshal_kernel__func__sock__in(
+	size_t* __pos,
+	struct fipc_message* __msg,
+	struct ext_registers* __ext,
+	struct func_call_ctx const* ctx,
+	struct sock const* ptr)
+{
+	
+}
+
+void callee_unmarshal_kernel__func__sock__in(
+	size_t* __pos,
+	const struct fipc_message* __msg,
+	const struct ext_registers* __ext,
+	struct func_call_ctx const* ctx,
+	struct sock* ptr)
+{
+	
+}
+
+void callee_marshal_kernel__func__sock__in(
+	size_t* __pos,
+	struct fipc_message* __msg,
+	struct ext_registers* __ext,
+	struct func_call_ctx const* ctx,
+	struct sock const* ptr)
+{
+	
+}
+
+void caller_unmarshal_kernel__func__sock__in(
+	size_t* __pos,
+	const struct fipc_message* __msg,
+	const struct ext_registers* __ext,
+	struct func_call_ctx const* ctx,
+	struct sock* ptr)
+{
+	
+}
+
+void caller_marshal_kernel__can_rx_unregister__dev__in(
 	size_t* __pos,
 	struct fipc_message* __msg,
 	struct ext_registers* __ext,
@@ -3440,7 +3370,7 @@ void caller_marshal_kernel__can_rx_unregister__dev__io(
 
 }
 
-void callee_unmarshal_kernel__can_rx_unregister__dev__io(
+void callee_unmarshal_kernel__can_rx_unregister__dev__in(
 	size_t* __pos,
 	const struct fipc_message* __msg,
 	const struct ext_registers* __ext,
@@ -3455,37 +3385,27 @@ void callee_unmarshal_kernel__can_rx_unregister__dev__io(
 
 }
 
-void callee_marshal_kernel__can_rx_unregister__dev__io(
+void callee_marshal_kernel__can_rx_unregister__dev__in(
 	size_t* __pos,
 	struct fipc_message* __msg,
 	struct ext_registers* __ext,
 	struct can_rx_unregister_call_ctx const* ctx,
 	struct net_device const* ptr)
 {
-	unsigned short const* type_ptr = &ptr->type;
 	
-	{
-		glue_pack(__pos, __msg, __ext, *type_ptr);
-	}
-
 }
 
-void caller_unmarshal_kernel__can_rx_unregister__dev__io(
+void caller_unmarshal_kernel__can_rx_unregister__dev__in(
 	size_t* __pos,
 	const struct fipc_message* __msg,
 	const struct ext_registers* __ext,
 	struct can_rx_unregister_call_ctx const* ctx,
 	struct net_device* ptr)
 {
-	unsigned short* type_ptr = &ptr->type;
 	
-	{
-		*type_ptr = glue_unpack(__pos, __msg, __ext, unsigned short);
-	}
-
 }
 
-void caller_marshal_kernel__can_rx_register__dev__io(
+void caller_marshal_kernel__can_rx_register__dev__in(
 	size_t* __pos,
 	struct fipc_message* __msg,
 	struct ext_registers* __ext,
@@ -3500,7 +3420,7 @@ void caller_marshal_kernel__can_rx_register__dev__io(
 
 }
 
-void callee_unmarshal_kernel__can_rx_register__dev__io(
+void callee_unmarshal_kernel__can_rx_register__dev__in(
 	size_t* __pos,
 	const struct fipc_message* __msg,
 	const struct ext_registers* __ext,
@@ -3515,37 +3435,27 @@ void callee_unmarshal_kernel__can_rx_register__dev__io(
 
 }
 
-void callee_marshal_kernel__can_rx_register__dev__io(
+void callee_marshal_kernel__can_rx_register__dev__in(
 	size_t* __pos,
 	struct fipc_message* __msg,
 	struct ext_registers* __ext,
 	struct can_rx_register_call_ctx const* ctx,
 	struct net_device const* ptr)
 {
-	unsigned short const* type_ptr = &ptr->type;
 	
-	{
-		glue_pack(__pos, __msg, __ext, *type_ptr);
-	}
-
 }
 
-void caller_unmarshal_kernel__can_rx_register__dev__io(
+void caller_unmarshal_kernel__can_rx_register__dev__in(
 	size_t* __pos,
 	const struct fipc_message* __msg,
 	const struct ext_registers* __ext,
 	struct can_rx_register_call_ctx const* ctx,
 	struct net_device* ptr)
 {
-	unsigned short* type_ptr = &ptr->type;
 	
-	{
-		*type_ptr = glue_unpack(__pos, __msg, __ext, unsigned short);
-	}
-
 }
 
-void caller_marshal_kernel__can_send__skb__io(
+void caller_marshal_kernel__can_send__skb__in(
 	size_t* __pos,
 	struct fipc_message* __msg,
 	struct ext_registers* __ext,
@@ -3554,19 +3464,13 @@ void caller_marshal_kernel__can_send__skb__io(
 {
 	struct sock* const* sk_ptr = &ptr->sk;
 	struct net_device* const* dev_ptr = &ptr->dev;
-	char const* cb_ptr = ptr->cb;
-	unsigned int const* len_ptr = &ptr->len;
-	unsigned int const* headers_end_ptr = ptr->headers_end;
-	unsigned int const* tail_ptr = &ptr->tail;
-	unsigned int const* end_ptr = &ptr->end;
-	unsigned char* const* head_ptr = &ptr->head;
-	unsigned char* const* data_ptr = &ptr->data;
+	unsigned int const* priority_ptr = &ptr->priority;
 	
 	{
 		__maybe_unused const void* __adjusted = *sk_ptr;
 		glue_pack_shadow(__pos, __msg, __ext, __adjusted);
 		if (*sk_ptr) {
-			caller_marshal_kernel__can_send__sk_buff_sk__io(__pos, __msg, __ext, ctx, *sk_ptr);
+			caller_marshal_kernel__can_send__sk_buff_sk__in(__pos, __msg, __ext, ctx, *sk_ptr);
 		}
 
 	}
@@ -3575,70 +3479,18 @@ void caller_marshal_kernel__can_send__skb__io(
 		__maybe_unused const void* __adjusted = *dev_ptr;
 		glue_pack_shadow(__pos, __msg, __ext, __adjusted);
 		if (*dev_ptr) {
-			caller_marshal_kernel__can_send__sk_buff_dev__io(__pos, __msg, __ext, ctx, *dev_ptr);
+			caller_marshal_kernel__can_send__sk_buff_dev__in(__pos, __msg, __ext, ctx, *dev_ptr);
 		}
 
 	}
 
 	{
-		size_t i, len = 48;
-		char const* array = cb_ptr;
-		glue_pack(__pos, __msg, __ext, len);
-		// Warning: see David if this breaks
-		glue_user_trace("Warning: see David if this breaks");
-		for (i = 0; i < len; ++i) {
-			char const* element = &array[i];
-			glue_pack(__pos, __msg, __ext, *element);
-		}
-
-	}
-
-	{
-		glue_pack(__pos, __msg, __ext, *len_ptr);
-	}
-
-	{
-		size_t i, len = 0;
-		unsigned int const* array = headers_end_ptr;
-		glue_pack(__pos, __msg, __ext, len);
-		// Warning: see David if this breaks
-		glue_user_trace("Warning: see David if this breaks");
-		for (i = 0; i < len; ++i) {
-			unsigned int const* element = &array[i];
-			glue_pack(__pos, __msg, __ext, *element);
-		}
-
-	}
-
-	{
-		glue_pack(__pos, __msg, __ext, *tail_ptr);
-	}
-
-	{
-		glue_pack(__pos, __msg, __ext, *end_ptr);
-	}
-
-	{
-		__maybe_unused const void* __adjusted = *head_ptr;
-		glue_pack_shadow(__pos, __msg, __ext, __adjusted);
-		if (*head_ptr) {
-			glue_pack(__pos, __msg, __ext, **head_ptr);
-		}
-
-	}
-
-	{
-		__maybe_unused const void* __adjusted = *data_ptr;
-		glue_pack_shadow(__pos, __msg, __ext, __adjusted);
-		if (*data_ptr) {
-			glue_pack(__pos, __msg, __ext, **data_ptr);
-		}
-
+		glue_pack(__pos, __msg, __ext, *priority_ptr);
 	}
 
 }
 
-void callee_unmarshal_kernel__can_send__skb__io(
+void callee_unmarshal_kernel__can_send__skb__in(
 	size_t* __pos,
 	const struct fipc_message* __msg,
 	const struct ext_registers* __ext,
@@ -3647,87 +3499,31 @@ void callee_unmarshal_kernel__can_send__skb__io(
 {
 	struct sock** sk_ptr = &ptr->sk;
 	struct net_device** dev_ptr = &ptr->dev;
-	char* cb_ptr = ptr->cb;
-	unsigned int* len_ptr = &ptr->len;
-	unsigned int* headers_end_ptr = ptr->headers_end;
-	unsigned int* tail_ptr = &ptr->tail;
-	unsigned int* end_ptr = &ptr->end;
-	unsigned char** head_ptr = &ptr->head;
-	unsigned char** data_ptr = &ptr->data;
+	unsigned int* priority_ptr = &ptr->priority;
 	
 	{
-		*sk_ptr = glue_unpack_shadow(__pos, __msg, __ext, struct sock*);
+		*sk_ptr = glue_unpack(__pos, __msg, __ext, struct sock*);
 		if (*sk_ptr) {
-			callee_unmarshal_kernel__can_send__sk_buff_sk__io(__pos, __msg, __ext, ctx, *sk_ptr);
+			callee_unmarshal_kernel__can_send__sk_buff_sk__in(__pos, __msg, __ext, ctx, *sk_ptr);
 		}
 
 	}
 
 	{
-		*dev_ptr = glue_unpack_shadow(__pos, __msg, __ext, struct net_device*);
+		*dev_ptr = glue_unpack(__pos, __msg, __ext, struct net_device*);
 		if (*dev_ptr) {
-			callee_unmarshal_kernel__can_send__sk_buff_dev__io(__pos, __msg, __ext, ctx, *dev_ptr);
+			callee_unmarshal_kernel__can_send__sk_buff_dev__in(__pos, __msg, __ext, ctx, *dev_ptr);
 		}
 
 	}
 
 	{
-		int i;
-		char* array = cb_ptr;
-		size_t len = glue_unpack(__pos, __msg, __ext, size_t);
-		// Warning: see David if this breaks
-		glue_user_trace("Warning: see David if this breaks");
-		for (i = 0; i < len; ++i) {
-			char* element = &array[i];
-			*element = glue_unpack(__pos, __msg, __ext, char);
-		}
-
-	}
-
-	{
-		*len_ptr = glue_unpack(__pos, __msg, __ext, unsigned int);
-	}
-
-	{
-		int i;
-		unsigned int* array = headers_end_ptr;
-		size_t len = glue_unpack(__pos, __msg, __ext, size_t);
-		// Warning: see David if this breaks
-		glue_user_trace("Warning: see David if this breaks");
-		for (i = 0; i < len; ++i) {
-			unsigned int* element = &array[i];
-			*element = glue_unpack(__pos, __msg, __ext, unsigned int);
-		}
-
-	}
-
-	{
-		*tail_ptr = glue_unpack(__pos, __msg, __ext, unsigned int);
-	}
-
-	{
-		*end_ptr = glue_unpack(__pos, __msg, __ext, unsigned int);
-	}
-
-	{
-		*head_ptr = glue_unpack_shadow(__pos, __msg, __ext, unsigned char*);
-		if (*head_ptr) {
-			**head_ptr = glue_unpack(__pos, __msg, __ext, unsigned char);
-		}
-
-	}
-
-	{
-		*data_ptr = glue_unpack_shadow(__pos, __msg, __ext, unsigned char*);
-		if (*data_ptr) {
-			**data_ptr = glue_unpack(__pos, __msg, __ext, unsigned char);
-		}
-
+		*priority_ptr = glue_unpack(__pos, __msg, __ext, unsigned int);
 	}
 
 }
 
-void callee_marshal_kernel__can_send__skb__io(
+void callee_marshal_kernel__can_send__skb__in(
 	size_t* __pos,
 	struct fipc_message* __msg,
 	struct ext_registers* __ext,
@@ -3736,91 +3532,24 @@ void callee_marshal_kernel__can_send__skb__io(
 {
 	struct sock* const* sk_ptr = &ptr->sk;
 	struct net_device* const* dev_ptr = &ptr->dev;
-	char const* cb_ptr = ptr->cb;
-	unsigned int const* len_ptr = &ptr->len;
-	unsigned int const* headers_end_ptr = ptr->headers_end;
-	unsigned int const* tail_ptr = &ptr->tail;
-	unsigned int const* end_ptr = &ptr->end;
-	unsigned char* const* head_ptr = &ptr->head;
-	unsigned char* const* data_ptr = &ptr->data;
 	
 	{
-		__maybe_unused const void* __adjusted = *sk_ptr;
-		glue_pack_shadow(__pos, __msg, __ext, __adjusted);
 		if (*sk_ptr) {
-			callee_marshal_kernel__can_send__sk_buff_sk__io(__pos, __msg, __ext, ctx, *sk_ptr);
+			callee_marshal_kernel__can_send__sk_buff_sk__in(__pos, __msg, __ext, ctx, *sk_ptr);
 		}
 
 	}
 
 	{
-		__maybe_unused const void* __adjusted = *dev_ptr;
-		glue_pack_shadow(__pos, __msg, __ext, __adjusted);
 		if (*dev_ptr) {
-			callee_marshal_kernel__can_send__sk_buff_dev__io(__pos, __msg, __ext, ctx, *dev_ptr);
-		}
-
-	}
-
-	{
-		size_t i, len = 48;
-		char const* array = cb_ptr;
-		glue_pack(__pos, __msg, __ext, len);
-		// Warning: see David if this breaks
-		glue_user_trace("Warning: see David if this breaks");
-		for (i = 0; i < len; ++i) {
-			char const* element = &array[i];
-			glue_pack(__pos, __msg, __ext, *element);
-		}
-
-	}
-
-	{
-		glue_pack(__pos, __msg, __ext, *len_ptr);
-	}
-
-	{
-		size_t i, len = 0;
-		unsigned int const* array = headers_end_ptr;
-		glue_pack(__pos, __msg, __ext, len);
-		// Warning: see David if this breaks
-		glue_user_trace("Warning: see David if this breaks");
-		for (i = 0; i < len; ++i) {
-			unsigned int const* element = &array[i];
-			glue_pack(__pos, __msg, __ext, *element);
-		}
-
-	}
-
-	{
-		glue_pack(__pos, __msg, __ext, *tail_ptr);
-	}
-
-	{
-		glue_pack(__pos, __msg, __ext, *end_ptr);
-	}
-
-	{
-		__maybe_unused const void* __adjusted = *head_ptr;
-		glue_pack_shadow(__pos, __msg, __ext, __adjusted);
-		if (*head_ptr) {
-			glue_pack(__pos, __msg, __ext, **head_ptr);
-		}
-
-	}
-
-	{
-		__maybe_unused const void* __adjusted = *data_ptr;
-		glue_pack_shadow(__pos, __msg, __ext, __adjusted);
-		if (*data_ptr) {
-			glue_pack(__pos, __msg, __ext, **data_ptr);
+			callee_marshal_kernel__can_send__sk_buff_dev__in(__pos, __msg, __ext, ctx, *dev_ptr);
 		}
 
 	}
 
 }
 
-void caller_unmarshal_kernel__can_send__skb__io(
+void caller_unmarshal_kernel__can_send__skb__in(
 	size_t* __pos,
 	const struct fipc_message* __msg,
 	const struct ext_registers* __ext,
@@ -3829,87 +3558,24 @@ void caller_unmarshal_kernel__can_send__skb__io(
 {
 	struct sock** sk_ptr = &ptr->sk;
 	struct net_device** dev_ptr = &ptr->dev;
-	char* cb_ptr = ptr->cb;
-	unsigned int* len_ptr = &ptr->len;
-	unsigned int* headers_end_ptr = ptr->headers_end;
-	unsigned int* tail_ptr = &ptr->tail;
-	unsigned int* end_ptr = &ptr->end;
-	unsigned char** head_ptr = &ptr->head;
-	unsigned char** data_ptr = &ptr->data;
 	
 	{
-		*sk_ptr = glue_unpack_shadow(__pos, __msg, __ext, struct sock*);
 		if (*sk_ptr) {
-			caller_unmarshal_kernel__can_send__sk_buff_sk__io(__pos, __msg, __ext, ctx, *sk_ptr);
+			caller_unmarshal_kernel__can_send__sk_buff_sk__in(__pos, __msg, __ext, ctx, *sk_ptr);
 		}
 
 	}
 
 	{
-		*dev_ptr = glue_unpack_shadow(__pos, __msg, __ext, struct net_device*);
 		if (*dev_ptr) {
-			caller_unmarshal_kernel__can_send__sk_buff_dev__io(__pos, __msg, __ext, ctx, *dev_ptr);
-		}
-
-	}
-
-	{
-		int i;
-		char* array = cb_ptr;
-		size_t len = glue_unpack(__pos, __msg, __ext, size_t);
-		// Warning: see David if this breaks
-		glue_user_trace("Warning: see David if this breaks");
-		for (i = 0; i < len; ++i) {
-			char* element = &array[i];
-			*element = glue_unpack(__pos, __msg, __ext, char);
-		}
-
-	}
-
-	{
-		*len_ptr = glue_unpack(__pos, __msg, __ext, unsigned int);
-	}
-
-	{
-		int i;
-		unsigned int* array = headers_end_ptr;
-		size_t len = glue_unpack(__pos, __msg, __ext, size_t);
-		// Warning: see David if this breaks
-		glue_user_trace("Warning: see David if this breaks");
-		for (i = 0; i < len; ++i) {
-			unsigned int* element = &array[i];
-			*element = glue_unpack(__pos, __msg, __ext, unsigned int);
-		}
-
-	}
-
-	{
-		*tail_ptr = glue_unpack(__pos, __msg, __ext, unsigned int);
-	}
-
-	{
-		*end_ptr = glue_unpack(__pos, __msg, __ext, unsigned int);
-	}
-
-	{
-		*head_ptr = glue_unpack_shadow(__pos, __msg, __ext, unsigned char*);
-		if (*head_ptr) {
-			**head_ptr = glue_unpack(__pos, __msg, __ext, unsigned char);
-		}
-
-	}
-
-	{
-		*data_ptr = glue_unpack_shadow(__pos, __msg, __ext, unsigned char*);
-		if (*data_ptr) {
-			**data_ptr = glue_unpack(__pos, __msg, __ext, unsigned char);
+			caller_unmarshal_kernel__can_send__sk_buff_dev__in(__pos, __msg, __ext, ctx, *dev_ptr);
 		}
 
 	}
 
 }
 
-void caller_marshal_kernel__can_send__sk_buff_sk__io(
+void caller_marshal_kernel__can_send__sk_buff_sk__in(
 	size_t* __pos,
 	struct fipc_message* __msg,
 	struct ext_registers* __ext,
@@ -3919,7 +3585,7 @@ void caller_marshal_kernel__can_send__sk_buff_sk__io(
 	
 }
 
-void callee_unmarshal_kernel__can_send__sk_buff_sk__io(
+void callee_unmarshal_kernel__can_send__sk_buff_sk__in(
 	size_t* __pos,
 	const struct fipc_message* __msg,
 	const struct ext_registers* __ext,
@@ -3929,7 +3595,7 @@ void callee_unmarshal_kernel__can_send__sk_buff_sk__io(
 	
 }
 
-void callee_marshal_kernel__can_send__sk_buff_sk__io(
+void callee_marshal_kernel__can_send__sk_buff_sk__in(
 	size_t* __pos,
 	struct fipc_message* __msg,
 	struct ext_registers* __ext,
@@ -3939,7 +3605,7 @@ void callee_marshal_kernel__can_send__sk_buff_sk__io(
 	
 }
 
-void caller_unmarshal_kernel__can_send__sk_buff_sk__io(
+void caller_unmarshal_kernel__can_send__sk_buff_sk__in(
 	size_t* __pos,
 	const struct fipc_message* __msg,
 	const struct ext_registers* __ext,
@@ -3949,7 +3615,7 @@ void caller_unmarshal_kernel__can_send__sk_buff_sk__io(
 	
 }
 
-void caller_marshal_kernel__can_send__sk_buff_dev__io(
+void caller_marshal_kernel__can_send__sk_buff_dev__in(
 	size_t* __pos,
 	struct fipc_message* __msg,
 	struct ext_registers* __ext,
@@ -3964,7 +3630,7 @@ void caller_marshal_kernel__can_send__sk_buff_dev__io(
 
 }
 
-void callee_unmarshal_kernel__can_send__sk_buff_dev__io(
+void callee_unmarshal_kernel__can_send__sk_buff_dev__in(
 	size_t* __pos,
 	const struct fipc_message* __msg,
 	const struct ext_registers* __ext,
@@ -3979,34 +3645,24 @@ void callee_unmarshal_kernel__can_send__sk_buff_dev__io(
 
 }
 
-void callee_marshal_kernel__can_send__sk_buff_dev__io(
+void callee_marshal_kernel__can_send__sk_buff_dev__in(
 	size_t* __pos,
 	struct fipc_message* __msg,
 	struct ext_registers* __ext,
 	struct can_send_call_ctx const* ctx,
 	struct net_device const* ptr)
 {
-	unsigned short const* type_ptr = &ptr->type;
 	
-	{
-		glue_pack(__pos, __msg, __ext, *type_ptr);
-	}
-
 }
 
-void caller_unmarshal_kernel__can_send__sk_buff_dev__io(
+void caller_unmarshal_kernel__can_send__sk_buff_dev__in(
 	size_t* __pos,
 	const struct fipc_message* __msg,
 	const struct ext_registers* __ext,
 	struct can_send_call_ctx const* ctx,
 	struct net_device* ptr)
 {
-	unsigned short* type_ptr = &ptr->type;
 	
-	{
-		*type_ptr = glue_unpack(__pos, __msg, __ext, unsigned short);
-	}
-
 }
 
 void caller_marshal_kernel__proto_ops_ioctl__sock__in(
@@ -4016,17 +3672,7 @@ void caller_marshal_kernel__proto_ops_ioctl__sock__in(
 	struct proto_ops_ioctl_call_ctx const* ctx,
 	struct socket const* ptr)
 {
-	struct sock* const* sk_ptr = &ptr->sk;
 	
-	{
-		__maybe_unused const void* __adjusted = *sk_ptr;
-		glue_pack_shadow(__pos, __msg, __ext, __adjusted);
-		if (*sk_ptr) {
-			caller_marshal_kernel__proto_ops_ioctl__socket_sk__in(__pos, __msg, __ext, ctx, *sk_ptr);
-		}
-
-	}
-
 }
 
 void callee_unmarshal_kernel__proto_ops_ioctl__sock__in(
@@ -4036,16 +3682,7 @@ void callee_unmarshal_kernel__proto_ops_ioctl__sock__in(
 	struct proto_ops_ioctl_call_ctx const* ctx,
 	struct socket* ptr)
 {
-	struct sock** sk_ptr = &ptr->sk;
 	
-	{
-		*sk_ptr = glue_unpack(__pos, __msg, __ext, struct sock*);
-		if (*sk_ptr) {
-			callee_unmarshal_kernel__proto_ops_ioctl__socket_sk__in(__pos, __msg, __ext, ctx, *sk_ptr);
-		}
-
-	}
-
 }
 
 void callee_marshal_kernel__proto_ops_ioctl__sock__in(
@@ -4055,15 +3692,7 @@ void callee_marshal_kernel__proto_ops_ioctl__sock__in(
 	struct proto_ops_ioctl_call_ctx const* ctx,
 	struct socket const* ptr)
 {
-	struct sock* const* sk_ptr = &ptr->sk;
 	
-	{
-		if (*sk_ptr) {
-			callee_marshal_kernel__proto_ops_ioctl__socket_sk__in(__pos, __msg, __ext, ctx, *sk_ptr);
-		}
-
-	}
-
 }
 
 void caller_unmarshal_kernel__proto_ops_ioctl__sock__in(
@@ -4072,94 +3701,6 @@ void caller_unmarshal_kernel__proto_ops_ioctl__sock__in(
 	const struct ext_registers* __ext,
 	struct proto_ops_ioctl_call_ctx const* ctx,
 	struct socket* ptr)
-{
-	struct sock** sk_ptr = &ptr->sk;
-	
-	{
-		if (*sk_ptr) {
-			caller_unmarshal_kernel__proto_ops_ioctl__socket_sk__in(__pos, __msg, __ext, ctx, *sk_ptr);
-		}
-
-	}
-
-}
-
-void caller_marshal_kernel__proto_ops_ioctl__socket_sk__in(
-	size_t* __pos,
-	struct fipc_message* __msg,
-	struct ext_registers* __ext,
-	struct proto_ops_ioctl_call_ctx const* ctx,
-	struct sock const* ptr)
-{
-	
-}
-
-void callee_unmarshal_kernel__proto_ops_ioctl__socket_sk__in(
-	size_t* __pos,
-	const struct fipc_message* __msg,
-	const struct ext_registers* __ext,
-	struct proto_ops_ioctl_call_ctx const* ctx,
-	struct sock* ptr)
-{
-	
-}
-
-void callee_marshal_kernel__proto_ops_ioctl__socket_sk__in(
-	size_t* __pos,
-	struct fipc_message* __msg,
-	struct ext_registers* __ext,
-	struct proto_ops_ioctl_call_ctx const* ctx,
-	struct sock const* ptr)
-{
-	
-}
-
-void caller_unmarshal_kernel__proto_ops_ioctl__socket_sk__in(
-	size_t* __pos,
-	const struct fipc_message* __msg,
-	const struct ext_registers* __ext,
-	struct proto_ops_ioctl_call_ctx const* ctx,
-	struct sock* ptr)
-{
-	
-}
-
-void caller_marshal_kernel__copy_from_iter__i__in(
-	size_t* __pos,
-	struct fipc_message* __msg,
-	struct ext_registers* __ext,
-	struct copy_from_iter_call_ctx const* ctx,
-	struct iov_iter const* ptr)
-{
-	
-}
-
-void callee_unmarshal_kernel__copy_from_iter__i__in(
-	size_t* __pos,
-	const struct fipc_message* __msg,
-	const struct ext_registers* __ext,
-	struct copy_from_iter_call_ctx const* ctx,
-	struct iov_iter* ptr)
-{
-	
-}
-
-void callee_marshal_kernel__copy_from_iter__i__in(
-	size_t* __pos,
-	struct fipc_message* __msg,
-	struct ext_registers* __ext,
-	struct copy_from_iter_call_ctx const* ctx,
-	struct iov_iter const* ptr)
-{
-	
-}
-
-void caller_unmarshal_kernel__copy_from_iter__i__in(
-	size_t* __pos,
-	const struct fipc_message* __msg,
-	const struct ext_registers* __ext,
-	struct copy_from_iter_call_ctx const* ctx,
-	struct iov_iter* ptr)
 {
 	
 }
@@ -4211,17 +3752,7 @@ void caller_marshal_kernel__proto_ops_poll__sock__in(
 	struct proto_ops_poll_call_ctx const* ctx,
 	struct socket const* ptr)
 {
-	struct sock* const* sk_ptr = &ptr->sk;
 	
-	{
-		__maybe_unused const void* __adjusted = *sk_ptr;
-		glue_pack_shadow(__pos, __msg, __ext, __adjusted);
-		if (*sk_ptr) {
-			caller_marshal_kernel__proto_ops_poll__socket_sk__in(__pos, __msg, __ext, ctx, *sk_ptr);
-		}
-
-	}
-
 }
 
 void callee_unmarshal_kernel__proto_ops_poll__sock__in(
@@ -4231,16 +3762,7 @@ void callee_unmarshal_kernel__proto_ops_poll__sock__in(
 	struct proto_ops_poll_call_ctx const* ctx,
 	struct socket* ptr)
 {
-	struct sock** sk_ptr = &ptr->sk;
 	
-	{
-		*sk_ptr = glue_unpack(__pos, __msg, __ext, struct sock*);
-		if (*sk_ptr) {
-			callee_unmarshal_kernel__proto_ops_poll__socket_sk__in(__pos, __msg, __ext, ctx, *sk_ptr);
-		}
-
-	}
-
 }
 
 void callee_marshal_kernel__proto_ops_poll__sock__in(
@@ -4250,15 +3772,7 @@ void callee_marshal_kernel__proto_ops_poll__sock__in(
 	struct proto_ops_poll_call_ctx const* ctx,
 	struct socket const* ptr)
 {
-	struct sock* const* sk_ptr = &ptr->sk;
 	
-	{
-		if (*sk_ptr) {
-			callee_marshal_kernel__proto_ops_poll__socket_sk__in(__pos, __msg, __ext, ctx, *sk_ptr);
-		}
-
-	}
-
 }
 
 void caller_unmarshal_kernel__proto_ops_poll__sock__in(
@@ -4267,54 +3781,6 @@ void caller_unmarshal_kernel__proto_ops_poll__sock__in(
 	const struct ext_registers* __ext,
 	struct proto_ops_poll_call_ctx const* ctx,
 	struct socket* ptr)
-{
-	struct sock** sk_ptr = &ptr->sk;
-	
-	{
-		if (*sk_ptr) {
-			caller_unmarshal_kernel__proto_ops_poll__socket_sk__in(__pos, __msg, __ext, ctx, *sk_ptr);
-		}
-
-	}
-
-}
-
-void caller_marshal_kernel__proto_ops_poll__socket_sk__in(
-	size_t* __pos,
-	struct fipc_message* __msg,
-	struct ext_registers* __ext,
-	struct proto_ops_poll_call_ctx const* ctx,
-	struct sock const* ptr)
-{
-	
-}
-
-void callee_unmarshal_kernel__proto_ops_poll__socket_sk__in(
-	size_t* __pos,
-	const struct fipc_message* __msg,
-	const struct ext_registers* __ext,
-	struct proto_ops_poll_call_ctx const* ctx,
-	struct sock* ptr)
-{
-	
-}
-
-void callee_marshal_kernel__proto_ops_poll__socket_sk__in(
-	size_t* __pos,
-	struct fipc_message* __msg,
-	struct ext_registers* __ext,
-	struct proto_ops_poll_call_ctx const* ctx,
-	struct sock const* ptr)
-{
-	
-}
-
-void caller_unmarshal_kernel__proto_ops_poll__socket_sk__in(
-	size_t* __pos,
-	const struct fipc_message* __msg,
-	const struct ext_registers* __ext,
-	struct proto_ops_poll_call_ctx const* ctx,
-	struct sock* ptr)
 {
 	
 }
@@ -4822,7 +4288,12 @@ void caller_marshal_kernel____sock_recv_ts_and_drops__sk__in(
 	struct __sock_recv_ts_and_drops_call_ctx const* ctx,
 	struct sock const* ptr)
 {
+	unsigned long const* sk_flags_ptr = &ptr->sk_flags;
 	
+	{
+		glue_pack(__pos, __msg, __ext, *sk_flags_ptr);
+	}
+
 }
 
 void callee_unmarshal_kernel____sock_recv_ts_and_drops__sk__in(
@@ -4832,7 +4303,12 @@ void callee_unmarshal_kernel____sock_recv_ts_and_drops__sk__in(
 	struct __sock_recv_ts_and_drops_call_ctx const* ctx,
 	struct sock* ptr)
 {
+	unsigned long* sk_flags_ptr = &ptr->sk_flags;
 	
+	{
+		*sk_flags_ptr = glue_unpack(__pos, __msg, __ext, unsigned long);
+	}
+
 }
 
 void callee_marshal_kernel____sock_recv_ts_and_drops__sk__in(
@@ -4882,7 +4358,12 @@ void callee_marshal_kernel____sock_recv_ts_and_drops__skb__in(
 	struct __sock_recv_ts_and_drops_call_ctx const* ctx,
 	struct sk_buff const* ptr)
 {
+	unsigned int const* priority_ptr = &ptr->priority;
 	
+	{
+		glue_pack(__pos, __msg, __ext, *priority_ptr);
+	}
+
 }
 
 void caller_unmarshal_kernel____sock_recv_ts_and_drops__skb__in(
@@ -4892,7 +4373,12 @@ void caller_unmarshal_kernel____sock_recv_ts_and_drops__skb__in(
 	struct __sock_recv_ts_and_drops_call_ctx const* ctx,
 	struct sk_buff* ptr)
 {
+	unsigned int* priority_ptr = &ptr->priority;
 	
+	{
+		*priority_ptr = glue_unpack(__pos, __msg, __ext, unsigned int);
+	}
+
 }
 
 void caller_marshal_kernel__skb_put__skb__in(
@@ -4902,64 +4388,15 @@ void caller_marshal_kernel__skb_put__skb__in(
 	struct skb_put_call_ctx const* ctx,
 	struct sk_buff const* ptr)
 {
-	struct net_device* const* dev_ptr = &ptr->dev;
-	unsigned int const* len_ptr = &ptr->len;
-	unsigned int const* headers_end_ptr = ptr->headers_end;
 	unsigned int const* tail_ptr = &ptr->tail;
 	unsigned int const* end_ptr = &ptr->end;
-	unsigned char* const* head_ptr = &ptr->head;
-	unsigned char* const* data_ptr = &ptr->data;
 	
-	{
-		__maybe_unused const void* __adjusted = *dev_ptr;
-		glue_pack_shadow(__pos, __msg, __ext, __adjusted);
-		if (*dev_ptr) {
-			caller_marshal_kernel__skb_put__sk_buff_dev__in(__pos, __msg, __ext, ctx, *dev_ptr);
-		}
-
-	}
-
-	{
-		glue_pack(__pos, __msg, __ext, *len_ptr);
-	}
-
-	{
-		size_t i, len = 0;
-		unsigned int const* array = headers_end_ptr;
-		glue_pack(__pos, __msg, __ext, len);
-		// Warning: see David if this breaks
-		glue_user_trace("Warning: see David if this breaks");
-		for (i = 0; i < len; ++i) {
-			unsigned int const* element = &array[i];
-			glue_pack(__pos, __msg, __ext, *element);
-		}
-
-	}
-
 	{
 		glue_pack(__pos, __msg, __ext, *tail_ptr);
 	}
 
 	{
 		glue_pack(__pos, __msg, __ext, *end_ptr);
-	}
-
-	{
-		__maybe_unused const void* __adjusted = *head_ptr;
-		glue_pack_shadow(__pos, __msg, __ext, __adjusted);
-		if (*head_ptr) {
-			glue_pack(__pos, __msg, __ext, **head_ptr);
-		}
-
-	}
-
-	{
-		__maybe_unused const void* __adjusted = *data_ptr;
-		glue_pack_shadow(__pos, __msg, __ext, __adjusted);
-		if (*data_ptr) {
-			glue_pack(__pos, __msg, __ext, **data_ptr);
-		}
-
 	}
 
 }
@@ -4971,61 +4408,15 @@ void callee_unmarshal_kernel__skb_put__skb__in(
 	struct skb_put_call_ctx const* ctx,
 	struct sk_buff* ptr)
 {
-	struct net_device** dev_ptr = &ptr->dev;
-	unsigned int* len_ptr = &ptr->len;
-	unsigned int* headers_end_ptr = ptr->headers_end;
 	unsigned int* tail_ptr = &ptr->tail;
 	unsigned int* end_ptr = &ptr->end;
-	unsigned char** head_ptr = &ptr->head;
-	unsigned char** data_ptr = &ptr->data;
 	
-	{
-		*dev_ptr = glue_unpack(__pos, __msg, __ext, struct net_device*);
-		if (*dev_ptr) {
-			callee_unmarshal_kernel__skb_put__sk_buff_dev__in(__pos, __msg, __ext, ctx, *dev_ptr);
-		}
-
-	}
-
-	{
-		*len_ptr = glue_unpack(__pos, __msg, __ext, unsigned int);
-	}
-
-	{
-		int i;
-		unsigned int* array = headers_end_ptr;
-		size_t len = glue_unpack(__pos, __msg, __ext, size_t);
-		// Warning: see David if this breaks
-		glue_user_trace("Warning: see David if this breaks");
-		for (i = 0; i < len; ++i) {
-			unsigned int* element = &array[i];
-			*element = glue_unpack(__pos, __msg, __ext, unsigned int);
-		}
-
-	}
-
 	{
 		*tail_ptr = glue_unpack(__pos, __msg, __ext, unsigned int);
 	}
 
 	{
 		*end_ptr = glue_unpack(__pos, __msg, __ext, unsigned int);
-	}
-
-	{
-		*head_ptr = glue_unpack(__pos, __msg, __ext, unsigned char*);
-		if (*head_ptr) {
-			**head_ptr = glue_unpack(__pos, __msg, __ext, unsigned char);
-		}
-
-	}
-
-	{
-		*data_ptr = glue_unpack(__pos, __msg, __ext, unsigned char*);
-		if (*data_ptr) {
-			**data_ptr = glue_unpack(__pos, __msg, __ext, unsigned char);
-		}
-
 	}
 
 }
@@ -5037,47 +4428,15 @@ void callee_marshal_kernel__skb_put__skb__in(
 	struct skb_put_call_ctx const* ctx,
 	struct sk_buff const* ptr)
 {
-	struct net_device* const* dev_ptr = &ptr->dev;
-	unsigned int const* len_ptr = &ptr->len;
-	unsigned int const* headers_end_ptr = ptr->headers_end;
 	unsigned int const* tail_ptr = &ptr->tail;
-	unsigned char* const* head_ptr = &ptr->head;
-	unsigned char* const* data_ptr = &ptr->data;
+	unsigned int const* end_ptr = &ptr->end;
 	
-	{
-		if (*dev_ptr) {
-			callee_marshal_kernel__skb_put__sk_buff_dev__in(__pos, __msg, __ext, ctx, *dev_ptr);
-		}
-
-	}
-
-	{
-		glue_pack(__pos, __msg, __ext, *len_ptr);
-	}
-
-	{
-		size_t i, len = 0;
-		unsigned int const* array = headers_end_ptr;
-		glue_pack(__pos, __msg, __ext, len);
-		// Warning: see David if this breaks
-		glue_user_trace("Warning: see David if this breaks");
-		for (i = 0; i < len; ++i) {
-			unsigned int const* element = &array[i];
-			glue_pack(__pos, __msg, __ext, *element);
-		}
-
-	}
-
 	{
 		glue_pack(__pos, __msg, __ext, *tail_ptr);
 	}
 
 	{
-		(void)head_ptr;
-	}
-
-	{
-		(void)data_ptr;
+		glue_pack(__pos, __msg, __ext, *end_ptr);
 	}
 
 }
@@ -5089,127 +4448,575 @@ void caller_unmarshal_kernel__skb_put__skb__in(
 	struct skb_put_call_ctx const* ctx,
 	struct sk_buff* ptr)
 {
-	struct net_device** dev_ptr = &ptr->dev;
-	unsigned int* len_ptr = &ptr->len;
-	unsigned int* headers_end_ptr = ptr->headers_end;
 	unsigned int* tail_ptr = &ptr->tail;
-	unsigned char** head_ptr = &ptr->head;
-	unsigned char** data_ptr = &ptr->data;
+	unsigned int* end_ptr = &ptr->end;
 	
-	{
-		if (*dev_ptr) {
-			caller_unmarshal_kernel__skb_put__sk_buff_dev__in(__pos, __msg, __ext, ctx, *dev_ptr);
-		}
-
-	}
-
-	{
-		*len_ptr = glue_unpack(__pos, __msg, __ext, unsigned int);
-	}
-
-	{
-		int i;
-		unsigned int* array = headers_end_ptr;
-		size_t len = glue_unpack(__pos, __msg, __ext, size_t);
-		// Warning: see David if this breaks
-		glue_user_trace("Warning: see David if this breaks");
-		for (i = 0; i < len; ++i) {
-			unsigned int* element = &array[i];
-			*element = glue_unpack(__pos, __msg, __ext, unsigned int);
-		}
-
-	}
-
 	{
 		*tail_ptr = glue_unpack(__pos, __msg, __ext, unsigned int);
 	}
 
 	{
-		(void)head_ptr;
-	}
-
-	{
-		(void)data_ptr;
+		*end_ptr = glue_unpack(__pos, __msg, __ext, unsigned int);
 	}
 
 }
 
-void caller_marshal_kernel__skb_put__sk_buff_dev__in(
+void caller_marshal_kernel__lvd_sock_put__sk__in(
 	size_t* __pos,
 	struct fipc_message* __msg,
 	struct ext_registers* __ext,
-	struct skb_put_call_ctx const* ctx,
-	struct net_device const* ptr)
-{
-	
-}
-
-void callee_unmarshal_kernel__skb_put__sk_buff_dev__in(
-	size_t* __pos,
-	const struct fipc_message* __msg,
-	const struct ext_registers* __ext,
-	struct skb_put_call_ctx const* ctx,
-	struct net_device* ptr)
-{
-	
-}
-
-void callee_marshal_kernel__skb_put__sk_buff_dev__in(
-	size_t* __pos,
-	struct fipc_message* __msg,
-	struct ext_registers* __ext,
-	struct skb_put_call_ctx const* ctx,
-	struct net_device const* ptr)
-{
-	
-}
-
-void caller_unmarshal_kernel__skb_put__sk_buff_dev__in(
-	size_t* __pos,
-	const struct fipc_message* __msg,
-	const struct ext_registers* __ext,
-	struct skb_put_call_ctx const* ctx,
-	struct net_device* ptr)
-{
-	
-}
-
-void caller_marshal_kernel__sk_free__sk__io(
-	size_t* __pos,
-	struct fipc_message* __msg,
-	struct ext_registers* __ext,
-	struct sk_free_call_ctx const* ctx,
+	struct lvd_sock_put_call_ctx const* ctx,
 	struct sock const* ptr)
 {
 	
 }
 
-void callee_unmarshal_kernel__sk_free__sk__io(
+void callee_unmarshal_kernel__lvd_sock_put__sk__in(
 	size_t* __pos,
 	const struct fipc_message* __msg,
 	const struct ext_registers* __ext,
-	struct sk_free_call_ctx const* ctx,
+	struct lvd_sock_put_call_ctx const* ctx,
 	struct sock* ptr)
 {
 	
 }
 
-void callee_marshal_kernel__sk_free__sk__io(
+void callee_marshal_kernel__lvd_sock_put__sk__in(
 	size_t* __pos,
 	struct fipc_message* __msg,
 	struct ext_registers* __ext,
-	struct sk_free_call_ctx const* ctx,
+	struct lvd_sock_put_call_ctx const* ctx,
 	struct sock const* ptr)
 {
 	
 }
 
-void caller_unmarshal_kernel__sk_free__sk__io(
+void caller_unmarshal_kernel__lvd_sock_put__sk__in(
 	size_t* __pos,
 	const struct fipc_message* __msg,
 	const struct ext_registers* __ext,
-	struct sk_free_call_ctx const* ctx,
+	struct lvd_sock_put_call_ctx const* ctx,
 	struct sock* ptr)
+{
+	
+}
+
+void caller_marshal_kernel__sock_no_mmap__file__in(
+	size_t* __pos,
+	struct fipc_message* __msg,
+	struct ext_registers* __ext,
+	struct sock_no_mmap_call_ctx const* ctx,
+	struct file const* ptr)
+{
+	
+}
+
+void callee_unmarshal_kernel__sock_no_mmap__file__in(
+	size_t* __pos,
+	const struct fipc_message* __msg,
+	const struct ext_registers* __ext,
+	struct sock_no_mmap_call_ctx const* ctx,
+	struct file* ptr)
+{
+	
+}
+
+void callee_marshal_kernel__sock_no_mmap__file__in(
+	size_t* __pos,
+	struct fipc_message* __msg,
+	struct ext_registers* __ext,
+	struct sock_no_mmap_call_ctx const* ctx,
+	struct file const* ptr)
+{
+	
+}
+
+void caller_unmarshal_kernel__sock_no_mmap__file__in(
+	size_t* __pos,
+	const struct fipc_message* __msg,
+	const struct ext_registers* __ext,
+	struct sock_no_mmap_call_ctx const* ctx,
+	struct file* ptr)
+{
+	
+}
+
+void caller_marshal_kernel__sock_no_mmap__sock__in(
+	size_t* __pos,
+	struct fipc_message* __msg,
+	struct ext_registers* __ext,
+	struct sock_no_mmap_call_ctx const* ctx,
+	struct socket const* ptr)
+{
+	
+}
+
+void callee_unmarshal_kernel__sock_no_mmap__sock__in(
+	size_t* __pos,
+	const struct fipc_message* __msg,
+	const struct ext_registers* __ext,
+	struct sock_no_mmap_call_ctx const* ctx,
+	struct socket* ptr)
+{
+	
+}
+
+void callee_marshal_kernel__sock_no_mmap__sock__in(
+	size_t* __pos,
+	struct fipc_message* __msg,
+	struct ext_registers* __ext,
+	struct sock_no_mmap_call_ctx const* ctx,
+	struct socket const* ptr)
+{
+	
+}
+
+void caller_unmarshal_kernel__sock_no_mmap__sock__in(
+	size_t* __pos,
+	const struct fipc_message* __msg,
+	const struct ext_registers* __ext,
+	struct sock_no_mmap_call_ctx const* ctx,
+	struct socket* ptr)
+{
+	
+}
+
+void caller_marshal_kernel__sock_no_mmap__vma__in(
+	size_t* __pos,
+	struct fipc_message* __msg,
+	struct ext_registers* __ext,
+	struct sock_no_mmap_call_ctx const* ctx,
+	struct vm_area_struct const* ptr)
+{
+	
+}
+
+void callee_unmarshal_kernel__sock_no_mmap__vma__in(
+	size_t* __pos,
+	const struct fipc_message* __msg,
+	const struct ext_registers* __ext,
+	struct sock_no_mmap_call_ctx const* ctx,
+	struct vm_area_struct* ptr)
+{
+	
+}
+
+void callee_marshal_kernel__sock_no_mmap__vma__in(
+	size_t* __pos,
+	struct fipc_message* __msg,
+	struct ext_registers* __ext,
+	struct sock_no_mmap_call_ctx const* ctx,
+	struct vm_area_struct const* ptr)
+{
+	
+}
+
+void caller_unmarshal_kernel__sock_no_mmap__vma__in(
+	size_t* __pos,
+	const struct fipc_message* __msg,
+	const struct ext_registers* __ext,
+	struct sock_no_mmap_call_ctx const* ctx,
+	struct vm_area_struct* ptr)
+{
+	
+}
+
+void caller_marshal_kernel__sock_no_shutdown__sock__in(
+	size_t* __pos,
+	struct fipc_message* __msg,
+	struct ext_registers* __ext,
+	struct sock_no_shutdown_call_ctx const* ctx,
+	struct socket const* ptr)
+{
+	
+}
+
+void callee_unmarshal_kernel__sock_no_shutdown__sock__in(
+	size_t* __pos,
+	const struct fipc_message* __msg,
+	const struct ext_registers* __ext,
+	struct sock_no_shutdown_call_ctx const* ctx,
+	struct socket* ptr)
+{
+	
+}
+
+void callee_marshal_kernel__sock_no_shutdown__sock__in(
+	size_t* __pos,
+	struct fipc_message* __msg,
+	struct ext_registers* __ext,
+	struct sock_no_shutdown_call_ctx const* ctx,
+	struct socket const* ptr)
+{
+	
+}
+
+void caller_unmarshal_kernel__sock_no_shutdown__sock__in(
+	size_t* __pos,
+	const struct fipc_message* __msg,
+	const struct ext_registers* __ext,
+	struct sock_no_shutdown_call_ctx const* ctx,
+	struct socket* ptr)
+{
+	
+}
+
+void caller_marshal_kernel__sock_no_listen__sock__in(
+	size_t* __pos,
+	struct fipc_message* __msg,
+	struct ext_registers* __ext,
+	struct sock_no_listen_call_ctx const* ctx,
+	struct socket const* ptr)
+{
+	
+}
+
+void callee_unmarshal_kernel__sock_no_listen__sock__in(
+	size_t* __pos,
+	const struct fipc_message* __msg,
+	const struct ext_registers* __ext,
+	struct sock_no_listen_call_ctx const* ctx,
+	struct socket* ptr)
+{
+	
+}
+
+void callee_marshal_kernel__sock_no_listen__sock__in(
+	size_t* __pos,
+	struct fipc_message* __msg,
+	struct ext_registers* __ext,
+	struct sock_no_listen_call_ctx const* ctx,
+	struct socket const* ptr)
+{
+	
+}
+
+void caller_unmarshal_kernel__sock_no_listen__sock__in(
+	size_t* __pos,
+	const struct fipc_message* __msg,
+	const struct ext_registers* __ext,
+	struct sock_no_listen_call_ctx const* ctx,
+	struct socket* ptr)
+{
+	
+}
+
+void caller_marshal_kernel__sock_no_accept__sock__in(
+	size_t* __pos,
+	struct fipc_message* __msg,
+	struct ext_registers* __ext,
+	struct sock_no_accept_call_ctx const* ctx,
+	struct socket const* ptr)
+{
+	
+}
+
+void callee_unmarshal_kernel__sock_no_accept__sock__in(
+	size_t* __pos,
+	const struct fipc_message* __msg,
+	const struct ext_registers* __ext,
+	struct sock_no_accept_call_ctx const* ctx,
+	struct socket* ptr)
+{
+	
+}
+
+void callee_marshal_kernel__sock_no_accept__sock__in(
+	size_t* __pos,
+	struct fipc_message* __msg,
+	struct ext_registers* __ext,
+	struct sock_no_accept_call_ctx const* ctx,
+	struct socket const* ptr)
+{
+	
+}
+
+void caller_unmarshal_kernel__sock_no_accept__sock__in(
+	size_t* __pos,
+	const struct fipc_message* __msg,
+	const struct ext_registers* __ext,
+	struct sock_no_accept_call_ctx const* ctx,
+	struct socket* ptr)
+{
+	
+}
+
+void caller_marshal_kernel__sock_no_accept__newsock__in(
+	size_t* __pos,
+	struct fipc_message* __msg,
+	struct ext_registers* __ext,
+	struct sock_no_accept_call_ctx const* ctx,
+	struct socket const* ptr)
+{
+	
+}
+
+void callee_unmarshal_kernel__sock_no_accept__newsock__in(
+	size_t* __pos,
+	const struct fipc_message* __msg,
+	const struct ext_registers* __ext,
+	struct sock_no_accept_call_ctx const* ctx,
+	struct socket* ptr)
+{
+	
+}
+
+void callee_marshal_kernel__sock_no_accept__newsock__in(
+	size_t* __pos,
+	struct fipc_message* __msg,
+	struct ext_registers* __ext,
+	struct sock_no_accept_call_ctx const* ctx,
+	struct socket const* ptr)
+{
+	
+}
+
+void caller_unmarshal_kernel__sock_no_accept__newsock__in(
+	size_t* __pos,
+	const struct fipc_message* __msg,
+	const struct ext_registers* __ext,
+	struct sock_no_accept_call_ctx const* ctx,
+	struct socket* ptr)
+{
+	
+}
+
+void caller_marshal_kernel__sock_no_socketpair__sock1__in(
+	size_t* __pos,
+	struct fipc_message* __msg,
+	struct ext_registers* __ext,
+	struct sock_no_socketpair_call_ctx const* ctx,
+	struct socket const* ptr)
+{
+	
+}
+
+void callee_unmarshal_kernel__sock_no_socketpair__sock1__in(
+	size_t* __pos,
+	const struct fipc_message* __msg,
+	const struct ext_registers* __ext,
+	struct sock_no_socketpair_call_ctx const* ctx,
+	struct socket* ptr)
+{
+	
+}
+
+void callee_marshal_kernel__sock_no_socketpair__sock1__in(
+	size_t* __pos,
+	struct fipc_message* __msg,
+	struct ext_registers* __ext,
+	struct sock_no_socketpair_call_ctx const* ctx,
+	struct socket const* ptr)
+{
+	
+}
+
+void caller_unmarshal_kernel__sock_no_socketpair__sock1__in(
+	size_t* __pos,
+	const struct fipc_message* __msg,
+	const struct ext_registers* __ext,
+	struct sock_no_socketpair_call_ctx const* ctx,
+	struct socket* ptr)
+{
+	
+}
+
+void caller_marshal_kernel__sock_no_socketpair__sock2__in(
+	size_t* __pos,
+	struct fipc_message* __msg,
+	struct ext_registers* __ext,
+	struct sock_no_socketpair_call_ctx const* ctx,
+	struct socket const* ptr)
+{
+	
+}
+
+void callee_unmarshal_kernel__sock_no_socketpair__sock2__in(
+	size_t* __pos,
+	const struct fipc_message* __msg,
+	const struct ext_registers* __ext,
+	struct sock_no_socketpair_call_ctx const* ctx,
+	struct socket* ptr)
+{
+	
+}
+
+void callee_marshal_kernel__sock_no_socketpair__sock2__in(
+	size_t* __pos,
+	struct fipc_message* __msg,
+	struct ext_registers* __ext,
+	struct sock_no_socketpair_call_ctx const* ctx,
+	struct socket const* ptr)
+{
+	
+}
+
+void caller_unmarshal_kernel__sock_no_socketpair__sock2__in(
+	size_t* __pos,
+	const struct fipc_message* __msg,
+	const struct ext_registers* __ext,
+	struct sock_no_socketpair_call_ctx const* ctx,
+	struct socket* ptr)
+{
+	
+}
+
+void caller_marshal_kernel__sock_no_connect__sock__in(
+	size_t* __pos,
+	struct fipc_message* __msg,
+	struct ext_registers* __ext,
+	struct sock_no_connect_call_ctx const* ctx,
+	struct socket const* ptr)
+{
+	
+}
+
+void callee_unmarshal_kernel__sock_no_connect__sock__in(
+	size_t* __pos,
+	const struct fipc_message* __msg,
+	const struct ext_registers* __ext,
+	struct sock_no_connect_call_ctx const* ctx,
+	struct socket* ptr)
+{
+	
+}
+
+void callee_marshal_kernel__sock_no_connect__sock__in(
+	size_t* __pos,
+	struct fipc_message* __msg,
+	struct ext_registers* __ext,
+	struct sock_no_connect_call_ctx const* ctx,
+	struct socket const* ptr)
+{
+	
+}
+
+void caller_unmarshal_kernel__sock_no_connect__sock__in(
+	size_t* __pos,
+	const struct fipc_message* __msg,
+	const struct ext_registers* __ext,
+	struct sock_no_connect_call_ctx const* ctx,
+	struct socket* ptr)
+{
+	
+}
+
+void caller_marshal_kernel__sock_no_connect__saddr__in(
+	size_t* __pos,
+	struct fipc_message* __msg,
+	struct ext_registers* __ext,
+	struct sock_no_connect_call_ctx const* ctx,
+	struct sockaddr const* ptr)
+{
+	
+}
+
+void callee_unmarshal_kernel__sock_no_connect__saddr__in(
+	size_t* __pos,
+	const struct fipc_message* __msg,
+	const struct ext_registers* __ext,
+	struct sock_no_connect_call_ctx const* ctx,
+	struct sockaddr* ptr)
+{
+	
+}
+
+void callee_marshal_kernel__sock_no_connect__saddr__in(
+	size_t* __pos,
+	struct fipc_message* __msg,
+	struct ext_registers* __ext,
+	struct sock_no_connect_call_ctx const* ctx,
+	struct sockaddr const* ptr)
+{
+	
+}
+
+void caller_unmarshal_kernel__sock_no_connect__saddr__in(
+	size_t* __pos,
+	const struct fipc_message* __msg,
+	const struct ext_registers* __ext,
+	struct sock_no_connect_call_ctx const* ctx,
+	struct sockaddr* ptr)
+{
+	
+}
+
+void caller_marshal_kernel__sock_no_sendpage__sock__in(
+	size_t* __pos,
+	struct fipc_message* __msg,
+	struct ext_registers* __ext,
+	struct sock_no_sendpage_call_ctx const* ctx,
+	struct socket const* ptr)
+{
+	
+}
+
+void callee_unmarshal_kernel__sock_no_sendpage__sock__in(
+	size_t* __pos,
+	const struct fipc_message* __msg,
+	const struct ext_registers* __ext,
+	struct sock_no_sendpage_call_ctx const* ctx,
+	struct socket* ptr)
+{
+	
+}
+
+void callee_marshal_kernel__sock_no_sendpage__sock__in(
+	size_t* __pos,
+	struct fipc_message* __msg,
+	struct ext_registers* __ext,
+	struct sock_no_sendpage_call_ctx const* ctx,
+	struct socket const* ptr)
+{
+	
+}
+
+void caller_unmarshal_kernel__sock_no_sendpage__sock__in(
+	size_t* __pos,
+	const struct fipc_message* __msg,
+	const struct ext_registers* __ext,
+	struct sock_no_sendpage_call_ctx const* ctx,
+	struct socket* ptr)
+{
+	
+}
+
+void caller_marshal_kernel__sock_no_sendpage__page__in(
+	size_t* __pos,
+	struct fipc_message* __msg,
+	struct ext_registers* __ext,
+	struct sock_no_sendpage_call_ctx const* ctx,
+	struct page const* ptr)
+{
+	
+}
+
+void callee_unmarshal_kernel__sock_no_sendpage__page__in(
+	size_t* __pos,
+	const struct fipc_message* __msg,
+	const struct ext_registers* __ext,
+	struct sock_no_sendpage_call_ctx const* ctx,
+	struct page* ptr)
+{
+	
+}
+
+void callee_marshal_kernel__sock_no_sendpage__page__in(
+	size_t* __pos,
+	struct fipc_message* __msg,
+	struct ext_registers* __ext,
+	struct sock_no_sendpage_call_ctx const* ctx,
+	struct page const* ptr)
+{
+	
+}
+
+void caller_unmarshal_kernel__sock_no_sendpage__page__in(
+	size_t* __pos,
+	const struct fipc_message* __msg,
+	const struct ext_registers* __ext,
+	struct sock_no_sendpage_call_ctx const* ctx,
+	struct page* ptr)
 {
 	
 }
@@ -5250,6 +5057,86 @@ void caller_unmarshal_kernel__lvd_memcpy_to_msg__msg__in(
 	const struct ext_registers* __ext,
 	struct lvd_memcpy_to_msg_call_ctx const* ctx,
 	struct msghdr* ptr)
+{
+	
+}
+
+void caller_marshal_kernel__lvd_memcpy_from_msg__msg__in(
+	size_t* __pos,
+	struct fipc_message* __msg,
+	struct ext_registers* __ext,
+	struct lvd_memcpy_from_msg_call_ctx const* ctx,
+	struct msghdr const* ptr)
+{
+	
+}
+
+void callee_unmarshal_kernel__lvd_memcpy_from_msg__msg__in(
+	size_t* __pos,
+	const struct fipc_message* __msg,
+	const struct ext_registers* __ext,
+	struct lvd_memcpy_from_msg_call_ctx const* ctx,
+	struct msghdr* ptr)
+{
+	
+}
+
+void callee_marshal_kernel__lvd_memcpy_from_msg__msg__in(
+	size_t* __pos,
+	struct fipc_message* __msg,
+	struct ext_registers* __ext,
+	struct lvd_memcpy_from_msg_call_ctx const* ctx,
+	struct msghdr const* ptr)
+{
+	
+}
+
+void caller_unmarshal_kernel__lvd_memcpy_from_msg__msg__in(
+	size_t* __pos,
+	const struct fipc_message* __msg,
+	const struct ext_registers* __ext,
+	struct lvd_memcpy_from_msg_call_ctx const* ctx,
+	struct msghdr* ptr)
+{
+	
+}
+
+void caller_marshal_kernel__lvd_dev_put__net_device__in(
+	size_t* __pos,
+	struct fipc_message* __msg,
+	struct ext_registers* __ext,
+	struct lvd_dev_put_call_ctx const* ctx,
+	struct net_device const* ptr)
+{
+	
+}
+
+void callee_unmarshal_kernel__lvd_dev_put__net_device__in(
+	size_t* __pos,
+	const struct fipc_message* __msg,
+	const struct ext_registers* __ext,
+	struct lvd_dev_put_call_ctx const* ctx,
+	struct net_device* ptr)
+{
+	
+}
+
+void callee_marshal_kernel__lvd_dev_put__net_device__in(
+	size_t* __pos,
+	struct fipc_message* __msg,
+	struct ext_registers* __ext,
+	struct lvd_dev_put_call_ctx const* ctx,
+	struct net_device const* ptr)
+{
+	
+}
+
+void caller_unmarshal_kernel__lvd_dev_put__net_device__in(
+	size_t* __pos,
+	const struct fipc_message* __msg,
+	const struct ext_registers* __ext,
+	struct lvd_dev_put_call_ctx const* ctx,
+	struct net_device* ptr)
 {
 	
 }

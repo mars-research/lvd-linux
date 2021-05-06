@@ -399,7 +399,8 @@ void callee_unmarshal_kernel__probe__kobject__in(
 	char const** name_ptr = &ptr->name;
 
 	{
-		*name_ptr = glue_unpack(__pos, __msg, __ext, char const*);
+		size_t __size = sizeof(char) * glue_peek(__pos, __msg, __ext);
+		*name_ptr = glue_unpack_bind_or_new_shadow(__pos, __msg, __ext, char const*, __size);
 		if (*name_ptr) {
 			char* writable = (char*)*name_ptr;
 			size_t i, len;
@@ -458,6 +459,16 @@ void caller_marshal_kernel__probe__resource__in(
 	struct probe_call_ctx const* ctx,
 	struct resource const* ptr)
 {
+	unsigned long long const* start_ptr = &ptr->start;
+	unsigned long long const* end_ptr = &ptr->end;
+
+	{
+		glue_pack(__pos, __msg, __ext, *start_ptr);
+	}
+
+	{
+		glue_pack(__pos, __msg, __ext, *end_ptr);
+	}
 
 }
 
@@ -468,6 +479,16 @@ void callee_unmarshal_kernel__probe__resource__in(
 	struct probe_call_ctx const* ctx,
 	struct resource* ptr)
 {
+	unsigned long long* start_ptr = &ptr->start;
+	unsigned long long* end_ptr = &ptr->end;
+
+	{
+		*start_ptr = glue_unpack(__pos, __msg, __ext, unsigned long long);
+	}
+
+	{
+		*end_ptr = glue_unpack(__pos, __msg, __ext, unsigned long long);
+	}
 
 	{
 	}
@@ -2555,7 +2576,7 @@ void caller_unmarshal_kernel__ndo_get_stats64__stats__in(
 	}
 }
 
-void caller_marshal_kernel__ndo_setup_tc__dev__io(
+void caller_marshal_kernel__ndo_setup_tc__dev__in(
 	size_t* __pos,
 	struct fipc_message* __msg,
 	struct ext_registers* __ext,
@@ -2585,7 +2606,7 @@ void caller_marshal_kernel__ndo_setup_tc__dev__io(
 
 }
 
-void callee_unmarshal_kernel__ndo_setup_tc__dev__io(
+void callee_unmarshal_kernel__ndo_setup_tc__dev__in(
 	size_t* __pos,
 	const struct fipc_message* __msg,
 	const struct ext_registers* __ext,
@@ -2617,23 +2638,18 @@ void callee_unmarshal_kernel__ndo_setup_tc__dev__io(
 	}
 }
 
-void callee_marshal_kernel__ndo_setup_tc__dev__io(
+void callee_marshal_kernel__ndo_setup_tc__dev__in(
 	size_t* __pos,
 	struct fipc_message* __msg,
 	struct ext_registers* __ext,
 	struct ndo_setup_tc_call_ctx const* ctx,
 	struct net_device const* ptr)
 {
-	unsigned long long const* state_ptr = &ptr->state;
 	unsigned int const* num_rx_queues_ptr = &ptr->num_rx_queues;
 	unsigned int const* num_tx_queues_ptr = &ptr->num_tx_queues;
 	unsigned char const* num_tc_ptr = &ptr->num_tc;
 	struct netdev_tc_txq const* tc_to_txq_ptr = ptr->tc_to_txq;
 	unsigned char const* prio_tc_map_ptr = ptr->prio_tc_map;
-
-	{
-		glue_pack(__pos, __msg, __ext, *state_ptr);
-	}
 
 	{
 		glue_pack(__pos, __msg, __ext, *num_rx_queues_ptr);
@@ -2675,23 +2691,18 @@ void callee_marshal_kernel__ndo_setup_tc__dev__io(
 
 }
 
-void caller_unmarshal_kernel__ndo_setup_tc__dev__io(
+void caller_unmarshal_kernel__ndo_setup_tc__dev__in(
 	size_t* __pos,
 	const struct fipc_message* __msg,
 	const struct ext_registers* __ext,
 	struct ndo_setup_tc_call_ctx const* ctx,
 	struct net_device* ptr)
 {
-	unsigned long long* state_ptr = &ptr->state;
 	unsigned int* num_rx_queues_ptr = &ptr->num_rx_queues;
 	unsigned int* num_tx_queues_ptr = &ptr->num_tx_queues;
 	unsigned char* num_tc_ptr = &ptr->num_tc;
 	struct netdev_tc_txq* tc_to_txq_ptr = ptr->tc_to_txq;
 	unsigned char* prio_tc_map_ptr = ptr->prio_tc_map;
-
-	{
-		*state_ptr = glue_unpack(__pos, __msg, __ext, unsigned long long);
-	}
 
 	{
 		*num_rx_queues_ptr = glue_unpack(__pos, __msg, __ext, unsigned int);

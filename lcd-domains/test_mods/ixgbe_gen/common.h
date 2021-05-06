@@ -32,7 +32,7 @@
 
 #ifndef LCD_ISOLATE
 #define glue_unpack_rpc_ptr(pos, msg, ext, name) \
-	glue_peek(pos, msg, ext) ? (fptr_##name)glue_unpack_rpc_ptr_impl(glue_unpack(pos, msg, ext, void*), LCD_DUP_TRAMPOLINE(trmp_##name), LCD_TRAMPOLINE_SIZE(trmp_##name)) : NULL
+	(fptr_##name)glue_unpack_rpc_ptr_impl(glue_unpack(pos, msg, ext, void*), LCD_DUP_TRAMPOLINE(trmp_##name), LCD_TRAMPOLINE_SIZE(trmp_##name))
 
 #else
 #define glue_unpack_rpc_ptr(pos, msg, ext, name) NULL; glue_user_panic("Trampolines cannot be used on LCD side")
@@ -1691,28 +1691,28 @@ void caller_unmarshal_kernel__ndo_get_stats64__stats__in(
 	struct ndo_get_stats64_call_ctx const* call_ctx,
 	struct rtnl_link_stats64* ptr);
 
-void caller_marshal_kernel__ndo_setup_tc__dev__io(
+void caller_marshal_kernel__ndo_setup_tc__dev__in(
 	size_t* __pos,
 	struct fipc_message* __msg,
 	struct ext_registers* __ext,
 	struct ndo_setup_tc_call_ctx const* call_ctx,
 	struct net_device const* ptr);
 
-void callee_unmarshal_kernel__ndo_setup_tc__dev__io(
+void callee_unmarshal_kernel__ndo_setup_tc__dev__in(
 	size_t* __pos,
 	const struct fipc_message* __msg,
 	const struct ext_registers* __ext,
 	struct ndo_setup_tc_call_ctx const* call_ctx,
 	struct net_device* ptr);
 
-void callee_marshal_kernel__ndo_setup_tc__dev__io(
+void callee_marshal_kernel__ndo_setup_tc__dev__in(
 	size_t* __pos,
 	struct fipc_message* __msg,
 	struct ext_registers* __ext,
 	struct ndo_setup_tc_call_ctx const* call_ctx,
 	struct net_device const* ptr);
 
-void caller_unmarshal_kernel__ndo_setup_tc__dev__io(
+void caller_unmarshal_kernel__ndo_setup_tc__dev__in(
 	size_t* __pos,
 	const struct fipc_message* __msg,
 	const struct ext_registers* __ext,

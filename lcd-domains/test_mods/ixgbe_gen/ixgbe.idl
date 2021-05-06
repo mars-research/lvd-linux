@@ -6,7 +6,7 @@ module kernel {
 			projection kobject kobj;
 		}
 		projection < struct kobject > kobject {
-			string [alloc_once(caller)] *name;
+			string [alloc_once(callee)] *name;
 		}
 		projection < struct pci_dev > pdev {
 			projection pci_dev_bus [alloc(callee)] * bus;
@@ -28,6 +28,8 @@ module kernel {
 			long unsigned int  driver_data;
 		}
 		projection <struct resource> resource {
+			u64 start;
+			u64 end;
 		}
 	}
 
@@ -873,19 +875,19 @@ rpc_ptr s32 [in, out] ndo_start_xmit( projection skb * [in, out] skb, projection
 		projection < struct ifreq > req {
 		}
 	}
-	rpc_ptr int ndo_change_mtu( projection netdev * [in] netdev, s32  new_mtu ) {
+	rpc_ptr int ndo_change_mtu( projection netdev [bind(callee)] * netdev, s32  new_mtu ) {
 		projection < struct net_device > netdev {
 			u32 [in, out] mtu;
 		}
 	}
 
-	rpc_ptr void  ndo_tx_timeout( projection netdev * [in] netdev ) {
+	rpc_ptr void  ndo_tx_timeout( projection netdev [bind(callee)] *netdev ) {
 		projection < struct net_device > netdev {
 		}
 	}
 
 	rpc_ptr projection ret_rtnl_link_stats64 [bind(callee)] * ndo_get_stats64(
-		projection netdev * netdev, projection stats [alloc(caller)] * stats ) {
+		projection netdev  [bind(callee)] * netdev, projection stats [alloc(callee)] * stats ) {
 		projection < struct net_device > netdev {
 		}
 		projection < struct rtnl_link_stats64 > ret_rtnl_link_stats64 {
@@ -1022,7 +1024,7 @@ rpc_ptr s32 [in, out] ndo_start_xmit( projection skb * [in, out] skb, projection
 		}
 	}
 	*/
-	rpc_ptr int ndo_setup_tc( projection dev * [in, out] dev, u32  handle, u16  proto, projection tc * [in] tc ) {
+	rpc_ptr int ndo_setup_tc( projection dev  [bind(callee)] * dev, u32  handle, u16  proto, projection tc * [in] tc ) {
 		projection < struct net_device > dev {
 			u64 state;
 			u32 [in, out] num_rx_queues;
@@ -1038,12 +1040,12 @@ rpc_ptr s32 [in, out] ndo_start_xmit( projection skb * [in, out] skb, projection
 		}
 	}
 
-	rpc_ptr u64  ndo_fix_features( projection netdev * [in] netdev, u64  features ) {
+	rpc_ptr u64  ndo_fix_features( projection netdev [bind(callee)] * netdev, u64  features ) {
 		projection < struct net_device > netdev {
 		}
 	}
 
-	rpc_ptr int ndo_set_features( projection netdev * [in] netdev, u64  features ) {
+	rpc_ptr int ndo_set_features( projection netdev [bind(callee)] * netdev, u64  features ) {
 		projection < struct net_device > netdev {
 			u64 [in, out] features;
 		}
@@ -2254,7 +2256,7 @@ rpc s32  skb_checksum_help( projection skb * [in, out] skb ) {
 		}
 	}
 
-	rpc int eth_platform_get_mac_address( projection dev [bind_memberof<struct pci_dev, dev>(caller)] * dev, array<u8, {{ETH_ALEN}}> [alloc(callee), out] * mac_addr ) {
+	rpc int eth_platform_get_mac_address( projection dev [bind_memberof<struct pci_dev, dev>(caller)] * dev, array<u8, {{ETH_ALEN}}> [alloc(callee), bind(callee)] * [in, out] mac_addr ) {
 		projection < struct device > dev {
 		}
 	}
@@ -2271,7 +2273,7 @@ rpc s32  skb_checksum_help( projection skb * [in, out] skb ) {
 			u8* [in] dev_addr;
 		}
 	}
-	rpc unsigned long dev_trans_start( projection dev * [in] dev ) {
+	rpc unsigned long dev_trans_start( projection dev * dev ) {
 		projection < struct net_device > dev {
 			u32 [in] priv_flags;
 			u32 [in] num_tx_queues;

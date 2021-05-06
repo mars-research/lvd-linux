@@ -716,7 +716,7 @@ int trmp_impl_ndo_change_mtu(fptr_ndo_change_mtu target, struct net_device* netd
 	glue_pack(__pos, __msg, __ext, target);
 	{
 		__maybe_unused const void* __adjusted = *netdev_ptr;
-		glue_pack_shadow(__pos, __msg, __ext, __adjusted);
+		glue_pack(__pos, __msg, __ext, __adjusted);
 		if (*netdev_ptr) {
 			caller_marshal_kernel__ndo_change_mtu__netdev__in(__pos, __msg, __ext, ctx, *netdev_ptr);
 		}
@@ -782,7 +782,7 @@ void trmp_impl_ndo_tx_timeout(fptr_ndo_tx_timeout target, struct net_device* net
 	glue_pack(__pos, __msg, __ext, target);
 	{
 		__maybe_unused const void* __adjusted = *netdev_ptr;
-		glue_pack_shadow(__pos, __msg, __ext, __adjusted);
+		glue_pack(__pos, __msg, __ext, __adjusted);
 		if (*netdev_ptr) {
 			caller_marshal_kernel__ndo_tx_timeout__netdev__in(__pos, __msg, __ext, ctx, *netdev_ptr);
 		}
@@ -839,7 +839,7 @@ struct rtnl_link_stats64* trmp_impl_ndo_get_stats64(fptr_ndo_get_stats64 target,
 	glue_pack(__pos, __msg, __ext, target);
 	{
 		__maybe_unused const void* __adjusted = *netdev_ptr;
-		glue_pack_shadow(__pos, __msg, __ext, __adjusted);
+		glue_pack(__pos, __msg, __ext, __adjusted);
 		if (*netdev_ptr) {
 			caller_marshal_kernel__ndo_get_stats64__netdev__in(__pos, __msg, __ext, ctx, *netdev_ptr);
 		}
@@ -923,9 +923,9 @@ int trmp_impl_ndo_setup_tc(fptr_ndo_setup_tc target, struct net_device* dev, uns
 	glue_pack(__pos, __msg, __ext, target);
 	{
 		__maybe_unused const void* __adjusted = *dev_ptr;
-		glue_pack_shadow(__pos, __msg, __ext, __adjusted);
+		glue_pack(__pos, __msg, __ext, __adjusted);
 		if (*dev_ptr) {
-			caller_marshal_kernel__ndo_setup_tc__dev__io(__pos, __msg, __ext, ctx, *dev_ptr);
+			caller_marshal_kernel__ndo_setup_tc__dev__in(__pos, __msg, __ext, ctx, *dev_ptr);
 		}
 
 	}
@@ -951,9 +951,8 @@ int trmp_impl_ndo_setup_tc(fptr_ndo_setup_tc target, struct net_device* dev, uns
 
 	*__pos = 0;
 	{
-		*dev_ptr = glue_unpack_shadow(__pos, __msg, __ext, struct net_device*);
 		if (*dev_ptr) {
-			caller_unmarshal_kernel__ndo_setup_tc__dev__io(__pos, __msg, __ext, ctx, *dev_ptr);
+			caller_unmarshal_kernel__ndo_setup_tc__dev__in(__pos, __msg, __ext, ctx, *dev_ptr);
 		}
 
 	}
@@ -1016,7 +1015,7 @@ unsigned long long trmp_impl_ndo_fix_features(fptr_ndo_fix_features target, stru
 	glue_pack(__pos, __msg, __ext, target);
 	{
 		__maybe_unused const void* __adjusted = *netdev_ptr;
-		glue_pack_shadow(__pos, __msg, __ext, __adjusted);
+		glue_pack(__pos, __msg, __ext, __adjusted);
 		if (*netdev_ptr) {
 			caller_marshal_kernel__ndo_fix_features__netdev__in(__pos, __msg, __ext, ctx, *netdev_ptr);
 		}
@@ -1085,7 +1084,7 @@ int trmp_impl_ndo_set_features(fptr_ndo_set_features target, struct net_device* 
 	glue_pack(__pos, __msg, __ext, target);
 	{
 		__maybe_unused const void* __adjusted = *netdev_ptr;
-		glue_pack_shadow(__pos, __msg, __ext, __adjusted);
+		glue_pack(__pos, __msg, __ext, __adjusted);
 		if (*netdev_ptr) {
 			caller_marshal_kernel__ndo_set_features__netdev__in(__pos, __msg, __ext, ctx, *netdev_ptr);
 		}
@@ -5602,7 +5601,19 @@ void eth_platform_get_mac_address_callee(struct fipc_message* __msg, struct ext_
 	{
 		size_t __size = sizeof(unsigned char) * glue_peek(__pos, __msg, __ext);
 		*mac_addr_ptr = glue_unpack_new_shadow(__pos, __msg, __ext, unsigned char*, (__size), (DEFAULT_GFP_FLAGS));
-		(void)mac_addr_ptr;
+		if (*mac_addr_ptr) {
+			int i;
+			unsigned char* array = *mac_addr_ptr;
+			size_t len = glue_unpack(__pos, __msg, __ext, size_t);
+			// Warning: see David if this breaks
+			glue_user_trace("Warning: see David if this breaks");
+			for (i = 0; i < len; ++i) {
+				unsigned char* element = &array[i];
+				*element = glue_unpack(__pos, __msg, __ext, unsigned char);
+			}
+
+		}
+
 	}
 
 	ret = eth_platform_get_mac_address(dev, mac_addr);
@@ -5616,6 +5627,8 @@ void eth_platform_get_mac_address_callee(struct fipc_message* __msg, struct ext_
 	}
 
 	{
+		__maybe_unused const void* __adjusted = *mac_addr_ptr;
+		glue_pack_shadow(__pos, __msg, __ext, __adjusted);
 		if (*mac_addr_ptr) {
 			size_t i, len = (ETH_ALEN);
 			unsigned char* array = *mac_addr_ptr;

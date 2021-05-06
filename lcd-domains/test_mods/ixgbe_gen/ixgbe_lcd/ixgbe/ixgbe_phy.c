@@ -307,33 +307,6 @@ s32 ixgbe_write_i2c_combined_generic_unlocked(struct ixgbe_hw *hw,
 	return ixgbe_write_i2c_combined_generic_int(hw, addr, reg, val, false);
 }
 
-int _mdio45_probe(struct mdio_if_info *mdio, int prtad)
-{
-	int mmd, stat2, devs1, devs2;
-
-	/* Assume PHY must have at least one of PMA/PMD, WIS, PCS, PHY
-	 * XS or DTE XS; give up if none is present. */
-	for (mmd = 1; mmd <= 5; mmd++) {
-		/* Is this MMD present? */
-		stat2 = mdio->mdio_read(mdio->dev, prtad, mmd, MDIO_STAT2);
-		if (stat2 < 0 ||
-		    (stat2 & MDIO_STAT2_DEVPRST) != MDIO_STAT2_DEVPRST_VAL)
-			continue;
-
-		/* It should tell us about all the other MMDs */
-		devs1 = mdio->mdio_read(mdio->dev, prtad, mmd, MDIO_DEVS1);
-		devs2 = mdio->mdio_read(mdio->dev, prtad, mmd, MDIO_DEVS2);
-		if (devs1 < 0 || devs2 < 0)
-			continue;
-
-		mdio->prtad = prtad;
-		mdio->mmds = devs1 | (devs2 << 16);
-		return 0;
-	}
-
-	return -ENODEV;
-}
-
 /**
  *  ixgbe_identify_phy_generic - Get physical layer module
  *  @hw: pointer to hardware structure
@@ -363,7 +336,7 @@ s32 ixgbe_identify_phy_generic(struct ixgbe_hw *hw)
 				printk("%s, Calling mdio45_probe with phy_addr %x\n",
 						__func__, phy_addr);
 
-			if (_mdio45_probe(&hw->phy.mdio, phy_addr) == 0) {
+			if (mdio45_probe(&hw->phy.mdio, phy_addr) == 0) {
 				ixgbe_get_phy_id(hw);
 				hw->phy.type =
 					ixgbe_get_phy_type_from_id(hw->phy.id);

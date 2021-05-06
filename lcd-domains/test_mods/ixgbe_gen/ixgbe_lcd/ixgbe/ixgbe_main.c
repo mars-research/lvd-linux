@@ -74,7 +74,7 @@
 #include <lcd_config/post_hook.h>
 
 #define NUM_HW_QUEUES	1
-char ixgbe_driver_name[] = "ixgbe";
+char ixgbe_driver_name[] = "ixgbe_gen";
 static const char ixgbe_driver_string[] =
 			      "Intel(R) 10 Gigabit PCI Express Network Driver";
 #ifdef IXGBE_FCOE
@@ -91,21 +91,18 @@ static const char ixgbe_copyright[] =
 
 static const char ixgbe_overheat_msg[] = "Network adapter has been stopped because it has over heated. Restart the computer. If the problem persists, power off the system and replace the adapter";
 
-#ifndef LCD_ISOLATE
 static const struct ixgbe_info *ixgbe_info_tbl[] = {
+#ifndef LCD_ISOLATE
 	[board_82598]		= &ixgbe_82598_info,
+#endif
 	[board_82599]		= &ixgbe_82599_info,
+#ifndef LCD_ISOLATE
 	[board_X540]		= &ixgbe_X540_info,
 	[board_X550]		= &ixgbe_X550_info,
 	[board_X550EM_x]	= &ixgbe_X550EM_x_info,
 	[board_x550em_a]	= &ixgbe_x550em_a_info,
-};
-#else
-static const struct ixgbe_info *ixgbe_info_tbl[] = {
-	[board_82599]		= &ixgbe_82599_info,
-};
 #endif
-
+};
 /* ixgbe_pci_tbl - PCI Device ID Table
  *
  * Wildcard entries (PCI_ANY_ID) should come last
@@ -210,6 +207,44 @@ static struct workqueue_struct *ixgbe_wq;
 
 #endif
 
+void lvd_napi_enable(struct napi_struct *n);
+void lvd_netif_trans_update(struct net_device *dev);
+void lvd_netif_tx_disable(struct net_device *dev);
+void lvd_netif_tx_wake_all_queues(struct net_device* dev);
+void lvd_napi_schedule_irqoff(struct napi_struct *n);
+typedef void (*fptr_timer_func)(unsigned long data);
+void lvd_setup_timer(struct timer_list* timer, fptr_timer_func func, unsigned int flags);
+
+#ifdef LCD_ISOLATE
+#undef napi_enable
+#define napi_enable	lvd_napi_enable
+
+#undef setup_timer
+#define setup_timer	lvd_setup_timer
+
+#undef netif_trans_update
+#define netif_trans_update	lvd_netif_trans_update
+
+#undef netif_tx_disable
+#define netif_tx_disable	lvd_netif_tx_disable
+
+#undef netif_tx_wake_all_queues
+#define netif_tx_wake_all_queues	lvd_netif_tx_wake_all_queues
+
+#undef napi_schedule_irqoff
+#define napi_schedule_irqoff	lvd_napi_schedule_irqoff
+
+#undef e_dev_warn
+#define e_dev_warn		LIBLCD_WARN
+
+#undef e_dev_err
+#define e_dev_err		LIBLCD_ERR
+
+#undef e_dev_info
+#define e_dev_info		LIBLCD_MSG
+
+#endif
+
 static bool ixgbe_check_cfg_remove(struct ixgbe_hw *hw, struct pci_dev *pdev);
 static void ixgbe_service_task(struct work_struct *work);
 
@@ -309,7 +344,7 @@ static void ixgbe_check_minimum_link(struct ixgbe_adapter *adapter,
 
 	if (pcie_get_minimum_link(pdev, &speed, &width) ||
 	    speed == PCI_SPEED_UNKNOWN || width == PCIE_LNK_WIDTH_UNKNOWN) {
-		LIBLCD_WARN("Unable to determine PCI Express bandwidth.\n");
+		e_dev_warn("Unable to determine PCI Express bandwidth.\n");
 		return;
 	}
 
@@ -327,13 +362,13 @@ static void ixgbe_check_minimum_link(struct ixgbe_adapter *adapter,
 		max_gts = 8 * width;
 		break;
 	default:
-		LIBLCD_WARN("Unable to determine PCI Express bandwidth.\n");
+		e_dev_warn("Unable to determine PCI Express bandwidth.\n");
 		return;
 	}
 
-	LIBLCD_MSG("PCI Express bandwidth of %dGT/s available\n",
+	e_dev_info("PCI Express bandwidth of %dGT/s available\n",
 		   max_gts);
-	LIBLCD_MSG("(Speed:%s, Width: x%d, Encoding Loss:%s)\n",
+	e_dev_info("(Speed:%s, Width: x%d, Encoding Loss:%s)\n",
 		   (speed == PCIE_SPEED_8_0GT ? "8.0GT/s" :
 		    speed == PCIE_SPEED_5_0GT ? "5.0GT/s" :
 		    speed == PCIE_SPEED_2_5GT ? "2.5GT/s" :
@@ -345,10 +380,10 @@ static void ixgbe_check_minimum_link(struct ixgbe_adapter *adapter,
 		    "Unknown"));
 
 	if (max_gts < expected_gts) {
-		LIBLCD_WARN("This is not sufficient for optimal performance of this card.\n");
-		LIBLCD_WARN("For optimal performance, at least %dGT/s of bandwidth is required.\n",
+		e_dev_warn("This is not sufficient for optimal performance of this card.\n");
+		e_dev_warn("For optimal performance, at least %dGT/s of bandwidth is required.\n",
 			expected_gts);
-		LIBLCD_WARN("A slot with more lanes and/or higher speed is suggested.\n");
+		e_dev_warn("A slot with more lanes and/or higher speed is suggested.\n");
 	}
 }
 #endif /* LCD_ISOLATE */
@@ -379,7 +414,7 @@ static void ixgbe_remove_adapter(struct ixgbe_hw *hw)
 	if (!hw->hw_addr)
 		return;
 	hw->hw_addr = NULL;
-	LIBLCD_ERR("Adapter removed\n");
+	e_dev_err("Adapter removed\n");
 #ifndef LCD_ISOLATE
 	if (test_bit(__IXGBE_SERVICE_INITED, &adapter->state))
 		ixgbe_service_event_schedule(adapter);
@@ -657,7 +692,7 @@ static void ixgbe_dump(struct ixgbe_adapter *adapter)
 	/* Print netdevice Info */
 	if (netdev) {
 		dev_info(&adapter->pdev->dev, "Net device Info\n");
-		LIBLCD_MSG("Device Name     state            "
+		pr_info("Device Name     state            "
 			"trans_start      last_rx\n");
 		pr_info("%-15s %016lX %016lX %016lX\n",
 			netdev->name,
@@ -1672,7 +1707,7 @@ static bool ixgbe_alloc_mapped_page(struct ixgbe_ring *rx_ring,
 			0, true);
 
 	if (ret)
-		LIBLCD_ERR("Mapping failed for packet");
+		e_dev_err("Mapping failed for packet");
 
 	/*
 	 * if mapping failed free memory back to system since
@@ -1696,9 +1731,9 @@ static bool ixgbe_alloc_mapped_page(struct ixgbe_ring *rx_ring,
 		unsigned ord = ixgbe_rx_pg_order(rx_ring);
 		pg_count += ord ? (1 << ord) : 1;
 		if (pg_count % 10 == 0)
-			LIBLCD_MSG("total rx pages %u", pg_count);
+			e_dev_info("total rx pages %u", pg_count);
 	} else {
-		LIBLCD_MSG("Error getting page");
+		e_dev_info("Error getting page");
 	}
 
 	return true;
@@ -2029,7 +2064,7 @@ static bool ixgbe_cleanup_headers(struct ixgbe_ring *rx_ring,
 #endif
 	/* if eth_skb_pad returns an error the skb was freed */
 	if (skb->len <  ETH_ZLEN) {
-		LIBLCD_ERR("skb len %d | data_len %d | nrfrags %d, I'll drop this!",
+		e_dev_err("skb len %d | data_len %d | nrfrags %d, I'll drop this!",
 				skb->len, skb->data_len,
 				skb_shinfo(skb)->nr_frags);
 		return true;
@@ -2973,10 +3008,9 @@ static irqreturn_t ixgbe_msix_other(int irq, void *data)
 	/* re-enable the original interrupt state, no lsc, no queues */
 	if (!test_bit(__IXGBE_DOWN, &adapter->state))
 		ixgbe_irq_enable(adapter, false, false);
+
 	return IRQ_HANDLED;
 }
-
-void ___napi_schedule_irqoff(struct napi_struct *napi);
 
 static irqreturn_t ixgbe_msix_clean_rings(int irq, void *data)
 {
@@ -2985,7 +3019,7 @@ static irqreturn_t ixgbe_msix_clean_rings(int irq, void *data)
 	/* EIAM disabled interrupts (on this vector) for us */
 
 	if (q_vector->rx.ring || q_vector->tx.ring)
-		___napi_schedule_irqoff(&q_vector->napi);
+		napi_schedule_irqoff(&q_vector->napi);
 
 	return IRQ_HANDLED;
 }
@@ -3028,13 +3062,14 @@ int ixgbe_poll(struct napi_struct *napi, int budget)
 		per_ring_budget = budget;
 
 	if (!once) {
-		LIBLCD_MSG("%s, budget %d | perring %d | qvec rx %d", __func__,
+		e_dev_info("%s, budget %d | perring %d | qvec rx %d", __func__,
 			budget, per_ring_budget, q_vector->rx.count);
 		once++;
 	}
 	ixgbe_for_each_ring(ring, q_vector->rx) {
 		int cleaned = ixgbe_clean_rx_irq(q_vector, ring,
 						 per_ring_budget);
+
 		work_done += cleaned;
 		if (cleaned >= per_ring_budget)
 			clean_complete = false;
@@ -4132,7 +4167,7 @@ static void ixgbe_configure_rx(struct ixgbe_adapter *adapter)
 	hw->mac.ops.enable_rx_dma(hw, rxctrl);
 }
 
-static int ixgbe_vlan_rx_add_vid(struct net_device *netdev,
+__maybe_unused static int ixgbe_vlan_rx_add_vid(struct net_device *netdev,
 				 __be16 proto, u16 vid)
 {
 	struct ixgbe_adapter *adapter = netdev_priv(netdev);
@@ -4147,7 +4182,7 @@ static int ixgbe_vlan_rx_add_vid(struct net_device *netdev,
 	return 0;
 }
 
-static int ixgbe_find_vlvf_entry(struct ixgbe_hw *hw, u32 vlan)
+__maybe_unused static int ixgbe_find_vlvf_entry(struct ixgbe_hw *hw, u32 vlan)
 {
 	u32 vlvf;
 	int idx;
@@ -4166,7 +4201,7 @@ static int ixgbe_find_vlvf_entry(struct ixgbe_hw *hw, u32 vlan)
 	return idx;
 }
 
-void ixgbe_update_pf_promisc_vlvf(struct ixgbe_adapter *adapter, u32 vid)
+__maybe_unused void ixgbe_update_pf_promisc_vlvf(struct ixgbe_adapter *adapter, u32 vid)
 {
 	struct ixgbe_hw *hw = &adapter->hw;
 	u32 bits, word;
@@ -4191,7 +4226,7 @@ void ixgbe_update_pf_promisc_vlvf(struct ixgbe_adapter *adapter, u32 vid)
 	}
 }
 
-static int ixgbe_vlan_rx_kill_vid(struct net_device *netdev,
+__maybe_unused static int ixgbe_vlan_rx_kill_vid(struct net_device *netdev,
 				  __be16 proto, u16 vid)
 {
 	struct ixgbe_adapter *adapter = netdev_priv(netdev);
@@ -4210,7 +4245,7 @@ static int ixgbe_vlan_rx_kill_vid(struct net_device *netdev,
  * ixgbe_vlan_strip_disable - helper to disable hw vlan stripping
  * @adapter: driver data
  */
-static void ixgbe_vlan_strip_disable(struct ixgbe_adapter *adapter)
+__maybe_unused static void ixgbe_vlan_strip_disable(struct ixgbe_adapter *adapter)
 {
 	struct ixgbe_hw *hw = &adapter->hw;
 	u32 vlnctrl;
@@ -4247,7 +4282,7 @@ static void ixgbe_vlan_strip_disable(struct ixgbe_adapter *adapter)
  * ixgbe_vlan_strip_enable - helper to enable hw vlan stripping
  * @adapter: driver data
  */
-static void ixgbe_vlan_strip_enable(struct ixgbe_adapter *adapter)
+__maybe_unused static void ixgbe_vlan_strip_enable(struct ixgbe_adapter *adapter)
 {
 	struct ixgbe_hw *hw = &adapter->hw;
 	u32 vlnctrl;
@@ -4280,7 +4315,7 @@ static void ixgbe_vlan_strip_enable(struct ixgbe_adapter *adapter)
 	}
 }
 
-static void ixgbe_vlan_promisc_enable(struct ixgbe_adapter *adapter)
+__maybe_unused static void ixgbe_vlan_promisc_enable(struct ixgbe_adapter *adapter)
 {
 	struct ixgbe_hw *hw = &adapter->hw;
 	u32 vlnctrl, i;
@@ -4330,7 +4365,7 @@ static void ixgbe_vlan_promisc_enable(struct ixgbe_adapter *adapter)
 }
 
 #define VFTA_BLOCK_SIZE 8
-static void ixgbe_scrub_vfta(struct ixgbe_adapter *adapter, u32 vfta_offset)
+__maybe_unused static void ixgbe_scrub_vfta(struct ixgbe_adapter *adapter, u32 vfta_offset)
 {
 	struct ixgbe_hw *hw = &adapter->hw;
 	u32 vfta[VFTA_BLOCK_SIZE] = { 0 };
@@ -4376,7 +4411,7 @@ static void ixgbe_scrub_vfta(struct ixgbe_adapter *adapter, u32 vfta_offset)
 	}
 }
 
-static void ixgbe_vlan_promisc_disable(struct ixgbe_adapter *adapter)
+__maybe_unused static void ixgbe_vlan_promisc_disable(struct ixgbe_adapter *adapter)
 {
 	struct ixgbe_hw *hw = &adapter->hw;
 	u32 vlnctrl, i;
@@ -4411,7 +4446,7 @@ static void ixgbe_vlan_promisc_disable(struct ixgbe_adapter *adapter)
 		ixgbe_scrub_vfta(adapter, i);
 }
 
-static void ixgbe_restore_vlan(struct ixgbe_adapter *adapter)
+__maybe_unused static void ixgbe_restore_vlan(struct ixgbe_adapter *adapter)
 {
 	u16 vid = 1;
 
@@ -4757,8 +4792,6 @@ static void ixgbe_napi_enable_all(struct ixgbe_adapter *adapter)
 		/* FIXME: enabling this causes undefined instruction
 		 * to be generated by the compiler. Disable it for now
 		 */
-		// TODO: do wrapper
-		//__napi_enable(&adapter->q_vector[q_idx]->napi);
 		napi_enable(&adapter->q_vector[q_idx]->napi);
 	}
 }
@@ -5559,11 +5592,11 @@ void ixgbe_reset(struct ixgbe_adapter *adapter)
 	case IXGBE_ERR_SFP_NOT_SUPPORTED:
 		break;
 	case IXGBE_ERR_MASTER_REQUESTS_PENDING:
-		LIBLCD_ERR("master disable timed out\n");
+		e_dev_err("master disable timed out\n");
 		break;
 	case IXGBE_ERR_EEPROM_VERSION:
 		/* We are running on a pre-production device, log a warning */
-		LIBLCD_WARN("This device is a pre-production adapter/LOM. "
+		e_dev_warn("This device is a pre-production adapter/LOM. "
 			   "Please be aware there may be issues associated with "
 			   "your hardware.  If you are experiencing problems "
 			   "please contact your Intel or hardware "
@@ -5571,7 +5604,7 @@ void ixgbe_reset(struct ixgbe_adapter *adapter)
 			   "hardware.\n");
 		break;
 	default:
-		LIBLCD_ERR("Hardware Error: %d\n", err);
+		e_dev_err("Hardware Error: %d\n", err);
 	}
 
 	clear_bit(__IXGBE_IN_SFP_INIT, &adapter->state);
@@ -5703,8 +5736,7 @@ void ixgbe_down(struct ixgbe_adapter *adapter)
 	/* call carrier off first to avoid false dev_watchdog timeouts */
 	netif_carrier_off(netdev);
 
-	/* TODO: calls out to perform this */
-	//__netif_tx_disable(netdev);
+	/* XXX: calls out */
 	netif_tx_disable(netdev);
 
 	/* disable any upper devices */
@@ -5715,8 +5747,7 @@ void ixgbe_down(struct ixgbe_adapter *adapter)
 			if (vlan->fwd_priv) {
 				netif_tx_stop_all_queues(upper);
 				netif_carrier_off(upper);
-				/* XXX: calls out to perform this */
-				//__netif_tx_disable(upper);
+				/* XXX: calls out */
 				netif_tx_disable(netdev);
 			}
 		}
@@ -5989,13 +6020,13 @@ static int ixgbe_sw_init(struct ixgbe_adapter *adapter)
 
 #ifdef CONFIG_PCI_IOV
 	if (max_vfs > 0)
-		LIBLCD_WARN("Enabling SR-IOV VFs using the max_vfs module parameter is deprecated - please use the pci sysfs interface instead.\n");
+		e_dev_warn("Enabling SR-IOV VFs using the max_vfs module parameter is deprecated - please use the pci sysfs interface instead.\n");
 
 	/* assign number of SR-IOV VFs */
 	if (hw->mac.type != ixgbe_mac_82598EB) {
 		if (max_vfs > IXGBE_MAX_VFS_DRV_LIMIT) {
 			adapter->num_vfs = 0;
-			LIBLCD_WARN("max_vfs parameter out of range. Not assigning any SR-IOV VFs\n");
+			e_dev_warn("max_vfs parameter out of range. Not assigning any SR-IOV VFs\n");
 		} else {
 			adapter->num_vfs = max_vfs;
 		}
@@ -6015,7 +6046,7 @@ static int ixgbe_sw_init(struct ixgbe_adapter *adapter)
 
 	/* initialize eeprom parameters */
 	if (ixgbe_init_eeprom_params_generic(hw)) {
-		LIBLCD_ERR("EEPROM initialization failed\n");
+		e_dev_err("EEPROM initialization failed\n");
 		return -EIO;
 	}
 
@@ -6044,7 +6075,7 @@ int ixgbe_setup_tx_resources(struct ixgbe_ring *tx_ring)
 	if (tx_ring->q_vector)
 		ring_node = tx_ring->q_vector->numa_node;
 
-	LIBLCD_MSG("%s, allocating memory ring_count %d | size per ring %zu\n",
+	e_dev_info("%s, allocating memory ring_count %d | size per ring %zu\n",
 			__func__, tx_ring->count, sizeof(struct ixgbe_tx_buffer) );
 	tx_ring->tx_buffer_info = kzalloc_node(size, GFP_KERNEL, ring_node);
 	if (!tx_ring->tx_buffer_info)
@@ -6131,7 +6162,7 @@ int ixgbe_setup_rx_resources(struct ixgbe_ring *rx_ring)
 	if (rx_ring->q_vector)
 		ring_node = rx_ring->q_vector->numa_node;
 
-	LIBLCD_MSG("%s, allocating rx memory ring_count %d | size per ring %zu\n",
+	e_dev_info("%s, allocating rx memory ring_count %d | size per ring %zu\n",
 			__func__, rx_ring->count, sizeof(struct ixgbe_rx_buffer));
 
 	rx_ring->rx_buffer_info = kzalloc_node(size, GFP_KERNEL, ring_node);
@@ -6469,7 +6500,7 @@ static int ixgbe_resume(struct pci_dev *pdev)
 
 	err = pci_enable_device_mem(pdev);
 	if (err) {
-		LIBLCD_ERR("Cannot enable PCI device from suspend\n");
+		e_dev_err("Cannot enable PCI device from suspend\n");
 		return err;
 	}
 	smp_mb__before_atomic();
@@ -6959,6 +6990,7 @@ static void ixgbe_watchdog_update_link(struct ixgbe_adapter *adapter)
 		IXGBE_WRITE_REG(hw, IXGBE_EIMS, IXGBE_EIMC_LSC);
 		IXGBE_WRITE_FLUSH(hw);
 	}
+
 	adapter->link_up = link_up;
 	adapter->link_speed = link_speed;
 }
@@ -6979,7 +7011,7 @@ static void ixgbe_update_default_up(struct ixgbe_adapter *adapter)
 	adapter->default_up = (up > 1) ? (ffs(up) - 1) : 0;
 #endif
 }
-extern void _netif_tx_wake_all_queues(struct net_device *dev);
+
 /**
  * ixgbe_watchdog_link_is_up - update netif_carrier status and
  *                             print link up message
@@ -7059,7 +7091,7 @@ static void ixgbe_watchdog_link_is_up(struct ixgbe_adapter *adapter)
 	ixgbe_check_vf_rate_limit(adapter);
 #endif
 	/* enable transmits */
-	_netif_tx_wake_all_queues(adapter->netdev);
+	netif_tx_wake_all_queues(adapter->netdev);
 
 	/* enable any upper devices */
 	rtnl_lock();
@@ -7068,7 +7100,7 @@ static void ixgbe_watchdog_link_is_up(struct ixgbe_adapter *adapter)
 			struct macvlan_dev *vlan = netdev_priv(upper);
 
 			if (vlan->fwd_priv)
-				_netif_tx_wake_all_queues(upper);
+				netif_tx_wake_all_queues(upper);
 		}
 	}
 	rtnl_unlock();
@@ -7185,9 +7217,9 @@ static inline void ixgbe_issue_vf_flr(struct ixgbe_adapter *adapter,
 				      struct pci_dev *vfdev)
 {
 	if (!pci_wait_for_pending_transaction(vfdev))
-		LIBLCD_WARN("Issuing VFLR with pending transactions\n");
+		e_dev_warn("Issuing VFLR with pending transactions\n");
 
-	LIBLCD_ERR("Issuing VFLR for VF %s\n", pci_name(vfdev));
+	e_dev_err("Issuing VFLR for VF %s\n", pci_name(vfdev));
 	pcie_capability_set_word(vfdev, PCI_EXP_DEVCTL, PCI_EXP_DEVCTL_BCR_FLR);
 
 	msleep(100);
@@ -7261,6 +7293,7 @@ ixgbe_check_for_bad_vf(struct ixgbe_adapter __always_unused *adapter)
 }
 #endif /* LCD_ISOLATE */
 #endif /* CONFIG_PCI_IOV */
+
 
 /**
  * ixgbe_watchdog_subtask - check and bring link up
@@ -7353,9 +7386,9 @@ sfp_out:
 
 	if ((err == IXGBE_ERR_SFP_NOT_SUPPORTED) &&
 	    (adapter->netdev->reg_state == NETREG_REGISTERED)) {
-		LIBLCD_ERR("failed to initialize because an unsupported "
+		e_dev_err("failed to initialize because an unsupported "
 			  "SFP+ module type was detected.\n");
-		LIBLCD_ERR("Reload the driver after installing a "
+		e_dev_err("Reload the driver after installing a "
 			  "supported module.\n");
 		unregister_netdev(adapter->netdev);
 	}
@@ -7786,11 +7819,13 @@ static void ixgbe_tx_map(struct ixgbe_ring *tx_ring,
 	for (frag = &skb_shinfo(skb)->frags[0];; frag++) {
 		if (dma_mapping_error(tx_ring->dev, dma))
 			goto dma_error;
+
 		/* record length, and DMA address */
 		dma_unmap_len_set(tx_buffer, len, size);
 		dma_unmap_addr_set(tx_buffer, dma, dma);
 
 		tx_desc->read.buffer_addr = cpu_to_le64(dma);
+
 		while (unlikely(size > IXGBE_MAX_DATA_PER_TXD)) {
 			tx_desc->read.cmd_type_len =
 				cpu_to_le32(cmd_type ^ IXGBE_MAX_DATA_PER_TXD);
@@ -7805,6 +7840,7 @@ static void ixgbe_tx_map(struct ixgbe_ring *tx_ring,
 
 			dma += IXGBE_MAX_DATA_PER_TXD;
 			size -= IXGBE_MAX_DATA_PER_TXD;
+
 			tx_desc->read.buffer_addr = cpu_to_le64(dma);
 		}
 
@@ -8217,11 +8253,12 @@ static netdev_tx_t __ixgbe_xmit_frame(struct sk_buff *skb,
 	return ixgbe_xmit_frame_ring(skb, adapter, tx_ring);
 }
 
-netdev_tx_t ixgbe_xmit_frame(struct sk_buff *skb,
+static netdev_tx_t ixgbe_xmit_frame(struct sk_buff *skb,
 				    struct net_device *netdev)
 {
 	return __ixgbe_xmit_frame(skb, netdev, NULL);
 }
+
 /**
  * ixgbe_set_mac - Change the Ethernet Address of the NIC
  * @netdev: network interface device structure
@@ -9140,7 +9177,7 @@ skip:
  * @dev: The port's netdev
  * @ti: Tunnel endpoint information
  **/
-static void ixgbe_add_vxlan_port(struct net_device *dev,
+__maybe_unused static void ixgbe_add_vxlan_port(struct net_device *dev,
 				 struct udp_tunnel_info *ti)
 {
 	struct ixgbe_adapter *adapter = netdev_priv(dev);
@@ -9175,7 +9212,7 @@ static void ixgbe_add_vxlan_port(struct net_device *dev,
  * @dev: The port's netdev
  * @ti: Tunnel endpoint information
  **/
-static void ixgbe_del_vxlan_port(struct net_device *dev,
+__maybe_unused static void ixgbe_del_vxlan_port(struct net_device *dev,
 				 struct udp_tunnel_info *ti)
 {
 	struct ixgbe_adapter *adapter = netdev_priv(dev);
@@ -9199,7 +9236,7 @@ static void ixgbe_del_vxlan_port(struct net_device *dev,
 	adapter->flags2 |= IXGBE_FLAG2_VXLAN_REREG_NEEDED;
 }
 
-static int ixgbe_ndo_fdb_add(struct ndmsg *ndm, struct nlattr *tb[],
+__maybe_unused static int ixgbe_ndo_fdb_add(struct ndmsg *ndm, struct nlattr *tb[],
 			     struct net_device *dev,
 			     const unsigned char *addr, u16 vid,
 			     u16 flags)
@@ -9223,7 +9260,7 @@ static int ixgbe_ndo_fdb_add(struct ndmsg *ndm, struct nlattr *tb[],
  *
  * Configure some settings require for various bridge modes.
  **/
-static int ixgbe_configure_bridge_mode(struct ixgbe_adapter *adapter,
+__maybe_unused static int ixgbe_configure_bridge_mode(struct ixgbe_adapter *adapter,
 				       __u16 mode)
 {
 	struct ixgbe_hw *hw = &adapter->hw;
@@ -9290,7 +9327,7 @@ static int ixgbe_configure_bridge_mode(struct ixgbe_adapter *adapter,
 	return 0;
 }
 
-static int ixgbe_ndo_bridge_setlink(struct net_device *dev,
+__maybe_unused static int ixgbe_ndo_bridge_setlink(struct net_device *dev,
 				    struct nlmsghdr *nlh, u16 flags)
 {
 	struct ixgbe_adapter *adapter = netdev_priv(dev);
@@ -9325,7 +9362,7 @@ static int ixgbe_ndo_bridge_setlink(struct net_device *dev,
 	return 0;
 }
 
-static int ixgbe_ndo_bridge_getlink(struct sk_buff *skb, u32 pid, u32 seq,
+__maybe_unused static int ixgbe_ndo_bridge_getlink(struct sk_buff *skb, u32 pid, u32 seq,
 				    struct net_device *dev,
 				    u32 filter_mask, int nlflags)
 {
@@ -9339,7 +9376,7 @@ static int ixgbe_ndo_bridge_getlink(struct sk_buff *skb, u32 pid, u32 seq,
 				       filter_mask, NULL);
 }
 
-static void *ixgbe_fwd_add(struct net_device *pdev, struct net_device *vdev)
+__maybe_unused static void *ixgbe_fwd_add(struct net_device *pdev, struct net_device *vdev)
 {
 	struct ixgbe_fwd_adapter *fwd_adapter = NULL;
 	struct ixgbe_adapter *adapter = netdev_priv(pdev);
@@ -9410,7 +9447,7 @@ fwd_add_err:
 	return ERR_PTR(err);
 }
 
-static void ixgbe_fwd_del(struct net_device *pdev, void *priv)
+__maybe_unused static void ixgbe_fwd_del(struct net_device *pdev, void *priv)
 {
 	struct ixgbe_fwd_adapter *fwd_adapter = priv;
 	struct ixgbe_adapter *adapter = fwd_adapter->real_adapter;
@@ -9476,8 +9513,10 @@ static const struct net_device_ops ixgbe_netdev_ops = {
 	.ndo_change_mtu		= ixgbe_change_mtu,
 	.ndo_tx_timeout		= ixgbe_tx_timeout,
 	.ndo_set_tx_maxrate	= ixgbe_tx_maxrate,
+#ifndef LCD_ISOLATE
 	.ndo_vlan_rx_add_vid	= ixgbe_vlan_rx_add_vid,
 	.ndo_vlan_rx_kill_vid	= ixgbe_vlan_rx_kill_vid,
+#endif
 	.ndo_do_ioctl		= ixgbe_ioctl,
 #ifdef CONFIG_PCI_IOV
 	.ndo_set_vf_mac		= ixgbe_ndo_set_vf_mac,
@@ -9507,6 +9546,7 @@ static const struct net_device_ops ixgbe_netdev_ops = {
 #endif /* IXGBE_FCOE */
 	.ndo_set_features = ixgbe_set_features,
 	.ndo_fix_features = ixgbe_fix_features,
+#ifndef LCD_ISOLATE
 	.ndo_fdb_add		= ixgbe_ndo_fdb_add,
 	.ndo_bridge_setlink	= ixgbe_ndo_bridge_setlink,
 	.ndo_bridge_getlink	= ixgbe_ndo_bridge_getlink,
@@ -9514,6 +9554,7 @@ static const struct net_device_ops ixgbe_netdev_ops = {
 	.ndo_dfwd_del_station	= ixgbe_fwd_del,
 	.ndo_udp_tunnel_add	= ixgbe_add_vxlan_port,
 	.ndo_udp_tunnel_del	= ixgbe_del_vxlan_port,
+#endif
 	.ndo_features_check	= ixgbe_features_check,
 };
 
@@ -9641,18 +9682,12 @@ bool ixgbe_wol_supported(struct ixgbe_adapter *adapter, u16 device_id,
  * The OS initialization, configuring of the adapter private structure,
  * and a hardware reset occur.
  **/
-
-
 static int ixgbe_probe(struct pci_dev *pdev, const struct pci_device_id *ent)
 {
 	struct net_device *netdev;
 	struct ixgbe_adapter *adapter = NULL;
 	struct ixgbe_hw *hw;
-#ifndef LCD_ISOLATE
 	const struct ixgbe_info *ii = ixgbe_info_tbl[ent->driver_data];
-#else
-	const struct ixgbe_info *ii = ixgbe_info_tbl[board_82599];
-#endif
 	int err, pci_using_dac;
 #ifndef LCD_ISOLATE
 	int expected_gts;
@@ -9668,6 +9703,7 @@ static int ixgbe_probe(struct pci_dev *pdev, const struct pci_device_id *ent)
 #endif
 	u32 eec;
 
+	printk("%s:%d #1", __func__, __LINE__);
 	/* Catch broken hardware that put the wrong VF device ID in
 	 * the PCIe SR-IOV capability.
 	 */
@@ -9677,10 +9713,12 @@ static int ixgbe_probe(struct pci_dev *pdev, const struct pci_device_id *ent)
 		return -EINVAL;
 	}
 
+	printk("%s:%d #2", __func__, __LINE__);
 	err = pci_enable_device_mem(pdev);
 	if (err)
 		return err;
 
+	printk("%s:%d #3", __func__, __LINE__);
 	if (!dma_set_mask_and_coherent(&pdev->dev, DMA_BIT_MASK(64))) {
 		pci_using_dac = 1;
 	} else {
@@ -9693,6 +9731,7 @@ static int ixgbe_probe(struct pci_dev *pdev, const struct pci_device_id *ent)
 		pci_using_dac = 0;
 	}
 
+	printk("%s:%d #4", __func__, __LINE__);
 	err = pci_request_mem_regions(pdev, ixgbe_driver_name);
 	if (err) {
 		dev_err(&pdev->dev,
@@ -9700,8 +9739,10 @@ static int ixgbe_probe(struct pci_dev *pdev, const struct pci_device_id *ent)
 		goto err_pci_reg;
 	}
 
+	printk("%s:%d #5", __func__, __LINE__);
 	pci_enable_pcie_error_reporting(pdev);
 
+	printk("%s:%d #6", __func__, __LINE__);
 	pci_set_master(pdev);
 	pci_save_state(pdev);
 
@@ -9714,6 +9755,7 @@ static int ixgbe_probe(struct pci_dev *pdev, const struct pci_device_id *ent)
 #endif
 	}
 
+	printk("%s:%d #7", __func__, __LINE__);
 	netdev = alloc_etherdev_mq(sizeof(struct ixgbe_adapter), indices);
 	if (!netdev) {
 		err = -ENOMEM;
@@ -9735,13 +9777,9 @@ static int ixgbe_probe(struct pci_dev *pdev, const struct pci_device_id *ent)
 	/* forcefully setting this to avoid a reset when enabled via ethtool */
 	adapter->flags |= IXGBE_FLAG_FDIR_PERFECT_CAPABLE;
 
-#ifndef LCD_ISOLATE
 	hw->hw_addr = ioremap(pci_resource_start(pdev, 0),
 			      pci_resource_len(pdev, 0));
-#else
-	/* already remapped by probe_callee in ixgbe_caller.c */
-	hw->hw_addr = (u8*) pci_resource_start(pdev, 0);
-#endif
+
 	adapter->io_addr = hw->hw_addr;
 	if (!hw->hw_addr) {
 		err = -EIO;
@@ -9829,11 +9867,11 @@ static int ixgbe_probe(struct pci_dev *pdev, const struct pci_device_id *ent)
 	if (err == IXGBE_ERR_SFP_NOT_PRESENT) {
 		err = 0;
 	} else if (err == IXGBE_ERR_SFP_NOT_SUPPORTED) {
-		LIBLCD_ERR("failed to load because an unsupported SFP+ or QSFP module type was detected.\n");
-		LIBLCD_ERR("Reload the driver after installing a supported module.\n");
+		e_dev_err("failed to load because an unsupported SFP+ or QSFP module type was detected.\n");
+		e_dev_err("Reload the driver after installing a supported module.\n");
 		goto err_sw_init;
 	} else if (err) {
-		LIBLCD_ERR("HW Init failed: %d\n", err);
+		e_dev_err("HW Init failed: %d\n", err);
 		goto err_sw_init;
 	}
 
@@ -9936,7 +9974,7 @@ skip_sriov:
 
 	/* make sure the EEPROM is good */
 	if (hw->eeprom.ops.validate_checksum(hw, NULL) < 0) {
-		LIBLCD_ERR("The EEPROM Checksum Is Not Valid\n");
+		e_dev_err("The EEPROM Checksum Is Not Valid\n");
 		err = -EIO;
 		goto err_sw_init;
 	}
@@ -9954,7 +9992,7 @@ skip_sriov:
 	printk("%s, %pM", __func__, netdev->dev_addr);
 
 	if (!is_valid_ether_addr(netdev->dev_addr)) {
-		LIBLCD_ERR("invalid MAC address\n");
+		e_dev_err("invalid MAC address\n");
 		err = -EIO;
 		goto err_sw_init;
 	}
@@ -10025,20 +10063,20 @@ skip_sriov:
 	if (err)
 		strlcpy(part_str, "Unknown", sizeof(part_str));
 	if (ixgbe_is_sfp(hw) && hw->phy.sfp_type != ixgbe_sfp_type_not_present)
-		LIBLCD_MSG("MAC: %d, PHY: %d, SFP+: %d, PBA No: %s\n",
+		e_dev_info("MAC: %d, PHY: %d, SFP+: %d, PBA No: %s\n",
 			   hw->mac.type, hw->phy.type, hw->phy.sfp_type,
 			   part_str);
 	else
-		LIBLCD_MSG("MAC: %d, PHY: %d, PBA No: %s\n",
+		e_dev_info("MAC: %d, PHY: %d, PBA No: %s\n",
 			   hw->mac.type, hw->phy.type, part_str);
 
-	LIBLCD_MSG("%pM\n", netdev->dev_addr);
+	e_dev_info("%pM\n", netdev->dev_addr);
 
 	/* reset the hardware with the new settings */
 	err = hw->mac.ops.start_hw(hw);
 	if (err == IXGBE_ERR_EEPROM_VERSION) {
 		/* We are running on a pre-production device, log a warning */
-		LIBLCD_WARN("This device is a pre-production adapter/LOM. "
+		e_dev_warn("This device is a pre-production adapter/LOM. "
 			   "Please be aware there may be issues associated "
 			   "with your hardware.  If you are experiencing "
 			   "problems please contact your Intel or hardware "
@@ -10046,7 +10084,6 @@ skip_sriov:
 			   "hardware.\n");
 	}
 	strcpy(netdev->name, "eth%d");
-
 	err = register_netdev(netdev);
 	if (err)
 		goto err_register;
@@ -10085,7 +10122,7 @@ skip_sriov:
 	/* add san mac addr to netdev */
 	ixgbe_add_sanmac_netdev(netdev);
 
-	LIBLCD_MSG("%s\n", ixgbe_default_device_descr);
+	e_dev_info("%s\n", ixgbe_default_device_descr);
 
 #ifdef CONFIG_IXGBE_HWMON
 	if (ixgbe_sysfs_init(adapter))
@@ -10137,11 +10174,7 @@ err_dma:
  **/
 static void ixgbe_remove(struct pci_dev *pdev)
 {
-#ifndef LCD_ISOLATE
 	struct ixgbe_adapter *adapter = pci_get_drvdata(pdev);
-#else
-	struct ixgbe_adapter *adapter = g_adapter;
-#endif
 	struct net_device *netdev;
 	bool disable_dev;
 	int i;
@@ -10155,7 +10188,9 @@ static void ixgbe_remove(struct pci_dev *pdev)
 	ixgbe_dbg_adapter_exit(adapter);
 #endif
 	set_bit(__IXGBE_REMOVING, &adapter->state);
+#ifndef LCD_ISOLATE
 	cancel_work_sync(&adapter->service_task);
+#endif
 
 #ifdef CONFIG_IXGBE_DCA
 	if (adapter->flags & IXGBE_FLAG_DCA_ENABLED) {
@@ -10263,8 +10298,8 @@ static pci_ers_result_t ixgbe_io_error_detected(struct pci_dev *pdev,
 		unsigned int device_id;
 
 		vf = (req_id & 0x7F) >> 1;
-		LIBLCD_ERR("VF %d has caused a PCIe error\n", vf);
-		LIBLCD_ERR("TLP: dw0: %8.8x\tdw1: %8.8x\tdw2: "
+		e_dev_err("VF %d has caused a PCIe error\n", vf);
+		e_dev_err("TLP: dw0: %8.8x\tdw1: %8.8x\tdw2: "
 				"%8.8x\tdw3: %8.8x\n",
 		dw0, dw1, dw2, dw3);
 		switch (adapter->hw.mac.type) {
@@ -10376,7 +10411,7 @@ static pci_ers_result_t ixgbe_io_slot_reset(struct pci_dev *pdev)
 
 	err = pci_cleanup_aer_uncorrect_error_status(pdev);
 	if (err) {
-		LIBLCD_ERR("pci_cleanup_aer_uncorrect_error_status "
+		e_dev_err("pci_cleanup_aer_uncorrect_error_status "
 			  "failed 0x%0x\n", err);
 		/* non-fatal, continue */
 	}

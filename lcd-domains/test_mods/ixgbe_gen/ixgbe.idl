@@ -2,6 +2,7 @@ module kernel {
 	rpc_ptr int probe( projection pdev [alloc(callee)] * pdev, projection ent [alloc(callee)] * ent ) {
 		projection < struct device> device {
 			//projection device_parent* parent;
+			array<u64, 1> [alloc(callee)] *dma_mask;
 			projection kobject kobj;
 		}
 		projection < struct kobject > kobject {
@@ -9,10 +10,13 @@ module kernel {
 		}
 		projection < struct pci_dev > pdev {
 			projection pci_dev_bus [alloc(callee)] * bus;
-			unsigned short vendor;
-			unsigned short device;
-			unsigned short subsystem_device;
-			//unsigned int is_virtfn : 1;
+			unsigned int	devfn;
+			unsigned short	vendor;
+			unsigned short	device;
+			unsigned short	subsystem_vendor;
+			unsigned short	subsystem_device;
+			u8		revision;
+			unsigned int is_virtfn : 1;
 			projection device dev;
 			array< projection resource, 11> resource;
 		}
@@ -1254,14 +1258,14 @@ rpc_ptr s32 [in, out] ndo_start_xmit( projection skb * [in, out] skb, projection
 		}
 	}
 
-	/* FIXME: Setup hook for timers 
-	rpc void  init_timer_key( projection timer * [in] timer, u32  flags, s8*  name, projection key *  key ) {
+	rpc_ptr void timer_func(unsigned long data) {
+	}
+
+	rpc void  lvd_setup_timer( projection timer [alloc(callee), bind(callee)] * [in, out] timer, rpc_ptr timer_func func, unsigned int flags ) {
 		projection < struct timer_list > timer {
-		}
-		projection < struct lock_class_key > key {
+			unsigned long [out] data;
 		}
 	}
-	*/
 
 	/* XXX debugfs
 	rpc_ptr s32  read( projection filp * [in] filp, s8*  buffer, u64  count, s64* [in] ppos ) {
@@ -1294,24 +1298,17 @@ rpc_ptr s32 [in, out] ndo_start_xmit( projection skb * [in, out] skb, projection
 	*/
 	rpc void  pci_disable_msi( projection dev * [in] dev ) {
 		projection < struct pci_dev > dev {
-			projection pci_dev_bus* bus;
 			u32 [in, out] irq;
-		}
-		projection < struct pci_bus > pci_dev_bus {
+			unsigned int [in, out] msi_enabled : 1;
 		}
 	}
 	rpc void  pci_disable_msix( projection dev * [in] dev ) {
 		projection < struct pci_dev > dev {
-			projection pci_dev_bus* bus;
-		}
-		projection < struct pci_bus > pci_dev_bus {
+			unsigned int [in, out] msix_enabled: 1;
 		}
 	}
 	rpc void  pci_disable_device( projection dev * [in] dev ) {
 		projection < struct pci_dev > dev {
-			projection pci_dev_bus* bus;
-		}
-		projection < struct pci_bus > pci_dev_bus {
 		}
 	}
 	rpc int pci_bus_read_config_word( projection bus * bus,
@@ -1380,24 +1377,24 @@ rpc bool  queue_work_on( s32  cpu, projection wq * [in] wq, projection work * [i
 	}
 	rpc s32  pci_save_state( projection dev * dev ) {
 		projection < struct pci_dev > dev {
-			u32 devfn;
-			u8 pcie_cap;
+			//u32 devfn;
+			//u8 pcie_cap;
 		}
 	}
 	rpc void  pci_set_master( projection dev * dev ) {
 		projection < struct pci_dev > dev {
 		}
 	}
-	rpc int pci_request_selected_regions( projection pdev * pdev, s32  bars, string [alloc(callee)] *res_name ) {
+	rpc int pci_request_selected_regions( projection pdev * pdev,
+			int bars, string [alloc(callee)] * res_name ) {
 		projection < struct pci_dev > pdev {
 		}
 	}
-	rpc void  pci_release_selected_regions( projection pdev * pdev, s32  bars ) {
+	rpc void  pci_release_selected_regions( projection pdev*  pdev, int  bars ) {
 		projection < struct pci_dev > pdev {
 		}
 	}
-
-	rpc s32 mod_timer( projection timer [bind(callee)] *timer, unsigned long expires ) {
+	rpc int mod_timer( projection timer [bind(callee)] *timer, unsigned long expires ) {
 		projection < struct timer_list > timer {
 		}
 	}
@@ -1405,7 +1402,7 @@ rpc bool  queue_work_on( s32  cpu, projection wq * [in] wq, projection work * [i
 		projection < struct pci_dev > dev {
 		}
 	}
-	rpc int pci_enable_device_mem( projection dev * [in] dev ) {
+	rpc int  pci_enable_device_mem( projection dev*  dev ) {
 		projection < struct pci_dev > dev {
 		}
 	}
@@ -1749,9 +1746,10 @@ rpc void  napi_complete_done( projection n * [in, out] n, s32  work_done ) {
 	*/
 	rpc void  unregister_netdev( projection dev * [in, out] dev ) {
 		projection < struct net_device > dev {
+			u32 [in, out] reg_state: 8;
 		}
 	}
-	rpc void  free_netdev( projection dev * [in, out] dev ) {
+	rpc void  free_netdev( projection dev [dealloc(caller)] *  dev ) {
 		projection < struct net_device > dev {
 			// TODO: dev_addr is assigned NULL
 			u8* dev_addr;
@@ -1779,18 +1777,24 @@ rpc void  napi_complete_done( projection n * [in, out] n, s32  work_done ) {
 
 	rpc int  register_netdev( projection dev* dev ) {
 		projection < struct net_device > dev {
-			array< char, 16> name;
-			long unsigned int state;
+			array< char, 16> [out] name;
+			long unsigned int [out] state;
+			u32 [out] reg_state : 8;
 			long long unsigned int [in, out] features;
 			long long unsigned int [in, out] hw_features;
 			long long unsigned int [in, out] vlan_features;
 			long long unsigned int [in, out] hw_enc_features;
 			long long unsigned int [in, out] mpls_features;
+			long long unsigned int [in, out] gso_partial_features;
 			projection net_device__global_netdev_ops [alloc(callee)] * netdev_ops;
 			projection net_device__global_ethtool_ops [alloc(callee)] * ethtool_ops;
 			unsigned int flags;
 			unsigned char addr_len;
+			unsigned int [out] mtu;
 			array<unsigned char, {{ctx->dev->addr_len}}> *dev_addr;
+			unsigned int [out] num_tx_queues;
+			u32 priv_flags;
+			int watchdog_timeo;
 			//unsigned int [in, out] reg_state : 8;
 		}
 	}
@@ -1802,14 +1806,14 @@ rpc void  napi_complete_done( projection n * [in, out] n, s32  work_done ) {
 	}
 	rpc void  netif_carrier_on( projection dev * [in, out] dev ) {
 		projection < struct net_device > dev {
-			u64 [in] state;
-			s32 [in, out] watchdog_timeo;
+			long unsigned int [in, out] state;
+			int [in, out] watchdog_timeo;
 			//u32 [in] reg_state;
 		}
 	}
 	rpc void  netif_carrier_off( projection dev * [in] dev ) {
 		projection < struct net_device > dev {
-			u64 [in] state;
+			long unsigned int [in, out] state;
 			//u32 [in] reg_state;
 		}
 	}
@@ -1824,7 +1828,7 @@ rpc projection ret_net_device* [in] netdev_all_upper_get_next_dev_rcu( projectio
 
 	rpc void  napi_disable( projection n [bind(callee)] *n ) {
 		projection < struct napi_struct > n {
-			u64 [in] state;
+			long unsigned int  state;
 		}
 	}
 
@@ -1836,7 +1840,7 @@ rpc projection ret_net_device* [in] netdev_all_upper_get_next_dev_rcu( projectio
 		projection < struct net_device > dev {
 		}
 		projection < struct napi_struct > napi {
-			u64 state;
+			long unsigned int  state;
 			u32 [in, out] napi_id;
 		}
 	}
@@ -1948,7 +1952,7 @@ rpc s32  skb_checksum_help( projection skb * [in, out] skb ) {
 	}
 	rpc int  netif_set_real_num_rx_queues( projection dev *dev, u32  rxq ) {
 		projection < struct net_device > dev {
-			u32 [in] num_rx_queues;
+			u32 [in, out] num_rx_queues;
 			//u32 [in] reg_state;
 		}
 	}
@@ -2108,7 +2112,7 @@ rpc s32  skb_checksum_help( projection skb * [in, out] skb ) {
 		}
 	}
 	*/
-	/* TODO: workqueue: need globals
+	/*
 	rpc projection ret_workqueue_struct* [in, out]alloc_sized(caller, var_size, var_gp) __alloc_workqueue_key( s8*  fmt, u32  flags, s32  max_active, projection key * [unused] key, s8* [unused] lock_name ) {
 		projection < struct workqueue_struct > ret_workqueue_struct {
 		}
@@ -2146,10 +2150,15 @@ rpc s32  skb_checksum_help( projection skb * [in, out] skb ) {
 	}
 	rpc_ptr unsigned int handler(int irq, void *id) {
 	}
-	
-	rpc int request_threaded_irq( u32  irq, rpc_ptr handler handler, rpc_ptr thread_fn thread_fn, unsigned long irqflags, string [alloc(callee)] *devname,
-			void [alloc<{{sizeof(void*)}}>(callee)] *dev_id ) {
+
+	rpc int request_threaded_irq( unsigned int irq,
+			rpc_ptr handler handler,
+			rpc_ptr thread_fn [unused] thread_fn,
+			long unsigned int irqflags,
+			string [alloc(callee)] * devname,
+			void [alloc<{{sizeof(void*)}}>(callee)] * [unused] dev_id ) {
 	}
+
 	rpc void  free_irq( u32  irq, void [bind(callee)] * dev_id ) {
 	}
 	rpc void  synchronize_irq( u32  irq ) {
@@ -2161,20 +2170,21 @@ rpc s32  skb_checksum_help( projection skb * [in, out] skb ) {
 			array< u64, 1> bits;
 		}
 	}
-	rpc int pci_enable_msix_range( projection dev * dev, array<projection entries, {{ctx->maxvec}}> [alloc(callee)] * entries, int minvec, int maxvec ) {
+	rpc int pci_enable_msix_range( projection dev * dev, array<projection entries, {{ctx->maxvec}}> [alloc(callee)] * [in, out] entries, int minvec, int maxvec ) {
 		projection < struct pci_dev > dev {
-			projection pci_dev_bus* bus;
-		}
-		projection < struct pci_bus > pci_dev_bus {
+			unsigned int [out] msi_enabled : 1;
+			unsigned int [out] msix_enabled: 1;
 		}
 		projection < struct msix_entry > entries {
+			u32 [out] vector;
+			u16 entry;
 		}
 	}
 	rpc int pci_enable_msi_range( projection dev *dev, int minvec, int maxvec ) {
 		projection < struct pci_dev > dev {
-			projection pci_dev_bus* bus;
-		}
-		projection < struct pci_bus > pci_dev_bus {
+			unsigned int [out] msi_enabled : 1;
+			unsigned int [out] msix_enabled: 1;
+			unsigned int [out] irq;
 		}
 	}
 	/* XXX: debugfs
@@ -2249,8 +2259,11 @@ rpc s32  skb_checksum_help( projection skb * [in, out] skb ) {
 		}
 	}
 
-	rpc projection ret_net_device [alloc<{{sizeof(struct net_device) + ctx->sizeof_priv}}>(caller)] *alloc_etherdev_mqs( s32  sizeof_priv, u32  txqs, u32  rxqs ) {
+	rpc projection ret_net_device [alloc<{{sizeof(struct net_device) + ctx->sizeof_priv}}>(caller)] *alloc_etherdev_mqs( int sizeof_priv, unsigned int txqs, unsigned int rxqs ) {
 		projection < struct net_device > ret_net_device {
+			array<unsigned char, {{MAX_ADDR_LEN}}> [alloc(caller)] *dev_addr;
+			unsigned int num_tx_queues;
+			u8 num_tc;
 		}
 	}
 	rpc_ptr int ndo_validate_addr( projection dev [bind(callee)]* dev ) {
@@ -2262,6 +2275,16 @@ rpc s32  skb_checksum_help( projection skb * [in, out] skb ) {
 		projection < struct net_device > dev {
 			u32 [in] priv_flags;
 			u32 [in] num_tx_queues;
+		}
+	}
+	rpc_ptr int mdio_read(projection net_device [bind(callee)] *dev, int prtad, int devad,
+			 u16 addr) {
+		projection < struct net_device > net_device {
+		}
+	}
+	rpc_ptr int mdio_write(projection net_device [bind(callee)] *dev, int prtad, int devad,
+			  u16 addr, u16 val) {
+		projection < struct net_device > net_device {
 		}
 	}
 	// TODO: fix sizeof(mii_data)
@@ -2279,9 +2302,12 @@ rpc s32  skb_checksum_help( projection skb * [in, out] skb ) {
 	}
 	rpc int mdio45_probe( projection mdio [alloc(callee)] * mdio, int prtad ) {
 		projection < struct mdio_if_info > mdio {
-			s32 [in, out] prtad;
+			int [in, out] prtad;
 			u32 [in, out] mmds;
+			unsigned int mode_support;
 			projection mdio_if_info_dev* dev;
+			rpc_ptr mdio_read mdio_read;
+			rpc_ptr mdio_write mdio_write;
 		}
 		projection < struct net_device > mdio_if_info_dev {
 		}
@@ -2294,17 +2320,12 @@ rpc s32  skb_checksum_help( projection skb * [in, out] skb ) {
 
 	rpc int __pci_register_driver( projection drv [alloc(callee)] * drv,
 		projection owner [alloc(callee)] * owner, string [alloc(callee)] * mod_name ) {
-		projection < struct device_driver> device_driver{
-		}
-		projection < struct pci_dynids> pci_dynids{
-		}
 		projection < struct pci_driver > drv {
 			string [alloc(callee)] *  name;
+			array<projection pci_device_id, null> [alloc(callee)] *id_table;
 			rpc_ptr probe probe;
 			rpc_ptr remove remove;
-			//projection device_driver driver;
-			//projection pci_dynids dynids;
-			array<projection pci_device_id, null> [alloc(callee)] *id_table;
+			rpc_ptr shutdown shutdown;
 		}
 		projection <struct pci_device_id> pci_device_id {
 			unsigned int vendor;
@@ -2379,5 +2400,64 @@ rpc s32  skb_checksum_help( projection skb * [in, out] skb ) {
 		rpc_ptr ndo_vlan_rx_add_vid ndo_vlan_rx_add_vid;
 		rpc_ptr ndo_vlan_rx_kill_vid ndo_vlan_rx_kill_vid;
 		*/
+	}
+
+	rpc int pci_enable_pcie_error_reporting(projection pdev *dev) {
+		projection < struct pci_dev > pdev {
+		}
+	}
+	rpc int pci_disable_pcie_error_reporting(projection pdev *dev) {
+		projection < struct pci_dev > pdev {
+		}
+	}
+	rpc void lvd_napi_enable(projection napi [bind(callee)] *napi) {
+		projection < struct napi_struct > napi {
+		}
+	}
+	rpc void lvd_netif_trans_update(projection dev *dev) {
+		projection < struct net_device > dev {
+		}
+	}
+	rpc void lvd_netif_tx_disable(projection dev *dev) {
+		projection < struct net_device > dev {
+		}
+	}
+	rpc void lvd_napi_schedule_irqoff(projection napi [bind(callee)] *napi) {
+		projection < struct napi_struct > napi {
+		}
+	}
+	rpc void lvd_netif_tx_wake_all_queues(projection dev *dev) {
+		projection < struct net_device > dev {
+		}
+	}
+	rpc unsigned long get_loops_per_jiffy() {
+	}
+
+	rpc unsigned long get_jiffies() {
+	}
+
+	rpc int eth_validate_addr( projection dev  *dev ) {
+		projection < struct net_device > dev {
+		}
+	}
+
+	rpc u32 ethtool_op_get_link(projection  dev *dev) {
+		projection < struct net_device > dev {
+		}
+	}
+
+	rpc int ethtool_op_get_ts_info( projection dev [bind(callee)] *  dev, projection info [alloc(callee)] *  info ) {
+		projection < struct net_device > dev {
+		}
+		projection < struct ethtool_ts_info > info {
+			unsigned int [in, out] so_timestamping;
+			int [in, out] phc_index;
+		}
+	}
+
+	rpc int ipv6_find_hdr(const projection skb *skb, unsigned int [alloc(callee), out] *offset,
+		  int target, unsigned short * [unused] fragoff, int * [unused] flags) {
+		projection < struct sk_buff > skb {
+		}
 	}
 }

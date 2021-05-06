@@ -2137,7 +2137,7 @@ static int ixgbe_wol_exclusion(struct ixgbe_adapter *adapter,
 	return retval;
 }
 
-static void ixgbe_get_wol(struct net_device *netdev,
+__maybe_unused static void ixgbe_get_wol(struct net_device *netdev,
 			  struct ethtool_wolinfo *wol)
 {
 	struct ixgbe_adapter *adapter = netdev_priv(netdev);
@@ -2160,7 +2160,7 @@ static void ixgbe_get_wol(struct net_device *netdev,
 		wol->wolopts |= WAKE_MAGIC;
 }
 
-static int ixgbe_set_wol(struct net_device *netdev, struct ethtool_wolinfo *wol)
+__maybe_unused static int ixgbe_set_wol(struct net_device *netdev, struct ethtool_wolinfo *wol)
 {
 	struct ixgbe_adapter *adapter = netdev_priv(netdev);
 
@@ -3224,8 +3224,10 @@ static const struct ethtool_ops ixgbe_ethtool_ops = {
 	.get_drvinfo            = ixgbe_get_drvinfo,
 	.get_regs_len           = ixgbe_get_regs_len,
 	.get_regs               = ixgbe_get_regs,
+#ifndef LCD_ISOLATE
 	.get_wol                = ixgbe_get_wol,
 	.set_wol                = ixgbe_set_wol,
+#endif
 	.nway_reset             = ixgbe_nway_reset,
 	.get_link               = ethtool_op_get_link,
 	.get_eeprom_len         = ixgbe_get_eeprom_len,

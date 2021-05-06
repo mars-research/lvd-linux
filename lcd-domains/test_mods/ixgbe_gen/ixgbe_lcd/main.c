@@ -14,6 +14,10 @@
 
 #include <lcd_config/post_hook.h>
 
+bool link_debug_verbose = true;
+unsigned long volatile jiffies;
+unsigned long loops_per_jiffy;
+
 int ixgbe_init_module(void);
 void ixgbe_exit_module(void);
 

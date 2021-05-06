@@ -207,13 +207,14 @@ static struct workqueue_struct *ixgbe_wq;
 
 #endif
 
+unsigned long get_jiffies(void);
 void lvd_napi_enable(struct napi_struct *n);
 void lvd_netif_trans_update(struct net_device *dev);
 void lvd_netif_tx_disable(struct net_device *dev);
 void lvd_netif_tx_wake_all_queues(struct net_device* dev);
 void lvd_napi_schedule_irqoff(struct napi_struct *n);
 typedef void (*fptr_timer_func)(unsigned long data);
-void lvd_setup_timer(struct timer_list* timer, fptr_timer_func func, unsigned int flags);
+void lvd_setup_timer(struct timer_list* timer, fptr_timer_func func, unsigned long);
 
 #ifdef LCD_ISOLATE
 #undef napi_enable
@@ -243,6 +244,11 @@ void lvd_setup_timer(struct timer_list* timer, fptr_timer_func func, unsigned in
 #undef e_dev_info
 #define e_dev_info		LIBLCD_MSG
 
+#undef jiffies
+#define jiffies			({ get_jiffies(); })
+
+#undef napi_alloc_skb
+#define napi_alloc_skb(n, l)	alloc_skb(l, GFP_ATOMIC)
 #endif
 
 static bool ixgbe_check_cfg_remove(struct ixgbe_hw *hw, struct pci_dev *pdev);
@@ -2927,7 +2933,11 @@ static inline void ixgbe_irq_enable(struct ixgbe_adapter *adapter, bool queues,
 
 static irqreturn_t ixgbe_msix_other(int irq, void *data)
 {
+#ifdef LCD_ISOLATE
+	struct ixgbe_adapter *adapter = g_adapter;
+#else
 	struct ixgbe_adapter *adapter = data;
+#endif
 	struct ixgbe_hw *hw = &adapter->hw;
 	u32 eicr;
 
@@ -4714,6 +4724,7 @@ void ixgbe_set_rx_mode(struct net_device *netdev)
 	fctrl |= IXGBE_FCTRL_DPF; /* discard pause frames when FC enabled */
 	fctrl |= IXGBE_FCTRL_PMCF;
 
+	printk("%s:%d #1", __func__, __LINE__);
 	/* clear the bits we are changing the status of */
 	fctrl &= ~(IXGBE_FCTRL_UPE | IXGBE_FCTRL_MPE);
 	if (netdev->flags & IFF_PROMISC) {
@@ -4734,6 +4745,7 @@ void ixgbe_set_rx_mode(struct net_device *netdev)
 	 * sufficient space to store all the addresses then enable
 	 * unicast promiscuous mode
 	 */
+	printk("%s:%d #2", __func__, __LINE__);
 	if (__dev_uc_sync(netdev, ixgbe_uc_sync, ixgbe_uc_unsync)) {
 		fctrl |= IXGBE_FCTRL_UPE;
 		vmolr |= IXGBE_VMOLR_ROPE;
@@ -4743,6 +4755,7 @@ void ixgbe_set_rx_mode(struct net_device *netdev)
 	 * then we should just turn on promiscuous mode so
 	 * that we can at least receive multicast traffic
 	 */
+	printk("%s:%d #3", __func__, __LINE__);
 	count = ixgbe_write_mc_addr_list(netdev);
 	if (count < 0) {
 		fctrl |= IXGBE_FCTRL_MPE;
@@ -4781,6 +4794,8 @@ void ixgbe_set_rx_mode(struct net_device *netdev)
 		ixgbe_vlan_promisc_disable(adapter);
 	else
 		ixgbe_vlan_promisc_enable(adapter);
+
+	printk("%s:%d #3", __func__, __LINE__);
 }
 
 static void ixgbe_napi_enable_all(struct ixgbe_adapter *adapter)
@@ -5254,7 +5269,7 @@ fwd_queue_err:
 	return err;
 }
 
-static void ixgbe_configure_dfwd(struct ixgbe_adapter *adapter)
+__maybe_unused static void ixgbe_configure_dfwd(struct ixgbe_adapter *adapter)
 {
 	struct net_device *upper;
 	struct list_head *iter;
@@ -5335,7 +5350,9 @@ static void ixgbe_configure(struct ixgbe_adapter *adapter)
 #endif /* IXGBE_FCOE */
 	ixgbe_configure_tx(adapter);
 	ixgbe_configure_rx(adapter);
+#ifndef LCD_ISOLATE
 	ixgbe_configure_dfwd(adapter);
+#endif
 }
 
 /**
@@ -6374,20 +6391,25 @@ int ixgbe_open(struct net_device *netdev)
 	if (test_bit(__IXGBE_TESTING, &adapter->state))
 		return -EBUSY;
 
+	printk("%s:%d #1", __func__, __LINE__);
 	netif_carrier_off(netdev);
 
+	printk("%s:%d #2", __func__, __LINE__);
 	/* allocate transmit descriptors */
 	err = ixgbe_setup_all_tx_resources(adapter);
 	if (err)
 		goto err_setup_tx;
 
+	printk("%s:%d #3", __func__, __LINE__);
 	/* allocate receive descriptors */
 	err = ixgbe_setup_all_rx_resources(adapter);
 	if (err)
 		goto err_setup_rx;
 
+	printk("%s:%d #4", __func__, __LINE__);
 	ixgbe_configure(adapter);
 
+	printk("%s:%d #5", __func__, __LINE__);
 	err = ixgbe_request_irq(adapter);
 	if (err)
 		goto err_req_irq;
@@ -6398,6 +6420,7 @@ int ixgbe_open(struct net_device *netdev)
 	else
 		queues = adapter->num_tx_queues;
 
+	printk("%s:%d #6", __func__, __LINE__);
 	err = netif_set_real_num_tx_queues(netdev, queues);
 	if (err)
 		goto err_set_queues;
@@ -6407,6 +6430,7 @@ int ixgbe_open(struct net_device *netdev)
 		queues = IXGBE_MAX_L2A_QUEUES;
 	else
 		queues = adapter->num_rx_queues;
+	printk("%s:%d #7", __func__, __LINE__);
 	err = netif_set_real_num_rx_queues(netdev, queues);
 	if (err)
 		goto err_set_queues;
@@ -6414,11 +6438,15 @@ int ixgbe_open(struct net_device *netdev)
 #ifdef CONFIG_PTP_1588_CLOCK
 	ixgbe_ptp_init(adapter);
 #endif
+	printk("%s:%d #8", __func__, __LINE__);
 	ixgbe_up_complete(adapter);
 
+	printk("%s:%d #9", __func__, __LINE__);
 	ixgbe_clear_vxlan_port(adapter);
-	udp_tunnel_get_rx_info(netdev);
+	printk("%s:%d #10", __func__, __LINE__);
+	//udp_tunnel_get_rx_info(netdev);
 
+	printk("%s:%d #11", __func__, __LINE__);
 	return 0;
 
 err_set_queues:
@@ -6872,6 +6900,7 @@ static void ixgbe_fdir_reinit_subtask(struct ixgbe_adapter *adapter)
 	struct ixgbe_hw *hw = &adapter->hw;
 	int i;
 
+	printk("%s:%d #1", __func__, __LINE__);
 	if (!(adapter->flags2 & IXGBE_FLAG2_FDIR_REQUIRES_REINIT))
 		return;
 
@@ -6897,6 +6926,7 @@ static void ixgbe_fdir_reinit_subtask(struct ixgbe_adapter *adapter)
 		e_err(probe, "failed to finish FDIR re-initialization, "
 		      "ignored adding FDIR ATR filters\n");
 	}
+	printk("%s:%d #2", __func__, __LINE__);
 }
 
 /**
@@ -7346,6 +7376,7 @@ static void ixgbe_sfp_detection_subtask(struct ixgbe_adapter *adapter)
 	adapter->sfp_poll_time = jiffies + IXGBE_SFP_POLL_JIFFIES - 1;
 
 	err = hw->phy.ops.identify_sfp(hw);
+	printk("%s:%d #1", __func__, __LINE__);
 	if (err == IXGBE_ERR_SFP_NOT_SUPPORTED)
 		goto sfp_out;
 
@@ -7355,6 +7386,7 @@ static void ixgbe_sfp_detection_subtask(struct ixgbe_adapter *adapter)
 		adapter->flags2 |= IXGBE_FLAG2_SFP_NEEDS_RESET;
 	}
 
+	printk("%s:%d #2", __func__, __LINE__);
 	/* exit on error */
 	if (err)
 		goto sfp_out;
@@ -7370,15 +7402,18 @@ static void ixgbe_sfp_detection_subtask(struct ixgbe_adapter *adapter)
 	 * support for that module.  setup_sfp() will fail in that case, so
 	 * we should not allow that module to load.
 	 */
+	printk("%s:%d #3", __func__, __LINE__);
 	if (hw->mac.type == ixgbe_mac_82598EB)
 		err = hw->phy.ops.reset(hw);
 	else
 		err = hw->mac.ops.setup_sfp(hw);
 
+	printk("%s:%d #4", __func__, __LINE__);
 	if (err == IXGBE_ERR_SFP_NOT_SUPPORTED)
 		goto sfp_out;
 
 	adapter->flags |= IXGBE_FLAG_NEED_LINK_CONFIG;
+	printk("%s:%d #5", __func__, __LINE__);
 	e_info(probe, "detected SFP+: %d\n", hw->phy.sfp_type);
 
 sfp_out:
@@ -7404,6 +7439,7 @@ static void ixgbe_sfp_link_config_subtask(struct ixgbe_adapter *adapter)
 	u32 speed;
 	bool autoneg = false;
 
+	printk("%s:%d #1", __func__, __LINE__);
 	if (!(adapter->flags & IXGBE_FLAG_NEED_LINK_CONFIG))
 		return;
 
@@ -7448,7 +7484,7 @@ static void ixgbe_service_timer(unsigned long data)
 		next_event_offset = HZ * 2;
 
 	/* Reset the timer */
-	mod_timer(&adapter->service_timer, next_event_offset + jiffies);
+	mod_timer(&adapter->service_timer, next_event_offset);
 
 	ixgbe_service_event_schedule(adapter);
 }
@@ -7540,6 +7576,7 @@ static void ixgbe_service_task(struct work_struct *work)
 	}
 #endif
 
+	printk("%s:%d #3", __func__, __LINE__);
 	ixgbe_service_event_complete(adapter);
 }
 
@@ -9780,6 +9817,12 @@ static int ixgbe_probe(struct pci_dev *pdev, const struct pci_device_id *ent)
 	hw->hw_addr = ioremap(pci_resource_start(pdev, 0),
 			      pci_resource_len(pdev, 0));
 
+	LIBLCD_MSG("%s, Assigning pci device to LVD domains (bus 0x%x, devfn 0x%x)",
+			__func__, pdev->bus->number, pdev->devfn);
+	err = lcd_syscall_assign_device(0, pdev->bus->number, pdev->devfn);
+
+	LIBLCD_MSG("%s, lcd_syscall_assign_device returned %d", __func__, err);
+
 	adapter->io_addr = hw->hw_addr;
 	if (!hw->hw_addr) {
 		err = -EIO;
@@ -10001,7 +10044,7 @@ skip_sriov:
 	ether_addr_copy(hw->mac.addr, hw->mac.perm_addr);
 	ixgbe_mac_set_default_filter(adapter);
 
-	setup_timer(&adapter->service_timer, &ixgbe_service_timer,
+	lvd_setup_timer(&adapter->service_timer, &ixgbe_service_timer,
 		    (unsigned long) adapter);
 
 	if (ixgbe_removed(hw->hw_addr)) {

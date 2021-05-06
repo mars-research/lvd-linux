@@ -65,13 +65,13 @@ void caller_marshal_kernel__probe__pdev__in(
 	}
 
 	{
-		size_t i, len = 11;
+		size_t __i, __len = 11;
 		struct resource const* array = resource_ptr;
-		glue_pack(__pos, __msg, __ext, len);
+		glue_pack(__pos, __msg, __ext, __len);
 		// Warning: see David if this breaks
 		glue_user_trace("Warning: see David if this breaks");
-		for (i = 0; i < len; ++i) {
-			struct resource const* element = &array[i];
+		for (__i = 0; __i < __len; ++__i) {
+			struct resource const* element = &array[__i];
 			caller_marshal_kernel__probe__resource__in(__pos, __msg, __ext, ctx, element);
 		}
 
@@ -140,13 +140,13 @@ void callee_unmarshal_kernel__probe__pdev__in(
 	}
 
 	{
-		int i;
+		int __i;
 		struct resource* array = resource_ptr;
-		size_t len = glue_unpack(__pos, __msg, __ext, size_t);
+		size_t __len = glue_unpack(__pos, __msg, __ext, size_t);
 		// Warning: see David if this breaks
 		glue_user_trace("Warning: see David if this breaks");
-		for (i = 0; i < len; ++i) {
-			struct resource* element = &array[i];
+		for (__i = 0; __i < __len; ++__i) {
+			struct resource* element = &array[__i];
 			callee_unmarshal_kernel__probe__resource__in(__pos, __msg, __ext, ctx, element);
 		}
 
@@ -212,6 +212,11 @@ void caller_marshal_kernel__probe__pci_dev_bus__in(
 	struct probe_call_ctx const* ctx,
 	struct pci_bus const* ptr)
 {
+	unsigned char const* number_ptr = &ptr->number;
+
+	{
+		glue_pack(__pos, __msg, __ext, *number_ptr);
+	}
 
 }
 
@@ -222,6 +227,11 @@ void callee_unmarshal_kernel__probe__pci_dev_bus__in(
 	struct probe_call_ctx const* ctx,
 	struct pci_bus* ptr)
 {
+	unsigned char* number_ptr = &ptr->number;
+
+	{
+		*number_ptr = glue_unpack(__pos, __msg, __ext, unsigned char);
+	}
 
 	{
 	}
@@ -263,13 +273,13 @@ void caller_marshal_kernel__probe__device__in(
 		__maybe_unused const void* __adjusted = *dma_mask_ptr;
 		glue_pack(__pos, __msg, __ext, __adjusted);
 		if (*dma_mask_ptr) {
-			size_t i, len = 1;
+			size_t __i, __len = 1;
 			unsigned long long const* array = *dma_mask_ptr;
-			glue_pack(__pos, __msg, __ext, len);
+			glue_pack(__pos, __msg, __ext, __len);
 			// Warning: see David if this breaks
 			glue_user_trace("Warning: see David if this breaks");
-			for (i = 0; i < len; ++i) {
-				unsigned long long const* element = &array[i];
+			for (__i = 0; __i < __len; ++__i) {
+				unsigned long long const* element = &array[__i];
 				glue_pack(__pos, __msg, __ext, *element);
 			}
 
@@ -297,13 +307,13 @@ void callee_unmarshal_kernel__probe__device__in(
 		size_t __size = sizeof(unsigned long long) * glue_peek(__pos, __msg, __ext);
 		*dma_mask_ptr = glue_unpack_new_shadow(__pos, __msg, __ext, unsigned long long*, (__size), (DEFAULT_GFP_FLAGS));
 		if (*dma_mask_ptr) {
-			int i;
+			int __i;
 			unsigned long long* array = *dma_mask_ptr;
-			size_t len = glue_unpack(__pos, __msg, __ext, size_t);
+			size_t __len = glue_unpack(__pos, __msg, __ext, size_t);
 			// Warning: see David if this breaks
 			glue_user_trace("Warning: see David if this breaks");
-			for (i = 0; i < len; ++i) {
-				unsigned long long* element = &array[i];
+			for (__i = 0; __i < __len; ++__i) {
+				unsigned long long* element = &array[__i];
 				*element = glue_unpack(__pos, __msg, __ext, unsigned long long);
 			}
 
@@ -374,12 +384,12 @@ void caller_marshal_kernel__probe__kobject__in(
 		__maybe_unused const void* __adjusted = *name_ptr;
 		glue_pack(__pos, __msg, __ext, __adjusted);
 		if (*name_ptr) {
-			size_t i, len;
+			size_t __i, __len;
 			char const* array = *name_ptr;
-			for (len = 0; array[len]; ++len);
-			glue_pack(__pos, __msg, __ext, len + 1);
-			for (i = 0; i < len; ++i) {
-				char const* element = &array[i];
+			for (__len = 0; array[__len]; ++__len);
+			glue_pack(__pos, __msg, __ext, __len + 1);
+			for (__i = 0; __i < __len; ++__i) {
+				char const* element = &array[__i];
 				glue_pack(__pos, __msg, __ext, *element);
 			}
 
@@ -400,15 +410,15 @@ void callee_unmarshal_kernel__probe__kobject__in(
 
 	{
 		size_t __size = sizeof(char) * glue_peek(__pos, __msg, __ext);
-		*name_ptr = glue_unpack_bind_or_new_shadow(__pos, __msg, __ext, char const*, __size);
+		*name_ptr = glue_unpack_bind_or_new_shadow(__pos, __msg, __ext, char const*, __size, DEFAULT_GFP_FLAGS);
 		if (*name_ptr) {
 			char* writable = (char*)*name_ptr;
-			size_t i, len;
+			size_t __i, __len;
 			char* array = writable;
-			len = glue_unpack(__pos, __msg, __ext, size_t) - 1;
-			array[len] = '\0';
-			for (i = 0; i < len; ++i) {
-				char* element = &array[i];
+			__len = glue_unpack(__pos, __msg, __ext, size_t) - 1;
+			array[__len] = '\0';
+			for (__i = 0; __i < __len; ++__i) {
+				char* element = &array[__i];
 				*element = glue_unpack(__pos, __msg, __ext, char);
 			}
 
@@ -668,6 +678,7 @@ void caller_marshal_kernel__ndo_set_rx_mode__netdev__in(
 	unsigned long long const* state_ptr = &ptr->state;
 	unsigned long long const* features_ptr = &ptr->features;
 	unsigned int const* flags_ptr = &ptr->flags;
+	struct netdev_hw_addr_list const* mc_ptr = &ptr->mc;
 
 	{
 		glue_pack(__pos, __msg, __ext, *state_ptr);
@@ -679,6 +690,10 @@ void caller_marshal_kernel__ndo_set_rx_mode__netdev__in(
 
 	{
 		glue_pack(__pos, __msg, __ext, *flags_ptr);
+	}
+
+	{
+		caller_marshal_kernel__ndo_set_rx_mode__netdev_hw_addr_list__in(__pos, __msg, __ext, ctx, mc_ptr);
 	}
 
 }
@@ -693,6 +708,7 @@ void callee_unmarshal_kernel__ndo_set_rx_mode__netdev__in(
 	unsigned long long* state_ptr = &ptr->state;
 	unsigned long long* features_ptr = &ptr->features;
 	unsigned int* flags_ptr = &ptr->flags;
+	struct netdev_hw_addr_list* mc_ptr = &ptr->mc;
 
 	{
 		*state_ptr = glue_unpack(__pos, __msg, __ext, unsigned long long);
@@ -707,6 +723,10 @@ void callee_unmarshal_kernel__ndo_set_rx_mode__netdev__in(
 	}
 
 	{
+		callee_unmarshal_kernel__ndo_set_rx_mode__netdev_hw_addr_list__in(__pos, __msg, __ext, ctx, mc_ptr);
+	}
+
+	{
 	}
 }
 
@@ -717,6 +737,11 @@ void callee_marshal_kernel__ndo_set_rx_mode__netdev__in(
 	struct ndo_set_rx_mode_call_ctx const* ctx,
 	struct net_device const* ptr)
 {
+	struct netdev_hw_addr_list const* mc_ptr = &ptr->mc;
+
+	{
+		callee_marshal_kernel__ndo_set_rx_mode__netdev_hw_addr_list__in(__pos, __msg, __ext, ctx, mc_ptr);
+	}
 
 }
 
@@ -727,6 +752,191 @@ void caller_unmarshal_kernel__ndo_set_rx_mode__netdev__in(
 	struct ndo_set_rx_mode_call_ctx const* ctx,
 	struct net_device* ptr)
 {
+	struct netdev_hw_addr_list* mc_ptr = &ptr->mc;
+
+	{
+		caller_unmarshal_kernel__ndo_set_rx_mode__netdev_hw_addr_list__in(__pos, __msg, __ext, ctx, mc_ptr);
+	}
+
+	{
+	}
+}
+
+void caller_marshal_kernel__ndo_set_rx_mode__netdev_hw_addr_list__in(
+	size_t* __pos,
+	struct fipc_message* __msg,
+	struct ext_registers* __ext,
+	struct ndo_set_rx_mode_call_ctx const* ctx,
+	struct netdev_hw_addr_list const* ptr)
+{
+	//struct list_head const* list_ptr = &ptr->list;
+	int const* count_ptr = &ptr->count;
+
+	{
+		//caller_marshal_kernel__ndo_set_rx_mode__list_head__in(__pos, __msg, __ext, ctx, list_ptr);
+	}
+
+	{
+		glue_pack(__pos, __msg, __ext, *count_ptr);
+	}
+
+	printk("%s, count %d\n", __func__, ptr->count);
+	if (*count_ptr) {
+		struct netdev_hw_addr *ha;
+		netdev_hw_addr_list_for_each(ha, ptr) {
+			int i = 0;
+			if (ha) {
+				glue_pack(__pos, __msg, __ext, ha);
+				for (; i < ETH_ALEN; i++) {
+					glue_pack(__pos, __msg, __ext, ha->addr[i]);
+				}
+			}
+		}
+	}
+
+
+}
+
+void callee_unmarshal_kernel__ndo_set_rx_mode__netdev_hw_addr_list__in(
+	size_t* __pos,
+	const struct fipc_message* __msg,
+	const struct ext_registers* __ext,
+	struct ndo_set_rx_mode_call_ctx const* ctx,
+	struct netdev_hw_addr_list* ptr)
+{
+	//struct list_head* list_ptr = &ptr->list;
+	int* count_ptr = &ptr->count;
+
+	{
+		//callee_unmarshal_kernel__ndo_set_rx_mode__list_head__in(__pos, __msg, __ext, ctx, list_ptr);
+	}
+
+	{
+		*count_ptr = glue_unpack(__pos, __msg, __ext, int);
+	}
+
+	if (*count_ptr) {
+		int j = 0;
+		for (; j < *count_ptr; j++) {
+			struct netdev_hw_addr *ha = glue_unpack_bind_or_new_shadow(__pos, __msg, __ext, struct netdev_hw_addr*, (sizeof(struct netdev_hw_addr)), (DEFAULT_GFP_FLAGS));
+			int i = 0;
+			
+			for (; i < ETH_ALEN; i++) {
+					ha->addr[i] = glue_unpack(__pos, __msg, __ext, unsigned char);
+			}
+
+			list_add_tail(&ha->list, &ptr->list);
+		}
+	}
+}
+
+void callee_marshal_kernel__ndo_set_rx_mode__netdev_hw_addr_list__in(
+	size_t* __pos,
+	struct fipc_message* __msg,
+	struct ext_registers* __ext,
+	struct ndo_set_rx_mode_call_ctx const* ctx,
+	struct netdev_hw_addr_list const* ptr)
+{
+	struct list_head const* list_ptr = &ptr->list;
+
+	{
+		callee_marshal_kernel__ndo_set_rx_mode__list_head__in(__pos, __msg, __ext, ctx, list_ptr);
+	}
+
+}
+
+void caller_unmarshal_kernel__ndo_set_rx_mode__netdev_hw_addr_list__in(
+	size_t* __pos,
+	const struct fipc_message* __msg,
+	const struct ext_registers* __ext,
+	struct ndo_set_rx_mode_call_ctx const* ctx,
+	struct netdev_hw_addr_list* ptr)
+{
+	struct list_head* list_ptr = &ptr->list;
+
+	{
+		caller_unmarshal_kernel__ndo_set_rx_mode__list_head__in(__pos, __msg, __ext, ctx, list_ptr);
+	}
+
+	{
+	}
+}
+
+void caller_marshal_kernel__ndo_set_rx_mode__list_head__in(
+	size_t* __pos,
+	struct fipc_message* __msg,
+	struct ext_registers* __ext,
+	struct ndo_set_rx_mode_call_ctx const* ctx,
+	struct list_head const* ptr)
+{
+	struct list_head* const* next_ptr = &ptr->next;
+
+	{
+		__maybe_unused const void* __adjusted = *next_ptr;
+		glue_pack(__pos, __msg, __ext, __adjusted);
+		if (*next_ptr) {
+			caller_marshal_kernel__ndo_set_rx_mode__list_head__in(__pos, __msg, __ext, ctx, *next_ptr);
+		}
+
+	}
+
+}
+
+void callee_unmarshal_kernel__ndo_set_rx_mode__list_head__in(
+	size_t* __pos,
+	const struct fipc_message* __msg,
+	const struct ext_registers* __ext,
+	struct ndo_set_rx_mode_call_ctx const* ctx,
+	struct list_head* ptr)
+{
+	struct list_head** next_ptr = &ptr->next;
+
+	{
+		size_t __size = sizeof(struct netdev_hw_addr);
+		*next_ptr = glue_unpack_new_shadow(__pos, __msg, __ext, struct list_head*, (__size), (DEFAULT_GFP_FLAGS));
+		if (*next_ptr) {
+			callee_unmarshal_kernel__ndo_set_rx_mode__list_head__in(__pos, __msg, __ext, ctx, *next_ptr);
+		}
+
+	}
+
+	{
+	}
+}
+
+void callee_marshal_kernel__ndo_set_rx_mode__list_head__in(
+	size_t* __pos,
+	struct fipc_message* __msg,
+	struct ext_registers* __ext,
+	struct ndo_set_rx_mode_call_ctx const* ctx,
+	struct list_head const* ptr)
+{
+	struct list_head* const* next_ptr = &ptr->next;
+
+	{
+		if (*next_ptr) {
+			callee_marshal_kernel__ndo_set_rx_mode__list_head__in(__pos, __msg, __ext, ctx, *next_ptr);
+		}
+
+	}
+
+}
+
+void caller_unmarshal_kernel__ndo_set_rx_mode__list_head__in(
+	size_t* __pos,
+	const struct fipc_message* __msg,
+	const struct ext_registers* __ext,
+	struct ndo_set_rx_mode_call_ctx const* ctx,
+	struct list_head* ptr)
+{
+	struct list_head** next_ptr = &ptr->next;
+
+	{
+		if (*next_ptr) {
+			caller_unmarshal_kernel__ndo_set_rx_mode__list_head__in(__pos, __msg, __ext, ctx, *next_ptr);
+		}
+
+	}
 
 	{
 	}
@@ -784,38 +994,9 @@ void caller_marshal_kernel__ndo_open__netdev__in(
 	struct net_device const* ptr)
 {
 	unsigned long long const* state_ptr = &ptr->state;
-	struct netdev_queue* const* _tx_ptr = &ptr->_tx;
-	unsigned char const* num_tc_ptr = &ptr->num_tc;
-	unsigned char const* prio_tc_map_ptr = ptr->prio_tc_map;
 
 	{
 		glue_pack(__pos, __msg, __ext, *state_ptr);
-	}
-
-	{
-		__maybe_unused const void* __adjusted = *_tx_ptr;
-		glue_pack_shadow(__pos, __msg, __ext, __adjusted);
-		if (*_tx_ptr) {
-			caller_marshal_kernel__ndo_open__net_device__tx__in(__pos, __msg, __ext, ctx, *_tx_ptr);
-		}
-
-	}
-
-	{
-		glue_pack(__pos, __msg, __ext, *num_tc_ptr);
-	}
-
-	{
-		size_t i, len = 16;
-		unsigned char const* array = prio_tc_map_ptr;
-		glue_pack(__pos, __msg, __ext, len);
-		// Warning: see David if this breaks
-		glue_user_trace("Warning: see David if this breaks");
-		for (i = 0; i < len; ++i) {
-			unsigned char const* element = &array[i];
-			glue_pack(__pos, __msg, __ext, *element);
-		}
-
 	}
 
 }
@@ -828,37 +1009,9 @@ void callee_unmarshal_kernel__ndo_open__netdev__in(
 	struct net_device* ptr)
 {
 	unsigned long long* state_ptr = &ptr->state;
-	struct netdev_queue** _tx_ptr = &ptr->_tx;
-	unsigned char* num_tc_ptr = &ptr->num_tc;
-	unsigned char* prio_tc_map_ptr = ptr->prio_tc_map;
 
 	{
 		*state_ptr = glue_unpack(__pos, __msg, __ext, unsigned long long);
-	}
-
-	{
-		*_tx_ptr = glue_unpack(__pos, __msg, __ext, struct netdev_queue*);
-		if (*_tx_ptr) {
-			callee_unmarshal_kernel__ndo_open__net_device__tx__in(__pos, __msg, __ext, ctx, *_tx_ptr);
-		}
-
-	}
-
-	{
-		*num_tc_ptr = glue_unpack(__pos, __msg, __ext, unsigned char);
-	}
-
-	{
-		int i;
-		unsigned char* array = prio_tc_map_ptr;
-		size_t len = glue_unpack(__pos, __msg, __ext, size_t);
-		// Warning: see David if this breaks
-		glue_user_trace("Warning: see David if this breaks");
-		for (i = 0; i < len; ++i) {
-			unsigned char* element = &array[i];
-			*element = glue_unpack(__pos, __msg, __ext, unsigned char);
-		}
-
 	}
 
 	{
@@ -872,29 +1025,6 @@ void callee_marshal_kernel__ndo_open__netdev__in(
 	struct ndo_open_call_ctx const* ctx,
 	struct net_device const* ptr)
 {
-	unsigned int const* num_rx_queues_ptr = &ptr->num_rx_queues;
-	struct netdev_queue* const* _tx_ptr = &ptr->_tx;
-	unsigned int const* num_tx_queues_ptr = &ptr->num_tx_queues;
-	unsigned char const* num_tc_ptr = &ptr->num_tc;
-
-	{
-		glue_pack(__pos, __msg, __ext, *num_rx_queues_ptr);
-	}
-
-	{
-		if (*_tx_ptr) {
-			callee_marshal_kernel__ndo_open__net_device__tx__in(__pos, __msg, __ext, ctx, *_tx_ptr);
-		}
-
-	}
-
-	{
-		glue_pack(__pos, __msg, __ext, *num_tx_queues_ptr);
-	}
-
-	{
-		glue_pack(__pos, __msg, __ext, *num_tc_ptr);
-	}
 
 }
 
@@ -904,73 +1034,6 @@ void caller_unmarshal_kernel__ndo_open__netdev__in(
 	const struct ext_registers* __ext,
 	struct ndo_open_call_ctx const* ctx,
 	struct net_device* ptr)
-{
-	unsigned int* num_rx_queues_ptr = &ptr->num_rx_queues;
-	struct netdev_queue** _tx_ptr = &ptr->_tx;
-	unsigned int* num_tx_queues_ptr = &ptr->num_tx_queues;
-	unsigned char* num_tc_ptr = &ptr->num_tc;
-
-	{
-		*num_rx_queues_ptr = glue_unpack(__pos, __msg, __ext, unsigned int);
-	}
-
-	{
-		if (*_tx_ptr) {
-			caller_unmarshal_kernel__ndo_open__net_device__tx__in(__pos, __msg, __ext, ctx, *_tx_ptr);
-		}
-
-	}
-
-	{
-		*num_tx_queues_ptr = glue_unpack(__pos, __msg, __ext, unsigned int);
-	}
-
-	{
-		*num_tc_ptr = glue_unpack(__pos, __msg, __ext, unsigned char);
-	}
-
-	{
-	}
-}
-
-void caller_marshal_kernel__ndo_open__net_device__tx__in(
-	size_t* __pos,
-	struct fipc_message* __msg,
-	struct ext_registers* __ext,
-	struct ndo_open_call_ctx const* ctx,
-	struct netdev_queue const* ptr)
-{
-
-}
-
-void callee_unmarshal_kernel__ndo_open__net_device__tx__in(
-	size_t* __pos,
-	const struct fipc_message* __msg,
-	const struct ext_registers* __ext,
-	struct ndo_open_call_ctx const* ctx,
-	struct netdev_queue* ptr)
-{
-
-	{
-	}
-}
-
-void callee_marshal_kernel__ndo_open__net_device__tx__in(
-	size_t* __pos,
-	struct fipc_message* __msg,
-	struct ext_registers* __ext,
-	struct ndo_open_call_ctx const* ctx,
-	struct netdev_queue const* ptr)
-{
-
-}
-
-void caller_unmarshal_kernel__ndo_open__net_device__tx__in(
-	size_t* __pos,
-	const struct fipc_message* __msg,
-	const struct ext_registers* __ext,
-	struct ndo_open_call_ctx const* ctx,
-	struct netdev_queue* ptr)
 {
 
 	{
@@ -1004,13 +1067,13 @@ void caller_marshal_kernel__ndo_start_xmit__skb__io(
 	unsigned char* const* data_ptr = &ptr->data;
 
 	{
-		size_t i, len = 48;
+		size_t __i, __len = 48;
 		signed char const* array = cb_ptr;
-		glue_pack(__pos, __msg, __ext, len);
+		glue_pack(__pos, __msg, __ext, __len);
 		// Warning: see David if this breaks
 		glue_user_trace("Warning: see David if this breaks");
-		for (i = 0; i < len; ++i) {
-			signed char const* element = &array[i];
+		for (__i = 0; __i < __len; ++__i) {
+			signed char const* element = &array[__i];
 			glue_pack(__pos, __msg, __ext, *element);
 		}
 
@@ -1033,26 +1096,26 @@ void caller_marshal_kernel__ndo_start_xmit__skb__io(
 	}
 
 	{
-		size_t i, len = 0;
+		size_t __i, __len = 0;
 		unsigned int const* array = headers_start_ptr;
-		glue_pack(__pos, __msg, __ext, len);
+		glue_pack(__pos, __msg, __ext, __len);
 		// Warning: see David if this breaks
 		glue_user_trace("Warning: see David if this breaks");
-		for (i = 0; i < len; ++i) {
-			unsigned int const* element = &array[i];
+		for (__i = 0; __i < __len; ++__i) {
+			unsigned int const* element = &array[__i];
 			glue_pack(__pos, __msg, __ext, *element);
 		}
 
 	}
 
 	{
-		size_t i, len = 0;
+		size_t __i, __len = 0;
 		unsigned char const* array = __pkt_type_offset_ptr;
-		glue_pack(__pos, __msg, __ext, len);
+		glue_pack(__pos, __msg, __ext, __len);
 		// Warning: see David if this breaks
 		glue_user_trace("Warning: see David if this breaks");
-		for (i = 0; i < len; ++i) {
-			unsigned char const* element = &array[i];
+		for (__i = 0; __i < __len; ++__i) {
+			unsigned char const* element = &array[__i];
 			glue_pack(__pos, __msg, __ext, *element);
 		}
 
@@ -1083,13 +1146,13 @@ void caller_marshal_kernel__ndo_start_xmit__skb__io(
 	}
 
 	{
-		size_t i, len = 0;
+		size_t __i, __len = 0;
 		unsigned int const* array = headers_end_ptr;
-		glue_pack(__pos, __msg, __ext, len);
+		glue_pack(__pos, __msg, __ext, __len);
 		// Warning: see David if this breaks
 		glue_user_trace("Warning: see David if this breaks");
-		for (i = 0; i < len; ++i) {
-			unsigned int const* element = &array[i];
+		for (__i = 0; __i < __len; ++__i) {
+			unsigned int const* element = &array[__i];
 			glue_pack(__pos, __msg, __ext, *element);
 		}
 
@@ -1150,13 +1213,13 @@ void callee_unmarshal_kernel__ndo_start_xmit__skb__io(
 	unsigned char** data_ptr = &ptr->data;
 
 	{
-		int i;
+		int __i;
 		signed char* array = cb_ptr;
-		size_t len = glue_unpack(__pos, __msg, __ext, size_t);
+		size_t __len = glue_unpack(__pos, __msg, __ext, size_t);
 		// Warning: see David if this breaks
 		glue_user_trace("Warning: see David if this breaks");
-		for (i = 0; i < len; ++i) {
-			signed char* element = &array[i];
+		for (__i = 0; __i < __len; ++__i) {
+			signed char* element = &array[__i];
 			*element = glue_unpack(__pos, __msg, __ext, signed char);
 		}
 
@@ -1179,26 +1242,26 @@ void callee_unmarshal_kernel__ndo_start_xmit__skb__io(
 	}
 
 	{
-		int i;
+		int __i;
 		unsigned int* array = headers_start_ptr;
-		size_t len = glue_unpack(__pos, __msg, __ext, size_t);
+		size_t __len = glue_unpack(__pos, __msg, __ext, size_t);
 		// Warning: see David if this breaks
 		glue_user_trace("Warning: see David if this breaks");
-		for (i = 0; i < len; ++i) {
-			unsigned int* element = &array[i];
+		for (__i = 0; __i < __len; ++__i) {
+			unsigned int* element = &array[__i];
 			*element = glue_unpack(__pos, __msg, __ext, unsigned int);
 		}
 
 	}
 
 	{
-		int i;
+		int __i;
 		unsigned char* array = __pkt_type_offset_ptr;
-		size_t len = glue_unpack(__pos, __msg, __ext, size_t);
+		size_t __len = glue_unpack(__pos, __msg, __ext, size_t);
 		// Warning: see David if this breaks
 		glue_user_trace("Warning: see David if this breaks");
-		for (i = 0; i < len; ++i) {
-			unsigned char* element = &array[i];
+		for (__i = 0; __i < __len; ++__i) {
+			unsigned char* element = &array[__i];
 			*element = glue_unpack(__pos, __msg, __ext, unsigned char);
 		}
 
@@ -1229,13 +1292,13 @@ void callee_unmarshal_kernel__ndo_start_xmit__skb__io(
 	}
 
 	{
-		int i;
+		int __i;
 		unsigned int* array = headers_end_ptr;
-		size_t len = glue_unpack(__pos, __msg, __ext, size_t);
+		size_t __len = glue_unpack(__pos, __msg, __ext, size_t);
 		// Warning: see David if this breaks
 		glue_user_trace("Warning: see David if this breaks");
-		for (i = 0; i < len; ++i) {
-			unsigned int* element = &array[i];
+		for (__i = 0; __i < __len; ++__i) {
+			unsigned int* element = &array[__i];
 			*element = glue_unpack(__pos, __msg, __ext, unsigned int);
 		}
 
@@ -1293,13 +1356,13 @@ void callee_marshal_kernel__ndo_start_xmit__skb__io(
 	unsigned char* const* data_ptr = &ptr->data;
 
 	{
-		size_t i, len = 48;
+		size_t __i, __len = 48;
 		signed char const* array = cb_ptr;
-		glue_pack(__pos, __msg, __ext, len);
+		glue_pack(__pos, __msg, __ext, __len);
 		// Warning: see David if this breaks
 		glue_user_trace("Warning: see David if this breaks");
-		for (i = 0; i < len; ++i) {
-			signed char const* element = &array[i];
+		for (__i = 0; __i < __len; ++__i) {
+			signed char const* element = &array[__i];
 			glue_pack(__pos, __msg, __ext, *element);
 		}
 
@@ -1322,26 +1385,26 @@ void callee_marshal_kernel__ndo_start_xmit__skb__io(
 	}
 
 	{
-		size_t i, len = 0;
+		size_t __i, __len = 0;
 		unsigned int const* array = headers_start_ptr;
-		glue_pack(__pos, __msg, __ext, len);
+		glue_pack(__pos, __msg, __ext, __len);
 		// Warning: see David if this breaks
 		glue_user_trace("Warning: see David if this breaks");
-		for (i = 0; i < len; ++i) {
-			unsigned int const* element = &array[i];
+		for (__i = 0; __i < __len; ++__i) {
+			unsigned int const* element = &array[__i];
 			glue_pack(__pos, __msg, __ext, *element);
 		}
 
 	}
 
 	{
-		size_t i, len = 0;
+		size_t __i, __len = 0;
 		unsigned char const* array = __pkt_type_offset_ptr;
-		glue_pack(__pos, __msg, __ext, len);
+		glue_pack(__pos, __msg, __ext, __len);
 		// Warning: see David if this breaks
 		glue_user_trace("Warning: see David if this breaks");
-		for (i = 0; i < len; ++i) {
-			unsigned char const* element = &array[i];
+		for (__i = 0; __i < __len; ++__i) {
+			unsigned char const* element = &array[__i];
 			glue_pack(__pos, __msg, __ext, *element);
 		}
 
@@ -1360,13 +1423,13 @@ void callee_marshal_kernel__ndo_start_xmit__skb__io(
 	}
 
 	{
-		size_t i, len = 0;
+		size_t __i, __len = 0;
 		unsigned int const* array = headers_end_ptr;
-		glue_pack(__pos, __msg, __ext, len);
+		glue_pack(__pos, __msg, __ext, __len);
 		// Warning: see David if this breaks
 		glue_user_trace("Warning: see David if this breaks");
-		for (i = 0; i < len; ++i) {
-			unsigned int const* element = &array[i];
+		for (__i = 0; __i < __len; ++__i) {
+			unsigned int const* element = &array[__i];
 			glue_pack(__pos, __msg, __ext, *element);
 		}
 
@@ -1424,13 +1487,13 @@ void caller_unmarshal_kernel__ndo_start_xmit__skb__io(
 	unsigned char** data_ptr = &ptr->data;
 
 	{
-		int i;
+		int __i;
 		signed char* array = cb_ptr;
-		size_t len = glue_unpack(__pos, __msg, __ext, size_t);
+		size_t __len = glue_unpack(__pos, __msg, __ext, size_t);
 		// Warning: see David if this breaks
 		glue_user_trace("Warning: see David if this breaks");
-		for (i = 0; i < len; ++i) {
-			signed char* element = &array[i];
+		for (__i = 0; __i < __len; ++__i) {
+			signed char* element = &array[__i];
 			*element = glue_unpack(__pos, __msg, __ext, signed char);
 		}
 
@@ -1453,26 +1516,26 @@ void caller_unmarshal_kernel__ndo_start_xmit__skb__io(
 	}
 
 	{
-		int i;
+		int __i;
 		unsigned int* array = headers_start_ptr;
-		size_t len = glue_unpack(__pos, __msg, __ext, size_t);
+		size_t __len = glue_unpack(__pos, __msg, __ext, size_t);
 		// Warning: see David if this breaks
 		glue_user_trace("Warning: see David if this breaks");
-		for (i = 0; i < len; ++i) {
-			unsigned int* element = &array[i];
+		for (__i = 0; __i < __len; ++__i) {
+			unsigned int* element = &array[__i];
 			*element = glue_unpack(__pos, __msg, __ext, unsigned int);
 		}
 
 	}
 
 	{
-		int i;
+		int __i;
 		unsigned char* array = __pkt_type_offset_ptr;
-		size_t len = glue_unpack(__pos, __msg, __ext, size_t);
+		size_t __len = glue_unpack(__pos, __msg, __ext, size_t);
 		// Warning: see David if this breaks
 		glue_user_trace("Warning: see David if this breaks");
-		for (i = 0; i < len; ++i) {
-			unsigned char* element = &array[i];
+		for (__i = 0; __i < __len; ++__i) {
+			unsigned char* element = &array[__i];
 			*element = glue_unpack(__pos, __msg, __ext, unsigned char);
 		}
 
@@ -1491,13 +1554,13 @@ void caller_unmarshal_kernel__ndo_start_xmit__skb__io(
 	}
 
 	{
-		int i;
+		int __i;
 		unsigned int* array = headers_end_ptr;
-		size_t len = glue_unpack(__pos, __msg, __ext, size_t);
+		size_t __len = glue_unpack(__pos, __msg, __ext, size_t);
 		// Warning: see David if this breaks
 		glue_user_trace("Warning: see David if this breaks");
-		for (i = 0; i < len; ++i) {
-			unsigned int* element = &array[i];
+		for (__i = 0; __i < __len; ++__i) {
+			unsigned int* element = &array[__i];
 			*element = glue_unpack(__pos, __msg, __ext, unsigned int);
 		}
 
@@ -1589,26 +1652,26 @@ void caller_marshal_kernel__ndo_features_check__skb__in(
 	unsigned char* const* data_ptr = &ptr->data;
 
 	{
-		size_t i, len = 0;
+		size_t __i, __len = 0;
 		unsigned int const* array = headers_start_ptr;
-		glue_pack(__pos, __msg, __ext, len);
+		glue_pack(__pos, __msg, __ext, __len);
 		// Warning: see David if this breaks
 		glue_user_trace("Warning: see David if this breaks");
-		for (i = 0; i < len; ++i) {
-			unsigned int const* element = &array[i];
+		for (__i = 0; __i < __len; ++__i) {
+			unsigned int const* element = &array[__i];
 			glue_pack(__pos, __msg, __ext, *element);
 		}
 
 	}
 
 	{
-		size_t i, len = 0;
+		size_t __i, __len = 0;
 		unsigned char const* array = __pkt_type_offset_ptr;
-		glue_pack(__pos, __msg, __ext, len);
+		glue_pack(__pos, __msg, __ext, __len);
 		// Warning: see David if this breaks
 		glue_user_trace("Warning: see David if this breaks");
-		for (i = 0; i < len; ++i) {
-			unsigned char const* element = &array[i];
+		for (__i = 0; __i < __len; ++__i) {
+			unsigned char const* element = &array[__i];
 			glue_pack(__pos, __msg, __ext, *element);
 		}
 
@@ -1652,26 +1715,26 @@ void callee_unmarshal_kernel__ndo_features_check__skb__in(
 	unsigned char** data_ptr = &ptr->data;
 
 	{
-		int i;
+		int __i;
 		unsigned int* array = headers_start_ptr;
-		size_t len = glue_unpack(__pos, __msg, __ext, size_t);
+		size_t __len = glue_unpack(__pos, __msg, __ext, size_t);
 		// Warning: see David if this breaks
 		glue_user_trace("Warning: see David if this breaks");
-		for (i = 0; i < len; ++i) {
-			unsigned int* element = &array[i];
+		for (__i = 0; __i < __len; ++__i) {
+			unsigned int* element = &array[__i];
 			*element = glue_unpack(__pos, __msg, __ext, unsigned int);
 		}
 
 	}
 
 	{
-		int i;
+		int __i;
 		unsigned char* array = __pkt_type_offset_ptr;
-		size_t len = glue_unpack(__pos, __msg, __ext, size_t);
+		size_t __len = glue_unpack(__pos, __msg, __ext, size_t);
 		// Warning: see David if this breaks
 		glue_user_trace("Warning: see David if this breaks");
-		for (i = 0; i < len; ++i) {
-			unsigned char* element = &array[i];
+		for (__i = 0; __i < __len; ++__i) {
+			unsigned char* element = &array[__i];
 			*element = glue_unpack(__pos, __msg, __ext, unsigned char);
 		}
 
@@ -1843,13 +1906,13 @@ void callee_marshal_kernel__ndo_set_mac_address__netdev__in(
 
 	{
 		if (*dev_addr_ptr) {
-			size_t i, len = (ctx->netdev->addr_len);
+			size_t __i, __len = (ctx->netdev->addr_len);
 			unsigned char* array = *dev_addr_ptr;
-			glue_pack(__pos, __msg, __ext, len);
+			glue_pack(__pos, __msg, __ext, __len);
 			// Warning: see David if this breaks
 			glue_user_trace("Warning: see David if this breaks");
-			for (i = 0; i < len; ++i) {
-				unsigned char* element = &array[i];
+			for (__i = 0; __i < __len; ++__i) {
+				unsigned char* element = &array[__i];
 				glue_pack(__pos, __msg, __ext, *element);
 			}
 
@@ -1870,13 +1933,13 @@ void caller_unmarshal_kernel__ndo_set_mac_address__netdev__in(
 
 	{
 		if (*dev_addr_ptr) {
-			int i;
+			int __i;
 			unsigned char* array = *dev_addr_ptr;
-			size_t len = glue_unpack(__pos, __msg, __ext, size_t);
+			size_t __len = glue_unpack(__pos, __msg, __ext, size_t);
 			// Warning: see David if this breaks
 			glue_user_trace("Warning: see David if this breaks");
-			for (i = 0; i < len; ++i) {
-				unsigned char* element = &array[i];
+			for (__i = 0; __i < __len; ++__i) {
+				unsigned char* element = &array[__i];
 				*element = glue_unpack(__pos, __msg, __ext, unsigned char);
 			}
 
@@ -2664,26 +2727,26 @@ void callee_marshal_kernel__ndo_setup_tc__dev__in(
 	}
 
 	{
-		size_t i, len = 16;
+		size_t __i, __len = 16;
 		struct netdev_tc_txq const* array = tc_to_txq_ptr;
-		glue_pack(__pos, __msg, __ext, len);
+		glue_pack(__pos, __msg, __ext, __len);
 		// Warning: see David if this breaks
 		glue_user_trace("Warning: see David if this breaks");
-		for (i = 0; i < len; ++i) {
-			struct netdev_tc_txq const* element = &array[i];
+		for (__i = 0; __i < __len; ++__i) {
+			struct netdev_tc_txq const* element = &array[__i];
 			callee_marshal_kernel__ndo_setup_tc__netdev_tc_txq__out(__pos, __msg, __ext, ctx, element);
 		}
 
 	}
 
 	{
-		size_t i, len = 16;
+		size_t __i, __len = 16;
 		unsigned char const* array = prio_tc_map_ptr;
-		glue_pack(__pos, __msg, __ext, len);
+		glue_pack(__pos, __msg, __ext, __len);
 		// Warning: see David if this breaks
 		glue_user_trace("Warning: see David if this breaks");
-		for (i = 0; i < len; ++i) {
-			unsigned char const* element = &array[i];
+		for (__i = 0; __i < __len; ++__i) {
+			unsigned char const* element = &array[__i];
 			glue_pack(__pos, __msg, __ext, *element);
 		}
 
@@ -2717,26 +2780,26 @@ void caller_unmarshal_kernel__ndo_setup_tc__dev__in(
 	}
 
 	{
-		int i;
+		int __i;
 		struct netdev_tc_txq* array = tc_to_txq_ptr;
-		size_t len = glue_unpack(__pos, __msg, __ext, size_t);
+		size_t __len = glue_unpack(__pos, __msg, __ext, size_t);
 		// Warning: see David if this breaks
 		glue_user_trace("Warning: see David if this breaks");
-		for (i = 0; i < len; ++i) {
-			struct netdev_tc_txq* element = &array[i];
+		for (__i = 0; __i < __len; ++__i) {
+			struct netdev_tc_txq* element = &array[__i];
 			caller_unmarshal_kernel__ndo_setup_tc__netdev_tc_txq__out(__pos, __msg, __ext, ctx, element);
 		}
 
 	}
 
 	{
-		int i;
+		int __i;
 		unsigned char* array = prio_tc_map_ptr;
-		size_t len = glue_unpack(__pos, __msg, __ext, size_t);
+		size_t __len = glue_unpack(__pos, __msg, __ext, size_t);
 		// Warning: see David if this breaks
 		glue_user_trace("Warning: see David if this breaks");
-		for (i = 0; i < len; ++i) {
-			unsigned char* element = &array[i];
+		for (__i = 0; __i < __len; ++__i) {
+			unsigned char* element = &array[__i];
 			*element = glue_unpack(__pos, __msg, __ext, unsigned char);
 		}
 
@@ -4463,13 +4526,13 @@ void caller_marshal_kernel_____pskb_trim__skb__io(
 	unsigned char* const* data_ptr = &ptr->data;
 
 	{
-		size_t i, len = 48;
+		size_t __i, __len = 48;
 		signed char const* array = cb_ptr;
-		glue_pack(__pos, __msg, __ext, len);
+		glue_pack(__pos, __msg, __ext, __len);
 		// Warning: see David if this breaks
 		glue_user_trace("Warning: see David if this breaks");
-		for (i = 0; i < len; ++i) {
-			signed char const* element = &array[i];
+		for (__i = 0; __i < __len; ++__i) {
+			signed char const* element = &array[__i];
 			glue_pack(__pos, __msg, __ext, *element);
 		}
 
@@ -4492,26 +4555,26 @@ void caller_marshal_kernel_____pskb_trim__skb__io(
 	}
 
 	{
-		size_t i, len = 0;
+		size_t __i, __len = 0;
 		unsigned int const* array = headers_start_ptr;
-		glue_pack(__pos, __msg, __ext, len);
+		glue_pack(__pos, __msg, __ext, __len);
 		// Warning: see David if this breaks
 		glue_user_trace("Warning: see David if this breaks");
-		for (i = 0; i < len; ++i) {
-			unsigned int const* element = &array[i];
+		for (__i = 0; __i < __len; ++__i) {
+			unsigned int const* element = &array[__i];
 			glue_pack(__pos, __msg, __ext, *element);
 		}
 
 	}
 
 	{
-		size_t i, len = 0;
+		size_t __i, __len = 0;
 		unsigned char const* array = __pkt_type_offset_ptr;
-		glue_pack(__pos, __msg, __ext, len);
+		glue_pack(__pos, __msg, __ext, __len);
 		// Warning: see David if this breaks
 		glue_user_trace("Warning: see David if this breaks");
-		for (i = 0; i < len; ++i) {
-			unsigned char const* element = &array[i];
+		for (__i = 0; __i < __len; ++__i) {
+			unsigned char const* element = &array[__i];
 			glue_pack(__pos, __msg, __ext, *element);
 		}
 
@@ -4530,13 +4593,13 @@ void caller_marshal_kernel_____pskb_trim__skb__io(
 	}
 
 	{
-		size_t i, len = 0;
+		size_t __i, __len = 0;
 		unsigned int const* array = headers_end_ptr;
-		glue_pack(__pos, __msg, __ext, len);
+		glue_pack(__pos, __msg, __ext, __len);
 		// Warning: see David if this breaks
 		glue_user_trace("Warning: see David if this breaks");
-		for (i = 0; i < len; ++i) {
-			unsigned int const* element = &array[i];
+		for (__i = 0; __i < __len; ++__i) {
+			unsigned int const* element = &array[__i];
 			glue_pack(__pos, __msg, __ext, *element);
 		}
 
@@ -4594,13 +4657,13 @@ void callee_unmarshal_kernel_____pskb_trim__skb__io(
 	unsigned char** data_ptr = &ptr->data;
 
 	{
-		int i;
+		int __i;
 		signed char* array = cb_ptr;
-		size_t len = glue_unpack(__pos, __msg, __ext, size_t);
+		size_t __len = glue_unpack(__pos, __msg, __ext, size_t);
 		// Warning: see David if this breaks
 		glue_user_trace("Warning: see David if this breaks");
-		for (i = 0; i < len; ++i) {
-			signed char* element = &array[i];
+		for (__i = 0; __i < __len; ++__i) {
+			signed char* element = &array[__i];
 			*element = glue_unpack(__pos, __msg, __ext, signed char);
 		}
 
@@ -4623,26 +4686,26 @@ void callee_unmarshal_kernel_____pskb_trim__skb__io(
 	}
 
 	{
-		int i;
+		int __i;
 		unsigned int* array = headers_start_ptr;
-		size_t len = glue_unpack(__pos, __msg, __ext, size_t);
+		size_t __len = glue_unpack(__pos, __msg, __ext, size_t);
 		// Warning: see David if this breaks
 		glue_user_trace("Warning: see David if this breaks");
-		for (i = 0; i < len; ++i) {
-			unsigned int* element = &array[i];
+		for (__i = 0; __i < __len; ++__i) {
+			unsigned int* element = &array[__i];
 			*element = glue_unpack(__pos, __msg, __ext, unsigned int);
 		}
 
 	}
 
 	{
-		int i;
+		int __i;
 		unsigned char* array = __pkt_type_offset_ptr;
-		size_t len = glue_unpack(__pos, __msg, __ext, size_t);
+		size_t __len = glue_unpack(__pos, __msg, __ext, size_t);
 		// Warning: see David if this breaks
 		glue_user_trace("Warning: see David if this breaks");
-		for (i = 0; i < len; ++i) {
-			unsigned char* element = &array[i];
+		for (__i = 0; __i < __len; ++__i) {
+			unsigned char* element = &array[__i];
 			*element = glue_unpack(__pos, __msg, __ext, unsigned char);
 		}
 
@@ -4661,13 +4724,13 @@ void callee_unmarshal_kernel_____pskb_trim__skb__io(
 	}
 
 	{
-		int i;
+		int __i;
 		unsigned int* array = headers_end_ptr;
-		size_t len = glue_unpack(__pos, __msg, __ext, size_t);
+		size_t __len = glue_unpack(__pos, __msg, __ext, size_t);
 		// Warning: see David if this breaks
 		glue_user_trace("Warning: see David if this breaks");
-		for (i = 0; i < len; ++i) {
-			unsigned int* element = &array[i];
+		for (__i = 0; __i < __len; ++__i) {
+			unsigned int* element = &array[__i];
 			*element = glue_unpack(__pos, __msg, __ext, unsigned int);
 		}
 
@@ -4725,13 +4788,13 @@ void callee_marshal_kernel_____pskb_trim__skb__io(
 	unsigned char* const* data_ptr = &ptr->data;
 
 	{
-		size_t i, len = 48;
+		size_t __i, __len = 48;
 		signed char const* array = cb_ptr;
-		glue_pack(__pos, __msg, __ext, len);
+		glue_pack(__pos, __msg, __ext, __len);
 		// Warning: see David if this breaks
 		glue_user_trace("Warning: see David if this breaks");
-		for (i = 0; i < len; ++i) {
-			signed char const* element = &array[i];
+		for (__i = 0; __i < __len; ++__i) {
+			signed char const* element = &array[__i];
 			glue_pack(__pos, __msg, __ext, *element);
 		}
 
@@ -4754,26 +4817,26 @@ void callee_marshal_kernel_____pskb_trim__skb__io(
 	}
 
 	{
-		size_t i, len = 0;
+		size_t __i, __len = 0;
 		unsigned int const* array = headers_start_ptr;
-		glue_pack(__pos, __msg, __ext, len);
+		glue_pack(__pos, __msg, __ext, __len);
 		// Warning: see David if this breaks
 		glue_user_trace("Warning: see David if this breaks");
-		for (i = 0; i < len; ++i) {
-			unsigned int const* element = &array[i];
+		for (__i = 0; __i < __len; ++__i) {
+			unsigned int const* element = &array[__i];
 			glue_pack(__pos, __msg, __ext, *element);
 		}
 
 	}
 
 	{
-		size_t i, len = 0;
+		size_t __i, __len = 0;
 		unsigned char const* array = __pkt_type_offset_ptr;
-		glue_pack(__pos, __msg, __ext, len);
+		glue_pack(__pos, __msg, __ext, __len);
 		// Warning: see David if this breaks
 		glue_user_trace("Warning: see David if this breaks");
-		for (i = 0; i < len; ++i) {
-			unsigned char const* element = &array[i];
+		for (__i = 0; __i < __len; ++__i) {
+			unsigned char const* element = &array[__i];
 			glue_pack(__pos, __msg, __ext, *element);
 		}
 
@@ -4792,13 +4855,13 @@ void callee_marshal_kernel_____pskb_trim__skb__io(
 	}
 
 	{
-		size_t i, len = 0;
+		size_t __i, __len = 0;
 		unsigned int const* array = headers_end_ptr;
-		glue_pack(__pos, __msg, __ext, len);
+		glue_pack(__pos, __msg, __ext, __len);
 		// Warning: see David if this breaks
 		glue_user_trace("Warning: see David if this breaks");
-		for (i = 0; i < len; ++i) {
-			unsigned int const* element = &array[i];
+		for (__i = 0; __i < __len; ++__i) {
+			unsigned int const* element = &array[__i];
 			glue_pack(__pos, __msg, __ext, *element);
 		}
 
@@ -4856,13 +4919,13 @@ void caller_unmarshal_kernel_____pskb_trim__skb__io(
 	unsigned char** data_ptr = &ptr->data;
 
 	{
-		int i;
+		int __i;
 		signed char* array = cb_ptr;
-		size_t len = glue_unpack(__pos, __msg, __ext, size_t);
+		size_t __len = glue_unpack(__pos, __msg, __ext, size_t);
 		// Warning: see David if this breaks
 		glue_user_trace("Warning: see David if this breaks");
-		for (i = 0; i < len; ++i) {
-			signed char* element = &array[i];
+		for (__i = 0; __i < __len; ++__i) {
+			signed char* element = &array[__i];
 			*element = glue_unpack(__pos, __msg, __ext, signed char);
 		}
 
@@ -4885,26 +4948,26 @@ void caller_unmarshal_kernel_____pskb_trim__skb__io(
 	}
 
 	{
-		int i;
+		int __i;
 		unsigned int* array = headers_start_ptr;
-		size_t len = glue_unpack(__pos, __msg, __ext, size_t);
+		size_t __len = glue_unpack(__pos, __msg, __ext, size_t);
 		// Warning: see David if this breaks
 		glue_user_trace("Warning: see David if this breaks");
-		for (i = 0; i < len; ++i) {
-			unsigned int* element = &array[i];
+		for (__i = 0; __i < __len; ++__i) {
+			unsigned int* element = &array[__i];
 			*element = glue_unpack(__pos, __msg, __ext, unsigned int);
 		}
 
 	}
 
 	{
-		int i;
+		int __i;
 		unsigned char* array = __pkt_type_offset_ptr;
-		size_t len = glue_unpack(__pos, __msg, __ext, size_t);
+		size_t __len = glue_unpack(__pos, __msg, __ext, size_t);
 		// Warning: see David if this breaks
 		glue_user_trace("Warning: see David if this breaks");
-		for (i = 0; i < len; ++i) {
-			unsigned char* element = &array[i];
+		for (__i = 0; __i < __len; ++__i) {
+			unsigned char* element = &array[__i];
 			*element = glue_unpack(__pos, __msg, __ext, unsigned char);
 		}
 
@@ -4923,13 +4986,13 @@ void caller_unmarshal_kernel_____pskb_trim__skb__io(
 	}
 
 	{
-		int i;
+		int __i;
 		unsigned int* array = headers_end_ptr;
-		size_t len = glue_unpack(__pos, __msg, __ext, size_t);
+		size_t __len = glue_unpack(__pos, __msg, __ext, size_t);
 		// Warning: see David if this breaks
 		glue_user_trace("Warning: see David if this breaks");
-		for (i = 0; i < len; ++i) {
-			unsigned int* element = &array[i];
+		for (__i = 0; __i < __len; ++__i) {
+			unsigned int* element = &array[__i];
 			*element = glue_unpack(__pos, __msg, __ext, unsigned int);
 		}
 
@@ -4982,26 +5045,26 @@ void caller_marshal_kernel__pskb_expand_head__skb__io(
 	unsigned char* const* data_ptr = &ptr->data;
 
 	{
-		size_t i, len = 0;
+		size_t __i, __len = 0;
 		unsigned int const* array = headers_start_ptr;
-		glue_pack(__pos, __msg, __ext, len);
+		glue_pack(__pos, __msg, __ext, __len);
 		// Warning: see David if this breaks
 		glue_user_trace("Warning: see David if this breaks");
-		for (i = 0; i < len; ++i) {
-			unsigned int const* element = &array[i];
+		for (__i = 0; __i < __len; ++__i) {
+			unsigned int const* element = &array[__i];
 			glue_pack(__pos, __msg, __ext, *element);
 		}
 
 	}
 
 	{
-		size_t i, len = 0;
+		size_t __i, __len = 0;
 		unsigned char const* array = __pkt_type_offset_ptr;
-		glue_pack(__pos, __msg, __ext, len);
+		glue_pack(__pos, __msg, __ext, __len);
 		// Warning: see David if this breaks
 		glue_user_trace("Warning: see David if this breaks");
-		for (i = 0; i < len; ++i) {
-			unsigned char const* element = &array[i];
+		for (__i = 0; __i < __len; ++__i) {
+			unsigned char const* element = &array[__i];
 			glue_pack(__pos, __msg, __ext, *element);
 		}
 
@@ -5020,13 +5083,13 @@ void caller_marshal_kernel__pskb_expand_head__skb__io(
 	}
 
 	{
-		size_t i, len = 0;
+		size_t __i, __len = 0;
 		unsigned int const* array = headers_end_ptr;
-		glue_pack(__pos, __msg, __ext, len);
+		glue_pack(__pos, __msg, __ext, __len);
 		// Warning: see David if this breaks
 		glue_user_trace("Warning: see David if this breaks");
-		for (i = 0; i < len; ++i) {
-			unsigned int const* element = &array[i];
+		for (__i = 0; __i < __len; ++__i) {
+			unsigned int const* element = &array[__i];
 			glue_pack(__pos, __msg, __ext, *element);
 		}
 
@@ -5079,26 +5142,26 @@ void callee_unmarshal_kernel__pskb_expand_head__skb__io(
 	unsigned char** data_ptr = &ptr->data;
 
 	{
-		int i;
+		int __i;
 		unsigned int* array = headers_start_ptr;
-		size_t len = glue_unpack(__pos, __msg, __ext, size_t);
+		size_t __len = glue_unpack(__pos, __msg, __ext, size_t);
 		// Warning: see David if this breaks
 		glue_user_trace("Warning: see David if this breaks");
-		for (i = 0; i < len; ++i) {
-			unsigned int* element = &array[i];
+		for (__i = 0; __i < __len; ++__i) {
+			unsigned int* element = &array[__i];
 			*element = glue_unpack(__pos, __msg, __ext, unsigned int);
 		}
 
 	}
 
 	{
-		int i;
+		int __i;
 		unsigned char* array = __pkt_type_offset_ptr;
-		size_t len = glue_unpack(__pos, __msg, __ext, size_t);
+		size_t __len = glue_unpack(__pos, __msg, __ext, size_t);
 		// Warning: see David if this breaks
 		glue_user_trace("Warning: see David if this breaks");
-		for (i = 0; i < len; ++i) {
-			unsigned char* element = &array[i];
+		for (__i = 0; __i < __len; ++__i) {
+			unsigned char* element = &array[__i];
 			*element = glue_unpack(__pos, __msg, __ext, unsigned char);
 		}
 
@@ -5117,13 +5180,13 @@ void callee_unmarshal_kernel__pskb_expand_head__skb__io(
 	}
 
 	{
-		int i;
+		int __i;
 		unsigned int* array = headers_end_ptr;
-		size_t len = glue_unpack(__pos, __msg, __ext, size_t);
+		size_t __len = glue_unpack(__pos, __msg, __ext, size_t);
 		// Warning: see David if this breaks
 		glue_user_trace("Warning: see David if this breaks");
-		for (i = 0; i < len; ++i) {
-			unsigned int* element = &array[i];
+		for (__i = 0; __i < __len; ++__i) {
+			unsigned int* element = &array[__i];
 			*element = glue_unpack(__pos, __msg, __ext, unsigned int);
 		}
 
@@ -5176,26 +5239,26 @@ void callee_marshal_kernel__pskb_expand_head__skb__io(
 	unsigned char* const* data_ptr = &ptr->data;
 
 	{
-		size_t i, len = 0;
+		size_t __i, __len = 0;
 		unsigned int const* array = headers_start_ptr;
-		glue_pack(__pos, __msg, __ext, len);
+		glue_pack(__pos, __msg, __ext, __len);
 		// Warning: see David if this breaks
 		glue_user_trace("Warning: see David if this breaks");
-		for (i = 0; i < len; ++i) {
-			unsigned int const* element = &array[i];
+		for (__i = 0; __i < __len; ++__i) {
+			unsigned int const* element = &array[__i];
 			glue_pack(__pos, __msg, __ext, *element);
 		}
 
 	}
 
 	{
-		size_t i, len = 0;
+		size_t __i, __len = 0;
 		unsigned char const* array = __pkt_type_offset_ptr;
-		glue_pack(__pos, __msg, __ext, len);
+		glue_pack(__pos, __msg, __ext, __len);
 		// Warning: see David if this breaks
 		glue_user_trace("Warning: see David if this breaks");
-		for (i = 0; i < len; ++i) {
-			unsigned char const* element = &array[i];
+		for (__i = 0; __i < __len; ++__i) {
+			unsigned char const* element = &array[__i];
 			glue_pack(__pos, __msg, __ext, *element);
 		}
 
@@ -5214,13 +5277,13 @@ void callee_marshal_kernel__pskb_expand_head__skb__io(
 	}
 
 	{
-		size_t i, len = 0;
+		size_t __i, __len = 0;
 		unsigned int const* array = headers_end_ptr;
-		glue_pack(__pos, __msg, __ext, len);
+		glue_pack(__pos, __msg, __ext, __len);
 		// Warning: see David if this breaks
 		glue_user_trace("Warning: see David if this breaks");
-		for (i = 0; i < len; ++i) {
-			unsigned int const* element = &array[i];
+		for (__i = 0; __i < __len; ++__i) {
+			unsigned int const* element = &array[__i];
 			glue_pack(__pos, __msg, __ext, *element);
 		}
 
@@ -5273,26 +5336,26 @@ void caller_unmarshal_kernel__pskb_expand_head__skb__io(
 	unsigned char** data_ptr = &ptr->data;
 
 	{
-		int i;
+		int __i;
 		unsigned int* array = headers_start_ptr;
-		size_t len = glue_unpack(__pos, __msg, __ext, size_t);
+		size_t __len = glue_unpack(__pos, __msg, __ext, size_t);
 		// Warning: see David if this breaks
 		glue_user_trace("Warning: see David if this breaks");
-		for (i = 0; i < len; ++i) {
-			unsigned int* element = &array[i];
+		for (__i = 0; __i < __len; ++__i) {
+			unsigned int* element = &array[__i];
 			*element = glue_unpack(__pos, __msg, __ext, unsigned int);
 		}
 
 	}
 
 	{
-		int i;
+		int __i;
 		unsigned char* array = __pkt_type_offset_ptr;
-		size_t len = glue_unpack(__pos, __msg, __ext, size_t);
+		size_t __len = glue_unpack(__pos, __msg, __ext, size_t);
 		// Warning: see David if this breaks
 		glue_user_trace("Warning: see David if this breaks");
-		for (i = 0; i < len; ++i) {
-			unsigned char* element = &array[i];
+		for (__i = 0; __i < __len; ++__i) {
+			unsigned char* element = &array[__i];
 			*element = glue_unpack(__pos, __msg, __ext, unsigned char);
 		}
 
@@ -5311,13 +5374,13 @@ void caller_unmarshal_kernel__pskb_expand_head__skb__io(
 	}
 
 	{
-		int i;
+		int __i;
 		unsigned int* array = headers_end_ptr;
-		size_t len = glue_unpack(__pos, __msg, __ext, size_t);
+		size_t __len = glue_unpack(__pos, __msg, __ext, size_t);
 		// Warning: see David if this breaks
 		glue_user_trace("Warning: see David if this breaks");
-		for (i = 0; i < len; ++i) {
-			unsigned int* element = &array[i];
+		for (__i = 0; __i < __len; ++__i) {
+			unsigned int* element = &array[__i];
 			*element = glue_unpack(__pos, __msg, __ext, unsigned int);
 		}
 
@@ -5458,13 +5521,13 @@ void caller_marshal_kernel____pskb_pull_tail__skb__io(
 	unsigned char* const* data_ptr = &ptr->data;
 
 	{
-		size_t i, len = 48;
+		size_t __i, __len = 48;
 		signed char const* array = cb_ptr;
-		glue_pack(__pos, __msg, __ext, len);
+		glue_pack(__pos, __msg, __ext, __len);
 		// Warning: see David if this breaks
 		glue_user_trace("Warning: see David if this breaks");
-		for (i = 0; i < len; ++i) {
-			signed char const* element = &array[i];
+		for (__i = 0; __i < __len; ++__i) {
+			signed char const* element = &array[__i];
 			glue_pack(__pos, __msg, __ext, *element);
 		}
 
@@ -5487,26 +5550,26 @@ void caller_marshal_kernel____pskb_pull_tail__skb__io(
 	}
 
 	{
-		size_t i, len = 0;
+		size_t __i, __len = 0;
 		unsigned int const* array = headers_start_ptr;
-		glue_pack(__pos, __msg, __ext, len);
+		glue_pack(__pos, __msg, __ext, __len);
 		// Warning: see David if this breaks
 		glue_user_trace("Warning: see David if this breaks");
-		for (i = 0; i < len; ++i) {
-			unsigned int const* element = &array[i];
+		for (__i = 0; __i < __len; ++__i) {
+			unsigned int const* element = &array[__i];
 			glue_pack(__pos, __msg, __ext, *element);
 		}
 
 	}
 
 	{
-		size_t i, len = 0;
+		size_t __i, __len = 0;
 		unsigned char const* array = __pkt_type_offset_ptr;
-		glue_pack(__pos, __msg, __ext, len);
+		glue_pack(__pos, __msg, __ext, __len);
 		// Warning: see David if this breaks
 		glue_user_trace("Warning: see David if this breaks");
-		for (i = 0; i < len; ++i) {
-			unsigned char const* element = &array[i];
+		for (__i = 0; __i < __len; ++__i) {
+			unsigned char const* element = &array[__i];
 			glue_pack(__pos, __msg, __ext, *element);
 		}
 
@@ -5525,13 +5588,13 @@ void caller_marshal_kernel____pskb_pull_tail__skb__io(
 	}
 
 	{
-		size_t i, len = 0;
+		size_t __i, __len = 0;
 		unsigned int const* array = headers_end_ptr;
-		glue_pack(__pos, __msg, __ext, len);
+		glue_pack(__pos, __msg, __ext, __len);
 		// Warning: see David if this breaks
 		glue_user_trace("Warning: see David if this breaks");
-		for (i = 0; i < len; ++i) {
-			unsigned int const* element = &array[i];
+		for (__i = 0; __i < __len; ++__i) {
+			unsigned int const* element = &array[__i];
 			glue_pack(__pos, __msg, __ext, *element);
 		}
 
@@ -5589,13 +5652,13 @@ void callee_unmarshal_kernel____pskb_pull_tail__skb__io(
 	unsigned char** data_ptr = &ptr->data;
 
 	{
-		int i;
+		int __i;
 		signed char* array = cb_ptr;
-		size_t len = glue_unpack(__pos, __msg, __ext, size_t);
+		size_t __len = glue_unpack(__pos, __msg, __ext, size_t);
 		// Warning: see David if this breaks
 		glue_user_trace("Warning: see David if this breaks");
-		for (i = 0; i < len; ++i) {
-			signed char* element = &array[i];
+		for (__i = 0; __i < __len; ++__i) {
+			signed char* element = &array[__i];
 			*element = glue_unpack(__pos, __msg, __ext, signed char);
 		}
 
@@ -5618,26 +5681,26 @@ void callee_unmarshal_kernel____pskb_pull_tail__skb__io(
 	}
 
 	{
-		int i;
+		int __i;
 		unsigned int* array = headers_start_ptr;
-		size_t len = glue_unpack(__pos, __msg, __ext, size_t);
+		size_t __len = glue_unpack(__pos, __msg, __ext, size_t);
 		// Warning: see David if this breaks
 		glue_user_trace("Warning: see David if this breaks");
-		for (i = 0; i < len; ++i) {
-			unsigned int* element = &array[i];
+		for (__i = 0; __i < __len; ++__i) {
+			unsigned int* element = &array[__i];
 			*element = glue_unpack(__pos, __msg, __ext, unsigned int);
 		}
 
 	}
 
 	{
-		int i;
+		int __i;
 		unsigned char* array = __pkt_type_offset_ptr;
-		size_t len = glue_unpack(__pos, __msg, __ext, size_t);
+		size_t __len = glue_unpack(__pos, __msg, __ext, size_t);
 		// Warning: see David if this breaks
 		glue_user_trace("Warning: see David if this breaks");
-		for (i = 0; i < len; ++i) {
-			unsigned char* element = &array[i];
+		for (__i = 0; __i < __len; ++__i) {
+			unsigned char* element = &array[__i];
 			*element = glue_unpack(__pos, __msg, __ext, unsigned char);
 		}
 
@@ -5656,13 +5719,13 @@ void callee_unmarshal_kernel____pskb_pull_tail__skb__io(
 	}
 
 	{
-		int i;
+		int __i;
 		unsigned int* array = headers_end_ptr;
-		size_t len = glue_unpack(__pos, __msg, __ext, size_t);
+		size_t __len = glue_unpack(__pos, __msg, __ext, size_t);
 		// Warning: see David if this breaks
 		glue_user_trace("Warning: see David if this breaks");
-		for (i = 0; i < len; ++i) {
-			unsigned int* element = &array[i];
+		for (__i = 0; __i < __len; ++__i) {
+			unsigned int* element = &array[__i];
 			*element = glue_unpack(__pos, __msg, __ext, unsigned int);
 		}
 
@@ -5720,13 +5783,13 @@ void callee_marshal_kernel____pskb_pull_tail__skb__io(
 	unsigned char* const* data_ptr = &ptr->data;
 
 	{
-		size_t i, len = 48;
+		size_t __i, __len = 48;
 		signed char const* array = cb_ptr;
-		glue_pack(__pos, __msg, __ext, len);
+		glue_pack(__pos, __msg, __ext, __len);
 		// Warning: see David if this breaks
 		glue_user_trace("Warning: see David if this breaks");
-		for (i = 0; i < len; ++i) {
-			signed char const* element = &array[i];
+		for (__i = 0; __i < __len; ++__i) {
+			signed char const* element = &array[__i];
 			glue_pack(__pos, __msg, __ext, *element);
 		}
 
@@ -5749,26 +5812,26 @@ void callee_marshal_kernel____pskb_pull_tail__skb__io(
 	}
 
 	{
-		size_t i, len = 0;
+		size_t __i, __len = 0;
 		unsigned int const* array = headers_start_ptr;
-		glue_pack(__pos, __msg, __ext, len);
+		glue_pack(__pos, __msg, __ext, __len);
 		// Warning: see David if this breaks
 		glue_user_trace("Warning: see David if this breaks");
-		for (i = 0; i < len; ++i) {
-			unsigned int const* element = &array[i];
+		for (__i = 0; __i < __len; ++__i) {
+			unsigned int const* element = &array[__i];
 			glue_pack(__pos, __msg, __ext, *element);
 		}
 
 	}
 
 	{
-		size_t i, len = 0;
+		size_t __i, __len = 0;
 		unsigned char const* array = __pkt_type_offset_ptr;
-		glue_pack(__pos, __msg, __ext, len);
+		glue_pack(__pos, __msg, __ext, __len);
 		// Warning: see David if this breaks
 		glue_user_trace("Warning: see David if this breaks");
-		for (i = 0; i < len; ++i) {
-			unsigned char const* element = &array[i];
+		for (__i = 0; __i < __len; ++__i) {
+			unsigned char const* element = &array[__i];
 			glue_pack(__pos, __msg, __ext, *element);
 		}
 
@@ -5787,13 +5850,13 @@ void callee_marshal_kernel____pskb_pull_tail__skb__io(
 	}
 
 	{
-		size_t i, len = 0;
+		size_t __i, __len = 0;
 		unsigned int const* array = headers_end_ptr;
-		glue_pack(__pos, __msg, __ext, len);
+		glue_pack(__pos, __msg, __ext, __len);
 		// Warning: see David if this breaks
 		glue_user_trace("Warning: see David if this breaks");
-		for (i = 0; i < len; ++i) {
-			unsigned int const* element = &array[i];
+		for (__i = 0; __i < __len; ++__i) {
+			unsigned int const* element = &array[__i];
 			glue_pack(__pos, __msg, __ext, *element);
 		}
 
@@ -5851,13 +5914,13 @@ void caller_unmarshal_kernel____pskb_pull_tail__skb__io(
 	unsigned char** data_ptr = &ptr->data;
 
 	{
-		int i;
+		int __i;
 		signed char* array = cb_ptr;
-		size_t len = glue_unpack(__pos, __msg, __ext, size_t);
+		size_t __len = glue_unpack(__pos, __msg, __ext, size_t);
 		// Warning: see David if this breaks
 		glue_user_trace("Warning: see David if this breaks");
-		for (i = 0; i < len; ++i) {
-			signed char* element = &array[i];
+		for (__i = 0; __i < __len; ++__i) {
+			signed char* element = &array[__i];
 			*element = glue_unpack(__pos, __msg, __ext, signed char);
 		}
 
@@ -5880,26 +5943,26 @@ void caller_unmarshal_kernel____pskb_pull_tail__skb__io(
 	}
 
 	{
-		int i;
+		int __i;
 		unsigned int* array = headers_start_ptr;
-		size_t len = glue_unpack(__pos, __msg, __ext, size_t);
+		size_t __len = glue_unpack(__pos, __msg, __ext, size_t);
 		// Warning: see David if this breaks
 		glue_user_trace("Warning: see David if this breaks");
-		for (i = 0; i < len; ++i) {
-			unsigned int* element = &array[i];
+		for (__i = 0; __i < __len; ++__i) {
+			unsigned int* element = &array[__i];
 			*element = glue_unpack(__pos, __msg, __ext, unsigned int);
 		}
 
 	}
 
 	{
-		int i;
+		int __i;
 		unsigned char* array = __pkt_type_offset_ptr;
-		size_t len = glue_unpack(__pos, __msg, __ext, size_t);
+		size_t __len = glue_unpack(__pos, __msg, __ext, size_t);
 		// Warning: see David if this breaks
 		glue_user_trace("Warning: see David if this breaks");
-		for (i = 0; i < len; ++i) {
-			unsigned char* element = &array[i];
+		for (__i = 0; __i < __len; ++__i) {
+			unsigned char* element = &array[__i];
 			*element = glue_unpack(__pos, __msg, __ext, unsigned char);
 		}
 
@@ -5918,13 +5981,13 @@ void caller_unmarshal_kernel____pskb_pull_tail__skb__io(
 	}
 
 	{
-		int i;
+		int __i;
 		unsigned int* array = headers_end_ptr;
-		size_t len = glue_unpack(__pos, __msg, __ext, size_t);
+		size_t __len = glue_unpack(__pos, __msg, __ext, size_t);
 		// Warning: see David if this breaks
 		glue_user_trace("Warning: see David if this breaks");
-		for (i = 0; i < len; ++i) {
-			unsigned int* element = &array[i];
+		for (__i = 0; __i < __len; ++__i) {
+			unsigned int* element = &array[__i];
 			*element = glue_unpack(__pos, __msg, __ext, unsigned int);
 		}
 
@@ -5982,13 +6045,13 @@ void caller_marshal_kernel__skb_put__skb__in(
 	}
 
 	{
-		size_t i, len = 0;
+		size_t __i, __len = 0;
 		unsigned int const* array = headers_end_ptr;
-		glue_pack(__pos, __msg, __ext, len);
+		glue_pack(__pos, __msg, __ext, __len);
 		// Warning: see David if this breaks
 		glue_user_trace("Warning: see David if this breaks");
-		for (i = 0; i < len; ++i) {
-			unsigned int const* element = &array[i];
+		for (__i = 0; __i < __len; ++__i) {
+			unsigned int const* element = &array[__i];
 			glue_pack(__pos, __msg, __ext, *element);
 		}
 
@@ -6046,13 +6109,13 @@ void callee_unmarshal_kernel__skb_put__skb__in(
 	}
 
 	{
-		int i;
+		int __i;
 		unsigned int* array = headers_end_ptr;
-		size_t len = glue_unpack(__pos, __msg, __ext, size_t);
+		size_t __len = glue_unpack(__pos, __msg, __ext, size_t);
 		// Warning: see David if this breaks
 		glue_user_trace("Warning: see David if this breaks");
-		for (i = 0; i < len; ++i) {
-			unsigned int* element = &array[i];
+		for (__i = 0; __i < __len; ++__i) {
+			unsigned int* element = &array[__i];
 			*element = glue_unpack(__pos, __msg, __ext, unsigned int);
 		}
 
@@ -6104,13 +6167,13 @@ void callee_marshal_kernel__skb_put__skb__in(
 	}
 
 	{
-		size_t i, len = 0;
+		size_t __i, __len = 0;
 		unsigned int const* array = headers_end_ptr;
-		glue_pack(__pos, __msg, __ext, len);
+		glue_pack(__pos, __msg, __ext, __len);
 		// Warning: see David if this breaks
 		glue_user_trace("Warning: see David if this breaks");
-		for (i = 0; i < len; ++i) {
-			unsigned int const* element = &array[i];
+		for (__i = 0; __i < __len; ++__i) {
+			unsigned int const* element = &array[__i];
 			glue_pack(__pos, __msg, __ext, *element);
 		}
 
@@ -6148,13 +6211,13 @@ void caller_unmarshal_kernel__skb_put__skb__in(
 	}
 
 	{
-		int i;
+		int __i;
 		unsigned int* array = headers_end_ptr;
-		size_t len = glue_unpack(__pos, __msg, __ext, size_t);
+		size_t __len = glue_unpack(__pos, __msg, __ext, size_t);
 		// Warning: see David if this breaks
 		glue_user_trace("Warning: see David if this breaks");
-		for (i = 0; i < len; ++i) {
-			unsigned int* element = &array[i];
+		for (__i = 0; __i < __len; ++__i) {
+			unsigned int* element = &array[__i];
 			*element = glue_unpack(__pos, __msg, __ext, unsigned int);
 		}
 
@@ -6197,13 +6260,13 @@ void caller_marshal_kernel__skb_tstamp_tx__orig_skb__io(
 	unsigned char* const* data_ptr = &ptr->data;
 
 	{
-		size_t i, len = 48;
+		size_t __i, __len = 48;
 		signed char const* array = cb_ptr;
-		glue_pack(__pos, __msg, __ext, len);
+		glue_pack(__pos, __msg, __ext, __len);
 		// Warning: see David if this breaks
 		glue_user_trace("Warning: see David if this breaks");
-		for (i = 0; i < len; ++i) {
-			signed char const* element = &array[i];
+		for (__i = 0; __i < __len; ++__i) {
+			signed char const* element = &array[__i];
 			glue_pack(__pos, __msg, __ext, *element);
 		}
 
@@ -6226,39 +6289,39 @@ void caller_marshal_kernel__skb_tstamp_tx__orig_skb__io(
 	}
 
 	{
-		size_t i, len = 0;
+		size_t __i, __len = 0;
 		unsigned int const* array = headers_start_ptr;
-		glue_pack(__pos, __msg, __ext, len);
+		glue_pack(__pos, __msg, __ext, __len);
 		// Warning: see David if this breaks
 		glue_user_trace("Warning: see David if this breaks");
-		for (i = 0; i < len; ++i) {
-			unsigned int const* element = &array[i];
+		for (__i = 0; __i < __len; ++__i) {
+			unsigned int const* element = &array[__i];
 			glue_pack(__pos, __msg, __ext, *element);
 		}
 
 	}
 
 	{
-		size_t i, len = 0;
+		size_t __i, __len = 0;
 		unsigned char const* array = __pkt_type_offset_ptr;
-		glue_pack(__pos, __msg, __ext, len);
+		glue_pack(__pos, __msg, __ext, __len);
 		// Warning: see David if this breaks
 		glue_user_trace("Warning: see David if this breaks");
-		for (i = 0; i < len; ++i) {
-			unsigned char const* element = &array[i];
+		for (__i = 0; __i < __len; ++__i) {
+			unsigned char const* element = &array[__i];
 			glue_pack(__pos, __msg, __ext, *element);
 		}
 
 	}
 
 	{
-		size_t i, len = 0;
+		size_t __i, __len = 0;
 		unsigned int const* array = headers_end_ptr;
-		glue_pack(__pos, __msg, __ext, len);
+		glue_pack(__pos, __msg, __ext, __len);
 		// Warning: see David if this breaks
 		glue_user_trace("Warning: see David if this breaks");
-		for (i = 0; i < len; ++i) {
-			unsigned int const* element = &array[i];
+		for (__i = 0; __i < __len; ++__i) {
+			unsigned int const* element = &array[__i];
 			glue_pack(__pos, __msg, __ext, *element);
 		}
 
@@ -6313,13 +6376,13 @@ void callee_unmarshal_kernel__skb_tstamp_tx__orig_skb__io(
 	unsigned char** data_ptr = &ptr->data;
 
 	{
-		int i;
+		int __i;
 		signed char* array = cb_ptr;
-		size_t len = glue_unpack(__pos, __msg, __ext, size_t);
+		size_t __len = glue_unpack(__pos, __msg, __ext, size_t);
 		// Warning: see David if this breaks
 		glue_user_trace("Warning: see David if this breaks");
-		for (i = 0; i < len; ++i) {
-			signed char* element = &array[i];
+		for (__i = 0; __i < __len; ++__i) {
+			signed char* element = &array[__i];
 			*element = glue_unpack(__pos, __msg, __ext, signed char);
 		}
 
@@ -6342,39 +6405,39 @@ void callee_unmarshal_kernel__skb_tstamp_tx__orig_skb__io(
 	}
 
 	{
-		int i;
+		int __i;
 		unsigned int* array = headers_start_ptr;
-		size_t len = glue_unpack(__pos, __msg, __ext, size_t);
+		size_t __len = glue_unpack(__pos, __msg, __ext, size_t);
 		// Warning: see David if this breaks
 		glue_user_trace("Warning: see David if this breaks");
-		for (i = 0; i < len; ++i) {
-			unsigned int* element = &array[i];
+		for (__i = 0; __i < __len; ++__i) {
+			unsigned int* element = &array[__i];
 			*element = glue_unpack(__pos, __msg, __ext, unsigned int);
 		}
 
 	}
 
 	{
-		int i;
+		int __i;
 		unsigned char* array = __pkt_type_offset_ptr;
-		size_t len = glue_unpack(__pos, __msg, __ext, size_t);
+		size_t __len = glue_unpack(__pos, __msg, __ext, size_t);
 		// Warning: see David if this breaks
 		glue_user_trace("Warning: see David if this breaks");
-		for (i = 0; i < len; ++i) {
-			unsigned char* element = &array[i];
+		for (__i = 0; __i < __len; ++__i) {
+			unsigned char* element = &array[__i];
 			*element = glue_unpack(__pos, __msg, __ext, unsigned char);
 		}
 
 	}
 
 	{
-		int i;
+		int __i;
 		unsigned int* array = headers_end_ptr;
-		size_t len = glue_unpack(__pos, __msg, __ext, size_t);
+		size_t __len = glue_unpack(__pos, __msg, __ext, size_t);
 		// Warning: see David if this breaks
 		glue_user_trace("Warning: see David if this breaks");
-		for (i = 0; i < len; ++i) {
-			unsigned int* element = &array[i];
+		for (__i = 0; __i < __len; ++__i) {
+			unsigned int* element = &array[__i];
 			*element = glue_unpack(__pos, __msg, __ext, unsigned int);
 		}
 
@@ -6429,13 +6492,13 @@ void callee_marshal_kernel__skb_tstamp_tx__orig_skb__io(
 	unsigned char* const* data_ptr = &ptr->data;
 
 	{
-		size_t i, len = 48;
+		size_t __i, __len = 48;
 		signed char const* array = cb_ptr;
-		glue_pack(__pos, __msg, __ext, len);
+		glue_pack(__pos, __msg, __ext, __len);
 		// Warning: see David if this breaks
 		glue_user_trace("Warning: see David if this breaks");
-		for (i = 0; i < len; ++i) {
-			signed char const* element = &array[i];
+		for (__i = 0; __i < __len; ++__i) {
+			signed char const* element = &array[__i];
 			glue_pack(__pos, __msg, __ext, *element);
 		}
 
@@ -6458,39 +6521,39 @@ void callee_marshal_kernel__skb_tstamp_tx__orig_skb__io(
 	}
 
 	{
-		size_t i, len = 0;
+		size_t __i, __len = 0;
 		unsigned int const* array = headers_start_ptr;
-		glue_pack(__pos, __msg, __ext, len);
+		glue_pack(__pos, __msg, __ext, __len);
 		// Warning: see David if this breaks
 		glue_user_trace("Warning: see David if this breaks");
-		for (i = 0; i < len; ++i) {
-			unsigned int const* element = &array[i];
+		for (__i = 0; __i < __len; ++__i) {
+			unsigned int const* element = &array[__i];
 			glue_pack(__pos, __msg, __ext, *element);
 		}
 
 	}
 
 	{
-		size_t i, len = 0;
+		size_t __i, __len = 0;
 		unsigned char const* array = __pkt_type_offset_ptr;
-		glue_pack(__pos, __msg, __ext, len);
+		glue_pack(__pos, __msg, __ext, __len);
 		// Warning: see David if this breaks
 		glue_user_trace("Warning: see David if this breaks");
-		for (i = 0; i < len; ++i) {
-			unsigned char const* element = &array[i];
+		for (__i = 0; __i < __len; ++__i) {
+			unsigned char const* element = &array[__i];
 			glue_pack(__pos, __msg, __ext, *element);
 		}
 
 	}
 
 	{
-		size_t i, len = 0;
+		size_t __i, __len = 0;
 		unsigned int const* array = headers_end_ptr;
-		glue_pack(__pos, __msg, __ext, len);
+		glue_pack(__pos, __msg, __ext, __len);
 		// Warning: see David if this breaks
 		glue_user_trace("Warning: see David if this breaks");
-		for (i = 0; i < len; ++i) {
-			unsigned int const* element = &array[i];
+		for (__i = 0; __i < __len; ++__i) {
+			unsigned int const* element = &array[__i];
 			glue_pack(__pos, __msg, __ext, *element);
 		}
 
@@ -6545,13 +6608,13 @@ void caller_unmarshal_kernel__skb_tstamp_tx__orig_skb__io(
 	unsigned char** data_ptr = &ptr->data;
 
 	{
-		int i;
+		int __i;
 		signed char* array = cb_ptr;
-		size_t len = glue_unpack(__pos, __msg, __ext, size_t);
+		size_t __len = glue_unpack(__pos, __msg, __ext, size_t);
 		// Warning: see David if this breaks
 		glue_user_trace("Warning: see David if this breaks");
-		for (i = 0; i < len; ++i) {
-			signed char* element = &array[i];
+		for (__i = 0; __i < __len; ++__i) {
+			signed char* element = &array[__i];
 			*element = glue_unpack(__pos, __msg, __ext, signed char);
 		}
 
@@ -6574,39 +6637,39 @@ void caller_unmarshal_kernel__skb_tstamp_tx__orig_skb__io(
 	}
 
 	{
-		int i;
+		int __i;
 		unsigned int* array = headers_start_ptr;
-		size_t len = glue_unpack(__pos, __msg, __ext, size_t);
+		size_t __len = glue_unpack(__pos, __msg, __ext, size_t);
 		// Warning: see David if this breaks
 		glue_user_trace("Warning: see David if this breaks");
-		for (i = 0; i < len; ++i) {
-			unsigned int* element = &array[i];
+		for (__i = 0; __i < __len; ++__i) {
+			unsigned int* element = &array[__i];
 			*element = glue_unpack(__pos, __msg, __ext, unsigned int);
 		}
 
 	}
 
 	{
-		int i;
+		int __i;
 		unsigned char* array = __pkt_type_offset_ptr;
-		size_t len = glue_unpack(__pos, __msg, __ext, size_t);
+		size_t __len = glue_unpack(__pos, __msg, __ext, size_t);
 		// Warning: see David if this breaks
 		glue_user_trace("Warning: see David if this breaks");
-		for (i = 0; i < len; ++i) {
-			unsigned char* element = &array[i];
+		for (__i = 0; __i < __len; ++__i) {
+			unsigned char* element = &array[__i];
 			*element = glue_unpack(__pos, __msg, __ext, unsigned char);
 		}
 
 	}
 
 	{
-		int i;
+		int __i;
 		unsigned int* array = headers_end_ptr;
-		size_t len = glue_unpack(__pos, __msg, __ext, size_t);
+		size_t __len = glue_unpack(__pos, __msg, __ext, size_t);
 		// Warning: see David if this breaks
 		glue_user_trace("Warning: see David if this breaks");
-		for (i = 0; i < len; ++i) {
-			unsigned int* element = &array[i];
+		for (__i = 0; __i < __len; ++__i) {
+			unsigned int* element = &array[__i];
 			*element = glue_unpack(__pos, __msg, __ext, unsigned int);
 		}
 
@@ -6708,13 +6771,13 @@ void caller_marshal_kernel__skb_pad__skb__io(
 	unsigned char* const* data_ptr = &ptr->data;
 
 	{
-		size_t i, len = 48;
+		size_t __i, __len = 48;
 		signed char const* array = cb_ptr;
-		glue_pack(__pos, __msg, __ext, len);
+		glue_pack(__pos, __msg, __ext, __len);
 		// Warning: see David if this breaks
 		glue_user_trace("Warning: see David if this breaks");
-		for (i = 0; i < len; ++i) {
-			signed char const* element = &array[i];
+		for (__i = 0; __i < __len; ++__i) {
+			signed char const* element = &array[__i];
 			glue_pack(__pos, __msg, __ext, *element);
 		}
 
@@ -6737,26 +6800,26 @@ void caller_marshal_kernel__skb_pad__skb__io(
 	}
 
 	{
-		size_t i, len = 0;
+		size_t __i, __len = 0;
 		unsigned int const* array = headers_start_ptr;
-		glue_pack(__pos, __msg, __ext, len);
+		glue_pack(__pos, __msg, __ext, __len);
 		// Warning: see David if this breaks
 		glue_user_trace("Warning: see David if this breaks");
-		for (i = 0; i < len; ++i) {
-			unsigned int const* element = &array[i];
+		for (__i = 0; __i < __len; ++__i) {
+			unsigned int const* element = &array[__i];
 			glue_pack(__pos, __msg, __ext, *element);
 		}
 
 	}
 
 	{
-		size_t i, len = 0;
+		size_t __i, __len = 0;
 		unsigned char const* array = __pkt_type_offset_ptr;
-		glue_pack(__pos, __msg, __ext, len);
+		glue_pack(__pos, __msg, __ext, __len);
 		// Warning: see David if this breaks
 		glue_user_trace("Warning: see David if this breaks");
-		for (i = 0; i < len; ++i) {
-			unsigned char const* element = &array[i];
+		for (__i = 0; __i < __len; ++__i) {
+			unsigned char const* element = &array[__i];
 			glue_pack(__pos, __msg, __ext, *element);
 		}
 
@@ -6775,13 +6838,13 @@ void caller_marshal_kernel__skb_pad__skb__io(
 	}
 
 	{
-		size_t i, len = 0;
+		size_t __i, __len = 0;
 		unsigned int const* array = headers_end_ptr;
-		glue_pack(__pos, __msg, __ext, len);
+		glue_pack(__pos, __msg, __ext, __len);
 		// Warning: see David if this breaks
 		glue_user_trace("Warning: see David if this breaks");
-		for (i = 0; i < len; ++i) {
-			unsigned int const* element = &array[i];
+		for (__i = 0; __i < __len; ++__i) {
+			unsigned int const* element = &array[__i];
 			glue_pack(__pos, __msg, __ext, *element);
 		}
 
@@ -6839,13 +6902,13 @@ void callee_unmarshal_kernel__skb_pad__skb__io(
 	unsigned char** data_ptr = &ptr->data;
 
 	{
-		int i;
+		int __i;
 		signed char* array = cb_ptr;
-		size_t len = glue_unpack(__pos, __msg, __ext, size_t);
+		size_t __len = glue_unpack(__pos, __msg, __ext, size_t);
 		// Warning: see David if this breaks
 		glue_user_trace("Warning: see David if this breaks");
-		for (i = 0; i < len; ++i) {
-			signed char* element = &array[i];
+		for (__i = 0; __i < __len; ++__i) {
+			signed char* element = &array[__i];
 			*element = glue_unpack(__pos, __msg, __ext, signed char);
 		}
 
@@ -6868,26 +6931,26 @@ void callee_unmarshal_kernel__skb_pad__skb__io(
 	}
 
 	{
-		int i;
+		int __i;
 		unsigned int* array = headers_start_ptr;
-		size_t len = glue_unpack(__pos, __msg, __ext, size_t);
+		size_t __len = glue_unpack(__pos, __msg, __ext, size_t);
 		// Warning: see David if this breaks
 		glue_user_trace("Warning: see David if this breaks");
-		for (i = 0; i < len; ++i) {
-			unsigned int* element = &array[i];
+		for (__i = 0; __i < __len; ++__i) {
+			unsigned int* element = &array[__i];
 			*element = glue_unpack(__pos, __msg, __ext, unsigned int);
 		}
 
 	}
 
 	{
-		int i;
+		int __i;
 		unsigned char* array = __pkt_type_offset_ptr;
-		size_t len = glue_unpack(__pos, __msg, __ext, size_t);
+		size_t __len = glue_unpack(__pos, __msg, __ext, size_t);
 		// Warning: see David if this breaks
 		glue_user_trace("Warning: see David if this breaks");
-		for (i = 0; i < len; ++i) {
-			unsigned char* element = &array[i];
+		for (__i = 0; __i < __len; ++__i) {
+			unsigned char* element = &array[__i];
 			*element = glue_unpack(__pos, __msg, __ext, unsigned char);
 		}
 
@@ -6906,13 +6969,13 @@ void callee_unmarshal_kernel__skb_pad__skb__io(
 	}
 
 	{
-		int i;
+		int __i;
 		unsigned int* array = headers_end_ptr;
-		size_t len = glue_unpack(__pos, __msg, __ext, size_t);
+		size_t __len = glue_unpack(__pos, __msg, __ext, size_t);
 		// Warning: see David if this breaks
 		glue_user_trace("Warning: see David if this breaks");
-		for (i = 0; i < len; ++i) {
-			unsigned int* element = &array[i];
+		for (__i = 0; __i < __len; ++__i) {
+			unsigned int* element = &array[__i];
 			*element = glue_unpack(__pos, __msg, __ext, unsigned int);
 		}
 
@@ -6970,13 +7033,13 @@ void callee_marshal_kernel__skb_pad__skb__io(
 	unsigned char* const* data_ptr = &ptr->data;
 
 	{
-		size_t i, len = 48;
+		size_t __i, __len = 48;
 		signed char const* array = cb_ptr;
-		glue_pack(__pos, __msg, __ext, len);
+		glue_pack(__pos, __msg, __ext, __len);
 		// Warning: see David if this breaks
 		glue_user_trace("Warning: see David if this breaks");
-		for (i = 0; i < len; ++i) {
-			signed char const* element = &array[i];
+		for (__i = 0; __i < __len; ++__i) {
+			signed char const* element = &array[__i];
 			glue_pack(__pos, __msg, __ext, *element);
 		}
 
@@ -6999,26 +7062,26 @@ void callee_marshal_kernel__skb_pad__skb__io(
 	}
 
 	{
-		size_t i, len = 0;
+		size_t __i, __len = 0;
 		unsigned int const* array = headers_start_ptr;
-		glue_pack(__pos, __msg, __ext, len);
+		glue_pack(__pos, __msg, __ext, __len);
 		// Warning: see David if this breaks
 		glue_user_trace("Warning: see David if this breaks");
-		for (i = 0; i < len; ++i) {
-			unsigned int const* element = &array[i];
+		for (__i = 0; __i < __len; ++__i) {
+			unsigned int const* element = &array[__i];
 			glue_pack(__pos, __msg, __ext, *element);
 		}
 
 	}
 
 	{
-		size_t i, len = 0;
+		size_t __i, __len = 0;
 		unsigned char const* array = __pkt_type_offset_ptr;
-		glue_pack(__pos, __msg, __ext, len);
+		glue_pack(__pos, __msg, __ext, __len);
 		// Warning: see David if this breaks
 		glue_user_trace("Warning: see David if this breaks");
-		for (i = 0; i < len; ++i) {
-			unsigned char const* element = &array[i];
+		for (__i = 0; __i < __len; ++__i) {
+			unsigned char const* element = &array[__i];
 			glue_pack(__pos, __msg, __ext, *element);
 		}
 
@@ -7037,13 +7100,13 @@ void callee_marshal_kernel__skb_pad__skb__io(
 	}
 
 	{
-		size_t i, len = 0;
+		size_t __i, __len = 0;
 		unsigned int const* array = headers_end_ptr;
-		glue_pack(__pos, __msg, __ext, len);
+		glue_pack(__pos, __msg, __ext, __len);
 		// Warning: see David if this breaks
 		glue_user_trace("Warning: see David if this breaks");
-		for (i = 0; i < len; ++i) {
-			unsigned int const* element = &array[i];
+		for (__i = 0; __i < __len; ++__i) {
+			unsigned int const* element = &array[__i];
 			glue_pack(__pos, __msg, __ext, *element);
 		}
 
@@ -7101,13 +7164,13 @@ void caller_unmarshal_kernel__skb_pad__skb__io(
 	unsigned char** data_ptr = &ptr->data;
 
 	{
-		int i;
+		int __i;
 		signed char* array = cb_ptr;
-		size_t len = glue_unpack(__pos, __msg, __ext, size_t);
+		size_t __len = glue_unpack(__pos, __msg, __ext, size_t);
 		// Warning: see David if this breaks
 		glue_user_trace("Warning: see David if this breaks");
-		for (i = 0; i < len; ++i) {
-			signed char* element = &array[i];
+		for (__i = 0; __i < __len; ++__i) {
+			signed char* element = &array[__i];
 			*element = glue_unpack(__pos, __msg, __ext, signed char);
 		}
 
@@ -7130,26 +7193,26 @@ void caller_unmarshal_kernel__skb_pad__skb__io(
 	}
 
 	{
-		int i;
+		int __i;
 		unsigned int* array = headers_start_ptr;
-		size_t len = glue_unpack(__pos, __msg, __ext, size_t);
+		size_t __len = glue_unpack(__pos, __msg, __ext, size_t);
 		// Warning: see David if this breaks
 		glue_user_trace("Warning: see David if this breaks");
-		for (i = 0; i < len; ++i) {
-			unsigned int* element = &array[i];
+		for (__i = 0; __i < __len; ++__i) {
+			unsigned int* element = &array[__i];
 			*element = glue_unpack(__pos, __msg, __ext, unsigned int);
 		}
 
 	}
 
 	{
-		int i;
+		int __i;
 		unsigned char* array = __pkt_type_offset_ptr;
-		size_t len = glue_unpack(__pos, __msg, __ext, size_t);
+		size_t __len = glue_unpack(__pos, __msg, __ext, size_t);
 		// Warning: see David if this breaks
 		glue_user_trace("Warning: see David if this breaks");
-		for (i = 0; i < len; ++i) {
-			unsigned char* element = &array[i];
+		for (__i = 0; __i < __len; ++__i) {
+			unsigned char* element = &array[__i];
 			*element = glue_unpack(__pos, __msg, __ext, unsigned char);
 		}
 
@@ -7168,13 +7231,13 @@ void caller_unmarshal_kernel__skb_pad__skb__io(
 	}
 
 	{
-		int i;
+		int __i;
 		unsigned int* array = headers_end_ptr;
-		size_t len = glue_unpack(__pos, __msg, __ext, size_t);
+		size_t __len = glue_unpack(__pos, __msg, __ext, size_t);
 		// Warning: see David if this breaks
 		glue_user_trace("Warning: see David if this breaks");
-		for (i = 0; i < len; ++i) {
-			unsigned int* element = &array[i];
+		for (__i = 0; __i < __len; ++__i) {
+			unsigned int* element = &array[__i];
 			*element = glue_unpack(__pos, __msg, __ext, unsigned int);
 		}
 
@@ -7220,13 +7283,13 @@ void caller_marshal_kernel__napi_consume_skb__skb__in(
 	unsigned char* const* head_ptr = &ptr->head;
 
 	{
-		size_t i, len = 48;
+		size_t __i, __len = 48;
 		signed char const* array = cb_ptr;
-		glue_pack(__pos, __msg, __ext, len);
+		glue_pack(__pos, __msg, __ext, __len);
 		// Warning: see David if this breaks
 		glue_user_trace("Warning: see David if this breaks");
-		for (i = 0; i < len; ++i) {
-			signed char const* element = &array[i];
+		for (__i = 0; __i < __len; ++__i) {
+			signed char const* element = &array[__i];
 			glue_pack(__pos, __msg, __ext, *element);
 		}
 
@@ -7259,13 +7322,13 @@ void callee_unmarshal_kernel__napi_consume_skb__skb__in(
 	unsigned char** head_ptr = &ptr->head;
 
 	{
-		int i;
+		int __i;
 		signed char* array = cb_ptr;
-		size_t len = glue_unpack(__pos, __msg, __ext, size_t);
+		size_t __len = glue_unpack(__pos, __msg, __ext, size_t);
 		// Warning: see David if this breaks
 		glue_user_trace("Warning: see David if this breaks");
-		for (i = 0; i < len; ++i) {
-			signed char* element = &array[i];
+		for (__i = 0; __i < __len; ++__i) {
+			signed char* element = &array[__i];
 			*element = glue_unpack(__pos, __msg, __ext, signed char);
 		}
 
@@ -7331,13 +7394,13 @@ void caller_marshal_kernel____dev_kfree_skb_any__skb__in(
 	unsigned char* const* head_ptr = &ptr->head;
 
 	{
-		size_t i, len = 48;
+		size_t __i, __len = 48;
 		signed char const* array = cb_ptr;
-		glue_pack(__pos, __msg, __ext, len);
+		glue_pack(__pos, __msg, __ext, __len);
 		// Warning: see David if this breaks
 		glue_user_trace("Warning: see David if this breaks");
-		for (i = 0; i < len; ++i) {
-			signed char const* element = &array[i];
+		for (__i = 0; __i < __len; ++__i) {
+			signed char const* element = &array[__i];
 			glue_pack(__pos, __msg, __ext, *element);
 		}
 
@@ -7370,13 +7433,13 @@ void callee_unmarshal_kernel____dev_kfree_skb_any__skb__in(
 	unsigned char** head_ptr = &ptr->head;
 
 	{
-		int i;
+		int __i;
 		signed char* array = cb_ptr;
-		size_t len = glue_unpack(__pos, __msg, __ext, size_t);
+		size_t __len = glue_unpack(__pos, __msg, __ext, size_t);
 		// Warning: see David if this breaks
 		glue_user_trace("Warning: see David if this breaks");
-		for (i = 0; i < len; ++i) {
-			signed char* element = &array[i];
+		for (__i = 0; __i < __len; ++__i) {
+			signed char* element = &array[__i];
 			*element = glue_unpack(__pos, __msg, __ext, signed char);
 		}
 
@@ -7441,26 +7504,26 @@ void caller_marshal_kernel____napi_alloc_skb__ret_sk_buff__in(
 	unsigned char const* __pkt_type_offset_ptr = ptr->__pkt_type_offset;
 
 	{
-		size_t i, len = 0;
+		size_t __i, __len = 0;
 		unsigned int const* array = headers_start_ptr;
-		glue_pack(__pos, __msg, __ext, len);
+		glue_pack(__pos, __msg, __ext, __len);
 		// Warning: see David if this breaks
 		glue_user_trace("Warning: see David if this breaks");
-		for (i = 0; i < len; ++i) {
-			unsigned int const* element = &array[i];
+		for (__i = 0; __i < __len; ++__i) {
+			unsigned int const* element = &array[__i];
 			glue_pack(__pos, __msg, __ext, *element);
 		}
 
 	}
 
 	{
-		size_t i, len = 0;
+		size_t __i, __len = 0;
 		unsigned char const* array = __pkt_type_offset_ptr;
-		glue_pack(__pos, __msg, __ext, len);
+		glue_pack(__pos, __msg, __ext, __len);
 		// Warning: see David if this breaks
 		glue_user_trace("Warning: see David if this breaks");
-		for (i = 0; i < len; ++i) {
-			unsigned char const* element = &array[i];
+		for (__i = 0; __i < __len; ++__i) {
+			unsigned char const* element = &array[__i];
 			glue_pack(__pos, __msg, __ext, *element);
 		}
 
@@ -7479,26 +7542,26 @@ void callee_unmarshal_kernel____napi_alloc_skb__ret_sk_buff__in(
 	unsigned char* __pkt_type_offset_ptr = ptr->__pkt_type_offset;
 
 	{
-		int i;
+		int __i;
 		unsigned int* array = headers_start_ptr;
-		size_t len = glue_unpack(__pos, __msg, __ext, size_t);
+		size_t __len = glue_unpack(__pos, __msg, __ext, size_t);
 		// Warning: see David if this breaks
 		glue_user_trace("Warning: see David if this breaks");
-		for (i = 0; i < len; ++i) {
-			unsigned int* element = &array[i];
+		for (__i = 0; __i < __len; ++__i) {
+			unsigned int* element = &array[__i];
 			*element = glue_unpack(__pos, __msg, __ext, unsigned int);
 		}
 
 	}
 
 	{
-		int i;
+		int __i;
 		unsigned char* array = __pkt_type_offset_ptr;
-		size_t len = glue_unpack(__pos, __msg, __ext, size_t);
+		size_t __len = glue_unpack(__pos, __msg, __ext, size_t);
 		// Warning: see David if this breaks
 		glue_user_trace("Warning: see David if this breaks");
-		for (i = 0; i < len; ++i) {
-			unsigned char* element = &array[i];
+		for (__i = 0; __i < __len; ++__i) {
+			unsigned char* element = &array[__i];
 			*element = glue_unpack(__pos, __msg, __ext, unsigned char);
 		}
 
@@ -7519,26 +7582,26 @@ void callee_marshal_kernel____napi_alloc_skb__ret_sk_buff__in(
 	unsigned char const* __pkt_type_offset_ptr = ptr->__pkt_type_offset;
 
 	{
-		size_t i, len = 0;
+		size_t __i, __len = 0;
 		unsigned int const* array = headers_start_ptr;
-		glue_pack(__pos, __msg, __ext, len);
+		glue_pack(__pos, __msg, __ext, __len);
 		// Warning: see David if this breaks
 		glue_user_trace("Warning: see David if this breaks");
-		for (i = 0; i < len; ++i) {
-			unsigned int const* element = &array[i];
+		for (__i = 0; __i < __len; ++__i) {
+			unsigned int const* element = &array[__i];
 			glue_pack(__pos, __msg, __ext, *element);
 		}
 
 	}
 
 	{
-		size_t i, len = 0;
+		size_t __i, __len = 0;
 		unsigned char const* array = __pkt_type_offset_ptr;
-		glue_pack(__pos, __msg, __ext, len);
+		glue_pack(__pos, __msg, __ext, __len);
 		// Warning: see David if this breaks
 		glue_user_trace("Warning: see David if this breaks");
-		for (i = 0; i < len; ++i) {
-			unsigned char const* element = &array[i];
+		for (__i = 0; __i < __len; ++__i) {
+			unsigned char const* element = &array[__i];
 			glue_pack(__pos, __msg, __ext, *element);
 		}
 
@@ -7557,26 +7620,26 @@ void caller_unmarshal_kernel____napi_alloc_skb__ret_sk_buff__in(
 	unsigned char* __pkt_type_offset_ptr = ptr->__pkt_type_offset;
 
 	{
-		int i;
+		int __i;
 		unsigned int* array = headers_start_ptr;
-		size_t len = glue_unpack(__pos, __msg, __ext, size_t);
+		size_t __len = glue_unpack(__pos, __msg, __ext, size_t);
 		// Warning: see David if this breaks
 		glue_user_trace("Warning: see David if this breaks");
-		for (i = 0; i < len; ++i) {
-			unsigned int* element = &array[i];
+		for (__i = 0; __i < __len; ++__i) {
+			unsigned int* element = &array[__i];
 			*element = glue_unpack(__pos, __msg, __ext, unsigned int);
 		}
 
 	}
 
 	{
-		int i;
+		int __i;
 		unsigned char* array = __pkt_type_offset_ptr;
-		size_t len = glue_unpack(__pos, __msg, __ext, size_t);
+		size_t __len = glue_unpack(__pos, __msg, __ext, size_t);
 		// Warning: see David if this breaks
 		glue_user_trace("Warning: see David if this breaks");
-		for (i = 0; i < len; ++i) {
-			unsigned char* element = &array[i];
+		for (__i = 0; __i < __len; ++__i) {
+			unsigned char* element = &array[__i];
 			*element = glue_unpack(__pos, __msg, __ext, unsigned char);
 		}
 
@@ -7819,13 +7882,13 @@ void caller_marshal_kernel__napi_gro_flush__napi_struct_gro_list__io(
 	unsigned char* const* data_ptr = &ptr->data;
 
 	{
-		size_t i, len = 48;
+		size_t __i, __len = 48;
 		signed char const* array = cb_ptr;
-		glue_pack(__pos, __msg, __ext, len);
+		glue_pack(__pos, __msg, __ext, __len);
 		// Warning: see David if this breaks
 		glue_user_trace("Warning: see David if this breaks");
-		for (i = 0; i < len; ++i) {
-			signed char const* element = &array[i];
+		for (__i = 0; __i < __len; ++__i) {
+			signed char const* element = &array[__i];
 			glue_pack(__pos, __msg, __ext, *element);
 		}
 
@@ -7848,26 +7911,26 @@ void caller_marshal_kernel__napi_gro_flush__napi_struct_gro_list__io(
 	}
 
 	{
-		size_t i, len = 0;
+		size_t __i, __len = 0;
 		unsigned int const* array = headers_start_ptr;
-		glue_pack(__pos, __msg, __ext, len);
+		glue_pack(__pos, __msg, __ext, __len);
 		// Warning: see David if this breaks
 		glue_user_trace("Warning: see David if this breaks");
-		for (i = 0; i < len; ++i) {
-			unsigned int const* element = &array[i];
+		for (__i = 0; __i < __len; ++__i) {
+			unsigned int const* element = &array[__i];
 			glue_pack(__pos, __msg, __ext, *element);
 		}
 
 	}
 
 	{
-		size_t i, len = 0;
+		size_t __i, __len = 0;
 		unsigned char const* array = __pkt_type_offset_ptr;
-		glue_pack(__pos, __msg, __ext, len);
+		glue_pack(__pos, __msg, __ext, __len);
 		// Warning: see David if this breaks
 		glue_user_trace("Warning: see David if this breaks");
-		for (i = 0; i < len; ++i) {
-			unsigned char const* element = &array[i];
+		for (__i = 0; __i < __len; ++__i) {
+			unsigned char const* element = &array[__i];
 			glue_pack(__pos, __msg, __ext, *element);
 		}
 
@@ -7902,13 +7965,13 @@ void caller_marshal_kernel__napi_gro_flush__napi_struct_gro_list__io(
 	}
 
 	{
-		size_t i, len = 0;
+		size_t __i, __len = 0;
 		unsigned int const* array = headers_end_ptr;
-		glue_pack(__pos, __msg, __ext, len);
+		glue_pack(__pos, __msg, __ext, __len);
 		// Warning: see David if this breaks
 		glue_user_trace("Warning: see David if this breaks");
-		for (i = 0; i < len; ++i) {
-			unsigned int const* element = &array[i];
+		for (__i = 0; __i < __len; ++__i) {
+			unsigned int const* element = &array[__i];
 			glue_pack(__pos, __msg, __ext, *element);
 		}
 
@@ -7970,13 +8033,13 @@ void callee_unmarshal_kernel__napi_gro_flush__napi_struct_gro_list__io(
 	unsigned char** data_ptr = &ptr->data;
 
 	{
-		int i;
+		int __i;
 		signed char* array = cb_ptr;
-		size_t len = glue_unpack(__pos, __msg, __ext, size_t);
+		size_t __len = glue_unpack(__pos, __msg, __ext, size_t);
 		// Warning: see David if this breaks
 		glue_user_trace("Warning: see David if this breaks");
-		for (i = 0; i < len; ++i) {
-			signed char* element = &array[i];
+		for (__i = 0; __i < __len; ++__i) {
+			signed char* element = &array[__i];
 			*element = glue_unpack(__pos, __msg, __ext, signed char);
 		}
 
@@ -7999,26 +8062,26 @@ void callee_unmarshal_kernel__napi_gro_flush__napi_struct_gro_list__io(
 	}
 
 	{
-		int i;
+		int __i;
 		unsigned int* array = headers_start_ptr;
-		size_t len = glue_unpack(__pos, __msg, __ext, size_t);
+		size_t __len = glue_unpack(__pos, __msg, __ext, size_t);
 		// Warning: see David if this breaks
 		glue_user_trace("Warning: see David if this breaks");
-		for (i = 0; i < len; ++i) {
-			unsigned int* element = &array[i];
+		for (__i = 0; __i < __len; ++__i) {
+			unsigned int* element = &array[__i];
 			*element = glue_unpack(__pos, __msg, __ext, unsigned int);
 		}
 
 	}
 
 	{
-		int i;
+		int __i;
 		unsigned char* array = __pkt_type_offset_ptr;
-		size_t len = glue_unpack(__pos, __msg, __ext, size_t);
+		size_t __len = glue_unpack(__pos, __msg, __ext, size_t);
 		// Warning: see David if this breaks
 		glue_user_trace("Warning: see David if this breaks");
-		for (i = 0; i < len; ++i) {
-			unsigned char* element = &array[i];
+		for (__i = 0; __i < __len; ++__i) {
+			unsigned char* element = &array[__i];
 			*element = glue_unpack(__pos, __msg, __ext, unsigned char);
 		}
 
@@ -8053,13 +8116,13 @@ void callee_unmarshal_kernel__napi_gro_flush__napi_struct_gro_list__io(
 	}
 
 	{
-		int i;
+		int __i;
 		unsigned int* array = headers_end_ptr;
-		size_t len = glue_unpack(__pos, __msg, __ext, size_t);
+		size_t __len = glue_unpack(__pos, __msg, __ext, size_t);
 		// Warning: see David if this breaks
 		glue_user_trace("Warning: see David if this breaks");
-		for (i = 0; i < len; ++i) {
-			unsigned int* element = &array[i];
+		for (__i = 0; __i < __len; ++__i) {
+			unsigned int* element = &array[__i];
 			*element = glue_unpack(__pos, __msg, __ext, unsigned int);
 		}
 
@@ -8120,13 +8183,13 @@ void callee_marshal_kernel__napi_gro_flush__napi_struct_gro_list__io(
 	unsigned char* const* data_ptr = &ptr->data;
 
 	{
-		size_t i, len = 48;
+		size_t __i, __len = 48;
 		signed char const* array = cb_ptr;
-		glue_pack(__pos, __msg, __ext, len);
+		glue_pack(__pos, __msg, __ext, __len);
 		// Warning: see David if this breaks
 		glue_user_trace("Warning: see David if this breaks");
-		for (i = 0; i < len; ++i) {
-			signed char const* element = &array[i];
+		for (__i = 0; __i < __len; ++__i) {
+			signed char const* element = &array[__i];
 			glue_pack(__pos, __msg, __ext, *element);
 		}
 
@@ -8149,26 +8212,26 @@ void callee_marshal_kernel__napi_gro_flush__napi_struct_gro_list__io(
 	}
 
 	{
-		size_t i, len = 0;
+		size_t __i, __len = 0;
 		unsigned int const* array = headers_start_ptr;
-		glue_pack(__pos, __msg, __ext, len);
+		glue_pack(__pos, __msg, __ext, __len);
 		// Warning: see David if this breaks
 		glue_user_trace("Warning: see David if this breaks");
-		for (i = 0; i < len; ++i) {
-			unsigned int const* element = &array[i];
+		for (__i = 0; __i < __len; ++__i) {
+			unsigned int const* element = &array[__i];
 			glue_pack(__pos, __msg, __ext, *element);
 		}
 
 	}
 
 	{
-		size_t i, len = 0;
+		size_t __i, __len = 0;
 		unsigned char const* array = __pkt_type_offset_ptr;
-		glue_pack(__pos, __msg, __ext, len);
+		glue_pack(__pos, __msg, __ext, __len);
 		// Warning: see David if this breaks
 		glue_user_trace("Warning: see David if this breaks");
-		for (i = 0; i < len; ++i) {
-			unsigned char const* element = &array[i];
+		for (__i = 0; __i < __len; ++__i) {
+			unsigned char const* element = &array[__i];
 			glue_pack(__pos, __msg, __ext, *element);
 		}
 
@@ -8199,13 +8262,13 @@ void callee_marshal_kernel__napi_gro_flush__napi_struct_gro_list__io(
 	}
 
 	{
-		size_t i, len = 0;
+		size_t __i, __len = 0;
 		unsigned int const* array = headers_end_ptr;
-		glue_pack(__pos, __msg, __ext, len);
+		glue_pack(__pos, __msg, __ext, __len);
 		// Warning: see David if this breaks
 		glue_user_trace("Warning: see David if this breaks");
-		for (i = 0; i < len; ++i) {
-			unsigned int const* element = &array[i];
+		for (__i = 0; __i < __len; ++__i) {
+			unsigned int const* element = &array[__i];
 			glue_pack(__pos, __msg, __ext, *element);
 		}
 
@@ -8266,13 +8329,13 @@ void caller_unmarshal_kernel__napi_gro_flush__napi_struct_gro_list__io(
 	unsigned char** data_ptr = &ptr->data;
 
 	{
-		int i;
+		int __i;
 		signed char* array = cb_ptr;
-		size_t len = glue_unpack(__pos, __msg, __ext, size_t);
+		size_t __len = glue_unpack(__pos, __msg, __ext, size_t);
 		// Warning: see David if this breaks
 		glue_user_trace("Warning: see David if this breaks");
-		for (i = 0; i < len; ++i) {
-			signed char* element = &array[i];
+		for (__i = 0; __i < __len; ++__i) {
+			signed char* element = &array[__i];
 			*element = glue_unpack(__pos, __msg, __ext, signed char);
 		}
 
@@ -8295,26 +8358,26 @@ void caller_unmarshal_kernel__napi_gro_flush__napi_struct_gro_list__io(
 	}
 
 	{
-		int i;
+		int __i;
 		unsigned int* array = headers_start_ptr;
-		size_t len = glue_unpack(__pos, __msg, __ext, size_t);
+		size_t __len = glue_unpack(__pos, __msg, __ext, size_t);
 		// Warning: see David if this breaks
 		glue_user_trace("Warning: see David if this breaks");
-		for (i = 0; i < len; ++i) {
-			unsigned int* element = &array[i];
+		for (__i = 0; __i < __len; ++__i) {
+			unsigned int* element = &array[__i];
 			*element = glue_unpack(__pos, __msg, __ext, unsigned int);
 		}
 
 	}
 
 	{
-		int i;
+		int __i;
 		unsigned char* array = __pkt_type_offset_ptr;
-		size_t len = glue_unpack(__pos, __msg, __ext, size_t);
+		size_t __len = glue_unpack(__pos, __msg, __ext, size_t);
 		// Warning: see David if this breaks
 		glue_user_trace("Warning: see David if this breaks");
-		for (i = 0; i < len; ++i) {
-			unsigned char* element = &array[i];
+		for (__i = 0; __i < __len; ++__i) {
+			unsigned char* element = &array[__i];
 			*element = glue_unpack(__pos, __msg, __ext, unsigned char);
 		}
 
@@ -8345,13 +8408,13 @@ void caller_unmarshal_kernel__napi_gro_flush__napi_struct_gro_list__io(
 	}
 
 	{
-		int i;
+		int __i;
 		unsigned int* array = headers_end_ptr;
-		size_t len = glue_unpack(__pos, __msg, __ext, size_t);
+		size_t __len = glue_unpack(__pos, __msg, __ext, size_t);
 		// Warning: see David if this breaks
 		glue_user_trace("Warning: see David if this breaks");
-		for (i = 0; i < len; ++i) {
-			unsigned int* element = &array[i];
+		for (__i = 0; __i < __len; ++__i) {
+			unsigned int* element = &array[__i];
 			*element = glue_unpack(__pos, __msg, __ext, unsigned int);
 		}
 
@@ -8515,13 +8578,13 @@ void caller_marshal_kernel__napi_complete_done__napi_struct_gro_list__io(
 	unsigned char* const* data_ptr = &ptr->data;
 
 	{
-		size_t i, len = 48;
+		size_t __i, __len = 48;
 		signed char const* array = cb_ptr;
-		glue_pack(__pos, __msg, __ext, len);
+		glue_pack(__pos, __msg, __ext, __len);
 		// Warning: see David if this breaks
 		glue_user_trace("Warning: see David if this breaks");
-		for (i = 0; i < len; ++i) {
-			signed char const* element = &array[i];
+		for (__i = 0; __i < __len; ++__i) {
+			signed char const* element = &array[__i];
 			glue_pack(__pos, __msg, __ext, *element);
 		}
 
@@ -8544,26 +8607,26 @@ void caller_marshal_kernel__napi_complete_done__napi_struct_gro_list__io(
 	}
 
 	{
-		size_t i, len = 0;
+		size_t __i, __len = 0;
 		unsigned int const* array = headers_start_ptr;
-		glue_pack(__pos, __msg, __ext, len);
+		glue_pack(__pos, __msg, __ext, __len);
 		// Warning: see David if this breaks
 		glue_user_trace("Warning: see David if this breaks");
-		for (i = 0; i < len; ++i) {
-			unsigned int const* element = &array[i];
+		for (__i = 0; __i < __len; ++__i) {
+			unsigned int const* element = &array[__i];
 			glue_pack(__pos, __msg, __ext, *element);
 		}
 
 	}
 
 	{
-		size_t i, len = 0;
+		size_t __i, __len = 0;
 		unsigned char const* array = __pkt_type_offset_ptr;
-		glue_pack(__pos, __msg, __ext, len);
+		glue_pack(__pos, __msg, __ext, __len);
 		// Warning: see David if this breaks
 		glue_user_trace("Warning: see David if this breaks");
-		for (i = 0; i < len; ++i) {
-			unsigned char const* element = &array[i];
+		for (__i = 0; __i < __len; ++__i) {
+			unsigned char const* element = &array[__i];
 			glue_pack(__pos, __msg, __ext, *element);
 		}
 
@@ -8598,13 +8661,13 @@ void caller_marshal_kernel__napi_complete_done__napi_struct_gro_list__io(
 	}
 
 	{
-		size_t i, len = 0;
+		size_t __i, __len = 0;
 		unsigned int const* array = headers_end_ptr;
-		glue_pack(__pos, __msg, __ext, len);
+		glue_pack(__pos, __msg, __ext, __len);
 		// Warning: see David if this breaks
 		glue_user_trace("Warning: see David if this breaks");
-		for (i = 0; i < len; ++i) {
-			unsigned int const* element = &array[i];
+		for (__i = 0; __i < __len; ++__i) {
+			unsigned int const* element = &array[__i];
 			glue_pack(__pos, __msg, __ext, *element);
 		}
 
@@ -8666,13 +8729,13 @@ void callee_unmarshal_kernel__napi_complete_done__napi_struct_gro_list__io(
 	unsigned char** data_ptr = &ptr->data;
 
 	{
-		int i;
+		int __i;
 		signed char* array = cb_ptr;
-		size_t len = glue_unpack(__pos, __msg, __ext, size_t);
+		size_t __len = glue_unpack(__pos, __msg, __ext, size_t);
 		// Warning: see David if this breaks
 		glue_user_trace("Warning: see David if this breaks");
-		for (i = 0; i < len; ++i) {
-			signed char* element = &array[i];
+		for (__i = 0; __i < __len; ++__i) {
+			signed char* element = &array[__i];
 			*element = glue_unpack(__pos, __msg, __ext, signed char);
 		}
 
@@ -8695,26 +8758,26 @@ void callee_unmarshal_kernel__napi_complete_done__napi_struct_gro_list__io(
 	}
 
 	{
-		int i;
+		int __i;
 		unsigned int* array = headers_start_ptr;
-		size_t len = glue_unpack(__pos, __msg, __ext, size_t);
+		size_t __len = glue_unpack(__pos, __msg, __ext, size_t);
 		// Warning: see David if this breaks
 		glue_user_trace("Warning: see David if this breaks");
-		for (i = 0; i < len; ++i) {
-			unsigned int* element = &array[i];
+		for (__i = 0; __i < __len; ++__i) {
+			unsigned int* element = &array[__i];
 			*element = glue_unpack(__pos, __msg, __ext, unsigned int);
 		}
 
 	}
 
 	{
-		int i;
+		int __i;
 		unsigned char* array = __pkt_type_offset_ptr;
-		size_t len = glue_unpack(__pos, __msg, __ext, size_t);
+		size_t __len = glue_unpack(__pos, __msg, __ext, size_t);
 		// Warning: see David if this breaks
 		glue_user_trace("Warning: see David if this breaks");
-		for (i = 0; i < len; ++i) {
-			unsigned char* element = &array[i];
+		for (__i = 0; __i < __len; ++__i) {
+			unsigned char* element = &array[__i];
 			*element = glue_unpack(__pos, __msg, __ext, unsigned char);
 		}
 
@@ -8749,13 +8812,13 @@ void callee_unmarshal_kernel__napi_complete_done__napi_struct_gro_list__io(
 	}
 
 	{
-		int i;
+		int __i;
 		unsigned int* array = headers_end_ptr;
-		size_t len = glue_unpack(__pos, __msg, __ext, size_t);
+		size_t __len = glue_unpack(__pos, __msg, __ext, size_t);
 		// Warning: see David if this breaks
 		glue_user_trace("Warning: see David if this breaks");
-		for (i = 0; i < len; ++i) {
-			unsigned int* element = &array[i];
+		for (__i = 0; __i < __len; ++__i) {
+			unsigned int* element = &array[__i];
 			*element = glue_unpack(__pos, __msg, __ext, unsigned int);
 		}
 
@@ -8816,13 +8879,13 @@ void callee_marshal_kernel__napi_complete_done__napi_struct_gro_list__io(
 	unsigned char* const* data_ptr = &ptr->data;
 
 	{
-		size_t i, len = 48;
+		size_t __i, __len = 48;
 		signed char const* array = cb_ptr;
-		glue_pack(__pos, __msg, __ext, len);
+		glue_pack(__pos, __msg, __ext, __len);
 		// Warning: see David if this breaks
 		glue_user_trace("Warning: see David if this breaks");
-		for (i = 0; i < len; ++i) {
-			signed char const* element = &array[i];
+		for (__i = 0; __i < __len; ++__i) {
+			signed char const* element = &array[__i];
 			glue_pack(__pos, __msg, __ext, *element);
 		}
 
@@ -8845,26 +8908,26 @@ void callee_marshal_kernel__napi_complete_done__napi_struct_gro_list__io(
 	}
 
 	{
-		size_t i, len = 0;
+		size_t __i, __len = 0;
 		unsigned int const* array = headers_start_ptr;
-		glue_pack(__pos, __msg, __ext, len);
+		glue_pack(__pos, __msg, __ext, __len);
 		// Warning: see David if this breaks
 		glue_user_trace("Warning: see David if this breaks");
-		for (i = 0; i < len; ++i) {
-			unsigned int const* element = &array[i];
+		for (__i = 0; __i < __len; ++__i) {
+			unsigned int const* element = &array[__i];
 			glue_pack(__pos, __msg, __ext, *element);
 		}
 
 	}
 
 	{
-		size_t i, len = 0;
+		size_t __i, __len = 0;
 		unsigned char const* array = __pkt_type_offset_ptr;
-		glue_pack(__pos, __msg, __ext, len);
+		glue_pack(__pos, __msg, __ext, __len);
 		// Warning: see David if this breaks
 		glue_user_trace("Warning: see David if this breaks");
-		for (i = 0; i < len; ++i) {
-			unsigned char const* element = &array[i];
+		for (__i = 0; __i < __len; ++__i) {
+			unsigned char const* element = &array[__i];
 			glue_pack(__pos, __msg, __ext, *element);
 		}
 
@@ -8895,13 +8958,13 @@ void callee_marshal_kernel__napi_complete_done__napi_struct_gro_list__io(
 	}
 
 	{
-		size_t i, len = 0;
+		size_t __i, __len = 0;
 		unsigned int const* array = headers_end_ptr;
-		glue_pack(__pos, __msg, __ext, len);
+		glue_pack(__pos, __msg, __ext, __len);
 		// Warning: see David if this breaks
 		glue_user_trace("Warning: see David if this breaks");
-		for (i = 0; i < len; ++i) {
-			unsigned int const* element = &array[i];
+		for (__i = 0; __i < __len; ++__i) {
+			unsigned int const* element = &array[__i];
 			glue_pack(__pos, __msg, __ext, *element);
 		}
 
@@ -8962,13 +9025,13 @@ void caller_unmarshal_kernel__napi_complete_done__napi_struct_gro_list__io(
 	unsigned char** data_ptr = &ptr->data;
 
 	{
-		int i;
+		int __i;
 		signed char* array = cb_ptr;
-		size_t len = glue_unpack(__pos, __msg, __ext, size_t);
+		size_t __len = glue_unpack(__pos, __msg, __ext, size_t);
 		// Warning: see David if this breaks
 		glue_user_trace("Warning: see David if this breaks");
-		for (i = 0; i < len; ++i) {
-			signed char* element = &array[i];
+		for (__i = 0; __i < __len; ++__i) {
+			signed char* element = &array[__i];
 			*element = glue_unpack(__pos, __msg, __ext, signed char);
 		}
 
@@ -8991,26 +9054,26 @@ void caller_unmarshal_kernel__napi_complete_done__napi_struct_gro_list__io(
 	}
 
 	{
-		int i;
+		int __i;
 		unsigned int* array = headers_start_ptr;
-		size_t len = glue_unpack(__pos, __msg, __ext, size_t);
+		size_t __len = glue_unpack(__pos, __msg, __ext, size_t);
 		// Warning: see David if this breaks
 		glue_user_trace("Warning: see David if this breaks");
-		for (i = 0; i < len; ++i) {
-			unsigned int* element = &array[i];
+		for (__i = 0; __i < __len; ++__i) {
+			unsigned int* element = &array[__i];
 			*element = glue_unpack(__pos, __msg, __ext, unsigned int);
 		}
 
 	}
 
 	{
-		int i;
+		int __i;
 		unsigned char* array = __pkt_type_offset_ptr;
-		size_t len = glue_unpack(__pos, __msg, __ext, size_t);
+		size_t __len = glue_unpack(__pos, __msg, __ext, size_t);
 		// Warning: see David if this breaks
 		glue_user_trace("Warning: see David if this breaks");
-		for (i = 0; i < len; ++i) {
-			unsigned char* element = &array[i];
+		for (__i = 0; __i < __len; ++__i) {
+			unsigned char* element = &array[__i];
 			*element = glue_unpack(__pos, __msg, __ext, unsigned char);
 		}
 
@@ -9041,13 +9104,13 @@ void caller_unmarshal_kernel__napi_complete_done__napi_struct_gro_list__io(
 	}
 
 	{
-		int i;
+		int __i;
 		unsigned int* array = headers_end_ptr;
-		size_t len = glue_unpack(__pos, __msg, __ext, size_t);
+		size_t __len = glue_unpack(__pos, __msg, __ext, size_t);
 		// Warning: see David if this breaks
 		glue_user_trace("Warning: see David if this breaks");
-		for (i = 0; i < len; ++i) {
-			unsigned int* element = &array[i];
+		for (__i = 0; __i < __len; ++__i) {
+			unsigned int* element = &array[__i];
 			*element = glue_unpack(__pos, __msg, __ext, unsigned int);
 		}
 
@@ -9745,13 +9808,13 @@ void caller_marshal_kernel__register_netdev__dev__in(
 		__maybe_unused const void* __adjusted = *dev_addr_ptr;
 		glue_pack_shadow(__pos, __msg, __ext, __adjusted);
 		if (*dev_addr_ptr) {
-			size_t i, len = (ctx->dev->addr_len);
+			size_t __i, __len = (ctx->dev->addr_len);
 			unsigned char* array = *dev_addr_ptr;
-			glue_pack(__pos, __msg, __ext, len);
+			glue_pack(__pos, __msg, __ext, __len);
 			// Warning: see David if this breaks
 			glue_user_trace("Warning: see David if this breaks");
-			for (i = 0; i < len; ++i) {
-				unsigned char* element = &array[i];
+			for (__i = 0; __i < __len; ++__i) {
+				unsigned char* element = &array[__i];
 				glue_pack(__pos, __msg, __ext, *element);
 			}
 
@@ -9844,13 +9907,13 @@ void callee_unmarshal_kernel__register_netdev__dev__in(
 	{
 		*dev_addr_ptr = glue_unpack(__pos, __msg, __ext, unsigned char*);
 		if (*dev_addr_ptr) {
-			int i;
+			int __i;
 			unsigned char* array = *dev_addr_ptr;
-			size_t len = glue_unpack(__pos, __msg, __ext, size_t);
+			size_t __len = glue_unpack(__pos, __msg, __ext, size_t);
 			// Warning: see David if this breaks
 			glue_user_trace("Warning: see David if this breaks");
-			for (i = 0; i < len; ++i) {
-				unsigned char* element = &array[i];
+			for (__i = 0; __i < __len; ++__i) {
+				unsigned char* element = &array[__i];
 				*element = glue_unpack(__pos, __msg, __ext, unsigned char);
 			}
 
@@ -9894,13 +9957,13 @@ void callee_marshal_kernel__register_netdev__dev__in(
 	unsigned int const* num_tx_queues_ptr = &ptr->num_tx_queues;
 
 	{
-		size_t i, len = 16;
+		size_t __i, __len = 16;
 		char const* array = name_ptr;
-		glue_pack(__pos, __msg, __ext, len);
+		glue_pack(__pos, __msg, __ext, __len);
 		// Warning: see David if this breaks
 		glue_user_trace("Warning: see David if this breaks");
-		for (i = 0; i < len; ++i) {
-			char const* element = &array[i];
+		for (__i = 0; __i < __len; ++__i) {
+			char const* element = &array[__i];
 			glue_pack(__pos, __msg, __ext, *element);
 		}
 
@@ -9990,13 +10053,13 @@ void caller_unmarshal_kernel__register_netdev__dev__in(
 	unsigned int* num_tx_queues_ptr = &ptr->num_tx_queues;
 
 	{
-		int i;
+		int __i;
 		char* array = name_ptr;
-		size_t len = glue_unpack(__pos, __msg, __ext, size_t);
+		size_t __len = glue_unpack(__pos, __msg, __ext, size_t);
 		// Warning: see David if this breaks
 		glue_user_trace("Warning: see David if this breaks");
-		for (i = 0; i < len; ++i) {
-			char* element = &array[i];
+		for (__i = 0; __i < __len; ++__i) {
+			char* element = &array[__i];
 			*element = glue_unpack(__pos, __msg, __ext, char);
 		}
 
@@ -10339,7 +10402,7 @@ void caller_unmarshal_kernel__netif_tx_stop_all_queues__dev__in(
 	}
 }
 
-void caller_marshal_kernel__netif_carrier_on__dev__io(
+void caller_marshal_kernel__netif_carrier_on__dev__in(
 	size_t* __pos,
 	struct fipc_message* __msg,
 	struct ext_registers* __ext,
@@ -10359,7 +10422,7 @@ void caller_marshal_kernel__netif_carrier_on__dev__io(
 
 }
 
-void callee_unmarshal_kernel__netif_carrier_on__dev__io(
+void callee_unmarshal_kernel__netif_carrier_on__dev__in(
 	size_t* __pos,
 	const struct fipc_message* __msg,
 	const struct ext_registers* __ext,
@@ -10381,7 +10444,7 @@ void callee_unmarshal_kernel__netif_carrier_on__dev__io(
 	}
 }
 
-void callee_marshal_kernel__netif_carrier_on__dev__io(
+void callee_marshal_kernel__netif_carrier_on__dev__in(
 	size_t* __pos,
 	struct fipc_message* __msg,
 	struct ext_registers* __ext,
@@ -10401,7 +10464,7 @@ void callee_marshal_kernel__netif_carrier_on__dev__io(
 
 }
 
-void caller_unmarshal_kernel__netif_carrier_on__dev__io(
+void caller_unmarshal_kernel__netif_carrier_on__dev__in(
 	size_t* __pos,
 	const struct fipc_message* __msg,
 	const struct ext_registers* __ext,
@@ -11036,13 +11099,13 @@ void caller_marshal_kernel__napi_gro_receive__skb__io(
 	unsigned char* const* data_ptr = &ptr->data;
 
 	{
-		size_t i, len = 48;
+		size_t __i, __len = 48;
 		signed char const* array = cb_ptr;
-		glue_pack(__pos, __msg, __ext, len);
+		glue_pack(__pos, __msg, __ext, __len);
 		// Warning: see David if this breaks
 		glue_user_trace("Warning: see David if this breaks");
-		for (i = 0; i < len; ++i) {
-			signed char const* element = &array[i];
+		for (__i = 0; __i < __len; ++__i) {
+			signed char const* element = &array[__i];
 			glue_pack(__pos, __msg, __ext, *element);
 		}
 
@@ -11061,26 +11124,26 @@ void caller_marshal_kernel__napi_gro_receive__skb__io(
 	}
 
 	{
-		size_t i, len = 0;
+		size_t __i, __len = 0;
 		unsigned int const* array = headers_start_ptr;
-		glue_pack(__pos, __msg, __ext, len);
+		glue_pack(__pos, __msg, __ext, __len);
 		// Warning: see David if this breaks
 		glue_user_trace("Warning: see David if this breaks");
-		for (i = 0; i < len; ++i) {
-			unsigned int const* element = &array[i];
+		for (__i = 0; __i < __len; ++__i) {
+			unsigned int const* element = &array[__i];
 			glue_pack(__pos, __msg, __ext, *element);
 		}
 
 	}
 
 	{
-		size_t i, len = 0;
+		size_t __i, __len = 0;
 		unsigned char const* array = __pkt_type_offset_ptr;
-		glue_pack(__pos, __msg, __ext, len);
+		glue_pack(__pos, __msg, __ext, __len);
 		// Warning: see David if this breaks
 		glue_user_trace("Warning: see David if this breaks");
-		for (i = 0; i < len; ++i) {
-			unsigned char const* element = &array[i];
+		for (__i = 0; __i < __len; ++__i) {
+			unsigned char const* element = &array[__i];
 			glue_pack(__pos, __msg, __ext, *element);
 		}
 
@@ -11103,13 +11166,13 @@ void caller_marshal_kernel__napi_gro_receive__skb__io(
 	}
 
 	{
-		size_t i, len = 0;
+		size_t __i, __len = 0;
 		unsigned int const* array = headers_end_ptr;
-		glue_pack(__pos, __msg, __ext, len);
+		glue_pack(__pos, __msg, __ext, __len);
 		// Warning: see David if this breaks
 		glue_user_trace("Warning: see David if this breaks");
-		for (i = 0; i < len; ++i) {
-			unsigned int const* element = &array[i];
+		for (__i = 0; __i < __len; ++__i) {
+			unsigned int const* element = &array[__i];
 			glue_pack(__pos, __msg, __ext, *element);
 		}
 
@@ -11167,13 +11230,13 @@ void callee_unmarshal_kernel__napi_gro_receive__skb__io(
 	unsigned char** data_ptr = &ptr->data;
 
 	{
-		int i;
+		int __i;
 		signed char* array = cb_ptr;
-		size_t len = glue_unpack(__pos, __msg, __ext, size_t);
+		size_t __len = glue_unpack(__pos, __msg, __ext, size_t);
 		// Warning: see David if this breaks
 		glue_user_trace("Warning: see David if this breaks");
-		for (i = 0; i < len; ++i) {
-			signed char* element = &array[i];
+		for (__i = 0; __i < __len; ++__i) {
+			signed char* element = &array[__i];
 			*element = glue_unpack(__pos, __msg, __ext, signed char);
 		}
 
@@ -11192,26 +11255,26 @@ void callee_unmarshal_kernel__napi_gro_receive__skb__io(
 	}
 
 	{
-		int i;
+		int __i;
 		unsigned int* array = headers_start_ptr;
-		size_t len = glue_unpack(__pos, __msg, __ext, size_t);
+		size_t __len = glue_unpack(__pos, __msg, __ext, size_t);
 		// Warning: see David if this breaks
 		glue_user_trace("Warning: see David if this breaks");
-		for (i = 0; i < len; ++i) {
-			unsigned int* element = &array[i];
+		for (__i = 0; __i < __len; ++__i) {
+			unsigned int* element = &array[__i];
 			*element = glue_unpack(__pos, __msg, __ext, unsigned int);
 		}
 
 	}
 
 	{
-		int i;
+		int __i;
 		unsigned char* array = __pkt_type_offset_ptr;
-		size_t len = glue_unpack(__pos, __msg, __ext, size_t);
+		size_t __len = glue_unpack(__pos, __msg, __ext, size_t);
 		// Warning: see David if this breaks
 		glue_user_trace("Warning: see David if this breaks");
-		for (i = 0; i < len; ++i) {
-			unsigned char* element = &array[i];
+		for (__i = 0; __i < __len; ++__i) {
+			unsigned char* element = &array[__i];
 			*element = glue_unpack(__pos, __msg, __ext, unsigned char);
 		}
 
@@ -11234,13 +11297,13 @@ void callee_unmarshal_kernel__napi_gro_receive__skb__io(
 	}
 
 	{
-		int i;
+		int __i;
 		unsigned int* array = headers_end_ptr;
-		size_t len = glue_unpack(__pos, __msg, __ext, size_t);
+		size_t __len = glue_unpack(__pos, __msg, __ext, size_t);
 		// Warning: see David if this breaks
 		glue_user_trace("Warning: see David if this breaks");
-		for (i = 0; i < len; ++i) {
-			unsigned int* element = &array[i];
+		for (__i = 0; __i < __len; ++__i) {
+			unsigned int* element = &array[__i];
 			*element = glue_unpack(__pos, __msg, __ext, unsigned int);
 		}
 
@@ -11302,13 +11365,13 @@ void callee_marshal_kernel__napi_gro_receive__skb__io(
 	}
 
 	{
-		size_t i, len = 0;
+		size_t __i, __len = 0;
 		unsigned int const* array = headers_end_ptr;
-		glue_pack(__pos, __msg, __ext, len);
+		glue_pack(__pos, __msg, __ext, __len);
 		// Warning: see David if this breaks
 		glue_user_trace("Warning: see David if this breaks");
-		for (i = 0; i < len; ++i) {
-			unsigned int const* element = &array[i];
+		for (__i = 0; __i < __len; ++__i) {
+			unsigned int const* element = &array[__i];
 			glue_pack(__pos, __msg, __ext, *element);
 		}
 
@@ -11356,13 +11419,13 @@ void caller_unmarshal_kernel__napi_gro_receive__skb__io(
 	}
 
 	{
-		int i;
+		int __i;
 		unsigned int* array = headers_end_ptr;
-		size_t len = glue_unpack(__pos, __msg, __ext, size_t);
+		size_t __len = glue_unpack(__pos, __msg, __ext, size_t);
 		// Warning: see David if this breaks
 		glue_user_trace("Warning: see David if this breaks");
-		for (i = 0; i < len; ++i) {
-			unsigned int* element = &array[i];
+		for (__i = 0; __i < __len; ++__i) {
+			unsigned int* element = &array[__i];
 			*element = glue_unpack(__pos, __msg, __ext, unsigned int);
 		}
 
@@ -11412,13 +11475,13 @@ void caller_marshal_kernel__netif_receive_skb__skb__io(
 	unsigned char* const* data_ptr = &ptr->data;
 
 	{
-		size_t i, len = 48;
+		size_t __i, __len = 48;
 		signed char const* array = cb_ptr;
-		glue_pack(__pos, __msg, __ext, len);
+		glue_pack(__pos, __msg, __ext, __len);
 		// Warning: see David if this breaks
 		glue_user_trace("Warning: see David if this breaks");
-		for (i = 0; i < len; ++i) {
-			signed char const* element = &array[i];
+		for (__i = 0; __i < __len; ++__i) {
+			signed char const* element = &array[__i];
 			glue_pack(__pos, __msg, __ext, *element);
 		}
 
@@ -11441,26 +11504,26 @@ void caller_marshal_kernel__netif_receive_skb__skb__io(
 	}
 
 	{
-		size_t i, len = 0;
+		size_t __i, __len = 0;
 		unsigned int const* array = headers_start_ptr;
-		glue_pack(__pos, __msg, __ext, len);
+		glue_pack(__pos, __msg, __ext, __len);
 		// Warning: see David if this breaks
 		glue_user_trace("Warning: see David if this breaks");
-		for (i = 0; i < len; ++i) {
-			unsigned int const* element = &array[i];
+		for (__i = 0; __i < __len; ++__i) {
+			unsigned int const* element = &array[__i];
 			glue_pack(__pos, __msg, __ext, *element);
 		}
 
 	}
 
 	{
-		size_t i, len = 0;
+		size_t __i, __len = 0;
 		unsigned char const* array = __pkt_type_offset_ptr;
-		glue_pack(__pos, __msg, __ext, len);
+		glue_pack(__pos, __msg, __ext, __len);
 		// Warning: see David if this breaks
 		glue_user_trace("Warning: see David if this breaks");
-		for (i = 0; i < len; ++i) {
-			unsigned char const* element = &array[i];
+		for (__i = 0; __i < __len; ++__i) {
+			unsigned char const* element = &array[__i];
 			glue_pack(__pos, __msg, __ext, *element);
 		}
 
@@ -11495,13 +11558,13 @@ void caller_marshal_kernel__netif_receive_skb__skb__io(
 	}
 
 	{
-		size_t i, len = 0;
+		size_t __i, __len = 0;
 		unsigned int const* array = headers_end_ptr;
-		glue_pack(__pos, __msg, __ext, len);
+		glue_pack(__pos, __msg, __ext, __len);
 		// Warning: see David if this breaks
 		glue_user_trace("Warning: see David if this breaks");
-		for (i = 0; i < len; ++i) {
-			unsigned int const* element = &array[i];
+		for (__i = 0; __i < __len; ++__i) {
+			unsigned int const* element = &array[__i];
 			glue_pack(__pos, __msg, __ext, *element);
 		}
 
@@ -11563,13 +11626,13 @@ void callee_unmarshal_kernel__netif_receive_skb__skb__io(
 	unsigned char** data_ptr = &ptr->data;
 
 	{
-		int i;
+		int __i;
 		signed char* array = cb_ptr;
-		size_t len = glue_unpack(__pos, __msg, __ext, size_t);
+		size_t __len = glue_unpack(__pos, __msg, __ext, size_t);
 		// Warning: see David if this breaks
 		glue_user_trace("Warning: see David if this breaks");
-		for (i = 0; i < len; ++i) {
-			signed char* element = &array[i];
+		for (__i = 0; __i < __len; ++__i) {
+			signed char* element = &array[__i];
 			*element = glue_unpack(__pos, __msg, __ext, signed char);
 		}
 
@@ -11592,26 +11655,26 @@ void callee_unmarshal_kernel__netif_receive_skb__skb__io(
 	}
 
 	{
-		int i;
+		int __i;
 		unsigned int* array = headers_start_ptr;
-		size_t len = glue_unpack(__pos, __msg, __ext, size_t);
+		size_t __len = glue_unpack(__pos, __msg, __ext, size_t);
 		// Warning: see David if this breaks
 		glue_user_trace("Warning: see David if this breaks");
-		for (i = 0; i < len; ++i) {
-			unsigned int* element = &array[i];
+		for (__i = 0; __i < __len; ++__i) {
+			unsigned int* element = &array[__i];
 			*element = glue_unpack(__pos, __msg, __ext, unsigned int);
 		}
 
 	}
 
 	{
-		int i;
+		int __i;
 		unsigned char* array = __pkt_type_offset_ptr;
-		size_t len = glue_unpack(__pos, __msg, __ext, size_t);
+		size_t __len = glue_unpack(__pos, __msg, __ext, size_t);
 		// Warning: see David if this breaks
 		glue_user_trace("Warning: see David if this breaks");
-		for (i = 0; i < len; ++i) {
-			unsigned char* element = &array[i];
+		for (__i = 0; __i < __len; ++__i) {
+			unsigned char* element = &array[__i];
 			*element = glue_unpack(__pos, __msg, __ext, unsigned char);
 		}
 
@@ -11646,13 +11709,13 @@ void callee_unmarshal_kernel__netif_receive_skb__skb__io(
 	}
 
 	{
-		int i;
+		int __i;
 		unsigned int* array = headers_end_ptr;
-		size_t len = glue_unpack(__pos, __msg, __ext, size_t);
+		size_t __len = glue_unpack(__pos, __msg, __ext, size_t);
 		// Warning: see David if this breaks
 		glue_user_trace("Warning: see David if this breaks");
-		for (i = 0; i < len; ++i) {
-			unsigned int* element = &array[i];
+		for (__i = 0; __i < __len; ++__i) {
+			unsigned int* element = &array[__i];
 			*element = glue_unpack(__pos, __msg, __ext, unsigned int);
 		}
 
@@ -11713,13 +11776,13 @@ void callee_marshal_kernel__netif_receive_skb__skb__io(
 	unsigned char* const* data_ptr = &ptr->data;
 
 	{
-		size_t i, len = 48;
+		size_t __i, __len = 48;
 		signed char const* array = cb_ptr;
-		glue_pack(__pos, __msg, __ext, len);
+		glue_pack(__pos, __msg, __ext, __len);
 		// Warning: see David if this breaks
 		glue_user_trace("Warning: see David if this breaks");
-		for (i = 0; i < len; ++i) {
-			signed char const* element = &array[i];
+		for (__i = 0; __i < __len; ++__i) {
+			signed char const* element = &array[__i];
 			glue_pack(__pos, __msg, __ext, *element);
 		}
 
@@ -11742,26 +11805,26 @@ void callee_marshal_kernel__netif_receive_skb__skb__io(
 	}
 
 	{
-		size_t i, len = 0;
+		size_t __i, __len = 0;
 		unsigned int const* array = headers_start_ptr;
-		glue_pack(__pos, __msg, __ext, len);
+		glue_pack(__pos, __msg, __ext, __len);
 		// Warning: see David if this breaks
 		glue_user_trace("Warning: see David if this breaks");
-		for (i = 0; i < len; ++i) {
-			unsigned int const* element = &array[i];
+		for (__i = 0; __i < __len; ++__i) {
+			unsigned int const* element = &array[__i];
 			glue_pack(__pos, __msg, __ext, *element);
 		}
 
 	}
 
 	{
-		size_t i, len = 0;
+		size_t __i, __len = 0;
 		unsigned char const* array = __pkt_type_offset_ptr;
-		glue_pack(__pos, __msg, __ext, len);
+		glue_pack(__pos, __msg, __ext, __len);
 		// Warning: see David if this breaks
 		glue_user_trace("Warning: see David if this breaks");
-		for (i = 0; i < len; ++i) {
-			unsigned char const* element = &array[i];
+		for (__i = 0; __i < __len; ++__i) {
+			unsigned char const* element = &array[__i];
 			glue_pack(__pos, __msg, __ext, *element);
 		}
 
@@ -11792,13 +11855,13 @@ void callee_marshal_kernel__netif_receive_skb__skb__io(
 	}
 
 	{
-		size_t i, len = 0;
+		size_t __i, __len = 0;
 		unsigned int const* array = headers_end_ptr;
-		glue_pack(__pos, __msg, __ext, len);
+		glue_pack(__pos, __msg, __ext, __len);
 		// Warning: see David if this breaks
 		glue_user_trace("Warning: see David if this breaks");
-		for (i = 0; i < len; ++i) {
-			unsigned int const* element = &array[i];
+		for (__i = 0; __i < __len; ++__i) {
+			unsigned int const* element = &array[__i];
 			glue_pack(__pos, __msg, __ext, *element);
 		}
 
@@ -11859,13 +11922,13 @@ void caller_unmarshal_kernel__netif_receive_skb__skb__io(
 	unsigned char** data_ptr = &ptr->data;
 
 	{
-		int i;
+		int __i;
 		signed char* array = cb_ptr;
-		size_t len = glue_unpack(__pos, __msg, __ext, size_t);
+		size_t __len = glue_unpack(__pos, __msg, __ext, size_t);
 		// Warning: see David if this breaks
 		glue_user_trace("Warning: see David if this breaks");
-		for (i = 0; i < len; ++i) {
-			signed char* element = &array[i];
+		for (__i = 0; __i < __len; ++__i) {
+			signed char* element = &array[__i];
 			*element = glue_unpack(__pos, __msg, __ext, signed char);
 		}
 
@@ -11888,26 +11951,26 @@ void caller_unmarshal_kernel__netif_receive_skb__skb__io(
 	}
 
 	{
-		int i;
+		int __i;
 		unsigned int* array = headers_start_ptr;
-		size_t len = glue_unpack(__pos, __msg, __ext, size_t);
+		size_t __len = glue_unpack(__pos, __msg, __ext, size_t);
 		// Warning: see David if this breaks
 		glue_user_trace("Warning: see David if this breaks");
-		for (i = 0; i < len; ++i) {
-			unsigned int* element = &array[i];
+		for (__i = 0; __i < __len; ++__i) {
+			unsigned int* element = &array[__i];
 			*element = glue_unpack(__pos, __msg, __ext, unsigned int);
 		}
 
 	}
 
 	{
-		int i;
+		int __i;
 		unsigned char* array = __pkt_type_offset_ptr;
-		size_t len = glue_unpack(__pos, __msg, __ext, size_t);
+		size_t __len = glue_unpack(__pos, __msg, __ext, size_t);
 		// Warning: see David if this breaks
 		glue_user_trace("Warning: see David if this breaks");
-		for (i = 0; i < len; ++i) {
-			unsigned char* element = &array[i];
+		for (__i = 0; __i < __len; ++__i) {
+			unsigned char* element = &array[__i];
 			*element = glue_unpack(__pos, __msg, __ext, unsigned char);
 		}
 
@@ -11938,13 +12001,13 @@ void caller_unmarshal_kernel__netif_receive_skb__skb__io(
 	}
 
 	{
-		int i;
+		int __i;
 		unsigned int* array = headers_end_ptr;
-		size_t len = glue_unpack(__pos, __msg, __ext, size_t);
+		size_t __len = glue_unpack(__pos, __msg, __ext, size_t);
 		// Warning: see David if this breaks
 		glue_user_trace("Warning: see David if this breaks");
-		for (i = 0; i < len; ++i) {
-			unsigned int* element = &array[i];
+		for (__i = 0; __i < __len; ++__i) {
+			unsigned int* element = &array[__i];
 			*element = glue_unpack(__pos, __msg, __ext, unsigned int);
 		}
 
@@ -12002,13 +12065,13 @@ void caller_marshal_kernel__skb_checksum_help__skb__io(
 	unsigned char* const* data_ptr = &ptr->data;
 
 	{
-		size_t i, len = 48;
+		size_t __i, __len = 48;
 		signed char const* array = cb_ptr;
-		glue_pack(__pos, __msg, __ext, len);
+		glue_pack(__pos, __msg, __ext, __len);
 		// Warning: see David if this breaks
 		glue_user_trace("Warning: see David if this breaks");
-		for (i = 0; i < len; ++i) {
-			signed char const* element = &array[i];
+		for (__i = 0; __i < __len; ++__i) {
+			signed char const* element = &array[__i];
 			glue_pack(__pos, __msg, __ext, *element);
 		}
 
@@ -12031,26 +12094,26 @@ void caller_marshal_kernel__skb_checksum_help__skb__io(
 	}
 
 	{
-		size_t i, len = 0;
+		size_t __i, __len = 0;
 		unsigned int const* array = headers_start_ptr;
-		glue_pack(__pos, __msg, __ext, len);
+		glue_pack(__pos, __msg, __ext, __len);
 		// Warning: see David if this breaks
 		glue_user_trace("Warning: see David if this breaks");
-		for (i = 0; i < len; ++i) {
-			unsigned int const* element = &array[i];
+		for (__i = 0; __i < __len; ++__i) {
+			unsigned int const* element = &array[__i];
 			glue_pack(__pos, __msg, __ext, *element);
 		}
 
 	}
 
 	{
-		size_t i, len = 0;
+		size_t __i, __len = 0;
 		unsigned char const* array = __pkt_type_offset_ptr;
-		glue_pack(__pos, __msg, __ext, len);
+		glue_pack(__pos, __msg, __ext, __len);
 		// Warning: see David if this breaks
 		glue_user_trace("Warning: see David if this breaks");
-		for (i = 0; i < len; ++i) {
-			unsigned char const* element = &array[i];
+		for (__i = 0; __i < __len; ++__i) {
+			unsigned char const* element = &array[__i];
 			glue_pack(__pos, __msg, __ext, *element);
 		}
 
@@ -12069,13 +12132,13 @@ void caller_marshal_kernel__skb_checksum_help__skb__io(
 	}
 
 	{
-		size_t i, len = 0;
+		size_t __i, __len = 0;
 		unsigned int const* array = headers_end_ptr;
-		glue_pack(__pos, __msg, __ext, len);
+		glue_pack(__pos, __msg, __ext, __len);
 		// Warning: see David if this breaks
 		glue_user_trace("Warning: see David if this breaks");
-		for (i = 0; i < len; ++i) {
-			unsigned int const* element = &array[i];
+		for (__i = 0; __i < __len; ++__i) {
+			unsigned int const* element = &array[__i];
 			glue_pack(__pos, __msg, __ext, *element);
 		}
 
@@ -12133,13 +12196,13 @@ void callee_unmarshal_kernel__skb_checksum_help__skb__io(
 	unsigned char** data_ptr = &ptr->data;
 
 	{
-		int i;
+		int __i;
 		signed char* array = cb_ptr;
-		size_t len = glue_unpack(__pos, __msg, __ext, size_t);
+		size_t __len = glue_unpack(__pos, __msg, __ext, size_t);
 		// Warning: see David if this breaks
 		glue_user_trace("Warning: see David if this breaks");
-		for (i = 0; i < len; ++i) {
-			signed char* element = &array[i];
+		for (__i = 0; __i < __len; ++__i) {
+			signed char* element = &array[__i];
 			*element = glue_unpack(__pos, __msg, __ext, signed char);
 		}
 
@@ -12162,26 +12225,26 @@ void callee_unmarshal_kernel__skb_checksum_help__skb__io(
 	}
 
 	{
-		int i;
+		int __i;
 		unsigned int* array = headers_start_ptr;
-		size_t len = glue_unpack(__pos, __msg, __ext, size_t);
+		size_t __len = glue_unpack(__pos, __msg, __ext, size_t);
 		// Warning: see David if this breaks
 		glue_user_trace("Warning: see David if this breaks");
-		for (i = 0; i < len; ++i) {
-			unsigned int* element = &array[i];
+		for (__i = 0; __i < __len; ++__i) {
+			unsigned int* element = &array[__i];
 			*element = glue_unpack(__pos, __msg, __ext, unsigned int);
 		}
 
 	}
 
 	{
-		int i;
+		int __i;
 		unsigned char* array = __pkt_type_offset_ptr;
-		size_t len = glue_unpack(__pos, __msg, __ext, size_t);
+		size_t __len = glue_unpack(__pos, __msg, __ext, size_t);
 		// Warning: see David if this breaks
 		glue_user_trace("Warning: see David if this breaks");
-		for (i = 0; i < len; ++i) {
-			unsigned char* element = &array[i];
+		for (__i = 0; __i < __len; ++__i) {
+			unsigned char* element = &array[__i];
 			*element = glue_unpack(__pos, __msg, __ext, unsigned char);
 		}
 
@@ -12200,13 +12263,13 @@ void callee_unmarshal_kernel__skb_checksum_help__skb__io(
 	}
 
 	{
-		int i;
+		int __i;
 		unsigned int* array = headers_end_ptr;
-		size_t len = glue_unpack(__pos, __msg, __ext, size_t);
+		size_t __len = glue_unpack(__pos, __msg, __ext, size_t);
 		// Warning: see David if this breaks
 		glue_user_trace("Warning: see David if this breaks");
-		for (i = 0; i < len; ++i) {
-			unsigned int* element = &array[i];
+		for (__i = 0; __i < __len; ++__i) {
+			unsigned int* element = &array[__i];
 			*element = glue_unpack(__pos, __msg, __ext, unsigned int);
 		}
 
@@ -12264,13 +12327,13 @@ void callee_marshal_kernel__skb_checksum_help__skb__io(
 	unsigned char* const* data_ptr = &ptr->data;
 
 	{
-		size_t i, len = 48;
+		size_t __i, __len = 48;
 		signed char const* array = cb_ptr;
-		glue_pack(__pos, __msg, __ext, len);
+		glue_pack(__pos, __msg, __ext, __len);
 		// Warning: see David if this breaks
 		glue_user_trace("Warning: see David if this breaks");
-		for (i = 0; i < len; ++i) {
-			signed char const* element = &array[i];
+		for (__i = 0; __i < __len; ++__i) {
+			signed char const* element = &array[__i];
 			glue_pack(__pos, __msg, __ext, *element);
 		}
 
@@ -12293,26 +12356,26 @@ void callee_marshal_kernel__skb_checksum_help__skb__io(
 	}
 
 	{
-		size_t i, len = 0;
+		size_t __i, __len = 0;
 		unsigned int const* array = headers_start_ptr;
-		glue_pack(__pos, __msg, __ext, len);
+		glue_pack(__pos, __msg, __ext, __len);
 		// Warning: see David if this breaks
 		glue_user_trace("Warning: see David if this breaks");
-		for (i = 0; i < len; ++i) {
-			unsigned int const* element = &array[i];
+		for (__i = 0; __i < __len; ++__i) {
+			unsigned int const* element = &array[__i];
 			glue_pack(__pos, __msg, __ext, *element);
 		}
 
 	}
 
 	{
-		size_t i, len = 0;
+		size_t __i, __len = 0;
 		unsigned char const* array = __pkt_type_offset_ptr;
-		glue_pack(__pos, __msg, __ext, len);
+		glue_pack(__pos, __msg, __ext, __len);
 		// Warning: see David if this breaks
 		glue_user_trace("Warning: see David if this breaks");
-		for (i = 0; i < len; ++i) {
-			unsigned char const* element = &array[i];
+		for (__i = 0; __i < __len; ++__i) {
+			unsigned char const* element = &array[__i];
 			glue_pack(__pos, __msg, __ext, *element);
 		}
 
@@ -12331,13 +12394,13 @@ void callee_marshal_kernel__skb_checksum_help__skb__io(
 	}
 
 	{
-		size_t i, len = 0;
+		size_t __i, __len = 0;
 		unsigned int const* array = headers_end_ptr;
-		glue_pack(__pos, __msg, __ext, len);
+		glue_pack(__pos, __msg, __ext, __len);
 		// Warning: see David if this breaks
 		glue_user_trace("Warning: see David if this breaks");
-		for (i = 0; i < len; ++i) {
-			unsigned int const* element = &array[i];
+		for (__i = 0; __i < __len; ++__i) {
+			unsigned int const* element = &array[__i];
 			glue_pack(__pos, __msg, __ext, *element);
 		}
 
@@ -12395,13 +12458,13 @@ void caller_unmarshal_kernel__skb_checksum_help__skb__io(
 	unsigned char** data_ptr = &ptr->data;
 
 	{
-		int i;
+		int __i;
 		signed char* array = cb_ptr;
-		size_t len = glue_unpack(__pos, __msg, __ext, size_t);
+		size_t __len = glue_unpack(__pos, __msg, __ext, size_t);
 		// Warning: see David if this breaks
 		glue_user_trace("Warning: see David if this breaks");
-		for (i = 0; i < len; ++i) {
-			signed char* element = &array[i];
+		for (__i = 0; __i < __len; ++__i) {
+			signed char* element = &array[__i];
 			*element = glue_unpack(__pos, __msg, __ext, signed char);
 		}
 
@@ -12424,26 +12487,26 @@ void caller_unmarshal_kernel__skb_checksum_help__skb__io(
 	}
 
 	{
-		int i;
+		int __i;
 		unsigned int* array = headers_start_ptr;
-		size_t len = glue_unpack(__pos, __msg, __ext, size_t);
+		size_t __len = glue_unpack(__pos, __msg, __ext, size_t);
 		// Warning: see David if this breaks
 		glue_user_trace("Warning: see David if this breaks");
-		for (i = 0; i < len; ++i) {
-			unsigned int* element = &array[i];
+		for (__i = 0; __i < __len; ++__i) {
+			unsigned int* element = &array[__i];
 			*element = glue_unpack(__pos, __msg, __ext, unsigned int);
 		}
 
 	}
 
 	{
-		int i;
+		int __i;
 		unsigned char* array = __pkt_type_offset_ptr;
-		size_t len = glue_unpack(__pos, __msg, __ext, size_t);
+		size_t __len = glue_unpack(__pos, __msg, __ext, size_t);
 		// Warning: see David if this breaks
 		glue_user_trace("Warning: see David if this breaks");
-		for (i = 0; i < len; ++i) {
-			unsigned char* element = &array[i];
+		for (__i = 0; __i < __len; ++__i) {
+			unsigned char* element = &array[__i];
 			*element = glue_unpack(__pos, __msg, __ext, unsigned char);
 		}
 
@@ -12462,13 +12525,13 @@ void caller_unmarshal_kernel__skb_checksum_help__skb__io(
 	}
 
 	{
-		int i;
+		int __i;
 		unsigned int* array = headers_end_ptr;
-		size_t len = glue_unpack(__pos, __msg, __ext, size_t);
+		size_t __len = glue_unpack(__pos, __msg, __ext, size_t);
 		// Warning: see David if this breaks
 		glue_user_trace("Warning: see David if this breaks");
-		for (i = 0; i < len; ++i) {
-			unsigned int* element = &array[i];
+		for (__i = 0; __i < __len; ++__i) {
+			unsigned int* element = &array[__i];
 			*element = glue_unpack(__pos, __msg, __ext, unsigned int);
 		}
 
@@ -12950,13 +13013,13 @@ void caller_marshal_kernel__netif_set_xps_queue__mask__in(
 	unsigned long long const* bits_ptr = ptr->bits;
 
 	{
-		size_t i, len = 1;
+		size_t __i, __len = 1;
 		unsigned long long const* array = bits_ptr;
-		glue_pack(__pos, __msg, __ext, len);
+		glue_pack(__pos, __msg, __ext, __len);
 		// Warning: see David if this breaks
 		glue_user_trace("Warning: see David if this breaks");
-		for (i = 0; i < len; ++i) {
-			unsigned long long const* element = &array[i];
+		for (__i = 0; __i < __len; ++__i) {
+			unsigned long long const* element = &array[__i];
 			glue_pack(__pos, __msg, __ext, *element);
 		}
 
@@ -12974,13 +13037,13 @@ void callee_unmarshal_kernel__netif_set_xps_queue__mask__in(
 	unsigned long long* bits_ptr = ptr->bits;
 
 	{
-		int i;
+		int __i;
 		unsigned long long* array = bits_ptr;
-		size_t len = glue_unpack(__pos, __msg, __ext, size_t);
+		size_t __len = glue_unpack(__pos, __msg, __ext, size_t);
 		// Warning: see David if this breaks
 		glue_user_trace("Warning: see David if this breaks");
-		for (i = 0; i < len; ++i) {
-			unsigned long long* element = &array[i];
+		for (__i = 0; __i < __len; ++__i) {
+			unsigned long long* element = &array[__i];
 			*element = glue_unpack(__pos, __msg, __ext, unsigned long long);
 		}
 
@@ -13022,13 +13085,13 @@ void caller_marshal_kernel__irq_set_affinity_hint__m__in(
 	unsigned long long const* bits_ptr = ptr->bits;
 
 	{
-		size_t i, len = 1;
+		size_t __i, __len = 1;
 		unsigned long long const* array = bits_ptr;
-		glue_pack(__pos, __msg, __ext, len);
+		glue_pack(__pos, __msg, __ext, __len);
 		// Warning: see David if this breaks
 		glue_user_trace("Warning: see David if this breaks");
-		for (i = 0; i < len; ++i) {
-			unsigned long long const* element = &array[i];
+		for (__i = 0; __i < __len; ++__i) {
+			unsigned long long const* element = &array[__i];
 			glue_pack(__pos, __msg, __ext, *element);
 		}
 
@@ -13046,13 +13109,13 @@ void callee_unmarshal_kernel__irq_set_affinity_hint__m__in(
 	unsigned long long* bits_ptr = ptr->bits;
 
 	{
-		int i;
+		int __i;
 		unsigned long long* array = bits_ptr;
-		size_t len = glue_unpack(__pos, __msg, __ext, size_t);
+		size_t __len = glue_unpack(__pos, __msg, __ext, size_t);
 		// Warning: see David if this breaks
 		glue_user_trace("Warning: see David if this breaks");
-		for (i = 0; i < len; ++i) {
-			unsigned long long* element = &array[i];
+		for (__i = 0; __i < __len; ++__i) {
+			unsigned long long* element = &array[__i];
 			*element = glue_unpack(__pos, __msg, __ext, unsigned long long);
 		}
 
@@ -13928,19 +13991,20 @@ void callee_marshal_kernel__alloc_etherdev_mqs__ret_net_device__out(
 {
 	unsigned char* const* dev_addr_ptr = &ptr->dev_addr;
 	unsigned int const* num_tx_queues_ptr = &ptr->num_tx_queues;
+	unsigned int const* num_rx_queues_ptr = &ptr->num_rx_queues;
 	unsigned char const* num_tc_ptr = &ptr->num_tc;
 
 	{
 		__maybe_unused const void* __adjusted = *dev_addr_ptr;
 		glue_pack(__pos, __msg, __ext, __adjusted);
 		if (*dev_addr_ptr) {
-			size_t i, len = (MAX_ADDR_LEN);
+			size_t __i, __len = (MAX_ADDR_LEN);
 			unsigned char* array = *dev_addr_ptr;
-			glue_pack(__pos, __msg, __ext, len);
+			glue_pack(__pos, __msg, __ext, __len);
 			// Warning: see David if this breaks
 			glue_user_trace("Warning: see David if this breaks");
-			for (i = 0; i < len; ++i) {
-				unsigned char* element = &array[i];
+			for (__i = 0; __i < __len; ++__i) {
+				unsigned char* element = &array[__i];
 				glue_pack(__pos, __msg, __ext, *element);
 			}
 
@@ -13950,6 +14014,10 @@ void callee_marshal_kernel__alloc_etherdev_mqs__ret_net_device__out(
 
 	{
 		glue_pack(__pos, __msg, __ext, *num_tx_queues_ptr);
+	}
+
+	{
+		glue_pack(__pos, __msg, __ext, *num_rx_queues_ptr);
 	}
 
 	{
@@ -13967,19 +14035,20 @@ void caller_unmarshal_kernel__alloc_etherdev_mqs__ret_net_device__out(
 {
 	unsigned char** dev_addr_ptr = &ptr->dev_addr;
 	unsigned int* num_tx_queues_ptr = &ptr->num_tx_queues;
+	unsigned int* num_rx_queues_ptr = &ptr->num_rx_queues;
 	unsigned char* num_tc_ptr = &ptr->num_tc;
 
 	{
 		size_t __size = sizeof(unsigned char) * glue_peek(__pos, __msg, __ext);
 		*dev_addr_ptr = glue_unpack_new_shadow(__pos, __msg, __ext, unsigned char*, (__size), (DEFAULT_GFP_FLAGS));
 		if (*dev_addr_ptr) {
-			int i;
+			int __i;
 			unsigned char* array = *dev_addr_ptr;
-			size_t len = glue_unpack(__pos, __msg, __ext, size_t);
+			size_t __len = glue_unpack(__pos, __msg, __ext, size_t);
 			// Warning: see David if this breaks
 			glue_user_trace("Warning: see David if this breaks");
-			for (i = 0; i < len; ++i) {
-				unsigned char* element = &array[i];
+			for (__i = 0; __i < __len; ++__i) {
+				unsigned char* element = &array[__i];
 				*element = glue_unpack(__pos, __msg, __ext, unsigned char);
 			}
 
@@ -13989,6 +14058,10 @@ void caller_unmarshal_kernel__alloc_etherdev_mqs__ret_net_device__out(
 
 	{
 		*num_tx_queues_ptr = glue_unpack(__pos, __msg, __ext, unsigned int);
+	}
+
+	{
+		*num_rx_queues_ptr = glue_unpack(__pos, __msg, __ext, unsigned int);
 	}
 
 	{
@@ -14675,12 +14748,12 @@ void caller_marshal_kernel____pci_register_driver__drv__in(
 		__maybe_unused const void* __adjusted = *name_ptr;
 		glue_pack(__pos, __msg, __ext, __adjusted);
 		if (*name_ptr) {
-			size_t i, len;
+			size_t __i, __len;
 			char const* array = *name_ptr;
-			for (len = 0; array[len]; ++len);
-			glue_pack(__pos, __msg, __ext, len + 1);
-			for (i = 0; i < len; ++i) {
-				char const* element = &array[i];
+			for (__len = 0; array[__len]; ++__len);
+			glue_pack(__pos, __msg, __ext, __len + 1);
+			for (__i = 0; __i < __len; ++__i) {
+				char const* element = &array[__i];
 				glue_pack(__pos, __msg, __ext, *element);
 			}
 
@@ -14692,13 +14765,13 @@ void caller_marshal_kernel____pci_register_driver__drv__in(
 		__maybe_unused const void* __adjusted = *id_table_ptr;
 		glue_pack(__pos, __msg, __ext, __adjusted);
 		if (*id_table_ptr) {
-			size_t i, len;
+			size_t __i, __len;
 			struct pci_device_id sentinel = { 0 };
 			struct pci_device_id const* array = *id_table_ptr;
-			for (len = 0; memcmp(&array[len], &sentinel, sizeof(array[0])); ++len) ;
-			glue_pack(__pos, __msg, __ext, len + 1);
-			for (i = 0; i < len; ++i) {
-				struct pci_device_id const* element = &array[i];
+			for (__len = 0; memcmp(&array[__len], &sentinel, sizeof(array[0])); ++__len) ;
+			glue_pack(__pos, __msg, __ext, __len + 1);
+			for (__i = 0; __i < __len; ++__i) {
+				struct pci_device_id const* element = &array[__i];
 				caller_marshal_kernel____pci_register_driver__pci_device_id__in(__pos, __msg, __ext, ctx, element);
 			}
 
@@ -14738,12 +14811,12 @@ void callee_unmarshal_kernel____pci_register_driver__drv__in(
 		*name_ptr = glue_unpack_new_shadow(__pos, __msg, __ext, char const*, (__size), (DEFAULT_GFP_FLAGS));
 		if (*name_ptr) {
 			char* writable = (char*)*name_ptr;
-			size_t i, len;
+			size_t __i, __len;
 			char* array = writable;
-			len = glue_unpack(__pos, __msg, __ext, size_t) - 1;
-			array[len] = '\0';
-			for (i = 0; i < len; ++i) {
-				char* element = &array[i];
+			__len = glue_unpack(__pos, __msg, __ext, size_t) - 1;
+			array[__len] = '\0';
+			for (__i = 0; __i < __len; ++__i) {
+				char* element = &array[__i];
 				*element = glue_unpack(__pos, __msg, __ext, char);
 			}
 
@@ -14755,12 +14828,12 @@ void callee_unmarshal_kernel____pci_register_driver__drv__in(
 		size_t __size = sizeof(struct pci_device_id) * glue_peek(__pos, __msg, __ext);
 		*id_table_ptr = glue_unpack_new_shadow(__pos, __msg, __ext, struct pci_device_id*, (__size), (DEFAULT_GFP_FLAGS));
 		if (*id_table_ptr) {
-			size_t i, len;
+			size_t __i, __len;
 			struct pci_device_id* array = *id_table_ptr;
-			len = glue_unpack(__pos, __msg, __ext, size_t) - 1;
-			memset(&array[len], 0x0, sizeof(array[len]));
-			for (i = 0; i < len; ++i) {
-				struct pci_device_id* element = &array[i];
+			__len = glue_unpack(__pos, __msg, __ext, size_t) - 1;
+			memset(&array[__len], 0x0, sizeof(array[__len]));
+			for (__i = 0; __i < __len; ++__i) {
+				struct pci_device_id* element = &array[__i];
 				callee_unmarshal_kernel____pci_register_driver__pci_device_id__in(__pos, __msg, __ext, ctx, element);
 			}
 

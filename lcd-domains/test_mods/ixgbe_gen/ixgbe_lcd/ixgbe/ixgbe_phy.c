@@ -1209,10 +1209,12 @@ s32 ixgbe_identify_sfp_module_generic(struct ixgbe_hw *hw)
 		hw->phy.sfp_type = ixgbe_sfp_type_not_present;
 		return IXGBE_ERR_SFP_NOT_PRESENT;
 	}
+	printk("%s:%d #1", __func__, __LINE__);
 
 	/* LAN ID is needed for sfp_type determination */
 	hw->mac.ops.set_lan_id(hw);
 
+	printk("%s:%d #2", __func__, __LINE__);
 	status = hw->phy.ops.read_i2c_eeprom(hw,
 					     IXGBE_SFF_IDENTIFIER,
 					     &identifier);
@@ -1224,6 +1226,7 @@ s32 ixgbe_identify_sfp_module_generic(struct ixgbe_hw *hw)
 		hw->phy.type = ixgbe_phy_sfp_unsupported;
 		return IXGBE_ERR_SFP_NOT_SUPPORTED;
 	}
+	printk("%s:%d #3", __func__, __LINE__);
 	status = hw->phy.ops.read_i2c_eeprom(hw,
 					     IXGBE_SFF_1GBE_COMP_CODES,
 					     &comp_codes_1g);
@@ -1231,6 +1234,7 @@ s32 ixgbe_identify_sfp_module_generic(struct ixgbe_hw *hw)
 	if (status)
 		goto err_read_i2c_eeprom;
 
+	printk("%s:%d #4", __func__, __LINE__);
 	status = hw->phy.ops.read_i2c_eeprom(hw,
 					     IXGBE_SFF_10GBE_COMP_CODES,
 					     &comp_codes_10g);
@@ -1439,6 +1443,7 @@ s32 ixgbe_identify_sfp_module_generic(struct ixgbe_hw *hw)
 		hw->phy.type = ixgbe_phy_sfp_unsupported;
 		return IXGBE_ERR_SFP_NOT_SUPPORTED;
 	}
+	printk("%s:%d #5", __func__, __LINE__);
 	return 0;
 
 err_read_i2c_eeprom:

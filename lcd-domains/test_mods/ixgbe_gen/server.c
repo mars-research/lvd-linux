@@ -222,6 +222,7 @@ void trmp_impl_ndo_set_rx_mode(fptr_ndo_set_rx_mode target, struct net_device* n
 	glue_call_client(__pos, __msg, RPC_ID_ndo_set_rx_mode);
 
 	*__pos = 0;
+	if (0)
 	{
 		if (*netdev_ptr) {
 			caller_unmarshal_kernel__ndo_set_rx_mode__netdev__in(__pos, __msg, __ext, ctx, *netdev_ptr);
@@ -1266,13 +1267,15 @@ void trmp_impl_timer_func(fptr_timer_func target, unsigned long data)
 	(void)__ext;
 
 	if (verbose_debug) {
-		printk("%s:%d, entered!\n", __func__, __LINE__);
+		//printk("%s:%d, entered!\n", __func__, __LINE__);
 	}
 
 	glue_pack(__pos, __msg, __ext, target);
 	{
 		glue_pack(__pos, __msg, __ext, *data_ptr);
 	}
+
+	//printk("%s, calling data %lx\n", __func__, data);
 
 	glue_call_client(__pos, __msg, RPC_ID_timer_func);
 
@@ -1281,7 +1284,7 @@ void trmp_impl_timer_func(fptr_timer_func target, unsigned long data)
 	}
 
 	if (verbose_debug) {
-		printk("%s:%d, returned!\n", __func__, __LINE__);
+		//printk("%s:%d, returned!\n", __func__, __LINE__);
 	}
 }
 
@@ -1302,12 +1305,12 @@ void lvd_setup_timer_callee(struct fipc_message* __msg, struct ext_registers* __
 
 	struct timer_list* timer = 0;
 	fptr_timer_func func = 0;
-	unsigned int flags = 0;
+	unsigned long data = 0;
 	struct timer_list** timer_ptr = &timer;
 	fptr_timer_func* func_ptr = &func;
-	unsigned int* flags_ptr = &flags;
+	unsigned long* data_ptr = &data;
 	
-	__maybe_unused struct lvd_setup_timer_call_ctx call_ctx = {timer, func, flags};
+	__maybe_unused struct lvd_setup_timer_call_ctx call_ctx = {timer, func, data};
 	__maybe_unused struct lvd_setup_timer_call_ctx *ctx = &call_ctx;
 
 	if (verbose_debug) {
@@ -1328,10 +1331,12 @@ void lvd_setup_timer_callee(struct fipc_message* __msg, struct ext_registers* __
 	}
 
 	{
-		*flags_ptr = glue_unpack(__pos, __msg, __ext, unsigned int);
+		*data_ptr = glue_unpack(__pos, __msg, __ext, unsigned long);
 	}
 
-	lvd_setup_timer(timer, func, flags);
+	printk("%s, timer %p | func %p | data %lx\n", __func__, timer,
+				func, data);
+	lvd_setup_timer(timer, func, data);
 
 	*__pos = 0;
 	{
@@ -2151,12 +2156,12 @@ void pci_request_selected_regions_callee(struct fipc_message* __msg, struct ext_
 		*res_name_ptr = glue_unpack_new_shadow(__pos, __msg, __ext, char const*, (__size), (DEFAULT_GFP_FLAGS));
 		if (*res_name_ptr) {
 			char* writable = (char*)*res_name_ptr;
-			size_t i, len;
+			size_t __i, __len;
 			char* array = writable;
-			len = glue_unpack(__pos, __msg, __ext, size_t) - 1;
-			array[len] = '\0';
-			for (i = 0; i < len; ++i) {
-				char* element = &array[i];
+			__len = glue_unpack(__pos, __msg, __ext, size_t) - 1;
+			array[__len] = '\0';
+			for (__i = 0; __i < __len; ++__i) {
+				char* element = &array[__i];
 				*element = glue_unpack(__pos, __msg, __ext, char);
 			}
 
@@ -2255,7 +2260,7 @@ void mod_timer_callee(struct fipc_message* __msg, struct ext_registers* __ext)
 	__maybe_unused struct mod_timer_call_ctx *ctx = &call_ctx;
 
 	if (verbose_debug) {
-		printk("%s:%d, entered!\n", __func__, __LINE__);
+		//printk("%s:%d, entered!\n", __func__, __LINE__);
 	}
 
 	{
@@ -2270,7 +2275,7 @@ void mod_timer_callee(struct fipc_message* __msg, struct ext_registers* __ext)
 		*expires_ptr = glue_unpack(__pos, __msg, __ext, unsigned long);
 	}
 
-	ret = mod_timer(timer, expires);
+	ret = mod_timer(timer, expires + jiffies);
 
 	*__pos = 0;
 	{
@@ -2289,7 +2294,7 @@ void mod_timer_callee(struct fipc_message* __msg, struct ext_registers* __ext)
 
 	__msg->regs[0] = *__pos;
 	if (verbose_debug) {
-		printk("%s:%d, returned!\n", __func__, __LINE__);
+		//printk("%s:%d, returned!\n", __func__, __LINE__);
 	}
 }
 
@@ -2503,7 +2508,27 @@ void netdev_rss_key_fill_callee(struct fipc_message* __msg, struct ext_registers
 	}
 
 	{
-		(void)buffer_ptr;
+		unsigned char* __casted = (unsigned char*)*buffer_ptr;
+		unsigned char** __casted_ptr = &__casted;
+		{
+			size_t __size = sizeof(unsigned char) * glue_peek(__pos, __msg, __ext);
+			*__casted_ptr = glue_unpack_new_shadow(__pos, __msg, __ext, unsigned char*, (__size), (DEFAULT_GFP_FLAGS));
+			if (*__casted_ptr) {
+				int __i;
+				unsigned char* array = *__casted_ptr;
+				size_t __len = glue_unpack(__pos, __msg, __ext, size_t);
+				// Warning: see David if this breaks
+				glue_user_trace("Warning: see David if this breaks");
+				for (__i = 0; __i < __len; ++__i) {
+					unsigned char* element = &array[__i];
+					*element = glue_unpack(__pos, __msg, __ext, unsigned char);
+				}
+
+			}
+
+		}
+
+		*buffer_ptr = (void*)__casted;
 	}
 
 	{
@@ -2514,9 +2539,24 @@ void netdev_rss_key_fill_callee(struct fipc_message* __msg, struct ext_registers
 
 	*__pos = 0;
 	{
-		__maybe_unused const void* __adjusted = *buffer_ptr;
-		glue_pack_shadow(__pos, __msg, __ext, __adjusted);
-		if (*buffer_ptr) {
+		unsigned char* __casted = (unsigned char*)*buffer_ptr;
+		unsigned char* const* __casted_ptr = &__casted;
+		{
+			__maybe_unused const void* __adjusted = *__casted_ptr;
+			glue_pack_shadow(__pos, __msg, __ext, __adjusted);
+			if (*__casted_ptr) {
+				size_t __i, __len = (ctx->len);
+				unsigned char* array = *__casted_ptr;
+				glue_pack(__pos, __msg, __ext, __len);
+				// Warning: see David if this breaks
+				glue_user_trace("Warning: see David if this breaks");
+				for (__i = 0; __i < __len; ++__i) {
+					unsigned char* element = &array[__i];
+					glue_pack(__pos, __msg, __ext, *element);
+				}
+
+			}
+
 		}
 
 	}
@@ -3731,9 +3771,9 @@ void netif_carrier_on_callee(struct fipc_message* __msg, struct ext_registers* _
 	}
 
 	{
-		*dev_ptr = glue_unpack_shadow(__pos, __msg, __ext, struct net_device*);
+		*dev_ptr = glue_unpack(__pos, __msg, __ext, struct net_device*);
 		if (*dev_ptr) {
-			callee_unmarshal_kernel__netif_carrier_on__dev__io(__pos, __msg, __ext, ctx, *dev_ptr);
+			callee_unmarshal_kernel__netif_carrier_on__dev__in(__pos, __msg, __ext, ctx, *dev_ptr);
 		}
 
 	}
@@ -3742,10 +3782,8 @@ void netif_carrier_on_callee(struct fipc_message* __msg, struct ext_registers* _
 
 	*__pos = 0;
 	{
-		__maybe_unused const void* __adjusted = *dev_ptr;
-		glue_pack_shadow(__pos, __msg, __ext, __adjusted);
 		if (*dev_ptr) {
-			callee_marshal_kernel__netif_carrier_on__dev__io(__pos, __msg, __ext, ctx, *dev_ptr);
+			callee_marshal_kernel__netif_carrier_on__dev__in(__pos, __msg, __ext, ctx, *dev_ptr);
 		}
 
 	}
@@ -4677,7 +4715,7 @@ unsigned int trmp_impl_handler(fptr_handler target, int irq, void* id)
 	(void)__ext;
 
 	if (verbose_debug) {
-		printk("%s:%d, entered!\n", __func__, __LINE__);
+		//printk("%s:%d, entered!\n", __func__, __LINE__);
 	}
 
 	glue_pack(__pos, __msg, __ext, target);
@@ -4708,7 +4746,7 @@ unsigned int trmp_impl_handler(fptr_handler target, int irq, void* id)
 	}
 
 	if (verbose_debug) {
-		printk("%s:%d, returned!\n", __func__, __LINE__);
+		//printk("%s:%d, returned!\n", __func__, __LINE__);
 	}
 	return ret;
 }
@@ -4738,6 +4776,7 @@ void request_threaded_irq_callee(struct fipc_message* __msg, struct ext_register
 	fptr_handler* handler_ptr = &handler;
 	unsigned long* irqflags_ptr = &irqflags;
 	char const** devname_ptr = &devname;
+	void** dev_id_ptr = &dev_id;
 	int ret = 0;
 	int* ret_ptr = &ret;
 	
@@ -4765,15 +4804,23 @@ void request_threaded_irq_callee(struct fipc_message* __msg, struct ext_register
 		*devname_ptr = glue_unpack_new_shadow(__pos, __msg, __ext, char const*, (__size), (DEFAULT_GFP_FLAGS));
 		if (*devname_ptr) {
 			char* writable = (char*)*devname_ptr;
-			size_t i, len;
+			size_t __i, __len;
 			char* array = writable;
-			len = glue_unpack(__pos, __msg, __ext, size_t) - 1;
-			array[len] = '\0';
-			for (i = 0; i < len; ++i) {
-				char* element = &array[i];
+			__len = glue_unpack(__pos, __msg, __ext, size_t) - 1;
+			array[__len] = '\0';
+			for (__i = 0; __i < __len; ++__i) {
+				char* element = &array[__i];
 				*element = glue_unpack(__pos, __msg, __ext, char);
 			}
 
+		}
+
+	}
+
+	{
+		size_t __size = sizeof(void*);
+		*dev_id_ptr = glue_unpack_new_shadow(__pos, __msg, __ext, void*, (__size), (DEFAULT_GFP_FLAGS));
+		if (*dev_id_ptr) {
 		}
 
 	}
@@ -4792,6 +4839,10 @@ void request_threaded_irq_callee(struct fipc_message* __msg, struct ext_register
 
 	{
 		(void)devname_ptr;
+	}
+
+	{
+		(void)dev_id_ptr;
 	}
 
 	{
@@ -4970,13 +5021,13 @@ void pci_enable_msix_range_callee(struct fipc_message* __msg, struct ext_registe
 		size_t __size = sizeof(struct msix_entry) * glue_peek(__pos, __msg, __ext);
 		*entries_ptr = glue_unpack_new_shadow(__pos, __msg, __ext, struct msix_entry*, (__size), (DEFAULT_GFP_FLAGS));
 		if (*entries_ptr) {
-			int i;
+			int __i;
 			struct msix_entry* array = *entries_ptr;
-			size_t len = glue_unpack(__pos, __msg, __ext, size_t);
+			size_t __len = glue_unpack(__pos, __msg, __ext, size_t);
 			// Warning: see David if this breaks
 			glue_user_trace("Warning: see David if this breaks");
-			for (i = 0; i < len; ++i) {
-				struct msix_entry* element = &array[i];
+			for (__i = 0; __i < __len; ++__i) {
+				struct msix_entry* element = &array[__i];
 				callee_unmarshal_kernel__pci_enable_msix_range__entries__io(__pos, __msg, __ext, ctx, element);
 			}
 
@@ -4992,8 +5043,16 @@ void pci_enable_msix_range_callee(struct fipc_message* __msg, struct ext_registe
 		*maxvec_ptr = glue_unpack(__pos, __msg, __ext, int);
 	}
 
+	printk("%s, dev %p entries %p minvec %d maxvec %d\n", __func__, dev, entries, minvec, maxvec);
+
 	ret = pci_enable_msix_range(dev, entries, minvec, maxvec);
 
+	{
+		int i = 0;
+		for (i = 0; i < ret; i++) {
+			printk("entry[%d]->vector %u\n", i, entries[i].vector);
+		}
+	}
 	*__pos = 0;
 	{
 		if (*dev_ptr) {
@@ -5004,15 +5063,15 @@ void pci_enable_msix_range_callee(struct fipc_message* __msg, struct ext_registe
 
 	{
 		__maybe_unused const void* __adjusted = *entries_ptr;
-		glue_pack(__pos, __msg, __ext, __adjusted);
+		glue_pack_shadow(__pos, __msg, __ext, __adjusted);
 		if (*entries_ptr) {
-			size_t i, len = (ctx->maxvec);
+			size_t __i, __len = (maxvec);
 			struct msix_entry* array = *entries_ptr;
-			glue_pack(__pos, __msg, __ext, len);
+			glue_pack(__pos, __msg, __ext, __len);
 			// Warning: see David if this breaks
 			glue_user_trace("Warning: see David if this breaks");
-			for (i = 0; i < len; ++i) {
-				struct msix_entry* element = &array[i];
+			for (__i = 0; __i < __len; ++__i) {
+				struct msix_entry* element = &array[__i];
 				callee_marshal_kernel__pci_enable_msix_range__entries__io(__pos, __msg, __ext, ctx, element);
 			}
 
@@ -5132,13 +5191,13 @@ void dev_addr_del_callee(struct fipc_message* __msg, struct ext_registers* __ext
 		*addr_ptr = glue_unpack_shadow(__pos, __msg, __ext, unsigned char const*);
 		if (*addr_ptr) {
 			unsigned char* writable = (unsigned char*)*addr_ptr;
-			int i;
+			int __i;
 			unsigned char* array = writable;
-			size_t len = glue_unpack(__pos, __msg, __ext, size_t);
+			size_t __len = glue_unpack(__pos, __msg, __ext, size_t);
 			// Warning: see David if this breaks
 			glue_user_trace("Warning: see David if this breaks");
-			for (i = 0; i < len; ++i) {
-				unsigned char* element = &array[i];
+			for (__i = 0; __i < __len; ++__i) {
+				unsigned char* element = &array[__i];
 				*element = glue_unpack(__pos, __msg, __ext, unsigned char);
 			}
 
@@ -5211,13 +5270,13 @@ void dev_addr_add_callee(struct fipc_message* __msg, struct ext_registers* __ext
 		*addr_ptr = glue_unpack_new_shadow(__pos, __msg, __ext, unsigned char const*, (__size), (DEFAULT_GFP_FLAGS));
 		if (*addr_ptr) {
 			unsigned char* writable = (unsigned char*)*addr_ptr;
-			int i;
+			int __i;
 			unsigned char* array = writable;
-			size_t len = glue_unpack(__pos, __msg, __ext, size_t);
+			size_t __len = glue_unpack(__pos, __msg, __ext, size_t);
 			// Warning: see David if this breaks
 			glue_user_trace("Warning: see David if this breaks");
-			for (i = 0; i < len; ++i) {
-				unsigned char* element = &array[i];
+			for (__i = 0; __i < __len; ++__i) {
+				unsigned char* element = &array[__i];
 				*element = glue_unpack(__pos, __msg, __ext, unsigned char);
 			}
 
@@ -5292,13 +5351,13 @@ int trmp_impl_sync(fptr_sync target, struct net_device* dev, unsigned char const
 		__maybe_unused const void* __adjusted = *addr_ptr;
 		glue_pack(__pos, __msg, __ext, __adjusted);
 		if (*addr_ptr) {
-			size_t i, len = (ETH_ALEN);
+			size_t __i, __len = (ETH_ALEN);
 			unsigned char const* array = *addr_ptr;
-			glue_pack(__pos, __msg, __ext, len);
+			glue_pack(__pos, __msg, __ext, __len);
 			// Warning: see David if this breaks
 			glue_user_trace("Warning: see David if this breaks");
-			for (i = 0; i < len; ++i) {
-				unsigned char const* element = &array[i];
+			for (__i = 0; __i < __len; ++__i) {
+				unsigned char const* element = &array[__i];
 				glue_pack(__pos, __msg, __ext, *element);
 			}
 
@@ -5376,13 +5435,13 @@ int trmp_impl_unsync(fptr_unsync target, struct net_device* dev, unsigned char c
 		__maybe_unused const void* __adjusted = *addr_ptr;
 		glue_pack(__pos, __msg, __ext, __adjusted);
 		if (*addr_ptr) {
-			size_t i, len = (ETH_ALEN);
+			size_t __i, __len = (ETH_ALEN);
 			unsigned char const* array = *addr_ptr;
-			glue_pack(__pos, __msg, __ext, len);
+			glue_pack(__pos, __msg, __ext, __len);
 			// Warning: see David if this breaks
 			glue_user_trace("Warning: see David if this breaks");
-			for (i = 0; i < len; ++i) {
-				unsigned char const* element = &array[i];
+			for (__i = 0; __i < __len; ++__i) {
+				unsigned char const* element = &array[__i];
 				glue_pack(__pos, __msg, __ext, *element);
 			}
 
@@ -5602,13 +5661,13 @@ void eth_platform_get_mac_address_callee(struct fipc_message* __msg, struct ext_
 		size_t __size = sizeof(unsigned char) * glue_peek(__pos, __msg, __ext);
 		*mac_addr_ptr = glue_unpack_new_shadow(__pos, __msg, __ext, unsigned char*, (__size), (DEFAULT_GFP_FLAGS));
 		if (*mac_addr_ptr) {
-			int i;
+			int __i;
 			unsigned char* array = *mac_addr_ptr;
-			size_t len = glue_unpack(__pos, __msg, __ext, size_t);
+			size_t __len = glue_unpack(__pos, __msg, __ext, size_t);
 			// Warning: see David if this breaks
 			glue_user_trace("Warning: see David if this breaks");
-			for (i = 0; i < len; ++i) {
-				unsigned char* element = &array[i];
+			for (__i = 0; __i < __len; ++__i) {
+				unsigned char* element = &array[__i];
 				*element = glue_unpack(__pos, __msg, __ext, unsigned char);
 			}
 
@@ -5630,13 +5689,13 @@ void eth_platform_get_mac_address_callee(struct fipc_message* __msg, struct ext_
 		__maybe_unused const void* __adjusted = *mac_addr_ptr;
 		glue_pack_shadow(__pos, __msg, __ext, __adjusted);
 		if (*mac_addr_ptr) {
-			size_t i, len = (ETH_ALEN);
+			size_t __i, __len = (ETH_ALEN);
 			unsigned char* array = *mac_addr_ptr;
-			glue_pack(__pos, __msg, __ext, len);
+			glue_pack(__pos, __msg, __ext, __len);
 			// Warning: see David if this breaks
 			glue_user_trace("Warning: see David if this breaks");
-			for (i = 0; i < len; ++i) {
-				unsigned char* element = &array[i];
+			for (__i = 0; __i < __len; ++__i) {
+				unsigned char* element = &array[__i];
 				glue_pack(__pos, __msg, __ext, *element);
 			}
 
@@ -6211,12 +6270,12 @@ void __pci_register_driver_callee(struct fipc_message* __msg, struct ext_registe
 		*mod_name_ptr = glue_unpack_new_shadow(__pos, __msg, __ext, char const*, (__size), (DEFAULT_GFP_FLAGS));
 		if (*mod_name_ptr) {
 			char* writable = (char*)*mod_name_ptr;
-			size_t i, len;
+			size_t __i, __len;
 			char* array = writable;
-			len = glue_unpack(__pos, __msg, __ext, size_t) - 1;
-			array[len] = '\0';
-			for (i = 0; i < len; ++i) {
-				char* element = &array[i];
+			__len = glue_unpack(__pos, __msg, __ext, size_t) - 1;
+			array[__len] = '\0';
+			for (__i = 0; __i < __len; ++__i) {
+				char* element = &array[__i];
 				*element = glue_unpack(__pos, __msg, __ext, char);
 			}
 
@@ -6580,7 +6639,7 @@ void get_jiffies_callee(struct fipc_message* __msg, struct ext_registers* __ext)
 	__maybe_unused struct get_jiffies_call_ctx *ctx = &call_ctx;
 
 	if (verbose_debug) {
-		printk("%s:%d, entered!\n", __func__, __LINE__);
+		//printk("%s:%d, entered!\n", __func__, __LINE__);
 	}
 
 	ret = get_jiffies();
@@ -6592,7 +6651,7 @@ void get_jiffies_callee(struct fipc_message* __msg, struct ext_registers* __ext)
 
 	__msg->regs[0] = *__pos;
 	if (verbose_debug) {
-		printk("%s:%d, returned!\n", __func__, __LINE__);
+		//printk("%s:%d, returned!\n", __func__, __LINE__);
 	}
 }
 
@@ -6920,7 +6979,7 @@ int try_dispatch(enum RPC_ID id, struct fipc_message* __msg, struct ext_register
 		break;
 
 	case RPC_ID_mod_timer:
-		glue_user_trace("mod_timer\n");
+		//glue_user_trace("mod_timer\n");
 		mod_timer_callee(__msg, __ext);
 		break;
 
@@ -7275,7 +7334,7 @@ int try_dispatch(enum RPC_ID id, struct fipc_message* __msg, struct ext_register
 		break;
 
 	case RPC_ID_get_jiffies:
-		glue_user_trace("get_jiffies\n");
+		//glue_user_trace("get_jiffies\n");
 		get_jiffies_callee(__msg, __ext);
 		break;
 

@@ -25,10 +25,10 @@
 		printk("%s:%d, unpack new shadow for type %s | size %llu\n", __func__, __LINE__, __stringify(type), (uint64_t) size); \
 	(type)glue_unpack_new_shadow_impl(glue_unpack(pos, msg, ext, void*), size, flags); })
 
-#define glue_unpack_bind_or_new_shadow(pos, msg, ext, type, size) ({ \
+#define glue_unpack_bind_or_new_shadow(pos, msg, ext, type, size, flags) ({ \
 	if (verbose_debug) \
 		printk("%s:%d, unpack or bind new shadow for type %s | size %llu\n", __func__, __LINE__, __stringify(type), (uint64_t) size); \
-	(type)glue_unpack_bind_or_new_shadow_impl(glue_unpack(pos, msg, ext, void*), size); })
+	(type)glue_unpack_bind_or_new_shadow_impl(glue_unpack(pos, msg, ext, void*), size, flags); })
 
 #ifndef LCD_ISOLATE
 #define glue_unpack_rpc_ptr(pos, msg, ext, name) \
@@ -115,7 +115,7 @@ static inline void* glue_unpack_new_shadow_impl(const void* ptr, size_t size, gf
 	return shadow;
 }
 
-static inline void* glue_unpack_bind_or_new_shadow_impl(const void* ptr, size_t size)
+static inline void* glue_unpack_bind_or_new_shadow_impl(const void* ptr, size_t size, gfp_t flags)
 {
 	void* shadow = 0;
 	if (!ptr)
@@ -123,7 +123,7 @@ static inline void* glue_unpack_bind_or_new_shadow_impl(const void* ptr, size_t 
 
 	shadow = glue_user_map_to_shadow(ptr, false);
 	if (!shadow) {
-		shadow = glue_user_alloc(size, DEFAULT_GFP_FLAGS);
+		shadow = glue_user_alloc(size, flags);
 		glue_user_add_shadow(ptr, shadow);
 	}
 	return shadow;
@@ -525,7 +525,7 @@ struct timer_func_call_ctx {
 struct lvd_setup_timer_call_ctx {
 	struct timer_list* timer;
 	fptr_timer_func func;
-	unsigned int flags;
+	unsigned long data;
 };
 
 struct pci_disable_msi_call_ctx {
@@ -1271,6 +1271,62 @@ void caller_unmarshal_kernel__ndo_set_rx_mode__netdev__in(
 	struct ndo_set_rx_mode_call_ctx const* call_ctx,
 	struct net_device* ptr);
 
+void caller_marshal_kernel__ndo_set_rx_mode__netdev_hw_addr_list__in(
+	size_t* __pos,
+	struct fipc_message* __msg,
+	struct ext_registers* __ext,
+	struct ndo_set_rx_mode_call_ctx const* call_ctx,
+	struct netdev_hw_addr_list const* ptr);
+
+void callee_unmarshal_kernel__ndo_set_rx_mode__netdev_hw_addr_list__in(
+	size_t* __pos,
+	const struct fipc_message* __msg,
+	const struct ext_registers* __ext,
+	struct ndo_set_rx_mode_call_ctx const* call_ctx,
+	struct netdev_hw_addr_list* ptr);
+
+void callee_marshal_kernel__ndo_set_rx_mode__netdev_hw_addr_list__in(
+	size_t* __pos,
+	struct fipc_message* __msg,
+	struct ext_registers* __ext,
+	struct ndo_set_rx_mode_call_ctx const* call_ctx,
+	struct netdev_hw_addr_list const* ptr);
+
+void caller_unmarshal_kernel__ndo_set_rx_mode__netdev_hw_addr_list__in(
+	size_t* __pos,
+	const struct fipc_message* __msg,
+	const struct ext_registers* __ext,
+	struct ndo_set_rx_mode_call_ctx const* call_ctx,
+	struct netdev_hw_addr_list* ptr);
+
+void caller_marshal_kernel__ndo_set_rx_mode__list_head__in(
+	size_t* __pos,
+	struct fipc_message* __msg,
+	struct ext_registers* __ext,
+	struct ndo_set_rx_mode_call_ctx const* call_ctx,
+	struct list_head const* ptr);
+
+void callee_unmarshal_kernel__ndo_set_rx_mode__list_head__in(
+	size_t* __pos,
+	const struct fipc_message* __msg,
+	const struct ext_registers* __ext,
+	struct ndo_set_rx_mode_call_ctx const* call_ctx,
+	struct list_head* ptr);
+
+void callee_marshal_kernel__ndo_set_rx_mode__list_head__in(
+	size_t* __pos,
+	struct fipc_message* __msg,
+	struct ext_registers* __ext,
+	struct ndo_set_rx_mode_call_ctx const* call_ctx,
+	struct list_head const* ptr);
+
+void caller_unmarshal_kernel__ndo_set_rx_mode__list_head__in(
+	size_t* __pos,
+	const struct fipc_message* __msg,
+	const struct ext_registers* __ext,
+	struct ndo_set_rx_mode_call_ctx const* call_ctx,
+	struct list_head* ptr);
+
 void caller_marshal_kernel__ndo_stop__netdev__in(
 	size_t* __pos,
 	struct fipc_message* __msg,
@@ -1326,34 +1382,6 @@ void caller_unmarshal_kernel__ndo_open__netdev__in(
 	const struct ext_registers* __ext,
 	struct ndo_open_call_ctx const* call_ctx,
 	struct net_device* ptr);
-
-void caller_marshal_kernel__ndo_open__net_device__tx__in(
-	size_t* __pos,
-	struct fipc_message* __msg,
-	struct ext_registers* __ext,
-	struct ndo_open_call_ctx const* call_ctx,
-	struct netdev_queue const* ptr);
-
-void callee_unmarshal_kernel__ndo_open__net_device__tx__in(
-	size_t* __pos,
-	const struct fipc_message* __msg,
-	const struct ext_registers* __ext,
-	struct ndo_open_call_ctx const* call_ctx,
-	struct netdev_queue* ptr);
-
-void callee_marshal_kernel__ndo_open__net_device__tx__in(
-	size_t* __pos,
-	struct fipc_message* __msg,
-	struct ext_registers* __ext,
-	struct ndo_open_call_ctx const* call_ctx,
-	struct netdev_queue const* ptr);
-
-void caller_unmarshal_kernel__ndo_open__net_device__tx__in(
-	size_t* __pos,
-	const struct fipc_message* __msg,
-	const struct ext_registers* __ext,
-	struct ndo_open_call_ctx const* call_ctx,
-	struct netdev_queue* ptr);
 
 void caller_marshal_kernel__ndo_start_xmit__skb__io(
 	size_t* __pos,
@@ -3447,28 +3475,28 @@ void caller_unmarshal_kernel__netif_tx_stop_all_queues__dev__in(
 	struct netif_tx_stop_all_queues_call_ctx const* call_ctx,
 	struct net_device* ptr);
 
-void caller_marshal_kernel__netif_carrier_on__dev__io(
+void caller_marshal_kernel__netif_carrier_on__dev__in(
 	size_t* __pos,
 	struct fipc_message* __msg,
 	struct ext_registers* __ext,
 	struct netif_carrier_on_call_ctx const* call_ctx,
 	struct net_device const* ptr);
 
-void callee_unmarshal_kernel__netif_carrier_on__dev__io(
+void callee_unmarshal_kernel__netif_carrier_on__dev__in(
 	size_t* __pos,
 	const struct fipc_message* __msg,
 	const struct ext_registers* __ext,
 	struct netif_carrier_on_call_ctx const* call_ctx,
 	struct net_device* ptr);
 
-void callee_marshal_kernel__netif_carrier_on__dev__io(
+void callee_marshal_kernel__netif_carrier_on__dev__in(
 	size_t* __pos,
 	struct fipc_message* __msg,
 	struct ext_registers* __ext,
 	struct netif_carrier_on_call_ctx const* call_ctx,
 	struct net_device const* ptr);
 
-void caller_unmarshal_kernel__netif_carrier_on__dev__io(
+void caller_unmarshal_kernel__netif_carrier_on__dev__in(
 	size_t* __pos,
 	const struct fipc_message* __msg,
 	const struct ext_registers* __ext,

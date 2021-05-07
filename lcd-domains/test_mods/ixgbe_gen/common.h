@@ -3035,61 +3035,33 @@ void caller_unmarshal_kernel__napi_gro_flush__napi_struct_gro_list__io(
 	struct napi_gro_flush_call_ctx const* call_ctx,
 	struct sk_buff* ptr);
 
-void caller_marshal_kernel__napi_complete_done__n__io(
+void caller_marshal_kernel__napi_complete_done__n__in(
 	size_t* __pos,
 	struct fipc_message* __msg,
 	struct ext_registers* __ext,
 	struct napi_complete_done_call_ctx const* call_ctx,
 	struct napi_struct const* ptr);
 
-void callee_unmarshal_kernel__napi_complete_done__n__io(
+void callee_unmarshal_kernel__napi_complete_done__n__in(
 	size_t* __pos,
 	const struct fipc_message* __msg,
 	const struct ext_registers* __ext,
 	struct napi_complete_done_call_ctx const* call_ctx,
 	struct napi_struct* ptr);
 
-void callee_marshal_kernel__napi_complete_done__n__io(
+void callee_marshal_kernel__napi_complete_done__n__in(
 	size_t* __pos,
 	struct fipc_message* __msg,
 	struct ext_registers* __ext,
 	struct napi_complete_done_call_ctx const* call_ctx,
 	struct napi_struct const* ptr);
 
-void caller_unmarshal_kernel__napi_complete_done__n__io(
+void caller_unmarshal_kernel__napi_complete_done__n__in(
 	size_t* __pos,
 	const struct fipc_message* __msg,
 	const struct ext_registers* __ext,
 	struct napi_complete_done_call_ctx const* call_ctx,
 	struct napi_struct* ptr);
-
-void caller_marshal_kernel__napi_complete_done__napi_struct_gro_list__io(
-	size_t* __pos,
-	struct fipc_message* __msg,
-	struct ext_registers* __ext,
-	struct napi_complete_done_call_ctx const* call_ctx,
-	struct sk_buff const* ptr);
-
-void callee_unmarshal_kernel__napi_complete_done__napi_struct_gro_list__io(
-	size_t* __pos,
-	const struct fipc_message* __msg,
-	const struct ext_registers* __ext,
-	struct napi_complete_done_call_ctx const* call_ctx,
-	struct sk_buff* ptr);
-
-void callee_marshal_kernel__napi_complete_done__napi_struct_gro_list__io(
-	size_t* __pos,
-	struct fipc_message* __msg,
-	struct ext_registers* __ext,
-	struct napi_complete_done_call_ctx const* call_ctx,
-	struct sk_buff const* ptr);
-
-void caller_unmarshal_kernel__napi_complete_done__napi_struct_gro_list__io(
-	size_t* __pos,
-	const struct fipc_message* __msg,
-	const struct ext_registers* __ext,
-	struct napi_complete_done_call_ctx const* call_ctx,
-	struct sk_buff* ptr);
 
 void caller_marshal_kernel__call_netdevice_notifiers__dev__in(
 	size_t* __pos,

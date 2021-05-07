@@ -3188,9 +3188,9 @@ void napi_complete_done(struct napi_struct* n, int work_done)
 
 	{
 		__maybe_unused const void* __adjusted = *n_ptr;
-		glue_pack_shadow(__pos, __msg, __ext, __adjusted);
+		glue_pack(__pos, __msg, __ext, __adjusted);
 		if (*n_ptr) {
-			caller_marshal_kernel__napi_complete_done__n__io(__pos, __msg, __ext, ctx, *n_ptr);
+			caller_marshal_kernel__napi_complete_done__n__in(__pos, __msg, __ext, ctx, *n_ptr);
 		}
 
 	}
@@ -3203,9 +3203,8 @@ void napi_complete_done(struct napi_struct* n, int work_done)
 
 	*__pos = 0;
 	{
-		*n_ptr = glue_unpack_shadow(__pos, __msg, __ext, struct napi_struct*);
 		if (*n_ptr) {
-			caller_unmarshal_kernel__napi_complete_done__n__io(__pos, __msg, __ext, ctx, *n_ptr);
+			caller_unmarshal_kernel__napi_complete_done__n__in(__pos, __msg, __ext, ctx, *n_ptr);
 		}
 
 	}
@@ -3780,6 +3779,7 @@ struct net_device* netdev_all_upper_get_next_dev_rcu(struct net_device* dev, str
 
 	if (verbose_debug) {
 		printk("%s:%d, entered!\n", __func__, __LINE__);
+		return NULL;
 	}
 
 	{
@@ -4075,6 +4075,13 @@ unsigned int napi_gro_receive(struct napi_struct* napi, struct sk_buff* skb)
 
 	if (verbose_debug) {
 		printk("%s:%d, entered!\n", __func__, __LINE__);
+		{
+			int i = 0;
+			for (i = 0; i < skb->len; i++) {
+				printk("%02x ", skb->data[i]);
+			}
+		}
+		return 0;
 	}
 
 	{
@@ -4606,7 +4613,6 @@ void thread_fn_callee(struct fipc_message* __msg, struct ext_registers* __ext)
 	int irq = 0;
 	void* id = 0;
 	int* irq_ptr = &irq;
-	void** id_ptr = &id;
 	unsigned int ret = 0;
 	unsigned int* ret_ptr = &ret;
 	
@@ -4621,22 +4627,10 @@ void thread_fn_callee(struct fipc_message* __msg, struct ext_registers* __ext)
 		*irq_ptr = glue_unpack(__pos, __msg, __ext, int);
 	}
 
-	{
-		*id_ptr = glue_unpack(__pos, __msg, __ext, void*);
-		if (*id_ptr) {
-		}
-
-	}
-
-	printk("%s, irq %d, id %p\n", __func__, irq, id);
 	ret = function_ptr(irq, id);
 
 	*__pos = 0;
 	{
-	}
-
-	{
-		(void)id_ptr;
 	}
 
 	{

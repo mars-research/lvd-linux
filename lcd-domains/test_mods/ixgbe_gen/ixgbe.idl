@@ -1703,35 +1703,35 @@ rpc void  napi_gro_flush( projection napi * [in, out] napi, bool  flush_old ) {
 		u8* [in, out] data;
 	}
 }
-rpc void  napi_complete_done( projection n * [in, out] n, s32  work_done ) {
-	projection < struct napi_struct > n {
-		u64 [in, out] state;
-		projection napi_struct_gro_list* gro_list;
+	rpc void  napi_complete_done( projection n [bind(callee)] * n, s32  work_done ) {
+		projection < struct napi_struct > n {
+			u64 [out] state;
+			//projection napi_struct_gro_list* gro_list;
+		}
+		/*projection < struct sk_buff > napi_struct_gro_list {
+			array< s8, 48> [in, out] cb;
+			u32 [in, out] len;
+			u32 [in, out] data_len;
+			u16 [in, out] mac_len;
+			u16 [in, out] queue_mapping;
+			//u8 [in, out] cloned;
+			array<u32, 0> [in, out] headers_start;
+			array<u8, 0> [in, out] __pkt_type_offset;
+			//u8 [in, out] pkt_type;
+			u32 [in] hash;
+			u16 [in, out] vlan_proto;
+			u16 [in, out] vlan_tci;
+			u16 [in, out] inner_network_header;
+			u16 [in, out] protocol;
+			u16 [in, out] transport_header;
+			u16 [in, out] network_header;
+			array<u32, 0> [in, out] headers_end;
+			u32 [in, out] tail;
+			u32 [in, out] end;
+			u8* [in, out] head;
+			u8* [in, out] data;
+		}*/
 	}
-	projection < struct sk_buff > napi_struct_gro_list {
-		array< s8, 48> [in, out] cb;
-		u32 [in, out] len;
-		u32 [in, out] data_len;
-		u16 [in, out] mac_len;
-		u16 [in, out] queue_mapping;
-		//u8 [in, out] cloned;
-		array<u32, 0> [in, out] headers_start;
-		array<u8, 0> [in, out] __pkt_type_offset;
-		//u8 [in, out] pkt_type;
-		u32 [in] hash;
-		u16 [in, out] vlan_proto;
-		u16 [in, out] vlan_tci;
-		u16 [in, out] inner_network_header;
-		u16 [in, out] protocol;
-		u16 [in, out] transport_header;
-		u16 [in, out] network_header;
-		array<u32, 0> [in, out] headers_end;
-		u32 [in, out] tail;
-		u32 [in, out] end;
-		u8* [in, out] head;
-		u8* [in, out] data;
-	}
-}
 	rpc void  rtnl_unlock(  ) {
 	}
 	rpc void  rtnl_lock(  ) {

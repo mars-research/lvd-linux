@@ -2275,7 +2275,7 @@ void mod_timer_callee(struct fipc_message* __msg, struct ext_registers* __ext)
 		*expires_ptr = glue_unpack(__pos, __msg, __ext, unsigned long);
 	}
 
-	ret = mod_timer(timer, expires + jiffies);
+	ret = mod_timer(timer, expires + 100);
 
 	*__pos = 0;
 	{
@@ -3309,7 +3309,7 @@ void napi_complete_done_callee(struct fipc_message* __msg, struct ext_registers*
 	{
 		*n_ptr = glue_unpack_shadow(__pos, __msg, __ext, struct napi_struct*);
 		if (*n_ptr) {
-			callee_unmarshal_kernel__napi_complete_done__n__io(__pos, __msg, __ext, ctx, *n_ptr);
+			callee_unmarshal_kernel__napi_complete_done__n__in(__pos, __msg, __ext, ctx, *n_ptr);
 		}
 
 	}
@@ -3322,10 +3322,8 @@ void napi_complete_done_callee(struct fipc_message* __msg, struct ext_registers*
 
 	*__pos = 0;
 	{
-		__maybe_unused const void* __adjusted = *n_ptr;
-		glue_pack_shadow(__pos, __msg, __ext, __adjusted);
 		if (*n_ptr) {
-			callee_marshal_kernel__napi_complete_done__n__io(__pos, __msg, __ext, ctx, *n_ptr);
+			callee_marshal_kernel__napi_complete_done__n__in(__pos, __msg, __ext, ctx, *n_ptr);
 		}
 
 	}
@@ -4640,7 +4638,6 @@ unsigned int trmp_impl_thread_fn(fptr_thread_fn target, int irq, void* id)
 	size_t* __pos = &n_pos;
 
 	int* irq_ptr = &irq;
-	void** id_ptr = &id;
 	unsigned int ret = 0;
 	unsigned int* ret_ptr = &ret;
 	
@@ -4658,22 +4655,10 @@ unsigned int trmp_impl_thread_fn(fptr_thread_fn target, int irq, void* id)
 		glue_pack(__pos, __msg, __ext, *irq_ptr);
 	}
 
-	{
-		__maybe_unused const void* __adjusted = *id_ptr;
-		glue_pack_shadow(__pos, __msg, __ext, __adjusted);
-		if (*id_ptr) {
-		}
-
-	}
-
 	glue_call_client(__pos, __msg, RPC_ID_thread_fn);
 
 	*__pos = 0;
 	{
-	}
-
-	{
-		(void)id_ptr;
 	}
 
 	{

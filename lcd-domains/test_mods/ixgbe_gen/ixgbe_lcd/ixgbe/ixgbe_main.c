@@ -7349,6 +7349,7 @@ static void ixgbe_watchdog_subtask(struct ixgbe_adapter *adapter)
 	ixgbe_update_stats(adapter);
 
 	ixgbe_watchdog_flush_tx(adapter);
+	printk("%s:%d #1", __func__, __LINE__);
 }
 
 /**
@@ -7484,7 +7485,7 @@ static void ixgbe_service_timer(unsigned long data)
 		next_event_offset = HZ * 2;
 
 	/* Reset the timer */
-	mod_timer(&adapter->service_timer, next_event_offset);
+	mod_timer(&adapter->service_timer, next_event_offset + jiffies);
 
 	ixgbe_service_event_schedule(adapter);
 }

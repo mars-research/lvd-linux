@@ -1,0 +1,6 @@
+obj-$(LCD_CONFIG_BUILD_NVME_GEN_BOOT)	+= boot/
+
+obj-$(LCD_CONFIG_BUILD_NVME_GEN_NVME_LCD) += nvme_lcd/
+
+obj-$(LCD_CONFIG_BUILD_NVME_GEN_BLK_KLCD) += blk_klcd/
+

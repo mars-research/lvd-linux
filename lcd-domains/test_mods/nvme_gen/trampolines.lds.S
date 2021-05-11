@@ -1,0 +1,26 @@
+#include <liblcd/trampoline_link.h>
+
+SECTIONS{
+	LCD_TRAMPOLINE_LINKER_SECTION(trmp_done)
+	LCD_TRAMPOLINE_LINKER_SECTION(trmp_blk_mq_ops_map_queue)
+	LCD_TRAMPOLINE_LINKER_SECTION(trmp_tag_iter_fn)
+	LCD_TRAMPOLINE_LINKER_SECTION(trmp_blk_mq_ops_exit_hctx)
+	LCD_TRAMPOLINE_LINKER_SECTION(trmp_blk_mq_ops_init_hctx)
+	LCD_TRAMPOLINE_LINKER_SECTION(trmp_blk_mq_ops_init_request)
+	LCD_TRAMPOLINE_LINKER_SECTION(trmp_blk_mq_ops_complete)
+	LCD_TRAMPOLINE_LINKER_SECTION(trmp_pci_error_handlers_error_detected)
+	LCD_TRAMPOLINE_LINKER_SECTION(trmp_pci_error_handlers_resume)
+	LCD_TRAMPOLINE_LINKER_SECTION(trmp_pci_driver_sriov_configure)
+	LCD_TRAMPOLINE_LINKER_SECTION(trmp_blk_mq_ops_poll)
+	LCD_TRAMPOLINE_LINKER_SECTION(trmp_pci_driver_probe)
+	LCD_TRAMPOLINE_LINKER_SECTION(trmp_blk_mq_ops_queue_rq)
+	LCD_TRAMPOLINE_LINKER_SECTION(trmp_pci_driver_remove)
+	LCD_TRAMPOLINE_LINKER_SECTION(trmp_pci_error_handlers_reset_notify)
+	LCD_TRAMPOLINE_LINKER_SECTION(trmp_pci_driver_shutdown)
+	LCD_TRAMPOLINE_LINKER_SECTION(trmp_pci_error_handlers_slot_reset)
+	LCD_TRAMPOLINE_LINKER_SECTION(trmp_blk_mq_ops_timeout)
+	LCD_TRAMPOLINE_LINKER_SECTION(trmp_thread_fn)
+	LCD_TRAMPOLINE_LINKER_SECTION(trmp_handler)
+}
+
+INSERT AFTER .text

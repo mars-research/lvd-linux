@@ -16,6 +16,7 @@
 
 int nvme_init(void);
 void nvme_exit(void);
+struct workqueue_struct* __global_init_var_system_wq(void);
 
 int handle_rpc_calls(struct fipc_message* msg)
 {
@@ -38,6 +39,7 @@ int __module_lcd_init(void)
 
 	glue_user_init();
 
+	system_wq = __global_init_var_system_wq();
 	ret = nvme_init();
 
 	return ret;

@@ -4,7 +4,17 @@
 
 #include <lcd_config/post_hook.h>
 
-struct workqueue_struct* __alloc_workqueue_key(char* fmt, unsigned int flags, int max_active, struct lock_class_key* key, char* lock_name)
+volatile unsigned long jiffies;
+
+unsigned char nvme_io_timeout;
+
+unsigned int nvme_max_retries;
+
+unsigned char admin_timeout;
+
+struct workqueue_struct* system_wq;
+
+struct workqueue_struct* lvd_alloc_workqueue(char const* fmt, unsigned int flags, int max_active)
 {
 	struct fipc_message __buffer = {0};
 	struct fipc_message *__msg = &__buffer;
@@ -12,14 +22,14 @@ struct workqueue_struct* __alloc_workqueue_key(char* fmt, unsigned int flags, in
 	size_t n_pos = 0;
 	size_t* __pos = &n_pos;
 
-	char** fmt_ptr = &fmt;
+	char const** fmt_ptr = &fmt;
 	unsigned int* flags_ptr = &flags;
 	int* max_active_ptr = &max_active;
 	struct workqueue_struct* ret = 0;
 	struct workqueue_struct** ret_ptr = &ret;
 	
-	__maybe_unused const struct __alloc_workqueue_key_call_ctx call_ctx = {fmt, flags, max_active, key, lock_name};
-	__maybe_unused const struct __alloc_workqueue_key_call_ctx *ctx = &call_ctx;
+	__maybe_unused const struct lvd_alloc_workqueue_call_ctx call_ctx = {fmt, flags, max_active};
+	__maybe_unused const struct lvd_alloc_workqueue_call_ctx *ctx = &call_ctx;
 
 	(void)__ext;
 
@@ -29,9 +39,17 @@ struct workqueue_struct* __alloc_workqueue_key(char* fmt, unsigned int flags, in
 
 	{
 		__maybe_unused const void* __adjusted = *fmt_ptr;
-		glue_pack_shadow(__pos, __msg, __ext, __adjusted);
+		glue_pack(__pos, __msg, __ext, __adjusted);
 		if (*fmt_ptr) {
-			glue_pack(__pos, __msg, __ext, **fmt_ptr);
+			size_t i, len;
+			char const* array = *fmt_ptr;
+			for (len = 0; array[len]; ++len);
+			glue_pack(__pos, __msg, __ext, len + 1);
+			for (i = 0; i < len; ++i) {
+				char const* element = &array[i];
+				glue_pack(__pos, __msg, __ext, *element);
+			}
+
 		}
 
 	}
@@ -44,7 +62,7 @@ struct workqueue_struct* __alloc_workqueue_key(char* fmt, unsigned int flags, in
 		glue_pack(__pos, __msg, __ext, *max_active_ptr);
 	}
 
-	glue_call_server(__pos, __msg, RPC_ID___alloc_workqueue_key);
+	glue_call_server(__pos, __msg, RPC_ID_lvd_alloc_workqueue);
 
 	*__pos = 0;
 	{
@@ -58,67 +76,12 @@ struct workqueue_struct* __alloc_workqueue_key(char* fmt, unsigned int flags, in
 	}
 
 	{
-		size_t __size = sizeof(struct workqueue_struct);
+		size_t __size = sizeof(void *);
 		*ret_ptr = glue_unpack_new_shadow(__pos, __msg, __ext, struct workqueue_struct*, (__size), ((DEFAULT_GFP_FLAGS)));
 		if (*ret_ptr) {
-			caller_unmarshal_kernel____alloc_workqueue_key__ret_workqueue_struct__out(__pos, __msg, __ext, ctx, *ret_ptr);
+			caller_unmarshal_kernel__lvd_alloc_workqueue__ret_workqueue_struct__out(__pos, __msg, __ext, ctx, *ret_ptr);
 		}
 
-	}
-
-	if (verbose_debug) {
-		printk("%s:%d, returned!\n", __func__, __LINE__);
-	}
-	return ret;
-}
-
-int __bitmap_weight(unsigned long* bitmap, unsigned int bits)
-{
-	struct fipc_message __buffer = {0};
-	struct fipc_message *__msg = &__buffer;
-	struct ext_registers* __ext = get_register_page(smp_processor_id());
-	size_t n_pos = 0;
-	size_t* __pos = &n_pos;
-
-	unsigned long** bitmap_ptr = &bitmap;
-	unsigned int* bits_ptr = &bits;
-	int ret = 0;
-	int* ret_ptr = &ret;
-	
-	__maybe_unused const struct __bitmap_weight_call_ctx call_ctx = {bitmap, bits};
-	__maybe_unused const struct __bitmap_weight_call_ctx *ctx = &call_ctx;
-
-	(void)__ext;
-
-	if (verbose_debug) {
-		printk("%s:%d, entered!\n", __func__, __LINE__);
-	}
-
-	{
-		__maybe_unused const void* __adjusted = *bitmap_ptr;
-		glue_pack_shadow(__pos, __msg, __ext, __adjusted);
-		if (*bitmap_ptr) {
-			glue_pack(__pos, __msg, __ext, **bitmap_ptr);
-		}
-
-	}
-
-	{
-		glue_pack(__pos, __msg, __ext, *bits_ptr);
-	}
-
-	glue_call_server(__pos, __msg, RPC_ID___bitmap_weight);
-
-	*__pos = 0;
-	{
-		(void)bitmap_ptr;
-	}
-
-	{
-	}
-
-	{
-		*ret_ptr = glue_unpack(__pos, __msg, __ext, int);
 	}
 
 	if (verbose_debug) {
@@ -460,7 +423,7 @@ int blk_mq_alloc_tag_set(struct blk_mq_tag_set* set)
 		__maybe_unused const void* __adjusted = *set_ptr;
 		glue_pack(__pos, __msg, __ext, __adjusted);
 		if (*set_ptr) {
-			caller_marshal_kernel__blk_mq_alloc_tag_set__set__io(__pos, __msg, __ext, ctx, *set_ptr);
+			caller_marshal_kernel__blk_mq_alloc_tag_set__set__in(__pos, __msg, __ext, ctx, *set_ptr);
 		}
 
 	}
@@ -469,9 +432,8 @@ int blk_mq_alloc_tag_set(struct blk_mq_tag_set* set)
 
 	*__pos = 0;
 	{
-		*set_ptr = glue_unpack(__pos, __msg, __ext, struct blk_mq_tag_set*);
 		if (*set_ptr) {
-			caller_unmarshal_kernel__blk_mq_alloc_tag_set__set__io(__pos, __msg, __ext, ctx, *set_ptr);
+			caller_unmarshal_kernel__blk_mq_alloc_tag_set__set__in(__pos, __msg, __ext, ctx, *set_ptr);
 		}
 
 	}
@@ -753,7 +715,8 @@ void blk_mq_ops_map_queue_callee(struct fipc_message* __msg, struct ext_register
 	}
 
 	{
-		*q_ptr = glue_unpack(__pos, __msg, __ext, struct request_queue*);
+		size_t __size = sizeof(struct request_queue);
+		*q_ptr = glue_unpack_bind_or_new_shadow(__pos, __msg, __ext, struct request_queue*, __size);
 		if (*q_ptr) {
 			callee_unmarshal_kernel__blk_mq_ops_map_queue__q__in(__pos, __msg, __ext, ctx, *q_ptr);
 		}
@@ -1215,7 +1178,7 @@ int del_timer_sync(struct timer_list* timer)
 
 	{
 		__maybe_unused const void* __adjusted = *timer_ptr;
-		glue_pack_shadow(__pos, __msg, __ext, __adjusted);
+		glue_pack(__pos, __msg, __ext, __adjusted);
 		if (*timer_ptr) {
 			caller_marshal_kernel__del_timer_sync__timer__in(__pos, __msg, __ext, ctx, *timer_ptr);
 		}
@@ -1351,9 +1314,9 @@ bool flush_work(struct work_struct* work)
 
 	{
 		__maybe_unused const void* __adjusted = *work_ptr;
-		glue_pack_shadow(__pos, __msg, __ext, __adjusted);
+		glue_pack(__pos, __msg, __ext, __adjusted);
 		if (*work_ptr) {
-			caller_marshal_kernel__flush_work__work__io(__pos, __msg, __ext, ctx, *work_ptr);
+			caller_marshal_kernel__flush_work__work__in(__pos, __msg, __ext, ctx, *work_ptr);
 		}
 
 	}
@@ -1362,9 +1325,8 @@ bool flush_work(struct work_struct* work)
 
 	*__pos = 0;
 	{
-		*work_ptr = glue_unpack_shadow(__pos, __msg, __ext, struct work_struct*);
 		if (*work_ptr) {
-			caller_unmarshal_kernel__flush_work__work__io(__pos, __msg, __ext, ctx, *work_ptr);
+			caller_unmarshal_kernel__flush_work__work__in(__pos, __msg, __ext, ctx, *work_ptr);
 		}
 
 	}
@@ -1426,6 +1388,38 @@ void free_irq(unsigned int irq, void* dev_id)
 	}
 }
 
+void timer_func_callee(struct fipc_message* __msg, struct ext_registers* __ext)
+{
+	size_t n_pos = 0;
+	size_t* __pos = &n_pos;
+
+	fptr_timer_func function_ptr = glue_unpack(__pos, __msg, __ext, fptr_timer_func);
+	unsigned long data = 0;
+	unsigned long* data_ptr = &data;
+	
+	__maybe_unused struct timer_func_call_ctx call_ctx = {data};
+	__maybe_unused struct timer_func_call_ctx *ctx = &call_ctx;
+
+	if (verbose_debug) {
+		printk("%s:%d, entered!\n", __func__, __LINE__);
+	}
+
+	{
+		*data_ptr = glue_unpack(__pos, __msg, __ext, unsigned long);
+	}
+
+	function_ptr(data);
+
+	*__pos = 0;
+	{
+	}
+
+	__msg->regs[0] = *__pos;
+	if (verbose_debug) {
+		printk("%s:%d, returned!\n", __func__, __LINE__);
+	}
+}
+
 struct device* get_device(struct device* dev)
 {
 	struct fipc_message __buffer = {0};
@@ -1435,8 +1429,8 @@ struct device* get_device(struct device* dev)
 	size_t* __pos = &n_pos;
 
 	struct device** dev_ptr = &dev;
-	struct device* ret = 0;
-	struct device** ret_ptr = &ret;
+	struct device* ret = dev;
+	//struct device** ret_ptr = &ret;
 	
 	__maybe_unused const struct get_device_call_ctx call_ctx = {dev};
 	__maybe_unused const struct get_device_call_ctx *ctx = &call_ctx;
@@ -1467,11 +1461,6 @@ struct device* get_device(struct device* dev)
 	}
 
 	{
-		*ret_ptr = glue_unpack_shadow(__pos, __msg, __ext, struct device*);
-		if (*ret_ptr) {
-			caller_unmarshal_kernel__get_device__ret_device__out(__pos, __msg, __ext, ctx, *ret_ptr);
-		}
-
 	}
 
 	if (verbose_debug) {
@@ -1480,7 +1469,7 @@ struct device* get_device(struct device* dev)
 	return ret;
 }
 
-void init_timer_key(struct timer_list* timer, unsigned int flags, char* name, struct lock_class_key* key)
+void lvd_setup_timer(struct timer_list* timer, fptr_timer_func func, unsigned long data)
 {
 	struct fipc_message __buffer = {0};
 	struct fipc_message *__msg = &__buffer;
@@ -1489,12 +1478,11 @@ void init_timer_key(struct timer_list* timer, unsigned int flags, char* name, st
 	size_t* __pos = &n_pos;
 
 	struct timer_list** timer_ptr = &timer;
-	unsigned int* flags_ptr = &flags;
-	char** name_ptr = &name;
-	struct lock_class_key** key_ptr = &key;
+	fptr_timer_func* func_ptr = &func;
+	unsigned long* data_ptr = &data;
 	
-	__maybe_unused const struct init_timer_key_call_ctx call_ctx = {timer, flags, name, key};
-	__maybe_unused const struct init_timer_key_call_ctx *ctx = &call_ctx;
+	__maybe_unused const struct lvd_setup_timer_call_ctx call_ctx = {timer, func, data};
+	__maybe_unused const struct lvd_setup_timer_call_ctx *ctx = &call_ctx;
 
 	(void)__ext;
 
@@ -1504,41 +1492,28 @@ void init_timer_key(struct timer_list* timer, unsigned int flags, char* name, st
 
 	{
 		__maybe_unused const void* __adjusted = *timer_ptr;
-		glue_pack_shadow(__pos, __msg, __ext, __adjusted);
+		glue_pack(__pos, __msg, __ext, __adjusted);
 		if (*timer_ptr) {
-			caller_marshal_kernel__init_timer_key__timer__in(__pos, __msg, __ext, ctx, *timer_ptr);
+			caller_marshal_kernel__lvd_setup_timer__timer__io(__pos, __msg, __ext, ctx, *timer_ptr);
 		}
 
 	}
 
 	{
-		glue_pack(__pos, __msg, __ext, *flags_ptr);
+		glue_pack(__pos, __msg, __ext, *func_ptr);
 	}
 
 	{
-		__maybe_unused const void* __adjusted = *name_ptr;
-		glue_pack_shadow(__pos, __msg, __ext, __adjusted);
-		if (*name_ptr) {
-			glue_pack(__pos, __msg, __ext, **name_ptr);
-		}
-
+		glue_pack(__pos, __msg, __ext, *data_ptr);
 	}
 
-	{
-		__maybe_unused const void* __adjusted = *key_ptr;
-		glue_pack_shadow(__pos, __msg, __ext, __adjusted);
-		if (*key_ptr) {
-			caller_marshal_kernel__init_timer_key__key__in(__pos, __msg, __ext, ctx, *key_ptr);
-		}
-
-	}
-
-	glue_call_server(__pos, __msg, RPC_ID_init_timer_key);
+	glue_call_server(__pos, __msg, RPC_ID_lvd_setup_timer);
 
 	*__pos = 0;
 	{
+		*timer_ptr = glue_unpack(__pos, __msg, __ext, struct timer_list*);
 		if (*timer_ptr) {
-			caller_unmarshal_kernel__init_timer_key__timer__in(__pos, __msg, __ext, ctx, *timer_ptr);
+			caller_unmarshal_kernel__lvd_setup_timer__timer__io(__pos, __msg, __ext, ctx, *timer_ptr);
 		}
 
 	}
@@ -1547,14 +1522,57 @@ void init_timer_key(struct timer_list* timer, unsigned int flags, char* name, st
 	}
 
 	{
-		(void)name_ptr;
+	}
+
+	if (verbose_debug) {
+		printk("%s:%d, returned!\n", __func__, __LINE__);
+	}
+}
+
+void lvd_init_work(struct work_struct* work, fptr_work_fn work_fn)
+{
+	struct fipc_message __buffer = {0};
+	struct fipc_message *__msg = &__buffer;
+	struct ext_registers* __ext = get_register_page(smp_processor_id());
+	size_t n_pos = 0;
+	size_t* __pos = &n_pos;
+
+	struct work_struct** work_ptr = &work;
+	fptr_work_fn* work_fn_ptr = &work_fn;
+	
+	__maybe_unused const struct lvd_init_work_call_ctx call_ctx = {work, work_fn};
+	__maybe_unused const struct lvd_init_work_call_ctx *ctx = &call_ctx;
+
+	(void)__ext;
+
+	if (verbose_debug) {
+		printk("%s:%d, entered!\n", __func__, __LINE__);
 	}
 
 	{
-		if (*key_ptr) {
-			caller_unmarshal_kernel__init_timer_key__key__in(__pos, __msg, __ext, ctx, *key_ptr);
+		__maybe_unused const void* __adjusted = *work_ptr;
+		glue_pack(__pos, __msg, __ext, __adjusted);
+		if (*work_ptr) {
+			caller_marshal_kernel__lvd_init_work__work__in(__pos, __msg, __ext, ctx, *work_ptr);
 		}
 
+	}
+
+	{
+		glue_pack(__pos, __msg, __ext, *work_fn_ptr);
+	}
+
+	glue_call_server(__pos, __msg, RPC_ID_lvd_init_work);
+
+	*__pos = 0;
+	{
+		if (*work_ptr) {
+			caller_unmarshal_kernel__lvd_init_work__work__in(__pos, __msg, __ext, ctx, *work_ptr);
+		}
+
+	}
+
+	{
 	}
 
 	if (verbose_debug) {
@@ -1604,16 +1622,9 @@ void* ioremap_nocache(unsigned long long phys_addr, unsigned long size)
 
 	*__pos = 0;
 	{
-		int __ret;
 		ioremap_len = glue_unpack(__pos, __msg, __ext, uint64_t);
-		__ret = lcd_ioremap_phys(ioremap_cptr, ioremap_len, &ioremap_gpa);
-		if (__ret) {
-			LIBLCD_ERR("failed to remap bar region");
-		}
+		lcd_ioremap_phys(ioremap_cptr, ioremap_len, &ioremap_gpa);
 		*ret_ptr = lcd_ioremap(gpa_val(ioremap_gpa), ioremap_len);
-		if (!*ret_ptr) {
-			LIBLCD_ERR("failed to ioremap virt");
-		}
 	}
 
 	{
@@ -1628,7 +1639,7 @@ void* ioremap_nocache(unsigned long long phys_addr, unsigned long size)
 	return ret;
 }
 
-int irq_set_affinity_hint(unsigned int irq, struct cpumask* m)
+int irq_set_affinity_hint(unsigned int irq, struct cpumask const* m)
 {
 	struct fipc_message __buffer = {0};
 	struct fipc_message *__msg = &__buffer;
@@ -1637,7 +1648,7 @@ int irq_set_affinity_hint(unsigned int irq, struct cpumask* m)
 	size_t* __pos = &n_pos;
 
 	unsigned int* irq_ptr = &irq;
-	struct cpumask** m_ptr = &m;
+	struct cpumask const** m_ptr = &m;
 	int ret = 0;
 	int* ret_ptr = &ret;
 	
@@ -1671,7 +1682,8 @@ int irq_set_affinity_hint(unsigned int irq, struct cpumask* m)
 
 	{
 		if (*m_ptr) {
-			caller_unmarshal_kernel__irq_set_affinity_hint__m__in(__pos, __msg, __ext, ctx, *m_ptr);
+			struct cpumask* writable = (struct cpumask*)*m_ptr;
+			caller_unmarshal_kernel__irq_set_affinity_hint__m__in(__pos, __msg, __ext, ctx, writable);
 		}
 
 	}
@@ -1710,9 +1722,9 @@ int mod_timer(struct timer_list* timer, unsigned long expires)
 
 	{
 		__maybe_unused const void* __adjusted = *timer_ptr;
-		glue_pack_shadow(__pos, __msg, __ext, __adjusted);
+		glue_pack(__pos, __msg, __ext, __adjusted);
 		if (*timer_ptr) {
-			caller_marshal_kernel__mod_timer__timer__io(__pos, __msg, __ext, ctx, *timer_ptr);
+			caller_marshal_kernel__mod_timer__timer__in(__pos, __msg, __ext, ctx, *timer_ptr);
 		}
 
 	}
@@ -1725,9 +1737,8 @@ int mod_timer(struct timer_list* timer, unsigned long expires)
 
 	*__pos = 0;
 	{
-		*timer_ptr = glue_unpack_shadow(__pos, __msg, __ext, struct timer_list*);
 		if (*timer_ptr) {
-			caller_unmarshal_kernel__mod_timer__timer__io(__pos, __msg, __ext, ctx, *timer_ptr);
+			caller_unmarshal_kernel__mod_timer__timer__in(__pos, __msg, __ext, ctx, *timer_ptr);
 		}
 
 	}
@@ -1805,20 +1816,20 @@ void blk_mq_ops_init_hctx_callee(struct fipc_message* __msg, struct ext_register
 	__maybe_unused struct blk_mq_ops_init_hctx_call_ctx *ctx = &call_ctx;
 
 	if (verbose_debug) {
-		printk("%s:%d, entered!\n", __func__, __LINE__);
+		//printk("%s:%d, entered!\n", __func__, __LINE__);
 	}
 
 	{
 		size_t __size = sizeof(struct blk_mq_hw_ctx);
 		*hctx_ptr = glue_unpack_new_shadow(__pos, __msg, __ext, struct blk_mq_hw_ctx*, (__size), (DEFAULT_GFP_FLAGS));
 		if (*hctx_ptr) {
-			callee_unmarshal_kernel__blk_mq_ops_init_hctx__hctx__io(__pos, __msg, __ext, ctx, *hctx_ptr);
+			callee_unmarshal_kernel__blk_mq_ops_init_hctx__hctx__in(__pos, __msg, __ext, ctx, *hctx_ptr);
 		}
 
 	}
 
 	{
-		*data_ptr = glue_unpack_shadow(__pos, __msg, __ext, void*);
+		*data_ptr = glue_unpack(__pos, __msg, __ext, void*);
 		if (*data_ptr) {
 		}
 
@@ -1832,10 +1843,8 @@ void blk_mq_ops_init_hctx_callee(struct fipc_message* __msg, struct ext_register
 
 	*__pos = 0;
 	{
-		__maybe_unused const void* __adjusted = *hctx_ptr;
-		glue_pack(__pos, __msg, __ext, __adjusted);
 		if (*hctx_ptr) {
-			callee_marshal_kernel__blk_mq_ops_init_hctx__hctx__io(__pos, __msg, __ext, ctx, *hctx_ptr);
+			callee_marshal_kernel__blk_mq_ops_init_hctx__hctx__in(__pos, __msg, __ext, ctx, *hctx_ptr);
 		}
 
 	}
@@ -1853,7 +1862,7 @@ void blk_mq_ops_init_hctx_callee(struct fipc_message* __msg, struct ext_register
 
 	__msg->regs[0] = *__pos;
 	if (verbose_debug) {
-		printk("%s:%d, returned!\n", __func__, __LINE__);
+		//printk("%s:%d, returned!\n", __func__, __LINE__);
 	}
 }
 
@@ -1877,7 +1886,7 @@ void blk_mq_ops_init_request_callee(struct fipc_message* __msg, struct ext_regis
 	__maybe_unused struct blk_mq_ops_init_request_call_ctx *ctx = &call_ctx;
 
 	if (verbose_debug) {
-		printk("%s:%d, entered!\n", __func__, __LINE__);
+		//printk("%s:%d, entered!\n", __func__, __LINE__);
 	}
 
 	{
@@ -1888,7 +1897,7 @@ void blk_mq_ops_init_request_callee(struct fipc_message* __msg, struct ext_regis
 	}
 
 	{
-		size_t __size = sizeof(struct request) + nvme_cmd_size((struct nvme_dev*)data);
+		size_t __size = sizeof(struct request);
 		*req_ptr = glue_unpack_new_shadow(__pos, __msg, __ext, struct request*, (__size), (DEFAULT_GFP_FLAGS));
 		if (*req_ptr) {
 			callee_unmarshal_kernel__blk_mq_ops_init_request__req__in(__pos, __msg, __ext, ctx, *req_ptr);
@@ -1916,7 +1925,7 @@ void blk_mq_ops_init_request_callee(struct fipc_message* __msg, struct ext_regis
 
 	__msg->regs[0] = *__pos;
 	if (verbose_debug) {
-		printk("%s:%d, returned!\n", __func__, __LINE__);
+		//printk("%s:%d, returned!\n", __func__, __LINE__);
 	}
 }
 
@@ -1955,6 +1964,10 @@ struct request* nvme_alloc_request(struct request_queue* q, struct nvme_command*
 
 	{
 		__maybe_unused const void* __adjusted = *cmd_ptr;
+		if (*cmd_ptr) {
+			caller_marshal_kernel__nvme_alloc_request__cmd__io(__pos, __msg, __ext, ctx, *cmd_ptr);
+		}
+
 	}
 
 	{
@@ -1976,7 +1989,6 @@ struct request* nvme_alloc_request(struct request_queue* q, struct nvme_command*
 	}
 
 	{
-		*cmd_ptr = glue_unpack(__pos, __msg, __ext, struct nvme_command*);
 		if (*cmd_ptr) {
 			caller_unmarshal_kernel__nvme_alloc_request__cmd__io(__pos, __msg, __ext, ctx, *cmd_ptr);
 		}
@@ -2071,7 +2083,7 @@ bool nvme_change_ctrl_state(struct nvme_ctrl* ctrl, unsigned int new_state)
 
 	{
 		__maybe_unused const void* __adjusted = *ctrl_ptr;
-		glue_pack_shadow(__pos, __msg, __ext, __adjusted);
+		glue_pack(__pos, __msg, __ext, __adjusted);
 		if (*ctrl_ptr) {
 			caller_marshal_kernel__nvme_change_ctrl_state__ctrl__in(__pos, __msg, __ext, ctx, *ctrl_ptr);
 		}
@@ -2136,6 +2148,10 @@ void nvme_complete_async_event(struct nvme_ctrl* ctrl, struct nvme_completion* c
 
 	{
 		__maybe_unused const void* __adjusted = *cqe_ptr;
+		if (*cqe_ptr) {
+			caller_marshal_kernel__nvme_complete_async_event__cqe__in(__pos, __msg, __ext, ctx, *cqe_ptr);
+		}
+
 	}
 
 	glue_call_server(__pos, __msg, RPC_ID_nvme_complete_async_event);
@@ -2461,7 +2477,384 @@ void pci_error_handlers_resume_callee(struct fipc_message* __msg, struct ext_reg
 	}
 }
 
-int nvme_init_ctrl(struct nvme_ctrl* ctrl, struct device* dev, struct nvme_ctrl_ops* ops, unsigned long quirks)
+void reg_read32_callee(struct fipc_message* __msg, struct ext_registers* __ext)
+{
+	size_t n_pos = 0;
+	size_t* __pos = &n_pos;
+
+	fptr_reg_read32 function_ptr = glue_unpack(__pos, __msg, __ext, fptr_reg_read32);
+	struct nvme_ctrl* ctrl = 0;
+	unsigned int off = 0;
+	struct nvme_ctrl** ctrl_ptr = &ctrl;
+	unsigned int* off_ptr = &off;
+	unsigned int __val;
+	unsigned int* val = &__val;
+	unsigned int** val_ptr = &val;
+	int ret = 0;
+	int* ret_ptr = &ret;
+	
+	__maybe_unused struct reg_read32_call_ctx call_ctx = {ctrl, off, val};
+	__maybe_unused struct reg_read32_call_ctx *ctx = &call_ctx;
+
+	if (verbose_debug) {
+		printk("%s:%d, entered!\n", __func__, __LINE__);
+	}
+
+	{
+		*ctrl_ptr = glue_unpack(__pos, __msg, __ext, struct nvme_ctrl*);
+		if (*ctrl_ptr) {
+			callee_unmarshal_kernel__reg_read32__nvme_ctrl__in(__pos, __msg, __ext, ctx, *ctrl_ptr);
+		}
+
+	}
+
+	{
+		*off_ptr = glue_unpack(__pos, __msg, __ext, unsigned int);
+	}
+
+	{
+		(void)val_ptr;
+	}
+
+	ret = function_ptr(ctrl, off, val);
+
+	*__pos = 0;
+	{
+		if (*ctrl_ptr) {
+			callee_marshal_kernel__reg_read32__nvme_ctrl__in(__pos, __msg, __ext, ctx, *ctrl_ptr);
+		}
+
+	}
+
+	{
+	}
+
+	{
+		if (*val_ptr) {
+			glue_pack(__pos, __msg, __ext, **val_ptr);
+		}
+
+	}
+
+	{
+		glue_pack(__pos, __msg, __ext, *ret_ptr);
+	}
+
+	__msg->regs[0] = *__pos;
+	if (verbose_debug) {
+		printk("%s:%d, returned!\n", __func__, __LINE__);
+	}
+}
+
+void reg_write32_callee(struct fipc_message* __msg, struct ext_registers* __ext)
+{
+	size_t n_pos = 0;
+	size_t* __pos = &n_pos;
+
+	fptr_reg_write32 function_ptr = glue_unpack(__pos, __msg, __ext, fptr_reg_write32);
+	struct nvme_ctrl* ctrl = 0;
+	unsigned int off = 0;
+	unsigned int val = 0;
+	struct nvme_ctrl** ctrl_ptr = &ctrl;
+	unsigned int* off_ptr = &off;
+	unsigned int* val_ptr = &val;
+	int ret = 0;
+	int* ret_ptr = &ret;
+	
+	__maybe_unused struct reg_write32_call_ctx call_ctx = {ctrl, off, val};
+	__maybe_unused struct reg_write32_call_ctx *ctx = &call_ctx;
+
+	if (verbose_debug) {
+		printk("%s:%d, entered!\n", __func__, __LINE__);
+	}
+
+	{
+		*ctrl_ptr = glue_unpack(__pos, __msg, __ext, struct nvme_ctrl*);
+		if (*ctrl_ptr) {
+			callee_unmarshal_kernel__reg_write32__nvme_ctrl__in(__pos, __msg, __ext, ctx, *ctrl_ptr);
+		}
+
+	}
+
+	{
+		*off_ptr = glue_unpack(__pos, __msg, __ext, unsigned int);
+	}
+
+	{
+		*val_ptr = glue_unpack(__pos, __msg, __ext, unsigned int);
+	}
+
+	ret = function_ptr(ctrl, off, val);
+
+	*__pos = 0;
+	{
+		if (*ctrl_ptr) {
+			callee_marshal_kernel__reg_write32__nvme_ctrl__in(__pos, __msg, __ext, ctx, *ctrl_ptr);
+		}
+
+	}
+
+	{
+	}
+
+	{
+	}
+
+	{
+		glue_pack(__pos, __msg, __ext, *ret_ptr);
+	}
+
+	__msg->regs[0] = *__pos;
+	if (verbose_debug) {
+		printk("%s:%d, returned!\n", __func__, __LINE__);
+	}
+}
+
+void reg_read64_callee(struct fipc_message* __msg, struct ext_registers* __ext)
+{
+	size_t n_pos = 0;
+	size_t* __pos = &n_pos;
+
+	fptr_reg_read64 function_ptr = glue_unpack(__pos, __msg, __ext, fptr_reg_read64);
+	struct nvme_ctrl* ctrl = 0;
+	unsigned int off = 0;
+	struct nvme_ctrl** ctrl_ptr = &ctrl;
+	unsigned int* off_ptr = &off;
+	unsigned long long __val;
+	unsigned long long* val = &__val;
+	unsigned long long** val_ptr = &val;
+	int ret = 0;
+	int* ret_ptr = &ret;
+	
+	__maybe_unused struct reg_read64_call_ctx call_ctx = {ctrl, off, val};
+	__maybe_unused struct reg_read64_call_ctx *ctx = &call_ctx;
+
+	if (verbose_debug) {
+		printk("%s:%d, entered!\n", __func__, __LINE__);
+	}
+
+	{
+		*ctrl_ptr = glue_unpack(__pos, __msg, __ext, struct nvme_ctrl*);
+		if (*ctrl_ptr) {
+			callee_unmarshal_kernel__reg_read64__nvme_ctrl__in(__pos, __msg, __ext, ctx, *ctrl_ptr);
+		}
+
+	}
+
+	{
+		*off_ptr = glue_unpack(__pos, __msg, __ext, unsigned int);
+	}
+
+	{
+		(void)val_ptr;
+	}
+
+	ret = function_ptr(ctrl, off, val);
+
+	*__pos = 0;
+	{
+		if (*ctrl_ptr) {
+			callee_marshal_kernel__reg_read64__nvme_ctrl__in(__pos, __msg, __ext, ctx, *ctrl_ptr);
+		}
+
+	}
+
+	{
+	}
+
+	{
+		if (*val_ptr) {
+			glue_pack(__pos, __msg, __ext, **val_ptr);
+		}
+
+	}
+
+	{
+		glue_pack(__pos, __msg, __ext, *ret_ptr);
+	}
+
+	__msg->regs[0] = *__pos;
+	if (verbose_debug) {
+		printk("%s:%d, returned!\n", __func__, __LINE__);
+	}
+}
+
+void reset_ctrl_callee(struct fipc_message* __msg, struct ext_registers* __ext)
+{
+	size_t n_pos = 0;
+	size_t* __pos = &n_pos;
+
+	fptr_reset_ctrl function_ptr = glue_unpack(__pos, __msg, __ext, fptr_reset_ctrl);
+	struct nvme_ctrl* ctrl = 0;
+	struct nvme_ctrl** ctrl_ptr = &ctrl;
+	int ret = 0;
+	int* ret_ptr = &ret;
+	
+	__maybe_unused struct reset_ctrl_call_ctx call_ctx = {ctrl};
+	__maybe_unused struct reset_ctrl_call_ctx *ctx = &call_ctx;
+
+	if (verbose_debug) {
+		printk("%s:%d, entered!\n", __func__, __LINE__);
+	}
+
+	{
+		*ctrl_ptr = glue_unpack(__pos, __msg, __ext, struct nvme_ctrl*);
+		if (*ctrl_ptr) {
+			callee_unmarshal_kernel__reset_ctrl__nvme_ctrl__in(__pos, __msg, __ext, ctx, *ctrl_ptr);
+		}
+
+	}
+
+	ret = function_ptr(ctrl);
+
+	*__pos = 0;
+	{
+		if (*ctrl_ptr) {
+			callee_marshal_kernel__reset_ctrl__nvme_ctrl__in(__pos, __msg, __ext, ctx, *ctrl_ptr);
+		}
+
+	}
+
+	{
+		glue_pack(__pos, __msg, __ext, *ret_ptr);
+	}
+
+	__msg->regs[0] = *__pos;
+	if (verbose_debug) {
+		printk("%s:%d, returned!\n", __func__, __LINE__);
+	}
+}
+
+void free_ctrl_callee(struct fipc_message* __msg, struct ext_registers* __ext)
+{
+	size_t n_pos = 0;
+	size_t* __pos = &n_pos;
+
+	fptr_free_ctrl function_ptr = glue_unpack(__pos, __msg, __ext, fptr_free_ctrl);
+	struct nvme_ctrl* ctrl = 0;
+	struct nvme_ctrl** ctrl_ptr = &ctrl;
+	
+	__maybe_unused struct free_ctrl_call_ctx call_ctx = {ctrl};
+	__maybe_unused struct free_ctrl_call_ctx *ctx = &call_ctx;
+
+	if (verbose_debug) {
+		printk("%s:%d, entered!\n", __func__, __LINE__);
+	}
+
+	{
+		*ctrl_ptr = glue_unpack(__pos, __msg, __ext, struct nvme_ctrl*);
+		if (*ctrl_ptr) {
+			callee_unmarshal_kernel__free_ctrl__nvme_ctrl__in(__pos, __msg, __ext, ctx, *ctrl_ptr);
+		}
+
+	}
+
+	function_ptr(ctrl);
+
+	*__pos = 0;
+	{
+		if (*ctrl_ptr) {
+			callee_marshal_kernel__free_ctrl__nvme_ctrl__in(__pos, __msg, __ext, ctx, *ctrl_ptr);
+		}
+
+	}
+
+	__msg->regs[0] = *__pos;
+	if (verbose_debug) {
+		printk("%s:%d, returned!\n", __func__, __LINE__);
+	}
+}
+
+void post_scan_callee(struct fipc_message* __msg, struct ext_registers* __ext)
+{
+	size_t n_pos = 0;
+	size_t* __pos = &n_pos;
+
+	fptr_post_scan function_ptr = glue_unpack(__pos, __msg, __ext, fptr_post_scan);
+	struct nvme_ctrl* ctrl = 0;
+	struct nvme_ctrl** ctrl_ptr = &ctrl;
+	
+	__maybe_unused struct post_scan_call_ctx call_ctx = {ctrl};
+	__maybe_unused struct post_scan_call_ctx *ctx = &call_ctx;
+
+	if (verbose_debug) {
+		printk("%s:%d, entered!\n", __func__, __LINE__);
+	}
+
+	{
+		*ctrl_ptr = glue_unpack(__pos, __msg, __ext, struct nvme_ctrl*);
+		if (*ctrl_ptr) {
+			callee_unmarshal_kernel__post_scan__nvme_ctrl__in(__pos, __msg, __ext, ctx, *ctrl_ptr);
+		}
+
+	}
+
+	function_ptr(ctrl);
+
+	*__pos = 0;
+	{
+		if (*ctrl_ptr) {
+			callee_marshal_kernel__post_scan__nvme_ctrl__in(__pos, __msg, __ext, ctx, *ctrl_ptr);
+		}
+
+	}
+
+	__msg->regs[0] = *__pos;
+	if (verbose_debug) {
+		printk("%s:%d, returned!\n", __func__, __LINE__);
+	}
+}
+
+void submit_async_event_callee(struct fipc_message* __msg, struct ext_registers* __ext)
+{
+	size_t n_pos = 0;
+	size_t* __pos = &n_pos;
+
+	fptr_submit_async_event function_ptr = glue_unpack(__pos, __msg, __ext, fptr_submit_async_event);
+	struct nvme_ctrl* ctrl = 0;
+	int aer_idx = 0;
+	struct nvme_ctrl** ctrl_ptr = &ctrl;
+	int* aer_idx_ptr = &aer_idx;
+	
+	__maybe_unused struct submit_async_event_call_ctx call_ctx = {ctrl, aer_idx};
+	__maybe_unused struct submit_async_event_call_ctx *ctx = &call_ctx;
+
+	if (verbose_debug) {
+		printk("%s:%d, entered!\n", __func__, __LINE__);
+	}
+
+	{
+		*ctrl_ptr = glue_unpack(__pos, __msg, __ext, struct nvme_ctrl*);
+		if (*ctrl_ptr) {
+			callee_unmarshal_kernel__submit_async_event__nvme_ctrl__in(__pos, __msg, __ext, ctx, *ctrl_ptr);
+		}
+
+	}
+
+	{
+		*aer_idx_ptr = glue_unpack(__pos, __msg, __ext, int);
+	}
+
+	function_ptr(ctrl, aer_idx);
+
+	*__pos = 0;
+	{
+		if (*ctrl_ptr) {
+			callee_marshal_kernel__submit_async_event__nvme_ctrl__in(__pos, __msg, __ext, ctx, *ctrl_ptr);
+		}
+
+	}
+
+	{
+	}
+
+	__msg->regs[0] = *__pos;
+	if (verbose_debug) {
+		printk("%s:%d, returned!\n", __func__, __LINE__);
+	}
+}
+
+int nvme_init_ctrl(struct nvme_ctrl* ctrl, struct device* dev, struct nvme_ctrl_ops const* ops, unsigned long quirks)
 {
 	struct fipc_message __buffer = {0};
 	struct fipc_message *__msg = &__buffer;
@@ -2471,7 +2864,7 @@ int nvme_init_ctrl(struct nvme_ctrl* ctrl, struct device* dev, struct nvme_ctrl_
 
 	struct nvme_ctrl** ctrl_ptr = &ctrl;
 	struct device** dev_ptr = &dev;
-	struct nvme_ctrl_ops** ops_ptr = &ops;
+	struct nvme_ctrl_ops const** ops_ptr = &ops;
 	unsigned long* quirks_ptr = &quirks;
 	int ret = 0;
 	int* ret_ptr = &ret;
@@ -2536,7 +2929,8 @@ int nvme_init_ctrl(struct nvme_ctrl* ctrl, struct device* dev, struct nvme_ctrl_
 
 	{
 		if (*ops_ptr) {
-			caller_unmarshal_kernel__nvme_init_ctrl__ops__in(__pos, __msg, __ext, ctx, *ops_ptr);
+			struct nvme_ctrl_ops* writable = (struct nvme_ctrl_ops*)*ops_ptr;
+			caller_unmarshal_kernel__nvme_init_ctrl__ops__in(__pos, __msg, __ext, ctx, writable);
 		}
 
 	}
@@ -2843,7 +3237,7 @@ void nvme_put_ctrl(struct nvme_ctrl* ctrl)
 
 	{
 		__maybe_unused const void* __adjusted = *ctrl_ptr;
-		glue_pack_shadow(__pos, __msg, __ext, __adjusted);
+		glue_pack(__pos, __msg, __ext, __adjusted);
 		if (*ctrl_ptr) {
 			caller_marshal_kernel__nvme_put_ctrl__ctrl__in(__pos, __msg, __ext, ctx, *ctrl_ptr);
 		}
@@ -2886,7 +3280,7 @@ void nvme_queue_async_events(struct nvme_ctrl* ctrl)
 
 	{
 		__maybe_unused const void* __adjusted = *ctrl_ptr;
-		glue_pack_shadow(__pos, __msg, __ext, __adjusted);
+		glue_pack(__pos, __msg, __ext, __adjusted);
 		if (*ctrl_ptr) {
 			caller_marshal_kernel__nvme_queue_async_events__ctrl__in(__pos, __msg, __ext, ctx, *ctrl_ptr);
 		}
@@ -2915,8 +3309,9 @@ void blk_mq_ops_queue_rq_callee(struct fipc_message* __msg, struct ext_registers
 
 	fptr_blk_mq_ops_queue_rq function_ptr = glue_unpack(__pos, __msg, __ext, fptr_blk_mq_ops_queue_rq);
 	struct blk_mq_hw_ctx* hctx = 0;
-	struct blk_mq_queue_data* bd = 0;
 	struct blk_mq_hw_ctx** hctx_ptr = &hctx;
+	struct blk_mq_queue_data __bd;
+	struct blk_mq_queue_data* bd = &__bd;
 	struct blk_mq_queue_data** bd_ptr = &bd;
 	int ret = 0;
 	int* ret_ptr = &ret;
@@ -2929,7 +3324,7 @@ void blk_mq_ops_queue_rq_callee(struct fipc_message* __msg, struct ext_registers
 	}
 
 	{
-		*hctx_ptr = glue_unpack(__pos, __msg, __ext, struct blk_mq_hw_ctx*);
+		*hctx_ptr = glue_unpack_shadow(__pos, __msg, __ext, struct blk_mq_hw_ctx*);
 		if (*hctx_ptr) {
 			callee_unmarshal_kernel__blk_mq_ops_queue_rq__hctx__in(__pos, __msg, __ext, ctx, *hctx_ptr);
 		}
@@ -2937,7 +3332,6 @@ void blk_mq_ops_queue_rq_callee(struct fipc_message* __msg, struct ext_registers
 	}
 
 	{
-		*bd_ptr = glue_unpack(__pos, __msg, __ext, struct blk_mq_queue_data*);
 		if (*bd_ptr) {
 			callee_unmarshal_kernel__blk_mq_ops_queue_rq__bd__in(__pos, __msg, __ext, ctx, *bd_ptr);
 		}
@@ -2992,7 +3386,7 @@ void nvme_queue_scan(struct nvme_ctrl* ctrl)
 
 	{
 		__maybe_unused const void* __adjusted = *ctrl_ptr;
-		glue_pack_shadow(__pos, __msg, __ext, __adjusted);
+		glue_pack(__pos, __msg, __ext, __adjusted);
 		if (*ctrl_ptr) {
 			caller_marshal_kernel__nvme_queue_scan__ctrl__in(__pos, __msg, __ext, ctx, *ctrl_ptr);
 		}
@@ -3075,7 +3469,7 @@ void nvme_remove_namespaces(struct nvme_ctrl* ctrl)
 
 	{
 		__maybe_unused const void* __adjusted = *ctrl_ptr;
-		glue_pack_shadow(__pos, __msg, __ext, __adjusted);
+		glue_pack(__pos, __msg, __ext, __adjusted);
 		if (*ctrl_ptr) {
 			caller_marshal_kernel__nvme_remove_namespaces__ctrl__in(__pos, __msg, __ext, ctx, *ctrl_ptr);
 		}
@@ -3222,6 +3616,10 @@ int nvme_set_queue_count(struct nvme_ctrl* ctrl, int* count)
 
 	{
 		__maybe_unused const void* __adjusted = *count_ptr;
+		if (*count_ptr) {
+			glue_pack(__pos, __msg, __ext, **count_ptr);
+		}
+
 	}
 
 	glue_call_server(__pos, __msg, RPC_ID_nvme_set_queue_count);
@@ -3592,6 +3990,10 @@ int nvme_submit_sync_cmd(struct request_queue* q, struct nvme_command* cmd, void
 
 	{
 		__maybe_unused const void* __adjusted = *cmd_ptr;
+		if (*cmd_ptr) {
+			caller_marshal_kernel__nvme_submit_sync_cmd__cmd__in(__pos, __msg, __ext, ctx, *cmd_ptr);
+		}
+
 	}
 
 	{
@@ -4013,7 +4415,7 @@ int pci_enable_msi_range(struct pci_dev* dev, int minvec, int maxvec)
 	return ret;
 }
 
-int pci_enable_msix(struct pci_dev* dev, struct msix_entry* entries, int minvec, int maxvec)
+int pci_enable_msix(struct pci_dev* dev, struct msix_entry* entries, int nvec)
 {
 	struct fipc_message __buffer = {0};
 	struct fipc_message *__msg = &__buffer;
@@ -4023,12 +4425,11 @@ int pci_enable_msix(struct pci_dev* dev, struct msix_entry* entries, int minvec,
 
 	struct pci_dev** dev_ptr = &dev;
 	struct msix_entry** entries_ptr = &entries;
-	int* minvec_ptr = &minvec;
-	int* maxvec_ptr = &maxvec;
+	int* nvec_ptr = &nvec;
 	int ret = 0;
 	int* ret_ptr = &ret;
 	
-	__maybe_unused const struct pci_enable_msix_call_ctx call_ctx = {dev, entries, minvec, maxvec};
+	__maybe_unused const struct pci_enable_msix_call_ctx call_ctx = {dev, entries, nvec};
 	__maybe_unused const struct pci_enable_msix_call_ctx *ctx = &call_ctx;
 
 	(void)__ext;
@@ -4050,7 +4451,7 @@ int pci_enable_msix(struct pci_dev* dev, struct msix_entry* entries, int minvec,
 		__maybe_unused const void* __adjusted = *entries_ptr;
 		glue_pack(__pos, __msg, __ext, __adjusted);
 		if (*entries_ptr) {
-			size_t i, len = (maxvec);
+			size_t i, len = (nvec);
 			struct msix_entry* array = *entries_ptr;
 			glue_pack(__pos, __msg, __ext, len);
 			// Warning: see David if this breaks
@@ -4065,11 +4466,7 @@ int pci_enable_msix(struct pci_dev* dev, struct msix_entry* entries, int minvec,
 	}
 
 	{
-		glue_pack(__pos, __msg, __ext, *minvec_ptr);
-	}
-
-	{
-		glue_pack(__pos, __msg, __ext, *maxvec_ptr);
+		glue_pack(__pos, __msg, __ext, *nvec_ptr);
 	}
 
 	glue_call_server(__pos, __msg, RPC_ID_pci_enable_msix);
@@ -4097,9 +4494,6 @@ int pci_enable_msix(struct pci_dev* dev, struct msix_entry* entries, int minvec,
 
 		}
 
-	}
-
-	{
 	}
 
 	{
@@ -4728,7 +5122,47 @@ void put_device(struct device* dev)
 	}
 }
 
-bool queue_work_on(int cpu, struct workqueue_struct* wq, struct work_struct* work)
+void work_fn_callee(struct fipc_message* __msg, struct ext_registers* __ext)
+{
+	size_t n_pos = 0;
+	size_t* __pos = &n_pos;
+
+	fptr_work_fn function_ptr = glue_unpack(__pos, __msg, __ext, fptr_work_fn);
+	struct work_struct* work = 0;
+	struct work_struct** work_ptr = &work;
+	
+	__maybe_unused struct work_fn_call_ctx call_ctx = {work};
+	__maybe_unused struct work_fn_call_ctx *ctx = &call_ctx;
+
+	if (verbose_debug) {
+		printk("%s:%d, entered!\n", __func__, __LINE__);
+	}
+
+	{
+		*work_ptr = glue_unpack(__pos, __msg, __ext, struct work_struct*);
+		if (*work_ptr) {
+			callee_unmarshal_kernel__work_fn__work__in(__pos, __msg, __ext, ctx, *work_ptr);
+		}
+
+	}
+
+	function_ptr(work);
+
+	*__pos = 0;
+	{
+		if (*work_ptr) {
+			callee_marshal_kernel__work_fn__work__in(__pos, __msg, __ext, ctx, *work_ptr);
+		}
+
+	}
+
+	__msg->regs[0] = *__pos;
+	if (verbose_debug) {
+		printk("%s:%d, returned!\n", __func__, __LINE__);
+	}
+}
+
+bool lvd_queue_work(struct workqueue_struct* wq, struct work_struct* work)
 {
 	struct fipc_message __buffer = {0};
 	struct fipc_message *__msg = &__buffer;
@@ -4736,14 +5170,13 @@ bool queue_work_on(int cpu, struct workqueue_struct* wq, struct work_struct* wor
 	size_t n_pos = 0;
 	size_t* __pos = &n_pos;
 
-	int* cpu_ptr = &cpu;
 	struct workqueue_struct** wq_ptr = &wq;
 	struct work_struct** work_ptr = &work;
 	bool ret = 0;
 	bool* ret_ptr = &ret;
 	
-	__maybe_unused const struct queue_work_on_call_ctx call_ctx = {cpu, wq, work};
-	__maybe_unused const struct queue_work_on_call_ctx *ctx = &call_ctx;
+	__maybe_unused const struct lvd_queue_work_call_ctx call_ctx = {wq, work};
+	__maybe_unused const struct lvd_queue_work_call_ctx *ctx = &call_ctx;
 
 	(void)__ext;
 
@@ -4752,44 +5185,36 @@ bool queue_work_on(int cpu, struct workqueue_struct* wq, struct work_struct* wor
 	}
 
 	{
-		glue_pack(__pos, __msg, __ext, *cpu_ptr);
-	}
-
-	{
 		__maybe_unused const void* __adjusted = *wq_ptr;
 		glue_pack_shadow(__pos, __msg, __ext, __adjusted);
 		if (*wq_ptr) {
-			caller_marshal_kernel__queue_work_on__wq__in(__pos, __msg, __ext, ctx, *wq_ptr);
+			caller_marshal_kernel__lvd_queue_work__wq__in(__pos, __msg, __ext, ctx, *wq_ptr);
 		}
 
 	}
 
 	{
 		__maybe_unused const void* __adjusted = *work_ptr;
-		glue_pack_shadow(__pos, __msg, __ext, __adjusted);
+		glue_pack(__pos, __msg, __ext, __adjusted);
 		if (*work_ptr) {
-			caller_marshal_kernel__queue_work_on__work__io(__pos, __msg, __ext, ctx, *work_ptr);
+			caller_marshal_kernel__lvd_queue_work__work__in(__pos, __msg, __ext, ctx, *work_ptr);
 		}
 
 	}
 
-	glue_call_server(__pos, __msg, RPC_ID_queue_work_on);
+	glue_call_server(__pos, __msg, RPC_ID_lvd_queue_work);
 
 	*__pos = 0;
 	{
-	}
-
-	{
 		if (*wq_ptr) {
-			caller_unmarshal_kernel__queue_work_on__wq__in(__pos, __msg, __ext, ctx, *wq_ptr);
+			caller_unmarshal_kernel__lvd_queue_work__wq__in(__pos, __msg, __ext, ctx, *wq_ptr);
 		}
 
 	}
 
 	{
-		*work_ptr = glue_unpack_shadow(__pos, __msg, __ext, struct work_struct*);
 		if (*work_ptr) {
-			caller_unmarshal_kernel__queue_work_on__work__io(__pos, __msg, __ext, ctx, *work_ptr);
+			caller_unmarshal_kernel__lvd_queue_work__work__in(__pos, __msg, __ext, ctx, *work_ptr);
 		}
 
 	}
@@ -5098,7 +5523,7 @@ unsigned int work_busy(struct work_struct* work)
 
 	{
 		__maybe_unused const void* __adjusted = *work_ptr;
-		glue_pack_shadow(__pos, __msg, __ext, __adjusted);
+		glue_pack(__pos, __msg, __ext, __adjusted);
 		if (*work_ptr) {
 			caller_marshal_kernel__work_busy__work__in(__pos, __msg, __ext, ctx, *work_ptr);
 		}
@@ -5174,11 +5599,178 @@ struct blk_mq_hw_ctx* blk_mq_map_queue(struct request_queue* q, int cpu)
 	}
 
 	{
-		*ret_ptr = glue_unpack(__pos, __msg, __ext, struct blk_mq_hw_ctx*);
+		*ret_ptr = glue_unpack_shadow(__pos, __msg, __ext, struct blk_mq_hw_ctx*);
 		if (*ret_ptr) {
 			caller_unmarshal_kernel__blk_mq_map_queue__ret_blk_mq_hw_ctx__out(__pos, __msg, __ext, ctx, *ret_ptr);
 		}
 
+	}
+
+	if (verbose_debug) {
+		printk("%s:%d, returned!\n", __func__, __LINE__);
+	}
+	return ret;
+}
+
+unsigned long __global_init_var_jiffies(void)
+{
+	struct fipc_message __buffer = {0};
+	struct fipc_message *__msg = &__buffer;
+	struct ext_registers* __ext = get_register_page(smp_processor_id());
+	size_t n_pos = 0;
+	size_t* __pos = &n_pos;
+
+	unsigned long ret = 0;
+	unsigned long* ret_ptr = &ret;
+	
+	__maybe_unused const struct __global_init_var_jiffies_call_ctx call_ctx = {};
+	__maybe_unused const struct __global_init_var_jiffies_call_ctx *ctx = &call_ctx;
+
+	(void)__ext;
+
+	if (verbose_debug) {
+		printk("%s:%d, entered!\n", __func__, __LINE__);
+	}
+
+	glue_call_server(__pos, __msg, RPC_ID___global_init_var_jiffies);
+
+	*__pos = 0;
+	{
+		*ret_ptr = glue_unpack(__pos, __msg, __ext, unsigned long);
+	}
+
+	if (verbose_debug) {
+		printk("%s:%d, returned!\n", __func__, __LINE__);
+	}
+	return ret;
+}
+
+unsigned char __global_init_var_nvme_io_timeout(void)
+{
+	struct fipc_message __buffer = {0};
+	struct fipc_message *__msg = &__buffer;
+	struct ext_registers* __ext = get_register_page(smp_processor_id());
+	size_t n_pos = 0;
+	size_t* __pos = &n_pos;
+
+	unsigned char ret = 0;
+	unsigned char* ret_ptr = &ret;
+	
+	__maybe_unused const struct __global_init_var_nvme_io_timeout_call_ctx call_ctx = {};
+	__maybe_unused const struct __global_init_var_nvme_io_timeout_call_ctx *ctx = &call_ctx;
+
+	(void)__ext;
+
+	if (verbose_debug) {
+		printk("%s:%d, entered!\n", __func__, __LINE__);
+	}
+
+	glue_call_server(__pos, __msg, RPC_ID___global_init_var_nvme_io_timeout);
+
+	*__pos = 0;
+	{
+		*ret_ptr = glue_unpack(__pos, __msg, __ext, unsigned char);
+	}
+
+	if (verbose_debug) {
+		printk("%s:%d, returned!\n", __func__, __LINE__);
+	}
+	return ret;
+}
+
+unsigned int __global_init_var_nvme_max_retries(void)
+{
+	struct fipc_message __buffer = {0};
+	struct fipc_message *__msg = &__buffer;
+	struct ext_registers* __ext = get_register_page(smp_processor_id());
+	size_t n_pos = 0;
+	size_t* __pos = &n_pos;
+
+	unsigned int ret = 0;
+	unsigned int* ret_ptr = &ret;
+	
+	__maybe_unused const struct __global_init_var_nvme_max_retries_call_ctx call_ctx = {};
+	__maybe_unused const struct __global_init_var_nvme_max_retries_call_ctx *ctx = &call_ctx;
+
+	(void)__ext;
+
+	if (verbose_debug) {
+		printk("%s:%d, entered!\n", __func__, __LINE__);
+	}
+
+	glue_call_server(__pos, __msg, RPC_ID___global_init_var_nvme_max_retries);
+
+	*__pos = 0;
+	{
+		*ret_ptr = glue_unpack(__pos, __msg, __ext, unsigned int);
+	}
+
+	if (verbose_debug) {
+		printk("%s:%d, returned!\n", __func__, __LINE__);
+	}
+	return ret;
+}
+
+unsigned char __global_init_var_admin_timeout(void)
+{
+	struct fipc_message __buffer = {0};
+	struct fipc_message *__msg = &__buffer;
+	struct ext_registers* __ext = get_register_page(smp_processor_id());
+	size_t n_pos = 0;
+	size_t* __pos = &n_pos;
+
+	unsigned char ret = 0;
+	unsigned char* ret_ptr = &ret;
+	
+	__maybe_unused const struct __global_init_var_admin_timeout_call_ctx call_ctx = {};
+	__maybe_unused const struct __global_init_var_admin_timeout_call_ctx *ctx = &call_ctx;
+
+	(void)__ext;
+
+	if (verbose_debug) {
+		printk("%s:%d, entered!\n", __func__, __LINE__);
+	}
+
+	glue_call_server(__pos, __msg, RPC_ID___global_init_var_admin_timeout);
+
+	*__pos = 0;
+	{
+		*ret_ptr = glue_unpack(__pos, __msg, __ext, unsigned char);
+	}
+
+	if (verbose_debug) {
+		printk("%s:%d, returned!\n", __func__, __LINE__);
+	}
+	return ret;
+}
+
+struct workqueue_struct* __global_init_var_system_wq(void)
+{
+	struct fipc_message __buffer = {0};
+	struct fipc_message *__msg = &__buffer;
+	struct ext_registers* __ext = get_register_page(smp_processor_id());
+	size_t n_pos = 0;
+	size_t* __pos = &n_pos;
+
+	struct workqueue_struct* ret = 0;
+	struct workqueue_struct** ret_ptr = &ret;
+	
+	__maybe_unused const struct __global_init_var_system_wq_call_ctx call_ctx = {};
+	__maybe_unused const struct __global_init_var_system_wq_call_ctx *ctx = &call_ctx;
+
+	(void)__ext;
+
+	if (verbose_debug) {
+		printk("%s:%d, entered!\n", __func__, __LINE__);
+	}
+
+	glue_call_server(__pos, __msg, RPC_ID___global_init_var_system_wq);
+
+	*__pos = 0;
+	{
+		size_t __size = 64;
+		*ret_ptr = glue_unpack_new_shadow(__pos, __msg, __ext, struct workqueue_struct*, (__size), (DEFAULT_GFP_FLAGS));
+		(void)ret_ptr;
 	}
 
 	if (verbose_debug) {
@@ -5192,6 +5784,10 @@ int try_dispatch(enum RPC_ID id, struct fipc_message* __msg, struct ext_register
 	switch(id) {
 	case MODULE_INIT:
 		glue_user_trace("MODULE_INIT");
+		jiffies = __global_init_var_jiffies();
+		nvme_io_timeout = __global_init_var_nvme_io_timeout();
+		nvme_max_retries = __global_init_var_nvme_max_retries();
+		admin_timeout = __global_init_var_admin_timeout();
 		__module_lcd_init();
 		shared_mem_init();
 		break;
@@ -5216,18 +5812,23 @@ int try_dispatch(enum RPC_ID id, struct fipc_message* __msg, struct ext_register
 		tag_iter_fn_callee(__msg, __ext);
 		break;
 
+	case RPC_ID_timer_func:
+		glue_user_trace("timer_func\n");
+		timer_func_callee(__msg, __ext);
+		break;
+
 	case RPC_ID_blk_mq_ops_exit_hctx:
 		glue_user_trace("blk_mq_ops_exit_hctx\n");
 		blk_mq_ops_exit_hctx_callee(__msg, __ext);
 		break;
 
 	case RPC_ID_blk_mq_ops_init_hctx:
-		glue_user_trace("blk_mq_ops_init_hctx\n");
+		//glue_user_trace("blk_mq_ops_init_hctx\n");
 		blk_mq_ops_init_hctx_callee(__msg, __ext);
 		break;
 
 	case RPC_ID_blk_mq_ops_init_request:
-		glue_user_trace("blk_mq_ops_init_request\n");
+		//glue_user_trace("blk_mq_ops_init_request\n");
 		blk_mq_ops_init_request_callee(__msg, __ext);
 		break;
 
@@ -5244,6 +5845,41 @@ int try_dispatch(enum RPC_ID id, struct fipc_message* __msg, struct ext_register
 	case RPC_ID_pci_error_handlers_resume:
 		glue_user_trace("pci_error_handlers_resume\n");
 		pci_error_handlers_resume_callee(__msg, __ext);
+		break;
+
+	case RPC_ID_reg_read32:
+		glue_user_trace("reg_read32\n");
+		reg_read32_callee(__msg, __ext);
+		break;
+
+	case RPC_ID_reg_write32:
+		glue_user_trace("reg_write32\n");
+		reg_write32_callee(__msg, __ext);
+		break;
+
+	case RPC_ID_reg_read64:
+		glue_user_trace("reg_read64\n");
+		reg_read64_callee(__msg, __ext);
+		break;
+
+	case RPC_ID_reset_ctrl:
+		glue_user_trace("reset_ctrl\n");
+		reset_ctrl_callee(__msg, __ext);
+		break;
+
+	case RPC_ID_free_ctrl:
+		glue_user_trace("free_ctrl\n");
+		free_ctrl_callee(__msg, __ext);
+		break;
+
+	case RPC_ID_post_scan:
+		glue_user_trace("post_scan\n");
+		post_scan_callee(__msg, __ext);
+		break;
+
+	case RPC_ID_submit_async_event:
+		glue_user_trace("submit_async_event\n");
+		submit_async_event_callee(__msg, __ext);
 		break;
 
 	case RPC_ID_pci_driver_sriov_configure:
@@ -5289,6 +5925,11 @@ int try_dispatch(enum RPC_ID id, struct fipc_message* __msg, struct ext_register
 	case RPC_ID_blk_mq_ops_timeout:
 		glue_user_trace("blk_mq_ops_timeout\n");
 		blk_mq_ops_timeout_callee(__msg, __ext);
+		break;
+
+	case RPC_ID_work_fn:
+		glue_user_trace("work_fn\n");
+		work_fn_callee(__msg, __ext);
 		break;
 
 	case RPC_ID_thread_fn:

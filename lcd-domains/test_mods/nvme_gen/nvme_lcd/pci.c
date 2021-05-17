@@ -55,6 +55,33 @@
 #include <lcd_config/post_hook.h>
 #endif
 
+struct workqueue_struct *lvd_alloc_workqueue(const char *fmt,
+					       unsigned int flags,
+					       int max_active);
+typedef void (*fptr_timer_func)(unsigned long data);
+void lvd_setup_timer(struct timer_list* timer, fptr_timer_func func, unsigned long);
+unsigned long __global_init_var_jiffies(void);
+typedef void (*fptr_work_fn)(struct work_struct* work);
+void lvd_init_work(struct work_struct* work, fptr_work_fn work_fn);
+bool lvd_queue_work(struct workqueue_struct *wq,
+			      struct work_struct *work);
+#ifdef LCD_ISOLATE
+#undef alloc_workqueue
+#define alloc_workqueue		lvd_alloc_workqueue
+
+#undef setup_timer
+#define setup_timer	lvd_setup_timer
+
+#undef jiffies
+#define jiffies			({ jiffies = __global_init_var_jiffies(); jiffies; })
+
+#undef INIT_WORK
+#define INIT_WORK(_work, _func)		lvd_init_work(_work, _func)
+
+#define queue_work		lvd_queue_work
+
+#endif
+
 #define NVME_Q_DEPTH		1024
 #define NVME_AQ_DEPTH		256
 #define SQ_SIZE(depth)		(depth * sizeof(struct nvme_command))
@@ -877,7 +904,7 @@ static void abort_endio(struct request *req, int error)
 {
 	struct nvme_iod *iod = blk_mq_rq_to_pdu(req);
 	struct nvme_queue *nvmeq = iod->nvmeq;
-	u16 status = req->errors;
+	__maybe_unused u16 status = req->errors;
 
 	dev_warn(nvmeq->dev->ctrl.device, "Abort status: 0x%x", status);
 	atomic_inc(&nvmeq->dev->ctrl.abort_limit);
@@ -1967,6 +1994,14 @@ static int nvme_dev_map(struct nvme_dev *dev)
 	if (!dev->bar)
 		goto release;
 
+	{
+		int _ret;
+
+		LIBLCD_MSG("%s, Assigning pci device to LVD domains (bus 0x%x, devfn 0x%x)",
+			__func__, pdev->bus->number, pdev->devfn);
+		_ret = lcd_syscall_assign_device(0, pdev->bus->number, pdev->devfn);
+		printk("%s, assign device returned %d\n", __func__, _ret);
+	}
        return 0;
   release:
        pci_release_mem_regions(pdev);
@@ -2008,6 +2043,7 @@ static int nvme_probe(struct pci_dev *pdev, const struct pci_device_id *id)
 	mutex_init(&dev->shutdown_lock);
 	init_completion(&dev->ioq_wait);
 
+	INIT_LIST_HEAD(&dev->dev->dma_pools);
 	result = nvme_setup_prp_pools(dev);
 	if (result)
 		goto put_pci;

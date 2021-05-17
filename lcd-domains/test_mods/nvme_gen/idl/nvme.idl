@@ -1,12 +1,13 @@
 module kernel {
-rpc projection ret_workqueue_struct [alloc<{{sizeof(struct workqueue_struct)}}, {{(DEFAULT_GFP_FLAGS)}}>(caller)] * __alloc_workqueue_key( char*  fmt, unsigned int  flags, int  max_active, projection key* [unused] key, char* [unused] lock_name ) {
-	projection < struct workqueue_struct > ret_workqueue_struct {
+	rpc projection ret_workqueue_struct [alloc<{{sizeof(void *)}}, {{(DEFAULT_GFP_FLAGS)}}>(caller)] *
+		lvd_alloc_workqueue( string [alloc(callee)] *  fmt,
+					unsigned int  flags,
+					int  max_active) {
+		projection < struct workqueue_struct > ret_workqueue_struct {
+		}
 	}
-	projection < struct lock_class_key > key {
-	}
-}
-rpc int  __bitmap_weight( long unsigned int* [in] bitmap, unsigned int  bits ) {
-}
+	/*rpc int  __bitmap_weight( long unsigned int* [in] bitmap, unsigned int  bits ) {
+	}*/
 	rpc int __pci_register_driver( projection _global_pci_driver [alloc(callee)] * drv,
 		projection owner [alloc(callee)] * owner, string [alloc(callee)] * mod_name ) {
 		projection < struct module > owner {
@@ -54,7 +55,7 @@ rpc int  __bitmap_weight( long unsigned int* [in] bitmap, unsigned int  bits ) {
 			//long unsigned int [in] queue_flags;
 		}
 	}
-	rpc int  blk_mq_alloc_tag_set( projection set [alloc(callee)] * [in, out] set ) {
+	rpc int  blk_mq_alloc_tag_set( projection set [alloc(callee)] * set ) {
 		projection < struct blk_mq_tag_set > set {
 			projection _global_blk_mq_ops [alloc(callee)] * ops;
 			unsigned int [in, out] nr_hw_queues;
@@ -62,7 +63,8 @@ rpc int  __bitmap_weight( long unsigned int* [in] bitmap, unsigned int  bits ) {
 			unsigned int [in] cmd_size;
 			int [in] numa_node;
 			void [alloc<{{sizeof(void*)}}>(callee)] * driver_data;
-			array<array<projection blk_mq_tag_set_tags, {{sizeof(struct blk_mq_tags)}} > [alloc(caller)] *, {{nr_cpu_ids}} > [alloc(caller)] * tags;
+			//array<array<projection blk_mq_tag_set_tags, {{sizeof(struct blk_mq_tags)}} > [alloc(caller)] *, {{nr_cpu_ids}} > [alloc(caller)] * [out] tags;
+			array<array<projection blk_mq_tag_set_tags, 1> [alloc(caller)] *, {{ptr->nr_hw_queues}} > [alloc(caller)] * [out] tags;
 		}
 		projection < struct blk_mq_tags > blk_mq_tag_set_tags {
 		}
@@ -144,7 +146,7 @@ rpc int  __bitmap_weight( long unsigned int* [in] bitmap, unsigned int  bits ) {
 		projection < struct blk_mq_tags > blk_mq_tag_set_tags {
 		}
 	}
-	rpc_ptr projection ret_blk_mq_hw_ctx*  blk_mq_ops_map_queue( projection q* [in] q, int  cpu ) {
+	rpc_ptr projection ret_blk_mq_hw_ctx [bind(callee)] *  blk_mq_ops_map_queue( projection q [alloc_once(callee)] * q, int  cpu ) {
 		projection < struct blk_mq_hw_ctx > ret_blk_mq_hw_ctx {
 		}
 		projection < struct request_queue > q {
@@ -220,14 +222,14 @@ rpc void  complete( projection x* [in] x ) {
 		//__wait_queue_head [in] wait;
 	}
 }
-rpc int  del_timer_sync( projection timer* [in] timer ) {
-	projection < struct timer_list > timer {
+	rpc int  del_timer_sync( projection timer [bind(callee)] * timer ) {
+		projection < struct timer_list > timer {
+		}
 	}
-}
-rpc void  destroy_workqueue( projection wq* [in] wq ) {
-	projection < struct workqueue_struct > wq {
+	rpc void  destroy_workqueue( projection wq* wq ) {
+		projection < struct workqueue_struct > wq {
+		}
 	}
-}
 	rpc void  device_release_driver( projection dev [bind_memberof<struct pci_dev, dev>(caller)] * dev) {
 		projection < struct device > dev {
 			/*projection device_device_private* p;
@@ -245,32 +247,45 @@ rpc void  destroy_workqueue( projection wq* [in] wq ) {
 		projection < struct dev_pm_domain > device_pm_domain {
 		}
 	}
-rpc bool  flush_work( projection work* [in, out] work ) {
-		projection < struct list_head> list_head {
-			//projection list_head_list_head* next;
+	rpc bool  flush_work( projection work [bind(callee)] * work ) {
+			projection < struct list_head> list_head {
+				//projection list_head_list_head* next;
+			}
+		projection < struct work_struct > work {
+			//atomic64_t [in, out] data;
+			//projection list_head entry;
 		}
-	projection < struct work_struct > work {
-		//atomic64_t [in, out] data;
-		projection list_head entry;
+		projection < struct list_head > list_head_next {
+		}
 	}
-	projection < struct list_head > list_head_next {
-	}
-}
 	rpc void  free_irq( unsigned int  irq, void [bind(callee)] *  dev_id ) {
 	}
 
-	rpc projection ret_device [bind(caller)] *  get_device( projection dev [bind_memberof<struct pci_dev, dev>(caller)] *  dev) {
+	rpc_ptr void timer_func(unsigned long data) {
+	}
+
+	rpc projection ret_device * [unused]  get_device( projection dev [bind_memberof<struct pci_dev, dev>(caller)] *  dev) {
 		projection < struct device > ret_device {
 		}
 		projection < struct device > dev {
 		}
 	}
-rpc void  init_timer_key( projection timer* [in] timer, unsigned int  flags, char*  name, projection key*  key ) {
-	projection < struct timer_list > timer {
+
+	rpc void  lvd_setup_timer( projection timer [alloc(callee), bind(callee)] * [in, out] timer,
+			rpc_ptr timer_func func, unsigned long data ) {
+		projection < struct timer_list > timer {
+			unsigned long [out] data;
+		}
 	}
-	projection < struct lock_class_key > key {
+
+	rpc void lvd_init_work(projection work [alloc(callee)] *work, rpc_ptr work_fn work_fn) {
+		projection < struct work_struct > work {
+			//projection  atomic64_t [out] data;
+		}
+		/*projection <struct atomic64_t> atomic64_t {
+			long counter;
+		}*/
 	}
-}
 
 	rpc void [ioremap(caller)]   *ioremap_nocache( u64  phys_addr, unsigned long size ) {
 	}
@@ -279,30 +294,30 @@ rpc void  init_timer_key( projection timer* [in] timer, unsigned int  flags, cha
 	rpc void*  ioremap_wc( long long unsigned int  phys_addr, long unsigned int  size ) {
 	}
 	*/
-	rpc int  irq_set_affinity_hint( unsigned int  irq, projection m [alloc(callee)] * m ) {
+	rpc int  irq_set_affinity_hint( unsigned int  irq, const projection m [alloc(callee)] * m ) {
 		projection < struct cpumask > m {
 			array< long unsigned int , 1> bits;
 		}
 	}
 
-rpc int  mod_timer( projection timer* [in, out] timer, long unsigned int  expires ) {
-	projection < struct timer_list > timer {
+	rpc int  mod_timer( projection timer [bind(callee)] * timer, long unsigned int  expires ) {
+		projection < struct timer_list > timer {
+		}
 	}
-}
 	rpc_ptr void  blk_mq_ops_exit_hctx( projection hctx [bind(callee)] * hctx, unsigned int [unused] hctx_idx ) {
 		projection < struct blk_mq_hw_ctx > hctx {
 		}
 	}
-	rpc_ptr int  blk_mq_ops_init_hctx( projection hctx [alloc(callee)] * [in, out] hctx, void [bind(callee)] *  data, unsigned int  hctx_idx ) {
+	rpc_ptr int  blk_mq_ops_init_hctx( projection hctx [alloc(callee)] * hctx, void *  data, unsigned int  hctx_idx ) {
 		projection < struct blk_mq_hw_ctx > hctx {
-			//projection blk_mq_hw_ctx_blk_mq_tags* tags;
-			
+			projection blk_mq_hw_ctx_tags [bind(callee)] * tags;
 		}
 		projection < struct blk_mq_tags > blk_mq_hw_ctx_tags {
 		}
 	}
 	rpc_ptr int  blk_mq_ops_init_request( void *  data,
-			projection req [alloc<{{sizeof(struct request) + nvme_cmd_size((struct nvme_dev*)data)}}>(callee)] * req,
+			//projection req [alloc<{{sizeof(struct request) + nvme_cmd_size((struct nvme_dev*)data)}}>(callee)] * req,
+			projection req [alloc<{{sizeof(struct request)}}>(callee)] * req,
 			unsigned int [unused] hctx_idx,
 			unsigned int [unused] rq_idx,
 			unsigned int [unused] numa_node ) {
@@ -310,7 +325,7 @@ rpc int  mod_timer( projection timer* [in, out] timer, long unsigned int  expire
 		}
 	}
 	/* XXX: if initialized correctly, the requests should already be passed across (alloc_tag_set and init_queue) */
-	rpc projection ret_request [bind(caller)] * [out]  nvme_alloc_request( projection q* [in] q, projection cmd [alloc_stack(callee)] * [in, out] cmd,
+	rpc projection ret_request [bind(caller)] * [out]  nvme_alloc_request( projection q* [in] q, projection cmd [alloc_stack(callee), in, out] * cmd,
 			unsigned int  flags, int  qid ) {
 		projection < struct request > ret_request {
 			unsigned int [out] cmd_type;
@@ -343,7 +358,7 @@ rpc int  mod_timer( projection timer* [in, out] timer, long unsigned int  expire
 		projection < struct gendisk > request_rq_disk {
 		}
 	}
-	rpc bool  nvme_change_ctrl_state( projection ctrl* [in] ctrl, unsigned int  new_state ) {
+	rpc bool  nvme_change_ctrl_state( projection ctrl [bind(callee)] * ctrl, unsigned int  new_state ) {
 		projection < struct nvme_ctrl > ctrl {
 			unsigned int [in, out] state;
 		}
@@ -400,9 +415,41 @@ rpc_ptr void  blk_mq_ops_complete( projection req* [in] req ) {
 		projection < struct pci_dev > pdev {
 		}
 	}
-	rpc int  nvme_init_ctrl( projection ctrl [alloc(callee)] * [in, out] ctrl,
+
+	rpc_ptr int reg_read32(projection nvme_ctrl *ctrl, u32 off,
+			u32 [alloc_stack(callee), out] * val) {
+		projection <struct nvme_ctrl> nvme_ctrl {
+		}
+	}
+	rpc_ptr int reg_write32(projection nvme_ctrl *ctrl, u32 off, u32 val) {
+		projection <struct nvme_ctrl> nvme_ctrl {
+		}
+	}
+	rpc_ptr int  reg_read64(projection nvme_ctrl *ctrl, u32 off,
+			u64 [alloc_stack(callee), out] * val) {
+		projection <struct nvme_ctrl> nvme_ctrl {
+		}
+	}
+	rpc_ptr int  reset_ctrl(projection nvme_ctrl *ctrl) {
+		projection <struct nvme_ctrl> nvme_ctrl {
+		}
+	}
+	rpc_ptr void free_ctrl(projection nvme_ctrl *ctrl) {
+		projection <struct nvme_ctrl> nvme_ctrl {
+		}
+	}
+	rpc_ptr void post_scan(projection nvme_ctrl *ctrl) {
+		projection <struct nvme_ctrl> nvme_ctrl {
+		}
+	}
+	rpc_ptr void submit_async_event(projection nvme_ctrl *ctrl, int aer_idx) {
+		projection <struct nvme_ctrl> nvme_ctrl {
+		}
+	}
+
+	rpc int  nvme_init_ctrl( projection ctrl [alloc(callee), bind(callee)] * [in, out] ctrl,
 			projection dev [bind_memberof<struct pci_dev, dev>(caller)] *  dev,
-			projection ops [alloc(callee)] *  ops, long unsigned int  quirks ) {
+			const projection ops [alloc(callee)] *  ops, long unsigned int  quirks ) {
 			projection < struct kref> kref {
 				//atomic_t [in] refcount;
 			}
@@ -418,6 +465,18 @@ rpc_ptr void  blk_mq_ops_complete( projection req* [in] req ) {
 		projection < struct device > dev {
 		}
 		projection < struct nvme_ctrl_ops > ops {
+			string [alloc(callee)] *name;
+			projection module [alloc(callee)] *module;
+			rpc_ptr reg_read32 reg_read32;
+			rpc_ptr reg_write32 reg_write32;
+			rpc_ptr reg_read64 reg_read64;
+			rpc_ptr reset_ctrl reset_ctrl;
+			rpc_ptr free_ctrl free_ctrl;
+			rpc_ptr post_scan post_scan;
+			rpc_ptr submit_async_event submit_async_event;
+		}
+
+		projection < struct module > module {
 		}
 	}
 	rpc int  nvme_init_identify( projection ctrl [bind(callee)] * ctrl ) {
@@ -450,7 +509,7 @@ rpc_ptr int  blk_mq_ops_poll( projection hctx* [in] hctx, unsigned int  tag ) {
 
 	rpc_ptr int pci_driver_probe( projection pdev [alloc(callee)] * pdev, projection ent [alloc(callee)] * ent ) {
 		projection < struct device> device {
-			int [in, out] numa_node;
+			//int [in, out] numa_node;
 			array<u64, 1> [alloc(callee)] *dma_mask;
 			projection kobject kobj;
 		}
@@ -482,46 +541,46 @@ rpc_ptr int  blk_mq_ops_poll( projection hctx* [in] hctx, unsigned int  tag ) {
 			u64 end;
 		}
 	}
-rpc void  nvme_put_ctrl( projection ctrl* [in] ctrl ) {
-		projection < struct kref> kref {
-			//atomic_t [in] refcount;
+	rpc void  nvme_put_ctrl( projection ctrl [bind(callee)] * ctrl ) {
+			projection < struct kref> kref {
+				//atomic_t [in] refcount;
+			}
+		projection < struct nvme_ctrl > ctrl {
+			projection kref kref;
 		}
-	projection < struct nvme_ctrl > ctrl {
-		projection kref kref;
 	}
-}
-rpc void  nvme_queue_async_events( projection ctrl* [in] ctrl ) {
-	projection < struct nvme_ctrl > ctrl {
+	rpc void  nvme_queue_async_events( projection ctrl [bind(callee)] * ctrl ) {
+		projection < struct nvme_ctrl > ctrl {
+		}
 	}
-}
 
-rpc_ptr int  blk_mq_ops_queue_rq( projection hctx* [in] hctx, projection bd* [in] bd ) {
-	projection < struct blk_mq_hw_ctx > hctx {
-		projection blk_mq_hw_ctx_queue* queue;
+	rpc_ptr int  blk_mq_ops_queue_rq( projection hctx [bind(callee)] * hctx, projection bd [alloc_stack(callee)] *  bd ) {
+		projection < struct blk_mq_hw_ctx > hctx {
+			projection blk_mq_hw_ctx_queue [bind(callee)] * queue;
+		}
+		projection < struct request_queue > blk_mq_hw_ctx_queue {
+		}
+		projection < struct blk_mq_queue_data > bd {
+			projection blk_mq_queue_data_rq [bind(callee)] * rq;
+		}
+		projection < struct request > blk_mq_queue_data_rq {
+		}
 	}
-	projection < struct request_queue > blk_mq_hw_ctx_queue {
+	rpc void  nvme_queue_scan( projection ctrl [bind(callee)] * ctrl ) {
+		projection < struct nvme_ctrl > ctrl {
+			unsigned int [in] state;
+		}
 	}
-	projection < struct blk_mq_queue_data > bd {
-		projection blk_mq_queue_data_rq* rq;
-	}
-	projection < struct request > blk_mq_queue_data_rq {
-	}
-}
-rpc void  nvme_queue_scan( projection ctrl* [in] ctrl ) {
-	projection < struct nvme_ctrl > ctrl {
-		unsigned int [in] state;
-	}
-}
 
 	rpc_ptr void  pci_driver_remove( projection pdev [bind(callee)] *pdev ) {
 		projection < struct pci_dev > pdev {
 		}
 	}
-rpc void  nvme_remove_namespaces( projection ctrl* [in] ctrl ) {
-	projection < struct nvme_ctrl > ctrl {
-		unsigned int [in] state;
+	rpc void  nvme_remove_namespaces( projection ctrl [bind(callee)] *  ctrl ) {
+		projection < struct nvme_ctrl > ctrl {
+			unsigned int [in] state;
+		}
 	}
-}
 rpc void  nvme_requeue_req( projection req* [in] req ) {
 	projection < struct request > req {
 		projection request_q* q;
@@ -655,7 +714,7 @@ rpc int  nvme_setup_cmd( projection ns* [in] ns, projection req* [in] req, proje
 		}
 	}
 
-	rpc int pci_enable_msix( projection dev * dev, array<projection entries, {{maxvec}}> [alloc(callee), bind(callee)] * [in, out] entries, int minvec, int maxvec ) {
+	rpc int pci_enable_msix( projection dev * dev, array<projection entries, {{nvec}}> [alloc(callee), bind(callee)] * [in, out] entries, int nvec) {
 		projection < struct pci_dev > dev {
 			unsigned int [out] msi_enabled : 1;
 			unsigned int [out] msix_enabled: 1;
@@ -721,13 +780,19 @@ rpc int  nvme_setup_cmd( projection ns* [in] ns, projection req* [in] req, proje
 		projection < struct device > dev {
 		}
 	}
-rpc bool  queue_work_on( int  cpu, projection wq* [in] wq, projection work* [in, out] work ) {
-	projection < struct workqueue_struct > wq {
+
+	rpc_ptr void work_fn(projection work *work) {
+		projection < struct work_struct > work {
+		}
 	}
-	projection < struct work_struct > work {
-		//atomic64_t [in, out] data;
+
+	rpc bool  lvd_queue_work(projection wq* wq, projection work [bind(callee)] * work ) {
+		projection < struct workqueue_struct > wq {
+		}
+		projection < struct work_struct > work {
+			//atomic64_t [in, out] data;
+		}
 	}
-}
 	rpc_ptr unsigned int thread_fn(int irq, void * [unused] id) {
 	}
 	rpc_ptr unsigned int handler(int irq, void * [unused] id) {
@@ -741,25 +806,26 @@ rpc bool  queue_work_on( int  cpu, projection wq* [in] wq, projection work* [in,
 			void [alloc<{{sizeof(void*)}}>(callee)] * dev_id ) {
 	}
 
-rpc long unsigned int  round_jiffies( long unsigned int  j ) {
-}
+	rpc long unsigned int  round_jiffies( long unsigned int  j ) {
+	}
 rpc long unsigned int  wait_for_completion_io_timeout( projection x* [in, out] x, long unsigned int [in, out] timeout ) {
 	projection < struct completion > x {
 		unsigned int [in, out] done;
 		//__wait_queue_head [in, out] wait;
 	}
 }
-rpc unsigned int  work_busy( projection work* [in] work ) {
-	projection < struct work_struct > work {
-		//atomic64_t [in] data;
+	rpc unsigned int  work_busy( projection work [bind(callee)] * work ) {
+		projection < struct work_struct > work {
+			//atomic64_t [in] data;
+		}
 	}
-}
-rpc projection ret_blk_mq_hw_ctx*  blk_mq_map_queue( projection q* [in] q, int  cpu ) {
-	projection < struct blk_mq_hw_ctx > ret_blk_mq_hw_ctx {
+	rpc projection ret_blk_mq_hw_ctx [bind(caller)] *  blk_mq_map_queue( projection q* q,
+				int  cpu ) {
+		projection < struct blk_mq_hw_ctx > ret_blk_mq_hw_ctx {
+		}
+		projection < struct request_queue > q {
+		}
 	}
-	projection < struct request_queue > q {
-	}
-}
 	projection < struct blk_mq_ops > _global_blk_mq_ops {
 		rpc_ptr blk_mq_ops_complete complete;
 		rpc_ptr blk_mq_ops_exit_hctx exit_hctx;
@@ -796,4 +862,15 @@ rpc projection ret_blk_mq_hw_ctx*  blk_mq_map_queue( projection q* [in] q, int  
 		rpc_ptr pci_error_handlers_resume resume;
 		rpc_ptr pci_error_handlers_slot_reset slot_reset;
 	}
+
+	global unsigned long jiffies {
+	}
+	global unsigned char nvme_io_timeout { }
+	global unsigned int nvme_max_retries { }
+	global unsigned char admin_timeout {}
+
+	global projection wq [alloc<{{64}}>(caller)] *system_wq {
+		projection <struct workqueue_struct> wq {
+		}
+	} 
 }

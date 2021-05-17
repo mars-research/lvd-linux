@@ -4,21 +4,21 @@
 
 #include <lcd_config/post_hook.h>
 
-void caller_marshal_kernel____alloc_workqueue_key__ret_workqueue_struct__out(
+void caller_marshal_kernel__lvd_alloc_workqueue__ret_workqueue_struct__out(
 	size_t* __pos,
 	struct fipc_message* __msg,
 	struct ext_registers* __ext,
-	struct __alloc_workqueue_key_call_ctx const* ctx,
+	struct lvd_alloc_workqueue_call_ctx const* ctx,
 	struct workqueue_struct const* ptr)
 {
 
 }
 
-void callee_unmarshal_kernel____alloc_workqueue_key__ret_workqueue_struct__out(
+void callee_unmarshal_kernel__lvd_alloc_workqueue__ret_workqueue_struct__out(
 	size_t* __pos,
 	const struct fipc_message* __msg,
 	const struct ext_registers* __ext,
-	struct __alloc_workqueue_key_call_ctx const* ctx,
+	struct lvd_alloc_workqueue_call_ctx const* ctx,
 	struct workqueue_struct* ptr)
 {
 
@@ -26,66 +26,22 @@ void callee_unmarshal_kernel____alloc_workqueue_key__ret_workqueue_struct__out(
 	}
 }
 
-void callee_marshal_kernel____alloc_workqueue_key__ret_workqueue_struct__out(
+void callee_marshal_kernel__lvd_alloc_workqueue__ret_workqueue_struct__out(
 	size_t* __pos,
 	struct fipc_message* __msg,
 	struct ext_registers* __ext,
-	struct __alloc_workqueue_key_call_ctx const* ctx,
+	struct lvd_alloc_workqueue_call_ctx const* ctx,
 	struct workqueue_struct const* ptr)
 {
 
 }
 
-void caller_unmarshal_kernel____alloc_workqueue_key__ret_workqueue_struct__out(
+void caller_unmarshal_kernel__lvd_alloc_workqueue__ret_workqueue_struct__out(
 	size_t* __pos,
 	const struct fipc_message* __msg,
 	const struct ext_registers* __ext,
-	struct __alloc_workqueue_key_call_ctx const* ctx,
+	struct lvd_alloc_workqueue_call_ctx const* ctx,
 	struct workqueue_struct* ptr)
-{
-
-	{
-	}
-}
-
-void caller_marshal_kernel____alloc_workqueue_key__key__in(
-	size_t* __pos,
-	struct fipc_message* __msg,
-	struct ext_registers* __ext,
-	struct __alloc_workqueue_key_call_ctx const* ctx,
-	struct lock_class_key const* ptr)
-{
-
-}
-
-void callee_unmarshal_kernel____alloc_workqueue_key__key__in(
-	size_t* __pos,
-	const struct fipc_message* __msg,
-	const struct ext_registers* __ext,
-	struct __alloc_workqueue_key_call_ctx const* ctx,
-	struct lock_class_key* ptr)
-{
-
-	{
-	}
-}
-
-void callee_marshal_kernel____alloc_workqueue_key__key__in(
-	size_t* __pos,
-	struct fipc_message* __msg,
-	struct ext_registers* __ext,
-	struct __alloc_workqueue_key_call_ctx const* ctx,
-	struct lock_class_key const* ptr)
-{
-
-}
-
-void caller_unmarshal_kernel____alloc_workqueue_key__key__in(
-	size_t* __pos,
-	const struct fipc_message* __msg,
-	const struct ext_registers* __ext,
-	struct __alloc_workqueue_key_call_ctx const* ctx,
-	struct lock_class_key* ptr)
 {
 
 	{
@@ -952,7 +908,7 @@ void caller_unmarshal_kernel__blk_get_queue__q__in(
 	}
 }
 
-void caller_marshal_kernel__blk_mq_alloc_tag_set__set__io(
+void caller_marshal_kernel__blk_mq_alloc_tag_set__set__in(
 	size_t* __pos,
 	struct fipc_message* __msg,
 	struct ext_registers* __ext,
@@ -971,7 +927,7 @@ void caller_marshal_kernel__blk_mq_alloc_tag_set__set__io(
 		__maybe_unused const void* __adjusted = *ops_ptr;
 		glue_pack(__pos, __msg, __ext, __adjusted);
 		if (*ops_ptr) {
-			caller_marshal_kernel___global_blk_mq_ops__io(__pos, __msg, __ext, *ops_ptr);
+			caller_marshal_kernel___global_blk_mq_ops__in(__pos, __msg, __ext, *ops_ptr);
 		}
 
 	}
@@ -1001,40 +957,12 @@ void caller_marshal_kernel__blk_mq_alloc_tag_set__set__io(
 	}
 
 	{
-		__maybe_unused const void* __adjusted = *tags_ptr;
-		glue_pack(__pos, __msg, __ext, __adjusted);
-		if (*tags_ptr) {
-			size_t i, len = (nr_cpu_ids);
-			struct blk_mq_tags** array = *tags_ptr;
-			glue_pack(__pos, __msg, __ext, len);
-			// Warning: see David if this breaks
-			glue_user_trace("Warning: see David if this breaks");
-			for (i = 0; i < len; ++i) {
-				struct blk_mq_tags** element = &array[i];
-				__maybe_unused const void* __adjusted = *element;
-				glue_pack(__pos, __msg, __ext, __adjusted);
-				if (*element) {
-					size_t i, len = (sizeof(struct blk_mq_tags));
-					struct blk_mq_tags* array = *element;
-					glue_pack(__pos, __msg, __ext, len);
-					// Warning: see David if this breaks
-					glue_user_trace("Warning: see David if this breaks");
-					for (i = 0; i < len; ++i) {
-						struct blk_mq_tags* element = &array[i];
-						caller_marshal_kernel__blk_mq_alloc_tag_set__blk_mq_tag_set_tags__io(__pos, __msg, __ext, ctx, element);
-					}
-
-				}
-
-			}
-
-		}
-
+		(void)tags_ptr;
 	}
 
 }
 
-void callee_unmarshal_kernel__blk_mq_alloc_tag_set__set__io(
+void callee_unmarshal_kernel__blk_mq_alloc_tag_set__set__in(
 	size_t* __pos,
 	const struct fipc_message* __msg,
 	const struct ext_registers* __ext,
@@ -1053,7 +981,7 @@ void callee_unmarshal_kernel__blk_mq_alloc_tag_set__set__io(
 		size_t __size = sizeof(struct blk_mq_ops);
 		*ops_ptr = glue_unpack_new_shadow(__pos, __msg, __ext, struct blk_mq_ops*, (__size), (DEFAULT_GFP_FLAGS));
 		if (*ops_ptr) {
-			callee_unmarshal_kernel___global_blk_mq_ops__io(__pos, __msg, __ext, *ops_ptr);
+			callee_unmarshal_kernel___global_blk_mq_ops__in(__pos, __msg, __ext, *ops_ptr);
 		}
 
 	}
@@ -1083,40 +1011,14 @@ void callee_unmarshal_kernel__blk_mq_alloc_tag_set__set__io(
 	}
 
 	{
-		*tags_ptr = glue_unpack(__pos, __msg, __ext, struct blk_mq_tags**);
-		if (*tags_ptr) {
-			int i;
-			struct blk_mq_tags** array = *tags_ptr;
-			size_t len = glue_unpack(__pos, __msg, __ext, size_t);
-			// Warning: see David if this breaks
-			glue_user_trace("Warning: see David if this breaks");
-			for (i = 0; i < len; ++i) {
-				struct blk_mq_tags** element = &array[i];
-				*element = glue_unpack(__pos, __msg, __ext, struct blk_mq_tags*);
-				if (*element) {
-					int i;
-					struct blk_mq_tags* array = *element;
-					size_t len = glue_unpack(__pos, __msg, __ext, size_t);
-					// Warning: see David if this breaks
-					glue_user_trace("Warning: see David if this breaks");
-					for (i = 0; i < len; ++i) {
-						struct blk_mq_tags* element = &array[i];
-						callee_unmarshal_kernel__blk_mq_alloc_tag_set__blk_mq_tag_set_tags__io(__pos, __msg, __ext, ctx, element);
-					}
-
-				}
-
-			}
-
-		}
-
+		(void)tags_ptr;
 	}
 
 	{
 	}
 }
 
-void callee_marshal_kernel__blk_mq_alloc_tag_set__set__io(
+void callee_marshal_kernel__blk_mq_alloc_tag_set__set__in(
 	size_t* __pos,
 	struct fipc_message* __msg,
 	struct ext_registers* __ext,
@@ -1130,10 +1032,8 @@ void callee_marshal_kernel__blk_mq_alloc_tag_set__set__io(
 	struct blk_mq_tags** const* tags_ptr = &ptr->tags;
 
 	{
-		__maybe_unused const void* __adjusted = *ops_ptr;
-		glue_pack(__pos, __msg, __ext, __adjusted);
 		if (*ops_ptr) {
-			callee_marshal_kernel___global_blk_mq_ops__io(__pos, __msg, __ext, *ops_ptr);
+			callee_marshal_kernel___global_blk_mq_ops__in(__pos, __msg, __ext, *ops_ptr);
 		}
 
 	}
@@ -1147,18 +1047,14 @@ void callee_marshal_kernel__blk_mq_alloc_tag_set__set__io(
 	}
 
 	{
-		__maybe_unused const void* __adjusted = *driver_data_ptr;
-		glue_pack(__pos, __msg, __ext, __adjusted);
-		if (*driver_data_ptr) {
-		}
-
+		(void)driver_data_ptr;
 	}
 
 	{
 		__maybe_unused const void* __adjusted = *tags_ptr;
 		glue_pack(__pos, __msg, __ext, __adjusted);
 		if (*tags_ptr) {
-			size_t i, len = (nr_cpu_ids);
+			size_t i, len = (ptr->nr_hw_queues);
 			struct blk_mq_tags** array = *tags_ptr;
 			glue_pack(__pos, __msg, __ext, len);
 			// Warning: see David if this breaks
@@ -1168,14 +1064,14 @@ void callee_marshal_kernel__blk_mq_alloc_tag_set__set__io(
 				__maybe_unused const void* __adjusted = *element;
 				glue_pack(__pos, __msg, __ext, __adjusted);
 				if (*element) {
-					size_t i, len = (sizeof(struct blk_mq_tags));
-					struct blk_mq_tags* array = *element;
+					size_t i, len = 1;
+					struct blk_mq_tags const* array = *element;
 					glue_pack(__pos, __msg, __ext, len);
 					// Warning: see David if this breaks
 					glue_user_trace("Warning: see David if this breaks");
 					for (i = 0; i < len; ++i) {
-						struct blk_mq_tags* element = &array[i];
-						callee_marshal_kernel__blk_mq_alloc_tag_set__blk_mq_tag_set_tags__io(__pos, __msg, __ext, ctx, element);
+						struct blk_mq_tags const* element = &array[i];
+						callee_marshal_kernel__blk_mq_alloc_tag_set__blk_mq_tag_set_tags__out(__pos, __msg, __ext, ctx, element);
 					}
 
 				}
@@ -1188,7 +1084,7 @@ void callee_marshal_kernel__blk_mq_alloc_tag_set__set__io(
 
 }
 
-void caller_unmarshal_kernel__blk_mq_alloc_tag_set__set__io(
+void caller_unmarshal_kernel__blk_mq_alloc_tag_set__set__in(
 	size_t* __pos,
 	const struct fipc_message* __msg,
 	const struct ext_registers* __ext,
@@ -1202,9 +1098,8 @@ void caller_unmarshal_kernel__blk_mq_alloc_tag_set__set__io(
 	struct blk_mq_tags*** tags_ptr = &ptr->tags;
 
 	{
-		*ops_ptr = glue_unpack(__pos, __msg, __ext, struct blk_mq_ops*);
 		if (*ops_ptr) {
-			caller_unmarshal_kernel___global_blk_mq_ops__io(__pos, __msg, __ext, *ops_ptr);
+			caller_unmarshal_kernel___global_blk_mq_ops__in(__pos, __msg, __ext, *ops_ptr);
 		}
 
 	}
@@ -1218,10 +1113,7 @@ void caller_unmarshal_kernel__blk_mq_alloc_tag_set__set__io(
 	}
 
 	{
-		*driver_data_ptr = glue_unpack(__pos, __msg, __ext, void*);
-		if (*driver_data_ptr) {
-		}
-
+		(void)driver_data_ptr;
 	}
 
 	{
@@ -1245,7 +1137,7 @@ void caller_unmarshal_kernel__blk_mq_alloc_tag_set__set__io(
 					glue_user_trace("Warning: see David if this breaks");
 					for (i = 0; i < len; ++i) {
 						struct blk_mq_tags* element = &array[i];
-						caller_unmarshal_kernel__blk_mq_alloc_tag_set__blk_mq_tag_set_tags__io(__pos, __msg, __ext, ctx, element);
+						caller_unmarshal_kernel__blk_mq_alloc_tag_set__blk_mq_tag_set_tags__out(__pos, __msg, __ext, ctx, element);
 					}
 
 				}
@@ -1260,7 +1152,7 @@ void caller_unmarshal_kernel__blk_mq_alloc_tag_set__set__io(
 	}
 }
 
-void caller_marshal_kernel___global_blk_mq_ops__io(
+void caller_marshal_kernel___global_blk_mq_ops__in(
 	size_t* __pos,
 	struct fipc_message* __msg,
 	struct ext_registers* __ext,
@@ -1309,7 +1201,7 @@ void caller_marshal_kernel___global_blk_mq_ops__io(
 
 }
 
-void callee_unmarshal_kernel___global_blk_mq_ops__io(
+void callee_unmarshal_kernel___global_blk_mq_ops__in(
 	size_t* __pos,
 	const struct fipc_message* __msg,
 	const struct ext_registers* __ext,
@@ -1360,107 +1252,27 @@ void callee_unmarshal_kernel___global_blk_mq_ops__io(
 	}
 }
 
-void callee_marshal_kernel___global_blk_mq_ops__io(
+void callee_marshal_kernel___global_blk_mq_ops__in(
 	size_t* __pos,
 	struct fipc_message* __msg,
 	struct ext_registers* __ext,
 	struct blk_mq_ops const* ptr)
 {
-	fptr_blk_mq_ops_complete const* complete_ptr = &ptr->complete;
-	fptr_blk_mq_ops_exit_hctx const* exit_hctx_ptr = &ptr->exit_hctx;
-	fptr_blk_mq_ops_init_hctx const* init_hctx_ptr = &ptr->init_hctx;
-	fptr_blk_mq_ops_init_request const* init_request_ptr = &ptr->init_request;
-	fptr_blk_mq_ops_map_queue const* map_queue_ptr = &ptr->map_queue;
-	fptr_blk_mq_ops_poll const* poll_ptr = &ptr->poll;
-	fptr_blk_mq_ops_queue_rq const* queue_rq_ptr = &ptr->queue_rq;
-	fptr_blk_mq_ops_timeout const* timeout_ptr = &ptr->timeout;
-
-	{
-		glue_pack(__pos, __msg, __ext, *complete_ptr);
-	}
-
-	{
-		glue_pack(__pos, __msg, __ext, *exit_hctx_ptr);
-	}
-
-	{
-		glue_pack(__pos, __msg, __ext, *init_hctx_ptr);
-	}
-
-	{
-		glue_pack(__pos, __msg, __ext, *init_request_ptr);
-	}
-
-	{
-		glue_pack(__pos, __msg, __ext, *map_queue_ptr);
-	}
-
-	{
-		glue_pack(__pos, __msg, __ext, *poll_ptr);
-	}
-
-	{
-		glue_pack(__pos, __msg, __ext, *queue_rq_ptr);
-	}
-
-	{
-		glue_pack(__pos, __msg, __ext, *timeout_ptr);
-	}
 
 }
 
-void caller_unmarshal_kernel___global_blk_mq_ops__io(
+void caller_unmarshal_kernel___global_blk_mq_ops__in(
 	size_t* __pos,
 	const struct fipc_message* __msg,
 	const struct ext_registers* __ext,
 	struct blk_mq_ops* ptr)
 {
-	fptr_blk_mq_ops_complete* complete_ptr = &ptr->complete;
-	fptr_blk_mq_ops_exit_hctx* exit_hctx_ptr = &ptr->exit_hctx;
-	fptr_blk_mq_ops_init_hctx* init_hctx_ptr = &ptr->init_hctx;
-	fptr_blk_mq_ops_init_request* init_request_ptr = &ptr->init_request;
-	fptr_blk_mq_ops_map_queue* map_queue_ptr = &ptr->map_queue;
-	fptr_blk_mq_ops_poll* poll_ptr = &ptr->poll;
-	fptr_blk_mq_ops_queue_rq* queue_rq_ptr = &ptr->queue_rq;
-	fptr_blk_mq_ops_timeout* timeout_ptr = &ptr->timeout;
-
-	{
-		*complete_ptr = glue_unpack_rpc_ptr(__pos, __msg, __ext, blk_mq_ops_complete);
-	}
-
-	{
-		*exit_hctx_ptr = glue_unpack_rpc_ptr(__pos, __msg, __ext, blk_mq_ops_exit_hctx);
-	}
-
-	{
-		*init_hctx_ptr = glue_unpack_rpc_ptr(__pos, __msg, __ext, blk_mq_ops_init_hctx);
-	}
-
-	{
-		*init_request_ptr = glue_unpack_rpc_ptr(__pos, __msg, __ext, blk_mq_ops_init_request);
-	}
-
-	{
-		*map_queue_ptr = glue_unpack_rpc_ptr(__pos, __msg, __ext, blk_mq_ops_map_queue);
-	}
-
-	{
-		*poll_ptr = glue_unpack_rpc_ptr(__pos, __msg, __ext, blk_mq_ops_poll);
-	}
-
-	{
-		*queue_rq_ptr = glue_unpack_rpc_ptr(__pos, __msg, __ext, blk_mq_ops_queue_rq);
-	}
-
-	{
-		*timeout_ptr = glue_unpack_rpc_ptr(__pos, __msg, __ext, blk_mq_ops_timeout);
-	}
 
 	{
 	}
 }
 
-void caller_marshal_kernel__blk_mq_alloc_tag_set__blk_mq_tag_set_tags__io(
+void caller_marshal_kernel__blk_mq_alloc_tag_set__blk_mq_tag_set_tags__out(
 	size_t* __pos,
 	struct fipc_message* __msg,
 	struct ext_registers* __ext,
@@ -1470,7 +1282,7 @@ void caller_marshal_kernel__blk_mq_alloc_tag_set__blk_mq_tag_set_tags__io(
 
 }
 
-void callee_unmarshal_kernel__blk_mq_alloc_tag_set__blk_mq_tag_set_tags__io(
+void callee_unmarshal_kernel__blk_mq_alloc_tag_set__blk_mq_tag_set_tags__out(
 	size_t* __pos,
 	const struct fipc_message* __msg,
 	const struct ext_registers* __ext,
@@ -1482,7 +1294,7 @@ void callee_unmarshal_kernel__blk_mq_alloc_tag_set__blk_mq_tag_set_tags__io(
 	}
 }
 
-void callee_marshal_kernel__blk_mq_alloc_tag_set__blk_mq_tag_set_tags__io(
+void callee_marshal_kernel__blk_mq_alloc_tag_set__blk_mq_tag_set_tags__out(
 	size_t* __pos,
 	struct fipc_message* __msg,
 	struct ext_registers* __ext,
@@ -1492,7 +1304,7 @@ void callee_marshal_kernel__blk_mq_alloc_tag_set__blk_mq_tag_set_tags__io(
 
 }
 
-void caller_unmarshal_kernel__blk_mq_alloc_tag_set__blk_mq_tag_set_tags__io(
+void caller_unmarshal_kernel__blk_mq_alloc_tag_set__blk_mq_tag_set_tags__out(
 	size_t* __pos,
 	const struct fipc_message* __msg,
 	const struct ext_registers* __ext,
@@ -3303,108 +3115,44 @@ void caller_unmarshal_kernel__device_release_driver__dev__in(
 	}
 }
 
-void caller_marshal_kernel__flush_work__work__io(
+void caller_marshal_kernel__flush_work__work__in(
 	size_t* __pos,
 	struct fipc_message* __msg,
 	struct ext_registers* __ext,
 	struct flush_work_call_ctx const* ctx,
 	struct work_struct const* ptr)
 {
-	struct list_head const* entry_ptr = &ptr->entry;
-
-	{
-		caller_marshal_kernel__flush_work__list_head__io(__pos, __msg, __ext, ctx, entry_ptr);
-	}
 
 }
 
-void callee_unmarshal_kernel__flush_work__work__io(
+void callee_unmarshal_kernel__flush_work__work__in(
 	size_t* __pos,
 	const struct fipc_message* __msg,
 	const struct ext_registers* __ext,
 	struct flush_work_call_ctx const* ctx,
 	struct work_struct* ptr)
 {
-	struct list_head* entry_ptr = &ptr->entry;
-
-	{
-		callee_unmarshal_kernel__flush_work__list_head__io(__pos, __msg, __ext, ctx, entry_ptr);
-	}
 
 	{
 	}
 }
 
-void callee_marshal_kernel__flush_work__work__io(
+void callee_marshal_kernel__flush_work__work__in(
 	size_t* __pos,
 	struct fipc_message* __msg,
 	struct ext_registers* __ext,
 	struct flush_work_call_ctx const* ctx,
 	struct work_struct const* ptr)
 {
-	struct list_head const* entry_ptr = &ptr->entry;
-
-	{
-		callee_marshal_kernel__flush_work__list_head__io(__pos, __msg, __ext, ctx, entry_ptr);
-	}
 
 }
 
-void caller_unmarshal_kernel__flush_work__work__io(
+void caller_unmarshal_kernel__flush_work__work__in(
 	size_t* __pos,
 	const struct fipc_message* __msg,
 	const struct ext_registers* __ext,
 	struct flush_work_call_ctx const* ctx,
 	struct work_struct* ptr)
-{
-	struct list_head* entry_ptr = &ptr->entry;
-
-	{
-		caller_unmarshal_kernel__flush_work__list_head__io(__pos, __msg, __ext, ctx, entry_ptr);
-	}
-
-	{
-	}
-}
-
-void caller_marshal_kernel__flush_work__list_head__io(
-	size_t* __pos,
-	struct fipc_message* __msg,
-	struct ext_registers* __ext,
-	struct flush_work_call_ctx const* ctx,
-	struct list_head const* ptr)
-{
-
-}
-
-void callee_unmarshal_kernel__flush_work__list_head__io(
-	size_t* __pos,
-	const struct fipc_message* __msg,
-	const struct ext_registers* __ext,
-	struct flush_work_call_ctx const* ctx,
-	struct list_head* ptr)
-{
-
-	{
-	}
-}
-
-void callee_marshal_kernel__flush_work__list_head__io(
-	size_t* __pos,
-	struct fipc_message* __msg,
-	struct ext_registers* __ext,
-	struct flush_work_call_ctx const* ctx,
-	struct list_head const* ptr)
-{
-
-}
-
-void caller_unmarshal_kernel__flush_work__list_head__io(
-	size_t* __pos,
-	const struct fipc_message* __msg,
-	const struct ext_registers* __ext,
-	struct flush_work_call_ctx const* ctx,
-	struct list_head* ptr)
 {
 
 	{
@@ -3499,21 +3247,21 @@ void caller_unmarshal_kernel__get_device__dev__in(
 	}
 }
 
-void caller_marshal_kernel__init_timer_key__timer__in(
+void caller_marshal_kernel__lvd_setup_timer__timer__io(
 	size_t* __pos,
 	struct fipc_message* __msg,
 	struct ext_registers* __ext,
-	struct init_timer_key_call_ctx const* ctx,
+	struct lvd_setup_timer_call_ctx const* ctx,
 	struct timer_list const* ptr)
 {
 
 }
 
-void callee_unmarshal_kernel__init_timer_key__timer__in(
+void callee_unmarshal_kernel__lvd_setup_timer__timer__io(
 	size_t* __pos,
 	const struct fipc_message* __msg,
 	const struct ext_registers* __ext,
-	struct init_timer_key_call_ctx const* ctx,
+	struct lvd_setup_timer_call_ctx const* ctx,
 	struct timer_list* ptr)
 {
 
@@ -3521,66 +3269,76 @@ void callee_unmarshal_kernel__init_timer_key__timer__in(
 	}
 }
 
-void callee_marshal_kernel__init_timer_key__timer__in(
+void callee_marshal_kernel__lvd_setup_timer__timer__io(
 	size_t* __pos,
 	struct fipc_message* __msg,
 	struct ext_registers* __ext,
-	struct init_timer_key_call_ctx const* ctx,
+	struct lvd_setup_timer_call_ctx const* ctx,
 	struct timer_list const* ptr)
 {
+	unsigned long const* data_ptr = &ptr->data;
+
+	{
+		glue_pack(__pos, __msg, __ext, *data_ptr);
+	}
 
 }
 
-void caller_unmarshal_kernel__init_timer_key__timer__in(
+void caller_unmarshal_kernel__lvd_setup_timer__timer__io(
 	size_t* __pos,
 	const struct fipc_message* __msg,
 	const struct ext_registers* __ext,
-	struct init_timer_key_call_ctx const* ctx,
+	struct lvd_setup_timer_call_ctx const* ctx,
 	struct timer_list* ptr)
 {
+	unsigned long* data_ptr = &ptr->data;
+
+	{
+		*data_ptr = glue_unpack(__pos, __msg, __ext, unsigned long);
+	}
 
 	{
 	}
 }
 
-void caller_marshal_kernel__init_timer_key__key__in(
+void caller_marshal_kernel__lvd_init_work__work__in(
 	size_t* __pos,
 	struct fipc_message* __msg,
 	struct ext_registers* __ext,
-	struct init_timer_key_call_ctx const* ctx,
-	struct lock_class_key const* ptr)
+	struct lvd_init_work_call_ctx const* ctx,
+	struct work_struct const* ptr)
 {
 
 }
 
-void callee_unmarshal_kernel__init_timer_key__key__in(
+void callee_unmarshal_kernel__lvd_init_work__work__in(
 	size_t* __pos,
 	const struct fipc_message* __msg,
 	const struct ext_registers* __ext,
-	struct init_timer_key_call_ctx const* ctx,
-	struct lock_class_key* ptr)
+	struct lvd_init_work_call_ctx const* ctx,
+	struct work_struct* ptr)
 {
 
 	{
 	}
 }
 
-void callee_marshal_kernel__init_timer_key__key__in(
+void callee_marshal_kernel__lvd_init_work__work__in(
 	size_t* __pos,
 	struct fipc_message* __msg,
 	struct ext_registers* __ext,
-	struct init_timer_key_call_ctx const* ctx,
-	struct lock_class_key const* ptr)
+	struct lvd_init_work_call_ctx const* ctx,
+	struct work_struct const* ptr)
 {
 
 }
 
-void caller_unmarshal_kernel__init_timer_key__key__in(
+void caller_unmarshal_kernel__lvd_init_work__work__in(
 	size_t* __pos,
 	const struct fipc_message* __msg,
 	const struct ext_registers* __ext,
-	struct init_timer_key_call_ctx const* ctx,
-	struct lock_class_key* ptr)
+	struct lvd_init_work_call_ctx const* ctx,
+	struct work_struct* ptr)
 {
 
 	{
@@ -3659,7 +3417,7 @@ void caller_unmarshal_kernel__irq_set_affinity_hint__m__in(
 	}
 }
 
-void caller_marshal_kernel__mod_timer__timer__io(
+void caller_marshal_kernel__mod_timer__timer__in(
 	size_t* __pos,
 	struct fipc_message* __msg,
 	struct ext_registers* __ext,
@@ -3669,7 +3427,7 @@ void caller_marshal_kernel__mod_timer__timer__io(
 
 }
 
-void callee_unmarshal_kernel__mod_timer__timer__io(
+void callee_unmarshal_kernel__mod_timer__timer__in(
 	size_t* __pos,
 	const struct fipc_message* __msg,
 	const struct ext_registers* __ext,
@@ -3681,7 +3439,7 @@ void callee_unmarshal_kernel__mod_timer__timer__io(
 	}
 }
 
-void callee_marshal_kernel__mod_timer__timer__io(
+void callee_marshal_kernel__mod_timer__timer__in(
 	size_t* __pos,
 	struct fipc_message* __msg,
 	struct ext_registers* __ext,
@@ -3691,7 +3449,7 @@ void callee_marshal_kernel__mod_timer__timer__io(
 
 }
 
-void caller_unmarshal_kernel__mod_timer__timer__io(
+void caller_unmarshal_kernel__mod_timer__timer__in(
 	size_t* __pos,
 	const struct fipc_message* __msg,
 	const struct ext_registers* __ext,
@@ -3747,44 +3505,123 @@ void caller_unmarshal_kernel__blk_mq_ops_exit_hctx__hctx__in(
 	}
 }
 
-void caller_marshal_kernel__blk_mq_ops_init_hctx__hctx__io(
+void caller_marshal_kernel__blk_mq_ops_init_hctx__hctx__in(
 	size_t* __pos,
 	struct fipc_message* __msg,
 	struct ext_registers* __ext,
 	struct blk_mq_ops_init_hctx_call_ctx const* ctx,
 	struct blk_mq_hw_ctx const* ptr)
 {
+	struct blk_mq_tags* const* tags_ptr = &ptr->tags;
+
+	{
+		__maybe_unused const void* __adjusted = *tags_ptr;
+		glue_pack(__pos, __msg, __ext, __adjusted);
+		if (*tags_ptr) {
+			caller_marshal_kernel__blk_mq_ops_init_hctx__blk_mq_hw_ctx_tags__in(__pos, __msg, __ext, ctx, *tags_ptr);
+		}
+
+	}
 
 }
 
-void callee_unmarshal_kernel__blk_mq_ops_init_hctx__hctx__io(
+void callee_unmarshal_kernel__blk_mq_ops_init_hctx__hctx__in(
 	size_t* __pos,
 	const struct fipc_message* __msg,
 	const struct ext_registers* __ext,
 	struct blk_mq_ops_init_hctx_call_ctx const* ctx,
 	struct blk_mq_hw_ctx* ptr)
+{
+	struct blk_mq_tags** tags_ptr = &ptr->tags;
+
+	{
+		*tags_ptr = glue_unpack_shadow(__pos, __msg, __ext, struct blk_mq_tags*);
+		if (*tags_ptr) {
+			callee_unmarshal_kernel__blk_mq_ops_init_hctx__blk_mq_hw_ctx_tags__in(__pos, __msg, __ext, ctx, *tags_ptr);
+		}
+
+	}
+
+	{
+	}
+}
+
+void callee_marshal_kernel__blk_mq_ops_init_hctx__hctx__in(
+	size_t* __pos,
+	struct fipc_message* __msg,
+	struct ext_registers* __ext,
+	struct blk_mq_ops_init_hctx_call_ctx const* ctx,
+	struct blk_mq_hw_ctx const* ptr)
+{
+	struct blk_mq_tags* const* tags_ptr = &ptr->tags;
+
+	{
+		if (*tags_ptr) {
+			callee_marshal_kernel__blk_mq_ops_init_hctx__blk_mq_hw_ctx_tags__in(__pos, __msg, __ext, ctx, *tags_ptr);
+		}
+
+	}
+
+}
+
+void caller_unmarshal_kernel__blk_mq_ops_init_hctx__hctx__in(
+	size_t* __pos,
+	const struct fipc_message* __msg,
+	const struct ext_registers* __ext,
+	struct blk_mq_ops_init_hctx_call_ctx const* ctx,
+	struct blk_mq_hw_ctx* ptr)
+{
+	struct blk_mq_tags** tags_ptr = &ptr->tags;
+
+	{
+		if (*tags_ptr) {
+			caller_unmarshal_kernel__blk_mq_ops_init_hctx__blk_mq_hw_ctx_tags__in(__pos, __msg, __ext, ctx, *tags_ptr);
+		}
+
+	}
+
+	{
+	}
+}
+
+void caller_marshal_kernel__blk_mq_ops_init_hctx__blk_mq_hw_ctx_tags__in(
+	size_t* __pos,
+	struct fipc_message* __msg,
+	struct ext_registers* __ext,
+	struct blk_mq_ops_init_hctx_call_ctx const* ctx,
+	struct blk_mq_tags const* ptr)
+{
+
+}
+
+void callee_unmarshal_kernel__blk_mq_ops_init_hctx__blk_mq_hw_ctx_tags__in(
+	size_t* __pos,
+	const struct fipc_message* __msg,
+	const struct ext_registers* __ext,
+	struct blk_mq_ops_init_hctx_call_ctx const* ctx,
+	struct blk_mq_tags* ptr)
 {
 
 	{
 	}
 }
 
-void callee_marshal_kernel__blk_mq_ops_init_hctx__hctx__io(
+void callee_marshal_kernel__blk_mq_ops_init_hctx__blk_mq_hw_ctx_tags__in(
 	size_t* __pos,
 	struct fipc_message* __msg,
 	struct ext_registers* __ext,
 	struct blk_mq_ops_init_hctx_call_ctx const* ctx,
-	struct blk_mq_hw_ctx const* ptr)
+	struct blk_mq_tags const* ptr)
 {
 
 }
 
-void caller_unmarshal_kernel__blk_mq_ops_init_hctx__hctx__io(
+void caller_unmarshal_kernel__blk_mq_ops_init_hctx__blk_mq_hw_ctx_tags__in(
 	size_t* __pos,
 	const struct fipc_message* __msg,
 	const struct ext_registers* __ext,
 	struct blk_mq_ops_init_hctx_call_ctx const* ctx,
-	struct blk_mq_hw_ctx* ptr)
+	struct blk_mq_tags* ptr)
 {
 
 	{
@@ -4933,6 +4770,314 @@ void caller_unmarshal_kernel__pci_error_handlers_resume__pdev__in(
 	}
 }
 
+void caller_marshal_kernel__reg_read32__nvme_ctrl__in(
+	size_t* __pos,
+	struct fipc_message* __msg,
+	struct ext_registers* __ext,
+	struct reg_read32_call_ctx const* ctx,
+	struct nvme_ctrl const* ptr)
+{
+
+}
+
+void callee_unmarshal_kernel__reg_read32__nvme_ctrl__in(
+	size_t* __pos,
+	const struct fipc_message* __msg,
+	const struct ext_registers* __ext,
+	struct reg_read32_call_ctx const* ctx,
+	struct nvme_ctrl* ptr)
+{
+
+	{
+	}
+}
+
+void callee_marshal_kernel__reg_read32__nvme_ctrl__in(
+	size_t* __pos,
+	struct fipc_message* __msg,
+	struct ext_registers* __ext,
+	struct reg_read32_call_ctx const* ctx,
+	struct nvme_ctrl const* ptr)
+{
+
+}
+
+void caller_unmarshal_kernel__reg_read32__nvme_ctrl__in(
+	size_t* __pos,
+	const struct fipc_message* __msg,
+	const struct ext_registers* __ext,
+	struct reg_read32_call_ctx const* ctx,
+	struct nvme_ctrl* ptr)
+{
+
+	{
+	}
+}
+
+void caller_marshal_kernel__reg_write32__nvme_ctrl__in(
+	size_t* __pos,
+	struct fipc_message* __msg,
+	struct ext_registers* __ext,
+	struct reg_write32_call_ctx const* ctx,
+	struct nvme_ctrl const* ptr)
+{
+
+}
+
+void callee_unmarshal_kernel__reg_write32__nvme_ctrl__in(
+	size_t* __pos,
+	const struct fipc_message* __msg,
+	const struct ext_registers* __ext,
+	struct reg_write32_call_ctx const* ctx,
+	struct nvme_ctrl* ptr)
+{
+
+	{
+	}
+}
+
+void callee_marshal_kernel__reg_write32__nvme_ctrl__in(
+	size_t* __pos,
+	struct fipc_message* __msg,
+	struct ext_registers* __ext,
+	struct reg_write32_call_ctx const* ctx,
+	struct nvme_ctrl const* ptr)
+{
+
+}
+
+void caller_unmarshal_kernel__reg_write32__nvme_ctrl__in(
+	size_t* __pos,
+	const struct fipc_message* __msg,
+	const struct ext_registers* __ext,
+	struct reg_write32_call_ctx const* ctx,
+	struct nvme_ctrl* ptr)
+{
+
+	{
+	}
+}
+
+void caller_marshal_kernel__reg_read64__nvme_ctrl__in(
+	size_t* __pos,
+	struct fipc_message* __msg,
+	struct ext_registers* __ext,
+	struct reg_read64_call_ctx const* ctx,
+	struct nvme_ctrl const* ptr)
+{
+
+}
+
+void callee_unmarshal_kernel__reg_read64__nvme_ctrl__in(
+	size_t* __pos,
+	const struct fipc_message* __msg,
+	const struct ext_registers* __ext,
+	struct reg_read64_call_ctx const* ctx,
+	struct nvme_ctrl* ptr)
+{
+
+	{
+	}
+}
+
+void callee_marshal_kernel__reg_read64__nvme_ctrl__in(
+	size_t* __pos,
+	struct fipc_message* __msg,
+	struct ext_registers* __ext,
+	struct reg_read64_call_ctx const* ctx,
+	struct nvme_ctrl const* ptr)
+{
+
+}
+
+void caller_unmarshal_kernel__reg_read64__nvme_ctrl__in(
+	size_t* __pos,
+	const struct fipc_message* __msg,
+	const struct ext_registers* __ext,
+	struct reg_read64_call_ctx const* ctx,
+	struct nvme_ctrl* ptr)
+{
+
+	{
+	}
+}
+
+void caller_marshal_kernel__reset_ctrl__nvme_ctrl__in(
+	size_t* __pos,
+	struct fipc_message* __msg,
+	struct ext_registers* __ext,
+	struct reset_ctrl_call_ctx const* ctx,
+	struct nvme_ctrl const* ptr)
+{
+
+}
+
+void callee_unmarshal_kernel__reset_ctrl__nvme_ctrl__in(
+	size_t* __pos,
+	const struct fipc_message* __msg,
+	const struct ext_registers* __ext,
+	struct reset_ctrl_call_ctx const* ctx,
+	struct nvme_ctrl* ptr)
+{
+
+	{
+	}
+}
+
+void callee_marshal_kernel__reset_ctrl__nvme_ctrl__in(
+	size_t* __pos,
+	struct fipc_message* __msg,
+	struct ext_registers* __ext,
+	struct reset_ctrl_call_ctx const* ctx,
+	struct nvme_ctrl const* ptr)
+{
+
+}
+
+void caller_unmarshal_kernel__reset_ctrl__nvme_ctrl__in(
+	size_t* __pos,
+	const struct fipc_message* __msg,
+	const struct ext_registers* __ext,
+	struct reset_ctrl_call_ctx const* ctx,
+	struct nvme_ctrl* ptr)
+{
+
+	{
+	}
+}
+
+void caller_marshal_kernel__free_ctrl__nvme_ctrl__in(
+	size_t* __pos,
+	struct fipc_message* __msg,
+	struct ext_registers* __ext,
+	struct free_ctrl_call_ctx const* ctx,
+	struct nvme_ctrl const* ptr)
+{
+
+}
+
+void callee_unmarshal_kernel__free_ctrl__nvme_ctrl__in(
+	size_t* __pos,
+	const struct fipc_message* __msg,
+	const struct ext_registers* __ext,
+	struct free_ctrl_call_ctx const* ctx,
+	struct nvme_ctrl* ptr)
+{
+
+	{
+	}
+}
+
+void callee_marshal_kernel__free_ctrl__nvme_ctrl__in(
+	size_t* __pos,
+	struct fipc_message* __msg,
+	struct ext_registers* __ext,
+	struct free_ctrl_call_ctx const* ctx,
+	struct nvme_ctrl const* ptr)
+{
+
+}
+
+void caller_unmarshal_kernel__free_ctrl__nvme_ctrl__in(
+	size_t* __pos,
+	const struct fipc_message* __msg,
+	const struct ext_registers* __ext,
+	struct free_ctrl_call_ctx const* ctx,
+	struct nvme_ctrl* ptr)
+{
+
+	{
+	}
+}
+
+void caller_marshal_kernel__post_scan__nvme_ctrl__in(
+	size_t* __pos,
+	struct fipc_message* __msg,
+	struct ext_registers* __ext,
+	struct post_scan_call_ctx const* ctx,
+	struct nvme_ctrl const* ptr)
+{
+
+}
+
+void callee_unmarshal_kernel__post_scan__nvme_ctrl__in(
+	size_t* __pos,
+	const struct fipc_message* __msg,
+	const struct ext_registers* __ext,
+	struct post_scan_call_ctx const* ctx,
+	struct nvme_ctrl* ptr)
+{
+
+	{
+	}
+}
+
+void callee_marshal_kernel__post_scan__nvme_ctrl__in(
+	size_t* __pos,
+	struct fipc_message* __msg,
+	struct ext_registers* __ext,
+	struct post_scan_call_ctx const* ctx,
+	struct nvme_ctrl const* ptr)
+{
+
+}
+
+void caller_unmarshal_kernel__post_scan__nvme_ctrl__in(
+	size_t* __pos,
+	const struct fipc_message* __msg,
+	const struct ext_registers* __ext,
+	struct post_scan_call_ctx const* ctx,
+	struct nvme_ctrl* ptr)
+{
+
+	{
+	}
+}
+
+void caller_marshal_kernel__submit_async_event__nvme_ctrl__in(
+	size_t* __pos,
+	struct fipc_message* __msg,
+	struct ext_registers* __ext,
+	struct submit_async_event_call_ctx const* ctx,
+	struct nvme_ctrl const* ptr)
+{
+
+}
+
+void callee_unmarshal_kernel__submit_async_event__nvme_ctrl__in(
+	size_t* __pos,
+	const struct fipc_message* __msg,
+	const struct ext_registers* __ext,
+	struct submit_async_event_call_ctx const* ctx,
+	struct nvme_ctrl* ptr)
+{
+
+	{
+	}
+}
+
+void callee_marshal_kernel__submit_async_event__nvme_ctrl__in(
+	size_t* __pos,
+	struct fipc_message* __msg,
+	struct ext_registers* __ext,
+	struct submit_async_event_call_ctx const* ctx,
+	struct nvme_ctrl const* ptr)
+{
+
+}
+
+void caller_unmarshal_kernel__submit_async_event__nvme_ctrl__in(
+	size_t* __pos,
+	const struct fipc_message* __msg,
+	const struct ext_registers* __ext,
+	struct submit_async_event_call_ctx const* ctx,
+	struct nvme_ctrl* ptr)
+{
+
+	{
+	}
+}
+
 void caller_marshal_kernel__nvme_init_ctrl__ctrl__io(
 	size_t* __pos,
 	struct fipc_message* __msg,
@@ -5222,6 +5367,68 @@ void caller_marshal_kernel__nvme_init_ctrl__ops__in(
 	struct nvme_init_ctrl_call_ctx const* ctx,
 	struct nvme_ctrl_ops const* ptr)
 {
+	char const* const* name_ptr = &ptr->name;
+	struct module* const* module_ptr = &ptr->module;
+	fptr_reg_read32 const* reg_read32_ptr = &ptr->reg_read32;
+	fptr_reg_write32 const* reg_write32_ptr = &ptr->reg_write32;
+	fptr_reg_read64 const* reg_read64_ptr = &ptr->reg_read64;
+	fptr_reset_ctrl const* reset_ctrl_ptr = &ptr->reset_ctrl;
+	fptr_free_ctrl const* free_ctrl_ptr = &ptr->free_ctrl;
+	fptr_post_scan const* post_scan_ptr = &ptr->post_scan;
+	fptr_submit_async_event const* submit_async_event_ptr = &ptr->submit_async_event;
+
+	{
+		__maybe_unused const void* __adjusted = *name_ptr;
+		glue_pack(__pos, __msg, __ext, __adjusted);
+		if (*name_ptr) {
+			size_t i, len;
+			char const* array = *name_ptr;
+			for (len = 0; array[len]; ++len);
+			glue_pack(__pos, __msg, __ext, len + 1);
+			for (i = 0; i < len; ++i) {
+				char const* element = &array[i];
+				glue_pack(__pos, __msg, __ext, *element);
+			}
+
+		}
+
+	}
+
+	{
+		__maybe_unused const void* __adjusted = *module_ptr;
+		glue_pack(__pos, __msg, __ext, __adjusted);
+		if (*module_ptr) {
+			caller_marshal_kernel__nvme_init_ctrl__module__in(__pos, __msg, __ext, ctx, *module_ptr);
+		}
+	}
+
+	{
+		glue_pack(__pos, __msg, __ext, *reg_read32_ptr);
+	}
+
+	{
+		glue_pack(__pos, __msg, __ext, *reg_write32_ptr);
+	}
+
+	{
+		glue_pack(__pos, __msg, __ext, *reg_read64_ptr);
+	}
+
+	{
+		glue_pack(__pos, __msg, __ext, *reset_ctrl_ptr);
+	}
+
+	{
+		glue_pack(__pos, __msg, __ext, *free_ctrl_ptr);
+	}
+
+	{
+		glue_pack(__pos, __msg, __ext, *post_scan_ptr);
+	}
+
+	{
+		glue_pack(__pos, __msg, __ext, *submit_async_event_ptr);
+	}
 
 }
 
@@ -5232,6 +5439,71 @@ void callee_unmarshal_kernel__nvme_init_ctrl__ops__in(
 	struct nvme_init_ctrl_call_ctx const* ctx,
 	struct nvme_ctrl_ops* ptr)
 {
+	char const** name_ptr = &ptr->name;
+	struct module** module_ptr = &ptr->module;
+	fptr_reg_read32* reg_read32_ptr = &ptr->reg_read32;
+	fptr_reg_write32* reg_write32_ptr = &ptr->reg_write32;
+	fptr_reg_read64* reg_read64_ptr = &ptr->reg_read64;
+	fptr_reset_ctrl* reset_ctrl_ptr = &ptr->reset_ctrl;
+	fptr_free_ctrl* free_ctrl_ptr = &ptr->free_ctrl;
+	fptr_post_scan* post_scan_ptr = &ptr->post_scan;
+	fptr_submit_async_event* submit_async_event_ptr = &ptr->submit_async_event;
+
+	{
+		size_t __size = sizeof(char) * glue_peek(__pos, __msg, __ext);
+		*name_ptr = glue_unpack_new_shadow(__pos, __msg, __ext, char const*, (__size), (DEFAULT_GFP_FLAGS));
+		if (*name_ptr) {
+			char* writable = (char*)*name_ptr;
+			size_t i, len;
+			char* array = writable;
+			len = glue_unpack(__pos, __msg, __ext, size_t) - 1;
+			array[len] = '\0';
+			for (i = 0; i < len; ++i) {
+				char* element = &array[i];
+				*element = glue_unpack(__pos, __msg, __ext, char);
+			}
+
+		}
+
+	}
+
+	{
+		size_t __size = sizeof(struct module);
+		*module_ptr = glue_unpack_new_shadow(__pos, __msg, __ext, struct module*, (__size), (DEFAULT_GFP_FLAGS));
+		if (*module_ptr) {
+			callee_unmarshal_kernel__nvme_init_ctrl__module__in(__pos, __msg, __ext, ctx, *module_ptr);
+		}
+		*module_ptr = THIS_MODULE;
+
+	}
+
+	{
+		*reg_read32_ptr = glue_unpack_rpc_ptr(__pos, __msg, __ext, reg_read32);
+	}
+
+	{
+		*reg_write32_ptr = glue_unpack_rpc_ptr(__pos, __msg, __ext, reg_write32);
+	}
+
+	{
+		*reg_read64_ptr = glue_unpack_rpc_ptr(__pos, __msg, __ext, reg_read64);
+	}
+
+	{
+		*reset_ctrl_ptr = glue_unpack_rpc_ptr(__pos, __msg, __ext, reset_ctrl);
+	}
+
+	{
+		*free_ctrl_ptr = glue_unpack_rpc_ptr(__pos, __msg, __ext, free_ctrl);
+	}
+
+	{
+		*post_scan_ptr = glue_unpack_rpc_ptr(__pos, __msg, __ext, post_scan);
+	}
+
+	{
+		*submit_async_event_ptr = glue_unpack_rpc_ptr(__pos, __msg, __ext, submit_async_event);
+	}
 
 	{
 	}
@@ -5244,6 +5516,19 @@ void callee_marshal_kernel__nvme_init_ctrl__ops__in(
 	struct nvme_init_ctrl_call_ctx const* ctx,
 	struct nvme_ctrl_ops const* ptr)
 {
+	char const* const* name_ptr = &ptr->name;
+	struct module* const* module_ptr = &ptr->module;
+
+	{
+		(void)name_ptr;
+	}
+
+	{
+		if (*module_ptr) {
+			callee_marshal_kernel__nvme_init_ctrl__module__in(__pos, __msg, __ext, ctx, *module_ptr);
+		}
+
+	}
 
 }
 
@@ -5253,6 +5538,63 @@ void caller_unmarshal_kernel__nvme_init_ctrl__ops__in(
 	const struct ext_registers* __ext,
 	struct nvme_init_ctrl_call_ctx const* ctx,
 	struct nvme_ctrl_ops* ptr)
+{
+	char const** name_ptr = &ptr->name;
+	struct module** module_ptr = &ptr->module;
+
+	{
+		(void)name_ptr;
+	}
+
+	{
+		if (*module_ptr) {
+			caller_unmarshal_kernel__nvme_init_ctrl__module__in(__pos, __msg, __ext, ctx, *module_ptr);
+		}
+
+	}
+
+	{
+	}
+}
+
+void caller_marshal_kernel__nvme_init_ctrl__module__in(
+	size_t* __pos,
+	struct fipc_message* __msg,
+	struct ext_registers* __ext,
+	struct nvme_init_ctrl_call_ctx const* ctx,
+	struct module const* ptr)
+{
+
+}
+
+void callee_unmarshal_kernel__nvme_init_ctrl__module__in(
+	size_t* __pos,
+	const struct fipc_message* __msg,
+	const struct ext_registers* __ext,
+	struct nvme_init_ctrl_call_ctx const* ctx,
+	struct module* ptr)
+{
+
+	{
+	}
+}
+
+void callee_marshal_kernel__nvme_init_ctrl__module__in(
+	size_t* __pos,
+	struct fipc_message* __msg,
+	struct ext_registers* __ext,
+	struct nvme_init_ctrl_call_ctx const* ctx,
+	struct module const* ptr)
+{
+
+}
+
+void caller_unmarshal_kernel__nvme_init_ctrl__module__in(
+	size_t* __pos,
+	const struct fipc_message* __msg,
+	const struct ext_registers* __ext,
+	struct nvme_init_ctrl_call_ctx const* ctx,
+	struct module* ptr)
 {
 
 	{
@@ -5929,13 +6271,8 @@ void caller_marshal_kernel__pci_driver_probe__device__in(
 	struct pci_driver_probe_call_ctx const* ctx,
 	struct device const* ptr)
 {
-	int const* numa_node_ptr = &ptr->numa_node;
 	unsigned long long* const* dma_mask_ptr = &ptr->dma_mask;
 	struct kobject const* kobj_ptr = &ptr->kobj;
-
-	{
-		glue_pack(__pos, __msg, __ext, *numa_node_ptr);
-	}
 
 	{
 		__maybe_unused const void* __adjusted = *dma_mask_ptr;
@@ -5968,13 +6305,8 @@ void callee_unmarshal_kernel__pci_driver_probe__device__in(
 	struct pci_driver_probe_call_ctx const* ctx,
 	struct device* ptr)
 {
-	int* numa_node_ptr = &ptr->numa_node;
 	unsigned long long** dma_mask_ptr = &ptr->dma_mask;
 	struct kobject* kobj_ptr = &ptr->kobj;
-
-	{
-		*numa_node_ptr = glue_unpack(__pos, __msg, __ext, int);
-	}
 
 	{
 		size_t __size = sizeof(unsigned long long) * glue_peek(__pos, __msg, __ext);
@@ -6009,13 +6341,8 @@ void callee_marshal_kernel__pci_driver_probe__device__in(
 	struct pci_driver_probe_call_ctx const* ctx,
 	struct device const* ptr)
 {
-	int const* numa_node_ptr = &ptr->numa_node;
 	unsigned long long* const* dma_mask_ptr = &ptr->dma_mask;
 	struct kobject const* kobj_ptr = &ptr->kobj;
-
-	{
-		glue_pack(__pos, __msg, __ext, *numa_node_ptr);
-	}
 
 	{
 		(void)dma_mask_ptr;
@@ -6034,13 +6361,8 @@ void caller_unmarshal_kernel__pci_driver_probe__device__in(
 	struct pci_driver_probe_call_ctx const* ctx,
 	struct device* ptr)
 {
-	int* numa_node_ptr = &ptr->numa_node;
 	unsigned long long** dma_mask_ptr = &ptr->dma_mask;
 	struct kobject* kobj_ptr = &ptr->kobj;
-
-	{
-		*numa_node_ptr = glue_unpack(__pos, __msg, __ext, int);
-	}
 
 	{
 		(void)dma_mask_ptr;
@@ -6093,7 +6415,7 @@ void callee_unmarshal_kernel__pci_driver_probe__kobject__in(
 
 	{
 		size_t __size = sizeof(char) * glue_peek(__pos, __msg, __ext);
-		*name_ptr = glue_unpack_bind_or_new_shadow(__pos, __msg, __ext, char const*, __size, DEFAULT_GFP_FLAGS);
+		*name_ptr = glue_unpack_bind_or_new_shadow(__pos, __msg, __ext, char const*, __size);
 		if (*name_ptr) {
 			char* writable = (char*)*name_ptr;
 			size_t i, len;
@@ -6426,7 +6748,7 @@ void caller_marshal_kernel__blk_mq_ops_queue_rq__hctx__in(
 
 	{
 		__maybe_unused const void* __adjusted = *queue_ptr;
-		glue_pack_shadow(__pos, __msg, __ext, __adjusted);
+		glue_pack(__pos, __msg, __ext, __adjusted);
 		if (*queue_ptr) {
 			caller_marshal_kernel__blk_mq_ops_queue_rq__blk_mq_hw_ctx_queue__in(__pos, __msg, __ext, ctx, *queue_ptr);
 		}
@@ -6445,7 +6767,7 @@ void callee_unmarshal_kernel__blk_mq_ops_queue_rq__hctx__in(
 	struct request_queue** queue_ptr = &ptr->queue;
 
 	{
-		*queue_ptr = glue_unpack(__pos, __msg, __ext, struct request_queue*);
+		*queue_ptr = glue_unpack_shadow(__pos, __msg, __ext, struct request_queue*);
 		if (*queue_ptr) {
 			callee_unmarshal_kernel__blk_mq_ops_queue_rq__blk_mq_hw_ctx_queue__in(__pos, __msg, __ext, ctx, *queue_ptr);
 		}
@@ -6549,7 +6871,7 @@ void caller_marshal_kernel__blk_mq_ops_queue_rq__bd__in(
 
 	{
 		__maybe_unused const void* __adjusted = *rq_ptr;
-		glue_pack_shadow(__pos, __msg, __ext, __adjusted);
+		glue_pack(__pos, __msg, __ext, __adjusted);
 		if (*rq_ptr) {
 			caller_marshal_kernel__blk_mq_ops_queue_rq__blk_mq_queue_data_rq__in(__pos, __msg, __ext, ctx, *rq_ptr);
 		}
@@ -6568,7 +6890,7 @@ void callee_unmarshal_kernel__blk_mq_ops_queue_rq__bd__in(
 	struct request** rq_ptr = &ptr->rq;
 
 	{
-		*rq_ptr = glue_unpack(__pos, __msg, __ext, struct request*);
+		*rq_ptr = glue_unpack_shadow(__pos, __msg, __ext, struct request*);
 		if (*rq_ptr) {
 			callee_unmarshal_kernel__blk_mq_ops_queue_rq__blk_mq_queue_data_rq__in(__pos, __msg, __ext, ctx, *rq_ptr);
 		}
@@ -9188,65 +9510,21 @@ void caller_unmarshal_kernel__put_device__dev__in(
 	}
 }
 
-void caller_marshal_kernel__queue_work_on__wq__in(
+void caller_marshal_kernel__work_fn__work__in(
 	size_t* __pos,
 	struct fipc_message* __msg,
 	struct ext_registers* __ext,
-	struct queue_work_on_call_ctx const* ctx,
-	struct workqueue_struct const* ptr)
-{
-
-}
-
-void callee_unmarshal_kernel__queue_work_on__wq__in(
-	size_t* __pos,
-	const struct fipc_message* __msg,
-	const struct ext_registers* __ext,
-	struct queue_work_on_call_ctx const* ctx,
-	struct workqueue_struct* ptr)
-{
-
-	{
-	}
-}
-
-void callee_marshal_kernel__queue_work_on__wq__in(
-	size_t* __pos,
-	struct fipc_message* __msg,
-	struct ext_registers* __ext,
-	struct queue_work_on_call_ctx const* ctx,
-	struct workqueue_struct const* ptr)
-{
-
-}
-
-void caller_unmarshal_kernel__queue_work_on__wq__in(
-	size_t* __pos,
-	const struct fipc_message* __msg,
-	const struct ext_registers* __ext,
-	struct queue_work_on_call_ctx const* ctx,
-	struct workqueue_struct* ptr)
-{
-
-	{
-	}
-}
-
-void caller_marshal_kernel__queue_work_on__work__io(
-	size_t* __pos,
-	struct fipc_message* __msg,
-	struct ext_registers* __ext,
-	struct queue_work_on_call_ctx const* ctx,
+	struct work_fn_call_ctx const* ctx,
 	struct work_struct const* ptr)
 {
 
 }
 
-void callee_unmarshal_kernel__queue_work_on__work__io(
+void callee_unmarshal_kernel__work_fn__work__in(
 	size_t* __pos,
 	const struct fipc_message* __msg,
 	const struct ext_registers* __ext,
-	struct queue_work_on_call_ctx const* ctx,
+	struct work_fn_call_ctx const* ctx,
 	struct work_struct* ptr)
 {
 
@@ -9254,21 +9532,109 @@ void callee_unmarshal_kernel__queue_work_on__work__io(
 	}
 }
 
-void callee_marshal_kernel__queue_work_on__work__io(
+void callee_marshal_kernel__work_fn__work__in(
 	size_t* __pos,
 	struct fipc_message* __msg,
 	struct ext_registers* __ext,
-	struct queue_work_on_call_ctx const* ctx,
+	struct work_fn_call_ctx const* ctx,
 	struct work_struct const* ptr)
 {
 
 }
 
-void caller_unmarshal_kernel__queue_work_on__work__io(
+void caller_unmarshal_kernel__work_fn__work__in(
 	size_t* __pos,
 	const struct fipc_message* __msg,
 	const struct ext_registers* __ext,
-	struct queue_work_on_call_ctx const* ctx,
+	struct work_fn_call_ctx const* ctx,
+	struct work_struct* ptr)
+{
+
+	{
+	}
+}
+
+void caller_marshal_kernel__lvd_queue_work__wq__in(
+	size_t* __pos,
+	struct fipc_message* __msg,
+	struct ext_registers* __ext,
+	struct lvd_queue_work_call_ctx const* ctx,
+	struct workqueue_struct const* ptr)
+{
+
+}
+
+void callee_unmarshal_kernel__lvd_queue_work__wq__in(
+	size_t* __pos,
+	const struct fipc_message* __msg,
+	const struct ext_registers* __ext,
+	struct lvd_queue_work_call_ctx const* ctx,
+	struct workqueue_struct* ptr)
+{
+
+	{
+	}
+}
+
+void callee_marshal_kernel__lvd_queue_work__wq__in(
+	size_t* __pos,
+	struct fipc_message* __msg,
+	struct ext_registers* __ext,
+	struct lvd_queue_work_call_ctx const* ctx,
+	struct workqueue_struct const* ptr)
+{
+
+}
+
+void caller_unmarshal_kernel__lvd_queue_work__wq__in(
+	size_t* __pos,
+	const struct fipc_message* __msg,
+	const struct ext_registers* __ext,
+	struct lvd_queue_work_call_ctx const* ctx,
+	struct workqueue_struct* ptr)
+{
+
+	{
+	}
+}
+
+void caller_marshal_kernel__lvd_queue_work__work__in(
+	size_t* __pos,
+	struct fipc_message* __msg,
+	struct ext_registers* __ext,
+	struct lvd_queue_work_call_ctx const* ctx,
+	struct work_struct const* ptr)
+{
+
+}
+
+void callee_unmarshal_kernel__lvd_queue_work__work__in(
+	size_t* __pos,
+	const struct fipc_message* __msg,
+	const struct ext_registers* __ext,
+	struct lvd_queue_work_call_ctx const* ctx,
+	struct work_struct* ptr)
+{
+
+	{
+	}
+}
+
+void callee_marshal_kernel__lvd_queue_work__work__in(
+	size_t* __pos,
+	struct fipc_message* __msg,
+	struct ext_registers* __ext,
+	struct lvd_queue_work_call_ctx const* ctx,
+	struct work_struct const* ptr)
+{
+
+}
+
+void caller_unmarshal_kernel__lvd_queue_work__work__in(
+	size_t* __pos,
+	const struct fipc_message* __msg,
+	const struct ext_registers* __ext,
+	struct lvd_queue_work_call_ctx const* ctx,
 	struct work_struct* ptr)
 {
 
@@ -9466,6 +9832,46 @@ void caller_unmarshal_kernel__blk_mq_map_queue__q__in(
 	const struct ext_registers* __ext,
 	struct blk_mq_map_queue_call_ctx const* ctx,
 	struct request_queue* ptr)
+{
+
+	{
+	}
+}
+
+void caller_marshal_kernel__wq__out(
+	size_t* __pos,
+	struct fipc_message* __msg,
+	struct ext_registers* __ext,
+	struct workqueue_struct const* ptr)
+{
+
+}
+
+void callee_unmarshal_kernel__wq__out(
+	size_t* __pos,
+	const struct fipc_message* __msg,
+	const struct ext_registers* __ext,
+	struct workqueue_struct* ptr)
+{
+
+	{
+	}
+}
+
+void callee_marshal_kernel__wq__out(
+	size_t* __pos,
+	struct fipc_message* __msg,
+	struct ext_registers* __ext,
+	struct workqueue_struct const* ptr)
+{
+
+}
+
+void caller_unmarshal_kernel__wq__out(
+	size_t* __pos,
+	const struct fipc_message* __msg,
+	const struct ext_registers* __ext,
+	struct workqueue_struct* ptr)
 {
 
 	{

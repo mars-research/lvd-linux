@@ -25,14 +25,14 @@
 		printk("%s:%d, unpack new shadow for type %s | size %llu\n", __func__, __LINE__, __stringify(type), (uint64_t) size); \
 	(type)glue_unpack_new_shadow_impl(glue_unpack(pos, msg, ext, void*), size, flags); })
 
-#define glue_unpack_bind_or_new_shadow(pos, msg, ext, type, size, flags) ({ \
+#define glue_unpack_bind_or_new_shadow(pos, msg, ext, type, size) ({ \
 	if (verbose_debug) \
 		printk("%s:%d, unpack or bind new shadow for type %s | size %llu\n", __func__, __LINE__, __stringify(type), (uint64_t) size); \
-	(type)glue_unpack_bind_or_new_shadow_impl(glue_unpack(pos, msg, ext, void*), size, flags); })
+	(type)glue_unpack_bind_or_new_shadow_impl(glue_unpack(pos, msg, ext, void*), size); })
 
 #ifndef LCD_ISOLATE
 #define glue_unpack_rpc_ptr(pos, msg, ext, name) \
-	glue_peek(pos, msg, ext) ? (fptr_##name)glue_unpack_rpc_ptr_impl(glue_unpack(pos, msg, ext, void*), LCD_DUP_TRAMPOLINE(trmp_##name), LCD_TRAMPOLINE_SIZE(trmp_##name)) : NULL
+	(fptr_##name)glue_unpack_rpc_ptr_impl(glue_unpack(pos, msg, ext, void*), LCD_DUP_TRAMPOLINE(trmp_##name), LCD_TRAMPOLINE_SIZE(trmp_##name))
 
 #else
 #define glue_unpack_rpc_ptr(pos, msg, ext, name) NULL; glue_user_panic("Trampolines cannot be used on LCD side")
@@ -60,8 +60,10 @@ void glue_user_remove_shadow(void* shadow);
 
 static inline void* glue_unpack_rpc_ptr_impl(void* target, struct lcd_trampoline_handle* handle, size_t size)
 {
-	if (!target)
-		glue_user_panic("Target was NULL");
+	if (!target) {
+		LIBLCD_WARN("Target was NULL");
+		return NULL;
+	}
 
 	if (!handle)
 		glue_user_panic("Trmp was NULL");
@@ -115,7 +117,7 @@ static inline void* glue_unpack_new_shadow_impl(const void* ptr, size_t size, gf
 	return shadow;
 }
 
-static inline void* glue_unpack_bind_or_new_shadow_impl(const void* ptr, size_t size, gfp_t flags)
+static inline void* glue_unpack_bind_or_new_shadow_impl(const void* ptr, size_t size)
 {
 	void* shadow = 0;
 	if (!ptr)
@@ -123,7 +125,7 @@ static inline void* glue_unpack_bind_or_new_shadow_impl(const void* ptr, size_t 
 
 	shadow = glue_user_map_to_shadow(ptr, false);
 	if (!shadow) {
-		shadow = glue_user_alloc(size, flags);
+		shadow = glue_user_alloc(size, DEFAULT_GFP_FLAGS);
 		glue_user_add_shadow(ptr, shadow);
 	}
 	return shadow;
@@ -150,8 +152,7 @@ enum RPC_ID {
 	MODULE_INIT,
 	MODULE_EXIT,
 	RPC_ID_shared_mem_init,
-	RPC_ID___alloc_workqueue_key,
-	RPC_ID___bitmap_weight,
+	RPC_ID_lvd_alloc_workqueue,
 	RPC_ID___pci_register_driver,
 	RPC_ID_blk_cleanup_queue,
 	RPC_ID_done,
@@ -177,8 +178,10 @@ enum RPC_ID {
 	RPC_ID_device_release_driver,
 	RPC_ID_flush_work,
 	RPC_ID_free_irq,
+	RPC_ID_timer_func,
 	RPC_ID_get_device,
-	RPC_ID_init_timer_key,
+	RPC_ID_lvd_setup_timer,
+	RPC_ID_lvd_init_work,
 	RPC_ID_ioremap_nocache,
 	RPC_ID_irq_set_affinity_hint,
 	RPC_ID_mod_timer,
@@ -195,6 +198,13 @@ enum RPC_ID {
 	RPC_ID_pci_cleanup_aer_uncorrect_error_status,
 	RPC_ID_pci_error_handlers_error_detected,
 	RPC_ID_pci_error_handlers_resume,
+	RPC_ID_reg_read32,
+	RPC_ID_reg_write32,
+	RPC_ID_reg_read64,
+	RPC_ID_reset_ctrl,
+	RPC_ID_free_ctrl,
+	RPC_ID_post_scan,
+	RPC_ID_submit_async_event,
 	RPC_ID_nvme_init_ctrl,
 	RPC_ID_nvme_init_identify,
 	RPC_ID_nvme_kill_queues,
@@ -237,7 +247,8 @@ enum RPC_ID {
 	RPC_ID_pci_set_master,
 	RPC_ID_pci_unregister_driver,
 	RPC_ID_put_device,
-	RPC_ID_queue_work_on,
+	RPC_ID_work_fn,
+	RPC_ID_lvd_queue_work,
 	RPC_ID_thread_fn,
 	RPC_ID_handler,
 	RPC_ID_request_threaded_irq,
@@ -245,6 +256,11 @@ enum RPC_ID {
 	RPC_ID_wait_for_completion_io_timeout,
 	RPC_ID_work_busy,
 	RPC_ID_blk_mq_map_queue,
+	RPC_ID___global_init_var_jiffies,
+	RPC_ID___global_init_var_nvme_io_timeout,
+	RPC_ID___global_init_var_nvme_max_retries,
+	RPC_ID___global_init_var_admin_timeout,
+	RPC_ID___global_init_var_system_wq,
 };
 
 int try_dispatch(enum RPC_ID id, struct fipc_message* __msg, struct ext_registers* __ext);
@@ -266,6 +282,12 @@ typedef void (*fptr_impl_tag_iter_fn)(fptr_tag_iter_fn target, struct request* r
 
 LCD_TRAMPOLINE_DATA(trmp_tag_iter_fn)
 void LCD_TRAMPOLINE_LINKAGE(trmp_tag_iter_fn) trmp_tag_iter_fn(struct request* rq, void* data, bool enable);
+
+typedef void (*fptr_timer_func)(unsigned long data);
+typedef void (*fptr_impl_timer_func)(fptr_timer_func target, unsigned long data);
+
+LCD_TRAMPOLINE_DATA(trmp_timer_func)
+void LCD_TRAMPOLINE_LINKAGE(trmp_timer_func) trmp_timer_func(unsigned long data);
 
 typedef void (*fptr_blk_mq_ops_exit_hctx)(struct blk_mq_hw_ctx* hctx, unsigned int hctx_idx);
 typedef void (*fptr_impl_blk_mq_ops_exit_hctx)(fptr_blk_mq_ops_exit_hctx target, struct blk_mq_hw_ctx* hctx, unsigned int hctx_idx);
@@ -302,6 +324,48 @@ typedef void (*fptr_impl_pci_error_handlers_resume)(fptr_pci_error_handlers_resu
 
 LCD_TRAMPOLINE_DATA(trmp_pci_error_handlers_resume)
 void LCD_TRAMPOLINE_LINKAGE(trmp_pci_error_handlers_resume) trmp_pci_error_handlers_resume(struct pci_dev* pdev);
+
+typedef int (*fptr_reg_read32)(struct nvme_ctrl* ctrl, unsigned int off, unsigned int* val);
+typedef int (*fptr_impl_reg_read32)(fptr_reg_read32 target, struct nvme_ctrl* ctrl, unsigned int off, unsigned int* val);
+
+LCD_TRAMPOLINE_DATA(trmp_reg_read32)
+int LCD_TRAMPOLINE_LINKAGE(trmp_reg_read32) trmp_reg_read32(struct nvme_ctrl* ctrl, unsigned int off, unsigned int* val);
+
+typedef int (*fptr_reg_write32)(struct nvme_ctrl* ctrl, unsigned int off, unsigned int val);
+typedef int (*fptr_impl_reg_write32)(fptr_reg_write32 target, struct nvme_ctrl* ctrl, unsigned int off, unsigned int val);
+
+LCD_TRAMPOLINE_DATA(trmp_reg_write32)
+int LCD_TRAMPOLINE_LINKAGE(trmp_reg_write32) trmp_reg_write32(struct nvme_ctrl* ctrl, unsigned int off, unsigned int val);
+
+typedef int (*fptr_reg_read64)(struct nvme_ctrl* ctrl, unsigned int off, unsigned long long* val);
+typedef int (*fptr_impl_reg_read64)(fptr_reg_read64 target, struct nvme_ctrl* ctrl, unsigned int off, unsigned long long* val);
+
+LCD_TRAMPOLINE_DATA(trmp_reg_read64)
+int LCD_TRAMPOLINE_LINKAGE(trmp_reg_read64) trmp_reg_read64(struct nvme_ctrl* ctrl, unsigned int off, unsigned long long* val);
+
+typedef int (*fptr_reset_ctrl)(struct nvme_ctrl* ctrl);
+typedef int (*fptr_impl_reset_ctrl)(fptr_reset_ctrl target, struct nvme_ctrl* ctrl);
+
+LCD_TRAMPOLINE_DATA(trmp_reset_ctrl)
+int LCD_TRAMPOLINE_LINKAGE(trmp_reset_ctrl) trmp_reset_ctrl(struct nvme_ctrl* ctrl);
+
+typedef void (*fptr_free_ctrl)(struct nvme_ctrl* ctrl);
+typedef void (*fptr_impl_free_ctrl)(fptr_free_ctrl target, struct nvme_ctrl* ctrl);
+
+LCD_TRAMPOLINE_DATA(trmp_free_ctrl)
+void LCD_TRAMPOLINE_LINKAGE(trmp_free_ctrl) trmp_free_ctrl(struct nvme_ctrl* ctrl);
+
+typedef void (*fptr_post_scan)(struct nvme_ctrl* ctrl);
+typedef void (*fptr_impl_post_scan)(fptr_post_scan target, struct nvme_ctrl* ctrl);
+
+LCD_TRAMPOLINE_DATA(trmp_post_scan)
+void LCD_TRAMPOLINE_LINKAGE(trmp_post_scan) trmp_post_scan(struct nvme_ctrl* ctrl);
+
+typedef void (*fptr_submit_async_event)(struct nvme_ctrl* ctrl, int aer_idx);
+typedef void (*fptr_impl_submit_async_event)(fptr_submit_async_event target, struct nvme_ctrl* ctrl, int aer_idx);
+
+LCD_TRAMPOLINE_DATA(trmp_submit_async_event)
+void LCD_TRAMPOLINE_LINKAGE(trmp_submit_async_event) trmp_submit_async_event(struct nvme_ctrl* ctrl, int aer_idx);
 
 typedef int (*fptr_pci_driver_sriov_configure)(struct pci_dev* pdev, int numvfs);
 typedef int (*fptr_impl_pci_driver_sriov_configure)(fptr_pci_driver_sriov_configure target, struct pci_dev* pdev, int numvfs);
@@ -357,6 +421,12 @@ typedef unsigned int (*fptr_impl_blk_mq_ops_timeout)(fptr_blk_mq_ops_timeout tar
 LCD_TRAMPOLINE_DATA(trmp_blk_mq_ops_timeout)
 unsigned int LCD_TRAMPOLINE_LINKAGE(trmp_blk_mq_ops_timeout) trmp_blk_mq_ops_timeout(struct request* req, bool reserved);
 
+typedef void (*fptr_work_fn)(struct work_struct* work);
+typedef void (*fptr_impl_work_fn)(fptr_work_fn target, struct work_struct* work);
+
+LCD_TRAMPOLINE_DATA(trmp_work_fn)
+void LCD_TRAMPOLINE_LINKAGE(trmp_work_fn) trmp_work_fn(struct work_struct* work);
+
 typedef unsigned int (*fptr_thread_fn)(int irq, void* id);
 typedef unsigned int (*fptr_impl_thread_fn)(fptr_thread_fn target, int irq, void* id);
 
@@ -369,17 +439,10 @@ typedef unsigned int (*fptr_impl_handler)(fptr_handler target, int irq, void* id
 LCD_TRAMPOLINE_DATA(trmp_handler)
 unsigned int LCD_TRAMPOLINE_LINKAGE(trmp_handler) trmp_handler(int irq, void* id);
 
-struct __alloc_workqueue_key_call_ctx {
-	char* fmt;
+struct lvd_alloc_workqueue_call_ctx {
+	char const* fmt;
 	unsigned int flags;
 	int max_active;
-	struct lock_class_key* key;
-	char* lock_name;
-};
-
-struct __bitmap_weight_call_ctx {
-	unsigned long* bitmap;
-	unsigned int bits;
 };
 
 struct __pci_register_driver_call_ctx {
@@ -499,15 +562,23 @@ struct free_irq_call_ctx {
 	void* dev_id;
 };
 
+struct timer_func_call_ctx {
+	unsigned long data;
+};
+
 struct get_device_call_ctx {
 	struct device* dev;
 };
 
-struct init_timer_key_call_ctx {
+struct lvd_setup_timer_call_ctx {
 	struct timer_list* timer;
-	unsigned int flags;
-	char* name;
-	struct lock_class_key* key;
+	fptr_timer_func func;
+	unsigned long data;
+};
+
+struct lvd_init_work_call_ctx {
+	struct work_struct* work;
+	fptr_work_fn work_fn;
 };
 
 struct ioremap_nocache_call_ctx {
@@ -517,7 +588,7 @@ struct ioremap_nocache_call_ctx {
 
 struct irq_set_affinity_hint_call_ctx {
 	unsigned int irq;
-	struct cpumask* m;
+	struct cpumask const* m;
 };
 
 struct mod_timer_call_ctx {
@@ -594,10 +665,45 @@ struct pci_error_handlers_resume_call_ctx {
 	struct pci_dev* pdev;
 };
 
+struct reg_read32_call_ctx {
+	struct nvme_ctrl* ctrl;
+	unsigned int off;
+	unsigned int* val;
+};
+
+struct reg_write32_call_ctx {
+	struct nvme_ctrl* ctrl;
+	unsigned int off;
+	unsigned int val;
+};
+
+struct reg_read64_call_ctx {
+	struct nvme_ctrl* ctrl;
+	unsigned int off;
+	unsigned long long* val;
+};
+
+struct reset_ctrl_call_ctx {
+	struct nvme_ctrl* ctrl;
+};
+
+struct free_ctrl_call_ctx {
+	struct nvme_ctrl* ctrl;
+};
+
+struct post_scan_call_ctx {
+	struct nvme_ctrl* ctrl;
+};
+
+struct submit_async_event_call_ctx {
+	struct nvme_ctrl* ctrl;
+	int aer_idx;
+};
+
 struct nvme_init_ctrl_call_ctx {
 	struct nvme_ctrl* ctrl;
 	struct device* dev;
-	struct nvme_ctrl_ops* ops;
+	struct nvme_ctrl_ops const* ops;
 	unsigned long quirks;
 };
 
@@ -734,8 +840,7 @@ struct pci_enable_msi_range_call_ctx {
 struct pci_enable_msix_call_ctx {
 	struct pci_dev* dev;
 	struct msix_entry* entries;
-	int minvec;
-	int maxvec;
+	int nvec;
 };
 
 struct pci_enable_msix_range_call_ctx {
@@ -789,8 +894,11 @@ struct put_device_call_ctx {
 	struct device* dev;
 };
 
-struct queue_work_on_call_ctx {
-	int cpu;
+struct work_fn_call_ctx {
+	struct work_struct* work;
+};
+
+struct lvd_queue_work_call_ctx {
 	struct workqueue_struct* wq;
 	struct work_struct* work;
 };
@@ -832,61 +940,48 @@ struct blk_mq_map_queue_call_ctx {
 	int cpu;
 };
 
-void caller_marshal_kernel____alloc_workqueue_key__ret_workqueue_struct__out(
+struct __global_init_var_jiffies_call_ctx {
+};
+
+struct __global_init_var_nvme_io_timeout_call_ctx {
+};
+
+struct __global_init_var_nvme_max_retries_call_ctx {
+};
+
+struct __global_init_var_admin_timeout_call_ctx {
+};
+
+struct __global_init_var_system_wq_call_ctx {
+};
+
+void caller_marshal_kernel__lvd_alloc_workqueue__ret_workqueue_struct__out(
 	size_t* __pos,
 	struct fipc_message* __msg,
 	struct ext_registers* __ext,
-	struct __alloc_workqueue_key_call_ctx const* call_ctx,
+	struct lvd_alloc_workqueue_call_ctx const* call_ctx,
 	struct workqueue_struct const* ptr);
 
-void callee_unmarshal_kernel____alloc_workqueue_key__ret_workqueue_struct__out(
+void callee_unmarshal_kernel__lvd_alloc_workqueue__ret_workqueue_struct__out(
 	size_t* __pos,
 	const struct fipc_message* __msg,
 	const struct ext_registers* __ext,
-	struct __alloc_workqueue_key_call_ctx const* call_ctx,
+	struct lvd_alloc_workqueue_call_ctx const* call_ctx,
 	struct workqueue_struct* ptr);
 
-void callee_marshal_kernel____alloc_workqueue_key__ret_workqueue_struct__out(
+void callee_marshal_kernel__lvd_alloc_workqueue__ret_workqueue_struct__out(
 	size_t* __pos,
 	struct fipc_message* __msg,
 	struct ext_registers* __ext,
-	struct __alloc_workqueue_key_call_ctx const* call_ctx,
+	struct lvd_alloc_workqueue_call_ctx const* call_ctx,
 	struct workqueue_struct const* ptr);
 
-void caller_unmarshal_kernel____alloc_workqueue_key__ret_workqueue_struct__out(
+void caller_unmarshal_kernel__lvd_alloc_workqueue__ret_workqueue_struct__out(
 	size_t* __pos,
 	const struct fipc_message* __msg,
 	const struct ext_registers* __ext,
-	struct __alloc_workqueue_key_call_ctx const* call_ctx,
+	struct lvd_alloc_workqueue_call_ctx const* call_ctx,
 	struct workqueue_struct* ptr);
-
-void caller_marshal_kernel____alloc_workqueue_key__key__in(
-	size_t* __pos,
-	struct fipc_message* __msg,
-	struct ext_registers* __ext,
-	struct __alloc_workqueue_key_call_ctx const* call_ctx,
-	struct lock_class_key const* ptr);
-
-void callee_unmarshal_kernel____alloc_workqueue_key__key__in(
-	size_t* __pos,
-	const struct fipc_message* __msg,
-	const struct ext_registers* __ext,
-	struct __alloc_workqueue_key_call_ctx const* call_ctx,
-	struct lock_class_key* ptr);
-
-void callee_marshal_kernel____alloc_workqueue_key__key__in(
-	size_t* __pos,
-	struct fipc_message* __msg,
-	struct ext_registers* __ext,
-	struct __alloc_workqueue_key_call_ctx const* call_ctx,
-	struct lock_class_key const* ptr);
-
-void caller_unmarshal_kernel____alloc_workqueue_key__key__in(
-	size_t* __pos,
-	const struct fipc_message* __msg,
-	const struct ext_registers* __ext,
-	struct __alloc_workqueue_key_call_ctx const* call_ctx,
-	struct lock_class_key* ptr);
 
 void caller_marshal_kernel___global_pci_driver__in(
 	size_t* __pos,
@@ -1184,80 +1279,80 @@ void caller_unmarshal_kernel__blk_get_queue__q__in(
 	struct blk_get_queue_call_ctx const* call_ctx,
 	struct request_queue* ptr);
 
-void caller_marshal_kernel__blk_mq_alloc_tag_set__set__io(
+void caller_marshal_kernel__blk_mq_alloc_tag_set__set__in(
 	size_t* __pos,
 	struct fipc_message* __msg,
 	struct ext_registers* __ext,
 	struct blk_mq_alloc_tag_set_call_ctx const* call_ctx,
 	struct blk_mq_tag_set const* ptr);
 
-void callee_unmarshal_kernel__blk_mq_alloc_tag_set__set__io(
+void callee_unmarshal_kernel__blk_mq_alloc_tag_set__set__in(
 	size_t* __pos,
 	const struct fipc_message* __msg,
 	const struct ext_registers* __ext,
 	struct blk_mq_alloc_tag_set_call_ctx const* call_ctx,
 	struct blk_mq_tag_set* ptr);
 
-void callee_marshal_kernel__blk_mq_alloc_tag_set__set__io(
+void callee_marshal_kernel__blk_mq_alloc_tag_set__set__in(
 	size_t* __pos,
 	struct fipc_message* __msg,
 	struct ext_registers* __ext,
 	struct blk_mq_alloc_tag_set_call_ctx const* call_ctx,
 	struct blk_mq_tag_set const* ptr);
 
-void caller_unmarshal_kernel__blk_mq_alloc_tag_set__set__io(
+void caller_unmarshal_kernel__blk_mq_alloc_tag_set__set__in(
 	size_t* __pos,
 	const struct fipc_message* __msg,
 	const struct ext_registers* __ext,
 	struct blk_mq_alloc_tag_set_call_ctx const* call_ctx,
 	struct blk_mq_tag_set* ptr);
 
-void caller_marshal_kernel___global_blk_mq_ops__io(
+void caller_marshal_kernel___global_blk_mq_ops__in(
 	size_t* __pos,
 	struct fipc_message* __msg,
 	struct ext_registers* __ext,
 	struct blk_mq_ops const* ptr);
 
-void callee_unmarshal_kernel___global_blk_mq_ops__io(
+void callee_unmarshal_kernel___global_blk_mq_ops__in(
 	size_t* __pos,
 	const struct fipc_message* __msg,
 	const struct ext_registers* __ext,
 	struct blk_mq_ops* ptr);
 
-void callee_marshal_kernel___global_blk_mq_ops__io(
+void callee_marshal_kernel___global_blk_mq_ops__in(
 	size_t* __pos,
 	struct fipc_message* __msg,
 	struct ext_registers* __ext,
 	struct blk_mq_ops const* ptr);
 
-void caller_unmarshal_kernel___global_blk_mq_ops__io(
+void caller_unmarshal_kernel___global_blk_mq_ops__in(
 	size_t* __pos,
 	const struct fipc_message* __msg,
 	const struct ext_registers* __ext,
 	struct blk_mq_ops* ptr);
 
-void caller_marshal_kernel__blk_mq_alloc_tag_set__blk_mq_tag_set_tags__io(
+void caller_marshal_kernel__blk_mq_alloc_tag_set__blk_mq_tag_set_tags__out(
 	size_t* __pos,
 	struct fipc_message* __msg,
 	struct ext_registers* __ext,
 	struct blk_mq_alloc_tag_set_call_ctx const* call_ctx,
 	struct blk_mq_tags const* ptr);
 
-void callee_unmarshal_kernel__blk_mq_alloc_tag_set__blk_mq_tag_set_tags__io(
+void callee_unmarshal_kernel__blk_mq_alloc_tag_set__blk_mq_tag_set_tags__out(
 	size_t* __pos,
 	const struct fipc_message* __msg,
 	const struct ext_registers* __ext,
 	struct blk_mq_alloc_tag_set_call_ctx const* call_ctx,
 	struct blk_mq_tags* ptr);
 
-void callee_marshal_kernel__blk_mq_alloc_tag_set__blk_mq_tag_set_tags__io(
+void callee_marshal_kernel__blk_mq_alloc_tag_set__blk_mq_tag_set_tags__out(
 	size_t* __pos,
 	struct fipc_message* __msg,
 	struct ext_registers* __ext,
 	struct blk_mq_alloc_tag_set_call_ctx const* call_ctx,
 	struct blk_mq_tags const* ptr);
 
-void caller_unmarshal_kernel__blk_mq_alloc_tag_set__blk_mq_tag_set_tags__io(
+void caller_unmarshal_kernel__blk_mq_alloc_tag_set__blk_mq_tag_set_tags__out(
 	size_t* __pos,
 	const struct fipc_message* __msg,
 	const struct ext_registers* __ext,
@@ -2020,61 +2115,33 @@ void caller_unmarshal_kernel__device_release_driver__dev__in(
 	struct device_release_driver_call_ctx const* call_ctx,
 	struct device* ptr);
 
-void caller_marshal_kernel__flush_work__work__io(
+void caller_marshal_kernel__flush_work__work__in(
 	size_t* __pos,
 	struct fipc_message* __msg,
 	struct ext_registers* __ext,
 	struct flush_work_call_ctx const* call_ctx,
 	struct work_struct const* ptr);
 
-void callee_unmarshal_kernel__flush_work__work__io(
+void callee_unmarshal_kernel__flush_work__work__in(
 	size_t* __pos,
 	const struct fipc_message* __msg,
 	const struct ext_registers* __ext,
 	struct flush_work_call_ctx const* call_ctx,
 	struct work_struct* ptr);
 
-void callee_marshal_kernel__flush_work__work__io(
+void callee_marshal_kernel__flush_work__work__in(
 	size_t* __pos,
 	struct fipc_message* __msg,
 	struct ext_registers* __ext,
 	struct flush_work_call_ctx const* call_ctx,
 	struct work_struct const* ptr);
 
-void caller_unmarshal_kernel__flush_work__work__io(
+void caller_unmarshal_kernel__flush_work__work__in(
 	size_t* __pos,
 	const struct fipc_message* __msg,
 	const struct ext_registers* __ext,
 	struct flush_work_call_ctx const* call_ctx,
 	struct work_struct* ptr);
-
-void caller_marshal_kernel__flush_work__list_head__io(
-	size_t* __pos,
-	struct fipc_message* __msg,
-	struct ext_registers* __ext,
-	struct flush_work_call_ctx const* call_ctx,
-	struct list_head const* ptr);
-
-void callee_unmarshal_kernel__flush_work__list_head__io(
-	size_t* __pos,
-	const struct fipc_message* __msg,
-	const struct ext_registers* __ext,
-	struct flush_work_call_ctx const* call_ctx,
-	struct list_head* ptr);
-
-void callee_marshal_kernel__flush_work__list_head__io(
-	size_t* __pos,
-	struct fipc_message* __msg,
-	struct ext_registers* __ext,
-	struct flush_work_call_ctx const* call_ctx,
-	struct list_head const* ptr);
-
-void caller_unmarshal_kernel__flush_work__list_head__io(
-	size_t* __pos,
-	const struct fipc_message* __msg,
-	const struct ext_registers* __ext,
-	struct flush_work_call_ctx const* call_ctx,
-	struct list_head* ptr);
 
 void caller_marshal_kernel__get_device__ret_device__out(
 	size_t* __pos,
@@ -2132,61 +2199,61 @@ void caller_unmarshal_kernel__get_device__dev__in(
 	struct get_device_call_ctx const* call_ctx,
 	struct device* ptr);
 
-void caller_marshal_kernel__init_timer_key__timer__in(
+void caller_marshal_kernel__lvd_setup_timer__timer__io(
 	size_t* __pos,
 	struct fipc_message* __msg,
 	struct ext_registers* __ext,
-	struct init_timer_key_call_ctx const* call_ctx,
+	struct lvd_setup_timer_call_ctx const* call_ctx,
 	struct timer_list const* ptr);
 
-void callee_unmarshal_kernel__init_timer_key__timer__in(
+void callee_unmarshal_kernel__lvd_setup_timer__timer__io(
 	size_t* __pos,
 	const struct fipc_message* __msg,
 	const struct ext_registers* __ext,
-	struct init_timer_key_call_ctx const* call_ctx,
+	struct lvd_setup_timer_call_ctx const* call_ctx,
 	struct timer_list* ptr);
 
-void callee_marshal_kernel__init_timer_key__timer__in(
+void callee_marshal_kernel__lvd_setup_timer__timer__io(
 	size_t* __pos,
 	struct fipc_message* __msg,
 	struct ext_registers* __ext,
-	struct init_timer_key_call_ctx const* call_ctx,
+	struct lvd_setup_timer_call_ctx const* call_ctx,
 	struct timer_list const* ptr);
 
-void caller_unmarshal_kernel__init_timer_key__timer__in(
+void caller_unmarshal_kernel__lvd_setup_timer__timer__io(
 	size_t* __pos,
 	const struct fipc_message* __msg,
 	const struct ext_registers* __ext,
-	struct init_timer_key_call_ctx const* call_ctx,
+	struct lvd_setup_timer_call_ctx const* call_ctx,
 	struct timer_list* ptr);
 
-void caller_marshal_kernel__init_timer_key__key__in(
+void caller_marshal_kernel__lvd_init_work__work__in(
 	size_t* __pos,
 	struct fipc_message* __msg,
 	struct ext_registers* __ext,
-	struct init_timer_key_call_ctx const* call_ctx,
-	struct lock_class_key const* ptr);
+	struct lvd_init_work_call_ctx const* call_ctx,
+	struct work_struct const* ptr);
 
-void callee_unmarshal_kernel__init_timer_key__key__in(
+void callee_unmarshal_kernel__lvd_init_work__work__in(
 	size_t* __pos,
 	const struct fipc_message* __msg,
 	const struct ext_registers* __ext,
-	struct init_timer_key_call_ctx const* call_ctx,
-	struct lock_class_key* ptr);
+	struct lvd_init_work_call_ctx const* call_ctx,
+	struct work_struct* ptr);
 
-void callee_marshal_kernel__init_timer_key__key__in(
+void callee_marshal_kernel__lvd_init_work__work__in(
 	size_t* __pos,
 	struct fipc_message* __msg,
 	struct ext_registers* __ext,
-	struct init_timer_key_call_ctx const* call_ctx,
-	struct lock_class_key const* ptr);
+	struct lvd_init_work_call_ctx const* call_ctx,
+	struct work_struct const* ptr);
 
-void caller_unmarshal_kernel__init_timer_key__key__in(
+void caller_unmarshal_kernel__lvd_init_work__work__in(
 	size_t* __pos,
 	const struct fipc_message* __msg,
 	const struct ext_registers* __ext,
-	struct init_timer_key_call_ctx const* call_ctx,
-	struct lock_class_key* ptr);
+	struct lvd_init_work_call_ctx const* call_ctx,
+	struct work_struct* ptr);
 
 void caller_marshal_kernel__irq_set_affinity_hint__m__in(
 	size_t* __pos,
@@ -2216,28 +2283,28 @@ void caller_unmarshal_kernel__irq_set_affinity_hint__m__in(
 	struct irq_set_affinity_hint_call_ctx const* call_ctx,
 	struct cpumask* ptr);
 
-void caller_marshal_kernel__mod_timer__timer__io(
+void caller_marshal_kernel__mod_timer__timer__in(
 	size_t* __pos,
 	struct fipc_message* __msg,
 	struct ext_registers* __ext,
 	struct mod_timer_call_ctx const* call_ctx,
 	struct timer_list const* ptr);
 
-void callee_unmarshal_kernel__mod_timer__timer__io(
+void callee_unmarshal_kernel__mod_timer__timer__in(
 	size_t* __pos,
 	const struct fipc_message* __msg,
 	const struct ext_registers* __ext,
 	struct mod_timer_call_ctx const* call_ctx,
 	struct timer_list* ptr);
 
-void callee_marshal_kernel__mod_timer__timer__io(
+void callee_marshal_kernel__mod_timer__timer__in(
 	size_t* __pos,
 	struct fipc_message* __msg,
 	struct ext_registers* __ext,
 	struct mod_timer_call_ctx const* call_ctx,
 	struct timer_list const* ptr);
 
-void caller_unmarshal_kernel__mod_timer__timer__io(
+void caller_unmarshal_kernel__mod_timer__timer__in(
 	size_t* __pos,
 	const struct fipc_message* __msg,
 	const struct ext_registers* __ext,
@@ -2272,33 +2339,61 @@ void caller_unmarshal_kernel__blk_mq_ops_exit_hctx__hctx__in(
 	struct blk_mq_ops_exit_hctx_call_ctx const* call_ctx,
 	struct blk_mq_hw_ctx* ptr);
 
-void caller_marshal_kernel__blk_mq_ops_init_hctx__hctx__io(
+void caller_marshal_kernel__blk_mq_ops_init_hctx__hctx__in(
 	size_t* __pos,
 	struct fipc_message* __msg,
 	struct ext_registers* __ext,
 	struct blk_mq_ops_init_hctx_call_ctx const* call_ctx,
 	struct blk_mq_hw_ctx const* ptr);
 
-void callee_unmarshal_kernel__blk_mq_ops_init_hctx__hctx__io(
+void callee_unmarshal_kernel__blk_mq_ops_init_hctx__hctx__in(
 	size_t* __pos,
 	const struct fipc_message* __msg,
 	const struct ext_registers* __ext,
 	struct blk_mq_ops_init_hctx_call_ctx const* call_ctx,
 	struct blk_mq_hw_ctx* ptr);
 
-void callee_marshal_kernel__blk_mq_ops_init_hctx__hctx__io(
+void callee_marshal_kernel__blk_mq_ops_init_hctx__hctx__in(
 	size_t* __pos,
 	struct fipc_message* __msg,
 	struct ext_registers* __ext,
 	struct blk_mq_ops_init_hctx_call_ctx const* call_ctx,
 	struct blk_mq_hw_ctx const* ptr);
 
-void caller_unmarshal_kernel__blk_mq_ops_init_hctx__hctx__io(
+void caller_unmarshal_kernel__blk_mq_ops_init_hctx__hctx__in(
 	size_t* __pos,
 	const struct fipc_message* __msg,
 	const struct ext_registers* __ext,
 	struct blk_mq_ops_init_hctx_call_ctx const* call_ctx,
 	struct blk_mq_hw_ctx* ptr);
+
+void caller_marshal_kernel__blk_mq_ops_init_hctx__blk_mq_hw_ctx_tags__in(
+	size_t* __pos,
+	struct fipc_message* __msg,
+	struct ext_registers* __ext,
+	struct blk_mq_ops_init_hctx_call_ctx const* call_ctx,
+	struct blk_mq_tags const* ptr);
+
+void callee_unmarshal_kernel__blk_mq_ops_init_hctx__blk_mq_hw_ctx_tags__in(
+	size_t* __pos,
+	const struct fipc_message* __msg,
+	const struct ext_registers* __ext,
+	struct blk_mq_ops_init_hctx_call_ctx const* call_ctx,
+	struct blk_mq_tags* ptr);
+
+void callee_marshal_kernel__blk_mq_ops_init_hctx__blk_mq_hw_ctx_tags__in(
+	size_t* __pos,
+	struct fipc_message* __msg,
+	struct ext_registers* __ext,
+	struct blk_mq_ops_init_hctx_call_ctx const* call_ctx,
+	struct blk_mq_tags const* ptr);
+
+void caller_unmarshal_kernel__blk_mq_ops_init_hctx__blk_mq_hw_ctx_tags__in(
+	size_t* __pos,
+	const struct fipc_message* __msg,
+	const struct ext_registers* __ext,
+	struct blk_mq_ops_init_hctx_call_ctx const* call_ctx,
+	struct blk_mq_tags* ptr);
 
 void caller_marshal_kernel__blk_mq_ops_init_request__req__in(
 	size_t* __pos,
@@ -2776,6 +2871,202 @@ void caller_unmarshal_kernel__pci_error_handlers_resume__pdev__in(
 	struct pci_error_handlers_resume_call_ctx const* call_ctx,
 	struct pci_dev* ptr);
 
+void caller_marshal_kernel__reg_read32__nvme_ctrl__in(
+	size_t* __pos,
+	struct fipc_message* __msg,
+	struct ext_registers* __ext,
+	struct reg_read32_call_ctx const* call_ctx,
+	struct nvme_ctrl const* ptr);
+
+void callee_unmarshal_kernel__reg_read32__nvme_ctrl__in(
+	size_t* __pos,
+	const struct fipc_message* __msg,
+	const struct ext_registers* __ext,
+	struct reg_read32_call_ctx const* call_ctx,
+	struct nvme_ctrl* ptr);
+
+void callee_marshal_kernel__reg_read32__nvme_ctrl__in(
+	size_t* __pos,
+	struct fipc_message* __msg,
+	struct ext_registers* __ext,
+	struct reg_read32_call_ctx const* call_ctx,
+	struct nvme_ctrl const* ptr);
+
+void caller_unmarshal_kernel__reg_read32__nvme_ctrl__in(
+	size_t* __pos,
+	const struct fipc_message* __msg,
+	const struct ext_registers* __ext,
+	struct reg_read32_call_ctx const* call_ctx,
+	struct nvme_ctrl* ptr);
+
+void caller_marshal_kernel__reg_write32__nvme_ctrl__in(
+	size_t* __pos,
+	struct fipc_message* __msg,
+	struct ext_registers* __ext,
+	struct reg_write32_call_ctx const* call_ctx,
+	struct nvme_ctrl const* ptr);
+
+void callee_unmarshal_kernel__reg_write32__nvme_ctrl__in(
+	size_t* __pos,
+	const struct fipc_message* __msg,
+	const struct ext_registers* __ext,
+	struct reg_write32_call_ctx const* call_ctx,
+	struct nvme_ctrl* ptr);
+
+void callee_marshal_kernel__reg_write32__nvme_ctrl__in(
+	size_t* __pos,
+	struct fipc_message* __msg,
+	struct ext_registers* __ext,
+	struct reg_write32_call_ctx const* call_ctx,
+	struct nvme_ctrl const* ptr);
+
+void caller_unmarshal_kernel__reg_write32__nvme_ctrl__in(
+	size_t* __pos,
+	const struct fipc_message* __msg,
+	const struct ext_registers* __ext,
+	struct reg_write32_call_ctx const* call_ctx,
+	struct nvme_ctrl* ptr);
+
+void caller_marshal_kernel__reg_read64__nvme_ctrl__in(
+	size_t* __pos,
+	struct fipc_message* __msg,
+	struct ext_registers* __ext,
+	struct reg_read64_call_ctx const* call_ctx,
+	struct nvme_ctrl const* ptr);
+
+void callee_unmarshal_kernel__reg_read64__nvme_ctrl__in(
+	size_t* __pos,
+	const struct fipc_message* __msg,
+	const struct ext_registers* __ext,
+	struct reg_read64_call_ctx const* call_ctx,
+	struct nvme_ctrl* ptr);
+
+void callee_marshal_kernel__reg_read64__nvme_ctrl__in(
+	size_t* __pos,
+	struct fipc_message* __msg,
+	struct ext_registers* __ext,
+	struct reg_read64_call_ctx const* call_ctx,
+	struct nvme_ctrl const* ptr);
+
+void caller_unmarshal_kernel__reg_read64__nvme_ctrl__in(
+	size_t* __pos,
+	const struct fipc_message* __msg,
+	const struct ext_registers* __ext,
+	struct reg_read64_call_ctx const* call_ctx,
+	struct nvme_ctrl* ptr);
+
+void caller_marshal_kernel__reset_ctrl__nvme_ctrl__in(
+	size_t* __pos,
+	struct fipc_message* __msg,
+	struct ext_registers* __ext,
+	struct reset_ctrl_call_ctx const* call_ctx,
+	struct nvme_ctrl const* ptr);
+
+void callee_unmarshal_kernel__reset_ctrl__nvme_ctrl__in(
+	size_t* __pos,
+	const struct fipc_message* __msg,
+	const struct ext_registers* __ext,
+	struct reset_ctrl_call_ctx const* call_ctx,
+	struct nvme_ctrl* ptr);
+
+void callee_marshal_kernel__reset_ctrl__nvme_ctrl__in(
+	size_t* __pos,
+	struct fipc_message* __msg,
+	struct ext_registers* __ext,
+	struct reset_ctrl_call_ctx const* call_ctx,
+	struct nvme_ctrl const* ptr);
+
+void caller_unmarshal_kernel__reset_ctrl__nvme_ctrl__in(
+	size_t* __pos,
+	const struct fipc_message* __msg,
+	const struct ext_registers* __ext,
+	struct reset_ctrl_call_ctx const* call_ctx,
+	struct nvme_ctrl* ptr);
+
+void caller_marshal_kernel__free_ctrl__nvme_ctrl__in(
+	size_t* __pos,
+	struct fipc_message* __msg,
+	struct ext_registers* __ext,
+	struct free_ctrl_call_ctx const* call_ctx,
+	struct nvme_ctrl const* ptr);
+
+void callee_unmarshal_kernel__free_ctrl__nvme_ctrl__in(
+	size_t* __pos,
+	const struct fipc_message* __msg,
+	const struct ext_registers* __ext,
+	struct free_ctrl_call_ctx const* call_ctx,
+	struct nvme_ctrl* ptr);
+
+void callee_marshal_kernel__free_ctrl__nvme_ctrl__in(
+	size_t* __pos,
+	struct fipc_message* __msg,
+	struct ext_registers* __ext,
+	struct free_ctrl_call_ctx const* call_ctx,
+	struct nvme_ctrl const* ptr);
+
+void caller_unmarshal_kernel__free_ctrl__nvme_ctrl__in(
+	size_t* __pos,
+	const struct fipc_message* __msg,
+	const struct ext_registers* __ext,
+	struct free_ctrl_call_ctx const* call_ctx,
+	struct nvme_ctrl* ptr);
+
+void caller_marshal_kernel__post_scan__nvme_ctrl__in(
+	size_t* __pos,
+	struct fipc_message* __msg,
+	struct ext_registers* __ext,
+	struct post_scan_call_ctx const* call_ctx,
+	struct nvme_ctrl const* ptr);
+
+void callee_unmarshal_kernel__post_scan__nvme_ctrl__in(
+	size_t* __pos,
+	const struct fipc_message* __msg,
+	const struct ext_registers* __ext,
+	struct post_scan_call_ctx const* call_ctx,
+	struct nvme_ctrl* ptr);
+
+void callee_marshal_kernel__post_scan__nvme_ctrl__in(
+	size_t* __pos,
+	struct fipc_message* __msg,
+	struct ext_registers* __ext,
+	struct post_scan_call_ctx const* call_ctx,
+	struct nvme_ctrl const* ptr);
+
+void caller_unmarshal_kernel__post_scan__nvme_ctrl__in(
+	size_t* __pos,
+	const struct fipc_message* __msg,
+	const struct ext_registers* __ext,
+	struct post_scan_call_ctx const* call_ctx,
+	struct nvme_ctrl* ptr);
+
+void caller_marshal_kernel__submit_async_event__nvme_ctrl__in(
+	size_t* __pos,
+	struct fipc_message* __msg,
+	struct ext_registers* __ext,
+	struct submit_async_event_call_ctx const* call_ctx,
+	struct nvme_ctrl const* ptr);
+
+void callee_unmarshal_kernel__submit_async_event__nvme_ctrl__in(
+	size_t* __pos,
+	const struct fipc_message* __msg,
+	const struct ext_registers* __ext,
+	struct submit_async_event_call_ctx const* call_ctx,
+	struct nvme_ctrl* ptr);
+
+void callee_marshal_kernel__submit_async_event__nvme_ctrl__in(
+	size_t* __pos,
+	struct fipc_message* __msg,
+	struct ext_registers* __ext,
+	struct submit_async_event_call_ctx const* call_ctx,
+	struct nvme_ctrl const* ptr);
+
+void caller_unmarshal_kernel__submit_async_event__nvme_ctrl__in(
+	size_t* __pos,
+	const struct fipc_message* __msg,
+	const struct ext_registers* __ext,
+	struct submit_async_event_call_ctx const* call_ctx,
+	struct nvme_ctrl* ptr);
+
 void caller_marshal_kernel__nvme_init_ctrl__ctrl__io(
 	size_t* __pos,
 	struct fipc_message* __msg,
@@ -2915,6 +3206,34 @@ void caller_unmarshal_kernel__nvme_init_ctrl__ops__in(
 	const struct ext_registers* __ext,
 	struct nvme_init_ctrl_call_ctx const* call_ctx,
 	struct nvme_ctrl_ops* ptr);
+
+void caller_marshal_kernel__nvme_init_ctrl__module__in(
+	size_t* __pos,
+	struct fipc_message* __msg,
+	struct ext_registers* __ext,
+	struct nvme_init_ctrl_call_ctx const* call_ctx,
+	struct module const* ptr);
+
+void callee_unmarshal_kernel__nvme_init_ctrl__module__in(
+	size_t* __pos,
+	const struct fipc_message* __msg,
+	const struct ext_registers* __ext,
+	struct nvme_init_ctrl_call_ctx const* call_ctx,
+	struct module* ptr);
+
+void callee_marshal_kernel__nvme_init_ctrl__module__in(
+	size_t* __pos,
+	struct fipc_message* __msg,
+	struct ext_registers* __ext,
+	struct nvme_init_ctrl_call_ctx const* call_ctx,
+	struct module const* ptr);
+
+void caller_unmarshal_kernel__nvme_init_ctrl__module__in(
+	size_t* __pos,
+	const struct fipc_message* __msg,
+	const struct ext_registers* __ext,
+	struct nvme_init_ctrl_call_ctx const* call_ctx,
+	struct module* ptr);
 
 void caller_marshal_kernel__nvme_init_identify__ctrl__in(
 	size_t* __pos,
@@ -4680,60 +4999,88 @@ void caller_unmarshal_kernel__put_device__dev__in(
 	struct put_device_call_ctx const* call_ctx,
 	struct device* ptr);
 
-void caller_marshal_kernel__queue_work_on__wq__in(
+void caller_marshal_kernel__work_fn__work__in(
 	size_t* __pos,
 	struct fipc_message* __msg,
 	struct ext_registers* __ext,
-	struct queue_work_on_call_ctx const* call_ctx,
-	struct workqueue_struct const* ptr);
-
-void callee_unmarshal_kernel__queue_work_on__wq__in(
-	size_t* __pos,
-	const struct fipc_message* __msg,
-	const struct ext_registers* __ext,
-	struct queue_work_on_call_ctx const* call_ctx,
-	struct workqueue_struct* ptr);
-
-void callee_marshal_kernel__queue_work_on__wq__in(
-	size_t* __pos,
-	struct fipc_message* __msg,
-	struct ext_registers* __ext,
-	struct queue_work_on_call_ctx const* call_ctx,
-	struct workqueue_struct const* ptr);
-
-void caller_unmarshal_kernel__queue_work_on__wq__in(
-	size_t* __pos,
-	const struct fipc_message* __msg,
-	const struct ext_registers* __ext,
-	struct queue_work_on_call_ctx const* call_ctx,
-	struct workqueue_struct* ptr);
-
-void caller_marshal_kernel__queue_work_on__work__io(
-	size_t* __pos,
-	struct fipc_message* __msg,
-	struct ext_registers* __ext,
-	struct queue_work_on_call_ctx const* call_ctx,
+	struct work_fn_call_ctx const* call_ctx,
 	struct work_struct const* ptr);
 
-void callee_unmarshal_kernel__queue_work_on__work__io(
+void callee_unmarshal_kernel__work_fn__work__in(
 	size_t* __pos,
 	const struct fipc_message* __msg,
 	const struct ext_registers* __ext,
-	struct queue_work_on_call_ctx const* call_ctx,
+	struct work_fn_call_ctx const* call_ctx,
 	struct work_struct* ptr);
 
-void callee_marshal_kernel__queue_work_on__work__io(
+void callee_marshal_kernel__work_fn__work__in(
 	size_t* __pos,
 	struct fipc_message* __msg,
 	struct ext_registers* __ext,
-	struct queue_work_on_call_ctx const* call_ctx,
+	struct work_fn_call_ctx const* call_ctx,
 	struct work_struct const* ptr);
 
-void caller_unmarshal_kernel__queue_work_on__work__io(
+void caller_unmarshal_kernel__work_fn__work__in(
 	size_t* __pos,
 	const struct fipc_message* __msg,
 	const struct ext_registers* __ext,
-	struct queue_work_on_call_ctx const* call_ctx,
+	struct work_fn_call_ctx const* call_ctx,
+	struct work_struct* ptr);
+
+void caller_marshal_kernel__lvd_queue_work__wq__in(
+	size_t* __pos,
+	struct fipc_message* __msg,
+	struct ext_registers* __ext,
+	struct lvd_queue_work_call_ctx const* call_ctx,
+	struct workqueue_struct const* ptr);
+
+void callee_unmarshal_kernel__lvd_queue_work__wq__in(
+	size_t* __pos,
+	const struct fipc_message* __msg,
+	const struct ext_registers* __ext,
+	struct lvd_queue_work_call_ctx const* call_ctx,
+	struct workqueue_struct* ptr);
+
+void callee_marshal_kernel__lvd_queue_work__wq__in(
+	size_t* __pos,
+	struct fipc_message* __msg,
+	struct ext_registers* __ext,
+	struct lvd_queue_work_call_ctx const* call_ctx,
+	struct workqueue_struct const* ptr);
+
+void caller_unmarshal_kernel__lvd_queue_work__wq__in(
+	size_t* __pos,
+	const struct fipc_message* __msg,
+	const struct ext_registers* __ext,
+	struct lvd_queue_work_call_ctx const* call_ctx,
+	struct workqueue_struct* ptr);
+
+void caller_marshal_kernel__lvd_queue_work__work__in(
+	size_t* __pos,
+	struct fipc_message* __msg,
+	struct ext_registers* __ext,
+	struct lvd_queue_work_call_ctx const* call_ctx,
+	struct work_struct const* ptr);
+
+void callee_unmarshal_kernel__lvd_queue_work__work__in(
+	size_t* __pos,
+	const struct fipc_message* __msg,
+	const struct ext_registers* __ext,
+	struct lvd_queue_work_call_ctx const* call_ctx,
+	struct work_struct* ptr);
+
+void callee_marshal_kernel__lvd_queue_work__work__in(
+	size_t* __pos,
+	struct fipc_message* __msg,
+	struct ext_registers* __ext,
+	struct lvd_queue_work_call_ctx const* call_ctx,
+	struct work_struct const* ptr);
+
+void caller_unmarshal_kernel__lvd_queue_work__work__in(
+	size_t* __pos,
+	const struct fipc_message* __msg,
+	const struct ext_registers* __ext,
+	struct lvd_queue_work_call_ctx const* call_ctx,
 	struct work_struct* ptr);
 
 void caller_marshal_kernel__wait_for_completion_io_timeout__x__io(
@@ -4847,6 +5194,30 @@ void caller_unmarshal_kernel__blk_mq_map_queue__q__in(
 	const struct ext_registers* __ext,
 	struct blk_mq_map_queue_call_ctx const* call_ctx,
 	struct request_queue* ptr);
+
+void caller_marshal_kernel__wq__out(
+	size_t* __pos,
+	struct fipc_message* __msg,
+	struct ext_registers* __ext,
+	struct workqueue_struct const* ptr);
+
+void callee_unmarshal_kernel__wq__out(
+	size_t* __pos,
+	const struct fipc_message* __msg,
+	const struct ext_registers* __ext,
+	struct workqueue_struct* ptr);
+
+void callee_marshal_kernel__wq__out(
+	size_t* __pos,
+	struct fipc_message* __msg,
+	struct ext_registers* __ext,
+	struct workqueue_struct const* ptr);
+
+void caller_unmarshal_kernel__wq__out(
+	size_t* __pos,
+	const struct fipc_message* __msg,
+	const struct ext_registers* __ext,
+	struct workqueue_struct* ptr);
 
 
 #endif

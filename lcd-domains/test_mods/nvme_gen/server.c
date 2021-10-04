@@ -3439,6 +3439,16 @@ void nvme_queue_async_events_callee(struct fipc_message* __msg, struct ext_regis
 	}
 }
 
+#define MAX_RQ_BUFS	64
+#define SHARED_POOL_SIZE	(256UL << 20)
+
+bool is_in_range(void *mem) {
+	if ((mem < bdata_data_pool) || (mem > (bdata_data_pool + SHARED_POOL_SIZE))) {
+		return false;
+	}
+	return true;
+}
+
 int trmp_impl_blk_mq_ops_queue_rq(fptr_blk_mq_ops_queue_rq target, struct blk_mq_hw_ctx* hctx, struct blk_mq_queue_data* bd)
 {
 	struct fipc_message __buffer = {0};
@@ -3451,6 +3461,7 @@ int trmp_impl_blk_mq_ops_queue_rq(fptr_blk_mq_ops_queue_rq target, struct blk_mq
 	struct blk_mq_queue_data** bd_ptr = &bd;
 	int ret = 0;
 	int* ret_ptr = &ret;
+	void *lcd_buf[MAX_RQ_BUFS] = {0};
 	
 	__maybe_unused const struct blk_mq_ops_queue_rq_call_ctx call_ctx = {hctx, bd};
 	__maybe_unused const struct blk_mq_ops_queue_rq_call_ctx *ctx = &call_ctx;
@@ -3477,6 +3488,42 @@ int trmp_impl_blk_mq_ops_queue_rq(fptr_blk_mq_ops_queue_rq target, struct blk_mq
 			caller_marshal_kernel__blk_mq_ops_queue_rq__bd__in(__pos, __msg, __ext, ctx, *bd_ptr);
 		}
 
+		if (blk_rq_bytes(bd->rq)) {
+			struct req_iterator iter;
+			struct bio_vec bvec;
+			int i = 0;
+			{
+
+				struct req_iterator iter;
+				struct bio_vec bvec;
+				int num_segs = 0;
+				rq_for_each_segment(bvec, bd->rq, iter) {
+					num_segs++;
+				}
+				// pack num_segments
+				glue_pack(__pos, __msg, __ext, num_segs);
+			}
+
+			rq_for_each_segment(bvec, bd->rq, iter) {
+				void *buf = page_address(bvec.bv_page);
+				lcd_buf[i] = priv_alloc(BLK_USER_BUF_POOL);
+				if (0)
+					printk("%s, pool_base: %p alloc from priv[%d]: %p offset: 0x%lx\n",
+							__func__, bdata_data_pool,
+							smp_processor_id(),
+							lcd_buf[i],
+							(unsigned long)(lcd_buf[i] - bdata_data_pool));
+				if (lcd_buf[i] && is_in_range(lcd_buf[i]))
+					memcpy(lcd_buf[i], buf + bvec.bv_offset, bvec.bv_len);
+				else {
+					LIBLCD_ERR("%s Allocated buffer not in range", __func__);
+					continue;
+				}
+				glue_pack(__pos, __msg, __ext, (lcd_buf[i] - bdata_data_pool));
+				i++;
+			}
+		}
+
 	}
 
 	glue_call_client(__pos, __msg, RPC_ID_blk_mq_ops_queue_rq);
@@ -3494,8 +3541,27 @@ int trmp_impl_blk_mq_ops_queue_rq(fptr_blk_mq_ops_queue_rq target, struct blk_mq
 			caller_unmarshal_kernel__blk_mq_ops_queue_rq__bd__in(__pos, __msg, __ext, ctx, *bd_ptr);
 		}
 
-	}
+		if (blk_rq_bytes(bd->rq)) {
+			struct req_iterator iter;
+			struct bio_vec bvec;
+			int i = 0;
 
+			if (!bd->rq->bio->bi_io_vec) {
+				printk("%s, io_vec list empty for rq: %p\n", __func__, bd->rq);
+				goto done;
+			}
+			rq_for_each_segment(bvec, bd->rq, iter) {
+				void *buf = page_address(bvec.bv_page);
+				if (lcd_buf[i] && buf) {
+					memcpy(buf + bvec.bv_offset, lcd_buf[i], bvec.bv_len);
+					priv_free(lcd_buf[i], BLK_USER_BUF_POOL);
+					i++;
+				}
+			}
+		}
+
+	}
+done:
 	{
 		*ret_ptr = glue_unpack(__pos, __msg, __ext, int);
 	}
@@ -3818,9 +3884,10 @@ void nvme_setup_cmd_callee(struct fipc_message* __msg, struct ext_registers* __e
 
 	struct nvme_ns* ns = 0;
 	struct request* req = 0;
-	struct nvme_command* cmd = 0;
 	struct nvme_ns** ns_ptr = &ns;
 	struct request** req_ptr = &req;
+	struct nvme_command __cmd;
+	struct nvme_command* cmd = &__cmd;
 	struct nvme_command** cmd_ptr = &cmd;
 	int ret = 0;
 	int* ret_ptr = &ret;
@@ -3849,9 +3916,8 @@ void nvme_setup_cmd_callee(struct fipc_message* __msg, struct ext_registers* __e
 	}
 
 	{
-		*cmd_ptr = glue_unpack_shadow(__pos, __msg, __ext, struct nvme_command*);
 		if (*cmd_ptr) {
-			callee_unmarshal_kernel__nvme_setup_cmd__cmd__io(__pos, __msg, __ext, ctx, *cmd_ptr);
+			callee_unmarshal_kernel__nvme_setup_cmd__cmd__out(__pos, __msg, __ext, ctx, *cmd_ptr);
 		}
 
 	}
@@ -3874,10 +3940,8 @@ void nvme_setup_cmd_callee(struct fipc_message* __msg, struct ext_registers* __e
 	}
 
 	{
-		__maybe_unused const void* __adjusted = *cmd_ptr;
-		glue_pack_shadow(__pos, __msg, __ext, __adjusted);
 		if (*cmd_ptr) {
-			callee_marshal_kernel__nvme_setup_cmd__cmd__io(__pos, __msg, __ext, ctx, *cmd_ptr);
+			callee_marshal_kernel__nvme_setup_cmd__cmd__out(__pos, __msg, __ext, ctx, *cmd_ptr);
 		}
 
 	}

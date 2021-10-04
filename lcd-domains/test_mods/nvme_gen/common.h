@@ -3739,6 +3739,34 @@ void caller_unmarshal_kernel__blk_mq_ops_queue_rq__blk_mq_hw_ctx_queue__in(
 	struct blk_mq_ops_queue_rq_call_ctx const* call_ctx,
 	struct request_queue* ptr);
 
+void caller_marshal_kernel__blk_mq_ops_queue_rq__nvme_ns__in(
+	size_t* __pos,
+	struct fipc_message* __msg,
+	struct ext_registers* __ext,
+	struct blk_mq_ops_queue_rq_call_ctx const* call_ctx,
+	struct nvme_ns const* ptr);
+
+void callee_unmarshal_kernel__blk_mq_ops_queue_rq__nvme_ns__in(
+	size_t* __pos,
+	const struct fipc_message* __msg,
+	const struct ext_registers* __ext,
+	struct blk_mq_ops_queue_rq_call_ctx const* call_ctx,
+	struct nvme_ns* ptr);
+
+void callee_marshal_kernel__blk_mq_ops_queue_rq__nvme_ns__in(
+	size_t* __pos,
+	struct fipc_message* __msg,
+	struct ext_registers* __ext,
+	struct blk_mq_ops_queue_rq_call_ctx const* call_ctx,
+	struct nvme_ns const* ptr);
+
+void caller_unmarshal_kernel__blk_mq_ops_queue_rq__nvme_ns__in(
+	size_t* __pos,
+	const struct fipc_message* __msg,
+	const struct ext_registers* __ext,
+	struct blk_mq_ops_queue_rq_call_ctx const* call_ctx,
+	struct nvme_ns* ptr);
+
 void caller_marshal_kernel__blk_mq_ops_queue_rq__bd__in(
 	size_t* __pos,
 	struct fipc_message* __msg,
@@ -3794,6 +3822,90 @@ void caller_unmarshal_kernel__blk_mq_ops_queue_rq__blk_mq_queue_data_rq__in(
 	const struct ext_registers* __ext,
 	struct blk_mq_ops_queue_rq_call_ctx const* call_ctx,
 	struct request* ptr);
+
+void caller_marshal_kernel__blk_mq_ops_queue_rq__request_bio__in(
+	size_t* __pos,
+	struct fipc_message* __msg,
+	struct ext_registers* __ext,
+	struct blk_mq_ops_queue_rq_call_ctx const* call_ctx,
+	struct bio const* ptr);
+
+void callee_unmarshal_kernel__blk_mq_ops_queue_rq__request_bio__in(
+	size_t* __pos,
+	const struct fipc_message* __msg,
+	const struct ext_registers* __ext,
+	struct blk_mq_ops_queue_rq_call_ctx const* call_ctx,
+	struct bio* ptr);
+
+void callee_marshal_kernel__blk_mq_ops_queue_rq__request_bio__in(
+	size_t* __pos,
+	struct fipc_message* __msg,
+	struct ext_registers* __ext,
+	struct blk_mq_ops_queue_rq_call_ctx const* call_ctx,
+	struct bio const* ptr);
+
+void caller_unmarshal_kernel__blk_mq_ops_queue_rq__request_bio__in(
+	size_t* __pos,
+	const struct fipc_message* __msg,
+	const struct ext_registers* __ext,
+	struct blk_mq_ops_queue_rq_call_ctx const* call_ctx,
+	struct bio* ptr);
+
+void caller_marshal_kernel__blk_mq_ops_queue_rq__rq__in(
+	size_t* __pos,
+	struct fipc_message* __msg,
+	struct ext_registers* __ext,
+	struct blk_mq_ops_queue_rq_call_ctx const* call_ctx,
+	struct request_queue const* ptr);
+
+void callee_unmarshal_kernel__blk_mq_ops_queue_rq__rq__in(
+	size_t* __pos,
+	const struct fipc_message* __msg,
+	const struct ext_registers* __ext,
+	struct blk_mq_ops_queue_rq_call_ctx const* call_ctx,
+	struct request_queue* ptr);
+
+void callee_marshal_kernel__blk_mq_ops_queue_rq__rq__in(
+	size_t* __pos,
+	struct fipc_message* __msg,
+	struct ext_registers* __ext,
+	struct blk_mq_ops_queue_rq_call_ctx const* call_ctx,
+	struct request_queue const* ptr);
+
+void caller_unmarshal_kernel__blk_mq_ops_queue_rq__rq__in(
+	size_t* __pos,
+	const struct fipc_message* __msg,
+	const struct ext_registers* __ext,
+	struct blk_mq_ops_queue_rq_call_ctx const* call_ctx,
+	struct request_queue* ptr);
+
+void caller_marshal_kernel__blk_mq_ops_queue_rq__limits__in(
+	size_t* __pos,
+	struct fipc_message* __msg,
+	struct ext_registers* __ext,
+	struct blk_mq_ops_queue_rq_call_ctx const* call_ctx,
+	struct queue_limits const* ptr);
+
+void callee_unmarshal_kernel__blk_mq_ops_queue_rq__limits__in(
+	size_t* __pos,
+	const struct fipc_message* __msg,
+	const struct ext_registers* __ext,
+	struct blk_mq_ops_queue_rq_call_ctx const* call_ctx,
+	struct queue_limits* ptr);
+
+void callee_marshal_kernel__blk_mq_ops_queue_rq__limits__in(
+	size_t* __pos,
+	struct fipc_message* __msg,
+	struct ext_registers* __ext,
+	struct blk_mq_ops_queue_rq_call_ctx const* call_ctx,
+	struct queue_limits const* ptr);
+
+void caller_unmarshal_kernel__blk_mq_ops_queue_rq__limits__in(
+	size_t* __pos,
+	const struct fipc_message* __msg,
+	const struct ext_registers* __ext,
+	struct blk_mq_ops_queue_rq_call_ctx const* call_ctx,
+	struct queue_limits* ptr);
 
 void caller_marshal_kernel__nvme_queue_scan__ctrl__in(
 	size_t* __pos,
@@ -4075,56 +4187,28 @@ void caller_unmarshal_kernel__nvme_setup_cmd__req__in(
 	struct nvme_setup_cmd_call_ctx const* call_ctx,
 	struct request* ptr);
 
-void caller_marshal_kernel__nvme_setup_cmd__request_bio__in(
-	size_t* __pos,
-	struct fipc_message* __msg,
-	struct ext_registers* __ext,
-	struct nvme_setup_cmd_call_ctx const* call_ctx,
-	struct bio const* ptr);
-
-void callee_unmarshal_kernel__nvme_setup_cmd__request_bio__in(
-	size_t* __pos,
-	const struct fipc_message* __msg,
-	const struct ext_registers* __ext,
-	struct nvme_setup_cmd_call_ctx const* call_ctx,
-	struct bio* ptr);
-
-void callee_marshal_kernel__nvme_setup_cmd__request_bio__in(
-	size_t* __pos,
-	struct fipc_message* __msg,
-	struct ext_registers* __ext,
-	struct nvme_setup_cmd_call_ctx const* call_ctx,
-	struct bio const* ptr);
-
-void caller_unmarshal_kernel__nvme_setup_cmd__request_bio__in(
-	size_t* __pos,
-	const struct fipc_message* __msg,
-	const struct ext_registers* __ext,
-	struct nvme_setup_cmd_call_ctx const* call_ctx,
-	struct bio* ptr);
-
-void caller_marshal_kernel__nvme_setup_cmd__cmd__io(
+void caller_marshal_kernel__nvme_setup_cmd__cmd__out(
 	size_t* __pos,
 	struct fipc_message* __msg,
 	struct ext_registers* __ext,
 	struct nvme_setup_cmd_call_ctx const* call_ctx,
 	struct nvme_command const* ptr);
 
-void callee_unmarshal_kernel__nvme_setup_cmd__cmd__io(
+void callee_unmarshal_kernel__nvme_setup_cmd__cmd__out(
 	size_t* __pos,
 	const struct fipc_message* __msg,
 	const struct ext_registers* __ext,
 	struct nvme_setup_cmd_call_ctx const* call_ctx,
 	struct nvme_command* ptr);
 
-void callee_marshal_kernel__nvme_setup_cmd__cmd__io(
+void callee_marshal_kernel__nvme_setup_cmd__cmd__out(
 	size_t* __pos,
 	struct fipc_message* __msg,
 	struct ext_registers* __ext,
 	struct nvme_setup_cmd_call_ctx const* call_ctx,
 	struct nvme_command const* ptr);
 
-void caller_unmarshal_kernel__nvme_setup_cmd__cmd__io(
+void caller_unmarshal_kernel__nvme_setup_cmd__cmd__out(
 	size_t* __pos,
 	const struct fipc_message* __msg,
 	const struct ext_registers* __ext,

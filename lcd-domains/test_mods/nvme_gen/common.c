@@ -5400,6 +5400,7 @@ void caller_marshal_kernel__nvme_init_ctrl__ops__in(
 		if (*module_ptr) {
 			caller_marshal_kernel__nvme_init_ctrl__module__in(__pos, __msg, __ext, ctx, *module_ptr);
 		}
+
 	}
 
 	{
@@ -6823,6 +6824,21 @@ void caller_marshal_kernel__blk_mq_ops_queue_rq__blk_mq_hw_ctx_queue__in(
 	struct blk_mq_ops_queue_rq_call_ctx const* ctx,
 	struct request_queue const* ptr)
 {
+	void* const* queuedata_ptr = &ptr->queuedata;
+
+	{
+		struct nvme_ns* __casted = (struct nvme_ns*)*queuedata_ptr;
+		struct nvme_ns* const* __casted_ptr = &__casted;
+		{
+			__maybe_unused const void* __adjusted = *__casted_ptr;
+			glue_pack(__pos, __msg, __ext, __adjusted);
+			if (*__casted_ptr) {
+				caller_marshal_kernel__blk_mq_ops_queue_rq__nvme_ns__in(__pos, __msg, __ext, ctx, *__casted_ptr);
+			}
+
+		}
+
+	}
 
 }
 
@@ -6833,6 +6849,22 @@ void callee_unmarshal_kernel__blk_mq_ops_queue_rq__blk_mq_hw_ctx_queue__in(
 	struct blk_mq_ops_queue_rq_call_ctx const* ctx,
 	struct request_queue* ptr)
 {
+	void** queuedata_ptr = &ptr->queuedata;
+
+	{
+		struct nvme_ns* __casted = (struct nvme_ns*)*queuedata_ptr;
+		struct nvme_ns** __casted_ptr = &__casted;
+		{
+			size_t __size = sizeof(struct nvme_ns);
+			*__casted_ptr = glue_unpack_new_shadow(__pos, __msg, __ext, struct nvme_ns*, (__size), (DEFAULT_GFP_FLAGS));
+			if (*__casted_ptr) {
+				callee_unmarshal_kernel__blk_mq_ops_queue_rq__nvme_ns__in(__pos, __msg, __ext, ctx, *__casted_ptr);
+			}
+
+		}
+
+		*queuedata_ptr = (void*)__casted;
+	}
 
 	{
 	}
@@ -6854,6 +6886,80 @@ void caller_unmarshal_kernel__blk_mq_ops_queue_rq__blk_mq_hw_ctx_queue__in(
 	const struct ext_registers* __ext,
 	struct blk_mq_ops_queue_rq_call_ctx const* ctx,
 	struct request_queue* ptr)
+{
+
+	{
+	}
+}
+
+void caller_marshal_kernel__blk_mq_ops_queue_rq__nvme_ns__in(
+	size_t* __pos,
+	struct fipc_message* __msg,
+	struct ext_registers* __ext,
+	struct blk_mq_ops_queue_rq_call_ctx const* ctx,
+	struct nvme_ns const* ptr)
+{
+	unsigned short const* ms_ptr = &ptr->ms;
+	unsigned char const* pi_type_ptr = &ptr->pi_type;
+	unsigned long const* flags_ptr = &ptr->flags;
+
+	{
+		glue_pack(__pos, __msg, __ext, *ms_ptr);
+	}
+
+	{
+		glue_pack(__pos, __msg, __ext, *pi_type_ptr);
+	}
+
+	{
+		glue_pack(__pos, __msg, __ext, *flags_ptr);
+	}
+
+}
+
+void callee_unmarshal_kernel__blk_mq_ops_queue_rq__nvme_ns__in(
+	size_t* __pos,
+	const struct fipc_message* __msg,
+	const struct ext_registers* __ext,
+	struct blk_mq_ops_queue_rq_call_ctx const* ctx,
+	struct nvme_ns* ptr)
+{
+	unsigned short* ms_ptr = &ptr->ms;
+	unsigned char* pi_type_ptr = &ptr->pi_type;
+	unsigned long* flags_ptr = &ptr->flags;
+
+	{
+		*ms_ptr = glue_unpack(__pos, __msg, __ext, unsigned short);
+	}
+
+	{
+		*pi_type_ptr = glue_unpack(__pos, __msg, __ext, unsigned char);
+	}
+
+	{
+		*flags_ptr = glue_unpack(__pos, __msg, __ext, unsigned long);
+	}
+
+	{
+	}
+}
+
+void callee_marshal_kernel__blk_mq_ops_queue_rq__nvme_ns__in(
+	size_t* __pos,
+	struct fipc_message* __msg,
+	struct ext_registers* __ext,
+	struct blk_mq_ops_queue_rq_call_ctx const* ctx,
+	struct nvme_ns const* ptr)
+{
+
+}
+
+void caller_unmarshal_kernel__blk_mq_ops_queue_rq__nvme_ns__in(
+	size_t* __pos,
+	const struct fipc_message* __msg,
+	const struct ext_registers* __ext,
+	struct blk_mq_ops_queue_rq_call_ctx const* ctx,
+	struct nvme_ns* ptr)
 {
 
 	{
@@ -6946,6 +7052,46 @@ void caller_marshal_kernel__blk_mq_ops_queue_rq__blk_mq_queue_data_rq__in(
 	struct blk_mq_ops_queue_rq_call_ctx const* ctx,
 	struct request const* ptr)
 {
+	unsigned int const* cmd_type_ptr = &ptr->cmd_type;
+	unsigned long long const* cmd_flags_ptr = &ptr->cmd_flags;
+	unsigned short const* nr_phys_segments_ptr = &ptr->nr_phys_segments;
+	int const* tag_ptr = &ptr->tag;
+	unsigned int const* __data_len_ptr = &ptr->__data_len;
+	unsigned long const* __sector_ptr = &ptr->__sector;
+	struct request_queue* const* q_ptr = &ptr->q;
+
+	{
+		glue_pack(__pos, __msg, __ext, *cmd_type_ptr);
+	}
+
+	{
+		glue_pack(__pos, __msg, __ext, *cmd_flags_ptr);
+	}
+
+	{
+		glue_pack(__pos, __msg, __ext, *nr_phys_segments_ptr);
+	}
+
+	{
+		glue_pack(__pos, __msg, __ext, *tag_ptr);
+	}
+
+	{
+		glue_pack(__pos, __msg, __ext, *__data_len_ptr);
+	}
+
+	{
+		glue_pack(__pos, __msg, __ext, *__sector_ptr);
+	}
+
+	{
+		__maybe_unused const void* __adjusted = *q_ptr;
+		glue_pack(__pos, __msg, __ext, __adjusted);
+		if (*q_ptr) {
+			caller_marshal_kernel__blk_mq_ops_queue_rq__rq__in(__pos, __msg, __ext, ctx, *q_ptr);
+		}
+
+	}
 
 }
 
@@ -6956,6 +7102,45 @@ void callee_unmarshal_kernel__blk_mq_ops_queue_rq__blk_mq_queue_data_rq__in(
 	struct blk_mq_ops_queue_rq_call_ctx const* ctx,
 	struct request* ptr)
 {
+	unsigned int* cmd_type_ptr = &ptr->cmd_type;
+	unsigned long long* cmd_flags_ptr = &ptr->cmd_flags;
+	unsigned short* nr_phys_segments_ptr = &ptr->nr_phys_segments;
+	int* tag_ptr = &ptr->tag;
+	unsigned int* __data_len_ptr = &ptr->__data_len;
+	unsigned long* __sector_ptr = &ptr->__sector;
+	struct request_queue** q_ptr = &ptr->q;
+
+	{
+		*cmd_type_ptr = glue_unpack(__pos, __msg, __ext, unsigned int);
+	}
+
+	{
+		*cmd_flags_ptr = glue_unpack(__pos, __msg, __ext, unsigned long long);
+	}
+
+	{
+		*nr_phys_segments_ptr = glue_unpack(__pos, __msg, __ext, unsigned short);
+	}
+
+	{
+		*tag_ptr = glue_unpack(__pos, __msg, __ext, int);
+	}
+
+	{
+		*__data_len_ptr = glue_unpack(__pos, __msg, __ext, unsigned int);
+	}
+
+	{
+		*__sector_ptr = glue_unpack(__pos, __msg, __ext, unsigned long);
+	}
+
+	{
+		*q_ptr = glue_unpack_shadow(__pos, __msg, __ext, struct request_queue*);
+		if (*q_ptr) {
+			callee_unmarshal_kernel__blk_mq_ops_queue_rq__rq__in(__pos, __msg, __ext, ctx, *q_ptr);
+		}
+
+	}
 
 	{
 	}
@@ -6968,6 +7153,14 @@ void callee_marshal_kernel__blk_mq_ops_queue_rq__blk_mq_queue_data_rq__in(
 	struct blk_mq_ops_queue_rq_call_ctx const* ctx,
 	struct request const* ptr)
 {
+	struct request_queue* const* q_ptr = &ptr->q;
+
+	{
+		if (*q_ptr) {
+			callee_marshal_kernel__blk_mq_ops_queue_rq__rq__in(__pos, __msg, __ext, ctx, *q_ptr);
+		}
+
+	}
 
 }
 
@@ -6977,6 +7170,176 @@ void caller_unmarshal_kernel__blk_mq_ops_queue_rq__blk_mq_queue_data_rq__in(
 	const struct ext_registers* __ext,
 	struct blk_mq_ops_queue_rq_call_ctx const* ctx,
 	struct request* ptr)
+{
+	struct request_queue** q_ptr = &ptr->q;
+
+	{
+		if (*q_ptr) {
+			caller_unmarshal_kernel__blk_mq_ops_queue_rq__rq__in(__pos, __msg, __ext, ctx, *q_ptr);
+		}
+
+	}
+
+	{
+	}
+}
+
+void caller_marshal_kernel__blk_mq_ops_queue_rq__request_bio__in(
+	size_t* __pos,
+	struct fipc_message* __msg,
+	struct ext_registers* __ext,
+	struct blk_mq_ops_queue_rq_call_ctx const* ctx,
+	struct bio const* ptr)
+{
+
+}
+
+void callee_unmarshal_kernel__blk_mq_ops_queue_rq__request_bio__in(
+	size_t* __pos,
+	const struct fipc_message* __msg,
+	const struct ext_registers* __ext,
+	struct blk_mq_ops_queue_rq_call_ctx const* ctx,
+	struct bio* ptr)
+{
+
+	{
+	}
+}
+
+void callee_marshal_kernel__blk_mq_ops_queue_rq__request_bio__in(
+	size_t* __pos,
+	struct fipc_message* __msg,
+	struct ext_registers* __ext,
+	struct blk_mq_ops_queue_rq_call_ctx const* ctx,
+	struct bio const* ptr)
+{
+
+}
+
+void caller_unmarshal_kernel__blk_mq_ops_queue_rq__request_bio__in(
+	size_t* __pos,
+	const struct fipc_message* __msg,
+	const struct ext_registers* __ext,
+	struct blk_mq_ops_queue_rq_call_ctx const* ctx,
+	struct bio* ptr)
+{
+
+	{
+	}
+}
+
+void caller_marshal_kernel__blk_mq_ops_queue_rq__rq__in(
+	size_t* __pos,
+	struct fipc_message* __msg,
+	struct ext_registers* __ext,
+	struct blk_mq_ops_queue_rq_call_ctx const* ctx,
+	struct request_queue const* ptr)
+{
+	struct queue_limits const* limits_ptr = &ptr->limits;
+
+	{
+		caller_marshal_kernel__blk_mq_ops_queue_rq__limits__in(__pos, __msg, __ext, ctx, limits_ptr);
+	}
+
+}
+
+void callee_unmarshal_kernel__blk_mq_ops_queue_rq__rq__in(
+	size_t* __pos,
+	const struct fipc_message* __msg,
+	const struct ext_registers* __ext,
+	struct blk_mq_ops_queue_rq_call_ctx const* ctx,
+	struct request_queue* ptr)
+{
+	struct queue_limits* limits_ptr = &ptr->limits;
+
+	{
+		callee_unmarshal_kernel__blk_mq_ops_queue_rq__limits__in(__pos, __msg, __ext, ctx, limits_ptr);
+	}
+
+	{
+	}
+}
+
+void callee_marshal_kernel__blk_mq_ops_queue_rq__rq__in(
+	size_t* __pos,
+	struct fipc_message* __msg,
+	struct ext_registers* __ext,
+	struct blk_mq_ops_queue_rq_call_ctx const* ctx,
+	struct request_queue const* ptr)
+{
+	struct queue_limits const* limits_ptr = &ptr->limits;
+
+	{
+		callee_marshal_kernel__blk_mq_ops_queue_rq__limits__in(__pos, __msg, __ext, ctx, limits_ptr);
+	}
+
+}
+
+void caller_unmarshal_kernel__blk_mq_ops_queue_rq__rq__in(
+	size_t* __pos,
+	const struct fipc_message* __msg,
+	const struct ext_registers* __ext,
+	struct blk_mq_ops_queue_rq_call_ctx const* ctx,
+	struct request_queue* ptr)
+{
+	struct queue_limits* limits_ptr = &ptr->limits;
+
+	{
+		caller_unmarshal_kernel__blk_mq_ops_queue_rq__limits__in(__pos, __msg, __ext, ctx, limits_ptr);
+	}
+
+	{
+	}
+}
+
+void caller_marshal_kernel__blk_mq_ops_queue_rq__limits__in(
+	size_t* __pos,
+	struct fipc_message* __msg,
+	struct ext_registers* __ext,
+	struct blk_mq_ops_queue_rq_call_ctx const* ctx,
+	struct queue_limits const* ptr)
+{
+	unsigned int const* max_hw_sectors_ptr = &ptr->max_hw_sectors;
+
+	{
+		glue_pack(__pos, __msg, __ext, *max_hw_sectors_ptr);
+	}
+
+}
+
+void callee_unmarshal_kernel__blk_mq_ops_queue_rq__limits__in(
+	size_t* __pos,
+	const struct fipc_message* __msg,
+	const struct ext_registers* __ext,
+	struct blk_mq_ops_queue_rq_call_ctx const* ctx,
+	struct queue_limits* ptr)
+{
+	unsigned int* max_hw_sectors_ptr = &ptr->max_hw_sectors;
+
+	{
+		*max_hw_sectors_ptr = glue_unpack(__pos, __msg, __ext, unsigned int);
+	}
+
+	{
+	}
+}
+
+void callee_marshal_kernel__blk_mq_ops_queue_rq__limits__in(
+	size_t* __pos,
+	struct fipc_message* __msg,
+	struct ext_registers* __ext,
+	struct blk_mq_ops_queue_rq_call_ctx const* ctx,
+	struct queue_limits const* ptr)
+{
+
+}
+
+void caller_unmarshal_kernel__blk_mq_ops_queue_rq__limits__in(
+	size_t* __pos,
+	const struct fipc_message* __msg,
+	const struct ext_registers* __ext,
+	struct blk_mq_ops_queue_rq_call_ctx const* ctx,
+	struct queue_limits* ptr)
 {
 
 	{
@@ -7483,19 +7846,9 @@ void caller_marshal_kernel__nvme_setup_cmd__ns__in(
 	struct nvme_ns const* ptr)
 {
 	int const* lba_shift_ptr = &ptr->lba_shift;
-	unsigned short const* ms_ptr = &ptr->ms;
-	unsigned char const* pi_type_ptr = &ptr->pi_type;
 
 	{
 		glue_pack(__pos, __msg, __ext, *lba_shift_ptr);
-	}
-
-	{
-		glue_pack(__pos, __msg, __ext, *ms_ptr);
-	}
-
-	{
-		glue_pack(__pos, __msg, __ext, *pi_type_ptr);
 	}
 
 }
@@ -7508,19 +7861,9 @@ void callee_unmarshal_kernel__nvme_setup_cmd__ns__in(
 	struct nvme_ns* ptr)
 {
 	int* lba_shift_ptr = &ptr->lba_shift;
-	unsigned short* ms_ptr = &ptr->ms;
-	unsigned char* pi_type_ptr = &ptr->pi_type;
 
 	{
 		*lba_shift_ptr = glue_unpack(__pos, __msg, __ext, int);
-	}
-
-	{
-		*ms_ptr = glue_unpack(__pos, __msg, __ext, unsigned short);
-	}
-
-	{
-		*pi_type_ptr = glue_unpack(__pos, __msg, __ext, unsigned char);
 	}
 
 	{
@@ -7556,41 +7899,6 @@ void caller_marshal_kernel__nvme_setup_cmd__req__in(
 	struct nvme_setup_cmd_call_ctx const* ctx,
 	struct request const* ptr)
 {
-	unsigned int const* cmd_type_ptr = &ptr->cmd_type;
-	unsigned long long const* cmd_flags_ptr = &ptr->cmd_flags;
-	unsigned int const* __data_len_ptr = &ptr->__data_len;
-	unsigned long const* __sector_ptr = &ptr->__sector;
-	struct bio* const* bio_ptr = &ptr->bio;
-	int const* tag_ptr = &ptr->tag;
-
-	{
-		glue_pack(__pos, __msg, __ext, *cmd_type_ptr);
-	}
-
-	{
-		glue_pack(__pos, __msg, __ext, *cmd_flags_ptr);
-	}
-
-	{
-		glue_pack(__pos, __msg, __ext, *__data_len_ptr);
-	}
-
-	{
-		glue_pack(__pos, __msg, __ext, *__sector_ptr);
-	}
-
-	{
-		__maybe_unused const void* __adjusted = *bio_ptr;
-		glue_pack_shadow(__pos, __msg, __ext, __adjusted);
-		if (*bio_ptr) {
-			caller_marshal_kernel__nvme_setup_cmd__request_bio__in(__pos, __msg, __ext, ctx, *bio_ptr);
-		}
-
-	}
-
-	{
-		glue_pack(__pos, __msg, __ext, *tag_ptr);
-	}
 
 }
 
@@ -7601,40 +7909,6 @@ void callee_unmarshal_kernel__nvme_setup_cmd__req__in(
 	struct nvme_setup_cmd_call_ctx const* ctx,
 	struct request* ptr)
 {
-	unsigned int* cmd_type_ptr = &ptr->cmd_type;
-	unsigned long long* cmd_flags_ptr = &ptr->cmd_flags;
-	unsigned int* __data_len_ptr = &ptr->__data_len;
-	unsigned long* __sector_ptr = &ptr->__sector;
-	struct bio** bio_ptr = &ptr->bio;
-	int* tag_ptr = &ptr->tag;
-
-	{
-		*cmd_type_ptr = glue_unpack(__pos, __msg, __ext, unsigned int);
-	}
-
-	{
-		*cmd_flags_ptr = glue_unpack(__pos, __msg, __ext, unsigned long long);
-	}
-
-	{
-		*__data_len_ptr = glue_unpack(__pos, __msg, __ext, unsigned int);
-	}
-
-	{
-		*__sector_ptr = glue_unpack(__pos, __msg, __ext, unsigned long);
-	}
-
-	{
-		*bio_ptr = glue_unpack(__pos, __msg, __ext, struct bio*);
-		if (*bio_ptr) {
-			callee_unmarshal_kernel__nvme_setup_cmd__request_bio__in(__pos, __msg, __ext, ctx, *bio_ptr);
-		}
-
-	}
-
-	{
-		*tag_ptr = glue_unpack(__pos, __msg, __ext, int);
-	}
 
 	{
 	}
@@ -7647,24 +7921,6 @@ void callee_marshal_kernel__nvme_setup_cmd__req__in(
 	struct nvme_setup_cmd_call_ctx const* ctx,
 	struct request const* ptr)
 {
-	unsigned int const* __data_len_ptr = &ptr->__data_len;
-	struct bio* const* bio_ptr = &ptr->bio;
-	unsigned short const* nr_phys_segments_ptr = &ptr->nr_phys_segments;
-
-	{
-		glue_pack(__pos, __msg, __ext, *__data_len_ptr);
-	}
-
-	{
-		if (*bio_ptr) {
-			callee_marshal_kernel__nvme_setup_cmd__request_bio__in(__pos, __msg, __ext, ctx, *bio_ptr);
-		}
-
-	}
-
-	{
-		glue_pack(__pos, __msg, __ext, *nr_phys_segments_ptr);
-	}
 
 }
 
@@ -7675,74 +7931,12 @@ void caller_unmarshal_kernel__nvme_setup_cmd__req__in(
 	struct nvme_setup_cmd_call_ctx const* ctx,
 	struct request* ptr)
 {
-	unsigned int* __data_len_ptr = &ptr->__data_len;
-	struct bio** bio_ptr = &ptr->bio;
-	unsigned short* nr_phys_segments_ptr = &ptr->nr_phys_segments;
-
-	{
-		*__data_len_ptr = glue_unpack(__pos, __msg, __ext, unsigned int);
-	}
-
-	{
-		if (*bio_ptr) {
-			caller_unmarshal_kernel__nvme_setup_cmd__request_bio__in(__pos, __msg, __ext, ctx, *bio_ptr);
-		}
-
-	}
-
-	{
-		*nr_phys_segments_ptr = glue_unpack(__pos, __msg, __ext, unsigned short);
-	}
 
 	{
 	}
 }
 
-void caller_marshal_kernel__nvme_setup_cmd__request_bio__in(
-	size_t* __pos,
-	struct fipc_message* __msg,
-	struct ext_registers* __ext,
-	struct nvme_setup_cmd_call_ctx const* ctx,
-	struct bio const* ptr)
-{
-
-}
-
-void callee_unmarshal_kernel__nvme_setup_cmd__request_bio__in(
-	size_t* __pos,
-	const struct fipc_message* __msg,
-	const struct ext_registers* __ext,
-	struct nvme_setup_cmd_call_ctx const* ctx,
-	struct bio* ptr)
-{
-
-	{
-	}
-}
-
-void callee_marshal_kernel__nvme_setup_cmd__request_bio__in(
-	size_t* __pos,
-	struct fipc_message* __msg,
-	struct ext_registers* __ext,
-	struct nvme_setup_cmd_call_ctx const* ctx,
-	struct bio const* ptr)
-{
-
-}
-
-void caller_unmarshal_kernel__nvme_setup_cmd__request_bio__in(
-	size_t* __pos,
-	const struct fipc_message* __msg,
-	const struct ext_registers* __ext,
-	struct nvme_setup_cmd_call_ctx const* ctx,
-	struct bio* ptr)
-{
-
-	{
-	}
-}
-
-void caller_marshal_kernel__nvme_setup_cmd__cmd__io(
+void caller_marshal_kernel__nvme_setup_cmd__cmd__out(
 	size_t* __pos,
 	struct fipc_message* __msg,
 	struct ext_registers* __ext,
@@ -7752,7 +7946,7 @@ void caller_marshal_kernel__nvme_setup_cmd__cmd__io(
 
 }
 
-void callee_unmarshal_kernel__nvme_setup_cmd__cmd__io(
+void callee_unmarshal_kernel__nvme_setup_cmd__cmd__out(
 	size_t* __pos,
 	const struct fipc_message* __msg,
 	const struct ext_registers* __ext,
@@ -7764,7 +7958,7 @@ void callee_unmarshal_kernel__nvme_setup_cmd__cmd__io(
 	}
 }
 
-void callee_marshal_kernel__nvme_setup_cmd__cmd__io(
+void callee_marshal_kernel__nvme_setup_cmd__cmd__out(
 	size_t* __pos,
 	struct fipc_message* __msg,
 	struct ext_registers* __ext,
@@ -7774,7 +7968,7 @@ void callee_marshal_kernel__nvme_setup_cmd__cmd__io(
 
 }
 
-void caller_unmarshal_kernel__nvme_setup_cmd__cmd__io(
+void caller_unmarshal_kernel__nvme_setup_cmd__cmd__out(
 	size_t* __pos,
 	const struct fipc_message* __msg,
 	const struct ext_registers* __ext,

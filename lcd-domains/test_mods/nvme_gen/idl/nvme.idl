@@ -173,7 +173,7 @@ rpc void  blk_mq_start_request( projection rq* [in] rq ) {
 		projection < struct request > rq {
 		}
 	}
-	rpc void  blk_mq_tagset_busy_iter( projection tagset [bind(callee)] * [in] tagset,
+	rpc void  blk_mq_tagset_busy_iter( projection tagset [bind(callee)] * tagset,
 		rpc_ptr  tag_iter_fn fn, void [alloc<{{sizeof(void*)}}>(callee)] *  priv ) {
 		projection < struct blk_mq_tag_set > tagset {
 			/*projection _global_blk_mq_ops* ops;
@@ -554,16 +554,43 @@ rpc_ptr int  blk_mq_ops_poll( projection hctx* [in] hctx, unsigned int  tag ) {
 		}
 	}
 
-	rpc_ptr int  blk_mq_ops_queue_rq( projection hctx [bind(callee)] * hctx, projection bd [alloc_stack(callee)] *  bd ) {
+	rpc_ptr int  blk_mq_ops_queue_rq( projection hctx [bind(callee)] * hctx,
+				projection bd [alloc_stack(callee)] *  bd ) {
 		projection < struct blk_mq_hw_ctx > hctx {
 			projection blk_mq_hw_ctx_queue [bind(callee)] * queue;
 		}
 		projection < struct request_queue > blk_mq_hw_ctx_queue {
+			casted<void*, projection nvme_ns [alloc(callee)] *> queuedata;
+		}
+		projection <struct nvme_ns> nvme_ns {		
+			unsigned short ms;
+			unsigned char pi_type;
+			unsigned long flags;
 		}
 		projection < struct blk_mq_queue_data > bd {
 			projection blk_mq_queue_data_rq [bind(callee)] * rq;
 		}
 		projection < struct request > blk_mq_queue_data_rq {
+			unsigned int [in] cmd_type;
+			long long unsigned int [in] cmd_flags;
+			unsigned short nr_phys_segments;
+			int [in] tag;
+			projection request_bio* [unused] bio;
+			unsigned int  __data_len;
+			long unsigned int __sector;
+			projection rq [bind(callee)] *q;
+		}
+
+		projection < struct request_queue > rq {
+			projection limits limits;
+		}
+
+		projection < struct queue_limits > limits {
+			unsigned int max_hw_sectors;
+		}
+
+		projection < struct bio > request_bio {
+			projection request_bio * [unused] bi_next;
 		}
 	}
 	rpc void  nvme_queue_scan( projection ctrl [bind(callee)] * ctrl ) {
@@ -603,26 +630,17 @@ rpc void  nvme_requeue_req( projection req* [in] req ) {
 		projection < struct request_queue > nvme_ctrl_admin_q {
 		}
 	}
-rpc int  nvme_setup_cmd( projection ns* [in] ns, projection req* [in] req, projection cmd* [in, out] cmd ) {
-	projection < struct nvme_ns > ns {
-		int [in] lba_shift;
-		unsigned short [in] ms;
-		unsigned char [in] pi_type;
+	rpc int  nvme_setup_cmd( projection ns* ns,
+			projection req* req,
+			projection cmd [alloc_stack(callee), out] * cmd ) {
+		projection < struct nvme_ns > ns {
+			int [in] lba_shift;
+		}
+		projection < struct request > req {
+		}
+		projection < struct nvme_command > cmd {
+		}
 	}
-	projection < struct request > req {
-		unsigned int [in] cmd_type;
-		long long unsigned int [in] cmd_flags;
-		unsigned int [in, out] __data_len;
-		long unsigned int [in] __sector;
-		projection request_bio* bio;
-		unsigned short [out] nr_phys_segments;
-		int [in] tag;
-	}
-	projection < struct bio > request_bio {
-	}
-	projection < struct nvme_command > cmd {
-	}
-}
 	rpc_ptr void  pci_driver_shutdown( projection pdev [bind(callee)] * pdev ) {
 		projection < struct pci_dev > pdev {
 		}

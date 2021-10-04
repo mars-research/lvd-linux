@@ -7,9 +7,10 @@
 #include <linux/blkdev.h>
 #include <linux/interrupt.h>
 #include <linux/pci.h>
+#include <linux/priv_mempool.h>
 #include "../../block/blk-mq-tag.h"
 
-extern void *skb_data_pool;
+extern void *bdata_data_pool;
 extern void shared_mem_init(void);
 extern void shared_mem_init_callee(struct fipc_message *msg, struct ext_registers* ext);
 

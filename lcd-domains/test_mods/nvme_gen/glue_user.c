@@ -5,6 +5,8 @@
 #include <libfipc_types.h>
 #include <asm/lcd_domains/libvmfunc.h>
 #include <linux/hashtable.h>
+#include <linux/vmalloc.h>
+#include <lcd_domains/microkernel.h>
 
 #include <lcd_config/post_hook.h>
 
@@ -164,13 +166,12 @@ void glue_user_init(void)
     hash_init(to_shadow_ht);
 }
 
-#if 0
 #ifdef LCD_ISOLATE
 
-void *skb_data_pool = NULL;
+void *bdata_data_pool = NULL;
 
-#define SKB_DATA_OBJ_SIZE	2048
-#define SKB_DATA_POOL	0
+#define DATA_OBJ_SIZE	4096
+
 void shared_mem_init(void) {
 	struct fipc_message buffer = {0};
 	struct fipc_message *msg = &buffer;
@@ -190,11 +191,11 @@ void shared_mem_init(void) {
 	}
 
 	// obj size
-	glue_pack(pos, msg, ext, SKB_DATA_OBJ_SIZE);
+	glue_pack(pos, msg, ext, DATA_OBJ_SIZE);
 	// cptr
 	glue_pack(pos, msg, ext, cptr_val(pool_cptr));
 	// pool type
-	glue_pack(pos, msg, ext, SKB_DATA_POOL);
+	glue_pack(pos, msg, ext, BLK_USER_BUF_POOL);
 
 	glue_call_server(pos, msg, RPC_ID_shared_mem_init);
 
@@ -212,26 +213,22 @@ void shared_mem_init(void) {
 	LIBLCD_MSG("%s, mapping private pool %p | ord %d", __func__,
 			gva_val(pool_addr), pool_ord);
 
-	skb_data_pool = (void*)gva_val(pool_addr);
+	bdata_data_pool = (void*)gva_val(pool_addr);
 fail_pool:
 fail_cptr:
-	LIBLCD_ERR("%s, skb_data_pool uninitialized!", __func__);
+	LIBLCD_ERR("%s, bdata_data_pool uninitialized!", __func__);
 	return;
 }
 
 #else
-
-#include <linux/priv_mempool.h>
-#include <linux/vmalloc.h>
-#include <lcd_domains/microkernel.h>
 
 #define SHARED_POOL_SIZE	(256UL << 20)
 #define SHARED_POOL_PAGES	(SHARED_POOL_SIZE >> PAGE_SHIFT)
 #define SHARED_POOL_ORDER	ilog2(roundup_pow_of_two(SHARED_POOL_PAGES))
 
 
-priv_pool_t *skb_pool;
-void *skb_data_pool = NULL;
+priv_pool_t *bdata_pool;
+void *bdata_data_pool = NULL;
 
 void shared_mem_init_callee(struct fipc_message *msg, struct ext_registers* ext)
 {
@@ -265,14 +262,14 @@ void shared_mem_init_callee(struct fipc_message *msg, struct ext_registers* ext)
 
 	// allocate memory
 	pool_size = SHARED_POOL_SIZE;
-	skb_data_pool = vzalloc(pool_size);
+	bdata_data_pool = vzalloc(pool_size);
 
 	// initialize private pool
-	skb_pool = priv_pool_init(ptype, (void*) skb_data_pool, pool_size, obj_size);
+	bdata_pool = priv_pool_init(ptype, (void*) bdata_data_pool, pool_size, obj_size);
 	// dump stats - debug info
-	priv_pool_dumpstats(skb_pool);
+	priv_pool_dumpstats(bdata_pool);
 
-	ret = lcd_volunteer_vmalloc_mem(__gva((unsigned long)skb_pool->pool),
+	ret = lcd_volunteer_vmalloc_mem(__gva((unsigned long)bdata_pool->pool),
 			SHARED_POOL_PAGES, &pool_cptr);
 	pool_ord = SHARED_POOL_ORDER;
 
@@ -296,13 +293,12 @@ fail_vol:
 	return;
 }
 
-void skb_data_shared_mem_uninit(void)
+void bdata_data_shared_mem_uninit(void)
 {
-	if (skb_data_pool)
-		vfree(skb_data_pool);
+	if (bdata_data_pool)
+		vfree(bdata_data_pool);
 
-	if (skb_pool)
-		priv_pool_destroy(skb_pool);
+	if (bdata_pool)
+		priv_pool_destroy(bdata_pool);
 }
-#endif
 #endif

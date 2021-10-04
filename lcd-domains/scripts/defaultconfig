@@ -97,3 +97,7 @@ sbedac_gen/edac_klcd nonisolated
 canraw_gen/boot nonisolated
 canraw_gen/can_lcd isolated
 canraw_gen/proto_klcd nonisolated
+
+nvme_gen/boot nonisolated
+nvme_gen/nvme_lcd isolated
+nvme_gen/blk_klcd nonisolated

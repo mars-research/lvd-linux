@@ -3302,6 +3302,8 @@ void nvme_queue_async_events(struct nvme_ctrl* ctrl)
 	}
 }
 
+#define MAX_RQ_BUFS	64
+
 void blk_mq_ops_queue_rq_callee(struct fipc_message* __msg, struct ext_registers* __ext)
 {
 	size_t n_pos = 0;
@@ -3315,7 +3317,13 @@ void blk_mq_ops_queue_rq_callee(struct fipc_message* __msg, struct ext_registers
 	struct blk_mq_queue_data** bd_ptr = &bd;
 	int ret = 0;
 	int* ret_ptr = &ret;
-	
+
+	void *kbuf = NULL;
+	void *kbuf_klcd[MAX_RQ_BUFS];
+	struct page *lcd_page = NULL;
+	unsigned long buf_offset[MAX_RQ_BUFS];
+	int num_segs = 0; 
+
 	__maybe_unused struct blk_mq_ops_queue_rq_call_ctx call_ctx = {hctx, bd};
 	__maybe_unused struct blk_mq_ops_queue_rq_call_ctx *ctx = &call_ctx;
 
@@ -3336,6 +3344,39 @@ void blk_mq_ops_queue_rq_callee(struct fipc_message* __msg, struct ext_registers
 			callee_unmarshal_kernel__blk_mq_ops_queue_rq__bd__in(__pos, __msg, __ext, ctx, *bd_ptr);
 		}
 
+		{
+			int i;
+			num_segs = glue_unpack(__pos, __msg, __ext, int);
+
+			if (num_segs > 0) {
+				for (i = 0; i < num_segs; i++) {
+					buf_offset[i] = glue_unpack(__pos, __msg, __ext, unsigned long);
+					kbuf_klcd[i] = bdata_data_pool + buf_offset[i];
+				}
+
+				lcd_page = lcd_alloc_pages(GFP_KERNEL,
+						ilog2(roundup_pow_of_two(num_segs)));
+				if (lcd_page) {
+					kbuf = lcd_page_address(lcd_page);
+				} else {
+					printk("%s page alloc failed", __func__);
+				}
+
+				for (i = 0; i < num_segs; i++) {
+					//printk("%s copying data from %p", __func__, kbuf_klcd[i]);
+					memcpy(kbuf, kbuf_klcd[i], PAGE_SIZE);
+					kbuf += PAGE_SIZE;
+				}
+
+				ret = blk_rq_map_kern(bd->rq->q, bd->rq, kbuf, bd->rq->__data_len, 0);
+
+				if (ret) {
+					printk("%s, map_kern of kbuf %p failed ret = %d for datalen %d",
+							__func__, kbuf, ret, bd->rq->__data_len);
+				}
+			}
+		}
+
 	}
 
 	ret = function_ptr(hctx, bd);
@@ -3353,6 +3394,16 @@ void blk_mq_ops_queue_rq_callee(struct fipc_message* __msg, struct ext_registers
 			callee_marshal_kernel__blk_mq_ops_queue_rq__bd__in(__pos, __msg, __ext, ctx, *bd_ptr);
 		}
 
+		if (num_segs) {
+			int i;
+			kbuf = lcd_page_address(lcd_page);
+			for (i = 0; i < num_segs; i++) {
+				memcpy(kbuf_klcd[i], kbuf, PAGE_SIZE);
+				kbuf += PAGE_SIZE;
+			}
+
+			lcd_free_pages(lcd_page, ilog2(roundup_pow_of_two(num_segs)));
+		}
 	}
 
 	{
@@ -3692,9 +3743,8 @@ int nvme_setup_cmd(struct nvme_ns* ns, struct request* req, struct nvme_command*
 
 	{
 		__maybe_unused const void* __adjusted = *cmd_ptr;
-		glue_pack_shadow(__pos, __msg, __ext, __adjusted);
 		if (*cmd_ptr) {
-			caller_marshal_kernel__nvme_setup_cmd__cmd__io(__pos, __msg, __ext, ctx, *cmd_ptr);
+			caller_marshal_kernel__nvme_setup_cmd__cmd__out(__pos, __msg, __ext, ctx, *cmd_ptr);
 		}
 
 	}
@@ -3717,9 +3767,8 @@ int nvme_setup_cmd(struct nvme_ns* ns, struct request* req, struct nvme_command*
 	}
 
 	{
-		*cmd_ptr = glue_unpack_shadow(__pos, __msg, __ext, struct nvme_command*);
 		if (*cmd_ptr) {
-			caller_unmarshal_kernel__nvme_setup_cmd__cmd__io(__pos, __msg, __ext, ctx, *cmd_ptr);
+			caller_unmarshal_kernel__nvme_setup_cmd__cmd__out(__pos, __msg, __ext, ctx, *cmd_ptr);
 		}
 
 	}

@@ -1,0 +1,1068 @@
+module kernel {
+rpc projection ret_class*  __class_create( projection owner*  owner, char*  name, projection key*  key ) {
+	projection < struct class > ret_class {
+		char* [out] name;
+		projection class_module* owner;
+		projection _global_attribute_group** dev_groups;
+	}
+	projection < struct module > class_ret_owner {
+	}
+	projection < struct module > owner {
+	}
+	projection < struct lock_class_key > key {
+	}
+}
+
+rpc long unsigned int  __msecs_to_jiffies( unsigned int  m ) {
+}
+
+
+rpc int __register_chrdev( unsigned int major, unsigned int baseminor, unsigned int count, string [alloc(callee)] *name, const projection _global_file_operations [alloc(callee)] * fops ) {
+
+}
+
+rpc void __unregister_chrdev( unsigned int major, unsigned int baseminor, unsigned int count, string [alloc(callee)] * name ) {
+}
+
+
+rpc projection ret_gendisk [alloc(caller)] *  alloc_disk_node( int  minors, int  node_id ) {
+		projection < struct hd_struct> hd_struct {
+			projection device __dev;
+		}
+			projection < struct device> device {
+				projection device_device_type* type;
+				projection device_class* class;
+				projection _global_attribute_group** groups;
+			}
+	projection < struct gendisk > ret_gendisk {
+		projection hd_struct part0;
+		projection _global_block_device_operations* fops;
+	}
+	projection < struct device_type > device_ret_type {
+	}
+	projection < struct class > device_ret_class {
+	}
+}
+rpc projection ret_block_device*  bdget_disk( projection disk* [in] disk, int  partno ) {
+	projection < struct block_device > ret_block_device {
+	}
+	projection < struct gendisk > disk {
+		projection _global_block_device_operations* fops;
+	}
+}
+rpc void  bdput( projection bdev* [in] bdev ) {
+	projection < struct block_device > bdev {
+	}
+}
+rpc int  bio_integrity_add_page( projection bio* [in] bio, projection page*  page, unsigned int  len, unsigned int  offset ) {
+	projection < struct bio > bio {
+		projection bio_block_device* bi_bdev;
+	}
+	projection < struct block_device > bio_bi_bdev {
+		projection block_device_gendisk* bd_disk;
+	}
+	projection < struct gendisk > block_device_bd_disk {
+		projection gendisk_request_queue* queue;
+	}
+	projection < struct request_queue > gendisk_queue {
+	}
+	projection < struct page > page {
+	}
+}
+rpc projection ret_bio_integrity_payload*  bio_integrity_alloc( projection bio* [in] bio, unsigned int  gfp_mask, unsigned int  nr_vecs ) {
+	projection < struct bio_integrity_payload > ret_bio_integrity_payload {
+	}
+	projection < struct bio > bio {
+	}
+}
+rpc void  blk_add_request_payload( projection rq* [in] rq, projection page*  page, int  offset, unsigned int  len ) {
+	projection < struct request > rq {
+		unsigned int [out] __data_len;
+		projection request_bio* bio;
+	}
+	projection < struct bio > request_bio {
+	}
+	projection < struct page > page {
+	}
+}
+rpc void  blk_cleanup_queue( projection q* [in] q ) {
+	projection < struct request_queue > q {
+		long unsigned int [in][out] queue_flags;
+		projection request_queue_spinlock* queue_lock;
+	}
+	projection < struct spinlock > request_queue_queue_lock {
+	}
+}
+rpc int  blk_execute_rq( projection q* [in] q, projection bd_disk* [in] bd_disk, projection rq* [in] rq, int  at_head ) {
+	projection < struct request_queue > q {
+		long unsigned int [in] queue_flags;
+		projection request_queue_spinlock* queue_lock;
+	}
+	projection < struct spinlock > request_queue_queue_lock {
+	}
+	projection < struct gendisk > bd_disk {
+		projection _global_block_device_operations* fops;
+	}
+	projection < struct request > rq {
+		int [in] errors;
+		void* [out] end_io_data;
+	}
+}
+rpc void  blk_execute_rq_nowait( projection q* [in] q, projection bd_disk* [in] bd_disk, projection rq* [in][out] rq, int  at_head, rpc_ptr  done done ) {
+	projection < struct request_queue > q {
+		long unsigned int [in] queue_flags;
+		projection request_queue_spinlock* queue_lock;
+	}
+	projection < struct spinlock > request_queue_queue_lock {
+	}
+	projection < struct gendisk > bd_disk {
+		projection _global_block_device_operations* fops;
+	}
+	projection < struct request > rq {
+		projection request_request_queue* q;
+		unsigned int [in] cmd_type;
+		long long unsigned int [in][out] cmd_flags;
+		unsigned int [in][out] __data_len;
+		long unsigned int [in][out] __sector;
+		projection request_bio* bio;
+		int [in][out] errors;
+		unsigned char* [in] cmd;
+	}
+	projection < struct request_queue > request_q {
+	}
+	projection < struct bio > request_bio {
+	}
+}
+rpc void  blk_integrity_register( projection disk* [in] disk, projection template* [in] template ) {
+	projection < struct gendisk > disk {
+		projection _global_block_device_operations* fops;
+		projection _request_queue* queue;
+		int [in] flags;
+	}
+		projection < struct queue_limits> queue_limits {
+			unsigned short [in] logical_block_size;
+		}
+	projection < struct request_queue > gendisk_queue {
+		projection queue_limits limits;
+		projection queue_limits limits;
+	}
+	projection < struct blk_integrity > template {
+		projection blk_integrity_blk_integrity_profile* profile;
+		unsigned char [in] flags;
+		unsigned char [in] tuple_size;
+		unsigned char [in] tag_size;
+	}
+	projection < struct blk_integrity_profile > blk_integrity_profile {
+	}
+}
+rpc void  blk_integrity_unregister( projection disk* [in] disk ) {
+	projection < struct gendisk > disk {
+		projection _global_block_device_operations* fops;
+		projection _request_queue* queue;
+		int [in] flags;
+	}
+	projection < struct request_queue > gendisk_queue {
+	}
+}
+rpc void  blk_mq_abort_requeue_list( projection q* [in] q ) {
+	projection < struct request_queue > q {
+	}
+}
+rpc projection ret_request*  blk_mq_alloc_request( projection q* [in] q, int  rw, unsigned int  flags ) {
+	projection < struct request > ret_request {
+		unsigned int [out] __data_len;
+		long unsigned int [out] __sector;
+		projection request_bio* bio;
+	}
+	projection < struct bio > request_ret_bio {
+	}
+	projection < struct request_queue > q {
+		long unsigned int [in] queue_flags;
+	}
+}
+rpc projection ret_request*  blk_mq_alloc_request_hctx( projection q* [in] q, int  rw, unsigned int  flags, unsigned int  hctx_idx ) {
+	projection < struct request > ret_request {
+		unsigned char*  cmd;
+	}
+	projection < struct request_queue > q {
+		long unsigned int [in] queue_flags;
+	}
+}
+rpc void  blk_mq_cancel_requeue_work( projection q* [in] q ) {
+	projection < struct request_queue > q {
+	}
+}
+rpc void  blk_mq_complete_request( projection rq* [in] rq, int  error ) {
+	projection < struct request > rq {
+		projection request_request_queue* q;
+		unsigned int [in] cmd_type;
+		long long unsigned int [in][out] cmd_flags;
+		unsigned int [in][out] __data_len;
+		long unsigned int [in][out] __sector;
+		projection request_bio* bio;
+		int [in][out] errors;
+		unsigned char* [in] cmd;
+	}
+	projection < struct request_queue > request_q {
+	}
+	projection < struct bio > request_bio {
+	}
+}
+rpc void  blk_mq_free_request( projection rq* [in] rq ) {
+	projection < struct request > rq {
+		projection request_request_queue* q;
+	}
+	projection < struct request_queue > request_q {
+	}
+}
+rpc void  blk_mq_freeze_queue( projection q* [in] q ) {
+	projection < struct request_queue > q {
+	}
+}
+rpc projection ret_request_queue*  blk_mq_init_queue( projection set* [in] set ) {
+	projection < struct request_queue > ret_request_queue {
+	}
+	projection < struct blk_mq_tag_set > set {
+	}
+}
+rpc void  blk_mq_kick_requeue_list( projection q* [in] q ) {
+	projection < struct request_queue > q {
+	}
+}
+rpc int  blk_mq_request_started( projection rq* [in] rq ) {
+	projection < struct request > rq {
+	}
+}
+rpc void  blk_mq_requeue_request( projection rq* [in][out] rq ) {
+	projection < struct request > rq {
+		projection request_request_queue* q;
+		long long unsigned int [in][out] cmd_flags;
+		unsigned int [in] __data_len;
+	}
+	projection < struct request_queue > request_q {
+	}
+}
+rpc void  blk_mq_start_stopped_hw_queues( projection q* [in] q, bool  async ) {
+	projection < struct request_queue > q {
+	}
+}
+rpc void  blk_mq_stop_hw_queues( projection q* [in] q ) {
+	projection < struct request_queue > q {
+	}
+}
+rpc void  blk_mq_unfreeze_queue( projection q* [in] q ) {
+	projection < struct request_queue > q {
+	}
+}
+rpc void  blk_queue_chunk_sectors( projection q* [in] q, unsigned int  chunk_sectors ) {
+	projection < struct request_queue > q {
+		projection queue_limits limits;
+	}
+}
+rpc void  blk_queue_logical_block_size( projection q* [in] q, unsigned short  size ) {
+		projection < struct queue_limits> queue_limits {
+			unsigned short [out] logical_block_size;
+		}
+	projection < struct request_queue > q {
+		projection queue_limits limits;
+		projection queue_limits limits;
+	}
+}
+rpc void  blk_queue_max_discard_sectors( projection q* [in] q, unsigned int  max_discard_sectors ) {
+	projection < struct request_queue > q {
+		projection queue_limits limits;
+	}
+}
+rpc void  blk_queue_max_hw_sectors( projection q* [in] q, unsigned int  max_hw_sectors ) {
+	projection < struct request_queue > q {
+		projection queue_limits limits;
+	}
+}
+rpc void  blk_queue_max_segments( projection q* [in] q, unsigned short  max_segments ) {
+	projection < struct request_queue > q {
+		projection queue_limits limits;
+	}
+}
+rpc void  blk_queue_virt_boundary( projection q* [in] q, long unsigned int  mask ) {
+	projection < struct request_queue > q {
+		projection queue_limits limits;
+	}
+}
+rpc void  blk_queue_write_cache( projection q* [in] q, bool  wc, bool  fua ) {
+	projection < struct request_queue > q {
+		long unsigned int [out] queue_flags;
+		projection request_queue_spinlock* queue_lock;
+	}
+	projection < struct spinlock > request_queue_queue_lock {
+	}
+}
+rpc int  blk_rq_map_kern( projection q* [in] q, projection rq* [in] rq, void*  kbuf, unsigned int  len, unsigned int  gfp_mask ) {
+	projection < struct request_queue > q {
+		projection queue_limits limits;
+	}
+	projection < struct request > rq {
+		projection request_request_queue* q;
+		long long unsigned int [in][out] cmd_flags;
+		unsigned int [in][out] __data_len;
+		projection request_bio* bio;
+	}
+	projection < struct request_queue > request_q {
+	}
+	projection < struct bio > request_bio {
+	}
+}
+rpc int  blk_rq_map_user( projection q* [in] q, projection rq* [in] rq, projection map_data*  map_data, void*  ubuf, long unsigned int  len, unsigned int  gfp_mask ) {
+	projection < struct request_queue > q {
+		projection queue_limits limits;
+	}
+	projection < struct request > rq {
+	}
+	projection < struct rq_map_data > map_data {
+	}
+}
+rpc int  blk_rq_unmap_user( projection bio* [in] bio ) {
+	projection < struct bio > bio {
+	}
+}
+rpc void  blk_set_queue_dying( projection q* [in] q ) {
+	projection < struct request_queue > q {
+		long unsigned int [out] queue_flags;
+		projection request_queue_spinlock* queue_lock;
+	}
+	projection < struct spinlock > request_queue_queue_lock {
+	}
+}
+rpc bool  cancel_delayed_work_sync( projection dwork* [in][out] dwork ) {
+	projection < struct delayed_work > dwork {
+		projection work_struct work;
+	}
+}
+rpc bool  capable( int  cap ) {
+}
+rpc void  class_destroy( projection cls* [in] cls ) {
+	projection < struct class > cls {
+		char* [in] name;
+		projection _global_attribute_group** dev_groups;
+		projection _subsys_private* p;
+	}
+	projection < struct subsys_private > class_p {
+	}
+}
+rpc_ptr long int  cntlid_show( projection dev* [in] dev, projection _global_device_attribute* [in] attr, char* alloc_stack buf ) {
+	projection < struct device > dev {
+		void* [in] driver_data;
+		projection _global_attribute_group** groups;
+	}
+}
+rpc void  del_gendisk( projection disk* [in] disk ) {
+		projection < struct hd_struct> hd_struct {
+			long unsigned int [out] nr_sects;
+			projection device __dev;
+			projection device __dev;
+		}
+			projection < struct device> device {
+				unsigned int [in] devt;
+				projection _global_attribute_group** groups;
+			}
+	projection < struct gendisk > disk {
+		projection hd_struct part0;
+		projection hd_struct part0;
+		projection _global_block_device_operations* fops;
+		int [in][out] flags;
+	}
+}
+rpc void  dev_err( projection dev* [in] dev, char*  fmt ) {
+	projection < struct device > dev {
+		projection kobject kobj;
+		char* [in] init_name;
+		projection device_bus_type* bus;
+		projection device_device_driver* driver;
+		projection device_class* class;
+		projection _global_attribute_group** groups;
+	}
+	projection < struct bus_type > device_bus {
+		char* [in] name;
+		projection _global_device_attribute* dev_attrs;
+		projection _global_attribute_group** bus_groups;
+		projection _global_attribute_group** dev_groups;
+		projection _global_attribute_group** drv_groups;
+	}
+	projection < struct device_driver > device_driver {
+	}
+	projection < struct class > device_class {
+		char* [in] name;
+		projection _global_attribute_group** dev_groups;
+	}
+}
+rpc void  dev_warn( projection dev* [in] dev, char*  fmt ) {
+	projection < struct device > dev {
+		projection kobject kobj;
+		char* [in] init_name;
+		projection device_bus_type* bus;
+		projection device_device_driver* driver;
+		projection device_class* class;
+		projection _global_attribute_group** groups;
+	}
+	projection < struct bus_type > device_bus {
+		char* [in] name;
+		projection _global_device_attribute* dev_attrs;
+		projection _global_attribute_group** bus_groups;
+		projection _global_attribute_group** dev_groups;
+		projection _global_attribute_group** drv_groups;
+	}
+	projection < struct device_driver > device_driver {
+	}
+	projection < struct class > device_class {
+		char* [in] name;
+		projection _global_attribute_group** dev_groups;
+	}
+}
+rpc void  device_add_disk( projection parent* [in] parent, projection disk* [in][out] disk ) {
+	projection < struct device > parent {
+		projection _global_attribute_group** groups;
+	}
+		projection < struct hd_struct> hd_struct {
+			projection device __dev;
+			projection device __dev;
+		}
+			projection < struct device> device {
+				projection device_device* parent;
+				projection device_device_private* p;
+				projection kobject kobj;
+				char* [in]may_within<self->driver_data, size>may_within<self->release, size> init_name;
+				projection device_device_type* type;
+				projection mutex mutex;
+				projection device_bus_type* bus;
+				projection device_device_driver* driver;
+				void* [in]may_within<self->driver_data, size>may_within<self->release, size> platform_data;
+				void* [in]may_within<self->release, size> driver_data;
+				projection dev_pm_info power;
+				projection device_dev_pm_domain* pm_domain;
+				projection device_irq_domain* msi_domain;
+				projection device_dev_pin_info* pins;
+				projection list_head msi_list;
+				long long unsigned int* [in]may_within<self->driver_data, size>may_within<self->release, size> dma_mask;
+				long long unsigned int [in] coherent_dma_mask;
+				long unsigned int [in] dma_pfn_offset;
+				projection device_device_dma_parameters* dma_parms;
+				projection list_head dma_pools;
+				projection device_dma_coherent_mem* dma_mem;
+				projection dev_archdata archdata;
+				projection device_device_node* of_node;
+				projection device_fwnode_handle* fwnode;
+				unsigned int [in][out] devt;
+				unsigned int [in] id;
+				projection spinlock devres_lock;
+				projection list_head devres_head;
+				projection klist_node knode_class;
+				projection device_class* class;
+				projection _global_attribute_group** groups;
+				projection _iommu_group* iommu_group;
+				bool [in] offline_disabled : 1;
+				bool [in] offline : 1;
+			}
+	projection < struct gendisk > disk {
+		array< char, 32> [in] disk_name;
+		projection hd_struct part0;
+		projection hd_struct part0;
+		projection _global_block_device_operations* fops;
+		projection _request_queue* queue;
+		int [in][out] flags;
+	}
+	projection < struct device > device_parent {
+	}
+	projection < struct device_private > device_p {
+	}
+	projection < struct device_type > device_type {
+	}
+	projection < struct bus_type > device_bus {
+	}
+	projection < struct device_driver > device_driver {
+	}
+	projection < struct dev_pm_domain > device_pm_domain {
+	}
+	projection < struct irq_domain > device_msi_domain {
+	}
+	projection < struct dev_pin_info > device_pins {
+	}
+	projection < struct device_dma_parameters > device_dma_parms {
+	}
+	projection < struct dma_coherent_mem > device_dma_mem {
+	}
+	projection < struct device_node > device_of_node {
+	}
+	projection < struct fwnode_handle > device_fwnode {
+	}
+	projection < struct class > device_class {
+	}
+	projection < struct iommu_group > device_iommu_group {
+	}
+	projection < struct request_queue > gendisk_queue {
+		long unsigned int [in] queue_flags;
+	}
+}
+rpc projection ret_device*  device_create_with_groups( projection class* [in] class, projection parent* [in] parent, unsigned int  devt, void*  drvdata, projection _global_attribute_group** [in] groups, char*  fmt ) {
+	projection < struct device > ret_device {
+		projection _global_attribute_group** groups;
+	}
+	projection < struct class > class {
+		projection _global_attribute_group** dev_groups;
+	}
+	projection < struct device > parent {
+		projection _global_attribute_group** groups;
+	}
+}
+rpc void  device_destroy( projection class* [in] class, unsigned int [unused] devt ) {
+	projection < struct class > class {
+		char* [in] name;
+		projection _global_attribute_group** dev_groups;
+		projection _subsys_private* p;
+	}
+	projection < struct subsys_private > class_p {
+	}
+}
+rpc bool  device_remove_file_self( projection dev* [in] dev, projection _global_device_attribute* [in] attr ) {
+	projection < struct device > dev {
+		projection _global_attribute_group** groups;
+	}
+}
+rpc_ptr long int  eui_show( projection dev* [in] dev, projection _global_device_attribute* [in] attr, char* alloc_stack buf ) {
+	projection < struct device > dev {
+		projection _global_attribute_group** groups;
+	}
+}
+rpc_ptr long int  firmware_rev_show( projection dev* [in] dev, projection _global_device_attribute* [in] attr, char* alloc_stack buf ) {
+	projection < struct device > dev {
+		void* [in] driver_data;
+		projection _global_attribute_group** groups;
+	}
+}
+rpc bool  flush_work( projection work* [in] work ) {
+	projection < struct work_struct > work {
+		projection atomic64_t data;
+	}
+}
+rpc projection ret_device*  get_device( projection dev* [in] dev ) {
+	projection < struct device > ret_device {
+		projection _global_attribute_group** groups;
+	}
+	projection < struct device > dev {
+		projection _global_attribute_group** groups;
+	}
+}
+rpc void  ida_destroy( projection ida* [in][out] ida ) {
+	projection < struct ida > ida {
+		projection idr idr;
+		projection ida_ida_bitmap* free_bitmap;
+	}
+	projection < struct ida_bitmap > ida_free_bitmap {
+	}
+}
+rpc int  ida_get_new_above( projection ida* [in][out] ida, int  starting_id, int* [out] p_id ) {
+		projection < struct idr> idr {
+			projection idr_idr_layer* hint;
+			projection spinlock lock;
+			int [in] id_free_cnt;
+		}
+	projection < struct ida > ida {
+		projection idr idr;
+		projection idr idr;
+		projection ida_ida_bitmap* free_bitmap;
+	}
+	projection < struct idr_layer > idr_hint {
+	}
+	projection < struct ida_bitmap > ida_free_bitmap {
+	}
+}
+rpc void  ida_init( projection ida* [in] ida ) {
+	projection < struct ida > ida {
+		projection idr idr;
+	}
+}
+rpc int  ida_pre_get( projection ida* [in][out] ida, unsigned int  gfp_mask ) {
+		projection < struct idr> idr {
+			projection idr_idr_layer* hint;
+			projection spinlock lock;
+		}
+	projection < struct ida > ida {
+		projection idr idr;
+		projection idr idr;
+		projection ida_ida_bitmap* free_bitmap;
+	}
+	projection < struct idr_layer > idr_hint {
+	}
+	projection < struct ida_bitmap > ida_free_bitmap {
+	}
+}
+rpc void  ida_remove( projection ida* [in][out] ida, int  id ) {
+		projection < struct idr> idr {
+			projection idr_idr_layer* hint;
+			projection idr_idr_layer* top;
+			int [in] layers;
+			projection spinlock lock;
+		}
+	projection < struct ida > ida {
+		projection idr idr;
+		projection idr idr;
+		projection ida_ida_bitmap* free_bitmap;
+	}
+	projection < struct idr_layer > idr_hint {
+	}
+	projection < struct idr_layer > idr_top {
+	}
+	projection < struct ida_bitmap > ida_free_bitmap {
+	}
+}
+rpc int  ida_simple_get( projection ida* [in][out] ida, unsigned int  start, unsigned int  end, unsigned int  gfp_mask ) {
+		projection < struct idr> idr {
+			projection idr_idr_layer* hint;
+			projection idr_idr_layer* top;
+			int [in] layers;
+			projection spinlock lock;
+			int [in] id_free_cnt;
+		}
+	projection < struct ida > ida {
+		projection idr idr;
+		projection idr idr;
+		projection ida_ida_bitmap* free_bitmap;
+	}
+	projection < struct idr_layer > idr_hint {
+	}
+	projection < struct idr_layer > idr_top {
+	}
+	projection < struct ida_bitmap > ida_free_bitmap {
+	}
+}
+rpc void  ida_simple_remove( projection ida* [in][out] ida, unsigned int  id ) {
+		projection < struct idr> idr {
+			projection idr_idr_layer* hint;
+			projection idr_idr_layer* top;
+			int [in] layers;
+			projection spinlock lock;
+		}
+	projection < struct ida > ida {
+		projection idr idr;
+		projection idr idr;
+		projection ida_ida_bitmap* free_bitmap;
+	}
+	projection < struct idr_layer > idr_hint {
+	}
+	projection < struct idr_layer > idr_top {
+	}
+	projection < struct ida_bitmap > ida_free_bitmap {
+	}
+}
+rpc void  init_timer_key( projection timer* [in] timer, unsigned int  flags, char*  name, projection key*  key ) {
+	projection < struct timer_list > timer {
+	}
+	projection < struct lock_class_key > key {
+	}
+}
+rpc void*  kmalloc_order( long unsigned int  size, unsigned int  flags, unsigned int  order ) {
+}
+rpc_ptr long int  model_show( projection dev* [in] dev, projection _global_device_attribute* [in] attr, char* alloc_stack buf ) {
+	projection < struct device > dev {
+		void* [in] driver_data;
+		projection _global_attribute_group** groups;
+	}
+}
+rpc void  msleep( unsigned int  msecs ) {
+}
+rpc_ptr long int  nsid_show( projection dev* [in] dev, projection _global_device_attribute* [in] attr, char* alloc_stack buf ) {
+	projection < struct device > dev {
+		projection _global_attribute_group** groups;
+	}
+}
+rpc_ptr unsigned short  nvme_ns_attrs_are_visible( projection kobj* [in]alloc_stack kobj, projection a* [in]alloc_stack a, int [unused] n ) {
+	projection < struct kobject > kobj {
+	}
+	projection < struct attribute > a {
+		unsigned short [in] mode;
+	}
+}
+rpc_ptr long int  nvme_sysfs_rescan( projection dev* [in] dev, projection _global_device_attribute* [in] attr, char* [unused] buf, long unsigned int  count ) {
+	projection < struct device > dev {
+		void* [in] driver_data;
+		projection _global_attribute_group** groups;
+	}
+}
+rpc_ptr long int  nvme_sysfs_reset( projection dev* [in] dev, projection _global_device_attribute* [in] attr, char* [unused] buf, long unsigned int  count ) {
+	projection < struct device > dev {
+		void* [in] driver_data;
+		projection _global_attribute_group** groups;
+	}
+}
+rpc_ptr long int  nvme_sysfs_show_subsysnqn( projection dev* [in] dev, projection _global_device_attribute* [in] attr, char* alloc_stack buf ) {
+	projection < struct device > dev {
+		void* [in] driver_data;
+		projection _global_attribute_group** groups;
+	}
+}
+rpc_ptr long int  nvme_sysfs_show_transport( projection dev* [in] dev, projection _global_device_attribute* [in] attr, char* alloc_stack buf ) {
+	projection < struct device > dev {
+		void* [in] driver_data;
+		projection _global_attribute_group** groups;
+	}
+}
+rpc void  put_device( projection dev* [in] dev ) {
+	projection < struct device > dev {
+		projection _global_attribute_group** groups;
+	}
+}
+rpc void  put_disk( projection disk* [in] disk ) {
+		projection < struct hd_struct> hd_struct {
+			projection device __dev;
+			projection device __dev;
+		}
+			projection < struct device> device {
+				projection _global_attribute_group** groups;
+			}
+	projection < struct gendisk > disk {
+		projection hd_struct part0;
+		projection hd_struct part0;
+		projection _global_block_device_operations* fops;
+	}
+}
+rpc bool  queue_delayed_work_on( int  cpu, projection wq* [in][out] wq, projection dwork* [in] dwork, long unsigned int  delay ) {
+	projection < struct workqueue_struct > wq {
+	}
+	projection < struct delayed_work > dwork {
+		projection work_struct work;
+	}
+}
+rpc bool  queue_work_on( int  cpu, projection wq* [in][out] wq, projection work* [in] work ) {
+	projection < struct workqueue_struct > wq {
+	}
+	projection < struct work_struct > work {
+		projection atomic64_t data;
+	}
+}
+rpc int  revalidate_disk( projection disk* [in] disk ) {
+		projection < struct hd_struct> hd_struct {
+			long unsigned int [in] nr_sects;
+			projection device __dev;
+			projection device __dev;
+		}
+			projection < struct device> device {
+				projection _global_attribute_group** groups;
+			}
+	projection < struct gendisk > disk {
+		array< char, 32> [in] disk_name;
+		projection hd_struct part0;
+		projection hd_struct part0;
+		projection _global_block_device_operations* fops;
+		projection _request_queue* queue;
+		int [in] flags;
+	}
+	projection < struct request_queue > gendisk_queue {
+	}
+}
+rpc_ptr long int  serial_show( projection dev* [in] dev, projection _global_device_attribute* [in] attr, char* alloc_stack buf ) {
+	projection < struct device > dev {
+		void* [in] driver_data;
+		projection _global_attribute_group** groups;
+	}
+}
+rpc int  sysfs_create_group( projection kobj* [in] kobj, projection _global_attribute_group* [in] grp ) {
+	projection < struct kobject > kobj {
+	}
+	projection < struct attribute > attribute_group_attrs {
+	}
+	projection < struct bin_attribute > attribute_group_bin_attrs {
+	}
+}
+rpc void  sysfs_remove_group( projection kobj* [in] kobj, projection _global_attribute_group* [in] grp ) {
+	projection < struct kobject > kobj {
+	}
+}
+rpc_ptr long int  uuid_show( projection dev* [in] dev, projection _global_device_attribute* [in] attr, char* alloc_stack buf ) {
+	projection < struct device > dev {
+		projection _global_attribute_group** groups;
+	}
+}
+rpc void  warn_slowpath_fmt( char*  file, int  line, char*  fmt ) {
+}
+rpc void  warn_slowpath_null( char*  file, int  line ) {
+}
+rpc_ptr long int  wwid_show( projection dev* [in] dev, projection _global_device_attribute* [in] attr, char* alloc_stack buf ) {
+	projection < struct device > dev {
+		projection _global_attribute_group** groups;
+	}
+}
+rpc void  delayed_work_timer_fn( long unsigned int  __data ) {
+}
+rpc_ptr long int  device_attribute_store( projection dev* [in] dev, projection _global_device_attribute* [in]alloc_stack attr, char* [unused] buf, long unsigned int  count ) {
+	projection < struct device > dev {
+		void* [in] driver_data;
+		projection _global_attribute_group** groups;
+	}
+}
+rpc_ptr int  block_device_operations_revalidate_disk( projection disk* [in] disk ) {
+		projection < struct hd_struct> hd_struct {
+			long unsigned int [out] nr_sects;
+		}
+	projection < struct gendisk > disk {
+		array< char, 32> [in]alloc_stack disk_name;
+		projection hd_struct part0;
+		projection hd_struct part0;
+		projection _global_block_device_operations* fops;
+		projection _request_queue* queue;
+	}
+	projection < struct request_queue > gendisk_queue {
+	}
+}
+rpc_ptr int  block_device_operations_open( projection bdev* [in] bdev, unsigned int [unused] mode ) {
+	projection < struct block_device > bdev {
+		projection block_device_gendisk* bd_disk;
+	}
+	projection < struct gendisk > block_device_bd_disk {
+		projection _global_block_device_operations* fops;
+	}
+}
+rpc_ptr void  block_device_operations_release( projection disk* [in] disk, unsigned int [unused] mode ) {
+	projection < struct gendisk > disk {
+		projection _global_block_device_operations* fops;
+	}
+}
+rpc_ptr int  block_device_operations_ioctl( projection bdev* [in] bdev, unsigned int [unused] mode, unsigned int  cmd, long unsigned int  arg ) {
+	projection < struct block_device > bdev {
+		projection block_device_gendisk* bd_disk;
+	}
+	projection < struct gendisk > block_device_bd_disk {
+		projection _global_block_device_operations* fops;
+	}
+}
+rpc_ptr int  block_device_operations_compat_ioctl( projection bdev* [in] bdev, unsigned int  mode, unsigned int  cmd, long unsigned int  arg ) {
+	projection < struct block_device > bdev {
+		projection block_device_gendisk* bd_disk;
+	}
+	projection < struct gendisk > block_device_bd_disk {
+		projection _global_block_device_operations* fops;
+	}
+}
+rpc_ptr int  block_device_operations_getgeo( projection bdev* [in] bdev, projection geo* [in][out] geo ) {
+	projection < struct block_device > bdev {
+		projection block_device_gendisk* bd_disk;
+	}
+		projection < struct hd_struct> hd_struct {
+			long unsigned int [in] nr_sects;
+		}
+	projection < struct gendisk > block_device_bd_disk {
+		projection hd_struct part0;
+		projection hd_struct part0;
+		projection _global_block_device_operations* fops;
+	}
+	projection < struct hd_geometry > geo {
+	}
+}
+rpc_ptr long int  file_operations_compat_ioctl( projection file* [in] file, unsigned int  cmd, long unsigned int  arg ) {
+	projection < struct file > file {
+	}
+}
+rpc_ptr int  file_operations_open( projection inode* [in] inode, projection file* [in] file ) {
+	projection < struct inode > inode {
+		unsigned int [in] i_rdev;
+	}
+	projection < struct file > file {
+	}
+}
+rpc_ptr int  file_operations_release( projection inode* [in] inode, projection file* [in] file ) {
+	projection < struct inode > inode {
+	}
+	projection < struct file > file {
+	}
+}
+rpc_ptr unsigned short  attribute_group_is_visible( projection kobj* [in]alloc_stack kobj, projection a* [in]alloc_stack a, int [unused] n ) {
+	projection < struct kobject > kobj {
+	}
+	projection < struct attribute > a {
+		unsigned short [in] mode;
+	}
+}
+rpc_ptr long int  device_attribute_show( projection dev* [in] dev, projection _global_device_attribute* [in] attr, char* alloc_stack buf ) {
+	projection < struct device > dev {
+		void* [in] driver_data;
+		projection _global_attribute_group** groups;
+	}
+}
+rpc_export int  __nvme_submit_sync_cmd( projection q* alloc_stack q, projection cmd* alloc_stack cmd, projection cqe* alloc_stack cqe, void*  buffer, unsigned int  bufflen, unsigned int  timeout, int  qid, int  at_head, int  flags ) {
+	projection < struct request_queue > q {
+	}
+	projection < struct nvme_command > cmd {
+	}
+	projection < struct nvme_completion > cqe {
+	}
+}
+rpc_export projection ret_request*  nvme_alloc_request( projection q* alloc_stack q, projection cmd* [in] cmd, unsigned int  flags, int  qid ) {
+	projection < struct request > ret_request {
+		unsigned int [out] cmd_type;
+		long long unsigned int  cmd_flags;
+		unsigned char* [out] cmd;
+		unsigned short [out] cmd_len;
+	}
+	projection < struct request_queue > q {
+	}
+	projection < struct nvme_command > cmd {
+	}
+}
+rpc_export void  nvme_cancel_request( projection req* [in] req, void* [in] data, bool [unused] reserved ) {
+	projection < struct request > req {
+		projection request_request_queue* q;
+		int [in] tag;
+	}
+	projection < struct request_queue > request_q {
+	}
+}
+rpc_export bool  nvme_change_ctrl_state( projection ctrl* [in][out] ctrl, unsigned int  new_state ) {
+	projection < struct nvme_ctrl > ctrl {
+	}
+}
+rpc_export void  nvme_complete_async_event( projection ctrl* [in] ctrl, projection cqe* [in] cqe ) {
+	projection < struct nvme_ctrl > ctrl {
+	}
+	projection < struct nvme_completion > cqe {
+	}
+}
+rpc_export int  nvme_disable_ctrl( projection ctrl* [in] ctrl, long long unsigned int  cap ) {
+	projection < struct nvme_ctrl > ctrl {
+	}
+}
+rpc_export int  nvme_enable_ctrl( projection ctrl* [in] ctrl, long long unsigned int  cap ) {
+	projection < struct nvme_ctrl > ctrl {
+	}
+}
+rpc_export int  nvme_init_ctrl( projection ctrl* [in][out] ctrl, projection dev* [in] dev, projection ops* alloc_stack ops, long unsigned int  quirks ) {
+	projection < struct nvme_ctrl > ctrl {
+	}
+	projection < struct device > dev {
+		projection _global_attribute_group** groups;
+	}
+	projection < struct nvme_ctrl_ops > ops {
+	}
+}
+rpc_export int  nvme_init_identify( projection ctrl* [in] ctrl ) {
+	projection < struct nvme_ctrl > ctrl {
+	}
+}
+rpc_export void  nvme_kill_queues( projection ctrl* [in] ctrl ) {
+	projection < struct nvme_ctrl > ctrl {
+	}
+}
+rpc_export void  nvme_put_ctrl( projection ctrl* [in] ctrl ) {
+	projection < struct nvme_ctrl > ctrl {
+	}
+}
+rpc_export void  nvme_queue_async_events( projection ctrl* [in] ctrl ) {
+	projection < struct nvme_ctrl > ctrl {
+	}
+}
+rpc_export void  nvme_queue_scan( projection ctrl* [in] ctrl ) {
+	projection < struct nvme_ctrl > ctrl {
+	}
+}
+rpc_export void  nvme_remove_namespaces( projection ctrl* [in] ctrl ) {
+	projection < struct nvme_ctrl > ctrl {
+	}
+}
+rpc_export void  nvme_requeue_req( projection req* [in] req ) {
+	projection < struct request > req {
+		projection request_request_queue* q;
+	}
+	projection < struct request_queue > request_q {
+		projection request_queue_spinlock* queue_lock;
+	}
+	projection < struct spinlock > request_queue_queue_lock {
+	}
+}
+rpc_export int  nvme_set_queue_count( projection ctrl* [in] ctrl, int* [in][out] count ) {
+	projection < struct nvme_ctrl > ctrl {
+	}
+}
+rpc_export int  nvme_setup_cmd( projection ns* [in] ns, projection req* [in] req, projection cmd* [out]alloc_stack cmd ) {
+	projection < struct nvme_ns > ns {
+	}
+	projection < struct request > req {
+		unsigned int [in] cmd_type;
+		unsigned char* [in][out] cmd;
+	}
+	projection < struct nvme_command > cmd {
+	}
+}
+rpc_export int  nvme_shutdown_ctrl( projection ctrl* [in] ctrl ) {
+	projection < struct nvme_ctrl > ctrl {
+	}
+}
+rpc_export void  nvme_start_keep_alive( projection ctrl* [in] ctrl ) {
+	projection < struct nvme_ctrl > ctrl {
+	}
+}
+rpc_export void  nvme_start_queues( projection ctrl* [in] ctrl ) {
+	projection < struct nvme_ctrl > ctrl {
+	}
+}
+rpc_export void  nvme_stop_keep_alive( projection ctrl* [in] ctrl ) {
+	projection < struct nvme_ctrl > ctrl {
+	}
+}
+rpc_export void  nvme_stop_queues( projection ctrl* [in] ctrl ) {
+	projection < struct nvme_ctrl > ctrl {
+	}
+}
+rpc_export int  nvme_submit_sync_cmd( projection q* alloc_stack q, projection cmd* alloc_stack cmd, void*  buffer, unsigned int  bufflen ) {
+	projection < struct request_queue > q {
+	}
+	projection < struct nvme_command > cmd {
+	}
+}
+rpc_export void  nvme_uninit_ctrl( projection ctrl* [in] ctrl ) {
+	projection < struct nvme_ctrl > ctrl {
+	}
+}
+projection < struct attribute_group > _global_attribute_group {
+	char* [in] name;
+	projection attribute_group_attribute** attrs;
+	projection attribute_group_bin_attribute** bin_attrs;
+	rpc_ptr attribute_group_is_visible is_visible;
+}
+projection < struct block_device_operations > _global_block_device_operations {
+	rpc_ptr block_device_operations_compat_ioctl compat_ioctl;
+	rpc_ptr block_device_operations_getgeo getgeo;
+	rpc_ptr block_device_operations_ioctl ioctl;
+	rpc_ptr block_device_operations_open open;
+	rpc_ptr block_device_operations_release release;
+	rpc_ptr block_device_operations_revalidate_disk revalidate_disk;
+}
+projection < struct device_attribute > _global_device_attribute {
+	rpc_ptr device_attribute_show show;
+	rpc_ptr device_attribute_store store;
+}
+projection < struct file_operations > _global_file_operations {
+	projection file_operations_module* owner;
+	rpc_ptr file_operations_compat_ioctl compat_ioctl;
+	rpc_ptr file_operations_open open;
+	rpc_ptr file_operations_release release;
+	rpc_ptr file_operations_unlocked_ioctl unlocked_ioctl;
+}
+
+
+};
+	global projection < struct blk_integrity_profile > blk_integrity_profile {
+	}
+	global projection < struct blk_integrity_profile > blk_integrity_profile {
+	}
+	global projection < struct array< kmem_cache, 0> > array< kmem_cache, 0> {
+	}
+	global [get]  jiffies
+	global [get][set] bool kref_get.__warned
+	global projection < struct array< mem_section, 1024> > array< mem_section, 1024> {
+	}
+	global projection < struct lock_class_key > lock_class_key {
+	}
+	global projection < struct lock_class_key > lock_class_key {
+	}
+	global projection < struct ratelimit_state > ratelimit_state {
+	}
+	global projection < struct lock_class_key > lock_class_key {
+	}
+	global projection < struct workqueue_struct > workqueue_struct {
+	}

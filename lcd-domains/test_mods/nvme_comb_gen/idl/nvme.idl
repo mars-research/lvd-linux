@@ -1,0 +1,910 @@
+module kernel {
+	rpc projection ret_workqueue_struct [alloc<{{sizeof(void *)}}, {{(DEFAULT_GFP_FLAGS)}}>(caller)] *
+		lvd_alloc_workqueue( string [alloc(callee)] *  fmt,
+					unsigned int  flags,
+					int  max_active) {
+		projection < struct workqueue_struct > ret_workqueue_struct {
+		}
+	}
+	/*rpc int  __bitmap_weight( long unsigned int* [in] bitmap, unsigned int  bits ) {
+	}*/
+	rpc int __pci_register_driver( projection _global_pci_driver [alloc(callee)] * drv,
+		projection owner [alloc(callee)] * owner, string [alloc(callee)] * mod_name ) {
+		projection < struct module > owner {
+		}
+	}
+	rpc void  blk_cleanup_queue( projection q* [in] q ) {
+		projection < struct request_queue > q {
+			long unsigned int [out] queue_flags;
+		}
+	}
+	rpc_ptr void done(projection rq * rq, int id) {
+		projection < struct request > rq {
+		}
+	}
+	rpc void  blk_execute_rq_nowait( projection q* q,
+			projection bd_disk*  [unused] bd_disk,
+			projection rq* [in, out] rq,
+			int  at_head,
+			rpc_ptr  done done ) {
+		projection < struct request_queue > q {
+			long unsigned int [in] queue_flags;
+		}
+		projection < struct gendisk > bd_disk {
+		}
+		projection < struct request > rq {
+			projection request_q [bind(caller)] * q;
+			unsigned int cmd_type;
+			long long unsigned int [in, out] cmd_flags;
+			//unsigned int [in, out] __data_len;
+			//long unsigned int [in, out] __sector;
+			//projection request_bio* bio;
+			//projection request_rq_disk* rq_disk;
+			//long unsigned int [in] start_time;
+			int [out] errors;
+		}
+		projection < struct request_queue > request_q {
+		}
+		projection < struct bio > request_bio {
+		}
+		projection < struct gendisk > request_rq_disk {
+		}
+	}
+	rpc bool  blk_get_queue( projection q* q ) {
+		projection < struct request_queue > q {
+			//long unsigned int [in] queue_flags;
+		}
+	}
+	rpc int  blk_mq_alloc_tag_set( projection set [alloc(callee)] * set ) {
+		projection < struct blk_mq_tag_set > set {
+			projection _global_blk_mq_ops [alloc(callee)] * ops;
+			unsigned int [in, out] nr_hw_queues;
+			unsigned int [in, out] queue_depth;
+			unsigned int [in] cmd_size;
+			int [in] numa_node;
+			void [alloc<{{sizeof(void*)}}>(callee)] * driver_data;
+			//array<array<projection blk_mq_tag_set_tags, {{sizeof(struct blk_mq_tags)}} > [alloc(caller)] *, {{nr_cpu_ids}} > [alloc(caller)] * [out] tags;
+			array<array<projection blk_mq_tag_set_tags, 1> [alloc(caller)] *, {{ptr->nr_hw_queues}} > [alloc(caller)] * [out] tags;
+		}
+		projection < struct blk_mq_tags > blk_mq_tag_set_tags {
+		}
+	}
+	rpc void  blk_mq_complete_request( projection rq * [in, out] rq, int  error ) {
+		projection < struct request > rq {
+			projection request_q * q;
+
+			unsigned int [in] cmd_type;
+			long long unsigned int [in, out] cmd_flags;
+			unsigned int [in, out] __data_len;
+			long unsigned int [in, out] __sector;
+
+			// TODO: Do we copy bios back and forth? this has iter
+			projection request_bio* bio;
+			projection request_rq_disk* rq_disk;
+			long unsigned int [in] start_time;
+			//int [in, out] tag;
+			int [out] errors;
+		}
+		projection < struct request_queue > request_q {
+		}
+		projection < struct bio > request_bio {
+		}
+		projection < struct gendisk > request_rq_disk {
+		}
+	}
+	rpc void  blk_mq_end_request( projection rq* [in, out] rq, int  error ) {
+		projection < struct request > rq {
+			projection request_q* q;
+			unsigned int [in] cmd_type;
+			long long unsigned int [in, out] cmd_flags;
+			unsigned int [in, out] __data_len;
+			long unsigned int [in, out] __sector;
+			// TODO: Do we copy bios back and forth? this has iter
+			projection request_bio* bio;
+			projection request_rq_disk* rq_disk;
+			long unsigned int [in] start_time;
+			int [in, out] tag;
+			int [out] errors;
+		}
+		projection < struct request_queue > request_q {
+		}
+		projection < struct bio > request_bio {
+		}
+		projection < struct gendisk > request_rq_disk {
+		}
+	}
+	rpc void  blk_mq_free_request( projection rq* [in, out] rq ) {
+		projection < struct request > rq {
+			projection request_q* q;
+			long long unsigned int [in, out] cmd_flags;
+			int [in, out] tag;
+		}
+		projection < struct request_queue > request_q {
+		}
+	}
+	rpc void  blk_mq_free_tag_set( projection set [bind(callee)] * set ) {
+		projection < struct blk_mq_tag_set > set {
+			/*projection _global_blk_mq_ops* ops;
+			void* [in] driver_data;
+			projection _blk_mq_tags** tags;*/
+		}
+		projection < struct blk_mq_tags > blk_mq_tag_set_tags {
+		}
+	}
+	rpc projection ret_request_queue [alloc(caller)] *  blk_mq_init_queue( projection set [bind(callee)] * set ) {
+		projection < struct request_queue > ret_request_queue {
+		}
+		projection < struct blk_mq_tag_set > set {
+			/*unsigned int [in] nr_hw_queues;
+			unsigned int [in] queue_depth;
+			int [in] numa_node;
+			unsigned int [in] timeout;
+			unsigned int [in, out] flags;
+			void* [in] driver_data;
+			projection _blk_mq_tags** tags;*/
+		}
+		projection < struct blk_mq_tags > blk_mq_tag_set_tags {
+		}
+	}
+	rpc_ptr projection ret_blk_mq_hw_ctx [bind(callee)] *  blk_mq_ops_map_queue( projection q [alloc_once(callee)] * q, int  cpu ) {
+		projection < struct blk_mq_hw_ctx > ret_blk_mq_hw_ctx {
+		}
+		projection < struct request_queue > q {
+		}
+	}
+rpc void  blk_mq_start_request( projection rq* [in] rq ) {
+	projection < struct request > rq {
+		projection request_q* q;
+		unsigned int [in] __data_len;
+		unsigned short [in, out] nr_phys_segments;
+	}
+	projection < struct request_queue > request_q {
+	}
+}
+	rpc void  blk_mq_start_stopped_hw_queues( projection q* q, bool  async ) {
+		projection < struct request_queue > q {
+		}
+	}
+	rpc void  blk_mq_stop_hw_queues( projection q* [in] q ) {
+		projection < struct request_queue > q {
+		}
+	}
+	rpc_ptr void tag_iter_fn(projection rq *rq, void *data, bool enable) {
+		projection < struct request > rq {
+		}
+	}
+	rpc void  blk_mq_tagset_busy_iter( projection tagset [bind(callee)] * tagset,
+		rpc_ptr  tag_iter_fn fn, void [alloc<{{sizeof(void*)}}>(callee)] *  priv ) {
+		projection < struct blk_mq_tag_set > tagset {
+			/*projection _global_blk_mq_ops* ops;
+			unsigned int [in] nr_hw_queues;
+			projection _blk_mq_tags** tags;*/
+		}
+		projection < struct blk_mq_tags > blk_mq_tag_set_tags {
+		}
+	}
+	rpc void  blk_mq_update_nr_hw_queues( projection set* set, int  nr_hw_queues ) {
+		projection < struct blk_mq_tag_set > set {
+			//projection _global_blk_mq_ops* ops;
+			unsigned int [in, out] nr_hw_queues;
+			//void* [in] driver_data;
+			//projection _blk_mq_tags** tags;
+		}
+		projection < struct blk_mq_tags > blk_mq_tag_set_tags {
+		}
+	}
+	rpc void  blk_put_queue( projection q* [in] q ) {
+		projection < struct request_queue > q {
+		}
+	}
+	/* No integrity req support for now
+	rpc int  blk_rq_count_integrity_sg( projection q* [in] q, projection bio* [in] bio ) {
+		projection < struct request_queue > q {
+		}
+		projection < struct bio > bio {
+		}
+	}
+	rpc int  blk_rq_map_integrity_sg( projection q* [in] q, projection bio* [in] bio, projection sglist* [in] sglist ) {
+		projection < struct request_queue > q {
+		}
+		projection < struct bio > bio {
+		}
+		projection < struct scatterlist > sglist {
+			long unsigned int [in, out] page_link;
+			unsigned int [out] offset;
+			unsigned int [in, out] length;
+		}
+	}
+	*/
+rpc void  complete( projection x* [in] x ) {
+	projection < struct completion > x {
+		unsigned int [in, out] done;
+		//__wait_queue_head [in] wait;
+	}
+}
+	rpc int  del_timer_sync( projection timer [bind(callee)] * timer ) {
+		projection < struct timer_list > timer {
+		}
+	}
+	rpc void  destroy_workqueue( projection wq* wq ) {
+		projection < struct workqueue_struct > wq {
+		}
+	}
+	rpc void  device_release_driver( projection dev [bind_memberof<struct pci_dev, dev>(caller)] * dev) {
+		projection < struct device > dev {
+			/*projection device_device_private* p;
+			projection device_bus_type* bus;
+			projection device_device_driver* driver;
+			void* [out] driver_data;
+			projection device_dev_pm_domain* pm_domain;*/
+		}
+		projection < struct device_private > device_p {
+		}
+		projection < struct bus_type > device_bus {
+		}
+		projection < struct device_driver > device_driver {
+		}
+		projection < struct dev_pm_domain > device_pm_domain {
+		}
+	}
+	rpc bool  flush_work( projection work [bind(callee)] * work ) {
+			projection < struct list_head> list_head {
+				//projection list_head_list_head* next;
+			}
+		projection < struct work_struct > work {
+			//atomic64_t [in, out] data;
+			//projection list_head entry;
+		}
+		projection < struct list_head > list_head_next {
+		}
+	}
+	rpc void  free_irq( unsigned int  irq, void [bind(callee)] *  dev_id ) {
+	}
+
+	rpc_ptr void timer_func(unsigned long data) {
+	}
+
+	rpc projection ret_device * [unused]  get_device( projection dev [bind_memberof<struct pci_dev, dev>(caller)] *  dev) {
+		projection < struct device > ret_device {
+		}
+		projection < struct device > dev {
+		}
+	}
+
+	rpc void  lvd_setup_timer( projection timer [alloc(callee), bind(callee)] * [in, out] timer,
+			rpc_ptr timer_func func, unsigned long data ) {
+		projection < struct timer_list > timer {
+			unsigned long [out] data;
+		}
+	}
+
+	rpc void lvd_init_work(projection work [alloc(callee)] *work, rpc_ptr work_fn work_fn) {
+		projection < struct work_struct > work {
+			//projection  atomic64_t [out] data;
+		}
+		/*projection <struct atomic64_t> atomic64_t {
+			long counter;
+		}*/
+	}
+
+	rpc void [ioremap(caller)]   *ioremap_nocache( u64  phys_addr, unsigned long size ) {
+	}
+
+	/* unused for our device
+	rpc void*  ioremap_wc( long long unsigned int  phys_addr, long unsigned int  size ) {
+	}
+	*/
+	rpc int  irq_set_affinity_hint( unsigned int  irq, const projection m [alloc(callee)] * m ) {
+		projection < struct cpumask > m {
+			array< long unsigned int , 1> bits;
+		}
+	}
+
+	rpc int  mod_timer( projection timer [bind(callee)] * timer, long unsigned int  expires ) {
+		projection < struct timer_list > timer {
+		}
+	}
+	rpc_ptr void  blk_mq_ops_exit_hctx( projection hctx [bind(callee)] * hctx, unsigned int [unused] hctx_idx ) {
+		projection < struct blk_mq_hw_ctx > hctx {
+		}
+	}
+	rpc_ptr int  blk_mq_ops_init_hctx( projection hctx [alloc(callee)] * hctx, void *  data, unsigned int  hctx_idx ) {
+		projection < struct blk_mq_hw_ctx > hctx {
+			projection blk_mq_hw_ctx_tags [bind(callee)] * tags;
+		}
+		projection < struct blk_mq_tags > blk_mq_hw_ctx_tags {
+		}
+	}
+	rpc_ptr int  blk_mq_ops_init_request( void *  data,
+			//projection req [alloc<{{sizeof(struct request) + nvme_cmd_size((struct nvme_dev*)data)}}>(callee)] * req,
+			projection req [alloc<{{sizeof(struct request)}}>(callee)] * req,
+			unsigned int [unused] hctx_idx,
+			unsigned int [unused] rq_idx,
+			unsigned int [unused] numa_node ) {
+		projection < struct request > req {
+		}
+	}
+	/* XXX: if initialized correctly, the requests should already be passed across (alloc_tag_set and init_queue) */
+	/*
+	rpc projection ret_request [bind(caller)] * [out]  nvme_alloc_request( projection q* [in] q, projection cmd [alloc_stack(callee), in, out] * cmd,
+			unsigned int  flags, int  qid ) {
+		projection < struct request > ret_request {
+			unsigned int [out] cmd_type;
+			long long unsigned int [out] cmd_flags;
+		}
+		projection < struct request_queue > q {
+			long unsigned int [in] queue_flags;
+		}
+		projection < struct nvme_command > cmd {
+		}
+	}
+	rpc void  nvme_cancel_request( projection req* [in, out] req, void* [unused]  data, bool [unused] reserved ) {
+		projection < struct request > req {
+			projection request_q* q;
+			unsigned int [in] cmd_type;
+			long long unsigned int [in, out] cmd_flags;
+			unsigned int [in, out] __data_len;
+			long unsigned int [in, out] __sector;
+			// TODO:
+			projection request_bio* bio;
+			projection request_rq_disk* rq_disk;
+			long unsigned int [in] start_time;
+			int [in, out] tag;
+			int [in, out] errors;
+		}
+		projection < struct request_queue > request_q {
+		}
+		projection < struct bio > request_bio {
+		}
+		projection < struct gendisk > request_rq_disk {
+		}
+	}
+	rpc bool  nvme_change_ctrl_state( projection ctrl [bind(callee)] * ctrl, unsigned int  new_state ) {
+		projection < struct nvme_ctrl > ctrl {
+			unsigned int [in, out] state;
+		}
+	}
+	rpc void  nvme_complete_async_event( projection ctrl [bind(callee)] * ctrl, projection cqe [alloc_stack(callee)] *  cqe ) {
+		projection < struct nvme_ctrl > ctrl {
+			//projection nvme_ctrl_device* device;
+		}
+		projection < struct device > nvme_ctrl_device {
+		}
+		projection < struct nvme_completion > cqe {
+			unsigned short [in] status;
+		}
+	}
+	*/
+rpc_ptr void  blk_mq_ops_complete( projection req* [in] req ) {
+	projection < struct request > req {
+		unsigned int [in] cmd_type;
+		long long unsigned int [in] cmd_flags;
+		long unsigned int [in] start_time;
+		int [in] errors;
+		unsigned int [in] timeout;
+	}
+}
+	/*
+	rpc int  nvme_disable_ctrl( projection ctrl [bind(callee)] * ctrl, long long unsigned int  cap ) {
+		projection < struct nvme_ctrl > ctrl {
+			//projection nvme_ctrl_blk_mq_tag_set* tagset;
+			//projection nvme_ctrl_device* device;
+			unsigned int [in, out] ctrl_config;
+		}
+		projection < struct blk_mq_tag_set > nvme_ctrl_tagset {
+		}
+		projection < struct device > nvme_ctrl_device {
+		}
+	}
+	rpc int  nvme_enable_ctrl( projection ctrl [bind(callee)] *  ctrl, long long unsigned int  cap ) {
+		projection < struct nvme_ctrl > ctrl {
+			//projection nvme_ctrl_device* device;
+			unsigned int [in, out] ctrl_config;
+			unsigned int [out] page_size;
+		}
+		projection < struct device > nvme_ctrl_device {
+		}
+	}
+	*/
+	rpc int  pci_cleanup_aer_uncorrect_error_status( projection dev* [in] dev ) {
+		projection < struct pci_dev > dev {
+		}
+	}
+
+	rpc_ptr unsigned int  pci_error_handlers_error_detected( projection pdev* [in] pdev, unsigned int  state ) {
+		projection < struct pci_dev > pdev {
+		}
+	}
+	rpc_ptr void  pci_error_handlers_resume( projection pdev* [in] pdev ) {
+		projection < struct pci_dev > pdev {
+		}
+	}
+
+	rpc_ptr int reg_read32(projection nvme_ctrl *ctrl, u32 off,
+			u32 [alloc_stack(callee), out] * val) {
+		projection <struct nvme_ctrl> nvme_ctrl {
+		}
+	}
+	rpc_ptr int reg_write32(projection nvme_ctrl *ctrl, u32 off, u32 val) {
+		projection <struct nvme_ctrl> nvme_ctrl {
+		}
+	}
+	rpc_ptr int  reg_read64(projection nvme_ctrl *ctrl, u32 off,
+			u64 [alloc_stack(callee), out] * val) {
+		projection <struct nvme_ctrl> nvme_ctrl {
+		}
+	}
+	rpc_ptr int  reset_ctrl(projection nvme_ctrl *ctrl) {
+		projection <struct nvme_ctrl> nvme_ctrl {
+		}
+	}
+	rpc_ptr void free_ctrl(projection nvme_ctrl *ctrl) {
+		projection <struct nvme_ctrl> nvme_ctrl {
+		}
+	}
+	rpc_ptr void post_scan(projection nvme_ctrl *ctrl) {
+		projection <struct nvme_ctrl> nvme_ctrl {
+		}
+	}
+	rpc_ptr void submit_async_event(projection nvme_ctrl *ctrl, int aer_idx) {
+		projection <struct nvme_ctrl> nvme_ctrl {
+		}
+	}
+
+	/*rpc int  nvme_init_ctrl( projection ctrl [alloc(callee), bind(callee)] * [in, out] ctrl,
+			projection dev [bind_memberof<struct pci_dev, dev>(caller)] *  dev,
+			const projection ops [alloc(callee)] *  ops, long unsigned int  quirks ) {
+			projection < struct kref> kref {
+				//atomic_t [in] refcount;
+			}
+		projection < struct nvme_ctrl > ctrl {
+			unsigned int [out] state;
+			u32 ctrl_config;
+			projection kref kref;
+			int [in, out] instance;
+			projection nvme_ctrl_device [alloc(caller)] * [out] device;
+		}
+		projection < struct device > nvme_ctrl_device {
+		}
+		projection < struct device > dev {
+		}
+		projection < struct nvme_ctrl_ops > ops {
+			string [alloc(callee)] *name;
+			projection module [alloc(callee)] *module;
+			rpc_ptr reg_read32 reg_read32;
+			rpc_ptr reg_write32 reg_write32;
+			rpc_ptr reg_read64 reg_read64;
+			rpc_ptr reset_ctrl reset_ctrl;
+			rpc_ptr free_ctrl free_ctrl;
+			rpc_ptr post_scan post_scan;
+			rpc_ptr submit_async_event submit_async_event;
+		}
+
+		projection < struct module > module {
+		}
+	}
+	rpc int  nvme_init_identify( projection ctrl [bind(callee)] * ctrl ) {
+		projection < struct nvme_ctrl > ctrl {
+			projection nvme_ctrl_admin_q* admin_q;
+			projection nvme_ctrl_device* device;
+			projection atomic64_t [out] abort_limit;
+		}
+		projection < struct request_queue > nvme_ctrl_admin_q {
+		}
+		projection < struct device > nvme_ctrl_device {
+		}
+		projection <struct atomic64_t> atomic64_t {
+			long counter;
+		}
+	}
+
+	rpc void  nvme_kill_queues( projection ctrl [bind(callee)] *  ctrl ) {
+		projection < struct nvme_ctrl > ctrl {
+		}
+	}
+	*/
+	rpc_ptr int  pci_driver_sriov_configure( projection pdev [bind(callee)] * pdev, int  numvfs ) {
+		projection < struct pci_dev > pdev {
+		}
+	}
+rpc_ptr int  blk_mq_ops_poll( projection hctx* [in] hctx, unsigned int  tag ) {
+	projection < struct blk_mq_hw_ctx > hctx {
+	}
+}
+
+	rpc_ptr int pci_driver_probe( projection pdev [alloc(callee)] * pdev, projection ent [alloc(callee)] * ent ) {
+		projection < struct device> device {
+			//int [in, out] numa_node;
+			array<u64, 1> [alloc(callee)] *dma_mask;
+			projection kobject kobj;
+		}
+		projection < struct kobject > kobject {
+			string [alloc_once(callee)] *name;
+		}
+		projection < struct pci_dev > pdev {
+			projection pci_dev_bus [alloc(callee)] * bus;
+			unsigned int	devfn;
+			unsigned short	vendor;
+			unsigned short	device;
+			unsigned short	subsystem_vendor;
+			unsigned short	subsystem_device;
+			u8		revision;
+			unsigned int is_virtfn : 1;
+			projection device dev;
+			array< projection resource, 11> resource;
+		}
+		projection < struct pci_bus > pci_dev_bus {
+			unsigned char number;
+		}
+		projection < struct device > device_parent {
+		}
+		projection < struct pci_device_id > ent {
+			long unsigned int  driver_data;
+		}
+		projection <struct resource> resource {
+			u64 start;
+			u64 end;
+		}
+	}
+	/*rpc void  nvme_put_ctrl( projection ctrl [bind(callee)] * ctrl ) {
+			projection < struct kref> kref {
+				//atomic_t [in] refcount;
+			}
+		projection < struct nvme_ctrl > ctrl {
+			projection kref kref;
+		}
+	}
+	rpc void  nvme_queue_async_events( projection ctrl [bind(callee)] * ctrl ) {
+		projection < struct nvme_ctrl > ctrl {
+		}
+	}
+	*/
+
+	rpc_ptr int  blk_mq_ops_queue_rq( projection hctx [bind(callee)] * hctx,
+				projection bd [alloc_stack(callee)] *  bd ) {
+		projection < struct blk_mq_hw_ctx > hctx {
+			projection blk_mq_hw_ctx_queue [bind(callee)] * queue;
+		}
+		projection < struct request_queue > blk_mq_hw_ctx_queue {
+			casted<void*, projection nvme_ns [alloc(callee)] *> queuedata;
+		}
+		projection <struct nvme_ns> nvme_ns {		
+			unsigned short ms;
+			unsigned char pi_type;
+			unsigned long flags;
+		}
+		projection < struct blk_mq_queue_data > bd {
+			projection blk_mq_queue_data_rq [bind(callee)] * rq;
+		}
+		projection < struct request > blk_mq_queue_data_rq {
+			unsigned int [in] cmd_type;
+			long long unsigned int [in] cmd_flags;
+			unsigned short nr_phys_segments;
+			int [in] tag;
+			projection request_bio* [unused] bio;
+			unsigned int  __data_len;
+			long unsigned int __sector;
+			projection rq [bind(callee)] *q;
+		}
+
+		projection < struct request_queue > rq {
+			projection limits limits;
+		}
+
+		projection < struct queue_limits > limits {
+			unsigned int max_hw_sectors;
+		}
+
+		projection < struct bio > request_bio {
+			projection request_bio * [unused] bi_next;
+		}
+	}
+	/*
+	rpc void  nvme_queue_scan( projection ctrl [bind(callee)] * ctrl ) {
+		projection < struct nvme_ctrl > ctrl {
+			unsigned int [in] state;
+		}
+	}
+	*/
+	rpc_ptr void  pci_driver_remove( projection pdev [bind(callee)] *pdev ) {
+		projection < struct pci_dev > pdev {
+		}
+	}
+	/*
+	rpc void  nvme_remove_namespaces( projection ctrl [bind(callee)] *  ctrl ) {
+		projection < struct nvme_ctrl > ctrl {
+			unsigned int [in] state;
+		}
+	}
+rpc void  nvme_requeue_req( projection req* [in] req ) {
+	projection < struct request > req {
+		projection request_q* q;
+		long long unsigned int [in, out] cmd_flags;
+		unsigned int [in] __data_len;
+		unsigned short [in, out] nr_phys_segments;
+	}
+	projection < struct request_queue > request_q {
+	}
+}
+	*/
+	rpc_ptr void  pci_error_handlers_reset_notify( projection pdev* [in] pdev, bool  prepare ) {
+		projection < struct pci_dev > pdev {
+		}
+	}
+	/*
+	rpc int  nvme_set_queue_count( projection ctrl [bind(callee)] * ctrl, int [alloc_stack(callee), in, out] * count ) {
+		projection < struct nvme_ctrl > ctrl {
+			projection nvme_ctrl_admin_q* admin_q;
+		}
+		projection < struct request_queue > nvme_ctrl_admin_q {
+		}
+	}
+	rpc int  nvme_setup_cmd( projection ns* ns,
+			projection req* req,
+			projection cmd [alloc_stack(callee), out] * cmd ) {
+		projection < struct nvme_ns > ns {
+			int [in] lba_shift;
+		}
+		projection < struct request > req {
+		}
+		projection < struct nvme_command > cmd {
+		}
+	}
+	*/
+	rpc_ptr void  pci_driver_shutdown( projection pdev [bind(callee)] * pdev ) {
+		projection < struct pci_dev > pdev {
+		}
+	}
+	/*
+	rpc int  nvme_shutdown_ctrl( projection ctrl [bind(callee)]  *ctrl ) {
+		projection < struct nvme_ctrl > ctrl {
+			//projection nvme_ctrl_device* device;
+			unsigned int [in, out] ctrl_config;
+		}
+		projection < struct device > nvme_ctrl_device {
+		}
+	}
+	*/
+	rpc_ptr unsigned int  pci_error_handlers_slot_reset( projection pdev* [in] pdev ) {
+		projection < struct pci_dev > pdev {
+		}
+	}
+	/*
+	rpc void  nvme_start_queues( projection ctrl [bind(callee)] * ctrl ) {
+		projection < struct nvme_ctrl > ctrl {
+		}
+	}
+	rpc void  nvme_stop_queues( projection ctrl [bind(callee)] * ctrl ) {
+		projection < struct nvme_ctrl > ctrl {
+		}
+	}
+	*/
+	/*rpc int  nvme_submit_sync_cmd( projection q* q, projection cmd [alloc_stack(callee)] *  cmd,
+			void* [unused]  buffer, unsigned int  bufflen ) {
+		projection < struct request_queue > q {
+			long unsigned int [in] queue_flags;
+		}
+		projection < struct nvme_command > cmd {
+		}
+	}*/
+
+	rpc_ptr unsigned int  blk_mq_ops_timeout( projection req [bind(callee)] * req, bool [unused] reserved ) {
+		projection < struct request > req {
+			int [in] tag;
+			int [out] errors;
+		}
+	}
+	/*
+	rpc void  nvme_uninit_ctrl( projection ctrl [bind(callee)] * ctrl ) {
+		projection < struct nvme_ctrl > ctrl {
+			unsigned int state;
+			int instance;
+		}
+	}
+	*/
+	rpc bool  pci_device_is_present( projection pdev* pdev ) {
+		projection < struct pci_dev > pdev {
+		}
+	}
+	rpc void  pci_disable_device( projection dev* dev ) {
+		projection < struct pci_dev > dev {
+			projection atomic64_t [in] enable_cnt;
+		}
+
+		projection <struct atomic64_t> atomic64_t {
+			long counter;
+		}
+	}
+	rpc void  pci_disable_msi( projection dev * dev ) {
+		projection < struct pci_dev > dev {
+			u32 [in, out] irq;
+			unsigned int [in, out] msi_enabled : 1;
+		}
+	}
+	rpc void  pci_disable_msix( projection dev * dev ) {
+		projection < struct pci_dev > dev {
+			unsigned int [in, out] msix_enabled: 1;
+		}
+	}
+
+	rpc int  pci_enable_device_mem( projection dev* [in] dev ) {
+		projection < struct pci_dev > dev {
+			/*array< resource, 11> [in] resource;
+			unsigned int [in] msi_enabled : 1;
+			unsigned int [in] msix_enabled : 1;*/
+			projection atomic64_t [in, out] enable_cnt;
+		}
+
+		projection <struct atomic64_t> atomic64_t {
+			long counter;
+		}
+	}
+
+	rpc int pci_enable_msi_range( projection dev *dev, int minvec, int maxvec ) {
+		projection < struct pci_dev > dev {
+			unsigned int [out] msi_enabled : 1;
+			unsigned int [out] msix_enabled: 1;
+			unsigned int [out] irq;
+		}
+	}
+
+	rpc int pci_enable_msix( projection dev * dev, array<projection entries, {{nvec}}> [alloc(callee), bind(callee)] * [in, out] entries, int nvec) {
+		projection < struct pci_dev > dev {
+			unsigned int [out] msi_enabled : 1;
+			unsigned int [out] msix_enabled: 1;
+		}
+		projection < struct msix_entry > entries {
+			u32 [out] vector;
+			u16 entry;
+		}
+	}
+
+	rpc int pci_enable_msix_range( projection dev * dev, array<projection entries, {{ctx->maxvec}}> [alloc(callee), bind(callee)] * [in, out] entries, int minvec, int maxvec ) {
+		projection < struct pci_dev > dev {
+			unsigned int [out] msi_enabled : 1;
+			unsigned int [out] msix_enabled: 1;
+		}
+		projection < struct msix_entry > entries {
+			u32 [out] vector;
+			u16 entry;
+		}
+	}
+	rpc int pci_enable_pcie_error_reporting(projection pdev *dev) {
+		projection < struct pci_dev > pdev {
+		}
+	}
+	rpc int pci_disable_pcie_error_reporting(projection pdev *dev) {
+		projection < struct pci_dev > pdev {
+		}
+	}
+
+	rpc void  pci_release_selected_regions( projection pdev*  pdev, int  bars ) {
+		projection < struct pci_dev > pdev {
+		}
+	}
+	rpc int pci_request_selected_regions( projection pdev * pdev,
+			int bars, string [alloc(callee)] * res_name ) {
+		projection < struct pci_dev > pdev {
+		}
+	}
+
+	rpc void  pci_restore_state( projection dev* dev ) {
+		projection < struct pci_dev > dev {
+		}
+	}
+	rpc int  pci_save_state( projection dev* dev ) {
+		projection < struct pci_dev > dev {
+		}
+	}
+	rpc int  pci_select_bars( projection dev* dev, long unsigned int  flags ) {
+		projection < struct pci_dev > dev {
+			//array< resource, 11> [in] resource;
+		}
+	}
+	rpc void  pci_set_master( projection dev* dev ) {
+		projection < struct pci_dev > dev {
+		}
+	}
+	rpc void pci_unregister_driver( projection drv [bind(callee), dealloc(callee)] * drv ) {
+		projection < struct pci_driver > drv {
+		}
+	}
+
+	rpc void  put_device( projection dev * dev ) {
+		projection < struct device > dev {
+		}
+	}
+
+	rpc_ptr void work_fn(projection work *work) {
+		projection < struct work_struct > work {
+		}
+	}
+
+	rpc bool  lvd_queue_work(projection wq* wq, projection work [bind(callee)] * work ) {
+		projection < struct workqueue_struct > wq {
+		}
+		projection < struct work_struct > work {
+			//atomic64_t [in, out] data;
+		}
+	}
+	rpc_ptr unsigned int thread_fn(int irq, void * [unused] id) {
+	}
+	rpc_ptr unsigned int handler(int irq, void * [unused] id) {
+	}
+
+	rpc int request_threaded_irq( unsigned int irq,
+			rpc_ptr handler handler,
+			rpc_ptr thread_fn [unused] thread_fn,
+			long unsigned int irqflags,
+			string [alloc(callee)] * devname,
+			void [alloc<{{sizeof(void*)}}>(callee)] * dev_id ) {
+	}
+
+	rpc long unsigned int  round_jiffies( long unsigned int  j ) {
+	}
+rpc long unsigned int  wait_for_completion_io_timeout( projection x* [in, out] x, long unsigned int [in, out] timeout ) {
+	projection < struct completion > x {
+		unsigned int [in, out] done;
+		//__wait_queue_head [in, out] wait;
+	}
+}
+	rpc unsigned int  work_busy( projection work [bind(callee)] * work ) {
+		projection < struct work_struct > work {
+			//atomic64_t [in] data;
+		}
+	}
+	rpc projection ret_blk_mq_hw_ctx [bind(caller)] *  blk_mq_map_queue( projection q* q,
+				int  cpu ) {
+		projection < struct blk_mq_hw_ctx > ret_blk_mq_hw_ctx {
+		}
+		projection < struct request_queue > q {
+		}
+	}
+	projection < struct blk_mq_ops > _global_blk_mq_ops {
+		rpc_ptr blk_mq_ops_complete complete;
+		rpc_ptr blk_mq_ops_exit_hctx exit_hctx;
+		rpc_ptr blk_mq_ops_init_hctx init_hctx;
+		rpc_ptr blk_mq_ops_init_request init_request;
+		rpc_ptr blk_mq_ops_map_queue map_queue;
+		rpc_ptr blk_mq_ops_poll poll;
+		rpc_ptr blk_mq_ops_queue_rq queue_rq;
+		rpc_ptr blk_mq_ops_timeout timeout;
+	}
+	projection <struct pci_device_id> pci_device_id {
+		unsigned int vendor;
+		unsigned int device;
+		unsigned int subvendor;
+		unsigned int subdevice;
+		unsigned int class;
+		unsigned int class_mask;
+		unsigned long long driver_data;
+	}
+
+	projection < struct pci_driver > _global_pci_driver {
+		string [alloc(callee)] *  name;
+		array<projection pci_device_id, null> [alloc(callee)] *id_table;
+		projection _global_pci_error_handlers [alloc(callee)] * err_handler;
+		rpc_ptr pci_driver_probe probe;
+		rpc_ptr pci_driver_remove remove;
+		rpc_ptr pci_driver_shutdown shutdown;
+		rpc_ptr pci_driver_sriov_configure sriov_configure;
+
+	}
+	projection < struct pci_error_handlers > _global_pci_error_handlers {
+		rpc_ptr pci_error_handlers_error_detected error_detected;
+		rpc_ptr pci_error_handlers_reset_notify reset_notify;
+		rpc_ptr pci_error_handlers_resume resume;
+		rpc_ptr pci_error_handlers_slot_reset slot_reset;
+	}
+
+	global unsigned long jiffies {
+	}
+	global unsigned char nvme_io_timeout { }
+	global unsigned int nvme_max_retries { }
+	global unsigned char admin_timeout {}
+
+	global projection wq [alloc<{{64}}>(caller)] *system_wq {
+		projection <struct workqueue_struct> wq {
+		}
+	} 
+}

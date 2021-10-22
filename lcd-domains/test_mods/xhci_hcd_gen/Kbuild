@@ -1,0 +1,6 @@
+obj-$(LCD_CONFIG_BUILD_XHCI_HCD_GEN_BOOT)	+= boot/
+
+obj-$(LCD_CONFIG_BUILD_XHCI_HCD_GEN_XHCI_HCD_LCD) += xhci_hcd_lcd/
+
+obj-$(LCD_CONFIG_BUILD_XHCI_HCD_GEN_USB_KLCD_KLCD) += usb_klcd_klcd/
+

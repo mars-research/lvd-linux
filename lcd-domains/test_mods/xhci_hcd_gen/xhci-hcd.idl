@@ -1,0 +1,162 @@
+module kernel {
+
+rpc void  add_timer( projection timer* timer ) {
+		/*projection < struct hlist_node> hlist_node {
+			projection hlist_node_hlist_node** pprev;
+		}*/
+	projection < struct timer_list > timer {
+		projection hlist_node entry;
+		long unsigned int [in, out] expires;
+	}
+	projection < struct hlist_node > hlist_node {
+	}
+}
+rpc void  complete( projection x* [in, out] x ) {
+	projection < struct completion > x {
+		unsigned int [in, out] done;
+	}
+}
+rpc int  del_timer( projection timer* [in] timer ) {
+		/*projection < struct hlist_node> hlist_node {
+			projection hlist_node_hlist_node** pprev;
+		}*/
+	projection < struct timer_list > timer {
+		projection hlist_node entry;
+	}
+	projection < struct hlist_node > hlist_node {
+	}
+}
+rpc int  del_timer_sync( projection timer* [in] timer ) {
+		/*projection < struct hlist_node> hlist_node {
+			projection hlist_node_hlist_node** pprev;
+		}*/
+	projection < struct timer_list > timer {
+		projection hlist_node entry;
+	}
+	projection < struct hlist_node > hlist_node {
+	}
+}
+
+rpc void  free_irq( unsigned int  irq, void*  dev_id ) {
+}
+rpc void  init_timer_key( projection timer* [in] timer, unsigned int  flags, char*  name, projection key*  key ) {
+		/*projection < struct hlist_node> hlist_node {
+			projection hlist_node_hlist_node** pprev;
+		}*/
+	projection < struct timer_list > timer {
+		projection hlist_node entry;
+	}
+	projection < struct hlist_node > hlist_node {
+	}
+	projection < struct lock_class_key > key {
+	}
+}
+rpc int  mod_timer( projection timer* [in, out] timer, long unsigned int  expires ) {
+		/*projection < struct hlist_node> hlist_node {
+			projection hlist_node_hlist_node** pprev;
+		}*/
+	projection < struct timer_list > timer {
+		projection hlist_node entry;
+		long unsigned int [in, out] expires;
+	}
+	projection < struct hlist_node > hlist_node {
+	}
+}
+rpc void  pci_disable_msi( projection dev* [in] dev ) {
+	projection < struct pci_dev > dev {
+		unsigned int [out] irq;
+	}
+}
+rpc void  pci_disable_msix( projection dev* [in] dev ) {
+	projection < struct pci_dev > dev {
+	}
+}
+rpc int  pci_enable_msi_range( projection dev* [in] dev, int  minvec, int  maxvec ) {
+	projection < struct pci_dev > dev {
+	}
+}
+rpc int  pci_enable_msix_range( projection dev* [in] dev, projection entries*  entries, int  minvec, int  maxvec ) {
+	projection < struct pci_dev > dev {
+	}
+	projection < struct msix_entry > entries {
+	}
+}
+rpc int  pci_set_power_state( projection dev* [in] dev, int  state ) {
+	projection < struct pci_dev > dev {
+	}
+}
+	rpc_ptr unsigned int thread_fn(int irq, void *id) {
+	}
+	rpc_ptr unsigned int handler(int irq, void *id) {
+	}
+	
+rpc int  request_threaded_irq( unsigned int  irq, rpc_ptr  handler handler, rpc_ptr  thread_fn thread_fn, long unsigned int  irqflags, char*  devname, void*  dev_id ) {
+}
+rpc void  wait_for_completion( projection x* [in] x ) {
+	projection < struct completion > x {
+		unsigned int [in, out] done;
+	}
+}
+rpc long unsigned int  wait_for_completion_timeout( projection x* [in] x, long unsigned int [in] timeout ) {
+	projection < struct completion > x {
+		unsigned int [in, out] done;
+	}
+}
+/*
+rpc_export void  xhci_dbg_trace( projection xhci* xhci, rpc_ptr  trace trace, char* fmt ) {
+	projection < struct xhci_hcd > xhci {
+		projection xhci_hcd_usb_hcd* main_hcd;
+	}
+	projection < struct usb_hcd > xhci_hcd_main_hcd {
+	}
+}*/
+rpc_ptr void get_quirks(projection device *dev, projection xhci_hcd *xhci_hcd) {
+	projection < struct device > device {
+	}
+
+	projection < struct xhci_hcd > xhci_hcd {
+	}
+}
+rpc_export int  xhci_gen_setup( projection hcd* [in] hcd, rpc_ptr  get_quirks get_quirks ) {
+	projection < struct usb_hcd > hcd {
+		int [out] speed;
+	}
+}
+rpc_export void  xhci_init_driver( projection drv* [in] drv, projection over* [in] over ) {
+	projection < struct hc_driver > drv {
+		long unsigned int [in, out] hcd_priv_size;
+	}
+	projection < struct xhci_driver_overrides > over {
+	}
+}
+rpc_export int  xhci_run( projection hcd* [in] hcd ) {
+	projection < struct usb_hcd > hcd {
+	}
+}
+
+
+/*
+	global projection < struct array< kmem_cache, 0> > array< kmem_cache, 0> {
+	}
+	global projection < struct lock_class_key > lock_class_key {
+	}
+	global projection < struct dma_map_ops > dma_map_ops {
+	}
+	global projection < struct lock_class_key > lock_class_key {
+	}
+	global [get][set] bool xhci_remove_stream_mapping.__warned
+	global projection < struct lock_class_key > lock_class_key {
+	}
+	global projection < struct array< mem_section, 1024> > array< mem_section, 1024> {
+	}
+	global [get]  jiffies
+	global [get][set] bool xhci_update_stream_segment_mapping.__warned
+	global projection < struct cpumask > cpumask {
+	}
+	global  int __preempt_count
+	global projection < struct ratelimit_state > ratelimit_state {
+	}
+	global projection < struct ratelimit_state > ratelimit_state {
+	}
+	*/
+}

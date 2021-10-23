@@ -20,6 +20,10 @@
  * Inc., 675 Mass Ave, Cambridge, MA 02139, USA.
  */
 
+#ifdef LCD_ISOLATE
+#include <lcd_config/pre_hook.h>
+#endif
+
 #include <linux/pci.h>
 #include <linux/irq.h>
 #include <linux/log2.h>
@@ -30,13 +34,23 @@
 #include <linux/dma-mapping.h>
 
 #include "xhci.h"
+
+#ifndef LCD_ISOLATE
 #include "xhci-trace.h"
 #include "xhci-mtk.h"
+#endif
+
+#ifdef LCD_ISOLATE
+#include <lcd_config/post_hook.h>
+
+#endif
 
 #define DRIVER_AUTHOR "Sarah Sharp"
 #define DRIVER_DESC "'eXtensible' Host Controller (xHC) Driver"
 
 #define	PORT_WAKE_BITS	(PORT_WKOC_E | PORT_WKDISC_E | PORT_WKCONN_E)
+
+void usb_disable_xhci_ports(struct pci_dev *xhci_pdev);
 
 /* Some 0.95 hardware can't handle the chain bit on a Link TRB being cleared */
 static int link_quirk;
@@ -712,8 +726,10 @@ void xhci_stop(struct usb_hcd *hcd)
 				__func__);
 	}
 
+#if 0 // We are not on AMD
 	if (xhci->quirks & XHCI_AMD_PLL_FIX)
 		usb_amd_dev_put();
+#endif
 
 	xhci_dbg_trace(xhci, trace_xhci_dbg_init,
 			"// Disabling event ring interrupts");
@@ -1666,8 +1682,12 @@ int xhci_drop_endpoint(struct usb_hcd *hcd, struct usb_device *udev,
 
 	xhci_endpoint_zero(xhci, xhci->devs[udev->slot_id], ep);
 
+
+// Not on mtk platform too
+#if 0
 	if (xhci->quirks & XHCI_MTK_HOST)
 		xhci_mtk_drop_ep_quirk(hcd, udev, ep);
+#endif
 
 	xhci_dbg(xhci, "drop ep 0x%x, slot id %d, new drop flags = %#x, new add flags = %#x\n",
 			(unsigned int) ep->desc.bEndpointAddress,
@@ -1763,7 +1783,8 @@ int xhci_add_endpoint(struct usb_hcd *hcd, struct usb_device *udev,
 				__func__, ep->desc.bEndpointAddress);
 		return -ENOMEM;
 	}
-
+// Not on mtk platform too
+#if 0
 	if (xhci->quirks & XHCI_MTK_HOST) {
 		ret = xhci_mtk_add_ep_quirk(hcd, udev, ep);
 		if (ret < 0) {
@@ -1772,7 +1793,7 @@ int xhci_add_endpoint(struct usb_hcd *hcd, struct usb_device *udev,
 			return ret;
 		}
 	}
-
+#endif
 	ctrl_ctx->add_flags |= cpu_to_le32(added_ctxs);
 	new_add_flags = le32_to_cpu(ctrl_ctx->add_flags);
 
@@ -3773,7 +3794,7 @@ disable_slot:
 static int xhci_setup_device(struct usb_hcd *hcd, struct usb_device *udev,
 			     enum xhci_setup_dev setup)
 {
-	const char *act = setup == SETUP_CONTEXT_ONLY ? "context" : "address";
+	__maybe_unused const char *act = setup == SETUP_CONTEXT_ONLY ? "context" : "address";
 	unsigned long flags;
 	struct xhci_virt_device *virt_dev;
 	int ret = 0;

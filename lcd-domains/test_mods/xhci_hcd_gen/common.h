@@ -171,6 +171,7 @@ enum RPC_ID {
 	RPC_ID_xhci_gen_setup,
 	RPC_ID_xhci_init_driver,
 	RPC_ID_xhci_run,
+	RPC_ID_usb_disable_xhci_ports,
 };
 
 int try_dispatch(enum RPC_ID id, struct fipc_message* __msg, struct ext_registers* __ext);
@@ -217,7 +218,7 @@ struct free_irq_call_ctx {
 struct init_timer_key_call_ctx {
 	struct timer_list* timer;
 	unsigned int flags;
-	char* name;
+	const char* name;
 	struct lock_class_key* key;
 };
 
@@ -267,7 +268,7 @@ struct request_threaded_irq_call_ctx {
 	fptr_handler handler;
 	fptr_thread_fn thread_fn;
 	unsigned long irqflags;
-	char* devname;
+	const char* devname;
 	void* dev_id;
 };
 
@@ -292,11 +293,15 @@ struct xhci_gen_setup_call_ctx {
 
 struct xhci_init_driver_call_ctx {
 	struct hc_driver* drv;
-	struct xhci_driver_overrides* over;
+	const struct xhci_driver_overrides* over;
 };
 
 struct xhci_run_call_ctx {
 	struct usb_hcd* hcd;
+};
+
+struct usb_disable_xhci_ports_call_ctx {
+	struct pci_dev* xhci_pdev;
 };
 
 void caller_marshal_kernel__add_timer__timer__in(
@@ -1026,6 +1031,34 @@ void caller_unmarshal_kernel__xhci_run__hcd__in(
 	const struct ext_registers* __ext,
 	struct xhci_run_call_ctx const* call_ctx,
 	struct usb_hcd* ptr);
+
+void caller_marshal_kernel__usb_disable_xhci_ports__pci_dev__in(
+	size_t* __pos,
+	struct fipc_message* __msg,
+	struct ext_registers* __ext,
+	struct usb_disable_xhci_ports_call_ctx const* call_ctx,
+	struct pci_dev const* ptr);
+
+void callee_unmarshal_kernel__usb_disable_xhci_ports__pci_dev__in(
+	size_t* __pos,
+	const struct fipc_message* __msg,
+	const struct ext_registers* __ext,
+	struct usb_disable_xhci_ports_call_ctx const* call_ctx,
+	struct pci_dev* ptr);
+
+void callee_marshal_kernel__usb_disable_xhci_ports__pci_dev__in(
+	size_t* __pos,
+	struct fipc_message* __msg,
+	struct ext_registers* __ext,
+	struct usb_disable_xhci_ports_call_ctx const* call_ctx,
+	struct pci_dev const* ptr);
+
+void caller_unmarshal_kernel__usb_disable_xhci_ports__pci_dev__in(
+	size_t* __pos,
+	const struct fipc_message* __msg,
+	const struct ext_registers* __ext,
+	struct usb_disable_xhci_ports_call_ctx const* call_ctx,
+	struct pci_dev* ptr);
 
 
 #endif

@@ -1072,7 +1072,7 @@ int xhci_gen_setup(struct usb_hcd* hcd, fptr_get_quirks get_quirks)
 }
 EXPORT_SYMBOL(xhci_gen_setup);
 
-void xhci_init_driver(struct hc_driver* drv, struct xhci_driver_overrides* over)
+void xhci_init_driver(struct hc_driver* drv, const struct xhci_driver_overrides* over)
 {
 	struct fipc_message __buffer = {0};
 	struct fipc_message *__msg = &__buffer;
@@ -1184,6 +1184,45 @@ int xhci_run(struct usb_hcd* hcd)
 }
 EXPORT_SYMBOL(xhci_run);
 
+void usb_disable_xhci_ports_callee(struct fipc_message* __msg, struct ext_registers* __ext)
+{
+	size_t n_pos = 0;
+	size_t* __pos = &n_pos;
+
+	struct pci_dev* xhci_pdev = 0;
+	struct pci_dev** xhci_pdev_ptr = &xhci_pdev;
+	
+	__maybe_unused struct usb_disable_xhci_ports_call_ctx call_ctx = {xhci_pdev};
+	__maybe_unused struct usb_disable_xhci_ports_call_ctx *ctx = &call_ctx;
+
+	if (verbose_debug) {
+		printk("%s:%d, entered!\n", __func__, __LINE__);
+	}
+
+	{
+		*xhci_pdev_ptr = glue_unpack(__pos, __msg, __ext, struct pci_dev*);
+		if (*xhci_pdev_ptr) {
+			callee_unmarshal_kernel__usb_disable_xhci_ports__pci_dev__in(__pos, __msg, __ext, ctx, *xhci_pdev_ptr);
+		}
+
+	}
+
+	usb_disable_xhci_ports(xhci_pdev);
+
+	*__pos = 0;
+	{
+		if (*xhci_pdev_ptr) {
+			callee_marshal_kernel__usb_disable_xhci_ports__pci_dev__in(__pos, __msg, __ext, ctx, *xhci_pdev_ptr);
+		}
+
+	}
+
+	__msg->regs[0] = *__pos;
+	if (verbose_debug) {
+		printk("%s:%d, returned!\n", __func__, __LINE__);
+	}
+}
+
 int try_dispatch(enum RPC_ID id, struct fipc_message* __msg, struct ext_registers* __ext)
 {
 	switch(id) {
@@ -1265,21 +1304,6 @@ int try_dispatch(enum RPC_ID id, struct fipc_message* __msg, struct ext_register
 	case RPC_ID_wait_for_completion_timeout:
 		glue_user_trace("wait_for_completion_timeout\n");
 		wait_for_completion_timeout_callee(__msg, __ext);
-		break;
-
-	case RPC_ID_xhci_gen_setup:
-		glue_user_trace("xhci_gen_setup\n");
-		xhci_gen_setup_callee(__msg, __ext);
-		break;
-
-	case RPC_ID_xhci_init_driver:
-		glue_user_trace("xhci_init_driver\n");
-		xhci_init_driver_callee(__msg, __ext);
-		break;
-
-	case RPC_ID_xhci_run:
-		glue_user_trace("xhci_run\n");
-		xhci_run_callee(__msg, __ext);
 		break;
 
 	default:

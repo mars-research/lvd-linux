@@ -238,7 +238,7 @@ void free_irq(unsigned int irq, void* dev_id)
 	}
 }
 
-void init_timer_key(struct timer_list* timer, unsigned int flags, char* name, struct lock_class_key* key)
+void init_timer_key(struct timer_list* timer, unsigned int flags, const char* name, struct lock_class_key* key)
 {
 	struct fipc_message __buffer = {0};
 	struct fipc_message *__msg = &__buffer;
@@ -774,7 +774,7 @@ void handler_callee(struct fipc_message* __msg, struct ext_registers* __ext)
 	}
 }
 
-int request_threaded_irq(unsigned int irq, fptr_handler handler, fptr_thread_fn thread_fn, unsigned long irqflags, char* devname, void* dev_id)
+int request_threaded_irq(unsigned int irq, fptr_handler handler, fptr_thread_fn thread_fn, unsigned long irqflags, const char* devname, void* dev_id)
 {
 	struct fipc_message __buffer = {0};
 	struct fipc_message *__msg = &__buffer;
@@ -1174,6 +1174,49 @@ void xhci_run_callee(struct fipc_message* __msg, struct ext_registers* __ext)
 	}
 
 	__msg->regs[0] = *__pos;
+	if (verbose_debug) {
+		printk("%s:%d, returned!\n", __func__, __LINE__);
+	}
+}
+
+void usb_disable_xhci_ports(struct pci_dev* xhci_pdev)
+{
+	struct fipc_message __buffer = {0};
+	struct fipc_message *__msg = &__buffer;
+	struct ext_registers* __ext = get_register_page(smp_processor_id());
+	size_t n_pos = 0;
+	size_t* __pos = &n_pos;
+
+	struct pci_dev** xhci_pdev_ptr = &xhci_pdev;
+	
+	__maybe_unused const struct usb_disable_xhci_ports_call_ctx call_ctx = {xhci_pdev};
+	__maybe_unused const struct usb_disable_xhci_ports_call_ctx *ctx = &call_ctx;
+
+	(void)__ext;
+
+	if (verbose_debug) {
+		printk("%s:%d, entered!\n", __func__, __LINE__);
+	}
+
+	{
+		__maybe_unused const void* __adjusted = *xhci_pdev_ptr;
+		glue_pack_shadow(__pos, __msg, __ext, __adjusted);
+		if (*xhci_pdev_ptr) {
+			caller_marshal_kernel__usb_disable_xhci_ports__pci_dev__in(__pos, __msg, __ext, ctx, *xhci_pdev_ptr);
+		}
+
+	}
+
+	glue_call_server(__pos, __msg, RPC_ID_usb_disable_xhci_ports);
+
+	*__pos = 0;
+	{
+		if (*xhci_pdev_ptr) {
+			caller_unmarshal_kernel__usb_disable_xhci_ports__pci_dev__in(__pos, __msg, __ext, ctx, *xhci_pdev_ptr);
+		}
+
+	}
+
 	if (verbose_debug) {
 		printk("%s:%d, returned!\n", __func__, __LINE__);
 	}

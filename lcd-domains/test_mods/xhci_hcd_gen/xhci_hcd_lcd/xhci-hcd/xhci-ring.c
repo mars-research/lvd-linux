@@ -64,12 +64,23 @@
  *   endpoint rings; it generates events on the event ring for these.
  */
 
+#ifdef LCD_ISOLATE
+#include <lcd_config/pre_hook.h>
+#endif
+
 #include <linux/scatterlist.h>
 #include <linux/slab.h>
 #include <linux/dma-mapping.h>
 #include "xhci.h"
+
+#ifndef LCD_ISOLATE
 #include "xhci-trace.h"
 #include "xhci-mtk.h"
+#endif
+
+#ifdef LCD_ISOLATE
+#include <lcd_config/post_hook.h>
+#endif
 
 /*
  * Returns zero if the TRB isn't in this segment, otherwise it returns the DMA
@@ -592,8 +603,11 @@ static void xhci_giveback_urb_in_irq(struct xhci_hcd *xhci,
 		if (usb_pipetype(urb->pipe) == PIPE_ISOCHRONOUS) {
 			xhci_to_hcd(xhci)->self.bandwidth_isoc_reqs--;
 			if (xhci_to_hcd(xhci)->self.bandwidth_isoc_reqs	== 0) {
+// We are not on AMD
+#if 0
 				if (xhci->quirks & XHCI_AMD_PLL_FIX)
 					usb_amd_quirk_pll_enable();
+#endif
 			}
 		}
 		usb_hcd_unlink_urb_from_ep(hcd, urb);
@@ -1910,8 +1924,10 @@ td_cleanup:
 		if (usb_pipetype(urb->pipe) == PIPE_ISOCHRONOUS) {
 			xhci_to_hcd(xhci)->self.bandwidth_isoc_reqs--;
 			if (xhci_to_hcd(xhci)->self.bandwidth_isoc_reqs == 0) {
+#if 0
 				if (xhci->quirks & XHCI_AMD_PLL_FIX)
 					usb_amd_quirk_pll_enable();
+#endif
 			}
 		}
 	}
@@ -3764,8 +3780,11 @@ static int xhci_queue_isoc_tx(struct xhci_hcd *xhci, gfp_t mem_flags,
 		xep->next_frame_id = urb->start_frame + num_tds * urb->interval;
 
 	if (xhci_to_hcd(xhci)->self.bandwidth_isoc_reqs == 0) {
+// Not AMD
+#if 0
 		if (xhci->quirks & XHCI_AMD_PLL_FIX)
 			usb_amd_quirk_pll_disable();
+#endif
 	}
 	xhci_to_hcd(xhci)->self.bandwidth_isoc_reqs++;
 

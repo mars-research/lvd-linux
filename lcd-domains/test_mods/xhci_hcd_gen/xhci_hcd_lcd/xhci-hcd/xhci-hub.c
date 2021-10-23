@@ -20,12 +20,23 @@
  * Inc., 675 Mass Ave, Cambridge, MA 02139, USA.
  */
 
+#ifdef LCD_ISOLATE
+#include <lcd_config/pre_hook.h>
+#endif
 
 #include <linux/slab.h>
 #include <asm/unaligned.h>
 
 #include "xhci.h"
+
+#ifndef LCD_ISOLATE
 #include "xhci-trace.h"
+#endif
+
+#ifdef LCD_ISOLATE
+#include <lcd_config/post_hook.h>
+#endif
+
 
 #define	PORT_WAKE_BITS	(PORT_WKOC_E | PORT_WKDISC_E | PORT_WKCONN_E)
 #define	PORT_RWC_BITS	(PORT_CSC | PORT_PEC | PORT_WRC | PORT_OCC | \
@@ -796,7 +807,7 @@ static u32 xhci_get_port_status(struct usb_hcd *hcd,
 				}
 				xhci_ring_device(xhci, slot_id);
 			} else {
-				int port_status = readl(port_array[wIndex]);
+				__maybe_unused int port_status = readl(port_array[wIndex]);
 				xhci_warn(xhci, "Port resume took longer than %i msec, port status = 0x%x\n",
 						XHCI_MAX_REXIT_TIMEOUT,
 						port_status);

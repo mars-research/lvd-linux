@@ -20,6 +20,10 @@
  * Inc., 675 Mass Ave, Cambridge, MA 02139, USA.
  */
 
+#ifdef LCD_ISOLATE
+#include <lcd_config/pre_hook.h>
+#endif
+
 #include <linux/usb.h>
 #include <linux/pci.h>
 #include <linux/slab.h>
@@ -27,7 +31,15 @@
 #include <linux/dma-mapping.h>
 
 #include "xhci.h"
+
+#ifndef LCD_ISOLATE
 #include "xhci-trace.h"
+#endif
+
+#ifdef LCD_ISOLATE
+#include <lcd_config/post_hook.h>
+#endif
+
 
 /*
  * Allocates a generic ring segment from the ring pool, sets the dma address,

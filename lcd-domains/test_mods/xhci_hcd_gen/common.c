@@ -1388,6 +1388,50 @@ void caller_unmarshal_kernel__xhci_run__hcd__in(
 	}
 }
 
+void caller_marshal_kernel__usb_disable_xhci_ports__pci_dev__in(
+	size_t* __pos,
+	struct fipc_message* __msg,
+	struct ext_registers* __ext,
+	struct usb_disable_xhci_ports_call_ctx const* ctx,
+	struct pci_dev const* ptr)
+{
+
+}
+
+void callee_unmarshal_kernel__usb_disable_xhci_ports__pci_dev__in(
+	size_t* __pos,
+	const struct fipc_message* __msg,
+	const struct ext_registers* __ext,
+	struct usb_disable_xhci_ports_call_ctx const* ctx,
+	struct pci_dev* ptr)
+{
+
+	{
+	}
+}
+
+void callee_marshal_kernel__usb_disable_xhci_ports__pci_dev__in(
+	size_t* __pos,
+	struct fipc_message* __msg,
+	struct ext_registers* __ext,
+	struct usb_disable_xhci_ports_call_ctx const* ctx,
+	struct pci_dev const* ptr)
+{
+
+}
+
+void caller_unmarshal_kernel__usb_disable_xhci_ports__pci_dev__in(
+	size_t* __pos,
+	const struct fipc_message* __msg,
+	const struct ext_registers* __ext,
+	struct usb_disable_xhci_ports_call_ctx const* ctx,
+	struct pci_dev* ptr)
+{
+
+	{
+	}
+}
+
 
 #ifdef LCD_ISOLATE
 __attribute__((weak)) void shared_mem_init(void) {

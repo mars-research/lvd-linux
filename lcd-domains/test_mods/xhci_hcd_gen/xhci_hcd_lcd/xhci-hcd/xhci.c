@@ -42,7 +42,6 @@
 
 #ifdef LCD_ISOLATE
 #include <lcd_config/post_hook.h>
-
 #endif
 
 #define DRIVER_AUTHOR "Sarah Sharp"
@@ -1904,7 +1903,7 @@ static int xhci_evaluate_context_result(struct xhci_hcd *xhci,
 		struct usb_device *udev, u32 *cmd_status)
 {
 	int ret;
-	struct xhci_virt_device *virt_dev = xhci->devs[udev->slot_id];
+	__maybe_unused struct xhci_virt_device *virt_dev = xhci->devs[udev->slot_id];
 
 	switch (*cmd_status) {
 	case COMP_CMD_ABORT:
@@ -5059,7 +5058,12 @@ MODULE_DESCRIPTION(DRIVER_DESC);
 MODULE_AUTHOR(DRIVER_AUTHOR);
 MODULE_LICENSE("GPL");
 
-static int __init xhci_hcd_init(void)
+#ifndef LCD_ISOLATE
+static int __init
+#else
+int
+#endif
+xhci_hcd_init(void)
 {
 	/*
 	 * Check the compiler generated sizes of structures that must be laid
@@ -5089,7 +5093,14 @@ static int __init xhci_hcd_init(void)
  * If an init function is provided, an exit function must also be provided
  * to allow module unload.
  */
-static void __exit xhci_hcd_fini(void) { }
+#ifndef LCD_ISOLATE
+static void __exit
+#else
+void
+#endif
+xhci_hcd_fini(void) { }
 
+#ifndef LCD_ISOLATE
 module_init(xhci_hcd_init);
 module_exit(xhci_hcd_fini);
+#endif

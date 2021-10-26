@@ -39,3 +39,4 @@ obj-m += skxedac_gen/
 obj-m += ixgbe_gen/
 obj-m += sbedac_gen/
 obj-m += canraw_gen/
+obj-m += xhci_hcd_gen/

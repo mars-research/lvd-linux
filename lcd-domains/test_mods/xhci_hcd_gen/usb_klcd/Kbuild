@@ -1,9 +1,9 @@
-obj-m += lcd_test_mod_xhci_hcd_gen_usb_klcd_klcd.o
+obj-m += lcd_test_mod_xhci_hcd_gen_usb_klcd.o
 
-lcd_test_mod_xhci_hcd_gen_usb_klcd_klcd-y		+= main.o
+lcd_test_mod_xhci_hcd_gen_usb_klcd-y		+= main.o
 
 # glue code
-lcd_test_mod_xhci_hcd_gen_usb_klcd_klcd-y		+= $(addprefix ../, server.o common.o glue_user.o )
+lcd_test_mod_xhci_hcd_gen_usb_klcd-y		+= $(addprefix ../, server.o common.o glue_user.o )
 
 cppflags-y += $(NONISOLATED_CFLAGS)
 

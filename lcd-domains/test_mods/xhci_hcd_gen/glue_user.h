@@ -4,7 +4,9 @@
 #include <linux/etherdevice.h>
 #include <net/rtnetlink.h>
 #include <linux/pci.h>
+#include <linux/dmi.h>
 #include <linux/aer.h>
+
 
 #include "xhci.h"
 

@@ -172,6 +172,19 @@ enum RPC_ID {
 	RPC_ID_xhci_init_driver,
 	RPC_ID_xhci_run,
 	RPC_ID_usb_disable_xhci_ports,
+	RPC_ID_dmi_get_system_info,
+	RPC_ID_usb_acpi_power_manageable,
+	RPC_ID_usb_acpi_set_power_state,
+	RPC_ID_usb_disabled,
+	RPC_ID_usb_hc_died,
+	RPC_ID_usb_hcd_check_unlink_urb,
+	RPC_ID_usb_hcd_giveback_urb,
+	RPC_ID_usb_hcd_irq,
+	RPC_ID_usb_hcd_is_primary_hcd,
+	RPC_ID_usb_hcd_link_urb_to_ep,
+	RPC_ID_usb_hcd_poll_rh_status,
+	RPC_ID_usb_hcd_unlink_urb_from_ep,
+	RPC_ID_usb_wakeup_notification,
 };
 
 int try_dispatch(enum RPC_ID id, struct fipc_message* __msg, struct ext_registers* __ext);
@@ -302,6 +315,68 @@ struct xhci_run_call_ctx {
 
 struct usb_disable_xhci_ports_call_ctx {
 	struct pci_dev* xhci_pdev;
+};
+
+struct dmi_get_system_info_call_ctx {
+	int field;
+};
+
+struct usb_acpi_power_manageable_call_ctx {
+	struct usb_device* hdev;
+	int index;
+};
+
+struct usb_acpi_set_power_state_call_ctx {
+	struct usb_device* hdev;
+	int index;
+	bool enable;
+};
+
+struct usb_disabled_call_ctx {
+};
+
+struct usb_hc_died_call_ctx {
+	struct usb_hcd* hcd;
+};
+
+struct usb_hcd_check_unlink_urb_call_ctx {
+	struct usb_hcd* hcd;
+	struct urb* urb;
+	int status;
+};
+
+struct usb_hcd_giveback_urb_call_ctx {
+	struct usb_hcd* hcd;
+	struct urb* urb;
+	int status;
+};
+
+struct usb_hcd_irq_call_ctx {
+	int irq;
+	void* __hcd;
+};
+
+struct usb_hcd_is_primary_hcd_call_ctx {
+	struct usb_hcd* hcd;
+};
+
+struct usb_hcd_link_urb_to_ep_call_ctx {
+	struct usb_hcd* hcd;
+	struct urb* urb;
+};
+
+struct usb_hcd_poll_rh_status_call_ctx {
+	struct usb_hcd* hcd;
+};
+
+struct usb_hcd_unlink_urb_from_ep_call_ctx {
+	struct usb_hcd* hcd;
+	struct urb* urb;
+};
+
+struct usb_wakeup_notification_call_ctx {
+	struct usb_device* hdev;
+	unsigned int portnum;
 };
 
 void caller_marshal_kernel__add_timer__timer__in(
@@ -1059,6 +1134,678 @@ void caller_unmarshal_kernel__usb_disable_xhci_ports__pci_dev__in(
 	const struct ext_registers* __ext,
 	struct usb_disable_xhci_ports_call_ctx const* call_ctx,
 	struct pci_dev* ptr);
+
+void caller_marshal_kernel__usb_acpi_power_manageable__hdev__in(
+	size_t* __pos,
+	struct fipc_message* __msg,
+	struct ext_registers* __ext,
+	struct usb_acpi_power_manageable_call_ctx const* call_ctx,
+	struct usb_device const* ptr);
+
+void callee_unmarshal_kernel__usb_acpi_power_manageable__hdev__in(
+	size_t* __pos,
+	const struct fipc_message* __msg,
+	const struct ext_registers* __ext,
+	struct usb_acpi_power_manageable_call_ctx const* call_ctx,
+	struct usb_device* ptr);
+
+void callee_marshal_kernel__usb_acpi_power_manageable__hdev__in(
+	size_t* __pos,
+	struct fipc_message* __msg,
+	struct ext_registers* __ext,
+	struct usb_acpi_power_manageable_call_ctx const* call_ctx,
+	struct usb_device const* ptr);
+
+void caller_unmarshal_kernel__usb_acpi_power_manageable__hdev__in(
+	size_t* __pos,
+	const struct fipc_message* __msg,
+	const struct ext_registers* __ext,
+	struct usb_acpi_power_manageable_call_ctx const* call_ctx,
+	struct usb_device* ptr);
+
+void caller_marshal_kernel__usb_acpi_set_power_state__hdev__in(
+	size_t* __pos,
+	struct fipc_message* __msg,
+	struct ext_registers* __ext,
+	struct usb_acpi_set_power_state_call_ctx const* call_ctx,
+	struct usb_device const* ptr);
+
+void callee_unmarshal_kernel__usb_acpi_set_power_state__hdev__in(
+	size_t* __pos,
+	const struct fipc_message* __msg,
+	const struct ext_registers* __ext,
+	struct usb_acpi_set_power_state_call_ctx const* call_ctx,
+	struct usb_device* ptr);
+
+void callee_marshal_kernel__usb_acpi_set_power_state__hdev__in(
+	size_t* __pos,
+	struct fipc_message* __msg,
+	struct ext_registers* __ext,
+	struct usb_acpi_set_power_state_call_ctx const* call_ctx,
+	struct usb_device const* ptr);
+
+void caller_unmarshal_kernel__usb_acpi_set_power_state__hdev__in(
+	size_t* __pos,
+	const struct fipc_message* __msg,
+	const struct ext_registers* __ext,
+	struct usb_acpi_set_power_state_call_ctx const* call_ctx,
+	struct usb_device* ptr);
+
+void caller_marshal_kernel__usb_hc_died__hcd__in(
+	size_t* __pos,
+	struct fipc_message* __msg,
+	struct ext_registers* __ext,
+	struct usb_hc_died_call_ctx const* call_ctx,
+	struct usb_hcd const* ptr);
+
+void callee_unmarshal_kernel__usb_hc_died__hcd__in(
+	size_t* __pos,
+	const struct fipc_message* __msg,
+	const struct ext_registers* __ext,
+	struct usb_hc_died_call_ctx const* call_ctx,
+	struct usb_hcd* ptr);
+
+void callee_marshal_kernel__usb_hc_died__hcd__in(
+	size_t* __pos,
+	struct fipc_message* __msg,
+	struct ext_registers* __ext,
+	struct usb_hc_died_call_ctx const* call_ctx,
+	struct usb_hcd const* ptr);
+
+void caller_unmarshal_kernel__usb_hc_died__hcd__in(
+	size_t* __pos,
+	const struct fipc_message* __msg,
+	const struct ext_registers* __ext,
+	struct usb_hc_died_call_ctx const* call_ctx,
+	struct usb_hcd* ptr);
+
+void caller_marshal_kernel__usb_hc_died__usb_bus__in(
+	size_t* __pos,
+	struct fipc_message* __msg,
+	struct ext_registers* __ext,
+	struct usb_hc_died_call_ctx const* call_ctx,
+	struct usb_bus const* ptr);
+
+void callee_unmarshal_kernel__usb_hc_died__usb_bus__in(
+	size_t* __pos,
+	const struct fipc_message* __msg,
+	const struct ext_registers* __ext,
+	struct usb_hc_died_call_ctx const* call_ctx,
+	struct usb_bus* ptr);
+
+void callee_marshal_kernel__usb_hc_died__usb_bus__in(
+	size_t* __pos,
+	struct fipc_message* __msg,
+	struct ext_registers* __ext,
+	struct usb_hc_died_call_ctx const* call_ctx,
+	struct usb_bus const* ptr);
+
+void caller_unmarshal_kernel__usb_hc_died__usb_bus__in(
+	size_t* __pos,
+	const struct fipc_message* __msg,
+	const struct ext_registers* __ext,
+	struct usb_hc_died_call_ctx const* call_ctx,
+	struct usb_bus* ptr);
+
+void caller_marshal_kernel__usb_hc_died__usb_bus_root_hub__in(
+	size_t* __pos,
+	struct fipc_message* __msg,
+	struct ext_registers* __ext,
+	struct usb_hc_died_call_ctx const* call_ctx,
+	struct usb_device const* ptr);
+
+void callee_unmarshal_kernel__usb_hc_died__usb_bus_root_hub__in(
+	size_t* __pos,
+	const struct fipc_message* __msg,
+	const struct ext_registers* __ext,
+	struct usb_hc_died_call_ctx const* call_ctx,
+	struct usb_device* ptr);
+
+void callee_marshal_kernel__usb_hc_died__usb_bus_root_hub__in(
+	size_t* __pos,
+	struct fipc_message* __msg,
+	struct ext_registers* __ext,
+	struct usb_hc_died_call_ctx const* call_ctx,
+	struct usb_device const* ptr);
+
+void caller_unmarshal_kernel__usb_hc_died__usb_bus_root_hub__in(
+	size_t* __pos,
+	const struct fipc_message* __msg,
+	const struct ext_registers* __ext,
+	struct usb_hc_died_call_ctx const* call_ctx,
+	struct usb_device* ptr);
+
+void caller_marshal_kernel__usb_hcd_check_unlink_urb__hcd__in(
+	size_t* __pos,
+	struct fipc_message* __msg,
+	struct ext_registers* __ext,
+	struct usb_hcd_check_unlink_urb_call_ctx const* call_ctx,
+	struct usb_hcd const* ptr);
+
+void callee_unmarshal_kernel__usb_hcd_check_unlink_urb__hcd__in(
+	size_t* __pos,
+	const struct fipc_message* __msg,
+	const struct ext_registers* __ext,
+	struct usb_hcd_check_unlink_urb_call_ctx const* call_ctx,
+	struct usb_hcd* ptr);
+
+void callee_marshal_kernel__usb_hcd_check_unlink_urb__hcd__in(
+	size_t* __pos,
+	struct fipc_message* __msg,
+	struct ext_registers* __ext,
+	struct usb_hcd_check_unlink_urb_call_ctx const* call_ctx,
+	struct usb_hcd const* ptr);
+
+void caller_unmarshal_kernel__usb_hcd_check_unlink_urb__hcd__in(
+	size_t* __pos,
+	const struct fipc_message* __msg,
+	const struct ext_registers* __ext,
+	struct usb_hcd_check_unlink_urb_call_ctx const* call_ctx,
+	struct usb_hcd* ptr);
+
+void caller_marshal_kernel__usb_hcd_check_unlink_urb__urb__in(
+	size_t* __pos,
+	struct fipc_message* __msg,
+	struct ext_registers* __ext,
+	struct usb_hcd_check_unlink_urb_call_ctx const* call_ctx,
+	struct urb const* ptr);
+
+void callee_unmarshal_kernel__usb_hcd_check_unlink_urb__urb__in(
+	size_t* __pos,
+	const struct fipc_message* __msg,
+	const struct ext_registers* __ext,
+	struct usb_hcd_check_unlink_urb_call_ctx const* call_ctx,
+	struct urb* ptr);
+
+void callee_marshal_kernel__usb_hcd_check_unlink_urb__urb__in(
+	size_t* __pos,
+	struct fipc_message* __msg,
+	struct ext_registers* __ext,
+	struct usb_hcd_check_unlink_urb_call_ctx const* call_ctx,
+	struct urb const* ptr);
+
+void caller_unmarshal_kernel__usb_hcd_check_unlink_urb__urb__in(
+	size_t* __pos,
+	const struct fipc_message* __msg,
+	const struct ext_registers* __ext,
+	struct usb_hcd_check_unlink_urb_call_ctx const* call_ctx,
+	struct urb* ptr);
+
+void caller_marshal_kernel__usb_hcd_check_unlink_urb__urb_ep__in(
+	size_t* __pos,
+	struct fipc_message* __msg,
+	struct ext_registers* __ext,
+	struct usb_hcd_check_unlink_urb_call_ctx const* call_ctx,
+	struct usb_host_endpoint const* ptr);
+
+void callee_unmarshal_kernel__usb_hcd_check_unlink_urb__urb_ep__in(
+	size_t* __pos,
+	const struct fipc_message* __msg,
+	const struct ext_registers* __ext,
+	struct usb_hcd_check_unlink_urb_call_ctx const* call_ctx,
+	struct usb_host_endpoint* ptr);
+
+void callee_marshal_kernel__usb_hcd_check_unlink_urb__urb_ep__in(
+	size_t* __pos,
+	struct fipc_message* __msg,
+	struct ext_registers* __ext,
+	struct usb_hcd_check_unlink_urb_call_ctx const* call_ctx,
+	struct usb_host_endpoint const* ptr);
+
+void caller_unmarshal_kernel__usb_hcd_check_unlink_urb__urb_ep__in(
+	size_t* __pos,
+	const struct fipc_message* __msg,
+	const struct ext_registers* __ext,
+	struct usb_hcd_check_unlink_urb_call_ctx const* call_ctx,
+	struct usb_host_endpoint* ptr);
+
+void caller_marshal_kernel__usb_hcd_giveback_urb__hcd__in(
+	size_t* __pos,
+	struct fipc_message* __msg,
+	struct ext_registers* __ext,
+	struct usb_hcd_giveback_urb_call_ctx const* call_ctx,
+	struct usb_hcd const* ptr);
+
+void callee_unmarshal_kernel__usb_hcd_giveback_urb__hcd__in(
+	size_t* __pos,
+	const struct fipc_message* __msg,
+	const struct ext_registers* __ext,
+	struct usb_hcd_giveback_urb_call_ctx const* call_ctx,
+	struct usb_hcd* ptr);
+
+void callee_marshal_kernel__usb_hcd_giveback_urb__hcd__in(
+	size_t* __pos,
+	struct fipc_message* __msg,
+	struct ext_registers* __ext,
+	struct usb_hcd_giveback_urb_call_ctx const* call_ctx,
+	struct usb_hcd const* ptr);
+
+void caller_unmarshal_kernel__usb_hcd_giveback_urb__hcd__in(
+	size_t* __pos,
+	const struct fipc_message* __msg,
+	const struct ext_registers* __ext,
+	struct usb_hcd_giveback_urb_call_ctx const* call_ctx,
+	struct usb_hcd* ptr);
+
+void caller_marshal_kernel__usb_hcd_giveback_urb__usb_hcd_driver__in(
+	size_t* __pos,
+	struct fipc_message* __msg,
+	struct ext_registers* __ext,
+	struct usb_hcd_giveback_urb_call_ctx const* call_ctx,
+	struct hc_driver const* ptr);
+
+void callee_unmarshal_kernel__usb_hcd_giveback_urb__usb_hcd_driver__in(
+	size_t* __pos,
+	const struct fipc_message* __msg,
+	const struct ext_registers* __ext,
+	struct usb_hcd_giveback_urb_call_ctx const* call_ctx,
+	struct hc_driver* ptr);
+
+void callee_marshal_kernel__usb_hcd_giveback_urb__usb_hcd_driver__in(
+	size_t* __pos,
+	struct fipc_message* __msg,
+	struct ext_registers* __ext,
+	struct usb_hcd_giveback_urb_call_ctx const* call_ctx,
+	struct hc_driver const* ptr);
+
+void caller_unmarshal_kernel__usb_hcd_giveback_urb__usb_hcd_driver__in(
+	size_t* __pos,
+	const struct fipc_message* __msg,
+	const struct ext_registers* __ext,
+	struct usb_hcd_giveback_urb_call_ctx const* call_ctx,
+	struct hc_driver* ptr);
+
+void caller_marshal_kernel__usb_hcd_giveback_urb__urb__in(
+	size_t* __pos,
+	struct fipc_message* __msg,
+	struct ext_registers* __ext,
+	struct usb_hcd_giveback_urb_call_ctx const* call_ctx,
+	struct urb const* ptr);
+
+void callee_unmarshal_kernel__usb_hcd_giveback_urb__urb__in(
+	size_t* __pos,
+	const struct fipc_message* __msg,
+	const struct ext_registers* __ext,
+	struct usb_hcd_giveback_urb_call_ctx const* call_ctx,
+	struct urb* ptr);
+
+void callee_marshal_kernel__usb_hcd_giveback_urb__urb__in(
+	size_t* __pos,
+	struct fipc_message* __msg,
+	struct ext_registers* __ext,
+	struct usb_hcd_giveback_urb_call_ctx const* call_ctx,
+	struct urb const* ptr);
+
+void caller_unmarshal_kernel__usb_hcd_giveback_urb__urb__in(
+	size_t* __pos,
+	const struct fipc_message* __msg,
+	const struct ext_registers* __ext,
+	struct usb_hcd_giveback_urb_call_ctx const* call_ctx,
+	struct urb* ptr);
+
+void caller_marshal_kernel__usb_hcd_giveback_urb__urb_dev__in(
+	size_t* __pos,
+	struct fipc_message* __msg,
+	struct ext_registers* __ext,
+	struct usb_hcd_giveback_urb_call_ctx const* call_ctx,
+	struct usb_device const* ptr);
+
+void callee_unmarshal_kernel__usb_hcd_giveback_urb__urb_dev__in(
+	size_t* __pos,
+	const struct fipc_message* __msg,
+	const struct ext_registers* __ext,
+	struct usb_hcd_giveback_urb_call_ctx const* call_ctx,
+	struct usb_device* ptr);
+
+void callee_marshal_kernel__usb_hcd_giveback_urb__urb_dev__in(
+	size_t* __pos,
+	struct fipc_message* __msg,
+	struct ext_registers* __ext,
+	struct usb_hcd_giveback_urb_call_ctx const* call_ctx,
+	struct usb_device const* ptr);
+
+void caller_unmarshal_kernel__usb_hcd_giveback_urb__urb_dev__in(
+	size_t* __pos,
+	const struct fipc_message* __msg,
+	const struct ext_registers* __ext,
+	struct usb_hcd_giveback_urb_call_ctx const* call_ctx,
+	struct usb_device* ptr);
+
+void caller_marshal_kernel__usb_hcd_giveback_urb__usb_device_parent__in(
+	size_t* __pos,
+	struct fipc_message* __msg,
+	struct ext_registers* __ext,
+	struct usb_hcd_giveback_urb_call_ctx const* call_ctx,
+	struct usb_device const* ptr);
+
+void callee_unmarshal_kernel__usb_hcd_giveback_urb__usb_device_parent__in(
+	size_t* __pos,
+	const struct fipc_message* __msg,
+	const struct ext_registers* __ext,
+	struct usb_hcd_giveback_urb_call_ctx const* call_ctx,
+	struct usb_device* ptr);
+
+void callee_marshal_kernel__usb_hcd_giveback_urb__usb_device_parent__in(
+	size_t* __pos,
+	struct fipc_message* __msg,
+	struct ext_registers* __ext,
+	struct usb_hcd_giveback_urb_call_ctx const* call_ctx,
+	struct usb_device const* ptr);
+
+void caller_unmarshal_kernel__usb_hcd_giveback_urb__usb_device_parent__in(
+	size_t* __pos,
+	const struct fipc_message* __msg,
+	const struct ext_registers* __ext,
+	struct usb_hcd_giveback_urb_call_ctx const* call_ctx,
+	struct usb_device* ptr);
+
+void caller_marshal_kernel__usb_hcd_is_primary_hcd__hcd__in(
+	size_t* __pos,
+	struct fipc_message* __msg,
+	struct ext_registers* __ext,
+	struct usb_hcd_is_primary_hcd_call_ctx const* call_ctx,
+	struct usb_hcd const* ptr);
+
+void callee_unmarshal_kernel__usb_hcd_is_primary_hcd__hcd__in(
+	size_t* __pos,
+	const struct fipc_message* __msg,
+	const struct ext_registers* __ext,
+	struct usb_hcd_is_primary_hcd_call_ctx const* call_ctx,
+	struct usb_hcd* ptr);
+
+void callee_marshal_kernel__usb_hcd_is_primary_hcd__hcd__in(
+	size_t* __pos,
+	struct fipc_message* __msg,
+	struct ext_registers* __ext,
+	struct usb_hcd_is_primary_hcd_call_ctx const* call_ctx,
+	struct usb_hcd const* ptr);
+
+void caller_unmarshal_kernel__usb_hcd_is_primary_hcd__hcd__in(
+	size_t* __pos,
+	const struct fipc_message* __msg,
+	const struct ext_registers* __ext,
+	struct usb_hcd_is_primary_hcd_call_ctx const* call_ctx,
+	struct usb_hcd* ptr);
+
+void caller_marshal_kernel__usb_hcd_is_primary_hcd__usb_hcd_primary_hcd__in(
+	size_t* __pos,
+	struct fipc_message* __msg,
+	struct ext_registers* __ext,
+	struct usb_hcd_is_primary_hcd_call_ctx const* call_ctx,
+	struct usb_hcd const* ptr);
+
+void callee_unmarshal_kernel__usb_hcd_is_primary_hcd__usb_hcd_primary_hcd__in(
+	size_t* __pos,
+	const struct fipc_message* __msg,
+	const struct ext_registers* __ext,
+	struct usb_hcd_is_primary_hcd_call_ctx const* call_ctx,
+	struct usb_hcd* ptr);
+
+void callee_marshal_kernel__usb_hcd_is_primary_hcd__usb_hcd_primary_hcd__in(
+	size_t* __pos,
+	struct fipc_message* __msg,
+	struct ext_registers* __ext,
+	struct usb_hcd_is_primary_hcd_call_ctx const* call_ctx,
+	struct usb_hcd const* ptr);
+
+void caller_unmarshal_kernel__usb_hcd_is_primary_hcd__usb_hcd_primary_hcd__in(
+	size_t* __pos,
+	const struct fipc_message* __msg,
+	const struct ext_registers* __ext,
+	struct usb_hcd_is_primary_hcd_call_ctx const* call_ctx,
+	struct usb_hcd* ptr);
+
+void caller_marshal_kernel__usb_hcd_link_urb_to_ep__hcd__in(
+	size_t* __pos,
+	struct fipc_message* __msg,
+	struct ext_registers* __ext,
+	struct usb_hcd_link_urb_to_ep_call_ctx const* call_ctx,
+	struct usb_hcd const* ptr);
+
+void callee_unmarshal_kernel__usb_hcd_link_urb_to_ep__hcd__in(
+	size_t* __pos,
+	const struct fipc_message* __msg,
+	const struct ext_registers* __ext,
+	struct usb_hcd_link_urb_to_ep_call_ctx const* call_ctx,
+	struct usb_hcd* ptr);
+
+void callee_marshal_kernel__usb_hcd_link_urb_to_ep__hcd__in(
+	size_t* __pos,
+	struct fipc_message* __msg,
+	struct ext_registers* __ext,
+	struct usb_hcd_link_urb_to_ep_call_ctx const* call_ctx,
+	struct usb_hcd const* ptr);
+
+void caller_unmarshal_kernel__usb_hcd_link_urb_to_ep__hcd__in(
+	size_t* __pos,
+	const struct fipc_message* __msg,
+	const struct ext_registers* __ext,
+	struct usb_hcd_link_urb_to_ep_call_ctx const* call_ctx,
+	struct usb_hcd* ptr);
+
+void caller_marshal_kernel__usb_hcd_link_urb_to_ep__urb__in(
+	size_t* __pos,
+	struct fipc_message* __msg,
+	struct ext_registers* __ext,
+	struct usb_hcd_link_urb_to_ep_call_ctx const* call_ctx,
+	struct urb const* ptr);
+
+void callee_unmarshal_kernel__usb_hcd_link_urb_to_ep__urb__in(
+	size_t* __pos,
+	const struct fipc_message* __msg,
+	const struct ext_registers* __ext,
+	struct usb_hcd_link_urb_to_ep_call_ctx const* call_ctx,
+	struct urb* ptr);
+
+void callee_marshal_kernel__usb_hcd_link_urb_to_ep__urb__in(
+	size_t* __pos,
+	struct fipc_message* __msg,
+	struct ext_registers* __ext,
+	struct usb_hcd_link_urb_to_ep_call_ctx const* call_ctx,
+	struct urb const* ptr);
+
+void caller_unmarshal_kernel__usb_hcd_link_urb_to_ep__urb__in(
+	size_t* __pos,
+	const struct fipc_message* __msg,
+	const struct ext_registers* __ext,
+	struct usb_hcd_link_urb_to_ep_call_ctx const* call_ctx,
+	struct urb* ptr);
+
+void caller_marshal_kernel__usb_hcd_link_urb_to_ep__urb_dev__in(
+	size_t* __pos,
+	struct fipc_message* __msg,
+	struct ext_registers* __ext,
+	struct usb_hcd_link_urb_to_ep_call_ctx const* call_ctx,
+	struct usb_device const* ptr);
+
+void callee_unmarshal_kernel__usb_hcd_link_urb_to_ep__urb_dev__in(
+	size_t* __pos,
+	const struct fipc_message* __msg,
+	const struct ext_registers* __ext,
+	struct usb_hcd_link_urb_to_ep_call_ctx const* call_ctx,
+	struct usb_device* ptr);
+
+void callee_marshal_kernel__usb_hcd_link_urb_to_ep__urb_dev__in(
+	size_t* __pos,
+	struct fipc_message* __msg,
+	struct ext_registers* __ext,
+	struct usb_hcd_link_urb_to_ep_call_ctx const* call_ctx,
+	struct usb_device const* ptr);
+
+void caller_unmarshal_kernel__usb_hcd_link_urb_to_ep__urb_dev__in(
+	size_t* __pos,
+	const struct fipc_message* __msg,
+	const struct ext_registers* __ext,
+	struct usb_hcd_link_urb_to_ep_call_ctx const* call_ctx,
+	struct usb_device* ptr);
+
+void caller_marshal_kernel__usb_hcd_link_urb_to_ep__urb_ep__in(
+	size_t* __pos,
+	struct fipc_message* __msg,
+	struct ext_registers* __ext,
+	struct usb_hcd_link_urb_to_ep_call_ctx const* call_ctx,
+	struct usb_host_endpoint const* ptr);
+
+void callee_unmarshal_kernel__usb_hcd_link_urb_to_ep__urb_ep__in(
+	size_t* __pos,
+	const struct fipc_message* __msg,
+	const struct ext_registers* __ext,
+	struct usb_hcd_link_urb_to_ep_call_ctx const* call_ctx,
+	struct usb_host_endpoint* ptr);
+
+void callee_marshal_kernel__usb_hcd_link_urb_to_ep__urb_ep__in(
+	size_t* __pos,
+	struct fipc_message* __msg,
+	struct ext_registers* __ext,
+	struct usb_hcd_link_urb_to_ep_call_ctx const* call_ctx,
+	struct usb_host_endpoint const* ptr);
+
+void caller_unmarshal_kernel__usb_hcd_link_urb_to_ep__urb_ep__in(
+	size_t* __pos,
+	const struct fipc_message* __msg,
+	const struct ext_registers* __ext,
+	struct usb_hcd_link_urb_to_ep_call_ctx const* call_ctx,
+	struct usb_host_endpoint* ptr);
+
+void caller_marshal_kernel__usb_hcd_poll_rh_status__hcd__in(
+	size_t* __pos,
+	struct fipc_message* __msg,
+	struct ext_registers* __ext,
+	struct usb_hcd_poll_rh_status_call_ctx const* call_ctx,
+	struct usb_hcd const* ptr);
+
+void callee_unmarshal_kernel__usb_hcd_poll_rh_status__hcd__in(
+	size_t* __pos,
+	const struct fipc_message* __msg,
+	const struct ext_registers* __ext,
+	struct usb_hcd_poll_rh_status_call_ctx const* call_ctx,
+	struct usb_hcd* ptr);
+
+void callee_marshal_kernel__usb_hcd_poll_rh_status__hcd__in(
+	size_t* __pos,
+	struct fipc_message* __msg,
+	struct ext_registers* __ext,
+	struct usb_hcd_poll_rh_status_call_ctx const* call_ctx,
+	struct usb_hcd const* ptr);
+
+void caller_unmarshal_kernel__usb_hcd_poll_rh_status__hcd__in(
+	size_t* __pos,
+	const struct fipc_message* __msg,
+	const struct ext_registers* __ext,
+	struct usb_hcd_poll_rh_status_call_ctx const* call_ctx,
+	struct usb_hcd* ptr);
+
+void caller_marshal_kernel__usb_hcd_poll_rh_status__usb_hcd_driver__in(
+	size_t* __pos,
+	struct fipc_message* __msg,
+	struct ext_registers* __ext,
+	struct usb_hcd_poll_rh_status_call_ctx const* call_ctx,
+	struct hc_driver const* ptr);
+
+void callee_unmarshal_kernel__usb_hcd_poll_rh_status__usb_hcd_driver__in(
+	size_t* __pos,
+	const struct fipc_message* __msg,
+	const struct ext_registers* __ext,
+	struct usb_hcd_poll_rh_status_call_ctx const* call_ctx,
+	struct hc_driver* ptr);
+
+void callee_marshal_kernel__usb_hcd_poll_rh_status__usb_hcd_driver__in(
+	size_t* __pos,
+	struct fipc_message* __msg,
+	struct ext_registers* __ext,
+	struct usb_hcd_poll_rh_status_call_ctx const* call_ctx,
+	struct hc_driver const* ptr);
+
+void caller_unmarshal_kernel__usb_hcd_poll_rh_status__usb_hcd_driver__in(
+	size_t* __pos,
+	const struct fipc_message* __msg,
+	const struct ext_registers* __ext,
+	struct usb_hcd_poll_rh_status_call_ctx const* call_ctx,
+	struct hc_driver* ptr);
+
+void caller_marshal_kernel__usb_hcd_unlink_urb_from_ep__hcd__in(
+	size_t* __pos,
+	struct fipc_message* __msg,
+	struct ext_registers* __ext,
+	struct usb_hcd_unlink_urb_from_ep_call_ctx const* call_ctx,
+	struct usb_hcd const* ptr);
+
+void callee_unmarshal_kernel__usb_hcd_unlink_urb_from_ep__hcd__in(
+	size_t* __pos,
+	const struct fipc_message* __msg,
+	const struct ext_registers* __ext,
+	struct usb_hcd_unlink_urb_from_ep_call_ctx const* call_ctx,
+	struct usb_hcd* ptr);
+
+void callee_marshal_kernel__usb_hcd_unlink_urb_from_ep__hcd__in(
+	size_t* __pos,
+	struct fipc_message* __msg,
+	struct ext_registers* __ext,
+	struct usb_hcd_unlink_urb_from_ep_call_ctx const* call_ctx,
+	struct usb_hcd const* ptr);
+
+void caller_unmarshal_kernel__usb_hcd_unlink_urb_from_ep__hcd__in(
+	size_t* __pos,
+	const struct fipc_message* __msg,
+	const struct ext_registers* __ext,
+	struct usb_hcd_unlink_urb_from_ep_call_ctx const* call_ctx,
+	struct usb_hcd* ptr);
+
+void caller_marshal_kernel__usb_hcd_unlink_urb_from_ep__urb__in(
+	size_t* __pos,
+	struct fipc_message* __msg,
+	struct ext_registers* __ext,
+	struct usb_hcd_unlink_urb_from_ep_call_ctx const* call_ctx,
+	struct urb const* ptr);
+
+void callee_unmarshal_kernel__usb_hcd_unlink_urb_from_ep__urb__in(
+	size_t* __pos,
+	const struct fipc_message* __msg,
+	const struct ext_registers* __ext,
+	struct usb_hcd_unlink_urb_from_ep_call_ctx const* call_ctx,
+	struct urb* ptr);
+
+void callee_marshal_kernel__usb_hcd_unlink_urb_from_ep__urb__in(
+	size_t* __pos,
+	struct fipc_message* __msg,
+	struct ext_registers* __ext,
+	struct usb_hcd_unlink_urb_from_ep_call_ctx const* call_ctx,
+	struct urb const* ptr);
+
+void caller_unmarshal_kernel__usb_hcd_unlink_urb_from_ep__urb__in(
+	size_t* __pos,
+	const struct fipc_message* __msg,
+	const struct ext_registers* __ext,
+	struct usb_hcd_unlink_urb_from_ep_call_ctx const* call_ctx,
+	struct urb* ptr);
+
+void caller_marshal_kernel__usb_wakeup_notification__hdev__in(
+	size_t* __pos,
+	struct fipc_message* __msg,
+	struct ext_registers* __ext,
+	struct usb_wakeup_notification_call_ctx const* call_ctx,
+	struct usb_device const* ptr);
+
+void callee_unmarshal_kernel__usb_wakeup_notification__hdev__in(
+	size_t* __pos,
+	const struct fipc_message* __msg,
+	const struct ext_registers* __ext,
+	struct usb_wakeup_notification_call_ctx const* call_ctx,
+	struct usb_device* ptr);
+
+void callee_marshal_kernel__usb_wakeup_notification__hdev__in(
+	size_t* __pos,
+	struct fipc_message* __msg,
+	struct ext_registers* __ext,
+	struct usb_wakeup_notification_call_ctx const* call_ctx,
+	struct usb_device const* ptr);
+
+void caller_unmarshal_kernel__usb_wakeup_notification__hdev__in(
+	size_t* __pos,
+	const struct fipc_message* __msg,
+	const struct ext_registers* __ext,
+	struct usb_wakeup_notification_call_ctx const* call_ctx,
+	struct usb_device* ptr);
 
 
 #endif

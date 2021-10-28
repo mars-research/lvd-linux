@@ -1222,6 +1222,686 @@ void usb_disable_xhci_ports(struct pci_dev* xhci_pdev)
 	}
 }
 
+char const* dmi_get_system_info(int field)
+{
+	struct fipc_message __buffer = {0};
+	struct fipc_message *__msg = &__buffer;
+	struct ext_registers* __ext = get_register_page(smp_processor_id());
+	size_t n_pos = 0;
+	size_t* __pos = &n_pos;
+
+	int* field_ptr = &field;
+	char const* ret = 0;
+	char const** ret_ptr = &ret;
+	
+	__maybe_unused const struct dmi_get_system_info_call_ctx call_ctx = {field};
+	__maybe_unused const struct dmi_get_system_info_call_ctx *ctx = &call_ctx;
+
+	(void)__ext;
+
+	if (verbose_debug) {
+		printk("%s:%d, entered!\n", __func__, __LINE__);
+	}
+
+	{
+		glue_pack(__pos, __msg, __ext, *field_ptr);
+	}
+
+	glue_call_server(__pos, __msg, RPC_ID_dmi_get_system_info);
+
+	*__pos = 0;
+	{
+	}
+
+	{
+		*ret_ptr = glue_unpack(__pos, __msg, __ext, char const*);
+		if (*ret_ptr) {
+			char* writable = (char*)*ret_ptr;
+			size_t i, len;
+			char* array = writable;
+			len = glue_unpack(__pos, __msg, __ext, size_t) - 1;
+			array[len] = '\0';
+			for (i = 0; i < len; ++i) {
+				char* element = &array[i];
+				*element = glue_unpack(__pos, __msg, __ext, char);
+			}
+
+		}
+
+	}
+
+	if (verbose_debug) {
+		printk("%s:%d, returned!\n", __func__, __LINE__);
+	}
+	return ret;
+}
+
+bool usb_acpi_power_manageable(struct usb_device* hdev, int index)
+{
+	struct fipc_message __buffer = {0};
+	struct fipc_message *__msg = &__buffer;
+	struct ext_registers* __ext = get_register_page(smp_processor_id());
+	size_t n_pos = 0;
+	size_t* __pos = &n_pos;
+
+	struct usb_device** hdev_ptr = &hdev;
+	int* index_ptr = &index;
+	bool ret = 0;
+	bool* ret_ptr = &ret;
+	
+	__maybe_unused const struct usb_acpi_power_manageable_call_ctx call_ctx = {hdev, index};
+	__maybe_unused const struct usb_acpi_power_manageable_call_ctx *ctx = &call_ctx;
+
+	(void)__ext;
+
+	if (verbose_debug) {
+		printk("%s:%d, entered!\n", __func__, __LINE__);
+	}
+
+	{
+		__maybe_unused const void* __adjusted = *hdev_ptr;
+		glue_pack_shadow(__pos, __msg, __ext, __adjusted);
+		if (*hdev_ptr) {
+			caller_marshal_kernel__usb_acpi_power_manageable__hdev__in(__pos, __msg, __ext, ctx, *hdev_ptr);
+		}
+
+	}
+
+	{
+		glue_pack(__pos, __msg, __ext, *index_ptr);
+	}
+
+	glue_call_server(__pos, __msg, RPC_ID_usb_acpi_power_manageable);
+
+	*__pos = 0;
+	{
+		if (*hdev_ptr) {
+			caller_unmarshal_kernel__usb_acpi_power_manageable__hdev__in(__pos, __msg, __ext, ctx, *hdev_ptr);
+		}
+
+	}
+
+	{
+	}
+
+	{
+		*ret_ptr = glue_unpack(__pos, __msg, __ext, bool);
+	}
+
+	if (verbose_debug) {
+		printk("%s:%d, returned!\n", __func__, __LINE__);
+	}
+	return ret;
+}
+
+int usb_acpi_set_power_state(struct usb_device* hdev, int index, bool enable)
+{
+	struct fipc_message __buffer = {0};
+	struct fipc_message *__msg = &__buffer;
+	struct ext_registers* __ext = get_register_page(smp_processor_id());
+	size_t n_pos = 0;
+	size_t* __pos = &n_pos;
+
+	struct usb_device** hdev_ptr = &hdev;
+	int* index_ptr = &index;
+	bool* enable_ptr = &enable;
+	int ret = 0;
+	int* ret_ptr = &ret;
+	
+	__maybe_unused const struct usb_acpi_set_power_state_call_ctx call_ctx = {hdev, index, enable};
+	__maybe_unused const struct usb_acpi_set_power_state_call_ctx *ctx = &call_ctx;
+
+	(void)__ext;
+
+	if (verbose_debug) {
+		printk("%s:%d, entered!\n", __func__, __LINE__);
+	}
+
+	{
+		__maybe_unused const void* __adjusted = *hdev_ptr;
+		glue_pack_shadow(__pos, __msg, __ext, __adjusted);
+		if (*hdev_ptr) {
+			caller_marshal_kernel__usb_acpi_set_power_state__hdev__in(__pos, __msg, __ext, ctx, *hdev_ptr);
+		}
+
+	}
+
+	{
+		glue_pack(__pos, __msg, __ext, *index_ptr);
+	}
+
+	{
+		glue_pack(__pos, __msg, __ext, *enable_ptr);
+	}
+
+	glue_call_server(__pos, __msg, RPC_ID_usb_acpi_set_power_state);
+
+	*__pos = 0;
+	{
+		if (*hdev_ptr) {
+			caller_unmarshal_kernel__usb_acpi_set_power_state__hdev__in(__pos, __msg, __ext, ctx, *hdev_ptr);
+		}
+
+	}
+
+	{
+	}
+
+	{
+	}
+
+	{
+		*ret_ptr = glue_unpack(__pos, __msg, __ext, int);
+	}
+
+	if (verbose_debug) {
+		printk("%s:%d, returned!\n", __func__, __LINE__);
+	}
+	return ret;
+}
+
+int usb_disabled(void)
+{
+	struct fipc_message __buffer = {0};
+	struct fipc_message *__msg = &__buffer;
+	struct ext_registers* __ext = get_register_page(smp_processor_id());
+	size_t n_pos = 0;
+	size_t* __pos = &n_pos;
+
+	int ret = 0;
+	int* ret_ptr = &ret;
+	
+	__maybe_unused const struct usb_disabled_call_ctx call_ctx = {};
+	__maybe_unused const struct usb_disabled_call_ctx *ctx = &call_ctx;
+
+	(void)__ext;
+
+	if (verbose_debug) {
+		printk("%s:%d, entered!\n", __func__, __LINE__);
+	}
+
+	glue_call_server(__pos, __msg, RPC_ID_usb_disabled);
+
+	*__pos = 0;
+	{
+		*ret_ptr = glue_unpack(__pos, __msg, __ext, int);
+	}
+
+	if (verbose_debug) {
+		printk("%s:%d, returned!\n", __func__, __LINE__);
+	}
+	return ret;
+}
+
+void usb_hc_died(struct usb_hcd* hcd)
+{
+	struct fipc_message __buffer = {0};
+	struct fipc_message *__msg = &__buffer;
+	struct ext_registers* __ext = get_register_page(smp_processor_id());
+	size_t n_pos = 0;
+	size_t* __pos = &n_pos;
+
+	struct usb_hcd** hcd_ptr = &hcd;
+	
+	__maybe_unused const struct usb_hc_died_call_ctx call_ctx = {hcd};
+	__maybe_unused const struct usb_hc_died_call_ctx *ctx = &call_ctx;
+
+	(void)__ext;
+
+	if (verbose_debug) {
+		printk("%s:%d, entered!\n", __func__, __LINE__);
+	}
+
+	{
+		__maybe_unused const void* __adjusted = *hcd_ptr;
+		glue_pack_shadow(__pos, __msg, __ext, __adjusted);
+		if (*hcd_ptr) {
+			caller_marshal_kernel__usb_hc_died__hcd__in(__pos, __msg, __ext, ctx, *hcd_ptr);
+		}
+
+	}
+
+	glue_call_server(__pos, __msg, RPC_ID_usb_hc_died);
+
+	*__pos = 0;
+	{
+		if (*hcd_ptr) {
+			caller_unmarshal_kernel__usb_hc_died__hcd__in(__pos, __msg, __ext, ctx, *hcd_ptr);
+		}
+
+	}
+
+	if (verbose_debug) {
+		printk("%s:%d, returned!\n", __func__, __LINE__);
+	}
+}
+
+int usb_hcd_check_unlink_urb(struct usb_hcd* hcd, struct urb* urb, int status)
+{
+	struct fipc_message __buffer = {0};
+	struct fipc_message *__msg = &__buffer;
+	struct ext_registers* __ext = get_register_page(smp_processor_id());
+	size_t n_pos = 0;
+	size_t* __pos = &n_pos;
+
+	struct urb** urb_ptr = &urb;
+	int* status_ptr = &status;
+	int ret = 0;
+	int* ret_ptr = &ret;
+	
+	__maybe_unused const struct usb_hcd_check_unlink_urb_call_ctx call_ctx = {hcd, urb, status};
+	__maybe_unused const struct usb_hcd_check_unlink_urb_call_ctx *ctx = &call_ctx;
+
+	(void)__ext;
+
+	if (verbose_debug) {
+		printk("%s:%d, entered!\n", __func__, __LINE__);
+	}
+
+	{
+		__maybe_unused const void* __adjusted = *urb_ptr;
+		glue_pack_shadow(__pos, __msg, __ext, __adjusted);
+		if (*urb_ptr) {
+			caller_marshal_kernel__usb_hcd_check_unlink_urb__urb__in(__pos, __msg, __ext, ctx, *urb_ptr);
+		}
+
+	}
+
+	{
+		glue_pack(__pos, __msg, __ext, *status_ptr);
+	}
+
+	glue_call_server(__pos, __msg, RPC_ID_usb_hcd_check_unlink_urb);
+
+	*__pos = 0;
+	{
+		if (*urb_ptr) {
+			caller_unmarshal_kernel__usb_hcd_check_unlink_urb__urb__in(__pos, __msg, __ext, ctx, *urb_ptr);
+		}
+
+	}
+
+	{
+	}
+
+	{
+		*ret_ptr = glue_unpack(__pos, __msg, __ext, int);
+	}
+
+	if (verbose_debug) {
+		printk("%s:%d, returned!\n", __func__, __LINE__);
+	}
+	return ret;
+}
+
+void usb_hcd_giveback_urb(struct usb_hcd* hcd, struct urb* urb, int status)
+{
+	struct fipc_message __buffer = {0};
+	struct fipc_message *__msg = &__buffer;
+	struct ext_registers* __ext = get_register_page(smp_processor_id());
+	size_t n_pos = 0;
+	size_t* __pos = &n_pos;
+
+	struct usb_hcd** hcd_ptr = &hcd;
+	struct urb** urb_ptr = &urb;
+	int* status_ptr = &status;
+	
+	__maybe_unused const struct usb_hcd_giveback_urb_call_ctx call_ctx = {hcd, urb, status};
+	__maybe_unused const struct usb_hcd_giveback_urb_call_ctx *ctx = &call_ctx;
+
+	(void)__ext;
+
+	if (verbose_debug) {
+		printk("%s:%d, entered!\n", __func__, __LINE__);
+	}
+
+	{
+		__maybe_unused const void* __adjusted = *hcd_ptr;
+		glue_pack_shadow(__pos, __msg, __ext, __adjusted);
+		if (*hcd_ptr) {
+			caller_marshal_kernel__usb_hcd_giveback_urb__hcd__in(__pos, __msg, __ext, ctx, *hcd_ptr);
+		}
+
+	}
+
+	{
+		__maybe_unused const void* __adjusted = *urb_ptr;
+		glue_pack_shadow(__pos, __msg, __ext, __adjusted);
+		if (*urb_ptr) {
+			caller_marshal_kernel__usb_hcd_giveback_urb__urb__in(__pos, __msg, __ext, ctx, *urb_ptr);
+		}
+
+	}
+
+	{
+		glue_pack(__pos, __msg, __ext, *status_ptr);
+	}
+
+	glue_call_server(__pos, __msg, RPC_ID_usb_hcd_giveback_urb);
+
+	*__pos = 0;
+	{
+		if (*hcd_ptr) {
+			caller_unmarshal_kernel__usb_hcd_giveback_urb__hcd__in(__pos, __msg, __ext, ctx, *hcd_ptr);
+		}
+
+	}
+
+	{
+		if (*urb_ptr) {
+			caller_unmarshal_kernel__usb_hcd_giveback_urb__urb__in(__pos, __msg, __ext, ctx, *urb_ptr);
+		}
+
+	}
+
+	{
+	}
+
+	if (verbose_debug) {
+		printk("%s:%d, returned!\n", __func__, __LINE__);
+	}
+}
+
+unsigned int usb_hcd_irq(int irq, void* __hcd)
+{
+	struct fipc_message __buffer = {0};
+	struct fipc_message *__msg = &__buffer;
+	struct ext_registers* __ext = get_register_page(smp_processor_id());
+	size_t n_pos = 0;
+	size_t* __pos = &n_pos;
+
+	void** __hcd_ptr = &__hcd;
+	unsigned int ret = 0;
+	unsigned int* ret_ptr = &ret;
+	
+	__maybe_unused const struct usb_hcd_irq_call_ctx call_ctx = {irq, __hcd};
+	__maybe_unused const struct usb_hcd_irq_call_ctx *ctx = &call_ctx;
+
+	(void)__ext;
+
+	if (verbose_debug) {
+		printk("%s:%d, entered!\n", __func__, __LINE__);
+	}
+
+	{
+		__maybe_unused const void* __adjusted = *__hcd_ptr;
+		glue_pack_shadow(__pos, __msg, __ext, __adjusted);
+		if (*__hcd_ptr) {
+		}
+
+	}
+
+	glue_call_server(__pos, __msg, RPC_ID_usb_hcd_irq);
+
+	*__pos = 0;
+	{
+		(void)__hcd_ptr;
+	}
+
+	{
+		*ret_ptr = glue_unpack(__pos, __msg, __ext, unsigned int);
+	}
+
+	if (verbose_debug) {
+		printk("%s:%d, returned!\n", __func__, __LINE__);
+	}
+	return ret;
+}
+
+int usb_hcd_is_primary_hcd(struct usb_hcd* hcd)
+{
+	struct fipc_message __buffer = {0};
+	struct fipc_message *__msg = &__buffer;
+	struct ext_registers* __ext = get_register_page(smp_processor_id());
+	size_t n_pos = 0;
+	size_t* __pos = &n_pos;
+
+	struct usb_hcd** hcd_ptr = &hcd;
+	int ret = 0;
+	int* ret_ptr = &ret;
+	
+	__maybe_unused const struct usb_hcd_is_primary_hcd_call_ctx call_ctx = {hcd};
+	__maybe_unused const struct usb_hcd_is_primary_hcd_call_ctx *ctx = &call_ctx;
+
+	(void)__ext;
+
+	if (verbose_debug) {
+		printk("%s:%d, entered!\n", __func__, __LINE__);
+	}
+
+	{
+		__maybe_unused const void* __adjusted = *hcd_ptr;
+		glue_pack_shadow(__pos, __msg, __ext, __adjusted);
+		if (*hcd_ptr) {
+			caller_marshal_kernel__usb_hcd_is_primary_hcd__hcd__in(__pos, __msg, __ext, ctx, *hcd_ptr);
+		}
+
+	}
+
+	glue_call_server(__pos, __msg, RPC_ID_usb_hcd_is_primary_hcd);
+
+	*__pos = 0;
+	{
+		if (*hcd_ptr) {
+			caller_unmarshal_kernel__usb_hcd_is_primary_hcd__hcd__in(__pos, __msg, __ext, ctx, *hcd_ptr);
+		}
+
+	}
+
+	{
+		*ret_ptr = glue_unpack(__pos, __msg, __ext, int);
+	}
+
+	if (verbose_debug) {
+		printk("%s:%d, returned!\n", __func__, __LINE__);
+	}
+	return ret;
+}
+
+int usb_hcd_link_urb_to_ep(struct usb_hcd* hcd, struct urb* urb)
+{
+	struct fipc_message __buffer = {0};
+	struct fipc_message *__msg = &__buffer;
+	struct ext_registers* __ext = get_register_page(smp_processor_id());
+	size_t n_pos = 0;
+	size_t* __pos = &n_pos;
+
+	struct usb_hcd** hcd_ptr = &hcd;
+	struct urb** urb_ptr = &urb;
+	int ret = 0;
+	int* ret_ptr = &ret;
+	
+	__maybe_unused const struct usb_hcd_link_urb_to_ep_call_ctx call_ctx = {hcd, urb};
+	__maybe_unused const struct usb_hcd_link_urb_to_ep_call_ctx *ctx = &call_ctx;
+
+	(void)__ext;
+
+	if (verbose_debug) {
+		printk("%s:%d, entered!\n", __func__, __LINE__);
+	}
+
+	{
+		__maybe_unused const void* __adjusted = *hcd_ptr;
+		glue_pack_shadow(__pos, __msg, __ext, __adjusted);
+		if (*hcd_ptr) {
+			caller_marshal_kernel__usb_hcd_link_urb_to_ep__hcd__in(__pos, __msg, __ext, ctx, *hcd_ptr);
+		}
+
+	}
+
+	{
+		__maybe_unused const void* __adjusted = *urb_ptr;
+		glue_pack_shadow(__pos, __msg, __ext, __adjusted);
+		if (*urb_ptr) {
+			caller_marshal_kernel__usb_hcd_link_urb_to_ep__urb__in(__pos, __msg, __ext, ctx, *urb_ptr);
+		}
+
+	}
+
+	glue_call_server(__pos, __msg, RPC_ID_usb_hcd_link_urb_to_ep);
+
+	*__pos = 0;
+	{
+		if (*hcd_ptr) {
+			caller_unmarshal_kernel__usb_hcd_link_urb_to_ep__hcd__in(__pos, __msg, __ext, ctx, *hcd_ptr);
+		}
+
+	}
+
+	{
+		if (*urb_ptr) {
+			caller_unmarshal_kernel__usb_hcd_link_urb_to_ep__urb__in(__pos, __msg, __ext, ctx, *urb_ptr);
+		}
+
+	}
+
+	{
+		*ret_ptr = glue_unpack(__pos, __msg, __ext, int);
+	}
+
+	if (verbose_debug) {
+		printk("%s:%d, returned!\n", __func__, __LINE__);
+	}
+	return ret;
+}
+
+void usb_hcd_poll_rh_status(struct usb_hcd* hcd)
+{
+	struct fipc_message __buffer = {0};
+	struct fipc_message *__msg = &__buffer;
+	struct ext_registers* __ext = get_register_page(smp_processor_id());
+	size_t n_pos = 0;
+	size_t* __pos = &n_pos;
+
+	struct usb_hcd** hcd_ptr = &hcd;
+	
+	__maybe_unused const struct usb_hcd_poll_rh_status_call_ctx call_ctx = {hcd};
+	__maybe_unused const struct usb_hcd_poll_rh_status_call_ctx *ctx = &call_ctx;
+
+	(void)__ext;
+
+	if (verbose_debug) {
+		printk("%s:%d, entered!\n", __func__, __LINE__);
+	}
+
+	{
+		__maybe_unused const void* __adjusted = *hcd_ptr;
+		glue_pack_shadow(__pos, __msg, __ext, __adjusted);
+		if (*hcd_ptr) {
+			caller_marshal_kernel__usb_hcd_poll_rh_status__hcd__in(__pos, __msg, __ext, ctx, *hcd_ptr);
+		}
+
+	}
+
+	glue_call_server(__pos, __msg, RPC_ID_usb_hcd_poll_rh_status);
+
+	*__pos = 0;
+	{
+		if (*hcd_ptr) {
+			caller_unmarshal_kernel__usb_hcd_poll_rh_status__hcd__in(__pos, __msg, __ext, ctx, *hcd_ptr);
+		}
+
+	}
+
+	if (verbose_debug) {
+		printk("%s:%d, returned!\n", __func__, __LINE__);
+	}
+}
+
+void usb_hcd_unlink_urb_from_ep(struct usb_hcd* hcd, struct urb* urb)
+{
+	struct fipc_message __buffer = {0};
+	struct fipc_message *__msg = &__buffer;
+	struct ext_registers* __ext = get_register_page(smp_processor_id());
+	size_t n_pos = 0;
+	size_t* __pos = &n_pos;
+
+	struct urb** urb_ptr = &urb;
+	
+	__maybe_unused const struct usb_hcd_unlink_urb_from_ep_call_ctx call_ctx = {hcd, urb};
+	__maybe_unused const struct usb_hcd_unlink_urb_from_ep_call_ctx *ctx = &call_ctx;
+
+	(void)__ext;
+
+	if (verbose_debug) {
+		printk("%s:%d, entered!\n", __func__, __LINE__);
+	}
+
+	{
+		__maybe_unused const void* __adjusted = *urb_ptr;
+		glue_pack_shadow(__pos, __msg, __ext, __adjusted);
+		if (*urb_ptr) {
+			caller_marshal_kernel__usb_hcd_unlink_urb_from_ep__urb__in(__pos, __msg, __ext, ctx, *urb_ptr);
+		}
+
+	}
+
+	glue_call_server(__pos, __msg, RPC_ID_usb_hcd_unlink_urb_from_ep);
+
+	*__pos = 0;
+	{
+		if (*urb_ptr) {
+			caller_unmarshal_kernel__usb_hcd_unlink_urb_from_ep__urb__in(__pos, __msg, __ext, ctx, *urb_ptr);
+		}
+
+	}
+
+	if (verbose_debug) {
+		printk("%s:%d, returned!\n", __func__, __LINE__);
+	}
+}
+
+void usb_wakeup_notification(struct usb_device* hdev, unsigned int portnum)
+{
+	struct fipc_message __buffer = {0};
+	struct fipc_message *__msg = &__buffer;
+	struct ext_registers* __ext = get_register_page(smp_processor_id());
+	size_t n_pos = 0;
+	size_t* __pos = &n_pos;
+
+	struct usb_device** hdev_ptr = &hdev;
+	unsigned int* portnum_ptr = &portnum;
+	
+	__maybe_unused const struct usb_wakeup_notification_call_ctx call_ctx = {hdev, portnum};
+	__maybe_unused const struct usb_wakeup_notification_call_ctx *ctx = &call_ctx;
+
+	(void)__ext;
+
+	if (verbose_debug) {
+		printk("%s:%d, entered!\n", __func__, __LINE__);
+	}
+
+	{
+		__maybe_unused const void* __adjusted = *hdev_ptr;
+		glue_pack_shadow(__pos, __msg, __ext, __adjusted);
+		if (*hdev_ptr) {
+			caller_marshal_kernel__usb_wakeup_notification__hdev__in(__pos, __msg, __ext, ctx, *hdev_ptr);
+		}
+
+	}
+
+	{
+		glue_pack(__pos, __msg, __ext, *portnum_ptr);
+	}
+
+	glue_call_server(__pos, __msg, RPC_ID_usb_wakeup_notification);
+
+	*__pos = 0;
+	{
+		if (*hdev_ptr) {
+			caller_unmarshal_kernel__usb_wakeup_notification__hdev__in(__pos, __msg, __ext, ctx, *hdev_ptr);
+		}
+
+	}
+
+	{
+	}
+
+	if (verbose_debug) {
+		printk("%s:%d, returned!\n", __func__, __LINE__);
+	}
+}
+
 int try_dispatch(enum RPC_ID id, struct fipc_message* __msg, struct ext_registers* __ext)
 {
 	switch(id) {

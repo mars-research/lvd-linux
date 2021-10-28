@@ -139,6 +139,105 @@ rpc void usb_disable_xhci_ports(projection pci_dev *xhci_pdev) {
 	}
 }
 
+rpc string [alloc(callee)] * dmi_get_system_info(int field) {
+}
+
+rpc bool  usb_acpi_power_manageable( projection hdev* [in] hdev, int  index ) {
+	projection < struct usb_device > hdev {
+		int [in] maxchild;
+	}
+}
+rpc int  usb_acpi_set_power_state( projection hdev* [in] hdev, int  index, bool  enable ) {
+	projection < struct usb_device > hdev {
+		int [in] maxchild;
+	}
+}
+rpc int  usb_disabled(  ) {
+}
+rpc void  usb_hc_died( projection hcd* [in] hcd ) {
+		projection < struct usb_bus> usb_bus {
+			projection usb_bus_root_hub* root_hub;
+		}
+	projection < struct usb_hcd > hcd {
+		projection usb_bus self;
+		long unsigned int [in] flags;
+		unsigned int [in] rh_registered : 1;
+	}
+	projection < struct device > usb_bus_controller {
+	}
+	projection < struct usb_device > usb_bus_root_hub {
+	}
+}
+rpc int  usb_hcd_check_unlink_urb( projection hcd* [unused] hcd, projection urb* [in] urb, int  status ) {
+	projection < struct usb_hcd > hcd {
+	}
+	projection < struct urb > urb {
+		projection urb_ep* ep;
+	}
+	projection < struct usb_host_endpoint > urb_ep {
+	}
+}
+rpc void  usb_hcd_giveback_urb( projection hcd* [in] hcd, projection urb* [in] urb, int  status ) {
+	projection < struct usb_hcd > hcd {
+		projection usb_hcd_driver* driver;
+	}
+	projection < struct hc_driver > usb_hcd_driver {
+	}
+	projection < struct urb > urb {
+		void* [out] hcpriv;
+		projection urb_dev* dev;
+		unsigned int [in] transfer_flags;
+		unsigned int [in] transfer_buffer_length;
+		unsigned int [in] actual_length;
+	}
+	projection < struct usb_device > urb_dev {
+		projection usb_device_parent* parent;
+	}
+	projection < struct usb_device > usb_device_parent {
+	}
+}
+rpc unsigned int  usb_hcd_irq( int [unused] irq, void* [in] __hcd ) {
+}
+rpc int  usb_hcd_is_primary_hcd( projection hcd* [in] hcd ) {
+	projection < struct usb_hcd > hcd {
+		projection usb_hcd_primary_hcd* primary_hcd;
+	}
+	projection < struct usb_hcd > usb_hcd_primary_hcd {
+	}
+}
+rpc int  usb_hcd_link_urb_to_ep( projection hcd* [in] hcd, projection urb* [in] urb ) {
+	projection < struct usb_hcd > hcd {
+		long unsigned int [in] flags;
+	}
+	projection < struct urb > urb {
+		projection urb_dev* dev;
+		projection urb_ep* ep;
+	}
+	projection < struct usb_device > urb_dev {
+	}
+	projection < struct usb_host_endpoint > urb_ep {
+	}
+}
+rpc void  usb_hcd_poll_rh_status( projection hcd* [in] hcd ) {
+	projection < struct usb_hcd > hcd {
+		projection usb_hcd_driver* driver;
+		long unsigned int [in] flags;
+	}
+	projection < struct hc_driver > usb_hcd_driver {
+	}
+}
+rpc void  usb_hcd_unlink_urb_from_ep( projection hcd* [unused] hcd, projection urb* [in] urb ) {
+	projection < struct usb_hcd > hcd {
+	}
+	projection < struct urb > urb {
+	}
+}
+rpc void  usb_wakeup_notification( projection hdev* [in] hdev, unsigned int  portnum ) {
+	projection < struct usb_device > hdev {
+		int [in] maxchild;
+	}
+}
+
 /*
 	global projection < struct array< kmem_cache, 0> > array< kmem_cache, 0> {
 	}

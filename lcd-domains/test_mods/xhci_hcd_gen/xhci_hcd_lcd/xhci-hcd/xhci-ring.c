@@ -78,6 +78,8 @@
 #include "xhci-mtk.h"
 #endif
 
+#include "xhci-stub.h"
+
 #ifdef LCD_ISOLATE
 #include <lcd_config/post_hook.h>
 #endif

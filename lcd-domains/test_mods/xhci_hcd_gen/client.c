@@ -4,6 +4,9 @@
 
 #include <lcd_config/post_hook.h>
 
+unsigned long loops_per_jiffy;
+unsigned long volatile jiffies;
+
 void add_timer(struct timer_list* timer)
 {
 	struct fipc_message __buffer = {0};
@@ -1902,11 +1905,84 @@ void usb_wakeup_notification(struct usb_device* hdev, unsigned int portnum)
 	}
 }
 
+unsigned long get_loops_per_jiffy(void)
+{
+	struct fipc_message __buffer = {0};
+	struct fipc_message *msg = &__buffer;
+	struct ext_registers* ext = get_register_page(smp_processor_id());
+	size_t n_pos = 0;
+	size_t* __pos = &n_pos;
+
+	unsigned long ret = 0;
+	unsigned long* ret_ptr = &ret;
+	
+	__maybe_unused const struct get_loops_per_jiffy_call_ctx call_ctx = {};
+	__maybe_unused const struct get_loops_per_jiffy_call_ctx *ctx = &call_ctx;
+
+	(void)ext;
+
+	if (verbose_debug) {
+		printk("%s:%d, entered!\n", __func__, __LINE__);
+	}
+
+	glue_call_server(__pos, msg, RPC_ID_get_loops_per_jiffy);
+
+	*__pos = 0;
+	{
+		*ret_ptr = glue_unpack(__pos, msg, ext, unsigned long);
+	}
+
+	if (verbose_debug) {
+		printk("%s:%d, returned!\n", __func__, __LINE__);
+	}
+	return ret;
+}
+
+unsigned long get_jiffies(void)
+{
+	struct fipc_message __buffer = {0};
+	struct fipc_message *__msg = &__buffer;
+	struct ext_registers* __ext = get_register_page(smp_processor_id());
+	size_t n_pos = 0;
+	size_t* __pos = &n_pos;
+
+	unsigned long ret = 0;
+	unsigned long* ret_ptr = &ret;
+	
+	__maybe_unused const struct get_jiffies_call_ctx call_ctx = {};
+	__maybe_unused const struct get_jiffies_call_ctx *ctx = &call_ctx;
+
+	(void)__ext;
+
+	if (verbose_debug) {
+		printk("%s:%d, entered!\n", __func__, __LINE__);
+	}
+
+	glue_call_server(__pos, __msg, RPC_ID_get_jiffies);
+
+	*__pos = 0;
+	{
+		*ret_ptr = glue_unpack(__pos, __msg, __ext, unsigned long);
+	}
+
+	if (verbose_debug) {
+		printk("%s:%d, returned!\n", __func__, __LINE__);
+	}
+	return ret;
+}
+
+void __init_globals(void) {
+
+	loops_per_jiffy = get_loops_per_jiffy();
+	jiffies = get_jiffies();
+}
+
 int try_dispatch(enum RPC_ID id, struct fipc_message* __msg, struct ext_registers* __ext)
 {
 	switch(id) {
 	case MODULE_INIT:
 		glue_user_trace("MODULE_INIT");
+		__init_globals();
 		__module_lcd_init();
 		shared_mem_init();
 		break;

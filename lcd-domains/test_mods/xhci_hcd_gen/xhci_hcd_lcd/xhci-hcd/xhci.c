@@ -53,12 +53,16 @@ void usb_disable_xhci_ports(struct pci_dev *xhci_pdev);
 
 /* Some 0.95 hardware can't handle the chain bit on a Link TRB being cleared */
 static int link_quirk;
+#ifndef LCD_ISOLATE
 module_param(link_quirk, int, S_IRUGO | S_IWUSR);
 MODULE_PARM_DESC(link_quirk, "Don't clear the chain bit on a link TRB");
+#endif
 
 static unsigned int quirks;
+#ifndef LCD_ISOLATE
 module_param(quirks, uint, S_IRUGO);
 MODULE_PARM_DESC(quirks, "Bit flags for quirks to be enabled as default");
+#endif
 
 /* TODO: copied from ehci-hcd.c - can this be refactored? */
 /*
@@ -1223,11 +1227,11 @@ static int xhci_check_args(struct usb_hcd *hcd, struct usb_device *udev,
 	struct xhci_virt_device	*virt_dev;
 
 	if (!hcd || (check_ep && !ep) || !udev) {
-		pr_debug("xHCI %s called with invalid args\n", func);
+		LIBLCD_MSG("xHCI %s called with invalid args\n", func);
 		return -EINVAL;
 	}
 	if (!udev->parent) {
-		pr_debug("xHCI %s called for root hub\n", func);
+		LIBLCD_MSG("xHCI %s called for root hub\n", func);
 		return 0;
 	}
 
@@ -5065,6 +5069,7 @@ int
 #endif
 xhci_hcd_init(void)
 {
+	printk("%s: #1\n", __func__);
 	/*
 	 * Check the compiler generated sizes of structures that must be laid
 	 * out in specific ways for hardware access.
@@ -5083,9 +5088,11 @@ xhci_hcd_init(void)
 	/* xhci_run_regs has eight fields and embeds 128 xhci_intr_regs */
 	BUILD_BUG_ON(sizeof(struct xhci_run_regs) != (8+8*128)*32/8);
 
+	printk("%s: #2\n", __func__);
 	if (usb_disabled())
 		return -ENODEV;
 
+	printk("%s: #3\n", __func__);
 	return 0;
 }
 

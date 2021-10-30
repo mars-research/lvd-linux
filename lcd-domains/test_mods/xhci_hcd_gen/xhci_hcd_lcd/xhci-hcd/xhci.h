@@ -1,3 +1,6 @@
+#ifndef XHCI_LCD_H
+#define XHCI_LCD_H
+
 #include "../../xhci.h"
 
 
@@ -21,3 +24,5 @@
 #define xhci_print_registers(...)	do { } while(0)
 #define xhci_print_run_regs(...)	do { } while(0)
 #define xhci_get_slot_state(...)	"none"
+
+#endif

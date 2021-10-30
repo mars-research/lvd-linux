@@ -215,9 +215,11 @@ static int xhci_insert_segment_mapping(struct radix_tree_root *trb_address_map,
 	if (radix_tree_lookup(trb_address_map, key))
 		return 0;
 
+#ifdef CONFIG_RADIX_TREE_PRELOAD
 	ret = radix_tree_maybe_preload(mem_flags);
 	if (ret)
 		return ret;
+#endif
 	ret = radix_tree_insert(trb_address_map,
 			key, ring);
 	radix_tree_preload_end();

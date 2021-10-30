@@ -185,6 +185,8 @@ enum RPC_ID {
 	RPC_ID_usb_hcd_poll_rh_status,
 	RPC_ID_usb_hcd_unlink_urb_from_ep,
 	RPC_ID_usb_wakeup_notification,
+	RPC_ID_get_loops_per_jiffy,
+	RPC_ID_get_jiffies,
 };
 
 int try_dispatch(enum RPC_ID id, struct fipc_message* __msg, struct ext_registers* __ext);
@@ -378,6 +380,13 @@ struct usb_wakeup_notification_call_ctx {
 	struct usb_device* hdev;
 	unsigned int portnum;
 };
+
+struct get_loops_per_jiffy_call_ctx {
+};
+
+struct get_jiffies_call_ctx {
+};
+
 
 void caller_marshal_kernel__add_timer__timer__in(
 	size_t* __pos,

@@ -52,7 +52,7 @@ static int boot_main(void)
 
 	/* ---------- RUN! ---------- */
 
-	LIBLCD_MSG("starting Block...");
+	LIBLCD_MSG("starting USB KLCD...");
 
 	/* run KLCD init */
 	ret = lcd_run(usb_klcd);
@@ -61,7 +61,7 @@ static int boot_main(void)
 		goto fail8;
 	}
 
-	LIBLCD_MSG("starting xhci_hcd block...");
+	LIBLCD_MSG("starting xhci_hcd LCD...");
 
 	ret = lcd_run(xhci_hcd_lcd);
 	if (ret) {

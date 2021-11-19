@@ -117,15 +117,16 @@ rpc_ptr void get_quirks(projection device *dev, projection xhci_hcd *xhci_hcd) {
 	projection < struct xhci_hcd > xhci_hcd {
 	}
 }
+
 rpc_export int  xhci_gen_setup( projection hcd* [in] hcd, rpc_ptr  get_quirks get_quirks ) {
 	projection < struct usb_hcd > hcd {
 		int [out] speed;
 	}
 }
-rpc_export void  xhci_init_driver( projection drv* [in] drv, projection over* [in] over ) {
-	projection < struct hc_driver > drv {
+rpc_export void  xhci_init_driver( projection _global_hc_driver [alloc(callee), out] * drv, projection over* [in] over ) {
+	/*projection < struct hc_driver > drv {
 		long unsigned int [in, out] hcd_priv_size;
-	}
+	}*/
 	projection < struct xhci_driver_overrides > over {
 	}
 }
@@ -237,6 +238,402 @@ rpc void  usb_wakeup_notification( projection hdev* [in] hdev, unsigned int  por
 		int [in] maxchild;
 	}
 }
+
+rpc_ptr int  hc_driver_start( projection hcd* [in] hcd ) {
+	projection < struct usb_hcd > hcd {
+		projection usb_hcd_primary_hcd* primary_hcd;
+
+	}
+	projection < struct usb_hcd > usb_hcd_primary_hcd {
+	}
+}
+rpc_ptr int  hc_driver_enable_device( projection hcd* hcd, projection udev [alloc_stack(callee)] *udev ) {
+	projection < struct usb_hcd > hcd {
+		projection usb_hcd_primary_hcd* primary_hcd;
+
+	}
+	projection < struct usb_hcd > usb_hcd_primary_hcd {
+		projection usb_hcd_primary_hcd* primary_hcd;
+
+	}
+	projection < struct usb_hcd > usb_hcd_primary_hcd {
+	}
+	projection < struct usb_device > udev {
+	}
+}
+
+rpc_ptr int  hc_driver_update_hub_device( projection hcd* [in] hcd, projection hdev* [in] hdev, projection tt* [in] tt, unsigned int  mem_flags ) {
+	projection < struct usb_hcd > hcd {
+		projection usb_hcd_primary_hcd* primary_hcd;
+
+	}
+	projection < struct usb_hcd > usb_hcd_primary_hcd {
+		projection usb_hcd_primary_hcd* primary_hcd;
+
+	}
+	projection < struct usb_hcd > usb_hcd_primary_hcd {
+	}
+	projection < struct usb_device > hdev {
+		int [in] slot_id;
+	}
+	projection < struct usb_tt > tt {
+	}
+}
+rpc_ptr int  hc_driver_reset_device( projection hcd* [in] hcd, projection udev* [in] udev ) {
+	projection < struct usb_hcd > hcd {
+		projection usb_hcd_primary_hcd* primary_hcd;
+
+	}
+	projection < struct usb_hcd > usb_hcd_primary_hcd {
+		projection usb_hcd_primary_hcd* primary_hcd;
+
+	}
+	projection < struct usb_hcd > usb_hcd_primary_hcd {
+	}
+	projection < struct usb_device > udev {
+		int [in] slot_id;
+	}
+}
+rpc_ptr int  hc_driver_update_device( projection hcd* [in] hcd, projection udev* [unused] udev ) {
+	projection < struct usb_hcd > hcd {
+	}
+	projection < struct usb_device > udev {
+	}
+}
+rpc_ptr int  hc_driver_set_usb2_hw_lpm( projection hcd* [in] hcd, projection udev* [unused] udev, int [unused] enable ) {
+	projection < struct usb_hcd > hcd {
+	}
+	projection < struct usb_device > udev {
+	}
+}
+rpc_ptr int  hc_driver_enable_usb3_lpm_timeout( projection hcd* [in] hcd, projection udev* [unused] udev, unsigned int [unused] state ) {
+	projection < struct usb_hcd > hcd {
+	}
+	projection < struct usb_device > udev {
+	}
+}
+rpc_ptr int  hc_driver_disable_usb3_lpm_timeout( projection hcd* [in] hcd, projection udev* [unused] udev, unsigned int [unused] state ) {
+	projection < struct usb_hcd > hcd {
+	}
+	projection < struct usb_device > udev {
+	}
+}
+rpc_ptr int  hc_driver_find_raw_port_number( projection hcd* [in] hcd, int  port1 ) {
+	projection < struct usb_hcd > hcd {
+		int [in] speed;
+		projection usb_hcd_primary_hcd* primary_hcd;
+
+	}
+	projection < struct usb_hcd > usb_hcd_primary_hcd {
+		projection usb_hcd_primary_hcd* primary_hcd;
+
+	}
+	projection < struct usb_hcd > usb_hcd_primary_hcd {
+	}
+}
+rpc_ptr void  hc_driver_stop( projection hcd* [in] hcd ) {
+	projection < struct usb_hcd > hcd {
+		projection usb_hcd_primary_hcd* primary_hcd;
+
+	}
+	projection < struct usb_hcd > usb_hcd_primary_hcd {
+		projection usb_hcd_primary_hcd* primary_hcd;
+
+	}
+	projection < struct usb_hcd > usb_hcd_primary_hcd {
+	}
+}
+rpc_ptr void  hc_driver_shutdown( projection hcd* [in] hcd ) {
+	projection < struct usb_hcd > hcd {
+		projection usb_hcd_primary_hcd* primary_hcd;
+
+	}
+	projection < struct usb_hcd > usb_hcd_primary_hcd {
+		projection usb_hcd_primary_hcd* primary_hcd;
+
+	}
+	projection < struct usb_hcd > usb_hcd_primary_hcd {
+	}
+}
+rpc_ptr int  hc_driver_get_frame_number( projection hcd* [in] hcd ) {
+	projection < struct usb_hcd > hcd {
+		projection usb_hcd_primary_hcd* primary_hcd;
+
+	}
+	projection < struct usb_hcd > usb_hcd_primary_hcd {
+		projection usb_hcd_primary_hcd* primary_hcd;
+
+	}
+	projection < struct usb_hcd > usb_hcd_primary_hcd {
+	}
+}
+rpc_ptr int  hc_driver_urb_enqueue( projection hcd* [in] hcd, projection urb* [in] urb, unsigned int  mem_flags ) {
+	projection < struct usb_hcd > hcd {
+		projection usb_hcd_primary_hcd* primary_hcd;
+
+	}
+	projection < struct usb_hcd > usb_hcd_primary_hcd {
+		projection usb_hcd_primary_hcd* primary_hcd;
+
+	}
+	projection < struct usb_hcd > usb_hcd_primary_hcd {
+	}
+	projection < struct urb > urb {
+		projection urb_dev* dev;
+		projection urb_ep* ep;
+	}
+	projection < struct usb_device > urb_dev {
+		int [in] slot_id;
+	}
+		projection < struct usb_endpoint_descriptor> usb_endpoint_descriptor {
+			unsigned char [in] bEndpointAddress;
+		}
+	projection < struct usb_host_endpoint > urb_ep {
+		projection usb_endpoint_descriptor desc;
+	}
+}
+rpc_ptr int  hc_driver_urb_dequeue( projection hcd* [in] hcd, projection urb* [in] urb, int  status ) {
+	projection < struct usb_hcd > hcd {
+		projection usb_hcd_primary_hcd* primary_hcd;
+
+	}
+	projection < struct usb_hcd > usb_hcd_primary_hcd {
+		projection usb_hcd_primary_hcd* primary_hcd;
+
+	}
+	projection < struct usb_hcd > usb_hcd_primary_hcd {
+	}
+	projection < struct urb > urb {
+		projection urb_dev* dev;
+		projection urb_ep* ep;
+	}
+	projection < struct usb_device > urb_dev {
+		int [in] slot_id;
+	}
+		projection < struct usb_endpoint_descriptor> usb_endpoint_descriptor {
+			unsigned char [in] bEndpointAddress;
+		}
+	projection < struct usb_host_endpoint > urb_ep {
+		projection usb_endpoint_descriptor desc;
+	}
+}
+rpc_ptr void  hc_driver_endpoint_reset( projection hcd* [in] hcd, projection ep* [in] ep ) {
+	projection < struct usb_hcd > hcd {
+		projection usb_hcd_primary_hcd* primary_hcd;
+
+	}
+	projection < struct usb_hcd > usb_hcd_primary_hcd {
+		projection usb_hcd_primary_hcd* primary_hcd;
+
+	}
+	projection < struct usb_hcd > usb_hcd_primary_hcd {
+	}
+		projection < struct usb_endpoint_descriptor> usb_endpoint_descriptor {
+			unsigned char [in] bEndpointAddress;
+		}
+	projection < struct usb_host_endpoint > ep {
+		projection usb_endpoint_descriptor desc;
+	}
+}
+rpc_ptr int  hc_driver_alloc_dev( projection hcd* [in] hcd, projection udev [alloc_stack(callee)] *udev ) {
+	projection < struct usb_hcd > hcd {
+		projection usb_hcd_primary_hcd* primary_hcd;
+
+	}
+	projection < struct usb_hcd > usb_hcd_primary_hcd {
+		projection usb_hcd_primary_hcd* primary_hcd;
+
+	}
+	projection < struct usb_hcd > usb_hcd_primary_hcd {
+	}
+	projection < struct usb_device > udev {
+		int [in, out] slot_id;
+	}
+}
+rpc_ptr void  hc_driver_free_dev( projection hcd* hcd, projection udev [alloc_stack (callee)] *udev ) {
+	projection < struct usb_hcd > hcd {
+		projection usb_hcd_primary_hcd* primary_hcd;
+
+	}
+	projection < struct usb_hcd > usb_hcd_primary_hcd {
+		projection usb_hcd_primary_hcd* primary_hcd;
+
+	}
+	projection < struct usb_hcd > usb_hcd_primary_hcd {
+	}
+	projection < struct usb_device > udev {
+		int [in] slot_id;
+	}
+}
+rpc_ptr int  hc_driver_alloc_streams( projection hcd* hcd, projection udev [alloc_stack(callee)] *udev, projection eps [alloc(callee)] * [alloc(callee)] *eps, unsigned int  num_eps, unsigned int  num_streams, unsigned int  mem_flags ) {
+	projection < struct usb_hcd > hcd {
+		projection usb_hcd_primary_hcd* primary_hcd;
+
+	}
+	projection < struct usb_hcd > usb_hcd_primary_hcd {
+		projection usb_hcd_primary_hcd* primary_hcd;
+
+	}
+	projection < struct usb_hcd > usb_hcd_primary_hcd {
+	}
+	projection < struct usb_device > udev {
+		int [in] slot_id;
+	}
+	projection < struct usb_host_endpoint > eps {
+	}
+}
+rpc_ptr int  hc_driver_free_streams( projection hcd* [in] hcd, projection udev [alloc_stack(callee)] *udev, projection eps** eps, unsigned int  num_eps, unsigned int [unused] mem_flags ) {
+	projection < struct usb_hcd > hcd {
+		projection usb_hcd_primary_hcd* primary_hcd;
+
+	}
+	projection < struct usb_hcd > usb_hcd_primary_hcd {
+		projection usb_hcd_primary_hcd* primary_hcd;
+
+	}
+	projection < struct usb_hcd > usb_hcd_primary_hcd {
+	}
+	projection < struct usb_device > udev {
+		int [in] slot_id;
+	}
+	projection < struct usb_host_endpoint > eps {
+	}
+}
+rpc_ptr int  hc_driver_add_endpoint( projection hcd*  hcd, projection udev*  udev, projection ep* [in] ep ) {
+	projection < struct usb_hcd > hcd {
+		projection usb_hcd_primary_hcd* primary_hcd;
+
+	}
+	projection < struct usb_hcd > usb_hcd_primary_hcd {
+		projection usb_hcd_primary_hcd* primary_hcd;
+
+	}
+	projection < struct usb_hcd > usb_hcd_primary_hcd {
+	}
+	projection < struct usb_device > udev {
+		int [in] slot_id;
+	}
+		projection < struct usb_endpoint_descriptor> usb_endpoint_descriptor {
+			unsigned char [in] bEndpointAddress;
+		}
+	projection < struct usb_host_endpoint > ep {
+		projection usb_endpoint_descriptor desc;
+	}
+}
+rpc_ptr int  hc_driver_drop_endpoint( projection hcd* [in] hcd, projection udev [alloc_stack(callee)] * udev, projection ep [alloc(callee)] * ep ) {
+	projection < struct usb_hcd > hcd {
+		projection usb_hcd_primary_hcd* primary_hcd;
+
+	}
+	projection < struct usb_hcd > usb_hcd_primary_hcd {
+		projection usb_hcd_primary_hcd* primary_hcd;
+
+	}
+	projection < struct usb_hcd > usb_hcd_primary_hcd {
+	}
+	projection < struct usb_device > udev {
+		int [in] slot_id;
+	}
+		projection < struct usb_endpoint_descriptor> usb_endpoint_descriptor {
+			unsigned char [in] bEndpointAddress;
+		}
+	projection < struct usb_host_endpoint > ep {
+		projection usb_endpoint_descriptor desc;
+	}
+}
+rpc_ptr int  hc_driver_check_bandwidth( projection hcd* [in] hcd, projection udev [alloc_stack(callee)]  *udev ) {
+	projection < struct usb_hcd > hcd {
+		projection usb_hcd_primary_hcd* primary_hcd;
+
+	}
+	projection < struct usb_hcd > usb_hcd_primary_hcd {
+		projection usb_hcd_primary_hcd* primary_hcd;
+
+	}
+	projection < struct usb_hcd > usb_hcd_primary_hcd {
+	}
+	projection < struct usb_device > udev {
+		int [in] slot_id;
+	}
+}
+rpc_ptr void  hc_driver_reset_bandwidth( projection hcd*  hcd, projection udev [alloc_stack(callee)] *udev ) {
+	projection < struct usb_hcd > hcd {
+		projection usb_hcd_primary_hcd* primary_hcd;
+
+	}
+	projection < struct usb_hcd > usb_hcd_primary_hcd {
+		projection usb_hcd_primary_hcd* primary_hcd;
+
+	}
+	projection < struct usb_hcd > usb_hcd_primary_hcd {
+	}
+	projection < struct usb_device > udev {
+		int [in] slot_id;
+	}
+}
+rpc_ptr int  hc_driver_address_device( projection hcd* hcd, projection udev [alloc_stack(callee)] *udev ) {
+	projection < struct usb_hcd > hcd {
+		projection usb_hcd_primary_hcd* primary_hcd;
+
+	}
+	projection < struct usb_hcd > usb_hcd_primary_hcd {
+		projection usb_hcd_primary_hcd* primary_hcd;
+
+	}
+	projection < struct usb_hcd > usb_hcd_primary_hcd {
+	}
+	projection < struct usb_device > udev {
+	}
+}
+rpc_ptr int  hc_driver_hub_status_data( projection hcd* hcd, char [alloc_stack(callee)]  *buf ) {
+	projection < struct usb_hcd > hcd {
+		int [in] speed;
+	}
+}
+rpc_ptr unsigned int  hc_driver_irq( projection hcd* [in] hcd ) {
+	projection < struct usb_hcd > hcd {
+	}
+}
+rpc_ptr int  hc_driver_hub_control( projection hcd* hcd, unsigned short  typeReq, unsigned short  wValue, unsigned short  wIndex, char [in, out, alloc_stack(callee)] *buf, unsigned short  wLength ) {
+	projection < struct usb_hcd > hcd {
+		int [in] speed;
+	}
+}
+
+projection < struct hc_driver > _global_hc_driver {
+	char* [in] description;
+	char* [in] product_desc;
+	int [in] flags;
+	long unsigned int [out] hcd_priv_size;
+	rpc_ptr hc_driver_add_endpoint add_endpoint;
+	rpc_ptr hc_driver_address_device address_device;
+	rpc_ptr hc_driver_alloc_dev alloc_dev;
+	rpc_ptr hc_driver_alloc_streams alloc_streams;
+	rpc_ptr hc_driver_check_bandwidth check_bandwidth;
+	rpc_ptr hc_driver_disable_usb3_lpm_timeout disable_usb3_lpm_timeout;
+	rpc_ptr hc_driver_drop_endpoint drop_endpoint;
+	rpc_ptr hc_driver_enable_device enable_device;
+	rpc_ptr hc_driver_enable_usb3_lpm_timeout enable_usb3_lpm_timeout;
+	rpc_ptr hc_driver_endpoint_reset endpoint_reset;
+	rpc_ptr hc_driver_find_raw_port_number find_raw_port_number;
+	rpc_ptr hc_driver_free_dev free_dev;
+	rpc_ptr hc_driver_free_streams free_streams;
+	rpc_ptr hc_driver_get_frame_number get_frame_number;
+	rpc_ptr hc_driver_hub_control hub_control;
+	rpc_ptr hc_driver_hub_status_data hub_status_data;
+	rpc_ptr hc_driver_irq irq;
+	rpc_ptr hc_driver_reset_bandwidth reset_bandwidth;
+	rpc_ptr hc_driver_reset_device reset_device;
+	rpc_ptr hc_driver_set_usb2_hw_lpm set_usb2_hw_lpm;
+	rpc_ptr hc_driver_shutdown shutdown;
+	rpc_ptr hc_driver_start start;
+	rpc_ptr hc_driver_stop stop;
+	rpc_ptr hc_driver_update_device update_device;
+	rpc_ptr hc_driver_update_hub_device update_hub_device;
+	rpc_ptr hc_driver_urb_dequeue urb_dequeue;
+	rpc_ptr hc_driver_urb_enqueue urb_enqueue;
+}
+
 
 /*
 	global projection < struct array< kmem_cache, 0> > array< kmem_cache, 0> {

@@ -4,9 +4,6 @@
 
 #include <lcd_config/post_hook.h>
 
-unsigned long loops_per_jiffy;
-unsigned long volatile jiffies;
-
 void add_timer(struct timer_list* timer)
 {
 	struct fipc_message __buffer = {0};
@@ -241,7 +238,7 @@ void free_irq(unsigned int irq, void* dev_id)
 	}
 }
 
-void init_timer_key(struct timer_list* timer, unsigned int flags, const char* name, struct lock_class_key* key)
+void init_timer_key(struct timer_list* timer, unsigned int flags, char* name, struct lock_class_key* key)
 {
 	struct fipc_message __buffer = {0};
 	struct fipc_message *__msg = &__buffer;
@@ -777,7 +774,7 @@ void handler_callee(struct fipc_message* __msg, struct ext_registers* __ext)
 	}
 }
 
-int request_threaded_irq(unsigned int irq, fptr_handler handler, fptr_thread_fn thread_fn, unsigned long irqflags, const char* devname, void* dev_id)
+int request_threaded_irq(unsigned int irq, fptr_handler handler, fptr_thread_fn thread_fn, unsigned long irqflags, char* devname, void* dev_id)
 {
 	struct fipc_message __buffer = {0};
 	struct fipc_message *__msg = &__buffer;
@@ -1099,9 +1096,10 @@ void xhci_init_driver_callee(struct fipc_message* __msg, struct ext_registers* _
 	}
 
 	{
-		*drv_ptr = glue_unpack(__pos, __msg, __ext, struct hc_driver*);
+		size_t __size = sizeof(struct hc_driver);
+		*drv_ptr = glue_unpack_new_shadow(__pos, __msg, __ext, struct hc_driver*, (__size), (DEFAULT_GFP_FLAGS));
 		if (*drv_ptr) {
-			callee_unmarshal_kernel__xhci_init_driver__drv__in(__pos, __msg, __ext, ctx, *drv_ptr);
+			callee_unmarshal_kernel___global_hc_driver__out(__pos, __msg, __ext, *drv_ptr);
 		}
 
 	}
@@ -1119,7 +1117,7 @@ void xhci_init_driver_callee(struct fipc_message* __msg, struct ext_registers* _
 	*__pos = 0;
 	{
 		if (*drv_ptr) {
-			callee_marshal_kernel__xhci_init_driver__drv__in(__pos, __msg, __ext, ctx, *drv_ptr);
+			callee_marshal_kernel___global_hc_driver__out(__pos, __msg, __ext, *drv_ptr);
 		}
 
 	}
@@ -1905,76 +1903,1720 @@ void usb_wakeup_notification(struct usb_device* hdev, unsigned int portnum)
 	}
 }
 
-unsigned long get_loops_per_jiffy(void)
+void hc_driver_start_callee(struct fipc_message* __msg, struct ext_registers* __ext)
 {
-	struct fipc_message __buffer = {0};
-	struct fipc_message *msg = &__buffer;
-	struct ext_registers* ext = get_register_page(smp_processor_id());
 	size_t n_pos = 0;
 	size_t* __pos = &n_pos;
 
-	unsigned long ret = 0;
-	unsigned long* ret_ptr = &ret;
+	fptr_hc_driver_start function_ptr = glue_unpack(__pos, __msg, __ext, fptr_hc_driver_start);
+	struct usb_hcd* hcd = 0;
+	struct usb_hcd** hcd_ptr = &hcd;
+	int ret = 0;
+	int* ret_ptr = &ret;
 	
-	__maybe_unused const struct get_loops_per_jiffy_call_ctx call_ctx = {};
-	__maybe_unused const struct get_loops_per_jiffy_call_ctx *ctx = &call_ctx;
-
-	(void)ext;
+	__maybe_unused struct hc_driver_start_call_ctx call_ctx = {hcd};
+	__maybe_unused struct hc_driver_start_call_ctx *ctx = &call_ctx;
 
 	if (verbose_debug) {
 		printk("%s:%d, entered!\n", __func__, __LINE__);
 	}
 
-	glue_call_server(__pos, msg, RPC_ID_get_loops_per_jiffy);
+	{
+		*hcd_ptr = glue_unpack(__pos, __msg, __ext, struct usb_hcd*);
+		if (*hcd_ptr) {
+			callee_unmarshal_kernel__hc_driver_start__hcd__in(__pos, __msg, __ext, ctx, *hcd_ptr);
+		}
+
+	}
+
+	ret = function_ptr(hcd);
 
 	*__pos = 0;
 	{
-		*ret_ptr = glue_unpack(__pos, msg, ext, unsigned long);
+		if (*hcd_ptr) {
+			callee_marshal_kernel__hc_driver_start__hcd__in(__pos, __msg, __ext, ctx, *hcd_ptr);
+		}
+
 	}
 
+	{
+		glue_pack(__pos, __msg, __ext, *ret_ptr);
+	}
+
+	__msg->regs[0] = *__pos;
 	if (verbose_debug) {
 		printk("%s:%d, returned!\n", __func__, __LINE__);
 	}
-	return ret;
 }
 
-unsigned long get_jiffies(void)
+void hc_driver_enable_device_callee(struct fipc_message* __msg, struct ext_registers* __ext)
 {
-	struct fipc_message __buffer = {0};
-	struct fipc_message *__msg = &__buffer;
-	struct ext_registers* __ext = get_register_page(smp_processor_id());
 	size_t n_pos = 0;
 	size_t* __pos = &n_pos;
 
-	unsigned long ret = 0;
-	unsigned long* ret_ptr = &ret;
+	fptr_hc_driver_enable_device function_ptr = glue_unpack(__pos, __msg, __ext, fptr_hc_driver_enable_device);
+	struct usb_hcd* hcd = 0;
+	struct usb_hcd** hcd_ptr = &hcd;
+	struct usb_device __udev;
+	struct usb_device* udev = &__udev;
+	struct usb_device** udev_ptr = &udev;
+	int ret = 0;
+	int* ret_ptr = &ret;
 	
-	__maybe_unused const struct get_jiffies_call_ctx call_ctx = {};
-	__maybe_unused const struct get_jiffies_call_ctx *ctx = &call_ctx;
-
-	(void)__ext;
+	__maybe_unused struct hc_driver_enable_device_call_ctx call_ctx = {hcd, udev};
+	__maybe_unused struct hc_driver_enable_device_call_ctx *ctx = &call_ctx;
 
 	if (verbose_debug) {
 		printk("%s:%d, entered!\n", __func__, __LINE__);
 	}
 
-	glue_call_server(__pos, __msg, RPC_ID_get_jiffies);
+	{
+		*hcd_ptr = glue_unpack(__pos, __msg, __ext, struct usb_hcd*);
+		if (*hcd_ptr) {
+			callee_unmarshal_kernel__hc_driver_enable_device__hcd__in(__pos, __msg, __ext, ctx, *hcd_ptr);
+		}
+
+	}
+
+	{
+		if (*udev_ptr) {
+			callee_unmarshal_kernel__hc_driver_enable_device__udev__in(__pos, __msg, __ext, ctx, *udev_ptr);
+		}
+
+	}
+
+	ret = function_ptr(hcd, udev);
 
 	*__pos = 0;
 	{
-		*ret_ptr = glue_unpack(__pos, __msg, __ext, unsigned long);
+		if (*hcd_ptr) {
+			callee_marshal_kernel__hc_driver_enable_device__hcd__in(__pos, __msg, __ext, ctx, *hcd_ptr);
+		}
+
 	}
 
+	{
+		if (*udev_ptr) {
+			callee_marshal_kernel__hc_driver_enable_device__udev__in(__pos, __msg, __ext, ctx, *udev_ptr);
+		}
+
+	}
+
+	{
+		glue_pack(__pos, __msg, __ext, *ret_ptr);
+	}
+
+	__msg->regs[0] = *__pos;
 	if (verbose_debug) {
 		printk("%s:%d, returned!\n", __func__, __LINE__);
 	}
-	return ret;
 }
 
-void __init_globals(void) {
+void hc_driver_update_hub_device_callee(struct fipc_message* __msg, struct ext_registers* __ext)
+{
+	size_t n_pos = 0;
+	size_t* __pos = &n_pos;
 
-	loops_per_jiffy = get_loops_per_jiffy();
-	jiffies = get_jiffies();
+	fptr_hc_driver_update_hub_device function_ptr = glue_unpack(__pos, __msg, __ext, fptr_hc_driver_update_hub_device);
+	struct usb_hcd* hcd = 0;
+	struct usb_device* hdev = 0;
+	struct usb_tt* tt = 0;
+	unsigned int mem_flags = 0;
+	struct usb_hcd** hcd_ptr = &hcd;
+	struct usb_device** hdev_ptr = &hdev;
+	struct usb_tt** tt_ptr = &tt;
+	unsigned int* mem_flags_ptr = &mem_flags;
+	int ret = 0;
+	int* ret_ptr = &ret;
+	
+	__maybe_unused struct hc_driver_update_hub_device_call_ctx call_ctx = {hcd, hdev, tt, mem_flags};
+	__maybe_unused struct hc_driver_update_hub_device_call_ctx *ctx = &call_ctx;
+
+	if (verbose_debug) {
+		printk("%s:%d, entered!\n", __func__, __LINE__);
+	}
+
+	{
+		*hcd_ptr = glue_unpack(__pos, __msg, __ext, struct usb_hcd*);
+		if (*hcd_ptr) {
+			callee_unmarshal_kernel__hc_driver_update_hub_device__hcd__in(__pos, __msg, __ext, ctx, *hcd_ptr);
+		}
+
+	}
+
+	{
+		*hdev_ptr = glue_unpack(__pos, __msg, __ext, struct usb_device*);
+		if (*hdev_ptr) {
+			callee_unmarshal_kernel__hc_driver_update_hub_device__hdev__in(__pos, __msg, __ext, ctx, *hdev_ptr);
+		}
+
+	}
+
+	{
+		*tt_ptr = glue_unpack(__pos, __msg, __ext, struct usb_tt*);
+		if (*tt_ptr) {
+			callee_unmarshal_kernel__hc_driver_update_hub_device__tt__in(__pos, __msg, __ext, ctx, *tt_ptr);
+		}
+
+	}
+
+	{
+		*mem_flags_ptr = glue_unpack(__pos, __msg, __ext, unsigned int);
+	}
+
+	ret = function_ptr(hcd, hdev, tt, mem_flags);
+
+	*__pos = 0;
+	{
+		if (*hcd_ptr) {
+			callee_marshal_kernel__hc_driver_update_hub_device__hcd__in(__pos, __msg, __ext, ctx, *hcd_ptr);
+		}
+
+	}
+
+	{
+		if (*hdev_ptr) {
+			callee_marshal_kernel__hc_driver_update_hub_device__hdev__in(__pos, __msg, __ext, ctx, *hdev_ptr);
+		}
+
+	}
+
+	{
+		if (*tt_ptr) {
+			callee_marshal_kernel__hc_driver_update_hub_device__tt__in(__pos, __msg, __ext, ctx, *tt_ptr);
+		}
+
+	}
+
+	{
+	}
+
+	{
+		glue_pack(__pos, __msg, __ext, *ret_ptr);
+	}
+
+	__msg->regs[0] = *__pos;
+	if (verbose_debug) {
+		printk("%s:%d, returned!\n", __func__, __LINE__);
+	}
+}
+
+void hc_driver_reset_device_callee(struct fipc_message* __msg, struct ext_registers* __ext)
+{
+	size_t n_pos = 0;
+	size_t* __pos = &n_pos;
+
+	fptr_hc_driver_reset_device function_ptr = glue_unpack(__pos, __msg, __ext, fptr_hc_driver_reset_device);
+	struct usb_hcd* hcd = 0;
+	struct usb_device* udev = 0;
+	struct usb_hcd** hcd_ptr = &hcd;
+	struct usb_device** udev_ptr = &udev;
+	int ret = 0;
+	int* ret_ptr = &ret;
+	
+	__maybe_unused struct hc_driver_reset_device_call_ctx call_ctx = {hcd, udev};
+	__maybe_unused struct hc_driver_reset_device_call_ctx *ctx = &call_ctx;
+
+	if (verbose_debug) {
+		printk("%s:%d, entered!\n", __func__, __LINE__);
+	}
+
+	{
+		*hcd_ptr = glue_unpack(__pos, __msg, __ext, struct usb_hcd*);
+		if (*hcd_ptr) {
+			callee_unmarshal_kernel__hc_driver_reset_device__hcd__in(__pos, __msg, __ext, ctx, *hcd_ptr);
+		}
+
+	}
+
+	{
+		*udev_ptr = glue_unpack(__pos, __msg, __ext, struct usb_device*);
+		if (*udev_ptr) {
+			callee_unmarshal_kernel__hc_driver_reset_device__udev__in(__pos, __msg, __ext, ctx, *udev_ptr);
+		}
+
+	}
+
+	ret = function_ptr(hcd, udev);
+
+	*__pos = 0;
+	{
+		if (*hcd_ptr) {
+			callee_marshal_kernel__hc_driver_reset_device__hcd__in(__pos, __msg, __ext, ctx, *hcd_ptr);
+		}
+
+	}
+
+	{
+		if (*udev_ptr) {
+			callee_marshal_kernel__hc_driver_reset_device__udev__in(__pos, __msg, __ext, ctx, *udev_ptr);
+		}
+
+	}
+
+	{
+		glue_pack(__pos, __msg, __ext, *ret_ptr);
+	}
+
+	__msg->regs[0] = *__pos;
+	if (verbose_debug) {
+		printk("%s:%d, returned!\n", __func__, __LINE__);
+	}
+}
+
+void hc_driver_update_device_callee(struct fipc_message* __msg, struct ext_registers* __ext)
+{
+	size_t n_pos = 0;
+	size_t* __pos = &n_pos;
+
+	fptr_hc_driver_update_device function_ptr = glue_unpack(__pos, __msg, __ext, fptr_hc_driver_update_device);
+	struct usb_hcd* hcd = 0;
+	struct usb_device* udev = 0;
+	struct usb_hcd** hcd_ptr = &hcd;
+	int ret = 0;
+	int* ret_ptr = &ret;
+	
+	__maybe_unused struct hc_driver_update_device_call_ctx call_ctx = {hcd, udev};
+	__maybe_unused struct hc_driver_update_device_call_ctx *ctx = &call_ctx;
+
+	if (verbose_debug) {
+		printk("%s:%d, entered!\n", __func__, __LINE__);
+	}
+
+	{
+		*hcd_ptr = glue_unpack(__pos, __msg, __ext, struct usb_hcd*);
+		if (*hcd_ptr) {
+			callee_unmarshal_kernel__hc_driver_update_device__hcd__in(__pos, __msg, __ext, ctx, *hcd_ptr);
+		}
+
+	}
+
+	ret = function_ptr(hcd, udev);
+
+	*__pos = 0;
+	{
+		if (*hcd_ptr) {
+			callee_marshal_kernel__hc_driver_update_device__hcd__in(__pos, __msg, __ext, ctx, *hcd_ptr);
+		}
+
+	}
+
+	{
+		glue_pack(__pos, __msg, __ext, *ret_ptr);
+	}
+
+	__msg->regs[0] = *__pos;
+	if (verbose_debug) {
+		printk("%s:%d, returned!\n", __func__, __LINE__);
+	}
+}
+
+void hc_driver_set_usb2_hw_lpm_callee(struct fipc_message* __msg, struct ext_registers* __ext)
+{
+	size_t n_pos = 0;
+	size_t* __pos = &n_pos;
+
+	fptr_hc_driver_set_usb2_hw_lpm function_ptr = glue_unpack(__pos, __msg, __ext, fptr_hc_driver_set_usb2_hw_lpm);
+	struct usb_hcd* hcd = 0;
+	struct usb_device* udev = 0;
+	int enable = 0;
+	struct usb_hcd** hcd_ptr = &hcd;
+	int ret = 0;
+	int* ret_ptr = &ret;
+	
+	__maybe_unused struct hc_driver_set_usb2_hw_lpm_call_ctx call_ctx = {hcd, udev, enable};
+	__maybe_unused struct hc_driver_set_usb2_hw_lpm_call_ctx *ctx = &call_ctx;
+
+	if (verbose_debug) {
+		printk("%s:%d, entered!\n", __func__, __LINE__);
+	}
+
+	{
+		*hcd_ptr = glue_unpack(__pos, __msg, __ext, struct usb_hcd*);
+		if (*hcd_ptr) {
+			callee_unmarshal_kernel__hc_driver_set_usb2_hw_lpm__hcd__in(__pos, __msg, __ext, ctx, *hcd_ptr);
+		}
+
+	}
+
+	ret = function_ptr(hcd, udev, enable);
+
+	*__pos = 0;
+	{
+		if (*hcd_ptr) {
+			callee_marshal_kernel__hc_driver_set_usb2_hw_lpm__hcd__in(__pos, __msg, __ext, ctx, *hcd_ptr);
+		}
+
+	}
+
+	{
+		glue_pack(__pos, __msg, __ext, *ret_ptr);
+	}
+
+	__msg->regs[0] = *__pos;
+	if (verbose_debug) {
+		printk("%s:%d, returned!\n", __func__, __LINE__);
+	}
+}
+
+void hc_driver_enable_usb3_lpm_timeout_callee(struct fipc_message* __msg, struct ext_registers* __ext)
+{
+	size_t n_pos = 0;
+	size_t* __pos = &n_pos;
+
+	fptr_hc_driver_enable_usb3_lpm_timeout function_ptr = glue_unpack(__pos, __msg, __ext, fptr_hc_driver_enable_usb3_lpm_timeout);
+	struct usb_hcd* hcd = 0;
+	struct usb_device* udev = 0;
+	unsigned int state = 0;
+	struct usb_hcd** hcd_ptr = &hcd;
+	int ret = 0;
+	int* ret_ptr = &ret;
+	
+	__maybe_unused struct hc_driver_enable_usb3_lpm_timeout_call_ctx call_ctx = {hcd, udev, state};
+	__maybe_unused struct hc_driver_enable_usb3_lpm_timeout_call_ctx *ctx = &call_ctx;
+
+	if (verbose_debug) {
+		printk("%s:%d, entered!\n", __func__, __LINE__);
+	}
+
+	{
+		*hcd_ptr = glue_unpack(__pos, __msg, __ext, struct usb_hcd*);
+		if (*hcd_ptr) {
+			callee_unmarshal_kernel__hc_driver_enable_usb3_lpm_timeout__hcd__in(__pos, __msg, __ext, ctx, *hcd_ptr);
+		}
+
+	}
+
+	ret = function_ptr(hcd, udev, state);
+
+	*__pos = 0;
+	{
+		if (*hcd_ptr) {
+			callee_marshal_kernel__hc_driver_enable_usb3_lpm_timeout__hcd__in(__pos, __msg, __ext, ctx, *hcd_ptr);
+		}
+
+	}
+
+	{
+		glue_pack(__pos, __msg, __ext, *ret_ptr);
+	}
+
+	__msg->regs[0] = *__pos;
+	if (verbose_debug) {
+		printk("%s:%d, returned!\n", __func__, __LINE__);
+	}
+}
+
+void hc_driver_disable_usb3_lpm_timeout_callee(struct fipc_message* __msg, struct ext_registers* __ext)
+{
+	size_t n_pos = 0;
+	size_t* __pos = &n_pos;
+
+	fptr_hc_driver_disable_usb3_lpm_timeout function_ptr = glue_unpack(__pos, __msg, __ext, fptr_hc_driver_disable_usb3_lpm_timeout);
+	struct usb_hcd* hcd = 0;
+	struct usb_device* udev = 0;
+	unsigned int state = 0;
+	struct usb_hcd** hcd_ptr = &hcd;
+	int ret = 0;
+	int* ret_ptr = &ret;
+	
+	__maybe_unused struct hc_driver_disable_usb3_lpm_timeout_call_ctx call_ctx = {hcd, udev, state};
+	__maybe_unused struct hc_driver_disable_usb3_lpm_timeout_call_ctx *ctx = &call_ctx;
+
+	if (verbose_debug) {
+		printk("%s:%d, entered!\n", __func__, __LINE__);
+	}
+
+	{
+		*hcd_ptr = glue_unpack(__pos, __msg, __ext, struct usb_hcd*);
+		if (*hcd_ptr) {
+			callee_unmarshal_kernel__hc_driver_disable_usb3_lpm_timeout__hcd__in(__pos, __msg, __ext, ctx, *hcd_ptr);
+		}
+
+	}
+
+	ret = function_ptr(hcd, udev, state);
+
+	*__pos = 0;
+	{
+		if (*hcd_ptr) {
+			callee_marshal_kernel__hc_driver_disable_usb3_lpm_timeout__hcd__in(__pos, __msg, __ext, ctx, *hcd_ptr);
+		}
+
+	}
+
+	{
+		glue_pack(__pos, __msg, __ext, *ret_ptr);
+	}
+
+	__msg->regs[0] = *__pos;
+	if (verbose_debug) {
+		printk("%s:%d, returned!\n", __func__, __LINE__);
+	}
+}
+
+void hc_driver_find_raw_port_number_callee(struct fipc_message* __msg, struct ext_registers* __ext)
+{
+	size_t n_pos = 0;
+	size_t* __pos = &n_pos;
+
+	fptr_hc_driver_find_raw_port_number function_ptr = glue_unpack(__pos, __msg, __ext, fptr_hc_driver_find_raw_port_number);
+	struct usb_hcd* hcd = 0;
+	int port1 = 0;
+	struct usb_hcd** hcd_ptr = &hcd;
+	int* port1_ptr = &port1;
+	int ret = 0;
+	int* ret_ptr = &ret;
+	
+	__maybe_unused struct hc_driver_find_raw_port_number_call_ctx call_ctx = {hcd, port1};
+	__maybe_unused struct hc_driver_find_raw_port_number_call_ctx *ctx = &call_ctx;
+
+	if (verbose_debug) {
+		printk("%s:%d, entered!\n", __func__, __LINE__);
+	}
+
+	{
+		*hcd_ptr = glue_unpack(__pos, __msg, __ext, struct usb_hcd*);
+		if (*hcd_ptr) {
+			callee_unmarshal_kernel__hc_driver_find_raw_port_number__hcd__in(__pos, __msg, __ext, ctx, *hcd_ptr);
+		}
+
+	}
+
+	{
+		*port1_ptr = glue_unpack(__pos, __msg, __ext, int);
+	}
+
+	ret = function_ptr(hcd, port1);
+
+	*__pos = 0;
+	{
+		if (*hcd_ptr) {
+			callee_marshal_kernel__hc_driver_find_raw_port_number__hcd__in(__pos, __msg, __ext, ctx, *hcd_ptr);
+		}
+
+	}
+
+	{
+	}
+
+	{
+		glue_pack(__pos, __msg, __ext, *ret_ptr);
+	}
+
+	__msg->regs[0] = *__pos;
+	if (verbose_debug) {
+		printk("%s:%d, returned!\n", __func__, __LINE__);
+	}
+}
+
+void hc_driver_stop_callee(struct fipc_message* __msg, struct ext_registers* __ext)
+{
+	size_t n_pos = 0;
+	size_t* __pos = &n_pos;
+
+	fptr_hc_driver_stop function_ptr = glue_unpack(__pos, __msg, __ext, fptr_hc_driver_stop);
+	struct usb_hcd* hcd = 0;
+	struct usb_hcd** hcd_ptr = &hcd;
+	
+	__maybe_unused struct hc_driver_stop_call_ctx call_ctx = {hcd};
+	__maybe_unused struct hc_driver_stop_call_ctx *ctx = &call_ctx;
+
+	if (verbose_debug) {
+		printk("%s:%d, entered!\n", __func__, __LINE__);
+	}
+
+	{
+		*hcd_ptr = glue_unpack(__pos, __msg, __ext, struct usb_hcd*);
+		if (*hcd_ptr) {
+			callee_unmarshal_kernel__hc_driver_stop__hcd__in(__pos, __msg, __ext, ctx, *hcd_ptr);
+		}
+
+	}
+
+	function_ptr(hcd);
+
+	*__pos = 0;
+	{
+		if (*hcd_ptr) {
+			callee_marshal_kernel__hc_driver_stop__hcd__in(__pos, __msg, __ext, ctx, *hcd_ptr);
+		}
+
+	}
+
+	__msg->regs[0] = *__pos;
+	if (verbose_debug) {
+		printk("%s:%d, returned!\n", __func__, __LINE__);
+	}
+}
+
+void hc_driver_shutdown_callee(struct fipc_message* __msg, struct ext_registers* __ext)
+{
+	size_t n_pos = 0;
+	size_t* __pos = &n_pos;
+
+	fptr_hc_driver_shutdown function_ptr = glue_unpack(__pos, __msg, __ext, fptr_hc_driver_shutdown);
+	struct usb_hcd* hcd = 0;
+	struct usb_hcd** hcd_ptr = &hcd;
+	
+	__maybe_unused struct hc_driver_shutdown_call_ctx call_ctx = {hcd};
+	__maybe_unused struct hc_driver_shutdown_call_ctx *ctx = &call_ctx;
+
+	if (verbose_debug) {
+		printk("%s:%d, entered!\n", __func__, __LINE__);
+	}
+
+	{
+		*hcd_ptr = glue_unpack(__pos, __msg, __ext, struct usb_hcd*);
+		if (*hcd_ptr) {
+			callee_unmarshal_kernel__hc_driver_shutdown__hcd__in(__pos, __msg, __ext, ctx, *hcd_ptr);
+		}
+
+	}
+
+	function_ptr(hcd);
+
+	*__pos = 0;
+	{
+		if (*hcd_ptr) {
+			callee_marshal_kernel__hc_driver_shutdown__hcd__in(__pos, __msg, __ext, ctx, *hcd_ptr);
+		}
+
+	}
+
+	__msg->regs[0] = *__pos;
+	if (verbose_debug) {
+		printk("%s:%d, returned!\n", __func__, __LINE__);
+	}
+}
+
+void hc_driver_get_frame_number_callee(struct fipc_message* __msg, struct ext_registers* __ext)
+{
+	size_t n_pos = 0;
+	size_t* __pos = &n_pos;
+
+	fptr_hc_driver_get_frame_number function_ptr = glue_unpack(__pos, __msg, __ext, fptr_hc_driver_get_frame_number);
+	struct usb_hcd* hcd = 0;
+	struct usb_hcd** hcd_ptr = &hcd;
+	int ret = 0;
+	int* ret_ptr = &ret;
+	
+	__maybe_unused struct hc_driver_get_frame_number_call_ctx call_ctx = {hcd};
+	__maybe_unused struct hc_driver_get_frame_number_call_ctx *ctx = &call_ctx;
+
+	if (verbose_debug) {
+		printk("%s:%d, entered!\n", __func__, __LINE__);
+	}
+
+	{
+		*hcd_ptr = glue_unpack(__pos, __msg, __ext, struct usb_hcd*);
+		if (*hcd_ptr) {
+			callee_unmarshal_kernel__hc_driver_get_frame_number__hcd__in(__pos, __msg, __ext, ctx, *hcd_ptr);
+		}
+
+	}
+
+	ret = function_ptr(hcd);
+
+	*__pos = 0;
+	{
+		if (*hcd_ptr) {
+			callee_marshal_kernel__hc_driver_get_frame_number__hcd__in(__pos, __msg, __ext, ctx, *hcd_ptr);
+		}
+
+	}
+
+	{
+		glue_pack(__pos, __msg, __ext, *ret_ptr);
+	}
+
+	__msg->regs[0] = *__pos;
+	if (verbose_debug) {
+		printk("%s:%d, returned!\n", __func__, __LINE__);
+	}
+}
+
+void hc_driver_urb_enqueue_callee(struct fipc_message* __msg, struct ext_registers* __ext)
+{
+	size_t n_pos = 0;
+	size_t* __pos = &n_pos;
+
+	fptr_hc_driver_urb_enqueue function_ptr = glue_unpack(__pos, __msg, __ext, fptr_hc_driver_urb_enqueue);
+	struct usb_hcd* hcd = 0;
+	struct urb* urb = 0;
+	unsigned int mem_flags = 0;
+	struct usb_hcd** hcd_ptr = &hcd;
+	struct urb** urb_ptr = &urb;
+	unsigned int* mem_flags_ptr = &mem_flags;
+	int ret = 0;
+	int* ret_ptr = &ret;
+	
+	__maybe_unused struct hc_driver_urb_enqueue_call_ctx call_ctx = {hcd, urb, mem_flags};
+	__maybe_unused struct hc_driver_urb_enqueue_call_ctx *ctx = &call_ctx;
+
+	if (verbose_debug) {
+		printk("%s:%d, entered!\n", __func__, __LINE__);
+	}
+
+	{
+		*hcd_ptr = glue_unpack(__pos, __msg, __ext, struct usb_hcd*);
+		if (*hcd_ptr) {
+			callee_unmarshal_kernel__hc_driver_urb_enqueue__hcd__in(__pos, __msg, __ext, ctx, *hcd_ptr);
+		}
+
+	}
+
+	{
+		*urb_ptr = glue_unpack(__pos, __msg, __ext, struct urb*);
+		if (*urb_ptr) {
+			callee_unmarshal_kernel__hc_driver_urb_enqueue__urb__in(__pos, __msg, __ext, ctx, *urb_ptr);
+		}
+
+	}
+
+	{
+		*mem_flags_ptr = glue_unpack(__pos, __msg, __ext, unsigned int);
+	}
+
+	ret = function_ptr(hcd, urb, mem_flags);
+
+	*__pos = 0;
+	{
+		if (*hcd_ptr) {
+			callee_marshal_kernel__hc_driver_urb_enqueue__hcd__in(__pos, __msg, __ext, ctx, *hcd_ptr);
+		}
+
+	}
+
+	{
+		if (*urb_ptr) {
+			callee_marshal_kernel__hc_driver_urb_enqueue__urb__in(__pos, __msg, __ext, ctx, *urb_ptr);
+		}
+
+	}
+
+	{
+	}
+
+	{
+		glue_pack(__pos, __msg, __ext, *ret_ptr);
+	}
+
+	__msg->regs[0] = *__pos;
+	if (verbose_debug) {
+		printk("%s:%d, returned!\n", __func__, __LINE__);
+	}
+}
+
+void hc_driver_urb_dequeue_callee(struct fipc_message* __msg, struct ext_registers* __ext)
+{
+	size_t n_pos = 0;
+	size_t* __pos = &n_pos;
+
+	fptr_hc_driver_urb_dequeue function_ptr = glue_unpack(__pos, __msg, __ext, fptr_hc_driver_urb_dequeue);
+	struct usb_hcd* hcd = 0;
+	struct urb* urb = 0;
+	int status = 0;
+	struct usb_hcd** hcd_ptr = &hcd;
+	struct urb** urb_ptr = &urb;
+	int* status_ptr = &status;
+	int ret = 0;
+	int* ret_ptr = &ret;
+	
+	__maybe_unused struct hc_driver_urb_dequeue_call_ctx call_ctx = {hcd, urb, status};
+	__maybe_unused struct hc_driver_urb_dequeue_call_ctx *ctx = &call_ctx;
+
+	if (verbose_debug) {
+		printk("%s:%d, entered!\n", __func__, __LINE__);
+	}
+
+	{
+		*hcd_ptr = glue_unpack(__pos, __msg, __ext, struct usb_hcd*);
+		if (*hcd_ptr) {
+			callee_unmarshal_kernel__hc_driver_urb_dequeue__hcd__in(__pos, __msg, __ext, ctx, *hcd_ptr);
+		}
+
+	}
+
+	{
+		*urb_ptr = glue_unpack(__pos, __msg, __ext, struct urb*);
+		if (*urb_ptr) {
+			callee_unmarshal_kernel__hc_driver_urb_dequeue__urb__in(__pos, __msg, __ext, ctx, *urb_ptr);
+		}
+
+	}
+
+	{
+		*status_ptr = glue_unpack(__pos, __msg, __ext, int);
+	}
+
+	ret = function_ptr(hcd, urb, status);
+
+	*__pos = 0;
+	{
+		if (*hcd_ptr) {
+			callee_marshal_kernel__hc_driver_urb_dequeue__hcd__in(__pos, __msg, __ext, ctx, *hcd_ptr);
+		}
+
+	}
+
+	{
+		if (*urb_ptr) {
+			callee_marshal_kernel__hc_driver_urb_dequeue__urb__in(__pos, __msg, __ext, ctx, *urb_ptr);
+		}
+
+	}
+
+	{
+	}
+
+	{
+		glue_pack(__pos, __msg, __ext, *ret_ptr);
+	}
+
+	__msg->regs[0] = *__pos;
+	if (verbose_debug) {
+		printk("%s:%d, returned!\n", __func__, __LINE__);
+	}
+}
+
+void hc_driver_endpoint_reset_callee(struct fipc_message* __msg, struct ext_registers* __ext)
+{
+	size_t n_pos = 0;
+	size_t* __pos = &n_pos;
+
+	fptr_hc_driver_endpoint_reset function_ptr = glue_unpack(__pos, __msg, __ext, fptr_hc_driver_endpoint_reset);
+	struct usb_hcd* hcd = 0;
+	struct usb_host_endpoint* ep = 0;
+	struct usb_hcd** hcd_ptr = &hcd;
+	struct usb_host_endpoint** ep_ptr = &ep;
+	
+	__maybe_unused struct hc_driver_endpoint_reset_call_ctx call_ctx = {hcd, ep};
+	__maybe_unused struct hc_driver_endpoint_reset_call_ctx *ctx = &call_ctx;
+
+	if (verbose_debug) {
+		printk("%s:%d, entered!\n", __func__, __LINE__);
+	}
+
+	{
+		*hcd_ptr = glue_unpack(__pos, __msg, __ext, struct usb_hcd*);
+		if (*hcd_ptr) {
+			callee_unmarshal_kernel__hc_driver_endpoint_reset__hcd__in(__pos, __msg, __ext, ctx, *hcd_ptr);
+		}
+
+	}
+
+	{
+		*ep_ptr = glue_unpack(__pos, __msg, __ext, struct usb_host_endpoint*);
+		if (*ep_ptr) {
+			callee_unmarshal_kernel__hc_driver_endpoint_reset__ep__in(__pos, __msg, __ext, ctx, *ep_ptr);
+		}
+
+	}
+
+	function_ptr(hcd, ep);
+
+	*__pos = 0;
+	{
+		if (*hcd_ptr) {
+			callee_marshal_kernel__hc_driver_endpoint_reset__hcd__in(__pos, __msg, __ext, ctx, *hcd_ptr);
+		}
+
+	}
+
+	{
+		if (*ep_ptr) {
+			callee_marshal_kernel__hc_driver_endpoint_reset__ep__in(__pos, __msg, __ext, ctx, *ep_ptr);
+		}
+
+	}
+
+	__msg->regs[0] = *__pos;
+	if (verbose_debug) {
+		printk("%s:%d, returned!\n", __func__, __LINE__);
+	}
+}
+
+void hc_driver_alloc_dev_callee(struct fipc_message* __msg, struct ext_registers* __ext)
+{
+	size_t n_pos = 0;
+	size_t* __pos = &n_pos;
+
+	fptr_hc_driver_alloc_dev function_ptr = glue_unpack(__pos, __msg, __ext, fptr_hc_driver_alloc_dev);
+	struct usb_hcd* hcd = 0;
+	struct usb_hcd** hcd_ptr = &hcd;
+	struct usb_device __udev;
+	struct usb_device* udev = &__udev;
+	struct usb_device** udev_ptr = &udev;
+	int ret = 0;
+	int* ret_ptr = &ret;
+	
+	__maybe_unused struct hc_driver_alloc_dev_call_ctx call_ctx = {hcd, udev};
+	__maybe_unused struct hc_driver_alloc_dev_call_ctx *ctx = &call_ctx;
+
+	if (verbose_debug) {
+		printk("%s:%d, entered!\n", __func__, __LINE__);
+	}
+
+	{
+		*hcd_ptr = glue_unpack(__pos, __msg, __ext, struct usb_hcd*);
+		if (*hcd_ptr) {
+			callee_unmarshal_kernel__hc_driver_alloc_dev__hcd__in(__pos, __msg, __ext, ctx, *hcd_ptr);
+		}
+
+	}
+
+	{
+		if (*udev_ptr) {
+			callee_unmarshal_kernel__hc_driver_alloc_dev__udev__in(__pos, __msg, __ext, ctx, *udev_ptr);
+		}
+
+	}
+
+	ret = function_ptr(hcd, udev);
+
+	*__pos = 0;
+	{
+		if (*hcd_ptr) {
+			callee_marshal_kernel__hc_driver_alloc_dev__hcd__in(__pos, __msg, __ext, ctx, *hcd_ptr);
+		}
+
+	}
+
+	{
+		if (*udev_ptr) {
+			callee_marshal_kernel__hc_driver_alloc_dev__udev__in(__pos, __msg, __ext, ctx, *udev_ptr);
+		}
+
+	}
+
+	{
+		glue_pack(__pos, __msg, __ext, *ret_ptr);
+	}
+
+	__msg->regs[0] = *__pos;
+	if (verbose_debug) {
+		printk("%s:%d, returned!\n", __func__, __LINE__);
+	}
+}
+
+void hc_driver_free_dev_callee(struct fipc_message* __msg, struct ext_registers* __ext)
+{
+	size_t n_pos = 0;
+	size_t* __pos = &n_pos;
+
+	fptr_hc_driver_free_dev function_ptr = glue_unpack(__pos, __msg, __ext, fptr_hc_driver_free_dev);
+	struct usb_hcd* hcd = 0;
+	struct usb_hcd** hcd_ptr = &hcd;
+	struct usb_device __udev;
+	struct usb_device* udev = &__udev;
+	struct usb_device** udev_ptr = &udev;
+	
+	__maybe_unused struct hc_driver_free_dev_call_ctx call_ctx = {hcd, udev};
+	__maybe_unused struct hc_driver_free_dev_call_ctx *ctx = &call_ctx;
+
+	if (verbose_debug) {
+		printk("%s:%d, entered!\n", __func__, __LINE__);
+	}
+
+	{
+		*hcd_ptr = glue_unpack(__pos, __msg, __ext, struct usb_hcd*);
+		if (*hcd_ptr) {
+			callee_unmarshal_kernel__hc_driver_free_dev__hcd__in(__pos, __msg, __ext, ctx, *hcd_ptr);
+		}
+
+	}
+
+	{
+		if (*udev_ptr) {
+			callee_unmarshal_kernel__hc_driver_free_dev__udev__in(__pos, __msg, __ext, ctx, *udev_ptr);
+		}
+
+	}
+
+	function_ptr(hcd, udev);
+
+	*__pos = 0;
+	{
+		if (*hcd_ptr) {
+			callee_marshal_kernel__hc_driver_free_dev__hcd__in(__pos, __msg, __ext, ctx, *hcd_ptr);
+		}
+
+	}
+
+	{
+		if (*udev_ptr) {
+			callee_marshal_kernel__hc_driver_free_dev__udev__in(__pos, __msg, __ext, ctx, *udev_ptr);
+		}
+
+	}
+
+	__msg->regs[0] = *__pos;
+	if (verbose_debug) {
+		printk("%s:%d, returned!\n", __func__, __LINE__);
+	}
+}
+
+void hc_driver_alloc_streams_callee(struct fipc_message* __msg, struct ext_registers* __ext)
+{
+	size_t n_pos = 0;
+	size_t* __pos = &n_pos;
+
+	fptr_hc_driver_alloc_streams function_ptr = glue_unpack(__pos, __msg, __ext, fptr_hc_driver_alloc_streams);
+	struct usb_hcd* hcd = 0;
+	struct usb_host_endpoint** eps = 0;
+	unsigned int num_eps = 0;
+	unsigned int num_streams = 0;
+	unsigned int mem_flags = 0;
+	struct usb_hcd** hcd_ptr = &hcd;
+	struct usb_device __udev;
+	struct usb_device* udev = &__udev;
+	struct usb_device** udev_ptr = &udev;
+	struct usb_host_endpoint*** eps_ptr = &eps;
+	unsigned int* num_eps_ptr = &num_eps;
+	unsigned int* num_streams_ptr = &num_streams;
+	unsigned int* mem_flags_ptr = &mem_flags;
+	int ret = 0;
+	int* ret_ptr = &ret;
+	
+	__maybe_unused struct hc_driver_alloc_streams_call_ctx call_ctx = {hcd, udev, eps, num_eps, num_streams, mem_flags};
+	__maybe_unused struct hc_driver_alloc_streams_call_ctx *ctx = &call_ctx;
+
+	if (verbose_debug) {
+		printk("%s:%d, entered!\n", __func__, __LINE__);
+	}
+
+	{
+		*hcd_ptr = glue_unpack(__pos, __msg, __ext, struct usb_hcd*);
+		if (*hcd_ptr) {
+			callee_unmarshal_kernel__hc_driver_alloc_streams__hcd__in(__pos, __msg, __ext, ctx, *hcd_ptr);
+		}
+
+	}
+
+	{
+		if (*udev_ptr) {
+			callee_unmarshal_kernel__hc_driver_alloc_streams__udev__in(__pos, __msg, __ext, ctx, *udev_ptr);
+		}
+
+	}
+
+	{
+		size_t __size = sizeof(struct usb_host_endpoint*);
+		*eps_ptr = glue_unpack_new_shadow(__pos, __msg, __ext, struct usb_host_endpoint**, (__size), (DEFAULT_GFP_FLAGS));
+		if (*eps_ptr) {
+			size_t __size = sizeof(struct usb_host_endpoint);
+			**eps_ptr = glue_unpack_new_shadow(__pos, __msg, __ext, struct usb_host_endpoint*, (__size), (DEFAULT_GFP_FLAGS));
+			if (**eps_ptr) {
+				callee_unmarshal_kernel__hc_driver_alloc_streams__eps__in(__pos, __msg, __ext, ctx, **eps_ptr);
+			}
+
+		}
+
+	}
+
+	{
+		*num_eps_ptr = glue_unpack(__pos, __msg, __ext, unsigned int);
+	}
+
+	{
+		*num_streams_ptr = glue_unpack(__pos, __msg, __ext, unsigned int);
+	}
+
+	{
+		*mem_flags_ptr = glue_unpack(__pos, __msg, __ext, unsigned int);
+	}
+
+	ret = function_ptr(hcd, udev, eps, num_eps, num_streams, mem_flags);
+
+	*__pos = 0;
+	{
+		if (*hcd_ptr) {
+			callee_marshal_kernel__hc_driver_alloc_streams__hcd__in(__pos, __msg, __ext, ctx, *hcd_ptr);
+		}
+
+	}
+
+	{
+		if (*udev_ptr) {
+			callee_marshal_kernel__hc_driver_alloc_streams__udev__in(__pos, __msg, __ext, ctx, *udev_ptr);
+		}
+
+	}
+
+	{
+		if (*eps_ptr) {
+			if (**eps_ptr) {
+				callee_marshal_kernel__hc_driver_alloc_streams__eps__in(__pos, __msg, __ext, ctx, **eps_ptr);
+			}
+
+		}
+
+	}
+
+	{
+	}
+
+	{
+	}
+
+	{
+	}
+
+	{
+		glue_pack(__pos, __msg, __ext, *ret_ptr);
+	}
+
+	__msg->regs[0] = *__pos;
+	if (verbose_debug) {
+		printk("%s:%d, returned!\n", __func__, __LINE__);
+	}
+}
+
+void hc_driver_free_streams_callee(struct fipc_message* __msg, struct ext_registers* __ext)
+{
+	size_t n_pos = 0;
+	size_t* __pos = &n_pos;
+
+	fptr_hc_driver_free_streams function_ptr = glue_unpack(__pos, __msg, __ext, fptr_hc_driver_free_streams);
+	struct usb_hcd* hcd = 0;
+	struct usb_host_endpoint** eps = 0;
+	unsigned int num_eps = 0;
+	unsigned int mem_flags = 0;
+	struct usb_hcd** hcd_ptr = &hcd;
+	struct usb_device __udev;
+	struct usb_device* udev = &__udev;
+	struct usb_device** udev_ptr = &udev;
+	struct usb_host_endpoint*** eps_ptr = &eps;
+	unsigned int* num_eps_ptr = &num_eps;
+	int ret = 0;
+	int* ret_ptr = &ret;
+	
+	__maybe_unused struct hc_driver_free_streams_call_ctx call_ctx = {hcd, udev, eps, num_eps, mem_flags};
+	__maybe_unused struct hc_driver_free_streams_call_ctx *ctx = &call_ctx;
+
+	if (verbose_debug) {
+		printk("%s:%d, entered!\n", __func__, __LINE__);
+	}
+
+	{
+		*hcd_ptr = glue_unpack(__pos, __msg, __ext, struct usb_hcd*);
+		if (*hcd_ptr) {
+			callee_unmarshal_kernel__hc_driver_free_streams__hcd__in(__pos, __msg, __ext, ctx, *hcd_ptr);
+		}
+
+	}
+
+	{
+		if (*udev_ptr) {
+			callee_unmarshal_kernel__hc_driver_free_streams__udev__in(__pos, __msg, __ext, ctx, *udev_ptr);
+		}
+
+	}
+
+	{
+		*eps_ptr = glue_unpack(__pos, __msg, __ext, struct usb_host_endpoint**);
+		if (*eps_ptr) {
+			**eps_ptr = glue_unpack(__pos, __msg, __ext, struct usb_host_endpoint*);
+			if (**eps_ptr) {
+				callee_unmarshal_kernel__hc_driver_free_streams__eps__in(__pos, __msg, __ext, ctx, **eps_ptr);
+			}
+
+		}
+
+	}
+
+	{
+		*num_eps_ptr = glue_unpack(__pos, __msg, __ext, unsigned int);
+	}
+
+	ret = function_ptr(hcd, udev, eps, num_eps, mem_flags);
+
+	*__pos = 0;
+	{
+		if (*hcd_ptr) {
+			callee_marshal_kernel__hc_driver_free_streams__hcd__in(__pos, __msg, __ext, ctx, *hcd_ptr);
+		}
+
+	}
+
+	{
+		if (*udev_ptr) {
+			callee_marshal_kernel__hc_driver_free_streams__udev__in(__pos, __msg, __ext, ctx, *udev_ptr);
+		}
+
+	}
+
+	{
+		if (*eps_ptr) {
+			if (**eps_ptr) {
+				callee_marshal_kernel__hc_driver_free_streams__eps__in(__pos, __msg, __ext, ctx, **eps_ptr);
+			}
+
+		}
+
+	}
+
+	{
+	}
+
+	{
+		glue_pack(__pos, __msg, __ext, *ret_ptr);
+	}
+
+	__msg->regs[0] = *__pos;
+	if (verbose_debug) {
+		printk("%s:%d, returned!\n", __func__, __LINE__);
+	}
+}
+
+void hc_driver_add_endpoint_callee(struct fipc_message* __msg, struct ext_registers* __ext)
+{
+	size_t n_pos = 0;
+	size_t* __pos = &n_pos;
+
+	fptr_hc_driver_add_endpoint function_ptr = glue_unpack(__pos, __msg, __ext, fptr_hc_driver_add_endpoint);
+	struct usb_hcd* hcd = 0;
+	struct usb_device* udev = 0;
+	struct usb_host_endpoint* ep = 0;
+	struct usb_hcd** hcd_ptr = &hcd;
+	struct usb_device** udev_ptr = &udev;
+	struct usb_host_endpoint** ep_ptr = &ep;
+	int ret = 0;
+	int* ret_ptr = &ret;
+	
+	__maybe_unused struct hc_driver_add_endpoint_call_ctx call_ctx = {hcd, udev, ep};
+	__maybe_unused struct hc_driver_add_endpoint_call_ctx *ctx = &call_ctx;
+
+	if (verbose_debug) {
+		printk("%s:%d, entered!\n", __func__, __LINE__);
+	}
+
+	{
+		*hcd_ptr = glue_unpack(__pos, __msg, __ext, struct usb_hcd*);
+		if (*hcd_ptr) {
+			callee_unmarshal_kernel__hc_driver_add_endpoint__hcd__in(__pos, __msg, __ext, ctx, *hcd_ptr);
+		}
+
+	}
+
+	{
+		*udev_ptr = glue_unpack(__pos, __msg, __ext, struct usb_device*);
+		if (*udev_ptr) {
+			callee_unmarshal_kernel__hc_driver_add_endpoint__udev__in(__pos, __msg, __ext, ctx, *udev_ptr);
+		}
+
+	}
+
+	{
+		*ep_ptr = glue_unpack(__pos, __msg, __ext, struct usb_host_endpoint*);
+		if (*ep_ptr) {
+			callee_unmarshal_kernel__hc_driver_add_endpoint__ep__in(__pos, __msg, __ext, ctx, *ep_ptr);
+		}
+
+	}
+
+	ret = function_ptr(hcd, udev, ep);
+
+	*__pos = 0;
+	{
+		if (*hcd_ptr) {
+			callee_marshal_kernel__hc_driver_add_endpoint__hcd__in(__pos, __msg, __ext, ctx, *hcd_ptr);
+		}
+
+	}
+
+	{
+		if (*udev_ptr) {
+			callee_marshal_kernel__hc_driver_add_endpoint__udev__in(__pos, __msg, __ext, ctx, *udev_ptr);
+		}
+
+	}
+
+	{
+		if (*ep_ptr) {
+			callee_marshal_kernel__hc_driver_add_endpoint__ep__in(__pos, __msg, __ext, ctx, *ep_ptr);
+		}
+
+	}
+
+	{
+		glue_pack(__pos, __msg, __ext, *ret_ptr);
+	}
+
+	__msg->regs[0] = *__pos;
+	if (verbose_debug) {
+		printk("%s:%d, returned!\n", __func__, __LINE__);
+	}
+}
+
+void hc_driver_drop_endpoint_callee(struct fipc_message* __msg, struct ext_registers* __ext)
+{
+	size_t n_pos = 0;
+	size_t* __pos = &n_pos;
+
+	fptr_hc_driver_drop_endpoint function_ptr = glue_unpack(__pos, __msg, __ext, fptr_hc_driver_drop_endpoint);
+	struct usb_hcd* hcd = 0;
+	struct usb_host_endpoint* ep = 0;
+	struct usb_hcd** hcd_ptr = &hcd;
+	struct usb_device __udev;
+	struct usb_device* udev = &__udev;
+	struct usb_device** udev_ptr = &udev;
+	struct usb_host_endpoint** ep_ptr = &ep;
+	int ret = 0;
+	int* ret_ptr = &ret;
+	
+	__maybe_unused struct hc_driver_drop_endpoint_call_ctx call_ctx = {hcd, udev, ep};
+	__maybe_unused struct hc_driver_drop_endpoint_call_ctx *ctx = &call_ctx;
+
+	if (verbose_debug) {
+		printk("%s:%d, entered!\n", __func__, __LINE__);
+	}
+
+	{
+		*hcd_ptr = glue_unpack(__pos, __msg, __ext, struct usb_hcd*);
+		if (*hcd_ptr) {
+			callee_unmarshal_kernel__hc_driver_drop_endpoint__hcd__in(__pos, __msg, __ext, ctx, *hcd_ptr);
+		}
+
+	}
+
+	{
+		if (*udev_ptr) {
+			callee_unmarshal_kernel__hc_driver_drop_endpoint__udev__in(__pos, __msg, __ext, ctx, *udev_ptr);
+		}
+
+	}
+
+	{
+		size_t __size = sizeof(struct usb_host_endpoint);
+		*ep_ptr = glue_unpack_new_shadow(__pos, __msg, __ext, struct usb_host_endpoint*, (__size), (DEFAULT_GFP_FLAGS));
+		if (*ep_ptr) {
+			callee_unmarshal_kernel__hc_driver_drop_endpoint__ep__in(__pos, __msg, __ext, ctx, *ep_ptr);
+		}
+
+	}
+
+	ret = function_ptr(hcd, udev, ep);
+
+	*__pos = 0;
+	{
+		if (*hcd_ptr) {
+			callee_marshal_kernel__hc_driver_drop_endpoint__hcd__in(__pos, __msg, __ext, ctx, *hcd_ptr);
+		}
+
+	}
+
+	{
+		if (*udev_ptr) {
+			callee_marshal_kernel__hc_driver_drop_endpoint__udev__in(__pos, __msg, __ext, ctx, *udev_ptr);
+		}
+
+	}
+
+	{
+		if (*ep_ptr) {
+			callee_marshal_kernel__hc_driver_drop_endpoint__ep__in(__pos, __msg, __ext, ctx, *ep_ptr);
+		}
+
+	}
+
+	{
+		glue_pack(__pos, __msg, __ext, *ret_ptr);
+	}
+
+	__msg->regs[0] = *__pos;
+	if (verbose_debug) {
+		printk("%s:%d, returned!\n", __func__, __LINE__);
+	}
+}
+
+void hc_driver_check_bandwidth_callee(struct fipc_message* __msg, struct ext_registers* __ext)
+{
+	size_t n_pos = 0;
+	size_t* __pos = &n_pos;
+
+	fptr_hc_driver_check_bandwidth function_ptr = glue_unpack(__pos, __msg, __ext, fptr_hc_driver_check_bandwidth);
+	struct usb_hcd* hcd = 0;
+	struct usb_hcd** hcd_ptr = &hcd;
+	struct usb_device __udev;
+	struct usb_device* udev = &__udev;
+	struct usb_device** udev_ptr = &udev;
+	int ret = 0;
+	int* ret_ptr = &ret;
+	
+	__maybe_unused struct hc_driver_check_bandwidth_call_ctx call_ctx = {hcd, udev};
+	__maybe_unused struct hc_driver_check_bandwidth_call_ctx *ctx = &call_ctx;
+
+	if (verbose_debug) {
+		printk("%s:%d, entered!\n", __func__, __LINE__);
+	}
+
+	{
+		*hcd_ptr = glue_unpack(__pos, __msg, __ext, struct usb_hcd*);
+		if (*hcd_ptr) {
+			callee_unmarshal_kernel__hc_driver_check_bandwidth__hcd__in(__pos, __msg, __ext, ctx, *hcd_ptr);
+		}
+
+	}
+
+	{
+		if (*udev_ptr) {
+			callee_unmarshal_kernel__hc_driver_check_bandwidth__udev__in(__pos, __msg, __ext, ctx, *udev_ptr);
+		}
+
+	}
+
+	ret = function_ptr(hcd, udev);
+
+	*__pos = 0;
+	{
+		if (*hcd_ptr) {
+			callee_marshal_kernel__hc_driver_check_bandwidth__hcd__in(__pos, __msg, __ext, ctx, *hcd_ptr);
+		}
+
+	}
+
+	{
+		if (*udev_ptr) {
+			callee_marshal_kernel__hc_driver_check_bandwidth__udev__in(__pos, __msg, __ext, ctx, *udev_ptr);
+		}
+
+	}
+
+	{
+		glue_pack(__pos, __msg, __ext, *ret_ptr);
+	}
+
+	__msg->regs[0] = *__pos;
+	if (verbose_debug) {
+		printk("%s:%d, returned!\n", __func__, __LINE__);
+	}
+}
+
+void hc_driver_reset_bandwidth_callee(struct fipc_message* __msg, struct ext_registers* __ext)
+{
+	size_t n_pos = 0;
+	size_t* __pos = &n_pos;
+
+	fptr_hc_driver_reset_bandwidth function_ptr = glue_unpack(__pos, __msg, __ext, fptr_hc_driver_reset_bandwidth);
+	struct usb_hcd* hcd = 0;
+	struct usb_hcd** hcd_ptr = &hcd;
+	struct usb_device __udev;
+	struct usb_device* udev = &__udev;
+	struct usb_device** udev_ptr = &udev;
+	
+	__maybe_unused struct hc_driver_reset_bandwidth_call_ctx call_ctx = {hcd, udev};
+	__maybe_unused struct hc_driver_reset_bandwidth_call_ctx *ctx = &call_ctx;
+
+	if (verbose_debug) {
+		printk("%s:%d, entered!\n", __func__, __LINE__);
+	}
+
+	{
+		*hcd_ptr = glue_unpack(__pos, __msg, __ext, struct usb_hcd*);
+		if (*hcd_ptr) {
+			callee_unmarshal_kernel__hc_driver_reset_bandwidth__hcd__in(__pos, __msg, __ext, ctx, *hcd_ptr);
+		}
+
+	}
+
+	{
+		if (*udev_ptr) {
+			callee_unmarshal_kernel__hc_driver_reset_bandwidth__udev__in(__pos, __msg, __ext, ctx, *udev_ptr);
+		}
+
+	}
+
+	function_ptr(hcd, udev);
+
+	*__pos = 0;
+	{
+		if (*hcd_ptr) {
+			callee_marshal_kernel__hc_driver_reset_bandwidth__hcd__in(__pos, __msg, __ext, ctx, *hcd_ptr);
+		}
+
+	}
+
+	{
+		if (*udev_ptr) {
+			callee_marshal_kernel__hc_driver_reset_bandwidth__udev__in(__pos, __msg, __ext, ctx, *udev_ptr);
+		}
+
+	}
+
+	__msg->regs[0] = *__pos;
+	if (verbose_debug) {
+		printk("%s:%d, returned!\n", __func__, __LINE__);
+	}
+}
+
+void hc_driver_address_device_callee(struct fipc_message* __msg, struct ext_registers* __ext)
+{
+	size_t n_pos = 0;
+	size_t* __pos = &n_pos;
+
+	fptr_hc_driver_address_device function_ptr = glue_unpack(__pos, __msg, __ext, fptr_hc_driver_address_device);
+	struct usb_hcd* hcd = 0;
+	struct usb_hcd** hcd_ptr = &hcd;
+	struct usb_device __udev;
+	struct usb_device* udev = &__udev;
+	struct usb_device** udev_ptr = &udev;
+	int ret = 0;
+	int* ret_ptr = &ret;
+	
+	__maybe_unused struct hc_driver_address_device_call_ctx call_ctx = {hcd, udev};
+	__maybe_unused struct hc_driver_address_device_call_ctx *ctx = &call_ctx;
+
+	if (verbose_debug) {
+		printk("%s:%d, entered!\n", __func__, __LINE__);
+	}
+
+	{
+		*hcd_ptr = glue_unpack(__pos, __msg, __ext, struct usb_hcd*);
+		if (*hcd_ptr) {
+			callee_unmarshal_kernel__hc_driver_address_device__hcd__in(__pos, __msg, __ext, ctx, *hcd_ptr);
+		}
+
+	}
+
+	{
+		if (*udev_ptr) {
+			callee_unmarshal_kernel__hc_driver_address_device__udev__in(__pos, __msg, __ext, ctx, *udev_ptr);
+		}
+
+	}
+
+	ret = function_ptr(hcd, udev);
+
+	*__pos = 0;
+	{
+		if (*hcd_ptr) {
+			callee_marshal_kernel__hc_driver_address_device__hcd__in(__pos, __msg, __ext, ctx, *hcd_ptr);
+		}
+
+	}
+
+	{
+		if (*udev_ptr) {
+			callee_marshal_kernel__hc_driver_address_device__udev__in(__pos, __msg, __ext, ctx, *udev_ptr);
+		}
+
+	}
+
+	{
+		glue_pack(__pos, __msg, __ext, *ret_ptr);
+	}
+
+	__msg->regs[0] = *__pos;
+	if (verbose_debug) {
+		printk("%s:%d, returned!\n", __func__, __LINE__);
+	}
+}
+
+void hc_driver_hub_status_data_callee(struct fipc_message* __msg, struct ext_registers* __ext)
+{
+	size_t n_pos = 0;
+	size_t* __pos = &n_pos;
+
+	fptr_hc_driver_hub_status_data function_ptr = glue_unpack(__pos, __msg, __ext, fptr_hc_driver_hub_status_data);
+	struct usb_hcd* hcd = 0;
+	struct usb_hcd** hcd_ptr = &hcd;
+	char __buf;
+	char* buf = &__buf;
+	char** buf_ptr = &buf;
+	int ret = 0;
+	int* ret_ptr = &ret;
+	
+	__maybe_unused struct hc_driver_hub_status_data_call_ctx call_ctx = {hcd, buf};
+	__maybe_unused struct hc_driver_hub_status_data_call_ctx *ctx = &call_ctx;
+
+	if (verbose_debug) {
+		printk("%s:%d, entered!\n", __func__, __LINE__);
+	}
+
+	{
+		*hcd_ptr = glue_unpack(__pos, __msg, __ext, struct usb_hcd*);
+		if (*hcd_ptr) {
+			callee_unmarshal_kernel__hc_driver_hub_status_data__hcd__in(__pos, __msg, __ext, ctx, *hcd_ptr);
+		}
+
+	}
+
+	{
+		if (*buf_ptr) {
+			**buf_ptr = glue_unpack(__pos, __msg, __ext, char);
+		}
+
+	}
+
+	ret = function_ptr(hcd, buf);
+
+	*__pos = 0;
+	{
+		if (*hcd_ptr) {
+			callee_marshal_kernel__hc_driver_hub_status_data__hcd__in(__pos, __msg, __ext, ctx, *hcd_ptr);
+		}
+
+	}
+
+	{
+		(void)buf_ptr;
+	}
+
+	{
+		glue_pack(__pos, __msg, __ext, *ret_ptr);
+	}
+
+	__msg->regs[0] = *__pos;
+	if (verbose_debug) {
+		printk("%s:%d, returned!\n", __func__, __LINE__);
+	}
+}
+
+void hc_driver_irq_callee(struct fipc_message* __msg, struct ext_registers* __ext)
+{
+	size_t n_pos = 0;
+	size_t* __pos = &n_pos;
+
+	fptr_hc_driver_irq function_ptr = glue_unpack(__pos, __msg, __ext, fptr_hc_driver_irq);
+	struct usb_hcd* hcd = 0;
+	struct usb_hcd** hcd_ptr = &hcd;
+	unsigned int ret = 0;
+	unsigned int* ret_ptr = &ret;
+	
+	__maybe_unused struct hc_driver_irq_call_ctx call_ctx = {hcd};
+	__maybe_unused struct hc_driver_irq_call_ctx *ctx = &call_ctx;
+
+	if (verbose_debug) {
+		printk("%s:%d, entered!\n", __func__, __LINE__);
+	}
+
+	{
+		*hcd_ptr = glue_unpack(__pos, __msg, __ext, struct usb_hcd*);
+		if (*hcd_ptr) {
+			callee_unmarshal_kernel__hc_driver_irq__hcd__in(__pos, __msg, __ext, ctx, *hcd_ptr);
+		}
+
+	}
+
+	ret = function_ptr(hcd);
+
+	*__pos = 0;
+	{
+		if (*hcd_ptr) {
+			callee_marshal_kernel__hc_driver_irq__hcd__in(__pos, __msg, __ext, ctx, *hcd_ptr);
+		}
+
+	}
+
+	{
+		glue_pack(__pos, __msg, __ext, *ret_ptr);
+	}
+
+	__msg->regs[0] = *__pos;
+	if (verbose_debug) {
+		printk("%s:%d, returned!\n", __func__, __LINE__);
+	}
+}
+
+void hc_driver_hub_control_callee(struct fipc_message* __msg, struct ext_registers* __ext)
+{
+	size_t n_pos = 0;
+	size_t* __pos = &n_pos;
+
+	fptr_hc_driver_hub_control function_ptr = glue_unpack(__pos, __msg, __ext, fptr_hc_driver_hub_control);
+	struct usb_hcd* hcd = 0;
+	unsigned short typeReq = 0;
+	unsigned short wValue = 0;
+	unsigned short wIndex = 0;
+	unsigned short wLength = 0;
+	struct usb_hcd** hcd_ptr = &hcd;
+	unsigned short* typeReq_ptr = &typeReq;
+	unsigned short* wValue_ptr = &wValue;
+	unsigned short* wIndex_ptr = &wIndex;
+	char __buf;
+	char* buf = &__buf;
+	char** buf_ptr = &buf;
+	unsigned short* wLength_ptr = &wLength;
+	int ret = 0;
+	int* ret_ptr = &ret;
+	
+	__maybe_unused struct hc_driver_hub_control_call_ctx call_ctx = {hcd, typeReq, wValue, wIndex, buf, wLength};
+	__maybe_unused struct hc_driver_hub_control_call_ctx *ctx = &call_ctx;
+
+	if (verbose_debug) {
+		printk("%s:%d, entered!\n", __func__, __LINE__);
+	}
+
+	{
+		*hcd_ptr = glue_unpack(__pos, __msg, __ext, struct usb_hcd*);
+		if (*hcd_ptr) {
+			callee_unmarshal_kernel__hc_driver_hub_control__hcd__in(__pos, __msg, __ext, ctx, *hcd_ptr);
+		}
+
+	}
+
+	{
+		*typeReq_ptr = glue_unpack(__pos, __msg, __ext, unsigned short);
+	}
+
+	{
+		*wValue_ptr = glue_unpack(__pos, __msg, __ext, unsigned short);
+	}
+
+	{
+		*wIndex_ptr = glue_unpack(__pos, __msg, __ext, unsigned short);
+	}
+
+	{
+		if (*buf_ptr) {
+			**buf_ptr = glue_unpack(__pos, __msg, __ext, char);
+		}
+
+	}
+
+	{
+		*wLength_ptr = glue_unpack(__pos, __msg, __ext, unsigned short);
+	}
+
+	ret = function_ptr(hcd, typeReq, wValue, wIndex, buf, wLength);
+
+	*__pos = 0;
+	{
+		if (*hcd_ptr) {
+			callee_marshal_kernel__hc_driver_hub_control__hcd__in(__pos, __msg, __ext, ctx, *hcd_ptr);
+		}
+
+	}
+
+	{
+	}
+
+	{
+	}
+
+	{
+	}
+
+	{
+		if (*buf_ptr) {
+			glue_pack(__pos, __msg, __ext, **buf_ptr);
+		}
+
+	}
+
+	{
+	}
+
+	{
+		glue_pack(__pos, __msg, __ext, *ret_ptr);
+	}
+
+	__msg->regs[0] = *__pos;
+	if (verbose_debug) {
+		printk("%s:%d, returned!\n", __func__, __LINE__);
+	}
 }
 
 int try_dispatch(enum RPC_ID id, struct fipc_message* __msg, struct ext_registers* __ext)
@@ -1982,7 +3624,6 @@ int try_dispatch(enum RPC_ID id, struct fipc_message* __msg, struct ext_register
 	switch(id) {
 	case MODULE_INIT:
 		glue_user_trace("MODULE_INIT");
-		__init_globals();
 		__module_lcd_init();
 		shared_mem_init();
 		break;
@@ -2020,6 +3661,141 @@ int try_dispatch(enum RPC_ID id, struct fipc_message* __msg, struct ext_register
 	case RPC_ID_xhci_run:
 		glue_user_trace("xhci_run\n");
 		xhci_run_callee(__msg, __ext);
+		break;
+
+	case RPC_ID_hc_driver_start:
+		glue_user_trace("hc_driver_start\n");
+		hc_driver_start_callee(__msg, __ext);
+		break;
+
+	case RPC_ID_hc_driver_enable_device:
+		glue_user_trace("hc_driver_enable_device\n");
+		hc_driver_enable_device_callee(__msg, __ext);
+		break;
+
+	case RPC_ID_hc_driver_update_hub_device:
+		glue_user_trace("hc_driver_update_hub_device\n");
+		hc_driver_update_hub_device_callee(__msg, __ext);
+		break;
+
+	case RPC_ID_hc_driver_reset_device:
+		glue_user_trace("hc_driver_reset_device\n");
+		hc_driver_reset_device_callee(__msg, __ext);
+		break;
+
+	case RPC_ID_hc_driver_update_device:
+		glue_user_trace("hc_driver_update_device\n");
+		hc_driver_update_device_callee(__msg, __ext);
+		break;
+
+	case RPC_ID_hc_driver_set_usb2_hw_lpm:
+		glue_user_trace("hc_driver_set_usb2_hw_lpm\n");
+		hc_driver_set_usb2_hw_lpm_callee(__msg, __ext);
+		break;
+
+	case RPC_ID_hc_driver_enable_usb3_lpm_timeout:
+		glue_user_trace("hc_driver_enable_usb3_lpm_timeout\n");
+		hc_driver_enable_usb3_lpm_timeout_callee(__msg, __ext);
+		break;
+
+	case RPC_ID_hc_driver_disable_usb3_lpm_timeout:
+		glue_user_trace("hc_driver_disable_usb3_lpm_timeout\n");
+		hc_driver_disable_usb3_lpm_timeout_callee(__msg, __ext);
+		break;
+
+	case RPC_ID_hc_driver_find_raw_port_number:
+		glue_user_trace("hc_driver_find_raw_port_number\n");
+		hc_driver_find_raw_port_number_callee(__msg, __ext);
+		break;
+
+	case RPC_ID_hc_driver_stop:
+		glue_user_trace("hc_driver_stop\n");
+		hc_driver_stop_callee(__msg, __ext);
+		break;
+
+	case RPC_ID_hc_driver_shutdown:
+		glue_user_trace("hc_driver_shutdown\n");
+		hc_driver_shutdown_callee(__msg, __ext);
+		break;
+
+	case RPC_ID_hc_driver_get_frame_number:
+		glue_user_trace("hc_driver_get_frame_number\n");
+		hc_driver_get_frame_number_callee(__msg, __ext);
+		break;
+
+	case RPC_ID_hc_driver_urb_enqueue:
+		glue_user_trace("hc_driver_urb_enqueue\n");
+		hc_driver_urb_enqueue_callee(__msg, __ext);
+		break;
+
+	case RPC_ID_hc_driver_urb_dequeue:
+		glue_user_trace("hc_driver_urb_dequeue\n");
+		hc_driver_urb_dequeue_callee(__msg, __ext);
+		break;
+
+	case RPC_ID_hc_driver_endpoint_reset:
+		glue_user_trace("hc_driver_endpoint_reset\n");
+		hc_driver_endpoint_reset_callee(__msg, __ext);
+		break;
+
+	case RPC_ID_hc_driver_alloc_dev:
+		glue_user_trace("hc_driver_alloc_dev\n");
+		hc_driver_alloc_dev_callee(__msg, __ext);
+		break;
+
+	case RPC_ID_hc_driver_free_dev:
+		glue_user_trace("hc_driver_free_dev\n");
+		hc_driver_free_dev_callee(__msg, __ext);
+		break;
+
+	case RPC_ID_hc_driver_alloc_streams:
+		glue_user_trace("hc_driver_alloc_streams\n");
+		hc_driver_alloc_streams_callee(__msg, __ext);
+		break;
+
+	case RPC_ID_hc_driver_free_streams:
+		glue_user_trace("hc_driver_free_streams\n");
+		hc_driver_free_streams_callee(__msg, __ext);
+		break;
+
+	case RPC_ID_hc_driver_add_endpoint:
+		glue_user_trace("hc_driver_add_endpoint\n");
+		hc_driver_add_endpoint_callee(__msg, __ext);
+		break;
+
+	case RPC_ID_hc_driver_drop_endpoint:
+		glue_user_trace("hc_driver_drop_endpoint\n");
+		hc_driver_drop_endpoint_callee(__msg, __ext);
+		break;
+
+	case RPC_ID_hc_driver_check_bandwidth:
+		glue_user_trace("hc_driver_check_bandwidth\n");
+		hc_driver_check_bandwidth_callee(__msg, __ext);
+		break;
+
+	case RPC_ID_hc_driver_reset_bandwidth:
+		glue_user_trace("hc_driver_reset_bandwidth\n");
+		hc_driver_reset_bandwidth_callee(__msg, __ext);
+		break;
+
+	case RPC_ID_hc_driver_address_device:
+		glue_user_trace("hc_driver_address_device\n");
+		hc_driver_address_device_callee(__msg, __ext);
+		break;
+
+	case RPC_ID_hc_driver_hub_status_data:
+		glue_user_trace("hc_driver_hub_status_data\n");
+		hc_driver_hub_status_data_callee(__msg, __ext);
+		break;
+
+	case RPC_ID_hc_driver_irq:
+		glue_user_trace("hc_driver_irq\n");
+		hc_driver_irq_callee(__msg, __ext);
+		break;
+
+	case RPC_ID_hc_driver_hub_control:
+		glue_user_trace("hc_driver_hub_control\n");
+		hc_driver_hub_control_callee(__msg, __ext);
 		break;
 
 	default:

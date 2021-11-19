@@ -185,8 +185,33 @@ enum RPC_ID {
 	RPC_ID_usb_hcd_poll_rh_status,
 	RPC_ID_usb_hcd_unlink_urb_from_ep,
 	RPC_ID_usb_wakeup_notification,
-	RPC_ID_get_loops_per_jiffy,
-	RPC_ID_get_jiffies,
+	RPC_ID_hc_driver_start,
+	RPC_ID_hc_driver_enable_device,
+	RPC_ID_hc_driver_update_hub_device,
+	RPC_ID_hc_driver_reset_device,
+	RPC_ID_hc_driver_update_device,
+	RPC_ID_hc_driver_set_usb2_hw_lpm,
+	RPC_ID_hc_driver_enable_usb3_lpm_timeout,
+	RPC_ID_hc_driver_disable_usb3_lpm_timeout,
+	RPC_ID_hc_driver_find_raw_port_number,
+	RPC_ID_hc_driver_stop,
+	RPC_ID_hc_driver_shutdown,
+	RPC_ID_hc_driver_get_frame_number,
+	RPC_ID_hc_driver_urb_enqueue,
+	RPC_ID_hc_driver_urb_dequeue,
+	RPC_ID_hc_driver_endpoint_reset,
+	RPC_ID_hc_driver_alloc_dev,
+	RPC_ID_hc_driver_free_dev,
+	RPC_ID_hc_driver_alloc_streams,
+	RPC_ID_hc_driver_free_streams,
+	RPC_ID_hc_driver_add_endpoint,
+	RPC_ID_hc_driver_drop_endpoint,
+	RPC_ID_hc_driver_check_bandwidth,
+	RPC_ID_hc_driver_reset_bandwidth,
+	RPC_ID_hc_driver_address_device,
+	RPC_ID_hc_driver_hub_status_data,
+	RPC_ID_hc_driver_irq,
+	RPC_ID_hc_driver_hub_control,
 };
 
 int try_dispatch(enum RPC_ID id, struct fipc_message* __msg, struct ext_registers* __ext);
@@ -208,6 +233,168 @@ typedef void (*fptr_impl_get_quirks)(fptr_get_quirks target, struct device* dev,
 
 LCD_TRAMPOLINE_DATA(trmp_get_quirks)
 void LCD_TRAMPOLINE_LINKAGE(trmp_get_quirks) trmp_get_quirks(struct device* dev, struct xhci_hcd* xhci_hcd);
+
+typedef int (*fptr_hc_driver_start)(struct usb_hcd* hcd);
+typedef int (*fptr_impl_hc_driver_start)(fptr_hc_driver_start target, struct usb_hcd* hcd);
+
+LCD_TRAMPOLINE_DATA(trmp_hc_driver_start)
+int LCD_TRAMPOLINE_LINKAGE(trmp_hc_driver_start) trmp_hc_driver_start(struct usb_hcd* hcd);
+
+typedef int (*fptr_hc_driver_enable_device)(struct usb_hcd* hcd, struct usb_device* udev);
+typedef int (*fptr_impl_hc_driver_enable_device)(fptr_hc_driver_enable_device target, struct usb_hcd* hcd, struct usb_device* udev);
+
+LCD_TRAMPOLINE_DATA(trmp_hc_driver_enable_device)
+int LCD_TRAMPOLINE_LINKAGE(trmp_hc_driver_enable_device) trmp_hc_driver_enable_device(struct usb_hcd* hcd, struct usb_device* udev);
+
+typedef int (*fptr_hc_driver_update_hub_device)(struct usb_hcd* hcd, struct usb_device* hdev, struct usb_tt* tt, unsigned int mem_flags);
+typedef int (*fptr_impl_hc_driver_update_hub_device)(fptr_hc_driver_update_hub_device target, struct usb_hcd* hcd, struct usb_device* hdev, struct usb_tt* tt, unsigned int mem_flags);
+
+LCD_TRAMPOLINE_DATA(trmp_hc_driver_update_hub_device)
+int LCD_TRAMPOLINE_LINKAGE(trmp_hc_driver_update_hub_device) trmp_hc_driver_update_hub_device(struct usb_hcd* hcd, struct usb_device* hdev, struct usb_tt* tt, unsigned int mem_flags);
+
+typedef int (*fptr_hc_driver_reset_device)(struct usb_hcd* hcd, struct usb_device* udev);
+typedef int (*fptr_impl_hc_driver_reset_device)(fptr_hc_driver_reset_device target, struct usb_hcd* hcd, struct usb_device* udev);
+
+LCD_TRAMPOLINE_DATA(trmp_hc_driver_reset_device)
+int LCD_TRAMPOLINE_LINKAGE(trmp_hc_driver_reset_device) trmp_hc_driver_reset_device(struct usb_hcd* hcd, struct usb_device* udev);
+
+typedef int (*fptr_hc_driver_update_device)(struct usb_hcd* hcd, struct usb_device* udev);
+typedef int (*fptr_impl_hc_driver_update_device)(fptr_hc_driver_update_device target, struct usb_hcd* hcd, struct usb_device* udev);
+
+LCD_TRAMPOLINE_DATA(trmp_hc_driver_update_device)
+int LCD_TRAMPOLINE_LINKAGE(trmp_hc_driver_update_device) trmp_hc_driver_update_device(struct usb_hcd* hcd, struct usb_device* udev);
+
+typedef int (*fptr_hc_driver_set_usb2_hw_lpm)(struct usb_hcd* hcd, struct usb_device* udev, int enable);
+typedef int (*fptr_impl_hc_driver_set_usb2_hw_lpm)(fptr_hc_driver_set_usb2_hw_lpm target, struct usb_hcd* hcd, struct usb_device* udev, int enable);
+
+LCD_TRAMPOLINE_DATA(trmp_hc_driver_set_usb2_hw_lpm)
+int LCD_TRAMPOLINE_LINKAGE(trmp_hc_driver_set_usb2_hw_lpm) trmp_hc_driver_set_usb2_hw_lpm(struct usb_hcd* hcd, struct usb_device* udev, int enable);
+
+typedef int (*fptr_hc_driver_enable_usb3_lpm_timeout)(struct usb_hcd* hcd, struct usb_device* udev, unsigned int state);
+typedef int (*fptr_impl_hc_driver_enable_usb3_lpm_timeout)(fptr_hc_driver_enable_usb3_lpm_timeout target, struct usb_hcd* hcd, struct usb_device* udev, unsigned int state);
+
+LCD_TRAMPOLINE_DATA(trmp_hc_driver_enable_usb3_lpm_timeout)
+int LCD_TRAMPOLINE_LINKAGE(trmp_hc_driver_enable_usb3_lpm_timeout) trmp_hc_driver_enable_usb3_lpm_timeout(struct usb_hcd* hcd, struct usb_device* udev, unsigned int state);
+
+typedef int (*fptr_hc_driver_disable_usb3_lpm_timeout)(struct usb_hcd* hcd, struct usb_device* udev, unsigned int state);
+typedef int (*fptr_impl_hc_driver_disable_usb3_lpm_timeout)(fptr_hc_driver_disable_usb3_lpm_timeout target, struct usb_hcd* hcd, struct usb_device* udev, unsigned int state);
+
+LCD_TRAMPOLINE_DATA(trmp_hc_driver_disable_usb3_lpm_timeout)
+int LCD_TRAMPOLINE_LINKAGE(trmp_hc_driver_disable_usb3_lpm_timeout) trmp_hc_driver_disable_usb3_lpm_timeout(struct usb_hcd* hcd, struct usb_device* udev, unsigned int state);
+
+typedef int (*fptr_hc_driver_find_raw_port_number)(struct usb_hcd* hcd, int port1);
+typedef int (*fptr_impl_hc_driver_find_raw_port_number)(fptr_hc_driver_find_raw_port_number target, struct usb_hcd* hcd, int port1);
+
+LCD_TRAMPOLINE_DATA(trmp_hc_driver_find_raw_port_number)
+int LCD_TRAMPOLINE_LINKAGE(trmp_hc_driver_find_raw_port_number) trmp_hc_driver_find_raw_port_number(struct usb_hcd* hcd, int port1);
+
+typedef void (*fptr_hc_driver_stop)(struct usb_hcd* hcd);
+typedef void (*fptr_impl_hc_driver_stop)(fptr_hc_driver_stop target, struct usb_hcd* hcd);
+
+LCD_TRAMPOLINE_DATA(trmp_hc_driver_stop)
+void LCD_TRAMPOLINE_LINKAGE(trmp_hc_driver_stop) trmp_hc_driver_stop(struct usb_hcd* hcd);
+
+typedef void (*fptr_hc_driver_shutdown)(struct usb_hcd* hcd);
+typedef void (*fptr_impl_hc_driver_shutdown)(fptr_hc_driver_shutdown target, struct usb_hcd* hcd);
+
+LCD_TRAMPOLINE_DATA(trmp_hc_driver_shutdown)
+void LCD_TRAMPOLINE_LINKAGE(trmp_hc_driver_shutdown) trmp_hc_driver_shutdown(struct usb_hcd* hcd);
+
+typedef int (*fptr_hc_driver_get_frame_number)(struct usb_hcd* hcd);
+typedef int (*fptr_impl_hc_driver_get_frame_number)(fptr_hc_driver_get_frame_number target, struct usb_hcd* hcd);
+
+LCD_TRAMPOLINE_DATA(trmp_hc_driver_get_frame_number)
+int LCD_TRAMPOLINE_LINKAGE(trmp_hc_driver_get_frame_number) trmp_hc_driver_get_frame_number(struct usb_hcd* hcd);
+
+typedef int (*fptr_hc_driver_urb_enqueue)(struct usb_hcd* hcd, struct urb* urb, unsigned int mem_flags);
+typedef int (*fptr_impl_hc_driver_urb_enqueue)(fptr_hc_driver_urb_enqueue target, struct usb_hcd* hcd, struct urb* urb, unsigned int mem_flags);
+
+LCD_TRAMPOLINE_DATA(trmp_hc_driver_urb_enqueue)
+int LCD_TRAMPOLINE_LINKAGE(trmp_hc_driver_urb_enqueue) trmp_hc_driver_urb_enqueue(struct usb_hcd* hcd, struct urb* urb, unsigned int mem_flags);
+
+typedef int (*fptr_hc_driver_urb_dequeue)(struct usb_hcd* hcd, struct urb* urb, int status);
+typedef int (*fptr_impl_hc_driver_urb_dequeue)(fptr_hc_driver_urb_dequeue target, struct usb_hcd* hcd, struct urb* urb, int status);
+
+LCD_TRAMPOLINE_DATA(trmp_hc_driver_urb_dequeue)
+int LCD_TRAMPOLINE_LINKAGE(trmp_hc_driver_urb_dequeue) trmp_hc_driver_urb_dequeue(struct usb_hcd* hcd, struct urb* urb, int status);
+
+typedef void (*fptr_hc_driver_endpoint_reset)(struct usb_hcd* hcd, struct usb_host_endpoint* ep);
+typedef void (*fptr_impl_hc_driver_endpoint_reset)(fptr_hc_driver_endpoint_reset target, struct usb_hcd* hcd, struct usb_host_endpoint* ep);
+
+LCD_TRAMPOLINE_DATA(trmp_hc_driver_endpoint_reset)
+void LCD_TRAMPOLINE_LINKAGE(trmp_hc_driver_endpoint_reset) trmp_hc_driver_endpoint_reset(struct usb_hcd* hcd, struct usb_host_endpoint* ep);
+
+typedef int (*fptr_hc_driver_alloc_dev)(struct usb_hcd* hcd, struct usb_device* udev);
+typedef int (*fptr_impl_hc_driver_alloc_dev)(fptr_hc_driver_alloc_dev target, struct usb_hcd* hcd, struct usb_device* udev);
+
+LCD_TRAMPOLINE_DATA(trmp_hc_driver_alloc_dev)
+int LCD_TRAMPOLINE_LINKAGE(trmp_hc_driver_alloc_dev) trmp_hc_driver_alloc_dev(struct usb_hcd* hcd, struct usb_device* udev);
+
+typedef void (*fptr_hc_driver_free_dev)(struct usb_hcd* hcd, struct usb_device* udev);
+typedef void (*fptr_impl_hc_driver_free_dev)(fptr_hc_driver_free_dev target, struct usb_hcd* hcd, struct usb_device* udev);
+
+LCD_TRAMPOLINE_DATA(trmp_hc_driver_free_dev)
+void LCD_TRAMPOLINE_LINKAGE(trmp_hc_driver_free_dev) trmp_hc_driver_free_dev(struct usb_hcd* hcd, struct usb_device* udev);
+
+typedef int (*fptr_hc_driver_alloc_streams)(struct usb_hcd* hcd, struct usb_device* udev, struct usb_host_endpoint** eps, unsigned int num_eps, unsigned int num_streams, unsigned int mem_flags);
+typedef int (*fptr_impl_hc_driver_alloc_streams)(fptr_hc_driver_alloc_streams target, struct usb_hcd* hcd, struct usb_device* udev, struct usb_host_endpoint** eps, unsigned int num_eps, unsigned int num_streams, unsigned int mem_flags);
+
+LCD_TRAMPOLINE_DATA(trmp_hc_driver_alloc_streams)
+int LCD_TRAMPOLINE_LINKAGE(trmp_hc_driver_alloc_streams) trmp_hc_driver_alloc_streams(struct usb_hcd* hcd, struct usb_device* udev, struct usb_host_endpoint** eps, unsigned int num_eps, unsigned int num_streams, unsigned int mem_flags);
+
+typedef int (*fptr_hc_driver_free_streams)(struct usb_hcd* hcd, struct usb_device* udev, struct usb_host_endpoint** eps, unsigned int num_eps, unsigned int mem_flags);
+typedef int (*fptr_impl_hc_driver_free_streams)(fptr_hc_driver_free_streams target, struct usb_hcd* hcd, struct usb_device* udev, struct usb_host_endpoint** eps, unsigned int num_eps, unsigned int mem_flags);
+
+LCD_TRAMPOLINE_DATA(trmp_hc_driver_free_streams)
+int LCD_TRAMPOLINE_LINKAGE(trmp_hc_driver_free_streams) trmp_hc_driver_free_streams(struct usb_hcd* hcd, struct usb_device* udev, struct usb_host_endpoint** eps, unsigned int num_eps, unsigned int mem_flags);
+
+typedef int (*fptr_hc_driver_add_endpoint)(struct usb_hcd* hcd, struct usb_device* udev, struct usb_host_endpoint* ep);
+typedef int (*fptr_impl_hc_driver_add_endpoint)(fptr_hc_driver_add_endpoint target, struct usb_hcd* hcd, struct usb_device* udev, struct usb_host_endpoint* ep);
+
+LCD_TRAMPOLINE_DATA(trmp_hc_driver_add_endpoint)
+int LCD_TRAMPOLINE_LINKAGE(trmp_hc_driver_add_endpoint) trmp_hc_driver_add_endpoint(struct usb_hcd* hcd, struct usb_device* udev, struct usb_host_endpoint* ep);
+
+typedef int (*fptr_hc_driver_drop_endpoint)(struct usb_hcd* hcd, struct usb_device* udev, struct usb_host_endpoint* ep);
+typedef int (*fptr_impl_hc_driver_drop_endpoint)(fptr_hc_driver_drop_endpoint target, struct usb_hcd* hcd, struct usb_device* udev, struct usb_host_endpoint* ep);
+
+LCD_TRAMPOLINE_DATA(trmp_hc_driver_drop_endpoint)
+int LCD_TRAMPOLINE_LINKAGE(trmp_hc_driver_drop_endpoint) trmp_hc_driver_drop_endpoint(struct usb_hcd* hcd, struct usb_device* udev, struct usb_host_endpoint* ep);
+
+typedef int (*fptr_hc_driver_check_bandwidth)(struct usb_hcd* hcd, struct usb_device* udev);
+typedef int (*fptr_impl_hc_driver_check_bandwidth)(fptr_hc_driver_check_bandwidth target, struct usb_hcd* hcd, struct usb_device* udev);
+
+LCD_TRAMPOLINE_DATA(trmp_hc_driver_check_bandwidth)
+int LCD_TRAMPOLINE_LINKAGE(trmp_hc_driver_check_bandwidth) trmp_hc_driver_check_bandwidth(struct usb_hcd* hcd, struct usb_device* udev);
+
+typedef void (*fptr_hc_driver_reset_bandwidth)(struct usb_hcd* hcd, struct usb_device* udev);
+typedef void (*fptr_impl_hc_driver_reset_bandwidth)(fptr_hc_driver_reset_bandwidth target, struct usb_hcd* hcd, struct usb_device* udev);
+
+LCD_TRAMPOLINE_DATA(trmp_hc_driver_reset_bandwidth)
+void LCD_TRAMPOLINE_LINKAGE(trmp_hc_driver_reset_bandwidth) trmp_hc_driver_reset_bandwidth(struct usb_hcd* hcd, struct usb_device* udev);
+
+typedef int (*fptr_hc_driver_address_device)(struct usb_hcd* hcd, struct usb_device* udev);
+typedef int (*fptr_impl_hc_driver_address_device)(fptr_hc_driver_address_device target, struct usb_hcd* hcd, struct usb_device* udev);
+
+LCD_TRAMPOLINE_DATA(trmp_hc_driver_address_device)
+int LCD_TRAMPOLINE_LINKAGE(trmp_hc_driver_address_device) trmp_hc_driver_address_device(struct usb_hcd* hcd, struct usb_device* udev);
+
+typedef int (*fptr_hc_driver_hub_status_data)(struct usb_hcd* hcd, char* buf);
+typedef int (*fptr_impl_hc_driver_hub_status_data)(fptr_hc_driver_hub_status_data target, struct usb_hcd* hcd, char* buf);
+
+LCD_TRAMPOLINE_DATA(trmp_hc_driver_hub_status_data)
+int LCD_TRAMPOLINE_LINKAGE(trmp_hc_driver_hub_status_data) trmp_hc_driver_hub_status_data(struct usb_hcd* hcd, char* buf);
+
+typedef unsigned int (*fptr_hc_driver_irq)(struct usb_hcd* hcd);
+typedef unsigned int (*fptr_impl_hc_driver_irq)(fptr_hc_driver_irq target, struct usb_hcd* hcd);
+
+LCD_TRAMPOLINE_DATA(trmp_hc_driver_irq)
+unsigned int LCD_TRAMPOLINE_LINKAGE(trmp_hc_driver_irq) trmp_hc_driver_irq(struct usb_hcd* hcd);
+
+typedef int (*fptr_hc_driver_hub_control)(struct usb_hcd* hcd, unsigned short typeReq, unsigned short wValue, unsigned short wIndex, char* buf, unsigned short wLength);
+typedef int (*fptr_impl_hc_driver_hub_control)(fptr_hc_driver_hub_control target, struct usb_hcd* hcd, unsigned short typeReq, unsigned short wValue, unsigned short wIndex, char* buf, unsigned short wLength);
+
+LCD_TRAMPOLINE_DATA(trmp_hc_driver_hub_control)
+int LCD_TRAMPOLINE_LINKAGE(trmp_hc_driver_hub_control) trmp_hc_driver_hub_control(struct usb_hcd* hcd, unsigned short typeReq, unsigned short wValue, unsigned short wIndex, char* buf, unsigned short wLength);
 
 struct add_timer_call_ctx {
 	struct timer_list* timer;
@@ -233,7 +420,7 @@ struct free_irq_call_ctx {
 struct init_timer_key_call_ctx {
 	struct timer_list* timer;
 	unsigned int flags;
-	const char* name;
+	char* name;
 	struct lock_class_key* key;
 };
 
@@ -283,7 +470,7 @@ struct request_threaded_irq_call_ctx {
 	fptr_handler handler;
 	fptr_thread_fn thread_fn;
 	unsigned long irqflags;
-	const char* devname;
+	char* devname;
 	void* dev_id;
 };
 
@@ -308,7 +495,7 @@ struct xhci_gen_setup_call_ctx {
 
 struct xhci_init_driver_call_ctx {
 	struct hc_driver* drv;
-	const struct xhci_driver_overrides* over;
+	struct xhci_driver_overrides* over;
 };
 
 struct xhci_run_call_ctx {
@@ -381,12 +568,155 @@ struct usb_wakeup_notification_call_ctx {
 	unsigned int portnum;
 };
 
-struct get_loops_per_jiffy_call_ctx {
+struct hc_driver_start_call_ctx {
+	struct usb_hcd* hcd;
 };
 
-struct get_jiffies_call_ctx {
+struct hc_driver_enable_device_call_ctx {
+	struct usb_hcd* hcd;
+	struct usb_device* udev;
 };
 
+struct hc_driver_update_hub_device_call_ctx {
+	struct usb_hcd* hcd;
+	struct usb_device* hdev;
+	struct usb_tt* tt;
+	unsigned int mem_flags;
+};
+
+struct hc_driver_reset_device_call_ctx {
+	struct usb_hcd* hcd;
+	struct usb_device* udev;
+};
+
+struct hc_driver_update_device_call_ctx {
+	struct usb_hcd* hcd;
+	struct usb_device* udev;
+};
+
+struct hc_driver_set_usb2_hw_lpm_call_ctx {
+	struct usb_hcd* hcd;
+	struct usb_device* udev;
+	int enable;
+};
+
+struct hc_driver_enable_usb3_lpm_timeout_call_ctx {
+	struct usb_hcd* hcd;
+	struct usb_device* udev;
+	unsigned int state;
+};
+
+struct hc_driver_disable_usb3_lpm_timeout_call_ctx {
+	struct usb_hcd* hcd;
+	struct usb_device* udev;
+	unsigned int state;
+};
+
+struct hc_driver_find_raw_port_number_call_ctx {
+	struct usb_hcd* hcd;
+	int port1;
+};
+
+struct hc_driver_stop_call_ctx {
+	struct usb_hcd* hcd;
+};
+
+struct hc_driver_shutdown_call_ctx {
+	struct usb_hcd* hcd;
+};
+
+struct hc_driver_get_frame_number_call_ctx {
+	struct usb_hcd* hcd;
+};
+
+struct hc_driver_urb_enqueue_call_ctx {
+	struct usb_hcd* hcd;
+	struct urb* urb;
+	unsigned int mem_flags;
+};
+
+struct hc_driver_urb_dequeue_call_ctx {
+	struct usb_hcd* hcd;
+	struct urb* urb;
+	int status;
+};
+
+struct hc_driver_endpoint_reset_call_ctx {
+	struct usb_hcd* hcd;
+	struct usb_host_endpoint* ep;
+};
+
+struct hc_driver_alloc_dev_call_ctx {
+	struct usb_hcd* hcd;
+	struct usb_device* udev;
+};
+
+struct hc_driver_free_dev_call_ctx {
+	struct usb_hcd* hcd;
+	struct usb_device* udev;
+};
+
+struct hc_driver_alloc_streams_call_ctx {
+	struct usb_hcd* hcd;
+	struct usb_device* udev;
+	struct usb_host_endpoint** eps;
+	unsigned int num_eps;
+	unsigned int num_streams;
+	unsigned int mem_flags;
+};
+
+struct hc_driver_free_streams_call_ctx {
+	struct usb_hcd* hcd;
+	struct usb_device* udev;
+	struct usb_host_endpoint** eps;
+	unsigned int num_eps;
+	unsigned int mem_flags;
+};
+
+struct hc_driver_add_endpoint_call_ctx {
+	struct usb_hcd* hcd;
+	struct usb_device* udev;
+	struct usb_host_endpoint* ep;
+};
+
+struct hc_driver_drop_endpoint_call_ctx {
+	struct usb_hcd* hcd;
+	struct usb_device* udev;
+	struct usb_host_endpoint* ep;
+};
+
+struct hc_driver_check_bandwidth_call_ctx {
+	struct usb_hcd* hcd;
+	struct usb_device* udev;
+};
+
+struct hc_driver_reset_bandwidth_call_ctx {
+	struct usb_hcd* hcd;
+	struct usb_device* udev;
+};
+
+struct hc_driver_address_device_call_ctx {
+	struct usb_hcd* hcd;
+	struct usb_device* udev;
+};
+
+struct hc_driver_hub_status_data_call_ctx {
+	struct usb_hcd* hcd;
+	char* buf;
+};
+
+struct hc_driver_irq_call_ctx {
+	struct usb_hcd* hcd;
+};
+
+struct hc_driver_hub_control_call_ctx {
+	struct usb_hcd* hcd;
+	unsigned short typeReq;
+	unsigned short wValue;
+	unsigned short wIndex;
+	char* buf;
+	unsigned short wLength;
+};
 
 void caller_marshal_kernel__add_timer__timer__in(
 	size_t* __pos,
@@ -1032,32 +1362,28 @@ void caller_unmarshal_kernel__xhci_gen_setup__hcd__in(
 	struct xhci_gen_setup_call_ctx const* call_ctx,
 	struct usb_hcd* ptr);
 
-void caller_marshal_kernel__xhci_init_driver__drv__in(
+void caller_marshal_kernel___global_hc_driver__out(
 	size_t* __pos,
 	struct fipc_message* __msg,
 	struct ext_registers* __ext,
-	struct xhci_init_driver_call_ctx const* call_ctx,
 	struct hc_driver const* ptr);
 
-void callee_unmarshal_kernel__xhci_init_driver__drv__in(
+void callee_unmarshal_kernel___global_hc_driver__out(
 	size_t* __pos,
 	const struct fipc_message* __msg,
 	const struct ext_registers* __ext,
-	struct xhci_init_driver_call_ctx const* call_ctx,
 	struct hc_driver* ptr);
 
-void callee_marshal_kernel__xhci_init_driver__drv__in(
+void callee_marshal_kernel___global_hc_driver__out(
 	size_t* __pos,
 	struct fipc_message* __msg,
 	struct ext_registers* __ext,
-	struct xhci_init_driver_call_ctx const* call_ctx,
 	struct hc_driver const* ptr);
 
-void caller_unmarshal_kernel__xhci_init_driver__drv__in(
+void caller_unmarshal_kernel___global_hc_driver__out(
 	size_t* __pos,
 	const struct fipc_message* __msg,
 	const struct ext_registers* __ext,
-	struct xhci_init_driver_call_ctx const* call_ctx,
 	struct hc_driver* ptr);
 
 void caller_marshal_kernel__xhci_init_driver__over__in(
@@ -1815,6 +2141,2246 @@ void caller_unmarshal_kernel__usb_wakeup_notification__hdev__in(
 	const struct ext_registers* __ext,
 	struct usb_wakeup_notification_call_ctx const* call_ctx,
 	struct usb_device* ptr);
+
+void caller_marshal_kernel__hc_driver_start__hcd__in(
+	size_t* __pos,
+	struct fipc_message* __msg,
+	struct ext_registers* __ext,
+	struct hc_driver_start_call_ctx const* call_ctx,
+	struct usb_hcd const* ptr);
+
+void callee_unmarshal_kernel__hc_driver_start__hcd__in(
+	size_t* __pos,
+	const struct fipc_message* __msg,
+	const struct ext_registers* __ext,
+	struct hc_driver_start_call_ctx const* call_ctx,
+	struct usb_hcd* ptr);
+
+void callee_marshal_kernel__hc_driver_start__hcd__in(
+	size_t* __pos,
+	struct fipc_message* __msg,
+	struct ext_registers* __ext,
+	struct hc_driver_start_call_ctx const* call_ctx,
+	struct usb_hcd const* ptr);
+
+void caller_unmarshal_kernel__hc_driver_start__hcd__in(
+	size_t* __pos,
+	const struct fipc_message* __msg,
+	const struct ext_registers* __ext,
+	struct hc_driver_start_call_ctx const* call_ctx,
+	struct usb_hcd* ptr);
+
+void caller_marshal_kernel__hc_driver_start__usb_hcd_primary_hcd__in(
+	size_t* __pos,
+	struct fipc_message* __msg,
+	struct ext_registers* __ext,
+	struct hc_driver_start_call_ctx const* call_ctx,
+	struct usb_hcd const* ptr);
+
+void callee_unmarshal_kernel__hc_driver_start__usb_hcd_primary_hcd__in(
+	size_t* __pos,
+	const struct fipc_message* __msg,
+	const struct ext_registers* __ext,
+	struct hc_driver_start_call_ctx const* call_ctx,
+	struct usb_hcd* ptr);
+
+void callee_marshal_kernel__hc_driver_start__usb_hcd_primary_hcd__in(
+	size_t* __pos,
+	struct fipc_message* __msg,
+	struct ext_registers* __ext,
+	struct hc_driver_start_call_ctx const* call_ctx,
+	struct usb_hcd const* ptr);
+
+void caller_unmarshal_kernel__hc_driver_start__usb_hcd_primary_hcd__in(
+	size_t* __pos,
+	const struct fipc_message* __msg,
+	const struct ext_registers* __ext,
+	struct hc_driver_start_call_ctx const* call_ctx,
+	struct usb_hcd* ptr);
+
+void caller_marshal_kernel__hc_driver_enable_device__hcd__in(
+	size_t* __pos,
+	struct fipc_message* __msg,
+	struct ext_registers* __ext,
+	struct hc_driver_enable_device_call_ctx const* call_ctx,
+	struct usb_hcd const* ptr);
+
+void callee_unmarshal_kernel__hc_driver_enable_device__hcd__in(
+	size_t* __pos,
+	const struct fipc_message* __msg,
+	const struct ext_registers* __ext,
+	struct hc_driver_enable_device_call_ctx const* call_ctx,
+	struct usb_hcd* ptr);
+
+void callee_marshal_kernel__hc_driver_enable_device__hcd__in(
+	size_t* __pos,
+	struct fipc_message* __msg,
+	struct ext_registers* __ext,
+	struct hc_driver_enable_device_call_ctx const* call_ctx,
+	struct usb_hcd const* ptr);
+
+void caller_unmarshal_kernel__hc_driver_enable_device__hcd__in(
+	size_t* __pos,
+	const struct fipc_message* __msg,
+	const struct ext_registers* __ext,
+	struct hc_driver_enable_device_call_ctx const* call_ctx,
+	struct usb_hcd* ptr);
+
+void caller_marshal_kernel__hc_driver_enable_device__usb_hcd_primary_hcd__in(
+	size_t* __pos,
+	struct fipc_message* __msg,
+	struct ext_registers* __ext,
+	struct hc_driver_enable_device_call_ctx const* call_ctx,
+	struct usb_hcd const* ptr);
+
+void callee_unmarshal_kernel__hc_driver_enable_device__usb_hcd_primary_hcd__in(
+	size_t* __pos,
+	const struct fipc_message* __msg,
+	const struct ext_registers* __ext,
+	struct hc_driver_enable_device_call_ctx const* call_ctx,
+	struct usb_hcd* ptr);
+
+void callee_marshal_kernel__hc_driver_enable_device__usb_hcd_primary_hcd__in(
+	size_t* __pos,
+	struct fipc_message* __msg,
+	struct ext_registers* __ext,
+	struct hc_driver_enable_device_call_ctx const* call_ctx,
+	struct usb_hcd const* ptr);
+
+void caller_unmarshal_kernel__hc_driver_enable_device__usb_hcd_primary_hcd__in(
+	size_t* __pos,
+	const struct fipc_message* __msg,
+	const struct ext_registers* __ext,
+	struct hc_driver_enable_device_call_ctx const* call_ctx,
+	struct usb_hcd* ptr);
+
+void caller_marshal_kernel__hc_driver_enable_device__udev__in(
+	size_t* __pos,
+	struct fipc_message* __msg,
+	struct ext_registers* __ext,
+	struct hc_driver_enable_device_call_ctx const* call_ctx,
+	struct usb_device const* ptr);
+
+void callee_unmarshal_kernel__hc_driver_enable_device__udev__in(
+	size_t* __pos,
+	const struct fipc_message* __msg,
+	const struct ext_registers* __ext,
+	struct hc_driver_enable_device_call_ctx const* call_ctx,
+	struct usb_device* ptr);
+
+void callee_marshal_kernel__hc_driver_enable_device__udev__in(
+	size_t* __pos,
+	struct fipc_message* __msg,
+	struct ext_registers* __ext,
+	struct hc_driver_enable_device_call_ctx const* call_ctx,
+	struct usb_device const* ptr);
+
+void caller_unmarshal_kernel__hc_driver_enable_device__udev__in(
+	size_t* __pos,
+	const struct fipc_message* __msg,
+	const struct ext_registers* __ext,
+	struct hc_driver_enable_device_call_ctx const* call_ctx,
+	struct usb_device* ptr);
+
+void caller_marshal_kernel__hc_driver_update_hub_device__hcd__in(
+	size_t* __pos,
+	struct fipc_message* __msg,
+	struct ext_registers* __ext,
+	struct hc_driver_update_hub_device_call_ctx const* call_ctx,
+	struct usb_hcd const* ptr);
+
+void callee_unmarshal_kernel__hc_driver_update_hub_device__hcd__in(
+	size_t* __pos,
+	const struct fipc_message* __msg,
+	const struct ext_registers* __ext,
+	struct hc_driver_update_hub_device_call_ctx const* call_ctx,
+	struct usb_hcd* ptr);
+
+void callee_marshal_kernel__hc_driver_update_hub_device__hcd__in(
+	size_t* __pos,
+	struct fipc_message* __msg,
+	struct ext_registers* __ext,
+	struct hc_driver_update_hub_device_call_ctx const* call_ctx,
+	struct usb_hcd const* ptr);
+
+void caller_unmarshal_kernel__hc_driver_update_hub_device__hcd__in(
+	size_t* __pos,
+	const struct fipc_message* __msg,
+	const struct ext_registers* __ext,
+	struct hc_driver_update_hub_device_call_ctx const* call_ctx,
+	struct usb_hcd* ptr);
+
+void caller_marshal_kernel__hc_driver_update_hub_device__usb_hcd_primary_hcd__in(
+	size_t* __pos,
+	struct fipc_message* __msg,
+	struct ext_registers* __ext,
+	struct hc_driver_update_hub_device_call_ctx const* call_ctx,
+	struct usb_hcd const* ptr);
+
+void callee_unmarshal_kernel__hc_driver_update_hub_device__usb_hcd_primary_hcd__in(
+	size_t* __pos,
+	const struct fipc_message* __msg,
+	const struct ext_registers* __ext,
+	struct hc_driver_update_hub_device_call_ctx const* call_ctx,
+	struct usb_hcd* ptr);
+
+void callee_marshal_kernel__hc_driver_update_hub_device__usb_hcd_primary_hcd__in(
+	size_t* __pos,
+	struct fipc_message* __msg,
+	struct ext_registers* __ext,
+	struct hc_driver_update_hub_device_call_ctx const* call_ctx,
+	struct usb_hcd const* ptr);
+
+void caller_unmarshal_kernel__hc_driver_update_hub_device__usb_hcd_primary_hcd__in(
+	size_t* __pos,
+	const struct fipc_message* __msg,
+	const struct ext_registers* __ext,
+	struct hc_driver_update_hub_device_call_ctx const* call_ctx,
+	struct usb_hcd* ptr);
+
+void caller_marshal_kernel__hc_driver_update_hub_device__hdev__in(
+	size_t* __pos,
+	struct fipc_message* __msg,
+	struct ext_registers* __ext,
+	struct hc_driver_update_hub_device_call_ctx const* call_ctx,
+	struct usb_device const* ptr);
+
+void callee_unmarshal_kernel__hc_driver_update_hub_device__hdev__in(
+	size_t* __pos,
+	const struct fipc_message* __msg,
+	const struct ext_registers* __ext,
+	struct hc_driver_update_hub_device_call_ctx const* call_ctx,
+	struct usb_device* ptr);
+
+void callee_marshal_kernel__hc_driver_update_hub_device__hdev__in(
+	size_t* __pos,
+	struct fipc_message* __msg,
+	struct ext_registers* __ext,
+	struct hc_driver_update_hub_device_call_ctx const* call_ctx,
+	struct usb_device const* ptr);
+
+void caller_unmarshal_kernel__hc_driver_update_hub_device__hdev__in(
+	size_t* __pos,
+	const struct fipc_message* __msg,
+	const struct ext_registers* __ext,
+	struct hc_driver_update_hub_device_call_ctx const* call_ctx,
+	struct usb_device* ptr);
+
+void caller_marshal_kernel__hc_driver_update_hub_device__tt__in(
+	size_t* __pos,
+	struct fipc_message* __msg,
+	struct ext_registers* __ext,
+	struct hc_driver_update_hub_device_call_ctx const* call_ctx,
+	struct usb_tt const* ptr);
+
+void callee_unmarshal_kernel__hc_driver_update_hub_device__tt__in(
+	size_t* __pos,
+	const struct fipc_message* __msg,
+	const struct ext_registers* __ext,
+	struct hc_driver_update_hub_device_call_ctx const* call_ctx,
+	struct usb_tt* ptr);
+
+void callee_marshal_kernel__hc_driver_update_hub_device__tt__in(
+	size_t* __pos,
+	struct fipc_message* __msg,
+	struct ext_registers* __ext,
+	struct hc_driver_update_hub_device_call_ctx const* call_ctx,
+	struct usb_tt const* ptr);
+
+void caller_unmarshal_kernel__hc_driver_update_hub_device__tt__in(
+	size_t* __pos,
+	const struct fipc_message* __msg,
+	const struct ext_registers* __ext,
+	struct hc_driver_update_hub_device_call_ctx const* call_ctx,
+	struct usb_tt* ptr);
+
+void caller_marshal_kernel__hc_driver_reset_device__hcd__in(
+	size_t* __pos,
+	struct fipc_message* __msg,
+	struct ext_registers* __ext,
+	struct hc_driver_reset_device_call_ctx const* call_ctx,
+	struct usb_hcd const* ptr);
+
+void callee_unmarshal_kernel__hc_driver_reset_device__hcd__in(
+	size_t* __pos,
+	const struct fipc_message* __msg,
+	const struct ext_registers* __ext,
+	struct hc_driver_reset_device_call_ctx const* call_ctx,
+	struct usb_hcd* ptr);
+
+void callee_marshal_kernel__hc_driver_reset_device__hcd__in(
+	size_t* __pos,
+	struct fipc_message* __msg,
+	struct ext_registers* __ext,
+	struct hc_driver_reset_device_call_ctx const* call_ctx,
+	struct usb_hcd const* ptr);
+
+void caller_unmarshal_kernel__hc_driver_reset_device__hcd__in(
+	size_t* __pos,
+	const struct fipc_message* __msg,
+	const struct ext_registers* __ext,
+	struct hc_driver_reset_device_call_ctx const* call_ctx,
+	struct usb_hcd* ptr);
+
+void caller_marshal_kernel__hc_driver_reset_device__usb_hcd_primary_hcd__in(
+	size_t* __pos,
+	struct fipc_message* __msg,
+	struct ext_registers* __ext,
+	struct hc_driver_reset_device_call_ctx const* call_ctx,
+	struct usb_hcd const* ptr);
+
+void callee_unmarshal_kernel__hc_driver_reset_device__usb_hcd_primary_hcd__in(
+	size_t* __pos,
+	const struct fipc_message* __msg,
+	const struct ext_registers* __ext,
+	struct hc_driver_reset_device_call_ctx const* call_ctx,
+	struct usb_hcd* ptr);
+
+void callee_marshal_kernel__hc_driver_reset_device__usb_hcd_primary_hcd__in(
+	size_t* __pos,
+	struct fipc_message* __msg,
+	struct ext_registers* __ext,
+	struct hc_driver_reset_device_call_ctx const* call_ctx,
+	struct usb_hcd const* ptr);
+
+void caller_unmarshal_kernel__hc_driver_reset_device__usb_hcd_primary_hcd__in(
+	size_t* __pos,
+	const struct fipc_message* __msg,
+	const struct ext_registers* __ext,
+	struct hc_driver_reset_device_call_ctx const* call_ctx,
+	struct usb_hcd* ptr);
+
+void caller_marshal_kernel__hc_driver_reset_device__udev__in(
+	size_t* __pos,
+	struct fipc_message* __msg,
+	struct ext_registers* __ext,
+	struct hc_driver_reset_device_call_ctx const* call_ctx,
+	struct usb_device const* ptr);
+
+void callee_unmarshal_kernel__hc_driver_reset_device__udev__in(
+	size_t* __pos,
+	const struct fipc_message* __msg,
+	const struct ext_registers* __ext,
+	struct hc_driver_reset_device_call_ctx const* call_ctx,
+	struct usb_device* ptr);
+
+void callee_marshal_kernel__hc_driver_reset_device__udev__in(
+	size_t* __pos,
+	struct fipc_message* __msg,
+	struct ext_registers* __ext,
+	struct hc_driver_reset_device_call_ctx const* call_ctx,
+	struct usb_device const* ptr);
+
+void caller_unmarshal_kernel__hc_driver_reset_device__udev__in(
+	size_t* __pos,
+	const struct fipc_message* __msg,
+	const struct ext_registers* __ext,
+	struct hc_driver_reset_device_call_ctx const* call_ctx,
+	struct usb_device* ptr);
+
+void caller_marshal_kernel__hc_driver_update_device__hcd__in(
+	size_t* __pos,
+	struct fipc_message* __msg,
+	struct ext_registers* __ext,
+	struct hc_driver_update_device_call_ctx const* call_ctx,
+	struct usb_hcd const* ptr);
+
+void callee_unmarshal_kernel__hc_driver_update_device__hcd__in(
+	size_t* __pos,
+	const struct fipc_message* __msg,
+	const struct ext_registers* __ext,
+	struct hc_driver_update_device_call_ctx const* call_ctx,
+	struct usb_hcd* ptr);
+
+void callee_marshal_kernel__hc_driver_update_device__hcd__in(
+	size_t* __pos,
+	struct fipc_message* __msg,
+	struct ext_registers* __ext,
+	struct hc_driver_update_device_call_ctx const* call_ctx,
+	struct usb_hcd const* ptr);
+
+void caller_unmarshal_kernel__hc_driver_update_device__hcd__in(
+	size_t* __pos,
+	const struct fipc_message* __msg,
+	const struct ext_registers* __ext,
+	struct hc_driver_update_device_call_ctx const* call_ctx,
+	struct usb_hcd* ptr);
+
+void caller_marshal_kernel__hc_driver_update_device__udev__in(
+	size_t* __pos,
+	struct fipc_message* __msg,
+	struct ext_registers* __ext,
+	struct hc_driver_update_device_call_ctx const* call_ctx,
+	struct usb_device const* ptr);
+
+void callee_unmarshal_kernel__hc_driver_update_device__udev__in(
+	size_t* __pos,
+	const struct fipc_message* __msg,
+	const struct ext_registers* __ext,
+	struct hc_driver_update_device_call_ctx const* call_ctx,
+	struct usb_device* ptr);
+
+void callee_marshal_kernel__hc_driver_update_device__udev__in(
+	size_t* __pos,
+	struct fipc_message* __msg,
+	struct ext_registers* __ext,
+	struct hc_driver_update_device_call_ctx const* call_ctx,
+	struct usb_device const* ptr);
+
+void caller_unmarshal_kernel__hc_driver_update_device__udev__in(
+	size_t* __pos,
+	const struct fipc_message* __msg,
+	const struct ext_registers* __ext,
+	struct hc_driver_update_device_call_ctx const* call_ctx,
+	struct usb_device* ptr);
+
+void caller_marshal_kernel__hc_driver_set_usb2_hw_lpm__hcd__in(
+	size_t* __pos,
+	struct fipc_message* __msg,
+	struct ext_registers* __ext,
+	struct hc_driver_set_usb2_hw_lpm_call_ctx const* call_ctx,
+	struct usb_hcd const* ptr);
+
+void callee_unmarshal_kernel__hc_driver_set_usb2_hw_lpm__hcd__in(
+	size_t* __pos,
+	const struct fipc_message* __msg,
+	const struct ext_registers* __ext,
+	struct hc_driver_set_usb2_hw_lpm_call_ctx const* call_ctx,
+	struct usb_hcd* ptr);
+
+void callee_marshal_kernel__hc_driver_set_usb2_hw_lpm__hcd__in(
+	size_t* __pos,
+	struct fipc_message* __msg,
+	struct ext_registers* __ext,
+	struct hc_driver_set_usb2_hw_lpm_call_ctx const* call_ctx,
+	struct usb_hcd const* ptr);
+
+void caller_unmarshal_kernel__hc_driver_set_usb2_hw_lpm__hcd__in(
+	size_t* __pos,
+	const struct fipc_message* __msg,
+	const struct ext_registers* __ext,
+	struct hc_driver_set_usb2_hw_lpm_call_ctx const* call_ctx,
+	struct usb_hcd* ptr);
+
+void caller_marshal_kernel__hc_driver_set_usb2_hw_lpm__udev__in(
+	size_t* __pos,
+	struct fipc_message* __msg,
+	struct ext_registers* __ext,
+	struct hc_driver_set_usb2_hw_lpm_call_ctx const* call_ctx,
+	struct usb_device const* ptr);
+
+void callee_unmarshal_kernel__hc_driver_set_usb2_hw_lpm__udev__in(
+	size_t* __pos,
+	const struct fipc_message* __msg,
+	const struct ext_registers* __ext,
+	struct hc_driver_set_usb2_hw_lpm_call_ctx const* call_ctx,
+	struct usb_device* ptr);
+
+void callee_marshal_kernel__hc_driver_set_usb2_hw_lpm__udev__in(
+	size_t* __pos,
+	struct fipc_message* __msg,
+	struct ext_registers* __ext,
+	struct hc_driver_set_usb2_hw_lpm_call_ctx const* call_ctx,
+	struct usb_device const* ptr);
+
+void caller_unmarshal_kernel__hc_driver_set_usb2_hw_lpm__udev__in(
+	size_t* __pos,
+	const struct fipc_message* __msg,
+	const struct ext_registers* __ext,
+	struct hc_driver_set_usb2_hw_lpm_call_ctx const* call_ctx,
+	struct usb_device* ptr);
+
+void caller_marshal_kernel__hc_driver_enable_usb3_lpm_timeout__hcd__in(
+	size_t* __pos,
+	struct fipc_message* __msg,
+	struct ext_registers* __ext,
+	struct hc_driver_enable_usb3_lpm_timeout_call_ctx const* call_ctx,
+	struct usb_hcd const* ptr);
+
+void callee_unmarshal_kernel__hc_driver_enable_usb3_lpm_timeout__hcd__in(
+	size_t* __pos,
+	const struct fipc_message* __msg,
+	const struct ext_registers* __ext,
+	struct hc_driver_enable_usb3_lpm_timeout_call_ctx const* call_ctx,
+	struct usb_hcd* ptr);
+
+void callee_marshal_kernel__hc_driver_enable_usb3_lpm_timeout__hcd__in(
+	size_t* __pos,
+	struct fipc_message* __msg,
+	struct ext_registers* __ext,
+	struct hc_driver_enable_usb3_lpm_timeout_call_ctx const* call_ctx,
+	struct usb_hcd const* ptr);
+
+void caller_unmarshal_kernel__hc_driver_enable_usb3_lpm_timeout__hcd__in(
+	size_t* __pos,
+	const struct fipc_message* __msg,
+	const struct ext_registers* __ext,
+	struct hc_driver_enable_usb3_lpm_timeout_call_ctx const* call_ctx,
+	struct usb_hcd* ptr);
+
+void caller_marshal_kernel__hc_driver_enable_usb3_lpm_timeout__udev__in(
+	size_t* __pos,
+	struct fipc_message* __msg,
+	struct ext_registers* __ext,
+	struct hc_driver_enable_usb3_lpm_timeout_call_ctx const* call_ctx,
+	struct usb_device const* ptr);
+
+void callee_unmarshal_kernel__hc_driver_enable_usb3_lpm_timeout__udev__in(
+	size_t* __pos,
+	const struct fipc_message* __msg,
+	const struct ext_registers* __ext,
+	struct hc_driver_enable_usb3_lpm_timeout_call_ctx const* call_ctx,
+	struct usb_device* ptr);
+
+void callee_marshal_kernel__hc_driver_enable_usb3_lpm_timeout__udev__in(
+	size_t* __pos,
+	struct fipc_message* __msg,
+	struct ext_registers* __ext,
+	struct hc_driver_enable_usb3_lpm_timeout_call_ctx const* call_ctx,
+	struct usb_device const* ptr);
+
+void caller_unmarshal_kernel__hc_driver_enable_usb3_lpm_timeout__udev__in(
+	size_t* __pos,
+	const struct fipc_message* __msg,
+	const struct ext_registers* __ext,
+	struct hc_driver_enable_usb3_lpm_timeout_call_ctx const* call_ctx,
+	struct usb_device* ptr);
+
+void caller_marshal_kernel__hc_driver_disable_usb3_lpm_timeout__hcd__in(
+	size_t* __pos,
+	struct fipc_message* __msg,
+	struct ext_registers* __ext,
+	struct hc_driver_disable_usb3_lpm_timeout_call_ctx const* call_ctx,
+	struct usb_hcd const* ptr);
+
+void callee_unmarshal_kernel__hc_driver_disable_usb3_lpm_timeout__hcd__in(
+	size_t* __pos,
+	const struct fipc_message* __msg,
+	const struct ext_registers* __ext,
+	struct hc_driver_disable_usb3_lpm_timeout_call_ctx const* call_ctx,
+	struct usb_hcd* ptr);
+
+void callee_marshal_kernel__hc_driver_disable_usb3_lpm_timeout__hcd__in(
+	size_t* __pos,
+	struct fipc_message* __msg,
+	struct ext_registers* __ext,
+	struct hc_driver_disable_usb3_lpm_timeout_call_ctx const* call_ctx,
+	struct usb_hcd const* ptr);
+
+void caller_unmarshal_kernel__hc_driver_disable_usb3_lpm_timeout__hcd__in(
+	size_t* __pos,
+	const struct fipc_message* __msg,
+	const struct ext_registers* __ext,
+	struct hc_driver_disable_usb3_lpm_timeout_call_ctx const* call_ctx,
+	struct usb_hcd* ptr);
+
+void caller_marshal_kernel__hc_driver_disable_usb3_lpm_timeout__udev__in(
+	size_t* __pos,
+	struct fipc_message* __msg,
+	struct ext_registers* __ext,
+	struct hc_driver_disable_usb3_lpm_timeout_call_ctx const* call_ctx,
+	struct usb_device const* ptr);
+
+void callee_unmarshal_kernel__hc_driver_disable_usb3_lpm_timeout__udev__in(
+	size_t* __pos,
+	const struct fipc_message* __msg,
+	const struct ext_registers* __ext,
+	struct hc_driver_disable_usb3_lpm_timeout_call_ctx const* call_ctx,
+	struct usb_device* ptr);
+
+void callee_marshal_kernel__hc_driver_disable_usb3_lpm_timeout__udev__in(
+	size_t* __pos,
+	struct fipc_message* __msg,
+	struct ext_registers* __ext,
+	struct hc_driver_disable_usb3_lpm_timeout_call_ctx const* call_ctx,
+	struct usb_device const* ptr);
+
+void caller_unmarshal_kernel__hc_driver_disable_usb3_lpm_timeout__udev__in(
+	size_t* __pos,
+	const struct fipc_message* __msg,
+	const struct ext_registers* __ext,
+	struct hc_driver_disable_usb3_lpm_timeout_call_ctx const* call_ctx,
+	struct usb_device* ptr);
+
+void caller_marshal_kernel__hc_driver_find_raw_port_number__hcd__in(
+	size_t* __pos,
+	struct fipc_message* __msg,
+	struct ext_registers* __ext,
+	struct hc_driver_find_raw_port_number_call_ctx const* call_ctx,
+	struct usb_hcd const* ptr);
+
+void callee_unmarshal_kernel__hc_driver_find_raw_port_number__hcd__in(
+	size_t* __pos,
+	const struct fipc_message* __msg,
+	const struct ext_registers* __ext,
+	struct hc_driver_find_raw_port_number_call_ctx const* call_ctx,
+	struct usb_hcd* ptr);
+
+void callee_marshal_kernel__hc_driver_find_raw_port_number__hcd__in(
+	size_t* __pos,
+	struct fipc_message* __msg,
+	struct ext_registers* __ext,
+	struct hc_driver_find_raw_port_number_call_ctx const* call_ctx,
+	struct usb_hcd const* ptr);
+
+void caller_unmarshal_kernel__hc_driver_find_raw_port_number__hcd__in(
+	size_t* __pos,
+	const struct fipc_message* __msg,
+	const struct ext_registers* __ext,
+	struct hc_driver_find_raw_port_number_call_ctx const* call_ctx,
+	struct usb_hcd* ptr);
+
+void caller_marshal_kernel__hc_driver_find_raw_port_number__usb_hcd_primary_hcd__in(
+	size_t* __pos,
+	struct fipc_message* __msg,
+	struct ext_registers* __ext,
+	struct hc_driver_find_raw_port_number_call_ctx const* call_ctx,
+	struct usb_hcd const* ptr);
+
+void callee_unmarshal_kernel__hc_driver_find_raw_port_number__usb_hcd_primary_hcd__in(
+	size_t* __pos,
+	const struct fipc_message* __msg,
+	const struct ext_registers* __ext,
+	struct hc_driver_find_raw_port_number_call_ctx const* call_ctx,
+	struct usb_hcd* ptr);
+
+void callee_marshal_kernel__hc_driver_find_raw_port_number__usb_hcd_primary_hcd__in(
+	size_t* __pos,
+	struct fipc_message* __msg,
+	struct ext_registers* __ext,
+	struct hc_driver_find_raw_port_number_call_ctx const* call_ctx,
+	struct usb_hcd const* ptr);
+
+void caller_unmarshal_kernel__hc_driver_find_raw_port_number__usb_hcd_primary_hcd__in(
+	size_t* __pos,
+	const struct fipc_message* __msg,
+	const struct ext_registers* __ext,
+	struct hc_driver_find_raw_port_number_call_ctx const* call_ctx,
+	struct usb_hcd* ptr);
+
+void caller_marshal_kernel__hc_driver_stop__hcd__in(
+	size_t* __pos,
+	struct fipc_message* __msg,
+	struct ext_registers* __ext,
+	struct hc_driver_stop_call_ctx const* call_ctx,
+	struct usb_hcd const* ptr);
+
+void callee_unmarshal_kernel__hc_driver_stop__hcd__in(
+	size_t* __pos,
+	const struct fipc_message* __msg,
+	const struct ext_registers* __ext,
+	struct hc_driver_stop_call_ctx const* call_ctx,
+	struct usb_hcd* ptr);
+
+void callee_marshal_kernel__hc_driver_stop__hcd__in(
+	size_t* __pos,
+	struct fipc_message* __msg,
+	struct ext_registers* __ext,
+	struct hc_driver_stop_call_ctx const* call_ctx,
+	struct usb_hcd const* ptr);
+
+void caller_unmarshal_kernel__hc_driver_stop__hcd__in(
+	size_t* __pos,
+	const struct fipc_message* __msg,
+	const struct ext_registers* __ext,
+	struct hc_driver_stop_call_ctx const* call_ctx,
+	struct usb_hcd* ptr);
+
+void caller_marshal_kernel__hc_driver_stop__usb_hcd_primary_hcd__in(
+	size_t* __pos,
+	struct fipc_message* __msg,
+	struct ext_registers* __ext,
+	struct hc_driver_stop_call_ctx const* call_ctx,
+	struct usb_hcd const* ptr);
+
+void callee_unmarshal_kernel__hc_driver_stop__usb_hcd_primary_hcd__in(
+	size_t* __pos,
+	const struct fipc_message* __msg,
+	const struct ext_registers* __ext,
+	struct hc_driver_stop_call_ctx const* call_ctx,
+	struct usb_hcd* ptr);
+
+void callee_marshal_kernel__hc_driver_stop__usb_hcd_primary_hcd__in(
+	size_t* __pos,
+	struct fipc_message* __msg,
+	struct ext_registers* __ext,
+	struct hc_driver_stop_call_ctx const* call_ctx,
+	struct usb_hcd const* ptr);
+
+void caller_unmarshal_kernel__hc_driver_stop__usb_hcd_primary_hcd__in(
+	size_t* __pos,
+	const struct fipc_message* __msg,
+	const struct ext_registers* __ext,
+	struct hc_driver_stop_call_ctx const* call_ctx,
+	struct usb_hcd* ptr);
+
+void caller_marshal_kernel__hc_driver_shutdown__hcd__in(
+	size_t* __pos,
+	struct fipc_message* __msg,
+	struct ext_registers* __ext,
+	struct hc_driver_shutdown_call_ctx const* call_ctx,
+	struct usb_hcd const* ptr);
+
+void callee_unmarshal_kernel__hc_driver_shutdown__hcd__in(
+	size_t* __pos,
+	const struct fipc_message* __msg,
+	const struct ext_registers* __ext,
+	struct hc_driver_shutdown_call_ctx const* call_ctx,
+	struct usb_hcd* ptr);
+
+void callee_marshal_kernel__hc_driver_shutdown__hcd__in(
+	size_t* __pos,
+	struct fipc_message* __msg,
+	struct ext_registers* __ext,
+	struct hc_driver_shutdown_call_ctx const* call_ctx,
+	struct usb_hcd const* ptr);
+
+void caller_unmarshal_kernel__hc_driver_shutdown__hcd__in(
+	size_t* __pos,
+	const struct fipc_message* __msg,
+	const struct ext_registers* __ext,
+	struct hc_driver_shutdown_call_ctx const* call_ctx,
+	struct usb_hcd* ptr);
+
+void caller_marshal_kernel__hc_driver_shutdown__usb_hcd_primary_hcd__in(
+	size_t* __pos,
+	struct fipc_message* __msg,
+	struct ext_registers* __ext,
+	struct hc_driver_shutdown_call_ctx const* call_ctx,
+	struct usb_hcd const* ptr);
+
+void callee_unmarshal_kernel__hc_driver_shutdown__usb_hcd_primary_hcd__in(
+	size_t* __pos,
+	const struct fipc_message* __msg,
+	const struct ext_registers* __ext,
+	struct hc_driver_shutdown_call_ctx const* call_ctx,
+	struct usb_hcd* ptr);
+
+void callee_marshal_kernel__hc_driver_shutdown__usb_hcd_primary_hcd__in(
+	size_t* __pos,
+	struct fipc_message* __msg,
+	struct ext_registers* __ext,
+	struct hc_driver_shutdown_call_ctx const* call_ctx,
+	struct usb_hcd const* ptr);
+
+void caller_unmarshal_kernel__hc_driver_shutdown__usb_hcd_primary_hcd__in(
+	size_t* __pos,
+	const struct fipc_message* __msg,
+	const struct ext_registers* __ext,
+	struct hc_driver_shutdown_call_ctx const* call_ctx,
+	struct usb_hcd* ptr);
+
+void caller_marshal_kernel__hc_driver_get_frame_number__hcd__in(
+	size_t* __pos,
+	struct fipc_message* __msg,
+	struct ext_registers* __ext,
+	struct hc_driver_get_frame_number_call_ctx const* call_ctx,
+	struct usb_hcd const* ptr);
+
+void callee_unmarshal_kernel__hc_driver_get_frame_number__hcd__in(
+	size_t* __pos,
+	const struct fipc_message* __msg,
+	const struct ext_registers* __ext,
+	struct hc_driver_get_frame_number_call_ctx const* call_ctx,
+	struct usb_hcd* ptr);
+
+void callee_marshal_kernel__hc_driver_get_frame_number__hcd__in(
+	size_t* __pos,
+	struct fipc_message* __msg,
+	struct ext_registers* __ext,
+	struct hc_driver_get_frame_number_call_ctx const* call_ctx,
+	struct usb_hcd const* ptr);
+
+void caller_unmarshal_kernel__hc_driver_get_frame_number__hcd__in(
+	size_t* __pos,
+	const struct fipc_message* __msg,
+	const struct ext_registers* __ext,
+	struct hc_driver_get_frame_number_call_ctx const* call_ctx,
+	struct usb_hcd* ptr);
+
+void caller_marshal_kernel__hc_driver_get_frame_number__usb_hcd_primary_hcd__in(
+	size_t* __pos,
+	struct fipc_message* __msg,
+	struct ext_registers* __ext,
+	struct hc_driver_get_frame_number_call_ctx const* call_ctx,
+	struct usb_hcd const* ptr);
+
+void callee_unmarshal_kernel__hc_driver_get_frame_number__usb_hcd_primary_hcd__in(
+	size_t* __pos,
+	const struct fipc_message* __msg,
+	const struct ext_registers* __ext,
+	struct hc_driver_get_frame_number_call_ctx const* call_ctx,
+	struct usb_hcd* ptr);
+
+void callee_marshal_kernel__hc_driver_get_frame_number__usb_hcd_primary_hcd__in(
+	size_t* __pos,
+	struct fipc_message* __msg,
+	struct ext_registers* __ext,
+	struct hc_driver_get_frame_number_call_ctx const* call_ctx,
+	struct usb_hcd const* ptr);
+
+void caller_unmarshal_kernel__hc_driver_get_frame_number__usb_hcd_primary_hcd__in(
+	size_t* __pos,
+	const struct fipc_message* __msg,
+	const struct ext_registers* __ext,
+	struct hc_driver_get_frame_number_call_ctx const* call_ctx,
+	struct usb_hcd* ptr);
+
+void caller_marshal_kernel__hc_driver_urb_enqueue__hcd__in(
+	size_t* __pos,
+	struct fipc_message* __msg,
+	struct ext_registers* __ext,
+	struct hc_driver_urb_enqueue_call_ctx const* call_ctx,
+	struct usb_hcd const* ptr);
+
+void callee_unmarshal_kernel__hc_driver_urb_enqueue__hcd__in(
+	size_t* __pos,
+	const struct fipc_message* __msg,
+	const struct ext_registers* __ext,
+	struct hc_driver_urb_enqueue_call_ctx const* call_ctx,
+	struct usb_hcd* ptr);
+
+void callee_marshal_kernel__hc_driver_urb_enqueue__hcd__in(
+	size_t* __pos,
+	struct fipc_message* __msg,
+	struct ext_registers* __ext,
+	struct hc_driver_urb_enqueue_call_ctx const* call_ctx,
+	struct usb_hcd const* ptr);
+
+void caller_unmarshal_kernel__hc_driver_urb_enqueue__hcd__in(
+	size_t* __pos,
+	const struct fipc_message* __msg,
+	const struct ext_registers* __ext,
+	struct hc_driver_urb_enqueue_call_ctx const* call_ctx,
+	struct usb_hcd* ptr);
+
+void caller_marshal_kernel__hc_driver_urb_enqueue__usb_hcd_primary_hcd__in(
+	size_t* __pos,
+	struct fipc_message* __msg,
+	struct ext_registers* __ext,
+	struct hc_driver_urb_enqueue_call_ctx const* call_ctx,
+	struct usb_hcd const* ptr);
+
+void callee_unmarshal_kernel__hc_driver_urb_enqueue__usb_hcd_primary_hcd__in(
+	size_t* __pos,
+	const struct fipc_message* __msg,
+	const struct ext_registers* __ext,
+	struct hc_driver_urb_enqueue_call_ctx const* call_ctx,
+	struct usb_hcd* ptr);
+
+void callee_marshal_kernel__hc_driver_urb_enqueue__usb_hcd_primary_hcd__in(
+	size_t* __pos,
+	struct fipc_message* __msg,
+	struct ext_registers* __ext,
+	struct hc_driver_urb_enqueue_call_ctx const* call_ctx,
+	struct usb_hcd const* ptr);
+
+void caller_unmarshal_kernel__hc_driver_urb_enqueue__usb_hcd_primary_hcd__in(
+	size_t* __pos,
+	const struct fipc_message* __msg,
+	const struct ext_registers* __ext,
+	struct hc_driver_urb_enqueue_call_ctx const* call_ctx,
+	struct usb_hcd* ptr);
+
+void caller_marshal_kernel__hc_driver_urb_enqueue__urb__in(
+	size_t* __pos,
+	struct fipc_message* __msg,
+	struct ext_registers* __ext,
+	struct hc_driver_urb_enqueue_call_ctx const* call_ctx,
+	struct urb const* ptr);
+
+void callee_unmarshal_kernel__hc_driver_urb_enqueue__urb__in(
+	size_t* __pos,
+	const struct fipc_message* __msg,
+	const struct ext_registers* __ext,
+	struct hc_driver_urb_enqueue_call_ctx const* call_ctx,
+	struct urb* ptr);
+
+void callee_marshal_kernel__hc_driver_urb_enqueue__urb__in(
+	size_t* __pos,
+	struct fipc_message* __msg,
+	struct ext_registers* __ext,
+	struct hc_driver_urb_enqueue_call_ctx const* call_ctx,
+	struct urb const* ptr);
+
+void caller_unmarshal_kernel__hc_driver_urb_enqueue__urb__in(
+	size_t* __pos,
+	const struct fipc_message* __msg,
+	const struct ext_registers* __ext,
+	struct hc_driver_urb_enqueue_call_ctx const* call_ctx,
+	struct urb* ptr);
+
+void caller_marshal_kernel__hc_driver_urb_enqueue__urb_dev__in(
+	size_t* __pos,
+	struct fipc_message* __msg,
+	struct ext_registers* __ext,
+	struct hc_driver_urb_enqueue_call_ctx const* call_ctx,
+	struct usb_device const* ptr);
+
+void callee_unmarshal_kernel__hc_driver_urb_enqueue__urb_dev__in(
+	size_t* __pos,
+	const struct fipc_message* __msg,
+	const struct ext_registers* __ext,
+	struct hc_driver_urb_enqueue_call_ctx const* call_ctx,
+	struct usb_device* ptr);
+
+void callee_marshal_kernel__hc_driver_urb_enqueue__urb_dev__in(
+	size_t* __pos,
+	struct fipc_message* __msg,
+	struct ext_registers* __ext,
+	struct hc_driver_urb_enqueue_call_ctx const* call_ctx,
+	struct usb_device const* ptr);
+
+void caller_unmarshal_kernel__hc_driver_urb_enqueue__urb_dev__in(
+	size_t* __pos,
+	const struct fipc_message* __msg,
+	const struct ext_registers* __ext,
+	struct hc_driver_urb_enqueue_call_ctx const* call_ctx,
+	struct usb_device* ptr);
+
+void caller_marshal_kernel__hc_driver_urb_enqueue__urb_ep__in(
+	size_t* __pos,
+	struct fipc_message* __msg,
+	struct ext_registers* __ext,
+	struct hc_driver_urb_enqueue_call_ctx const* call_ctx,
+	struct usb_host_endpoint const* ptr);
+
+void callee_unmarshal_kernel__hc_driver_urb_enqueue__urb_ep__in(
+	size_t* __pos,
+	const struct fipc_message* __msg,
+	const struct ext_registers* __ext,
+	struct hc_driver_urb_enqueue_call_ctx const* call_ctx,
+	struct usb_host_endpoint* ptr);
+
+void callee_marshal_kernel__hc_driver_urb_enqueue__urb_ep__in(
+	size_t* __pos,
+	struct fipc_message* __msg,
+	struct ext_registers* __ext,
+	struct hc_driver_urb_enqueue_call_ctx const* call_ctx,
+	struct usb_host_endpoint const* ptr);
+
+void caller_unmarshal_kernel__hc_driver_urb_enqueue__urb_ep__in(
+	size_t* __pos,
+	const struct fipc_message* __msg,
+	const struct ext_registers* __ext,
+	struct hc_driver_urb_enqueue_call_ctx const* call_ctx,
+	struct usb_host_endpoint* ptr);
+
+void caller_marshal_kernel__hc_driver_urb_enqueue__usb_endpoint_descriptor__in(
+	size_t* __pos,
+	struct fipc_message* __msg,
+	struct ext_registers* __ext,
+	struct hc_driver_urb_enqueue_call_ctx const* call_ctx,
+	struct usb_endpoint_descriptor const* ptr);
+
+void callee_unmarshal_kernel__hc_driver_urb_enqueue__usb_endpoint_descriptor__in(
+	size_t* __pos,
+	const struct fipc_message* __msg,
+	const struct ext_registers* __ext,
+	struct hc_driver_urb_enqueue_call_ctx const* call_ctx,
+	struct usb_endpoint_descriptor* ptr);
+
+void callee_marshal_kernel__hc_driver_urb_enqueue__usb_endpoint_descriptor__in(
+	size_t* __pos,
+	struct fipc_message* __msg,
+	struct ext_registers* __ext,
+	struct hc_driver_urb_enqueue_call_ctx const* call_ctx,
+	struct usb_endpoint_descriptor const* ptr);
+
+void caller_unmarshal_kernel__hc_driver_urb_enqueue__usb_endpoint_descriptor__in(
+	size_t* __pos,
+	const struct fipc_message* __msg,
+	const struct ext_registers* __ext,
+	struct hc_driver_urb_enqueue_call_ctx const* call_ctx,
+	struct usb_endpoint_descriptor* ptr);
+
+void caller_marshal_kernel__hc_driver_urb_dequeue__hcd__in(
+	size_t* __pos,
+	struct fipc_message* __msg,
+	struct ext_registers* __ext,
+	struct hc_driver_urb_dequeue_call_ctx const* call_ctx,
+	struct usb_hcd const* ptr);
+
+void callee_unmarshal_kernel__hc_driver_urb_dequeue__hcd__in(
+	size_t* __pos,
+	const struct fipc_message* __msg,
+	const struct ext_registers* __ext,
+	struct hc_driver_urb_dequeue_call_ctx const* call_ctx,
+	struct usb_hcd* ptr);
+
+void callee_marshal_kernel__hc_driver_urb_dequeue__hcd__in(
+	size_t* __pos,
+	struct fipc_message* __msg,
+	struct ext_registers* __ext,
+	struct hc_driver_urb_dequeue_call_ctx const* call_ctx,
+	struct usb_hcd const* ptr);
+
+void caller_unmarshal_kernel__hc_driver_urb_dequeue__hcd__in(
+	size_t* __pos,
+	const struct fipc_message* __msg,
+	const struct ext_registers* __ext,
+	struct hc_driver_urb_dequeue_call_ctx const* call_ctx,
+	struct usb_hcd* ptr);
+
+void caller_marshal_kernel__hc_driver_urb_dequeue__usb_hcd_primary_hcd__in(
+	size_t* __pos,
+	struct fipc_message* __msg,
+	struct ext_registers* __ext,
+	struct hc_driver_urb_dequeue_call_ctx const* call_ctx,
+	struct usb_hcd const* ptr);
+
+void callee_unmarshal_kernel__hc_driver_urb_dequeue__usb_hcd_primary_hcd__in(
+	size_t* __pos,
+	const struct fipc_message* __msg,
+	const struct ext_registers* __ext,
+	struct hc_driver_urb_dequeue_call_ctx const* call_ctx,
+	struct usb_hcd* ptr);
+
+void callee_marshal_kernel__hc_driver_urb_dequeue__usb_hcd_primary_hcd__in(
+	size_t* __pos,
+	struct fipc_message* __msg,
+	struct ext_registers* __ext,
+	struct hc_driver_urb_dequeue_call_ctx const* call_ctx,
+	struct usb_hcd const* ptr);
+
+void caller_unmarshal_kernel__hc_driver_urb_dequeue__usb_hcd_primary_hcd__in(
+	size_t* __pos,
+	const struct fipc_message* __msg,
+	const struct ext_registers* __ext,
+	struct hc_driver_urb_dequeue_call_ctx const* call_ctx,
+	struct usb_hcd* ptr);
+
+void caller_marshal_kernel__hc_driver_urb_dequeue__urb__in(
+	size_t* __pos,
+	struct fipc_message* __msg,
+	struct ext_registers* __ext,
+	struct hc_driver_urb_dequeue_call_ctx const* call_ctx,
+	struct urb const* ptr);
+
+void callee_unmarshal_kernel__hc_driver_urb_dequeue__urb__in(
+	size_t* __pos,
+	const struct fipc_message* __msg,
+	const struct ext_registers* __ext,
+	struct hc_driver_urb_dequeue_call_ctx const* call_ctx,
+	struct urb* ptr);
+
+void callee_marshal_kernel__hc_driver_urb_dequeue__urb__in(
+	size_t* __pos,
+	struct fipc_message* __msg,
+	struct ext_registers* __ext,
+	struct hc_driver_urb_dequeue_call_ctx const* call_ctx,
+	struct urb const* ptr);
+
+void caller_unmarshal_kernel__hc_driver_urb_dequeue__urb__in(
+	size_t* __pos,
+	const struct fipc_message* __msg,
+	const struct ext_registers* __ext,
+	struct hc_driver_urb_dequeue_call_ctx const* call_ctx,
+	struct urb* ptr);
+
+void caller_marshal_kernel__hc_driver_urb_dequeue__urb_dev__in(
+	size_t* __pos,
+	struct fipc_message* __msg,
+	struct ext_registers* __ext,
+	struct hc_driver_urb_dequeue_call_ctx const* call_ctx,
+	struct usb_device const* ptr);
+
+void callee_unmarshal_kernel__hc_driver_urb_dequeue__urb_dev__in(
+	size_t* __pos,
+	const struct fipc_message* __msg,
+	const struct ext_registers* __ext,
+	struct hc_driver_urb_dequeue_call_ctx const* call_ctx,
+	struct usb_device* ptr);
+
+void callee_marshal_kernel__hc_driver_urb_dequeue__urb_dev__in(
+	size_t* __pos,
+	struct fipc_message* __msg,
+	struct ext_registers* __ext,
+	struct hc_driver_urb_dequeue_call_ctx const* call_ctx,
+	struct usb_device const* ptr);
+
+void caller_unmarshal_kernel__hc_driver_urb_dequeue__urb_dev__in(
+	size_t* __pos,
+	const struct fipc_message* __msg,
+	const struct ext_registers* __ext,
+	struct hc_driver_urb_dequeue_call_ctx const* call_ctx,
+	struct usb_device* ptr);
+
+void caller_marshal_kernel__hc_driver_urb_dequeue__urb_ep__in(
+	size_t* __pos,
+	struct fipc_message* __msg,
+	struct ext_registers* __ext,
+	struct hc_driver_urb_dequeue_call_ctx const* call_ctx,
+	struct usb_host_endpoint const* ptr);
+
+void callee_unmarshal_kernel__hc_driver_urb_dequeue__urb_ep__in(
+	size_t* __pos,
+	const struct fipc_message* __msg,
+	const struct ext_registers* __ext,
+	struct hc_driver_urb_dequeue_call_ctx const* call_ctx,
+	struct usb_host_endpoint* ptr);
+
+void callee_marshal_kernel__hc_driver_urb_dequeue__urb_ep__in(
+	size_t* __pos,
+	struct fipc_message* __msg,
+	struct ext_registers* __ext,
+	struct hc_driver_urb_dequeue_call_ctx const* call_ctx,
+	struct usb_host_endpoint const* ptr);
+
+void caller_unmarshal_kernel__hc_driver_urb_dequeue__urb_ep__in(
+	size_t* __pos,
+	const struct fipc_message* __msg,
+	const struct ext_registers* __ext,
+	struct hc_driver_urb_dequeue_call_ctx const* call_ctx,
+	struct usb_host_endpoint* ptr);
+
+void caller_marshal_kernel__hc_driver_urb_dequeue__usb_endpoint_descriptor__in(
+	size_t* __pos,
+	struct fipc_message* __msg,
+	struct ext_registers* __ext,
+	struct hc_driver_urb_dequeue_call_ctx const* call_ctx,
+	struct usb_endpoint_descriptor const* ptr);
+
+void callee_unmarshal_kernel__hc_driver_urb_dequeue__usb_endpoint_descriptor__in(
+	size_t* __pos,
+	const struct fipc_message* __msg,
+	const struct ext_registers* __ext,
+	struct hc_driver_urb_dequeue_call_ctx const* call_ctx,
+	struct usb_endpoint_descriptor* ptr);
+
+void callee_marshal_kernel__hc_driver_urb_dequeue__usb_endpoint_descriptor__in(
+	size_t* __pos,
+	struct fipc_message* __msg,
+	struct ext_registers* __ext,
+	struct hc_driver_urb_dequeue_call_ctx const* call_ctx,
+	struct usb_endpoint_descriptor const* ptr);
+
+void caller_unmarshal_kernel__hc_driver_urb_dequeue__usb_endpoint_descriptor__in(
+	size_t* __pos,
+	const struct fipc_message* __msg,
+	const struct ext_registers* __ext,
+	struct hc_driver_urb_dequeue_call_ctx const* call_ctx,
+	struct usb_endpoint_descriptor* ptr);
+
+void caller_marshal_kernel__hc_driver_endpoint_reset__hcd__in(
+	size_t* __pos,
+	struct fipc_message* __msg,
+	struct ext_registers* __ext,
+	struct hc_driver_endpoint_reset_call_ctx const* call_ctx,
+	struct usb_hcd const* ptr);
+
+void callee_unmarshal_kernel__hc_driver_endpoint_reset__hcd__in(
+	size_t* __pos,
+	const struct fipc_message* __msg,
+	const struct ext_registers* __ext,
+	struct hc_driver_endpoint_reset_call_ctx const* call_ctx,
+	struct usb_hcd* ptr);
+
+void callee_marshal_kernel__hc_driver_endpoint_reset__hcd__in(
+	size_t* __pos,
+	struct fipc_message* __msg,
+	struct ext_registers* __ext,
+	struct hc_driver_endpoint_reset_call_ctx const* call_ctx,
+	struct usb_hcd const* ptr);
+
+void caller_unmarshal_kernel__hc_driver_endpoint_reset__hcd__in(
+	size_t* __pos,
+	const struct fipc_message* __msg,
+	const struct ext_registers* __ext,
+	struct hc_driver_endpoint_reset_call_ctx const* call_ctx,
+	struct usb_hcd* ptr);
+
+void caller_marshal_kernel__hc_driver_endpoint_reset__usb_hcd_primary_hcd__in(
+	size_t* __pos,
+	struct fipc_message* __msg,
+	struct ext_registers* __ext,
+	struct hc_driver_endpoint_reset_call_ctx const* call_ctx,
+	struct usb_hcd const* ptr);
+
+void callee_unmarshal_kernel__hc_driver_endpoint_reset__usb_hcd_primary_hcd__in(
+	size_t* __pos,
+	const struct fipc_message* __msg,
+	const struct ext_registers* __ext,
+	struct hc_driver_endpoint_reset_call_ctx const* call_ctx,
+	struct usb_hcd* ptr);
+
+void callee_marshal_kernel__hc_driver_endpoint_reset__usb_hcd_primary_hcd__in(
+	size_t* __pos,
+	struct fipc_message* __msg,
+	struct ext_registers* __ext,
+	struct hc_driver_endpoint_reset_call_ctx const* call_ctx,
+	struct usb_hcd const* ptr);
+
+void caller_unmarshal_kernel__hc_driver_endpoint_reset__usb_hcd_primary_hcd__in(
+	size_t* __pos,
+	const struct fipc_message* __msg,
+	const struct ext_registers* __ext,
+	struct hc_driver_endpoint_reset_call_ctx const* call_ctx,
+	struct usb_hcd* ptr);
+
+void caller_marshal_kernel__hc_driver_endpoint_reset__ep__in(
+	size_t* __pos,
+	struct fipc_message* __msg,
+	struct ext_registers* __ext,
+	struct hc_driver_endpoint_reset_call_ctx const* call_ctx,
+	struct usb_host_endpoint const* ptr);
+
+void callee_unmarshal_kernel__hc_driver_endpoint_reset__ep__in(
+	size_t* __pos,
+	const struct fipc_message* __msg,
+	const struct ext_registers* __ext,
+	struct hc_driver_endpoint_reset_call_ctx const* call_ctx,
+	struct usb_host_endpoint* ptr);
+
+void callee_marshal_kernel__hc_driver_endpoint_reset__ep__in(
+	size_t* __pos,
+	struct fipc_message* __msg,
+	struct ext_registers* __ext,
+	struct hc_driver_endpoint_reset_call_ctx const* call_ctx,
+	struct usb_host_endpoint const* ptr);
+
+void caller_unmarshal_kernel__hc_driver_endpoint_reset__ep__in(
+	size_t* __pos,
+	const struct fipc_message* __msg,
+	const struct ext_registers* __ext,
+	struct hc_driver_endpoint_reset_call_ctx const* call_ctx,
+	struct usb_host_endpoint* ptr);
+
+void caller_marshal_kernel__hc_driver_endpoint_reset__usb_endpoint_descriptor__in(
+	size_t* __pos,
+	struct fipc_message* __msg,
+	struct ext_registers* __ext,
+	struct hc_driver_endpoint_reset_call_ctx const* call_ctx,
+	struct usb_endpoint_descriptor const* ptr);
+
+void callee_unmarshal_kernel__hc_driver_endpoint_reset__usb_endpoint_descriptor__in(
+	size_t* __pos,
+	const struct fipc_message* __msg,
+	const struct ext_registers* __ext,
+	struct hc_driver_endpoint_reset_call_ctx const* call_ctx,
+	struct usb_endpoint_descriptor* ptr);
+
+void callee_marshal_kernel__hc_driver_endpoint_reset__usb_endpoint_descriptor__in(
+	size_t* __pos,
+	struct fipc_message* __msg,
+	struct ext_registers* __ext,
+	struct hc_driver_endpoint_reset_call_ctx const* call_ctx,
+	struct usb_endpoint_descriptor const* ptr);
+
+void caller_unmarshal_kernel__hc_driver_endpoint_reset__usb_endpoint_descriptor__in(
+	size_t* __pos,
+	const struct fipc_message* __msg,
+	const struct ext_registers* __ext,
+	struct hc_driver_endpoint_reset_call_ctx const* call_ctx,
+	struct usb_endpoint_descriptor* ptr);
+
+void caller_marshal_kernel__hc_driver_alloc_dev__hcd__in(
+	size_t* __pos,
+	struct fipc_message* __msg,
+	struct ext_registers* __ext,
+	struct hc_driver_alloc_dev_call_ctx const* call_ctx,
+	struct usb_hcd const* ptr);
+
+void callee_unmarshal_kernel__hc_driver_alloc_dev__hcd__in(
+	size_t* __pos,
+	const struct fipc_message* __msg,
+	const struct ext_registers* __ext,
+	struct hc_driver_alloc_dev_call_ctx const* call_ctx,
+	struct usb_hcd* ptr);
+
+void callee_marshal_kernel__hc_driver_alloc_dev__hcd__in(
+	size_t* __pos,
+	struct fipc_message* __msg,
+	struct ext_registers* __ext,
+	struct hc_driver_alloc_dev_call_ctx const* call_ctx,
+	struct usb_hcd const* ptr);
+
+void caller_unmarshal_kernel__hc_driver_alloc_dev__hcd__in(
+	size_t* __pos,
+	const struct fipc_message* __msg,
+	const struct ext_registers* __ext,
+	struct hc_driver_alloc_dev_call_ctx const* call_ctx,
+	struct usb_hcd* ptr);
+
+void caller_marshal_kernel__hc_driver_alloc_dev__usb_hcd_primary_hcd__in(
+	size_t* __pos,
+	struct fipc_message* __msg,
+	struct ext_registers* __ext,
+	struct hc_driver_alloc_dev_call_ctx const* call_ctx,
+	struct usb_hcd const* ptr);
+
+void callee_unmarshal_kernel__hc_driver_alloc_dev__usb_hcd_primary_hcd__in(
+	size_t* __pos,
+	const struct fipc_message* __msg,
+	const struct ext_registers* __ext,
+	struct hc_driver_alloc_dev_call_ctx const* call_ctx,
+	struct usb_hcd* ptr);
+
+void callee_marshal_kernel__hc_driver_alloc_dev__usb_hcd_primary_hcd__in(
+	size_t* __pos,
+	struct fipc_message* __msg,
+	struct ext_registers* __ext,
+	struct hc_driver_alloc_dev_call_ctx const* call_ctx,
+	struct usb_hcd const* ptr);
+
+void caller_unmarshal_kernel__hc_driver_alloc_dev__usb_hcd_primary_hcd__in(
+	size_t* __pos,
+	const struct fipc_message* __msg,
+	const struct ext_registers* __ext,
+	struct hc_driver_alloc_dev_call_ctx const* call_ctx,
+	struct usb_hcd* ptr);
+
+void caller_marshal_kernel__hc_driver_alloc_dev__udev__in(
+	size_t* __pos,
+	struct fipc_message* __msg,
+	struct ext_registers* __ext,
+	struct hc_driver_alloc_dev_call_ctx const* call_ctx,
+	struct usb_device const* ptr);
+
+void callee_unmarshal_kernel__hc_driver_alloc_dev__udev__in(
+	size_t* __pos,
+	const struct fipc_message* __msg,
+	const struct ext_registers* __ext,
+	struct hc_driver_alloc_dev_call_ctx const* call_ctx,
+	struct usb_device* ptr);
+
+void callee_marshal_kernel__hc_driver_alloc_dev__udev__in(
+	size_t* __pos,
+	struct fipc_message* __msg,
+	struct ext_registers* __ext,
+	struct hc_driver_alloc_dev_call_ctx const* call_ctx,
+	struct usb_device const* ptr);
+
+void caller_unmarshal_kernel__hc_driver_alloc_dev__udev__in(
+	size_t* __pos,
+	const struct fipc_message* __msg,
+	const struct ext_registers* __ext,
+	struct hc_driver_alloc_dev_call_ctx const* call_ctx,
+	struct usb_device* ptr);
+
+void caller_marshal_kernel__hc_driver_free_dev__hcd__in(
+	size_t* __pos,
+	struct fipc_message* __msg,
+	struct ext_registers* __ext,
+	struct hc_driver_free_dev_call_ctx const* call_ctx,
+	struct usb_hcd const* ptr);
+
+void callee_unmarshal_kernel__hc_driver_free_dev__hcd__in(
+	size_t* __pos,
+	const struct fipc_message* __msg,
+	const struct ext_registers* __ext,
+	struct hc_driver_free_dev_call_ctx const* call_ctx,
+	struct usb_hcd* ptr);
+
+void callee_marshal_kernel__hc_driver_free_dev__hcd__in(
+	size_t* __pos,
+	struct fipc_message* __msg,
+	struct ext_registers* __ext,
+	struct hc_driver_free_dev_call_ctx const* call_ctx,
+	struct usb_hcd const* ptr);
+
+void caller_unmarshal_kernel__hc_driver_free_dev__hcd__in(
+	size_t* __pos,
+	const struct fipc_message* __msg,
+	const struct ext_registers* __ext,
+	struct hc_driver_free_dev_call_ctx const* call_ctx,
+	struct usb_hcd* ptr);
+
+void caller_marshal_kernel__hc_driver_free_dev__usb_hcd_primary_hcd__in(
+	size_t* __pos,
+	struct fipc_message* __msg,
+	struct ext_registers* __ext,
+	struct hc_driver_free_dev_call_ctx const* call_ctx,
+	struct usb_hcd const* ptr);
+
+void callee_unmarshal_kernel__hc_driver_free_dev__usb_hcd_primary_hcd__in(
+	size_t* __pos,
+	const struct fipc_message* __msg,
+	const struct ext_registers* __ext,
+	struct hc_driver_free_dev_call_ctx const* call_ctx,
+	struct usb_hcd* ptr);
+
+void callee_marshal_kernel__hc_driver_free_dev__usb_hcd_primary_hcd__in(
+	size_t* __pos,
+	struct fipc_message* __msg,
+	struct ext_registers* __ext,
+	struct hc_driver_free_dev_call_ctx const* call_ctx,
+	struct usb_hcd const* ptr);
+
+void caller_unmarshal_kernel__hc_driver_free_dev__usb_hcd_primary_hcd__in(
+	size_t* __pos,
+	const struct fipc_message* __msg,
+	const struct ext_registers* __ext,
+	struct hc_driver_free_dev_call_ctx const* call_ctx,
+	struct usb_hcd* ptr);
+
+void caller_marshal_kernel__hc_driver_free_dev__udev__in(
+	size_t* __pos,
+	struct fipc_message* __msg,
+	struct ext_registers* __ext,
+	struct hc_driver_free_dev_call_ctx const* call_ctx,
+	struct usb_device const* ptr);
+
+void callee_unmarshal_kernel__hc_driver_free_dev__udev__in(
+	size_t* __pos,
+	const struct fipc_message* __msg,
+	const struct ext_registers* __ext,
+	struct hc_driver_free_dev_call_ctx const* call_ctx,
+	struct usb_device* ptr);
+
+void callee_marshal_kernel__hc_driver_free_dev__udev__in(
+	size_t* __pos,
+	struct fipc_message* __msg,
+	struct ext_registers* __ext,
+	struct hc_driver_free_dev_call_ctx const* call_ctx,
+	struct usb_device const* ptr);
+
+void caller_unmarshal_kernel__hc_driver_free_dev__udev__in(
+	size_t* __pos,
+	const struct fipc_message* __msg,
+	const struct ext_registers* __ext,
+	struct hc_driver_free_dev_call_ctx const* call_ctx,
+	struct usb_device* ptr);
+
+void caller_marshal_kernel__hc_driver_alloc_streams__hcd__in(
+	size_t* __pos,
+	struct fipc_message* __msg,
+	struct ext_registers* __ext,
+	struct hc_driver_alloc_streams_call_ctx const* call_ctx,
+	struct usb_hcd const* ptr);
+
+void callee_unmarshal_kernel__hc_driver_alloc_streams__hcd__in(
+	size_t* __pos,
+	const struct fipc_message* __msg,
+	const struct ext_registers* __ext,
+	struct hc_driver_alloc_streams_call_ctx const* call_ctx,
+	struct usb_hcd* ptr);
+
+void callee_marshal_kernel__hc_driver_alloc_streams__hcd__in(
+	size_t* __pos,
+	struct fipc_message* __msg,
+	struct ext_registers* __ext,
+	struct hc_driver_alloc_streams_call_ctx const* call_ctx,
+	struct usb_hcd const* ptr);
+
+void caller_unmarshal_kernel__hc_driver_alloc_streams__hcd__in(
+	size_t* __pos,
+	const struct fipc_message* __msg,
+	const struct ext_registers* __ext,
+	struct hc_driver_alloc_streams_call_ctx const* call_ctx,
+	struct usb_hcd* ptr);
+
+void caller_marshal_kernel__hc_driver_alloc_streams__usb_hcd_primary_hcd__in(
+	size_t* __pos,
+	struct fipc_message* __msg,
+	struct ext_registers* __ext,
+	struct hc_driver_alloc_streams_call_ctx const* call_ctx,
+	struct usb_hcd const* ptr);
+
+void callee_unmarshal_kernel__hc_driver_alloc_streams__usb_hcd_primary_hcd__in(
+	size_t* __pos,
+	const struct fipc_message* __msg,
+	const struct ext_registers* __ext,
+	struct hc_driver_alloc_streams_call_ctx const* call_ctx,
+	struct usb_hcd* ptr);
+
+void callee_marshal_kernel__hc_driver_alloc_streams__usb_hcd_primary_hcd__in(
+	size_t* __pos,
+	struct fipc_message* __msg,
+	struct ext_registers* __ext,
+	struct hc_driver_alloc_streams_call_ctx const* call_ctx,
+	struct usb_hcd const* ptr);
+
+void caller_unmarshal_kernel__hc_driver_alloc_streams__usb_hcd_primary_hcd__in(
+	size_t* __pos,
+	const struct fipc_message* __msg,
+	const struct ext_registers* __ext,
+	struct hc_driver_alloc_streams_call_ctx const* call_ctx,
+	struct usb_hcd* ptr);
+
+void caller_marshal_kernel__hc_driver_alloc_streams__udev__in(
+	size_t* __pos,
+	struct fipc_message* __msg,
+	struct ext_registers* __ext,
+	struct hc_driver_alloc_streams_call_ctx const* call_ctx,
+	struct usb_device const* ptr);
+
+void callee_unmarshal_kernel__hc_driver_alloc_streams__udev__in(
+	size_t* __pos,
+	const struct fipc_message* __msg,
+	const struct ext_registers* __ext,
+	struct hc_driver_alloc_streams_call_ctx const* call_ctx,
+	struct usb_device* ptr);
+
+void callee_marshal_kernel__hc_driver_alloc_streams__udev__in(
+	size_t* __pos,
+	struct fipc_message* __msg,
+	struct ext_registers* __ext,
+	struct hc_driver_alloc_streams_call_ctx const* call_ctx,
+	struct usb_device const* ptr);
+
+void caller_unmarshal_kernel__hc_driver_alloc_streams__udev__in(
+	size_t* __pos,
+	const struct fipc_message* __msg,
+	const struct ext_registers* __ext,
+	struct hc_driver_alloc_streams_call_ctx const* call_ctx,
+	struct usb_device* ptr);
+
+void caller_marshal_kernel__hc_driver_alloc_streams__eps__in(
+	size_t* __pos,
+	struct fipc_message* __msg,
+	struct ext_registers* __ext,
+	struct hc_driver_alloc_streams_call_ctx const* call_ctx,
+	struct usb_host_endpoint const* ptr);
+
+void callee_unmarshal_kernel__hc_driver_alloc_streams__eps__in(
+	size_t* __pos,
+	const struct fipc_message* __msg,
+	const struct ext_registers* __ext,
+	struct hc_driver_alloc_streams_call_ctx const* call_ctx,
+	struct usb_host_endpoint* ptr);
+
+void callee_marshal_kernel__hc_driver_alloc_streams__eps__in(
+	size_t* __pos,
+	struct fipc_message* __msg,
+	struct ext_registers* __ext,
+	struct hc_driver_alloc_streams_call_ctx const* call_ctx,
+	struct usb_host_endpoint const* ptr);
+
+void caller_unmarshal_kernel__hc_driver_alloc_streams__eps__in(
+	size_t* __pos,
+	const struct fipc_message* __msg,
+	const struct ext_registers* __ext,
+	struct hc_driver_alloc_streams_call_ctx const* call_ctx,
+	struct usb_host_endpoint* ptr);
+
+void caller_marshal_kernel__hc_driver_free_streams__hcd__in(
+	size_t* __pos,
+	struct fipc_message* __msg,
+	struct ext_registers* __ext,
+	struct hc_driver_free_streams_call_ctx const* call_ctx,
+	struct usb_hcd const* ptr);
+
+void callee_unmarshal_kernel__hc_driver_free_streams__hcd__in(
+	size_t* __pos,
+	const struct fipc_message* __msg,
+	const struct ext_registers* __ext,
+	struct hc_driver_free_streams_call_ctx const* call_ctx,
+	struct usb_hcd* ptr);
+
+void callee_marshal_kernel__hc_driver_free_streams__hcd__in(
+	size_t* __pos,
+	struct fipc_message* __msg,
+	struct ext_registers* __ext,
+	struct hc_driver_free_streams_call_ctx const* call_ctx,
+	struct usb_hcd const* ptr);
+
+void caller_unmarshal_kernel__hc_driver_free_streams__hcd__in(
+	size_t* __pos,
+	const struct fipc_message* __msg,
+	const struct ext_registers* __ext,
+	struct hc_driver_free_streams_call_ctx const* call_ctx,
+	struct usb_hcd* ptr);
+
+void caller_marshal_kernel__hc_driver_free_streams__usb_hcd_primary_hcd__in(
+	size_t* __pos,
+	struct fipc_message* __msg,
+	struct ext_registers* __ext,
+	struct hc_driver_free_streams_call_ctx const* call_ctx,
+	struct usb_hcd const* ptr);
+
+void callee_unmarshal_kernel__hc_driver_free_streams__usb_hcd_primary_hcd__in(
+	size_t* __pos,
+	const struct fipc_message* __msg,
+	const struct ext_registers* __ext,
+	struct hc_driver_free_streams_call_ctx const* call_ctx,
+	struct usb_hcd* ptr);
+
+void callee_marshal_kernel__hc_driver_free_streams__usb_hcd_primary_hcd__in(
+	size_t* __pos,
+	struct fipc_message* __msg,
+	struct ext_registers* __ext,
+	struct hc_driver_free_streams_call_ctx const* call_ctx,
+	struct usb_hcd const* ptr);
+
+void caller_unmarshal_kernel__hc_driver_free_streams__usb_hcd_primary_hcd__in(
+	size_t* __pos,
+	const struct fipc_message* __msg,
+	const struct ext_registers* __ext,
+	struct hc_driver_free_streams_call_ctx const* call_ctx,
+	struct usb_hcd* ptr);
+
+void caller_marshal_kernel__hc_driver_free_streams__udev__in(
+	size_t* __pos,
+	struct fipc_message* __msg,
+	struct ext_registers* __ext,
+	struct hc_driver_free_streams_call_ctx const* call_ctx,
+	struct usb_device const* ptr);
+
+void callee_unmarshal_kernel__hc_driver_free_streams__udev__in(
+	size_t* __pos,
+	const struct fipc_message* __msg,
+	const struct ext_registers* __ext,
+	struct hc_driver_free_streams_call_ctx const* call_ctx,
+	struct usb_device* ptr);
+
+void callee_marshal_kernel__hc_driver_free_streams__udev__in(
+	size_t* __pos,
+	struct fipc_message* __msg,
+	struct ext_registers* __ext,
+	struct hc_driver_free_streams_call_ctx const* call_ctx,
+	struct usb_device const* ptr);
+
+void caller_unmarshal_kernel__hc_driver_free_streams__udev__in(
+	size_t* __pos,
+	const struct fipc_message* __msg,
+	const struct ext_registers* __ext,
+	struct hc_driver_free_streams_call_ctx const* call_ctx,
+	struct usb_device* ptr);
+
+void caller_marshal_kernel__hc_driver_free_streams__eps__in(
+	size_t* __pos,
+	struct fipc_message* __msg,
+	struct ext_registers* __ext,
+	struct hc_driver_free_streams_call_ctx const* call_ctx,
+	struct usb_host_endpoint const* ptr);
+
+void callee_unmarshal_kernel__hc_driver_free_streams__eps__in(
+	size_t* __pos,
+	const struct fipc_message* __msg,
+	const struct ext_registers* __ext,
+	struct hc_driver_free_streams_call_ctx const* call_ctx,
+	struct usb_host_endpoint* ptr);
+
+void callee_marshal_kernel__hc_driver_free_streams__eps__in(
+	size_t* __pos,
+	struct fipc_message* __msg,
+	struct ext_registers* __ext,
+	struct hc_driver_free_streams_call_ctx const* call_ctx,
+	struct usb_host_endpoint const* ptr);
+
+void caller_unmarshal_kernel__hc_driver_free_streams__eps__in(
+	size_t* __pos,
+	const struct fipc_message* __msg,
+	const struct ext_registers* __ext,
+	struct hc_driver_free_streams_call_ctx const* call_ctx,
+	struct usb_host_endpoint* ptr);
+
+void caller_marshal_kernel__hc_driver_add_endpoint__hcd__in(
+	size_t* __pos,
+	struct fipc_message* __msg,
+	struct ext_registers* __ext,
+	struct hc_driver_add_endpoint_call_ctx const* call_ctx,
+	struct usb_hcd const* ptr);
+
+void callee_unmarshal_kernel__hc_driver_add_endpoint__hcd__in(
+	size_t* __pos,
+	const struct fipc_message* __msg,
+	const struct ext_registers* __ext,
+	struct hc_driver_add_endpoint_call_ctx const* call_ctx,
+	struct usb_hcd* ptr);
+
+void callee_marshal_kernel__hc_driver_add_endpoint__hcd__in(
+	size_t* __pos,
+	struct fipc_message* __msg,
+	struct ext_registers* __ext,
+	struct hc_driver_add_endpoint_call_ctx const* call_ctx,
+	struct usb_hcd const* ptr);
+
+void caller_unmarshal_kernel__hc_driver_add_endpoint__hcd__in(
+	size_t* __pos,
+	const struct fipc_message* __msg,
+	const struct ext_registers* __ext,
+	struct hc_driver_add_endpoint_call_ctx const* call_ctx,
+	struct usb_hcd* ptr);
+
+void caller_marshal_kernel__hc_driver_add_endpoint__usb_hcd_primary_hcd__in(
+	size_t* __pos,
+	struct fipc_message* __msg,
+	struct ext_registers* __ext,
+	struct hc_driver_add_endpoint_call_ctx const* call_ctx,
+	struct usb_hcd const* ptr);
+
+void callee_unmarshal_kernel__hc_driver_add_endpoint__usb_hcd_primary_hcd__in(
+	size_t* __pos,
+	const struct fipc_message* __msg,
+	const struct ext_registers* __ext,
+	struct hc_driver_add_endpoint_call_ctx const* call_ctx,
+	struct usb_hcd* ptr);
+
+void callee_marshal_kernel__hc_driver_add_endpoint__usb_hcd_primary_hcd__in(
+	size_t* __pos,
+	struct fipc_message* __msg,
+	struct ext_registers* __ext,
+	struct hc_driver_add_endpoint_call_ctx const* call_ctx,
+	struct usb_hcd const* ptr);
+
+void caller_unmarshal_kernel__hc_driver_add_endpoint__usb_hcd_primary_hcd__in(
+	size_t* __pos,
+	const struct fipc_message* __msg,
+	const struct ext_registers* __ext,
+	struct hc_driver_add_endpoint_call_ctx const* call_ctx,
+	struct usb_hcd* ptr);
+
+void caller_marshal_kernel__hc_driver_add_endpoint__udev__in(
+	size_t* __pos,
+	struct fipc_message* __msg,
+	struct ext_registers* __ext,
+	struct hc_driver_add_endpoint_call_ctx const* call_ctx,
+	struct usb_device const* ptr);
+
+void callee_unmarshal_kernel__hc_driver_add_endpoint__udev__in(
+	size_t* __pos,
+	const struct fipc_message* __msg,
+	const struct ext_registers* __ext,
+	struct hc_driver_add_endpoint_call_ctx const* call_ctx,
+	struct usb_device* ptr);
+
+void callee_marshal_kernel__hc_driver_add_endpoint__udev__in(
+	size_t* __pos,
+	struct fipc_message* __msg,
+	struct ext_registers* __ext,
+	struct hc_driver_add_endpoint_call_ctx const* call_ctx,
+	struct usb_device const* ptr);
+
+void caller_unmarshal_kernel__hc_driver_add_endpoint__udev__in(
+	size_t* __pos,
+	const struct fipc_message* __msg,
+	const struct ext_registers* __ext,
+	struct hc_driver_add_endpoint_call_ctx const* call_ctx,
+	struct usb_device* ptr);
+
+void caller_marshal_kernel__hc_driver_add_endpoint__ep__in(
+	size_t* __pos,
+	struct fipc_message* __msg,
+	struct ext_registers* __ext,
+	struct hc_driver_add_endpoint_call_ctx const* call_ctx,
+	struct usb_host_endpoint const* ptr);
+
+void callee_unmarshal_kernel__hc_driver_add_endpoint__ep__in(
+	size_t* __pos,
+	const struct fipc_message* __msg,
+	const struct ext_registers* __ext,
+	struct hc_driver_add_endpoint_call_ctx const* call_ctx,
+	struct usb_host_endpoint* ptr);
+
+void callee_marshal_kernel__hc_driver_add_endpoint__ep__in(
+	size_t* __pos,
+	struct fipc_message* __msg,
+	struct ext_registers* __ext,
+	struct hc_driver_add_endpoint_call_ctx const* call_ctx,
+	struct usb_host_endpoint const* ptr);
+
+void caller_unmarshal_kernel__hc_driver_add_endpoint__ep__in(
+	size_t* __pos,
+	const struct fipc_message* __msg,
+	const struct ext_registers* __ext,
+	struct hc_driver_add_endpoint_call_ctx const* call_ctx,
+	struct usb_host_endpoint* ptr);
+
+void caller_marshal_kernel__hc_driver_add_endpoint__usb_endpoint_descriptor__in(
+	size_t* __pos,
+	struct fipc_message* __msg,
+	struct ext_registers* __ext,
+	struct hc_driver_add_endpoint_call_ctx const* call_ctx,
+	struct usb_endpoint_descriptor const* ptr);
+
+void callee_unmarshal_kernel__hc_driver_add_endpoint__usb_endpoint_descriptor__in(
+	size_t* __pos,
+	const struct fipc_message* __msg,
+	const struct ext_registers* __ext,
+	struct hc_driver_add_endpoint_call_ctx const* call_ctx,
+	struct usb_endpoint_descriptor* ptr);
+
+void callee_marshal_kernel__hc_driver_add_endpoint__usb_endpoint_descriptor__in(
+	size_t* __pos,
+	struct fipc_message* __msg,
+	struct ext_registers* __ext,
+	struct hc_driver_add_endpoint_call_ctx const* call_ctx,
+	struct usb_endpoint_descriptor const* ptr);
+
+void caller_unmarshal_kernel__hc_driver_add_endpoint__usb_endpoint_descriptor__in(
+	size_t* __pos,
+	const struct fipc_message* __msg,
+	const struct ext_registers* __ext,
+	struct hc_driver_add_endpoint_call_ctx const* call_ctx,
+	struct usb_endpoint_descriptor* ptr);
+
+void caller_marshal_kernel__hc_driver_drop_endpoint__hcd__in(
+	size_t* __pos,
+	struct fipc_message* __msg,
+	struct ext_registers* __ext,
+	struct hc_driver_drop_endpoint_call_ctx const* call_ctx,
+	struct usb_hcd const* ptr);
+
+void callee_unmarshal_kernel__hc_driver_drop_endpoint__hcd__in(
+	size_t* __pos,
+	const struct fipc_message* __msg,
+	const struct ext_registers* __ext,
+	struct hc_driver_drop_endpoint_call_ctx const* call_ctx,
+	struct usb_hcd* ptr);
+
+void callee_marshal_kernel__hc_driver_drop_endpoint__hcd__in(
+	size_t* __pos,
+	struct fipc_message* __msg,
+	struct ext_registers* __ext,
+	struct hc_driver_drop_endpoint_call_ctx const* call_ctx,
+	struct usb_hcd const* ptr);
+
+void caller_unmarshal_kernel__hc_driver_drop_endpoint__hcd__in(
+	size_t* __pos,
+	const struct fipc_message* __msg,
+	const struct ext_registers* __ext,
+	struct hc_driver_drop_endpoint_call_ctx const* call_ctx,
+	struct usb_hcd* ptr);
+
+void caller_marshal_kernel__hc_driver_drop_endpoint__usb_hcd_primary_hcd__in(
+	size_t* __pos,
+	struct fipc_message* __msg,
+	struct ext_registers* __ext,
+	struct hc_driver_drop_endpoint_call_ctx const* call_ctx,
+	struct usb_hcd const* ptr);
+
+void callee_unmarshal_kernel__hc_driver_drop_endpoint__usb_hcd_primary_hcd__in(
+	size_t* __pos,
+	const struct fipc_message* __msg,
+	const struct ext_registers* __ext,
+	struct hc_driver_drop_endpoint_call_ctx const* call_ctx,
+	struct usb_hcd* ptr);
+
+void callee_marshal_kernel__hc_driver_drop_endpoint__usb_hcd_primary_hcd__in(
+	size_t* __pos,
+	struct fipc_message* __msg,
+	struct ext_registers* __ext,
+	struct hc_driver_drop_endpoint_call_ctx const* call_ctx,
+	struct usb_hcd const* ptr);
+
+void caller_unmarshal_kernel__hc_driver_drop_endpoint__usb_hcd_primary_hcd__in(
+	size_t* __pos,
+	const struct fipc_message* __msg,
+	const struct ext_registers* __ext,
+	struct hc_driver_drop_endpoint_call_ctx const* call_ctx,
+	struct usb_hcd* ptr);
+
+void caller_marshal_kernel__hc_driver_drop_endpoint__udev__in(
+	size_t* __pos,
+	struct fipc_message* __msg,
+	struct ext_registers* __ext,
+	struct hc_driver_drop_endpoint_call_ctx const* call_ctx,
+	struct usb_device const* ptr);
+
+void callee_unmarshal_kernel__hc_driver_drop_endpoint__udev__in(
+	size_t* __pos,
+	const struct fipc_message* __msg,
+	const struct ext_registers* __ext,
+	struct hc_driver_drop_endpoint_call_ctx const* call_ctx,
+	struct usb_device* ptr);
+
+void callee_marshal_kernel__hc_driver_drop_endpoint__udev__in(
+	size_t* __pos,
+	struct fipc_message* __msg,
+	struct ext_registers* __ext,
+	struct hc_driver_drop_endpoint_call_ctx const* call_ctx,
+	struct usb_device const* ptr);
+
+void caller_unmarshal_kernel__hc_driver_drop_endpoint__udev__in(
+	size_t* __pos,
+	const struct fipc_message* __msg,
+	const struct ext_registers* __ext,
+	struct hc_driver_drop_endpoint_call_ctx const* call_ctx,
+	struct usb_device* ptr);
+
+void caller_marshal_kernel__hc_driver_drop_endpoint__ep__in(
+	size_t* __pos,
+	struct fipc_message* __msg,
+	struct ext_registers* __ext,
+	struct hc_driver_drop_endpoint_call_ctx const* call_ctx,
+	struct usb_host_endpoint const* ptr);
+
+void callee_unmarshal_kernel__hc_driver_drop_endpoint__ep__in(
+	size_t* __pos,
+	const struct fipc_message* __msg,
+	const struct ext_registers* __ext,
+	struct hc_driver_drop_endpoint_call_ctx const* call_ctx,
+	struct usb_host_endpoint* ptr);
+
+void callee_marshal_kernel__hc_driver_drop_endpoint__ep__in(
+	size_t* __pos,
+	struct fipc_message* __msg,
+	struct ext_registers* __ext,
+	struct hc_driver_drop_endpoint_call_ctx const* call_ctx,
+	struct usb_host_endpoint const* ptr);
+
+void caller_unmarshal_kernel__hc_driver_drop_endpoint__ep__in(
+	size_t* __pos,
+	const struct fipc_message* __msg,
+	const struct ext_registers* __ext,
+	struct hc_driver_drop_endpoint_call_ctx const* call_ctx,
+	struct usb_host_endpoint* ptr);
+
+void caller_marshal_kernel__hc_driver_drop_endpoint__usb_endpoint_descriptor__in(
+	size_t* __pos,
+	struct fipc_message* __msg,
+	struct ext_registers* __ext,
+	struct hc_driver_drop_endpoint_call_ctx const* call_ctx,
+	struct usb_endpoint_descriptor const* ptr);
+
+void callee_unmarshal_kernel__hc_driver_drop_endpoint__usb_endpoint_descriptor__in(
+	size_t* __pos,
+	const struct fipc_message* __msg,
+	const struct ext_registers* __ext,
+	struct hc_driver_drop_endpoint_call_ctx const* call_ctx,
+	struct usb_endpoint_descriptor* ptr);
+
+void callee_marshal_kernel__hc_driver_drop_endpoint__usb_endpoint_descriptor__in(
+	size_t* __pos,
+	struct fipc_message* __msg,
+	struct ext_registers* __ext,
+	struct hc_driver_drop_endpoint_call_ctx const* call_ctx,
+	struct usb_endpoint_descriptor const* ptr);
+
+void caller_unmarshal_kernel__hc_driver_drop_endpoint__usb_endpoint_descriptor__in(
+	size_t* __pos,
+	const struct fipc_message* __msg,
+	const struct ext_registers* __ext,
+	struct hc_driver_drop_endpoint_call_ctx const* call_ctx,
+	struct usb_endpoint_descriptor* ptr);
+
+void caller_marshal_kernel__hc_driver_check_bandwidth__hcd__in(
+	size_t* __pos,
+	struct fipc_message* __msg,
+	struct ext_registers* __ext,
+	struct hc_driver_check_bandwidth_call_ctx const* call_ctx,
+	struct usb_hcd const* ptr);
+
+void callee_unmarshal_kernel__hc_driver_check_bandwidth__hcd__in(
+	size_t* __pos,
+	const struct fipc_message* __msg,
+	const struct ext_registers* __ext,
+	struct hc_driver_check_bandwidth_call_ctx const* call_ctx,
+	struct usb_hcd* ptr);
+
+void callee_marshal_kernel__hc_driver_check_bandwidth__hcd__in(
+	size_t* __pos,
+	struct fipc_message* __msg,
+	struct ext_registers* __ext,
+	struct hc_driver_check_bandwidth_call_ctx const* call_ctx,
+	struct usb_hcd const* ptr);
+
+void caller_unmarshal_kernel__hc_driver_check_bandwidth__hcd__in(
+	size_t* __pos,
+	const struct fipc_message* __msg,
+	const struct ext_registers* __ext,
+	struct hc_driver_check_bandwidth_call_ctx const* call_ctx,
+	struct usb_hcd* ptr);
+
+void caller_marshal_kernel__hc_driver_check_bandwidth__usb_hcd_primary_hcd__in(
+	size_t* __pos,
+	struct fipc_message* __msg,
+	struct ext_registers* __ext,
+	struct hc_driver_check_bandwidth_call_ctx const* call_ctx,
+	struct usb_hcd const* ptr);
+
+void callee_unmarshal_kernel__hc_driver_check_bandwidth__usb_hcd_primary_hcd__in(
+	size_t* __pos,
+	const struct fipc_message* __msg,
+	const struct ext_registers* __ext,
+	struct hc_driver_check_bandwidth_call_ctx const* call_ctx,
+	struct usb_hcd* ptr);
+
+void callee_marshal_kernel__hc_driver_check_bandwidth__usb_hcd_primary_hcd__in(
+	size_t* __pos,
+	struct fipc_message* __msg,
+	struct ext_registers* __ext,
+	struct hc_driver_check_bandwidth_call_ctx const* call_ctx,
+	struct usb_hcd const* ptr);
+
+void caller_unmarshal_kernel__hc_driver_check_bandwidth__usb_hcd_primary_hcd__in(
+	size_t* __pos,
+	const struct fipc_message* __msg,
+	const struct ext_registers* __ext,
+	struct hc_driver_check_bandwidth_call_ctx const* call_ctx,
+	struct usb_hcd* ptr);
+
+void caller_marshal_kernel__hc_driver_check_bandwidth__udev__in(
+	size_t* __pos,
+	struct fipc_message* __msg,
+	struct ext_registers* __ext,
+	struct hc_driver_check_bandwidth_call_ctx const* call_ctx,
+	struct usb_device const* ptr);
+
+void callee_unmarshal_kernel__hc_driver_check_bandwidth__udev__in(
+	size_t* __pos,
+	const struct fipc_message* __msg,
+	const struct ext_registers* __ext,
+	struct hc_driver_check_bandwidth_call_ctx const* call_ctx,
+	struct usb_device* ptr);
+
+void callee_marshal_kernel__hc_driver_check_bandwidth__udev__in(
+	size_t* __pos,
+	struct fipc_message* __msg,
+	struct ext_registers* __ext,
+	struct hc_driver_check_bandwidth_call_ctx const* call_ctx,
+	struct usb_device const* ptr);
+
+void caller_unmarshal_kernel__hc_driver_check_bandwidth__udev__in(
+	size_t* __pos,
+	const struct fipc_message* __msg,
+	const struct ext_registers* __ext,
+	struct hc_driver_check_bandwidth_call_ctx const* call_ctx,
+	struct usb_device* ptr);
+
+void caller_marshal_kernel__hc_driver_reset_bandwidth__hcd__in(
+	size_t* __pos,
+	struct fipc_message* __msg,
+	struct ext_registers* __ext,
+	struct hc_driver_reset_bandwidth_call_ctx const* call_ctx,
+	struct usb_hcd const* ptr);
+
+void callee_unmarshal_kernel__hc_driver_reset_bandwidth__hcd__in(
+	size_t* __pos,
+	const struct fipc_message* __msg,
+	const struct ext_registers* __ext,
+	struct hc_driver_reset_bandwidth_call_ctx const* call_ctx,
+	struct usb_hcd* ptr);
+
+void callee_marshal_kernel__hc_driver_reset_bandwidth__hcd__in(
+	size_t* __pos,
+	struct fipc_message* __msg,
+	struct ext_registers* __ext,
+	struct hc_driver_reset_bandwidth_call_ctx const* call_ctx,
+	struct usb_hcd const* ptr);
+
+void caller_unmarshal_kernel__hc_driver_reset_bandwidth__hcd__in(
+	size_t* __pos,
+	const struct fipc_message* __msg,
+	const struct ext_registers* __ext,
+	struct hc_driver_reset_bandwidth_call_ctx const* call_ctx,
+	struct usb_hcd* ptr);
+
+void caller_marshal_kernel__hc_driver_reset_bandwidth__usb_hcd_primary_hcd__in(
+	size_t* __pos,
+	struct fipc_message* __msg,
+	struct ext_registers* __ext,
+	struct hc_driver_reset_bandwidth_call_ctx const* call_ctx,
+	struct usb_hcd const* ptr);
+
+void callee_unmarshal_kernel__hc_driver_reset_bandwidth__usb_hcd_primary_hcd__in(
+	size_t* __pos,
+	const struct fipc_message* __msg,
+	const struct ext_registers* __ext,
+	struct hc_driver_reset_bandwidth_call_ctx const* call_ctx,
+	struct usb_hcd* ptr);
+
+void callee_marshal_kernel__hc_driver_reset_bandwidth__usb_hcd_primary_hcd__in(
+	size_t* __pos,
+	struct fipc_message* __msg,
+	struct ext_registers* __ext,
+	struct hc_driver_reset_bandwidth_call_ctx const* call_ctx,
+	struct usb_hcd const* ptr);
+
+void caller_unmarshal_kernel__hc_driver_reset_bandwidth__usb_hcd_primary_hcd__in(
+	size_t* __pos,
+	const struct fipc_message* __msg,
+	const struct ext_registers* __ext,
+	struct hc_driver_reset_bandwidth_call_ctx const* call_ctx,
+	struct usb_hcd* ptr);
+
+void caller_marshal_kernel__hc_driver_reset_bandwidth__udev__in(
+	size_t* __pos,
+	struct fipc_message* __msg,
+	struct ext_registers* __ext,
+	struct hc_driver_reset_bandwidth_call_ctx const* call_ctx,
+	struct usb_device const* ptr);
+
+void callee_unmarshal_kernel__hc_driver_reset_bandwidth__udev__in(
+	size_t* __pos,
+	const struct fipc_message* __msg,
+	const struct ext_registers* __ext,
+	struct hc_driver_reset_bandwidth_call_ctx const* call_ctx,
+	struct usb_device* ptr);
+
+void callee_marshal_kernel__hc_driver_reset_bandwidth__udev__in(
+	size_t* __pos,
+	struct fipc_message* __msg,
+	struct ext_registers* __ext,
+	struct hc_driver_reset_bandwidth_call_ctx const* call_ctx,
+	struct usb_device const* ptr);
+
+void caller_unmarshal_kernel__hc_driver_reset_bandwidth__udev__in(
+	size_t* __pos,
+	const struct fipc_message* __msg,
+	const struct ext_registers* __ext,
+	struct hc_driver_reset_bandwidth_call_ctx const* call_ctx,
+	struct usb_device* ptr);
+
+void caller_marshal_kernel__hc_driver_address_device__hcd__in(
+	size_t* __pos,
+	struct fipc_message* __msg,
+	struct ext_registers* __ext,
+	struct hc_driver_address_device_call_ctx const* call_ctx,
+	struct usb_hcd const* ptr);
+
+void callee_unmarshal_kernel__hc_driver_address_device__hcd__in(
+	size_t* __pos,
+	const struct fipc_message* __msg,
+	const struct ext_registers* __ext,
+	struct hc_driver_address_device_call_ctx const* call_ctx,
+	struct usb_hcd* ptr);
+
+void callee_marshal_kernel__hc_driver_address_device__hcd__in(
+	size_t* __pos,
+	struct fipc_message* __msg,
+	struct ext_registers* __ext,
+	struct hc_driver_address_device_call_ctx const* call_ctx,
+	struct usb_hcd const* ptr);
+
+void caller_unmarshal_kernel__hc_driver_address_device__hcd__in(
+	size_t* __pos,
+	const struct fipc_message* __msg,
+	const struct ext_registers* __ext,
+	struct hc_driver_address_device_call_ctx const* call_ctx,
+	struct usb_hcd* ptr);
+
+void caller_marshal_kernel__hc_driver_address_device__usb_hcd_primary_hcd__in(
+	size_t* __pos,
+	struct fipc_message* __msg,
+	struct ext_registers* __ext,
+	struct hc_driver_address_device_call_ctx const* call_ctx,
+	struct usb_hcd const* ptr);
+
+void callee_unmarshal_kernel__hc_driver_address_device__usb_hcd_primary_hcd__in(
+	size_t* __pos,
+	const struct fipc_message* __msg,
+	const struct ext_registers* __ext,
+	struct hc_driver_address_device_call_ctx const* call_ctx,
+	struct usb_hcd* ptr);
+
+void callee_marshal_kernel__hc_driver_address_device__usb_hcd_primary_hcd__in(
+	size_t* __pos,
+	struct fipc_message* __msg,
+	struct ext_registers* __ext,
+	struct hc_driver_address_device_call_ctx const* call_ctx,
+	struct usb_hcd const* ptr);
+
+void caller_unmarshal_kernel__hc_driver_address_device__usb_hcd_primary_hcd__in(
+	size_t* __pos,
+	const struct fipc_message* __msg,
+	const struct ext_registers* __ext,
+	struct hc_driver_address_device_call_ctx const* call_ctx,
+	struct usb_hcd* ptr);
+
+void caller_marshal_kernel__hc_driver_address_device__udev__in(
+	size_t* __pos,
+	struct fipc_message* __msg,
+	struct ext_registers* __ext,
+	struct hc_driver_address_device_call_ctx const* call_ctx,
+	struct usb_device const* ptr);
+
+void callee_unmarshal_kernel__hc_driver_address_device__udev__in(
+	size_t* __pos,
+	const struct fipc_message* __msg,
+	const struct ext_registers* __ext,
+	struct hc_driver_address_device_call_ctx const* call_ctx,
+	struct usb_device* ptr);
+
+void callee_marshal_kernel__hc_driver_address_device__udev__in(
+	size_t* __pos,
+	struct fipc_message* __msg,
+	struct ext_registers* __ext,
+	struct hc_driver_address_device_call_ctx const* call_ctx,
+	struct usb_device const* ptr);
+
+void caller_unmarshal_kernel__hc_driver_address_device__udev__in(
+	size_t* __pos,
+	const struct fipc_message* __msg,
+	const struct ext_registers* __ext,
+	struct hc_driver_address_device_call_ctx const* call_ctx,
+	struct usb_device* ptr);
+
+void caller_marshal_kernel__hc_driver_hub_status_data__hcd__in(
+	size_t* __pos,
+	struct fipc_message* __msg,
+	struct ext_registers* __ext,
+	struct hc_driver_hub_status_data_call_ctx const* call_ctx,
+	struct usb_hcd const* ptr);
+
+void callee_unmarshal_kernel__hc_driver_hub_status_data__hcd__in(
+	size_t* __pos,
+	const struct fipc_message* __msg,
+	const struct ext_registers* __ext,
+	struct hc_driver_hub_status_data_call_ctx const* call_ctx,
+	struct usb_hcd* ptr);
+
+void callee_marshal_kernel__hc_driver_hub_status_data__hcd__in(
+	size_t* __pos,
+	struct fipc_message* __msg,
+	struct ext_registers* __ext,
+	struct hc_driver_hub_status_data_call_ctx const* call_ctx,
+	struct usb_hcd const* ptr);
+
+void caller_unmarshal_kernel__hc_driver_hub_status_data__hcd__in(
+	size_t* __pos,
+	const struct fipc_message* __msg,
+	const struct ext_registers* __ext,
+	struct hc_driver_hub_status_data_call_ctx const* call_ctx,
+	struct usb_hcd* ptr);
+
+void caller_marshal_kernel__hc_driver_irq__hcd__in(
+	size_t* __pos,
+	struct fipc_message* __msg,
+	struct ext_registers* __ext,
+	struct hc_driver_irq_call_ctx const* call_ctx,
+	struct usb_hcd const* ptr);
+
+void callee_unmarshal_kernel__hc_driver_irq__hcd__in(
+	size_t* __pos,
+	const struct fipc_message* __msg,
+	const struct ext_registers* __ext,
+	struct hc_driver_irq_call_ctx const* call_ctx,
+	struct usb_hcd* ptr);
+
+void callee_marshal_kernel__hc_driver_irq__hcd__in(
+	size_t* __pos,
+	struct fipc_message* __msg,
+	struct ext_registers* __ext,
+	struct hc_driver_irq_call_ctx const* call_ctx,
+	struct usb_hcd const* ptr);
+
+void caller_unmarshal_kernel__hc_driver_irq__hcd__in(
+	size_t* __pos,
+	const struct fipc_message* __msg,
+	const struct ext_registers* __ext,
+	struct hc_driver_irq_call_ctx const* call_ctx,
+	struct usb_hcd* ptr);
+
+void caller_marshal_kernel__hc_driver_hub_control__hcd__in(
+	size_t* __pos,
+	struct fipc_message* __msg,
+	struct ext_registers* __ext,
+	struct hc_driver_hub_control_call_ctx const* call_ctx,
+	struct usb_hcd const* ptr);
+
+void callee_unmarshal_kernel__hc_driver_hub_control__hcd__in(
+	size_t* __pos,
+	const struct fipc_message* __msg,
+	const struct ext_registers* __ext,
+	struct hc_driver_hub_control_call_ctx const* call_ctx,
+	struct usb_hcd* ptr);
+
+void callee_marshal_kernel__hc_driver_hub_control__hcd__in(
+	size_t* __pos,
+	struct fipc_message* __msg,
+	struct ext_registers* __ext,
+	struct hc_driver_hub_control_call_ctx const* call_ctx,
+	struct usb_hcd const* ptr);
+
+void caller_unmarshal_kernel__hc_driver_hub_control__hcd__in(
+	size_t* __pos,
+	const struct fipc_message* __msg,
+	const struct ext_registers* __ext,
+	struct hc_driver_hub_control_call_ctx const* call_ctx,
+	struct usb_hcd* ptr);
 
 
 #endif

@@ -4,6 +4,9 @@
 
 #include <lcd_config/post_hook.h>
 
+unsigned long loops_per_jiffy;
+unsigned long volatile jiffies;
+
 void add_timer(struct timer_list* timer)
 {
 	struct fipc_message __buffer = {0};
@@ -238,7 +241,7 @@ void free_irq(unsigned int irq, void* dev_id)
 	}
 }
 
-void init_timer_key(struct timer_list* timer, unsigned int flags, char* name, struct lock_class_key* key)
+void init_timer_key(struct timer_list* timer, unsigned int flags, const char* name, struct lock_class_key* key)
 {
 	struct fipc_message __buffer = {0};
 	struct fipc_message *__msg = &__buffer;
@@ -774,7 +777,7 @@ void handler_callee(struct fipc_message* __msg, struct ext_registers* __ext)
 	}
 }
 
-int request_threaded_irq(unsigned int irq, fptr_handler handler, fptr_thread_fn thread_fn, unsigned long irqflags, char* devname, void* dev_id)
+int request_threaded_irq(unsigned int irq, fptr_handler handler, fptr_thread_fn thread_fn, unsigned long irqflags, const char* devname, void* dev_id)
 {
 	struct fipc_message __buffer = {0};
 	struct fipc_message *__msg = &__buffer;
@@ -1956,9 +1959,8 @@ void hc_driver_enable_device_callee(struct fipc_message* __msg, struct ext_regis
 
 	fptr_hc_driver_enable_device function_ptr = glue_unpack(__pos, __msg, __ext, fptr_hc_driver_enable_device);
 	struct usb_hcd* hcd = 0;
+	struct usb_device* udev = 0;
 	struct usb_hcd** hcd_ptr = &hcd;
-	struct usb_device __udev;
-	struct usb_device* udev = &__udev;
 	struct usb_device** udev_ptr = &udev;
 	int ret = 0;
 	int* ret_ptr = &ret;
@@ -1979,6 +1981,8 @@ void hc_driver_enable_device_callee(struct fipc_message* __msg, struct ext_regis
 	}
 
 	{
+		size_t __size = sizeof(struct usb_device);
+		*udev_ptr = glue_unpack_new_shadow(__pos, __msg, __ext, struct usb_device*, (__size), (DEFAULT_GFP_FLAGS));
 		if (*udev_ptr) {
 			callee_unmarshal_kernel__hc_driver_enable_device__udev__in(__pos, __msg, __ext, ctx, *udev_ptr);
 		}
@@ -2744,9 +2748,8 @@ void hc_driver_alloc_dev_callee(struct fipc_message* __msg, struct ext_registers
 
 	fptr_hc_driver_alloc_dev function_ptr = glue_unpack(__pos, __msg, __ext, fptr_hc_driver_alloc_dev);
 	struct usb_hcd* hcd = 0;
+	struct usb_device* udev = 0;
 	struct usb_hcd** hcd_ptr = &hcd;
-	struct usb_device __udev;
-	struct usb_device* udev = &__udev;
 	struct usb_device** udev_ptr = &udev;
 	int ret = 0;
 	int* ret_ptr = &ret;
@@ -2767,6 +2770,8 @@ void hc_driver_alloc_dev_callee(struct fipc_message* __msg, struct ext_registers
 	}
 
 	{
+		size_t __size = sizeof(struct usb_device);
+		*udev_ptr = glue_unpack_new_shadow(__pos, __msg, __ext, struct usb_device*, (__size), (DEFAULT_GFP_FLAGS));
 		if (*udev_ptr) {
 			callee_unmarshal_kernel__hc_driver_alloc_dev__udev__in(__pos, __msg, __ext, ctx, *udev_ptr);
 		}
@@ -2807,9 +2812,8 @@ void hc_driver_free_dev_callee(struct fipc_message* __msg, struct ext_registers*
 
 	fptr_hc_driver_free_dev function_ptr = glue_unpack(__pos, __msg, __ext, fptr_hc_driver_free_dev);
 	struct usb_hcd* hcd = 0;
+	struct usb_device* udev = 0;
 	struct usb_hcd** hcd_ptr = &hcd;
-	struct usb_device __udev;
-	struct usb_device* udev = &__udev;
 	struct usb_device** udev_ptr = &udev;
 	
 	__maybe_unused struct hc_driver_free_dev_call_ctx call_ctx = {hcd, udev};
@@ -2828,6 +2832,8 @@ void hc_driver_free_dev_callee(struct fipc_message* __msg, struct ext_registers*
 	}
 
 	{
+		size_t __size = sizeof(struct usb_device);
+		*udev_ptr = glue_unpack_new_shadow(__pos, __msg, __ext, struct usb_device*, (__size), (DEFAULT_GFP_FLAGS));
 		if (*udev_ptr) {
 			callee_unmarshal_kernel__hc_driver_free_dev__udev__in(__pos, __msg, __ext, ctx, *udev_ptr);
 		}
@@ -2864,13 +2870,12 @@ void hc_driver_alloc_streams_callee(struct fipc_message* __msg, struct ext_regis
 
 	fptr_hc_driver_alloc_streams function_ptr = glue_unpack(__pos, __msg, __ext, fptr_hc_driver_alloc_streams);
 	struct usb_hcd* hcd = 0;
+	struct usb_device* udev = 0;
 	struct usb_host_endpoint** eps = 0;
 	unsigned int num_eps = 0;
 	unsigned int num_streams = 0;
 	unsigned int mem_flags = 0;
 	struct usb_hcd** hcd_ptr = &hcd;
-	struct usb_device __udev;
-	struct usb_device* udev = &__udev;
 	struct usb_device** udev_ptr = &udev;
 	struct usb_host_endpoint*** eps_ptr = &eps;
 	unsigned int* num_eps_ptr = &num_eps;
@@ -2895,6 +2900,8 @@ void hc_driver_alloc_streams_callee(struct fipc_message* __msg, struct ext_regis
 	}
 
 	{
+		size_t __size = sizeof(struct usb_device);
+		*udev_ptr = glue_unpack_new_shadow(__pos, __msg, __ext, struct usb_device*, (__size), (DEFAULT_GFP_FLAGS));
 		if (*udev_ptr) {
 			callee_unmarshal_kernel__hc_driver_alloc_streams__udev__in(__pos, __msg, __ext, ctx, *udev_ptr);
 		}
@@ -2980,12 +2987,11 @@ void hc_driver_free_streams_callee(struct fipc_message* __msg, struct ext_regist
 
 	fptr_hc_driver_free_streams function_ptr = glue_unpack(__pos, __msg, __ext, fptr_hc_driver_free_streams);
 	struct usb_hcd* hcd = 0;
+	struct usb_device* udev = 0;
 	struct usb_host_endpoint** eps = 0;
 	unsigned int num_eps = 0;
 	unsigned int mem_flags = 0;
 	struct usb_hcd** hcd_ptr = &hcd;
-	struct usb_device __udev;
-	struct usb_device* udev = &__udev;
 	struct usb_device** udev_ptr = &udev;
 	struct usb_host_endpoint*** eps_ptr = &eps;
 	unsigned int* num_eps_ptr = &num_eps;
@@ -3008,6 +3014,8 @@ void hc_driver_free_streams_callee(struct fipc_message* __msg, struct ext_regist
 	}
 
 	{
+		size_t __size = sizeof(struct usb_device);
+		*udev_ptr = glue_unpack_new_shadow(__pos, __msg, __ext, struct usb_device*, (__size), (DEFAULT_GFP_FLAGS));
 		if (*udev_ptr) {
 			callee_unmarshal_kernel__hc_driver_free_streams__udev__in(__pos, __msg, __ext, ctx, *udev_ptr);
 		}
@@ -3157,10 +3165,9 @@ void hc_driver_drop_endpoint_callee(struct fipc_message* __msg, struct ext_regis
 
 	fptr_hc_driver_drop_endpoint function_ptr = glue_unpack(__pos, __msg, __ext, fptr_hc_driver_drop_endpoint);
 	struct usb_hcd* hcd = 0;
+	struct usb_device* udev = 0;
 	struct usb_host_endpoint* ep = 0;
 	struct usb_hcd** hcd_ptr = &hcd;
-	struct usb_device __udev;
-	struct usb_device* udev = &__udev;
 	struct usb_device** udev_ptr = &udev;
 	struct usb_host_endpoint** ep_ptr = &ep;
 	int ret = 0;
@@ -3182,6 +3189,8 @@ void hc_driver_drop_endpoint_callee(struct fipc_message* __msg, struct ext_regis
 	}
 
 	{
+		size_t __size = sizeof(struct usb_device);
+		*udev_ptr = glue_unpack_new_shadow(__pos, __msg, __ext, struct usb_device*, (__size), (DEFAULT_GFP_FLAGS));
 		if (*udev_ptr) {
 			callee_unmarshal_kernel__hc_driver_drop_endpoint__udev__in(__pos, __msg, __ext, ctx, *udev_ptr);
 		}
@@ -3238,9 +3247,8 @@ void hc_driver_check_bandwidth_callee(struct fipc_message* __msg, struct ext_reg
 
 	fptr_hc_driver_check_bandwidth function_ptr = glue_unpack(__pos, __msg, __ext, fptr_hc_driver_check_bandwidth);
 	struct usb_hcd* hcd = 0;
+	struct usb_device* udev = 0;
 	struct usb_hcd** hcd_ptr = &hcd;
-	struct usb_device __udev;
-	struct usb_device* udev = &__udev;
 	struct usb_device** udev_ptr = &udev;
 	int ret = 0;
 	int* ret_ptr = &ret;
@@ -3261,6 +3269,8 @@ void hc_driver_check_bandwidth_callee(struct fipc_message* __msg, struct ext_reg
 	}
 
 	{
+		size_t __size = sizeof(struct usb_device);
+		*udev_ptr = glue_unpack_new_shadow(__pos, __msg, __ext, struct usb_device*, (__size), (DEFAULT_GFP_FLAGS));
 		if (*udev_ptr) {
 			callee_unmarshal_kernel__hc_driver_check_bandwidth__udev__in(__pos, __msg, __ext, ctx, *udev_ptr);
 		}
@@ -3301,9 +3311,8 @@ void hc_driver_reset_bandwidth_callee(struct fipc_message* __msg, struct ext_reg
 
 	fptr_hc_driver_reset_bandwidth function_ptr = glue_unpack(__pos, __msg, __ext, fptr_hc_driver_reset_bandwidth);
 	struct usb_hcd* hcd = 0;
+	struct usb_device* udev = 0;
 	struct usb_hcd** hcd_ptr = &hcd;
-	struct usb_device __udev;
-	struct usb_device* udev = &__udev;
 	struct usb_device** udev_ptr = &udev;
 	
 	__maybe_unused struct hc_driver_reset_bandwidth_call_ctx call_ctx = {hcd, udev};
@@ -3322,6 +3331,8 @@ void hc_driver_reset_bandwidth_callee(struct fipc_message* __msg, struct ext_reg
 	}
 
 	{
+		size_t __size = sizeof(struct usb_device);
+		*udev_ptr = glue_unpack_new_shadow(__pos, __msg, __ext, struct usb_device*, (__size), (DEFAULT_GFP_FLAGS));
 		if (*udev_ptr) {
 			callee_unmarshal_kernel__hc_driver_reset_bandwidth__udev__in(__pos, __msg, __ext, ctx, *udev_ptr);
 		}
@@ -3358,9 +3369,8 @@ void hc_driver_address_device_callee(struct fipc_message* __msg, struct ext_regi
 
 	fptr_hc_driver_address_device function_ptr = glue_unpack(__pos, __msg, __ext, fptr_hc_driver_address_device);
 	struct usb_hcd* hcd = 0;
+	struct usb_device* udev = 0;
 	struct usb_hcd** hcd_ptr = &hcd;
-	struct usb_device __udev;
-	struct usb_device* udev = &__udev;
 	struct usb_device** udev_ptr = &udev;
 	int ret = 0;
 	int* ret_ptr = &ret;
@@ -3381,6 +3391,8 @@ void hc_driver_address_device_callee(struct fipc_message* __msg, struct ext_regi
 	}
 
 	{
+		size_t __size = sizeof(struct usb_device);
+		*udev_ptr = glue_unpack_new_shadow(__pos, __msg, __ext, struct usb_device*, (__size), (DEFAULT_GFP_FLAGS));
 		if (*udev_ptr) {
 			callee_unmarshal_kernel__hc_driver_address_device__udev__in(__pos, __msg, __ext, ctx, *udev_ptr);
 		}
@@ -3619,11 +3631,84 @@ void hc_driver_hub_control_callee(struct fipc_message* __msg, struct ext_registe
 	}
 }
 
+unsigned long get_loops_per_jiffy(void)
+{
+	struct fipc_message __buffer = {0};
+	struct fipc_message *msg = &__buffer;
+	struct ext_registers* ext = get_register_page(smp_processor_id());
+	size_t n_pos = 0;
+	size_t* __pos = &n_pos;
+
+	unsigned long ret = 0;
+	unsigned long* ret_ptr = &ret;
+	
+	__maybe_unused const struct get_loops_per_jiffy_call_ctx call_ctx = {};
+	__maybe_unused const struct get_loops_per_jiffy_call_ctx *ctx = &call_ctx;
+
+	(void)ext;
+
+	if (verbose_debug) {
+		printk("%s:%d, entered!\n", __func__, __LINE__);
+	}
+
+	glue_call_server(__pos, msg, RPC_ID_get_loops_per_jiffy);
+
+	*__pos = 0;
+	{
+		*ret_ptr = glue_unpack(__pos, msg, ext, unsigned long);
+	}
+
+	if (verbose_debug) {
+		printk("%s:%d, returned!\n", __func__, __LINE__);
+	}
+	return ret;
+}
+
+unsigned long get_jiffies(void)
+{
+	struct fipc_message __buffer = {0};
+	struct fipc_message *msg = &__buffer;
+	struct ext_registers* ext = get_register_page(smp_processor_id());
+	size_t n_pos = 0;
+	size_t* __pos = &n_pos;
+
+	unsigned long ret = 0;
+	unsigned long* ret_ptr = &ret;
+	
+	__maybe_unused const struct get_jiffies_call_ctx call_ctx = {};
+	__maybe_unused const struct get_jiffies_call_ctx *ctx = &call_ctx;
+
+	(void)ext;
+
+	if (verbose_debug) {
+		printk("%s:%d, entered!\n", __func__, __LINE__);
+	}
+
+	glue_call_server(__pos, msg, RPC_ID_get_jiffies);
+
+	*__pos = 0;
+	{
+		*ret_ptr = glue_unpack(__pos, msg, ext, unsigned long);
+	}
+
+	if (verbose_debug) {
+		printk("%s:%d, returned!\n", __func__, __LINE__);
+	}
+	return ret;
+}
+
+void __init_globals(void) {
+
+	loops_per_jiffy = get_loops_per_jiffy();
+	jiffies = get_jiffies();
+}
+
 int try_dispatch(enum RPC_ID id, struct fipc_message* __msg, struct ext_registers* __ext)
 {
 	switch(id) {
 	case MODULE_INIT:
 		glue_user_trace("MODULE_INIT");
+		__init_globals();
 		__module_lcd_init();
 		shared_mem_init();
 		break;

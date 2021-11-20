@@ -1072,7 +1072,7 @@ int xhci_gen_setup(struct usb_hcd* hcd, fptr_get_quirks get_quirks)
 }
 EXPORT_SYMBOL(xhci_gen_setup);
 
-void xhci_init_driver(struct hc_driver* drv, struct xhci_driver_overrides* over)
+void xhci_init_driver(struct hc_driver* drv, const struct xhci_driver_overrides* over)
 {
 	struct fipc_message __buffer = {0};
 	struct fipc_message *__msg = &__buffer;
@@ -1183,6 +1183,21 @@ int xhci_run(struct usb_hcd* hcd)
 	return ret;
 }
 EXPORT_SYMBOL(xhci_run);
+
+void xhci_dbg_trace(struct xhci_hcd *xhci, void (*trace)(struct va_format *),
+            const char *fmt, ...)
+{
+    struct va_format vaf;
+    va_list args;
+
+    va_start(args, fmt);
+    vaf.fmt = fmt;
+    vaf.va = &args;
+    printk("%pV\n", &vaf);
+    trace(&vaf);
+    va_end(args);
+}
+EXPORT_SYMBOL(xhci_dbg_trace);
 
 void usb_disable_xhci_ports_callee(struct fipc_message* __msg, struct ext_registers* __ext)
 {
@@ -1948,6 +1963,11 @@ int trmp_impl_hc_driver_enable_device(fptr_hc_driver_enable_device target, struc
 
 	{
 		__maybe_unused const void* __adjusted = *udev_ptr;
+		glue_pack(__pos, __msg, __ext, __adjusted);
+		if (*udev_ptr) {
+			caller_marshal_kernel__hc_driver_enable_device__udev__in(__pos, __msg, __ext, ctx, *udev_ptr);
+		}
+
 	}
 
 	glue_call_client(__pos, __msg, RPC_ID_hc_driver_enable_device);
@@ -2927,6 +2947,11 @@ int trmp_impl_hc_driver_alloc_dev(fptr_hc_driver_alloc_dev target, struct usb_hc
 
 	{
 		__maybe_unused const void* __adjusted = *udev_ptr;
+		glue_pack(__pos, __msg, __ext, __adjusted);
+		if (*udev_ptr) {
+			caller_marshal_kernel__hc_driver_alloc_dev__udev__in(__pos, __msg, __ext, ctx, *udev_ptr);
+		}
+
 	}
 
 	glue_call_client(__pos, __msg, RPC_ID_hc_driver_alloc_dev);
@@ -2998,6 +3023,11 @@ void trmp_impl_hc_driver_free_dev(fptr_hc_driver_free_dev target, struct usb_hcd
 
 	{
 		__maybe_unused const void* __adjusted = *udev_ptr;
+		glue_pack(__pos, __msg, __ext, __adjusted);
+		if (*udev_ptr) {
+			caller_marshal_kernel__hc_driver_free_dev__udev__in(__pos, __msg, __ext, ctx, *udev_ptr);
+		}
+
 	}
 
 	glue_call_client(__pos, __msg, RPC_ID_hc_driver_free_dev);
@@ -3070,6 +3100,11 @@ int trmp_impl_hc_driver_alloc_streams(fptr_hc_driver_alloc_streams target, struc
 
 	{
 		__maybe_unused const void* __adjusted = *udev_ptr;
+		glue_pack(__pos, __msg, __ext, __adjusted);
+		if (*udev_ptr) {
+			caller_marshal_kernel__hc_driver_alloc_streams__udev__in(__pos, __msg, __ext, ctx, *udev_ptr);
+		}
+
 	}
 
 	{
@@ -3190,6 +3225,11 @@ int trmp_impl_hc_driver_free_streams(fptr_hc_driver_free_streams target, struct 
 
 	{
 		__maybe_unused const void* __adjusted = *udev_ptr;
+		glue_pack(__pos, __msg, __ext, __adjusted);
+		if (*udev_ptr) {
+			caller_marshal_kernel__hc_driver_free_streams__udev__in(__pos, __msg, __ext, ctx, *udev_ptr);
+		}
+
 	}
 
 	{
@@ -3390,6 +3430,11 @@ int trmp_impl_hc_driver_drop_endpoint(fptr_hc_driver_drop_endpoint target, struc
 
 	{
 		__maybe_unused const void* __adjusted = *udev_ptr;
+		glue_pack(__pos, __msg, __ext, __adjusted);
+		if (*udev_ptr) {
+			caller_marshal_kernel__hc_driver_drop_endpoint__udev__in(__pos, __msg, __ext, ctx, *udev_ptr);
+		}
+
 	}
 
 	{
@@ -3479,6 +3524,11 @@ int trmp_impl_hc_driver_check_bandwidth(fptr_hc_driver_check_bandwidth target, s
 
 	{
 		__maybe_unused const void* __adjusted = *udev_ptr;
+		glue_pack(__pos, __msg, __ext, __adjusted);
+		if (*udev_ptr) {
+			caller_marshal_kernel__hc_driver_check_bandwidth__udev__in(__pos, __msg, __ext, ctx, *udev_ptr);
+		}
+
 	}
 
 	glue_call_client(__pos, __msg, RPC_ID_hc_driver_check_bandwidth);
@@ -3550,6 +3600,11 @@ void trmp_impl_hc_driver_reset_bandwidth(fptr_hc_driver_reset_bandwidth target, 
 
 	{
 		__maybe_unused const void* __adjusted = *udev_ptr;
+		glue_pack(__pos, __msg, __ext, __adjusted);
+		if (*udev_ptr) {
+			caller_marshal_kernel__hc_driver_reset_bandwidth__udev__in(__pos, __msg, __ext, ctx, *udev_ptr);
+		}
+
 	}
 
 	glue_call_client(__pos, __msg, RPC_ID_hc_driver_reset_bandwidth);
@@ -3618,6 +3673,11 @@ int trmp_impl_hc_driver_address_device(fptr_hc_driver_address_device target, str
 
 	{
 		__maybe_unused const void* __adjusted = *udev_ptr;
+		glue_pack(__pos, __msg, __ext, __adjusted);
+		if (*udev_ptr) {
+			caller_marshal_kernel__hc_driver_address_device__udev__in(__pos, __msg, __ext, ctx, *udev_ptr);
+		}
+
 	}
 
 	glue_call_client(__pos, __msg, RPC_ID_hc_driver_address_device);
@@ -3893,6 +3953,63 @@ int LCD_TRAMPOLINE_LINKAGE(trmp_hc_driver_hub_control) trmp_hc_driver_hub_contro
 	return impl(target, hcd, typeReq, wValue, wIndex, buf, wLength);
 }
 
+void get_loops_per_jiffy_callee(struct fipc_message* msg, struct ext_registers* ext)
+{
+	size_t n_pos = 0;
+	size_t* __pos = &n_pos;
+
+	unsigned long ret = 0;
+	unsigned long* ret_ptr = &ret;
+	
+	__maybe_unused struct get_loops_per_jiffy_call_ctx call_ctx = {};
+	__maybe_unused struct get_loops_per_jiffy_call_ctx *ctx = &call_ctx;
+
+	if (verbose_debug) {
+		printk("%s:%d, entered!\n", __func__, __LINE__);
+	}
+
+	ret = loops_per_jiffy;
+
+	*__pos = 0;
+	{
+		glue_pack(__pos, msg, ext, *ret_ptr);
+	}
+
+	msg->regs[0] = *__pos;
+	if (verbose_debug) {
+		printk("%s:%d, returned!\n", __func__, __LINE__);
+	}
+}
+
+void get_jiffies_callee(struct fipc_message* msg, struct ext_registers* ext)
+{
+	size_t n_pos = 0;
+	size_t* __pos = &n_pos;
+
+	unsigned long ret = 0;
+	unsigned long* ret_ptr = &ret;
+	
+	__maybe_unused struct get_jiffies_call_ctx call_ctx = {};
+	__maybe_unused struct get_jiffies_call_ctx *ctx = &call_ctx;
+
+	if (verbose_debug) {
+		printk("%s:%d, entered!\n", __func__, __LINE__);
+	}
+
+	ret = jiffies;
+
+	*__pos = 0;
+	{
+		glue_pack(__pos, msg, ext, *ret_ptr);
+	}
+
+	msg->regs[0] = *__pos;
+	if (verbose_debug) {
+		printk("%s:%d, returned!\n", __func__, __LINE__);
+	}
+}
+
+
 int try_dispatch(enum RPC_ID id, struct fipc_message* __msg, struct ext_registers* __ext)
 {
 	switch(id) {
@@ -3976,21 +4093,6 @@ int try_dispatch(enum RPC_ID id, struct fipc_message* __msg, struct ext_register
 		wait_for_completion_timeout_callee(__msg, __ext);
 		break;
 
-	case RPC_ID_xhci_gen_setup:
-		glue_user_trace("xhci_gen_setup\n");
-		xhci_gen_setup_callee(__msg, __ext);
-		break;
-
-	case RPC_ID_xhci_init_driver:
-		glue_user_trace("xhci_init_driver\n");
-		xhci_init_driver_callee(__msg, __ext);
-		break;
-
-	case RPC_ID_xhci_run:
-		glue_user_trace("xhci_run\n");
-		xhci_run_callee(__msg, __ext);
-		break;
-
 	case RPC_ID_usb_disable_xhci_ports:
 		glue_user_trace("usb_disable_xhci_ports\n");
 		usb_disable_xhci_ports_callee(__msg, __ext);
@@ -4060,6 +4162,17 @@ int try_dispatch(enum RPC_ID id, struct fipc_message* __msg, struct ext_register
 		glue_user_trace("usb_wakeup_notification\n");
 		usb_wakeup_notification_callee(__msg, __ext);
 		break;
+
+	case RPC_ID_get_loops_per_jiffy:
+		glue_user_trace("get_loops_per_jiffy\n");
+		get_loops_per_jiffy_callee(__msg, __ext);
+		break;
+
+	case RPC_ID_get_jiffies:
+		glue_user_trace("get_jiffies\n");
+		get_jiffies_callee(__msg, __ext);
+		break;
+
 
 	default:
 		return 0;

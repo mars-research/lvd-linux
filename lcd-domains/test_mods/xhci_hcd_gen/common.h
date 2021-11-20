@@ -212,6 +212,8 @@ enum RPC_ID {
 	RPC_ID_hc_driver_hub_status_data,
 	RPC_ID_hc_driver_irq,
 	RPC_ID_hc_driver_hub_control,
+	RPC_ID_get_loops_per_jiffy,
+	RPC_ID_get_jiffies,
 };
 
 int try_dispatch(enum RPC_ID id, struct fipc_message* __msg, struct ext_registers* __ext);
@@ -420,8 +422,14 @@ struct free_irq_call_ctx {
 struct init_timer_key_call_ctx {
 	struct timer_list* timer;
 	unsigned int flags;
-	char* name;
+	const char* name;
 	struct lock_class_key* key;
+};
+
+struct get_loops_per_jiffy_call_ctx {
+};
+
+struct get_jiffies_call_ctx {
 };
 
 struct mod_timer_call_ctx {
@@ -470,7 +478,7 @@ struct request_threaded_irq_call_ctx {
 	fptr_handler handler;
 	fptr_thread_fn thread_fn;
 	unsigned long irqflags;
-	char* devname;
+	const char* devname;
 	void* dev_id;
 };
 
@@ -495,7 +503,7 @@ struct xhci_gen_setup_call_ctx {
 
 struct xhci_init_driver_call_ctx {
 	struct hc_driver* drv;
-	struct xhci_driver_overrides* over;
+	const struct xhci_driver_overrides* over;
 };
 
 struct xhci_run_call_ctx {

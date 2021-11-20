@@ -247,7 +247,7 @@ rpc_ptr int  hc_driver_start( projection hcd* [in] hcd ) {
 	projection < struct usb_hcd > usb_hcd_primary_hcd {
 	}
 }
-rpc_ptr int  hc_driver_enable_device( projection hcd* hcd, projection udev [alloc_stack(callee)] *udev ) {
+rpc_ptr int  hc_driver_enable_device( projection hcd* hcd, projection udev [alloc(callee)] *udev ) {
 	projection < struct usb_hcd > hcd {
 		projection usb_hcd_primary_hcd* primary_hcd;
 
@@ -435,7 +435,7 @@ rpc_ptr void  hc_driver_endpoint_reset( projection hcd* [in] hcd, projection ep*
 		projection usb_endpoint_descriptor desc;
 	}
 }
-rpc_ptr int  hc_driver_alloc_dev( projection hcd* [in] hcd, projection udev [alloc_stack(callee)] *udev ) {
+rpc_ptr int  hc_driver_alloc_dev( projection hcd* [in] hcd, projection udev [alloc(callee)] *udev ) {
 	projection < struct usb_hcd > hcd {
 		projection usb_hcd_primary_hcd* primary_hcd;
 
@@ -450,7 +450,7 @@ rpc_ptr int  hc_driver_alloc_dev( projection hcd* [in] hcd, projection udev [all
 		int [in, out] slot_id;
 	}
 }
-rpc_ptr void  hc_driver_free_dev( projection hcd* hcd, projection udev [alloc_stack (callee)] *udev ) {
+rpc_ptr void  hc_driver_free_dev( projection hcd* hcd, projection udev [alloc (callee)] *udev ) {
 	projection < struct usb_hcd > hcd {
 		projection usb_hcd_primary_hcd* primary_hcd;
 
@@ -465,7 +465,7 @@ rpc_ptr void  hc_driver_free_dev( projection hcd* hcd, projection udev [alloc_st
 		int [in] slot_id;
 	}
 }
-rpc_ptr int  hc_driver_alloc_streams( projection hcd* hcd, projection udev [alloc_stack(callee)] *udev, projection eps [alloc(callee)] * [alloc(callee)] *eps, unsigned int  num_eps, unsigned int  num_streams, unsigned int  mem_flags ) {
+rpc_ptr int  hc_driver_alloc_streams( projection hcd* hcd, projection udev [alloc(callee)] *udev, projection eps [alloc(callee)] * [alloc(callee)] *eps, unsigned int  num_eps, unsigned int  num_streams, unsigned int  mem_flags ) {
 	projection < struct usb_hcd > hcd {
 		projection usb_hcd_primary_hcd* primary_hcd;
 
@@ -482,7 +482,7 @@ rpc_ptr int  hc_driver_alloc_streams( projection hcd* hcd, projection udev [allo
 	projection < struct usb_host_endpoint > eps {
 	}
 }
-rpc_ptr int  hc_driver_free_streams( projection hcd* [in] hcd, projection udev [alloc_stack(callee)] *udev, projection eps** eps, unsigned int  num_eps, unsigned int [unused] mem_flags ) {
+rpc_ptr int  hc_driver_free_streams( projection hcd* [in] hcd, projection udev [alloc(callee)] *udev, projection eps** eps, unsigned int  num_eps, unsigned int [unused] mem_flags ) {
 	projection < struct usb_hcd > hcd {
 		projection usb_hcd_primary_hcd* primary_hcd;
 
@@ -520,7 +520,7 @@ rpc_ptr int  hc_driver_add_endpoint( projection hcd*  hcd, projection udev*  ude
 		projection usb_endpoint_descriptor desc;
 	}
 }
-rpc_ptr int  hc_driver_drop_endpoint( projection hcd* [in] hcd, projection udev [alloc_stack(callee)] * udev, projection ep [alloc(callee)] * ep ) {
+rpc_ptr int  hc_driver_drop_endpoint( projection hcd* hcd, projection udev [alloc(callee)] * udev, projection ep [alloc(callee)] * ep ) {
 	projection < struct usb_hcd > hcd {
 		projection usb_hcd_primary_hcd* primary_hcd;
 
@@ -541,7 +541,7 @@ rpc_ptr int  hc_driver_drop_endpoint( projection hcd* [in] hcd, projection udev 
 		projection usb_endpoint_descriptor desc;
 	}
 }
-rpc_ptr int  hc_driver_check_bandwidth( projection hcd* [in] hcd, projection udev [alloc_stack(callee)]  *udev ) {
+rpc_ptr int  hc_driver_check_bandwidth( projection hcd* [in] hcd, projection udev [alloc(callee)]  *udev ) {
 	projection < struct usb_hcd > hcd {
 		projection usb_hcd_primary_hcd* primary_hcd;
 
@@ -556,7 +556,7 @@ rpc_ptr int  hc_driver_check_bandwidth( projection hcd* [in] hcd, projection ude
 		int [in] slot_id;
 	}
 }
-rpc_ptr void  hc_driver_reset_bandwidth( projection hcd*  hcd, projection udev [alloc_stack(callee)] *udev ) {
+rpc_ptr void  hc_driver_reset_bandwidth( projection hcd*  hcd, projection udev [alloc(callee)] *udev ) {
 	projection < struct usb_hcd > hcd {
 		projection usb_hcd_primary_hcd* primary_hcd;
 
@@ -571,7 +571,7 @@ rpc_ptr void  hc_driver_reset_bandwidth( projection hcd*  hcd, projection udev [
 		int [in] slot_id;
 	}
 }
-rpc_ptr int  hc_driver_address_device( projection hcd* hcd, projection udev [alloc_stack(callee)] *udev ) {
+rpc_ptr int  hc_driver_address_device( projection hcd* hcd, projection udev [alloc(callee)] *udev ) {
 	projection < struct usb_hcd > hcd {
 		projection usb_hcd_primary_hcd* primary_hcd;
 

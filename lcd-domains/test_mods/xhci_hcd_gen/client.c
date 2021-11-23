@@ -241,7 +241,7 @@ void free_irq(unsigned int irq, void* dev_id)
 	}
 }
 
-void init_timer_key(struct timer_list* timer, unsigned int flags, const char* name, struct lock_class_key* key)
+void init_timer_key(struct timer_list* timer, unsigned int flags, char const* name, struct lock_class_key* key)
 {
 	struct fipc_message __buffer = {0};
 	struct fipc_message *__msg = &__buffer;
@@ -251,7 +251,7 @@ void init_timer_key(struct timer_list* timer, unsigned int flags, const char* na
 
 	struct timer_list** timer_ptr = &timer;
 	unsigned int* flags_ptr = &flags;
-	char** name_ptr = &name;
+	char const** name_ptr = &name;
 	struct lock_class_key** key_ptr = &key;
 	
 	__maybe_unused const struct init_timer_key_call_ctx call_ctx = {timer, flags, name, key};
@@ -777,7 +777,7 @@ void handler_callee(struct fipc_message* __msg, struct ext_registers* __ext)
 	}
 }
 
-int request_threaded_irq(unsigned int irq, fptr_handler handler, fptr_thread_fn thread_fn, unsigned long irqflags, const char* devname, void* dev_id)
+int request_threaded_irq(unsigned int irq, fptr_handler handler, fptr_thread_fn thread_fn, unsigned long irqflags, char const* devname, void* dev_id)
 {
 	struct fipc_message __buffer = {0};
 	struct fipc_message *__msg = &__buffer;
@@ -789,7 +789,7 @@ int request_threaded_irq(unsigned int irq, fptr_handler handler, fptr_thread_fn 
 	fptr_handler* handler_ptr = &handler;
 	fptr_thread_fn* thread_fn_ptr = &thread_fn;
 	unsigned long* irqflags_ptr = &irqflags;
-	char** devname_ptr = &devname;
+	char const** devname_ptr = &devname;
 	void** dev_id_ptr = &dev_id;
 	int ret = 0;
 	int* ret_ptr = &ret;
@@ -1047,13 +1047,15 @@ void xhci_gen_setup_callee(struct fipc_message* __msg, struct ext_registers* __e
 	}
 
 	{
-		*hcd_ptr = glue_unpack(__pos, __msg, __ext, struct usb_hcd*);
+		size_t __size = sizeof(hcd) + sizeof(struct xhci_hcd);
+		*hcd_ptr = glue_unpack_new_shadow(__pos, __msg, __ext, struct usb_hcd*, (__size), (DEFAULT_GFP_FLAGS));
 		if (*hcd_ptr) {
 			callee_unmarshal_kernel__xhci_gen_setup__hcd__in(__pos, __msg, __ext, ctx, *hcd_ptr);
 		}
 
 	}
 
+	if (0)
 	{
 		*get_quirks_ptr = glue_unpack_rpc_ptr(__pos, __msg, __ext, get_quirks);
 	}
@@ -1087,9 +1089,9 @@ void xhci_init_driver_callee(struct fipc_message* __msg, struct ext_registers* _
 	size_t* __pos = &n_pos;
 
 	struct hc_driver* drv = 0;
-	struct xhci_driver_overrides* over = 0;
+	struct xhci_driver_overrides const* over = 0;
 	struct hc_driver** drv_ptr = &drv;
-	struct xhci_driver_overrides** over_ptr = &over;
+	struct xhci_driver_overrides const** over_ptr = &over;
 	
 	__maybe_unused struct xhci_init_driver_call_ctx call_ctx = {drv, over};
 	__maybe_unused struct xhci_init_driver_call_ctx *ctx = &call_ctx;
@@ -1108,9 +1110,11 @@ void xhci_init_driver_callee(struct fipc_message* __msg, struct ext_registers* _
 	}
 
 	{
-		*over_ptr = glue_unpack(__pos, __msg, __ext, struct xhci_driver_overrides*);
+		size_t __size = sizeof(struct xhci_driver_overrides);
+		*over_ptr = glue_unpack_new_shadow(__pos, __msg, __ext, struct xhci_driver_overrides const*, (__size), (DEFAULT_GFP_FLAGS));
 		if (*over_ptr) {
-			callee_unmarshal_kernel__xhci_init_driver__over__in(__pos, __msg, __ext, ctx, *over_ptr);
+			struct xhci_driver_overrides* writable = (struct xhci_driver_overrides*)*over_ptr;
+			callee_unmarshal_kernel__xhci_init_driver__over__in(__pos, __msg, __ext, ctx, writable);
 		}
 
 	}
@@ -1901,52 +1905,6 @@ void usb_wakeup_notification(struct usb_device* hdev, unsigned int portnum)
 	{
 	}
 
-	if (verbose_debug) {
-		printk("%s:%d, returned!\n", __func__, __LINE__);
-	}
-}
-
-void hc_driver_start_callee(struct fipc_message* __msg, struct ext_registers* __ext)
-{
-	size_t n_pos = 0;
-	size_t* __pos = &n_pos;
-
-	fptr_hc_driver_start function_ptr = glue_unpack(__pos, __msg, __ext, fptr_hc_driver_start);
-	struct usb_hcd* hcd = 0;
-	struct usb_hcd** hcd_ptr = &hcd;
-	int ret = 0;
-	int* ret_ptr = &ret;
-	
-	__maybe_unused struct hc_driver_start_call_ctx call_ctx = {hcd};
-	__maybe_unused struct hc_driver_start_call_ctx *ctx = &call_ctx;
-
-	if (verbose_debug) {
-		printk("%s:%d, entered!\n", __func__, __LINE__);
-	}
-
-	{
-		*hcd_ptr = glue_unpack(__pos, __msg, __ext, struct usb_hcd*);
-		if (*hcd_ptr) {
-			callee_unmarshal_kernel__hc_driver_start__hcd__in(__pos, __msg, __ext, ctx, *hcd_ptr);
-		}
-
-	}
-
-	ret = function_ptr(hcd);
-
-	*__pos = 0;
-	{
-		if (*hcd_ptr) {
-			callee_marshal_kernel__hc_driver_start__hcd__in(__pos, __msg, __ext, ctx, *hcd_ptr);
-		}
-
-	}
-
-	{
-		glue_pack(__pos, __msg, __ext, *ret_ptr);
-	}
-
-	__msg->regs[0] = *__pos;
 	if (verbose_debug) {
 		printk("%s:%d, returned!\n", __func__, __LINE__);
 	}
@@ -3631,6 +3589,99 @@ void hc_driver_hub_control_callee(struct fipc_message* __msg, struct ext_registe
 	}
 }
 
+void hc_driver_reset_callee(struct fipc_message* __msg, struct ext_registers* __ext)
+{
+	size_t n_pos = 0;
+	size_t* __pos = &n_pos;
+
+	fptr_hc_driver_reset function_ptr = glue_unpack(__pos, __msg, __ext, fptr_hc_driver_reset);
+	struct usb_hcd* cd = 0;
+	struct usb_hcd** cd_ptr = &cd;
+	int ret = 0;
+	int* ret_ptr = &ret;
+	
+	__maybe_unused struct hc_driver_reset_call_ctx call_ctx = {cd};
+	__maybe_unused struct hc_driver_reset_call_ctx *ctx = &call_ctx;
+
+	if (verbose_debug) {
+		printk("%s:%d, entered!\n", __func__, __LINE__);
+	}
+
+	{
+		*cd_ptr = glue_unpack(__pos, __msg, __ext, struct usb_hcd*);
+		if (*cd_ptr) {
+			callee_unmarshal_kernel__hc_driver_reset__usb_hcd__in(__pos, __msg, __ext, ctx, *cd_ptr);
+		}
+
+	}
+
+	ret = function_ptr(cd);
+
+	*__pos = 0;
+	{
+		if (*cd_ptr) {
+			callee_marshal_kernel__hc_driver_reset__usb_hcd__in(__pos, __msg, __ext, ctx, *cd_ptr);
+		}
+
+	}
+
+	{
+		glue_pack(__pos, __msg, __ext, *ret_ptr);
+	}
+
+	__msg->regs[0] = *__pos;
+	if (verbose_debug) {
+		printk("%s:%d, returned!\n", __func__, __LINE__);
+	}
+}
+
+void hc_driver_start_callee(struct fipc_message* __msg, struct ext_registers* __ext)
+{
+	size_t n_pos = 0;
+	size_t* __pos = &n_pos;
+
+	fptr_hc_driver_start function_ptr = glue_unpack(__pos, __msg, __ext, fptr_hc_driver_start);
+	struct usb_hcd* cd = 0;
+	struct usb_hcd** cd_ptr = &cd;
+	int ret = 0;
+	int* ret_ptr = &ret;
+	
+	__maybe_unused struct hc_driver_start_call_ctx call_ctx = {cd};
+	__maybe_unused struct hc_driver_start_call_ctx *ctx = &call_ctx;
+
+	if (verbose_debug) {
+		printk("%s:%d, entered!\n", __func__, __LINE__);
+	}
+
+	{
+		size_t __size = sizeof(struct usb_hcd);
+		*cd_ptr = glue_unpack_new_shadow(__pos, __msg, __ext, struct usb_hcd*, (__size), (DEFAULT_GFP_FLAGS));
+		if (*cd_ptr) {
+			callee_unmarshal_kernel__hc_driver_start__usb_hcd__out(__pos, __msg, __ext, ctx, *cd_ptr);
+		}
+
+	}
+
+	ret = function_ptr(cd);
+
+	*__pos = 0;
+	{
+		if (*cd_ptr) {
+			callee_marshal_kernel__hc_driver_start__usb_hcd__out(__pos, __msg, __ext, ctx, *cd_ptr);
+		}
+
+	}
+
+	{
+		glue_pack(__pos, __msg, __ext, *ret_ptr);
+	}
+
+	__msg->regs[0] = *__pos;
+	if (verbose_debug) {
+		printk("%s:%d, returned!\n", __func__, __LINE__);
+	}
+}
+
 unsigned long get_loops_per_jiffy(void)
 {
 	struct fipc_message __buffer = {0};
@@ -3702,7 +3753,6 @@ void __init_globals(void) {
 	loops_per_jiffy = get_loops_per_jiffy();
 	jiffies = get_jiffies();
 }
-
 int try_dispatch(enum RPC_ID id, struct fipc_message* __msg, struct ext_registers* __ext)
 {
 	switch(id) {
@@ -3746,11 +3796,6 @@ int try_dispatch(enum RPC_ID id, struct fipc_message* __msg, struct ext_register
 	case RPC_ID_xhci_run:
 		glue_user_trace("xhci_run\n");
 		xhci_run_callee(__msg, __ext);
-		break;
-
-	case RPC_ID_hc_driver_start:
-		glue_user_trace("hc_driver_start\n");
-		hc_driver_start_callee(__msg, __ext);
 		break;
 
 	case RPC_ID_hc_driver_enable_device:
@@ -3881,6 +3926,16 @@ int try_dispatch(enum RPC_ID id, struct fipc_message* __msg, struct ext_register
 	case RPC_ID_hc_driver_hub_control:
 		glue_user_trace("hc_driver_hub_control\n");
 		hc_driver_hub_control_callee(__msg, __ext);
+		break;
+
+	case RPC_ID_hc_driver_reset:
+		glue_user_trace("hc_driver_reset\n");
+		hc_driver_reset_callee(__msg, __ext);
+		break;
+
+	case RPC_ID_hc_driver_start:
+		glue_user_trace("hc_driver_start\n");
+		hc_driver_start_callee(__msg, __ext);
 		break;
 
 	default:

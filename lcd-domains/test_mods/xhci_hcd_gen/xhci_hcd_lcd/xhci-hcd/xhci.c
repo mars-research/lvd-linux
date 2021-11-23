@@ -4916,7 +4916,13 @@ int xhci_gen_setup(struct usb_hcd *hcd, xhci_get_quirks_t get_quirks)
 
 	xhci->quirks |= quirks;
 
-	get_quirks(dev, xhci);
+	//get_quirks(dev, xhci);
+
+	if (to_pci_dev(dev)->vendor == PCI_VENDOR_ID_INTEL) {
+		xhci->quirks |= XHCI_LPM_SUPPORT;
+		xhci->quirks |= XHCI_INTEL_HOST;
+		xhci->quirks |= XHCI_AVOID_BEI;
+	}
 
 	/* In xhci controllers which follow xhci 1.0 spec gives a spurious
 	 * success event after a short transfer. This quirk will ignore such

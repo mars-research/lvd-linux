@@ -17,7 +17,7 @@
 #define xhci_dbg_erst(x, y)		do { } while(0)
 #define xhci_dbg_ctx(x, y, z)		do { } while(0)
 #define xhci_dbg_regs(x)		do { } while(0)
-#define xhci_dbg_trace(...)		do { } while(0)
+#define xhci_dbg_trace(xhci, trace, ...)	LIBLCD_MSG(__VA_ARGS__)
 
 #define xhci_print_trb_offsets(...)	do { } while(0)
 #define xhci_print_ir_set(...)		do { } while(0)	

@@ -4,7 +4,6 @@ SECTIONS{
 	LCD_TRAMPOLINE_LINKER_SECTION(trmp_thread_fn)
 	LCD_TRAMPOLINE_LINKER_SECTION(trmp_handler)
 	LCD_TRAMPOLINE_LINKER_SECTION(trmp_get_quirks)
-	LCD_TRAMPOLINE_LINKER_SECTION(trmp_hc_driver_start)
 	LCD_TRAMPOLINE_LINKER_SECTION(trmp_hc_driver_enable_device)
 	LCD_TRAMPOLINE_LINKER_SECTION(trmp_hc_driver_update_hub_device)
 	LCD_TRAMPOLINE_LINKER_SECTION(trmp_hc_driver_reset_device)
@@ -31,6 +30,8 @@ SECTIONS{
 	LCD_TRAMPOLINE_LINKER_SECTION(trmp_hc_driver_hub_status_data)
 	LCD_TRAMPOLINE_LINKER_SECTION(trmp_hc_driver_irq)
 	LCD_TRAMPOLINE_LINKER_SECTION(trmp_hc_driver_hub_control)
+	LCD_TRAMPOLINE_LINKER_SECTION(trmp_hc_driver_reset)
+	LCD_TRAMPOLINE_LINKER_SECTION(trmp_hc_driver_start)
 }
 
 INSERT AFTER .text

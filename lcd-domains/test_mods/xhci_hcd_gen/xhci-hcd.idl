@@ -1,6 +1,6 @@
 module kernel {
 
-rpc void  add_timer( projection timer* timer ) {
+rpc void  add_timer( projection timer [alloc(callee)] * timer ) {
 		/*projection < struct hlist_node> hlist_node {
 			projection hlist_node_hlist_node** pprev;
 		}*/
@@ -16,7 +16,7 @@ rpc void  complete( projection x* [in, out] x ) {
 		unsigned int [in, out] done;
 	}
 }
-rpc int  del_timer( projection timer* [in] timer ) {
+rpc int  del_timer( projection timer [bind(callee)] * timer ) {
 		/*projection < struct hlist_node> hlist_node {
 			projection hlist_node_hlist_node** pprev;
 		}*/
@@ -26,7 +26,7 @@ rpc int  del_timer( projection timer* [in] timer ) {
 	projection < struct hlist_node > hlist_node {
 	}
 }
-rpc int  del_timer_sync( projection timer* [in] timer ) {
+rpc int  del_timer_sync( projection timer [bind(callee)] * timer ) {
 		/*projection < struct hlist_node> hlist_node {
 			projection hlist_node_hlist_node** pprev;
 		}*/
@@ -135,6 +135,41 @@ rpc_export int  xhci_gen_setup( projection hcd [alloc<{{sizeof(hcd) + sizeof(str
 	}
 }
 */
+rpc_export int  xhci_gen_setup_with_xhci( projection hcd [alloc<{{sizeof(*hcd) + sizeof(struct xhci_hcd)}}>(callee)] *hcd,
+					projection xhci_hcd [within<{{hcd}}, {{sizeof(struct xhci_hcd) + sizeof(struct usb_hcd)}}>] *xhci) {
+       projection < struct usb_bus> usb_bus {
+		projection usb_bus_controller [alloc(callee)] * controller;
+		unsigned int [in, out] is_b_host : 1;
+		projection usb_bus_root_hub [alloc(callee)] * root_hub;
+	}
+        projection < struct usb_hcd > hcd {
+                projection usb_bus self;
+                int [out] speed;
+                projection hc_driver [bind(caller)] * driver;
+                unsigned int [out] rh_registered : 1;
+		void [ioremap(callee)] *regs;
+        }
+
+	projection < struct hc_driver > hc_driver {
+
+	}
+
+	projection < struct xhci_hcd> xhci_hcd {
+		char sbrn;
+		unsigned short hci_version;
+		unsigned int quirks;
+		unsigned int xhc_state;
+
+	}
+
+        projection < struct device > usb_bus_controller {
+        }
+        projection < struct usb_device > usb_bus_root_hub {
+                unsigned int [out] speed;
+        }
+}
+
+/*
 rpc_export int  xhci_gen_setup( projection hcd [alloc<{{sizeof(hcd) + sizeof(struct xhci_hcd)}}>(callee)] *hcd,
 					rpc_ptr  get_quirks get_quirks ) {
        projection < struct usb_bus> usb_bus {
@@ -159,7 +194,7 @@ rpc_export int  xhci_gen_setup( projection hcd [alloc<{{sizeof(hcd) + sizeof(str
                 unsigned int [out] speed;
         }
 }
-
+*/
 rpc_export void  xhci_init_driver( projection _global_hc_driver [alloc(callee), out] * drv,
 			const projection over [alloc(callee)] * over ) {
 	/*projection < struct hc_driver > drv {
@@ -169,6 +204,41 @@ rpc_export void  xhci_init_driver( projection _global_hc_driver [alloc(callee), 
 		unsigned int extra_priv_size;
 		//rpc_ptr hc_driver_reset reset; 
 	}
+
+	projection < struct hc_driver > _global_hc_driver {
+	string [alloc(caller), out] *description;
+	string [alloc(caller), out] *product_desc;
+	int flags;
+	long unsigned int hcd_priv_size;
+	//rpc_ptr hc_driver_reset reset;
+	rpc_ptr hc_driver_add_endpoint add_endpoint;
+	rpc_ptr hc_driver_address_device address_device;
+	rpc_ptr hc_driver_alloc_dev alloc_dev;
+	rpc_ptr hc_driver_alloc_streams alloc_streams;
+	rpc_ptr hc_driver_check_bandwidth check_bandwidth;
+	rpc_ptr hc_driver_disable_usb3_lpm_timeout disable_usb3_lpm_timeout;
+	rpc_ptr hc_driver_drop_endpoint drop_endpoint;
+	rpc_ptr hc_driver_enable_device enable_device;
+	rpc_ptr hc_driver_enable_usb3_lpm_timeout enable_usb3_lpm_timeout;
+	rpc_ptr hc_driver_endpoint_reset endpoint_reset;
+	rpc_ptr hc_driver_find_raw_port_number find_raw_port_number;
+	rpc_ptr hc_driver_free_dev free_dev;
+	rpc_ptr hc_driver_free_streams free_streams;
+	rpc_ptr hc_driver_get_frame_number get_frame_number;
+	rpc_ptr hc_driver_hub_control hub_control;
+	rpc_ptr hc_driver_hub_status_data hub_status_data;
+	rpc_ptr hc_driver_irq irq;
+	rpc_ptr hc_driver_reset_bandwidth reset_bandwidth;
+	rpc_ptr hc_driver_reset_device reset_device;
+	rpc_ptr hc_driver_set_usb2_hw_lpm set_usb2_hw_lpm;
+	rpc_ptr hc_driver_shutdown shutdown;
+	rpc_ptr hc_driver_start start;
+	rpc_ptr hc_driver_stop stop;
+	rpc_ptr hc_driver_update_device update_device;
+	rpc_ptr hc_driver_update_hub_device update_hub_device;
+	rpc_ptr hc_driver_urb_dequeue urb_dequeue;
+	rpc_ptr hc_driver_urb_enqueue urb_enqueue;
+}
 }
 rpc_export int  xhci_run( projection hcd* [in] hcd ) {
 	projection < struct usb_hcd > hcd {
@@ -220,10 +290,10 @@ rpc int  usb_hcd_check_unlink_urb( projection hcd* [unused] hcd, projection urb*
 }
 rpc void  usb_hcd_giveback_urb( projection hcd* [in] hcd, projection urb* [in] urb, int  status ) {
 	projection < struct usb_hcd > hcd {
-		projection usb_hcd_driver* driver;
+		//projection usb_hcd_driver* driver;
 	}
-	projection < struct hc_driver > usb_hcd_driver {
-	}
+	/*projection < struct hc_driver > usb_hcd_driver {
+	}*/
 	projection < struct urb > urb {
 		void* [out] hcpriv;
 		projection urb_dev* dev;
@@ -261,11 +331,11 @@ rpc int  usb_hcd_link_urb_to_ep( projection hcd* [in] hcd, projection urb* [in] 
 }
 rpc void  usb_hcd_poll_rh_status( projection hcd* [in] hcd ) {
 	projection < struct usb_hcd > hcd {
-		projection usb_hcd_driver* driver;
+		//projection usb_hcd_driver* driver;
 		long unsigned int [in] flags;
 	}
-	projection < struct hc_driver > usb_hcd_driver {
-	}
+	/*projection < struct hc_driver > usb_hcd_driver {
+	}*/
 }
 rpc void  usb_hcd_unlink_urb_from_ep( projection hcd* [unused] hcd, projection urb* [in] urb ) {
 	projection < struct usb_hcd > hcd {
@@ -643,7 +713,7 @@ rpc_ptr int hc_driver_start(projection usb_hcd [alloc(callee), out] *cd) {
 	}	
 }
 
-projection < struct hc_driver > _global_hc_driver {
+/*projection < struct hc_driver > _global_hc_driver {
 	string [alloc(caller), out] *description;
 	string [alloc(caller), out] *product_desc;
 	int flags;
@@ -677,7 +747,7 @@ projection < struct hc_driver > _global_hc_driver {
 	rpc_ptr hc_driver_urb_dequeue urb_dequeue;
 	rpc_ptr hc_driver_urb_enqueue urb_enqueue;
 }
-
+*/
 
 /*
 	global projection < struct array< kmem_cache, 0> > array< kmem_cache, 0> {

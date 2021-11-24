@@ -168,7 +168,7 @@ enum RPC_ID {
 	RPC_ID_wait_for_completion,
 	RPC_ID_wait_for_completion_timeout,
 	RPC_ID_get_quirks,
-	RPC_ID_xhci_gen_setup,
+	RPC_ID_xhci_gen_setup_with_xhci,
 	RPC_ID_xhci_init_driver,
 	RPC_ID_xhci_run,
 	RPC_ID_usb_disable_xhci_ports,
@@ -497,9 +497,9 @@ struct get_quirks_call_ctx {
 	struct xhci_hcd* xhci_hcd;
 };
 
-struct xhci_gen_setup_call_ctx {
+struct xhci_gen_setup_with_xhci_call_ctx {
 	struct usb_hcd* hcd;
-	fptr_get_quirks get_quirks;
+	struct xhci_hcd* xhci;
 };
 
 struct xhci_init_driver_call_ctx {
@@ -1354,168 +1354,200 @@ void caller_unmarshal_kernel__get_quirks__xhci_hcd__in(
 	struct get_quirks_call_ctx const* call_ctx,
 	struct xhci_hcd* ptr);
 
-void caller_marshal_kernel__xhci_gen_setup__hcd__in(
+void caller_marshal_kernel__xhci_gen_setup_with_xhci__hcd__in(
 	size_t* __pos,
 	struct fipc_message* __msg,
 	struct ext_registers* __ext,
-	struct xhci_gen_setup_call_ctx const* call_ctx,
+	struct xhci_gen_setup_with_xhci_call_ctx const* call_ctx,
 	struct usb_hcd const* ptr);
 
-void callee_unmarshal_kernel__xhci_gen_setup__hcd__in(
+void callee_unmarshal_kernel__xhci_gen_setup_with_xhci__hcd__in(
 	size_t* __pos,
 	const struct fipc_message* __msg,
 	const struct ext_registers* __ext,
-	struct xhci_gen_setup_call_ctx const* call_ctx,
+	struct xhci_gen_setup_with_xhci_call_ctx const* call_ctx,
 	struct usb_hcd* ptr);
 
-void callee_marshal_kernel__xhci_gen_setup__hcd__in(
+void callee_marshal_kernel__xhci_gen_setup_with_xhci__hcd__in(
 	size_t* __pos,
 	struct fipc_message* __msg,
 	struct ext_registers* __ext,
-	struct xhci_gen_setup_call_ctx const* call_ctx,
+	struct xhci_gen_setup_with_xhci_call_ctx const* call_ctx,
 	struct usb_hcd const* ptr);
 
-void caller_unmarshal_kernel__xhci_gen_setup__hcd__in(
+void caller_unmarshal_kernel__xhci_gen_setup_with_xhci__hcd__in(
 	size_t* __pos,
 	const struct fipc_message* __msg,
 	const struct ext_registers* __ext,
-	struct xhci_gen_setup_call_ctx const* call_ctx,
+	struct xhci_gen_setup_with_xhci_call_ctx const* call_ctx,
 	struct usb_hcd* ptr);
 
-void caller_marshal_kernel__xhci_gen_setup__usb_bus__in(
+void caller_marshal_kernel__xhci_gen_setup_with_xhci__usb_bus__in(
 	size_t* __pos,
 	struct fipc_message* __msg,
 	struct ext_registers* __ext,
-	struct xhci_gen_setup_call_ctx const* call_ctx,
+	struct xhci_gen_setup_with_xhci_call_ctx const* call_ctx,
 	struct usb_bus const* ptr);
 
-void callee_unmarshal_kernel__xhci_gen_setup__usb_bus__in(
+void callee_unmarshal_kernel__xhci_gen_setup_with_xhci__usb_bus__in(
 	size_t* __pos,
 	const struct fipc_message* __msg,
 	const struct ext_registers* __ext,
-	struct xhci_gen_setup_call_ctx const* call_ctx,
+	struct xhci_gen_setup_with_xhci_call_ctx const* call_ctx,
 	struct usb_bus* ptr);
 
-void callee_marshal_kernel__xhci_gen_setup__usb_bus__in(
+void callee_marshal_kernel__xhci_gen_setup_with_xhci__usb_bus__in(
 	size_t* __pos,
 	struct fipc_message* __msg,
 	struct ext_registers* __ext,
-	struct xhci_gen_setup_call_ctx const* call_ctx,
+	struct xhci_gen_setup_with_xhci_call_ctx const* call_ctx,
 	struct usb_bus const* ptr);
 
-void caller_unmarshal_kernel__xhci_gen_setup__usb_bus__in(
+void caller_unmarshal_kernel__xhci_gen_setup_with_xhci__usb_bus__in(
 	size_t* __pos,
 	const struct fipc_message* __msg,
 	const struct ext_registers* __ext,
-	struct xhci_gen_setup_call_ctx const* call_ctx,
+	struct xhci_gen_setup_with_xhci_call_ctx const* call_ctx,
 	struct usb_bus* ptr);
 
-void caller_marshal_kernel__xhci_gen_setup__usb_bus_controller__in(
+void caller_marshal_kernel__xhci_gen_setup_with_xhci__usb_bus_controller__in(
 	size_t* __pos,
 	struct fipc_message* __msg,
 	struct ext_registers* __ext,
-	struct xhci_gen_setup_call_ctx const* call_ctx,
+	struct xhci_gen_setup_with_xhci_call_ctx const* call_ctx,
 	struct device const* ptr);
 
-void callee_unmarshal_kernel__xhci_gen_setup__usb_bus_controller__in(
+void callee_unmarshal_kernel__xhci_gen_setup_with_xhci__usb_bus_controller__in(
 	size_t* __pos,
 	const struct fipc_message* __msg,
 	const struct ext_registers* __ext,
-	struct xhci_gen_setup_call_ctx const* call_ctx,
+	struct xhci_gen_setup_with_xhci_call_ctx const* call_ctx,
 	struct device* ptr);
 
-void callee_marshal_kernel__xhci_gen_setup__usb_bus_controller__in(
+void callee_marshal_kernel__xhci_gen_setup_with_xhci__usb_bus_controller__in(
 	size_t* __pos,
 	struct fipc_message* __msg,
 	struct ext_registers* __ext,
-	struct xhci_gen_setup_call_ctx const* call_ctx,
+	struct xhci_gen_setup_with_xhci_call_ctx const* call_ctx,
 	struct device const* ptr);
 
-void caller_unmarshal_kernel__xhci_gen_setup__usb_bus_controller__in(
+void caller_unmarshal_kernel__xhci_gen_setup_with_xhci__usb_bus_controller__in(
 	size_t* __pos,
 	const struct fipc_message* __msg,
 	const struct ext_registers* __ext,
-	struct xhci_gen_setup_call_ctx const* call_ctx,
+	struct xhci_gen_setup_with_xhci_call_ctx const* call_ctx,
 	struct device* ptr);
 
-void caller_marshal_kernel__xhci_gen_setup__usb_bus_root_hub__in(
+void caller_marshal_kernel__xhci_gen_setup_with_xhci__usb_bus_root_hub__in(
 	size_t* __pos,
 	struct fipc_message* __msg,
 	struct ext_registers* __ext,
-	struct xhci_gen_setup_call_ctx const* call_ctx,
+	struct xhci_gen_setup_with_xhci_call_ctx const* call_ctx,
 	struct usb_device const* ptr);
 
-void callee_unmarshal_kernel__xhci_gen_setup__usb_bus_root_hub__in(
+void callee_unmarshal_kernel__xhci_gen_setup_with_xhci__usb_bus_root_hub__in(
 	size_t* __pos,
 	const struct fipc_message* __msg,
 	const struct ext_registers* __ext,
-	struct xhci_gen_setup_call_ctx const* call_ctx,
+	struct xhci_gen_setup_with_xhci_call_ctx const* call_ctx,
 	struct usb_device* ptr);
 
-void callee_marshal_kernel__xhci_gen_setup__usb_bus_root_hub__in(
+void callee_marshal_kernel__xhci_gen_setup_with_xhci__usb_bus_root_hub__in(
 	size_t* __pos,
 	struct fipc_message* __msg,
 	struct ext_registers* __ext,
-	struct xhci_gen_setup_call_ctx const* call_ctx,
+	struct xhci_gen_setup_with_xhci_call_ctx const* call_ctx,
 	struct usb_device const* ptr);
 
-void caller_unmarshal_kernel__xhci_gen_setup__usb_bus_root_hub__in(
+void caller_unmarshal_kernel__xhci_gen_setup_with_xhci__usb_bus_root_hub__in(
 	size_t* __pos,
 	const struct fipc_message* __msg,
 	const struct ext_registers* __ext,
-	struct xhci_gen_setup_call_ctx const* call_ctx,
+	struct xhci_gen_setup_with_xhci_call_ctx const* call_ctx,
 	struct usb_device* ptr);
 
-void caller_marshal_kernel__xhci_gen_setup__hc_driver__in(
+void caller_marshal_kernel__xhci_gen_setup_with_xhci__hc_driver__in(
 	size_t* __pos,
 	struct fipc_message* __msg,
 	struct ext_registers* __ext,
-	struct xhci_gen_setup_call_ctx const* call_ctx,
+	struct xhci_gen_setup_with_xhci_call_ctx const* call_ctx,
 	struct hc_driver const* ptr);
 
-void callee_unmarshal_kernel__xhci_gen_setup__hc_driver__in(
+void callee_unmarshal_kernel__xhci_gen_setup_with_xhci__hc_driver__in(
 	size_t* __pos,
 	const struct fipc_message* __msg,
 	const struct ext_registers* __ext,
-	struct xhci_gen_setup_call_ctx const* call_ctx,
+	struct xhci_gen_setup_with_xhci_call_ctx const* call_ctx,
 	struct hc_driver* ptr);
 
-void callee_marshal_kernel__xhci_gen_setup__hc_driver__in(
+void callee_marshal_kernel__xhci_gen_setup_with_xhci__hc_driver__in(
 	size_t* __pos,
 	struct fipc_message* __msg,
 	struct ext_registers* __ext,
-	struct xhci_gen_setup_call_ctx const* call_ctx,
+	struct xhci_gen_setup_with_xhci_call_ctx const* call_ctx,
 	struct hc_driver const* ptr);
 
-void caller_unmarshal_kernel__xhci_gen_setup__hc_driver__in(
+void caller_unmarshal_kernel__xhci_gen_setup_with_xhci__hc_driver__in(
 	size_t* __pos,
 	const struct fipc_message* __msg,
 	const struct ext_registers* __ext,
-	struct xhci_gen_setup_call_ctx const* call_ctx,
+	struct xhci_gen_setup_with_xhci_call_ctx const* call_ctx,
 	struct hc_driver* ptr);
 
-void caller_marshal_kernel___global_hc_driver__out(
+void caller_marshal_kernel__xhci_gen_setup_with_xhci__xhci_hcd__in(
 	size_t* __pos,
 	struct fipc_message* __msg,
 	struct ext_registers* __ext,
-	struct hc_driver const* ptr);
+	struct xhci_gen_setup_with_xhci_call_ctx const* call_ctx,
+	struct xhci_hcd const* ptr);
 
-void callee_unmarshal_kernel___global_hc_driver__out(
+void callee_unmarshal_kernel__xhci_gen_setup_with_xhci__xhci_hcd__in(
 	size_t* __pos,
 	const struct fipc_message* __msg,
 	const struct ext_registers* __ext,
+	struct xhci_gen_setup_with_xhci_call_ctx const* call_ctx,
+	struct xhci_hcd* ptr);
+
+void callee_marshal_kernel__xhci_gen_setup_with_xhci__xhci_hcd__in(
+	size_t* __pos,
+	struct fipc_message* __msg,
+	struct ext_registers* __ext,
+	struct xhci_gen_setup_with_xhci_call_ctx const* call_ctx,
+	struct xhci_hcd const* ptr);
+
+void caller_unmarshal_kernel__xhci_gen_setup_with_xhci__xhci_hcd__in(
+	size_t* __pos,
+	const struct fipc_message* __msg,
+	const struct ext_registers* __ext,
+	struct xhci_gen_setup_with_xhci_call_ctx const* call_ctx,
+	struct xhci_hcd* ptr);
+
+void caller_marshal_kernel__xhci_init_driver___global_hc_driver__out(
+	size_t* __pos,
+	struct fipc_message* __msg,
+	struct ext_registers* __ext,
+	struct xhci_init_driver_call_ctx const* call_ctx,
+	struct hc_driver const* ptr);
+
+void callee_unmarshal_kernel__xhci_init_driver___global_hc_driver__out(
+	size_t* __pos,
+	const struct fipc_message* __msg,
+	const struct ext_registers* __ext,
+	struct xhci_init_driver_call_ctx const* call_ctx,
 	struct hc_driver* ptr);
 
-void callee_marshal_kernel___global_hc_driver__out(
+void callee_marshal_kernel__xhci_init_driver___global_hc_driver__out(
 	size_t* __pos,
 	struct fipc_message* __msg,
 	struct ext_registers* __ext,
+	struct xhci_init_driver_call_ctx const* call_ctx,
 	struct hc_driver const* ptr);
 
-void caller_unmarshal_kernel___global_hc_driver__out(
+void caller_unmarshal_kernel__xhci_init_driver___global_hc_driver__out(
 	size_t* __pos,
 	const struct fipc_message* __msg,
 	const struct ext_registers* __ext,
+	struct xhci_init_driver_call_ctx const* call_ctx,
 	struct hc_driver* ptr);
 
 void caller_marshal_kernel__xhci_init_driver__over__in(
@@ -1854,34 +1886,6 @@ void caller_unmarshal_kernel__usb_hcd_giveback_urb__hcd__in(
 	struct usb_hcd_giveback_urb_call_ctx const* call_ctx,
 	struct usb_hcd* ptr);
 
-void caller_marshal_kernel__usb_hcd_giveback_urb__usb_hcd_driver__in(
-	size_t* __pos,
-	struct fipc_message* __msg,
-	struct ext_registers* __ext,
-	struct usb_hcd_giveback_urb_call_ctx const* call_ctx,
-	struct hc_driver const* ptr);
-
-void callee_unmarshal_kernel__usb_hcd_giveback_urb__usb_hcd_driver__in(
-	size_t* __pos,
-	const struct fipc_message* __msg,
-	const struct ext_registers* __ext,
-	struct usb_hcd_giveback_urb_call_ctx const* call_ctx,
-	struct hc_driver* ptr);
-
-void callee_marshal_kernel__usb_hcd_giveback_urb__usb_hcd_driver__in(
-	size_t* __pos,
-	struct fipc_message* __msg,
-	struct ext_registers* __ext,
-	struct usb_hcd_giveback_urb_call_ctx const* call_ctx,
-	struct hc_driver const* ptr);
-
-void caller_unmarshal_kernel__usb_hcd_giveback_urb__usb_hcd_driver__in(
-	size_t* __pos,
-	const struct fipc_message* __msg,
-	const struct ext_registers* __ext,
-	struct usb_hcd_giveback_urb_call_ctx const* call_ctx,
-	struct hc_driver* ptr);
-
 void caller_marshal_kernel__usb_hcd_giveback_urb__urb__in(
 	size_t* __pos,
 	struct fipc_message* __msg,
@@ -2133,34 +2137,6 @@ void caller_unmarshal_kernel__usb_hcd_poll_rh_status__hcd__in(
 	const struct ext_registers* __ext,
 	struct usb_hcd_poll_rh_status_call_ctx const* call_ctx,
 	struct usb_hcd* ptr);
-
-void caller_marshal_kernel__usb_hcd_poll_rh_status__usb_hcd_driver__in(
-	size_t* __pos,
-	struct fipc_message* __msg,
-	struct ext_registers* __ext,
-	struct usb_hcd_poll_rh_status_call_ctx const* call_ctx,
-	struct hc_driver const* ptr);
-
-void callee_unmarshal_kernel__usb_hcd_poll_rh_status__usb_hcd_driver__in(
-	size_t* __pos,
-	const struct fipc_message* __msg,
-	const struct ext_registers* __ext,
-	struct usb_hcd_poll_rh_status_call_ctx const* call_ctx,
-	struct hc_driver* ptr);
-
-void callee_marshal_kernel__usb_hcd_poll_rh_status__usb_hcd_driver__in(
-	size_t* __pos,
-	struct fipc_message* __msg,
-	struct ext_registers* __ext,
-	struct usb_hcd_poll_rh_status_call_ctx const* call_ctx,
-	struct hc_driver const* ptr);
-
-void caller_unmarshal_kernel__usb_hcd_poll_rh_status__usb_hcd_driver__in(
-	size_t* __pos,
-	const struct fipc_message* __msg,
-	const struct ext_registers* __ext,
-	struct usb_hcd_poll_rh_status_call_ctx const* call_ctx,
-	struct hc_driver* ptr);
 
 void caller_marshal_kernel__usb_hcd_unlink_urb_from_ep__hcd__in(
 	size_t* __pos,

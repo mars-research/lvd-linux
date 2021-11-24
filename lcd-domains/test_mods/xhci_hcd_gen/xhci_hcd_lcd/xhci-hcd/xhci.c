@@ -4855,9 +4855,15 @@ int xhci_get_frame(struct usb_hcd *hcd)
 	return readl(&xhci->run_regs->microframe_index) >> 3;
 }
 
+#ifdef CONFIG_IDL_ALIASING
 int xhci_gen_setup(struct usb_hcd *hcd, xhci_get_quirks_t get_quirks)
+#else
+int xhci_gen_setup_with_xhci(struct usb_hcd *hcd, struct xhci_hcd *xhci)
+#endif
 {
+#ifdef CONFIG_IDL_ALIASING
 	struct xhci_hcd		*xhci;
+#endif
 	struct device		*dev = hcd->self.controller;
 	int			retval;
 
@@ -4870,7 +4876,9 @@ int xhci_gen_setup(struct usb_hcd *hcd, xhci_get_quirks_t get_quirks)
 	/* XHCI controllers don't stop the ep queue on short packets :| */
 	hcd->self.no_stop_on_short = 1;
 
+#ifdef CONFIG_IDL_ALIASING
 	xhci = hcd_to_xhci(hcd);
+#endif
 
 	if (usb_hcd_is_primary_hcd(hcd)) {
 		xhci->main_hcd = hcd;

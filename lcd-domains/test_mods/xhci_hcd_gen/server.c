@@ -20,7 +20,8 @@ void add_timer_callee(struct fipc_message* __msg, struct ext_registers* __ext)
 	}
 
 	{
-		*timer_ptr = glue_unpack(__pos, __msg, __ext, struct timer_list*);
+		size_t __size = sizeof(struct timer_list);
+		*timer_ptr = glue_unpack_new_shadow(__pos, __msg, __ext, struct timer_list*, (__size), (DEFAULT_GFP_FLAGS));
 		if (*timer_ptr) {
 			callee_unmarshal_kernel__add_timer__timer__in(__pos, __msg, __ext, ctx, *timer_ptr);
 		}
@@ -102,7 +103,7 @@ void del_timer_callee(struct fipc_message* __msg, struct ext_registers* __ext)
 	}
 
 	{
-		*timer_ptr = glue_unpack(__pos, __msg, __ext, struct timer_list*);
+		*timer_ptr = glue_unpack_shadow(__pos, __msg, __ext, struct timer_list*);
 		if (*timer_ptr) {
 			callee_unmarshal_kernel__del_timer__timer__in(__pos, __msg, __ext, ctx, *timer_ptr);
 		}
@@ -147,7 +148,7 @@ void del_timer_sync_callee(struct fipc_message* __msg, struct ext_registers* __e
 	}
 
 	{
-		*timer_ptr = glue_unpack(__pos, __msg, __ext, struct timer_list*);
+		*timer_ptr = glue_unpack_shadow(__pos, __msg, __ext, struct timer_list*);
 		if (*timer_ptr) {
 			callee_unmarshal_kernel__del_timer_sync__timer__in(__pos, __msg, __ext, ctx, *timer_ptr);
 		}
@@ -1015,7 +1016,7 @@ void LCD_TRAMPOLINE_LINKAGE(trmp_get_quirks) trmp_get_quirks(struct device* dev,
 	return impl(target, dev, xhci_hcd);
 }
 
-int xhci_gen_setup(struct usb_hcd* hcd, fptr_get_quirks get_quirks)
+int xhci_gen_setup_with_xhci(struct usb_hcd* hcd, struct xhci_hcd* xhci)
 {
 	struct fipc_message __buffer = {0};
 	struct fipc_message *__msg = &__buffer;
@@ -1024,12 +1025,12 @@ int xhci_gen_setup(struct usb_hcd* hcd, fptr_get_quirks get_quirks)
 	size_t* __pos = &n_pos;
 
 	struct usb_hcd** hcd_ptr = &hcd;
-	fptr_get_quirks* get_quirks_ptr = &get_quirks;
+	struct xhci_hcd** xhci_ptr = &xhci;
 	int ret = 0;
 	int* ret_ptr = &ret;
 	
-	__maybe_unused const struct xhci_gen_setup_call_ctx call_ctx = {hcd, get_quirks};
-	__maybe_unused const struct xhci_gen_setup_call_ctx *ctx = &call_ctx;
+	__maybe_unused const struct xhci_gen_setup_with_xhci_call_ctx call_ctx = {hcd, xhci};
+	__maybe_unused const struct xhci_gen_setup_with_xhci_call_ctx *ctx = &call_ctx;
 
 	(void)__ext;
 
@@ -1041,26 +1042,35 @@ int xhci_gen_setup(struct usb_hcd* hcd, fptr_get_quirks get_quirks)
 		__maybe_unused const void* __adjusted = *hcd_ptr;
 		glue_pack(__pos, __msg, __ext, __adjusted);
 		if (*hcd_ptr) {
-			caller_marshal_kernel__xhci_gen_setup__hcd__in(__pos, __msg, __ext, ctx, *hcd_ptr);
+			caller_marshal_kernel__xhci_gen_setup_with_xhci__hcd__in(__pos, __msg, __ext, ctx, *hcd_ptr);
 		}
 
 	}
 
 	{
-		glue_pack(__pos, __msg, __ext, *get_quirks_ptr);
+		__maybe_unused const void* __adjusted = *xhci_ptr;
+		const ptrdiff_t __offset = (void*)__adjusted - (void*) hcd;
+		if (__offset >= (sizeof(struct xhci_hcd) + sizeof(struct usb_hcd)) || __offset < 0)
+			glue_user_panic("Bounds check failed!");
+
+		glue_pack(__pos, __msg, __ext, __offset);
 	}
 
-	glue_call_client(__pos, __msg, RPC_ID_xhci_gen_setup);
+	glue_call_client(__pos, __msg, RPC_ID_xhci_gen_setup_with_xhci);
 
 	*__pos = 0;
 	{
 		if (*hcd_ptr) {
-			caller_unmarshal_kernel__xhci_gen_setup__hcd__in(__pos, __msg, __ext, ctx, *hcd_ptr);
+			caller_unmarshal_kernel__xhci_gen_setup_with_xhci__hcd__in(__pos, __msg, __ext, ctx, *hcd_ptr);
 		}
 
 	}
 
 	{
+		if (*xhci_ptr) {
+			caller_unmarshal_kernel__xhci_gen_setup_with_xhci__xhci_hcd__in(__pos, __msg, __ext, ctx, *xhci_ptr);
+		}
+
 	}
 
 	{
@@ -1072,7 +1082,7 @@ int xhci_gen_setup(struct usb_hcd* hcd, fptr_get_quirks get_quirks)
 	}
 	return ret;
 }
-EXPORT_SYMBOL(xhci_gen_setup);
+EXPORT_SYMBOL(xhci_gen_setup_with_xhci);
 
 void xhci_init_driver(struct hc_driver* drv, struct xhci_driver_overrides const* over)
 {
@@ -1098,7 +1108,7 @@ void xhci_init_driver(struct hc_driver* drv, struct xhci_driver_overrides const*
 		__maybe_unused const void* __adjusted = *drv_ptr;
 		glue_pack(__pos, __msg, __ext, __adjusted);
 		if (*drv_ptr) {
-			caller_marshal_kernel___global_hc_driver__out(__pos, __msg, __ext, *drv_ptr);
+			caller_marshal_kernel__xhci_init_driver___global_hc_driver__out(__pos, __msg, __ext, ctx, *drv_ptr);
 		}
 
 	}
@@ -1117,8 +1127,9 @@ void xhci_init_driver(struct hc_driver* drv, struct xhci_driver_overrides const*
 	*__pos = 0;
 	{
 		if (*drv_ptr) {
-			caller_unmarshal_kernel___global_hc_driver__out(__pos, __msg, __ext, *drv_ptr);
+			caller_unmarshal_kernel__xhci_init_driver___global_hc_driver__out(__pos, __msg, __ext, ctx, *drv_ptr);
 		}
+
 		if (over->reset) {
 			drv->reset = over->reset;
 		}

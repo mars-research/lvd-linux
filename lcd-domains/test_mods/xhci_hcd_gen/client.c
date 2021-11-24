@@ -28,7 +28,7 @@ void add_timer(struct timer_list* timer)
 
 	{
 		__maybe_unused const void* __adjusted = *timer_ptr;
-		glue_pack_shadow(__pos, __msg, __ext, __adjusted);
+		glue_pack(__pos, __msg, __ext, __adjusted);
 		if (*timer_ptr) {
 			caller_marshal_kernel__add_timer__timer__in(__pos, __msg, __ext, ctx, *timer_ptr);
 		}
@@ -117,7 +117,7 @@ int del_timer(struct timer_list* timer)
 
 	{
 		__maybe_unused const void* __adjusted = *timer_ptr;
-		glue_pack_shadow(__pos, __msg, __ext, __adjusted);
+		glue_pack(__pos, __msg, __ext, __adjusted);
 		if (*timer_ptr) {
 			caller_marshal_kernel__del_timer__timer__in(__pos, __msg, __ext, ctx, *timer_ptr);
 		}
@@ -167,7 +167,7 @@ int del_timer_sync(struct timer_list* timer)
 
 	{
 		__maybe_unused const void* __adjusted = *timer_ptr;
-		glue_pack_shadow(__pos, __msg, __ext, __adjusted);
+		glue_pack(__pos, __msg, __ext, __adjusted);
 		if (*timer_ptr) {
 			caller_marshal_kernel__del_timer_sync__timer__in(__pos, __msg, __ext, ctx, *timer_ptr);
 		}
@@ -1027,50 +1027,54 @@ void get_quirks_callee(struct fipc_message* __msg, struct ext_registers* __ext)
 	}
 }
 
-void xhci_gen_setup_callee(struct fipc_message* __msg, struct ext_registers* __ext)
+void xhci_gen_setup_with_xhci_callee(struct fipc_message* __msg, struct ext_registers* __ext)
 {
 	size_t n_pos = 0;
 	size_t* __pos = &n_pos;
 
 	struct usb_hcd* hcd = 0;
-	fptr_get_quirks get_quirks = 0;
+	struct xhci_hcd* xhci = 0;
 	struct usb_hcd** hcd_ptr = &hcd;
-	fptr_get_quirks* get_quirks_ptr = &get_quirks;
+	struct xhci_hcd** xhci_ptr = &xhci;
 	int ret = 0;
 	int* ret_ptr = &ret;
 	
-	__maybe_unused struct xhci_gen_setup_call_ctx call_ctx = {hcd, get_quirks};
-	__maybe_unused struct xhci_gen_setup_call_ctx *ctx = &call_ctx;
+	__maybe_unused struct xhci_gen_setup_with_xhci_call_ctx call_ctx = {hcd, xhci};
+	__maybe_unused struct xhci_gen_setup_with_xhci_call_ctx *ctx = &call_ctx;
 
 	if (verbose_debug) {
 		printk("%s:%d, entered!\n", __func__, __LINE__);
 	}
 
 	{
-		size_t __size = sizeof(hcd) + sizeof(struct xhci_hcd);
+		size_t __size = sizeof(*hcd) + sizeof(struct xhci_hcd);
 		*hcd_ptr = glue_unpack_new_shadow(__pos, __msg, __ext, struct usb_hcd*, (__size), (DEFAULT_GFP_FLAGS));
 		if (*hcd_ptr) {
-			callee_unmarshal_kernel__xhci_gen_setup__hcd__in(__pos, __msg, __ext, ctx, *hcd_ptr);
+			callee_unmarshal_kernel__xhci_gen_setup_with_xhci__hcd__in(__pos, __msg, __ext, ctx, *hcd_ptr);
 		}
 
 	}
 
-	if (0)
 	{
-		*get_quirks_ptr = glue_unpack_rpc_ptr(__pos, __msg, __ext, get_quirks);
+		size_t __offset = glue_unpack(__pos, __msg, __ext, size_t);
+		*xhci_ptr = (struct xhci_hcd*)(__offset + hcd);
 	}
 
-	ret = xhci_gen_setup(hcd, get_quirks);
+	ret = xhci_gen_setup_with_xhci(hcd, xhci);
 
 	*__pos = 0;
 	{
 		if (*hcd_ptr) {
-			callee_marshal_kernel__xhci_gen_setup__hcd__in(__pos, __msg, __ext, ctx, *hcd_ptr);
+			callee_marshal_kernel__xhci_gen_setup_with_xhci__hcd__in(__pos, __msg, __ext, ctx, *hcd_ptr);
 		}
 
 	}
 
 	{
+		if (*xhci_ptr) {
+			callee_marshal_kernel__xhci_gen_setup_with_xhci__xhci_hcd__in(__pos, __msg, __ext, ctx, *xhci_ptr);
+		}
+
 	}
 
 	{
@@ -1104,7 +1108,7 @@ void xhci_init_driver_callee(struct fipc_message* __msg, struct ext_registers* _
 		size_t __size = sizeof(struct hc_driver);
 		*drv_ptr = glue_unpack_new_shadow(__pos, __msg, __ext, struct hc_driver*, (__size), (DEFAULT_GFP_FLAGS));
 		if (*drv_ptr) {
-			callee_unmarshal_kernel___global_hc_driver__out(__pos, __msg, __ext, *drv_ptr);
+			callee_unmarshal_kernel__xhci_init_driver___global_hc_driver__out(__pos, __msg, __ext, ctx, *drv_ptr);
 		}
 
 	}
@@ -1124,7 +1128,7 @@ void xhci_init_driver_callee(struct fipc_message* __msg, struct ext_registers* _
 	*__pos = 0;
 	{
 		if (*drv_ptr) {
-			callee_marshal_kernel___global_hc_driver__out(__pos, __msg, __ext, *drv_ptr);
+			callee_marshal_kernel__xhci_init_driver___global_hc_driver__out(__pos, __msg, __ext, ctx, *drv_ptr);
 		}
 
 	}
@@ -3783,9 +3787,9 @@ int try_dispatch(enum RPC_ID id, struct fipc_message* __msg, struct ext_register
 		get_quirks_callee(__msg, __ext);
 		break;
 
-	case RPC_ID_xhci_gen_setup:
-		glue_user_trace("xhci_gen_setup\n");
-		xhci_gen_setup_callee(__msg, __ext);
+	case RPC_ID_xhci_gen_setup_with_xhci:
+		glue_user_trace("xhci_gen_setup_with_xhci\n");
+		xhci_gen_setup_with_xhci_callee(__msg, __ext);
 		break;
 
 	case RPC_ID_xhci_init_driver:

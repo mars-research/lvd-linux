@@ -1849,7 +1849,11 @@ int xhci_init(struct usb_hcd *hcd);
 int xhci_run(struct usb_hcd *hcd);
 void xhci_stop(struct usb_hcd *hcd);
 void xhci_shutdown(struct usb_hcd *hcd);
+#ifdef CONFIG_IDL_ALIASING
 int xhci_gen_setup(struct usb_hcd *hcd, xhci_get_quirks_t get_quirks);
+#else
+int xhci_gen_setup_with_xhci(struct usb_hcd *hcd, struct xhci_hcd *xhci);
+#endif
 void xhci_init_driver(struct hc_driver *drv,
 		      const struct xhci_driver_overrides *over);
 

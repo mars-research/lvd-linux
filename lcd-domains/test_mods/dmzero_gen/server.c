@@ -6,45 +6,46 @@
 
 int trmp_impl_ctr(fptr_ctr target, struct dm_target* ti, unsigned int argc, char** argv)
 {
-	struct fipc_message buffer = {0};
-	struct fipc_message *msg = &buffer;
+	struct fipc_message __buffer = {0};
+	struct fipc_message *msg = &__buffer;
 	struct ext_registers* ext = get_register_page(smp_processor_id());
 	size_t n_pos = 0;
-	size_t* pos = &n_pos;
+	size_t* __pos = &n_pos;
 
 	struct dm_target** ti_ptr = &ti;
 	unsigned int* argc_ptr = &argc;
 	int ret = 0;
 	int* ret_ptr = &ret;
 	
+	__maybe_unused const struct ctr_call_ctx call_ctx = {ti, argc, argv};
+	__maybe_unused const struct ctr_call_ctx *ctx = &call_ctx;
+
 	(void)ext;
 
 	if (verbose_debug) {
 		printk("%s:%d, entered!\n", __func__, __LINE__);
 	}
 
-	glue_pack(pos, msg, ext, target);
+	glue_pack(__pos, msg, ext, target);
 	{
-		glue_pack(pos, msg, ext, *ti_ptr);
+		const void* __adjusted = *ti_ptr;
+		glue_pack(__pos, msg, ext, __adjusted);
 		if (*ti_ptr) {
-			caller_marshal_kernel__ctr__ti__in(pos, msg, ext, *ti_ptr);
+			caller_marshal_kernel__ctr__ti__in(__pos, msg, ext, ctx, *ti_ptr);
 		}
 
 	}
 
 	{
-		glue_pack(pos, msg, ext, *argc_ptr);
+		glue_pack(__pos, msg, ext, *argc_ptr);
 	}
 
-	{
-	}
+	glue_call_client(__pos, msg, RPC_ID_ctr);
 
-	glue_call_client(pos, msg, RPC_ID_ctr);
-
-	*pos = 0;
+	*__pos = 0;
 	{
 		if (*ti_ptr) {
-			caller_unmarshal_kernel__ctr__ti__in(pos, msg, ext, *ti_ptr);
+			caller_unmarshal_kernel__ctr__ti__in(__pos, msg, ext, ctx, *ti_ptr);
 		}
 
 	}
@@ -53,10 +54,7 @@ int trmp_impl_ctr(fptr_ctr target, struct dm_target* ti, unsigned int argc, char
 	}
 
 	{
-	}
-
-	{
-		*ret_ptr = glue_unpack(pos, msg, ext, int);
+		*ret_ptr = glue_unpack(__pos, msg, ext, int);
 	}
 
 	if (verbose_debug) {
@@ -77,49 +75,47 @@ int LCD_TRAMPOLINE_LINKAGE(trmp_ctr) trmp_ctr(struct dm_target* ti, unsigned int
 
 int trmp_impl_map(fptr_map target, struct dm_target* ti, struct bio* bio)
 {
-	struct fipc_message buffer = {0};
-	struct fipc_message *msg = &buffer;
+	struct fipc_message __buffer = {0};
+	struct fipc_message *msg = &__buffer;
 	struct ext_registers* ext = get_register_page(smp_processor_id());
 	size_t n_pos = 0;
-	size_t* pos = &n_pos;
+	size_t* __pos = &n_pos;
 
 	struct bio** bio_ptr = &bio;
 	int ret = 0;
 	int* ret_ptr = &ret;
 	
+	__maybe_unused const struct map_call_ctx call_ctx = {ti, bio};
+	__maybe_unused const struct map_call_ctx *ctx = &call_ctx;
+
 	(void)ext;
 
 	if (verbose_debug) {
 		printk("%s:%d, entered!\n", __func__, __LINE__);
 	}
 
-	glue_pack(pos, msg, ext, target);
+	glue_pack(__pos, msg, ext, target);
 	{
-	}
-
-	{
-		glue_pack(pos, msg, ext, *bio_ptr);
+		const void* __adjusted = *bio_ptr;
+		glue_pack(__pos, msg, ext, __adjusted);
 		if (*bio_ptr) {
-			caller_marshal_kernel__map__bio__in(pos, msg, ext, *bio_ptr);
+			caller_marshal_kernel__map__bio__in(__pos, msg, ext, ctx, *bio_ptr);
 		}
 
 	}
 
-	glue_call_client(pos, msg, RPC_ID_map);
+	glue_call_client(__pos, msg, RPC_ID_map);
 
-	*pos = 0;
-	{
-	}
-
+	*__pos = 0;
 	{
 		if (*bio_ptr) {
-			caller_unmarshal_kernel__map__bio__in(pos, msg, ext, *bio_ptr);
+			caller_unmarshal_kernel__map__bio__in(__pos, msg, ext, ctx, *bio_ptr);
 		}
 
 	}
 
 	{
-		*ret_ptr = glue_unpack(pos, msg, ext, int);
+		*ret_ptr = glue_unpack(__pos, msg, ext, int);
 	}
 
 	if (verbose_debug) {
@@ -141,34 +137,37 @@ int LCD_TRAMPOLINE_LINKAGE(trmp_map) trmp_map(struct dm_target* ti, struct bio* 
 void zero_fill_bio_callee(struct fipc_message* msg, struct ext_registers* ext)
 {
 	size_t n_pos = 0;
-	size_t* pos = &n_pos;
+	size_t* __pos = &n_pos;
 
 	struct bio* bio = 0;
 	struct bio** bio_ptr = &bio;
 	
+	__maybe_unused struct zero_fill_bio_call_ctx call_ctx = {bio};
+	__maybe_unused struct zero_fill_bio_call_ctx *ctx = &call_ctx;
+
 	if (verbose_debug) {
 		printk("%s:%d, entered!\n", __func__, __LINE__);
 	}
 
 	{
-		*bio_ptr = glue_unpack(pos, msg, ext, struct bio*);
+		*bio_ptr = glue_unpack(__pos, msg, ext, struct bio*);
 		if (*bio_ptr) {
-			callee_unmarshal_kernel__zero_fill_bio__bio__in(pos, msg, ext, *bio_ptr);
+			callee_unmarshal_kernel__zero_fill_bio__bio__in(__pos, msg, ext, ctx, *bio_ptr);
 		}
 
 	}
 
 	zero_fill_bio(bio);
 
-	*pos = 0;
+	*__pos = 0;
 	{
 		if (*bio_ptr) {
-			callee_marshal_kernel__zero_fill_bio__bio__in(pos, msg, ext, *bio_ptr);
+			callee_marshal_kernel__zero_fill_bio__bio__in(__pos, msg, ext, ctx, *bio_ptr);
 		}
 
 	}
 
-	msg->regs[0] = *pos;
+	msg->regs[0] = *__pos;
 	if (verbose_debug) {
 		printk("%s:%d, returned!\n", __func__, __LINE__);
 	}
@@ -177,34 +176,37 @@ void zero_fill_bio_callee(struct fipc_message* msg, struct ext_registers* ext)
 void bio_endio_callee(struct fipc_message* msg, struct ext_registers* ext)
 {
 	size_t n_pos = 0;
-	size_t* pos = &n_pos;
+	size_t* __pos = &n_pos;
 
 	struct bio* bio = 0;
 	struct bio** bio_ptr = &bio;
 	
+	__maybe_unused struct bio_endio_call_ctx call_ctx = {bio};
+	__maybe_unused struct bio_endio_call_ctx *ctx = &call_ctx;
+
 	if (verbose_debug) {
 		printk("%s:%d, entered!\n", __func__, __LINE__);
 	}
 
 	{
-		*bio_ptr = glue_unpack(pos, msg, ext, struct bio*);
+		*bio_ptr = glue_unpack(__pos, msg, ext, struct bio*);
 		if (*bio_ptr) {
-			callee_unmarshal_kernel__bio_endio__bio__in(pos, msg, ext, *bio_ptr);
+			callee_unmarshal_kernel__bio_endio__bio__in(__pos, msg, ext, ctx, *bio_ptr);
 		}
 
 	}
 
 	bio_endio(bio);
 
-	*pos = 0;
+	*__pos = 0;
 	{
 		if (*bio_ptr) {
-			callee_marshal_kernel__bio_endio__bio__in(pos, msg, ext, *bio_ptr);
+			callee_marshal_kernel__bio_endio__bio__in(__pos, msg, ext, ctx, *bio_ptr);
 		}
 
 	}
 
-	msg->regs[0] = *pos;
+	msg->regs[0] = *__pos;
 	if (verbose_debug) {
 		printk("%s:%d, returned!\n", __func__, __LINE__);
 	}
@@ -213,34 +215,37 @@ void bio_endio_callee(struct fipc_message* msg, struct ext_registers* ext)
 void dm_unregister_target_callee(struct fipc_message* msg, struct ext_registers* ext)
 {
 	size_t n_pos = 0;
-	size_t* pos = &n_pos;
+	size_t* __pos = &n_pos;
 
 	struct target_type* tt = 0;
 	struct target_type** tt_ptr = &tt;
 	
+	__maybe_unused struct dm_unregister_target_call_ctx call_ctx = {tt};
+	__maybe_unused struct dm_unregister_target_call_ctx *ctx = &call_ctx;
+
 	if (verbose_debug) {
 		printk("%s:%d, entered!\n", __func__, __LINE__);
 	}
 
 	{
-		*tt_ptr = glue_unpack_shadow(pos, msg, ext, struct target_type*);
+		*tt_ptr = glue_unpack_shadow(__pos, msg, ext, struct target_type*);
 		if (*tt_ptr) {
-			callee_unmarshal_kernel__dm_unregister_target__tt__in(pos, msg, ext, *tt_ptr);
+			callee_unmarshal_kernel__dm_unregister_target__tt__in(__pos, msg, ext, ctx, *tt_ptr);
 		}
 
 	}
 
 	dm_unregister_target(tt);
 
-	*pos = 0;
+	*__pos = 0;
 	{
 		if (*tt_ptr) {
-			callee_marshal_kernel__dm_unregister_target__tt__in(pos, msg, ext, *tt_ptr);
+			callee_marshal_kernel__dm_unregister_target__tt__in(__pos, msg, ext, ctx, *tt_ptr);
 		}
 
 	}
 
-	msg->regs[0] = *pos;
+	msg->regs[0] = *__pos;
 	if (verbose_debug) {
 		printk("%s:%d, returned!\n", __func__, __LINE__);
 	}
@@ -249,40 +254,46 @@ void dm_unregister_target_callee(struct fipc_message* msg, struct ext_registers*
 void dm_register_target_callee(struct fipc_message* msg, struct ext_registers* ext)
 {
 	size_t n_pos = 0;
-	size_t* pos = &n_pos;
+	size_t* __pos = &n_pos;
 
 	struct target_type* tt = 0;
 	struct target_type** tt_ptr = &tt;
 	int ret = 0;
 	int* ret_ptr = &ret;
 	
+	__maybe_unused struct dm_register_target_call_ctx call_ctx = {tt};
+	__maybe_unused struct dm_register_target_call_ctx *ctx = &call_ctx;
+
 	if (verbose_debug) {
 		printk("%s:%d, entered!\n", __func__, __LINE__);
 	}
 
 	{
-		*tt_ptr = glue_unpack_new_shadow(pos, msg, ext, struct target_type*, sizeof(struct target_type));
+		*tt_ptr = glue_unpack_new_shadow(__pos, msg, ext, struct target_type*, (sizeof(struct target_type)), (DEFAULT_GFP_FLAGS));
 		if (*tt_ptr) {
-			callee_unmarshal_kernel__dm_register_target__tt__in(pos, msg, ext, *tt_ptr);
+			callee_unmarshal_kernel__dm_register_target__tt__in(__pos, msg, ext, ctx, *tt_ptr);
 		}
 
 	}
 
+	tt->module = THIS_MODULE;
+	printk("%s, tt->name %s | tt->version {%u, %u, %u} | tt->module %p | tt->ctr %p | tt->map %p\n",
+				__func__, tt->name, tt->version[0], tt->version[1], tt->version[2], tt->module, tt->ctr, tt->map);
 	ret = dm_register_target(tt);
 
-	*pos = 0;
+	*__pos = 0;
 	{
 		if (*tt_ptr) {
-			callee_marshal_kernel__dm_register_target__tt__in(pos, msg, ext, *tt_ptr);
+			callee_marshal_kernel__dm_register_target__tt__in(__pos, msg, ext, ctx, *tt_ptr);
 		}
 
 	}
 
 	{
-		glue_pack(pos, msg, ext, *ret_ptr);
+		glue_pack(__pos, msg, ext, *ret_ptr);
 	}
 
-	msg->regs[0] = *pos;
+	msg->regs[0] = *__pos;
 	if (verbose_debug) {
 		printk("%s:%d, returned!\n", __func__, __LINE__);
 	}
@@ -291,6 +302,11 @@ void dm_register_target_callee(struct fipc_message* msg, struct ext_registers* e
 int try_dispatch(enum RPC_ID id, struct fipc_message* msg, struct ext_registers* ext)
 {
 	switch(id) {
+	case RPC_ID_shared_mem_init:
+		glue_user_trace("shared_mem_init\n");
+		shared_mem_init_callee(msg, ext);
+		break;
+
 	case RPC_ID_zero_fill_bio:
 		glue_user_trace("zero_fill_bio\n");
 		zero_fill_bio_callee(msg, ext);

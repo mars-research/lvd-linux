@@ -15,19 +15,20 @@ module kernel {
 		}
 	}
 
+	rpc void bio_endio( projection bio * bio ) {
+		projection < struct bio > bio {
+		}
+	}
 	rpc void zero_fill_bio( projection bio * bio ) {
 		projection < struct bio > bio {
 		}
 	}
 
-	rpc void bio_endio( projection bio * bio ) {
-		projection < struct bio > bio {
-		}
-	}
+
 	
 	rpc void dm_unregister_target( projection tt [bind(callee)] * tt ) {
 		projection < struct target_type > tt {
-			const string [alloc(callee)] *name;
+			string [alloc(callee)] *name;
 			array <unsigned int, 3> version;
 			rpc_ptr ctr ctr;
 			rpc_ptr map map;
@@ -36,7 +37,7 @@ module kernel {
 
 	rpc int dm_register_target( projection tt [alloc(callee)] * tt ) {
 		projection < struct target_type > tt {
-			const string [alloc(callee)] *name;
+			string [alloc(callee)] *name;
 			array <unsigned int, 3> version;
 			rpc_ptr ctr ctr;
 			rpc_ptr map map;

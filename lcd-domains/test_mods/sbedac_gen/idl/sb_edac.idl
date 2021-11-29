@@ -4,7 +4,6 @@ module kernel {
 			void [alloc<{{sizeof(struct mce)}}>(callee)] *  data ) {
 
 		projection < struct notifier_block > nb {
-			rpc_ptr notifier_call notifier_call;
 		}
 	}
 
@@ -17,6 +16,7 @@ module kernel {
 
 	rpc void mce_register_decode_chain( projection notifier_block [alloc(callee)] *nb) {
 		projection < struct notifier_block > notifier_block {
+			rpc_ptr notifier_call notifier_call;
 		}
 	}
 
@@ -168,6 +168,7 @@ module kernel {
 			bool is_virt_csrow;
 		}
 	}
+
 	rpc projection ret_pci_dev [alloc_once(caller)] * pci_get_device( unsigned int  vendor,
 			unsigned int  device, projection from * from ) {
 		projection < struct pci_dev > ret_pci_dev {

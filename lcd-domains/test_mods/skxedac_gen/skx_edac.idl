@@ -1,16 +1,43 @@
 module kernel {
-
 	rpc_ptr int notifier_call( projection nb * [unused] nb,
 			long unsigned int [unused] val,
 			void [alloc<{{sizeof(struct mce)}}>(callee)] *  data ) {
 
 		projection < struct notifier_block > nb {
+		}
+	}
+
+	rpc void mce_unregister_decode_chain( 
+		projection notifier_block [bind(callee), dealloc(callee)] *nb) {
+
+		projection < struct notifier_block > notifier_block {
+		}
+	}
+
+	rpc void mce_register_decode_chain( projection notifier_block [alloc(callee)] *nb) {
+		projection < struct notifier_block > notifier_block {
 			rpc_ptr notifier_call notifier_call;
 		}
 	}
 
-	rpc int pci_enable_device( projection dev *  dev ) {
+	rpc void pci_dev_put( projection dev *  dev ) {
+		projection < struct device> device{
+		}
 		projection < struct pci_dev > dev {
+			//projection device dev;
+		}
+	}
+
+	rpc projection ret_pci_dev [bind(caller)] * pci_dev_get( projection dev *  dev ) {
+		projection < struct device> device{
+		}
+		projection < struct pci_dev > ret_pci_dev {
+			//projection device dev;
+		}
+		projection < struct device> device{
+		}
+		projection < struct pci_dev > dev {
+			//projection device dev;
 		}
 	}
 
@@ -32,89 +59,6 @@ module kernel {
 		}
 	}
 
-	rpc projection ret_pci_dev [bind(caller)] * pci_dev_get( projection dev *  dev ) {
-		projection < struct device> device{
-		}
-		projection < struct pci_dev > ret_pci_dev {
-			//projection device dev;
-		}
-		projection < struct device> device{
-		}
-		projection < struct pci_dev > dev {
-			//projection device dev;
-		}
-	}
-
-	rpc void pci_dev_put( projection dev *  dev ) {
-		projection < struct device> device{
-		}
-		projection < struct pci_dev > dev {
-			//projection device dev;
-		}
-	}
-
-	rpc void mce_unregister_decode_chain( 
-		projection notifier_block [bind(callee), dealloc(callee)] *nb) {
-
-		projection < struct notifier_block > notifier_block {
-		}
-	}
-
-	rpc void mce_register_decode_chain( projection notifier_block [alloc(callee)] *nb) {
-		projection < struct notifier_block > notifier_block {
-		}
-	}
-
-	/* XXX: Let's NOT worry about debugfs for now
-	rpc_ptr int open( projection inode *  inode, projection file *  file ) {
-		projection < struct inode > inode {
-		}
-		projection < struct file > file {
-		}
-	}
-	rpc void debugfs_remove_recursive( projection dentry *  dentry ) {
-		projection < struct dentry > dentry {
-		}
-	}
-	rpc projection ret_dentry* debugfs_create_dir( char*  name, projection parent *  parent ) {
-		projection < struct dentry > ret_dentry {
-		}
-		projection < struct dentry > parent {
-		}
-	}
-	rpc projection ret_dentry* debugfs_create_file( char*  name, unsigned short  mode, projection parent *  parent, void*  data, projection fops *  fops ) {
-		projection < struct dentry > ret_dentry {
-		}
-		projection < struct dentry > parent {
-		}
-		projection < struct file_operations > fops {
-			rpc_ptr open open;
-		}
-	}
-	rpc long long int generic_file_llseek( projection file *  file, long long int  offset, int  whence ) {
-		projection < struct file > file {
-		}
-	}
-	rpc long int simple_attr_read( projection file *  file, char*  buf, long unsigned int  len, long long int*  ppos ) {
-		projection < struct file > file {
-		}
-	}
-	rpc long int simple_attr_write( projection file *  file, char*  buf, long unsigned int  len, long long int* [unused] ppos ) {
-		projection < struct file > file {
-		}
-	}
-	rpc int simple_attr_release( projection inode * [unused] inode, projection file *  file ) {
-		projection < struct inode > inode {
-		}
-		projection < struct file > file {
-		}
-	}
-	rpc int simple_attr_open( projection inode *  inode, projection file *  file, rpc_ptr  get get, rpc_ptr  set set, char*  fmt ) {
-		projection < struct inode > inode {
-		}
-		projection < struct file > file {
-		}
-	} */
 
 	rpc void edac_mc_handle_error( unsigned int  type,
 		projection mci * mci, unsigned short  error_count,
@@ -135,6 +79,11 @@ module kernel {
 		}
 	}
 
+	rpc int pci_enable_device( projection dev *  dev ) {
+		projection < struct pci_dev > dev {
+		}
+	}
+
 	rpc projection ret_mem_ctl_info* edac_mc_del_mc( projection dev [bind(callee)] *  dev ) {
 		projection < struct mem_ctl_info > ret_mem_ctl_info {
 			int  mc_idx;
@@ -142,6 +91,7 @@ module kernel {
 		projection < struct device > dev {
 		}
 	}
+
 
 	rpc int edac_mc_add_mc_with_groups( projection mci *  mci,
 			const projection groups ** [unused]  groups ) {
@@ -245,4 +195,55 @@ module kernel {
 		projection < struct pci_bus > bus {
 		}
 	}
+
+	/* XXX: Let's NOT worry about debugfs for now
+	rpc_ptr int open( projection inode *  inode, projection file *  file ) {
+		projection < struct inode > inode {
+		}
+		projection < struct file > file {
+		}
+	}
+	rpc void debugfs_remove_recursive( projection dentry *  dentry ) {
+		projection < struct dentry > dentry {
+		}
+	}
+	rpc projection ret_dentry* debugfs_create_dir( char*  name, projection parent *  parent ) {
+		projection < struct dentry > ret_dentry {
+		}
+		projection < struct dentry > parent {
+		}
+	}
+	rpc projection ret_dentry* debugfs_create_file( char*  name, unsigned short  mode, projection parent *  parent, void*  data, projection fops *  fops ) {
+		projection < struct dentry > ret_dentry {
+		}
+		projection < struct dentry > parent {
+		}
+		projection < struct file_operations > fops {
+			rpc_ptr open open;
+		}
+	}
+	rpc long long int generic_file_llseek( projection file *  file, long long int  offset, int  whence ) {
+		projection < struct file > file {
+		}
+	}
+	rpc long int simple_attr_read( projection file *  file, char*  buf, long unsigned int  len, long long int*  ppos ) {
+		projection < struct file > file {
+		}
+	}
+	rpc long int simple_attr_write( projection file *  file, char*  buf, long unsigned int  len, long long int* [unused] ppos ) {
+		projection < struct file > file {
+		}
+	}
+	rpc int simple_attr_release( projection inode * [unused] inode, projection file *  file ) {
+		projection < struct inode > inode {
+		}
+		projection < struct file > file {
+		}
+	}
+	rpc int simple_attr_open( projection inode *  inode, projection file *  file, rpc_ptr  get get, rpc_ptr  set set, char*  fmt ) {
+		projection < struct inode > inode {
+		}
+		projection < struct file > file {
+		}
+	} */
 }

@@ -4,46 +4,51 @@
 
 #include <lcd_config/post_hook.h>
 
-void read_callee(struct fipc_message* msg, struct ext_registers* ext)
+void read_callee(struct fipc_message* __msg, struct ext_registers* __ext)
 {
 	size_t n_pos = 0;
-	size_t* pos = &n_pos;
+	size_t* __pos = &n_pos;
 
-	fptr_read function_ptr = glue_unpack(pos, msg, ext, fptr_read);
+	fptr_read function_ptr = glue_unpack(__pos, __msg, __ext, fptr_read);
 	struct file* file = 0;
-	char* buf = 0;
 	unsigned long count = 0;
-	long long* ppos = 0;
 	struct file** file_ptr = &file;
+	char __buf;
+	char* buf = &__buf;
 	char** buf_ptr = &buf;
 	unsigned long* count_ptr = &count;
+	long long __ppos;
+	long long* ppos = &__ppos;
 	long long** ppos_ptr = &ppos;
 	long ret = 0;
 	long* ret_ptr = &ret;
 	
+	__maybe_unused struct read_call_ctx call_ctx = {file, buf, count, ppos};
+	__maybe_unused struct read_call_ctx *ctx = &call_ctx;
+
 	if (verbose_debug) {
 		printk("%s:%d, entered!\n", __func__, __LINE__);
 	}
 
 	{
-		*file_ptr = glue_unpack_new_shadow(pos, msg, ext, struct file*, sizeof(struct file));
+		size_t __size = sizeof(struct file);
+		*file_ptr = glue_unpack_bind_or_new_shadow(__pos, __msg, __ext, struct file*, __size, DEFAULT_GFP_FLAGS);
 		if (*file_ptr) {
-			callee_unmarshal_kernel__read__file__in(pos, msg, ext, *file_ptr);
+			callee_unmarshal_kernel__read__file__in(__pos, __msg, __ext, ctx, *file_ptr);
 		}
 
 	}
 
 	{
-		*buf_ptr = glue_unpack_new_shadow(pos, msg, ext, char*, sizeof(char) * glue_peek(pos, msg, ext));
 		if (*buf_ptr) {
-			int i;
+			int __i;
 			char* array = *buf_ptr;
-			size_t len = glue_unpack(pos, msg, ext, size_t);
+			size_t __len = glue_unpack(__pos, __msg, __ext, size_t);
 			// Warning: see David if this breaks
 			glue_user_trace("Warning: see David if this breaks");
-			for (i = 0; i < len; ++i) {
-				char* element = &array[i];
-				*element = glue_unpack(pos, msg, ext, char);
+			for (__i = 0; __i < __len; ++__i) {
+				char* element = &array[__i];
+				*element = glue_unpack(__pos, __msg, __ext, char);
 			}
 
 		}
@@ -51,37 +56,36 @@ void read_callee(struct fipc_message* msg, struct ext_registers* ext)
 	}
 
 	{
-		*count_ptr = glue_unpack(pos, msg, ext, unsigned long);
+		*count_ptr = glue_unpack(__pos, __msg, __ext, unsigned long);
 	}
 
 	{
-		*ppos_ptr = glue_unpack_new_shadow(pos, msg, ext, long long*, sizeof(long long));
 		if (*ppos_ptr) {
-			**ppos_ptr = glue_unpack(pos, msg, ext, long long);
+			**ppos_ptr = glue_unpack(__pos, __msg, __ext, long long);
 		}
 
 	}
 
 	ret = function_ptr(file, buf, count, ppos);
 
-	*pos = 0;
+	*__pos = 0;
 	{
 		if (*file_ptr) {
-			callee_marshal_kernel__read__file__in(pos, msg, ext, *file_ptr);
+			callee_marshal_kernel__read__file__in(__pos, __msg, __ext, ctx, *file_ptr);
 		}
 
 	}
 
 	{
 		if (*buf_ptr) {
-			size_t i, len = *count_ptr;
+			size_t __i, __len = (count);
 			char* array = *buf_ptr;
-			glue_pack(pos, msg, ext, len);
+			glue_pack(__pos, __msg, __ext, __len);
 			// Warning: see David if this breaks
 			glue_user_trace("Warning: see David if this breaks");
-			for (i = 0; i < len; ++i) {
-				char* element = &array[i];
-				glue_pack(pos, msg, ext, *element);
+			for (__i = 0; __i < __len; ++__i) {
+				char* element = &array[__i];
+				glue_pack(__pos, __msg, __ext, *element);
 			}
 
 		}
@@ -96,21 +100,21 @@ void read_callee(struct fipc_message* msg, struct ext_registers* ext)
 	}
 
 	{
-		glue_pack(pos, msg, ext, *ret_ptr);
+		glue_pack(__pos, __msg, __ext, *ret_ptr);
 	}
 
-	msg->regs[0] = *pos;
+	__msg->regs[0] = *__pos;
 	if (verbose_debug) {
 		printk("%s:%d, returned!\n", __func__, __LINE__);
 	}
 }
 
-void write_callee(struct fipc_message* msg, struct ext_registers* ext)
+void write_callee(struct fipc_message* __msg, struct ext_registers* __ext)
 {
 	size_t n_pos = 0;
-	size_t* pos = &n_pos;
+	size_t* __pos = &n_pos;
 
-	fptr_write function_ptr = glue_unpack(pos, msg, ext, fptr_write);
+	fptr_write function_ptr = glue_unpack(__pos, __msg, __ext, fptr_write);
 	struct file* file = 0;
 	char const* buf = 0;
 	unsigned long count = 0;
@@ -122,30 +126,35 @@ void write_callee(struct fipc_message* msg, struct ext_registers* ext)
 	long ret = 0;
 	long* ret_ptr = &ret;
 	
+	__maybe_unused struct write_call_ctx call_ctx = {file, buf, count, ppos};
+	__maybe_unused struct write_call_ctx *ctx = &call_ctx;
+
 	if (verbose_debug) {
 		printk("%s:%d, entered!\n", __func__, __LINE__);
 	}
 
 	{
-		*file_ptr = glue_unpack_new_shadow(pos, msg, ext, struct file*, sizeof(struct file));
+		size_t __size = sizeof(struct file);
+		*file_ptr = glue_unpack_new_shadow(__pos, __msg, __ext, struct file*, (__size), (DEFAULT_GFP_FLAGS));
 		if (*file_ptr) {
-			callee_unmarshal_kernel__write__file__in(pos, msg, ext, *file_ptr);
+			callee_unmarshal_kernel__write__file__in(__pos, __msg, __ext, ctx, *file_ptr);
 		}
 
 	}
 
 	{
-		*buf_ptr = glue_unpack_new_shadow(pos, msg, ext, char const*, sizeof(char) * glue_peek(pos, msg, ext));
+		size_t __size = sizeof(char) * glue_peek(__pos, __msg, __ext);
+		*buf_ptr = glue_unpack_new_shadow(__pos, __msg, __ext, char const*, (__size), (DEFAULT_GFP_FLAGS));
 		if (*buf_ptr) {
 			char* writable = (char*)*buf_ptr;
-			int i;
+			int __i;
 			char* array = writable;
-			size_t len = glue_unpack(pos, msg, ext, size_t);
+			size_t __len = glue_unpack(__pos, __msg, __ext, size_t);
 			// Warning: see David if this breaks
 			glue_user_trace("Warning: see David if this breaks");
-			for (i = 0; i < len; ++i) {
-				char* element = &array[i];
-				*element = glue_unpack(pos, msg, ext, char);
+			for (__i = 0; __i < __len; ++__i) {
+				char* element = &array[__i];
+				*element = glue_unpack(__pos, __msg, __ext, char);
 			}
 
 		}
@@ -153,23 +162,24 @@ void write_callee(struct fipc_message* msg, struct ext_registers* ext)
 	}
 
 	{
-		*count_ptr = glue_unpack(pos, msg, ext, unsigned long);
+		*count_ptr = glue_unpack(__pos, __msg, __ext, unsigned long);
 	}
 
 	{
-		*ppos_ptr = glue_unpack_new_shadow(pos, msg, ext, long long*, sizeof(long long));
+		size_t __size = sizeof(long long);
+		*ppos_ptr = glue_unpack_new_shadow(__pos, __msg, __ext, long long*, (__size), (DEFAULT_GFP_FLAGS));
 		if (*ppos_ptr) {
-			**ppos_ptr = glue_unpack(pos, msg, ext, long long);
+			**ppos_ptr = glue_unpack(__pos, __msg, __ext, long long);
 		}
 
 	}
 
 	ret = function_ptr(file, buf, count, ppos);
 
-	*pos = 0;
+	*__pos = 0;
 	{
 		if (*file_ptr) {
-			callee_marshal_kernel__write__file__in(pos, msg, ext, *file_ptr);
+			callee_marshal_kernel__write__file__in(__pos, __msg, __ext, ctx, *file_ptr);
 		}
 
 	}
@@ -186,21 +196,21 @@ void write_callee(struct fipc_message* msg, struct ext_registers* ext)
 	}
 
 	{
-		glue_pack(pos, msg, ext, *ret_ptr);
+		glue_pack(__pos, __msg, __ext, *ret_ptr);
 	}
 
-	msg->regs[0] = *pos;
+	__msg->regs[0] = *__pos;
 	if (verbose_debug) {
 		printk("%s:%d, returned!\n", __func__, __LINE__);
 	}
 }
 
-void compat_ioctl_callee(struct fipc_message* msg, struct ext_registers* ext)
+void compat_ioctl_callee(struct fipc_message* __msg, struct ext_registers* __ext)
 {
 	size_t n_pos = 0;
-	size_t* pos = &n_pos;
+	size_t* __pos = &n_pos;
 
-	fptr_compat_ioctl function_ptr = glue_unpack(pos, msg, ext, fptr_compat_ioctl);
+	fptr_compat_ioctl function_ptr = glue_unpack(__pos, __msg, __ext, fptr_compat_ioctl);
 	struct file* file = 0;
 	unsigned int ioc = 0;
 	unsigned long arg = 0;
@@ -210,32 +220,36 @@ void compat_ioctl_callee(struct fipc_message* msg, struct ext_registers* ext)
 	long ret = 0;
 	long* ret_ptr = &ret;
 	
+	__maybe_unused struct compat_ioctl_call_ctx call_ctx = {file, ioc, arg};
+	__maybe_unused struct compat_ioctl_call_ctx *ctx = &call_ctx;
+
 	if (verbose_debug) {
 		printk("%s:%d, entered!\n", __func__, __LINE__);
 	}
 
 	{
-		*file_ptr = glue_unpack_new_shadow(pos, msg, ext, struct file*, sizeof(struct file));
+		size_t __size = sizeof(struct file);
+		*file_ptr = glue_unpack_new_shadow(__pos, __msg, __ext, struct file*, (__size), (DEFAULT_GFP_FLAGS));
 		if (*file_ptr) {
-			callee_unmarshal_kernel__compat_ioctl__file__in(pos, msg, ext, *file_ptr);
+			callee_unmarshal_kernel__compat_ioctl__file__in(__pos, __msg, __ext, ctx, *file_ptr);
 		}
 
 	}
 
 	{
-		*ioc_ptr = glue_unpack(pos, msg, ext, unsigned int);
+		*ioc_ptr = glue_unpack(__pos, __msg, __ext, unsigned int);
 	}
 
 	{
-		*arg_ptr = glue_unpack(pos, msg, ext, unsigned long);
+		*arg_ptr = glue_unpack(__pos, __msg, __ext, unsigned long);
 	}
 
 	ret = function_ptr(file, ioc, arg);
 
-	*pos = 0;
+	*__pos = 0;
 	{
 		if (*file_ptr) {
-			callee_marshal_kernel__compat_ioctl__file__in(pos, msg, ext, *file_ptr);
+			callee_marshal_kernel__compat_ioctl__file__in(__pos, __msg, __ext, ctx, *file_ptr);
 		}
 
 	}
@@ -247,21 +261,21 @@ void compat_ioctl_callee(struct fipc_message* msg, struct ext_registers* ext)
 	}
 
 	{
-		glue_pack(pos, msg, ext, *ret_ptr);
+		glue_pack(__pos, __msg, __ext, *ret_ptr);
 	}
 
-	msg->regs[0] = *pos;
+	__msg->regs[0] = *__pos;
 	if (verbose_debug) {
 		printk("%s:%d, returned!\n", __func__, __LINE__);
 	}
 }
 
-void open_callee(struct fipc_message* msg, struct ext_registers* ext)
+void open_callee(struct fipc_message* __msg, struct ext_registers* __ext)
 {
 	size_t n_pos = 0;
-	size_t* pos = &n_pos;
+	size_t* __pos = &n_pos;
 
-	fptr_open function_ptr = glue_unpack(pos, msg, ext, fptr_open);
+	fptr_open function_ptr = glue_unpack(__pos, __msg, __ext, fptr_open);
 	struct inode* inode = 0;
 	struct file* file = 0;
 	struct inode** inode_ptr = &inode;
@@ -269,48 +283,53 @@ void open_callee(struct fipc_message* msg, struct ext_registers* ext)
 	int ret = 0;
 	int* ret_ptr = &ret;
 	
+	__maybe_unused struct open_call_ctx call_ctx = {inode, file};
+	__maybe_unused struct open_call_ctx *ctx = &call_ctx;
+
 	if (verbose_debug) {
 		printk("%s:%d, entered!\n", __func__, __LINE__);
 	}
 
 	{
-		*inode_ptr = glue_unpack_new_shadow(pos, msg, ext, struct inode*, sizeof(struct inode));
+		size_t __size = sizeof(struct inode);
+		*inode_ptr = glue_unpack_new_shadow(__pos, __msg, __ext, struct inode*, (__size), (DEFAULT_GFP_FLAGS));
 		if (*inode_ptr) {
-			callee_unmarshal_kernel__open__inode__in(pos, msg, ext, *inode_ptr);
+			callee_unmarshal_kernel__open__inode__in(__pos, __msg, __ext, ctx, *inode_ptr);
 		}
 
 	}
 
 	{
-		*file_ptr = glue_unpack_new_shadow(pos, msg, ext, struct file*, sizeof(struct file));
+		size_t __size = sizeof(struct file);
+		*file_ptr = glue_unpack_new_shadow(__pos, __msg, __ext, struct file*, (__size), (DEFAULT_GFP_FLAGS));
 		if (*file_ptr) {
-			callee_unmarshal_kernel__open__file__in(pos, msg, ext, *file_ptr);
+			callee_unmarshal_kernel__open__file__in(__pos, __msg, __ext, ctx, *file_ptr);
 		}
 
 	}
 
 	ret = function_ptr(inode, file);
 
-	*pos = 0;
+	*__pos = 0;
 	{
 		if (*inode_ptr) {
-			callee_marshal_kernel__open__inode__in(pos, msg, ext, *inode_ptr);
+			callee_marshal_kernel__open__inode__in(__pos, __msg, __ext, ctx, *inode_ptr);
 		}
 
 	}
 
 	{
 		if (*file_ptr) {
-			callee_marshal_kernel__open__file__in(pos, msg, ext, *file_ptr);
+			callee_marshal_kernel__open__file__in(__pos, __msg, __ext, ctx, *file_ptr);
 		}
 
 	}
 
 	{
-		glue_pack(pos, msg, ext, *ret_ptr);
+		glue_pack(__pos, __msg, __ext, *ret_ptr);
 	}
 
-	msg->regs[0] = *pos;
+	__msg->regs[0] = *__pos;
 	if (verbose_debug) {
 		printk("%s:%d, returned!\n", __func__, __LINE__);
 	}
@@ -318,11 +337,11 @@ void open_callee(struct fipc_message* msg, struct ext_registers* ext)
 
 int __register_chrdev(unsigned int major, unsigned int baseminor, unsigned int count, char const* name, struct file_operations const* fops)
 {
-	struct fipc_message buffer = {0};
-	struct fipc_message *msg = &buffer;
-	struct ext_registers* ext = get_register_page(smp_processor_id());
+	struct fipc_message __buffer = {0};
+	struct fipc_message *__msg = &__buffer;
+	struct ext_registers* __ext = get_register_page(smp_processor_id());
 	size_t n_pos = 0;
-	size_t* pos = &n_pos;
+	size_t* __pos = &n_pos;
 
 	unsigned int* major_ptr = &major;
 	unsigned int* baseminor_ptr = &baseminor;
@@ -332,34 +351,38 @@ int __register_chrdev(unsigned int major, unsigned int baseminor, unsigned int c
 	int ret = 0;
 	int* ret_ptr = &ret;
 	
-	(void)ext;
+	__maybe_unused const struct __register_chrdev_call_ctx call_ctx = {major, baseminor, count, name, fops};
+	__maybe_unused const struct __register_chrdev_call_ctx *ctx = &call_ctx;
+
+	(void)__ext;
 
 	if (verbose_debug) {
 		printk("%s:%d, entered!\n", __func__, __LINE__);
 	}
 
 	{
-		glue_pack(pos, msg, ext, *major_ptr);
+		glue_pack(__pos, __msg, __ext, *major_ptr);
 	}
 
 	{
-		glue_pack(pos, msg, ext, *baseminor_ptr);
+		glue_pack(__pos, __msg, __ext, *baseminor_ptr);
 	}
 
 	{
-		glue_pack(pos, msg, ext, *count_ptr);
+		glue_pack(__pos, __msg, __ext, *count_ptr);
 	}
 
 	{
-		glue_pack(pos, msg, ext, *name_ptr);
+		__maybe_unused const void* __adjusted = *name_ptr;
+		glue_pack(__pos, __msg, __ext, __adjusted);
 		if (*name_ptr) {
-			size_t i, len;
+			size_t __i, __len;
 			char const* array = *name_ptr;
-			for (len = 0; array[len]; ++len);
-			glue_pack(pos, msg, ext, len + 1);
-			for (i = 0; i < len; ++i) {
-				char const* element = &array[i];
-				glue_pack(pos, msg, ext, *element);
+			for (__len = 0; array[__len]; ++__len);
+			glue_pack(__pos, __msg, __ext, __len + 1);
+			for (__i = 0; __i < __len; ++__i) {
+				char const* element = &array[__i];
+				glue_pack(__pos, __msg, __ext, *element);
 			}
 
 		}
@@ -367,16 +390,17 @@ int __register_chrdev(unsigned int major, unsigned int baseminor, unsigned int c
 	}
 
 	{
-		glue_pack(pos, msg, ext, *fops_ptr);
+		__maybe_unused const void* __adjusted = *fops_ptr;
+		glue_pack(__pos, __msg, __ext, __adjusted);
 		if (*fops_ptr) {
-			caller_marshal_kernel____register_chrdev__fops__in(pos, msg, ext, *fops_ptr);
+			caller_marshal_kernel____register_chrdev__fops__in(__pos, __msg, __ext, ctx, *fops_ptr);
 		}
 
 	}
 
-	glue_call_server(pos, msg, RPC_ID___register_chrdev);
+	glue_call_server(__pos, __msg, RPC_ID___register_chrdev);
 
-	*pos = 0;
+	*__pos = 0;
 	{
 	}
 
@@ -393,13 +417,13 @@ int __register_chrdev(unsigned int major, unsigned int baseminor, unsigned int c
 	{
 		if (*fops_ptr) {
 			struct file_operations* writable = (struct file_operations*)*fops_ptr;
-			caller_unmarshal_kernel____register_chrdev__fops__in(pos, msg, ext, writable);
+			caller_unmarshal_kernel____register_chrdev__fops__in(__pos, __msg, __ext, ctx, writable);
 		}
 
 	}
 
 	{
-		*ret_ptr = glue_unpack(pos, msg, ext, int);
+		*ret_ptr = glue_unpack(__pos, __msg, __ext, int);
 	}
 
 	if (verbose_debug) {
@@ -410,54 +434,58 @@ int __register_chrdev(unsigned int major, unsigned int baseminor, unsigned int c
 
 void __unregister_chrdev(unsigned int major, unsigned int baseminor, unsigned int count, char const* name)
 {
-	struct fipc_message buffer = {0};
-	struct fipc_message *msg = &buffer;
-	struct ext_registers* ext = get_register_page(smp_processor_id());
+	struct fipc_message __buffer = {0};
+	struct fipc_message *__msg = &__buffer;
+	struct ext_registers* __ext = get_register_page(smp_processor_id());
 	size_t n_pos = 0;
-	size_t* pos = &n_pos;
+	size_t* __pos = &n_pos;
 
 	unsigned int* major_ptr = &major;
 	unsigned int* baseminor_ptr = &baseminor;
 	unsigned int* count_ptr = &count;
 	char const** name_ptr = &name;
 	
-	(void)ext;
+	__maybe_unused const struct __unregister_chrdev_call_ctx call_ctx = {major, baseminor, count, name};
+	__maybe_unused const struct __unregister_chrdev_call_ctx *ctx = &call_ctx;
+
+	(void)__ext;
 
 	if (verbose_debug) {
 		printk("%s:%d, entered!\n", __func__, __LINE__);
 	}
 
 	{
-		glue_pack(pos, msg, ext, *major_ptr);
+		glue_pack(__pos, __msg, __ext, *major_ptr);
 	}
 
 	{
-		glue_pack(pos, msg, ext, *baseminor_ptr);
+		glue_pack(__pos, __msg, __ext, *baseminor_ptr);
 	}
 
 	{
-		glue_pack(pos, msg, ext, *count_ptr);
+		glue_pack(__pos, __msg, __ext, *count_ptr);
 	}
 
 	{
-		glue_pack(pos, msg, ext, *name_ptr);
+		__maybe_unused const void* __adjusted = *name_ptr;
+		glue_pack(__pos, __msg, __ext, __adjusted);
 		if (*name_ptr) {
-			size_t i, len;
+			size_t __i, __len;
 			char const* array = *name_ptr;
-			for (len = 0; array[len]; ++len);
-			glue_pack(pos, msg, ext, len + 1);
-			for (i = 0; i < len; ++i) {
-				char const* element = &array[i];
-				glue_pack(pos, msg, ext, *element);
+			for (__len = 0; array[__len]; ++__len);
+			glue_pack(__pos, __msg, __ext, __len + 1);
+			for (__i = 0; __i < __len; ++__i) {
+				char const* element = &array[__i];
+				glue_pack(__pos, __msg, __ext, *element);
 			}
 
 		}
 
 	}
 
-	glue_call_server(pos, msg, RPC_ID___unregister_chrdev);
+	glue_call_server(__pos, __msg, RPC_ID___unregister_chrdev);
 
-	*pos = 0;
+	*__pos = 0;
 	{
 	}
 
@@ -478,22 +506,25 @@ void __unregister_chrdev(unsigned int major, unsigned int baseminor, unsigned in
 
 void cpu_maps_update_begin(void)
 {
-	struct fipc_message buffer = {0};
-	struct fipc_message *msg = &buffer;
-	struct ext_registers* ext = get_register_page(smp_processor_id());
+	struct fipc_message __buffer = {0};
+	struct fipc_message *__msg = &__buffer;
+	struct ext_registers* __ext = get_register_page(smp_processor_id());
 	size_t n_pos = 0;
-	size_t* pos = &n_pos;
+	size_t* __pos = &n_pos;
 
 	
-	(void)ext;
+	__maybe_unused const struct cpu_maps_update_begin_call_ctx call_ctx = {};
+	__maybe_unused const struct cpu_maps_update_begin_call_ctx *ctx = &call_ctx;
+
+	(void)__ext;
 
 	if (verbose_debug) {
 		printk("%s:%d, entered!\n", __func__, __LINE__);
 	}
 
-	glue_call_server(pos, msg, RPC_ID_cpu_maps_update_begin);
+	glue_call_server(__pos, __msg, RPC_ID_cpu_maps_update_begin);
 
-	*pos = 0;
+	*__pos = 0;
 	if (verbose_debug) {
 		printk("%s:%d, returned!\n", __func__, __LINE__);
 	}
@@ -501,22 +532,25 @@ void cpu_maps_update_begin(void)
 
 void cpu_maps_update_done(void)
 {
-	struct fipc_message buffer = {0};
-	struct fipc_message *msg = &buffer;
-	struct ext_registers* ext = get_register_page(smp_processor_id());
+	struct fipc_message __buffer = {0};
+	struct fipc_message *__msg = &__buffer;
+	struct ext_registers* __ext = get_register_page(smp_processor_id());
 	size_t n_pos = 0;
-	size_t* pos = &n_pos;
+	size_t* __pos = &n_pos;
 
 	
-	(void)ext;
+	__maybe_unused const struct cpu_maps_update_done_call_ctx call_ctx = {};
+	__maybe_unused const struct cpu_maps_update_done_call_ctx *ctx = &call_ctx;
+
+	(void)__ext;
 
 	if (verbose_debug) {
 		printk("%s:%d, entered!\n", __func__, __LINE__);
 	}
 
-	glue_call_server(pos, msg, RPC_ID_cpu_maps_update_done);
+	glue_call_server(__pos, __msg, RPC_ID_cpu_maps_update_done);
 
-	*pos = 0;
+	*__pos = 0;
 	if (verbose_debug) {
 		printk("%s:%d, returned!\n", __func__, __LINE__);
 	}
@@ -524,60 +558,64 @@ void cpu_maps_update_done(void)
 
 int wrmsr_safe_regs_on_cpu(unsigned int cpu, unsigned int* regs)
 {
-	struct fipc_message buffer = {0};
-	struct fipc_message *msg = &buffer;
-	struct ext_registers* ext = get_register_page(smp_processor_id());
+	struct fipc_message __buffer = {0};
+	struct fipc_message *__msg = &__buffer;
+	struct ext_registers* __ext = get_register_page(smp_processor_id());
 	size_t n_pos = 0;
-	size_t* pos = &n_pos;
+	size_t* __pos = &n_pos;
 
 	unsigned int* cpu_ptr = &cpu;
 	unsigned int** regs_ptr = &regs;
 	int ret = 0;
 	int* ret_ptr = &ret;
 	
-	(void)ext;
+	__maybe_unused const struct wrmsr_safe_regs_on_cpu_call_ctx call_ctx = {cpu, regs};
+	__maybe_unused const struct wrmsr_safe_regs_on_cpu_call_ctx *ctx = &call_ctx;
+
+	(void)__ext;
 
 	if (verbose_debug) {
 		printk("%s:%d, entered!\n", __func__, __LINE__);
 	}
 
 	{
-		glue_pack(pos, msg, ext, *cpu_ptr);
+		glue_pack(__pos, __msg, __ext, *cpu_ptr);
 	}
 
 	{
-		glue_pack(pos, msg, ext, *regs_ptr);
+		__maybe_unused const void* __adjusted = *regs_ptr;
+		glue_pack(__pos, __msg, __ext, __adjusted);
 		if (*regs_ptr) {
-			size_t i, len = 8;
+			size_t __i, __len = 8;
 			unsigned int const* array = *regs_ptr;
-			glue_pack(pos, msg, ext, len);
+			glue_pack(__pos, __msg, __ext, __len);
 			// Warning: see David if this breaks
 			glue_user_trace("Warning: see David if this breaks");
-			for (i = 0; i < len; ++i) {
-				unsigned int const* element = &array[i];
-				glue_pack(pos, msg, ext, *element);
+			for (__i = 0; __i < __len; ++__i) {
+				unsigned int const* element = &array[__i];
+				glue_pack(__pos, __msg, __ext, *element);
 			}
 
 		}
 
 	}
 
-	glue_call_server(pos, msg, RPC_ID_wrmsr_safe_regs_on_cpu);
+	glue_call_server(__pos, __msg, RPC_ID_wrmsr_safe_regs_on_cpu);
 
-	*pos = 0;
+	*__pos = 0;
 	{
 	}
 
 	{
 		if (*regs_ptr) {
-			int i;
+			int __i;
 			unsigned int* array = *regs_ptr;
-			size_t len = glue_unpack(pos, msg, ext, size_t);
+			size_t __len = glue_unpack(__pos, __msg, __ext, size_t);
 			// Warning: see David if this breaks
 			glue_user_trace("Warning: see David if this breaks");
-			for (i = 0; i < len; ++i) {
-				unsigned int* element = &array[i];
-				*element = glue_unpack(pos, msg, ext, unsigned int);
+			for (__i = 0; __i < __len; ++__i) {
+				unsigned int* element = &array[__i];
+				*element = glue_unpack(__pos, __msg, __ext, unsigned int);
 			}
 
 		}
@@ -585,7 +623,7 @@ int wrmsr_safe_regs_on_cpu(unsigned int cpu, unsigned int* regs)
 	}
 
 	{
-		*ret_ptr = glue_unpack(pos, msg, ext, int);
+		*ret_ptr = glue_unpack(__pos, __msg, __ext, int);
 	}
 
 	if (verbose_debug) {
@@ -596,60 +634,64 @@ int wrmsr_safe_regs_on_cpu(unsigned int cpu, unsigned int* regs)
 
 int rdmsr_safe_regs_on_cpu(unsigned int cpu, unsigned int* regs)
 {
-	struct fipc_message buffer = {0};
-	struct fipc_message *msg = &buffer;
-	struct ext_registers* ext = get_register_page(smp_processor_id());
+	struct fipc_message __buffer = {0};
+	struct fipc_message *__msg = &__buffer;
+	struct ext_registers* __ext = get_register_page(smp_processor_id());
 	size_t n_pos = 0;
-	size_t* pos = &n_pos;
+	size_t* __pos = &n_pos;
 
 	unsigned int* cpu_ptr = &cpu;
 	unsigned int** regs_ptr = &regs;
 	int ret = 0;
 	int* ret_ptr = &ret;
 	
-	(void)ext;
+	__maybe_unused const struct rdmsr_safe_regs_on_cpu_call_ctx call_ctx = {cpu, regs};
+	__maybe_unused const struct rdmsr_safe_regs_on_cpu_call_ctx *ctx = &call_ctx;
+
+	(void)__ext;
 
 	if (verbose_debug) {
 		printk("%s:%d, entered!\n", __func__, __LINE__);
 	}
 
 	{
-		glue_pack(pos, msg, ext, *cpu_ptr);
+		glue_pack(__pos, __msg, __ext, *cpu_ptr);
 	}
 
 	{
-		glue_pack(pos, msg, ext, *regs_ptr);
+		__maybe_unused const void* __adjusted = *regs_ptr;
+		glue_pack(__pos, __msg, __ext, __adjusted);
 		if (*regs_ptr) {
-			size_t i, len = 8;
+			size_t __i, __len = 8;
 			unsigned int const* array = *regs_ptr;
-			glue_pack(pos, msg, ext, len);
+			glue_pack(__pos, __msg, __ext, __len);
 			// Warning: see David if this breaks
 			glue_user_trace("Warning: see David if this breaks");
-			for (i = 0; i < len; ++i) {
-				unsigned int const* element = &array[i];
-				glue_pack(pos, msg, ext, *element);
+			for (__i = 0; __i < __len; ++__i) {
+				unsigned int const* element = &array[__i];
+				glue_pack(__pos, __msg, __ext, *element);
 			}
 
 		}
 
 	}
 
-	glue_call_server(pos, msg, RPC_ID_rdmsr_safe_regs_on_cpu);
+	glue_call_server(__pos, __msg, RPC_ID_rdmsr_safe_regs_on_cpu);
 
-	*pos = 0;
+	*__pos = 0;
 	{
 	}
 
 	{
 		if (*regs_ptr) {
-			int i;
+			int __i;
 			unsigned int* array = *regs_ptr;
-			size_t len = glue_unpack(pos, msg, ext, size_t);
+			size_t __len = glue_unpack(__pos, __msg, __ext, size_t);
 			// Warning: see David if this breaks
 			glue_user_trace("Warning: see David if this breaks");
-			for (i = 0; i < len; ++i) {
-				unsigned int* element = &array[i];
-				*element = glue_unpack(pos, msg, ext, unsigned int);
+			for (__i = 0; __i < __len; ++__i) {
+				unsigned int* element = &array[__i];
+				*element = glue_unpack(__pos, __msg, __ext, unsigned int);
 			}
 
 		}
@@ -657,7 +699,7 @@ int rdmsr_safe_regs_on_cpu(unsigned int cpu, unsigned int* regs)
 	}
 
 	{
-		*ret_ptr = glue_unpack(pos, msg, ext, int);
+		*ret_ptr = glue_unpack(__pos, __msg, __ext, int);
 	}
 
 	if (verbose_debug) {
@@ -668,11 +710,11 @@ int rdmsr_safe_regs_on_cpu(unsigned int cpu, unsigned int* regs)
 
 int wrmsr_safe_on_cpu(unsigned int cpu, unsigned int msr_no, unsigned int l, unsigned int h)
 {
-	struct fipc_message buffer = {0};
-	struct fipc_message *msg = &buffer;
-	struct ext_registers* ext = get_register_page(smp_processor_id());
+	struct fipc_message __buffer = {0};
+	struct fipc_message *__msg = &__buffer;
+	struct ext_registers* __ext = get_register_page(smp_processor_id());
 	size_t n_pos = 0;
-	size_t* pos = &n_pos;
+	size_t* __pos = &n_pos;
 
 	unsigned int* cpu_ptr = &cpu;
 	unsigned int* msr_no_ptr = &msr_no;
@@ -681,34 +723,34 @@ int wrmsr_safe_on_cpu(unsigned int cpu, unsigned int msr_no, unsigned int l, uns
 	int ret = 0;
 	int* ret_ptr = &ret;
 	
-	(void)ext;
+	__maybe_unused const struct wrmsr_safe_on_cpu_call_ctx call_ctx = {cpu, msr_no, l, h};
+	__maybe_unused const struct wrmsr_safe_on_cpu_call_ctx *ctx = &call_ctx;
+
+	(void)__ext;
 
 	if (verbose_debug) {
 		printk("%s:%d, entered!\n", __func__, __LINE__);
 	}
 
 	{
-		glue_pack(pos, msg, ext, *cpu_ptr);
+		glue_pack(__pos, __msg, __ext, *cpu_ptr);
 	}
 
 	{
-		glue_pack(pos, msg, ext, *msr_no_ptr);
+		glue_pack(__pos, __msg, __ext, *msr_no_ptr);
 	}
 
 	{
-		glue_pack(pos, msg, ext, *l_ptr);
+		glue_pack(__pos, __msg, __ext, *l_ptr);
 	}
 
 	{
-		glue_pack(pos, msg, ext, *h_ptr);
+		glue_pack(__pos, __msg, __ext, *h_ptr);
 	}
 
-	glue_call_server(pos, msg, RPC_ID_wrmsr_safe_on_cpu);
+	glue_call_server(__pos, __msg, RPC_ID_wrmsr_safe_on_cpu);
 
-	*pos = 0;
-	{
-	}
-
+	*__pos = 0;
 	{
 	}
 
@@ -719,7 +761,10 @@ int wrmsr_safe_on_cpu(unsigned int cpu, unsigned int msr_no, unsigned int l, uns
 	}
 
 	{
-		*ret_ptr = glue_unpack(pos, msg, ext, int);
+	}
+
+	{
+		*ret_ptr = glue_unpack(__pos, __msg, __ext, int);
 	}
 
 	if (verbose_debug) {
@@ -730,11 +775,11 @@ int wrmsr_safe_on_cpu(unsigned int cpu, unsigned int msr_no, unsigned int l, uns
 
 int rdmsr_safe_on_cpu(unsigned int cpu, unsigned int msr_no, unsigned int* l, unsigned int* h)
 {
-	struct fipc_message buffer = {0};
-	struct fipc_message *msg = &buffer;
-	struct ext_registers* ext = get_register_page(smp_processor_id());
+	struct fipc_message __buffer = {0};
+	struct fipc_message *__msg = &__buffer;
+	struct ext_registers* __ext = get_register_page(smp_processor_id());
 	size_t n_pos = 0;
-	size_t* pos = &n_pos;
+	size_t* __pos = &n_pos;
 
 	unsigned int* cpu_ptr = &cpu;
 	unsigned int* msr_no_ptr = &msr_no;
@@ -743,33 +788,38 @@ int rdmsr_safe_on_cpu(unsigned int cpu, unsigned int msr_no, unsigned int* l, un
 	int ret = 0;
 	int* ret_ptr = &ret;
 	
-	(void)ext;
+	__maybe_unused const struct rdmsr_safe_on_cpu_call_ctx call_ctx = {cpu, msr_no, l, h};
+	__maybe_unused const struct rdmsr_safe_on_cpu_call_ctx *ctx = &call_ctx;
+
+	(void)__ext;
 
 	if (verbose_debug) {
 		printk("%s:%d, entered!\n", __func__, __LINE__);
 	}
 
 	{
-		glue_pack(pos, msg, ext, *cpu_ptr);
+		glue_pack(__pos, __msg, __ext, *cpu_ptr);
 	}
 
 	{
-		glue_pack(pos, msg, ext, *msr_no_ptr);
+		glue_pack(__pos, __msg, __ext, *msr_no_ptr);
 	}
 
 	{
-		glue_pack(pos, msg, ext, *l_ptr);
+		__maybe_unused const void* __adjusted = *l_ptr;
+		glue_pack(__pos, __msg, __ext, __adjusted);
 		(void)l_ptr;
 	}
 
 	{
-		glue_pack(pos, msg, ext, *h_ptr);
+		__maybe_unused const void* __adjusted = *h_ptr;
+		glue_pack(__pos, __msg, __ext, __adjusted);
 		(void)h_ptr;
 	}
 
-	glue_call_server(pos, msg, RPC_ID_rdmsr_safe_on_cpu);
+	glue_call_server(__pos, __msg, RPC_ID_rdmsr_safe_on_cpu);
 
-	*pos = 0;
+	*__pos = 0;
 	{
 	}
 
@@ -778,20 +828,20 @@ int rdmsr_safe_on_cpu(unsigned int cpu, unsigned int msr_no, unsigned int* l, un
 
 	{
 		if (*l_ptr) {
-			**l_ptr = glue_unpack(pos, msg, ext, unsigned int);
+			**l_ptr = glue_unpack(__pos, __msg, __ext, unsigned int);
 		}
 
 	}
 
 	{
 		if (*h_ptr) {
-			**h_ptr = glue_unpack(pos, msg, ext, unsigned int);
+			**h_ptr = glue_unpack(__pos, __msg, __ext, unsigned int);
 		}
 
 	}
 
 	{
-		*ret_ptr = glue_unpack(pos, msg, ext, int);
+		*ret_ptr = glue_unpack(__pos, __msg, __ext, int);
 	}
 
 	if (verbose_debug) {
@@ -802,34 +852,37 @@ int rdmsr_safe_on_cpu(unsigned int cpu, unsigned int msr_no, unsigned int* l, un
 
 bool capable(int cap)
 {
-	struct fipc_message buffer = {0};
-	struct fipc_message *msg = &buffer;
-	struct ext_registers* ext = get_register_page(smp_processor_id());
+	struct fipc_message __buffer = {0};
+	struct fipc_message *__msg = &__buffer;
+	struct ext_registers* __ext = get_register_page(smp_processor_id());
 	size_t n_pos = 0;
-	size_t* pos = &n_pos;
+	size_t* __pos = &n_pos;
 
 	int* cap_ptr = &cap;
 	bool ret = 0;
 	bool* ret_ptr = &ret;
 	
-	(void)ext;
+	__maybe_unused const struct capable_call_ctx call_ctx = {cap};
+	__maybe_unused const struct capable_call_ctx *ctx = &call_ctx;
+
+	(void)__ext;
 
 	if (verbose_debug) {
 		printk("%s:%d, entered!\n", __func__, __LINE__);
 	}
 
 	{
-		glue_pack(pos, msg, ext, *cap_ptr);
+		glue_pack(__pos, __msg, __ext, *cap_ptr);
 	}
 
-	glue_call_server(pos, msg, RPC_ID_capable);
+	glue_call_server(__pos, __msg, RPC_ID_capable);
 
-	*pos = 0;
+	*__pos = 0;
 	{
 	}
 
 	{
-		*ret_ptr = glue_unpack(pos, msg, ext, bool);
+		*ret_ptr = glue_unpack(__pos, __msg, __ext, bool);
 	}
 
 	if (verbose_debug) {
@@ -840,11 +893,11 @@ bool capable(int cap)
 
 long long no_seek_end_llseek(struct file* file, long long offset, int whence)
 {
-	struct fipc_message buffer = {0};
-	struct fipc_message *msg = &buffer;
-	struct ext_registers* ext = get_register_page(smp_processor_id());
+	struct fipc_message __buffer = {0};
+	struct fipc_message *__msg = &__buffer;
+	struct ext_registers* __ext = get_register_page(smp_processor_id());
 	size_t n_pos = 0;
-	size_t* pos = &n_pos;
+	size_t* __pos = &n_pos;
 
 	struct file** file_ptr = &file;
 	long long* offset_ptr = &offset;
@@ -852,34 +905,38 @@ long long no_seek_end_llseek(struct file* file, long long offset, int whence)
 	long long ret = 0;
 	long long* ret_ptr = &ret;
 	
-	(void)ext;
+	__maybe_unused const struct no_seek_end_llseek_call_ctx call_ctx = {file, offset, whence};
+	__maybe_unused const struct no_seek_end_llseek_call_ctx *ctx = &call_ctx;
+
+	(void)__ext;
 
 	if (verbose_debug) {
 		printk("%s:%d, entered!\n", __func__, __LINE__);
 	}
 
 	{
-		glue_pack_shadow(pos, msg, ext, *file_ptr);
+		__maybe_unused const void* __adjusted = *file_ptr;
+		glue_pack_shadow(__pos, __msg, __ext, __adjusted);
 		if (*file_ptr) {
-			caller_marshal_kernel__no_seek_end_llseek__file__in(pos, msg, ext, *file_ptr);
+			caller_marshal_kernel__no_seek_end_llseek__file__in(__pos, __msg, __ext, ctx, *file_ptr);
 		}
 
 	}
 
 	{
-		glue_pack(pos, msg, ext, *offset_ptr);
+		glue_pack(__pos, __msg, __ext, *offset_ptr);
 	}
 
 	{
-		glue_pack(pos, msg, ext, *whence_ptr);
+		glue_pack(__pos, __msg, __ext, *whence_ptr);
 	}
 
-	glue_call_server(pos, msg, RPC_ID_no_seek_end_llseek);
+	glue_call_server(__pos, __msg, RPC_ID_no_seek_end_llseek);
 
-	*pos = 0;
+	*__pos = 0;
 	{
 		if (*file_ptr) {
-			caller_unmarshal_kernel__no_seek_end_llseek__file__in(pos, msg, ext, *file_ptr);
+			caller_unmarshal_kernel__no_seek_end_llseek__file__in(__pos, __msg, __ext, ctx, *file_ptr);
 		}
 
 	}
@@ -891,7 +948,7 @@ long long no_seek_end_llseek(struct file* file, long long offset, int whence)
 	}
 
 	{
-		*ret_ptr = glue_unpack(pos, msg, ext, long long);
+		*ret_ptr = glue_unpack(__pos, __msg, __ext, long long);
 	}
 
 	if (verbose_debug) {
@@ -900,55 +957,60 @@ long long no_seek_end_llseek(struct file* file, long long offset, int whence)
 	return ret;
 }
 
-struct class* __class_create(struct module* owner, char const* name, struct lock_class_key *key)
+struct class* __class_create(struct module* owner, char const* name)
 {
-	struct fipc_message buffer = {0};
-	struct fipc_message *msg = &buffer;
-	struct ext_registers* ext = get_register_page(smp_processor_id());
+	struct fipc_message __buffer = {0};
+	struct fipc_message *__msg = &__buffer;
+	struct ext_registers* __ext = get_register_page(smp_processor_id());
 	size_t n_pos = 0;
-	size_t* pos = &n_pos;
+	size_t* __pos = &n_pos;
 
 	struct module** owner_ptr = &owner;
 	char const** name_ptr = &name;
 	struct class* ret = 0;
 	struct class** ret_ptr = &ret;
 	
-	(void)ext;
+	__maybe_unused const struct __class_create_call_ctx call_ctx = {owner, name};
+	__maybe_unused const struct __class_create_call_ctx *ctx = &call_ctx;
+
+	(void)__ext;
 
 	if (verbose_debug) {
 		printk("%s:%d, entered!\n", __func__, __LINE__);
 	}
 
 	{
-		glue_pack(pos, msg, ext, *owner_ptr);
+		__maybe_unused const void* __adjusted = *owner_ptr;
+		glue_pack(__pos, __msg, __ext, __adjusted);
 		if (*owner_ptr) {
-			caller_marshal_kernel____class_create__owner__in(pos, msg, ext, *owner_ptr);
+			caller_marshal_kernel____class_create__owner__in(__pos, __msg, __ext, ctx, *owner_ptr);
 		}
 
 	}
 
 	{
-		glue_pack(pos, msg, ext, *name_ptr);
+		__maybe_unused const void* __adjusted = *name_ptr;
+		glue_pack(__pos, __msg, __ext, __adjusted);
 		if (*name_ptr) {
-			size_t i, len;
+			size_t __i, __len;
 			char const* array = *name_ptr;
-			for (len = 0; array[len]; ++len);
-			glue_pack(pos, msg, ext, len + 1);
-			for (i = 0; i < len; ++i) {
-				char const* element = &array[i];
-				glue_pack(pos, msg, ext, *element);
+			for (__len = 0; array[__len]; ++__len);
+			glue_pack(__pos, __msg, __ext, __len + 1);
+			for (__i = 0; __i < __len; ++__i) {
+				char const* element = &array[__i];
+				glue_pack(__pos, __msg, __ext, *element);
 			}
 
 		}
 
 	}
 
-	glue_call_server(pos, msg, RPC_ID___class_create);
+	glue_call_server(__pos, __msg, RPC_ID___class_create);
 
-	*pos = 0;
+	*__pos = 0;
 	{
 		if (*owner_ptr) {
-			caller_unmarshal_kernel____class_create__owner__in(pos, msg, ext, *owner_ptr);
+			caller_unmarshal_kernel____class_create__owner__in(__pos, __msg, __ext, ctx, *owner_ptr);
 		}
 
 	}
@@ -958,9 +1020,10 @@ struct class* __class_create(struct module* owner, char const* name, struct lock
 	}
 
 	{
-		*ret_ptr = glue_unpack_new_shadow(pos, msg, ext, struct class*, sizeof(struct class));
+		size_t __size = sizeof(struct class);
+		*ret_ptr = glue_unpack_new_shadow(__pos, __msg, __ext, struct class*, (__size), (DEFAULT_GFP_FLAGS));
 		if (*ret_ptr) {
-			caller_unmarshal_kernel____class_create__ret_class__out(pos, msg, ext, *ret_ptr);
+			caller_unmarshal_kernel____class_create__ret_class__out(__pos, __msg, __ext, ctx, *ret_ptr);
 		}
 
 	}
@@ -971,46 +1034,49 @@ struct class* __class_create(struct module* owner, char const* name, struct lock
 	return ret;
 }
 
-void devnode_callee(struct fipc_message* msg, struct ext_registers* ext)
+void devnode_callee(struct fipc_message* __msg, struct ext_registers* __ext)
 {
 	size_t n_pos = 0;
-	size_t* pos = &n_pos;
+	size_t* __pos = &n_pos;
 
-	fptr_devnode function_ptr = glue_unpack(pos, msg, ext, fptr_devnode);
+	fptr_devnode function_ptr = glue_unpack(__pos, __msg, __ext, fptr_devnode);
 	struct device* dev = 0;
 	unsigned short* mode = 0;
 	struct device** dev_ptr = &dev;
 	unsigned short** mode_ptr = &mode;
-	char const* ret = 0;
-	char const** ret_ptr = &ret;
+	char* ret = 0;
+	char** ret_ptr = &ret;
 	
+	__maybe_unused struct devnode_call_ctx call_ctx = {dev, mode};
+	__maybe_unused struct devnode_call_ctx *ctx = &call_ctx;
+
 	if (verbose_debug) {
 		printk("%s:%d, entered!\n", __func__, __LINE__);
 	}
 
 	{
-		*dev_ptr = glue_unpack_new_shadow(pos, msg, ext, struct device*, sizeof(struct device));
+		size_t __size = sizeof(struct device);
+		*dev_ptr = glue_unpack_new_shadow(__pos, __msg, __ext, struct device*, (__size), (DEFAULT_GFP_FLAGS));
 		if (*dev_ptr) {
-			callee_unmarshal_kernel__devnode__device__in(pos, msg, ext, *dev_ptr);
+			callee_unmarshal_kernel__devnode__device__in(__pos, __msg, __ext, ctx, *dev_ptr);
 		}
 
 	}
 
-	if (0)
 	{
-		*mode_ptr = glue_unpack(pos, msg, ext, unsigned short*);
+		*mode_ptr = glue_unpack(__pos, __msg, __ext, unsigned short*);
 		if (*mode_ptr) {
-			**mode_ptr = glue_unpack(pos, msg, ext, unsigned short);
+			**mode_ptr = glue_unpack(__pos, __msg, __ext, unsigned short);
 		}
 
 	}
 
 	ret = function_ptr(dev, mode);
 
-	*pos = 0;
+	*__pos = 0;
 	{
 		if (*dev_ptr) {
-			callee_marshal_kernel__devnode__device__in(pos, msg, ext, *dev_ptr);
+			callee_marshal_kernel__devnode__device__in(__pos, __msg, __ext, ctx, *dev_ptr);
 		}
 
 	}
@@ -1020,22 +1086,23 @@ void devnode_callee(struct fipc_message* msg, struct ext_registers* ext)
 	}
 
 	{
-		glue_pack(pos, msg, ext, *ret_ptr);
+		__maybe_unused const void* __adjusted = *ret_ptr;
+		glue_pack(__pos, __msg, __ext, __adjusted);
 		if (*ret_ptr) {
-			size_t i, len;
+			size_t __i, __len;
 			char const* array = *ret_ptr;
-			for (len = 0; array[len]; ++len);
-			glue_pack(pos, msg, ext, len + 1);
-			for (i = 0; i < len; ++i) {
-				char const* element = &array[i];
-				glue_pack(pos, msg, ext, *element);
+			for (__len = 0; array[__len]; ++__len);
+			glue_pack(__pos, __msg, __ext, __len + 1);
+			for (__i = 0; __i < __len; ++__i) {
+				char const* element = &array[__i];
+				glue_pack(__pos, __msg, __ext, *element);
 			}
 
 		}
 
 	}
 
-	msg->regs[0] = *pos;
+	__msg->regs[0] = *__pos;
 	if (verbose_debug) {
 		printk("%s:%d, returned!\n", __func__, __LINE__);
 	}
@@ -1043,65 +1110,62 @@ void devnode_callee(struct fipc_message* msg, struct ext_registers* ext)
 
 struct device* __device_create(struct class* class, struct device* parent, unsigned int devt, void* drvdata, char const* fmt, unsigned int cpu)
 {
-	struct fipc_message buffer = {0};
-	struct fipc_message *msg = &buffer;
-	struct ext_registers* ext = get_register_page(smp_processor_id());
+	struct fipc_message __buffer = {0};
+	struct fipc_message *__msg = &__buffer;
+	struct ext_registers* __ext = get_register_page(smp_processor_id());
 	size_t n_pos = 0;
-	size_t* pos = &n_pos;
+	size_t* __pos = &n_pos;
 
 	struct class** class_ptr = &class;
 	struct device** parent_ptr = &parent;
 	unsigned int* devt_ptr = &devt;
-	void** drvdata_ptr = &drvdata;
 	char const** fmt_ptr = &fmt;
 	unsigned int* cpu_ptr = &cpu;
 	struct device* ret = 0;
 	struct device** ret_ptr = &ret;
 	
-	(void)ext;
+	__maybe_unused const struct __device_create_call_ctx call_ctx = {class, parent, devt, drvdata, fmt, cpu};
+	__maybe_unused const struct __device_create_call_ctx *ctx = &call_ctx;
+
+	(void)__ext;
 
 	if (verbose_debug) {
 		printk("%s:%d, entered!\n", __func__, __LINE__);
 	}
 
 	{
-		glue_pack_shadow(pos, msg, ext, *class_ptr);
+		__maybe_unused const void* __adjusted = *class_ptr;
+		glue_pack_shadow(__pos, __msg, __ext, __adjusted);
 		if (*class_ptr) {
-			caller_marshal_kernel____device_create__class__in(pos, msg, ext, *class_ptr);
+			caller_marshal_kernel____device_create__class__in(__pos, __msg, __ext, ctx, *class_ptr);
 		}
 
 	}
 
 	{
-		glue_pack(pos, msg, ext, *parent_ptr);
+		__maybe_unused const void* __adjusted = *parent_ptr;
+		glue_pack(__pos, __msg, __ext, __adjusted);
 		if (*parent_ptr) {
-			caller_marshal_kernel____device_create__parent__in(pos, msg, ext, *parent_ptr);
+			caller_marshal_kernel____device_create__parent__in(__pos, __msg, __ext, ctx, *parent_ptr);
 		}
 
 	}
 
 	{
-		glue_pack(pos, msg, ext, *devt_ptr);
-	}
-
-	if (0)
-	{
-		glue_pack_shadow(pos, msg, ext, *drvdata_ptr);
-		if (*drvdata_ptr) {
-		}
-
+		glue_pack(__pos, __msg, __ext, *devt_ptr);
 	}
 
 	{
-		glue_pack(pos, msg, ext, *fmt_ptr);
+		__maybe_unused const void* __adjusted = *fmt_ptr;
+		glue_pack(__pos, __msg, __ext, __adjusted);
 		if (*fmt_ptr) {
-			size_t i, len;
+			size_t __i, __len;
 			char const* array = *fmt_ptr;
-			for (len = 0; array[len]; ++len);
-			glue_pack(pos, msg, ext, len + 1);
-			for (i = 0; i < len; ++i) {
-				char const* element = &array[i];
-				glue_pack(pos, msg, ext, *element);
+			for (__len = 0; array[__len]; ++__len);
+			glue_pack(__pos, __msg, __ext, __len + 1);
+			for (__i = 0; __i < __len; ++__i) {
+				char const* element = &array[__i];
+				glue_pack(__pos, __msg, __ext, *element);
 			}
 
 		}
@@ -1109,32 +1173,27 @@ struct device* __device_create(struct class* class, struct device* parent, unsig
 	}
 
 	{
-		glue_pack(pos, msg, ext, *cpu_ptr);
+		glue_pack(__pos, __msg, __ext, *cpu_ptr);
 	}
 
-	glue_dump_msg(msg);
-	glue_call_server(pos, msg, RPC_ID___device_create);
+	glue_call_server(__pos, __msg, RPC_ID___device_create);
 
-	*pos = 0;
+	*__pos = 0;
 	{
 		if (*class_ptr) {
-			caller_unmarshal_kernel____device_create__class__in(pos, msg, ext, *class_ptr);
+			caller_unmarshal_kernel____device_create__class__in(__pos, __msg, __ext, ctx, *class_ptr);
 		}
 
 	}
 
 	{
 		if (*parent_ptr) {
-			caller_unmarshal_kernel____device_create__parent__in(pos, msg, ext, *parent_ptr);
+			caller_unmarshal_kernel____device_create__parent__in(__pos, __msg, __ext, ctx, *parent_ptr);
 		}
 
 	}
 
 	{
-	}
-
-	{
-		(void)drvdata_ptr;
 	}
 
 	{
@@ -1145,9 +1204,9 @@ struct device* __device_create(struct class* class, struct device* parent, unsig
 	}
 
 	{
-		*ret_ptr = glue_unpack_shadow(pos, msg, ext, struct device*);
+		*ret_ptr = glue_unpack_shadow(__pos, __msg, __ext, struct device*);
 		if (*ret_ptr) {
-			caller_unmarshal_kernel____device_create__ret_device__out(pos, msg, ext, *ret_ptr);
+			caller_unmarshal_kernel____device_create__ret_device__out(__pos, __msg, __ext, ctx, *ret_ptr);
 		}
 
 	}
@@ -1160,39 +1219,43 @@ struct device* __device_create(struct class* class, struct device* parent, unsig
 
 void device_destroy(struct class* class, unsigned int devt)
 {
-	struct fipc_message buffer = {0};
-	struct fipc_message *msg = &buffer;
-	struct ext_registers* ext = get_register_page(smp_processor_id());
+	struct fipc_message __buffer = {0};
+	struct fipc_message *__msg = &__buffer;
+	struct ext_registers* __ext = get_register_page(smp_processor_id());
 	size_t n_pos = 0;
-	size_t* pos = &n_pos;
+	size_t* __pos = &n_pos;
 
 	struct class** class_ptr = &class;
 	unsigned int* devt_ptr = &devt;
 	
-	(void)ext;
+	__maybe_unused const struct device_destroy_call_ctx call_ctx = {class, devt};
+	__maybe_unused const struct device_destroy_call_ctx *ctx = &call_ctx;
+
+	(void)__ext;
 
 	if (verbose_debug) {
 		printk("%s:%d, entered!\n", __func__, __LINE__);
 	}
 
 	{
-		glue_pack_shadow(pos, msg, ext, *class_ptr);
+		__maybe_unused const void* __adjusted = *class_ptr;
+		glue_pack_shadow(__pos, __msg, __ext, __adjusted);
 		if (*class_ptr) {
-			caller_marshal_kernel__device_destroy__class__in(pos, msg, ext, *class_ptr);
+			caller_marshal_kernel__device_destroy__class__in(__pos, __msg, __ext, ctx, *class_ptr);
 		}
 
 	}
 
 	{
-		glue_pack(pos, msg, ext, *devt_ptr);
+		glue_pack(__pos, __msg, __ext, *devt_ptr);
 	}
 
-	glue_call_server(pos, msg, RPC_ID_device_destroy);
+	glue_call_server(__pos, __msg, RPC_ID_device_destroy);
 
-	*pos = 0;
+	*__pos = 0;
 	{
 		if (*class_ptr) {
-			caller_unmarshal_kernel__device_destroy__class__in(pos, msg, ext, *class_ptr);
+			caller_unmarshal_kernel__device_destroy__class__in(__pos, __msg, __ext, ctx, *class_ptr);
 		}
 
 	}
@@ -1207,34 +1270,38 @@ void device_destroy(struct class* class, unsigned int devt)
 
 void class_destroy(struct class* cls)
 {
-	struct fipc_message buffer = {0};
-	struct fipc_message *msg = &buffer;
-	struct ext_registers* ext = get_register_page(smp_processor_id());
+	struct fipc_message __buffer = {0};
+	struct fipc_message *__msg = &__buffer;
+	struct ext_registers* __ext = get_register_page(smp_processor_id());
 	size_t n_pos = 0;
-	size_t* pos = &n_pos;
+	size_t* __pos = &n_pos;
 
 	struct class** cls_ptr = &cls;
 	
-	(void)ext;
+	__maybe_unused const struct class_destroy_call_ctx call_ctx = {cls};
+	__maybe_unused const struct class_destroy_call_ctx *ctx = &call_ctx;
+
+	(void)__ext;
 
 	if (verbose_debug) {
 		printk("%s:%d, entered!\n", __func__, __LINE__);
 	}
 
 	{
-		glue_pack_shadow(pos, msg, ext, *cls_ptr);
+		__maybe_unused const void* __adjusted = *cls_ptr;
+		glue_pack_shadow(__pos, __msg, __ext, __adjusted);
 		if (*cls_ptr) {
-			caller_marshal_kernel__class_destroy__cls__in(pos, msg, ext, *cls_ptr);
+			caller_marshal_kernel__class_destroy__cls__in(__pos, __msg, __ext, ctx, *cls_ptr);
 		}
 
 	}
 
-	glue_call_server(pos, msg, RPC_ID_class_destroy);
+	glue_call_server(__pos, __msg, RPC_ID_class_destroy);
 
-	*pos = 0;
+	*__pos = 0;
 	{
 		if (*cls_ptr) {
-			caller_unmarshal_kernel__class_destroy__cls__in(pos, msg, ext, *cls_ptr);
+			caller_unmarshal_kernel__class_destroy__cls__in(__pos, __msg, __ext, ctx, *cls_ptr);
 		}
 
 	}
@@ -1244,12 +1311,13 @@ void class_destroy(struct class* cls)
 	}
 }
 
-int try_dispatch(enum RPC_ID id, struct fipc_message* msg, struct ext_registers* ext)
+int try_dispatch(enum RPC_ID id, struct fipc_message* __msg, struct ext_registers* __ext)
 {
 	switch(id) {
 	case MODULE_INIT:
 		glue_user_trace("MODULE_INIT");
 		__module_lcd_init();
+		shared_mem_init();
 		break;
 
 	case MODULE_EXIT:
@@ -1259,27 +1327,27 @@ int try_dispatch(enum RPC_ID id, struct fipc_message* msg, struct ext_registers*
 
 	case RPC_ID_read:
 		glue_user_trace("read\n");
-		read_callee(msg, ext);
+		read_callee(__msg, __ext);
 		break;
 
 	case RPC_ID_write:
 		glue_user_trace("write\n");
-		write_callee(msg, ext);
+		write_callee(__msg, __ext);
 		break;
 
 	case RPC_ID_compat_ioctl:
 		glue_user_trace("compat_ioctl\n");
-		compat_ioctl_callee(msg, ext);
+		compat_ioctl_callee(__msg, __ext);
 		break;
 
 	case RPC_ID_open:
 		glue_user_trace("open\n");
-		open_callee(msg, ext);
+		open_callee(__msg, __ext);
 		break;
 
 	case RPC_ID_devnode:
 		glue_user_trace("devnode\n");
-		devnode_callee(msg, ext);
+		devnode_callee(__msg, __ext);
 		break;
 
 	default:

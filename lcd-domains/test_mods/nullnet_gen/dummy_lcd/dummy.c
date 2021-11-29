@@ -138,20 +138,6 @@ static int dummy_change_carrier(struct net_device *dev, bool new_carrier)
 	return 0;
 }
 
-#ifdef LCD_ISOLATE
-static const struct net_device_ops_container dummy_netdev_ops_container = {
-	.net_device_ops = {
-		.ndo_init		= dummy_dev_init,
-		.ndo_uninit		= dummy_dev_uninit,
-		.ndo_start_xmit		= dummy_xmit,
-		.ndo_validate_addr	= eth_validate_addr,
-		.ndo_set_rx_mode	= set_multicast_list,
-		.ndo_set_mac_address	= eth_mac_addr,
-		.ndo_get_stats64	= dummy_get_stats64,
-		.ndo_change_carrier	= dummy_change_carrier,
-	}
-};
-#else
 static const struct net_device_ops dummy_netdev_ops = {
 	.ndo_init		= dummy_dev_init,
 	.ndo_uninit		= dummy_dev_uninit,
@@ -162,7 +148,7 @@ static const struct net_device_ops dummy_netdev_ops = {
 	.ndo_get_stats64	= dummy_get_stats64,
 	.ndo_change_carrier	= dummy_change_carrier,
 };
-#endif
+
 static void dummy_get_drvinfo(struct net_device *dev,
 			      struct ethtool_drvinfo *info)
 {
@@ -182,7 +168,7 @@ static void dummy_setup(struct net_device *dev)
 	ether_setup(dev);
 
 	/* Initialize the device structure. */
-	dev->netdev_ops = &dummy_netdev_ops_container.net_device_ops;
+	dev->netdev_ops = &dummy_netdev_ops;
 	dev->ethtool_ops = &dummy_ethtool_ops;
 	dev->destructor = free_netdev;
 
@@ -219,18 +205,10 @@ static int dummy_validate(struct nlattr *tb[], struct nlattr *data[])
 	return 0;
 }
 
-#ifdef LCD_ISOLATE
-static struct rtnl_link_ops_container dummy_link_ops_container __read_mostly = {
-	.rtnl_link_ops = {
-#else
 static struct rtnl_link_ops dummy_link_ops __read_mostly = {
-#endif
 	.kind		= DRV_NAME,
 	.setup		= dummy_setup,
 	.validate	= dummy_validate,
-#ifdef LCD_ISOLATE
-	}
-#endif
 };
 
 #ifndef LCD_ISOLATE
@@ -258,7 +236,7 @@ static int __init dummy_init_one(void)
 	if (!dev_dummy)
 		return -ENOMEM;
 
-	dev_dummy->rtnl_link_ops = &dummy_link_ops_container.rtnl_link_ops;
+	dev_dummy->rtnl_link_ops = &dummy_link_ops;
 	printk("Dummy allocated");
 	err = register_netdevice(dev_dummy);
 	printk("Register net dev returned %d", err);
@@ -283,7 +261,7 @@ int dummy_init_module(void)
 	int err = 0;
 
 	rtnl_lock();
-	err = __rtnl_link_register(&dummy_link_ops_container.rtnl_link_ops);
+	err = __rtnl_link_register(&dummy_link_ops);
 	if (err < 0)
 		goto out;
 
@@ -293,7 +271,7 @@ int dummy_init_module(void)
 	}
 
 	if (err < 0)
-		__rtnl_link_unregister(&dummy_link_ops_container.rtnl_link_ops);
+		__rtnl_link_unregister(&dummy_link_ops);
 
 out:
 	rtnl_unlock();
@@ -306,7 +284,7 @@ static void __exit dummy_cleanup_module(void)
 void dummy_cleanup_module(void)
 #endif
 {
-	rtnl_link_unregister(&dummy_link_ops_container.rtnl_link_ops);
+	rtnl_link_unregister(&dummy_link_ops);
 }
 
 #ifndef LCD_ISOLATE

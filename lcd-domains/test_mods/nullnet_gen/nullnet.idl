@@ -21,12 +21,8 @@ module kernel {
             unsigned long long [out] features;
             unsigned long long [out] hw_features;
             unsigned long long [out] hw_enc_features;
-            const projection _global_netdev_ops [bind(callee)] *netdev_ops;
-            const projection _global_ethtool_ops [bind(callee)] *ethtool_ops;
             unsigned int  flags;
             unsigned int  priv_flags;
-            unsigned char  addr_assign_type;
-            const projection _global_rtnl_link_ops [bind(callee)] *rtnl_link_ops;
         }
     }
 
@@ -46,29 +42,12 @@ module kernel {
         unsigned int rxqs
     ) {
         projection < struct net_device > ret_net_device {
-            unsigned long long  features;
-            unsigned long long  hw_features;
-            unsigned long long  hw_enc_features;
-            const projection _global_netdev_ops [in]* [out] netdev_ops;
-            const projection _global_ethtool_ops [in] * [out] ethtool_ops;
-            unsigned int  flags;
             unsigned int [out] priv_flags;
-            unsigned char  addr_assign_type;
-            const projection _global_rtnl_link_ops *rtnl_link_ops;
         }
     }
 
     rpc void free_netdev( projection dev  *dev ) {
         projection < struct net_device > dev {
-            unsigned long long  features;
-            unsigned long long  hw_features;
-            unsigned long long  hw_enc_features;
-            const projection _global_netdev_ops *netdev_ops;
-            const projection _global_ethtool_ops *ethtool_ops;
-            unsigned int  flags;
-            unsigned int  priv_flags;
-            unsigned char  addr_assign_type;
-            const projection _global_rtnl_link_ops *rtnl_link_ops;
         }
     }
 
@@ -86,7 +65,7 @@ module kernel {
 
     rpc int __rtnl_link_register(projection _global_rtnl_link_ops [alloc(callee)]* _global_rtnl_link_ops) {
         projection < struct rtnl_link_ops > _global_rtnl_link_ops {
-            const string [alloc(callee)]* kind;
+            string [alloc(callee)]* kind;
             rpc_ptr setup setup;
             rpc_ptr validate validate;
         }
@@ -99,7 +78,7 @@ module kernel {
     rpc void ether_setup( projection dev  *dev ) {
         projection < struct net_device > dev {
             unsigned int [out] flags;
-            unsigned int [out] priv_flags;
+            unsigned int [in, out] priv_flags;
         }
     }
 
@@ -109,7 +88,7 @@ module kernel {
     }
 
     // FIXME: p is actually a void*
-    rpc int eth_mac_addr( projection dev  *dev, projection p  *p ) {
+    rpc int eth_mac_addr( projection dev  *dev, projection p *p ) {
         projection < struct net_device > dev {
             unsigned int  priv_flags;
         }
@@ -118,23 +97,15 @@ module kernel {
         }
     }
 
-    /*
-        Current issue with these is that we assume "direct" RPCs are defined on the kernel side
-        These exist in the driver, however
-        rpc unsigned int dummy_init_module() {}
-        rpc void dummy_cleanup_module() {}
-    */
-    
     rpc_ptr void setup( projection dev [alloc(callee)]*dev ) {
         projection < struct net_device > dev {
-            unsigned long long [out] features;
-            unsigned long long [out] hw_features;
-            unsigned long long [out] hw_enc_features;
+            unsigned long long [in, out] features;
+            unsigned long long [in, out] hw_features;
+            unsigned long long [in, out] hw_enc_features;
             const projection _global_netdev_ops[alloc(caller)] * [out] netdev_ops;
             const projection _global_ethtool_ops[alloc(caller)] * [out] ethtool_ops;
-            unsigned int [out] flags;
-            unsigned int [out] priv_flags;
-            unsigned char  addr_assign_type;
+            unsigned int [in, out] flags;
+            unsigned int [in, out] priv_flags;
         }
     }
 
@@ -174,6 +145,16 @@ module kernel {
         }
     }
 
+    rpc_ptr int ndo_validate_addr(projection net_device [bind(callee)] *dev) {
+        projection < struct net_device > dev {
+        }
+    }
+
+	rpc_ptr int ndo_set_mac_address(projection net_device [bind(callee)] *dev, void *addr) {
+        projection < struct net_device > dev {
+        }
+    }
+
     rpc_ptr projection ret_rtnl_link_stats64* ndo_get_stats64( projection dev [bind(callee)]  *dev, projection stats  [alloc(callee)] *stats ) {
         projection < struct net_device > dev {
         }
@@ -205,7 +186,9 @@ module kernel {
         rpc_ptr ndo_init ndo_init;
         rpc_ptr ndo_uninit ndo_uninit;
         rpc_ptr ndo_start_xmit ndo_start_xmit;
+        rpc_ptr ndo_validate_addr ndo_validate_addr;
         rpc_ptr ndo_set_rx_mode ndo_set_rx_mode;
+        rpc_ptr ndo_set_mac_address ndo_set_mac_address;
         rpc_ptr ndo_get_stats64 ndo_get_stats64;
         rpc_ptr ndo_change_carrier ndo_change_carrier;
     }

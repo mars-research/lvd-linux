@@ -5,6 +5,8 @@
 #include <libfipc.h>
 #include <liblcd/boot_info.h>
 #include <asm/cacheflush.h>
+#include <lcd_domains/microkernel.h>
+#include <liblcd/liblcd.h>
 
 #include "glue_user.h"
 
@@ -22,6 +24,11 @@
 		printk("%s:%d, unpack new shadow for type %s | size %llu\n", __func__, __LINE__, __stringify(type), (uint64_t) size); \
 	(type)glue_unpack_new_shadow_impl(glue_unpack(pos, msg, ext, void*), size); })
 
+#define glue_unpack_bind_or_new_shadow(pos, msg, ext, type, size) ({ \
+	if (verbose_debug) \
+		printk("%s:%d, unpack or bind new shadow for type %s | size %llu\n", __func__, __LINE__, __stringify(type), (uint64_t) size); \
+	(type)glue_unpack_bind_or_new_shadow_impl(glue_unpack(pos, msg, ext, void*), size); })
+
 #ifndef LCD_ISOLATE
 #define glue_unpack_rpc_ptr(pos, msg, ext, name) \
 	glue_peek(pos, msg, ext) ? (fptr_##name)glue_unpack_rpc_ptr_impl(glue_unpack(pos, msg, ext, void*), LCD_DUP_TRAMPOLINE(trmp_##name), LCD_TRAMPOLINE_SIZE(trmp_##name)) : NULL
@@ -34,6 +41,7 @@
 #define glue_call_server(pos, msg, rpc_id) \
 	msg->regs[0] = *pos; *pos = 0; glue_user_call_server(msg, rpc_id);
 
+#define glue_remove_shadow(shadow) glue_user_remove_shadow(shadow)
 #define glue_call_client(pos, msg, rpc_id) \
 	msg->regs[0] = *pos; *pos = 0; glue_user_call_client(msg, rpc_id);
 
@@ -47,6 +55,7 @@ void* glue_user_alloc(size_t size);
 void glue_user_free(void* ptr);
 void glue_user_call_server(struct fipc_message* msg, size_t rpc_id);
 void glue_user_call_client(struct fipc_message* msg, size_t rpc_id);
+void glue_user_remove_shadow(void* shadow);
 
 static inline void* glue_unpack_rpc_ptr_impl(void* target, struct lcd_trampoline_handle* handle, size_t size)
 {
@@ -96,11 +105,26 @@ glue_peek_impl(size_t* pos, const struct fipc_message* msg, const struct ext_reg
 
 static inline void* glue_unpack_new_shadow_impl(const void* ptr, size_t size)
 {
-	void* shadow = 0;	if (!ptr)
+	void* shadow = 0;
+	if (!ptr)
 		return NULL;
 
 	shadow = glue_user_alloc(size);
 	glue_user_add_shadow(ptr, shadow);
+	return shadow;
+}
+
+static inline void* glue_unpack_bind_or_new_shadow_impl(const void* ptr, size_t size)
+{
+	void* shadow = 0;
+	if (!ptr)
+		return NULL;
+
+	shadow = glue_user_map_to_shadow(ptr);
+	if (!shadow) {
+		shadow = glue_user_alloc(size);
+		glue_user_add_shadow(ptr, shadow);
+	}
 	return shadow;
 }
 

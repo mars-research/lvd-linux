@@ -9,19 +9,13 @@ module kernel {
 	}
 	rpc_ptr int  net_device_ops_ndo_validate_addr( projection dev*  dev ) {
 		projection < struct net_device > dev {
-			projection __global_netdev_ops* netdev_ops;
-			projection __global_ethtool_ops* ethtool_ops;
 			unsigned char*  dev_addr;
-			projection __global_rtnl_link_ops* rtnl_link_ops;
 		}
 	}
 	rpc_ptr int  net_device_ops_ndo_set_mac_address( projection dev*  dev, void*  p ) {
 		projection < struct net_device > dev {
-			projection __global_netdev_ops* netdev_ops;
-			projection __global_ethtool_ops* ethtool_ops;
 			unsigned int  priv_flags;
 			unsigned char*  dev_addr;
-			projection __global_rtnl_link_ops* rtnl_link_ops;
 		}
 	}
 	rpc_ptr void  rtnl_link_ops_setup( projection dev*  dev ) {
@@ -38,25 +32,16 @@ module kernel {
 	}
 	rpc_ptr void  ethtool_ops_get_drvinfo( projection dev*  dev, projection info*  info ) {
 		projection < struct net_device > dev {
-			projection __global_netdev_ops* netdev_ops;
-			projection __global_ethtool_ops* ethtool_ops;
-			projection __global_rtnl_link_ops* rtnl_link_ops;
 		}
 		projection < struct ethtool_drvinfo > info {
 		}
 	}
 	rpc_ptr int  net_device_ops_ndo_init( projection dev*  dev ) {
 		projection < struct net_device > dev {
-			projection __global_netdev_ops* netdev_ops;
-			projection __global_ethtool_ops* ethtool_ops;
-			projection __global_rtnl_link_ops* rtnl_link_ops;
 		}
 	}
 	rpc_ptr void  net_device_ops_ndo_uninit( projection dev*  dev ) {
 		projection < struct net_device > dev {
-			projection __global_netdev_ops* netdev_ops;
-			projection __global_ethtool_ops* ethtool_ops;
-			projection __global_rtnl_link_ops* rtnl_link_ops;
 		}
 	}
 	rpc_ptr int  net_device_ops_ndo_start_xmit( projection skb*  skb, projection dev*  dev ) {
@@ -64,16 +49,10 @@ module kernel {
 			unsigned int  len;
 		}
 		projection < struct net_device > dev {
-			projection __global_netdev_ops* netdev_ops;
-			projection __global_ethtool_ops* ethtool_ops;
-			projection __global_rtnl_link_ops* rtnl_link_ops;
 		}
 	}
 	rpc_ptr void  net_device_ops_ndo_set_rx_mode( projection dev*  dev ) {
 		projection < struct net_device > dev {
-			projection __global_netdev_ops* netdev_ops;
-			projection __global_ethtool_ops* ethtool_ops;
-			projection __global_rtnl_link_ops* rtnl_link_ops;
 		}
 	}
 	rpc_ptr projection ret_rtnl_link_stats64*  net_device_ops_ndo_get_stats64( projection dev*  dev, projection stats*  stats ) {
@@ -82,9 +61,6 @@ module kernel {
 			long long unsigned int [in, out] tx_bytes;
 		}
 		projection < struct net_device > dev {
-			projection __global_netdev_ops* netdev_ops;
-			projection __global_ethtool_ops* ethtool_ops;
-			projection __global_rtnl_link_ops* rtnl_link_ops;
 		}
 		projection < struct rtnl_link_stats64 > stats {
 			long long unsigned int [in, out] tx_packets;
@@ -93,9 +69,6 @@ module kernel {
 	}
 	rpc_ptr int  net_device_ops_ndo_change_carrier( projection dev*  dev, bool  new_carrier ) {
 		projection < struct net_device > dev {
-			projection __global_netdev_ops* netdev_ops;
-			projection __global_ethtool_ops* ethtool_ops;
-			projection __global_rtnl_link_ops* rtnl_link_ops;
 		}
 	}
 	rpc_ptr int  rtnl_link_ops_validate( projection tb**  tb, projection data** [unused] data ) {
@@ -119,16 +92,10 @@ module kernel {
 	}
 	rpc void  netif_carrier_on( projection dev*  dev ) {
 		projection < struct net_device > dev {
-			projection __global_netdev_ops* netdev_ops;
-			projection __global_ethtool_ops* ethtool_ops;
-			projection __global_rtnl_link_ops* rtnl_link_ops;
 		}
 	}
 	rpc void  netif_carrier_off( projection dev*  dev ) {
 		projection < struct net_device > dev {
-			projection __global_netdev_ops* netdev_ops;
-			projection __global_ethtool_ops* ethtool_ops;
-			projection __global_rtnl_link_ops* rtnl_link_ops;
 		}
 	}
 	rpc int  register_netdevice( projection dev* [in, out] dev ) {
@@ -154,9 +121,6 @@ module kernel {
 	}
 	rpc void  free_netdev( projection dev*  dev ) {
 		projection < struct net_device > dev {
-			projection __global_netdev_ops* netdev_ops;
-			projection __global_ethtool_ops* ethtool_ops;
-			projection __global_rtnl_link_ops* rtnl_link_ops;
 		}
 	}
 	rpc void  rtnl_link_unregister( projection _global_rtnl_link_ops* [in, out] _global_rtnl_link_ops ) {
@@ -179,7 +143,9 @@ module kernel {
 		rpc_ptr net_device_ops_ndo_validate_addr ndo_validate_addr;
 	}
 	projection < struct rtnl_link_ops > _global_rtnl_link_ops {
-		char* [in, out] kind;
+		// false-positive/annotation : 1
+		// missing-alloc-annotation : 1
+		string [alloc(callee)] * kind;
 		rpc_ptr rtnl_link_ops_setup setup;
 		rpc_ptr rtnl_link_ops_validate validate;
 	}

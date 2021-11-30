@@ -135,8 +135,13 @@ rpc_export int  xhci_gen_setup( projection hcd [alloc<{{sizeof(hcd) + sizeof(str
 	}
 }
 */
+rpc void [ioremap(caller)]  *ioremap_nocache( u64  phys_addr, unsigned long size ) {
+
+}
+
 rpc_export int  xhci_gen_setup_with_xhci( projection hcd [alloc<{{sizeof(*hcd) + sizeof(struct xhci_hcd)}}>(callee)] *hcd,
-					projection xhci_hcd [within<{{hcd}}, {{sizeof(struct xhci_hcd) + sizeof(struct usb_hcd)}}>] *xhci) {
+					projection xhci_hcd [within<{{hcd}}, {{sizeof(struct xhci_hcd) + sizeof(struct usb_hcd)}}>] *xhci,
+					rpc_ptr get_quirks get_quirks) {
        projection < struct usb_bus> usb_bus {
 		projection usb_bus_controller [alloc(callee)] * controller;
 		unsigned int [in, out] is_b_host : 1;
@@ -145,9 +150,11 @@ rpc_export int  xhci_gen_setup_with_xhci( projection hcd [alloc<{{sizeof(*hcd) +
         projection < struct usb_hcd > hcd {
                 projection usb_bus self;
                 int [out] speed;
-                projection hc_driver [bind(caller)] * driver;
+                projection hc_driver [bind(callee)] * driver;
                 unsigned int [out] rh_registered : 1;
-		void [ioremap(callee)] *regs;
+		unsigned long rsrc_start;
+		unsigned long rsrc_len;
+		//void *regs;
         }
 
 	projection < struct hc_driver > hc_driver {
@@ -159,7 +166,6 @@ rpc_export int  xhci_gen_setup_with_xhci( projection hcd [alloc<{{sizeof(*hcd) +
 		unsigned short hci_version;
 		unsigned int quirks;
 		unsigned int xhc_state;
-
 	}
 
         projection < struct device > usb_bus_controller {

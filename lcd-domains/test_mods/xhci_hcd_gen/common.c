@@ -1191,7 +1191,8 @@ void caller_marshal_kernel__xhci_gen_setup_with_xhci__hcd__in(
 {
 	struct usb_bus const* self_ptr = &ptr->self;
 	struct hc_driver* const* driver_ptr = &ptr->driver;
-	void* const* regs_ptr = &ptr->regs;
+	unsigned long const* rsrc_start_ptr = &ptr->rsrc_start;
+	unsigned long const *rsrc_len_ptr = &ptr->rsrc_len;
 
 	{
 		caller_marshal_kernel__xhci_gen_setup_with_xhci__usb_bus__in(__pos, __msg, __ext, ctx, self_ptr);
@@ -1199,7 +1200,7 @@ void caller_marshal_kernel__xhci_gen_setup_with_xhci__hcd__in(
 
 	{
 		__maybe_unused const void* __adjusted = *driver_ptr;
-		glue_pack_shadow(__pos, __msg, __ext, __adjusted);
+		glue_pack(__pos, __msg, __ext, __adjusted);
 		if (*driver_ptr) {
 			caller_marshal_kernel__xhci_gen_setup_with_xhci__hc_driver__in(__pos, __msg, __ext, ctx, *driver_ptr);
 		}
@@ -1207,11 +1208,11 @@ void caller_marshal_kernel__xhci_gen_setup_with_xhci__hcd__in(
 	}
 
 	{
-		__maybe_unused const void* __adjusted = *regs_ptr;
-		glue_pack(__pos, __msg, __ext, __adjusted);
-		if (*regs_ptr) {
-		}
+		glue_pack(__pos, __msg, __ext, *rsrc_start_ptr);
+	}
 
+	{
+		glue_pack(__pos, __msg, __ext, *rsrc_len_ptr);
 	}
 
 }
@@ -1225,14 +1226,15 @@ void callee_unmarshal_kernel__xhci_gen_setup_with_xhci__hcd__in(
 {
 	struct usb_bus* self_ptr = &ptr->self;
 	struct hc_driver** driver_ptr = &ptr->driver;
-	void** regs_ptr = &ptr->regs;
+	unsigned long* rsrc_start_ptr = &ptr->rsrc_start;
+	unsigned long* rsrc_len_ptr = &ptr->rsrc_len;
 
 	{
 		callee_unmarshal_kernel__xhci_gen_setup_with_xhci__usb_bus__in(__pos, __msg, __ext, ctx, self_ptr);
 	}
 
 	{
-		*driver_ptr = glue_unpack(__pos, __msg, __ext, struct hc_driver*);
+		*driver_ptr = glue_unpack_shadow(__pos, __msg, __ext, struct hc_driver*);
 		if (*driver_ptr) {
 			callee_unmarshal_kernel__xhci_gen_setup_with_xhci__hc_driver__in(__pos, __msg, __ext, ctx, *driver_ptr);
 		}
@@ -1240,10 +1242,11 @@ void callee_unmarshal_kernel__xhci_gen_setup_with_xhci__hcd__in(
 	}
 
 	{
-		*regs_ptr = glue_unpack(__pos, __msg, __ext, void*);
-		if (*regs_ptr) {
-		}
+		*rsrc_start_ptr = glue_unpack(__pos, __msg, __ext, unsigned long);
+	}
 
+	{
+		*rsrc_len_ptr = glue_unpack(__pos, __msg, __ext, unsigned long);
 	}
 
 	{
@@ -1262,7 +1265,6 @@ void callee_marshal_kernel__xhci_gen_setup_with_xhci__hcd__in(
 	struct hc_driver* const* driver_ptr = &ptr->driver;
 	unsigned int __rh_registered = ptr->rh_registered;
 	unsigned int const* __rh_registered_ptr = &__rh_registered;
-	void* const* regs_ptr = &ptr->regs;
 
 	{
 		callee_marshal_kernel__xhci_gen_setup_with_xhci__usb_bus__in(__pos, __msg, __ext, ctx, self_ptr);
@@ -1283,10 +1285,6 @@ void callee_marshal_kernel__xhci_gen_setup_with_xhci__hcd__in(
 		glue_pack(__pos, __msg, __ext, *__rh_registered_ptr);
 	}
 
-	{
-		(void)regs_ptr;
-	}
-
 }
 
 void caller_unmarshal_kernel__xhci_gen_setup_with_xhci__hcd__in(
@@ -1301,7 +1299,6 @@ void caller_unmarshal_kernel__xhci_gen_setup_with_xhci__hcd__in(
 	struct hc_driver** driver_ptr = &ptr->driver;
 	unsigned int __rh_registered = ptr->rh_registered;
 	unsigned int* __rh_registered_ptr = &__rh_registered;
-	void** regs_ptr = &ptr->regs;
 
 	{
 		caller_unmarshal_kernel__xhci_gen_setup_with_xhci__usb_bus__in(__pos, __msg, __ext, ctx, self_ptr);
@@ -1320,10 +1317,6 @@ void caller_unmarshal_kernel__xhci_gen_setup_with_xhci__hcd__in(
 
 	{
 		*__rh_registered_ptr = glue_unpack(__pos, __msg, __ext, unsigned int);
-	}
-
-	{
-		(void)regs_ptr;
 	}
 
 	{

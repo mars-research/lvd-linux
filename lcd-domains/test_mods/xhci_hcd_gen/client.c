@@ -1027,6 +1027,73 @@ void get_quirks_callee(struct fipc_message* __msg, struct ext_registers* __ext)
 	}
 }
 
+void* ioremap_nocache(unsigned long long phys_addr, unsigned long size)
+{
+	struct fipc_message __buffer = {0};
+	struct fipc_message *__msg = &__buffer;
+	struct ext_registers* __ext = get_register_page(smp_processor_id());
+	size_t n_pos = 0;
+	size_t* __pos = &n_pos;
+
+	unsigned long long* phys_addr_ptr = &phys_addr;
+	unsigned long* size_ptr = &size;
+	cptr_t ioremap_cptr;
+	gpa_t ioremap_gpa;
+	uint64_t ioremap_len;
+	void* ret = 0;
+	void** ret_ptr = &ret;
+	
+	__maybe_unused const struct ioremap_nocache_call_ctx call_ctx = {phys_addr, size};
+	__maybe_unused const struct ioremap_nocache_call_ctx *ctx = &call_ctx;
+
+	(void)__ext;
+
+	if (verbose_debug) {
+		printk("%s:%d, entered!\n", __func__, __LINE__);
+		printk("got phys_addr 0x%llx, len 0x%lx", phys_addr, size);
+	}
+
+	{
+		lcd_cptr_alloc(&ioremap_cptr);
+		glue_pack(__pos, __msg, __ext, cptr_val(ioremap_cptr));
+	}
+
+	{
+		glue_pack(__pos, __msg, __ext, *phys_addr_ptr);
+	}
+
+	{
+		glue_pack(__pos, __msg, __ext, *size_ptr);
+	}
+
+	glue_call_server(__pos, __msg, RPC_ID_ioremap_nocache);
+
+	*__pos = 0;
+	{
+		int __ret;
+		ioremap_len = glue_unpack(__pos, __msg, __ext, uint64_t);
+		__ret = lcd_ioremap_phys(ioremap_cptr, ioremap_len, &ioremap_gpa);
+		if (__ret) {
+			LIBLCD_ERR("failed to remap bar region");
+		}
+		*ret_ptr = lcd_ioremap(gpa_val(ioremap_gpa), ioremap_len);
+		if (!*ret_ptr) {
+			LIBLCD_ERR("failed to ioremap virt");
+		}
+	}
+
+	{
+	}
+
+	{
+	}
+
+	if (verbose_debug) {
+		printk("%s:%d, returned!\n", __func__, __LINE__);
+	}
+	return ret;
+}
+
 void xhci_gen_setup_with_xhci_callee(struct fipc_message* __msg, struct ext_registers* __ext)
 {
 	size_t n_pos = 0;
@@ -1034,12 +1101,14 @@ void xhci_gen_setup_with_xhci_callee(struct fipc_message* __msg, struct ext_regi
 
 	struct usb_hcd* hcd = 0;
 	struct xhci_hcd* xhci = 0;
+	fptr_get_quirks get_quirks = 0;
 	struct usb_hcd** hcd_ptr = &hcd;
 	struct xhci_hcd** xhci_ptr = &xhci;
+	fptr_get_quirks* get_quirks_ptr = &get_quirks;
 	int ret = 0;
 	int* ret_ptr = &ret;
 	
-	__maybe_unused struct xhci_gen_setup_with_xhci_call_ctx call_ctx = {hcd, xhci};
+	__maybe_unused struct xhci_gen_setup_with_xhci_call_ctx call_ctx = {hcd, xhci, get_quirks};
 	__maybe_unused struct xhci_gen_setup_with_xhci_call_ctx *ctx = &call_ctx;
 
 	if (verbose_debug) {
@@ -1058,9 +1127,19 @@ void xhci_gen_setup_with_xhci_callee(struct fipc_message* __msg, struct ext_regi
 	{
 		size_t __offset = glue_unpack(__pos, __msg, __ext, size_t);
 		*xhci_ptr = (struct xhci_hcd*)(__offset + hcd);
+
+
+		if (*xhci_ptr) {
+			callee_unmarshal_kernel__xhci_gen_setup_with_xhci__xhci_hcd__in(__pos, __msg, __ext, ctx, *xhci_ptr);
+		}
 	}
 
-	ret = xhci_gen_setup_with_xhci(hcd, xhci);
+  	if (0)
+	{
+		*get_quirks_ptr = glue_unpack_rpc_ptr(__pos, __msg, __ext, get_quirks);
+	}
+
+	ret = xhci_gen_setup_with_xhci(hcd, xhci, get_quirks);
 
 	*__pos = 0;
 	{
@@ -1075,6 +1154,9 @@ void xhci_gen_setup_with_xhci_callee(struct fipc_message* __msg, struct ext_regi
 			callee_marshal_kernel__xhci_gen_setup_with_xhci__xhci_hcd__in(__pos, __msg, __ext, ctx, *xhci_ptr);
 		}
 
+	}
+
+	{
 	}
 
 	{

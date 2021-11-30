@@ -1016,7 +1016,71 @@ void LCD_TRAMPOLINE_LINKAGE(trmp_get_quirks) trmp_get_quirks(struct device* dev,
 	return impl(target, dev, xhci_hcd);
 }
 
-int xhci_gen_setup_with_xhci(struct usb_hcd* hcd, struct xhci_hcd* xhci)
+void ioremap_nocache_callee(struct fipc_message* __msg, struct ext_registers* __ext)
+{
+	size_t n_pos = 0;
+	size_t* __pos = &n_pos;
+
+	unsigned long long phys_addr = 0;
+	unsigned long size = 0;
+	unsigned long long* phys_addr_ptr = &phys_addr;
+	unsigned long* size_ptr = &size;
+	cptr_t resource_cptr;
+	__maybe_unused unsigned int resource_len;
+	cptr_t lcd_resource_cptr;
+	void* ret = 0;
+	void** ret_ptr = &ret;
+	
+	__maybe_unused struct ioremap_nocache_call_ctx call_ctx = {phys_addr, size};
+	__maybe_unused struct ioremap_nocache_call_ctx *ctx = &call_ctx;
+
+	if (verbose_debug) {
+		printk("%s:%d, entered!\n", __func__, __LINE__);
+	}
+
+	{
+		lcd_resource_cptr.cptr = glue_unpack(__pos, __msg, __ext, uint64_t);
+	}
+
+	{
+		*phys_addr_ptr = glue_unpack(__pos, __msg, __ext, unsigned long long);
+	}
+
+	{
+		*size_ptr = glue_unpack(__pos, __msg, __ext, unsigned long);
+	}
+
+	if (verbose_debug) {
+		printk("got phys_addr 0x%llx, len 0x%lx", phys_addr, size);
+	}
+
+	ret = (void *) phys_addr;
+
+	*__pos = 0;
+
+	{
+		dump_stack();
+		if (!current->cptr_cache) {
+			printk("cptr_cache corrupt? %p\n", current->cptr_cache);
+		}
+		lcd_volunteer_dev_mem(__gpa((uint64_t)*ret_ptr), get_order(size), &resource_cptr);
+		copy_msg_cap_vmfunc(current->lcd, current->vmfunc_lcd, resource_cptr, lcd_resource_cptr);
+		glue_pack(__pos, __msg, __ext, size);
+	}
+
+	{
+	}
+
+	{
+	}
+
+	__msg->regs[0] = *__pos;
+	if (verbose_debug) {
+		printk("%s:%d, returned!\n", __func__, __LINE__);
+	}
+}
+
+int xhci_gen_setup_with_xhci(struct usb_hcd* hcd, struct xhci_hcd* xhci, fptr_get_quirks get_quirks)
 {
 	struct fipc_message __buffer = {0};
 	struct fipc_message *__msg = &__buffer;
@@ -1026,10 +1090,11 @@ int xhci_gen_setup_with_xhci(struct usb_hcd* hcd, struct xhci_hcd* xhci)
 
 	struct usb_hcd** hcd_ptr = &hcd;
 	struct xhci_hcd** xhci_ptr = &xhci;
+	fptr_get_quirks* get_quirks_ptr = &get_quirks;
 	int ret = 0;
 	int* ret_ptr = &ret;
 	
-	__maybe_unused const struct xhci_gen_setup_with_xhci_call_ctx call_ctx = {hcd, xhci};
+	__maybe_unused const struct xhci_gen_setup_with_xhci_call_ctx call_ctx = {hcd, xhci, get_quirks};
 	__maybe_unused const struct xhci_gen_setup_with_xhci_call_ctx *ctx = &call_ctx;
 
 	(void)__ext;
@@ -1042,6 +1107,9 @@ int xhci_gen_setup_with_xhci(struct usb_hcd* hcd, struct xhci_hcd* xhci)
 		__maybe_unused const void* __adjusted = *hcd_ptr;
 		glue_pack(__pos, __msg, __ext, __adjusted);
 		if (*hcd_ptr) {
+			printk("%s:%d rsrc_start %llx rsrc_len %llx\n",
+				__func__, __LINE__,
+				hcd->rsrc_start, hcd->rsrc_len);
 			caller_marshal_kernel__xhci_gen_setup_with_xhci__hcd__in(__pos, __msg, __ext, ctx, *hcd_ptr);
 		}
 
@@ -1054,6 +1122,15 @@ int xhci_gen_setup_with_xhci(struct usb_hcd* hcd, struct xhci_hcd* xhci)
 			glue_user_panic("Bounds check failed!");
 
 		glue_pack(__pos, __msg, __ext, __offset);
+
+		if (*xhci_ptr) {
+			caller_marshal_kernel__xhci_gen_setup_with_xhci__xhci_hcd__in(__pos, __msg, __ext, ctx, *xhci_ptr);
+		}
+	}
+
+  	if (0)
+	{
+		glue_pack(__pos, __msg, __ext, *get_quirks_ptr);
 	}
 
 	glue_call_client(__pos, __msg, RPC_ID_xhci_gen_setup_with_xhci);
@@ -1071,6 +1148,9 @@ int xhci_gen_setup_with_xhci(struct usb_hcd* hcd, struct xhci_hcd* xhci)
 			caller_unmarshal_kernel__xhci_gen_setup_with_xhci__xhci_hcd__in(__pos, __msg, __ext, ctx, *xhci_ptr);
 		}
 
+	}
+
+	{
 	}
 
 	{
@@ -4168,6 +4248,11 @@ int try_dispatch(enum RPC_ID id, struct fipc_message* __msg, struct ext_register
 	case RPC_ID_wait_for_completion_timeout:
 		glue_user_trace("wait_for_completion_timeout\n");
 		wait_for_completion_timeout_callee(__msg, __ext);
+		break;
+
+	case RPC_ID_ioremap_nocache:
+		glue_user_trace("ioremap_nocache\n");
+		ioremap_nocache_callee(__msg, __ext);
 		break;
 
 	case RPC_ID_usb_disable_xhci_ports:

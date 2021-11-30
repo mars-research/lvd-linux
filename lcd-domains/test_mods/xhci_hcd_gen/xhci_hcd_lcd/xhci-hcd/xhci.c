@@ -4858,7 +4858,7 @@ int xhci_get_frame(struct usb_hcd *hcd)
 #ifdef CONFIG_IDL_ALIASING
 int xhci_gen_setup(struct usb_hcd *hcd, xhci_get_quirks_t get_quirks)
 #else
-int xhci_gen_setup_with_xhci(struct usb_hcd *hcd, struct xhci_hcd *xhci)
+int xhci_gen_setup_with_xhci(struct usb_hcd *hcd, struct xhci_hcd *xhci, xhci_get_quirks_t get_quirks)
 #endif
 {
 #ifdef CONFIG_IDL_ALIASING
@@ -4904,6 +4904,8 @@ int xhci_gen_setup_with_xhci(struct usb_hcd *hcd, struct xhci_hcd *xhci)
 		 */
 		return 0;
 	}
+
+	hcd->regs = ioremap_nocache(hcd->rsrc_start, hcd->rsrc_len);
 
 	mutex_init(&xhci->mutex);
 	xhci->cap_regs = hcd->regs;

@@ -168,6 +168,7 @@ enum RPC_ID {
 	RPC_ID_wait_for_completion,
 	RPC_ID_wait_for_completion_timeout,
 	RPC_ID_get_quirks,
+	RPC_ID_ioremap_nocache,
 	RPC_ID_xhci_gen_setup_with_xhci,
 	RPC_ID_xhci_init_driver,
 	RPC_ID_xhci_run,
@@ -497,9 +498,15 @@ struct get_quirks_call_ctx {
 	struct xhci_hcd* xhci_hcd;
 };
 
+struct ioremap_nocache_call_ctx {
+	unsigned long long phys_addr;
+	unsigned long size;
+};
+
 struct xhci_gen_setup_with_xhci_call_ctx {
 	struct usb_hcd* hcd;
 	struct xhci_hcd* xhci;
+	fptr_get_quirks get_quirks;
 };
 
 struct xhci_init_driver_call_ctx {

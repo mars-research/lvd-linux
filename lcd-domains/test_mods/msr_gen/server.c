@@ -1010,7 +1010,7 @@ void __class_create_callee(struct fipc_message* __msg, struct ext_registers* __e
 
 	}
 
-	ret = __class_create(owner, name);
+	ret = class_create(THIS_MODULE, name);
 
 	*__pos = 0;
 	{
@@ -1196,7 +1196,7 @@ void __device_create_callee(struct fipc_message* __msg, struct ext_registers* __
 		*cpu_ptr = glue_unpack(__pos, __msg, __ext, unsigned int);
 	}
 
-	ret = __device_create(class, parent, devt, drvdata, fmt, cpu);
+	ret = device_create(class, parent, devt, drvdata, fmt, cpu);
 
 	*__pos = 0;
 	{

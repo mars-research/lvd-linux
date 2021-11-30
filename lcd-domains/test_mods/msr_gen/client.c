@@ -957,7 +957,7 @@ long long no_seek_end_llseek(struct file* file, long long offset, int whence)
 	return ret;
 }
 
-struct class* __class_create(struct module* owner, char const* name)
+struct class* __class_create(struct module* owner, char const* name, struct lock_class_key *key)
 {
 	struct fipc_message __buffer = {0};
 	struct fipc_message *__msg = &__buffer;

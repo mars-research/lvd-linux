@@ -10,6 +10,8 @@
 #include <liblcd/liblcd.h>
 #include <lcd_domains/microkernel.h>
 
+extern struct task_struct *klcd_thread;
+
 /* RESOURCE TREES -------------------------------------------------- */
 
 /* 
@@ -177,7 +179,7 @@ static void mo_remove_from_trees(struct task_struct *t,
 int _lcd_alloc_pages_exact_node(int nid, unsigned int flags, 
 				unsigned int order, cptr_t *slot_out)
 {
-	struct lcd *lcd = current->lcd;
+	struct lcd *lcd = klcd_thread->lcd;
 	cptr_t slot;
 	int ret;
 	/*
@@ -209,7 +211,7 @@ fail1:
 int _lcd_alloc_pages(unsigned int flags, unsigned int order,
 		cptr_t *slot_out)
 {
-	struct lcd *lcd = current->lcd;
+	struct lcd *lcd = klcd_thread->lcd;
 	cptr_t slot;
 	int ret;
 	/*
@@ -240,7 +242,7 @@ fail1:
 
 int _lcd_vmalloc(unsigned long nr_pages, cptr_t *slot_out)
 {
-	struct lcd *lcd = current->lcd;
+	struct lcd *lcd = klcd_thread->lcd;
 	cptr_t slot;
 	int ret;
 	/*
@@ -294,7 +296,7 @@ static int do_map(struct lcd *lcd, struct lcd_memory_object *mo,
 	 * same memory object. This is OK for now (address -> cptr 
 	 * translation just needs some cptr, size, offset, etc.).
 	 */
-	ret = mo_insert_in_trees(current, mo, mo_cptr);
+	ret = mo_insert_in_trees(klcd_thread, mo, mo_cptr);
 	if (ret) {
 		LIBLCD_ERR("insert into resource tree failed");
 		goto fail2;
@@ -325,12 +327,12 @@ static void do_phys_unmap(struct lcd *lcd, struct lcd_memory_object *mo,
 	/*
 	 * Remove from resource trees
 	 */
-	mo_remove_from_trees(current, mo, cap_cnode_cptr(mo_cnode));
+	mo_remove_from_trees(klcd_thread, mo, cap_cnode_cptr(mo_cnode));
 	/*
 	 * "Unmap" from physical address space (this is a no-op for
 	 * non-isolated code right now)
 	 */
-	__lcd_do_unmap_memory_object(current->lcd, mo,
+	__lcd_do_unmap_memory_object(klcd_thread->lcd, mo,
 				cap_cnode_metadata(mo_cnode));
 }
 
@@ -344,7 +346,7 @@ void _lcd_munmap(cptr_t mo_cptr, gpa_t base)
 	 *
 	 * Get and lock the memory object
 	 */
-	ret = __lcd_get_memory_object(current->lcd, mo_cptr, &cnode, &mo);
+	ret = __lcd_get_memory_object(klcd_thread->lcd, mo_cptr, &cnode, &mo);
 	if (ret) {
 		LIBLCD_ERR("error looking up memory object");
 		goto fail1;
@@ -352,11 +354,11 @@ void _lcd_munmap(cptr_t mo_cptr, gpa_t base)
 	/*
 	 * Do the unmap
 	 */
-	do_phys_unmap(current->lcd, mo, cnode);
+	do_phys_unmap(klcd_thread->lcd, mo, cnode);
 	/*
 	 * Release locks
 	 */
-	__lcd_put_memory_object(current->lcd, cnode, mo);
+	__lcd_put_memory_object(klcd_thread->lcd, cnode, mo);
 
 fail1:
 	return;
@@ -367,7 +369,7 @@ fail1:
 struct page *lcd_alloc_pages_exact_node(int nid, unsigned int flags, 
 					unsigned int order)
 {
-	struct lcd *lcd = current->lcd;
+	struct lcd *lcd = klcd_thread->lcd;
 	int ret;
 	cptr_t slot;
 	struct lcd_memory_object *mo;
@@ -416,7 +418,7 @@ fail1:
 
 struct page *lcd_alloc_pages(unsigned int flags, unsigned int order)
 {
-	struct lcd *lcd = current->lcd;
+	struct lcd *lcd = klcd_thread->lcd;
 	int ret;
 	cptr_t slot;
 	struct lcd_memory_object *mo;
@@ -513,7 +515,7 @@ int lcd_create_mo_metadata(void *base, unsigned long size, enum lcd_microkernel_
 	int ret;
 	cptr_t slot;
 	struct lcd_memory_object *mo;
-	struct lcd *lcd = current->lcd;
+	struct lcd *lcd = klcd_thread->lcd;
 
 	/*
 	 * Convert to number of pages, rounding up
@@ -548,7 +550,7 @@ int lcd_create_mo_metadata(void *base, unsigned long size, enum lcd_microkernel_
 	 * same memory object. This is OK for now (address -> cptr
 	 * translation just needs some cptr, size, offset, etc.).
 	 */
-	ret = mo_insert_in_trees(current, mo, slot);
+	ret = mo_insert_in_trees(klcd_thread, mo, slot);
 	if (ret) {
 		LIBLCD_ERR("insert into resource tree failed");
 		goto fail3;
@@ -564,7 +566,7 @@ fail1:
 
 void* lcd_vmalloc(unsigned long sz)
 {
-	struct lcd *lcd = current->lcd;
+	struct lcd *lcd = klcd_thread->lcd;
 	unsigned long nr_pages;
 	int ret;
 	cptr_t slot;
@@ -660,7 +662,7 @@ int lcd_map_phys(cptr_t pages, unsigned int order, gpa_t *base_out)
 	 * Look up memory object so we can get struct page pointer,
 	 * and then translate to physical address
 	 */
-	ret = __lcd_get_memory_object(current->lcd, pages, &cnode, &mo);
+	ret = __lcd_get_memory_object(klcd_thread->lcd, pages, &cnode, &mo);
 	if (ret) {
 		LIBLCD_ERR("internal error: mem lookup failed");
 		goto fail1;
@@ -676,7 +678,7 @@ int lcd_map_phys(cptr_t pages, unsigned int order, gpa_t *base_out)
 	/*
 	 * "Map" the pages (adds pages to proper resource tree)
 	 */
-	ret = do_map(current->lcd, mo, cnode, pages);
+	ret = do_map(klcd_thread->lcd, mo, cnode, pages);
 	if (ret) {
 		LIBLCD_ERR("error mapping pages in resource tree");
 		goto fail3;
@@ -687,13 +689,13 @@ int lcd_map_phys(cptr_t pages, unsigned int order, gpa_t *base_out)
 	/*
 	 * Release memory object
 	 */
-	__lcd_put_memory_object(current->lcd, cnode, mo);
+	__lcd_put_memory_object(klcd_thread->lcd, cnode, mo);
 	
 	return 0;
 
 fail3:
 fail2:
-	__lcd_put_memory_object(current->lcd, cnode, mo);
+	__lcd_put_memory_object(klcd_thread->lcd, cnode, mo);
 fail1:
 	return ret;
 }
@@ -708,7 +710,7 @@ int lcd_map_virt(cptr_t pages, unsigned int order, gva_t *gva_out)
 	 *
 	 * Look up memory object so we can get virtual address.
 	 */
-	ret = __lcd_get_memory_object(current->lcd, pages, &cnode, &mo);
+	ret = __lcd_get_memory_object(klcd_thread->lcd, pages, &cnode, &mo);
 	if (ret) {
 		LIBLCD_ERR("internal error: mem lookup failed");
 		goto fail1;
@@ -723,7 +725,7 @@ int lcd_map_virt(cptr_t pages, unsigned int order, gva_t *gva_out)
 	/*
 	 * "Map" the memory (adds pages to proper resource tree)
 	 */
-	ret = do_map(current->lcd, mo, cnode, pages);
+	ret = do_map(klcd_thread->lcd, mo, cnode, pages);
 	if (ret) {
 		LIBLCD_ERR("error mapping pages in resource tree");
 		goto fail3;
@@ -735,13 +737,13 @@ int lcd_map_virt(cptr_t pages, unsigned int order, gva_t *gva_out)
 	/*
 	 * Release memory object
 	 */
-	__lcd_put_memory_object(current->lcd, cnode, mo);
+	__lcd_put_memory_object(klcd_thread->lcd, cnode, mo);
 	
 	return 0;
 
 fail3:
 fail2:
-	__lcd_put_memory_object(current->lcd, cnode, mo);
+	__lcd_put_memory_object(klcd_thread->lcd, cnode, mo);
 fail1:
 	return ret;
 }
@@ -829,6 +831,7 @@ static int volunteer_mem_obj(struct task_struct *t,
 		LIBLCD_ERR("cptr alloc failed");
 		goto fail2;
 	}
+	printk("%s, cptr_alloc allocated %lx\n", __func__, cptr_val(slot));
 	ret = __lcd_insert_memory_object(t->lcd, slot, mem_obj,
 					nr_pages, sub_type, &mo);
 	if (ret) {
@@ -867,7 +870,7 @@ static void unvolunteer_mem_obj(cptr_t mo_cptr)
 int lcd_volunteer_pages(struct page *base, unsigned int order,
 			cptr_t *slot_out)
 {
-	return volunteer_mem_obj(current, base,
+	return volunteer_mem_obj(klcd_thread, base,
 				page_to_pfn(base), (1UL << order),
 				LCD_MICROKERNEL_TYPE_ID_VOLUNTEERED_PAGE,
 				slot_out);
@@ -883,7 +886,7 @@ void lcd_unvolunteer_pages(cptr_t pages)
 int lcd_volunteer_dev_mem(gpa_t base, unsigned int order,
 			cptr_t *slot_out)
 {
-	return volunteer_mem_obj(current, (void *)gpa_val(base),
+	return volunteer_mem_obj(klcd_thread, (void *)gpa_val(base),
 				gpa_val(base), (1UL << order),
 				LCD_MICROKERNEL_TYPE_ID_VOLUNTEERED_DEV_MEM,
 				slot_out);
@@ -899,7 +902,7 @@ void lcd_unvolunteer_dev_mem(cptr_t devmem)
 int lcd_volunteer_vmalloc_mem(gva_t base, unsigned long nr_pages,
 			cptr_t *slot_out)
 {
-	return volunteer_mem_obj(current, (void *)gva_val(base),
+	return volunteer_mem_obj(klcd_thread, (void *)gva_val(base),
 				gva_val(base), nr_pages,
 				LCD_MICROKERNEL_TYPE_ID_VOLUNTEERED_VMALLOC_MEM,
 				slot_out);
@@ -920,7 +923,7 @@ int lcd_phys_to_resource_node(gpa_t paddr, struct lcd_resource_node **n)
 	 * (For vmalloc mem, should use lcd_virt_to_resource_node.)
 	 */
 	return lcd_resource_tree_search_addr(
-		current->lcd_resource_trees[LCD_RESOURCE_TREE_CONTIGUOUS],
+		klcd_thread->lcd_resource_trees[LCD_RESOURCE_TREE_CONTIGUOUS],
 		gpa_val(paddr),
 		n);
 }
@@ -960,7 +963,7 @@ int virt_to_resource_node(gva_t vaddr, struct lcd_resource_node **n,
 	 * Look in non-contiguous mem first
 	 */
 	ret = lcd_resource_tree_search_addr(
-		current->lcd_resource_trees[LCD_RESOURCE_TREE_NON_CONTIGUOUS],
+		klcd_thread->lcd_resource_trees[LCD_RESOURCE_TREE_NON_CONTIGUOUS],
 		gva_val(vaddr),
 		n);
 	if (ret) {

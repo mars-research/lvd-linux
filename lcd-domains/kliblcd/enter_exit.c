@@ -9,6 +9,9 @@
 #include <lcd_domains/microkernel.h>
 #include <thc.h>
 
+struct task_struct *klcd_thread;
+EXPORT_SYMBOL(klcd_thread);
+
 int lcd_enter(void)
 {
 	int ret;
@@ -45,6 +48,8 @@ int lcd_enter(void)
 		LCD_ERR("cptr cache alloc");
 		goto fail2;
 	}
+	klcd_thread = current;
+	printk("%s current %p\n", __func__, current);
 	current->cptr_cache = cache;
 	ret = cptr_cache_init(cache);
 	if (ret) {

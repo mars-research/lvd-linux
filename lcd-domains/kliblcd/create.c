@@ -8,6 +8,9 @@
 #include <liblcd/liblcd.h>
 #include <lcd_domains/microkernel.h>
 
+
+extern struct task_struct *klcd_thread;
+
 int lvd_create(cptr_t *lcd, int lvd_id)
 {
 	cptr_t slot;
@@ -147,34 +150,34 @@ int lcd_save_cr3(cptr_t lcd, void *lcd_ptables)
 int lcd_memory_grant_and_map(cptr_t lcd, cptr_t mo, cptr_t dest_slot,
 			gpa_t base)
 {
-	return __lcd_memory_grant_and_map(current->lcd, lcd, mo,
+	return __lcd_memory_grant_and_map(klcd_thread->lcd, lcd, mo,
 					dest_slot, base);
 }
 
 int lcd_memory_grant_and_map_hpa(cptr_t lcd, cptr_t mo, cptr_t dest_slot,
 			gpa_t base, hpa_t hpa_base)
 {
-	return __lcd_memory_grant_and_map_hpa(current->lcd, lcd, mo,
+	return __lcd_memory_grant_and_map_hpa(klcd_thread->lcd, lcd, mo,
 					dest_slot, base, hpa_base);
 }
 
 int lcd_memory_grant_and_map_cpu(cptr_t lcd, cptr_t mo, cptr_t dest_slot,
 			gpa_t base, int cpu)
 {
-	return __lcd_memory_grant_and_map_cpu(current->lcd, lcd, mo,
+	return __lcd_memory_grant_and_map_cpu(klcd_thread->lcd, lcd, mo,
 					dest_slot, base, cpu);
 }
 
 int lcd_memory_grant_and_map_percpu(cptr_t lcd, cptr_t mo, cptr_t dest_slot,
 			gpa_t base, int cpu)
 {
-	return __lcd_memory_grant_and_map_percpu(current->lcd, lcd, mo,
+	return __lcd_memory_grant_and_map_percpu(klcd_thread->lcd, lcd, mo,
 					dest_slot, base, cpu);
 }
 
 int lcd_cap_grant(cptr_t lcd, cptr_t src, cptr_t dest)
 {
-	return __lcd_cap_grant(current->lcd, lcd, src, dest);
+	return __lcd_cap_grant(klcd_thread->lcd, lcd, src, dest);
 }
 
 int lcd_set_struct_module_hva(cptr_t lcd, struct module *mod)

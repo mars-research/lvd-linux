@@ -1417,6 +1417,34 @@ void caller_unmarshal_kernel__xhci_gen_setup_with_xhci__usb_bus__in(
 	struct xhci_gen_setup_with_xhci_call_ctx const* call_ctx,
 	struct usb_bus* ptr);
 
+void caller_marshal_kernel__xhci_gen_setup_with_xhci__pci_device__in(
+	size_t* __pos,
+	struct fipc_message* __msg,
+	struct ext_registers* __ext,
+	struct xhci_gen_setup_with_xhci_call_ctx const* call_ctx,
+	struct pci_dev const* ptr);
+
+void callee_unmarshal_kernel__xhci_gen_setup_with_xhci__pci_device__in(
+	size_t* __pos,
+	const struct fipc_message* __msg,
+	const struct ext_registers* __ext,
+	struct xhci_gen_setup_with_xhci_call_ctx const* call_ctx,
+	struct pci_dev* ptr);
+
+void callee_marshal_kernel__xhci_gen_setup_with_xhci__pci_device__in(
+	size_t* __pos,
+	struct fipc_message* __msg,
+	struct ext_registers* __ext,
+	struct xhci_gen_setup_with_xhci_call_ctx const* call_ctx,
+	struct pci_dev const* ptr);
+
+void caller_unmarshal_kernel__xhci_gen_setup_with_xhci__pci_device__in(
+	size_t* __pos,
+	const struct fipc_message* __msg,
+	const struct ext_registers* __ext,
+	struct xhci_gen_setup_with_xhci_call_ctx const* call_ctx,
+	struct pci_dev* ptr);
+
 void caller_marshal_kernel__xhci_gen_setup_with_xhci__usb_bus_controller__in(
 	size_t* __pos,
 	struct fipc_message* __msg,

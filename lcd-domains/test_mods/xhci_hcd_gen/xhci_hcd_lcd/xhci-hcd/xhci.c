@@ -201,8 +201,10 @@ int xhci_reset(struct xhci_hcd *xhci)
 	 * Without this delay, the subsequent HC register access,
 	 * may result in a system hang very rarely.
 	 */
-	if (xhci->quirks & XHCI_INTEL_HOST)
+	if (xhci->quirks & XHCI_INTEL_HOST) {
+		printk("%s udelay 1000", __func__);
 		udelay(1000);
+	}
 
 	ret = xhci_handshake(&xhci->op_regs->command,
 			CMD_RESET, 0, 10 * 1000 * 1000);
@@ -4929,6 +4931,8 @@ int xhci_gen_setup_with_xhci(struct usb_hcd *hcd, struct xhci_hcd *xhci, xhci_ge
 	//get_quirks(dev, xhci);
 
 	if (to_pci_dev(dev)->vendor == PCI_VENDOR_ID_INTEL) {
+		printk("%s:%d setting up quirks for intel USB bus\n",
+				__func__, __LINE__);
 		xhci->quirks |= XHCI_LPM_SUPPORT;
 		xhci->quirks |= XHCI_INTEL_HOST;
 		xhci->quirks |= XHCI_AVOID_BEI;
@@ -4949,8 +4953,16 @@ int xhci_gen_setup_with_xhci(struct usb_hcd *hcd, struct xhci_hcd *xhci, xhci_ge
 	xhci_dbg(xhci, "Resetting HCD\n");
 	/* Reset the internal HC memory state and registers. */
 	retval = xhci_reset(xhci);
-	if (retval)
+
+	printk("%s, xhci_reset returned %d\n", __func__, retval);
+
+	if (retval) {
+		printk("%s:%d early return due to failure %d\n",
+				__func__, __LINE__,
+				retval);
 		return retval;
+	}
+	
 	xhci_dbg(xhci, "Reset complete\n");
 
 	/*
@@ -4984,8 +4996,12 @@ int xhci_gen_setup_with_xhci(struct usb_hcd *hcd, struct xhci_hcd *xhci, xhci_ge
 	xhci_dbg(xhci, "Calling HCD init\n");
 	/* Initialize HCD and host controller data structures. */
 	retval = xhci_init(hcd);
-	if (retval)
+	if (retval) {
+		printk("%s:%d early return at xhci_init %d\n",
+				__func__, __LINE__,
+				retval);
 		return retval;
+	}
 	xhci_dbg(xhci, "Called HCD init\n");
 
 	xhci_info(xhci, "hcc params 0x%08x hci version 0x%x quirks 0x%08x\n",

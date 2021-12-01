@@ -1332,13 +1332,28 @@ void caller_marshal_kernel__xhci_gen_setup_with_xhci__usb_bus__in(
 	struct usb_bus const* ptr)
 {
 	struct device* const* controller_ptr = &ptr->controller;
+	struct pci_dev* _pci_dev_ptr = to_pci_dev(ptr->controller);
+	struct pci_dev* const* pci_dev_ptr = &_pci_dev_ptr;
 	unsigned int __is_b_host = ptr->is_b_host;
 	unsigned int const* __is_b_host_ptr = &__is_b_host;
 	struct usb_device* const* root_hub_ptr = &ptr->root_hub;
 
 	{
-		__maybe_unused const void* __adjusted = *controller_ptr;
+		__maybe_unused const void* __adjusted = *pci_dev_ptr;
 		glue_pack(__pos, __msg, __ext, __adjusted);
+		if (*pci_dev_ptr) {
+			caller_marshal_kernel__xhci_gen_setup_with_xhci__pci_device__in(__pos, __msg, __ext, ctx, *pci_dev_ptr);
+		}
+
+	}
+
+	{
+		__maybe_unused const void* __adjusted = *controller_ptr;
+		const ptrdiff_t __offset = (void*)__adjusted - (void*) _pci_dev_ptr;
+		if (__offset >= (sizeof(struct device)) || __offset < 0)
+			glue_user_panic("Bounds check failed!");
+
+		glue_pack(__pos, __msg, __ext, __offset);
 		if (*controller_ptr) {
 			caller_marshal_kernel__xhci_gen_setup_with_xhci__usb_bus_controller__in(__pos, __msg, __ext, ctx, *controller_ptr);
 		}
@@ -1367,14 +1382,24 @@ void callee_unmarshal_kernel__xhci_gen_setup_with_xhci__usb_bus__in(
 	struct xhci_gen_setup_with_xhci_call_ctx const* ctx,
 	struct usb_bus* ptr)
 {
+	struct pci_dev* pci_dev_ptr;
 	struct device** controller_ptr = &ptr->controller;
 	unsigned int __is_b_host = ptr->is_b_host;
 	unsigned int* __is_b_host_ptr = &__is_b_host;
 	struct usb_device** root_hub_ptr = &ptr->root_hub;
 
 	{
-		size_t __size = sizeof(struct device);
-		*controller_ptr = glue_unpack_new_shadow(__pos, __msg, __ext, struct device*, (__size), (DEFAULT_GFP_FLAGS));
+		size_t __size = sizeof(struct pci_dev);
+		pci_dev_ptr = glue_unpack_new_shadow(__pos, __msg, __ext, struct pci_dev*, (__size), (DEFAULT_GFP_FLAGS));
+		if (pci_dev_ptr) {
+			callee_unmarshal_kernel__xhci_gen_setup_with_xhci__pci_device__in(__pos, __msg, __ext, ctx, pci_dev_ptr);
+		}
+
+	}
+
+	{
+		__maybe_unused size_t __offset = glue_unpack(__pos, __msg, __ext, size_t);
+		*controller_ptr = &pci_dev_ptr->dev;
 		if (*controller_ptr) {
 			callee_unmarshal_kernel__xhci_gen_setup_with_xhci__usb_bus_controller__in(__pos, __msg, __ext, ctx, *controller_ptr);
 		}
@@ -1407,9 +1432,18 @@ void callee_marshal_kernel__xhci_gen_setup_with_xhci__usb_bus__in(
 	struct usb_bus const* ptr)
 {
 	struct device* const* controller_ptr = &ptr->controller;
+	struct pci_dev* _pci_dev_ptr = to_pci_dev(ptr->controller);
+	struct pci_dev* const* pci_dev_ptr = &_pci_dev_ptr;
 	unsigned int __is_b_host = ptr->is_b_host;
 	unsigned int const* __is_b_host_ptr = &__is_b_host;
 	struct usb_device* const* root_hub_ptr = &ptr->root_hub;
+
+	{
+		if (*pci_dev_ptr) {
+			callee_marshal_kernel__xhci_gen_setup_with_xhci__pci_device__in(__pos, __msg, __ext, ctx, *pci_dev_ptr);
+		}
+
+	}
 
 	{
 		if (*controller_ptr) {
@@ -1439,9 +1473,18 @@ void caller_unmarshal_kernel__xhci_gen_setup_with_xhci__usb_bus__in(
 	struct usb_bus* ptr)
 {
 	struct device** controller_ptr = &ptr->controller;
+	struct pci_dev* _pci_dev_ptr = to_pci_dev(ptr->controller);
+	struct pci_dev** pci_dev_ptr = &_pci_dev_ptr;
 	unsigned int __is_b_host = ptr->is_b_host;
 	unsigned int* __is_b_host_ptr = &__is_b_host;
 	struct usb_device** root_hub_ptr = &ptr->root_hub;
+
+	{
+		if (*pci_dev_ptr) {
+			caller_unmarshal_kernel__xhci_gen_setup_with_xhci__pci_device__in(__pos, __msg, __ext, ctx, *pci_dev_ptr);
+		}
+
+	}
 
 	{
 		if (*controller_ptr) {
@@ -1463,6 +1506,70 @@ void caller_unmarshal_kernel__xhci_gen_setup_with_xhci__usb_bus__in(
 
 	{
 		ptr->is_b_host = *__is_b_host_ptr;
+	}
+}
+
+void caller_marshal_kernel__xhci_gen_setup_with_xhci__pci_device__in(
+	size_t* __pos,
+	struct fipc_message* __msg,
+	struct ext_registers* __ext,
+	struct xhci_gen_setup_with_xhci_call_ctx const* ctx,
+	struct pci_dev const* ptr)
+{
+	unsigned short const* vendor_ptr = &ptr->vendor;
+	unsigned short const* device_ptr = &ptr->device;
+
+	{
+		glue_pack(__pos, __msg, __ext, *vendor_ptr);
+	}
+
+	{
+		glue_pack(__pos, __msg, __ext, *device_ptr);
+	}
+
+}
+
+void callee_unmarshal_kernel__xhci_gen_setup_with_xhci__pci_device__in(
+	size_t* __pos,
+	const struct fipc_message* __msg,
+	const struct ext_registers* __ext,
+	struct xhci_gen_setup_with_xhci_call_ctx const* ctx,
+	struct pci_dev* ptr)
+{
+	unsigned short* vendor_ptr = &ptr->vendor;
+	unsigned short* device_ptr = &ptr->device;
+
+	{
+		*vendor_ptr = glue_unpack(__pos, __msg, __ext, unsigned short);
+	}
+
+	{
+		*device_ptr = glue_unpack(__pos, __msg, __ext, unsigned short);
+	}
+
+	{
+	}
+}
+
+void callee_marshal_kernel__xhci_gen_setup_with_xhci__pci_device__in(
+	size_t* __pos,
+	struct fipc_message* __msg,
+	struct ext_registers* __ext,
+	struct xhci_gen_setup_with_xhci_call_ctx const* ctx,
+	struct pci_dev const* ptr)
+{
+
+}
+
+void caller_unmarshal_kernel__xhci_gen_setup_with_xhci__pci_device__in(
+	size_t* __pos,
+	const struct fipc_message* __msg,
+	const struct ext_registers* __ext,
+	struct xhci_gen_setup_with_xhci_call_ctx const* ctx,
+	struct pci_dev* ptr)
+{
+
+	{
 	}
 }
 

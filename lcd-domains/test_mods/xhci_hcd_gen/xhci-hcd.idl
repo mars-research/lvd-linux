@@ -143,7 +143,9 @@ rpc_export int  xhci_gen_setup_with_xhci( projection hcd [alloc<{{sizeof(*hcd) +
 					projection xhci_hcd [within<{{hcd}}, {{sizeof(struct xhci_hcd) + sizeof(struct usb_hcd)}}>] *xhci,
 					rpc_ptr get_quirks get_quirks) {
        projection < struct usb_bus> usb_bus {
-		projection usb_bus_controller [alloc(callee)] * controller;
+		projection pci_device [alloc(callee)] *pci_dev;
+		//projection usb_bus_controller [alloc(callee)] * controller;
+		projection usb_bus_controller [within<{{pci_dev}}, {{sizeof(struct device)}}>] * controller;
 		unsigned int [in, out] is_b_host : 1;
 		projection usb_bus_root_hub [alloc(callee)] * root_hub;
 	}
@@ -157,6 +159,10 @@ rpc_export int  xhci_gen_setup_with_xhci( projection hcd [alloc<{{sizeof(*hcd) +
 		//void *regs;
         }
 
+	projection <struct pci_dev> pci_device {
+		unsigned short vendor;
+		unsigned short device;
+	}
 	projection < struct hc_driver > hc_driver {
 
 	}
@@ -166,10 +172,13 @@ rpc_export int  xhci_gen_setup_with_xhci( projection hcd [alloc<{{sizeof(*hcd) +
 		unsigned short hci_version;
 		unsigned int quirks;
 		unsigned int xhc_state;
+
 	}
 
         projection < struct device > usb_bus_controller {
+			array<u64, 1> [alloc(callee)] *dma_mask;
         }
+
         projection < struct usb_device > usb_bus_root_hub {
                 unsigned int [out] speed;
         }

@@ -571,7 +571,7 @@ int xhci_init(struct usb_hcd *hcd)
 	}
 
 	printk("%s, hcd %p xhci %p\n", __func__, hcd, xhci);
-	//retval = xhci_mem_init(xhci, GFP_KERNEL);
+	retval = xhci_mem_init(xhci, GFP_KERNEL);
 	xhci_dbg_trace(xhci, trace_xhci_dbg_init, "Finished xhci_init");
 
 	/* Initializing Compliance Mode Recovery Data If Needed */

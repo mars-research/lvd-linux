@@ -2418,6 +2418,7 @@ int xhci_mem_init(struct xhci_hcd *xhci, gfp_t flags)
 			(unsigned long long)xhci->dcbaa->dma, xhci->dcbaa);
 	xhci_write_64(xhci, dma, &xhci->op_regs->dcbaa_ptr);
 
+	INIT_LIST_HEAD(&dev->dma_pools);
 	/*
 	 * Initialize the ring segment pool.  The ring must be a contiguous
 	 * structure comprised of TRBs.  The TRBs must be 16 byte aligned,

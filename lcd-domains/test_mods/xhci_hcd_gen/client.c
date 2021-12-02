@@ -1372,7 +1372,8 @@ char const* dmi_get_system_info(int field)
 	}
 
 	{
-		*ret_ptr = glue_unpack(__pos, __msg, __ext, char const*);
+		size_t __size = sizeof(char) * glue_peek(__pos, __msg, __ext);
+		*ret_ptr = glue_unpack_new_shadow(__pos, __msg, __ext, char const*, (__size), (DEFAULT_GFP_FLAGS));
 		if (*ret_ptr) {
 			char* writable = (char*)*ret_ptr;
 			size_t i, len;

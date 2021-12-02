@@ -245,7 +245,7 @@ rpc void usb_disable_xhci_ports(projection pci_dev *xhci_pdev) {
 	}
 }
 
-rpc string [alloc(callee)] * dmi_get_system_info(int field) {
+rpc string [alloc(caller)] * dmi_get_system_info(int field) {
 }
 
 rpc bool  usb_acpi_power_manageable( projection hdev* [in] hdev, int  index ) {

@@ -28,4 +28,14 @@
 #define xhci_print_run_regs(...)	do { } while(0)
 #define xhci_get_slot_state(...)	"none"
 
+#ifdef LCD_ISOLATE
+#undef setup_timer
+#define setup_timer	lvd_setup_timer
+
+typedef void (*fptr_timer_func)(unsigned long data);
+void lvd_setup_timer(struct timer_list* timer, fptr_timer_func func, unsigned long);
+
+#endif
+
+
 #endif

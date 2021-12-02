@@ -11,12 +11,7 @@ void caller_marshal_kernel__add_timer__timer__in(
 	struct add_timer_call_ctx const* ctx,
 	struct timer_list const* ptr)
 {
-	struct hlist_node const* entry_ptr = &ptr->entry;
 	unsigned long const* expires_ptr = &ptr->expires;
-
-	{
-		caller_marshal_kernel__add_timer__hlist_node__in(__pos, __msg, __ext, ctx, entry_ptr);
-	}
 
 	{
 		glue_pack(__pos, __msg, __ext, *expires_ptr);
@@ -31,12 +26,7 @@ void callee_unmarshal_kernel__add_timer__timer__in(
 	struct add_timer_call_ctx const* ctx,
 	struct timer_list* ptr)
 {
-	struct hlist_node* entry_ptr = &ptr->entry;
 	unsigned long* expires_ptr = &ptr->expires;
-
-	{
-		callee_unmarshal_kernel__add_timer__hlist_node__in(__pos, __msg, __ext, ctx, entry_ptr);
-	}
 
 	{
 		*expires_ptr = glue_unpack(__pos, __msg, __ext, unsigned long);
@@ -53,12 +43,7 @@ void callee_marshal_kernel__add_timer__timer__in(
 	struct add_timer_call_ctx const* ctx,
 	struct timer_list const* ptr)
 {
-	struct hlist_node const* entry_ptr = &ptr->entry;
 	unsigned long const* expires_ptr = &ptr->expires;
-
-	{
-		callee_marshal_kernel__add_timer__hlist_node__in(__pos, __msg, __ext, ctx, entry_ptr);
-	}
 
 	{
 		glue_pack(__pos, __msg, __ext, *expires_ptr);
@@ -73,60 +58,11 @@ void caller_unmarshal_kernel__add_timer__timer__in(
 	struct add_timer_call_ctx const* ctx,
 	struct timer_list* ptr)
 {
-	struct hlist_node* entry_ptr = &ptr->entry;
 	unsigned long* expires_ptr = &ptr->expires;
-
-	{
-		caller_unmarshal_kernel__add_timer__hlist_node__in(__pos, __msg, __ext, ctx, entry_ptr);
-	}
 
 	{
 		*expires_ptr = glue_unpack(__pos, __msg, __ext, unsigned long);
 	}
-
-	{
-	}
-}
-
-void caller_marshal_kernel__add_timer__hlist_node__in(
-	size_t* __pos,
-	struct fipc_message* __msg,
-	struct ext_registers* __ext,
-	struct add_timer_call_ctx const* ctx,
-	struct hlist_node const* ptr)
-{
-
-}
-
-void callee_unmarshal_kernel__add_timer__hlist_node__in(
-	size_t* __pos,
-	const struct fipc_message* __msg,
-	const struct ext_registers* __ext,
-	struct add_timer_call_ctx const* ctx,
-	struct hlist_node* ptr)
-{
-
-	{
-	}
-}
-
-void callee_marshal_kernel__add_timer__hlist_node__in(
-	size_t* __pos,
-	struct fipc_message* __msg,
-	struct ext_registers* __ext,
-	struct add_timer_call_ctx const* ctx,
-	struct hlist_node const* ptr)
-{
-
-}
-
-void caller_unmarshal_kernel__add_timer__hlist_node__in(
-	size_t* __pos,
-	const struct fipc_message* __msg,
-	const struct ext_registers* __ext,
-	struct add_timer_call_ctx const* ctx,
-	struct hlist_node* ptr)
-{
 
 	{
 	}
@@ -203,11 +139,6 @@ void caller_marshal_kernel__del_timer__timer__in(
 	struct del_timer_call_ctx const* ctx,
 	struct timer_list const* ptr)
 {
-	struct hlist_node const* entry_ptr = &ptr->entry;
-
-	{
-		caller_marshal_kernel__del_timer__hlist_node__in(__pos, __msg, __ext, ctx, entry_ptr);
-	}
 
 }
 
@@ -218,11 +149,6 @@ void callee_unmarshal_kernel__del_timer__timer__in(
 	struct del_timer_call_ctx const* ctx,
 	struct timer_list* ptr)
 {
-	struct hlist_node* entry_ptr = &ptr->entry;
-
-	{
-		callee_unmarshal_kernel__del_timer__hlist_node__in(__pos, __msg, __ext, ctx, entry_ptr);
-	}
 
 	{
 	}
@@ -235,11 +161,6 @@ void callee_marshal_kernel__del_timer__timer__in(
 	struct del_timer_call_ctx const* ctx,
 	struct timer_list const* ptr)
 {
-	struct hlist_node const* entry_ptr = &ptr->entry;
-
-	{
-		callee_marshal_kernel__del_timer__hlist_node__in(__pos, __msg, __ext, ctx, entry_ptr);
-	}
 
 }
 
@@ -249,55 +170,6 @@ void caller_unmarshal_kernel__del_timer__timer__in(
 	const struct ext_registers* __ext,
 	struct del_timer_call_ctx const* ctx,
 	struct timer_list* ptr)
-{
-	struct hlist_node* entry_ptr = &ptr->entry;
-
-	{
-		caller_unmarshal_kernel__del_timer__hlist_node__in(__pos, __msg, __ext, ctx, entry_ptr);
-	}
-
-	{
-	}
-}
-
-void caller_marshal_kernel__del_timer__hlist_node__in(
-	size_t* __pos,
-	struct fipc_message* __msg,
-	struct ext_registers* __ext,
-	struct del_timer_call_ctx const* ctx,
-	struct hlist_node const* ptr)
-{
-
-}
-
-void callee_unmarshal_kernel__del_timer__hlist_node__in(
-	size_t* __pos,
-	const struct fipc_message* __msg,
-	const struct ext_registers* __ext,
-	struct del_timer_call_ctx const* ctx,
-	struct hlist_node* ptr)
-{
-
-	{
-	}
-}
-
-void callee_marshal_kernel__del_timer__hlist_node__in(
-	size_t* __pos,
-	struct fipc_message* __msg,
-	struct ext_registers* __ext,
-	struct del_timer_call_ctx const* ctx,
-	struct hlist_node const* ptr)
-{
-
-}
-
-void caller_unmarshal_kernel__del_timer__hlist_node__in(
-	size_t* __pos,
-	const struct fipc_message* __msg,
-	const struct ext_registers* __ext,
-	struct del_timer_call_ctx const* ctx,
-	struct hlist_node* ptr)
 {
 
 	{
@@ -311,11 +183,6 @@ void caller_marshal_kernel__del_timer_sync__timer__in(
 	struct del_timer_sync_call_ctx const* ctx,
 	struct timer_list const* ptr)
 {
-	struct hlist_node const* entry_ptr = &ptr->entry;
-
-	{
-		caller_marshal_kernel__del_timer_sync__hlist_node__in(__pos, __msg, __ext, ctx, entry_ptr);
-	}
 
 }
 
@@ -326,11 +193,6 @@ void callee_unmarshal_kernel__del_timer_sync__timer__in(
 	struct del_timer_sync_call_ctx const* ctx,
 	struct timer_list* ptr)
 {
-	struct hlist_node* entry_ptr = &ptr->entry;
-
-	{
-		callee_unmarshal_kernel__del_timer_sync__hlist_node__in(__pos, __msg, __ext, ctx, entry_ptr);
-	}
 
 	{
 	}
@@ -343,11 +205,6 @@ void callee_marshal_kernel__del_timer_sync__timer__in(
 	struct del_timer_sync_call_ctx const* ctx,
 	struct timer_list const* ptr)
 {
-	struct hlist_node const* entry_ptr = &ptr->entry;
-
-	{
-		callee_marshal_kernel__del_timer_sync__hlist_node__in(__pos, __msg, __ext, ctx, entry_ptr);
-	}
 
 }
 
@@ -358,225 +215,95 @@ void caller_unmarshal_kernel__del_timer_sync__timer__in(
 	struct del_timer_sync_call_ctx const* ctx,
 	struct timer_list* ptr)
 {
-	struct hlist_node* entry_ptr = &ptr->entry;
-
-	{
-		caller_unmarshal_kernel__del_timer_sync__hlist_node__in(__pos, __msg, __ext, ctx, entry_ptr);
-	}
 
 	{
 	}
 }
 
-void caller_marshal_kernel__del_timer_sync__hlist_node__in(
+void caller_marshal_kernel__lvd_setup_timer__timer__io(
 	size_t* __pos,
 	struct fipc_message* __msg,
 	struct ext_registers* __ext,
-	struct del_timer_sync_call_ctx const* ctx,
-	struct hlist_node const* ptr)
-{
-
-}
-
-void callee_unmarshal_kernel__del_timer_sync__hlist_node__in(
-	size_t* __pos,
-	const struct fipc_message* __msg,
-	const struct ext_registers* __ext,
-	struct del_timer_sync_call_ctx const* ctx,
-	struct hlist_node* ptr)
-{
-
-	{
-	}
-}
-
-void callee_marshal_kernel__del_timer_sync__hlist_node__in(
-	size_t* __pos,
-	struct fipc_message* __msg,
-	struct ext_registers* __ext,
-	struct del_timer_sync_call_ctx const* ctx,
-	struct hlist_node const* ptr)
-{
-
-}
-
-void caller_unmarshal_kernel__del_timer_sync__hlist_node__in(
-	size_t* __pos,
-	const struct fipc_message* __msg,
-	const struct ext_registers* __ext,
-	struct del_timer_sync_call_ctx const* ctx,
-	struct hlist_node* ptr)
-{
-
-	{
-	}
-}
-
-void caller_marshal_kernel__init_timer_key__timer__in(
-	size_t* __pos,
-	struct fipc_message* __msg,
-	struct ext_registers* __ext,
-	struct init_timer_key_call_ctx const* ctx,
+	struct lvd_setup_timer_call_ctx const* ctx,
 	struct timer_list const* ptr)
 {
-	struct hlist_node const* entry_ptr = &ptr->entry;
-
-	{
-		caller_marshal_kernel__init_timer_key__hlist_node__in(__pos, __msg, __ext, ctx, entry_ptr);
-	}
 
 }
 
-void callee_unmarshal_kernel__init_timer_key__timer__in(
+void callee_unmarshal_kernel__lvd_setup_timer__timer__io(
 	size_t* __pos,
 	const struct fipc_message* __msg,
 	const struct ext_registers* __ext,
-	struct init_timer_key_call_ctx const* ctx,
+	struct lvd_setup_timer_call_ctx const* ctx,
 	struct timer_list* ptr)
 {
-	struct hlist_node* entry_ptr = &ptr->entry;
-
-	{
-		callee_unmarshal_kernel__init_timer_key__hlist_node__in(__pos, __msg, __ext, ctx, entry_ptr);
-	}
 
 	{
 	}
 }
 
-void callee_marshal_kernel__init_timer_key__timer__in(
+void callee_marshal_kernel__lvd_setup_timer__timer__io(
 	size_t* __pos,
 	struct fipc_message* __msg,
 	struct ext_registers* __ext,
-	struct init_timer_key_call_ctx const* ctx,
+	struct lvd_setup_timer_call_ctx const* ctx,
 	struct timer_list const* ptr)
 {
-	struct hlist_node const* entry_ptr = &ptr->entry;
+	unsigned long const* data_ptr = &ptr->data;
 
 	{
-		callee_marshal_kernel__init_timer_key__hlist_node__in(__pos, __msg, __ext, ctx, entry_ptr);
+		glue_pack(__pos, __msg, __ext, *data_ptr);
 	}
 
 }
 
-void caller_unmarshal_kernel__init_timer_key__timer__in(
+void caller_unmarshal_kernel__lvd_setup_timer__timer__io(
 	size_t* __pos,
 	const struct fipc_message* __msg,
 	const struct ext_registers* __ext,
-	struct init_timer_key_call_ctx const* ctx,
+	struct lvd_setup_timer_call_ctx const* ctx,
 	struct timer_list* ptr)
 {
-	struct hlist_node* entry_ptr = &ptr->entry;
+	unsigned long* data_ptr = &ptr->data;
 
 	{
-		caller_unmarshal_kernel__init_timer_key__hlist_node__in(__pos, __msg, __ext, ctx, entry_ptr);
+		*data_ptr = glue_unpack(__pos, __msg, __ext, unsigned long);
 	}
 
 	{
 	}
 }
 
-void caller_marshal_kernel__init_timer_key__hlist_node__in(
-	size_t* __pos,
-	struct fipc_message* __msg,
-	struct ext_registers* __ext,
-	struct init_timer_key_call_ctx const* ctx,
-	struct hlist_node const* ptr)
-{
-
-}
-
-void callee_unmarshal_kernel__init_timer_key__hlist_node__in(
-	size_t* __pos,
-	const struct fipc_message* __msg,
-	const struct ext_registers* __ext,
-	struct init_timer_key_call_ctx const* ctx,
-	struct hlist_node* ptr)
-{
-
-	{
-	}
-}
-
-void callee_marshal_kernel__init_timer_key__hlist_node__in(
-	size_t* __pos,
-	struct fipc_message* __msg,
-	struct ext_registers* __ext,
-	struct init_timer_key_call_ctx const* ctx,
-	struct hlist_node const* ptr)
-{
-
-}
-
-void caller_unmarshal_kernel__init_timer_key__hlist_node__in(
-	size_t* __pos,
-	const struct fipc_message* __msg,
-	const struct ext_registers* __ext,
-	struct init_timer_key_call_ctx const* ctx,
-	struct hlist_node* ptr)
-{
-
-	{
-	}
-}
-
-void caller_marshal_kernel__init_timer_key__key__in(
-	size_t* __pos,
-	struct fipc_message* __msg,
-	struct ext_registers* __ext,
-	struct init_timer_key_call_ctx const* ctx,
-	struct lock_class_key const* ptr)
-{
-
-}
-
-void callee_unmarshal_kernel__init_timer_key__key__in(
-	size_t* __pos,
-	const struct fipc_message* __msg,
-	const struct ext_registers* __ext,
-	struct init_timer_key_call_ctx const* ctx,
-	struct lock_class_key* ptr)
-{
-
-	{
-	}
-}
-
-void callee_marshal_kernel__init_timer_key__key__in(
-	size_t* __pos,
-	struct fipc_message* __msg,
-	struct ext_registers* __ext,
-	struct init_timer_key_call_ctx const* ctx,
-	struct lock_class_key const* ptr)
-{
-
-}
-
-void caller_unmarshal_kernel__init_timer_key__key__in(
-	size_t* __pos,
-	const struct fipc_message* __msg,
-	const struct ext_registers* __ext,
-	struct init_timer_key_call_ctx const* ctx,
-	struct lock_class_key* ptr)
-{
-
-	{
-	}
-}
-
-void caller_marshal_kernel__mod_timer__timer__io(
+void caller_marshal_kernel__mod_timer__timer__in(
 	size_t* __pos,
 	struct fipc_message* __msg,
 	struct ext_registers* __ext,
 	struct mod_timer_call_ctx const* ctx,
 	struct timer_list const* ptr)
 {
-	struct hlist_node const* entry_ptr = &ptr->entry;
-	unsigned long const* expires_ptr = &ptr->expires;
+
+}
+
+void callee_unmarshal_kernel__mod_timer__timer__in(
+	size_t* __pos,
+	const struct fipc_message* __msg,
+	const struct ext_registers* __ext,
+	struct mod_timer_call_ctx const* ctx,
+	struct timer_list* ptr)
+{
 
 	{
-		caller_marshal_kernel__mod_timer__hlist_node__io(__pos, __msg, __ext, ctx, entry_ptr);
 	}
+}
+
+void callee_marshal_kernel__mod_timer__timer__in(
+	size_t* __pos,
+	struct fipc_message* __msg,
+	struct ext_registers* __ext,
+	struct mod_timer_call_ctx const* ctx,
+	struct timer_list const* ptr)
+{
+	unsigned long const* expires_ptr = &ptr->expires;
 
 	{
 		glue_pack(__pos, __msg, __ext, *expires_ptr);
@@ -584,109 +311,18 @@ void caller_marshal_kernel__mod_timer__timer__io(
 
 }
 
-void callee_unmarshal_kernel__mod_timer__timer__io(
+void caller_unmarshal_kernel__mod_timer__timer__in(
 	size_t* __pos,
 	const struct fipc_message* __msg,
 	const struct ext_registers* __ext,
 	struct mod_timer_call_ctx const* ctx,
 	struct timer_list* ptr)
 {
-	struct hlist_node* entry_ptr = &ptr->entry;
 	unsigned long* expires_ptr = &ptr->expires;
-
-	{
-		callee_unmarshal_kernel__mod_timer__hlist_node__io(__pos, __msg, __ext, ctx, entry_ptr);
-	}
 
 	{
 		*expires_ptr = glue_unpack(__pos, __msg, __ext, unsigned long);
 	}
-
-	{
-	}
-}
-
-void callee_marshal_kernel__mod_timer__timer__io(
-	size_t* __pos,
-	struct fipc_message* __msg,
-	struct ext_registers* __ext,
-	struct mod_timer_call_ctx const* ctx,
-	struct timer_list const* ptr)
-{
-	struct hlist_node const* entry_ptr = &ptr->entry;
-	unsigned long const* expires_ptr = &ptr->expires;
-
-	{
-		callee_marshal_kernel__mod_timer__hlist_node__io(__pos, __msg, __ext, ctx, entry_ptr);
-	}
-
-	{
-		glue_pack(__pos, __msg, __ext, *expires_ptr);
-	}
-
-}
-
-void caller_unmarshal_kernel__mod_timer__timer__io(
-	size_t* __pos,
-	const struct fipc_message* __msg,
-	const struct ext_registers* __ext,
-	struct mod_timer_call_ctx const* ctx,
-	struct timer_list* ptr)
-{
-	struct hlist_node* entry_ptr = &ptr->entry;
-	unsigned long* expires_ptr = &ptr->expires;
-
-	{
-		caller_unmarshal_kernel__mod_timer__hlist_node__io(__pos, __msg, __ext, ctx, entry_ptr);
-	}
-
-	{
-		*expires_ptr = glue_unpack(__pos, __msg, __ext, unsigned long);
-	}
-
-	{
-	}
-}
-
-void caller_marshal_kernel__mod_timer__hlist_node__io(
-	size_t* __pos,
-	struct fipc_message* __msg,
-	struct ext_registers* __ext,
-	struct mod_timer_call_ctx const* ctx,
-	struct hlist_node const* ptr)
-{
-
-}
-
-void callee_unmarshal_kernel__mod_timer__hlist_node__io(
-	size_t* __pos,
-	const struct fipc_message* __msg,
-	const struct ext_registers* __ext,
-	struct mod_timer_call_ctx const* ctx,
-	struct hlist_node* ptr)
-{
-
-	{
-	}
-}
-
-void callee_marshal_kernel__mod_timer__hlist_node__io(
-	size_t* __pos,
-	struct fipc_message* __msg,
-	struct ext_registers* __ext,
-	struct mod_timer_call_ctx const* ctx,
-	struct hlist_node const* ptr)
-{
-
-}
-
-void caller_unmarshal_kernel__mod_timer__hlist_node__io(
-	size_t* __pos,
-	const struct fipc_message* __msg,
-	const struct ext_registers* __ext,
-	struct mod_timer_call_ctx const* ctx,
-	struct hlist_node* ptr)
-{
 
 	{
 	}
@@ -1580,6 +1216,23 @@ void caller_marshal_kernel__xhci_gen_setup_with_xhci__usb_bus_controller__in(
 	struct xhci_gen_setup_with_xhci_call_ctx const* ctx,
 	struct device const* ptr)
 {
+	unsigned long long* const* dma_mask_ptr = &ptr->dma_mask;
+
+	{
+		__maybe_unused const void* __adjusted = *dma_mask_ptr;
+		glue_pack(__pos, __msg, __ext, __adjusted);
+		if (*dma_mask_ptr) {
+			size_t i, len = 1;
+			unsigned long long const* array = *dma_mask_ptr;
+			glue_pack(__pos, __msg, __ext, len);
+			for (i = 0; i < len; ++i) {
+				unsigned long long const* element = &array[i];
+				glue_pack(__pos, __msg, __ext, *element);
+			}
+
+		}
+
+	}
 
 }
 
@@ -1590,6 +1243,23 @@ void callee_unmarshal_kernel__xhci_gen_setup_with_xhci__usb_bus_controller__in(
 	struct xhci_gen_setup_with_xhci_call_ctx const* ctx,
 	struct device* ptr)
 {
+	unsigned long long** dma_mask_ptr = &ptr->dma_mask;
+
+	{
+		size_t __size = sizeof(unsigned long long) * glue_peek(__pos, __msg, __ext);
+		*dma_mask_ptr = glue_unpack_new_shadow(__pos, __msg, __ext, unsigned long long*, (__size), (DEFAULT_GFP_FLAGS));
+		if (*dma_mask_ptr) {
+			int i;
+			unsigned long long* array = *dma_mask_ptr;
+			size_t len = glue_unpack(__pos, __msg, __ext, size_t);
+			for (i = 0; i < len; ++i) {
+				unsigned long long* element = &array[i];
+				*element = glue_unpack(__pos, __msg, __ext, unsigned long long);
+			}
+
+		}
+
+	}
 
 	{
 	}
@@ -1602,6 +1272,11 @@ void callee_marshal_kernel__xhci_gen_setup_with_xhci__usb_bus_controller__in(
 	struct xhci_gen_setup_with_xhci_call_ctx const* ctx,
 	struct device const* ptr)
 {
+	unsigned long long* const* dma_mask_ptr = &ptr->dma_mask;
+
+	{
+		(void)dma_mask_ptr;
+	}
 
 }
 
@@ -1612,6 +1287,11 @@ void caller_unmarshal_kernel__xhci_gen_setup_with_xhci__usb_bus_controller__in(
 	struct xhci_gen_setup_with_xhci_call_ctx const* ctx,
 	struct device* ptr)
 {
+	unsigned long long** dma_mask_ptr = &ptr->dma_mask;
+
+	{
+		(void)dma_mask_ptr;
+	}
 
 	{
 	}

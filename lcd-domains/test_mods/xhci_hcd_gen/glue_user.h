@@ -19,6 +19,10 @@ extern void shared_mem_init_callee(struct fipc_message *msg, struct ext_register
 int __module_lcd_init(void);
 void __module_lcd_exit(void);
 
+#ifndef LCD_ISOLATE
+#define lvd_setup_timer		setup_timer
+#endif
+
 struct atomic64_t {
 	long counter;
 };

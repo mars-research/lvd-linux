@@ -2348,19 +2348,29 @@ static int xhci_setup_port_arrays(struct xhci_hcd *xhci, gfp_t flags)
 int xhci_mem_init(struct xhci_hcd *xhci, gfp_t flags)
 {
 	dma_addr_t	dma;
-	struct device	*dev = xhci_to_hcd(xhci)->self.controller;
+	struct device	*dev;
 	unsigned int	val, val2;
 	u64		val_64;
 	struct xhci_segment	*seg;
 	u32 page_size, temp;
 	int i;
+	struct usb_hcd *hcd;
+	hcd = xhci_to_hcd(xhci);
+
+	printk("%s, xhci %p hcd %p\n", __func__, xhci, hcd);
+	printk("%s, hcd->self.controller %p\n", __func__, hcd->self.controller);
+
+	dev = hcd->self.controller;
 
 	INIT_LIST_HEAD(&xhci->cmd_list);
 
+	printk("%s, setup_timer", __func__);
 	/* init command timeout timer */
 	setup_timer(&xhci->cmd_timer, xhci_handle_command_timeout,
 		    (unsigned long)xhci);
 
+
+	printk("%s, setup_timer DONE", __func__);
 	page_size = readl(&xhci->op_regs->page_size);
 	xhci_dbg_trace(xhci, trace_xhci_dbg_init,
 			"Supported page size register = 0x%x", page_size);

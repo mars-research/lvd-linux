@@ -22,8 +22,7 @@ void add_timer_callee(struct fipc_message* __msg, struct ext_registers* __ext)
 	}
 
 	{
-		size_t __size = sizeof(struct timer_list);
-		*timer_ptr = glue_unpack_new_shadow(__pos, __msg, __ext, struct timer_list*, (__size), (DEFAULT_GFP_FLAGS));
+		*timer_ptr = glue_unpack_shadow(__pos, __msg, __ext, struct timer_list*);
 		if (*timer_ptr) {
 			callee_unmarshal_kernel__add_timer__timer__in(__pos, __msg, __ext, ctx, *timer_ptr);
 		}
@@ -132,6 +131,50 @@ void del_timer_callee(struct fipc_message* __msg, struct ext_registers* __ext)
 	}
 }
 
+void free_irq_callee(struct fipc_message* __msg, struct ext_registers* __ext)
+{
+	size_t n_pos = 0;
+	size_t* __pos = &n_pos;
+
+	unsigned int irq = 0;
+	void* dev_id = 0;
+	unsigned int* irq_ptr = &irq;
+	void** dev_id_ptr = &dev_id;
+	
+	__maybe_unused struct free_irq_call_ctx call_ctx = {irq, dev_id};
+	__maybe_unused struct free_irq_call_ctx *ctx = &call_ctx;
+
+	if (verbose_debug) {
+		printk("%s:%d, entered!\n", __func__, __LINE__);
+	}
+
+	{
+		*irq_ptr = glue_unpack(__pos, __msg, __ext, unsigned int);
+	}
+
+	{
+		*dev_id_ptr = glue_unpack(__pos, __msg, __ext, void*);
+		if (*dev_id_ptr) {
+		}
+
+	}
+
+	free_irq(irq, dev_id);
+
+	*__pos = 0;
+	{
+	}
+
+	{
+		(void)dev_id_ptr;
+	}
+
+	__msg->regs[0] = *__pos;
+	if (verbose_debug) {
+		printk("%s:%d, returned!\n", __func__, __LINE__);
+	}
+}
+
 void del_timer_sync_callee(struct fipc_message* __msg, struct ext_registers* __ext)
 {
 	size_t n_pos = 0;
@@ -177,106 +220,97 @@ void del_timer_sync_callee(struct fipc_message* __msg, struct ext_registers* __e
 	}
 }
 
-void free_irq_callee(struct fipc_message* __msg, struct ext_registers* __ext)
+void trmp_impl_timer_func(fptr_timer_func target, unsigned long data)
 {
+	struct fipc_message __buffer = {0};
+	struct fipc_message *__msg = &__buffer;
+	struct ext_registers* __ext = get_register_page(smp_processor_id());
 	size_t n_pos = 0;
 	size_t* __pos = &n_pos;
 
-	unsigned int irq = 0;
-	void* dev_id = 0;
-	unsigned int* irq_ptr = &irq;
-	void** dev_id_ptr = &dev_id;
+	unsigned long* data_ptr = &data;
 	
-	__maybe_unused struct free_irq_call_ctx call_ctx = {irq, dev_id};
-	__maybe_unused struct free_irq_call_ctx *ctx = &call_ctx;
+	__maybe_unused const struct timer_func_call_ctx call_ctx = {data};
+	__maybe_unused const struct timer_func_call_ctx *ctx = &call_ctx;
+
+	(void)__ext;
 
 	if (verbose_debug) {
 		printk("%s:%d, entered!\n", __func__, __LINE__);
 	}
 
+	glue_pack(__pos, __msg, __ext, target);
 	{
-		*irq_ptr = glue_unpack(__pos, __msg, __ext, unsigned int);
+		glue_pack(__pos, __msg, __ext, *data_ptr);
 	}
 
-	{
-		*dev_id_ptr = glue_unpack(__pos, __msg, __ext, void*);
-		if (*dev_id_ptr) {
-		}
-
-	}
-
-	free_irq(irq, dev_id);
+	glue_call_client(__pos, __msg, RPC_ID_timer_func);
 
 	*__pos = 0;
 	{
 	}
 
-	{
-		(void)dev_id_ptr;
-	}
-
-	__msg->regs[0] = *__pos;
 	if (verbose_debug) {
 		printk("%s:%d, returned!\n", __func__, __LINE__);
 	}
 }
 
-void init_timer_key_callee(struct fipc_message* __msg, struct ext_registers* __ext)
+LCD_TRAMPOLINE_DATA(trmp_timer_func)
+void LCD_TRAMPOLINE_LINKAGE(trmp_timer_func) trmp_timer_func(unsigned long data)
+{
+	volatile fptr_impl_timer_func impl;
+	fptr_timer_func target;
+	LCD_TRAMPOLINE_PROLOGUE(target, trmp_timer_func);
+	impl = trmp_impl_timer_func;
+	return impl(target, data);
+}
+
+void lvd_setup_timer_callee(struct fipc_message* __msg, struct ext_registers* __ext)
 {
 	size_t n_pos = 0;
 	size_t* __pos = &n_pos;
 
 	struct timer_list* timer = 0;
-	unsigned int flags = 0;
-	char const* name = 0;
-	struct lock_class_key* key = 0;
+	fptr_timer_func func = 0;
+	unsigned long data = 0;
 	struct timer_list** timer_ptr = &timer;
-	unsigned int* flags_ptr = &flags;
-	char const** name_ptr = &name;
-	struct lock_class_key** key_ptr = &key;
+	fptr_timer_func* func_ptr = &func;
+	unsigned long* data_ptr = &data;
 	
-	__maybe_unused struct init_timer_key_call_ctx call_ctx = {timer, flags, name, key};
-	__maybe_unused struct init_timer_key_call_ctx *ctx = &call_ctx;
+	__maybe_unused struct lvd_setup_timer_call_ctx call_ctx = {timer, func, data};
+	__maybe_unused struct lvd_setup_timer_call_ctx *ctx = &call_ctx;
 
 	if (verbose_debug) {
 		printk("%s:%d, entered!\n", __func__, __LINE__);
 	}
 
 	{
-		*timer_ptr = glue_unpack(__pos, __msg, __ext, struct timer_list*);
+		size_t __size = sizeof(struct timer_list);
+		*timer_ptr = glue_unpack_new_shadow(__pos, __msg, __ext, struct timer_list*, (__size), (DEFAULT_GFP_FLAGS));
 		if (*timer_ptr) {
-			callee_unmarshal_kernel__init_timer_key__timer__in(__pos, __msg, __ext, ctx, *timer_ptr);
+			callee_unmarshal_kernel__lvd_setup_timer__timer__io(__pos, __msg, __ext, ctx, *timer_ptr);
 		}
 
 	}
 
 	{
-		*flags_ptr = glue_unpack(__pos, __msg, __ext, unsigned int);
+		*func_ptr = glue_unpack_rpc_ptr(__pos, __msg, __ext, timer_func);
 	}
 
 	{
-		*name_ptr = glue_unpack(__pos, __msg, __ext, char const*);
-		if (*name_ptr) {
-			char* writable = (char*)*name_ptr;
-			*writable = glue_unpack(__pos, __msg, __ext, char);
-		}
-
+		*data_ptr = glue_unpack(__pos, __msg, __ext, unsigned long);
 	}
 
-	{
-		*key_ptr = glue_unpack(__pos, __msg, __ext, struct lock_class_key*);
-		if (*key_ptr) {
-			callee_unmarshal_kernel__init_timer_key__key__in(__pos, __msg, __ext, ctx, *key_ptr);
-		}
-
-	}
-
-	init_timer_key(timer, flags, name, key);
+	printk("%s, timer %p | func %p | data %lx\n", __func__, timer,
+				func, data);
+	lvd_setup_timer(timer, func, data);
 
 	*__pos = 0;
 	{
+		__maybe_unused const void* __adjusted = *timer_ptr;
+		glue_pack_shadow(__pos, __msg, __ext, __adjusted);
 		if (*timer_ptr) {
-			callee_marshal_kernel__init_timer_key__timer__in(__pos, __msg, __ext, ctx, *timer_ptr);
+			callee_marshal_kernel__lvd_setup_timer__timer__io(__pos, __msg, __ext, ctx, *timer_ptr);
 		}
 
 	}
@@ -285,14 +319,6 @@ void init_timer_key_callee(struct fipc_message* __msg, struct ext_registers* __e
 	}
 
 	{
-		(void)name_ptr;
-	}
-
-	{
-		if (*key_ptr) {
-			callee_marshal_kernel__init_timer_key__key__in(__pos, __msg, __ext, ctx, *key_ptr);
-		}
-
 	}
 
 	__msg->regs[0] = *__pos;
@@ -323,7 +349,7 @@ void mod_timer_callee(struct fipc_message* __msg, struct ext_registers* __ext)
 	{
 		*timer_ptr = glue_unpack_shadow(__pos, __msg, __ext, struct timer_list*);
 		if (*timer_ptr) {
-			callee_unmarshal_kernel__mod_timer__timer__io(__pos, __msg, __ext, ctx, *timer_ptr);
+			callee_unmarshal_kernel__mod_timer__timer__in(__pos, __msg, __ext, ctx, *timer_ptr);
 		}
 
 	}
@@ -336,10 +362,8 @@ void mod_timer_callee(struct fipc_message* __msg, struct ext_registers* __ext)
 
 	*__pos = 0;
 	{
-		__maybe_unused const void* __adjusted = *timer_ptr;
-		glue_pack_shadow(__pos, __msg, __ext, __adjusted);
 		if (*timer_ptr) {
-			callee_marshal_kernel__mod_timer__timer__io(__pos, __msg, __ext, ctx, *timer_ptr);
+			callee_marshal_kernel__mod_timer__timer__in(__pos, __msg, __ext, ctx, *timer_ptr);
 		}
 
 	}
@@ -1106,7 +1130,19 @@ int xhci_gen_setup_with_xhci(struct usb_hcd* hcd, struct xhci_hcd* xhci, fptr_ge
 
 	if (verbose_debug) {
 		printk("%s:%d, entered!\n", __func__, __LINE__);
+		printk("%s sizeof(struct usb_hcd) %zu | sizeof(struct xhci_hcd) %zu\n",
+				__func__, sizeof(struct usb_hcd), sizeof(struct xhci_hcd));
+
+		if (usb_hcd_is_primary_hcd(hcd)) {
+			printk("%s, hcd %p primary_hcd %p\n",
+					__func__, hcd, hcd->primary_hcd);
+
+			printk("%s:%d hcd %p | hcd->hcd_priv %p | xhci %p\n",
+				       	__func__, __LINE__,
+					hcd, hcd->hcd_priv, xhci);
+		}
 	}
+
 
 	{
 		__maybe_unused const void* __adjusted = *hcd_ptr;
@@ -1123,14 +1159,17 @@ int xhci_gen_setup_with_xhci(struct usb_hcd* hcd, struct xhci_hcd* xhci, fptr_ge
 	{
 		__maybe_unused const void* __adjusted = *xhci_ptr;
 		const ptrdiff_t __offset = (void*)__adjusted - (void*) hcd;
+
+		printk("%s:%d mapping offset for xhci(hcd_priv) %lu\n", __func__, __LINE__, __offset);
+
 		if (__offset >= (sizeof(struct xhci_hcd) + sizeof(struct usb_hcd)) || __offset < 0)
 			glue_user_panic("Bounds check failed!");
 
 		glue_pack(__pos, __msg, __ext, __offset);
-
 		if (*xhci_ptr) {
 			caller_marshal_kernel__xhci_gen_setup_with_xhci__xhci_hcd__in(__pos, __msg, __ext, ctx, *xhci_ptr);
 		}
+
 	}
 
   	if (0)
@@ -4195,19 +4234,19 @@ int try_dispatch(enum RPC_ID id, struct fipc_message* __msg, struct ext_register
 		del_timer_callee(__msg, __ext);
 		break;
 
-	case RPC_ID_del_timer_sync:
-		glue_user_trace("del_timer_sync\n");
-		del_timer_sync_callee(__msg, __ext);
-		break;
-
 	case RPC_ID_free_irq:
 		glue_user_trace("free_irq\n");
 		free_irq_callee(__msg, __ext);
 		break;
 
-	case RPC_ID_init_timer_key:
-		glue_user_trace("init_timer_key\n");
-		init_timer_key_callee(__msg, __ext);
+	case RPC_ID_del_timer_sync:
+		glue_user_trace("del_timer_sync\n");
+		del_timer_sync_callee(__msg, __ext);
+		break;
+
+	case RPC_ID_lvd_setup_timer:
+		glue_user_trace("lvd_setup_timer\n");
+		lvd_setup_timer_callee(__msg, __ext);
 		break;
 
 	case RPC_ID_mod_timer:

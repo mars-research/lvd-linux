@@ -150,12 +150,13 @@ enum RPC_ID {
 	MODULE_INIT,
 	MODULE_EXIT,
 	RPC_ID_shared_mem_init,
-	RPC_ID_add_timer,
 	RPC_ID_complete,
+	RPC_ID_add_timer,
 	RPC_ID_del_timer,
-	RPC_ID_del_timer_sync,
 	RPC_ID_free_irq,
-	RPC_ID_init_timer_key,
+	RPC_ID_del_timer_sync,
+	RPC_ID_timer_func,
+	RPC_ID_lvd_setup_timer,
 	RPC_ID_mod_timer,
 	RPC_ID_pci_disable_msi,
 	RPC_ID_pci_disable_msix,
@@ -219,6 +220,12 @@ enum RPC_ID {
 };
 
 int try_dispatch(enum RPC_ID id, struct fipc_message* __msg, struct ext_registers* __ext);
+
+typedef void (*fptr_timer_func)(unsigned long data);
+typedef void (*fptr_impl_timer_func)(fptr_timer_func target, unsigned long data);
+
+LCD_TRAMPOLINE_DATA(trmp_timer_func)
+void LCD_TRAMPOLINE_LINKAGE(trmp_timer_func) trmp_timer_func(unsigned long data);
 
 typedef unsigned int (*fptr_thread_fn)(int irq, void* id);
 typedef unsigned int (*fptr_impl_thread_fn)(fptr_thread_fn target, int irq, void* id);
@@ -418,20 +425,23 @@ struct del_timer_call_ctx {
 	struct timer_list* timer;
 };
 
-struct del_timer_sync_call_ctx {
-	struct timer_list* timer;
-};
-
 struct free_irq_call_ctx {
 	unsigned int irq;
 	void* dev_id;
 };
 
-struct init_timer_key_call_ctx {
+struct del_timer_sync_call_ctx {
 	struct timer_list* timer;
-	unsigned int flags;
-	char const* name;
-	struct lock_class_key* key;
+};
+
+struct timer_func_call_ctx {
+	unsigned long data;
+};
+
+struct lvd_setup_timer_call_ctx {
+	struct timer_list* timer;
+	fptr_timer_func func;
+	unsigned long data;
 };
 
 struct mod_timer_call_ctx {
@@ -773,34 +783,6 @@ void caller_unmarshal_kernel__add_timer__timer__in(
 	struct add_timer_call_ctx const* call_ctx,
 	struct timer_list* ptr);
 
-void caller_marshal_kernel__add_timer__hlist_node__in(
-	size_t* __pos,
-	struct fipc_message* __msg,
-	struct ext_registers* __ext,
-	struct add_timer_call_ctx const* call_ctx,
-	struct hlist_node const* ptr);
-
-void callee_unmarshal_kernel__add_timer__hlist_node__in(
-	size_t* __pos,
-	const struct fipc_message* __msg,
-	const struct ext_registers* __ext,
-	struct add_timer_call_ctx const* call_ctx,
-	struct hlist_node* ptr);
-
-void callee_marshal_kernel__add_timer__hlist_node__in(
-	size_t* __pos,
-	struct fipc_message* __msg,
-	struct ext_registers* __ext,
-	struct add_timer_call_ctx const* call_ctx,
-	struct hlist_node const* ptr);
-
-void caller_unmarshal_kernel__add_timer__hlist_node__in(
-	size_t* __pos,
-	const struct fipc_message* __msg,
-	const struct ext_registers* __ext,
-	struct add_timer_call_ctx const* call_ctx,
-	struct hlist_node* ptr);
-
 void caller_marshal_kernel__complete__x__io(
 	size_t* __pos,
 	struct fipc_message* __msg,
@@ -857,34 +839,6 @@ void caller_unmarshal_kernel__del_timer__timer__in(
 	struct del_timer_call_ctx const* call_ctx,
 	struct timer_list* ptr);
 
-void caller_marshal_kernel__del_timer__hlist_node__in(
-	size_t* __pos,
-	struct fipc_message* __msg,
-	struct ext_registers* __ext,
-	struct del_timer_call_ctx const* call_ctx,
-	struct hlist_node const* ptr);
-
-void callee_unmarshal_kernel__del_timer__hlist_node__in(
-	size_t* __pos,
-	const struct fipc_message* __msg,
-	const struct ext_registers* __ext,
-	struct del_timer_call_ctx const* call_ctx,
-	struct hlist_node* ptr);
-
-void callee_marshal_kernel__del_timer__hlist_node__in(
-	size_t* __pos,
-	struct fipc_message* __msg,
-	struct ext_registers* __ext,
-	struct del_timer_call_ctx const* call_ctx,
-	struct hlist_node const* ptr);
-
-void caller_unmarshal_kernel__del_timer__hlist_node__in(
-	size_t* __pos,
-	const struct fipc_message* __msg,
-	const struct ext_registers* __ext,
-	struct del_timer_call_ctx const* call_ctx,
-	struct hlist_node* ptr);
-
 void caller_marshal_kernel__del_timer_sync__timer__in(
 	size_t* __pos,
 	struct fipc_message* __msg,
@@ -913,173 +867,61 @@ void caller_unmarshal_kernel__del_timer_sync__timer__in(
 	struct del_timer_sync_call_ctx const* call_ctx,
 	struct timer_list* ptr);
 
-void caller_marshal_kernel__del_timer_sync__hlist_node__in(
+void caller_marshal_kernel__lvd_setup_timer__timer__io(
 	size_t* __pos,
 	struct fipc_message* __msg,
 	struct ext_registers* __ext,
-	struct del_timer_sync_call_ctx const* call_ctx,
-	struct hlist_node const* ptr);
-
-void callee_unmarshal_kernel__del_timer_sync__hlist_node__in(
-	size_t* __pos,
-	const struct fipc_message* __msg,
-	const struct ext_registers* __ext,
-	struct del_timer_sync_call_ctx const* call_ctx,
-	struct hlist_node* ptr);
-
-void callee_marshal_kernel__del_timer_sync__hlist_node__in(
-	size_t* __pos,
-	struct fipc_message* __msg,
-	struct ext_registers* __ext,
-	struct del_timer_sync_call_ctx const* call_ctx,
-	struct hlist_node const* ptr);
-
-void caller_unmarshal_kernel__del_timer_sync__hlist_node__in(
-	size_t* __pos,
-	const struct fipc_message* __msg,
-	const struct ext_registers* __ext,
-	struct del_timer_sync_call_ctx const* call_ctx,
-	struct hlist_node* ptr);
-
-void caller_marshal_kernel__init_timer_key__timer__in(
-	size_t* __pos,
-	struct fipc_message* __msg,
-	struct ext_registers* __ext,
-	struct init_timer_key_call_ctx const* call_ctx,
+	struct lvd_setup_timer_call_ctx const* call_ctx,
 	struct timer_list const* ptr);
 
-void callee_unmarshal_kernel__init_timer_key__timer__in(
+void callee_unmarshal_kernel__lvd_setup_timer__timer__io(
 	size_t* __pos,
 	const struct fipc_message* __msg,
 	const struct ext_registers* __ext,
-	struct init_timer_key_call_ctx const* call_ctx,
+	struct lvd_setup_timer_call_ctx const* call_ctx,
 	struct timer_list* ptr);
 
-void callee_marshal_kernel__init_timer_key__timer__in(
+void callee_marshal_kernel__lvd_setup_timer__timer__io(
 	size_t* __pos,
 	struct fipc_message* __msg,
 	struct ext_registers* __ext,
-	struct init_timer_key_call_ctx const* call_ctx,
+	struct lvd_setup_timer_call_ctx const* call_ctx,
 	struct timer_list const* ptr);
 
-void caller_unmarshal_kernel__init_timer_key__timer__in(
+void caller_unmarshal_kernel__lvd_setup_timer__timer__io(
 	size_t* __pos,
 	const struct fipc_message* __msg,
 	const struct ext_registers* __ext,
-	struct init_timer_key_call_ctx const* call_ctx,
+	struct lvd_setup_timer_call_ctx const* call_ctx,
 	struct timer_list* ptr);
 
-void caller_marshal_kernel__init_timer_key__hlist_node__in(
-	size_t* __pos,
-	struct fipc_message* __msg,
-	struct ext_registers* __ext,
-	struct init_timer_key_call_ctx const* call_ctx,
-	struct hlist_node const* ptr);
-
-void callee_unmarshal_kernel__init_timer_key__hlist_node__in(
-	size_t* __pos,
-	const struct fipc_message* __msg,
-	const struct ext_registers* __ext,
-	struct init_timer_key_call_ctx const* call_ctx,
-	struct hlist_node* ptr);
-
-void callee_marshal_kernel__init_timer_key__hlist_node__in(
-	size_t* __pos,
-	struct fipc_message* __msg,
-	struct ext_registers* __ext,
-	struct init_timer_key_call_ctx const* call_ctx,
-	struct hlist_node const* ptr);
-
-void caller_unmarshal_kernel__init_timer_key__hlist_node__in(
-	size_t* __pos,
-	const struct fipc_message* __msg,
-	const struct ext_registers* __ext,
-	struct init_timer_key_call_ctx const* call_ctx,
-	struct hlist_node* ptr);
-
-void caller_marshal_kernel__init_timer_key__key__in(
-	size_t* __pos,
-	struct fipc_message* __msg,
-	struct ext_registers* __ext,
-	struct init_timer_key_call_ctx const* call_ctx,
-	struct lock_class_key const* ptr);
-
-void callee_unmarshal_kernel__init_timer_key__key__in(
-	size_t* __pos,
-	const struct fipc_message* __msg,
-	const struct ext_registers* __ext,
-	struct init_timer_key_call_ctx const* call_ctx,
-	struct lock_class_key* ptr);
-
-void callee_marshal_kernel__init_timer_key__key__in(
-	size_t* __pos,
-	struct fipc_message* __msg,
-	struct ext_registers* __ext,
-	struct init_timer_key_call_ctx const* call_ctx,
-	struct lock_class_key const* ptr);
-
-void caller_unmarshal_kernel__init_timer_key__key__in(
-	size_t* __pos,
-	const struct fipc_message* __msg,
-	const struct ext_registers* __ext,
-	struct init_timer_key_call_ctx const* call_ctx,
-	struct lock_class_key* ptr);
-
-void caller_marshal_kernel__mod_timer__timer__io(
+void caller_marshal_kernel__mod_timer__timer__in(
 	size_t* __pos,
 	struct fipc_message* __msg,
 	struct ext_registers* __ext,
 	struct mod_timer_call_ctx const* call_ctx,
 	struct timer_list const* ptr);
 
-void callee_unmarshal_kernel__mod_timer__timer__io(
+void callee_unmarshal_kernel__mod_timer__timer__in(
 	size_t* __pos,
 	const struct fipc_message* __msg,
 	const struct ext_registers* __ext,
 	struct mod_timer_call_ctx const* call_ctx,
 	struct timer_list* ptr);
 
-void callee_marshal_kernel__mod_timer__timer__io(
+void callee_marshal_kernel__mod_timer__timer__in(
 	size_t* __pos,
 	struct fipc_message* __msg,
 	struct ext_registers* __ext,
 	struct mod_timer_call_ctx const* call_ctx,
 	struct timer_list const* ptr);
 
-void caller_unmarshal_kernel__mod_timer__timer__io(
+void caller_unmarshal_kernel__mod_timer__timer__in(
 	size_t* __pos,
 	const struct fipc_message* __msg,
 	const struct ext_registers* __ext,
 	struct mod_timer_call_ctx const* call_ctx,
 	struct timer_list* ptr);
-
-void caller_marshal_kernel__mod_timer__hlist_node__io(
-	size_t* __pos,
-	struct fipc_message* __msg,
-	struct ext_registers* __ext,
-	struct mod_timer_call_ctx const* call_ctx,
-	struct hlist_node const* ptr);
-
-void callee_unmarshal_kernel__mod_timer__hlist_node__io(
-	size_t* __pos,
-	const struct fipc_message* __msg,
-	const struct ext_registers* __ext,
-	struct mod_timer_call_ctx const* call_ctx,
-	struct hlist_node* ptr);
-
-void callee_marshal_kernel__mod_timer__hlist_node__io(
-	size_t* __pos,
-	struct fipc_message* __msg,
-	struct ext_registers* __ext,
-	struct mod_timer_call_ctx const* call_ctx,
-	struct hlist_node const* ptr);
-
-void caller_unmarshal_kernel__mod_timer__hlist_node__io(
-	size_t* __pos,
-	const struct fipc_message* __msg,
-	const struct ext_registers* __ext,
-	struct mod_timer_call_ctx const* call_ctx,
-	struct hlist_node* ptr);
 
 void caller_marshal_kernel__pci_disable_msi__dev__in(
 	size_t* __pos,

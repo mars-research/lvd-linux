@@ -1,67 +1,47 @@
 module kernel {
 
-rpc void  add_timer( projection timer [alloc(callee)] * timer ) {
-		/*projection < struct hlist_node> hlist_node {
-			projection hlist_node_hlist_node** pprev;
-		}*/
-	projection < struct timer_list > timer {
-		projection hlist_node entry;
-		long unsigned int [in, out] expires;
+	rpc void  add_timer( projection timer [bind(callee)] * timer ) {
+		projection < struct timer_list > timer {
+			long unsigned int [in, out] expires;
+		}
 	}
-	projection < struct hlist_node > hlist_node {
-	}
-}
+
 rpc void  complete( projection x* [in, out] x ) {
 	projection < struct completion > x {
 		unsigned int [in, out] done;
 	}
 }
-rpc int  del_timer( projection timer [bind(callee)] * timer ) {
-		/*projection < struct hlist_node> hlist_node {
-			projection hlist_node_hlist_node** pprev;
-		}*/
-	projection < struct timer_list > timer {
-		projection hlist_node entry;
+	rpc int  del_timer( projection timer [bind(callee)] * timer ) {
+
+		projection < struct timer_list > timer {
+		}
 	}
-	projection < struct hlist_node > hlist_node {
-	}
-}
-rpc int  del_timer_sync( projection timer [bind(callee)] * timer ) {
-		/*projection < struct hlist_node> hlist_node {
-			projection hlist_node_hlist_node** pprev;
-		}*/
-	projection < struct timer_list > timer {
-		projection hlist_node entry;
-	}
-	projection < struct hlist_node > hlist_node {
-	}
-}
 
 rpc void  free_irq( unsigned int  irq, void*  dev_id ) {
 }
-rpc void  init_timer_key( projection timer* [in] timer, unsigned int  flags, const char*  name, projection key*  key ) {
-		/*projection < struct hlist_node> hlist_node {
-			projection hlist_node_hlist_node** pprev;
-		}*/
-	projection < struct timer_list > timer {
-		projection hlist_node entry;
+
+
+	rpc int del_timer_sync( projection timer [bind(callee)] *timer ) {
+		projection < struct timer_list > timer {
+		}
 	}
-	projection < struct hlist_node > hlist_node {
+
+	rpc_ptr void timer_func(unsigned long data) {
 	}
-	projection < struct lock_class_key > key {
+
+	rpc void  lvd_setup_timer( projection timer [alloc(callee), bind(callee)] * [in, out] timer,
+			rpc_ptr timer_func func, unsigned long data ) {
+		projection < struct timer_list > timer {
+			unsigned long [out] data;
+		}
 	}
-}
-rpc int  mod_timer( projection timer* [in, out] timer, long unsigned int  expires ) {
-		/*projection < struct hlist_node> hlist_node {
-			projection hlist_node_hlist_node** pprev;
-		}*/
-	projection < struct timer_list > timer {
-		projection hlist_node entry;
-		long unsigned int [in, out] expires;
+
+	rpc int mod_timer( projection timer [bind(callee)] *timer, unsigned long expires ) {
+		projection < struct timer_list > timer {
+			long unsigned int [out] expires;
+		}
 	}
-	projection < struct hlist_node > hlist_node {
-	}
-}
+
 rpc void  pci_disable_msi( projection dev* [in] dev ) {
 	projection < struct pci_dev > dev {
 		unsigned int [out] irq;

@@ -569,7 +569,9 @@ int xhci_init(struct usb_hcd *hcd)
 		xhci_dbg_trace(xhci, trace_xhci_dbg_init,
 				"xHCI doesn't need link TRB QUIRK");
 	}
-	retval = xhci_mem_init(xhci, GFP_KERNEL);
+
+	printk("%s, hcd %p xhci %p\n", __func__, hcd, xhci);
+	//retval = xhci_mem_init(xhci, GFP_KERNEL);
 	xhci_dbg_trace(xhci, trace_xhci_dbg_init, "Finished xhci_init");
 
 	/* Initializing Compliance Mode Recovery Data If Needed */
@@ -4883,6 +4885,7 @@ int xhci_gen_setup_with_xhci(struct usb_hcd *hcd, struct xhci_hcd *xhci, xhci_ge
 #endif
 
 	if (usb_hcd_is_primary_hcd(hcd)) {
+		printk("%s, primary hcd setting main_hcd to %p\n", __func__, hcd);
 		xhci->main_hcd = hcd;
 		/* Mark the first roothub as being USB 2.0.
 		 * The xHCI driver will register the USB 3.0 roothub.

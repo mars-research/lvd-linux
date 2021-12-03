@@ -153,7 +153,7 @@ void free_irq_callee(struct fipc_message* __msg, struct ext_registers* __ext)
 	}
 
 	{
-		*dev_id_ptr = glue_unpack(__pos, __msg, __ext, void*);
+		*dev_id_ptr = glue_unpack_shadow(__pos, __msg, __ext, void*);
 		if (*dev_id_ptr) {
 		}
 
@@ -459,6 +459,103 @@ void pci_disable_msix_callee(struct fipc_message* __msg, struct ext_registers* _
 	}
 }
 
+void pci_enable_msix_range_callee(struct fipc_message* __msg, struct ext_registers* __ext)
+{
+	size_t n_pos = 0;
+	size_t* __pos = &n_pos;
+
+	struct pci_dev* dev = 0;
+	struct msix_entry* entries = 0;
+	int minvec = 0;
+	int maxvec = 0;
+	struct pci_dev** dev_ptr = &dev;
+	struct msix_entry** entries_ptr = &entries;
+	int* minvec_ptr = &minvec;
+	int* maxvec_ptr = &maxvec;
+	int ret = 0;
+	int* ret_ptr = &ret;
+	
+	__maybe_unused struct pci_enable_msix_range_call_ctx call_ctx = {dev, entries, minvec, maxvec};
+	__maybe_unused struct pci_enable_msix_range_call_ctx *ctx = &call_ctx;
+
+	if (verbose_debug) {
+		printk("%s:%d, entered!\n", __func__, __LINE__);
+	}
+
+	{
+		*dev_ptr = glue_unpack(__pos, __msg, __ext, struct pci_dev*);
+		if (*dev_ptr) {
+			callee_unmarshal_kernel__pci_enable_msix_range__dev__in(__pos, __msg, __ext, ctx, *dev_ptr);
+		}
+
+	}
+
+	{
+		size_t __size = sizeof(struct msix_entry) * glue_peek(__pos, __msg, __ext);
+		*entries_ptr = glue_unpack_new_shadow(__pos, __msg, __ext, struct msix_entry*, (__size), (DEFAULT_GFP_FLAGS));
+		if (*entries_ptr) {
+			int i;
+			struct msix_entry* array = *entries_ptr;
+			size_t len = glue_unpack(__pos, __msg, __ext, size_t);
+			for (i = 0; i < len; ++i) {
+				struct msix_entry* element = &array[i];
+				callee_unmarshal_kernel__pci_enable_msix_range__entries__io(__pos, __msg, __ext, ctx, element);
+			}
+
+		}
+
+	}
+
+	{
+		*minvec_ptr = glue_unpack(__pos, __msg, __ext, int);
+	}
+
+	{
+		*maxvec_ptr = glue_unpack(__pos, __msg, __ext, int);
+	}
+
+	ret = pci_enable_msix_range(dev, entries, minvec, maxvec);
+
+	*__pos = 0;
+	{
+		if (*dev_ptr) {
+			callee_marshal_kernel__pci_enable_msix_range__dev__in(__pos, __msg, __ext, ctx, *dev_ptr);
+		}
+
+	}
+
+	{
+		__maybe_unused const void* __adjusted = *entries_ptr;
+		glue_pack_shadow(__pos, __msg, __ext, __adjusted);
+		if (*entries_ptr) {
+			size_t i, len = (ctx->maxvec);
+			struct msix_entry* array = *entries_ptr;
+			glue_pack(__pos, __msg, __ext, len);
+			for (i = 0; i < len; ++i) {
+				struct msix_entry* element = &array[i];
+				callee_marshal_kernel__pci_enable_msix_range__entries__io(__pos, __msg, __ext, ctx, element);
+			}
+
+		}
+
+	}
+
+	{
+	}
+
+	{
+	}
+
+	{
+		glue_pack(__pos, __msg, __ext, *ret_ptr);
+	}
+
+	__msg->regs[0] = *__pos;
+	if (verbose_debug) {
+		printk("%s:%d, returned!\n", __func__, __LINE__);
+	}
+}
+
 void pci_enable_msi_range_callee(struct fipc_message* __msg, struct ext_registers* __ext)
 {
 	size_t n_pos = 0;
@@ -502,86 +599,6 @@ void pci_enable_msi_range_callee(struct fipc_message* __msg, struct ext_register
 	{
 		if (*dev_ptr) {
 			callee_marshal_kernel__pci_enable_msi_range__dev__in(__pos, __msg, __ext, ctx, *dev_ptr);
-		}
-
-	}
-
-	{
-	}
-
-	{
-	}
-
-	{
-		glue_pack(__pos, __msg, __ext, *ret_ptr);
-	}
-
-	__msg->regs[0] = *__pos;
-	if (verbose_debug) {
-		printk("%s:%d, returned!\n", __func__, __LINE__);
-	}
-}
-
-void pci_enable_msix_range_callee(struct fipc_message* __msg, struct ext_registers* __ext)
-{
-	size_t n_pos = 0;
-	size_t* __pos = &n_pos;
-
-	struct pci_dev* dev = 0;
-	struct msix_entry* entries = 0;
-	int minvec = 0;
-	int maxvec = 0;
-	struct pci_dev** dev_ptr = &dev;
-	struct msix_entry** entries_ptr = &entries;
-	int* minvec_ptr = &minvec;
-	int* maxvec_ptr = &maxvec;
-	int ret = 0;
-	int* ret_ptr = &ret;
-	
-	__maybe_unused struct pci_enable_msix_range_call_ctx call_ctx = {dev, entries, minvec, maxvec};
-	__maybe_unused struct pci_enable_msix_range_call_ctx *ctx = &call_ctx;
-
-	if (verbose_debug) {
-		printk("%s:%d, entered!\n", __func__, __LINE__);
-	}
-
-	{
-		*dev_ptr = glue_unpack(__pos, __msg, __ext, struct pci_dev*);
-		if (*dev_ptr) {
-			callee_unmarshal_kernel__pci_enable_msix_range__dev__in(__pos, __msg, __ext, ctx, *dev_ptr);
-		}
-
-	}
-
-	{
-		*entries_ptr = glue_unpack(__pos, __msg, __ext, struct msix_entry*);
-		if (*entries_ptr) {
-			callee_unmarshal_kernel__pci_enable_msix_range__entries__in(__pos, __msg, __ext, ctx, *entries_ptr);
-		}
-
-	}
-
-	{
-		*minvec_ptr = glue_unpack(__pos, __msg, __ext, int);
-	}
-
-	{
-		*maxvec_ptr = glue_unpack(__pos, __msg, __ext, int);
-	}
-
-	ret = pci_enable_msix_range(dev, entries, minvec, maxvec);
-
-	*__pos = 0;
-	{
-		if (*dev_ptr) {
-			callee_marshal_kernel__pci_enable_msix_range__dev__in(__pos, __msg, __ext, ctx, *dev_ptr);
-		}
-
-	}
-
-	{
-		if (*entries_ptr) {
-			callee_marshal_kernel__pci_enable_msix_range__entries__in(__pos, __msg, __ext, ctx, *entries_ptr);
 		}
 
 	}
@@ -799,7 +816,6 @@ void request_threaded_irq_callee(struct fipc_message* __msg, struct ext_register
 	void* dev_id = 0;
 	unsigned int* irq_ptr = &irq;
 	fptr_handler* handler_ptr = &handler;
-	fptr_thread_fn* thread_fn_ptr = &thread_fn;
 	unsigned long* irqflags_ptr = &irqflags;
 	char const** devname_ptr = &devname;
 	void** dev_id_ptr = &dev_id;
@@ -822,24 +838,30 @@ void request_threaded_irq_callee(struct fipc_message* __msg, struct ext_register
 	}
 
 	{
-		*thread_fn_ptr = glue_unpack_rpc_ptr(__pos, __msg, __ext, thread_fn);
-	}
-
-	{
 		*irqflags_ptr = glue_unpack(__pos, __msg, __ext, unsigned long);
 	}
 
 	{
-		*devname_ptr = glue_unpack(__pos, __msg, __ext, char const*);
+		size_t __size = sizeof(char) * glue_peek(__pos, __msg, __ext);
+		*devname_ptr = glue_unpack_new_shadow(__pos, __msg, __ext, char const*, (__size), (DEFAULT_GFP_FLAGS));
 		if (*devname_ptr) {
 			char* writable = (char*)*devname_ptr;
-			*writable = glue_unpack(__pos, __msg, __ext, char);
+			size_t i, len;
+			char* array = writable;
+			len = glue_unpack(__pos, __msg, __ext, size_t) - 1;
+			array[len] = '\0';
+			for (i = 0; i < len; ++i) {
+				char* element = &array[i];
+				*element = glue_unpack(__pos, __msg, __ext, char);
+			}
+
 		}
 
 	}
 
 	{
-		*dev_id_ptr = glue_unpack(__pos, __msg, __ext, void*);
+		size_t __size = sizeof(void*);
+		*dev_id_ptr = glue_unpack_new_shadow(__pos, __msg, __ext, void*, (__size), (DEFAULT_GFP_FLAGS));
 		if (*dev_id_ptr) {
 		}
 
@@ -848,9 +870,6 @@ void request_threaded_irq_callee(struct fipc_message* __msg, struct ext_register
 	ret = request_threaded_irq(irq, handler, thread_fn, irqflags, devname, dev_id);
 
 	*__pos = 0;
-	{
-	}
-
 	{
 	}
 
@@ -1143,7 +1162,6 @@ int xhci_gen_setup_with_xhci(struct usb_hcd* hcd, struct xhci_hcd* xhci, fptr_ge
 		}
 	}
 
-
 	{
 		__maybe_unused const void* __adjusted = *hcd_ptr;
 		glue_pack(__pos, __msg, __ext, __adjusted);
@@ -1296,7 +1314,7 @@ int xhci_run(struct usb_hcd* hcd)
 
 	{
 		__maybe_unused const void* __adjusted = *hcd_ptr;
-		glue_pack_shadow(__pos, __msg, __ext, __adjusted);
+		glue_pack(__pos, __msg, __ext, __adjusted);
 		if (*hcd_ptr) {
 			caller_marshal_kernel__xhci_run__hcd__in(__pos, __msg, __ext, ctx, *hcd_ptr);
 		}
@@ -3890,7 +3908,7 @@ unsigned int trmp_impl_hc_driver_irq(fptr_hc_driver_irq target, struct usb_hcd* 
 	glue_pack(__pos, __msg, __ext, target);
 	{
 		__maybe_unused const void* __adjusted = *hcd_ptr;
-		glue_pack_shadow(__pos, __msg, __ext, __adjusted);
+		glue_pack(__pos, __msg, __ext, __adjusted);
 		if (*hcd_ptr) {
 			caller_marshal_kernel__hc_driver_irq__hcd__in(__pos, __msg, __ext, ctx, *hcd_ptr);
 		}
@@ -4032,7 +4050,7 @@ int LCD_TRAMPOLINE_LINKAGE(trmp_hc_driver_hub_control) trmp_hc_driver_hub_contro
 	return impl(target, hcd, typeReq, wValue, wIndex, buf, wLength);
 }
 
-int trmp_impl_hc_driver_reset(fptr_hc_driver_reset target, struct usb_hcd* cd)
+int trmp_impl_hc_driver_reset(fptr_hc_driver_reset target, struct usb_hcd* hcd)
 {
 	struct fipc_message __buffer = {0};
 	struct fipc_message *__msg = &__buffer;
@@ -4040,11 +4058,11 @@ int trmp_impl_hc_driver_reset(fptr_hc_driver_reset target, struct usb_hcd* cd)
 	size_t n_pos = 0;
 	size_t* __pos = &n_pos;
 
-	struct usb_hcd** cd_ptr = &cd;
+	struct usb_hcd** hcd_ptr = &hcd;
 	int ret = 0;
 	int* ret_ptr = &ret;
 	
-	__maybe_unused const struct hc_driver_reset_call_ctx call_ctx = {cd};
+	__maybe_unused const struct hc_driver_reset_call_ctx call_ctx = {hcd};
 	__maybe_unused const struct hc_driver_reset_call_ctx *ctx = &call_ctx;
 
 	(void)__ext;
@@ -4055,10 +4073,10 @@ int trmp_impl_hc_driver_reset(fptr_hc_driver_reset target, struct usb_hcd* cd)
 
 	glue_pack(__pos, __msg, __ext, target);
 	{
-		__maybe_unused const void* __adjusted = *cd_ptr;
-		glue_pack_shadow(__pos, __msg, __ext, __adjusted);
-		if (*cd_ptr) {
-			caller_marshal_kernel__hc_driver_reset__usb_hcd__in(__pos, __msg, __ext, ctx, *cd_ptr);
+		__maybe_unused const void* __adjusted = *hcd_ptr;
+		glue_pack(__pos, __msg, __ext, __adjusted);
+		if (*hcd_ptr) {
+			caller_marshal_kernel__hc_driver_reset__usb_hcd__in(__pos, __msg, __ext, ctx, *hcd_ptr);
 		}
 
 	}
@@ -4067,8 +4085,8 @@ int trmp_impl_hc_driver_reset(fptr_hc_driver_reset target, struct usb_hcd* cd)
 
 	*__pos = 0;
 	{
-		if (*cd_ptr) {
-			caller_unmarshal_kernel__hc_driver_reset__usb_hcd__in(__pos, __msg, __ext, ctx, *cd_ptr);
+		if (*hcd_ptr) {
+			caller_unmarshal_kernel__hc_driver_reset__usb_hcd__in(__pos, __msg, __ext, ctx, *hcd_ptr);
 		}
 
 	}
@@ -4084,16 +4102,16 @@ int trmp_impl_hc_driver_reset(fptr_hc_driver_reset target, struct usb_hcd* cd)
 }
 
 LCD_TRAMPOLINE_DATA(trmp_hc_driver_reset)
-int LCD_TRAMPOLINE_LINKAGE(trmp_hc_driver_reset) trmp_hc_driver_reset(struct usb_hcd* cd)
+int LCD_TRAMPOLINE_LINKAGE(trmp_hc_driver_reset) trmp_hc_driver_reset(struct usb_hcd* hcd)
 {
 	volatile fptr_impl_hc_driver_reset impl;
 	fptr_hc_driver_reset target;
 	LCD_TRAMPOLINE_PROLOGUE(target, trmp_hc_driver_reset);
 	impl = trmp_impl_hc_driver_reset;
-	return impl(target, cd);
+	return impl(target, hcd);
 }
 
-int trmp_impl_hc_driver_start(fptr_hc_driver_start target, struct usb_hcd* cd)
+int trmp_impl_hc_driver_start(fptr_hc_driver_start target, struct usb_hcd* hcd)
 {
 	struct fipc_message __buffer = {0};
 	struct fipc_message *__msg = &__buffer;
@@ -4101,11 +4119,11 @@ int trmp_impl_hc_driver_start(fptr_hc_driver_start target, struct usb_hcd* cd)
 	size_t n_pos = 0;
 	size_t* __pos = &n_pos;
 
-	struct usb_hcd** cd_ptr = &cd;
+	struct usb_hcd** hcd_ptr = &hcd;
 	int ret = 0;
 	int* ret_ptr = &ret;
 	
-	__maybe_unused const struct hc_driver_start_call_ctx call_ctx = {cd};
+	__maybe_unused const struct hc_driver_start_call_ctx call_ctx = {hcd};
 	__maybe_unused const struct hc_driver_start_call_ctx *ctx = &call_ctx;
 
 	(void)__ext;
@@ -4116,10 +4134,10 @@ int trmp_impl_hc_driver_start(fptr_hc_driver_start target, struct usb_hcd* cd)
 
 	glue_pack(__pos, __msg, __ext, target);
 	{
-		__maybe_unused const void* __adjusted = *cd_ptr;
+		__maybe_unused const void* __adjusted = *hcd_ptr;
 		glue_pack(__pos, __msg, __ext, __adjusted);
-		if (*cd_ptr) {
-			caller_marshal_kernel__hc_driver_start__usb_hcd__out(__pos, __msg, __ext, ctx, *cd_ptr);
+		if (*hcd_ptr) {
+			caller_marshal_kernel__hc_driver_start__usb_hcd__in(__pos, __msg, __ext, ctx, *hcd_ptr);
 		}
 
 	}
@@ -4128,8 +4146,8 @@ int trmp_impl_hc_driver_start(fptr_hc_driver_start target, struct usb_hcd* cd)
 
 	*__pos = 0;
 	{
-		if (*cd_ptr) {
-			caller_unmarshal_kernel__hc_driver_start__usb_hcd__out(__pos, __msg, __ext, ctx, *cd_ptr);
+		if (*hcd_ptr) {
+			caller_unmarshal_kernel__hc_driver_start__usb_hcd__in(__pos, __msg, __ext, ctx, *hcd_ptr);
 		}
 
 	}
@@ -4145,13 +4163,13 @@ int trmp_impl_hc_driver_start(fptr_hc_driver_start target, struct usb_hcd* cd)
 }
 
 LCD_TRAMPOLINE_DATA(trmp_hc_driver_start)
-int LCD_TRAMPOLINE_LINKAGE(trmp_hc_driver_start) trmp_hc_driver_start(struct usb_hcd* cd)
+int LCD_TRAMPOLINE_LINKAGE(trmp_hc_driver_start) trmp_hc_driver_start(struct usb_hcd* hcd)
 {
 	volatile fptr_impl_hc_driver_start impl;
 	fptr_hc_driver_start target;
 	LCD_TRAMPOLINE_PROLOGUE(target, trmp_hc_driver_start);
 	impl = trmp_impl_hc_driver_start;
-	return impl(target, cd);
+	return impl(target, hcd);
 }
 
 void get_loops_per_jiffy_callee(struct fipc_message* msg, struct ext_registers* ext)
@@ -4264,14 +4282,14 @@ int try_dispatch(enum RPC_ID id, struct fipc_message* __msg, struct ext_register
 		pci_disable_msix_callee(__msg, __ext);
 		break;
 
-	case RPC_ID_pci_enable_msi_range:
-		glue_user_trace("pci_enable_msi_range\n");
-		pci_enable_msi_range_callee(__msg, __ext);
-		break;
-
 	case RPC_ID_pci_enable_msix_range:
 		glue_user_trace("pci_enable_msix_range\n");
 		pci_enable_msix_range_callee(__msg, __ext);
+		break;
+
+	case RPC_ID_pci_enable_msi_range:
+		glue_user_trace("pci_enable_msi_range\n");
+		pci_enable_msi_range_callee(__msg, __ext);
 		break;
 
 	case RPC_ID_pci_set_power_state:

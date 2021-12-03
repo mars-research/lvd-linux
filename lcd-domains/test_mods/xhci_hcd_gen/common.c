@@ -426,50 +426,6 @@ void caller_unmarshal_kernel__pci_disable_msix__dev__in(
 	}
 }
 
-void caller_marshal_kernel__pci_enable_msi_range__dev__in(
-	size_t* __pos,
-	struct fipc_message* __msg,
-	struct ext_registers* __ext,
-	struct pci_enable_msi_range_call_ctx const* ctx,
-	struct pci_dev const* ptr)
-{
-
-}
-
-void callee_unmarshal_kernel__pci_enable_msi_range__dev__in(
-	size_t* __pos,
-	const struct fipc_message* __msg,
-	const struct ext_registers* __ext,
-	struct pci_enable_msi_range_call_ctx const* ctx,
-	struct pci_dev* ptr)
-{
-
-	{
-	}
-}
-
-void callee_marshal_kernel__pci_enable_msi_range__dev__in(
-	size_t* __pos,
-	struct fipc_message* __msg,
-	struct ext_registers* __ext,
-	struct pci_enable_msi_range_call_ctx const* ctx,
-	struct pci_dev const* ptr)
-{
-
-}
-
-void caller_unmarshal_kernel__pci_enable_msi_range__dev__in(
-	size_t* __pos,
-	const struct fipc_message* __msg,
-	const struct ext_registers* __ext,
-	struct pci_enable_msi_range_call_ctx const* ctx,
-	struct pci_dev* ptr)
-{
-
-	{
-	}
-}
-
 void caller_marshal_kernel__pci_enable_msix_range__dev__in(
 	size_t* __pos,
 	struct fipc_message* __msg,
@@ -499,6 +455,18 @@ void callee_marshal_kernel__pci_enable_msix_range__dev__in(
 	struct pci_enable_msix_range_call_ctx const* ctx,
 	struct pci_dev const* ptr)
 {
+	unsigned int __msi_enabled = ptr->msi_enabled;
+	unsigned int const* __msi_enabled_ptr = &__msi_enabled;
+	unsigned int __msix_enabled = ptr->msix_enabled;
+	unsigned int const* __msix_enabled_ptr = &__msix_enabled;
+
+	{
+		glue_pack(__pos, __msg, __ext, *__msi_enabled_ptr);
+	}
+
+	{
+		glue_pack(__pos, __msg, __ext, *__msix_enabled_ptr);
+	}
 
 }
 
@@ -509,52 +477,176 @@ void caller_unmarshal_kernel__pci_enable_msix_range__dev__in(
 	struct pci_enable_msix_range_call_ctx const* ctx,
 	struct pci_dev* ptr)
 {
+	unsigned int __msi_enabled = ptr->msi_enabled;
+	unsigned int* __msi_enabled_ptr = &__msi_enabled;
+	unsigned int __msix_enabled = ptr->msix_enabled;
+	unsigned int* __msix_enabled_ptr = &__msix_enabled;
 
 	{
+		*__msi_enabled_ptr = glue_unpack(__pos, __msg, __ext, unsigned int);
+	}
+
+	{
+		*__msix_enabled_ptr = glue_unpack(__pos, __msg, __ext, unsigned int);
+	}
+
+	{
+		ptr->msi_enabled = *__msi_enabled_ptr;
+		ptr->msix_enabled = *__msix_enabled_ptr;
 	}
 }
 
-void caller_marshal_kernel__pci_enable_msix_range__entries__in(
+void caller_marshal_kernel__pci_enable_msix_range__entries__io(
 	size_t* __pos,
 	struct fipc_message* __msg,
 	struct ext_registers* __ext,
 	struct pci_enable_msix_range_call_ctx const* ctx,
 	struct msix_entry const* ptr)
 {
+	unsigned short const* entry_ptr = &ptr->entry;
+
+	{
+		glue_pack(__pos, __msg, __ext, *entry_ptr);
+	}
 
 }
 
-void callee_unmarshal_kernel__pci_enable_msix_range__entries__in(
+void callee_unmarshal_kernel__pci_enable_msix_range__entries__io(
 	size_t* __pos,
 	const struct fipc_message* __msg,
 	const struct ext_registers* __ext,
 	struct pci_enable_msix_range_call_ctx const* ctx,
 	struct msix_entry* ptr)
 {
+	unsigned short* entry_ptr = &ptr->entry;
+
+	{
+		*entry_ptr = glue_unpack(__pos, __msg, __ext, unsigned short);
+	}
 
 	{
 	}
 }
 
-void callee_marshal_kernel__pci_enable_msix_range__entries__in(
+void callee_marshal_kernel__pci_enable_msix_range__entries__io(
 	size_t* __pos,
 	struct fipc_message* __msg,
 	struct ext_registers* __ext,
 	struct pci_enable_msix_range_call_ctx const* ctx,
 	struct msix_entry const* ptr)
 {
+	unsigned int const* vector_ptr = &ptr->vector;
+	unsigned short const* entry_ptr = &ptr->entry;
+
+	{
+		glue_pack(__pos, __msg, __ext, *vector_ptr);
+	}
+
+	{
+		glue_pack(__pos, __msg, __ext, *entry_ptr);
+	}
 
 }
 
-void caller_unmarshal_kernel__pci_enable_msix_range__entries__in(
+void caller_unmarshal_kernel__pci_enable_msix_range__entries__io(
 	size_t* __pos,
 	const struct fipc_message* __msg,
 	const struct ext_registers* __ext,
 	struct pci_enable_msix_range_call_ctx const* ctx,
 	struct msix_entry* ptr)
 {
+	unsigned int* vector_ptr = &ptr->vector;
+	unsigned short* entry_ptr = &ptr->entry;
 
 	{
+		*vector_ptr = glue_unpack(__pos, __msg, __ext, unsigned int);
+	}
+
+	{
+		*entry_ptr = glue_unpack(__pos, __msg, __ext, unsigned short);
+	}
+
+	{
+	}
+}
+
+void caller_marshal_kernel__pci_enable_msi_range__dev__in(
+	size_t* __pos,
+	struct fipc_message* __msg,
+	struct ext_registers* __ext,
+	struct pci_enable_msi_range_call_ctx const* ctx,
+	struct pci_dev const* ptr)
+{
+
+}
+
+void callee_unmarshal_kernel__pci_enable_msi_range__dev__in(
+	size_t* __pos,
+	const struct fipc_message* __msg,
+	const struct ext_registers* __ext,
+	struct pci_enable_msi_range_call_ctx const* ctx,
+	struct pci_dev* ptr)
+{
+
+	{
+	}
+}
+
+void callee_marshal_kernel__pci_enable_msi_range__dev__in(
+	size_t* __pos,
+	struct fipc_message* __msg,
+	struct ext_registers* __ext,
+	struct pci_enable_msi_range_call_ctx const* ctx,
+	struct pci_dev const* ptr)
+{
+	unsigned int __msi_enabled = ptr->msi_enabled;
+	unsigned int const* __msi_enabled_ptr = &__msi_enabled;
+	unsigned int __msix_enabled = ptr->msix_enabled;
+	unsigned int const* __msix_enabled_ptr = &__msix_enabled;
+	unsigned int const* irq_ptr = &ptr->irq;
+
+	{
+		glue_pack(__pos, __msg, __ext, *__msi_enabled_ptr);
+	}
+
+	{
+		glue_pack(__pos, __msg, __ext, *__msix_enabled_ptr);
+	}
+
+	{
+		glue_pack(__pos, __msg, __ext, *irq_ptr);
+	}
+
+}
+
+void caller_unmarshal_kernel__pci_enable_msi_range__dev__in(
+	size_t* __pos,
+	const struct fipc_message* __msg,
+	const struct ext_registers* __ext,
+	struct pci_enable_msi_range_call_ctx const* ctx,
+	struct pci_dev* ptr)
+{
+	unsigned int __msi_enabled = ptr->msi_enabled;
+	unsigned int* __msi_enabled_ptr = &__msi_enabled;
+	unsigned int __msix_enabled = ptr->msix_enabled;
+	unsigned int* __msix_enabled_ptr = &__msix_enabled;
+	unsigned int* irq_ptr = &ptr->irq;
+
+	{
+		*__msi_enabled_ptr = glue_unpack(__pos, __msg, __ext, unsigned int);
+	}
+
+	{
+		*__msix_enabled_ptr = glue_unpack(__pos, __msg, __ext, unsigned int);
+	}
+
+	{
+		*irq_ptr = glue_unpack(__pos, __msg, __ext, unsigned int);
+	}
+
+	{
+		ptr->msi_enabled = *__msi_enabled_ptr;
+		ptr->msix_enabled = *__msix_enabled_ptr;
 	}
 }
 
@@ -8689,7 +8781,7 @@ void caller_unmarshal_kernel__hc_driver_reset__usb_hcd__in(
 	}
 }
 
-void caller_marshal_kernel__hc_driver_start__usb_hcd__out(
+void caller_marshal_kernel__hc_driver_start__usb_hcd__in(
 	size_t* __pos,
 	struct fipc_message* __msg,
 	struct ext_registers* __ext,
@@ -8699,7 +8791,7 @@ void caller_marshal_kernel__hc_driver_start__usb_hcd__out(
 
 }
 
-void callee_unmarshal_kernel__hc_driver_start__usb_hcd__out(
+void callee_unmarshal_kernel__hc_driver_start__usb_hcd__in(
 	size_t* __pos,
 	const struct fipc_message* __msg,
 	const struct ext_registers* __ext,
@@ -8711,7 +8803,7 @@ void callee_unmarshal_kernel__hc_driver_start__usb_hcd__out(
 	}
 }
 
-void callee_marshal_kernel__hc_driver_start__usb_hcd__out(
+void callee_marshal_kernel__hc_driver_start__usb_hcd__in(
 	size_t* __pos,
 	struct fipc_message* __msg,
 	struct ext_registers* __ext,
@@ -8727,7 +8819,7 @@ void callee_marshal_kernel__hc_driver_start__usb_hcd__out(
 
 }
 
-void caller_unmarshal_kernel__hc_driver_start__usb_hcd__out(
+void caller_unmarshal_kernel__hc_driver_start__usb_hcd__in(
 	size_t* __pos,
 	const struct fipc_message* __msg,
 	const struct ext_registers* __ext,

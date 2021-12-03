@@ -150,8 +150,8 @@ enum RPC_ID {
 	MODULE_INIT,
 	MODULE_EXIT,
 	RPC_ID_shared_mem_init,
-	RPC_ID_complete,
 	RPC_ID_add_timer,
+	RPC_ID_complete,
 	RPC_ID_del_timer,
 	RPC_ID_free_irq,
 	RPC_ID_del_timer_sync,
@@ -160,8 +160,8 @@ enum RPC_ID {
 	RPC_ID_mod_timer,
 	RPC_ID_pci_disable_msi,
 	RPC_ID_pci_disable_msix,
-	RPC_ID_pci_enable_msi_range,
 	RPC_ID_pci_enable_msix_range,
+	RPC_ID_pci_enable_msi_range,
 	RPC_ID_pci_set_power_state,
 	RPC_ID_thread_fn,
 	RPC_ID_handler,
@@ -401,17 +401,17 @@ typedef int (*fptr_impl_hc_driver_hub_control)(fptr_hc_driver_hub_control target
 LCD_TRAMPOLINE_DATA(trmp_hc_driver_hub_control)
 int LCD_TRAMPOLINE_LINKAGE(trmp_hc_driver_hub_control) trmp_hc_driver_hub_control(struct usb_hcd* hcd, unsigned short typeReq, unsigned short wValue, unsigned short wIndex, char* buf, unsigned short wLength);
 
-typedef int (*fptr_hc_driver_reset)(struct usb_hcd* cd);
-typedef int (*fptr_impl_hc_driver_reset)(fptr_hc_driver_reset target, struct usb_hcd* cd);
+typedef int (*fptr_hc_driver_reset)(struct usb_hcd* hcd);
+typedef int (*fptr_impl_hc_driver_reset)(fptr_hc_driver_reset target, struct usb_hcd* hcd);
 
 LCD_TRAMPOLINE_DATA(trmp_hc_driver_reset)
-int LCD_TRAMPOLINE_LINKAGE(trmp_hc_driver_reset) trmp_hc_driver_reset(struct usb_hcd* cd);
+int LCD_TRAMPOLINE_LINKAGE(trmp_hc_driver_reset) trmp_hc_driver_reset(struct usb_hcd* hcd);
 
-typedef int (*fptr_hc_driver_start)(struct usb_hcd* cd);
-typedef int (*fptr_impl_hc_driver_start)(fptr_hc_driver_start target, struct usb_hcd* cd);
+typedef int (*fptr_hc_driver_start)(struct usb_hcd* hcd);
+typedef int (*fptr_impl_hc_driver_start)(fptr_hc_driver_start target, struct usb_hcd* hcd);
 
 LCD_TRAMPOLINE_DATA(trmp_hc_driver_start)
-int LCD_TRAMPOLINE_LINKAGE(trmp_hc_driver_start) trmp_hc_driver_start(struct usb_hcd* cd);
+int LCD_TRAMPOLINE_LINKAGE(trmp_hc_driver_start) trmp_hc_driver_start(struct usb_hcd* hcd);
 
 struct add_timer_call_ctx {
 	struct timer_list* timer;
@@ -457,15 +457,15 @@ struct pci_disable_msix_call_ctx {
 	struct pci_dev* dev;
 };
 
-struct pci_enable_msi_range_call_ctx {
+struct pci_enable_msix_range_call_ctx {
 	struct pci_dev* dev;
+	struct msix_entry* entries;
 	int minvec;
 	int maxvec;
 };
 
-struct pci_enable_msix_range_call_ctx {
+struct pci_enable_msi_range_call_ctx {
 	struct pci_dev* dev;
-	struct msix_entry* entries;
 	int minvec;
 	int maxvec;
 };
@@ -741,19 +741,19 @@ struct hc_driver_hub_control_call_ctx {
 };
 
 struct hc_driver_reset_call_ctx {
-	struct usb_hcd* cd;
+	struct usb_hcd* hcd;
 };
 
 struct hc_driver_start_call_ctx {
-	struct usb_hcd* cd;
+	struct usb_hcd* hcd;
 };
 
 struct get_loops_per_jiffy_call_ctx {
 };
 
 struct get_jiffies_call_ctx {
-};
 
+};
 
 void caller_marshal_kernel__add_timer__timer__in(
 	size_t* __pos,
@@ -979,34 +979,6 @@ void caller_unmarshal_kernel__pci_disable_msix__dev__in(
 	struct pci_disable_msix_call_ctx const* call_ctx,
 	struct pci_dev* ptr);
 
-void caller_marshal_kernel__pci_enable_msi_range__dev__in(
-	size_t* __pos,
-	struct fipc_message* __msg,
-	struct ext_registers* __ext,
-	struct pci_enable_msi_range_call_ctx const* call_ctx,
-	struct pci_dev const* ptr);
-
-void callee_unmarshal_kernel__pci_enable_msi_range__dev__in(
-	size_t* __pos,
-	const struct fipc_message* __msg,
-	const struct ext_registers* __ext,
-	struct pci_enable_msi_range_call_ctx const* call_ctx,
-	struct pci_dev* ptr);
-
-void callee_marshal_kernel__pci_enable_msi_range__dev__in(
-	size_t* __pos,
-	struct fipc_message* __msg,
-	struct ext_registers* __ext,
-	struct pci_enable_msi_range_call_ctx const* call_ctx,
-	struct pci_dev const* ptr);
-
-void caller_unmarshal_kernel__pci_enable_msi_range__dev__in(
-	size_t* __pos,
-	const struct fipc_message* __msg,
-	const struct ext_registers* __ext,
-	struct pci_enable_msi_range_call_ctx const* call_ctx,
-	struct pci_dev* ptr);
-
 void caller_marshal_kernel__pci_enable_msix_range__dev__in(
 	size_t* __pos,
 	struct fipc_message* __msg,
@@ -1035,33 +1007,61 @@ void caller_unmarshal_kernel__pci_enable_msix_range__dev__in(
 	struct pci_enable_msix_range_call_ctx const* call_ctx,
 	struct pci_dev* ptr);
 
-void caller_marshal_kernel__pci_enable_msix_range__entries__in(
+void caller_marshal_kernel__pci_enable_msix_range__entries__io(
 	size_t* __pos,
 	struct fipc_message* __msg,
 	struct ext_registers* __ext,
 	struct pci_enable_msix_range_call_ctx const* call_ctx,
 	struct msix_entry const* ptr);
 
-void callee_unmarshal_kernel__pci_enable_msix_range__entries__in(
+void callee_unmarshal_kernel__pci_enable_msix_range__entries__io(
 	size_t* __pos,
 	const struct fipc_message* __msg,
 	const struct ext_registers* __ext,
 	struct pci_enable_msix_range_call_ctx const* call_ctx,
 	struct msix_entry* ptr);
 
-void callee_marshal_kernel__pci_enable_msix_range__entries__in(
+void callee_marshal_kernel__pci_enable_msix_range__entries__io(
 	size_t* __pos,
 	struct fipc_message* __msg,
 	struct ext_registers* __ext,
 	struct pci_enable_msix_range_call_ctx const* call_ctx,
 	struct msix_entry const* ptr);
 
-void caller_unmarshal_kernel__pci_enable_msix_range__entries__in(
+void caller_unmarshal_kernel__pci_enable_msix_range__entries__io(
 	size_t* __pos,
 	const struct fipc_message* __msg,
 	const struct ext_registers* __ext,
 	struct pci_enable_msix_range_call_ctx const* call_ctx,
 	struct msix_entry* ptr);
+
+void caller_marshal_kernel__pci_enable_msi_range__dev__in(
+	size_t* __pos,
+	struct fipc_message* __msg,
+	struct ext_registers* __ext,
+	struct pci_enable_msi_range_call_ctx const* call_ctx,
+	struct pci_dev const* ptr);
+
+void callee_unmarshal_kernel__pci_enable_msi_range__dev__in(
+	size_t* __pos,
+	const struct fipc_message* __msg,
+	const struct ext_registers* __ext,
+	struct pci_enable_msi_range_call_ctx const* call_ctx,
+	struct pci_dev* ptr);
+
+void callee_marshal_kernel__pci_enable_msi_range__dev__in(
+	size_t* __pos,
+	struct fipc_message* __msg,
+	struct ext_registers* __ext,
+	struct pci_enable_msi_range_call_ctx const* call_ctx,
+	struct pci_dev const* ptr);
+
+void caller_unmarshal_kernel__pci_enable_msi_range__dev__in(
+	size_t* __pos,
+	const struct fipc_message* __msg,
+	const struct ext_registers* __ext,
+	struct pci_enable_msi_range_call_ctx const* call_ctx,
+	struct pci_dev* ptr);
 
 void caller_marshal_kernel__pci_set_power_state__dev__in(
 	size_t* __pos,
@@ -4339,28 +4339,28 @@ void caller_unmarshal_kernel__hc_driver_reset__usb_hcd__in(
 	struct hc_driver_reset_call_ctx const* call_ctx,
 	struct usb_hcd* ptr);
 
-void caller_marshal_kernel__hc_driver_start__usb_hcd__out(
+void caller_marshal_kernel__hc_driver_start__usb_hcd__in(
 	size_t* __pos,
 	struct fipc_message* __msg,
 	struct ext_registers* __ext,
 	struct hc_driver_start_call_ctx const* call_ctx,
 	struct usb_hcd const* ptr);
 
-void callee_unmarshal_kernel__hc_driver_start__usb_hcd__out(
+void callee_unmarshal_kernel__hc_driver_start__usb_hcd__in(
 	size_t* __pos,
 	const struct fipc_message* __msg,
 	const struct ext_registers* __ext,
 	struct hc_driver_start_call_ctx const* call_ctx,
 	struct usb_hcd* ptr);
 
-void callee_marshal_kernel__hc_driver_start__usb_hcd__out(
+void callee_marshal_kernel__hc_driver_start__usb_hcd__in(
 	size_t* __pos,
 	struct fipc_message* __msg,
 	struct ext_registers* __ext,
 	struct hc_driver_start_call_ctx const* call_ctx,
 	struct usb_hcd const* ptr);
 
-void caller_unmarshal_kernel__hc_driver_start__usb_hcd__out(
+void caller_unmarshal_kernel__hc_driver_start__usb_hcd__in(
 	size_t* __pos,
 	const struct fipc_message* __msg,
 	const struct ext_registers* __ext,

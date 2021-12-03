@@ -170,7 +170,7 @@ void free_irq(unsigned int irq, void* dev_id)
 
 	{
 		__maybe_unused const void* __adjusted = *dev_id_ptr;
-		glue_pack_shadow(__pos, __msg, __ext, __adjusted);
+		glue_pack(__pos, __msg, __ext, __adjusted);
 		if (*dev_id_ptr) {
 		}
 
@@ -477,6 +477,104 @@ void pci_disable_msix(struct pci_dev* dev)
 	}
 }
 
+int pci_enable_msix_range(struct pci_dev* dev, struct msix_entry* entries, int minvec, int maxvec)
+{
+	struct fipc_message __buffer = {0};
+	struct fipc_message *__msg = &__buffer;
+	struct ext_registers* __ext = get_register_page(smp_processor_id());
+	size_t n_pos = 0;
+	size_t* __pos = &n_pos;
+
+	struct pci_dev** dev_ptr = &dev;
+	struct msix_entry** entries_ptr = &entries;
+	int* minvec_ptr = &minvec;
+	int* maxvec_ptr = &maxvec;
+	int ret = 0;
+	int* ret_ptr = &ret;
+	
+	__maybe_unused const struct pci_enable_msix_range_call_ctx call_ctx = {dev, entries, minvec, maxvec};
+	__maybe_unused const struct pci_enable_msix_range_call_ctx *ctx = &call_ctx;
+
+	(void)__ext;
+
+	if (verbose_debug) {
+		printk("%s:%d, entered!\n", __func__, __LINE__);
+	}
+
+	{
+		__maybe_unused const void* __adjusted = *dev_ptr;
+		glue_pack_shadow(__pos, __msg, __ext, __adjusted);
+		if (*dev_ptr) {
+			caller_marshal_kernel__pci_enable_msix_range__dev__in(__pos, __msg, __ext, ctx, *dev_ptr);
+		}
+
+	}
+
+	{
+		__maybe_unused const void* __adjusted = *entries_ptr;
+		glue_pack(__pos, __msg, __ext, __adjusted);
+		if (*entries_ptr) {
+			size_t i, len = (ctx->maxvec);
+			struct msix_entry* array = *entries_ptr;
+			glue_pack(__pos, __msg, __ext, len);
+			for (i = 0; i < len; ++i) {
+				struct msix_entry* element = &array[i];
+				caller_marshal_kernel__pci_enable_msix_range__entries__io(__pos, __msg, __ext, ctx, element);
+			}
+
+		}
+
+	}
+
+	{
+		glue_pack(__pos, __msg, __ext, *minvec_ptr);
+	}
+
+	{
+		glue_pack(__pos, __msg, __ext, *maxvec_ptr);
+	}
+
+	glue_call_server(__pos, __msg, RPC_ID_pci_enable_msix_range);
+
+	*__pos = 0;
+	{
+		if (*dev_ptr) {
+			caller_unmarshal_kernel__pci_enable_msix_range__dev__in(__pos, __msg, __ext, ctx, *dev_ptr);
+		}
+
+	}
+
+	{
+		*entries_ptr = glue_unpack(__pos, __msg, __ext, struct msix_entry*);
+		if (*entries_ptr) {
+			int i;
+			struct msix_entry* array = *entries_ptr;
+			size_t len = glue_unpack(__pos, __msg, __ext, size_t);
+			for (i = 0; i < len; ++i) {
+				struct msix_entry* element = &array[i];
+				caller_unmarshal_kernel__pci_enable_msix_range__entries__io(__pos, __msg, __ext, ctx, element);
+			}
+
+		}
+
+	}
+
+	{
+	}
+
+	{
+	}
+
+	{
+		*ret_ptr = glue_unpack(__pos, __msg, __ext, int);
+	}
+
+	if (verbose_debug) {
+		printk("%s:%d, returned!\n", __func__, __LINE__);
+	}
+	return ret;
+}
+
 int pci_enable_msi_range(struct pci_dev* dev, int minvec, int maxvec)
 {
 	struct fipc_message __buffer = {0};
@@ -523,89 +621,6 @@ int pci_enable_msi_range(struct pci_dev* dev, int minvec, int maxvec)
 	{
 		if (*dev_ptr) {
 			caller_unmarshal_kernel__pci_enable_msi_range__dev__in(__pos, __msg, __ext, ctx, *dev_ptr);
-		}
-
-	}
-
-	{
-	}
-
-	{
-	}
-
-	{
-		*ret_ptr = glue_unpack(__pos, __msg, __ext, int);
-	}
-
-	if (verbose_debug) {
-		printk("%s:%d, returned!\n", __func__, __LINE__);
-	}
-	return ret;
-}
-
-int pci_enable_msix_range(struct pci_dev* dev, struct msix_entry* entries, int minvec, int maxvec)
-{
-	struct fipc_message __buffer = {0};
-	struct fipc_message *__msg = &__buffer;
-	struct ext_registers* __ext = get_register_page(smp_processor_id());
-	size_t n_pos = 0;
-	size_t* __pos = &n_pos;
-
-	struct pci_dev** dev_ptr = &dev;
-	struct msix_entry** entries_ptr = &entries;
-	int* minvec_ptr = &minvec;
-	int* maxvec_ptr = &maxvec;
-	int ret = 0;
-	int* ret_ptr = &ret;
-	
-	__maybe_unused const struct pci_enable_msix_range_call_ctx call_ctx = {dev, entries, minvec, maxvec};
-	__maybe_unused const struct pci_enable_msix_range_call_ctx *ctx = &call_ctx;
-
-	(void)__ext;
-
-	if (verbose_debug) {
-		printk("%s:%d, entered!\n", __func__, __LINE__);
-	}
-
-	{
-		__maybe_unused const void* __adjusted = *dev_ptr;
-		glue_pack_shadow(__pos, __msg, __ext, __adjusted);
-		if (*dev_ptr) {
-			caller_marshal_kernel__pci_enable_msix_range__dev__in(__pos, __msg, __ext, ctx, *dev_ptr);
-		}
-
-	}
-
-	{
-		__maybe_unused const void* __adjusted = *entries_ptr;
-		glue_pack_shadow(__pos, __msg, __ext, __adjusted);
-		if (*entries_ptr) {
-			caller_marshal_kernel__pci_enable_msix_range__entries__in(__pos, __msg, __ext, ctx, *entries_ptr);
-		}
-
-	}
-
-	{
-		glue_pack(__pos, __msg, __ext, *minvec_ptr);
-	}
-
-	{
-		glue_pack(__pos, __msg, __ext, *maxvec_ptr);
-	}
-
-	glue_call_server(__pos, __msg, RPC_ID_pci_enable_msix_range);
-
-	*__pos = 0;
-	{
-		if (*dev_ptr) {
-			caller_unmarshal_kernel__pci_enable_msix_range__dev__in(__pos, __msg, __ext, ctx, *dev_ptr);
-		}
-
-	}
-
-	{
-		if (*entries_ptr) {
-			caller_unmarshal_kernel__pci_enable_msix_range__entries__in(__pos, __msg, __ext, ctx, *entries_ptr);
 		}
 
 	}
@@ -796,7 +811,6 @@ int request_threaded_irq(unsigned int irq, fptr_handler handler, fptr_thread_fn 
 
 	unsigned int* irq_ptr = &irq;
 	fptr_handler* handler_ptr = &handler;
-	fptr_thread_fn* thread_fn_ptr = &thread_fn;
 	unsigned long* irqflags_ptr = &irqflags;
 	char const** devname_ptr = &devname;
 	void** dev_id_ptr = &dev_id;
@@ -821,25 +835,29 @@ int request_threaded_irq(unsigned int irq, fptr_handler handler, fptr_thread_fn 
 	}
 
 	{
-		glue_pack(__pos, __msg, __ext, *thread_fn_ptr);
-	}
-
-	{
 		glue_pack(__pos, __msg, __ext, *irqflags_ptr);
 	}
 
 	{
 		__maybe_unused const void* __adjusted = *devname_ptr;
-		glue_pack_shadow(__pos, __msg, __ext, __adjusted);
+		glue_pack(__pos, __msg, __ext, __adjusted);
 		if (*devname_ptr) {
-			glue_pack(__pos, __msg, __ext, **devname_ptr);
+			size_t i, len;
+			char const* array = *devname_ptr;
+			for (len = 0; array[len]; ++len);
+			glue_pack(__pos, __msg, __ext, len + 1);
+			for (i = 0; i < len; ++i) {
+				char const* element = &array[i];
+				glue_pack(__pos, __msg, __ext, *element);
+			}
+
 		}
 
 	}
 
 	{
 		__maybe_unused const void* __adjusted = *dev_id_ptr;
-		glue_pack_shadow(__pos, __msg, __ext, __adjusted);
+		glue_pack(__pos, __msg, __ext, __adjusted);
 		if (*dev_id_ptr) {
 		}
 
@@ -848,9 +866,6 @@ int request_threaded_irq(unsigned int irq, fptr_handler handler, fptr_thread_fn 
 	glue_call_server(__pos, __msg, RPC_ID_request_threaded_irq);
 
 	*__pos = 0;
-	{
-	}
-
 	{
 	}
 
@@ -1270,7 +1285,7 @@ void xhci_run_callee(struct fipc_message* __msg, struct ext_registers* __ext)
 	}
 
 	{
-		*hcd_ptr = glue_unpack(__pos, __msg, __ext, struct usb_hcd*);
+		*hcd_ptr = glue_unpack_shadow(__pos, __msg, __ext, struct usb_hcd*);
 		if (*hcd_ptr) {
 			callee_unmarshal_kernel__xhci_run__hcd__in(__pos, __msg, __ext, ctx, *hcd_ptr);
 		}
@@ -3574,7 +3589,7 @@ void hc_driver_irq_callee(struct fipc_message* __msg, struct ext_registers* __ex
 	}
 
 	{
-		*hcd_ptr = glue_unpack(__pos, __msg, __ext, struct usb_hcd*);
+		*hcd_ptr = glue_unpack_shadow(__pos, __msg, __ext, struct usb_hcd*);
 		if (*hcd_ptr) {
 			callee_unmarshal_kernel__hc_driver_irq__hcd__in(__pos, __msg, __ext, ctx, *hcd_ptr);
 		}
@@ -3706,12 +3721,12 @@ void hc_driver_reset_callee(struct fipc_message* __msg, struct ext_registers* __
 	size_t* __pos = &n_pos;
 
 	fptr_hc_driver_reset function_ptr = glue_unpack(__pos, __msg, __ext, fptr_hc_driver_reset);
-	struct usb_hcd* cd = 0;
-	struct usb_hcd** cd_ptr = &cd;
+	struct usb_hcd* hcd = 0;
+	struct usb_hcd** hcd_ptr = &hcd;
 	int ret = 0;
 	int* ret_ptr = &ret;
 	
-	__maybe_unused struct hc_driver_reset_call_ctx call_ctx = {cd};
+	__maybe_unused struct hc_driver_reset_call_ctx call_ctx = {hcd};
 	__maybe_unused struct hc_driver_reset_call_ctx *ctx = &call_ctx;
 
 	if (verbose_debug) {
@@ -3719,19 +3734,19 @@ void hc_driver_reset_callee(struct fipc_message* __msg, struct ext_registers* __
 	}
 
 	{
-		*cd_ptr = glue_unpack(__pos, __msg, __ext, struct usb_hcd*);
-		if (*cd_ptr) {
-			callee_unmarshal_kernel__hc_driver_reset__usb_hcd__in(__pos, __msg, __ext, ctx, *cd_ptr);
+		*hcd_ptr = glue_unpack_shadow(__pos, __msg, __ext, struct usb_hcd*);
+		if (*hcd_ptr) {
+			callee_unmarshal_kernel__hc_driver_reset__usb_hcd__in(__pos, __msg, __ext, ctx, *hcd_ptr);
 		}
 
 	}
 
-	ret = function_ptr(cd);
+	ret = function_ptr(hcd);
 
 	*__pos = 0;
 	{
-		if (*cd_ptr) {
-			callee_marshal_kernel__hc_driver_reset__usb_hcd__in(__pos, __msg, __ext, ctx, *cd_ptr);
+		if (*hcd_ptr) {
+			callee_marshal_kernel__hc_driver_reset__usb_hcd__in(__pos, __msg, __ext, ctx, *hcd_ptr);
 		}
 
 	}
@@ -3752,12 +3767,12 @@ void hc_driver_start_callee(struct fipc_message* __msg, struct ext_registers* __
 	size_t* __pos = &n_pos;
 
 	fptr_hc_driver_start function_ptr = glue_unpack(__pos, __msg, __ext, fptr_hc_driver_start);
-	struct usb_hcd* cd = 0;
-	struct usb_hcd** cd_ptr = &cd;
+	struct usb_hcd* hcd = 0;
+	struct usb_hcd** hcd_ptr = &hcd;
 	int ret = 0;
 	int* ret_ptr = &ret;
 	
-	__maybe_unused struct hc_driver_start_call_ctx call_ctx = {cd};
+	__maybe_unused struct hc_driver_start_call_ctx call_ctx = {hcd};
 	__maybe_unused struct hc_driver_start_call_ctx *ctx = &call_ctx;
 
 	if (verbose_debug) {
@@ -3765,20 +3780,19 @@ void hc_driver_start_callee(struct fipc_message* __msg, struct ext_registers* __
 	}
 
 	{
-		size_t __size = sizeof(struct usb_hcd);
-		*cd_ptr = glue_unpack_new_shadow(__pos, __msg, __ext, struct usb_hcd*, (__size), (DEFAULT_GFP_FLAGS));
-		if (*cd_ptr) {
-			callee_unmarshal_kernel__hc_driver_start__usb_hcd__out(__pos, __msg, __ext, ctx, *cd_ptr);
+		*hcd_ptr = glue_unpack_shadow(__pos, __msg, __ext, struct usb_hcd*);
+		if (*hcd_ptr) {
+			callee_unmarshal_kernel__hc_driver_start__usb_hcd__in(__pos, __msg, __ext, ctx, *hcd_ptr);
 		}
 
 	}
 
-	ret = function_ptr(cd);
+	ret = function_ptr(hcd);
 
 	*__pos = 0;
 	{
-		if (*cd_ptr) {
-			callee_marshal_kernel__hc_driver_start__usb_hcd__out(__pos, __msg, __ext, ctx, *cd_ptr);
+		if (*hcd_ptr) {
+			callee_marshal_kernel__hc_driver_start__usb_hcd__in(__pos, __msg, __ext, ctx, *hcd_ptr);
 		}
 
 	}

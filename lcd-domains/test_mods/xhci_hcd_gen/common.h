@@ -3723,34 +3723,6 @@ void caller_unmarshal_kernel__hc_driver_add_endpoint__hcd__in(
 	struct hc_driver_add_endpoint_call_ctx const* call_ctx,
 	struct usb_hcd* ptr);
 
-void caller_marshal_kernel__hc_driver_add_endpoint__usb_hcd_primary_hcd__in(
-	size_t* __pos,
-	struct fipc_message* __msg,
-	struct ext_registers* __ext,
-	struct hc_driver_add_endpoint_call_ctx const* call_ctx,
-	struct usb_hcd const* ptr);
-
-void callee_unmarshal_kernel__hc_driver_add_endpoint__usb_hcd_primary_hcd__in(
-	size_t* __pos,
-	const struct fipc_message* __msg,
-	const struct ext_registers* __ext,
-	struct hc_driver_add_endpoint_call_ctx const* call_ctx,
-	struct usb_hcd* ptr);
-
-void callee_marshal_kernel__hc_driver_add_endpoint__usb_hcd_primary_hcd__in(
-	size_t* __pos,
-	struct fipc_message* __msg,
-	struct ext_registers* __ext,
-	struct hc_driver_add_endpoint_call_ctx const* call_ctx,
-	struct usb_hcd const* ptr);
-
-void caller_unmarshal_kernel__hc_driver_add_endpoint__usb_hcd_primary_hcd__in(
-	size_t* __pos,
-	const struct fipc_message* __msg,
-	const struct ext_registers* __ext,
-	struct hc_driver_add_endpoint_call_ctx const* call_ctx,
-	struct usb_hcd* ptr);
-
 void caller_marshal_kernel__hc_driver_add_endpoint__udev__in(
 	size_t* __pos,
 	struct fipc_message* __msg,
@@ -3773,6 +3745,34 @@ void callee_marshal_kernel__hc_driver_add_endpoint__udev__in(
 	struct usb_device const* ptr);
 
 void caller_unmarshal_kernel__hc_driver_add_endpoint__udev__in(
+	size_t* __pos,
+	const struct fipc_message* __msg,
+	const struct ext_registers* __ext,
+	struct hc_driver_add_endpoint_call_ctx const* call_ctx,
+	struct usb_device* ptr);
+
+void caller_marshal_kernel__hc_driver_add_endpoint__usb_device__in(
+	size_t* __pos,
+	struct fipc_message* __msg,
+	struct ext_registers* __ext,
+	struct hc_driver_add_endpoint_call_ctx const* call_ctx,
+	struct usb_device const* ptr);
+
+void callee_unmarshal_kernel__hc_driver_add_endpoint__usb_device__in(
+	size_t* __pos,
+	const struct fipc_message* __msg,
+	const struct ext_registers* __ext,
+	struct hc_driver_add_endpoint_call_ctx const* call_ctx,
+	struct usb_device* ptr);
+
+void callee_marshal_kernel__hc_driver_add_endpoint__usb_device__in(
+	size_t* __pos,
+	struct fipc_message* __msg,
+	struct ext_registers* __ext,
+	struct hc_driver_add_endpoint_call_ctx const* call_ctx,
+	struct usb_device const* ptr);
+
+void caller_unmarshal_kernel__hc_driver_add_endpoint__usb_device__in(
 	size_t* __pos,
 	const struct fipc_message* __msg,
 	const struct ext_registers* __ext,

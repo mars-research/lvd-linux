@@ -1104,13 +1104,6 @@ void ioremap_nocache_callee(struct fipc_message* __msg, struct ext_registers* __
 	*__pos = 0;
 
 	{
-		dump_stack();
-		if (!current->cptr_cache) {
-			printk("cptr_cache corrupt? %p\n", current->cptr_cache);
-		}
-		printk("%s:%d current %p | klcd_thread %p current-> lcd %p is_kthread %d\n", __func__, __LINE__,
-				current, klcd_thread,  current->lcd, current->flags & PF_KTHREAD);
-
 		lcd_volunteer_dev_mem(__gpa((uint64_t)*ret_ptr), get_order(size), &resource_cptr);
 		copy_msg_cap_vmfunc(klcd_thread->lcd, klcd_thread->vmfunc_lcd, resource_cptr, lcd_resource_cptr);
 		glue_pack(__pos, __msg, __ext, size);
@@ -3423,7 +3416,7 @@ int trmp_impl_hc_driver_add_endpoint(fptr_hc_driver_add_endpoint target, struct 
 	glue_pack(__pos, __msg, __ext, target);
 	{
 		__maybe_unused const void* __adjusted = *hcd_ptr;
-		glue_pack_shadow(__pos, __msg, __ext, __adjusted);
+		glue_pack(__pos, __msg, __ext, __adjusted);
 		if (*hcd_ptr) {
 			caller_marshal_kernel__hc_driver_add_endpoint__hcd__in(__pos, __msg, __ext, ctx, *hcd_ptr);
 		}
@@ -3432,7 +3425,7 @@ int trmp_impl_hc_driver_add_endpoint(fptr_hc_driver_add_endpoint target, struct 
 
 	{
 		__maybe_unused const void* __adjusted = *udev_ptr;
-		glue_pack_shadow(__pos, __msg, __ext, __adjusted);
+		glue_pack(__pos, __msg, __ext, __adjusted);
 		if (*udev_ptr) {
 			caller_marshal_kernel__hc_driver_add_endpoint__udev__in(__pos, __msg, __ext, ctx, *udev_ptr);
 		}
@@ -3441,7 +3434,7 @@ int trmp_impl_hc_driver_add_endpoint(fptr_hc_driver_add_endpoint target, struct 
 
 	{
 		__maybe_unused const void* __adjusted = *ep_ptr;
-		glue_pack_shadow(__pos, __msg, __ext, __adjusted);
+		glue_pack(__pos, __msg, __ext, __adjusted);
 		if (*ep_ptr) {
 			caller_marshal_kernel__hc_driver_add_endpoint__ep__in(__pos, __msg, __ext, ctx, *ep_ptr);
 		}

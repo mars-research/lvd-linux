@@ -617,27 +617,31 @@ rpc_ptr int  hc_driver_free_streams( projection hcd* [in] hcd, projection udev [
 	projection < struct usb_host_endpoint > eps {
 	}
 }
-rpc_ptr int  hc_driver_add_endpoint( projection hcd*  hcd, projection udev*  udev, projection ep* [in] ep ) {
-	projection < struct usb_hcd > hcd {
-		projection usb_hcd_primary_hcd* primary_hcd;
+	rpc_ptr int  hc_driver_add_endpoint( projection hcd [bind(callee)] *  hcd, projection udev [alloc(callee)] *  udev, projection ep [alloc(callee)] * ep ) {
+		projection < struct usb_hcd > hcd {
+			//projection usb_hcd_primary_hcd* primary_hcd;
 
-	}
-	projection < struct usb_hcd > usb_hcd_primary_hcd {
-		projection usb_hcd_primary_hcd* primary_hcd;
+		}
+		projection < struct usb_hcd > usb_hcd_primary_hcd {
+			//projection usb_hcd_primary_hcd* primary_hcd;
 
-	}
-	projection < struct usb_hcd > usb_hcd_primary_hcd {
-	}
-	projection < struct usb_device > udev {
-		int [in] slot_id;
-	}
+		}
+		projection < struct usb_hcd > usb_hcd_primary_hcd {
+		}
+		projection < struct usb_device > udev {
+			int slot_id;
+			projection usb_device [alloc(callee)] *parent;	
+		}
+
+		projection < struct usb_device > usb_device {
+		}
 		projection < struct usb_endpoint_descriptor> usb_endpoint_descriptor {
 			unsigned char [in] bEndpointAddress;
 		}
-	projection < struct usb_host_endpoint > ep {
-		projection usb_endpoint_descriptor desc;
+		projection < struct usb_host_endpoint > ep {
+			projection usb_endpoint_descriptor desc;
+		}
 	}
-}
 rpc_ptr int  hc_driver_drop_endpoint( projection hcd* hcd, projection udev [alloc(callee)] * udev, projection ep [alloc(callee)] * ep ) {
 	projection < struct usb_hcd > hcd {
 		projection usb_hcd_primary_hcd* primary_hcd;

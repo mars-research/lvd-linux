@@ -3185,7 +3185,7 @@ void hc_driver_add_endpoint_callee(struct fipc_message* __msg, struct ext_regist
 	}
 
 	{
-		*hcd_ptr = glue_unpack(__pos, __msg, __ext, struct usb_hcd*);
+		*hcd_ptr = glue_unpack_shadow(__pos, __msg, __ext, struct usb_hcd*);
 		if (*hcd_ptr) {
 			callee_unmarshal_kernel__hc_driver_add_endpoint__hcd__in(__pos, __msg, __ext, ctx, *hcd_ptr);
 		}
@@ -3193,7 +3193,8 @@ void hc_driver_add_endpoint_callee(struct fipc_message* __msg, struct ext_regist
 	}
 
 	{
-		*udev_ptr = glue_unpack(__pos, __msg, __ext, struct usb_device*);
+		size_t __size = sizeof(struct usb_device);
+		*udev_ptr = glue_unpack_new_shadow(__pos, __msg, __ext, struct usb_device*, (__size), (DEFAULT_GFP_FLAGS));
 		if (*udev_ptr) {
 			callee_unmarshal_kernel__hc_driver_add_endpoint__udev__in(__pos, __msg, __ext, ctx, *udev_ptr);
 		}
@@ -3201,7 +3202,8 @@ void hc_driver_add_endpoint_callee(struct fipc_message* __msg, struct ext_regist
 	}
 
 	{
-		*ep_ptr = glue_unpack(__pos, __msg, __ext, struct usb_host_endpoint*);
+		size_t __size = sizeof(struct usb_host_endpoint);
+		*ep_ptr = glue_unpack_new_shadow(__pos, __msg, __ext, struct usb_host_endpoint*, (__size), (DEFAULT_GFP_FLAGS));
 		if (*ep_ptr) {
 			callee_unmarshal_kernel__hc_driver_add_endpoint__ep__in(__pos, __msg, __ext, ctx, *ep_ptr);
 		}

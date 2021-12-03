@@ -61,9 +61,10 @@ void complete_callee(struct fipc_message* __msg, struct ext_registers* __ext)
 	}
 
 	{
-		*x_ptr = glue_unpack_shadow(__pos, __msg, __ext, struct completion*);
+		size_t __size = sizeof(struct completion);
+		*x_ptr = glue_unpack_bind_or_new_shadow(__pos, __msg, __ext, struct completion*, __size, DEFAULT_GFP_FLAGS);
 		if (*x_ptr) {
-			callee_unmarshal_kernel__complete__x__io(__pos, __msg, __ext, ctx, *x_ptr);
+			callee_unmarshal_kernel__complete__x__in(__pos, __msg, __ext, ctx, *x_ptr);
 		}
 
 	}
@@ -72,10 +73,8 @@ void complete_callee(struct fipc_message* __msg, struct ext_registers* __ext)
 
 	*__pos = 0;
 	{
-		__maybe_unused const void* __adjusted = *x_ptr;
-		glue_pack_shadow(__pos, __msg, __ext, __adjusted);
 		if (*x_ptr) {
-			callee_marshal_kernel__complete__x__io(__pos, __msg, __ext, ctx, *x_ptr);
+			callee_marshal_kernel__complete__x__in(__pos, __msg, __ext, ctx, *x_ptr);
 		}
 
 	}
@@ -514,7 +513,9 @@ void pci_enable_msix_range_callee(struct fipc_message* __msg, struct ext_registe
 		*maxvec_ptr = glue_unpack(__pos, __msg, __ext, int);
 	}
 
+	printk("%s, dev %p entries %p minvec %d maxvec %d\n", __func__, dev, entries, minvec, maxvec);
 	ret = pci_enable_msix_range(dev, entries, minvec, maxvec);
+	printk("%s, returned %d\n", __func__, ret);
 
 	*__pos = 0;
 	{
@@ -913,7 +914,8 @@ void wait_for_completion_callee(struct fipc_message* __msg, struct ext_registers
 	}
 
 	{
-		*x_ptr = glue_unpack(__pos, __msg, __ext, struct completion*);
+		size_t __size = sizeof(struct completion);
+		*x_ptr = glue_unpack_bind_or_new_shadow(__pos, __msg, __ext, struct completion*, __size, DEFAULT_GFP_FLAGS);
 		if (*x_ptr) {
 			callee_unmarshal_kernel__wait_for_completion__x__in(__pos, __msg, __ext, ctx, *x_ptr);
 		}
@@ -956,7 +958,8 @@ void wait_for_completion_timeout_callee(struct fipc_message* __msg, struct ext_r
 	}
 
 	{
-		*x_ptr = glue_unpack(__pos, __msg, __ext, struct completion*);
+		size_t __size = sizeof(struct completion);
+		*x_ptr = glue_unpack_bind_or_new_shadow(__pos, __msg, __ext, struct completion*, __size, DEFAULT_GFP_FLAGS);
 		if (*x_ptr) {
 			callee_unmarshal_kernel__wait_for_completion_timeout__x__in(__pos, __msg, __ext, ctx, *x_ptr);
 		}
@@ -2044,7 +2047,7 @@ int trmp_impl_hc_driver_enable_device(fptr_hc_driver_enable_device target, struc
 	glue_pack(__pos, __msg, __ext, target);
 	{
 		__maybe_unused const void* __adjusted = *hcd_ptr;
-		glue_pack_shadow(__pos, __msg, __ext, __adjusted);
+		glue_pack(__pos, __msg, __ext, __adjusted);
 		if (*hcd_ptr) {
 			caller_marshal_kernel__hc_driver_enable_device__hcd__in(__pos, __msg, __ext, ctx, *hcd_ptr);
 		}
@@ -2124,7 +2127,7 @@ int trmp_impl_hc_driver_update_hub_device(fptr_hc_driver_update_hub_device targe
 	glue_pack(__pos, __msg, __ext, target);
 	{
 		__maybe_unused const void* __adjusted = *hcd_ptr;
-		glue_pack_shadow(__pos, __msg, __ext, __adjusted);
+		glue_pack(__pos, __msg, __ext, __adjusted);
 		if (*hcd_ptr) {
 			caller_marshal_kernel__hc_driver_update_hub_device__hcd__in(__pos, __msg, __ext, ctx, *hcd_ptr);
 		}
@@ -2133,7 +2136,7 @@ int trmp_impl_hc_driver_update_hub_device(fptr_hc_driver_update_hub_device targe
 
 	{
 		__maybe_unused const void* __adjusted = *hdev_ptr;
-		glue_pack_shadow(__pos, __msg, __ext, __adjusted);
+		glue_pack(__pos, __msg, __ext, __adjusted);
 		if (*hdev_ptr) {
 			caller_marshal_kernel__hc_driver_update_hub_device__hdev__in(__pos, __msg, __ext, ctx, *hdev_ptr);
 		}
@@ -2142,7 +2145,7 @@ int trmp_impl_hc_driver_update_hub_device(fptr_hc_driver_update_hub_device targe
 
 	{
 		__maybe_unused const void* __adjusted = *tt_ptr;
-		glue_pack_shadow(__pos, __msg, __ext, __adjusted);
+		glue_pack(__pos, __msg, __ext, __adjusted);
 		if (*tt_ptr) {
 			caller_marshal_kernel__hc_driver_update_hub_device__tt__in(__pos, __msg, __ext, ctx, *tt_ptr);
 		}
@@ -2225,7 +2228,7 @@ int trmp_impl_hc_driver_reset_device(fptr_hc_driver_reset_device target, struct 
 	glue_pack(__pos, __msg, __ext, target);
 	{
 		__maybe_unused const void* __adjusted = *hcd_ptr;
-		glue_pack_shadow(__pos, __msg, __ext, __adjusted);
+		glue_pack(__pos, __msg, __ext, __adjusted);
 		if (*hcd_ptr) {
 			caller_marshal_kernel__hc_driver_reset_device__hcd__in(__pos, __msg, __ext, ctx, *hcd_ptr);
 		}
@@ -2234,7 +2237,7 @@ int trmp_impl_hc_driver_reset_device(fptr_hc_driver_reset_device target, struct 
 
 	{
 		__maybe_unused const void* __adjusted = *udev_ptr;
-		glue_pack_shadow(__pos, __msg, __ext, __adjusted);
+		glue_pack(__pos, __msg, __ext, __adjusted);
 		if (*udev_ptr) {
 			caller_marshal_kernel__hc_driver_reset_device__udev__in(__pos, __msg, __ext, ctx, *udev_ptr);
 		}
@@ -2786,7 +2789,7 @@ int trmp_impl_hc_driver_urb_enqueue(fptr_hc_driver_urb_enqueue target, struct us
 	glue_pack(__pos, __msg, __ext, target);
 	{
 		__maybe_unused const void* __adjusted = *hcd_ptr;
-		glue_pack_shadow(__pos, __msg, __ext, __adjusted);
+		glue_pack(__pos, __msg, __ext, __adjusted);
 		if (*hcd_ptr) {
 			caller_marshal_kernel__hc_driver_urb_enqueue__hcd__in(__pos, __msg, __ext, ctx, *hcd_ptr);
 		}
@@ -2955,7 +2958,7 @@ void trmp_impl_hc_driver_endpoint_reset(fptr_hc_driver_endpoint_reset target, st
 	glue_pack(__pos, __msg, __ext, target);
 	{
 		__maybe_unused const void* __adjusted = *hcd_ptr;
-		glue_pack_shadow(__pos, __msg, __ext, __adjusted);
+		glue_pack(__pos, __msg, __ext, __adjusted);
 		if (*hcd_ptr) {
 			caller_marshal_kernel__hc_driver_endpoint_reset__hcd__in(__pos, __msg, __ext, ctx, *hcd_ptr);
 		}
@@ -2964,7 +2967,7 @@ void trmp_impl_hc_driver_endpoint_reset(fptr_hc_driver_endpoint_reset target, st
 
 	{
 		__maybe_unused const void* __adjusted = *ep_ptr;
-		glue_pack_shadow(__pos, __msg, __ext, __adjusted);
+		glue_pack(__pos, __msg, __ext, __adjusted);
 		if (*ep_ptr) {
 			caller_marshal_kernel__hc_driver_endpoint_reset__ep__in(__pos, __msg, __ext, ctx, *ep_ptr);
 		}
@@ -3028,7 +3031,7 @@ int trmp_impl_hc_driver_alloc_dev(fptr_hc_driver_alloc_dev target, struct usb_hc
 	glue_pack(__pos, __msg, __ext, target);
 	{
 		__maybe_unused const void* __adjusted = *hcd_ptr;
-		glue_pack_shadow(__pos, __msg, __ext, __adjusted);
+		glue_pack(__pos, __msg, __ext, __adjusted);
 		if (*hcd_ptr) {
 			caller_marshal_kernel__hc_driver_alloc_dev__hcd__in(__pos, __msg, __ext, ctx, *hcd_ptr);
 		}
@@ -3605,7 +3608,7 @@ int trmp_impl_hc_driver_check_bandwidth(fptr_hc_driver_check_bandwidth target, s
 	glue_pack(__pos, __msg, __ext, target);
 	{
 		__maybe_unused const void* __adjusted = *hcd_ptr;
-		glue_pack_shadow(__pos, __msg, __ext, __adjusted);
+		glue_pack(__pos, __msg, __ext, __adjusted);
 		if (*hcd_ptr) {
 			caller_marshal_kernel__hc_driver_check_bandwidth__hcd__in(__pos, __msg, __ext, ctx, *hcd_ptr);
 		}
@@ -3967,7 +3970,7 @@ int trmp_impl_hc_driver_hub_control(fptr_hc_driver_hub_control target, struct us
 	glue_pack(__pos, __msg, __ext, target);
 	{
 		__maybe_unused const void* __adjusted = *hcd_ptr;
-		glue_pack_shadow(__pos, __msg, __ext, __adjusted);
+		glue_pack(__pos, __msg, __ext, __adjusted);
 		if (*hcd_ptr) {
 			caller_marshal_kernel__hc_driver_hub_control__hcd__in(__pos, __msg, __ext, ctx, *hcd_ptr);
 		}
@@ -3988,6 +3991,18 @@ int trmp_impl_hc_driver_hub_control(fptr_hc_driver_hub_control target, struct us
 
 	{
 		__maybe_unused const void* __adjusted = *buf_ptr;
+		glue_pack(__pos, __msg, __ext, __adjusted);
+		if (*buf_ptr) {
+			size_t i, len = (wLength);
+			char* array = *buf_ptr;
+			glue_pack(__pos, __msg, __ext, len);
+			for (i = 0; i < len; ++i) {
+				char* element = &array[i];
+				glue_pack(__pos, __msg, __ext, *element);
+			}
+
+		}
+
 	}
 
 	{
@@ -4014,8 +4029,16 @@ int trmp_impl_hc_driver_hub_control(fptr_hc_driver_hub_control target, struct us
 	}
 
 	{
+		*buf_ptr = glue_unpack(__pos, __msg, __ext, char*);
 		if (*buf_ptr) {
-			**buf_ptr = glue_unpack(__pos, __msg, __ext, char);
+			int i;
+			char* array = *buf_ptr;
+			size_t len = glue_unpack(__pos, __msg, __ext, size_t);
+			for (i = 0; i < len; ++i) {
+				char* element = &array[i];
+				*element = glue_unpack(__pos, __msg, __ext, char);
+			}
+
 		}
 
 	}

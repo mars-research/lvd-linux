@@ -142,7 +142,14 @@ rpc_export int  xhci_gen_setup_with_xhci( projection hcd [alloc<{{sizeof(*hcd) +
 	projection <struct pci_dev> pci_device {
 		unsigned short vendor;
 		unsigned short device;
+		unsigned int devfn;
+		projection pci_bus [alloc(callee)] *bus;
 	}
+
+	projection <struct pci_bus> pci_bus {
+		unsigned char number;
+	}
+
 	projection < struct hc_driver > hc_driver {
 
 	}

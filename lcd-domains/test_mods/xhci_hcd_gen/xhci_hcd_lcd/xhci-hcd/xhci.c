@@ -40,6 +40,8 @@
 #include "xhci-mtk.h"
 #endif
 
+#include <asm/lcd_domains/liblcd.h>
+
 #ifdef LCD_ISOLATE
 #include <lcd_config/post_hook.h>
 #endif
@@ -4911,6 +4913,20 @@ int xhci_gen_setup_with_xhci(struct usb_hcd *hcd, struct xhci_hcd *xhci, xhci_ge
 	}
 
 	hcd->regs = ioremap_nocache(hcd->rsrc_start, hcd->rsrc_len);
+
+	{
+		struct pci_dev *pdev = to_pci_dev(dev);
+		LIBLCD_MSG("%s, Assigning pci device to LVD domains (bus 0x%x, devfn 0x%x)",
+				__func__, pdev->bus->number, pdev->devfn);
+
+		retval = lcd_syscall_assign_device(0, pdev->bus->number, pdev->devfn);
+
+		if (retval) {
+			LIBLCD_ERR("%s, lcd_syscall_assign_device failed? %d", __func__, retval);
+		} else {
+			LIBLCD_MSG("%s, lcd_syscall_assign_device returned %d", __func__, retval);
+		}
+	}
 
 	mutex_init(&xhci->mutex);
 	xhci->cap_regs = hcd->regs;

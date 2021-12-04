@@ -1171,17 +1171,24 @@ int xhci_gen_setup_with_xhci(struct usb_hcd* hcd, struct xhci_hcd* xhci, fptr_ge
 	}
 
 	{
+		// All good with this is a primary hcd
 		__maybe_unused const void* __adjusted = *xhci_ptr;
 		const ptrdiff_t __offset = (void*)__adjusted - (void*) hcd;
 
 		printk("%s:%d mapping offset for xhci(hcd_priv) %lu\n", __func__, __LINE__, __offset);
+		// if it's not a primary hcd, the native code always passes
+		// xhci of the primary_hcd, but this xhci is likely marshaled
+		// before when the root port got registered.
+		if (usb_hcd_is_primary_hcd(hcd)) {
+			// check if offset is valid only for primary_hcd
+			if (__offset >= (sizeof(struct xhci_hcd) + sizeof(struct usb_hcd)) || __offset < 0)
+				glue_user_panic("Bounds check failed!");
 
-		if (__offset >= (sizeof(struct xhci_hcd) + sizeof(struct usb_hcd)) || __offset < 0)
-			glue_user_panic("Bounds check failed!");
+			glue_pack(__pos, __msg, __ext, __offset);
 
-		glue_pack(__pos, __msg, __ext, __offset);
-		if (*xhci_ptr) {
-			caller_marshal_kernel__xhci_gen_setup_with_xhci__xhci_hcd__in(__pos, __msg, __ext, ctx, *xhci_ptr);
+			if (*xhci_ptr) {
+				caller_marshal_kernel__xhci_gen_setup_with_xhci__xhci_hcd__in(__pos, __msg, __ext, ctx, *xhci_ptr);
+			}
 		}
 
 	}
@@ -2550,7 +2557,7 @@ int trmp_impl_hc_driver_find_raw_port_number(fptr_hc_driver_find_raw_port_number
 	glue_pack(__pos, __msg, __ext, target);
 	{
 		__maybe_unused const void* __adjusted = *hcd_ptr;
-		glue_pack_shadow(__pos, __msg, __ext, __adjusted);
+		glue_pack(__pos, __msg, __ext, __adjusted);
 		if (*hcd_ptr) {
 			caller_marshal_kernel__hc_driver_find_raw_port_number__hcd__in(__pos, __msg, __ext, ctx, *hcd_ptr);
 		}
@@ -2798,7 +2805,7 @@ int trmp_impl_hc_driver_urb_enqueue(fptr_hc_driver_urb_enqueue target, struct us
 
 	{
 		__maybe_unused const void* __adjusted = *urb_ptr;
-		glue_pack_shadow(__pos, __msg, __ext, __adjusted);
+		glue_pack(__pos, __msg, __ext, __adjusted);
 		if (*urb_ptr) {
 			caller_marshal_kernel__hc_driver_urb_enqueue__urb__in(__pos, __msg, __ext, ctx, *urb_ptr);
 		}
@@ -3107,7 +3114,7 @@ void trmp_impl_hc_driver_free_dev(fptr_hc_driver_free_dev target, struct usb_hcd
 	glue_pack(__pos, __msg, __ext, target);
 	{
 		__maybe_unused const void* __adjusted = *hcd_ptr;
-		glue_pack_shadow(__pos, __msg, __ext, __adjusted);
+		glue_pack(__pos, __msg, __ext, __adjusted);
 		if (*hcd_ptr) {
 			caller_marshal_kernel__hc_driver_free_dev__hcd__in(__pos, __msg, __ext, ctx, *hcd_ptr);
 		}
@@ -3514,7 +3521,7 @@ int trmp_impl_hc_driver_drop_endpoint(fptr_hc_driver_drop_endpoint target, struc
 	glue_pack(__pos, __msg, __ext, target);
 	{
 		__maybe_unused const void* __adjusted = *hcd_ptr;
-		glue_pack_shadow(__pos, __msg, __ext, __adjusted);
+		glue_pack(__pos, __msg, __ext, __adjusted);
 		if (*hcd_ptr) {
 			caller_marshal_kernel__hc_driver_drop_endpoint__hcd__in(__pos, __msg, __ext, ctx, *hcd_ptr);
 		}
@@ -3757,7 +3764,7 @@ int trmp_impl_hc_driver_address_device(fptr_hc_driver_address_device target, str
 	glue_pack(__pos, __msg, __ext, target);
 	{
 		__maybe_unused const void* __adjusted = *hcd_ptr;
-		glue_pack_shadow(__pos, __msg, __ext, __adjusted);
+		glue_pack(__pos, __msg, __ext, __adjusted);
 		if (*hcd_ptr) {
 			caller_marshal_kernel__hc_driver_address_device__hcd__in(__pos, __msg, __ext, ctx, *hcd_ptr);
 		}
@@ -3835,7 +3842,7 @@ int trmp_impl_hc_driver_hub_status_data(fptr_hc_driver_hub_status_data target, s
 	glue_pack(__pos, __msg, __ext, target);
 	{
 		__maybe_unused const void* __adjusted = *hcd_ptr;
-		glue_pack_shadow(__pos, __msg, __ext, __adjusted);
+		glue_pack(__pos, __msg, __ext, __adjusted);
 		if (*hcd_ptr) {
 			caller_marshal_kernel__hc_driver_hub_status_data__hcd__in(__pos, __msg, __ext, ctx, *hcd_ptr);
 		}
@@ -3844,6 +3851,18 @@ int trmp_impl_hc_driver_hub_status_data(fptr_hc_driver_hub_status_data target, s
 
 	{
 		__maybe_unused const void* __adjusted = *buf_ptr;
+		glue_pack(__pos, __msg, __ext, __adjusted);
+		if (*buf_ptr) {
+			size_t i, len = (32);
+			char* array = *buf_ptr;
+			glue_pack(__pos, __msg, __ext, len);
+			for (i = 0; i < len; ++i) {
+				char* element = &array[i];
+				glue_pack(__pos, __msg, __ext, *element);
+			}
+
+		}
+
 	}
 
 	glue_call_client(__pos, __msg, RPC_ID_hc_driver_hub_status_data);
@@ -3857,7 +3876,18 @@ int trmp_impl_hc_driver_hub_status_data(fptr_hc_driver_hub_status_data target, s
 	}
 
 	{
-		(void)buf_ptr;
+		*buf_ptr = glue_unpack(__pos, __msg, __ext, char*);
+		if (*buf_ptr) {
+			int i;
+			char* array = *buf_ptr;
+			size_t len = glue_unpack(__pos, __msg, __ext, size_t);
+			for (i = 0; i < len; ++i) {
+				char* element = &array[i];
+				*element = glue_unpack(__pos, __msg, __ext, char);
+			}
+
+		}
+
 	}
 
 	{

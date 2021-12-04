@@ -1147,9 +1147,9 @@ void xhci_gen_setup_with_xhci_callee(struct fipc_message* __msg, struct ext_regi
 
 	}
 
+	if (usb_hcd_is_primary_hcd(hcd))
 	{
 		size_t __offset = glue_unpack(__pos, __msg, __ext, size_t);
-
 
 		printk("%s:%d unpacking offset for xhci(hcd_priv) %lu\n", __func__, __LINE__, __offset);
 		*xhci_ptr = (struct xhci_hcd*)(__offset + (void*) hcd);
@@ -1162,14 +1162,15 @@ void xhci_gen_setup_with_xhci_callee(struct fipc_message* __msg, struct ext_regi
 			printk("%s, hcd %p primary_hcd %p\n",
 					__func__, hcd, hcd->primary_hcd);
 
-		hcd->primary_hcd = NULL;
+		//hcd->primary_hcd = NULL;
 			printk("%s:%d hcd %p | hcd->hcd_priv %p | xhci %p\n",
 				       	__func__, __LINE__,
 					hcd, hcd->hcd_priv, xhci);
 		if (*xhci_ptr) {
 			callee_unmarshal_kernel__xhci_gen_setup_with_xhci__xhci_hcd__in(__pos, __msg, __ext, ctx, *xhci_ptr);
 		}
-
+	} else {
+		*xhci_ptr = hcd_to_xhci(hcd);
 	}
 
   	if (0)
@@ -2467,7 +2468,7 @@ void hc_driver_find_raw_port_number_callee(struct fipc_message* __msg, struct ex
 	}
 
 	{
-		*hcd_ptr = glue_unpack(__pos, __msg, __ext, struct usb_hcd*);
+		*hcd_ptr = glue_unpack_shadow(__pos, __msg, __ext, struct usb_hcd*);
 		if (*hcd_ptr) {
 			callee_unmarshal_kernel__hc_driver_find_raw_port_number__hcd__in(__pos, __msg, __ext, ctx, *hcd_ptr);
 		}
@@ -2658,7 +2659,8 @@ void hc_driver_urb_enqueue_callee(struct fipc_message* __msg, struct ext_registe
 	}
 
 	{
-		*urb_ptr = glue_unpack(__pos, __msg, __ext, struct urb*);
+		size_t __size = sizeof(struct urb);
+		*urb_ptr = glue_unpack_bind_or_new_shadow(__pos, __msg, __ext, struct urb*, __size, DEFAULT_GFP_FLAGS);
 		if (*urb_ptr) {
 			callee_unmarshal_kernel__hc_driver_urb_enqueue__urb__in(__pos, __msg, __ext, ctx, *urb_ptr);
 		}
@@ -2912,7 +2914,7 @@ void hc_driver_free_dev_callee(struct fipc_message* __msg, struct ext_registers*
 	}
 
 	{
-		*hcd_ptr = glue_unpack(__pos, __msg, __ext, struct usb_hcd*);
+		*hcd_ptr = glue_unpack_shadow(__pos, __msg, __ext, struct usb_hcd*);
 		if (*hcd_ptr) {
 			callee_unmarshal_kernel__hc_driver_free_dev__hcd__in(__pos, __msg, __ext, ctx, *hcd_ptr);
 		}
@@ -2921,7 +2923,7 @@ void hc_driver_free_dev_callee(struct fipc_message* __msg, struct ext_registers*
 
 	{
 		size_t __size = sizeof(struct usb_device);
-		*udev_ptr = glue_unpack_new_shadow(__pos, __msg, __ext, struct usb_device*, (__size), (DEFAULT_GFP_FLAGS));
+		*udev_ptr = glue_unpack_bind_or_new_shadow(__pos, __msg, __ext, struct usb_device*, __size, DEFAULT_GFP_FLAGS);
 		if (*udev_ptr) {
 			callee_unmarshal_kernel__hc_driver_free_dev__udev__in(__pos, __msg, __ext, ctx, *udev_ptr);
 		}
@@ -3271,7 +3273,7 @@ void hc_driver_drop_endpoint_callee(struct fipc_message* __msg, struct ext_regis
 	}
 
 	{
-		*hcd_ptr = glue_unpack(__pos, __msg, __ext, struct usb_hcd*);
+		*hcd_ptr = glue_unpack_shadow(__pos, __msg, __ext, struct usb_hcd*);
 		if (*hcd_ptr) {
 			callee_unmarshal_kernel__hc_driver_drop_endpoint__hcd__in(__pos, __msg, __ext, ctx, *hcd_ptr);
 		}
@@ -3280,7 +3282,7 @@ void hc_driver_drop_endpoint_callee(struct fipc_message* __msg, struct ext_regis
 
 	{
 		size_t __size = sizeof(struct usb_device);
-		*udev_ptr = glue_unpack_new_shadow(__pos, __msg, __ext, struct usb_device*, (__size), (DEFAULT_GFP_FLAGS));
+		*udev_ptr = glue_unpack_bind_or_new_shadow(__pos, __msg, __ext, struct usb_device*, __size, DEFAULT_GFP_FLAGS);
 		if (*udev_ptr) {
 			callee_unmarshal_kernel__hc_driver_drop_endpoint__udev__in(__pos, __msg, __ext, ctx, *udev_ptr);
 		}
@@ -3289,7 +3291,7 @@ void hc_driver_drop_endpoint_callee(struct fipc_message* __msg, struct ext_regis
 
 	{
 		size_t __size = sizeof(struct usb_host_endpoint);
-		*ep_ptr = glue_unpack_new_shadow(__pos, __msg, __ext, struct usb_host_endpoint*, (__size), (DEFAULT_GFP_FLAGS));
+		*ep_ptr = glue_unpack_bind_or_new_shadow(__pos, __msg, __ext, struct usb_host_endpoint*, __size, DEFAULT_GFP_FLAGS);
 		if (*ep_ptr) {
 			callee_unmarshal_kernel__hc_driver_drop_endpoint__ep__in(__pos, __msg, __ext, ctx, *ep_ptr);
 		}
@@ -3473,7 +3475,7 @@ void hc_driver_address_device_callee(struct fipc_message* __msg, struct ext_regi
 	}
 
 	{
-		*hcd_ptr = glue_unpack(__pos, __msg, __ext, struct usb_hcd*);
+		*hcd_ptr = glue_unpack_shadow(__pos, __msg, __ext, struct usb_hcd*);
 		if (*hcd_ptr) {
 			callee_unmarshal_kernel__hc_driver_address_device__hcd__in(__pos, __msg, __ext, ctx, *hcd_ptr);
 		}
@@ -3482,7 +3484,7 @@ void hc_driver_address_device_callee(struct fipc_message* __msg, struct ext_regi
 
 	{
 		size_t __size = sizeof(struct usb_device);
-		*udev_ptr = glue_unpack_new_shadow(__pos, __msg, __ext, struct usb_device*, (__size), (DEFAULT_GFP_FLAGS));
+		*udev_ptr = glue_unpack_bind_or_new_shadow(__pos, __msg, __ext, struct usb_device*, __size, DEFAULT_GFP_FLAGS);
 		if (*udev_ptr) {
 			callee_unmarshal_kernel__hc_driver_address_device__udev__in(__pos, __msg, __ext, ctx, *udev_ptr);
 		}
@@ -3523,9 +3525,8 @@ void hc_driver_hub_status_data_callee(struct fipc_message* __msg, struct ext_reg
 
 	fptr_hc_driver_hub_status_data function_ptr = glue_unpack(__pos, __msg, __ext, fptr_hc_driver_hub_status_data);
 	struct usb_hcd* hcd = 0;
+	char* buf = 0;
 	struct usb_hcd** hcd_ptr = &hcd;
-	char __buf;
-	char* buf = &__buf;
 	char** buf_ptr = &buf;
 	int ret = 0;
 	int* ret_ptr = &ret;
@@ -3538,7 +3539,7 @@ void hc_driver_hub_status_data_callee(struct fipc_message* __msg, struct ext_reg
 	}
 
 	{
-		*hcd_ptr = glue_unpack(__pos, __msg, __ext, struct usb_hcd*);
+		*hcd_ptr = glue_unpack_shadow(__pos, __msg, __ext, struct usb_hcd*);
 		if (*hcd_ptr) {
 			callee_unmarshal_kernel__hc_driver_hub_status_data__hcd__in(__pos, __msg, __ext, ctx, *hcd_ptr);
 		}
@@ -3546,8 +3547,17 @@ void hc_driver_hub_status_data_callee(struct fipc_message* __msg, struct ext_reg
 	}
 
 	{
+		size_t __size = sizeof(char) * glue_peek(__pos, __msg, __ext);
+		*buf_ptr = glue_unpack_new_shadow(__pos, __msg, __ext, char*, (__size), (DEFAULT_GFP_FLAGS));
 		if (*buf_ptr) {
-			**buf_ptr = glue_unpack(__pos, __msg, __ext, char);
+			int i;
+			char* array = *buf_ptr;
+			size_t len = glue_unpack(__pos, __msg, __ext, size_t);
+			for (i = 0; i < len; ++i) {
+				char* element = &array[i];
+				*element = glue_unpack(__pos, __msg, __ext, char);
+			}
+
 		}
 
 	}
@@ -3563,7 +3573,19 @@ void hc_driver_hub_status_data_callee(struct fipc_message* __msg, struct ext_reg
 	}
 
 	{
-		(void)buf_ptr;
+		__maybe_unused const void* __adjusted = *buf_ptr;
+		glue_pack_shadow(__pos, __msg, __ext, __adjusted);
+		if (*buf_ptr) {
+			size_t i, len = (32);
+			char* array = *buf_ptr;
+			glue_pack(__pos, __msg, __ext, len);
+			for (i = 0; i < len; ++i) {
+				char* element = &array[i];
+				glue_pack(__pos, __msg, __ext, *element);
+			}
+
+		}
+
 	}
 
 	{

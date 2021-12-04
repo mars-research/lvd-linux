@@ -921,6 +921,7 @@ void caller_marshal_kernel__xhci_gen_setup_with_xhci__hcd__in(
 	struct hc_driver* const* driver_ptr = &ptr->driver;
 	unsigned long const* rsrc_start_ptr = &ptr->rsrc_start;
 	unsigned long const *rsrc_len_ptr = &ptr->rsrc_len;
+	struct usb_hcd* const* primary_hcd_ptr = &ptr->primary_hcd;
 
 	{
 		caller_marshal_kernel__xhci_gen_setup_with_xhci__usb_bus__in(__pos, __msg, __ext, ctx, self_ptr);
@@ -943,6 +944,15 @@ void caller_marshal_kernel__xhci_gen_setup_with_xhci__hcd__in(
 		glue_pack(__pos, __msg, __ext, *rsrc_len_ptr);
 	}
 
+	{
+		__maybe_unused const void* __adjusted = *primary_hcd_ptr;
+		glue_pack(__pos, __msg, __ext, __adjusted);
+		if (*primary_hcd_ptr) {
+			caller_marshal_kernel__xhci_gen_setup_with_xhci__usb_hcd_primary_hcd__in(__pos, __msg, __ext, ctx, *primary_hcd_ptr);
+		}
+
+	}
+
 }
 
 void callee_unmarshal_kernel__xhci_gen_setup_with_xhci__hcd__in(
@@ -956,6 +966,7 @@ void callee_unmarshal_kernel__xhci_gen_setup_with_xhci__hcd__in(
 	struct hc_driver** driver_ptr = &ptr->driver;
 	unsigned long* rsrc_start_ptr = &ptr->rsrc_start;
 	unsigned long* rsrc_len_ptr = &ptr->rsrc_len;
+	struct usb_hcd** primary_hcd_ptr = &ptr->primary_hcd;
 
 	{
 		callee_unmarshal_kernel__xhci_gen_setup_with_xhci__usb_bus__in(__pos, __msg, __ext, ctx, self_ptr);
@@ -978,6 +989,15 @@ void callee_unmarshal_kernel__xhci_gen_setup_with_xhci__hcd__in(
 	}
 
 	{
+		size_t __size = sizeof(struct usb_hcd);
+		*primary_hcd_ptr = glue_unpack_bind_or_new_shadow(__pos, __msg, __ext, struct usb_hcd*, __size, DEFAULT_GFP_FLAGS);
+		if (*primary_hcd_ptr) {
+			callee_unmarshal_kernel__xhci_gen_setup_with_xhci__usb_hcd_primary_hcd__in(__pos, __msg, __ext, ctx, *primary_hcd_ptr);
+		}
+
+	}
+
+	{
 	}
 }
 
@@ -993,6 +1013,7 @@ void callee_marshal_kernel__xhci_gen_setup_with_xhci__hcd__in(
 	struct hc_driver* const* driver_ptr = &ptr->driver;
 	unsigned int __rh_registered = ptr->rh_registered;
 	unsigned int const* __rh_registered_ptr = &__rh_registered;
+	struct usb_hcd* const* primary_hcd_ptr = &ptr->primary_hcd;
 
 	{
 		callee_marshal_kernel__xhci_gen_setup_with_xhci__usb_bus__in(__pos, __msg, __ext, ctx, self_ptr);
@@ -1013,6 +1034,13 @@ void callee_marshal_kernel__xhci_gen_setup_with_xhci__hcd__in(
 		glue_pack(__pos, __msg, __ext, *__rh_registered_ptr);
 	}
 
+	{
+		if (*primary_hcd_ptr) {
+			callee_marshal_kernel__xhci_gen_setup_with_xhci__usb_hcd_primary_hcd__in(__pos, __msg, __ext, ctx, *primary_hcd_ptr);
+		}
+
+	}
+
 }
 
 void caller_unmarshal_kernel__xhci_gen_setup_with_xhci__hcd__in(
@@ -1027,6 +1055,7 @@ void caller_unmarshal_kernel__xhci_gen_setup_with_xhci__hcd__in(
 	struct hc_driver** driver_ptr = &ptr->driver;
 	unsigned int __rh_registered = ptr->rh_registered;
 	unsigned int* __rh_registered_ptr = &__rh_registered;
+	struct usb_hcd** primary_hcd_ptr = &ptr->primary_hcd;
 
 	{
 		caller_unmarshal_kernel__xhci_gen_setup_with_xhci__usb_bus__in(__pos, __msg, __ext, ctx, self_ptr);
@@ -1045,6 +1074,13 @@ void caller_unmarshal_kernel__xhci_gen_setup_with_xhci__hcd__in(
 
 	{
 		*__rh_registered_ptr = glue_unpack(__pos, __msg, __ext, unsigned int);
+	}
+
+	{
+		if (*primary_hcd_ptr) {
+			caller_unmarshal_kernel__xhci_gen_setup_with_xhci__usb_hcd_primary_hcd__in(__pos, __msg, __ext, ctx, *primary_hcd_ptr);
+		}
+
 	}
 
 	{
@@ -1581,6 +1617,50 @@ void caller_unmarshal_kernel__xhci_gen_setup_with_xhci__hc_driver__in(
 	const struct ext_registers* __ext,
 	struct xhci_gen_setup_with_xhci_call_ctx const* ctx,
 	struct hc_driver* ptr)
+{
+
+	{
+	}
+}
+
+void caller_marshal_kernel__xhci_gen_setup_with_xhci__usb_hcd_primary_hcd__in(
+	size_t* __pos,
+	struct fipc_message* __msg,
+	struct ext_registers* __ext,
+	struct xhci_gen_setup_with_xhci_call_ctx const* ctx,
+	struct usb_hcd const* ptr)
+{
+
+}
+
+void callee_unmarshal_kernel__xhci_gen_setup_with_xhci__usb_hcd_primary_hcd__in(
+	size_t* __pos,
+	const struct fipc_message* __msg,
+	const struct ext_registers* __ext,
+	struct xhci_gen_setup_with_xhci_call_ctx const* ctx,
+	struct usb_hcd* ptr)
+{
+
+	{
+	}
+}
+
+void callee_marshal_kernel__xhci_gen_setup_with_xhci__usb_hcd_primary_hcd__in(
+	size_t* __pos,
+	struct fipc_message* __msg,
+	struct ext_registers* __ext,
+	struct xhci_gen_setup_with_xhci_call_ctx const* ctx,
+	struct usb_hcd const* ptr)
+{
+
+}
+
+void caller_unmarshal_kernel__xhci_gen_setup_with_xhci__usb_hcd_primary_hcd__in(
+	size_t* __pos,
+	const struct fipc_message* __msg,
+	const struct ext_registers* __ext,
+	struct xhci_gen_setup_with_xhci_call_ctx const* ctx,
+	struct usb_hcd* ptr)
 {
 
 	{
@@ -3532,6 +3612,16 @@ void caller_marshal_kernel__hc_driver_enable_device__hcd__in(
 	struct hc_driver_enable_device_call_ctx const* ctx,
 	struct usb_hcd const* ptr)
 {
+	struct usb_hcd* const* primary_hcd_ptr = &ptr->primary_hcd;
+
+	{
+		__maybe_unused const void* __adjusted = *primary_hcd_ptr;
+		glue_pack(__pos, __msg, __ext, __adjusted);
+		if (*primary_hcd_ptr) {
+			caller_marshal_kernel__hc_driver_enable_device__usb_hcd_primary_hcd__in(__pos, __msg, __ext, ctx, *primary_hcd_ptr);
+		}
+
+	}
 
 }
 
@@ -3542,6 +3632,16 @@ void callee_unmarshal_kernel__hc_driver_enable_device__hcd__in(
 	struct hc_driver_enable_device_call_ctx const* ctx,
 	struct usb_hcd* ptr)
 {
+	struct usb_hcd** primary_hcd_ptr = &ptr->primary_hcd;
+
+	{
+		size_t __size = sizeof(struct usb_hcd);
+		*primary_hcd_ptr = glue_unpack_bind_or_new_shadow(__pos, __msg, __ext, struct usb_hcd*, __size, DEFAULT_GFP_FLAGS);
+		if (*primary_hcd_ptr) {
+			callee_unmarshal_kernel__hc_driver_enable_device__usb_hcd_primary_hcd__in(__pos, __msg, __ext, ctx, *primary_hcd_ptr);
+		}
+
+	}
 
 	{
 	}
@@ -3554,10 +3654,70 @@ void callee_marshal_kernel__hc_driver_enable_device__hcd__in(
 	struct hc_driver_enable_device_call_ctx const* ctx,
 	struct usb_hcd const* ptr)
 {
+	struct usb_hcd* const* primary_hcd_ptr = &ptr->primary_hcd;
+
+	{
+		if (*primary_hcd_ptr) {
+			callee_marshal_kernel__hc_driver_enable_device__usb_hcd_primary_hcd__in(__pos, __msg, __ext, ctx, *primary_hcd_ptr);
+		}
+
+	}
 
 }
 
 void caller_unmarshal_kernel__hc_driver_enable_device__hcd__in(
+	size_t* __pos,
+	const struct fipc_message* __msg,
+	const struct ext_registers* __ext,
+	struct hc_driver_enable_device_call_ctx const* ctx,
+	struct usb_hcd* ptr)
+{
+	struct usb_hcd** primary_hcd_ptr = &ptr->primary_hcd;
+
+	{
+		if (*primary_hcd_ptr) {
+			caller_unmarshal_kernel__hc_driver_enable_device__usb_hcd_primary_hcd__in(__pos, __msg, __ext, ctx, *primary_hcd_ptr);
+		}
+
+	}
+
+	{
+	}
+}
+
+void caller_marshal_kernel__hc_driver_enable_device__usb_hcd_primary_hcd__in(
+	size_t* __pos,
+	struct fipc_message* __msg,
+	struct ext_registers* __ext,
+	struct hc_driver_enable_device_call_ctx const* ctx,
+	struct usb_hcd const* ptr)
+{
+
+}
+
+void callee_unmarshal_kernel__hc_driver_enable_device__usb_hcd_primary_hcd__in(
+	size_t* __pos,
+	const struct fipc_message* __msg,
+	const struct ext_registers* __ext,
+	struct hc_driver_enable_device_call_ctx const* ctx,
+	struct usb_hcd* ptr)
+{
+
+	{
+	}
+}
+
+void callee_marshal_kernel__hc_driver_enable_device__usb_hcd_primary_hcd__in(
+	size_t* __pos,
+	struct fipc_message* __msg,
+	struct ext_registers* __ext,
+	struct hc_driver_enable_device_call_ctx const* ctx,
+	struct usb_hcd const* ptr)
+{
+
+}
+
+void caller_unmarshal_kernel__hc_driver_enable_device__usb_hcd_primary_hcd__in(
 	size_t* __pos,
 	const struct fipc_message* __msg,
 	const struct ext_registers* __ext,
@@ -3630,6 +3790,16 @@ void caller_marshal_kernel__hc_driver_update_hub_device__hcd__in(
 	struct hc_driver_update_hub_device_call_ctx const* ctx,
 	struct usb_hcd const* ptr)
 {
+	struct usb_hcd* const* primary_hcd_ptr = &ptr->primary_hcd;
+
+	{
+		__maybe_unused const void* __adjusted = *primary_hcd_ptr;
+		glue_pack(__pos, __msg, __ext, __adjusted);
+		if (*primary_hcd_ptr) {
+			caller_marshal_kernel__hc_driver_update_hub_device__usb_hcd_primary_hcd__in(__pos, __msg, __ext, ctx, *primary_hcd_ptr);
+		}
+
+	}
 
 }
 
@@ -3640,6 +3810,16 @@ void callee_unmarshal_kernel__hc_driver_update_hub_device__hcd__in(
 	struct hc_driver_update_hub_device_call_ctx const* ctx,
 	struct usb_hcd* ptr)
 {
+	struct usb_hcd** primary_hcd_ptr = &ptr->primary_hcd;
+
+	{
+		size_t __size = sizeof(struct usb_hcd);
+		*primary_hcd_ptr = glue_unpack_bind_or_new_shadow(__pos, __msg, __ext, struct usb_hcd*, __size, DEFAULT_GFP_FLAGS);
+		if (*primary_hcd_ptr) {
+			callee_unmarshal_kernel__hc_driver_update_hub_device__usb_hcd_primary_hcd__in(__pos, __msg, __ext, ctx, *primary_hcd_ptr);
+		}
+
+	}
 
 	{
 	}
@@ -3652,10 +3832,70 @@ void callee_marshal_kernel__hc_driver_update_hub_device__hcd__in(
 	struct hc_driver_update_hub_device_call_ctx const* ctx,
 	struct usb_hcd const* ptr)
 {
+	struct usb_hcd* const* primary_hcd_ptr = &ptr->primary_hcd;
+
+	{
+		if (*primary_hcd_ptr) {
+			callee_marshal_kernel__hc_driver_update_hub_device__usb_hcd_primary_hcd__in(__pos, __msg, __ext, ctx, *primary_hcd_ptr);
+		}
+
+	}
 
 }
 
 void caller_unmarshal_kernel__hc_driver_update_hub_device__hcd__in(
+	size_t* __pos,
+	const struct fipc_message* __msg,
+	const struct ext_registers* __ext,
+	struct hc_driver_update_hub_device_call_ctx const* ctx,
+	struct usb_hcd* ptr)
+{
+	struct usb_hcd** primary_hcd_ptr = &ptr->primary_hcd;
+
+	{
+		if (*primary_hcd_ptr) {
+			caller_unmarshal_kernel__hc_driver_update_hub_device__usb_hcd_primary_hcd__in(__pos, __msg, __ext, ctx, *primary_hcd_ptr);
+		}
+
+	}
+
+	{
+	}
+}
+
+void caller_marshal_kernel__hc_driver_update_hub_device__usb_hcd_primary_hcd__in(
+	size_t* __pos,
+	struct fipc_message* __msg,
+	struct ext_registers* __ext,
+	struct hc_driver_update_hub_device_call_ctx const* ctx,
+	struct usb_hcd const* ptr)
+{
+
+}
+
+void callee_unmarshal_kernel__hc_driver_update_hub_device__usb_hcd_primary_hcd__in(
+	size_t* __pos,
+	const struct fipc_message* __msg,
+	const struct ext_registers* __ext,
+	struct hc_driver_update_hub_device_call_ctx const* ctx,
+	struct usb_hcd* ptr)
+{
+
+	{
+	}
+}
+
+void callee_marshal_kernel__hc_driver_update_hub_device__usb_hcd_primary_hcd__in(
+	size_t* __pos,
+	struct fipc_message* __msg,
+	struct ext_registers* __ext,
+	struct hc_driver_update_hub_device_call_ctx const* ctx,
+	struct usb_hcd const* ptr)
+{
+
+}
+
+void caller_unmarshal_kernel__hc_driver_update_hub_device__usb_hcd_primary_hcd__in(
 	size_t* __pos,
 	const struct fipc_message* __msg,
 	const struct ext_registers* __ext,
@@ -3852,6 +4092,16 @@ void caller_marshal_kernel__hc_driver_reset_device__hcd__in(
 	struct hc_driver_reset_device_call_ctx const* ctx,
 	struct usb_hcd const* ptr)
 {
+	struct usb_hcd* const* primary_hcd_ptr = &ptr->primary_hcd;
+
+	{
+		__maybe_unused const void* __adjusted = *primary_hcd_ptr;
+		glue_pack_shadow(__pos, __msg, __ext, __adjusted);
+		if (*primary_hcd_ptr) {
+			caller_marshal_kernel__hc_driver_reset_device__usb_hcd_primary_hcd__in(__pos, __msg, __ext, ctx, *primary_hcd_ptr);
+		}
+
+	}
 
 }
 
@@ -3862,6 +4112,15 @@ void callee_unmarshal_kernel__hc_driver_reset_device__hcd__in(
 	struct hc_driver_reset_device_call_ctx const* ctx,
 	struct usb_hcd* ptr)
 {
+	struct usb_hcd** primary_hcd_ptr = &ptr->primary_hcd;
+
+	{
+		*primary_hcd_ptr = glue_unpack(__pos, __msg, __ext, struct usb_hcd*);
+		if (*primary_hcd_ptr) {
+			callee_unmarshal_kernel__hc_driver_reset_device__usb_hcd_primary_hcd__in(__pos, __msg, __ext, ctx, *primary_hcd_ptr);
+		}
+
+	}
 
 	{
 	}
@@ -3874,10 +4133,70 @@ void callee_marshal_kernel__hc_driver_reset_device__hcd__in(
 	struct hc_driver_reset_device_call_ctx const* ctx,
 	struct usb_hcd const* ptr)
 {
+	struct usb_hcd* const* primary_hcd_ptr = &ptr->primary_hcd;
+
+	{
+		if (*primary_hcd_ptr) {
+			callee_marshal_kernel__hc_driver_reset_device__usb_hcd_primary_hcd__in(__pos, __msg, __ext, ctx, *primary_hcd_ptr);
+		}
+
+	}
 
 }
 
 void caller_unmarshal_kernel__hc_driver_reset_device__hcd__in(
+	size_t* __pos,
+	const struct fipc_message* __msg,
+	const struct ext_registers* __ext,
+	struct hc_driver_reset_device_call_ctx const* ctx,
+	struct usb_hcd* ptr)
+{
+	struct usb_hcd** primary_hcd_ptr = &ptr->primary_hcd;
+
+	{
+		if (*primary_hcd_ptr) {
+			caller_unmarshal_kernel__hc_driver_reset_device__usb_hcd_primary_hcd__in(__pos, __msg, __ext, ctx, *primary_hcd_ptr);
+		}
+
+	}
+
+	{
+	}
+}
+
+void caller_marshal_kernel__hc_driver_reset_device__usb_hcd_primary_hcd__in(
+	size_t* __pos,
+	struct fipc_message* __msg,
+	struct ext_registers* __ext,
+	struct hc_driver_reset_device_call_ctx const* ctx,
+	struct usb_hcd const* ptr)
+{
+
+}
+
+void callee_unmarshal_kernel__hc_driver_reset_device__usb_hcd_primary_hcd__in(
+	size_t* __pos,
+	const struct fipc_message* __msg,
+	const struct ext_registers* __ext,
+	struct hc_driver_reset_device_call_ctx const* ctx,
+	struct usb_hcd* ptr)
+{
+
+	{
+	}
+}
+
+void callee_marshal_kernel__hc_driver_reset_device__usb_hcd_primary_hcd__in(
+	size_t* __pos,
+	struct fipc_message* __msg,
+	struct ext_registers* __ext,
+	struct hc_driver_reset_device_call_ctx const* ctx,
+	struct usb_hcd const* ptr)
+{
+
+}
+
+void caller_unmarshal_kernel__hc_driver_reset_device__usb_hcd_primary_hcd__in(
 	size_t* __pos,
 	const struct fipc_message* __msg,
 	const struct ext_registers* __ext,
@@ -4471,16 +4790,6 @@ void caller_marshal_kernel__hc_driver_find_raw_port_number__usb_hcd_primary_hcd_
 	struct hc_driver_find_raw_port_number_call_ctx const* ctx,
 	struct usb_hcd const* ptr)
 {
-	struct usb_hcd* const* primary_hcd_ptr = &ptr->primary_hcd;
-
-	{
-		__maybe_unused const void* __adjusted = *primary_hcd_ptr;
-		glue_pack_shadow(__pos, __msg, __ext, __adjusted);
-		if (*primary_hcd_ptr) {
-			caller_marshal_kernel__hc_driver_find_raw_port_number__usb_hcd_primary_hcd__in(__pos, __msg, __ext, ctx, *primary_hcd_ptr);
-		}
-
-	}
 
 }
 
@@ -4491,15 +4800,6 @@ void callee_unmarshal_kernel__hc_driver_find_raw_port_number__usb_hcd_primary_hc
 	struct hc_driver_find_raw_port_number_call_ctx const* ctx,
 	struct usb_hcd* ptr)
 {
-	struct usb_hcd** primary_hcd_ptr = &ptr->primary_hcd;
-
-	{
-		*primary_hcd_ptr = glue_unpack(__pos, __msg, __ext, struct usb_hcd*);
-		if (*primary_hcd_ptr) {
-			callee_unmarshal_kernel__hc_driver_find_raw_port_number__usb_hcd_primary_hcd__in(__pos, __msg, __ext, ctx, *primary_hcd_ptr);
-		}
-
-	}
 
 	{
 	}
@@ -4512,14 +4812,6 @@ void callee_marshal_kernel__hc_driver_find_raw_port_number__usb_hcd_primary_hcd_
 	struct hc_driver_find_raw_port_number_call_ctx const* ctx,
 	struct usb_hcd const* ptr)
 {
-	struct usb_hcd* const* primary_hcd_ptr = &ptr->primary_hcd;
-
-	{
-		if (*primary_hcd_ptr) {
-			callee_marshal_kernel__hc_driver_find_raw_port_number__usb_hcd_primary_hcd__in(__pos, __msg, __ext, ctx, *primary_hcd_ptr);
-		}
-
-	}
 
 }
 
@@ -4530,14 +4822,6 @@ void caller_unmarshal_kernel__hc_driver_find_raw_port_number__usb_hcd_primary_hc
 	struct hc_driver_find_raw_port_number_call_ctx const* ctx,
 	struct usb_hcd* ptr)
 {
-	struct usb_hcd** primary_hcd_ptr = &ptr->primary_hcd;
-
-	{
-		if (*primary_hcd_ptr) {
-			caller_unmarshal_kernel__hc_driver_find_raw_port_number__usb_hcd_primary_hcd__in(__pos, __msg, __ext, ctx, *primary_hcd_ptr);
-		}
-
-	}
 
 	{
 	}
@@ -5024,6 +5308,16 @@ void caller_marshal_kernel__hc_driver_urb_enqueue__hcd__in(
 	struct hc_driver_urb_enqueue_call_ctx const* ctx,
 	struct usb_hcd const* ptr)
 {
+	struct usb_hcd* const* primary_hcd_ptr = &ptr->primary_hcd;
+
+	{
+		__maybe_unused const void* __adjusted = *primary_hcd_ptr;
+		glue_pack_shadow(__pos, __msg, __ext, __adjusted);
+		if (*primary_hcd_ptr) {
+			caller_marshal_kernel__hc_driver_urb_enqueue__usb_hcd_primary_hcd__in(__pos, __msg, __ext, ctx, *primary_hcd_ptr);
+		}
+
+	}
 
 }
 
@@ -5034,6 +5328,15 @@ void callee_unmarshal_kernel__hc_driver_urb_enqueue__hcd__in(
 	struct hc_driver_urb_enqueue_call_ctx const* ctx,
 	struct usb_hcd* ptr)
 {
+	struct usb_hcd** primary_hcd_ptr = &ptr->primary_hcd;
+
+	{
+		*primary_hcd_ptr = glue_unpack(__pos, __msg, __ext, struct usb_hcd*);
+		if (*primary_hcd_ptr) {
+			callee_unmarshal_kernel__hc_driver_urb_enqueue__usb_hcd_primary_hcd__in(__pos, __msg, __ext, ctx, *primary_hcd_ptr);
+		}
+
+	}
 
 	{
 	}
@@ -5046,10 +5349,70 @@ void callee_marshal_kernel__hc_driver_urb_enqueue__hcd__in(
 	struct hc_driver_urb_enqueue_call_ctx const* ctx,
 	struct usb_hcd const* ptr)
 {
+	struct usb_hcd* const* primary_hcd_ptr = &ptr->primary_hcd;
+
+	{
+		if (*primary_hcd_ptr) {
+			callee_marshal_kernel__hc_driver_urb_enqueue__usb_hcd_primary_hcd__in(__pos, __msg, __ext, ctx, *primary_hcd_ptr);
+		}
+
+	}
 
 }
 
 void caller_unmarshal_kernel__hc_driver_urb_enqueue__hcd__in(
+	size_t* __pos,
+	const struct fipc_message* __msg,
+	const struct ext_registers* __ext,
+	struct hc_driver_urb_enqueue_call_ctx const* ctx,
+	struct usb_hcd* ptr)
+{
+	struct usb_hcd** primary_hcd_ptr = &ptr->primary_hcd;
+
+	{
+		if (*primary_hcd_ptr) {
+			caller_unmarshal_kernel__hc_driver_urb_enqueue__usb_hcd_primary_hcd__in(__pos, __msg, __ext, ctx, *primary_hcd_ptr);
+		}
+
+	}
+
+	{
+	}
+}
+
+void caller_marshal_kernel__hc_driver_urb_enqueue__usb_hcd_primary_hcd__in(
+	size_t* __pos,
+	struct fipc_message* __msg,
+	struct ext_registers* __ext,
+	struct hc_driver_urb_enqueue_call_ctx const* ctx,
+	struct usb_hcd const* ptr)
+{
+
+}
+
+void callee_unmarshal_kernel__hc_driver_urb_enqueue__usb_hcd_primary_hcd__in(
+	size_t* __pos,
+	const struct fipc_message* __msg,
+	const struct ext_registers* __ext,
+	struct hc_driver_urb_enqueue_call_ctx const* ctx,
+	struct usb_hcd* ptr)
+{
+
+	{
+	}
+}
+
+void callee_marshal_kernel__hc_driver_urb_enqueue__usb_hcd_primary_hcd__in(
+	size_t* __pos,
+	struct fipc_message* __msg,
+	struct ext_registers* __ext,
+	struct hc_driver_urb_enqueue_call_ctx const* ctx,
+	struct usb_hcd const* ptr)
+{
+
+}
+
+void caller_unmarshal_kernel__hc_driver_urb_enqueue__usb_hcd_primary_hcd__in(
 	size_t* __pos,
 	const struct fipc_message* __msg,
 	const struct ext_registers* __ext,
@@ -5073,7 +5436,7 @@ void caller_marshal_kernel__hc_driver_urb_enqueue__urb__in(
 
 	{
 		__maybe_unused const void* __adjusted = *dev_ptr;
-		glue_pack_shadow(__pos, __msg, __ext, __adjusted);
+		glue_pack(__pos, __msg, __ext, __adjusted);
 		if (*dev_ptr) {
 			caller_marshal_kernel__hc_driver_urb_enqueue__urb_dev__in(__pos, __msg, __ext, ctx, *dev_ptr);
 		}
@@ -5082,7 +5445,7 @@ void caller_marshal_kernel__hc_driver_urb_enqueue__urb__in(
 
 	{
 		__maybe_unused const void* __adjusted = *ep_ptr;
-		glue_pack_shadow(__pos, __msg, __ext, __adjusted);
+		glue_pack(__pos, __msg, __ext, __adjusted);
 		if (*ep_ptr) {
 			caller_marshal_kernel__hc_driver_urb_enqueue__urb_ep__in(__pos, __msg, __ext, ctx, *ep_ptr);
 		}
@@ -5102,7 +5465,8 @@ void callee_unmarshal_kernel__hc_driver_urb_enqueue__urb__in(
 	struct usb_host_endpoint** ep_ptr = &ptr->ep;
 
 	{
-		*dev_ptr = glue_unpack(__pos, __msg, __ext, struct usb_device*);
+		size_t __size = sizeof(struct usb_device);
+		*dev_ptr = glue_unpack_bind_or_new_shadow(__pos, __msg, __ext, struct usb_device*, __size, DEFAULT_GFP_FLAGS);
 		if (*dev_ptr) {
 			callee_unmarshal_kernel__hc_driver_urb_enqueue__urb_dev__in(__pos, __msg, __ext, ctx, *dev_ptr);
 		}
@@ -5110,7 +5474,8 @@ void callee_unmarshal_kernel__hc_driver_urb_enqueue__urb__in(
 	}
 
 	{
-		*ep_ptr = glue_unpack(__pos, __msg, __ext, struct usb_host_endpoint*);
+		size_t __size = sizeof(struct usb_host_endpoint);
+		*ep_ptr = glue_unpack_bind_or_new_shadow(__pos, __msg, __ext, struct usb_host_endpoint*, __size, DEFAULT_GFP_FLAGS);
 		if (*ep_ptr) {
 			callee_unmarshal_kernel__hc_driver_urb_enqueue__urb_ep__in(__pos, __msg, __ext, ctx, *ep_ptr);
 		}
@@ -5798,6 +6163,16 @@ void caller_marshal_kernel__hc_driver_endpoint_reset__hcd__in(
 	struct hc_driver_endpoint_reset_call_ctx const* ctx,
 	struct usb_hcd const* ptr)
 {
+	struct usb_hcd* const* primary_hcd_ptr = &ptr->primary_hcd;
+
+	{
+		__maybe_unused const void* __adjusted = *primary_hcd_ptr;
+		glue_pack(__pos, __msg, __ext, __adjusted);
+		if (*primary_hcd_ptr) {
+			caller_marshal_kernel__hc_driver_endpoint_reset__usb_hcd_primary_hcd__in(__pos, __msg, __ext, ctx, *primary_hcd_ptr);
+		}
+
+	}
 
 }
 
@@ -5808,6 +6183,16 @@ void callee_unmarshal_kernel__hc_driver_endpoint_reset__hcd__in(
 	struct hc_driver_endpoint_reset_call_ctx const* ctx,
 	struct usb_hcd* ptr)
 {
+	struct usb_hcd** primary_hcd_ptr = &ptr->primary_hcd;
+
+	{
+		size_t __size = sizeof(struct usb_hcd);
+		*primary_hcd_ptr = glue_unpack_bind_or_new_shadow(__pos, __msg, __ext, struct usb_hcd*, __size, DEFAULT_GFP_FLAGS);
+		if (*primary_hcd_ptr) {
+			callee_unmarshal_kernel__hc_driver_endpoint_reset__usb_hcd_primary_hcd__in(__pos, __msg, __ext, ctx, *primary_hcd_ptr);
+		}
+
+	}
 
 	{
 	}
@@ -5820,10 +6205,70 @@ void callee_marshal_kernel__hc_driver_endpoint_reset__hcd__in(
 	struct hc_driver_endpoint_reset_call_ctx const* ctx,
 	struct usb_hcd const* ptr)
 {
+	struct usb_hcd* const* primary_hcd_ptr = &ptr->primary_hcd;
+
+	{
+		if (*primary_hcd_ptr) {
+			callee_marshal_kernel__hc_driver_endpoint_reset__usb_hcd_primary_hcd__in(__pos, __msg, __ext, ctx, *primary_hcd_ptr);
+		}
+
+	}
 
 }
 
 void caller_unmarshal_kernel__hc_driver_endpoint_reset__hcd__in(
+	size_t* __pos,
+	const struct fipc_message* __msg,
+	const struct ext_registers* __ext,
+	struct hc_driver_endpoint_reset_call_ctx const* ctx,
+	struct usb_hcd* ptr)
+{
+	struct usb_hcd** primary_hcd_ptr = &ptr->primary_hcd;
+
+	{
+		if (*primary_hcd_ptr) {
+			caller_unmarshal_kernel__hc_driver_endpoint_reset__usb_hcd_primary_hcd__in(__pos, __msg, __ext, ctx, *primary_hcd_ptr);
+		}
+
+	}
+
+	{
+	}
+}
+
+void caller_marshal_kernel__hc_driver_endpoint_reset__usb_hcd_primary_hcd__in(
+	size_t* __pos,
+	struct fipc_message* __msg,
+	struct ext_registers* __ext,
+	struct hc_driver_endpoint_reset_call_ctx const* ctx,
+	struct usb_hcd const* ptr)
+{
+
+}
+
+void callee_unmarshal_kernel__hc_driver_endpoint_reset__usb_hcd_primary_hcd__in(
+	size_t* __pos,
+	const struct fipc_message* __msg,
+	const struct ext_registers* __ext,
+	struct hc_driver_endpoint_reset_call_ctx const* ctx,
+	struct usb_hcd* ptr)
+{
+
+	{
+	}
+}
+
+void callee_marshal_kernel__hc_driver_endpoint_reset__usb_hcd_primary_hcd__in(
+	size_t* __pos,
+	struct fipc_message* __msg,
+	struct ext_registers* __ext,
+	struct hc_driver_endpoint_reset_call_ctx const* ctx,
+	struct usb_hcd const* ptr)
+{
+
+}
+
+void caller_unmarshal_kernel__hc_driver_endpoint_reset__usb_hcd_primary_hcd__in(
 	size_t* __pos,
 	const struct fipc_message* __msg,
 	const struct ext_registers* __ext,
@@ -5960,6 +6405,16 @@ void caller_marshal_kernel__hc_driver_alloc_dev__hcd__in(
 	struct hc_driver_alloc_dev_call_ctx const* ctx,
 	struct usb_hcd const* ptr)
 {
+	struct usb_hcd* const* primary_hcd_ptr = &ptr->primary_hcd;
+
+	{
+		__maybe_unused const void* __adjusted = *primary_hcd_ptr;
+		glue_pack(__pos, __msg, __ext, __adjusted);
+		if (*primary_hcd_ptr) {
+			caller_marshal_kernel__hc_driver_alloc_dev__usb_hcd_primary_hcd__in(__pos, __msg, __ext, ctx, *primary_hcd_ptr);
+		}
+
+	}
 
 }
 
@@ -5970,6 +6425,16 @@ void callee_unmarshal_kernel__hc_driver_alloc_dev__hcd__in(
 	struct hc_driver_alloc_dev_call_ctx const* ctx,
 	struct usb_hcd* ptr)
 {
+	struct usb_hcd** primary_hcd_ptr = &ptr->primary_hcd;
+
+	{
+		size_t __size = sizeof(struct usb_hcd);
+		*primary_hcd_ptr = glue_unpack_bind_or_new_shadow(__pos, __msg, __ext, struct usb_hcd*, __size, DEFAULT_GFP_FLAGS);
+		if (*primary_hcd_ptr) {
+			callee_unmarshal_kernel__hc_driver_alloc_dev__usb_hcd_primary_hcd__in(__pos, __msg, __ext, ctx, *primary_hcd_ptr);
+		}
+
+	}
 
 	{
 	}
@@ -5982,10 +6447,70 @@ void callee_marshal_kernel__hc_driver_alloc_dev__hcd__in(
 	struct hc_driver_alloc_dev_call_ctx const* ctx,
 	struct usb_hcd const* ptr)
 {
+	struct usb_hcd* const* primary_hcd_ptr = &ptr->primary_hcd;
+
+	{
+		if (*primary_hcd_ptr) {
+			callee_marshal_kernel__hc_driver_alloc_dev__usb_hcd_primary_hcd__in(__pos, __msg, __ext, ctx, *primary_hcd_ptr);
+		}
+
+	}
 
 }
 
 void caller_unmarshal_kernel__hc_driver_alloc_dev__hcd__in(
+	size_t* __pos,
+	const struct fipc_message* __msg,
+	const struct ext_registers* __ext,
+	struct hc_driver_alloc_dev_call_ctx const* ctx,
+	struct usb_hcd* ptr)
+{
+	struct usb_hcd** primary_hcd_ptr = &ptr->primary_hcd;
+
+	{
+		if (*primary_hcd_ptr) {
+			caller_unmarshal_kernel__hc_driver_alloc_dev__usb_hcd_primary_hcd__in(__pos, __msg, __ext, ctx, *primary_hcd_ptr);
+		}
+
+	}
+
+	{
+	}
+}
+
+void caller_marshal_kernel__hc_driver_alloc_dev__usb_hcd_primary_hcd__in(
+	size_t* __pos,
+	struct fipc_message* __msg,
+	struct ext_registers* __ext,
+	struct hc_driver_alloc_dev_call_ctx const* ctx,
+	struct usb_hcd const* ptr)
+{
+
+}
+
+void callee_unmarshal_kernel__hc_driver_alloc_dev__usb_hcd_primary_hcd__in(
+	size_t* __pos,
+	const struct fipc_message* __msg,
+	const struct ext_registers* __ext,
+	struct hc_driver_alloc_dev_call_ctx const* ctx,
+	struct usb_hcd* ptr)
+{
+
+	{
+	}
+}
+
+void callee_marshal_kernel__hc_driver_alloc_dev__usb_hcd_primary_hcd__in(
+	size_t* __pos,
+	struct fipc_message* __msg,
+	struct ext_registers* __ext,
+	struct hc_driver_alloc_dev_call_ctx const* ctx,
+	struct usb_hcd const* ptr)
+{
+
+}
+
+void caller_unmarshal_kernel__hc_driver_alloc_dev__usb_hcd_primary_hcd__in(
 	size_t* __pos,
 	const struct fipc_message* __msg,
 	const struct ext_registers* __ext,
@@ -6072,7 +6597,7 @@ void caller_marshal_kernel__hc_driver_free_dev__hcd__in(
 
 	{
 		__maybe_unused const void* __adjusted = *primary_hcd_ptr;
-		glue_pack_shadow(__pos, __msg, __ext, __adjusted);
+		glue_pack(__pos, __msg, __ext, __adjusted);
 		if (*primary_hcd_ptr) {
 			caller_marshal_kernel__hc_driver_free_dev__usb_hcd_primary_hcd__in(__pos, __msg, __ext, ctx, *primary_hcd_ptr);
 		}
@@ -6091,7 +6616,8 @@ void callee_unmarshal_kernel__hc_driver_free_dev__hcd__in(
 	struct usb_hcd** primary_hcd_ptr = &ptr->primary_hcd;
 
 	{
-		*primary_hcd_ptr = glue_unpack(__pos, __msg, __ext, struct usb_hcd*);
+		size_t __size = sizeof(struct usb_hcd);
+		*primary_hcd_ptr = glue_unpack_bind_or_new_shadow(__pos, __msg, __ext, struct usb_hcd*, __size, DEFAULT_GFP_FLAGS);
 		if (*primary_hcd_ptr) {
 			callee_unmarshal_kernel__hc_driver_free_dev__usb_hcd_primary_hcd__in(__pos, __msg, __ext, ctx, *primary_hcd_ptr);
 		}
@@ -6147,16 +6673,6 @@ void caller_marshal_kernel__hc_driver_free_dev__usb_hcd_primary_hcd__in(
 	struct hc_driver_free_dev_call_ctx const* ctx,
 	struct usb_hcd const* ptr)
 {
-	struct usb_hcd* const* primary_hcd_ptr = &ptr->primary_hcd;
-
-	{
-		__maybe_unused const void* __adjusted = *primary_hcd_ptr;
-		glue_pack_shadow(__pos, __msg, __ext, __adjusted);
-		if (*primary_hcd_ptr) {
-			caller_marshal_kernel__hc_driver_free_dev__usb_hcd_primary_hcd__in(__pos, __msg, __ext, ctx, *primary_hcd_ptr);
-		}
-
-	}
 
 }
 
@@ -6167,15 +6683,6 @@ void callee_unmarshal_kernel__hc_driver_free_dev__usb_hcd_primary_hcd__in(
 	struct hc_driver_free_dev_call_ctx const* ctx,
 	struct usb_hcd* ptr)
 {
-	struct usb_hcd** primary_hcd_ptr = &ptr->primary_hcd;
-
-	{
-		*primary_hcd_ptr = glue_unpack(__pos, __msg, __ext, struct usb_hcd*);
-		if (*primary_hcd_ptr) {
-			callee_unmarshal_kernel__hc_driver_free_dev__usb_hcd_primary_hcd__in(__pos, __msg, __ext, ctx, *primary_hcd_ptr);
-		}
-
-	}
 
 	{
 	}
@@ -6188,14 +6695,6 @@ void callee_marshal_kernel__hc_driver_free_dev__usb_hcd_primary_hcd__in(
 	struct hc_driver_free_dev_call_ctx const* ctx,
 	struct usb_hcd const* ptr)
 {
-	struct usb_hcd* const* primary_hcd_ptr = &ptr->primary_hcd;
-
-	{
-		if (*primary_hcd_ptr) {
-			callee_marshal_kernel__hc_driver_free_dev__usb_hcd_primary_hcd__in(__pos, __msg, __ext, ctx, *primary_hcd_ptr);
-		}
-
-	}
 
 }
 
@@ -6206,14 +6705,6 @@ void caller_unmarshal_kernel__hc_driver_free_dev__usb_hcd_primary_hcd__in(
 	struct hc_driver_free_dev_call_ctx const* ctx,
 	struct usb_hcd* ptr)
 {
-	struct usb_hcd** primary_hcd_ptr = &ptr->primary_hcd;
-
-	{
-		if (*primary_hcd_ptr) {
-			caller_unmarshal_kernel__hc_driver_free_dev__usb_hcd_primary_hcd__in(__pos, __msg, __ext, ctx, *primary_hcd_ptr);
-		}
-
-	}
 
 	{
 	}
@@ -6792,6 +7283,16 @@ void caller_marshal_kernel__hc_driver_add_endpoint__hcd__in(
 	struct hc_driver_add_endpoint_call_ctx const* ctx,
 	struct usb_hcd const* ptr)
 {
+	struct usb_hcd* const* primary_hcd_ptr = &ptr->primary_hcd;
+
+	{
+		__maybe_unused const void* __adjusted = *primary_hcd_ptr;
+		glue_pack(__pos, __msg, __ext, __adjusted);
+		if (*primary_hcd_ptr) {
+			caller_marshal_kernel__hc_driver_add_endpoint__usb_hcd_primary_hcd__in(__pos, __msg, __ext, ctx, *primary_hcd_ptr);
+		}
+
+	}
 
 }
 
@@ -6802,6 +7303,16 @@ void callee_unmarshal_kernel__hc_driver_add_endpoint__hcd__in(
 	struct hc_driver_add_endpoint_call_ctx const* ctx,
 	struct usb_hcd* ptr)
 {
+	struct usb_hcd** primary_hcd_ptr = &ptr->primary_hcd;
+
+	{
+		size_t __size = sizeof(struct usb_hcd);
+		*primary_hcd_ptr = glue_unpack_bind_or_new_shadow(__pos, __msg, __ext, struct usb_hcd*, __size, DEFAULT_GFP_FLAGS);
+		if (*primary_hcd_ptr) {
+			callee_unmarshal_kernel__hc_driver_add_endpoint__usb_hcd_primary_hcd__in(__pos, __msg, __ext, ctx, *primary_hcd_ptr);
+		}
+
+	}
 
 	{
 	}
@@ -6814,10 +7325,70 @@ void callee_marshal_kernel__hc_driver_add_endpoint__hcd__in(
 	struct hc_driver_add_endpoint_call_ctx const* ctx,
 	struct usb_hcd const* ptr)
 {
+	struct usb_hcd* const* primary_hcd_ptr = &ptr->primary_hcd;
+
+	{
+		if (*primary_hcd_ptr) {
+			callee_marshal_kernel__hc_driver_add_endpoint__usb_hcd_primary_hcd__in(__pos, __msg, __ext, ctx, *primary_hcd_ptr);
+		}
+
+	}
 
 }
 
 void caller_unmarshal_kernel__hc_driver_add_endpoint__hcd__in(
+	size_t* __pos,
+	const struct fipc_message* __msg,
+	const struct ext_registers* __ext,
+	struct hc_driver_add_endpoint_call_ctx const* ctx,
+	struct usb_hcd* ptr)
+{
+	struct usb_hcd** primary_hcd_ptr = &ptr->primary_hcd;
+
+	{
+		if (*primary_hcd_ptr) {
+			caller_unmarshal_kernel__hc_driver_add_endpoint__usb_hcd_primary_hcd__in(__pos, __msg, __ext, ctx, *primary_hcd_ptr);
+		}
+
+	}
+
+	{
+	}
+}
+
+void caller_marshal_kernel__hc_driver_add_endpoint__usb_hcd_primary_hcd__in(
+	size_t* __pos,
+	struct fipc_message* __msg,
+	struct ext_registers* __ext,
+	struct hc_driver_add_endpoint_call_ctx const* ctx,
+	struct usb_hcd const* ptr)
+{
+
+}
+
+void callee_unmarshal_kernel__hc_driver_add_endpoint__usb_hcd_primary_hcd__in(
+	size_t* __pos,
+	const struct fipc_message* __msg,
+	const struct ext_registers* __ext,
+	struct hc_driver_add_endpoint_call_ctx const* ctx,
+	struct usb_hcd* ptr)
+{
+
+	{
+	}
+}
+
+void callee_marshal_kernel__hc_driver_add_endpoint__usb_hcd_primary_hcd__in(
+	size_t* __pos,
+	struct fipc_message* __msg,
+	struct ext_registers* __ext,
+	struct hc_driver_add_endpoint_call_ctx const* ctx,
+	struct usb_hcd const* ptr)
+{
+
+}
+
+void caller_unmarshal_kernel__hc_driver_add_endpoint__usb_hcd_primary_hcd__in(
 	size_t* __pos,
 	const struct fipc_message* __msg,
 	const struct ext_registers* __ext,
@@ -7092,7 +7663,7 @@ void caller_marshal_kernel__hc_driver_drop_endpoint__hcd__in(
 
 	{
 		__maybe_unused const void* __adjusted = *primary_hcd_ptr;
-		glue_pack_shadow(__pos, __msg, __ext, __adjusted);
+		glue_pack(__pos, __msg, __ext, __adjusted);
 		if (*primary_hcd_ptr) {
 			caller_marshal_kernel__hc_driver_drop_endpoint__usb_hcd_primary_hcd__in(__pos, __msg, __ext, ctx, *primary_hcd_ptr);
 		}
@@ -7111,7 +7682,8 @@ void callee_unmarshal_kernel__hc_driver_drop_endpoint__hcd__in(
 	struct usb_hcd** primary_hcd_ptr = &ptr->primary_hcd;
 
 	{
-		*primary_hcd_ptr = glue_unpack(__pos, __msg, __ext, struct usb_hcd*);
+		size_t __size = sizeof(struct usb_hcd);
+		*primary_hcd_ptr = glue_unpack_bind_or_new_shadow(__pos, __msg, __ext, struct usb_hcd*, __size, DEFAULT_GFP_FLAGS);
 		if (*primary_hcd_ptr) {
 			callee_unmarshal_kernel__hc_driver_drop_endpoint__usb_hcd_primary_hcd__in(__pos, __msg, __ext, ctx, *primary_hcd_ptr);
 		}
@@ -7167,16 +7739,6 @@ void caller_marshal_kernel__hc_driver_drop_endpoint__usb_hcd_primary_hcd__in(
 	struct hc_driver_drop_endpoint_call_ctx const* ctx,
 	struct usb_hcd const* ptr)
 {
-	struct usb_hcd* const* primary_hcd_ptr = &ptr->primary_hcd;
-
-	{
-		__maybe_unused const void* __adjusted = *primary_hcd_ptr;
-		glue_pack_shadow(__pos, __msg, __ext, __adjusted);
-		if (*primary_hcd_ptr) {
-			caller_marshal_kernel__hc_driver_drop_endpoint__usb_hcd_primary_hcd__in(__pos, __msg, __ext, ctx, *primary_hcd_ptr);
-		}
-
-	}
 
 }
 
@@ -7187,15 +7749,6 @@ void callee_unmarshal_kernel__hc_driver_drop_endpoint__usb_hcd_primary_hcd__in(
 	struct hc_driver_drop_endpoint_call_ctx const* ctx,
 	struct usb_hcd* ptr)
 {
-	struct usb_hcd** primary_hcd_ptr = &ptr->primary_hcd;
-
-	{
-		*primary_hcd_ptr = glue_unpack(__pos, __msg, __ext, struct usb_hcd*);
-		if (*primary_hcd_ptr) {
-			callee_unmarshal_kernel__hc_driver_drop_endpoint__usb_hcd_primary_hcd__in(__pos, __msg, __ext, ctx, *primary_hcd_ptr);
-		}
-
-	}
 
 	{
 	}
@@ -7208,14 +7761,6 @@ void callee_marshal_kernel__hc_driver_drop_endpoint__usb_hcd_primary_hcd__in(
 	struct hc_driver_drop_endpoint_call_ctx const* ctx,
 	struct usb_hcd const* ptr)
 {
-	struct usb_hcd* const* primary_hcd_ptr = &ptr->primary_hcd;
-
-	{
-		if (*primary_hcd_ptr) {
-			callee_marshal_kernel__hc_driver_drop_endpoint__usb_hcd_primary_hcd__in(__pos, __msg, __ext, ctx, *primary_hcd_ptr);
-		}
-
-	}
 
 }
 
@@ -7226,14 +7771,6 @@ void caller_unmarshal_kernel__hc_driver_drop_endpoint__usb_hcd_primary_hcd__in(
 	struct hc_driver_drop_endpoint_call_ctx const* ctx,
 	struct usb_hcd* ptr)
 {
-	struct usb_hcd** primary_hcd_ptr = &ptr->primary_hcd;
-
-	{
-		if (*primary_hcd_ptr) {
-			caller_unmarshal_kernel__hc_driver_drop_endpoint__usb_hcd_primary_hcd__in(__pos, __msg, __ext, ctx, *primary_hcd_ptr);
-		}
-
-	}
 
 	{
 	}
@@ -7418,6 +7955,16 @@ void caller_marshal_kernel__hc_driver_check_bandwidth__hcd__in(
 	struct hc_driver_check_bandwidth_call_ctx const* ctx,
 	struct usb_hcd const* ptr)
 {
+	struct usb_hcd* const* primary_hcd_ptr = &ptr->primary_hcd;
+
+	{
+		__maybe_unused const void* __adjusted = *primary_hcd_ptr;
+		glue_pack(__pos, __msg, __ext, __adjusted);
+		if (*primary_hcd_ptr) {
+			caller_marshal_kernel__hc_driver_check_bandwidth__usb_hcd_primary_hcd__in(__pos, __msg, __ext, ctx, *primary_hcd_ptr);
+		}
+
+	}
 
 }
 
@@ -7428,6 +7975,16 @@ void callee_unmarshal_kernel__hc_driver_check_bandwidth__hcd__in(
 	struct hc_driver_check_bandwidth_call_ctx const* ctx,
 	struct usb_hcd* ptr)
 {
+	struct usb_hcd** primary_hcd_ptr = &ptr->primary_hcd;
+
+	{
+		size_t __size = sizeof(struct usb_hcd);
+		*primary_hcd_ptr = glue_unpack_bind_or_new_shadow(__pos, __msg, __ext, struct usb_hcd*, __size, DEFAULT_GFP_FLAGS);
+		if (*primary_hcd_ptr) {
+			callee_unmarshal_kernel__hc_driver_check_bandwidth__usb_hcd_primary_hcd__in(__pos, __msg, __ext, ctx, *primary_hcd_ptr);
+		}
+
+	}
 
 	{
 	}
@@ -7440,10 +7997,70 @@ void callee_marshal_kernel__hc_driver_check_bandwidth__hcd__in(
 	struct hc_driver_check_bandwidth_call_ctx const* ctx,
 	struct usb_hcd const* ptr)
 {
+	struct usb_hcd* const* primary_hcd_ptr = &ptr->primary_hcd;
+
+	{
+		if (*primary_hcd_ptr) {
+			callee_marshal_kernel__hc_driver_check_bandwidth__usb_hcd_primary_hcd__in(__pos, __msg, __ext, ctx, *primary_hcd_ptr);
+		}
+
+	}
 
 }
 
 void caller_unmarshal_kernel__hc_driver_check_bandwidth__hcd__in(
+	size_t* __pos,
+	const struct fipc_message* __msg,
+	const struct ext_registers* __ext,
+	struct hc_driver_check_bandwidth_call_ctx const* ctx,
+	struct usb_hcd* ptr)
+{
+	struct usb_hcd** primary_hcd_ptr = &ptr->primary_hcd;
+
+	{
+		if (*primary_hcd_ptr) {
+			caller_unmarshal_kernel__hc_driver_check_bandwidth__usb_hcd_primary_hcd__in(__pos, __msg, __ext, ctx, *primary_hcd_ptr);
+		}
+
+	}
+
+	{
+	}
+}
+
+void caller_marshal_kernel__hc_driver_check_bandwidth__usb_hcd_primary_hcd__in(
+	size_t* __pos,
+	struct fipc_message* __msg,
+	struct ext_registers* __ext,
+	struct hc_driver_check_bandwidth_call_ctx const* ctx,
+	struct usb_hcd const* ptr)
+{
+
+}
+
+void callee_unmarshal_kernel__hc_driver_check_bandwidth__usb_hcd_primary_hcd__in(
+	size_t* __pos,
+	const struct fipc_message* __msg,
+	const struct ext_registers* __ext,
+	struct hc_driver_check_bandwidth_call_ctx const* ctx,
+	struct usb_hcd* ptr)
+{
+
+	{
+	}
+}
+
+void callee_marshal_kernel__hc_driver_check_bandwidth__usb_hcd_primary_hcd__in(
+	size_t* __pos,
+	struct fipc_message* __msg,
+	struct ext_registers* __ext,
+	struct hc_driver_check_bandwidth_call_ctx const* ctx,
+	struct usb_hcd const* ptr)
+{
+
+}
+
+void caller_unmarshal_kernel__hc_driver_check_bandwidth__usb_hcd_primary_hcd__in(
 	size_t* __pos,
 	const struct fipc_message* __msg,
 	const struct ext_registers* __ext,
@@ -7812,7 +8429,7 @@ void caller_marshal_kernel__hc_driver_address_device__hcd__in(
 
 	{
 		__maybe_unused const void* __adjusted = *primary_hcd_ptr;
-		glue_pack_shadow(__pos, __msg, __ext, __adjusted);
+		glue_pack(__pos, __msg, __ext, __adjusted);
 		if (*primary_hcd_ptr) {
 			caller_marshal_kernel__hc_driver_address_device__usb_hcd_primary_hcd__in(__pos, __msg, __ext, ctx, *primary_hcd_ptr);
 		}
@@ -7831,7 +8448,8 @@ void callee_unmarshal_kernel__hc_driver_address_device__hcd__in(
 	struct usb_hcd** primary_hcd_ptr = &ptr->primary_hcd;
 
 	{
-		*primary_hcd_ptr = glue_unpack(__pos, __msg, __ext, struct usb_hcd*);
+		size_t __size = sizeof(struct usb_hcd);
+		*primary_hcd_ptr = glue_unpack_bind_or_new_shadow(__pos, __msg, __ext, struct usb_hcd*, __size, DEFAULT_GFP_FLAGS);
 		if (*primary_hcd_ptr) {
 			callee_unmarshal_kernel__hc_driver_address_device__usb_hcd_primary_hcd__in(__pos, __msg, __ext, ctx, *primary_hcd_ptr);
 		}
@@ -7887,16 +8505,6 @@ void caller_marshal_kernel__hc_driver_address_device__usb_hcd_primary_hcd__in(
 	struct hc_driver_address_device_call_ctx const* ctx,
 	struct usb_hcd const* ptr)
 {
-	struct usb_hcd* const* primary_hcd_ptr = &ptr->primary_hcd;
-
-	{
-		__maybe_unused const void* __adjusted = *primary_hcd_ptr;
-		glue_pack_shadow(__pos, __msg, __ext, __adjusted);
-		if (*primary_hcd_ptr) {
-			caller_marshal_kernel__hc_driver_address_device__usb_hcd_primary_hcd__in(__pos, __msg, __ext, ctx, *primary_hcd_ptr);
-		}
-
-	}
 
 }
 
@@ -7907,15 +8515,6 @@ void callee_unmarshal_kernel__hc_driver_address_device__usb_hcd_primary_hcd__in(
 	struct hc_driver_address_device_call_ctx const* ctx,
 	struct usb_hcd* ptr)
 {
-	struct usb_hcd** primary_hcd_ptr = &ptr->primary_hcd;
-
-	{
-		*primary_hcd_ptr = glue_unpack(__pos, __msg, __ext, struct usb_hcd*);
-		if (*primary_hcd_ptr) {
-			callee_unmarshal_kernel__hc_driver_address_device__usb_hcd_primary_hcd__in(__pos, __msg, __ext, ctx, *primary_hcd_ptr);
-		}
-
-	}
 
 	{
 	}
@@ -7928,14 +8527,6 @@ void callee_marshal_kernel__hc_driver_address_device__usb_hcd_primary_hcd__in(
 	struct hc_driver_address_device_call_ctx const* ctx,
 	struct usb_hcd const* ptr)
 {
-	struct usb_hcd* const* primary_hcd_ptr = &ptr->primary_hcd;
-
-	{
-		if (*primary_hcd_ptr) {
-			callee_marshal_kernel__hc_driver_address_device__usb_hcd_primary_hcd__in(__pos, __msg, __ext, ctx, *primary_hcd_ptr);
-		}
-
-	}
 
 }
 
@@ -7946,14 +8537,6 @@ void caller_unmarshal_kernel__hc_driver_address_device__usb_hcd_primary_hcd__in(
 	struct hc_driver_address_device_call_ctx const* ctx,
 	struct usb_hcd* ptr)
 {
-	struct usb_hcd** primary_hcd_ptr = &ptr->primary_hcd;
-
-	{
-		if (*primary_hcd_ptr) {
-			caller_unmarshal_kernel__hc_driver_address_device__usb_hcd_primary_hcd__in(__pos, __msg, __ext, ctx, *primary_hcd_ptr);
-		}
-
-	}
 
 	{
 	}
@@ -8064,6 +8647,16 @@ void caller_marshal_kernel__hc_driver_irq__hcd__in(
 	struct hc_driver_irq_call_ctx const* ctx,
 	struct usb_hcd const* ptr)
 {
+	struct usb_hcd* const* primary_hcd_ptr = &ptr->primary_hcd;
+
+	{
+		__maybe_unused const void* __adjusted = *primary_hcd_ptr;
+		glue_pack(__pos, __msg, __ext, __adjusted);
+		if (*primary_hcd_ptr) {
+			caller_marshal_kernel__hc_driver_irq__usb_hcd_primary_hcd__in(__pos, __msg, __ext, ctx, *primary_hcd_ptr);
+		}
+
+	}
 
 }
 
@@ -8074,6 +8667,16 @@ void callee_unmarshal_kernel__hc_driver_irq__hcd__in(
 	struct hc_driver_irq_call_ctx const* ctx,
 	struct usb_hcd* ptr)
 {
+	struct usb_hcd** primary_hcd_ptr = &ptr->primary_hcd;
+
+	{
+		size_t __size = sizeof(struct usb_hcd);
+		*primary_hcd_ptr = glue_unpack_bind_or_new_shadow(__pos, __msg, __ext, struct usb_hcd*, __size, DEFAULT_GFP_FLAGS);
+		if (*primary_hcd_ptr) {
+			callee_unmarshal_kernel__hc_driver_irq__usb_hcd_primary_hcd__in(__pos, __msg, __ext, ctx, *primary_hcd_ptr);
+		}
+
+	}
 
 	{
 	}
@@ -8086,10 +8689,70 @@ void callee_marshal_kernel__hc_driver_irq__hcd__in(
 	struct hc_driver_irq_call_ctx const* ctx,
 	struct usb_hcd const* ptr)
 {
+	struct usb_hcd* const* primary_hcd_ptr = &ptr->primary_hcd;
+
+	{
+		if (*primary_hcd_ptr) {
+			callee_marshal_kernel__hc_driver_irq__usb_hcd_primary_hcd__in(__pos, __msg, __ext, ctx, *primary_hcd_ptr);
+		}
+
+	}
 
 }
 
 void caller_unmarshal_kernel__hc_driver_irq__hcd__in(
+	size_t* __pos,
+	const struct fipc_message* __msg,
+	const struct ext_registers* __ext,
+	struct hc_driver_irq_call_ctx const* ctx,
+	struct usb_hcd* ptr)
+{
+	struct usb_hcd** primary_hcd_ptr = &ptr->primary_hcd;
+
+	{
+		if (*primary_hcd_ptr) {
+			caller_unmarshal_kernel__hc_driver_irq__usb_hcd_primary_hcd__in(__pos, __msg, __ext, ctx, *primary_hcd_ptr);
+		}
+
+	}
+
+	{
+	}
+}
+
+void caller_marshal_kernel__hc_driver_irq__usb_hcd_primary_hcd__in(
+	size_t* __pos,
+	struct fipc_message* __msg,
+	struct ext_registers* __ext,
+	struct hc_driver_irq_call_ctx const* ctx,
+	struct usb_hcd const* ptr)
+{
+
+}
+
+void callee_unmarshal_kernel__hc_driver_irq__usb_hcd_primary_hcd__in(
+	size_t* __pos,
+	const struct fipc_message* __msg,
+	const struct ext_registers* __ext,
+	struct hc_driver_irq_call_ctx const* ctx,
+	struct usb_hcd* ptr)
+{
+
+	{
+	}
+}
+
+void callee_marshal_kernel__hc_driver_irq__usb_hcd_primary_hcd__in(
+	size_t* __pos,
+	struct fipc_message* __msg,
+	struct ext_registers* __ext,
+	struct hc_driver_irq_call_ctx const* ctx,
+	struct usb_hcd const* ptr)
+{
+
+}
+
+void caller_unmarshal_kernel__hc_driver_irq__usb_hcd_primary_hcd__in(
 	size_t* __pos,
 	const struct fipc_message* __msg,
 	const struct ext_registers* __ext,
@@ -8109,9 +8772,19 @@ void caller_marshal_kernel__hc_driver_hub_control__hcd__in(
 	struct usb_hcd const* ptr)
 {
 	int const* speed_ptr = &ptr->speed;
+	struct usb_hcd* const* primary_hcd_ptr = &ptr->primary_hcd;
 
 	{
 		glue_pack(__pos, __msg, __ext, *speed_ptr);
+	}
+
+	{
+		__maybe_unused const void* __adjusted = *primary_hcd_ptr;
+		glue_pack(__pos, __msg, __ext, __adjusted);
+		if (*primary_hcd_ptr) {
+			caller_marshal_kernel__hc_driver_hub_control__usb_hcd_primary_hcd__in(__pos, __msg, __ext, ctx, *primary_hcd_ptr);
+		}
+
 	}
 
 }
@@ -8124,9 +8797,19 @@ void callee_unmarshal_kernel__hc_driver_hub_control__hcd__in(
 	struct usb_hcd* ptr)
 {
 	int* speed_ptr = &ptr->speed;
+	struct usb_hcd** primary_hcd_ptr = &ptr->primary_hcd;
 
 	{
 		*speed_ptr = glue_unpack(__pos, __msg, __ext, int);
+	}
+
+	{
+		size_t __size = sizeof(struct usb_hcd);
+		*primary_hcd_ptr = glue_unpack_bind_or_new_shadow(__pos, __msg, __ext, struct usb_hcd*, __size, DEFAULT_GFP_FLAGS);
+		if (*primary_hcd_ptr) {
+			callee_unmarshal_kernel__hc_driver_hub_control__usb_hcd_primary_hcd__in(__pos, __msg, __ext, ctx, *primary_hcd_ptr);
+		}
+
 	}
 
 	{
@@ -8140,10 +8823,70 @@ void callee_marshal_kernel__hc_driver_hub_control__hcd__in(
 	struct hc_driver_hub_control_call_ctx const* ctx,
 	struct usb_hcd const* ptr)
 {
+	struct usb_hcd* const* primary_hcd_ptr = &ptr->primary_hcd;
+
+	{
+		if (*primary_hcd_ptr) {
+			callee_marshal_kernel__hc_driver_hub_control__usb_hcd_primary_hcd__in(__pos, __msg, __ext, ctx, *primary_hcd_ptr);
+		}
+
+	}
 
 }
 
 void caller_unmarshal_kernel__hc_driver_hub_control__hcd__in(
+	size_t* __pos,
+	const struct fipc_message* __msg,
+	const struct ext_registers* __ext,
+	struct hc_driver_hub_control_call_ctx const* ctx,
+	struct usb_hcd* ptr)
+{
+	struct usb_hcd** primary_hcd_ptr = &ptr->primary_hcd;
+
+	{
+		if (*primary_hcd_ptr) {
+			caller_unmarshal_kernel__hc_driver_hub_control__usb_hcd_primary_hcd__in(__pos, __msg, __ext, ctx, *primary_hcd_ptr);
+		}
+
+	}
+
+	{
+	}
+}
+
+void caller_marshal_kernel__hc_driver_hub_control__usb_hcd_primary_hcd__in(
+	size_t* __pos,
+	struct fipc_message* __msg,
+	struct ext_registers* __ext,
+	struct hc_driver_hub_control_call_ctx const* ctx,
+	struct usb_hcd const* ptr)
+{
+
+}
+
+void callee_unmarshal_kernel__hc_driver_hub_control__usb_hcd_primary_hcd__in(
+	size_t* __pos,
+	const struct fipc_message* __msg,
+	const struct ext_registers* __ext,
+	struct hc_driver_hub_control_call_ctx const* ctx,
+	struct usb_hcd* ptr)
+{
+
+	{
+	}
+}
+
+void callee_marshal_kernel__hc_driver_hub_control__usb_hcd_primary_hcd__in(
+	size_t* __pos,
+	struct fipc_message* __msg,
+	struct ext_registers* __ext,
+	struct hc_driver_hub_control_call_ctx const* ctx,
+	struct usb_hcd const* ptr)
+{
+
+}
+
+void caller_unmarshal_kernel__hc_driver_hub_control__usb_hcd_primary_hcd__in(
 	size_t* __pos,
 	const struct fipc_message* __msg,
 	const struct ext_registers* __ext,
@@ -8162,6 +8905,16 @@ void caller_marshal_kernel__hc_driver_reset__usb_hcd__in(
 	struct hc_driver_reset_call_ctx const* ctx,
 	struct usb_hcd const* ptr)
 {
+	struct usb_hcd* const* primary_hcd_ptr = &ptr->primary_hcd;
+
+	{
+		__maybe_unused const void* __adjusted = *primary_hcd_ptr;
+		glue_pack(__pos, __msg, __ext, __adjusted);
+		if (*primary_hcd_ptr) {
+			caller_marshal_kernel__hc_driver_reset__usb_hcd_primary_hcd__in(__pos, __msg, __ext, ctx, *primary_hcd_ptr);
+		}
+
+	}
 
 }
 
@@ -8172,6 +8925,16 @@ void callee_unmarshal_kernel__hc_driver_reset__usb_hcd__in(
 	struct hc_driver_reset_call_ctx const* ctx,
 	struct usb_hcd* ptr)
 {
+	struct usb_hcd** primary_hcd_ptr = &ptr->primary_hcd;
+
+	{
+		size_t __size = sizeof(struct usb_hcd);
+		*primary_hcd_ptr = glue_unpack_bind_or_new_shadow(__pos, __msg, __ext, struct usb_hcd*, __size, DEFAULT_GFP_FLAGS);
+		if (*primary_hcd_ptr) {
+			callee_unmarshal_kernel__hc_driver_reset__usb_hcd_primary_hcd__in(__pos, __msg, __ext, ctx, *primary_hcd_ptr);
+		}
+
+	}
 
 	{
 	}
@@ -8184,10 +8947,70 @@ void callee_marshal_kernel__hc_driver_reset__usb_hcd__in(
 	struct hc_driver_reset_call_ctx const* ctx,
 	struct usb_hcd const* ptr)
 {
+	struct usb_hcd* const* primary_hcd_ptr = &ptr->primary_hcd;
+
+	{
+		if (*primary_hcd_ptr) {
+			callee_marshal_kernel__hc_driver_reset__usb_hcd_primary_hcd__in(__pos, __msg, __ext, ctx, *primary_hcd_ptr);
+		}
+
+	}
 
 }
 
 void caller_unmarshal_kernel__hc_driver_reset__usb_hcd__in(
+	size_t* __pos,
+	const struct fipc_message* __msg,
+	const struct ext_registers* __ext,
+	struct hc_driver_reset_call_ctx const* ctx,
+	struct usb_hcd* ptr)
+{
+	struct usb_hcd** primary_hcd_ptr = &ptr->primary_hcd;
+
+	{
+		if (*primary_hcd_ptr) {
+			caller_unmarshal_kernel__hc_driver_reset__usb_hcd_primary_hcd__in(__pos, __msg, __ext, ctx, *primary_hcd_ptr);
+		}
+
+	}
+
+	{
+	}
+}
+
+void caller_marshal_kernel__hc_driver_reset__usb_hcd_primary_hcd__in(
+	size_t* __pos,
+	struct fipc_message* __msg,
+	struct ext_registers* __ext,
+	struct hc_driver_reset_call_ctx const* ctx,
+	struct usb_hcd const* ptr)
+{
+
+}
+
+void callee_unmarshal_kernel__hc_driver_reset__usb_hcd_primary_hcd__in(
+	size_t* __pos,
+	const struct fipc_message* __msg,
+	const struct ext_registers* __ext,
+	struct hc_driver_reset_call_ctx const* ctx,
+	struct usb_hcd* ptr)
+{
+
+	{
+	}
+}
+
+void callee_marshal_kernel__hc_driver_reset__usb_hcd_primary_hcd__in(
+	size_t* __pos,
+	struct fipc_message* __msg,
+	struct ext_registers* __ext,
+	struct hc_driver_reset_call_ctx const* ctx,
+	struct usb_hcd const* ptr)
+{
+
+}
+
+void caller_unmarshal_kernel__hc_driver_reset__usb_hcd_primary_hcd__in(
 	size_t* __pos,
 	const struct fipc_message* __msg,
 	const struct ext_registers* __ext,
@@ -8206,6 +9029,17 @@ void caller_marshal_kernel__hc_driver_start__usb_hcd__in(
 	struct hc_driver_start_call_ctx const* ctx,
 	struct usb_hcd const* ptr)
 {
+	struct usb_hcd* __primary_hcd = ptr->primary_hcd;
+	struct usb_hcd* const* __primary_hcd_ptr = &__primary_hcd;
+
+	{
+		__maybe_unused const void* __adjusted = *__primary_hcd_ptr;
+		glue_pack(__pos, __msg, __ext, __adjusted);
+		if (*__primary_hcd_ptr) {
+			caller_marshal_kernel__hc_driver_start__usb_hcd_primary_hcd__in(__pos, __msg, __ext, ctx, *__primary_hcd_ptr);
+		}
+
+	}
 
 }
 
@@ -8216,6 +9050,17 @@ void callee_unmarshal_kernel__hc_driver_start__usb_hcd__in(
 	struct hc_driver_start_call_ctx const* ctx,
 	struct usb_hcd* ptr)
 {
+	struct usb_hcd* __primary_hcd = ptr->primary_hcd;
+	struct usb_hcd** __primary_hcd_ptr = &__primary_hcd;
+
+	{
+		size_t __size = sizeof(struct usb_hcd);
+		*__primary_hcd_ptr = glue_unpack_bind_or_new_shadow(__pos, __msg, __ext, struct usb_hcd*, __size, DEFAULT_GFP_FLAGS);
+		if (*__primary_hcd_ptr) {
+			callee_unmarshal_kernel__hc_driver_start__usb_hcd_primary_hcd__in(__pos, __msg, __ext, ctx, *__primary_hcd_ptr);
+		}
+
+	}
 
 	{
 	}
@@ -8230,9 +9075,17 @@ void callee_marshal_kernel__hc_driver_start__usb_hcd__in(
 {
 	unsigned int __uses_new_polling = ptr->uses_new_polling;
 	unsigned int const* __uses_new_polling_ptr = &__uses_new_polling;
+	struct usb_hcd* const* primary_hcd_ptr = &ptr->primary_hcd;
 
 	{
 		glue_pack(__pos, __msg, __ext, *__uses_new_polling_ptr);
+	}
+
+	{
+		if (*primary_hcd_ptr) {
+			callee_marshal_kernel__hc_driver_start__usb_hcd_primary_hcd__in(__pos, __msg, __ext, ctx, *primary_hcd_ptr);
+		}
+
 	}
 
 }
@@ -8246,13 +9099,65 @@ void caller_unmarshal_kernel__hc_driver_start__usb_hcd__in(
 {
 	unsigned int __uses_new_polling = ptr->uses_new_polling;
 	unsigned int* __uses_new_polling_ptr = &__uses_new_polling;
+	struct usb_hcd** primary_hcd_ptr = &ptr->primary_hcd;
 
 	{
 		*__uses_new_polling_ptr = glue_unpack(__pos, __msg, __ext, unsigned int);
 	}
 
 	{
+		if (*primary_hcd_ptr) {
+			caller_unmarshal_kernel__hc_driver_start__usb_hcd_primary_hcd__in(__pos, __msg, __ext, ctx, *primary_hcd_ptr);
+		}
+
+	}
+
+	{
 		ptr->uses_new_polling = *__uses_new_polling_ptr;
+	}
+}
+
+void caller_marshal_kernel__hc_driver_start__usb_hcd_primary_hcd__in(
+	size_t* __pos,
+	struct fipc_message* __msg,
+	struct ext_registers* __ext,
+	struct hc_driver_start_call_ctx const* ctx,
+	struct usb_hcd const* ptr)
+{
+
+}
+
+void callee_unmarshal_kernel__hc_driver_start__usb_hcd_primary_hcd__in(
+	size_t* __pos,
+	const struct fipc_message* __msg,
+	const struct ext_registers* __ext,
+	struct hc_driver_start_call_ctx const* ctx,
+	struct usb_hcd* ptr)
+{
+
+	{
+	}
+}
+
+void callee_marshal_kernel__hc_driver_start__usb_hcd_primary_hcd__in(
+	size_t* __pos,
+	struct fipc_message* __msg,
+	struct ext_registers* __ext,
+	struct hc_driver_start_call_ctx const* ctx,
+	struct usb_hcd const* ptr)
+{
+
+}
+
+void caller_unmarshal_kernel__hc_driver_start__usb_hcd_primary_hcd__in(
+	size_t* __pos,
+	const struct fipc_message* __msg,
+	const struct ext_registers* __ext,
+	struct hc_driver_start_call_ctx const* ctx,
+	struct usb_hcd* ptr)
+{
+
+	{
 	}
 }
 

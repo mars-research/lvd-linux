@@ -74,13 +74,13 @@ module kernel {
 		projection < struct pci_dev > dev {
 		}
 	}
-	rpc_ptr unsigned int thread_fn(int irq, void *id) {
+	rpc_ptr unsigned int thread_fn(int irq, void [unused] *id) {
 	}
-	rpc_ptr unsigned int handler(int irq, void *id) {
+	rpc_ptr unsigned int irq_handler(int irq, void [unused] *id) {
 	}
 	
 	rpc int request_threaded_irq( unsigned int irq,
-			rpc_ptr handler handler,
+			rpc_ptr irq_handler handler,
 			rpc_ptr thread_fn [unused] thread_fn,
 			long unsigned int irqflags,
 			string [alloc(callee)] * devname,
@@ -152,6 +152,11 @@ rpc_export int  xhci_gen_setup( projection hcd [alloc<{{sizeof(hcd) + sizeof(str
 			unsigned long rsrc_start;
 			unsigned long rsrc_len;
 			projection usb_hcd_primary_hcd [alloc_once(callee)] * primary_hcd;
+			projection usb_hcd_shared_hcd [alloc_once(callee)] * shared_hcd;
+		}
+
+		projection < struct usb_hcd > usb_hcd_shared_hcd {
+
 		}
 
 		projection < struct usb_hcd > usb_hcd_primary_hcd {
@@ -274,16 +279,18 @@ rpc_export int  xhci_gen_setup( projection hcd [alloc<{{sizeof(hcd) + sizeof(str
 	rpc string [alloc(caller)] * dmi_get_system_info(int field) {
 	}
 
-rpc bool  usb_acpi_power_manageable( projection hdev* [in] hdev, int  index ) {
-	projection < struct usb_device > hdev {
-		int [in] maxchild;
+	rpc bool  usb_acpi_power_manageable( projection hdev [bind(callee)] *hdev, int  index ) {
+		projection < struct usb_device > hdev {
+			int [in] maxchild;
+		}
 	}
-}
-rpc int  usb_acpi_set_power_state( projection hdev* [in] hdev, int  index, bool  enable ) {
-	projection < struct usb_device > hdev {
-		int [in] maxchild;
+
+	rpc int  usb_acpi_set_power_state( projection hdev [bind(callee)] * hdev, int  index, bool  enable ) {
+		projection < struct usb_device > hdev {
+			int [in] maxchild;
+		}
 	}
-}
+
 	rpc int  usb_disabled(  ) {
 	}
 

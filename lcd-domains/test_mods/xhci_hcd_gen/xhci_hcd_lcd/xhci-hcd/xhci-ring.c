@@ -2817,8 +2817,11 @@ hw_died:
 	return IRQ_HANDLED;
 }
 
+extern void *handler_arg;
+
 irqreturn_t xhci_msi_irq(int irq, void *hcd)
 {
+	hcd = handler_arg;
 	return xhci_irq(hcd);
 }
 

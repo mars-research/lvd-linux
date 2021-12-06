@@ -704,9 +704,7 @@ unsigned int trmp_impl_thread_fn(fptr_thread_fn target, int irq, void* id)
 	{
 		__maybe_unused const void* __adjusted = *id_ptr;
 		glue_pack_shadow(__pos, __msg, __ext, __adjusted);
-		if (*id_ptr) {
-		}
-
+		(void)id_ptr;
 	}
 
 	glue_call_client(__pos, __msg, RPC_ID_thread_fn);
@@ -739,7 +737,7 @@ unsigned int LCD_TRAMPOLINE_LINKAGE(trmp_thread_fn) trmp_thread_fn(int irq, void
 	return impl(target, irq, id);
 }
 
-unsigned int trmp_impl_handler(fptr_handler target, int irq, void* id)
+unsigned int trmp_impl_irq_handler(fptr_irq_handler target, int irq, void* id)
 {
 	struct fipc_message __buffer = {0};
 	struct fipc_message *__msg = &__buffer;
@@ -752,8 +750,8 @@ unsigned int trmp_impl_handler(fptr_handler target, int irq, void* id)
 	unsigned int ret = 0;
 	unsigned int* ret_ptr = &ret;
 	
-	__maybe_unused const struct handler_call_ctx call_ctx = {irq, id};
-	__maybe_unused const struct handler_call_ctx *ctx = &call_ctx;
+	__maybe_unused const struct irq_handler_call_ctx call_ctx = {irq, id};
+	__maybe_unused const struct irq_handler_call_ctx *ctx = &call_ctx;
 
 	(void)__ext;
 
@@ -769,12 +767,10 @@ unsigned int trmp_impl_handler(fptr_handler target, int irq, void* id)
 	{
 		__maybe_unused const void* __adjusted = *id_ptr;
 		glue_pack_shadow(__pos, __msg, __ext, __adjusted);
-		if (*id_ptr) {
-		}
-
+		(void)id_ptr;
 	}
 
-	glue_call_client(__pos, __msg, RPC_ID_handler);
+	glue_call_client(__pos, __msg, RPC_ID_irq_handler);
 
 	*__pos = 0;
 	{
@@ -794,13 +790,13 @@ unsigned int trmp_impl_handler(fptr_handler target, int irq, void* id)
 	return ret;
 }
 
-LCD_TRAMPOLINE_DATA(trmp_handler)
-unsigned int LCD_TRAMPOLINE_LINKAGE(trmp_handler) trmp_handler(int irq, void* id)
+LCD_TRAMPOLINE_DATA(trmp_irq_handler)
+unsigned int LCD_TRAMPOLINE_LINKAGE(trmp_irq_handler) trmp_irq_handler(int irq, void* id)
 {
-	volatile fptr_impl_handler impl;
-	fptr_handler target;
-	LCD_TRAMPOLINE_PROLOGUE(target, trmp_handler);
-	impl = trmp_impl_handler;
+	volatile fptr_impl_irq_handler impl;
+	fptr_irq_handler target;
+	LCD_TRAMPOLINE_PROLOGUE(target, trmp_irq_handler);
+	impl = trmp_impl_irq_handler;
 	return impl(target, irq, id);
 }
 
@@ -810,13 +806,13 @@ void request_threaded_irq_callee(struct fipc_message* __msg, struct ext_register
 	size_t* __pos = &n_pos;
 
 	unsigned int irq = 0;
-	fptr_handler handler = 0;
+	fptr_irq_handler handler = 0;
 	fptr_thread_fn thread_fn = 0;
 	unsigned long irqflags = 0;
 	char const* devname = 0;
 	void* dev_id = 0;
 	unsigned int* irq_ptr = &irq;
-	fptr_handler* handler_ptr = &handler;
+	fptr_irq_handler* handler_ptr = &handler;
 	unsigned long* irqflags_ptr = &irqflags;
 	char const** devname_ptr = &devname;
 	void** dev_id_ptr = &dev_id;
@@ -835,7 +831,7 @@ void request_threaded_irq_callee(struct fipc_message* __msg, struct ext_register
 	}
 
 	{
-		*handler_ptr = glue_unpack_rpc_ptr(__pos, __msg, __ext, handler);
+		*handler_ptr = glue_unpack_rpc_ptr(__pos, __msg, __ext, irq_handler);
 	}
 
 	{
@@ -1469,7 +1465,8 @@ void usb_acpi_power_manageable_callee(struct fipc_message* __msg, struct ext_reg
 	}
 
 	{
-		*hdev_ptr = glue_unpack(__pos, __msg, __ext, struct usb_device*);
+		size_t __size = sizeof(struct usb_device);
+		*hdev_ptr = glue_unpack_bind_or_new_shadow(__pos, __msg, __ext, struct usb_device*, __size, DEFAULT_GFP_FLAGS);
 		if (*hdev_ptr) {
 			callee_unmarshal_kernel__usb_acpi_power_manageable__hdev__in(__pos, __msg, __ext, ctx, *hdev_ptr);
 		}
@@ -1525,7 +1522,8 @@ void usb_acpi_set_power_state_callee(struct fipc_message* __msg, struct ext_regi
 	}
 
 	{
-		*hdev_ptr = glue_unpack(__pos, __msg, __ext, struct usb_device*);
+		size_t __size = sizeof(struct usb_device);
+		*hdev_ptr = glue_unpack_bind_or_new_shadow(__pos, __msg, __ext, struct usb_device*, __size, DEFAULT_GFP_FLAGS);
 		if (*hdev_ptr) {
 			callee_unmarshal_kernel__usb_acpi_set_power_state__hdev__in(__pos, __msg, __ext, ctx, *hdev_ptr);
 		}
@@ -1809,7 +1807,7 @@ void usb_hcd_is_primary_hcd_callee(struct fipc_message* __msg, struct ext_regist
 	__maybe_unused struct usb_hcd_is_primary_hcd_call_ctx *ctx = &call_ctx;
 
 	if (verbose_debug) {
-		printk("%s:%d, entered!\n", __func__, __LINE__);
+		//printk("%s:%d, entered!\n", __func__, __LINE__);
 	}
 
 	{
@@ -1836,7 +1834,7 @@ void usb_hcd_is_primary_hcd_callee(struct fipc_message* __msg, struct ext_regist
 
 	__msg->regs[0] = *__pos;
 	if (verbose_debug) {
-		printk("%s:%d, returned!\n", __func__, __LINE__);
+		//printk("%s:%d, returned!\n", __func__, __LINE__);
 	}
 }
 
@@ -4409,7 +4407,7 @@ int try_dispatch(enum RPC_ID id, struct fipc_message* __msg, struct ext_register
 		break;
 
 	case RPC_ID_usb_hcd_is_primary_hcd:
-		glue_user_trace("usb_hcd_is_primary_hcd\n");
+		//glue_user_trace("usb_hcd_is_primary_hcd\n");
 		usb_hcd_is_primary_hcd_callee(__msg, __ext);
 		break;
 

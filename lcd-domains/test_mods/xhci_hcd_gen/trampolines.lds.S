@@ -3,7 +3,7 @@
 SECTIONS{
 	LCD_TRAMPOLINE_LINKER_SECTION(trmp_timer_func)
 	LCD_TRAMPOLINE_LINKER_SECTION(trmp_thread_fn)
-	LCD_TRAMPOLINE_LINKER_SECTION(trmp_handler)
+	LCD_TRAMPOLINE_LINKER_SECTION(trmp_irq_handler)
 	LCD_TRAMPOLINE_LINKER_SECTION(trmp_get_quirks)
 	LCD_TRAMPOLINE_LINKER_SECTION(trmp_hc_driver_enable_device)
 	LCD_TRAMPOLINE_LINKER_SECTION(trmp_hc_driver_update_hub_device)

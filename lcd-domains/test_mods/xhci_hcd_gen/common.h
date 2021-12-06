@@ -164,7 +164,7 @@ enum RPC_ID {
 	RPC_ID_pci_enable_msi_range,
 	RPC_ID_pci_set_power_state,
 	RPC_ID_thread_fn,
-	RPC_ID_handler,
+	RPC_ID_irq_handler,
 	RPC_ID_request_threaded_irq,
 	RPC_ID_wait_for_completion,
 	RPC_ID_wait_for_completion_timeout,
@@ -233,11 +233,11 @@ typedef unsigned int (*fptr_impl_thread_fn)(fptr_thread_fn target, int irq, void
 LCD_TRAMPOLINE_DATA(trmp_thread_fn)
 unsigned int LCD_TRAMPOLINE_LINKAGE(trmp_thread_fn) trmp_thread_fn(int irq, void* id);
 
-typedef unsigned int (*fptr_handler)(int irq, void* id);
-typedef unsigned int (*fptr_impl_handler)(fptr_handler target, int irq, void* id);
+typedef unsigned int (*fptr_irq_handler)(int irq, void* id);
+typedef unsigned int (*fptr_impl_irq_handler)(fptr_irq_handler target, int irq, void* id);
 
-LCD_TRAMPOLINE_DATA(trmp_handler)
-unsigned int LCD_TRAMPOLINE_LINKAGE(trmp_handler) trmp_handler(int irq, void* id);
+LCD_TRAMPOLINE_DATA(trmp_irq_handler)
+unsigned int LCD_TRAMPOLINE_LINKAGE(trmp_irq_handler) trmp_irq_handler(int irq, void* id);
 
 typedef void (*fptr_get_quirks)(struct device* dev, struct xhci_hcd* xhci_hcd);
 typedef void (*fptr_impl_get_quirks)(fptr_get_quirks target, struct device* dev, struct xhci_hcd* xhci_hcd);
@@ -480,14 +480,14 @@ struct thread_fn_call_ctx {
 	void* id;
 };
 
-struct handler_call_ctx {
+struct irq_handler_call_ctx {
 	int irq;
 	void* id;
 };
 
 struct request_threaded_irq_call_ctx {
 	unsigned int irq;
-	fptr_handler handler;
+	fptr_irq_handler handler;
 	fptr_thread_fn thread_fn;
 	unsigned long irqflags;
 	char const* devname;

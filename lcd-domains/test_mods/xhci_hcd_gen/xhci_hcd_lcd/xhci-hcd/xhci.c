@@ -66,6 +66,8 @@ module_param(quirks, uint, S_IRUGO);
 MODULE_PARM_DESC(quirks, "Bit flags for quirks to be enabled as default");
 #endif
 
+void *handler_arg;
+
 /* TODO: copied from ehci-hcd.c - can this be refactored? */
 /*
  * xhci_handshake - spin reading hc until handshake completes or fails
@@ -253,6 +255,7 @@ static int xhci_setup_msi(struct xhci_hcd *xhci)
 {
 	int ret;
 	struct pci_dev  *pdev = to_pci_dev(xhci_to_hcd(xhci)->self.controller);
+	void *arg;
 
 	ret = pci_enable_msi(pdev);
 	if (ret) {
@@ -261,8 +264,12 @@ static int xhci_setup_msi(struct xhci_hcd *xhci)
 		return ret;
 	}
 
+	arg = xhci_to_hcd(xhci);
+
 	ret = request_irq(pdev->irq, xhci_msi_irq,
-				0, "xhci_hcd", xhci_to_hcd(xhci));
+				0, "xhci_hcd", arg);
+	handler_arg = arg;
+
 	if (ret) {
 		xhci_dbg_trace(xhci, trace_xhci_dbg_init,
 				"disable MSI interrupt");

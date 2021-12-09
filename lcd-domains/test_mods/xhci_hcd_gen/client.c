@@ -1069,7 +1069,6 @@ void* ioremap_nocache(unsigned long long phys_addr, unsigned long size)
 
 	if (verbose_debug) {
 		printk("%s:%d, entered!\n", __func__, __LINE__);
-		printk("got phys_addr 0x%llx, len 0x%lx", phys_addr, size);
 	}
 
 	{
@@ -1431,7 +1430,7 @@ bool usb_acpi_power_manageable(struct usb_device* hdev, int index)
 
 	{
 		__maybe_unused const void* __adjusted = *hdev_ptr;
-		glue_pack(__pos, __msg, __ext, __adjusted);
+		glue_pack_shadow(__pos, __msg, __ext, __adjusted);
 		if (*hdev_ptr) {
 			caller_marshal_kernel__usb_acpi_power_manageable__hdev__in(__pos, __msg, __ext, ctx, *hdev_ptr);
 		}
@@ -1490,7 +1489,7 @@ int usb_acpi_set_power_state(struct usb_device* hdev, int index, bool enable)
 
 	{
 		__maybe_unused const void* __adjusted = *hdev_ptr;
-		glue_pack(__pos, __msg, __ext, __adjusted);
+		glue_pack_shadow(__pos, __msg, __ext, __adjusted);
 		if (*hdev_ptr) {
 			caller_marshal_kernel__usb_acpi_set_power_state__hdev__in(__pos, __msg, __ext, ctx, *hdev_ptr);
 		}
@@ -2272,7 +2271,7 @@ void hc_driver_update_device_callee(struct fipc_message* __msg, struct ext_regis
 	}
 
 	{
-		*hcd_ptr = glue_unpack(__pos, __msg, __ext, struct usb_hcd*);
+		*hcd_ptr = glue_unpack_shadow(__pos, __msg, __ext, struct usb_hcd*);
 		if (*hcd_ptr) {
 			callee_unmarshal_kernel__hc_driver_update_device__hcd__in(__pos, __msg, __ext, ctx, *hcd_ptr);
 		}
@@ -2320,7 +2319,7 @@ void hc_driver_set_usb2_hw_lpm_callee(struct fipc_message* __msg, struct ext_reg
 	}
 
 	{
-		*hcd_ptr = glue_unpack(__pos, __msg, __ext, struct usb_hcd*);
+		*hcd_ptr = glue_unpack_shadow(__pos, __msg, __ext, struct usb_hcd*);
 		if (*hcd_ptr) {
 			callee_unmarshal_kernel__hc_driver_set_usb2_hw_lpm__hcd__in(__pos, __msg, __ext, ctx, *hcd_ptr);
 		}
@@ -2368,7 +2367,7 @@ void hc_driver_enable_usb3_lpm_timeout_callee(struct fipc_message* __msg, struct
 	}
 
 	{
-		*hcd_ptr = glue_unpack(__pos, __msg, __ext, struct usb_hcd*);
+		*hcd_ptr = glue_unpack_shadow(__pos, __msg, __ext, struct usb_hcd*);
 		if (*hcd_ptr) {
 			callee_unmarshal_kernel__hc_driver_enable_usb3_lpm_timeout__hcd__in(__pos, __msg, __ext, ctx, *hcd_ptr);
 		}
@@ -2416,7 +2415,7 @@ void hc_driver_disable_usb3_lpm_timeout_callee(struct fipc_message* __msg, struc
 	}
 
 	{
-		*hcd_ptr = glue_unpack(__pos, __msg, __ext, struct usb_hcd*);
+		*hcd_ptr = glue_unpack_shadow(__pos, __msg, __ext, struct usb_hcd*);
 		if (*hcd_ptr) {
 			callee_unmarshal_kernel__hc_driver_disable_usb3_lpm_timeout__hcd__in(__pos, __msg, __ext, ctx, *hcd_ptr);
 		}
@@ -2515,7 +2514,7 @@ void hc_driver_stop_callee(struct fipc_message* __msg, struct ext_registers* __e
 	}
 
 	{
-		*hcd_ptr = glue_unpack(__pos, __msg, __ext, struct usb_hcd*);
+		*hcd_ptr = glue_unpack_shadow(__pos, __msg, __ext, struct usb_hcd*);
 		if (*hcd_ptr) {
 			callee_unmarshal_kernel__hc_driver_stop__hcd__in(__pos, __msg, __ext, ctx, *hcd_ptr);
 		}
@@ -2555,7 +2554,7 @@ void hc_driver_shutdown_callee(struct fipc_message* __msg, struct ext_registers*
 	}
 
 	{
-		*hcd_ptr = glue_unpack(__pos, __msg, __ext, struct usb_hcd*);
+		*hcd_ptr = glue_unpack_shadow(__pos, __msg, __ext, struct usb_hcd*);
 		if (*hcd_ptr) {
 			callee_unmarshal_kernel__hc_driver_shutdown__hcd__in(__pos, __msg, __ext, ctx, *hcd_ptr);
 		}
@@ -2597,7 +2596,7 @@ void hc_driver_get_frame_number_callee(struct fipc_message* __msg, struct ext_re
 	}
 
 	{
-		*hcd_ptr = glue_unpack(__pos, __msg, __ext, struct usb_hcd*);
+		*hcd_ptr = glue_unpack_shadow(__pos, __msg, __ext, struct usb_hcd*);
 		if (*hcd_ptr) {
 			callee_unmarshal_kernel__hc_driver_get_frame_number__hcd__in(__pos, __msg, __ext, ctx, *hcd_ptr);
 		}
@@ -2720,7 +2719,7 @@ void hc_driver_urb_dequeue_callee(struct fipc_message* __msg, struct ext_registe
 	}
 
 	{
-		*hcd_ptr = glue_unpack(__pos, __msg, __ext, struct usb_hcd*);
+		*hcd_ptr = glue_unpack_shadow(__pos, __msg, __ext, struct usb_hcd*);
 		if (*hcd_ptr) {
 			callee_unmarshal_kernel__hc_driver_urb_dequeue__hcd__in(__pos, __msg, __ext, ctx, *hcd_ptr);
 		}
@@ -3092,7 +3091,7 @@ void hc_driver_free_streams_callee(struct fipc_message* __msg, struct ext_regist
 	}
 
 	{
-		*hcd_ptr = glue_unpack(__pos, __msg, __ext, struct usb_hcd*);
+		*hcd_ptr = glue_unpack_shadow(__pos, __msg, __ext, struct usb_hcd*);
 		if (*hcd_ptr) {
 			callee_unmarshal_kernel__hc_driver_free_streams__hcd__in(__pos, __msg, __ext, ctx, *hcd_ptr);
 		}

@@ -1991,4 +1991,6 @@ static inline struct xhci_ring *xhci_urb_to_transfer_ring(struct xhci_hcd *xhci,
 					urb->stream_id);
 }
 
+#define ENTRY_DEBUG	printk("%s:%d called\n", __func__, __LINE__)
+
 #endif /* __LINUX_XHCI_HCD_H */

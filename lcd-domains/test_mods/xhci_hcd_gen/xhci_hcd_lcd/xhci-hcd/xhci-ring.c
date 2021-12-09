@@ -1590,6 +1590,10 @@ static void handle_port_status(struct xhci_hcd *xhci,
 	faked_port_index = find_faked_portnum_from_hw_portnum(hcd, xhci,
 			port_id);
 
+	printk("%s reading faked_port_index %u at addr %p\n", __func__, faked_port_index,
+			port_array[faked_port_index]
+			);
+
 	temp = readl(port_array[faked_port_index]);
 	if (hcd->state == HC_STATE_SUSPENDED) {
 		xhci_dbg(xhci, "resume root hub\n");

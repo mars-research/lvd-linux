@@ -1539,6 +1539,62 @@ void caller_unmarshal_kernel__xhci_run__hcd__in(
 	struct xhci_run_call_ctx const* call_ctx,
 	struct usb_hcd* ptr);
 
+void caller_marshal_kernel__xhci_run__xhci_hcd__in(
+	size_t* __pos,
+	struct fipc_message* __msg,
+	struct ext_registers* __ext,
+	struct xhci_run_call_ctx const* call_ctx,
+	struct xhci_hcd const* ptr);
+
+void callee_unmarshal_kernel__xhci_run__xhci_hcd__in(
+	size_t* __pos,
+	const struct fipc_message* __msg,
+	const struct ext_registers* __ext,
+	struct xhci_run_call_ctx const* call_ctx,
+	struct xhci_hcd* ptr);
+
+void callee_marshal_kernel__xhci_run__xhci_hcd__in(
+	size_t* __pos,
+	struct fipc_message* __msg,
+	struct ext_registers* __ext,
+	struct xhci_run_call_ctx const* call_ctx,
+	struct xhci_hcd const* ptr);
+
+void caller_unmarshal_kernel__xhci_run__xhci_hcd__in(
+	size_t* __pos,
+	const struct fipc_message* __msg,
+	const struct ext_registers* __ext,
+	struct xhci_run_call_ctx const* call_ctx,
+	struct xhci_hcd* ptr);
+
+void caller_marshal_kernel__xhci_run__usb_hcd_shared_hcd__in(
+	size_t* __pos,
+	struct fipc_message* __msg,
+	struct ext_registers* __ext,
+	struct xhci_run_call_ctx const* call_ctx,
+	struct usb_hcd const* ptr);
+
+void callee_unmarshal_kernel__xhci_run__usb_hcd_shared_hcd__in(
+	size_t* __pos,
+	const struct fipc_message* __msg,
+	const struct ext_registers* __ext,
+	struct xhci_run_call_ctx const* call_ctx,
+	struct usb_hcd* ptr);
+
+void callee_marshal_kernel__xhci_run__usb_hcd_shared_hcd__in(
+	size_t* __pos,
+	struct fipc_message* __msg,
+	struct ext_registers* __ext,
+	struct xhci_run_call_ctx const* call_ctx,
+	struct usb_hcd const* ptr);
+
+void caller_unmarshal_kernel__xhci_run__usb_hcd_shared_hcd__in(
+	size_t* __pos,
+	const struct fipc_message* __msg,
+	const struct ext_registers* __ext,
+	struct xhci_run_call_ctx const* call_ctx,
+	struct usb_hcd* ptr);
+
 void caller_marshal_kernel__usb_disable_xhci_ports__pci_dev__in(
 	size_t* __pos,
 	struct fipc_message* __msg,

@@ -2223,6 +2223,8 @@ static int xhci_setup_port_arrays(struct xhci_hcd *xhci, gfp_t flags)
 	int cap_count = 0;
 	u32 cap_start;
 
+	ENTRY_DEBUG;
+
 	num_ports = HCS_MAX_PORTS(xhci->hcs_params1);
 	xhci->port_array = kzalloc(sizeof(*xhci->port_array)*num_ports, flags);
 	if (!xhci->port_array)
@@ -2321,11 +2323,15 @@ static int xhci_setup_port_arrays(struct xhci_hcd *xhci, gfp_t flags)
 				break;
 		}
 	}
+	printk("%s, num_usb3_ports %u\n", __func__, xhci->num_usb3_ports);
+
 	if (xhci->num_usb3_ports) {
 		xhci->usb3_ports = kmalloc(sizeof(*xhci->usb3_ports)*
 				xhci->num_usb3_ports, flags);
 		if (!xhci->usb3_ports)
 			return -ENOMEM;
+
+		printk("%s, usb3_ports %p\n", __func__, xhci->usb3_ports);
 
 		port_index = 0;
 		for (i = 0; i < num_ports; i++)

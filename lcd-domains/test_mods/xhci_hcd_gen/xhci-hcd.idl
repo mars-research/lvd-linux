@@ -70,7 +70,7 @@ module kernel {
 		}
 	}
 
-	rpc int  pci_set_power_state( projection dev* [in] dev, int  state ) {
+	rpc int  pci_set_power_state( projection dev* dev, int  state ) {
 		projection < struct pci_dev > dev {
 		}
 	}
@@ -152,11 +152,6 @@ rpc_export int  xhci_gen_setup( projection hcd [alloc<{{sizeof(hcd) + sizeof(str
 			unsigned long rsrc_start;
 			unsigned long rsrc_len;
 			projection usb_hcd_primary_hcd [alloc_once(callee)] * primary_hcd;
-			projection usb_hcd_shared_hcd [alloc_once(callee)] * shared_hcd;
-		}
-
-		projection < struct usb_hcd > usb_hcd_shared_hcd {
-
 		}
 
 		projection < struct usb_hcd > usb_hcd_primary_hcd {
@@ -268,6 +263,14 @@ rpc_export int  xhci_gen_setup( projection hcd [alloc<{{sizeof(hcd) + sizeof(str
 	// xhci_run is called multiple times with different args
 	rpc_export int  xhci_run( projection hcd [alloc_once(callee)] * hcd ) {
 		projection < struct usb_hcd > hcd {
+			casted<unsigned long  *, projection xhci_hcd [within<{{hcd}}, {{sizeof(struct xhci_hcd)}}>]*> hcd_priv;
+		}
+
+		projection < struct xhci_hcd > xhci_hcd {
+			projection usb_hcd_shared_hcd [alloc_once(callee)] * shared_hcd;
+		}
+
+		projection < struct usb_hcd > usb_hcd_shared_hcd {
 		}
 	}
 
@@ -279,13 +282,13 @@ rpc_export int  xhci_gen_setup( projection hcd [alloc<{{sizeof(hcd) + sizeof(str
 	rpc string [alloc(caller)] * dmi_get_system_info(int field) {
 	}
 
-	rpc bool  usb_acpi_power_manageable( projection hdev [bind(callee)] *hdev, int  index ) {
+	rpc bool  usb_acpi_power_manageable( projection hdev *hdev, int  index ) {
 		projection < struct usb_device > hdev {
 			int [in] maxchild;
 		}
 	}
 
-	rpc int  usb_acpi_set_power_state( projection hdev [bind(callee)] * hdev, int  index, bool  enable ) {
+	rpc int  usb_acpi_set_power_state( projection hdev * hdev, int  index, bool  enable ) {
 		projection < struct usb_device > hdev {
 			int [in] maxchild;
 		}
@@ -294,50 +297,56 @@ rpc_export int  xhci_gen_setup( projection hcd [alloc<{{sizeof(hcd) + sizeof(str
 	rpc int  usb_disabled(  ) {
 	}
 
-rpc void  usb_hc_died( projection hcd* [in] hcd ) {
+	rpc void  usb_hc_died( projection hcd *hcd ) {
 		projection < struct usb_bus> usb_bus {
-			projection usb_bus_root_hub* root_hub;
+			projection usb_bus_root_hub * root_hub;
 		}
-	projection < struct usb_hcd > hcd {
-		projection usb_bus self;
-		long unsigned int [in] flags;
-		unsigned int [in] rh_registered : 1;
+		projection < struct usb_hcd > hcd {
+			projection usb_bus self;
+			long unsigned int [in] flags;
+			unsigned int [in] rh_registered : 1;
+		}
+		projection < struct device > usb_bus_controller {
+		}
+		projection < struct usb_device > usb_bus_root_hub {
+		}
 	}
-	projection < struct device > usb_bus_controller {
+
+	// FIXME: urb allocated by the driver?
+	rpc int  usb_hcd_check_unlink_urb( projection hcd* [unused] hcd, projection urb* [in] urb, int  status ) {
+		projection < struct usb_hcd > hcd {
+		}
+		projection < struct urb > urb {
+			projection urb_ep* ep;
+		}
+		projection < struct usb_host_endpoint > urb_ep {
+		}
 	}
-	projection < struct usb_device > usb_bus_root_hub {
+
+	// FIXME: urb allocated by the driver?
+	rpc void  usb_hcd_giveback_urb( projection hcd *hcd, projection urb* [in] urb, int  status ) {
+		projection < struct usb_hcd > hcd {
+			//projection usb_hcd_driver* driver;
+		}
+		/*projection < struct hc_driver > usb_hcd_driver {
+		}*/
+		projection < struct urb > urb {
+			void* [out] hcpriv;
+			projection urb_dev* dev;
+			unsigned int [in] transfer_flags;
+			unsigned int [in] transfer_buffer_length;
+			unsigned int [in] actual_length;
+		}
+		projection < struct usb_device > urb_dev {
+			projection usb_device_parent* parent;
+		}
+		projection < struct usb_device > usb_device_parent {
+		}
 	}
-}
-rpc int  usb_hcd_check_unlink_urb( projection hcd* [unused] hcd, projection urb* [in] urb, int  status ) {
-	projection < struct usb_hcd > hcd {
+
+	rpc unsigned int  usb_hcd_irq( int [unused] irq, void* [in] __hcd ) {
 	}
-	projection < struct urb > urb {
-		projection urb_ep* ep;
-	}
-	projection < struct usb_host_endpoint > urb_ep {
-	}
-}
-rpc void  usb_hcd_giveback_urb( projection hcd* [in] hcd, projection urb* [in] urb, int  status ) {
-	projection < struct usb_hcd > hcd {
-		//projection usb_hcd_driver* driver;
-	}
-	/*projection < struct hc_driver > usb_hcd_driver {
-	}*/
-	projection < struct urb > urb {
-		void* [out] hcpriv;
-		projection urb_dev* dev;
-		unsigned int [in] transfer_flags;
-		unsigned int [in] transfer_buffer_length;
-		unsigned int [in] actual_length;
-	}
-	projection < struct usb_device > urb_dev {
-		projection usb_device_parent* parent;
-	}
-	projection < struct usb_device > usb_device_parent {
-	}
-}
-rpc unsigned int  usb_hcd_irq( int [unused] irq, void* [in] __hcd ) {
-}
+
 	rpc int  usb_hcd_is_primary_hcd( projection hcd* hcd ) {
 		projection < struct usb_hcd > hcd {
 			//projection usb_hcd_primary_hcd* primary_hcd;
@@ -345,7 +354,8 @@ rpc unsigned int  usb_hcd_irq( int [unused] irq, void* [in] __hcd ) {
 		projection < struct usb_hcd > usb_hcd_primary_hcd {
 		}
 	}
-rpc int  usb_hcd_link_urb_to_ep( projection hcd* [in] hcd, projection urb* [in] urb ) {
+
+rpc int  usb_hcd_link_urb_to_ep( projection hcd *hcd, projection urb* [in] urb ) {
 	projection < struct usb_hcd > hcd {
 		long unsigned int [in] flags;
 	}
@@ -358,7 +368,7 @@ rpc int  usb_hcd_link_urb_to_ep( projection hcd* [in] hcd, projection urb* [in] 
 	projection < struct usb_host_endpoint > urb_ep {
 	}
 }
-rpc void  usb_hcd_poll_rh_status( projection hcd* [in] hcd ) {
+rpc void  usb_hcd_poll_rh_status( projection hcd *hcd ) {
 	projection < struct usb_hcd > hcd {
 		//projection usb_hcd_driver* driver;
 		long unsigned int [in] flags;
@@ -411,7 +421,7 @@ rpc void  usb_wakeup_notification( projection hdev* [in] hdev, unsigned int  por
 	rpc_ptr int  hc_driver_reset_device( projection hcd [bind(callee)] * hcd,
 			projection udev [alloc_once(callee)] * udev ) {
 		projection < struct usb_hcd > hcd {
-			projection usb_hcd_primary_hcd* primary_hcd;
+			projection usb_hcd_primary_hcd [bind(callee)] *primary_hcd;
 		}
 		projection < struct usb_hcd > usb_hcd_primary_hcd {
 		}
@@ -422,25 +432,25 @@ rpc void  usb_wakeup_notification( projection hdev* [in] hdev, unsigned int  por
 		projection < struct usb_device > usb_device {
 		}
 	}
-rpc_ptr int  hc_driver_update_device( projection hcd* [in] hcd, projection udev* [unused] udev ) {
+rpc_ptr int  hc_driver_update_device( projection hcd [bind(callee)] *hcd, projection udev* [unused] udev ) {
 	projection < struct usb_hcd > hcd {
 	}
 	projection < struct usb_device > udev {
 	}
 }
-rpc_ptr int  hc_driver_set_usb2_hw_lpm( projection hcd* [in] hcd, projection udev* [unused] udev, int [unused] enable ) {
+rpc_ptr int  hc_driver_set_usb2_hw_lpm( projection hcd [bind(callee)] *hcd, projection udev* [unused] udev, int [unused] enable ) {
 	projection < struct usb_hcd > hcd {
 	}
 	projection < struct usb_device > udev {
 	}
 }
-rpc_ptr int  hc_driver_enable_usb3_lpm_timeout( projection hcd* [in] hcd, projection udev* [unused] udev, unsigned int [unused] state ) {
+rpc_ptr int  hc_driver_enable_usb3_lpm_timeout( projection hcd [bind(callee)] *hcd, projection udev* [unused] udev, unsigned int [unused] state ) {
 	projection < struct usb_hcd > hcd {
 	}
 	projection < struct usb_device > udev {
 	}
 }
-rpc_ptr int  hc_driver_disable_usb3_lpm_timeout( projection hcd* [in] hcd, projection udev* [unused] udev, unsigned int [unused] state ) {
+rpc_ptr int  hc_driver_disable_usb3_lpm_timeout( projection hcd [bind(callee)] *hcd, projection udev* [unused] udev, unsigned int [unused] state ) {
 	projection < struct usb_hcd > hcd {
 	}
 	projection < struct usb_device > udev {
@@ -450,52 +460,37 @@ rpc_ptr int  hc_driver_disable_usb3_lpm_timeout( projection hcd* [in] hcd, proje
 				int  port1 ) {
 		projection < struct usb_hcd > hcd {
 			int [in] speed;
-			projection usb_hcd_primary_hcd* primary_hcd;
+			projection usb_hcd_primary_hcd [bind(callee)] *primary_hcd;
 		}
 		projection < struct usb_hcd > usb_hcd_primary_hcd {
 		}
 	}
 
-rpc_ptr void  hc_driver_stop( projection hcd* [in] hcd ) {
-	projection < struct usb_hcd > hcd {
-		projection usb_hcd_primary_hcd* primary_hcd;
-
+	rpc_ptr void  hc_driver_stop( projection hcd [bind(callee)] *hcd ) {
+		projection < struct usb_hcd > hcd {
+			projection usb_hcd_primary_hcd [bind(callee)] *primary_hcd;
+		}
+		projection < struct usb_hcd > usb_hcd_primary_hcd {
+		}
 	}
-	projection < struct usb_hcd > usb_hcd_primary_hcd {
-		projection usb_hcd_primary_hcd* primary_hcd;
-
+	rpc_ptr void  hc_driver_shutdown( projection hcd [bind(callee)] *hcd ) {
+		projection < struct usb_hcd > hcd {
+			projection usb_hcd_primary_hcd [bind(callee)] *primary_hcd;
+		}
+		projection < struct usb_hcd > usb_hcd_primary_hcd {
+		}
 	}
-	projection < struct usb_hcd > usb_hcd_primary_hcd {
+	rpc_ptr int  hc_driver_get_frame_number( projection hcd [bind(callee)] *hcd ) {
+		projection < struct usb_hcd > hcd {
+			projection usb_hcd_primary_hcd [bind(callee)] *primary_hcd;
+		}
+		projection < struct usb_hcd > usb_hcd_primary_hcd {
+		}
 	}
-}
-rpc_ptr void  hc_driver_shutdown( projection hcd* [in] hcd ) {
-	projection < struct usb_hcd > hcd {
-		projection usb_hcd_primary_hcd* primary_hcd;
-
-	}
-	projection < struct usb_hcd > usb_hcd_primary_hcd {
-		projection usb_hcd_primary_hcd* primary_hcd;
-
-	}
-	projection < struct usb_hcd > usb_hcd_primary_hcd {
-	}
-}
-rpc_ptr int  hc_driver_get_frame_number( projection hcd* [in] hcd ) {
-	projection < struct usb_hcd > hcd {
-		projection usb_hcd_primary_hcd* primary_hcd;
-
-	}
-	projection < struct usb_hcd > usb_hcd_primary_hcd {
-		projection usb_hcd_primary_hcd* primary_hcd;
-
-	}
-	projection < struct usb_hcd > usb_hcd_primary_hcd {
-	}
-}
 	rpc_ptr int  hc_driver_urb_enqueue( projection hcd [bind(callee)] *hcd,
 		projection urb [alloc_once(callee)] * urb, unsigned int  mem_flags ) {
 		projection < struct usb_hcd > hcd {
-			projection usb_hcd_primary_hcd* primary_hcd;
+			projection usb_hcd_primary_hcd [bind(callee)] *primary_hcd;
 		}
 		projection < struct usb_hcd > usb_hcd_primary_hcd {
 		}
@@ -514,13 +509,13 @@ rpc_ptr int  hc_driver_get_frame_number( projection hcd* [in] hcd ) {
 		}
 	}
 
-rpc_ptr int  hc_driver_urb_dequeue( projection hcd* [in] hcd, projection urb* [in] urb, int  status ) {
+rpc_ptr int  hc_driver_urb_dequeue( projection hcd [bind(callee)] *hcd, projection urb* [in] urb, int  status ) {
 	projection < struct usb_hcd > hcd {
-		projection usb_hcd_primary_hcd* primary_hcd;
+		projection usb_hcd_primary_hcd [bind(callee)] *primary_hcd;
 
 	}
 	projection < struct usb_hcd > usb_hcd_primary_hcd {
-		projection usb_hcd_primary_hcd* primary_hcd;
+		projection usb_hcd_primary_hcd [bind(callee)] *primary_hcd;
 
 	}
 	projection < struct usb_hcd > usb_hcd_primary_hcd {
@@ -580,11 +575,11 @@ rpc_ptr int  hc_driver_urb_dequeue( projection hcd* [in] hcd, projection urb* [i
 
 rpc_ptr int  hc_driver_alloc_streams( projection hcd* hcd, projection udev [alloc(callee)] *udev, projection eps [alloc(callee)] * [alloc(callee)] *eps, unsigned int  num_eps, unsigned int  num_streams, unsigned int  mem_flags ) {
 	projection < struct usb_hcd > hcd {
-		projection usb_hcd_primary_hcd* primary_hcd;
+		projection usb_hcd_primary_hcd [bind(callee)] *primary_hcd;
 
 	}
 	projection < struct usb_hcd > usb_hcd_primary_hcd {
-		projection usb_hcd_primary_hcd* primary_hcd;
+		projection usb_hcd_primary_hcd [bind(callee)] *primary_hcd;
 
 	}
 	projection < struct usb_hcd > usb_hcd_primary_hcd {
@@ -595,13 +590,13 @@ rpc_ptr int  hc_driver_alloc_streams( projection hcd* hcd, projection udev [allo
 	projection < struct usb_host_endpoint > eps {
 	}
 }
-rpc_ptr int  hc_driver_free_streams( projection hcd* [in] hcd, projection udev [alloc(callee)] *udev, projection eps** eps, unsigned int  num_eps, unsigned int [unused] mem_flags ) {
+rpc_ptr int  hc_driver_free_streams( projection hcd [bind(callee)] *hcd, projection udev [alloc(callee)] *udev, projection eps** eps, unsigned int  num_eps, unsigned int [unused] mem_flags ) {
 	projection < struct usb_hcd > hcd {
-		projection usb_hcd_primary_hcd* primary_hcd;
+		projection usb_hcd_primary_hcd [bind(callee)] *primary_hcd;
 
 	}
 	projection < struct usb_hcd > usb_hcd_primary_hcd {
-		projection usb_hcd_primary_hcd* primary_hcd;
+		projection usb_hcd_primary_hcd [bind(callee)] *primary_hcd;
 
 	}
 	projection < struct usb_hcd > usb_hcd_primary_hcd {
@@ -669,11 +664,11 @@ rpc_ptr int  hc_driver_free_streams( projection hcd* [in] hcd, projection udev [
 	}
 rpc_ptr void  hc_driver_reset_bandwidth( projection hcd*  hcd, projection udev [alloc(callee)] *udev ) {
 	projection < struct usb_hcd > hcd {
-		projection usb_hcd_primary_hcd* primary_hcd;
+		projection usb_hcd_primary_hcd [bind(callee)] *primary_hcd;
 
 	}
 	projection < struct usb_hcd > usb_hcd_primary_hcd {
-		projection usb_hcd_primary_hcd* primary_hcd;
+		projection usb_hcd_primary_hcd [bind(callee)] *primary_hcd;
 
 	}
 	projection < struct usb_hcd > usb_hcd_primary_hcd {

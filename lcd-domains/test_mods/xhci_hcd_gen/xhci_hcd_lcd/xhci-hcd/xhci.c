@@ -579,10 +579,13 @@ int xhci_init(struct usb_hcd *hcd)
 				"xHCI doesn't need link TRB QUIRK");
 	}
 
-	printk("%s, hcd %p xhci %p\n", __func__, hcd, xhci);
+	printk("%s, hcd %p xhci %p | version %x | params %x\n",
+			__func__, hcd, xhci, xhci->hci_version, xhci->hcc_params);
 	retval = xhci_mem_init(xhci, GFP_KERNEL);
 	xhci_dbg_trace(xhci, trace_xhci_dbg_init, "Finished xhci_init");
 
+	printk("%s, after mem_init hcd %p xhci %p | version %x | params %x\n",
+			__func__, hcd, xhci, xhci->hci_version, xhci->hcc_params);
 	/* Initializing Compliance Mode Recovery Data If Needed */
 	if (xhci_compliance_mode_recovery_timer_quirk_check()) {
 		xhci->quirks |= XHCI_COMP_MODE_QUIRK;
@@ -634,6 +637,11 @@ int xhci_run(struct usb_hcd *hcd)
 	/* Start the xHCI host controller running only after the USB 2.0 roothub
 	 * is setup.
 	 */
+
+	// XXX: HACK: This need to be fixed in IDL
+	if (!usb_hcd_is_primary_hcd(hcd)) {
+		xhci->shared_hcd = hcd;
+	}
 
 	hcd->uses_new_polling = 1;
 	if (!usb_hcd_is_primary_hcd(hcd))
@@ -4946,8 +4954,17 @@ int xhci_gen_setup_with_xhci(struct usb_hcd *hcd, struct xhci_hcd *xhci, xhci_ge
 	xhci->hcs_params2 = readl(&xhci->cap_regs->hcs_params2);
 	xhci->hcs_params3 = readl(&xhci->cap_regs->hcs_params3);
 	xhci->hcc_params = readl(&xhci->cap_regs->hc_capbase);
+
+	printk("%s:%d hcc_params %x\n", __func__, __LINE__, xhci->hcc_params);
+
 	xhci->hci_version = HC_VERSION(xhci->hcc_params);
+
+	printk("%s:%d hcc_version %x\n", __func__, __LINE__, xhci->hci_version);
+
 	xhci->hcc_params = readl(&xhci->cap_regs->hcc_params);
+
+	printk("%s:%d hcc_params %x\n", __func__, __LINE__, xhci->hcc_params);
+
 	if (xhci->hci_version > 0x100)
 		xhci->hcc_params2 = readl(&xhci->cap_regs->hcc_params2);
 	xhci_print_registers(xhci);
@@ -4963,6 +4980,9 @@ int xhci_gen_setup_with_xhci(struct usb_hcd *hcd, struct xhci_hcd *xhci, xhci_ge
 		xhci->quirks |= XHCI_INTEL_HOST;
 		xhci->quirks |= XHCI_AVOID_BEI;
 	}
+
+
+	printk("%s:%d xhci->quirks %x\n", __func__, __LINE__, xhci->quirks);
 
 	/* In xhci controllers which follow xhci 1.0 spec gives a spurious
 	 * success event after a short transfer. This quirk will ignore such
@@ -5029,6 +5049,10 @@ int xhci_gen_setup_with_xhci(struct usb_hcd *hcd, struct xhci_hcd *xhci, xhci_ge
 		return retval;
 	}
 	xhci_dbg(xhci, "Called HCD init\n");
+
+
+	printk("%s, hcd %p xhci %p | version %x | params %x\n",
+			__func__, hcd, xhci, xhci->hci_version, xhci->hcc_params);
 
 	xhci_info(xhci, "hcc params 0x%08x hci version 0x%x quirks 0x%08x\n",
 		  xhci->hcc_params, xhci->hci_version, xhci->quirks);

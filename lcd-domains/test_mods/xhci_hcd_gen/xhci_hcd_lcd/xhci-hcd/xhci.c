@@ -5050,13 +5050,12 @@ int xhci_gen_setup_with_xhci(struct usb_hcd *hcd, struct xhci_hcd *xhci, xhci_ge
 	}
 	xhci_dbg(xhci, "Called HCD init\n");
 
+	LIBLCD_MSG("hcc params 0x%08x hci version 0x%x quirks 0x%08x\n",
+		  xhci->hcc_params, xhci->hci_version, xhci->quirks);
+
 
 	printk("%s, hcd %p xhci %p | version %x | params %x\n",
 			__func__, hcd, xhci, xhci->hci_version, xhci->hcc_params);
-
-	xhci_info(xhci, "hcc params 0x%08x hci version 0x%x quirks 0x%08x\n",
-		  xhci->hcc_params, xhci->hci_version, xhci->quirks);
-
 	return 0;
 }
 EXPORT_SYMBOL_GPL(xhci_gen_setup);

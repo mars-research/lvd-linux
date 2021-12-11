@@ -12,6 +12,9 @@ DEFINE_HASHTABLE(shadow_ht, 4);
 DEFINE_HASHTABLE(to_shadow_ht, 4);
 bool initialized = 0;
 
+#undef verbose_debug
+#define verbose_debug 0
+
 struct shadow_link {
     struct hlist_node hentry;
     struct hlist_node to_hentry;
@@ -27,7 +30,8 @@ void glue_user_panic(const char* msg)
 
 void glue_user_trace(const char* msg)
 {
-    LIBLCD_MSG(msg);
+    //if (verbose_debug)
+        LIBLCD_MSG(msg);
 }
 
 void glue_user_call_server(struct fipc_message* msg, size_t id)

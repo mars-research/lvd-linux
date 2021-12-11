@@ -11,7 +11,7 @@
 #include "glue_user.h"
 
 #define DEFAULT_GFP_FLAGS  (GFP_KERNEL)
-#define verbose_debug 1
+#define verbose_debug 0
 #define glue_pack(pos, msg, ext, value) glue_pack_impl((pos), (msg), (ext), (uint64_t)(value))
 #define glue_pack_shadow(pos, msg, ext, value) glue_pack_shadow_impl((pos), (msg), (ext), (value))
 #define glue_unpack(pos, msg, ext, type) (type)glue_unpack_impl((pos), (msg), (ext))
@@ -4534,6 +4534,62 @@ void caller_unmarshal_kernel__hc_driver_hub_control__hcd__in(
 	const struct ext_registers* __ext,
 	struct hc_driver_hub_control_call_ctx const* call_ctx,
 	struct usb_hcd* ptr);
+
+void caller_marshal_kernel__hc_driver_hub_control__usb_bus__in(
+	size_t* __pos,
+	struct fipc_message* __msg,
+	struct ext_registers* __ext,
+	struct hc_driver_hub_control_call_ctx const* call_ctx,
+	struct usb_bus const* ptr);
+
+void callee_unmarshal_kernel__hc_driver_hub_control__usb_bus__in(
+	size_t* __pos,
+	const struct fipc_message* __msg,
+	const struct ext_registers* __ext,
+	struct hc_driver_hub_control_call_ctx const* call_ctx,
+	struct usb_bus* ptr);
+
+void callee_marshal_kernel__hc_driver_hub_control__usb_bus__in(
+	size_t* __pos,
+	struct fipc_message* __msg,
+	struct ext_registers* __ext,
+	struct hc_driver_hub_control_call_ctx const* call_ctx,
+	struct usb_bus const* ptr);
+
+void caller_unmarshal_kernel__hc_driver_hub_control__usb_bus__in(
+	size_t* __pos,
+	const struct fipc_message* __msg,
+	const struct ext_registers* __ext,
+	struct hc_driver_hub_control_call_ctx const* call_ctx,
+	struct usb_bus* ptr);
+
+void caller_marshal_kernel__hc_driver_hub_control__usb_bus_root_hub__in(
+	size_t* __pos,
+	struct fipc_message* __msg,
+	struct ext_registers* __ext,
+	struct hc_driver_hub_control_call_ctx const* call_ctx,
+	struct usb_device const* ptr);
+
+void callee_unmarshal_kernel__hc_driver_hub_control__usb_bus_root_hub__in(
+	size_t* __pos,
+	const struct fipc_message* __msg,
+	const struct ext_registers* __ext,
+	struct hc_driver_hub_control_call_ctx const* call_ctx,
+	struct usb_device* ptr);
+
+void callee_marshal_kernel__hc_driver_hub_control__usb_bus_root_hub__in(
+	size_t* __pos,
+	struct fipc_message* __msg,
+	struct ext_registers* __ext,
+	struct hc_driver_hub_control_call_ctx const* call_ctx,
+	struct usb_device const* ptr);
+
+void caller_unmarshal_kernel__hc_driver_hub_control__usb_bus_root_hub__in(
+	size_t* __pos,
+	const struct fipc_message* __msg,
+	const struct ext_registers* __ext,
+	struct hc_driver_hub_control_call_ctx const* call_ctx,
+	struct usb_device* ptr);
 
 void caller_marshal_kernel__hc_driver_hub_control__usb_hcd_primary_hcd__in(
 	size_t* __pos,

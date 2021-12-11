@@ -149,6 +149,7 @@ rpc_export int  xhci_gen_setup( projection hcd [alloc<{{sizeof(hcd) + sizeof(str
 			int [out] speed;
 			projection hc_driver [bind(callee)] * driver;
 			unsigned int [out] rh_registered : 1;
+			unsigned int [out] has_tt:1;
 			unsigned long rsrc_start;
 			unsigned long rsrc_len;
 			projection usb_hcd_primary_hcd [alloc_once(callee)] * primary_hcd;
@@ -410,6 +411,7 @@ rpc void  usb_wakeup_notification( projection hdev* [in] hdev, unsigned int  por
 		}
 		projection < struct usb_device > hdev {
 			int [in] slot_id;
+			int maxchild;
 			projection usb_device [alloc_once(callee)] *parent;	
 		}
 		projection < struct usb_device > usb_device {
@@ -703,13 +705,23 @@ rpc_ptr void  hc_driver_reset_bandwidth( projection hcd*  hcd, projection udev [
 
 	rpc_ptr int  hc_driver_hub_control( projection hcd [bind(callee)] * hcd, unsigned short  typeReq,
 		unsigned short  wValue, unsigned short  wIndex,
-		array<char, {{wLength}}> [alloc(callee), bind(callee)] * [in, out] buf,
+		//array<char, {{wLength}}> [alloc(callee), bind(callee)] * [in, out] buf,
+		array<char, {{wLength}}> [alloc_stack(callee)] * [in, out] buf,
  		unsigned short  wLength ) {
 		projection < struct usb_hcd > hcd {
+			projection usb_bus self;
 			int [in] speed;
 			projection usb_hcd_primary_hcd [alloc_once(callee)] * primary_hcd;
 		}
 		projection < struct usb_hcd > usb_hcd_primary_hcd {
+		}
+
+	       	projection < struct usb_bus> usb_bus {
+			projection usb_bus_root_hub [alloc_once(callee)] * root_hub;
+		}
+
+		projection < struct usb_device > usb_bus_root_hub {
+			unsigned int [out] speed;
 		}
 	}
 

@@ -1992,10 +1992,13 @@ static int process_ctrl_td(struct xhci_hcd *xhci, struct xhci_td *td,
 		return finish_td(xhci, td, event_trb, event, ep, status, false);
 	case COMP_STOP:
 		/* Did we stop at data stage? */
-		if (event_trb != ep_ring->dequeue && event_trb != td->last_trb)
+		if (event_trb != ep_ring->dequeue && event_trb != td->last_trb) {
 			td->urb->actual_length =
 				td->urb->transfer_buffer_length -
 				EVENT_TRB_LEN(le32_to_cpu(event->transfer_len));
+			printk("%s:%d actual_length = %d", __func__, __LINE__,
+					td->urb->actual_length);
+		}
 		/* fall through */
 	case COMP_STOP_INVAL:
 		return finish_td(xhci, td, event_trb, event, ep, status, false);
@@ -2010,10 +2013,14 @@ static int process_ctrl_td(struct xhci_hcd *xhci, struct xhci_td *td,
 	case COMP_STALL:
 		/* Did we transfer part of the data (middle) phase? */
 		if (event_trb != ep_ring->dequeue &&
-				event_trb != td->last_trb)
+				event_trb != td->last_trb) {
 			td->urb->actual_length =
 				td->urb->transfer_buffer_length -
 				EVENT_TRB_LEN(le32_to_cpu(event->transfer_len));
+
+			printk("%s:%d actual_length = %d", __func__, __LINE__,
+					td->urb->actual_length);
+		}
 		else if (!td->urb_length_set)
 			td->urb->actual_length = 0;
 
@@ -2052,6 +2059,8 @@ static int process_ctrl_td(struct xhci_hcd *xhci, struct xhci_td *td,
 				EVENT_TRB_LEN(le32_to_cpu(event->transfer_len));
 			xhci_dbg(xhci, "Waiting for status "
 					"stage event\n");
+			printk("%s:%d actual_length = %d", __func__, __LINE__,
+					td->urb->actual_length);
 			return 0;
 		}
 	}

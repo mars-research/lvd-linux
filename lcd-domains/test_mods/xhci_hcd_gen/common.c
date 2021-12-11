@@ -1111,9 +1111,13 @@ void caller_marshal_kernel__xhci_gen_setup_with_xhci__usb_bus__in(
 	struct device* const* controller_ptr = &ptr->controller;
 	struct pci_dev* _pci_dev_ptr = to_pci_dev(ptr->controller);
 	struct pci_dev* const* pci_dev_ptr = &_pci_dev_ptr;
-	unsigned int __is_b_host = ptr->is_b_host;
-	unsigned int const* __is_b_host_ptr = &__is_b_host;
 	struct usb_device* const* root_hub_ptr = &ptr->root_hub;
+	unsigned int __sg_tablesize = ptr->sg_tablesize;
+	unsigned int const* __sg_tablesize_ptr = &__sg_tablesize;
+	unsigned int __no_sg_constraint = ptr->no_sg_constraint;
+	unsigned int const* __no_sg_constraint_ptr = &__no_sg_constraint;
+	unsigned int __no_stop_on_short = ptr->no_stop_on_short;
+	unsigned int const* __no_stop_on_short_ptr = &__no_stop_on_short;
 
 	{
 		__maybe_unused const void* __adjusted = *pci_dev_ptr;
@@ -1138,16 +1142,24 @@ void caller_marshal_kernel__xhci_gen_setup_with_xhci__usb_bus__in(
 	}
 
 	{
-		glue_pack(__pos, __msg, __ext, *__is_b_host_ptr);
-	}
-
-	{
 		__maybe_unused const void* __adjusted = *root_hub_ptr;
 		glue_pack(__pos, __msg, __ext, __adjusted);
 		if (*root_hub_ptr) {
 			caller_marshal_kernel__xhci_gen_setup_with_xhci__usb_bus_root_hub__in(__pos, __msg, __ext, ctx, *root_hub_ptr);
 		}
 
+	}
+
+	{
+		glue_pack(__pos, __msg, __ext, *__sg_tablesize_ptr);
+	}
+
+	{
+		glue_pack(__pos, __msg, __ext, *__no_sg_constraint_ptr);
+	}
+
+	{
+		glue_pack(__pos, __msg, __ext, *__no_stop_on_short_ptr);
 	}
 
 }
@@ -1161,9 +1173,13 @@ void callee_unmarshal_kernel__xhci_gen_setup_with_xhci__usb_bus__in(
 {
 	struct pci_dev* pci_dev_ptr;
 	struct device** controller_ptr = &ptr->controller;
-	unsigned int __is_b_host = ptr->is_b_host;
-	unsigned int* __is_b_host_ptr = &__is_b_host;
 	struct usb_device** root_hub_ptr = &ptr->root_hub;
+	unsigned int __sg_tablesize = ptr->sg_tablesize;
+	unsigned int* __sg_tablesize_ptr = &__sg_tablesize;
+	unsigned int __no_sg_constraint = ptr->no_sg_constraint;
+	unsigned int* __no_sg_constraint_ptr = &__no_sg_constraint;
+	unsigned int __no_stop_on_short = ptr->no_stop_on_short;
+	unsigned int* __no_stop_on_short_ptr = &__no_stop_on_short;
 
 	{
 		size_t __size = sizeof(struct pci_dev);
@@ -1184,12 +1200,8 @@ void callee_unmarshal_kernel__xhci_gen_setup_with_xhci__usb_bus__in(
 	}
 
 	{
-		*__is_b_host_ptr = glue_unpack(__pos, __msg, __ext, unsigned int);
-	}
-
-	{
 		size_t __size = sizeof(struct usb_device);
-		*root_hub_ptr = glue_unpack_new_shadow(__pos, __msg, __ext, struct usb_device*, (__size), (DEFAULT_GFP_FLAGS));
+		*root_hub_ptr = glue_unpack_bind_or_new_shadow(__pos, __msg, __ext, struct usb_device*, __size, DEFAULT_GFP_FLAGS);
 		if (*root_hub_ptr) {
 			callee_unmarshal_kernel__xhci_gen_setup_with_xhci__usb_bus_root_hub__in(__pos, __msg, __ext, ctx, *root_hub_ptr);
 		}
@@ -1197,7 +1209,21 @@ void callee_unmarshal_kernel__xhci_gen_setup_with_xhci__usb_bus__in(
 	}
 
 	{
-		ptr->is_b_host = *__is_b_host_ptr;
+		*__sg_tablesize_ptr = glue_unpack(__pos, __msg, __ext, unsigned int);
+	}
+
+	{
+		*__no_sg_constraint_ptr = glue_unpack(__pos, __msg, __ext, unsigned int);
+	}
+
+	{
+		*__no_stop_on_short_ptr = glue_unpack(__pos, __msg, __ext, unsigned int);
+	}
+
+	{
+		ptr->sg_tablesize = *__sg_tablesize_ptr;
+		ptr->no_sg_constraint = *__no_sg_constraint_ptr;
+		ptr->no_stop_on_short = *__no_stop_on_short_ptr;
 	}
 }
 
@@ -1211,9 +1237,13 @@ void callee_marshal_kernel__xhci_gen_setup_with_xhci__usb_bus__in(
 	struct device* const* controller_ptr = &ptr->controller;
 	struct pci_dev* _pci_dev_ptr = to_pci_dev(ptr->controller);
 	struct pci_dev* const* pci_dev_ptr = &_pci_dev_ptr;
-	unsigned int __is_b_host = ptr->is_b_host;
-	unsigned int const* __is_b_host_ptr = &__is_b_host;
 	struct usb_device* const* root_hub_ptr = &ptr->root_hub;
+	unsigned int __sg_tablesize = ptr->sg_tablesize;
+	unsigned int const* __sg_tablesize_ptr = &__sg_tablesize;
+	unsigned int __no_sg_constraint = ptr->no_sg_constraint;
+	unsigned int const* __no_sg_constraint_ptr = &__no_sg_constraint;
+	unsigned int __no_stop_on_short = ptr->no_stop_on_short;
+	unsigned int const* __no_stop_on_short_ptr = &__no_stop_on_short;
 
 	{
 		if (*pci_dev_ptr) {
@@ -1230,14 +1260,22 @@ void callee_marshal_kernel__xhci_gen_setup_with_xhci__usb_bus__in(
 	}
 
 	{
-		glue_pack(__pos, __msg, __ext, *__is_b_host_ptr);
-	}
-
-	{
 		if (*root_hub_ptr) {
 			callee_marshal_kernel__xhci_gen_setup_with_xhci__usb_bus_root_hub__in(__pos, __msg, __ext, ctx, *root_hub_ptr);
 		}
 
+	}
+
+	{
+		glue_pack(__pos, __msg, __ext, *__sg_tablesize_ptr);
+	}
+
+	{
+		glue_pack(__pos, __msg, __ext, *__no_sg_constraint_ptr);
+	}
+
+	{
+		glue_pack(__pos, __msg, __ext, *__no_stop_on_short_ptr);
 	}
 
 }
@@ -1252,9 +1290,13 @@ void caller_unmarshal_kernel__xhci_gen_setup_with_xhci__usb_bus__in(
 	struct device** controller_ptr = &ptr->controller;
 	struct pci_dev* _pci_dev_ptr = to_pci_dev(ptr->controller);
 	struct pci_dev** pci_dev_ptr = &_pci_dev_ptr;
-	unsigned int __is_b_host = ptr->is_b_host;
-	unsigned int* __is_b_host_ptr = &__is_b_host;
 	struct usb_device** root_hub_ptr = &ptr->root_hub;
+	unsigned int __sg_tablesize = ptr->sg_tablesize;
+	unsigned int* __sg_tablesize_ptr = &__sg_tablesize;
+	unsigned int __no_sg_constraint = ptr->no_sg_constraint;
+	unsigned int* __no_sg_constraint_ptr = &__no_sg_constraint;
+	unsigned int __no_stop_on_short = ptr->no_stop_on_short;
+	unsigned int* __no_stop_on_short_ptr = &__no_stop_on_short;
 
 	{
 		if (*pci_dev_ptr) {
@@ -1271,10 +1313,6 @@ void caller_unmarshal_kernel__xhci_gen_setup_with_xhci__usb_bus__in(
 	}
 
 	{
-		*__is_b_host_ptr = glue_unpack(__pos, __msg, __ext, unsigned int);
-	}
-
-	{
 		if (*root_hub_ptr) {
 			caller_unmarshal_kernel__xhci_gen_setup_with_xhci__usb_bus_root_hub__in(__pos, __msg, __ext, ctx, *root_hub_ptr);
 		}
@@ -1282,7 +1320,21 @@ void caller_unmarshal_kernel__xhci_gen_setup_with_xhci__usb_bus__in(
 	}
 
 	{
-		ptr->is_b_host = *__is_b_host_ptr;
+		*__sg_tablesize_ptr = glue_unpack(__pos, __msg, __ext, unsigned int);
+	}
+
+	{
+		*__no_sg_constraint_ptr = glue_unpack(__pos, __msg, __ext, unsigned int);
+	}
+
+	{
+		*__no_stop_on_short_ptr = glue_unpack(__pos, __msg, __ext, unsigned int);
+	}
+
+	{
+		ptr->sg_tablesize = *__sg_tablesize_ptr;
+		ptr->no_sg_constraint = *__no_sg_constraint_ptr;
+		ptr->no_stop_on_short = *__no_stop_on_short_ptr;
 	}
 }
 
@@ -2254,6 +2306,8 @@ void caller_marshal_kernel__xhci_run__hcd__in(
 	struct usb_hcd const* ptr)
 {
 	unsigned long* const* hcd_priv_ptr = &ptr->hcd_priv;
+	unsigned int __uses_new_polling = ptr->uses_new_polling;
+	unsigned int const* __uses_new_polling_ptr = &__uses_new_polling;
 
 	{
 		struct xhci_hcd* __casted = (struct xhci_hcd*)*hcd_priv_ptr;
@@ -2273,6 +2327,10 @@ void caller_marshal_kernel__xhci_run__hcd__in(
 
 	}
 
+	{
+		glue_pack(__pos, __msg, __ext, *__uses_new_polling_ptr);
+	}
+
 }
 
 void callee_unmarshal_kernel__xhci_run__hcd__in(
@@ -2283,6 +2341,8 @@ void callee_unmarshal_kernel__xhci_run__hcd__in(
 	struct usb_hcd* ptr)
 {
 	unsigned long** hcd_priv_ptr = &ptr->hcd_priv;
+	unsigned int __uses_new_polling = ptr->uses_new_polling;
+	unsigned int* __uses_new_polling_ptr = &__uses_new_polling;
 
 	{
 		struct xhci_hcd* __casted = (struct xhci_hcd*)*hcd_priv_ptr;
@@ -2300,6 +2360,11 @@ void callee_unmarshal_kernel__xhci_run__hcd__in(
 	}
 
 	{
+		*__uses_new_polling_ptr = glue_unpack(__pos, __msg, __ext, unsigned int);
+	}
+
+	{
+		ptr->uses_new_polling = *__uses_new_polling_ptr;
 	}
 }
 
@@ -2310,6 +2375,12 @@ void callee_marshal_kernel__xhci_run__hcd__in(
 	struct xhci_run_call_ctx const* ctx,
 	struct usb_hcd const* ptr)
 {
+	unsigned int __uses_new_polling = ptr->uses_new_polling;
+	unsigned int const* __uses_new_polling_ptr = &__uses_new_polling;
+
+	{
+		glue_pack(__pos, __msg, __ext, *__uses_new_polling_ptr);
+	}
 
 }
 
@@ -2320,8 +2391,15 @@ void caller_unmarshal_kernel__xhci_run__hcd__in(
 	struct xhci_run_call_ctx const* ctx,
 	struct usb_hcd* ptr)
 {
+	unsigned int __uses_new_polling = ptr->uses_new_polling;
+	unsigned int* __uses_new_polling_ptr = &__uses_new_polling;
 
 	{
+		*__uses_new_polling_ptr = glue_unpack(__pos, __msg, __ext, unsigned int);
+	}
+
+	{
+		ptr->uses_new_polling = *__uses_new_polling_ptr;
 	}
 }
 

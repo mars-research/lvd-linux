@@ -1227,6 +1227,7 @@ int xhci_hub_control(struct usb_hcd *hcd, u16 typeReq, u16 wValue,
 	default:
 error:
 		/* "stall" on error */
+		printk("%s:%d returning EPIPE due to stall", __func__, __LINE__);
 		retval = -EPIPE;
 	}
 	spin_unlock_irqrestore(&xhci->lock, flags);

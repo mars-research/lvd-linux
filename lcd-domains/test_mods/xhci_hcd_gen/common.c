@@ -923,6 +923,7 @@ void caller_marshal_kernel__xhci_gen_setup_with_xhci__hcd__in(
 	unsigned long const* rsrc_start_ptr = &ptr->rsrc_start;
 	unsigned long const *rsrc_len_ptr = &ptr->rsrc_len;
 	struct usb_hcd* const* primary_hcd_ptr = &ptr->primary_hcd;
+	unsigned long const* flags_ptr = &ptr->flags;
 
 	{
 		caller_marshal_kernel__xhci_gen_setup_with_xhci__usb_bus__in(__pos, __msg, __ext, ctx, self_ptr);
@@ -958,6 +959,10 @@ void caller_marshal_kernel__xhci_gen_setup_with_xhci__hcd__in(
 
 	}
 
+	{
+		glue_pack(__pos, __msg, __ext, *flags_ptr);
+	}
+
 }
 
 void callee_unmarshal_kernel__xhci_gen_setup_with_xhci__hcd__in(
@@ -973,6 +978,7 @@ void callee_unmarshal_kernel__xhci_gen_setup_with_xhci__hcd__in(
 	unsigned long* rsrc_start_ptr = &ptr->rsrc_start;
 	unsigned long* rsrc_len_ptr = &ptr->rsrc_len;
 	struct usb_hcd** primary_hcd_ptr = &ptr->primary_hcd;
+	unsigned long* flags_ptr = &ptr->flags;
 
 	{
 		callee_unmarshal_kernel__xhci_gen_setup_with_xhci__usb_bus__in(__pos, __msg, __ext, ctx, self_ptr);
@@ -1005,6 +1011,10 @@ void callee_unmarshal_kernel__xhci_gen_setup_with_xhci__hcd__in(
 			callee_unmarshal_kernel__xhci_gen_setup_with_xhci__usb_hcd_primary_hcd__in(__pos, __msg, __ext, ctx, *primary_hcd_ptr);
 		}
 
+	}
+
+	{
+		*flags_ptr = glue_unpack(__pos, __msg, __ext, unsigned long);
 	}
 
 	{

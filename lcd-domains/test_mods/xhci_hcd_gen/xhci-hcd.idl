@@ -155,6 +155,7 @@ rpc_export int  xhci_gen_setup( projection hcd [alloc<{{sizeof(hcd) + sizeof(str
 			unsigned long rsrc_start;
 			unsigned long rsrc_len;
 			projection usb_hcd_primary_hcd [alloc_once(callee)] * primary_hcd;
+			long unsigned int flags;
 		}
 
 		projection < struct usb_hcd > usb_hcd_primary_hcd {

@@ -148,7 +148,7 @@ rpc_export int  xhci_gen_setup( projection hcd [alloc<{{sizeof(hcd) + sizeof(str
 		}
 		projection < struct usb_hcd > hcd {
 			projection usb_bus self;
-			int [out] speed;
+			int [in, out] speed;
 			projection hc_driver [bind(callee)] * driver;
 			unsigned int [out] rh_registered : 1;
 			unsigned int [out] has_tt:1;

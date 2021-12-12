@@ -918,6 +918,7 @@ void caller_marshal_kernel__xhci_gen_setup_with_xhci__hcd__in(
 	struct usb_hcd const* ptr)
 {
 	struct usb_bus const* self_ptr = &ptr->self;
+	int const* speed_ptr = &ptr->speed;
 	struct hc_driver* const* driver_ptr = &ptr->driver;
 	unsigned long const* rsrc_start_ptr = &ptr->rsrc_start;
 	unsigned long const *rsrc_len_ptr = &ptr->rsrc_len;
@@ -925,6 +926,10 @@ void caller_marshal_kernel__xhci_gen_setup_with_xhci__hcd__in(
 
 	{
 		caller_marshal_kernel__xhci_gen_setup_with_xhci__usb_bus__in(__pos, __msg, __ext, ctx, self_ptr);
+	}
+
+	{
+		glue_pack(__pos, __msg, __ext, *speed_ptr);
 	}
 
 	{
@@ -963,6 +968,7 @@ void callee_unmarshal_kernel__xhci_gen_setup_with_xhci__hcd__in(
 	struct usb_hcd* ptr)
 {
 	struct usb_bus* self_ptr = &ptr->self;
+	int* speed_ptr = &ptr->speed;
 	struct hc_driver** driver_ptr = &ptr->driver;
 	unsigned long* rsrc_start_ptr = &ptr->rsrc_start;
 	unsigned long* rsrc_len_ptr = &ptr->rsrc_len;
@@ -970,6 +976,10 @@ void callee_unmarshal_kernel__xhci_gen_setup_with_xhci__hcd__in(
 
 	{
 		callee_unmarshal_kernel__xhci_gen_setup_with_xhci__usb_bus__in(__pos, __msg, __ext, ctx, self_ptr);
+	}
+
+	{
+		*speed_ptr = glue_unpack(__pos, __msg, __ext, int);
 	}
 
 	{

@@ -3847,6 +3847,49 @@ void hc_driver_start_callee(struct fipc_message* __msg, struct ext_registers* __
 	}
 }
 
+void lvd_init_completion(struct completion* c)
+{
+	struct fipc_message __buffer = {0};
+	struct fipc_message *__msg = &__buffer;
+	struct ext_registers* __ext = get_register_page(smp_processor_id());
+	size_t n_pos = 0;
+	size_t* __pos = &n_pos;
+
+	struct completion** c_ptr = &c;
+	
+	__maybe_unused const struct lvd_init_completion_call_ctx call_ctx = {c};
+	__maybe_unused const struct lvd_init_completion_call_ctx *ctx = &call_ctx;
+
+	(void)__ext;
+
+	if (verbose_debug) {
+		printk("%s:%d, entered!\n", __func__, __LINE__);
+	}
+
+	{
+		__maybe_unused const void* __adjusted = *c_ptr;
+		glue_pack(__pos, __msg, __ext, __adjusted);
+		if (*c_ptr) {
+			caller_marshal_kernel__lvd_init_completion__completion__in(__pos, __msg, __ext, ctx, *c_ptr);
+		}
+
+	}
+
+	glue_call_server(__pos, __msg, RPC_ID_lvd_init_completion);
+
+	*__pos = 0;
+	{
+		if (*c_ptr) {
+			caller_unmarshal_kernel__lvd_init_completion__completion__in(__pos, __msg, __ext, ctx, *c_ptr);
+		}
+
+	}
+
+	if (verbose_debug) {
+		printk("%s:%d, returned!\n", __func__, __LINE__);
+	}
+}
+
 unsigned long get_loops_per_jiffy(void)
 {
 	struct fipc_message __buffer = {0};

@@ -61,8 +61,7 @@ void complete_callee(struct fipc_message* __msg, struct ext_registers* __ext)
 	}
 
 	{
-		size_t __size = sizeof(struct completion);
-		*x_ptr = glue_unpack_bind_or_new_shadow(__pos, __msg, __ext, struct completion*, __size, DEFAULT_GFP_FLAGS);
+		*x_ptr = glue_unpack_shadow(__pos, __msg, __ext, struct completion*);
 		if (*x_ptr) {
 			callee_unmarshal_kernel__complete__x__in(__pos, __msg, __ext, ctx, *x_ptr);
 		}
@@ -910,8 +909,7 @@ void wait_for_completion_callee(struct fipc_message* __msg, struct ext_registers
 	}
 
 	{
-		size_t __size = sizeof(struct completion);
-		*x_ptr = glue_unpack_bind_or_new_shadow(__pos, __msg, __ext, struct completion*, __size, DEFAULT_GFP_FLAGS);
+		*x_ptr = glue_unpack_shadow(__pos, __msg, __ext, struct completion*);
 		if (*x_ptr) {
 			callee_unmarshal_kernel__wait_for_completion__x__in(__pos, __msg, __ext, ctx, *x_ptr);
 		}
@@ -954,8 +952,7 @@ void wait_for_completion_timeout_callee(struct fipc_message* __msg, struct ext_r
 	}
 
 	{
-		size_t __size = sizeof(struct completion);
-		*x_ptr = glue_unpack_bind_or_new_shadow(__pos, __msg, __ext, struct completion*, __size, DEFAULT_GFP_FLAGS);
+		*x_ptr = glue_unpack_shadow(__pos, __msg, __ext, struct completion*);
 		if (*x_ptr) {
 			callee_unmarshal_kernel__wait_for_completion_timeout__x__in(__pos, __msg, __ext, ctx, *x_ptr);
 		}
@@ -4214,6 +4211,45 @@ int LCD_TRAMPOLINE_LINKAGE(trmp_hc_driver_start) trmp_hc_driver_start(struct usb
 	return impl(target, hcd);
 }
 
+void lvd_init_completion_callee(struct fipc_message* __msg, struct ext_registers* __ext)
+{
+	size_t n_pos = 0;
+	size_t* __pos = &n_pos;
+
+	struct completion* c = 0;
+	struct completion** c_ptr = &c;
+	
+	__maybe_unused struct lvd_init_completion_call_ctx call_ctx = {c};
+	__maybe_unused struct lvd_init_completion_call_ctx *ctx = &call_ctx;
+
+	if (verbose_debug) {
+		printk("%s:%d, entered!\n", __func__, __LINE__);
+	}
+
+	{
+		size_t __size = sizeof(struct completion);
+		*c_ptr = glue_unpack_bind_or_new_shadow(__pos, __msg, __ext, struct completion*, __size, DEFAULT_GFP_FLAGS);
+		if (*c_ptr) {
+			callee_unmarshal_kernel__lvd_init_completion__completion__in(__pos, __msg, __ext, ctx, *c_ptr);
+		}
+
+	}
+
+	lvd_init_completion(c);
+
+	*__pos = 0;
+	{
+		if (*c_ptr) {
+			callee_marshal_kernel__lvd_init_completion__completion__in(__pos, __msg, __ext, ctx, *c_ptr);
+		}
+
+	}
+
+	__msg->regs[0] = *__pos;
+	if (verbose_debug) {
+		printk("%s:%d, returned!\n", __func__, __LINE__);
+	}
+}
 void get_loops_per_jiffy_callee(struct fipc_message* msg, struct ext_registers* ext)
 {
 	size_t n_pos = 0;
@@ -4429,7 +4465,12 @@ int try_dispatch(enum RPC_ID id, struct fipc_message* __msg, struct ext_register
 		usb_wakeup_notification_callee(__msg, __ext);
 		break;
 
-	case RPC_ID_get_loops_per_jiffy:
+	case RPC_ID_lvd_init_completion:
+		glue_user_trace("lvd_init_completion\n");
+		lvd_init_completion_callee(__msg, __ext);
+		break;
+
+  case RPC_ID_get_loops_per_jiffy:
 		glue_user_trace("get_loops_per_jiffy\n");
 		get_loops_per_jiffy_callee(__msg, __ext);
 		break;

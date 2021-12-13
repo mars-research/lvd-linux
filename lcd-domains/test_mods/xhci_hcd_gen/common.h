@@ -215,6 +215,7 @@ enum RPC_ID {
 	RPC_ID_hc_driver_hub_control,
 	RPC_ID_hc_driver_reset,
 	RPC_ID_hc_driver_start,
+	RPC_ID_lvd_init_completion,
 	RPC_ID_get_loops_per_jiffy,
 	RPC_ID_get_jiffies,
 };
@@ -746,6 +747,10 @@ struct hc_driver_reset_call_ctx {
 
 struct hc_driver_start_call_ctx {
 	struct usb_hcd* hcd;
+};
+
+struct lvd_init_completion_call_ctx {
+	struct completion* c;
 };
 
 struct get_loops_per_jiffy_call_ctx {
@@ -4730,6 +4735,34 @@ void caller_unmarshal_kernel__hc_driver_start__usb_hcd_primary_hcd__in(
 	const struct ext_registers* __ext,
 	struct hc_driver_start_call_ctx const* call_ctx,
 	struct usb_hcd* ptr);
+
+void caller_marshal_kernel__lvd_init_completion__completion__in(
+	size_t* __pos,
+	struct fipc_message* __msg,
+	struct ext_registers* __ext,
+	struct lvd_init_completion_call_ctx const* call_ctx,
+	struct completion const* ptr);
+
+void callee_unmarshal_kernel__lvd_init_completion__completion__in(
+	size_t* __pos,
+	const struct fipc_message* __msg,
+	const struct ext_registers* __ext,
+	struct lvd_init_completion_call_ctx const* call_ctx,
+	struct completion* ptr);
+
+void callee_marshal_kernel__lvd_init_completion__completion__in(
+	size_t* __pos,
+	struct fipc_message* __msg,
+	struct ext_registers* __ext,
+	struct lvd_init_completion_call_ctx const* call_ctx,
+	struct completion const* ptr);
+
+void caller_unmarshal_kernel__lvd_init_completion__completion__in(
+	size_t* __pos,
+	const struct fipc_message* __msg,
+	const struct ext_registers* __ext,
+	struct lvd_init_completion_call_ctx const* call_ctx,
+	struct completion* ptr);
 
 
 #endif

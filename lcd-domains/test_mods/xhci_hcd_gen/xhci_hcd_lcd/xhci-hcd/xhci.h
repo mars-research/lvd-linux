@@ -38,6 +38,11 @@
 typedef void (*fptr_timer_func)(unsigned long data);
 void lvd_setup_timer(struct timer_list* timer, fptr_timer_func func, unsigned long);
 
+#undef init_completion
+#define init_completion	lvd_init_completion
+
+void lvd_init_completion(struct completion *c);
+
 #endif		/* LCD_ISOLATE */
 
 

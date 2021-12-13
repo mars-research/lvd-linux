@@ -9490,6 +9490,60 @@ void caller_unmarshal_kernel__hc_driver_start__usb_hcd_primary_hcd__in(
 	}
 }
 
+void caller_marshal_kernel__lvd_init_completion__completion__in(
+	size_t* __pos,
+	struct fipc_message* __msg,
+	struct ext_registers* __ext,
+	struct lvd_init_completion_call_ctx const* ctx,
+	struct completion const* ptr)
+{
+
+}
+
+void callee_unmarshal_kernel__lvd_init_completion__completion__in(
+	size_t* __pos,
+	const struct fipc_message* __msg,
+	const struct ext_registers* __ext,
+	struct lvd_init_completion_call_ctx const* ctx,
+	struct completion* ptr)
+{
+
+	{
+	}
+}
+
+void callee_marshal_kernel__lvd_init_completion__completion__in(
+	size_t* __pos,
+	struct fipc_message* __msg,
+	struct ext_registers* __ext,
+	struct lvd_init_completion_call_ctx const* ctx,
+	struct completion const* ptr)
+{
+	unsigned int const* done_ptr = &ptr->done;
+
+	{
+		glue_pack(__pos, __msg, __ext, *done_ptr);
+	}
+
+}
+
+void caller_unmarshal_kernel__lvd_init_completion__completion__in(
+	size_t* __pos,
+	const struct fipc_message* __msg,
+	const struct ext_registers* __ext,
+	struct lvd_init_completion_call_ctx const* ctx,
+	struct completion* ptr)
+{
+	unsigned int* done_ptr = &ptr->done;
+
+	{
+		*done_ptr = glue_unpack(__pos, __msg, __ext, unsigned int);
+	}
+
+	{
+	}
+}
+
 
 #ifdef LCD_ISOLATE
 __attribute__((weak)) void shared_mem_init(void) {

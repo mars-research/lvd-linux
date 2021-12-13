@@ -5,11 +5,12 @@ module kernel {
 		}
 	}
 
-	rpc void  complete( projection x [alloc_once(callee)] * x ) {
+	rpc void  complete( projection x [bind(callee)] * x ) {
 		projection < struct completion > x {
 			unsigned int [in, out] done;
 		}
 	}
+
 	rpc int  del_timer( projection timer [bind(callee)] * timer ) {
 
 		projection < struct timer_list > timer {
@@ -87,12 +88,12 @@ module kernel {
 			void [alloc<{{sizeof(void*)}}>(callee)] * dev_id ) {
 	}
 
-	rpc void  wait_for_completion( projection x [alloc_once(callee)] * x ) {
+	rpc void  wait_for_completion( projection x [bind(callee)] * x ) {
 		projection < struct completion > x {
 			unsigned int [in, out] done;
 		}
 	}
-	rpc long unsigned int  wait_for_completion_timeout( projection x [alloc_once(callee)] * x,
+	rpc long unsigned int  wait_for_completion_timeout( projection x [bind(callee)] * x,
 				long unsigned int [in] timeout ) {
 		projection < struct completion > x {
 			unsigned int [in, out] done;
@@ -745,6 +746,12 @@ rpc_ptr void  hc_driver_reset_bandwidth( projection hcd*  hcd, projection udev [
 		}
 	}
 
+	rpc void lvd_init_completion(projection completion [alloc_once(callee)] *c) {
+
+		projection < struct completion > completion {
+			unsigned int [out] done;
+		}
+	}
 /*
 	global projection < struct array< kmem_cache, 0> > array< kmem_cache, 0> {
 	}

@@ -21,6 +21,7 @@ void __module_lcd_exit(void);
 
 #ifndef LCD_ISOLATE
 #define lvd_setup_timer		setup_timer
+#define lvd_init_completion	init_completion
 #endif
 
 struct atomic64_t {

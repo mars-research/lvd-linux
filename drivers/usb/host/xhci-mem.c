@@ -2313,6 +2313,8 @@ static int xhci_setup_port_arrays(struct xhci_hcd *xhci, gfp_t flags)
 		if (!xhci->usb3_ports)
 			return -ENOMEM;
 
+		printk("%s, num_usb3_ports %d\n", __func__, xhci->num_usb3_ports);
+
 		port_index = 0;
 		for (i = 0; i < num_ports; i++)
 			if (xhci->port_array[i] == 0x03) {
@@ -2340,6 +2342,10 @@ int xhci_mem_init(struct xhci_hcd *xhci, gfp_t flags)
 	struct xhci_segment	*seg;
 	u32 page_size, temp;
 	int i;
+
+
+	printk("%s, xhci %p hcd %p\n", __func__, xhci, xhci_to_hcd(xhci));
+	printk("%s, hcd->self.controller %p\n", __func__, xhci_to_hcd(xhci)->self.controller);
 
 	INIT_LIST_HEAD(&xhci->cmd_list);
 

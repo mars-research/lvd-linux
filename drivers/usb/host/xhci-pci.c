@@ -223,7 +223,20 @@ static int xhci_pci_setup(struct usb_hcd *hcd)
 	if (!xhci->sbrn)
 		pci_read_config_byte(pdev, XHCI_SBRN_OFFSET, &xhci->sbrn);
 
-	retval = xhci_gen_setup(hcd, xhci_pci_quirks);
+	dump_stack();
+	printk("%s:%d rsrc_start %llx rsrc_len %llx\n", __func__, __LINE__,
+			hcd->rsrc_start, hcd->rsrc_len);
+
+	//retval = xhci_gen_setup(hcd, xhci_pci_quirks);
+	
+	printk("%s:%d hcd { %p .hcd_priv %p .primary_hcd %p }, xhci { %p | .main_hcd %p}\n",
+				__func__, __LINE__,
+				hcd, hcd->hcd_priv,
+				hcd->primary_hcd,
+				xhci, xhci->main_hcd 
+				);
+
+	retval = xhci_gen_setup_with_xhci(hcd, xhci, xhci_pci_quirks);
 	if (retval)
 		return retval;
 
@@ -255,6 +268,9 @@ static int xhci_pci_probe(struct pci_dev *dev, const struct pci_device_id *id)
 
 	/* Prevent runtime suspending between USB-2 and USB-3 initialization */
 	pm_runtime_get_noresume(&dev->dev);
+
+	dump_stack();
+	dev_dbg(&dev->dev, "%s:%d probe init\n", __func__, __LINE__);	
 
 	/* Register the USB 2.0 roothub.
 	 * FIXME: USB core must know to register the USB 2.0 roothub first.
@@ -293,6 +309,7 @@ static int xhci_pci_probe(struct pci_dev *dev, const struct pci_device_id *id)
 	/* USB-2 and USB-3 roothubs initialized, allow runtime pm suspend */
 	pm_runtime_put_noidle(&dev->dev);
 
+	dev_dbg(&dev->dev, "%s:%d probe done\n", __func__, __LINE__);	
 	return 0;
 
 put_usb3_hcd:

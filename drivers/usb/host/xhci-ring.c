@@ -1466,6 +1466,7 @@ static unsigned int find_faked_portnum_from_hw_portnum(struct usb_hcd *hcd,
 	for (i = 0; i < (port_id - 1); i++) {
 		u8 port_speed = xhci->port_array[i];
 
+		printk("%s, %d | port_speed %u\n", __func__, i, port_speed);
 		/*
 		 * Skip ports that don't have known speeds, or have duplicate
 		 * Extended Capabilities port speed entries.
@@ -1573,6 +1574,12 @@ static void handle_port_status(struct xhci_hcd *xhci,
 	/* Find the faked port hub number */
 	faked_port_index = find_faked_portnum_from_hw_portnum(hcd, xhci,
 			port_id);
+
+	printk("%s:%d faked_port_index %u | reading port_array %p\n",
+			__func__, __LINE__,
+			faked_port_index,
+			port_array[faked_port_index]
+			);
 
 	temp = readl(port_array[faked_port_index]);
 	if (hcd->state == HC_STATE_SUSPENDED) {

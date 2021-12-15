@@ -51,6 +51,9 @@ static int usb_start_wait_urb(struct urb *urb, int timeout, int *actual_length)
 	urb->context = &ctx;
 	urb->actual_length = 0;
 	retval = usb_submit_urb(urb, GFP_NOIO);
+	dev_dbg(&urb->dev->dev, "%s:%d usb_submit_urb ret %d\n",
+			__func__, __LINE__, retval);
+			
 	if (unlikely(retval))
 		goto out;
 
@@ -147,6 +150,8 @@ int usb_control_msg(struct usb_device *dev, unsigned int pipe, __u8 request,
 	dr->wLength = cpu_to_le16(size);
 
 	ret = usb_internal_control_msg(dev, pipe, dr, data, size, timeout);
+
+	dev_dbg(&dev->dev, "usb_internal_control_msg returned %d\n", ret);
 
 	kfree(dr);
 
@@ -641,6 +646,10 @@ int usb_get_descriptor(struct usb_device *dev, unsigned char type,
 				USB_REQ_GET_DESCRIPTOR, USB_DIR_IN,
 				(type << 8) + index, 0, buf, size,
 				USB_CTRL_GET_TIMEOUT);
+
+		dev_dbg(&dev->dev, "sending usb_control_msg to %d returned %d\n",
+				i, result);
+
 		if (result <= 0 && result != -ETIMEDOUT)
 			continue;
 		if (result > 1 && ((u8 *)buf)[1] != type) {

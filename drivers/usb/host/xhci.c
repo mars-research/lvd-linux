@@ -240,6 +240,9 @@ static int xhci_setup_msi(struct xhci_hcd *xhci)
 		return ret;
 	}
 
+	printk("%s:%d requesting irq %d with hcd %p\n", __func__, __LINE__,
+				pdev->irq, xhci_to_hcd(xhci));
+
 	ret = request_irq(pdev->irq, xhci_msi_irq,
 				0, "xhci_hcd", xhci_to_hcd(xhci));
 	if (ret) {
@@ -307,7 +310,8 @@ static int xhci_setup_msix(struct xhci_hcd *xhci)
 
 	ret = pci_enable_msix_exact(pdev, xhci->msix_entries, xhci->msix_count);
 	if (ret) {
-		xhci_dbg_trace(xhci, trace_xhci_dbg_init,
+		//xhci_dbg_trace(xhci, trace_xhci_dbg_init,
+		xhci_dbg(xhci,
 				"Failed to enable MSI-X");
 		goto free_entries;
 	}
@@ -601,6 +605,14 @@ int xhci_run(struct usb_hcd *hcd)
 	int ret;
 	struct xhci_hcd *xhci = hcd_to_xhci(hcd);
 
+	ENTRY_DEBUG;
+
+
+	printk("%s:%d hcd %p | hcd->hcd_priv %p\n", __func__, __LINE__,
+				hcd, hcd->hcd_priv);
+	printk("%s, xhci %p | xhci->shared_hcd %p\n", __func__,
+			xhci, xhci->shared_hcd);
+
 	/* Start the xHCI host controller running only after the USB 2.0 roothub
 	 * is setup.
 	 */
@@ -683,6 +695,8 @@ void xhci_stop(struct usb_hcd *hcd)
 	u32 temp;
 	struct xhci_hcd *xhci = hcd_to_xhci(hcd);
 
+	ENTRY_DEBUG;
+
 	mutex_lock(&xhci->mutex);
 
 	if (!(xhci->xhc_state & XHCI_STATE_HALTED)) {
@@ -743,6 +757,8 @@ void xhci_stop(struct usb_hcd *hcd)
 void xhci_shutdown(struct usb_hcd *hcd)
 {
 	struct xhci_hcd *xhci = hcd_to_xhci(hcd);
+
+	ENTRY_DEBUG;
 
 	if (xhci->quirks & XHCI_SPURIOUS_REBOOT)
 		usb_disable_xhci_ports(to_pci_dev(hcd->self.controller));
@@ -1336,6 +1352,8 @@ int xhci_urb_enqueue(struct usb_hcd *hcd, struct urb *urb, gfp_t mem_flags)
 	struct urb_priv	*urb_priv;
 	int size, i;
 
+	ENTRY_DEBUG;
+
 	if (!urb || xhci_check_args(hcd, urb->dev, urb->ep,
 					true, true, __func__) <= 0)
 		return -EINVAL;
@@ -1504,6 +1522,8 @@ int xhci_urb_dequeue(struct usb_hcd *hcd, struct urb *urb, int status)
 	struct xhci_virt_ep *ep;
 	struct xhci_command *command;
 
+	ENTRY_DEBUG;
+
 	xhci = hcd_to_xhci(hcd);
 	spin_lock_irqsave(&xhci->lock, flags);
 	/* Make sure the URB hasn't completed or been unlinked already */
@@ -1618,6 +1638,8 @@ int xhci_drop_endpoint(struct usb_hcd *hcd, struct usb_device *udev,
 	u32 new_add_flags, new_drop_flags;
 	int ret;
 
+	ENTRY_DEBUG;
+
 	ret = xhci_check_args(hcd, udev, ep, 1, true, __func__);
 	if (ret <= 0)
 		return ret;
@@ -1702,9 +1724,13 @@ int xhci_add_endpoint(struct usb_hcd *hcd, struct usb_device *udev,
 	struct xhci_virt_device *virt_dev;
 	int ret = 0;
 
+	ENTRY_DEBUG;
+
 	ret = xhci_check_args(hcd, udev, ep, 1, true, __func__);
 	if (ret <= 0) {
 		/* So we won't queue a reset ep command for a root hub */
+		printk("%s:%d roothub?\n", __func__, __LINE__);
+		printk("hcd %p | udev %p | ep %p\n", hcd, udev, ep);
 		ep->hcpriv = NULL;
 		return ret;
 	}
@@ -2730,6 +2756,8 @@ int xhci_check_bandwidth(struct usb_hcd *hcd, struct usb_device *udev)
 	struct xhci_slot_ctx *slot_ctx;
 	struct xhci_command *command;
 
+	ENTRY_DEBUG;
+
 	ret = xhci_check_args(hcd, udev, NULL, 0, true, __func__);
 	if (ret <= 0)
 		return ret;
@@ -2830,6 +2858,7 @@ void xhci_reset_bandwidth(struct usb_hcd *hcd, struct usb_device *udev)
 	struct xhci_virt_device	*virt_dev;
 	int i, ret;
 
+	ENTRY_DEBUG;
 	ret = xhci_check_args(hcd, udev, NULL, 0, true, __func__);
 	if (ret <= 0)
 		return;
@@ -2955,6 +2984,7 @@ void xhci_endpoint_reset(struct usb_hcd *hcd,
 {
 	struct xhci_hcd *xhci;
 
+	ENTRY_DEBUG;
 	xhci = hcd_to_xhci(hcd);
 
 	/*
@@ -3141,6 +3171,8 @@ int xhci_alloc_streams(struct usb_hcd *hcd, struct usb_device *udev,
 	unsigned long flags;
 	u32 changed_ep_bitmask = 0;
 
+	ENTRY_DEBUG;
+
 	if (!eps)
 		return -EINVAL;
 
@@ -3303,6 +3335,8 @@ int xhci_free_streams(struct usb_hcd *hcd, struct usb_device *udev,
 	unsigned long flags;
 	u32 changed_ep_bitmask;
 
+	ENTRY_DEBUG;
+
 	xhci = hcd_to_xhci(hcd);
 	vdev = xhci->devs[udev->slot_id];
 
@@ -3433,6 +3467,8 @@ int xhci_discover_or_reset_device(struct usb_hcd *hcd, struct usb_device *udev)
 	int last_freed_endpoint;
 	struct xhci_slot_ctx *slot_ctx;
 	int old_active_eps = 0;
+
+	ENTRY_DEBUG;
 
 	ret = xhci_check_args(hcd, udev, NULL, 0, false, __func__);
 	if (ret <= 0)
@@ -3594,6 +3630,8 @@ void xhci_free_dev(struct usb_hcd *hcd, struct usb_device *udev)
 	int i, ret;
 	struct xhci_command *command;
 
+	ENTRY_DEBUG;
+
 	command = xhci_alloc_command(xhci, false, false, GFP_KERNEL);
 	if (!command)
 		return;
@@ -3684,6 +3722,8 @@ int xhci_alloc_dev(struct usb_hcd *hcd, struct usb_device *udev)
 	unsigned long flags;
 	int ret, slot_id;
 	struct xhci_command *command;
+
+	ENTRY_DEBUG;
 
 	command = xhci_alloc_command(xhci, false, false, GFP_KERNEL);
 	if (!command)
@@ -3949,11 +3989,13 @@ out:
 
 int xhci_address_device(struct usb_hcd *hcd, struct usb_device *udev)
 {
+	ENTRY_DEBUG;
 	return xhci_setup_device(hcd, udev, SETUP_CONTEXT_ADDRESS);
 }
 
 int xhci_enable_device(struct usb_hcd *hcd, struct usb_device *udev)
 {
+	ENTRY_DEBUG;
 	return xhci_setup_device(hcd, udev, SETUP_CONTEXT_ONLY);
 }
 
@@ -3969,6 +4011,8 @@ int xhci_find_raw_port_number(struct usb_hcd *hcd, int port1)
 	__le32 __iomem *base_addr = &xhci->op_regs->port_status_base;
 	__le32 __iomem *addr;
 	int raw_port;
+
+	ENTRY_DEBUG;
 
 	if (hcd->speed < HCD_USB3)
 		addr = xhci->usb2_ports[port1 - 1];
@@ -4121,6 +4165,8 @@ int xhci_set_usb2_hardware_lpm(struct usb_hcd *hcd,
 	int		hird, exit_latency;
 	int		ret;
 
+	ENTRY_DEBUG;
+
 	if (hcd->speed >= HCD_USB3 || !xhci->hw_lpm_support ||
 			!udev->lpm_capable)
 		return -EPERM;
@@ -4237,6 +4283,8 @@ int xhci_update_device(struct usb_hcd *hcd, struct usb_device *udev)
 {
 	struct xhci_hcd	*xhci = hcd_to_xhci(hcd);
 	int		portnum = udev->portnum - 1;
+
+	ENTRY_DEBUG;
 
 	if (hcd->speed >= HCD_USB3 || !xhci->sw_lpm_support ||
 			!udev->lpm_capable)
@@ -4650,6 +4698,8 @@ int xhci_enable_usb3_lpm_timeout(struct usb_hcd *hcd,
 	int mel;
 	int ret;
 
+	ENTRY_DEBUG;
+
 	xhci = hcd_to_xhci(hcd);
 	/* The LPM timeout values are pretty host-controller specific, so don't
 	 * enable hub-initiated timeouts unless the vendor has provided
@@ -4678,6 +4728,8 @@ int xhci_disable_usb3_lpm_timeout(struct usb_hcd *hcd,
 {
 	struct xhci_hcd	*xhci;
 	u16 mel;
+
+	ENTRY_DEBUG;
 
 	xhci = hcd_to_xhci(hcd);
 	if (!xhci || !(xhci->quirks & XHCI_LPM_SUPPORT) ||
@@ -4729,6 +4781,8 @@ int xhci_update_hub_device(struct usb_hcd *hcd, struct usb_device *hdev,
 	unsigned long flags;
 	unsigned think_time;
 	int ret;
+
+	ENTRY_DEBUG;
 
 	/* Ignore root hubs */
 	if (!hdev->parent)
@@ -4828,14 +4882,26 @@ int xhci_get_frame(struct usb_hcd *hcd)
 {
 	struct xhci_hcd *xhci = hcd_to_xhci(hcd);
 	/* EHCI mods by the periodic size.  Why? */
+
+	ENTRY_DEBUG;
+
 	return readl(&xhci->run_regs->microframe_index) >> 3;
 }
+
+
+int xhci_gen_setup_with_xhci(struct usb_hcd *hcd, struct xhci_hcd *xhci, xhci_get_quirks_t get_quirks)
+{
+	return xhci_gen_setup(hcd, get_quirks);
+}
+EXPORT_SYMBOL_GPL(xhci_gen_setup_with_xhci);
 
 int xhci_gen_setup(struct usb_hcd *hcd, xhci_get_quirks_t get_quirks)
 {
 	struct xhci_hcd		*xhci;
 	struct device		*dev = hcd->self.controller;
 	int			retval;
+
+	ENTRY_DEBUG;
 
 	/* Accept arbitrarily long scatter-gather lists */
 	hcd->self.sg_tablesize = ~0;
@@ -4847,6 +4913,14 @@ int xhci_gen_setup(struct usb_hcd *hcd, xhci_get_quirks_t get_quirks)
 	hcd->self.no_stop_on_short = 1;
 
 	xhci = hcd_to_xhci(hcd);
+
+	if (usb_hcd_is_primary_hcd(hcd)) {
+		printk("%s, hcd %p primary_hcd %p\n",
+				__func__, hcd, hcd->primary_hcd);
+
+		printk("%s:%d hcd %p | hcd->hcd_priv %p\n", __func__, __LINE__,
+					hcd, hcd->hcd_priv);
+	}
 
 	if (usb_hcd_is_primary_hcd(hcd)) {
 		xhci->main_hcd = hcd;
@@ -4870,6 +4944,7 @@ int xhci_gen_setup(struct usb_hcd *hcd, xhci_get_quirks_t get_quirks)
 		/* xHCI private pointer was set in xhci_pci_probe for the second
 		 * registered roothub.
 		 */
+		printk("%s:%d hcd->speed %d\n", __func__, __LINE__, hcd->speed);
 		return 0;
 	}
 
@@ -4884,15 +4959,28 @@ int xhci_gen_setup(struct usb_hcd *hcd, xhci_get_quirks_t get_quirks)
 	xhci->hcs_params2 = readl(&xhci->cap_regs->hcs_params2);
 	xhci->hcs_params3 = readl(&xhci->cap_regs->hcs_params3);
 	xhci->hcc_params = readl(&xhci->cap_regs->hc_capbase);
+
+	printk("%s hcc_params %x\n", __func__, xhci->hcc_params);
+
 	xhci->hci_version = HC_VERSION(xhci->hcc_params);
+
 	xhci->hcc_params = readl(&xhci->cap_regs->hcc_params);
+
+	printk("%s hcc_params %x | hci_version %x \n", __func__,
+				xhci->hcc_params, xhci->hci_version);
+
 	if (xhci->hci_version > 0x100)
 		xhci->hcc_params2 = readl(&xhci->cap_regs->hcc_params2);
 	xhci_print_registers(xhci);
 
+
+	printk("%s xhci->quirks %x | quirks %x \n", __func__, xhci->quirks, quirks);
+
 	xhci->quirks |= quirks;
 
 	get_quirks(dev, xhci);
+
+	printk("%s xhci->quirks %x \n", __func__, xhci->quirks);
 
 	/* In xhci controllers which follow xhci 1.0 spec gives a spurious
 	 * success event after a short transfer. This quirk will ignore such

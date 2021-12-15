@@ -50,6 +50,7 @@
 #include "usb.h"
 
 
+
 /*-------------------------------------------------------------------------*/
 
 /*
@@ -592,6 +593,8 @@ static int rh_call_control (struct usb_hcd *hcd, struct urb *urb)
 				bufp = usb11_rh_dev_descriptor;
 				break;
 			default:
+				printk("%s:%d failed hcd->speed %d\n", __func__, __LINE__,
+					hcd->speed);
 				goto error;
 			}
 			len = 18;
@@ -615,6 +618,8 @@ static int rh_call_control (struct usb_hcd *hcd, struct urb *urb)
 				len = sizeof fs_rh_config_descriptor;
 				break;
 			default:
+				printk("%s:%d failed hcd->speed %d\n", __func__, __LINE__,
+					hcd->speed);
 				goto error;
 			}
 			if (device_can_wakeup(&hcd->self.root_hub->dev))
@@ -693,6 +698,8 @@ nongeneric:
 		break;
 error:
 		/* "protocol stall" on error */
+
+		printk("%s:%d stalled status = -EPIPE\n", __func__, __LINE__);
 		status = -EPIPE;
 	}
 
@@ -1643,10 +1650,18 @@ int usb_hcd_submit_urb (struct urb *urb, gfp_t mem_flags)
 
 	if (is_root_hub(urb->dev)) {
 		status = rh_urb_enqueue(hcd, urb);
+		dev_dbg(&urb->dev->dev, "%s:%d rh_urb_enqueue ret %d\n",
+				__func__, __LINE__, status);
 	} else {
 		status = map_urb_for_dma(hcd, urb, mem_flags);
+		dev_dbg(&urb->dev->dev, "map_urb_for_dma ret %d\n",
+				status);
 		if (likely(status == 0)) {
 			status = hcd->driver->urb_enqueue(hcd, urb, mem_flags);
+
+			dev_dbg(&urb->dev->dev, "urb_enqueue ret %d\n",
+					status);
+
 			if (unlikely(status))
 				unmap_urb_for_dma(hcd, urb);
 		}

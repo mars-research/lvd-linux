@@ -332,6 +332,9 @@ int usb_submit_urb(struct urb *urb, gfp_t mem_flags)
 	int				is_out;
 	unsigned int			allowed;
 
+
+	dev_dbg(&urb->dev->dev, "%s:%d #1\n",
+			__func__, __LINE__);
 	if (!urb || !urb->complete)
 		return -EINVAL;
 	if (urb->hcpriv) {
@@ -343,6 +346,8 @@ int usb_submit_urb(struct urb *urb, gfp_t mem_flags)
 	if ((!dev) || (dev->state < USB_STATE_UNAUTHENTICATED))
 		return -ENODEV;
 
+	dev_dbg(&urb->dev->dev, "%s:%d #2\n",
+			__func__, __LINE__);
 	/* For now, get the endpoint from the pipe.  Eventually drivers
 	 * will be required to set urb->ep directly and we will eliminate
 	 * urb->pipe.
@@ -371,6 +376,8 @@ int usb_submit_urb(struct urb *urb, gfp_t mem_flags)
 		is_out = usb_endpoint_dir_out(&ep->desc);
 	}
 
+	dev_dbg(&urb->dev->dev, "%s:%d #3\n",
+			__func__, __LINE__);
 	/* Clear the internal flags and cache the direction for later use */
 	urb->transfer_flags &= ~(URB_DIR_MASK | URB_DMA_MAP_SINGLE |
 			URB_DMA_MAP_PAGE | URB_DMA_MAP_SG | URB_MAP_LOCAL |
@@ -391,6 +398,8 @@ int usb_submit_urb(struct urb *urb, gfp_t mem_flags)
 		return -EMSGSIZE;
 	}
 
+	dev_dbg(&urb->dev->dev, "%s:%d #4\n",
+			__func__, __LINE__);
 	/* periodic transfers limit size per frame/uframe,
 	 * but drivers only control those sizes for ISO.
 	 * while we're checking, initialize return status.
@@ -434,6 +443,9 @@ int usb_submit_urb(struct urb *urb, gfp_t mem_flags)
 				return -EINVAL;
 	}
 
+	dev_dbg(&urb->dev->dev, "%s:%d #5\n",
+			__func__, __LINE__);
+
 	/* the I/O buffer must be mapped/unmapped, except when length=0 */
 	if (urb->transfer_buffer_length > INT_MAX)
 		return -EMSGSIZE;
@@ -451,6 +463,11 @@ int usb_submit_urb(struct urb *urb, gfp_t mem_flags)
 	/* Check against a simple/standard policy */
 	allowed = (URB_NO_TRANSFER_DMA_MAP | URB_NO_INTERRUPT | URB_DIR_MASK |
 			URB_FREE_BUFFER);
+
+	dev_dbg(&urb->dev->dev, "%s:%d usbdev %p xfertype %d | speed %d | urb->interval %d\n",
+			__func__, __LINE__, dev, xfertype, dev->speed,
+			urb->interval);
+
 	switch (xfertype) {
 	case USB_ENDPOINT_XFER_BULK:
 	case USB_ENDPOINT_XFER_INT:

@@ -1850,6 +1850,7 @@ int xhci_run(struct usb_hcd *hcd);
 void xhci_stop(struct usb_hcd *hcd);
 void xhci_shutdown(struct usb_hcd *hcd);
 int xhci_gen_setup(struct usb_hcd *hcd, xhci_get_quirks_t get_quirks);
+int xhci_gen_setup_with_xhci(struct usb_hcd *hcd, struct xhci_hcd *xhci, xhci_get_quirks_t get_quirks);
 void xhci_init_driver(struct hc_driver *drv,
 		      const struct xhci_driver_overrides *over);
 
@@ -1986,5 +1987,7 @@ static inline struct xhci_ring *xhci_urb_to_transfer_ring(struct xhci_hcd *xhci,
 					xhci_get_endpoint_index(&urb->ep->desc),
 					urb->stream_id);
 }
+
+#define ENTRY_DEBUG	printk("%s:%d called\n", __func__, __LINE__)
 
 #endif /* __LINUX_XHCI_HCD_H */

@@ -860,12 +860,19 @@ static void hub_power_on(struct usb_hub *hub, bool do_delay)
 	else
 		dev_dbg(hub->intfdev, "trying to enable port power on "
 				"non-switchable hub\n");
-	for (port1 = 1; port1 <= hub->hdev->maxchild; port1++)
+	dev_dbg(hub->intfdev, "%s:%d trying to power on %d ports\n",
+			__func__, __LINE__, hub->hdev->maxchild);
+
+	for (port1 = 1; port1 <= hub->hdev->maxchild; port1++) {
+		dev_dbg(hub->intfdev, "%s:%d trying to power on port %d\n",
+				__func__, __LINE__, port1);
 		if (test_bit(port1, hub->power_bits))
 			set_port_feature(hub->hdev, port1, USB_PORT_FEAT_POWER);
 		else
 			usb_clear_port_feature(hub->hdev, port1,
 						USB_PORT_FEAT_POWER);
+	}
+
 	if (do_delay)
 		msleep(hub_power_on_good_delay(hub));
 }
@@ -1648,6 +1655,7 @@ static int hub_configure(struct usb_hub *hub,
 	 * starts getting port status changes for devices under the hub.
 	 */
 	if (hcd->driver->update_hub_device) {
+		dev_dbg(hub->intfdev, "%s:%d calling update_hub_device\n", __func__, __LINE__);
 		ret = hcd->driver->update_hub_device(hcd, hdev,
 				&hub->tt, GFP_KERNEL);
 		if (ret < 0) {
@@ -1658,6 +1666,7 @@ static int hub_configure(struct usb_hub *hub,
 
 	usb_hub_adjust_deviceremovable(hdev, hub->descriptor);
 
+	dev_dbg(hub->intfdev, "%s:%d calling hub_activate\n", __func__, __LINE__);
 	hub_activate(hub, HUB_INIT);
 	return 0;
 
@@ -1846,6 +1855,8 @@ descriptor_error:
 
 	if (id->driver_info & HUB_QUIRK_CHECK_PORT_AUTOSUSPEND)
 		hub->quirk_check_port_auto_suspend = 1;
+
+	dev_dbg(&intf->dev, "%s:%d configuring hub\n", __func__, __LINE__);
 
 	if (hub_configure(hub, endpoint) >= 0)
 		return 0;

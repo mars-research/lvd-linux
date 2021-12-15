@@ -4316,17 +4316,17 @@ int try_dispatch(enum RPC_ID id, struct fipc_message* __msg, struct ext_register
 		break;
 
 	case RPC_ID_add_timer:
-		glue_user_trace("add_timer\n");
+		//glue_user_trace("add_timer\n");
 		add_timer_callee(__msg, __ext);
 		break;
 
 	case RPC_ID_complete:
-		glue_user_trace("complete\n");
+		//glue_user_trace("complete\n");
 		complete_callee(__msg, __ext);
 		break;
 
 	case RPC_ID_del_timer:
-		glue_user_trace("del_timer\n");
+		//glue_user_trace("del_timer\n");
 		del_timer_callee(__msg, __ext);
 		break;
 
@@ -4336,17 +4336,17 @@ int try_dispatch(enum RPC_ID id, struct fipc_message* __msg, struct ext_register
 		break;
 
 	case RPC_ID_del_timer_sync:
-		glue_user_trace("del_timer_sync\n");
+		//glue_user_trace("del_timer_sync\n");
 		del_timer_sync_callee(__msg, __ext);
 		break;
 
 	case RPC_ID_lvd_setup_timer:
-		glue_user_trace("lvd_setup_timer\n");
+		//glue_user_trace("lvd_setup_timer\n");
 		lvd_setup_timer_callee(__msg, __ext);
 		break;
 
 	case RPC_ID_mod_timer:
-		glue_user_trace("mod_timer\n");
+		//glue_user_trace("mod_timer\n");
 		mod_timer_callee(__msg, __ext);
 		break;
 
@@ -4381,7 +4381,7 @@ int try_dispatch(enum RPC_ID id, struct fipc_message* __msg, struct ext_register
 		break;
 
 	case RPC_ID_wait_for_completion:
-		glue_user_trace("wait_for_completion\n");
+		//glue_user_trace("wait_for_completion\n");
 		wait_for_completion_callee(__msg, __ext);
 		break;
 
@@ -4391,7 +4391,7 @@ int try_dispatch(enum RPC_ID id, struct fipc_message* __msg, struct ext_register
 		break;
 
 	case RPC_ID_ioremap_nocache:
-		glue_user_trace("ioremap_nocache\n");
+		//glue_user_trace("ioremap_nocache\n");
 		ioremap_nocache_callee(__msg, __ext);
 		break;
 
@@ -4401,17 +4401,17 @@ int try_dispatch(enum RPC_ID id, struct fipc_message* __msg, struct ext_register
 		break;
 
 	case RPC_ID_dmi_get_system_info:
-		glue_user_trace("dmi_get_system_info\n");
+		//glue_user_trace("dmi_get_system_info\n");
 		dmi_get_system_info_callee(__msg, __ext);
 		break;
 
 	case RPC_ID_usb_acpi_power_manageable:
-		glue_user_trace("usb_acpi_power_manageable\n");
+		//glue_user_trace("usb_acpi_power_manageable\n");
 		usb_acpi_power_manageable_callee(__msg, __ext);
 		break;
 
 	case RPC_ID_usb_acpi_set_power_state:
-		glue_user_trace("usb_acpi_set_power_state\n");
+		//glue_user_trace("usb_acpi_set_power_state\n");
 		usb_acpi_set_power_state_callee(__msg, __ext);
 		break;
 
@@ -4436,7 +4436,7 @@ int try_dispatch(enum RPC_ID id, struct fipc_message* __msg, struct ext_register
 		break;
 
 	case RPC_ID_usb_hcd_irq:
-		glue_user_trace("usb_hcd_irq\n");
+		//glue_user_trace("usb_hcd_irq\n");
 		usb_hcd_irq_callee(__msg, __ext);
 		break;
 
@@ -4466,17 +4466,17 @@ int try_dispatch(enum RPC_ID id, struct fipc_message* __msg, struct ext_register
 		break;
 
 	case RPC_ID_lvd_init_completion:
-		glue_user_trace("lvd_init_completion\n");
+		//glue_user_trace("lvd_init_completion\n");
 		lvd_init_completion_callee(__msg, __ext);
 		break;
 
-  case RPC_ID_get_loops_per_jiffy:
-		glue_user_trace("get_loops_per_jiffy\n");
+	case RPC_ID_get_loops_per_jiffy:
+		//glue_user_trace("get_loops_per_jiffy\n");
 		get_loops_per_jiffy_callee(__msg, __ext);
 		break;
 
 	case RPC_ID_get_jiffies:
-		glue_user_trace("get_jiffies\n");
+		//glue_user_trace("get_jiffies\n");
 		get_jiffies_callee(__msg, __ext);
 		break;
 

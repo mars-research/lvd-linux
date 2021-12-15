@@ -43,6 +43,11 @@ void lvd_setup_timer(struct timer_list* timer, fptr_timer_func func, unsigned lo
 
 void lvd_init_completion(struct completion *c);
 
+#undef jiffies
+#define jiffies			({ get_jiffies(); })
+
+unsigned long get_jiffies(void);
+
 #endif		/* LCD_ISOLATE */
 
 

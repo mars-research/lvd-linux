@@ -3977,12 +3977,12 @@ int try_dispatch(enum RPC_ID id, struct fipc_message* __msg, struct ext_register
 		break;
 
 	case RPC_ID_timer_func:
-		glue_user_trace("timer_func\n");
+		//glue_user_trace("timer_func\n");
 		timer_func_callee(__msg, __ext);
 		break;
 
 	case RPC_ID_thread_fn:
-		glue_user_trace("thread_fn\n");
+		//glue_user_trace("thread_fn\n");
 		thread_fn_callee(__msg, __ext);
 		break;
 
@@ -4132,7 +4132,7 @@ int try_dispatch(enum RPC_ID id, struct fipc_message* __msg, struct ext_register
 		break;
 
 	case RPC_ID_hc_driver_irq:
-		glue_user_trace("hc_driver_irq\n");
+		//glue_user_trace("hc_driver_irq\n");
 		hc_driver_irq_callee(__msg, __ext);
 		break;
 

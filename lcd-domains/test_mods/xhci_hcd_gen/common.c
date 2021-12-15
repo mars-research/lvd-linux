@@ -1617,6 +1617,11 @@ void caller_marshal_kernel__xhci_gen_setup_with_xhci__usb_bus_root_hub__in(
 	struct xhci_gen_setup_with_xhci_call_ctx const* ctx,
 	struct usb_device const* ptr)
 {
+	unsigned int const* speed_ptr = &ptr->speed;
+
+	{
+		glue_pack(__pos, __msg, __ext, *speed_ptr);
+	}
 
 }
 
@@ -1627,6 +1632,11 @@ void callee_unmarshal_kernel__xhci_gen_setup_with_xhci__usb_bus_root_hub__in(
 	struct xhci_gen_setup_with_xhci_call_ctx const* ctx,
 	struct usb_device* ptr)
 {
+	unsigned int* speed_ptr = &ptr->speed;
+
+	{
+		*speed_ptr = glue_unpack(__pos, __msg, __ext, unsigned int);
+	}
 
 	{
 	}
@@ -9136,6 +9146,11 @@ void caller_marshal_kernel__hc_driver_hub_control__usb_bus_root_hub__in(
 	struct hc_driver_hub_control_call_ctx const* ctx,
 	struct usb_device const* ptr)
 {
+	unsigned int const* speed_ptr = &ptr->speed;
+
+	{
+		glue_pack(__pos, __msg, __ext, *speed_ptr);
+	}
 
 }
 
@@ -9146,6 +9161,11 @@ void callee_unmarshal_kernel__hc_driver_hub_control__usb_bus_root_hub__in(
 	struct hc_driver_hub_control_call_ctx const* ctx,
 	struct usb_device* ptr)
 {
+	unsigned int* speed_ptr = &ptr->speed;
+
+	{
+		*speed_ptr = glue_unpack(__pos, __msg, __ext, unsigned int);
+	}
 
 	{
 	}

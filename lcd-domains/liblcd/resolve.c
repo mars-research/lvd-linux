@@ -130,11 +130,13 @@ unsigned long get_seconds(void)
 	return 0;
 }
 
+#if 0
 void __init_waitqueue_head(wait_queue_head_t *q, const char *name, 
 			struct lock_class_key *k)
 {
 	return;
 }
+#endif
 
 struct task_struct fake_kthread;
 struct task_struct *kthread_create_on_node(int (*threadfn)(void *data),

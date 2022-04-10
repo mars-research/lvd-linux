@@ -351,10 +351,13 @@ void alloc_dheap_pages(void)
 	return;
 }
 
+extern void __init_globals(void);
+
 int handle_rpc_calls(struct fipc_message *msg)
 {
 	switch(msg->rpc_id) {
 	case MODULE_INIT:
+		__init_globals();
 		callee_main();
 		//create_hwbp();
 		//alloc_free_pages();

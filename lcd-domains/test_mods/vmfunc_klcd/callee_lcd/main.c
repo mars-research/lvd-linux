@@ -22,6 +22,9 @@ extern int vmfunc_wrapper(struct fipc_message *req);
 EXPORT_SYMBOL(vmfunc_sboard_load_addr);
 EXPORT_SYMBOL(vmfunc_trampoline_load_addr);
 
+unsigned long loops_per_jiffy;
+unsigned long volatile jiffies;
+
 int callee(struct fipc_message *msg2)
 {
 	int ret = 0;
@@ -45,6 +48,12 @@ int callee(struct fipc_message *msg2)
 //			(end - start) / TRANSACTIONS,
 //			TRANSACTIONS);
 	return ret;
+}
+
+extern unsigned long get_jiffies(void);
+void __init_globals(void) {
+
+	jiffies = get_jiffies();
 }
 
 int callee_main(void)

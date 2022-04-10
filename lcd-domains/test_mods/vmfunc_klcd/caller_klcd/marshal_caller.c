@@ -188,3 +188,16 @@ uint64_t test_marshal_voidptr(size_t data_sz) {
 exit:
 	return -1;
 }
+
+void get_jiffies_callee(struct fipc_message* msg, struct ext_registers* ext)
+{
+	if (verbose_debug) {
+		printk("%s:%d, entered!\n", __func__, __LINE__);
+	}
+
+	fipc_set_reg0(msg, jiffies);
+
+	if (verbose_debug) {
+		printk("%s:%d, returned!\n", __func__, __LINE__);
+	}
+}

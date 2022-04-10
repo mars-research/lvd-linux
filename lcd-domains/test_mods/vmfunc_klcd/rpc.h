@@ -19,6 +19,7 @@
 
 #define INIT_FIPC_MSG(msg)             memset(msg, 0x0, sizeof(*msg))
 
+#define verbose_debug 1
 enum fn_type {
 	MODULE_INIT,
 	NULL_INVOCATION, 
@@ -36,6 +37,7 @@ enum fn_type {
 	MARSHAL_STRING,
 	MARSHAL_VOIDP,
 	MARSHAL_UNION,
+	RPC_ID_get_jiffies,
 };
 int callee(struct fipc_message *);
 
@@ -46,4 +48,6 @@ async_msg_set_fn_type(struct fipc_message *msg, int type)
 	msg->rpc_id = type;
 }
 
+struct get_jiffies_call_ctx {
+};
 #endif /* LCD_ASYNC_RPC_TEST_H */

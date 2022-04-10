@@ -13,6 +13,8 @@
 
 #include <lcd_config/post_hook.h>
 
+extern unsigned long volatile jiffies;
+
 int marshal_int_callee(struct fipc_message *msg) {
 
 	int foo = fipc_get_reg0(msg);
@@ -123,4 +125,26 @@ int marshal_union_callee(struct fipc_message *msg) {
 exit:
 	fipc_set_reg0(msg, 0xbad);
 	return 0;
+}
+
+
+unsigned long get_jiffies(void)
+{
+	struct fipc_message __buffer = {0};
+	struct fipc_message *msg = &__buffer;
+
+	unsigned long ret = 0;
+	
+	if (verbose_debug) {
+		printk("%s:%d, entered!\n", __func__, __LINE__);
+	}
+
+	async_msg_set_fn_type(msg, RPC_ID_get_jiffies);
+
+	ret = fipc_get_reg0(msg);
+
+	if (verbose_debug) {
+		printk("%s:%d, returned!\n", __func__, __LINE__);
+	}
+	return ret;
 }

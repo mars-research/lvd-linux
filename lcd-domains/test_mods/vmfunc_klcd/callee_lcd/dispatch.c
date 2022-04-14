@@ -383,9 +383,12 @@ int handle_rpc_calls(struct fipc_message *msg)
 	case IRQ_HANDLER:
 		irq_handler(msg);
 		break;
+	case MARSHAL_NONE:
+		marshal_none_callee(msg);
+		break;
 	case MARSHAL_INT:
 		marshal_int_callee(msg);
-		break;	
+		break;
 	case MARSHAL_ARRAY:
 		marshal_array_callee(msg);
 		break;

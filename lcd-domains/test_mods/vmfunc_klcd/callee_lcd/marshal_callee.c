@@ -15,6 +15,10 @@
 
 extern unsigned long volatile jiffies;
 
+int marshal_none_callee(struct fipc_message *msg) {
+	return 0;
+}
+
 int marshal_int_callee(struct fipc_message *msg) {
 
 	int foo = fipc_get_reg0(msg);

@@ -17,15 +17,14 @@ uint64_t test_marshal_empty(void) {
 		struct fipc_message *msg = &m;
 		INIT_FIPC_MSG(msg);
 
-		async_msg_set_fn_type(msg, MARSHAL_INT);
-		fipc_set_reg0(msg, 0xdeadbeef);
+		async_msg_set_fn_type(msg, MARSHAL_NONE);
 
 		vmfunc_klcd_wrapper(msg, OTHER_DOMAIN);
 	}
 
 	end = rdtsc();
 
-	printk("%s: %d iterations of marshal int took %llu cycles (avg: %llu cycles)\n",
+	printk("%s: %d iterations of marshal none took %llu cycles (avg: %llu cycles)\n",
 				__func__, NUM_ITERATIONS, end - start, (end - start) / NUM_ITERATIONS);
 	return end - start;
 }

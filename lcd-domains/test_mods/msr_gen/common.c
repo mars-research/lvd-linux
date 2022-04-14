@@ -611,6 +611,7 @@ void callee_unmarshal_kernel____register_chrdev__fops__in(
 		}
 
 	}
+  *owner_ptr = THIS_MODULE;
 
 	{
 		*read_ptr = glue_unpack_rpc_ptr(__pos, __msg, __ext, read);

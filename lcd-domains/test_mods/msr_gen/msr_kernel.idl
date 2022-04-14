@@ -83,7 +83,7 @@ rpc projection ret_class [alloc(caller)] * __class_create( projection owner [bin
 	}*/
 }
 
-rpc_ptr array<char, null> [alloc(caller)] * devnode( projection device [alloc(callee)] *dev, unsigned short *mode ) {
+rpc_ptr array<char, null> [alloc(caller)] * devnode( projection device [alloc(callee)] *dev, unsigned short * [unused] mode ) {
 	projection <struct device> device {
 		unsigned int devt;
 	}
@@ -107,5 +107,8 @@ rpc void class_destroy( projection cls * cls ) {
 	projection < struct class > cls {
 	}
 }
+	rpc unsigned long get_jiffies() {
+	}
+
 
 }

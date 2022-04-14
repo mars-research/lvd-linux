@@ -62,6 +62,11 @@ long trmp_impl_read(fptr_read target, struct file* file, char* buf, unsigned lon
 
 	{
 		__maybe_unused const void* __adjusted = *ppos_ptr;
+		glue_pack(__pos, __msg, __ext, __adjusted);
+		if (*ppos_ptr) {
+			glue_pack(__pos, __msg, __ext, **ppos_ptr);
+		}
+
 	}
 
 	glue_call_client(__pos, __msg, RPC_ID_read);

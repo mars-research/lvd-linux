@@ -15,11 +15,10 @@ void read_callee(struct fipc_message* __msg, struct ext_registers* __ext)
 	struct file* file = 0;
 	char* buf = 0;
 	unsigned long count = 0;
+	long long* ppos = 0;
 	struct file** file_ptr = &file;
 	char** buf_ptr = &buf;
 	unsigned long* count_ptr = &count;
-	long long __ppos;
-	long long* ppos = &__ppos;
 	long long** ppos_ptr = &ppos;
 	long ret = 0;
 	long* ret_ptr = &ret;
@@ -33,7 +32,7 @@ void read_callee(struct fipc_message* __msg, struct ext_registers* __ext)
 
 	{
 		size_t __size = sizeof(struct file);
-		*file_ptr = glue_unpack_bind_or_new_shadow(__pos, __msg, __ext, struct file*, __size, DEFAULT_GFP_FLAGS);
+		*file_ptr = glue_unpack_new_shadow(__pos, __msg, __ext, struct file*, (__size), (DEFAULT_GFP_FLAGS));
 		if (*file_ptr) {
 			callee_unmarshal_kernel__read__file__in(__pos, __msg, __ext, ctx, *file_ptr);
 		}
@@ -63,6 +62,8 @@ void read_callee(struct fipc_message* __msg, struct ext_registers* __ext)
 	}
 
 	{
+		size_t __size = sizeof(long long);
+		*ppos_ptr = glue_unpack_new_shadow(__pos, __msg, __ext, long long*, (__size), (DEFAULT_GFP_FLAGS));
 		if (*ppos_ptr) {
 			**ppos_ptr = glue_unpack(__pos, __msg, __ext, long long);
 		}

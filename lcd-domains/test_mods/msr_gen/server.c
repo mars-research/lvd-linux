@@ -1325,6 +1325,34 @@ void class_destroy_callee(struct fipc_message* __msg, struct ext_registers* __ex
 	}
 }
 
+void get_jiffies_callee(struct fipc_message* msg, struct ext_registers* ext)
+{
+	size_t n_pos = 0;
+	size_t* __pos = &n_pos;
+
+	unsigned long ret = 0;
+	unsigned long* ret_ptr = &ret;
+	
+	__maybe_unused struct get_jiffies_call_ctx call_ctx = {};
+	__maybe_unused struct get_jiffies_call_ctx *ctx = &call_ctx;
+
+	if (verbose_debug) {
+		printk("%s:%d, entered!\n", __func__, __LINE__);
+	}
+
+	ret = jiffies;
+
+	*__pos = 0;
+	{
+		glue_pack(__pos, msg, ext, *ret_ptr);
+	}
+
+	msg->regs[0] = *__pos;
+	if (verbose_debug) {
+		printk("%s:%d, returned!\n", __func__, __LINE__);
+	}
+}
+
 int try_dispatch(enum RPC_ID id, struct fipc_message* __msg, struct ext_registers* __ext)
 {
 	switch(id) {
@@ -1401,6 +1429,11 @@ int try_dispatch(enum RPC_ID id, struct fipc_message* __msg, struct ext_register
 	case RPC_ID_class_destroy:
 		glue_user_trace("class_destroy\n");
 		class_destroy_callee(__msg, __ext);
+		break;
+
+	case RPC_ID_get_jiffies:
+		glue_user_trace("get_jiffies\n");
+		get_jiffies_callee(__msg, __ext);
 		break;
 
 	default:

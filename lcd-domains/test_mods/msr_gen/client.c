@@ -4,6 +4,8 @@
 
 #include <lcd_config/post_hook.h>
 
+unsigned long volatile jiffies;
+
 void read_callee(struct fipc_message* __msg, struct ext_registers* __ext)
 {
 	size_t n_pos = 0;
@@ -1311,11 +1313,50 @@ void class_destroy(struct class* cls)
 	}
 }
 
+unsigned long get_jiffies(void)
+{
+	struct fipc_message __buffer = {0};
+	struct fipc_message *msg = &__buffer;
+	struct ext_registers* ext = get_register_page(smp_processor_id());
+	size_t n_pos = 0;
+	size_t* __pos = &n_pos;
+
+	unsigned long ret = 0;
+	unsigned long* ret_ptr = &ret;
+	
+	__maybe_unused const struct get_jiffies_call_ctx call_ctx = {};
+	__maybe_unused const struct get_jiffies_call_ctx *ctx = &call_ctx;
+
+	(void)ext;
+
+	if (verbose_debug) {
+		printk("%s:%d, entered!\n", __func__, __LINE__);
+	}
+
+	glue_call_server(__pos, msg, RPC_ID_get_jiffies);
+
+	*__pos = 0;
+	{
+		*ret_ptr = glue_unpack(__pos, msg, ext, unsigned long);
+	}
+
+	if (verbose_debug) {
+		printk("%s:%d, returned!\n", __func__, __LINE__);
+	}
+	return ret;
+}
+
+void __init_globals(void) {
+
+	jiffies = get_jiffies();
+}
+
 int try_dispatch(enum RPC_ID id, struct fipc_message* __msg, struct ext_registers* __ext)
 {
 	switch(id) {
 	case MODULE_INIT:
 		glue_user_trace("MODULE_INIT");
+		__init_globals();
 		__module_lcd_init();
 		shared_mem_init();
 		break;

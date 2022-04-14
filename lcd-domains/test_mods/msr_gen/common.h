@@ -169,6 +169,7 @@ enum RPC_ID {
 	RPC_ID___device_create,
 	RPC_ID_device_destroy,
 	RPC_ID_class_destroy,
+	RPC_ID_get_jiffies,
 };
 
 int try_dispatch(enum RPC_ID id, struct fipc_message* __msg, struct ext_registers* __ext);
@@ -309,6 +310,9 @@ struct device_destroy_call_ctx {
 
 struct class_destroy_call_ctx {
 	struct class* cls;
+};
+
+struct get_jiffies_call_ctx {
 };
 
 void caller_marshal_kernel__read__file__in(

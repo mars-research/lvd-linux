@@ -40,7 +40,6 @@
 #include <linux/rtnetlink.h>
 #include <net/rtnetlink.h>
 #include <linux/u64_stats_sync.h>
-#include "../glue_helper.h"
 
 #ifdef LCD_ISOLATE
 #include <lcd_config/post_hook.h>

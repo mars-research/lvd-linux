@@ -12,7 +12,6 @@
 
 #include "../common.h"
 
-#include "../rdtsc_helper.h"
 #include <lcd_config/post_hook.h>
 
 struct thc_channel *net_async;

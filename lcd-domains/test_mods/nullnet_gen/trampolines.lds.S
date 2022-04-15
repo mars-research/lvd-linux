@@ -7,6 +7,8 @@ SECTIONS{
 	LCD_TRAMPOLINE_LINKER_SECTION(trmp_ndo_uninit)
 	LCD_TRAMPOLINE_LINKER_SECTION(trmp_ndo_start_xmit)
 	LCD_TRAMPOLINE_LINKER_SECTION(trmp_ndo_set_rx_mode)
+	LCD_TRAMPOLINE_LINKER_SECTION(trmp_ndo_validate_addr)
+	LCD_TRAMPOLINE_LINKER_SECTION(trmp_ndo_set_mac_address)
 	LCD_TRAMPOLINE_LINKER_SECTION(trmp_ndo_get_stats64)
 	LCD_TRAMPOLINE_LINKER_SECTION(trmp_ndo_change_carrier)
 	LCD_TRAMPOLINE_LINKER_SECTION(trmp_validate)

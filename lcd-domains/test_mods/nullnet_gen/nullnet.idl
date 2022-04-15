@@ -3,7 +3,6 @@
 module kernel {
     rpc void netif_carrier_on( projection dev *dev ) {
         projection < struct net_device > dev {
-            const projection _global_netdev_ops *netdev_ops;
         }
     }
 
@@ -18,11 +17,11 @@ module kernel {
 
     rpc int register_netdevice( projection dev *dev ) {
         projection < struct net_device > dev {
-            unsigned long long [out] features;
-            unsigned long long [out] hw_features;
-            unsigned long long [out] hw_enc_features;
-            unsigned int  flags;
-            unsigned int  priv_flags;
+            //unsigned long long [out] features;
+            //unsigned long long [out] hw_features;
+            //unsigned long long [out] hw_enc_features;
+            //unsigned int  flags;
+            //unsigned int  priv_flags;
         }
     }
 
@@ -42,7 +41,7 @@ module kernel {
         unsigned int rxqs
     ) {
         projection < struct net_device > ret_net_device {
-            unsigned int [out] priv_flags;
+            //unsigned int [out] priv_flags;
         }
     }
 
@@ -78,7 +77,7 @@ module kernel {
     rpc void ether_setup( projection dev  *dev ) {
         projection < struct net_device > dev {
             unsigned int [out] flags;
-            unsigned int [in, out] priv_flags;
+            unsigned int [out] priv_flags;
         }
     }
 
@@ -90,7 +89,7 @@ module kernel {
     // FIXME: p is actually a void*
     rpc int eth_mac_addr( projection dev  *dev, projection p *p ) {
         projection < struct net_device > dev {
-            unsigned int  priv_flags;
+            //unsigned int  priv_flags;
         }
 
         projection < struct sockaddr > p {
@@ -145,12 +144,12 @@ module kernel {
         }
     }
 
-    rpc_ptr int ndo_validate_addr(projection net_device [bind(callee)] *dev) {
+    rpc_ptr int ndo_validate_addr(projection dev [bind(callee)] *dev) {
         projection < struct net_device > dev {
         }
     }
 
-	rpc_ptr int ndo_set_mac_address(projection net_device [bind(callee)] *dev, void *addr) {
+	rpc_ptr int ndo_set_mac_address(projection dev [bind(callee)] *dev, void *addr) {
         projection < struct net_device > dev {
         }
     }
@@ -170,7 +169,6 @@ module kernel {
 
     rpc_ptr int ndo_change_carrier( projection dev  [bind(callee)] *dev, bool new_carrier ) {
         projection < struct net_device > dev {
-            const projection _global_netdev_ops *netdev_ops;
         }
     }
 
@@ -200,5 +198,12 @@ module kernel {
     projection < struct rtnl_link_ops > _global_rtnl_link_ops {
         rpc_ptr setup setup;
         rpc_ptr validate validate;
+    }
+
+	rpc unsigned long get_jiffies() {
+	}
+
+    rpc void get_random_bytes(array<char, {{nbytes}}> [alloc(callee), out] *buf, int nbytes) {
+
     }
 }

@@ -48,7 +48,7 @@ void glue_user_call_client(struct fipc_message* msg, size_t id)
 	glue_user_trace("Completed call in KLCD");
 }
 
-void* glue_user_map_to_shadow(const void* obj)
+void* glue_user_map_to_shadow(const void* obj, bool fail)
 {
     struct shadow_link *link;
 
@@ -67,7 +67,8 @@ void* glue_user_map_to_shadow(const void* obj)
         }
     }
 
-    glue_user_panic("Remote for shadow was not found in to_shadow_ht");
+    if (fail)
+        glue_user_panic("Remote for shadow was not found in to_shadow_ht");
 
     return NULL;
 }
@@ -119,9 +120,9 @@ void glue_user_add_shadow(const void* ptr, void* shadow)
     LIBLCD_MSG("Inserted shadow with <key %p, ptr %p>\n", shadow, ptr);
 }
 
-void* glue_user_alloc(size_t size)
+void* glue_user_alloc(size_t size, gfp_t flags)
 {
-    void* ptr = kzalloc(size, GFP_KERNEL);
+    void* ptr = kzalloc(size, flags);
     if (!ptr) {
         glue_user_panic("Couldn't allocate");
     }
@@ -190,6 +191,9 @@ void shared_mem_init(void) {
 			gva_val(pool_addr), pool_ord);
 
 	skb_data_pool = (void*)gva_val(pool_addr);
+
+  return;
+
 fail_pool:
 fail_cptr:
 	LIBLCD_ERR("%s, skb_data_pool uninitialized!", __func__);

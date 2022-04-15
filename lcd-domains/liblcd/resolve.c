@@ -120,10 +120,12 @@ int printk(const char *fmt, ...)
 	return 0;
 }
 
+#if 0
 void get_random_bytes(void *buf, int nbytes)
 {
 	return;
 }
+#endif
 
 unsigned long get_seconds(void)
 {

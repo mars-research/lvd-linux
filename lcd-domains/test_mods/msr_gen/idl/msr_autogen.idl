@@ -1,0 +1,130 @@
+// Sync stubs for boundary functions
+module kernel {
+rpc projection ret_class [alloc(caller)] *  __class_create( projection module [alloc(callee)] *  owner, string [alloc(callee)]*  name, projection lock_class_key [alloc(callee)] *  key ) {
+	projection < struct class > ret_class {
+		string [alloc(caller), out]  *name;
+	}
+	projection < struct module > module {
+	}
+	projection < struct lock_class_key > lock_class_key {
+	}
+}
+rpc int  __register_chrdev( unsigned int  major, unsigned int  baseminor, unsigned int  count, string [alloc(callee)] *  name, const projection _global_file_operations [alloc(callee)] * fops ) {
+}
+rpc void  __unregister_chrdev( unsigned int  major, unsigned int  baseminor, unsigned int  count, string * [unused] name ) {
+}
+rpc bool  capable( int  cap ) {
+}
+rpc void  class_destroy( projection class* [in] cls ) {
+	projection < struct class > class {
+		//char* [in] name;
+	}
+}
+rpc void  cpu_maps_update_begin(  ) {
+}
+rpc void  cpu_maps_update_done(  ) {
+}
+rpc_ptr array<char, null> [alloc(caller)] * devnode( projection device [alloc(callee)] *dev, unsigned short * [unused] mode ) {
+	projection <struct device> device {
+		unsigned int devt;
+	}
+}
+
+rpc projection ret_device [bind(caller)] *  device_create( projection class*  class, projection device [alloc(callee)] *  parent, unsigned int  devt, void*  [unused] drvdata, string [alloc(callee)] * fmt, u32 cpu) {
+	projection < struct device > ret_device {
+	}
+	projection < struct class > class {
+		rpc_ptr devnode  devnode;
+	}
+	projection < struct device > device {
+	}
+}
+rpc void  device_destroy( projection class* [in] class, unsigned int [unused] devt ) {
+	projection < struct class > class {
+		//char* [in] name;
+	}
+}
+rpc int rdmsr_safe_on_cpu( unsigned int cpu, unsigned int msr_no, unsigned int [alloc(callee), out] * l, unsigned int [alloc(callee), out] * h ) {
+}
+rpc int rdmsr_safe_regs_on_cpu( unsigned int cpu, array<unsigned int, 8> [alloc(callee), in, out] * regs ) {
+}
+/*rpc void  warn_slowpath_fmt( char*  file, int  line, char*  fmt ) {
+}*/
+rpc int  wrmsr_safe_on_cpu( unsigned int  cpu, unsigned int  msr_no, unsigned int  l, unsigned int  h ) {
+}
+rpc int wrmsr_safe_regs_on_cpu( unsigned int cpu, array<unsigned int, 8> [alloc(callee), in, out] *regs ) {
+}
+rpc long long no_seek_end_llseek( projection file * file, long long offset, int  whence ) {
+	projection < struct file > file {
+		//projection _global_file_operations* f_op;
+		unsigned int [in] f_mode;
+		u64 [in,out] f_pos;
+		u64 [out] f_version;
+	}
+}
+
+rpc_ptr s64 llseek( projection file [alloc(callee)] * file, s64  offset, int  whence ) {
+	projection < struct file > file {
+		//projection _global_file_operations* f_op;
+		unsigned int [in] f_mode;
+		u64 [in,out] f_pos;
+		u64 [out] f_version;
+	}
+
+}
+
+rpc_ptr u64  msr_read( projection file [alloc(callee)] * file, array<char, {{count}}> [alloc(callee), in, out] *buf, u64  count, u64 [alloc(callee)] * ppos ) {
+	projection < struct file > file {
+		projection file_inode [alloc(callee)]* f_inode;
+		//projection _global_file_operations* f_op;
+	}
+	projection < struct inode > file_inode {
+		unsigned int [in] i_rdev;
+		//projection _global_file_operations* i_fop;
+	}
+}
+rpc_ptr u64  msr_write( projection file [alloc(callee)] * file, array<char, {{count}}> [alloc(callee), in, out] *buf, u64  count, u64 [alloc(callee)]* ppos ) {
+	projection < struct file > file {
+		projection file_inode [alloc(callee)]* f_inode;
+		//projection _global_file_operations* f_op;
+	}
+	projection < struct inode > file_inode {
+		unsigned int [in] i_rdev;
+		//projection _global_file_operations* i_fop;
+	}
+}
+rpc_ptr u64  msr_ioctl( projection file [alloc(callee)] * file, unsigned int  ioc, u64  arg ) {
+	projection < struct file > file {
+		projection file_inode [alloc(callee)]* f_inode;
+		//projection _global_file_operations* f_op;
+		unsigned int [in] f_mode;
+	}
+	projection < struct inode > file_inode {
+		unsigned int [in] i_rdev;
+		//projection _global_file_operations* i_fop;
+	}
+}
+rpc_ptr int  msr_open( projection inode [alloc(callee)] * inode, projection file [alloc(callee)] * file ) {
+	projection < struct inode > inode {
+		//projection _global_file_operations* i_fop;
+	}
+	projection < struct file > file {
+		projection file_inode [alloc(callee)]* f_inode;
+		//projection _global_file_operations* f_op;
+	}
+	projection < struct inode > file_inode {
+		unsigned int [in] i_rdev;
+		//projection _global_file_operations* i_fop;
+	}
+}
+projection < struct file_operations > _global_file_operations {
+	rpc_ptr msr_ioctl compat_ioctl;
+	rpc_ptr msr_ioctl unlocked_ioctl;
+	rpc_ptr msr_open open;
+	rpc_ptr msr_read read;
+	rpc_ptr msr_write write;
+	rpc_ptr llseek llseek;
+}
+	rpc unsigned long get_jiffies() {
+	}
+}

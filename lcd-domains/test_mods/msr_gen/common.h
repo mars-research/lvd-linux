@@ -150,53 +150,30 @@ enum RPC_ID {
 	MODULE_INIT,
 	MODULE_EXIT,
 	RPC_ID_shared_mem_init,
-	RPC_ID_read,
-	RPC_ID_write,
-	RPC_ID_compat_ioctl,
-	RPC_ID_open,
+	RPC_ID___class_create,
 	RPC_ID___register_chrdev,
 	RPC_ID___unregister_chrdev,
+	RPC_ID_capable,
+	RPC_ID_class_destroy,
 	RPC_ID_cpu_maps_update_begin,
 	RPC_ID_cpu_maps_update_done,
-	RPC_ID_wrmsr_safe_regs_on_cpu,
+	RPC_ID_devnode,
+	RPC_ID_device_create,
+	RPC_ID_device_destroy,
+	RPC_ID_rdmsr_safe_on_cpu,
 	RPC_ID_rdmsr_safe_regs_on_cpu,
 	RPC_ID_wrmsr_safe_on_cpu,
-	RPC_ID_rdmsr_safe_on_cpu,
-	RPC_ID_capable,
+	RPC_ID_wrmsr_safe_regs_on_cpu,
 	RPC_ID_no_seek_end_llseek,
-	RPC_ID___class_create,
-	RPC_ID_devnode,
-	RPC_ID___device_create,
-	RPC_ID_device_destroy,
-	RPC_ID_class_destroy,
+	RPC_ID_llseek,
+	RPC_ID_msr_read,
+	RPC_ID_msr_write,
+	RPC_ID_msr_ioctl,
+	RPC_ID_msr_open,
 	RPC_ID_get_jiffies,
 };
 
 int try_dispatch(enum RPC_ID id, struct fipc_message* __msg, struct ext_registers* __ext);
-
-typedef long (*fptr_read)(struct file* file, char* buf, unsigned long count, long long* ppos);
-typedef long (*fptr_impl_read)(fptr_read target, struct file* file, char* buf, unsigned long count, long long* ppos);
-
-LCD_TRAMPOLINE_DATA(trmp_read)
-long LCD_TRAMPOLINE_LINKAGE(trmp_read) trmp_read(struct file* file, char* buf, unsigned long count, long long* ppos);
-
-typedef long (*fptr_write)(struct file* file, char const* buf, unsigned long count, long long* ppos);
-typedef long (*fptr_impl_write)(fptr_write target, struct file* file, char const* buf, unsigned long count, long long* ppos);
-
-LCD_TRAMPOLINE_DATA(trmp_write)
-long LCD_TRAMPOLINE_LINKAGE(trmp_write) trmp_write(struct file* file, char const* buf, unsigned long count, long long* ppos);
-
-typedef long (*fptr_compat_ioctl)(struct file* file, unsigned int ioc, unsigned long arg);
-typedef long (*fptr_impl_compat_ioctl)(fptr_compat_ioctl target, struct file* file, unsigned int ioc, unsigned long arg);
-
-LCD_TRAMPOLINE_DATA(trmp_compat_ioctl)
-long LCD_TRAMPOLINE_LINKAGE(trmp_compat_ioctl) trmp_compat_ioctl(struct file* file, unsigned int ioc, unsigned long arg);
-
-typedef int (*fptr_open)(struct inode* inode, struct file* file);
-typedef int (*fptr_impl_open)(fptr_open target, struct inode* inode, struct file* file);
-
-LCD_TRAMPOLINE_DATA(trmp_open)
-int LCD_TRAMPOLINE_LINKAGE(trmp_open) trmp_open(struct inode* inode, struct file* file);
 
 typedef char* (*fptr_devnode)(struct device* dev, unsigned short* mode);
 typedef char* (*fptr_impl_devnode)(fptr_devnode target, struct device* dev, unsigned short* mode);
@@ -204,29 +181,40 @@ typedef char* (*fptr_impl_devnode)(fptr_devnode target, struct device* dev, unsi
 LCD_TRAMPOLINE_DATA(trmp_devnode)
 char* LCD_TRAMPOLINE_LINKAGE(trmp_devnode) trmp_devnode(struct device* dev, unsigned short* mode);
 
-struct read_call_ctx {
-	struct file* file;
-	char* buf;
-	unsigned long count;
-	long long* ppos;
-};
+typedef long long (*fptr_llseek)(struct file* file, long long offset, int whence);
+typedef long long (*fptr_impl_llseek)(fptr_llseek target, struct file* file, long long offset, int whence);
 
-struct write_call_ctx {
-	struct file* file;
-	char const* buf;
-	unsigned long count;
-	long long* ppos;
-};
+LCD_TRAMPOLINE_DATA(trmp_llseek)
+long long LCD_TRAMPOLINE_LINKAGE(trmp_llseek) trmp_llseek(struct file* file, long long offset, int whence);
 
-struct compat_ioctl_call_ctx {
-	struct file* file;
-	unsigned int ioc;
-	unsigned long arg;
-};
+typedef unsigned long long (*fptr_msr_read)(struct file* file, char* buf, unsigned long long count, unsigned long long* ppos);
+typedef unsigned long long (*fptr_impl_msr_read)(fptr_msr_read target, struct file* file, char* buf, unsigned long long count, unsigned long long* ppos);
 
-struct open_call_ctx {
-	struct inode* inode;
-	struct file* file;
+LCD_TRAMPOLINE_DATA(trmp_msr_read)
+unsigned long long LCD_TRAMPOLINE_LINKAGE(trmp_msr_read) trmp_msr_read(struct file* file, char* buf, unsigned long long count, unsigned long long* ppos);
+
+typedef unsigned long long (*fptr_msr_write)(struct file* file, char* buf, unsigned long long count, unsigned long long* ppos);
+typedef unsigned long long (*fptr_impl_msr_write)(fptr_msr_write target, struct file* file, char* buf, unsigned long long count, unsigned long long* ppos);
+
+LCD_TRAMPOLINE_DATA(trmp_msr_write)
+unsigned long long LCD_TRAMPOLINE_LINKAGE(trmp_msr_write) trmp_msr_write(struct file* file, char* buf, unsigned long long count, unsigned long long* ppos);
+
+typedef unsigned long long (*fptr_msr_ioctl)(struct file* file, unsigned int ioc, unsigned long long arg);
+typedef unsigned long long (*fptr_impl_msr_ioctl)(fptr_msr_ioctl target, struct file* file, unsigned int ioc, unsigned long long arg);
+
+LCD_TRAMPOLINE_DATA(trmp_msr_ioctl)
+unsigned long long LCD_TRAMPOLINE_LINKAGE(trmp_msr_ioctl) trmp_msr_ioctl(struct file* file, unsigned int ioc, unsigned long long arg);
+
+typedef int (*fptr_msr_open)(struct inode* inode, struct file* file);
+typedef int (*fptr_impl_msr_open)(fptr_msr_open target, struct inode* inode, struct file* file);
+
+LCD_TRAMPOLINE_DATA(trmp_msr_open)
+int LCD_TRAMPOLINE_LINKAGE(trmp_msr_open) trmp_msr_open(struct inode* inode, struct file* file);
+
+struct __class_create_call_ctx {
+	struct module* owner;
+	char const* name;
+	struct lock_class_key* key;
 };
 
 struct __register_chrdev_call_ctx {
@@ -244,15 +232,44 @@ struct __unregister_chrdev_call_ctx {
 	char const* name;
 };
 
+struct capable_call_ctx {
+	int cap;
+};
+
+struct class_destroy_call_ctx {
+	struct class* cls;
+};
+
 struct cpu_maps_update_begin_call_ctx {
 };
 
 struct cpu_maps_update_done_call_ctx {
 };
 
-struct wrmsr_safe_regs_on_cpu_call_ctx {
+struct devnode_call_ctx {
+	struct device* dev;
+	unsigned short* mode;
+};
+
+struct device_create_call_ctx {
+	struct class* class;
+	struct device* parent;
+	unsigned int devt;
+	void* drvdata;
+	char const* fmt;
 	unsigned int cpu;
-	unsigned int* regs;
+};
+
+struct device_destroy_call_ctx {
+	struct class* class;
+	unsigned int devt;
+};
+
+struct rdmsr_safe_on_cpu_call_ctx {
+	unsigned int cpu;
+	unsigned int msr_no;
+	unsigned int* l;
+	unsigned int* h;
 };
 
 struct rdmsr_safe_regs_on_cpu_call_ctx {
@@ -267,15 +284,9 @@ struct wrmsr_safe_on_cpu_call_ctx {
 	unsigned int h;
 };
 
-struct rdmsr_safe_on_cpu_call_ctx {
+struct wrmsr_safe_regs_on_cpu_call_ctx {
 	unsigned int cpu;
-	unsigned int msr_no;
-	unsigned int* l;
-	unsigned int* h;
-};
-
-struct capable_call_ctx {
-	int cap;
+	unsigned int* regs;
 };
 
 struct no_seek_end_llseek_call_ctx {
@@ -284,344 +295,39 @@ struct no_seek_end_llseek_call_ctx {
 	int whence;
 };
 
-struct __class_create_call_ctx {
-	struct module* owner;
-	char const* name;
+struct llseek_call_ctx {
+	struct file* file;
+	long long offset;
+	int whence;
 };
 
-struct devnode_call_ctx {
-	struct device* dev;
-	unsigned short* mode;
+struct msr_read_call_ctx {
+	struct file* file;
+	char* buf;
+	unsigned long long count;
+	unsigned long long* ppos;
 };
 
-struct __device_create_call_ctx {
-	struct class* class;
-	struct device* parent;
-	unsigned int devt;
-	void* drvdata;
-	char const* fmt;
-	unsigned int cpu;
+struct msr_write_call_ctx {
+	struct file* file;
+	char* buf;
+	unsigned long long count;
+	unsigned long long* ppos;
 };
 
-struct device_destroy_call_ctx {
-	struct class* class;
-	unsigned int devt;
+struct msr_ioctl_call_ctx {
+	struct file* file;
+	unsigned int ioc;
+	unsigned long long arg;
 };
 
-struct class_destroy_call_ctx {
-	struct class* cls;
+struct msr_open_call_ctx {
+	struct inode* inode;
+	struct file* file;
 };
 
 struct get_jiffies_call_ctx {
 };
-
-void caller_marshal_kernel__read__file__in(
-	size_t* __pos,
-	struct fipc_message* __msg,
-	struct ext_registers* __ext,
-	struct read_call_ctx const* call_ctx,
-	struct file const* ptr);
-
-void callee_unmarshal_kernel__read__file__in(
-	size_t* __pos,
-	const struct fipc_message* __msg,
-	const struct ext_registers* __ext,
-	struct read_call_ctx const* call_ctx,
-	struct file* ptr);
-
-void callee_marshal_kernel__read__file__in(
-	size_t* __pos,
-	struct fipc_message* __msg,
-	struct ext_registers* __ext,
-	struct read_call_ctx const* call_ctx,
-	struct file const* ptr);
-
-void caller_unmarshal_kernel__read__file__in(
-	size_t* __pos,
-	const struct fipc_message* __msg,
-	const struct ext_registers* __ext,
-	struct read_call_ctx const* call_ctx,
-	struct file* ptr);
-
-void caller_marshal_kernel__read__inode__in(
-	size_t* __pos,
-	struct fipc_message* __msg,
-	struct ext_registers* __ext,
-	struct read_call_ctx const* call_ctx,
-	struct inode const* ptr);
-
-void callee_unmarshal_kernel__read__inode__in(
-	size_t* __pos,
-	const struct fipc_message* __msg,
-	const struct ext_registers* __ext,
-	struct read_call_ctx const* call_ctx,
-	struct inode* ptr);
-
-void callee_marshal_kernel__read__inode__in(
-	size_t* __pos,
-	struct fipc_message* __msg,
-	struct ext_registers* __ext,
-	struct read_call_ctx const* call_ctx,
-	struct inode const* ptr);
-
-void caller_unmarshal_kernel__read__inode__in(
-	size_t* __pos,
-	const struct fipc_message* __msg,
-	const struct ext_registers* __ext,
-	struct read_call_ctx const* call_ctx,
-	struct inode* ptr);
-
-void caller_marshal_kernel__write__file__in(
-	size_t* __pos,
-	struct fipc_message* __msg,
-	struct ext_registers* __ext,
-	struct write_call_ctx const* call_ctx,
-	struct file const* ptr);
-
-void callee_unmarshal_kernel__write__file__in(
-	size_t* __pos,
-	const struct fipc_message* __msg,
-	const struct ext_registers* __ext,
-	struct write_call_ctx const* call_ctx,
-	struct file* ptr);
-
-void callee_marshal_kernel__write__file__in(
-	size_t* __pos,
-	struct fipc_message* __msg,
-	struct ext_registers* __ext,
-	struct write_call_ctx const* call_ctx,
-	struct file const* ptr);
-
-void caller_unmarshal_kernel__write__file__in(
-	size_t* __pos,
-	const struct fipc_message* __msg,
-	const struct ext_registers* __ext,
-	struct write_call_ctx const* call_ctx,
-	struct file* ptr);
-
-void caller_marshal_kernel__write__inode__in(
-	size_t* __pos,
-	struct fipc_message* __msg,
-	struct ext_registers* __ext,
-	struct write_call_ctx const* call_ctx,
-	struct inode const* ptr);
-
-void callee_unmarshal_kernel__write__inode__in(
-	size_t* __pos,
-	const struct fipc_message* __msg,
-	const struct ext_registers* __ext,
-	struct write_call_ctx const* call_ctx,
-	struct inode* ptr);
-
-void callee_marshal_kernel__write__inode__in(
-	size_t* __pos,
-	struct fipc_message* __msg,
-	struct ext_registers* __ext,
-	struct write_call_ctx const* call_ctx,
-	struct inode const* ptr);
-
-void caller_unmarshal_kernel__write__inode__in(
-	size_t* __pos,
-	const struct fipc_message* __msg,
-	const struct ext_registers* __ext,
-	struct write_call_ctx const* call_ctx,
-	struct inode* ptr);
-
-void caller_marshal_kernel__compat_ioctl__file__in(
-	size_t* __pos,
-	struct fipc_message* __msg,
-	struct ext_registers* __ext,
-	struct compat_ioctl_call_ctx const* call_ctx,
-	struct file const* ptr);
-
-void callee_unmarshal_kernel__compat_ioctl__file__in(
-	size_t* __pos,
-	const struct fipc_message* __msg,
-	const struct ext_registers* __ext,
-	struct compat_ioctl_call_ctx const* call_ctx,
-	struct file* ptr);
-
-void callee_marshal_kernel__compat_ioctl__file__in(
-	size_t* __pos,
-	struct fipc_message* __msg,
-	struct ext_registers* __ext,
-	struct compat_ioctl_call_ctx const* call_ctx,
-	struct file const* ptr);
-
-void caller_unmarshal_kernel__compat_ioctl__file__in(
-	size_t* __pos,
-	const struct fipc_message* __msg,
-	const struct ext_registers* __ext,
-	struct compat_ioctl_call_ctx const* call_ctx,
-	struct file* ptr);
-
-void caller_marshal_kernel__compat_ioctl__inode__in(
-	size_t* __pos,
-	struct fipc_message* __msg,
-	struct ext_registers* __ext,
-	struct compat_ioctl_call_ctx const* call_ctx,
-	struct inode const* ptr);
-
-void callee_unmarshal_kernel__compat_ioctl__inode__in(
-	size_t* __pos,
-	const struct fipc_message* __msg,
-	const struct ext_registers* __ext,
-	struct compat_ioctl_call_ctx const* call_ctx,
-	struct inode* ptr);
-
-void callee_marshal_kernel__compat_ioctl__inode__in(
-	size_t* __pos,
-	struct fipc_message* __msg,
-	struct ext_registers* __ext,
-	struct compat_ioctl_call_ctx const* call_ctx,
-	struct inode const* ptr);
-
-void caller_unmarshal_kernel__compat_ioctl__inode__in(
-	size_t* __pos,
-	const struct fipc_message* __msg,
-	const struct ext_registers* __ext,
-	struct compat_ioctl_call_ctx const* call_ctx,
-	struct inode* ptr);
-
-void caller_marshal_kernel__open__inode__in(
-	size_t* __pos,
-	struct fipc_message* __msg,
-	struct ext_registers* __ext,
-	struct open_call_ctx const* call_ctx,
-	struct inode const* ptr);
-
-void callee_unmarshal_kernel__open__inode__in(
-	size_t* __pos,
-	const struct fipc_message* __msg,
-	const struct ext_registers* __ext,
-	struct open_call_ctx const* call_ctx,
-	struct inode* ptr);
-
-void callee_marshal_kernel__open__inode__in(
-	size_t* __pos,
-	struct fipc_message* __msg,
-	struct ext_registers* __ext,
-	struct open_call_ctx const* call_ctx,
-	struct inode const* ptr);
-
-void caller_unmarshal_kernel__open__inode__in(
-	size_t* __pos,
-	const struct fipc_message* __msg,
-	const struct ext_registers* __ext,
-	struct open_call_ctx const* call_ctx,
-	struct inode* ptr);
-
-void caller_marshal_kernel__open__file__in(
-	size_t* __pos,
-	struct fipc_message* __msg,
-	struct ext_registers* __ext,
-	struct open_call_ctx const* call_ctx,
-	struct file const* ptr);
-
-void callee_unmarshal_kernel__open__file__in(
-	size_t* __pos,
-	const struct fipc_message* __msg,
-	const struct ext_registers* __ext,
-	struct open_call_ctx const* call_ctx,
-	struct file* ptr);
-
-void callee_marshal_kernel__open__file__in(
-	size_t* __pos,
-	struct fipc_message* __msg,
-	struct ext_registers* __ext,
-	struct open_call_ctx const* call_ctx,
-	struct file const* ptr);
-
-void caller_unmarshal_kernel__open__file__in(
-	size_t* __pos,
-	const struct fipc_message* __msg,
-	const struct ext_registers* __ext,
-	struct open_call_ctx const* call_ctx,
-	struct file* ptr);
-
-void caller_marshal_kernel____register_chrdev__fops__in(
-	size_t* __pos,
-	struct fipc_message* __msg,
-	struct ext_registers* __ext,
-	struct __register_chrdev_call_ctx const* call_ctx,
-	struct file_operations const* ptr);
-
-void callee_unmarshal_kernel____register_chrdev__fops__in(
-	size_t* __pos,
-	const struct fipc_message* __msg,
-	const struct ext_registers* __ext,
-	struct __register_chrdev_call_ctx const* call_ctx,
-	struct file_operations* ptr);
-
-void callee_marshal_kernel____register_chrdev__fops__in(
-	size_t* __pos,
-	struct fipc_message* __msg,
-	struct ext_registers* __ext,
-	struct __register_chrdev_call_ctx const* call_ctx,
-	struct file_operations const* ptr);
-
-void caller_unmarshal_kernel____register_chrdev__fops__in(
-	size_t* __pos,
-	const struct fipc_message* __msg,
-	const struct ext_registers* __ext,
-	struct __register_chrdev_call_ctx const* call_ctx,
-	struct file_operations* ptr);
-
-void caller_marshal_kernel____register_chrdev__owner__in(
-	size_t* __pos,
-	struct fipc_message* __msg,
-	struct ext_registers* __ext,
-	struct __register_chrdev_call_ctx const* call_ctx,
-	struct module const* ptr);
-
-void callee_unmarshal_kernel____register_chrdev__owner__in(
-	size_t* __pos,
-	const struct fipc_message* __msg,
-	const struct ext_registers* __ext,
-	struct __register_chrdev_call_ctx const* call_ctx,
-	struct module* ptr);
-
-void callee_marshal_kernel____register_chrdev__owner__in(
-	size_t* __pos,
-	struct fipc_message* __msg,
-	struct ext_registers* __ext,
-	struct __register_chrdev_call_ctx const* call_ctx,
-	struct module const* ptr);
-
-void caller_unmarshal_kernel____register_chrdev__owner__in(
-	size_t* __pos,
-	const struct fipc_message* __msg,
-	const struct ext_registers* __ext,
-	struct __register_chrdev_call_ctx const* call_ctx,
-	struct module* ptr);
-
-void caller_marshal_kernel__no_seek_end_llseek__file__in(
-	size_t* __pos,
-	struct fipc_message* __msg,
-	struct ext_registers* __ext,
-	struct no_seek_end_llseek_call_ctx const* call_ctx,
-	struct file const* ptr);
-
-void callee_unmarshal_kernel__no_seek_end_llseek__file__in(
-	size_t* __pos,
-	const struct fipc_message* __msg,
-	const struct ext_registers* __ext,
-	struct no_seek_end_llseek_call_ctx const* call_ctx,
-	struct file* ptr);
-
-void callee_marshal_kernel__no_seek_end_llseek__file__in(
-	size_t* __pos,
-	struct fipc_message* __msg,
-	struct ext_registers* __ext,
-	struct no_seek_end_llseek_call_ctx const* call_ctx,
-	struct file const* ptr);
-
-void caller_unmarshal_kernel__no_seek_end_llseek__file__in(
-	size_t* __pos,
-	const struct fipc_message* __msg,
-	const struct ext_registers* __ext,
-	struct no_seek_end_llseek_call_ctx const* call_ctx,
-	struct file* ptr);
 
 void caller_marshal_kernel____class_create__ret_class__out(
 	size_t* __pos,
@@ -651,33 +357,113 @@ void caller_unmarshal_kernel____class_create__ret_class__out(
 	struct __class_create_call_ctx const* call_ctx,
 	struct class* ptr);
 
-void caller_marshal_kernel____class_create__owner__in(
+void caller_marshal_kernel____class_create__module__in(
 	size_t* __pos,
 	struct fipc_message* __msg,
 	struct ext_registers* __ext,
 	struct __class_create_call_ctx const* call_ctx,
 	struct module const* ptr);
 
-void callee_unmarshal_kernel____class_create__owner__in(
+void callee_unmarshal_kernel____class_create__module__in(
 	size_t* __pos,
 	const struct fipc_message* __msg,
 	const struct ext_registers* __ext,
 	struct __class_create_call_ctx const* call_ctx,
 	struct module* ptr);
 
-void callee_marshal_kernel____class_create__owner__in(
+void callee_marshal_kernel____class_create__module__in(
 	size_t* __pos,
 	struct fipc_message* __msg,
 	struct ext_registers* __ext,
 	struct __class_create_call_ctx const* call_ctx,
 	struct module const* ptr);
 
-void caller_unmarshal_kernel____class_create__owner__in(
+void caller_unmarshal_kernel____class_create__module__in(
 	size_t* __pos,
 	const struct fipc_message* __msg,
 	const struct ext_registers* __ext,
 	struct __class_create_call_ctx const* call_ctx,
 	struct module* ptr);
+
+void caller_marshal_kernel____class_create__lock_class_key__in(
+	size_t* __pos,
+	struct fipc_message* __msg,
+	struct ext_registers* __ext,
+	struct __class_create_call_ctx const* call_ctx,
+	struct lock_class_key const* ptr);
+
+void callee_unmarshal_kernel____class_create__lock_class_key__in(
+	size_t* __pos,
+	const struct fipc_message* __msg,
+	const struct ext_registers* __ext,
+	struct __class_create_call_ctx const* call_ctx,
+	struct lock_class_key* ptr);
+
+void callee_marshal_kernel____class_create__lock_class_key__in(
+	size_t* __pos,
+	struct fipc_message* __msg,
+	struct ext_registers* __ext,
+	struct __class_create_call_ctx const* call_ctx,
+	struct lock_class_key const* ptr);
+
+void caller_unmarshal_kernel____class_create__lock_class_key__in(
+	size_t* __pos,
+	const struct fipc_message* __msg,
+	const struct ext_registers* __ext,
+	struct __class_create_call_ctx const* call_ctx,
+	struct lock_class_key* ptr);
+
+void caller_marshal_kernel___global_file_operations__in(
+	size_t* __pos,
+	struct fipc_message* __msg,
+	struct ext_registers* __ext,
+	struct file_operations const* ptr);
+
+void callee_unmarshal_kernel___global_file_operations__in(
+	size_t* __pos,
+	const struct fipc_message* __msg,
+	const struct ext_registers* __ext,
+	struct file_operations* ptr);
+
+void callee_marshal_kernel___global_file_operations__in(
+	size_t* __pos,
+	struct fipc_message* __msg,
+	struct ext_registers* __ext,
+	struct file_operations const* ptr);
+
+void caller_unmarshal_kernel___global_file_operations__in(
+	size_t* __pos,
+	const struct fipc_message* __msg,
+	const struct ext_registers* __ext,
+	struct file_operations* ptr);
+
+void caller_marshal_kernel__class_destroy__class__in(
+	size_t* __pos,
+	struct fipc_message* __msg,
+	struct ext_registers* __ext,
+	struct class_destroy_call_ctx const* call_ctx,
+	struct class const* ptr);
+
+void callee_unmarshal_kernel__class_destroy__class__in(
+	size_t* __pos,
+	const struct fipc_message* __msg,
+	const struct ext_registers* __ext,
+	struct class_destroy_call_ctx const* call_ctx,
+	struct class* ptr);
+
+void callee_marshal_kernel__class_destroy__class__in(
+	size_t* __pos,
+	struct fipc_message* __msg,
+	struct ext_registers* __ext,
+	struct class_destroy_call_ctx const* call_ctx,
+	struct class const* ptr);
+
+void caller_unmarshal_kernel__class_destroy__class__in(
+	size_t* __pos,
+	const struct fipc_message* __msg,
+	const struct ext_registers* __ext,
+	struct class_destroy_call_ctx const* call_ctx,
+	struct class* ptr);
 
 void caller_marshal_kernel__devnode__device__in(
 	size_t* __pos,
@@ -707,88 +493,88 @@ void caller_unmarshal_kernel__devnode__device__in(
 	struct devnode_call_ctx const* call_ctx,
 	struct device* ptr);
 
-void caller_marshal_kernel____device_create__ret_device__out(
+void caller_marshal_kernel__device_create__ret_device__out(
 	size_t* __pos,
 	struct fipc_message* __msg,
 	struct ext_registers* __ext,
-	struct __device_create_call_ctx const* call_ctx,
+	struct device_create_call_ctx const* call_ctx,
 	struct device const* ptr);
 
-void callee_unmarshal_kernel____device_create__ret_device__out(
+void callee_unmarshal_kernel__device_create__ret_device__out(
 	size_t* __pos,
 	const struct fipc_message* __msg,
 	const struct ext_registers* __ext,
-	struct __device_create_call_ctx const* call_ctx,
+	struct device_create_call_ctx const* call_ctx,
 	struct device* ptr);
 
-void callee_marshal_kernel____device_create__ret_device__out(
+void callee_marshal_kernel__device_create__ret_device__out(
 	size_t* __pos,
 	struct fipc_message* __msg,
 	struct ext_registers* __ext,
-	struct __device_create_call_ctx const* call_ctx,
+	struct device_create_call_ctx const* call_ctx,
 	struct device const* ptr);
 
-void caller_unmarshal_kernel____device_create__ret_device__out(
+void caller_unmarshal_kernel__device_create__ret_device__out(
 	size_t* __pos,
 	const struct fipc_message* __msg,
 	const struct ext_registers* __ext,
-	struct __device_create_call_ctx const* call_ctx,
+	struct device_create_call_ctx const* call_ctx,
 	struct device* ptr);
 
-void caller_marshal_kernel____device_create__class__in(
+void caller_marshal_kernel__device_create__class__in(
 	size_t* __pos,
 	struct fipc_message* __msg,
 	struct ext_registers* __ext,
-	struct __device_create_call_ctx const* call_ctx,
+	struct device_create_call_ctx const* call_ctx,
 	struct class const* ptr);
 
-void callee_unmarshal_kernel____device_create__class__in(
+void callee_unmarshal_kernel__device_create__class__in(
 	size_t* __pos,
 	const struct fipc_message* __msg,
 	const struct ext_registers* __ext,
-	struct __device_create_call_ctx const* call_ctx,
+	struct device_create_call_ctx const* call_ctx,
 	struct class* ptr);
 
-void callee_marshal_kernel____device_create__class__in(
+void callee_marshal_kernel__device_create__class__in(
 	size_t* __pos,
 	struct fipc_message* __msg,
 	struct ext_registers* __ext,
-	struct __device_create_call_ctx const* call_ctx,
+	struct device_create_call_ctx const* call_ctx,
 	struct class const* ptr);
 
-void caller_unmarshal_kernel____device_create__class__in(
+void caller_unmarshal_kernel__device_create__class__in(
 	size_t* __pos,
 	const struct fipc_message* __msg,
 	const struct ext_registers* __ext,
-	struct __device_create_call_ctx const* call_ctx,
+	struct device_create_call_ctx const* call_ctx,
 	struct class* ptr);
 
-void caller_marshal_kernel____device_create__parent__in(
+void caller_marshal_kernel__device_create__device__in(
 	size_t* __pos,
 	struct fipc_message* __msg,
 	struct ext_registers* __ext,
-	struct __device_create_call_ctx const* call_ctx,
+	struct device_create_call_ctx const* call_ctx,
 	struct device const* ptr);
 
-void callee_unmarshal_kernel____device_create__parent__in(
+void callee_unmarshal_kernel__device_create__device__in(
 	size_t* __pos,
 	const struct fipc_message* __msg,
 	const struct ext_registers* __ext,
-	struct __device_create_call_ctx const* call_ctx,
+	struct device_create_call_ctx const* call_ctx,
 	struct device* ptr);
 
-void callee_marshal_kernel____device_create__parent__in(
+void callee_marshal_kernel__device_create__device__in(
 	size_t* __pos,
 	struct fipc_message* __msg,
 	struct ext_registers* __ext,
-	struct __device_create_call_ctx const* call_ctx,
+	struct device_create_call_ctx const* call_ctx,
 	struct device const* ptr);
 
-void caller_unmarshal_kernel____device_create__parent__in(
+void caller_unmarshal_kernel__device_create__device__in(
 	size_t* __pos,
 	const struct fipc_message* __msg,
 	const struct ext_registers* __ext,
-	struct __device_create_call_ctx const* call_ctx,
+	struct device_create_call_ctx const* call_ctx,
 	struct device* ptr);
 
 void caller_marshal_kernel__device_destroy__class__in(
@@ -819,33 +605,313 @@ void caller_unmarshal_kernel__device_destroy__class__in(
 	struct device_destroy_call_ctx const* call_ctx,
 	struct class* ptr);
 
-void caller_marshal_kernel__class_destroy__cls__in(
+void caller_marshal_kernel__no_seek_end_llseek__file__in(
 	size_t* __pos,
 	struct fipc_message* __msg,
 	struct ext_registers* __ext,
-	struct class_destroy_call_ctx const* call_ctx,
-	struct class const* ptr);
+	struct no_seek_end_llseek_call_ctx const* call_ctx,
+	struct file const* ptr);
 
-void callee_unmarshal_kernel__class_destroy__cls__in(
+void callee_unmarshal_kernel__no_seek_end_llseek__file__in(
 	size_t* __pos,
 	const struct fipc_message* __msg,
 	const struct ext_registers* __ext,
-	struct class_destroy_call_ctx const* call_ctx,
-	struct class* ptr);
+	struct no_seek_end_llseek_call_ctx const* call_ctx,
+	struct file* ptr);
 
-void callee_marshal_kernel__class_destroy__cls__in(
+void callee_marshal_kernel__no_seek_end_llseek__file__in(
 	size_t* __pos,
 	struct fipc_message* __msg,
 	struct ext_registers* __ext,
-	struct class_destroy_call_ctx const* call_ctx,
-	struct class const* ptr);
+	struct no_seek_end_llseek_call_ctx const* call_ctx,
+	struct file const* ptr);
 
-void caller_unmarshal_kernel__class_destroy__cls__in(
+void caller_unmarshal_kernel__no_seek_end_llseek__file__in(
 	size_t* __pos,
 	const struct fipc_message* __msg,
 	const struct ext_registers* __ext,
-	struct class_destroy_call_ctx const* call_ctx,
-	struct class* ptr);
+	struct no_seek_end_llseek_call_ctx const* call_ctx,
+	struct file* ptr);
+
+void caller_marshal_kernel__llseek__file__in(
+	size_t* __pos,
+	struct fipc_message* __msg,
+	struct ext_registers* __ext,
+	struct llseek_call_ctx const* call_ctx,
+	struct file const* ptr);
+
+void callee_unmarshal_kernel__llseek__file__in(
+	size_t* __pos,
+	const struct fipc_message* __msg,
+	const struct ext_registers* __ext,
+	struct llseek_call_ctx const* call_ctx,
+	struct file* ptr);
+
+void callee_marshal_kernel__llseek__file__in(
+	size_t* __pos,
+	struct fipc_message* __msg,
+	struct ext_registers* __ext,
+	struct llseek_call_ctx const* call_ctx,
+	struct file const* ptr);
+
+void caller_unmarshal_kernel__llseek__file__in(
+	size_t* __pos,
+	const struct fipc_message* __msg,
+	const struct ext_registers* __ext,
+	struct llseek_call_ctx const* call_ctx,
+	struct file* ptr);
+
+void caller_marshal_kernel__msr_read__file__in(
+	size_t* __pos,
+	struct fipc_message* __msg,
+	struct ext_registers* __ext,
+	struct msr_read_call_ctx const* call_ctx,
+	struct file const* ptr);
+
+void callee_unmarshal_kernel__msr_read__file__in(
+	size_t* __pos,
+	const struct fipc_message* __msg,
+	const struct ext_registers* __ext,
+	struct msr_read_call_ctx const* call_ctx,
+	struct file* ptr);
+
+void callee_marshal_kernel__msr_read__file__in(
+	size_t* __pos,
+	struct fipc_message* __msg,
+	struct ext_registers* __ext,
+	struct msr_read_call_ctx const* call_ctx,
+	struct file const* ptr);
+
+void caller_unmarshal_kernel__msr_read__file__in(
+	size_t* __pos,
+	const struct fipc_message* __msg,
+	const struct ext_registers* __ext,
+	struct msr_read_call_ctx const* call_ctx,
+	struct file* ptr);
+
+void caller_marshal_kernel__msr_read__file_inode__in(
+	size_t* __pos,
+	struct fipc_message* __msg,
+	struct ext_registers* __ext,
+	struct msr_read_call_ctx const* call_ctx,
+	struct inode const* ptr);
+
+void callee_unmarshal_kernel__msr_read__file_inode__in(
+	size_t* __pos,
+	const struct fipc_message* __msg,
+	const struct ext_registers* __ext,
+	struct msr_read_call_ctx const* call_ctx,
+	struct inode* ptr);
+
+void callee_marshal_kernel__msr_read__file_inode__in(
+	size_t* __pos,
+	struct fipc_message* __msg,
+	struct ext_registers* __ext,
+	struct msr_read_call_ctx const* call_ctx,
+	struct inode const* ptr);
+
+void caller_unmarshal_kernel__msr_read__file_inode__in(
+	size_t* __pos,
+	const struct fipc_message* __msg,
+	const struct ext_registers* __ext,
+	struct msr_read_call_ctx const* call_ctx,
+	struct inode* ptr);
+
+void caller_marshal_kernel__msr_write__file__in(
+	size_t* __pos,
+	struct fipc_message* __msg,
+	struct ext_registers* __ext,
+	struct msr_write_call_ctx const* call_ctx,
+	struct file const* ptr);
+
+void callee_unmarshal_kernel__msr_write__file__in(
+	size_t* __pos,
+	const struct fipc_message* __msg,
+	const struct ext_registers* __ext,
+	struct msr_write_call_ctx const* call_ctx,
+	struct file* ptr);
+
+void callee_marshal_kernel__msr_write__file__in(
+	size_t* __pos,
+	struct fipc_message* __msg,
+	struct ext_registers* __ext,
+	struct msr_write_call_ctx const* call_ctx,
+	struct file const* ptr);
+
+void caller_unmarshal_kernel__msr_write__file__in(
+	size_t* __pos,
+	const struct fipc_message* __msg,
+	const struct ext_registers* __ext,
+	struct msr_write_call_ctx const* call_ctx,
+	struct file* ptr);
+
+void caller_marshal_kernel__msr_write__file_inode__in(
+	size_t* __pos,
+	struct fipc_message* __msg,
+	struct ext_registers* __ext,
+	struct msr_write_call_ctx const* call_ctx,
+	struct inode const* ptr);
+
+void callee_unmarshal_kernel__msr_write__file_inode__in(
+	size_t* __pos,
+	const struct fipc_message* __msg,
+	const struct ext_registers* __ext,
+	struct msr_write_call_ctx const* call_ctx,
+	struct inode* ptr);
+
+void callee_marshal_kernel__msr_write__file_inode__in(
+	size_t* __pos,
+	struct fipc_message* __msg,
+	struct ext_registers* __ext,
+	struct msr_write_call_ctx const* call_ctx,
+	struct inode const* ptr);
+
+void caller_unmarshal_kernel__msr_write__file_inode__in(
+	size_t* __pos,
+	const struct fipc_message* __msg,
+	const struct ext_registers* __ext,
+	struct msr_write_call_ctx const* call_ctx,
+	struct inode* ptr);
+
+void caller_marshal_kernel__msr_ioctl__file__in(
+	size_t* __pos,
+	struct fipc_message* __msg,
+	struct ext_registers* __ext,
+	struct msr_ioctl_call_ctx const* call_ctx,
+	struct file const* ptr);
+
+void callee_unmarshal_kernel__msr_ioctl__file__in(
+	size_t* __pos,
+	const struct fipc_message* __msg,
+	const struct ext_registers* __ext,
+	struct msr_ioctl_call_ctx const* call_ctx,
+	struct file* ptr);
+
+void callee_marshal_kernel__msr_ioctl__file__in(
+	size_t* __pos,
+	struct fipc_message* __msg,
+	struct ext_registers* __ext,
+	struct msr_ioctl_call_ctx const* call_ctx,
+	struct file const* ptr);
+
+void caller_unmarshal_kernel__msr_ioctl__file__in(
+	size_t* __pos,
+	const struct fipc_message* __msg,
+	const struct ext_registers* __ext,
+	struct msr_ioctl_call_ctx const* call_ctx,
+	struct file* ptr);
+
+void caller_marshal_kernel__msr_ioctl__file_inode__in(
+	size_t* __pos,
+	struct fipc_message* __msg,
+	struct ext_registers* __ext,
+	struct msr_ioctl_call_ctx const* call_ctx,
+	struct inode const* ptr);
+
+void callee_unmarshal_kernel__msr_ioctl__file_inode__in(
+	size_t* __pos,
+	const struct fipc_message* __msg,
+	const struct ext_registers* __ext,
+	struct msr_ioctl_call_ctx const* call_ctx,
+	struct inode* ptr);
+
+void callee_marshal_kernel__msr_ioctl__file_inode__in(
+	size_t* __pos,
+	struct fipc_message* __msg,
+	struct ext_registers* __ext,
+	struct msr_ioctl_call_ctx const* call_ctx,
+	struct inode const* ptr);
+
+void caller_unmarshal_kernel__msr_ioctl__file_inode__in(
+	size_t* __pos,
+	const struct fipc_message* __msg,
+	const struct ext_registers* __ext,
+	struct msr_ioctl_call_ctx const* call_ctx,
+	struct inode* ptr);
+
+void caller_marshal_kernel__msr_open__inode__in(
+	size_t* __pos,
+	struct fipc_message* __msg,
+	struct ext_registers* __ext,
+	struct msr_open_call_ctx const* call_ctx,
+	struct inode const* ptr);
+
+void callee_unmarshal_kernel__msr_open__inode__in(
+	size_t* __pos,
+	const struct fipc_message* __msg,
+	const struct ext_registers* __ext,
+	struct msr_open_call_ctx const* call_ctx,
+	struct inode* ptr);
+
+void callee_marshal_kernel__msr_open__inode__in(
+	size_t* __pos,
+	struct fipc_message* __msg,
+	struct ext_registers* __ext,
+	struct msr_open_call_ctx const* call_ctx,
+	struct inode const* ptr);
+
+void caller_unmarshal_kernel__msr_open__inode__in(
+	size_t* __pos,
+	const struct fipc_message* __msg,
+	const struct ext_registers* __ext,
+	struct msr_open_call_ctx const* call_ctx,
+	struct inode* ptr);
+
+void caller_marshal_kernel__msr_open__file__in(
+	size_t* __pos,
+	struct fipc_message* __msg,
+	struct ext_registers* __ext,
+	struct msr_open_call_ctx const* call_ctx,
+	struct file const* ptr);
+
+void callee_unmarshal_kernel__msr_open__file__in(
+	size_t* __pos,
+	const struct fipc_message* __msg,
+	const struct ext_registers* __ext,
+	struct msr_open_call_ctx const* call_ctx,
+	struct file* ptr);
+
+void callee_marshal_kernel__msr_open__file__in(
+	size_t* __pos,
+	struct fipc_message* __msg,
+	struct ext_registers* __ext,
+	struct msr_open_call_ctx const* call_ctx,
+	struct file const* ptr);
+
+void caller_unmarshal_kernel__msr_open__file__in(
+	size_t* __pos,
+	const struct fipc_message* __msg,
+	const struct ext_registers* __ext,
+	struct msr_open_call_ctx const* call_ctx,
+	struct file* ptr);
+
+void caller_marshal_kernel__msr_open__file_inode__in(
+	size_t* __pos,
+	struct fipc_message* __msg,
+	struct ext_registers* __ext,
+	struct msr_open_call_ctx const* call_ctx,
+	struct inode const* ptr);
+
+void callee_unmarshal_kernel__msr_open__file_inode__in(
+	size_t* __pos,
+	const struct fipc_message* __msg,
+	const struct ext_registers* __ext,
+	struct msr_open_call_ctx const* call_ctx,
+	struct inode* ptr);
+
+void callee_marshal_kernel__msr_open__file_inode__in(
+	size_t* __pos,
+	struct fipc_message* __msg,
+	struct ext_registers* __ext,
+	struct msr_open_call_ctx const* call_ctx,
+	struct inode const* ptr);
+
+void caller_unmarshal_kernel__msr_open__file_inode__in(
+	size_t* __pos,
+	const struct fipc_message* __msg,
+	const struct ext_registers* __ext,
+	struct msr_open_call_ctx const* call_ctx,
+	struct inode* ptr);
 
 
 #endif

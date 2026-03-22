@@ -128,11 +128,11 @@ fail5:
 
 #ifdef TEST_VMFUNC_TWO_LCDS
 	lcd_cap_delete(lcd2);
-	lcd_destroy_create_ctx(ctx2); /* tears down LCD 2 */
+	lvd_destroy_create_ctx(ctx2); /* tears down LCD 2 */
 fail4:
 #endif
 	lcd_cap_delete(lcd1);
-	lcd_destroy_create_ctx(ctx1); /* tears down LCD 1 */
+	lvd_destroy_create_ctx(ctx1); /* tears down LCD 1 */
 fail3:
 fail2:
 	lcd_exit(0); /* tears down everything else */
@@ -168,10 +168,10 @@ int boot_lcd_thread(void *data)
 
 #ifdef TEST_VMFUNC_TWO_LCDS
 	if (ctx2)
-		lcd_destroy_create_ctx(ctx2); /* tears down LCD 2 */
+		lvd_destroy_create_ctx(ctx2); /* tears down LCD 2 */
 #endif
 	if (ctx1)
-		lcd_destroy_create_ctx(ctx1); /* tears down LCD 1 */
+		lvd_destroy_create_ctx(ctx1); /* tears down LCD 1 */
 
 	lcd_exit(0);
 	return 0;

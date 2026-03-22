@@ -81,7 +81,7 @@ static int boot_main(void)
 fail9:
 fail8:
 	lcd_cap_delete(dmzero_lcd);
-	lcd_destroy_create_ctx(dmzero_ctx);
+	lvd_destroy_create_ctx(dmzero_ctx);
 fail4:
 	//lcd_cap_delete(dm_klcd);
 	lcd_destroy_module_klcd(dm_klcd, "lcd_test_mod_dmzero_gen_dm_klcd");
@@ -118,7 +118,7 @@ int boot_lcd_thread(void *data)
 		if (current->lcd)
 			lcd_cap_delete(dmzero_lcd);
 		if (dmzero_ctx)
-			lcd_destroy_create_ctx(dmzero_ctx);
+			lvd_destroy_create_ctx(dmzero_ctx);
 
 		lcd_exit(0);
 	}

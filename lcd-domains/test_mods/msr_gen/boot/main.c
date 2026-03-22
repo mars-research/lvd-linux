@@ -82,7 +82,7 @@ static int boot_main(void)
 fail9:
 fail8:
 	lcd_cap_delete(msr_lcd);
-	lcd_destroy_create_ctx(msr_ctx);
+	lvd_destroy_create_ctx(msr_ctx);
 fail4:
 	//lcd_cap_delete(msr_klcd);
 	lcd_destroy_module_klcd(msr_klcd, "lcd_test_mod_msr_gen_msr_klcd");
@@ -119,7 +119,7 @@ int boot_lcd_thread(void *data)
 		if (current->lcd)
 			lcd_cap_delete(msr_lcd);
 		if (msr_ctx)
-			lcd_destroy_create_ctx(msr_ctx);
+			lvd_destroy_create_ctx(msr_ctx);
 
 		lcd_exit(0);
 	}

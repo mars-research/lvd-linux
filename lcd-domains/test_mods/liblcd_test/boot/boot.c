@@ -55,7 +55,7 @@ static int boot_main(void)
 out:
 fail3:
 	lcd_cap_delete(lcd);
-	lcd_destroy_create_ctx(ctx);
+	lvd_destroy_create_ctx(ctx);
 fail2:
 	lcd_exit(0);
 fail1:

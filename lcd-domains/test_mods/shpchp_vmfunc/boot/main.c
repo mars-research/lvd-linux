@@ -85,7 +85,7 @@ static int boot_main(void)
 fail5:
 fail4:
 	lcd_cap_delete(shpchp_lcd);
-	lcd_destroy_create_ctx(shpchp_ctx);
+	lvd_destroy_create_ctx(shpchp_ctx);
 fail3:
 	//lcd_cap_delete(pci_klcd);
 	lcd_destroy_module_klcd(pci_klcd, "lcd_test_mod_shpchp_vmfunc_pci_klcd");
@@ -121,7 +121,7 @@ int boot_lcd_thread(void *data)
 		if (current->lcd)
 			lcd_cap_delete(shpchp_lcd);
 		if (shpchp_ctx)
-			lcd_destroy_create_ctx(shpchp_ctx);
+			lvd_destroy_create_ctx(shpchp_ctx);
 		lcd_exit(0);
 	}
 	return 0;

@@ -98,7 +98,7 @@ fail10:
 fail9:
 fail5:
 	lcd_cap_delete(lcd);
-	lcd_destroy_create_ctx(lcd_ctx); /* tears down LCD 2 */
+	lvd_destroy_create_ctx(lcd_ctx); /* tears down LCD 2 */
 fail4:
 	lcd_destroy_module_klcd(klcd, "lcd_test_mod_vmfunc_klcd_caller_klcd");
 fail3:
@@ -134,7 +134,7 @@ int boot_lcd_thread(void *data)
 		}
 
 		if (lcd_ctx)
-			lcd_destroy_create_ctx(lcd_ctx); /* tears down LCD 2 */
+			lvd_destroy_create_ctx(lcd_ctx); /* tears down LCD 2 */
 
 		lcd_exit(0);
 	}

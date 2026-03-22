@@ -75,7 +75,7 @@ static int boot_main(void)
 fail9:
 fail8:
 	lcd_cap_delete(xhci_hcd_lcd);
-	lcd_destroy_create_ctx(xhci_hcd_ctx);
+	lvd_destroy_create_ctx(xhci_hcd_ctx);
 fail4:
 	//lcd_cap_delete(usb_klcd);
 	lcd_destroy_module_klcd(usb_klcd, "lcd_test_mod_xhci_hcd_gen_usb_klcd");
@@ -112,7 +112,7 @@ int boot_lcd_thread(void *data)
 		if (current->lcd)
 			lcd_cap_delete(xhci_hcd_lcd);
 		if (xhci_hcd_ctx)
-			lcd_destroy_create_ctx(xhci_hcd_ctx);
+			lvd_destroy_create_ctx(xhci_hcd_ctx);
 
 		lcd_exit(0);
 	}

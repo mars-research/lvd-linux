@@ -81,7 +81,7 @@ static int boot_main(void)
 fail9:
 fail8:
 	lcd_cap_delete(can_lcd);
-	lcd_destroy_create_ctx(can_ctx);
+	lvd_destroy_create_ctx(can_ctx);
 fail4:
 	//lcd_cap_delete(proto_klcd);
 	lcd_destroy_module_klcd(proto_klcd, "lcd_test_mod_canraw_gen_proto_klcd");
@@ -118,7 +118,7 @@ int boot_lcd_thread(void *data)
 		if (current->lcd)
 			lcd_cap_delete(can_lcd);
 		if (can_ctx)
-			lcd_destroy_create_ctx(can_ctx);
+			lvd_destroy_create_ctx(can_ctx);
 
 		lcd_exit(0);
 	}

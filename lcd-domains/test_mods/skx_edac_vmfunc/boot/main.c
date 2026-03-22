@@ -82,7 +82,7 @@ static int boot_main(void)
 fail5:
 fail4:
 	lcd_cap_delete(skx_edac_lcd);
-	lcd_destroy_create_ctx(skx_edac_ctx);
+	lvd_destroy_create_ctx(skx_edac_ctx);
 fail3:
 	//lcd_cap_delete(edac_klcd);
 	lcd_destroy_module_klcd(edac_klcd, "lcd_test_mod_skx_edac_vmfunc_edac_klcd");
@@ -118,7 +118,7 @@ int boot_lcd_thread(void *data)
 		if (current->lcd)
 			lcd_cap_delete(skx_edac_lcd);
 		if (skx_edac_ctx)
-			lcd_destroy_create_ctx(skx_edac_ctx);
+			lvd_destroy_create_ctx(skx_edac_ctx);
 		lcd_exit(0);
 	}
 	return 0;

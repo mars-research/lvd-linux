@@ -235,18 +235,18 @@ lcd_to_boot_cptr_cache(struct lcd_create_ctx *ctx)
  */
 void lcd_dump_virt_addr_space(struct lcd_create_ctx *ctx);
 /**
- * lcd_destroy_create_ctx -- Tear down lcd_create_ctx returned from
- *                           lcd_create_module_lcd
+ * lvd_destroy_create_ctx -- Tear down lcd_create_ctx returned from
+ *                           lvd_create_module_lvd
  * @ctx: the ctx to destroy
  *
- * This *releases* all of the memory used to initialize the new LCD.
+ * This *releases* all of the memory used to initialize the new LVD.
  * It will not destroy the new LCD itself, and since the LCD was granted
  * capabilities to the boot and stack pages, module pages, and so on,
  * it will continue to have access to them. Only when you delete
  * the lcd capability will this trigger the full tear down (so long
  * as no one else was granted the lcd capability).
  */
-void lcd_destroy_create_ctx(struct lcd_create_ctx *ctx);
+void lvd_destroy_create_ctx(struct lcd_create_ctx *ctx);
 
 /* What about lcd_destroy_module_lcd? Use lcd_cap_delete on the lcd
  * capability. */

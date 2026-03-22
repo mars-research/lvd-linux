@@ -85,7 +85,7 @@ static int boot_main(void)
 fail5:
 fail4:
 	lcd_cap_delete(nvme_lcd);
-	lcd_destroy_create_ctx(nvme_ctx);
+	lvd_destroy_create_ctx(nvme_ctx);
 fail3:
 	//lcd_cap_delete(blk_klcd);
 	lcd_destroy_module_klcd(blk_klcd, "lcd_test_mod_nvme_core_vmfunc_blk_klcd");
@@ -121,7 +121,7 @@ int boot_lcd_thread(void *data)
 		if (current->lcd)
 			lcd_cap_delete(nvme_lcd);
 		if (nvme_ctx)
-			lcd_destroy_create_ctx(nvme_ctx);
+			lvd_destroy_create_ctx(nvme_ctx);
 		lcd_exit(0);
 	}
 	return 0;

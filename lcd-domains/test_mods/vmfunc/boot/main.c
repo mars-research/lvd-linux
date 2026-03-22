@@ -41,19 +41,19 @@ static int boot_main(void)
 	/*
 	 * Create lcds
 	 */
-	ret = lcd_create_module_lcd(LCD_DIR("vmfunc/caller_lcd"),
+	ret = lvd_create_module_lvd(LCD_DIR("vmfunc/caller_lcd"),
 				"lcd_test_mod_vmfunc_caller_lcd",
-				&lcd1, 
-				&ctx1);
+				&lcd1,
+				&ctx1, 1);
 	if (ret) {
 		LIBLCD_ERR("failed to create lcd1");
 		goto fail3;
 	}
 #ifdef TEST_VMFUNC_TWO_LCDS
-	ret = lcd_create_module_lcd(LCD_DIR("vmfunc/callee_lcd"),
+	ret = lvd_create_module_lvd(LCD_DIR("vmfunc/callee_lcd"),
 				"lcd_test_mod_vmfunc_callee_lcd",
-				&lcd2, 
-				&ctx2);
+				&lcd2,
+				&ctx2, 2);
 	if (ret) {
 		LIBLCD_ERR("failed to create lcd2");
 		goto fail4;

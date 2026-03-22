@@ -96,7 +96,6 @@ static int __init lcd_init(void)
 {
 	int ret;
 
-#ifdef CONFIG_LVD
 	/*
 	 * Initialize each of the subsystems
 	 */
@@ -111,13 +110,6 @@ static int __init lcd_init(void)
 		LCD_ERR("failed to create cpuid pages");
 		goto fail0a;
 	}
-#else
-	ret = lcd_arch_init();
-	if (ret) {
-		LCD_ERR("failed to init arch-dependent code");
-		goto fail0;
-	}
-#endif
 	ret = cap_init();
 	if (ret) {
 		LCD_ERR("failed to init capability subsystem");
@@ -128,45 +120,40 @@ static int __init lcd_init(void)
 		LCD_ERR("failed to init capability types");
 		goto fail2;
 	}
-	ret = __lcd_ipc_init();
-	if (ret) {
-		LCD_ERR("failed to init ipc subsystem");
-		goto fail3;
-	}
 	ret = __lcd_mem_itree_init();
 	if (ret) {
 		LCD_ERR("failed to init global mem itree");
-		goto fail4;
+		goto fail3;
 	}
 	ret = __lcd_mem_init();
 	if (ret) {
 		LCD_ERR("failed to init memory subsystem");
-		goto fail5;
+		goto fail4;
 	}
 	ret = __lcd_run_init();
 	if (ret) {
 		LCD_ERR("failed to init run loop subsystem");
-		goto fail6;
+		goto fail5;
 	}
 	ret = __lcd_console_init();
 	if (ret) {
 		LCD_ERR("failed to init console subsystem");
-		goto fail7;
+		goto fail6;
 	}
 	ret = misc_register(&lcd_dev);
 	if (ret) {
 		LCD_ERR("misc device register failed, ret = %d", ret);
-		goto fail8;
+		goto fail7;
 	}
 	ret = fipc_init();
 	if (ret) {
 		LCD_ERR("error initializing libfipc, ret = %d", ret);
-		goto fail9;
+		goto fail8;
 	}
 	ret = thc_global_init();
 	if (ret) {
 		LCD_ERR("error initialing libasync, ret = %d", ret);
-		goto fail10;
+		goto fail9;
 	}
 
 	lcd_debugfs_init();
@@ -174,20 +161,18 @@ static int __init lcd_init(void)
 
 	return 0;
 
-fail10:
-	fipc_fini();
 fail9:
-	misc_deregister(&lcd_dev);	
+	fipc_fini();
 fail8:
-	__lcd_console_exit();
+	misc_deregister(&lcd_dev);
 fail7:
-	__lcd_run_exit();
+	__lcd_console_exit();
 fail6:
-	__lcd_mem_exit();
+	__lcd_run_exit();
 fail5:
-	__lcd_mem_itree_exit();
+	__lcd_mem_exit();
 fail4:
-	__lcd_ipc_exit();
+	__lcd_mem_itree_exit();
 fail3:
 	__lcd_exit_cap_types();
 fail2:
@@ -195,12 +180,7 @@ fail2:
 fail1:
 	destroy_cpuid_pages();
 fail0a:
-#ifdef CONFIG_LVD
 	lcd_arch_vmfunc_exit();
-#else
-	lcd_arch_exit();
-#endif
-
 fail0:
 	return ret;
 }
@@ -223,15 +203,10 @@ static void __exit lcd_exit(void)
 	__lcd_run_exit();
 	__lcd_mem_exit();
 	__lcd_mem_itree_exit();
-	__lcd_ipc_exit();
 	__lcd_exit_cap_types();
 	cap_fini();
-#ifdef CONFIG_LVD
 	lcd_arch_vmfunc_exit();
 	destroy_cpuid_pages();
-#else
-	lcd_arch_exit();
-#endif
 	remove_mapped_cr3();
 	LCD_MSG("lcd microkernel exited");
 }

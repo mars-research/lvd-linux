@@ -948,51 +948,8 @@ int __lcd_get_sync_endpoint(struct lcd *caller, cptr_t sync_ep_cptr,
 /**
  * __lcd_put_sync_endpoint -- Release sync endpoint locks
  */
-void __lcd_put_sync_endpoint(struct lcd *caller, struct cnode *cnode, 
+void __lcd_put_sync_endpoint(struct lcd *caller, struct cnode *cnode,
 			struct lcd_sync_endpoint *e);
-/**
- * __lcd_send -- Sync IPC send
- * @caller: LCD doing the sending
- * @endpoint: cptr to sync IPC endpoint
- */
-int __lcd_send(struct lcd *caller, cptr_t endpoint);
-/**
- * __lcd_recv -- Sync IPC receive
- * @caller: LCD doing the receiving
- * @endpoint: cptr to sync IPC endpoint
- */
-int __lcd_recv(struct lcd *caller, cptr_t endpoint);
-/**
- * __lcd_poll_recv -- Non-blocking sync ipc receive
- */
-int __lcd_poll_recv(struct lcd *caller, cptr_t endpoint);
-/**
- * __lcd_call -- Sync IPC call
- * @caller: LCD doing the calling
- * @endpoint: cptr to sync IPC endpoint
- *
- * This is equivalent to an __lcd_send followed by an __lcd_recv
- * on @caller's private endpoint (LCD_CPTR_CALL_ENDPOINT).
- */
-int __lcd_call(struct lcd *caller, cptr_t endpoint);
-/**
- * __lcd_reply -- Sync IPC reply
- * @caller: LCD doing the replying
- *
- * The endpoint is implicit: it is stored in a dedicated slot in the
- * @caller's cspace (LCD_CPTR_REPLY_ENDPOINT).
- */
-int __lcd_reply(struct lcd *caller);
-/**
- * __lcd_ipc_init -- Invoke when microkernel initiailizes
- *
- * Initialize synchronous IPC code, data structures.
- */
-int __lcd_ipc_init(void);
-/**
- * __lcd_ipc_exit -- Invoke before microkernel exits
- */
-void __lcd_ipc_exit(void);
 
 
 void copy_msg_cap_vmfunc(struct lcd *sender, struct lcd *receiver,

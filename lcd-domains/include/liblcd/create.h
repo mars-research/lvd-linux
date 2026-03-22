@@ -172,34 +172,32 @@ struct lcd_create_ctx {
 };
 
 /**
- * lcd_create_module_lcd -- Create an LCD and load a kernel module in it
+ * lvd_create_module_lvd -- Create an LVD and load a kernel module in it
  * @mdir: host absolute path to directory containing kernel module
  * @mname: kernel module file name
  * @lcd: out param, cptr to created lcd capability
  * @ctx: out param, lcd_create_ctx, allocated and used by this function
+ * @lcd_id: LCD ID for the LVD (used to index into global LCD list)
  *
  * IMPORTANT: You must also call lcd_dump_boot_info before running the LCD.
  * Create and dump boot info are decoupled so that you can store values
  * yourself in the LCD's bootstrap pages *after* create but *before* running
  * it.
- * 
- * Big routine to automatically create an lcd, load a module inside it,
+ *
+ * Big routine to automatically create an lvd, load a module inside it,
  * and configure it per the address space layout on the wiki.
  *
- * The LCD's cspace will contain capabilities to the pages that
+ * The LVD's cspace will contain capabilities to the pages that
  * contain the kernel module, guest virtual paging tables, bootstrap
  * pages, and stack pages. (The LCD *does not* get a capability to the
  * UTCB page. This page cannot disappear under the microkernel's toes
  * during an IPC transfer, so we don't allow LCD's to manage it.)
  *
  * Also returns an lcd_create_ctx that you should pass to
- * lcd_destroy_module_lcd to tear everything down (destroy the LCD,
- * unload the kernel module, etc.) So long as you don't pass the capability 
+ * lcd_destroy_create_ctx to tear everything down (destroy the LCD,
+ * unload the kernel module, etc.) So long as you don't pass the capability
  * to any other lcd, etc., this will stop and destroy the lcd.
  */
-int lcd_create_module_lcd(char *mdir, char *mname, cptr_t *lcd,
-			struct lcd_create_ctx **ctx);
-
 int lvd_create_module_lvd(char *mdir, char *mname, cptr_t *lcd,
 			struct lcd_create_ctx **ctx, int lcd_id);
 

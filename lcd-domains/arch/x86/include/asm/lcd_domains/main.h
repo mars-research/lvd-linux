@@ -249,13 +249,6 @@ int lcd_arch_vmfunc_init(void);
 #endif
 
 /**
- * Turns off VMX on *all* cpu's and tears down arch-dependent code.
- * 
- * Important: All LCDs should be destroyed before calling this
- * routine (otherwise, memory will leak).
- */
-void lcd_arch_exit(void);
-/**
  * Creates the arch-dependent part of an LCD (e.g., the ept).
  */
 int lcd_arch_create(struct lcd_arch **out);
@@ -266,11 +259,6 @@ int lcd_arch_create(struct lcd_arch **out);
  * will be freed. This is for convenience. But beware.
  */
 void lcd_arch_destroy(struct lcd_arch *lcd_arch);
-/**
- * Does logical consistency checks (e.g., runs through checks
- * listed in Intel SDM V3 26.1, 26.2, and 26.3).
- */
-int lcd_arch_check(struct lcd_arch *lcd_arch);
 /**
  * Runs lcd_arch on the calling cpu. (If the LCD is active on
  * a different cpu, it will become inactive there.) Kernel

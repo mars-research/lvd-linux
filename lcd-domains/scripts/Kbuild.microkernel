@@ -19,7 +19,6 @@ lcd_domains-y += $(addprefix microkernel/, \
 	      console.o \
 	      create.o \
 	      debugfs.o \
-	      ipc.o \
 	      main.o \
 	      mem.o \
 	      iommu.o \
@@ -42,7 +41,6 @@ lcd_domains-y += $(addprefix arch/$(ARCH)/microkernel/, \
               ept.o \
               ept_lcd.o \
               run.o \
-              check.o \
               dump_stack.o \
               )
 

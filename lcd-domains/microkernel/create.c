@@ -9,7 +9,6 @@
 #include <lcd_domains/microkernel.h>
 #include <asm/lcd_domains/create.h>
 #include <asm/lcd_domains/ept.h>
-#include <asm/lcd_domains/check.h>
 
 /* CREATE -------------------------------------------------- */
 #define NUM_LCDS		5
@@ -101,33 +100,10 @@ int __lcd_create_no_vm(struct lcd **out, const char *name)
 		goto fail1;
 	}
 
-#ifndef CONFIG_LVD
-	/*
-	 * Create a kernel thread (won't run till we wake it up)
-	 */
-	lcd->kthread = kthread_create(__lcd_kthread_main, NULL, name);
-	if (!lcd->kthread) {
-		LCD_ERR("failed to create kthread");
-		goto fail2;
-	}
-	/*
-	 * Bump reference count on kthread
-	 */
-	get_task_struct(lcd->kthread);
-	/*
-	 * Store back reference to lcd
-	 */
-	lcd->kthread->lcd = lcd;
-#endif
-
 	*out = lcd;
 
 	return 0;
 
-#ifndef CONFIG_LVD
-fail2:
-	__lcd_destroy_no_vm_no_thread(lcd);
-#endif
 fail1:
 	return ret;
 }
@@ -391,57 +367,6 @@ void __lcd_put(struct lcd *caller, struct cnode *cnode, struct lcd *lcd)
 
 /* CONFIGURE LCD -------------------------------------------------- */
 
-static int config_lcd(struct lcd *caller, struct lcd *lcd_struct, 
-		gva_t pc, gva_t sp, 
-		gpa_t gva_root, gpa_t utcb_page)
-{
-	int ret = 0;
-#ifndef CONFIG_LVD
-	hva_t utcb_page_addr;
-	/*
-	 * If lcd is not an embryo, fail
-	 */
-	if (!lcd_status_embryo(lcd_struct)) {
-		LCD_ERR("cannot config: lcd not an embryo");
-		ret = -EINVAL;
-		goto fail1;
-	}
-	/*
-	 * Set pc, sp, gva_root
-	 */
-	lcd_arch_set_pc(lcd_struct->lcd_arch, pc);
-	lcd_arch_set_sp(lcd_struct->lcd_arch, sp);
-	lcd_arch_set_gva_root(lcd_struct->lcd_arch, gva_root);
-	/*
-	 * Map utcb page in guest physical
-	 */
-	utcb_page_addr = va2hva(lcd_struct->utcb);
-	ret = lcd_arch_ept_map(lcd_struct->lcd_arch, utcb_page, 
-			hva2hpa(utcb_page_addr),
-			1, 0);
-	if (ret) {
-		LCD_ERR("map");
-		goto fail2;
-	}
-	/*
-	 * Make sure lcd_arch has valid state
-	 */
-	ret = lcd_arch_check(lcd_struct->lcd_arch);
-	if (ret) {
-		LCD_ERR("bad lcd_arch state");
-		goto fail3;
-	}
-
-	return 0;
-
-fail3:
-	lcd_arch_ept_unmap(lcd_struct->lcd_arch, utcb_page);
-fail2:
-fail1:
-#endif
-	return ret;
-}
-
 static int config_klcd(struct lcd *caller, struct lcd *lcd_struct, 
 		gva_t pc, gva_t sp, 
 		gpa_t gva_root, gpa_t utcb_page)
@@ -477,21 +402,21 @@ int __lcd_config(struct lcd *caller, cptr_t lcd, gva_t pc, gva_t sp,
 	switch (lcd_struct->type) {
 
 	case LCD_TYPE_ISOLATED:
-		ret = config_lcd(caller, lcd_struct, pc, sp, gva_root, 
-				utcb_page);
+		/* LVDs don't need config - address spaces set up in module_create_lvd */
+		ret = 0;
 		break;
 	case LCD_TYPE_NONISOLATED:
-		ret = config_klcd(caller, lcd_struct, pc, sp, gva_root, 
+		ret = config_klcd(caller, lcd_struct, pc, sp, gva_root,
 				utcb_page);
+		if (ret) {
+			LCD_ERR("error config'ing klcd, ret = %d", ret);
+			goto fail2;
+		}
 		break;
 	default:
 		/* shouldn't happen */
 		LCD_ERR("unexpected lcd type: %d",
 			lcd_struct->type);
-		goto fail2;		
-	}
-	if (ret) {
-		LCD_ERR("error config'ing lcd, ret = %d", ret);
 		goto fail2;
 	}
 	/*
@@ -907,9 +832,6 @@ void __lcd_destroy(struct lcd *lcd)
 	 *     ept, which requires the lcd arch.)
 	 */
 	mark_lcd_as_dead(lcd);
-#ifndef CONFIG_LVD
-	destroy_kthread(lcd);
-#endif
 	destroy_cspace_and_utcb(lcd);
 	lcd_arch_destroy(lcd->lcd_arch);
 	lcd->lcd_arch = NULL;

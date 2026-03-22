@@ -9,21 +9,16 @@
 #define ASM_X86_LCD_DOMAINS_INIT_H
 
 /**
- * Initializes the arch-dependent code for LCD (detects required
- * features, turns on VMX on *all* cpu's).
+ * Initializes VMFUNC for LVDs (EPT switching, state pages).
  */
-int lcd_arch_init(void);
-
 int lcd_arch_vmfunc_init(void);
 
 /**
- * Turns off VMX on *all* cpu's and tears down arch-dependent code.
- * 
+ * Tears down VMFUNC resources.
+ *
  * Important: All LCDs should be destroyed before calling this
  * routine (otherwise, memory will leak).
  */
-void lcd_arch_exit(void);
-
 void lcd_arch_vmfunc_exit(void);
 
 /* Some internal data used by init */

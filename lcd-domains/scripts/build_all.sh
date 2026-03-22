@@ -10,10 +10,4 @@ make libfipc.liblcd $@
 make libasync.liblcd $@
 make liblcd $@
 
-make libcap.libdeker $@
-make libfipc.libdeker $@
-make libasync.libdeker $@
-make liblcd_for_deker $@
-make libdeker
-
-make test_mods_deker $@
+make test_mods $@

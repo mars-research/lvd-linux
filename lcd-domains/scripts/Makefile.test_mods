@@ -29,7 +29,6 @@ KLIBLCD_SYMBOLS=$(MICROKERNEL_BUILD_DIR)/Module.symvers
 
 export NONISOLATED_CFLAGS=$(MICROKERNEL_CFLAGS)
 export ISOLATED_CFLAGS=$(LIBLCD_CFLAGS)
-export DEKER_CFLAGS=$(LIBDEKER_CFLAGS)
 
 # ------------------------------------------------------------
 # LIBLCD
@@ -37,37 +36,7 @@ export DEKER_CFLAGS=$(LIBDEKER_CFLAGS)
 LIBLCD_PATH_CMD=$(shell scripts/relpath.py $(LIBLCD_BUILD_DIR)/liblcd.a $(shell dirname $(shell readlink -f $@)))
 
 # ------------------------------------------------------------
-# LIBDEKER
-
-ifneq ($(DEKER),)
-
-# We use the clang-compiled version of liblcd, and libdeker. They are
-# listed in the link order: libdeker liblcd so that the linker will choose
-# the weak symbols from libdeker over the same symbols in liblcd.
-
-LIBDEKER_PATH_CMD=$(shell scripts/relpath.py $(LIBDEKER_BUILD_DIR)/libdeker.a $(shell dirname $(shell readlink -f $@))) $(shell scripts/relpath.py $(LIBDEKER_BUILD_DIR)/liblcd_build/liblcd.a $(shell dirname $(shell readlink -f $@)))
-
-LIBDEKER_RUNTIME_PATH_CMD=$(shell scripts/relpath.py $(LIBDEKER_BUILD_DIR)/libdeker/deker_rt.o $(shell dirname $(shell readlink -f $@))) $(shell scripts/relpath.py $(LIBDEKER_BUILD_DIR)/libdeker/smack.o $(shell dirname $(shell readlink -f $@)))
-
-MAYBE_LIBDEKER=$(LIBDEKER_BUILD_DIR)/libdeker.a
-
-endif
-
-# ------------------------------------------------------------
 # Targets
-
-ifneq ($(DEKER),)
-
-test_mods_deker: test_mods
-	@echo "  DEKER MODPOST"
-	@scripts/deker_mod_post.sh test_mods/config \
-	$(WLLVM_EXTRACT_BC_PATH)
-
-else
-
-test_mods_deker: test_mods
-
-endif
 
 test_mods: $(LCD_TEST_MODULES_BUILD_DIR)/Kbuild \
 	$(LCD_TEST_MODULES_BUILD_DIR)/Kbuild.config \
@@ -81,8 +50,6 @@ $(LCD_TEST_MODULES_BUILD_DIR)/%/Kbuild: $(LCD_TEST_MODULES_DIR)/%/Kbuild | \
 	@echo "  KBUILD     $^"
 	@printf "#\n# BEGIN: Auto-generated part.\n#\n" > $@ && \
 	printf "\n" >> $@ && \
-	printf "LIBDEKER=$(LIBDEKER_PATH_CMD)\n" >> $@ && \
-	printf "LIBDEKER_RUNTIME=$(LIBDEKER_RUNTIME_PATH_CMD)\n" >> $@ && \
 	printf "LIBLCD=$(LIBLCD_PATH_CMD)\n" >> $@ && \
 	printf "src=$(shell dirname `readlink -f $<`)\n" >> $@ && \
 	printf "\n" >> $@ && \

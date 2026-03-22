@@ -12,7 +12,6 @@
 #    libcap.X,           --  Build libcap/libfipc/libasync for X, where X is
 #    libfipc.X,                   microkernel
 #    libasync.X                   liblcd
-#                                 libdeker
 #
 #                            libasync.X depends on libfipc.X being built.
 #
@@ -22,12 +21,7 @@
 #    liblcd              --  Build liblcd library kernel; depends on
 #                            on libcap/libfipc/libasync liblcd builds.
 #
-#    libdeker            --  Build libdeker; depends on
-#                            on libcap/libfipc/libasync libdeker builds.
-#
-#    test_mods           --  Builds all of the test modules/examples. If
-#                            DEKER is set, isolated test modules require
-#                            libdeker; otherwise, they require liblcd.
+#    test_mods           --  Builds all of the test modules/examples.
 #
 #    clean               --  Remove built object files and local
 #                            install directories. But doesn't delete
@@ -88,14 +82,6 @@ include scripts/Makefile.microkernel
 
 include scripts/Makefile.liblcd
 
-# ------------------------------------------------------------
-# LIBDEKER build setup
-
-ifneq ($(DEKER),)
-include scripts/Makefile.libdeker
-else # ! DEKER
-include scripts/Makefile.libdeker.dummy
-endif
 
 # ------------------------------------------------------------
 # Test modules/examples

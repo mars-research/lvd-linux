@@ -9,14 +9,12 @@
 #include <lcd_config/pre_hook.h>
 
 #include <liblcd/enter_exit.h>
-#include <thc.h>
 #include <libfipc.h>
 #include <lcd_domains/liblcd.h>
 #include <asm/lcd_domains/liblcd.h>
 
 #include <lcd_config/post_hook.h>
 
-static int thc_initialized;
 extern void skb_init(void);
 
 int 
@@ -106,27 +104,6 @@ lcd_enter(void)
 		goto fail;
 	}
 	LIBLCD_MSG("libcap initialized");
-#ifndef CONFIG_LVD
-	/*
-	 * Initialize libfipc
-	 */
-	ret = fipc_init();
-	if (ret) {
-		LIBLCD_ERR("failed to init libfipc");
-		goto fail;
-	}
-	/*
-	 * Set up async runtime
-	 */
-	ret = thc_global_init();
-	if (ret) {
-		LIBLCD_ERR("failed to init libasync");
-		goto fail;
-	}
-	thc_init();
-	thc_initialized = 1;
-	LIBLCD_MSG("async runtime initialized");
-#endif
 
 	skb_init();
 	LIBLCD_MSG("skb cache initialized");
@@ -148,13 +125,6 @@ __noreturn lcd_exit(int retval)
 	lcd_printk("=================");
 	lcd_printk("LCD SHUTTING DOWN");
 	lcd_printk("=================");
-
-	/*
-	 * For now, just tear down async so we can make sure
-	 * it all worked.
-	 */
-	if (thc_initialized)
-		thc_done();
 
 	LIBLCD_MSG("exiting");
 

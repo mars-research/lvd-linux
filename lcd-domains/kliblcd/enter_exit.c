@@ -7,7 +7,6 @@
 #include <libcap.h>
 #include <liblcd/liblcd.h>
 #include <lcd_domains/microkernel.h>
-#include <thc.h>
 
 struct task_struct *klcd_thread;
 EXPORT_SYMBOL(klcd_thread);
@@ -95,10 +94,6 @@ int lcd_enter(void)
 		goto fail8;
 	}
 	current->lcd_resource_trees[1] = t;
-	/*
-	 * Set up thc runtime
-	 */
-	thc_init();
 
 	return 0;
 
@@ -153,8 +148,6 @@ void lcd_exit(int retval)
 		lcd_destroy_free_resource_tree(current->lcd_resource_trees[0]);
 	if (current->lcd_resource_trees[1])
 		lcd_destroy_free_resource_tree(current->lcd_resource_trees[1]);
-	if (current->ptstate)
-		thc_done();
 
 	current->lcd = NULL;
 	current->cptr_cache = NULL;

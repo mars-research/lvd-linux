@@ -9,17 +9,15 @@
 #    all                 --  Build microkernel, liblcd, and all
 #                            test modules/examples
 #
-#    libcap.X,           --  Build libcap/libfipc/libasync for X, where X is
-#    libfipc.X,                   microkernel
-#    libasync.X                   liblcd
-#
-#                            libasync.X depends on libfipc.X being built.
+#    libcap.X            --  Build libcap for X, where X is
+#                                 microkernel
+#                                 liblcd
 #
 #    microkernel         --  Build the LCD microkernel and kLIBLCD; depends
-#                            on libcap/libfipc/libasync microkernel builds.
+#                            on libcap microkernel build.
 #
 #    liblcd              --  Build liblcd library kernel; depends on
-#                            on libcap/libfipc/libasync liblcd builds.
+#                            on libcap liblcd build.
 #
 #    test_mods           --  Builds all of the test modules/examples.
 #
@@ -93,12 +91,6 @@ include scripts/Makefile.test_mods
 
 libcap/configure: libcap/configure.ac
 	cd libcap && ./autogen.sh
-
-libasync/fast-ipc-module/configure: libasync/fast-ipc-module/configure.ac
-	cd libasync/fast-ipc-module && ./autogen.sh
-
-libasync/configure: libasync/configure.ac
-	cd libasync && ./autogen.sh
 
 # ------------------------------------------------------------
 # clean

@@ -2,7 +2,3 @@
 	path = lcd-domains/libcap
 	url = https://github.com/ksplit/libcap.git
 	branch = dev_ksplit
-[submodule "lcd-domains/libasync"]
-	path = lcd-domains/libasync
-	url = https://github.com/ksplit/libasync.git
-	branch = dev_ksplit

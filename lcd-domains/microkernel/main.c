@@ -24,8 +24,6 @@
 #include <asm/lcd_domains/vmfunc.h>
 #include <asm/lcd_domains/init.h>
 #include <libcap.h>
-#include <libfipc.h>
-#include <thc.h>
 
 MODULE_LICENSE("GPL");
 MODULE_DESCRIPTION("LCD driver");
@@ -145,29 +143,16 @@ static int __init lcd_init(void)
 		LCD_ERR("misc device register failed, ret = %d", ret);
 		goto fail7;
 	}
-	ret = fipc_init();
-	if (ret) {
-		LCD_ERR("error initializing libfipc, ret = %d", ret);
-		goto fail8;
-	}
-	ret = thc_global_init();
-	if (ret) {
-		LCD_ERR("error initialing libasync, ret = %d", ret);
-		goto fail9;
-	}
 
 	lcd_debugfs_init();
 	LCD_MSG("lcd microkernel initialized");
 
 	return 0;
 
-fail9:
-	fipc_fini();
-fail8:
-	misc_deregister(&lcd_dev);
 fail7:
-	__lcd_console_exit();
+	misc_deregister(&lcd_dev);
 fail6:
+	__lcd_console_exit();
 	__lcd_run_exit();
 fail5:
 	__lcd_mem_exit();
@@ -196,8 +181,6 @@ void remove_mapped_cr3(void)
 static void __exit lcd_exit(void)
 {
 	lcd_debugfs_exit();
-	thc_global_fini();
-	fipc_fini();
 	misc_deregister(&lcd_dev);
 	__lcd_console_exit();
 	__lcd_run_exit();

@@ -24,8 +24,6 @@ MICROKERNEL_BASE_CFLAGS= \
 MICROKERNEL_CFLAGS= \
 	$(MICROKERNEL_BASE_CFLAGS) \
 	-I$(MICROKERNEL_BUILD_DIR)/libcap.install/include \
-	-I$(MICROKERNEL_BUILD_DIR)/libfipc.install/include \
-	-I$(MICROKERNEL_BUILD_DIR)/libasync.install/include \
 
 export MICROKERNEL_CFLAGS
 
@@ -34,10 +32,6 @@ MICROKERNEL_DIRS= \
 	kliblcd \
 	libcap.build \
 	libcap.install \
-	libfipc.build \
-	libfipc.install \
-	libasync.build \
-	libasync.install \
 	common \
 	arch/$(ARCH)/microkernel
 MICROKERNEL_BUILD_DIRS=$(foreach dir,$(MICROKERNEL_DIRS),\
@@ -46,11 +40,9 @@ MICROKERNEL_BUILD_DIRS=$(foreach dir,$(MICROKERNEL_DIRS),\
 MICROKERNEL_LIB_CFLAGS= $(MICROKERNEL_BASE_CFLAGS)
 
 MICROKERNEL_LIBCAP=$(MICROKERNEL_BUILD_DIR)/libcap.install/lib/libcap.a
-MICROKERNEL_LIBFIPC=$(MICROKERNEL_BUILD_DIR)/libfipc.install/lib/libfipc.a
-MICROKERNEL_LIBASYNC=$(MICROKERNEL_BUILD_DIR)/libasync.install/lib/libasync.a
 
 microkernel: $(MICROKERNEL_BUILD_DIR)/Kbuild | \
-	$(MICROKERNEL_LIBCAP) $(MICROKERNEL_LIBFIPC) $(MICROKERNEL_LIBASYNC) \
+	$(MICROKERNEL_LIBCAP) \
 	$(MICROKERNEL_BUILD_DIRS)
 	$(MAKE) -C .. M=$(MICROKERNEL_BUILD_DIR) $(MAKEFLAGS)
 
@@ -74,38 +66,6 @@ $(MICROKERNEL_BUILD_DIR)/libcap.build/Makefile: libcap/configure | \
 	CSPACE_DEPTH_BITS=$(LCD_CSPACE_DEPTH_BITS) \
 	CSPACE_CNODE_TABLE_BITS=$(LCD_CSPACE_CNODE_TABLE_BITS)
 
-libfipc.microkernel: $(MICROKERNEL_BUILD_DIR)/libfipc.build/Makefile
-	$(MAKE) -C $(MICROKERNEL_BUILD_DIR)/libfipc.build \
-		CFLAGS="$(MICROKERNEL_LIB_CFLAGS) -I$(MICROKERNEL_BUILD_DIR)/libcap.install/include" $(MAKEFLAGS) && \
-	$(MAKE) -C $(MICROKERNEL_BUILD_DIR)/libfipc.build install \
-	$(MAKEFLAGS) && \
-	cd $(MICROKERNEL_BUILD_DIR)/libfipc.install/lib && \
-	ar x libfipc.a
-
-$(MICROKERNEL_BUILD_DIR)/libfipc.build/Makefile: \
-	libasync/fast-ipc-module/configure | \
-	$(MICROKERNEL_BUILD_DIRS)
-	cd $(MICROKERNEL_BUILD_DIR)/libfipc.build && \
-	$(LCD_DOMAINS_TOP_SRC_DIR)/libasync/fast-ipc-module/configure \
-	--with-kernel-headers=$(LCD_DOMAINS_TOP_SRC_DIR)/.. \
-	--prefix=$(MICROKERNEL_BUILD_DIR)/libfipc.install
-
-libasync.microkernel: $(MICROKERNEL_BUILD_DIR)/libasync.build/Makefile
-	$(MAKE) -C $(MICROKERNEL_BUILD_DIR)/libasync.build \
-		CFLAGS="$(MICROKERNEL_LIB_CFLAGS) -I$(MICROKERNEL_BUILD_DIR)/libcap.install/include -I$(MICROKERNEL_BUILD_DIR)/libfipc.install/include -DNDEBUG" $(MAKEFLAGS) && \
-	$(MAKE) -C $(MICROKERNEL_BUILD_DIR)/libasync.build install \
-	$(MAKEFLAGS) && \
-	cd $(MICROKERNEL_BUILD_DIR)/libasync.install/lib && \
-	ar x libasync.a
-
-$(MICROKERNEL_BUILD_DIR)/libasync.build/Makefile: libasync/configure | \
-	$(MICROKERNEL_BUILD_DIRS)
-	cd $(MICROKERNEL_BUILD_DIR)/libasync.build && \
-	$(LCD_DOMAINS_TOP_SRC_DIR)/libasync/configure \
-	--with-kernel-headers=$(LCD_DOMAINS_TOP_SRC_DIR)/.. \
-	--with-libfipc=$(MICROKERNEL_BUILD_DIR)/libfipc.install \
-	--prefix=$(MICROKERNEL_BUILD_DIR)/libasync.install
-
 $(MICROKERNEL_BUILD_DIR)/Kbuild: scripts/Kbuild.microkernel | \
 	$(MICROKERNEL_BUILD_DIRS)
 	cp scripts/Kbuild.microkernel $(MICROKERNEL_BUILD_DIR)/Kbuild
@@ -114,7 +74,7 @@ $(MICROKERNEL_BUILD_DIRS):
 	@echo "  MKDIR      $@"
 	@mkdir -p $@
 
-clean-microkernel: clean-mk-libcap clean-mk-libfipc clean-mk-libasync
+clean-microkernel: clean-mk-libcap
 	if test -e $(MICROKERNEL_BUILD_DIR)/Kbuild; then \
 		$(MAKE) -C .. M=$(MICROKERNEL_BUILD_DIR) clean; \
 	fi
@@ -130,6 +90,4 @@ clean: clean-microkernel
 .PHONY: \
 	microkernel \
 	libcap.microkernel \
-	libfipc.microkernel \
-	libasync.microkernel \
 	clean-microkernel

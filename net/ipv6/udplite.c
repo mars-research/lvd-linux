@@ -10,6 +10,7 @@
  */
 #include <linux/export.h>
 #include <linux/proc_fs.h>
+#include <linux/sgtable.h>
 #include "udp_impl.h"
 
 static int udplitev6_sk_init(struct sock *sk)
@@ -124,6 +125,9 @@ static struct pernet_operations udplite6_net_ops = {
 
 int __init udplite6_proc_init(void)
 {
+	// pr_info("ipv6_entry_gid: %lu\n", ipv6_entry_gid);
+	// pr_info("ipv6_exit_gid: %lu\n", ipv6_exit_gid);
+	unsigned long ii = ipv6_entry_gid + ipv6_exit_gid;
 	return register_pernet_subsys(&udplite6_net_ops);
 }
 

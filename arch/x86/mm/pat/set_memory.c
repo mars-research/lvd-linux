@@ -20,6 +20,11 @@
 #include <linux/kernel.h>
 #include <linux/cc_platform.h>
 #include <linux/set_memory.h>
+#include <linux/pkeys.h>
+#include <linux/pks.h>
+#include <linux/pks-keys.h>
+#include <linux/kthread.h>
+#include <linux/delay.h>
 
 #include <asm/e820/api.h>
 #include <asm/processor.h>
@@ -73,6 +78,68 @@ static DEFINE_SPINLOCK(cpa_lock);
 #define CPA_ARRAY 2
 #define CPA_PAGES_ARRAY 4
 #define CPA_NO_CHECK_ALIAS 8 /* Do not search for aliases */
+
+static struct page *alloc_regular_dmap_table(void)
+{
+	return alloc_pages(GFP_KERNEL, 0);
+}
+
+#ifdef CONFIG_PKS_MONITOR
+static LLIST_HEAD(tables_cache);
+static bool dmap_tables_inited;
+
+void add_dmap_table(unsigned long addr)
+{
+	struct llist_node *node = (struct llist_node *)addr;
+
+	enable_pgtable_write();
+	llist_add(node, &tables_cache);
+	disable_pgtable_write();
+}
+
+static struct page *get_pks_table(void)
+{
+	void *ptr = llist_del_first(&tables_cache);
+
+	if (!ptr)
+		return NULL;
+
+	return virt_to_page(ptr);
+}
+
+static struct page *alloc_dmap_table(void)
+{
+	struct page *table;
+
+	if (!pks_tables_inited())
+		return alloc_regular_dmap_table();
+
+	table = get_pks_table();
+	/* Fall back to un-protected table is couldn't get one from cache */
+	if (!table) {
+		if (dmap_tables_inited)
+			WARN(1, "Allocating unprotected direct map table\n");
+		table = alloc_regular_dmap_table();
+	}
+
+	return table;
+}
+
+static void free_dmap_table(struct page *table)
+{
+	add_dmap_table((unsigned long)virt_to_page(table));
+}
+#else /* CONFIG_PKS_MONITOR */
+static struct page *alloc_dmap_table(void)
+{
+	return alloc_regular_dmap_table();
+}
+
+static void free_dmap_table(struct page *table)
+{
+	__free_page(table);
+}
+#endif
 
 static inline pgprot_t cachemode2pgprot(enum page_cache_mode pcm)
 {
@@ -1114,14 +1181,17 @@ static int split_large_page(struct cpa_data *cpa, pte_t *kpte,
 
 	if (!debug_pagealloc_enabled())
 		spin_unlock(&cpa_lock);
-	base = alloc_pages(GFP_KERNEL, 0);
+	base = alloc_dmap_table();
+	//base = alloc_table(GFP_KERNEL); //endless recursive functions (get_grouped_page_atomic) cause a stack overflow
+	//base = alloc_pages(GFP_KERNEL, 0); //no pks protection
 	if (!debug_pagealloc_enabled())
 		spin_lock(&cpa_lock);
 	if (!base)
 		return -ENOMEM;
 
 	if (__split_large_page(cpa, kpte, address, base))
-		__free_page(base);
+		//free_table(base);
+		free_dmap_table(base);
 
 	return 0;
 }
@@ -1134,7 +1204,7 @@ static bool try_to_free_pte_page(pte_t *pte)
 		if (!pte_none(pte[i]))
 			return false;
 
-	free_page((unsigned long)pte);
+	free_dmap_table(virt_to_page(pte));
 	return true;
 }
 
@@ -1146,7 +1216,7 @@ static bool try_to_free_pmd_page(pmd_t *pmd)
 		if (!pmd_none(pmd[i]))
 			return false;
 
-	free_page((unsigned long)pmd);
+	free_dmap_table(virt_to_page(pmd));
 	return true;
 }
 
@@ -1231,6 +1301,10 @@ static void unmap_pud_range(p4d_t *p4d, unsigned long start, unsigned long end)
 		unsigned long next_page = (start + PUD_SIZE) & PUD_MASK;
 		unsigned long pre_end	= min_t(unsigned long, end, next_page);
 
+		// if(pre_end == 0) {
+		// 	pre_end = end;
+		// }
+
 		unmap_pmd_range(pud, start, pre_end);
 
 		start = pre_end;
@@ -1262,6 +1336,9 @@ static void unmap_pud_range(p4d_t *p4d, unsigned long start, unsigned long end)
 	 * populate_pgd's error path
 	 */
 }
+// #ifdef CONFIG_ASID_SWITCH4PKS
+// EXPORT_SYMBOL(unmap_pud_range);
+// #endif /* CONFIG_ASID_SWITCH4PKS */
 
 static int alloc_pte_page(pmd_t *pmd)
 {
@@ -2008,6 +2085,13 @@ int clear_mce_nospec(unsigned long pfn)
 EXPORT_SYMBOL_GPL(clear_mce_nospec);
 #endif /* CONFIG_X86_64 */
 
+int set_memory_pks(unsigned long addr, int numpages, int key)
+{
+	return change_page_attr_set_clr(&addr, numpages, __pgprot(_PAGE_PKEY(key)),
+					__pgprot(_PAGE_PKEY(0xF & ~(unsigned int)key)),
+					0, 0, NULL);
+}
+
 int set_memory_x(unsigned long addr, int numpages)
 {
 	if (!(__supported_pte_mask & _PAGE_NX))
@@ -2413,6 +2497,474 @@ int __init kernel_unmap_pages_in_pgd(pgd_t *pgd, unsigned long address,
 
 	return retval;
 }
+
+#ifndef HIGHMEM
+static struct page *__alloc_page_order(int node, gfp_t gfp_mask, int order)
+{
+	if (node == NUMA_NO_NODE)
+		return alloc_pages(gfp_mask, order);
+
+	return alloc_pages_node(node, gfp_mask, order);
+}
+
+static struct grouped_page_cache *__get_gpc_from_sc(struct shrinker *shrinker)
+{
+	return container_of(shrinker, struct grouped_page_cache, shrinker);
+}
+
+static unsigned long grouped_shrink_count(struct shrinker *shrinker,
+					  struct shrink_control *sc)
+{
+	struct grouped_page_cache *gpc = __get_gpc_from_sc(shrinker);
+	unsigned long page_cnt = list_lru_shrink_count(&gpc->lru, sc);
+
+	return page_cnt ? page_cnt : SHRINK_EMPTY;
+}
+
+static enum lru_status grouped_isolate(struct list_head *item,
+				       struct list_lru_one *list,
+				       spinlock_t *lock, void *cb_arg)
+{
+	struct list_head *dispose = cb_arg;
+
+	list_lru_isolate_move(list, item, dispose);
+
+	return LRU_REMOVED;
+}
+
+static void __dispose_pages(struct grouped_page_cache *gpc, struct list_head *head)
+{
+	struct list_head *cur, *next;
+
+	list_for_each_safe(cur, next, head) {
+		struct page *page = list_entry(cur, struct page, lru);
+
+		list_del(cur);
+
+		if (gpc->pre_shrink_free)
+			gpc->pre_shrink_free(page, 1);
+
+		__free_pages(page, 0);
+	}
+}
+
+static unsigned long grouped_shrink_scan(struct shrinker *shrinker,
+					 struct shrink_control *sc)
+{
+	struct grouped_page_cache *gpc = __get_gpc_from_sc(shrinker);
+	unsigned long isolated;
+	LIST_HEAD(freeable);
+
+	if (!(sc->gfp_mask & gpc->gfp))
+		return SHRINK_STOP;
+
+	isolated = list_lru_shrink_walk(&gpc->lru, sc, grouped_isolate,
+					&freeable);
+	__dispose_pages(gpc, &freeable);
+
+	/* Every item walked gets isolated */
+	sc->nr_scanned += isolated;
+
+	return isolated;
+}
+
+static struct page *__remove_first_page(struct grouped_page_cache *gpc, int node)
+{
+	unsigned int start_nid, i;
+	struct list_head *head;
+	
+	// pr_info("Myin __remove_first_page\n");
+	if (node != NUMA_NO_NODE) {
+		head = list_lru_get_mru(&gpc->lru, node);
+		if (head)
+			return list_entry(head, struct page, lru);
+		return NULL;
+	}
+
+	/* If NUMA_NO_NODE, search the nodes in round robin for a page */
+	start_nid = (unsigned int)atomic_fetch_inc(&gpc->nid_round_robin) % nr_node_ids;
+	for (i = 0; i < nr_node_ids; i++) {
+		int cur_nid = (start_nid + i) % nr_node_ids;
+
+		head = list_lru_get_mru(&gpc->lru, cur_nid);
+		if (head)
+			return list_entry(head, struct page, lru);
+	}
+
+	return NULL;
+}
+
+/* Helper to try to convert the pages, or clean up and free if it fails */
+static int __try_convert(struct grouped_page_cache *gpc, struct page *page, int cnt)
+{
+	int i;
+
+	// pr_info("Myin __try_convert\n");
+
+	if (gpc->pre_add_to_cache && gpc->pre_add_to_cache(page, cnt)) {
+		if (gpc->pre_shrink_free)
+			gpc->pre_shrink_free(page, cnt);
+		for (i = 0; i < cnt; i++)
+			__free_pages(&page[i], 0);
+		return 1;
+	}
+	return 0;
+}
+
+/* Get and add some new pages to the cache to be used by VM_GROUP_PAGES */
+static struct page *__replenish_grouped_pages(struct grouped_page_cache *gpc, int node)
+{
+	const unsigned int hpage_cnt = HPAGE_SIZE >> PAGE_SHIFT;
+	struct page *page;
+	int i;
+
+	// pr_info("Myin __replenish_grouped_pages\n");
+
+	page = __alloc_page_order(node, gpc->gfp, HUGETLB_PAGE_ORDER);
+	if (!page) {
+		page = __alloc_page_order(node, gpc->gfp, 0);
+		if (__try_convert(gpc, page, 1))
+			return NULL;
+
+		return page;
+	}
+
+	split_page(page, HUGETLB_PAGE_ORDER);
+
+	/* If fail to convert to be added, try to clean up and free */
+	//if (__try_convert(gpc, page, 1))
+	if (__try_convert(gpc, page, hpage_cnt))
+		return NULL;
+
+	/* Add the rest to the cache except for the one returned below */
+	for (i = 1; i < hpage_cnt; i++)
+		free_grouped_page(gpc, &page[i]);
+
+	return &page[0];
+}
+
+int init_grouped_page_cache(struct grouped_page_cache *gpc, gfp_t gfp,
+			    gpc_callback pre_add_to_cache,
+			    gpc_callback pre_shrink_free)
+{
+	int err = 0;
+
+	memset(gpc, 0, sizeof(struct grouped_page_cache));
+
+	if (list_lru_init(&gpc->lru))
+		goto out;
+
+	gpc->shrinker.count_objects = grouped_shrink_count;
+	gpc->shrinker.scan_objects = grouped_shrink_scan;
+	gpc->shrinker.seeks = DEFAULT_SEEKS;
+	gpc->shrinker.flags = SHRINKER_NUMA_AWARE;
+
+	err = register_shrinker(&gpc->shrinker, "pks-gpc");
+	if (err)
+		list_lru_destroy(&gpc->lru);
+
+	gpc->pre_add_to_cache = pre_add_to_cache;
+	gpc->pre_shrink_free = pre_shrink_free;
+
+	__replenish_grouped_pages(gpc, numa_node_id());
+out:
+	return err;
+}
+
+struct page *get_grouped_page(int node, struct grouped_page_cache *gpc)
+{
+	struct page *page;
+	// pr_info("Myin get_grouped_page\n");
+
+	if (in_interrupt()) {
+		pr_warn_once("grouped pages: Cannot allocate grouped page in interrupt");
+		return NULL;
+	}
+
+	page = __remove_first_page(gpc, node);
+
+	if (page)
+		return page;
+
+	return __replenish_grouped_pages(gpc, node);
+}
+
+struct page *get_grouped_page_atomic(int node, struct grouped_page_cache *gpc)
+{
+	struct page *page;
+	// pr_info("Myin get_grouped_page_atomic1\n");
+
+	if (in_interrupt()) {
+		pr_warn_once("grouped pages: Cannot allocate grouped page in interrupt");
+		return NULL;
+	}
+
+	/* First see if there are any grouped pages already in the cache */
+	// all converted in __replenish_grouped_pages
+	page = __remove_first_page(gpc, node);
+
+	/*
+	 * If there wasn't one in the cache, allocate only a single page to not
+	 * stress the reserves.
+	 */
+	if (!page)
+	{
+		// pr_info("Myin get_grouped_page_atomic2\n");
+		page = __alloc_page_order(node, gpc->gfp | GFP_ATOMIC, 0);
+		/* Convert the single page if configured for this cache */	
+		if (!page || __try_convert(gpc, page, 1))
+		return NULL;
+	}
+
+	return page;
+}
+
+void free_grouped_page(struct grouped_page_cache *gpc, struct page *page)
+{
+	INIT_LIST_HEAD(&page->lru);
+	list_lru_add_node(&gpc->lru, &page->lru, page_to_nid(page));
+}
+#endif /* !HIGHMEM */
+
+#ifdef CONFIG_PKS_MONITOR
+#define IS_TABLE_KEY(val) (((val & _PAGE_PKEY_MASK) >> _PAGE_BIT_PKEY_BIT0) == PKS_KEY_MONITOR)
+
+static bool is_dmap_protected(unsigned long addr)
+{
+	pgd_t *pgd;
+	p4d_t *p4d;
+	pud_t *pud;
+	pmd_t *pmd;
+	pte_t *pte;
+
+	pgd = init_mm.pgd + pgd_index(addr);
+	if (!pgd_present(*pgd))
+		return true;
+
+	p4d = p4d_offset(pgd, addr);
+	if (!p4d_present(*p4d) || (p4d_large(*p4d) && IS_TABLE_KEY(p4d_val(*p4d))))
+		return true;
+	else if (p4d_large(*p4d))
+		return false;
+
+	pud = pud_offset(p4d, addr);
+	if (!pud_present(*pud) || (pud_large(*pud) && IS_TABLE_KEY(pud_val(*pud))))
+		return true;
+	else if (pud_large(*pud))
+		return false;
+
+	pmd = pmd_offset(pud, addr);
+	if (!pmd_present(*pmd) || (pmd_large(*pmd) && IS_TABLE_KEY(pmd_val(*pmd))))
+		return true;
+	else if (pmd_large(*pmd))
+		return false;
+
+	pte = pte_offset_kernel(pmd, addr);
+	if (!pte_present(*pte) || IS_TABLE_KEY(pte_val(*pte)))
+		return true;
+
+	return false;
+}
+
+static void ensure_table_protected(unsigned long pfn, void *vaddr, void *vend)
+{
+	unsigned long addr_table = (unsigned long)__va(pfn << PAGE_SHIFT);
+
+	if (is_dmap_protected(addr_table))
+		return;
+
+	if (set_memory_pks(addr_table, 1, PKS_KEY_MONITOR))
+		pr_warn("Failed to protect page table mapping 0x%pK-0x%pK\n", vaddr, vend);
+}
+
+typedef void (*traverse_cb)(unsigned long pfn, void *vaddr, void *vend);
+
+/*
+ * The pXX_page_vaddr() functions are half way done being renamed to pXX_pgtable(),
+ * leaving no pattern in the names, provide local copies of the missing pXX_pgtable()
+ * implementations for the time being so they can be used in the template below.
+ */
+
+static inline p4d_t *pgd_pgtable(pgd_t pgd)
+{
+	return (p4d_t *)pgd_page_vaddr(pgd);
+}
+
+#define TRAVERSE(upper, lower, ptrs_cnt, upper_size, skip) \
+static void traverse_##upper(upper##_t *upper, traverse_cb cb, unsigned long base) \
+{ \
+	unsigned long cur_addr = base; \
+	upper##_t *cur; \
+\
+	if (skip) { \
+		traverse_##lower((lower##_t *)upper, cb, cur_addr); \
+		return; \
+	} \
+\
+	for (cur = upper; cur < upper + ptrs_cnt; cur++) { \
+		/* \
+		 * Use native_foo_val() instead of foo_none() because pgd_none() always \
+		 * return 0 when in 4 level paging. \
+		 */ \
+		if (native_##upper##_val(*cur) && !upper##_large(*cur)) { \
+			void *vstart = (void *)sign_extend64(cur_addr, __VIRTUAL_MASK_SHIFT); \
+			void *vend = vstart + upper_size - 1; \
+\
+			cb(upper##_pfn(*cur), vstart, vend); \
+			traverse_##lower((lower##_t *)upper##_pgtable(*cur), cb, cur_addr); \
+		} \
+		cur_addr += upper_size; \
+	} \
+}
+
+static void traverse_pte(pte_t *pte, traverse_cb cb, unsigned long base) { }
+TRAVERSE(pmd, pte, PTRS_PER_PMD, PMD_SIZE, false)
+TRAVERSE(pud, pmd, PTRS_PER_PUD, PUD_SIZE, false)
+TRAVERSE(p4d, pud, PTRS_PER_P4D, P4D_SIZE, !pgtable_l5_enabled())
+TRAVERSE(pgd, p4d, PTRS_PER_PGD, PGDIR_SIZE, false)
+
+static void traverse_mm(struct mm_struct *mm, traverse_cb cb)
+{
+	cb(__pa(mm->pgd) >> PAGE_SHIFT, 0, (void *)-1);
+	traverse_pgd(mm->pgd, cb, 0);
+}
+
+#ifdef CONFIG_PKS_PG_TABLES_DEBUG
+static void check_table_protected(unsigned long pfn, void *vaddr, void *vend)
+{
+	if (is_dmap_protected((unsigned long)__va(pfn << PAGE_SHIFT)))
+		return;
+
+	pr_warn("Found unprotected page, pfn: %lx maps address:0x%p\n", pfn, vaddr);
+}
+
+static int table_scan_fn(void *data)
+{
+	while (1) {
+		msleep(MSEC_PER_SEC);
+		mmap_read_lock(current->active_mm);
+		traverse_mm(current->active_mm, &check_table_protected);
+		mmap_read_unlock(current->active_mm);
+	}
+	return 0;
+}
+
+static void __init init_pks_table_scan(void)
+{
+	struct task_struct *thread;
+	int cpu;
+
+	pr_info("Starting pks_table_debug thread on %d cpus\n", num_online_cpus());
+	for (cpu = 0; cpu < num_online_cpus(); cpu++) {
+		thread = kthread_create_on_cpu(table_scan_fn, NULL, cpu, "pks_table_debug");
+		if (IS_ERR(thread)) {
+			pr_err("Failed to create pks_table_debug threads\n");
+			break;
+		}
+		wake_up_process(thread);
+	}
+}
+#else
+static void __init init_pks_table_scan(void) { }
+#endif
+
+static void free_maybe_reserved(struct page *page)
+{
+	if (PageReserved(page))
+		free_reserved_page(page);
+	else
+		__free_page(page);
+}
+
+struct pks_table_llnode {
+	struct llist_node node;
+	void *table;
+};
+
+extern void init_private_stacks(int pkey);
+
+/* PKS protect reserved dmap tables */
+static int __init init_pks_dmap_tables(void)
+{
+	static LLIST_HEAD(tables_to_covert);
+	struct pks_table_llnode *cur_entry;
+	struct llist_node *cur, *next;
+	struct pks_table_llnode *tmp;
+	bool fail_to_build_list = false;
+
+	/*
+	 * If pks tables failed to initialize, return the pages to the page
+	 * allocator, and don't enable dmap tables.
+	 */
+	if (!pks_tables_inited()) {
+		llist_for_each_safe(cur, next, llist_del_all(&tables_cache))
+			free_maybe_reserved(virt_to_page(cur));
+		return 0;
+	}
+
+	/* Build separate list of tables */
+	llist_for_each_safe(cur, next, llist_del_all(&tables_cache)) {
+		tmp = kmalloc(sizeof(*tmp), GFP_KERNEL);
+		if (!tmp) {
+			fail_to_build_list = true;
+			free_maybe_reserved(virt_to_page(cur));
+			continue;
+		}
+		tmp->table = cur;
+		llist_add(&tmp->node, &tables_to_covert);
+		llist_add(cur, &tables_cache);
+	}
+
+	if (fail_to_build_list)
+		goto out_err;
+
+	/*
+	 * Tables in tables_cache can now be used, because they are being kept track
+	 * of tables_to_covert.
+	 */
+	dmap_tables_inited = true;
+
+	/*
+	 * PKS protect all tables in tables_to_covert. Some of them are also in tables_cache
+	 * and may get used in this process.
+	 */
+	while ((cur = llist_del_first(&tables_to_covert))) {
+		cur_entry = llist_entry(cur, struct pks_table_llnode, node);
+		set_memory_pks((unsigned long)cur_entry->table, 1, PKS_KEY_MONITOR);
+		kfree(cur_entry);
+	}
+
+	/*
+	 * It is safe to traverse while the callback ensure_table_protected() may
+	 * change the page tables, because CPA will only split pages and not merge
+	 * them. Any page used for the splits, will have already been protected in
+	 * a previous step, so they will not be missed if tables are mapped by a
+	 * structure that has already been traversed.
+	 */
+	traverse_mm(&init_mm, &ensure_table_protected);
+
+	init_pks_table_scan();
+
+	pr_info("PKS dmap tables initialized\n");
+
+#ifdef CONFIG_PKS_STACK
+	init_private_stacks(2);
+#endif
+
+	return 0;
+out_err:
+	while ((cur = llist_del_first(&tables_to_covert))) {
+		cur_entry = llist_entry(cur, struct pks_table_llnode, node);
+		free_maybe_reserved(virt_to_page(cur));
+		kfree(cur_entry);
+	}
+	pr_warn("Unable to protect direct map page cache, direct map unprotected.\n");
+	return 0;
+}
+
+late_initcall(init_pks_dmap_tables);
+// EXPORT_SYMBOL(init_pks_dmap_tables);
+#endif /* CONFIG_PKS_MONITOR */
 
 /*
  * The testcases use internal knowledge of the implementation that shouldn't

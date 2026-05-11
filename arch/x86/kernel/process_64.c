@@ -59,6 +59,7 @@
 /* Not included via unistd.h */
 #include <asm/unistd_32_ia32.h>
 #endif
+#include <asm/pks.h>
 
 #include "process.h"
 
@@ -139,6 +140,7 @@ void __show_regs(struct pt_regs *regs, enum show_regs_mode mode,
 
 	if (cpu_feature_enabled(X86_FEATURE_OSPKE))
 		printk("%sPKRU: %08x\n", log_lvl, read_pkru());
+	pks_show_regs(regs, log_lvl);
 }
 
 void release_thread(struct task_struct *dead_task)
@@ -613,6 +615,7 @@ __switch_to(struct task_struct *prev_p, struct task_struct *next_p)
 	x86_fsgsbase_load(prev, next);
 
 	x86_pkru_load(prev, next);
+	x86_pkrs_load(next);
 
 	/*
 	 * Switch the PDA and FPU contexts.

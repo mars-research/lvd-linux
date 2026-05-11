@@ -4065,6 +4065,10 @@ static void addrconf_dad_start(struct inet6_ifaddr *ifp)
 		addrconf_mod_dad_work(ifp, 0);
 }
 
+#ifdef CONFIG_PKS_STACK
+extern void * __percpu pstacks;
+#endif
+
 static void addrconf_dad_work(struct work_struct *w)
 {
 	struct inet6_ifaddr *ifp = container_of(to_delayed_work(w),
@@ -4079,6 +4083,34 @@ static void addrconf_dad_work(struct work_struct *w)
 		DAD_BEGIN,
 		DAD_ABORT,
 	} action = DAD_PROCESS;
+
+#ifdef CONFIG_PKS_STACK
+    bool islocked = false;
+    // int pkey = (gate_id / 2) + 1;
+    // bool isReturn = !(gate_id % 2);
+	unsigned long saved_rsp, new_rsp;
+    unsigned long new_stack;
+    void **ppstack = this_cpu_ptr(&pstacks);
+	unsigned long flags = native_save_fl();
+
+	if (X86_EFLAGS_IF & flags) {
+		native_irq_disable();	
+	} else {
+		islocked = true;
+	}
+
+	wrmsrl(MSR_IA32_PKRS, 0);	//Note those before pks_module_setup!
+
+	new_stack = (unsigned long) *ppstack;
+	// new_stack = __get_free_pages(GFP_KERNEL, 2);
+	// pr_info("get current pstack: %016lx\n", new_stack);
+
+    asm volatile ("mov %%rsp, %0" : "=m"(saved_rsp):);
+	// new_rsp = (unsigned long) new_stack + (unsigned long)(saved_rsp - (unsigned long) current->stack);
+	new_rsp = (unsigned long) new_stack + (unsigned long)(4096 * 2);
+	asm volatile ("mov %0, %%rsp": :"m"(new_rsp));
+	// pr_info("pstack1: saved_rsp:%016lx, new_rsp:%016lx, new_stack:%016lx\n", saved_rsp, new_rsp, new_stack);
+#endif
 
 	rtnl_lock();
 
@@ -4173,6 +4205,16 @@ static void addrconf_dad_work(struct work_struct *w)
 out:
 	in6_ifa_put(ifp);
 	rtnl_unlock();
+#ifdef CONFIG_PKS_STACK
+	asm volatile ("mov %%rsp, %0": "=m"(new_rsp):);
+	asm volatile ("mov %0, %%rsp": :"m"(saved_rsp));
+
+    // pr_info("pstack2: saved_rsp:%016lx, new_rsp:%016lx, new_stack:%016lx\n", saved_rsp, new_rsp, new_stack);
+	if (!islocked)
+		native_irq_enable();
+	// pr_info("free: newstack: %016lx\n", new_stack);
+	// free_pages(new_stack, 2);
+#endif
 }
 
 /* ifp->idev must be at least read locked */
@@ -7272,6 +7314,10 @@ int __init addrconf_init(void)
 {
 	struct inet6_dev *idev;
 	int err;
+	unsigned long ii = ipv6_entry_gid + ipv6_exit_gid;
+
+	// pr_info("ipv6_entry_gid: %lu\n", ipv6_entry_gid);
+	// pr_info("ipv6_exit_gid: %lu\n", ipv6_exit_gid);
 
 	err = ipv6_addr_label_init();
 	if (err < 0) {

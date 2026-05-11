@@ -27,6 +27,9 @@ EXPORT_SYMBOL(inet6_protos);
 
 int inet6_add_protocol(const struct inet6_protocol *prot, unsigned char protocol)
 {
+	// pr_info("ipv6_entry_gid: %lu\n", ipv6_entry_gid);
+	// pr_info("ipv6_exit_gid: %lu\n", ipv6_exit_gid);
+	unsigned long ii = ipv6_entry_gid + ipv6_exit_gid;
 	return !cmpxchg((const struct inet6_protocol **)&inet6_protos[protocol],
 			NULL, prot) ? 0 : -1;
 }

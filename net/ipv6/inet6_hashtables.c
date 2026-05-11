@@ -29,7 +29,10 @@ u32 inet6_ehashfn(const struct net *net,
 	static u32 ipv6_hash_secret __read_mostly;
 
 	u32 lhash, fhash;
+	unsigned long ii = ipv6_entry_gid + ipv6_exit_gid;
 
+	// pr_info("ipv6_entry_gid: %lu\n", ipv6_entry_gid);
+	// pr_info("ipv6_exit_gid: %lu\n", ipv6_exit_gid);
 	net_get_random_once(&inet6_ehash_secret, sizeof(inet6_ehash_secret));
 	net_get_random_once(&ipv6_hash_secret, sizeof(ipv6_hash_secret));
 

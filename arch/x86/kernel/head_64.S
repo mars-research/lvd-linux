@@ -66,6 +66,7 @@ SYM_CODE_START_NOALIGN(startup_64)
 
 	leaq	_text(%rip), %rdi
 
+
 	/*
 	 * initial_gs points to initial fixed_percpu_data struct with storage for
 	 * the stack protector canary. Global pointer fixups are needed at this
@@ -107,6 +108,19 @@ SYM_CODE_START_NOALIGN(startup_64)
 .Lon_kernel_cs:
 	UNWIND_HINT_EMPTY
 
+#ifdef CONFIG_PKK
+	pushq	%rax
+	pushq	%rcx
+	pushq	%rdx
+	xorq	%rax, %rax
+	xorq	%rdx, %rdx
+	xorq	%rcx, %rcx
+	wrpkru
+	popq	%rdx
+	popq	%rcx
+	popq	%rax
+#endif /* CONFIG_PKK */
+
 	/* Sanitize CPU configuration */
 	call verify_cpu
 
@@ -142,6 +156,22 @@ SYM_CODE_START(secondary_startup_64)
 	 * to have any identity mapped pages in the kernel page table
 	 * after the boot processor executes this code.
 	 */
+
+#ifdef CONFIG_PKK
+	pushq	%rax
+	pushq	%rcx
+	pushq	%rdx
+	movq	%cr4, %rax
+	orq	$X86_CR4_PKE, %rax
+	movq	%rax, %cr4
+	xorq	%rax, %rax
+	xorq	%rdx, %rdx
+	xorq	%rcx, %rcx
+	wrpkru
+	popq	%rdx
+	popq	%rcx
+	popq	%rax
+#endif /* CONFIG_PKK */
 
 	/* Sanitize CPU configuration */
 	call verify_cpu
@@ -188,7 +218,11 @@ SYM_INNER_LABEL(secondary_startup_64_no_verify, SYM_L_GLOBAL)
 #endif
 
 	/* Enable PAE mode, PGE and LA57 */
+#ifdef CONFIG_PKK
+	orl	$(X86_CR4_PAE | X86_CR4_PGE | X86_CR4_PKE), %ecx
+#else /* !CONFIG_PKK */
 	orl	$(X86_CR4_PAE | X86_CR4_PGE), %ecx
+#endif /* CONFIG_PKK */
 #ifdef CONFIG_X86_5LEVEL
 	testl	$1, __pgtable_l5_enabled(%rip)
 	jz	1f
@@ -350,6 +384,20 @@ SYM_INNER_LABEL(secondary_startup_64_no_verify, SYM_L_GLOBAL)
 	 *	REX.W + FF /5 JMP m16:64 Jump far, absolute indirect,
 	 *		address given in m16:64.
 	 */
+
+#ifdef CONFIG_PKK
+	pushq	%rax
+	pushq	%rcx
+	pushq	%rdx
+	xorq	%rax, %rax
+	xorq	%rdx, %rdx
+	xorq	%rcx, %rcx
+	wrpkru
+	popq	%rdx
+	popq	%rcx
+	popq	%rax
+#endif /* CONFIG_PKK */
+
 	pushq	$.Lafter_lret	# put return address on stack for unwinder
 	xorl	%ebp, %ebp	# clear frame pointer
 	movq	initial_code(%rip), %rax
@@ -398,8 +446,10 @@ SYM_CODE_START_NOALIGN(vc_boot_ghcb)
 	movq    %rsp, %rdi
 	movq	ORIG_RAX(%rsp), %rsi
 	movq	initial_vc_handler(%rip), %rax
+	PUSH_PTREGS_AUXILIARY
 	ANNOTATE_RETPOLINE_SAFE
 	call	*%rax
+	POP_PTREGS_AUXILIARY
 
 	/* Unwind pt_regs */
 	POP_REGS
@@ -470,6 +520,23 @@ SYM_CODE_START_LOCAL(early_idt_handler_common)
 	pushq %r9				/* pt_regs->r9 */
 	pushq %r10				/* pt_regs->r10 */
 	pushq %r11				/* pt_regs->r11 */
+#ifdef CONFIG_PKK
+	xorl	%ecx, %ecx
+	ALTERNATIVE "", "rdpkru", X86_FEATURE_OSPKE
+	pushq	%rax			/* pt_regs->pkru */
+	cmpl	$55540000, %eax
+	je		.Lno_wrpkru
+	movl	$55540000, %eax
+	ALTERNATIVE "", "wrpkru", X86_FEATURE_OSPKE
+	movq 	%cs, %rcx
+	testb 	$3, %cl
+	je		.Lno_wrpkru
+	nop
+.Lno_wrpkru:
+	movq (5*8)(%rsp), %rax
+	movq (6*8)(%rsp), %rcx
+	movq (7*8)(%rsp), %rdx
+#endif
 	pushq %rbx				/* pt_regs->bx */
 	pushq %rbp				/* pt_regs->bp */
 	pushq %r12				/* pt_regs->r12 */
@@ -479,7 +546,9 @@ SYM_CODE_START_LOCAL(early_idt_handler_common)
 	UNWIND_HINT_REGS
 
 	movq %rsp,%rdi		/* RDI = pt_regs; RSI is already trapnr */
+	PUSH_PTREGS_AUXILIARY
 	call do_early_exception
+	POP_PTREGS_AUXILIARY
 
 	decl early_recursion_flag(%rip)
 	jmp restore_regs_and_return_to_kernel
@@ -508,7 +577,9 @@ SYM_CODE_START_NOALIGN(vc_no_ghcb)
 	/* Call C handler */
 	movq    %rsp, %rdi
 	movq	ORIG_RAX(%rsp), %rsi
+	PUSH_PTREGS_AUXILIARY
 	call    do_vc_no_ghcb
+	POP_PTREGS_AUXILIARY
 
 	/* Unwind pt_regs */
 	POP_REGS

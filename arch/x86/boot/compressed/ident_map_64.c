@@ -379,3 +379,8 @@ void do_boot_page_fault(struct pt_regs *regs, unsigned long error_code)
 	 */
 	kernel_add_identity_map(address, end);
 }
+
+#ifdef CONFIG_PKS_MONITOR
+void enable_pgtable_write(void) {}
+void disable_pgtable_write(void) {}
+#endif

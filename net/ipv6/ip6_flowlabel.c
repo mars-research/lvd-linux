@@ -394,7 +394,11 @@ fl_create(struct net *net, struct sock *sk, struct in6_flowlabel_req *freq,
 		struct ipcm6_cookie ipc6;
 
 		err = -ENOMEM;
+#ifdef CONFIG_PKS_HEAP
+		fl->opt = kmalloc_pks(sizeof(*fl->opt) + olen, GFP_KERNEL);
+#else
 		fl->opt = kmalloc(sizeof(*fl->opt) + olen, GFP_KERNEL);
+#endif		
 		if (!fl->opt)
 			goto done;
 
@@ -637,7 +641,11 @@ static int ipv6_flowlabel_get(struct sock *sk, struct in6_flowlabel_req *freq,
 	if (!fl)
 		return err;
 
+#ifdef CONFIG_PKS_HEAP
+	sfl1 = kmalloc_pks(sizeof(*sfl1), GFP_KERNEL);
+#else
 	sfl1 = kmalloc(sizeof(*sfl1), GFP_KERNEL);
+#endif
 
 	if (freq->flr_label) {
 		err = -EEXIST;
@@ -898,6 +906,9 @@ static struct pernet_operations ip6_flowlabel_net_ops = {
 
 int ip6_flowlabel_init(void)
 {
+	// pr_info("ipv6_entry_gid: %lu\n", ipv6_entry_gid);
+	// pr_info("ipv6_exit_gid: %lu\n", ipv6_exit_gid);
+	unsigned long ii = ipv6_entry_gid + ipv6_exit_gid;
 	return register_pernet_subsys(&ip6_flowlabel_net_ops);
 }
 

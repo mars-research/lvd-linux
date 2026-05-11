@@ -40,8 +40,12 @@ static bool ipv6_mapped_addr_any(const struct in6_addr *a)
 
 static void ip6_datagram_flow_key_init(struct flowi6 *fl6, struct sock *sk)
 {
+	unsigned long ii = ipv6_entry_gid + ipv6_exit_gid;
 	struct inet_sock *inet = inet_sk(sk);
 	struct ipv6_pinfo *np = inet6_sk(sk);
+
+	// pr_info("ipv6_entry_gid: %lu\n", ipv6_entry_gid);
+	// pr_info("ipv6_exit_gid: %lu\n", ipv6_exit_gid);
 
 	memset(fl6, 0, sizeof(*fl6));
 	fl6->flowi6_proto = sk->sk_protocol;

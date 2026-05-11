@@ -83,8 +83,8 @@ static struct sk_buff *udp6_ufo_fragment(struct sk_buff *skb,
 		 * bytes to insert fragment header.
 		 */
 		err = ip6_find_1stfragopt(skb, &prevhdr);
-		if (err < 0)
-			return ERR_PTR(err);
+		//if (err < 0)
+			//return ERR_PTR(err);
 		unfrag_ip6hlen = err;
 		nexthdr = *prevhdr;
 		*prevhdr = NEXTHDR_FRAGMENT;
@@ -197,6 +197,9 @@ static const struct net_offload udpv6_offload = {
 
 int udpv6_offload_init(void)
 {
+	// pr_info("ipv6_entry_gid: %lu\n", ipv6_entry_gid);
+	// pr_info("ipv6_exit_gid: %lu\n", ipv6_exit_gid);
+	unsigned long ii = ipv6_entry_gid + ipv6_exit_gid;
 	return inet6_add_offload(&udpv6_offload, IPPROTO_UDP);
 }
 

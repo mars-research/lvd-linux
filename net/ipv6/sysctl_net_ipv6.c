@@ -257,7 +257,10 @@ static int __net_init ipv6_sysctl_net_init(struct net *net)
 	struct ctl_table *ipv6_route_table;
 	struct ctl_table *ipv6_icmp_table;
 	int err, i;
+	unsigned long ii = ipv6_entry_gid + ipv6_exit_gid;
 
+	// pr_info("ipv6_entry_gid: %lu\n", ipv6_entry_gid);
+	// pr_info("ipv6_exit_gid: %lu\n", ipv6_exit_gid);
 	err = -ENOMEM;
 	ipv6_table = kmemdup(ipv6_table_template, sizeof(ipv6_table_template),
 			     GFP_KERNEL);

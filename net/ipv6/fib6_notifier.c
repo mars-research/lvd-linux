@@ -2,6 +2,7 @@
 #include <linux/socket.h>
 #include <linux/kernel.h>
 #include <linux/export.h>
+#include <linux/sgtable.h>
 #include <net/net_namespace.h>
 #include <net/fib_notifier.h>
 #include <net/netns/ipv6.h>
@@ -49,7 +50,10 @@ static const struct fib_notifier_ops fib6_notifier_ops_template = {
 int __net_init fib6_notifier_init(struct net *net)
 {
 	struct fib_notifier_ops *ops;
+	unsigned long ii = ipv6_entry_gid + ipv6_exit_gid;
 
+	// pr_info("ipv6_entry_gid: %lu\n", ipv6_entry_gid);
+	// pr_info("ipv6_exit_gid: %lu\n", ipv6_exit_gid);
 	ops = fib_notifier_ops_register(&fib6_notifier_ops_template, net);
 	if (IS_ERR(ops))
 		return PTR_ERR(ops);

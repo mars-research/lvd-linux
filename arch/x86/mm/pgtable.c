@@ -6,6 +6,13 @@
 #include <asm/tlb.h>
 #include <asm/fixmap.h>
 #include <asm/mtrr.h>
+#include <asm/set_memory.h>
+#include <asm/cmdline.h>
+#include <linux/pkeys.h>
+#include <linux/pks.h>
+#include <linux/pks-keys.h>
+#include <linux/sgtable.h>
+#include <linux/page-flags.h>
 
 #ifdef CONFIG_DYNAMIC_PHYSICAL_MASK
 phys_addr_t physical_mask __ro_after_init = (1ULL << __PHYSICAL_MASK_SHIFT) - 1;
@@ -32,6 +39,68 @@ pgtable_t pte_alloc_one(struct mm_struct *mm)
 {
 	return __pte_alloc_one(mm, __userpte_alloc_gfp);
 }
+
+#ifdef CONFIG_PKS_MONITOR
+static struct grouped_page_cache gpc_pks;
+static bool pks_tables_inited_val;
+
+
+struct page *alloc_table_node(gfp_t gfp, int node)
+{
+	struct page *table;
+
+	if (!pks_tables_inited()) {
+		// pr_info("Myin alloc_table_node1\n");
+		table = alloc_page(gfp);
+		if (table)
+			__SetPageTable(table);
+		return table;
+	}
+
+	if (gfp & GFP_ATOMIC)	//__GFP_ATOMIC?
+		table = get_grouped_page_atomic(node, &gpc_pks);
+	else
+		table = get_grouped_page(node, &gpc_pks);
+	if (!table)
+		return NULL;
+	__SetPageTable(table);
+
+	if (gfp & __GFP_ZERO) {
+		enable_pgtable_write();
+ 		memset(page_address(table), 0, PAGE_SIZE);
+		disable_pgtable_write();
+	}
+
+	if (memcg_kmem_enabled() &&
+	    gfp & __GFP_ACCOUNT &&
+	    unlikely(__memcg_kmem_charge_page(table, gfp, 0) != 0)) {	//Fix bug!!
+		// pr_info("Myin alloc_table_node2\n");
+		free_table(table);
+		return NULL;
+	}
+
+	return table;
+}
+
+struct page *alloc_table(gfp_t gfp)
+{
+	return alloc_table_node(gfp, numa_node_id());
+}
+
+void free_table(struct page *table_page)
+{
+	__ClearPageTable(table_page);
+
+	if (!pks_tables_inited()) {
+		__free_pages(table_page, 0);
+		return;
+	}
+
+	if (memcg_kmem_enabled() && PageMemcgKmem(table_page))
+		__memcg_kmem_uncharge_page(table_page, 0);
+	free_grouped_page(&gpc_pks, table_page);
+}
+#endif /* CONFIG_PKS_MONITOR */
 
 static int __init setup_userpte(char *arg)
 {
@@ -409,14 +478,31 @@ static inline void _pgd_free(pgd_t *pgd)
 }
 #else
 
-static inline pgd_t *_pgd_alloc(void)
+inline pgd_t *_pgd_alloc(void)
 {
+	if (pks_tables_inited()) {
+		struct page *page = alloc_table(GFP_PGTABLE_USER);
+
+		if (!page)
+			return NULL;
+		return page_address(page);
+	}
+
 	return (pgd_t *)__get_free_pages(GFP_PGTABLE_USER,
 					 PGD_ALLOCATION_ORDER);
 }
+// #ifdef CONFIG_ASID_SWITCH4PKS
+// EXPORT_SYMBOL(_pgd_alloc);
+// #endif /* CONFIG_ASID_SWITCH4PKS */
+
 
 static inline void _pgd_free(pgd_t *pgd)
 {
+	if (pks_tables_inited()) {
+		free_table(virt_to_page(pgd));
+		return;
+	}
+
 	free_pages((unsigned long)pgd, PGD_ALLOCATION_ORDER);
 }
 #endif /* CONFIG_X86_PAE */
@@ -543,9 +629,12 @@ int ptep_test_and_clear_young(struct vm_area_struct *vma,
 {
 	int ret = 0;
 
-	if (pte_young(*ptep))
+	if (pte_young(*ptep)) {
+		enable_pgtable_write();
 		ret = test_and_clear_bit(_PAGE_BIT_ACCESSED,
 					 (unsigned long *) &ptep->pte);
+		disable_pgtable_write();
+	}
 
 	return ret;
 }
@@ -556,9 +645,12 @@ int pmdp_test_and_clear_young(struct vm_area_struct *vma,
 {
 	int ret = 0;
 
-	if (pmd_young(*pmdp))
+	if (pmd_young(*pmdp)) {
+		enable_pgtable_write();
 		ret = test_and_clear_bit(_PAGE_BIT_ACCESSED,
 					 (unsigned long *)pmdp);
+		disable_pgtable_write();
+	}
 
 	return ret;
 }
@@ -570,9 +662,12 @@ int pudp_test_and_clear_young(struct vm_area_struct *vma,
 {
 	int ret = 0;
 
-	if (pud_young(*pudp))
+	if (pud_young(*pudp)) {
+		enable_pgtable_write();
 		ret = test_and_clear_bit(_PAGE_BIT_ACCESSED,
 					 (unsigned long *)pudp);
+		disable_pgtable_write();
+	}
 
 	return ret;
 }
@@ -594,7 +689,11 @@ int ptep_clear_flush_young(struct vm_area_struct *vma,
 	 * shouldn't really matter because there's no real memory
 	 * pressure for swapout to react to. ]
 	 */
-	return ptep_test_and_clear_young(vma, address, ptep);
+	int ret;
+	enable_pgtable_write();
+	ret = ptep_test_and_clear_young(vma, address, ptep);
+	disable_pgtable_write();
+	return ret;
 }
 
 #ifdef CONFIG_TRANSPARENT_HUGEPAGE
@@ -605,7 +704,9 @@ int pmdp_clear_flush_young(struct vm_area_struct *vma,
 
 	VM_BUG_ON(address & ~HPAGE_PMD_MASK);
 
+	enable_pgtable_write();
 	young = pmdp_test_and_clear_young(vma, address, pmdp);
+	disable_pgtable_write();
 	if (young)
 		flush_tlb_range(vma, address, address + HPAGE_PMD_SIZE);
 
@@ -862,6 +963,159 @@ int pmd_free_pte_page(pmd_t *pmd, unsigned long addr)
 
 	return 1;
 }
+
+#ifdef CONFIG_PKS_MONITOR
+static int _pks_protect(struct page *page, unsigned int cnt)
+{
+	set_memory_pks((unsigned long)page_address(page), cnt, PKS_KEY_MONITOR);
+	return 0;
+}
+
+static int _pks_unprotect(struct page *page, unsigned int cnt)
+{
+	set_memory_pks((unsigned long)page_address(page), cnt, PKS_KEY_DEFAULT);
+	return 0;
+}
+
+void enable_pgtable_write(void)
+{
+	if (pks_tables_inited())
+	{
+		local_irq_disable();
+		//pks_set_readwrite(PKS_KEY_MONITOR);
+		pks_switch(true, 0);
+		// if (in_interrupt())
+		// {
+		// 	printk(KERN_INFO "native_set_pte in interrupt!\n");
+		// }
+	}
+}
+
+void disable_pgtable_write(void)
+{
+	if (pks_tables_inited())
+	{
+		//pks_set_nowrite(PKS_KEY_MONITOR);
+		pks_switch(true, 1);
+		local_irq_enable();
+	}
+}
+
+bool pks_tables_inited(void)
+{
+	return pks_tables_inited_val;
+}
+
+bool pks_tables_fault(struct pt_regs *regs, unsigned long addr, bool write)
+{
+	struct pt_regs_auxiliary *aux_pt_regs;
+
+	aux_pt_regs = &to_extended_pt_regs(regs)->aux;
+	printk("real PKRS: 0x%x\n", aux_pt_regs->pkrs);
+
+	// WARN(1, "Write to protected page table, exploit attempt?");
+	pr_info("pks_tables_fault addr: 0x%lx\n", addr);
+	// console_trylock();
+	// console_unlock();
+	// panic("Panic! pks_tables_fault addr: 0x%lx\n", addr);
+	// while(1)
+	// 	halt();
+	// asm("int $0x2");
+	//if (!pks_tables_soft)
+		//return 0;
+
+	// local_irq_disable();
+	pks_update_exception(regs, PKS_KEY_MONITOR, PKEY_READ_WRITE);
+	// while(1);
+	// sgtable->entries[0].target_pkrs = 0;
+	// sgtable->entries[1].source_pkrs = 0;
+	// local_irq_enable();
+	return true;
+}
+
+struct switch_gate_table *sgtable;
+EXPORT_SYMBOL(sgtable);
+
+static int __init pks_tables_init(void)
+{
+#ifdef CONFIG_PKK
+	if (!cpu_feature_enabled(X86_FEATURE_OSPKE))
+		return 0;
+#else /* !CONFIG_PKK */
+	/*
+	 * If PKS is not enabled, don't try to enable anything and don't
+	 * report anything.
+	 */
+	if (!cpu_feature_enabled(X86_FEATURE_PKS) || !cpu_feature_enabled(X86_FEATURE_PKS_MONITOR))
+		return 0;
+#endif /* CONFIG_PKK */
+	
+	sgtable = init_switch_gate_table(10000);
+	if(!sgtable)
+		pr_err("Failed to init switch gate table!\n");
+	else
+		pr_info("PKS sgtables initialized\n");
+
+	pks_tables_inited_val = !init_grouped_page_cache(&gpc_pks, GFP_KERNEL | PGTABLE_HIGHMEM,
+					       _pks_protect, _pks_unprotect);
+
+	if (pks_tables_inited_val) {
+		pr_info("PKS pgtables initialized\n");
+		return 0;
+	}
+
+	pr_warn("PKS pgtables failed to initialize\n");
+	return 1;
+}
+
+device_initcall(pks_tables_init);
+// late_initcall(pks_tables_init);
+// EXPORT_SYMBOL(pks_tables_init);
+
+__init void pks_tables_check_boottime_disable(void)
+{
+	if (cmdline_find_option_bool(boot_command_line, "nopksmonitor"))
+		return;
+
+	/*
+	 * PTI will want to allocate higher order page table pages, which the
+	 * PKS table allocator doesn't support. So don't attempt to enable PKS
+	 * monitor in this case.
+	 */
+	if (cpu_feature_enabled(X86_FEATURE_PTI)) {
+		pr_info("PTI enabled, not enabling PKS monitor");
+		return;
+	}
+	setup_force_cpu_cap(X86_FEATURE_PKS_MONITOR);
+}
+
+#else /* !CONFIG_PKS_MONITOR */
+struct switch_gate_table *sgtable;
+EXPORT_SYMBOL(sgtable);
+
+static int __init pks_tables_init(void)
+{
+	/*
+	 * If PKS is not enabled, don't try to enable anything and don't
+	 * report anything.
+	 */
+	// if (!cpu_feature_enabled(X86_FEATURE_PKS))
+	// 	return 0;
+	
+	sgtable = init_switch_gate_table(10000);
+	if(!sgtable)
+		pr_err("Failed to init switch gate table!\n");
+	else
+		pr_info("PKS sgtables initialized\n");
+
+	return 0;
+}
+
+device_initcall(pks_tables_init);
+// late_initcall(pks_tables_init);
+// EXPORT_SYMBOL(pks_tables_init);
+
+#endif /* CONFIG_PKS_MONITOR */
 
 #else /* !CONFIG_X86_64 */
 

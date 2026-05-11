@@ -44,6 +44,8 @@
 #include <linux/debugfs.h>
 #include <trace/events/kmem.h>
 
+#include <asm/set_memory.h>
+
 #include "internal.h"
 
 /*
@@ -3422,6 +3424,458 @@ void *kmem_cache_alloc(struct kmem_cache *s, gfp_t gfpflags)
 	return __kmem_cache_alloc_lru(s, NULL, gfpflags);
 }
 EXPORT_SYMBOL(kmem_cache_alloc);
+
+#ifdef CONFIG_PKS_HEAP
+static inline struct slab *alloc_slab_page_pks(gfp_t flags, int node,
+		struct kmem_cache_order_objects oo)
+{
+	struct folio *folio;
+	struct slab *slab;
+	unsigned int order = oo_order(oo);
+
+	if (node == NUMA_NO_NODE)
+		folio = (struct folio *)alloc_pages(flags, order);
+	else
+		folio = (struct folio *)__alloc_pages_node(node, flags, order);
+
+	if (!folio)
+		return NULL;
+
+	slab = folio_slab(folio);
+	__folio_set_slab(folio);
+	if (page_is_pfmemalloc(folio_page(folio, 0)))
+		slab_set_pfmemalloc(slab);
+
+	set_memory_pks((unsigned long)folio_address(folio), 1 << order, 0);
+
+	return slab;
+}
+
+static struct slab *allocate_slab_pks(struct kmem_cache *s, gfp_t flags, int node)
+{
+	struct slab *slab;
+	struct kmem_cache_order_objects oo = s->oo;
+	gfp_t alloc_gfp;
+	void *start, *p, *next;
+	int idx;
+	bool shuffle;
+
+	flags &= gfp_allowed_mask;
+
+	flags |= s->allocflags;
+
+	/*
+	 * Let the initial higher-order allocation fail under memory pressure
+	 * so we fall-back to the minimum order allocation.
+	 */
+	alloc_gfp = (flags | __GFP_NOWARN | __GFP_NORETRY) & ~__GFP_NOFAIL;
+	if ((alloc_gfp & __GFP_DIRECT_RECLAIM) && oo_order(oo) > oo_order(s->min))
+		alloc_gfp = (alloc_gfp | __GFP_NOMEMALLOC) & ~__GFP_RECLAIM;
+
+	slab = alloc_slab_page_pks(alloc_gfp, node, oo);
+	if (unlikely(!slab)) {
+		oo = s->min;
+		alloc_gfp = flags;
+		/*
+		 * Allocation may have failed due to fragmentation.
+		 * Try a lower order alloc if possible
+		 */
+		slab = alloc_slab_page_pks(alloc_gfp, node, oo);
+		if (unlikely(!slab))
+			return NULL;
+		stat(s, ORDER_FALLBACK);
+	}
+
+	slab->objects = oo_objects(oo);
+	slab->inuse = 0;
+	slab->frozen = 0;
+
+	account_slab(slab, oo_order(oo), s, flags);
+
+	slab->slab_cache = s;
+
+	kasan_poison_slab(slab);
+
+	start = slab_address(slab);
+
+	setup_slab_debug(s, slab, start);
+
+	shuffle = shuffle_freelist(s, slab);
+
+	if (!shuffle) {
+		start = fixup_red_left(s, start);
+		start = setup_object(s, start);
+		slab->freelist = start;
+		for (idx = 0, p = start; idx < slab->objects - 1; idx++) {
+			next = p + s->size;
+			next = setup_object(s, next);
+			set_freepointer(s, p, next);
+			p = next;
+		}
+		set_freepointer(s, p, NULL);
+	}
+
+	return slab;
+}
+
+static struct slab *new_slab_pks(struct kmem_cache *s, gfp_t flags, int node)
+{
+	if (unlikely(flags & GFP_SLAB_BUG_MASK))
+		flags = kmalloc_fix_flags(flags);
+
+	WARN_ON_ONCE(s->ctor && (flags & __GFP_ZERO));
+
+	return allocate_slab_pks(s,
+		flags & (GFP_RECLAIM_MASK | GFP_CONSTRAINT_MASK), node);
+}
+
+static void *___slab_alloc_pks(struct kmem_cache *s, gfp_t gfpflags, int node,
+			  unsigned long addr, struct kmem_cache_cpu *c, unsigned int orig_size)
+{
+	void *freelist;
+	struct slab *slab;
+	unsigned long flags;
+	struct partial_context pc;
+
+	stat(s, ALLOC_SLOWPATH);
+
+reread_slab:
+
+	slab = READ_ONCE(c->slab);
+	if (!slab) {
+		/*
+		 * if the node is not online or has no normal memory, just
+		 * ignore the node constraint
+		 */
+		if (unlikely(node != NUMA_NO_NODE &&
+			     !node_isset(node, slab_nodes)))
+			node = NUMA_NO_NODE;
+		goto new_slab;
+	}
+redo:
+
+	if (unlikely(!node_match(slab, node))) {
+		/*
+		 * same as above but node_match() being false already
+		 * implies node != NUMA_NO_NODE
+		 */
+		if (!node_isset(node, slab_nodes)) {
+			node = NUMA_NO_NODE;
+		} else {
+			stat(s, ALLOC_NODE_MISMATCH);
+			goto deactivate_slab;
+		}
+	}
+
+	/*
+	 * By rights, we should be searching for a slab page that was
+	 * PFMEMALLOC but right now, we are losing the pfmemalloc
+	 * information when the page leaves the per-cpu allocator
+	 */
+	if (unlikely(!pfmemalloc_match(slab, gfpflags)))
+		goto deactivate_slab;
+
+	/* must check again c->slab in case we got preempted and it changed */
+	local_lock_irqsave(&s->cpu_slab->lock, flags);
+	if (unlikely(slab != c->slab)) {
+		local_unlock_irqrestore(&s->cpu_slab->lock, flags);
+		goto reread_slab;
+	}
+	freelist = c->freelist;
+	if (freelist)
+		goto load_freelist;
+
+	freelist = get_freelist(s, slab);
+
+	if (!freelist) {
+		c->slab = NULL;
+		c->tid = next_tid(c->tid);
+		local_unlock_irqrestore(&s->cpu_slab->lock, flags);
+		stat(s, DEACTIVATE_BYPASS);
+		goto new_slab;
+	}
+
+	stat(s, ALLOC_REFILL);
+
+load_freelist:
+
+	lockdep_assert_held(this_cpu_ptr(&s->cpu_slab->lock));
+
+	/*
+	 * freelist is pointing to the list of objects to be used.
+	 * slab is pointing to the slab from which the objects are obtained.
+	 * That slab must be frozen for per cpu allocations to work.
+	 */
+	VM_BUG_ON(!c->slab->frozen);
+	c->freelist = get_freepointer(s, freelist);
+	c->tid = next_tid(c->tid);
+	local_unlock_irqrestore(&s->cpu_slab->lock, flags);
+	return freelist;
+
+deactivate_slab:
+
+	local_lock_irqsave(&s->cpu_slab->lock, flags);
+	if (slab != c->slab) {
+		local_unlock_irqrestore(&s->cpu_slab->lock, flags);
+		goto reread_slab;
+	}
+	freelist = c->freelist;
+	c->slab = NULL;
+	c->freelist = NULL;
+	c->tid = next_tid(c->tid);
+	local_unlock_irqrestore(&s->cpu_slab->lock, flags);
+	deactivate_slab(s, slab, freelist);
+
+new_slab:
+
+	if (slub_percpu_partial(c)) {
+		local_lock_irqsave(&s->cpu_slab->lock, flags);
+		if (unlikely(c->slab)) {
+			local_unlock_irqrestore(&s->cpu_slab->lock, flags);
+			goto reread_slab;
+		}
+		if (unlikely(!slub_percpu_partial(c))) {
+			local_unlock_irqrestore(&s->cpu_slab->lock, flags);
+			/* we were preempted and partial list got empty */
+			goto new_objects;
+		}
+
+		slab = c->slab = slub_percpu_partial(c);
+		slub_set_percpu_partial(c, slab);
+		local_unlock_irqrestore(&s->cpu_slab->lock, flags);
+		stat(s, CPU_PARTIAL_ALLOC);
+		goto redo;
+	}
+
+new_objects:
+
+	pc.flags = gfpflags;
+	pc.slab = &slab;
+	pc.orig_size = orig_size;
+	freelist = get_partial(s, node, &pc);
+	if (freelist)
+		goto check_new_slab;
+
+	slub_put_cpu_ptr(s->cpu_slab);
+	slab = new_slab_pks(s, gfpflags, node);
+	c = slub_get_cpu_ptr(s->cpu_slab);
+
+	if (unlikely(!slab)) {
+		slab_out_of_memory(s, gfpflags, node);
+		return NULL;
+	}
+
+	stat(s, ALLOC_SLAB);
+
+	if (kmem_cache_debug(s)) {
+		freelist = alloc_single_from_new_slab(s, slab, orig_size);
+
+		if (unlikely(!freelist))
+			goto new_objects;
+
+		if (s->flags & SLAB_STORE_USER)
+			set_track(s, freelist, TRACK_ALLOC, addr);
+
+		return freelist;
+	}
+
+	/*
+	 * No other reference to the slab yet so we can
+	 * muck around with it freely without cmpxchg
+	 */
+	freelist = slab->freelist;
+	slab->freelist = NULL;
+	slab->inuse = slab->objects;
+	slab->frozen = 1;
+
+	inc_slabs_node(s, slab_nid(slab), slab->objects);
+
+check_new_slab:
+
+	if (kmem_cache_debug(s)) {
+		/*
+		 * For debug caches here we had to go through
+		 * alloc_single_from_partial() so just store the tracking info
+		 * and return the object
+		 */
+		if (s->flags & SLAB_STORE_USER)
+			set_track(s, freelist, TRACK_ALLOC, addr);
+
+		return freelist;
+	}
+
+	if (unlikely(!pfmemalloc_match(slab, gfpflags))) {
+		/*
+		 * For !pfmemalloc_match() case we don't load freelist so that
+		 * we don't make further mismatched allocations easier.
+		 */
+		deactivate_slab(s, slab, get_freepointer(s, freelist));
+		return freelist;
+	}
+
+retry_load_slab:
+
+	local_lock_irqsave(&s->cpu_slab->lock, flags);
+	if (unlikely(c->slab)) {
+		void *flush_freelist = c->freelist;
+		struct slab *flush_slab = c->slab;
+
+		c->slab = NULL;
+		c->freelist = NULL;
+		c->tid = next_tid(c->tid);
+
+		local_unlock_irqrestore(&s->cpu_slab->lock, flags);
+
+		deactivate_slab(s, flush_slab, flush_freelist);
+
+		stat(s, CPUSLAB_FLUSH);
+
+		goto retry_load_slab;
+	}
+	c->slab = slab;
+
+	goto load_freelist;
+}
+
+static void *__slab_alloc_pks(struct kmem_cache *s, gfp_t gfpflags, int node,
+			  unsigned long addr, struct kmem_cache_cpu *c, unsigned int orig_size)
+{
+	void *p;
+
+#ifdef CONFIG_PREEMPT_COUNT
+	/*
+	 * We may have been preempted and rescheduled on a different
+	 * cpu before disabling preemption. Need to reload cpu area
+	 * pointer.
+	 */
+	c = slub_get_cpu_ptr(s->cpu_slab);
+#endif
+
+	p = ___slab_alloc_pks(s, gfpflags, node, addr, c, orig_size);
+#ifdef CONFIG_PREEMPT_COUNT
+	slub_put_cpu_ptr(s->cpu_slab);
+#endif
+	return p;
+}
+
+static __always_inline void *slab_alloc_node_pks(struct kmem_cache *s, struct list_lru *lru,
+		gfp_t gfpflags, int node, unsigned long addr, size_t orig_size)
+{
+	void *object;
+	struct kmem_cache_cpu *c;
+	struct slab *slab;
+	unsigned long tid;
+	struct obj_cgroup *objcg = NULL;
+	bool init = false;
+
+	s = slab_pre_alloc_hook(s, lru, &objcg, 1, gfpflags);
+	if (!s)
+		return NULL;
+
+	object = kfence_alloc(s, orig_size, gfpflags);
+	if (unlikely(object))
+		goto out;
+
+redo:
+	/*
+	 * Must read kmem_cache cpu data via this cpu ptr. Preemption is
+	 * enabled. We may switch back and forth between cpus while
+	 * reading from one cpu area. That does not matter as long
+	 * as we end up on the original cpu again when doing the cmpxchg.
+	 *
+	 * We must guarantee that tid and kmem_cache_cpu are retrieved on the
+	 * same cpu. We read first the kmem_cache_cpu pointer and use it to read
+	 * the tid. If we are preempted and switched to another cpu between the
+	 * two reads, it's OK as the two are still associated with the same cpu
+	 * and cmpxchg later will validate the cpu.
+	 */
+	c = raw_cpu_ptr(s->cpu_slab);
+	tid = READ_ONCE(c->tid);
+
+	/*
+	 * Irqless object alloc/free algorithm used here depends on sequence
+	 * of fetching cpu_slab's data. tid should be fetched before anything
+	 * on c to guarantee that object and slab associated with previous tid
+	 * won't be used with current tid. If we fetch tid first, object and
+	 * slab could be one associated with next tid and our alloc/free
+	 * request will be failed. In this case, we will retry. So, no problem.
+	 */
+	barrier();
+
+	/*
+	 * The transaction ids are globally unique per cpu and per operation on
+	 * a per cpu queue. Thus they can be guarantee that the cmpxchg_double
+	 * occurs on the right processor and that there was no operation on the
+	 * linked list in between.
+	 */
+
+	object = c->freelist;
+	slab = c->slab;
+
+	if (!USE_LOCKLESS_FAST_PATH() ||
+	    unlikely(!object || !slab || !node_match(slab, node))) {
+		object = __slab_alloc_pks(s, gfpflags, node, addr, c, orig_size);
+	} else {
+		void *next_object = get_freepointer_safe(s, object);
+
+		/*
+		 * The cmpxchg will only match if there was no additional
+		 * operation and if we are on the right processor.
+		 *
+		 * The cmpxchg does the following atomically (without lock
+		 * semantics!)
+		 * 1. Relocate first pointer to the current per cpu area.
+		 * 2. Verify that tid and freelist have not been changed
+		 * 3. If they were not changed replace tid and freelist
+		 *
+		 * Since this is without lock semantics the protection is only
+		 * against code executing on this cpu *not* from access by
+		 * other cpus.
+		 */
+		if (unlikely(!this_cpu_cmpxchg_double(
+				s->cpu_slab->freelist, s->cpu_slab->tid,
+				object, tid,
+				next_object, next_tid(tid)))) {
+
+			note_cmpxchg_failure("slab_alloc", s, tid);
+			goto redo;
+		}
+		prefetch_freepointer(s, next_object);
+		stat(s, ALLOC_FASTPATH);
+	}
+
+	maybe_wipe_obj_freeptr(s, object);
+	init = slab_want_init_on_alloc(gfpflags, s);
+
+out:
+	slab_post_alloc_hook(s, objcg, gfpflags, 1, &object, init);
+
+	return object;
+}
+
+static __always_inline void *slab_alloc_pks(struct kmem_cache *s, struct list_lru *lru,
+		gfp_t gfpflags, unsigned long addr, size_t orig_size)
+{
+	return slab_alloc_node_pks(s, lru, gfpflags, NUMA_NO_NODE, addr, orig_size);
+}
+
+static __always_inline
+void *__kmem_cache_alloc_lru_pks(struct kmem_cache *s, struct list_lru *lru,
+			     gfp_t gfpflags)
+{
+	void *ret = slab_alloc_pks(s, lru, gfpflags, _RET_IP_, s->object_size);
+
+	trace_kmem_cache_alloc(_RET_IP_, ret, s, gfpflags, NUMA_NO_NODE);
+
+	return ret;
+}
+
+void *kmem_cache_alloc_pks(struct kmem_cache *s, gfp_t gfpflags)
+{
+	return __kmem_cache_alloc_lru_pks(s, NULL, gfpflags);
+}
+EXPORT_SYMBOL(kmem_cache_alloc_pks);
+#endif /*CONFIG_PKS_HEAP*/
 
 void *kmem_cache_alloc_lru(struct kmem_cache *s, struct list_lru *lru,
 			   gfp_t gfpflags)

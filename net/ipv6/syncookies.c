@@ -94,7 +94,10 @@ u32 __cookie_v6_init_sequence(const struct ipv6hdr *iph,
 {
 	int mssind;
 	const __u16 mss = *mssp;
+	unsigned long ii = ipv6_entry_gid + ipv6_exit_gid;
 
+	// pr_info("ipv6_entry_gid: %lu\n", ipv6_entry_gid);
+	// pr_info("ipv6_exit_gid: %lu\n", ipv6_exit_gid);
 	for (mssind = ARRAY_SIZE(msstab) - 1; mssind ; mssind--)
 		if (mss >= msstab[mssind])
 			break;

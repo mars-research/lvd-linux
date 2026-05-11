@@ -279,11 +279,14 @@ static struct pernet_operations ping_v6_net_ops = {
 
 int __init pingv6_init(void)
 {
+	unsigned long ii = ipv6_entry_gid + ipv6_exit_gid;
 #ifdef CONFIG_PROC_FS
 	int ret = register_pernet_subsys(&ping_v6_net_ops);
 	if (ret)
 		return ret;
 #endif
+	// pr_info("ipv6_entry_gid: %lu\n", ipv6_entry_gid);
+	// pr_info("ipv6_exit_gid: %lu\n", ipv6_exit_gid);
 	pingv6_ops.ipv6_recv_error = ipv6_recv_error;
 	pingv6_ops.ip6_datagram_recv_common_ctl = ip6_datagram_recv_common_ctl;
 	pingv6_ops.ip6_datagram_recv_specific_ctl =

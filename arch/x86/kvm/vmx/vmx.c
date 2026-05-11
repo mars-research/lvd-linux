@@ -3246,10 +3246,20 @@ static void vmx_load_mmu_pgd(struct kvm_vcpu *vcpu, hpa_t root_hpa,
 	bool update_guest_cr3 = true;
 	unsigned long guest_cr3;
 	u64 eptp;
+	u64 eptp_list_address;
+	u64 *eptps;
 
 	if (enable_ept) {
 		eptp = construct_eptp(vcpu, root_hpa, root_level);
 		vmcs_write64(EPT_POINTER, eptp);
+
+		eptp_list_address = vmcs_read64(EPTP_LIST_ADDRESS);
+		eptps = (u64 *) phys_to_virt(eptp_list_address);
+		eptps[0] = eptp;
+		eptps[1] = eptp;
+		pr_info("ept_pointer:       %016lx\n", (unsigned long)eptp);
+		pr_info("eptp_list_address: %016lx\n",  (unsigned long)eptp_list_address);
+		pr_info("eptps(virt):       %016lx\n", (unsigned long)eptps);
 
 		hv_track_root_tdp(vcpu, root_hpa);
 
@@ -4589,6 +4599,8 @@ static void init_vmcs(struct vcpu_vmx *vmx)
 {
 	struct kvm *kvm = vmx->vcpu.kvm;
 	struct kvm_vmx *kvm_vmx = to_kvm_vmx(kvm);
+	unsigned long *eptps;
+	unsigned long ept_pointer;
 
 	if (nested)
 		nested_vmx_set_vmcs_shadowing_bitmap();
@@ -4645,8 +4657,15 @@ static void init_vmcs(struct vcpu_vmx *vmx)
 	vmcs_writel(HOST_FS_BASE, 0); /* 22.2.4 */
 	vmcs_writel(HOST_GS_BASE, 0); /* 22.2.4 */
 
-	if (cpu_has_vmx_vmfunc())
-		vmcs_write64(VM_FUNCTION_CONTROL, 0);
+	if (cpu_has_vmx_vmfunc()) {
+		vmcs_write64(VM_FUNCTION_CONTROL, 1);
+		eptps = (unsigned long *) __get_free_page(GFP_KERNEL);
+		ept_pointer = vmcs_read64(EPT_POINTER);
+		pr_info("============== init vmcs: ept_pointer %016lx =========== eptps: %016lx %016lx\n", ept_pointer,  (unsigned long)eptps, (unsigned long)virt_to_phys(eptps));
+		eptps[0] = ept_pointer;
+		eptps[1] = ept_pointer;
+		vmcs_write64(EPTP_LIST_ADDRESS, virt_to_phys(eptps));
+	}		
 
 	vmcs_write32(VM_EXIT_MSR_STORE_COUNT, 0);
 	vmcs_write32(VM_EXIT_MSR_LOAD_COUNT, 0);

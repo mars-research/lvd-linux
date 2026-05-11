@@ -1310,6 +1310,9 @@ static struct inet_protosw rawv6_protosw = {
 
 int __init rawv6_init(void)
 {
+	// pr_info("ipv6_entry_gid: %lu\n", ipv6_entry_gid);
+	// pr_info("ipv6_exit_gid: %lu\n", ipv6_exit_gid);
+	unsigned long ii = ipv6_entry_gid + ipv6_exit_gid;
 	return inet6_register_protosw(&rawv6_protosw);
 }
 

@@ -5,6 +5,9 @@
 #include <linux/mm.h>
 #include <asm/page.h>
 #include <asm-generic/set_memory.h>
+#include <linux/gfp.h>
+#include <linux/list_lru.h>
+#include <linux/shrinker.h>
 
 /*
  * The set_memory_* API can be used to change various attributes of a virtual
@@ -50,6 +53,7 @@ int set_memory_decrypted(unsigned long addr, int numpages);
 int set_memory_np_noalias(unsigned long addr, int numpages);
 int set_memory_nonglobal(unsigned long addr, int numpages);
 int set_memory_global(unsigned long addr, int numpages);
+int set_memory_pks(unsigned long addr, int numpages, int key);
 
 int set_pages_array_uc(struct page **pages, int addrinarray);
 int set_pages_array_wc(struct page **pages, int addrinarray);
@@ -85,5 +89,25 @@ int set_direct_map_default_noflush(struct page *page);
 bool kernel_page_present(struct page *page);
 
 extern int kernel_set_to_readonly;
+
+void add_dmap_table(unsigned long addr);
+
+typedef int (*gpc_callback)(struct page*, unsigned int);
+
+struct grouped_page_cache {
+	struct shrinker shrinker;
+	struct list_lru lru;
+	gfp_t gfp;
+    gpc_callback pre_add_to_cache;
+	gpc_callback pre_shrink_free;
+	atomic_t nid_round_robin;
+};
+
+int init_grouped_page_cache(struct grouped_page_cache *gpc, gfp_t gfp,
+			    gpc_callback pre_add_to_cache,
+			    gpc_callback pre_shrink_free);
+struct page *get_grouped_page(int node, struct grouped_page_cache *gpc);
+struct page *get_grouped_page_atomic(int node, struct grouped_page_cache *gpc);
+void free_grouped_page(struct grouped_page_cache *gpc, struct page *page);
 
 #endif /* _ASM_X86_SET_MEMORY_H */

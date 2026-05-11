@@ -120,6 +120,19 @@ extern pmdval_t early_pmd_flags;
 #define arch_end_context_switch(prev)	do {} while(0)
 #endif	/* CONFIG_PARAVIRT_XXL */
 
+#ifdef CONFIG_PKS_MONITOR
+void pks_tables_check_boottime_disable(void);
+void enable_pgtable_write(void);
+void disable_pgtable_write(void);
+bool pks_tables_inited(void);
+bool pks_tables_fault(struct pt_regs *regs, unsigned long addr, bool write);
+#else /* CONFIG_PKS_MONITOR */
+static inline void pks_tables_check_boottime_disable(void) { }
+static void enable_pgtable_write(void) { }
+static void disable_pgtable_write(void) { }
+#define pks_tables_inited() 0
+#endif /* CONFIG_PKS_MONITOR */
+
 /*
  * The following only work if pte_present() is true.
  * Undefined behaviour if not..
@@ -1078,7 +1091,9 @@ static inline pte_t ptep_get_and_clear_full(struct mm_struct *mm,
 static inline void ptep_set_wrprotect(struct mm_struct *mm,
 				      unsigned long addr, pte_t *ptep)
 {
+	enable_pgtable_write();
 	clear_bit(_PAGE_BIT_RW, (unsigned long *)&ptep->pte);
+	disable_pgtable_write();
 }
 
 #define flush_tlb_fix_spurious_fault(vma, address) do { } while (0)
@@ -1136,7 +1151,9 @@ static inline pud_t pudp_huge_get_and_clear(struct mm_struct *mm,
 static inline void pmdp_set_wrprotect(struct mm_struct *mm,
 				      unsigned long addr, pmd_t *pmdp)
 {
+	enable_pgtable_write();
 	clear_bit(_PAGE_BIT_RW, (unsigned long *)pmdp);
+	disable_pgtable_write();
 }
 
 #define pud_write pud_write
@@ -1152,10 +1169,18 @@ static inline pmd_t pmdp_establish(struct vm_area_struct *vma,
 {
 	page_table_check_pmd_set(vma->vm_mm, address, pmdp, pmd);
 	if (IS_ENABLED(CONFIG_SMP)) {
-		return xchg(pmdp, pmd);
+		pmd_t ret;
+
+		enable_pgtable_write();
+		ret = xchg(pmdp, pmd);
+		disable_pgtable_write();
+
+		return ret;
 	} else {
 		pmd_t old = *pmdp;
+		enable_pgtable_write();
 		WRITE_ONCE(*pmdp, pmd);
+		disable_pgtable_write();
 		return old;
 	}
 }
@@ -1243,13 +1268,17 @@ static inline p4d_t *user_to_kernel_p4dp(p4d_t *p4dp)
  */
 static inline void clone_pgd_range(pgd_t *dst, pgd_t *src, int count)
 {
+	enable_pgtable_write();
 	memcpy(dst, src, count * sizeof(pgd_t));
+	disable_pgtable_write();
 #ifdef CONFIG_PAGE_TABLE_ISOLATION
 	if (!static_cpu_has(X86_FEATURE_PTI))
 		return;
 	/* Clone the user space pgd as well */
+	enable_pgtable_write();
 	memcpy(kernel_to_user_pgdp(dst), kernel_to_user_pgdp(src),
 	       count * sizeof(pgd_t));
+	disable_pgtable_write();
 #endif
 }
 

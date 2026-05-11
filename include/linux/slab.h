@@ -350,6 +350,11 @@ enum kmalloc_cache_type {
 extern struct kmem_cache *
 kmalloc_caches[NR_KMALLOC_TYPES][KMALLOC_SHIFT_HIGH + 1];
 
+#ifdef CONFIG_PKS_HEAP
+extern struct kmem_cache *
+kmalloc_pks_caches[NR_KMALLOC_TYPES][KMALLOC_SHIFT_HIGH + 1];
+#endif
+
 /*
  * Define gfp bits that should not be set for KMALLOC_NORMAL.
  */
@@ -441,6 +446,10 @@ static_assert(PAGE_SHIFT <= 20);
 #endif /* !CONFIG_SLOB */
 
 void *__kmalloc(size_t size, gfp_t flags) __assume_kmalloc_alignment __alloc_size(1);
+#ifdef CONFIG_PKS_HEAP
+void *__kmalloc_pks(size_t size, gfp_t flags) __assume_kmalloc_alignment __alloc_size(1);
+void *kmem_cache_alloc_pks(struct kmem_cache *s, gfp_t flags) __assume_slab_alignment __malloc;
+#endif
 void *kmem_cache_alloc(struct kmem_cache *s, gfp_t flags) __assume_slab_alignment __malloc;
 void *kmem_cache_alloc_lru(struct kmem_cache *s, struct list_lru *lru,
 			   gfp_t gfpflags) __assume_slab_alignment __malloc;
@@ -557,6 +566,30 @@ static __always_inline __alloc_size(1) void *kmalloc(size_t size, gfp_t flags)
 	}
 	return __kmalloc(size, flags);
 }
+
+#ifdef CONFIG_PKS_HEAP
+static __always_inline __alloc_size(1) void *kmalloc_pks(size_t size, gfp_t flags)
+{
+	if (__builtin_constant_p(size)) {
+#ifndef CONFIG_SLOB
+		unsigned int index;
+#endif
+		if (size > KMALLOC_MAX_CACHE_SIZE)
+			return kmalloc_large(size, flags);
+#ifndef CONFIG_SLOB
+		index = kmalloc_index(size);
+
+		if (!index)
+			return ZERO_SIZE_PTR;
+
+		return kmalloc_trace(
+				kmalloc_pks_caches[kmalloc_type(flags)][index],
+				flags, size);
+#endif
+	}
+	return __kmalloc_pks(size, flags);
+}
+#endif /*CONFIG_PKS_HEAP*/
 
 #ifndef CONFIG_SLOB
 static __always_inline __alloc_size(1) void *kmalloc_node(size_t size, gfp_t flags, int node)
@@ -679,6 +712,13 @@ static inline void *kmem_cache_zalloc(struct kmem_cache *k, gfp_t flags)
 	return kmem_cache_alloc(k, flags | __GFP_ZERO);
 }
 
+#ifdef CONFIG_PKS_HEAP
+static inline void *kmem_cache_zalloc_pks(struct kmem_cache *k, gfp_t flags)
+{
+	return kmem_cache_alloc_pks(k, flags | __GFP_ZERO);
+}
+#endif /*CONFIG_PKS_HEAP*/
+
 /**
  * kzalloc - allocate memory. The memory is set to zero.
  * @size: how many bytes of memory are required.
@@ -701,6 +741,7 @@ static inline __alloc_size(1) void *kzalloc_node(size_t size, gfp_t flags, int n
 }
 
 extern void *kvmalloc_node(size_t size, gfp_t flags, int node) __alloc_size(1);
+// extern void *kvmalloc_node_pks(size_t size, gfp_t flags, int node) __alloc_size(1);
 static inline __alloc_size(1) void *kvmalloc(size_t size, gfp_t flags)
 {
 	return kvmalloc_node(size, flags, NUMA_NO_NODE);

@@ -256,6 +256,9 @@ static const struct inet6_protocol tunnelmpls6_protocol = {
 
 static int __init tunnel6_init(void)
 {
+	// pr_info("ipv6_entry_gid: %lu\n", ipv6_entry_gid);
+	// pr_info("ipv6_exit_gid: %lu\n", ipv6_exit_gid);
+	unsigned long ii = ipv6_entry_gid + ipv6_exit_gid;
 	if (inet6_add_protocol(&tunnel6_protocol, IPPROTO_IPV6)) {
 		pr_err("%s: can't add protocol\n", __func__);
 		return -EAGAIN;

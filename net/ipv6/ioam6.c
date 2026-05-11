@@ -14,6 +14,7 @@
 #include <linux/ioam6_genl.h>
 #include <linux/rhashtable.h>
 #include <linux/netdevice.h>
+#include <linux/sgtable.h>
 
 #include <net/addrconf.h>
 #include <net/genetlink.h>
@@ -249,7 +250,11 @@ static int ioam6_genl_dumpns_start(struct netlink_callback *cb)
 	struct rhashtable_iter *iter = (struct rhashtable_iter *)cb->args[0];
 
 	if (!iter) {
+#ifdef CONFIG_PKS_HEAP
+		iter = kmalloc_pks(sizeof(*iter), GFP_KERNEL);
+#else
 		iter = kmalloc(sizeof(*iter), GFP_KERNEL);
+#endif
 		if (!iter)
 			return -ENOMEM;
 
@@ -435,7 +440,11 @@ static int ioam6_genl_dumpsc_start(struct netlink_callback *cb)
 	struct rhashtable_iter *iter = (struct rhashtable_iter *)cb->args[0];
 
 	if (!iter) {
+#ifdef CONFIG_PKS_HEAP
+		iter = kmalloc_pks(sizeof(*iter), GFP_KERNEL);
+#else
 		iter = kmalloc(sizeof(*iter), GFP_KERNEL);
+#endif
 		if (!iter)
 			return -ENOMEM;
 
@@ -942,7 +951,10 @@ static struct pernet_operations ioam6_net_ops = {
 
 int __init ioam6_init(void)
 {
+	unsigned long ii = ipv6_entry_gid + ipv6_exit_gid;
 	int err = register_pernet_subsys(&ioam6_net_ops);
+	// pr_info("ipv6_entry_gid: %lu\n", ipv6_entry_gid);
+	// pr_info("ipv6_exit_gid: %lu\n", ipv6_exit_gid);
 	if (err)
 		goto out;
 

@@ -2373,6 +2373,18 @@ static inline bool ptlock_init(struct page *page) { return true; }
 static inline void ptlock_free(struct page *page) {}
 #endif /* USE_SPLIT_PTE_PTLOCKS */
 
+#ifndef CONFIG_PKS_MONITOR
+static inline void free_table(struct page *table_page)
+{
+	__free_pages(table_page, 0);
+}
+
+static inline struct page *alloc_table_node(gfp_t gfp, int node)
+{
+	return alloc_pages_node(node, gfp, 0);
+}
+#endif /* CONFIG_PKS_MONITOR */
+
 static inline void pgtable_init(void)
 {
 	ptlock_cache_init();
@@ -2383,7 +2395,6 @@ static inline bool pgtable_pte_page_ctor(struct page *page)
 {
 	if (!ptlock_init(page))
 		return false;
-	__SetPageTable(page);
 	inc_lruvec_page_state(page, NR_PAGETABLE);
 	return true;
 }
@@ -2391,7 +2402,6 @@ static inline bool pgtable_pte_page_ctor(struct page *page)
 static inline void pgtable_pte_page_dtor(struct page *page)
 {
 	ptlock_free(page);
-	__ClearPageTable(page);
 	dec_lruvec_page_state(page, NR_PAGETABLE);
 }
 
@@ -2478,7 +2488,6 @@ static inline bool pgtable_pmd_page_ctor(struct page *page)
 {
 	if (!pmd_ptlock_init(page))
 		return false;
-	__SetPageTable(page);
 	inc_lruvec_page_state(page, NR_PAGETABLE);
 	return true;
 }
@@ -2486,7 +2495,6 @@ static inline bool pgtable_pmd_page_ctor(struct page *page)
 static inline void pgtable_pmd_page_dtor(struct page *page)
 {
 	pmd_ptlock_free(page);
-	__ClearPageTable(page);
 	dec_lruvec_page_state(page, NR_PAGETABLE);
 }
 

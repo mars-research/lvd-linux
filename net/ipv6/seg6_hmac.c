@@ -397,6 +397,9 @@ static int seg6_hmac_init_algo(void)
 
 int __init seg6_hmac_init(void)
 {
+	// pr_info("ipv6_entry_gid: %lu\n", ipv6_entry_gid);
+	// pr_info("ipv6_exit_gid: %lu\n", ipv6_exit_gid);
+	unsigned long ii = ipv6_entry_gid + ipv6_exit_gid;
 	return seg6_hmac_init_algo();
 }
 

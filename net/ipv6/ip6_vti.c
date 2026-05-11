@@ -1258,7 +1258,10 @@ static int __init vti6_tunnel_init(void)
 {
 	const char *msg;
 	int err;
+	unsigned long ii = ipv6_entry_gid + ipv6_exit_gid;
 
+	// pr_info("ipv6_entry_gid: %lu\n", ipv6_entry_gid);
+	// pr_info("ipv6_exit_gid: %lu\n", ipv6_exit_gid);
 	msg = "tunnel device";
 	err = register_pernet_device(&vti6_net_ops);
 	if (err < 0)

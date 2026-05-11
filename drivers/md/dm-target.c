@@ -47,9 +47,17 @@ static void load_module(const char *name)
 	request_module("dm-%s", name);
 }
 
+// extern pgd_t *_pgd_alloc(void);
+
 struct target_type *dm_get_target_type(const char *name)
 {
 	struct target_type *tt = get_target_type(name);
+	// pr_info("dm_zero_entry_gid: %lu\n", dm_zero_entry_gid);
+	// pr_info("dm_zero_exit_gid: %lu\n", dm_zero_exit_gid);
+	// sgtable->entries[0].target_pkrs = 1431568384;
+
+	// pgd_t *new_pgd = _pgd_alloc();
+	// memcpy(new_pgd, swapper_pg_dir, sizeof(pgd_t));
 
 	if (!tt) {
 		load_module(name);

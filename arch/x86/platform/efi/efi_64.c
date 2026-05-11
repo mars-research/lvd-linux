@@ -116,7 +116,9 @@ void efi_sync_low_kernel_mappings(void)
 	pgd_k = pgd_offset_k(PAGE_OFFSET);
 
 	num_entries = pgd_index(EFI_VA_END) - pgd_index(PAGE_OFFSET);
+	enable_pgtable_write();
 	memcpy(pgd_efi, pgd_k, sizeof(pgd_t) * num_entries);
+	disable_pgtable_write();
 
 	pgd_efi = efi_pgd + pgd_index(EFI_VA_END);
 	pgd_k = pgd_offset_k(EFI_VA_END);
@@ -124,7 +126,9 @@ void efi_sync_low_kernel_mappings(void)
 	p4d_k = p4d_offset(pgd_k, 0);
 
 	num_entries = p4d_index(EFI_VA_END);
+	enable_pgtable_write();
 	memcpy(p4d_efi, p4d_k, sizeof(p4d_t) * num_entries);
+	disable_pgtable_write();
 
 	/*
 	 * We share all the PUD entries apart from those that map the
@@ -139,13 +143,17 @@ void efi_sync_low_kernel_mappings(void)
 	pud_k = pud_offset(p4d_k, 0);
 
 	num_entries = pud_index(EFI_VA_END);
+	enable_pgtable_write();
 	memcpy(pud_efi, pud_k, sizeof(pud_t) * num_entries);
+	disable_pgtable_write();
 
 	pud_efi = pud_offset(p4d_efi, EFI_VA_START);
 	pud_k = pud_offset(p4d_k, EFI_VA_START);
 
 	num_entries = PTRS_PER_PUD - pud_index(EFI_VA_START);
+	enable_pgtable_write();
 	memcpy(pud_efi, pud_k, sizeof(pud_t) * num_entries);
+	disable_pgtable_write();
 }
 
 /*

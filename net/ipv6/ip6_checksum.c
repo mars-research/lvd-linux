@@ -3,6 +3,7 @@
 #include <net/udp.h>
 #include <net/udplite.h>
 #include <asm/checksum.h>
+#include <linux/sgtable.h>
 
 #ifndef _HAVE_ARCH_IPV6_CSUM
 __sum16 csum_ipv6_magic(const struct in6_addr *saddr,
@@ -65,7 +66,10 @@ EXPORT_SYMBOL(csum_ipv6_magic);
 int udp6_csum_init(struct sk_buff *skb, struct udphdr *uh, int proto)
 {
 	int err;
+	unsigned long ii = ipv6_entry_gid + ipv6_exit_gid;
 
+	// pr_info("ipv6_entry_gid: %lu\n", ipv6_entry_gid);
+	// pr_info("ipv6_exit_gid: %lu\n", ipv6_exit_gid);
 	UDP_SKB_CB(skb)->partial_cov = 0;
 	UDP_SKB_CB(skb)->cscov = skb->len;
 

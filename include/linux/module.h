@@ -27,6 +27,7 @@
 #include <linux/tracepoint-defs.h>
 #include <linux/srcu.h>
 #include <linux/static_call_types.h>
+#include <linux/sgtable.h>
 
 #include <linux/percpu.h>
 #include <asm/module.h>

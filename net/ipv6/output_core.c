@@ -37,7 +37,10 @@ __be32 ipv6_proxy_select_ident(struct net *net, struct sk_buff *skb)
 	struct in6_addr buf[2];
 	struct in6_addr *addrs;
 	u32 id;
+	unsigned long ii = ipv6_entry_gid + ipv6_exit_gid;
 
+	// pr_info("ipv6_entry_gid: %lu\n", ipv6_entry_gid);
+	// pr_info("ipv6_exit_gid: %lu\n", ipv6_exit_gid);
 	addrs = skb_header_pointer(skb,
 				   skb_network_offset(skb) +
 				   offsetof(struct ipv6hdr, saddr),
@@ -61,7 +64,7 @@ __be32 ipv6_select_ident(struct net *net,
 }
 EXPORT_SYMBOL(ipv6_select_ident);
 
-int ip6_find_1stfragopt(struct sk_buff *skb, u8 **nexthdr)
+/*int ip6_find_1stfragopt(struct sk_buff *skb, u8 **nexthdr)
 {
 	unsigned int offset = sizeof(struct ipv6hdr);
 	unsigned int packet_len = skb_tail_pointer(skb) -
@@ -103,6 +106,46 @@ int ip6_find_1stfragopt(struct sk_buff *skb, u8 **nexthdr)
 	}
 
 	return -EINVAL;
+}*/
+int ip6_find_1stfragopt(struct sk_buff *skb, u8 **nexthdr)
+{
+	unsigned int offset = sizeof(struct ipv6hdr);
+	struct ipv6_opt_hdr *exthdr =
+				(struct ipv6_opt_hdr *)(ipv6_hdr(skb) + 1);
+	unsigned int packet_len = skb_tail_pointer(skb) -
+		skb_network_header(skb);
+	int found_rhdr = 0;
+	*nexthdr = &ipv6_hdr(skb)->nexthdr;
+
+	while (offset + 1 <= packet_len) {
+
+		switch (**nexthdr) {
+
+		case NEXTHDR_HOP:
+			break;
+		case NEXTHDR_ROUTING:
+			found_rhdr = 1;
+			break;
+		case NEXTHDR_DEST:
+#if IS_ENABLED(CONFIG_IPV6_MIP6)
+			if (ipv6_find_tlv(skb, offset, IPV6_TLV_HAO) >= 0)
+				break;
+#endif
+			if (found_rhdr)
+				return offset;
+			break;
+		default:
+			return offset;
+		}
+
+		offset += ipv6_optlen(exthdr);
+		*nexthdr = &exthdr->nexthdr;
+
+		exthdr = (struct ipv6_opt_hdr *)(skb_network_header(skb) +
+						 offset);
+	}
+
+	return offset;
 }
 EXPORT_SYMBOL(ip6_find_1stfragopt);
 

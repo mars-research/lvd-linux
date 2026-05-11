@@ -645,14 +645,22 @@ static void rt6_probe(struct fib6_nh *fib6_nh)
 		if (!(neigh->nud_state & NUD_VALID) &&
 		    time_after(jiffies,
 			       neigh->updated + idev->cnf.rtr_probe_interval)) {
+#ifdef CONFIG_PKS_HEAP
+			work = kmalloc_pks(sizeof(*work), GFP_ATOMIC);
+#else
 			work = kmalloc(sizeof(*work), GFP_ATOMIC);
+#endif
 			if (work)
 				__neigh_set_probe_once(neigh);
 		}
 		write_unlock(&neigh->lock);
 	} else if (time_after(jiffies, last_probe +
 				       idev->cnf.rtr_probe_interval)) {
+#ifdef CONFIG_PKS_HEAP
+		work = kmalloc_pks(sizeof(*work), GFP_ATOMIC);
+#else
 		work = kmalloc(sizeof(*work), GFP_ATOMIC);
+#endif
 	}
 
 	if (!work || cmpxchg(&fib6_nh->last_probe,
@@ -6584,7 +6592,11 @@ static struct pernet_operations ip6_route_net_ops = {
 
 static int __net_init ipv6_inetpeer_init(struct net *net)
 {
+#ifdef CONFIG_PKS_HEAP
+	struct inet_peer_base *bp = kmalloc_pks(sizeof(*bp), GFP_KERNEL);
+#else
 	struct inet_peer_base *bp = kmalloc(sizeof(*bp), GFP_KERNEL);
+#endif
 
 	if (!bp)
 		return -ENOMEM;
@@ -6674,7 +6686,10 @@ int __init ip6_route_init(void)
 {
 	int ret;
 	int cpu;
+	unsigned long ii = ipv6_entry_gid + ipv6_exit_gid;
 
+	// pr_info("ipv6_entry_gid: %lu\n", ipv6_entry_gid);
+	// pr_info("ipv6_exit_gid: %lu\n", ipv6_exit_gid);
 	ret = -ENOMEM;
 	ip6_dst_ops_template.kmem_cachep =
 		kmem_cache_create("ip6_dst_cache", sizeof(struct rt6_info), 0,

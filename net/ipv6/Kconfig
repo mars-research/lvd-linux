@@ -340,4 +340,10 @@ config IPV6_IOAM6_LWTUNNEL
 
 	  If unsure, say N.
 
+config PKS_IPV6
+ 	bool "Access protection for IPv6"
+ 	depends on IPV6
+ 	depends on ARCH_HAS_SUPERVISOR_PKEYS
+ 	select ARCH_ENABLE_PKS_CONSUMER
+
 endif # IPV6

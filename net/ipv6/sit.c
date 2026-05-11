@@ -1909,7 +1909,10 @@ static void __exit sit_cleanup(void)
 static int __init sit_init(void)
 {
 	int err;
+	unsigned long ii = ipv6_entry_gid + ipv6_exit_gid;
 
+	// pr_info("ipv6_entry_gid: %lu\n", ipv6_entry_gid);
+	// pr_info("ipv6_exit_gid: %lu\n", ipv6_exit_gid);
 	pr_info("IPv6, IPv4 and MPLS over IPv4 tunneling driver\n");
 
 	err = register_pernet_device(&sit_net_ops);

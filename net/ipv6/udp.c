@@ -1785,7 +1785,10 @@ static struct inet_protosw udpv6_protosw = {
 int __init udpv6_init(void)
 {
 	int ret;
+	unsigned long ii = ipv6_entry_gid + ipv6_exit_gid;
 
+	// pr_info("ipv6_entry_gid: %lu\n", ipv6_entry_gid);
+	// pr_info("ipv6_exit_gid: %lu\n", ipv6_exit_gid);
 	ret = inet6_add_protocol(&udpv6_protocol, IPPROTO_UDP);
 	if (ret)
 		goto out;

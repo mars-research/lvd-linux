@@ -669,10 +669,41 @@ struct kmem_cache *__init create_kmalloc_cache(const char *name,
 	return s;
 }
 
+#ifdef CONFIG_PKS_HEAP
+struct kmem_cache *__init create_kmalloc_cache_pks(const char *name,
+		unsigned int size, slab_flags_t flags,
+		unsigned int useroffset, unsigned int usersize)
+{
+	struct kmem_cache *s = kmem_cache_zalloc_pks(kmem_cache, GFP_NOWAIT);
+
+	if (!s)
+		panic("Out of memory when creating slab %s\n", name);
+
+	// if (size > PAGE_SIZE) {
+	// 	set_memory_pks((unsigned long)s, size >> PAGE_SHIFT, 0);
+	// }
+
+	create_boot_cache(s, name, size, flags | SLAB_KMALLOC, useroffset,
+								usersize);
+	kasan_cache_create_kmalloc(s);
+	list_add(&s->list, &slab_caches);
+	s->refcount = 1;
+	return s;
+}
+#endif
+
 struct kmem_cache *
 kmalloc_caches[NR_KMALLOC_TYPES][KMALLOC_SHIFT_HIGH + 1] __ro_after_init =
 { /* initialization for https://bugs.llvm.org/show_bug.cgi?id=42570 */ };
 EXPORT_SYMBOL(kmalloc_caches);
+
+#ifdef CONFIG_PKS_HEAP
+struct kmem_cache *
+kmalloc_pks_caches[NR_KMALLOC_TYPES][KMALLOC_SHIFT_HIGH + 1] =
+{ /* initialization for https://bugs.llvm.org/show_bug.cgi?id=42570 */ };
+EXPORT_SYMBOL(kmalloc_pks_caches);
+#endif /*CONFIG_PKS_HEAP*/
+
 
 /*
  * Conversion table for small slabs sizes / 8 to the index in the
@@ -733,6 +764,26 @@ struct kmem_cache *kmalloc_slab(size_t size, gfp_t flags)
 
 	return kmalloc_caches[kmalloc_type(flags)][index];
 }
+
+#ifdef CONFIG_PKS_HEAP
+struct kmem_cache *kmalloc_slab_pks(size_t size, gfp_t flags)
+{
+	unsigned int index;
+
+	if (size <= 192) {
+		if (!size)
+			return ZERO_SIZE_PTR;
+
+		index = size_index[size_index_elem(size)];
+	} else {
+		if (WARN_ON_ONCE(size > KMALLOC_MAX_CACHE_SIZE))
+			return NULL;
+		index = fls(size - 1);
+	}
+
+	return kmalloc_pks_caches[kmalloc_type(flags)][index];
+}
+#endif /*CONFIG_PKS_HEAP*/
 
 size_t kmalloc_size_roundup(size_t size)
 {
@@ -804,6 +855,47 @@ const struct kmalloc_info_struct kmalloc_info[] __initconst = {
 	INIT_KMALLOC_INFO(1048576, 1M),
 	INIT_KMALLOC_INFO(2097152, 2M)
 };
+
+#ifdef CONFIG_PKS_HEAP
+#define INIT_KMALLOC_INFO_PKS(__size, __short_size)			\
+{								\
+	.name[KMALLOC_NORMAL]  = "kmalloc-pks-" #__short_size,	\
+	.name[KMALLOC_RECLAIM] = "kmalloc-pks-rcl-" #__short_size,	\
+	KMALLOC_CGROUP_NAME(__short_size)			\
+	KMALLOC_DMA_NAME(__short_size)				\
+	.size = __size,						\
+}
+
+/*
+ * kmalloc_info[] is to make slub_debug=,kmalloc-xx option work at boot time.
+ * kmalloc_index() supports up to 2^21=2MB, so the final entry of the table is
+ * kmalloc-2M.
+ */
+const struct kmalloc_info_struct kmalloc_info_pks[] __initconst = {
+	INIT_KMALLOC_INFO_PKS(0, 0),
+	INIT_KMALLOC_INFO_PKS(96, 96),
+	INIT_KMALLOC_INFO_PKS(192, 192),
+	INIT_KMALLOC_INFO_PKS(8, 8),
+	INIT_KMALLOC_INFO_PKS(16, 16),
+	INIT_KMALLOC_INFO_PKS(32, 32),
+	INIT_KMALLOC_INFO_PKS(64, 64),
+	INIT_KMALLOC_INFO_PKS(128, 128),
+	INIT_KMALLOC_INFO_PKS(256, 256),
+	INIT_KMALLOC_INFO_PKS(512, 512),
+	INIT_KMALLOC_INFO_PKS(1024, 1k),
+	INIT_KMALLOC_INFO_PKS(2048, 2k),
+	INIT_KMALLOC_INFO_PKS(4096, 4k),
+	INIT_KMALLOC_INFO_PKS(8192, 8k),
+	INIT_KMALLOC_INFO_PKS(16384, 16k),
+	INIT_KMALLOC_INFO_PKS(32768, 32k),
+	INIT_KMALLOC_INFO_PKS(65536, 64k),
+	INIT_KMALLOC_INFO_PKS(131072, 128k),
+	INIT_KMALLOC_INFO_PKS(262144, 256k),
+	INIT_KMALLOC_INFO_PKS(524288, 512k),
+	INIT_KMALLOC_INFO_PKS(1048576, 1M),
+	INIT_KMALLOC_INFO_PKS(2097152, 2M)
+};
+#endif /*CONFIG_PKS_HEAP*/
 
 /*
  * Patch up the size_index table if we have strange large alignment
@@ -880,6 +972,36 @@ new_kmalloc_cache(int idx, enum kmalloc_cache_type type, slab_flags_t flags)
 		kmalloc_caches[type][idx]->refcount = -1;
 }
 
+#ifdef CONFIG_PKS_HEAP
+static void __init
+new_kmalloc_cache_pks(int idx, enum kmalloc_cache_type type, slab_flags_t flags)
+{
+	if (type == KMALLOC_RECLAIM) {
+		flags |= SLAB_RECLAIM_ACCOUNT;
+	} else if (IS_ENABLED(CONFIG_MEMCG_KMEM) && (type == KMALLOC_CGROUP)) {
+		if (mem_cgroup_kmem_disabled()) {
+			kmalloc_pks_caches[type][idx] = kmalloc_pks_caches[KMALLOC_NORMAL][idx];
+			return;
+		}
+		flags |= SLAB_ACCOUNT;
+	} else if (IS_ENABLED(CONFIG_ZONE_DMA) && (type == KMALLOC_DMA)) {
+		flags |= SLAB_CACHE_DMA;
+	}
+
+	kmalloc_pks_caches[type][idx] = create_kmalloc_cache_pks(
+					kmalloc_info_pks[idx].name[type],
+					kmalloc_info_pks[idx].size, flags, 0,
+					kmalloc_info_pks[idx].size);
+
+	/*
+	 * If CONFIG_MEMCG_KMEM is enabled, disable cache merging for
+	 * KMALLOC_NORMAL caches.
+	 */
+	if (IS_ENABLED(CONFIG_MEMCG_KMEM) && (type == KMALLOC_NORMAL))
+		kmalloc_pks_caches[type][idx]->refcount = -1;
+}
+#endif /*CONFIG_PKS_HEAP*/
+
 /*
  * Create the kmalloc array. Some of the regular kmalloc arrays
  * may already have been created because they were needed to
@@ -895,6 +1017,9 @@ void __init create_kmalloc_caches(slab_flags_t flags)
 	 */
 	for (type = KMALLOC_NORMAL; type < NR_KMALLOC_TYPES; type++) {
 		for (i = KMALLOC_SHIFT_LOW; i <= KMALLOC_SHIFT_HIGH; i++) {
+#ifdef CONFIG_PKS_HEAP
+			new_kmalloc_cache_pks(i, type, flags);
+#endif
 			if (!kmalloc_caches[type][i])
 				new_kmalloc_cache(i, type, flags);
 
@@ -904,11 +1029,19 @@ void __init create_kmalloc_caches(slab_flags_t flags)
 			 * earlier power of two caches
 			 */
 			if (KMALLOC_MIN_SIZE <= 32 && i == 6 &&
-					!kmalloc_caches[type][1])
+					!kmalloc_caches[type][1]) {
 				new_kmalloc_cache(1, type, flags);
+#ifdef CONFIG_PKS_HEAP
+				new_kmalloc_cache_pks(1, type, flags);
+#endif
+			}
 			if (KMALLOC_MIN_SIZE <= 64 && i == 7 &&
-					!kmalloc_caches[type][2])
+					!kmalloc_caches[type][2]) {
 				new_kmalloc_cache(2, type, flags);
+#ifdef CONFIG_PKS_HEAP
+				new_kmalloc_cache_pks(2, type, flags);
+#endif
+			}
 		}
 	}
 
@@ -957,6 +1090,32 @@ void *__do_kmalloc_node(size_t size, gfp_t flags, int node, unsigned long caller
 	return ret;
 }
 
+#ifdef CONFIG_PKS_HEAP
+static __always_inline
+void *__do_kmalloc_node_pks(size_t size, gfp_t flags, int node, unsigned long caller)
+{
+	struct kmem_cache *s;
+	void *ret;
+
+	if (unlikely(size > KMALLOC_MAX_CACHE_SIZE)) {
+		ret = __kmalloc_large_node(size, flags, node);
+		trace_kmalloc(caller, ret, size,
+			      PAGE_SIZE << get_order(size), flags, node);
+		return ret;
+	}
+
+	s = kmalloc_slab_pks(size, flags);
+
+	if (unlikely(ZERO_OR_NULL_PTR(s)))
+		return s;
+
+	ret = __kmem_cache_alloc_node(s, flags, node, size, caller);
+	ret = kasan_kmalloc(s, ret, size, flags);
+	trace_kmalloc(caller, ret, size, s->size, flags, node);
+	return ret;
+}
+#endif /*CONFIG_PKS_HEAP*/
+
 void *__kmalloc_node(size_t size, gfp_t flags, int node)
 {
 	return __do_kmalloc_node(size, flags, node, _RET_IP_);
@@ -968,6 +1127,14 @@ void *__kmalloc(size_t size, gfp_t flags)
 	return __do_kmalloc_node(size, flags, NUMA_NO_NODE, _RET_IP_);
 }
 EXPORT_SYMBOL(__kmalloc);
+
+#ifdef CONFIG_PKS_HEAP
+void *__kmalloc_pks(size_t size, gfp_t flags)
+{
+	return __do_kmalloc_node_pks(size, flags, NUMA_NO_NODE, _RET_IP_);
+}
+EXPORT_SYMBOL(__kmalloc_pks);
+#endif /*CONFIG_PKS_HEAP*/
 
 void *__kmalloc_node_track_caller(size_t size, gfp_t flags,
 				  int node, unsigned long caller)

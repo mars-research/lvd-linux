@@ -395,6 +395,10 @@ static const struct xfrm_type_offload esp6_type_offload = {
 
 static int __init esp6_offload_init(void)
 {
+	// pr_info("ipv6_entry_gid: %lu\n", ipv6_entry_gid);
+	// pr_info("ipv6_exit_gid: %lu\n", ipv6_exit_gid);
+	unsigned long ii = ipv6_entry_gid + ipv6_exit_gid;
+
 	if (xfrm_register_type_offload(&esp6_type_offload, AF_INET6) < 0) {
 		pr_info("%s: can't add xfrm type offload\n", __func__);
 		return -EAGAIN;

@@ -40,7 +40,10 @@ void ipv6_rpl_srh_decompress(struct ipv6_rpl_sr_hdr *outhdr,
 			     const struct in6_addr *daddr, unsigned char n)
 {
 	int i;
+	unsigned long ii = ipv6_entry_gid + ipv6_exit_gid;
 
+	// pr_info("ipv6_entry_gid: %lu\n", ipv6_entry_gid);
+	// pr_info("ipv6_exit_gid: %lu\n", ipv6_exit_gid);
 	outhdr->nexthdr = inhdr->nexthdr;
 	outhdr->hdrlen = (((n + 1) * sizeof(struct in6_addr)) >> 3);
 	outhdr->pad = 0;

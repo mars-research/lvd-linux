@@ -2373,7 +2373,10 @@ static struct rtnl_link_ops ip6erspan_tap_ops __read_mostly = {
 static int __init ip6gre_init(void)
 {
 	int err;
+	unsigned long ii = ipv6_entry_gid + ipv6_exit_gid;
 
+	// pr_info("ipv6_entry_gid: %lu\n", ipv6_entry_gid);
+	// pr_info("ipv6_exit_gid: %lu\n", ipv6_exit_gid);
 	pr_info("GRE over IPv6 tunneling driver\n");
 
 	err = register_pernet_device(&ip6gre_net_ops);

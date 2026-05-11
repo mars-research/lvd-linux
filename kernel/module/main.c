@@ -39,6 +39,7 @@
 #include <linux/uaccess.h>
 #include <asm/cacheflush.h>
 #include <linux/set_memory.h>
+#include <asm/set_memory.h>
 #include <asm/mmu_context.h>
 #include <linux/license.h>
 #include <asm/sections.h>
@@ -56,6 +57,8 @@
 #include <linux/cfi.h>
 #include <uapi/linux/module.h>
 #include "internal.h"
+#include <linux/pks.h>
+#include <linux/sgtable.h>
 
 #define CREATE_TRACE_POINTS
 #include <trace/events/module.h>
@@ -2441,6 +2444,7 @@ static noinline int do_init_module(struct module *mod)
 {
 	int ret = 0;
 	struct mod_initfree *freeinit;
+	//u32 pkrs_pre;
 
 	freeinit = kmalloc(sizeof(*freeinit), GFP_KERNEL);
 	if (!freeinit) {
@@ -2524,6 +2528,133 @@ static noinline int do_init_module(struct module *mod)
 	mutex_unlock(&module_mutex);
 	wake_up_all(&module_wq);
 
+#ifdef CONFIG_PKS_IPV6
+	if (strcmp(mod->name, "ipv6") == 0) {
+		// set_memory_pks((unsigned long)mod->init_layout.base, mod->init_layout.size >> PAGE_SHIFT, PKS_KEY_IPV6);
+		// set_memory_pks((unsigned long)mod->core_layout.base, mod->core_layout.size >> PAGE_SHIFT, PKS_KEY_IPV6);
+		// pks_switch(true, 0);
+		// pkrs_pre = __this_cpu_read(previous_pkrs);
+		// register_switch_gate(sgtable, PKRS_MONITOR, pkrs_pre, 0, 0);
+		// register_switch_gate(sgtable, pkrs_pre, PKRS_IPV6, 0, 0);
+		// register_switch_gate(sgtable, PKRS_IPV6, pkrs_pre, 0, 0);
+		// pks_switch(true, 1);
+		pks_module_setup(mod);
+	}
+	//wrmsrl(MSR_IA32_PKRS, 1431655760);
+#endif
+
+#ifdef CONFIG_PKS_NF_TABLES
+	if (strcmp(mod->name, "nf_tables") == 0) {
+		pks_module_setup(mod);
+	}
+#endif
+
+#ifdef CONFIG_PKS_LKM20
+	pr_info("Install PKS module %s!\n", mod->name);
+	pks_module_setup(mod);
+	// if (strcmp(mod->name, "i915") != 0) {
+	// 	pks_module_setup(mod);
+	// }
+/*if (strcmp(mod->name, "nfnetlink") == 0) {
+pks_module_setup(mod);
+} else if (strcmp(mod->name, "nf_defrag_ipv4") == 0) {
+pks_module_setup(mod);
+} else if (strcmp(mod->name, "nf_defrag_ipv6") == 0) {
+pks_module_setup(mod);
+} else if (strcmp(mod->name, "ipv6") == 0) {
+pks_module_setup(mod);
+} else if (strcmp(mod->name, "nf_conntrack") == 0) {
+pks_module_setup(mod);
+} else if (strcmp(mod->name, "nf_nat") == 0) {
+pks_module_setup(mod);
+} else if (strcmp(mod->name, "nf_tables") == 0) {
+pks_module_setup(mod);
+} else if (strcmp(mod->name, "x_tables") == 0) {
+pks_module_setup(mod);
+} else if (strcmp(mod->name, "ip_tables") == 0) {
+pks_module_setup(mod);
+} else if (strcmp(mod->name, "ip6_tables") == 0) {
+pks_module_setup(mod);
+} else if (strcmp(mod->name, "nft_compat") == 0) {
+pks_module_setup(mod);
+} else if (strcmp(mod->name, "nft_nat") == 0) {
+pks_module_setup(mod);
+} else if (strcmp(mod->name, "typec") == 0) {
+pks_module_setup(mod);
+} else if (strcmp(mod->name, "tps6598x") == 0) {
+pks_module_setup(mod);
+} else if (strcmp(mod->name, "xhci_pci_renesas") == 0) {
+pks_module_setup(mod);
+} else if (strcmp(mod->name, "xhci_pci") == 0) {
+pks_module_setup(mod);
+} else if (strcmp(mod->name, "overlay") == 0) {
+pks_module_setup(mod);
+} else if (strcmp(mod->name, "pstore_zone") == 0) {
+pks_module_setup(mod);
+} else if (strcmp(mod->name, "ramoops") == 0) {
+pks_module_setup(mod);
+} else if (strcmp(mod->name, "pstore_blk") == 0) {
+pks_module_setup(mod);
+}*/
+	// if (strcmp(mod->name, "nfnetlink") == 0) {
+	// 	pks_module_setup(mod);
+	// } else if (strcmp(mod->name, "nf_defrag_ipv4") == 0) {
+	// 	pks_module_setup(mod);
+	// } else if (strcmp(mod->name, "nf_defrag_ipv6") == 0) {
+	// 	pks_module_setup(mod);
+	// } else if (strcmp(mod->name, "ipv6") == 0) {
+	// 	pks_module_setup(mod);
+	// } else if (strcmp(mod->name, "nf_conntrack") == 0) {
+	// 	pks_module_setup(mod);
+	// } else if (strcmp(mod->name, "nf_nat") == 0) {
+	// 	pks_module_setup(mod);
+	// } else if (strcmp(mod->name, "nf_tables") == 0) {
+	// 	pks_module_setup(mod);
+	// } else if (strcmp(mod->name, "x_tables") == 0) {
+	// 	pks_module_setup(mod);
+	// } else if (strcmp(mod->name, "ip_tables") == 0) {
+	// 	pks_module_setup(mod);
+	// } else if (strcmp(mod->name, "ip6_tables") == 0) {
+	// 	pks_module_setup(mod);
+	// } else if (strcmp(mod->name, "nft_compat") == 0) {
+	// 	pks_module_setup(mod);
+	// } else if (strcmp(mod->name, "nft_nat") == 0) {
+	// 	pks_module_setup(mod);
+	// } else if (strcmp(mod->name, "typec") == 0) {
+	// 	pks_module_setup(mod);
+	// } else if (strcmp(mod->name, "tps6598x") == 0) {
+	// 	pks_module_setup(mod);
+	// } else if (strcmp(mod->name, "xhci_pci_renesas") == 0) {
+	// 	pks_module_setup(mod);
+	// } else if (strcmp(mod->name, "xhci_pci") == 0) {
+	// 	pks_module_setup(mod);
+	// } else if (strcmp(mod->name, "overlay") == 0) {
+	// 	pks_module_setup(mod);
+	// } else if (strcmp(mod->name, "pstore_zone") == 0) {
+	// 	pks_module_setup(mod);
+	// } else if (strcmp(mod->name, "ramoops") == 0) {
+	// 	pks_module_setup(mod);
+	// } else if (strcmp(mod->name, "pstore_blk") == 0) {
+	// 	pks_module_setup(mod);
+	// } 
+#endif
+
+#ifdef CONFIG_PKS_DM_ZERO
+	pks_module_insert(mod->name, mod);
+	// if (strcmp(mod->name, "dm_zero") == 0) {
+	// 	// set_memory_pks((unsigned long)mod->init_layout.base, mod->init_layout.size >> PAGE_SHIFT, PKS_KEY_DM_ZERO);
+	// 	// set_memory_pks((unsigned long)mod->core_layout.base, mod->core_layout.size >> PAGE_SHIFT, PKS_KEY_DM_ZERO);
+	// 	// // pks_switch(true, 0);
+	// 	// // pkrs_pre = __this_cpu_read(previous_pkrs);
+	// 	// // register_switch_gate(sgtable, PKRS_MONITOR, pkrs_pre, 0, 0);
+	// 	// register_switch_gate(sgtable, PKRS_DEFAULT, PKRS_DM_ZERO, 0, 0);
+	// 	// // register_switch_gate(sgtable, PKRS_DM_ZERO, pkrs_pre, 0, 0);
+	// 	// // pks_switch(true, 1);
+	// 	pks_module_setup(mod);
+	// }
+	//wrmsrl(MSR_IA32_PKRS, 1431655760);
+#endif
+
 	return 0;
 
 fail_free_freeinit:
@@ -2541,6 +2672,181 @@ fail:
 	wake_up_all(&module_wq);
 	return ret;
 }
+
+// bool pks_entry_gate(u32 new_pkrs)
+// {
+// 	uint64_t start, end;
+// 	unsigned cycles_low, cycles_high, cycles_low1, cycles_high1;
+// 	u32 pkrs;
+	
+// 	//start = rdtsc();
+// 	// asm volatile("cpuid\n\t"
+// 	// 			"rdtsc\n\t"
+// 	// 			"mov %%edx, %0\n\t"
+// 	// 			"mov %%eax, %1\n\t": "=r" (cycles_high), "=r" (cycles_low)::
+// 	// 			"%rax", "%rbx", "%rcx", "%rdx");
+// 	pkrs = __this_cpu_read(pkrs_cache);
+
+// 	if (pkrs == new_pkrs)
+// 		return false;
+// 	__this_cpu_write(pkrs_cache, new_pkrs);
+// 	//start = rdtsc();
+// 	asm volatile("cpuid\n\t"
+// 				"rdtsc\n\t"
+// 				"mov %%edx, %0\n\t"
+// 				"mov %%eax, %1\n\t": "=r" (cycles_high), "=r" (cycles_low)::
+// 				"%rax", "%rbx", "%rcx", "%rdx");
+// 	wrmsrl(MSR_IA32_PKRS, new_pkrs);
+// 	//end = rdtsc();
+// 	asm volatile("rdtscp\n\t"
+// 				"mov %%edx, %0\n\t"
+// 				"mov %%eax, %1\n\t"
+// 				"cpuid\n\t": "=r" (cycles_high1), "=r" (cycles_low1)::
+// 				"%rax", "%rbx", "%rcx", "%rdx");
+// 	start = ( ((uint64_t)cycles_high << 32) | cycles_low );
+// 	end = ( ((uint64_t)cycles_high1 << 32) | cycles_low1 );
+// 	printk(KERN_INFO "start:%llu, end:%llu, cycles:%llu\n", start, end, end-start);
+// 	return true;
+// }
+// EXPORT_SYMBOL(pks_entry_gate);
+
+// bool pks_exit_gate(bool insert, u32 new_pkrs)
+// {
+// 	if (insert) {
+// 		__this_cpu_write(pkrs_cache, new_pkrs);
+// 		wrmsrl(MSR_IA32_PKRS, new_pkrs);
+// 		return true;
+// 	}
+// 	return false;
+// }
+// EXPORT_SYMBOL(pks_exit_gate);
+
+#ifdef CONFIG_PKS_IPV6
+bool ipv6_pks_fault_callback(struct pt_regs *regs, unsigned long address, bool write)
+{
+	printk(KERN_INFO "IPV6 protection being disabled in the fault callback!\n");
+	pks_update_exception(regs, 2, PKEY_READ_WRITE);
+	return true;
+}
+#endif
+
+#ifdef CONFIG_PKS_NF_TABLES
+bool nf_tables_pks_fault_callback(struct pt_regs *regs, unsigned long address, bool write)
+{
+	printk(KERN_INFO "nf_tables protection being disabled in the fault callback!\n");
+	pks_update_exception(regs, 3, PKEY_READ_WRITE);
+	return true;
+}
+#endif
+
+#ifdef CONFIG_PKS_DM_ZERO
+bool dm_zero_pks_fault_callback(struct pt_regs *regs, unsigned long address, bool write)
+{
+	printk(KERN_INFO "DM_ZERO protection being disabled in the fault callback!\n");
+	pks_update_exception(regs, 3, PKEY_READ_WRITE);
+	return true;
+}
+#endif
+
+#ifdef CONFIG_PKS_LKM20
+bool pkey2_fault_callback(struct pt_regs *regs, unsigned long address, bool write)
+{
+	// printk(KERN_INFO "pkey2 protection being disabled in the fault callback!\n");
+	pks_update_exception(regs, 2, PKEY_READ_WRITE);
+	return true;
+}
+
+bool pkey3_fault_callback(struct pt_regs *regs, unsigned long address, bool write)
+{
+	// printk(KERN_INFO "pkey3 protection being disabled in the fault callback!\n");
+	pks_update_exception(regs, 3, PKEY_READ_WRITE);
+	return true;
+}
+
+bool pkey4_fault_callback(struct pt_regs *regs, unsigned long address, bool write)
+{
+	// printk(KERN_INFO "pkey4 protection being disabled in the fault callback!\n");
+	pks_update_exception(regs, 4, PKEY_READ_WRITE);
+	return true;
+}
+
+bool pkey5_fault_callback(struct pt_regs *regs, unsigned long address, bool write)
+{
+	// printk(KERN_INFO "pkey5 protection being disabled in the fault callback!\n");
+	pks_update_exception(regs, 5, PKEY_READ_WRITE);
+	return true;
+}
+
+bool pkey6_fault_callback(struct pt_regs *regs, unsigned long address, bool write)
+{
+	// printk(KERN_INFO "pkey6 protection being disabled in the fault callback!\n");
+	pks_update_exception(regs, 6, PKEY_READ_WRITE);
+	return true;
+}
+
+bool pkey7_fault_callback(struct pt_regs *regs, unsigned long address, bool write)
+{
+	// printk(KERN_INFO "pkey7 protection being disabled in the fault callback!\n");
+	pks_update_exception(regs, 7, PKEY_READ_WRITE);
+	return true;
+}
+
+bool pkey8_fault_callback(struct pt_regs *regs, unsigned long address, bool write)
+{
+	// printk(KERN_INFO "pkey8 protection being disabled in the fault callback!\n");
+	pks_update_exception(regs, 8, PKEY_READ_WRITE);
+	return true;
+}
+
+bool pkey9_fault_callback(struct pt_regs *regs, unsigned long address, bool write)
+{
+	// printk(KERN_INFO "pkey9 protection being disabled in the fault callback!\n");
+	pks_update_exception(regs, 9, PKEY_READ_WRITE);
+	return true;
+}
+
+bool pkey10_fault_callback(struct pt_regs *regs, unsigned long address, bool write)
+{
+	// printk(KERN_INFO "pkey10 protection being disabled in the fault callback!\n");
+	pks_update_exception(regs, 10, PKEY_READ_WRITE);
+	return true;
+}
+
+bool pkey11_fault_callback(struct pt_regs *regs, unsigned long address, bool write)
+{
+	// printk(KERN_INFO "pkey11 protection being disabled in the fault callback!\n");
+	pks_update_exception(regs, 11, PKEY_READ_WRITE);
+	return true;
+}
+
+bool pkey12_fault_callback(struct pt_regs *regs, unsigned long address, bool write)
+{
+	// printk(KERN_INFO "pkey12 protection being disabled in the fault callback!\n");
+	pks_update_exception(regs, 12, PKEY_READ_WRITE);
+	return true;
+}
+
+bool pkey13_fault_callback(struct pt_regs *regs, unsigned long address, bool write)
+{
+	// printk(KERN_INFO "pkey13 protection being disabled in the fault callback!\n");
+	pks_update_exception(regs, 13, PKEY_READ_WRITE);
+	return true;
+}
+
+bool pkey14_fault_callback(struct pt_regs *regs, unsigned long address, bool write)
+{
+	// printk(KERN_INFO "pkey14 protection being disabled in the fault callback!\n");
+	pks_update_exception(regs, 14, PKEY_READ_WRITE);
+	return true;
+}
+
+bool pkey15_fault_callback(struct pt_regs *regs, unsigned long address, bool write)
+{
+	// printk(KERN_INFO "pkey15 protection being disabled in the fault callback!\n");
+	pks_update_exception(regs, 15, PKEY_READ_WRITE);
+	return true;
+}
+#endif
 
 static int may_init_module(void)
 {

@@ -33,6 +33,7 @@
 #include <asm/kvm_para.h>		/* kvm_handle_async_pf		*/
 #include <asm/vdso.h>			/* fixup_vdso_exception()	*/
 #include <asm/irq_stack.h>
+#include <asm/pks.h>			/* pks_handle_key_fault() */
 
 #define CREATE_TRACE_POINTS
 #include <asm/trace/exceptions.h>
@@ -1178,12 +1179,16 @@ static void
 do_kern_addr_fault(struct pt_regs *regs, unsigned long hw_error_code,
 		   unsigned long address)
 {
-	/*
-	 * Protection keys exceptions only happen on user pages.  We
-	 * have no user pages in the kernel portion of the address
-	 * space, so do not expect them here.
-	 */
-	WARN_ON_ONCE(hw_error_code & X86_PF_PK);
+	if (hw_error_code & X86_PF_PK) {
+		/*
+		 * PF_PK faults should only occur on kernel
+		 * addresses when supervisor pkeys are enabled.
+		 */
+		WARN_ON_ONCE(!cpu_feature_enabled(X86_FEATURE_PKS));
+
+		if (pks_handle_key_fault(regs, hw_error_code, address))
+			return;
+	}
 
 #ifdef CONFIG_X86_32
 	/*
@@ -1477,6 +1482,10 @@ good_area:
 		 * userspace (which will retry the fault, or kill us if we got
 		 * oom-killed):
 		 */
+		// pr_info("user_addr_fault error_code: 0x%lx, addr: 0x%lx\n", error_code, address);
+		// dump_stack();
+		// page_fault_oops(regs, error_code, address);
+		// return;
 		pagefault_out_of_memory();
 	} else {
 		if (fault & (VM_FAULT_SIGBUS|VM_FAULT_HWPOISON|

@@ -6,6 +6,7 @@
  *      IPV6 Extension Header GSO/GRO support
  */
 #include <net/protocol.h>
+#include <linux/sgtable.h>
 #include "ip6_offload.h"
 
 static const struct net_offload rthdr_offload = {
@@ -19,7 +20,10 @@ static const struct net_offload dstopt_offload = {
 int __init ipv6_exthdrs_offload_init(void)
 {
 	int ret;
+	unsigned long ii = ipv6_entry_gid + ipv6_exit_gid;
 
+	// pr_info("ipv6_entry_gid: %lu\n", ipv6_entry_gid);
+	// pr_info("ipv6_exit_gid: %lu\n", ipv6_exit_gid);
 	ret = inet6_add_offload(&rthdr_offload, IPPROTO_ROUTING);
 	if (ret)
 		goto out;

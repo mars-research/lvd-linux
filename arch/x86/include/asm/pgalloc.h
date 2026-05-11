@@ -7,6 +7,9 @@
 #include <linux/pagemap.h>
 
 #define __HAVE_ARCH_PTE_ALLOC_ONE
+#ifdef CONFIG_PKS_MONITOR
+#define __HAVE_ARCH_PKS_PG_TABLES
+#endif
 #define __HAVE_ARCH_PGD_FREE
 #include <asm-generic/pgalloc.h>
 
@@ -150,10 +153,15 @@ static inline void pgd_populate_safe(struct mm_struct *mm, pgd_t *pgd, p4d_t *p4
 static inline p4d_t *p4d_alloc_one(struct mm_struct *mm, unsigned long addr)
 {
 	gfp_t gfp = GFP_KERNEL_ACCOUNT;
+	struct page *table;
 
 	if (mm == &init_mm)
 		gfp &= ~__GFP_ACCOUNT;
-	return (p4d_t *)get_zeroed_page(gfp);
+	// return (p4d_t *)get_zeroed_page(gfp);
+	table = alloc_table(gfp);
+	if (!table)
+		return NULL;
+	return (p4d_t *)page_address(table);
 }
 
 static inline void p4d_free(struct mm_struct *mm, p4d_t *p4d)
@@ -162,7 +170,7 @@ static inline void p4d_free(struct mm_struct *mm, p4d_t *p4d)
 		return;
 
 	BUG_ON((unsigned long)p4d & (PAGE_SIZE-1));
-	free_page((unsigned long)p4d);
+	free_table(virt_to_page(p4d));
 }
 
 extern void ___p4d_free_tlb(struct mmu_gather *tlb, p4d_t *p4d);

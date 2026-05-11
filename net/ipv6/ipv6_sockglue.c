@@ -60,12 +60,19 @@ DEFINE_STATIC_KEY_FALSE(ip6_min_hopcount);
 int ip6_ra_control(struct sock *sk, int sel)
 {
 	struct ip6_ra_chain *ra, *new_ra, **rap;
+	unsigned long ii = ipv6_entry_gid + ipv6_exit_gid;
 
 	/* RA packet may be delivered ONLY to IPPROTO_RAW socket */
+	// pr_info("ipv6_entry_gid: %lu\n", ipv6_entry_gid);
+	// pr_info("ipv6_exit_gid: %lu\n", ipv6_exit_gid);
 	if (sk->sk_type != SOCK_RAW || inet_sk(sk)->inet_num != IPPROTO_RAW)
 		return -ENOPROTOOPT;
 
+#ifdef CONFIG_PKS_HEAP
+	new_ra = (sel >= 0) ? kmalloc_pks(sizeof(*new_ra), GFP_KERNEL) : NULL;
+#else
 	new_ra = (sel >= 0) ? kmalloc(sizeof(*new_ra), GFP_KERNEL) : NULL;
+#endif
 	if (sel >= 0 && !new_ra)
 		return -ENOMEM;
 
@@ -247,7 +254,11 @@ static int compat_ipv6_set_mcast_msfilter(struct sock *sk, sockptr_t optval,
 	if (optlen > READ_ONCE(sysctl_optmem_max) - 4)
 		return -ENOBUFS;
 
+#ifdef CONFIG_PKS_HEAP
+	p = kmalloc_pks(optlen + 4, GFP_KERNEL);
+#else
 	p = kmalloc(optlen + 4, GFP_KERNEL);
+#endif
 	if (!p)
 		return -ENOMEM;
 

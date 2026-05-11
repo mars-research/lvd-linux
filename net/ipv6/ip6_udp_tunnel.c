@@ -19,7 +19,10 @@ int udp_sock_create6(struct net *net, struct udp_port_cfg *cfg,
 	struct sockaddr_in6 udp6_addr = {};
 	int err;
 	struct socket *sock = NULL;
+	unsigned long ii = ipv6_entry_gid + ipv6_exit_gid;
 
+	// pr_info("ipv6_entry_gid: %lu\n", ipv6_entry_gid);
+	// pr_info("ipv6_exit_gid: %lu\n", ipv6_exit_gid);
 	err = sock_create_kern(net, AF_INET6, SOCK_DGRAM, 0, &sock);
 	if (err < 0)
 		goto error;

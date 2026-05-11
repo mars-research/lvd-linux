@@ -65,6 +65,25 @@ For 32-bit we have the following conventions - kernel is built with
  * for assembly code:
  */
 
+ #ifdef CONFIG_ARCH_HAS_PTREGS_AUXILIARY
+
+.macro PUSH_PTREGS_AUXILIARY
+	/* add space for pt_regs_auxiliary */
+	subq $PTREGS_AUX_SIZE, %rsp
+.endm
+
+.macro POP_PTREGS_AUXILIARY
+	/* remove space for pt_regs_auxiliary */
+	addq $PTREGS_AUX_SIZE, %rsp
+.endm
+
+#else
+
+#define PUSH_PTREGS_AUXILIARY
+#define POP_PTREGS_AUXILIARY
+
+#endif
+
 .macro PUSH_REGS rdx=%rdx rcx=%rcx rax=%rax save_ret=0
 	.if \save_ret
 	pushq	%rsi		/* pt_regs->si */
@@ -81,6 +100,25 @@ For 32-bit we have the following conventions - kernel is built with
 	pushq   %r9		/* pt_regs->r9 */
 	pushq   %r10		/* pt_regs->r10 */
 	pushq   %r11		/* pt_regs->r11 */
+#ifdef CONFIG_PKK
+	movq	%rax, %r11
+	xorl	%ecx, %ecx
+	ALTERNATIVE "", "rdpkru", X86_FEATURE_OSPKE
+	pushq	%rax			/* pt_regs->pkru */
+	cmpl	$0x55540000, %eax
+	je		1f
+	movl	$0x55540000, %eax
+	ALTERNATIVE "", "wrpkru", X86_FEATURE_OSPKE
+	movq 	%cs, %rcx
+	testb 	$3, %cl
+	je 		1f
+	nop
+1:
+	movq	%r11, %rax
+	movq (6*8)(%rsp), %rcx
+	movq (7*8)(%rsp), %rdx
+	movq (8)(%rsp), %r11
+#endif /* CONFIG_PKK */
 	pushq	%rbx		/* pt_regs->rbx */
 	pushq	%rbp		/* pt_regs->rbp */
 	pushq	%r12		/* pt_regs->r12 */
@@ -129,6 +167,23 @@ For 32-bit we have the following conventions - kernel is built with
 	popq %r12
 	popq %rbp
 	popq %rbx
+#ifdef CONFIG_PKK
+	popq %rax
+	pushq %rcx
+	pushq %rdx
+	xorl	%ecx, %ecx
+	xorl	%edx, %edx
+	cmpl	$0x55540000, %eax
+	je 		1f
+	ALTERNATIVE "", "wrpkru", X86_FEATURE_OSPKE
+	movq 	%cs, %rcx
+	testb 	$3, %cl
+	je 		1f
+	nop
+1:
+	popq %rdx
+	popq %rcx
+#endif /* CONFIG_PKK */
 	popq %r11
 	popq %r10
 	popq %r9

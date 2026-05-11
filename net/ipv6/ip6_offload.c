@@ -157,12 +157,21 @@ static struct sk_buff *ipv6_gso_segment(struct sk_buff *skb,
 		skb->network_header = (u8 *)ipv6h - skb->head;
 		skb_reset_mac_len(skb);
 
-		if (udpfrag) {
+		/*if (udpfrag) {
 			int err = ip6_find_1stfragopt(skb, &prevhdr);
 			if (err < 0) {
 				kfree_skb_list(segs);
 				return ERR_PTR(err);
 			}
+			fptr = (struct frag_hdr *)((u8 *)ipv6h + err);
+			fptr->frag_off = htons(offset);
+			if (skb->next)
+				fptr->frag_off |= htons(IP6_MF);
+			offset += (ntohs(ipv6h->payload_len) -
+				   sizeof(struct frag_hdr));
+		}*/
+		if (udpfrag) {
+			int err = ip6_find_1stfragopt(skb, &prevhdr);
 			fptr = (struct frag_hdr *)((u8 *)ipv6h + err);
 			fptr->frag_off = htons(offset);
 			if (skb->next)
@@ -471,6 +480,9 @@ static const struct net_offload ip6ip6_offload = {
 static int __init ipv6_offload_init(void)
 {
 
+	// pr_info("ipv6_entry_gid: %lu\n", ipv6_entry_gid);
+	// pr_info("ipv6_exit_gid: %lu\n", ipv6_exit_gid);
+	unsigned long ii = ipv6_entry_gid + ipv6_exit_gid;
 	if (tcpv6_offload_init() < 0)
 		pr_crit("%s: Cannot add TCP protocol offload\n", __func__);
 	if (ipv6_exthdrs_offload_init() < 0)

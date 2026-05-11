@@ -181,7 +181,10 @@ static int eafnosupport_fib6_nh_init(struct net *net, struct fib6_nh *fib6_nh,
 				     struct fib6_config *cfg, gfp_t gfp_flags,
 				     struct netlink_ext_ack *extack)
 {
+	unsigned long ii = ipv6_entry_gid + ipv6_exit_gid;
 	NL_SET_ERR_MSG(extack, "IPv6 support not enabled in kernel");
+	// pr_info("ipv6_entry_gid: %lu\n", ipv6_entry_gid);
+	// pr_info("ipv6_exit_gid: %lu\n", ipv6_exit_gid);
 	return -EAFNOSUPPORT;
 }
 

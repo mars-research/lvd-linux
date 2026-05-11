@@ -117,7 +117,9 @@ SYM_INNER_LABEL(entry_SYSENTER_compat_after_hwframe, SYM_L_GLOBAL)
 .Lsysenter_flags_fixed:
 
 	movq	%rsp, %rdi
+	PUSH_PTREGS_AUXILIARY
 	call	do_SYSENTER_32
+	POP_PTREGS_AUXILIARY
 	/* XEN PV guests always use IRET path */
 	ALTERNATIVE "testl %eax, %eax; jz swapgs_restore_regs_and_return_to_usermode", \
 		    "jmp swapgs_restore_regs_and_return_to_usermode", X86_FEATURE_XENPV
@@ -212,7 +214,9 @@ SYM_INNER_LABEL(entry_SYSCALL_compat_after_hwframe, SYM_L_GLOBAL)
 	UNTRAIN_RET
 
 	movq	%rsp, %rdi
+	PUSH_PTREGS_AUXILIARY
 	call	do_fast_syscall_32
+	POP_PTREGS_AUXILIARY
 	/* XEN PV guests always use IRET path */
 	ALTERNATIVE "testl %eax, %eax; jz swapgs_restore_regs_and_return_to_usermode", \
 		    "jmp swapgs_restore_regs_and_return_to_usermode", X86_FEATURE_XENPV
@@ -351,6 +355,8 @@ SYM_CODE_START(entry_INT80_compat)
 	UNTRAIN_RET
 
 	movq	%rsp, %rdi
+	PUSH_PTREGS_AUXILIARY
 	call	do_int80_syscall_32
+	POP_PTREGS_AUXILIARY
 	jmp	swapgs_restore_regs_and_return_to_usermode
 SYM_CODE_END(entry_INT80_compat)

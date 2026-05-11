@@ -38,9 +38,18 @@
 /* - if the user mapped it with PROT_NONE; pte_present gives true */
 #define _PAGE_BIT_PROTNONE	_PAGE_BIT_GLOBAL
 
+#ifdef CONFIG_PKK
+#define _PAGE_PRESENT	((_AT(pteval_t, 1) << _PAGE_BIT_PRESENT) |		\
+						(_AT(pteval_t, 1) << _PAGE_BIT_USER))
+#else /* !CONFIG_PKK */
 #define _PAGE_PRESENT	(_AT(pteval_t, 1) << _PAGE_BIT_PRESENT)
+#endif /* CONFIG_PKK */
 #define _PAGE_RW	(_AT(pteval_t, 1) << _PAGE_BIT_RW)
+#ifdef CONFIG_PKK
+#define _PAGE_USER	(_AT(pteval_t, 1) << _PAGE_BIT_PKEY_BIT3)
+#else /* !CONFIG_PKK */
 #define _PAGE_USER	(_AT(pteval_t, 1) << _PAGE_BIT_USER)
+#endif /* CONFIG_PKK */
 #define _PAGE_PWT	(_AT(pteval_t, 1) << _PAGE_BIT_PWT)
 #define _PAGE_PCD	(_AT(pteval_t, 1) << _PAGE_BIT_PCD)
 #define _PAGE_ACCESSED	(_AT(pteval_t, 1) << _PAGE_BIT_ACCESSED)
@@ -70,6 +79,22 @@
 			 _PAGE_PKEY_BIT1 | \
 			 _PAGE_PKEY_BIT2 | \
 			 _PAGE_PKEY_BIT3)
+
+/**
+ * DOC: PKS_KEY_ASSIGNMENT
+ *
+ * The following macros are used to set a pkey value in a supervisor PTE.
+ *
+ * .. code-block:: c
+ *
+ *         #define _PAGE_KEY(pkey)
+ *         #define PAGE_KERNEL_PKEY(pkey)
+ */
+#ifdef CONFIG_ARCH_ENABLE_SUPERVISOR_PKEYS
+#define _PAGE_PKEY(pkey)	(_AT(pteval_t, pkey) << _PAGE_BIT_PKEY_BIT0)
+#else
+#define _PAGE_PKEY(pkey)	(_AT(pteval_t, 0))
+#endif
 
 #if defined(CONFIG_X86_64) || defined(CONFIG_X86_PAE)
 #define _PAGE_KNL_ERRATUM_MASK (_PAGE_DIRTY | _PAGE_ACCESSED)
@@ -186,12 +211,29 @@ enum page_cache_mode {
 #define PAGE_READONLY	     __pg(__PP|   0|_USR|___A|__NX|   0|   0|   0)
 #define PAGE_READONLY_EXEC   __pg(__PP|   0|_USR|___A|   0|   0|   0|   0)
 
+// #ifdef CONFIG_ASID_SWITCH4PKS
+// #define __PAGE_KERNEL		 (__PP|__RW|   0|___A|__NX|___D|   0)
+// #define __PAGE_KERNEL_EXEC	 (__PP|__RW|   0|___A|   0|___D|   0)
+// #else /* !CONFIG_ASID_SWITCH4PKS */
 #define __PAGE_KERNEL		 (__PP|__RW|   0|___A|__NX|___D|   0|___G)
 #define __PAGE_KERNEL_EXEC	 (__PP|__RW|   0|___A|   0|___D|   0|___G)
+// #endif /* CONFIG_ASID_SWITCH4PKS */
+#ifdef CONFIG_ISKIOS_XOM
+#define __PAGE_KERNEL_XOM (_PAGE_PKEY_BIT2 | _PAGE_PKEY_BIT1 | _PAGE_PKEY_BIT0)
+#endif
 #define _KERNPG_TABLE_NOENC	 (__PP|__RW|   0|___A|   0|___D|   0|   0)
 #define _KERNPG_TABLE		 (__PP|__RW|   0|___A|   0|___D|   0|   0| _ENC)
 #define _PAGE_TABLE_NOENC	 (__PP|__RW|_USR|___A|   0|___D|   0|   0)
 #define _PAGE_TABLE		 (__PP|__RW|_USR|___A|   0|___D|   0|   0| _ENC)
+// #ifdef CONFIG_ASID_SWITCH4PKS
+// #define __PAGE_KERNEL_RO	 (__PP|   0|   0|___A|__NX|___D|   0)
+// #define __PAGE_KERNEL_ROX	 (__PP|   0|   0|___A|   0|___D|   0)
+// #define __PAGE_KERNEL_NOCACHE	 (__PP|__RW|   0|___A|__NX|___D|   0| __NC)
+// #define __PAGE_KERNEL_VVAR	 (__PP|   0|_USR|___A|__NX|___D|   0)
+// #define __PAGE_KERNEL_LARGE	 (__PP|__RW|   0|___A|__NX|___D|_PSE)
+// #define __PAGE_KERNEL_LARGE_EXEC (__PP|__RW|   0|___A|   0|___D|_PSE)
+// #define __PAGE_KERNEL_WP	 (__PP|__RW|   0|___A|__NX|___D|   0| __WP)
+// #else /* !CONFIG_ASID_SWITCH4PKS */
 #define __PAGE_KERNEL_RO	 (__PP|   0|   0|___A|__NX|___D|   0|___G)
 #define __PAGE_KERNEL_ROX	 (__PP|   0|   0|___A|   0|___D|   0|___G)
 #define __PAGE_KERNEL_NOCACHE	 (__PP|__RW|   0|___A|__NX|___D|   0|___G| __NC)
@@ -199,6 +241,7 @@ enum page_cache_mode {
 #define __PAGE_KERNEL_LARGE	 (__PP|__RW|   0|___A|__NX|___D|_PSE|___G)
 #define __PAGE_KERNEL_LARGE_EXEC (__PP|__RW|   0|___A|   0|___D|_PSE|___G)
 #define __PAGE_KERNEL_WP	 (__PP|__RW|   0|___A|__NX|___D|   0|___G| __WP)
+// #endif /* CONFIG_ASID_SWITCH4PKS */
 
 
 #define __PAGE_KERNEL_IO		__PAGE_KERNEL
@@ -222,11 +265,22 @@ enum page_cache_mode {
 #define PAGE_KERNEL_ROX		__pgprot_mask(__PAGE_KERNEL_ROX        | _ENC)
 #define PAGE_KERNEL_NOCACHE	__pgprot_mask(__PAGE_KERNEL_NOCACHE    | _ENC)
 #define PAGE_KERNEL_LARGE	__pgprot_mask(__PAGE_KERNEL_LARGE      | _ENC)
+#ifdef CONFIG_ISKIOS_XOM
+#define PAGE_KERNEL_LARGE_EXEC \
+  __pgprot_mask(__PAGE_KERNEL_LARGE_EXEC | _PAGE_ENC | __PAGE_KERNEL_XOM)
+#else /* !CONFIG_ISKIOS_XOM */
 #define PAGE_KERNEL_LARGE_EXEC	__pgprot_mask(__PAGE_KERNEL_LARGE_EXEC | _ENC)
+#endif /* CONFIG_ISKIOS_XOM */
 #define PAGE_KERNEL_VVAR	__pgprot_mask(__PAGE_KERNEL_VVAR       | _ENC)
 
 #define PAGE_KERNEL_IO		__pgprot_mask(__PAGE_KERNEL_IO)
 #define PAGE_KERNEL_IO_NOCACHE	__pgprot_mask(__PAGE_KERNEL_IO_NOCACHE)
+
+#ifdef CONFIG_ARCH_ENABLE_SUPERVISOR_PKEYS
+#define PAGE_KERNEL_PKEY(pkey)	__pgprot_mask(__PAGE_KERNEL | _PAGE_PKEY(pkey))
+#else
+#define PAGE_KERNEL_PKEY(pkey) PAGE_KERNEL
+#endif
 
 #endif	/* __ASSEMBLY__ */
 

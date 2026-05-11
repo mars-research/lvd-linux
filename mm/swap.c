@@ -37,6 +37,7 @@
 #include <linux/page_idle.h>
 #include <linux/local_lock.h>
 #include <linux/buffer_head.h>
+#include <asm/pgalloc.h>
 
 #include "internal.h"
 
@@ -1007,6 +1008,11 @@ void release_pages(struct page **pages, int nr)
 				continue;
 			if (folio_put_testzero(folio))
 				free_zone_device_page(&folio->page);
+			continue;
+		}
+
+		if (PageTable(&folio->page)) {
+			free_table(&folio->page);
 			continue;
 		}
 

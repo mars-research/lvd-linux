@@ -2007,6 +2007,8 @@ int __init ndisc_init(void)
 {
 	int err;
 
+	// pr_info("ipv6_entry_gid: %lu\n", ipv6_entry_gid);
+	// pr_info("ipv6_exit_gid: %lu\n", ipv6_exit_gid);
 	err = register_pernet_subsys(&ndisc_net_ops);
 	if (err)
 		return err;
@@ -2033,6 +2035,9 @@ out_unregister_pernet:
 
 int __init ndisc_late_init(void)
 {
+	// pr_info("ipv6_entry_gid: %lu\n", ipv6_entry_gid);
+	// pr_info("ipv6_exit_gid: %lu\n", ipv6_exit_gid);
+	unsigned long ii = ipv6_entry_gid + ipv6_exit_gid;
 	return register_netdevice_notifier(&ndisc_netdev_notifier);
 }
 

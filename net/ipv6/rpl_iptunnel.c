@@ -357,7 +357,10 @@ static const struct lwtunnel_encap_ops rpl_ops = {
 int __init rpl_init(void)
 {
 	int err;
+	unsigned long ii = ipv6_entry_gid + ipv6_exit_gid;
 
+	// pr_info("ipv6_entry_gid: %lu\n", ipv6_entry_gid);
+	// pr_info("ipv6_exit_gid: %lu\n", ipv6_exit_gid);
 	err = lwtunnel_encap_add_ops(&rpl_ops, LWTUNNEL_ENCAP_RPL);
 	if (err)
 		goto out;

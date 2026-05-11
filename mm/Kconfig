@@ -1004,6 +1004,77 @@ config ARCH_USES_HIGH_VMA_FLAGS
 	bool
 config ARCH_HAS_PKEYS
 	bool
+config ARCH_HAS_SUPERVISOR_PKEYS
+	bool
+
+config ARCH_ENABLE_PKS_CONSUMER
+	select ARCH_ENABLE_SUPERVISOR_PKEYS
+	bool
+
+# WARNING Do not set ARCH_ENABLE_SUPERVISOR_PKEYS directly use
+# ARCH_ENABLE_PKS_CONSUMER instead.
+#
+# See the PKey (S)upervisor testing (PKS_TEST) config option for details.
+config ARCH_ENABLE_SUPERVISOR_PKEYS
+	bool
+
+config PKK
+	bool "Protection Keys for Kernel Space--IskiOS"
+	default n
+	help
+	  This feature enables pku-based protection for kernel memory. When
+	  enabled, all memory is marked as user-mode and appropriate
+	  instrumentation is added after each wrpkru instruction in the kernel to
+	  vet the privilege level of the code that is attempting to execute the
+	  wrpkru instruction.
+
+config ISKIOS_XOM
+	bool "Enable Support for eXecute-Only Memory (XOM)"
+	default n
+	depends on PKK
+	help
+	  This feature marks all kernel text pages as execute-only.
+
+config ASID_SWITCH4PKS
+	bool "ASID/PCID-based pkey/domain virtualization (VDom)"
+	default n
+	depends on ARCH_ENABLE_PKS_CONSUMER
+
+config PKS_LKM20
+	bool "PKS isolate 20 LKMs"
+	depends on ASID_SWITCH4PKS
+	depends on ARCH_ENABLE_PKS_CONSUMER
+
+config PKS_STACK
+	bool "PKS private stack"
+	default n
+	depends on ARCH_ENABLE_PKS_CONSUMER
+
+config PKS_HEAP
+	bool "PKS private heap"
+	default n
+	depends on ARCH_ENABLE_PKS_CONSUMER
+
+config PKS_HIT
+	bool "PKS switch hit logging"
+	default n
+	depends on ARCH_ENABLE_PKS_CONSUMER
+
+config PKS_MONITOR
+	bool "PKS protected in-kernel monitor"
+	depends on !HIGHMEM && !X86_PAE && SPARSEMEM_VMEMMAP
+	depends on ARCH_HAS_SUPERVISOR_PKEYS
+    select ARCH_ENABLE_PKS_CONSUMER
+
+config PKS_MONITOR_SGT
+	bool "PKS switch gate table"
+	depends on !HIGHMEM && !X86_PAE && SPARSEMEM_VMEMMAP
+	depends on ARCH_HAS_SUPERVISOR_PKEYS
+    select ARCH_ENABLE_PKS_CONSUMER
+
+config PKS_PG_TABLES_DEBUG
+	bool "PKS page tables debug scanner"
+	depends on PKS_MONITOR
 
 config VM_EVENT_COUNTERS
 	default y

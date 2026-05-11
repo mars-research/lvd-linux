@@ -7,6 +7,7 @@
  */
 #include <linux/indirect_call_wrapper.h>
 #include <linux/skbuff.h>
+#include <linux/sgtable.h>
 #include <net/gro.h>
 #include <net/protocol.h>
 #include <net/tcp.h>
@@ -75,5 +76,8 @@ static const struct net_offload tcpv6_offload = {
 
 int __init tcpv6_offload_init(void)
 {
+	// pr_info("ipv6_entry_gid: %lu\n", ipv6_entry_gid);
+	// pr_info("ipv6_exit_gid: %lu\n", ipv6_exit_gid);
+	unsigned long ii = ipv6_entry_gid + ipv6_exit_gid;
 	return inet6_add_offload(&tcpv6_offload, IPPROTO_TCP);
 }

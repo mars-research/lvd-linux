@@ -224,9 +224,9 @@ static void noinstr arm64_exit_el1_dbg(struct pt_regs *regs)
 }
 
 #ifdef CONFIG_PREEMPT_DYNAMIC
-DEFINE_STATIC_KEY_TRUE(sk_dynamic_irqentry_exit_cond_resched);
+DEFINE_STATIC_KEY_TRUE(sk_dynamic_irqentry_exit_cond_resched_internal);
 #define need_irq_preemption() \
-	(static_branch_unlikely(&sk_dynamic_irqentry_exit_cond_resched))
+	(static_branch_unlikely(&sk_dynamic_irqentry_exit_cond_resched_internal))
 #else
 #define need_irq_preemption()	(IS_ENABLED(CONFIG_PREEMPTION))
 #endif

@@ -1077,6 +1077,12 @@ static int __init inet6_init(void)
 {
 	struct list_head *r;
 	int err = 0;
+	unsigned long ii = ipv6_entry_gid + ipv6_exit_gid;
+
+	// pr_info("inet6_init\n");
+
+	// pr_info("ipv6_entry_gid: %lu\n", ipv6_entry_gid);
+	// pr_info("ipv6_exit_gid: %lu\n", ipv6_exit_gid);
 
 	sock_skb_cb_check_size(sizeof(struct inet6_skb_parm));
 

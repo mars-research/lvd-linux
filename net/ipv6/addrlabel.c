@@ -19,6 +19,7 @@
 #include <linux/if_addrlabel.h>
 #include <linux/netlink.h>
 #include <linux/rtnetlink.h>
+#include <linux/sgtable.h>
 
 #if 0
 #define ADDRLABEL(x...) printk(x)
@@ -186,7 +187,11 @@ static struct ip6addrlbl_entry *ip6addrlbl_alloc(const struct in6_addr *prefix,
 		break;
 	}
 
+#ifdef CONFIG_PKS_HEAP
+	newp = kmalloc_pks(sizeof(*newp), GFP_KERNEL);
+#else
 	newp = kmalloc(sizeof(*newp), GFP_KERNEL);
+#endif
 	if (!newp)
 		return ERR_PTR(-ENOMEM);
 
@@ -356,6 +361,9 @@ static struct pernet_operations ipv6_addr_label_ops = {
 
 int __init ipv6_addr_label_init(void)
 {
+	// pr_info("ipv6_entry_gid: %lu\n", ipv6_entry_gid);
+	// pr_info("ipv6_exit_gid: %lu\n", ipv6_exit_gid);
+	unsigned long ii = ipv6_entry_gid + ipv6_exit_gid;
 	return register_pernet_subsys(&ipv6_addr_label_ops);
 }
 

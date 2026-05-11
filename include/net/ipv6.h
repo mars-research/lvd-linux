@@ -14,6 +14,7 @@
 #include <linux/jhash.h>
 #include <linux/refcount.h>
 #include <linux/jump_label_ratelimit.h>
+#include <linux/sgtable.h>
 #include <net/if_inet6.h>
 #include <net/flow.h>
 #include <net/flow_dissector.h>

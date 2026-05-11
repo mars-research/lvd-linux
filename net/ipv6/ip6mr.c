@@ -1372,7 +1372,10 @@ static struct pernet_operations ip6mr_net_ops = {
 int __init ip6_mr_init(void)
 {
 	int err;
+	unsigned long ii = ipv6_entry_gid + ipv6_exit_gid;
 
+	// pr_info("ipv6_entry_gid: %lu\n", ipv6_entry_gid);
+	// pr_info("ipv6_exit_gid: %lu\n", ipv6_exit_gid);
 	mrt_cachep = kmem_cache_create("ip6_mrt_cache",
 				       sizeof(struct mfc6_cache),
 				       0, SLAB_HWCACHE_ALIGN,

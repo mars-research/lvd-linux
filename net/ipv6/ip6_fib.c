@@ -2448,7 +2448,10 @@ static struct pernet_operations fib6_net_ops = {
 int __init fib6_init(void)
 {
 	int ret = -ENOMEM;
+	unsigned long ii = ipv6_entry_gid + ipv6_exit_gid;
 
+	// pr_info("ipv6_entry_gid: %lu\n", ipv6_entry_gid);
+	// pr_info("ipv6_exit_gid: %lu\n", ipv6_exit_gid);
 	fib6_node_kmem = kmem_cache_create("fib6_nodes",
 					   sizeof(struct fib6_node), 0,
 					   SLAB_HWCACHE_ALIGN | SLAB_ACCOUNT,

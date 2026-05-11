@@ -602,6 +602,10 @@ void ac6_proc_exit(struct net *net)
 int __init ipv6_anycast_init(void)
 {
 	int i;
+	unsigned long ii = ipv6_entry_gid + ipv6_exit_gid;
+
+	// pr_info("ipv6_entry_gid: %lu\n", ipv6_entry_gid);
+	// pr_info("ipv6_exit_gid: %lu\n", ipv6_exit_gid);
 
 	for (i = 0; i < IN6_ADDR_HSIZE; i++)
 		INIT_HLIST_HEAD(&inet6_acaddr_lst[i]);

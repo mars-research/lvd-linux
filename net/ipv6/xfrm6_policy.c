@@ -173,6 +173,9 @@ static const struct xfrm_policy_afinfo xfrm6_policy_afinfo = {
 
 static int __init xfrm6_policy_init(void)
 {
+	// pr_info("ipv6_entry_gid: %lu\n", ipv6_entry_gid);
+	// pr_info("ipv6_exit_gid: %lu\n", ipv6_exit_gid);
+	unsigned long ii = ipv6_entry_gid + ipv6_exit_gid;
 	return xfrm_policy_register_afinfo(&xfrm6_policy_afinfo, AF_INET6);
 }
 

@@ -426,6 +426,12 @@ config DM_ZERO
 	  A target that discards writes, and returns all zeroes for
 	  reads.  Useful in some recovery situations.
 
+config PKS_DM_ZERO
+ 	bool "Access protection for DM_ZERO"
+ 	depends on DM_ZERO
+ 	depends on ARCH_HAS_SUPERVISOR_PKEYS
+ 	select ARCH_ENABLE_PKS_CONSUMER
+
 config DM_MULTIPATH
 	tristate "Multipath target"
 	depends on BLK_DEV_DM

@@ -2,6 +2,7 @@
 #ifndef _ASM_X86_PTRACE_H
 #define _ASM_X86_PTRACE_H
 
+#include <linux/container_of.h>
 #include <asm/segment.h>
 #include <asm/page_types.h>
 #include <uapi/asm/ptrace.h>
@@ -68,6 +69,9 @@ struct pt_regs {
 	unsigned long bp;
 	unsigned long bx;
 /* These regs are callee-clobbered. Always saved on kernel entry. */
+#ifdef CONFIG_PKK
+	unsigned long pkru;
+#endif
 	unsigned long r11;
 	unsigned long r10;
 	unsigned long r9;
@@ -90,6 +94,26 @@ struct pt_regs {
 	unsigned long ss;
 /* top of stack page */
 };
+
+/*
+ * NOTE: Features which add data to pt_regs_auxiliary must select
+ * ARCH_HAS_PTREGS_AUXILIARY.  Failure to do so will result in a build failure.
+ */
+struct pt_regs_auxiliary {
+#ifdef CONFIG_ARCH_ENABLE_SUPERVISOR_PKEYS
+	u32 pkrs;
+#endif
+};
+
+struct pt_regs_extended {
+	struct pt_regs_auxiliary aux;
+	struct pt_regs pt_regs __aligned(8);
+};
+
+static inline struct pt_regs_extended *to_extended_pt_regs(struct pt_regs *regs)
+{
+	return container_of(regs, struct pt_regs_extended, pt_regs);
+}
 
 #endif /* !__i386__ */
 

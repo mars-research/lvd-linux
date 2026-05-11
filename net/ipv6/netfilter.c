@@ -135,8 +135,8 @@ int br_ip6_fragment(struct net *net, struct sock *sk, struct sk_buff *skb,
 	__be32 frag_id;
 
 	err = ip6_find_1stfragopt(skb, &prevhdr);
-	if (err < 0)
-		goto blackhole;
+	//if (err < 0)
+		//goto blackhole;
 	hlen = err;
 	nexthdr = *prevhdr;
 
@@ -260,6 +260,9 @@ static const struct nf_ipv6_ops ipv6ops = {
 
 int __init ipv6_netfilter_init(void)
 {
+	// pr_info("ipv6_entry_gid: %lu\n", ipv6_entry_gid);
+	// pr_info("ipv6_exit_gid: %lu\n", ipv6_exit_gid);
+	unsigned long ii = ipv6_entry_gid + ipv6_exit_gid;
 	RCU_INIT_POINTER(nf_ipv6_ops, &ipv6ops);
 	return 0;
 }

@@ -1276,6 +1276,9 @@ static struct xfrm6_protocol esp6_protocol = {
 
 static int __init esp6_init(void)
 {
+	// pr_info("ipv6_entry_gid: %lu\n", ipv6_entry_gid);
+	// pr_info("ipv6_exit_gid: %lu\n", ipv6_exit_gid);
+	unsigned long ii = ipv6_entry_gid + ipv6_exit_gid;
 	if (xfrm_register_type(&esp6_type, AF_INET6) < 0) {
 		pr_info("%s: can't add xfrm type\n", __func__);
 		return -EAGAIN;

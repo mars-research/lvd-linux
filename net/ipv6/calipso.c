@@ -31,6 +31,7 @@
 #include <linux/bug.h>
 #include <asm/unaligned.h>
 #include <linux/crc-ccitt.h>
+#include <linux/sgtable.h>
 
 /* Maximium size of the calipso option including
  * the two-byte TLV header.
@@ -1445,6 +1446,9 @@ int __init calipso_init(void)
 {
 	int ret_val;
 
+	unsigned long ii = ipv6_entry_gid + ipv6_exit_gid;
+	// pr_info("ipv6_entry_gid: %lu\n", ipv6_entry_gid);
+	// pr_info("ipv6_exit_gid: %lu\n", ipv6_exit_gid);
 	ret_val = calipso_cache_init();
 	if (!ret_val)
 		netlbl_calipso_ops_register(&ops);

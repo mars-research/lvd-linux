@@ -341,7 +341,11 @@ static int seg6_genl_dumphmac_start(struct netlink_callback *cb)
 	iter = (struct rhashtable_iter *)cb->args[0];
 
 	if (!iter) {
+#ifdef CONFIG_PKS_HEAP
+		iter = kmalloc_pks(sizeof(*iter), GFP_KERNEL);
+#else
 		iter = kmalloc(sizeof(*iter), GFP_KERNEL);
+#endif
 		if (!iter)
 			return -ENOMEM;
 
@@ -511,7 +515,10 @@ static struct genl_family seg6_genl_family __ro_after_init = {
 int __init seg6_init(void)
 {
 	int err;
+	unsigned long ii = ipv6_entry_gid + ipv6_exit_gid;
 
+	// pr_info("ipv6_entry_gid: %lu\n", ipv6_entry_gid);
+	// pr_info("ipv6_exit_gid: %lu\n", ipv6_exit_gid);
 	err = genl_register_family(&seg6_genl_family);
 	if (err)
 		goto out;

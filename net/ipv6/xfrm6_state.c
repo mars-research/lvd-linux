@@ -12,6 +12,7 @@
  *
  */
 
+#include <linux/sgtable.h>
 #include <net/xfrm.h>
 
 static struct xfrm_state_afinfo xfrm6_state_afinfo = {
@@ -24,6 +25,9 @@ static struct xfrm_state_afinfo xfrm6_state_afinfo = {
 
 int __init xfrm6_state_init(void)
 {
+	// pr_info("ipv6_entry_gid: %lu\n", ipv6_entry_gid);
+	// pr_info("ipv6_exit_gid: %lu\n", ipv6_exit_gid);
+	unsigned long ii = ipv6_entry_gid + ipv6_exit_gid;
 	return xfrm_state_register_afinfo(&xfrm6_state_afinfo);
 }
 

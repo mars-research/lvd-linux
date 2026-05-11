@@ -471,7 +471,12 @@ static void __init pmd_huge_tests(struct pgtable_debug_args *args)
 	 * X86 defined pmd_set_huge() verifies that the given
 	 * PMD is not a populated non-leaf entry.
 	 */
+#ifdef CONFIG_X86
+	/* Use setter so that protections can be toggled if needed */
+	set_pmd(args->pmdp, __pmd(0));
+#else
 	WRITE_ONCE(*args->pmdp, __pmd(0));
+#endif
 	WARN_ON(!pmd_set_huge(args->pmdp, __pfn_to_phys(args->fixed_pmd_pfn), args->page_prot));
 	WARN_ON(!pmd_clear_huge(args->pmdp));
 	pmd = READ_ONCE(*args->pmdp);
@@ -490,7 +495,12 @@ static void __init pud_huge_tests(struct pgtable_debug_args *args)
 	 * X86 defined pud_set_huge() verifies that the given
 	 * PUD is not a populated non-leaf entry.
 	 */
+#ifdef CONFIG_X86
+	/* Use setter so that protections can be toggled if needed */
+	set_pud(args->pudp, __pud(0));
+#else
 	WRITE_ONCE(*args->pudp, __pud(0));
+#endif
 	WARN_ON(!pud_set_huge(args->pudp, __pfn_to_phys(args->fixed_pud_pfn), args->page_prot));
 	WARN_ON(!pud_clear_huge(args->pudp));
 	pud = READ_ONCE(*args->pudp);
@@ -529,7 +539,12 @@ static void __init pud_clear_tests(struct pgtable_debug_args *args)
 
 	pr_debug("Validating PUD clear\n");
 	pud = __pud(pud_val(pud) | RANDOM_ORVALUE);
+#ifdef CONFIG_X86
+	/* Use setter so that protections can be toggled if needed */
+	set_pud(args->pudp, pud);
+#else
 	WRITE_ONCE(*args->pudp, pud);
+#endif
 	pud_clear(args->pudp);
 	pud = READ_ONCE(*args->pudp);
 	WARN_ON(!pud_none(pud));
@@ -566,7 +581,12 @@ static void __init p4d_clear_tests(struct pgtable_debug_args *args)
 
 	pr_debug("Validating P4D clear\n");
 	p4d = __p4d(p4d_val(p4d) | RANDOM_ORVALUE);
+#ifdef CONFIG_X86
+	/* Use setter so that protections can be toggled if needed */
+	set_p4d(args->p4dp, p4d);
+#else
 	WRITE_ONCE(*args->p4dp, p4d);
+#endif
 	p4d_clear(args->p4dp);
 	p4d = READ_ONCE(*args->p4dp);
 	WARN_ON(!p4d_none(p4d));
@@ -600,7 +620,12 @@ static void __init pgd_clear_tests(struct pgtable_debug_args *args)
 
 	pr_debug("Validating PGD clear\n");
 	pgd = __pgd(pgd_val(pgd) | RANDOM_ORVALUE);
+#ifdef CONFIG_X86
+	/* Use setter so that protections can be toggled if needed */
+	set_pgd(args->pgdp, pgd);
+#else
 	WRITE_ONCE(*args->pgdp, pgd);
+#endif
 	pgd_clear(args->pgdp);
 	pgd = READ_ONCE(*args->pgdp);
 	WARN_ON(!pgd_none(pgd));
@@ -665,7 +690,12 @@ static void __init pmd_clear_tests(struct pgtable_debug_args *args)
 
 	pr_debug("Validating PMD clear\n");
 	pmd = __pmd(pmd_val(pmd) | RANDOM_ORVALUE);
+#ifdef CONFIG_X86
+	/* Use setter so that protections can be toggled if needed */
+	set_pmd(args->pmdp, pmd);
+#else
 	WRITE_ONCE(*args->pmdp, pmd);
+#endif
 	pmd_clear(args->pmdp);
 	pmd = READ_ONCE(*args->pmdp);
 	WARN_ON(!pmd_none(pmd));

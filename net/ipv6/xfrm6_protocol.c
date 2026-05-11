@@ -318,6 +318,9 @@ EXPORT_SYMBOL(xfrm6_protocol_deregister);
 
 int __init xfrm6_protocol_init(void)
 {
+	// pr_info("ipv6_entry_gid: %lu\n", ipv6_entry_gid);
+	// pr_info("ipv6_exit_gid: %lu\n", ipv6_exit_gid);
+	unsigned long ii = ipv6_entry_gid + ipv6_exit_gid;
 	return xfrm_input_register_afinfo(&xfrm6_input_afinfo);
 }
 

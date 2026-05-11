@@ -2465,7 +2465,11 @@ static int sf_setstate(struct ifmcaddr6 *pmc)
 				    &psf->sf_addr))
 					break;
 			if (!dpsf) {
+#ifdef CONFIG_PKS_HEAP
+				dpsf = kmalloc_pks(sizeof(*dpsf), GFP_KERNEL);
+#else
 				dpsf = kmalloc(sizeof(*dpsf), GFP_KERNEL);
+#endif
 				if (!dpsf)
 					continue;
 				*dpsf = *psf;
@@ -3193,6 +3197,9 @@ int __init igmp6_init(void)
 
 int __init igmp6_late_init(void)
 {
+	// pr_info("ipv6_entry_gid: %lu\n", ipv6_entry_gid);
+	// pr_info("ipv6_exit_gid: %lu\n", ipv6_exit_gid);
+	unsigned long ii = ipv6_entry_gid + ipv6_exit_gid;
 	return register_netdevice_notifier(&igmp6_netdev_notifier);
 }
 

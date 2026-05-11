@@ -16,7 +16,10 @@ static int ipv6_mc_check_ip6hdr(struct sk_buff *skb)
 	const struct ipv6hdr *ip6h;
 	unsigned int len;
 	unsigned int offset = skb_network_offset(skb) + sizeof(*ip6h);
+	unsigned long ii = ipv6_entry_gid + ipv6_exit_gid;
 
+	// pr_info("ipv6_entry_gid: %lu\n", ipv6_entry_gid);
+	// pr_info("ipv6_exit_gid: %lu\n", ipv6_exit_gid);
 	if (!pskb_may_pull(skb, offset))
 		return -EINVAL;
 

@@ -33,7 +33,10 @@ struct dst_entry *inet6_csk_route_req(const struct sock *sk,
 	const struct ipv6_pinfo *np = inet6_sk(sk);
 	struct in6_addr *final_p, final;
 	struct dst_entry *dst;
+	unsigned long ii = ipv6_entry_gid + ipv6_exit_gid;
 
+	// pr_info("ipv6_entry_gid: %lu\n", ipv6_entry_gid);
+	// pr_info("ipv6_exit_gid: %lu\n", ipv6_exit_gid);
 	memset(fl6, 0, sizeof(*fl6));
 	fl6->flowi6_proto = proto;
 	fl6->daddr = ireq->ir_v6_rmt_addr;

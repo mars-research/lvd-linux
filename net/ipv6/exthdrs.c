@@ -883,7 +883,10 @@ static const struct inet6_protocol nodata_protocol = {
 int __init ipv6_exthdrs_init(void)
 {
 	int ret;
+	unsigned long ii = ipv6_entry_gid + ipv6_exit_gid;
 
+	// pr_info("ipv6_entry_gid: %lu\n", ipv6_entry_gid);
+	// pr_info("ipv6_exit_gid: %lu\n", ipv6_exit_gid);
 	ret = inet6_add_protocol(&rthdr_protocol, IPPROTO_ROUTING);
 	if (ret)
 		goto out;

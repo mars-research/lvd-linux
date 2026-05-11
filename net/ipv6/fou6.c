@@ -209,7 +209,10 @@ static void ip6_tnl_encap_del_fou_ops(void)
 static int __init fou6_init(void)
 {
 	int ret;
+	unsigned long ii = ipv6_entry_gid + ipv6_exit_gid;
 
+	// pr_info("ipv6_entry_gid: %lu\n", ipv6_entry_gid);
+	// pr_info("ipv6_exit_gid: %lu\n", ipv6_exit_gid);
 	ret = ip6_tnl_encap_add_fou_ops();
 
 	return ret;

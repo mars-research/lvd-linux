@@ -64,7 +64,9 @@ void set_pte_vaddr_pud(pud_t *pud_page, unsigned long vaddr, pte_t new_pte);
 
 static inline void native_set_pte(pte_t *ptep, pte_t pte)
 {
+	enable_pgtable_write();
 	WRITE_ONCE(*ptep, pte);
+	disable_pgtable_write();
 }
 
 static inline void native_pte_clear(struct mm_struct *mm, unsigned long addr,
@@ -80,7 +82,9 @@ static inline void native_set_pte_atomic(pte_t *ptep, pte_t pte)
 
 static inline void native_set_pmd(pmd_t *pmdp, pmd_t pmd)
 {
+	enable_pgtable_write();
 	WRITE_ONCE(*pmdp, pmd);
+	disable_pgtable_write();
 }
 
 static inline void native_pmd_clear(pmd_t *pmd)
@@ -91,7 +95,11 @@ static inline void native_pmd_clear(pmd_t *pmd)
 static inline pte_t native_ptep_get_and_clear(pte_t *xp)
 {
 #ifdef CONFIG_SMP
-	return native_make_pte(xchg(&xp->pte, 0));
+	pteval_t pte_val;
+	enable_pgtable_write();
+	pte_val = xchg(&xp->pte, 0);
+	disable_pgtable_write();
+	return native_make_pte(pte_val);
 #else
 	/* native_local_ptep_get_and_clear,
 	   but duplicated because of cyclic dependency */
@@ -104,7 +112,11 @@ static inline pte_t native_ptep_get_and_clear(pte_t *xp)
 static inline pmd_t native_pmdp_get_and_clear(pmd_t *xp)
 {
 #ifdef CONFIG_SMP
-	return native_make_pmd(xchg(&xp->pmd, 0));
+	pteval_t pte_val;
+	enable_pgtable_write();
+	pte_val = xchg(&xp->pmd, 0);
+	disable_pgtable_write();
+	return native_make_pmd(pte_val);
 #else
 	/* native_local_pmdp_get_and_clear,
 	   but duplicated because of cyclic dependency */
@@ -116,7 +128,9 @@ static inline pmd_t native_pmdp_get_and_clear(pmd_t *xp)
 
 static inline void native_set_pud(pud_t *pudp, pud_t pud)
 {
+	enable_pgtable_write();
 	WRITE_ONCE(*pudp, pud);
+	disable_pgtable_write();
 }
 
 static inline void native_pud_clear(pud_t *pud)
@@ -127,7 +141,11 @@ static inline void native_pud_clear(pud_t *pud)
 static inline pud_t native_pudp_get_and_clear(pud_t *xp)
 {
 #ifdef CONFIG_SMP
-	return native_make_pud(xchg(&xp->pud, 0));
+	pteval_t pte_val;
+	enable_pgtable_write();
+	pte_val = xchg(&xp->pud, 0);
+	disable_pgtable_write();
+	return native_make_pud(pte_val);
 #else
 	/* native_local_pudp_get_and_clear,
 	 * but duplicated because of cyclic dependency
@@ -144,13 +162,17 @@ static inline void native_set_p4d(p4d_t *p4dp, p4d_t p4d)
 	pgd_t pgd;
 
 	if (pgtable_l5_enabled() || !IS_ENABLED(CONFIG_PAGE_TABLE_ISOLATION)) {
+		enable_pgtable_write();
 		WRITE_ONCE(*p4dp, p4d);
+		disable_pgtable_write();
 		return;
 	}
 
 	pgd = native_make_pgd(native_p4d_val(p4d));
 	pgd = pti_set_user_pgtbl((pgd_t *)p4dp, pgd);
+	enable_pgtable_write();
 	WRITE_ONCE(*p4dp, native_make_p4d(native_pgd_val(pgd)));
+	disable_pgtable_write();
 }
 
 static inline void native_p4d_clear(p4d_t *p4d)
@@ -160,7 +182,9 @@ static inline void native_p4d_clear(p4d_t *p4d)
 
 static inline void native_set_pgd(pgd_t *pgdp, pgd_t pgd)
 {
+	enable_pgtable_write();
 	WRITE_ONCE(*pgdp, pti_set_user_pgtbl(pgdp, pgd));
+	disable_pgtable_write();
 }
 
 static inline void native_pgd_clear(pgd_t *pgd)

@@ -671,8 +671,11 @@ int ip6_fraglist_init(struct sk_buff *skb, unsigned int hlen, u8 *prevhdr,
 {
 	unsigned int first_len;
 	struct frag_hdr *fh;
+	unsigned long ii = ipv6_entry_gid + ipv6_exit_gid;
 
 	/* BUILD HEADER */
+	// pr_info("ipv6_entry_gid: %lu\n", ipv6_entry_gid);
+	// pr_info("ipv6_exit_gid: %lu\n", ipv6_exit_gid);
 	*prevhdr = NEXTHDR_FRAGMENT;
 	iter->tmp_hdr = kmemdup(skb_network_header(skb), hlen, GFP_ATOMIC);
 	if (!iter->tmp_hdr)
@@ -844,8 +847,8 @@ int ip6_fragment(struct net *net, struct sock *sk, struct sk_buff *skb,
 	u8 *prevhdr, nexthdr = 0;
 
 	err = ip6_find_1stfragopt(skb, &prevhdr);
-	if (err < 0)
-		goto fail;
+	//if (err < 0)
+	//	goto fail;
 	hlen = err;
 	nexthdr = *prevhdr;
 	nexthdr_offset = prevhdr - skb_network_header(skb);

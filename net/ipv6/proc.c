@@ -310,6 +310,9 @@ static struct pernet_operations ipv6_proc_ops = {
 
 int __init ipv6_misc_proc_init(void)
 {
+	// pr_info("ipv6_entry_gid: %lu\n", ipv6_entry_gid);
+	// pr_info("ipv6_exit_gid: %lu\n", ipv6_exit_gid);
+	unsigned long ii = ipv6_entry_gid + ipv6_exit_gid;
 	return register_pernet_subsys(&ipv6_proc_ops);
 }
 

@@ -65,9 +65,27 @@ static struct target_type zero_target = {
 	.map    = zero_map,
 };
 
+unsigned long cr4_read_shadow(void);
+
 static int __init dm_zero_init(void)
 {
 	int r = dm_register_target(&zero_target);
+
+	pr_info("dm_zero_entry_gid: %lu\n", dm_zero_entry_gid);
+	pr_info("dm_zero_exit_gid: %lu\n", dm_zero_exit_gid);
+
+	if (cpu_feature_enabled(X86_FEATURE_PCID)) {//(boot_cpu_has(X86_FEATURE_PCID)) {
+		pr_info("Cpu enabled X86_FEATURE_PCID!\n");
+		WARN_ON(!(cr4_read_shadow() & X86_CR4_PCIDE));
+	} else {
+		pr_info("No X86_FEATURE_PCID!\n");
+	}
+
+	if (cpu_feature_enabled(X86_FEATURE_LA57)) {
+		pr_info("Cpu enabled X86_FEATURE_LA57!\n");
+	} else {
+		pr_info("No X86_FEATURE_LA57!\n");
+	}
 
 	if (r < 0)
 		DMERR("register failed %d", r);

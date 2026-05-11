@@ -6,6 +6,7 @@
 #include <linux/swapfile.h>
 #include <linux/swapops.h>
 #include <linux/kmemleak.h>
+#include <linux/hugetlb.h>
 #include <linux/sched/task.h>
 
 #include <asm/set_memory.h>
@@ -26,6 +27,7 @@
 #include <asm/pti.h>
 #include <asm/text-patching.h>
 #include <asm/memtype.h>
+#include <asm/pgalloc.h>
 
 /*
  * We need to define the tracepoints somewhere, and tlb.c
@@ -128,6 +130,17 @@ __ref void *alloc_low_pages(unsigned int num)
 	if (after_bootmem) {
 		unsigned int order;
 
+		if (cpu_feature_enabled(X86_FEATURE_PKS_MONITOR)) {
+			struct page *page;
+
+			/* 64 bit only allocates order 0 pages */
+			WARN_ON(num != 1);
+
+			page = alloc_table(GFP_ATOMIC | __GFP_ZERO);
+			if (!page)
+				return NULL;
+			return (void *)page_address(page);
+		}
 		order = get_order((unsigned long)num << PAGE_SHIFT);
 		return (void *)__get_free_pages(GFP_ATOMIC | __GFP_ZERO, order);
 	}
@@ -511,6 +524,86 @@ bool pfn_range_is_mapped(unsigned long start_pfn, unsigned long end_pfn)
 	return false;
 }
 
+#ifdef CONFIG_PKS_MONITOR
+/* Page tables needed in bytes */
+static u64 calc_tables_needed(unsigned int size)
+{
+	unsigned int puds = size >> PUD_SHIFT;
+	unsigned int pmds = size >> PMD_SHIFT;
+
+	// // Round up for small sizes
+	// if (puds == 0)
+	// 	puds = 1; 
+	// if (pmds == 0)
+	// 	pmds = 1;
+	// Fail to alloc later
+
+	/*
+	 * Catch if direct map ever might need more page tables to split
+	 * down to 4k.
+	 */
+	BUILD_BUG_ON(p4d_huge(foo));
+	BUILD_BUG_ON(pgd_huge(foo));
+
+	return (puds + pmds) << PAGE_SHIFT;
+}
+
+/*
+ * If pre boot, reserve large pages from memory that will be mapped. It's ok that this is not
+ * mapped as PKS, other init code in CPA will handle the conversion.
+ */
+static unsigned int __init reserve_pre_boot(u64 start, u64 end)
+{
+	u64 cur = memblock_phys_alloc_range(HPAGE_SIZE, HPAGE_SIZE, start, end);
+	int i;
+
+	if (!cur)
+		return 0;
+	memblock_reserve(cur, HPAGE_SIZE);
+	for (i = 0; i < HPAGE_SIZE; i += PAGE_SIZE)
+		add_dmap_table((unsigned long)__va(cur + i));
+	return HPAGE_SIZE;
+}
+
+/* If post boot, memblock is not available. Just reserve from other memory regions */
+static unsigned int __init reserve_post_boot(void)
+{
+	struct page *page = alloc_table(GFP_KERNEL);
+
+	if (!page)
+		return 0;
+
+	add_dmap_table((unsigned long)page_address(page));
+
+	return PAGE_SIZE;
+}
+
+static void __init reserve_page_tables(u64 start, u64 end)
+{
+	u64 reserve_size = calc_tables_needed(end - start);
+	u64 reserved = 0;
+	u64 cur_reserved;
+
+	while (reserved < reserve_size) {
+		if (after_bootmem)
+			cur_reserved = reserve_post_boot();
+		else
+			cur_reserved = reserve_pre_boot(start, end);
+
+		if (!cur_reserved) {
+			WARN(1, "Could not reserve direct map page tables %llu/%llu\n",
+				reserved,
+				reserve_size);
+			return;
+		}
+
+		reserved += cur_reserved;
+	}
+}
+#else
+static inline void reserve_page_tables(u64 start, u64 end) { }
+#endif
+
 /*
  * Setup the direct mapping of the physical memory at PAGE_OFFSET.
  * This runs before bootmem is initialized and gets pages directly from
@@ -535,6 +628,9 @@ unsigned long __ref init_memory_mapping(unsigned long start,
 						   prot);
 
 	add_pfn_range_mapped(start >> PAGE_SHIFT, ret >> PAGE_SHIFT);
+
+	if (cpu_feature_enabled(X86_FEATURE_PKS_MONITOR))
+		reserve_page_tables(start, end);
 
 	return ret >> PAGE_SHIFT;
 }
@@ -740,6 +836,7 @@ void __init init_mem_mapping(void)
 	unsigned long end;
 
 	pti_check_boottime_disable();
+	pks_tables_check_boottime_disable();
 	probe_page_size_mask();
 	setup_pcid();
 

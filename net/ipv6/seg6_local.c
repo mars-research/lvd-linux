@@ -2289,6 +2289,9 @@ int __init seg6_local_init(void)
 	 * behavior attributes and the maximum number of defined attributes
 	 * exceeds the allowed value.
 	 */
+	// pr_info("ipv6_entry_gid: %lu\n", ipv6_entry_gid);
+	// pr_info("ipv6_exit_gid: %lu\n", ipv6_exit_gid);
+	unsigned long ii = ipv6_entry_gid + ipv6_exit_gid;
 	BUILD_BUG_ON(SEG6_LOCAL_MAX + 1 > BITS_PER_TYPE(unsigned long));
 
 	/* If the default NEXT-C-SID Locator-Block/Node Function lengths (in

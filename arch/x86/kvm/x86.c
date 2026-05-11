@@ -58,6 +58,8 @@
 #include <linux/mem_encrypt.h>
 #include <linux/entry-kvm.h>
 #include <linux/suspend.h>
+#include <linux/ptrace.h>
+#include <linux/sched/task_stack.h>
 
 #include <trace/events/kvm.h>
 
@@ -1002,7 +1004,11 @@ void kvm_load_guest_xsave_state(struct kvm_vcpu *vcpu)
 	    vcpu->arch.pkru != vcpu->arch.host_pkru &&
 	    ((vcpu->arch.xcr0 & XFEATURE_MASK_PKRU) ||
 	     kvm_read_cr4_bits(vcpu, X86_CR4_PKE)))
+#ifdef CONFIG_PKK
+		current_pt_regs()->pkru = vcpu->arch.pkru;
+#else /* !CONFIG_PKK */
 		write_pkru(vcpu->arch.pkru);
+#endif /* CONFIG_PKK */
 #endif /* CONFIG_X86_INTEL_MEMORY_PROTECTION_KEYS */
 }
 EXPORT_SYMBOL_GPL(kvm_load_guest_xsave_state);
@@ -1018,7 +1024,11 @@ void kvm_load_host_xsave_state(struct kvm_vcpu *vcpu)
 	     kvm_read_cr4_bits(vcpu, X86_CR4_PKE))) {
 		vcpu->arch.pkru = rdpkru();
 		if (vcpu->arch.pkru != vcpu->arch.host_pkru)
+#ifdef CONFIG_PKK
+			current_pt_regs()->pkru = vcpu->arch.host_pkru;
+#else /* !CONFIG_PKK */
 			write_pkru(vcpu->arch.host_pkru);
+#endif /* CONFIG_PKK */
 	}
 #endif /* CONFIG_X86_INTEL_MEMORY_PROTECTION_KEYS */
 

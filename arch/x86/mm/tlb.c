@@ -274,7 +274,7 @@ static inline void invalidate_user_asid(u16 asid)
 		  (unsigned long *)this_cpu_ptr(&cpu_tlbstate.user_pcid_flush_mask));
 }
 
-static void load_new_mm_cr3(pgd_t *pgdir, u16 new_asid, bool need_flush)
+void load_new_mm_cr3(pgd_t *pgdir, u16 new_asid, bool need_flush)
 {
 	unsigned long new_mm_cr3;
 
@@ -292,6 +292,9 @@ static void load_new_mm_cr3(pgd_t *pgdir, u16 new_asid, bool need_flush)
 	 */
 	write_cr3(new_mm_cr3);
 }
+// #ifdef CONFIG_ASID_SWITCH4PKS
+// EXPORT_SYMBOL(load_new_mm_cr3);
+// #endif /* CONFIG_ASID_SWITCH4PKS */
 
 void leave_mm(int cpu)
 {
